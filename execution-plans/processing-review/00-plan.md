@@ -82,6 +82,27 @@ judged by route: a model the app bundles or downloads for any user needs a licen
 runs on their own cluster through our kit may carry a research or non-commercial licence, stated plainly in the
 kit (owner, 2026-10-20).
 
+## Every stage against every compute route
+
+Owner, 2026-10-20: keep every compute route in view for every stage. The gap audit fills this matrix, and each
+stage's decision note gives a recommendation, or says "none found" with the search behind it, in every cell.
+
+Routes:
+
+- R1. On the Mac, built in: Apple Vision, Core ML, Foundation Models; no download beyond the app.
+- R2. On the Mac, open weights: MLX, llama.cpp, ONNX, LM Studio or Ollama, by memory tier (16, 32, 64 GB and up).
+- R3. Cheap API: OpenRouter and similar hosts of open-weight models.
+- R4. Premium API: Gemini, Claude, OpenAI, Mistral, with batch discounts.
+- R5. Subscriptions through a local agent CLI: the Claude and ChatGPT plans, no per-call money.
+- R6. Commercial document services: Google Document AI, Azure Document Intelligence, Textract, Extend, Transkribus.
+- R7. A cluster: Sherlock (design target), FarmShare, any Slurm cluster; large models, GPU-only methods, training.
+- R8. Hybrids: cascades and routers across R1-R7 (cheap or local first, escalate on low confidence or failure),
+  and work split by stage (for example layout on the Mac, reading on the cluster).
+
+Stages: image preparation for the reading copy (crop, deskew, dewarp); enhancement as OCR input only; layout and
+reading order; OCR and HTR; text placement on the image; marks (annotations, stamps, signatures); page-stream
+segmentation and enclosure relations; dating; entities; training a model on the user's own photographs.
+
 ## Phase 0 — housekeeping (interactive)
 
 - Done 2026-10-20: one gate, `W46.review-done`, on every processing item; the Processor UI items freed from the
