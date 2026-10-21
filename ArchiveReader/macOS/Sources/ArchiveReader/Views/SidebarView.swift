@@ -40,8 +40,8 @@ struct SidebarView: View {
                 .onMove { from, to in model.savedSearches.move(fromOffsets: from, toOffset: to) }
             } header: {
                 HStack {
-                    Text("Smart Folders")
-                    Spacer()
+                    Text("Smart Folders").lineLimit(1)
+                    Spacer(minLength: 0)   // the header ran 3 pt past its 190-pt cell (W40.fix-reader-narrow-window)
                     Button { model.showingSaveDialog = true } label: { Image(systemName: "plus") }
                         .buttonStyle(.plain)
                         .help("Save the current filters as a smart folder")

@@ -341,95 +341,125 @@ struct NavigationWindowView: View {
 
     // MARK: Filter bar
 
+    /// The filter bar's controls need about 860 pt in one row, which a 900-pt window with its sidebar cannot give
+    /// the content column. An HStack that wide overflowed and was centred, pushing the sidebar off the window's
+    /// left edge and the needs-attention toggle off its right (W40.fix-reader-narrow-window). So the bar wraps:
+    /// one row when it fits, two when not, three when the sidebar is dragged wide as well.
     private var filterBar: some View {
-        HStack(spacing: 12) {
-            Picker("Read state", selection: $model.filter.read) {
-                Text("All").tag(ReadFilter.all)
-                Text("Unread").tag(ReadFilter.unread)
-                Text("Read").tag(ReadFilter.read)
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 12) {
+                filterBarQueryControls
+                filterBarSearchControls
+                Spacer()
+                filterBarTrailingButtons
             }
-            .pickerStyle(.segmented)
-            .fixedSize()
-            .labelsHidden()
-            .help("Filter the list by read state")
-            .accessibilityIdentifier("ar.filter.readState")
-
-            HStack(spacing: 4) {
-                ForEach([3, 2, 1], id: \.self) { q in
-                    Toggle("Q\(q)", isOn: Binding(
-                        get: { model.filter.qualities.contains(q) },
-                        set: { on in
-                            if on { model.filter.qualities.insert(q) } else { model.filter.qualities.remove(q) }
-                        }))
-                    .toggleStyle(.button)
-                    .controlSize(.small)
-                    .help("Show only documents at quality Q\(q)")
-                    .accessibilityIdentifier("ar.filter.quality.Q\(q)")
-                }
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 12) { filterBarQueryControls; Spacer(minLength: 0) }
+                HStack(spacing: 12) { filterBarSearchControls; Spacer(); filterBarTrailingButtons }
             }
-
-            subjectFilterField
-
-            // W37: a compact button (the bar is already full at narrow widths); the range lives in a popover.
-            Button { showingDateFilter = true } label: {
-                if let years = model.filter.dateYearsSummary {
-                    Label(years, systemImage: "calendar")
-                } else {
-                    Label("Dates", systemImage: "calendar").labelStyle(.iconOnly)
-                }
-            }
-            .controlSize(.small)
-            .fixedSize()
-            .help("Filter by year: matches a document's own date or the date of the letter it was sent with")
-            .accessibilityIdentifier("ar.filter.dates")
-            .popover(isPresented: $showingDateFilter) { dateFilterPopover }
-
-            TextField("Filter file name…", text: $model.filterSearchText)
-                .textFieldStyle(.roundedBorder)
-                .frame(minWidth: 90, maxWidth: 160)   // a full bar must not squeeze it to nothing
-                .help("Filter the list by file name")
-                .accessibilityIdentifier("ar.filter.name")
-
-            HStack(spacing: 3) {
-                Image(systemName: "text.magnifyingglass").foregroundStyle(model.ftsPaths != nil ? Color.accentColor : .secondary)
-                TextField("Search OCR text…", text: $model.fullTextQuery)
-                    .textFieldStyle(.roundedBorder)
-                    .frame(minWidth: 100, maxWidth: 180)
-                    .focused($searchFocused)
-                    .help("Search the full OCR text of documents")
-                    .accessibilityIdentifier("ar.filter.ocr")
-                if model.ftsPaths != nil {
-                    Button { model.fullTextQuery = ""; model.runFullTextSearch() } label: {
-                        Image(systemName: "xmark.circle.fill")
-                    }
-                    .buttonStyle(.borderless)
-                    .help("Clear full-text search")
-                    .accessibilityIdentifier("ar.filter.ocrClear")
-                }
-            }
-
-            if model.needsAttentionCount > 0 {
-                Toggle(isOn: $model.filter.needsAttentionOnly) {
-                    Label("\(model.needsAttentionCount) need attention", systemImage: "exclamationmark.triangle")
-                }
-                .toggleStyle(.button)
-                .controlSize(.small)
-                .help("Show only non-standard PDFs — files that couldn't be opened, or have no selectable text")
-                .accessibilityIdentifier("ar.filter.needsAttention")
-            }
-
-            Spacer()
-
-            if model.filter.isActive || model.filterSearchText.trimmingCharacters(in: .whitespaces) != "" || model.ftsPaths != nil {
-                Button("Save as Smart Folder") { model.showingSaveDialog = true }
-                    .help("Save these filters as a smart folder in the sidebar")
-                    .accessibilityIdentifier("ar.filter.saveSmartFolder")
-                Button("Clear") { model.clearUserFilters() }
-                    .help(model.scope != nil ? "Clear user filters (return to smart folder)" : "Clear all filters and searches")
-                    .accessibilityIdentifier("ar.filter.clear")
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 12) { filterBarQueryControls; Spacer(minLength: 0) }
+                HStack(spacing: 12) { filterBarSearchControls; Spacer(minLength: 0) }
+                HStack(spacing: 12) { Spacer(); filterBarTrailingButtons }
             }
         }
         .padding(8)
+    }
+
+    /// Read state, quality, tags and dates: what the documents are.
+    @ViewBuilder
+    private var filterBarQueryControls: some View {
+        Picker("Read state", selection: $model.filter.read) {
+            Text("All").tag(ReadFilter.all)
+            Text("Unread").tag(ReadFilter.unread)
+            Text("Read").tag(ReadFilter.read)
+        }
+        .pickerStyle(.segmented)
+        .fixedSize()
+        .labelsHidden()
+        .help("Filter the list by read state")
+        .accessibilityIdentifier("ar.filter.readState")
+
+        HStack(spacing: 4) {
+            ForEach([3, 2, 1], id: \.self) { q in
+                Toggle("Q\(q)", isOn: Binding(
+                    get: { model.filter.qualities.contains(q) },
+                    set: { on in
+                        if on { model.filter.qualities.insert(q) } else { model.filter.qualities.remove(q) }
+                    }))
+                .toggleStyle(.button)
+                .controlSize(.small)
+                .help("Show only documents at quality Q\(q)")
+                .accessibilityIdentifier("ar.filter.quality.Q\(q)")
+            }
+        }
+        .fixedSize()   // squeezed, the chips collapse to "…" pills
+
+        subjectFilterField
+
+        // W37: a compact button (the bar is already full at narrow widths); the range lives in a popover.
+        Button { showingDateFilter = true } label: {
+            if let years = model.filter.dateYearsSummary {
+                Label(years, systemImage: "calendar")
+            } else {
+                Label("Dates", systemImage: "calendar").labelStyle(.iconOnly)
+            }
+        }
+        .controlSize(.small)
+        .fixedSize()
+        .help("Filter by year: matches a document's own date or the date of the letter it was sent with")
+        .accessibilityIdentifier("ar.filter.dates")
+        .popover(isPresented: $showingDateFilter) { dateFilterPopover }
+    }
+
+    /// File name, OCR text and the needs-attention toggle: finding documents by what they contain.
+    @ViewBuilder
+    private var filterBarSearchControls: some View {
+        TextField("Filter file name…", text: $model.filterSearchText)
+            .textFieldStyle(.roundedBorder)
+            .frame(minWidth: 90, maxWidth: 160)   // a full bar must not squeeze it to nothing
+            .help("Filter the list by file name")
+            .accessibilityIdentifier("ar.filter.name")
+
+        HStack(spacing: 3) {
+            Image(systemName: "text.magnifyingglass").foregroundStyle(model.ftsPaths != nil ? Color.accentColor : .secondary)
+            TextField("Search OCR text…", text: $model.fullTextQuery)
+                .textFieldStyle(.roundedBorder)
+                .frame(minWidth: 100, maxWidth: 180)
+                .focused($searchFocused)
+                .help("Search the full OCR text of documents")
+                .accessibilityIdentifier("ar.filter.ocr")
+            if model.ftsPaths != nil {
+                Button { model.fullTextQuery = ""; model.runFullTextSearch() } label: {
+                    Image(systemName: "xmark.circle.fill")
+                }
+                .buttonStyle(.borderless)
+                .help("Clear full-text search")
+                .accessibilityIdentifier("ar.filter.ocrClear")
+            }
+        }
+
+        if model.needsAttentionCount > 0 {
+            Toggle(isOn: $model.filter.needsAttentionOnly) {
+                Label("\(model.needsAttentionCount) need attention", systemImage: "exclamationmark.triangle")
+            }
+            .toggleStyle(.button)
+            .controlSize(.small)
+            .help("Show only non-standard PDFs — files that couldn't be opened, or have no selectable text")
+            .accessibilityIdentifier("ar.filter.needsAttention")
+        }
+    }
+
+    @ViewBuilder
+    private var filterBarTrailingButtons: some View {
+        if model.filter.isActive || model.filterSearchText.trimmingCharacters(in: .whitespaces) != "" || model.ftsPaths != nil {
+            Button("Save as Smart Folder") { model.showingSaveDialog = true }
+                .help("Save these filters as a smart folder in the sidebar")
+                .accessibilityIdentifier("ar.filter.saveSmartFolder")
+            Button("Clear") { model.clearUserFilters() }
+                .help(model.scope != nil ? "Clear user filters (return to smart folder)" : "Clear all filters and searches")
+                .accessibilityIdentifier("ar.filter.clear")
+        }
     }
 
     private var dateFilterPopover: some View {

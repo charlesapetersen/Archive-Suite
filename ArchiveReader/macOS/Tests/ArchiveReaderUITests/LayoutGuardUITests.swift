@@ -16,19 +16,7 @@ final class LayoutGuardUITests: FixtureUITestCase {
         sweepMainScreens(appearance: "dark")
     }
 
-    /// At its 900-pt minimum width the navigation window pushes the sidebar's scroll view about 50 pt off the
-    /// window's left edge, the "Smart Folders" header overruns its cell, and the filter bar runs past the right
-    /// edge, taking the needs-attention toggle with it (VM, 2026-10-11). Its fix deletes this entry.
-    private let narrowWindow = LayoutGuard.KnownIssue(tag: "W40.fix-reader-narrow-window") {
-        let v = $0
-        let insideVertically = v.frame.minY >= v.bounds.minY - 2 && v.frame.maxY <= v.bounds.maxY + 2
-        return (v.kind == .window && v.type == .scrollView && v.frame.minX < v.bounds.minX && insideVertically)
-            || (v.kind == .window && v.identifier == "ar.filter.needsAttention" && v.frame.maxX > v.bounds.maxX)
-            || (v.kind == .container && v.label == "Smart Folders")
-    }
-
     /// The preview sheet is 940×700 over a 900×612 window, so it overhangs it on every side (VM, 2026-10-11).
-    /// The sheet's sweep reads the whole window, so it sees `narrowWindow` behind the sheet as well.
     private let oversizeSheet = LayoutGuard.KnownIssue(tag: "W40.fix-reader-preview-sheet-oversize") {
         $0.kind == .window && $0.type == .sheet
     }
@@ -54,14 +42,13 @@ final class LayoutGuardUITests: FixtureUITestCase {
         let main = app.windows["Archive Reader"]
         waitForRows(minimum: 3, timeout: 10)
         clickRow(0)
-        LayoutGuard.sweep(main, screen: "navigation window, \(appearance)", in: self, known: [narrowWindow],
-                          ignore: isPDFPage)
+        LayoutGuard.sweep(main, screen: "navigation window, \(appearance)", in: self, ignore: isPDFPage)
 
         toolbarButton("ar.toolbar.preview").click()
         let open = app.buttons["ar.preview.open"]
         XCTAssertTrue(open.waitForExistence(timeout: 5), "the preview sheet should open")
         LayoutGuard.sweep(main, screen: "preview sheet, \(appearance)", in: self, resize: false,
-                          known: [oversizeSheet, narrowWindow], ignore: isPDFPage)
+                          known: [oversizeSheet], ignore: isPDFPage)
 
         open.click()
         let viewer = app.windows.matching(NSPredicate(format: "title != %@", "Archive Reader")).firstMatch
