@@ -14,13 +14,17 @@ words**.
 ## Prime directive — file safety
 
 - Archive Notes writes **only its own store** (UUID-folder Markdown + assets under
-  `~/Library/Application Support/ArchiveNotes/`). The archive **corpus is read-only** — durable-link
-  resolution and page rendering only; never a tag write, move, rename, or delete on a corpus file.
+  `Application Support/ArchiveNotes/Store` inside the app's sandbox container,
+  `~/Library/Containers/com.archivenotes.app/Data/Library/…`). The archive **corpus is read-only** — durable-link
+  resolution and page rendering only; never a tag write, move, rename, or delete on a corpus file. (The
+  code guarantees this, not the OS: a granted archive folder is writable from Notes' sandbox.)
 - The **only** Finder-tag writer is `NotesTagProjector`, which mirrors a note's front-matter subjects,
   canonical Quality (`Q1`–`Q3`; 0/unrated has no Q tag), and date into the existing
   Year/Month/Day/Decade facets on that note's **own** `.md` file via
   `ArchiveCore.CoordinatedTagWriter` — never onto corpus PDFs. Front matter remains authoritative, and
-  Notes records only facets it actually introduces so a matching third-party Finder tag stays untouched.
+  Notes records only the date facets it actually introduces so a matching third-party date tag stays
+  untouched. `Q1`–`Q3` are always Notes' own: a hand-applied `Q` tag that front-matter does not hold is
+  replaced or removed on the note's next save.
 - Never test against the real store or corpus — scratch/`mktemp`/`TESTOUT` output only. Full protocol:
   [GUI_SAFETY.md](GUI_SAFETY.md).
 
@@ -101,7 +105,8 @@ store or corpus** — [GUI_SAFETY.md](GUI_SAFETY.md).
 ## Architecture (short)
 
 Swift 6 · SwiftUI (+ AppKit where needed) · PDFKit · system SQLite FTS5 (no third-party deps) ·
-XcodeGen build · sandboxed to a user-granted store root (security-scoped bookmark). Depends on the
+XcodeGen build · sandboxed; the store is the container default (a user-granted store root by
+security-scoped bookmark is not wired in the UI yet — `W40.fix-notes-choose-store`). Depends on the
 shared [`ArchiveCore`](../packages/ArchiveCore) package for tags, PDF parsing, durable links, and the
 suite marker. The store is a set of UUID-folder Markdown notes (`NoteStore`), indexed into a
 disposable FTS5 cache (`NotesIndex`); folders/memberships/templates live in an

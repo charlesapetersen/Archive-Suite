@@ -4,8 +4,9 @@
 > **shipped and were deleted** (git history keeps them). **This file is RETAINED** — not as an execution plan
 > but as the **authoritative interface contract + architecture record** for the app: §2 locked design decisions,
 > §5 front-matter schema, and **§16 Interface Contract** are cited by [`ArchiveNotes/CLAUDE.md`](../../ArchiveNotes/CLAUDE.md)
-> (e.g. §16.1/§16.3/§16.4) and must stay in sync with it. (A future cleanup pass may fold §16 into
-> `ArchiveNotes/CLAUDE.md` or promote it to `SPEC/` and then delete this file — tracked in `SUITE_TODO.md`.)
+> (e.g. §16.1/§16.3/§16.4) and must stay in sync with it. **It is kept permanently** (owner decision
+> 2026-07-29): it is neither folded into `ArchiveNotes/CLAUDE.md` nor promoted to `SPEC/`, and it is exempt from the
+> delete-a-shipped-plan convention — see `ArchiveNotes/CLAUDE.md` §*`00-overview.md` is the interface spec*.
 >
 > The shipped, now-deleted wave plans (for orientation only — read the code + `ArchiveNotes/CLAUDE.md` for current truth):
 > - `00a` ArchiveCore extraction · `01` scaffold + 3-pane shell · `02` store/front-matter/virtual-folders/FTS5 ·
@@ -119,6 +120,9 @@ and `05` §per-block chips).
 ### 3.4 Zotero reference
 `{ selectLink: "zotero://select/…", itemKey, library, kind: item|attachment, citation?, fetched? }`. Item-
 level (whole note cites a Zotero source) or per-block. Multiple allowed (owner: "multiple Zotero items").
+As shipped, only an item-level ref (inspector *Attach to note*) fetches its citation, with a spinner, offline
+warning and Retry. A per-block ref (Note ▸ Attach Zotero Link…, or the clipboard banner's Attach) shows its
+stored `citation` or else its item key; only Auto-fill from Zotero fills that in.
 
 ### 3.5 Round-up
 A note whose blocks anchor several **loosely related** PDFs (not one segment), conventionally within a
@@ -126,17 +130,19 @@ single year. Modeled as an ordinary note with `roundup: true` and multiple `read
 blocks; the year constraint is a soft UI affordance (offer to set the note's date to that year), not enforced.
 
 ### 3.6 Folder & Replication (virtual — D3)
-- **Folder**: `{ id, name, parentId?, sortOrder, templateId?, kind: normal|smart }`. A user-creatable,
+- **Folder**: `{ id, name, parentId?, sortOrder, kind: normal|smart }` (no `templateId` — a folder's template
+  is a row in the assignments table, §16.4). A user-creatable,
   movable tree. `smart` folders store a saved query (keyword+tags+kind+date) and behave as a scoped root
   (mirrors Reader's shipped smart-folder-as-scope behavior).
 - **Membership (replication)**: a many-to-many `{ itemId, folderId, addedAt }`. An item shown in K folders
   has K membership rows — these are DevonThink **replicants** (one underlying file, many places). Removing a
   membership removes that replicant. **Removing the *last* membership** triggers the mandatory
-  "sole remaining instance — this will delete the note itself" confirmation, then deletes the item's folder
-  (files) after the guard (§9, `06`).
+  "sole remaining instance — this will delete the note itself" confirmation, then moves the item's folder
+  (files) to the Trash — recoverable — after the guard (§9, `06`).
 
 ### 3.7 Template
-`{ id, name, kind: note|extract, bodyMarkdown, frontmatterDefaults }`. Assigned to a folder (`Folder.templateId`);
+`{ id, name, kind: note|extract, bodyMarkdown, frontmatterDefaults }`. Assigned to a folder (a
+`template_assignments` row, §16.4);
 "New from template" inside that folder (or a child, inheriting) instantiates it. Stored as real template
 `.md` files in a `Templates/` area + a small store (see `06`).
 
@@ -149,7 +155,9 @@ it a **portable identity** (§8). Not per-file; per-root.
 ## 4. On-disk layout
 
 ```
-<NotesStore>/                         # user-chosen folder (security-scoped bookmark) OR app-default on first run
+<NotesStore>/                         # user-chosen folder (security-scoped bookmark; picker not yet wired —
+                                      #   W40.fix-notes-choose-store) OR app-default on first run:
+                                      #   <app container>/Data/Library/Application Support/ArchiveNotes/Store
   .archive-suite-root.json            # RootMarker {guid,name,kind:notes} (§8)
   items/
     7f3a9c21-…/                        # one folder per item; folder name = id (UUID)
@@ -167,9 +175,12 @@ it a **portable identity** (§8). Not per-file; per-root.
                                         #   (durable mirror of the DB organizational graph; §2, 02)
 ```
 
-- **Index DB** (disposable cache) lives *outside* the store, in `~/Library/Application
+- **Index DB** (disposable cache) lives *outside* the store, in `Application
   Support/ArchiveNotes/notes-index-v1.sqlite3` (mirrors Reader's `content-index-v2` posture). Rebuildable
   from `items/**/*.md` + `organization.json`.
+- The app is **sandboxed** (D10), so every `Application Support/ArchiveNotes/…` path here is inside the app
+  container, `~/Library/Containers/com.archivenotes.app/Data/Library/Application Support/ArchiveNotes/` — not
+  the bare `~/Library/Application Support/ArchiveNotes/`.
 - Moving computers = copy the whole `<NotesStore>/` folder; IDs, titles, memberships (`organization.json`),
   and the root marker all travel; the index rebuilds; durable links resolve after a one-time re-grant.
 
@@ -221,8 +232,10 @@ My own gloss: this cuts against the "Noyce as sole culture-setter" story…
 - **Schema evolution**: additive only; unknown keys preserved on round-trip (never dropped); `schema`
   bumped when the reader must special-case older files.
 
-The Finder-tag **mirror** (D2) writes exactly `tags` (title-cased per the shared convention), nothing else,
-via the audited projector (§9). It is regenerable from front-matter and never the source of truth.
+The Finder-tag **mirror** (D2) writes exactly the subjects in `tags` (title-cased per the shared convention),
+the `quality` facet as `Q1`–`Q3`, and the date (and the `additional_dates` sent-with date, W37) as the existing
+Year/Month/Day/Decade facets — nothing else (never `authors`) — via the audited projector (§9). It is
+regenerable from front-matter and never the source of truth.
 
 ---
 
@@ -285,8 +298,10 @@ On first grant of a Reader archive root **or** the Notes store, drop `.archive-s
   the GUID in `.archive-suite-root.json` matches the stored one → links resolve. If the GUID is unknown,
   surface "This link points at an archive root that isn't set up on this Mac — choose it?" (a guided
   re-grant), never a silent failure.
-- **Fallbacks** (in order): exact rel path → same basename elsewhere under root (offer) → "document not
-  found in the current archive" message. Never open a raw file outside the granted scope.
+- **Fallbacks** (in order): exact rel path → same basename elsewhere under root (offer — in the shipped
+  preview popover this is a message naming the found file; it has no button to preview, open or re-link it)
+  → "document not found in the current archive" message. A basename search that stopped early says it did
+  not finish ("may still be there"), never "not found". Never open a raw file outside the granted scope.
 
 ### 8.4 Reader-side additions (see `04`)
 Reader gains: `CFBundleURLTypes` (`archivereader`), an app-level deep-link **router** + `.onOpenURL`, a
@@ -299,7 +314,9 @@ up, and a link to a file that genuinely isn't there still fails honestly rather 
 **"Copy Archive Link(s)"** command
 that writes a multi-representation pasteboard item: the `archivereader://reveal…` URL(s) as plain text **plus**
 a custom-UTI JSON payload `[{link, display, page, thumbnailPNGbase64?}]` that Notes reads on paste to build
-source blocks in one step. These are **read-only w.r.t. the corpus** (Tier-1/2, no `TagWriter` change).
+source blocks in one step. The thumbnail is optional: a link pasted as plain text carries none, and Notes then
+renders the page itself when its root is already granted (`SourceBlockThumbnailRenderer`, `W9.b4`).
+These are **read-only w.r.t. the corpus** (Tier-1/2, no `TagWriter` change).
 
 ---
 
@@ -315,8 +332,10 @@ irreplaceable-data safety envelope, so it obeys **every** invariant proven in Re
 4. Verify-by-re-read (multiset-equal) before returning success.
 5. Only ever adds/removes projected subjects, Quality, and date facets; date removals use the hidden
    per-item ledger of facets Notes actually introduced, so a matching third-party Finder tag is never
-   adopted. The one-way R13d cleanup strips the exact retired `ArchiveSuite` stamp while preserving every
-   other tag.
+   adopted. **Quality is the exception:** `Q1`–`Q3` are always treated as Notes-owned, so a hand-applied
+   `Q` token that disagrees with front-matter `quality` (and is not also a subject) is replaced or removed
+   on the note's next save (`W19.q4`). The one-way R13d cleanup strips the exact retired `ArchiveSuite`
+   stamp while preserving every other tag; it runs lazily, on that note's next projection, not at launch.
 
 Because Notes writes **only its own newly-created files**, and never the Reader/Processor corpus, the blast
 radius is bounded — but the invariants are non-negotiable (Tier-2 for anything in this projector). See `08`
@@ -379,7 +398,10 @@ Differences for Notes (`02`):
 ## 12. Risk, tiers & the Prime Directives (inherited)
 
 - **File safety > everything.** Never write to a real corpus. Notes writes only its **own** store; the only
-  corpus interaction is **read-only** (durable-link resolution, page rendering, Copy-link consumption). All
+  corpus interaction is **read-only** (durable-link resolution, page rendering, Copy-link consumption).
+  That is held **by code discipline, not by the OS**: the sandbox grants `files.user-selected.read-write` and
+  the Reader-root bookmark is minted without `.securityScopeAllowOnlyReadAccess`, so a granted archive root is
+  writable from Notes — no code path may write there, and any change near one is Tier-2. All
   dev/test tag writes happen on **scratch copies** (`mktemp`), never the owner's data (memory
   `archive-test-run-safety`; Reader Prime Directive).
 - **Tier-2** (adversarial review + a functional test on scratch copies) for: the `NotesTagProjector` (§9),
@@ -421,8 +443,9 @@ Estimated bounded sub-tasks per wave are enumerated in each plan file; expect ~3
 Every wave sub-task: own worktree → clean build, no new warnings → touched-app smoke/unit tests → Tier-2
 review where §12 requires → **docs move in the same commit** (flip the `SUITE_TODO.md` Archive Notes
 checkbox, update this folder's plan/`KNOWN_ISSUES.md`) → push → remove worktree. Delete a wave plan file only
-when its wave fully ships (git keeps history); keep `00-overview.md` until the whole app ships, then fold the
-durable architecture into `ArchiveNotes/CLAUDE.md`.
+when its wave fully ships (git keeps history). `00-overview.md` itself is **kept permanently** as the interface
+spec (owner decision 2026-07-29, `ArchiveNotes/CLAUDE.md`); it was originally to be folded into
+`ArchiveNotes/CLAUDE.md` once the app shipped, and that is no longer the plan.
 
 ---
 
@@ -457,7 +480,7 @@ durable architecture into `ArchiveNotes/CLAUDE.md`.
   - `save(_ item: Item, blocks: [Block])`
   - `load(id: UUID) -> (Item, [Block])`
   - `rename(id: UUID, to title: String)` — renames `<uuid>/<Title>.md` (title=filename, D1)
-  - `delete(id: UUID)` — deletes the whole `<uuid>/` folder; **only ever called after** the last-membership guard (§3.6)
+  - `delete(id: UUID)` — moves the whole `<uuid>/` folder to the Trash (recoverable, coordinated); **only ever called after** the last-membership guard (§3.6)
   - `importAsset(_ data: Data, ext: String, into id: UUID) -> String` — writes into `<uuid>/assets/`, returns the `assets/<file>` relative path
   - `copyAssets(from: UUID, to: UUID, rewriteBodyPaths body: String) -> String` — Create-Extract asset carry-over; returns rewritten markdown
   - `metadata(for id: UUID) -> ItemMetadata?`
@@ -522,8 +545,10 @@ the W6 gap (italic-on-`date_uncertain`, authors column, and `modified` sort are 
 `Extracts` (`extractsHomeFolderId`; default membership for new extracts). Satisfies W7's `extractsHomeFolderId`.
 
 ### 16.7 PDFThumbnailer placement
-`PDFThumbnailer` (PDFKit page→image + two-tier cache, W4) lives in the **ArchiveNotes app target**, NOT
-ArchiveCore — Reader renders pages live and never needs it, so ArchiveCore stays minimal/read-side.
+*Superseded (see §17 Deviations):* `PDFThumbnailer` (page→image + two-tier cache, W4) lives in
+**ArchiveCore `Thumbnails/`**, rendered through CoreGraphics/ImageIO with no AppKit (W9.c3). The original
+plan put it in the ArchiveNotes app target to keep ArchiveCore minimal; Notes reaches it through
+`SourceBlockThumbnailRenderer`.
 
 ### 16.8 archivenotes:// grammar (canonical)
 `archivenotes://open?id=<UUID>` with optional `#block-<n>`. §6's block-header `note:` example uses this exact

@@ -276,7 +276,9 @@ The metadata inspector now adds/removes normalized subjects. Every delta saves a
 and projects Finder tags through `NotesTagProjector`, preserving third-party tags, Finder label, current
 date/Quality facets, and concurrent body/title/tag edits. If the independent Finder projection fails after
 YAML saves, an item-local pending-subject record retains removal ownership across relaunch; Retry replays
-the same idempotent add/remove instead of falsely reporting a discarded edit as successful.
+the same idempotent add/remove instead of falsely reporting a discarded edit as successful. The Retry button
+itself lasts only for the session (view state): after a relaunch the user repeats the edit, which still
+removes the old subjects because of that record. Nothing retries automatically (ledger row N-17, `W40.b5`).
 
 **Tier-2 verification:** independent adversarial review found and closed a subject-to-date ownership leak,
 a lost failed-edit retry, padded-subject normalization, and failed-rename display drift. Scratch tests cover

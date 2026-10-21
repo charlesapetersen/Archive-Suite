@@ -7,15 +7,25 @@ this file is authoritative for Notes‑specific work.
 
 ## Core Directive — file safety
 
-- Notes writes **only its own store** (UUID‑folder Markdown+assets under
-  `~/Library/Application Support/ArchiveNotes/`). The archive corpus is **read‑only** — durable‑link
-  resolution and page rendering only; no tag writes, no moves, no deletes on corpus files.
+- Notes writes **only its own store** (UUID‑folder Markdown+assets under `Application Support/ArchiveNotes/Store`
+  — the app is sandboxed, so that is inside its container,
+  `~/Library/Containers/com.archivenotes.app/Data/Library/Application Support/ArchiveNotes/`, not the bare
+  `~/Library/Application Support/ArchiveNotes/`; a user-picked store is not wired yet —
+  `W40.fix-notes-choose-store`). The archive corpus is **read‑only** — durable‑link
+  resolution and page rendering only; no tag writes, no moves, no deletes on corpus files. ⚠️ That holds **by
+  code discipline, not by the OS**: the sandbox has `files.user-selected.read-write` and `ReaderRootStore`
+  mints the Reader-root bookmark without `.securityScopeAllowOnlyReadAccess`, so a granted archive root *is*
+  writable from Notes. Nothing may write there; treat any code near a corpus URL as Tier-2.
 - The **only** Finder‑tag writer is `NotesTagProjector` (W2), which mirrors title-cased front‑matter
   `tags` (subjects), the canonical Quality facet `Q1`–`Q3`, **and date into the existing
   Year/Month/Day/Decade facets** onto the note's own `.md` file via `ArchiveCore.CoordinatedTagWriter` —
   never onto corpus PDFs. Front-matter remains authoritative: `quality` 0/unrated writes no Q tag,
   invalid dates/quality values invent no tag, and a date update removes only facets recorded in the
-  item-local ledger as actually introduced by Notes. `authors` stay **front‑matter‑only** (authoritative,
+  item-local ledger as actually introduced by Notes. **Quality has no such ledger:** `Q1`–`Q3` are always
+  treated as Notes-owned, so a hand-applied `Q` token that front-matter does not hold (and that is not also a
+  subject) is replaced or removed on the note's next save (`W19.q4`, "replaces stale Q"). The sent-with date
+  (`W37`) projects into the same date facets and ledger. The retired `ArchiveSuite` stamp is stripped lazily,
+  on a note's next projection, not at launch. `authors` stay **front‑matter‑only** (authoritative,
   durable plain-text YAML); an author facet
   remains a deferred owner decision. This adds no Finder vocabulary beyond the shared subject, Quality,
   and date contract (overview decisions **D2/D4/D9**).
@@ -40,7 +50,8 @@ this file is authoritative for Notes‑specific work.
   replicated membership, embedded Reader corpus) and prints its path for the app's `#if DEBUG`
   `-ANUITestStorePath` override; `scripts/gui-drive-notes.sh` is the sourced cliclick/osascript drive
   library (scratch-only; reads tags to assert, never drives the store picker — **host-only, so unattended
-  sessions are blocked from it**). The `ArchiveNotesUITests` XCUITest suite (G0–G17 catalog) runs **off-screen in the
+  sessions are blocked from it**). The `ArchiveNotesUITests` XCUITest suite (G0–G17 catalog, plus G18–G20 and the
+  `NotesE2*Tests`, journey, layout, visual-review and accessibility classes beyond it) runs **off-screen in the
   Tart VM** — it joined the VM lane on 2026-07-30, so it is part of the periodic health gate
   (`AUTONOMOUS_GUI_VM_APPS="reader notes"`) and the fixture is built inside the VM on demand.
   **README + check catalog + the owner-eye checks (G2 typing, G6/G11
@@ -339,8 +350,14 @@ macOS/Sources/ArchiveNotes/
                                    Title/DateDisplay/Kind + weak notesModel) + EditorFormatting actions
                                    (bold/italic/code/link/heading/list/blockquote/code-block/indent/
                                    outdent) + insertTestBlock + pasteSourceBlocks + createExtract/
-                                   appendToExtract + makeNotePassageSource (W7-S2) + FocusedValue key
-    FormattingToolbar.swift        SwiftUI toolbar reflecting + driving formatting state
+                                   appendToExtract + makeNotePassageSource (W7-S2) + FocusedValue key.
+                                   indent/outdent have NO toolbar button or Format-menu item: they are
+                                   reached only from EditorTextView's Tab / Shift-Tab (outdent also from
+                                   Return or Backspace on an empty list item). A Zotero block chip shows
+                                   the ref's stored citation, else its item key — nothing fetches one for
+                                   it except Auto-fill (only NoteZoteroInspector fetches)
+    FormattingToolbar.swift        SwiftUI toolbar reflecting + driving formatting state (bold/italic/
+                                   code/link, heading menu, lists, blockquote, code block — no indent)
   Views/
     NotesBrowserView.swift         3-pane browsing shell (folder tree │ item list │ detail) for the
                                    Notes + Extracts windows (W6-S1); @AppStorage panel widths + tree
@@ -354,8 +371,9 @@ macOS/Sources/ArchiveNotes/
                                    pane swaps to TemplatesManagerView in templates mode (W6-S6). Hosts the
                                    hidden `an.status.indexReady` a11y probe the GUI harness polls (W8-S7 §3.4)
     TemplatesManagerView.swift     Per-window templates manager (shown in the item pane in templates mode):
-                                   list all templates + New/Duplicate/Rename/Delete via NotesModel; body
-                                   editing rides the (deferred) note-editor wiring (W6-S6)
+                                   list all templates + New/Duplicate/Rename/Delete via NotesModel (W6-S6);
+                                   selecting a template opens its body in the detail editor, which
+                                   autosaves it (W9.d3)
     NotesFolderTreeView.swift      Left pane — mutable id-keyed folder tree (recursive ForEach / per-level
                                    DisclosureGroup + two-way @State selection sync, Smart Folders / Folders
                                    sections, All Notes pseudo-row, context-menu create/rename/delete) (W6-S2).
@@ -391,11 +409,15 @@ macOS/Sources/ArchiveNotes/
                                    day precision the fields are typed in the item's display calendar
                                    (when Settings allows) and converted to the ISO day (W24.cal1-validator)
     NoteTagsInspector.swift        Detail add/remove subjects, retrying the exact failed delta rather
-                                   than silently dropping it (W9.b3)
+                                   than silently dropping it (W9.b3). The Retry button is per-session view
+                                   state (@State failedEdit), gone after a relaunch; what survives is
+                                   NoteStore's pending-subjects journal, so the user repeats the edit and
+                                   it still removes the old subjects. Nothing retries automatically
     NoteTitleTextField.swift       AppKit inline-title field: Return/Escape/blank semantics and
                                    identity-guarded failed-save restoration (W9.b3)
     NotesContextMenu.swift         Item-row NSMenu builder (closure-trampoline): Add to Folder ▸ /
-                                   Open / Reveal / New from Template / Set Quality + confirmed whole-item Delete
+                                   Open / Reveal / Copy Link (W9.b9) / New from Template / Set Quality +
+                                   confirmed whole-item Delete
                                    (W9.d2); Add/Move folder and scoped Remove — the a11y/keyboard drag path (W6-S5)
     NotesWindowAccessor.swift      NSViewRepresentable reaching the hosting NSWindow (restore/remember
                                    window size, DV-1 pattern; Reader's WindowAccessor is private)
@@ -409,11 +431,17 @@ macOS/Sources/ArchiveNotes/
     PanelDivider.swift             Draggable divider (copied from Reader)
     NotesSettingsView.swift        ⌘, Options — Zotero section (enable / clipboard-detect / citation
                                    style / advanced host+port), @AppStorage-bound (§D.8); Dates
-                                   section "Show dates in other calendars" (W24.cal1-toggle)
+                                   section "Show dates in other calendars" (W24.cal1-toggle). Enable,
+                                   clipboard-detect and style apply at once; host+port are read only at
+                                   launch (ArchiveNotesApp builds the ZoteroClient once), so a changed
+                                   port needs a relaunch
     ThumbnailImageCache.swift      @MainActor NSCache<NSString, NSImage> (300 count / 64 MB)
     NotesPDFPaneView.swift         Notes-side PDFPaneController + PDFPaneView (read-only, no-persist)
     ReaderPreviewPopover.swift     NSPopover PDF preview via ReaderLinkResolver; degrade messages for
-                                   needsRootGrant / renamedCandidate / notFound / searchIncomplete.
+                                   needsRootGrant / renamedCandidate / notFound / searchIncomplete
+                                   (renamedCandidate is a message naming the found file — no button to
+                                   preview, open or re-link it; searchIncomplete says the search "did not
+                                   finish… may still be there").
                                    Shows the walk-free answer immediately and, when a basename search is
                                    needed, a live "N items checked" state it cancels on dismiss/re-show
                                    (PreviewSearchModel, generation-scoped so a finished search's straggler
