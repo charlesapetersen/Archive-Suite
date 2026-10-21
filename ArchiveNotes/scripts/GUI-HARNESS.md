@@ -111,6 +111,6 @@ File ▸ Choose Store Folder… (it persists over the owner's real root).
   tags to assert, never drives the store picker). Calibrate its table geometry against a
   `gui_capture_window` shot before trusting row-index clicks.
 - `macOS/Tests/ArchiveNotesUITests/` — `SmokeUITest.swift` (launch) + `NotesGUITests.swift`
-  (`NotesFixtureUITestCase` base + G0–G17).
+  (`NotesFixtureUITestCase` base + G0–G20).
 - [`../GUI_SAFETY.md`](../GUI_SAFETY.md) — the authoritative test file-safety protocol + the runtime
   DEBUG scratch-write guard.

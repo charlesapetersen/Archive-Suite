@@ -68,4 +68,6 @@ The iOS companion needs its own **iOS** OAuth client in the same project, regist
 ID `com.archiveprocessor.capture.ios`, with the same "Custom URI scheme" toggle enabled. Its client
 ID goes in `ArchiveCaptureiOS/Sources/ArchiveCaptureiOS/Net/DriveAuth.swift` and the matching
 reversed scheme in `ArchiveCaptureiOS/project.yml`. The iOS companion builds again (W40.i1),
-but its on-device OAuth flow is unverified.
+but its on-device OAuth flow is unverified, and as committed it cannot sign in: `DriveAuth.swift` holds the
+placeholder `YOUR_IOS_CLIENT_ID.apps.googleusercontent.com`, and unlike Android the sign-in button still shows
+with no real client id (not yet — `W40.i-fix-ios-drive-oauth-client`).

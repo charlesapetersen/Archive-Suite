@@ -1896,10 +1896,19 @@ doesn't exist — so the real page images stayed in the output dir, unmoved and 
 
 ---
 
-## 1. Live "Process live" rotation review skips segments restored from a legacy staging manifest
+## 1. Live "Process live" rotation review skips segments restored from a legacy staging manifest (moot: legacy manifests are refused)
 
-**Status:** ✅ **FIXED in code 2026-07-17 (W14.5 — Fix option 1).** `LiveCaptureProcessor.loadStagingManifest()`
-now migrates a legacy manifest instead of restoring it verbatim: via the new
+**Status:** ✅ **MOOT — no legacy manifest is read any more (corrected 2026-10-21, W40.b5).** There is no
+migration path: `LiveCaptureProcessor.loadStagingManifest()` (`Capture/LiveCaptureProcessor.swift:536`) decodes
+only the current, versioned `StagingManifest` and blocks recovery of anything else as "malformed or uses an
+unsupported schema" (`:570-573`), because the suite has no production material to carry forward (root
+`CLAUDE.md` §*There is no production material yet*). A legacy bare-array manifest therefore never reaches the
+rotation review at all. `migrateLegacyManifestSegments` is still in the file, but no production path calls it;
+only `LiveCaptureRecoveryTestDriver` (`:255`) does. The W14.5 record below is history: it described the loader
+of its day, not today's.
+
+**Earlier status (superseded):** ✅ **FIXED in code 2026-07-17 (W14.5 — Fix option 1).** `LiveCaptureProcessor.loadStagingManifest()`
+then migrated a legacy manifest instead of restoring it verbatim: via the new
 `migrateLegacyManifestSegments(_:sourcesPresent:)`, each legacy segment **whose source photos all still exist**
 is DROPPED (its stale staged output deleted) so the existing `activate()` resume path re-processes it from
 scratch (re-OCR + re-tag → a proper `retained` entry → the end-of-session rotation review now includes it);

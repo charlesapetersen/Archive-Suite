@@ -12106,3 +12106,26 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   job.sbatch and wave.sbatch run for real against the fake reader. Not yet run on a real cluster: the first real
   wave (W46.box-collect or the first cluster item) is its cluster check. Sherlock profile still waits for the account.
   <!-- /W46.cluster-waves -->
+- [x] **W40.b5 — correct the doc drift the ledgers found [S-M]** · §W40 — verification phase: prove the Suite works (owner-approved 2026-10-04) · SHIPPED 2026-10-21 (lane: reader,notes,processor) (uses: light)
+  Every **Drift** note and doc-against-doc bullet in `verification/reader.md`, `notes.md`, `processor.md` and
+  `capture.md` was checked against the code and the guide corrected where the code's behaviour is intended.
+  Reader (R-06, R-07, R-08, R-11, R-19, R-25/R-26, R-32, R-35): sort, read-state picker, no NOT, search as you
+  type, hard-coded marker default and no batch Retry, dead `InlineEditCells` with the ⌘I sheet as the one date
+  editor, Open in Default App in the context menu only, viewer keys and split clamp; stale test counts replaced
+  with how to count. The §12 audit ledger had shipped (`W40.audit-ledger`), so it was left as documented.
+  Notes (N-01, N-03, N-04, N-12, N-17, N-38, N-43, N-47 + 13 doc-vs-doc bullets): container store path,
+  corpus read-only by code not OS, Q1–Q3 Notes-owned, indent by Tab only, Retry is session state, Zotero
+  host/port at launch; `00-overview.md` mirror, Trash delete, kept-permanently header, no `Folder.templateId`;
+  SMOKE_TEST G-catalogue, VM lane, Dates section. Processor (P-01–P-06, P-08, P-10, P-12, P-20, P-22, P-25,
+  P-26, P-28, P-29, P-32, P-35, P-42, P-47): `TESTING.md` pypdf (Homebrew python3 only), 40 PDFs not 586,
+  the UITest bundle exists; `KNOWN_ISSUES.md` §1 now moot (legacy manifests are refused, no migration); five
+  cloud providers, gateway rotation falls back to Vision, opt-in log file, Review rotation pass. Capture
+  (C-01, C-11, C-44): pairing chooser, held photos, the iPhone no longer "deferred", iOS Drive sign-in not
+  working until `W40.i-fix-ios-drive-oauth-client`.
+  Left on purpose, each because a fix item or open suspect will change the CODE to match the promise, so the
+  promise stays with a "not yet" marker: `W40.fix-notes-choose-store`, `W40.fix-reader-read-toggle`,
+  `W40.fix-reader-sent-with-date`, `W40.i-fix-ios-pairing-generation` (C-34), suspects S-025/S-026/S-028/S-029
+  (P-17, P-22). P-30 (ChatGPT plan share) is promised only in done-records; N-25's "permanently delete" is a
+  code string. Ledger rows were not edited: their Drift notes stay as the record of what was found.
+  Noticed: `verification/processor.md` counts 18 Processor UITest methods; there are 24 today.
+  <!-- /W40.b5 -->

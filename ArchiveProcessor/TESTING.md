@@ -85,9 +85,11 @@ clicking**, via a headless hook built into the app (`Capture/ProcessFilesTestDri
   through Spotlight: `tier2_assert.py` has always used the xattr, and `TagReading.read` uses
   `url.resourceValues`. The likelier cause is the main-actor context named two bullets up. Do not delete this
   architecture on the strength of that, and do not restate the Spotlight claim as fact.
-  ⚠️ **`pypdf` is NOT installed on this machine** (measured 2026-08-06; this line used to say "present").
-  `tier2_assert.py` makes that a **hard failure** — *"pypdf not available — cannot verify PDF structure"* — so
-  `test-tier2.sh` cannot pass here at all until someone installs it.
+  ⚠️ **`pypdf` is installed only for the Homebrew `python3`** (pypdf 6.7.5, measured 2026-10-21; on 2026-08-06
+  it was missing altogether). `test-tier2.sh` calls `python3` from `PATH`, so it finds pypdf only when
+  `/opt/homebrew/bin` comes before `/usr/bin`; the system `/usr/bin/python3` has no pypdf. Without it
+  `tier2_assert.py` makes a **hard failure** — *"pypdf not available — cannot verify PDF structure"* — so check
+  `python3 -c 'import pypdf'` before blaming the app.
 - Each case launches the app with env config, waits for the marker, kills the app, asserts, and cleans up
   the pipeline's `pending_run.json` resume-state so no stale "Resume Run" prompt is left behind.
 
@@ -126,19 +128,20 @@ models. Drive the app by hand (`./launch.sh`). Each row: **do → expect**; note
   a `test_results/` ground truth to compare the app's box/folder/start/continuation calls against).
 - **Mixed collection** — one folder under `Test Files/` that includes a box photo and a folder photo
   (to exercise Red/Purple + `Unread`-last).
-- **PDF set** — a handful from the 586 `*.pdf` (pre-OCR'd / re-OCR path).
+- **PDF set** — a handful of the 40 `*.pdf` in `Test Files/DeaverLLM/` (pre-OCR'd / re-OCR path); the folder
+  was slimmed to a minimum on 2026-07-18 (`CLAUDE.md` §Test Files), so the 586 PDFs this line once counted are gone.
 
 ### 2.0 Launch & shell
 - [ ] `./launch.sh` builds-if-stale and brings up the window (confirm `pgrep -x ArchiveProcessor`).
-- [ ] The three areas are reachable: **Process Files**, **Tools**, **Live Capture**; **Settings** opens with ⌘,.
+- [ ] The three areas are reachable: **Process Files**, **Live Capture**, **Tools**; **Settings** opens with ⌘,.
 - [ ] No console crash/exception on launch; window renders (not blank).
 
 ### 2.1 Settings (⌘,) — every control, help, and gray-out
 Per the project convention, **every setting has a `?` help popover and grays out when irrelevant.**
-- [ ] **Provider** dropdown lists Anthropic / Gemini / Mistral; **Model** dropdown updates to that provider's built-ins.
+- [ ] **Provider** dropdown lists Anthropic / Gemini / Mistral / OpenAI / OpenRouter (Apple Vision, the API Gateway and the Local CLI Agent are chosen in the **OCR backend** picker); **Model** dropdown updates to that provider's built-ins (Gemini defaults to `gemini-3.8-flash`, OpenAI to `gpt-5-nano`).
 - [ ] **Thinking level** (Low/High) shows only for models that support it; grayed/hidden otherwise.
-- [ ] **API mode + key**: entering a key persists to Keychain; masked; not echoed. Switching provider swaps the key field.
-- [ ] **Use gateway** toggle: ON reveals base URL / model ID / Gateway key and **grays out** batch + LLM-rotation (unsupported on gateway path); OFF hides them.
+- [ ] **API keys**: one field per provider (Anthropic, Gemini, Mistral, OpenAI, OpenRouter, plus Gateway when **Use gateway** is on); entering a key persists to Keychain; masked; not echoed.
+- [ ] **Use gateway** toggle: ON reveals base URL / model ID / Gateway key and **grays out** batch (unsupported on gateway path); **Detect rotation** stays enabled, but an LLM rotation mode falls back to local Vision on this path; OFF hides them.
 - [ ] **Manage custom models…** adds an extra Anthropic/Gemini model ID; it then appears in the Model dropdown; persists across relaunch.
 - [ ] **Input resolution** control present + `?` popover; **Batch** toggle present + `?`; **Rotation mode** present + `?`.
 - [ ] **Tagging options** + **Live-capture mode** (Stage for later / Process live) present + `?`.
@@ -146,7 +149,7 @@ Per the project convention, **every setting has a `?` help popover and grays out
 - [ ] **Pinned cost-estimate pane** shows a 1,000-file estimate and updates when provider/model/batch change.
 
 ### 2.2 Cost estimator (Process Files)
-- [ ] Add files → estimate appears; **standard vs batch** shown side by side.
+- [ ] Add files → estimate appears; with **Batch** on (direct provider, not pre-OCRed input) **standard vs batch** shown side by side; with Batch off, standard only.
 - [ ] Estimate updates as files are added/removed and when the model changes.
 - [ ] Batch price is visibly lower than standard.
 
@@ -165,12 +168,12 @@ tagging mode **Automatic**, an output folder in the scratchpad (not inside `Test
 - [ ] **Page 1** = the original image full-page.
 - [ ] **Page 2** = header `Extracted text.`, subheader `[Provider] · [Model] · [D Month YYYY]`, then the body; **all text on a single tall page** (never overflows to page 3).
 - [ ] macOS Finder **tags applied**: year, month, subjects; **box photo → Red**, **folder photo → Purple**; **`Unread` present and applied last**.
-- [ ] A **batch log `.txt`** lists any files that produced no OCR text, with the reason.
+- [ ] With **Write a processing log file** on in Settings (off by default), a **log `.txt`** (`ArchiveProcessor_Log_<timestamp>.txt`) lists any files that produced no OCR text, with the reason.
 
 ### 2.5 Tagging modes
 For each mode, run 2 images and verify behavior (esp. the **`Unread`-last** rule):
 - [ ] **Automatic** — full segmentation + date + subjects; `Unread` stamped last.
-- [ ] **Auto date** / **Auto date + manual seg** — dates auto, seg per mode; `Unread` stamped.
+- [ ] **Auto date** — dates auto, subjects entered by you, segmentation per the chosen **Segmentation approach** (the old "Auto date + manual seg" is now Auto date with approach Manual); `Unread` stamped.
 - [ ] **Human** — you supply tags via the review UI; `Unread` stamped.
 - [ ] **No tagging** — PDFs produced, **no tags written, no `Unread`**.
 - [ ] **Copy source tags** — original file's tags copied to output, **no `Unread`**.
@@ -184,7 +187,7 @@ Continuation calls to that folder's `test_results/` ground truth.
 - [ ] Note the match rate vs. ground truth in the run log.
 
 ### 2.7 Rotation review
-- [ ] With rotation enabled, sideways/upside-down scans are flagged for rotation review and corrected in output.
+- [ ] With rotation enabled, sideways/upside-down scans are corrected in output. With **Review rotation** on as well, a separate rotation pass (radio buttons + `[`/`]`) appears before the segmentation review. Gateway, Local Agent and Mistral runs use local Vision for detection.
 
 ### 2.8 Batch mode
 - [ ] Enable **Batch**; submit a small run → app reports it's submitted for batch (lower cost, longer turnaround); results land when ready; batch log correct.
@@ -193,19 +196,20 @@ Continuation calls to that folder's `test_results/` ground truth.
 - [ ] Feed a PDF from `Test Files/*.pdf`; the app handles it (re-OCR or passthrough per design) without collision/overwrite of the input.
 
 ### 2.10 Gateway (OpenAI-compatible) — *only if you have an endpoint*
-- [ ] Turn on **Use gateway**, set base URL + model + Gateway key, run 1 image → OCR returns via the gateway; batch/rotation correctly disabled.
+- [ ] Turn on **Use gateway**, set base URL + model + Gateway key, run 1 image → OCR returns via the gateway; batch disabled, and rotation (if on) detected by local Vision rather than the LLM.
 
 ### 2.11 Custom models
 - [ ] Add a custom Gemini model ID, select it, run 1 image → it's used (visible in the page-2 subheader).
 
 ### 2.12 Tools tab
 - [ ] **Compare Models** — run 1 image across 2 cheap models; side-by-side diff renders.
-- [ ] **Test Resolution** — runs `performResolutionTestCall`; shows the resolution/cost tradeoff result.
+- [ ] **Test Resolution** — runs `performResolutionTestCall` at 10, 20, 40, 60, 80 and 100%; shows each reading's text, a similarity badge and a word diff against full size (no cost figure); adopting one sets the resolution. Disabled with no API key.
+- [ ] **Processing History** — lists past Process Files runs with provider/model, file counts and estimated cost.
 
 ### 2.13 Error handling & resilience
 - [ ] **Bad key** → clear error, no crash, no silent empty PDFs.
 - [ ] **Gemini "Recitation"** (feed a page of clearly copyrighted text) → page 2 shows `No text returned…` with the `Recitation` reason.
-- [ ] **No text returned** → `No text returned by model.` + reason; file listed in batch log.
+- [ ] **No text returned** → `No text returned by model.` + reason; file listed in the log (with **Write a processing log file** on).
 - [ ] **Network drop mid-run** → surfaced + retry/resume, not a lost file or a corrupt PDF.
 - [ ] **Interrupt a batch** partway → no half-written/overwritten outputs; safe to re-run.
 
@@ -264,8 +268,9 @@ and none of them. Each is a standalone shell driver that compiles or drives the 
 asserts externally, and needs no API key, no network and no window. Nothing here touches a real corpus.
 
 Run one directly: `ArchiveProcessor/scripts/<name>.sh`. They are the right home for any invariant that does
-not need pixels — which, given the Processor still has **no test target at all** (`project.yml` declares
-neither a unit nor a UITest bundle — SUITE_TODO `W21.vmgui-d`), is where nearly all of its coverage lives.
+not need pixels — which, given the Processor has **no unit-test target** (`project.yml` declares only the
+`ArchiveProcessorUITests` UI bundle, run off-screen in the VM by `ops/gui/vm-gui-runner.sh processor xcuitest`, and
+none of its tests starts a run), is where nearly all of its coverage lives.
 
 The four long-running report drivers (`test-recovery.sh`, `test-manifest-persistence.sh`,
 `test-merge-safety.sh`, and `test-batch-resume.sh`) share one bounded report waiter: 180 seconds for the
@@ -481,7 +486,7 @@ smoke test if the OCR/tagging/PDF path changed. Cut the release only after it co
 | `Gemini` | `gemini-2.5-flash-lite` | `…/models/<m>:generateContent?key=` inline_data | may refuse copyrighted text → `Recitation` |
 | `Mistral` | `mistral-ocr-latest` | `POST /v1/ocr` image_url data URI | returns **markdown** |
 | `Anthropic` | `claude-sonnet-4-6` | messages API, image block | use only when Anthropic path must be tested |
-| `Gateway` | (your model) | OpenAI-compatible `chat/completions` | no batch / no rotation |
+| `Gateway` | (your model) | OpenAI-compatible `chat/completions` | no batch / no LLM rotation (falls back to local Vision) |
 
 Read a key manually (will prompt once): `security find-generic-password -s com.archiveprocessor.app -a Gemini -w`
 

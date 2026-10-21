@@ -8,29 +8,30 @@ The app has three areas, selectable at the top of the window, plus a native Sett
 
 - **Process Files** — drop in images (or a folder) and run OCR + tagging + organization as a batch.
 - **Live Capture** — photograph documents with an **Android or iPhone** companion app and stream them to the Mac; optionally OCR/tag/PDF **each segment as you shoot** so processing finishes with capture.
-- **Tools** — one-off diagnostics: compare OCR across models, and test how image resolution affects OCR.
+- **Tools** — one-off diagnostics: compare OCR across models, test how image resolution affects OCR, and look back over past runs.
 - **Settings (⌘,)** — all durable settings (provider, model, API key, rotation, tagging options, live-capture mode) in one place, with a live cost estimate for 1,000 files that updates as you change settings.
 
 ## Features
 
 ### Cloud and on-device OCR
 
-Process scanned images through any of four cloud LLM providers or the free, local Apple Vision backend:
+Process scanned images through any of five cloud LLM providers or the free, local Apple Vision backend:
 
 | Provider | Models | Thinking Mode | Batch Processing |
 |----------|--------|---------------|------------------|
 | **Anthropic** | Claude Sonnet 4.6, Claude Opus 4.6 | Low / High | Yes |
-| **Google Gemini** | 3.1 Flash Lite (default), 3.5 Flash, 3.1 Pro, 3 Flash Preview, 2.5 Pro, 2.5 Flash, 2.5 Flash Lite | Low / High | Yes |
+| **Google Gemini** | 3.8 Flash (default), 3.5 Flash Lite, 3.1 Flash Lite, 3.5 Flash, 3.1 Pro, 3 Flash Preview, 2.5 Flash, 2.5 Flash Lite, 2.5 Pro | Low / High | Yes |
 | **Mistral** | Mistral OCR 3 | — | Yes |
 | **OpenAI (ChatGPT)** | GPT-5 nano (default), GPT-5 mini, GPT-5.4 mini, GPT-5.4, GPT-5.5 | Low / High (reasoning models) | — |
+| **OpenRouter** | Qwen3-VL 235B (default), Qwen3.6 27B, GLM-5.3 Flash — each pinned to one host | — | — |
 | **Apple Vision** | macOS Vision | — | — |
 
 - Also supports an **OpenAI-compatible API Gateway** (custom base URL + model ID) for self-hosted or proxied endpoints, with user-supplied pricing for cost estimates — including a one-click **"Fill in OpenAI preset"** that prefills OpenAI's public endpoint, model, and pricing (a custom base URL then covers **Azure OpenAI** / proxies)
-- Or a **Local Agent CLI backend** — for an enterprise/subscription **Claude Code**, **Gemini CLI**, or **OpenAI Codex** entitlement with **no API key**: pick *Local CLI Agent* in Settings, point it at the installed CLI, and OCR runs through your existing subscription login (a guided *Set up* wizard + *Detect & Verify* check are built in). Batch mode is skipped on this path; cost shows "Included in your subscription — usage limits apply."
+- Or a **Local Agent CLI backend** — for an enterprise/subscription **Claude Code**, **Gemini CLI**, or **OpenAI Codex** entitlement with **no API key**: pick *Local CLI Agent* in Settings, point it at the installed CLI, and OCR runs through your existing subscription login (a guided *Set up* wizard for Claude Code and Gemini CLI, and a *Detect & Verify* check, are built in; Codex is chosen in the Settings tool picker). Only Claude Code has been checked end to end so far. Batch mode is skipped on this path; cost shows "Included in your subscription — usage limits apply."
 - Or choose **Apple Vision (on this Mac)** in Settings for free, on-device transcription with no API key or network request. It uses the Mac's performance cores and exposes language, fast-recognition, confidence, and custom-vocabulary controls. With **Use an LLM for text-only judgement** off, choose **No tagging** or **Copy source file tags** for a fully offline, fully free run. Turn it on to send only Vision's extracted text (never the image) to a separately selected direct LLM for classification, dates, segmentation, and generated tags. Vision is strongest on clean typescript and weaker on handwriting or heavily skewed scans, where cloud vision-language models can be preferable, so it remains an added backend rather than the default.
 - Switch providers and models at any time (in **Settings**)
 - API keys stored securely in macOS Keychain
-- Cost estimation displayed before processing (standard and batch pricing)
+- Cost estimation displayed before processing (standard pricing, and batch pricing too when batch mode is on)
 - Custom OCR prompts — append additional instructions to the default OCR prompt
 - Image resolution scaling — **size-based** (target a fraction of a standard image size; see below) to lower API cost and time, downscaling large files more
 
@@ -38,11 +39,14 @@ Process scanned images through any of four cloud LLM providers or the free, loca
 
 You bring your own API keys, and the app makes that easy. A **first-run wizard** (and a **Set up keys**
 button in Settings) walks you through creating and pasting a **free** Gemini or Mistral key — both
-providers offer an OCR-capable free tier with **no credit card required** — or a pay-as-you-go **OpenAI** key:
+providers offer an OCR-capable free tier with **no credit card required** — or a pay-as-you-go **Anthropic**
+or **OpenAI** key (an OpenRouter key is pasted straight into Settings):
 
 - Step-by-step instructions with the exact console page to open for each provider
-- Paste-and-validate: each key is format-checked, then confirmed with a live call (a synthetic
-  sample-OCR test) before it's saved — so a mistyped or wrong-provider key is caught immediately
+- Paste-and-validate: a key that doesn't look right gets a warning, and **Validate key** confirms it with a
+  cheap live call to the provider (no page is read) and saves it once it passes — so a mistyped or
+  wrong-provider key is caught immediately. A separate **Test OCR on a sample page** button then reads one
+  synthetic page, if you want to see it work
 - Per-provider status chips in Settings show at a glance which keys are set and working
 - Keys are stored only in the macOS Keychain — never in code, config files, or logs
 
@@ -59,9 +63,9 @@ When enabled, continuation pages are merged into a single PDF with their documen
 
 ### Image Orientation Correction
 
-The LLM detects if images are rotated sideways or upside down. Output PDFs always show correctly oriented images. For folder photographs, orientation is based on the folder tab rather than document text.
+The LLM detects if images are rotated sideways or upside down, and output PDFs show them upright. For folder photographs, orientation is based on the folder tab rather than document text. Mistral, an API Gateway and the Local Agent have no LLM rotation check, so with them the app uses the Mac's own detector, which is less accurate; it does the same if the LLM check fails. Detection can also be set to the Mac's detector only, or off.
 
-Users can manually correct rotation during the segmentation review dialog — radio buttons for 0°, 90°, 180°, 270° with live thumbnail preview. Keyboard shortcuts (`[`/`]`) rotate the focused image in 90° increments.
+To check rotation by hand, turn on **Review rotation** in Settings (it needs a detection mode). It is its own short pass, before the segmentation review: radio buttons for 0°, 90°, 180°, 270° with live thumbnail preview, and `[`/`]` rotate the focused image in 90° increments.
 
 ### Document Classification
 
@@ -72,13 +76,14 @@ Every image is automatically classified as one of:
 - **Document Start** — first page of a new document
 - **Document Continuation** — subsequent page of the same document
 
-Mistral (which uses a dedicated OCR endpoint without prompt support) classifies via text heuristics instead.
+Mistral (which uses a dedicated OCR endpoint without prompt support) classifies via text heuristics instead; for pre-OCRed PDFs it uses a short text-only Mistral chat call. Apple Vision returns no classification unless its text-only LLM judgement is turned on.
 
 ### Previous-page image context
 
 Optionally send the **previous page's image** alongside the current one to improve classification
-(box / folder / document continuation). This applies to the LLM-segmenting providers (Gemini, Anthropic),
-roughly doubles per-image cost, and **keeps OCR running in parallel**. (An earlier free-text
+(box / folder / document continuation). It is used only when the OCR model's own page labels segment the run
+(Automatic tagging with Manual segmentation), and not for pre-OCRed input; it roughly doubles per-image cost and
+**keeps OCR running in parallel**. (An earlier free-text
 "previous text context" slider was removed; OCR always runs in parallel now, across a configurable worker
 pool — *Settings › Parallel OCR workers*, default 4.)
 
@@ -152,8 +157,8 @@ new, billable request.
 
 ### Automatic Retry
 
-- **Auto-retry:** Files that fail due to rate limits or server overload (429, 503, 529) are automatically retried with exponential backoff
-- **User retry dialog:** After auto-retry, remaining failures prompt a dialog where you can retry with a different provider/model/API key. The retry loop continues until all files succeed or you choose to continue.
+- **Auto-retry:** a rate-limited request (429) is retried with exponential backoff, and files that still fail on rate limits or server overload (429, 503, 529) get one more automatic pass about 10 seconds later
+- **User retry dialog:** After auto-retry, remaining failures prompt a dialog where you can retry them. A retry uses the run's own provider, model and key (only the image rotation can be changed). The retry loop continues until all files succeed or you choose to continue.
 
 ### Document Segmentation & Tagging
 
@@ -198,10 +203,8 @@ The processing workflow includes multiple interactive review points with pause/r
 A full-screen dialog showing all files with:
 - Scrollable thumbnail grid with adjustable size slider (60–800px)
 - Classification radio buttons per file (New Document, Continuation, Box, Folder)
-- Rotation correction radio buttons (0°, 90°, 180°, 270°) with live preview
 - Full keyboard navigation:
-  - `1`–`4` — set classification
-  - `[`/`]` — rotate counter-clockwise/clockwise
+  - `1`–`4` — set classification (`1` and `2`, the document classes, only where they are shown)
   - `↑`/`↓` — navigate between files
   - `Return` — confirm and proceed
 
@@ -218,20 +221,21 @@ Review and correct LLM-extracted collection names for box images before files ar
 Diagnostics live in the **Tools** tab (next to Process Files and Live Capture):
 
 - **Compare Models** — run one image through several provider/model combinations side by side, with diff highlighting, and adopt a model directly from the results.
-- **Test Resolution** — OCR one image at 10–100% resolution to see how downscaling trades accuracy against cost, then adopt a resolution.
+- **Test Resolution** — OCR one image at 10, 20, 40, 60, 80 and 100% resolution and compare each reading with the full-size one (a similarity score and a word diff), then adopt a resolution. It shows the text, not the cost, and needs an API key, so it doesn't run with Apple Vision.
+- **Processing History** — past Process Files runs: provider and model, file counts, and each run's estimated cost. No API key needed.
 
 ### Settings window (⌘,)
 
-All durable settings live in a native macOS Settings window: provider/model/API mode, a **separate API-key field per provider** (Anthropic / Gemini / Mistral / OpenAI / Gateway, each in the Keychain), Apple Vision's no-key local controls, input & processing (pre-OCR, batch, image resolution), rotation, tagging & segmentation options, custom models, and the Live Capture processing mode. The tagging **mode** dropdown and the output folder stay in the Process Files view for quick access.
+All durable settings live in a native macOS Settings window: provider/model/API mode, a **separate API-key field per provider** (Anthropic / Gemini / Mistral / OpenAI / OpenRouter, plus Gateway when the gateway is on, each in the Keychain), Apple Vision's no-key local controls, input & processing (pre-OCR, batch, image resolution), rotation, tagging & segmentation options, custom models, and the Live Capture processing mode. The tagging **mode** dropdown is in Settings and also in the Process Files view for quick access; the output folder is chosen in the Process Files view.
 
 A **pinned pane on the right** recomputes live for 1,000 files (at your standard image size) as you change settings:
 
-- **Cost** — broken out by phase: OCR, **rotation** (LLM rotation calls, which weren't counted before), tagging, and collection ID, with standard and batch totals.
+- **Cost** — broken out by phase: OCR, **rotation** (LLM rotation calls, which weren't counted before), tagging, collection ID and segmentation, with a standard total and, when batch mode is on, a batch total. Apple Vision, the Local Agent and a gateway with no pricing show a note in place of dollar figures.
 - **Time** — an estimate of *processing* time (network + LLM generation only, not human interaction), broken out per phase, calibrated from measured latencies and the pipeline's concurrency (OCR 4-wide, tagging 6-wide; rotation overlaps OCR). Interactive (non-batch) processing; batch mode returns asynchronously.
 
 ### Size-based image resolution
 
-The image-resolution slider is a **target fraction of a standard image size** (default 3 MB, configurable in Settings), not a fixed percentage of each file's dimensions. At 100% it targets the standard size, so **larger files are downscaled more** while average/small files are left full-resolution — evening out cost and time across a collection.
+The image-resolution slider is a **target fraction of a standard image size** (default 3 MB, configurable in Settings), not a fixed percentage of each file's dimensions. At 100% it targets the standard size, so **larger files are downscaled more** while average/small files are left full-resolution — evening out cost and time across a collection. Batch runs don't do this yet: they scale every image by the plain slider percentage, so at 100% a large scan goes up whole.
 
 ### Pre-OCRed PDF Input
 
@@ -246,8 +250,8 @@ Process PDFs that already contain OCR text (e.g., from a previous run):
 
 - **Drag and drop** images onto the app window
 - **File selection** via standard macOS open panel
-- **Directory selection** — recursively finds all images in the selected folder
-- Supported formats: JPEG, PNG, TIFF, HEIC (plus PDF for pre-OCRed input)
+- **Directory selection** — adds the images in the selected folder (for now only its top level: images in sub-folders are not picked up)
+- Supported formats: JPEG, PNG, TIFF, HEIC, plus PDF (a multi-page PDF is read again page by page; with pre-OCRed input, PDFs only)
 
 ### Other Features
 
@@ -255,20 +259,20 @@ Process PDFs that already contain OCR text (e.g., from a previous run):
 - **Source tag pass-through** — optionally copy existing Finder tags from source files to output PDFs
 - **Progress tracking** — real-time status messages and progress bar
 - **Error display** — full error text visible in the file pane
-- **Log file** — generated after processing, listing all failures with reasons
+- **Log file** — optional (*Write a processing log file* in Settings, off by default): a `.txt` written after processing, listing all failures with reasons
 - **Secure networking** — ephemeral URLSession, retry with backoff on transient errors, cellular network support
 
 ## Live Capture (phone companion + streaming)
 
 Photograph documents with a phone and stream them straight into the pipeline — no scanner, no manual import. This is the **Live Capture** tab plus a companion app for **Android** (`ArchiveCapture/`, Kotlin + Jetpack Compose + CameraX) or **iPhone** (`ArchiveCaptureiOS/`, SwiftUI + AVFoundation). Both companions speak the same streaming protocol and offer the same capture workflow; pick whichever phone you have.
 
-**On the phone:** shoot document pages with a full-resolution shutter; mark **Box** (red) and **Folder** (purple) with dedicated buttons; **End segment** finishes a document. Minimal on-phone tagging per segment: **Quality** (Unrated or Q1–Q3, with a per-page Q3 override via long-press) and **year/month**. Photos and their grouping/tags are written to disk immediately and uploaded via a durable, auto-retrying queue — so a photo (which can't be re-taken) is never lost, even across an app crash or an unplugged cable. As each segment is confirmed on the Mac, its photos **leave the phone** (with a transfer animation), so images stream to the Mac in segments rather than piling up on the device.
+**On the phone:** shoot document pages with a full-resolution shutter; mark **Box** (red) and **Folder** (purple) with dedicated buttons; **End segment** finishes a document. Minimal on-phone tagging per segment: **Quality** (Unrated or Q1–Q3, with a per-page Q3 override via long-press) and **year/month**. Photos and their grouping/tags are written to disk immediately and uploaded via a durable, auto-retrying queue — so a photo (which can't be re-taken) is never lost, even across an app crash or an unplugged cable. (On Android, if the phone's saved record was out of date when the app died, the photos it recovers are held on the phone until you tap **Review** to tag and send them.) As each segment is confirmed on the Mac, its photos **leave the phone** (with a transfer animation), so images stream to the Mac in segments rather than piling up on the device.
 
-**Pairing:** the Mac shows a QR code (host / port / token); the phone scans it (or you can enter host/port/token manually). Works over the LAN; **Android** additionally supports **USB** with no shared Wi-Fi (the Mac auto-runs `adb reverse` so the phone reaches `127.0.0.1`). Pairing is stable across Mac restarts (persisted token + pinned port); the QR hides once a phone is paired. Once paired, the phone opens straight to the capture screen — use **Re-pair** there to return to the scanner and switch connection (e.g. from USB to Wi-Fi) or Macs; captured photos are kept and upload once reconnected.
+**Pairing:** the Mac shows a QR code (host / port / token); the phone scans it (or you can enter host/port/token manually). The Android app first asks how the phone is connected (Wired, Wi-Fi or Cloud) before it scans. Works over the LAN; **Android** additionally supports **USB** with no shared Wi-Fi (the Mac auto-runs `adb reverse` so the phone reaches `127.0.0.1`). Pairing is stable across Mac restarts (persisted token + pinned port); the QR hides once a phone is paired. Once paired, the phone opens straight to the capture screen — use **Re-pair** there to return to the scanner and switch connection (e.g. from USB to Wi-Fi) or Macs; captured photos are kept and upload once reconnected.
 
-**Transports (all behind one seam — same never-lose-a-photo pipeline):** direct **LAN** (default), **USB local relay** (Android, `adb reverse`), and a **Google Drive cloud relay** — the wireless fallback for **client-isolated networks** (public/guest/airport Wi-Fi that blocks device-to-device) and **off-site** capture. In cloud mode the phone uploads each captured object to the user's Google Drive and the Mac pulls + ingests them through the same segment pipeline (the Mac deletes each object after a durable receipt). The Mac side ships; the phone Drive transport is **owner-gated on Google OAuth** (`drive.file` scope).
+**Transports (all behind one seam — same never-lose-a-photo pipeline):** direct **LAN** (default), **USB local relay** (Android, `adb reverse`), and a **Google Drive cloud relay** — the wireless fallback for **client-isolated networks** (public/guest/airport Wi-Fi that blocks device-to-device) and **off-site** capture. In cloud mode the phone uploads each captured object to the user's Google Drive and the Mac pulls + ingests them through the same segment pipeline (the Mac deletes each object after a durable receipt). The Mac side ships, and so does the **Android** phone side (checked end to end over a real Drive account; `drive.file` scope). On the **iPhone** the Drive transport is built, but Drive sign-in does not work yet: the app still carries a placeholder Google sign-in client id.
 
-**On the Mac**, each completed document segment pops an **auto-advancing tag card** — add subject tags (with autocomplete from your existing Finder tags) and adjust the phone's date/0–3 Quality rating. `0` is Unrated and writes no tag; `1`–`3` write canonical `Q1`–`Q3`. The card is fully keyboard-driven (↑/↓ to pick a suggestion, ⇥ to complete, ⏎ to add / save, ⌫ to delete the previous tag).
+**On the Mac**, each completed document segment pops an **auto-advancing tag card** — add subject tags (with autocomplete from your existing Finder tags) and adjust the phone's date/0–3 Quality rating. `0` is Unrated and writes no tag; `1`–`3` write canonical `Q1`–`Q3`. Tagging and saving are keyboard-driven (↑/↓ to pick a suggestion, ⇥ to complete, ⏎ to add a tag or, on an empty field, save and advance, ⌫ to delete the previous tag, esc to clear what you typed); **Skip** is a button only.
 
 **Backup folder.** Every photo received from the phone is also kept in a durable, easy-to-find folder — **`~/Pictures/Archive Processor Live Capture`** — until the run's output is fully written. A **Backup Folder** button in the Live Capture tab opens it in Finder, so if anything goes wrong you can recover and copy the original photos yourself (they can't be re-taken).
 
@@ -352,8 +356,8 @@ ArchiveProcessor/macOS/Sources/ArchiveProcessor/
 │   ├── AnthropicClient / GeminiClient / MistralClient / VisionClient / OpenAICompatibleClient (gateway)
 │   ├── BatchOCR.swift                 # Batch clients for all three providers
 │   ├── ImageEncoding.swift            # Image downscaling / base64 encoding for API calls
-│   ├── KeyValidator.swift             # API-key format checks (guided setup)
-│   ├── SampleOCRTester.swift          # Live key confirmation via a synthetic-token OCR call
+│   ├── KeyValidator.swift             # Live key check via one cheap call (guided setup)
+│   ├── SampleOCRTester.swift          # Optional sample-page OCR test via a synthetic-token page
 │   ├── PDFGenerator.swift             # Output PDF creation
 │   ├── PDFTextExtractor / PDFToImageConverter
 │   ├── RotationDetector / LLMRotationDetector   # local Vision + LLM rotation
@@ -379,7 +383,7 @@ ArchiveProcessor/macOS/Sources/ArchiveProcessor/
     ├── SettingsView.swift             # Settings window (⌘,) + live cost pane
     ├── ManageModelsView.swift         # Add/remove custom model IDs
     ├── ProviderKeyWizard.swift        # Guided first-run BYO-key setup
-    ├── ToolsView.swift                # Compare Models + Test Resolution
+    ├── ToolsView.swift                # Compare Models + Test Resolution + Processing History
     ├── LiveCaptureView.swift          # Live Capture UI (pairing, status, tag card)
     ├── CollectionFinalizeSheet.swift  # End-of-session collection naming
     ├── BoxFolderConfirmSheet.swift    # Confirm box/folder markers during review

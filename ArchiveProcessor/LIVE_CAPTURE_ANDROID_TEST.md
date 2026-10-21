@@ -4,7 +4,9 @@ A bit-by-bit script to fully exercise the **Android** companion (`ArchiveCapture
 **Live Capture** tab. Runs only when you're here to hold the phone — every step is: **tap on phone →
 what the phone should do → what to check on the Mac**. It stresses pairing (LAN + USB + the new
 Re-pair path), capture, markers, on-phone tagging, both processing modes, finish/collection naming,
-the backup folder, and failure/recovery. (iPhone is deferred; this is Android-only.)
+the backup folder, and failure/recovery. (This script is Android-only. The iPhone companion is no longer
+deferred — it is back in the verify loop since `W40.i1`, 2026-10-21, with its rows in `verification/capture.md` —
+but it has no walkthrough of its own yet.)
 
 > **Golden rule under test:** *a captured photo is never lost.* Archival photos can't be re-shot, so
 > anywhere below where a photo could vanish (crash, network drop, quit), we verify it survived — on the
@@ -23,12 +25,12 @@ the backup folder, and failure/recovery. (iPhone is deferred; this is Android-on
 
 ### A1 · Wi-Fi pairing
 1. Phone + Mac on the **same Wi-Fi**, no USB cable.
-2. Launch Archive Capture on the phone → it should show the **QR scanner** (no saved endpoint yet).
-   - ✅ Expect: camera scanner screen. If it jumps straight to the capture screen, a stale endpoint is saved — do **A5 Re-pair first**, then come back.
+2. Launch Archive Capture on the phone → with no saved endpoint it asks **"How is this phone connected to the Mac?"** (Wired / Wi-Fi / Cloud); tap **Wi-Fi (same network)**.
+   - ✅ Expect: the chooser, then the camera scanner screen. If it jumps straight to the capture screen, a stale endpoint is saved — do **A5 Re-pair first**, then come back.
 3. Point the phone at the Mac's QR code.
    - ✅ Expect: phone recognizes it, shows **connecting…**, then the **capture screen**.
    - ✅ On Mac: the QR **hides** (paired), the tab shows the phone as connected (name).
-4. **Stress:** cover the QR / scan a random QR → phone should reject gracefully (no crash, stays on scanner).
+4. **Stress:** cover the QR / scan a random QR → phone should reject gracefully (no crash, stays on scanner). The refusal is silent: no message is shown for a QR that isn't a pairing code.
 
 ### A2 · First captures
 5. Tap the **shutter** on a document page.
@@ -111,6 +113,10 @@ Do these deliberately; each must **not** lose a captured image.
 5. Force-stop the Android app (swipe away / kill) with unsent items in the queue.
 6. Reopen it.
    - ✅ The durable queue **survives the restart**; unsent items are still there and upload once connected.
+   - ✅ Exception (`W23.m8`): if the phone's saved session record was out of date when it was killed (a save had
+     failed), the recovered pages are **held** on the phone rather than sent, and the phone says *"Recovered N
+     photo(s) whose box/folder wasn't saved — tap Review to tag and send."* Held is not lost — check they are still
+     listed and go up after Review.
 
 ### C4 · Backup-folder recovery (catastrophic case)
 7. At any point mid-session, on the Mac click **Backup Folder**.
@@ -134,4 +140,5 @@ Do these deliberately; each must **not** lose a captured image.
 - Across **every** failure in Run C, **no captured photo is lost**, and the backup folder is only cleared after a successful finalize.
 
 Log anything that fails (with the step number) in `KNOWN_ISSUES.md`. iPhone companion (`ArchiveCaptureiOS/`)
-gets the same walkthrough later — the protocol and UX are shared, so most steps transfer.
+has no walkthrough of its own yet — the protocol and UX are shared, so most steps transfer, except USB (Android
+only), the Cloud mode (not on iOS yet, `W40.i-fix-ios-cloud-pairing`) and the Android connection chooser.

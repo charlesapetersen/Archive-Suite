@@ -137,10 +137,8 @@ out larger splits itself: file `<tag>a`, `<tag>b` … with `(blocked-on:)` chain
 - **`W40.b3` — Processor ledger [M].** Sources: `ArchiveProcessor/CLAUDE.md`, `README.md`, `TESTING.md`,
   `LIVE_CAPTURE_ANDROID_TEST.md`, `SPEC/tag-format.md`. Roughly 37 rows.
 - **`W40.b4` — capture ledger, Android and iOS [S].** Extends `verification/capture.md` from `W40.i2`.
-- **`W40.b5` — doc drift [S-M].** Correct what the ledgers found the guides claiming falsely: Reader map entries
-  for dead or deleted files and its stale test counts; Processor `TESTING.md` (pypdf, "586 PDFs", "no test
-  target"); Processor `KNOWN_ISSUES.md` §1's migration claim. Leave the Reader §12 promise until the owner rules
-  on `W40.f1`, but mark it there as unimplemented.
+- **`W40.b5` — doc drift — SHIPPED 2026-10-21.** Guides corrected against the four ledgers; record in
+  `SUITE_TODO_DONE.md`. The §12 audit ledger had shipped meanwhile (`W40.audit-ledger`), so it was not marked unimplemented.
 
 ## C — rehearsal material
 
