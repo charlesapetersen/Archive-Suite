@@ -1,6 +1,6 @@
 # The field's segmentation scorers on every cached answer — W46.fix-seg-scorers
 
-Made by `scripts/segbench/rescore.py` (owner, public, report) from the response caches, with no call and no money: a cache miss is reported as incomplete and the process refuses the network. Definitions are in `score.py`'s docstring; the figures are pooled sums over the boxes named. Window and whole-folder sources take the truth's photo labels, so their figures measure boundaries; the spring runs keep their own. Higher is better except Pk, WindowDiff and MNDD. A source appears in a table only where its cache is complete on every box of that table. On the owner boxes Pk equals WindowDiff because k, half the mean truth segment length with each label photo a segment, rounds to 1 there; on Lincoln and CREST k is 2.
+Made by `scripts/segbench/rescore.py` (owner, public, report) from the response caches, with no call and no money: a cache miss is reported as incomplete and the process refuses the network. Definitions are in `score.py`'s docstring; the figures are pooled sums over the boxes named. Window and whole-folder sources take the truth's photo labels, so their figures measure boundaries; the spring runs keep their own. Higher is better except Pk, WindowDiff and MNDD. A source appears in a table only where its cache is complete on every box of that table. On the owner boxes Pk equals WindowDiff: k is half the mean truth segment length, and their documents average about 1.6 pages, so k rounds to 1 with or without the label photos counted, and at k = 1 the two measures are the same; on Lincoln and CREST k is 2.
 
 ## Development boxes (Dean, Deaver, Herrnstein; 551 pages)
 
@@ -9,12 +9,12 @@ Made by `scripts/segbench/rescore.py` (owner, public, report) from the response 
 | whole-gemini | whole folder, Gemini API | 93.1% | 0.941 | 0.026 | 0.026 | 0.963 | 0.969 | 0.994 | 0.950 | 66.7% | 2.7 |
 | window-or-fs-seg-4b-pilot | window, FarmShare | 92.5% | 0.929 | 0.031 | 0.031 | 0.940 | 0.945 | 0.995 | 0.929 | 58.3% | 2.9 |
 | window-cues-codex | window, subscription | 91.3% | 0.958 | 0.018 | 0.018 | 0.970 | 0.978 | 0.992 | 0.956 | 70.8% | 3.1 |
-| window-claude | window, subscription | 90.7% | 0.954 | 0.020 | 0.020 | 0.966 | 0.973 | 0.992 | 0.951 | 70.8% | 3.3 |
 | window-gemini-3.8-flash-low | window, Gemini API | 90.7% | 0.941 | 0.026 | 0.026 | 0.960 | 0.965 | 0.994 | 0.947 | 70.8% | 3.6 |
+| window-claude | window, subscription | 90.7% | 0.954 | 0.020 | 0.020 | 0.966 | 0.973 | 0.992 | 0.951 | 70.8% | 3.3 |
 | window-or-fs-seg-2b | window, FarmShare | 90.5% | 0.929 | 0.031 | 0.031 | 0.938 | 0.945 | 0.993 | 0.923 | 58.3% | 3.4 |
 | window-local-seg-2b-8bit | window, Mac local | 90.3% | 0.929 | 0.031 | 0.031 | 0.940 | 0.948 | 0.992 | 0.922 | 54.2% | 3.4 |
-| window-or-fs-qwen3.5-27b | window, FarmShare | 90.2% | 0.933 | 0.029 | 0.029 | 0.956 | 0.963 | 0.993 | 0.941 | 66.7% | 3.8 |
 | window-or-glm5.3-flash | window, OpenRouter | 90.2% | 0.937 | 0.027 | 0.027 | 0.952 | 0.958 | 0.994 | 0.942 | 66.7% | 4.0 |
+| window-or-fs-qwen3.5-27b | window, FarmShare | 90.2% | 0.933 | 0.029 | 0.029 | 0.956 | 0.963 | 0.993 | 0.941 | 66.7% | 3.8 |
 | window-or-gpt5.6-luna | window, OpenRouter | 90.0% | 0.945 | 0.024 | 0.024 | 0.958 | 0.967 | 0.991 | 0.942 | 66.7% | 3.6 |
 | window-local-seg-date-2b-8bit | window, Mac local | 89.4% | 0.921 | 0.035 | 0.035 | 0.935 | 0.941 | 0.993 | 0.919 | 50.0% | 4.2 |
 | whole-gemini-c10 | whole folder, Gemini API | 89.4% | 0.941 | 0.026 | 0.026 | 0.954 | 0.962 | 0.991 | 0.937 | 62.5% | 3.8 |
@@ -141,12 +141,12 @@ Development boxes, the oracle count (pooled):
 | whole-gemini | 93.1% | 90.5% | -2.5 pts |
 | window-or-fs-seg-4b-pilot | 92.5% | 92.5% | +0.0 pts |
 | window-cues-codex | 91.3% | 91.5% | +0.2 pts |
-| window-claude | 90.7% | 90.5% | -0.2 pts |
 | window-gemini-3.8-flash-low | 90.7% | 90.7% | +0.0 pts |
+| window-claude | 90.7% | 90.5% | -0.2 pts |
 | window-or-fs-seg-2b | 90.5% | 88.4% | -2.1 pts |
 | window-local-seg-2b-8bit | 90.3% | 89.8% | -0.6 pts |
-| window-or-fs-qwen3.5-27b | 90.2% | 88.8% | -1.4 pts |
 | window-or-glm5.3-flash | 90.2% | 85.5% | -4.6 pts |
+| window-or-fs-qwen3.5-27b | 90.2% | 88.8% | -1.4 pts |
 | window-or-gpt5.6-luna | 90.0% | 89.2% | -0.8 pts |
 | window-local-seg-date-2b-8bit | 89.4% | 85.7% | -3.7 pts |
 | whole-gemini-c10 | 89.4% | 90.3% | +1.0 pts |

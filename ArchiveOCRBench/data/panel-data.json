@@ -6552,6 +6552,12 @@
       "photo_type_swaps": 0,
       "photos_missed": 0,
       "false_photos": 0
+     },
+     "field": {
+      "pq": 0.11320754716981132,
+      "kappa": 0.0,
+      "mndd": 97,
+      "mndd_per_100_pages": 75.78125
      }
     },
     "no-boundaries": {
@@ -6601,6 +6607,12 @@
       "photo_type_swaps": 0,
       "photos_missed": 0,
       "false_photos": 0
+     },
+     "field": {
+      "pq": 0.0,
+      "kappa": 0.0,
+      "mndd": 111,
+      "mndd_per_100_pages": 86.71875
      }
     },
     "rule-cues-sketch": {
@@ -6650,6 +6662,12 @@
       "photo_type_swaps": 0,
       "photos_missed": 0,
       "false_photos": 0
+     },
+     "field": {
+      "pq": 0.11920529801324503,
+      "kappa": 0.04073665450224904,
+      "mndd": 92,
+      "mndd_per_100_pages": 71.875
      }
     },
     "rule-cues": {
@@ -6699,6 +6717,12 @@
       "photo_type_swaps": 0,
       "photos_missed": 0,
       "false_photos": 0
+     },
+     "field": {
+      "pq": 0.16206896551724137,
+      "kappa": 0.0738072225639223,
+      "mndd": 84,
+      "mndd_per_100_pages": 65.625
      }
     },
     "fs-qwen3.5-27b": {
@@ -6748,6 +6772,12 @@
       "photo_type_swaps": 0,
       "photos_missed": 0,
       "false_photos": 0
+     },
+     "field": {
+      "pq": 0.9296875,
+      "kappa": 0.9573396036278133,
+      "mndd": 2,
+      "mndd_per_100_pages": 1.5625
      }
     },
     "fs-seg-2b": {
@@ -6797,6 +6827,12 @@
       "photo_type_swaps": 0,
       "photos_missed": 0,
       "false_photos": 0
+     },
+     "field": {
+      "pq": 0.8602150537634409,
+      "kappa": 0.9127147766323023,
+      "mndd": 5,
+      "mndd_per_100_pages": 3.90625
      }
     },
     "fs-seg-4b": {
@@ -6846,6 +6882,12 @@
       "photo_type_swaps": 0,
       "photos_missed": 0,
       "false_photos": 0
+     },
+     "field": {
+      "pq": 0.9523809523809523,
+      "kappa": 0.9784270426363173,
+      "mndd": 1,
+      "mndd_per_100_pages": 0.78125
      }
     }
    },
@@ -6904,6 +6946,12 @@
       "photo_type_swaps": 0,
       "photos_missed": 0,
       "false_photos": 0
+     },
+     "field": {
+      "pq": 0.1111111111111111,
+      "kappa": 0.0,
+      "mndd": 180,
+      "mndd_per_100_pages": 68.96551724137932
      }
     },
     "no-boundaries": {
@@ -6953,6 +7001,12 @@
       "photo_type_swaps": 0,
       "photos_missed": 0,
       "false_photos": 0
+     },
+     "field": {
+      "pq": 0.0,
+      "kappa": 0.0,
+      "mndd": 239,
+      "mndd_per_100_pages": 91.57088122605364
      }
     },
     "rule-cues-sketch": {
@@ -7002,6 +7056,12 @@
       "photo_type_swaps": 0,
       "photos_missed": 0,
       "false_photos": 0
+     },
+     "field": {
+      "pq": 0.1111111111111111,
+      "kappa": 0.0,
+      "mndd": 180,
+      "mndd_per_100_pages": 68.96551724137932
      }
     },
     "rule-cues": {
@@ -7051,6 +7111,12 @@
       "photo_type_swaps": 0,
       "photos_missed": 0,
       "false_photos": 0
+     },
+     "field": {
+      "pq": 0.28212353907080073,
+      "kappa": 0.2737430167597766,
+      "mndd": 103,
+      "mndd_per_100_pages": 39.46360153256705
      }
     },
     "fs-qwen3.5-27b": {
@@ -7100,6 +7166,12 @@
       "photo_type_swaps": 0,
       "photos_missed": 0,
       "false_photos": 2
+     },
+     "field": {
+      "pq": 0.5790546281518908,
+      "kappa": 0.6829268292682927,
+      "mndd": 41,
+      "mndd_per_100_pages": 15.708812260536398
      }
     },
     "fs-seg-2b": {
@@ -7149,6 +7221,12 @@
       "photo_type_swaps": 0,
       "photos_missed": 0,
       "false_photos": 4
+     },
+     "field": {
+      "pq": 0.5170984436555371,
+      "kappa": 0.6375757575757576,
+      "mndd": 46,
+      "mndd_per_100_pages": 17.624521072796934
      }
     },
     "fs-seg-4b": {
@@ -7198,6 +7276,12 @@
       "photo_type_swaps": 0,
       "photos_missed": 0,
       "false_photos": 3
+     },
+     "field": {
+      "pq": 0.6425572691197691,
+      "kappa": 0.7220125786163523,
+      "mndd": 35,
+      "mndd_per_100_pages": 13.409961685823754
      }
     }
    },

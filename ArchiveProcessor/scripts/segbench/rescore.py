@@ -272,8 +272,9 @@ def render(owner_res: dict, public_res: dict) -> str:
            "`score.py`'s docstring; the figures are pooled sums over the boxes named. Window and whole-folder sources "
            "take the truth's photo labels, so their figures measure boundaries; the spring runs keep their own. "
            "Higher is better except Pk, WindowDiff and MNDD. A source appears in a table only where its cache is "
-           "complete on every box of that table. On the owner boxes Pk equals WindowDiff because k, half the mean "
-           "truth segment length with each label photo a segment, rounds to 1 there; on Lincoln and CREST k is 2.", ""]
+           "complete on every box of that table. On the owner boxes Pk equals WindowDiff: k is half the mean truth "
+           "segment length, and their documents average about 1.6 pages, so k rounds to 1 with or without the label "
+           "photos counted, and at k = 1 the two measures are the same; on Lincoln and CREST k is 2.", ""]
     sections = [("Development boxes (Dean, Deaver, Herrnstein; 551 pages)", dev),
                 ("Locked test boxes (Stanton, RG165; 363 pages), answers already cached by the finalists' --final runs",
                  test)]

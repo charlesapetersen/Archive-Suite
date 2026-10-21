@@ -229,6 +229,20 @@ def public_segmentation():
         if result["truth_sha256"] != digest or result["pages"] != len(truth["pages"]):
             sys.exit(f"{path.name}: scores do not match the frozen public truth")
         boxes.append(result)
+    # W46.fix-seg-scorers: the field's scorers on the same answers (rescore.py), joined by source name; the two
+    # files must agree on the figure they share.
+    field = RESULTS / "seg-scorers-public.json"
+    if field.exists():
+        rescored = json.loads(field.read_text())["boxes"]
+        for b in boxes:
+            sources = next(v for k, v in rescored.items() if k.lower() == b["box"].lower())["sources"]
+            for k, r in b["models"].items():
+                f = sources.get(k) or sources.get(f"window-or-{k}")
+                if f is None:
+                    continue
+                if f["counts"]["pages_exact"] != r["counts"]["pages_exact"]:
+                    sys.exit(f"seg-scorers-public.json disagrees with {b['box']}-scores.json on {k}")
+                r["field"] = {m: f["metrics"][m] for m in ("pq", "kappa", "mndd", "mndd_per_100_pages")}
     return boxes
 
 
