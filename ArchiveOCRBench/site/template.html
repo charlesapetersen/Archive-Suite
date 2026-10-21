@@ -78,7 +78,7 @@ footer p { font-size: 13px; }
   <header class="part" id="ocr">
     <div class="eyebrow">Part 1 · OCR panel · 96 truth pages</div>
     <h2>OCR price and accuracy</h2>
-    <p>Each point is one route: its NES score against what 1,000 pages cost. NES is character edit similarity to the adjudicated truth, so 96 means about 4% of characters would need fixing. A failed page scores 0. Where a provider sells batch processing, the route appears twice, at its standard and batch price, joined by a dotted line. Two routes ran on our own hardware rather than a paid endpoint, so they sit in the free column: Qwen3-VL 8B at 4-bit on the owner's Mac, and Qwen3.6 27B at fp8 on one GPU of Stanford's FarmShare cluster. Each is the same model as a hosted route in the local panel, and the tables list it under that route.</p>
+    <p>Each point is one route: its NES score against what 1,000 pages cost. NES is character edit similarity to the adjudicated truth, so 96 means about 4% of characters would need fixing. A failed page scores 0. Where a provider sells batch processing, the route appears twice, at its standard and batch price, joined by a dotted line. Some routes ran on our own hardware rather than a paid endpoint. Those on the owner's Mac sit in the free column. Qwen3.6 27B at fp8 ran on one GPU of Stanford's FarmShare cluster, which bills nothing, but it is too large for the Mac, so it is priced at what OpenRouter charges for the same model, from its own measured tokens. Each is the same model as a hosted route in the local panel, and the tables list it under that route.</p>
   </header>
 
   <div class="legend" aria-label="Chart legend">
@@ -110,7 +110,7 @@ footer p { font-size: 13px; }
   <section class="panel" id="seg-table">
     <div class="head"><h2>With checking</h2><span class="meta">each approach at its flag level frozen for the 98% bar</span></div>
     <div class="tbl"><table><thead><tr><th>#</th><th>Approach</th><th>No checking</th><th>Checks per 100 pages</th><th>Right after checking</th><th>Unflagged errors</th><th>Per 1,000</th><th>Batch</th></tr></thead><tbody id="seg-rows"></tbody></table></div>
-    <p class="note">Full manual asks about every boundary and costs nothing; it is the floor. Prices are API list and batch prices per 1,000 pages, from tokens measured over all five boxes. Claude and ChatGPT ran on their subscriptions, so theirs are what the same requests would cost on the API. Gemini 3.8 Flash is at an introductory price until 31 Dec 2026; at the later price its $3.61 becomes $7.22 ($3.61 by batch). GLM-5.3 Flash, GPT-5.6 Luna and Qwen3.5 Flash were the cheap models that survived a one-box screen; all three did worse off that box. Qwen3.5 27B on FarmShare is the open-weight model that cleans the corpus labels a small Mac model will be trained on; it runs on Stanford's GPUs, so it has no price per page and is not on the chart, and its confidences are too even to flag on, so reaching 98% means checking every gap, as Full manual does. Every error count here is small, so one or two errors either way is noise, and a zero on 363 pages is not a promise of zero. The fine-tuned Qwen3.5 4B and 2B are small models trained on the owner's corpus with that teacher's cleaned labels, so they can run on an 8 or 16 GB Mac; these are their FarmShare figures at full precision, and the Mac's own 4-bit and 8-bit figures are in <code>seg-students.md</code>. Sources: <code>options.md</code>, <code>cheap-models.md</code>, <code>seg-teacher.md</code> and <code>seg-students.md</code> in <code>ArchiveProcessor/segbench-results/</code>.</p>
+    <p class="note">Full manual asks about every boundary and costs nothing; it is the floor. Prices are API list and batch prices per 1,000 pages, from tokens measured over all five boxes. Claude and ChatGPT ran on their subscriptions, so theirs are what the same requests would cost on the API. Gemini 3.8 Flash is at an introductory price until 31 Dec 2026; at the later price its $3.61 becomes $7.22 ($3.61 by batch). GLM-5.3 Flash, GPT-5.6 Luna and Qwen3.5 Flash were the cheap models that survived a one-box screen; all three did worse off that box. Qwen3.5 27B on FarmShare is the open-weight model that cleans the corpus labels a small Mac model will be trained on; it ran on Stanford's GPUs, which bill nothing, but it is too large for the Mac, so it is priced at OpenRouter's rate for its measured tokens (seven-page windows at stride 3, from its FarmShare run on the Deaver box), and its confidences are too even to flag on, so reaching 98% means checking every gap, as Full manual does. Every error count here is small, so one or two errors either way is noise, and a zero on 363 pages is not a promise of zero. The fine-tuned Qwen3.5 4B and 2B are small models trained on the owner's corpus with that teacher's cleaned labels, so they can run on an 8 or 16 GB Mac and are free; these are their FarmShare figures at full precision, and the Mac's own 4-bit and 8-bit figures are in <code>seg-students.md</code>. Sources: <code>options.md</code>, <code>cheap-models.md</code>, <code>seg-teacher.md</code> and <code>seg-students.md</code> in <code>ArchiveProcessor/segbench-results/</code>.</p>
   </section>
 
   <section class="panel" id="joint-model" hidden>
@@ -144,14 +144,14 @@ footer p { font-size: 13px; }
     <p id="fs-lede"></p>
   </header>
   <section class="panel" id="fs-truth">
-    <div class="head"><h2>Archive photos: the 96 truth pages</h2><span class="meta">vLLM 0.31 · no money spent</span></div>
-    <div class="tbl"><table><thead><tr><th>Model</th><th>KV cache</th><th>NES %</th><th>Answered</th><th>Clippings NES %</th><th>Photos an hour per GPU</th><th>GPU-hours per 100,000 photos</th></tr></thead><tbody id="fs-truth-rows"></tbody></table></div>
-    <p class="note">The frozen panel images and the same NES scorer as part 1. Qwen models use the panel prompt; CHURRO uses its own XML transcription prompt. Differences below a point are noise on this small set. FarmShare costs nothing, so speed stands where price stands in part 1; your account may run 4 GPUs at once. Source: <code>ArchiveProcessor/segbench-results/farmshare/truth/</code>.</p>
+    <div class="head"><h2>Archive photos: the 96 truth pages</h2><span class="meta">vLLM 0.31 · priced at OpenRouter's rates</span></div>
+    <div class="tbl"><table><thead><tr><th>Model</th><th>KV cache</th><th>NES %</th><th>Answered</th><th>Clippings NES %</th><th>Per 1,000 photos</th><th>Photos an hour per GPU</th><th>GPU-hours per 100,000 photos</th></tr></thead><tbody id="fs-truth-rows"></tbody></table></div>
+    <p class="note">The frozen panel images and the same NES scorer as part 1. Qwen models use the panel prompt; CHURRO uses its own XML transcription prompt. Differences below a point are noise on this small set. FarmShare bills nothing, but a user without it would rent these models, so each one too large for the 18 GB Mac is priced as if the same requests went to OpenRouter: the run's own mean prompt and completion tokens at OpenRouter's list price for the same model (read 2026-10-20). CHURRO-3B fits on the Mac, so it stays free. Your account may run 4 GPUs at once. Source: <code>ArchiveProcessor/segbench-results/farmshare/truth/</code>.</p>
   </section>
   <section class="panel" id="fs-news">
     <div class="head"><h2>Newspapers: NewsBench's 15 scored broadsheet pages</h2><span class="meta">NewsBench score.py · overall = 1 − CER</span></div>
-    <div class="tbl"><table><thead><tr><th>Reader</th><th>How the page is read</th><th>Overall</th><th>Broadsheet</th><th>Page</th><th>Pages answered</th><th>Pages an hour per GPU</th></tr></thead><tbody id="fs-news-rows"></tbody></table></div>
-    <p class="note">Full Library of Congress newspaper pages, scored by NewsBench's own scorer, not NES, so these do not compare with the tables above. "Regions" means newspaper-ocr's layout detector cut the page first and each region was read alone. Reference rows are NewsBench's published results, made elsewhere. Source: <code>ArchiveProcessor/segbench-results/farmshare/news/</code>.</p>
+    <div class="tbl"><table><thead><tr><th>Reader</th><th>How the page is read</th><th>Overall</th><th>Broadsheet</th><th>Page</th><th>Pages answered</th><th>Per 1,000 pages</th><th>Pages an hour per GPU</th></tr></thead><tbody id="fs-news-rows"></tbody></table></div>
+    <p class="note">Full Library of Congress newspaper pages, scored by NewsBench's own scorer, not NES, so these do not compare with the tables above. "Regions" means newspaper-ocr's layout detector cut the page first and each region was read alone. Reference rows are NewsBench's published results, made elsewhere. Prices are OpenRouter's rates for the run's tokens; GLM-OCR fits on the Mac and is free, and the region runs recorded no tokens, so they have no price. Source: <code>ArchiveProcessor/segbench-results/farmshare/news/</code>.</p>
   </section>
 
   <header class="part" id="difficulty">
@@ -214,8 +214,8 @@ footer p { font-size: 13px; }
 
   <section class="panel" id="date-open" hidden>
     <div class="head"><h2>Open-weight models on FarmShare</h2><span class="meta">the same documents and prompt, as the app's local route sends it</span></div>
-    <div class="tbl"><table><thead><tr><th>Model</th><th>Year exact</th><th>Year printed in the text</th><th>Year not in the text</th><th>Owner's month</th><th>Unusable replies</th></tr></thead><tbody id="date-open-rows"></tbody></table></div>
-    <p class="note">Sent as the local route sends a text call: one message, 512 tokens, temperature 0, no reasoning switch. Qwen3.5 and Qwen3.6 think by default, so sent that way they spend all 512 tokens thinking and answer nothing: in the app every document would get no year and Date Uncertain (KNOWN_ISSUES: the local route sends no reasoning switch; filed as W41.app-local-models-fu2). "Thinking off" rows switch it off. Every model reads a printed year about as well as Gemini; the gap is the year that is not in the text, estimated from context. No money.</p>
+    <div class="tbl"><table><thead><tr><th>Model</th><th>Year exact</th><th>Year printed in the text</th><th>Year not in the text</th><th>Owner's month</th><th>Unusable replies</th><th>Per 1,000 documents</th></tr></thead><tbody id="date-open-rows"></tbody></table></div>
+    <p class="note">Sent as the local route sends a text call: one message, 512 tokens, temperature 0, no reasoning switch. Qwen3.5 and Qwen3.6 think by default, so sent that way they spend all 512 tokens thinking and answer nothing: in the app every document would get no year and Date Uncertain (KNOWN_ISSUES: the local route sends no reasoning switch; filed as W41.app-local-models-fu2). "Thinking off" rows switch it off. Every model reads a printed year about as well as Gemini; the gap is the year that is not in the text, estimated from context. FarmShare bills nothing; Qwen3.6 27B and 35B-A3B are too large for the Mac, so they are priced at OpenRouter's rate for their mean tokens a document, and the smaller models fit on the Mac and are free.</p>
   </section>
 
   <section class="panel" id="date-public" hidden>
@@ -247,7 +247,7 @@ footer p { font-size: 13px; }
   </section>
 
   <footer>
-    <p><strong>OCR costs.</strong> Measured charges for the panel's pinned OpenRouter endpoint (Mistral's published rate for Mistral OCR), as dollars per 1,000 pages, averaged over all 96 pages; the same route cost is used on every chart, so the kind charts compare accuracy at a route's average price. Apple Vision runs on the device and costs nothing, and so do the three models read on our Mac (an M3 Pro with 18 GB): Qwen3-VL 8B (about 41 seconds a page), LightOnOCR-3-4B (about 24) and Qwen3.5-9B (about 38). Qwen3.6 27B on FarmShare is priced at $0 because the cluster bills nothing; what it costs is GPU time, shown in the tables as GPU-hours per 100,000 photos. Claude Sonnet 5.5 ran through the subscription; its price is an estimate from its token counts at $2 and $10 per million input and output tokens, using the standard image size, and was not measured.</p>
+    <p><strong>OCR costs.</strong> Measured charges for the panel's pinned OpenRouter endpoint (Mistral's published rate for Mistral OCR), as dollars per 1,000 pages, averaged over all 96 pages; the same route cost is used on every chart, so the kind charts compare accuracy at a route's average price. Apple Vision runs on the device and costs nothing, and so do the three models read on our Mac (an M3 Pro with 18 GB): Qwen3-VL 8B (about 41 seconds a page), LightOnOCR-3-4B (about 24) and Qwen3.5-9B (about 38). Qwen3.6 27B ran on FarmShare, which bills nothing, but it does not fit on the Mac, so it is priced at OpenRouter's list rate for the same model ($0.25 and $2 per million input and output tokens, read 2026-10-20) applied to its own measured tokens; its GPU time is in the tables as GPU-hours per 100,000 photos. Claude Sonnet 5.5 ran through the subscription; its price is an estimate from its token counts at $2 and $10 per million input and output tokens, using the standard image size, and was not measured.</p>
     <p><strong>Batch prices.</strong> Half the measured cost, where OpenRouter lists a batch version of the model at half its standard price (Gemini 3.8 Flash's batch price is half of what the run paid). Mistral OCR's batch price follows Mistral's published 50% batch discount. Routes with no batch point have no batch version in the catalogue.</p>
     <p><strong>Limits.</strong> One corpus of about 100 pages. Claude Opus 5.5 and Gemini 3.8 Flash drafted the truth before it was adjudicated, so it may lean toward those families. The "local panel" was chosen for models that could run on a Mac, and ran hosted; two of them have been measured on the Mac itself: Qwen3-VL 8B lost 2.15 points, nearly all of them on four pages it failed to finish, and Qwen3.5-9B gained 2.48, because the hosted route failed four pages and the Mac one; on handwritten pages the Mac's Qwen3.5-9B is 3.0 points below its hosted run. LightOnOCR-3-4B has no hosted route to compare. The FarmShare route is the same model and precision as the hosted Qwen3.6 27B and differs by about a point, which is within noise. Differences of a point or two are not a ranking, and the handwritten chart rests on about 2,200 words.</p>
   </footer>
@@ -260,7 +260,7 @@ const FREE = 0.17;
 const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 const money = v => v === 0 ? 'free' : '$' + v.toFixed(2);
 const OWN = { mac: 'on our Mac', farmshare: 'Stanford FarmShare' };
-const priceCell = r => r.panel === 'farmshare' ? '$0' : money(r.std) + (r.id === 'claude-sonnet5.5' ? ' (est.)' : '');
+const priceCell = r => money(r.std) + (r.id === 'claude-sonnet5.5' ? ' (est.)' : r.panel === 'farmshare' ? ' (OpenRouter rate)' : '');
 const hwText = r => r.panel === 'mac' ? r.hw.seconds.toFixed(0) + ' s a page · ' + r.hw.peak_gb.toFixed(1) + ' GB peak (' + r.hw.peak_max_gb.toFixed(1) + ' max) · ' + r.machine
   : r.panel === 'farmshare' ? Math.round(r.hw.photos_per_hour).toLocaleString() + ' photos an hour · ' + Math.round(r.hw.gpu_hours_per_100k) + ' GPU-hours per 100,000 · ' + r.machine : '—';
 const overallRank = DATA.charts[0].scores;
@@ -356,7 +356,7 @@ function render() {
           label: i => { const p = i.raw, r = p.r; if (o.seg) return [p.y.toFixed(1) + '% of pages in the exact document, no checking',
             money(p.x) + ' per 1,000 pages' + (p.b ? ' by batch' : (r.batch ? ' at list price' : '')), r.checks.toFixed(1) + ' checks per 100 pages to reach ' + pct1(r.after)];
             return ['NES ' + p.y.toFixed(2) + ' (' + p.s[1] + ' of ' + p.s[2] + ' pages answered)',
-            r.panel === 'farmshare' ? '$0 · ' + Math.round(r.hw.gpu_hours_per_100k) + ' GPU-hours per 100,000 photos' : r.std === 0 ? 'free, on device' : money(p.x) + ' per 1,000 pages' + (p.b ? ' by batch' : (r.batch ? ' standard' : '')) + (r.id === 'claude-sonnet5.5' ? ', estimated' : ''),
+            r.panel === 'farmshare' ? money(p.x) + ' per 1,000 pages at OpenRouter\'s rate for the same model · ' + Math.round(r.hw.gpu_hours_per_100k) + ' GPU-hours per 100,000 photos on FarmShare' : r.std === 0 ? 'free, on device' : money(p.x) + ' per 1,000 pages' + (p.b ? ' by batch' : (r.batch ? ' standard' : '')) + (r.id === 'claude-sonnet5.5' ? ', estimated' : ''),
             r.pair ? 'run ' + OWN[r.panel] + '; hosted as ' + byId[r.pair].num + ', NES ' + o.c.scores[r.pair][0].toFixed(2)
               : r.panel === 'mac' ? 'run on our Mac; no hosted route serves it' : r.panel === 'local' ? 'local panel, run hosted' : 'cloud panel']; } } } },
         scales: {
@@ -374,7 +374,7 @@ const SEG = DATA.segmentation.slice().sort((a, b) => (b.nocheck ?? -1) - (a.noch
 SEG.forEach((a, i) => { a.num = i + 1; a.id = 'seg' + i; });
 const pct1 = v => v === null ? '—' : v.toFixed(1) + '%';
 const segP = [];
-SEG.filter(a => a.nocheck !== null && !a.farmshare && !a.mac).forEach(a => {
+SEG.filter(a => a.nocheck !== null && a.std !== null && !a.mac).forEach(a => {
   const s = [a.nocheck];
   segP.push({ x: a.std, y: a.nocheck, r: a, b: false, s });
   if (a.batch) segP.push({ x: a.batch, y: a.nocheck, r: a, b: true, s });
@@ -384,7 +384,7 @@ const segTop = SEG.filter(a => a.nocheck === SEG[0].nocheck).map(a => a.name);
 document.getElementById('seg-note').textContent = 'Highest: ' + segTop.join(' and ') + (segTop.length > 1 ? ', tied' : '') + ' at ' + SEG[0].nocheck.toFixed(1) + '%. Best-value points: ' +
   segP.filter(p => p.front).sort((a, b) => a.x - b.x).map(p => p.r.name + (p.b ? ' (batch)' : '')).join(', ') + '. ' + (f => f ? 'With checking, ' + f.name + ' reaches 100% with the fewest checks (' + f.checks.toFixed(1) + ' per 100 pages).' : '')(SEG.filter(a => a.nocheck !== null && a.after === 100).sort((a, b) => a.checks - b.checks)[0]);
 document.getElementById('seg-rows').innerHTML = SEG.map(a => '<tr><td>' + a.num + '</td><td>' + a.name + '</td><td>' + pct1(a.nocheck) + '</td><td>' + a.checks.toFixed(1) +
-  '</td><td>' + pct1(a.after) + '</td><td>' + a.unflagged + '</td><td>' + (a.farmshare ? 'FarmShare GPUs' : a.mac ? 'free, on your Mac' : a.std ? money(a.std) : 'none') + '</td><td>' + (a.batch ? money(a.batch) : '—') + '</td></tr>').join('');
+  '</td><td>' + pct1(a.after) + '</td><td>' + a.unflagged + '</td><td>' + (a.farmshare ? (a.std ? money(a.std) + ' (OpenRouter rate)' : 'free, fits on the Mac') : a.mac ? 'free, on your Mac' : a.std ? money(a.std) : 'none') + '</td><td>' + (a.batch ? money(a.batch) : '—') + '</td></tr>').join('');
 charts.push({ P: segP, canvas: document.querySelector('#seg-chart canvas'), seg: true });
 
 const publicSeg = DATA.public_segmentation || [];
@@ -432,14 +432,14 @@ const n0 = v => Math.round(v).toLocaleString();
 const best = FS.truth[0];
 document.getElementById('fs-lede').textContent = 'Open-weight models on FarmShare L40S GPUs. The highest score on these 96 pages, ' + best.name + ', scored ' +
   best.nes.toFixed(2) + ' NES with every page answered, at ' + n0(best.per_hour) + ' photos an hour, which is about ' + n0(best.gpu_hours_100k) +
-  ' GPU-hours for 100,000 photos. Sub-point score differences are not a ranking.' + (FS.bulk ? ' The separate Qwen3.6 27B pilot on ' + FS.bulk.pages.toLocaleString() + ' real corpus pages across ' + FS.bulk.gpus + ' GPUs read ' +
-  n0(FS.bulk.per_hour_total) + ' pages an hour in all, with ' + FS.bulk.failed + ' failed.' : '');
+  ' GPU-hours for 100,000 photos' + (best.usd_1000 ? ', or ' + money(best.usd_1000) + ' per 1,000 photos at OpenRouter\'s rate for the same model' : '') + '. Sub-point score differences are not a ranking.' + (FS.bulk ? ' The separate Qwen3.6 27B pilot on ' + FS.bulk.pages.toLocaleString() + ' real corpus pages across ' + FS.bulk.gpus + ' GPUs read ' +
+  n0(FS.bulk.per_hour_total) + ' pages an hour in all, with ' + FS.bulk.failed + ' failed; at OpenRouter\'s rate it would have cost ' + money(FS.bulk.usd_total) + ' (' + money(FS.bulk.usd_1000) + ' per 1,000 pages).' : '');
 document.getElementById('fs-truth-rows').innerHTML = FS.truth.map(r => '<tr><td>' + r.name + '</td><td>' + r.kv + '</td><td>' + r.nes.toFixed(2) +
-  '</td><td>' + r.ok + '/' + r.n + '</td><td>' + r.clippings.toFixed(2) + '</td><td>' + n0(r.per_hour) + '</td><td>' + n0(r.gpu_hours_100k) + '</td></tr>').join('');
+  '</td><td>' + r.ok + '/' + r.n + '</td><td>' + r.clippings.toFixed(2) + '</td><td>' + (r.usd_1000 ? money(r.usd_1000) : 'free, fits on the Mac') + '</td><td>' + n0(r.per_hour) + '</td><td>' + n0(r.gpu_hours_100k) + '</td></tr>').join('');
 document.getElementById('fs-news-rows').innerHTML = FS.news.map(r => '<tr><td>' + r.name + '</td><td>' + r.how + '</td><td>' + r.overall.toFixed(3) +
-  '</td><td>' + r.broadsheet.toFixed(3) + '</td><td>' + r.page.toFixed(3) + '</td><td>' + r.answered + '</td><td>' + n0(r.per_hour) + '</td></tr>').join('') +
+  '</td><td>' + r.broadsheet.toFixed(3) + '</td><td>' + r.page.toFixed(3) + '</td><td>' + r.answered + '</td><td>' + (r.fits_mac ? 'free, fits on the Mac' : r.usd_1000 ? money(r.usd_1000) : 'no tokens recorded') + '</td><td>' + n0(r.per_hour) + '</td></tr>').join('') +
   FS.news_reference.map(r => '<tr><td>' + r.label + '</td><td>reference</td><td>' + r.overall.toFixed(3) + '</td><td>' + r.broadsheet.toFixed(3) +
-  '</td><td>' + r.page.toFixed(3) + '</td><td>—</td><td>—</td></tr>').join('');
+  '</td><td>' + r.page.toFixed(3) + '</td><td>—</td><td>—</td><td>—</td></tr>').join('');
 
 
 // Part 5: difficulty and cascades.
@@ -448,7 +448,7 @@ const f2 = v => v === null || v === undefined ? '—' : v.toFixed(2);
 const sgn = v => (v > 0 ? '+' : '') + v.toFixed(2);
 document.getElementById('dif-rank-rows').innerHTML = DF.routes.slice().sort((a, b) => b.adjusted - a.adjusted).map((r, i) =>
   '<tr><td>' + (i + 1) + '</td><td>' + r.name + '</td><td>' + r.answered + '/' + DF.pages + '</td><td>' + f2(r.answered_nes) + '</td><td>' + f2(r.adjusted) +
-  '</td><td>' + sgn(r.page_mix) + '</td><td>' + r.failed + '</td><td>' + f2(r.strict) + '</td><td>' + (r.app ? money(r.price) : '$0') + '</td></tr>').join('');
+  '</td><td>' + sgn(r.page_mix) + '</td><td>' + r.failed + '</td><td>' + f2(r.strict) + '</td><td>' + money(r.price) + '</td></tr>').join('');
 const CURVE = ['claude-sonnet5.5', 'gemini3.8-flash', 'qwen3.8-flash', 'qwen3.5-9b-mlx4', 'apple-vision'];
 const routeName = Object.fromEntries(DF.routes.map(r => [r.id, r.name]));
 const binLabel = DF.curves.bins.map((b, i) => (i === 0 ? 'easiest' : i === 5 ? 'hardest' : 'bin ' + (i + 1)) + ' · ' + (100 - b.difficulty).toFixed(1));
@@ -560,7 +560,7 @@ if (DT) {
   const keys = Object.keys(OM).sort();
   if (keys.length) {
     const orow = (label, m) => '<tr><td>' + label + '</td><td>' + sh(m.year.all.exact) + '</td><td>' + sh(m.year['in text'].exact) +
-      '</td><td>' + sh(m.year['not in text'].exact) + '</td><td>' + sh(m.month.owner) + '</td><td>' + m.parse_failures + ' of ' + m.documents + '</td></tr>';
+      '</td><td>' + sh(m.year['not in text'].exact) + '</td><td>' + sh(m.month.owner) + '</td><td>' + m.parse_failures + ' of ' + m.documents + '</td><td>' + (m.usd_per_1000 ? money(m.usd_per_1000) : 'free, fits on the Mac') + '</td></tr>';
     document.getElementById('date-open-rows').innerHTML = [orow(DT.model + ' (the app\'s default)', DT), ...keys.map(k => orow(name(k), OM[k]))].join('');
     document.getElementById('date-open').hidden = false;
   }

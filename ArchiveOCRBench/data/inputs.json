@@ -54,7 +54,7 @@
     }
   },
   "own_hardware": {
-    "source": "Routes run on our own hardware, not a paid endpoint, so they cost no money. Scores, speed and memory are read from segbench-results; only names and machines are entered here. Mac: ocr-mac-local.md (W41.mac-local-measure), mlx-community/Qwen3-VL-8B-Instruct-4bit through mlx-vlm; ocr-mac-local-hw.md (W41.mac-local-hw), the Vision OCR lab's handwriting pick LightOnOCR-3-4B (prithivMLmods/LightOnOCR-3-4B-MLX, 8bit, at its card's settings) and runner-up Qwen3.5-9B (mlx-community/Qwen3.5-9B-4bit, the panel's prompt, thinking off), on the same Mac. FarmShare: farmshare/truth/ (cbd0e68c), Qwen/Qwen3.6-27B-FP8 on vLLM 0.31.0, one L40S per run (scripts/segbench/institutional-compute/README.md); its cost is GPU time on Stanford's cluster.",
+    "source": "Routes run on our own hardware, not a paid endpoint. The Mac routes cost no money; the FarmShare route is too large for the Mac, so it is priced at OpenRouter's rate for the same model (openrouter_open_weights). Scores, speed and memory are read from segbench-results; only names and machines are entered here. Mac: ocr-mac-local.md (W41.mac-local-measure), mlx-community/Qwen3-VL-8B-Instruct-4bit through mlx-vlm; ocr-mac-local-hw.md (W41.mac-local-hw), the Vision OCR lab's handwriting pick LightOnOCR-3-4B (prithivMLmods/LightOnOCR-3-4B-MLX, 8bit, at its card's settings) and runner-up Qwen3.5-9B (mlx-community/Qwen3.5-9B-4bit, the panel's prompt, thinking off), on the same Mac. FarmShare: farmshare/truth/ (cbd0e68c), Qwen/Qwen3.6-27B-FP8 on vLLM 0.31.0, one L40S per run (scripts/segbench/institutional-compute/README.md); its GPU time on Stanford's cluster is shown beside that price.",
     "routes": {
       "qwen3-vl-8b-mlx4": {"name": "Qwen3-VL 8B 4-bit (Mac)", "where": "mac", "key": "qwen3-vl-8b-mlx4", "pair": "qwen3-vl-8b", "machine": "Apple M3 Pro, 18 GB"},
       "lightonocr-3-4b-mlx8": {"name": "LightOnOCR-3-4B 8-bit (Mac)", "where": "mac", "key": "lightonocr-3-4b-mlx8", "pair": null, "report": "ocr-mac-local-hw.md", "speed": "## Speed and memory: lightonocr-3-4b-mlx8", "machine": "Apple M3 Pro, 18 GB"},
@@ -65,6 +65,26 @@
       {"name": "Qwen3.6 27B fp8, bf16 KV cache (FarmShare)", "run": "qwen3.6-27b-1849744", "machine": "one NVIDIA L40S, Stanford FarmShare"},
       {"name": "Qwen3.6 27B, fp8 at load (FarmShare)", "run": "qwen3.6-27b-dyn-1849745", "machine": "one NVIDIA L40S, Stanford FarmShare"}
     ]
+  },
+  "openrouter_open_weights": {
+    "source": "Models too large for the 18 GB M3 Pro are priced as if the same requests went to OpenRouter, not as free. Rates are OpenRouter's catalogue list prices per million input and output tokens for the same open-weight model (https://openrouter.ai/api/v1/models, read 2026-10-20); every model below is listed there, so none needed an estimate from a similar model. A FarmShare run's price is its own measured tokens (summary.json or pages.csv mean prompt and completion tokens) at these rates. A model not listed here fits on the Mac (CHURRO-3B, GLM-OCR, Qari 4B, Fanar 7B, the 2B and 4B fine-tunes, Qwen3-VL 8B, Qwen3.5 4B) and stays free, though it was run on FarmShare. The key is the run's FS_PRESET with any '-dyn' suffix removed.",
+    "checked": "2026-10-20",
+    "models": {
+      "qwen3.6-27b": {"openrouter": "qwen/qwen3.6-27b", "in": 0.25, "out": 2.0},
+      "qwen3.5-27b": {"openrouter": "qwen/qwen3.5-27b", "in": 0.27, "out": 2.16},
+      "qwen3.6-35b-a3b": {"openrouter": "qwen/qwen3.6-35b-a3b", "in": 0.10, "out": 0.95},
+      "qwen3.5-122b-a10b": {"openrouter": "qwen/qwen3.5-122b-a10b", "in": 0.26, "out": 2.08},
+      "qwen3.8-27b": {"openrouter": "qwen/qwen3.8-27b", "in": 0.04, "out": 1.35}
+    },
+    "dating_tokens": {
+      "source": "date-tagging.json keeps no token counts for the FarmShare dating runs, so the means are entered here: promptTokenCount and candidatesTokenCount averaged over the 300 cached answers in ~/Library/Caches/ArchiveSuiteRehearsal/date-tagging/answers-<model>/ (read 2026-10-20). Runs with thinking on stop at the 512-token cap.",
+      "models": {
+        "qwen3.6-27b": {"prompt": 1560.7, "completion": 512.0},
+        "qwen3.6-27b-nothink": {"prompt": 1562.7, "completion": 136.1},
+        "qwen3.6-35b-a3b": {"prompt": 1560.7, "completion": 512.0},
+        "qwen3.6-35b-a3b-nothink": {"prompt": 1562.7, "completion": 134.5}
+      }
+    }
   },
   "kinds": ["typewritten", "printed", "handwritten"]
 }

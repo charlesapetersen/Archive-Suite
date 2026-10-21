@@ -222,13 +222,14 @@
    "name": "Qwen3.6 27B fp8 (FarmShare)",
    "panel": "farmshare",
    "pair": "qwen3.6-27b",
-   "std": 0.0,
+   "std": 1.95,
    "batch": null,
    "machine": "one NVIDIA L40S, Stanford FarmShare",
    "hw": {
     "photos_per_hour": 1054.7,
     "gpus": 1,
-    "gpu_hours_per_100k": 94.8136910969944
+    "gpu_hours_per_100k": 94.8136910969944,
+    "usd_per_1000": 1.945699494949495
    }
   }
  ],
@@ -236,11 +237,13 @@
   {
    "name": "Qwen3.6 27B fp8, bf16 KV cache (FarmShare)",
    "panel": "farmshare",
+   "std": 1.95,
    "machine": "one NVIDIA L40S, Stanford FarmShare",
    "hw": {
     "photos_per_hour": 903.0,
     "gpus": 1,
-    "gpu_hours_per_100k": 110.74197120708749
+    "gpu_hours_per_100k": 110.74197120708749,
+    "usd_per_1000": 1.9461641414141413
    },
    "scores": {
     "overall": [
@@ -268,11 +271,13 @@
   {
    "name": "Qwen3.6 27B, fp8 at load (FarmShare)",
    "panel": "farmshare",
+   "std": 1.95,
    "machine": "one NVIDIA L40S, Stanford FarmShare",
    "hw": {
     "photos_per_hour": 649.2,
     "gpus": 1,
-    "gpu_hours_per_100k": 154.03573629081947
+    "gpu_hours_per_100k": 154.03573629081947,
+    "usd_per_1000": 1.9512757731958763
    },
    "scores": {
     "overall": [
@@ -1010,7 +1015,7 @@
    "after": 100.0,
    "checks": 86.8,
    "unflagged": 0,
-   "std": null,
+   "std": 1.27,
    "batch": null,
    "farmshare": true,
    "source": "seg-teacher.md"
@@ -1122,7 +1127,8 @@
     "n": 96,
     "clippings": 93.6,
     "per_hour": 1025.6,
-    "gpu_hours_100k": 98
+    "gpu_hours_100k": 98,
+    "usd_1000": 2.1
    },
    {
     "label": "qwen3.6-27b-1849739",
@@ -1134,7 +1140,8 @@
     "n": 96,
     "clippings": 93.51,
     "per_hour": 1054.7,
-    "gpu_hours_100k": 95
+    "gpu_hours_100k": 95,
+    "usd_1000": 1.95
    },
    {
     "label": "qwen3.6-27b-1849744",
@@ -1146,7 +1153,8 @@
     "n": 96,
     "clippings": 93.6,
     "per_hour": 903.0,
-    "gpu_hours_100k": 111
+    "gpu_hours_100k": 111,
+    "usd_1000": 1.95
    },
    {
     "label": "qwen3.5-122b-a10b-1850212",
@@ -1158,7 +1166,8 @@
     "n": 96,
     "clippings": 93.74,
     "per_hour": 729.4,
-    "gpu_hours_100k": 137
+    "gpu_hours_100k": 137,
+    "usd_1000": 2.02
    },
    {
     "label": "qwen3.6-35b-a3b-1850004",
@@ -1170,7 +1179,8 @@
     "n": 96,
     "clippings": 94.08,
     "per_hour": 3327.0,
-    "gpu_hours_100k": 30
+    "gpu_hours_100k": 30,
+    "usd_1000": 0.87
    },
    {
     "label": "qwen3.6-27b-dyn-1849745",
@@ -1182,7 +1192,8 @@
     "n": 96,
     "clippings": 93.6,
     "per_hour": 649.2,
-    "gpu_hours_100k": 154
+    "gpu_hours_100k": 154,
+    "usd_1000": 1.95
    },
    {
     "label": "qwen3.8-27b-1850053",
@@ -1194,7 +1205,8 @@
     "n": 96,
     "clippings": 94.45,
     "per_hour": 1063.2,
-    "gpu_hours_100k": 94
+    "gpu_hours_100k": 94,
+    "usd_1000": 0.78
    },
    {
     "label": "churro-1855420",
@@ -1206,7 +1218,8 @@
     "n": 96,
     "clippings": 92.78,
     "per_hour": 1251.0,
-    "gpu_hours_100k": 80
+    "gpu_hours_100k": 80,
+    "usd_1000": null
    }
   ],
   "news": [
@@ -1215,7 +1228,9 @@
     "how": "DocLayout-YOLO 1280 regions, the kit's glm-ocr route",
     "per_hour": 1087.3,
     "answered": "19/19",
+    "usd_1000": null,
     "name": "GLM-OCR",
+    "fits_mac": true,
     "overall": 0.969,
     "broadsheet": 0.975,
     "page": 0.965
@@ -1225,7 +1240,9 @@
     "how": "whole page",
     "per_hour": 65.2,
     "answered": "17/19",
+    "usd_1000": 12.66,
     "name": "Qwen3.6 27B",
+    "fits_mac": false,
     "overall": 0.967,
     "broadsheet": 0.994,
     "page": 0.949
@@ -1235,7 +1252,9 @@
     "how": "DocLayout-YOLO regions (fs_news_layout.py)",
     "per_hour": 58.0,
     "answered": "19/19",
+    "usd_1000": null,
     "name": "Qwen3.6 27B",
+    "fits_mac": false,
     "overall": 0.965,
     "broadsheet": 0.98,
     "page": 0.954
@@ -1245,7 +1264,9 @@
     "how": "DocLayout-YOLO regions (fs_news_layout.py)",
     "per_hour": 483.8,
     "answered": "19/19",
+    "usd_1000": null,
     "name": "GLM-OCR",
+    "fits_mac": true,
     "overall": 0.959,
     "broadsheet": 0.973,
     "page": 0.949
@@ -1255,7 +1276,9 @@
     "how": "PP-DocLayout regions (fs_news_layout.py)",
     "per_hour": 478.3,
     "answered": "19/19",
+    "usd_1000": null,
     "name": "GLM-OCR",
+    "fits_mac": true,
     "overall": 0.938,
     "broadsheet": 0.966,
     "page": 0.92
@@ -1265,7 +1288,9 @@
     "how": "PP-DocLayout regions (fs_news_layout.py)",
     "per_hour": 64.6,
     "answered": "19/19",
+    "usd_1000": null,
     "name": "Qwen3.6 27B",
+    "fits_mac": false,
     "overall": 0.936,
     "broadsheet": 0.97,
     "page": 0.914
@@ -1275,7 +1300,9 @@
     "how": "whole page",
     "per_hour": 67.4,
     "answered": "15/19",
+    "usd_1000": 6.93,
     "name": "Qwen3.8 27B",
+    "fits_mac": false,
     "overall": 0.893,
     "broadsheet": 0.827,
     "page": 0.937
@@ -1381,7 +1408,9 @@
      "mean_tokens_out": 223
     }
    },
-   "note": "Model: qwen3.6-27b, fp8 KV cache, one L40S per shard, 32 requests in flight per server. wall_s per page is with 32 in flight, so it ranks pages but is not a page time. Kind is the model's own label (90% right on the truth set)."
+   "note": "Model: qwen3.6-27b, fp8 KV cache, one L40S per shard, 32 requests in flight per server. wall_s per page is with 32 in flight, so it ranks pages but is not a page time. Kind is the model's own label (90% right on the truth set).",
+   "usd_1000": 2.21,
+   "usd_total": 4.41
   }
  },
  "difficulty": {
@@ -1753,7 +1782,7 @@
    {
     "id": "qwen3.6-27b-farmshare",
     "name": "Qwen3.6 27B fp8 (FarmShare)",
-    "price": 0.0,
+    "price": 1.95,
     "app": false,
     "strict": 95.25,
     "answered": 96,
@@ -7513,7 +7542,7 @@
     "model": "qwen3.6-27b",
     "documents": 300,
     "usd": 0.0,
-    "usd_per_1000": 0.0,
+    "usd_per_1000": 1.41,
     "year": {
      "year+month": {
       "exact": [
@@ -7628,7 +7657,7 @@
     "model": "qwen3.6-27b-nothink",
     "documents": 300,
     "usd": 0.0,
-    "usd_per_1000": 0.0,
+    "usd_per_1000": 0.66,
     "year": {
      "year+month": {
       "exact": [
@@ -7743,7 +7772,7 @@
     "model": "qwen3.6-35b-a3b",
     "documents": 300,
     "usd": 0.0,
-    "usd_per_1000": 0.0,
+    "usd_per_1000": 0.64,
     "year": {
      "year+month": {
       "exact": [
@@ -7858,7 +7887,7 @@
     "model": "qwen3.6-35b-a3b-nothink",
     "documents": 300,
     "usd": 0.0,
-    "usd_per_1000": 0.0,
+    "usd_per_1000": 0.28,
     "year": {
      "year+month": {
       "exact": [

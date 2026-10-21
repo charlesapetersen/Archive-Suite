@@ -4,9 +4,9 @@ What the bench has measured, as one page you can read and share. It has seven pa
 
 1. **OCR.** The W41 OCR panel: twenty-five hosted routes read the same 96 adjudicated truth pages, and each is
    scored for accuracy (NES) against its price per 1,000 pages, overall and separately for typewritten, printed and
-   handwritten pages. Four more routes ran the same pages on our own hardware and are drawn in the free column:
-   Qwen3-VL 8B at 4-bit, LightOnOCR-3-4B at 8-bit and Qwen3.5-9B at 4-bit on the owner's Mac, and Qwen3.6 27B at
-   fp8 on one L40S on Stanford FarmShare.
+   handwritten pages. Four more routes ran the same pages on our own hardware: Qwen3-VL 8B at 4-bit, LightOnOCR-3-4B at 8-bit and
+   Qwen3.5-9B at 4-bit on the owner's Mac, drawn in the free column, and Qwen3.6 27B at fp8 on one L40S on Stanford
+   FarmShare, which is too large for the Mac and so is priced at OpenRouter's rate for the same model.
 2. **Segmentation.** How well each approach splits a box of photographs into documents, on the two locked test
    boxes (Stanton and RG 165, 363 pages): pages in the exact document with no checking, against price; and, in a
    table, the checks per 100 pages each needs, the pages right after checking, and the errors left unflagged.
@@ -14,7 +14,7 @@ What the bench has measured, as one page you can read and share. It has seven pa
    handwritten truth pages, as missed and added words. A different truth set and score from part 1; the pick and
    runner-up are also on part 1's charts as Mac routes, scored by NES (W41.mac-local-hw).
 4. **FarmShare.** Open-weight models served on Stanford's FarmShare GPUs, one L40S each: the same 96 truth pages
-   scored as part 1 scores them, with photos an hour in place of price (FarmShare costs nothing); NewsBench's
+   scored as part 1 scores them, with photos an hour and, for each model too large for the Mac, its price at OpenRouter's rate; NewsBench's
    newspaper pages read whole and through a layout detector, scored by NewsBench; and a 2,000-page run on the real
    corpus. Read from `ArchiveProcessor/segbench-results/farmshare/` (`build.py` → `farmshare()`).
 5. **Difficulty and cascades.** Part 1's routes ranked on the pages they answered, apart from their failures, with a
@@ -126,8 +126,12 @@ Python standard library.
 - **Prices** are the measured charge per page, times 1,000: OpenRouter's on the panel's pinned endpoint, and
   Mistral's published rate for Mistral OCR. The local panel's costs include its reports' conservative ceilings
   for calls with no billing record. Apple
-  Vision runs on the device and is drawn in a "free" column, as are the three routes on our Mac (◇). The FarmShare route
-  (□) is priced at $0, since the cluster bills nothing, with its GPU-hours per 100,000 photos beside it. Claude Sonnet 5.5 ran on the subscription, so its
+  Vision runs on the device and is drawn in a "free" column, as are the three routes on our Mac (◇). Models too
+  large for the 18 GB Mac are not free even when they ran on FarmShare, which bills nothing: each is priced at
+  OpenRouter's catalogue list rate for the same open-weight model applied to the run's own measured tokens
+  (`data/inputs.json` → `openrouter_open_weights`, read 2026-10-20). That covers the FarmShare route (□) on the
+  charts, part 4's Qwen tables and the 2,000-page pilot, the segmentation teacher and the dating runs. Models that
+  fit on the Mac (CHURRO-3B, GLM-OCR, the 2B and 4B fine-tunes) stay free. Claude Sonnet 5.5 ran on the subscription, so its
   price is an estimate (`data/inputs.json` → `sonnet_api_estimate`).
 - **Batch points** sit at half the measured cost, for routes whose batch price is half their standard price.
   A dotted line joins the two points.
