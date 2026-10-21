@@ -52,3 +52,9 @@ After strands B (running), C and D: weekly all-models 12%, Fable 15%; the 5-hour
 4-5% of the Fable week, so G, H and K wait for the 5-hour reset (07:40 UTC). At 21:52 local the 5-hour window was 93%, Fable week 23%.
 
 The owner's Gemini report is assessed in `screens/gemini-report-2026-10-20.md` (HR-DocStream does not exist).
+
+## Phase 2
+
+- [x] 2026-10-21 — gap audit drafted (Fable) and checked: `10-gap-audit.md`, 40 ranked items, seven owner decisions.
+- [ ] Owner's decisions on section 6, then file Phase 3 items with plan-edit.sh.
+- Engine paused for Archive Suite by the owner during Phase 2 (2026-10-21; `manager.py resume "Archive Suite"`).
