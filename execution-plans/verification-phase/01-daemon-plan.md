@@ -107,17 +107,17 @@ out larger splits itself: file `<tag>a`, `<tag>b` … with `(blocked-on:)` chain
 - **`W40.i1` — build it again.** Shipped 2026-10-21: it built with no source changes, for the simulator and
   the device, against the bundled iOS 27 SDK and with no simulator runtime installed; the gate's `ios-build`
   step builds it. See `SUITE_TODO_DONE.md`.
-- **`W40.i2` — parity with Android [M].** A feature-by-feature comparison of iOS and Android, written into
-  `verification/capture.md`. Include every fix recorded as Android-only while parked (search the done-records for
-  "iOS twin" and "PARKED"; `W23.m1` is one). File each gap as `W40.i-fix-<slug>` (blocked-on: W40.i2).
+- **`W40.i2` — parity with Android.** Shipped 2026-10-21: `verification/capture.md`. The wire contract matches; iOS
+  lacks the parked-era Android safety fixes. Eleven `W40.i-fix-ios-*` items filed (two S1), see `SUITE_TODO_DONE.md`.
 - **`W40.i3` — iOS in the phone↔Mac E2E [M].** Extend `ArchiveProcessor/scripts/e2e-phone-mac.sh` to drive the
   iOS simulator through the same inject seam Android uses. Running a simulator needs the runtime W40.i1 did
-  not install (about 16 GB): check free disk first and stop and report under 30 GB (13 GB on 2026-10-21). Blocked on the parity fixes the comparison files; add
-  their tags to this line when they are filed.
+  not install (about 16 GB): check free disk first and stop and report under 30 GB (13 GB on 2026-10-21). Blocked on the parity fixes `W40.i2` filed (every
+  `W40.i-fix-ios-*` but `polish`, listed in its `SUITE_TODO.md` line). It also builds the iOS inject seam.
 - **`W40.i5` — borrowed-iPhone session pack [S].** The owner has no iPhone and no paid developer account; a
   phone is borrowed for one concentrated period. Prepare `verification/sessions/iphone-1.md` so that period goes
   on testing: free-Apple-ID signing steps in Xcode (Personal Team; the install lasts seven days), enabling
-  Developer Mode on the phone and trusting the developer, pairing with the Mac over Wi-Fi and USB, then the
+  Developer Mode on the phone and trusting the developer, minting the iOS Google OAuth client if the Drive relay is
+  to be tried (`W40.i-fix-ios-drive-oauth-client`), pairing with the Mac over Wi-Fi and USB, then the
   capture tasks in order with a note form. Everything the simulator can show must already be shown, so the
   borrowed phone tests only camera, real network and the device itself.
 - **`W40.i4` — real-iPhone pass — OWNER.** HOLD QUEUE only. The owner's concentrated session with a borrowed

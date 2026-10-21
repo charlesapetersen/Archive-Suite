@@ -409,3 +409,50 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Status:** `open`
 - **History:**
   - 2026-10-20 W40.e6 — raised.
+
+### S-021 · Android's Drive relay reports a segment signal as sent when the Drive write failed
+
+- **Raised:** 2026-10-21 · W40.i2 · parity comparison, by code reading.
+- **Suspected behaviour:** `DriveRelayTransport.segmentComplete` (`ArchiveProcessor/ArchiveCapture/app/src/main/java/
+  com/archiveprocessor/capture/net/DriveRelayTransport.kt:88-93`) returns `true` after `upsert`, which swallows every
+  exception. If the `<group>.segment.json` write fails, the phone records the segment as acked and never re-sends
+  the signal, so the Mac shows no tag card for that segment until Finish force-completes it. iOS returns `false`
+  here and retries.
+- **Where:** `DriveRelayTransport.kt:33-40`, `:88-93`.
+- **Would confirm it:** a test in `DriveRelayTransportTest` whose `MockDrive` answers the segment create with a 500:
+  `segmentComplete` returns `true` and no segment object exists.
+- **Would clear it:** `segmentComplete` returns `false` in that test.
+- **Status:** `open`
+- **History:**
+  - 2026-10-21 W40.i2 — raised.
+
+### S-022 · iOS may write a HEIC photo, or a wrongly rotated one, into a `.jpg` the Mac reads as JPEG
+
+- **Raised:** 2026-10-21 · W40.i2 · parity comparison, by code reading.
+- **Suspected behaviour:** `CameraController` (`ArchiveProcessor/ArchiveCaptureiOS/Sources/ArchiveCaptureiOS/Camera/
+  CameraController.swift:63-92`) captures with default `AVCapturePhotoSettings()` and sets neither the codec nor the
+  connection's orientation. If the default were HEVC, `fileDataRepresentation()` would be HEIC bytes saved as
+  `img_*.jpg` and sent as `image/jpeg`. A portrait shot may also carry an orientation the Mac's pipeline does not
+  apply.
+- **Where:** `Camera/CameraController.swift:63-92`.
+- **Would confirm it:** on a simulator with a camera stand-in, or the borrowed phone (`W40.i4`), capture one portrait
+  and one landscape page and check the first bytes (`FF D8 FF`) and the EXIF orientation of what reaches the Mac.
+- **Would clear it:** both files are JPEG and both read upright on the Mac.
+- **Status:** `open`
+- **History:**
+  - 2026-10-21 W40.i2 — raised.
+
+### S-023 · iOS uploads may be cut off whenever the phone leaves the app
+
+- **Raised:** 2026-10-21 · W40.i2 · parity comparison, by code reading.
+- **Suspected behaviour:** the iOS companion requests no background time (`beginBackgroundTask`) and uses a default
+  `URLSession`. When the operator switches apps or locks the phone mid-upload, iOS suspends the process and the
+  request fails; the 8 s auto-retry resends it on return. Nothing is lost, but uploads stall while the app is away,
+  and a Mac waiting on Finish waits with it.
+- **Where:** `Capture/CaptureViewModel.swift:416-460`, `Net/MacClient.swift`.
+- **Would confirm it:** in the `W40.i3` simulator E2E, background the app during a multi-page upload and record
+  whether in-flight requests fail.
+- **Would clear it:** the uploads finish while the app is in the background.
+- **Status:** `open`
+- **History:**
+  - 2026-10-21 W40.i2 — raised.
