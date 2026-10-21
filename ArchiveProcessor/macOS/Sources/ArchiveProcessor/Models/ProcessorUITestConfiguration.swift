@@ -44,6 +44,39 @@ enum ProcessorUITestConfiguration {
         return syntheticMultiPagePDF()
     }
 
+    /// W40.e12: realistic volume for the visual review — 60 synthetic page images, some with long archival
+    /// file names, built in this app's own temporary directory and admitted like a drop. Never a corpus file.
+    static var droppedVolume: [URL]? {
+        guard isActive, arguments.contains("-APUITestSyntheticVolume") else { return nil }
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("archive-processor-uitest-volume", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        var urls: [URL] = []
+        for i in 1...60 {
+            let name = i % 7 == 0
+                ? String(format: "Box 214 Folder 37 — Memorandum for the President from the Director of the Office of Management and Budget re FY1982 deficit projections, page %03d.png", i)
+                : String(format: "IMG_%04d.png", 4100 + i)
+            let url = dir.appendingPathComponent(name)
+            if !FileManager.default.fileExists(atPath: url.path) {
+                let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: 120, pixelsHigh: 160, bitsPerSample: 8,
+                                           samplesPerPixel: 3, hasAlpha: false, isPlanar: false,
+                                           colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)
+                rep.flatMap { NSGraphicsContext(bitmapImageRep: $0) }.map { ctx in
+                    NSGraphicsContext.saveGraphicsState()
+                    NSGraphicsContext.current = ctx
+                    NSColor(white: 0.93, alpha: 1).setFill()
+                    NSBezierPath(rect: NSRect(x: 0, y: 0, width: 120, height: 160)).fill()
+                    "p. \(i)".draw(at: NSPoint(x: 12, y: 70), withAttributes: [.font: NSFont.systemFont(ofSize: 16)])
+                    NSGraphicsContext.restoreGraphicsState()
+                }
+                guard let png = rep?.representation(using: .png, properties: [:]),
+                      (try? png.write(to: url, options: .atomic)) != nil else { continue }
+            }
+            urls.append(url)
+        }
+        return urls
+    }
+
     /// Apply deterministic, no-key defaults before SwiftUI creates any `@AppStorage` view. This is a
     /// launch argument rather than a scheme default so ordinary Debug launches remain unchanged.
     static func installScratchDefaults() {

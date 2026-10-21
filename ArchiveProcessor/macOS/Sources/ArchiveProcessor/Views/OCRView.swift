@@ -297,6 +297,9 @@ struct OCRView: View {
             if droppedFiles.isEmpty, let testPDF = ProcessorUITestConfiguration.droppedPDF {
                 handleDroppedURLs([testPDF])
             }
+            if droppedFiles.isEmpty, let volume = ProcessorUITestConfiguration.droppedVolume {
+                handleDroppedURLs(volume)
+            }
 #endif
         }
         .onChange(of: taggingModeRaw) { _, _ in
