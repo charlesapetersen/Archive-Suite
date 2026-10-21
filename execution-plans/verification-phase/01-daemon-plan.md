@@ -223,7 +223,10 @@ where it can.
   row `R-47`, suspects `S-016`–`S-018`.)*
 - **`W40.e6` — parser robustness [M].** In-suite fuzz loops (truncate, flip bytes, nest) over the tag format, note
   front-matter, the relay object format, the staging manifest and page-2 metadata; property tests for tag
-  write-then-read round trips. A crash or a silent wrong value is a bug; a clean error is a pass.
+  write-then-read round trips. A crash or a silent wrong value is a bug; a clean error is a pass. *(SHIPPED
+  2026-10-20: `ParserFuzzTests`, `FrontMatterMutationFuzzTests`, `test-relay-fuzz.sh` (gate step), recovery Test
+  27b; evidence `verification/evidence/core/W40.e6-parser-robustness.md`. Fixed the tag facets' sign/zero leniency
+  and `W40.fix-notes-unclosed-header`; filed three `W40.fix-*`.)*
 - **`W40.e7` — mutation sample on the irreversible paths [M].** About ten planted mutants each in the tag writer,
   finalize/Trash, note save and Reader undo. Prove each mutant landed before believing it survived. Survivors are
   missing tests, filed as `S3`.

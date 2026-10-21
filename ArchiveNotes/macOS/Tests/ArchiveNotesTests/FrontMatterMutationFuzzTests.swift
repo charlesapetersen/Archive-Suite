@@ -102,6 +102,23 @@ struct FrontMatterMutationFuzzTests {
         }
     }
 
+    /// `W40.fix-notes-unclosed-header`'s reproduction, verbatim (`verification/evidence/notes/W40.c1-rehearsal-
+    /// store-load.md`): the nine-line note gained one `<!-- block: freeform -->` per save. Encoded three times,
+    /// it must come back byte-identical every time.
+    @Test
+    func rehearsalStoreUnclosedHeaderNoteIsStableAcrossThreeSaves() throws {
+        let body = "Intro paragraph.\n\n<!-- block: reader-page\n     link: broken header with no close\n\nTail paragraph.\n"
+        let text = "---\nschema: 1\nid: \(UUID().uuidString.lowercased())\nkind: note\ntitle: Unclosed\nroundup: false\n"
+            + "created: 2026-10-14T00:00:00Z\nmodified: 2026-10-14T00:00:00Z\n---\n" + body
+        var saved = text
+        for save in 1...3 {
+            let item = try FrontMatterCodec.decode(saved)
+            #expect(item.blocks.map(\.kind) == [.freeform], "save \(save)")
+            saved = FrontMatterCodec.encode(item)
+            #expect(saved == text, "save \(save) changed the file")
+        }
+    }
+
     /// The same file through the editor: the bridge's save writes a header for every chip, so a degraded
     /// block must not get one — or every edit-and-save in the window adds a block, as the store's did.
     @Test @MainActor

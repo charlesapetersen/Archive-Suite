@@ -378,3 +378,34 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Status:** `open`
 - **History:**
   - 2026-10-16 W40.e5 — raised.
+
+### S-019 · Typing `-->` after an unclosed Notes block header may drop the lines before it
+
+- **Raised:** 2026-10-20 · W40.e6 · the Tier-2 review of the unclosed-header fix, by code reading.
+- **Suspected behaviour:** a degraded block (an unclosed `<!-- block: reader-doc` header, kept as text) is still
+  live syntax. If the user types prose and then a line holding `-->` into it and saves, the next read takes
+  everything up to that `-->` as the header, and `parseHeader` drops every header line without a colon
+  (`ArchiveNotes/macOS/Sources/ArchiveNotes/Store/BlockParser.swift:236`), so the prose lines vanish. The same
+  happened before the W40.e6 fix.
+- **Where:** `Store/BlockParser.swift` `parseSegment` / `parseHeader`.
+- **Would confirm it:** a unit test: decode a note whose body is `<!-- block: reader-doc\n link: x\nSome prose\nA --> B`,
+  encode it, decode again, and look for "Some prose" in the blocks' markdown.
+- **Would clear it:** "Some prose" survives.
+- **Status:** `open`
+- **History:**
+  - 2026-10-20 W40.e6 — raised.
+
+### S-020 · An extract built from a degraded Notes block may detach its text from the passage
+
+- **Raised:** 2026-10-20 · W40.e6 · the Tier-2 review of the unclosed-header fix, by code reading.
+- **Suspected behaviour:** `ExtractBuilder.flattenedNestedHeaders` (`ArchiveNotes/macOS/Sources/ArchiveNotes/Core/
+  ExtractBuilder.swift:207`) keeps an unclosed opener in a passage's text. An extract covering a degraded block is
+  then saved as a note-passage header followed by that opener; on reload the note-passage block is empty and the
+  text is a separate freeform block with no provenance.
+- **Where:** `Core/ExtractBuilder.swift:200-215`.
+- **Would confirm it:** a unit test: build an extract from a note holding a degraded block, encode, decode, and
+  check that the passage's block still holds the text.
+- **Would clear it:** the passage keeps its text and its source.
+- **Status:** `open`
+- **History:**
+  - 2026-10-20 W40.e6 — raised.
