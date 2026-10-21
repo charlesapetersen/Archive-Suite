@@ -40,7 +40,9 @@ The question the review set was whether to read a photographed page in one shot 
   seven on 99 pages. The two sets rank the models differently: LightOnOCR-3 4B leads the 895 and is fourth on the 96.
   Recommendations for the owner's material therefore rest on the 96 first, and the both-sets rule is confirmed in
   practice. Both LightOnOCR models score about 68 on the 96's table pages against 82-92 for the others; unexplained,
-  and folded into W46.ocr-regions. Ling 3 Flash VL's 96-page run is still pending on FarmShare.
+  and folded into W46.ocr-regions. Ling 3 Flash VL's 96-page run (c4fc5575) then scored 93.74, the best of the eight,
+  with no caps, against 60.2 on the 895; it needs four L40S (93 GPU-minutes for 99 pages), and the Qwen 27B runs remain
+  above it at 95.3. Lines above that call the runs pending are superseded.
 - HR-DocStream: the owner confirmed it was invented by the Gemini session (2026-10-20); owner question 2 is closed.
 - The NewsBench disagreement between E and C is two different runs, not an error: our lab's score file
   (`farmshare/news/newsbench-score.txt`) has qwen3.8-flash at 0.907 on PaddleX regions and 0.341 whole-page; C's 0.125
