@@ -5,7 +5,7 @@
       --route glm-ocr=OUT/glm-ocr:native --route qwen3-vl-8b=OUT/qwen3-vl-8b:panel \
       --route ppocrv6-medium=OUT/ppocrv6-medium-native:pipeline ...
 
-Each ROOT is one model's folder from a truth96 run (execution-plans/truth96-farmshare-20261020.md): readings in
+Each ROOT is one model's folder from a truth96 run (segbench-results/farmshare/truth96-20261020.md): readings in
 ROOT/results/ocr/<folder name>/<page>.json, or ROOT/raw/ for the PP-OCRv6 pipeline. Readings go through
 farmshare_expanded_report.reading() in the route's mode (panel parses KIND/TABLE/TEXT; native scores the reply as
 written; pipeline accepts status ok without a finish reason), and every page through ocr_panel_score.score() against
@@ -103,6 +103,13 @@ def collector_wall(root, mode, records):
     return pilot['wall_s'] + full['wall_s']
 
 
+def precision(model, mode):
+    """Weight precision as run: the pipeline's default, the publisher's fp8 checkpoint (Ling 3 Flash VL), else bf16."""
+    if mode == 'pipeline':
+        return 'pipeline default'
+    return 'fp8 (publisher checkpoint)' if model.lower().endswith('-fp8') else 'bf16'
+
+
 def strata(rr):
     """ocr-truth.md's draw strata (date bins; the handwritten, clippings and tables tags) and the panel's kinds."""
     groups = collections.defaultdict(list)
@@ -155,7 +162,7 @@ def score_route(label, root, mode, jobs, truth_dir, rows, agreement, sacct, gpus
     summary = {
         'label': f'{label}-{job}',
         'env': {'model': st['model'], 'revision': st.get('revision'), 'route': st.get('route'), 'mode': mode,
-                'precision': 'pipeline default' if mode == 'pipeline' else 'bf16',
+                'precision': precision(st['model'], mode),
                 'SLURM_JOB_ID': job, 'SLURMD_NODENAME': job_row.get('NodeList'), 'FS_MODEL': st['model'],
                 'FS_PRESET': preset,
                 'FS_VLLM_ARGS': st.get('server_args', ''),

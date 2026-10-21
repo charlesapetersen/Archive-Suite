@@ -50,6 +50,13 @@ class Outcomes(unittest.TestCase):
         self.assertFalse(T.repetitive(''))
 
 
+class Precision(unittest.TestCase):
+    def test_fp8_checkpoint_is_not_labelled_bf16(self):
+        self.assertEqual(T.precision('inclusionAI/Ling-3.0-flash-VL-fp8', 'panel'), 'fp8 (publisher checkpoint)')
+        self.assertEqual(T.precision('Qwen/Qwen3-VL-8B-Instruct', 'panel'), 'bf16')
+        self.assertEqual(T.precision('PP-OCRv6 medium', 'pipeline'), 'pipeline default')
+
+
 class Wall(unittest.TestCase):
     def test_vllm_wall_adds_pilot_and_full_pass_and_pipeline_sums_pages(self):
         with tempfile.TemporaryDirectory() as d:

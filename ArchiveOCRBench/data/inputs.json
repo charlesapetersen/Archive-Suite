@@ -67,14 +67,15 @@
     ]
   },
   "openrouter_open_weights": {
-    "source": "Models too large for the 18 GB M3 Pro are priced as if the same requests went to OpenRouter, not as free. Rates are OpenRouter's catalogue list prices per million input and output tokens for the same open-weight model (https://openrouter.ai/api/v1/models, read 2026-10-20); every model below is listed there, so none needed an estimate from a similar model. A FarmShare run's price is its own measured tokens (summary.json or pages.csv mean prompt and completion tokens) at these rates. A model not listed here fits on the Mac (CHURRO-3B, GLM-OCR, Qari 4B, Fanar 7B, the 2B and 4B fine-tunes, Qwen3-VL 8B, Qwen3.5 4B) and stays free, though it was run on FarmShare. The key is the run's FS_PRESET with any '-dyn' suffix removed.",
+    "source": "Models too large for the 18 GB M3 Pro are priced as if the same requests went to OpenRouter, not as free. Rates are OpenRouter's catalogue list prices per million input and output tokens for the same open-weight model (https://openrouter.ai/api/v1/models, read 2026-10-20); every model below is listed there, so none needed an estimate from a similar model. A FarmShare run's price is its own measured tokens (summary.json or pages.csv mean prompt and completion tokens) at these rates. A model not listed here fits on the Mac (CHURRO-3B, GLM-OCR, Qari 4B, Fanar 7B, the 2B and 4B fine-tunes, Qwen3-VL 8B, Qwen3.5 4B) and stays free, though it was run on FarmShare. The key is the run's FS_PRESET with any '-dyn' suffix removed. Ling 3 Flash VL was read on 2026-10-21: OpenRouter lists inclusionai/ling-3.0-flash-vl (Hugging Face inclusionAI/Ling-3.0-flash-VL) at $0.06 in and $0.18 out, served by one provider, DeepInfra, at fp16; the FarmShare run used the publisher's fp8 checkpoint of the same model on four L40S, too large for the Mac.",
     "checked": "2026-10-20",
     "models": {
       "qwen3.6-27b": {"openrouter": "qwen/qwen3.6-27b", "in": 0.25, "out": 2.0},
       "qwen3.5-27b": {"openrouter": "qwen/qwen3.5-27b", "in": 0.27, "out": 2.16},
       "qwen3.6-35b-a3b": {"openrouter": "qwen/qwen3.6-35b-a3b", "in": 0.10, "out": 0.95},
       "qwen3.5-122b-a10b": {"openrouter": "qwen/qwen3.5-122b-a10b", "in": 0.26, "out": 2.08},
-      "qwen3.8-27b": {"openrouter": "qwen/qwen3.8-27b", "in": 0.04, "out": 1.35}
+      "qwen3.8-27b": {"openrouter": "qwen/qwen3.8-27b", "in": 0.04, "out": 1.35},
+      "ling3-flash-vl-fp8": {"openrouter": "inclusionai/ling-3.0-flash-vl", "in": 0.06, "out": 0.18}
     },
     "dating_tokens": {
       "source": "date-tagging.json keeps no token counts for the FarmShare dating runs, so the means are entered here: promptTokenCount and candidatesTokenCount averaged over the 300 cached answers in ~/Library/Caches/ArchiveSuiteRehearsal/date-tagging/answers-<model>/ (read 2026-10-20). Runs with thinking on stop at the 512-token cap.",

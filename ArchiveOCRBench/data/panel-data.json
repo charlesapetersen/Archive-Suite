@@ -1183,6 +1183,19 @@
     "usd_1000": 0.87
    },
    {
+    "label": "ling3-flash-vl-fp8-1861703",
+    "name": "Ling 3 Flash VL (publisher fp8, 4 GPUs)",
+    "kv": "bf16",
+    "gpus": 4,
+    "nes": 93.74,
+    "ok": 96,
+    "n": 96,
+    "clippings": 93.38,
+    "per_hour": 76.6,
+    "gpu_hours_100k": 1305,
+    "usd_1000": 0.33
+   },
+   {
     "label": "qwen3.6-27b-dyn-1849745",
     "name": "Qwen3.6 27B, fp8 at load time",
     "kv": "fp8",
