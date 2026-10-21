@@ -219,6 +219,15 @@ depends on the apps' current settings, structure or outputs.
   about $8 list / $4 batch. Newer gateway models need the owner to request access; on 2026-10-21 the key had only
   older ones (Gemini 2.0 Flash/2.5 Pro, Claude 4.5 Sonnet/Opus 4.6, GPT-5/5.2), not Gemini 3.7 Flash, Claude 5
   Sonnet, GPT 5.6 Luna or GLM 5.3 Flash.
+- ⛔ **Plan routes wait for the gateway (owner, 2026-10-21).** No bench or experiment arm runs a model through the
+  Claude or ChatGPT plan (`claude -p`, `codex exec`, the app's Local Agent backend) until `W46.gateway-models-ok` is
+  ticked; that model's arm then runs through the gateway, in the item's `-paid` half. The Phase 3 queue was filed
+  with $0 plan-route arms in its free halves; those arms are held, and the rest of each item (open models, cached
+  replies, scorers) goes ahead. Held 2026-10-21: `W46.seg-lincoln-cloud` and `W46.seg-lincoln-cloud-codex` wait on
+  the gate outright (their Claude c1 windows of 14:31 stay as results; the live c2 runs were stopped); the plan-route
+  arms of `W46.ocr-regions`, `W46.date-traceable`, `W46.marks-detect`, `W46.ent-robust`, `W46.ent-score` and the
+  `claude -p` voter in `W46.kit-gate` are skipped. Coding sessions themselves (the engine running on the plan) are not
+  arms and are unaffected.
 - ⏸ **Paid hosted benchmarking is on hold (owner, 2026-10-17).** Open-weight models on FarmShare first; paid hosted
   bench runs wait for `W43.sweep` at the end of the queue, behind a full price estimate. A session that wants a paid
   run and defers it adds a line to [`execution-plans/paid-runs-deferred.md`](execution-plans/paid-runs-deferred.md)
