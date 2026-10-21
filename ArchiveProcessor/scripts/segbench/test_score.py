@@ -104,6 +104,55 @@ class Toys(unittest.TestCase):
         self.assertEqual(r["pages_in_exact_doc"], 1.0)
         self.assertEqual(r["edits_per_100_pages"], 0.0)
 
+    def test_field_scorers_perfect(self):
+        r = d(self.T, list(self.T))
+        self.assertEqual((r["kappa"], r["doc_f1"], r["pq"], r["rq"], r["sq"], r["stp"]), (1.0,) * 6)
+        self.assertEqual(r["mndd"], 0)
+
+    def test_field_scorers_one_merge_by_hand(self):
+        # Truth [2,3,4] [5] [6,7]; predicted [2..5] [6,7].
+        r = d(self.T, [B, F, N, C, C, C, N, C])
+        self.assertAlmostEqual(r["doc_precision"], 1 / 2)
+        self.assertAlmostEqual(r["doc_f1"], 0.4)               # 2 (1/2)(1/3) / (5/6)
+        # IoU: [2,3,4]~[2..5] 3/4 matches, [5]~[2..5] 1/4 does not, [6,7] 1. TP 2, FP 0, FN 1.
+        self.assertAlmostEqual(r["rq"], 0.8)
+        self.assertAlmostEqual(r["sq"], 0.875)
+        self.assertAlmostEqual(r["pq"], 0.7)
+        self.assertEqual(r["mndd"], 1)                         # move page 5 out
+        # Gaps 5: tp 1, fs 0, fm 1, tn 3. po 4/5, pe (1*2 + 4*3)/25 = 0.56.
+        self.assertAlmostEqual(r["kappa"], 0.24 / 0.44)
+        self.assertEqual(r["stp"], 0.0)
+
+    def test_field_scorers_no_boundaries(self):
+        r = d([B, F, N, N, N, N], [B, F, N, C, C, C])
+        self.assertEqual((r["pq"], r["rq"], r["sq"]), (0.0, 0.0, 0.0))  # every IoU 1/4
+        self.assertEqual(r["mndd"], 3)
+        self.assertEqual(r["kappa"], 0.0)                      # tp 0, tn 0: agreement is chance
+        self.assertEqual(r["doc_f1"], None)                    # no exact document: 0 precision, 0 recall
+
+    def test_mndd_is_the_best_matching_not_the_greedy_one(self):
+        # Truth [0,1] [2,3,4]; predicted [0] [1,2,3] [4]: move 1 back and 4 back, two drags.
+        self.assertEqual(d([N, C, N, C, C], [N, N, C, C, N])["mndd"], 2)
+        # Truth [0,1,2] [3,4]; predicted [0,1] [2,3,4]: move page 2.
+        self.assertEqual(d([N, C, C, N, C], [N, C, N, C, C])["mndd"], 1)
+        # A chain of four pieces where the middle overlap is largest: truth [0] [1,2,3] [4],
+        # predicted [0,1] [2,3,4]: pieces 1,1,2,1; best is [0]~[0,1] and [1,2,3]~[2,3,4] = 3, so 2.
+        self.assertEqual(d([N, N, C, C, N], [N, C, N, C, C])["mndd"], 2)
+
+    def test_segment_scorers_ignore_photo_pages(self):
+        # The Folder photo called New opens the predicted segment {0,1,2}; on document pages it is
+        # {1,2}, the truth document, so PQ and MNDD see no error. The exact-page-set figures still do.
+        r = d([F, N, C], [N, C, C])
+        self.assertEqual((r["pq"], r["mndd"]), (1.0, 0))
+        self.assertEqual(r["doc_precision"], 0.0)
+
+    def test_field_scorers_pool_as_sums(self):
+        a = score_labels(self.T, [B, F, N, C, C, C, N, C], "a")
+        b = score_labels([B, F, N, N, N, N], [B, F, N, C, C, C], "b")
+        r = derived(a + b)
+        self.assertEqual(r["mndd"], 4)
+        self.assertAlmostEqual(r["rq"], 2 / (2 + (1 + 5) / 2))  # TP 2, FP 0+1, FN 1+4
+
     def test_pk_windowdiff_by_hand(self):
         # 6 pages, truth [0,1,2][3,4,5] -> 2 segments, k = round(6/2/2) = 2 (round half to even -> 2).
         t = [N, C, C, N, C, C]

@@ -22,6 +22,26 @@ Every metric in execution-plans/segmentation/00-plan.md Part 2 "Metrics". Defini
 * Box/folder photos are scored apart: truth photo pages given the exact label, document pages
   wrongly called a photo, and Box/Folder confused with each other.
 
+The field's scorers (W46.fix-seg-scorers; A-segmentation test 2). The segment-level ones are over the
+truth's DOCUMENT PAGES only: truth documents against the predicted segments cut down to those pages (a
+predicted segment that holds a photo page counts for its document pages), so photo errors, scored apart
+above, do not enter them twice.
+* KAPPA: Cohen's kappa of the predicted against the truth boundary decision over document gaps. It
+  corrects agreement for the boundary rate, which differs a lot between boxes (about 59% of document
+  gaps on the development boxes, 31% on Lincoln, 24% on CREST).
+* DOCUMENT F1 on exact page sets: precision = exact documents / predicted segments, recall = exact
+  documents / truth documents (recall is ``docs_exact``).
+* PANOPTIC QUALITY as OpenPSS defines it: a truth document and a predicted segment match when their
+  page sets have IoU over 0.5 (such a match is unique); RQ = TP / (TP + FP/2 + FN/2), SQ = the mean
+  IoU of the matches, PQ = SQ x RQ.
+* STP, the straight-through rate (Heidenreich et al.): the share of streams that need no correction.
+  Our stream is the folder, so STP is ``folders_perfect``; a public box is one stream.
+* MNDD, the minimum number of drag-and-drops (Heidenreich et al.): single-page moves that turn the
+  prediction into the truth = document pages minus the largest page overlap of a one-to-one matching
+  of truth documents to predicted segments (a page left out of the matching is moved once; a truth
+  document matched to nothing is built from moved pages). Both are interval partitions of the same
+  ordered pages, so the matching is a chain and ``_max_matching`` solves it exactly in linear time.
+
 Pooled figures sum the counts over collections (Pk/WindowDiff pool their windows), so a
 pooled percentage is page- or item-weighted, not a mean of per-collection percentages.
 """
@@ -96,6 +116,10 @@ class Counts:
     pk_windows: int = 0
     pk_errors: int = 0
     wd_errors: int = 0
+    pred_docs: int = 0          # predicted segments over the truth's document pages
+    pq_tp: int = 0              # truth documents matched at IoU > 0.5
+    pq_iou: float = 0.0         # sum of the matches' IoU
+    mndd: int = 0               # minimum single-page drag-and-drops
     collections: list = field(default_factory=list)
 
     def __add__(self, o: "Counts") -> "Counts":
@@ -113,6 +137,11 @@ def derived(c: Counts) -> dict:
     p = _ratio(c.tp, c.tp + c.false_splits)
     r = _ratio(c.tp, c.truth_bounds)
     f1 = (2 * p * r / (p + r)) if p is not None and r is not None and (p + r) else None
+    dp, dr = _ratio(c.docs_exact, c.pred_docs), _ratio(c.docs_exact, c.docs)
+    doc_f1 = (2 * dp * dr / (dp + dr)) if dp is not None and dr is not None and (dp + dr) else None
+    fp, fn = c.pred_docs - c.pq_tp, c.docs - c.pq_tp
+    rq = _ratio(c.pq_tp, c.pq_tp + (fp + fn) / 2) if c.pred_docs or c.docs else None
+    sq = c.pq_iou / c.pq_tp if c.pq_tp else (0.0 if rq is not None else None)
     return {
         "collections": "+".join(c.collections),
         "pages": c.pages,
@@ -135,7 +164,46 @@ def derived(c: Counts) -> dict:
         "photo_type_swaps": c.photo_type_swaps,
         "photos_missed": c.photos_missed,
         "false_photos": c.false_photos,
+        "kappa": kappa(c),
+        "doc_precision": dp,
+        "doc_f1": doc_f1,
+        "pq": rq * sq if rq is not None else None,
+        "rq": rq,
+        "sq": sq,
+        "stp": _ratio(c.folders_perfect, c.folders),
+        "mndd": c.mndd,
+        "mndd_per_100_pages": _ratio(100 * c.mndd, c.pages),
     }
+
+
+def kappa(c: Counts) -> float | None:
+    """Cohen's kappa over document gaps; None without gaps, 1.0 when both sides are constant and agree."""
+    n = c.gaps
+    if not n:
+        return None
+    a, b, m = c.tp, c.false_splits, c.false_merges
+    d = n - a - b - m
+    po = (a + d) / n
+    pe = ((a + b) * (a + m) + (m + d) * (b + d)) / (n * n)
+    if pe == 1:
+        return 1.0 if po == 1 else 0.0
+    return (po - pe) / (1 - pe)
+
+
+def _max_matching(pieces: list[tuple[int, int, int]]) -> int:
+    """Largest total overlap of a one-to-one truth/prediction matching. ``pieces`` is the common
+    refinement in page order, (truth segment, predicted segment, pages); both segment indices are
+    non-decreasing along it, so a matching's pairs strictly increase in both and the best one ending
+    at piece i extends the best one ending before the first piece of either of its segments."""
+    first_t: dict[int, int] = {}
+    first_p: dict[int, int] = {}
+    prefix = [0]                       # prefix[j] = best matching within pieces[:j]
+    for i, (t, p, w) in enumerate(pieces):
+        first_t.setdefault(t, i)
+        first_p.setdefault(p, i)
+        best_here = w + prefix[min(first_t[t], first_p[p])]
+        prefix.append(max(prefix[-1], best_here))
+    return prefix[-1]
 
 
 def score_labels(truth: list[str], pred: list[str], name: str = "") -> Counts:
@@ -158,6 +226,27 @@ def score_labels(truth: list[str], pred: list[str], name: str = "") -> Counts:
             c.docs_exact += 1
             c.pages_exact += len(pages)
             exact_pages |= pages
+
+    # The field's segment scorers, over the truth's document pages (the module docstring).
+    pieces: list[list[int]] = []       # (truth segment, predicted segment, pages), in page order
+    seg_sizes: dict[tuple[str, int], int] = {}
+    for i in range(n):
+        if truth[i] in PHOTO:
+            continue
+        key = (t_ids[i], p_ids[i])
+        if pieces and (pieces[-1][0], pieces[-1][1]) == key:
+            pieces[-1][2] += 1
+        else:
+            pieces.append([t_ids[i], p_ids[i], 1])
+        seg_sizes[("t", t_ids[i])] = seg_sizes.get(("t", t_ids[i]), 0) + 1
+        seg_sizes[("p", p_ids[i])] = seg_sizes.get(("p", p_ids[i]), 0) + 1
+    c.pred_docs = sum(k[0] == "p" for k in seg_sizes)
+    for t, p, w in pieces:
+        iou = w / (seg_sizes[("t", t)] + seg_sizes[("p", p)] - w)
+        if iou > 0.5:
+            c.pq_tp += 1
+            c.pq_iou += iou
+    c.mndd = c.doc_pages - _max_matching([tuple(x) for x in pieces])
 
     # Folders: maximal runs of document pages.
     i = 0
