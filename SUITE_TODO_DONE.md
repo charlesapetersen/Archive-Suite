@@ -12016,3 +12016,23 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
 - [x] **W40.fix-notes-row-clip — Notes list rows are clipped to about half their height [S · S3]** · §W40 — verification phase (lane: notes) (uses: build,vm). Owner-reported 2026-10-11 with a screenshot (All Notes, Extracts filter, dark mode): every populated row in the note list is about two-thirds the height of the empty stripe rows below it, so titles and dates show only their top half ("Jul 14, 2026" loses its descenders) and the Quality chevrons sit against the row top. Reproduction is the owner's screenshot; re-reproduce in the VM first and keep that screenshot under `verification/evidence/notes/`. Likely cause [I, not checked]: `NotesTableView.swift:44-45` sets `rowHeight` and then `usesAutomaticRowHeights = true`, so the row height comes from the cell views' constraints, and if those cells have no top-to-bottom constraint chain the rows collapse below the text. Fix, then ship the test that failed before it: a Notes UI test asserting every visible cell's text frame lies inside its row frame, which is the first instance of `W40.e9`. Rows are S3 rather than S4 because the note names are unreadable. Not caught by any existing test: the GUI tests find rows by identifier and click them, which a clipped row still passes.
   - SHIPPED 2026-10-21. Cause as guessed: `NotesTableView` set `usesAutomaticRowHeights = true`, the rows took their height from the cells' fitting sizes, and the text fields' vertical compression resistance (750) lost, collapsing rows to 16 pt with 12 pt text. Every Notes cell is one line, so the table now uses a fixed 24 pt row (`ceil(max(20, 13 × 1.8))`) and no automatic heights. Test: the strict `rowClip` KnownIssue is deleted from `LayoutGuardUITests`, so its sweep (the first instance of `W40.e9`'s every-cell-fits check) now fails on any short list cell; VM 3/3 green, remaining reports all `W40.fix-notes-narrow-window`; title text now 18 pt in a 24 pt cell. Evidence `verification/evidence/notes/W40.fix-notes-row-clip.md`. Not checked here: whether `W40.fix-notes-list-overrun` shares a cause; the title field has leading/trailing constraints to its cell, so likely not.
   <!-- /W40.fix-notes-row-clip -->
+- [x] **W40.b3 — Processor feature ledger [M]** · §W40 — verification phase: prove the Suite works (owner-approved 2026-10-04) · SHIPPED 2026-10-21 (this commit) (lane: processor) (uses: light)
+  `verification/processor.md`: 52 rows (P-01–P-52), each promise written from Processor `README.md`, `CLAUDE.md`,
+  `TESTING.md`, `LIVE_CAPTURE_ANDROID_TEST.md` (Mac side) and `SPEC/tag-format.md` and committed before any code was
+  opened (`d3db14f3`), then traced at `8a03097c` to its entry point (`file:line`) and best real-path test, with four
+  read-only tracing passes; all 511 `file:line` citations checked mechanically and a sample by eye. Count:
+  `unproven 51 · works 1` — P-45 (USB tunnel, Mac side) on `W40.d6`'s evidence. No row unreachable, so no decision
+  for the owner. The phone side stays with `W40.b4` (`capture.md`).
+  **Reproduced:** `scripts/test-drive-store.sh` (and `test-drive-live.sh`) cannot compile — stale pre-de-nest path —
+  filed `W40.fix-drive-script-path` (S3), evidence `verification/evidence/processor/W40.b3-drive-store-path.md`.
+  **Suspects S-024–S-039** in `verification/SUSPECTS.md`; on irreversible paths: S-034 (No tagging / Copy source still
+  write Box/Folder tags with collection segmentation on) and S-036 (an edited collection name with `/` or `..` is
+  filed unnormalised); money: S-025 (OpenAI gateway preset picks a reasoning model), S-026/S-027 (batch not
+  size-based; batch toggle offered for providers without batch), S-032 (unavailable segmentation approach fails only
+  after OCR), S-039 (Stage for later can hand photos off twice).
+  **Drift for `W40.b5`** (22 rows' Notes plus a doc-against-doc list at the ledger's end): README's provider table
+  (no OpenRouter, wrong Gemini default); the processing log is opt-in, not always written; folder input is one level
+  deep, not recursive; rotation is a separate review pass, not part of segmentation review; Test Resolution shows no
+  cost; 503/529 get one fixed retry, not exponential backoff; gateway and Local Agent do not grey out rotation or
+  batch; `TESTING.md`'s "no test target", "586 PDFs" and "Auto date + manual seg". Docs only, no app build.
+  <!-- /W40.b3 -->
