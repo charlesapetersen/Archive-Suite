@@ -15,8 +15,8 @@ Read `00-plan.md`, then this table. Take the first phase step not done. Strand n
   Flash VL (1860274), stock PP-OCRv6 (1860044) and the three Qwen 27B/35B comparison rows, all 895 pages:
   `ArchiveProcessor/segbench-results/bench-corpus/open-sweep-20261019.md`; ArchiveOCRBench Part 7. A review
   baseline; nothing adopted.
-- [ ] Nemotron job 1860275: TIMEOUT at 20:54 on 2026-10-20 with 839 of 895 pages read (631 ok, 207 cap, 1
-  malformed); 56 unread. Not scored. A third submission for the 56 is the owner's call.
+- [x] Nemotron job 1860275: TIMEOUT at 20:54 on 2026-10-20 with 839 of 895 pages read (631 ok, 207 cap, 1
+  malformed); 56 unread. Not scored. Owner: dropped, no third submission.
 - [ ] Add a Sherlock profile to `scripts/segbench/institutional-compute/` once the account exists (strand J
   gathers its partitions, GPU types and limits first).
 

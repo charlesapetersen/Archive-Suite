@@ -137,7 +137,8 @@ unfinished, and do not score a partial cache.
 **Result, read 2026-10-20 21:20 by the processing-review session:** 1860275 ended TIMEOUT at 07:00:16
 (20:54:48). Cached readings: 839 of 895 pages — 631 ok, 207 cap, 1 malformed record; 56 pages unread. The 241
 `error.json` files are all from the first run and every one now has a reading beside it. Not scored (partial).
-Whether to submit a third time for the 56 pages is with the owner.
+Owner, 2026-10-20: dropped, no third submission. 207 caps on 839 pages already put it below
+LightOnOCR-3 4B at many times the GPU cost.
 
 6. Ling3 (1860274) is already complete: 816 ok, 79 cap, no errors. Inkling is parked. Neither needs more FarmShare
    time.

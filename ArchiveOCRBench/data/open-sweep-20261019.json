@@ -142,7 +142,7 @@
   {
    "route": "Nemotron 3.5 Super VL NVFP4",
    "job": 1860275,
-   "state": "Rerun running at 20:55 on 2026-10-20, ends at its limit; partial cache not scored."
+   "state": "Rerun timed out at 7 h on 2026-10-20 with 839 of 895 pages read (631 ok, 207 cap). Not scored (partial). Owner, 2026-10-20: dropped as not competitive; no third submission."
   },
   {
    "route": "Inkling Small Q4 GGUF",
