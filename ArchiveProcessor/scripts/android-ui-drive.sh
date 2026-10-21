@@ -23,8 +23,10 @@ ADB="$(command -v adb || echo "$SDK/platform-tools/adb")"
 # counts every process in the child's session, and passes its lock descriptor down, as holding the Mac-wide heavy
 # lock. A qemu or adb server started here inherited both, so the lock stayed held for as long as the AVD ran and
 # every build on the Mac queued behind it (a following `install` deadlocked on it). New session, fds >2 closed.
-detached(){ python3 -c 'import os, sys; os.setsid(); os.closerange(3, 65536); os.execv(sys.argv[1], sys.argv[1:])' "$@"; }
-detached "$ADB" start-server >/dev/null 2>&1   # before the first adb call below would fork it in-session
+# An array, not a function: `func … &` forks a bash subshell that stays in-session, holding the lock, as the
+# daemon's parent for its whole life; a simple command backgrounded with & execs python (then the daemon) directly.
+DETACHED=(python3 -c 'import os, sys; os.setsid(); os.closerange(3, 65536); os.execv(sys.argv[1], sys.argv[1:])')
+"${DETACHED[@]}" "$ADB" start-server >/dev/null 2>&1   # before the first adb call below would fork it in-session
 # SAFETY: target ONLY the emulator, never a physical phone that may also be attached (a real device
 # could be in use). Pin every adb + gradle call to the emulator serial via ANDROID_SERIAL (both honor it).
 # Derived best-effort at load; the strict "exactly one emulator" check is ENFORCED LAZILY by
@@ -134,7 +136,7 @@ ensure_avd(){ [ -x "$EMULATOR" ] || die "emulator not installed — run: sdkmana
     log "set hw.keyboard=yes in $cfg"
   fi; }
 boot(){ ensure_avd
-  log "booting headless emulator $AVD"; detached "$EMULATOR" -avd "$AVD" -no-window -no-audio -no-boot-anim -no-snapshot -camera-back virtualscene -gpu swiftshader_indirect >/tmp/ap-emu.log 2>&1 &
+  log "booting headless emulator $AVD"; "${DETACHED[@]}" "$EMULATOR" -avd "$AVD" -no-window -no-audio -no-boot-anim -no-snapshot -camera-back virtualscene -gpu swiftshader_indirect >/tmp/ap-emu.log 2>&1 &
   # Wait for an emulator-* serial specifically (adb wait-for-device returns immediately if a physical
   # device is already connected, causing require_emulator to fail before the emulator registers).
   log "waiting for emulator to register with adb…"
@@ -149,7 +151,7 @@ boot(){ ensure_avd
 install(){ [ -f "$APPDIR/local.properties" ] || echo "sdk.dir=$SDK" > "$APPDIR/local.properties"
   # Build the APK, then install to the EMULATOR ONLY with an explicit -s serial. NOT `gradle installDebug`,
   # which can push to every attached device (incl. a physical phone in use). adb -s can only hit the emulator.
-  ( cd "$APPDIR" && ./gradlew --no-daemon :app:assembleDebug ) || die "assemble failed"   # no daemon: it would outlive this command holding the heavy lock (see detached)
+  ( cd "$APPDIR" && ./gradlew --no-daemon :app:assembleDebug ) || die "assemble failed"   # no daemon: it would outlive this command holding the heavy lock (see DETACHED)
   local apk="$APPDIR/app/build/outputs/apk/debug/app-debug.apk"; [ -f "$apk" ] || die "APK not found: $apk"
   "$ADB" -s "$EMU_SERIAL" install -r "$apk" || die "install to $EMU_SERIAL failed"
   # Clear app data so every run starts at the CONNECT screen (deterministic pairing). `install -r` keeps

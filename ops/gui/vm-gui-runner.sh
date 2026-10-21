@@ -475,7 +475,8 @@ start_phone_leg() {
 }
 stop_phone_leg() {
   local run="$APP_ART/live-capture" line out backup
-  [ -n "$PHONE_PID" ] && { kill "$PHONE_PID" 2>/dev/null; wait "$PHONE_PID" 2>/dev/null; }
+  # `|| true`: under set -e, the killed leg's 143 from `wait` would end this script before its record and cleanup.
+  if [ -n "$PHONE_PID" ]; then kill "$PHONE_PID" 2>/dev/null || true; wait "$PHONE_PID" 2>/dev/null || true; fi
   PHONE_PID=""
   # The AVD the leg booted (headless): stop it, as e2e-phone-mac.sh does.
   "${ANDROID_HOME:-/opt/homebrew/share/android-commandlinetools}/platform-tools/adb" emu kill >/dev/null 2>&1 || true

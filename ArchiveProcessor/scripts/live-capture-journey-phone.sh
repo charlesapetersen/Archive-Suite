@@ -56,6 +56,10 @@ done
 log "fixtures: $(find "$RUN/fixtures" -name '*.jpg' | wc -l | tr -d ' ') photos from $PHOTOS"
 
 # --- AVD up (headless) and the companion built + installed ---
+# The adb server must not start inside this run's heavy-lock session, or it holds the Mac-wide lock after the
+# run (android-ui-drive.sh, `DETACHED`): start it the same way before the first adb call.
+python3 -c 'import os, sys; os.setsid(); os.closerange(3, 65536); os.execv(sys.argv[1], sys.argv[1:])' \
+  "$ADB" start-server >/dev/null 2>&1
 if ! "$ADB" devices 2>/dev/null | grep -q '^emulator-'; then
   log "booting the headless AVD…"
   bash "$DRIVER" boot >> "$LOG" 2>&1 || die "AVD boot failed"

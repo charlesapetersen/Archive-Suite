@@ -151,6 +151,9 @@ final class LiveCaptureJourneyUITests: XCTestCase {
             "-liveProcessingMode", mode,
             "-useAppleVision", "YES", "-visionUseLLMJudgment", "NO",
             "-useGateway", "NO", "-useLocalAgent", "NO",
+            // Copy source file tags: with Apple Vision and no LLM judgement the only other choice is No tagging,
+            // which writes no Finder tag at all, not even the tag card's (W40.fix-live-vision-drops-card-tags).
+            "-taggingModeRaw", "copySource",
             "-rotationModeRaw", "off", "-reviewRotation", "NO", "-mergeDocuments", "NO",
             "-tagVocabulary", "", "-outputDirectory", out.path
         ])
@@ -190,7 +193,11 @@ final class LiveCaptureJourneyUITests: XCTestCase {
                     field.typeText(year)
                 }
                 if let quality {
-                    let picker = app.popUpButtons["Quality"]
+                    // The Picker's "Quality" label is not its accessibility title on macOS 26 (measured in the
+                    // VM: `popUpButtons["Quality"]` is absent), so find it by its current value instead.
+                    let picker = app.popUpButtons.matching(NSPredicate(
+                        format: "label == 'Quality' OR value CONTAINS 'Unrated' OR value BEGINSWITH '0 '")).firstMatch
+                    if !picker.exists { print("[w40d5] card tree:\n\(app.sheets.firstMatch.debugDescription)") }
                     XCTAssertTrue(picker.exists, "the card's Quality picker")
                     picker.click()
                     let item = app.menuItems[quality]
