@@ -51,6 +51,13 @@ The project has measured a lot and read little. The record, in brief, with the f
 - Phases 0-2 and 4 run interactively. Phase 3, the experiments, is queued for the engine.
 - Experiments use free cluster compute (Sherlock first) where they can. Paid APIs are used when a question needs them, under the
   $3 rule in `~/Claude/CLAUDE.md`.
+- Every model tested on the 895-page public set is also run on the owner's 96 truth pages (root CLAUDE.md, "Both
+  OCR sets, every time").
+- Dating is explicit only. A date written or printed on the document is wanted; so is a date inherited from an
+  explicitly dated covering document when the enclosure relation can be established (in the owner's tags, a dated
+  document with no date of its own is almost always an enclosure). Estimating a year from style, hand, typeface or
+  neighbours is out of scope. Strand B covers explicit extraction and enclosure detection; the app's speculative
+  year and `Date Uncertain` behaviour is reviewed against this in Phase 4.
 - Entities (authors, senders and recipients, places) are a long-term option, and are reviewed mainly as an input to
   dating and segmentation. More languages, scripts and eras are a long-term goal; the existing corpus and the
   public set are broad enough for now.
@@ -83,8 +90,9 @@ Strands:
 - A. Page-stream segmentation and document splitting: page-pair classifiers (LayoutLMv3 and successors), DocLLM,
   OmniParser, doc-split-v1, DocSplit (arXiv 2602.15958) and the papers that cite it, HR-DocStream, TABME and others;
   adapting to a new collection; learning from a user's corrections.
-- B. Dating: from text, from neighbours and collection context, from the image (hand, typeface, letterhead, paper);
-  uncertainty and calibration.
+- B. Dating, explicit only: extracting and normalising dates written or printed on a document (letterheads,
+  postmarks, stamps, annotations, partial dates), and detecting enclosure relations so an undated enclosure takes its
+  covering document's date (SPEC/tag-format.md, W37.dual-date). Stylistic or visual date estimation is out of scope.
 - C. OCR and HTR: current vision-language OCR models, historical-script specialists, post-OCR correction,
   historical language models (HMBERT and the Saskatchewan thesis the owner cited), whole-page against region-first.
 - D. Image enhancement, dewarping, deskewing and binarisation, with the Rényi DIE model as a starting point; which

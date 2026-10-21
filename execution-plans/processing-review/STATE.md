@@ -17,6 +17,9 @@ Read `00-plan.md`, then this table. Take the first phase step not done. Strand n
   baseline; nothing adopted.
 - [x] Nemotron job 1860275: TIMEOUT at 20:54 on 2026-10-20 with 839 of 895 pages read (631 ok, 207 cap, 1
   malformed); 56 unread. Not scored. Owner: dropped, no third submission.
+- [ ] Run the models scored on the 895 but not yet on the owner's 96 pages (owner, 2026-10-20, both sets every
+  time): GLM-OCR, LightOnOCR-3 0.8B and 4B at bf16 (the 4B has only a Mac 8-bit run, 89.13), PaddleOCR-VL 1.5,
+  Qwen3.5 4B, Ling 3 Flash VL and stock PP-OCRv6, on FarmShare, same settings as the open sweep.
 - [ ] Add a Sherlock profile to `scripts/segbench/institutional-compute/` once the account exists (strand J
   gathers its partitions, GPU types and limits first).
 

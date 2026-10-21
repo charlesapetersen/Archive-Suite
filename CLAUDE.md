@@ -275,6 +275,11 @@ repository, go in by hand with its file and commit when an item or the owner poi
 (`data/vision-ocr-handwriting.json` is the pattern). The published copy of the page is republished only by an
 interactive session; an unattended one says in its commit body that the published copy is now behind. How to rebuild and read it: [`ArchiveOCRBench/README.md`](ArchiveOCRBench/README.md).
 
+**Both OCR sets, every time (owner, 2026-10-20).** A model tested on the 895-page public set is also run on the
+owner's 96 truth pages, with the same settings, in the same item. The 96 are the owner's own material and are what
+the bench page's first charts show, so a model scored only on the public set is missing from the comparison that
+matters most. A run that cannot do both says why in its commit body and files the missing half.
+
 ## Working directive — token-efficient feature-add & maintenance
 
 Treat context/token cost as a real budget alongside speed and correctness. Applies to every change in
