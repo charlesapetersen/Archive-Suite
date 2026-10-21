@@ -34,7 +34,7 @@ Read `00-plan.md`, then this table. Take the first phase step not done. Strand n
 | C OCR and HTR | done, `screens/C-screen.md` | done 2026-10-20 (Fable), `C-ocr.md` | Kiessling Latin 8.70/13.07 and Polay WERs checked in the PDF texts | done |
 | D enhancement and marks | done, `screens/D-screen.md` | done 2026-10-20 (Fable), `D-enhancement.md` | UVDoc MIT licence checked | done |
 | E layout | done, `screens/E-screen.md` | done 2026-10-20 (Fable), `E-layout.md` | NewsBench figures match our farmshare/news results | done |
-| F text placement | done, `screens/F-screen.md` | started (Fable) | | |
+| F text placement | done, `screens/F-screen.md` | done 2026-10-20 (Fable), `F-placement.md` | lab figure checked: vision-ocr HW-BUILD-2026-10-15.tsv (placed 0.654; 96 to 367 missed per 1,000) | done |
 | G entities | done, `screens/G-screen.md` | | | |
 | H whole-corpus and user training | done, `screens/H-screen.md` | | | |
 | K kind identification and mixed pages | queued for after the 5-hour reset | | | |
