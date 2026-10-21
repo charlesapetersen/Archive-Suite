@@ -21,6 +21,8 @@
 #                CORRUPT_INDEX_FIXTURE=1 (Reader/Notes focused W23.m9-fu3 test),
 #                READER_JOURNEY=rehearsal (W40.d8 triage journey on the real-corpus sample).
 #                NOTES_JOURNEY=integrations (W40.d10: Notes with the real Zotero and Reader in the VM).
+#                PROCESSOR_JOURNEY=livecapture (W40.d5: hand-driven live capture against the real Android
+#                companion on a headless AVD on the host; xcuitest lane only).
 #                VISUAL_REVIEW=1 (W40.e10/e11 screenshot tour; pair with ONLY_TESTING=<App>UITests/VisualReviewUITests).
 #                TRANSIENT_VIDEO=1 (W40.e13: record the guest screen across the run; scan with transient-frames.py).
 #
@@ -122,6 +124,24 @@ if [ "${NOTES_JOURNEY:-}" = "integrations" ]; then
   esac
 elif [ -n "${NOTES_JOURNEY:-}" ]; then
   die "unknown NOTES_JOURNEY '$NOTES_JOURNEY' (use: integrations)"
+fi
+# PROCESSOR_JOURNEY=livecapture (W40.d5): live capture with the tag cards and Finish done by hand in the guest
+# (LiveCaptureJourneyUITests) while the real Android companion on a headless AVD on the HOST sends real photos
+# (ArchiveProcessor/scripts/live-capture-journey-phone.sh, started in the background below). The test reads
+# TEST_RUNNER_W40D5_DIR and skips itself in every other run, because nothing else starts a phone.
+PROCESSOR_LIVECAPTURE=0
+LIVE_GDIR="$GUEST_HOME/w40d5-live-capture"
+if [ "${PROCESSOR_JOURNEY:-}" = "livecapture" ]; then
+  [ "$APP" = processor ] || die "PROCESSOR_JOURNEY is supported only for processor."
+  [ "$LANE" = xcuitest ] || die "PROCESSOR_JOURNEY=livecapture runs on the xcuitest lane only."
+  [ -n "$CORRUPT_TEST_SELECTOR" ] && die "PROCESSOR_JOURNEY and CORRUPT_INDEX_FIXTURE cannot be combined."
+  PROCESSOR_LIVECAPTURE=1
+  CORRUPT_TEST_SELECTOR="ArchiveProcessorUITests/LiveCaptureJourneyUITests"
+  if [ -n "${ONLY_TESTING:-}" ] && [ "$ONLY_TESTING" != "$CORRUPT_TEST_SELECTOR" ]; then
+    die "PROCESSOR_JOURNEY=livecapture runs only ONLY_TESTING=$CORRUPT_TEST_SELECTOR"
+  fi
+elif [ -n "${PROCESSOR_JOURNEY:-}" ]; then
+  die "unknown PROCESSOR_JOURNEY '$PROCESSOR_JOURNEY' (use: livecapture)"
 fi
 ONLY_TESTING="${ONLY_TESTING:-${CORRUPT_TEST_SELECTOR:-$(archive_app_field "$APP" tests)}}"
 TEST_ARGS="$(archive_xcode_test_args "$ONLY_TESTING")" \
@@ -402,6 +422,8 @@ run_xcuitest() {
     tart exec "$VM" bash -lc "rm -f $vflags" >/dev/null 2>&1 || true
   fi
   log "building + running $ONLY_TESTING for $APP in the VM…"
+  local test_env=""
+  if [ "$PROCESSOR_LIVECAPTURE" = 1 ]; then start_phone_leg; test_env="TEST_RUNNER_W40D5_DIR='$LIVE_GDIR'"; fi
   video_start
   # xcodebuild REFUSES to overwrite an existing -resultBundlePath, so a fixed path makes every re-run fail
   # before executing a single test. Remove it first.
@@ -412,13 +434,14 @@ run_xcuitest() {
   # therefore detects this VM from `hw.model` rather than from anything passed in here.
   tart exec "$VM" bash -lc "
     rm -rf '$GUEST_DD/uitest.xcresult'
-    xcodebuild test \
+    $test_env xcodebuild test \
       -project '$GUEST_REPO/$PROJ_REL' -scheme '$SCHEME' \
       $TEST_ARGS -destination 'platform=macOS' \
       -derivedDataPath '$GUEST_DD' -resultBundlePath '$GUEST_DD/uitest.xcresult' \
       CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO
   " 2>&1 | tee "$APP_ART/xcuitest.log" | grep -E 'Test Suite|Executed [0-9]+ test|\*\* TEST' || true
   log "XCUITest log: $APP_ART/xcuitest.log"
+  [ "$PROCESSOR_LIVECAPTURE" = 1 ] && stop_phone_leg
   video_stop
   # Clear the flag straight away: the health gate's gui-vm-gate.sh shares this VM but not this script.
   tart exec "$VM" bash -lc "rm -f $vflags" >/dev/null 2>&1 || true
@@ -436,6 +459,36 @@ run_xcuitest() {
     warn "no '** TEST SUCCEEDED **' marker for $APP — the XCUITest run FAILED (or never finished); see the log."
     XCUITEST_FAILED=1
   fi
+}
+
+# --- PROCESSOR_JOURNEY=livecapture: the phone leg on the host, and the guest-side file record afterwards ---
+PHONE_PID=""
+start_phone_leg() {
+  local run="$APP_ART/live-capture"
+  rm -rf "$run"; mkdir -p "$run"
+  tart exec "$VM" bash -lc "rm -rf '$LIVE_GDIR' && mkdir -p '$LIVE_GDIR' && date +%s > '$LIVE_GDIR/started'" \
+    || die "could not prepare $LIVE_GDIR in the guest"
+  bash "$REPO/ArchiveProcessor/scripts/live-capture-journey-phone.sh" "$VM" "$LIVE_GDIR" "$run" \
+    > "$run/phone-leg.out" 2>&1 &
+  PHONE_PID=$!
+  log "phone leg started (pid $PHONE_PID; log: $run/phone.log)"
+}
+stop_phone_leg() {
+  local run="$APP_ART/live-capture" line out backup
+  [ -n "$PHONE_PID" ] && { kill "$PHONE_PID" 2>/dev/null; wait "$PHONE_PID" 2>/dev/null; }
+  PHONE_PID=""
+  # The AVD the leg booted (headless): stop it, as e2e-phone-mac.sh does.
+  "${ANDROID_HOME:-/opt/homebrew/share/android-commandlinetools}/platform-tools/adb" emu kill >/dev/null 2>&1 || true
+  grep -q PHONE_LEG_DONE "$run/phone.log" 2>/dev/null || warn "the phone leg did not finish every phase (log: $run/phone.log)"
+  # Outside the runner's sandbox: the filed PDFs' times and tags, and the Trash (live-capture-journey-record.sh).
+  line="$(grep -o '\[w40d5\] live out=[^ ]* backup=[^ ]*' "$APP_ART/xcuitest.log" | head -1)"
+  out="$(printf '%s' "$line" | sed -n 's/.* out=\([^ ]*\) .*/\1/p')"
+  backup="$(printf '%s' "$line" | sed -n 's/.* backup=\([^ ]*\).*/\1/p')"
+  [ -n "$out" ] || { warn "no live-phase paths in the xcuitest log; no file record"; return 0; }
+  tart exec "$VM" bash "$GUEST_REPO/ArchiveProcessor/scripts/live-capture-journey-record.sh" \
+    "$LIVE_GDIR/started" "$out" "$backup" > "$run/mac-files.txt" 2>&1 \
+    || warn "guest file record incomplete (see $run/mac-files.txt)"
+  log "guest file record: $run/mac-files.txt"
 }
 
 # --- bring the tests' screenshots back to the host (STEP 3.5's "READ the screenshot") ---------------
