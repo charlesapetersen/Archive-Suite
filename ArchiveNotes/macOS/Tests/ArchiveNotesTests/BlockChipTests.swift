@@ -85,6 +85,49 @@ final class BlockChipTests: XCTestCase {
         print("ARTIFACT W9.cand2 chip: \(artifact.path)")
     }
 
+    /// W40.fix-notes-chip-first-draw-blank: the note pane builds a new editor for each note
+    /// (`.id(bodyEditor.loadedID)`), so the document is loaded before the editor has a window. TextKit makes a
+    /// chip's view provider only when it draws the chip's paragraph, so without help the first frame of every
+    /// note showed its text under an empty chip slot (VM screen video: 2–5 frames). The chip view must be in
+    /// place, its label laid out, after the window's first layout pass, with no draw and no run-loop turn before
+    /// it. The window is never ordered in, and this host never draws, so nothing here makes the provider for it.
+    func testANewEditorsChipsAreInPlaceAfterItsFirstLayout() throws {
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 600, height: 400),
+                              styleMask: [.titled], backing: .buffered, defer: true)
+        window.isReleasedWhenClosed = false
+        defer { window.close() }
+        func chips(in view: NSView) -> [BlockHeaderChipView] {
+            view.subviews.flatMap { ($0 as? BlockHeaderChipView).map { [$0] } ?? chips(in: $0) }
+        }
+        func labels(in view: NSView) -> [NSTextField] {
+            view.subviews.flatMap { ($0 as? NSTextField).map { [$0] } ?? labels(in: $0) }
+        }
+        for (index, title) in ["first.pdf", "second.pdf"].enumerated() {
+            let scroll = NSScrollView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
+            let textView = EditorTextView()
+            textView.frame = NSRect(x: 0, y: 0, width: 600, height: 400)
+            textView.autoresizingMask = [.width]
+            textView.textContainer?.widthTracksTextView = true
+            scroll.documentView = textView
+            textView.replaceStyledDocument(with: MarkdownBridge.parse(markdown: """
+                <!-- block: reader-page
+                     link: archivereader://reveal?root=TEST&rel=\(title)&page=1
+                     display: "\(title) — p. 1"
+                     page: 1 -->
+                Body of note \(index).
+
+                """))
+            window.contentView = scroll   // as SwiftUI inserts the rebuilt editor
+            window.contentView?.layoutSubtreeIfNeeded()
+
+            let installed = chips(in: textView).filter { !$0.frame.isEmpty }
+            XCTAssertEqual(installed.count, 1, "note \(index): the chip view must be installed by the first layout")
+            let label = try XCTUnwrap(installed.first.flatMap { labels(in: $0).first }, "note \(index): no label")
+            XCTAssertEqual(label.stringValue, "\(title) — p. 1")
+            XCTAssertGreaterThan(label.frame.width, 0, "note \(index): the chip's label must be laid out, not empty")
+        }
+    }
+
     // MARK: - Multi-block body
 
     func testMultiBlockBodyRoundTrip() {

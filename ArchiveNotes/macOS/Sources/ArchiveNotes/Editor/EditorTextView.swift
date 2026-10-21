@@ -145,6 +145,7 @@ final class EditorTextView: NSTextView {
         }
         needsLayout = true
         needsDisplay = true
+        installChipViewsAtNextLayout = true
     }
 
     func performContentEditingTransaction(_ edit: () -> Void) {
@@ -213,6 +214,7 @@ final class EditorTextView: NSTextView {
                                                    name: NSView.boundsDidChangeNotification, object: clip)
             observedClipView = clip
         }
+        installChipViewsAtNextLayout = true
         relayoutViewportSoon()
     }
 
@@ -270,8 +272,10 @@ final class EditorTextView: NSTextView {
     /// viewport passes of later scrolling. TextKit's own later passes still own these views through their
     /// providers, so they can take them back.
     /// Returns whether it installed, moved or removed any view.
+    /// `layingOutViews` also lays out each chip's own subviews now, for a caller already inside a layout pass,
+    /// where a view it adds would otherwise draw before its label is placed.
     @discardableResult
-    private func installStrandedChipViews() -> Bool {
+    private func installStrandedChipViews(layingOutViews: Bool = false) -> Bool {
         guard let layout = textLayoutManager,
               let viewport = layout.textViewportLayoutController.viewportRange else { return false }
         var changed = false
@@ -290,6 +294,7 @@ final class EditorTextView: NSTextView {
             }
             return true
         }
+        defer { if layingOutViews { placements.forEach { $0.0.layoutSubtreeIfNeeded() } } }
         for (view, frame) in placements {
             if let parent = view.superview {
                 let current = parent.convert(view.frame, to: self)
@@ -343,7 +348,45 @@ final class EditorTextView: NSTextView {
     /// `textViewportLayoutControllerDidLayout`, is public only from macOS 27.)
     override func layout() {
         super.layout()
+        if installChipViewsAtNextLayout, window != nil, let layout = textLayoutManager {
+            // The first layout of a loaded document, or of an editor just put in a window, installs and lays
+            // out its chip views itself: the frame after this pass is the first to draw the new text, and the
+            // pane builds a new editor for each note, so this is every note switch. Left to TextKit, a chip's
+            // view existed only after that frame had drawn its paragraph, and the VM's screen video showed the
+            // new body for 2–5 frames under an empty chip slot (W40.fix-notes-chip-first-draw-blank). Once per
+            // load, so it cannot feed the loop guarded below.
+            installChipViewsAtNextLayout = false
+            layout.textViewportLayoutController.layoutViewport()
+            createChipViewProvidersInViewport()
+            installStrandedChipViews(layingOutViews: true)
+        }
         scheduleStrandedCheck(fromLayout: true)
+    }
+    private var installChipViewsAtNextLayout = false
+
+    /// TextKit 2 makes a fragment's attachment view providers when it first draws the fragment, so a chip's view
+    /// can exist only after a frame that showed its paragraph without it. Drawing each viewport fragment that holds
+    /// a chip but no provider once into a throwaway bitmap makes them now, before the first real frame.
+    private func createChipViewProvidersInViewport() {
+        guard let storage = textStorage, let layout = textLayoutManager, let content = layout.textContentManager,
+              let viewport = layout.textViewportLayoutController.viewportRange else { return }
+        let start = content.offset(from: content.documentRange.location, to: viewport.location)
+        let length = content.offset(from: viewport.location, to: viewport.endLocation)
+        guard start >= 0, length > 0, start + length <= storage.length else { return }
+        var fragments: [NSTextLayoutFragment] = []
+        storage.enumerateAttribute(.attachment, in: NSRange(location: start, length: length)) { value, range, _ in
+            guard value is BlockHeaderAttachment,
+                  let location = content.location(content.documentRange.location, offsetBy: range.location),
+                  let fragment = layout.textLayoutFragment(for: location),
+                  fragment.textAttachmentViewProviders.isEmpty,
+                  !fragments.contains(where: { $0 === fragment }) else { return }
+            fragments.append(fragment)
+        }
+        guard !fragments.isEmpty,
+              let bitmap = CGContext(data: nil, width: 1, height: 1, bitsPerComponent: 8, bytesPerRow: 0,
+                                     space: CGColorSpaceCreateDeviceRGB(),
+                                     bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return }
+        for fragment in fragments { fragment.draw(at: .zero, in: bitmap) }
     }
 
     /// One `installStrandedChipViews` pass on the next turn, however many requests arrive before it. A pass

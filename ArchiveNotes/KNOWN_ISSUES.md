@@ -14,8 +14,20 @@ path draws nothing and the chip view owns the drawing. Guards: `BlockChipTests.t
 (the fallback is fully transparent for Reader, Zotero and passage chips at three widths) and the VM test
 `ChipsOverdrawnUITests` (dark mode; shots the editor for six seconds after open and fails on any row with a
 ≥ 60 px run of pale pixels — 57 such rows before the fix, none after). Evidence:
-`verification/evidence/notes/W40.fix-notes-chips-overdrawn-{before,after}.png`. Whether this also explains
-the 2–3-frame blank chip box on note switch is `W40.fix-notes-chip-first-draw-blank`'s to check.
+`verification/evidence/notes/W40.fix-notes-chips-overdrawn-{before,after}.png`. It did not explain the
+blank chip slot on note switch, which had its own cause (next entry).
+
+## ✅ FIXED (W40.fix-notes-chip-first-draw-blank, 2026-10-21) — empty chip slot for 2–5 frames on note switch
+
+TextKit 2 makes a fragment's attachment view providers only when it first **draws** the fragment (measured in the
+VM: `textAttachmentViewProviders` is empty after `layoutViewport()` and at `viewWillDraw`, filled one pass after
+the first draw). The note pane builds a new editor for each note (`.id(bodyEditor.loadedID)`), so every note
+switch drew the new body once with no chip view, and the view arrived 80–180 ms later. `EditorTextView.layout()`
+now, once per document load or window move, draws each viewport fragment that holds a chip but no provider into
+a 1×1 throwaway bitmap, then installs and lays out the chip views before the first real frame. **A unit test
+can only see this through that draw:** the app-hosted unit bundle never draws, so without it no provider ever
+appears there. Guard: `BlockChipTests.testANewEditorsChipsAreInPlaceAfterItsFirstLayout`. Evidence:
+`verification/evidence/notes/W40.fix-notes-chip-first-draw-blank.md`.
 
 ## ✅ FIXED (W40.fix-notes-outside-edit-overwrite, 2026-10-15) — checked editor saves
 
