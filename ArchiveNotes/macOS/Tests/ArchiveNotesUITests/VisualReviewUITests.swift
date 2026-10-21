@@ -458,30 +458,11 @@ final class VisualReviewUITests: NotesFixtureUITestCase {
                 + "date: 1968-07\ndate_precision: month\ndate_uncertain: false\nquality: 2\n"
                 + "tags: [\(tags.joined(separator: ", "))]\nroundup: false\ncreated: \(stamp)\nmodified: \(stamp)\n---\n"
         }
-        let link = "archivereader://reveal?root=\(Self.corpusRootGUID)&rel=sample.pdf&jpeg="
-        var body = ""
-        for k in 1...24 {
-            body += "<!-- block: reader-doc\n     link: \(link)\n     display: \"00984 — Apple Inc, folder \(k).pdf\" -->\n"
-                + "Passage \(k) from the Apple Inc correspondence.\n\n"
-        }
-        for p in 1...5 {
-            body += "<!-- block: reader-page\n     link: \(link)&page=1\n     display: \"sample.pdf — p. \(p)\"\n"
-                + "     page: 1\n     thumb: assets/p\(p)-thumb.png -->\n![sample.pdf — p. \(p)](assets/p\(p)-thumb.png)\n\n"
-                + "Page passage \(p).\n\n"
-        }
-        body += "<!-- block: note-passage\n     display: \"Moore on Intel culture — 1968\"\n"
-            + "     note: archivenotes://open?id=\(Self.idReader)#block-0 -->\nMoore on the early culture.\n"
         let tags = ["intel", "corporate culture", "apple inc", "semiconductors", "silicon valley", "venture capital",
                     "fairchild", "labor relations", "management", "oral history", "computing history", "1968",
                     "governor's office", "department of finance — correspondence", "press releases"]
-        let many = items.appendingPathComponent(Self.idManyChips)
-        try FileManager.default.createDirectory(at: many.appendingPathComponent("assets"), withIntermediateDirectories: true)
-        try Data((front(Self.idManyChips, "Many chips — Apple Inc correspondence", tags: tags) + body).utf8)
-            .write(to: many.appendingPathComponent("Many chips — Apple Inc correspondence.md"))
-        let thumb = items.appendingPathComponent(Self.idReader).appendingPathComponent("assets/p1-thumb.png")
-        if let png = try? Data(contentsOf: thumb) {
-            for p in 1...5 { try png.write(to: many.appendingPathComponent("assets/p\(p)-thumb.png")) }
-        }
+        try ChipsOverdrawnUITests.writeManyChipsNote(id: Self.idManyChips,
+                                                     title: "Many chips — Apple Inc correspondence", tags: tags)
 
         let longTitle = "Memorandum to the Governor regarding the 1978 budget and its consequences for local "
             + "government finance, county services, school districts and the special districts, with attachments"

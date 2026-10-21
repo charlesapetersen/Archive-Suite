@@ -3,6 +3,19 @@
 Running log of quirks, risks, and things verified/unverified for the Notes app. Keep current.
 (Sibling logs: `../ArchiveReader/KNOWN_ISSUES.md`, `../ArchiveProcessor/KNOWN_ISSUES.md`.)
 
+## ✅ FIXED (W40.fix-notes-chips-overdrawn, 2026-10-20) — file icon painted over source chips
+
+`BlockHeaderAttachment` has a view provider but inherited AppKit's image fallback. With nil data/type,
+that fallback returns a generic folded-document icon, which TextKit drew across each chip's bounds (hiding
+the label's end and the Reveal/Preview buttons) while it installed the chip views of a newly opened note.
+In the VM, a note with 24 reader-doc chips showed it from ~0.5 s to ~1.2 s after open; the owner saw it
+about two seconds after open. The attachment now carries a transparent 1×28 fallback image, so the image
+path draws nothing and the chip view owns the drawing. Guards: `BlockChipTests.testViewBackedChipDoesNotDrawAFileIcon`
+(the fallback is fully transparent for Reader, Zotero and passage chips at three widths) and the VM test
+`ChipsOverdrawnUITests` (dark mode; shots the editor for six seconds after open and fails on any row with a
+≥ 60 px run of pale pixels — 57 such rows before the fix, none after). Evidence:
+`verification/evidence/notes/W40.fix-notes-chips-overdrawn-{before,after}.png`. Whether this also explains
+the 2–3-frame blank chip box on note switch is `W40.fix-notes-chip-first-draw-blank`'s to check.
 
 ## ✅ FIXED (W40.fix-notes-outside-edit-overwrite, 2026-10-15) — checked editor saves
 

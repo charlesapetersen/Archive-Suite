@@ -57,6 +57,9 @@ final class BlockHeaderAttachment: NSTextAttachment {
     init(sourceBox: SourceAnchorBox) {
         self.sourceBox = sourceBox
         super.init(data: nil, ofType: nil)
+        // Keep AppKit's image/view-provider lifecycle, but never paint its generic
+        // file icon over the live chip while TextKit installs the view.
+        image = NSImage(size: NSSize(width: 1, height: chipHeight), flipped: false) { _ in true }
         allowsTextAttachmentView = true
         self.bounds = CGRect(origin: .zero, size: CGSize(width: 1, height: chipHeight))
     }

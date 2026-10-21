@@ -8,6 +8,43 @@ import AppKit
 @MainActor
 final class BlockChipTests: XCTestCase {
 
+    /// TextKit asks for the attachment's image as well as its live view. The default
+    /// nil-data attachment supplies a folded-document icon which can cover the chip.
+    func testViewBackedChipDoesNotDrawAFileIcon() throws {
+        let anchors = [
+            SourceAnchor(link: "archivereader://reveal?root=TEST&rel=sample.pdf&page=1",
+                         display: "sample.pdf — p. 1", page: 1),
+            SourceAnchor(display: "Lovelace, 1843", zoteroSelect: "zotero://select/items/ABC123"),
+            SourceAnchor.notePassage(sourceNoteId: UUID(), sourceBlockIndex: 0,
+                                     sourceTitle: "Source passage", sourceDateDisplay: "")
+        ]
+        let storage = NSTextContentStorage()
+        for anchor in anchors {
+            let attachment = BlockHeaderAttachment(sourceBox: SourceAnchorBox(anchor: anchor))
+            for width in [CGFloat(200), 320, 600] {
+                let image = attachment.image(for: CGRect(x: 0, y: 0, width: width, height: 28),
+                                             attributes: [:], location: storage.documentRange.location,
+                                             textContainer: nil)
+                let fallback = try XCTUnwrap(image)
+                let bitmap = try XCTUnwrap(NSBitmapImageRep(
+                    bitmapDataPlanes: nil, pixelsWide: Int(width), pixelsHigh: 28,
+                    bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true,
+                    isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0))
+                let context = try XCTUnwrap(NSGraphicsContext(bitmapImageRep: bitmap))
+                NSGraphicsContext.saveGraphicsState()
+                NSGraphicsContext.current = context
+                fallback.draw(in: NSRect(x: 0, y: 0, width: width, height: 28))
+                NSGraphicsContext.restoreGraphicsState()
+                let visiblePixels = (0..<bitmap.pixelsHigh).reduce(0) { count, y in
+                    count + (0..<bitmap.pixelsWide).filter {
+                        (bitmap.colorAt(x: $0, y: y)?.alphaComponent ?? 0) > 0.01
+                    }.count
+                }
+                XCTAssertEqual(visiblePixels, 0, "the image fallback must never cover the live chip")
+            }
+        }
+    }
+
     func testViewProviderUsesAttachmentBeforeAnyFactorySetup() throws {
         let id = UUID()
         let anchor = SourceAnchor.notePassage(sourceNoteId: id, sourceBlockIndex: 0,
