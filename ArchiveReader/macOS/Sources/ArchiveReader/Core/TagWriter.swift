@@ -75,8 +75,17 @@ enum TagWriter {
     /// identity exactly like `apply`. Read/Unread tokens are matched EXACTLY (not case-folded): the inverse
     /// carries the exact token read from disk, so exact match both restores correctly and avoids disturbing a
     /// token a concurrent edit re-cased.
+    ///
+    /// `undoing` is the change the inverse reverses (W45.undo-still-applied). The inverse never moves a
+    /// token's count past the count it had before that change: a token someone has put back since is not
+    /// added again, and a second undo of the same step (an undo line that never reached the ledger, or
+    /// another running copy undoing it at the same moment; the coordinated write serializes the two, so
+    /// the later one reads the earlier one's result) writes nothing. The label is restored only while it
+    /// still reads as the change left it; when someone has changed it since, the colour tokens in the
+    /// inverse are left alone too, so a file never ends with a second colour token beside the new one.
     static func applyOccurrence(_ delta: TagOccurrenceDelta, to url: URL,
-                                expecting identity: FileIdentity? = nil) throws -> TagWriteResult {
+                                expecting identity: FileIdentity? = nil,
+                                undoing change: UndoneChange) throws -> TagWriteResult {
         try recorded(.undo, url) { try CoordinatedTagWriter.write(url, expectedIdentity: identity) { current, label in
             var targetLabel = label
             switch delta.color {
@@ -85,24 +94,48 @@ enum TagWriter {
             case .clear:                 targetLabel = 0               // "
             case nil:                    break
             }
+            let colourChangedSince = delta.color != nil
+                && normalizedLabel(label) != normalizedLabel(change.afterLabel)
+            if colourChangedSince { targetLabel = label }
+            let colourTokens: Set<String> = colourChangedSince ? [ArchiveColor.box.tokenName, ArchiveColor.folder.tokenName] : []
 
-            // §9 occurrence-precise reconcile against the FRESH read: strip EXACTLY the listed number of
+            // §9 occurrence-precise reconcile against the FRESH read: strip at most the listed number of
             // occurrences of each removed token (a copy a concurrent edit added survives), keep every other
-            // token verbatim & in place, then append the listed occurrences of each added token — this last
-            // step is what re-introduces a duplicate the set path (line ~52) refuses to.
+            // token verbatim & in place, then append at most the listed occurrences of each added token —
+            // this last step is what re-introduces a duplicate the set path (line ~52) refuses to. Neither
+            // step takes a token past its count before the change.
+            func count(_ tags: [String]) -> [String: Int] { tags.reduce(into: [:]) { $0[$1, default: 0] += 1 } }
+            let was = count(change.before), now = count(current)
             var removalBudget: [String: Int] = [:]
-            for t in delta.remove { removalBudget[t, default: 0] += 1 }
+            for (t, n) in count(delta.remove) where !colourTokens.contains(t) {
+                removalBudget[t] = min(n, max(0, now[t, default: 0] - was[t, default: 0]))
+            }
+            var additionBudget: [String: Int] = [:]
+            for (t, n) in count(delta.add) where !colourTokens.contains(t) {
+                additionBudget[t] = min(n, max(0, was[t, default: 0] - now[t, default: 0]))
+            }
             var newTags: [String] = []
             newTags.reserveCapacity(current.count + delta.add.count)
             for token in current {
                 if let n = removalBudget[token], n > 0 { removalBudget[token] = n - 1 }  // cancel one occurrence
                 else { newTags.append(token) }                                           // keep verbatim
             }
-            newTags.append(contentsOf: delta.add)
+            for token in delta.add {
+                if let n = additionBudget[token], n > 0 { additionBudget[token] = n - 1; newTags.append(token) }
+            }
 
             if newTags == current && normalizedLabel(targetLabel) == normalizedLabel(label) { return nil }
             return (newTags, targetLabel)
         } }
+    }
+
+    /// The change an undo reverses, as `applyOccurrence(undoing:)` checks the fresh read against it: the
+    /// tags before the change and the label after it.
+    struct UndoneChange: Sendable {
+        let before: [String]
+        let afterLabel: Int?
+        init(before: [String], afterLabel: Int?) { self.before = before; self.afterLabel = afterLabel }
+        init(_ r: TagWriteResult) { self.init(before: r.before, afterLabel: r.afterLabel) }
     }
 
     /// Apply the same delta to a group of files. Each file is an INDEPENDENT, idempotent unit — never

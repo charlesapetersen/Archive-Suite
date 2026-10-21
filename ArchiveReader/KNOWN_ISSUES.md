@@ -789,6 +789,27 @@ and barrier: forward recording remains best-effort, rather than a write-ahead jo
 Scratch regressions: UndoDurabilityTests, LedgerUndoHistoryTests; evidence in
 verification/evidence/reader/W40.audit-ledger-undo.md. R-46 stays fixed-pending-recheck.
 
+### W45.undo-still-applied — undo never takes a token past its count before the change (fixed 2026-10-20)
+
+The occurrence inverse used to append its additions unconditionally and always restore the label, so an
+undo against a file changed since stacked tokens. Tested on scratch files before the fix: a second undo
+of the same step turned `[A,A,B]` into `[A×4,B]`, two undos at once left `Unread` twice, a token put back
+since got a second copy, and a colour changed since got the old label and colour token back over it.
+`beginUndo` does not stop two running copies of the app from both undoing one group, so the guard lives
+in the writer: `TagWriter.applyOccurrence(undoing:)` moves each token in the inverse toward, never past,
+its count before the change, on the coordinated fresh read. It restores the label only while the label
+still reads as the change left it, and otherwise also leaves the inverse's colour tokens alone. Each
+token is judged on its own, and the rest of the file's undo still goes ahead. Tests:
+`TagWriterTests`, MARK "Undo against a file changed since".
+- **Changed meaning:** a copy someone added since, of a token the change removed, now counts toward the
+  restore. Before `[A,A]`, the change removes both, someone adds one `A`, undo gives `[A,A]` (main gave `[A,A,A]`).
+- **Two running copies are covered by reasoning, not by a test.** The in-process path lock serializes two
+  undos inside one app. Across two copies, the guard relies on `NSFileCoordinator` writing claims excluding
+  each other, so the later undo reads the earlier one's result. Writers that do not coordinate (Finder, raw
+  xattr writes) were never serialized and still are not.
+- **Counts are exact strings:** a re-cased copy (`unread` put back where the change removed `Unread`) is not
+  counted, so undo still adds `Unread`. This is unchanged from before, and matches the path's exact matching of Read/Unread.
+
 
 ### W40.root-marker — root identity deferred to the first archive-link copy (fixed 2026-10-18)
 

@@ -172,7 +172,9 @@ add {"1981"}`. All of the following hold for every delta.
    re-computing the *delta* against current state — never rewrite a stale full array. **Undo = the
    inverse delta** (`add↔remove`) applied to a fresh read, so undo can never emit or destroy an
    unrelated token, and it preserves concurrent third-party edits. Bulk/group actions = **one**
-   grouped undo.
+   grouped undo. An undo never takes a token past its count before the change, and restores the label
+   only while it still reads as the change left it, so a repeated undo or a re-tag since is never stacked
+   (`applyOccurrence(undoing:)`, W45.undo-still-applied; detail in `KNOWN_ISSUES.md`).
 10. **Group edits** show tri-state presence (on all / some / none of the selection, like Finder);
     "add X" affects only files lacking X, "remove X" only files having it. The Read/Unread fast-path
     default does **not** add a read-state token to a marker/neither file (option, off).

@@ -1128,7 +1128,8 @@ final class NavigationModel: ObservableObject {
                     }
                     let inverse = TagOccurrenceDelta(add: entry.inverse.add, remove: entry.inverse.remove,
                         color: entry.inverse.label.map { .restoreLabel($0) })
-                    verified.append(try TagWriter.applyOccurrence(inverse, to: target.url, expecting: target.identity))
+                    verified.append(try TagWriter.applyOccurrence(inverse, to: target.url, expecting: target.identity,
+                        undoing: .init(before: entry.before, afterLabel: entry.afterLabel)))
                 } catch { failures.append(URL(fileURLWithPath: entry.path).lastPathComponent) }
             }
         }

@@ -371,7 +371,7 @@ final class TagWriterTests: XCTestCase {
         XCTAssertEqual(multiset(try readTags(url)), ["B": 1])                 // forward: both A's gone
         XCTAssertEqual(r.occurrenceInverse.add.sorted(), ["A", "A"])          // inverse carries multiplicity
 
-        _ = try TagWriter.applyOccurrence(r.occurrenceInverse, to: url)       // occurrence-aware undo
+        _ = try TagWriter.applyOccurrence(r.occurrenceInverse, to: url, undoing: .init(r))       // occurrence-aware undo
         XCTAssertEqual(multiset(try readTags(url)), ["A": 2, "B": 1])         // exact count restored
     }
 
@@ -385,7 +385,7 @@ final class TagWriterTests: XCTestCase {
 
         let occURL = try makeFile("dup-occ.pdf", tags: ["A", "A", "B"])
         let rOcc = try TagWriter.apply(TagDelta(remove: ["A"]), to: occURL)
-        _ = try TagWriter.applyOccurrence(rOcc.occurrenceInverse, to: occURL)
+        _ = try TagWriter.applyOccurrence(rOcc.occurrenceInverse, to: occURL, undoing: .init(rOcc))
         XCTAssertEqual(multiset(try readTags(occURL)), ["A": 2, "B": 1])     // both restored
     }
 
@@ -397,7 +397,7 @@ final class TagWriterTests: XCTestCase {
         // Simulate a concurrent third-party edit landing before the undo.
         try (url as NSURL).setResourceValue(["Y"], forKey: .tagNamesKey)
 
-        _ = try TagWriter.applyOccurrence(r.occurrenceInverse, to: url)
+        _ = try TagWriter.applyOccurrence(r.occurrenceInverse, to: url, undoing: .init(r))
         XCTAssertEqual(multiset(try readTags(url)), ["A": 2, "Y": 1])        // Y kept, both A's restored
     }
 
@@ -410,7 +410,7 @@ final class TagWriterTests: XCTestCase {
         // A concurrent editor adds a second "Economics" before the undo.
         try (url as NSURL).setResourceValue(["Unread", "Economics", "Economics"], forKey: .tagNamesKey)
 
-        _ = try TagWriter.applyOccurrence(r.occurrenceInverse, to: url)
+        _ = try TagWriter.applyOccurrence(r.occurrenceInverse, to: url, undoing: .init(r))
         XCTAssertEqual(multiset(try readTags(url)), ["Unread": 1, "Economics": 1])  // one copy survives
     }
 
@@ -422,10 +422,75 @@ final class TagWriterTests: XCTestCase {
         XCTAssertEqual(try readLabel(url), 6)
         XCTAssertTrue(Set(try readTags(url)).contains("Red"))
 
-        _ = try TagWriter.applyOccurrence(r.occurrenceInverse, to: url)
+        _ = try TagWriter.applyOccurrence(r.occurrenceInverse, to: url, undoing: .init(r))
         XCTAssertEqual(try readLabel(url) ?? 0, 0)                            // label restored
         XCTAssertFalse(Set(try readTags(url)).contains("Red"))               // color token stripped
         XCTAssertTrue(Set(try readTags(url)).contains("Unread"))             // subject preserved
+    }
+
+    // MARK: Undo against a file changed since (W45.undo-still-applied)
+
+    /// Someone else's edit between the change and its undo. A new `URL` for each write, so no
+    /// resource-value cache puts stale Finder info back.
+    private func editElsewhere(_ url: URL, tags: [String], label: Int? = nil) throws {
+        try (URL(fileURLWithPath: url.path) as NSURL).setResourceValue(tags, forKey: .tagNamesKey)
+        if let label { try (URL(fileURLWithPath: url.path) as NSURL).setResourceValue(label, forKey: .labelNumberKey) }
+    }
+    private func freshLabel(_ url: URL) throws -> Int { try readLabel(URL(fileURLWithPath: url.path)) ?? 0 }
+
+    /// A token the change removed and someone has put back since is not added a second time.
+    func testUndoDoesNotStackATokenPutBackSince() throws {
+        let url = try makeFile("readded.pdf", tags: ["Unread", "Economics"])
+        let r = try TagWriter.apply(TagDelta(add: ["Read"], remove: ["Unread"]), to: url)
+        try editElsewhere(url, tags: ["Economics", "Unread"])                            // re-marked elsewhere
+
+        _ = try TagWriter.applyOccurrence(r.occurrenceInverse, to: url, undoing: .init(r))
+        XCTAssertEqual(multiset(try readTags(url)), ["Unread": 1, "Economics": 1])
+    }
+
+    /// The same step undone twice (a second running copy, or an undo line that never reached the ledger):
+    /// the second inverse finds the file already as it was and writes nothing.
+    func testSecondUndoOfTheSameStepWritesNothing() throws {
+        let url = try makeFile("twice.pdf", tags: ["A", "A", "B"])
+        let r = try TagWriter.apply(TagDelta(remove: ["A"]), to: url)
+        _ = try TagWriter.applyOccurrence(r.occurrenceInverse, to: url, undoing: .init(r))
+        let second = try TagWriter.applyOccurrence(r.occurrenceInverse, to: url, undoing: .init(r))
+        XCTAssertTrue(second.isNoOp)
+        XCTAssertEqual(multiset(try readTags(url)), ["A": 2, "B": 1])
+    }
+
+    /// Two undos of the same step at the same moment end with the file as it was before the step (main
+    /// stacked a second `Unread`). This pins the outcome, not the serialization that produces it.
+    func testConcurrentUndosOfTheSameStepApplyOnce() throws {
+        for round in 0..<8 {
+            let url = try makeFile("undo-race-\(round).pdf", tags: ["Unread"])
+            let r = try TagWriter.apply(TagDelta(add: ["Read"], remove: ["Unread"]), to: url)
+            DispatchQueue.concurrentPerform(iterations: 2) { _ in
+                _ = try? TagWriter.applyOccurrence(r.occurrenceInverse, to: url, undoing: .init(r))
+            }
+            XCTAssertEqual(multiset(try readTags(url)), ["Unread": 1], "round \(round)")
+        }
+    }
+
+    /// A colour someone changed since is kept: neither the old label nor the old colour token is put back.
+    func testUndoLeavesAColourChangedSince() throws {
+        let url = try makeFile("recolour.pdf", tags: ["Purple", "Unread"], label: 3)
+        let r = try TagWriter.apply(TagDelta(color: .set(.box)), to: url)                // Purple → Red, 3 → 6
+        try editElsewhere(url, tags: ["Unread"], label: 0)                                // colour cleared elsewhere
+
+        _ = try TagWriter.applyOccurrence(r.occurrenceInverse, to: url, undoing: .init(r))
+        XCTAssertEqual(multiset(try readTags(url)), ["Unread": 1])
+        XCTAssertEqual(try freshLabel(url), 0)
+    }
+
+    /// The guard is per token: what nobody touched since is still restored when something else was.
+    func testUndoStillRestoresTheTokensNobodyChanged() throws {
+        let url = try makeFile("partial.pdf", tags: ["Unread", "Economics"])
+        let r = try TagWriter.apply(TagDelta(add: ["Read", "Trade"], remove: ["Unread", "Economics"]), to: url)
+        try editElsewhere(url, tags: ["Read", "Trade", "Unread"])                         // Unread put back
+
+        _ = try TagWriter.applyOccurrence(r.occurrenceInverse, to: url, undoing: .init(r))
+        XCTAssertEqual(multiset(try readTags(url)), ["Unread": 1, "Economics": 1])
     }
 
     // MARK: Concurrent same-path writes (W15.tu4) — the Reader adapter inherits §10 serialization
