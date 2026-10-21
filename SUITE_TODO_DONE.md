@@ -11952,3 +11952,18 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
 - [x] **W40.fix-notes-unclosed-header — a note with an unclosed block header gains a `<!-- block: freeform -->` line on every save [S · S3]** · §W40 — verification phase · SHIPPED 2026-10-20 with W40.e6, which found the same bug by fuzzing (lane: notes). Both save paths wrote a header for the freeform block that an unclosed header degrades to (§6, kept): the store (`BlockParser.serialize`) and the editor (`MarkdownBridge` writes a header per chip). `Block.headerless`, set only for that case and carried as `SourceAnchorBox.headerless`, writes it back with no header of its own; `Block ==` compares it.
   - The test the item asked for: `FrontMatterMutationFuzzTests.rehearsalStoreUnclosedHeaderNoteIsStableAcrossThreeSaves`, the nine-line note from `verification/evidence/notes/W40.c1-rehearsal-store-load.md`, byte-identical after each of three saves. Plus `unterminatedBlockHeaderIsWrittenBackAsItWas`, `unterminatedBlockHeaderSurvivesTheEditor`, and the damaged-file loop (262 unstable saves before, 0 after). `BlockHeaderTests.malformedHeaderDegradesToFreeform` unchanged. Tier-2 review (opus): no data-loss regression.
   <!-- /W40.fix-notes-unclosed-header -->
+- [x] **W40.e7 — mutation sample on the irreversible paths [M]** · §W40 verification phase · SHIPPED 2026-10-20 (this commit; checkpoint `aa8f0b82`)
+  `ops/verify/mutation-sample.sh <core|processor|notes|reader> [--check] [--only IDs]` plants 50 mutants one at a time:
+  12 in the tag writer, 13 in Processor finalize/Trash, 12 in Notes note save and 13 in Reader undo. For each it
+  rebuilds, runs the area's tests and restores the source. A survivor counts only when the compiled object file
+  for its source differs from the baseline, which proves the mutant landed. All 50 mutants landed.
+  33 of 50 were killed (tag writer 7/12, Processor 7/13, Notes 10/12, Reader 9/13). The 17 survivors are all on
+  lines the suites demonstrably run, so each one is a missing check, not untested code. They are filed `S3` as
+  `W40.fix-mut-tagwriter-tests`, `W40.fix-mut-processor-trash-tests`, `W40.fix-mut-notes-save-tests` and
+  `W40.fix-mut-reader-undo-tests`.
+  The most notable: recovery Test 4 says it checks "not a hard rm", but a hard delete passes it (P01). Reader
+  `undoLast` undoing the OLDEST change passes all 15 tests that call it (R08). `shouldRemoveTag` matching by prefix
+  breaks its own "never substring" promise, and no test notices (C11).
+  The Processor survivors were re-run against all 27 drivers that spend no money (`MUT_DRIVERS=all`), and none
+  of them was killed there either. Evidence: `verification/evidence/core/W40.e7-mutation-sample.md`.
+  <!-- /W40.e7 -->

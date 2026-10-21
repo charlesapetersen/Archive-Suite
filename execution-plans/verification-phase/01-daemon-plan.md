@@ -229,7 +229,9 @@ where it can.
   and `W40.fix-notes-unclosed-header`; filed three `W40.fix-*`.)*
 - **`W40.e7` — mutation sample on the irreversible paths [M].** About ten planted mutants each in the tag writer,
   finalize/Trash, note save and Reader undo. Prove each mutant landed before believing it survived. Survivors are
-  missing tests, filed as `S3`.
+  missing tests, filed as `S3`. *(SHIPPED 2026-10-20: `ops/verify/mutation-sample.sh`, landing proved by the
+  object-file hash; evidence `verification/evidence/core/W40.e7-mutation-sample.md`. 33 of 50 killed; the 17
+  survivors filed as the four `W40.fix-mut-*` items.)*
 - **`W40.e8` — Android screens without an emulator [M].** Gated on `W40.e8-owner-ok` (an instrumented lane was
   declined 2026-07-31). Robolectric Compose tests plus Roborazzi screenshots under `testDebugUnitTest`.
 - **`W40.e9` — layout guard [M].** Owner-requested 2026-10-11: the Notes note list shipped with every row

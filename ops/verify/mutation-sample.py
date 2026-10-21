@@ -18,7 +18,8 @@ reported `not-landed` and makes the run exit 2.
 Verdicts:  killed (tests failed) · timeout (tests hung; counted as killed, but listed) · survived (tests
 green, object changed) · not-landed · compile-error (the mutant is invalid; fix its text).
 """
-import hashlib, os, pathlib, shutil, subprocess, sys, time
+import functools, hashlib, os, pathlib, subprocess, sys, time
+print = functools.partial(print, flush=True)  # progress lines reach a redirected log as they happen
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 OUT_BASE = pathlib.Path(os.environ.get("MUT_OUT", "/tmp/mutation-sample"))
@@ -146,7 +147,17 @@ MUTANTS = {
   ],
 }
 
+# The drivers that cover finalize/Trash. MUT_DRIVERS=all widens it to every driver that spends no money (the
+# sanitizer runner's list), to confirm a survivor is not killed somewhere else in the gate.
 PROC_DRIVERS = ["test-recovery.sh", "test-manifest-persistence.sh", "test-merge-safety.sh"]
+ALL_DRIVERS = """test-batch-resume.sh test-collection-organize.sh test-dual-date.sh test-institutional-compute-import.sh
+test-filerelay.sh test-incremental-skip.sh test-local-models.sh test-localagent.sh test-manifest-persistence.sh
+test-merge-safety.sh test-multipage-reocr.sh test-network-session.sh test-ocr-cascade.sh test-ocr-page-guidance.sh
+test-ocr-page-kind.sh test-ocr-refusal.sh test-processfiles-tagwarn.sh test-processing-history.sh test-recovery.sh
+test-retry-backend.sh test-segment-json.sh test-segmentation-chatgpt.sh test-segmentation-chooser.sh
+test-segmentation-engine.sh test-segmentation-plan.sh test-segmentation-review.sh test-vision-hybrid.sh""".split()
+if os.environ.get("MUT_DRIVERS") == "all":
+    PROC_DRIVERS = ALL_DRIVERS
 
 
 def run(cmd, cwd, log, timeout, env=None):
@@ -207,8 +218,11 @@ class Area:
         stem = pathlib.Path(src).name
         n = self.name
         if n == "core":
+            # Either SwiftPM layout: `…/ArchiveCore.build/TagWrite.swift.o` or the swift-build one,
+            # `…/ArchiveCore.build/Debug/ArchiveCore-t.build/Objects-normal/arm64/TagWrite.o`.
             base = ROOT / "packages/ArchiveCore/.build/mut"
-            cands = [p for p in base.rglob(stem + ".o") if "ArchiveCore.build" in str(p)]
+            cands = [p for name in (stem + ".o", pathlib.Path(stem).stem + ".o") for p in base.rglob(name)
+                     if "ArchiveCore" in str(p) and "Tests" not in str(p)]
         else:
             app = {"reader": "ArchiveReader", "notes": "ArchiveNotes", "processor": "ArchiveProcessor"}[n]
             base = ROOT / f"{app}/macOS/build/{'DD' if n == 'processor' else 'mut-DD'}/Build/Intermediates.noindex"
