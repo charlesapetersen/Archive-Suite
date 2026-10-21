@@ -37,9 +37,9 @@ Read `00-plan.md`, then this table. Take the first phase step not done. Strand n
 | E layout | done, `screens/E-screen.md` | done 2026-10-20 (Fable), `E-layout.md` | NewsBench figures match our farmshare/news results | done |
 | F text placement | done, `screens/F-screen.md` | done 2026-10-20 (Fable), `F-placement.md` | lab figure checked: vision-ocr HW-BUILD-2026-10-15.tsv (placed 0.654; 96 to 367 missed per 1,000) | done |
 | G entities | done, `screens/G-screen.md` | started 2026-10-21 00:45 (Fable) | | |
-| H whole-corpus and user training | done, `screens/H-screen.md` | started 2026-10-21 00:45 (Fable) | | |
+| H whole-corpus and user training | done, `screens/H-screen.md` | done 2026-10-21 (Fable), `H-corpus.md` | | done |
 | K kind identification and mixed pages | self-screened (29 candidates) | done 2026-10-21 (Fable), `K-kinds.md` | readers' own kind labels rechecked from ocr-pages.csv (Qwen3-VL 235B 94/96, Sonnet 92/96, Gemini 3.8 Flash 87/94) | done |
-| L phone capture | self-screened | started 2026-10-21 00:45 (Fable) | | |
+| L phone capture | self-screened (39 candidates) | done 2026-10-21 (Fable), `L-capture.md` | capture split rerun (`scripts/segbench/capture_attrs.py pages.tsv ocr-pages.csv`); companions' default camera settings checked in code | done |
 | I model inventory | done, `I-inventory.md` | n/a | | done |
 | J compute and prices | done, `J-compute.md` | n/a | | done |
 
