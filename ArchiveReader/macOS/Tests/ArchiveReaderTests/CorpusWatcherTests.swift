@@ -1084,6 +1084,66 @@ final class CorpusWatcherStreamTests: XCTestCase {
         wait(for: [delivered], timeout: 5)
     }
 
+    /// `W45.corpuswatcher-uaf`. FSEvents may run, or have queued, a callback when the watcher is freed:
+    /// `FSEventStreamStop` does not wait for it. The box the callback dereferences must therefore be kept
+    /// alive by the stream until every callback queued before teardown has run, and freed after.
+    func testTheStreamKeepsTheCallbackBoxAliveForCallbacksQueuedBeforeTeardown() throws {
+        let root = try temporaryRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let queue = DispatchQueue(label: "CorpusWatcherStreamTests.blocked")
+        let blocker = DispatchSemaphore(value: 0)
+        let handled = CounterBox()
+        let occupied = DispatchSemaphore(value: 0)
+        var handledBeforeTeardown = 0
+        weak var box: AnyObject?
+        do {
+            let watcher = CorpusWatcher(root: root, queue: queue) { _ in handled.increment() }
+            XCTAssertEqual(watcher.start(), .started)
+            box = watcher.callbackBoxForTesting
+            // Occupy the queue so a delivered batch waits behind us, as a callback in flight would.
+            queue.async { occupied.signal(); blocker.wait() }
+            occupied.wait()
+            handledBeforeTeardown = handled.value
+            try Data("bytes".utf8).write(to: root.appendingPathComponent("late.pdf"))
+            // Nothing observable says a batch has been queued behind the blocker (a flush would wait on
+            // the blocked queue), so wait well past the stream's 0.25 s latency. Too short a wait could
+            // only fail this test spuriously, never pass it wrongly.
+            Thread.sleep(forTimeInterval: 2)
+            withExtendedLifetime(watcher) {}        // alive until here even in an optimised build
+        }                                           // the watcher is freed here: deinit → stop()
+        XCTAssertNotNil(box, "the stream, not the freed watcher, must own the box a queued callback reads")
+        blocker.signal()
+        queue.sync {}                               // the queued callback runs; FSEvents lets go of the stream
+        XCTAssertNil(box, "the stream's release must balance its retain: the box must not leak")
+        XCTAssertEqual(handled.value, handledBeforeTeardown, "a callback for a freed watcher must not reach its handler")
+    }
+
+    /// Watchers created and dropped fast while events arrive — the shape the 2026-10-17 SIGBUS came from.
+    func testWatchersStartedAndDroppedWhileEventsArriveDoNotTouchFreedMemory() throws {
+        let root = try temporaryRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let writing = FlagBox()
+        let writerDone = DispatchSemaphore(value: 0)
+        let writer = Thread {
+            defer { writerDone.signal() }
+            var n = 0
+            while !writing.isSet {
+                try? Data("\(n)".utf8).write(to: root.appendingPathComponent("churn-\(n % 8).pdf"))
+                n += 1
+                usleep(500)
+            }
+        }
+        writer.qualityOfService = .userInteractive  // the join below must not wait on a lower QoS
+        writer.start()
+        defer { _ = writing.claim(); writerDone.wait() }   // joined before the root is removed
+        for _ in 0..<150 {
+            let watcher = CorpusWatcher(root: root) { _ in }
+            XCTAssertEqual(watcher.start(), .started)
+            usleep(UInt32.random(in: 0...30_000))   // sometimes long enough for a batch to be in flight
+            if Bool.random() { watcher.stop() }      // explicit stop, or teardown from deinit alone
+        }
+    }
+
     private func temporaryRoot() throws -> URL {
         let root = URL(fileURLWithPath: NSTemporaryDirectory())
             .appendingPathComponent("CorpusWatcherStreamTests-\(UUID().uuidString)", isDirectory: true)
@@ -1213,6 +1273,7 @@ private final class CounterBox: @unchecked Sendable {
 private final class FlagBox: @unchecked Sendable {
     private let lock = NSLock()
     private var value = false
+    var isSet: Bool { lock.lock(); defer { lock.unlock() }; return value }
     func claim() -> Bool {
         lock.lock(); defer { lock.unlock() }
         guard !value else { return false }

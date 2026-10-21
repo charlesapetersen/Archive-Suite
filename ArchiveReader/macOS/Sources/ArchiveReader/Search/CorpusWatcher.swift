@@ -223,7 +223,7 @@ final class CorpusWatcher: CorpusWatching, @unchecked Sendable {
     private let handler: Handler
     private let startSecurityScope: @Sendable (URL) -> Bool
     private let stopSecurityScope: @Sendable (URL) -> Void
-    private let queue = DispatchQueue(label: "ArchiveReader.CorpusWatcher", qos: .utility)
+    private let queue: DispatchQueue
     private let callbackBox = CallbackBox()
     private var stream: FSEventStreamRef?
     private var holdsSecurityScope = false
@@ -235,8 +235,10 @@ final class CorpusWatcher: CorpusWatching, @unchecked Sendable {
          stopSecurityScope: @escaping @Sendable (URL) -> Void = {
              $0.stopAccessingSecurityScopedResource()
          },
+         queue: DispatchQueue = DispatchQueue(label: "ArchiveReader.CorpusWatcher", qos: .utility),
          handler: @escaping Handler) {
         self.root = root
+        self.queue = queue
         self.startSecurityScope = startSecurityScope
         self.stopSecurityScope = stopSecurityScope
         self.handler = handler
@@ -256,11 +258,24 @@ final class CorpusWatcher: CorpusWatching, @unchecked Sendable {
         // the path is inaccessible. Only a successful start increments the scope count and needs a stop.
         holdsSecurityScope = startSecurityScope(root)
 
+        // The STREAM owns the box (+1 at create, -1 when the stream is freed), not merely the watcher:
+        // a callback already running or queued on `queue` when the watcher is freed must still find a
+        // live box, whose weak `owner` is nil by then, so it does nothing. With `retain: nil` the box
+        // died with the watcher and such a callback read freed memory — a SIGBUS in
+        // `swift_weakLoadStrong` from this callback, seen once in the unit bundle on 2026-10-17 while
+        // tests created and dropped models in quick succession (`W45.corpuswatcher-uaf`).
         var context = FSEventStreamContext(
             version: 0,
             info: Unmanaged.passUnretained(callbackBox).toOpaque(),
-            retain: nil,
-            release: nil,
+            retain: { info in
+                guard let info else { return nil }
+                _ = Unmanaged<CallbackBox>.fromOpaque(info).retain()
+                return info
+            },
+            release: { info in
+                guard let info else { return }
+                Unmanaged<CallbackBox>.fromOpaque(info).release()
+            },
             copyDescription: nil
         )
         let callback: FSEventStreamCallback = { _, info, count, rawPaths, rawFlags, _ in
@@ -312,8 +327,15 @@ final class CorpusWatcher: CorpusWatching, @unchecked Sendable {
             releaseSecurityScope()
             return
         }
-        // FSEvents.h requires this exact order. `Stop` also waits for any callback in flight before
-        // returning, so releasing the callback box's unretained context afterwards is safe.
+        // FSEvents.h requires this exact order. `Stop` does NOT wait for a callback already running or
+        // queued on `queue`; that callback is safe because FSEvents keeps the stream, and through its
+        // context retain (see `start()`) the callback box, alive until it has run — measured by
+        // `testTheStreamKeepsTheCallbackBoxAliveForCallbacksQueuedBeforeTeardown` with this synchronous
+        // release. Never drain `queue` here (`queue.sync {}`): `stop()` runs on the main thread while a
+        // callback can be in a filesystem call on a stalled root (`W26.fsev-fu1`), and it is also
+        // reached from INSIDE a callback that held the watcher's last reference, where a drain would
+        // wait on itself. A callback that still runs after this returns reaches `handler` only if the
+        // watcher is still alive (an explicit `stop()`), and `ArchiveLibrary` drops those by generation.
         FSEventStreamStop(active)
         FSEventStreamInvalidate(active)       // while still scheduled on `queue`
         FSEventStreamRelease(active)
@@ -329,6 +351,11 @@ final class CorpusWatcher: CorpusWatching, @unchecked Sendable {
     }
 
     deinit { stop() }
+
+#if DEBUG
+    /// The box the stream's context points at, so a test can hold it weakly and see who keeps it alive.
+    var callbackBoxForTesting: AnyObject { callbackBox }
+#endif
 
     private func receive(paths: [String], flags: [FSEventStreamEventFlags]) {
         let request = CorpusWatchRequest.reduce(root: root, paths: paths, flags: flags)
