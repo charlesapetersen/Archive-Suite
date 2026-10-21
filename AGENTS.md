@@ -120,7 +120,7 @@ plan's `## WORK QUEUE` (`ops/autonomous/next-queue-item.sh` walks only that).
 |------|-----------|
 | **reader** | `ArchiveReader/` — views, navigation, tag editing (via `TagWriter`), content index |
 | **processor-macOS** | `ArchiveProcessor/macOS/` — OCR pipeline, tagging, review flows, capture server |
-| **processor-iOS** | `ArchiveProcessor/ArchiveCaptureiOS/` — iPhone capture companion. **PARKED 2026-07-18** — source retained, full-app build out of the verify loop; see `ArchiveCaptureiOS/PARKED.md` |
+| **processor-iOS** | `ArchiveProcessor/ArchiveCaptureiOS/` — iPhone capture companion. Parked 2026-07-18, revived by W40.i1 (2026-10-21): the health gate builds it (`ios-build`) |
 | **processor-android** | `ArchiveProcessor/ArchiveCapture/` — Android capture companion |
 | **notes** | `ArchiveNotes/` — note/extract store, editor, index, cross-app linking, Zotero |
 | **suite** | root docs, `SPEC/`, `release/`, `launch.sh` dispatcher |

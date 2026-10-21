@@ -104,15 +104,15 @@ out larger splits itself: file `<tag>a`, `<tag>b` … with `(blocked-on:)` chain
 
 ## I — revive the iPhone companion (owner, 2026-10-04: before testing)
 
-- **`W40.i1` — build it again [S-M].** Check free disk first (the runtime is about 16 GB; stop and report under
-  30 GB free). `xcodebuild -downloadPlatform iOS`, `xcodegen generate`, simulator build, fix compile breaks. Restore
-  the iOS build line in `ArchiveProcessor/CLAUDE.md`, add an iOS build step to the gate, delete
-  `ArchiveCaptureiOS/PARKED.md`, and amend the "ON HOLD" text in `SUITE_TODO.md` §Project focus.
+- **`W40.i1` — build it again.** Shipped 2026-10-21: it built with no source changes, for the simulator and
+  the device, against the bundled iOS 27 SDK and with no simulator runtime installed; the gate's `ios-build`
+  step builds it. See `SUITE_TODO_DONE.md`.
 - **`W40.i2` — parity with Android [M].** A feature-by-feature comparison of iOS and Android, written into
   `verification/capture.md`. Include every fix recorded as Android-only while parked (search the done-records for
   "iOS twin" and "PARKED"; `W23.m1` is one). File each gap as `W40.i-fix-<slug>` (blocked-on: W40.i2).
 - **`W40.i3` — iOS in the phone↔Mac E2E [M].** Extend `ArchiveProcessor/scripts/e2e-phone-mac.sh` to drive the
-  iOS simulator through the same inject seam Android uses. Blocked on the parity fixes the comparison files; add
+  iOS simulator through the same inject seam Android uses. Running a simulator needs the runtime W40.i1 did
+  not install (about 16 GB): check free disk first and stop and report under 30 GB (13 GB on 2026-10-21). Blocked on the parity fixes the comparison files; add
   their tags to this line when they are filed.
 - **`W40.i5` — borrowed-iPhone session pack [S].** The owner has no iPhone and no paid developer account; a
   phone is borrowed for one concentrated period. Prepare `verification/sessions/iphone-1.md` so that period goes

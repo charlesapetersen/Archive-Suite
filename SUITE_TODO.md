@@ -59,13 +59,11 @@ the head of the plan's `## WORK QUEUE` — read it there before re-ordering anyt
 companion — plus the core Mac pipeline (OCR/tag/PDF/finalize) and the Reader, which continue as normal.
 
 **ON HOLD — maintain-only** (mirror shared-contract changes so they don't rot, but **no new feature
-development, and NOT a code-review or bug-fix target**; keep them compiling — **except the iOS companion,
-now fully PARKED, see below**):
-- **iOS companion** — `ArchiveProcessor/ArchiveCaptureiOS/`. **PARKED 2026-07-18 — stronger than
-  maintain-only: its full-app build is now OUT of the verify loop** (iOS simulator runtime removed to
-  reclaim ~18 GB — see `ArchiveCaptureiOS/PARKED.md`). Source retained and still gets shared-contract
-  edits; parity is auto-checked via `scripts/test-relay-golden.sh` (host `swiftc`, no runtime needed), so
-  it can't rot. Reviving = reinstall a simulator runtime + restore its build line (steps in PARKED.md).
+development, and NOT a code-review or bug-fix target**; keep them compiling):
+- **iOS companion** — `ArchiveProcessor/ArchiveCaptureiOS/`. Parked 2026-07-18, **revived by W40.i1
+  (2026-10-21)**: it builds again and the health gate builds it (`ios-build`, generic simulator destination,
+  no simulator runtime needed). Its revival work is W40.i2-i5 (parity with Android, the E2E, the borrowed
+  phone); until those land, the maintain-only rule above still applies to it.
 - **Cloud (Google Drive) relay transport** — Mac `Net/{DriveObjectStore,DriveClient,DriveAuth}.swift` + the
   `FileRelayReceiver`/`RelayObjectStore` cloud path (incl. the offline `FileRelay` stand-in); both companions'
   `DriveRelayTransport`/`DriveAuth`/`DriveClient`. The `RelayObjectFormat` wire contract stays frozen — only
@@ -403,8 +401,8 @@ stale-callback ordering, ArchiveCore partial Finder-tag mutation (already docume
 stripping / case-only tag convergence / smart-folder flattening (all intentional, tested behaviour). Do **not**
 re-promote those.
 
-**iOS parity is PARKED** (§Project focus): where a finding has an iOS twin (`W23.m1`), fix **Android only** and
-record the iOS parity as parked — do not revive the iOS build to chase it.
+**iOS parity** (§Project focus): where a finding has an iOS twin (`W23.m1`), fix **Android only** and
+record the iOS twin; `W40.i2` collects those twins into the parity comparison.
 
 **Prior-art audit — CLOSED 2026-07-29. Do not go re-mining the archive.** A removed Codex worktree (work dated
 2026-07-17, preserved as branch `wt/codex-processor-bugfixes-20260712` + patches in
@@ -1021,7 +1019,6 @@ on `a1` rather than `a3`. The freeze is now per area: only an app's ledger and j
 unfinished features — Processor `b3` and `d1`-`d4` on `W36.seg-decision`, the Reader and Notes ledgers `b1`/`b2` on
 `W24.cal1` (their journeys follow through `b1`/`b2`). Rule 7 of the daemon plan says the same.
 
-- [ ] **`W40.i1` — iPhone companion builds again [S-M]** (blocked-on: W42.int-done) (lane: processor,ops) (uses: build) (blocked-on: W40.a1). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §I.
 - [ ] **`W40.i2` — iPhone companion parity with Android [M]** (blocked-on: W42.int-done) (lane: processor) (uses: build) (blocked-on: W40.i1). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §I.
 - [ ] **`W40.i3` — iPhone companion in the phone↔Mac E2E [M]** (blocked-on: W42.int-done) (lane: processor) (uses: build) (blocked-on: W40.i2). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §I.
 - [ ] **`W40.i5` — borrowed-iPhone session pack [S]** (blocked-on: W42.int-done) (lane: docs) (uses: light) (blocked-on: W40.i3). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §I. Judge first whether it is time for the owner's session (§G "Is it time?"); the blockers being ticked is not enough.

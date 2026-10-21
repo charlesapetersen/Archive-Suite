@@ -67,5 +67,5 @@ Drive sign-in is disabled, with a message pointing here.
 The iOS companion needs its own **iOS** OAuth client in the same project, registered against bundle
 ID `com.archiveprocessor.capture.ios`, with the same "Custom URI scheme" toggle enabled. Its client
 ID goes in `ArchiveCaptureiOS/Sources/ArchiveCaptureiOS/Net/DriveAuth.swift` and the matching
-reversed scheme in `ArchiveCaptureiOS/project.yml`. The iOS companion is currently
-[parked](../ArchiveCaptureiOS/PARKED.md) and its on-device OAuth flow is unverified.
+reversed scheme in `ArchiveCaptureiOS/project.yml`. The iOS companion builds again (W40.i1),
+but its on-device OAuth flow is unverified.

@@ -11979,3 +11979,14 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   launch away from the real Keychain), `LIVECAPTURE_AUTOSTART`, and the `BATCHRESUME_TEST` pending-state redirect.
   These are launch guards, not drivers. Rule for new drivers: `ArchiveProcessor/CLAUDE.md`.
   <!-- /W40.a5 -->
+- [x] **W40.i1 — iPhone companion builds again [S-M]** · §W40 (lane: processor,ops) — SHIPPED 2026-10-21.
+  The iPhone companion (`ArchiveProcessor/ArchiveCaptureiOS/`) built with no source changes: Debug for
+  `generic/platform=iOS Simulator` and for `generic/platform=iOS` (with `CODE_SIGNING_ALLOWED=NO`), both clean, with no
+  compiler warnings, against Xcode's bundled iOS 27.0 SDK. **No simulator runtime was installed, and none is needed to
+  build.** PARKED.md said a scheme build needs one; that is not true with the generic destination. Free disk was 13 GB,
+  under the plan's 30 GB floor for the 16 GB runtime download, so it was not downloaded. W40.i3, which runs the simulator,
+  needs it, and its plan line now says to check disk first. The health gate gained an `ios-build` step, the same build
+  (about 15 s warm, free). The iOS build line is back in `ArchiveProcessor/CLAUDE.md`. `ArchiveCaptureiOS/PARKED.md` is
+  deleted, and the parked wording is gone from SUITE_TODO §Project focus, the two AGENTS.md lane lists, `bootstrap.sh`
+  and `README-oauth.md`. iOS stays maintain-only until W40.i2-i5 land.
+  <!-- /W40.i1 -->

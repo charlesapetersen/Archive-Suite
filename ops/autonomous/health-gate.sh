@@ -348,6 +348,9 @@ step notes  bash -c 'cd ArchiveNotes/macOS  && xcodegen generate >/dev/null 2>&1
 # Processor: build then launch the SAME gate artifact, free. The recovery driver is synthetic/headless
 # ($0, no network, no OCR, no GUI) and confirms the app reached main; a build alone cannot catch a pre-main
 # abort. `ARCHIVEPROC_TEST_BINARY` is explicit so this cannot accidentally pass against stale build/DD.
+# W40.i1: the iPhone companion builds again. The generic simulator destination needs only the SDK Xcode
+# bundles, not an installed simulator runtime (removed 2026-07-18 for disk), so this costs no download. Free.
+step ios-build bash -c 'cd ArchiveProcessor/ArchiveCaptureiOS && xcodegen generate >/dev/null 2>&1 && xcodebuild -scheme ArchiveCaptureiOS -destination "generic/platform=iOS Simulator" -configuration Debug -derivedDataPath ./build/gate-DD build'
 step processor-build bash -c 'cd ArchiveProcessor/macOS && xcodegen generate >/dev/null 2>&1 && xcodebuild -scheme ArchiveProcessor -configuration Debug -derivedDataPath ./build/gate-DD build'
 step processor-launch bash -c 'cd ArchiveProcessor && ARCHIVEPROC_TEST_BINARY="$PWD/macOS/build/gate-DD/Build/Products/Debug/ArchiveProcessor.app/Contents/MacOS/ArchiveProcessor" bash scripts/test-recovery.sh'
 # W28.cert-fu3 (heavy block: test-recovery.sh takes the heavy lock as a whole-script entry): prove the launch gate itself runs a binary that aborts before main and reports a failing
