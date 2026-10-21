@@ -340,6 +340,9 @@ step archivecore bash "$ROOT/ops/autonomous/archivecore-tests.sh"
 step relay-golden bash "$ROOT/ArchiveProcessor/scripts/test-relay-golden.sh"
 # W40.e6: seeded fuzz + round-trip properties of the same format, Mac and iOS copies, ~10 s, free.
 step relay-fuzz bash "$ROOT/ArchiveProcessor/scripts/test-relay-fuzz.sh"
+# W40.fix-drive-script-path: the Mac cloud relay's DriveObjectStore against a mock Drive; offline, no OAuth, free.
+# Nothing ran it, so it compiled from a pre-de-nest path unnoticed. (test-drive-live.sh stays owner-run: OAuth.)
+step drive-store bash "$ROOT/ArchiveProcessor/scripts/test-drive-store.sh"
 step e2e-cleanup-proof python3 "$ROOT/ArchiveProcessor/scripts/test-e2e-cleanup.py"
 # W41.ocr-smoke-term: the Processor smoke's teardown and pass/fail oracle on scratch children and fixtures; free.
 step smoke-teardown-proof python3 "$ROOT/ArchiveProcessor/scripts/test-smoke-teardown.py"

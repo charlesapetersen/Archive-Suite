@@ -13,7 +13,7 @@
 set -uo pipefail
 . "$(dirname "$0")/../../ops/autonomous/heavy-enter.sh"
 cd "$(dirname "$0")/.."
-REPO="$PWD"; NET="$REPO/ArchiveProcessor/Sources/ArchiveProcessor/Net"
+REPO="$PWD"; NET="$REPO/macOS/Sources/ArchiveProcessor/Net"
 [ -n "${DRIVE_ACCESS_TOKEN:-}" ] || { echo "set DRIVE_ACCESS_TOKEN (a drive.file access token) first"; exit 2; }
 W=$(mktemp -d)
 cat > "$W/main.swift" <<'SWIFT'

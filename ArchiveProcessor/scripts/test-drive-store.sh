@@ -7,7 +7,7 @@
 set -uo pipefail
 . "$(dirname "$0")/../../ops/autonomous/heavy-enter.sh"
 cd "$(dirname "$0")/.."
-REPO="$PWD"; W=$(mktemp -d); NET="$REPO/ArchiveProcessor/Sources/ArchiveProcessor/Net"
+REPO="$PWD"; W=$(mktemp -d); NET="$REPO/macOS/Sources/ArchiveProcessor/Net"
 cat > "$W/main.swift" <<'SWIFT'
 import Foundation
 

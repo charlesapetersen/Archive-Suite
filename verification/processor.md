@@ -960,7 +960,10 @@ cover the Mac: the receiver, the tag card, the drain gate, staging, finalize and
 - **Status:** `unproven`
 - **History:**
   - 2026-10-21 W40.b3 — row written, `unproven`.
-- **Notes:** `scripts/test-drive-store.sh:10` and `scripts/test-drive-live.sh:16` compile from
+  - 2026-10-21 W40.fix-drive-script-path — both scripts' path fixed; the mock test passes 10/10 and runs in the health
+    gate as `drive-store` ([`evidence/processor/W40.fix-drive-script-path.md`](evidence/processor/W40.fix-drive-script-path.md)).
+    Still `unproven`: a mock pass is not a pull from Drive.
+- **Notes:** (fixed 2026-10-21, history above) `scripts/test-drive-store.sh:10` and `scripts/test-drive-live.sh:16` compile from
   `$REPO/ArchiveProcessor/Sources/ArchiveProcessor/Net`, where `$REPO` is already `ArchiveProcessor/` — a path that
   does not exist since the de-nest. **Reproduced** 2026-10-21: the script fails at `swiftc` with "error opening input
   file" ([`evidence/processor/W40.b3-drive-store-path.md`](evidence/processor/W40.b3-drive-store-path.md)), so the Drive
