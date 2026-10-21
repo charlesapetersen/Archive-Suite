@@ -2,7 +2,7 @@ import XCTest
 
 /// W40.e9 — the layout guard (`packages/UITestSupport/LayoutGuard.swift`) over Notes' main screens: the note
 /// window with a note open in the editor and inspector, and the Extracts window with an extract open (the owner's
-/// report of `W40.fix-notes-row-clip` was the Extracts list). Each at its typical and minimum size, on open and
+/// report of `W40.fix-notes-row-clip` was the Extracts list; its every-cell-fits check is this sweep). Each at its typical and minimum size, on open and
 /// once settled; one test per appearance, because the appearance is a launch argument
 /// (`-ArchiveUITestAppearance`, read by the app's DEBUG `UITestAppearance`). Read-only: nothing here
 /// edits the fixture.
@@ -26,7 +26,7 @@ final class LayoutGuardUITests: NotesFixtureUITestCase {
         continueAfterFailure = true   // a layout failure on one screen must not hide the next screen's
         open(Self.idPlain, in: mainWindow)
         LayoutGuard.sweep(mainWindow, screen: "note window, \(appearance)", in: self,
-                          known: [rowClip, narrowWindow], ignore: isHarness)
+                          known: [narrowWindow], ignore: isHarness)
 
         let windowMenu = app.menuBars.menuBarItems["Window"]
         XCTAssertTrue(windowMenu.waitForExistence(timeout: 10), "the Window menu should exist")
@@ -38,14 +38,7 @@ final class LayoutGuardUITests: NotesFixtureUITestCase {
         XCTAssertTrue(extracts.waitForExistence(timeout: 15), "the Extracts window should be open")
         open(Self.idExtract, in: extracts)
         LayoutGuard.sweep(extracts, screen: "extracts window, \(appearance)", in: self,
-                          known: [rowClip, narrowWindow], ignore: isHarness)
-    }
-
-    /// The list rows are clipped to about two-thirds of their height (the owner's report, reproduced here in
-    /// the VM on 2026-10-11: every list cell's text is 12 pt tall for a line that needs 16). Its fix ships with
-    /// this guard as its failing-before test; that session deletes this entry, and the sweep fails until it does.
-    private let rowClip = LayoutGuard.KnownIssue(tag: "W40.fix-notes-row-clip") {
-        $0.kind == .short && $0.identifier.hasPrefix("an.cell.")
+                          known: [narrowWindow], ignore: isHarness)
     }
 
     /// At its minimum width (1053 pt in the VM) the window is narrower than its three panes: the sidebar's scroll

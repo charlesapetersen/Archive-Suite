@@ -43,8 +43,9 @@ struct NotesTableView: NSViewRepresentable {
         tableView.allowsColumnReordering = true
         tableView.allowsColumnResizing = true
         tableView.columnAutoresizingStyle = .lastColumnOnlyAutoresizingStyle
-        tableView.rowHeight = max(20, Self.fontSize * 1.8)
-        tableView.usesAutomaticRowHeights = true
+        // Fixed height, not `usesAutomaticRowHeights`: every cell here is one line, and with automatic
+        // heights the rows collapsed to 16 pt and squeezed each 16 pt text line to 12 (W40.fix-notes-row-clip).
+        tableView.rowHeight = ceil(max(20, Self.fontSize * 1.8))
         tableView.intercellSpacing = NSSize(width: 8, height: 2)
 
         let headerView = ColumnPickerHeaderView()
