@@ -76,6 +76,12 @@ The project has measured a lot and read little. The record, in brief, with the f
 Each recommendation is given per profile and per document kind (typed, printed, handwritten, forms, clippings,
 newspapers, non-Latin scripts, early modern hands).
 
+Running on a Mac is an attribute of the laptop profile, never a filter on candidates. A method that needs GPUs
+(diffusion restorers, large readers, training) is a candidate for the cluster profile on Sherlock. Licences are
+judged by route: a model the app bundles or downloads for any user needs a licence that allows that; a model a user
+runs on their own cluster through our kit may carry a research or non-commercial licence, stated plainly in the
+kit (owner, 2026-10-20).
+
 ## Phase 0 — housekeeping (interactive)
 
 - Done 2026-10-20: one gate, `W46.review-done`, on every processing item; the Processor UI items freed from the
