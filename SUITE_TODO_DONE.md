@@ -12463,3 +12463,24 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   longer start inside heavy-run's session, where they held the Mac-wide heavy lock for as long as they lived.
   Evidence: `verification/evidence/processor/W40.d5-live-capture.md`.
   <!-- /W40.d5 -->
+- [x] **W46.fix-date-truth — the dating A-D sheet for the 33 strict and 21 none cases, and the scorer changes [S]** · §Document processing review — W46 (owner, 2026-10-20) · SHIPPED 2026-10-21
+  (lane: segbench) — `scripts/segbench/date_scorers.py` (+ `test_date_scorers.py`, 17 tests) and `date_truth.py`
+  (classes / sheet / score), cached answers only, $0 -> `segbench-results/date-truth.md/.json`. `enclosure_split.py`'s
+  loading is now importable (`load`, `build_rows`); its printed report is byte-identical.
+  - Classes on the 131 unprinted-year documents (B-dating.md test 1's definitions): A strict 33, A' chained 7, B near
+    35, C far 35, D none 21; A+A'+B = 75, matching the audit.
+  - Scorers (gap audit §4 fix 9, dating): invalid-reply rate, accuracy by class, tolerance curve k=0..5, HDC
+    interval distance (decades; year+DU as ±1), Date Uncertain as two error rates, split-conformal coverage/width/
+    Winkler at 90% with swapped halves and 15 per half, evidence validity (ready; no cached reply cites evidence).
+  - Readings: Gemini 3.8 Flash exact A 81.8 / A' 71.4 / B 62.9 / C 45.7 / D 61.9%, within one 89-100% everywhere;
+    Qwen3.6-27B (nothink) 66.7 / 71.4 / 40.0 / 20.0 / 33.3%. Date Uncertain: Gemini flags 69.8% of owner-certain
+    unprinted years uncertain and misses 4.4% of owner-uncertain; Qwen3-VL 8B misses 95.6%. Conformal 90% on the
+    unprinted years: Gemini widens about ±1-2 years (92.4% covered), the 27B ±5-6 (91.6%), the 4B ±15-18. The three
+    thinking runs (ran to 512 tokens) give no year and are left out of the tables.
+  - Owner sheet (private, `date-tagging/cases/index.html` in the bench cache): 54 cases (33 A, 21 D), page images by
+    sips, file links to the PDFs, one question each ("where did the year come from", 7 answers, handwritten/stamped/
+    typed for an image date), about 54 minutes. D01's printed "1915" was OCRed as "ISIS": the image option matters.
+    Timing rule: nothing queued changes the sample, its tags or its text cache; offered via gate
+    W46.date-cases-owner-ok. W46.fix-date-truth-score reads the exported answers.
+  - Not on ArchiveOCRBench: dating is not an OCR or segmentation result, and date-tagging.json is unchanged.
+  <!-- /W46.fix-date-truth -->
