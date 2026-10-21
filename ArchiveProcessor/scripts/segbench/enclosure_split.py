@@ -1,6 +1,7 @@
 """Read-only analysis for strand B: split the sampled 'year not in text' documents by whether a dated
 document with the same owner year sits beside them in folder order, and score the cached model answers
-on each side. Writes nothing outside stdout. Run from scripts/segbench so the bench modules import."""
+on each side. Writes nothing outside stdout. Run from scripts/segbench so the bench modules import.
+load(), build_rows() and nearest_same_year() are imported by date_truth.py (W46.fix-date-truth)."""
 import collections, hashlib, json, os, re, sys
 sys.path.insert(0, os.getcwd())
 import date_tagging as DT
@@ -9,33 +10,41 @@ import corpus_survey as CS
 
 CUES = re.compile(r"enclos|attach|herewith|transmit|forward(ing)? (you|to you|a copy)|copy of|for your (information|files|review)", re.I)
 
-sample = [json.loads(l) for l in open(os.path.join(DT.CACHE, "sample.jsonl"), encoding="utf-8")]
-by_id = {d["id"]: d for d in sample}
-want = set(by_id)
+FOUND = {}   # main()'s located folders, for nearest_same_year without an argument
+LABELS = (None, "qwen3.6-27b-nothink", "qwen3.5-4b-nothink", "qwen3-vl-8b")
 
-lab = {}
-for line in open(os.path.join(CP.CACHE, "labels.jsonl"), encoding="utf-8"):
-    g = json.loads(line)
-    lab[(g["folder_id"], g["n"])] = g
-folders = sorted({os.path.dirname(g["left"]) for g in lab.values()})
 
-found = {}
-for f in folders:
-    segs = DT.folder_documents(f, lab)
-    ids = [hashlib.sha1(s["pages"][0].encode()).hexdigest()[:16] if s["kind"] == "doc" else None for s in segs]
-    hits = [k for k, i in enumerate(ids) if i in want]
-    if not hits:
-        continue
-    texts = ["\n\n".join(DT.page_text(p) for p in s["pages"]) for s in segs]
-    truths = [None] * len(segs)
-    for k, s in enumerate(segs):
-        if s["kind"] == "doc":
-            cls, tr = DT.truth_of(CS.read_tags(os.path.join(CS.CORPUS, s["pages"][0])))
-            truths[k] = (cls, tr)
-    for k in hits:
-        found[ids[k]] = {"folder": f, "k": k, "segs": segs, "texts": texts, "truths": truths}
+def load():
+    """(sample, found): the 300 sampled documents, and for each one located in its folder the folder's
+    tag-rule segments, their texts and owner truths, and the document's position k among them."""
+    sample = [json.loads(l) for l in open(os.path.join(DT.CACHE, "sample.jsonl"), encoding="utf-8")]
+    by_id = {d["id"]: d for d in sample}
+    want = set(by_id)
 
-print(f"sampled {len(sample)}, located in folders {len(found)}")
+    lab = {}
+    for line in open(os.path.join(CP.CACHE, "labels.jsonl"), encoding="utf-8"):
+        g = json.loads(line)
+        lab[(g["folder_id"], g["n"])] = g
+    folders = sorted({os.path.dirname(g["left"]) for g in lab.values()})
+
+    found = {}
+    for f in folders:
+        segs = DT.folder_documents(f, lab)
+        ids = [hashlib.sha1(s["pages"][0].encode()).hexdigest()[:16] if s["kind"] == "doc" else None for s in segs]
+        hits = [k for k, i in enumerate(ids) if i in want]
+        if not hits:
+            continue
+        texts = ["\n\n".join(DT.page_text(p) for p in s["pages"]) for s in segs]
+        truths = [None] * len(segs)
+        for k, s in enumerate(segs):
+            if s["kind"] == "doc":
+                cls, tr = DT.truth_of(CS.read_tags(os.path.join(CS.CORPUS, s["pages"][0])))
+                truths[k] = (cls, tr)
+        for k in hits:
+            found[ids[k]] = {"folder": f, "k": k, "segs": segs, "texts": texts, "truths": truths}
+
+    return sample, found
+
 
 def own_year_in_text(k, info):
     cls, tr = info["truths"][k]
@@ -98,15 +107,21 @@ def answers(d, label):
     y = int(year) if year and re.fullmatch(r"\d{4}", year) else None
     return {"y": y, "du": du}
 
-rows = []
-for d in sample:
-    if "year" not in d["truth"]:
-        continue
-    info = found.get(d["id"])
-    if not info:
-        continue
-    c = classify(d, info)
-    rows.append({**d, **c, "ans": {lab_: answers(d, lab_) for lab_ in (None, "qwen3.6-27b-nothink", "qwen3.5-4b-nothink", "qwen3-vl-8b")}})
+
+def build_rows(sample, found, labels=LABELS):
+    """The year-tagged sampled documents with their neighbour flags and each label's cached answer."""
+    rows = []
+    for d in sample:
+        if "year" not in d["truth"]:
+            continue
+        info = found.get(d["id"])
+        if not info:
+            continue
+        c = classify(d, info)
+        rows.append({**d, **c, "ans": {lab_: answers(d, lab_) for lab_ in labels}})
+
+    return rows
+
 
 def pct(a, b):
     return f"{100.0 * a / b:.1f}% ({a}/{b})" if b else "–"
@@ -122,40 +137,10 @@ def report(name, rs):
         print(f"  {lab_ or 'gemini-3.8-flash':22s} exact {pct(ex, len(got)):16s} within1 {pct(w1, len(got)):16s} "
               f"DU {pct(du, len(got)):16s} reply==prev doc's year {pct(prevy, len(got))}")
 
-not_in = [r for r in rows if not r["year_in_text"]]
-in_t = [r for r in rows if r["year_in_text"]]
-print(f"\nyear-tagged rows {len(rows)}: in text {len(in_t)}, not in text {len(not_in)}")
-c = collections.Counter()
-for r in not_in:
-    c["prev segment is a document"] += r["prev_doc"]
-    c["prev doc dated in its own text, same owner year"] += r["prev_dated_same_year"]
-    c["  ... and same owner month"] += r["prev_dated_same_year_month"]
-    c["prev doc has same owner year but its year not in its text"] += r["prev_undated_same_year"]
-    c["prev doc dated in its own text, different year"] += r["prev_dated_other_year"]
-    c["prev doc text has an enclosure cue word"] += r["prev_cue"]
-    c["prev dated same year AND cue"] += r["prev_dated_same_year"] and r["prev_cue"]
-    c["next doc dated in its own text, same year"] += r["next_dated_same_year"]
-    c["some doc within 3 dated in its own text, same year"] += r["any3_dated_same_year"]
-    c[f"class {r['class']}"] += 1
-for k_, v in c.items():
-    print(f"  {k_}: {v} of {len(not_in)}")
-
-report("ALL year-tagged", rows)
-report("year in text", in_t)
-report("year NOT in text", not_in)
-report("NOT in text, prev doc dated same year (enclosure-consistent, strict)", [r for r in not_in if r["prev_dated_same_year"]])
-report("NOT in text, some doc within 3 dated same year (loose)", [r for r in not_in if r["any3_dated_same_year"]])
-report("NOT in text, no dated same-year doc within 3 (the rest)", [r for r in not_in if not r["any3_dated_same_year"]])
-report("NOT in text, owner certain (year, year+month)", [r for r in not_in if r["class"] in ("year", "year+month")])
-report("NOT in text, owner Date Uncertain", [r for r in not_in if r["class"] == "year+DU"])
-for cls_ in ("year+month", "year", "year+DU"):
-    rs = [r for r in not_in if r["class"] == cls_]
-    print(f"\n  class {cls_}: {len(rs)} not-in-text; strict enclosure-consistent {sum(r['prev_dated_same_year'] for r in rs)}, "
-          f"loose {sum(r['any3_dated_same_year'] for r in rs)}, prev cue {sum(r['prev_cue'] for r in rs)}")
 
 # --- extension: distance to the nearest dated same-year document anywhere in the folder
-def nearest_same_year(r):
-    info = found[r["id"]]; k = info["k"]; y = r["truth"]["year"]
+def nearest_same_year(r, found=None):
+    info = (found if found is not None else FOUND)[r["id"]]; k = info["k"]; y = r["truth"]["year"]
     best = None
     for jj, s in enumerate(info["segs"]):
         if jj == k or s["kind"] != "doc":
@@ -166,23 +151,65 @@ def nearest_same_year(r):
             best = d if best is None or d < best else best
     return best
 
-print("\n== nearest dated same-year document in the folder, for the 131 not-in-text")
-hist = collections.Counter()
-for r in not_in:
-    d = nearest_same_year(r)
-    hist["adjacent (1)" if d == 1 else "2-3" if d is not None and d <= 3 else "4-10" if d is not None and d <= 10 else ">10" if d is not None else "none in folder"] += 1
-for k_ in ("adjacent (1)", "2-3", "4-10", ">10", "none in folder"):
-    print(f"  {k_}: {hist[k_]}")
-rest = [r for r in not_in if not r["any3_dated_same_year"]]
-print(f"  of the {len(rest)} with none within 3: none anywhere in folder = {sum(nearest_same_year(r) is None for r in rest)}")
-# folder spread: how many distinct owner years among dated documents of the folder
-print("\n== folder year spread for the 131 (distinct owner years among the folder's documents with a year tag)")
-sp = collections.Counter()
-for r in not_in:
-    info = found[r["id"]]
-    ys = {t[1]["year"] for t in info["truths"] if t and t[1] and "year" in t[1]}
-    sp["1 year" if len(ys) <= 1 else "2 years" if len(ys) == 2 else "3-5 years" if len(ys) <= 5 else ">5 years"] += 1
-for k_ in ("1 year", "2 years", "3-5 years", ">5 years"):
-    print(f"  {k_}: {sp[k_]}")
-report("NOT in text, folder has a single owner year", [r for r in not_in if len({t[1]['year'] for t in found[r['id']]['truths'] if t and t[1] and 'year' in t[1]}) <= 1])
-report("NOT in text, folder has 3+ owner years", [r for r in not_in if len({t[1]['year'] for t in found[r['id']]['truths'] if t and t[1] and 'year' in t[1]}) >= 3])
+
+def main():
+    global FOUND
+    sample, found = load()
+    FOUND = found
+    print(f"sampled {len(sample)}, located in folders {len(found)}")
+    rows = build_rows(sample, found)
+    not_in = [r for r in rows if not r["year_in_text"]]
+    in_t = [r for r in rows if r["year_in_text"]]
+    print(f"\nyear-tagged rows {len(rows)}: in text {len(in_t)}, not in text {len(not_in)}")
+    c = collections.Counter()
+    for r in not_in:
+        c["prev segment is a document"] += r["prev_doc"]
+        c["prev doc dated in its own text, same owner year"] += r["prev_dated_same_year"]
+        c["  ... and same owner month"] += r["prev_dated_same_year_month"]
+        c["prev doc has same owner year but its year not in its text"] += r["prev_undated_same_year"]
+        c["prev doc dated in its own text, different year"] += r["prev_dated_other_year"]
+        c["prev doc text has an enclosure cue word"] += r["prev_cue"]
+        c["prev dated same year AND cue"] += r["prev_dated_same_year"] and r["prev_cue"]
+        c["next doc dated in its own text, same year"] += r["next_dated_same_year"]
+        c["some doc within 3 dated in its own text, same year"] += r["any3_dated_same_year"]
+        c[f"class {r['class']}"] += 1
+    for k_, v in c.items():
+        print(f"  {k_}: {v} of {len(not_in)}")
+
+    report("ALL year-tagged", rows)
+    report("year in text", in_t)
+    report("year NOT in text", not_in)
+    report("NOT in text, prev doc dated same year (enclosure-consistent, strict)", [r for r in not_in if r["prev_dated_same_year"]])
+    report("NOT in text, some doc within 3 dated same year (loose)", [r for r in not_in if r["any3_dated_same_year"]])
+    report("NOT in text, no dated same-year doc within 3 (the rest)", [r for r in not_in if not r["any3_dated_same_year"]])
+    report("NOT in text, owner certain (year, year+month)", [r for r in not_in if r["class"] in ("year", "year+month")])
+    report("NOT in text, owner Date Uncertain", [r for r in not_in if r["class"] == "year+DU"])
+    for cls_ in ("year+month", "year", "year+DU"):
+        rs = [r for r in not_in if r["class"] == cls_]
+        print(f"\n  class {cls_}: {len(rs)} not-in-text; strict enclosure-consistent {sum(r['prev_dated_same_year'] for r in rs)}, "
+              f"loose {sum(r['any3_dated_same_year'] for r in rs)}, prev cue {sum(r['prev_cue'] for r in rs)}")
+
+    print("\n== nearest dated same-year document in the folder, for the 131 not-in-text")
+    hist = collections.Counter()
+    for r in not_in:
+        d = nearest_same_year(r)
+        hist["adjacent (1)" if d == 1 else "2-3" if d is not None and d <= 3 else "4-10" if d is not None and d <= 10 else ">10" if d is not None else "none in folder"] += 1
+    for k_ in ("adjacent (1)", "2-3", "4-10", ">10", "none in folder"):
+        print(f"  {k_}: {hist[k_]}")
+    rest = [r for r in not_in if not r["any3_dated_same_year"]]
+    print(f"  of the {len(rest)} with none within 3: none anywhere in folder = {sum(nearest_same_year(r) is None for r in rest)}")
+    # folder spread: how many distinct owner years among dated documents of the folder
+    print("\n== folder year spread for the 131 (distinct owner years among the folder's documents with a year tag)")
+    sp = collections.Counter()
+    for r in not_in:
+        info = found[r["id"]]
+        ys = {t[1]["year"] for t in info["truths"] if t and t[1] and "year" in t[1]}
+        sp["1 year" if len(ys) <= 1 else "2 years" if len(ys) == 2 else "3-5 years" if len(ys) <= 5 else ">5 years"] += 1
+    for k_ in ("1 year", "2 years", "3-5 years", ">5 years"):
+        print(f"  {k_}: {sp[k_]}")
+    report("NOT in text, folder has a single owner year", [r for r in not_in if len({t[1]['year'] for t in found[r['id']]['truths'] if t and t[1] and 'year' in t[1]}) <= 1])
+    report("NOT in text, folder has 3+ owner years", [r for r in not_in if len({t[1]['year'] for t in found[r['id']]['truths'] if t and t[1] and 'year' in t[1]}) >= 3])
+
+
+if __name__ == "__main__":
+    main()
