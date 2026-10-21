@@ -348,24 +348,18 @@ struct NavigationWindowView: View {
     /// The filter bar's controls need about 860 pt in one row, which a 900-pt window with its sidebar cannot give
     /// the content column. An HStack that wide overflowed and was centred, pushing the sidebar off the window's
     /// left edge and the needs-attention toggle off its right (W40.fix-reader-narrow-window). So the bar wraps:
-    /// one row when it fits, two when not, three when the sidebar is dragged wide as well.
+    /// `FilterBarLayout` moves a group that does not fit to the next row.
+    ///
+    /// It is a `Layout`, not a `ViewThatFits` over one-, two- and three-row copies of the controls (as it was until
+    /// W40.fix-reader-filter-focus): `ViewThatFits` shows one copy at a time, so when Save/Clear appear (the first
+    /// character typed into the file-name filter, say) and the bar no longer fits its copy, it swaps in another, the
+    /// text fields are rebuilt and the one being typed in loses the keyboard. Here they keep their identity.
     private var filterBar: some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(spacing: 12) {
-                filterBarQueryControls
-                filterBarSearchControls
-                Spacer()
-                filterBarTrailingButtons
-            }
-            VStack(alignment: .leading, spacing: 6) {
-                HStack(spacing: 12) { filterBarQueryControls; Spacer(minLength: 0) }
-                HStack(spacing: 12) { filterBarSearchControls; Spacer(); filterBarTrailingButtons }
-            }
-            VStack(alignment: .leading, spacing: 6) {
-                HStack(spacing: 12) { filterBarQueryControls; Spacer(minLength: 0) }
-                HStack(spacing: 12) { filterBarSearchControls; Spacer(minLength: 0) }
-                HStack(spacing: 12) { Spacer(); filterBarTrailingButtons }
-            }
+        FilterBarLayout(spacing: 12) {
+            // each group wraps whole, as the rows did before: what the documents are, then what they contain
+            HStack(spacing: 12) { filterBarQueryControls }
+            HStack(spacing: 12) { filterBarSearchControls }
+            filterBarTrailingButtons
         }
         .padding(8)
     }
@@ -449,6 +443,7 @@ struct NavigationWindowView: View {
             }
             .toggleStyle(.button)
             .controlSize(.small)
+            .fixedSize()
             .help("Show only non-standard PDFs — files that couldn't be opened, or have no selectable text")
             .accessibilityIdentifier("ar.filter.needsAttention")
         }
@@ -458,11 +453,15 @@ struct NavigationWindowView: View {
     private var filterBarTrailingButtons: some View {
         if model.filter.isActive || model.filterSearchText.trimmingCharacters(in: .whitespaces) != "" || model.ftsPaths != nil {
             Button("Save as Smart Folder") { model.showingSaveDialog = true }
+                .fixedSize()
                 .help("Save these filters as a smart folder in the sidebar")
                 .accessibilityIdentifier("ar.filter.saveSmartFolder")
+                .filterBarTrailing()
             Button("Clear") { model.clearUserFilters() }
+                .fixedSize()
                 .help(model.scope != nil ? "Clear user filters (return to smart folder)" : "Clear all filters and searches")
                 .accessibilityIdentifier("ar.filter.clear")
+                .filterBarTrailing()
         }
     }
 
