@@ -146,6 +146,13 @@ Strands:
   shadow, glare, curl, blur, colour casts, capture-app processing, resolution and compression; which defects matter for
   each stage, quality assessment at capture time against repair afterwards, camera-captured benchmarks to borrow, and
   defect-tagged tests on the 96 and the 895.
+- M. Several captures of one page (owner, 2026-10-21, from truth page p009): a page photographed with an overlay
+  (here a handwritten sticky note on a typed 1993 DEC letter, Computer History Museum 00096) and again without it
+  (00097). Ideal output: the overlay's text from the first photo, the page's text from the unobscured one, both photos
+  kept as evidence, and the pair linked as one page so the text is not counted twice. Touches segmentation (a
+  'same page, re-shot' relation beside the enclosure relation; the bench's photo-level score already counts
+  extra photos), OCR (merging two readings of one page), placement (which image carries the layer) and kinds (an
+  overlay is a mark). Folded into W46.mixed-route and W46.seg-adapt-curve's feature work until it earns its own item.
 - I. Model inventory: Hugging Face and GitHub, with licence, size, positions or not, languages, and whether it runs
   on a Mac (MLX or llama.cpp) at each memory size.
 - J. Compute and prices: Sherlock's partitions, GPU types, job limits, storage and model-download rules (the

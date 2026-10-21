@@ -81,3 +81,13 @@ The owner's Gemini report is assessed in `screens/gemini-report-2026-10-20.md` (
 - 32 GB Mac: available only if really necessary. W46.kit-mac-lora runs the 18 GB arm first; the 32 GB arm is asked
   for only if the 18 GB arm cannot fit the training at all.
 - Ling 3 Flash VL's 96-page job (1861703) was still PENDING (Resources) at 08:40 on 2026-10-21.
+- p009 (owner): a photograph of a typed DEC document dated 23 July 1993 with a large yellow sticky note on top;
+  handwriting on the note and on the page. The next photo (Computer History Museum/DEC Records 00097) shows the page
+  without the note. Its truth text was drafted from 00096 alone, so text under the note is missing or guessed;
+  W46.fix-ocr-truth-bias re-checks it. New review case M in 00-plan.md.
+- Handwritten locked box (owner): the Rawls papers, `05 Final Tagging/5 Priority 5/Rawls papers`, 1,764 ABBYY PDFs
+  tagged only with 17 box (red) and 37 folder (purple) labels, which may be incomplete; no document tags. Proposed
+  slice: images 00057-00252 (196 pages, three folders after the box label at 00056), boundaries drafted by a model and
+  ruled by the owner. More owner time than an already-tagged box (about 2-3 h rather than 1 h).
+- Clippings locked box: Deaver is a development box and cannot be the locked test. Candidates ranked by share of
+  clipping-tagged pages were shown to the owner; the owner picks one.
