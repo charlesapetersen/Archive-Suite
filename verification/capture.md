@@ -1,7 +1,7 @@
 # Capture companions — Android and iOS
 
-Format and statuses: [`README.md`](README.md). The parity comparison below was written by `W40.i2`, 2026-10-21.
-The feature-ledger rows (`C-01` …) come later, from `W40.b4`, which extends this file.
+Format and statuses: [`README.md`](README.md). The parity comparison below was written by `W40.i2`, 2026-10-21;
+the feature ledger (`C-` rows, [§Feature ledger](#feature-ledger) at the end) by `W40.b4`, the same day.
 
 - **What was compared:** the Android companion (`ArchiveProcessor/ArchiveCapture/app/src/main/java/com/archiveprocessor/capture/`,
   with its JVM tests) and the iOS companion (`ArchiveProcessor/ArchiveCaptureiOS/Sources/ArchiveCaptureiOS/`), each
@@ -107,3 +107,207 @@ iOS, so each was checked against the iOS code.
 `ArchiveProcessor/README.md` §Transports still says the phone side of the Drive relay is owner-gated on OAuth.
 `ArchiveProcessor/CLAUDE.md` calls the iOS Drive transport "built + mock-tested", which is true of the transport but
 not of sign-in, which cannot work with the placeholder client id.
+
+---
+
+## Feature ledger
+
+Written by `W40.b4`, 2026-10-21.
+
+- **Sources the promises were written from (rule 3):** `ArchiveProcessor/README.md` §Live Capture (On the phone,
+  Pairing, Transports); `ArchiveProcessor/CLAUDE.md` §Primary Function 3 (Streaming + never-lose-a-photo, Two
+  transports, Pairing + connect flow, On the phone); `ArchiveProcessor/LIVE_CAPTURE_ANDROID_TEST.md` Runs A-C, phone
+  side only; `ArchiveProcessor/ArchiveCapture/README-oauth.md`; `SPEC/relay-object-format.md` (§The one rule,
+  §Epoch, §Never-lose invariant, A5). The Mac side of the same features is the Processor ledger's
+  ([`processor.md`](processor.md) P-43 to P-52).
+- **Sources read at:** `e14c5adc`.
+- **Count:** _filled in once the rows are traced._
+
+**Checkpoint 1 holds the promises only.** The parity comparison above was written from the code by `W40.i2`, so the
+code is not unseen; the promises below were nonetheless written from the guides alone, and *Reached by*,
+*Real-path test*, *Runtime evidence* and *Status* are filled in by the trace that follows.
+
+**One row per phone.** The guides promise the two phones the same workflow, but each phone is shown working or not
+on its own, so each feature has an Android row (`C-01` to `C-14`) and an iOS row numbered thirty higher (`C-31` to
+`C-44`). USB is promised for Android only, so there is no `C-43`. `C-15` is the wire contract, which is one promise
+about both phones' bytes.
+
+### Android
+
+### C-01 · Android · Pairing by QR scan
+
+- **Promise:** with no saved endpoint the app opens on a QR scanner; scanning the Mac's QR (host, port, token, name,
+  optional relay code) shows connecting…, then the capture screen. A random QR is refused without a crash and the
+  scanner stays up.
+- **Promised in:** `README.md` §Live Capture (Pairing); `CLAUDE.md` §Pairing + connect flow; `LIVE_CAPTURE_ANDROID_TEST.md`
+  A1.
+
+### C-02 · Android · Manual entry of host, port and token
+
+- **Promise:** instead of scanning, host, port and token can be typed in, and the phone pairs the same way.
+- **Promised in:** `README.md` §Live Capture (Pairing).
+
+### C-03 · Android · Honest connect diagnostics
+
+- **Promise:** a short reachability check before pairing reports unreachable, refused or unauthorised, so pairing
+  never fails silently; a stale QR (old token) or the wrong Mac gives a clear failure and a way to Re-pair, with no
+  crash and no hang.
+- **Promised in:** `CLAUDE.md` §Pairing + connect flow (P0/P1); `LIVE_CAPTURE_ANDROID_TEST.md` C6.
+
+### C-04 · Android · Saved endpoint and Re-pair
+
+- **Promise:** once paired, the app opens straight to the capture screen; Re-pair (with a confirmation) is the only
+  way back to the scanner, tells the Mac to show its QR again (`POST /session/disconnect`), and clears the saved
+  endpoint, so a USB pairing at `127.0.0.1` can move to Wi-Fi or another Mac. Captured, unsent photos are kept across
+  it and upload to the new endpoint, with no duplicates on the Mac.
+- **Promised in:** `README.md` §Live Capture (Pairing); `CLAUDE.md` §Pairing + connect flow; `LIVE_CAPTURE_ANDROID_TEST.md`
+  A5, B2, C5.
+
+### C-05 · Android · Full-resolution shutter
+
+- **Promise:** the shutter takes a full-resolution photo of the page; the phone confirms it (thumbnail, counter).
+- **Promised in:** `README.md` §Live Capture (On the phone); `CLAUDE.md` §On the phone; `LIVE_CAPTURE_ANDROID_TEST.md` A2.
+
+### C-06 · Android · Box and Folder markers
+
+- **Promise:** dedicated Box (red) and Folder (purple) buttons mark the next photo as a box label or a folder, and
+  the Mac registers it as such.
+- **Promised in:** `README.md` §Live Capture (On the phone); `CLAUDE.md` §On the phone; `LIVE_CAPTURE_ANDROID_TEST.md` A3.
+
+### C-07 · Android · End segment
+
+- **Promise:** End segment is the only "done" action: it closes the document, sends its tags and the list of its
+  pages as taken at that moment, and does not hold back the photos, which have already streamed. While a page of the
+  segment is still unsent, the Mac defers the segment.
+- **Promised in:** `README.md` §Live Capture (On the phone); `CLAUDE.md` §Streaming + never-lose-a-photo;
+  `LIVE_CAPTURE_ANDROID_TEST.md` A2 step 7; `SPEC/relay-object-format.md` A5.
+
+### C-08 · Android · On-phone tagging: Quality and date
+
+- **Promise:** per segment, Quality (Unrated or Q1-Q3) and year/month; a long-press on a page sets Q3 for that page
+  alone. The values stick on the item and reach the Mac as `Q1`-`Q3` (nothing for Unrated) and the date.
+- **Promised in:** `README.md` §Live Capture (On the phone); `CLAUDE.md` §On the phone; `LIVE_CAPTURE_ANDROID_TEST.md` A4.
+
+### C-09 · Android · Uploads as shot, through a durable auto-retrying queue
+
+- **Promise:** each photo and its grouping and tags are written to disk at once and uploaded as it is shot, through
+  a queue that retries on its own. With the network off, or the Mac app quit, the phone keeps shooting and queueing
+  and shows that it is retrying; when the Mac is back, everything queued arrives.
+- **Promised in:** `README.md` §Live Capture (On the phone); `CLAUDE.md` §Streaming + never-lose-a-photo;
+  `LIVE_CAPTURE_ANDROID_TEST.md` C1, C2.
+
+### C-10 · Android · The phone's copy is deleted only after the Mac's durable ack
+
+- **Promise:** a page is marked sent only after the Mac's durable ack (over Drive, a valid receipt), and only then
+  does the phone delete its copy; as each segment is confirmed its photos leave the phone with a transfer animation,
+  so photos do not pile up on the device.
+- **Promised in:** `README.md` §Live Capture (On the phone); `CLAUDE.md` §Streaming + never-lose-a-photo;
+  `SPEC/relay-object-format.md` §The one rule, §Never-lose invariant.
+
+### C-11 · Android · The queue survives the app being killed
+
+- **Promise:** after the app is force-stopped or crashes with unsent photos, reopening it shows them still there, and
+  they upload once connected.
+- **Promised in:** `README.md` §Live Capture (On the phone, "even across an app crash"); `LIVE_CAPTURE_ANDROID_TEST.md` C3.
+
+### C-12 · Android · Queue-depth heartbeat
+
+- **Promise:** the phone tells the Mac how many photos it still has to send (`POST /phone/status`, `X-Pending`), which
+  is what the Mac's Finish waits on.
+- **Promised in:** `CLAUDE.md` §On the phone, §On the Mac.
+
+### C-13 · Android · USB with no shared Wi-Fi
+
+- **Promise:** with the phone on a USB cable, it pairs to `127.0.0.1` through the Mac's `adb reverse` and captures with
+  no shared network; an unplugged cable loses nothing.
+- **Promised in:** `README.md` §Live Capture (Pairing, On the phone); `CLAUDE.md` §USB local relay;
+  `LIVE_CAPTURE_ANDROID_TEST.md` B1.
+
+### C-14 · Android · Google Drive cloud relay, phone side
+
+- **Promise:** signed in to Google (on-device sign-in, `drive.file`), the phone uploads each object to the user's Drive
+  for a client-isolated or off-site session; it adopts the Mac's published epoch, so uploads resume after a Mac restart
+  with no re-pair, and trusts a receipt only when it matches. A build with no client id still works for LAN and USB,
+  with Drive sign-in disabled and a message saying why.
+- **Promised in:** `README.md` §Live Capture (Transports); `CLAUDE.md` §Google Drive cloud relay, §Cloud-relay OAuth
+  setup; `ArchiveCapture/README-oauth.md`; `SPEC/relay-object-format.md` §Epoch.
+
+### C-15 · Both phones · The same bytes on the wire
+
+- **Promise:** both companions speak the same protocol and write every relay object byte for byte as the SPEC
+  defines, so the Mac cannot tell which phone sent a page.
+- **Promised in:** `README.md` §Live Capture; `CLAUDE.md` §Primary Function 3, §Google Drive cloud relay;
+  `SPEC/relay-object-format.md` §Purpose & status.
+
+### iOS
+
+The guides promise the iPhone the same workflow as Android ("pick whichever phone you have"); each row below makes
+the promise of its Android twin, thirty lower, unless it says otherwise.
+
+### C-31 · iOS · Pairing by QR scan
+
+- **Promise:** as `C-01`.
+- **Promised in:** `README.md` §Live Capture (Pairing); `CLAUDE.md` §Pairing + connect flow.
+
+### C-32 · iOS · Manual entry of host, port and token
+
+- **Promise:** as `C-02`.
+- **Promised in:** `README.md` §Live Capture (Pairing).
+
+### C-33 · iOS · Honest connect diagnostics
+
+- **Promise:** as `C-03`.
+- **Promised in:** `CLAUDE.md` §Pairing + connect flow.
+
+### C-34 · iOS · Saved endpoint and Re-pair
+
+- **Promise:** as `C-04`, without the USB case.
+- **Promised in:** `README.md` §Live Capture (Pairing); `CLAUDE.md` §Pairing + connect flow.
+
+### C-35 · iOS · Full-resolution shutter
+
+- **Promise:** as `C-05`.
+- **Promised in:** `README.md` §Live Capture (On the phone); `CLAUDE.md` §On the phone.
+
+### C-36 · iOS · Box and Folder markers
+
+- **Promise:** as `C-06`.
+- **Promised in:** `README.md` §Live Capture (On the phone); `CLAUDE.md` §On the phone.
+
+### C-37 · iOS · End segment
+
+- **Promise:** as `C-07`.
+- **Promised in:** `README.md` §Live Capture (On the phone); `CLAUDE.md` §Streaming + never-lose-a-photo;
+  `SPEC/relay-object-format.md` A5.
+
+### C-38 · iOS · On-phone tagging: Quality and date
+
+- **Promise:** as `C-08`.
+- **Promised in:** `README.md` §Live Capture (On the phone); `CLAUDE.md` §On the phone.
+
+### C-39 · iOS · Uploads as shot, through a durable auto-retrying queue
+
+- **Promise:** as `C-09`.
+- **Promised in:** `README.md` §Live Capture (On the phone); `CLAUDE.md` §Streaming + never-lose-a-photo.
+
+### C-40 · iOS · The phone's copy is deleted only after the Mac's durable ack
+
+- **Promise:** as `C-10`.
+- **Promised in:** `README.md` §Live Capture (On the phone); `CLAUDE.md` §Streaming + never-lose-a-photo;
+  `SPEC/relay-object-format.md` §The one rule, §Never-lose invariant.
+
+### C-41 · iOS · The queue survives the app being killed
+
+- **Promise:** as `C-11`.
+- **Promised in:** `README.md` §Live Capture (On the phone, "even across an app crash").
+
+### C-42 · iOS · Queue-depth heartbeat
+
+- **Promise:** as `C-12`.
+- **Promised in:** `CLAUDE.md` §On the phone, §On the Mac.
+
+### C-44 · iOS · Google Drive cloud relay, phone side
+
+- **Promise:** as `C-14`, with the iPhone's own iOS OAuth client (bundle `com.archiveprocessor.capture.ios`).
+- **Promised in:** `README.md` §Live Capture (Transports); `CLAUDE.md` §Google Drive cloud relay ("the iOS transport
+  is built + mock-tested"); `ArchiveCapture/README-oauth.md` §iPhone companion; `SPEC/relay-object-format.md` §Epoch.
