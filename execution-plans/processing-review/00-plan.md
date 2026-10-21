@@ -41,10 +41,14 @@ The project has measured a lot and read little. The record, in brief, with the f
   stamps or bleed-through may produce an OCR input only, never the image a reader sees. Seemingly incidental marks
   are evidence and are preserved.
 - Text placed on the page image is preferred to a separate text page, unless a text page is necessary.
-- Sherlock access is being applied for. Experiments plan on FarmShare first and add Sherlock when access arrives.
+- Sherlock is the cluster the review plans for from the start (owner: assume access will come). Experiments are
+  designed for its GPUs (H100 and A100 class, multi-GPU nodes), so models too large for FarmShare's L40S cards are
+  in scope. FarmShare stays a second cluster profile, a fallback while the Sherlock account is pending, and the
+  home of the outputs already collected. The cluster kit (`scripts/segbench/institutional-compute/`) gets a
+  Sherlock profile beside `profiles/farmshare.json`.
 - The Vision OCR integration waits on this review. The Processor UI and bug items no longer wait on it.
 - Phases 0-2 and 4 run interactively. Phase 3, the experiments, is queued for the engine.
-- Experiments use free cluster compute where they can. Paid APIs are used when a question needs them, under the
+- Experiments use free cluster compute (Sherlock first) where they can. Paid APIs are used when a question needs them, under the
   $3 rule in `~/Claude/CLAUDE.md`.
 - Entities (authors, senders and recipients, places) are a long-term option, and are reviewed mainly as an input to
   dating and segmentation. More languages, scripts and eras are a long-term goal; the existing corpus and the
@@ -55,7 +59,7 @@ The project has measured a lot and read little. The record, in brief, with the f
 1. A laptop only, open weights: Macs with 16, 32 and 64 GB or more.
 2. Cheap API access: OpenRouter and similar.
 3. Premium APIs or subscriptions: Gemini, Claude, OpenAI, and the Claude and ChatGPT plans.
-4. A cluster: FarmShare, Sherlock, or any Slurm cluster with GPUs.
+4. A cluster: Sherlock, FarmShare, or any Slurm cluster with GPUs.
 5. Any of the above plus a coding agent, which can train a model on the user's own photographs with a kit we
    provide (see strand H).
 
@@ -94,7 +98,8 @@ Strands:
   own photographs, including what a coding-agent kit would need and how a trained model plugs into the Processor.
 - I. Model inventory: Hugging Face and GitHub, with licence, size, positions or not, languages, and whether it runs
   on a Mac (MLX or llama.cpp) at each memory size.
-- J. Compute and prices: Sherlock's GPUs and policies, FarmShare limits, OpenRouter and direct API prices, batch
+- J. Compute and prices: Sherlock's partitions, GPU types, job limits, storage and model-download rules (the
+  design target), FarmShare limits as the fallback, OpenRouter and direct API prices, batch
   discounts.
 
 How the reading is done, so the expensive model reads only what matters:
@@ -120,6 +125,10 @@ measures its share of the weekly window, and the rest are paced from that figure
 - Find where an existing public benchmark already answers a question well enough that we need not build our own
   (for example DocSplit for splitting, published HTR benchmarks for specialist scripts), and where our material
   differs enough that we must. Record the reason either way.
+- Where a public benchmark is close but not exact, borrow its data, metrics or scripts and run them ourselves:
+  when our setup differs (photographs rather than scans, our resolution and JPEG settings, our prompts and routes),
+  when the published scores predate the current models, or when we want its pages inside our own scorer. Check the
+  licence and the test-contamination risk for each, as the public OCR set already does.
 - Fix the weak test sets the review needs: the OCR truth that favours Claude and Gemini (a third family adjudicates
   or a fresh set is drafted differently), more locked segmentation boxes, a larger dating test set with unprinted
   years, and a new small set of pages with marks (marginalia, stamps, annotations, scribbles) that measures whether
@@ -137,7 +146,7 @@ Filed as queue items of medium size, each behind the owner's approval of the gap
 routes with staged pipelines on the same frozen sets, and switch each stage off in turn to measure its contribution:
 enhancement as OCR input on and off, dewarping, layout first, page-pair classifiers against windows, collection
 context for dating, entity cues for dating and segmentation, and user-trained models against general ones.
-FarmShare first, Sherlock when access arrives, the Mac for profile 1, paid APIs where a question needs them.
+Sherlock first, FarmShare as fallback, the Mac for profile 1, paid APIs where a question needs them.
 
 ## Phase 4 — decisions and the work queue (interactive)
 
