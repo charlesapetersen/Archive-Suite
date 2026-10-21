@@ -283,7 +283,8 @@ page where a new kind of result needs it; then run `python3 ArchiveOCRBench/buil
 An estimate goes in only labelled as one, as Sonnet's API price is. Figures from the Vision OCR lab, a separate
 repository, go in by hand with its file and commit when an item or the owner points at them
 (`data/vision-ocr-handwriting.json` is the pattern). The published copy of the page is republished only by an
-interactive session; an unattended one says in its commit body that the published copy is now behind. How to rebuild and read it: [`ArchiveOCRBench/README.md`](ArchiveOCRBench/README.md).
+interactive session; an unattended one says in its commit body that the published copy is now behind. How to rebuild and read it: [`ArchiveOCRBench/README.md`](ArchiveOCRBench/README.md). Every measured route goes on every chart its data supports (owner, 2026-10-21;
+the README's "Completeness rule"), kept light rather than perfect.
 
 **Both OCR sets, every time (owner, 2026-10-20).** A model tested on the 895-page public set is also run on the
 owner's 96 truth pages, with the same settings, in the same item. The 96 are the owner's own material and are what
