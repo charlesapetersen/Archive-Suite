@@ -24,6 +24,30 @@ if [ "${2:-}" = t96 ]; then
   done
   cat jobs.tsv; exit 0
 fi
+#   bash loop-rerun-submit.sh ROOT redo [--dry-run]
+# A second pilot and every one-GPU job again (both sets), after the first pilot failed and cancelled the rest.
+# Ling's two jobs are kept: their afterany dependency was met by the cancellations. The old list goes to
+# jobs-1.tsv and its Ling lines carry over.
+if [ "${2:-}" = redo ]; then
+  DRY="${3:-}"
+  mv jobs.tsv jobs-1.tsv
+  pilot=$(run sbatch --parsable --hold --partition=gpu --gres=gpu:1 --cpus-per-task=8 --mem=64G --time=01:00:00 \
+    --job-name=loops-pilot --output="$ROOT/logs/slurm-%j.out" "$JOB" "$ROOT" pilot ngram)
+  printf 'pilot\tngram\t%s\n' "$pilot" > jobs.tsv
+  for route in lightonocr3-0.8b paddleocr-vl1.5 glm-ocr lightonocr3-4b qwen3.5-4b qwen3-vl-8b qwen3.6-35b-a3b qwen3.6-27b qwen3.5-27b; do
+    hours=$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))[sys.argv[2]]["hours"])' routes.json "$route")
+    for arm in ngram half; do
+      id=$(run sbatch --parsable --partition=gpu --gres=gpu:1 --cpus-per-task=8 --mem=64G --time="$hours:00:00" \
+        --dependency="afterok:$pilot" --job-name="loops-$route-$arm" --output="$ROOT/logs/slurm-%j.out" \
+        "$JOB" "$ROOT" "$route" "$arm")
+      printf '%s\t%s\t%s\n' "$route" "$arm" "$id" >> jobs.tsv
+    done
+  done
+  grep '^ling3-flash-vl-fp8' jobs-1.tsv >> jobs.tsv
+  bash "$ROOT/loop-rerun-submit.sh" "$ROOT" t96 "$pilot" $DRY >/dev/null
+  run scontrol release "$pilot" >/dev/null
+  cat jobs.tsv; exit 0
+fi
 head -3 caps/lightonocr3-0.8b.jsonl > caps/pilot.jsonl
 python3 - "$ROOT/routes.json" <<'EOF'
 import json,sys

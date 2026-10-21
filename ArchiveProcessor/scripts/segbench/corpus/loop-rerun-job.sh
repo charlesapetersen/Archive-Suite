@@ -9,6 +9,14 @@ source /home/users/cp1/Archive-Suite/ArchiveProcessor/scripts/segbench/farmshare
 export HF_HOME HF_HUB_OFFLINE=1 TOKENIZERS_PARALLELISM=false
 get() { "$FS_PY" -c 'import json,sys;print(json.load(open(sys.argv[1]))[sys.argv[2]][sys.argv[3]])' "$ROOT/routes.json" "$ROUTE" "$1"; }
 MODEL=$(get model); NAME=$(get served); ARGS=$(get vllm_args); PROMPT=$(get prompt); CONC=$(get concurrency)
+# Offline, a repo id resolves only through refs/main, and some cached repos have none (LightOnOCR-3, PaddleOCR-VL
+# 1.5: the first pilot, 1863313, died on it). With no ref and a single snapshot, serve that snapshot's directory.
+cache="$HF_HOME/hub/models--${MODEL//\//--}"
+if [ ! -d "$MODEL" ] && [ ! -f "$cache/refs/main" ]; then
+  snaps=("$cache"/snapshots/*)
+  [ "${#snaps[@]}" -eq 1 ] && [ -f "${snaps[0]}/config.json" ] || { echo "no usable snapshot for $MODEL"; exit 1; }
+  MODEL="${snaps[0]}"
+fi
 export FS_MODEL="$MODEL" FS_SERVED="$NAME"
 PORT=$((16000 + SLURM_JOB_ID % 10000)); export FS_URL="http://127.0.0.1:$PORT"
 CUDA=$("$FS_PY" -c 'import nvidia,os;print(os.path.join(list(nvidia.__path__)[0],"cu13"))')
