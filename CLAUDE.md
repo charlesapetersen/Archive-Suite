@@ -209,6 +209,16 @@ depends on the apps' current settings, structure or outputs.
   piece of work (an item across all its sessions) without asking him first. Subscription usage is not money. Over
   $3, an unattended session asks in the Daemon Report and moves on. The rule's authority is `~/Claude/CLAUDE.md`,
   section "Spending money".
+- ✅ **The W46 processing review's paid arms are released (owner, 2026-10-21).** The hold below no longer covers the
+  review's items (`execution-plans/processing-review/10-gap-audit.md` §5). Route order: the **Stanford AI API gateway**
+  first (`https://aiapi-prod.stanford.edu/v1`, the Processor's gateway key in Keychain, account `Gateway`), ahead of the
+  Claude and ChatGPT plan routes and ahead of personal keys. The gateway is real money on a Stanford PTA, not the
+  owner's: up to its $50 a month may go to the review, but none is spent for its own sake. Personal keys only for what
+  the gateway cannot serve (Azure, Textract, Document AI checks; one Gemini 3.7-against-3.8 Flash check on the 96).
+  The $3-per-item rule still applies to each item, except W46.seg-window-modality's full 551-page sweep, approved at
+  about $8 list / $4 batch. Newer gateway models need the owner to request access; on 2026-10-21 the key had only
+  older ones (Gemini 2.0 Flash/2.5 Pro, Claude 4.5 Sonnet/Opus 4.6, GPT-5/5.2), not Gemini 3.7 Flash, Claude 5
+  Sonnet, GPT 5.6 Luna or GLM 5.3 Flash.
 - ⏸ **Paid hosted benchmarking is on hold (owner, 2026-10-17).** Open-weight models on FarmShare first; paid hosted
   bench runs wait for `W43.sweep` at the end of the queue, behind a full price estimate. A session that wants a paid
   run and defers it adds a line to [`execution-plans/paid-runs-deferred.md`](execution-plans/paid-runs-deferred.md)

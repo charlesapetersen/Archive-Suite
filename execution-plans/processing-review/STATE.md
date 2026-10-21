@@ -56,5 +56,16 @@ The owner's Gemini report is assessed in `screens/gemini-report-2026-10-20.md` (
 ## Phase 2
 
 - [x] 2026-10-21 — gap audit drafted (Fable) and checked: `10-gap-audit.md`, 40 ranked items, seven owner decisions.
-- [ ] Owner's decisions on section 6, then file Phase 3 items with plan-edit.sh.
+- [x] Owner's decisions on section 6 (2026-10-21):
+  1. Paid arms released, Stanford AI API gateway first (about $32 there, about $2 personal); up to the gateway's
+     $50 a month, not spent for its own sake. Owner to request Gemini 3.7 Flash, Claude 5 Sonnet, GPT 5.6 Luna and
+     GLM 5.3 Flash on the gateway; until then gateway arms wait.
+  2. Labelling: the owner takes the judgement sets (short passes about 3.5 h, the two new boxes about 2 h, about 40
+     marks pages about 6-7 h); placement boxes, capture tags and the rest are drafted by models and audited.
+  3. Request Reading the Archive's gated gold: yes (owner's request via the Zenodo record).
+  4. Sherlock: the owner has already asked the sponsor.
+  5. Lock two more segmentation boxes, one clippings-heavy and one handwritten; the owner names them.
+  6. W46.seg-window-modality's full 551-page Gemini sweep approved (about $8 list, $4 batch).
+  7. Plan-route cap: superseded by the gateway-first rule; gateway use up to $50 a month.
+- [ ] File the Phase 3 items with plan-edit.sh (each behind its prerequisites; gateway arms behind the model-access gate).
 - Engine paused for Archive Suite by the owner during Phase 2 (2026-10-21; `manager.py resume "Archive Suite"`).

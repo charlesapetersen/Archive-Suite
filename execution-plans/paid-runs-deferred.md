@@ -4,6 +4,10 @@ Owner, 2026-10-17: no more paid hosted benchmarking for now; open-weight models 
 wait for W43.sweep at the end of the queue, which starts with a full price estimate over every line below and asks
 the owner before spending (gate W43.sweep-owner-ok).
 
+Owner, 2026-10-21: the W46 processing review's paid arms are released (root CLAUDE.md, the gateway-first rule);
+they are not listed here. The rows below that the review's items cover (the CREST and Lincoln reference routes) run
+inside W46.seg-lincoln-cloud.
+
 **The rule:** any session that wants a paid hosted run and does not do it because of this hold adds a line here, in the
 same commit as the decision, naming the run, the item it came from, the pages or windows, and the cost estimate if it
 has one. W43.sweep prices and runs this list; the line is deleted only when its run lands (git keeps the history).
