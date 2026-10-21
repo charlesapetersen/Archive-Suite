@@ -86,7 +86,10 @@ import ArchiveCore
 ///      and only the operator's existing bulk retry starts the replacement call (Test 26).
 ///  24. A staging manifest is versioned and fingerprinted (W17.stg1): a valid record resumes, while tampered,
 ///      unversioned, missing-version/fingerprint, or unknown-version records are quarantined byte-for-byte and
-///      block normal processing without touching their staged artifacts (Test 27).
+///      block normal processing without touching their staged artifacts (Test 27). W40.e6 adds a seeded fuzz
+///      loop over the same record — truncated, bit-flipped, spliced, nested, re-spaced: each damaged body either
+///      resumes the exact record that was written or is quarantined like the hand-made cases, never a third
+///      outcome (Test 27b).
 ///  25. Launch-time stranded-session detection (W17.det1) counts only session-shaped backup folders with a
 ///      nonempty canonical staging array, reports the count on the existing status line, and mutates nothing
 ///      in the Backup Folder (Test 28).
@@ -3688,6 +3691,66 @@ enum LiveCaptureRecoveryTestDriver {
             let oldUnversioned = try? JSONEncoder().encode([integritySegment])
             check("an old unversioned manifest quarantines rather than resuming (W17.stg1)",
                   rejectedManifest("unversioned", oldUnversioned))
+
+            // --- Test 27b (W40.e6): seeded damage to the same current record. A crash or a resumed record that
+            // differs from what was written is a failure; resuming the identical record (the damage was only
+            // whitespace, say) or quarantining exactly as above is a pass. Seeded, so a failure reproduces.
+            func canonical(_ staged: [LiveCaptureProcessor.StagedSegment]) -> Data? {
+                let e = JSONEncoder(); e.outputFormatting = [.sortedKeys]
+                return try? e.encode(staged)
+            }
+            var fuzzState: UInt64 = 0xE6_57A6
+            func fuzzInt(_ n: Int) -> Int {   // SplitMix64, 0..<n
+                fuzzState &+= 0x9E37_79B9_7F4A_7C15
+                var z = fuzzState
+                z = (z ^ (z >> 30)) &* 0xBF58_476D_1CE4_E5B9
+                z = (z ^ (z >> 27)) &* 0x94D0_49BB_1331_11EB
+                return Int((z ^ (z >> 31)) % UInt64(max(n, 1)))
+            }
+            var fuzzResumed = 0, fuzzQuarantined = 0, fuzzBad: [String] = []
+            if let currentData, let wantStaged = canonical([integritySegment]) {
+                for i in 0..<60 {
+                    var b = [UInt8](currentData)
+                    for _ in 0..<(1 + fuzzInt(3)) {
+                        let n = b.count
+                        guard n > 1 else { break }
+                        switch fuzzInt(6) {
+                        case 0: b = Array(b.prefix(fuzzInt(n)))                                   // truncate
+                        case 1: b[fuzzInt(n)] ^= UInt8(1 << fuzzInt(8))                           // flip a bit
+                        case 2: b.insert(Array("{}[]\":,\\0 ".utf8)[fuzzInt(10)], at: fuzzInt(n + 1)) // insert
+                        case 3: let a = fuzzInt(n); b.insert(contentsOf: b[a..<min(n, a + 1 + fuzzInt(40))], at: fuzzInt(n + 1))
+                        case 4: b = Array("{\"staged\":".utf8) + b + Array("}".utf8)            // nest
+                        default:                                                                   // re-space
+                            if let at = b.indices.filter({ b[$0] == UInt8(ascii: ",") }).randomElement() {
+                                b.insert(contentsOf: Array(" \n\t".utf8), at: at + 1)
+                            }
+                        }
+                    }
+                    let bytes = Data(b)
+                    let caseDir = tmp.appendingPathComponent("manifest-fuzz-\(i)", isDirectory: true)
+                    try? fm.createDirectory(at: caseDir, withIntermediateDirectories: true)
+                    try? bytes.write(to: caseDir.appendingPathComponent("staging-manifest.json"), options: .atomic)
+                    let loaded = LiveCaptureProcessor(session: rsSession)
+                    loaded._recoveryTestLoadManifest(stagingDir: caseDir, config: rsConfig)
+                    let names = (try? fm.contentsOfDirectory(atPath: caseDir.path)) ?? []
+                    if !loaded.stagingRecoveryBlocked {
+                        if canonical(loaded.staged) == wantStaged, names == ["staging-manifest.json"] { fuzzResumed += 1 }
+                        else { fuzzBad.append("#\(i) resumed \(loaded.staged.map(\.groupId)) from \(String(decoding: bytes, as: UTF8.self))") }
+                    } else {
+                        let q = names.first { $0.hasPrefix("staging-manifest.corrupt-") }
+                        let kept = q.flatMap { try? Data(contentsOf: caseDir.appendingPathComponent($0)) }
+                        if kept == bytes, loaded.staged.isEmpty, loaded.stagingRecoveryNotice != nil,
+                           !names.contains("staging-manifest.json") { fuzzQuarantined += 1 }
+                        else { fuzzBad.append("#\(i) blocked but evidence \(names) not kept byte-for-byte") }
+                    }
+                }
+            } else {
+                fuzzBad.append("no current manifest to damage")
+            }
+            if !fuzzBad.isEmpty { NSLog("W40.e6 manifest fuzz: %@", fuzzBad.prefix(5).joined(separator: " | ")) }
+            check("60 damaged manifests each resume the exact record or quarantine it byte-for-byte (W40.e6: \(fuzzResumed) resumed, \(fuzzQuarantined) quarantined)",
+                  fuzzBad.isEmpty && fuzzResumed + fuzzQuarantined == 60 && fuzzQuarantined > 0
+                      && fm.fileExists(atPath: integrityArtifact.path))
 
             // --- Test 28 (W17.det1): detection is a pure scan, not recovery machinery. Only the two
             // session-shaped folders with a nonempty canonical `staged` array count; empty/malformed

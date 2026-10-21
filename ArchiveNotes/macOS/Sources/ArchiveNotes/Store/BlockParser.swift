@@ -25,11 +25,17 @@ struct Block: Sendable {
     var source: SourceAnchor?
     var markdown: String
     var unknownHeaderFields: [(String, String)]
+    /// The block was read from a header that never closes (a file cut off mid-header, or a hand edit): §6
+    /// degrades it to `freeform` with the raw text as its markdown, and that text already begins with the
+    /// opener, so it is written back with no header of its own. Writing one made every save prepend a new
+    /// empty `<!-- block: freeform -->`, growing the file by a block per save (W40.e6).
+    var headerless = false
 }
 
 extension Block: Equatable {
     static func == (lhs: Block, rhs: Block) -> Bool {
         lhs.kind == rhs.kind &&
+        lhs.headerless == rhs.headerless &&
         lhs.source == rhs.source &&
         lhs.markdown == rhs.markdown &&
         lhs.unknownHeaderFields.count == rhs.unknownHeaderFields.count &&
@@ -92,7 +98,7 @@ enum BlockParser {
         var out = leadingText ?? ""
         if !blocks.isEmpty, !out.isEmpty, !endsWithLineTerminator(out) { out += "\n" }
         for (i, block) in blocks.enumerated() {
-            out += serializeHeader(block)
+            if !block.headerless { out += serializeHeader(block) }
             out += block.markdown
             if i + 1 < blocks.count, !block.markdown.isEmpty, !endsWithLineTerminator(block.markdown) {
                 out += "\n"
@@ -197,7 +203,7 @@ enum BlockParser {
 
     private static func parseSegment(_ text: String) -> Block {
         guard let closeRange = text.range(of: "-->") else {
-            return Block(kind: .freeform, source: nil, markdown: text, unknownHeaderFields: [])
+            return Block(kind: .freeform, source: nil, markdown: text, unknownHeaderFields: [], headerless: true)
         }
 
         let headerRaw = String(text[text.startIndex..<closeRange.upperBound])

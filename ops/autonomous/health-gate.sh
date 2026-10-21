@@ -338,6 +338,8 @@ step archivecore bash "$ROOT/ops/autonomous/archivecore-tests.sh"
 # W40.a3: byte-identical iOS/Android relay JSON is a mandatory, free gate lane.
 # The harness takes the heavy lock for its Swift/JVM builds; missing fixtures fail closed.
 step relay-golden bash "$ROOT/ArchiveProcessor/scripts/test-relay-golden.sh"
+# W40.e6: seeded fuzz + round-trip properties of the same format, Mac and iOS copies, ~10 s, free.
+step relay-fuzz bash "$ROOT/ArchiveProcessor/scripts/test-relay-fuzz.sh"
 step e2e-cleanup-proof python3 "$ROOT/ArchiveProcessor/scripts/test-e2e-cleanup.py"
 # W41.ocr-smoke-term: the Processor smoke's teardown and pass/fail oracle on scratch children and fixtures; free.
 step smoke-teardown-proof python3 "$ROOT/ArchiveProcessor/scripts/test-smoke-teardown.py"

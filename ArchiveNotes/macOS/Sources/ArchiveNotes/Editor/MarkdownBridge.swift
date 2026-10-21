@@ -122,7 +122,8 @@ enum MarkdownBridge {
         let box = SourceAnchorBox(
             anchor: anchor,
             kind: block.kind,
-            unknownHeaderFields: block.unknownHeaderFields
+            unknownHeaderFields: block.unknownHeaderFields,
+            headerless: block.headerless
         )
         let attachment = BlockHeaderAttachment(sourceBox: box)
         attachment.onReveal = onReveal
@@ -398,6 +399,10 @@ enum MarkdownBridge {
     /// on by `serializeBodySegment`. Deleting the image in the editor now sticks, too; it used to
     /// reappear on the next save.
     private static func serializeBlockHeader(_ box: SourceAnchorBox) -> String {
+        // A block degraded from an unclosed header (`Block.headerless`) keeps its chip, so its text stays a
+        // block of its own in the editor, but writes no header: its text already begins with the opener, and
+        // a header here came back as one more `<!-- block: freeform -->` on every save (W40.e6).
+        if box.headerless { return "" }
         let block = Block(
             kind: box.kind,
             source: box.anchor,

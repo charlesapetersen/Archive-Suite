@@ -220,7 +220,7 @@ Continuation calls to that folder's `test_results/` ground truth.
 
 ---
 
-## Tier 2C — Live Capture relay/cloud transport (`scripts/test-{filerelay,relay-golden,relay-transport,drive-*}.sh`)
+## Tier 2C — Live Capture relay/cloud transport (`scripts/test-{filerelay,relay-golden,relay-fuzz,relay-transport,drive-*}.sh`)
 
 The cloud-transport work (USB local relay + **Google Drive cloud relay**, the `RelayObjectStore` /
 `FileRelayReceiver` seam) has its own Tier-2 scripts. Each launches the built app (or a standalone
@@ -235,6 +235,12 @@ Most are **key-free / \$0 / offline**; only the live one touches Google:
   `RelayObjectFormat` must emit **byte-identical** canonical JSON to the committed golden in
   `SPEC/relay-golden/` (checks iOS via `swiftc` + Android via plain-JVM JUnit) — catches any
   Swift↔Kotlin escaping / key-order / hex-case drift.
+- **`test-relay-fuzz.sh`** — key-free, in the health gate (W40.e6). Seeded fuzz and round-trip properties
+  of the Mac and iOS `RelayObjectFormat` (each compiled standalone from `scripts/relay-fuzz/main.swift`):
+  `parse(canonicalJSON(m)) == m` for random string maps, every encoder field and fingerprint reads back,
+  20,000 truncated / bit-flipped / spliced / deeply nested bodies parse or refuse without crashing, names
+  read back as their identity, and both platforms emit identical bytes for 4,000 seeded objects. Prints the
+  `W40.fix-processor-relay-parse-lenient` cases as `KNOWN` rather than failing on them.
 - **`test-relay-transport.sh`** — key-free. The phone-side never-lose contract of the iOS
   `FileRelayTransport`: a photo is only considered sent once a matching receipt comes back, never on a
   write alone.

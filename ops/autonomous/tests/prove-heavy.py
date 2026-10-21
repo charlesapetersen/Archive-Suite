@@ -356,6 +356,7 @@ echo "gate-rc=$GATE_RC"
                    "ops/gui/vm-gui-runner.sh", "ArchiveReader/test-smoke.sh", "ArchiveNotes/test-smoke.sh",
                    "ArchiveProcessor/test-smoke.sh", "ArchiveProcessor/scripts/require-unsandboxed.sh",
                    "ArchiveProcessor/scripts/android-ui-drive.sh", "ArchiveProcessor/scripts/test-relay-golden.sh",
+                   "ArchiveProcessor/scripts/test-relay-fuzz.sh",
                    "ArchiveProcessor/scripts/test-tag-vocabulary.sh", "ops/scale/run-scale-verify.sh",
                    "ops/gui/vm-seed-accessibility.sh",
                    "ArchiveProcessor/scripts/test-controlled-vocabulary.sh",

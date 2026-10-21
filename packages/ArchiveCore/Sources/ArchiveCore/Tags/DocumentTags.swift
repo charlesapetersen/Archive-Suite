@@ -346,17 +346,25 @@ extension DocumentTags {
     /// "MM Month" where MM is 1...12 and the name matches that month (case-insensitive).
     public static func parseMonth(_ s: String) -> Month? {
         let parts = s.split(separator: " ", maxSplits: 1, omittingEmptySubsequences: true)
-        guard parts.count == 2, let num = Int(parts[0]), (1...12).contains(num) else { return nil }
+        guard parts.count == 2, let num = oneOrTwoDigits(parts[0]), (1...12).contains(num) else { return nil }
         guard monthNames[num - 1].caseInsensitiveCompare(String(parts[1])) == .orderedSame else { return nil }
         return Month(number: num, name: monthNames[num - 1])
     }
 
-    /// "Day N" where N is 1...31 (unpadded).
+    /// "Day N" where N is 1...31. Written unpadded; a reader also takes one leading zero ("Day 05").
     public static func parseDay(_ s: String) -> Int? {
         let parts = s.split(separator: " ", omittingEmptySubsequences: true)
         guard parts.count == 2, parts[0].caseInsensitiveCompare("Day") == .orderedSame,
-              let n = Int(parts[1]), (1...31).contains(n) else { return nil }
+              let n = oneOrTwoDigits(parts[1]), (1...31).contains(n) else { return nil }
         return n
+    }
+
+    /// One or two ASCII digits, nothing else. `Int(_:)` alone also takes a sign and any number of leading
+    /// zeros, which let `+12 December`, `0007 July` and `Day 013` fill a facet (W40.e6) — and a facet edit
+    /// removes the token it consumed, so a lookalike subject was one edit away from being deleted.
+    private static func oneOrTwoDigits(_ s: Substring) -> Int? {
+        guard (1...2).contains(s.count), s.allSatisfy({ ("0"..."9").contains($0) }) else { return nil }
+        return Int(s)
     }
 
     /// Bare integer of 3–4 digits. Display/sort-only; a numeric subject (a box number, a book title
@@ -367,12 +375,14 @@ extension DocumentTags {
         return y
     }
 
-    /// "1970s"-style decade token (4-digit number + trailing "s").
     /// A decade token "NNNNs": 3–4 digits whose last digit is 0, then a lowercase 's'
     /// (e.g. "1970s", medieval-friendly "970s"). Returns the decade START year (1970).
+    /// ASCII digits only: `Int(_:)` also takes a sign, so `-170s` was a decade starting in -170 and `+00s`
+    /// one starting in 0 (W40.e6).
     public static func parseDecade(_ s: String) -> Int? {
-        guard (4...5).contains(s.count), s.hasSuffix("s"),
-              let y = Int(s.dropLast()), y % 10 == 0 else { return nil }
+        guard (4...5).contains(s.count), s.hasSuffix("s") else { return nil }
+        let digits = s.dropLast()
+        guard digits.allSatisfy({ ("0"..."9").contains($0) }), let y = Int(digits), y % 10 == 0 else { return nil }
         return y
     }
 
