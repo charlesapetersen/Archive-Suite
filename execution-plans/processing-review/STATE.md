@@ -33,7 +33,7 @@ Read `00-plan.md`, then this table. Take the first phase step not done. Strand n
 | B dating | done, `screens/B-screen.md` | done 2026-10-20 (Fable), `B-dating.md` | enclosure split rerun: 33/75/21 of 131 and model figures reproduce (`scripts/segbench/enclosure_split.py`) | done |
 | C OCR and HTR | done, `screens/C-screen.md` | done 2026-10-20 (Fable), `C-ocr.md` | Kiessling Latin 8.70/13.07 and Polay WERs checked in the PDF texts | done |
 | D enhancement and marks | done, `screens/D-screen.md` | done 2026-10-20 (Fable), `D-enhancement.md` | UVDoc MIT licence checked | done |
-| E layout | done, `screens/E-screen.md` | started (Fable) | | |
+| E layout | done, `screens/E-screen.md` | done 2026-10-20 (Fable), `E-layout.md` | NewsBench figures match our farmshare/news results | done |
 | F text placement | done, `screens/F-screen.md` | started (Fable) | | |
 | G entities | done, `screens/G-screen.md` | | | |
 | H whole-corpus and user training | done, `screens/H-screen.md` | | | |
