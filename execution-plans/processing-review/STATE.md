@@ -20,6 +20,8 @@ Read `00-plan.md`, then this table. Take the first phase step not done. Strand n
 - [ ] Run the models scored on the 895 but not yet on the owner's 96 pages (owner, 2026-10-20, both sets every
   time): GLM-OCR, LightOnOCR-3 0.8B and 4B at bf16 (the 4B has only a Mac 8-bit run, 89.13), PaddleOCR-VL 1.5,
   Qwen3.5 4B, Ling 3 Flash VL and stock PP-OCRv6, on FarmShare, same settings as the open sweep.
+  Status: submitted 2026-10-20, jobs 1861696–1861703 (one afterany chain, Qwen3-VL 8B added at 1861701, Ling
+  last); collect and score per `execution-plans/truth96-farmshare-20261020.md`.
 - [ ] Add a Sherlock profile to `scripts/segbench/institutional-compute/` once the account exists (strand J
   gathers its partitions, GPU types and limits first).
 
