@@ -25,10 +25,10 @@ Read `00-plan.md`, then this table. Take the first phase step not done. Strand n
 
 | strand | screen | deep read | checked | note |
 |---|---|---|---|---|
-| A segmentation | | | | |
-| B dating | | | | |
-| C OCR and HTR | | | | |
-| D enhancement and marks | | | | |
+| A segmentation | done 2026-10-20, `screens/A-screen.md` | started (Fable) | | |
+| B dating | done 2026-10-20, `screens/B-screen.md` |  | | |
+| C OCR and HTR | done 2026-10-20, `screens/C-screen.md` |  | | |
+| D enhancement and marks | done 2026-10-20, `screens/D-screen.md` |  | | |
 | E layout | | | | |
 | F text placement | | | | |
 | G entities | | | | |
@@ -38,4 +38,5 @@ Read `00-plan.md`, then this table. Take the first phase step not done. Strand n
 
 ## Usage
 
-Not yet measured. Record the first strand's share of the weekly window here.
+Before the screens (2026-10-20 ~21:00): weekly all-models 3%, weekly Fable 0%. The four Sonnet screens and
+strand A's Fable read are measured against that.
