@@ -53,11 +53,13 @@ The project has measured a lot and read little. The record, in brief, with the f
   $3 rule in `~/Claude/CLAUDE.md`.
 - Every model tested on the 895-page public set is also run on the owner's 96 truth pages (root CLAUDE.md, "Both
   OCR sets, every time").
-- Dating is explicit only. A date written or printed on the document is wanted; so is a date inherited from an
-  explicitly dated covering document when the enclosure relation can be established (in the owner's tags, a dated
-  document with no date of its own is almost always an enclosure). Estimating a year from style, hand, typeface or
-  neighbours is out of scope. Strand B covers explicit extraction and enclosure detection; the app's speculative
-  year and `Date Uncertain` behaviour is reviewed against this in Phase 4.
+- Dating suggestions must be traceable. A date written or printed on the document is the main case; so is a date
+  inherited from an explicitly dated covering document when the enclosure relation can be established (in the
+  owner's tags, a dated document with no date of its own is almost always an enclosure). A year estimated from
+  neighbours is acceptable when it is marked `Date Uncertain`. Dating from typeface, paper or similar cues would be
+  welcome if feasible, which the owner doubts. Every date that is not explicit must carry the evidence it rests on
+  (the neighbouring document or cue, quoted or located) and a confidence score or similar; an untraceable guess is
+  not acceptable. Phase 4 checks the app's tagging against this.
 - Entities (authors, senders and recipients, places) are a long-term option, and are reviewed mainly as an input to
   dating and segmentation. More languages, scripts and eras are a long-term goal; the existing corpus and the
   public set are broad enough for now.
@@ -92,7 +94,8 @@ Strands:
   adapting to a new collection; learning from a user's corrections.
 - B. Dating, explicit only: extracting and normalising dates written or printed on a document (letterheads,
   postmarks, stamps, annotations, partial dates), and detecting enclosure relations so an undated enclosure takes its
-  covering document's date (SPEC/tag-format.md, W37.dual-date). Stylistic or visual date estimation is out of scope.
+  covering document's date (SPEC/tag-format.md, W37.dual-date); non-explicit estimates from neighbours or visual
+  cues, judged by traceability (does the cited evidence support the date?) and calibration.
 - C. OCR and HTR: current vision-language OCR models, historical-script specialists, post-OCR correction,
   historical language models (HMBERT and the Saskatchewan thesis the owner cited), whole-page against region-first.
 - D. Image enhancement, dewarping, deskewing and binarisation, with the Rényi DIE model as a starting point; which
