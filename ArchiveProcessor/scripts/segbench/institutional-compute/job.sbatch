@@ -13,12 +13,14 @@ server="" wave_note=""
 # A wave stage (wave.py) records how it ended, for the score job; a pilot that fails cancels the rest of its chain.
 on_exit() {
   local rc=$?
-  [ -z "$server" ] || { kill "$server" 2>/dev/null; wait "$server" 2>/dev/null || true; }
+  set +e   # nothing in here may stop it early: the state file and the chain cancel come first, before vLLM's
+           # shutdown, which can outlast Slurm's KillWait
   if [ -n "${IC_WAVE_DIR:-}" ]; then
     printf 'rc=%s job=%s %s\n' "$rc" "${SLURM_JOB_ID:-local}" "$wave_note" \
-      > "$IC_WAVE_DIR/state/${IC_WAVE_STAGE}-${SLURM_ARRAY_TASK_ID:-0}" || true
-    [ "$IC_WAVE_STAGE" != pilot ] || [ "$rc" -eq 0 ] || "$IC_PY" wave.py fail "$IC_WAVE_DIR" "pilot job exit $rc" || true
+      > "$IC_WAVE_DIR/state/${IC_WAVE_STAGE}-${SLURM_ARRAY_TASK_ID:-0}"
+    [ "$IC_WAVE_STAGE" != pilot ] || [ "$rc" -eq 0 ] || "$IC_PY" wave.py fail "$IC_WAVE_DIR" "pilot job exit $rc"
   fi
+  [ -z "$server" ] || { kill "$server" 2>/dev/null; wait "$server" 2>/dev/null; }
 }
 trap on_exit EXIT
 trap 'exit 143' TERM   # Slurm's SIGTERM at the wall limit or scancel: still record the exit
@@ -42,8 +44,9 @@ done
 curl -sf "http://127.0.0.1:$port/health" >/dev/null || { echo "vLLM not healthy after 30 min"; tail -50 "$log"; exit 1; }
 echo "vLLM up after $(( $(date +%s) - start )) s"
 export IC_URL="http://127.0.0.1:$port"
-label="${IC_LABEL:-${IC_PRESET_NAME}-${SLURM_JOB_ID:-local}}"
-runs="${IC_RUNS:-$IC_ROOT/runs}"   # a wave gives each job and stage its own folder (IC_RUNS, IC_LABEL)
+label="${IC_PRESET_NAME}-${SLURM_JOB_ID:-local}" runs="$IC_ROOT/runs"
+# A wave gives each job and stage its own folder; outside a wave a leftover IC_LABEL or IC_RUNS changes nothing.
+[ -z "${IC_WAVE_DIR:-}" ] || { label="$IC_LABEL" runs="$IC_RUNS"; }
 # IC_LAYOUT=1 (the glm-ocr preset) makes every mode below layout-first: cluster_ocr.py reads it as --layout.
 
 case "$IC_MODE" in

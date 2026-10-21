@@ -22,6 +22,8 @@ while [ $# -gt 0 ]; do
 done
 [ "${#positional[@]}" -eq 2 ] || { echo 'need MODE PRESET (auto chooses by GPU memory)' >&2; exit 2; }
 IC_MODE="${positional[0]}"; IC_PRESET_NAME="${positional[1]}"
+# The wave's per-stage settings (wave.py) must not leak from a login shell into an ordinary run.
+[ -n "${IC_WAVE_DIR:-}" ] || unset IC_LIMIT IC_RUNS IC_WAVE_STAGE IC_WAVE_JOB
 active_profile="" active_profile_hash=""
 if [ -f compute.env ]; then source compute.env; active_profile="$IC_PROFILE"; active_profile_hash="${IC_PROFILE_SHA256:-}"; fi
 profile="${profile:-${active_profile:-farmshare}}"

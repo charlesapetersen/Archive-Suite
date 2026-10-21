@@ -31,7 +31,8 @@ requeue (`job.sbatch`, `train.sbatch`). A profile cannot translate a different s
 ## Make a cluster profile
 
 Each `profiles/*.json` file holds the cluster’s display name, scheduler settings, GPU type and per-card
-memory, modules/CUDA setup, scratch path, and persistent storage path. `farmshare.json` reflects FarmShare’s
+memory, modules/CUDA setup, scratch path, and persistent storage path, plus an optional CPU partition and QOS
+(`slurm.cpu_partition`, `slurm.cpu_qos`) for a wave's score jobs. `farmshare.json` reflects FarmShare’s
 reported 2026-10-15 limits; `example-university.json` is a **fictional**, offline-tested 80 GB H100 example, not a
 claim about another university’s infrastructure. Copy either to a new file and replace every setting with
 answers from your office. JSON is data, never shell code. Paths may use `$USER`, `$HOME` and other existing
@@ -126,6 +127,37 @@ new `--out` rather than relabel old text. Copy text **and** `_meta` back to a sc
 select **Institutional computing** in the app. No migration for older FarmShare metadata is provided because
 nothing produced by these apps is retained. `cluster_ocr.py bulk` called directly requires `--cluster NAME`
 or the profile’s exported `CLUSTER_NAME`.
+
+## Waves: many jobs as dependency chains
+
+A **wave** is a JSON file listing cluster jobs (`waves/example.json`). One short login-node step sends every
+ready job as a chain of three Slurm jobs, each triggering the next, so the login session can end straight away:
+
+```bash
+python3 wave.py submit waves/my-wave.json --dry-run   # every sbatch command; no Slurm, no setup, nothing created
+python3 wave.py submit waves/my-wave.json             # exit 3 if some job was not sent (not ready, or no room)
+python3 wave.py status waves/my-wave.json
+```
+
+1. **Pilot**: the job's mode, preset and input on its first three items (`IC_LIMIT=3`), into its own folder,
+   then a gate: all three must have been read (OCR modes: a parsed reply; seg: an answered window; text: a
+   reply). A failed pilot cancels the rest of its chain. It is submitted held and released only once the whole
+   chain has been accepted, so a refused submission never leaves a GPU job running that nothing will score.
+2. **Full**: the whole run, `--dependency=afterok:<pilot>`. Bulk keeps its shards and its self-requeue.
+3. **Score**: a small CPU job, `--dependency=afterany:<full>`, on the profile's `slurm.cpu_partition`. It waits
+   for any requeued bulk shard, runs the job's own `score` argv if it has one (placeholders `{full}`, `{pilot}`,
+   `{results}`, `{wave_dir}`), and copies the run's small files (summaries, `pages.csv`, throughput, failure and
+   escalation logs; never transcripts, replies or images) into `results/<id>/` with a `status.json`.
+
+Each job's files live under `$IC_ROOT/waves/<wave>/<id>/`, and only **`$IC_ROOT/waves/<wave>/results/`** needs to
+come back to the Mac. A job is ready when its input is on the cluster (the pack's index file, a bulk folder
+holding an image, NewsBench); `submit` skips a job that already has a chain and stops at the profile's
+submitted-job limit, so run it again as input arrives or jobs finish. Job fields: `id`, `mode` (`truth`, `seg`,
+`text`, `news`, `bulk`; `news-layout` has no pilot), `preset`, `pack` or `in`/`out`/`shards`, `hours`,
+`pilot_hours` (default 1), `score_hours` (default 1), `env` (extra `IC_*` settings) and `score`. Paths may use
+`$IC_ROOT`, `$USER` and `$HOME`. The CPU partition is taken from the profile without a live check; a wrong one
+is refused at submission, before the pilot is released. The chain is tested offline against a pretend Slurm
+(`test_institutional_compute.Wave`); no real wave has run yet.
 
 Other modes remain available: `cluster_seg.py` packs/runs/imports segmentation windows; `cluster_text.py`
 sends exported text prompts; `train_seg.py` and `train.sbatch` train/merge students. Training is manually

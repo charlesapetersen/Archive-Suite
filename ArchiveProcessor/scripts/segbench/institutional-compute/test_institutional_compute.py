@@ -1079,6 +1079,42 @@ class Wave(unittest.TestCase):
         self.assertEqual(status['reason'], 'pilot gate: 2 of 3 items read; pilot job exit 1')
         self.assertTrue((self.root / 'waves/w1/results/b/pilot/failed-0.jsonl').exists())
 
+    def test_pilot_whose_server_dies_at_start_up_still_cancels_and_reports(self):
+        inp = self.tmp / 'pages'; self.images(inp, {'a.png': (0, 0, 0)})
+        self.submit(self.wave([{'id': 'b', 'mode': 'bulk', 'preset': 'auto', 'in': str(inp)}]))
+        r = self.run_job(7001, 0, IC_VLLM='/usr/bin/false')   # vLLM gone before the trap's kill
+        self.assertNotEqual(r.returncode, 0)
+        self.assertEqual((self.slurm / 'scancel').read_text(), '7002 7003\n')
+        status = json.loads((self.root / 'waves/w1/results/b/status.json').read_text())
+        self.assertEqual(status['status'], 'pilot-failed')
+        self.assertTrue((self.root / 'waves/w1/b/state/pilot-0').read_text().startswith('rc=1'))
+
+    def test_leftover_job_folder_is_never_reused(self):
+        inp = self.tmp / 'pages'; self.images(inp, {'a.png': (0, 0, 0)})
+        wave = self.wave([{'id': 'b', 'mode': 'bulk', 'preset': 'auto', 'in': str(inp)}])
+        (self.root / 'waves/w1/b/state').mkdir(parents=True)
+        (self.root / 'waves/w1/b/state/full-0').write_text('rc=0 job=1 \n')
+        r = self.submit(wave)
+        self.assertEqual(r.returncode, 3)
+        self.assertIn('left from an earlier chain', r.stdout)
+        self.assertFalse((self.slurm / '7001.argv').exists())
+
+    def test_score_rounds_follow_the_jobs_own_chain_limit(self):
+        inp = self.tmp / 'pages'; self.images(inp, {'a.png': (0, 0, 0)})
+        self.submit(self.wave([{'id': 'b', 'mode': 'bulk', 'preset': 'auto', 'in': str(inp),
+                                'env': {'IC_CHAIN_MAX': '60'}}]))
+        self.assertEqual(self.job(7003)[1]['IC_CHAIN_MAX'], '60')
+        jd = self.root / 'waves/w1/b'
+        (jd / 'state/full-0').write_text('rc=0 job=7002 requeued 7999\n')
+        (self.slurm / 'queue').write_text('7999\n')
+        r = self.run_job(7003, IC_SCORE_ROUND='40')          # beyond the default 31 rounds, inside 61
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn('--dependency=afterany:7999', self.job(7004)[0])
+        (self.slurm / 'queue').write_text('')                 # gone without reporting
+        self.assertNotEqual(self.run_job(7004).returncode, 0)
+        status = json.loads((self.root / 'waves/w1/results/b/status.json').read_text())
+        self.assertIn('left the queue without reporting', status['reason'])
+
     def test_full_run_failure_is_reported_by_the_score_job(self):
         inp = self.tmp / 'pages'; self.images(inp, {'a.png': (0, 0, 0)})
         self.submit(self.wave([{'id': 'b', 'mode': 'bulk', 'preset': 'auto', 'in': str(inp)}]))

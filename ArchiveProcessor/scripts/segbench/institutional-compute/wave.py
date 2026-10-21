@@ -187,10 +187,19 @@ def queued():
 
 
 def in_queue(ids):
+    """The IDs still queued or running. A job Slurm no longer knows is absent; any other squeue failure is retried and
+    then counted as still queued, so a slurmctld hiccup makes the score job wait a round instead of failing a live
+    shard."""
     if not ids:
         return set()
-    r = subprocess.run(['squeue', '-h', '-o', '%A', '-j', ','.join(ids)], capture_output=True, text=True)
-    return set(r.stdout.split()) & set(ids) if r.returncode == 0 else set()
+    for attempt in range(3):
+        r = subprocess.run(['squeue', '-h', '-o', '%F %A', '-j', ','.join(ids)], capture_output=True, text=True)
+        if r.returncode == 0:
+            return set(r.stdout.split()) & set(ids)
+        if 'Invalid job id' in r.stderr:
+            return set()
+        time.sleep(10 * (attempt + 1))
+    return set(ids)
 
 
 # ---------------------------------------------------------------- submit
@@ -243,7 +252,9 @@ def submit_job(job, cfg, wd, profile, dry):
         if dry:
             print('  score: ' + ' '.join(shlex.quote(s) for s in score))
             return None
-        env = dict(base, IC_WAVE_DIR=str(wd / job['id']), IC_WAVE_STAGE='score', IC_WAVE_JOB=job['id'], IC_DIR=str(HERE))
+        # The job's own env too: its IC_CHAIN_MAX bounds the score job's rounds as it bounds the requeues.
+        env = dict(base, **job.get('env', {}), IC_WAVE_DIR=str(wd / job['id']), IC_WAVE_STAGE='score',
+                   IC_WAVE_JOB=job['id'], IC_DIR=str(HERE))
         r = subprocess.run(score, env=env, capture_output=True, text=True)
         if r.returncode != 0:
             raise RuntimeError(f'score: {r.stderr.strip() or r.stdout.strip()}')
@@ -253,10 +264,12 @@ def submit_job(job, cfg, wd, profile, dry):
         write(wd / job['id'] / 'chain.json', chain)
         subprocess.run(['scontrol', 'release', ids['pilot']], check=True, capture_output=True, text=True)
         return chain
-    except (RuntimeError, subprocess.CalledProcessError, OSError) as e:
-        if ids:   # never leave half a chain: a held pilot, or a full run nothing scores
+    except BaseException as e:   # an interrupt too: never leave half a chain (a held pilot, a full run nothing scores)
+        if ids:
             subprocess.run(['scancel', *ids.values()], capture_output=True)
         (wd / job['id'] / 'chain.json').unlink(missing_ok=True)
+        if not isinstance(e, (RuntimeError, subprocess.CalledProcessError, OSError)):
+            raise
         raise RuntimeError(f'{job["id"]}: {getattr(e, "stderr", None) or e}') from None
 
 
@@ -274,6 +287,10 @@ def cmd_submit(a):
     for job in jobs:
         if not a.dry_run and (wd / job['id'] / 'chain.json').exists():
             print(f'{job["id"]}: already submitted (wave.py status)'); continue
+        if not a.dry_run and (wd / job['id']).exists():
+            # Old answers, side files or state would let a new pilot gate or score pass on an earlier run's work.
+            print(f'{job["id"]}: not sent, {wd / job["id"]} is left from an earlier chain; move it aside to rerun')
+            skipped += 1; continue
         missing = ready(job, cfg['IC_ROOT'])
         if missing:
             print(f'{job["id"]}: not ready, {missing}'); skipped += 1; continue
@@ -406,12 +423,18 @@ def cmd_score(a):
     for task in range(chain['shards']):
         f = jdir / 'state' / f'full-{task}'
         rc, new = parse_state(f.read_text()) if f.exists() else (None, None)
+        queued = False
+        while new and not queued:
+            queued = new in in_queue([new])
+            if not queued:   # it may have finished, or requeued again, between the read and the queue check
+                rc, again = parse_state(f.read_text())
+                if again == new:
+                    bad.append(f'shard {task}: requeued job {new} left the queue without reporting'); break
+                new = again
+        if queued:
+            wait.append(new); continue
         if new:
-            if new in in_queue([new]):
-                wait.append(new); continue
-            rc, new = parse_state(f.read_text())   # it may have finished between the read and the queue check
-            if new:
-                bad.append(f'shard {task}: requeued job {new} left the queue without reporting'); continue
+            continue
         if rc is None:
             bad.append(f'shard {task}: no exit recorded (killed, or never ran)')
         elif rc != 0:
@@ -442,6 +465,10 @@ def cmd_score(a):
     return 0
 
 
+def cmd_report(a):
+    finish(a.job_dir, a.status, a.reason)
+
+
 def cmd_score_args(a):
     """For wave.sbatch's resubmission: the score job's sbatch arguments, one per line."""
     cfg = {k: os.environ.get(k, '') for k in ('IC_CPU_PARTITION', 'IC_CPU_QOS', 'IC_ACCOUNT', 'IC_MAXWALL_MIN', 'IC_ROOT')}
@@ -458,10 +485,11 @@ def main():
     for name in ('gate', 'score', 'score-args'):
         sub.add_parser(name).add_argument('job_dir')
     p = sub.add_parser('fail'); p.add_argument('job_dir'); p.add_argument('reason')
+    p = sub.add_parser('report'); p.add_argument('job_dir'); p.add_argument('status'); p.add_argument('reason')
     a = ap.parse_args()
     try:
         fn = {'submit': cmd_submit, 'status': cmd_status, 'gate': cmd_gate, 'fail': cmd_fail,
-              'score': cmd_score, 'score-args': cmd_score_args}[a.cmd]
+              'score': cmd_score, 'score-args': cmd_score_args, 'report': cmd_report}[a.cmd]
         sys.exit(fn(a) or 0)
     except (OSError, ValueError, KeyError) as e:
         sys.exit(f'wave.py {a.cmd}: {e}')
