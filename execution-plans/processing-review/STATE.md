@@ -30,7 +30,7 @@ Read `00-plan.md`, then this table. Take the first phase step not done. Strand n
 | strand | screen | deep read | checked | note |
 |---|---|---|---|---|
 | A segmentation | done, `screens/A-screen.md` | done 2026-10-20 (Fable), `A-segmentation.md` | Lincoln figures checked against lincoln-scores.json | done |
-| B dating | done 2026-10-20, `screens/B-screen.md` | started (Fable) | | |
+| B dating | done, `screens/B-screen.md` | done 2026-10-20 (Fable), `B-dating.md` | enclosure split rerun: 33/75/21 of 131 and model figures reproduce (`scripts/segbench/enclosure_split.py`) | done |
 | C OCR and HTR | done, `screens/C-screen.md` | done 2026-10-20 (Fable), `C-ocr.md` | Kiessling Latin 8.70/13.07 and Polay WERs checked in the PDF texts | done |
 | D enhancement and marks | done, `screens/D-screen.md` | done 2026-10-20 (Fable), `D-enhancement.md` | UVDoc MIT licence checked | done |
 | E layout | done, `screens/E-screen.md` | started (Fable) | | |
