@@ -4,11 +4,26 @@
 # A three-page pilot (LightOnOCR-3 0.8B, n-gram arm) goes first, held until every job is accepted; each one-GPU
 # route x arm job follows it afterok, and Ling's two four-GPU jobs follow all of those (afterany), so a whole-node
 # job never sits ahead of the one-GPU queue under the four-GPU user limit. Job ids land in ROOT/jobs.tsv.
+#   bash loop-rerun-submit.sh ROOT t96 PILOT_JOB [--dry-run]
+# The 96's own caps (routes.json's t96-* entries, from the truth96 run), one GPU job per route x arm, after the
+# same pilot. Appended to jobs.tsv.
 set -euo pipefail
 ROOT="$1"; DRY="${2:-}"
 cd "$ROOT"
 JOB="$ROOT/loop-rerun-job.sh"
 run() { if [ "$DRY" = --dry-run ]; then printf '%q ' "$@" >&2; echo >&2; echo 0; else "$@"; fi; }
+if [ "${2:-}" = t96 ]; then
+  PILOT="$3"; DRY="${4:-}"
+  for route in $(python3 -c 'import json;print(" ".join(k for k in json.load(open("routes.json")) if k.startswith("t96-")))'); do
+    for arm in ngram half; do
+      id=$(run sbatch --parsable --partition=gpu --gres=gpu:1 --cpus-per-task=8 --mem=64G --time=01:00:00 \
+        --dependency="afterok:$PILOT" --job-name="loops-$route-$arm" --output="$ROOT/logs/slurm-%j.out" \
+        "$JOB" "$ROOT" "$route" "$arm")
+      printf '%s\t%s\t%s\n' "$route" "$arm" "$id" >> jobs.tsv
+    done
+  done
+  cat jobs.tsv; exit 0
+fi
 head -3 caps/lightonocr3-0.8b.jsonl > caps/pilot.jsonl
 python3 - "$ROOT/routes.json" <<'EOF'
 import json,sys

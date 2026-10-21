@@ -71,9 +71,19 @@ SECOND['lightonocr3-4b'] = 'qwen3.6-27b'
 ARMS = ('ngram', 'half')
 LATIN = {'L1', 'L2', 'L3', 'L4', 'L5', 'L6', 'L7', 'L8', 'L9'}
 
+# The 96 (the owner's truth pages): the truth96 run's caps, same routes and prompts (2026-10-20, jobs 1861696-703).
+T = LTS / 'FarmShare-truth96-20261020/outputs'
+TFS = f'{FS}/truth96-20261020'
+T96 = {f't96-{k}': dict(dir=T / f'{d}/results/ocr/{d}', mode=ROUTES[k]['mode'], model=ROUTES[k]['model'],
+                        prompt=f'{TFS}/{d}/ocr/panel-prompt.txt', base=k)
+       for k, d in (('glm-ocr', 'glm-ocr'), ('lightonocr3-4b', 'lightonocr3-4b'), ('lightonocr3-0.8b', 'lightonocr3-08b'),
+                    ('paddleocr-vl1.5', 'paddleocr-vl15'), ('qwen3-vl-8b', 'qwen3-vl-8b'), ('qwen3.5-4b', 'qwen35-4b'))}
+T96_PPOCR = T / 'ppocrv6-medium-native/raw'
+T96_MANIFEST = f'{TFS}/truth99.jsonl'
 
-def caps(route):
-    return sorted(k for k, r in F.read_records(ROUTES[route]['dir']).items() if r.get('status') == 'cap')
+
+def caps(spec):
+    return sorted(k for k, r in F.read_records(spec['dir']).items() if r.get('status') == 'cap')
 
 
 def cmd_caps(a):
@@ -81,9 +91,12 @@ def cmd_caps(a):
     for line in Path(a.cluster_manifest).read_text().splitlines() if a.cluster_manifest else []:
         r = json.loads(line); cluster[r['id']] = r
     out = a.out; (out / 'caps').mkdir(parents=True, exist_ok=True)
-    plan, lines = {}, []
-    for route, spec in ROUTES.items():
-        ids = caps(route)
+    table = T96 if a.set == 'truth96' else ROUTES
+    plan = json.loads((out / 'routes.json').read_text()) if (out / 'routes.json').exists() else {}
+    for route, spec in table.items():
+        ids = caps(spec)
+        if not ids:
+            continue
         rows = [cluster[i] for i in ids] if cluster else [{'id': i} for i in ids]
         (out / 'caps' / f'{route}.jsonl').write_text(''.join(json.dumps(r) + '\n' for r in rows))
         plan[route] = {'model': spec['model'], 'served': route, 'prompt': spec['prompt'],
@@ -98,58 +111,132 @@ def arm_records(runs, route, arm):
     return F.read_records(d) if d.is_dir() else {}
 
 
+def texts_dir(d):
+    return {f.stem: f.read_text() for f in d.glob('*.txt')} if d.is_dir() else {}
+
+
+def mlx_readings(d):
+    """ocr_mac_local's readings, by panel page id (p018): the parsed TEXT, '' for a failed or capped one."""
+    out = {}
+    for f in d.glob('*.json') if d.is_dir() else []:
+        if f.name.endswith('.raw.json'):
+            continue
+        got = json.loads(f.read_text())
+        out[got['meta']['page']] = {'text': ((got.get('parsed') or {}).get('text') or '').strip(),
+                                    'status': 'cap' if got['meta']['finish'] == 'length' else 'ok' if got.get('parsed') else 'failed',
+                                    'tokens': got['meta'].get('completion_tokens'), 'wall_s': got['meta'].get('wall_s')}
+    return out
+
+
+def cascade(texts):
+    """The first arm, in the order a route would try them, that gave a reading: own route again with n-gram
+    blocking, then at half size, then the second open reader, then the reader that cannot loop."""
+    for arm in ('ngram', 'half', 'second', 'kraken-ppocrv6', 'ppocrv6'):
+        if texts.get(arm):
+            return texts[arm]
+    return ''
+
+
+def score_route(set_name, route, ids, ref_of, texts_of, meta_of):
+    pages, cands = [], {}
+    for jid in ids:
+        ref, stratum = ref_of(jid)
+        texts = {k: v for k, v in texts_of(jid, stratum).items() if v is not None}
+        texts['cascade'] = cascade(texts)
+        for arm, text in texts.items():
+            m = meta_of(arm, jid)
+            row = {'set': set_name, 'route': route, 'arm': arm, 'page': jid, 'stratum': stratum, 'ok': bool(text),
+                   'status': m.get('status', ''), 'tokens': m.get('tokens', ''), 'wall_s': m.get('wall_s', ''),
+                   **(S.score(ref, text, stratum) if stratum else S.score(ref, text))}
+            pages.append(row); cands.setdefault(arm, []).append(row)
+    rows = []
+    for arm, rr in cands.items():
+        agg = S.aggregate(rr)
+        def num(k):
+            xs = [r[k] for r in rr if isinstance(r[k], (int, float)) and not isinstance(r[k], bool)]
+            return round(sum(xs), 2) if xs else ''
+        rows.append({'set': set_name, 'route': route, 'arm': arm, 'caps': len(ids), 'n': len(rr),
+                     **{k: agg[k] for k in ('ok', 'failed', 'nes', 'chrf')},
+                     'still_capped': sum(r['status'] == 'cap' for r in rr), 'completion_tokens': num('tokens'),
+                     'wall_s': num('wall_s')})
+    return rows, pages
+
+
+def meta_from(records):
+    def get(jid):
+        r = records.get(jid) or {}
+        return {'status': r.get('status', ''), 'tokens': (r.get('usage') or {}).get('completion_tokens', ''), 'wall_s': r.get('wall_s', '')}
+    return get
+
+
 def cmd_report(a):
+    rows, pages = [], []
+    # The 895.
     R.MANIFEST = MANIFEST
     truth = {R.job_id(r): r for r in R.frozen()}
     saved = {k: F.read_records(v['dir']) for k, v in ROUTES.items()}
     pp = F.read_records(PPOCR['dir'])
-    kraken = {}
-    kdir = a.runs / 'kraken'
-    if kdir.is_dir():
-        for f in kdir.glob('*.txt'):
-            kraken[f.stem] = f.read_text()
-    rows, pages = [], []
+    kraken = texts_dir(a.runs / 'kraken')
     for route, spec in ROUTES.items():
         ids = sorted(k for k, r in saved[route].items() if r.get('status') == 'cap')
         arms = {arm: arm_records(a.runs, route, arm) for arm in ARMS}
-        cands = {}
-        for jid in ids:
-            t = truth[jid]
-            ref = Path(t['truth']).read_text()
-            texts = {
-                'ngram': X.reading(arms['ngram'].get(jid), spec['mode']) if jid in arms['ngram'] else None,
-                'half': X.reading(arms['half'].get(jid), spec['mode']) if jid in arms['half'] else None,
-                'second': X.reading(saved[SECOND[route]].get(jid), ROUTES[SECOND[route]]['mode']),
-                'ppocrv6': X.reading(pp.get(jid), 'pipeline'),
-                'kraken-ppocrv6': kraken.get(jid) if t['stratum'] in LATIN and kraken else None,
-            }
-            for arm, text in texts.items():
-                if text is None:
-                    continue
-                rec = arms.get(arm, {}).get(jid) if arm in ARMS else None
-                row = {'route': route, 'arm': arm, 'page': jid, 'stratum': t['stratum'], 'ok': bool(text),
-                       'status': (rec or {}).get('status', ''), 'tokens': ((rec or {}).get('usage') or {}).get('completion_tokens', ''),
-                       **S.score(ref, text, t['stratum'])}
-                pages.append(row)
-                cands.setdefault(arm, []).append(row)
-        for arm, rr in cands.items():
-            agg = S.aggregate(rr)
-            toks = [r['tokens'] for r in rr if isinstance(r['tokens'], int)]
-            rows.append({'route': route, 'arm': arm, 'caps': len(ids), 'n': len(rr), **{k: agg[k] for k in ('ok', 'failed', 'nes', 'chrf')},
-                         'still_capped': sum(r['status'] == 'cap' for r in rr), 'completion_tokens': sum(toks) if toks else ''})
+        metas = {arm: meta_from(arms[arm]) for arm in ARMS}
+        def texts_of(jid, stratum):
+            return {**{arm: X.reading(arms[arm][jid], spec['mode']) if jid in arms[arm] else None for arm in ARMS},
+                    'second': X.reading(saved[SECOND[route]].get(jid), ROUTES[SECOND[route]]['mode']),
+                    'ppocrv6': X.reading(pp.get(jid), 'pipeline'),
+                    'kraken-ppocrv6': kraken.get(jid) if stratum in LATIN and kraken else None}
+        rr, pg = score_route('public895', route, ids, lambda j: (Path(truth[j]['truth']).read_text(), truth[j]['stratum']),
+                             texts_of, lambda arm, j: metas[arm](j) if arm in metas else {})
+        rows += rr; pages += pg
+    # The 96 (the three agreement-only letters are kept and marked, since a cap there is a cap too).
+    tsaved = {k: F.read_records(v['dir']) for k, v in T96.items()}
+    t_lo4 = tsaved['t96-lightonocr3-4b']
+    tpp = F.read_records(T96_PPOCR)
+    k96 = texts_dir(a.runs / 'kraken96')
+    ref96 = lambda j: ((X.R.P.TRUTH / 'truth' / (j + '.txt')).read_text(), None)
+    for route, spec in T96.items():
+        ids = sorted(k for k, r in tsaved[route].items() if r.get('status') == 'cap')
+        if not ids:
+            continue
+        arms = {arm: arm_records(a.runs, route, arm) for arm in ARMS}
+        metas = {arm: meta_from(arms[arm]) for arm in ARMS}
+        second = 't96-lightonocr3-4b' if spec['base'] != 'lightonocr3-4b' else None
+        def texts_of(jid, _s):
+            return {**{arm: X.reading(arms[arm][jid], spec['mode']) if jid in arms[arm] else None for arm in ARMS},
+                    'second': X.reading(tsaved[second].get(jid), 'native') if second else None,
+                    'ppocrv6': X.reading(tpp.get(jid), 'pipeline'), 'kraken-ppocrv6': k96.get(jid)}
+        rr, pg = score_route('truth96', route, ids, ref96, texts_of, lambda arm, j: metas[arm](j) if arm in metas else {})
+        rows += rr; pages += pg
+    # The 96's three MLX loops (Qwen3-VL 8B 4-bit on this Mac), read again by loop_mac.py.
+    import ocr_mac_local as M
+    base = mlx_readings(M.OUT)
+    loops = {arm: mlx_readings(M.OUT.parent / (M.KEY + '-loops') / arm) for arm in ARMS}
+    ids = sorted(p for p, r in base.items() if r['status'] == 'cap')
+    fs8b = tsaved['t96-qwen3-vl-8b']
+    def mlx_texts(jid, _s):
+        return {**{arm: loops[arm][jid]['text'] if jid in loops[arm] else None for arm in ARMS},
+                'second': X.reading(t_lo4.get(jid), 'native'), 'ppocrv6': X.reading(tpp.get(jid), 'pipeline'),
+                'kraken-ppocrv6': k96.get(jid), 'bf16-vllm': X.reading(fs8b.get(jid), 'panel')}
+    rr, pg = score_route('truth96', 'mlx-qwen3-vl-8b-4bit', ids, ref96, mlx_texts,
+                         lambda arm, j: loops[arm].get(j, {}) if arm in loops else {})
+    rows += rr; pages += pg
     a.out.mkdir(parents=True, exist_ok=True)
-    S.write_csv(a.out / f'{a.name}.csv', rows, ['route', 'arm', 'caps', 'n', 'ok', 'failed', 'still_capped', 'nes', 'chrf', 'completion_tokens'])
+    S.write_csv(a.out / f'{a.name}.csv', rows, ['set', 'route', 'arm', 'caps', 'n', 'ok', 'failed', 'still_capped', 'nes',
+                                                'chrf', 'completion_tokens', 'wall_s'])
     S.write_csv(a.out / f'{a.name}-pages.csv',
                 [{k: round(v, 6) if isinstance(v, float) else v for k, v in r.items()} for r in pages],
-                ['route', 'arm', 'page', 'stratum', 'ok', 'status', 'tokens', 'nes', 'chrf', 'words', 'missed', 'added'])
-    print(json.dumps(rows, indent=1))
+                ['set', 'route', 'arm', 'page', 'stratum', 'ok', 'status', 'tokens', 'wall_s', 'nes', 'chrf', 'words',
+                 'missed', 'added'])
+    print(f'{len(rows)} rows, {len(pages)} page rows -> {a.out}')
 
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest='cmd', required=True)
     c = sub.add_parser('caps'); c.add_argument('--out', type=Path, required=True)
-    c.add_argument('--cluster-manifest', help='public895.jsonl copied from the cluster (image paths there)')
+    c.add_argument('--cluster-manifest', help='public895.jsonl / truth99.jsonl copied from the cluster (its image paths)')
+    c.add_argument('--set', choices=['public895', 'truth96'], default='public895')
     r = sub.add_parser('report'); r.add_argument('--runs', type=Path, required=True)
     r.add_argument('--out', type=Path, required=True); r.add_argument('--name', default='loop-rerun-20261021')
     a = ap.parse_args()
