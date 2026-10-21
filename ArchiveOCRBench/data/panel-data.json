@@ -20243,6 +20243,372 @@
      "nes": 0.9555791013687122
     }
    ]
+  },
+  "truth_bias": {
+   "truth": {
+    "words": 30003,
+    "agreed": 29397,
+    "spans": 324,
+    "adjudicated": 606
+   },
+   "reference": "qwen3.6-27b",
+   "sheet": {
+    "joins": 265,
+    "blocks": 18,
+    "eligible_pages": 50,
+    "answered_pages": 95,
+    "chosen": 20,
+    "items": 59,
+    "minutes": 13.658333333333333,
+    "differences_total": 194,
+    "differences_on_chosen": 62,
+    "differences_median_page": 1,
+    "mixed_items": 2
+   },
+   "routes": [
+    {
+     "route": "drafter claude-opus5.5",
+     "family": "drafter",
+     "pages": 96,
+     "agreed_acc": 1.0,
+     "agreed_acc_joined": 1.0,
+     "adjudicated_acc": 0.5016501650165016,
+     "lead_agreed_joined": 0.013637295782350178
+    },
+    {
+     "route": "drafter gemini3.8-flash",
+     "family": "drafter",
+     "pages": 96,
+     "agreed_acc": 1.0,
+     "agreed_acc_joined": 1.0,
+     "adjudicated_acc": 0.6848184818481848,
+     "lead_agreed_joined": 0.013637295782350178
+    },
+    {
+     "route": "gemini3.8-flash",
+     "family": "drafter family",
+     "pages": 94,
+     "agreed_acc": 0.9981864471802742,
+     "agreed_acc_joined": 0.9984305792906218,
+     "adjudicated_acc": 0.7210144927536232,
+     "lead_agreed_joined": 0.012195976729515667
+    },
+    {
+     "route": "gemini3.1-pro",
+     "family": "drafter family",
+     "pages": 94,
+     "agreed_acc": 0.9967914065497158,
+     "agreed_acc_joined": 0.9970704146758275,
+     "adjudicated_acc": 0.822463768115942,
+     "lead_agreed_joined": 0.010969369874535562
+    },
+    {
+     "route": "claude-sonnet5.5",
+     "family": "drafter family",
+     "pages": 96,
+     "agreed_acc": 0.9937068408340988,
+     "agreed_acc_joined": 0.9959519678878798,
+     "adjudicated_acc": 0.7343234323432343,
+     "lead_agreed_joined": 0.009570032127965034
+    },
+    {
+     "route": "gemini3.5-flash",
+     "family": "drafter family",
+     "pages": 94,
+     "agreed_acc": 0.9876538904195584,
+     "agreed_acc_joined": 0.9967565305339519,
+     "adjudicated_acc": 0.730072463768116,
+     "lead_agreed_joined": 0.010689002593397334
+    },
+    {
+     "route": "gemini3.5-flash-lite",
+     "family": "drafter family",
+     "pages": 94,
+     "agreed_acc": 0.9817598437554493,
+     "agreed_acc_joined": 0.9899208314442158,
+     "adjudicated_acc": 0.7137681159420289,
+     "lead_agreed_joined": 0.0036447746547977333
+    },
+    {
+     "route": "gemini3.1-flash-lite",
+     "family": "drafter family",
+     "pages": 93,
+     "agreed_acc": 0.9798436568864585,
+     "agreed_acc_joined": 0.9890279384442808,
+     "adjudicated_acc": 0.7367458866544789,
+     "lead_agreed_joined": 0.002571509088347246
+    },
+    {
+     "route": "qwen3.5-9b-mlx4",
+     "family": "third family",
+     "pages": 95,
+     "agreed_acc": 0.9780784380887139,
+     "agreed_acc_joined": 0.9861277616030142,
+     "adjudicated_acc": 0.6390728476821192,
+     "lead_agreed_joined": -3.44162995594699e-05
+    },
+    {
+     "route": "qwen3.5-397b",
+     "family": "third family",
+     "pages": 96,
+     "agreed_acc": 0.9759499268632854,
+     "agreed_acc_joined": 0.9841480423172433,
+     "adjudicated_acc": 0.7013201320132013,
+     "lead_agreed_joined": -0.002153257228792116
+    },
+    {
+     "route": "qwen3-vl-8b",
+     "family": "third family",
+     "pages": 95,
+     "agreed_acc": 0.9755779205166077,
+     "agreed_acc_joined": 0.9830316353519046,
+     "adjudicated_acc": 0.6428571428571429,
+     "lead_agreed_joined": -0.0031407468765100033
+    },
+    {
+     "route": "ling3-flash-vl-fp8",
+     "family": "third family",
+     "pages": 96,
+     "agreed_acc": 0.9752695853318366,
+     "agreed_acc_joined": 0.9796237711331088,
+     "adjudicated_acc": 0.6452145214521452,
+     "lead_agreed_joined": -0.0068015585480893925
+    },
+    {
+     "route": "qwen3-vl-8b-mlx4",
+     "family": "third family",
+     "pages": 92,
+     "agreed_acc": 0.9746520874751491,
+     "agreed_acc_joined": 0.9825333712013633,
+     "adjudicated_acc": 0.6712062256809338,
+     "lead_agreed_joined": -0.0032109600770630076
+    },
+    {
+     "route": "qwen3.5-27b",
+     "family": "third family",
+     "pages": 96,
+     "agreed_acc": 0.9733986461203524,
+     "agreed_acc_joined": 0.9879919719699289,
+     "adjudicated_acc": 0.7491749174917491,
+     "lead_agreed_joined": 0.0016063982500512664
+    },
+    {
+     "route": "qwen3-vl-235b",
+     "family": "third family",
+     "pages": 96,
+     "agreed_acc": 0.9730924924312004,
+     "agreed_acc_joined": 0.9844882130829676,
+     "adjudicated_acc": 0.6534653465346535,
+     "lead_agreed_joined": -0.0016063982500512664
+    },
+    {
+     "route": "gpt5.4-mini",
+     "family": "third family",
+     "pages": 95,
+     "agreed_acc": 0.9730741491225058,
+     "agreed_acc_joined": 0.9773328296184359,
+     "adjudicated_acc": 0.6374172185430463,
+     "lead_agreed_joined": -0.008765270204983078
+    },
+    {
+     "route": "qwen3.5-35b-a3b",
+     "family": "third family",
+     "pages": 94,
+     "agreed_acc": 0.9728412978127915,
+     "agreed_acc_joined": 0.9828616841159601,
+     "adjudicated_acc": 0.6672443674176777,
+     "lead_agreed_joined": -0.0032289424345531836
+    },
+    {
+     "route": "qwen3.6-35b-a3b",
+     "family": "third family",
+     "pages": 96,
+     "agreed_acc": 0.9723441167466068,
+     "agreed_acc_joined": 0.9789094125250876,
+     "adjudicated_acc": 0.6551155115511551,
+     "lead_agreed_joined": -0.007382596213001524
+    },
+    {
+     "route": "qwen3.8-flash",
+     "family": "third family",
+     "pages": 93,
+     "agreed_acc": 0.9701809682331692,
+     "agreed_acc_joined": 0.9862945780359104,
+     "adjudicated_acc": 0.7009009009009008,
+     "lead_agreed_joined": 0.0005694355470139412
+    },
+    {
+     "route": "qwen3.6-27b",
+     "family": "third family",
+     "pages": 95,
+     "agreed_acc": 0.9686581447809146,
+     "agreed_acc_joined": 0.9863627042176498,
+     "adjudicated_acc": 0.6528239202657807,
+     "lead_agreed_joined": null
+    },
+    {
+     "route": "qwen3.5-4b",
+     "family": "third family",
+     "pages": 95,
+     "agreed_acc": 0.9659028914348063,
+     "agreed_acc_joined": 0.9721426623022368,
+     "adjudicated_acc": 0.6881188118811881,
+     "lead_agreed_joined": -0.014560279557367606
+    },
+    {
+     "route": "fs-churro",
+     "family": "third family",
+     "pages": 94,
+     "agreed_acc": 0.9649398220826793,
+     "agreed_acc_joined": 0.9657770800627944,
+     "adjudicated_acc": 0.6726618705035972,
+     "lead_agreed_joined": -0.020682885788403604
+    },
+    {
+     "route": "qwen3-vl-30b-a3b",
+     "family": "third family",
+     "pages": 94,
+     "agreed_acc": 0.9605120492462663,
+     "agreed_acc_joined": 0.9748872022664475,
+     "adjudicated_acc": 0.679465776293823,
+     "lead_agreed_joined": -0.011282159426402427
+    },
+    {
+     "route": "mistral-large4",
+     "family": "third family",
+     "pages": 96,
+     "agreed_acc": 0.9602340374868183,
+     "agreed_acc_joined": 0.9806102663537095,
+     "adjudicated_acc": 0.6600660066006601,
+     "lead_agreed_joined": -0.0057078405906076934
+    },
+    {
+     "route": "qwen3.5-9b",
+     "family": "third family",
+     "pages": 92,
+     "agreed_acc": 0.9592290315528674,
+     "agreed_acc_joined": 0.9746046782773446,
+     "adjudicated_acc": 0.7045075125208681,
+     "lead_agreed_joined": -0.010912952722745062
+    },
+    {
+     "route": "gpt5.6-luna",
+     "family": "third family",
+     "pages": 95,
+     "agreed_acc": 0.9566232784970979,
+     "agreed_acc_joined": 0.9675447333173061,
+     "adjudicated_acc": 0.6390728476821192,
+     "lead_agreed_joined": -0.01825522810407887
+    },
+    {
+     "route": "mistral-ocr",
+     "family": "third family",
+     "pages": 96,
+     "agreed_acc": 0.9563560907575603,
+     "agreed_acc_joined": 0.9802020614348403,
+     "adjudicated_acc": 0.6600660066006601,
+     "lead_agreed_joined": -0.006049627452320627
+    },
+    {
+     "route": "gemma4-31b",
+     "family": "third family",
+     "pages": 93,
+     "agreed_acc": 0.9525789177001127,
+     "agreed_acc_joined": 0.955749718151071,
+     "adjudicated_acc": 0.5913978494623656,
+     "lead_agreed_joined": -0.03062488936094887
+    },
+    {
+     "route": "gemma4-26b-a4b",
+     "family": "third family",
+     "pages": 86,
+     "agreed_acc": 0.9507033688733936,
+     "agreed_acc_joined": 0.9533384683990757,
+     "adjudicated_acc": 0.594847775175644,
+     "lead_agreed_joined": -0.03567351598173518
+    },
+    {
+     "route": "lightonocr3-0.8b",
+     "family": "third family",
+     "pages": 96,
+     "agreed_acc": 0.9462530190155458,
+     "agreed_acc_joined": 0.9698268530802463,
+     "adjudicated_acc": 0.594059405940594,
+     "lead_agreed_joined": -0.01394490395789183
+    },
+    {
+     "route": "paddleocr-vl1.5",
+     "family": "third family",
+     "pages": 86,
+     "agreed_acc": 0.9443498222748815,
+     "agreed_acc_joined": 0.9674170616113744,
+     "adjudicated_acc": 0.6472019464720195,
+     "lead_agreed_joined": -0.02136290892850501
+    },
+    {
+     "route": "lightonocr3-4b",
+     "family": "third family",
+     "pages": 96,
+     "agreed_acc": 0.9438037895023301,
+     "agreed_acc_joined": 0.9692145457019423,
+     "adjudicated_acc": 0.5429042904290429,
+     "lead_agreed_joined": -0.014525941622803962
+    },
+    {
+     "route": "lightonocr-3-4b-mlx8",
+     "family": "third family",
+     "pages": 96,
+     "agreed_acc": 0.9432595162771712,
+     "agreed_acc_joined": 0.9689764261659353,
+     "adjudicated_acc": 0.5214521452145214,
+     "lead_agreed_joined": -0.014936085856859571
+    },
+    {
+     "route": "mistral-medium3.5",
+     "family": "third family",
+     "pages": 96,
+     "agreed_acc": 0.9401979793856516,
+     "agreed_acc_joined": 0.9628193353063238,
+     "adjudicated_acc": 0.5247524752475248,
+     "lead_agreed_joined": -0.0232073279103151
+    },
+    {
+     "route": "mistral-small-24b",
+     "family": "third family",
+     "pages": 94,
+     "agreed_acc": 0.9378200941807308,
+     "agreed_acc_joined": 0.9588904547485649,
+     "adjudicated_acc": 0.5695970695970696,
+     "lead_agreed_joined": -0.02787179664295092
+    },
+    {
+     "route": "glm-ocr",
+     "family": "third family",
+     "pages": 95,
+     "agreed_acc": 0.9367417381497557,
+     "agreed_acc_joined": 0.960322613717918,
+     "adjudicated_acc": 0.2772963604852686,
+     "lead_agreed_joined": -0.02544468099718422
+    },
+    {
+     "route": "apple-vision",
+     "family": "third family",
+     "pages": 96,
+     "agreed_acc": 0.8397795693438106,
+     "agreed_acc_joined": 0.8411742694832806,
+     "adjudicated_acc": 0.504950495049505,
+     "lead_agreed_joined": -0.14317451637159062
+    },
+    {
+     "route": "ppocrv6-medium",
+     "family": "third family",
+     "pages": 96,
+     "agreed_acc": 0.7728679797258223,
+     "agreed_acc_joined": 0.7762016532299214,
+     "adjudicated_acc": 0.4867986798679868,
+     "lead_agreed_joined": -0.20944698885774826
+    }
+   ]
   }
  }
 }

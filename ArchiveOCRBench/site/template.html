@@ -210,6 +210,8 @@ footer p { font-size: 13px; }
     <div class="tbl"><table><thead><tr><th>Route</th><th>Answered</th><th>NES</th><th>Added</th><th>Rewritten</th><th>cMER</th><th>Bag-of-words F1</th><th>Gap</th><th>Order (pages)</th></tr></thead><tbody id="sc-pub"></tbody></table></div>
     <p class="note" id="sc-chaos-note"></p>
     <div class="tbl"><table><thead><tr><th>Route</th><th>Pages read</th><th>Copied as printed</th><th>Corrected to the expected word</th><th>Other</th><th>NES</th></tr></thead><tbody id="sc-chaos"></tbody></table></div>
+    <p class="note" id="sc-bias-note"></p>
+    <div class="tbl"><table><thead><tr><th>Route</th><th>Family</th><th>Pages</th><th>Agreed words</th><th>Joins forgiven</th><th>Adjudicated words</th><th>Lead on agreed, joins forgiven</th></tr></thead><tbody id="sc-bias"></tbody></table></div>
   </section>
 
   <header class="part" id="dating">
@@ -531,6 +533,12 @@ if (SC) {
     document.getElementById('sc-chaos-note').textContent = 'The altered-word probe (CHAOS-Bench\'s idea): ' + CH.altered_words + ' words on ' + CH.pages + ' typewritten owner pages had one letter replaced by another of the same page\'s type (' + CH.made + ' made, ' + CH.rejected_by_eye + ' left out after an eye check). A reader that copies is reading the page; one that corrects writes the word it expects.';
     document.getElementById('sc-chaos').innerHTML = CH.routes.slice().sort((a, b) => b.recall - a.recall).map(r => '<tr><td>' + r.route + '</td><td>' + r.pages + '</td><td>' + r.copied + ' (' + p0(r.recall) + ')</td><td>' + r.corrected + '</td><td>' + (r.other + r.unread) + '</td><td>' + p1(r.nes) + '</td></tr>').join('');
   } else document.getElementById('sc-chaos-note').textContent = 'The altered-word probe has not been scored yet.';
+  const TB = SC.truth_bias;
+  if (TB) {
+    document.getElementById('sc-bias-note').textContent = 'Is the 96\'s truth biased toward its drafters? Of its ' + TB.truth.words.toLocaleString() + ' words, ' + TB.truth.agreed.toLocaleString() + ' are where Claude Opus 5.5 and Gemini 3.8 Flash wrote the same and nobody looked; ' + TB.truth.adjudicated + ' come from the ' + TB.truth.spans + ' spans the owner settled. Each route\'s share of each kind of word read in order, on the pages it answered; "joins forgiven" also counts a line-end hyphen kept or joined (the drafters keep it). The lead is over ' + TB.reference + '. A blind owner check of ' + TB.sheet.items + ' places on ' + TB.sheet.chosen + ' pages where ' + TB.reference + ' reads the agreed words differently will say how much of the remaining gap is the truth\'s mistake (W46.fix-ocr-truth-bias-score).';
+    const pp = v => v === null || v === undefined ? '—' : (100 * v).toFixed(2);
+    document.getElementById('sc-bias').innerHTML = TB.routes.map(r => '<tr><td>' + r.route + '</td><td>' + r.family + '</td><td>' + r.pages + '</td><td>' + pp(r.agreed_acc) + '</td><td>' + pp(r.agreed_acc_joined) + '</td><td>' + pp(r.adjudicated_acc) + '</td><td>' + (r.lead_agreed_joined === null ? '—' : (r.lead_agreed_joined >= 0 ? '+' : '−') + Math.abs(100 * r.lead_agreed_joined).toFixed(2)) + '</td></tr>').join('');
+  }
 }
 const curveCanvas = document.querySelector('#dif-curves canvas'), frontCanvas = document.querySelector('#dif-frontier canvas');
 let curveChart, frontChart;

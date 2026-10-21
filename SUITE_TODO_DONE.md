@@ -12436,3 +12436,17 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   - Not computable from cached readings: the mark-region ink check and reseeding instability (need enhanced
     images and mark boxes: W46.enh-ocr-input, W46.enh-ocr-input-marks); both functions are tested.
   <!-- /W46.fix-ocr-scorers -->
+- [x] **W46.fix-ocr-truth-bias — the 96's truth-bias split and the blind re-adjudication sheet [S]** · §Document processing review — W46 (owner, 2026-10-20) · SHIPPED 2026-10-21
+  (lane: segbench) — `scripts/segbench/ocr_truth_bias.py` (+ `test_ocr_truth_bias.py`), saved readings only, $0 ->
+  `segbench-results/ocr-truth-bias.md/.json`; ArchiveOCRBench gains a table under the scorers section.
+  - Truth of the 96: 30,003 scored words, 29,397 (98.0%) agreed by both drafters and unreviewed, 606 from the 324
+    owner-adjudicated spans (the audit's 416 spans were over all 100 drawn pages).
+  - Strict, the drafter-family routes (Gemini, Claude Sonnet 5.5) lead Qwen3.6-27B by +2.15 points on agreed words;
+    with line-end hyphen joins forgiven only +0.83: most of the strict lead is the drafters keeping "uni- versity",
+    which S0 does not join. Qwen3.6-27B misses 1.36% of agreed words joins-forgiven, the most bias could explain.
+    Adjudicated words (606, the hard places) cannot settle it: every route is far lower there, intervals wide.
+  - Blind sheet (private, `ocr-truth/blind/`: index.html, key.json, differences.json): Qwen3.6-27B differs from the
+    agreed text on 50 of its 95 answered pages, 194 places after leaving out 265 join-only and 18 passage-length
+    (>6 words: reading order) places; 20 random pages (seed 46), 59 places, A/B in random order, key not loaded by the
+    sheet; about 14 minutes. Answers: {page: {item: a|b|either|=typed}}. Scored by W46.fix-ocr-truth-bias-score.
+  <!-- /W46.fix-ocr-truth-bias -->

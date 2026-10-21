@@ -1,0 +1,1276 @@
+{
+ "truth": {
+  "words": 30003,
+  "agreed": 29397,
+  "spans": 324,
+  "adjudicated": 606
+ },
+ "reference": "qwen3.6-27b",
+ "split": [
+  {
+   "route": "drafter claude-opus5.5",
+   "family": "drafter",
+   "pages": 96,
+   "agreed_n": 29397,
+   "agreed_read": 29397,
+   "agreed_joined": 29397,
+   "adjudicated_n": 606,
+   "adjudicated_read": 304,
+   "adjudicated_joined": 306,
+   "agreed_acc": 1.0,
+   "adjudicated_acc": 0.5016501650165016,
+   "agreed_acc_joined": 1.0,
+   "adjudicated_acc_joined": 0.504950495049505,
+   "lead": {
+    "pages": 95,
+    "lead_agreed": 0.03134185521908539,
+    "lead_agreed_ci": [
+     0.020263157894736872,
+     0.043659994122065116
+    ],
+    "lead_adjudicated": -0.15116279069767447,
+    "lead_adjudicated_ci": [
+     -0.43377483443708614,
+     0.17664233576642335
+    ],
+    "lead_agreed_joined": 0.013637295782350178,
+    "lead_agreed_joined_ci": [
+     0.007306699625577062,
+     0.021427263292839283
+    ]
+   }
+  },
+  {
+   "route": "drafter gemini3.8-flash",
+   "family": "drafter",
+   "pages": 96,
+   "agreed_n": 29397,
+   "agreed_read": 29397,
+   "agreed_joined": 29397,
+   "adjudicated_n": 606,
+   "adjudicated_read": 415,
+   "adjudicated_joined": 467,
+   "agreed_acc": 1.0,
+   "adjudicated_acc": 0.6848184818481848,
+   "agreed_acc_joined": 1.0,
+   "adjudicated_acc_joined": 0.7706270627062707,
+   "lead": {
+    "pages": 95,
+    "lead_agreed": 0.03134185521908539,
+    "lead_agreed_ci": [
+     0.020184274225033216,
+     0.04409414271835532
+    ],
+    "lead_adjudicated": 0.03322259136212624,
+    "lead_adjudicated_ci": [
+     -0.02564102564102566,
+     0.09225092250922506
+    ],
+    "lead_agreed_joined": 0.013637295782350178,
+    "lead_agreed_joined_ci": [
+     0.007178890182382602,
+     0.021622131998866978
+    ]
+   }
+  },
+  {
+   "route": "gemini3.8-flash",
+   "family": "drafter family",
+   "pages": 94,
+   "agreed_n": 28673,
+   "agreed_read": 28621,
+   "agreed_joined": 28628,
+   "adjudicated_n": 552,
+   "adjudicated_read": 398,
+   "adjudicated_joined": 419,
+   "agreed_acc": 0.9981864471802742,
+   "adjudicated_acc": 0.7210144927536232,
+   "agreed_acc_joined": 0.9984305792906218,
+   "adjudicated_acc_joined": 0.7590579710144928,
+   "lead": {
+    "pages": 93,
+    "lead_agreed": 0.030104436812223967,
+    "lead_agreed_ci": [
+     0.01914335341291251,
+     0.04318793087457884
+    ],
+    "lead_adjudicated": 0.07299270072992703,
+    "lead_adjudicated_ci": [
+     -0.01883239171374762,
+     0.18701700154559497
+    ],
+    "lead_agreed_joined": 0.012195976729515667,
+    "lead_agreed_joined_ci": [
+     0.005520422067712527,
+     0.020073529411764768
+    ]
+   }
+  },
+  {
+   "route": "gemini3.1-pro",
+   "family": "drafter family",
+   "pages": 94,
+   "agreed_n": 28673,
+   "agreed_read": 28581,
+   "agreed_joined": 28589,
+   "adjudicated_n": 552,
+   "adjudicated_read": 454,
+   "adjudicated_joined": 466,
+   "agreed_acc": 0.9967914065497158,
+   "adjudicated_acc": 0.822463768115942,
+   "agreed_acc_joined": 0.9970704146758275,
+   "adjudicated_acc_joined": 0.8442028985507246,
+   "lead": {
+    "pages": 93,
+    "lead_agreed": 0.02884278404710172,
+    "lead_agreed_ci": [
+     0.017364614867137584,
+     0.041695123616992236
+    ],
+    "lead_adjudicated": 0.17518248175182483,
+    "lead_adjudicated_ci": [
+     0.04842105263157892,
+     0.33544303797468356
+    ],
+    "lead_agreed_joined": 0.010969369874535562,
+    "lead_agreed_joined_ci": [
+     0.004897874114214273,
+     0.019042141921467137
+    ]
+   }
+  },
+  {
+   "route": "claude-sonnet5.5",
+   "family": "drafter family",
+   "pages": 96,
+   "agreed_n": 29397,
+   "agreed_read": 29212,
+   "agreed_joined": 29278,
+   "adjudicated_n": 606,
+   "adjudicated_read": 445,
+   "adjudicated_joined": 457,
+   "agreed_acc": 0.9937068408340988,
+   "adjudicated_acc": 0.7343234323432343,
+   "agreed_acc_joined": 0.9959519678878798,
+   "adjudicated_acc_joined": 0.7541254125412541,
+   "lead": {
+    "pages": 95,
+    "lead_agreed": 0.025018798277394283,
+    "lead_agreed_ci": [
+     0.013709260217278807,
+     0.03758770464416972
+    ],
+    "lead_adjudicated": 0.07973421926910296,
+    "lead_adjudicated_ci": [
+     0.006741573033707926,
+     0.1796875
+    ],
+    "lead_agreed_joined": 0.009570032127965034,
+    "lead_agreed_joined_ci": [
+     0.003772161448510003,
+     0.017385705086928605
+    ]
+   }
+  },
+  {
+   "route": "gemini3.5-flash",
+   "family": "drafter family",
+   "pages": 94,
+   "agreed_n": 28673,
+   "agreed_read": 28319,
+   "agreed_joined": 28580,
+   "adjudicated_n": 552,
+   "adjudicated_read": 403,
+   "adjudicated_joined": 449,
+   "agreed_acc": 0.9876538904195584,
+   "adjudicated_acc": 0.730072463768116,
+   "agreed_acc_joined": 0.9967565305339519,
+   "adjudicated_acc_joined": 0.8134057971014492,
+   "lead": {
+    "pages": 93,
+    "lead_agreed": 0.019765893320249472,
+    "lead_agreed_ci": [
+     0.009039145907473345,
+     0.03265164644714036
+    ],
+    "lead_adjudicated": 0.07846715328467158,
+    "lead_adjudicated_ci": [
+     -0.044742729306487705,
+     0.23460410557184752
+    ],
+    "lead_agreed_joined": 0.010689002593397334,
+    "lead_agreed_joined_ci": [
+     0.004329998359849041,
+     0.018654063323434666
+    ]
+   }
+  },
+  {
+   "route": "gemini3.5-flash-lite",
+   "family": "drafter family",
+   "pages": 94,
+   "agreed_n": 28673,
+   "agreed_read": 28150,
+   "agreed_joined": 28384,
+   "adjudicated_n": 552,
+   "adjudicated_read": 394,
+   "adjudicated_joined": 412,
+   "agreed_acc": 0.9817598437554493,
+   "adjudicated_acc": 0.7137681159420289,
+   "agreed_acc_joined": 0.9899208314442158,
+   "adjudicated_acc_joined": 0.7463768115942029,
+   "lead": {
+    "pages": 93,
+    "lead_agreed": 0.013667904955491639,
+    "lead_agreed_ci": [
+     0.0023987526486226596,
+     0.02610966057441244
+    ],
+    "lead_adjudicated": 0.062043795620437936,
+    "lead_adjudicated_ci": [
+     -0.010526315789473717,
+     0.16732283464566933
+    ],
+    "lead_agreed_joined": 0.0036447746547977333,
+    "lead_agreed_joined_ci": [
+     -0.0027412498510189787,
+     0.011703332532518762
+    ]
+   }
+  },
+  {
+   "route": "gemini3.1-flash-lite",
+   "family": "drafter family",
+   "pages": 93,
+   "agreed_n": 28527,
+   "agreed_read": 27952,
+   "agreed_joined": 28214,
+   "adjudicated_n": 547,
+   "adjudicated_read": 403,
+   "adjudicated_joined": 420,
+   "agreed_acc": 0.9798436568864585,
+   "adjudicated_acc": 0.7367458866544789,
+   "agreed_acc_joined": 0.9890279384442808,
+   "adjudicated_acc_joined": 0.7678244972577697,
+   "lead": {
+    "pages": 92,
+    "lead_agreed": 0.011624630125405044,
+    "lead_agreed_ci": [
+     -0.0035045910142286196,
+     0.02615269359122796
+    ],
+    "lead_adjudicated": 0.0847145488029466,
+    "lead_adjudicated_ci": [
+     0.014678899082568808,
+     0.18905472636815923
+    ],
+    "lead_agreed_joined": 0.002571509088347246,
+    "lead_agreed_joined_ci": [
+     -0.009840871021775555,
+     0.013175728920409746
+    ]
+   }
+  },
+  {
+   "route": "qwen3.5-9b-mlx4",
+   "family": "third family",
+   "pages": 95,
+   "agreed_n": 29195,
+   "agreed_read": 28555,
+   "agreed_joined": 28790,
+   "adjudicated_n": 604,
+   "adjudicated_read": 386,
+   "adjudicated_joined": 421,
+   "agreed_acc": 0.9780784380887139,
+   "adjudicated_acc": 0.6390728476821192,
+   "agreed_acc_joined": 0.9861277616030142,
+   "adjudicated_acc_joined": 0.6970198675496688,
+   "lead": {
+    "pages": 94,
+    "lead_agreed": 0.009774229074889895,
+    "lead_agreed_ci": [
+     0.0005452748526053597,
+     0.019940109212612356
+    ],
+    "lead_adjudicated": -0.014999999999999902,
+    "lead_adjudicated_ci": [
+     -0.07377049180327866,
+     0.029484029484029506
+    ],
+    "lead_agreed_joined": -3.44162995594699e-05,
+    "lead_agreed_joined_ci": [
+     -0.0044224933824004165,
+     0.0051120723554857195
+    ]
+   }
+  },
+  {
+   "route": "qwen3.5-397b",
+   "family": "third family",
+   "pages": 96,
+   "agreed_n": 29397,
+   "agreed_read": 28690,
+   "agreed_joined": 28931,
+   "adjudicated_n": 606,
+   "adjudicated_read": 425,
+   "adjudicated_joined": 445,
+   "agreed_acc": 0.9759499268632854,
+   "adjudicated_acc": 0.7013201320132013,
+   "agreed_acc_joined": 0.9841480423172433,
+   "adjudicated_acc_joined": 0.7343234323432343,
+   "lead": {
+    "pages": 95,
+    "lead_agreed": 0.007382596213001635,
+    "lead_agreed_ci": [
+     -0.0012891819219861267,
+     0.016192125176349825
+    ],
+    "lead_adjudicated": 0.046511627906976716,
+    "lead_adjudicated_ci": [
+     -0.008264462809917328,
+     0.12587412587412583
+    ],
+    "lead_agreed_joined": -0.002153257228792116,
+    "lead_agreed_joined_ci": [
+     -0.006246317030053072,
+     0.0021803257663203235
+    ]
+   }
+  },
+  {
+   "route": "qwen3-vl-8b",
+   "family": "third family",
+   "pages": 95,
+   "agreed_n": 29113,
+   "agreed_read": 28402,
+   "agreed_joined": 28619,
+   "adjudicated_n": 560,
+   "adjudicated_read": 360,
+   "adjudicated_joined": 398,
+   "agreed_acc": 0.9755779205166077,
+   "adjudicated_acc": 0.6428571428571429,
+   "agreed_acc_joined": 0.9830316353519046,
+   "adjudicated_acc_joined": 0.7107142857142857,
+   "lead": {
+    "pages": 94,
+    "lead_agreed": 0.0073169048112100565,
+    "lead_agreed_ci": [
+     -0.002440002673975483,
+     0.018758716875871717
+    ],
+    "lead_adjudicated": -0.008992805755395739,
+    "lead_adjudicated_ci": [
+     -0.03508771929824561,
+     0.018567639257294433
+    ],
+    "lead_agreed_joined": -0.0031407468765100033,
+    "lead_agreed_joined_ci": [
+     -0.00719642196590109,
+     0.001624152097067011
+    ]
+   }
+  },
+  {
+   "route": "ling3-flash-vl-fp8",
+   "family": "third family",
+   "pages": 96,
+   "agreed_n": 29397,
+   "agreed_read": 28670,
+   "agreed_joined": 28798,
+   "adjudicated_n": 606,
+   "adjudicated_read": 391,
+   "adjudicated_joined": 425,
+   "agreed_acc": 0.9752695853318366,
+   "adjudicated_acc": 0.6452145214521452,
+   "agreed_acc_joined": 0.9796237711331088,
+   "adjudicated_acc_joined": 0.7013201320132013,
+   "lead": {
+    "pages": 95,
+    "lead_agreed": 0.006596486431061588,
+    "lead_agreed_ci": [
+     -0.005517289850998086,
+     0.018164333796345744
+    ],
+    "lead_adjudicated": -0.00830564784053156,
+    "lead_adjudicated_ci": [
+     -0.05427408412483037,
+     0.03435114503816794
+    ],
+    "lead_agreed_joined": -0.0068015585480893925,
+    "lead_agreed_joined_ci": [
+     -0.016354920575242016,
+     0.0012287395718812988
+    ]
+   }
+  },
+  {
+   "route": "qwen3-vl-8b-mlx4",
+   "family": "third family",
+   "pages": 92,
+   "agreed_n": 28168,
+   "agreed_read": 27454,
+   "agreed_joined": 27676,
+   "adjudicated_n": 514,
+   "adjudicated_read": 345,
+   "adjudicated_joined": 385,
+   "agreed_acc": 0.9746520874751491,
+   "adjudicated_acc": 0.6712062256809338,
+   "agreed_acc_joined": 0.9825333712013633,
+   "adjudicated_acc_joined": 0.7490272373540856,
+   "lead": {
+    "pages": 91,
+    "lead_agreed": 0.007349530843055452,
+    "lead_agreed_ci": [
+     -0.0027151211361737815,
+     0.018037569375266793
+    ],
+    "lead_adjudicated": -0.02941176470588236,
+    "lead_adjudicated_ci": [
+     -0.09953703703703709,
+     0.024311183144246296
+    ],
+    "lead_agreed_joined": -0.0032109600770630076,
+    "lead_agreed_joined_ci": [
+     -0.007065544197233931,
+     0.0013738683200056334
+    ]
+   }
+  },
+  {
+   "route": "qwen3.5-27b",
+   "family": "third family",
+   "pages": 96,
+   "agreed_n": 29397,
+   "agreed_read": 28615,
+   "agreed_joined": 29044,
+   "adjudicated_n": 606,
+   "adjudicated_read": 454,
+   "adjudicated_joined": 479,
+   "agreed_acc": 0.9733986461203524,
+   "adjudicated_acc": 0.7491749174917491,
+   "agreed_acc_joined": 0.9879919719699289,
+   "adjudicated_acc_joined": 0.7904290429042904,
+   "lead": {
+    "pages": 95,
+    "lead_agreed": 0.004716658691639952,
+    "lead_agreed_ci": [
+     -0.000922345595799734,
+     0.01212628057704368
+    ],
+    "lead_adjudicated": 0.09468438538205981,
+    "lead_adjudicated_ci": [
+     -0.013782542113323193,
+     0.23906249999999996
+    ],
+    "lead_agreed_joined": 0.0016063982500512664,
+    "lead_agreed_joined_ci": [
+     -0.001456108722784566,
+     0.005842479934201172
+    ]
+   }
+  },
+  {
+   "route": "qwen3-vl-235b",
+   "family": "third family",
+   "pages": 96,
+   "agreed_n": 29397,
+   "agreed_read": 28606,
+   "agreed_joined": 28941,
+   "adjudicated_n": 606,
+   "adjudicated_read": 396,
+   "adjudicated_joined": 430,
+   "agreed_acc": 0.9730924924312004,
+   "adjudicated_acc": 0.6534653465346535,
+   "agreed_acc_joined": 0.9844882130829676,
+   "adjudicated_acc_joined": 0.7095709570957096,
+   "lead": {
+    "pages": 95,
+    "lead_agreed": 0.004716658691639952,
+    "lead_agreed_ci": [
+     -0.002479152580572408,
+     0.012503161926787909
+    ],
+    "lead_adjudicated": 0.0016611295681062677,
+    "lead_adjudicated_ci": [
+     -0.03653585926928282,
+     0.04398148148148151
+    ],
+    "lead_agreed_joined": -0.0016063982500512664,
+    "lead_agreed_joined_ci": [
+     -0.006737767529004901,
+     0.0033786044022211525
+    ]
+   }
+  },
+  {
+   "route": "gpt5.4-mini",
+   "family": "third family",
+   "pages": 95,
+   "agreed_n": 29117,
+   "agreed_read": 28333,
+   "agreed_joined": 28457,
+   "adjudicated_n": 604,
+   "adjudicated_read": 385,
+   "adjudicated_joined": 405,
+   "agreed_acc": 0.9730741491225058,
+   "adjudicated_acc": 0.6374172185430463,
+   "agreed_acc_joined": 0.9773328296184359,
+   "adjudicated_acc_joined": 0.6705298013245033,
+   "lead": {
+    "pages": 94,
+    "lead_agreed": 0.004900269169714977,
+    "lead_agreed_ci": [
+     -0.0122042808862185,
+     0.01962224554039871
+    ],
+    "lead_adjudicated": -0.014999999999999902,
+    "lead_adjudicated_ci": [
+     -0.09807073954983919,
+     0.08530805687203791
+    ],
+    "lead_agreed_joined": -0.008765270204983078,
+    "lead_agreed_joined_ci": [
+     -0.022364682742041175,
+     0.00028550582114650336
+    ]
+   }
+  },
+  {
+   "route": "qwen3.5-35b-a3b",
+   "family": "third family",
+   "pages": 94,
+   "agreed_n": 28941,
+   "agreed_read": 28155,
+   "agreed_joined": 28445,
+   "adjudicated_n": 577,
+   "adjudicated_read": 385,
+   "adjudicated_joined": 397,
+   "agreed_acc": 0.9728412978127915,
+   "adjudicated_acc": 0.6672443674176777,
+   "agreed_acc_joined": 0.9828616841159601,
+   "adjudicated_acc_joined": 0.6880415944540728,
+   "lead": {
+    "pages": 93,
+    "lead_agreed": 0.004687174501770697,
+    "lead_agreed_ci": [
+     -0.00401870242281388,
+     0.01316283034953103
+    ],
+    "lead_adjudicated": -0.010471204188481686,
+    "lead_adjudicated_ci": [
+     -0.07594936708860756,
+     0.04276985743380857
+    ],
+    "lead_agreed_joined": -0.0032289424345531836,
+    "lead_agreed_joined_ci": [
+     -0.008503401360544172,
+     0.0018879798615482057
+    ]
+   }
+  },
+  {
+   "route": "qwen3.6-35b-a3b",
+   "family": "third family",
+   "pages": 96,
+   "agreed_n": 29397,
+   "agreed_read": 28584,
+   "agreed_joined": 28777,
+   "adjudicated_n": 606,
+   "adjudicated_read": 397,
+   "adjudicated_joined": 437,
+   "agreed_acc": 0.9723441167466068,
+   "adjudicated_acc": 0.6551155115511551,
+   "agreed_acc_joined": 0.9789094125250876,
+   "adjudicated_acc_joined": 0.7211221122112211,
+   "lead": {
+    "pages": 95,
+    "lead_agreed": 0.0037938341650146645,
+    "lead_agreed_ci": [
+     -0.008508914100486265,
+     0.013954671159286725
+    ],
+    "lead_adjudicated": 0.0016611295681062677,
+    "lead_adjudicated_ci": [
+     -0.027027027027027084,
+     0.032745591939546626
+    ],
+    "lead_agreed_joined": -0.007382596213001524,
+    "lead_agreed_joined_ci": [
+     -0.018697019414820826,
+     0.00048305845007245996
+    ]
+   }
+  },
+  {
+   "route": "qwen3.8-flash",
+   "family": "third family",
+   "pages": 93,
+   "agreed_n": 28237,
+   "agreed_read": 27395,
+   "agreed_joined": 27850,
+   "adjudicated_n": 555,
+   "adjudicated_read": 389,
+   "adjudicated_joined": 429,
+   "agreed_acc": 0.9701809682331692,
+   "adjudicated_acc": 0.7009009009009008,
+   "agreed_acc_joined": 0.9862945780359104,
+   "adjudicated_acc_joined": 0.772972972972973,
+   "lead": {
+    "pages": 92,
+    "lead_agreed": 0.002704818848316637,
+    "lead_agreed_ci": [
+     -0.0036222788078758006,
+     0.009256719692814053
+    ],
+    "lead_adjudicated": 0.07803992740471866,
+    "lead_adjudicated_ci": [
+     -0.015086206896551713,
+     0.22007722007722008
+    ],
+    "lead_agreed_joined": 0.0005694355470139412,
+    "lead_agreed_joined_ci": [
+     -0.0026329233308445277,
+     0.004833895665715016
+    ]
+   }
+  },
+  {
+   "route": "qwen3.6-27b",
+   "family": "third family",
+   "pages": 95,
+   "agreed_n": 29258,
+   "agreed_read": 28341,
+   "agreed_joined": 28859,
+   "adjudicated_n": 602,
+   "adjudicated_read": 393,
+   "adjudicated_joined": 439,
+   "agreed_acc": 0.9686581447809146,
+   "adjudicated_acc": 0.6528239202657807,
+   "agreed_acc_joined": 0.9863627042176498,
+   "adjudicated_acc_joined": 0.729235880398671
+  },
+  {
+   "route": "qwen3.5-4b",
+   "family": "third family",
+   "pages": 95,
+   "agreed_n": 29328,
+   "agreed_read": 28328,
+   "agreed_joined": 28511,
+   "adjudicated_n": 606,
+   "adjudicated_read": 417,
+   "adjudicated_joined": 431,
+   "agreed_acc": 0.9659028914348063,
+   "adjudicated_acc": 0.6881188118811881,
+   "agreed_acc_joined": 0.9721426623022368,
+   "adjudicated_acc_joined": 0.7112211221122112,
+   "lead": {
+    "pages": 94,
+    "lead_agreed": -0.003014834355407947,
+    "lead_agreed_ci": [
+     -0.01798370887548928,
+     0.00952858575727178
+    ],
+    "lead_adjudicated": 0.03488372093023251,
+    "lead_adjudicated_ci": [
+     -0.018421052631578894,
+     0.11486486486486491
+    ],
+    "lead_agreed_joined": -0.014560279557367606,
+    "lead_agreed_joined_ci": [
+     -0.027445598902176016,
+     -0.005691155882890042
+    ]
+   }
+  },
+  {
+   "route": "fs-churro",
+   "family": "third family",
+   "pages": 94,
+   "agreed_n": 28665,
+   "agreed_read": 27660,
+   "agreed_joined": 27684,
+   "adjudicated_n": 556,
+   "adjudicated_read": 374,
+   "adjudicated_joined": 386,
+   "agreed_acc": 0.9649398220826793,
+   "adjudicated_acc": 0.6726618705035972,
+   "agreed_acc_joined": 0.9657770800627944,
+   "adjudicated_acc_joined": 0.6942446043165468,
+   "lead": {
+    "pages": 93,
+    "lead_agreed": -0.0035055738624412136,
+    "lead_agreed_ci": [
+     -0.025864553314120964,
+     0.015710233471525115
+    ],
+    "lead_adjudicated": 0.019927536231884035,
+    "lead_adjudicated_ci": [
+     -0.057086614173228356,
+     0.13812154696132595
+    ],
+    "lead_agreed_joined": -0.020682885788403604,
+    "lead_agreed_joined_ci": [
+     -0.03929078014184395,
+     -0.005504880780924926
+    ]
+   }
+  },
+  {
+   "route": "qwen3-vl-30b-a3b",
+   "family": "third family",
+   "pages": 94,
+   "agreed_n": 28591,
+   "agreed_read": 27462,
+   "agreed_joined": 27873,
+   "adjudicated_n": 599,
+   "adjudicated_read": 407,
+   "adjudicated_joined": 425,
+   "agreed_acc": 0.9605120492462663,
+   "adjudicated_acc": 0.679465776293823,
+   "agreed_acc_joined": 0.9748872022664475,
+   "adjudicated_acc_joined": 0.7095158597662772,
+   "lead": {
+    "pages": 93,
+    "lead_agreed": -0.00903275692394212,
+    "lead_agreed_ci": [
+     -0.01884537912669415,
+     -3.60828462149243e-05
+    ],
+    "lead_adjudicated": 0.025210084033613467,
+    "lead_adjudicated_ci": [
+     -0.020725388601036232,
+     0.10238095238095246
+    ],
+    "lead_agreed_joined": -0.011282159426402427,
+    "lead_agreed_joined_ci": [
+     -0.01905328966954445,
+     -0.004006437694757392
+    ]
+   }
+  },
+  {
+   "route": "mistral-large4",
+   "family": "third family",
+   "pages": 96,
+   "agreed_n": 29397,
+   "agreed_read": 28228,
+   "agreed_joined": 28827,
+   "adjudicated_n": 606,
+   "adjudicated_read": 400,
+   "adjudicated_joined": 435,
+   "agreed_acc": 0.9602340374868183,
+   "adjudicated_acc": 0.6600660066006601,
+   "agreed_acc_joined": 0.9806102663537095,
+   "adjudicated_acc_joined": 0.7178217821782178,
+   "lead": {
+    "pages": 95,
+    "lead_agreed": -0.008407956798140659,
+    "lead_agreed_ci": [
+     -0.023208531532913912,
+     0.001322751322751281
+    ],
+    "lead_adjudicated": 0.00830564784053156,
+    "lead_adjudicated_ci": [
+     -0.015360983102918668,
+     0.04130434782608694
+    ],
+    "lead_agreed_joined": -0.0057078405906076934,
+    "lead_agreed_joined_ci": [
+     -0.021556195965417912,
+     0.004691910120596776
+    ]
+   }
+  },
+  {
+   "route": "qwen3.5-9b",
+   "family": "third family",
+   "pages": 92,
+   "agreed_n": 27446,
+   "agreed_read": 26327,
+   "agreed_joined": 26749,
+   "adjudicated_n": 599,
+   "adjudicated_read": 422,
+   "adjudicated_joined": 446,
+   "agreed_acc": 0.9592290315528674,
+   "adjudicated_acc": 0.7045075125208681,
+   "agreed_acc_joined": 0.9746046782773446,
+   "adjudicated_acc_joined": 0.7445742904841403,
+   "lead": {
+    "pages": 91,
+    "lead_agreed": -0.011205917896510043,
+    "lead_agreed_ci": [
+     -0.027341929470250048,
+     -0.0013792075148172378
+    ],
+    "lead_adjudicated": 0.04705882352941182,
+    "lead_adjudicated_ci": [
+     -0.009276437847866359,
+     0.13214285714285712
+    ],
+    "lead_agreed_joined": -0.010912952722745062,
+    "lead_agreed_joined_ci": [
+     -0.027471361900721303,
+     -0.0013214515637176572
+    ]
+   }
+  },
+  {
+   "route": "gpt5.6-luna",
+   "family": "third family",
+   "pages": 95,
+   "agreed_n": 29117,
+   "agreed_read": 27854,
+   "agreed_joined": 28172,
+   "adjudicated_n": 604,
+   "adjudicated_read": 386,
+   "adjudicated_joined": 398,
+   "agreed_acc": 0.9566232784970979,
+   "adjudicated_acc": 0.6390728476821192,
+   "agreed_acc_joined": 0.9675447333173061,
+   "adjudicated_acc_joined": 0.6589403973509934,
+   "lead": {
+    "pages": 94,
+    "lead_agreed": -0.011284422665470362,
+    "lead_agreed_ci": [
+     -0.032558928268611176,
+     0.0038033937975424648
+    ],
+    "lead_adjudicated": -0.009999999999999898,
+    "lead_adjudicated_ci": [
+     -0.079059829059829,
+     0.0853242320819112
+    ],
+    "lead_agreed_joined": -0.01825522810407887,
+    "lead_agreed_joined_ci": [
+     -0.0377403356206264,
+     -0.005647664971266231
+    ]
+   }
+  },
+  {
+   "route": "mistral-ocr",
+   "family": "third family",
+   "pages": 96,
+   "agreed_n": 29397,
+   "agreed_read": 28114,
+   "agreed_joined": 28815,
+   "adjudicated_n": 606,
+   "adjudicated_read": 400,
+   "adjudicated_joined": 437,
+   "agreed_acc": 0.9563560907575603,
+   "adjudicated_acc": 0.6600660066006601,
+   "agreed_acc_joined": 0.9802020614348403,
+   "adjudicated_acc_joined": 0.7211221122112211,
+   "lead": {
+    "pages": 95,
+    "lead_agreed": -0.012235969649326717,
+    "lead_agreed_ci": [
+     -0.029343048350691014,
+     0.0010479983232026813
+    ],
+    "lead_adjudicated": 0.004983388704318914,
+    "lead_adjudicated_ci": [
+     -0.033033033033033066,
+     0.05052631578947375
+    ],
+    "lead_agreed_joined": -0.006049627452320627,
+    "lead_agreed_joined_ci": [
+     -0.023196979722103328,
+     0.006789409706780547
+    ]
+   }
+  },
+  {
+   "route": "gemma4-31b",
+   "family": "third family",
+   "pages": 93,
+   "agreed_n": 28384,
+   "agreed_read": 27038,
+   "agreed_joined": 27128,
+   "adjudicated_n": 558,
+   "adjudicated_read": 330,
+   "adjudicated_joined": 358,
+   "agreed_acc": 0.9525789177001127,
+   "adjudicated_acc": 0.5913978494623656,
+   "agreed_acc_joined": 0.955749718151071,
+   "adjudicated_acc_joined": 0.6415770609318996,
+   "lead": {
+    "pages": 92,
+    "lead_agreed": -0.01695875376172773,
+    "lead_agreed_ci": [
+     -0.03414144791840834,
+     -0.0008209899770806883
+    ],
+    "lead_adjudicated": -0.06137184115523464,
+    "lead_adjudicated_ci": [
+     -0.14311926605504582,
+     0.015590200445434299
+    ],
+    "lead_agreed_joined": -0.03062488936094887,
+    "lead_agreed_joined_ci": [
+     -0.05181806248359144,
+     -0.013688553426935757
+    ]
+   }
+  },
+  {
+   "route": "gemma4-26b-a4b",
+   "family": "third family",
+   "pages": 86,
+   "agreed_n": 24667,
+   "agreed_read": 23451,
+   "agreed_joined": 23516,
+   "adjudicated_n": 427,
+   "adjudicated_read": 254,
+   "adjudicated_joined": 285,
+   "agreed_acc": 0.9507033688733936,
+   "adjudicated_acc": 0.594847775175644,
+   "agreed_acc_joined": 0.9533384683990757,
+   "adjudicated_acc_joined": 0.667447306791569,
+   "lead": {
+    "pages": 85,
+    "lead_agreed": -0.024991846053489808,
+    "lead_agreed_ci": [
+     -0.042679270572466566,
+     -0.010301263362487822
+    ],
+    "lead_adjudicated": -0.009456264775413725,
+    "lead_adjudicated_ci": [
+     -0.047281323877068515,
+     0.029325513196480912
+    ],
+    "lead_agreed_joined": -0.03567351598173518,
+    "lead_agreed_joined_ci": [
+     -0.05388652266504412,
+     -0.019636153624025376
+    ]
+   }
+  },
+  {
+   "route": "lightonocr3-0.8b",
+   "family": "third family",
+   "pages": 96,
+   "agreed_n": 29397,
+   "agreed_read": 27817,
+   "agreed_joined": 28510,
+   "adjudicated_n": 606,
+   "adjudicated_read": 360,
+   "adjudicated_joined": 399,
+   "agreed_acc": 0.9462530190155458,
+   "adjudicated_acc": 0.594059405940594,
+   "agreed_acc_joined": 0.9698268530802463,
+   "adjudicated_acc_joined": 0.6584158415841584,
+   "lead": {
+    "pages": 95,
+    "lead_agreed": -0.019857816665527328,
+    "lead_agreed_ci": [
+     -0.030831332428576386,
+     -0.010787757150025001
+    ],
+    "lead_adjudicated": -0.05813953488372092,
+    "lead_adjudicated_ci": [
+     -0.12808988764044948,
+     0.002136752136752129
+    ],
+    "lead_agreed_joined": -0.01394490395789183,
+    "lead_agreed_joined_ci": [
+     -0.024408817635270585,
+     -0.005206501090550875
+    ]
+   }
+  },
+  {
+   "route": "paddleocr-vl1.5",
+   "family": "third family",
+   "pages": 86,
+   "agreed_n": 27008,
+   "agreed_read": 25505,
+   "agreed_joined": 26128,
+   "adjudicated_n": 411,
+   "adjudicated_read": 266,
+   "adjudicated_joined": 303,
+   "agreed_acc": 0.9443498222748815,
+   "adjudicated_acc": 0.6472019464720195,
+   "agreed_acc_joined": 0.9674170616113744,
+   "adjudicated_acc_joined": 0.7372262773722628,
+   "lead": {
+    "pages": 85,
+    "lead_agreed": -0.025531281402359607,
+    "lead_agreed_ci": [
+     -0.04463805941506105,
+     -0.013120326308633579
+    ],
+    "lead_adjudicated": -0.06388206388206386,
+    "lead_adjudicated_ci": [
+     -0.12693498452012386,
+     -0.01521739130434785
+    ],
+    "lead_agreed_joined": -0.02136290892850501,
+    "lead_agreed_joined_ci": [
+     -0.04148401582379979,
+     -0.008388799180812034
+    ]
+   }
+  },
+  {
+   "route": "lightonocr3-4b",
+   "family": "third family",
+   "pages": 96,
+   "agreed_n": 29397,
+   "agreed_read": 27745,
+   "agreed_joined": 28492,
+   "adjudicated_n": 606,
+   "adjudicated_read": 329,
+   "adjudicated_joined": 365,
+   "agreed_acc": 0.9438037895023301,
+   "adjudicated_acc": 0.5429042904290429,
+   "agreed_acc_joined": 0.9692145457019423,
+   "adjudicated_acc_joined": 0.6023102310231023,
+   "lead": {
+    "pages": 95,
+    "lead_agreed": -0.022284503383689924,
+    "lead_agreed_ci": [
+     -0.034293497856656474,
+     -0.01339554963019396
+    ],
+    "lead_adjudicated": -0.10797342192691028,
+    "lead_adjudicated_ci": [
+     -0.21219822109275732,
+     -0.01388888888888884
+    ],
+    "lead_agreed_joined": -0.014525941622803962,
+    "lead_agreed_joined_ci": [
+     -0.025546622586219758,
+     -0.0060094617056641875
+    ]
+   }
+  },
+  {
+   "route": "lightonocr-3-4b-mlx8",
+   "family": "third family",
+   "pages": 96,
+   "agreed_n": 29397,
+   "agreed_read": 27729,
+   "agreed_joined": 28485,
+   "adjudicated_n": 606,
+   "adjudicated_read": 316,
+   "adjudicated_joined": 355,
+   "agreed_acc": 0.9432595162771712,
+   "adjudicated_acc": 0.5214521452145214,
+   "agreed_acc_joined": 0.9689764261659353,
+   "adjudicated_acc_joined": 0.5858085808580858,
+   "lead": {
+    "pages": 95,
+    "lead_agreed": -0.023002255793287296,
+    "lead_agreed_ci": [
+     -0.03448027382453611,
+     -0.013180478642443094
+    ],
+    "lead_adjudicated": -0.1312292358803987,
+    "lead_adjudicated_ci": [
+     -0.2563482466747279,
+     -0.025522041763341052
+    ],
+    "lead_agreed_joined": -0.014936085856859571,
+    "lead_agreed_joined_ci": [
+     -0.025819296526877977,
+     -0.005823868206827787
+    ]
+   }
+  },
+  {
+   "route": "mistral-medium3.5",
+   "family": "third family",
+   "pages": 96,
+   "agreed_n": 29397,
+   "agreed_read": 27639,
+   "agreed_joined": 28304,
+   "adjudicated_n": 606,
+   "adjudicated_read": 318,
+   "adjudicated_joined": 355,
+   "agreed_acc": 0.9401979793856516,
+   "adjudicated_acc": 0.5247524752475248,
+   "agreed_acc_joined": 0.9628193353063238,
+   "adjudicated_acc_joined": 0.5858085808580858,
+   "lead": {
+    "pages": 95,
+    "lead_agreed": -0.02816323740515414,
+    "lead_agreed_ci": [
+     -0.04766031195840548,
+     -0.013786792740582587
+    ],
+    "lead_adjudicated": -0.12790697674418605,
+    "lead_adjudicated_ci": [
+     -0.2468085106382979,
+     -0.03393665158371051
+    ],
+    "lead_agreed_joined": -0.0232073279103151,
+    "lead_agreed_joined_ci": [
+     -0.04285352576275481,
+     -0.008734631991825781
+    ]
+   }
+  },
+  {
+   "route": "mistral-small-24b",
+   "family": "third family",
+   "pages": 94,
+   "agreed_n": 29093,
+   "agreed_read": 27284,
+   "agreed_joined": 27897,
+   "adjudicated_n": 546,
+   "adjudicated_read": 311,
+   "adjudicated_joined": 323,
+   "agreed_acc": 0.9378200941807308,
+   "adjudicated_acc": 0.5695970695970696,
+   "agreed_acc_joined": 0.9588904547485649,
+   "adjudicated_acc_joined": 0.5915750915750916,
+   "lead": {
+    "pages": 93,
+    "lead_agreed": -0.031152863162257405,
+    "lead_agreed_ci": [
+     -0.051625562434453154,
+     -0.01531244764617179
+    ],
+    "lead_adjudicated": -0.12915129151291505,
+    "lead_adjudicated_ci": [
+     -0.2451923076923077,
+     -0.04092071611253201
+    ],
+    "lead_agreed_joined": -0.02787179664295092,
+    "lead_agreed_joined_ci": [
+     -0.04887697387779122,
+     -0.011646859083191852
+    ]
+   }
+  },
+  {
+   "route": "glm-ocr",
+   "family": "third family",
+   "pages": 95,
+   "agreed_n": 29261,
+   "agreed_read": 27410,
+   "agreed_joined": 28100,
+   "adjudicated_n": 577,
+   "adjudicated_read": 160,
+   "adjudicated_joined": 172,
+   "agreed_acc": 0.9367417381497557,
+   "adjudicated_acc": 0.2772963604852686,
+   "agreed_acc_joined": 0.960322613717918,
+   "adjudicated_acc_joined": 0.29809358752166376,
+   "lead": {
+    "pages": 94,
+    "lead_agreed": -0.03135086875901383,
+    "lead_agreed_ci": [
+     -0.04386408134908104,
+     -0.01983672846570539
+    ],
+    "lead_adjudicated": -0.4013961605584642,
+    "lead_adjudicated_ci": [
+     -0.5629139072847682,
+     -0.1869158878504673
+    ],
+    "lead_agreed_joined": -0.02544468099718422,
+    "lead_agreed_joined_ci": [
+     -0.03847050594544177,
+     -0.014044106690508151
+    ]
+   }
+  },
+  {
+   "route": "apple-vision",
+   "family": "third family",
+   "pages": 96,
+   "agreed_n": 29397,
+   "agreed_read": 24687,
+   "agreed_joined": 24728,
+   "adjudicated_n": 606,
+   "adjudicated_read": 306,
+   "adjudicated_joined": 311,
+   "agreed_acc": 0.8397795693438106,
+   "adjudicated_acc": 0.504950495049505,
+   "agreed_acc_joined": 0.8411742694832806,
+   "adjudicated_acc_joined": 0.5132013201320133,
+   "lead": {
+    "pages": 95,
+    "lead_agreed": -0.12687128306787887,
+    "lead_agreed_ci": [
+     -0.178943538517514,
+     -0.0795173800632002
+    ],
+    "lead_adjudicated": -0.14451827242524917,
+    "lead_adjudicated_ci": [
+     -0.2142857142857143,
+     -0.0839813374805598
+    ],
+    "lead_agreed_joined": -0.14317451637159062,
+    "lead_agreed_joined_ci": [
+     -0.19523246650906223,
+     -0.09632522634475416
+    ]
+   }
+  },
+  {
+   "route": "ppocrv6-medium",
+   "family": "third family",
+   "pages": 96,
+   "agreed_n": 29397,
+   "agreed_read": 22720,
+   "agreed_joined": 22818,
+   "adjudicated_n": 606,
+   "adjudicated_read": 295,
+   "adjudicated_joined": 325,
+   "agreed_acc": 0.7728679797258223,
+   "adjudicated_acc": 0.4867986798679868,
+   "agreed_acc_joined": 0.7762016532299214,
+   "adjudicated_acc_joined": 0.5363036303630363,
+   "lead": {
+    "pages": 95,
+    "lead_agreed": -0.19509194066580082,
+    "lead_agreed_ci": [
+     -0.2523315095747327,
+     -0.14026296952115436
+    ],
+    "lead_adjudicated": -0.16279069767441862,
+    "lead_adjudicated_ci": [
+     -0.24105461393596989,
+     -0.10090556274256146
+    ],
+    "lead_agreed_joined": -0.20944698885774826,
+    "lead_agreed_joined_ci": [
+     -0.2740801984291029,
+     -0.14755591170685511
+    ]
+   }
+  }
+ ],
+ "by_family": {
+  "drafter family": {
+   "routes": 6,
+   "agreed_acc": 0.9896570142709259,
+   "agreed_acc_joined": 0.9945263770461296,
+   "adjudicated_acc": 0.7430646932629039,
+   "lead_agreed_joined": 0.008273444178093095
+  },
+  "third family": {
+   "routes": 28,
+   "agreed_acc": 0.95072205635222,
+   "agreed_acc_joined": 0.963523233170445,
+   "adjudicated_acc": 0.6190350234202607,
+   "lead_agreed_joined": -0.022313443484134183
+  }
+ },
+ "sheet": {
+  "joins": 265,
+  "blocks": 18,
+  "eligible_pages": 50,
+  "answered_pages": 95,
+  "chosen": 20,
+  "items": 59,
+  "minutes": 13.658333333333333,
+  "differences_total": 194,
+  "differences_on_chosen": 62,
+  "differences_median_page": 1,
+  "mixed_items": 2
+ }
+}
