@@ -170,6 +170,6 @@ separately so a default-fixture skip is not counted as a pass. No new compiler w
 All 35 Reader and 57 Notes distinct UI tests passed across their required fixtures. Notes' explicit
 G19→G3 and G3→G19 pairs pass; disabling fixture restoration fails the next seeded-row assertion
 ([order proof](evidence/notes/W40.a3-order-regression.md)). A real golden mismatch makes the mandatory
-gate step red. Existing strict layout findings remain tracked (`W40.fix-reader-narrow-window`,
-`W40.fix-reader-preview-sheet-oversize`, `W40.fix-notes-row-clip`, `W40.fix-notes-narrow-window`);
+gate step red. Existing strict layout findings remain tracked (`W40.fix-reader-preview-sheet-oversize`,
+`W40.fix-notes-row-clip`, `W40.fix-notes-narrow-window`);
 green suites do not close those issues or promote any feature ledger's status.

@@ -40,12 +40,15 @@ struct SidebarView: View {
                 .onMove { from, to in model.savedSearches.move(fromOffsets: from, toOffset: to) }
             } header: {
                 HStack {
-                    Text("Smart Folders").lineLimit(1)
-                    Spacer(minLength: 0)   // the header ran 3 pt past its 190-pt cell (W40.fix-reader-narrow-window)
+                    Text("Smart Folders")
+                    Spacer()
                     Button { model.showingSaveDialog = true } label: { Image(systemName: "plus") }
                         .buttonStyle(.plain)
                         .help("Save the current filters as a smart folder")
                 }
+                // The list lays its header out at the row's full width but 4 pt in, so it ran 3 pt past its
+                // cell (W40.fix-reader-narrow-window, VM layout guard); the inset keeps the + inside.
+                .padding(.trailing, 8)
             }
 
             Section("Folders") {
