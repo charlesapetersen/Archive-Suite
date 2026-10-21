@@ -42,7 +42,8 @@ The project has measured a lot and read little. The record, in brief, with the f
   are evidence and are preserved.
 - Text placed on the page image is preferred to a separate text page, unless a text page is necessary.
 - Sherlock is the cluster the review plans for from the start (owner: assume access will come). Experiments are
-  designed for its GPUs (H100 and A100 class, multi-GPU nodes), so models too large for FarmShare's L40S cards are
+  designed for its GPUs (its public gpu partition lists 16 H100 and 32 L40S among about 200 GPUs, no A100; 16 GPUs
+  per user, 2-day jobs; `J-compute.md`), so models too large for FarmShare's L40S cards are
   in scope. FarmShare stays a second cluster profile, a fallback while the Sherlock account is pending, and the
   home of the outputs already collected. The cluster kit (`scripts/segbench/institutional-compute/`) gets a
   Sherlock profile beside `profiles/farmshare.json`.

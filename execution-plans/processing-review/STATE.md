@@ -15,9 +15,8 @@ Read `00-plan.md`, then this table. Take the first phase step not done. Strand n
   Flash VL (1860274), stock PP-OCRv6 (1860044) and the three Qwen 27B/35B comparison rows, all 895 pages:
   `ArchiveProcessor/segbench-results/bench-corpus/open-sweep-20261019.md`; ArchiveOCRBench Part 7. A review
   baseline; nothing adopted.
-- [ ] Nemotron job 1860275: still RUNNING at 20:55 on 2026-10-20, ending at its 7 h limit. When it ends, count the
-  clean readings (`execution-plans/general-model-sweep-20261019.md`, "Checking Nemotron"). A partial cache is not
-  scored; a third submission is the owner's call.
+- [ ] Nemotron job 1860275: TIMEOUT at 20:54 on 2026-10-20 with 839 of 895 pages read (631 ok, 207 cap, 1
+  malformed); 56 unread. Not scored. A third submission for the 56 is the owner's call.
 - [ ] Add a Sherlock profile to `scripts/segbench/institutional-compute/` once the account exists (strand J
   gathers its partitions, GPU types and limits first).
 
@@ -25,18 +24,20 @@ Read `00-plan.md`, then this table. Take the first phase step not done. Strand n
 
 | strand | screen | deep read | checked | note |
 |---|---|---|---|---|
-| A segmentation | done 2026-10-20, `screens/A-screen.md` | started (Fable) | | |
-| B dating | done 2026-10-20, `screens/B-screen.md` |  | | |
-| C OCR and HTR | done 2026-10-20, `screens/C-screen.md` |  | | |
-| D enhancement and marks | done 2026-10-20, `screens/D-screen.md` |  | | |
-| E layout | | | | |
-| F text placement | | | | |
-| G entities | | | | |
-| H whole-corpus and user training | | | | |
-| I model inventory | | | | |
-| J compute and prices | | | | |
+| A segmentation | done, `screens/A-screen.md` | done 2026-10-20 (Fable), `A-segmentation.md` | Lincoln figures checked against lincoln-scores.json | done |
+| B dating | done 2026-10-20, `screens/B-screen.md` | started (Fable) | | |
+| C OCR and HTR | done 2026-10-20, `screens/C-screen.md` | started (Fable) | | |
+| D enhancement and marks | done 2026-10-20, `screens/D-screen.md` | started (Fable) | | |
+| E layout | done, `screens/E-screen.md` | | | |
+| F text placement | done, `screens/F-screen.md` | | | |
+| G entities | done, `screens/G-screen.md` | | | |
+| H whole-corpus and user training | done, `screens/H-screen.md` | | | |
+| I model inventory | done, `I-inventory.md` | n/a | | done |
+| J compute and prices | done, `J-compute.md` | n/a | | done |
 
 ## Usage
 
-Before the screens (2026-10-20 ~21:00): weekly all-models 3%, weekly Fable 0%. The four Sonnet screens and
-strand A's Fable read are measured against that.
+Before the screens (2026-10-20 ~21:00): weekly all-models 3%, weekly Fable 0%. After Phase 0, ten screens and inventories (Sonnet) and strand A's Fable read: weekly
+all-models 6%, weekly Fable 3%. One Fable deep read is therefore about 3% of the Fable window.
+
+The owner's Gemini report is assessed in `screens/gemini-report-2026-10-20.md` (HR-DocStream does not exist).
