@@ -4,6 +4,8 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
+    // W40.e8 — screenshot recording/verification for the Robolectric screen tests (see app/src/test/.../ui/).
+    id("io.github.takahirom.roborazzi")
 }
 
 // The Google OAuth client for the Drive cloud relay is per-installation, not per-project: it is bound to
@@ -59,6 +61,10 @@ android {
     kotlinOptions {
         jvmTarget = "17"
     }
+    testOptions {
+        // W40.e8 — Robolectric needs the merged resources and manifest to inflate a real ComponentActivity.
+        unitTests.isIncludeAndroidResources = true
+    }
     buildFeatures {
         compose = true
         buildConfig = true   // exposes BuildConfig.DEBUG for the debug-only deterministic capture-inject test seam
@@ -100,4 +106,22 @@ dependencies {
     // Plain-JVM unit tests (RelayObjectFormat golden byte-check; no emulator/Robolectric).
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20240303")   // org.json for JVM tests (android.jar's is device-only)
+
+    // W40.e8 — the screens tested without an emulator: Compose UI tests on Robolectric, run by the same
+    // testDebugUnitTest task, with Roborazzi screenshots compared against the committed goldens.
+    testImplementation(composeBom)
+    testImplementation("androidx.compose.ui:ui-test-junit4")
+    debugImplementation("androidx.compose.ui:ui-test-manifest")
+    testImplementation("org.robolectric:robolectric:4.14.1")
+    testImplementation("io.github.takahirom.roborazzi:roborazzi:1.32.2")
+    testImplementation("io.github.takahirom.roborazzi:roborazzi-compose:1.32.2")
+}
+
+// W40.e8 — goldens live in the source tree so they are committed; record with -Proborazzi.test.record=true.
+roborazzi {
+    outputDir.set(file("src/test/screenshots"))
+    // A failed comparison's actual and diff images go under build/, never next to the goldens.
+    compare {
+        outputDir.set(layout.buildDirectory.dir("outputs/roborazzi"))
+    }
 }

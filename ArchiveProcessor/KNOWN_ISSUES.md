@@ -635,7 +635,9 @@ all five mechanisms proven non-vacuous by neutering — pre-fix `save` always re
 adoption ignoring staleness → 3 RED; set-on-failure instead of set-before-write → 1 RED; `clear()` keeping
 the flag → 2 RED; `createTempFile` back outside the `try` → 1 RED. 56/56 pass restored. Not covered: the
 Compose banner and the view model's own wiring lines — the app has no instrumentation-test target
-(`androidTest`), so those are compiler- and inspection-level only.
+(`androidTest`), so those are compiler- and inspection-level only. *(Since W40.e8, 2026-10-21, the screens are covered
+emulator-free by Robolectric Compose tests and screenshot goldens — `scripts/test-android-unit.sh`, a gate step —
+including the capture screen's restored-session state; the `sessionNotSaved` banner itself is still unasserted.)*
 
 `ArchiveCapture/.../data/{SessionStore,ManifestFileWriter}.kt`, `capture/{CaptureModels,CaptureViewModel}.kt`,
 `ui/CaptureScreen.kt`.

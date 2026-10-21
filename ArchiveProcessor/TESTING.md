@@ -470,6 +470,16 @@ header comment for what it actually covers. Related non-`test-*` drivers in the 
 `localagent-{mechanism,pacing,validator,wiring}-test.swift` (compiled directly) and `android-ui-drive.sh`
 (the Android companion's emulator lane).
 
+**Android screens without an emulator — `test-android-unit.sh`** (W40.e8, in the health gate, free). Runs the
+capture app's whole `testDebugUnitTest` suite, which since W40.e8 includes Robolectric Compose tests of every
+screen (`ArchiveCapture/app/src/test/java/.../ui/`: the pairing flow, the capture screen on a seeded session, the
+End-segment tag sheet) and Roborazzi screenshots compared against the goldens committed in
+`app/src/test/screenshots/`. The capture-screen tests build the real `CaptureViewModel` on a session written by the
+real `SessionStore`; Robolectric denies the camera, so the scanner and preview are never bound and what is tested is
+everything around them. A deliberate pixel change re-records with `./gradlew :app:recordRoborazziDebug` and commits
+the new PNGs after looking at them. Not covered: the CameraX preview and QR decode themselves, which still need
+`android-ui-drive.sh` or a phone.
+
 ---
 
 ## Tier 3 — Release gate

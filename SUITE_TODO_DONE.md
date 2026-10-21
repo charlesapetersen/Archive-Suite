@@ -12484,3 +12484,17 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
     W46.date-cases-owner-ok. W46.fix-date-truth-score reads the exported answers.
   - Not on ArchiveOCRBench: dating is not an OCR or segmentation result, and date-tagging.json is unchanged.
   <!-- /W46.fix-date-truth -->
+- [x] **W40.e8 — Android screen tests without an emulator [M]** · §W40 verification phase · SHIPPED 2026-10-21 (this commit)
+  Robolectric 4.14.1 Compose UI tests plus Roborazzi 1.32.2 screenshots, run by `testDebugUnitTest` (SDK 35, a fixed
+  411×891dp xxhdpi phone, native graphics). `ConnectScreenTest` (9): the three modes, Robolectric's denied camera,
+  manual entry (the USB host prefilled to 127.0.0.1, empty on Wi-Fi), a portless Connect doing nothing, back from
+  every mode, and Cloud on a build with no OAuth client saying so. `CaptureScreenTest` (8): the real view model on a
+  session written by the real `SessionStore` (no endpoint, so nothing sends): the strip's per-state labels, Clear
+  and the third-tap delete each stopping for confirmation and their Cancel leaving the files, Re-pair's cancel, and
+  a restart mid-tagging reopening the tag sheet. `SegmentTagSheetScreenTest` (7): what Apply, Skip and Cancel send.
+  7 goldens in `ArchiveCapture/app/src/test/screenshots/`, read by eye before committing. New gate step
+  `android-unit` (`ArchiveProcessor/scripts/test-android-unit.sh`, heavy lock, ~36 s): the whole suite, 80 tests, plus
+  `verifyRoborazziDebug`. Shown to fail: Clear without its confirmation, the failed-upload dot drawn orange (only the
+  screenshot can see it) and delete skipping its confirmation each turned one test red. No defects found. Not
+  covered: the CameraX preview and QR decode (still `android-ui-drive.sh` or a phone), and the `sessionNotSaved` banner.
+  <!-- /W40.e8 -->

@@ -232,7 +232,9 @@ where it can.
   object-file hash; evidence `verification/evidence/core/W40.e7-mutation-sample.md`. 33 of 50 killed; the 17
   survivors filed as the four `W40.fix-mut-*` items.)*
 - **`W40.e8` — Android screens without an emulator [M].** Gated on `W40.e8-owner-ok` (an instrumented lane was
-  declined 2026-07-31). Robolectric Compose tests plus Roborazzi screenshots under `testDebugUnitTest`.
+  declined 2026-07-31). Robolectric Compose tests plus Roborazzi screenshots under `testDebugUnitTest`. *(SHIPPED 2026-10-21: 24 screen
+  tests over ConnectScreen, CaptureScreen and SegmentTagSheet with 7 screenshot goldens; gate step `android-unit`
+  (`ArchiveProcessor/scripts/test-android-unit.sh`). Three planted mutants all caught. No defects found.)*
 - **`W40.e9` — layout guard [M].** Owner-requested 2026-10-11: the Notes note list shipped with every row
   clipped to half height (`W40.fix-notes-row-clip`) and nothing in the suite could see it, because the UI tests
   find elements by identifier and a clipped element is still found and clickable. Add a shared helper to each UI
