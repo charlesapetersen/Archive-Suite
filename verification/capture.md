@@ -120,17 +120,36 @@ Written by `W40.b4`, 2026-10-21.
   side only; `ArchiveProcessor/ArchiveCapture/README-oauth.md`; `SPEC/relay-object-format.md` (§The one rule,
   §Epoch, §Never-lose invariant, A5). The Mac side of the same features is the Processor ledger's
   ([`processor.md`](processor.md) P-43 to P-52).
-- **Sources read at:** `e14c5adc`.
-- **Count:** _filled in once the rows are traced._
+- **Sources read at:** `e14c5adc`; code traced at the same commit.
+- **Count:** `unproven 27 · works 1` (works: C-02, on `W40.a3`'s emulator round trip).
 
-**Checkpoint 1 holds the promises only.** The parity comparison above was written from the code by `W40.i2`, so the
-code is not unseen; the promises below were nonetheless written from the guides alone, and *Reached by*,
-*Real-path test*, *Runtime evidence* and *Status* are filled in by the trace that follows.
+**Order of work (rule 3).** The *Promise* and *Promised in* of every row were committed first (`77bdc91c`), from
+the guides alone. The parity comparison above had already been written from the code by `W40.i2`, so the code was
+not unseen; the trace below re-read each entry point at `e14c5adc`.
 
-**One row per phone.** The guides promise the two phones the same workflow, but each phone is shown working or not
-on its own, so each feature has an Android row (`C-01` to `C-14`) and an iOS row numbered thirty higher (`C-31` to
-`C-44`). USB is promised for Android only, so there is no `C-43`. `C-15` is the wire contract, which is one promise
-about both phones' bytes.
+**One row per phone.** Each phone is shown working or not on its own, so each feature has an Android row (`C-01` to
+`C-14`) and an iOS row numbered thirty higher (`C-31` to `C-44`). USB is promised for Android only, so there is no
+`C-43`. `C-15` is the wire contract, one promise about both phones' bytes.
+
+**Runtime evidence.** One run has driven a phone through a promise: `W40.a3`'s Android emulator round trip
+([`evidence/capture/W40.a3-phone-e2e.md`](evidence/capture/W40.a3-phone-e2e.md)). It pairs by manual entry, takes
+three shutter taps through the DEBUG inject seam (`A/ui/CaptureScreen.kt:389-411`, which swaps the camera frame for
+a fixture), ends each segment with Skip, and screenshots the drained phone; the Mac then files three PDFs. It moves
+`C-02` to `works` and is partial evidence for `C-05`, `C-07`, `C-09` and `C-10`. The iOS app has never run: it builds
+(`W40.i1`), but there is no simulator runtime, so every iOS row is `unproven` and waits on `W40.i3` (the iPhone in the
+E2E) and the owner's borrowed-phone pass (`W40.i4`). The iOS gaps `W40.i2` filed are read from the code, not
+reproduced, so they make no iOS row `broken` (rule 5); each row names its fix item.
+
+**Tests.** Android's ten JVM test files (`app/src/test/java/com/archiveprocessor/capture/`, below `AT/`) test the
+policy helpers the view model calls (`CaptureModels.kt`, `SessionStore`, the transports), not a user's tap; no
+`androidTest` set exists, so nothing renders a Compose screen. iOS has no test target; four `swiftc` scripts test the
+network layer only. `scripts/test-relay-transport.sh` and `scripts/test-drive-transport.sh` were run for this ledger
+on 2026-10-21 and passed (`TRANSPORT ROUND-TRIP: PASS`, `DRIVE TRANSPORT (mock): PASS`).
+
+**Drift.** Where the code does not do what the promise says, *Notes* starts with **Drift** (C-01, C-11, C-34, C-44).
+Input for `W40.b5`; not a reproduced bug. No new suspects; S-021 to S-023 from `W40.i2` are cited where they apply.
+
+Paths: `A/` and `I/` as in the parity comparison above; `scripts/` is `ArchiveProcessor/scripts/`.
 
 ### Android
 
@@ -141,11 +160,34 @@ about both phones' bytes.
   scanner stays up.
 - **Promised in:** `README.md` §Live Capture (Pairing); `CLAUDE.md` §Pairing + connect flow; `LIVE_CAPTURE_ANDROID_TEST.md`
   A1.
+- **Reached by:** launch with no endpoint (`A/MainActivity.kt:34`, `:47`) → `ConnectScreen` (`A/ui/ConnectScreen.kt:48`)
+  → Wi-Fi or Wired (`:66-67`) → scanner (`QrAnalyzer`, `:115-127`) → `vm.connectFromQr` (`A/capture/CaptureViewModel.kt:319`)
+  → `MacEndpoint.fromQrPayload` (`A/net/MacEndpoint.kt`) → `connect` (`:292`). A payload that does not parse returns
+  `false` (`:321`) and the analyzer re-arms (`A/ui/ConnectScreen.kt:124`).
+- **Real-path test:** `AT/net/MacEndpointQrTest` (five QR shapes: legacy LAN, combined with relay, string port and
+  unknown keys, legacy cloud). The scan itself has no test.
+- **Runtime evidence:** none. The `W40.a3` E2E pairs by manual entry.
+- **Status:** `unproven`
+- **History:**
+  - 2026-10-21 W40.b4 — row written, `unproven`.
+- **Notes:** **Drift.** The app opens on a "How is this phone connected?" chooser (Wired, Wi-Fi, Cloud;
+  `A/ui/ConnectScreen.kt:58-68`), not on the scanner as A1 says. A non-pairing QR is refused silently: no message is set
+  on that path (`A/capture/CaptureViewModel.kt:321`). The emulator's virtual-scene camera could show a scan.
 
 ### C-02 · Android · Manual entry of host, port and token
 
 - **Promise:** instead of scanning, host, port and token can be typed in, and the phone pairs the same way.
 - **Promised in:** `README.md` §Live Capture (Pairing).
+- **Reached by:** "Enter manually instead" (`A/ui/ConnectScreen.kt:151`) → `ManualConnect` (`:160`; the port field keeps
+  digits only, `:167`) → Connect (`:171`) → `vm.connect` (`A/capture/CaptureViewModel.kt:292`).
+- **Real-path test:** `scripts/e2e-phone-mac.sh`, through `scripts/android-ui-drive.sh` `pair` (taps Wi-Fi, Enter
+  manually, types the three fields, taps Connect; `android-ui-drive.sh:160-176`).
+- **Runtime evidence:** 2026-10-11 · `0511d85c` · [`evidence/capture/W40.a3-phone-e2e.md`](evidence/capture/W40.a3-phone-e2e.md)
+  (pairing screenshot `05-connected.png` inspected; the run went on to file three PDFs).
+- **Status:** `works`
+- **History:**
+  - 2026-10-21 W40.b4 — row written; `works` on the emulator, taken in from `W40.a3`'s evidence.
+- **Notes:** shown on the `ap_test36` emulator over the LAN route; a physical phone is the owner's pass.
 
 ### C-03 · Android · Honest connect diagnostics
 
@@ -153,6 +195,16 @@ about both phones' bytes.
   never fails silently; a stale QR (old token) or the wrong Mac gives a clear failure and a way to Re-pair, with no
   crash and no hang.
 - **Promised in:** `CLAUDE.md` §Pairing + connect flow (P0/P1); `LIVE_CAPTURE_ANDROID_TEST.md` C6.
+- **Reached by:** any connect → `MacClient(ep).reachability()` (`A/capture/CaptureViewModel.kt:295`) → one message per
+  cause (`:304-312`), shown on the connect screen.
+- **Real-path test:** none.
+- **Runtime evidence:** none.
+- **Status:** `unproven`
+- **History:**
+  - 2026-10-21 W40.b4 — row written, `unproven`.
+- **Notes:** the C6 case (stale token on a saved endpoint, after pairing) has no preflight: uploads simply fail and
+  auto-retry, so what the operator sees then is the upload summary, not the unauthorised message. Cloud pairing skips
+  the probe by design (`:327-330`). All four causes can be staged on the emulator (Mac stopped, wrong port, wrong token).
 
 ### C-04 · Android · Saved endpoint and Re-pair
 
@@ -162,17 +214,46 @@ about both phones' bytes.
   it and upload to the new endpoint, with no duplicates on the Mac.
 - **Promised in:** `README.md` §Live Capture (Pairing); `CLAUDE.md` §Pairing + connect flow; `LIVE_CAPTURE_ANDROID_TEST.md`
   A5, B2, C5.
+- **Reached by:** saved endpoint → `CaptureScreen` (`A/MainActivity.kt:46`); Re-pair (`A/ui/CaptureScreen.kt:171-172`)
+  → confirm (`:362-366`) → `vm.disconnect()` (`A/capture/CaptureViewModel.kt:343`: `sessionDisconnect`, then
+  `retirePreviousPairing` `:360`, `clearEndpoint`). A new connect calls `resumeUploads` (`:301`).
+- **Real-path test:** `AT/capture/CapturePairingGenerationTest` (eight tests: a reply from the unpaired Mac never
+  confirms a page; the pre-fix disposition is shown to differ) — the policy helper `sendAck`, not a tap.
+- **Runtime evidence:** none.
+- **Status:** `unproven`
+- **History:**
+  - 2026-10-21 W40.b4 — row written, `unproven`.
+- **Notes:** "no duplicates" is the Mac's `(group, seq)` replace (P-44). The re-pair path is the `W23.m1` fix.
 
 ### C-05 · Android · Full-resolution shutter
 
 - **Promise:** the shutter takes a full-resolution photo of the page; the phone confirms it (thumbnail, counter).
 - **Promised in:** `README.md` §Live Capture (On the phone); `CLAUDE.md` §On the phone; `LIVE_CAPTURE_ANDROID_TEST.md` A2.
+- **Reached by:** shutter (`A/ui/CaptureScreen.kt:272`) → `takePicture` (`:372`, CameraX `controller.takePicture`
+  `:413`) → `vm.addDocumentPhoto` (`A/capture/CaptureViewModel.kt:372`).
+- **Real-path test:** the E2E taps the shutter, but the DEBUG inject seam replaces the camera's frame
+  (`A/ui/CaptureScreen.kt:389-411`).
+- **Runtime evidence:** partial. 2026-10-11 · `0511d85c` · [`evidence/capture/W40.a3-phone-e2e.md`](evidence/capture/W40.a3-phone-e2e.md):
+  three taps reached the Mac and were screenshotted on the phone, but the pixels were the fixture, not the camera.
+- **Status:** `unproven`
+- **History:**
+  - 2026-10-21 W40.b4 — row written, `unproven`.
+- **Notes:** "full resolution" depends on the device's camera. The emulator's virtual-scene camera can show the CameraX
+  path; the resolution on a real phone is the owner's pass.
 
 ### C-06 · Android · Box and Folder markers
 
 - **Promise:** dedicated Box (red) and Folder (purple) buttons mark the next photo as a box label or a folder, and
   the Mac registers it as such.
 - **Promised in:** `README.md` §Live Capture (On the phone); `CLAUDE.md` §On the phone; `LIVE_CAPTURE_ANDROID_TEST.md` A3.
+- **Reached by:** Box (`A/ui/CaptureScreen.kt:262`) / Folder (`:282`) → `vm.captureMarker` (`A/capture/CaptureViewModel.kt:393`),
+  a one-photo group of that type; with a page selected the same buttons reclassify it (`reclassifySelected`, `:583`).
+- **Real-path test:** none against the real Mac. `scripts/android-ui-drive.sh` `flow` taps Box against a fake stub
+  (`:211`).
+- **Runtime evidence:** none (the `W40.a3` E2E captures documents only).
+- **Status:** `unproven`
+- **History:**
+  - 2026-10-21 W40.b4 — row written, `unproven`.
 
 ### C-07 · Android · End segment
 
@@ -181,12 +262,34 @@ about both phones' bytes.
   segment is still unsent, the Mac defers the segment.
 - **Promised in:** `README.md` §Live Capture (On the phone); `CLAUDE.md` §Streaming + never-lose-a-photo;
   `LIVE_CAPTURE_ANDROID_TEST.md` A2 step 7; `SPEC/relay-object-format.md` A5.
+- **Reached by:** End segment (`A/ui/CaptureScreen.kt:188`) → `finishDocumentSegment` (`A/capture/CaptureViewModel.kt:611`)
+  → tag sheet (`A/ui/CaptureScreen.kt:306`) → Apply or Skip → `finalizeSegment` (`:658`) → `trySendSegmentComplete`
+  (`:701`), which waits until every page of the group is uploaded (`:705`) and is retried from the upload's success
+  (`:820`) and from `resendEndedSegments` (`:728`).
+- **Real-path test:** the E2E (End segment, then Skip, per document).
+- **Runtime evidence:** partial. 2026-10-11 · `0511d85c` · [`evidence/capture/W40.a3-phone-e2e.md`](evidence/capture/W40.a3-phone-e2e.md):
+  three single-page segments ended and were filed. The deferral of a segment with a page still unsent was not shown.
+- **Status:** `unproven`
+- **History:**
+  - 2026-10-21 W40.b4 — row written, `unproven`.
+- **Notes:** the phone holds the segment-complete until its pages are sent; the Mac's own deferral is P-47's. With no
+  page captured, End segment says so instead of doing nothing (`:615-622`).
 
 ### C-08 · Android · On-phone tagging: Quality and date
 
 - **Promise:** per segment, Quality (Unrated or Q1-Q3) and year/month; a long-press on a page sets Q3 for that page
   alone. The values stick on the item and reach the Mac as `Q1`-`Q3` (nothing for Unrated) and the date.
 - **Promised in:** `README.md` §Live Capture (On the phone); `CLAUDE.md` §On the phone; `LIVE_CAPTURE_ANDROID_TEST.md` A4.
+- **Reached by:** tag sheet (`A/ui/SegmentTagSheet.kt`; Quality values `:103`) → `applyTagsAndContinue`
+  (`A/capture/CaptureViewModel.kt:627`); long-press on a strip thumbnail (`A/ui/CaptureScreen.kt:246`, `:483`) →
+  `toggleQ3` (`A/capture/CaptureViewModel.kt:416`), which resends the page if it was already sent (`resendOrEnqueue`
+  `:433`).
+- **Real-path test:** `AT/capture/CaptureQueuePolicyTest` covers a metadata change during an upload (the deferred
+  resend); nothing drives the sheet.
+- **Runtime evidence:** none. The E2E taps Skip, so no phone tag was sent; its year tags came from OCR.
+- **Status:** `unproven`
+- **History:**
+  - 2026-10-21 W40.b4 — row written, `unproven`.
 
 ### C-09 · Android · Uploads as shot, through a durable auto-retrying queue
 
@@ -195,6 +298,17 @@ about both phones' bytes.
   and shows that it is retrying; when the Mac is back, everything queued arrives.
 - **Promised in:** `README.md` §Live Capture (On the phone); `CLAUDE.md` §Streaming + never-lose-a-photo;
   `LIVE_CAPTURE_ANDROID_TEST.md` C1, C2.
+- **Reached by:** `addDocumentPhoto` (`A/capture/CaptureViewModel.kt:372`) → `persist` (`:235`) → `enqueueUpload`
+  (`:758`; three tries, `:779-786`); `startAutoRetry` (`:262`) re-sends FAILED and PENDING every 8 s; Retry button
+  (`A/ui/CaptureScreen.kt:184` → `retryFailed` `:841`).
+- **Real-path test:** `AT/capture/CaptureQueuePolicyTest` (what counts as unsent and retryable); `AT/data/ManifestFileWriterTest`
+  (the session write). No test takes the network away.
+- **Runtime evidence:** partial: the `W40.a3` E2E uploaded three photos as shot on a healthy network. No drop or Mac
+  quit was staged.
+- **Status:** `unproven`
+- **History:**
+  - 2026-10-21 W40.b4 — row written, `unproven`.
+- **Notes:** C1 and C2 can both be staged on the emulator (`adb shell svc wifi disable`, or stop the headless Mac).
 
 ### C-10 · Android · The phone's copy is deleted only after the Mac's durable ack
 
@@ -203,18 +317,50 @@ about both phones' bytes.
   so photos do not pile up on the device.
 - **Promised in:** `README.md` §Live Capture (On the phone); `CLAUDE.md` §Streaming + never-lose-a-photo;
   `SPEC/relay-object-format.md` §The one rule, §Never-lose invariant.
+- **Reached by:** `postPhoto` returns `true` (`A/net/MacClient.kt`; `A/net/FileRelayTransport.kt:42-51` for a receipt)
+  → `setState(UPLOADED)` only for the current pairing (`A/capture/CaptureViewModel.kt:793-794`) → after 650 ms
+  `removeConfirmed` (`:567`), which deletes only the same, still-UPLOADED file and keeps document pages until their
+  segment ends (`:577`).
+- **Real-path test:** `AT/capture/CaptureDeletePolicyTest`, `AT/capture/CapturePairingGenerationTest`,
+  `AT/net/DriveRelayTransportTest` (receipt acceptance over a mock Drive).
+- **Runtime evidence:** partial: the `W40.a3` E2E screenshot `zz-drained` shows the phone emptied after the Mac
+  confirmed. That a failed or stale ack keeps the photo was not shown.
+- **Status:** `unproven`
+- **History:**
+  - 2026-10-21 W40.b4 — row written, `unproven`.
 
 ### C-11 · Android · The queue survives the app being killed
 
 - **Promise:** after the app is force-stopped or crashes with unsent photos, reopening it shows them still there, and
   they upload once connected.
 - **Promised in:** `README.md` §Live Capture (On the phone, "even across an app crash"); `LIVE_CAPTURE_ANDROID_TEST.md` C3.
+- **Reached by:** launch → `store.load()` (`A/capture/CaptureViewModel.kt:181`, `A/data/SessionStore.kt:115`; a file that
+  is gone is skipped, `:124`) → confirmed items pruned (`:193-197`), the rest re-sent; untracked photos adopted into a
+  recovery segment (`A/capture/CaptureModels.kt:184-215`).
+- **Real-path test:** `AT/data/SessionStoreTest` (twelve tests: save reports failure, the stale marker survives a
+  restart), `AT/capture/CaptureRecoverySequenceTest` (a lost snapshot holds its photos), `AT/capture/CaptureOrphanAdoptionTest`.
+- **Runtime evidence:** none.
+- **Status:** `unproven`
+- **History:**
+  - 2026-10-21 W40.b4 — row written, `unproven`.
+- **Notes:** **Drift.** Recovered pages against a stale session are held for the operator's review rather than sent
+  (`W23.m8`); the guides promise only that they upload. `adb shell am force-stop` stages C3 on the emulator.
 
 ### C-12 · Android · Queue-depth heartbeat
 
 - **Promise:** the phone tells the Mac how many photos it still has to send (`POST /phone/status`, `X-Pending`), which
   is what the Mac's Finish waits on.
 - **Promised in:** `CLAUDE.md` §On the phone, §On the Mac.
+- **Reached by:** every enqueue and settle (`A/capture/CaptureViewModel.kt:772`, `:824`), each reconnect (`:256`) and the 8 s loop (`:278`) →
+  `sendStatusReport` (`:736`: `pendingReportCount`, one conflated channel) → `reportStatus` (`:178-179`,
+  `A/net/MacClient.kt`).
+- **Real-path test:** `AT/capture/CaptureQueuePolicyTest` (the count includes every unconfirmed state; a retryable
+  failure blocks "drained"), `AT/capture/CaptureOrphanAdoptionTest` (a held page still counts).
+- **Runtime evidence:** none. The E2E finished through `/session/complete` and did not show the Mac waiting.
+- **Status:** `unproven`
+- **History:**
+  - 2026-10-21 W40.b4 — row written, `unproven`.
+- **Notes:** Drive carries no heartbeat (suspect S-038, Mac side).
 
 ### C-13 · Android · USB with no shared Wi-Fi
 
@@ -222,6 +368,15 @@ about both phones' bytes.
   no shared network; an unplugged cable loses nothing.
 - **Promised in:** `README.md` §Live Capture (Pairing, On the phone); `CLAUDE.md` §USB local relay;
   `LIVE_CAPTURE_ANDROID_TEST.md` B1.
+- **Reached by:** Wired (USB cable) (`A/ui/ConnectScreen.kt:66`) → scan → `connectFromQr` replaces the host with
+  `127.0.0.1` (`A/capture/CaptureViewModel.kt:323`).
+- **Real-path test:** `scripts/usb-reverse-probe.sh` checks the tunnel with an in-device ping, not the app.
+- **Runtime evidence:** none for the phone app. The tunnel itself is P-45 (`works`, [`evidence/processor/W40.d6-usb-transport.md`](evidence/processor/W40.d6-usb-transport.md)).
+- **Status:** `unproven`
+- **History:**
+  - 2026-10-21 W40.b4 — row written, `unproven`.
+- **Notes:** Wired manual entry fills `127.0.0.1` too (`ManualConnect(vm, wired, …)`). The emulator can show the app over
+  the tunnel; a real cable and its unplug is the owner's pass.
 
 ### C-14 · Android · Google Drive cloud relay, phone side
 
@@ -231,6 +386,21 @@ about both phones' bytes.
   with Drive sign-in disabled and a message saying why.
 - **Promised in:** `README.md` §Live Capture (Transports); `CLAUDE.md` §Google Drive cloud relay, §Cloud-relay OAuth
   setup; `ArchiveCapture/README-oauth.md`; `SPEC/relay-object-format.md` §Epoch.
+- **Reached by:** Cloud (Google Drive) (`A/ui/ConnectScreen.kt:68`) → `CloudPairing` (`:183`; QR or typed relay token
+  `:244`, Sign in & connect `:245`) → `DriveAuth.authorizeIntent` (`A/net/DriveAuth.kt:44`) → `vm.connectCloud`
+  (`A/capture/CaptureViewModel.kt:331`) → `DriveRelayTransport` (`:289`). Unconfigured: `CLIENT_ID` empty and
+  `UNCONFIGURED_MESSAGE` (`A/net/DriveAuth.kt:105-113`).
+- **Real-path test:** `AT/net/DriveRelayTransportTest` (the transport over a mock Drive); `scripts/test-relay-golden.sh`
+  (bytes). Nothing covers sign-in or epoch adoption against a real receiver.
+- **Runtime evidence:** none. `CLAUDE.md` says the Android relay was "verified end-to-end" over a real Drive account on
+  2026-07-07; there is no evidence file for it.
+- **Status:** `unproven`
+- **History:**
+  - 2026-10-21 W40.b4 — row written, `unproven`.
+- **Notes:** a real run needs the owner's Google account and an Android OAuth client in `local.properties`, so the
+  sign-in half is `unverifiable-here` until those exist on this machine; the transport half can be shown against
+  `FileRelay` (a directory store) with no account. Suspect S-021: a failed Drive write of the segment-complete is
+  reported as success.
 
 ### C-15 · Both phones · The same bytes on the wire
 
@@ -238,76 +408,215 @@ about both phones' bytes.
   defines, so the Mac cannot tell which phone sent a page.
 - **Promised in:** `README.md` §Live Capture; `CLAUDE.md` §Primary Function 3, §Google Drive cloud relay;
   `SPEC/relay-object-format.md` §Purpose & status.
+- **Reached by:** every send; `A/net/RelayObjectFormat.kt` and `I/Net/RelayObjectFormat.swift`, HTTP headers in
+  `A/net/MacClient.kt:30-126` and `I/Net/MacClient.swift:29-113` (compared constant by constant above).
+- **Real-path test:** `AT/net/RelayObjectFormatTest` (Android against the committed golden files);
+  `scripts/test-relay-golden.sh` (iOS, Android and Mac against the same files, in the gate); `scripts/test-relay-fuzz.sh`.
+- **Runtime evidence:** none for the promise. [`evidence/capture/W40.a3-relay-golden.md`](evidence/capture/W40.a3-relay-golden.md)
+  is a gate run of the byte comparison, a test of the writer code, not a run of either phone.
+- **Status:** `unproven`
+- **History:**
+  - 2026-10-21 W40.b4 — row written, `unproven`.
+- **Notes:** the one difference is cosmetic: the group id is lowercase hex on Android and uppercase on iOS, which the
+  Mac's `isSafeGroupId` accepts. A real iOS photo reaching the Mac would make this row's evidence (`W40.i3`).
 
 ### iOS
 
 The guides promise the iPhone the same workflow as Android ("pick whichever phone you have"); each row below makes
-the promise of its Android twin, thirty lower, unless it says otherwise.
+the promise of its Android twin, thirty lower, unless it says otherwise. No iOS row has a real-path test of a user's
+action or any runtime evidence: there is no test target and no simulator runtime (above). The next evidence is
+`W40.i3`, which waits on the iOS fix items named below.
 
 ### C-31 · iOS · Pairing by QR scan
 
 - **Promise:** as `C-01`.
 - **Promised in:** `README.md` §Live Capture (Pairing); `CLAUDE.md` §Pairing + connect flow.
+- **Reached by:** no endpoint (`I/ContentView.swift:7-8`) → `ConnectScreen` scanner (`I/UI/ConnectScreen.swift:64`,
+  `I/UI/QRScannerView.swift`) → `vm.connectFromQR` (`I/Capture/CaptureViewModel.swift:108`; a payload that does not parse
+  sets `.badQR`) → `attemptConnect` (`:115`).
+- **Real-path test:** none.
+- **Runtime evidence:** none.
+- **Status:** `unproven`
+- **History:**
+  - 2026-10-21 W40.b4 — row written, `unproven`.
+- **Notes:** opens on the scanner as promised, and names a bad QR (unlike `C-01`). A cloud-mode QR is refused
+  (`I/Net/MacEndpoint.swift:19-32`) → `W40.i-fix-ios-cloud-pairing`. With camera access denied the scanner is black
+  with no message → `W40.i-fix-ios-polish`.
 
 ### C-32 · iOS · Manual entry of host, port and token
 
 - **Promise:** as `C-02`.
 - **Promised in:** `README.md` §Live Capture (Pairing).
+- **Reached by:** Connect (`I/UI/ConnectScreen.swift:45`) → `manualConnect` (`:112-124`, port checked 1-65535) →
+  `vm.connect` (`I/Capture/CaptureViewModel.swift:104`).
+- **Real-path test:** none.
+- **Runtime evidence:** none.
+- **Status:** `unproven`
+- **History:**
+  - 2026-10-21 W40.b4 — row written, `unproven`.
 
 ### C-33 · iOS · Honest connect diagnostics
 
 - **Promise:** as `C-03`.
 - **Promised in:** `CLAUDE.md` §Pairing + connect flow.
+- **Reached by:** `attemptConnect` → `MacClient.reachability()` (`I/Capture/CaptureViewModel.swift:117`) → `connectPhase`
+  `.unreachable` / `.refused` / `.unauthorized` (`:142-145`) → message (`I/UI/ConnectScreen.swift:77`).
+- **Real-path test:** none.
+- **Runtime evidence:** none.
+- **Status:** `unproven`
+- **History:**
+  - 2026-10-21 W40.b4 — row written, `unproven`.
+- **Notes:** when the QR carries a relay code and the phone is signed in, an unreachable Mac switches to Drive silently
+  apart from a status line (`:128-138`) → `W40.i-fix-ios-cloud-pairing`.
 
 ### C-34 · iOS · Saved endpoint and Re-pair
 
 - **Promise:** as `C-04`, without the USB case.
 - **Promised in:** `README.md` §Live Capture (Pairing); `CLAUDE.md` §Pairing + connect flow.
+- **Reached by:** saved endpoint (`I/ContentView.swift:10`) → Re-pair (`I/UI/CaptureScreen.swift:54`) → confirm
+  (`:146-150`) → `vm.disconnect()` (`I/Capture/CaptureViewModel.swift:148`); a new connect calls `resumeUploads` (`:126`).
+- **Real-path test:** none.
+- **Runtime evidence:** none.
+- **Status:** `unproven`
+- **History:**
+  - 2026-10-21 W40.b4 — row written, `unproven`.
+- **Notes:** **Drift.** "Captured photos are kept and upload once you reconnect" (the dialog, `:150`) does not hold for a
+  page whose upload is in flight at Re-pair: its reply from the old Mac marks it sent and the phone deletes it
+  (code read) → `W40.i-fix-ios-pairing-generation` (S2).
 
 ### C-35 · iOS · Full-resolution shutter
 
 - **Promise:** as `C-05`.
 - **Promised in:** `README.md` §Live Capture (On the phone); `CLAUDE.md` §On the phone.
+- **Reached by:** shutter (`I/UI/CaptureScreen.swift:98`) → `capture(.document)` (`:172`) → `camera.capturePhoto`
+  (`I/Camera/CameraController.swift:80`, default `AVCapturePhotoSettings` `:88`) → `vm.addDocumentPhoto`
+  (`I/Capture/CaptureViewModel.swift:187`).
+- **Real-path test:** none.
+- **Runtime evidence:** none.
+- **Status:** `unproven`
+- **History:**
+  - 2026-10-21 W40.b4 — row written, `unproven`.
+- **Notes:** the camera needs a real iPhone (`W40.i4`). Suspect S-022 (format and orientation not set).
 
 ### C-36 · iOS · Box and Folder markers
 
 - **Promise:** as `C-06`.
 - **Promised in:** `README.md` §Live Capture (On the phone); `CLAUDE.md` §On the phone.
+- **Reached by:** Box (`I/UI/CaptureScreen.swift:94`) / Folder (`:102`) → `capture(_:)` (`:172`; reclassifies a selected
+  page, `:173`) → `vm.captureMarker` (`I/Capture/CaptureViewModel.swift:204`).
+- **Real-path test:** none.
+- **Runtime evidence:** none.
+- **Status:** `unproven`
+- **History:**
+  - 2026-10-21 W40.b4 — row written, `unproven`.
 
 ### C-37 · iOS · End segment
 
 - **Promise:** as `C-07`.
 - **Promised in:** `README.md` §Live Capture (On the phone); `CLAUDE.md` §Streaming + never-lose-a-photo;
   `SPEC/relay-object-format.md` A5.
+- **Reached by:** End segment (`I/UI/CaptureScreen.swift:63`) → `finishDocumentSegment` (`I/Capture/CaptureViewModel.swift:309`)
+  → tag sheet (`I/UI/CaptureScreen.swift:128-132`) → `finalizeSegment` (`:334`) → `trySendSegmentComplete` (`:366`).
+- **Real-path test:** `scripts/test-relay-transport.sh` (the iOS `FileRelayTransport.segmentComplete` writes its object;
+  passed 2026-10-21); the view model is untested.
+- **Runtime evidence:** none.
+- **Status:** `unproven`
+- **History:**
+  - 2026-10-21 W40.b4 — row written, `unproven`.
+- **Notes:** ended segments are held in a `Dictionary`, so their tag cards can reach the Mac out of order →
+  `W40.i-fix-ios-polish`.
 
 ### C-38 · iOS · On-phone tagging: Quality and date
 
 - **Promise:** as `C-08`.
 - **Promised in:** `README.md` §Live Capture (On the phone); `CLAUDE.md` §On the phone.
+- **Reached by:** tag sheet (`I/UI/SegmentTagSheet.swift`; Quality values `:61`) → `applyTagsAndContinue`
+  (`I/Capture/CaptureViewModel.swift:319`); long-press (`I/UI/CaptureScreen.swift:83`) → `toggleQ3` (`:217`).
+- **Real-path test:** none.
+- **Runtime evidence:** none.
+- **Status:** `unproven`
+- **History:**
+  - 2026-10-21 W40.b4 — row written, `unproven`.
+- **Notes:** a Q3 toggled during an upload is a pending resend, which the auto-retry and resume filters skip →
+  `W40.i-fix-ios-heartbeat-count`.
 
 ### C-39 · iOS · Uploads as shot, through a durable auto-retrying queue
 
 - **Promise:** as `C-09`.
 - **Promised in:** `README.md` §Live Capture (On the phone); `CLAUDE.md` §Streaming + never-lose-a-photo.
+- **Reached by:** `addDocumentPhoto` (`I/Capture/CaptureViewModel.swift:187`) → `persist` (`:597`) → `enqueueUpload`
+  (`:418`); `startAutoRetry` (`:512`, every 8 s, started at init `:76`); Retry (`I/UI/CaptureScreen.swift:61` →
+  `retryFailed` `:466`).
+- **Real-path test:** `scripts/test-relay-transport.sh` (the transport's retry-safe `postPhoto`; passed 2026-10-21);
+  the queue is untested.
+- **Runtime evidence:** none.
+- **Status:** `unproven`
+- **History:**
+  - 2026-10-21 W40.b4 — row written, `unproven`.
+- **Notes:** photos are kept in Caches, which iOS may empty → `W40.i-fix-ios-photo-storage` (S1); session writes ignore
+  failure → `W40.i-fix-ios-session-durability`. Uploads with the app in the background: suspect S-023.
 
 ### C-40 · iOS · The phone's copy is deleted only after the Mac's durable ack
 
 - **Promise:** as `C-10`.
 - **Promised in:** `README.md` §Live Capture (On the phone); `CLAUDE.md` §Streaming + never-lose-a-photo;
   `SPEC/relay-object-format.md` §The one rule, §Never-lose invariant.
+- **Reached by:** `postPhoto` → `setState(.uploaded)` → `removeConfirmed` (`I/Capture/CaptureViewModel.swift:534`);
+  receipt acceptance `I/Net/FileRelayTransport.swift:35-42`, `I/Net/DriveRelayTransport.swift:40-44`.
+- **Real-path test:** `scripts/test-relay-transport.sh` (no receipt or a mismatched one returns `false`); the deletion
+  in the view model is untested.
+- **Runtime evidence:** none.
+- **Status:** `unproven`
+- **History:**
+  - 2026-10-21 W40.b4 — row written, `unproven`.
+- **Notes:** two code-read ways an unsent photo is deleted: a late reply after Clear marks a new photo with the reused id
+  as sent → `W40.i-fix-ios-clear-generation` (S1); a reply from the Mac just unpaired from →
+  `W40.i-fix-ios-pairing-generation` (S2). Until those land this row cannot honestly move to `works`.
 
 ### C-41 · iOS · The queue survives the app being killed
 
 - **Promise:** as `C-11`.
 - **Promised in:** `README.md` §Live Capture (On the phone, "even across an app crash").
+- **Reached by:** init → `restore()` (`I/Capture/CaptureViewModel.swift:75`, `:567`) → `SessionStore.load`
+  (`I/Capture/SessionStore.swift`).
+- **Real-path test:** none.
+- **Runtime evidence:** none.
+- **Status:** `unproven`
+- **History:**
+  - 2026-10-21 W40.b4 — row written, `unproven`.
+- **Notes:** restore trusts each photo's absolute path, which changes on reinstall (`:567-595`) →
+  `W40.i-fix-ios-photo-storage` (S1); a photo written but not yet listed is never found →
+  `W40.i-fix-ios-session-durability` (S2).
 
 ### C-42 · iOS · Queue-depth heartbeat
 
 - **Promise:** as `C-12`.
 - **Promised in:** `CLAUDE.md` §On the phone, §On the Mac.
+- **Reached by:** `enqueueUpload` and the 8 s loop → `sendStatusReport` (`I/Capture/CaptureViewModel.swift:392`) →
+  `MacClient.reportStatus`.
+- **Real-path test:** none.
+- **Runtime evidence:** none.
+- **Status:** `unproven`
+- **History:**
+  - 2026-10-21 W40.b4 — row written, `unproven`.
+- **Notes:** counts pending and uploading only, not FAILED pages still retrying, and sends each report on its own
+  unordered `Task` (`:392-396`), so the Mac can be told 0 early → `W40.i-fix-ios-heartbeat-count` (S2).
 
 ### C-44 · iOS · Google Drive cloud relay, phone side
 
 - **Promise:** as `C-14`, with the iPhone's own iOS OAuth client (bundle `com.archiveprocessor.capture.ios`).
 - **Promised in:** `README.md` §Live Capture (Transports); `CLAUDE.md` §Google Drive cloud relay ("the iOS transport
   is built + mock-tested"); `ArchiveCapture/README-oauth.md` §iPhone companion; `SPEC/relay-object-format.md` §Epoch.
+- **Reached by:** Sign in (`I/UI/ConnectScreen.swift:150` → `DriveAuth.signIn`, `I/Net/DriveAuth.swift:100`) → Drive chosen
+  at connect when the QR has a relay code (`I/Capture/CaptureViewModel.swift:120-121`, `:128-138`) →
+  `DriveRelayTransport` (`:80`).
+- **Real-path test:** `scripts/test-drive-transport.sh` (the iOS Drive transport over a mock; passed 2026-10-21).
+  Sign-in has no test.
+- **Runtime evidence:** none.
+- **Status:** `unproven`
+- **History:**
+  - 2026-10-21 W40.b4 — row written, `unproven`.
+- **Notes:** **Drift.** "A build with no client id … with Drive sign-in disabled and a message" does not hold: the id is
+  the placeholder `YOUR_IOS_CLIENT_ID.apps.googleusercontent.com` (`I/Net/DriveAuth.swift:73`) and the sign-in button
+  always shows → `W40.i-fix-ios-drive-oauth-client` (S2). Tokens are kept in `UserDefaults` →
+  `W40.i-fix-ios-drive-token-keychain`. A real sign-in needs an iOS OAuth client the owner mints (the `W40.i5` pack).

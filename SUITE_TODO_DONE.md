@@ -12036,3 +12036,20 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   cost; 503/529 get one fixed retry, not exponential backoff; gateway and Local Agent do not grey out rotation or
   batch; `TESTING.md`'s "no test target", "586 PDFs" and "Auto date + manual seg". Docs only, no app build.
   <!-- /W40.b3 -->
+- [x] **W40.b4 — capture feature ledger, Android and iOS [S]** · §W40 — verification phase: prove the Suite works (owner-approved 2026-10-04) · SHIPPED 2026-10-21 (this commit) (lane: processor) (uses: light)
+  `verification/capture.md` §Feature ledger, after `W40.i2`'s parity comparison: 28 rows, one per phone per promised
+  feature (Android C-01–C-14, iOS C-31–C-44, no C-43 since USB is Android-only) plus C-15 for the shared wire contract.
+  Promises written from Processor `README.md`/`CLAUDE.md` §Live Capture, `LIVE_CAPTURE_ANDROID_TEST.md` (phone side),
+  `ArchiveCapture/README-oauth.md` and `SPEC/relay-object-format.md`, committed before the trace (`77bdc91c`); then
+  traced at `e14c5adc`, every `A/`/`I/` `file:line` checked mechanically and the tricky ones by eye. Count:
+  `unproven 27 · works 1` — C-02 (Android manual-entry pairing) on `W40.a3`'s emulator round trip, which is also
+  partial evidence for C-05/C-07/C-09/C-10 (its shutter taps go through the DEBUG inject seam, not the camera). Every
+  iOS row is `unproven`: the app has never run (no simulator runtime); its code-read gaps name their `W40.i-fix-ios-*`
+  items but make no row `broken` (rule 5). `scripts/test-relay-transport.sh` and `scripts/test-drive-transport.sh`
+  (iOS transports) were run and pass. No row unreachable, no new suspect, no owner decision.
+  **Drift for `W40.b5`:** Android opens on a Wired/Wi-Fi/Cloud chooser, not the scanner (A1); a non-pairing QR is
+  refused silently on Android; recovered pages against a stale session are held, not uploaded (C-11); the iOS Re-pair
+  dialog's "captured photos are kept" fails for an in-flight upload (C-34); the iOS build has no "unconfigured" state
+  for Drive sign-in (C-44); `CLAUDE.md`'s "verified end-to-end 2026-07-07" for the Android Drive relay has no evidence
+  file. Docs only, no app build.
+  <!-- /W40.b4 -->
