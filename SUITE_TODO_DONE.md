@@ -12450,3 +12450,16 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
     (>6 words: reading order) places; 20 random pages (seed 46), 59 places, A/B in random order, key not loaded by the
     sheet; about 14 minutes. Answers: {page: {item: a|b|either|=typed}}. Scored by W46.fix-ocr-truth-bias-score.
   <!-- /W46.fix-ocr-truth-bias -->
+- [x] **W40.d5 — live capture with hand-driven review [M]** · §W40 — verification phase · SHIPPED 2026-10-21 (this commit) (blocked-on: W42.int-done) (lane: processor) (uses: build) (blocked-on: W40.b4, W40.c1). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §D.
+  The journey: `PROCESSOR_JOURNEY=livecapture ops/gui/vm-gui-runner.sh processor xcuitest` runs `LiveCaptureJourneyUITests`
+  in the VM (tag cards, Finish, collection name and Finalize by hand; no AUTOSKIPTAGS/AUTOFINALIZE) while
+  `ArchiveProcessor/scripts/live-capture-journey-phone.sh` pairs the real companion on a headless AVD and injects seven
+  real Dean Papers photos, through `scripts/tcp-relay.py` over the Tart agent (the host cannot route to the VM's
+  192.168.64.x). Apple Vision, $0. Run 5 green (615 s): typed subject/year/Q2 landed as Finder tags in Copy source
+  mode; originals reached the Trash 8 s after the last PDF (guest stat); a read-only output kept every original;
+  Stage for later handed two photos to Process Files. Ledger: P-47 `broken`, P-50 `works`, P-49/P-51/C-07 evidence.
+  Filed `W40.fix-live-vision-drops-card-tags` (S2: No tagging, Apple Vision's default, drops every card value) and
+  `W40.fix-live-finalize-failure-silent` (S3). Also fixed `android-ui-drive.sh`: adb, qemu and the gradle daemon no
+  longer start inside heavy-run's session, where they held the Mac-wide heavy lock for as long as they lived.
+  Evidence: `verification/evidence/processor/W40.d5-live-capture.md`.
+  <!-- /W40.d5 -->

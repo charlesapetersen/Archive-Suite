@@ -83,7 +83,13 @@ final class LiveCaptureJourneyUITests: XCTestCase {
 
         // Originals: gone from the session folder once their output is filed (CaptureSession.clearFiled →
         // trashOrRemove). The host checks the Trash and the timestamps from outside the sandbox.
-        let remaining = originals(under: backup)
+        // The move comes after the last PDF lands (run 4: PDFs by …671, originals moved at …678), so wait for it.
+        var remaining = originals(under: backup)
+        let trashDeadline = Date().addingTimeInterval(60)
+        while !remaining.isEmpty, Date() < trashDeadline {
+            RunLoop.current.run(until: Date().addingTimeInterval(1))
+            remaining = originals(under: backup)
+        }
         XCTAssertTrue(remaining.isEmpty, "every filed original must have left the session folder: \(remaining)")
         attachScreenshot("w40d5-live-finalized")
     }
@@ -253,8 +259,13 @@ final class LiveCaptureJourneyUITests: XCTestCase {
         files(under: dir).filter { $0.pathExtension.lowercased() == "pdf" }
     }
 
+    /// The received photos in the session folder, not the staged outputs beside them in `_processed/` (in Copy
+    /// source mode those include a renamed copy of each image).
     private func originals(under dir: URL) -> [URL] {
-        files(under: dir).filter { ["jpg", "jpeg", "heic", "png"].contains($0.pathExtension.lowercased()) }
+        files(under: dir).filter {
+            ["jpg", "jpeg", "heic", "png"].contains($0.pathExtension.lowercased())
+                && !$0.pathComponents.contains("_processed")
+        }
     }
 
     private func files(under dir: URL) -> [URL] {

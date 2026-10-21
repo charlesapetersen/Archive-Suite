@@ -13,8 +13,10 @@ find "$out" -name '*.pdf' -exec stat -f '%m %B %N' {} \;
 echo "== their Finder tags (xattr com.apple.metadata:_kMDItemUserTags)"
 find "$out" -name '*.pdf' | while IFS= read -r f; do
   echo "$f"
-  xattr -px com.apple.metadata:_kMDItemUserTags "$f" 2>/dev/null | xxd -r -p \
-    | plutil -convert xml1 -o - - 2>/dev/null | sed -n 's/.*<string>\(.*\)<\/string>.*/    \1/p'
+  python3 -c 'import plistlib, subprocess, sys
+r = subprocess.run(["xattr", "-px", "com.apple.metadata:_kMDItemUserTags", sys.argv[1]], capture_output=True, text=True)
+tags = plistlib.loads(bytes.fromhex("".join(r.stdout.split()))) if r.returncode == 0 else []
+print("    " + (", ".join(repr(t) for t in tags) if tags else "(no tags)"))' "$f"
 done
 echo "== session folder after finalize"
 find "$backup" -print

@@ -981,12 +981,16 @@ cover the Mac: the receiver, the tag card, the drain gate, staging, finalize and
   `Net/FileRelayReceiver.swift:229`) → `markSegmentComplete` (`Capture/CaptureSession.swift:839`) → `pendingTagGroup`
   → sheet (`Views/LiveCaptureView.swift:114-121`) → `SegmentTagCard` (`:897`) → Save (`:1109`) / Skip (`:1118`) →
   `applyMacTags` / `skipMacTags` (`Capture/CaptureSession.swift:917`, `:936`).
-- **Real-path test:** no UITest. `scripts/test-manifest-persistence.sh` (persistence and rollback on a failed Save);
-  `scripts/test-recovery.sh` (phone Q3, card 0 writes no tag, copy-source quality). Nothing renders the card.
-- **Runtime evidence:** none (the E2E auto-skips cards).
-- **Status:** `unproven`
+- **Real-path test:** `PROCESSOR_JOURNEY=livecapture ops/gui/vm-gui-runner.sh processor xcuitest` (`LiveCaptureJourneyUITests`, real companion on a headless AVD; W40.d5) fills, skips and saves cards by hand. Also `scripts/test-manifest-persistence.sh`
+  (persistence and rollback on a failed Save); `scripts/test-recovery.sh` (phone Q3, card 0 writes no tag, copy-source
+  quality).
+- **Runtime evidence:** 2026-10-21 · W40.d5 · [`evidence/processor/W40.d5-live-capture.md`](evidence/processor/W40.d5-live-capture.md): with Copy source file tags, the typed subject, typed year and
+  picked Q2 landed as `W40d5 Dean Alpha`, `1973`, `Q2` on their PDF, a skipped card's PDF carried none. With Apple
+  Vision's default No tagging the same card values were written nowhere.
+- **Status:** `broken` — `W40.fix-live-vision-drops-card-tags` (S2).
 - **History:**
   - 2026-10-21 W40.b3 — row written, `unproven`.
+  - 2026-10-21 W40.d5 — `broken`: works in Copy source mode, the card's tags are dropped in No tagging.
 - **Notes:** **Drift.** "Fully keyboard-driven": ⏎ on an empty field saves (`Views/LiveCaptureView.swift:1086-1089`),
   but Skip has no keyboard route and esc only clears the draft (`:1102-1107`). S-021 (Android relay) can stop a card
   appearing.
@@ -1025,11 +1029,14 @@ cover the Mac: the receiver, the tag card, the drain gate, staging, finalize and
 - **Real-path test:** `scripts/test-recovery.sh` (confirm-before-delete, Trash not remove, placeholder sources held,
   stragglers; `Capture/LiveCaptureRecoveryTestDriver.swift:164-404`, `:634-735`). Direct calls; the reveal button is
   untested.
-- **Runtime evidence:** none (the E2E log names the backup path and "3 files moved", not what stayed or went to the
-  Trash).
+- **Runtime evidence:** 2026-10-21 · W40.d5 · [`evidence/processor/W40.d5-live-capture.md`](evidence/processor/W40.d5-live-capture.md): after a hand-driven finalize every original and `_processed`
+  reached `~/.Trash` 8 s after the last PDF was on disk (guest `stat`: PDFs …928/…964/…020, Trash ctime …028), the
+  session folder kept only `manifest.json`; with the output folder read-only nothing filed and both originals stayed.
+  The Backup Folder button was not pressed, so the row stays `unproven` on that part alone.
 - **Status:** `unproven`
 - **History:**
   - 2026-10-21 W40.b3 — row written, `unproven`.
+  - 2026-10-21 W40.d5 — Trash ordering and keep-on-failure shown; the reveal button not.
 - **Notes:** in Stage for later nothing ever retires the backup photos (the only `clearFiled` caller is the live
   finalize), so they stay until a manual Clear. Safe, but not "until the run's output is finalized".
 
@@ -1042,12 +1049,14 @@ cover the Mac: the receiver, the tag card, the drain gate, staging, finalize and
 - **Reached by:** ⌘, → When capturing (`Views/SettingsView.swift:961`, default stage `:90`) → Process N →
   (`Views/LiveCaptureView.swift:576`) → `stageForProcessing` (`:721`) → `orderedFilesAndGroups`
   (`Capture/CaptureSession.swift:948`) → `onProcess` (`ContentView.swift:136`) → `Views/OCRView.swift:317-343`.
-- **Real-path test:** none for the hand-off (`Capture/LiveCaptureRecoveryTestDriver.swift:3927`, `:4015` check only
-  the filtering in `orderedFilesAndGroups`).
-- **Runtime evidence:** none.
-- **Status:** `unproven`
+- **Real-path test:** `PROCESSOR_JOURNEY=livecapture ops/gui/vm-gui-runner.sh processor xcuitest` (`LiveCaptureJourneyUITests`, real companion on a headless AVD; W40.d5), stage phase (clicks Process N → and checks Process Files has the photos);
+  `Capture/LiveCaptureRecoveryTestDriver.swift:3927`, `:4015` check the filtering in `orderedFilesAndGroups`.
+- **Runtime evidence:** 2026-10-21 · W40.d5 · [`evidence/processor/W40.d5-live-capture.md`](evidence/processor/W40.d5-live-capture.md): two photos from the phone, "Process 2 →", Process Files listed both
+  with the session's tagging mode and the cost line.
+- **Status:** `works`
 - **History:**
   - 2026-10-21 W40.b3 — row written, `unproven`.
+  - 2026-10-21 W40.d5 — `works`.
 - **Notes:** suspect `S-039` (the same photos can be handed off twice).
 
 ### P-51 · Process live
@@ -1069,10 +1078,13 @@ cover the Mac: the receiver, the tag card, the drain gate, staging, finalize and
 - **Runtime evidence:** partial. 2026-10-11 · `0511d85c` · [`evidence/capture/W40.a3-phone-e2e.md`](evidence/capture/W40.a3-phone-e2e.md):
   OCR on arrival, three tagged PDFs filed into one collection. The collection was auto-named, merge was off, rotation
   off, and only PDFs were asserted, so the name sheet, the fuzzy match, merging and the renamed image copies were not
-  shown.
+  shown. 2026-10-21 · W40.d5 · [`evidence/processor/W40.d5-live-capture.md`](evidence/processor/W40.d5-live-capture.md): Apple Vision OCR on arrival, Finish by hand, the collection named in the sheet,
+  three PDFs numbered 00001-00003; the fuzzy match, merging and numbering into an existing folder still not shown. A
+  finalize that files nothing (read-only output) shows no message at all: `W40.fix-live-finalize-failure-silent` (S3).
 - **Status:** `unproven`
 - **History:**
   - 2026-10-21 W40.b3 — row written, `unproven`.
+  - 2026-10-21 W40.d5 — evidence added; still `unproven` (append, merge not shown).
 - **Notes:** `similarity()` scores any substring match 0.9 with no minimum length
   (`Capture/LiveCaptureProcessor.swift:2693-2695`), so a folder named "A" ranks high for most names.
 

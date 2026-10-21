@@ -269,9 +269,11 @@ Paths: `A/` and `I/` as in the parity comparison above; `scripts/` is `ArchivePr
 - **Real-path test:** the E2E (End segment, then Skip, per document).
 - **Runtime evidence:** partial. 2026-10-11 · `0511d85c` · [`evidence/capture/W40.a3-phone-e2e.md`](evidence/capture/W40.a3-phone-e2e.md):
   three single-page segments ended and were filed. The deferral of a segment with a page still unsent was not shown.
+  2026-10-21 · W40.d5 · [`evidence/processor/W40.d5-live-capture.md`](evidence/processor/W40.d5-live-capture.md): seven more single-page segments of real photos ended, each raising its Mac tag card.
 - **Status:** `unproven`
 - **History:**
   - 2026-10-21 W40.b4 — row written, `unproven`.
+  - 2026-10-21 W40.d5 — more partial evidence; deferral still not shown.
 - **Notes:** the phone holds the segment-complete until its pages are sent; the Mac's own deferral is P-47's. With no
   page captured, End segment says so instead of doing nothing (`:615-622`).
 
