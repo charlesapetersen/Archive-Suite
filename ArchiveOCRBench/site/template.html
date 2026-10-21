@@ -414,7 +414,9 @@ const publicSeg = DATA.public_segmentation || [];
 const publicSegNames = {'all-new': 'Every page starts a document', 'no-boundaries': 'Whole box is one document',
   'rule-cues-sketch': 'Rule sketch + Apple Vision', 'rule-cues': 'Rules fitted on owner development boxes + Apple Vision',
   'fs-qwen3.5-27b': 'Qwen3.5 27B teacher · FarmShare', 'fs-seg-2b': 'Trained Qwen3.5 2B · FarmShare',
-  'fs-seg-4b': 'Trained Qwen3.5 4B · FarmShare'};
+  'fs-seg-4b': 'Trained Qwen3.5 4B · FarmShare',
+  'window-cues-claude': 'Claude Sonnet 5.5 windows · plan', 'window-cues-claude-cue': 'Claude Sonnet 5.5 windows, stated letter cues · plan',
+  'window-cues-codex': 'ChatGPT gpt-6.1-sol windows · plan', 'window-cues-codex-cue': 'ChatGPT gpt-6.1-sol windows, stated letter cues · plan'};
 document.getElementById('public-seg-rows').innerHTML = publicSeg.flatMap(b => Object.entries(b.models)
   .sort((a, c) => c[1].metrics.pages_in_exact_doc - a[1].metrics.pages_in_exact_doc)
   .map(([k, r]) => '<tr><td>' + b.box + '</td><td>' + b.pages + ' / ' + b.documents + '</td><td>' + (publicSegNames[k] || k) +

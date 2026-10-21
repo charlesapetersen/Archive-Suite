@@ -4,6 +4,8 @@
     python method_window_cues.py collect opus [Deaver]     # claude -p with Opus 5.5 (cached)
     python method_window_cues.py collect codex [Deaver]    # codex exec, subscription (cached)
     python method_window_cues.py report [Deaver]           # scores; segbench-results/cues-models-<box>.md
+    python method_window_cues.py collect claude-cue [Dean Deaver Herrnstein]   # c2: c1 plus stated letter cues
+    SEGBENCH_CACHE=ROOT/cache python method_window_cues.py collect-public ROUTE ROOT [lincoln crest]
 
 Owner, 2026-10-05, after Gemini 3.8 Flash matched window-claude on Deaver: "Test Claude on just that box so
 we can compare. Also try Codex for comparison." So the three models get the SAME prompt: method_gemini's
@@ -43,10 +45,13 @@ PROMPT_VERSION = "c1"
 CODEX_BIN = "/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex"
 CODEX_MODEL, CODEX_EFFORT = "gpt-6.1-sol", "low"
 USAGE_SH = Path("/Users/cp1/Claude/Archive Suite/ops/autonomous/usage-window.sh")
-ROUTES = ("claude", "opus", "codex")
-CLAUDE_MODELS = {"claude": "claude-sonnet-5-5", "opus": "claude-opus-5-5"}
-CLAUDE_READING_LOG = Path.home() / ".local/state/visionocr-autonomous/last-session.log"
-GUARD = {"claude": 70, "opus": 70, "codex": 100}
+ROUTES = ("claude", "opus", "codex", "claude-cue", "codex-cue")
+CLAUDE_MODELS = {"claude": "claude-sonnet-5-5", "opus": "claude-opus-5-5", "claude-cue": "claude-sonnet-5-5"}
+CUE_PROMPT_VERSION = "c2"   # c1 plus the stated letter cues (W46.seg-lincoln-cloud)
+# The Vision OCR daemon's session log and this project's own (the engine's current session); the fresher reading
+# of the two counts. The first alone went stale (last written 2026-10-08) and then read as 0%, so no guard at all.
+CLAUDE_READING_LOGS = (Path.home() / ".local/state/visionocr-autonomous/last-session.log", None)
+GUARD = {"claude": 70, "opus": 70, "codex": 100, "claude-cue": 70, "codex-cue": 100}
 CONCURRENCY = 3
 STAGGER_S = 4.0
 
@@ -71,6 +76,24 @@ def prompt_template(route: str) -> str:
     return G.PROMPT.replace(_IMAGES_G, _IMAGES["codex" if route == "codex" else "claude"]).replace(_ANSWER_G, _ANSWER)
 
 
+def cue_block(col, nums, idx) -> str:
+    """W46.seg-lincoln-cloud (G-entities test 4, prompt arm): features_cues' letter patterns, as a stated cue."""
+    import features_cues as FC
+    lines = []
+    for (n, i), (m, j) in zip(zip(nums, idx), zip(nums[1:], idx[1:])):
+        sal, clo, _both, _hdr = FC.letter_features(col.text(i), col.text(j))
+        said = [w for w, on in (("page %d opens with a salutation or memo heading" % m, sal),
+                                ("page %d ends with a closing, signature or enclosure line" % n, clo)) if on]
+        if said:
+            lines.append(f"- gap [{n}, {m}]: " + "; ".join(said))
+    return ("\n\nSTATED LETTER CUES. A pattern check over the OCR text above, at the head of each page and the foot of "
+            "the page before. It reads printed and typed text and misses most handwriting. Where it fires it is "
+            "right about nine times in ten: a salutation after a closing almost always starts a new document, "
+            "either alone is good evidence, and a line repeated at the head of both pages (a running header) was "
+            "not counted as a salutation. A gap not listed had neither cue, which says little either way.\n"
+            + ("\n".join(lines) if lines else "- none in this window") + "\n")
+
+
 def build_request(route, col, a, b):
     nums = [col.pages[i].n for i in range(a, b)]
     thumbs = [data.thumbnail(col.name, col.pages[i], W.THUMB_PX) for i in range(a, b)]
@@ -79,6 +102,8 @@ def build_request(route, col, a, b):
     files = "\n".join(f"- {W.fname(n)}  (page {n})" for n in nums)
     texts = "\n".join(f"--- page {n} ---\n{W.page_text(col, i)}" for n, i in zip(nums, range(a, b)))
     gaps = ", ".join(f"[{x}, {x + 1}]" for x in nums[:-1])
+    if route.endswith("-cue"):
+        texts += cue_block(col, nums, list(range(a, b)))
     prompt = prompt_template(route).format(k=len(nums), files=files, texts=texts, gaps=gaps, max_text=W.MAX_TEXT,
                                            pages=", ".join(str(n) for n in nums))
     return prompt, thumbs, nums
@@ -86,6 +111,10 @@ def build_request(route, col, a, b):
 
 def model_of(route):
     return CLAUDE_MODELS.get(route) or f"{CODEX_MODEL}/{CODEX_EFFORT}"
+
+
+def version_of(route):
+    return CUE_PROMPT_VERSION if route.endswith("-cue") else PROMPT_VERSION
 
 
 CACHES = {r: data.ResponseCache(f"window-cues-{r}") for r in ROUTES}
@@ -149,7 +178,7 @@ def codex_usage(output: str) -> dict | None:
 def judge(route):
     def judge_window(col, a, b, allow_call=True):
         prompt, thumbs, nums = build_request(route, col, a, b)
-        key = data.response_cache_key(model_of(route), PROMPT_VERSION, prompt, [data.file_hash(t) for t in thumbs])
+        key = data.response_cache_key(model_of(route), version_of(route), prompt, [data.file_hash(t) for t in thumbs])
         hit = CACHES[route].get(key)
         if hit is not None:
             return W.parse_answer(hit["result"], nums)
@@ -165,7 +194,7 @@ def judge(route):
         last = None
         for attempt in range(3):
             try:
-                out = call_codex(prompt, wd, files) if route == "codex" else W.call_claude(prompt, wd)
+                out = call_codex(prompt, wd, files) if route.startswith("codex") else W.call_claude(prompt, wd)
             except W.UsageLimit:
                 log(route, {"collection": col.name, "window": nums, "event": "usage-limit", "t": time.time()})
                 raise
@@ -195,10 +224,9 @@ def judge(route):
 
 
 def used_pct(route) -> int:
-    # Claude: the Vision OCR daemon's live session log carries the account's readings; claude -p --output-format
-    # json carries none, and this script's default LOG (the Archive Suite daemon's) is a Codex session now.
-    args = ["--raw"] + (["--codex-latest"] if route == "codex" else [str(CLAUDE_READING_LOG)])
-    r = subprocess.run(["bash", str(USAGE_SH), *args], capture_output=True, text=True)
+    if not route.startswith("codex"):
+        return _claude_pct()
+    r = subprocess.run(["bash", str(USAGE_SH), "--raw", "--codex-latest"], capture_output=True, text=True)
     try:
         pct, resets = r.stdout.split()[:2]
     except ValueError:
@@ -215,14 +243,32 @@ def used_pct(route) -> int:
         return 100
 
 
-def collect(route, names, allow_test=False):
-    """``allow_test`` is for options.py's ``collect-openai-test --final`` only, which checks the freeze first."""
-    if not allow_test:
+def _claude_pct() -> int:
+    """Claude: claude -p --output-format json carries no reading, so the account's comes from a session log. The
+    highest reading whose window has not reset counts; with none, stop rather than spend blind."""
+    now, best = time.time(), None
+    for log_path in CLAUDE_READING_LOGS:
+        r = subprocess.run(["bash", str(USAGE_SH), "--raw", *([str(log_path)] if log_path else [])],
+                           capture_output=True, text=True)
+        try:
+            pct, resets = (float(x) for x in r.stdout.split()[:2])
+        except ValueError:
+            continue
+        if resets > now:
+            best = max(best or 0, int(pct))
+    return 100 if best is None else best
+
+
+def collect(route, names, allow_test=False, cols=None):
+    """``allow_test`` is for options.py's ``collect-openai-test --final`` only, which checks the freeze first.
+    ``cols``: already-loaded collections (the public boxes, public_segmentation.load) instead of ``names``."""
+    if cols is None and not allow_test:
         W.refuse_test(names)
     if route in CLAUDE_MODELS:
         W.MODEL = CLAUDE_MODELS[route]  # read by W.call_claude; one route per process
     jw = judge(route)
-    jobs = [(c, a, b) for n in names for c in [data.load(n, with_exif=False)] for a, b in W.windows(len(c.pages))]
+    cols = cols if cols is not None else [data.load(n, with_exif=False) for n in names]
+    jobs = [(c, a, b) for c in cols for a, b in W.windows(len(c.pages))]
     todo = [j for j in jobs if jw(*j, allow_call=False) is None]
     print(f"{route}: {len(jobs)} windows, {len(todo)} to call", flush=True)
     stop, done, t0 = threading.Event(), [0], time.time()
@@ -289,6 +335,14 @@ def report(name) -> str:
 def main(argv) -> int:
     if len(argv) >= 2 and argv[0] == "collect" and argv[1] in ROUTES:
         collect(argv[1], argv[2:] or ["Deaver"])
+    elif len(argv) >= 3 and argv[0] == "collect-public" and argv[1] in ROUTES:
+        # The public boxes keep their own cache beside their images; every cache and log path above is fixed at
+        # import, so the variable must be set before Python starts, never patched here.
+        root = Path(argv[2]).resolve()
+        if data.CACHE_DIR.resolve() != root / "cache":
+            raise SystemExit(f"set SEGBENCH_CACHE={root / 'cache'} for the public boxes")
+        import public_segmentation as P
+        collect(argv[1], [], cols=[P.load(b, root)[0] for b in argv[3:] or ["lincoln", "crest"]])
     elif argv and argv[0] == "report":
         for name in argv[1:] or ["Deaver"]:
             W.refuse_test([name])

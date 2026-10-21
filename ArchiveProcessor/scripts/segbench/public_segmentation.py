@@ -6,6 +6,7 @@ its image hash, audit and label before OCR/model collection. No paid collection 
   public_segmentation.py --root DIR --box crest verify|ocr|score
   public_segmentation.py --root DIR --box crest pack --key fs-seg-2b --out DIR
   public_segmentation.py --root DIR --box crest score --out-dir STAGED_NUMBERS
+  public_segmentation.py --root DIR --box crest score --key window-cues-claude   # plan-route cache, no calls
 Cluster answers use institutional-compute/cluster_seg.py run/import unchanged. For import, set
 SEGBENCH_CACHE=<root>/cache explicitly, so the owner's benchmark cache/logs are not replaced.
 """
@@ -128,8 +129,16 @@ def score(col, manifest, key, output_dir=None):
         predictions["rule-cues"] = from_labels(labels, cue="fitted on owner development boxes only")
     if key:
         import method_window as W
-        import method_openrouter as R
-        predictions[key] = W.assemble(col, W.combine(col, R.judge(key)), False)
+        if key.startswith("window-cues-"):
+            # W46.seg-lincoln-cloud: the plan routes (claude -p, codex exec), read from their own caches only.
+            import method_window_cues as WC
+            route = key.removeprefix("window-cues-")
+            if route not in WC.ROUTES:
+                raise ValueError(f"unknown window-cues route {route}")
+            predictions[key] = W.assemble(col, W.combine(col, WC.judge(route)), False)  # combine never calls
+        else:
+            import method_openrouter as R
+            predictions[key] = W.assemble(col, W.combine(col, R.judge(key)), False)
     result = {"box": col.name, "public": True, "pages": len(col.pages),
               "documents": Counter(col.labels)["New"], "models": {},
               "truth_sha256": hashlib.sha256(json.dumps(manifest, sort_keys=True).encode()).hexdigest()}
