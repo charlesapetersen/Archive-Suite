@@ -20,6 +20,8 @@ never the real `Test files/` corpus. Mark-Read / tag edits therefore never touch
       **PASS** — Sep 1980 → Oct 1980 → Sep 1982 → undated Red markers (00001/00006) last.
 - [~] **C. Read-state filter** — not driven directly this pass; the filter engine is exercised by F/G
       (filename/FTS narrow the set correctly) and the Unread/Read/No-read-state/All tabs render.
+      *(Now: the filter-bar picker offers All/Unread/Read only; No-read-state is the Options default or a
+      smart folder.)*
 - [x] **D. Priority filter (historical; superseded by Quality)** — **PASS**. P10 verified
       pre-compaction; the by-name sort this pass shows each row's P-value (P8/P9/P10, markers none),
       matching the Priority chips. The current Quality replacement is recorded separately below.
@@ -28,6 +30,7 @@ never the real `Test files/` corpus. Mark-Read / tag edits therefore never touch
 - [x] **F. Filename filter** — **PASS**. Typing "00030" → "1 shown · 30 total" (exactly 00030); Clear resets.
 - [x] **G. Full-text OCR search** — **PASS**. Submit-on-Return: "California" → 30 (all docs mention it;
       confirmed in the OCR body), nonsense "zzzqqxnope" → "0 shown · No matches". Content index built.
+      *(Now: there is no submit; the search runs as you type, 150 ms after the last keystroke.)*
 - [x] **H. Sort menu** — **PASS**. "Sort by File Name" reorders 00001,00002,… (markers inline);
       "Sort by Document Date" restores chronological.
 - [x] **I. Open two-up viewer (⌘O)** — **PASS**. Image left / OCR text right, title "00015…pdf 1 of 1",
@@ -136,6 +139,8 @@ sheet-confirm flows (save-smart-folder, tag-rename) are `[~]` — verified by un
 - [~] **Open in Default App (C7)** — read-only `NSWorkspace.open` in the row context menu.
 - [x] **Read single-click toggle (C8)** — clicking a Read cell flips Unread↔Read (00015 Unread→Read on
       disk + re-rendered); right-click for explicit set/clear. **PASS** (GUI + `xattr`).
+      *(Since lost: this ran on the SwiftUI `Table`; the AppKit table's Read column is a plain label, so
+      the gesture is unreachable until `W40.fix-reader-read-toggle`.)*
 - [~] **Corpus-wide tag rename (D1, Tier-2)** — unit tests assert the primitive swaps only that tag,
       preserves other tags, leaves bytes unchanged, and undo (inverse delta) restores it; the rename
       **sheet opens with the correct affected count** ("Affects 27 files. Undoable as a single step").

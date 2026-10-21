@@ -7,7 +7,7 @@ filter by subject / quality / read-state, read them two-up (image + OCR text), c
 file links, and mark them Read as you go.
 
 > **Status:** Shipped — v1 plus a full P2 pass (non-standard-PDF detection, near-duplicate tag
-> finder, document-viewer refinements, duplicate-filename disambiguation); 186 tests green. **This
+> finder, document-viewer refinements, duplicate-filename disambiguation); unit and UI test bundles green. **This
 > file is the durable record** for the Reader. **Core Directive**, **Verified Facts**, and **Safety
 > Protocol** below are settled and non-negotiable; the keyboard map, options, edge-case rules, and
 > decisions are folded into the sections below.
@@ -177,10 +177,13 @@ add {"1981"}`. All of the following hold for every delta.
    (`applyOccurrence(undoing:)`, W45.undo-still-applied; detail in `KNOWN_ISSUES.md`).
 10. **Group edits** show tri-state presence (on all / some / none of the selection, like Finder);
     "add X" affects only files lacking X, "remove X" only files having it. The Read/Unread fast-path
-    default does **not** add a read-state token to a marker/neither file (option, off).
+    default does **not** add a read-state token to a marker/neither file. *As shipped:* this is
+    hard-coded, not an Options toggle (`TagWriter.setReadState(addIfMissing:)` defaults to `false`;
+    the only `true` caller is the unwired `setReadStateInline`; ledger R-19).
 11. **Batch = independent idempotent units** (bounded concurrency), never all-or-nothing. Surface
     partial failures ("12 of 15 updated; 3 could not — Retry"); a row leaves a filtered view only
-    after its write **verified**.
+    after its write **verified**. *As shipped:* the status line reads "Marked N; M could not update."
+    and no Retry is offered anywhere (ledger R-19; undo's retry question is `W40.fix-reader-undo-partial`).
 12. **Append-only audit ledger** of `{path, bookmark, delta, before[], after[], timestamp}` for
     every change — transparency/history and inverse-delta undo source, *not* blind full-array restore.
     *Mechanism (W40.audit-ledger):* `Core/AuditLedger.swift`, one JSON line per verified `TagWriter`
@@ -278,7 +281,7 @@ writes against the real corpus — always a copy.
 *Navigation window*
 - `↑/↓` move selection · `⇧↑/⇧↓` extend · `⌘A` select all · type letters/digits = type-select *(native `Table`)*
 - `Space` Quick-Look-style **Preview** (2-up peek; fires only when the list has key focus) · `⌘Y` Preview (menu) ·
-  `⏎`/double-click or `⌘O` open in the document window
+  double-click or `⌘O` open in the document window (`⏎` has no handler; ledger R-35)
 - `⌘R` Mark Read · `⌘U` Mark Unread · `⌘I` Edit Tags… · `⌘⇧F` Toggle Flag · `⌘Z` Undo tag change (grouped; **no redo binding**)
 - **Keyboard triage (G4):** `⌘]`/`⌘[` Next/Previous Unread · `⌘⇧M` Mark Read & Next Unread (mark Read via `TagWriter`,
   then jump to the next `Unread`). Focus-scoped bare-key equivalents fire only when the list has key focus
@@ -287,13 +290,18 @@ writes against the real corpus — always a copy.
 - `⌘⇧C` Copy Link(s) · `⌘⇧R` Reveal in Finder · `⌘⇧O` Choose Archive Folder…
 - `⌘L` focus tag filter · `⌘⌥F` Search OCR text · `⌘⇧K` Clear filters & search
 - *Menu-only (no shortcut):* Sort by Date/Name/Quality/Read-state · Rename Tag… · Find Similar Tags… ·
-  Save Current Search… · Select Document Run · Open in Default App
+  Save Current Search… · Select Document Run
+- *Sorting:* each Sort menu item sets that field, then name, both ascending. A column-header click also
+  sorts (including Type and Tags, which the menu lacks); a second sort level is set from the header's
+  right-click menu (Set as Secondary Sort / Default Sort).
+- *Row context menu only (no menu-bar item):* Open in Default App — opens every selected file, read-only.
 
 *Document window* (the **focused pane** carries an accent border; switch it with `⌘⌥←`/`⌘⌥→`)
 - `↑/↓` **scroll** the focused page (PDFView) — *not* document cycling
 - `⌘⇧↑/⌘⇧↓` previous/next page in the segment (the opened run/selection)
 - `⌘⌥←`/`⌘⌥→` focus image pane / focus text pane
-- `⌘↑`/`⌘↓` zoom in/out the focused pane · `⌘0` fit the focused page · `⌥⌘0` reset split + zoom to defaults
+- `⌘↑`/`⌘↓` zoom in/out the focused pane · `⌘0` fit the focused page · `⌥⌘0` reset the split to the saved
+  default (not necessarily ⅔) and fit both panes
 - `⌘C` copy verbatim · `⌘⇧C` copy cleaned-for-prose (intelligent)
 - `⌘F` find in the open document(s) · `⌘G`/`⇧⌘G` next/previous match (highlight-all, wraps, "N of M" across open docs)
 - `⌘,` Options (both windows)
@@ -316,7 +324,8 @@ writes against the real corpus — always a copy.
 
 - **Copying links:** link format (`file://` URL · POSIX path · Markdown · HTML) · blank lines between links (0–5).
 - **Copying text:** collapse single line breaks → spaces (on) · blank line = paragraph break (on) · rejoin hyphenated line-splits (on).
-- **Document viewer:** default split (image %/text %, 0.2–0.8). Per-pane zoom, split position, and window
+- **Document viewer:** default split (image %/text %, 0.2–0.8; a splitter drag clamps to 0.15–0.85 and
+  saves to the same setting, so the stored value can sit outside the slider's range). Per-pane zoom, split position, and window
   size are **not** toggles — the viewer persists the *last used* value as the next default (DV-1/DV-2).
 - **Navigation defaults:** default read-state filter (All / Unread / Read / No-read-state) · combine subject filters with ANY (off = ALL).
 - **File list:** list text size (10–20 pt; smaller = denser rows).
@@ -336,6 +345,8 @@ writes against the real corpus — always a copy.
   PDFs are legitimate (`PDFFormatStatus`); a file is flagged only when unreadable or text-less. Tagged
   non-PDF images stay listed (they carry read-state); the viewer degrades.
 - **Neither Read nor Unread:** tri-state "No-read-state" bucket; markers stay visible, never silently lost.
+  The filter bar's picker offers All/Unread/Read only; No-read-state is reached as the Options default, a
+  smart folder, or saved view state (ledger R-07).
 - **Read-failure ≠ empty tags:** abort the write (Safety Protocol §3).
 - **Duplicate filenames across boxes:** colliding rows show their containing folder as a subtitle
   (`DuplicateNames`); copied link groups carry full paths.
@@ -352,8 +363,9 @@ writes against the real corpus — always a copy.
 - **Discovery = owned filesystem truth** over the granted archive root; `LibraryIndex` is an OS-SQLite
   warm cache, FSEvents supplies live dirtiness, and files tagged `Read`/`Unread` form the visible universe.
   No third-party ORM.
-- **Subject filters AND by default** (OR/NOT via toggle); read-state is a tri-state filter; "Mark Read"
-  never adds a read-state token to a marker/neither file (option, off).
+- **Subject filters AND by default** (ANY/OR via the Options toggle or the tag cloud's All/Any; there is
+  no NOT); read-state is a tri-state filter; "Mark Read" never adds a read-state token to a marker/neither
+  file (hard-coded, not an Options toggle).
 - **Facet classification is display/sort/filter only** — never drives a write.
 - **Full tag editing is first-class** (single + group), always via `TagWriter`; free-form subjects with
   autocomplete + near-duplicate warning (`TagSimilarity`) to curb fragmentation.
@@ -441,8 +453,12 @@ Views/
   SidebarView.swift           Left sidebar: Smart Folders (saved searches) + a navigable folder tree
                               (List(selection:)+OutlineGroup). Durable smart-folder highlight; folder
                               selection exits the scope.
-  InlineEditCells.swift       Supporting SwiftUI cell views retained from the pre-AppKit table: ReadStateCell,
-                              DateCell. Multi-file edits use the ⌘I editor.
+  InlineEditCells.swift       DEAD CODE: SwiftUI cells left from the pre-AppKit table, referenced nowhere
+                              (the AppKit Read and Date columns are plain labels). ReadStateCell stays until
+                              W40.fix-reader-read-toggle wires the click/right-click into the AppKit Read
+                              column; DateCell is deleted by W40.fix-reader-sent-with-date. Dates (incl.
+                              Sent-With, once that item ships) are edited in the ⌘I sheet, the one date
+                              editor (owner, 2026-10-12); there is no inline date editing in the list.
                               The inline per-row subject editor is AppKitTableView's TagTokenCellView
                               (NSTokenField): autocomplete from the corpus; edit-start-base diff → ONE
                               TagWriter delta; commits the field's tokens on blur — WYSIWYG, so a
@@ -474,14 +490,16 @@ durable-link types (`DurableLink`/`ArchiveLinkPayload`/`RootMarker`), `PDFThumbn
 **The Finder-tag write choke-point is `ArchiveCore.CoordinatedTagWriter`**
 (`Tags/TagWrite.swift`): Reader's `TagWriter` is a thin *delta adapter* over it and Processor's `MacOSTagger`
 is the *fresh-write adapter* — no app calls `setResourceValue` directly, so the coordinated metadata-only
-write + verify can never drift between apps. **Build lane:** `swift test` in `packages/ArchiveCore` (~100
+write + verify can never drift between apps. **Build lane:** `swift test` in `packages/ArchiveCore` (its
 unit tests); both apps depend on it via `project.yml` (`packages: ArchiveCore` → `path: ../../packages/ArchiveCore`).
 A change here is **Tier-2** and must build+test all three apps (Reader + Processor + Notes). SPEC:
 [`../SPEC/tag-format.md`](../SPEC/tag-format.md).
 
 UI shipped in two owner-requested batches (Batch 1 refinements; Batch 2: sidebar, smart folders,
 item-4 wins, tag rename) — see `git log` for the detail.
-`ArchiveReader/Tests/ArchiveReaderTests/` — 30 test files (266 tests). `scripts/lint-write-surface.sh`
+Tests: `macOS/Tests/ArchiveReaderTests/` (unit, app-hosted) and `macOS/Tests/ArchiveReaderUITests/`
+(XCUITest, off-screen VM only). No count is kept here because it goes stale; `grep -r 'func test'` a
+bundle for the current one. `scripts/lint-write-surface.sh`
 enforces the write surface across the Reader target **and** `packages/ArchiveCore` (W26.lint);
 `scripts/test-lint-write-surface.sh` is its 22-check self-test — it plants violations in a `mktemp` copy of
 both trees and asserts the lint fails, because a lint that cannot fail is exactly what this one was.

@@ -18,8 +18,9 @@ in `test-lint-write-surface.sh`. Only allowance data and prose changed; app beha
 
 The Sort & Filter year range matches a file's own date OR its `Sent With` date (each value meeting both
 bounds) and lists the file once. The Date column shows both dates (`Nov 3, 1957 · sent Mar 12, 1958`), but
-nothing highlights which of the two put the row in the result. The sent-with date is edited per file in the
-Date cell's popover; the ⌘I group editor has no sent-with control.
+nothing highlights which of the two put the row in the result. The Reader has no live sent-with editor: the
+Date cell's popover (`DateCell`) went with the move to the AppKit table and is dead code, and the ⌘I sheet,
+the one date editor (owner, 2026-10-12), has no sent-with control yet (`W40.fix-reader-sent-with-date`).
 
 The filter bar is crowded in a narrow window (the VM's ~900-pt window): the quality toggles collapse to
 `…`, which already happened before W37. W37 adds only a calendar button (the range is in its popover), and

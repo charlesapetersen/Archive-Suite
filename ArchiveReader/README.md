@@ -22,7 +22,7 @@ Protocol.
 ## What it does
 
 > **Status (2026-07-07):** shipped — v1 plus a full P2 pass (non-standard-PDF detection, near-duplicate
-> tag finder, document-viewer refinements, duplicate-filename disambiguation); **161 tests** pass; the
+> tag finder, document-viewer refinements, duplicate-filename disambiguation); the test suite passes; the
 > document-viewer flows are owner-verified. `CLAUDE.md` is the authoritative record.
 
 
@@ -30,7 +30,8 @@ Protocol.
   Spotlight, so a stale or dead index can never hide your files. ~102k PDFs walk in ~10 s, a warm start
   paints from the local index while it revalidates, and FSEvents keeps it live.
 - **Navigation window** (Finder-Smart-Folder-like): columns for Document date · File name · File
-  type · File tags · Quality · Read/Unread; multi-level sort (chronological by default; medieval-safe);
+  type · File tags · Quality · Read/Unread; multi-level sort (chronological by default; medieval-safe; a second level from the column header's
+  right-click menu);
   separate filters for subject tags, Quality (Q1–Q3), and read-state.
 - **Full-text search** across the OCR'd text.
 - **Edit tags** for one file or a group (subjects, date facets, Quality, color) — safely.
