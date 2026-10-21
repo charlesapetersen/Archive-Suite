@@ -29,10 +29,10 @@ Read `00-plan.md`, then this table. Take the first phase step not done. Strand n
 |---|---|---|---|---|
 | A segmentation | done, `screens/A-screen.md` | done 2026-10-20 (Fable), `A-segmentation.md` | Lincoln figures checked against lincoln-scores.json | done |
 | B dating | done 2026-10-20, `screens/B-screen.md` | started (Fable) | | |
-| C OCR and HTR | done 2026-10-20, `screens/C-screen.md` | started (Fable) | | |
-| D enhancement and marks | done 2026-10-20, `screens/D-screen.md` | started (Fable) | | |
-| E layout | done, `screens/E-screen.md` | | | |
-| F text placement | done, `screens/F-screen.md` | | | |
+| C OCR and HTR | done, `screens/C-screen.md` | done 2026-10-20 (Fable), `C-ocr.md` | Kiessling Latin 8.70/13.07 and Polay WERs checked in the PDF texts | done |
+| D enhancement and marks | done, `screens/D-screen.md` | done 2026-10-20 (Fable), `D-enhancement.md` | UVDoc MIT licence checked | done |
+| E layout | done, `screens/E-screen.md` | started (Fable) | | |
+| F text placement | done, `screens/F-screen.md` | started (Fable) | | |
 | G entities | done, `screens/G-screen.md` | | | |
 | H whole-corpus and user training | done, `screens/H-screen.md` | | | |
 | I model inventory | done, `I-inventory.md` | n/a | | done |
@@ -42,5 +42,7 @@ Read `00-plan.md`, then this table. Take the first phase step not done. Strand n
 
 Before the screens (2026-10-20 ~21:00): weekly all-models 3%, weekly Fable 0%. After Phase 0, ten screens and inventories (Sonnet) and strand A's Fable read: weekly
 all-models 6%, weekly Fable 3%. One Fable deep read is therefore about 3% of the Fable window.
+After strands B (running), C and D: weekly all-models 12%, Fable 15%; the 5-hour window 65%. A read costs
+4-5% of the Fable week, so G and H wait for the 5-hour reset (07:40 UTC).
 
 The owner's Gemini report is assessed in `screens/gemini-report-2026-10-20.md` (HR-DocStream does not exist).
