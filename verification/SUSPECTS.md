@@ -456,3 +456,237 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Status:** `open`
 - **History:**
   - 2026-10-21 W40.i2 — raised.
+
+### S-024 · The key wizard reports a key as validated when the Keychain refused to save it
+
+- **Raised:** 2026-10-21 · W40.b3 · ledger trace, by code reading.
+- **Suspected behaviour:** `ProviderKeyWizard.validate()` ignores `KeychainHelper.save`'s result
+  (`ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/ProviderKeyWizard.swift:206`) and sets
+  `keyValidated_<account>` (`:207`); `keyStatusChip` trusts that flag without checking a key exists
+  (`Views/SettingsView.swift:735-737`). A locked or denying Keychain leaves Settings showing "Validated" over an empty
+  key field, and the run then fails for want of a key.
+- **Where:** `P-04`; the two lines above.
+- **Would confirm it:** drive the wizard where `save` returns false (headless mode already makes it do so,
+  `Models/KeychainHelper.swift:30`) and read the chip state.
+- **Would clear it:** the chip reads "Save failed" or not-set in that run.
+- **Status:** `open`
+- **History:**
+  - 2026-10-21 W40.b3 — raised.
+
+### S-025 · The gateway's "Fill in OpenAI preset" picks a reasoning model the gateway request cannot drive
+
+- **Raised:** 2026-10-21 · W40.b3 · ledger trace, by code reading.
+- **Suspected behaviour:** `applyOpenAIGatewayPreset` looks for the first OpenAI model with `!supportsThinking`
+  (`Views/SettingsView.swift:1066`), but every entry in `LLMModel.openaiModels` is `supportsThinking: true`
+  (`Models/ProviderModels.swift:351-391`), so it falls back to `gpt-5-nano`, a reasoning model. The gateway sends plain
+  `max_tokens` (`OCR/OpenAICompatibleClient.swift:63`), which `CLAUDE.md` §OpenAI-compatible gateway says OpenAI's
+  reasoning models reject. Every page of a run set up by the preset would fail.
+- **Where:** `P-08`.
+- **Would confirm it:** apply the preset and read `gatewayModelID`, then send one page through the no-wire seam and
+  check the body; a single live page against OpenAI (under a cent) would show the 400.
+- **Would clear it:** OpenAI accepts the request, or the preset picks a model that takes `max_tokens`.
+- **Status:** `open`
+- **History:**
+  - 2026-10-21 W40.b3 — raised.
+
+### S-026 · Batch OCR is not size-based: large images go up at full size
+
+- **Raised:** 2026-10-21 · W40.b3 · ledger trace, by code reading.
+- **Suspected behaviour:** the direct path scales each image by `targetDimensionScale` toward the standard size; the
+  batch path passes the raw slider fraction to `ImageEncoding.loadImageAsJPEG(scale:)`
+  (`OCR/OCRProcessor+OCR.swift:787-801`, `OCR/BatchOCR.swift:59`), a plain dimension scale. At 100% a 10 MB scan is sent
+  whole in batch, so batch costs and times exceed the estimate, which assumes size-based scaling.
+- **Where:** `P-17`, `P-19`.
+- **Would confirm it:** encode one oversized JPEG through both paths at 100% and compare the bytes sent.
+- **Would clear it:** both paths send the same size.
+- **Status:** `open`
+- **History:**
+  - 2026-10-21 W40.b3 — raised.
+
+### S-027 · Batch mode is offered for providers with no batch, and still changes the run
+
+- **Raised:** 2026-10-21 · W40.b3 · ledger trace, by code reading.
+- **Suspected behaviour:** the Batch toggle stays enabled for OpenAI, OpenRouter and the Local Agent
+  (`Views/SettingsView.swift:758`). With it on, the cost panes show a batch total (`Views/OCRView.swift:701`,
+  `Views/SettingsView.swift:295`) the run never gets (it goes standard, `OCR/OCRProcessor+Pipeline.swift:2857`), and the
+  raw flag still drops per-page readers and the institutional import (`:2776`, `:2780`) — features the user turned on.
+- **Where:** `P-03`, `P-14`, `P-15`, `P-19`.
+- **Would confirm it:** OpenAI selected, Batch on, page kinds on: check the estimate and whether the run read pages
+  with the per-kind reader.
+- **Would clear it:** the toggle is disabled there, or those sites test `provider.supportsBatch`.
+- **Status:** `open`
+- **History:**
+  - 2026-10-21 W40.b3 — raised.
+
+### S-028 · A chosen folder is read one level deep; nested photos are silently left out
+
+- **Raised:** 2026-10-21 · W40.b3 · ledger trace, by code reading.
+- **Suspected behaviour:** README promises a recursive search, but folder input uses `contentsOfDirectory`
+  (`Views/OCRView.swift:1211`, `:1231`). A box folder with sub-folders adds only its top-level images, with no message;
+  the user may believe a box was processed when part of it was not. Re-adding a file also appends a duplicate (`:1217`).
+- **Where:** `P-22`.
+- **Would confirm it:** a scratch folder holding `a/b/x.jpg` and `y.jpg`, dropped: count the rows.
+- **Would clear it:** both files are listed.
+- **Status:** `open`
+- **History:**
+  - 2026-10-21 W40.b3 — raised.
+
+### S-029 · An LLM rotation failure silently falls back to the weaker local detector
+
+- **Raised:** 2026-10-21 · W40.b3 · ledger trace, by code reading.
+- **Suspected behaviour:** when LLM rotation fails, or the route has none (gateway, Local Agent, Mistral), detection
+  falls back to local Vision (`OCR/OCRProcessor+OCR.swift:1841-1851`, `OCR/LLMRotationDetector.swift:44-45`), which the
+  app's help calls about 60% accurate (`Models/ProviderModels.swift:155`). Nothing records the fallback, so sideways
+  pages can land in output PDFs that README says are always upright.
+- **Where:** `P-25`.
+- **Would confirm it:** a run of rotated synthetic scans with LLM rotation set and the key removed: check page 1
+  orientation and whether anything reports the fallback.
+- **Would clear it:** the fallback is reported, or the pages come out upright.
+- **Status:** `open`
+- **History:**
+  - 2026-10-21 W40.b3 — raised.
+
+### S-030 · The run log can give one failed file another's reason
+
+- **Raised:** 2026-10-21 · W40.b3 · ledger trace, by code reading.
+- **Suspected behaviour:** `writeLogFile` finds each failure's job by base name
+  (`OCR/OCRProcessor+Pipeline.swift:3419`), so two failing files with the same name in different folders both get the
+  first one's reason. Its write is `try?` (`:3444`), so a failed log write is silent.
+- **Where:** `P-26`.
+- **Would confirm it:** a run with two same-named failing files from two folders, logging on.
+- **Would clear it:** each line carries its own file's reason.
+- **Status:** `open`
+- **History:**
+  - 2026-10-21 W40.b3 — raised.
+
+### S-031 · Under a window segmentation approach, enclosures may get no `Sent With` date
+
+- **Raised:** 2026-10-21 · W40.b3 · ledger trace, by code reading.
+- **Suspected behaviour:** the window prompts treat an enclosure as its own document
+  (`Segmentation/WindowPrompts.swift:53`), but nothing in `Segmentation/` sets `enclosureOf`; the relation comes only
+  from the OCR `[enclosure]` marker in `DocumentSegmenter`. If the window path bypasses that, a letter's enclosure
+  loses its cover date.
+- **Where:** `P-28`, `P-30`.
+- **Would confirm it:** a window-approach run (recorded answers) on a letter plus an enclosure page carrying the
+  marker: check the enclosure's tags for `Sent With`.
+- **Would clear it:** `Sent With` is written.
+- **Status:** `open`
+- **History:**
+  - 2026-10-21 W40.b3 — raised.
+
+### S-032 · A segmentation approach with no key can be started, and fails only after the OCR is paid for
+
+- **Raised:** 2026-10-21 · W40.b3 · ledger trace, by code reading.
+- **Suspected behaviour:** the chooser comment says an unavailable approach "is gated where the run starts"
+  (`Views/SegmentationChooserView.swift:44-46`), but `canStartProcessing` (`Views/OCRView.swift:799`) does not check it.
+  The run OCRs every page, then `WindowStageTransport.make` fails (`Segmentation/RunSegmentation.swift:225`) and the user
+  is asked what to do after the spend.
+- **Where:** `P-30`, `P-31`.
+- **Would confirm it:** choose Gemini only with no Gemini key, three pages on a cheap OCR model; watch when the prompt
+  appears.
+- **Would clear it:** Start is disabled, or the run stops before OCR.
+- **Status:** `open`
+- **History:**
+  - 2026-10-21 W40.b3 — raised.
+
+### S-033 · A tag reply with no year and `date_uncertain: false` gets no date tags at all
+
+- **Raised:** 2026-10-21 · W40.b3 · ledger trace, by code reading.
+- **Suspected behaviour:** `parseTagResponse` (`Tagging/TagGenerator.swift:170-181`) adds `Date Uncertain` only when
+  the model says so; JSON with `year: null` and the flag false or absent yields a document with no year, no month and
+  no `Date Uncertain`, against the promise that an undated document is always marked.
+- **Where:** `P-33`.
+- **Would confirm it:** feed that JSON to the parser in a driver and read the tags.
+- **Would clear it:** `Date Uncertain` is forced when there is no year.
+- **Status:** `open`
+- **History:**
+  - 2026-10-21 W40.b3 — raised.
+
+### S-034 · No tagging and Copy source tags still write Box/Folder tags when collection segmentation is on
+
+- **Raised:** 2026-10-21 · W40.b3 · ledger trace, by code reading.
+- **Suspected behaviour:** with collection segmentation on, `applyBoxFolderLabelTags`
+  (`OCR/OCRProcessor+Tagging.swift:260`, from `OCR/OCRProcessor+Pipeline.swift:3176`) writes `Box` + Red or `Folder` +
+  Purple in every mode. Under Copy source tags this replaces the copied source tags on those PDFs; under No tagging it
+  writes tags the mode promises not to. A tag write on an irreversible path: worth a journey's time.
+- **Where:** `P-35`; `SPEC/tag-format.md` §Invariant 6.
+- **Would confirm it:** a scratch Copy source run with collection segmentation on and a tagged box photo; read the
+  output's tags.
+- **Would clear it:** the source tags survive (or the owner rules that Red/Purple belongs in those modes, and the SPEC
+  says so).
+- **Status:** `open`
+- **History:**
+  - 2026-10-21 W40.b3 — raised.
+
+### S-035 · Resuming a batch skips the per-page review and the box/folder confirmation
+
+- **Raised:** 2026-10-21 · W40.b3 · ledger trace, by code reading.
+- **Suspected behaviour:** `resumeBatch` (`OCR/OCRProcessor+Pipeline.swift:1556-1583`) segments straight from the
+  stored classifications for non-window plans and tags with no Tagging Review. Skipping the Tagging Review is
+  commented as deliberate (`:1572`); skipping the per-page dialog and the box/folder confirmation is not. A resumed
+  batch files outputs the user never reviewed.
+- **Where:** `P-32`, `P-37`, `P-40`.
+- **Would confirm it:** `scripts/test-batch-resume.sh`-style resume of a finished batch under Automatic + Manual:
+  record which review gates are raised.
+- **Would clear it:** the dialog and confirmation are raised, or the skip is a recorded decision.
+- **Status:** `open`
+- **History:**
+  - 2026-10-21 W40.b3 — raised.
+
+### S-036 · An edited collection name is used as typed when the user clicks Confirm
+
+- **Raised:** 2026-10-21 · W40.b3 · ledger trace, by code reading.
+- **Suspected behaviour:** the review sheet normalises a name only on Return
+  (`Views/OCRView+CollectionReviewSheet.swift:127-130`); `applyReviewEdits` takes the typed text
+  (`OCR/OCRProcessor+ReviewFlows.swift:224`), and `organizeOutput` builds the folder from it
+  (`Tagging/CollectionSegmenter.swift:306`). A name with `/` makes filing throw part-way; `..` files outside the chosen
+  output folder; an empty name files into the output folder itself. An output-path write: worth a journey's time.
+- **Where:** `P-39`.
+- **Would confirm it:** call `organizeOutput` (as `scripts/test-collection-organize.sh` does) with the names `a/b`,
+  `..` and empty, in a scratch directory.
+- **Would clear it:** each is normalised or refused before anything is filed.
+- **Status:** `open`
+- **History:**
+  - 2026-10-21 W40.b3 — raised.
+
+### S-037 · No pairing QR at all when the Mac's address is not on en0 or en1
+
+- **Raised:** 2026-10-21 · W40.b3 · ledger trace, by code reading.
+- **Suspected behaviour:** `primaryIPv4()` (`Views/LiveCaptureView.swift:748-770`) looks only at en0 and en1. On a Mac
+  whose only address is on another interface (a USB-C Ethernet adapter, or Wi-Fi off with a USB-tethered Android),
+  `pairingPayload` is nil and the whole Pair the phone box disappears, manual host included — even though USB pairing
+  needs no Wi-Fi address.
+- **Where:** `P-43`.
+- **Would confirm it:** in the VM, with the guest's only interface renamed off en0/en1 (or a stubbed address list),
+  open Live Capture and Start.
+- **Would clear it:** a QR or a fallback host is shown.
+- **Status:** `open`
+- **History:**
+  - 2026-10-21 W40.b3 — raised.
+
+### S-038 · Over the Drive relay, Finish cannot wait for the phone to drain
+
+- **Raised:** 2026-10-21 · W40.b3 · ledger trace, by code reading.
+- **Suspected behaviour:** the drain gate is fed only by `POST /phone/status` (`Net/CaptureServer.swift:575-579`);
+  `SPEC/relay-object-format.md` has no status object, so over the relay `phonePendingActive` is always false and Finish
+  finalizes while photos are still on the phone, in segments still being shot.
+- **Where:** `P-48`; `SPEC/relay-object-format.md`.
+- **Would confirm it:** `scripts/test-filerelay.sh`-style session with an ended segment whose last page has not yet
+  arrived: press Finish and count pages filed.
+- **Would clear it:** Finish holds until the page lands.
+- **Status:** `open`
+- **History:**
+  - 2026-10-21 W40.b3 — raised.
+
+### S-039 · Stage for later can hand the same photos to Process Files twice
+
+- **Raised:** 2026-10-21 · W40.b3 · ledger trace, by code reading.
+- **Suspected behaviour:** `stageForProcessing` (`Views/LiveCaptureView.swift:721`) neither removes nor marks the
+  photos it hands off, so a second click, or one after a relaunch, sends the same photos again and they are OCRed and
+  paid for twice; the existing filter blocks only photos whose output is already verified in staging.
+- **Where:** `P-50`.
+- **Would confirm it:** in a driver, hand off twice and count the files Process Files receives.
+- **Would clear it:** the second hand-off is empty or refused.
+- **Status:** `open`
+- **History:**
+  - 2026-10-21 W40.b3 — raised.
