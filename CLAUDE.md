@@ -242,7 +242,7 @@ once 7.5 GB lands in it.
 - **Per‑worktree DerivedData** (`-derivedDataPath ./build/DD`) so concurrent agents/worktrees don't collide. `build/` is gitignored.
 - **Three apps, three bundle IDs** (`com.archiveprocessor.app`, `com.archivereader.app`, `com.archivenotes.app`) — never merged.
 - **Signing: a local self‑signed cert, `CODE_SIGN_IDENTITY: "Archive Suite Dev"`** — **not** ad‑hoc (`"-"`) since 2026‑08‑07, still not notarized (ad‑hoc pinned the designated requirement to the **cdhash**, so every rebuild looked like a new program and macOS forgot every TCC grant). Create the identity once per machine with **[`ops/setup-signing-cert.sh`](ops/setup-signing-cert.sh)**, which carries the full rationale and the traps; key at `~/.local/share/archive-suite-signing/` — **back it up** (losing it ⇒ new cert ⇒ re‑grant every prompt). iOS stays ad‑hoc (a macOS cert is invalid there), and so does **every build inside the Tart GUI‑VM** — no keychain in the guest, so `gui-vm-gate.sh`/`vm-gui-runner.sh` pass `CODE_SIGN_IDENTITY=-`; ⛔ don't provision the cert into the VM (W28.cert‑fu1).
-  ⚠️ **A self‑signed cert has no Team ID**, so `ENABLE_HARDENED_RUNTIME: YES` + **library validation** refuses Xcode 16's `<App>.debug.dylib` (*no team ≠ same team*) — the app dies at launch with SIGABRT, taking every app‑hosted test with it. Reader/Notes therefore use **Debug‑only** `com.apple.security.cs.disable-library-validation` + `com.apple.security.get-task-allow` entitlements for their app-hosted tests. Processor has no app-hosted XCTest target or previews and instead sets `ENABLE_DEBUG_DYLIB: NO` in its **Debug target config**, preserving strict library validation in both configurations; Xcode still injects `get-task-allow` into that Debug signature. Its Release config sets `CODE_SIGN_INJECT_BASE_ENTITLEMENTS: NO`, because a signed-product audit caught Xcode injecting `get-task-allow` there too. **⛔ Release must contain neither debug entitlement.**
+  ⚠️ **A self‑signed cert has no Team ID**, so `ENABLE_HARDENED_RUNTIME: YES` + **library validation** refuses Xcode 16's `<App>.debug.dylib` (*no team ≠ same team*) — the app dies at launch with SIGABRT, taking every app‑hosted test with it. Reader/Notes therefore use **Debug‑only** `com.apple.security.cs.disable-library-validation` + `com.apple.security.get-task-allow` entitlements for their app-hosted tests. Processor instead sets `ENABLE_DEBUG_DYLIB: NO` (Debug) and `CODE_SIGN_INJECT_BASE_ENTITLEMENTS: NO` (Release), keeping strict library validation — why: [`ArchiveProcessor/CLAUDE.md`](ArchiveProcessor/CLAUDE.md) §*Releasing*, W28.cert-fu2. **⛔ Release must contain neither debug entitlement.**
   Full record — why ad‑hoc failed, W7.1, W28.cert‑fu1: `SUITE_TODO_DONE.md` §*Signing + TCC consent*.
 - **Never** hand‑edit a `.pbxproj` (edit `project.yml` + regenerate). **Never** write to a real corpus during dev/test — copy to the scratchpad first (Reader's Core Directive).
 
@@ -303,10 +303,8 @@ this repo:
   rather than firing them inline while interactive.
 - **Read narrowly.** Scoped reads, `grep`/Explore to locate, `git log -- <path>` scoped to a subdir.
   Don't load whole files, or the *other* app, when a change touches one.
-- **Structure shrinks context.** Per‑app `CLAUDE.md` with a tight **Implementation Map**, small
-  single‑purpose files, ownership lanes (see `AGENTS.md`), and one shared spec mean a change loads
-  *one app + one spec*, not the whole repo.
-- **DRY docs & tooling.** Umbrella‑plus‑per‑app docs with no duplicated prose; one shared launch path.
+- **Structure shrinks context.** Per‑app guides with a tight **Implementation Map**, small files, ownership
+  lanes (`AGENTS.md`) and one shared spec: a change loads *one app + one spec*. No duplicated prose across docs.
 - **Batch & cache.** Independent tool calls together; surgical `Edit`s over full rewrites.
 - **Guardrail:** efficiency never overrides correctness or the Reader Prime Directive (file safety).
   When they conflict, quality wins — but take the cheapest path that fully meets the bar.
@@ -326,7 +324,7 @@ this repo:
 
 The two repos were merged into this monorepo and Archive Suite v1.0.0 shipped (see `git log` for the
 record). De‑nesting shipped (`7706368`); `packages/ArchiveCore` shipped in the W0 refactor
-(`49c0162`–`b90800f`); Archive Notes scaffolding is in progress.
+(`49c0162`–`b90800f`).
 
 ## ⚠️ The history was rewritten when this repo went public (2026‑08‑12) — every SHA before then changed
 
