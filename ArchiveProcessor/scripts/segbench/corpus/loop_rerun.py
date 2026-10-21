@@ -70,6 +70,8 @@ SECOND = {k: 'lightonocr3-4b' for k in ROUTES}
 SECOND['lightonocr3-4b'] = 'qwen3.6-27b'
 ARMS = ('ngram', 'half')
 LATIN = {'L1', 'L2', 'L3', 'L4', 'L5', 'L6', 'L7', 'L8', 'L9'}
+# Sources the kraken PP-OCRv6 card's public training list names (loop_kraken.py): its rows there are labelled.
+KRAKEN_TRAINED_ON = {'koenigsfelden', 'kurrent', 'iforal', 'ocrd', 'voc', 'muharaf', 'eparchos'}
 
 # The 96 (the owner's truth pages): the truth96 run's caps, same routes and prompts (2026-10-20, jobs 1861696-703).
 T = LTS / 'FarmShare-truth96-20261020/outputs'
@@ -188,6 +190,8 @@ def cmd_report(a):
                     'kraken-ppocrv6': kraken.get(jid) if stratum in LATIN and kraken else None}
         rr, pg = score_route('public895', route, ids, lambda j: (Path(truth[j]['truth']).read_text(), truth[j]['stratum']),
                              texts_of, lambda arm, j: metas[arm](j) if arm in metas else {})
+        for p in pg:
+            p['source'] = truth[p['page']]['source']
         rows += rr; pages += pg
     # The 96 (the three agreement-only letters are kept and marked, since a cap there is a cap too).
     tsaved = {k: F.read_records(v['dir']) for k, v in T96.items()}
@@ -226,7 +230,7 @@ def cmd_report(a):
                                                 'chrf', 'completion_tokens', 'wall_s'])
     S.write_csv(a.out / f'{a.name}-pages.csv',
                 [{k: round(v, 6) if isinstance(v, float) else v for k, v in r.items()} for r in pages],
-                ['set', 'route', 'arm', 'page', 'stratum', 'ok', 'status', 'tokens', 'wall_s', 'nes', 'chrf', 'words',
+                ['set', 'route', 'arm', 'page', 'stratum', 'source', 'ok', 'status', 'tokens', 'wall_s', 'nes', 'chrf', 'words',
                  'missed', 'added'])
     (a.out / f'{a.name}-tables.md').write_text(tables(rows, pages))
     print(f'{len(rows)} rows, {len(pages)} page rows -> {a.out}')
@@ -261,6 +265,12 @@ def tables(rows, pages):
             pr = [p for p in pages if p['set'] == 'public895' and p['arm'] == arm and test(p['stratum'])]
             cells.append('–' if not pr else f"{100 * sum(p['nes'] for p in pr) / len(pr):.1f} ({len(pr)})")
         out.append(f'| {label} | ' + ' | '.join(cells) + ' |')
+    kp = [p for p in pages if p['set'] == 'public895' and p['arm'] == 'kraken-ppocrv6']
+    for label, test in (('trained on the source', lambda p: p.get('source') in KRAKEN_TRAINED_ON),
+                        ('not in its public training list', lambda p: p.get('source') not in KRAKEN_TRAINED_ON)):
+        pr = [p for p in kp if test(p)]
+        if pr:
+            out.append(f'| kraken PP-OCRv6, {label} | – | – | – | {100 * sum(p["nes"] for p in pr) / len(pr):.1f} ({len(pr)}) | – | – |')
     out += ['', 'The 96 (the owner\'s truth pages), the same arms:', '',
             '| route | caps | ' + ' | '.join(ARM_ORDER) + ' |', '|---|---:|' + '---:|' * len(ARM_ORDER)]
     for route in [*T96, 'mlx-qwen3-vl-8b-4bit']:
