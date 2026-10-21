@@ -73,3 +73,11 @@ The owner's Gemini report is assessed in `screens/gemini-report-2026-10-20.md` (
   Sherlock-scale parts split out. List in `SUITE_TODO.md` §"Document processing review — W46". Plan backup:
   `.maintenance/AUTONOMOUS_PLAN.md.pre-phase3-20261021T081333`.
 - Engine paused for Archive Suite by the owner during Phase 2 (2026-10-21; `manager.py resume "Archive Suite"`).
+
+## Owner answers, 2026-10-21 (after Phase 3 was filed)
+
+- macOS 27: the owner can upgrade this Mac; not done. W46.macos27-ok stays open until the owner upgrades for other
+  reasons or asks for it; W46.r1-foundation is a low-ranked free-voter test and does not justify an OS upgrade alone.
+- 32 GB Mac: available only if really necessary. W46.kit-mac-lora runs the 18 GB arm first; the 32 GB arm is asked
+  for only if the 18 GB arm cannot fit the training at all.
+- Ling 3 Flash VL's 96-page job (1861703) was still PENDING (Resources) at 08:40 on 2026-10-21.
