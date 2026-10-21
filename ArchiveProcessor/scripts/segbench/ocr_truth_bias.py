@@ -14,7 +14,9 @@ looked) or ADJUDICATED (the owner chose or typed it). The audit's test (10-gap-a
   2. sheet  — a blind re-adjudication sheet: 20 random pages where Qwen3.6-27B (the best open, third-family
      reader) reads the agreed text differently. Each difference is shown as two unlabelled readings in a random
      order; the owner picks the one the image shows, types a correction, or says either will do. Which reading is
-     the truth is kept in a key file the sheet never loads. W46.fix-ocr-truth-bias-score scores the answers.
+     the truth is kept in a key file the sheet never loads. Each place carries a rough box on the page image, from
+     Apple Vision's word positions (locate); a place with no aligned Vision word in reach says instead how far
+     through the page's text it is. W46.fix-ocr-truth-bias-score scores the answers.
 
 Word accuracy here: the scorer's words (ocr_panel_score.tokens of normal(), [illegible] dropped), the truth and a
 reading aligned in order (difflib), and a truth word counts as read when it sits in an aligned equal run. This is
@@ -45,12 +47,16 @@ T = P.T
 RESULTS = HERE.parents[1] / 'segbench-results'
 BLIND = T.CACHE / 'blind'
 ANSWERS = T.CACHE / 'answers-applied.json'   # what `ocr_truth.py apply` built truth/ from
+VISION_WORDS = T.CACHE / 'vision-words.json' # Apple Vision's word boxes for the 100 truth pages (F-placement.md)
 REFERENCE = 'qwen3.6-27b'                    # the third-family reader the sheet is drawn against
 SEED = 46
 SHEET_PAGES = 20
 PER_PAGE_MAX = 15       # differences shown per page; more are sampled, and the key says how many there were
 CONTEXT = 5             # truth words shown either side of a difference
 BLOCK_WORDS = 6         # a longer difference is a passage left out, added or moved: reading order, not reading
+ANCHOR = 2              # aligned truth/Vision words in a run before the run places a box (one aligns by chance)
+REACH = 40              # truth words either side searched for an anchor
+SPREAD = 3              # Vision words either side of an interpolated place
 BOOT = 2000
 ILLEGIBLE = re.compile(r'\[illegible\]', re.I)
 DRAFTER_FAMILY = ('claude', 'gemini')        # the drafters' families: a shared blind spot would favour these
@@ -157,11 +163,62 @@ def differences(truth: list[tuple[str, str]], reading: str) -> list[dict]:
         reading_words = ' '.join(raw_h[hk[j1][0]:hk[j2 - 1][0] + 1]) if j1 < j2 else ''
         out.append({'truth': ' '.join(raw_t[r0:r1]), 'qwen': reading_words,
                     'before': ' '.join(raw_t[max(0, r0 - CONTEXT):r0]), 'after': ' '.join(raw_t[r1:r1 + CONTEXT]),
-                    'mixed': labs != {'agreed'}, 'join': join, 'block': max(i2 - i1, j2 - j1) > BLOCK_WORDS, 'truth_words': i2 - i1, 'qwen_words': j2 - j1})
+                    'mixed': labs != {'agreed'}, 'join': join, 'block': max(i2 - i1, j2 - j1) > BLOCK_WORDS, 'truth_words': i2 - i1, 'qwen_words': j2 - j1,
+                    't0': r0, 't1': r1})
     return out
 
 
+def locate(raw_t: list[str], vision: list[list], t0: int, t1: int):
+    """A rough box [x, y, w, h] (0-1, top left) on the page for truth words t0..t1-1, from Apple Vision's word boxes
+    (vision-words.json, in Vision's reading order). The truth and Vision's words are aligned as the scorer's words,
+    and only runs of ANCHOR or more aligned words, or a lone aligned word whose text occurs once in each, are
+    trusted. The box holds the Vision words aligned to the place's own truth words; failing that, the place lies
+    between the nearest trusted truth word on each side (within REACH words), so the box holds the Vision words
+    between those two anchors, or, when they are far apart in Vision's order, a few words at the place's
+    proportional position between them; with an anchor on one side only, the words just past it. Then only the
+    words on the focus word's line are kept. None when no anchor is in reach. The box comes from the truth's
+    positions and Vision's, never from either reading, so it says where to look and not which reading is the
+    truth."""
+    tk, vk = keyed(raw_t), [(i, k) for i, v in enumerate(vision) for k in keys(v[0])]
+    tw, vw = [k for _, k in tk], [k for _, k in vk]
+    at = {}
+    for blk in difflib.SequenceMatcher(None, tw, vw, autojunk=False).get_matching_blocks():
+        lone = blk.size and len(tw[blk.a]) >= 3 and tw.count(tw[blk.a]) == vw.count(tw[blk.a]) == 1
+        if blk.size >= ANCHOR or lone:
+            for n in range(blk.size):
+                at.setdefault(tk[blk.a + n][0], []).append(vk[blk.b + n][0])
+    idx = [v for i in range(t0, t1) for v in at.get(i, [])]
+    focus = idx[len(idx) // 2] if idx else None
+    if not idx:
+        before = max((i for i in at if t0 - REACH <= i < t0), default=None)
+        after = min((i for i in at if t1 <= i < t1 + REACH), default=None)
+        vb = max(at[before]) if before is not None else None
+        va = min(at[after]) if after is not None else None
+        if vb is not None and va is not None and va < vb:   # the two orders disagree here: trust the nearer side
+            vb, va = (vb, None) if t0 - before <= after - t1 else (None, va)
+        if vb is not None and va is not None:
+            if va - vb <= 2 * SPREAD + 2:
+                idx = list(range(vb, va + 1))
+            else:
+                c = round(vb + (t0 - before) / (after - before) * (va - vb))
+                idx = list(range(c - SPREAD, c + SPREAD + 1))
+            focus = idx[len(idx) // 2]
+        elif vb is not None:
+            idx, focus = list(range(vb, vb + SPREAD + 1)), vb
+        elif va is not None:
+            idx, focus = list(range(va - SPREAD, va + 1)), va
+    if focus is None:
+        return None
+    # Vision's order can run on into another column or block: keep the words within a line and a half of the focus
+    mid, fh = vision[focus][2] + vision[focus][4] / 2, vision[focus][4]
+    bx = [vision[i][1:] for i in idx if 0 <= i < len(vision) and abs(vision[i][2] + vision[i][4] / 2 - mid) <= 1.5 * fh]
+    x0, y0 = min(b[0] for b in bx), min(b[1] for b in bx)
+    x1, y1 = max(b[0] + b[2] for b in bx), max(b[1] + b[3] for b in bx)
+    return [round(v, 4) for v in (x0, y0, x1 - x0, y1 - y0)]
+
+
 def build_sheet(pages96, truths, qwen, rng):
+    vision = json.loads(VISION_WORDS.read_text())
     every = {p: differences(truths[p], qwen[p]) for p in pages96 if qwen.get(p)}
     diffs = {p: [x for x in d if not (x['join'] or x['block'])] for p, d in every.items()}
     eligible = sorted(p for p, d in diffs.items() if d)
@@ -175,7 +232,9 @@ def build_sheet(pages96, truths, qwen, rng):
             x = d[i]
             truth_first = rng.random() < .5
             a, b = (x['truth'], x['qwen']) if truth_first else (x['qwen'], x['truth'])
-            items.append({'id': str(n), 'before': x['before'], 'after': x['after'], 'a': a, 'b': b})
+            box = locate([w for w, _ in truths[p]], vision.get(p, []), x['t0'], x['t1'])
+            items.append({'id': str(n), 'before': x['before'], 'after': x['after'], 'a': a, 'b': b, 'box': box,
+                          'at': round(x['t0'] / max(1, len(truths[p])), 2)})
             key.setdefault(p, {'differences': len(d), 'shown': len(shown), 'items': {}})['items'][str(n)] = {
                 'a': 'truth' if truth_first else 'qwen', **x}
         data.append({'page': p, 'img': f'../pages/{p}.jpg', 'items': items})
@@ -195,25 +254,29 @@ def build_sheet(pages96, truths, qwen, rng):
             'items': n_items, 'minutes': minutes, 'differences_total': sum(per_page),
             'differences_on_chosen': sum(len(diffs[p]) for p in chosen),
             'differences_median_page': per_page[len(per_page) // 2] if per_page else 0,
-            'mixed_items': sum(v['mixed'] for k in key.values() for v in k['items'].values())}
+            'mixed_items': sum(v['mixed'] for k in key.values() for v in k['items'].values()),
+            'boxed_items': sum(x['box'] is not None for d in data for x in d['items'])}
 
 
 SHEET_HTML = r"""<!doctype html><meta charset="utf-8"><title>W46 blind truth check</title>
 <style>
-body{font:14px -apple-system,sans-serif;margin:0}
+body{font:14px -apple-system,sans-serif;margin:0;background:#fff;color:#111;color-scheme:light}
 header{position:sticky;top:0;background:#fff;border-bottom:1px solid #ccc;padding:6px 12px;z-index:2}
 .page{display:flex;gap:12px;border-bottom:3px solid #999;padding:10px;min-height:90vh}
-.img{flex:1 1 55%;position:sticky;top:44px;height:88vh;overflow:auto}
-.img img{width:100%;cursor:zoom-in}.img img.zoom{width:250%;cursor:zoom-out}
-.list{flex:1 1 45%}.it{border:1px solid #ccc;border-radius:4px;padding:6px;margin:8px 0;font-family:Georgia,serif}
+.img{flex:1 1 55%;position:sticky;top:var(--head,44px);height:calc(100vh - var(--head,44px) - 20px);overflow:auto}
+.frame{position:relative;width:100%;cursor:zoom-in}.frame.zoom{width:250%;cursor:zoom-out}.frame img{width:100%;display:block}
+.box{position:absolute;border:3px solid #f0a;border-radius:4px;box-shadow:0 0 0 2000px rgba(0,0,0,.12);pointer-events:none;display:none}
+.where{color:#a40;font-size:12px;display:block}
+.list{flex:1 1 45%}.it{scroll-margin:var(--head,44px) 0 10px;border:1px solid #ccc;border-radius:4px;padding:6px;margin:8px 0;font-family:Georgia,serif}
 .it.cur{outline:3px solid #06f}.it.done{background:#e6f6e6;border-color:#4a4}
 .ctx{color:#777}.opt{display:block;margin:3px 0;font-family:-apple-system,sans-serif}.opt.sel{font-weight:bold;color:#060}
 .k{color:#888;font-size:12px}.typed{color:#a40}
 </style>
 <header><b>Blind truth check</b> — __N__ places on __PAGES__ pages, about __MINUTES__ minutes. Two readings of the same
 words; which reading is which is not shown. Pick the one the photograph shows.
-Keys: <b>1</b> A · <b>2</b> B · <b>3</b> neither (type it) · <b>4</b> either will do / can't tell · <b>n/p</b> next/previous.
-Click the image to zoom. Answers stay in this browser; <button onclick="exportAnswers()">Export answers</button>
+Keys: <b>1</b> A · <b>2</b> B · <b>3</b> neither (type it) · <b>4</b> either will do / can't tell · <b>n/p</b> next/previous · <b>z</b> zoom.
+The pink box marks roughly where each place is (from Apple Vision's word positions; it can be off by a line or so).
+Click the image or press <b>z</b> to zoom. Answers stay in this browser; <button onclick="exportAnswers()">Export answers</button>
 <span id="prog"></span></header><div id="root"></div>
 <script>
 const DATA=__DATA__;const KEY='w46-truth-bias-blind';
@@ -228,17 +291,32 @@ function paint(it){const v=ans(it);it.el.classList.toggle('done',v!==undefined);
  it.el.querySelector('.typed').textContent=v&&v.startsWith('=')?'typed: '+v.slice(1):(v==='either'?'either will do':'')}
 const root=document.getElementById('root');
 for(const p of DATA){const div=document.createElement('div');div.className='page';
- let h=`<div class="img"><img src="${p.img}" onclick="this.classList.toggle('zoom')"></div><div class="list"><b>${p.page}</b>`;
+ let h=`<div class="img"><div class="frame"><img src="${p.img}"><div class="box"></div></div></div><div class="list"><b>${p.page}</b>`;
  for(const x of p.items){h+=`<div class="it" data-key="${x.id}"><span class="ctx">… ${esc(x.before)}</span> <b>[ ]</b> <span class="ctx">${esc(x.after)} …</span>`+
+  (x.box?'':`<span class="where">No box for this place: it is about ${Math.round(100*x.at)}% of the way through the page's text.</span>`)+
   `<span class="opt" data-v="a"><span class="k">1 A:</span> ${esc(x.a)||'<i>(nothing)</i>'}</span>`+
   `<span class="opt" data-v="b"><span class="k">2 B:</span> ${esc(x.b)||'<i>(nothing)</i>'}</span><span class="typed"></span></div>`}
  div.innerHTML=h+'</div>';root.appendChild(div);
- div.querySelectorAll('.it').forEach(el=>{const it={page:p.page,key:el.dataset.key,el};items.push(it);paint(it);
+ const frame=div.querySelector('.frame');frame.onclick=()=>{frame.classList.toggle('zoom');if(items[cur]&&items[cur].frame===frame)show(items[cur])};
+ div.querySelectorAll('.it').forEach(el=>{const x=p.items.find(x=>x.id===el.dataset.key);
+  const it={page:p.page,key:el.dataset.key,el,box:x.box,pane:div.querySelector('.img'),frame,mark:div.querySelector('.box')};items.push(it);paint(it);
   el.addEventListener('click',()=>go(items.indexOf(it)))})}
-let cur=0;function go(i){if(i<0||i>=items.length)return;items[cur].el.classList.remove('cur');cur=i;
- const el=items[cur].el;el.classList.add('cur');el.scrollIntoView({block:'center'})}
+let cur=0,first=true;function go(i){if(i<0||i>=items.length)return;const prev=first?null:items[cur];first=false;items[cur].el.classList.remove('cur');cur=i;
+ const el=items[cur].el;el.classList.add('cur');
+ if(!prev||prev.page!==items[cur].page)el.closest('.page').scrollIntoView({block:'start'});
+ el.scrollIntoView({block:'nearest'});show(items[cur])}
+function head(){const h=document.querySelector('header').offsetHeight;document.documentElement.style.setProperty('--head',h+'px');
+ document.querySelectorAll('.page').forEach(d=>d.style.scrollMarginTop=h+'px')}
+addEventListener('resize',head);head();
+const PAD=.012;
+function show(it){if(!it)return;const m=it.mark,b=it.box;if(!b){m.style.display='none';return}
+ const w=Math.max(b[2]+2*PAD,.08),h=Math.max(b[3]+2*PAD,.03),x=Math.max(0,b[0]+b[2]/2-w/2),y=Math.max(0,b[1]+b[3]/2-h/2);
+ Object.assign(m.style,{display:'block',left:100*x+'%',top:100*y+'%',width:100*w+'%',height:100*h+'%'});
+ const f=it.frame,pane=it.pane,centre=()=>{pane.scrollTop=(y+h/2)*f.offsetHeight-pane.clientHeight/2;
+  pane.scrollLeft=(x+w/2)*f.offsetWidth-pane.clientWidth/2};
+ const img=f.querySelector('img');if(img.complete)centre();else img.addEventListener("load",centre,{once:true})}
 document.addEventListener('keydown',e=>{const it=items[cur];if(!it)return;
- if(e.key==='n')go(cur+1);else if(e.key==='p')go(cur-1);
+ if(e.key==='n')go(cur+1);else if(e.key==='z'){it.frame.classList.toggle('zoom');show(it)}else if(e.key==='p')go(cur-1);
  else if(e.key==='1'){set(it,'a');go(cur+1)}else if(e.key==='2'){set(it,'b');go(cur+1)}
  else if(e.key==='4'){set(it,'either');go(cur+1)}
  else if(e.key==='3'){const t=prompt('What the photograph shows here (empty = nothing):','');if(t!==null){set(it,'='+t);go(cur+1)}}});
@@ -310,7 +388,9 @@ def write_md(path, out):
           f'{sh["chosen"]} of those pages at random (seed {SEED}) and at most {PER_PAGE_MAX} places on each, '
           f'{sh["items"]} places in all ({sh["differences_on_chosen"]} exist on those pages; {sh["mixed_items"]} touch '
           f'an adjudicated word as well). Each place shows the two readings as A and B in a random order. About '
-          f'{sh["minutes"]:.0f} minutes at ocr_truth.py\'s review rates. The sheet and its key are private, under '
+          f'{sh["minutes"]:.0f} minutes at ocr_truth.py\'s review rates. {sh["boxed_items"]} of the places carry a rough box '
+          'on the page image, taken from Apple Vision\'s word positions; the rest say how far through the page\'s text '
+          'they are. The sheet and its key are private, under '
           '`ocr-truth/blind/`; W46.fix-ocr-truth-bias-score scores the owner\'s answers.', '']
     path.write_text('\n'.join(L) + '\n')
 
