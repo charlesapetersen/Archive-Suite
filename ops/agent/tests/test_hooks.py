@@ -85,7 +85,8 @@ class Fixture(unittest.TestCase):
                         ignore=shutil.ignore_patterns("tests", "__pycache__"))
         auto = os.path.join(self.repo, "ops", "autonomous")
         os.makedirs(auto)
-        for f in ("next-queue-item.sh", "worker-state.py", "keychain-provider-accounts.sh"):
+        for f in ("next-queue-item.sh", "worker-state.py", "keychain-provider-accounts.sh", "cluster-reach.py",
+                  "plan-edit.sh", "plan-edit.py"):
             shutil.copy2(os.path.join(AUTONOMOUS, f), auto)
         self.write("ops/autonomous/resume-prompt.txt", "work __REPO__\n")
         self.write(".maintenance/AUTONOMOUS_PLAN.md", PLAN)
@@ -171,6 +172,145 @@ class Queue(Fixture):
         r = self.hook("queue")
         self.assertEqual(r.returncode, 1)
         self.assertIn("no plan", r.stderr)
+
+
+class Cluster(Fixture):
+    """W46.engine-cluster: a `(cluster: NAME)` item is offered only while its login answers (cluster-reach.py)."""
+
+    ITEMS = ("- [ ] **C.sub — to submit** (lane: segbench) (uses: light) (cluster: farmshare)\n"
+             "- [ ] **C.got — finished** (lane: segbench) (uses: light) (cluster: farmshare)\n"
+             "- [ ] **C.run — running** (lane: segbench) (uses: light) (cluster: farmshare)\n"
+             "- [ ] **C.dep — not ready** (lane: segbench) (uses: light) (cluster: farmshare) (blocked-on: H.ok)\n")
+
+    def setUp(self):
+        super().setUp()
+        self.write(".maintenance/AUTONOMOUS_PLAN.md", PLAN.replace("- [ ] **A.four", self.ITEMS + "- [ ] **A.four"))
+        self.calls = os.path.join(self.tmp, "ssh-calls")
+        self.ssh = os.path.join(self.tmp, "fake-ssh")
+        self.fake_ssh(0)
+        self.mark("C.got", "finished")
+        self.mark("C.run", "submitted")
+
+    def fake_ssh(self, rc):
+        with open(self.ssh, "w") as f:
+            f.write("#!/bin/sh\necho \"$@\" >> %s\necho rice-01; echo cp1; echo /home/cp1\nexit %d\n"
+                    % (shlex.quote(self.calls), rc))
+        os.chmod(self.ssh, 0o755)
+
+    def mark(self, tag, state):
+        run(["/usr/bin/python3", os.path.join(self.repo, "ops/autonomous/cluster-reach.py"), "mark", tag, state],
+            env=self.env)
+
+    def socket(self):
+        os.makedirs(os.path.join(self.tmp, ".ssh"), exist_ok=True)
+        open(os.path.join(self.tmp, ".ssh", "cm-farmshare"), "w").close()
+
+    def queue(self):
+        r = self.hook("queue", CLUSTER_SSH=self.ssh)
+        self.assertIn(r.returncode, (0, 3), r.stderr)
+        return {d["tag"]: d for d in self.jsonl(r.stdout)}
+
+    def report(self):
+        with open(os.path.join(self.repo, ".maintenance", "AUTONOMOUS_PLAN.md")) as f:
+            return f.read().split("## Daemon Report")[1]
+
+    def ssh_args(self):
+        if not os.path.exists(self.calls):
+            return ""
+        with open(self.calls) as f:
+            return f.read()
+
+    def ssh_calls(self):
+        return len(self.ssh_args().splitlines())
+
+    def upkeep(self):
+        r = self.hook("upkeep", CLUSTER_SSH=self.ssh)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        return r.stdout
+
+    def test_no_login_skips_the_items_and_upkeep_asks_once_a_day(self):
+        before = self.report()
+        items = self.queue()
+        for tag in ("C.sub", "C.got", "C.run"):
+            self.assertEqual(items[tag]["status"], "blocked", items[tag])
+            self.assertTrue(items[tag]["reason"].startswith("cluster farmshare not reachable (no SSH master"))
+            self.assertNotIn("blocked_on", items[tag])
+        self.assertEqual(items["C.dep"]["blocked_on"], ["H.ok"])
+        self.assertEqual(items["A.one"]["status"], "ok")
+        self.assertEqual(self.ssh_calls(), 0)                # no socket: the network is never touched
+        self.assertEqual(self.report(), before)              # the queue hook is read-only on the repo
+        self.assertIn("asked the owner", self.upkeep())
+        rep = self.report()
+        # C.got is finished and C.run submitted (it may have finished: only a login can tell); C.dep is not ready.
+        self.assertIn("FarmShare: 1 item ready to submit, 2 submitted or finished to collect", rep)
+        line = next(ln for ln in rep.splitlines() if "Cluster login" in ln)
+        self.assertNotRegex(line, r"(?i)no decision")        # so the owner is emailed
+        self.assertIn("nothing to ask", self.upkeep())
+        self.assertEqual(self.report().count("Cluster login"), 1)
+        holds = {d["key"]: d for d in self.jsonl(self.hook("holds").stdout)}
+        report = [d for k, d in holds.items() if k.startswith("daemon-report:")]
+        self.assertIn("Cluster login", report[0]["text"])
+
+    def test_the_ask_is_an_entry_under_the_digest_rule_too(self):
+        plan = PLAN.replace("- [ ] **A.four", self.ITEMS + "- [ ] **A.four")
+        head, tail = plan.split("## Daemon Report — owner decisions / follow-ups\n")
+        older = ("\n### 2026-10-20 — overnight (no decision)\n\n- **[W1.a]** a mention\n- **[W1.b]** another\n\n"
+                 "### ✅ 2026-10-06 — walkthrough done (owner): settled.\n")
+        self.write(".maintenance/AUTONOMOUS_PLAN.md", head + "## Daemon Report — owner decisions / follow-ups\n" + older)
+        self.upkeep()
+        holds = {d["key"]: d for d in self.jsonl(self.hook("holds").stdout)}
+        report = [d for k, d in holds.items() if k.startswith("daemon-report:")]
+        self.assertEqual(len(report), 1, holds)
+        self.assertIn("Cluster login", report[0]["text"])
+
+    def test_a_live_login_offers_them_and_the_check_is_cached(self):
+        self.socket()
+        items = self.queue()
+        self.assertEqual([items[t]["status"] for t in ("C.sub", "C.got", "C.run")], ["ok"] * 3)
+        self.assertEqual(self.ssh_calls(), 1)                # one round trip for three items
+        self.assertIn("ProxyCommand=false", self.ssh_args())
+        self.assertIn("BatchMode=yes", self.ssh_args())
+        self.queue()
+        self.assertEqual(self.ssh_calls(), 1)                # within CACHE_SECONDS: no second round trip
+        self.assertIn("nothing to ask", self.upkeep())
+        self.assertNotIn("Cluster login", self.report())
+
+    def test_an_unwritable_cache_still_costs_one_round_trip_per_run(self):
+        self.socket()
+        open(os.path.join(self.state, "cluster-reach"), "w").close()   # a file where the cache dir should be
+        self.queue()
+        self.assertEqual(self.ssh_calls(), 1)
+
+    def test_a_stalled_login_is_not_reachable(self):
+        self.socket()
+        self.fake_ssh(255)
+        items = self.queue()
+        self.assertIn("preflight exited 255", items["C.sub"]["reason"])
+
+    def test_box_holds_the_results_once_box_collect_is_done(self):
+        self.mark("C.got", "in-box")
+        self.assertEqual(self.queue()["C.got"]["status"], "blocked")    # W46.box-collect not done yet
+        self.write("SUITE_TODO_DONE.md", "- [x] **T.old — archived**\n- [x] **W46.box-collect — Box**\n")
+        items = self.queue()
+        self.assertEqual((items["C.got"]["status"], items["C.sub"]["status"]), ("ok", "blocked"))
+
+    def test_marker_case_and_unknown_clusters(self):
+        items = ("- [ ] **C.cap — capitalised** (lane: segbench) (uses: light) (cluster: FarmShare)\n"
+                 "- [ ] **C.typo — misspelt** (lane: segbench) (uses: light) (cluster: sherlok)\n")
+        self.write(".maintenance/AUTONOMOUS_PLAN.md", PLAN.replace("- [ ] **A.four", items + "- [ ] **A.four"))
+        got = self.queue()
+        self.assertEqual((got["C.cap"]["status"], got["C.typo"]["status"]), ("blocked", "blocked"))
+        self.upkeep()
+        rep = self.report()
+        self.assertIn("FarmShare: 1 item ready to submit", rep)
+        self.assertNotIn("sherlok", rep.split("Cluster login")[1].split("\n")[0])
+
+    def test_nothing_to_ask_when_no_cluster_item_is_ready(self):
+        self.write(".maintenance/AUTONOMOUS_PLAN.md", PLAN.replace(
+            "- [ ] **A.four", "- [ ] **C.dep — not ready** (uses: light) (cluster: farmshare) (blocked-on: H.ok)\n"
+            "- [ ] **A.four"))
+        self.assertIn("nothing to ask", self.upkeep())
+        self.assertNotIn("Cluster login", self.report())
 
 
 class Holds(Fixture):

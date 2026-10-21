@@ -73,3 +73,10 @@ connection policy. Keep the Mac on AC power and leave the lid open; closing it c
 The SSH master itself may also have a finite ControlPersist interval. If access expires, record the
 blocker and leave reauthentication to the owner. Submitted Slurm jobs run remotely and do not depend
 on keeping a local interactive shell open; save their job IDs so the next session can find them.
+
+## The engine's side (W46.engine-cluster)
+
+The queue offers a `(cluster: farmshare)` item only while this preflight passes (cached five minutes), and asks the
+owner to log in at most once a day when it does not. After submitting an item's jobs, record where they are:
+`ops/autonomous/cluster-reach.py mark TAG submitted`, then `finished` when they end, `clear` when the item ships.
+Detail: `ops/autonomous/README.md` §"Cluster items".

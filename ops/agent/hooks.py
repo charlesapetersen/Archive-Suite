@@ -7,7 +7,9 @@ Thin adapters: the queue is ops/autonomous/next-queue-item.sh's answer, with its
 worker-state.py's own lanes() and uses(); the holds are the plan's HOLD QUEUE, the WORK QUEUE's [hold] items and
 the unwalked Daemon Report entries; the status is status-digest.sh's counts. The scripts are found beside this
 file (../autonomous); the data comes from $AGENT_REPO (the plan is gitignored and lives only in the primary
-checkout) and $AGENT_STATE. Read-only, stdlib only, no network.
+checkout) and $AGENT_STATE. Read-only on the repo, stdlib only. The one network call: an open item with a
+`(cluster: NAME)` marker makes the queue run ../autonomous/cluster-reach.py's cached SSH preflight, whose cache is
+in $AGENT_STATE (W46.engine-cluster); the login request it leads to is written by the upkeep hook.
 """
 import hashlib
 import importlib.util
@@ -94,6 +96,24 @@ def clean(s, n=200):
 
 # ---- queue ------------------------------------------------------------------------------------------------
 
+_cluster = {}
+
+
+def cluster_offer(tag, text):
+    """cluster-reach.py's offer(): an item with a `(cluster: NAME)` marker is offered only while that cluster's login
+    answers, or once Box holds its finished results (W46.engine-cluster). The module and the done-state of
+    W46.box-collect are loaded on the first marked item, so an unmarked queue costs nothing and touches no network."""
+    if "(cluster:" not in text:
+        return True, None
+    if not _cluster:
+        spec = importlib.util.spec_from_file_location("cluster_reach", os.path.join(SCRIPTS, "cluster-reach.py"))
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        done, pend = tag_states()
+        _cluster.update(mod=mod, box=mod.BOX_ITEM in done and mod.BOX_ITEM not in pend)
+    return _cluster["mod"].offer(tag, text, _cluster["box"])
+
+
 def queue():
     rc, rows, msg = resolver_rows()
     if rc == 3:
@@ -120,8 +140,12 @@ def queue():
         elif HOLD_MARK.search(text):
             d["status"], d["reason"] = "hold", "held for the owner ([hold] or needs: owner)"
         else:
-            d["status"] = "ok"
-            runnable += 1
+            ok, why = cluster_offer(tag, text)
+            if ok:
+                d["status"] = "ok"
+                runnable += 1
+            else:
+                d["status"], d["reason"] = "blocked", why
         m = EFFORT.search(text)
         if m:
             d["effort"] = m.group(1)

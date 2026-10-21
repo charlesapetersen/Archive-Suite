@@ -1356,3 +1356,32 @@ handles a fully-blocked queue as a clean terminal state — no daemon change nee
 token after its checkbox (`W15.a`, `W3.f1`, `W13.oai-1`); keep prerequisite tags distinctive. Proven by
 `tests/prove-dep-gating.sh` (chains, satisfied/missing/circular prerequisites, multi-prereq, cross-tracker,
 tag-parse).
+
+## Cluster items — `(cluster: farmshare|sherlock)` (`cluster-reach.py`, W46.engine-cluster)
+
+An item that needs a cluster says so with a `(cluster: NAME)` marker. It is not a `(uses: …)` value, because
+`worker-state.py` and the Agent Manager refuse unknown ones. The queue hook (`ops/agent/hooks.py`) offers such an
+item only when `cluster-reach.py`'s `offer()` allows it, and only once its `(blocked-on:)` prerequisites are met:
+
+- **the login answers.** The bounded, read-only preflight of `execution-plans/farmshare-access.md` runs through
+  the owner's existing SSH master (`~/.ssh/cm-farmshare`; Sherlock's `~/.ssh/cm-sherlock` is a placeholder until
+  `W46.sherlock-ok`). With no socket it fails without touching the network; `BatchMode=yes` and
+  `ProxyCommand=false` mean it can never prompt or open a fresh login. The answer is cached for five minutes in
+  `$AGENT_STATE/cluster-reach/<NAME>.json`, because the engine runs the queue hook often.
+- **or Box holds the results.** Once `W46.box-collect` is done, an item whose ledger says `in-box` is offered
+  without SSH: only collection is left.
+
+Otherwise the item is `blocked` with a reason starting `cluster NAME not reachable`, which the engine skips
+silently. The queue hook stays read-only on the repo (the Agent Manager's contract); the **upkeep** hook runs
+`cluster-reach.py ask`, which writes at most one Daemon Report line a day (`- **[Cluster login]** (DATE) — …`, an
+entry opener under both of `hooks.py`'s report rules, without "no decision", so the owner is emailed) naming each
+cluster with the items ready to submit and the items submitted or finished to collect; a day's stamp is
+`$AGENT_STATE/cluster-ask-DATE`. Nothing waiting on the login means no line. Upkeep never runs while a session of
+this project runs, so on a busy day the line comes at the next gap between sessions.
+
+**The ledger** is one word per item in `$AGENT_STATE/cluster-jobs/<TAG>`, written with
+`ops/autonomous/cluster-reach.py mark TAG submitted|finished|in-box|clear`. A session that submits an item's jobs
+marks it `submitted` (the ask counts it as one to collect, because only a login can tell it has finished); one that sees them
+finish marks `finished`; the Box pickup marks `in-box`; the item's completing session marks `clear`. No file means
+nothing submitted yet. `ops/autonomous/cluster-reach.py check farmshare` runs the cached preflight by hand.
+Tests: `ops/agent/tests/test_hooks.py` class `Cluster`.
