@@ -209,11 +209,11 @@ def newsbench(ref: str, hyp: str) -> dict:
 
 
 def newsbench_pool(pages: list[dict]) -> dict:
-    """NewsBench's table row: overall from pooled edits over pooled characters, chrF and bowF1 as page means."""
+    """NewsBench's table row (score.py main): overall is 1 - the mean of the page CERs, every page weighted alike;
+    chrF and bowF1 are page means. Pass every page, failures as empty readings, as NewsBench scores them."""
     if not pages:
         return {}
-    chars = sum(p['chars'] for p in pages)
-    ov = 1 - (sum(p['edits'] for p in pages) / chars) if chars else 0.0
+    ov = 1 - sum(1 - p['overall'] for p in pages) / len(pages)
     bow = sum(p['bowF1'] for p in pages) / len(pages)
     return {'overall': ov, 'chrF': sum(p['chrF'] for p in pages) / len(pages), 'bowF1': bow, 'gap': bow - ov,
             'pages': len(pages)}
@@ -238,16 +238,14 @@ def reading_order_edit(truth: str, hyp: str, min_score: float = 60.0) -> dict | 
     if len(blocks) < 2:
         return None
     text = _nb_norm_sp(hyp)
-    mask = [False] * len(text)
     found = []
     for idx in sorted(range(len(blocks)), key=lambda i: -len(blocks[i])):
-        if not text:
-            break
+        # claimed spans are blanked with a character no block holds, so a later block is searched for in the
+        # unclaimed text only, and positions stay those of the reading
         a = partial_ratio_alignment(blocks[idx], text)
-        if a is None or a.score < min_score or any(mask[a.dest_start:a.dest_end]):
+        if a is None or a.score < min_score or '\x00' in text[a.dest_start:a.dest_end]:
             continue
-        for k in range(a.dest_start, a.dest_end):
-            mask[k] = True
+        text = text[:a.dest_start] + '\x00' * (a.dest_end - a.dest_start) + text[a.dest_end:]
         found.append((a.dest_start, idx))
     if len(found) < 2:
         return {'blocks': len(blocks), 'matched': len(found), 'edit': None}
@@ -281,9 +279,11 @@ _MARKUP = [
     (re.compile(r'^\s{0,3}#{1,6}\s+', re.M), ''),                  # headings
     (re.compile(r'^\s*\|?\s*:?-{3,}:?\s*(?:\|\s*:?-{3,}:?\s*)*\|?\s*$', re.M), ''),  # pipe-table rules
     (re.compile(r'\*\*(.+?)\*\*|__(.+?)__', re.S), r'\1\2'),        # bold
-    (re.compile(r'\$\$?([^$]*)\$\$?'), r'\1'),                     # LaTeX delimiters
-]
-_HAS_MARKUP = re.compile(r'^\s{0,3}#{1,6}\s|\*\*|</?[a-z][a-z0-9]*[\s>/]|!\[|^\s*\|.*\|\s*$|\$', re.I | re.M)
+    (re.compile(r'\$\$?([^$\n]*\\[A-Za-z][^$\n]*)\$\$?'), r'\1'),   # LaTeX: delimiters around a command only,
+]                                                                   # so a dollar amount is left alone
+# Table bars alone are not markup here (the panel's own format uses them, and normal() folds them); a rule line is.
+_HAS_MARKUP = re.compile(r'^\s{0,3}#{1,6}\s|\*\*|</?[a-z][a-z0-9]*[\s>/]|!\[|^\s*\|?\s*:?-{3,}:?\s*\||'
+                         r'\$[^$\n]*\\[A-Za-z]', re.I | re.M)
 
 
 def has_markup(text: str) -> bool:

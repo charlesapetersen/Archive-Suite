@@ -1,0 +1,96 @@
+{
+ "pages": 20,
+ "altered_words": 54,
+ "made": 60,
+ "rejected_by_eye": 6,
+ "routes": [
+  {
+   "route": "apple-vision",
+   "pages": 20,
+   "words": 54,
+   "copied": 48,
+   "corrected": 2,
+   "other": 4,
+   "unread": 0,
+   "recall": 0.8888888888888888,
+   "nes": 0.9531027659678395
+  },
+  {
+   "route": "glm-ocr",
+   "pages": 20,
+   "words": 54,
+   "copied": 12,
+   "corrected": 39,
+   "other": 3,
+   "unread": 0,
+   "recall": 0.2222222222222222,
+   "nes": 0.9632552035356016
+  },
+  {
+   "route": "lightonocr3-0.8b",
+   "pages": 20,
+   "words": 54,
+   "copied": 6,
+   "corrected": 46,
+   "other": 2,
+   "unread": 0,
+   "recall": 0.1111111111111111,
+   "nes": 0.9636692439483084
+  },
+  {
+   "route": "lightonocr3-4b",
+   "pages": 20,
+   "words": 54,
+   "copied": 3,
+   "corrected": 48,
+   "other": 3,
+   "unread": 0,
+   "recall": 0.05555555555555555,
+   "nes": 0.9699605732213701
+  },
+  {
+   "route": "paddleocr-vl1.5",
+   "pages": 19,
+   "words": 54,
+   "copied": 6,
+   "corrected": 44,
+   "other": 1,
+   "unread": 3,
+   "recall": 0.1111111111111111,
+   "nes": 0.9350451812316379
+  },
+  {
+   "route": "ppocrv6-medium",
+   "pages": 20,
+   "words": 54,
+   "copied": 52,
+   "corrected": 0,
+   "other": 2,
+   "unread": 0,
+   "recall": 0.9629629629629629,
+   "nes": 0.9239398748805285
+  },
+  {
+   "route": "qwen3-vl-8b",
+   "pages": 19,
+   "words": 54,
+   "copied": 15,
+   "corrected": 32,
+   "other": 4,
+   "unread": 3,
+   "recall": 0.2777777777777778,
+   "nes": 0.9218572436855462
+  },
+  {
+   "route": "qwen3.5-4b",
+   "pages": 20,
+   "words": 54,
+   "copied": 30,
+   "corrected": 20,
+   "other": 4,
+   "unread": 0,
+   "recall": 0.5555555555555556,
+   "nes": 0.9555791013687122
+  }
+ ]
+}

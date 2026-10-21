@@ -202,6 +202,16 @@ footer p { font-size: 13px; }
     <div class="tbl"><table><thead><tr><th>Step</th><th>Seconds a page</th><th>Peak memory</th></tr></thead><tbody id="kind-clf-speed"></tbody></table></div>
   </section>
 
+  <section class="panel" id="ocr-scorers" hidden>
+    <div class="head"><h2>What a reader adds, and whether it reads what is printed</h2><span class="meta">every saved reading re-scored · no new calls (W46.fix-ocr-scorers)</span></div>
+    <p class="note">Added words are insertions and rewritten words substitutions more than one letter from the truth word, each over the truth's words, on the pages answered. cMER is HIPE-OCRepair's character error bounded at 100%. NewsBench's bag-of-words F1 ignores order; its gap (bag-of-words F1 less 1 − CER) is the order penalty, Latin-script pages only. Suspect words are those Apple Vision's reading of the page lacks (Gemini 3.8 Flash's, for Vision); precision is the share the truth lacks too, recall the share of the reading's non-truth words caught. The owner's 96 pages:</p>
+    <div class="tbl"><table><thead><tr><th>Route</th><th>Answered</th><th>NES</th><th>Added</th><th>Rewritten</th><th>cMER</th><th>Bag-of-words F1</th><th>Gap</th><th>Suspect</th><th>Precision</th><th>Recall</th></tr></thead><tbody id="sc-own"></tbody></table></div>
+    <p class="note">The 895 public pages, each route over the pages its run covered. Order is OmniDocBench's reading-order edit over the truth's paragraphs or lines (lower is better); the 96's truth has no blocks to order.</p>
+    <div class="tbl"><table><thead><tr><th>Route</th><th>Answered</th><th>NES</th><th>Added</th><th>Rewritten</th><th>cMER</th><th>Bag-of-words F1</th><th>Gap</th><th>Order (pages)</th></tr></thead><tbody id="sc-pub"></tbody></table></div>
+    <p class="note" id="sc-chaos-note"></p>
+    <div class="tbl"><table><thead><tr><th>Route</th><th>Pages read</th><th>Copied as printed</th><th>Corrected to the expected word</th><th>Other</th><th>NES</th></tr></thead><tbody id="sc-chaos"></tbody></table></div>
+  </section>
+
   <header class="part" id="dating">
     <div class="eyebrow">Part 6 · Dating documents · the owner's own tags as the answer</div>
     <h2>The year and month the tagger gives a document</h2>
@@ -508,6 +518,20 @@ if (KC) {
   document.getElementById('kind-clf-route').innerHTML = '<tr><td>True kinds</td><td>—</td><td>' + f2(KC.oracle_nes) + '</td><td>—</td></tr>' + KC.routing.map(r => '<tr><td>' + r.classifier + '</td><td>' + r.as_labelled + ' of ' + r.n + '</td><td>' + f2(r.mean_nes) + '</td><td>' + (r.lost >= 0 ? '−' : '+') + Math.abs(r.lost).toFixed(2) + '</td></tr>').join('');
   document.getElementById('kind-clf-speed').innerHTML = KC.speed.map(s => '<tr><td>' + s.step + '</td><td>' + s.s_page.toFixed(2) + '</td><td>' + (s.peak_gb ? s.peak_gb.toFixed(1) + ' GB' : 'OS model') + '</td></tr>').join('');
 } else document.getElementById('kind-clf').hidden = true;
+const SC = DATA.ocr_scorers;
+if (SC) {
+  document.getElementById('ocr-scorers').hidden = false;
+  const p1 = v => v === null || v === undefined ? '—' : (100 * v).toFixed(1);
+  const p0 = v => v === null || v === undefined ? '—' : (100 * v).toFixed(0) + '%';
+  const head = r => '<td>' + r.route + ' <span class="meta">' + r.family + '</span></td><td>' + r.ok + ' of ' + r.n + '</td><td>' + p1(r.nes) + '</td><td>' + p1(r.added_rate) + '</td><td>' + p1(r.rewritten_rate) + '</td><td>' + p1(r.cmer) + '</td><td>' + p1(r.nb_bowF1) + '</td><td>' + p1(r.nb_gap) + '</td>';
+  document.getElementById('sc-own').innerHTML = SC.owner96.map(r => '<tr>' + head(r) + '<td>' + p1(r.suspect_rate) + '</td><td>' + p0(r.suspect_precision) + '</td><td>' + p0(r.suspect_recall) + '</td></tr>').join('');
+  document.getElementById('sc-pub').innerHTML = SC.public895.map(r => '<tr>' + head(r) + '<td>' + (r.order_edit === null ? '—' : r.order_edit.toFixed(3) + ' (' + r.order_pages + ')') + '</td></tr>').join('');
+  const CH = SC.chaos;
+  if (CH) {
+    document.getElementById('sc-chaos-note').textContent = 'The altered-word probe (CHAOS-Bench\'s idea): ' + CH.altered_words + ' words on ' + CH.pages + ' typewritten owner pages had one letter replaced by another of the same page\'s type (' + CH.made + ' made, ' + CH.rejected_by_eye + ' left out after an eye check). A reader that copies is reading the page; one that corrects writes the word it expects.';
+    document.getElementById('sc-chaos').innerHTML = CH.routes.slice().sort((a, b) => b.recall - a.recall).map(r => '<tr><td>' + r.route + '</td><td>' + r.pages + '</td><td>' + r.copied + ' (' + p0(r.recall) + ')</td><td>' + r.corrected + '</td><td>' + (r.other + r.unread) + '</td><td>' + p1(r.nes) + '</td></tr>').join('');
+  } else document.getElementById('sc-chaos-note').textContent = 'The altered-word probe has not been scored yet.';
+}
 const curveCanvas = document.querySelector('#dif-curves canvas'), frontCanvas = document.querySelector('#dif-frontier canvas');
 let curveChart, frontChart;
 function renderDifficulty() {

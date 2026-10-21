@@ -44,6 +44,8 @@ KIND_CLASSIFIER = RESULTS / "kind-classifier.json"  # W41.bench-kind-classifier:
 DATING = RESULTS / "date-tagging.json"  # W41.date-tag-measure: date_tagging.py score
 DATING_PUBLIC = RESULTS / "date-tagging-public.json"
 PUBLIC = RESULTS / "bench-corpus"  # W43.corpus-build: corpus/routes.py report, the public strata
+OCR_SCORERS = RESULTS / "ocr-scorers.json"  # W46.fix-ocr-scorers: ocr_rescore.py, every cached reading re-scored
+CHAOS = RESULTS / "chaos-probe.json"  # W46.fix-ocr-scorers: chaos_probe.py score, the altered-word probe
 OPEN_SWEEP = HERE / "data" / "open-sweep-20261019.json"  # the open-model sweep's receipts (hand-entered, sourced)
 TEMPLATE = HERE / "site" / "template.html"
 OUT_DATA = HERE / "data" / "panel-data.json"
@@ -398,6 +400,24 @@ def open_sweep(num):
             "hardware": receipts["hardware"]}
 
 
+SCORER_FIELDS = ("route", "family", "n", "ok", "nes", "nes_answered", "added_rate", "rewritten_rate", "cmer",
+                 "nb_overall", "nb_bowF1", "nb_gap", "suspect_rate", "suspect_precision", "suspect_recall",
+                 "order_edit", "order_pages", "markup_pages", "markup_mean_lift")
+
+
+def ocr_scorers():
+    """The review's scorer additions per route on the 96 and on the 895 (whole sets only; the strata stay in the
+    report), and the altered-word probe. None until ocr_rescore.py has run."""
+    if not OCR_SCORERS.exists():
+        return None
+    d = json.loads(OCR_SCORERS.read_text())
+    out = {s: sorted(({k: r.get(k) for k in SCORER_FIELDS} for r in d["summary"]
+                      if r["set"] == s and r["stratum"] == "all" and r["ok"]), key=lambda r: -r["nes"])
+           for s in ("owner96", "public895")}
+    out["chaos"] = json.loads(CHAOS.read_text()) if CHAOS.exists() else None
+    return out
+
+
 def main():
     check = "--check" in sys.argv[1:]
     inputs = json.loads(INPUTS.read_text())
@@ -489,7 +509,7 @@ def main():
              "dating_public": json.loads(DATING_PUBLIC.read_text()) if DATING_PUBLIC.exists() else None,
              "seg_date": json.loads((RESULTS / "seg-date-model-final.json").read_text())
                          if (RESULTS / "seg-date-model-final.json").exists() else None,
-             "public": public()}
+             "public": public(), "ocr_scorers": ocr_scorers()}
     page = TEMPLATE.read_text().replace("__DATA__", json.dumps(built, separators=(",", ":")))
     outputs = {OUT_DATA: json.dumps(built, indent=1) + "\n", OUT_PAGE: page, OUT_DIFFICULTY: difficulty.report(diff)}
 

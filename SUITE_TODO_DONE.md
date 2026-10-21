@@ -12403,3 +12403,36 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   remains). Cluster results come back over SSH at each submit login; Stanford Google Drive through rclone is the
   route if results ever wait too long between logins.
   <!-- /W46.box-collect -->
+- [x] **`W46.fix-ocr-scorers` — the OCR scorer additions on every cached reading [S]** · §Document processing review — W46 (lane: segbench) (uses: light) (cluster: farmshare) (blocked-on: W46.cluster-waves) — Added, rewritten and restoration-only words, suspect rate, mark-region check, cMER, NewsBench and OmniDocBench order scores, preservation rates, the markup-aware diagnostic; the CHAOS probe's open-route readings go to the cluster. detail: execution-plans/processing-review/10-gap-audit.md §5 item 2
+  SHIPPED 2026-10-21. No model calls on the Mac; $0. Scorers in `scripts/segbench/ocr_scorers.py` (unit tests
+  `test_ocr_scorers.py`); `ocr_rescore.py` re-scores 38 routes on the 96 and 25 on the 895 (16,013 page scores) ->
+  `segbench-results/ocr-scorers.md|.json|-pages.csv`; the bench page has a new table section. NES reproduces the
+  published panel figures (Gemini 3.8 Flash 94.47, Mistral OCR 92.91 on the 96).
+  - Added and rewritten words on the 96 (pooled over answered pages): the best readers add about 1% and rewrite
+    0.2-0.3% (Gemini 3.1 Pro 0.9/0.2, Gemini 3.8 Flash 1.1/0.2, Claude Sonnet 5.5 1.1/0.3); GLM-OCR adds least
+    (0.7) but rewrites 1.9; PP-OCRv6 10.5/10.3, Apple Vision 5.2/5.8. On the 895 the reference Gemini adds 17.7
+    and rewrites 24.2, the open routes 5-11 and 11-16.
+  - The two-reader suspect check with Apple Vision as the second reader is weak as a reference-free filter on our
+    material: 6-40% of suspect words are really absent from the truth on the 96 (Vision misses too much) though it
+    catches 51-91% of a route's non-truth words; page-level Spearman with the added rate 0.25-0.56. A threshold on
+    it needs a stronger second reader (W46.enh-ocr-input).
+  - Markup-aware diagnostic: stripping Markdown/HTML lifts LightOnOCR-3 4B by 2.75 points on the 96 (36 pages)
+    and 1.43 on the 895 (124 pages; the open sweep said about 1.4), the 0.8B by 3.61 and 1.52, Mistral OCR 0.32;
+    every other route moves under 0.25. The convention (native Markdown scored as written) is unchanged.
+  - NewsBench gap and OmniDocBench order: order edit 0.00-0.05 on L1-L3 and L8 for the open VLMs, 0.13-0.24 on L4
+    tables and 0.11-0.20 on L5; on L9 Qwen3.6-27B gap 0.029 (claim 34 said 0.017, a different gold
+    normalisation), PP-OCRv6 order 0.58. The 96's truth has no blocks, so only the gap is scored there.
+  - Long s and ligatures: on L8 Fraktur CHURRO keeps 95.5% of the truth's, every VLM 0-10%; CHURRO inserts
+    archaic characters on 68.5% of L5 pages whose truth has none, Gemini 3.8 Flash on 32.9%.
+  - Restoration-only words, run on the local panel's half and quarter scale readings against the original (a
+    downscale, not an enhancement): 7-19 per 1,000 at half, 15-93 at quarter.
+  - CHAOS probe (`chaos_probe.py`, tests `test_chaos_probe.py`): 20 typed owner pages, 60 one-letter
+    alterations pasted from the page's own type, 6 rejected by eye, 54 scored. Copied as printed: PP-OCRv6 96%,
+    Apple Vision 89%, Qwen3.5-4B 56%, Qwen3-VL-8B 28%, GLM-OCR 22%, LightOnOCR-3 0.8B and PaddleOCR-VL 1.5 11%,
+    LightOnOCR-3 4B 6%; the VLMs mostly "correct" to the expected word (20-48 of 54). Open routes on FarmShare
+    jobs 1863267-1863273 (one afterany chain, free); readings in `~/Claude/Long term storage/FarmShare-chaos20-20261021/`;
+    images, truths and the word list private in the cache's `ocr-scorers/chaos/`. Not run on the probe: Ling 3
+    Flash VL (a whole four-GPU node), the Mac MLX routes, and the hosted routes (Gemini is W46.fix-ocr-scorers-paid).
+  - Not computable from cached readings: the mark-region ink check and reseeding instability (need enhanced
+    images and mark boxes: W46.enh-ocr-input, W46.enh-ocr-input-marks); both functions are tested.
+  <!-- /W46.fix-ocr-scorers -->

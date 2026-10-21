@@ -86,9 +86,10 @@ class NewsBench(unittest.TestCase):
         self.assertAlmostEqual(r['gap'], r['bowF1'] - r['overall'])
         self.assertEqual(S.newsbench(ref, ref)['overall'], 1.0)
 
-    def test_pool_weights_characters(self):
+    def test_pool_weights_pages_alike(self):
+        # NewsBench's table averages the page CERs: a perfect long page and a wrong short one give 0.5
         a, b = S.newsbench('abcdefghij', 'abcdefghij'), S.newsbench('ab', 'xy')
-        self.assertAlmostEqual(S.newsbench_pool([a, b])['overall'], 1 - 2 / 12)
+        self.assertAlmostEqual(S.newsbench_pool([a, b])['overall'], 0.5)
 
 
 class ReadingOrder(unittest.TestCase):
@@ -105,6 +106,11 @@ class ReadingOrder(unittest.TestCase):
         r = S.reading_order_edit(self.TRUTH, hyp)
         self.assertEqual(r['matched'], 3)
         self.assertGreater(r['edit'], 0.0)
+
+    def test_duplicate_blocks_both_found(self):
+        truth = 'the same header line here\n\nthe body of the letter follows\n\nthe same header line here'
+        r = S.reading_order_edit(truth, truth.replace('\n\n', ' '))
+        self.assertEqual((r['matched'], r['edit']), (3, 0.0))
 
     def test_single_block(self):
         self.assertIsNone(S.reading_order_edit('only one block of words here', 'anything'))
@@ -123,6 +129,9 @@ class Markup(unittest.TestCase):
         out = ' '.join(S.strip_markup(md).split())
         self.assertEqual(out, 'Heading Dear Sir, one two | a | b |')
         self.assertFalse(S.has_markup('Dear Sir, a plain letter.'))
+        self.assertFalse(S.has_markup('paid $5 and $10 | 1972 | total'))
+        self.assertTrue(S.has_markup('the area $\\alpha$ of'))
+        self.assertEqual(S.strip_markup('cost $5 and $6'), 'cost $5 and $6')
 
 
 if __name__ == '__main__':

@@ -115,6 +115,11 @@ record:
 - The Vision kind comes from `scripts/segbench/vision_kind/run.sh`, which builds a small tool against a vision-ocr
   checkout's `Sources/` (read only; the commit is printed) and writes into the private cache's `vision-kind/`;
   then rerun `ocr_pages_export.py`. The bulk pages' images are the bulk pilot's 2,400 px renders, kept on the Mac.
+- `ocr-scorers.json` (`scripts/segbench/ocr_rescore.py`, W46.fix-ocr-scorers): every saved reading of the 96 and
+  the 895 re-scored with the processing review's scorer additions (added and rewritten words, cMER, NewsBench's
+  bag-of-words F1 and gap, the two-reader suspect check, OmniDocBench's reading-order edit). The page shows the
+  whole-set rows of every route that answered; the strata, preservation, markup and restoration-only tables are in
+  `ocr-scorers.md` only. `chaos-probe.json` (`chaos_probe.py`) is the altered-word probe on 20 typed owner pages.
 - `ocr-panel-cloud-pilot.md`: the three-page pilot that came before the full cloud run.
 - `options.md`: the segmentation approaches on the test boxes (manual, Claude, Gemini, ChatGPT, Claude and
   ChatGPT together), each at the flag level frozen on the development boxes, with their API cost.
