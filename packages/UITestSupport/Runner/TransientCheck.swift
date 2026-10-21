@@ -199,6 +199,37 @@ enum TransientCheckSelfTest {
         XCTAssertEqual(kinds([a, s(e("x.title", "Moore", h: 27), e("x.date", "1968")),
                               s(e("x.title", "Moore", h: 33), e("x.date", "1968")), tall]), [],
                        "a smooth animation from one height to another is clean", file: file, line: line)
+        // THE SLIDE ALLOWANCE (W40.fix-split-animation-wobble): a wobble up to 1/20 of how far the element slides.
+        func slide(_ ys: [Int], _ hs: [Int]) -> [TransientFinding.Kind] {
+            kinds(zip(ys, hs).map { s(e("x.title", "Moore", h: $1, y: $0), e("x.date", "1968")) })
+        }
+        func slideWide(_ xs: [Int], _ ws: [Int]) -> [TransientFinding.Kind] {
+            kinds(zip(xs, ws).map { s(TransientEntry(role: "AXStaticText", identifier: "x.title", text: "Moore",
+                                                     x: $0, y: 0, w: $1, h: 20)) })
+        }
+        XCTAssertEqual(slide([0, 100, 200], [20, 23, 20]), [],
+                       "a 3 pt wobble in height while the element slides 200 pt is clean", file: file, line: line)
+        XCTAssertEqual(slide([0, 100, 200], [20, 16, 22]), [],
+                       "4 pt outside the range while sliding is clean", file: file, line: line)
+        XCTAssertEqual(slideWide([-1, 211, 217], [1115, 1108, 1116]), [],
+                       "the Reader row measured 2026-10-21 is clean", file: file, line: line)
+        XCTAssertEqual(slide([0, 100, 200], [20, 31, 20]), [.geometry],
+                       "an 11 pt wobble is a finding even while sliding 200 pt", file: file, line: line)
+        XCTAssertEqual(slide([0, 50, 100], [20, 26, 20]), [.geometry],
+                       "a 6 pt wobble is a finding while sliding 100 pt", file: file, line: line)
+        XCTAssertEqual(slide([0, 20, 39], [20, 23, 20]), [.geometry],
+                       "a 3 pt wobble while moving under 40 pt is a finding", file: file, line: line)
+        XCTAssertEqual(slide([0, 0, 0], [20, 21, 20]), [.geometry],
+                       "a 1 pt wobble with no slide is a finding", file: file, line: line)
+        XCTAssertEqual(slide([0, 100, 97, 200], [20, 20, 20, 20]), [.geometry],
+                       "a turn back in the moving coordinate itself is a finding", file: file, line: line)
+        XCTAssertEqual(slideWide([0, 100, 97, 200], [100, 160, 220, 260]), [.geometry],
+                       "a turn back in a moving coordinate is a finding while another one moves too",
+                       file: file, line: line)
+        XCTAssertEqual(TransientAnalysis.geometryDeviation([1112, 1113, 1111]), 1, file: file, line: line)
+        XCTAssertEqual(TransientAnalysis.geometryDeviation([1112, 1109, 1115]), 3, file: file, line: line)
+        XCTAssertEqual(TransientAnalysis.geometryDeviation([0, 10, 7, 20]), 3, file: file, line: line)
+        XCTAssertEqual(TransientAnalysis.geometryDeviation([0, 10, 20]), 0, file: file, line: line)
         let link = TransientLink(first: "x.title", second: "y.body")
         func pair(_ title: String, _ body: String) -> TransientAnalysis.LinkState { (title, body) }
         func linkKinds(_ states: [TransientAnalysis.LinkState]) -> [TransientFinding.Kind] {

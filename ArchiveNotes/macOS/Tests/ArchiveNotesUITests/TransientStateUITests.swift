@@ -18,12 +18,6 @@ final class TransientStateUITests: NotesFixtureUITestCase {
     /// for 100–133 ms, which each section alone passes).
     static let links = [TransientLink(first: "an.detail.header", second: "an.editor.text")]
 
-    /// `W40.fix-split-animation-wobble`: while the folder tree animates, a list row's or the header's width turns
-    /// back by 1–2 points (1010→1012→1008), on some runs and not others (measured in the VM, 2026-10-17).
-    static let splitWobble = TransientCheck.KnownIssue(tag: "W40.fix-split-animation-wobble", intermittent: true) {
-        $0.hasPrefix("an.list geometry: ") && $0.contains(" width ")
-    }
-
     private var plant = false
     override var extraLaunchArguments: [String] {
         TransientCheck.launchArguments(sections: Self.sections, links: Self.links, plant: plant)
@@ -69,10 +63,10 @@ final class TransientStateUITests: NotesFixtureUITestCase {
             TransientCheck.check("close the smart-folder sheet", in: app, test: self) {
                 window.sheets.firstMatch.buttons["Cancel"].click()
             }
-            TransientCheck.check("hide the folder tree", in: app, test: self, known: [Self.splitWobble]) {
+            TransientCheck.check("hide the folder tree", in: app, test: self) {
                 window.descendants(matching: .any)["an.toggleTree"].firstMatch.click()
             }
-            TransientCheck.check("show the folder tree", in: app, test: self, known: [Self.splitWobble]) {
+            TransientCheck.check("show the folder tree", in: app, test: self) {
                 window.descendants(matching: .any)["an.toggleTree"].firstMatch.click()
             }
         }

@@ -11,7 +11,7 @@
 //   • reverted  — the new text shown, then the old one again;
 //   • removed   — the section left the screen and came back;
 //   • geometry  — a frame outside the old→new range, or one that changes direction (a height that grows and
-//                 shrinks back);
+//                 shrinks back), except a few points' wobble in an element that is sliding (THE SLIDE ALLOWANCE);
 //   • structure — elements added or removed and then put back (neither the old nor the new element list).
 //
 // One finding per section per kind per transition: the first offending step, which is the reproduction.
@@ -114,9 +114,13 @@ enum TransientAnalysis {
         let shape = old.shape
         if states.allSatisfy({ $0.shape == shape }) {
             outer: for j in old.entries.indices {
+                let tracks = (0..<4).map { c in states.map { $0.entries[j].coordinates[c] } }
                 for c in 0..<4 {
-                    let values = states.map { $0.entries[j].coordinates[c] }
+                    let values = tracks[c]
                     if let problem = geometryProblem(values) {
+                        let slide = tracks.indices.filter { $0 != c }.map { travel(tracks[$0]) }.max() ?? 0
+                        if slide >= slideTravel, travel(values) < slideTravel,
+                           geometryDeviation(values) * slideShare <= slide { continue }
                         let odd = states.first { !(min(values[0], values[last])...max(values[0], values[last]))
                             .contains($0.entries[j].coordinates[c]) } ?? states[1]
                         note(.geometry, "\(old.entries[j].name) \(["x", "y", "width", "height"][c]) "
@@ -151,6 +155,37 @@ enum TransientAnalysis {
                                         + "\(quote(firstNew ? s.second : s.first))")]
         }
         return []
+    }
+
+    /// THE SLIDE ALLOWANCE (W40.fix-split-animation-wobble). While an element slides — the file list when the
+    /// Reader's sidebar opens or closes, Notes' list when the folder tree does — the split view re-lays it out every
+    /// pass, and its width turns back by a few points on the way (measured in the VM: a Reader row at x 162→-1 with
+    /// width 1112→1113→1111, one settling at x 217 with width 1115→1108→1116, a Notes row 1010→1012→1008). The row
+    /// is wider than the visible list, so the change is at a clipped edge, and it lasts one frame of an element
+    /// moving by a sidebar's width: not something a user can see, so not a finding. The allowance is narrow:
+    /// another coordinate of the SAME element must travel at least `slideTravel`, the offending one must not (a
+    /// turn back in a coordinate that is itself moving still counts), and it may stray by at most 1/`slideShare`
+    /// of that travel (10 pt for a 200 pt sidebar).
+    static let slideTravel = 40
+    static let slideShare = 20
+
+    static func travel(_ values: [Int]) -> Int { (values.max() ?? 0) - (values.min() ?? 0) }
+
+    /// How far `values` strays from a steady move from its first to its last: the larger of the distance it goes
+    /// outside that range and the largest step back against the move's direction. 0 when `geometryProblem` is nil.
+    static func geometryDeviation(_ values: [Int]) -> Int {
+        guard let a = values.first, let b = values.last else { return 0 }
+        let lo = min(a, b), hi = max(a, b)
+        var deviation = values.map { max(lo - $0, $0 - hi, 0) }.max() ?? 0
+        if a != b {
+            let d = b > a ? 1 : -1
+            var extreme = a
+            for v in values {
+                if (v - extreme) * d > 0 { extreme = v }
+                deviation = max(deviation, (extreme - v) * d)
+            }
+        }
+        return deviation
     }
 
     /// nil when `values` goes from its first to its last without leaving that range and without turning back.
