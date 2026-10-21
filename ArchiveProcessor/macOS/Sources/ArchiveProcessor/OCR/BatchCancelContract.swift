@@ -1,3 +1,4 @@
+#if DEBUG // W40.a5: a test driver/contract, compiled out of Release
 import Foundation
 
 /// **Cancel-path journal-retention contract for the paid batch path** (W16.bat2) — headless, $0, no
@@ -447,3 +448,5 @@ enum BatchCancelContract {
               deleteCallsHeld)
     }
 }
+
+#endif

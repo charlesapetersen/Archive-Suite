@@ -1,3 +1,4 @@
+#if DEBUG // W40.a5: a test driver/contract, compiled out of Release
 import Foundation
 
 /// **Provider response-shape contract for the three paid batch clients** (W16.bat1) — headless, $0,
@@ -657,3 +658,5 @@ enum BatchParseContract {
               parseBatchErrorBody(data: Data(), statusCode: 500) == "API error (500)")
     }
 }
+
+#endif

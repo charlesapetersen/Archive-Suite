@@ -99,7 +99,8 @@ out larger splits itself: file `<tag>a`, `<tag>b` … with `(blocked-on:)` chain
   2026-10-14, see SUITE_TODO_DONE.md.)*
 - **`W40.a5` — test drivers out of Release [S].** Processor's 17 env-gated drivers and their `*Contract.swift`
   seams compile into Release (`ContentView.swift` dispatch). Put them behind `#if DEBUG` or a build flag, or prove
-  why a script needs them in Release. Prove absence with `nm` on the Release binary. Tier-2.
+  why a script needs them in Release. Prove absence with `nm` on the Release binary. Tier-2. *(SHIPPED
+  2026-10-21, see SUITE_TODO_DONE.md.)*
 
 ## I — revive the iPhone companion (owner, 2026-10-04: before testing)
 

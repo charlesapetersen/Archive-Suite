@@ -1,3 +1,4 @@
+#if DEBUG // W40.a5: a test driver/contract, compiled out of Release
 import Foundation
 
 /// **The interrupted-paid-batch TAIL contract** (W16.bat4) — headless, $0, no network, no keys. Drives the
@@ -508,3 +509,5 @@ enum BatchInterruptTailContract {
         var label: String { firstBad.map { "\(name) [first bad shape: \($0)]" } ?? name }
     }
 }
+
+#endif

@@ -1,3 +1,4 @@
+#if DEBUG // W40.a5: a test driver/contract, compiled out of Release
 import Foundation
 
 /// Headless, $0 self-test of `CollectionSegmenter.organizeOutput`, gated by `COLLECTIONORGANIZE_TEST=1`
@@ -242,3 +243,5 @@ enum CollectionOrganizeTestDriver {
         NSLog("ORGANIZETEST DONE: \(passed ? "ALL PASS" : "SOME FAILED") → \(outPath)")
     }
 }
+
+#endif

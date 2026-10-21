@@ -1,3 +1,4 @@
+#if DEBUG // W40.a5: a test driver/contract, compiled out of Release
 import Foundation
 
 /// **Cancel-path WIRING contract for the paid batch path** (W16.bat2-fu) — headless, $0, no network, no
@@ -740,3 +741,5 @@ enum BatchCancelWiringContract {
         var label: String { firstBad.map { "\(name) [first bad shape: \($0)]" } ?? name }
     }
 }
+
+#endif

@@ -1,3 +1,4 @@
+#if DEBUG // W40.a5: a test driver/contract, compiled out of Release
 import Foundation
 
 /// Headless, key-free ($0) functional test of `IncrementalSkip` — the incremental-processing
@@ -181,3 +182,5 @@ enum IncrementalSkipTestDriver {
         exit(passed ? 0 : 1)
     }
 }
+
+#endif

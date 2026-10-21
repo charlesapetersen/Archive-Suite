@@ -1,3 +1,4 @@
+#if DEBUG // W40.a5: a test driver/contract, compiled out of Release
 import AppKit
 import Foundation
 import PDFKit
@@ -295,3 +296,5 @@ enum InstitutionalComputeImportTestDriver {
         exit(passed ? 0 : 1)
     }
 }
+
+#endif

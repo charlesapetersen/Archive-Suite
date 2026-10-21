@@ -1,3 +1,4 @@
+#if DEBUG // W40.a5: a test driver/contract, compiled out of Release
 import Foundation
 
 /// **A paid job created as Stop landed still reaches the recovery journal** (W16.bat5-fu) — headless, $0,
@@ -510,3 +511,5 @@ enum BatchClosedJournalAppendContract {
               result.elapsed < 1.0)
     }
 }
+
+#endif

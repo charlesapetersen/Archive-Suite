@@ -1,3 +1,4 @@
+#if DEBUG // W40.a5: a test driver/contract, compiled out of Release
 import Foundation
 import CoreGraphics
 import CoreText
@@ -334,3 +335,5 @@ enum MultiPageReOCRTestDriver {
         exit(passed ? 0 : 1)
     }
 }
+
+#endif

@@ -1,3 +1,4 @@
+#if DEBUG // W40.a5: a test driver/contract, compiled out of Release
 import Foundation
 import AppKit
 
@@ -910,3 +911,5 @@ enum ManifestPersistenceTestDriver {
         NSLog("MANIFESTTEST DONE: \(passed ? "ALL PASS" : "SOME FAILED") → \(outPath)")
     }
 }
+
+#endif

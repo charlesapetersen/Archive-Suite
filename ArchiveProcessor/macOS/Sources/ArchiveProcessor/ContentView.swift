@@ -20,6 +20,7 @@ struct ContentView: View {
 
     var body: some View {
         Group {
+#if DEBUG
             if ProcessInfo.processInfo.environment["PROCESSFILES_TESTMODE"] == "1" {
                 // Headless Process Files test: ProcessFilesTestDriver drives `processor` directly,
                 // so render a STATIC placeholder (never OCRView / its review sheets / tag card). The
@@ -36,6 +37,9 @@ struct ContentView: View {
             } else {
                 mainContent
             }
+#else
+            mainContent
+#endif
         }
         .onAppear {
 #if DEBUG
@@ -52,6 +56,8 @@ struct ContentView: View {
                 processor._uiTestShowFlaggedReview()
             }
 #endif
+#if DEBUG
+            // W40.a5: the env-gated drivers are Debug-only; a Release build carries none of them.
             LiveCaptureTestDriver.runIfRequested(session: capture)
             FileRelayTestDriver.runIfRequested(session: capture)
             ProcessFilesTestDriver.runIfRequested()
@@ -83,6 +89,7 @@ struct ContentView: View {
             SegmentationPlanTestDriver.runIfRequested()      // $0 W36 Claude plan route: meter, calibration, cancel
             SegmentationChatGPTTestDriver.runIfRequested()   // $0 W36 ChatGPT plan route: Sign in with ChatGPT, fake server
             SegmentationProofDriver.runIfRequested()         // PAID (cents) W36 one real folder through real models
+#endif
             maybePresentKeyOnboarding()
         }
 #if DEBUG

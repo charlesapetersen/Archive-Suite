@@ -1,3 +1,4 @@
+#if DEBUG // W40.a5: a test driver/contract, compiled out of Release
 import AppKit
 import Foundation
 
@@ -365,3 +366,5 @@ private extension OCRProcessor.PendingRun {
         return r
     }
 }
+
+#endif

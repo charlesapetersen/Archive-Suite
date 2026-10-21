@@ -1,3 +1,4 @@
+#if DEBUG // W40.a5: a test driver/contract, compiled out of Release
 import Foundation
 
 /// Headless, $0 self-test of the Claude plan route (W36.seg-opt-subscription), gated by `SEGMENTATION_PLAN_TEST=1`
@@ -515,3 +516,5 @@ enum SegmentationPlanTestDriver {
         check("6 an unread stdin cannot raise SIGPIPE", quick.exitCode == 0 && !quick.spawnFailed, "\(quick)")
     }
 }
+
+#endif

@@ -1,3 +1,4 @@
+#if DEBUG // W40.a5: a test driver/contract, compiled out of Release
 import Foundation
 import PDFKit
 
@@ -203,3 +204,5 @@ enum ProcessFilesTestDriver {
         NSLog("PFDRIVER: done — \(succeeded) succeeded, \(failed) failed → \(runDir.path)")
     }
 }
+
+#endif

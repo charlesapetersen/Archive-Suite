@@ -1,3 +1,4 @@
+#if DEBUG // W40.a5: a test driver/contract, compiled out of Release
 import Foundation
 
 /// Headless, $0 self-test of the window segmenter (W36.seg-opt-engine), gated by `SEGMENTATION_ENGINE_TEST=1`
@@ -757,3 +758,5 @@ private extension Result where Failure == Error {
         return nil
     }
 }
+
+#endif

@@ -1,3 +1,4 @@
+#if DEBUG // W40.a5: a test driver/contract, compiled out of Release
 import AppKit
 import Foundation
 
@@ -520,3 +521,5 @@ enum LocalModelsTestDriver {
         }
     }
 }
+
+#endif

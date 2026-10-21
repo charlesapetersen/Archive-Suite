@@ -1,3 +1,4 @@
+#if DEBUG // W40.a5: a test driver/contract, compiled out of Release
 import Foundation
 import AppKit
 
@@ -301,3 +302,5 @@ enum FileRelayTestDriver {
         NSLog("FILERELAY: DONE allPass=\(allPass) \(results.filter { $0.pass }.count)/\(results.count)")
     }
 }
+
+#endif

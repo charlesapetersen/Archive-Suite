@@ -1,3 +1,4 @@
+#if DEBUG // W40.a5: a test driver/contract, compiled out of Release
 import Foundation
 
 /// **Dismissing an interrupted run cannot divert paid-batch results** (W16.bat8) — headless, $0, no
@@ -84,3 +85,5 @@ enum BatchDismissedRunContract {
                   && processor.activePendingRun == nil)
     }
 }
+
+#endif

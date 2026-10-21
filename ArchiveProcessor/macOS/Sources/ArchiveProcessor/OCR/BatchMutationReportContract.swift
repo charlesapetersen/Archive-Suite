@@ -1,3 +1,4 @@
+#if DEBUG // W40.a5: a test driver/contract, compiled out of Release
 import Foundation
 
 /// **No paid-batch journal mutation fails in silence** (W16.bat3-fu) — headless, $0, no network, no keys.
@@ -282,3 +283,5 @@ enum BatchMutationReportContract {
         check("mutation report: and it leaves the interrupted-run manifest alone as well", runIntact)
     }
 }
+
+#endif

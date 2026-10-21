@@ -1,3 +1,4 @@
+#if DEBUG // W40.a5: a test driver/contract, compiled out of Release
 import Foundation
 
 /// **What an interrupted paid submission TELLS the operator** (W16.bat3-fu2) — headless, $0, no network,
@@ -269,3 +270,5 @@ enum BatchSubmissionMessageContract {
         try? fm.removeItem(at: url)
     }
 }
+
+#endif

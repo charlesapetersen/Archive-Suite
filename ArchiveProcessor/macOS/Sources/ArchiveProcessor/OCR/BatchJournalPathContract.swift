@@ -1,3 +1,4 @@
+#if DEBUG // W40.a5: a test driver/contract, compiled out of Release
 import Foundation
 
 /// **Where the two durable journals resolve to, and what the SHIPPED deleter does when it runs**
@@ -384,3 +385,5 @@ enum BatchJournalPathContract {
             submittedChunkIds: chunkIds)
     }
 }
+
+#endif

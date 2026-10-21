@@ -1,3 +1,4 @@
+#if DEBUG // W40.a5: a test driver/contract, compiled out of Release
 import Foundation
 
 /// **What pressing Stop during a paid batch POLL does to the recovery journal** (W16.bat3) — headless, $0,
@@ -379,3 +380,5 @@ enum BatchPollCancelContract {
             submittedChunkIds: chunkIds)
     }
 }
+
+#endif

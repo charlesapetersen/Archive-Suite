@@ -1,3 +1,4 @@
+#if DEBUG // W40.a5: a test driver/contract, compiled out of Release
 import Foundation
 import AppKit
 import PDFKit
@@ -349,3 +350,5 @@ private extension GeneratedTags {
         return t
     }
 }
+
+#endif

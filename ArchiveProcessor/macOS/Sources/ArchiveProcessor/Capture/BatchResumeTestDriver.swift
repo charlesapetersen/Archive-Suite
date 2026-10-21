@@ -1,3 +1,4 @@
+#if DEBUG // W40.a5: a test driver/contract, compiled out of Release
 import Foundation
 import AppKit
 
@@ -902,3 +903,5 @@ enum BatchResumeTestDriver {
         NSLog("BATCHRESUME DONE: \(passed ? "ALL PASS" : "SOME FAILED") → \(outPath)")
     }
 }
+
+#endif

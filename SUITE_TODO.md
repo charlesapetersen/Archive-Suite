@@ -1021,7 +1021,6 @@ on `a1` rather than `a3`. The freeze is now per area: only an app's ledger and j
 unfinished features — Processor `b3` and `d1`-`d4` on `W36.seg-decision`, the Reader and Notes ledgers `b1`/`b2` on
 `W24.cal1` (their journeys follow through `b1`/`b2`). Rule 7 of the daemon plan says the same.
 
-- [ ] **`W40.a5` — test drivers out of the Processor Release build [S · Tier-2]** (blocked-on: W42.int-done) (lane: processor) (uses: build) (blocked-on: W40.a1). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §A.
 - [ ] **`W40.i1` — iPhone companion builds again [S-M]** (blocked-on: W42.int-done) (lane: processor,ops) (uses: build) (blocked-on: W40.a1). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §I.
 - [ ] **`W40.i2` — iPhone companion parity with Android [M]** (blocked-on: W42.int-done) (lane: processor) (uses: build) (blocked-on: W40.i1). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §I.
 - [ ] **`W40.i3` — iPhone companion in the phone↔Mac E2E [M]** (blocked-on: W42.int-done) (lane: processor) (uses: build) (blocked-on: W40.i2). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §I.

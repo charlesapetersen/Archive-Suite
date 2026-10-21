@@ -324,6 +324,11 @@ review of the whole accumulated diff since the last release** (the *find → ref
 defects, a second set of agents tries to refute each, only survivors are real), and a **live smoke test** if
 the OCR/tagging/PDF path changed. Cut the release only after it comes back clean.
 
+**The env-gated drivers are Debug-only (W40.a5).** Every `*TestDriver.swift`, `SegmentationProofDriver.swift`
+and `*Contract.swift` is wrapped whole in `#if DEBUG`, as is their dispatch in `ContentView` and the stub branch of
+`NetworkSession.activeTestTransport`; every driver script runs the Debug build. A new driver gets the same wrapper.
+Check with `nm <Release binary> | swift demangle | grep -E 'TestDriver|Contract'`, which should print nothing.
+
 **Smoke tests (the cheap regression gate).** The suite dispatcher and the app-local scripts make Tier-1 a
 one-liner — run the relevant lane before pushing an OCR/pipeline change or as a sanity gate:
 - **`ArchiveProcessor/test-smoke.sh`** — headless end-to-end OCR: reads the Gemini key from the Keychain

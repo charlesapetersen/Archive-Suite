@@ -1,3 +1,4 @@
+#if DEBUG // W40.a5: a test driver/contract, compiled out of Release
 import Foundation
 
 /// Headless, $0 contract for the Vision + LLM hybrid. It drives the production
@@ -93,3 +94,5 @@ enum VisionHybridTestDriver {
         NSLog("VISIONHYBRID \(passed ? "ALL PASS" : "SOME FAILED")")
     }
 }
+
+#endif

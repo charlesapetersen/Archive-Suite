@@ -1,3 +1,4 @@
+#if DEBUG // W40.a5: a test driver/contract, compiled out of Release
 import Foundation
 
 /// Headless, no-network regression for request retry/cancellation safety. Every response is injected;
@@ -163,3 +164,5 @@ enum NetworkSessionTestDriver {
         NSLog("NETWORKSESSION DONE: \(passed ? "ALL PASS" : "SOME FAILED") → \(outPath)")
     }
 }
+
+#endif

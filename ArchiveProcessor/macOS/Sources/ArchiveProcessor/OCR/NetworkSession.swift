@@ -146,6 +146,7 @@ enum NetworkSession {
     /// already decided by the nil, so a shipped build does no environment work per request. Which half is
     /// read first cannot weaken the gate: both must hold either way.
     nonisolated static var activeTestTransport: (@Sendable (URLRequest) async throws -> (Data, URLResponse))? {
+#if DEBUG
         guard let stub = testTransport,
               (testTransportIsEnabled(
                 flag: ProcessInfo.processInfo.environment[OCRProcessor.batchResumeTestEnvKey])
@@ -167,6 +168,10 @@ enum NetworkSession {
                 flag: ProcessInfo.processInfo.environment[InstitutionalComputeImportTestDriver.envKey]))
         else { return nil }
         return stub
+#else
+        // W40.a5: the drivers that own these flags are compiled out of Release, so no stub is reachable.
+        return nil
+#endif
     }
 
     /// Internal so a check can assert the seam is dormant before it installs one and dormant again after.

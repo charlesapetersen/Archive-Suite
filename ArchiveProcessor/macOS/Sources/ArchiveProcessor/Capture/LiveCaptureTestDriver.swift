@@ -1,3 +1,4 @@
+#if DEBUG // W40.a5: a test driver/contract, compiled out of Release
 import Foundation
 import AppKit
 
@@ -98,3 +99,5 @@ enum LiveCaptureTestDriver {
         try? summary.write(toFile: donePath, atomically: true, encoding: .utf8)
     }
 }
+
+#endif

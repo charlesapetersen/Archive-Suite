@@ -1,3 +1,4 @@
+#if DEBUG // W40.a5: a test driver/contract, compiled out of Release
 import Foundation
 
 /// Headless proof of the segmentation build on one small real folder, through real models (W36.seg-opt-proof),
@@ -362,3 +363,5 @@ enum SegmentationProofDriver {
         }
     }
 }
+
+#endif

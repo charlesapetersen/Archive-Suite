@@ -11967,3 +11967,15 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   The Processor survivors were re-run against all 27 drivers that spend no money (`MUT_DRIVERS=all`), and none
   of them was killed there either. Evidence: `verification/evidence/core/W40.e7-mutation-sample.md`.
   <!-- /W40.e7 -->
+- [x] **W40.a5 — test drivers out of the Processor Release build [S · Tier-2]** · §W40 verification phase · SHIPPED 2026-10-21 (this commit)
+  All 45 env-gated driver and seam files (`*TestDriver.swift`, `SegmentationProofDriver.swift`, `*Contract.swift`)
+  are wrapped whole in `#if DEBUG`. So are their dispatch in `ContentView` and the `PROCESSFILES_TESTMODE`
+  placeholder, and `NetworkSession.activeTestTransport` returns nil in Release. No script needs them in Release:
+  every driver script, the smoke tests, the e2e, the health gate and the VM lane build Debug, and the DMG script only
+  stages the apps. Proof: in the Release binary, `nm | swift demangle` finds 0 driver or contract symbols out of
+  37,027; the Debug binary has 46 such types. Release and Debug both build clean with no new warnings. The
+  batch-resume, network-session, vision-hybrid and retry-backend driver scripts pass on Debug (1,072 PASS, 0 FAIL).
+  Adversarial review: no findings. Left in Release on purpose: `KeychainHelper.isHeadlessTestMode` (it keeps a test
+  launch away from the real Keychain), `LIVECAPTURE_AUTOSTART`, and the `BATCHRESUME_TEST` pending-state redirect.
+  These are launch guards, not drivers. Rule for new drivers: `ArchiveProcessor/CLAUDE.md`.
+  <!-- /W40.a5 -->
