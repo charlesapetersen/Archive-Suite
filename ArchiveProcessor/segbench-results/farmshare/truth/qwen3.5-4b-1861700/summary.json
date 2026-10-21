@@ -1,0 +1,252 @@
+{
+ "label": "qwen3.5-4b-1861700",
+ "env": {
+  "model": "Qwen/Qwen3.5-4B",
+  "revision": "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+  "route": "panel",
+  "mode": "panel",
+  "precision": "bf16",
+  "SLURM_JOB_ID": "1861700",
+  "SLURMD_NODENAME": "oat-05",
+  "FS_MODEL": "Qwen/Qwen3.5-4B",
+  "FS_PRESET": "qwen3.5-4b",
+  "FS_VLLM_ARGS": "--tensor-parallel-size 1 --max-model-len 16384 --kv-cache-dtype auto --gpu-memory-utilization 0.90 --max-num-seqs 16",
+  "FS_KV": null,
+  "vllm": "0.31.0",
+  "max_tokens": 8192,
+  "temperature": 0,
+  "concurrency": 8,
+  "prompt_sha256": "2ab7ab039a6e42db6734ad7c7e5a168a60856d3bfb27e02f6c2bef08137aee8d",
+  "versions": null,
+  "note": "panel prompt (KIND/TABLE/TEXT), parsed as the panel parses it; caps, errors and blanks count as failures"
+ },
+ "throughput": {
+  "pages": 99,
+  "ok": 98,
+  "wall_s": 184.0,
+  "gpus": 1,
+  "pages_per_hour_per_gpu": 1936.7,
+  "mean_prompt_tokens": 4139.132653061224,
+  "mean_completion_tokens": 482.9387755102041,
+  "job_elapsed_s": 261,
+  "note": "wall_s is collector time (pilot + full pass); job_elapsed_s is the Slurm job including server start and model load"
+ },
+ "outcomes": {
+  "all_99": {
+   "ok": 98,
+   "cap": 1
+  },
+  "accuracy_96": {
+   "ok": 95,
+   "cap": 1
+  },
+  "cap_pages": [
+   "p025"
+  ],
+  "caps_repetitive": 1
+ },
+ "accuracy_96": {
+  "n": 96,
+  "ok": 95,
+  "failed": 0.01041666666666663,
+  "nes_answered": 0.919076544057466,
+  "nes": 0.9095028300568674,
+  "chrf": 0.9289672451516782,
+  "miss": 0.027197280271972803,
+  "add": 0.0289304402893044,
+  "cost": 0,
+  "words": 30003
+ },
+ "agreement_3": {
+  "n": 3,
+  "ok": 3,
+  "failed": 0.0,
+  "nes_answered": 0.6907357615112665,
+  "nes": 0.6907357615112665,
+  "chrf": 0.5771528734066694,
+  "miss": 0.2177293934681182,
+  "add": 0.2939346811819596,
+  "cost": 0,
+  "words": 643
+ },
+ "clippings": {
+  "n": 13,
+  "ok": 13,
+  "failed": 0.0,
+  "nes_answered": 0.8941080461016754,
+  "nes": 0.8941080461016754,
+  "chrf": 0.9390086145571017,
+  "miss": 0.02610575324243432,
+  "add": 0.041237113402061855,
+  "cost": 0,
+  "words": 6014
+ },
+ "all_99": {
+  "n": 99,
+  "ok": 98,
+  "failed": 0.010101010101010055,
+  "nes_answered": 0.9120865201019701,
+  "nes": 0.902873524949425,
+  "chrf": 0.9183062035836475,
+  "miss": 0.031194935717548784,
+  "add": 0.034490634993147556,
+  "cost": 0,
+  "words": 30646
+ },
+ "strata_96": {
+  "clippings": {
+   "yes": {
+    "n": 13,
+    "ok": 13,
+    "failed": 0.0,
+    "nes_answered": 0.8941080461016754,
+    "nes": 0.8941080461016754,
+    "chrf": 0.9390086145571017,
+    "miss": 0.02610575324243432,
+    "add": 0.041237113402061855,
+    "cost": 0,
+    "words": 6014
+   }
+  },
+  "date_bin": {
+   "1900-1949": {
+    "n": 14,
+    "ok": 14,
+    "failed": 0.0,
+    "nes_answered": 0.9168407365438526,
+    "nes": 0.9168407365438526,
+    "chrf": 0.9280980174784073,
+    "miss": 0.02320342419463843,
+    "add": 0.030862806938499663,
+    "cost": 0,
+    "words": 4439
+   },
+   "1950-1984": {
+    "n": 49,
+    "ok": 48,
+    "failed": 0.020408163265306145,
+    "nes_answered": 0.8880369482342948,
+    "nes": 0.8699137452091051,
+    "chrf": 0.89676879856119,
+    "miss": 0.04707287933094385,
+    "add": 0.048506571087216246,
+    "cost": 0,
+    "words": 12555
+   },
+   "1985 on": {
+    "n": 12,
+    "ok": 12,
+    "failed": 0.0,
+    "nes_answered": 0.9438473364192301,
+    "nes": 0.9438473364192301,
+    "chrf": 0.973328307682714,
+    "miss": 0.0063882063882063885,
+    "add": 0.008108108108108109,
+    "cost": 0,
+    "words": 4070
+   },
+   "before 1900": {
+    "n": 11,
+    "ok": 11,
+    "failed": 0.0,
+    "nes_answered": 0.9648205096529623,
+    "nes": 0.9648205096529623,
+    "chrf": 0.9719928420291158,
+    "miss": 0.006588429071443277,
+    "add": 0.008853201564751905,
+    "cost": 0,
+    "words": 4857
+   },
+   "undated": {
+    "n": 10,
+    "ok": 10,
+    "failed": 0.0,
+    "nes_answered": 0.9911534215385831,
+    "nes": 0.9911534215385831,
+    "chrf": 0.987395120585225,
+    "miss": 0.01567858892699657,
+    "add": 0.011268985791278784,
+    "cost": 0,
+    "words": 4082
+   }
+  },
+  "handwritten": {
+   "yes": {
+    "n": 12,
+    "ok": 12,
+    "failed": 0.0,
+    "nes_answered": 0.8315012102712598,
+    "nes": 0.8315012102712598,
+    "chrf": 0.8063074522407275,
+    "miss": 0.13267466478475654,
+    "add": 0.13832039520112915,
+    "cost": 0,
+    "words": 1417
+   }
+  },
+  "kind": {
+   "handwritten": {
+    "n": 16,
+    "ok": 16,
+    "failed": 0.0,
+    "nes_answered": 0.855343127825202,
+    "nes": 0.855343127825202,
+    "chrf": 0.8263041118643939,
+    "miss": 0.1008249312557287,
+    "add": 0.09624197983501374,
+    "cost": 0,
+    "words": 2182
+   },
+   "mixed": {
+    "n": 2,
+    "ok": 2,
+    "failed": 0.0,
+    "nes_answered": 0.7135563044012114,
+    "nes": 0.7135563044012114,
+    "chrf": 0.8458787720087627,
+    "miss": 0.08095238095238096,
+    "add": 0.05714285714285714,
+    "cost": 0,
+    "words": 210
+   },
+   "printed": {
+    "n": 28,
+    "ok": 28,
+    "failed": 0.0,
+    "nes_answered": 0.9077503812772475,
+    "nes": 0.9077503812772475,
+    "chrf": 0.9572318132441323,
+    "miss": 0.017344259686530354,
+    "add": 0.024266051396292464,
+    "cost": 0,
+    "words": 12569
+   },
+   "typewritten": {
+    "n": 50,
+    "ok": 49,
+    "failed": 0.020000000000000018,
+    "nes_answered": 0.9547481297079731,
+    "nes": 0.9356531671138135,
+    "chrf": 0.9493148285975513,
+    "miss": 0.02399946815583034,
+    "add": 0.022669857731684617,
+    "cost": 0,
+    "words": 15042
+   }
+  },
+  "tables": {
+   "yes": {
+    "n": 12,
+    "ok": 11,
+    "failed": 0.08333333333333337,
+    "nes_answered": 0.9676244191444175,
+    "nes": 0.8869890508823827,
+    "chrf": 0.8906595108748081,
+    "miss": 0.03129657228017884,
+    "add": 0.005961251862891207,
+    "cost": 0,
+    "words": 2684
+   }
+  }
+ }
+}

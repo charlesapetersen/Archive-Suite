@@ -92,3 +92,27 @@ submission.
    Run `python3 ArchiveOCRBench/build.py` and commit the built files. Only an interactive session republishes the
    page.
 6. Tick the Phase 0 item in `processing-review/STATE.md` and delete this plan once the rows are on the bench.
+
+## Collected and scored, 2026-10-21
+
+Jobs 1861696-1861702 all COMPLETED on 20 Oct between 21:37 and 22:05 PDT on `oat-05`, 22.8 GPU minutes in all
+(`sacct` Elapsed). Each VLM `status.json` read `completed_raw` with `terminal: 99`, and PP-OCRv6's `summary.json`
+read `raw_complete_review_pending` with 99 ok. The seven model folders, the Slurm logs, `jobs.json`,
+`truth99.jsonl` and `recovery/` were copied to `L/outputs/` (6.9 MB, no weights), with the `sacct` receipt in
+`L/outputs/sacct.txt`. Ling's folder and the PaddleX cache were left on the cluster.
+
+Counts on the 99 pages: GLM-OCR 98 ok and 1 cap; LightOnOCR-3 0.8B 98 and 1; LightOnOCR-3 4B 99 and 0;
+PaddleOCR-VL 1.5 88 and 11; Qwen3.5 4B 98 and 1; Qwen3-VL 8B 98 and 1; PP-OCRv6 99 ok. No errors, blanks,
+unparsable replies or missing pages. 14 of the 15 caps are repetitive loops. Every reading's image SHA-256 equals
+the panel manifest's original.
+
+The scorer is `ArchiveProcessor/scripts/segbench/corpus/farmshare_truth96.py`, with a unit test. Results are in
+`ArchiveProcessor/segbench-results/farmshare/truth/<label>-<job>/` and
+`ArchiveProcessor/segbench-results/farmshare/truth96-20261020.md`. The rows are in ArchiveOCRBench Part 4, and the
+published copy of the page is now behind.
+
+**Still open: Ling 3 Flash VL, job 1861703, PENDING** at 2026-10-21 ~05:45 (it needs a whole four-GPU node). Do not
+resubmit or cancel it. When it finishes, copy `S/ling3-flash-vl-fp8/` and its log to `L/outputs/`, refresh
+`sacct.txt` and score it with `--route "ling3-flash-vl-fp8=$O/ling3-flash-vl-fp8:panel" --gpus ling3-flash-vl-fp8=4`. Then add its
+`PRESET_NAMES` entry and its price (it does not fit on the Mac; `inputs.json` has no OpenRouter rate for it yet),
+rebuild the bench, tick the STATE.md item and delete this plan.

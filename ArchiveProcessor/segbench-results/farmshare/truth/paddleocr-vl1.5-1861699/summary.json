@@ -1,0 +1,262 @@
+{
+ "label": "paddleocr-vl1.5-1861699",
+ "env": {
+  "model": "PaddlePaddle/PaddleOCR-VL-1.5",
+  "revision": "2a4195faa5e7914c12f2fc601d72c81caf8d2da5",
+  "route": "native-ocr",
+  "mode": "native",
+  "precision": "bf16",
+  "SLURM_JOB_ID": "1861699",
+  "SLURMD_NODENAME": "oat-05",
+  "FS_MODEL": "PaddlePaddle/PaddleOCR-VL-1.5",
+  "FS_PRESET": "paddleocr-vl1.5-native",
+  "FS_VLLM_ARGS": "--tensor-parallel-size 1 --max-model-len 16384 --kv-cache-dtype auto --gpu-memory-utilization 0.90 --max-num-seqs 16",
+  "FS_KV": null,
+  "vllm": "0.31.0",
+  "max_tokens": 8192,
+  "temperature": 0,
+  "concurrency": 8,
+  "prompt_sha256": "d715a33c90db45b3c55e06be0210b87cbc9d97c0b84dc5d30edc331f8e65e2ff",
+  "versions": null,
+  "note": "the model card's own prompt, reply scored as written; caps, errors and blanks count as failures"
+ },
+ "throughput": {
+  "pages": 99,
+  "ok": 88,
+  "wall_s": 57.5,
+  "gpus": 1,
+  "pages_per_hour_per_gpu": 6203.7,
+  "mean_prompt_tokens": 1255.7272727272727,
+  "mean_completion_tokens": 464.5568181818182,
+  "job_elapsed_s": 114,
+  "note": "wall_s is collector time (pilot + full pass); job_elapsed_s is the Slurm job including server start and model load"
+ },
+ "outcomes": {
+  "all_99": {
+   "ok": 88,
+   "cap": 11
+  },
+  "accuracy_96": {
+   "ok": 86,
+   "cap": 10
+  },
+  "cap_pages": [
+   "p013",
+   "p018",
+   "p025",
+   "p048",
+   "p050",
+   "p054",
+   "p081",
+   "p082",
+   "p088",
+   "p093",
+   "p094"
+  ],
+  "caps_repetitive": 10
+ },
+ "accuracy_96": {
+  "n": 96,
+  "ok": 86,
+  "failed": 0.10416666666666663,
+  "nes_answered": 0.9352565348506625,
+  "nes": 0.8378339791370518,
+  "chrf": 0.8407781946534368,
+  "miss": 0.1294203912942039,
+  "add": 0.028497150284971504,
+  "cost": 0,
+  "words": 30003
+ },
+ "agreement_3": {
+  "n": 3,
+  "ok": 2,
+  "failed": 0.33333333333333337,
+  "nes_answered": 0.5942031652617383,
+  "nes": 0.39613544350782554,
+  "chrf": 0.2989316774400103,
+  "miss": 0.463452566096423,
+  "add": 0.4510108864696734,
+  "cost": 0,
+  "words": 643
+ },
+ "clippings": {
+  "n": 13,
+  "ok": 11,
+  "failed": 0.15384615384615385,
+  "nes_answered": 0.9434241352862162,
+  "nes": 0.7982819606267982,
+  "chrf": 0.8128794020703503,
+  "miss": 0.15729963418689724,
+  "add": 0.03890921183904224,
+  "cost": 0,
+  "words": 6014
+ },
+ "all_99": {
+  "n": 99,
+  "ok": 88,
+  "failed": 0.11111111111111116,
+  "nes_answered": 0.9275053219054598,
+  "nes": 0.8244491750270753,
+  "chrf": 0.8243586032227269,
+  "miss": 0.1364288977354304,
+  "add": 0.0373621353520851,
+  "cost": 0,
+  "words": 30646
+ },
+ "strata_96": {
+  "clippings": {
+   "yes": {
+    "n": 13,
+    "ok": 11,
+    "failed": 0.15384615384615385,
+    "nes_answered": 0.9434241352862162,
+    "nes": 0.7982819606267982,
+    "chrf": 0.8128794020703503,
+    "miss": 0.15729963418689724,
+    "add": 0.03890921183904224,
+    "cost": 0,
+    "words": 6014
+   }
+  },
+  "date_bin": {
+   "1900-1949": {
+    "n": 14,
+    "ok": 12,
+    "failed": 0.1428571428571429,
+    "nes_answered": 0.9397744423022693,
+    "nes": 0.8055209505448022,
+    "chrf": 0.8138625050495625,
+    "miss": 0.2034241946384321,
+    "add": 0.02613201171435008,
+    "cost": 0,
+    "words": 4439
+   },
+   "1950-1984": {
+    "n": 49,
+    "ok": 43,
+    "failed": 0.12244897959183676,
+    "nes_answered": 0.9147643789230178,
+    "nes": 0.802752414156934,
+    "chrf": 0.8085373866456953,
+    "miss": 0.13261648745519714,
+    "add": 0.0391079251294305,
+    "cost": 0,
+    "words": 12555
+   },
+   "1985 on": {
+    "n": 12,
+    "ok": 12,
+    "failed": 0.0,
+    "nes_answered": 0.9463394163037059,
+    "nes": 0.9463394163037059,
+    "chrf": 0.9506549036978637,
+    "miss": 0.04963144963144963,
+    "add": 0.022604422604422605,
+    "cost": 0,
+    "words": 4070
+   },
+   "before 1900": {
+    "n": 11,
+    "ok": 11,
+    "failed": 0.0,
+    "nes_answered": 0.9627476466465413,
+    "nes": 0.9627476466465413,
+    "chrf": 0.9591007564166926,
+    "miss": 0.03808935556928145,
+    "add": 0.023059501750051472,
+    "cost": 0,
+    "words": 4857
+   },
+   "undated": {
+    "n": 10,
+    "ok": 8,
+    "failed": 0.19999999999999996,
+    "nes_answered": 0.9842004108854444,
+    "nes": 0.7873603287083555,
+    "chrf": 0.7744332505439006,
+    "miss": 0.22733953944145027,
+    "add": 0.010779029887310143,
+    "cost": 0,
+    "words": 4082
+   }
+  },
+  "handwritten": {
+   "yes": {
+    "n": 12,
+    "ok": 9,
+    "failed": 0.25,
+    "nes_answered": 0.8510803681441911,
+    "nes": 0.6383102761081433,
+    "chrf": 0.5905841554723384,
+    "miss": 0.42201834862385323,
+    "add": 0.1086803105151729,
+    "cost": 0,
+    "words": 1417
+   }
+  },
+  "kind": {
+   "handwritten": {
+    "n": 16,
+    "ok": 13,
+    "failed": 0.1875,
+    "nes_answered": 0.8715179402172849,
+    "nes": 0.708108326426544,
+    "chrf": 0.6617200930000988,
+    "miss": 0.30522456461961506,
+    "add": 0.09486709440879927,
+    "cost": 0,
+    "words": 2182
+   },
+   "mixed": {
+    "n": 2,
+    "ok": 2,
+    "failed": 0.0,
+    "nes_answered": 0.7577026873187751,
+    "nes": 0.7577026873187751,
+    "chrf": 0.6985479323033823,
+    "miss": 0.3142857142857143,
+    "add": 0.10476190476190476,
+    "cost": 0,
+    "words": 210
+   },
+   "printed": {
+    "n": 28,
+    "ok": 25,
+    "failed": 0.1071428571428571,
+    "nes_answered": 0.9234675747865553,
+    "nes": 0.8245246203451387,
+    "chrf": 0.8583855159607422,
+    "miss": 0.12021640544196038,
+    "add": 0.02808497096029915,
+    "cost": 0,
+    "words": 12569
+   },
+   "typewritten": {
+    "n": 50,
+    "ok": 46,
+    "failed": 0.07999999999999996,
+    "nes_answered": 0.9673963919571922,
+    "nes": 0.8900046806006168,
+    "chrf": 0.8939058977444161,
+    "miss": 0.10902805477994948,
+    "add": 0.01814918228958915,
+    "cost": 0,
+    "words": 15042
+   }
+  },
+  "tables": {
+   "yes": {
+    "n": 12,
+    "ok": 11,
+    "failed": 0.08333333333333337,
+    "nes_answered": 0.8956918798238813,
+    "nes": 0.8210508898385579,
+    "chrf": 0.8784869265411536,
+    "miss": 0.04880774962742176,
+    "add": 0.01564828614008942,
+    "cost": 0,
+    "words": 2684
+   }
+  }
+ }
+}

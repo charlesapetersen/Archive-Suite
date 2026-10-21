@@ -243,7 +243,13 @@ def handwriting():
 FARMSHARE_ROOT = RESULTS / "farmshare"
 PRESET_NAMES = {"qwen3.5-27b": "Qwen3.5 27B", "qwen3.6-27b": "Qwen3.6 27B", "qwen3.6-27b-dyn": "Qwen3.6 27B, fp8 at load time",
                 "qwen3.6-35b-a3b": "Qwen3.6 35B-A3B", "qwen3.8-27b": "Qwen3.8 27B", "glm-ocr": "GLM-OCR",
-                "qwen3.5-122b-a10b": "Qwen3.5 122B-A10B"}
+                "qwen3.5-122b-a10b": "Qwen3.5 122B-A10B",
+                # truth96 runs of the 895-page open sweep's models (farmshare_truth96.py): native and pipeline routes
+                # keep their own prompt, so the name says so, as on the 895
+                "glm-ocr-native": "GLM-OCR (native prompt)", "lightonocr3-0.8b-native": "LightOnOCR-3 0.8B (native, image only)",
+                "lightonocr3-4b-native": "LightOnOCR-3 4B (native, image only)",
+                "paddleocr-vl1.5-native": "PaddleOCR-VL 1.5 (native prompt)", "qwen3.5-4b": "Qwen3.5 4B",
+                "qwen3-vl-8b": "Qwen3-VL 8B", "ppocrv6-medium-pipeline": "PP-OCRv6 medium (pipeline, not a VLM)"}
 
 
 def newsbench_table():
@@ -270,7 +276,7 @@ def farmshare(op):
         kv = re.search(r"--kv-cache-dtype (\S+)", env.get("FS_VLLM_ARGS", ""))
         a = s["accuracy_96"]
         truth.append({"label": s["label"], "name": PRESET_NAMES.get(env["FS_PRESET"], env["FS_PRESET"]),
-                      "kv": "bf16" if kv and kv.group(1) == "auto" else (kv.group(1) if kv else "?"),
+                      "kv": env.get("FS_KV") or ("bf16" if kv and kv.group(1) == "auto" else (kv.group(1) if kv else "?")),
                       "gpus": t["gpus"], "nes": round(100 * a["nes"], 2), "ok": a["ok"], "n": a["n"],
                       "clippings": round(100 * s["clippings"]["nes"], 2), "per_hour": t["pages_per_hour_per_gpu"],
                       "gpu_hours_100k": round(100000 / t["pages_per_hour_per_gpu"]),  # already per GPU

@@ -18,11 +18,12 @@ Read `00-plan.md`, then this table. Take the first phase step not done. Strand n
 - [x] Nemotron job 1860275: TIMEOUT at 20:54 on 2026-10-20 with 839 of 895 pages read (631 ok, 207 cap, 1
   malformed); 56 unread. Not scored. Owner: dropped, no third submission.
 - [ ] Run the models scored on the 895 but not yet on the owner's 96 pages (owner, 2026-10-20, both sets every
-  time; submitted 2026-10-20, jobs 1861696-1861703; collection blocked 2026-10-21 00:46: the cm-farmshare socket
-  timed out, so the owner must reopen the login): GLM-OCR, LightOnOCR-3 0.8B and 4B at bf16 (the 4B has only a Mac 8-bit run, 89.13), PaddleOCR-VL 1.5,
-  Qwen3.5 4B, Ling 3 Flash VL and stock PP-OCRv6, on FarmShare, same settings as the open sweep.
-  Status: submitted 2026-10-20, jobs 1861696–1861703 (one afterany chain, Qwen3-VL 8B added at 1861701, Ling
-  last); collect and score per `execution-plans/truth96-farmshare-20261020.md`.
+  time; jobs 1861696-1861703, same settings as the open sweep). **Seven scored 2026-10-21** (jobs
+  1861696-1861702, collected after the login was reopened): NES on the 96, failures as 0, Qwen3-VL 8B 92.52,
+  Qwen3.5 4B 90.95, GLM-OCR 90.90, LightOnOCR-3 4B 89.38 (Mac 8-bit 89.13), LightOnOCR-3 0.8B 88.00,
+  PaddleOCR-VL 1.5 83.78 (11 caps), PP-OCRv6 76.85. `ArchiveProcessor/segbench-results/farmshare/truth96-20261020.md`;
+  ArchiveOCRBench Part 4. A review baseline; nothing adopted. **Ling 3 Flash VL (1861703) still pending** (needs a
+  four-GPU node); collect and score it per `execution-plans/truth96-farmshare-20261020.md`, then tick this.
 - [ ] Add a Sherlock profile to `scripts/segbench/institutional-compute/` once the account exists (strand J
   gathers its partitions, GPU types and limits first).
 
