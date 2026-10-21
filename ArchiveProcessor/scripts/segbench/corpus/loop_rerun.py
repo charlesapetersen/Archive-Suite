@@ -228,7 +228,46 @@ def cmd_report(a):
                 [{k: round(v, 6) if isinstance(v, float) else v for k, v in r.items()} for r in pages],
                 ['set', 'route', 'arm', 'page', 'stratum', 'ok', 'status', 'tokens', 'wall_s', 'nes', 'chrf', 'words',
                  'missed', 'added'])
+    (a.out / f'{a.name}-tables.md').write_text(tables(rows, pages))
     print(f'{len(rows)} rows, {len(pages)} page rows -> {a.out}')
+
+
+SWEEP = HERE.parents[2] / 'segbench-results/bench-corpus/open-sweep-20261019.json'
+ARM_ORDER = ('ngram', 'half', 'second', 'kraken-ppocrv6', 'ppocrv6', 'bf16-vllm', 'cascade')
+
+
+def tables(rows, pages):
+    """The report's tables, from whatever arms have readings; an arm with none shows a dash."""
+    overall = {m['route']: m['nes'] for m in json.loads(SWEEP.read_text())['models']
+               if m['subset'] == 'full895' and m['stratum'] == 'all'}
+    by = {(r['set'], r['route'], r['arm']): r for r in rows}
+    cell = lambda r: '–' if r is None else f"{100 * r['nes']:.1f} ({r['ok']}/{r['n']})"
+    out = ['NES % on the capped pages only (answered / pages); the original reading of every one of them scores 0.', '',
+           '| route | caps | ' + ' | '.join(ARM_ORDER) + ' | 895 NES before | after the cascade |',
+           '|---|---:|' + '---:|' * len(ARM_ORDER) + '---:|---:|']
+    for route in ROUTES:
+        rs = [by.get(('public895', route, arm)) for arm in ARM_ORDER]
+        caps_n = next(r['caps'] for r in rs if r)
+        casc = by.get(('public895', route, 'cascade'))
+        before = overall.get(route)
+        after = before + casc['nes'] * casc['n'] / 895 if before is not None and casc else None
+        out.append(f'| {route} | {caps_n} | ' + ' | '.join(cell(r) for r in rs) +
+                   f" | {'–' if before is None else f'{100 * before:.1f}'} | {'–' if after is None else f'{100 * after:.1f}'} |")
+    out += ['', 'By script, the cascade and its parts, all routes pooled (pages, NES %):', '',
+            '| strata | ' + ' | '.join(ARM_ORDER[:-2] + ('cascade',)) + ' |', '|---|' + '---:|' * (len(ARM_ORDER) - 1) + '']
+    for label, test in (('Latin (L1-L9)', lambda s: s in LATIN), ('other scripts (N1-N6)', lambda s: s not in LATIN)):
+        cells = []
+        for arm in ARM_ORDER[:-2] + ('cascade',):
+            pr = [p for p in pages if p['set'] == 'public895' and p['arm'] == arm and test(p['stratum'])]
+            cells.append('–' if not pr else f"{100 * sum(p['nes'] for p in pr) / len(pr):.1f} ({len(pr)})")
+        out.append(f'| {label} | ' + ' | '.join(cells) + ' |')
+    out += ['', 'The 96 (the owner\'s truth pages), the same arms:', '',
+            '| route | caps | ' + ' | '.join(ARM_ORDER) + ' |', '|---|---:|' + '---:|' * len(ARM_ORDER)]
+    for route in [*T96, 'mlx-qwen3-vl-8b-4bit']:
+        rs = [by.get(('truth96', route, arm)) for arm in ARM_ORDER]
+        if any(rs):
+            out.append(f"| {route} | {next(r['caps'] for r in rs if r)} | " + ' | '.join(cell(r) for r in rs) + ' |')
+    return '\n'.join(out) + '\n'
 
 
 def main():
