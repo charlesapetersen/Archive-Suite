@@ -89,5 +89,13 @@ The owner's Gemini report is assessed in `screens/gemini-report-2026-10-20.md` (
   tagged only with 17 box (red) and 37 folder (purple) labels, which may be incomplete; no document tags. Proposed
   slice: images 00057-00252 (196 pages, three folders after the box label at 00056), boundaries drafted by a model and
   ruled by the owner. More owner time than an already-tagged box (about 2-3 h rather than 1 h).
-- Clippings locked box: Deaver is a development box and cannot be the locked test. Candidates ranked by share of
-  clipping-tagged pages were shown to the owner; the owner picks one.
+- Locked boxes named (owner, 2026-10-21), three rather than two, one per type:
+  1. Handwritten: Rawls papers, images 00057-00252 (196 pages), confirmed by the owner. Boundaries drafted by a
+     model and ruled by the owner, about 2-3 h.
+  2. Bound periodical photographed page by page: Stanford University Archives/Stanford Illustrated Review (147 pages,
+     1919-1939, 143 year-tagged). The owner: the Alumni Review, Observer and Illustrated Review are all this common
+     type; one stands for it. Chosen for the pre-1940 era the 96 barely cover. Already tagged per document, about 1 h.
+  3. Individual clippings taken in a reading room, mixed with other papers: Stanford University Archives/SC0122 — News
+     Service (200 pages, 1953-1985, 61% clipping-tagged). The owner: Espinosa, the News Service collections and Rogge
+     are this type. Chosen as closest to the Deaver problem across four decades. About 1 h.
+  Deaver stays a development box.
