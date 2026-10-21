@@ -28,6 +28,13 @@ class CaptureTags(unittest.TestCase):
         self.assertEqual(res['neighbour']['severe'], 1)
         self.assertEqual(res['any']['per_route']['r'], (-25.0, 2))
 
+    def test_baseline_is_pages_without_that_tag(self):
+        self.tags['p2']['curl'] = 1  # p2 carries another tag, so it still counts against neighbour, not against any
+        res = C.analyse(ATTRS, self.tags, self.scores, self.kinds)
+        self.assertEqual(res['neighbour']['per_route']['r'], (-15.0, 1))
+        self.assertEqual(res['any']['per_route']['r'][1], 3)  # p1, p2 against p3; p4 against p5
+        self.assertAlmostEqual(res['any']['per_route']['r'][0], (-10 + 10 - 35) / 3)
+
     def test_unpaired_page_is_left_out(self):
         self.kinds['p4'] = 'printed'
         res = C.analyse(ATTRS, self.tags, self.scores, self.kinds)

@@ -12498,3 +12498,21 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   screenshot can see it) and delete skipping its confirmation each turned one test red. No defects found. Not
   covered: the CameraX preview and QR decode (still `android-ui-drive.sh` or a phone), and the `sessionNotSaved` banner.
   <!-- /W40.e8 -->
+- [x] **W46.fix-capture-tags — capture-defect tags on the 96 and the 20 ladder pages [S]** · §Document processing review — W46 (owner, 2026-10-20) · SHIPPED 2026-10-21
+  (lane: segbench) — `scripts/segbench/capture_tags.py` (+ `test_capture_tags.py`, 6 tests), cached readings only, $0
+  -> `segbench-results/capture-tags.json` (per-page levels 0/1/2 on 14 attributes, method, agreement) and `.md`.
+  - Tags (L-capture test 1's attributes; not owner-labelled, STATE Phase 2 decision 2): drafted by Opus 5.5 subagents
+    from the images; a Sonnet 5.5 audit with the draft in view changed only 11 of 1,344 cells, too deferential to count
+    as a check, so Sonnet 5.5 tagged all 96 again blind (presence kappa 0.14 low light to 0.85 show-through; 1.00 hand)
+    and an Opus 5.5 third look settled the 173 disputed cells on 81 pages. 90 of 96 pages carry a tag. Drafts, blind
+    tags, adjudication notes: private, `capture-tags/` in the bench cache.
+  - Loss by tag, median over 29 routes, against same kind and source class without the tag: edge cut -6.4, colour
+    -4.1, mixed -3.0 (2 severe -20.4), neighbour -1.9 (18 severe -5.2), faint ink -1.8, show-through -0.7 (12 severe
+    -5.2); optical tags no loss (perspective +1.1, glare +2.0, defocus +2.2, shadow +2.5, curl +2.6, hand +3.2); no
+    motion blur anywhere. Framing and material, not optics, as L expected.
+  - The 20 ladder pages are among the 96. Their quarter-size collapse tracks native size (PDF images of 1,255-2,538 px),
+    not any tag; the apparent defocus effect there is that confound.
+  - Known limits: tags co-occur, so a tag's loss carries some of its companions'; adjudicators split on database
+    caption headers (neighbour 1 on p019/p081, 2 on p076/p085) and counted letterheads as mixed.
+  - Not on ArchiveOCRBench: no route or figure was measured, only ocr-pages.csv re-read by tag, which no chart takes.
+  <!-- /W46.fix-capture-tags -->

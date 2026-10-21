@@ -2,14 +2,16 @@
 
   python3 -I capture_tags.py [--ladder <ocr-panel-local/scores.csv>]
 
-Reads segbench-results/capture-tags.json (the per-page tags: drafted from the images by one model, audited by a
-second, disagreements settled by a third look; schema in that file's "attributes") and segbench-results/
+Reads segbench-results/capture-tags.json (the per-page tags: drafted from the images by one model, audited and
+tagged again blind by a second, disagreements settled by a third look; how, in its "method") and segbench-results/
 ocr-pages.csv (every route's NES on every page), and writes segbench-results/capture-tags.md.
 
-The loss for a tag is paired within its stratum: for each tagged page, its NES minus the mean NES of the untagged
-pages of the same kind and the same source class (phone original, or the PDF's processed image), on the same
-route; a page whose stratum has no untagged page is left out and counted. Rows the provider failed (error,
-provider-error, interrupted) are not capture effects and are dropped; loops (length) and refusals stay, scored 0.
+The loss for a tag is paired within its stratum: for each tagged page, its NES minus the mean NES of the pages of
+the same kind and the same source class (phone original, or the PDF's processed image) that do not carry that tag,
+on the same route; a page whose stratum has no such page is left out and counted. Tags co-occur (90 of the 96
+carry at least one), so a tag's loss includes whatever its companions cost; "any" is against the untagged pages.
+Rows the provider failed (error, provider-error, interrupted) are not capture effects and are dropped; loops
+(length) and refusals stay, scored 0.
 The private ladder scores, when given, add the NES drop from original to half and quarter for tagged against
 untagged ladder pages. Only page ids, tags and numbers are written; nothing needs the network or money.
 """
@@ -53,10 +55,11 @@ def level(page, attrs, attr):
 
 
 def paired_loss(route_scores, tags, kinds, attrs, attr, at_least=1):
-    """Mean over tagged pages of (page NES - mean NES of untagged pages in its stratum), and the pages used."""
+    """Mean over tagged pages of (page NES - mean NES of the stratum's pages without this tag), and the pages used.
+    For 'any' the comparison pages carry no tag at all."""
     clean = defaultdict(list)
     for p in tags.values():
-        if p['page'] in route_scores and not level(p, attrs, 'any'):
+        if p['page'] in route_scores and not level(p, attrs, attr):
             clean[stratum(p, kinds)].append(route_scores[p['page']])
     diffs = [route_scores[p['page']] - mean(clean[stratum(p, kinds)]) for p in tags.values()
              if p['page'] in route_scores and level(p, attrs, attr) >= at_least and clean.get(stratum(p, kinds))]
@@ -65,10 +68,10 @@ def paired_loss(route_scores, tags, kinds, attrs, attr, at_least=1):
 
 def analyse(attrs, tags, scores, kinds):
     """attr (and 'any') -> pages tagged, severe, unpaired, per-route (loss, n), median over routes, routes worse."""
-    clean_strata = {stratum(p, kinds) for p in tags.values() if not level(p, attrs, 'any')}
     out = {}
     for attr in attrs + ['any']:
         tagged = [p for p in tags.values() if level(p, attrs, attr) >= 1]
+        clean_strata = {stratum(p, kinds) for p in tags.values() if not level(p, attrs, attr)}
         per_route = {r: paired_loss(s, tags, kinds, attrs, attr) for r, s in sorted(scores.items())}
         severe = [paired_loss(s, tags, kinds, attrs, attr, 2)[0] for s in scores.values()]
         losses = [v for v, _ in per_route.values() if v is not None]
@@ -112,12 +115,13 @@ def fmt(x, signed=True):
     return '' if x is None else (f'{x:+.1f}' if signed else f'{x:.1f}')
 
 
-def report(attrs, tags, kinds, res, method, ladder_res=None):
+def report(attrs, tags, kinds, res, method, ladder_res=None, agreement=None, reading=''):
     lines = ['# W46.fix-capture-tags — capture-defect tags on the 96, and every saved route\'s NES by tag', '',
-             method, '',
+             method, '', *([reading, ''] if reading else []),
              f'{len(tags)} pages tagged; {sum(not any(p[a] for a in attrs) for p in tags.values())} carry no tag. '
-             f'Loss is in NES points, tagged page minus the untagged pages of its kind and source class on the same '
-             f'route (negative = the tag costs words). "routes worse" counts routes whose paired loss is below zero; '
+             f'Loss is in NES points, tagged page minus the pages of its kind and source class without that tag, on the '
+             f'same route (negative = the tag costs words; "any" is against the pages with no tag). Tags co-occur, so '
+             f'a tag\'s loss carries some of its companions\'. "routes worse" counts routes whose paired loss is below zero; '
              f'a tag on fewer than {MIN_TAGGED} paired pages is listed without a number.', '',
              '## Per tag, over all routes', '',
              '| tag | pages | severe | unpaired | median loss | median loss, severe only | routes worse |',
@@ -130,6 +134,11 @@ def report(attrs, tags, kinds, res, method, ladder_res=None):
         lines.append(f"| {a} | {r['tagged']} | {r['severe']} | {r['unpaired']} | "
                      f"{'too few' if few else fmt(r['median'])} | {fmt(r['severe_median']) if not few else ''} | "
                      f"{'' if few else str(r['worse']) + '/' + str(r['routes'])} |")
+    if agreement:
+        lines += ['', '## How far the two taggers agreed (presence, before the third look)', '',
+                  '| tag | drafted and audited | blind | pages agreeing | kappa |', '|---|---:|---:|---:|---:|']
+        lines += [f"| {a} | {agreement[a]['drafted']} | {agreement[a]['blind']} | {agreement[a]['agree']} | "
+                  f"{agreement[a]['kappa']:.2f} |" for a in attrs]
     lines += ['', '## Per route, the tags with enough pages', '']
     shown = [a for a in order if max((n for _, n in res[a]['per_route'].values()), default=0) >= MIN_TAGGED]
     lines += ['| route | ' + ' | '.join(shown) + ' | any |', '|---|' + '---:|' * (len(shown) + 1)]
@@ -171,7 +180,8 @@ def main():
     scores, kinds = load_scores()
     res = analyse(attrs, tags, scores, kinds)
     lad = ladder(args.ladder, tags, attrs) if args.ladder else None
-    OUT.write_text(report(attrs, tags, kinds, res, meta['method'], lad))
+    OUT.write_text(report(attrs, tags, kinds, res, meta['method'], lad, meta.get('agreement'),
+                          meta.get('reading', '')))
     print(OUT.read_text())
 
 
