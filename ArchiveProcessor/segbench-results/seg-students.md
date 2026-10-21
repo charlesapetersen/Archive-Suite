@@ -106,3 +106,10 @@ Gemini 3.8 Flash 90.7%, and the untrained 4B at 4-bit on this Mac 57.4% on Deave
   owner's corpus, so their 97% says the model carries across his collections, not to other people's. The test
   boxes, which no training window saw, are the better guide, and there the students are about ten points behind the
   best cloud model.
+
+## Where the builds are (2026-10-21)
+
+The shipped build, `seg-qwen3.5-2b-8bit`, stays in `~/.local/share/visionocr-ocrlab/mlx/`. The other three MLX
+builds (`seg-qwen3.5-4b-8bit`, `seg-qwen3.5-4b-4bit`, `seg-qwen3.5-2b-4bit`, 9.3 GB) were moved off this Mac to free
+disk, into the owner's OneDrive-Stanford folder as `Offload to OneDrive/visionocr-seg-builds`, with a README. Copy
+them back to that path to rerun `method_local.py`'s seg-4b, seg-2b or seg-4b-8bit.

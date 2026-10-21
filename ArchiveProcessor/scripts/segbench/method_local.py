@@ -47,6 +47,8 @@ MODELS = {  # key: (repo in the lab's Hugging Face cache, label)
     "qwen3-vl-8b": ("mlx-community/Qwen3-VL-8B-Instruct-4bit", "Qwen3-VL-8B, 4-bit"),
     # W41.seg-mac-model: the FarmShare fine-tunes (W41.seg-finetune), merged there and converted here to 4-bit MLX
     # with the lab's convert-mlx.py; mlx_vlm loads a build from its folder.
+    # seg-4b, seg-2b and seg-4b-8bit were offloaded on 2026-10-21 to the owner's OneDrive-Stanford folder
+    # ("Offload to OneDrive/visionocr-seg-builds"); copy them back to ~/.local/share/visionocr-ocrlab/mlx/ to rerun.
     "seg-4b": (str(Path("~/.local/share/visionocr-ocrlab/mlx/seg-qwen3.5-4b-4bit").expanduser()),
                "Qwen3.5-4B fine-tuned for segmentation, 4-bit"),
     "seg-2b": (str(Path("~/.local/share/visionocr-ocrlab/mlx/seg-qwen3.5-2b-4bit").expanduser()),
