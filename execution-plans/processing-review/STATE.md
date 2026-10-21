@@ -67,5 +67,9 @@ The owner's Gemini report is assessed in `screens/gemini-report-2026-10-20.md` (
   5. Lock two more segmentation boxes, one clippings-heavy and one handwritten; the owner names them.
   6. W46.seg-window-modality's full 551-page Gemini sweep approved (about $8 list, $4 batch).
   7. Plan-route cap: superseded by the gateway-first rule; gateway use up to $50 a month.
-- [ ] File the Phase 3 items with plan-edit.sh (each behind its prerequisites; gateway arms behind the model-access gate).
+- [x] File the Phase 3 items with plan-edit.sh (each behind its prerequisites; gateway arms behind the model-access gate).
+  Phase 3 filed 2026-10-21, 74 items and 11 owner gates: three cluster-infrastructure items first, then the audit's 40
+  in rank order, with gateway arms split into `-paid` items, owner passes split into sheet, gate and score, and the
+  Sherlock-scale parts split out. List in `SUITE_TODO.md` §"Document processing review — W46". Plan backup:
+  `.maintenance/AUTONOMOUS_PLAN.md.pre-phase3-20261021T081333`.
 - Engine paused for Archive Suite by the owner during Phase 2 (2026-10-21; `manager.py resume "Archive Suite"`).

@@ -190,7 +190,9 @@ efficiency plan item 12): `light` (no heavy lock — bash, lint, Python, a read-
 allowed. The last `(uses…)` on the item's line is its tag, so a title may quote one first. An untagged item reads
 as `build`; a malformed tag or unknown value is refused, not defaulted: `worker-state.py reserve` skips that item
 and prints `refused TAG: …` to the worker log, and `check-tracker-sync.sh` fails the gate with `BAD USES TAG` so
-the item cannot starve quietly. Reservation returns
+the item cannot starve quietly. A `(cluster: farmshare)` or `(cluster: sherlock)` marker (W46, 2026-10-21) names an
+item that needs a cluster; it is deliberately not a uses value, which `worker-state.py` and the Agent Manager would
+refuse, and nothing reads it until W46.engine-cluster. Reservation returns
 `tag<TAB>token<TAB>uses<TAB>text` and records `uses` in the claim. It is deliberately not `needs:`, which the
 hold test reads as an owner hold. Every open item in both trackers carries one.
 
