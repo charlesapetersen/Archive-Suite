@@ -245,7 +245,9 @@ def used_pct(route) -> int:
 
 def _claude_pct() -> int:
     """Claude: claude -p --output-format json carries no reading, so the account's comes from a session log. The
-    highest reading whose window has not reset counts; with none, stop rather than spend blind."""
+    highest reading whose window has not reset counts. A reading whose window reset within the last hour stands for
+    the new window's start (0%): the log refreshes only when its session next acts, so a run queued for the reset
+    would otherwise find nothing current. With no reading of either kind, stop rather than spend blind."""
     now, best = time.time(), None
     for log_path in CLAUDE_READING_LOGS:
         r = subprocess.run(["bash", str(USAGE_SH), "--raw", *([str(log_path)] if log_path else [])],
@@ -256,6 +258,8 @@ def _claude_pct() -> int:
             continue
         if resets > now:
             best = max(best or 0, int(pct))
+        elif now - resets < 3600:
+            best = max(best or 0, 0)
     return 100 if best is None else best
 
 

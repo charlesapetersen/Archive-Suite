@@ -27,6 +27,10 @@
         "pk_windows": 259,
         "pk_errors": 118,
         "wd_errors": 240,
+        "pred_docs": 261,
+        "pq_tp": 19,
+        "pq_iou": 19.0,
+        "mndd": 180,
         "collections": []
       },
       "metrics": {
@@ -50,7 +54,16 @@
         "photo_accuracy": null,
         "photo_type_swaps": 0,
         "photos_missed": 0,
-        "false_photos": 0
+        "false_photos": 0,
+        "kappa": 0.0,
+        "doc_precision": 0.07279693486590039,
+        "doc_f1": 0.1111111111111111,
+        "pq": 0.1111111111111111,
+        "rq": 0.1111111111111111,
+        "sq": 1.0,
+        "stp": 0.0,
+        "mndd": 180,
+        "mndd_per_100_pages": 68.96551724137932
       }
     },
     "no-boundaries": {
@@ -76,6 +89,10 @@
         "pk_windows": 259,
         "pk_errors": 141,
         "wd_errors": 141,
+        "pred_docs": 1,
+        "pq_tp": 0,
+        "pq_iou": 0.0,
+        "mndd": 239,
         "collections": []
       },
       "metrics": {
@@ -99,7 +116,16 @@
         "photo_accuracy": null,
         "photo_type_swaps": 0,
         "photos_missed": 0,
-        "false_photos": 0
+        "false_photos": 0,
+        "kappa": 0.0,
+        "doc_precision": 0.0,
+        "doc_f1": null,
+        "pq": 0.0,
+        "rq": 0.0,
+        "sq": 0.0,
+        "stp": 0.0,
+        "mndd": 239,
+        "mndd_per_100_pages": 91.57088122605364
       }
     },
     "rule-cues-sketch": {
@@ -125,6 +151,10 @@
         "pk_windows": 259,
         "pk_errors": 118,
         "wd_errors": 240,
+        "pred_docs": 261,
+        "pq_tp": 19,
+        "pq_iou": 19.0,
+        "mndd": 180,
         "collections": []
       },
       "metrics": {
@@ -148,7 +178,16 @@
         "photo_accuracy": null,
         "photo_type_swaps": 0,
         "photos_missed": 0,
-        "false_photos": 0
+        "false_photos": 0,
+        "kappa": 0.0,
+        "doc_precision": 0.07279693486590039,
+        "doc_f1": 0.1111111111111111,
+        "pq": 0.1111111111111111,
+        "rq": 0.1111111111111111,
+        "sq": 1.0,
+        "stp": 0.0,
+        "mndd": 180,
+        "mndd_per_100_pages": 68.96551724137932
       }
     },
     "rule-cues": {
@@ -174,6 +213,10 @@
         "pk_windows": 259,
         "pk_errors": 71,
         "wd_errors": 139,
+        "pred_docs": 151,
+        "pq_tp": 37,
+        "pq_iou": 32.726330532212884,
+        "mndd": 103,
         "collections": []
       },
       "metrics": {
@@ -197,7 +240,16 @@
         "photo_accuracy": null,
         "photo_type_swaps": 0,
         "photos_missed": 0,
-        "false_photos": 0
+        "false_photos": 0,
+        "kappa": 0.2737430167597766,
+        "doc_precision": 0.152317880794702,
+        "doc_f1": 0.19827586206896552,
+        "pq": 0.28212353907080073,
+        "rq": 0.31896551724137934,
+        "sq": 0.8844954197895374,
+        "stp": 0.0,
+        "mndd": 103,
+        "mndd_per_100_pages": 39.46360153256705
       }
     },
     "fs-qwen3.5-27b": {
@@ -345,6 +397,68 @@
         "photo_type_swaps": 0,
         "photos_missed": 0,
         "false_photos": 3
+      }
+    },
+    "window-cues-claude": {
+      "counts": {
+        "pages": 261,
+        "doc_pages": 261,
+        "pages_exact": 235,
+        "docs": 81,
+        "docs_exact": 76,
+        "folders": 1,
+        "folders_perfect": 0,
+        "gaps": 260,
+        "truth_bounds": 80,
+        "tp": 78,
+        "false_splits": 1,
+        "false_merges": 2,
+        "edits": 3,
+        "photos": 0,
+        "photos_exact": 0,
+        "photo_type_swaps": 0,
+        "photos_missed": 0,
+        "false_photos": 0,
+        "pk_windows": 259,
+        "pk_errors": 1,
+        "wd_errors": 6,
+        "pred_docs": 80,
+        "pq_tp": 77,
+        "pq_iou": 76.95454545454545,
+        "mndd": 3,
+        "collections": []
+      },
+      "metrics": {
+        "collections": "",
+        "pages": 261,
+        "doc_pages": 261,
+        "docs": 81,
+        "pages_in_exact_doc": 0.9003831417624522,
+        "docs_exact": 0.9382716049382716,
+        "folders": 1,
+        "folders_perfect": 0.0,
+        "false_splits": 1,
+        "false_merges": 2,
+        "boundary_precision": 0.9873417721518988,
+        "boundary_recall": 0.975,
+        "boundary_f1": 0.9811320754716981,
+        "pk": 0.003861003861003861,
+        "windowdiff": 0.023166023166023165,
+        "edits_per_100_pages": 1.1494252873563218,
+        "photos": 0,
+        "photo_accuracy": null,
+        "photo_type_swaps": 0,
+        "photos_missed": 0,
+        "false_photos": 0,
+        "kappa": 0.9728222996515681,
+        "doc_precision": 0.95,
+        "doc_f1": 0.9440993788819876,
+        "pq": 0.9559570863918689,
+        "rq": 0.9565217391304348,
+        "sq": 0.999409681227863,
+        "stp": 0.0,
+        "mndd": 3,
+        "mndd_per_100_pages": 1.1494252873563218
       }
     }
   },

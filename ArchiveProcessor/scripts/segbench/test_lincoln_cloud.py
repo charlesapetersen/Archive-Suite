@@ -42,6 +42,14 @@ class Guard(unittest.TestCase):
             self.assertEqual(WC.used_pct("claude"), 61)
         with mock.patch.object(WC.subprocess, "run", return_value=SimpleNamespace(stdout="")):
             self.assertEqual(WC.used_pct("claude-cue"), 100)
+        just_reset = SimpleNamespace(stdout=f"71 {now - 120}")
+        with mock.patch.object(WC.subprocess, "run", return_value=just_reset), \
+                mock.patch.object(WC.time, "time", return_value=now):
+            self.assertEqual(WC.used_pct("claude"), 0)
+        days_old = SimpleNamespace(stdout=f"24 {now - 86400 * 12}")
+        with mock.patch.object(WC.subprocess, "run", return_value=days_old), \
+                mock.patch.object(WC.time, "time", return_value=now):
+            self.assertEqual(WC.used_pct("claude"), 100)
 
 
 class ReviewLoad(unittest.TestCase):
