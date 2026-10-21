@@ -355,24 +355,15 @@ The original history is kept as a git bundle **outside the repo, untracked and u
 ~/Claude/Long term storage/Preserved Bundles/archive-suite-full-backup-2026-08-11.bundle
 ```
 
-*Moved there 2026-08-13* (owner: keep `~/Claude/` itself clean — see that folder's `README.md`). It sat at
-`~/Claude/archive-suite-full-backup-2026-08-11.bundle` until then, which is the path older docs quote. **The
-path now contains spaces — quote it in every command**, as with this checkout's own path.
-
-| | |
-|---|---|
-| SHA‑256 | `491776575b3305551cae6b422256bb723ea89ba80d6dbf0f8df8f20d3d030048` (re‑verified after the move) |
-| Size | 28,428,854 bytes (27 MB) |
-| Contents | 42 refs, 1,017 commits, complete history; original `HEAD` = `3ea86c4` |
-| Verify | `git bundle verify "$HOME/Claude/Long term storage/Preserved Bundles/archive-suite-full-backup-2026-08-11.bundle"` (run from inside a repo) |
-| Read it | `git clone --bare "$HOME/Claude/Long term storage/Preserved Bundles/archive-suite-full-backup-2026-08-11.bundle" /tmp/as-original` |
+Moved there 2026-08-13 from `~/Claude/`, the path older docs quote. **The path contains spaces — quote it in
+every command.** Verify: `git bundle verify "<path>"` from inside a repo; read: `git clone --bare "<path>"
+/tmp/as-original`. Its SHA-256, size and contents: `SUITE_TODO_DONE.md` §"Pre-rewrite bundle — reference facts".
 
 **⛔ Never push it, commit it, or merge from it.** It is the *un‑scrubbed* history, so it still carries the
 personal email addresses, home‑directory paths, the old account name, the GCP project number, and — the
 reason this warning is emphatic — an **OAuth client secret** in a since‑deleted execution plan. The owner
-**deactivated** that credential on 2026‑08‑12, so it is dead. (It was **replaced on 2026‑08‑13** — the owner
-minted a fresh Desktop OAuth client and Settings confirmed sign-in, so cloud relay works again; `W29.drive-secret`
-is in [`SUITE_TODO_DONE.md`](SUITE_TODO_DONE.md). The dead secret in the bundle stays dead.) The bundle is nonetheless why this file says "treat it as credential‑bearing" rather
+**deactivated** that credential on 2026‑08‑12 and replaced it on 2026‑08‑13 (`W29.drive-secret`), so the
+one in the bundle is dead. The bundle is nonetheless why this file says "treat it as credential‑bearing" rather
 than "it's just old commits": the next thing to land in a planning doc might not be dead. `.gitignore`
 refuses `*.bundle` so a stray copy inside the checkout cannot be committed by accident, but that guard only
 covers this directory — the file's real protection is living outside it.

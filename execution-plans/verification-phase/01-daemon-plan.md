@@ -156,7 +156,7 @@ regenerable. It is never committed. Each set gets a `MANIFEST.txt` saying what i
   `ArchiveReader/scripts/rehearsal-sample.py`; evidence `verification/evidence/reader/W40.c2-sample.md`. The copy
   is made with `cp -c -p` (APFS clones), not `ditto`, which wrote full copies on the same volume.)*
 - **No Google Drive sync test.** The corpus path contains `Google Drive`, but it is a plain local folder and Google
-  Drive is not running on this machine (owner, 2026-10-04; also `SUITE_TODO.md` §Wave 26). There is no sync
+  Drive is not running on this machine (owner, 2026-10-04; also `SUITE_TODO_DONE.md` §"Wave 26 — background"). There is no sync
   behaviour to test. Do not file one.
 
 ## D — journeys (rehearse the four real uses end to end)
