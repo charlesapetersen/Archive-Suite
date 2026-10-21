@@ -1,0 +1,51 @@
+{
+ "pages": 848,
+ "documents": 463,
+ "multi_page_documents": 193,
+ "multi_page_pages": 578,
+ "pages_below_floor": 78,
+ "hand_counts": {
+  "typewritten": 471,
+  "handwritten": 14,
+  "printed": 363
+ },
+ "form_pages": 6,
+ "hand_churn_documents": 24,
+ "form_churn_documents": 2,
+ "hand_churn_by_box": {
+  "Dean": [
+   0,
+   35
+  ],
+  "Deaver": [
+   1,
+   39
+  ],
+  "Herrnstein": [
+   5,
+   41
+  ],
+  "Stanton": [
+   11,
+   63
+  ],
+  "RG165": [
+   7,
+   15
+  ]
+ },
+ "minority_pages": 28,
+ "minority_where": {
+  "last page": 13,
+  "first page": 5,
+  "between": 10
+ },
+ "minority_below_floor": 16,
+ "minority_conf_median": 0.7756400960711257,
+ "all_conf_median": 0.9883868855763799,
+ "churn_pairs": {
+  "printed + typewritten": 21,
+  "handwritten + printed": 2,
+  "handwritten + typewritten": 1
+ }
+}

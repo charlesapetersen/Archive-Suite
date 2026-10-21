@@ -12129,3 +12129,23 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   code string. Ledger rows were not edited: their Drift notes stay as the record of what was found.
   Noticed: `verification/processor.md` counts 18 Processor UITest methods; there are 24 today.
   <!-- /W40.b5 -->
+- [x] **W46.fix-seg-scorers — the field's segmentation scorers on every cached answer, plus the feature cues [M]** · §Document processing review — W46 (owner, 2026-10-20) (lane: segbench) (uses: light) · SHIPPED 2026-10-21
+  No calls, $0. `score.py` gains Cohen's kappa (document gaps), document F1 on exact page sets, PQ/RQ/SQ (IoU > 0.5,
+  OpenPSS), STP (= folders perfect) and MNDD (exact chain matching), segment scorers over the truth's document pages.
+  `rescore.py` re-scores 44 cached answer sources (cache-only, network refused) on the five owner boxes, Lincoln and
+  CREST -> `segbench-results/seg-scorers.md`; Lincoln/CREST reproduce public-segmentation's figures. Results: on
+  Lincoln PQ is 17-18 pts above pages exact (seg-4b 46.7% vs 0.643), 1-11 on owner boxes, below it on CREST, so
+  much of the Lincoln drop is near misses; MNDD ranks dev sources like pages exact (Spearman 0.967), PQ 0.772,
+  kappa 0.714. Pk = WindowDiff on owner boxes (k rounds to 1; documents average 1.6 pages). Count prior (A test 9):
+  Lincoln's catalogue 72 lifts seg-4b 46.7% -> 57.9% (oracle 81: 62.8%), the 27B 39.5% -> 45.2%; CREST's 22 PDFs
+  against 31 documents halves it; the oracle count does not help the owner boxes (-2.5 to +0.2). Feature cues
+  (`layout.py`, PP-DocLayoutV3 via mlx-vlm, 0.21-0.24 s a page over 1,303 pages; `features_cues.py`): letter cues
+  fire at 99%/98% precision on 44-46% of dev boundaries but add nothing over the model's own; layout lifts the
+  no-embedding model 56.0% -> 60.8% (MNDD 161 -> 88) yet lowers the embedding model 66.2% -> 58.1% and raises the
+  review for 98%, Lincoln 33.7% -> 42.1%, CREST down; unstable on three folds, not worth shipping as is. Kind churn
+  (K test 5, `kind_churn.py`, the shipped classifier on 848 document pages): 24 of 193 multi-page documents (12.4%)
+  hold two hands, 21 of them printed + typewritten, Dean 0/35 to RG165 7/15; 28 minority pages, median confidence
+  0.776, 16 below the 0.8 floor, so a document prior below the floor would touch about 16 pages in 848.
+  ArchiveOCRBench public-boxes table gains PQ, kappa, MNDD (published copy behind). Deaver's older TSVs predate a
+  2-page truth correction (CSV 2026-10-05 20:29), which is why its re-scored figures run 1.4 pts higher.
+  <!-- /W46.fix-seg-scorers -->
