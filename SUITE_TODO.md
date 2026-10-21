@@ -85,6 +85,10 @@ concentrate on:** LAN transport (`Net/CaptureServer.swift`, `CaptureReceiver`, n
   strata of public page-level ground truth (Latin-script hands, print and newspapers from 1500 to 1950, plus Arabic,
   Cyrillic, Greek, Hebrew, Chinese and Devanagari) on top of the frozen 96, sized from the panel's variance, with
   sources, licences, scorer changes and cost. `00-plan.md`; waits on `W43.corpus-plan-owner-ok`.
+- `processing-review/` — **PLANNED 2026-10-20 (W46, Archive Processor)**: a review of segmentation, dating, OCR,
+  enhancement, layout, text placement and entities against the current literature and model releases, for each user
+  profile (laptop, cheap API, premium API, cluster, coding agent), ending in the processing work queue. `00-plan.md`;
+  progress in `STATE.md`. Every processing item waits on `W46.review-done`.
 - `segmentation/` — **PLANNED 2026-10-05 (W36, Archive Processor)**: a bake-off of automatic segmentation methods
   (frontier models over page windows, a second model as voter, on-device feature and vision models, agreement plus
   review) on the owner's ground truth, the owner's decision, then a build only if usable. `00-plan.md`; the first early read (W36.seg-window) is `03-early-read.md`.
@@ -823,6 +827,18 @@ Every Phase A–E item has shipped and `execution-plans/archive-notes/09-gap-clo
 completion records are under §W9 in `SUITE_TODO_DONE.md`, and the plan's out-of-scope and deviation lists now
 live in `execution-plans/archive-notes/00-overview.md` §17. ⛔ Do not re-file A4 (R13d removed the
 `ArchiveSuite` marker on purpose). New Notes gaps are filed as their own items, not under W9.
+
+## Document processing review — W46 (owner, 2026-10-20)
+
+The owner paused processing work for a review of the whole approach: `execution-plans/processing-review/00-plan.md`.
+The plan's HOLD QUEUE gate `W46.review-done` now holds every segmentation, OCR, dating, layout, text-layer, model and
+sweep item: W41.seg-label-clean-fu1, W41.app-local-seg-publish, W43.seg-date-public, W44.reocr-plan, -spec,
+-processor and -reader, W43.sweep, W43.farmshare-ocr-more, W43.open-sweep-more, W43.general-sweep-farmshare,
+W43.inkling-farmshare, W43.ppocrv6-farmshare, W43.app-guide-refresh, W42.c41-newspaper-scans, W40.d1, W40.d3 and
+W40.d4. The Vision OCR integration (W42.int-s1 to s7, not yet filed) also waits on it. The gate replaces the earlier
+parking behind W43.sweep-owner-ok, which would have released all of them with the paid sweep. The Processor UI and
+bug items (W40.a5, i1-i3, i5, b3, b4, d2, d5, e8, e12, g3) no longer wait on W42.int-done, so the engine can run
+them; d2 and g3 still wait on d1. The review files its own work queue in its Phase 4, then the gate is approved.
 
 ## Archive Processor — automatic segmentation (owner, 2026-10-05; before the W40 freeze)
 
