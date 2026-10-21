@@ -142,6 +142,10 @@ Strands:
   the reader that suits it, and reassembling the text layer in order. The settling question is whether one strong
   reader on the whole mixed page is already good enough, so that region routing helps only the cheaper routes.
   Overlaps strands D (marks) and E (layout).
+- L. Phone capture in imperfect conditions (owner, 2026-10-21), the most distinctive feature of our setting: light,
+  shadow, glare, curl, blur, colour casts, capture-app processing, resolution and compression; which defects matter for
+  each stage, quality assessment at capture time against repair afterwards, camera-captured benchmarks to borrow, and
+  defect-tagged tests on the 96 and the 895.
 - I. Model inventory: Hugging Face and GitHub, with licence, size, positions or not, languages, and whether it runs
   on a Mac (MLX or llama.cpp) at each memory size.
 - J. Compute and prices: Sherlock's partitions, GPU types, job limits, storage and model-download rules (the

@@ -18,7 +18,8 @@ Read `00-plan.md`, then this table. Take the first phase step not done. Strand n
 - [x] Nemotron job 1860275: TIMEOUT at 20:54 on 2026-10-20 with 839 of 895 pages read (631 ok, 207 cap, 1
   malformed); 56 unread. Not scored. Owner: dropped, no third submission.
 - [ ] Run the models scored on the 895 but not yet on the owner's 96 pages (owner, 2026-10-20, both sets every
-  time): GLM-OCR, LightOnOCR-3 0.8B and 4B at bf16 (the 4B has only a Mac 8-bit run, 89.13), PaddleOCR-VL 1.5,
+  time; submitted 2026-10-20, jobs 1861696-1861703; collection blocked 2026-10-21 00:46: the cm-farmshare socket
+  timed out, so the owner must reopen the login): GLM-OCR, LightOnOCR-3 0.8B and 4B at bf16 (the 4B has only a Mac 8-bit run, 89.13), PaddleOCR-VL 1.5,
   Qwen3.5 4B, Ling 3 Flash VL and stock PP-OCRv6, on FarmShare, same settings as the open sweep.
   Status: submitted 2026-10-20, jobs 1861696–1861703 (one afterany chain, Qwen3-VL 8B added at 1861701, Ling
   last); collect and score per `execution-plans/truth96-farmshare-20261020.md`.
@@ -35,9 +36,10 @@ Read `00-plan.md`, then this table. Take the first phase step not done. Strand n
 | D enhancement and marks | done, `screens/D-screen.md` | done 2026-10-20 (Fable), `D-enhancement.md` | UVDoc MIT licence checked | done |
 | E layout | done, `screens/E-screen.md` | done 2026-10-20 (Fable), `E-layout.md` | NewsBench figures match our farmshare/news results | done |
 | F text placement | done, `screens/F-screen.md` | done 2026-10-20 (Fable), `F-placement.md` | lab figure checked: vision-ocr HW-BUILD-2026-10-15.tsv (placed 0.654; 96 to 367 missed per 1,000) | done |
-| G entities | done, `screens/G-screen.md` | | | |
-| H whole-corpus and user training | done, `screens/H-screen.md` | | | |
-| K kind identification and mixed pages | queued for after the 5-hour reset | | | |
+| G entities | done, `screens/G-screen.md` | started 2026-10-21 00:45 (Fable) | | |
+| H whole-corpus and user training | done, `screens/H-screen.md` | started 2026-10-21 00:45 (Fable) | | |
+| K kind identification and mixed pages | self-screened | started 2026-10-21 00:45 (Fable) | | |
+| L phone capture | self-screened | started 2026-10-21 00:45 (Fable) | | |
 | I model inventory | done, `I-inventory.md` | n/a | | done |
 | J compute and prices | done, `J-compute.md` | n/a | | done |
 
