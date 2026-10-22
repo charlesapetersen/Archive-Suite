@@ -22,7 +22,8 @@ points normalised with a top-left origin, as the truth is. Truth words whose box
 nothing there and nobody has drawn it) or `illegible`, and N6's line-only words, are not scored at word level;
 the counts say how many.
 
-Usage: python3 place_score.py <hyp-dir> [--group owner-typed] [--json out.json]
+Usage: python3 place_score.py <hyp-dir> [--group owner-typed] [--verdict ok] [--json out.json]
+       (--verdict ok scores only the pages the independent audit passed; see segbench-results/place-truth.md)
        (hyp-dir holds <page>.json, the page id with '/' as '__')
 """
 from __future__ import annotations
@@ -96,7 +97,9 @@ def match(truth_words, hyp_words, thr):
 
 def word_scores(truth: dict, hyp: dict) -> dict:
     tw = scoreable(truth)
-    hw = [w for w in hyp.get('words', []) if w.get('box')]
+    # A reader's word on ink the truth calls illegible is neither right nor wrong: it is left out.
+    ill = [w['box'] for w in truth['words'] if w.get('box') and w['status'] == 'illegible']
+    hw = [w for w in hyp.get('words', []) if w.get('box') and not any(centres_meet(b, w['box']) for b in ill)]
     out = {'truth_words': len(tw), 'hyp_words': len(hw),
            'unscored_truth_words': len(truth['words']) - len(tw)}
     for thr in (0.5, 0.7, 'centre'):
@@ -257,10 +260,14 @@ def main():
     ap.add_argument('hyp_dir', type=Path)
     ap.add_argument('--group')
     ap.add_argument('--json', type=Path)
+    ap.add_argument('--verdict', default='', help='comma list (ok,fix): score only pages the audit gave these')
     a = ap.parse_args()
+    keep = set(filter(None, a.verdict.split(',')))
     rows = []
     for t in place_truth.load_all():
         if a.group and t['group'] != a.group:
+            continue
+        if keep and (t.get('audit') or {}).get('verdict') not in keep:
             continue
         f = a.hyp_dir / (t['page'].replace('/', '__') + '.json')
         if f.exists():

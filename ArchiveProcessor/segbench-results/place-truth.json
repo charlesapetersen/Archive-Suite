@@ -6,7 +6,7 @@
    "lines": 517,
    "baselines": 517,
    "status": {
-    "line-gaps": 3698,
+    "line-only": 3698,
     "page-xml": 616
    },
    "median_lines_per_page": 27.0
@@ -24,37 +24,36 @@
   "owner-typed": {
    "pages": 40,
    "words": 14243,
-   "lines": 1962,
-   "baselines": 1962,
+   "lines": 1987,
+   "baselines": 1980,
    "status": {
-    "vision": 11765,
-    "vision-sub": 310,
-    "missing": 374,
-    "split": 153,
-    "vision-moved": 168,
-    "tesseract": 122,
-    "tesseract-sub": 4,
-    "illegible": 25,
-    "drawn": 1322
+    "vision": 10549,
+    "vision-sub": 199,
+    "missing": 181,
+    "split": 95,
+    "drawn": 2978,
+    "illegible": 19,
+    "vision-moved": 138,
+    "tesseract": 83,
+    "tesseract-sub": 1
    },
    "median_lines_per_page": 37.0
   },
   "owner-hand": {
    "pages": 21,
    "words": 3170,
-   "lines": 436,
-   "baselines": 436,
+   "lines": 564,
+   "baselines": 560,
    "status": {
-    "illegible": 74,
-    "vision": 759,
-    "missing": 935,
-    "vision-moved": 16,
-    "split": 217,
-    "vision-sub": 277,
-    "tesseract": 4,
-    "drawn": 888
+    "illegible": 73,
+    "drawn": 2307,
+    "missing": 172,
+    "vision": 401,
+    "vision-sub": 151,
+    "split": 65,
+    "vision-moved": 1
    },
-   "median_lines_per_page": 15
+   "median_lines_per_page": 24
   }
  },
  "pages": [
@@ -76,7 +75,7 @@
    "words": 188,
    "lines": 24,
    "missing": 0,
-   "audit": "fix"
+   "audit": "ok"
   },
   {
    "page": "071_132_001",
@@ -96,7 +95,7 @@
    "words": 186,
    "lines": 25,
    "missing": 0,
-   "audit": "fix"
+   "audit": "ok"
   },
   {
    "page": "072_099_001",
@@ -106,7 +105,7 @@
    "words": 192,
    "lines": 24,
    "missing": 0,
-   "audit": "fix"
+   "audit": "ok"
   },
   {
    "page": "072_105_002",
@@ -116,7 +115,7 @@
    "words": 119,
    "lines": 25,
    "missing": 0,
-   "audit": "fix"
+   "audit": "ok"
   },
   {
    "page": "073_052_001",
@@ -136,7 +135,7 @@
    "words": 206,
    "lines": 27,
    "missing": 0,
-   "audit": "fix"
+   "audit": "ok"
   },
   {
    "page": "073_070_001",
@@ -156,7 +155,7 @@
    "words": 118,
    "lines": 17,
    "missing": 0,
-   "audit": "fix"
+   "audit": "ok"
   },
   {
    "page": "115_007_004",
@@ -176,7 +175,7 @@
    "words": 334,
    "lines": 32,
    "missing": 0,
-   "audit": "fix"
+   "audit": "ok"
   },
   {
    "page": "115_076_003",
@@ -186,7 +185,7 @@
    "words": 71,
    "lines": 7,
    "missing": 0,
-   "audit": "fix"
+   "audit": "ok"
   },
   {
    "page": "115_080_003",
@@ -196,7 +195,7 @@
    "words": 219,
    "lines": 30,
    "missing": 0,
-   "audit": "fix"
+   "audit": "ok"
   },
   {
    "page": "115_087_004",
@@ -206,7 +205,7 @@
    "words": 322,
    "lines": 32,
    "missing": 0,
-   "audit": "fix"
+   "audit": "ok"
   },
   {
    "page": "115_101_003",
@@ -216,7 +215,7 @@
    "words": 274,
    "lines": 31,
    "missing": 0,
-   "audit": "fix"
+   "audit": "ok"
   },
   {
    "page": "116_244_001",
@@ -226,7 +225,7 @@
    "words": 159,
    "lines": 20,
    "missing": 0,
-   "audit": "redraw"
+   "audit": "ok"
   },
   {
    "page": "116_287_001",
@@ -236,7 +235,7 @@
    "words": 302,
    "lines": 33,
    "missing": 0,
-   "audit": "fix"
+   "audit": "ok"
   },
   {
    "page": "116_288_001",
@@ -246,7 +245,7 @@
    "words": 329,
    "lines": 32,
    "missing": 0,
-   "audit": "fix"
+   "audit": "ok"
   },
   {
    "page": "116_405_002",
@@ -256,7 +255,7 @@
    "words": 238,
    "lines": 27,
    "missing": 0,
-   "audit": "redraw"
+   "audit": "fix"
   },
   {
    "page": "dudhadasa1900/07",
@@ -266,7 +265,7 @@
    "words": 213,
    "lines": 29,
    "missing": 0,
-   "audit": "fix"
+   "audit": "ok"
   },
   {
    "page": "dudhadasa1900/08",
@@ -286,7 +285,7 @@
    "words": 225,
    "lines": 29,
    "missing": 0,
-   "audit": "ok"
+   "audit": "fix"
   },
   {
    "page": "giridharadasa1902/06",
@@ -296,7 +295,7 @@
    "words": 126,
    "lines": 27,
    "missing": 0,
-   "audit": "fix"
+   "audit": "ok"
   },
   {
    "page": "giridharadasa1902/08",
@@ -346,7 +345,7 @@
    "words": 106,
    "lines": 17,
    "missing": 0,
-   "audit": "fix"
+   "audit": "ok"
   },
   {
    "page": "hajarilala1919/12",
@@ -356,7 +355,7 @@
    "words": 108,
    "lines": 17,
    "missing": 0,
-   "audit": "fix"
+   "audit": "ok"
   },
   {
    "page": "jagannatha1955/001",
@@ -386,7 +385,7 @@
    "words": 155,
    "lines": 22,
    "missing": 0,
-   "audit": "fix"
+   "audit": "ok"
   },
   {
    "page": "jnanadasa1895/03",
@@ -444,9 +443,9 @@
    "kind": "handwritten",
    "in_96": true,
    "words": 75,
-   "lines": 9,
-   "missing": 48,
-   "audit": null
+   "lines": 16,
+   "missing": 0,
+   "audit": "redraw"
   },
   {
    "page": "p008",
@@ -454,9 +453,9 @@
    "kind": "typewritten",
    "in_96": true,
    "words": 605,
-   "lines": 51,
-   "missing": 11,
-   "audit": "fix"
+   "lines": 56,
+   "missing": 0,
+   "audit": "ok"
   },
   {
    "page": "p009",
@@ -464,9 +463,9 @@
    "kind": "mixed",
    "in_96": true,
    "words": 169,
-   "lines": 40,
-   "missing": 34,
-   "audit": null
+   "lines": 53,
+   "missing": 1,
+   "audit": "fix"
   },
   {
    "page": "p014",
@@ -486,7 +485,7 @@
    "words": 234,
    "lines": 53,
    "missing": 0,
-   "audit": null
+   "audit": "ok"
   },
   {
    "page": "p018",
@@ -494,9 +493,9 @@
    "kind": "printed",
    "in_96": true,
    "words": 340,
-   "lines": 60,
-   "missing": 142,
-   "audit": null
+   "lines": 87,
+   "missing": 21,
+   "audit": "fix"
   },
   {
    "page": "p019",
@@ -526,7 +525,7 @@
    "words": 290,
    "lines": 40,
    "missing": 0,
-   "audit": null
+   "audit": "redraw"
   },
   {
    "page": "p023",
@@ -534,9 +533,9 @@
    "kind": "typewritten",
    "in_96": true,
    "words": 204,
-   "lines": 29,
+   "lines": 30,
    "missing": 0,
-   "audit": "fix"
+   "audit": "ok"
   },
   {
    "page": "p024",
@@ -546,7 +545,7 @@
    "words": 147,
    "lines": 40,
    "missing": 0,
-   "audit": null
+   "audit": "fix"
   },
   {
    "page": "p026",
@@ -594,9 +593,9 @@
    "kind": "printed",
    "in_96": true,
    "words": 28,
-   "lines": 18,
-   "missing": 4,
-   "audit": null
+   "lines": 12,
+   "missing": 0,
+   "audit": "fix"
   },
   {
    "page": "p036",
@@ -654,9 +653,9 @@
    "kind": "handwritten",
    "in_96": true,
    "words": 86,
-   "lines": 10,
-   "missing": 17,
-   "audit": null
+   "lines": 17,
+   "missing": 0,
+   "audit": "fix"
   },
   {
    "page": "p047",
@@ -664,9 +663,9 @@
    "kind": "handwritten",
    "in_96": true,
    "words": 110,
-   "lines": 14,
-   "missing": 60,
-   "audit": null
+   "lines": 27,
+   "missing": 6,
+   "audit": "redraw"
   },
   {
    "page": "p048",
@@ -675,8 +674,8 @@
    "in_96": true,
    "words": 69,
    "lines": 21,
-   "missing": 5,
-   "audit": "fix"
+   "missing": 0,
+   "audit": "ok"
   },
   {
    "page": "p049",
@@ -684,9 +683,9 @@
    "kind": "handwritten",
    "in_96": true,
    "words": 87,
-   "lines": 7,
-   "missing": 73,
-   "audit": null
+   "lines": 22,
+   "missing": 0,
+   "audit": "fix"
   },
   {
    "page": "p050",
@@ -694,9 +693,9 @@
    "kind": "handwritten",
    "in_96": true,
    "words": 201,
-   "lines": 14,
-   "missing": 171,
-   "audit": null
+   "lines": 51,
+   "missing": 3,
+   "audit": "fix"
   },
   {
    "page": "p051",
@@ -704,9 +703,9 @@
    "kind": "handwritten",
    "in_96": true,
    "words": 92,
-   "lines": 15,
-   "missing": 2,
-   "audit": "fix"
+   "lines": 16,
+   "missing": 0,
+   "audit": "ok"
   },
   {
    "page": "p052",
@@ -734,9 +733,9 @@
    "kind": "handwritten",
    "in_96": true,
    "words": 156,
-   "lines": 14,
-   "missing": 92,
-   "audit": null
+   "lines": 29,
+   "missing": 0,
+   "audit": "fix"
   },
   {
    "page": "p055",
@@ -754,9 +753,9 @@
    "kind": "handwritten",
    "in_96": true,
    "words": 135,
-   "lines": 22,
-   "missing": 32,
-   "audit": null
+   "lines": 21,
+   "missing": 0,
+   "audit": "fix"
   },
   {
    "page": "p057",
@@ -766,7 +765,7 @@
    "words": 77,
    "lines": 16,
    "missing": 0,
-   "audit": null
+   "audit": "ok"
   },
   {
    "page": "p058",
@@ -805,8 +804,8 @@
    "in_96": true,
    "words": 164,
    "lines": 34,
-   "missing": 35,
-   "audit": null
+   "missing": 0,
+   "audit": "ok"
   },
   {
    "page": "p066",
@@ -834,9 +833,9 @@
    "kind": "typewritten",
    "in_96": true,
    "words": 128,
-   "lines": 20,
-   "missing": 5,
-   "audit": "fix"
+   "lines": 26,
+   "missing": 0,
+   "audit": "ok"
   },
   {
    "page": "p072",
@@ -886,7 +885,7 @@
    "words": 663,
    "lines": 146,
    "missing": 0,
-   "audit": null
+   "audit": "fix"
   },
   {
    "page": "p081",
@@ -896,7 +895,7 @@
    "words": 449,
    "lines": 83,
    "missing": 0,
-   "audit": null
+   "audit": "fix"
   },
   {
    "page": "p086",
@@ -906,7 +905,7 @@
    "words": 324,
    "lines": 28,
    "missing": 0,
-   "audit": null
+   "audit": "fix"
   },
   {
    "page": "p087",
@@ -964,9 +963,9 @@
    "kind": "handwritten",
    "in_96": false,
    "words": 299,
-   "lines": 13,
-   "missing": 239,
-   "audit": null
+   "lines": 34,
+   "missing": 0,
+   "audit": "redraw"
   },
   {
    "page": "p097",
@@ -1004,9 +1003,9 @@
    "kind": "typewritten",
    "in_96": true,
    "words": 166,
-   "lines": 46,
-   "missing": 17,
-   "audit": null
+   "lines": 38,
+   "missing": 0,
+   "audit": "ok"
   },
   {
    "page": "paramananda1924/000c",
@@ -1026,7 +1025,7 @@
    "words": 149,
    "lines": 19,
    "missing": 0,
-   "audit": "ok"
+   "audit": "fix"
   },
   {
    "page": "paramananda1924/06",
@@ -1056,7 +1055,7 @@
    "words": 45,
    "lines": 8,
    "missing": 0,
-   "audit": "redraw"
+   "audit": "fix"
   },
   {
    "page": "pyarelala1914/04",
@@ -1066,7 +1065,7 @@
    "words": 90,
    "lines": 17,
    "missing": 0,
-   "audit": "fix"
+   "audit": "ok"
   },
   {
    "page": "pyarelala1914/12",
@@ -1106,7 +1105,7 @@
    "words": 222,
    "lines": 39,
    "missing": 0,
-   "audit": "ok"
+   "audit": "fix"
   },
   {
    "page": "simha1914/000_2",
@@ -1146,7 +1145,7 @@
    "words": 68,
    "lines": 20,
    "missing": 0,
-   "audit": "fix"
+   "audit": "ok"
   },
   {
    "page": "sriramastavarajah1898/05",
@@ -1156,7 +1155,7 @@
    "words": 98,
    "lines": 20,
    "missing": 0,
-   "audit": "fix"
+   "audit": "ok"
   },
   {
    "page": "sriramastavarajah1898/08",
@@ -1176,7 +1175,7 @@
    "words": 101,
    "lines": 20,
    "missing": 0,
-   "audit": "fix"
+   "audit": "ok"
   },
   {
    "page": "sriramastavarajah1898/11",
@@ -1186,7 +1185,7 @@
    "words": 119,
    "lines": 20,
    "missing": 0,
-   "audit": "fix"
+   "audit": "ok"
   },
   {
    "page": "sriramastavarajah1898/12",
@@ -1196,7 +1195,7 @@
    "words": 123,
    "lines": 20,
    "missing": 0,
-   "audit": "fix"
+   "audit": "ok"
   },
   {
    "page": "sriramastavarajah1898/14",
@@ -1246,7 +1245,7 @@
    "words": 46,
    "lines": 17,
    "missing": 0,
-   "audit": "fix"
+   "audit": "ok"
   },
   {
    "page": "vyasa1906/03",
