@@ -183,7 +183,9 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
             // Normalize resend intent first so pruning can never delete a page whose corrected metadata
             // still needs delivery, and so resume/auto-retry have an explicitly sendable PENDING state.
             items.addAll(r.items.map { it.normalizeForRestore() })
-            seqCounter = r.seq
+            // A stale file's counter can lag seqs already sent to the group it restores as current; skip
+            // past them before anything is adopted or shot (W40.fix-android-stale-seq).
+            seqCounter = seqAfterRestore(r.seq, manifestWasStale)
             nextId = r.nextId
             r.groupId?.let { currentGroupId = it }
             // Restore segments ended-but-not-yet-acked so their completion signal is re-sent below (each

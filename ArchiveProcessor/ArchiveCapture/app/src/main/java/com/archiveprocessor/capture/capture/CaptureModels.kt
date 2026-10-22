@@ -192,6 +192,17 @@ internal fun adoptedOrphan(
     needsReview = manifestStale
 )
 
+/** W40.fix-android-stale-seq — how far a launch against a stale manifest moves the seq counter on. The
+ *  file's counter can lag seqs already sent to the current group, which the file restores as current, and
+ *  a new page reusing one would replace that page on the Mac, which keys on (group, seq). A gap is
+ *  harmless: the Mac accepts any seq ≥ 0 and orders pages by it. Same margin as iOS
+ *  (`CaptureQueue.staleSeqMargin`). */
+internal const val STALE_SEQ_MARGIN = 10_000
+
+/** The seq counter to carry on from after restoring [restoredSeq] from the session file. */
+internal fun seqAfterRestore(restoredSeq: Int, manifestStale: Boolean): Int =
+    if (manifestStale) restoredSeq + STALE_SEQ_MARGIN else restoredSeq
+
 /** The whole recovery sweep, as a function of what is on disk: every capture file the restored session
  *  doesn't account for, re-adopted in filename order into one recovery segment starting at [firstId] /
  *  [firstSeq]. Pure, so the contract that matters — a stale manifest yields pages that are kept but not

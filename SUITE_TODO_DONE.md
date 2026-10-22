@@ -12633,3 +12633,12 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   - Host tests: 11 new (220 checks, `scripts/test-ios-capture-queue.sh`); they use the new API, so they don't compile
     against the old core. iOS generic-simulator build green, no new warnings. Tier-2 adversarial review: no HIGH.
   <!-- /W40.i-fix-ios-session-durability -->
+- [x] **W40.fix-android-stale-seq — after a stale restore Android can reuse a seq the Mac already holds [XS · S3 · Tier-2]** · §W40 (lane: processor) (uses: build). Found by the `W40.i-fix-ios-session-durability` review 2026-10-21. Android's recovery restores `seqCounter` from a stale `session.json` and adopts orphans from `seqCounter + 1` (`CaptureViewModel.kt:221`); the file's counter can lag seqs already sent to the restored current group, so the next page shot into it replaces that page on the Mac (same group + seq). The phone keeps the original in the held recovery group, so nothing is lost, but the Mac's copy of the group is wrong. iOS moves the counter on by `CaptureQueue.staleSeqMargin` (10,000) on a stale or unreadable launch; port that, with a JVM test of the scenario.
+  SHIPPED 2026-10-21. A restore against a stale `session.json` (the W23.m8 marker) now moves `seqCounter` on by
+  `STALE_SEQ_MARGIN` (10,000, the iOS `CaptureQueue.staleSeqMargin`) before orphans are adopted or a page is shot
+  (`seqAfterRestore` in `CaptureModels.kt`). An unreadable file restores nothing, so new pages go to a fresh group and
+  cannot collide; the margin is not needed there. The Mac accepts any seq ≥ 0 (`CaptureServer`, `FileRelayReceiver`) and
+  an ended segment lists its seqs explicitly, so the gap is harmless. `CaptureStaleSeqTest` (4 JVM tests): a page sent and
+  then deleted leaves fewer orphans than seqs used, and without the margin the next page reuses seq 8; with it, no
+  reuse. `./gradlew --offline testDebugUnitTest` green. Tier-2 self-review: no HIGH.
+  <!-- /W40.fix-android-stale-seq -->
