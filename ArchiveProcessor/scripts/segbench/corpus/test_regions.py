@@ -150,11 +150,13 @@ class Report(unittest.TestCase):
         self.assertEqual([(r['index'], r['status']) for r in got], [(0, 'ok'), (1, 'error')])
 
     def test_table_shows_the_change_on_whole_page(self):
-        row = lambda arm, nes: {'group': 'L4', 'route': 'glm-ocr', 'arm': arm, 'n': 80, 'ok': 80, 'nes': nes,
-                                'order_edit': 0.1}
-        md = self.R.tables([row('whole', 0.5), row('doclayout_yolo', 0.9), row('tiles', 0.45)], {'glm-ocr': 1.234})
+        row = lambda arm, nes, same='': {'group': 'L4', 'route': 'glm-ocr', 'arm': arm, 'n': 80, 'ok': 80, 'nes': nes,
+                                         'order_edit': 0.1, 'whole_nes_same': same}
+        # tiles cover fewer pages than whole here: its Δ is against whole page on those pages (0.6), not all (0.5)
+        md = self.R.tables([row('whole', 0.5), row('doclayout_yolo', 0.9, 0.5), row('tiles', 0.45, 0.6)],
+                           {'glm-ocr': 1.234})
         line = next(l for l in md.splitlines() if l.startswith('| glm-ocr'))
-        self.assertIn('| 50.0 (80/80) | 90.0 (80/80) | – | 45.0 (80/80) | +40.0 | – | -5.0 |', line)
+        self.assertIn('| 50.0 (80/80) | 90.0 (80/80) | – | 45.0 (80/80) | +40.0 | – | -15.0 |', line)
         self.assertIn('GPU-hours', md)
 
 

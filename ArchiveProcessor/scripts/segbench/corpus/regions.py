@@ -233,11 +233,15 @@ def cmd_report(a):
             mine = [r for r in page_rows if r['route'] == route and r['arm'] == arm]
             for g in sorted({g for r in mine for g in r['groups'].split(';')}):
                 rr = [r for r in mine if g in r['groups'].split(';')]
-                rows.append({'group': g, 'route': route, 'arm': arm, **score_rows(rr, S)})
+                ids = {r['page'] for r in rr}
+                same = [r for r in page_rows if r['route'] == route and r['arm'] == 'whole' and r['page'] in ids
+                        and g in r['groups'].split(';')]
+                rows.append({'group': g, 'route': route, 'arm': arm, **score_rows(rr, S),
+                             'whole_nes_same': round(S.aggregate(same)['nes'], 4) if same else ''})
     gpu = gpu_hours(runs)
     a.out.mkdir(parents=True, exist_ok=True)
     S.write_csv(a.out / f'{a.name}.csv', rows, ['group', 'route', 'arm', 'n', 'ok', 'nes', 'nes_answered', 'chrf',
-                                                'order_edit', 'order_pages', 'crops', 'crops_failed'])
+                                                'order_edit', 'order_pages', 'crops', 'crops_failed', 'whole_nes_same'])
     S.write_csv(a.out / f'{a.name}-pages.csv', [{k: round(v, 6) if isinstance(v, float) else v for k, v in r.items()}
                                                 for r in page_rows],
                 ['set', 'groups', 'route', 'arm', 'page', 'ok', 'nes', 'chrf', 'words', 'missed', 'added', 'order_edit',
@@ -263,7 +267,7 @@ def tables(rows: list[dict], gpu: dict) -> str:
     reading-order edit (OmniDocBench's, over matched blocks; lower is better)."""
     by = {(r['group'], r['route'], r['arm']): r for r in rows}
     arms = ('whole', *C.ARMS)
-    out = ['NES % (pages answered / pages); a failed page scores 0. Δ is the arm against whole page, in points.',
+    out = ['NES % (pages answered / pages); a failed page scores 0. Δ is the arm against whole page on the same pages, in points.',
            'Order: mean reading-order edit over the pages with two or more matched truth blocks (lower is better);',
            'not scorable on the 96, whose truth is kept as one line with no paragraph breaks.', '']
     for g in [g for g in GROUP_ORDER if any(k[0] == g for k in by)]:
@@ -274,8 +278,8 @@ def tables(rows: list[dict], gpu: dict) -> str:
             if not any(rs):
                 continue
             cell = lambda r: '–' if r is None else f"{100 * r['nes']:.1f} ({r['ok']}/{r['n']})"
-            base = rs[0]
-            delta = lambda r: '–' if r is None or base is None else f"{100 * (r['nes'] - base['nes']):+.1f}"
+            delta = lambda r: '–' if r is None or r['whole_nes_same'] == '' else \
+                f"{100 * (r['nes'] - r['whole_nes_same']):+.1f}"
             order = ' / '.join('–' if r is None or r['order_edit'] == '' else f"{r['order_edit']:.2f}" for r in rs)
             out.append(f'| {route} | ' + ' | '.join(cell(r) for r in rs) + ' | ' +
                        ' | '.join(delta(r) for r in rs[1:]) + f' | {order} |')
