@@ -63,15 +63,30 @@ class Lattice(unittest.TestCase):
         s = E.sagitta(bent_grid(0.02), [0, 0.5], [1, 0.5], scale)
         self.assertAlmostEqual(s, 20, delta=0.5)  # 0.02 of 1000 px at the middle of the row
 
-    def test_line_curvature(self):
-        def words(ys):
-            return [{'quad': [[x, y - 0.02], [x + 0.05, y - 0.02], [x + 0.05, y], [x, y]]}
-                    for x, y in zip(np.linspace(0.1, 0.8, len(ys)), ys)]
+    def test_angle_residual(self):
+        def line(y, deg, x0=0.1, x1=0.8):
+            s = np.tan(np.radians(deg)) * (x1 - x0)
+            return {'quad': [[x0, y - 0.02], [x1, y - 0.02 + s], [x1, y + s], [x0, y]]}
         scale = (1000, 1000)
-        self.assertIsNone(E.line_curvature(words([0.5] * 3), scale))
-        self.assertLess(E.line_curvature(words(np.linspace(0.4, 0.6, 6)), scale), 1e-9)  # straight, though slanted
-        bowed = E.line_curvature(words([0.5, 0.51, 0.515, 0.515, 0.51, 0.5]), scale)
-        self.assertGreater(bowed, 0.1)
+        self.assertIsNone(E.angle_residual([line(0.5, 0)] * 4, scale))  # too few lines
+        self.assertIsNone(E.angle_residual([line(y, 0, 0.1, 0.2) for y in np.linspace(.1, .9, 8)], scale))  # narrow
+        smooth = [line(y, 0.5 + 2 * y) for y in np.linspace(.1, .9, 8)]  # perspective: angle grows down the page
+        self.assertLess(E.angle_residual(smooth, scale), 1e-3)
+        curled = [line(y, 3 * np.sin(np.pi * y)) for y in np.linspace(.1, .9, 8)]
+        self.assertGreater(E.angle_residual(curled, scale), 0.3)
+
+    def test_lattice_bend(self):
+        scale = (1000, 1000)
+        self.assertLess(E.lattice_bend(homography_grid(), scale), 1e-3)
+        self.assertAlmostEqual(E.lattice_bend(bent_grid(0.02), scale), 20, delta=0.5)
+
+    def test_truth_words_align(self):
+        def w(t, x):
+            return {'text': t, 'quad': [[x, 0.1], [x + 0.05, 0.1], [x + 0.05, 0.12], [x, 0.12]]}
+        lines = [{'words': [w('the', 0.0), w('neighbour', 0.1)]},  # a neighbouring page's words first
+                 {'words': [w('The', 0.3), w('cat', 0.4), w('sat', 0.5)]}]
+        c = E.truth_words(lines, ['the', 'cat', 'sat'])
+        np.testing.assert_allclose(c[:, 0], [0.325, 0.425, 0.525])  # the page's own 'The', not the neighbour's
 
 
 if __name__ == '__main__':

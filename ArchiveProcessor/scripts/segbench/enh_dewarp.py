@@ -3,6 +3,7 @@
 
   V=~/Library/Caches/ArchiveSuiteRehearsal/enh-dewarp/venv/bin/python
   $V enh_dewarp.py prepare      # Apple quads, then the arms' images and saved grids (quad, uvdoc, docres)
+  $V enh_dewarp.py extras       # hand crops, the app's encoder at three settings, dewarp-then-quarter on the ladder
   $V enh_dewarp.py vision       # Apple Vision lines and word boxes on raw and on every arm
   $V enh_dewarp.py report       # segbench-results/enh-dewarp.md and enh-dewarp-pages.csv
 
@@ -125,19 +126,39 @@ def sagitta(grid, p0, p1, scale, n=50):
     return float(np.abs(d[0] * (pts[:, 1] - a[1]) - d[1] * (pts[:, 0] - a[0])).max() / L)
 
 
-def line_curvature(words, scale):
-    """RMS distance of a line's word bottom centres from their total-least-squares line, in median word heights.
-    None below four words."""
-    if len(words) < 4:
+def angle_residual(lines, scale, min_width=0.25, min_lines=5):
+    """Vision's reference-free bend signal. Vision's word boxes are cut from their line's quad (every word bottom
+    lies on the line's bottom edge, measured), so no line shows a curve of its own; what a curl changes is the
+    angle of whole lines across the page. Fit each wide line's baseline angle as a + b x + c y (a camera's tilt
+    or perspective varies that smoothly) and return the RMS residual in degrees; None with too few wide lines."""
+    pts = []
+    for l in lines:
+        q = np.float64(l['quad']) * scale
+        d = q[2] - q[3]
+        if np.hypot(*d) < min_width * scale[0]:
+            continue
+        c = q.mean(0) / scale
+        pts.append((c[0], c[1], np.degrees(np.arctan2(d[1], d[0]))))
+    if len(pts) < min_lines:
         return None
-    q = np.float64([w['quad'] for w in words]) * scale  # (n, 4 corners TL TR BR BL, 2)
-    bottom = (q[:, 2] + q[:, 3]) / 2
-    height = np.median(np.linalg.norm((q[:, 3] + q[:, 2]) / 2 - (q[:, 0] + q[:, 1]) / 2, axis=1))
-    if height <= 0:
-        return None
-    c = bottom - bottom.mean(0)
-    normal = np.linalg.svd(c, full_matrices=False)[2][-1]
-    return float(np.sqrt(((c @ normal) ** 2).mean()) / height)
+    a = np.array(pts)
+    X = np.column_stack([np.ones(len(a)), a[:, 0], a[:, 1]])
+    coef = np.linalg.lstsq(X, a[:, 2], rcond=None)[0]
+    return float(np.sqrt(((a[:, 2] - X @ coef) ** 2).mean()))
+
+
+def lattice_bend(grid, scale):
+    """The dewarper's own bend estimate: the median, over the lattice's rows, of each row's sagitta in pixels at
+    `scale`. A homography leaves rows straight, so this is the non-projective part of the map."""
+    out = []
+    for row in grid:
+        pts = row * scale
+        a, b = pts[0], pts[-1]
+        d = b - a
+        L = np.hypot(*d)
+        if L:
+            out.append(np.abs(d[0] * (pts[:, 1] - a[1]) - d[1] * (pts[:, 0] - a[0])).max() / L)
+    return float(np.median(out)) if out else 0.
 
 
 # ---------- runs ----------
@@ -155,7 +176,11 @@ def raw_image(page):
 
 
 def arm_image(arm, page):
-    return raw_image(page) if arm == 'raw' else CACHE / 'images' / arm / (page + '.jpg')
+    if arm == 'raw':
+        return raw_image(page)
+    if arm == 'quarter':
+        return P.CACHE / 'images' / (page + '-quarter.jpg')
+    return CACHE / 'images' / arm / (page + '.jpg')
 
 
 def swift(mode, rows):
@@ -203,9 +228,67 @@ def prepare():
         print(p, 'done', flush=True)
 
 
+# L test 4: the six typed originals with the lowest median NES over the 29 saved routes (ocr-pages.csv), cropped
+# to the page by eye (Claude Opus 5.5 looking at each at 900 px with a 10% grid, 2026-10-22), as normalised
+# x0, y0, x1, y1. p024 and p001 fill the frame edge to edge, so they have no crop: scope is not their loss.
+HAND = {
+    'p013': (0.0, 0.0, 1.0, 0.985),     # wood below the page's foot
+    'p100': (0.045, 0.0, 1.0, 1.0),     # the binding strip at the left
+    'p066': (0.0, 0.03, 0.955, 1.0),    # the tabbed pages and a neighbour's heading at the right
+    'p069': (0.0, 0.03, 0.975, 0.955),  # a sticky note above, the archive's copyright slip below
+    'p024': None, 'p001': None,
+}
+# L test 5: the app's encoder (ImageEncoding.loadImageAsJPEG, copied into segbench-dewarp) at the app's settings,
+# at the bench's size and quality, and at the segmentation window's 1,600 px.
+ENCODINGS = {'enc-2048-q85': (2048, 0.85), 'enc-2400-q90': (2400, 0.90), 'enc-1600-q90': (1600, 0.90)}
+LADDER_ARMS = ('quad-quarter', 'uvdoc-quarter')  # D test 6: dewarp the full image, then make the quarter rung
+
+
+def ladder_pages():
+    return sorted(set(json.loads((P.TRUTH / 'ladder.json').read_text())) - P.AGREEMENT)
+
+
+def extra_jobs():
+    """(arm, page) for every image the extras add."""
+    return ([('hand', p) for p, box in HAND.items() if box] + [(a, p) for a in ENCODINGS for p in pages()]
+            + [(a, p) for a in LADDER_ARMS for p in ladder_pages()] + [('quarter', p) for p in ladder_pages()])
+
+
+def quarter(img):
+    """ocr_truth.py's quarter rung (LANCZOS to a quarter, JPEG 92), as an array the panel's freezing then takes."""
+    import io
+    from PIL import Image
+    im = Image.fromarray(img)
+    buf = io.BytesIO()
+    im.resize((im.width // 4, im.height // 4), Image.LANCZOS).save(buf, 'JPEG', quality=92)
+    return np.asarray(Image.open(buf).convert('RGB'))
+
+
+def prepare_extras():
+    import dewarp_arms as A
+    from PIL import Image
+    swift('encode', [(source(p), arm_image(a, p), cap, q) for a, (cap, q) in ENCODINGS.items() for p in pages()])
+    for p, box in HAND.items():
+        if box and not arm_image('hand', p).exists():
+            with Image.open(source(p)) as im:
+                w, h = im.size
+                img = np.asarray(im.convert('RGB').crop((round(box[0] * w), round(box[1] * h),
+                                                         round(box[2] * w), round(box[3] * h))))
+            freeze(img, arm_image('hand', p))
+    for p in ladder_pages():
+        if all(arm_image(a, p).exists() for a in LADDER_ARMS):
+            continue
+        with Image.open(source(p)) as im:
+            img = np.asarray(im.convert('RGB'))
+        quad = json.loads((CACHE / 'quad' / (p + '.json')).read_text())
+        freeze(quarter(A.quad_arm(img, quad)[0]), arm_image('quad-quarter', p))
+        freeze(quarter(A.uvdoc_after_quad(img, quad, SRC)[0]), arm_image('uvdoc-quarter', p))
+
+
 def vision():
     rows = [(arm_image(a, p), CACHE / 'lines' / a / (p + '.json')) for a in ('raw', *ARMS) for p in pages()]
-    swift('lines', rows)
+    rows += [(arm_image(a, p), CACHE / 'lines' / a / (p + '.json')) for a, p in extra_jobs()]
+    swift('lines', [r for r in rows if r[0].exists()])
 
 
 def load_lines(arm, page):
@@ -213,20 +296,21 @@ def load_lines(arm, page):
     return d, '\n'.join(l['text'] for l in d['lines'])
 
 
-def edge_loss(grid, raw_lines, truth_counts):
+def truth_words(raw_lines, truth_tokens):
+    """Centres of the raw reading's words that align to the truth's word sequence (difflib's matching blocks),
+    so a neighbouring page's 'the' is not taken for one of the page's own."""
+    import difflib
     import ocr_panel_score as S
-    left = collections.Counter(truth_counts)
-    poly = frame(grid)
-    centres = []
-    for line in raw_lines:
-        for w in line['words']:
-            t = S.tokens(w['text'])
-            if len(t) == 1 and left[t[0]] > 0:
-                left[t[0]] -= 1
-                centres.append(np.float64(w['quad']).mean(0))
-    if not centres:
-        return 0, 0
-    return int((~inside(poly, np.array(centres))).sum()), len(centres)
+    words = [(t[0], np.float64(w['quad']).mean(0)) for line in raw_lines for w in line['words']
+             if len(t := S.tokens(w['text'])) == 1]
+    sm = difflib.SequenceMatcher(None, [t for t, _ in words], truth_tokens, autojunk=False)
+    return np.array([words[b.a + k][1] for b in sm.get_matching_blocks() for k in range(b.size)]).reshape(-1, 2)
+
+
+def edge_loss(grid, centres):
+    if not len(centres):
+        return 0
+    return int((~inside(frame(grid), centres)).sum())
 
 
 def round_trip(grid, arm_lines, raw_lines, scale_src, scale_out):
@@ -234,7 +318,7 @@ def round_trip(grid, arm_lines, raw_lines, scale_src, scale_out):
     lines = sorted((l for l in arm_lines if len(l['text']) >= 10), key=lambda l: -len(l['text']))[:MAX_LINES]
     out = []
     for l in lines:
-        q = np.float64(l['quad'])
+        q = np.clip(np.float64(l['quad']), 0, 1)  # Vision's quads can overhang the image by a hair
         back = grid_eval(grid, q)
         uv, _ = invert(grid, back)
         row = {'inversion': float(np.linalg.norm((uv - q) * scale_out, axis=1).max()),
@@ -261,23 +345,24 @@ def measure():
         if p in P.AGREEMENT:
             continue
         truth = (P.TRUTH / 'truth' / (p + '.txt')).read_text()
-        truth_counts = collections.Counter(S.tokens(S.normal(truth)))
         raw, raw_text = load_lines('raw', p)
         cached = (P.CACHE / 'vision' / (p + '-original.txt')).read_text()
         if raw_text != cached:
             raise SystemExit(f'{p}: segbench-dewarp lines differs from the panel\'s saved Vision text')
         scale = (raw['width'], raw['height'])
-        curv = [c for l in raw['lines'] if (c := line_curvature(l['words'], scale)) is not None]
+        centres = truth_words(raw['lines'], S.tokens(S.normal(truth)))
+        bend = angle_residual(raw['lines'], scale)
         base = {'page': p, 'source': 'original' if r['source'] == 'original' else 'pdf image', 'kind': r['kind'],
-                'curvature': statistics.median(curv) if curv else '', 'curved_lines': len(curv),
+                'angle_residual': '' if bend is None else bend,
+                'uvdoc_bend': lattice_bend(np.load(CACHE / 'grids/uvdoc' / (p + '.npz'))['grid'], scale),
                 **{t: tags[p][t] for t in ('curl', 'perspective', 'edge_cut', 'neighbour')}}
-        rows.append({**base, 'arm': 'raw', **S.score(truth, raw_text), 'edge_lost': 0, 'edge_words': ''})
+        rows.append({**base, 'arm': 'raw', **S.score(truth, raw_text), 'edge_lost': 0, 'edge_words': len(centres)})
         for arm in ARMS:
             d, text = load_lines(arm, p)
             z = np.load(CACHE / 'grids' / arm / (p + '.npz'))
             g = z['grid']
-            lost, seen = edge_loss(g, raw['lines'], truth_counts)
-            row = {**base, 'arm': arm, **S.score(truth, text), 'edge_lost': lost, 'edge_words': seen,
+            row = {**base, 'arm': arm, **S.score(truth, text), 'edge_lost': edge_loss(g, centres),
+                   'edge_words': len(centres),
                    'found': bool(z['found']) if 'found' in z else '', 'mask': float(z['mask']) if 'mask' in z else '',
                    'foldovers': foldovers(g)}
             rt = round_trip(g, d['lines'], raw['lines'], scale, (d['width'], d['height']))
@@ -288,13 +373,51 @@ def measure():
     return rows, trips
 
 
-FIELDS = ['page', 'arm', 'source', 'kind', 'nes', 'words', 'hyp_words', 'missed', 'added', 'edge_lost', 'edge_words',
-          'found', 'mask', 'foldovers', 'sagitta_max', 'curvature', 'curved_lines', 'curl', 'perspective', 'edge_cut',
-          'neighbour']
+FIELDS = ['page', 'arm', 'source', 'kind', 'nes', 'chrf', 'words', 'hyp_words', 'missed', 'added', 'edge_lost', 'edge_words',
+          'found', 'mask', 'foldovers', 'sagitta_max', 'angle_residual', 'uvdoc_bend', 'curl', 'perspective',
+          'edge_cut', 'neighbour']
+
+
+def arm_table(by, groups, arms, base, edge=False):
+    import ocr_panel_score as S
+
+    def delta(key, arm, ps):
+        t = S.paired([by[arm, p][key] for p in ps], [by[base, p][key] for p in ps])
+        return f"{100 * t['delta']:+.1f} ({100 * t['lo']:+.1f} to {100 * t['hi']:+.1f}, p {t['p']:.3f})"
+    L = [f'| pages | n | arm | NES % | Δ NES vs {base} | chrF2 % | Δ chrF2 | words added % | words missed % |'
+         + (' edge-lost truth words (pages) |' if edge else ''),
+         '|---|---:|---|---:|---|---:|---|---:|---:|' + ('---:|' if edge else '')]
+    for name, ps in groups.items():
+        if not ps:
+            continue
+        for arm in arms:
+            rr = [by[arm, p] for p in ps]
+            hyp = sum(r['hyp_words'] for r in rr) or 1
+            words = sum(r['words'] for r in rr) or 1
+            d_nes, d_chrf = ('—', '—') if arm == base else (delta('nes', arm, ps), delta('chrf', arm, ps))
+            row = (f"| {name} | {len(ps)} | {arm} | {100 * statistics.mean(r['nes'] for r in rr):.1f} | {d_nes} | "
+                   f"{100 * statistics.mean(r['chrf'] for r in rr):.1f} | {d_chrf} | "
+                   f"{100 * sum(r['added'] for r in rr) / hyp:.1f} | {100 * sum(r['missed'] for r in rr) / words:.1f} |")
+            if edge:
+                row += f" {sum(r['edge_lost'] for r in rr)} ({sum(r['edge_lost'] > 0 for r in rr)}) |"
+            L.append(row)
+    return L
+
+
+def extra_rows():
+    """Scores for the extras' images (text only, no lattice)."""
+    import ocr_panel_score as S
+    out = []
+    for arm, p in extra_jobs():
+        f = CACHE / 'lines' / arm / (p + '.json')
+        if not f.exists():
+            continue
+        truth = (P.TRUTH / 'truth' / (p + '.txt')).read_text()
+        out.append({'page': p, 'arm': arm, **S.score(truth, load_lines(arm, p)[1])})
+    return out
 
 
 def report():
-    import ocr_panel_score as S
     from scipy.stats import spearmanr
     rows, trips = measure()
     with PAGES.open('w') as f:
@@ -312,24 +435,10 @@ def report():
          'Generated by `scripts/segbench/enh_dewarp.py report`; the method is in its docstring and in '
          '`dewarp_arms.py`. Reader: Apple Vision with the app\'s settings. Page-level numbers: `enh-dewarp-pages.csv`.', '',
          '## NES and words, each arm against raw', '',
-         '| pages | n | arm | NES % | Δ NES vs raw (95% CI, p) | words added % | words missed % | edge-lost truth words (pages) |',
-         '|---|---:|---|---:|---|---:|---:|---:|']
-    for name, ps in {**groups, **tag_groups}.items():
-        if not ps:
-            continue
-        for arm in ('raw', *ARMS):
-            rr = [by[arm, p] for p in ps]
-            nes = 100 * statistics.mean(r['nes'] for r in rr)
-            hyp = sum(r['hyp_words'] for r in rr) or 1
-            words = sum(r['words'] for r in rr) or 1
-            if arm == 'raw':
-                delta = '—'
-            else:
-                t = S.paired([by[arm, p]['nes'] for p in ps], [by['raw', p]['nes'] for p in ps])
-                delta = f"{100 * t['delta']:+.1f} ({100 * t['lo']:+.1f} to {100 * t['hi']:+.1f}, p {t['p']:.3f})"
-            lost = sum(r['edge_lost'] for r in rr)
-            L.append(f"| {name} | {len(ps)} | {arm} | {nes:.1f} | {delta} | {100 * sum(r['added'] for r in rr) / hyp:.1f} | "
-                     f"{100 * sum(r['missed'] for r in rr) / words:.1f} | {lost} ({sum(r['edge_lost'] > 0 for r in rr)}) |")
+         'NES follows reading order, so a page whose lines Vision orders differently on a near-identical image can '
+         'swing by tens of points (p008, a flat PDF image the quad leaves whole, is one); chrF and the word rates '
+         'do not depend on order. Δ is paired by page: the mean, a 95% bootstrap interval and a permutation p.', '']
+    L += arm_table(by, {**groups, **tag_groups}, ('raw', *ARMS), 'raw', edge=True)
     found = sum(by['quad', p]['found'] for p in ids)
     L += ['', f'Apple\'s quad was found on {found} of {len(ids)} pages; where it was not, the quad arm is the raw image '
           'and UVDoc reads the raw image.', '',
@@ -355,30 +464,64 @@ def report():
                      f"{100 * sum(t['sagitta'] > t['height'] / 4 for t in tt) / len(tt):.0f}% | "
                      f"{sum(fold)} ({sum(f > 0 for f in fold)}) |")
     L += ['', '## The curvature trigger', '',
-          'Per page, the raw image\'s line curvature (median RMS distance of word bottoms from a straight line, in '
-          'word heights) against each arm\'s NES gain over raw, on the originals with at least three measurable lines.', '',
-          '| arm | pages | Spearman ρ (p) | mean gain, curvature above median | mean gain, at or below |',
-          '|---|---:|---|---:|---:|']
-    cp = [p for p in groups['originals'] if by['raw', p]['curved_lines'] >= 3]
-    if cp:
-        med = statistics.median(by['raw', p]['curvature'] for p in cp)
+          'Vision gives no curvature inside a line: its word boxes are cut from the line\'s quad (every word\'s bottom '
+          'centre lies within 1 px of its line\'s bottom edge on the raw images). Two signals stand in, each against '
+          'each arm\'s NES gain over raw on the originals: the RMS residual, in degrees, of wide lines\' baseline '
+          'angles after a fit linear in the line\'s position (what perspective alone produces), and UVDoc\'s own '
+          'bend, the median sagitta of its lattice\'s rows in pixels of the 2400 px image.', '',
+          '| signal | arm | pages | Spearman ρ (p) | mean gain, signal above median | mean gain, at or below |',
+          '|---|---|---:|---|---:|---:|']
+    for sig, unit in (('angle_residual', '°'), ('uvdoc_bend', ' px')):
+        cp = [p for p in groups['originals'] if by['raw', p][sig] != '']
+        if len(cp) < 5:
+            continue
+        x = [by['raw', p][sig] for p in cp]
+        med = statistics.median(x)
         for arm in ARMS:
             gain = [by[arm, p]['nes'] - by['raw', p]['nes'] for p in cp]
-            curv = [by['raw', p]['curvature'] for p in cp]
-            rho, pv = spearmanr(curv, gain)
-            hi = [g for g, c in zip(gain, curv) if c > med]
-            lo = [g for g, c in zip(gain, curv) if c <= med]
-            L.append(f'| {arm} | {len(cp)} | {rho:+.2f} ({pv:.3f}) | {100 * statistics.mean(hi):+.1f} | {100 * statistics.mean(lo):+.1f} |')
-        L.append(f'\nMedian curvature {med:.3f} word heights.')
+            rho, pv = spearmanr(x, gain)
+            hi = [g for g, c in zip(gain, x) if c > med]
+            lo = [g for g, c in zip(gain, x) if c <= med]
+            L.append(f'| {sig} (median {med:.2f}{unit}) | {arm} | {len(cp)} | {rho:+.2f} ({pv:.3f}) | '
+                     f'{100 * statistics.mean(hi):+.1f} | {100 * statistics.mean(lo):+.1f} |')
+    ex = extra_rows()
+    for r in ex:
+        by[r['arm'], r['page']] = r
+    with PAGES.open('a') as f:
+        w = csv.DictWriter(f, FIELDS, extrasaction='ignore', lineterminator='\n')
+        for r in ex:
+            w.writerow({k: (round(v, 6) if isinstance(v, float) else v) for k, v in r.items()})
+    hand = [p for p, box in HAND.items() if box and ('hand', p) in by]
+    if hand:
+        L += ['', '## Hand crops of the six worst typed originals', '',
+              'The page cropped by eye (`HAND` in the script) against raw and the two automatic crops. '
+              + ', '.join(p for p, box in HAND.items() if not box) + ' fill the frame and have no crop.', '']
+        L += arm_table(by, {'hand-cropped': hand}, ('raw', 'quad', 'uvdoc', 'hand'), 'raw')
+        L += ['', '| page | raw NES | quad | uvdoc | hand |', '|---|---:|---:|---:|---:|']
+        L += [f"| {p} | " + ' | '.join(f"{100 * by[a, p]['nes']:.1f}" for a in ('raw', 'quad', 'uvdoc', 'hand')) + ' |'
+              for p in hand]
+    if all((a, p) in by for a in ENCODINGS for p in ids):
+        L += ['', "## The app's encoding", '',
+              "Each through the app's own encoder (ImageEncoding.loadImageAsJPEG, copied into segbench-dewarp): the "
+              "app's 2048 px at quality 0.85, the bench's 2400 at 0.90 and the segmentation window's 1,600 at 0.90, "
+              "against raw, the panel's Pillow 2400 px JPEG 90.", '']
+        L += arm_table(by, groups, ('raw', *ENCODINGS), 'raw')
+    lad = [p for p in ladder_pages() if all((a, p) in by for a in ('quarter', *LADDER_ARMS))]
+    if lad:
+        L += ['', '## Dewarp before downscaling, the ladder pages', '',
+              'The quarter rung made from the quad crop or the UVDoc image of the full photograph, against the '
+              "panel's quarter rung of the raw photograph (both LANCZOS to a quarter, JPEG 92, then the panel's "
+              'freezing); the original size for reference.', '']
+        L += arm_table(by, {'ladder': lad}, ('quarter', *LADDER_ARMS, 'raw'), 'quarter')
     REPORT.write_text('\n'.join(L) + '\n')
     print(REPORT)
 
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument('cmd', choices=['prepare', 'vision', 'report'])
+    ap.add_argument('cmd', choices=['prepare', 'extras', 'vision', 'report'])
     a = ap.parse_args()
-    {'prepare': prepare, 'vision': vision, 'report': report}[a.cmd]()
+    {'prepare': prepare, 'extras': prepare_extras, 'vision': vision, 'report': report}[a.cmd]()
 
 
 if __name__ == '__main__':
