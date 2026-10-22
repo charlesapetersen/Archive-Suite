@@ -222,6 +222,7 @@ final class RootMarkerDisclosureTests: XCTestCase {
         XCTAssertEqual(model.selectionDisplayCalendar, .julian)
         let relaunched = NavigationModel(defaults: modelDefaults)
         XCTAssertEqual(relaunched.rootStore.preferenceGUID, preferenceID)
+        relaunched.recompute()   // only listed rows can be selected (W40.fix-reader-phantom-selection)
         relaunched.selection = Set(relaunched.library.files.map(\.id))
         XCTAssertEqual(relaunched.selectionDisplayCalendar, .julian)
         XCTAssertEqual(DocumentImageSourcePreferences(defaults: modelDefaults)

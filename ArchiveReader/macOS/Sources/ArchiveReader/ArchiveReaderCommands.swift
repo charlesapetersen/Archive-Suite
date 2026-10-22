@@ -24,7 +24,7 @@ struct ArchiveReaderCommands: Commands {
     @AppStorage("ar.showSidebar") private var showingSidebar = true
     @AppStorage("ar.showTagCloud") private var showingTagCloud = false
 
-    private var noSelection: Bool { nav?.selection.isEmpty ?? true }
+    private var noSelection: Bool { nav?.selectedFiles.isEmpty ?? true }
     /// No viewer, or a viewer with no find bar (the preview sheet) — see the Find items below.
     private var noFind: Bool { !(doc?.supportsFind ?? false) }
 

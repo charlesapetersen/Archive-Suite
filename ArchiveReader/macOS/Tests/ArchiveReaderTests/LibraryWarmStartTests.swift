@@ -223,6 +223,7 @@ final class LibraryWarmStartTests: XCTestCase {
         // Finder changed the formerly cached row while Reader was closed. It is no longer a Reader
         // member, so the stale selection must not add a Read tag and resurrect it into the archive.
         try setTags([], on: staleURL)
+        model.recompute()   // only listed rows can be selected (W40.fix-reader-phantom-selection)
         model.selection = [staleURL, validURL]
         XCTAssertEqual(model.selectedFiles.count, 2, "precondition: the mixed selection is active")
 
@@ -325,6 +326,7 @@ final class LibraryWarmStartTests: XCTestCase {
             url: diskRow.url, name: diskRow.name, fileType: diskRow.fileType, tags: diskRow.tags,
             contentModified: diskRow.contentModified, provenance: .cache(asOf: Date())
         )])
+        model.recompute()   // only listed rows can be selected (W40.fix-reader-phantom-selection)
         model.selection = [diskRow.url]
         XCTAssertEqual(model.selectedFiles.count, 1, "precondition: the cached row is selected")
 

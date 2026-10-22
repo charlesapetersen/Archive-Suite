@@ -52,10 +52,17 @@ extension XCTestCase {
     ///
     /// Replaces the `navModel(root:)` helper that three test classes had each written for themselves,
     /// every copy against `.standard`.
+    ///
+    /// The list is brought in step with the library before it is handed back: `displayed` follows
+    /// `library.files` one main-queue hop later, and only displayed rows can be selected or acted on
+    /// (`W40.fix-reader-phantom-selection`), so a test selecting straight after init would otherwise
+    /// select nothing. The window never sees that gap — nobody can click a row before it is drawn.
     @MainActor
     func fixtureNavigationModel(pinnedTo root: URL,
                                 _ testName: String = #function,
                                 file: StaticString = #filePath, line: UInt = #line) -> NavigationModel {
-        NavigationModel(defaults: fixtureDefaults(pinnedTo: root, testName, file: file, line: line))
+        let model = NavigationModel(defaults: fixtureDefaults(pinnedTo: root, testName, file: file, line: line))
+        model.recompute()
+        return model
     }
 }

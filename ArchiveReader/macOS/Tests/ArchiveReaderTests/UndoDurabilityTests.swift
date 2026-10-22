@@ -42,6 +42,7 @@ final class UndoDurabilityTests: XCTestCase {
     }
 
     private func select(_ urls: [URL], in model: NavigationModel) throws {
+        model.recompute()   // only listed rows can be selected (W40.fix-reader-phantom-selection)
         let ids = Set(model.library.files.filter { f in urls.contains { $0.path == f.url.path } }.map(\.id))
         XCTAssertEqual(ids.count, urls.count, "precondition: discovery lists every fixture file")
         model.selection = ids

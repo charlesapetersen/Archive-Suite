@@ -62,7 +62,12 @@ final class NavigationModel: ObservableObject {
     @Published private(set) var baseFtsPaths: Set<String>?
     private var baseFtsGeneration = 0
     // Sheet/dialog presentation lives on the model so menu commands can trigger it too.
-    @Published var showingEditor = false
+    /// While the tag editor is open its targets hold still: an edit that moves them out of the filter
+    /// ("Remove X" under a tag-X filter) would otherwise prune them and leave the open sheet acting on
+    /// nothing. They were visible when it opened (pruned here first), and are pruned again on close.
+    @Published var showingEditor = false {
+        didSet { if showingEditor != oldValue { pruneSelectionToDisplayed(); refreshSelectionCache() } }
+    }
     @Published var showingPreview = false
     @Published var showingSaveDialog = false
     @Published var renamingSearch: SavedSearch?     // non-nil while renaming a smart folder
@@ -417,10 +422,13 @@ final class NavigationModel: ObservableObject {
             // pollute it). The selection itself is the epoch — no separate generation counter needed.
             guard self.selection == snapshot else { return }
             let classifications = paths.map { cls[$0] }
+            // Runs are found over the whole library (a filter must not split one), but only the members
+            // the list shows join the selection (`W40.fix-reader-phantom-selection`).
+            let visible = Set(self.displayed.map(\.id))
             var newSel = snapshot
             for (i, p) in paths.enumerated() where selected.contains(p) {
                 if let range = DocumentRuns.runContaining(i, classifications: classifications) {
-                    for j in range { newSel.insert(files[j].id) }
+                    for j in range where visible.contains(files[j].id) { newSel.insert(files[j].id) }
                 }
             }
             if newSel != self.selection {
@@ -498,12 +506,14 @@ final class NavigationModel: ObservableObject {
 
     private var didRestoreSelection = false
     private func restoreSelectionIfNeeded() {
-        guard !didRestoreSelection, !library.files.isEmpty else { return }
+        // On the list, not the library: a restored filter may still be hiding every row (a "needs
+        // attention" filter before format statuses arrive), and the resume should wait for it.
+        guard !didRestoreSelection, !displayed.isEmpty else { return }
         didRestoreSelection = true
         let saved = Set((defaults.stringArray(forKey: Self.selectionKey) ?? [])
             .compactMap(URL.init(string:)))
         guard !saved.isEmpty else { return }
-        let present = Set(library.files.map(\.id)).intersection(saved)
+        let present = Set(displayed.map(\.id)).intersection(saved)   // a restored filter may hide some
         if !present.isEmpty { selection = present }
     }
     private func persistSelection() {
@@ -547,6 +557,7 @@ final class NavigationModel: ObservableObject {
         displayedGeneration += 1
         _tagCloudCache = nil
         duplicatedNames = DuplicateNames.duplicatedNames(in: displayed)   // O(n) filename-collision set
+        if !showingEditor { pruneSelectionToDisplayed() }
         refreshSelectionCache()   // sort order affects the selection cache too
         persistViewState()        // C2: remember filter + sort across launches
     }
@@ -706,8 +717,10 @@ final class NavigationModel: ObservableObject {
         }
     }
 
-    /// Selected files resolved against the WHOLE library (not just filtered `displayed` rows), in sort
-    /// order — so a run/filtered selection still opens/copies/marks every member. Cached (recomputed on
+    /// Selected files resolved against the DISPLAYED rows only, in sort order — every selection-wide
+    /// action (Edit Tags, Mark Read, Open, Copy Links, Flag) acts on this, so none can reach a file the
+    /// list does not show. It once resolved against the whole library, which let a filtered-away
+    /// selection be tagged unseen (`W40.fix-reader-phantom-selection`). Cached (recomputed on
     /// selection / sort / library change) to avoid an O(N) scan + sort on every SwiftUI render.
     var selectedFiles: [ArchiveFile] { selectedFilesCache }
 
@@ -727,7 +740,20 @@ final class NavigationModel: ObservableObject {
 
     private func refreshSelectionCache() {
         let sel = selection
-        selectedFilesCache = LibrarySort.sorted(library.files.filter { sel.contains($0.id) }, by: sort)
+        // The open tag editor resolves its (already-pruned) targets against the library — see
+        // `showingEditor`; everything else only against the rows the list shows.
+        let base = showingEditor ? library.files : displayed
+        selectedFilesCache = sel.isEmpty ? [] : LibrarySort.sorted(base.filter { sel.contains($0.id) }, by: sort)
+    }
+
+    /// A row the filter hid leaves the selection, as it leaves the table's highlight; kept, it was
+    /// counted in the status bar and came back selected when the filter cleared
+    /// (`W40.fix-reader-phantom-selection`). Losing a selection to a narrowing filter is the price,
+    /// as in Finder.
+    private func pruneSelectionToDisplayed() {
+        guard !selection.isEmpty else { return }
+        let visible = Set(displayed.map(\.id))
+        if !selection.isSubset(of: visible) { selection.formIntersection(visible) }
     }
     private func refreshSubjectsCache() {
         allSubjectsCache = Array(Set(library.files.flatMap(\.subjects)))

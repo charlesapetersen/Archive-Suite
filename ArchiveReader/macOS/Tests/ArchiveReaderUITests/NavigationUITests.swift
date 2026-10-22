@@ -371,6 +371,82 @@ final class NavigationUITests: FixtureUITestCase {
         captureScreenshot("w40-audit-ledger-undo-verified")
     }
 
+    // MARK: - Phantom selection (W40.fix-reader-phantom-selection)
+
+    /// The selection is never wider than the list. Select a row, filter it away: the status bar must
+    /// stop counting it, Mark Read (toolbar and ⌘R) must not reach it, and clearing the filter must not
+    /// bring it back selected. Then, with two rows selected, opening and closing the tag cloud must
+    /// leave the table highlighting exactly what the status bar counts — the tour's "2 selected",
+    /// nothing highlighted. Writes nothing when the fix holds; reads the tags back to prove it.
+    func testAFilteredAwaySelectionIsNotCountedOrActedOn() throws {
+        try requireGeneratedScratchFixtureForTagWrites()
+        let name = "00002 IMG — Brown.pdf"
+        let path = URL(fileURLWithPath: Self.fixturePath).appendingPathComponent(name).path
+        // A fresh URL per read: a reused one caches its resource values and would never see a write.
+        func tagsOnDisk() -> [String] {
+            ((try? URL(fileURLWithPath: path).resourceValues(forKeys: [.tagNamesKey]))?.tagNames ?? []).sorted()
+        }
+        let selectedCount = app.staticTexts["ar.status.selectedCount"]
+        let highlighted = table.tableRows.matching(NSPredicate(format: "isSelected == true"))
+
+        typeInField("ar.filter.name", text: "00002")
+        XCTAssertTrue(waitForRowCount(1), "name filter should isolate the scratch document")
+        clickRow(0)
+        XCTAssertTrue(selectedCount.waitForExistence(timeout: 5), "one visible row selected is counted")
+        XCTAssertEqual(shownText(selectedCount), "1 selected")
+        let before = tagsOnDisk()
+
+        // Filter the selected row away.
+        let nameField = app.textFields["ar.filter.name"]
+        nameField.click()
+        pressKey("a", modifiers: .command)
+        nameField.typeText("matches-no-fixture-file")
+        XCTAssertTrue(waitForRowCount(0), "the filter should hide every row")
+        XCTAssertTrue(waitForDisappearance(selectedCount, timeout: 5),
+                      "a row the list does not show is not counted as selected")
+        XCTAssertFalse(toolbarButton("ar.toolbar.markRead").isEnabled, "Mark Read has nothing visible to act on")
+        app.activate()
+        pressKey("r", modifiers: .command)   // Selection ▸ Mark Read, in case the toolbar lies
+        RunLoop.current.run(until: Date().addingTimeInterval(2))
+        XCTAssertEqual(tagsOnDisk(), before, "no tag may be written to a file the list does not show")
+        captureScreenshot("w40-phantom-selection-filtered-away")
+
+        // Clear the filter: the row comes back, but not selected.
+        nameField.click()
+        pressKey("a", modifiers: .command)
+        nameField.typeText(XCUIKeyboardKey.delete.rawValue)
+        waitForRows(minimum: 2, timeout: 5)
+        XCTAssertGreaterThanOrEqual(rowCount, 2, "clearing the name filter should restore the fixture list")
+        XCTAssertEqual(highlighted.count, 0, "the hidden selection does not come back with the row")
+        XCTAssertFalse(selectedCount.exists, "and nothing is counted")
+
+        // Two rows selected, then the tag cloud opened and closed (the tour's path to the phantom).
+        clickRow(0)
+        XCUIElement.perform(withKeyModifiers: .shift) { self.table.tableRows.element(boundBy: 1).click() }
+        XCTAssertTrue(selectedCount.waitForExistence(timeout: 5))
+        XCTAssertEqual(shownText(selectedCount), "2 selected", "precondition: a click and a Shift-click select two rows")
+        let tagCloud = toolbarButton("ar.toolbar.tagCloud")
+        tagCloud.click()
+        RunLoop.current.run(until: Date().addingTimeInterval(1))
+        tagCloud.click()
+        RunLoop.current.run(until: Date().addingTimeInterval(1))
+        let counted = selectedCount.exists ? shownText(selectedCount) : "0 selected"
+        XCTAssertEqual(counted, "\(highlighted.count) selected",
+                       "after the tag cloud opens and closes, the table highlights what the status bar counts")
+        captureScreenshot("w40-phantom-selection-after-tag-cloud")
+    }
+
+    /// A SwiftUI `Text` reports its string as the element's value; its label is empty.
+    private func shownText(_ element: XCUIElement) -> String {
+        (element.value as? String).flatMap { $0.isEmpty ? nil : $0 } ?? element.label
+    }
+
+    private func waitForDisappearance(_ element: XCUIElement, timeout: TimeInterval) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        while element.exists, Date() < deadline { RunLoop.current.run(until: Date().addingTimeInterval(0.25)) }
+        return !element.exists
+    }
+
     private func waitForTags(on filename: String,
                              containing required: [String],
                              excluding forbidden: [String] = [],

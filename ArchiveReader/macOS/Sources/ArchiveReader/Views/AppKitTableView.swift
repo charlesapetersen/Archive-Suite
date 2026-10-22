@@ -174,6 +174,7 @@ struct AppKitTableView: NSViewRepresentable {
 
         // Only rebuild the O(N) lookup dictionary + diff the snapshot when `displayed` actually changed.
         let gen = model.displayedGeneration
+        var rowsChanged = false
         if coordinator.lastDisplayedGeneration != gen {
             coordinator.lastDisplayedGeneration = gen
             coordinator.displayedByID = Dictionary(uniqueKeysWithValues: model.displayed.map { ($0.id, $0) })
@@ -182,6 +183,7 @@ struct AppKitTableView: NSViewRepresentable {
             let idsChanged = newIDs != coordinator.currentSnapshotIDs
             if idsChanged {
                 coordinator.applySnapshot(newIDs, animated: false)
+                rowsChanged = true
             } else {
                 // IDs unchanged but values may have changed (tag edit, flag toggle) — reload visible rows.
                 // Exclude the row with an active tag edit to prevent editor dismissal.
@@ -201,8 +203,11 @@ struct AppKitTableView: NSViewRepresentable {
             }
         }
 
-        // Selection sync (SwiftUI → AppKit)
-        if coordinator.lastPushedSelection != selection {
+        // Selection sync (SwiftUI → AppKit). Also after the rows change: the highlight is row indices,
+        // and a new snapshot shifts or drops them while the model's selection stays the same, so the
+        // `lastPushedSelection` check alone left a selection unhighlighted — the "2 selected", nothing highlighted, of
+        // `W40.fix-reader-phantom-selection`.
+        if rowsChanged || coordinator.lastPushedSelection != selection {
             coordinator.syncSelection(selection)
         }
 
@@ -256,6 +261,12 @@ struct AppKitTableView: NSViewRepresentable {
             var snapshot = NSDiffableDataSourceSnapshot<Int, ArchiveFile.ID>()
             snapshot.appendSections([0])
             snapshot.appendItems(ids, toSection: 0)
+            // A selection change the apply itself reports is the table shifting or trimming row
+            // indices, not the user choosing rows; written back it would retarget the model's selection
+            // to whatever rows slid under the old indices. The caller re-pushes the model's selection
+            // afterwards (`W40.fix-reader-phantom-selection`).
+            isUpdatingSelection = true
+            defer { isUpdatingSelection = false }
             dataSource?.apply(snapshot, animatingDifferences: animated)
         }
 

@@ -146,7 +146,7 @@ struct NavigationWindowView: View {
         // Focus-scoped Space → preview (fires only when the list has key focus, so Space still types
         // into the filter text fields).
         .onKeyPress(.space) {
-            guard !model.selection.isEmpty else { return .ignored }
+            guard !model.selectedFiles.isEmpty else { return .ignored }
             model.showingPreview = true
             return .handled
         }
@@ -570,42 +570,42 @@ struct NavigationWindowView: View {
             .accessibilityIdentifier("ar.toolbar.tagCloud")
 
             Button { openSelection() } label: { Label("Open", systemImage: "square.split.2x1") }
-                .disabled(model.selection.isEmpty)
+                .disabled(model.selectedFiles.isEmpty)
                 .help("Open the selected documents for reading (⌘O)")
                 .accessibilityIdentifier("ar.toolbar.open")
 
             Button { model.showingPreview = true } label: { Label("Preview", systemImage: "eye") }
-                .disabled(model.selection.isEmpty)
+                .disabled(model.selectedFiles.isEmpty)
                 .help("Preview the selection 2-up without opening it (Space or ⌘Y)")
                 .accessibilityIdentifier("ar.toolbar.preview")
 
             Button { model.copyLinks() } label: { Label("Copy Links", systemImage: "link") }
-                .disabled(model.selection.isEmpty)
+                .disabled(model.selectedFiles.isEmpty)
                 .help("Copy links to the selected files (⌘⇧C)")
                 .accessibilityIdentifier("ar.toolbar.copyLinks")
 
             Button { model.copyArchiveLinks() } label: { Label("Copy Archive Links", systemImage: "link.badge.plus") }
-                .disabled(model.selection.isEmpty)
+                .disabled(model.selectedFiles.isEmpty)
                 .help("Copy durable archive links (⌘⇧L)")
                 .accessibilityIdentifier("ar.toolbar.copyArchiveLinks")
 
             Button { model.mark(.read) } label: { Label("Mark Read", systemImage: "checkmark.circle") }
-                .disabled(model.selection.isEmpty)
+                .disabled(model.selectedFiles.isEmpty)
                 .help("Mark the selected documents as read (⌘R)")
                 .accessibilityIdentifier("ar.toolbar.markRead")
 
             Button { model.mark(.unread) } label: { Label("Mark Unread", systemImage: "circle") }
-                .disabled(model.selection.isEmpty)
+                .disabled(model.selectedFiles.isEmpty)
                 .help("Mark the selected documents as unread (⌘U)")
                 .accessibilityIdentifier("ar.toolbar.markUnread")
 
             Button { model.showingEditor = true } label: { Label("Edit Tags", systemImage: "tag") }
-                .disabled(model.selection.isEmpty)
+                .disabled(model.selectedFiles.isEmpty)
                 .help("Edit tags for the selected documents (⌘I)")
                 .accessibilityIdentifier("ar.toolbar.editTags")
 
             Button { model.toggleFlagSelection() } label: { Label("Flag", systemImage: "flag") }
-                .disabled(model.selection.isEmpty)
+                .disabled(model.selectedFiles.isEmpty)
                 .help("Flag or unflag the selection — app-only, never written to the file (⌘⇧F)")
                 .accessibilityIdentifier("ar.toolbar.flag")
 
@@ -685,7 +685,12 @@ struct NavigationWindowView: View {
                 Text(model.statusMessage).foregroundStyle(.secondary)
                     .accessibilityIdentifier("ar.status.message")
             }
-            if !model.selection.isEmpty { Text("\(model.selection.count) selected").foregroundStyle(.secondary) }
+            // Counts what the actions will act on (`selectedFiles`, visible rows only), so the number can
+            // never name a file the list does not show (`W40.fix-reader-phantom-selection`).
+            if !model.selectedFiles.isEmpty {
+                Text("\(model.selectedFiles.count) selected").foregroundStyle(.secondary)
+                    .accessibilityIdentifier("ar.status.selectedCount")
+            }
         }
         .font(.callout)
         .padding(.horizontal, 10).padding(.vertical, 6)
