@@ -12786,3 +12786,25 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
     text; filed W46.date-traceable-vision. Not run here: the Gemini and claude -p arms (W46.date-traceable-paid, after
     W46.gateway-models-ok), the relation classifier (W46.date-enclosure, not shipped), Foundation Models as chooser.
   <!-- /W46.date-traceable -->
+- [x] **W40.fix-reader-tagcloud-width — opening the tag cloud pushes the Quality and Read columns off the window, and the cloud clips long tags [S · S3]** · §W40 (lane: reader) (uses: build,vm). Found by `W40.e10` 2026-10-16; reproduction: `verification/evidence/reader/visual-2026-10-16-tagcloud-squeeze.jpg` and `…-tagcloud-volume.jpg`. At the 1400-pt window, opening the tag cloud keeps every column at its width, so Quality shows "Qua"/"N"/"Q" and Read is reachable only by scrolling sideways. In the cloud, a large tag is cut at the panel edge without an ellipsis ("Agricultural Labor Rel", "Department of Financ"). Fix: shrink the flexible columns (File name, File tags) first when the cloud opens, and truncate or wrap cloud tags. Add the tag cloud to `LayoutGuardUITests`, whose controls-inside-window check should catch the Read pop-ups.
+  SHIPPED 2026-10-22 (checkpoints `0a6a6063`, `9a914cdf`, `40c6a575`, `c0da7f4f`, final commit). File name and File tags now give up the
+  width the cloud takes, in proportion to what each can spare, and get it back exactly when it closes
+  (`TableColumnFitter`, replacing last-column-only autoresizing, which took it all from Read; AppKit's uniform style
+  was tried and fell short once File tags hit its minimum). Past both minimums the table scrolls; Quality and Read
+  are never squeezed. Cloud tags wrap to two lines then middle-truncate; the tooltip names the whole tag.
+  Bringing Quality on screen exposed two defects the old layout hid off the window's edge: Quality's 75-pt pop-up
+  overhung its 72-pt column (now 80, minimum 78), and a row whose tags wrap never grew, because NSTokenField's
+  intrinsic height is one line however its tokens wrap (measured: 20 pt at 160 and 900 wide). `WrappingTokenField`
+  reports the wrapped height, and the cell and the fitter re-note the row when it changes. The two flexible widths
+  add up to exactly the whole points available (File tags takes the remainder): rounding each down alone made Read
+  wobble a point as the sidebar slid in (TransientStateUITests, 1007 → 1223 → 1222).
+  The tour's row right-click and shift-click aim near the row's left edge, as `clickRow`'s fallback does: at the 900-pt minimum the
+  row's centre now falls in the File name/Type gap, where XCUITest's hit test finds no row (the tour passed there on
+  the pre-fix tree). `AccessibilityAuditUITests` still fails in the VM, as it did on main on 2026-10-21 (preview-sheet
+  dimmed text, and now dark/light secondary text "PDF"/"Read"/"Unread" at 3.2–3.9:1, text whose colour this item did not
+  touch: at that 1402-pt window Type has not moved and Read sits 8 pt right); W40.fix-reader-a11y-contrast's family.
+  Tests: `TableColumnFitTests` (host, incl. `testWrappedTagsAskForATallerCell`, which fails on a plain NSTokenField);
+  `LayoutGuardUITests` opens the cloud, widens the window to 1400 pt, sweeps it, and checks the first row's last
+  cell ends before the cloud's tags (the guard alone exempts cells inside a scroll view). VM, light and dark:
+  2 tests, 0 violations; TransientStateUITests green. Whole Reader UI suite in the VM: 51 tests, red only in the audit and TransientState (fixed above). At the 900-pt minimum the column minimums cannot fit beside sidebar and cloud, by design.
+  <!-- /W40.fix-reader-tagcloud-width -->
