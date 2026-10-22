@@ -239,6 +239,96 @@ def cmd_fetch_images(a):
     print("kept", dict(got))
 
 
+def bates_range(b):
+    m = re.fullmatch(r"(\d+)(?:/(\d+))?", (b or "").strip())
+    if not m:
+        return None
+    s = int(m.group(1))
+    tail = m.group(2)
+    return s, (int(str(s)[:len(str(s)) - len(tail)] + tail) if tail else s)
+
+
+def cmd_neighbours(a):
+    """Does a parent share its attachment's <ag>? AT records marked "Attached to a Responsive Document" are paired
+    with the document just before them in Bates order, B&W letters and memos with the one just after, found through
+    IDL; the neighbour's XML member is fetched (fetch-member) and its <ag> compared."""
+    rows = [json.loads(l) for l in open(os.path.join(CACHE, "records.jsonl"))]
+    path = os.path.join(CACHE, "neighbours.json")
+    if a.lookup:
+        import random
+        random.seed(46)
+        at = [x for x in rows if x["coll"] == "at" and x["tid"].startswith("z") and "Attached" in (x["rn"] or "")
+              and ag_kind(x["ag"]) == "number" and bates_range(x["bates"])]
+        bw = [x for x in rows if x["coll"] == "bw" and x["tid"].startswith("z") and re.search(r"LET|MEMO|Letter|Memo", x["dt"] or "")
+              and ag_kind(x["ag"]) == "number" and bates_range(x["bates"])]
+        out = []
+        for d, x in [("prev", x) for x in random.sample(at, a.n)] + [("next", x) for x in random.sample(bw, a.n)]:
+            s, e = bates_range(x["bates"])
+            t = s - 1 if d == "prev" else e + 1
+            docs = solr({"q": f"collectioncode:{x['coll']} AND (bn:{t} OR bn:{t}-* OR bn:*-{t})", "rows": 5,
+                         "fl": "id,tid,bn,dd,ti,dt,pg"})["response"]["docs"]
+            out.append(dict(dir=d, tid=x["tid"], coll=x["coll"], neighbours=[n["tid"] for n in docs if n.get("tid")]))
+        json.dump(out, open(path, "w"), indent=1)
+        need = sorted({f"{n[0]}.{n[1]}" for o in out for n in o["neighbours"]})
+        print("members needed:", " ".join(need))
+        return
+    by_tid = {x["tid"]: x for x in rows}
+    res = collections.Counter()
+    cases = []
+    for o in json.load(open(path)):
+        x = by_tid[o["tid"]]
+        found = [by_tid[n] for n in o["neighbours"] if n in by_tid]
+        if not o["neighbours"]:
+            k = "no neighbour in IDL"
+        elif not found:
+            k = "neighbour's member not fetched"
+        elif ag_kind(x["ag"]) != "number":
+            k = "own ag is 0"
+        elif any(n["ag"] == x["ag"] for n in found):
+            k = "same ag"
+        elif any(ag_kind(n["ag"]) == "number" and abs(int(n["ag"]) - int(x["ag"])) == 1 for n in found):
+            k = "ag differs by 1"
+        else:
+            k = "different ag"
+        res[(o["coll"], k)] += 1
+        cases.append(dict(tid=o["tid"], coll=o["coll"], dir=o["dir"], result=k,
+                          neighbour=[dict(tid=n["tid"], ag_kind=ag_kind(n["ag"]),
+                                          ag_delta=(int(n["ag"]) - int(x["ag"])) if ag_kind(n["ag"]) == "number" else None)
+                                     for n in found]))
+    out = dict(counts={f"{c} {k}": v for (c, k), v in sorted(res.items())}, cases=cases)
+    json.dump(out, open(os.path.join(CACHE, "neighbour-test.json"), "w"), indent=1)
+    print(json.dumps(out["counts"], indent=1))
+    for c in cases:
+        print(c)
+
+
+STOP = set("the of and a an to in for on by with at from is are as or this that report list letter memo".split())
+
+
+def words(s):
+    return {w for w in re.findall(r"[a-z]{3,}", (s or "").lower()) if w not in STOP}
+
+
+def cmd_rj_next(a):
+    """RJ's text <ag> names attachments. Is the named attachment the next record in Bates order? IDL titles only."""
+    import random
+    rows = [json.loads(l) for l in open(os.path.join(CACHE, "records.jsonl"))]
+    pool = [x for x in rows if x["coll"] == "rj" and x["tid"].startswith("z") and ag_kind(x["ag"]) == "text"
+            and "FOOTNOTES" not in x["ag"].upper() and bates_range(x["bates"])]
+    random.seed(46)
+    res, cases = collections.Counter(), []
+    for x in random.sample(pool, a.n):
+        s, e = bates_range(x["bates"])
+        docs = solr({"q": f"collectioncode:rj AND (bn:{e + 1} OR bn:{e + 1}-*)", "rows": 3, "fl": "tid,bn,ti,dt,dd"})["response"]["docs"]
+        ov = max((len(words(x["ag"]) & words(d.get("ti"))) / max(1, len(words(x["ag"]))) for d in docs), default=None)
+        k = "no next record" if ov is None else "next record is the named attachment" if ov >= 0.5 else "next record is something else"
+        res[k] += 1
+        cases.append(dict(tid=x["tid"], result=k, overlap=None if ov is None else round(ov, 2)))
+    out = dict(pool=len(pool), counts=dict(res), cases=cases)
+    json.dump(out, open(os.path.join(CACHE, "rj-next.json"), "w"), indent=1)
+    print(json.dumps(out["counts"]), len(pool))
+
+
 def cmd_report(_):
     rows = [json.loads(l) for l in open(os.path.join(CACHE, "records.jsonl"))]
     idl = json.load(open(os.path.join(CACHE, "idl.json")))
@@ -263,8 +353,107 @@ def cmd_report(_):
         shared_groups_year_span_ge_1=sum(s >= 1 for s in spans), shared_groups_with_two_years=len(spans),
         shared_groups_marked_attached=sum(any("Attached" in (x["rn"] or "") for x in v) for v in shared),
         idl=idl, judged=judged)
+    for key, name in (("neighbour_test", "neighbour-test.json"), ("rj_next", "rj-next.json")):
+        p = os.path.join(CACHE, name)
+        stats[key] = json.load(open(p)) if os.path.exists(p) else None
     json.dump(stats, open(os.path.join(RESULTS, "date-iitcdip.json"), "w"), indent=1)
-    print(json.dumps({k: v for k, v in stats.items() if k not in ("judged",)}, indent=1))
+    write_md(stats)
+    print(json.dumps({k: v for k, v in stats.items() if k not in ("judged", "neighbour_test", "rj_next")}, indent=1))
+
+
+def write_md(st):
+    bc = st["by_collection"]
+    colls = [c for c in ("at", "bw", "rj", "pm", "ll", "ct", "ti") if c in bc]
+    names = dict(at="American Tobacco", bw="Brown & Williamson", rj="R.J. Reynolds", pm="Philip Morris",
+                 ll="Lorillard", ct="Council for Tobacco Research", ti="Tobacco Institute")
+    L = ["# Dating: IIT-CDIP's <ag> and <dd> fields checked on a sample (W46.date-iitcdip)", "",
+         "Written by `scripts/segbench/date_iitcdip.py report`. The question (B-dating.md test 7 and question 6): is "
+         "IIT-CDIP's attachment-group element `<ag>` a cover-with-attachments relation, and is its document date "
+         "`<dd>` usable, so that 200 of its documents can be a public relation and dating set? $0, network only. "
+         "The text, records and page images stay in the bench cache (`date-tagging/iitcdip/`); this page carries "
+         "counts and case ids only.", "",
+         "## Verdict: one collection passes", "",
+         "`<ag>` means three different things. At American Tobacco it is a family number: a document and the "
+         "attachments filed behind it share it, so it is the cover-with-attachments relation the item hoped for. At "
+         "Brown & Williamson it is a running record number, and at R.J. Reynolds a free-text list of attachment titles; "
+         "neither links a cover to its attachments. `<dd>` holds up as a year label where the page carries a date. So "
+         "the 200 are drawn from American Tobacco families only, and their pages are checked before they are used. "
+         "The AT family reading rests so far on the records' types, titles and Bates order; the pages of a sample of "
+         "families are the next check.", "",
+         "## Where the data came from", "",
+         f"The item said to use the Industry Documents Library API. IDL's Solr index has no `<ag>` field: its "
+         f"`attachment` field is filled on {st['idl']['industry:Tobacco AND attachment:*']:,} tobacco records, every one "
+         f"in the JUUL collection (born-digital email, 2015-2019), and on none of the MSA collections IIT-CDIP was "
+         f"built from. IDL's PDF downloads refuse scripted requests (HTTP 403 from CloudFront). NIST now hosts "
+         f"IIT-CDIP openly (data.nist.gov, mds2-2531: six text tars of gzipped XML and 648 image tars of TIFF pages). "
+         f"Its README repeats that UCSF makes the documents available for research under fair use, so the "
+         f"no-redistribution reading from W46.fix-date-truth-score stands. The text records keep the producers' "
+         f"metadata block, where `<ag>` sits. {st['source']}, plus single members fetched by Range request, gave "
+         f"{st['records']:,} records.", "",
+         "## What <ag> holds, by producing company", "",
+         "| collection | records | numeric `<ag>` | `0` | free-text `<ag>` | none |", "|---|---|---|---|---|---|"]
+    for c in colls:
+        b = bc[c]
+        L.append(f"| {names[c]} ({c}) | {b['records']:,} | {b.get('ag number', 0):,} | {b.get('ag zero', 0):,} | "
+                 f"{b.get('ag text', 0):,} | {b.get('ag none', 0):,} |")
+    nt = st["neighbour_test"] or {"counts": {}}
+    rj = st["rj_next"] or {"counts": {}}
+    L += ["",
+          f"- **Numeric (AT, B&W).** Almost every record has one, so it is not a flag for records that have attachments. "
+          f"A family's members differ in the first or second letter of the tid, so they sit in different XML members "
+          f"and a single member shows few shared values. "
+          f"Of {st['numeric_ag_values']:,} distinct values, {st['shared_groups']} are shared by more than one record "
+          f"(sizes {st['group_sizes']}). Members of a shared value differ only in a tid letter and lie 20 to 30 Bates "
+          f"numbers apart. They are siblings filed together: a series of market snapshots, a run of magazine ads, six "
+          f"patent abstracts, five 1963 letters each marked \"Attached to a Responsive Document\", the tabbed sections of "
+          f"a binder. {st['shared_groups_mixed_doctype']} of the {st['shared_groups']} mix document types, and in "
+          f"{st['shared_groups_year_span_ge_1']} of the {st['shared_groups_with_two_years']} with two dated members "
+          f"the dates are a year or more apart.",
+          "- **The Bates-neighbour test.** A B&W letter or memo and the document right after it in Bates order (found in "
+          "IDL, its record fetched from NIST), and an AT record marked \"Attached to a Responsive Document\" and the "
+          "document right before it: " + "; ".join(f"{k}: {v}" for k, v in nt["counts"].items()) + ". At AT the "
+          "attachment and the document before it share the number in most pairs; the document before is the parent "
+          "(a memo with its chart, a buck slip with its memo, a specification behind its project memo) or a sibling "
+          "attachment of the same parent, and a value one apart is the next family. At B&W the next document's "
+          "value is the letter's plus one, a running record number, so a B&W cover and its attachment never share it.",
+          f"- **Free text (RJ).** A list of the attachments by title, author and date (\"CIGARETTE ANALYSIS REPORT, BY "
+          f"SELLS RE, 771214.\"), or \"LIST OF FOOTNOTES.\". It names an enclosure but does not point to it. On "
+          f"{sum(rj['counts'].values())} RJ records drawn at random (footnote lists excluded), the next record in "
+          f"Bates order was the named attachment on {rj['counts'].get('next record is the named attachment', 0)}, "
+          f"something else on {rj['counts'].get('next record is something else', 0)}, and absent from IDL on "
+          f"{rj['counts'].get('no next record', 0)}.",
+          "- **PM, Lorillard, CTR, TI.** Never present.", "",
+          "## <dd> against the page", "",
+          "| collection | records | full date | year and month | year only | none or dummy | dd year in the OCR text | two-digit year only | absent from the OCR |",
+          "|---|---|---|---|---|---|---|---|---|"]
+    for c in colls:
+        b = bc[c]
+        L.append(f"| {c} | {b['records']:,} | {b.get('dd full', 0):,} | {b.get('dd year+month', 0):,} | "
+                 f"{b.get('dd year only', 0):,} | {b.get('dd none', 0) + b.get('dd out of range', 0):,} | "
+                 f"{b.get('dd year in OCR: yyyy', 0):,} | {b.get('dd year in OCR: yy', 0):,} | "
+                 f"{b.get('dd year in OCR: absent', 0):,} |")
+    j = st["judged"]
+    vs = collections.Counter(x["dd_vs_page"] for x in j)
+    kinds = collections.Counter(x["kind"] for x in j)
+    L += ["", f"First pages of {len(j)} documents with `<ag>` (14 from shared groups, 10 with free-text `<ag>`, 12 single "
+          f"numeric), streamed from NIST's z.s image tar. 30 were read blind by a subagent (dates transcribed before "
+          f"`<dd>` was shown) and 6 by the session. Each page's own date compared with `<dd>`: "
+          + ", ".join(f"{k} {v}" for k, v in vs.most_common()) + ".", "",
+          "Where the page carries a date and `<dd>` is set, the years agree on all but one. That one is a 1995 email "
+          "whose table gives 1994 data. The two day-level misses are minutes dated a week after the meeting and a "
+          "cover letter a day after its typed date. The month-level miss is a sheet of two pasted clippings, where "
+          "`<dd>` is the earlier one. Where the page has no date (ads, charts, clippings), `<dd>` is the producer's "
+          "date from elsewhere and cannot be checked on the page. `19000000` is one of the dummy values Lewis warns "
+          "about. Page kinds: " + ", ".join(f"{k} {v}" for k, v in kinds.most_common()) + ".", "",
+          "## What follows", "",
+          "- The 200 come from AT families: a parent (`rn` a request code, not \"Attached to a Responsive Document\") "
+          "and its attachments sharing `<ag>`, Bates-contiguous in IDL. Family members spread over tars paired by tid "
+          "prefix, so the draw keeps families whose members all lie in one pair of image tars (`y.s` and `z.s` first) "
+          "and checks each family's pages before it counts.",
+          "- `<dd>` is a weak year label, not truth: 21% of records have none, and on undated pages it cannot be checked.",
+          "- B&W and RJ give no relation. RJ's free text still names what a cover enclosed, a cue a relation classifier "
+          "could use, but its attachment was the next record in only 2 of 40.", ""]
+    open(os.path.join(RESULTS, "date-iitcdip.md"), "w").write("\n".join(L))
 
 
 def main():
@@ -285,6 +474,13 @@ def main():
     i.add_argument("--tar", default="z.s")
     i.add_argument("--quota", default="shared=14,rjtext=10,single=12")
     i.set_defaults(f=cmd_fetch_images)
+    n = s.add_parser("neighbours")
+    n.add_argument("--lookup", action="store_true", help="draw the pairs and look the neighbours up in IDL")
+    n.add_argument("--n", type=int, default=20)
+    n.set_defaults(f=cmd_neighbours)
+    j = s.add_parser("rj-next")
+    j.add_argument("--n", type=int, default=40)
+    j.set_defaults(f=cmd_rj_next)
     s.add_parser("report").set_defaults(f=cmd_report)
     a = p.parse_args()
     a.f(a)

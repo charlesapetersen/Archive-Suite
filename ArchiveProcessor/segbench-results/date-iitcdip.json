@@ -1,0 +1,1223 @@
+{
+ "source": "NIST mds2-2531 cdip-text/cdip-6.tar (the only text tar fetched)",
+ "records": 223295,
+ "by_collection": {
+  "?": {
+   "records": 9,
+   "ag none": 9,
+   "dd full": 7,
+   "dd year in OCR: absent": 2,
+   "dd none": 2,
+   "dd year in OCR: yyyy": 5
+  },
+  "at": {
+   "records": 14850,
+   "ag number": 14598,
+   "dd full": 11861,
+   "dd year in OCR: yyyy": 9196,
+   "dd year only": 1898,
+   "dd year in OCR: absent": 3076,
+   "ag none": 252,
+   "dd none": 169,
+   "dd year in OCR: yy": 1665,
+   "dd year+month": 921,
+   "dd out of range": 1
+  },
+  "bw": {
+   "records": 21120,
+   "ag number": 17231,
+   "dd year only": 1444,
+   "dd year in OCR: absent": 5133,
+   "dd year+month": 1326,
+   "dd full": 16166,
+   "dd year in OCR: yyyy": 11600,
+   "dd none": 2184,
+   "dd year in OCR: yy": 1776,
+   "ag zero": 3847,
+   "ag none": 42
+  },
+  "ct": {
+   "records": 15122,
+   "ag none": 15122,
+   "dd full": 10201,
+   "dd year in OCR: yyyy": 9075,
+   "dd year+month": 1225,
+   "dd year in OCR: yy": 1091,
+   "dd year only": 2010,
+   "dd none": 1685,
+   "dd year in OCR: absent": 2918,
+   "dd out of range": 1
+  },
+  "ll": {
+   "records": 23699,
+   "ag none": 23699,
+   "dd none": 7679,
+   "dd full": 14703,
+   "dd year in OCR: yyyy": 11492,
+   "dd year in OCR: yy": 2086,
+   "dd year in OCR: absent": 2285,
+   "dd year only": 506,
+   "dd year+month": 811
+  },
+  "pm": {
+   "records": 93800,
+   "ag none": 93800,
+   "dd full": 58841,
+   "dd year in OCR: yyyy": 44149,
+   "dd none": 31638,
+   "dd year in OCR: yy": 9727,
+   "dd year in OCR: absent": 7470,
+   "dd year+month": 1859,
+   "dd year only": 1451,
+   "dd out of range": 11
+  },
+  "rj": {
+   "records": 45140,
+   "ag none": 39694,
+   "dd full": 35696,
+   "dd year in OCR: yyyy": 27862,
+   "dd none": 1967,
+   "dd year in OCR: absent": 9603,
+   "dd year in OCR: yy": 4907,
+   "ag text": 5446,
+   "dd year only": 5124,
+   "dd year+month": 2349,
+   "dd out of range": 4
+  },
+  "ti": {
+   "records": 9555,
+   "ag none": 9555,
+   "dd full": 6795,
+   "dd year in OCR: yyyy": 5348,
+   "dd year only": 781,
+   "dd year in OCR: absent": 1867,
+   "dd year in OCR: yy": 925,
+   "dd none": 1286,
+   "dd year+month": 693
+  }
+ },
+ "numeric_ag_values": 27326,
+ "group_sizes": {
+  "1": 24158,
+  "2": 2301,
+  "3": 734,
+  "4": 24,
+  "5": 49,
+  "6+": 60
+ },
+ "shared_groups": 3168,
+ "shared_groups_mixed_doctype": 1968,
+ "shared_groups_year_span_ge_1": 381,
+ "shared_groups_with_two_years": 3029,
+ "shared_groups_marked_attached": 1049,
+ "idl": {
+  "industry:Tobacco": 19959630,
+  "industry:Tobacco AND attachment:*": 321478,
+  "industry:Tobacco AND tid:*": 15026678,
+  "industry:Tobacco AND tid:* AND attachment:*": 251,
+  "attachment by collection": {
+   "juul": 321478
+  },
+  "ag:* (text match, not a field)": 5627
+ },
+ "judged": [
+  {
+   "tid": "zsp02d00",
+   "coll": "bw",
+   "sample": "shared",
+   "ag_kind": "number",
+   "dd": "19970300",
+   "page_date": "1997-03-00",
+   "dd_vs_page": "year+month agree",
+   "kind": "attachment",
+   "relation_cue": "",
+   "reader": "blind subagent (opus)"
+  },
+  {
+   "tid": "zsp43f00",
+   "coll": "bw",
+   "sample": "shared",
+   "ag_kind": "number",
+   "dd": "00000000",
+   "page_date": "1974-04-00",
+   "dd_vs_page": "dd none",
+   "kind": "attachment",
+   "relation_cue": "",
+   "reader": "blind subagent (opus)"
+  },
+  {
+   "tid": "zsp75f00",
+   "coll": "at",
+   "sample": "shared",
+   "ag_kind": "number",
+   "dd": "19660210",
+   "page_date": "1966-02-10",
+   "dd_vs_page": "exact",
+   "kind": "cover",
+   "relation_cue": "Attached are revised Reference Book pages D.M. 14A, D.M. 20A and revised Evaluation and Progress instruction page; Attachments; DISTRIBUTION stamp: MAILED TO SE",
+   "reader": "blind subagent (opus)"
+  },
+  {
+   "tid": "zsp91d00",
+   "coll": "bw",
+   "sample": "shared",
+   "ag_kind": "number",
+   "dd": "19971200",
+   "page_date": "1997-12-00",
+   "dd_vs_page": "year+month agree",
+   "kind": "attachment",
+   "relation_cue": "",
+   "reader": "blind subagent (opus)"
+  },
+  {
+   "tid": "zsq43f00",
+   "coll": "bw",
+   "sample": "shared",
+   "ag_kind": "number",
+   "dd": "00000000",
+   "page_date": "1975-00-00",
+   "dd_vs_page": "dd none",
+   "kind": "attachment",
+   "relation_cue": "",
+   "reader": "blind subagent (opus)"
+  },
+  {
+   "tid": "zsq80a00",
+   "coll": "at",
+   "sample": "shared",
+   "ag_kind": "number",
+   "dd": "19651217",
+   "page_date": "1965-12-09",
+   "dd_vs_page": "day differs",
+   "kind": "standalone",
+   "relation_cue": "",
+   "reader": "blind subagent (opus)"
+  },
+  {
+   "tid": "zsr15f00",
+   "coll": "at",
+   "sample": "shared",
+   "ag_kind": "number",
+   "dd": "19890000",
+   "page_date": "none",
+   "dd_vs_page": "no date on page",
+   "kind": "attachment",
+   "relation_cue": "",
+   "reader": "blind subagent (opus)"
+  },
+  {
+   "tid": "zss12d00",
+   "coll": "bw",
+   "sample": "shared",
+   "ag_kind": "number",
+   "dd": "19960800",
+   "page_date": "1996-08-00",
+   "dd_vs_page": "year+month agree",
+   "kind": "attachment",
+   "relation_cue": "",
+   "reader": "blind subagent (opus)"
+  },
+  {
+   "tid": "zss15f00",
+   "coll": "at",
+   "sample": "shared",
+   "ag_kind": "number",
+   "dd": "19840912",
+   "page_date": "none",
+   "dd_vs_page": "no date on page",
+   "kind": "divider/blank",
+   "relation_cue": "tab divider '1'",
+   "reader": "session"
+  },
+  {
+   "tid": "zst52d00",
+   "coll": "at",
+   "sample": "shared",
+   "ag_kind": "number",
+   "dd": "19811100",
+   "page_date": "none",
+   "dd_vs_page": "no date on page",
+   "kind": "attachment",
+   "relation_cue": "",
+   "reader": "blind subagent (opus)"
+  },
+  {
+   "tid": "zsu85f00",
+   "coll": "at",
+   "sample": "shared",
+   "ag_kind": "number",
+   "dd": "19630506",
+   "page_date": "1963-05-06",
+   "dd_vs_page": "exact",
+   "kind": "standalone",
+   "relation_cue": "acknowledges receipt of your letter of April 30th",
+   "reader": "session"
+  },
+  {
+   "tid": "zsw84f00",
+   "coll": "at",
+   "sample": "shared",
+   "ag_kind": "number",
+   "dd": "19871120",
+   "page_date": "0000-11-20",
+   "dd_vs_page": "no date on page",
+   "kind": "attachment",
+   "relation_cue": "",
+   "reader": "blind subagent (opus)"
+  },
+  {
+   "tid": "zsy31a00",
+   "coll": "at",
+   "sample": "shared",
+   "ag_kind": "number",
+   "dd": "19580916",
+   "page_date": "1958-10-10",
+   "dd_vs_page": "month differs",
+   "kind": "attachment",
+   "relation_cue": "",
+   "reader": "blind subagent (opus)"
+  },
+  {
+   "tid": "zsy65a00",
+   "coll": "rj",
+   "sample": "rjtext",
+   "ag_kind": "text",
+   "dd": "19960711",
+   "page_date": "1996-07-11",
+   "dd_vs_page": "exact",
+   "kind": "cover",
+   "relation_cue": "Attachments: FDA-FEMA.DOC",
+   "reader": "blind subagent (opus)"
+  },
+  {
+   "tid": "zsz01c00",
+   "coll": "bw",
+   "sample": "single",
+   "ag_kind": "number",
+   "dd": "19800108",
+   "page_date": "1980-01-08",
+   "dd_vs_page": "exact",
+   "kind": "standalone",
+   "relation_cue": "",
+   "reader": "session"
+  },
+  {
+   "tid": "zsz02d00",
+   "coll": "bw",
+   "sample": "single",
+   "ag_kind": "number",
+   "dd": "00000000",
+   "page_date": "1998-08-15",
+   "dd_vs_page": "dd none",
+   "kind": "attachment",
+   "relation_cue": "",
+   "reader": "blind subagent (opus)"
+  },
+  {
+   "tid": "zsz11c00",
+   "coll": "bw",
+   "sample": "single",
+   "ag_kind": "number",
+   "dd": "19990401",
+   "page_date": "1999-04-01",
+   "dd_vs_page": "exact",
+   "kind": "standalone",
+   "relation_cue": "",
+   "reader": "blind subagent (opus)"
+  },
+  {
+   "tid": "zsz12d00",
+   "coll": "bw",
+   "sample": "single",
+   "ag_kind": "number",
+   "dd": "19770606",
+   "page_date": "1977-06-06",
+   "dd_vs_page": "exact",
+   "kind": "standalone",
+   "relation_cue": "TO: Thom Graff, Richard Hensler, David Silverstone",
+   "reader": "blind subagent (opus)"
+  },
+  {
+   "tid": "zsz13a00",
+   "coll": "rj",
+   "sample": "rjtext",
+   "ag_kind": "text",
+   "dd": "19690527",
+   "page_date": "1969-05-27",
+   "dd_vs_page": "exact",
+   "kind": "cover",
+   "relation_cue": "I am enclosing some material ... 'The Cigarette Controversy/Eight Questions and Answers'",
+   "reader": "session"
+  },
+  {
+   "tid": "zsz15a00",
+   "coll": "rj",
+   "sample": "rjtext",
+   "ag_kind": "text",
+   "dd": "19951116",
+   "page_date": "1994-00-00",
+   "dd_vs_page": "year differs",
+   "kind": "attachment",
+   "relation_cue": "",
+   "reader": "blind subagent (opus)"
+  },
+  {
+   "tid": "zsz19d00",
+   "coll": "rj",
+   "sample": "rjtext",
+   "ag_kind": "text",
+   "dd": "19750103",
+   "page_date": "1975-01-03",
+   "dd_vs_page": "exact",
+   "kind": "other",
+   "relation_cue": "Management Information Clipping routing sheet, 'SEE NEXT PAGE'",
+   "reader": "session"
+  },
+  {
+   "tid": "zsz23a00",
+   "coll": "at",
+   "sample": "single",
+   "ag_kind": "number",
+   "dd": "19700814",
+   "page_date": "1970-08-14",
+   "dd_vs_page": "exact",
+   "kind": "cover",
+   "relation_cue": "we are forwarding you the following: 1. Letter of Instructions 2. Circular No. 4197 ... 6. Letter Regarding Sales to Government Activities; Attachments",
+   "reader": "blind subagent (opus)"
+  },
+  {
+   "tid": "zsz31a00",
+   "coll": "at",
+   "sample": "single",
+   "ag_kind": "number",
+   "dd": "19651026",
+   "page_date": "1965-10-25",
+   "dd_vs_page": "day differs",
+   "kind": "cover",
+   "relation_cue": "Attached please find Celanese Cigarette Tow Newsletter for October 1965; Attachment",
+   "reader": "session"
+  },
+  {
+   "tid": "zsz33a00",
+   "coll": "bw",
+   "sample": "single",
+   "ag_kind": "number",
+   "dd": "19800100",
+   "page_date": "none",
+   "dd_vs_page": "no date on page",
+   "kind": "attachment",
+   "relation_cue": "",
+   "reader": "blind subagent (opus)"
+  },
+  {
+   "tid": "zsz41a00",
+   "coll": "at",
+   "sample": "single",
+   "ag_kind": "number",
+   "dd": "19821208",
+   "page_date": "1982-12-08",
+   "dd_vs_page": "exact",
+   "kind": "cover",
+   "relation_cue": "(see attached brochure)",
+   "reader": "blind subagent (opus)"
+  },
+  {
+   "tid": "zsz53d00",
+   "coll": "rj",
+   "sample": "rjtext",
+   "ag_kind": "text",
+   "dd": "19920000",
+   "page_date": "1992-00-00",
+   "dd_vs_page": "year agrees",
+   "kind": "standalone",
+   "relation_cue": "",
+   "reader": "blind subagent (opus)"
+  },
+  {
+   "tid": "zsz61d00",
+   "coll": "rj",
+   "sample": "rjtext",
+   "ag_kind": "text",
+   "dd": "19810327",
+   "page_date": "1981-03-27",
+   "dd_vs_page": "exact",
+   "kind": "cover",
+   "relation_cue": "The full newsstory on the above referenced \"study\" is attached.; Att:1; cc: H.C.R., S.B.W., C.A.T., R.E.M., R.J.M., J.A.G., A.R., C.W.N., K.G.O., R.S., P.M.S., ",
+   "reader": "blind subagent (opus)"
+  },
+  {
+   "tid": "zsz68d00",
+   "coll": "rj",
+   "sample": "rjtext",
+   "ag_kind": "text",
+   "dd": "19760200",
+   "page_date": "1976-02-00",
+   "dd_vs_page": "year+month agree",
+   "kind": "standalone",
+   "relation_cue": "",
+   "reader": "blind subagent (opus)"
+  },
+  {
+   "tid": "zsz69d00",
+   "coll": "rj",
+   "sample": "rjtext",
+   "ag_kind": "text",
+   "dd": "19820000",
+   "page_date": "none",
+   "dd_vs_page": "no date on page",
+   "kind": "attachment",
+   "relation_cue": "SEE OFFER INSIDE!",
+   "reader": "blind subagent (opus)"
+  },
+  {
+   "tid": "zsz71d00",
+   "coll": "bw",
+   "sample": "single",
+   "ag_kind": "number",
+   "dd": "19790000",
+   "page_date": "none",
+   "dd_vs_page": "no date on page",
+   "kind": "attachment",
+   "relation_cue": "",
+   "reader": "blind subagent (opus)"
+  },
+  {
+   "tid": "zsz81d00",
+   "coll": "bw",
+   "sample": "single",
+   "ag_kind": "number",
+   "dd": "19840430",
+   "page_date": "1984-04-30",
+   "dd_vs_page": "exact",
+   "kind": "standalone",
+   "relation_cue": "cc: Prof. Yasunosuke Suzuki",
+   "reader": "blind subagent (opus)"
+  },
+  {
+   "tid": "zsz85d00",
+   "coll": "rj",
+   "sample": "rjtext",
+   "ag_kind": "text",
+   "dd": "19820603",
+   "page_date": "1982-06-03",
+   "dd_vs_page": "exact",
+   "kind": "standalone",
+   "relation_cue": "",
+   "reader": "blind subagent (opus)"
+  },
+  {
+   "tid": "zsz89d00",
+   "coll": "rj",
+   "sample": "rjtext",
+   "ag_kind": "text",
+   "dd": "19620906",
+   "page_date": "1962-09-06",
+   "dd_vs_page": "exact",
+   "kind": "standalone",
+   "relation_cue": "cc: Members, Public Relations Representatives, Legal Representatives",
+   "reader": "blind subagent (opus)"
+  },
+  {
+   "tid": "zsz90c00",
+   "coll": "bw",
+   "sample": "single",
+   "ag_kind": "number",
+   "dd": "19000000",
+   "page_date": "none",
+   "dd_vs_page": "no date on page",
+   "kind": "attachment",
+   "relation_cue": "Valuable coupons inside!",
+   "reader": "blind subagent (opus)"
+  },
+  {
+   "tid": "zsz91d00",
+   "coll": "bw",
+   "sample": "single",
+   "ag_kind": "number",
+   "dd": "19831129",
+   "page_date": "none",
+   "dd_vs_page": "no date on page",
+   "kind": "attachment",
+   "relation_cue": "",
+   "reader": "blind subagent (opus)"
+  },
+  {
+   "tid": "zsz93f00",
+   "coll": "bw",
+   "sample": "shared",
+   "ag_kind": "number",
+   "dd": "19690604",
+   "page_date": "1969-00-00",
+   "dd_vs_page": "year agrees",
+   "kind": "attachment",
+   "relation_cue": "",
+   "reader": "blind subagent (opus)"
+  }
+ ],
+ "neighbour_test": {
+  "counts": {
+   "at ag differs by 1": 2,
+   "at different ag": 1,
+   "at no neighbour in IDL": 2,
+   "at same ag": 15,
+   "bw ag differs by 1": 5,
+   "bw different ag": 1,
+   "bw no neighbour in IDL": 11,
+   "bw own ag is 0": 3
+  },
+  "cases": [
+   {
+    "tid": "zst64f00",
+    "coll": "at",
+    "dir": "prev",
+    "result": "same ag",
+    "neighbour": [
+     {
+      "tid": "yst64f00",
+      "ag_kind": "number",
+      "ag_delta": 0
+     }
+    ]
+   },
+   {
+    "tid": "zvq85f00",
+    "coll": "at",
+    "dir": "prev",
+    "result": "no neighbour in IDL",
+    "neighbour": []
+   },
+   {
+    "tid": "zsl34f00",
+    "coll": "at",
+    "dir": "prev",
+    "result": "same ag",
+    "neighbour": [
+     {
+      "tid": "ysl34f00",
+      "ag_kind": "number",
+      "ag_delta": 0
+     }
+    ]
+   },
+   {
+    "tid": "zxh75f00",
+    "coll": "at",
+    "dir": "prev",
+    "result": "same ag",
+    "neighbour": [
+     {
+      "tid": "yxh75f00",
+      "ag_kind": "number",
+      "ag_delta": 0
+     }
+    ]
+   },
+   {
+    "tid": "zxh41a00",
+    "coll": "at",
+    "dir": "prev",
+    "result": "ag differs by 1",
+    "neighbour": [
+     {
+      "tid": "yxh41a00",
+      "ag_kind": "number",
+      "ag_delta": -1
+     }
+    ]
+   },
+   {
+    "tid": "zuc90a00",
+    "coll": "at",
+    "dir": "prev",
+    "result": "same ag",
+    "neighbour": [
+     {
+      "tid": "yuc90a00",
+      "ag_kind": "number",
+      "ag_delta": 0
+     }
+    ]
+   },
+   {
+    "tid": "zxu54f00",
+    "coll": "at",
+    "dir": "prev",
+    "result": "same ag",
+    "neighbour": [
+     {
+      "tid": "yxu54f00",
+      "ag_kind": "number",
+      "ag_delta": 0
+     }
+    ]
+   },
+   {
+    "tid": "zwq34f00",
+    "coll": "at",
+    "dir": "prev",
+    "result": "same ag",
+    "neighbour": [
+     {
+      "tid": "ywq34f00",
+      "ag_kind": "number",
+      "ag_delta": 0
+     }
+    ]
+   },
+   {
+    "tid": "zti84f00",
+    "coll": "at",
+    "dir": "prev",
+    "result": "same ag",
+    "neighbour": [
+     {
+      "tid": "yti84f00",
+      "ag_kind": "number",
+      "ag_delta": 0
+     }
+    ]
+   },
+   {
+    "tid": "zxg34f00",
+    "coll": "at",
+    "dir": "prev",
+    "result": "same ag",
+    "neighbour": [
+     {
+      "tid": "yxg34f00",
+      "ag_kind": "number",
+      "ag_delta": 0
+     }
+    ]
+   },
+   {
+    "tid": "zwv05f00",
+    "coll": "at",
+    "dir": "prev",
+    "result": "ag differs by 1",
+    "neighbour": [
+     {
+      "tid": "ywv05f00",
+      "ag_kind": "number",
+      "ag_delta": -1
+     }
+    ]
+   },
+   {
+    "tid": "zzl65f00",
+    "coll": "at",
+    "dir": "prev",
+    "result": "same ag",
+    "neighbour": [
+     {
+      "tid": "yzl65f00",
+      "ag_kind": "number",
+      "ag_delta": 0
+     }
+    ]
+   },
+   {
+    "tid": "zsj85f00",
+    "coll": "at",
+    "dir": "prev",
+    "result": "same ag",
+    "neighbour": [
+     {
+      "tid": "ysj85f00",
+      "ag_kind": "number",
+      "ag_delta": 0
+     }
+    ]
+   },
+   {
+    "tid": "zsj25f00",
+    "coll": "at",
+    "dir": "prev",
+    "result": "no neighbour in IDL",
+    "neighbour": []
+   },
+   {
+    "tid": "zsr01a00",
+    "coll": "at",
+    "dir": "prev",
+    "result": "same ag",
+    "neighbour": [
+     {
+      "tid": "ysr01a00",
+      "ag_kind": "number",
+      "ag_delta": 0
+     }
+    ]
+   },
+   {
+    "tid": "zzf74f00",
+    "coll": "at",
+    "dir": "prev",
+    "result": "same ag",
+    "neighbour": [
+     {
+      "tid": "yzf74f00",
+      "ag_kind": "number",
+      "ag_delta": 0
+     }
+    ]
+   },
+   {
+    "tid": "zuy45f00",
+    "coll": "at",
+    "dir": "prev",
+    "result": "same ag",
+    "neighbour": [
+     {
+      "tid": "yuy45f00",
+      "ag_kind": "number",
+      "ag_delta": 0
+     }
+    ]
+   },
+   {
+    "tid": "zxu15f00",
+    "coll": "at",
+    "dir": "prev",
+    "result": "same ag",
+    "neighbour": [
+     {
+      "tid": "yxu15f00",
+      "ag_kind": "number",
+      "ag_delta": 0
+     }
+    ]
+   },
+   {
+    "tid": "zzs41a00",
+    "coll": "at",
+    "dir": "prev",
+    "result": "same ag",
+    "neighbour": [
+     {
+      "tid": "yzs41a00",
+      "ag_kind": "number",
+      "ag_delta": 0
+     }
+    ]
+   },
+   {
+    "tid": "zso45f00",
+    "coll": "at",
+    "dir": "prev",
+    "result": "different ag",
+    "neighbour": [
+     {
+      "tid": "yso45f00",
+      "ag_kind": "number",
+      "ag_delta": -2
+     }
+    ]
+   },
+   {
+    "tid": "zsi14f00",
+    "coll": "bw",
+    "dir": "next",
+    "result": "no neighbour in IDL",
+    "neighbour": []
+   },
+   {
+    "tid": "ztk60f00",
+    "coll": "bw",
+    "dir": "next",
+    "result": "ag differs by 1",
+    "neighbour": [
+     {
+      "tid": "auk60f00",
+      "ag_kind": "number",
+      "ag_delta": 1
+     }
+    ]
+   },
+   {
+    "tid": "zxy01c00",
+    "coll": "bw",
+    "dir": "next",
+    "result": "no neighbour in IDL",
+    "neighbour": []
+   },
+   {
+    "tid": "zvd60f00",
+    "coll": "bw",
+    "dir": "next",
+    "result": "no neighbour in IDL",
+    "neighbour": []
+   },
+   {
+    "tid": "zxs40f00",
+    "coll": "bw",
+    "dir": "next",
+    "result": "ag differs by 1",
+    "neighbour": [
+     {
+      "tid": "ays40f00",
+      "ag_kind": "number",
+      "ag_delta": 1
+     }
+    ]
+   },
+   {
+    "tid": "zvn21f00",
+    "coll": "bw",
+    "dir": "next",
+    "result": "own ag is 0",
+    "neighbour": [
+     {
+      "tid": "awn21f00",
+      "ag_kind": "zero",
+      "ag_delta": null
+     }
+    ]
+   },
+   {
+    "tid": "zzu53f00",
+    "coll": "bw",
+    "dir": "next",
+    "result": "own ag is 0",
+    "neighbour": [
+     {
+      "tid": "aav53f00",
+      "ag_kind": "zero",
+      "ag_delta": null
+     }
+    ]
+   },
+   {
+    "tid": "zsx83f00",
+    "coll": "bw",
+    "dir": "next",
+    "result": "no neighbour in IDL",
+    "neighbour": []
+   },
+   {
+    "tid": "zwg45a00",
+    "coll": "bw",
+    "dir": "next",
+    "result": "ag differs by 1",
+    "neighbour": [
+     {
+      "tid": "ywg45a00",
+      "ag_kind": "number",
+      "ag_delta": 1
+     }
+    ]
+   },
+   {
+    "tid": "zzs01c00",
+    "coll": "bw",
+    "dir": "next",
+    "result": "no neighbour in IDL",
+    "neighbour": []
+   },
+   {
+    "tid": "zxe73f00",
+    "coll": "bw",
+    "dir": "next",
+    "result": "no neighbour in IDL",
+    "neighbour": []
+   },
+   {
+    "tid": "zvw11f00",
+    "coll": "bw",
+    "dir": "next",
+    "result": "no neighbour in IDL",
+    "neighbour": []
+   },
+   {
+    "tid": "ztq81d00",
+    "coll": "bw",
+    "dir": "next",
+    "result": "different ag",
+    "neighbour": [
+     {
+      "tid": "bvn40f00",
+      "ag_kind": "number",
+      "ag_delta": -383767
+     }
+    ]
+   },
+   {
+    "tid": "zxc40f00",
+    "coll": "bw",
+    "dir": "next",
+    "result": "no neighbour in IDL",
+    "neighbour": []
+   },
+   {
+    "tid": "zxa73f00",
+    "coll": "bw",
+    "dir": "next",
+    "result": "own ag is 0",
+    "neighbour": [
+     {
+      "tid": "aya73f00",
+      "ag_kind": "zero",
+      "ag_delta": null
+     }
+    ]
+   },
+   {
+    "tid": "zsu01c00",
+    "coll": "bw",
+    "dir": "next",
+    "result": "no neighbour in IDL",
+    "neighbour": []
+   },
+   {
+    "tid": "zwy89e00",
+    "coll": "bw",
+    "dir": "next",
+    "result": "ag differs by 1",
+    "neighbour": [
+     {
+      "tid": "axy89e00",
+      "ag_kind": "number",
+      "ag_delta": 1
+     }
+    ]
+   },
+   {
+    "tid": "zzp70f00",
+    "coll": "bw",
+    "dir": "next",
+    "result": "no neighbour in IDL",
+    "neighbour": []
+   },
+   {
+    "tid": "zxw71d00",
+    "coll": "bw",
+    "dir": "next",
+    "result": "no neighbour in IDL",
+    "neighbour": []
+   },
+   {
+    "tid": "zys81d00",
+    "coll": "bw",
+    "dir": "next",
+    "result": "ag differs by 1",
+    "neighbour": [
+     {
+      "tid": "azs81d00",
+      "ag_kind": "number",
+      "ag_delta": 1
+     }
+    ]
+   }
+  ]
+ },
+ "rj_next": {
+  "pool": 1649,
+  "counts": {
+   "next record is something else": 32,
+   "no next record": 6,
+   "next record is the named attachment": 2
+  },
+  "cases": [
+   {
+    "tid": "zsq75d00",
+    "result": "next record is something else",
+    "overlap": 0.0
+   },
+   {
+    "tid": "zvx03d00",
+    "result": "next record is something else",
+    "overlap": 0.0
+   },
+   {
+    "tid": "zsi55d00",
+    "result": "next record is something else",
+    "overlap": 0.13
+   },
+   {
+    "tid": "zxt80d00",
+    "result": "next record is something else",
+    "overlap": 0.0
+   },
+   {
+    "tid": "zxt13a00",
+    "result": "next record is something else",
+    "overlap": 0.0
+   },
+   {
+    "tid": "zuc88d00",
+    "result": "next record is something else",
+    "overlap": 0.0
+   },
+   {
+    "tid": "zyf31d00",
+    "result": "no next record",
+    "overlap": null
+   },
+   {
+    "tid": "zwy01d00",
+    "result": "next record is something else",
+    "overlap": 0.05
+   },
+   {
+    "tid": "ztj85a00",
+    "result": "next record is something else",
+    "overlap": 0.2
+   },
+   {
+    "tid": "zxr54d00",
+    "result": "next record is something else",
+    "overlap": 0.0
+   },
+   {
+    "tid": "zxe59d00",
+    "result": "no next record",
+    "overlap": null
+   },
+   {
+    "tid": "zzz03c00",
+    "result": "next record is something else",
+    "overlap": 0.25
+   },
+   {
+    "tid": "zsh15d00",
+    "result": "no next record",
+    "overlap": null
+   },
+   {
+    "tid": "zsg79d00",
+    "result": "next record is something else",
+    "overlap": 0.0
+   },
+   {
+    "tid": "zsp49d00",
+    "result": "next record is something else",
+    "overlap": 0.0
+   },
+   {
+    "tid": "zzt69d00",
+    "result": "next record is something else",
+    "overlap": 0.0
+   },
+   {
+    "tid": "zvb25d00",
+    "result": "next record is something else",
+    "overlap": 0.0
+   },
+   {
+    "tid": "zye90d00",
+    "result": "next record is something else",
+    "overlap": 0.43
+   },
+   {
+    "tid": "zsm82a00",
+    "result": "next record is the named attachment",
+    "overlap": 1.0
+   },
+   {
+    "tid": "zsg95d00",
+    "result": "next record is something else",
+    "overlap": 0.25
+   },
+   {
+    "tid": "ztf64d00",
+    "result": "next record is something else",
+    "overlap": 0.0
+   },
+   {
+    "tid": "zxh25d00",
+    "result": "next record is something else",
+    "overlap": 0.0
+   },
+   {
+    "tid": "zus28c00",
+    "result": "next record is something else",
+    "overlap": 0.0
+   },
+   {
+    "tid": "zxb41d00",
+    "result": "next record is something else",
+    "overlap": 0.0
+   },
+   {
+    "tid": "zvd78d00",
+    "result": "next record is something else",
+    "overlap": 0.0
+   },
+   {
+    "tid": "zza64d00",
+    "result": "next record is something else",
+    "overlap": 0.0
+   },
+   {
+    "tid": "zzn92d00",
+    "result": "no next record",
+    "overlap": null
+   },
+   {
+    "tid": "zsv20d00",
+    "result": "next record is something else",
+    "overlap": 0.0
+   },
+   {
+    "tid": "zvv85d00",
+    "result": "next record is something else",
+    "overlap": 0.0
+   },
+   {
+    "tid": "zyx65d00",
+    "result": "next record is something else",
+    "overlap": 0.0
+   },
+   {
+    "tid": "zwo55d00",
+    "result": "next record is something else",
+    "overlap": 0.08
+   },
+   {
+    "tid": "zvl65d00",
+    "result": "next record is something else",
+    "overlap": 0.0
+   },
+   {
+    "tid": "ztk65d00",
+    "result": "no next record",
+    "overlap": null
+   },
+   {
+    "tid": "zwm95d00",
+    "result": "next record is something else",
+    "overlap": 0.28
+   },
+   {
+    "tid": "zwl65d00",
+    "result": "no next record",
+    "overlap": null
+   },
+   {
+    "tid": "zsq55a00",
+    "result": "next record is something else",
+    "overlap": 0.03
+   },
+   {
+    "tid": "zwk33d00",
+    "result": "next record is something else",
+    "overlap": 0.0
+   },
+   {
+    "tid": "zzk39d00",
+    "result": "next record is the named attachment",
+    "overlap": 0.5
+   },
+   {
+    "tid": "zyu77c00",
+    "result": "next record is something else",
+    "overlap": 0.0
+   },
+   {
+    "tid": "zxf73d00",
+    "result": "next record is something else",
+    "overlap": 0.17
+   }
+  ]
+ }
+}
