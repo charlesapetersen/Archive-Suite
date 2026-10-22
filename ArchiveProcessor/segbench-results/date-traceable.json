@@ -1,0 +1,1465 @@
+{
+ "alpha": 0.1,
+ "label": "qwen3.6-27b-nothink",
+ "answers": 0,
+ "rules": {
+  "owner": {
+   "by_class": {
+    "in text": {
+     "latest right": 110,
+     "n": 119,
+     "with candidates": 119,
+     "truth among candidates": 119,
+     "pick right": 106,
+     "ambiguous": 29,
+     "ambiguous right": 19,
+     "sure": 63,
+     "sure right": 60,
+     "single": 27,
+     "single right": 27
+    },
+    "A": {
+     "latest right": 1,
+     "n": 33,
+     "with candidates": 6,
+     "truth among candidates": 1,
+     "pick right": 1,
+     "none": 27,
+     "none right": 0,
+     "ambiguous": 1,
+     "ambiguous right": 0,
+     "sure": 3,
+     "sure right": 1,
+     "single": 2,
+     "single right": 0
+    },
+    "C": {
+     "latest right": 0,
+     "n": 35,
+     "with candidates": 14,
+     "truth among candidates": 0,
+     "pick right": 0,
+     "none": 21,
+     "none right": 0,
+     "ambiguous": 7,
+     "ambiguous right": 0,
+     "single": 6,
+     "single right": 0,
+     "sure": 1,
+     "sure right": 0
+    },
+    "D": {
+     "latest right": 0,
+     "n": 21,
+     "with candidates": 5,
+     "truth among candidates": 1,
+     "pick right": 0,
+     "none": 16,
+     "none right": 0,
+     "ambiguous": 3,
+     "ambiguous right": 0,
+     "sure": 2,
+     "sure right": 0
+    },
+    "B": {
+     "latest right": 0,
+     "n": 35,
+     "with candidates": 10,
+     "truth among candidates": 0,
+     "pick right": 0,
+     "ambiguous": 4,
+     "ambiguous right": 0,
+     "sure": 4,
+     "sure right": 0,
+     "none": 25,
+     "none right": 0,
+     "single": 2,
+     "single right": 0
+    },
+    "A'": {
+     "latest right": 1,
+     "n": 7,
+     "with candidates": 2,
+     "truth among candidates": 2,
+     "pick right": 1,
+     "none": 5,
+     "none right": 0,
+     "ambiguous": 1,
+     "ambiguous right": 0,
+     "sure": 1,
+     "sure right": 1
+    }
+   },
+   "ms_per_doc": 0.38
+  },
+  "public": {
+   "by_class": {
+    "in text": {
+     "latest right": 237,
+     "n": 257,
+     "with candidates": 255,
+     "truth among candidates": 255,
+     "pick right": 236,
+     "sure": 170,
+     "sure right": 166,
+     "single": 46,
+     "single right": 46,
+     "ambiguous": 39,
+     "ambiguous right": 24,
+     "none": 2,
+     "none right": 0
+    },
+    "not in text": {
+     "latest right": 8,
+     "n": 43,
+     "with candidates": 16,
+     "truth among candidates": 8,
+     "pick right": 8,
+     "sure": 11,
+     "sure right": 8,
+     "none": 27,
+     "none right": 0,
+     "single": 3,
+     "single right": 0,
+     "ambiguous": 2,
+     "ambiguous right": 0
+    }
+   },
+   "ms_per_doc": 0.23
+  }
+ },
+ "one_shot": {
+  "owner|gemini-3.8-flash": {
+   "n": 300,
+   "exact": {
+    "in text": [
+     116,
+     119
+    ],
+    "A": [
+     27,
+     33
+    ],
+    "A'": [
+     5,
+     7
+    ],
+    "B": [
+     22,
+     35
+    ],
+    "C": [
+     16,
+     35
+    ],
+    "D": [
+     13,
+     21
+    ],
+    "decade": [
+     34,
+     50
+    ],
+    "A+A'+B": [
+     54,
+     75
+    ],
+    "C+D": [
+     29,
+     56
+    ],
+    "not in text": [
+     83,
+     131
+    ],
+    "all year-tagged": [
+     199,
+     250
+    ],
+    "all": [
+     233,
+     300
+    ]
+   },
+   "within1": {
+    "in text": [
+     118,
+     119
+    ],
+    "A": [
+     31,
+     33
+    ],
+    "A'": [
+     7,
+     7
+    ],
+    "B": [
+     31,
+     35
+    ],
+    "C": [
+     32,
+     35
+    ],
+    "D": [
+     19,
+     21
+    ],
+    "decade": [
+     40,
+     50
+    ],
+    "A+A'+B": [
+     69,
+     75
+    ],
+    "C+D": [
+     51,
+     56
+    ],
+    "not in text": [
+     120,
+     131
+    ],
+    "all year-tagged": [
+     238,
+     250
+    ],
+    "all": [
+     278,
+     300
+    ]
+   },
+   "invalid": [
+    0,
+    300
+   ],
+   "stages": {
+    "one-shot": 300
+   },
+   "evidence": {
+    "none": 300
+   },
+   "right_unsupported": 0,
+   "conformal": {
+    "in text": {
+     "n": 119,
+     "alpha": 0.1,
+     "q": [
+      0,
+      0
+     ],
+     "coverage": [
+      116,
+      119
+     ],
+     "width": 0.0,
+     "winkler": 0.6722689075630253,
+     "no_year": 0
+    },
+    "A+A'+B": {
+     "n": 75,
+     "alpha": 0.1,
+     "q": [
+      1,
+      4
+     ],
+     "coverage": [
+      70,
+      75
+     ],
+     "width": 4.96,
+     "winkler": 11.093333333333334,
+     "no_year": 0
+    },
+    "C+D": {
+     "n": 56,
+     "alpha": 0.1,
+     "q": [
+      1,
+      3
+     ],
+     "coverage": [
+      52,
+      56
+     ],
+     "width": 4.0,
+     "winkler": 6.857142857142857,
+     "no_year": 0
+    },
+    "not in text": {
+     "n": 131,
+     "alpha": 0.1,
+     "q": [
+      1,
+      2
+     ],
+     "coverage": [
+      121,
+      131
+     ],
+     "width": 2.9923664122137406,
+     "winkler": 7.7251908396946565,
+     "no_year": 0
+    },
+    "all": {
+     "n": 300,
+     "alpha": 0.1,
+     "q": [
+      3,
+      5
+     ],
+     "coverage": [
+      275,
+      300
+     ],
+     "width": 8.0,
+     "winkler": 20.6,
+     "no_year": 0
+    }
+   },
+   "du": {
+    "certain_flagged_uncertain": [
+     63,
+     200
+    ],
+    "uncertain_flagged_certain": [
+     6,
+     50
+    ]
+   }
+  },
+  "owner|qwen3.6-27b-nothink (app prompt)": {
+   "n": 300,
+   "exact": {
+    "in text": [
+     116,
+     119
+    ],
+    "A": [
+     22,
+     33
+    ],
+    "A'": [
+     5,
+     7
+    ],
+    "B": [
+     14,
+     35
+    ],
+    "C": [
+     7,
+     35
+    ],
+    "D": [
+     7,
+     21
+    ],
+    "decade": [
+     29,
+     50
+    ],
+    "A+A'+B": [
+     41,
+     75
+    ],
+    "C+D": [
+     14,
+     56
+    ],
+    "not in text": [
+     55,
+     131
+    ],
+    "all year-tagged": [
+     171,
+     250
+    ],
+    "all": [
+     200,
+     300
+    ]
+   },
+   "within1": {
+    "in text": [
+     118,
+     119
+    ],
+    "A": [
+     26,
+     33
+    ],
+    "A'": [
+     6,
+     7
+    ],
+    "B": [
+     24,
+     35
+    ],
+    "C": [
+     21,
+     35
+    ],
+    "D": [
+     13,
+     21
+    ],
+    "decade": [
+     36,
+     50
+    ],
+    "A+A'+B": [
+     56,
+     75
+    ],
+    "C+D": [
+     34,
+     56
+    ],
+    "not in text": [
+     90,
+     131
+    ],
+    "all year-tagged": [
+     208,
+     250
+    ],
+    "all": [
+     244,
+     300
+    ]
+   },
+   "invalid": [
+    0,
+    300
+   ],
+   "stages": {
+    "one-shot": 300
+   },
+   "evidence": {
+    "none": 300
+   },
+   "right_unsupported": 0,
+   "conformal": {
+    "in text": {
+     "n": 119,
+     "alpha": 0.1,
+     "q": [
+      0,
+      0
+     ],
+     "coverage": [
+      116,
+      119
+     ],
+     "width": 0.0,
+     "winkler": 1.0084033613445378,
+     "no_year": 0
+    },
+    "A+A'+B": {
+     "n": 75,
+     "alpha": 0.1,
+     "q": [
+      4,
+      8
+     ],
+     "coverage": [
+      66,
+      75
+     ],
+     "width": 11.946666666666667,
+     "winkler": 24.746666666666666,
+     "no_year": 0
+    },
+    "C+D": {
+     "n": 56,
+     "alpha": 0.1,
+     "q": [
+      15,
+      4
+     ],
+     "coverage": [
+      50,
+      56
+     ],
+     "width": 19.0,
+     "winkler": 35.42857142857143,
+     "no_year": 0
+    },
+    "not in text": {
+     "n": 131,
+     "alpha": 0.1,
+     "q": [
+      6,
+      5
+     ],
+     "coverage": [
+      120,
+      131
+     ],
+     "width": 11.007633587786259,
+     "winkler": 22.458015267175572,
+     "no_year": 0
+    },
+    "all": {
+     "n": 300,
+     "alpha": 0.1,
+     "q": [
+      5,
+      6
+     ],
+     "coverage": [
+      275,
+      300
+     ],
+     "width": 11.0,
+     "winkler": 27.2,
+     "no_year": 0
+    }
+   },
+   "du": {
+    "certain_flagged_uncertain": [
+     52,
+     200
+    ],
+    "uncertain_flagged_certain": [
+     18,
+     50
+    ]
+   }
+  },
+  "owner|mlx-date-2b-8bit-nothink (app prompt)": {
+   "n": 300,
+   "exact": {
+    "in text": [
+     113,
+     119
+    ],
+    "A": [
+     23,
+     33
+    ],
+    "A'": [
+     5,
+     7
+    ],
+    "B": [
+     13,
+     35
+    ],
+    "C": [
+     4,
+     35
+    ],
+    "D": [
+     6,
+     21
+    ],
+    "decade": [
+     28,
+     50
+    ],
+    "A+A'+B": [
+     41,
+     75
+    ],
+    "C+D": [
+     10,
+     56
+    ],
+    "not in text": [
+     51,
+     131
+    ],
+    "all year-tagged": [
+     164,
+     250
+    ],
+    "all": [
+     192,
+     300
+    ]
+   },
+   "within1": {
+    "in text": [
+     118,
+     119
+    ],
+    "A": [
+     28,
+     33
+    ],
+    "A'": [
+     6,
+     7
+    ],
+    "B": [
+     23,
+     35
+    ],
+    "C": [
+     22,
+     35
+    ],
+    "D": [
+     11,
+     21
+    ],
+    "decade": [
+     36,
+     50
+    ],
+    "A+A'+B": [
+     57,
+     75
+    ],
+    "C+D": [
+     33,
+     56
+    ],
+    "not in text": [
+     90,
+     131
+    ],
+    "all year-tagged": [
+     208,
+     250
+    ],
+    "all": [
+     244,
+     300
+    ]
+   },
+   "invalid": [
+    0,
+    300
+   ],
+   "stages": {
+    "one-shot": 300
+   },
+   "evidence": {
+    "none": 300
+   },
+   "right_unsupported": 0,
+   "conformal": {
+    "in text": {
+     "n": 119,
+     "alpha": 0.1,
+     "q": [
+      0,
+      0
+     ],
+     "coverage": [
+      113,
+      119
+     ],
+     "width": 0.0,
+     "winkler": 1.5126050420168067,
+     "no_year": 0
+    },
+    "A+A'+B": {
+     "n": 75,
+     "alpha": 0.1,
+     "q": [
+      3,
+      7
+     ],
+     "coverage": [
+      66,
+      75
+     ],
+     "width": 9.946666666666667,
+     "winkler": 21.413333333333334,
+     "no_year": 0
+    },
+    "C+D": {
+     "n": 56,
+     "alpha": 0.1,
+     "q": [
+      20,
+      33
+     ],
+     "coverage": [
+      54,
+      56
+     ],
+     "width": 53.0,
+     "winkler": 62.285714285714285,
+     "no_year": 0
+    },
+    "not in text": {
+     "n": 131,
+     "alpha": 0.1,
+     "q": [
+      9,
+      7
+     ],
+     "coverage": [
+      121,
+      131
+     ],
+     "width": 16.015267175572518,
+     "winkler": 32.80916030534351,
+     "no_year": 0
+    },
+    "all": {
+     "n": 300,
+     "alpha": 0.1,
+     "q": [
+      6,
+      7
+     ],
+     "coverage": [
+      275,
+      300
+     ],
+     "width": 13.0,
+     "winkler": 30.866666666666667,
+     "no_year": 0
+    }
+   },
+   "du": {
+    "certain_flagged_uncertain": [
+     0,
+     200
+    ],
+    "uncertain_flagged_certain": [
+     50,
+     50
+    ]
+   }
+  },
+  "public|mlx-date-2b-8bit-nothink (app prompt)": {
+   "n": 300,
+   "exact": {
+    "in text": [
+     245,
+     257
+    ],
+    "not in text": [
+     39,
+     43
+    ],
+    "all": [
+     284,
+     300
+    ]
+   },
+   "within1": {
+    "in text": [
+     252,
+     257
+    ],
+    "not in text": [
+     40,
+     43
+    ],
+    "all": [
+     292,
+     300
+    ]
+   },
+   "invalid": [
+    0,
+    300
+   ],
+   "stages": {
+    "one-shot": 300
+   },
+   "evidence": {
+    "none": 300
+   },
+   "right_unsupported": 0,
+   "conformal": {
+    "in text": {
+     "n": 257,
+     "alpha": 0.1,
+     "q": [
+      0,
+      0
+     ],
+     "coverage": [
+      245,
+      257
+     ],
+     "width": 0.0,
+     "winkler": 3.424124513618677,
+     "no_year": 0
+    },
+    "not in text": {
+     "n": 43,
+     "alpha": 0.1,
+     "q": [
+      0,
+      2
+     ],
+     "coverage": [
+      40,
+      43
+     ],
+     "width": 1.9534883720930232,
+     "winkler": 5.209302325581396,
+     "no_year": 0
+    },
+    "all": {
+     "n": 300,
+     "alpha": 0.1,
+     "q": [
+      0,
+      0
+     ],
+     "coverage": [
+      284,
+      300
+     ],
+     "width": 0.0,
+     "winkler": 3.466666666666667,
+     "no_year": 0
+    }
+   },
+   "du": null
+  }
+ },
+ "trace": {},
+ "pipeline": {
+  "owner|rules only|no residue stage|t=3": {
+   "n": 300,
+   "exact": {
+    "in text": [
+     106,
+     119
+    ],
+    "A": [
+     25,
+     33
+    ],
+    "A'": [
+     5,
+     7
+    ],
+    "B": [
+     7,
+     35
+    ],
+    "C": [
+     2,
+     35
+    ],
+    "D": [
+     2,
+     21
+    ],
+    "decade": [
+     15,
+     50
+    ],
+    "A+A'+B": [
+     37,
+     75
+    ],
+    "C+D": [
+     4,
+     56
+    ],
+    "not in text": [
+     41,
+     131
+    ],
+    "all year-tagged": [
+     147,
+     250
+    ],
+    "all": [
+     162,
+     300
+    ]
+   },
+   "within1": {
+    "in text": [
+     112,
+     119
+    ],
+    "A": [
+     27,
+     33
+    ],
+    "A'": [
+     6,
+     7
+    ],
+    "B": [
+     16,
+     35
+    ],
+    "C": [
+     12,
+     35
+    ],
+    "D": [
+     6,
+     21
+    ],
+    "decade": [
+     19,
+     50
+    ],
+    "A+A'+B": [
+     49,
+     75
+    ],
+    "C+D": [
+     18,
+     56
+    ],
+    "not in text": [
+     67,
+     131
+    ],
+    "all year-tagged": [
+     179,
+     250
+    ],
+    "all": [
+     198,
+     300
+    ]
+   },
+   "invalid": [
+    19,
+    300
+   ],
+   "stages": {
+    "rule": 176,
+    "propagated": 105,
+    "none": 19
+   },
+   "evidence": {
+    "valid": 270,
+    "unsupported": 11
+   },
+   "right_unsupported": 6,
+   "conformal": {
+    "in text": {
+     "n": 119,
+     "alpha": 0.1,
+     "q": [
+      1,
+      1
+     ],
+     "coverage": [
+      112,
+      119
+     ],
+     "width": 2.0,
+     "winkler": 42.33613445378151,
+     "no_year": 0
+    },
+    "A+A'+B": {
+     "n": 75,
+     "alpha": 0.1,
+     "q": [
+      Infinity,
+      118
+     ],
+     "coverage": [
+      70,
+      75
+     ],
+     "width": 236.0,
+     "winkler": 236.0,
+     "no_year": 5
+    },
+    "C+D": {
+     "n": 56,
+     "alpha": 0.1,
+     "q": [
+      Infinity,
+      Infinity
+     ],
+     "coverage": [
+      49,
+      56
+     ],
+     "width": null,
+     "winkler": null,
+     "no_year": 7
+    },
+    "not in text": {
+     "n": 131,
+     "alpha": 0.1,
+     "q": [
+      Infinity,
+      Infinity
+     ],
+     "coverage": [
+      119,
+      131
+     ],
+     "width": null,
+     "winkler": null,
+     "no_year": 12
+    },
+    "all": {
+     "n": 300,
+     "alpha": 0.1,
+     "q": [
+      47,
+      73
+     ],
+     "coverage": [
+      274,
+      300
+     ],
+     "width": 120.4626334519573,
+     "winkler": 146.93950177935943,
+     "no_year": 19
+    }
+   },
+   "du": {
+    "certain_flagged_uncertain": [
+     61,
+     200
+    ],
+    "uncertain_flagged_certain": [
+     17,
+     50
+    ]
+   },
+   "per_1000": {
+    "gpu_s": 0.0,
+    "mac_s": 0.0,
+    "calls": {}
+   }
+  },
+  "owner|2B chooser|no residue stage|t=3": {
+   "n": 300,
+   "exact": {
+    "in text": [
+     113,
+     119
+    ],
+    "A": [
+     25,
+     33
+    ],
+    "A'": [
+     5,
+     7
+    ],
+    "B": [
+     7,
+     35
+    ],
+    "C": [
+     2,
+     35
+    ],
+    "D": [
+     3,
+     21
+    ],
+    "decade": [
+     15,
+     50
+    ],
+    "A+A'+B": [
+     37,
+     75
+    ],
+    "C+D": [
+     5,
+     56
+    ],
+    "not in text": [
+     42,
+     131
+    ],
+    "all year-tagged": [
+     155,
+     250
+    ],
+    "all": [
+     170,
+     300
+    ]
+   },
+   "within1": {
+    "in text": [
+     117,
+     119
+    ],
+    "A": [
+     27,
+     33
+    ],
+    "A'": [
+     6,
+     7
+    ],
+    "B": [
+     16,
+     35
+    ],
+    "C": [
+     13,
+     35
+    ],
+    "D": [
+     7,
+     21
+    ],
+    "decade": [
+     20,
+     50
+    ],
+    "A+A'+B": [
+     49,
+     75
+    ],
+    "C+D": [
+     20,
+     56
+    ],
+    "not in text": [
+     69,
+     131
+    ],
+    "all year-tagged": [
+     186,
+     250
+    ],
+    "all": [
+     206,
+     300
+    ]
+   },
+   "invalid": [
+    19,
+    300
+   ],
+   "stages": {
+    "chooser": 39,
+    "propagated": 105,
+    "rule": 137,
+    "none": 19
+   },
+   "evidence": {
+    "valid": 269,
+    "unsupported": 12
+   },
+   "right_unsupported": 7,
+   "conformal": {
+    "in text": {
+     "n": 119,
+     "alpha": 0.1,
+     "q": [
+      0,
+      0
+     ],
+     "coverage": [
+      113,
+      119
+     ],
+     "width": 0.0,
+     "winkler": 11.092436974789916,
+     "no_year": 0
+    },
+    "A+A'+B": {
+     "n": 75,
+     "alpha": 0.1,
+     "q": [
+      Infinity,
+      118
+     ],
+     "coverage": [
+      70,
+      75
+     ],
+     "width": 236.0,
+     "winkler": 236.0,
+     "no_year": 5
+    },
+    "C+D": {
+     "n": 56,
+     "alpha": 0.1,
+     "q": [
+      Infinity,
+      Infinity
+     ],
+     "coverage": [
+      49,
+      56
+     ],
+     "width": null,
+     "winkler": null,
+     "no_year": 7
+    },
+    "not in text": {
+     "n": 131,
+     "alpha": 0.1,
+     "q": [
+      Infinity,
+      Infinity
+     ],
+     "coverage": [
+      119,
+      131
+     ],
+     "width": null,
+     "winkler": null,
+     "no_year": 12
+    },
+    "all": {
+     "n": 300,
+     "alpha": 0.1,
+     "q": [
+      36,
+      69
+     ],
+     "coverage": [
+      273,
+      300
+     ],
+     "width": 105.58718861209964,
+     "winkler": 129.0747330960854,
+     "no_year": 19
+    }
+   },
+   "du": {
+    "certain_flagged_uncertain": [
+     61,
+     200
+    ],
+    "uncertain_flagged_certain": [
+     17,
+     50
+    ]
+   },
+   "per_1000": {
+    "gpu_s": 0.0,
+    "mac_s": 259.5,
+    "calls": {
+     "2b": 56
+    }
+   }
+  },
+  "public|rules only|no residue stage|t=3": {
+   "n": 300,
+   "exact": {
+    "in text": [
+     236,
+     257
+    ],
+    "not in text": [
+     8,
+     43
+    ],
+    "all": [
+     244,
+     300
+    ]
+   },
+   "within1": {
+    "in text": [
+     242,
+     257
+    ],
+    "not in text": [
+     9,
+     43
+    ],
+    "all": [
+     251,
+     300
+    ]
+   },
+   "invalid": [
+    29,
+    300
+   ],
+   "stages": {
+    "rule": 271,
+    "none": 29
+   },
+   "evidence": {
+    "valid": 258,
+    "unsupported": 13
+   },
+   "right_unsupported": 10,
+   "conformal": {
+    "in text": {
+     "n": 257,
+     "alpha": 0.1,
+     "q": [
+      1,
+      0
+     ],
+     "coverage": [
+      240,
+      257
+     ],
+     "width": 1.011764705882353,
+     "winkler": 30.188235294117646,
+     "no_year": 2
+    },
+    "not in text": {
+     "n": 43,
+     "alpha": 0.1,
+     "q": [
+      Infinity,
+      Infinity
+     ],
+     "coverage": [
+      16,
+      43
+     ],
+     "width": null,
+     "winkler": null,
+     "no_year": 27
+    },
+    "all": {
+     "n": 300,
+     "alpha": 0.1,
+     "q": [
+      Infinity,
+      50
+     ],
+     "coverage": [
+      269,
+      300
+     ],
+     "width": 100.0,
+     "winkler": 126.51851851851852,
+     "no_year": 29
+    }
+   },
+   "du": null,
+   "per_1000": {
+    "gpu_s": 0.0,
+    "mac_s": 0.0,
+    "calls": {}
+   }
+  },
+  "public|2B chooser|no residue stage|t=3": {
+   "n": 300,
+   "exact": {
+    "in text": [
+     247,
+     257
+    ],
+    "not in text": [
+     8,
+     43
+    ],
+    "all": [
+     255,
+     300
+    ]
+   },
+   "within1": {
+    "in text": [
+     251,
+     257
+    ],
+    "not in text": [
+     9,
+     43
+    ],
+    "all": [
+     260,
+     300
+    ]
+   },
+   "invalid": [
+    29,
+    300
+   ],
+   "stages": {
+    "rule": 236,
+    "chooser": 35,
+    "none": 29
+   },
+   "evidence": {
+    "valid": 259,
+    "unsupported": 12
+   },
+   "right_unsupported": 10,
+   "conformal": {
+    "in text": {
+     "n": 257,
+     "alpha": 0.1,
+     "q": [
+      0,
+      0
+     ],
+     "coverage": [
+      247,
+      257
+     ],
+     "width": 0.0,
+     "winkler": 3.607843137254902,
+     "no_year": 2
+    },
+    "not in text": {
+     "n": 43,
+     "alpha": 0.1,
+     "q": [
+      Infinity,
+      Infinity
+     ],
+     "coverage": [
+      16,
+      43
+     ],
+     "width": null,
+     "winkler": null,
+     "no_year": 27
+    },
+    "all": {
+     "n": 300,
+     "alpha": 0.1,
+     "q": [
+      Infinity,
+      45
+     ],
+     "coverage": [
+      271,
+      300
+     ],
+     "width": 90.0,
+     "winkler": 90.0,
+     "no_year": 29
+    }
+   },
+   "du": null,
+   "per_1000": {
+    "gpu_s": 0.0,
+    "mac_s": 190.0,
+    "calls": {
+     "2b": 41
+    }
+   }
+  }
+ },
+ "cost": {
+  "choose": {
+   "gpu_s_per_reply": null,
+   "n": 0
+  },
+  "trace-plain": {
+   "gpu_s_per_reply": null,
+   "n": 0
+  },
+  "trace-neigh": {
+   "gpu_s_per_reply": null,
+   "n": 0
+  },
+  "trace-shots": {
+   "gpu_s_per_reply": null,
+   "n": 0
+  }
+ }
+}

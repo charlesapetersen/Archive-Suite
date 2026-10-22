@@ -209,7 +209,7 @@ def document_pool():
                               "collection": CP.collection_of(f), "pages": len(s["pages"]), "truth": truth,
                               "year_in_text": bool(year_s) and year_s in texts[k][:3000],
                               "prompt": build_prompt(texts[k], context), "n_near": len(near),
-                              "context_ids": context_ids})
+                              "context_ids": context_ids, "folder": f, "position": k})
     counts["folders"] = len(folders)
     return pool, counts
 
@@ -237,7 +237,7 @@ def cmd_sample(a):
     os.makedirs(CACHE, exist_ok=True)
     with open(os.path.join(CACHE, "sample.jsonl.tmp"), "w", encoding="utf-8") as fh:
         for d in sample:
-            fh.write(json.dumps({k: v for k, v in d.items() if k != "context_ids"}, ensure_ascii=False) + "\n")
+            fh.write(json.dumps({k: v for k, v in d.items() if k not in ("context_ids", "folder", "position")}, ensure_ascii=False) + "\n")
     os.replace(os.path.join(CACHE, "sample.jsonl.tmp"), os.path.join(CACHE, "sample.jsonl"))
     json.dump(dict(sorted(counts.items())), open(os.path.join(CACHE, "sample-summary.json"), "w"), indent=1)
     print(json.dumps(dict(sorted(counts.items())), indent=1))
