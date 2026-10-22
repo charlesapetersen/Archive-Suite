@@ -42,6 +42,7 @@ LTS_2B = os.path.expanduser("~/Claude/Long term storage/FarmShare-20261018/date-
 RESULTS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "segbench-results", "date-traceable.md")
 RESULTS_JSON = RESULTS[:-3] + ".json"
 LABEL_27B = "qwen3.6-27b-nothink"
+LABEL_VISION = LABEL_27B + "-vision"     # the same model on prompts built from Apple Vision text
 LO, HI = 1800, 2030
 TEXT_CHARS = 3000          # what the app sends of a document
 NEAR_CHARS = 600           # of each neighbour in the trace prompt (the app's context sends 300 of three)
@@ -186,7 +187,8 @@ def vision_text(pages):
 
 def cmd_vision(a):
     """Render (sips, into the cache; the corpus is only read) and read (segbench's ocr.swift, the app's Vision
-    settings) the first two pages of each owner document and of the three documents before it. Resumable."""
+    settings) the first two pages of each owner document and of the three documents before it and, with --after, the
+    three after it (the trace prompt shows them; the re-classing reads the year within three either side). Resumable."""
     import subprocess
     import corpus_survey as CS
     import data as D
@@ -198,7 +200,11 @@ def cmd_vision(a):
         if not info:
             continue
         k, segs = info["k"], info["segs"]
-        for j in [k] + [j for j in range(k - 1, -1, -1) if segs[j]["kind"] == "doc"][:NEAR]:
+        js = [k] + [j for j in range(k - 1, -1, -1) if segs[j]["kind"] == "doc"][:NEAR]
+        if a.after:
+            js += [j for j in range(k + 1, len(segs)) if segs[j]["kind"] == "doc"][:NEAR]
+            js += [j for j in range(max(0, k - NEAR), min(len(segs), k + NEAR + 1)) if segs[j]["kind"] == "doc"]
+        for j in js:
             pages += [p for p in segs[j]["pages"][:VISION_PAGES] if p not in pages]
     pages = pages[:a.limit or None]
     tool = D.build_ocr_tool()
@@ -232,13 +238,31 @@ def cmd_vision(a):
 
 # ---- documents ------------------------------------------------------------------------------------------------------
 
+def union_cands(primary, other, mode="union"):
+    """Rule candidates from two readings of one document. "union": the primary text's, then the other's; rule_pick keeps
+    list order, so the primary's head date wins, the other's head date comes next, and the weighted fallback counts a
+    year printed in both texts twice. "fallback": the primary's alone, the other's only when the primary has none."""
+    cs = candidates(primary)
+    if mode == "fallback":
+        return cs or candidates(other or "")
+    return cs + candidates(other or "")
+
+
+SOURCES = ("abbyy", "vision", "union-abbyy", "union-vision", "fallback-abbyy", "fallback-vision")
+
+
 def owner_docs(source="abbyy"):
     """The owner's 300 with each one's folder neighbours: [{id, set, cls, truth, text, collection, folder, near}],
     near = [(label, id, text, rule pick)] for up to three documents either side (Box/Folder labels skipped, not counted).
     source "vision": Apple Vision text of the first two pages instead of the corpus text cache, for the document and
-    the three before it (propagation looks only back); a document with any of those pages unread is left out."""
+    the three before it (propagation looks only back); a document with any of those pages unread is left out. The
+    three after are kept where Vision read them (`vision --after`). "union-abbyy" / "union-vision": the same documents,
+    the rule reading both texts' candidates with the named one first (`union_cands`), text and prompts the primary's,
+    `alt` the other text (the evidence check accepts a quote from either). "fallback-abbyy" / "fallback-vision": the
+    named text's candidates alone, the other's only where it has none."""
     import date_truth as DTr
     import enclosure_split as ES
+    assert source in SOURCES, source
     sample, found = ES.load()
     rows = ES.build_rows(sample, found, labels=())
     cls = {r["id"]: DTr.structural_class(r, found[r["id"]], found) for r in rows}
@@ -250,22 +274,64 @@ def owner_docs(source="abbyy"):
         k, segs, texts = info["k"], info["segs"], info["texts"]
         before = [j for j in range(k - 1, -1, -1) if segs[j]["kind"] == "doc"][:NEAR]
         after = [j for j in range(k + 1, len(segs)) if segs[j]["kind"] == "doc"][:NEAR]
-        if source == "vision":
+        ctexts, alt = dict(enumerate(texts)), {}
+        if source != "abbyy":
             vt = {j: vision_text(segs[j]["pages"]) for j in [k] + before}
             if any(v is None for v in vt.values()):
                 continue
-            texts = dict(enumerate(texts))
-            texts.update(vt)
-            after = []
+            va = {j: vision_text(segs[j]["pages"]) for j in after}
+            after = [j for j in after if va[j] is not None]
+            vt.update({j: va[j] for j in after})
+            if source.endswith("-abbyy"):
+                alt = vt
+            else:
+                texts, alt = {**ctexts, **vt}, ({j: ctexts[j] for j in vt} if source != "vision" else {})
+        mode = source.split("-")[0]
         near = []
         for lab, js in (("P", before), ("N", after)):
             for i, j in enumerate(js, 1):
+                cs = union_cands(texts[j], alt[j], mode) if alt else candidates(texts[j])
                 near.append({"label": f"{lab}{i}", "dist": i if lab == "P" else -i, "text": texts[j],
-                             "pick": rule_pick(candidates(texts[j]))})
-        out.append({"id": "o:" + d["id"], "set": "owner", "cls": cls.get(d["id"], "decade" if d["class"] == "decade" else None),
-                    "kind": d["class"], "truth": d["truth"], "text": texts[k], "collection": d["collection"],
-                    "folder": info["folder"], "position": k, "near": near, "prompt": d["prompt"]})
+                             "alt": alt.get(j), "pick": rule_pick(cs)})
+        doc = {"id": "o:" + d["id"], "set": "owner", "cls": cls.get(d["id"], "decade" if d["class"] == "decade" else None),
+               "kind": d["class"], "truth": d["truth"], "text": texts[k], "collection": d["collection"],
+               "folder": info["folder"], "position": k, "near": near, "prompt": d["prompt"]}
+        if alt:
+            doc["alt"], doc["cands"] = alt[k], union_cands(texts[k], alt[k], mode)
+        out.append(doc)
     return out
+
+
+def reread_classes():
+    """date_truth's classes with a year counting as printed when it is in the corpus text OR in Apple Vision's text of
+    the document's first two pages ({id: class}, owner ids "o:…"). Vision text exists for the 300 and the three
+    documents either side of each, so a class that looks further (C against D, the nearest printed same-year document
+    anywhere in the folder) reads the corpus text alone beyond them. The definitions are date_truth's and
+    enclosure_split's own, called with their printed-year test swapped."""
+    import date_truth as DTr
+    import enclosure_split as ES
+    sample, found = ES.load()
+    orig = ES.own_year_in_text
+
+    def printed(k, info):
+        if orig(k, info):
+            return True
+        tr = info["truths"][k][1]
+        if not tr or "year" not in tr:
+            return False
+        vt = vision_text(info["segs"][k]["pages"])
+        return vt is not None and str(tr["year"]) in vt[:TEXT_CHARS]
+
+    ES.own_year_in_text = printed
+    try:
+        rows = ES.build_rows(sample, found, labels=())
+        for r in rows:
+            r["year_in_text"] = printed(found[r["id"]]["k"], found[r["id"]])
+        cls = {r["id"]: DTr.structural_class(r, found[r["id"]], found) for r in rows}
+    finally:
+        ES.own_year_in_text = orig
+    return {"o:" + d["id"]: cls.get(d["id"], "decade" if d["class"] == "decade" else None)
+            for d in sample if d["id"] in found}
 
 
 def public_docs():
@@ -446,8 +512,12 @@ def context_of(doc, variant="plain"):
     """What a trace prompt gave the model, by the ids it may cite (evidence_check's context). "neigh" adds each
     neighbour's rule line, which that prompt shows; "rules" is what the rule stage read (3,000 characters of each)."""
     ctx = {"self": doc["text"][:TEXT_CHARS]}
+    if variant == "rules" and doc.get("alt"):
+        ctx["self"] += "\n" + doc["alt"][:TEXT_CHARS]
     for n in doc["near"]:
         ctx[n["label"]] = n["text"][:TEXT_CHARS if variant == "rules" else NEAR_CHARS]
+        if variant == "rules" and n.get("alt"):
+            ctx[n["label"]] += "\n" + n["alt"][:TEXT_CHARS]
         if variant == "neigh" and n["pick"][3] is not None:
             ctx[n["label"]] += "\n" + n["pick"][3]["line"]
     return ctx
@@ -481,9 +551,27 @@ def requests(owner, pub, pool):
     return out
 
 
+def requests_vision(vis):
+    """[(id, prompt)] of the Vision-text pack (W46.date-traceable-vision): choose on every ambiguous rule pick and
+    trace-neigh on all of the owner's documents, both built from Apple Vision text. Same ids as the corpus-text pack;
+    the replies are imported under LABEL_VISION."""
+    out = []
+    for d in vis:
+        cs = candidates(d["text"])
+        if rule_pick(cs)[2] == "ambiguous":
+            out.append(("choose|" + d["id"], choose_prompt(d, distinct(cs))))
+        out.append(("trace-neigh|" + d["id"], trace_prompt(d, "neigh")))
+    i = next(k for k, (i_, _) in enumerate(out) if i_.startswith("choose|"))
+    out.insert(0, out.pop(i))
+    return out
+
+
 def cmd_export(a):
-    owner, pub, pool = all_docs()
-    reqs = requests(owner, pub, pool)
+    if a.source == "vision":
+        reqs = requests_vision(owner_docs("vision"))
+    else:
+        owner, pub, pool = all_docs()
+        reqs = requests(owner, pub, pool)
     os.makedirs(a.out, exist_ok=True)
     with open(os.path.join(a.out, "requests.jsonl"), "w", encoding="utf-8") as fh:
         for i, p in reqs:
@@ -552,7 +640,7 @@ def row(doc, stage, y, du, parsed=True, lo=None, hi=None, evidence=None, verdict
 def pipeline(doc, chooser, residue, threshold, variant="plain"):
     """One document through the stages. chooser: None (rule pick stands), "2b" or a dict of 27B choose replies.
     residue: a dict of trace replies for one variant, or None (no residue stage: unreached documents get no year)."""
-    cs = candidates(doc["text"])
+    cs = doc.get("cands") or candidates(doc["text"])
     y, _, conf, c = rule_pick(cs)
     calls = []
     if y is not None:
@@ -743,6 +831,7 @@ def cmd_score(a):
             ts = [json.loads(l) for l in open(tf)]
             n = sum(t["read_now"] for t in ts)
             out["vision"]["seconds_per_page"] = round(sum(t["render_s"] + t["read_s"] for t in ts) / max(1, n), 2)
+        out["vision_arms"] = vision_arms(owner, vis, ans)
     for arm in ("choose", "trace-plain", "trace-neigh", "trace-shots"):
         out["cost"][arm] = {"gpu_s_per_reply": secs.get(arm), "n": sum(1 for i in ans if i.startswith(arm + "|"))}
     os.makedirs(os.path.dirname(RESULTS_JSON), exist_ok=True)
@@ -750,6 +839,60 @@ def cmd_score(a):
         json.dump(out, fh, indent=1)
     write_md(out)
     print(f"{len(out['pipeline'])} pipeline configurations scored -> {RESULTS}")
+
+
+def vision_arms(owner, vis, ans):
+    """W46.date-traceable-vision: the 27B's chooser and residue on Vision text, the rules on the union of both texts,
+    and every configuration scored twice, on date_truth's classes and on the classes re-read with Vision text
+    (`reread_classes`). The 300 one-shot replies and the corpus-text pipeline are re-scored on the same documents so
+    the two class tables compare like with like."""
+    va = load_answers(LABEL_VISION)
+    ids = {d["id"] for d in vis}
+    corpus = [d for d in owner if d["id"] in ids]
+    rc = reread_classes()
+    union = {s: owner_docs(s) for s in SOURCES[2:]}
+    res_c = {d["id"]: ans[f"trace-neigh|{d['id']}"] for d in corpus if f"trace-neigh|{d['id']}" in ans}
+    res_v = {d["id"]: va[f"trace-neigh|{d['id']}"] for d in vis if f"trace-neigh|{d['id']}" in va}
+    cfg = []
+    for lab, name in ((None, DT.MODEL), (LABEL_27B, "27B one shot, app prompt"),
+                      ("mlx-date-2b-8bit-nothink", "2B one shot, app prompt")):
+        rs = [row(d, "one-shot", *got) for d in corpus for got in [one_shot(d, lab)] if got is not None]
+        if len(rs) == len(corpus):
+            cfg.append((f"{name} (corpus text)", rs))
+    cfg.append(("27B trace-neigh one shot (corpus text)", trace_rows(corpus, ans, "neigh")))
+    if len(res_v) == len(vis):
+        cfg.append(("27B trace-neigh one shot (Vision text)", trace_rows(vis, va, "neigh")))
+    cfg.append(("corpus text: 2B chooser|27B trace-neigh|t=3", [pipeline(d, "2b", res_c, NEAR, "neigh") for d in corpus]))
+    choosers = [("rules only", None), ("2B chooser", "2b")] + ([("27B chooser", va)] if va else [])
+    for cn, ch in choosers:
+        for rn, res, ts in (("no residue stage", None, (NEAR,)), ("27B trace-neigh", res_v if va else None, (0, NEAR))):
+            if res is None and rn != "no residue stage":
+                continue
+            for t in ts:
+                cfg.append((f"Vision text: {cn}|{rn}|t={t}", [pipeline(d, ch, res, t, "neigh") for d in vis]))
+    for src, docs in union.items():
+        first = "corpus" if src.endswith("-abbyy") else "Vision"
+        how = "first" if src.startswith("union") else "else the other"
+        for cn, ch in (("rules only", None), ("2B chooser", "2b")):
+            # the residue's replies are the ones whose prompt carried the primary text, so their quotes check against it
+            for rn, res in (("no residue stage", None),
+                            ("27B trace-neigh", res_c if src.endswith("-abbyy") else (res_v if va else None))):
+                if res is None and rn != "no residue stage":
+                    continue
+                cfg.append((f"{src.split('-')[0]}, {first} {how}: {cn}|{rn}|t={NEAR}",
+                            [pipeline(d, ch, res, NEAR, "neigh") for d in docs]))
+    secs = {**arm_seconds(va, LABEL_VISION)}
+    out = {"documents": len(vis), "answers": len(va), "configs": {},
+           "classes": {"corpus": dict(collections.Counter(d["cls"] for d in vis)),
+                       "reread": dict(collections.Counter(rc[d["id"]] for d in vis))},
+           "moved": dict(collections.Counter(f"{d['cls']} -> {rc[d['id']]}" for d in vis if d["cls"] != rc[d["id"]])),
+           "cost": {arm: {"gpu_s_per_reply": secs.get(arm), "n": sum(1 for i in va if i.startswith(arm + "|"))}
+                    for arm in ("choose", "trace-neigh")}}
+    for name, rs in cfg:
+        rr = [{**r, "cls": rc[r["id"]]} for r in rs]
+        out["configs"][name] = {"corpus": summary(rs, "owner"), "reread": summary(rr, "owner"),
+                                "per_1000": per_1000(rs, secs) if any(r.get("calls") for r in rs) else None}
+    return out
 
 
 def pc(x):
@@ -884,6 +1027,38 @@ def write_md(out):
               f"corpus text cache on the same documents. Rendering and reading took {v.get('seconds_per_page', '–')} s "
               f"a page on this Mac. The 2B chooser's replies were made from the corpus text; on Vision text it is kept "
               f"only when it names a Vision candidate. The route's own chooser (Foundation Models) is not measured.")
+    va = out.get("vision_arms")
+    if va:
+        order = OWNER_STRATA
+        L += ["## The chooser and the residue on Vision text, and the classes re-read on it (W46.date-traceable-vision)", "",
+              f"The 27B's choose and trace-neigh prompts built from Apple Vision text ({va['answers']} replies, the "
+              f"same model and settings as the corpus-text run); the rule stage reading the candidates of both texts "
+              f"(union, the named text's first); and the classes re-read with a year counting as printed when it is in "
+              f"the corpus text or in Vision's text of the first two pages. Vision text covers the 300 and the three "
+              f"documents either side of each, so C against D (the nearest printed same-year document anywhere in the "
+              f"folder) still reads the corpus text beyond them. {va['documents']} documents.", "",
+              "| classes | " + " | ".join(order) + " |", "|---|" + "---:|" * len(order)]
+        for k in ("corpus", "reread"):
+            L.append(f"| {'corpus text (date_truth)' if k == 'corpus' else 're-read with Vision text'} | "
+                     + " | ".join(str(va["classes"][k].get(c, 0)) for c in order) + " |")
+        L += ["", "Moved: " + ", ".join(f"{k} {v}" for k, v in sorted(va["moved"].items(), key=lambda kv: -kv[1])) + ".", ""]
+        for k, title in (("corpus", "scored on the corpus-text classes"), ("reread", "scored on the classes re-read with Vision text")):
+            table(f"Vision-text arms, owner set, {title} (exact year)",
+                  [(name, c[k]) for name, c in va["configs"].items()], True,
+                  "" if k == "corpus" else "The same rows; only the class each document is counted under changes. "
+                  "'not in text' is now the documents whose year neither text prints.")
+        L += ["| arm (Vision text) | replies | GPU-seconds a reply |", "|---|---:|---:|"]
+        for arm, c in va["cost"].items():
+            v = c["gpu_s_per_reply"]
+            L.append(f"| {arm} | {c['n']} | {v:.2f} |" if v is not None else f"| {arm} | {c['n']} | – |")
+        L += ["", "| configuration | 27B calls per 1,000 | GPU-seconds per 1,000 | Mac seconds per 1,000 (2B) |",
+              "|---|---:|---:|---:|"]
+        for name, c in va["configs"].items():
+            p = c["per_1000"]
+            if p:
+                n = sum(v for a, v in p["calls"].items() if a != "2b") * 1000 / max(1, c["corpus"]["n"])
+                L.append(f"| {name} | {n:.0f} | {p['gpu_s']:.0f} | {p['mac_s']:.0f} |")
+        L.append("")
     L += ["## Cost", "", "GPU-seconds a reply: the job's measured wall time on one L40S (16 requests at once), shared "
           "over the arms by tokens. A configuration's cost per 1,000 documents is its calls times these; the 2B "
           "chooser runs on the Mac at 1.39 s a document. No money on any arm.", "",
@@ -905,10 +1080,11 @@ def main():
     sub = ap.add_subparsers(dest="cmd", required=True)
     sub.add_parser("rules")
     e = sub.add_parser("export"); e.add_argument("--out", required=True)
+    e.add_argument("--source", choices=("abbyy", "vision"), default="abbyy")
     i = sub.add_parser("import"); i.add_argument("--answers", required=True); i.add_argument("--label", default=LABEL_27B)
     i.add_argument("--summary", help="cluster_text's summary-*.json of the full run (its wall time prices the arms)")
     sub.add_parser("score")
-    v = sub.add_parser("vision"); v.add_argument("--limit", type=int, default=0)
+    v = sub.add_parser("vision"); v.add_argument("--limit", type=int, default=0); v.add_argument("--after", action="store_true")
     a = ap.parse_args()
     {"rules": cmd_rules, "export": cmd_export, "import": cmd_import, "score": cmd_score, "vision": cmd_vision}[a.cmd](a)
 

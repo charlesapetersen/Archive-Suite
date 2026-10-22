@@ -124,6 +124,30 @@ class Pipeline(unittest.TestCase):
         self.assertEqual(T.pipeline(d, {}, None, 3)["y"], 1951)
 
 
+class Union(unittest.TestCase):
+    def test_the_primary_texts_head_date_wins_then_the_others(self):
+        abbyy, vision = "Dear Sir\nthe 1946 act", "March 3, 1947\nDear Sir"
+        self.assertEqual(T.rule_pick(T.union_cands(abbyy, vision))[0], 1947)     # the corpus prints no dated form
+        self.assertEqual(T.rule_pick(T.union_cands("May 1, 1950", vision))[0], 1950)
+        self.assertEqual(T.rule_pick(T.union_cands(vision, "May 1, 1950"))[0], 1947)
+        self.assertEqual(T.union_cands("no date", None), [])
+
+    def test_fallback_reads_the_other_text_only_when_the_primary_has_no_date(self):
+        self.assertEqual([c["year"] for c in T.union_cands("1950", "May 1, 1947", "fallback")], [1950])
+        self.assertEqual([c["year"] for c in T.union_cands("no date", "May 1, 1947", "fallback")], [1947])
+
+    def test_a_year_in_both_texts_counts_twice_in_the_fallback(self):
+        cs = T.union_cands("x\n" * 20 + "in 1950 and 1946", "x\n" * 20 + "1946 again")
+        self.assertEqual(T.rule_pick(cs)[0], 1946)
+
+    def test_the_union_document_and_its_evidence_read_both_texts(self):
+        d = doc("Dear Sir, ISIS")
+        d["alt"], d["cands"] = "June 1, 1915\nDear Sir", T.union_cands(d["text"], "June 1, 1915\nDear Sir")
+        r = T.pipeline(d, None, None, 3)
+        self.assertEqual((r["stage"], r["y"], r["verdict"]), ("rule", 1915, "valid"))
+        self.assertNotIn("June", T.context_of(d, "neigh")["self"])     # a trace prompt showed only the primary
+
+
 class Prompts(unittest.TestCase):
     def test_trace_prompt_variants(self):
         d = doc("Dear Sir", near=[("P1", "May 5, 1946\nmemo"), ("N1", "no date")])
