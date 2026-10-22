@@ -422,6 +422,40 @@ final class ViewerUITests: FixtureUITestCase {
         dismissPreviewSheet()
     }
 
+    /// W40.fix-reader-doc-find-focus: ⌘F must leave the caret in the find field, so typing lands there with
+    /// no click. `app.typeText` types into whatever holds keyboard focus, so the field's value is the proof.
+    /// Twice: once opening the bar, once with the bar already open after a click moved focus to a pane —
+    /// the case where `showingFind` does not change.
+    func testFindShortcutFocusesTheFindField() throws {
+        waitForRows(minimum: 3, timeout: 10)
+        clickRow(0)
+        pressKey("o", modifiers: .command)
+        settle(2)
+        XCTAssertGreaterThanOrEqual(app.windows.count, 2, "precondition: the document window opened")
+
+        pressKey("f", modifiers: .command)
+        let find = app.textFields["ar.doc.findField"]
+        XCTAssertTrue(find.waitForExistence(timeout: 5), "⌘F should show the find bar")
+        settle(0.5)
+        app.typeText("Calif")
+        settle(0.3)
+        XCTAssertEqual(find.value as? String, "Calif", "typing straight after ⌘F should land in the find field")
+
+        // Move focus into the image pane, below the find bar, then ⌘F again on the open bar.
+        find.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+            .withOffset(CGVector(dx: 0, dy: 250)).click()
+        settle(0.5)
+        XCTAssertFalse((find.value(forKey: "hasKeyboardFocus") as? Bool) ?? false,
+                       "precondition: clicking the pane took focus from the find field")
+        pressKey("f", modifiers: .command)
+        settle(0.5)
+        XCTAssertTrue((find.value(forKey: "hasKeyboardFocus") as? Bool) ?? false,
+                      "⌘F with the bar already open should put the caret back in the find field")
+
+        pressKey("w", modifiers: .command)
+        settle(1)
+    }
+
     /// Open the preview sheet from the navigation toolbar (more robust than Space, which is focus-scoped)
     /// and wait for it to be on screen.
     private func openPreviewSheet() {

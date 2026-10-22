@@ -51,7 +51,13 @@ struct DocumentWindowView: View {
             }
         }
         // DV-2: the split width + per-pane zoom now persist across ↑/↓ cycling — no per-document reset.
-        .onChange(of: model.showingFind) { if model.showingFind { findFocused = true } }
+        // W40.fix-reader-doc-find-focus: ⌘F left the caret in the pane. Setting focus in the same update
+        // that inserts the find bar targets a field that isn't in the window yet, so it is deferred a turn;
+        // and a pane's PDFView is an AppKit first responder SwiftUI's focus doesn't always take from, so it
+        // is resigned first. The counter makes ⌘F refocus a bar that is already open; `showingFind` still
+        // covers ⌘G / ⇧⌘G opening the bar.
+        .onChange(of: model.findFocusRequest) { focusFindField() }
+        .onChange(of: model.showingFind) { if model.showingFind { focusFindField() } }
         // DV-1: on close, the current window size becomes the default for the next viewer.
         .onDisappear { if let w = docWindow { AppSettings.setViewerWindowSize(w.frame.size) } }
     }
@@ -177,6 +183,13 @@ struct DocumentWindowView: View {
         .padding(8)
     }
 
+    private func focusFindField() {
+        DispatchQueue.main.async {
+            docWindow?.makeFirstResponder(nil)
+            findFocused = true
+        }
+    }
+
     @ToolbarContentBuilder private var toolbar: some ToolbarContent {
         ToolbarItemGroup {
             Button { model.previous() } label: { Label("Previous", systemImage: "chevron.up") }
@@ -210,7 +223,7 @@ struct DocumentWindowView: View {
                 .help("Copy the selected text exactly (⌘C)")
             Button { model.copySelection() } label: { Label("Copy Cleaned", systemImage: "doc.on.doc.fill") }
                 .help("Copy the selected text cleaned for prose — joins lines, de-hyphenates (⌘⇧C)")
-            Button { model.showingFind = true; findFocused = true } label: { Label("Find", systemImage: "magnifyingglass") }
+            Button { model.beginFind() } label: { Label("Find", systemImage: "magnifyingglass") }
                 .help("Search for text in this document (⌘F)")
             Button { fraction = defaultFraction; model.leftController.fit(); model.rightController.fit() } label: {
                 Label("Reset Layout", systemImage: "rectangle.split.2x1")

@@ -12729,3 +12729,15 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
     Plus a fixed-width cell render. Reader unit suite green (DeepLinkTests skipped as usual), no new warnings.
     No VM pass: the headless table render shows the bug and the fix directly.
   <!-- /W40.fix-reader-long-name-overrun -->
+- [x] **W40.fix-reader-doc-find-focus — ⌘F in the document window opens the find bar but leaves the caret elsewhere, so typing goes nowhere [S · S3]** · §W40 — verification phase · SHIPPED 2026-10-21
+  (lane: reader) Found by `W40.e10` 2026-10-16 (`verification/evidence/reader/visual-2026-10-16.md`): the tour printed
+  `find field focused after ⌘F: false` in all four tours. Cause (the fix bears it out): `DocumentWindowView` set `findFocused = true`
+  in the same update that inserted the find bar, so it aimed at a field that wasn't in the window yet, while a pane's
+  PDFView kept first responder. Fix: the model's new `beginFind()` (⌘F and the toolbar's Find) shows the bar and bumps
+  `findFocusRequest`; the view defers focus one main-queue turn, resigns the PDFView (`makeFirstResponder(nil)`) and
+  then sets the focus state. The counter also refocuses a bar that is already open after a click into a pane, where
+  `showingFind` does not change; ⌘G / ⇧⌘G opening the bar still focus it through `showingFind`.
+  Test: `ViewerUITests.testFindShortcutFocusesTheFindField` presses ⌘F and types with no click (`app.typeText`), then
+  clicks the image pane and checks ⌘F puts the caret back. VM: passes with the fix (and ×3 iterations); with the fix
+  stashed it fails on `"" ≠ "Calif"`, so it discriminates. Reader unit suite green (DeepLinkTests skipped), no new warnings.
+  <!-- /W40.fix-reader-doc-find-focus -->

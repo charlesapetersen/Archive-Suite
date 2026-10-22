@@ -163,7 +163,7 @@ struct ArchiveReaderCommands: Commands {
             // The preview sheet publishes a model so zoom/paging/copy/page-link reach it (W26.previewzoom),
             // which enables every `doc == nil` item here — but it has no find bar and no way to type a
             // query, so ⌘F looked live and did nothing there (W26.previewzoom-fu1).
-            Button("Find…") { doc?.showingFind = true }
+            Button("Find…") { doc?.beginFind() }
                 .keyboardShortcut("f", modifiers: .command).disabled(noFind)
             Button("Find Next") { doc?.showingFind = true; doc?.findNext() }
                 .keyboardShortcut("g", modifiers: .command).disabled(noFind)

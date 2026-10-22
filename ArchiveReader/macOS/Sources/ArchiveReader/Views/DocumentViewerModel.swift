@@ -22,6 +22,9 @@ final class DocumentViewerModel: ObservableObject {
     @Published private(set) var jpegPartnerRelativePath: String?
     @Published private(set) var imageSource: DocumentImageSource = .pdf
     @Published var showingFind = false   // driven by the toolbar and the Document menu
+    /// Bumped by every `beginFind()`, so the view puts the caret in the find field even when the bar is
+    /// already showing (⌘F again after clicking a pane), where `showingFind` itself does not change.
+    @Published private(set) var findFocusRequest = 0
     @Published var findQuery = ""        // the find-bar text (bound to the field)
     @Published private(set) var findOrdinal: Int?     // 1-based position of the current match ("3 of 12")
     @Published private(set) var findTotal = 0         // total matches across ALL open documents
@@ -255,6 +258,13 @@ final class DocumentViewerModel: ObservableObject {
         findNavigator = FindNavigator(perPane: perPane)
         refreshFindPublished()
         applyCurrentMatch()
+    }
+
+    /// Show the find bar and ask the view to focus its field. ⌘F and the toolbar's Find button.
+    func beginFind() {
+        guard supportsFind else { return }
+        showingFind = true
+        findFocusRequest += 1
     }
 
     /// Move to the next match (wrapping past the last), rebuilding first if the query changed. ⌘G.
