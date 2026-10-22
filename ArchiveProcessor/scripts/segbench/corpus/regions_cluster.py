@@ -137,12 +137,12 @@ def cmd_detect_yolo(a):
     from PIL import Image
     from newspaper_ocr.detectors import DETECTORS
     from newspaper_ocr.layout_processor import LayoutProcessor
-    import newspaper_ocr
+    from importlib.metadata import version
     det = DETECTORS.get('doclayout_yolo')(model_dir=None, skip_lines=True)
     proc = LayoutProcessor()
     dest = a.root / 'regions' / 'doclayout_yolo.json'
     store = json.loads(dest.read_text()) if dest.exists() else {
-        'detector': f'DocLayout-YOLO via newspaper-ocr {newspaper_ocr.__version__}, library layout processing',
+        'detector': f'DocLayout-YOLO via newspaper-ocr {version("newspaper-ocr")}, library layout processing',
         'pages': {}}
     t0 = time.time(); todo = [p for p in load_pages(a.root, a.limit) if p['id'] not in store['pages']]
     for n, p in enumerate(todo, 1):
