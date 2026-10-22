@@ -50,7 +50,7 @@ iOS, so each was checked against the iOS code.
 | `W23.m1` (2026-07-30) | a pairing generation on every send, so a reply from the Mac just unpaired from cannot mark a page delivered and delete the phone's copy | absent: `disconnect()` (`I/Capture/CaptureViewModel.swift:148`) leaves uploads running, and their reply still marks the page uploaded | `W40.i-fix-ios-pairing-generation` |
 | `W23.m8` (2026-07-30) | `SessionStore.save` reports failure; a durable stale marker; pages recovered against a stale session are held for review | absent: `SessionStore.save` ignores errors (`I/Capture/SessionStore.swift:38-41`) | `W40.i-fix-ios-session-durability` |
 | manifest fallback (2026-07-12) | a fallback no longer deletes the last good session before the new one is written | iOS writes `.atomic` and has no fallback path, so this case does not arise | none |
-| pending count (2026-07-12) | auto-retrying FAILED pages count as pending, so they hold the Mac's Finish | absent: the heartbeat counts only pending and uploading (`CaptureViewModel.swift:392-396`), although auto-retry does resend FAILED pages | `W40.i-fix-ios-heartbeat-count` |
+| pending count (2026-07-12) | auto-retrying FAILED pages count as pending, so they hold the Mac's Finish | was absent (the heartbeat counted only pending and uploading, though auto-retry resends FAILED pages); now it counts every page the Mac must still receive, failed and pending-resend included (`CaptureQueue.heartbeatCount`) | **fixed** by `W40.i-fix-ios-heartbeat-count` (2026-10-21) |
 | Clear race (2026-07-12) | Clear cancels and joins uploads, and item ids are never reused | was absent (`nextId = 1`, uploads left running); now Clear moves a generation on, cancels the sends and never reuses an id, and a reply from an older generation records nothing (`CaptureQueue.clear`, `CaptureViewModel.clearSession`) | **fixed** by `W40.i-fix-ios-clear-generation` (2026-10-21) |
 | thumbnails off the UI thread (2026-07-12) | | already off the main thread (`I/UI/CaptureScreen.swift:225`) | none |
 | Quality `Q1`–`Q3` cutover (2026-09-03) | | iOS sends the same values | none |
@@ -64,10 +64,10 @@ iOS, so each was checked against the iOS code.
 | Restoring the session after the app is killed | skips items whose file is gone (`A/data/SessionStore.kt:124`); a pending resend is kept over an uploaded state | stored each photo's absolute file URL (the container path changes on reinstall, every seven days on a free account), never checked the file, and pruned a page whose resend was pending. Now stores the file name only, skips and reports a missing file with a "Photos missing" alert, and restores a pending resend as pending (`CaptureQueue.restore`) | **fixed** by `W40.i-fix-ios-photo-storage` (2026-10-21) |
 | Clear session | bumps a session generation, cancels and waits for uploads, never reuses ids (`CaptureViewModel.kt:876-899`) | reset ids to 1 with uploads still running, so a late reply marked a *new* photo with the same id as uploaded; now bumps a generation, cancels the sends (without awaiting: the main actor serialises, and the generation check drops a late reply) and never reuses an id | **fixed** by `W40.i-fix-ios-clear-generation` (2026-10-21) |
 | Re-pairing while uploads run (`W23.m1`) | see above | see above | **gap, S2** → `W40.i-fix-ios-pairing-generation` |
-| "Phone still has N to send" heartbeat | counts every unconfirmed page; one ordered, conflated writer (`CaptureViewModel.kt:736-740`) | excludes FAILED pages; one unordered `Task` per report. The Mac can be told 0 while pages are still to come, and finish a partial session | **gap, S2** → `W40.i-fix-ios-heartbeat-count` |
+| "Phone still has N to send" heartbeat | counts every unconfirmed page; one ordered, conflated writer (`CaptureViewModel.kt:736-740`) | excluded FAILED pages and sent one unordered `Task` per report, so the Mac could be told 0 early; now counts every unconfirmed page through one ordered, conflated writer (`HeartbeatMailbox`, 5 s report timeout) | **fixed** by `W40.i-fix-ios-heartbeat-count` (2026-10-21) |
 | Photos on disk the session does not list | adopted into a recovery segment, held for review if the session was stale (`CaptureModels.kt:184-215`) | never seen again: a crash between writing the photo and saving the session strands it | **gap, S2** → `W40.i-fix-ios-session-durability` |
 | Session file writes | off the main thread, temp + fsync + atomic move, reports failure (`A/data/ManifestFileWriter.kt`) | `.atomic` write on the main thread on every change; failure ignored | **gap, S3**, part of `W40.i-fix-ios-session-durability` |
-| Pending resend (a Q3 toggle or reclassify during an upload) | included in auto-retry and resume | not in the auto-retry or resume filters | **gap, S3**, part of `W40.i-fix-ios-heartbeat-count` |
+| Pending resend (a Q3 toggle or reclassify during an upload) | included in auto-retry and resume | was not in the auto-retry or resume filters; now it is, and a confirmed send with a resend pending goes straight back to pending (`CaptureQueue.prepareDeferredResend`) | **fixed** by `W40.i-fix-ios-heartbeat-count` (2026-10-21) |
 | Google Drive sign-in | client id from `local.properties`; empty disables sign-in with a message (`A/net/DriveAuth.kt:105-113`) | hard-coded placeholder `YOUR_IOS_CLIENT_ID.apps.googleusercontent.com` (`I/Net/DriveAuth.swift:73`, `project.yml:42`); the sign-in button always shows and Google rejects it | **gap, S2** → `W40.i-fix-ios-drive-oauth-client`. The cloud relay cannot be reached on iOS |
 | Drive tokens | private SharedPreferences, `allowBackup=false` | access and refresh tokens in plain `UserDefaults`, which goes into device backups (`DriveAuth.swift:29-48`) | **gap, S3** → `W40.i-fix-ios-drive-token-keychain` |
 | Cloud pairing | an explicit Cloud mode with no LAN probe; relay token from the QR or typed in; Google sign-in launched with the QR's `account` as the login hint (`A/ui/ConnectScreen.kt:183-249`) | no Cloud choice: Drive is used only after a LAN ping, a refused connection never falls back, and a working LAN is passed over for Drive when signed in (`CaptureViewModel.swift:115-146`). A `mode:"cloud"` QR is refused as "not an Archive Processor pairing code" (`I/Net/MacEndpoint.swift:19-32`). No typed relay token | **gap, S3** → `W40.i-fix-ios-cloud-pairing` |
@@ -539,8 +539,8 @@ action or any runtime evidence: there is no test target and no simulator runtime
 - **Status:** `unproven`
 - **History:**
   - 2026-10-21 W40.b4 — row written, `unproven`.
-- **Notes:** a Q3 toggled during an upload is a pending resend, which the auto-retry and resume filters skip →
-  `W40.i-fix-ios-heartbeat-count`.
+- **Notes:** a Q3 toggled during an upload is a pending resend; the auto-retry and resume filters skipped it until
+  `W40.i-fix-ios-heartbeat-count` (2026-10-21), which added it to both.
 
 ### C-39 · iOS · Uploads as shot, through a durable auto-retrying queue
 
@@ -601,8 +601,10 @@ action or any runtime evidence: there is no test target and no simulator runtime
 - **Status:** `unproven`
 - **History:**
   - 2026-10-21 W40.b4 — row written, `unproven`.
-- **Notes:** counts pending and uploading only, not FAILED pages still retrying, and sends each report on its own
-  unordered `Task` (`:392-396`), so the Mac can be told 0 early → `W40.i-fix-ios-heartbeat-count` (S2).
+- **Notes:** counted pending and uploading only, not FAILED pages still retrying, and sent each report on its own
+  unordered `Task`, so the Mac could be told 0 early. Fixed by `W40.i-fix-ios-heartbeat-count` (2026-10-21): every
+  unconfirmed page counts, through one ordered writer (host tests in `CaptureQueueTests.swift`). Still `unproven`
+  at runtime: no iPhone E2E yet (`W40.i3`).
 
 ### C-44 · iOS · Google Drive cloud relay, phone side
 

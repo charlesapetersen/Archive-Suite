@@ -142,8 +142,49 @@ test("counts and filters by state") {
     check(q.autoRetryCandidates.map(\.id) == [ids[0], ids[3]], "auto-retry = pending + failed")
     check(q.failedItems.map(\.id) == [ids[3]], "failed")
     check(q.uploadSummary == "2 queued · 1 failed", "summary")
-    // CURRENT: failed pages are left out of the heartbeat. W40.i-fix-ios-heartbeat-count changes this.
-    check(q.heartbeatCount == 2, "heartbeat = pending + uploading")
+    check(q.heartbeatCount == 3, "heartbeat = every page not confirmed, failed included")
+}
+
+test("a failed page keeps the Mac waiting: the heartbeat reaches 0 only when all are confirmed") {
+    var q = makeQueue()
+    let a = q.addDocument(fileURL: url("a")), b = q.addDocument(fileURL: url("b"))
+    q.setState(a.id, .uploaded); q.setState(b.id, .failed)
+    check(q.heartbeatCount == 1, "the failed page still counts, since auto-retry will send it")
+    check(q.autoRetryCandidates.map(\.id) == [b.id], "and auto-retry does send it")
+    q.setState(b.id, .uploaded)
+    check(q.heartbeatCount == 0, "drained")
+}
+
+test("a page with a resend pending counts, and is resent by auto-retry and resume") {
+    var q = makeQueue()
+    let a = q.addDocument(fileURL: url("a")), b = q.addDocument(fileURL: url("b"))
+    q.setState(a.id, .uploaded); q.setState(b.id, .uploaded)
+    _ = q.markNeedsResend(a.id)                  // the Mac holds a's stale fields
+    check(q.heartbeatCount == 1, "the Mac must still receive a's current fields")
+    check(q.autoRetryCandidates.map(\.id) == [a.id], "auto-retry resends it")
+    check(q.resumeCandidates.map(\.id) == [a.id], "a reconnect resends it")
+}
+
+test("a confirmed send with a resend pending goes straight back to pending") {
+    var q = makeQueue()
+    let a = q.addDocument(fileURL: url("a"))
+    q.setState(a.id, .uploading)
+    _ = q.markNeedsResend(a.id)                  // a Q3 toggle while the upload ran
+    let next = q.prepareDeferredResend(a.id)
+    check(next?.state == .pending && next?.needsResend == nil, "pending, marker folded in")
+    check(q.heartbeatCount == 1, "never counted as delivered in between")
+    check(q.prepareDeferredResend(99) == nil, "unknown id")
+}
+
+test("the heartbeat mailbox runs one writer and sends only the newest waiting report") {
+    var m = HeartbeatMailbox<Int>()
+    check(m.offer(3), "first offer starts the writer")
+    check(!m.offer(2) && !m.offer(0), "later offers join the running writer")
+    check(m.take() == 0, "the writer sends only the newest, so the older 3 and 2 never land after it")
+    check(!m.offer(1), "an offer while the 0 is on the wire waits for the same writer")
+    check(m.take() == 1, "and goes out after it, in order")
+    check(m.take() == nil && !m.writerRunning, "nothing waiting ends the writer")
+    check(m.offer(4) && m.take() == 4, "the next offer starts a new writer")
 }
 
 test("clear empties the session, restarts seqs and never reuses an id") {

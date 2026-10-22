@@ -12594,3 +12594,18 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
     field) is filed as `W40.i-fix-ios-resend-window`. As on Android, pages the old Mac confirmed before a re-pair
     stay there (KNOWN_ISSUES W23.m1, inherent).
   <!-- /W40.i-fix-ios-pairing-generation -->
+- [x] **W40.i-fix-ios-heartbeat-count — iOS tells the Mac it has nothing left to send while FAILED pages are still retrying [S · S2 · Tier-2]** · §W40 (lane: processor) (uses: build) (blocked-on: W40.i2, W40.i-fix-ios-testable-core). Found by `W40.i2` 2026-10-21; detail in `verification/capture.md`. `sendStatusReport()` counted only pending and uploading pages, though auto-retry resends FAILED ones, and sent each report on its own unordered `Task`; the Mac could show 0 to send and let Finish close a partial session. SHIPPED 2026-10-21.
+  - `CaptureQueue.macStillNeeds` (not uploaded, or a resend pending; Android's `requiresDeleteConfirmation`) is now the
+    heartbeat count and the resume filter; auto-retry also takes pages with a resend pending. A confirmed send whose
+    fields changed while it ran goes straight back to pending (`prepareDeferredResend`, Android's), never through a
+    moment as uploaded-and-current, and so is no longer lost if the re-enqueue finds no client.
+  - `HeartbeatMailbox`: one ordered, conflated writer on the main actor (Android's CONFLATED `statusChannel`), so an
+    older 0 can never land after a newer count. Delete and Clear now send a report too (Clear's 0 ordered after any
+    earlier one). `reportStatus` times out in 5 s, not 30 s, so a request stalled on a Mac just unpaired from cannot
+    hold the next Mac's reports past its 20 s staleness window (the review's should-fix).
+  - Tests: host suite 157 checks pass (5 new tests, the pinned "heartbeat = pending + uploading" flipped to 3); iOS
+    generic-simulator build green, no new warnings; relay transport and golden scripts pass. Tier-2 adversarial
+    review: nothing blocking. Its other should-fix (the delete gate still uses `state != .uploaded`, not
+    `macStillNeeds`) belongs to `W40.i-fix-ios-delete-confirm`. A FAILED page that can never succeed now holds the
+    Mac's Finish while the phone is alive, as on Android; the operator deletes it or cancels Finish.
+  <!-- /W40.i-fix-ios-heartbeat-count -->

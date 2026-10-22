@@ -236,8 +236,6 @@ final class CaptureViewModel: ObservableObject {
 
     private func markNeedsResend(_ id: Int64) { if queue.markNeedsResend(id) { persist() } }
 
-    private func clearNeedsResend(_ id: Int64) { if queue.clearNeedsResend(id) { persist() } }
-
     private func clearSelection() { selectedItemId = nil; armed = false }
 
     /// Tap cycle on a thumbnail: select → arm (show X) → delete.
@@ -270,6 +268,7 @@ final class CaptureViewModel: ObservableObject {
         try? FileManager.default.removeItem(at: removed.fileURL)
         clearSelection()
         persist()
+        sendStatusReport()   // the Mac's "phone still has N to send" must stop counting a deleted page
     }
 
     /// Reclassify the selected photo as a single-image box/folder marker (own group) and upload it.
@@ -362,14 +361,21 @@ final class CaptureViewModel: ObservableObject {
         for group in queue.endedSegments.keys { trySendSegmentComplete(group: group) }
     }
 
-    /// Heartbeat the count of photos still IN FLIGHT to the Mac (pending/uploading) so the Mac can surface
-    /// "phone still has N photos to send" and hold Finish until they arrive — reaching 0 once they settle.
-    /// What it counts, and what it leaves out, is `CaptureQueue.heartbeatCount`.
+    /// Heartbeat the count of photos the Mac must still receive so it can surface "phone still has N photos to
+    /// send" and hold Finish until they arrive — reaching 0 once every page is confirmed. What it counts is
+    /// `CaptureQueue.heartbeatCount`. Reports go through one writer, newest first, so an older count can never
+    /// land after a newer one (`HeartbeatMailbox`). The writer runs on the main actor, as does every offer, so the
+    /// mailbox needs no lock.
     private func sendStatusReport() {
         guard let c = client else { return }
-        let pending = queue.heartbeatCount
-        Task { _ = await c.reportStatus(pending: pending) }
+        guard heartbeat.offer(StatusReport(client: c, pending: queue.heartbeatCount)) else { return }
+        Task {
+            while let next = heartbeat.take() { _ = await next.client.reportStatus(pending: next.pending) }
+        }
     }
+
+    private struct StatusReport { let client: any SegmentTransport; let pending: Int }
+    private var heartbeat = HeartbeatMailbox<StatusReport>()
 
     private func startNewGroup() { queue.startNewGroup(); persist() }
 
@@ -437,15 +443,19 @@ final class CaptureViewModel: ObservableObject {
                   ack != .requeueStale else { return }
             if ack == .confirm {
                 sentCount += 1
-                setState(item.id, .uploaded)
                 // A field changed while this upload was in flight (per-page Q3 / reclassify): the bytes just
                 // sent are stale. Re-send with the CURRENT fields instead of confirming — do NOT
-                // removeConfirmed (that would drop the photo having sent only the old value). The re-enqueue
-                // is scheduled on a fresh Task so it runs after this one's `defer` releases the in-flight guard.
+                // removeConfirmed (that would drop the photo having sent only the old value). The page goes
+                // straight back to pending, never through a moment as uploaded-and-current, so neither the
+                // heartbeat nor a lost re-enqueue can treat it as delivered. The re-enqueue is scheduled on a
+                // fresh Task so it runs after this one's `defer` releases the in-flight guard.
                 if queue.item(item.id)?.needsResend == true {
-                    clearNeedsResend(item.id)
-                    Task { @MainActor in if let latest = queue.item(item.id) { enqueueUpload(latest) } }
+                    if queue.prepareDeferredResend(item.id) != nil { persist() }
+                    Task { @MainActor in
+                        if let latest = queue.item(item.id), latest.state == .pending { enqueueUpload(latest) }
+                    }
                 } else {
+                    setState(item.id, .uploaded)
                     // Confirmed durably on the Mac → drop it from the phone shortly after (lets the strip
                     // animate it out), so photos transfer in segments instead of piling up.
                     Task { try? await Task.sleep(nanoseconds: 650_000_000); removeConfirmed(item) }
@@ -495,7 +505,7 @@ final class CaptureViewModel: ObservableObject {
         }
     }
 
-    /// Re-send anything not confirmed on the Mac (in-flight/failed, or still-PENDING). Document pages now
+    /// Re-send anything the Mac must still receive (in-flight/failed, still-PENDING, or a resend pending). Document pages now
     /// stream as shot, so a PENDING doc is simply one captured while unpaired/offline — send it too.
     /// Idempotent on the Mac (same group+seq → replace); the inFlightUploads guard prevents double-sends.
     private func resumeUploads() {
@@ -513,8 +523,9 @@ final class CaptureViewModel: ObservableObject {
                 try? await Task.sleep(nanoseconds: 8_000_000_000)
                 guard let self else { return }
                 guard self.client != nil else { continue }
-                // Flush anything not confirmed on the Mac — failed uploads and any still-PENDING page
-                // (document pages now stream as shot, so a PENDING doc just hasn't reached the Mac yet).
+                // Flush anything not confirmed on the Mac — failed uploads, any still-PENDING page
+                // (document pages now stream as shot, so a PENDING doc just hasn't reached the Mac yet),
+                // and any page with a resend pending.
                 let needs = self.queue.autoRetryCandidates
                 needs.forEach { self.enqueueUpload($0) }
                 // Retry any ended segment whose completion signal hasn't been acked (gated on all its
@@ -555,6 +566,7 @@ final class CaptureViewModel: ObservableObject {
         transferFlash = nil
         statusMessage = ""
         store.clear()
+        sendStatusReport()   // a 0 for the cleared session, ordered after any report from before Clear
     }
 
     // MARK: - Persistence / helpers

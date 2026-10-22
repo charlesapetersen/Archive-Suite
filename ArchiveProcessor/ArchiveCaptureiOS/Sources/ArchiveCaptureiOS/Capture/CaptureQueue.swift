@@ -270,16 +270,33 @@ struct CaptureQueue {
 
     // MARK: - Counts and filters
 
-    /// The count heartbeated to the Mac as "phone still has N photos to send": pending and uploading pages.
-    /// FAILED pages are deliberately EXCLUDED: they need a manual Retry and won't arrive on their own, so
-    /// they must not block Finish forever (the operator sees + retries them in the phone's strip).
-    var heartbeatCount: Int { items.filter { $0.state == .pending || $0.state == .uploading }.count }
+    /// A page the Mac must still receive: not confirmed, or confirmed with bytes a pending resend (a Q3 toggle or
+    /// reclassify during its upload) has made stale. Android's `requiresDeleteConfirmation`.
+    static func macStillNeeds(_ item: CapturedItem) -> Bool { item.state != .uploaded || item.needsResend == true }
 
-    /// Everything not confirmed on the Mac, re-sent on (re)connect.
-    var resumeCandidates: [CapturedItem] { items.filter { $0.state != .uploaded } }
+    /// The count heartbeated to the Mac as "phone still has N photos to send": every page it must still receive.
+    /// FAILED pages count, because the auto-retry loop sends them again on its own; leaving them out told the Mac 0
+    /// while pages were still to come, so Finish could close a partial session (W40.i-fix-ios-heartbeat-count,
+    /// Android's `pendingReportCount`). It reaches 0 only when every page left is confirmed and current.
+    var heartbeatCount: Int { items.filter(Self.macStillNeeds).count }
 
-    /// What the auto-retry loop flushes: failed uploads and any still-PENDING page.
-    var autoRetryCandidates: [CapturedItem] { items.filter { $0.state == .failed || $0.state == .pending } }
+    /// Everything the Mac must still receive, re-sent on (re)connect.
+    var resumeCandidates: [CapturedItem] { items.filter(Self.macStillNeeds) }
+
+    /// What the auto-retry loop flushes: failed uploads, any still-PENDING page, and any page with a resend pending.
+    var autoRetryCandidates: [CapturedItem] {
+        items.filter { $0.state == .failed || $0.state == .pending || $0.needsResend == true }
+    }
+
+    /// The Mac confirmed a send whose fields changed while it ran: the bytes it holds are stale, so the page goes
+    /// back to pending with the marker folded in, in one step, so no heartbeat in between can count it as
+    /// delivered (Android's `prepareDeferredResend`). Returns the page to send again, or nil if it is gone.
+    mutating func prepareDeferredResend(_ id: Int64) -> CapturedItem? {
+        guard let i = items.firstIndex(where: { $0.id == id }) else { return nil }
+        items[i].state = .pending
+        items[i].needsResend = nil
+        return items[i]
+    }
 
     var failedItems: [CapturedItem] { items.filter { $0.state == .failed } }
 
@@ -366,5 +383,31 @@ struct CaptureQueue {
                                                               year: $0.value.year, month: $0.value.month, seqs: $0.value.seqs) }
         return .init(items: items, seq: seqCounter, nextId: nextId, groupId: currentGroupId,
                      pendingTagGroupId: pendingTagGroupId, endedSegments: ended)
+    }
+}
+
+/// One ordered, conflated writer for the heartbeat (W40.i-fix-ios-heartbeat-count, Android's CONFLATED
+/// `statusChannel`). Each report used to go out on its own `Task`, so two could reach the Mac out of order and an
+/// older 0 overwrite a newer count. Now one writer sends at a time and only the newest waiting report is kept.
+/// The view model offers each report and runs the writer; this holds only the bookkeeping, so the host tests can
+/// drive it.
+struct HeartbeatMailbox<Report> {
+    private(set) var waiting: Report?
+    private(set) var writerRunning = false
+
+    /// Keep `report` as the newest, replacing any not yet sent. Returns true if no writer is running, so the caller
+    /// must start one.
+    mutating func offer(_ report: Report) -> Bool {
+        waiting = report
+        guard !writerRunning else { return false }
+        writerRunning = true
+        return true
+    }
+
+    /// The writer's next report to send. Nil ends the writer, so the next `offer` starts a new one.
+    mutating func take() -> Report? {
+        guard let report = waiting else { writerRunning = false; return nil }
+        waiting = nil
+        return report
     }
 }
