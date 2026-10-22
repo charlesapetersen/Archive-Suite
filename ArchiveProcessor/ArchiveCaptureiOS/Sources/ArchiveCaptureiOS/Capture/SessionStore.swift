@@ -35,6 +35,9 @@ struct SessionStore {
         url = dir.appendingPathComponent("capture-session.json")
     }
 
+    /// A store at an explicit file, for the host tests (`scripts/test-ios-capture-queue.sh`).
+    init(url: URL) { self.url = url }
+
     func save(_ snapshot: Snapshot) {
         guard let data = try? JSONEncoder().encode(snapshot) else { return }
         try? data.write(to: url, options: .atomic)
