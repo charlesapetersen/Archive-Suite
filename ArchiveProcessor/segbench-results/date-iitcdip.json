@@ -1,115 +1,115 @@
 {
  "source": "NIST mds2-2531 cdip-text/cdip-6.tar (the only text tar fetched)",
- "records": 223295,
+ "records": 265821,
  "by_collection": {
   "?": {
-   "records": 9,
-   "ag none": 9,
-   "dd full": 7,
+   "records": 10,
+   "ag none": 10,
+   "dd full": 8,
+   "dd year in OCR: yyyy": 6,
    "dd year in OCR: absent": 2,
-   "dd none": 2,
-   "dd year in OCR: yyyy": 5
+   "dd none": 2
   },
   "at": {
-   "records": 14850,
-   "ag number": 14598,
-   "dd full": 11861,
-   "dd year in OCR: yyyy": 9196,
-   "dd year only": 1898,
-   "dd year in OCR: absent": 3076,
-   "ag none": 252,
-   "dd none": 169,
-   "dd year in OCR: yy": 1665,
-   "dd year+month": 921,
+   "records": 17678,
+   "ag number": 17377,
+   "dd full": 14091,
+   "dd year in OCR: yyyy": 10953,
+   "dd year only": 2278,
+   "dd year in OCR: absent": 3648,
+   "ag none": 301,
+   "dd none": 199,
+   "dd year in OCR: yy": 1996,
+   "dd year+month": 1109,
    "dd out of range": 1
   },
   "bw": {
-   "records": 21120,
-   "ag number": 17231,
-   "dd year only": 1444,
-   "dd year in OCR: absent": 5133,
-   "dd year+month": 1326,
-   "dd full": 16166,
-   "dd year in OCR: yyyy": 11600,
-   "dd none": 2184,
-   "dd year in OCR: yy": 1776,
-   "ag zero": 3847,
-   "ag none": 42
+   "records": 25144,
+   "ag number": 20513,
+   "dd year only": 1694,
+   "dd year in OCR: absent": 6103,
+   "dd year+month": 1591,
+   "dd full": 19245,
+   "dd year in OCR: yyyy": 13821,
+   "dd none": 2614,
+   "dd year in OCR: yy": 2107,
+   "ag zero": 4581,
+   "ag none": 50
   },
   "ct": {
-   "records": 15122,
-   "ag none": 15122,
-   "dd full": 10201,
-   "dd year in OCR: yyyy": 9075,
-   "dd year+month": 1225,
-   "dd year in OCR: yy": 1091,
-   "dd year only": 2010,
-   "dd none": 1685,
-   "dd year in OCR: absent": 2918,
-   "dd out of range": 1
+   "records": 18004,
+   "ag none": 18004,
+   "dd full": 12218,
+   "dd year in OCR: yyyy": 10808,
+   "dd year+month": 1428,
+   "dd year in OCR: yy": 1302,
+   "dd year only": 2360,
+   "dd none": 1995,
+   "dd year in OCR: absent": 3481,
+   "dd out of range": 3
   },
   "ll": {
-   "records": 23699,
-   "ag none": 23699,
-   "dd none": 7679,
-   "dd full": 14703,
-   "dd year in OCR: yyyy": 11492,
-   "dd year in OCR: yy": 2086,
-   "dd year in OCR: absent": 2285,
-   "dd year only": 506,
-   "dd year+month": 811
+   "records": 28206,
+   "ag none": 28206,
+   "dd none": 9144,
+   "dd full": 17497,
+   "dd year in OCR: yyyy": 13665,
+   "dd year in OCR: yy": 2480,
+   "dd year in OCR: absent": 2722,
+   "dd year only": 605,
+   "dd year+month": 960
   },
   "pm": {
-   "records": 93800,
-   "ag none": 93800,
-   "dd full": 58841,
-   "dd year in OCR: yyyy": 44149,
-   "dd none": 31638,
-   "dd year in OCR: yy": 9727,
-   "dd year in OCR: absent": 7470,
-   "dd year+month": 1859,
-   "dd year only": 1451,
-   "dd out of range": 11
+   "records": 111666,
+   "ag none": 111666,
+   "dd full": 70089,
+   "dd year in OCR: yyyy": 52527,
+   "dd none": 37644,
+   "dd year in OCR: yy": 11574,
+   "dd year in OCR: absent": 8933,
+   "dd year+month": 2209,
+   "dd year only": 1709,
+   "dd out of range": 15
   },
   "rj": {
-   "records": 45140,
-   "ag none": 39694,
-   "dd full": 35696,
-   "dd year in OCR: yyyy": 27862,
-   "dd none": 1967,
-   "dd year in OCR: absent": 9603,
-   "dd year in OCR: yy": 4907,
-   "ag text": 5446,
-   "dd year only": 5124,
-   "dd year+month": 2349,
-   "dd out of range": 4
+   "records": 53737,
+   "ag none": 47247,
+   "dd full": 42464,
+   "dd year in OCR: yyyy": 33159,
+   "dd none": 2371,
+   "dd year in OCR: absent": 11406,
+   "dd year in OCR: yy": 5848,
+   "ag text": 6490,
+   "dd year only": 6086,
+   "dd year+month": 2811,
+   "dd out of range": 5
   },
   "ti": {
-   "records": 9555,
-   "ag none": 9555,
-   "dd full": 6795,
-   "dd year in OCR: yyyy": 5348,
-   "dd year only": 781,
-   "dd year in OCR: absent": 1867,
-   "dd year in OCR: yy": 925,
-   "dd none": 1286,
-   "dd year+month": 693
+   "records": 11376,
+   "ag none": 11376,
+   "dd full": 8094,
+   "dd year in OCR: yyyy": 6393,
+   "dd year only": 940,
+   "dd year in OCR: absent": 2227,
+   "dd year in OCR: yy": 1092,
+   "dd none": 1507,
+   "dd year+month": 835
   }
  },
- "numeric_ag_values": 27326,
+ "numeric_ag_values": 32359,
  "group_sizes": {
-  "1": 24158,
-  "2": 2301,
-  "3": 734,
-  "4": 24,
-  "5": 49,
-  "6+": 60
+  "1": 28614,
+  "2": 2570,
+  "3": 1023,
+  "4": 32,
+  "5": 23,
+  "6+": 97
  },
- "shared_groups": 3168,
- "shared_groups_mixed_doctype": 1968,
- "shared_groups_year_span_ge_1": 381,
- "shared_groups_with_two_years": 3029,
- "shared_groups_marked_attached": 1049,
+ "shared_groups": 3745,
+ "shared_groups_mixed_doctype": 2380,
+ "shared_groups_year_span_ge_1": 460,
+ "shared_groups_with_two_years": 3585,
+ "shared_groups_marked_attached": 1246,
  "idl": {
   "industry:Tobacco": 19959630,
   "industry:Tobacco AND attachment:*": 321478,
@@ -1219,5 +1219,67 @@
     "overlap": 0.17
    }
   ]
- }
+ },
+ "family_judged": [
+  {
+   "ag": "60068210",
+   "verdict": "cover with attachment",
+   "cover": "bates-first",
+   "note": "memo 'Attached is the ... Returned Goods Report', chart follows"
+  },
+  {
+   "ag": "60366223",
+   "verdict": "cover with attachment",
+   "cover": "bates-first (rn named the report)",
+   "note": "FTC letter 'Submitted herewith ... Enclosure', report follows"
+  },
+  {
+   "ag": "60138099",
+   "verdict": "filed together, no cover",
+   "cover": null,
+   "note": "two clippings of 7/31/76"
+  },
+  {
+   "ag": "13255123",
+   "verdict": "related, not the enclosure",
+   "cover": null,
+   "note": "memo enclosing a transcript; the other member is an earlier memo, not the transcript"
+  },
+  {
+   "ag": "60248542",
+   "verdict": "related, not the enclosure",
+   "cover": null,
+   "note": "reply 'I enclose' with the incoming letter it answers filed behind"
+  },
+  {
+   "ag": "60364857",
+   "verdict": "related, not the enclosure",
+   "cover": null,
+   "note": "paper and an outline drawn from it"
+  },
+  {
+   "ag": "60002016",
+   "verdict": "cover with attachment",
+   "cover": "bates-first",
+   "note": "memo 'the attached article ... Attachment', clipping follows"
+  },
+  {
+   "ag": "60345529",
+   "verdict": "cover with attachment",
+   "cover": "bates-first (rn named the analysis)",
+   "note": "letter 'we are attaching tobacco analyses ... Attachment', table follows"
+  },
+  {
+   "ag": "60376431",
+   "verdict": "cover with attachment",
+   "cover": "bates-first",
+   "note": "market lot memo, summary table follows"
+  },
+  {
+   "ag": "60246573",
+   "verdict": "filed together, no cover",
+   "cover": null,
+   "note": "the same clipping page twice"
+  }
+ ]
 }

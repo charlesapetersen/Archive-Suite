@@ -302,6 +302,73 @@ def cmd_neighbours(a):
         print(c)
 
 
+def at_families(rows):
+    """AT families: one member whose rn is a request code (the parent) and at least one marked "Attached to a
+    Responsive Document", all sharing a numeric <ag>. Members share the tid's last seven characters and differ in the
+    first letter, so one family's pages lie in image tars a.X, b.X, y.X and z.X for one second letter X."""
+    out = []
+    for (coll, ag), v in groups(rows).items():
+        if coll != "at" or len(v) < 2:
+            continue
+        par = [x for x in v if "Attached" not in (x["rn"] or "")]
+        att = [x for x in v if "Attached" in (x["rn"] or "")]
+        if len(par) == 1 and att:
+            out.append(dict(ag=ag, parent=par[0], attachments=sorted(att, key=lambda x: bates_range(x["bates"]) or (0, 0))))
+    return out
+
+
+def cmd_fetch_image_tar(a):
+    sp = os.path.join(CACHE, "nist-sizes.json")
+    if not os.path.exists(sp):
+        rec = json.load(urllib.request.urlopen("https://data.nist.gov/rmm/records?@id=ark:/88434/mds2-2531",
+                                               timeout=120))["ResultData"][0]
+        json.dump({c["filepath"]: c.get("size") for c in rec["components"] if c.get("filepath")}, open(sp, "w"))
+    sizes = json.load(open(sp))
+    os.makedirs(os.path.join(CACHE, "imagetars"), exist_ok=True)
+    for t in a.tars:
+        name = f"images.{t}.tar"
+        fetch(f"{NIST}/cdip-images/{name}", os.path.join(CACHE, "imagetars", name), sizes[f"cdip-images/{name}"])
+        print(name, flush=True)
+
+
+def cmd_family_pages(a):
+    """Pages of a random sample of AT families whose members are all in the local image tars (imagetars/*.tar)."""
+    import random
+    import subprocess
+    rows = [json.loads(l) for l in open(os.path.join(CACHE, "records.jsonl"))]
+    tdir = os.path.join(CACHE, "imagetars")
+    sizes = json.load(open(os.path.join(CACHE, "nist-sizes.json")))
+    done = [n for n in os.listdir(tdir) if n.endswith(".tar")
+            and os.path.getsize(os.path.join(tdir, n)) >= (sizes.get("cdip-images/" + n) or 1 << 62)]
+    local = {n[len("images."):-len(".tar")].replace(".", "") for n in done}
+    fams = [f for f in at_families(rows) if all(x["tid"][:2] in local for x in [f["parent"]] + f["attachments"])]
+    random.seed(46)
+    pick = random.sample(fams, min(a.n, len(fams)))
+    want = {x["tid"] for f in pick for x in [f["parent"]] + f["attachments"]}
+    pdir, odir = os.path.join(CACHE, "family-png"), os.path.join(CACHE, "family-tif")
+    os.makedirs(pdir, exist_ok=True)
+    for n in sorted(done):
+        with tarfile.open(os.path.join(tdir, n)) as t:
+            for m in t:
+                parts = m.name.split("/")
+                if m.isfile() and len(parts) >= 2 and parts[-2] in want:
+                    dest = os.path.join(odir, parts[-2], parts[-1])
+                    os.makedirs(os.path.dirname(dest), exist_ok=True)
+                    open(dest, "wb").write(t.extractfile(m).read())
+    for tid in sorted(want):
+        d = os.path.join(odir, tid)
+        if os.path.isdir(d) and not os.path.exists(os.path.join(pdir, tid + ".png")):
+            f = sorted(os.listdir(d))[0]
+            subprocess.run(["sips", "-s", "format", "png", "-Z", "1100", os.path.join(d, f), "--out",
+                            os.path.join(pdir, tid + ".png")], capture_output=True)
+    man = [dict(ag=f["ag"], members=[dict(role=r, tid=x["tid"], bates=x["bates"], dt=x["dt"], title=x["title"][:80],
+                                          dd=x["dd"], png=os.path.exists(os.path.join(pdir, x["tid"] + ".png")))
+                                     for r, x in [("parent", f["parent"])] + [("attachment", y) for y in f["attachments"]]])
+           for f in pick]
+    json.dump(man, open(os.path.join(CACHE, "family-sample.json"), "w"), indent=1)
+    print(len(fams), "families wholly in", sorted(local), "; sampled", len(pick))
+
+
 STOP = set("the of and a an to in for on by with at from is are as or this that report list letter memo".split())
 
 
@@ -353,7 +420,8 @@ def cmd_report(_):
         shared_groups_year_span_ge_1=sum(s >= 1 for s in spans), shared_groups_with_two_years=len(spans),
         shared_groups_marked_attached=sum(any("Attached" in (x["rn"] or "") for x in v) for v in shared),
         idl=idl, judged=judged)
-    for key, name in (("neighbour_test", "neighbour-test.json"), ("rj_next", "rj-next.json")):
+    for key, name in (("neighbour_test", "neighbour-test.json"), ("rj_next", "rj-next.json"),
+                      ("family_judged", "family-judgements.json")):
         p = os.path.join(CACHE, name)
         stats[key] = json.load(open(p)) if os.path.exists(p) else None
     json.dump(stats, open(os.path.join(RESULTS, "date-iitcdip.json"), "w"), indent=1)
@@ -373,13 +441,12 @@ def write_md(st):
          "The text, records and page images stay in the bench cache (`date-tagging/iitcdip/`); this page carries "
          "counts and case ids only.", "",
          "## Verdict: one collection passes", "",
-         "`<ag>` means three different things. At American Tobacco it is a family number: a document and the "
-         "attachments filed behind it share it, so it is the cover-with-attachments relation the item hoped for. At "
+         "`<ag>` means three different things. At American Tobacco it is a family number: documents filed together "
+         "share it, and about half of those families are the cover-with-attachments relation the item hoped for. At "
          "Brown & Williamson it is a running record number, and at R.J. Reynolds a free-text list of attachment titles; "
          "neither links a cover to its attachments. `<dd>` holds up as a year label where the page carries a date. So "
-         "the 200 are drawn from American Tobacco families only, and their pages are checked before they are used. "
-         "The AT family reading rests so far on the records' types, titles and Bates order; the pages of a sample of "
-         "families are the next check.", "",
+         "the 200 are drawn from American Tobacco families only. On the page, 5 of 10 sampled families are a cover "
+         "with its attachment, so each family is checked before it counts.", "",
          "## Where the data came from", "",
          f"The item said to use the Industry Documents Library API. IDL's Solr index has no `<ag>` field: its "
          f"`attachment` field is filled on {st['idl']['industry:Tobacco AND attachment:*']:,} tobacco records, every one "
@@ -445,11 +512,20 @@ def write_md(st):
           "`<dd>` is the earlier one. Where the page has no date (ads, charts, clippings), `<dd>` is the producer's "
           "date from elsewhere and cannot be checked on the page. `19000000` is one of the dummy values Lewis warns "
           "about. Page kinds: " + ", ".join(f"{k} {v}" for k, v in kinds.most_common()) + ".", "",
-          "## What follows", "",
-          "- The 200 come from AT families: a parent (`rn` a request code, not \"Attached to a Responsive Document\") "
-          "and its attachments sharing `<ag>`, Bates-contiguous in IDL. Family members spread over tars paired by tid "
-          "prefix, so the draw keeps families whose members all lie in one pair of image tars (`y.s` and `z.s` first) "
-          "and checks each family's pages before it counts.",
+          "## AT families on the page", ""]
+    fj = st.get("family_judged") or []
+    fv = collections.Counter(x["verdict"] for x in fj)
+    L += [f"{len(fj)} AT families drawn at random (seed 46) from those whose members all lie in the y.s and z.s image "
+          f"tars, every member's first page read by the session: " + ", ".join(f"{k} {v}" for k, v in fv.most_common())
+          + ". In every true pair the first member in Bates order is the cover; the `rn` field named the wrong parent in "
+          "two of them, so the cover is taken from Bates order, not `rn`. So `<ag>` at AT is a filed-together family, a "
+          "candidate pool rather than truth: about half are a cover with its attachment, the rest related papers (a reply "
+          "with the letter it answers, a memo with an earlier memo, a paper with its outline) or clippings filed together.",
+          "", "## What follows", "",
+          "- The 200 come from AT families sharing `<ag>`, cover taken as the first member in Bates order, and each is "
+          "checked on its pages before it counts, since only about half are a cover with its attachment. A family's "
+          "members lie in image tars a.X, b.X, y.X and z.X for one second letter X; the four `s` tars hold 134 "
+          "families (about 270 documents), enough for 200 documents once each family's pages are checked.",
           "- `<dd>` is a weak year label, not truth: 21% of records have none, and on undated pages it cannot be checked.",
           "- B&W and RJ give no relation. RJ's free text still names what a cover enclosed, a cue a relation classifier "
           "could use, but its attachment was the next record in only 2 of 40.", ""]
@@ -478,6 +554,12 @@ def main():
     n.add_argument("--lookup", action="store_true", help="draw the pairs and look the neighbours up in IDL")
     n.add_argument("--n", type=int, default=20)
     n.set_defaults(f=cmd_neighbours)
+    it = s.add_parser("fetch-image-tar", help="whole image tars (about 2 GB each), resumable, into imagetars/")
+    it.add_argument("tars", nargs="+", help="e.g. y.s z.s a.s b.s")
+    it.set_defaults(f=cmd_fetch_image_tar)
+    fp = s.add_parser("family-pages")
+    fp.add_argument("--n", type=int, default=10)
+    fp.set_defaults(f=cmd_family_pages)
     j = s.add_parser("rj-next")
     j.add_argument("--n", type=int, default=40)
     j.set_defaults(f=cmd_rj_next)
