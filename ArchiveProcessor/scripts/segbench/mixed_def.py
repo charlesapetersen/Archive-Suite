@@ -5,7 +5,7 @@ K-kinds.md test 2).
   mixed_def.py fetch                    # the bulk pilot's 2,000 JPEGs from FarmShare into CACHE/pages (owner's SSH master)
   mixed_def.py signals                  # kind-signals (Vision, no model) over the pages -> CACHE/signals.tsv
   run-guarded.sh --label atrium --need-gb 3 -- <kraken venv>/bin/python mixed_def.py atrium [--check]
-  /usr/local/bin/python3 mixed_def.py labels    # four labels per page -> segbench-results/mixed-def.md/.json, labels.csv
+  /usr/local/bin/python3 mixed_def.py labels    # four labels per page -> CACHE/labels.tsv, segbench-results/mixed-def.md/.json, the sheet
   /usr/local/bin/python3 mixed_def.py sheet     # the owner's sheet -> CACHE/sheet/index.html (+ key.json)
   /usr/local/bin/python3 mixed_def.py score --answers FILE   # after the owner: the definition and its corpus share
 
@@ -29,8 +29,9 @@ and both labels with a mixed class (ATRIUM, Qwen) say mixed.
 
 The sheet is blind: it shows the page and asks how much handwriting it carries and whether the owner would call it
 mixed, never what any label said. It holds 100 disagreements (stratified by the pattern of the disagreement), 50
-all-mixed pages and 20 control pages on which every label agrees the page is not mixed, which is what lets `score`
-estimate the corpus share without assuming the agreed pages are clean. The key (stratum and labels) is a separate
+all-mixed pages (topped up, when too few, from pages both mixed classes call mixed) and 20 control pages on which
+every label agrees the page is typed or printed, which is what lets `score` estimate the corpus share without
+assuming the agreed pages are clean. The key (stratum and labels) is a separate
 file the sheet never loads.
 
 Images and the per-page labels stay in the private cache; the repo is public, so segbench-results carries aggregates
@@ -231,8 +232,14 @@ def choose(rows, rng):
     by = {k: [r for r in rows if r['kind'] == k] for k in KIND_SETS}
     dis = stratified(rng, by['disagree'], SHEET_DISAGREE, lambda r: r['pattern'])
     mixed = rng.sample(by['mixed'], min(SHEET_MIXED, len(by['mixed'])))
+    # Too few all-mixed pages: the rest from pages both mixed classes call mixed while another label dissents. They
+    # inform the cut and the labels' check, not the corpus share (they would count the disagreements twice).
+    taken = {r['page'] for r in dis}
+    both = [r for r in by['disagree'] if r['qwen'] == 'mixed' and r['atrium'] == 'TEXT' and r['page'] not in taken]
+    extra = rng.sample(both, min(SHEET_MIXED - len(mixed), len(both)))
     control = rng.sample(by['clean'], min(SHEET_CONTROL, len(by['clean'])))
-    chosen = [('disagree', r) for r in dis] + [('mixed', r) for r in mixed] + [('control', r) for r in control]
+    chosen = ([('disagree', r) for r in dis] + [('mixed', r) for r in mixed] + [('mixed-both', r) for r in extra]
+              + [('control', r) for r in control])
     rng.shuffle(chosen)
     return chosen, by
 
@@ -253,6 +260,7 @@ def sheet(rows):
                                     .replace('__HANDTEXT__', json.dumps(HAND_TEXT))
                                     .replace('__ASKS__', json.dumps(ASKS_MIXED)))
     key = {'seed': SEED, 'strata': {k: len(v) for k, v in by.items()},
+           'pattern_sizes': dict(Counter(r['pattern'] for r in by['disagree'])),
            'pages': {r['page']: {'stratum': s, **{k: r[k] for k in LABELERS}, 'pattern': r['pattern']} for s, r in chosen}}
     (out / 'key.json').write_text(json.dumps(key, indent=1))
     return {'pages': len(data), 'minutes': round(minutes), 'by_stratum': dict(Counter(s for s, _ in chosen)),
@@ -297,7 +305,7 @@ DATA.forEach((d,i)=>{const el=document.createElement('div');el.className='page';
  el.innerHTML=h;root.appendChild(el);const p={page:d.page,el};P.push(p);
  el.querySelector('.frame').onclick=e=>e.currentTarget.classList.toggle('zoom');
  el.querySelectorAll('.opt').forEach(o=>o.onclick=()=>{go(i);set(p,o.dataset.f,o.dataset.v)});
- el.querySelector('.q').addEventListener('click',()=>{if(cur!==i)go(i)});paint(p)});
+ el.querySelector('.q').addEventListener('click',e=>{if(!e.target.closest('.opt')&&cur!==i)go(i)});paint(p)});
 let cur=0;function go(i){if(i<0||i>=P.length)return;P[cur].el.classList.remove('cur');cur=i;P[cur].el.classList.add('cur');
  P[cur].el.scrollIntoView({block:'start'})}
 function head(){document.documentElement.style.setProperty('--head',document.querySelector('header').offsetHeight+'px')}
@@ -321,15 +329,19 @@ MIXED_CALL = {'qwen': 'mixed', 'atrium': 'TEXT', 'regression': 'handwritten', 's
 
 def score(answers, key, rows):
     """The definition the owner's answers support and its share of the 2,000. Each sampled stratum's rate is
-    applied to the stratum's size in the 2,000. Two strata are not sampled and are reported apart so the assumption
+    applied to the stratum's size in the 2,000; the disagreements, drawn with at least one page of every pattern,
+    are weighted pattern by pattern (a pattern with no answer takes the pooled rate). 'mixed-both' pages (the
+    all-mixed top-up) count for the cut and the labels' check only. Two strata are not sampled and are reported apart so the assumption
     is visible: 'open' (consistent with mixed but not settled) gets the disagreements' rate, the nearest checked
     stratum; 'hand' (every label allows only a handwritten page) counts as not mixed."""
     pages = key['pages']
     got = {p: a for p, a in answers.items() if p in pages and a.get('hand')}
     size = Counter(r['kind'] for r in rows)
     stratum_of = {'disagree': 'disagree', 'mixed': 'mixed', 'control': 'clean'}
+    sizes = key.get('pattern_sizes', {})
     out = {'answered': len(got), 'sheet': len(pages), 'strata': dict(size), 'hand': {}, 'by_threshold': [], 'labelers': {}}
-    out['hand'] = {s: dict(Counter(a['hand'] for p, a in got.items() if pages[p]['stratum'] == s)) for s in stratum_of}
+    out['hand'] = {s: dict(Counter(a['hand'] for p, a in got.items() if pages[p]['stratum'] == s))
+                   for s in (*stratum_of, 'mixed-both')}
     yes = {p for p, a in got.items() if a.get('mixed') == 'yes'}
     out['owner_mixed'] = len(yes)
     # The owner's own cut: the least handwriting at which most of the pages carrying it were called mixed.
@@ -341,8 +353,14 @@ def score(answers, key, rows):
         at = set(ORDER[ORDER.index(h):])
         est, parts = 0.0, {}
         for s, k in stratum_of.items():
-            a = [x for p, x in got.items() if pages[p]['stratum'] == s]
-            rate = sum(x['hand'] in at for x in a) / len(a) if a else 0.0
+            a = [(pages[p]['pattern'], x['hand'] in at) for p, x in got.items() if pages[p]['stratum'] == s]
+            rate = sum(v for _, v in a) / len(a) if a else 0.0
+            if s == 'disagree' and a and sizes:
+                per = {}
+                for pat, v in a:
+                    per.setdefault(pat, []).append(v)
+                n_dis = sum(sizes.values())
+                rate = sum(n * (sum(per[pat]) / len(per[pat]) if pat in per else rate) for pat, n in sizes.items()) / n_dis
             parts[k] = {'answered': len(a), 'rate': round(rate, 3)}
             est += rate * size.get(k, 0)
         open_rate = parts['disagree']['rate']   # 'hand' adds nothing: a handwritten page is not mixed
@@ -527,7 +545,9 @@ def write_md(J):
     L += ['', '## The owner\'s sheet', '',
           f'{sh["pages"]} pages, about {sh["minutes"]} minutes: '
           + ', '.join(f'{v} {s}' for s, v in sh['by_stratum'].items())
-          + f' (the disagreements spread over {sh["patterns_in_sheet"]} patterns; the controls are pages every label '
+          + f' (the disagreements spread over {sh["patterns_in_sheet"]} patterns; mixed-both tops up the {k.get("mixed", 0)} '
+          'all-mixed pages with pages ATRIUM and Qwen both call mixed while another label dissents, and counts for the '
+          'cut but not the corpus share; the controls are pages every label '
           'calls typed or printed, so the score can check the agreed pages rather than assume them clean). Blind: '
           'each page asks how much handwriting it carries and whether the owner would call it mixed; no label is shown. '
           f'Seed {SEED}. The sheet and its key are private, under `mixed-def/sheet/`; gate W46.mixed-def-owner-ok, and '

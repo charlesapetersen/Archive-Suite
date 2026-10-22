@@ -12753,3 +12753,20 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   VM screenshot tour (`VisualReviewUITests`) read: 12-file sheet at minimum size shows all ten subjects dashed over
   three rows; the 30-subject volume file shows every chip filled; current choices are solid accent buttons.
   <!-- /W40.fix-reader-tag-editor-chips -->
+- [x] **W46.fix-marks-set — the mixed-page definition sheet on the 2,000 bulk-pilot pages [S]** · §Document processing review — W46 (owner, 2026-10-20) — SHIPPED 2026-10-22
+  `ArchiveProcessor/scripts/segbench/mixed_def.py` (tests `test_mixed_def.py`, 20), report `segbench-results/mixed-def.md`/`.json`.
+  The bulk pilot's 2,000 JPEGs had gone from the Mac (a scratchpad); FarmShare still held them and `fetch` copies them
+  to `~/Library/Caches/ArchiveSuiteRehearsal/mixed-def/pages/`. Four labels: the app's regression
+  (`kind-classifier-model.json` on kind-signals: typewritten 1,229, printed 550, handwritten 221); the lab's sorter
+  (saved; photograph 1,532); ATRIUM `ufal/vit-historical-page` main v4.3 zero-shot on the Mac, 157 s for 2,000 on MPS
+  (TEXT, its mixed class, 563 = 28.1%); Qwen3.6-27B's saved bulk label (mixed 165 = 8.2%). Qwen and ATRIUM both say
+  mixed on 114. ATRIUM preprocessing chosen on the 144 owner-labelled pages: ImageNet mean at 384 px 90/144 (0.5 mean
+  85, 224 px 63/61); it over-calls TEXT on phone photographs (30 of 144 where the owner has 3), which W46.kind-atrium
+  measures. Read as allowed kinds (typed/printed, mixed, handwritten): 630 disagree (418 of them ATRIUM's TEXT against
+  every other label's typed), 39 all-mixed, 1,212 agreed typed or printed, 105 agreed handwritten, 14 unsettled.
+  The blind sheet (`mixed-def/sheet/index.html`, key apart): 100 disagreements stratified over 29 patterns, the 39
+  all-mixed pages topped up with 11 both-mixed-class pages, 20 agreed-typed controls; 170 pages, about 57 minutes;
+  keys 0-5/x for how much handwriting, y/n for mixed. `score` post-stratifies the disagreements by pattern, uses the
+  controls instead of assuming agreed pages clean, keeps the top-up out of the share. Not rerun on the cluster: Qwen's
+  label existed. Behaviour of the sheet checked in jsdom (keys, clicks, re-answer). No money. Gate W46.mixed-def-owner-ok.
+  <!-- /W46.fix-marks-set -->

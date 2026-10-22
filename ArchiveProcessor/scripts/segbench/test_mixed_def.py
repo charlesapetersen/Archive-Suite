@@ -114,9 +114,9 @@ class Score(unittest.TestCase):
         self.rows = ([{'kind': 'disagree'}] * 100 + [{'kind': 'mixed'}] * 50 + [{'kind': 'clean'}] * 1700
                      + [{'kind': 'hand'}] * 50 + [{'kind': 'open'}] * 100)
         pages, answers = {}, {}
-        def add(i, stratum, hand, mixed=None):
+        def add(i, stratum, hand, mixed=None, pattern='x'):
             p = f'p{i:05d}'
-            pages[p] = {'stratum': stratum, **lab(qwen='mixed' if stratum == 'mixed' else 'typewritten',
+            pages[p] = {'stratum': stratum, 'pattern': pattern, **lab(qwen='mixed' if stratum == 'mixed' else 'typewritten',
                                                   atrium='TEXT' if stratum != 'control' else 'TEXT_T')}
             answers[p] = {'hand': hand, **({'mixed': mixed} if mixed else {})}
         i = 0
@@ -152,6 +152,36 @@ class Score(unittest.TestCase):
         self.assertEqual(q['found'], 8)      # the all-mixed pages with a long passage
         self.assertEqual(q['false'], 2)      # the all-mixed pages with a signature only
 
+    def test_disagreements_are_weighted_by_pattern(self):
+        # pattern a (90 pages in the 2,000) answered once with no handwriting, pattern b (10 pages) nine times with a
+        # passage: unweighted 0.9 of 100, weighted 0.1 of 100
+        for p, v in self.key['pages'].items():
+            if v['stratum'] == 'disagree':
+                v['pattern'] = 'b'
+                self.answers[p] = {'hand': 'passage', 'mixed': 'yes'}
+        first = next(p for p, v in self.key['pages'].items() if v['stratum'] == 'disagree')
+        self.key['pages'][first]['pattern'] = 'a'
+        self.answers[first] = {'hand': 'none'}
+        self.key['pattern_sizes'] = {'a': 90, 'b': 10}
+        at = {r['at_least']: r for r in M.score(self.answers, self.key, self.rows)['by_threshold']}
+        self.assertAlmostEqual(at['passage']['strata']['disagree']['rate'], 0.1)
+        # a pattern with no answer takes the pooled rate (0.9)
+        self.key['pattern_sizes'] = {'a': 50, 'b': 10, 'c': 40}
+        at = {r['at_least']: r for r in M.score(self.answers, self.key, self.rows)['by_threshold']}
+        self.assertAlmostEqual(at['passage']['strata']['disagree']['rate'], (0 + 10 + 36) / 100, places=3)
+
+    def test_top_up_pages_set_the_cut_but_not_the_share(self):
+        before = M.score(self.answers, self.key, self.rows)
+        for j in range(5):
+            p = f'p9{j:04d}'
+            self.key['pages'][p] = {'stratum': 'mixed-both', 'pattern': 'x', **lab(qwen='mixed', atrium='TEXT')}
+            self.answers[p] = {'hand': 'few', 'mixed': 'yes'}
+        out = M.score(self.answers, self.key, self.rows)
+        self.assertEqual(out['cut'], 'few')
+        self.assertEqual(out['hand']['mixed-both'], {'few': 5})
+        b = {r['at_least']: r['pages'] for r in before['by_threshold']}
+        self.assertEqual({r['at_least']: r['pages'] for r in out['by_threshold']}, b)
+
     def test_unanswered_and_unknown_pages_are_ignored(self):
         self.answers['p99999'] = {'hand': 'long', 'mixed': 'yes'}
         self.answers['p00000'] = {}
@@ -177,6 +207,12 @@ class Sheet(unittest.TestCase):
         key = json.loads((M.CACHE / 'sheet' / 'key.json').read_text())
         self.assertEqual(len(key['pages']), sh['pages'])
         self.assertEqual(sh['by_stratum'].get('disagree'), min(100, sum(r['kind'] == 'disagree' for r in rows)))
+        n_mixed = sh['by_stratum'].get('mixed', 0) + sh['by_stratum'].get('mixed-both', 0)
+        self.assertEqual(n_mixed, 50)
+        self.assertEqual(sum(key['pattern_sizes'].values()), sum(r['kind'] == 'disagree' for r in rows))
+        for p, v in key['pages'].items():
+            if v['stratum'] == 'mixed-both':
+                self.assertEqual((v['qwen'], v['atrium']), ('mixed', 'TEXT'))
         for word in ('TEXT_T', 'typewritten', 'disagree', 'stratum'):   # no label or stratum leaks into the sheet
             self.assertNotIn(word, html.split('const DATA=')[1].split(';')[0])
 

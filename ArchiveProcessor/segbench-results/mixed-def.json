@@ -1,0 +1,167 @@
+{
+ "pages": 2000,
+ "counts": {
+  "regression": {
+   "typewritten": 1229,
+   "printed": 550,
+   "handwritten": 221
+  },
+  "sorter": {
+   "other": 305,
+   "photograph": 1532,
+   "handwriting": 151,
+   "newspaper": 12
+  },
+  "atrium": {
+   "TEXT_T": 634,
+   "TEXT": 563,
+   "PHOTO": 118,
+   "TEXT_P": 227,
+   "DRAW": 157,
+   "LINE_HW": 42,
+   "LINE_T": 113,
+   "TEXT_HW": 97,
+   "LINE_P": 46,
+   "DRAW_L": 1,
+   "PHOTO_L": 2
+  },
+  "qwen": {
+   "typewritten": 1197,
+   "printed": 482,
+   "handwritten": 143,
+   "mixed": 165,
+   "(none)": 13
+  }
+ },
+ "kinds": {
+  "clean": 1212,
+  "disagree": 630,
+  "hand": 105,
+  "mixed": 39,
+  "open": 14
+ },
+ "disagreement_patterns": {
+  "regression:C sorter:CM atrium:M qwen:C": 418,
+  "regression:C sorter:CM atrium:M qwen:M": 74,
+  "regression:HM sorter:CM atrium:H qwen:H": 15,
+  "regression:C sorter:HM atrium:C qwen:C": 15,
+  "regression:HM sorter:CM atrium:M qwen:C": 12,
+  "regression:HM sorter:CM atrium:H qwen:M": 11,
+  "regression:C sorter:CM qwen:M": 9,
+  "regression:C sorter:CM atrium:C qwen:M": 8,
+  "regression:C sorter:HM qwen:C": 8,
+  "regression:C sorter:HM atrium:M qwen:C": 7,
+  "regression:HM sorter:CM qwen:H": 6,
+  "regression:HM sorter:CM qwen:C": 5,
+  "regression:C sorter:C atrium:M qwen:C": 5,
+  "regression:C sorter:CM atrium:H qwen:H": 5,
+  "regression:C sorter:CM qwen:H": 4,
+  "regression:C sorter:HM atrium:H qwen:H": 3,
+  "regression:HM sorter:CM atrium:C qwen:M": 3,
+  "regression:HM sorter:HM atrium:H qwen:M": 3,
+  "regression:C sorter:CM atrium:M": 3,
+  "regression:HM sorter:CM atrium:C qwen:C": 3,
+  "regression:C sorter:CM atrium:H qwen:M": 3,
+  "regression:HM sorter:CM atrium:M qwen:H": 2,
+  "regression:C sorter:CM atrium:H qwen:C": 2,
+  "regression:C sorter:HM qwen:H": 1,
+  "regression:C sorter:HM atrium:M qwen:M": 1,
+  "regression:HM sorter:HM atrium:M qwen:H": 1,
+  "regression:HM sorter:C qwen:H": 1,
+  "regression:HM sorter:HM qwen:C": 1,
+  "regression:C sorter:HM atrium:M qwen:H": 1
+ },
+ "mixed_said": {
+  "qwen": 165,
+  "atrium": 563,
+  "both": 114,
+  "either": 614
+ },
+ "atrium_run": {
+  "prep": "imagenet-384",
+  "device": "mps",
+  "seconds": 157.1,
+  "pages": 2000,
+  "revision": "543216d6b7e12552b164372e9124ceb168b06b98"
+ },
+ "atrium_check": {
+  "imagenet-384": {
+   "right": 90,
+   "n": 144
+  },
+  "half-384": {
+   "right": 85,
+   "n": 144
+  },
+  "imagenet-224": {
+   "right": 63,
+   "n": 144
+  },
+  "half-224": {
+   "right": 61,
+   "n": 144
+  }
+ },
+ "sheet": {
+  "pages": 170,
+  "minutes": 57,
+  "by_stratum": {
+   "disagree": 100,
+   "mixed": 39,
+   "control": 20,
+   "mixed-both": 11
+  },
+  "patterns_in_sheet": 29
+ },
+ "cross_qwen_atrium": {
+  "": {
+   "TEXT_P": 4,
+   "LINE_T": 1,
+   "TEXT_T": 2,
+   "TEXT": 3,
+   "PHOTO": 1,
+   "TEXT_HW": 1,
+   "LINE_P": 1
+  },
+  "handwritten": {
+   "PHOTO": 2,
+   "LINE_HW": 34,
+   "TEXT_HW": 85,
+   "DRAW": 18,
+   "TEXT": 4
+  },
+  "mixed": {
+   "TEXT": 114,
+   "LINE_T": 8,
+   "TEXT_P": 1,
+   "PHOTO": 3,
+   "TEXT_HW": 10,
+   "DRAW": 18,
+   "LINE_HW": 7,
+   "TEXT_T": 2,
+   "DRAW_L": 1,
+   "PHOTO_L": 1
+  },
+  "printed": {
+   "PHOTO": 105,
+   "TEXT_P": 105,
+   "DRAW": 93,
+   "TEXT": 143,
+   "TEXT_T": 7,
+   "LINE_T": 8,
+   "LINE_P": 20,
+   "TEXT_HW": 1
+  },
+  "typewritten": {
+   "TEXT_T": 623,
+   "TEXT": 299,
+   "LINE_T": 96,
+   "TEXT_P": 117,
+   "DRAW": 28,
+   "LINE_P": 25,
+   "PHOTO": 7,
+   "LINE_HW": 1,
+   "PHOTO_L": 1
+  }
+ }
+}
