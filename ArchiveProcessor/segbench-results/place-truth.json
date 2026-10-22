@@ -61,7 +61,7 @@
    "words": 197,
    "lines": 23,
    "missing": 0,
-   "audit": null
+   "audit": "fix"
   },
   {
    "page": "071_109_001",
@@ -401,7 +401,7 @@
    "words": 138,
    "lines": 24,
    "missing": 1,
-   "audit": null
+   "audit": "ok"
   },
   {
    "page": "p004",
@@ -411,7 +411,7 @@
    "words": 285,
    "lines": 25,
    "missing": 5,
-   "audit": null
+   "audit": "ok"
   },
   {
    "page": "p005",
@@ -441,7 +441,7 @@
    "words": 75,
    "lines": 9,
    "missing": 48,
-   "audit": null
+   "audit": "redraw"
   },
   {
    "page": "p008",
@@ -541,7 +541,7 @@
    "words": 147,
    "lines": 23,
    "missing": 78,
-   "audit": null
+   "audit": "redraw"
   },
   {
    "page": "p026",
@@ -761,7 +761,7 @@
    "words": 77,
    "lines": 17,
    "missing": 52,
-   "audit": null
+   "audit": "redraw"
   },
   {
    "page": "p058",
@@ -921,7 +921,7 @@
    "words": 452,
    "lines": 40,
    "missing": 21,
-   "audit": null
+   "audit": "ok"
   },
   {
    "page": "p090",
