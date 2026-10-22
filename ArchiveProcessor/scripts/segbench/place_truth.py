@@ -16,8 +16,10 @@ same length), `missing` (Vision has no word there, or read a stretch too differe
 tool), `vision-moved` (the same word, found by a second pass where Vision read the block in another order). Lines follow Vision's lines; a line's baseline is drafted at BASELINE_FRAC of
 its words' height. The transcript is the truth text, broken where the drafted lines break.
 
-Usage: python3 place_truth.py build    # writes STORE and the summary
-       python3 place_truth.py summary  # prints the summary only
+Usage: python3 place_truth.py build                  # writes STORE and the summary
+       python3 place_truth.py summary                # prints the summary only
+       python3 place_truth.py overlay [page ...]     # STORE/overlay/<page>.jpg: boxes and baselines on the image
+       python3 place_truth.py audit PAGE VERDICT NOTE BY   # ok | fix | redraw, kept across rebuilds
 """
 from __future__ import annotations
 
@@ -46,7 +48,8 @@ SCORED = RESULTS / 'ocr-pages.csv'
 SEED = 'W46.fix-place-truth'
 N_TYPED = 40
 SHARE_RATIO = 1.6  # a replace block is shared out only when its truth and Vision characters are this close
-BASELINE_FRAC = 0.78  # of a Vision word box's height, top down: where the baseline sits in a box with descenders
+BASELINE_FRAC = 0.78
+BENTHAM_DROP = 0.2  # of a Bentham line polygon's height, below its middle: where the baseline of a hand sits  # of a Vision word box's height, top down: where the baseline sits in a box with descenders
 
 
 def norm(t: str) -> str:
@@ -247,11 +250,25 @@ def line_share(toks, box):
     return out
 
 
+def derived_baseline(pts, W, H):
+    """A straight baseline for a line known only as a polygon round its ink: the least-squares line through the
+    polygon's points (its middle), moved down by BENTHAM_DROP of the polygon's height about that line."""
+    n = len(pts)
+    mx = sum(x for x, _ in pts) / n; my = sum(y for _, y in pts) / n
+    sxx = sum((x - mx) ** 2 for x, _ in pts)
+    slope = sum((x - mx) * (y - my) for x, y in pts) / sxx if sxx else 0.0
+    res = sorted(y - (my + slope * (x - mx)) for x, y in pts)
+    h = res[int(0.9 * (n - 1))] - res[int(0.1 * (n - 1))]
+    x0, x1 = min(x for x, _ in pts), max(x for x, _ in pts)
+    f = lambda x: my + slope * (x - mx) + BENTHAM_DROP * h
+    return [[round(x0 / W, 5), round(f(x0) / H, 5)], [round(x1 / W, 5), round(f(x1) / H, 5)]]
+
+
 def bentham_page(xml: Path, img: Path) -> dict:
     """Lines and words from a Bentham PAGE 2010 file, in src_bentham's reading order. Word elements carry no text:
     a line's tokens are given to its Word boxes left to right when the counts agree (3 of the 20 pages have Word
-    elements at all); otherwise the line's box is shared out by character count (`line-share`, a draft). PAGE 2010 here has no Baseline: it is derived as the
-    lower quartile of the line polygon's y at each word, a drafted line, so READ-BAD on L2 measures against it."""
+    elements at all); otherwise the line's box is shared out by character count (`line-share`, a draft). PAGE 2010 here has no Baseline: `derived_baseline` drafts a
+    straight one per line, so READ-BAD on L2 measures against a draft until the audit passes it."""
     import src_bentham as sb
     root = ET.fromstring(xml.read_bytes())
     W, H = image_size(img)
@@ -286,15 +303,8 @@ def bentham_page(xml: Path, img: Path) -> dict:
             for k, t in enumerate(toks):
                 words.append({'text': t, 'box': _bbox(wboxes[k], W, H) if ok else shares[k], 'line': ln,
                               'status': 'page-xml' if ok else 'line-share'})
-            xs = sorted({x for x, _ in pts})
-            base = []
-            for b in (wboxes or [pts]):
-                bx0, bx1 = min(x for x, _ in b), max(x for x, _ in b)
-                col = sorted(y for x, y in pts if bx0 <= x <= bx1) or sorted(y for _, y in pts)
-                y = col[int(0.75 * (len(col) - 1))]
-                base += [[round(bx0 / W, 5), round(y / H, 5)], [round(bx1 / W, 5), round(y / H, 5)]]
             out_lines.append({'id': ln, 'text': text, 'box': _bbox(pts, W, H),
-                              'baseline': base if xs else None, 'status': 'page-xml, baseline derived'})
+                              'baseline': derived_baseline(pts, W, H), 'status': 'page-xml, baseline derived'})
     return {'words': words, 'lines': out_lines, 'width': W, 'height': H}
 
 
@@ -439,14 +449,52 @@ def write(pages):
         (STORE / 'xml' / f'{name}.xml').write_text(page_xml(p))
 
 
+COLOURS = {'vision': 'lime', 'vision-sub': 'yellow', 'vision-moved': 'yellow', 'split': 'orange',
+           'line-share': 'orange', 'page-xml': 'dodgerblue', 'corrected': 'magenta'}
+
+
+def overlay(p: dict, out: Path, long_side: int = 1800) -> Path:
+    """The page image with its word boxes (by status colour) and baselines (red), for the audit; ImageMagick."""
+    W, H = p['width'], p['height']
+    k = long_side / max(W, H)
+    cmd = ['magick', p['image'], '-resize', f'{round(W * k)}x{round(H * k)}!', '-fill', 'none', '-strokewidth', '2']
+    for w in p['words']:
+        if w['box']:
+            x, y, bw, bh = (v * s for v, s in zip(w['box'], (W * k, H * k, W * k, H * k)))
+            cmd += ['-stroke', COLOURS.get(w['status'], 'gray'), '-draw', f'rectangle {x:.0f},{y:.0f} {x + bw:.0f},{y + bh:.0f}']
+    for l in p['lines']:
+        if l['baseline'] and len(l['baseline']) >= 2:
+            pts = ' '.join(f'{x * W * k:.0f},{y * H * k:.0f}' for x, y in l['baseline'])
+            cmd += ['-stroke', 'red', '-draw', f'polyline {pts}']
+    out.parent.mkdir(parents=True, exist_ok=True)
+    subprocess.run(cmd + ['-quality', '80', str(out)], check=True)
+    return out
+
+
+def record_audit(page_id: str, verdict: str, note: str, by: str) -> None:
+    """Store an auditor's verdict (ok / fix / redraw) on a page; a page with an audit is never redrafted."""
+    f = STORE / f"{page_id.replace('/', '__')}.json"
+    p = json.loads(f.read_text())
+    p['audit'] = {'verdict': verdict, 'note': note, 'by': by}
+    f.write_text(json.dumps(p, ensure_ascii=False, indent=1))
+
+
 def load_all() -> list[dict]:
     return [json.loads(f.read_text()) for f in sorted(STORE.glob('*.json'))]
 
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument('cmd', choices=['build', 'summary'])
+    ap.add_argument('cmd', choices=['build', 'summary', 'overlay', 'audit'])
+    ap.add_argument('rest', nargs='*', help='overlay: page ids (none = all); audit: page verdict note by')
     a = ap.parse_args()
+    if a.cmd == 'overlay':
+        for p in load_all():
+            if not a.rest or p['page'] in a.rest:
+                print(overlay(p, STORE / 'overlay' / f"{p['page'].replace('/', '__')}.jpg"))
+        return
+    if a.cmd == 'audit':
+        record_audit(*a.rest)
     if a.cmd == 'build':
         typed, hand, allk, scored = owner_pages()
         pages = build_owner('owner-typed', typed, allk, scored) + build_owner('owner-hand', hand, allk, scored)

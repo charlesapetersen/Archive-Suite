@@ -1,0 +1,125 @@
+<!doctype html>
+<!-- W46.fix-place-truth — the placement truth correction tool. Open this file in a browser (no server), then
+     choose a page's JSON from ~/Library/Application Support/ArchiveSuiteRehearsal/place-truth/ and its image (the
+     JSON's "image" path). Nothing is written until Save, which downloads <page>.json with "corrected": true; move it
+     back over the draft (place_truth.py build never overwrites a corrected page).
+
+     Words: click a word in the list or a box on the page to select it. Drag inside a box to move it, drag its
+     bottom-right corner to resize, drag on empty page to draw a box for the selected word (how a `missing` word
+     gets one). Delete/Backspace clears the selected word's box. Edit its text in the field. [ and ] step through
+     words, M jumps to the next missing word.
+     Baselines: B starts redrawing the selected word's line's baseline; click points left to right, Enter ends.
+     Colours: green vision, yellow vision-sub/moved, orange split/line-share, blue page-xml, red outline = selected,
+     cyan = the selected line's baseline. -->
+<html><head><meta charset="utf-8"><title>Placement truth — correction tool</title>
+<style>
+body{margin:0;font:13px -apple-system,sans-serif;display:flex;height:100vh}
+#side{width:330px;overflow:auto;border-right:1px solid #ccc;padding:6px;box-sizing:border-box}
+#main{flex:1;overflow:auto;position:relative}
+canvas{display:block}
+.w{cursor:pointer;padding:1px 3px;display:inline-block;margin:1px;border-radius:3px}
+.w.missing{background:#fcc}.w.sel{outline:2px solid red}
+#bar{position:sticky;top:0;background:#fff;padding:4px 0;border-bottom:1px solid #ddd}
+</style></head><body>
+<div id="side"><div id="bar">
+JSON <input type="file" id="fj" accept=".json"><br>Image <input type="file" id="fi" accept="image/*"><br>
+zoom <input type="range" id="zoom" min="0.1" max="1.5" step="0.05" value="0.4">
+<button id="save">Save</button> <span id="stat"></span><br>
+text <input id="txt" size="22"> <span id="st"></span>
+</div><div id="list"></div></div>
+<div id="main"><canvas id="cv"></canvas></div>
+<script>
+let page = null, img = null, sel = -1, drag = null, baseMode = false, basePts = [];
+const cv = document.getElementById('cv'), cx = cv.getContext('2d');
+const $ = id => document.getElementById(id);
+const Z = () => parseFloat($('zoom').value);
+const colour = s => ({vision: '#0a0', 'vision-sub': '#cc0', 'vision-moved': '#cc0', split: '#f80',
+  'line-share': '#f80', 'page-xml': '#06f', corrected: '#a0a'})[s] || '#888';
+$('fj').onchange = e => e.target.files[0].text().then(t => { page = JSON.parse(t); sel = -1; list(); draw(); });
+$('fi').onchange = e => { const u = URL.createObjectURL(e.target.files[0]); img = new Image(); img.onload = draw; img.src = u; };
+$('zoom').oninput = draw;
+function W() { return img ? img.naturalWidth : page.width; } function H() { return img ? img.naturalHeight : page.height; }
+function list() {
+  const L = $('list'); L.innerHTML = ''; let line = -1;
+  page.words.forEach((w, i) => {
+    if (w.line !== line) { line = w.line; L.appendChild(document.createElement('br')); }
+    const s = document.createElement('span'); s.textContent = w.text;
+    s.className = 'w' + (w.box ? '' : ' missing') + (i === sel ? ' sel' : ''); s.onclick = () => pick(i); L.appendChild(s);
+  });
+  const miss = page.words.filter(w => !w.box && w.status !== 'illegible' && w.status !== 'line-only').length;
+  $('stat').textContent = `${page.page}: ${miss} unboxed`;
+}
+function pick(i) {
+  sel = i; const w = page.words[i]; $('txt').value = w ? w.text : ''; $('st').textContent = w ? w.status : '';
+  list(); draw();
+  if (w && w.box) $('main').scrollTo({left: w.box[0] * W() * Z() - 200, top: w.box[1] * H() * Z() - 200});
+}
+$('txt').oninput = () => { if (sel >= 0) { page.words[sel].text = $('txt').value; touch(page.words[sel]); list(); } };
+function touch(w) { w.status = 'corrected'; }
+function draw() {
+  if (!page) return; const z = Z(); cv.width = W() * z; cv.height = H() * z;
+  if (img) cx.drawImage(img, 0, 0, cv.width, cv.height);
+  page.words.forEach((w, i) => {
+    if (!w.box) return; const [x, y, ww, hh] = w.box;
+    cx.strokeStyle = i === sel ? 'red' : colour(w.status); cx.lineWidth = i === sel ? 2 : 1;
+    cx.strokeRect(x * cv.width, y * cv.height, ww * cv.width, hh * cv.height);
+  });
+  const line = sel >= 0 ? page.words[sel].line : -1;
+  page.lines.forEach(l => {
+    const pts = (baseMode && l.id === line) ? basePts : l.baseline; if (!pts || !pts.length) return;
+    cx.strokeStyle = l.id === line ? 'cyan' : 'rgba(255,0,255,.5)'; cx.lineWidth = 2; cx.beginPath();
+    pts.forEach(([x, y], k) => (k ? cx.lineTo : cx.moveTo).call(cx, x * cv.width, y * cv.height)); cx.stroke();
+  });
+}
+function at(e) { const r = cv.getBoundingClientRect(); return [(e.clientX - r.left) / cv.width, (e.clientY - r.top) / cv.height]; }
+function hit(p) {
+  for (let i = page.words.length - 1; i >= 0; i--) { const b = page.words[i].box;
+    if (b && p[0] >= b[0] && p[0] <= b[0] + b[2] && p[1] >= b[1] && p[1] <= b[1] + b[3]) return i; }
+  return -1;
+}
+cv.onmousedown = e => {
+  if (!page) return; const p = at(e);
+  if (baseMode) { basePts.push(p.map(v => +v.toFixed(5))); draw(); return; }
+  const i = hit(p);
+  if (i >= 0) {
+    if (i !== sel) pick(i); const b = page.words[i].box;
+    const corner = Math.abs(p[0] - (b[0] + b[2])) * cv.width < 8 && Math.abs(p[1] - (b[1] + b[3])) * cv.height < 8;
+    drag = {mode: corner ? 'size' : 'move', p, b: b.slice()};
+  } else if (sel >= 0) drag = {mode: 'new', p};
+};
+cv.onmousemove = e => {
+  if (!drag) return; const p = at(e), w = page.words[sel], dx = p[0] - drag.p[0], dy = p[1] - drag.p[1];
+  if (drag.mode === 'move') w.box = [drag.b[0] + dx, drag.b[1] + dy, drag.b[2], drag.b[3]];
+  else if (drag.mode === 'size') w.box = [drag.b[0], drag.b[1], Math.max(.002, drag.b[2] + dx), Math.max(.002, drag.b[3] + dy)];
+  else w.box = [Math.min(p[0], drag.p[0]), Math.min(p[1], drag.p[1]), Math.abs(dx), Math.abs(dy)];
+  draw();
+};
+cv.onmouseup = () => {
+  if (drag && sel >= 0 && page.words[sel].box) { page.words[sel].box = page.words[sel].box.map(v => +v.toFixed(5)); touch(page.words[sel]); list(); }
+  drag = null;
+};
+document.onkeydown = e => {
+  if (!page || e.target === $('txt')) return;
+  if (e.key === '[' && sel > 0) pick(sel - 1);
+  else if (e.key === ']' && sel < page.words.length - 1) pick(sel + 1);
+  else if (e.key === 'm' || e.key === 'M') { const n = page.words.findIndex((w, k) => k > sel && !w.box && w.status !== 'illegible'); if (n >= 0) pick(n); }
+  else if ((e.key === 'Delete' || e.key === 'Backspace') && sel >= 0) { page.words[sel].box = null; page.words[sel].status = 'missing'; list(); draw(); }
+  else if ((e.key === 'b' || e.key === 'B') && sel >= 0) { baseMode = true; basePts = []; draw(); }
+  else if (e.key === 'Enter' && baseMode) {
+    const l = page.lines.find(l => l.id === page.words[sel].line);
+    if (l && basePts.length >= 2) { l.baseline = basePts; l.status = 'corrected'; }
+    baseMode = false; draw();
+  } else return;
+  e.preventDefault();
+};
+$('save').onclick = () => {
+  page.corrected = true;
+  page.lines.forEach(l => { const ws = page.words.filter(w => w.line === l.id); l.text = ws.map(w => w.text).join(' ');
+    const bs = ws.filter(w => w.box).map(w => w.box);
+    if (bs.length) { const x0 = Math.min(...bs.map(b => b[0])), y0 = Math.min(...bs.map(b => b[1]));
+      l.box = [x0, y0, Math.max(...bs.map(b => b[0] + b[2])) - x0, Math.max(...bs.map(b => b[1] + b[3])) - y0].map(v => +v.toFixed(5)); } });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(page, null, 1)], {type: 'application/json'}));
+  a.download = page.page.replace('/', '__') + '.json'; a.click();
+};
+</script></body></html>
