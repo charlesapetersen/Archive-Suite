@@ -26,6 +26,7 @@ Usage: python3 place_truth.py build                  # writes STORE and the summ
        python3 place_truth.py grid PAGE ...          # STORE/grid/<page>.jpg: the image with a permille grid
        python3 place_truth.py zoom PAGE X0 Y0 X1 Y1   # /tmp: a region enlarged, grid every 10 permille
        python3 place_truth.py bands PAGE X0 X1 [Y0 Y1]   # inked row bands in a strip (permille): where lines sit
+       python3 place_truth.py spec PAGE              # STORE/spec/<page>.json: the page as it stands, as a line spec
        python3 place_truth.py lines PAGE SPEC BY     # redraw a page from a line spec (apply_lines), then overlay it
        python3 place_truth.py audit PAGE VERDICT NOTE BY   # ok | fix | redraw, kept across rebuilds
 """
@@ -813,8 +814,10 @@ def apply_lines(page_id: str, spec_path: Path, by: str) -> dict:
     together exactly the transcript's tokens. A "box": [x0, y0, x1, y1] may stand in for "height" on a level
     line. Word boxes come from `gap_split` in the band along the baseline (or inside the box) (`drawn`);
     an optional "words": [[x0, y0, x1, y1], ...] per line, one per token, overrides the split; a line with
-    "absent": true holds transcript words the image does not show (left unboxed). Raises on a text
-    mismatch, so a spec that drops or reorders words never lands."""
+    "absent": true holds transcript words the image does not show (left unboxed); a null in "words" leaves that
+    one word unboxed. A word whose box is the one it already had keeps its status, so a spec from `spec` with a few
+    lines redrawn marks only those lines `drawn`. Raises on a text mismatch, so a spec that drops or reorders words
+    never lands."""
     f = STORE / f"{page_id.replace('/', '__')}.json"
     p = json.loads(f.read_text())
     spec = json.loads(Path(spec_path).read_text())
@@ -838,15 +841,25 @@ def apply_lines(page_id: str, spec_path: Path, by: str) -> dict:
         bl = [[x / 1000, y / 1000] for x, y in ln['baseline']]
         asc = ln['height'] / 1000 if ln.get('height') else None
         box = pm(ln['box']) if ln.get('box') else band_box(bl, asc)
-        wb = [pm(b) for b in ln['words']] if ln.get('words') else gap_split(g, box, lt, bl, asc)
+        wb = [b and pm(b) for b in ln['words']] if ln.get('words') else gap_split(g, box, lt, bl, asc)
         if len(wb) != len(lt):
             raise SystemExit(f'{page_id} line {ln_id}: {len(wb)} word boxes for {len(lt)} words')
         for t, b in zip(lt, wb):
-            st = 'illegible' if p['words'][i]['status'] == 'illegible' else 'drawn'
-            words.append({'text': t, 'box': [round(v, 5) for v in clamp(b)], 'line': ln_id, 'status': st})
+            old = p['words'][i]
+            wbox = [round(v, 5) for v in clamp(b)] if b else None
+            if old['status'] == 'illegible':
+                st = 'illegible'
+            elif wbox is None:
+                st = 'missing'
+            elif old['box'] and all(abs(u - v) < 6e-4 for u, v in zip(wbox, old['box'])):
+                st, wbox = old['status'], old['box']
+            else:
+                st = 'drawn'
+            words.append({'text': t, 'box': wbox, 'line': ln_id, 'status': st})
             i += 1
+        wb = [b for b in wb if b]
         bl = [[round(x, 5), round(y, 5)] for x, y in bl]
-        if not ln.get('box'):  # the line box is the words' union, not the band, which is generous by design
+        if not ln.get('box') and wb:  # the line box is the words' union, not the band, which is generous by design
             box = union(wb)
         lines.append({'id': ln_id, 'text': ln['text'], 'box': [round(v, 5) for v in clamp(box)], 'baseline': bl,
                       'status': 'drawn'})
@@ -854,6 +867,35 @@ def apply_lines(page_id: str, spec_path: Path, by: str) -> dict:
     f.write_text(json.dumps(p, ensure_ascii=False, indent=1))
     (STORE / 'xml' / f'{f.stem}.xml').write_text(page_xml(p))
     return p
+
+
+def export_spec(p: dict) -> dict:
+    """The page as it stands, in apply_lines' form (permille): one spec line per run of words on one line, with
+    its baseline, box and word boxes, so a drawer edits only the faulted lines and `lines` keeps the rest as is."""
+    k = lambda v: round(v * 1000, 1)
+    pm = lambda b: [k(b[0]), k(b[1]), k(b[0] + b[2]), k(b[1] + b[3])]
+    by_id = {l['id']: l for l in p['lines']}
+    runs = []
+    for w in p['words']:
+        if runs and runs[-1][0] == w.get('line'):
+            runs[-1][1].append(w)
+        else:
+            runs.append((w.get('line'), [w]))
+    out = []
+    for lid, ws in runs:
+        l = by_id.get(lid) or {}
+        boxes = [w['box'] for w in ws if w['box']]
+        if not boxes:
+            out.append({'text': ' '.join(w['text'] for w in ws), 'absent': True})
+            continue
+        bl = l.get('baseline')
+        if not bl or len(bl) < 2:
+            f = bottom_fit(boxes)
+            x0, x1 = min(b[0] for b in boxes), max(b[0] + b[2] for b in boxes)
+            bl = [[x0, f(x0)], [x1, f(x1)]]
+        out.append({'text': ' '.join(w['text'] for w in ws), 'baseline': [[k(x), k(y)] for x, y in bl],
+                    'box': pm(union(boxes)), 'words': [w['box'] and pm(w['box']) for w in ws]})
+    return {'lines': out}
 
 
 def record_audit(page_id: str, verdict: str, note: str, by: str) -> None:
@@ -870,7 +912,7 @@ def load_all() -> list[dict]:
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument('cmd', choices=['build', 'summary', 'overlay', 'grid', 'zoom', 'bands', 'lines', 'audit'])
+    ap.add_argument('cmd', choices=['build', 'summary', 'overlay', 'grid', 'zoom', 'bands', 'spec', 'lines', 'audit'])
     ap.add_argument('rest', nargs='*', help='overlay, grid: page ids (none = all); bands: page x0 x1 [y0 y1]; '
                                             'lines: page spec by; '
                                             'audit: page verdict note by')
@@ -889,6 +931,13 @@ def main():
         p = next(q for q in load_all() if q['page'] == a.rest[0])
         for top, bot in bands(p, *map(float, a.rest[1:])):
             print(f'{top:7.1f} {bot:7.1f}')
+        return
+    if a.cmd == 'spec':
+        p = next(q for q in load_all() if q['page'] == a.rest[0])
+        out = STORE / 'spec' / f"{p['page'].replace('/', '__')}.json"
+        out.parent.mkdir(exist_ok=True)
+        out.write_text(json.dumps(export_spec(p), ensure_ascii=False, indent=1))
+        print(out)
         return
     if a.cmd == 'lines':
         p = apply_lines(*a.rest)
