@@ -11,8 +11,9 @@ as the bench corpus does), plus a PAGE-XML copy of each and a text-free summary 
 The owner pages' boxes are DRAFTED: each truth word is aligned with Apple Vision's word boxes
 (`vision-words.json`, top-left normalised [x, y, w, h], `.accurate`), as `locate.py` aligned disputed spans. A
 word's `status` says where its box came from: `vision` (same word), `vision-sub` (Vision read it differently,
-one for one), `split` (its box is a share of Vision words read as a different count), `missing` (Vision has no
-word there: draw it in the tool). Lines follow Vision's lines; a line's baseline is drafted at BASELINE_FRAC of
+one for one), `split` (its box is a share of Vision words read as a different count, within SHARE_RATIO of the
+same length), `missing` (Vision has no word there, or read a stretch too different to share: draw it in the
+tool), `vision-moved` (the same word, found by a second pass where Vision read the block in another order). Lines follow Vision's lines; a line's baseline is drafted at BASELINE_FRAC of
 its words' height. The transcript is the truth text, broken where the drafted lines break.
 
 Usage: python3 place_truth.py build    # writes STORE and the summary
@@ -44,6 +45,7 @@ SCORED = RESULTS / 'ocr-pages.csv'
 
 SEED = 'W46.fix-place-truth'
 N_TYPED = 40
+SHARE_RATIO = 1.6  # a replace block is shared out only when its truth and Vision characters are this close
 BASELINE_FRAC = 0.78  # of a Vision word box's height, top down: where the baseline sits in a box with descenders
 
 
@@ -143,10 +145,25 @@ def draft_owner(page: str, text: str, vw) -> tuple[list[dict], list[dict]]:
                                      status='vision' if op == 'equal' else 'vision-sub')
         elif op == 'replace':
             idx = [i for i in range(i1, i2) if words[i]['status'] != 'illegible']
-            if not idx:
-                continue
+            tc = sum(len(toks[i]) for i in idx)
+            vc = sum(len(w[0]) for w in vw[j1:j2])
+            if not idx or not (1 / SHARE_RATIO <= tc / max(1, vc) <= SHARE_RATIO):
+                continue  # Vision read a different stretch, not this one differently: the words stay `missing`
             for i, (box, ln) in zip(idx, share([toks[i] for i in idx], vw[j1:j2], vlines[j1:j2])):
                 words[i].update(box=box, line=ln, status='split')
+    # Second pass: Vision reads some blocks in another order (a letterhead after the body, a second column first),
+    # which the first pass sees as deletion plus insertion. Match the still-missing words against the Vision words
+    # nobody took, keeping only runs of two or more, or single words of four or more letters.
+    used = {tuple(w['box']) for w in words if w['box']}
+    free = [k for k, v in enumerate(vw) if tuple(v[1:5]) not in used]
+    miss = [i for i, w in enumerate(words) if w['status'] == 'missing' and tn[i]]
+    sm2 = difflib.SequenceMatcher(None, [tn[i] for i in miss], [vn[k] for k in free], autojunk=False)
+    for blk in sm2.get_matching_blocks():
+        if blk.size < 2 and (blk.size == 0 or len(tn[miss[blk.a]]) < 4):
+            continue
+        for k in range(blk.size):
+            v = vw[free[blk.b + k]]
+            words[miss[blk.a + k]].update(box=list(v[1:5]), line=vlines[free[blk.b + k]], status='vision-moved')
     # Unplaced words take the line of the placed word before them (or after, at the top of the page).
     last = next((w['line'] for w in words if w['line'] is not None), 0)
     for w in words:

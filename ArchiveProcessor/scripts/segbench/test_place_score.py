@@ -103,6 +103,11 @@ class Drafting(unittest.TestCase):
         self.assertEqual([l['text'] for l in lines], ['Dear Sir,', 'I am glad to', 'hear you'])
         self.assertAlmostEqual(lines[0]['baseline'][0][1], 0.1 + pt.BASELINE_FRAC * 0.02, places=4)
 
+    def test_a_much_longer_truth_stretch_stays_missing(self):
+        vw = [['Dear', 0.1, 0.1, 0.1, 0.02], ['19', 0.3, 0.1, 0.03, 0.02], ['hear', 0.1, 0.2, 0.08, 0.02]]
+        words, _ = pt.draft_owner('p', 'Dear 1909. Mr F. P. Keppel Secretary hear', vw)
+        self.assertEqual([w['status'] for w in words][1:7], ['missing'] * 6)
+
     def test_illegible_is_never_boxed(self):
         words, _ = pt.draft_owner('p', '[illegible] Dear Sir,', self.VW[:2])
         self.assertEqual(words[0]['status'], 'illegible')

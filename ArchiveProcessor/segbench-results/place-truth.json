@@ -24,30 +24,32 @@
   "owner-typed": {
    "pages": 40,
    "words": 14243,
-   "lines": 1743,
-   "baselines": 1743,
+   "lines": 1763,
+   "baselines": 1763,
    "status": {
     "vision": 12058,
     "vision-sub": 337,
-    "missing": 891,
-    "split": 932,
+    "missing": 1260,
+    "split": 174,
+    "vision-moved": 389,
     "illegible": 25
    },
-   "median_lines_per_page": 35.0
+   "median_lines_per_page": 33.0
   },
   "owner-hand": {
    "pages": 21,
    "words": 3170,
-   "lines": 439,
-   "baselines": 439,
+   "lines": 386,
+   "baselines": 386,
    "status": {
     "illegible": 74,
     "vision": 1152,
-    "split": 1446,
-    "missing": 95,
+    "missing": 1282,
+    "vision-moved": 18,
+    "split": 241,
     "vision-sub": 403
    },
-   "median_lines_per_page": 18
+   "median_lines_per_page": 15
   }
  },
  "pages": [
@@ -408,7 +410,7 @@
    "in_96": true,
    "words": 285,
    "lines": 25,
-   "missing": 4,
+   "missing": 5,
    "audit": null
   },
   {
@@ -428,7 +430,7 @@
    "in_96": true,
    "words": 45,
    "lines": 8,
-   "missing": 2,
+   "missing": 0,
    "audit": null
   },
   {
@@ -437,8 +439,8 @@
    "kind": "handwritten",
    "in_96": true,
    "words": 75,
-   "lines": 11,
-   "missing": 13,
+   "lines": 9,
+   "missing": 48,
    "audit": null
   },
   {
@@ -447,8 +449,8 @@
    "kind": "typewritten",
    "in_96": true,
    "words": 605,
-   "lines": 50,
-   "missing": 34,
+   "lines": 49,
+   "missing": 35,
    "audit": null
   },
   {
@@ -457,8 +459,8 @@
    "kind": "mixed",
    "in_96": true,
    "words": 169,
-   "lines": 37,
-   "missing": 6,
+   "lines": 39,
+   "missing": 37,
    "audit": null
   },
   {
@@ -477,7 +479,7 @@
    "kind": "handwritten",
    "in_96": true,
    "words": 234,
-   "lines": 46,
+   "lines": 45,
    "missing": 29,
    "audit": null
   },
@@ -487,8 +489,8 @@
    "kind": "printed",
    "in_96": true,
    "words": 340,
-   "lines": 46,
-   "missing": 128,
+   "lines": 55,
+   "missing": 157,
    "audit": null
   },
   {
@@ -517,8 +519,8 @@
    "kind": "handwritten",
    "in_96": true,
    "words": 290,
-   "lines": 17,
-   "missing": 11,
+   "lines": 15,
+   "missing": 198,
    "audit": null
   },
   {
@@ -537,8 +539,8 @@
    "kind": "typewritten",
    "in_96": true,
    "words": 147,
-   "lines": 31,
-   "missing": 44,
+   "lines": 23,
+   "missing": 78,
    "audit": null
   },
   {
@@ -567,8 +569,8 @@
    "kind": "mixed",
    "in_96": true,
    "words": 54,
-   "lines": 17,
-   "missing": 2,
+   "lines": 16,
+   "missing": 14,
    "audit": null
   },
   {
@@ -587,8 +589,8 @@
    "kind": "printed",
    "in_96": true,
    "words": 28,
-   "lines": 19,
-   "missing": 3,
+   "lines": 18,
+   "missing": 4,
    "audit": null
   },
   {
@@ -607,8 +609,8 @@
    "kind": "handwritten",
    "in_96": true,
    "words": 188,
-   "lines": 24,
-   "missing": 2,
+   "lines": 21,
+   "missing": 66,
    "audit": null
   },
   {
@@ -627,8 +629,8 @@
    "kind": "printed",
    "in_96": true,
    "words": 690,
-   "lines": 91,
-   "missing": 112,
+   "lines": 101,
+   "missing": 8,
    "audit": null
   },
   {
@@ -637,8 +639,8 @@
    "kind": "handwritten",
    "in_96": true,
    "words": 113,
-   "lines": 14,
-   "missing": 0,
+   "lines": 13,
+   "missing": 16,
    "audit": null
   },
   {
@@ -647,8 +649,8 @@
    "kind": "handwritten",
    "in_96": true,
    "words": 86,
-   "lines": 12,
-   "missing": 0,
+   "lines": 10,
+   "missing": 17,
    "audit": null
   },
   {
@@ -658,7 +660,7 @@
    "in_96": true,
    "words": 110,
    "lines": 14,
-   "missing": 0,
+   "missing": 60,
    "audit": null
   },
   {
@@ -667,8 +669,8 @@
    "kind": "handwritten",
    "in_96": true,
    "words": 69,
-   "lines": 21,
-   "missing": 5,
+   "lines": 20,
+   "missing": 6,
    "audit": null
   },
   {
@@ -677,8 +679,8 @@
    "kind": "handwritten",
    "in_96": true,
    "words": 87,
-   "lines": 14,
-   "missing": 0,
+   "lines": 7,
+   "missing": 73,
    "audit": null
   },
   {
@@ -687,8 +689,8 @@
    "kind": "handwritten",
    "in_96": true,
    "words": 201,
-   "lines": 18,
-   "missing": 20,
+   "lines": 14,
+   "missing": 171,
    "audit": null
   },
   {
@@ -697,8 +699,8 @@
    "kind": "handwritten",
    "in_96": true,
    "words": 92,
-   "lines": 16,
-   "missing": 0,
+   "lines": 15,
+   "missing": 2,
    "audit": null
   },
   {
@@ -718,7 +720,7 @@
    "in_96": true,
    "words": 152,
    "lines": 24,
-   "missing": 0,
+   "missing": 8,
    "audit": null
   },
   {
@@ -727,8 +729,8 @@
    "kind": "handwritten",
    "in_96": true,
    "words": 156,
-   "lines": 18,
-   "missing": 1,
+   "lines": 14,
+   "missing": 92,
    "audit": null
   },
   {
@@ -737,8 +739,8 @@
    "kind": "handwritten",
    "in_96": true,
    "words": 92,
-   "lines": 18,
-   "missing": 0,
+   "lines": 15,
+   "missing": 3,
    "audit": null
   },
   {
@@ -747,8 +749,8 @@
    "kind": "handwritten",
    "in_96": true,
    "words": 135,
-   "lines": 24,
-   "missing": 2,
+   "lines": 22,
+   "missing": 32,
    "audit": null
   },
   {
@@ -757,8 +759,8 @@
    "kind": "typewritten",
    "in_96": true,
    "words": 77,
-   "lines": 18,
-   "missing": 50,
+   "lines": 17,
+   "missing": 52,
    "audit": null
   },
   {
@@ -767,8 +769,8 @@
    "kind": "printed",
    "in_96": true,
    "words": 315,
-   "lines": 38,
-   "missing": 4,
+   "lines": 40,
+   "missing": 5,
    "audit": null
   },
   {
@@ -787,8 +789,8 @@
    "kind": "printed",
    "in_96": true,
    "words": 544,
-   "lines": 85,
-   "missing": 22,
+   "lines": 86,
+   "missing": 25,
    "audit": null
   },
   {
@@ -807,8 +809,8 @@
    "kind": "typewritten",
    "in_96": true,
    "words": 71,
-   "lines": 24,
-   "missing": 22,
+   "lines": 22,
+   "missing": 24,
    "audit": null
   },
   {
@@ -838,7 +840,7 @@
    "in_96": true,
    "words": 1071,
    "lines": 165,
-   "missing": 27,
+   "missing": 30,
    "audit": null
   },
   {
@@ -847,8 +849,8 @@
    "kind": "printed",
    "in_96": true,
    "words": 82,
-   "lines": 19,
-   "missing": 10,
+   "lines": 22,
+   "missing": 1,
    "audit": null
   },
   {
@@ -867,8 +869,8 @@
    "kind": "printed",
    "in_96": true,
    "words": 926,
-   "lines": 111,
-   "missing": 10,
+   "lines": 112,
+   "missing": 7,
    "audit": null
   },
   {
@@ -877,8 +879,8 @@
    "kind": "printed",
    "in_96": true,
    "words": 663,
-   "lines": 39,
-   "missing": 248,
+   "lines": 76,
+   "missing": 307,
    "audit": null
   },
   {
@@ -887,8 +889,8 @@
    "kind": "printed",
    "in_96": true,
    "words": 449,
-   "lines": 59,
-   "missing": 1,
+   "lines": 32,
+   "missing": 323,
    "audit": null
   },
   {
@@ -897,8 +899,8 @@
    "kind": "handwritten",
    "in_96": false,
    "words": 324,
-   "lines": 29,
-   "missing": 3,
+   "lines": 27,
+   "missing": 102,
    "audit": null
   },
   {
@@ -908,7 +910,7 @@
    "in_96": true,
    "words": 661,
    "lines": 70,
-   "missing": 45,
+   "missing": 42,
    "audit": null
   },
   {
@@ -917,8 +919,8 @@
    "kind": "typewritten",
    "in_96": true,
    "words": 452,
-   "lines": 41,
-   "missing": 17,
+   "lines": 40,
+   "missing": 21,
    "audit": null
   },
   {
@@ -928,7 +930,7 @@
    "in_96": true,
    "words": 542,
    "lines": 62,
-   "missing": 26,
+   "missing": 39,
    "audit": null
   },
   {
@@ -937,8 +939,8 @@
    "kind": "handwritten",
    "in_96": false,
    "words": 90,
-   "lines": 9,
-   "missing": 0,
+   "lines": 8,
+   "missing": 68,
    "audit": null
   },
   {
@@ -957,8 +959,8 @@
    "kind": "handwritten",
    "in_96": false,
    "words": 299,
-   "lines": 31,
-   "missing": 0,
+   "lines": 13,
+   "missing": 239,
    "audit": null
   },
   {
@@ -967,8 +969,8 @@
    "kind": "typewritten",
    "in_96": true,
    "words": 320,
-   "lines": 37,
-   "missing": 7,
+   "lines": 38,
+   "missing": 4,
    "audit": null
   },
   {
@@ -997,8 +999,8 @@
    "kind": "typewritten",
    "in_96": true,
    "words": 166,
-   "lines": 46,
-   "missing": 2,
+   "lines": 43,
+   "missing": 20,
    "audit": null
   },
   {
