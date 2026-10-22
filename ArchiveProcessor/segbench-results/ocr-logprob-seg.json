@@ -1,0 +1,154 @@
+{
+ "development": {
+  "gaps": 494,
+  "new": 294,
+  "wrong": 17,
+  "auc_p_new_vs_new": 0.9808418367346938,
+  "auc_low_confidence_vs_wrong": 0.7624244666420027,
+  "auc_disagree_vs_wrong": 0.6943519546183253,
+  "raw_brier": 0.028672267206477732,
+  "raw_ece": 0.01696356275303638,
+  "distinct_p_new": 19,
+  "wrong_caught_reviewing": {
+   "10%": 0.47058823529411764,
+   "20%": 0.5882352941176471
+  }
+ },
+ "test": {
+  "gaps": 315,
+  "new": 130,
+  "wrong": 29,
+  "auc_p_new_vs_new": 0.9579209979209979,
+  "auc_low_confidence_vs_wrong": 0.697371593923318,
+  "auc_disagree_vs_wrong": 0.660176030865686,
+  "raw_brier": 0.0713313492063492,
+  "raw_ece": 0.04750793650793648,
+  "distinct_p_new": 20,
+  "wrong_caught_reviewing": {
+   "10%": 0.4482758620689655,
+   "20%": 0.4482758620689655
+  },
+  "cal_brier": 0.07448706925237394,
+  "cal_ece": 0.06031037019311725,
+  "wrong_after_calibration": 26
+ },
+ "test_by_box": {
+  "Stanton": {
+   "gaps": 238,
+   "new": 107,
+   "wrong": 27,
+   "auc_p_new_vs_new": 0.948277092102447,
+   "auc_low_confidence_vs_wrong": 0.7094962260839038,
+   "auc_disagree_vs_wrong": 0.6709671757065122,
+   "raw_brier": 0.08528865546218488,
+   "raw_ece": 0.06319327731092433,
+   "distinct_p_new": 20,
+   "wrong_caught_reviewing": {
+    "10%": 0.4444444444444444,
+    "20%": 0.48148148148148145
+   },
+   "cal_brier": 0.08991980493693978,
+   "cal_ece": 0.0707743734009517,
+   "wrong_after_calibration": 24
+  },
+  "RG165": {
+   "gaps": 77,
+   "new": 23,
+   "wrong": 2,
+   "auc_p_new_vs_new": 0.9826892109500805,
+   "auc_low_confidence_vs_wrong": 0.5766666666666667,
+   "auc_disagree_vs_wrong": 0.49333333333333335,
+   "raw_brier": 0.02819058441558442,
+   "raw_ece": 0.023441558441558444,
+   "distinct_p_new": 12,
+   "wrong_caught_reviewing": {
+    "10%": 0.0,
+    "20%": 0.0
+   },
+   "cal_brier": 0.026785886227352264,
+   "cal_ece": 0.03373909332272575,
+   "wrong_after_calibration": 2
+  }
+ },
+ "development_by_box": {
+  "Dean": {
+   "gaps": 191,
+   "new": 116,
+   "wrong": 5,
+   "auc_p_new_vs_new": 0.9745977011494252,
+   "auc_low_confidence_vs_wrong": 0.5473118279569893,
+   "auc_disagree_vs_wrong": 0.5919354838709677,
+   "raw_brier": 0.025782460732984295,
+   "raw_ece": 0.023141361256544542,
+   "distinct_p_new": 15,
+   "wrong_caught_reviewing": {
+    "10%": 0.4,
+    "20%": 0.4
+   }
+  },
+  "Deaver": {
+   "gaps": 136,
+   "new": 84,
+   "wrong": 7,
+   "auc_p_new_vs_new": 0.9796245421245421,
+   "auc_low_confidence_vs_wrong": 0.8615725359911407,
+   "auc_disagree_vs_wrong": 0.7740863787375415,
+   "raw_brier": 0.03444871323529412,
+   "raw_ece": 0.016286764705882282,
+   "distinct_p_new": 17,
+   "wrong_caught_reviewing": {
+    "10%": 0.7142857142857143,
+    "20%": 0.8571428571428571
+   }
+  },
+  "Herrnstein": {
+   "gaps": 167,
+   "new": 94,
+   "wrong": 5,
+   "auc_p_new_vs_new": 0.9867385601865345,
+   "auc_low_confidence_vs_wrong": 0.8308641975308642,
+   "auc_disagree_vs_wrong": 0.6845679012345679,
+   "raw_brier": 0.02727320359281437,
+   "raw_ece": 0.023203592814371305,
+   "distinct_p_new": 13,
+   "wrong_caught_reviewing": {
+    "10%": 0.4,
+    "20%": 0.8
+   }
+  }
+ },
+ "isotonic_blocks": [
+  [
+   0.0,
+   0.0,
+   0.0
+  ],
+  [
+   0.005,
+   0.48,
+   0.0476
+  ],
+  [
+   0.495,
+   0.5,
+   0.4286
+  ],
+  [
+   0.505,
+   0.525,
+   0.7778
+  ],
+  [
+   0.95,
+   0.995,
+   0.995
+  ],
+  [
+   1.0,
+   1.0,
+   1.0
+  ]
+ ],
+ "item": "W46.ocr-logprob",
+ "key": "fs-seg-2b"
+}
