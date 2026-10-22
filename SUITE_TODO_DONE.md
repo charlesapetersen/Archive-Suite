@@ -12701,3 +12701,7 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
     its blocking requests (up to 65 s each), so the delete can wait minutes on a bad network; the page stays visible
     and safe meanwhile.
   <!-- /W40.i-fix-ios-delete-confirm -->
+- [x] **W40.i-fix-ios-resend-window — iOS records a page uploaded before re-sending a changed field, so a crash in between loses the change [XS · S3 · Tier-2]** · §W40 (lane: processor) (uses: build) (blocked-on: W40.i-fix-ios-testable-core). Found 2026-10-21 by the `W40.i-fix-ios-pairing-generation` Tier-2 review: the confirmed-upload `needsResend` branch of `enqueueUpload` saved the page `.uploaded` with the marker cleared and re-enqueued later, so a kill in that window let `restore` drop it as confirmed. SHIPPED 2026-10-21.
+  - The fix itself had already landed in `W40.i-fix-ios-heartbeat-count` (e7e0ed69): that branch now calls `CaptureQueue.prepareDeferredResend` (pending + marker cleared in one step, Android's) and persists before the re-enqueue; and `restore` independently restores any `needsResend` page as pending (`W40.i-fix-ios-photo-storage`). No code change was needed here.
+  - This item adds the host test that pins the exact crash window: confirm → `prepareDeferredResend` → snapshot → restore keeps the page, not dropped, in `resumeCandidates` (`CaptureQueueTests.swift`; host suite 296 checks pass).
+  <!-- /W40.i-fix-ios-resend-window -->

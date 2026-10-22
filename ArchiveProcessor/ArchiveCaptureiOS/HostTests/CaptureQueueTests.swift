@@ -177,6 +177,20 @@ test("a confirmed send with a resend pending goes straight back to pending") {
     check(q.prepareDeferredResend(99) == nil, "unknown id")
 }
 
+test("a crash between the confirmed send and the resend keeps the change (W40.i-fix-ios-resend-window)") {
+    var q = makeQueue()
+    let a = q.addMarker(fileURL: url("a"), type: .box)   // a marker: an uploaded one is pruned on restore
+    q.setState(a.id, .uploading)
+    _ = q.markNeedsResend(a.id)                          // reclassified while the upload ran
+    _ = q.prepareDeferredResend(a.id)                    // the Mac confirmed the stale bytes
+    let saved = q.snapshot()                             // persisted; the app dies before the re-enqueue
+    check(saved.items.first { $0.id == a.id }?.state == .pending, "saved as pending, never as uploaded")
+    var r = makeQueue()
+    let res = r.restore(saved, fileExists: { _ in true })
+    check(res.dropped.isEmpty, "not dropped as confirmed")
+    check(r.resumeCandidates.map(\.id) == [a.id], "the next launch sends the current fields")
+}
+
 test("the heartbeat mailbox runs one writer and sends only the newest waiting report") {
     var m = HeartbeatMailbox<Int>()
     check(m.offer(3), "first offer starts the writer")
