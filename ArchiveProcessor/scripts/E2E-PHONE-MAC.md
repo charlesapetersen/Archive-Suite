@@ -66,5 +66,15 @@ xcodegen on PATH. Artifacts (raw backup, screencaps, `mac.log`, `REPORT.txt`, fi
 new, owner-private `/tmp/ap-e2e-*` dir (`E2E_RUNDIR` must name a nonexistent path with that prefix). Exit 0
 = PASS. `KEEP_EMU=always|onfail|never` controls emulator teardown (default `onfail`).
 
+## The iPhone companion (`--ios`, W40.i3)
+`e2e-phone-mac.sh --ios` runs the same Mac side, fixtures and assertions against the iPhone companion in a
+headless iOS simulator (`ios-sim-drive.sh`: `simctl boot`, never Simulator.app). Needs an iOS simulator runtime
+(`xcodebuild -downloadPlatform iOS`, about 8 GB). The simulator has no camera and no `adb input`, so the app's
+DEBUG-only harness (`ArchiveCaptureiOS/.../Debug/E2EHarness.swift`, absent from Release) supplies B1's twin —
+`Documents/test_inject.jpg` at the shutter — plus pairing from a launch payload and a driver that runs shutter,
+End segment and Skip per fixture; the script stages the fixtures and follows `Documents/e2e-status.txt`. It does
+not tap buttons, so the UI wiring is not covered. Its screenshots are currently one stale frame (`WARN STALE
+screencaps`, `W40.i3-fu-shots`). Evidence: `verification/evidence/capture/W40.i3-ios-e2e.md`.
+
 ## Cost
 Tiny — 3 fixtures × `gemini-2.5-flash-lite` (a few cents). Isolated output; never touches the real corpus.

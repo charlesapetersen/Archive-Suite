@@ -12863,3 +12863,18 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
     telling a mentioned year from a dating year (10 of 29). Nothing changes a tag: which year a wrong tag should hold
     is the owner's call. detail: ArchiveProcessor/segbench-results/date-draft-audit.md
   <!-- /W46.date-audit-score -->
+- [x] **W40.i3 — iPhone companion in the phone↔Mac E2E** · §W40 verification phase · SHIPPED 2026-10-22
+  `e2e-phone-mac.sh --ios` runs the real Mac side against the iPhone companion in a headless iOS 27 simulator
+  (`scripts/ios-sim-drive.sh`; iPhone 18 Pro device `ap-e2e-iphone`; runtime installed with `xcodebuild
+  -downloadPlatform iOS`, 8 GB). The app gained a DEBUG-only harness (`Debug/E2EHarness.swift`): Android's
+  `test_inject.jpg` seam at the shutter, pairing from a launch payload via `connectFromQR`, and a driver for shutter /
+  End segment / Skip that waits until every page and segment ack has reached the Mac. Release proven free of it
+  (`strings`: 0 vs 6 in Debug). Four runs passed: 3/3 tokens and years end to end; Android rerun also passed. Tier-2
+  review (opus): no HIGH; two MED fixed (a cancelled sleep spinning the main actor; the driver re-running on a new
+  view identity), plus device pick from the runtime's own list, token not via a here-string, a scaled poll budget,
+  a check that each segment really ended. Found: screenshots are one stale frame → `W40.i3-fu-shots` (WARN until
+  fixed). Ledger rows C-31, C-37, C-39, C-40 got runtime evidence and stay `unproven` (buttons not tapped, no retry,
+  no QR scan). The xcodebuild shim now passes `-downloadPlatform` without the heavy lock (it had held it for the
+  whole download). The owner-approved hook narrowing (headless `simctl boot|launch`) is NOT landed: `.claude/` is
+  not writable unattended. Evidence: `verification/evidence/capture/W40.i3-ios-e2e.md`.
+  <!-- /W40.i3 -->

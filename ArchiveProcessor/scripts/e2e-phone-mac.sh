@@ -257,6 +257,14 @@ for i in $(seq 1 "$ndocs"); do
   [ -s "$SHOTS/doc$i-captured.png" ] || { log "  MISSING screencap: doc$i-captured.png"; PHONE_OK=1; }
 done
 [ -s "$SHOTS/05-connected.png" ] || { log "  MISSING screencap: 05-connected.png (pairing)"; PHONE_OK=1; }
+# iOS: each page's shot shows its own thumbnail, so identical files mean the app drew nothing new while its
+# driver ran: every --ios run on 2026-10-22 had all its shots on one launch-time frame, though the app drew
+# normally once the driver ended. A WARNING until W40.i3-fu-shots finds why; it then becomes a failure.
+# Android is left as it was.
+if [ "$PHONE" = ios ] && [ "$ndocs" -gt 1 ]; then
+  distinct=$(for i in $(seq 1 "$ndocs"); do md5 -q "$SHOTS/doc$i-captured.png" 2>/dev/null; done | sort -u | wc -l | tr -d ' ')
+  [ "$distinct" = "$ndocs" ] || log "  WARN STALE screencaps: $distinct distinct of $ndocs doc shots — the phone UI is NOT evidenced (W40.i3-fu-shots)"
+fi
 
 # --- 7. verdict --------------------------------------------------------------
 echo | tee -a "$REPORT"

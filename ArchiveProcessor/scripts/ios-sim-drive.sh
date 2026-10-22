@@ -44,14 +44,16 @@ boot(){
   local u rt dt
   u="$(udid)"
   if [ -z "$u" ]; then
-    rt="$(xcrun simctl list runtimes -j | python3 -c 'import json,sys
+    # The newest iOS runtime, and the first (newest) iPhone in ITS supported list: the global device-type list
+    # is not in date order and includes phones the runtime refuses (an iPhone 6s Plus on iOS 27 → "Incompatible
+    # device"); the runtime's own list is newest first (iOS 27: iPhone 18 Pro … iPhone 11).
+    read -r rt dt < <(xcrun simctl list runtimes -j | python3 -c 'import json,sys
 rs=[r for r in json.load(sys.stdin)["runtimes"] if r["platform"]=="iOS" and r["isAvailable"]]
-print(rs[-1]["identifier"] if rs else "")')"
-    [ -n "$rt" ] || die "no iOS simulator runtime installed (xcodebuild -downloadPlatform iOS, about 8 GB)"
-    dt="$(xcrun simctl list devicetypes -j | python3 -c 'import json,sys
-ts=[t["identifier"] for t in json.load(sys.stdin)["devicetypes"] if t["name"].startswith("iPhone") and t.get("productFamily","iPhone")=="iPhone"]
-print(ts[-1] if ts else "")')"
-    [ -n "$dt" ] || die "no iPhone device type"
+if not rs: sys.exit(0)
+r=rs[-1]; ts=[t["identifier"] for t in r.get("supportedDeviceTypes",[]) if t.get("productFamily")=="iPhone"]
+print(r["identifier"], ts[0] if ts else "")')
+    [ -n "${rt:-}" ] || die "no iOS simulator runtime installed (xcodebuild -downloadPlatform iOS, about 8 GB)"
+    [ -n "${dt:-}" ] || die "the $rt runtime lists no iPhone device type"
     u="$(xcrun simctl create "$DEVICE" "$dt" "$rt")" || die "simctl create failed ($dt, $rt)"
     log "created $DEVICE ($dt, $rt) = $u"
   fi
@@ -83,7 +85,7 @@ run(){
   require_booted
   IFS= read -r token || die "LAN token missing on stdin"
   data="$(xcrun simctl get_app_container "$U" "$BUNDLE" data)" || die "no data container (install first)"
-  mkdir -p "$data/Documents/e2e-inbox"; rm -f "$data/Documents/e2e-status.txt"
+  mkdir -p "$data/Documents/e2e-inbox"; rm -f "$data/Documents/e2e-status.txt" "$data/Documents"/e2e-shot-*
   status="$data/Documents/e2e-status.txt"
   # Name-ordered inbox in ground-truth order, so doc i on the Mac is doc i in ground_truth.json.
   while IFS= read -r f <&3; do
@@ -93,26 +95,31 @@ run(){
 for d in json.load(open(sys.argv[1])): print(d["file"])' "$gt")
   n=$i; log "staged $n fixture(s) in the app's inbox"
   # The payload rides in the child's environment (SIMCTL_CHILD_ prefix), never in argv.
-  SIMCTL_CHILD_ARCHIVECAP_E2E_PAIR="$(python3 -c 'import json,sys;print(json.dumps({"host":"127.0.0.1","port":int(sys.argv[1]),"token":sys.stdin.read().strip(),"name":"E2E Mac"}))' "$port" <<<"$token")" \
+  # printf into a pipe, not a here-string: bash 3.2 spools a here-string to a temp file.
+  SIMCTL_CHILD_ARCHIVECAP_E2E_PAIR="$(printf '%s' "$token" | python3 -c 'import json,sys;print(json.dumps({"host":"127.0.0.1","port":int(sys.argv[1]),"token":sys.stdin.read().strip(),"name":"E2E Mac"}))' "$port")" \
   SIMCTL_CHILD_ARCHIVECAP_E2E_DRIVE=1 \
     xcrun simctl launch "$U" "$BUNDLE" >/dev/null || die "simctl launch failed"
   unset token
   log "launched; following the app's E2E progress"
-  local seen=0 total
-  for _ in $(seq 1 1800); do                      # 0.1 s steps: 180 s for pairing + capture + drain
-    total="$(wc -l < "$status" 2>/dev/null | tr -d ' ')"; total="${total:-0}"
+  # Outlast the app's own deadlines (≈27 s per document worst case + 120 s to settle), so the app's FAIL line,
+  # which names the cause, arrives before this script's generic timeout.
+  local seen=0 total budget=$(( 60 + 30 * n + 150 )) t0=$SECONDS
+  while [ $((SECONDS - t0)) -lt "$budget" ]; do
+    total="$( { wc -l < "$status"; } 2>/dev/null | tr -d ' ')"; total="${total:-0}"
     while [ "$seen" -lt "$total" ]; do            # every new line, in order, so no step is skipped
       seen=$((seen+1)); line="$(sed -n "${seen}p" "$status")"; last="$line"; log "app: $line"
       case "$line" in
-        paired) shot 05-connected ;;
-        "captured "*) shot "doc${line#captured }-captured" ;;
+        paired) ;;
+        ready) sleep 1; shot 05-connected; touch "$data/Documents/e2e-shot-0" ;;   # release the driver
+        "captured "*) sleep 0.5; shot "doc${line#captured }-captured"   # a beat for the frame to render
+                      touch "$data/Documents/e2e-shot-${line#captured }" ;;   # release the driver
         "DONE "*) shot zz-drained; return 0 ;;
         FAIL*) shot zz-fail; die "app reported: $line" ;;
       esac
     done
     sleep 0.1
   done
-  shot zz-timeout; die "no DONE from the app after 180 s (last: ${last:-nothing})"
+  shot zz-timeout; die "no DONE from the app after ${budget} s (last: ${last:-nothing})"
 }
 
 shutdown(){ local u; u="$(udid)"; [ -n "$u" ] && xcrun simctl shutdown "$u" >/dev/null 2>&1; true; }

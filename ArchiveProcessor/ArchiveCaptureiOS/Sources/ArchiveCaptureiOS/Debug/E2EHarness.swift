@@ -15,7 +15,8 @@ import Foundation
 ///   in name order, what the Android driver taps: drop the file at the inject seam, press the shutter, End
 ///   segment, then "Skip (tag on Mac)". The simulator has no `adb input`, so the driver presses the buttons'
 ///   own actions rather than synthesising touches; the shutter goes through the screen's `capture(.document)`.
-///   Progress goes to `Documents/e2e-status.txt`, one line per step, which the script polls.
+///   Progress goes to `Documents/e2e-status.txt`, one line per step, which the script polls; after each
+///   capture the driver waits for the script's `Documents/e2e-shot-<n>` so the screenshot shows that page.
 enum E2EHarness {
     private static var env: [String: String] { ProcessInfo.processInfo.environment }
 
@@ -34,6 +35,11 @@ enum E2EHarness {
         guard let data = try? Data(contentsOf: injectURL) else { return nil }
         try? FileManager.default.removeItem(at: injectURL)
         return data
+    }
+
+    /// Whether the script has screenshotted page `n` (it creates `Documents/e2e-shot-<n>`).
+    static func shotTaken(_ n: Int) -> Bool {
+        FileManager.default.fileExists(atPath: documents.appendingPathComponent("e2e-shot-\(n)").path)
     }
 
     /// The inbox's JPEGs in name order (doc1…, doc2…), for the driver.
@@ -62,15 +68,21 @@ enum E2EHarness {
         NSLog("[e2e] %@", line)
     }
 
-    /// Poll `cond` on the main actor every 100 ms until it holds or `seconds` pass.
+    /// Poll `cond` on the main actor every 100 ms until it holds or `seconds` pass. False on cancellation too:
+    /// a cancelled `Task.sleep` throws at once, so swallowing it would spin the main thread to the deadline.
     @MainActor
     static func wait(_ seconds: Double, _ cond: () -> Bool) async -> Bool {
         let deadline = Date().addingTimeInterval(seconds)
         while !cond() {
             if Date() > deadline { return false }
-            try? await Task.sleep(nanoseconds: 100_000_000)
+            do { try await Task.sleep(nanoseconds: 100_000_000) } catch { return false }
         }
         return true
     }
+
+    /// The driver runs once per launch: a capture screen that reappears (a new view identity re-runs `.task`)
+    /// must not drive the inbox's remainder a second time under the same `captured N` lines.
+    @MainActor private static var driven = false
+    @MainActor static func claimDrive() -> Bool { if driven { return false }; driven = true; return true }
 }
 #endif

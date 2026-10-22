@@ -148,7 +148,7 @@ struct CaptureScreen: View {
         .onAppear { camera.start() }
         .onDisappear { camera.stop() }
         #if DEBUG
-        .task { if E2EHarness.drives { await driveForE2E() } }
+        .task { if E2EHarness.drives, E2EHarness.claimDrive() { await driveForE2E() } }
         #endif
         // Gesture-dismiss is DISABLED (interactiveDismissDisabled) so an accidental swipe can't silently
         // strand the just-ended document. The operator must choose in the sheet: Apply & continue / Skip
@@ -226,7 +226,13 @@ struct CaptureScreen: View {
     private func driveForE2E() async {
         let docs = E2EHarness.inbox()
         guard !docs.isEmpty else { E2EHarness.status("FAIL inbox empty"); return }
+        // Start from a settled, active app, and only once the script has its shot of the connected screen
+        // (e2e-shot-0): driving straight from launch left every screenshot on the launch-time frame.
+        _ = await E2EHarness.wait(30) { UIApplication.shared.applicationState == .active }
+        E2EHarness.status("ready")
+        _ = await E2EHarness.wait(20) { E2EHarness.shotTaken(0) }
         for (i, doc) in docs.enumerated() {
+            if Task.isCancelled { E2EHarness.status("FAIL driver cancelled before doc \(i + 1)"); return }
             let n = i + 1
             guard E2EHarness.stage(doc) else { E2EHarness.status("FAIL staging doc \(n)"); return }
             guard await E2EHarness.wait(10, { !isCapturing }) else { E2EHarness.status("FAIL shutter busy \(n)"); return }
@@ -237,12 +243,17 @@ struct CaptureScreen: View {
                 E2EHarness.status("FAIL capture \(n): \(vm.captureError ?? vm.statusMessage)"); return
             }
             E2EHarness.status("captured \(n)")
-            try? await Task.sleep(nanoseconds: 1_500_000_000)   // a beat for the script's screenshot
+            // Hold the page on screen until the script has its screenshot (it drops e2e-shot-N); a fixed pause
+            // let all five shots of the first run catch one stale frame. Not fatal if it never comes.
+            _ = await E2EHarness.wait(20) { E2EHarness.shotTaken(n) }
             vm.finishDocumentSegment()                         // "End segment"
             guard await E2EHarness.wait(5, { vm.pendingTagGroupId != nil }) else {
                 E2EHarness.status("FAIL no tag sheet \(n): \(vm.statusMessage)"); return
             }
+            let group = vm.currentGroupId
             vm.applyTagsAndContinue(quality: nil, year: nil, month: nil)   // "Skip (tag on Mac)"
+            // A segment that silently failed to end would merge two documents into one group.
+            guard vm.currentGroupId != group else { E2EHarness.status("FAIL segment \(n) did not end"); return }
             E2EHarness.status("ended \(n)")
         }
         guard await E2EHarness.wait(120, { vm.e2eSettled }) else {

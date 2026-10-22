@@ -436,11 +436,12 @@ action or any runtime evidence: there is no test target and no simulator runtime
 - **Reached by:** no endpoint (`I/ContentView.swift:7-8`) → `ConnectScreen` scanner (`I/UI/ConnectScreen.swift:64`,
   `I/UI/QRScannerView.swift`) → `vm.connectFromQR` (`I/Capture/CaptureViewModel.swift:108`; a payload that does not parse
   sets `.badQR`) → `attemptConnect` (`:115`).
-- **Real-path test:** none.
-- **Runtime evidence:** none.
+- **Real-path test:** `scripts/e2e-phone-mac.sh --ios` pairs through `connectFromQR` from a launch payload (the scanner's own path after the scan; the camera scan itself is not run).
+- **Runtime evidence:** 2026-10-22 · `W40.i3` · [`evidence/capture/W40.i3-ios-e2e.md`](evidence/capture/W40.i3-ios-e2e.md).
 - **Status:** `unproven`
 - **History:**
   - 2026-10-21 W40.b4 — row written, `unproven`.
+  - 2026-10-22 W40.i3 — runtime evidence: the QR payload path from `connectFromQR` on (probe, pair, saved endpoint) ran; the camera scan did not. Stays `unproven`.
 - **Notes:** opens on the scanner as promised, and names a bad QR (unlike `C-01`). A cloud-mode QR was refused; since
   `W40.i-fix-ios-cloud-pairing` (2026-10-21) Wi-Fi names it as a Cloud code and the Cloud choice accepts it. With camera access denied the scanner was black
   with no message; since `W40.i-fix-ios-polish` (2026-10-21) it says so and offers Open Settings.
@@ -521,11 +522,12 @@ action or any runtime evidence: there is no test target and no simulator runtime
 - **Reached by:** End segment (`I/UI/CaptureScreen.swift:63`) → `finishDocumentSegment` (`I/Capture/CaptureViewModel.swift:309`)
   → tag sheet (`I/UI/CaptureScreen.swift:128-132`) → `finalizeSegment` (`:334`) → `trySendSegmentComplete` (`:366`).
 - **Real-path test:** `scripts/test-relay-transport.sh` (the iOS `FileRelayTransport.segmentComplete` writes its object;
-  passed 2026-10-21); the view model is untested.
-- **Runtime evidence:** none.
+  passed 2026-10-21); the view model is untested; `scripts/e2e-phone-mac.sh --ios`: the app's DEBUG driver calls `finishDocumentSegment` then the sheet's Skip (`applyTagsAndContinue(nil, nil, nil)`) per document; the Mac received three separate segments.
+- **Runtime evidence:** 2026-10-22 · `W40.i3` · [`evidence/capture/W40.i3-ios-e2e.md`](evidence/capture/W40.i3-ios-e2e.md).
 - **Status:** `unproven`
 - **History:**
   - 2026-10-21 W40.b4 — row written, `unproven`.
+  - 2026-10-22 W40.i3 — runtime evidence: three segments ended and acknowledged by the Mac; the End segment and Skip buttons were not tapped (the driver calls their actions). Stays `unproven`.
 - **Notes:** ended segments were held in a `Dictionary`, so their tag cards could reach the Mac out of order; since
   `W40.i-fix-ios-polish` (2026-10-21) they are kept in the order ended, through restore.
 
@@ -551,11 +553,12 @@ action or any runtime evidence: there is no test target and no simulator runtime
   (`:418`); `startAutoRetry` (`:512`, every 8 s, started at init `:76`); Retry (`I/UI/CaptureScreen.swift:61` →
   `retryFailed` `:466`).
 - **Real-path test:** `scripts/test-relay-transport.sh` (the transport's retry-safe `postPhoto`; passed 2026-10-21);
-  the queue is untested.
-- **Runtime evidence:** none.
+  the queue is untested; `scripts/e2e-phone-mac.sh --ios`: the shutter's `capture(.document)` with the inject seam's bytes → `persistCapturedJPEG` → `addDocumentPhoto` → upload to the real Mac.
+- **Runtime evidence:** 2026-10-22 · `W40.i3` · [`evidence/capture/W40.i3-ios-e2e.md`](evidence/capture/W40.i3-ios-e2e.md).
 - **Status:** `unproven`
 - **History:**
   - 2026-10-21 W40.b4 — row written, `unproven`.
+  - 2026-10-22 W40.i3 — runtime evidence: uploads as shot reached the real Mac and were OCR'd (3/3 tokens and years); auto-retry and Retry were not exercised. Stays `unproven`.
 - **Notes:** photos are kept in Caches, which iOS may empty → `W40.i-fix-ios-photo-storage` (S1); session writes ignored
   failure (fixed by `W40.i-fix-ios-session-durability`, 2026-10-21). Uploads with the app in the background: suspect S-023.
 
@@ -567,11 +570,12 @@ action or any runtime evidence: there is no test target and no simulator runtime
 - **Reached by:** `postPhoto` → `setState(.uploaded)` → `removeConfirmed` (`I/Capture/CaptureViewModel.swift:534`);
   receipt acceptance `I/Net/FileRelayTransport.swift:35-42`, `I/Net/DriveRelayTransport.swift:40-44`.
 - **Real-path test:** `scripts/test-relay-transport.sh` (no receipt or a mismatched one returns `false`); the deletion
-  in the view model is untested.
-- **Runtime evidence:** none.
+  in the view model is untested; `scripts/e2e-phone-mac.sh --ios`: its driver reports DONE only once no page is left on the phone and every ended segment is acknowledged.
+- **Runtime evidence:** 2026-10-22 · `W40.i3` · [`evidence/capture/W40.i3-ios-e2e.md`](evidence/capture/W40.i3-ios-e2e.md).
 - **Status:** `unproven`
 - **History:**
   - 2026-10-21 W40.b4 — row written, `unproven`.
+  - 2026-10-22 W40.i3 — runtime evidence: every page left the phone after the Mac confirmed it; that none leaves before is not what this run shows. Stays `unproven`.
 - **Notes:** two code-read ways an unsent photo is deleted: a late reply after Clear marks a new photo with the reused id
   as sent → `W40.i-fix-ios-clear-generation` (S1); a reply from the Mac just unpaired from →
   `W40.i-fix-ios-pairing-generation` (S2). Until those land this row cannot honestly move to `works`.
