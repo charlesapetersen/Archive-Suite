@@ -20,12 +20,17 @@
 # Usage:  OCR_KEY=<gemini-key> scripts/e2e-phone-mac.sh
 #         (if OCR_KEY unset, falls back to the Keychain Gemini key)
 #   caffeinate -di scripts/e2e-phone-mac.sh     # keep the Mac awake for the run
+#   scripts/e2e-phone-mac.sh --ios              # the iPhone companion instead (W40.i3): a headless iOS
+#         simulator via ios-sim-drive.sh, same Mac, fixtures and assertions. Needs an iOS simulator runtime.
 # ============================================================================
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/require-unsandboxed.sh"   # no app launch inside the Codex sandbox (2026-10-05)
 set -uo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"                 # …/ArchiveProcessor/scripts
-DRIVER="$HERE/android-ui-drive.sh"                    # proven emulator + UI driver (subcommands)
+PHONE=android
+case "${1:-}" in --ios) PHONE=ios ;; --android|"") ;; *) printf '[e2e] usage: %s [--android|--ios]\n' "$0" >&2; exit 2 ;; esac
+if [ "$PHONE" = ios ]; then DRIVER="$HERE/ios-sim-drive.sh"   # headless simulator + the app's DEBUG E2E harness
+else DRIVER="$HERE/android-ui-drive.sh"; fi                    # proven emulator + UI driver (subcommands)
 FIXTURES="$HERE/e2e-fixtures"                          # doc*.jpg + ground_truth.json
 GT="$FIXTURES/ground_truth.json"
 APPROOT="$(cd "$HERE/../macOS" && pwd)"               # the XcodeGen project dir
@@ -47,10 +52,11 @@ esac
 umask 077                                               # private from the instant the run directory is created
 mkdir "$RUN" || { printf '[e2e] FAIL: cannot atomically claim fresh run directory: %s\n' "$RUN" >&2; exit 2; }
 mkdir "$TESTOUT" "$SHOTS"
-export OUT="$SHOTS"                                    # android-ui-drive.sh screencaps land here
+export OUT="$SHOTS"                                    # the phone driver's screenshots land here
 
 log(){ printf '\033[35m[e2e]\033[0m %s\n' "$*" | tee -a "$REPORT"; }
 MAC_PID=""; KEEP_EMU="${KEEP_EMU:-onfail}"
+phone_down(){ if [ "$PHONE" = ios ]; then bash "$DRIVER" shutdown; else "$ADB" emu kill 2>/dev/null; fi; }
 redact_ready_token(){
   # The READY file briefly carries the LAN bearer needed for emulator pairing. The app has finished its one
   # READY write before this runs, so replacing it cannot detach a live writer from its artifact path.
@@ -109,7 +115,7 @@ cleanup(){
   redact_closed_maclog
 }
 die(){ printf '\033[31m[e2e] FAIL:\033[0m %s\n' "$*" | tee -a "$REPORT" >&2; cleanup
-       [ "$KEEP_EMU" = never ] && "$ADB" emu kill 2>/dev/null; exit 1; }
+       [ "$KEEP_EMU" = never ] && phone_down; exit 1; }
 
 # Defensive cleanup: scrub any token-bearing artifact even if a child/older driver revision emitted one.
 # shellcheck disable=SC2329  # invoked by the EXIT trap below
@@ -133,7 +139,7 @@ KEY="${OCR_KEY:-$(security find-generic-password -s com.archiveprocessor.app -a 
 [ -f "$GT" ] || die "fixtures missing: $GT"
 [ -f "$DRIVER" ] || die "driver missing: $DRIVER"
 command -v xcodegen >/dev/null || die "xcodegen not on PATH"
-log "run dir: $RUN"
+log "run dir: $RUN (phone: $PHONE)"
 
 # --- 1. build the Mac app (Debug) --------------------------------------------
 log "building Mac app (Debug)…"
@@ -191,6 +197,15 @@ case "$TOKEN" in *[!ABCDEFGHJKMNPQRSTUVWXYZ23456789]*) die "READY LAN token has 
 redact_ready_token
 log "Mac listening on LAN port $PORT"
 
+if [ "$PHONE" = ios ]; then
+# --- 3+4 (iOS). simulator + app, then pair + inject in one launch ------------
+# The simulator shares the Mac's network, so the app pairs to 127.0.0.1:$PORT directly. It pairs from the
+# payload through the scanner's own path, then its DEBUG harness presses shutter / End segment / Skip per
+# fixture, each page entering through the inject seam (ios-sim-drive.sh header).
+bash "$DRIVER" boot            || die "simulator boot failed"
+bash "$DRIVER" install         || die "app install failed"
+printf '%s\n' "$TOKEN" | bash "$DRIVER" run "$PORT" "$FIXTURES" "$GT" || die "iOS pair + inject flow failed"
+else
 # --- 3. emulator + app + pair over LAN (proven driver subcommands) -----------
 # The emulator is launched (backgrounded) inside `boot` and survives as an
 # adb-tracked orphan across subsequent subcommands.
@@ -200,6 +215,7 @@ printf '%s\n' "$TOKEN" | bash "$DRIVER" pair "$PORT" || die "pairing failed"
 
 # --- 4. inject the known documents through the REAL capture path -------------
 bash "$DRIVER" inject-flow "$FIXTURES" "$GT" || die "inject-flow failed"
+fi
 
 # --- 5. signal session-complete → Mac auto-finalizes -------------------------
 # The companion has NO session-finish UI (it finishes per-segment; whole-session
@@ -207,7 +223,8 @@ bash "$DRIVER" inject-flow "$FIXTURES" "$GT" || die "inject-flow failed"
 # `POST /session/complete` control signal itself, over the Bearer route the
 # protocol defines → completeAllOpenDocGroups → (B2) AUTOFINALIZE, whose
 # requestFinish is drain-gated (holds until the phone drained), then finalize.
-# 10.0.2.2:$PORT (what the emulator paired to) forwards to the Mac's 127.0.0.1:$PORT.
+# 10.0.2.2:$PORT (what the emulator paired to) forwards to the Mac's 127.0.0.1:$PORT; the iOS
+# simulator paired to 127.0.0.1:$PORT itself.
 sleep 3
 log "sending POST /session/complete (Bearer) → Mac auto-finalize…"
 code=$(printf 'header = "Authorization: Bearer %s"\n' "$TOKEN" | \
@@ -246,8 +263,8 @@ echo | tee -a "$REPORT"
 if [ "$MAC_OK" = 0 ] && [ "$PHONE_OK" = 0 ]; then
   cleanup || die "Mac test-child cleanup failed (output assertions passed; teardown did not)"
   log "RESULT: PASS ✅  (round-trip verified; artifacts in $RUN)"
-  [ "$KEEP_EMU" != always ] && "$ADB" emu kill 2>/dev/null; exit 0
+  [ "$KEEP_EMU" != always ] && phone_down; exit 0
 else
   log "RESULT: FAIL ❌  (mac=$MAC_OK phone=$PHONE_OK; artifacts + logs in $RUN)"
-  cleanup; [ "$KEEP_EMU" = never ] && "$ADB" emu kill 2>/dev/null; exit 1
+  cleanup; [ "$KEEP_EMU" = never ] && phone_down; exit 1
 fi

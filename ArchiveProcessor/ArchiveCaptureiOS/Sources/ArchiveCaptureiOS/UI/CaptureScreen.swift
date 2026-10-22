@@ -147,6 +147,9 @@ struct CaptureScreen: View {
         .preferredColorScheme(.dark)
         .onAppear { camera.start() }
         .onDisappear { camera.stop() }
+        #if DEBUG
+        .task { if E2EHarness.drives { await driveForE2E() } }
+        #endif
         // Gesture-dismiss is DISABLED (interactiveDismissDisabled) so an accidental swipe can't silently
         // strand the just-ended document. The operator must choose in the sheet: Apply & continue / Skip
         // (both end the segment and send it to the Mac) or Cancel — keep shooting (End segment was a
@@ -216,6 +219,38 @@ struct CaptureScreen: View {
             if type == .document { vm.addDocumentPhoto(url) } else { vm.captureMarker(url, type: type) }
         }
     }
+
+    #if DEBUG
+    /// The E2E driver (Debug/E2EHarness.swift): per inbox JPEG, the Android driver's taps — shutter, End
+    /// segment, Skip — then wait until every page and segment signal has reached the Mac.
+    private func driveForE2E() async {
+        let docs = E2EHarness.inbox()
+        guard !docs.isEmpty else { E2EHarness.status("FAIL inbox empty"); return }
+        for (i, doc) in docs.enumerated() {
+            let n = i + 1
+            guard E2EHarness.stage(doc) else { E2EHarness.status("FAIL staging doc \(n)"); return }
+            guard await E2EHarness.wait(10, { !isCapturing }) else { E2EHarness.status("FAIL shutter busy \(n)"); return }
+            capture(.document)
+            guard await E2EHarness.wait(10, {
+                !isCapturing && vm.items.contains { $0.groupId == vm.currentGroupId && $0.type == .document }
+            }) else {
+                E2EHarness.status("FAIL capture \(n): \(vm.captureError ?? vm.statusMessage)"); return
+            }
+            E2EHarness.status("captured \(n)")
+            try? await Task.sleep(nanoseconds: 1_500_000_000)   // a beat for the script's screenshot
+            vm.finishDocumentSegment()                         // "End segment"
+            guard await E2EHarness.wait(5, { vm.pendingTagGroupId != nil }) else {
+                E2EHarness.status("FAIL no tag sheet \(n): \(vm.statusMessage)"); return
+            }
+            vm.applyTagsAndContinue(quality: nil, year: nil, month: nil)   // "Skip (tag on Mac)"
+            E2EHarness.status("ended \(n)")
+        }
+        guard await E2EHarness.wait(120, { vm.e2eSettled }) else {
+            E2EHarness.status("FAIL not settled: \(vm.items.count) page(s) on the phone; \(vm.statusMessage)"); return
+        }
+        E2EHarness.status("DONE \(docs.count)")
+    }
+    #endif
 }
 
 /// A capture strip thumbnail with an upload-state dot (teal, with a check badge, once saved to Photos); loads a

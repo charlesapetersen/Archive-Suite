@@ -38,6 +38,11 @@ final class CaptureViewModel: ObservableObject {
     var items: [CapturedItem] { queue.items }
     var currentGroupId: String { queue.currentGroupId }
     var pendingTagGroupId: String? { queue.pendingTagGroupId }
+    #if DEBUG
+    /// The E2E driver's "everything reached the Mac": no page left on the phone and no ended segment still
+    /// waiting for the Mac's acknowledgement (Debug/E2EHarness.swift).
+    var e2eSettled: Bool { queue.items.isEmpty && queue.endedSegments.entries.isEmpty }
+    #endif
     /// Recovered pages held until reviewed (W40.i-fix-ios-session-durability): their box/folder was never saved.
     var heldForReviewCount: Int { queue.heldForReviewCount }
     @Published private(set) var statusMessage = ""

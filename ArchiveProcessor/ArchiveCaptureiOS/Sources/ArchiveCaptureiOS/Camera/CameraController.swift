@@ -79,6 +79,10 @@ final class CameraController: NSObject, ObservableObject {
     /// Capture a full-resolution JPEG; `completion` is called on the main thread (nil on failure).
     func capturePhoto(_ completion: @escaping (Data?) -> Void) {
         queue.async {
+            #if DEBUG
+            // The E2E's inject seam (Debug/E2EHarness.swift): a waiting file stands in for the shot.
+            if let injected = E2EHarness.takeInjected() { DispatchQueue.main.async { completion(injected) }; return }
+            #endif
             // Require a live video connection: capturing without one throws NSInvalidArgumentException
             // (a hard crash) rather than failing gracefully, so convert that to completion(nil).
             guard self.configured, self.hasVideoInput,
