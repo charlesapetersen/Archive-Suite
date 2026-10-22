@@ -89,7 +89,7 @@ final class TableColumnFitTests: XCTestCase {
         resize(scrollView, to: 500)
         XCTAssertEqual(width(tableView, "name"), 200)
         XCTAssertEqual(width(tableView, "tags"), 160)
-        XCTAssertEqual(width(tableView, "quality"), 72)
+        XCTAssertEqual(width(tableView, "quality"), 80)
         XCTAssertEqual(width(tableView, "read"), 84)
     }
 

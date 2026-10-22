@@ -64,7 +64,21 @@ final class TableColumnFitter: NSObject {
                                  minimums: flexible.map(\.minWidth), available: available)
         isFitting = true
         defer { isFitting = false }
-        for (column, width) in zip(flexible, target) where column.width != width { column.width = width }
+        var changed = false
+        for (column, width) in zip(flexible, target) where column.width != width {
+            column.width = width
+            changed = true
+        }
+        if changed { remeasureVisibleRows() }
+    }
+
+    /// Automatic row heights are measured once per row, so a File tags column made narrower would leave its wrapped
+    /// second line of tags drawn below the row. Only the rows on screen: the rest are measured as they scroll in.
+    private func remeasureVisibleRows() {
+        guard let tableView else { return }
+        let rows = tableView.rows(in: tableView.visibleRect)
+        guard rows.length > 0 else { return }
+        tableView.noteHeightOfRows(withIndexesChanged: IndexSet(integersIn: rows.location..<NSMaxRange(rows)))
     }
 
     @objc private func clipFrameDidChange(_ note: Notification) { fit() }
@@ -75,5 +89,6 @@ final class TableColumnFitter: NSObject {
         guard !isFitting, let column = note.userInfo?["NSTableColumn"] as? NSTableColumn,
               flexibleIDs.contains(column.identifier.rawValue) else { return }
         preferred[column.identifier.rawValue] = column.width
+        remeasureVisibleRows()
     }
 }

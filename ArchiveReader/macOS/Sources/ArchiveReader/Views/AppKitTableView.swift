@@ -30,7 +30,9 @@ struct AppKitTableView: NSViewRepresentable {
         .init(id: "type", title: "Type", width: 56, minWidth: 44, maxWidth: 80, sortField: .fileType),
         .init(id: "classification", title: "Provenance", width: 132, minWidth: 100, maxWidth: 220, sortField: nil),
         .init(id: "tags", title: "File tags", width: 300, minWidth: 160, maxWidth: 600, sortField: .subjects, flexible: true),
-        .init(id: "quality", title: "Quality", width: 72, minWidth: 60, maxWidth: 100, sortField: .quality),
+        // Quality holds a 75-pt pop-up inset 1 pt each side, so 78 is the narrowest it fits in. At 72 it overhung
+        // its cell, unseen while the column sat scrolled off past the window (W40.fix-reader-tagcloud-width).
+        .init(id: "quality", title: "Quality", width: 80, minWidth: 78, maxWidth: 100, sortField: .quality),
         .init(id: "read", title: "Read", width: 84, minWidth: 70, maxWidth: 110, sortField: .readState),
     ]
 
@@ -676,6 +678,17 @@ final class TagTokenCellView: NSTableCellView {
         ])
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    /// The field wraps its tokens to its width, so the height it asks for must follow that width: a narrower
+    /// File tags column (the tag cloud opening) then gives a taller row rather than a second line drawn below it.
+    override func layout() {
+        super.layout()
+        let width = tokenField.frame.width
+        if width > 0, tokenField.preferredMaxLayoutWidth != width {
+            tokenField.preferredMaxLayoutWidth = width
+            tokenField.invalidateIntrinsicContentSize()
+        }
+    }
 }
 
 // MARK: - Column-picker header view

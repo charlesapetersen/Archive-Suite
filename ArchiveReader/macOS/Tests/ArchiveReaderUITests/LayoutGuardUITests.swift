@@ -1,7 +1,7 @@
 import XCTest
 
 /// W40.e9 — the layout guard (`packages/UITestSupport/LayoutGuard.swift`) over the Reader's main screens: the
-/// navigation window with a document selected, the Edit Tags and Similar Tags sheets, the preview sheet, and the
+/// navigation window with a document selected, then with the tag cloud open, the Edit Tags and Similar Tags sheets, the preview sheet, and the
 /// document viewer window. Each at its
 /// typical and minimum size, on open and once settled; one test per appearance, because the appearance is a
 /// launch argument.
@@ -39,6 +39,7 @@ final class LayoutGuardUITests: FixtureUITestCase {
         waitForRows(minimum: 3, timeout: 10)
         clickRow(0)
         LayoutGuard.sweep(main, screen: "navigation window, \(appearance)", in: self, ignore: isPDFPage)
+        sweepTagCloud(main, appearance: appearance)
 
         // The tag sheets at the window's size (W40.fix-reader-tag-editor-chips): Edit Tags over every row, so
         // its subjects are a mix of full and partial chips, then Find Similar Tags. Done only dismisses.
@@ -66,6 +67,38 @@ final class LayoutGuardUITests: FixtureUITestCase {
         let viewer = app.windows.matching(NSPredicate(format: "title != %@", "Archive Reader")).firstMatch
         XCTAssertTrue(viewer.waitForExistence(timeout: 10), "Open in Viewer should bring up the document window")
         LayoutGuard.sweep(viewer, screen: "document viewer, \(appearance)", in: self, ignore: isPDFPage)
+    }
+
+    /// The navigation window with the tag cloud open (W40.fix-reader-tagcloud-width). The guard exempts what is
+    /// inside a scroll view, and the table's cells are, so it cannot see the defect this was filed for: opening
+    /// the cloud kept every column at its width and pushed Quality and Read under the panel, reachable only by
+    /// scrolling sideways. So the sweep is followed by a direct check that the first row's last cell ends
+    /// before the cloud's tags begin, at the 1400-pt window the defect was seen at: at the window's 900-pt
+    /// minimum the columns' own minimums cannot fit beside the sidebar and the cloud, and the table scrolls by
+    /// design. The window is put back to its size afterwards, and the cloud, a persisted toggle, closed again.
+    private func sweepTagCloud(_ main: XCUIElement, appearance: String) {
+        let tags = main.buttons.matching(identifier: "ar.tagCloud.tag")
+        let button = toolbarButton("ar.toolbar.tagCloud")
+        if !tags.firstMatch.exists { button.click() }
+        guard tags.firstMatch.waitForExistence(timeout: 5) else {
+            return XCTFail("the tag cloud should open from the toolbar, with the fixture's tags in it")
+        }
+        let original = main.frame
+        let wide = LayoutGuard.dragCorner(of: main, to: CGPoint(x: original.minX + 1400, y: original.minY + 860))
+        XCTAssertEqual(wide.width, 1400, accuracy: 2, "the window should widen to 1400 pt for the tag cloud check")
+        LayoutGuard.sweep(main, screen: "tag cloud, \(appearance)", in: self)
+
+        _ = LayoutGuard.waitUntilSettled(main)
+        let cells = table.tableRows.element(boundBy: 0).cells.allElementsBoundByIndex
+        let lastEdge = cells.map(\.frame.maxX).max() ?? 0
+        let cloudEdge = tags.allElementsBoundByIndex.map(\.frame.minX).min() ?? 0
+        XCTAssertGreaterThan(cells.count, 0, "the first row should have cells")
+        XCTAssertLessThanOrEqual(lastEdge, cloudEdge + LayoutGuard.tolerance,
+                                 "tag cloud, \(appearance): the last column ends at x=\(lastEdge), past the cloud's "
+                                    + "first tag at x=\(cloudEdge); the columns should shrink to fit beside it")
+        LayoutGuard.dragCorner(of: main, to: CGPoint(x: original.maxX, y: original.maxY))
+        button.click()
+        XCTAssertTrue(tags.firstMatch.waitForNonExistence(timeout: 5), "the tag cloud should close from the toolbar")
     }
 }
 
