@@ -44,6 +44,7 @@ KIND_CLASSIFIER = RESULTS / "kind-classifier.json"  # W41.bench-kind-classifier:
 DATING = RESULTS / "date-tagging.json"  # W41.date-tag-measure: date_tagging.py score
 DATING_PUBLIC = RESULTS / "date-tagging-public.json"
 DATING_TRACEABLE = RESULTS / "date-traceable.json"  # W46.date-traceable: date_traceable.py score
+DATING_ENCLOSURE = RESULTS / "date-enclosure.json"  # W46.date-enclosure: date_enclosure.py score
 PUBLIC = RESULTS / "bench-corpus"  # W43.corpus-build: corpus/routes.py report, the public strata
 OCR_SCORERS = RESULTS / "ocr-scorers.json"  # W46.fix-ocr-scorers: ocr_rescore.py, every cached reading re-scored
 TRUTH_BIAS = RESULTS / "ocr-truth-bias.json"  # W46.fix-ocr-truth-bias: ocr_truth_bias.py, agreed v adjudicated words
@@ -122,6 +123,19 @@ def dating_traceable():
             rows.append({"kind": "pipeline", "name": f"{chooser}, {residue}, {t}", **cut(s),
                          "gpu_s_1000": s["per_1000"]["gpu_s"], "mac_s_1000": s["per_1000"]["mac_s"]})
     return {"rows": rows, "vision": {k: cut(v) for k, v in (d.get("vision") or {}).items() if isinstance(v, dict) and "exact" in v}}
+
+
+def dating_enclosure():
+    """The enclosure panel's rows: each arm's result on the owner's relation truth, its firing rate on the structural
+    proxy (A, A' and the matched negatives) and its proposals' propagated years."""
+    if not DATING_ENCLOSURE.exists():
+        return None
+    d = json.loads(DATING_ENCLOSURE.read_text())
+    rows = [{"arm": k, "name": a["name"], "owner": a["owner"]["confusion"], "precision": a["owner"]["precision"],
+             "recall": a["owner"]["recall"], "rate": {g: [a["rate"][g]["fired"], a["rate"][g]["of"]] for g in ("A", "A'", "neg")},
+             "auc": a["auc_proxy"], "seconds": a["seconds_mean"], "propagation": a["propagation"]}
+            for k, a in d["arms"].items()]
+    return {"set": d["set"], "rows": rows}
 
 
 def money_cells(cell):
@@ -545,6 +559,7 @@ def main():
              "dating": dating,
              "dating_public": json.loads(DATING_PUBLIC.read_text()) if DATING_PUBLIC.exists() else None,
              "dating_traceable": dating_traceable(),
+             "dating_enclosure": dating_enclosure(),
              "seg_date": json.loads((RESULTS / "seg-date-model-final.json").read_text())
                          if (RESULTS / "seg-date-model-final.json").exists() else None,
              "public": public(), "ocr_scorers": ocr_scorers(),

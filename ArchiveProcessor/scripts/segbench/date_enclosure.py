@@ -426,12 +426,20 @@ def arm_predictions(items):
             if p is None:
                 out[i] = {"yes": None, "score": None, "cue": None, "cue_found": None, "secs": r.get("wall_s"), "cls": None}
                 continue
-            conf = p["confidence"]
-            score = conf if conf is not None else float(p["sent_with"])
-            out[i] = {"yes": p["sent_with"], "score": score, "cue": p["cue"], "cue_found": cue_found(p["cue"], by_id[i]),
-                      "secs": r.get("wall_s", r.get("seconds")), "cls": None}
+            out[i] = {"yes": p["sent_with"], "score": relation_score(p), "cue": p["cue"],
+                      "cue_found": cue_found(p["cue"], by_id[i]), "secs": r.get("wall_s", r.get("seconds")), "cls": None}
         arms["relate:" + key] = out
     return arms
+
+
+def relation_score(p):
+    """P(sent with) for ranking. The prompt asks for the confidence that Document 2 was sent with Document 1, but the
+    2B answers false with 0.99, i.e. its confidence in the verdict; the reading that agrees with the verdict is taken
+    (a confidence on the verdict's side of 0.5 is P(sent with), else confidence in the verdict)."""
+    conf, yes = p["confidence"], p["sent_with"]
+    if conf is None:
+        return float(yes)
+    return conf if (conf >= 0.5) == yes else 1.0 - conf
 
 
 def wilson(k, n, z=1.96):
@@ -552,7 +560,27 @@ def pc(k, n):
     return f"{100 * k / n:.1f}%" if n else "–"
 
 
-FINDINGS = []   # filled in by hand from the scored run (the item's report), one string per bullet
+FINDINGS = [   # written by hand from the scored run of 2026-10-22, one string per bullet
+    "The marker, on the local route: Qwen3-VL 8B 4-bit, given the app's exact OCR prompt (compiled from "
+    "`OCRPrompt.swift`), wrote `[enclosure]` on none of the 225 pages, including none of the owner's 3 confirmed "
+    "enclosures. On the Mac route the app therefore proposes no relation at all: recall 0 of 3, precision undefined. "
+    "It also called 53 of the 225 tag-rule document starts continuations (owner 8 of 15, A 19 of 60, A' 12 of 45, "
+    "negatives 14 of 105), and the marker can only stand on a start; one of the 3 enclosures (a10) was among them.",
+    "The trained 2B as a relation classifier answered false on all 225, with an AUC of 0.48 for its confidence on "
+    "A and A' against the negatives: no signal. Its cue is often a sentence of the prompt rather than of either "
+    "document. It was trained to date documents, not to relate them, so this measures the shipped model's reach, not "
+    "what a small model could learn (R7's fine-tune on the A-D truth).",
+    "Cue words are not a relation signal on this material. Read in the cover's last 600 characters they fire on "
+    "1.7% of A, 6.7% of A' and 3.8% of the negatives; read anywhere in the cover, 13.3%, 13.3% and 23.8%, more on "
+    "the negatives than on A and A' (AUC 0.45). None of the owner's 3 enclosures is announced in its cover's tail. "
+    "This fits the owner's answers: most strict-class documents are not enclosures (date-truth-sets.md), so a "
+    "cover that says \"I enclose\" is usually followed by something other than what it enclosed, or by nothing.",
+    "The limit is the truth, not the arms: 3 owner-confirmed enclosures cannot give a precision for any arm that "
+    "fires, and the structural classes are not relation truth. Still to run: Qwen3.6-27B on the same 225 pairs (the "
+    "pack is built; cluster work now waits for an owner-started Sherlock session, owner 2026-10-22) and the Gemini "
+    "arm with images (W46.date-enclosure-paid). For the app now: on local routes the marker is inert, so `Sent With` "
+    "is never proposed there, and nothing the free arms showed argues for proposing it by rule instead.",
+]
 
 
 def write_md(out):

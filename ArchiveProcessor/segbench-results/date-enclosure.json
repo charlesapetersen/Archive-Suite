@@ -178,6 +178,165 @@
     4,
     25
    ]
+  },
+  "marker:qwen3-vl-8b-mlx4": {
+   "name": "[enclosure] marker, app OCR prompt, Qwen3-VL 8B, 4-bit MLX",
+   "n": 225,
+   "owner": {
+    "confusion": {
+     "TN": 12,
+     "FN": 3
+    },
+    "precision": [
+     0,
+     0
+    ],
+    "recall": [
+     0,
+     3
+    ]
+   },
+   "owner_no_bound": {
+    "confusion": {
+     "TN": 11,
+     "FN": 2
+    },
+    "precision": [
+     0,
+     0
+    ],
+    "recall": [
+     0,
+     2
+    ]
+   },
+   "rate": {
+    "A": {
+     "fired": 0,
+     "of": 60,
+     "no_reply": 0,
+     "ci": [
+      0.0,
+      0.06
+     ]
+    },
+    "A'": {
+     "fired": 0,
+     "of": 45,
+     "no_reply": 0,
+     "ci": [
+      0.0,
+      0.079
+     ]
+    },
+    "neg": {
+     "fired": 0,
+     "of": 105,
+     "no_reply": 0,
+     "ci": [
+      0.0,
+      0.035
+     ]
+    },
+    "owner": {
+     "fired": 0,
+     "of": 15,
+     "no_reply": 0,
+     "ci": [
+      0.0,
+      0.204
+     ]
+    }
+   },
+   "auc_proxy": 0.5,
+   "propagation": {},
+   "seconds_mean": 9.63,
+   "classified": {
+    "document_start": 171,
+    "document_continuation": 53,
+    "folder_label": 1
+   },
+   "neg_fired_cover_cue": [
+    0,
+    0
+   ]
+  },
+  "relate:date-2b-mlx8": {
+   "name": "relation classifier, the trained 2B date model, 8-bit MLX",
+   "n": 225,
+   "owner": {
+    "confusion": {
+     "TN": 12,
+     "FN": 3
+    },
+    "precision": [
+     0,
+     0
+    ],
+    "recall": [
+     0,
+     3
+    ]
+   },
+   "owner_no_bound": {
+    "confusion": {
+     "TN": 11,
+     "FN": 2
+    },
+    "precision": [
+     0,
+     0
+    ],
+    "recall": [
+     0,
+     2
+    ]
+   },
+   "rate": {
+    "A": {
+     "fired": 0,
+     "of": 60,
+     "no_reply": 0,
+     "ci": [
+      0.0,
+      0.06
+     ]
+    },
+    "A'": {
+     "fired": 0,
+     "of": 45,
+     "no_reply": 0,
+     "ci": [
+      0.0,
+      0.079
+     ]
+    },
+    "neg": {
+     "fired": 0,
+     "of": 105,
+     "no_reply": 0,
+     "ci": [
+      0.0,
+      0.035
+     ]
+    },
+    "owner": {
+     "fired": 0,
+     "of": 15,
+     "no_reply": 0,
+     "ci": [
+      0.0,
+      0.204
+     ]
+    }
+   },
+   "auc_proxy": 0.48,
+   "propagation": {},
+   "seconds_mean": 1.57,
+   "neg_fired_cover_cue": [
+    0,
+    0
+   ]
   }
  }
 }

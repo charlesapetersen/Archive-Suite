@@ -11236,6 +11236,164 @@
    }
   }
  },
+ "dating_enclosure": {
+  "set": {
+   "owner": 15,
+   "A": 60,
+   "A'": 45,
+   "neg": 105
+  },
+  "rows": [
+   {
+    "arm": "cue",
+    "name": "cue words in the cover's last 600 characters (rule)",
+    "owner": {
+     "TN": 11,
+     "FN": 3,
+     "FP": 1
+    },
+    "precision": [
+     0,
+     1
+    ],
+    "recall": [
+     0,
+     3
+    ],
+    "rate": {
+     "A": [
+      1,
+      60
+     ],
+     "A'": [
+      3,
+      45
+     ],
+     "neg": [
+      4,
+      105
+     ]
+    },
+    "auc": 0.5,
+    "seconds": null,
+    "propagation": {
+     "pos_proposed": 5,
+     "pos_cover_dated": 2,
+     "pos_year_right": 1,
+     "neg_proposed": 4,
+     "neg_cover_dated": 3,
+     "neg_year_right": 0
+    }
+   },
+   {
+    "arm": "cue-any",
+    "name": "cue words anywhere in the cover (rule)",
+    "owner": {
+     "TN": 11,
+     "FN": 3,
+     "FP": 1
+    },
+    "precision": [
+     0,
+     1
+    ],
+    "recall": [
+     0,
+     3
+    ],
+    "rate": {
+     "A": [
+      8,
+      60
+     ],
+     "A'": [
+      6,
+      45
+     ],
+     "neg": [
+      25,
+      105
+     ]
+    },
+    "auc": 0.448,
+    "seconds": null,
+    "propagation": {
+     "pos_proposed": 15,
+     "pos_cover_dated": 10,
+     "pos_year_right": 7,
+     "neg_proposed": 25,
+     "neg_cover_dated": 23,
+     "neg_year_right": 0
+    }
+   },
+   {
+    "arm": "marker:qwen3-vl-8b-mlx4",
+    "name": "[enclosure] marker, app OCR prompt, Qwen3-VL 8B, 4-bit MLX",
+    "owner": {
+     "TN": 12,
+     "FN": 3
+    },
+    "precision": [
+     0,
+     0
+    ],
+    "recall": [
+     0,
+     3
+    ],
+    "rate": {
+     "A": [
+      0,
+      60
+     ],
+     "A'": [
+      0,
+      45
+     ],
+     "neg": [
+      0,
+      105
+     ]
+    },
+    "auc": 0.5,
+    "seconds": 9.63,
+    "propagation": {}
+   },
+   {
+    "arm": "relate:date-2b-mlx8",
+    "name": "relation classifier, the trained 2B date model, 8-bit MLX",
+    "owner": {
+     "TN": 12,
+     "FN": 3
+    },
+    "precision": [
+     0,
+     0
+    ],
+    "recall": [
+     0,
+     3
+    ],
+    "rate": {
+     "A": [
+      0,
+      60
+     ],
+     "A'": [
+      0,
+      45
+     ],
+     "neg": [
+      0,
+      105
+     ]
+    },
+    "auc": 0.48,
+    "seconds": 1.57,
+    "propagation": {}
+   }
+  ]
+ },
  "seg_date": {
   "locked_gpu": {
    "boxes": {

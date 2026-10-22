@@ -249,6 +249,12 @@ footer p { font-size: 13px; }
     <p class="note">Rule candidates from the text, each with its line; where the rule is not sure, a chooser (the 2B's own reply when it names a candidate, or Qwen3.6 27B picking a numbered candidate); a document that prints no date takes the year of the nearest earlier one that does, when that is at most t documents back; the rest go to Qwen3.6 27B with a prompt that asks for the year, an interval, Date Uncertain and a quote from a named document, which is then checked against the text it was given. A quote of a two-digit date ("8/31/67") fails the check, which needs the four-digit year. All free on FarmShare and the Mac; the Gemini arm is W46.date-traceable-paid. Full tables, conformal coverage and the public set: <code>ArchiveProcessor/segbench-results/date-traceable.md</code>.</p>
   </section>
 
+  <section class="panel" id="date-enclosure" hidden>
+    <div class="head"><h2>Was it sent with the letter before it?</h2><span class="meta" id="date-enclosure-meta"></span></div>
+    <div class="tbl"><table><thead><tr><th>Arm</th><th>Owner's truth: right yes / wrong yes / missed</th><th>Fires on A</th><th>Fires on A'</th><th>Fires on the matched negatives</th><th>AUC, A and A' against negatives</th><th>Proposals whose propagated year is the owner's</th><th>Seconds a document</th></tr></thead><tbody id="date-enclosure-rows"></tbody></table></div>
+    <p class="note">The app proposes an enclosure only from the OCR model's <code>[enclosure]</code> marker; this is its first measurement, beside a relation classifier that reads the letter and the next document's first page, and a cue-word rule. The owner's truth is small: 15 documents whose previous one he judged, 3 of them sent with it. A and A' are documents whose year matches the one before; the owner refuted most of the strict class as covers, so firing there is a structural proxy, not recall. A proposal on a matched negative would write a Sent With the owner did not use. All free, on this Mac and FarmShare; the Gemini arm is W46.date-enclosure-paid. Full tables: <code>ArchiveProcessor/segbench-results/date-enclosure.md</code>.</p>
+  </section>
+
   <header class="part" id="public">
     <div class="eyebrow">Part 7 · Public truth sets · not the owner's archive</div>
     <h2>Reference routes on the public strata</h2>
@@ -659,6 +665,20 @@ if (DTR && DTR.rows.length) {
     (r.valid || r.unsupported ? r.valid + ' / ' + r.unsupported : 'none asked') + '</td><td>' +
     (r.gpu_s_1000 == null ? '–' : Math.round(r.gpu_s_1000).toLocaleString()) + '</td></tr>').join('');
   document.getElementById('date-traceable').hidden = false;
+}
+
+const DEN = DATA.dating_enclosure;
+if (DEN && DEN.rows.length) {
+  const fr = x => x[1] ? x[0] + ' of ' + x[1] + ' (' + (100 * x[0] / x[1]).toFixed(1) + '%)' : '–';
+  document.getElementById('date-enclosure-meta').textContent = Object.entries(DEN.set).map(([k, v]) => k + ' ' + v).join(' · ');
+  document.getElementById('date-enclosure-rows').innerHTML = DEN.rows.map(r => {
+    const p = r.propagation, n = (p.pos_proposed || 0) + (p.neg_proposed || 0);
+    return '<tr><td>' + r.name + '</td><td>' + (r.owner.TP || 0) + ' / ' + (r.owner.FP || 0) + ' / ' + (r.owner.FN || 0) +
+      '</td><td>' + fr(r.rate.A) + '</td><td>' + fr(r.rate["A'"]) + '</td><td>' + fr(r.rate.neg) + '</td><td>' +
+      (r.auc == null ? '–' : r.auc.toFixed(2)) + '</td><td>' + fr([(p.pos_year_right || 0) + (p.neg_year_right || 0), n]) +
+      '</td><td>' + (r.seconds == null ? '–' : r.seconds.toFixed(1)) + '</td></tr>';
+  }).join('');
+  document.getElementById('date-enclosure').hidden = false;
 }
 
 // Part 7: the public strata.

@@ -69,6 +69,13 @@ class Scores(unittest.TestCase):
         self.assertEqual(E.auc([0.5], [0.5]), 0.5)
         self.assertIsNone(E.auc([], [1]))
 
+    def test_relation_score_reads_confidence_on_the_verdicts_side(self):
+        self.assertAlmostEqual(E.relation_score({"sent_with": False, "confidence": 0.99}), 0.01)
+        self.assertEqual(E.relation_score({"sent_with": False, "confidence": 0.2}), 0.2)
+        self.assertEqual(E.relation_score({"sent_with": True, "confidence": 0.8}), 0.8)
+        self.assertAlmostEqual(E.relation_score({"sent_with": True, "confidence": 0.1}), 0.9)
+        self.assertEqual(E.relation_score({"sent_with": True, "confidence": None}), 1.0)
+
     def test_confusion_counts_no_reply_apart(self):
         c = E.confusion([(True, True), (False, True), (True, False), (False, False), (True, None)])
         self.assertEqual(c, {"TP": 1, "FP": 1, "FN": 1, "TN": 1, "no reply": 1})
