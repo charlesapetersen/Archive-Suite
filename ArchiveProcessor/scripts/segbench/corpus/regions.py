@@ -2,7 +2,7 @@
 """W46.ocr-regions — whole page against detector regions against tiles, four open readers (the Mac half).
 
   <lab venv>/bin/python regions.py prepare --out DIR    # DIR/regions/pp-doclayoutv3.json
-  regions.py report --runs DIR --out DIR                # stitch each arm's crops and score them (later session)
+  regions.py report --runs DIR --out DIR                # stitch each arm's crops, score them beside whole page
 
 `prepare` runs PP-DocLayoutV3 (the mlx-vlm port `layout.py` uses, conf 0.5, its own reading order) on this Mac
 over the run's pages, L9, L4, L3 and L1 of the 895 (the frozen originals) and the owner's 99 (the panel's frozen
@@ -87,6 +87,166 @@ def stitch(arm: str, crops: list[dict]) -> str:
     return '\n'.join(out)
 
 
+LO = LTS / 'FarmShare-regions-20261021'
+# Qwen3.6-27B's whole-page readings of the 99: the truth run whose server settings are the regions run's (kv-cache
+# auto; 1849739 used fp8), copied from runs/truth/qwen3.6-27b-1849744/replies. The other three: the truth96 run.
+QWEN96 = LO / 'whole96-qwen3.6-27b-1849744/replies'
+T96_DIR = {'glm-ocr': 't96-glm-ocr', 'paddleocr-vl1.5': 't96-paddleocr-vl1.5', 'lightonocr3-4b': 't96-lightonocr3-4b'}
+KINDS = ('clippings', 'tables', 'handwritten', 'typed, no table or clipping')
+
+
+def kinds_of(row: dict) -> list[str]:
+    """The 96's kind groups a panel row belongs to (the panel's tags and kinds; a page may be in two)."""
+    out = [k for k in ('clippings', 'tables') if (row.get(k) or 'no') != 'no']
+    if row.get('kind') == 'handwritten' or (row.get('handwritten') or 'no') != 'no':
+        out.append('handwritten')
+    if not out and row.get('kind') == 'typewritten':
+        out.append('typed, no table or clipping')
+    return out
+
+
+def page_reading(arm: str, records: list[dict], expected: int | None, mode: str, reading) -> dict:
+    """One page's stitched text from its crop records (any status), with the crops that gave nothing counted.
+    expected is the kept-region count for a detector arm (None for tiles: the records say how many were cut)."""
+    good = []
+    for r in records:
+        text = reading(r, mode)
+        if text:
+            good.append({'index': r['index'], 'box': r['box'], 'text': text})
+    n = expected if expected is not None else len(records)
+    return {'text': stitch(arm, good) if good else '', 'crops': n, 'crops_failed': n - len(good),
+            'completion_tokens': sum((r.get('usage') or {}).get('completion_tokens') or 0 for r in records)}
+
+
+def crop_records(runs: Path, route: str, arm: str, pid: str) -> list[dict]:
+    """A page's crop readings, the last attempt at each index: NNN.json, else its NNN.error.json."""
+    d = runs / 'out' / route / arm / pid
+    got = {}
+    for f in sorted(d.glob('*.json')) if d.is_dir() else []:
+        k = int(f.name.split('.')[0])
+        if f.name.endswith('.error.json') and k in got:
+            continue
+        got[k] = json.loads(f.read_text())
+    return [got[k] for k in sorted(got)]
+
+
+def score_rows(rr: list[dict], S) -> dict:
+    agg = S.aggregate(rr)
+    edits = [r['order_edit'] for r in rr if isinstance(r.get('order_edit'), float)]
+    return {'n': agg['n'], 'ok': agg['ok'], 'nes': round(agg['nes'], 4), 'nes_answered': round(agg['nes_answered'], 4),
+            'chrf': round(agg['chrf'], 4), 'order_edit': round(sum(edits) / len(edits), 4) if edits else '',
+            'order_pages': len(edits), 'crops': sum(r.get('crops') or 0 for r in rr),
+            'crops_failed': sum(r.get('crops_failed') or 0 for r in rr)}
+
+
+def whole96(route: str, L, F):
+    if route == 'qwen3.6-27b':
+        out = {}
+        for f in QWEN96.glob('*.json'):
+            j = json.loads(f.read_text())
+            out[f.stem] = {'raw': j['reply'].get('raw', ''), 'status': j['meta'].get('status'),
+                           'finish': j['meta'].get('finish'), 'usage': {'completion_tokens': j['meta'].get('completion_tokens')}}
+        return out
+    return F.read_records(L.T96[T96_DIR[route]]['dir'])
+
+
+def cmd_report(a):
+    import loop_rerun as L
+    import ocr_panel as P
+    import ocr_panel_score as S
+    import ocr_scorers as O
+    X, F = L.X, L.F
+    runs = a.runs
+    pages = C.load_pages(runs)
+    regions = {arm: json.loads((runs / 'regions' / f'{arm}.json').read_text())['pages'] for arm in C.ARMS if arm != 'tiles'}
+    R.MANIFEST = MANIFEST
+    truth = {R.job_id(r): r for r in R.frozen()}
+    panel = {r['page']: r for r in P.rows()}
+    rows, page_rows = [], []
+    for route in C.READERS:
+        mode = L.ROUTES[route]['mode']
+        whole = {'public895': F.read_records(L.ROUTES[route]['dir']), 'owner99': whole96(route, L, F)}
+        for p in pages:
+            pid, set_ = p['id'], p['set']
+            if set_ == 'public895':
+                ref, stratum = Path(truth[pid]['truth']).read_text(), truth[pid]['stratum']
+                groups = [stratum]
+            else:
+                ref, stratum = (P.TRUTH / 'truth' / (pid + '.txt')).read_text(), None
+                if pid in P.AGREEMENT:
+                    continue   # the three agreement-only letters: not truth the 96 can rank readers on
+                groups = ['the 96', *kinds_of(panel[pid])]
+            readings = {'whole': {'text': X.reading(whole[set_].get(pid), mode), 'crops': '', 'crops_failed': '',
+                                  'completion_tokens': ((whole[set_].get(pid) or {}).get('usage') or {}).get('completion_tokens', '')}}
+            for arm in C.ARMS:
+                expected = None if arm == 'tiles' else len(C.keep_regions(regions[arm][pid]))   # every page was detected
+                recs = crop_records(runs, route, arm, pid)
+                if recs or expected == 0:
+                    readings[arm] = page_reading(arm, recs, expected, mode, X.reading)
+            for arm, got in readings.items():
+                sc = S.score(ref, got['text'], stratum) if stratum else S.score(ref, got['text'])
+                order = O.reading_order_edit(ref, got['text']) if got['text'] else None
+                page_rows.append({'set': set_, 'groups': ';'.join(groups), 'route': route, 'arm': arm, 'page': pid,
+                                  'ok': bool(got['text']), **sc, 'order_edit': (order or {}).get('edit'),
+                                  **{k: got[k] for k in ('crops', 'crops_failed', 'completion_tokens')}})
+    for route in C.READERS:
+        for arm in ('whole', *C.ARMS):
+            mine = [r for r in page_rows if r['route'] == route and r['arm'] == arm]
+            for g in sorted({g for r in mine for g in r['groups'].split(';')}):
+                rr = [r for r in mine if g in r['groups'].split(';')]
+                rows.append({'group': g, 'route': route, 'arm': arm, **score_rows(rr, S)})
+    gpu = gpu_hours(runs)
+    a.out.mkdir(parents=True, exist_ok=True)
+    S.write_csv(a.out / f'{a.name}.csv', rows, ['group', 'route', 'arm', 'n', 'ok', 'nes', 'nes_answered', 'chrf',
+                                                'order_edit', 'order_pages', 'crops', 'crops_failed'])
+    S.write_csv(a.out / f'{a.name}-pages.csv', [{k: round(v, 6) if isinstance(v, float) else v for k, v in r.items()}
+                                                for r in page_rows],
+                ['set', 'groups', 'route', 'arm', 'page', 'ok', 'nes', 'chrf', 'words', 'missed', 'added', 'order_edit',
+                 'crops', 'crops_failed', 'completion_tokens'])
+    (a.out / f'{a.name}-tables.md').write_text(tables(rows, gpu))
+    print(f'{len(rows)} rows, {len(page_rows)} page rows -> {a.out}')
+
+
+def gpu_hours(runs: Path) -> dict:
+    """GPU-hours each route's read jobs spent (one GPU a job; the pilot is GLM-OCR's), from their summaries."""
+    out = {}
+    for f in (runs / 'out').glob('*/summary-*.json'):
+        s = json.loads(f.read_text())
+        out[s['route']] = out.get(s['route'], 0) + s['wall_s'] / 3600
+    return {k: round(v, 2) for k, v in out.items()}
+
+
+GROUP_ORDER = ('L9', 'L4', 'L3', 'L1', 'the 96', *KINDS)
+
+
+def tables(rows: list[dict], gpu: dict) -> str:
+    """One table a group: each reader's NES % by arm (answered / pages), the arm's change on whole page, and the
+    reading-order edit (OmniDocBench's, over matched blocks; lower is better)."""
+    by = {(r['group'], r['route'], r['arm']): r for r in rows}
+    arms = ('whole', *C.ARMS)
+    out = ['NES % (pages answered / pages); a failed page scores 0. Δ is the arm against whole page, in points.',
+           'Order: mean reading-order edit over the pages with two or more matched truth blocks (lower is better);',
+           'not scorable on the 96, whose truth is kept as one line with no paragraph breaks.', '']
+    for g in [g for g in GROUP_ORDER if any(k[0] == g for k in by)]:
+        out += [f'### {g}', '', '| reader | ' + ' | '.join(arms) + ' | ' + ' | '.join(f'Δ {a}' for a in C.ARMS) +
+                ' | order: ' + ' / '.join(arms) + ' |', '|---|' + '---:|' * (2 * len(arms))]
+        for route in C.READERS:
+            rs = [by.get((g, route, arm)) for arm in arms]
+            if not any(rs):
+                continue
+            cell = lambda r: '–' if r is None else f"{100 * r['nes']:.1f} ({r['ok']}/{r['n']})"
+            base = rs[0]
+            delta = lambda r: '–' if r is None or base is None else f"{100 * (r['nes'] - base['nes']):+.1f}"
+            order = ' / '.join('–' if r is None or r['order_edit'] == '' else f"{r['order_edit']:.2f}" for r in rs)
+            out.append(f'| {route} | ' + ' | '.join(cell(r) for r in rs) + ' | ' +
+                       ' | '.join(delta(r) for r in rs[1:]) + f' | {order} |')
+        out.append('')
+    if gpu:
+        out += ['GPU-hours spent reading crops (all three arms, the 354 pages): ' +
+                ', '.join(f'{k} {v}' for k, v in sorted(gpu.items())), '']
+    return '\n'.join(out)
+
+
 def cmd_prepare(a):
     from PIL import Image
     import layout
@@ -113,8 +273,10 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest='cmd', required=True)
     p = sub.add_parser('prepare'); p.add_argument('--out', type=Path, required=True)
+    r = sub.add_parser('report'); r.add_argument('--runs', type=Path, required=True, help='the run folder brought back')
+    r.add_argument('--out', type=Path, required=True); r.add_argument('--name', default='regions-20261021')
     a = ap.parse_args()
-    {'prepare': cmd_prepare}[a.cmd](a)
+    {'prepare': cmd_prepare, 'report': cmd_report}[a.cmd](a)
 
 
 if __name__ == '__main__':

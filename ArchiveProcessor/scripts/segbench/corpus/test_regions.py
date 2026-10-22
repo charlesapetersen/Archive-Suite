@@ -84,5 +84,56 @@ class Stitch(unittest.TestCase):
         self.assertEqual(self.R.stitch('pp-doclayoutv3', crops), 'Title\n\nbody')
 
 
+class Report(unittest.TestCase):
+    def setUp(self):
+        import regions
+        self.R = regions
+
+    @staticmethod
+    def reading(r, mode):
+        return r['raw'].strip() if r.get('status') == 'ok' and r.get('finish') == 'stop' else ''
+
+    def rec(self, i, raw, status='ok', finish='stop'):
+        return {'index': i, 'box': [0, i / 4, 1, (i + 1) / 4], 'raw': raw, 'status': status, 'finish': finish,
+                'usage': {'completion_tokens': 10}}
+
+    def test_kind_groups(self):
+        k = self.R.kinds_of
+        self.assertEqual(k({'kind': 'printed', 'clippings': 'yes', 'tables': ''}), ['clippings'])
+        self.assertEqual(k({'kind': 'printed', 'clippings': 'yes', 'tables': 'yes'}), ['clippings', 'tables'])
+        self.assertEqual(k({'kind': 'handwritten', 'handwritten': ''}), ['handwritten'])
+        self.assertEqual(k({'kind': 'typewritten', 'tables': 'yes'}), ['tables'])
+        self.assertEqual(k({'kind': 'typewritten'}), ['typed, no table or clipping'])
+        self.assertEqual(k({'kind': 'printed'}), [])
+
+    def test_failed_crops_are_counted_and_left_out(self):
+        recs = [self.rec(0, 'Title'), self.rec(1, 'loop loop', 'cap', 'length'), self.rec(2, 'body')]
+        got = self.R.page_reading('doclayout_yolo', recs, 4, 'native', self.reading)
+        self.assertEqual((got['text'], got['crops'], got['crops_failed'], got['completion_tokens']),
+                         ('Title\n\nbody', 4, 2, 30))
+
+    def test_no_regions_is_an_empty_reading(self):
+        self.assertEqual(self.R.page_reading('pp-doclayoutv3', [], 0, 'native', self.reading)['text'], '')
+
+    def test_a_retried_crop_uses_its_reading_not_its_error(self):
+        import json, tempfile
+        from pathlib import Path
+        with tempfile.TemporaryDirectory() as t:
+            d = Path(t) / 'out/glm-ocr/tiles/p001'; d.mkdir(parents=True)
+            (d / '000.error.json').write_text(json.dumps(self.rec(0, '', 'error', None)))
+            (d / '000.json').write_text(json.dumps(self.rec(0, 'read')))
+            (d / '001.error.json').write_text(json.dumps(self.rec(1, '', 'error', None)))
+            got = self.R.crop_records(Path(t), 'glm-ocr', 'tiles', 'p001')
+        self.assertEqual([(r['index'], r['status']) for r in got], [(0, 'ok'), (1, 'error')])
+
+    def test_table_shows_the_change_on_whole_page(self):
+        row = lambda arm, nes: {'group': 'L4', 'route': 'glm-ocr', 'arm': arm, 'n': 80, 'ok': 80, 'nes': nes,
+                                'order_edit': 0.1}
+        md = self.R.tables([row('whole', 0.5), row('doclayout_yolo', 0.9), row('tiles', 0.45)], {'glm-ocr': 1.234})
+        line = next(l for l in md.splitlines() if l.startswith('| glm-ocr'))
+        self.assertIn('| 50.0 (80/80) | 90.0 (80/80) | – | 45.0 (80/80) | +40.0 | – | -5.0 |', line)
+        self.assertIn('GPU-hours', md)
+
+
 if __name__ == '__main__':
     unittest.main()
