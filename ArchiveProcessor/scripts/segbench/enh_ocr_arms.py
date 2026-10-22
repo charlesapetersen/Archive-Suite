@@ -111,3 +111,12 @@ def docres(img, task, src: Path):
         shadow[shadow == 0] = 0.00001
         out = np.clip(bgr.astype(float) / shadow, 0, 255).astype(np.uint8)
     return np.ascontiguousarray(out[..., ::-1])
+
+
+def enhance(arm, img, src: Path):
+    """One arm's image from the raw RGB image, the same size."""
+    if arm == 'shading':
+        return shading(img)
+    if arm in ('docres-appearance', 'docres-deshadow'):
+        return docres(img, arm.split('-')[1], src)
+    raise KeyError(arm)
