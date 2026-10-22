@@ -20,12 +20,15 @@ mkdir -p "$FS_ROOT" "$HF_HOME" "$SH_SHIM"
 printf 'import sys\nsys.modules.setdefault("torchcodec", None)\n' > "$SH_SHIM/sitecustomize.py"
 models="$SCRATCH/w46-models-$SLURM_JOB_ID.txt"; : > "$models"
 for root in "$@"; do
+  mkdir -p "$(dirname "$FS_ROOT/$root")"     # a ROOT may be nested (interactive-20261018/ocr)
   rsync -a --exclude=/jobs.tsv "$SRC/$root/" "$FS_ROOT/$root/"
   [ ! -e "$SRC/$root/jobs.tsv" ] || [ -e "$FS_ROOT/$root/jobs-farmshare.tsv" ] || cp "$SRC/$root/jobs.tsv" "$FS_ROOT/$root/jobs-farmshare.tsv"
   for f in "$SH_DIR"/../corpus/*-job.sh "$SH_DIR"/../corpus/loop-rerun-seq.sh; do
     [ ! -e "$FS_ROOT/$root/$(basename "$f")" ] || cp "$f" "$FS_ROOT/$root/"
   done
-  # A route's model is a repo id, or (Ling) a snapshot path under FarmShare's HF cache, which is this one.
+  # A route's model is a repo id, or (Ling) a snapshot path under FarmShare's HF cache, which is this one. Folders
+  # staged only for the prompts and readings the routes point at have no routes.json.
+  [ -s "$FS_ROOT/$root/routes.json" ] || continue
   "$FS_PY" - "$FS_ROOT/$root/routes.json" "$HF_HOME" >> "$models" <<'PY'
 import json, re, sys
 for name, r in json.load(open(sys.argv[1])).items():

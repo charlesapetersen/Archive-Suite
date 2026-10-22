@@ -38,7 +38,8 @@ hours() { python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))[sys.arg
 [ "$DRY" = --dry-run ] || mkdir -p "$LOOPS/logs" "$REG/logs" "$DEW/logs" "$ENH/logs" "$LP/logs"
 
 stage=$(run sbatch --parsable --output="$FS_ROOT/logs/stage-%j.out" "$SH_DIR/stage-job.sh" "$SH_DIR" \
-  loop-rerun-20261021 regions-20261021 dewarp-20261022 enh-ocr-input-20261022 logprob-20261022)
+  loop-rerun-20261021 regions-20261021 dewarp-20261022 enh-ocr-input-20261022 logprob-20261022 \
+  open-sweep-20261019 truth96-20261020 interactive-20261018/ocr)   # the last three: prompts and readings routes.json names
 rec stage - "$stage"
 pilot=$(run sbatch --parsable "${G1[@]}" --time=01:00:00 --dependency="afterok:$stage" --job-name=sh-env-pilot \
   --output="$FS_ROOT/logs/slurm-%j.out" "$CORPUS/loop-rerun-job.sh" "$LOOPS" pilot ngram)
