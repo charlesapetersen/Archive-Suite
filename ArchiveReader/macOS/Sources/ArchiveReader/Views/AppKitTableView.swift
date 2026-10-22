@@ -296,8 +296,8 @@ struct AppKitTableView: NSViewRepresentable {
             }
 
             let cellID = NSUserInterfaceItemIdentifier("cell.\(colID)")
-            let cell: NSTableCellView
-            if let reused = tableView.makeView(withIdentifier: cellID, owner: nil) as? NSTableCellView {
+            let cell: TintedTextCellView
+            if let reused = tableView.makeView(withIdentifier: cellID, owner: nil) as? TintedTextCellView {
                 cell = reused
             } else {
                 cell = Self.makeTextCell(identifier: cellID)
@@ -311,6 +311,7 @@ struct AppKitTableView: NSViewRepresentable {
             let tf = cell.textField!
             let regularFont = NSFont.systemFont(ofSize: currentFontSize)
             tf.font = regularFont
+            cell.tint = nil
             tf.textColor = .labelColor
             tf.toolTip = nil
 
@@ -358,9 +359,7 @@ struct AppKitTableView: NSViewRepresentable {
                 )
 
             case "read":
-                let state = file.readState
-                tf.stringValue = state?.rawValue ?? "—"
-                tf.textColor = state == .unread ? .controlAccentColor : .secondaryLabelColor
+                Self.configureReadStateCell(cell, state: file.readState)
 
             default:
                 tf.stringValue = ""
@@ -426,8 +425,8 @@ struct AppKitTableView: NSViewRepresentable {
 
         /// A plain text cell (every column but tags and quality), exposed internally so the headless
         /// pixel guard lays out the same view the table does.
-        static func makeTextCell(identifier: NSUserInterfaceItemIdentifier) -> NSTableCellView {
-            let cell = NSTableCellView()
+        static func makeTextCell(identifier: NSUserInterfaceItemIdentifier) -> TintedTextCellView {
+            let cell = TintedTextCellView()
             cell.identifier = identifier
             let tf = NSTextField(labelWithString: "")
             tf.translatesAutoresizingMaskIntoConstraints = false
@@ -443,6 +442,17 @@ struct AppKitTableView: NSViewRepresentable {
                 tf.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
             ])
             return cell
+        }
+
+        /// The Read column's label, exposed internally so the headless contrast guard renders the same cell the
+        /// table does. W40.fix-reader-selected-row-contrast: "Unread" is the accent on an ordinary row and the
+        /// selected-row text colour on an emphasized one, where the accent was a blue label on the blue selection.
+        /// "Read" stays secondary; AppKit dims that itself under emphasis, so the two still differ on a selected row.
+        static func configureReadStateCell(_ cell: TintedTextCellView, state: ReadState?) {
+            cell.textField?.stringValue = state?.rawValue ?? "—"
+            cell.tint = state == .unread
+                ? (normal: .controlAccentColor, emphasized: .alternateSelectedControlTextColor)
+                : (normal: .secondaryLabelColor, emphasized: .secondaryLabelColor)
         }
 
         /// The Name cell's formatter, exposed internally so the headless pixel guard renders the same
@@ -651,6 +661,30 @@ final class SortableDiffableDataSource: NSTableViewDiffableDataSource<Int, Archi
     }
 }
 
+// MARK: - Text cell whose colour follows the selection
+
+/// A plain text cell whose colour can follow the row's selection (W40.fix-reader-selected-row-contrast).
+/// `NSTableCellView` hands the row's background style to its text field, and AppKit then draws `labelColor` and
+/// `secondaryLabelColor` in the selected-row text colours itself; an explicit colour such as the accent it leaves
+/// alone, which is how the Read column's blue "Unread" came to be drawn on the blue selection. A cell with a `tint`
+/// draws `tint.normal` on an ordinary row and `tint.emphasized` on a selected, emphasized one; without one it is a
+/// plain text cell whose caller sets the colour.
+@MainActor
+final class TintedTextCellView: NSTableCellView {
+    var tint: (normal: NSColor, emphasized: NSColor)? {
+        didSet { applyTint() }
+    }
+
+    override var backgroundStyle: NSView.BackgroundStyle {
+        didSet { applyTint() }
+    }
+
+    private func applyTint() {
+        guard let tint, let textField else { return }
+        textField.textColor = backgroundStyle == .emphasized ? tint.emphasized : tint.normal
+    }
+}
+
 // MARK: - Tag token cell view for inline tag editing
 
 /// Custom cell for the "File tags" column: an `NSTokenField` that renders subject tags as removable
@@ -658,7 +692,7 @@ final class SortableDiffableDataSource: NSTableViewDiffableDataSource<Int, Archi
 /// base so the coordinator's delegate methods can commit through `TagWriter`.
 @MainActor
 final class TagTokenCellView: NSTableCellView {
-    let tokenField: NSTokenField = {
+    let tokenField: WrappingTokenField = {
         let tf = WrappingTokenField()
         tf.translatesAutoresizingMaskIntoConstraints = false
         tf.tokenStyle = .rounded
@@ -687,8 +721,18 @@ final class TagTokenCellView: NSTableCellView {
             tokenField.topAnchor.constraint(equalTo: topAnchor, constant: 2),
             tokenField.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -2),
         ])
+        tokenField.onEditingChange = { [weak self] in self?.editingStateChanged() }
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    /// The row's selection state is what the field draws its chips by (W40.fix-reader-selected-row-contrast):
+    /// filled on an ordinary row, outlined in the selected-row text colour on an emphasized one.
+    override var backgroundStyle: NSView.BackgroundStyle {
+        didSet {
+            tokenField.cell?.backgroundStyle = backgroundStyle
+            tokenField.needsDisplay = true
+        }
+    }
 
     /// The field wraps its tokens to its width, so the height it asks for must follow that width, and the row must
     /// be measured again when it changes: automatic row heights measure a row once, before this cell has a width, so
@@ -698,10 +742,27 @@ final class TagTokenCellView: NSTableCellView {
         super.layout()
         let width = tokenField.frame.width
         guard width > 0, tokenField.preferredMaxLayoutWidth != width else { return }
-        let before = tokenField.intrinsicContentSize.height
         tokenField.preferredMaxLayoutWidth = width
+        noteRowHeightIfStale()
+    }
+
+    /// The field editor lays the tokens out natively while the Reader's chips are drawn otherwise, and the two can
+    /// need different heights; told after the editor comes or goes.
+    private func editingStateChanged() {
+        tokenField.needsDisplay = true
+        noteRowHeightIfStale()
+    }
+
+    /// The row was measured at whatever height the field last reported, before it had a width or in the other
+    /// editing state; if the height it needs now differs, the row is measured again.
+    private func noteRowHeightIfStale() {
+        let measured = tokenField.lastReportedHeight
         tokenField.invalidateIntrinsicContentSize()
-        guard tokenField.intrinsicContentSize.height != before else { return }
+        guard tokenField.intrinsicContentSize.height != measured else { return }
+        noteRowHeight()
+    }
+
+    private func noteRowHeight() {
         DispatchQueue.main.async { [weak self] in
             guard let self, let table = self.enclosingTableView else { return }
             let row = table.row(for: self)
@@ -718,12 +779,65 @@ final class TagTokenCellView: NSTableCellView {
 
 /// A token field whose height is that of its tokens wrapped to `preferredMaxLayoutWidth`. NSTokenField's own
 /// intrinsic height is one line however many lines its tokens wrap to.
+///
+/// W40.fix-reader-selected-row-contrast: while no field editor is up, the field draws the Reader's own chips
+/// (`TagChips`) and is as tall as they are, so a selected row's chips are outlined in the selected-row text colour
+/// instead of filled with a tint of it. The native tokens return while the field is being edited.
 final class WrappingTokenField: NSTokenField {
+    /// Called on the next turn after the field editor comes or goes.
+    var onEditingChange: (() -> Void)?
+
+    /// The subjects as the field holds them (`objectValue` is the represented objects, strings here).
+    var chipTitles: [String] { (objectValue as? [Any])?.compactMap { $0 as? String } ?? [] }
+
+    /// Whether the row is selected and emphasized: the cell's background style, which the row view sets.
+    var isEmphasized: Bool { cell?.backgroundStyle == .emphasized }
+
+    var isBeingEdited: Bool { currentEditor() != nil }
+
+    private var chipFont: NSFont { font ?? .systemFont(ofSize: NSFont.systemFontSize) }
+
+    /// The height last handed to Auto Layout, so the cell can tell when the row was measured at a stale one.
+    private(set) var lastReportedHeight: CGFloat?
+
     override var intrinsicContentSize: NSSize {
         let width = preferredMaxLayoutWidth > 0 ? preferredMaxLayoutWidth : frame.width
-        guard width > 0, let cell else { return super.intrinsicContentSize }
+        let height = height(editing: isBeingEdited, width: width)
+        lastReportedHeight = height
+        return NSSize(width: NSView.noIntrinsicMetric, height: height)
+    }
+
+    /// The height the field needs at `width`: the native tokens' while editing, the Reader's chips' otherwise.
+    /// Before the field has a width (a row's first measurement) it is one line, the usual row; a row whose tags
+    /// wrap is measured again once the cell is laid out (`TagTokenCellView.layout`).
+    func height(editing: Bool, width: CGFloat) -> CGFloat {
+        let width = width > 0 ? width : CGFloat.greatestFiniteMagnitude
+        if !editing { return TagChips.layout(chipTitles, font: chipFont, width: width).height }
+        guard let cell else { return TagChips.chipHeight(for: chipFont) }
         let size = cell.cellSize(forBounds: NSRect(x: 0, y: 0, width: width, height: .greatestFiniteMagnitude))
-        return NSSize(width: NSView.noIntrinsicMetric, height: ceil(size.height))
+        return ceil(size.height)
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        guard !isBeingEdited else { return super.draw(dirtyRect) }
+        let layout = TagChips.layout(chipTitles, font: chipFont, width: bounds.width)
+        if layout.chips.isEmpty {
+            TagChips.drawPlaceholder(placeholderString ?? "", in: bounds, flipped: isFlipped,
+                                     font: chipFont, emphasized: isEmphasized)
+        } else {
+            TagChips.draw(layout, in: bounds, flipped: isFlipped, font: chipFont, emphasized: isEmphasized)
+        }
+    }
+
+    override func becomeFirstResponder() -> Bool {
+        let accepted = super.becomeFirstResponder()
+        if accepted { DispatchQueue.main.async { [weak self] in self?.onEditingChange?() } }
+        return accepted
+    }
+
+    override func textDidEndEditing(_ notification: Notification) {
+        super.textDidEndEditing(notification)
+        DispatchQueue.main.async { [weak self] in self?.onEditingChange?() }
     }
 }
 

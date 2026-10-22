@@ -450,6 +450,15 @@ Views/
                               the Quality-column popup is the per-file Quality editor;
                               ContextMenuTableView + ContextMenuActions trampoline to NavigationModel;
                               optional default-hidden Provenance column uses the existing header picker.
+                              Text cells are TintedTextCellView: a `tint` (normal, emphasized) follows the
+                              row's selection, so the Read column's "Unread" is the accent on an ordinary row
+                              and the selected-row text colour on a selected one (W40.fix-reader-selected-row-contrast).
+  TagChips.swift              The File tags chips the Reader draws itself while a row's token field is not
+                              being edited: filled with an accent tint on an ordinary row, outlined in the
+                              selected-row text colour on a selected one, same geometry in both (NSTokenField
+                              tints its tokens with the accent, which on a selected row is the row's own colour,
+                              and has no outline style). WrappingTokenField draws them and takes their height;
+                              the native field editor draws the tokens while editing.
   SidebarView.swift           Left sidebar: Smart Folders (saved searches) + a navigable folder tree
                               (List(selection:)+OutlineGroup). Durable smart-folder highlight; folder
                               selection exits the scope.
@@ -511,7 +520,10 @@ Build: `xcodegen generate && xcodebuild -scheme ArchiveReader … build/test`.
 (`ImageRenderer`) or a PDF page (ArchiveCore `PDFThumbnailer`) to real pixels and asserts on them
 (`assertRendersNonBlank`, `nonWhiteFraction`, `meanLuminance`); `DocumentRenderGuardTests.swift` guards the
 2-page PDF SPEC (page 0 scan / page 1 OCR) headlessly and, for W9.b4, decodes a copied Reader page-link's
-PNG to prove it is nonblank — no app launch, no TCC prompt, health-gate-safe.
+PNG to prove it is nonblank — no app launch, no TCC prompt, health-gate-safe. `InkContrast` (same file) is the
+WCAG contrast of one ink on one background in a crop; `SelectedRowContrastTests` lays the Read and File tags
+cells out in a real, emphasized-selected `NSTableView` and asserts the "Unread" label and every chip clear 3:1
+against the selection in light and dark, and that the probe fails the accent label the Reader used to draw.
 Reference-image diffs: `SnapshotTests.swift` (swift-snapshot-testing SPM dep; refs in `__Snapshots__/`).
 The Tart VM is its reference renderer: it compares there and deliberately skips on the host; see
 `ops/gui/README.md` for the guarded guest-only re-recording flow.

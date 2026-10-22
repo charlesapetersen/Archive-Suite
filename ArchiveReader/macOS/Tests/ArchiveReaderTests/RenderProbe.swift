@@ -163,6 +163,68 @@ enum RenderProbe {
     }
 }
 
+// MARK: - Contrast
+
+/// The WCAG 2 contrast of one colour of ink on one background, for the class of defect the layout guard cannot
+/// see: a label the right size in the right place, in a colour that vanishes into what is behind it
+/// (W40.fix-reader-selected-row-contrast, an accent-blue "Unread" on the accent-blue selection).
+struct InkContrast: CustomStringConvertible {
+    /// Relative luminance of the background: the most common luminance in the crop.
+    let background: Double
+    /// Relative luminance of the ink: the mean of the pixels farthest from the background, the glyph cores.
+    let ink: Double
+
+    /// WCAG 2 contrast ratio, 1 (none) to 21 (black on white). WCAG asks 3 of large text and 4.5 of body text.
+    var ratio: Double { (max(background, ink) + 0.05) / (min(background, ink) + 0.05) }
+
+    var description: String {
+        String(format: "contrast %.2f (background L=%.3f, ink L=%.3f)", ratio, background, ink)
+    }
+
+    /// Measures a crop that holds one colour of ink on one background: a label's rect, a chip's. `inkFraction` is
+    /// the share of pixels taken as ink, small enough to be the solid strokes rather than the anti-aliased edges.
+    static func measure(_ cgImage: CGImage, inkFraction: Double = 0.03) -> InkContrast? {
+        let lums = relativeLuminances(cgImage)
+        guard lums.count >= 64 else { return nil }
+        var bins = [[Double]](repeating: [], count: 64)
+        for l in lums { bins[min(63, Int(l * 64))].append(l) }
+        let fullest = bins.max { $0.count < $1.count }!
+        let background = fullest.reduce(0, +) / Double(fullest.count)
+        let farthest = lums.sorted { abs($0 - background) > abs($1 - background) }
+        let n = max(16, Int(Double(lums.count) * inkFraction))
+        let ink = farthest.prefix(n).reduce(0, +) / Double(n)
+        return InkContrast(background: background, ink: ink)
+    }
+
+    /// The relative luminance of every opaque pixel, the sRGB channels linearised as WCAG 2 defines.
+    static func relativeLuminances(_ cgImage: CGImage) -> [Double] {
+        let w = cgImage.width, h = cgImage.height
+        guard w > 0, h > 0 else { return [] }
+        let bytesPerRow = w * 4
+        guard let ctx = CGContext(data: nil, width: w, height: h, bitsPerComponent: 8, bytesPerRow: bytesPerRow,
+                                  space: CGColorSpaceCreateDeviceRGB(),
+                                  bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return [] }
+        ctx.draw(cgImage, in: CGRect(x: 0, y: 0, width: w, height: h))
+        guard let data = ctx.data else { return [] }
+        let ptr = data.bindMemory(to: UInt8.self, capacity: h * bytesPerRow)
+        func linear(_ byte: UInt8) -> Double {
+            let c = Double(byte) / 255
+            return c <= 0.04045 ? c / 12.92 : pow((c + 0.055) / 1.055, 2.4)
+        }
+        var lums: [Double] = []
+        lums.reserveCapacity(w * h)
+        for y in 0..<h {
+            let row = y * bytesPerRow
+            for x in 0..<w {
+                let o = row + x * 4
+                guard ptr[o + 3] > 0 else { continue }
+                lums.append(0.2126 * linear(ptr[o]) + 0.7152 * linear(ptr[o + 1]) + 0.0722 * linear(ptr[o + 2]))
+            }
+        }
+        return lums
+    }
+}
+
 // MARK: - Guards (XCTestCase-attached, so failures blame the caller's line)
 
 extension XCTestCase {
