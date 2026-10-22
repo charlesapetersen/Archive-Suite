@@ -134,7 +134,15 @@ struct ConnectScreen: View {
     @ViewBuilder private var driveSection: some View {
         VStack(spacing: 8) {
             Divider().padding(.horizontal)
-            if vm.driveAuth.isSignedIn {
+            if !DriveAuth.isConfigured {
+                // No OAuth client in this build (Config/DriveLocal.xcconfig): a sign-in button could only
+                // draw Google's invalid_client page, so say why the cloud relay is unavailable instead.
+                Label("Google Drive relay not configured in this build", systemImage: "cloud.slash")
+                    .foregroundStyle(.secondary).font(.callout)
+                Text("Wi-Fi capture works as normal. The cloud relay needs an iOS OAuth client — see README-oauth.md.")
+                    .font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                    .padding(.horizontal)
+            } else if vm.driveAuth.isSignedIn {
                 Label("Google Drive relay ready", systemImage: "checkmark.circle.fill")
                     .foregroundStyle(.green).font(.callout)
                 Button("Sign out of Google Drive", role: .destructive) { vm.driveAuth.signOut() }

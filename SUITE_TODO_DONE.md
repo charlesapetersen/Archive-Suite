@@ -12646,3 +12646,18 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   **`W46.fix-place-truth` — the placement truth set and its three scorers [M]** (lane: segbench) (uses: light) — 40 typed and 20 handwritten owner pages plus 20 L1/L2 and 40 N6; boxes drafted from vision-words.json and by a subagent in a small correction tool, model-audited (STATE Phase 2 decision 2); line-broken transcripts. detail: execution-plans/processing-review/10-gap-audit.md §5 item 22
   Shipped: place_truth.py (121 pages: Vision drafts aligned to the truth text, a Tesseract third pass, ink-tight boxes, gap_split, grid/zoom/bands/lines drawing commands, ink-fitted Bentham baselines, N6 boxes widened to their published baselines), place_score.py (F1@0.5/0.7/centre, mCER, READ-BAD-style baselines, line alignment, --verdict), place_functional.swift (PDFKit find-in-place, text-layer read-back, oracle). 30 owner pages redrawn by Opus 5.5 subagents; every page but four audited by Sonnet 5.5 subagents: typed 26 ok / 13 fix, hand 4 ok / 9 fix / 5 redraw, Bentham 14 ok / 6 fix, N6 28 ok / 12 fix (published geometry). Truth vs itself 1.0 (hand words 0.9998). Vision's padded boxes against the ink-tight truth: F1 0.627 @0.5, 0.192 @0.7, 0.947 @centre: IoU here measures box convention, so place-print ranks on F1@centre. Faulted pages left to W46.fix-place-truth-fu. Results: ArchiveProcessor/segbench-results/place-truth.md.
   <!-- /W46.fix-place-truth -->
+- [x] **W40.i-fix-ios-drive-oauth-client — iOS ships a placeholder Google client id, so Drive sign-in can never succeed [S · S2]** · §W40 — (lane: processor) (uses: build) (blocked-on: W40.i2). Found by `W40.i2` 2026-10-21; detail in `verification/capture.md`. `DriveAuth.clientID` is `YOUR_IOS_CLIENT_ID.apps.googleusercontent.com` (`Net/DriveAuth.swift:73`, URL scheme in `project.yml:42`) and the sign-in button always shows. Read the id from a build setting supplied by an untracked local file, as Android reads `local.properties`, and with none set hide sign-in and say Drive is not configured. Minting an iOS OAuth client is the owner's step: add it to the `W40.i5` pack rather than asking now. — SHIPPED 2026-10-21.
+  The id now comes from the gitignored `ArchiveCaptureiOS/Config/DriveLocal.xcconfig` (`DRIVE_OAUTH_CLIENT_ID = …`),
+  optionally `#include?`d by the tracked `Config/Drive.xcconfig` (XcodeGen `configFiles`), into Info.plist
+  `DriveOAuthClientID`. `Net/DriveOAuthConfig.swift` (Foundation only) trims and validates it and derives the
+  reversed-client-id redirect; an empty, unexpanded or placeholder id is "not configured": `DriveAuth.signIn`
+  returns the not-configured message, `isSignedIn` stays false (so Drive is never picked), and ConnectScreen shows
+  "Google Drive relay not configured in this build" instead of the sign-in button. The `CFBundleURLTypes`
+  registration was dropped: `ASWebAuthenticationSession` catches its own callback scheme, and a build setting cannot
+  derive the reversed scheme. Tier-2 review (opus) found two more, fixed here: a saved Drive transport mode was
+  restored without a sign-in check (now falls back to Wi-Fi), and the sign-in session had no
+  `presentationContextProvider` and was not retained, so `start()` would fail on any iOS 13+ device even with a
+  real id (now a key-window anchor, the session held, the continuation resumed once). Verified: build clean both unconfigured (Info.plist value empty) and with a scratch
+  DriveLocal.xcconfig (id lands in the built Info.plist); parser host tests in `scripts/test-ios-capture-queue.sh`
+  (233 checks pass). Real sign-in unverified until the owner mints an iOS OAuth client (`W40.i5` pack, `W40.i4`).
+  <!-- /W40.i-fix-ios-drive-oauth-client -->

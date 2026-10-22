@@ -66,8 +66,11 @@ Drive sign-in is disabled, with a message pointing here.
 
 The iOS companion needs its own **iOS** OAuth client in the same project, registered against bundle
 ID `com.archiveprocessor.capture.ios`, with the same "Custom URI scheme" toggle enabled. Its client
-ID goes in `ArchiveCaptureiOS/Sources/ArchiveCaptureiOS/Net/DriveAuth.swift` and the matching
-reversed scheme in `ArchiveCaptureiOS/project.yml`. The iOS companion builds again (W40.i1),
-but its on-device OAuth flow is unverified, and as committed it cannot sign in: `DriveAuth.swift` holds the
-placeholder `YOUR_IOS_CLIENT_ID.apps.googleusercontent.com`, and unlike Android the sign-in button still shows
-with no real client id (not yet — `W40.i-fix-ios-drive-oauth-client`).
+ID goes in the gitignored `ArchiveCaptureiOS/Config/DriveLocal.xcconfig`, one line:
+```
+DRIVE_OAUTH_CLIENT_ID = 1234567890-abcdef.apps.googleusercontent.com
+```
+then rebuild. The redirect scheme is derived from it in `Net/DriveOAuthConfig.swift`; nothing else to keep in
+sync. Without the file the app builds, Wi-Fi capture works, and the Drive section says the relay is not
+configured instead of offering sign-in. The on-device OAuth flow is still unverified (the borrowed-iPhone
+pass, `W40.i4`).

@@ -1,6 +1,7 @@
 import AuthenticationServices
 import CryptoKit
 import Foundation
+import UIKit
 
 /// Thread-safe token storage so `DriveClient`'s synchronous token provider (called off the main thread)
 /// can read the current access/refresh tokens without actor-isolation conflicts.
@@ -61,22 +62,17 @@ private final class TokenStore: @unchecked Sendable {
 /// an OAuth client in the same GCP project can see/write the folder the Mac created.
 ///
 /// **Setup (one-time, GCP console):** create an **iOS** OAuth client in your own project with
-/// bundle ID `com.archiveprocessor.capture.ios`. Copy the client ID here. Enable **"Custom URI scheme"**
-/// in the client's Advanced Settings (off by default; Google blocks it otherwise — same gotcha as Android).
+/// bundle ID `com.archiveprocessor.capture.ios`, enable **"Custom URI scheme"** in its Advanced Settings
+/// (off by default; Google blocks it otherwise — same gotcha as Android), and put its id in the gitignored
+/// `Config/DriveLocal.xcconfig` (`DriveOAuthConfig`). A build without one hides sign-in.
 @MainActor
 final class DriveAuth: ObservableObject {
 
     // MARK: - GCP iOS OAuth client
 
-    /// iOS OAuth client in your own GCP project (bundle ID com.archiveprocessor.capture.ios).
-    /// **Replace this** with the real client ID after creating the iOS client in the Google Cloud console.
-    static let clientID = "YOUR_IOS_CLIENT_ID.apps.googleusercontent.com"
-
-    /// Reversed-client-ID custom scheme — the redirect URI for iOS installed-app clients (no secret needed).
-    static var redirectURI: String {
-        let prefix = clientID.components(separatedBy: ".apps.googleusercontent.com").first!
-        return "com.googleusercontent.apps.\(prefix):/oauth2redirect"
-    }
+    /// The iOS OAuth client this build carries, or nil when none was configured (`DriveOAuthConfig`).
+    nonisolated static let config: DriveOAuthConfig? = .current
+    nonisolated static var isConfigured: Bool { config != nil }
 
     private static let authEndpoint = "https://accounts.google.com/o/oauth2/v2/auth"
     private static let tokenEndpoint = "https://oauth2.googleapis.com/token"
@@ -90,21 +86,27 @@ final class DriveAuth: ObservableObject {
     /// read tokens without crossing the `@MainActor` boundary.
     private let tokens = TokenStore()
 
+    /// Held for the life of the sign-in sheet: `ASWebAuthenticationSession` must be retained, and since iOS 13
+    /// `start()` fails at once (`presentationContextNotProvided`) without a presentation context.
+    private var authSession: ASWebAuthenticationSession?
+    private let presentationAnchor = KeyWindowAnchor()
+
     init() {
         tokens.load()
-        isSignedIn = tokens.refreshToken != nil
+        isSignedIn = Self.isConfigured && tokens.refreshToken != nil
     }
 
     // MARK: - Sign in (ASWebAuthenticationSession + PKCE)
 
     func signIn() async -> (success: Bool, error: String?) {
+        guard let config = Self.config else { return (false, DriveOAuthConfig.unconfiguredMessage) }
         let verifier = Self.generateCodeVerifier()
         let challenge = Self.sha256Base64URL(verifier)
 
         var comps = URLComponents(string: Self.authEndpoint)!
         comps.queryItems = [
-            URLQueryItem(name: "client_id", value: Self.clientID),
-            URLQueryItem(name: "redirect_uri", value: Self.redirectURI),
+            URLQueryItem(name: "client_id", value: config.clientID),
+            URLQueryItem(name: "redirect_uri", value: config.redirectURI),
             URLQueryItem(name: "response_type", value: "code"),
             URLQueryItem(name: "scope", value: Self.scope),
             URLQueryItem(name: "code_challenge", value: challenge),
@@ -115,25 +117,33 @@ final class DriveAuth: ObservableObject {
 
         guard let authURL = comps.url else { return (false, "Failed to build auth URL") }
 
-        let scheme = Self.redirectURI.components(separatedBy: ":").first!
+        let scheme = config.redirectScheme
 
         do {
             let callbackURL = try await withCheckedThrowingContinuation { (cont: CheckedContinuation<URL, Error>) in
+                // start() returning false may or may not also call the handler; resume exactly once.
+                let once = ResumeOnce()
                 let session = ASWebAuthenticationSession(url: authURL, callbackURLScheme: scheme) { url, error in
+                    guard once.claim() else { return }
                     if let url { cont.resume(returning: url) }
                     else { cont.resume(throwing: error ?? DriveAuthError.cancelled) }
                 }
                 session.prefersEphemeralWebBrowserSession = true
-                session.start()
+                session.presentationContextProvider = presentationAnchor
+                authSession = session
+                if !session.start(), once.claim() { cont.resume(throwing: DriveAuthError.couldNotStart) }
             }
+            authSession = nil
 
             guard let code = URLComponents(url: callbackURL, resolvingAgainstBaseURL: false)?
                     .queryItems?.first(where: { $0.name == "code" })?.value else {
                 return (false, "No authorization code in the redirect")
             }
 
-            return await exchangeCode(code, verifier: verifier)
+            return await exchangeCode(code, verifier: verifier, config: config)
         } catch {
+            authSession = nil
+            if (error as? DriveAuthError) == .couldNotStart { return (false, "Could not open the Google sign-in sheet") }
             if (error as? DriveAuthError) == .cancelled || (error as NSError).code == 1 {
                 return (false, "Sign-in was cancelled")
             }
@@ -141,11 +151,12 @@ final class DriveAuth: ObservableObject {
         }
     }
 
-    private func exchangeCode(_ code: String, verifier: String) async -> (success: Bool, error: String?) {
+    private func exchangeCode(_ code: String, verifier: String,
+                              config: DriveOAuthConfig) async -> (success: Bool, error: String?) {
         let body = [
             "code": code,
-            "client_id": Self.clientID,
-            "redirect_uri": Self.redirectURI,
+            "client_id": config.clientID,
+            "redirect_uri": config.redirectURI,
             "grant_type": "authorization_code",
             "code_verifier": verifier,
         ]
@@ -153,9 +164,9 @@ final class DriveAuth: ObservableObject {
     }
 
     func refreshAccessToken() async -> Bool {
-        guard let rt = tokens.refreshToken else { return false }
+        guard let config = Self.config, let rt = tokens.refreshToken else { return false }
         let body = [
-            "client_id": Self.clientID,
+            "client_id": config.clientID,
             "refresh_token": rt,
             "grant_type": "refresh_token",
         ]
@@ -264,4 +275,21 @@ private extension Data {
 
 private enum DriveAuthError: Error {
     case cancelled
+    case couldNotStart
+}
+
+private final class ResumeOnce: @unchecked Sendable {
+    private let lock = NSLock()
+    private var done = false
+    func claim() -> Bool { lock.withLock { if done { return false }; done = true; return true } }
+}
+
+/// Presents the sign-in sheet over the app's key window.
+private final class KeyWindowAnchor: NSObject, ASWebAuthenticationPresentationContextProviding {
+    func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
+        let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+        return scenes.flatMap(\.windows).first(where: \.isKeyWindow)
+            ?? scenes.first?.windows.first
+            ?? ASPresentationAnchor()
+    }
 }

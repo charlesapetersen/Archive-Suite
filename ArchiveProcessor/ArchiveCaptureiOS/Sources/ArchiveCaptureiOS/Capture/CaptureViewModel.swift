@@ -73,6 +73,9 @@ final class CaptureViewModel: ObservableObject {
     init() {
         endpoint = Self.loadEndpoint()
         transportMode = TransportMode(rawValue: UserDefaults.standard.string(forKey: Self.transportModeKey) ?? "") ?? .lan
+        // A saved Drive mode only stands while this build can sign in: one made without an OAuth client
+        // (W40.i-fix-ios-drive-oauth-client) could never refresh the token, and offers no sign-out.
+        if transportMode == .drive && !driveAuth.isSignedIn { transportMode = .lan }
         client = endpoint.map { Self.makeTransport(endpoint: $0, mode: transportMode, driveAuth: driveAuth) }
         // W23.m8's port: read this BEFORE anything can save. restore() persists, and the first save that lands
         // clears the flag; read later, recovered pages would be adopted as if their classification were known.

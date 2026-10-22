@@ -117,7 +117,7 @@ out larger splits itself: file `<tag>a`, `<tag>b` … with `(blocked-on:)` chain
   phone is borrowed for one concentrated period. Prepare `verification/sessions/iphone-1.md` so that period goes
   on testing: free-Apple-ID signing steps in Xcode (Personal Team; the install lasts seven days), enabling
   Developer Mode on the phone and trusting the developer, minting the iOS Google OAuth client if the Drive relay is
-  to be tried (`W40.i-fix-ios-drive-oauth-client`), pairing with the Mac over Wi-Fi and USB, then the
+  to be tried and putting its id in `ArchiveCaptureiOS/Config/DriveLocal.xcconfig` (`README-oauth.md` §iPhone companion), pairing with the Mac over Wi-Fi and USB, then the
   capture tasks in order with a note form. Everything the simulator can show must already be shown, so the
   borrowed phone tests only camera, real network and the device itself.
 - **`W40.i4` — real-iPhone pass — OWNER.** HOLD QUEUE only. The owner's concentrated session with a borrowed

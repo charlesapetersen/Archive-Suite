@@ -668,6 +668,22 @@ test("the session writer keeps only the newest snapshot and orders a Clear") {
     check(m.take() == nil, "drained")
 }
 
+// W40.i-fix-ios-drive-oauth-client: the client id comes from the build, and a build without one is "not configured".
+test("an unconfigured build has no Drive OAuth client") {
+    for raw in [nil, "", "   ", "$(DRIVE_OAUTH_CLIENT_ID)", "YOUR_IOS_CLIENT_ID.apps.googleusercontent.com",
+                ".apps.googleusercontent.com", "1234-abc", "1234 abc.apps.googleusercontent.com",
+                "https://x.apps.googleusercontent.com"] as [String?] {
+        check(DriveOAuthConfig(rawClientID: raw) == nil, "refused: \(raw ?? "nil")")
+    }
+    check(DriveOAuthConfig.current == nil, "the host binary's Info.plist carries none")
+}
+test("a configured client id yields its reversed-client-id redirect") {
+    let c = DriveOAuthConfig(rawClientID: " 1234-abcdef.apps.googleusercontent.com\n")
+    check(c?.clientID == "1234-abcdef.apps.googleusercontent.com", "trimmed")
+    check(c?.redirectScheme == "com.googleusercontent.apps.1234-abcdef", "scheme")
+    check(c?.redirectURI == "com.googleusercontent.apps.1234-abcdef:/oauth2redirect", "redirect URI")
+}
+
 print("")
 print("\(passes) checks passed, \(failures) failed")
 exit(failures == 0 ? 0 : 1)

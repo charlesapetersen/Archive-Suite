@@ -33,3 +33,6 @@ Test Outputs/
 
 # Transient maintenance/resume state (session working files; incl. test-results/)
 .maintenance/
+
+# iOS Drive relay OAuth client id (per builder; ArchiveCaptureiOS/Config/Drive.xcconfig)
+ArchiveCaptureiOS/Config/DriveLocal.xcconfig

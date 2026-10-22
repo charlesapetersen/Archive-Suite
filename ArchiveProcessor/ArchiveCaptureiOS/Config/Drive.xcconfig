@@ -1,0 +1,14 @@
+// Drive cloud relay: the iOS Google OAuth client. Tracked; holds no id.
+//
+// A Google iOS OAuth client is bound to one GCP project + bundle ID, so it cannot be shared — every builder
+// mints their own (ArchiveCapture/README-oauth.md, "iPhone companion"). Put it in the gitignored
+// DriveLocal.xcconfig next to this file, one line:
+//
+//     DRIVE_OAUTH_CLIENT_ID = 1234567890-abcdef.apps.googleusercontent.com
+//
+// and rebuild (the include is read at build time; no `xcodegen generate` needed). Absent that file the id stays empty, the app
+// builds, Drive sign-in is hidden and Wi-Fi capture works as normal (Net/DriveOAuthConfig.swift).
+
+DRIVE_OAUTH_CLIENT_ID =
+
+#include? "DriveLocal.xcconfig"
