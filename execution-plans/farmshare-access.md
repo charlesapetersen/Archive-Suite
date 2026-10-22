@@ -80,3 +80,5 @@ The queue offers a `(cluster: farmshare)` item only while this preflight passes 
 owner to log in at most once a day when it does not. After submitting an item's jobs, record where they are:
 `ops/autonomous/cluster-reach.py mark TAG submitted`, then `finished` when they end, `clear` when the item ships.
 Detail: `ops/autonomous/README.md` §"Cluster items".
+
+Sherlock is different: the engine may not drive it at all. See `execution-plans/sherlock-access.md`.
