@@ -682,6 +682,11 @@ def overlay(p: dict, out: Path, long_side: int = 1800) -> Path:
         if w['box']:
             x, y, bw, bh = (v * s for v, s in zip(w['box'], (W * k, H * k, W * k, H * k)))
             cmd += ['-stroke', COLOURS.get(w['status'], 'gray'), '-draw', f'rectangle {x:.0f},{y:.0f} {x + bw:.0f},{y + bh:.0f}']
+    if not any(w['box'] for w in p['words']):  # a line-level page (N6): show its line boxes instead
+        for l in p['lines']:
+            if l['box']:
+                x, y, bw, bh = (v * s for v, s in zip(l['box'], (W * k, H * k, W * k, H * k)))
+                cmd += ['-stroke', 'dodgerblue', '-draw', f'rectangle {x:.0f},{y:.0f} {x + bw:.0f},{y + bh:.0f}']
     for l in p['lines']:
         if l['baseline'] and len(l['baseline']) >= 2:
             pts = ' '.join(f'{x * W * k:.0f},{y * H * k:.0f}' for x, y in l['baseline'])
