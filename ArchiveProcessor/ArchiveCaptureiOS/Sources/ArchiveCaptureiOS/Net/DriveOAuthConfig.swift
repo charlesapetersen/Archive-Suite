@@ -26,6 +26,29 @@ struct DriveOAuthConfig: Equatable, Sendable {
     }
     var redirectURI: String { redirectScheme + ":/oauth2redirect" }
 
+    static let authEndpoint = "https://accounts.google.com/o/oauth2/v2/auth"
+    static let scope = "https://www.googleapis.com/auth/drive.file"
+
+    /// Google's consent URL for a PKCE sign-in. `loginHint` (a cloud QR's `account`) pre-selects that account,
+    /// so the phone lands on the one the Mac uses; an empty or absent hint is left out.
+    func authorizationURL(codeChallenge: String, loginHint: String? = nil) -> URL? {
+        var comps = URLComponents(string: Self.authEndpoint)!
+        comps.queryItems = [
+            URLQueryItem(name: "client_id", value: clientID),
+            URLQueryItem(name: "redirect_uri", value: redirectURI),
+            URLQueryItem(name: "response_type", value: "code"),
+            URLQueryItem(name: "scope", value: Self.scope),
+            URLQueryItem(name: "code_challenge", value: codeChallenge),
+            URLQueryItem(name: "code_challenge_method", value: "S256"),
+            URLQueryItem(name: "access_type", value: "offline"),
+            URLQueryItem(name: "prompt", value: "consent"),
+        ]
+        if let hint = loginHint?.trimmingCharacters(in: .whitespacesAndNewlines), !hint.isEmpty {
+            comps.queryItems?.append(URLQueryItem(name: "login_hint", value: hint))
+        }
+        return comps.url
+    }
+
     /// The configured client, or nil when the build carries none. Trimmed, because a trailing space from a
     /// pasted value would still look configured but break the redirect scheme and draw `invalid_client`
     /// (the trap Android's build script trims for). Anything not shaped like a Google client id is refused:

@@ -776,6 +776,53 @@ test("the Keychain item is this-device-only, readable after first unlock") {
     check((attrs[kSecValueData as String] as? Data) == Data("x".utf8), "data set")
 }
 
+// MARK: - Cloud pairing (W40.i-fix-ios-cloud-pairing)
+
+test("a combined LAN QR keeps its relay code for Cloud") {
+    let ep = try XCTUnwrap(MacEndpoint.fromQRPayload(#"{"host":"10.0.0.5","port":8765,"token":"T","name":"Studio","relay":"R"}"#))
+    check(!ep.isCloud && ep.host == "10.0.0.5" && ep.port == 8765 && ep.token == "T", "Wi-Fi fields")
+    check(ep.relayToken == "R", "relay code offered to Cloud")
+}
+test("a LAN-only QR offers nothing to Cloud") {
+    let ep = try XCTUnwrap(MacEndpoint.fromQRPayload(#"{"host":"10.0.0.5","port":"8765","token":"T"}"#))
+    check(ep.relayToken == nil && ep.name == "Mac" && ep.port == 8765, "no relay; string port; default name")
+    check(MacEndpoint.fromQRPayload(#"{"host":"10.0.0.5","port":8765,"token":"T","relay":""}"#)?.relayToken == nil,
+          "an empty relay counts as absent")
+}
+test("a cloud QR is accepted, with its account as the hint") {
+    let ep = try XCTUnwrap(MacEndpoint.fromQRPayload(#"{"mode":"cloud","token":"RT","name":"Studio","account":"me@example.org"}"#))
+    check(ep.isCloud && ep.host.isEmpty && ep.port == 0, "cloud, no host to dial")
+    check(ep.relayToken == "RT" && ep.account == "me@example.org" && ep.name == "Studio", "relay token, account, name")
+    let bare = try XCTUnwrap(MacEndpoint.fromQRPayload(#"{"mode":"cloud","token":"RT","account":""}"#))
+    check(bare.account == nil && bare.relayToken == "RT", "an empty account is no hint")
+}
+test("QRs without a token, or a LAN QR without a host or port, are refused") {
+    check(MacEndpoint.fromQRPayload(#"{"mode":"cloud","token":""}"#) == nil, "cloud, empty token")
+    check(MacEndpoint.fromQRPayload(#"{"host":"h","port":0,"token":"T"}"#) == nil, "port 0")
+    check(MacEndpoint.fromQRPayload(#"{"port":8765,"token":"T"}"#) == nil, "no host")
+    check(MacEndpoint.fromQRPayload("not json") == nil, "not JSON")
+}
+test("a cloud pairing survives being saved and loaded") {
+    let ep = MacEndpoint.cloud(relayToken: "RT", name: "Studio", account: "me@example.org")
+    let back = try JSONDecoder().decode(MacEndpoint.self, from: try JSONEncoder().encode(ep))
+    check(back == ep && back.isCloud && back.relayToken == "RT", "round trip")
+    let typed = MacEndpoint.cloud(relayToken: "RT")
+    check(typed.isCloud && typed.name == "Mac" && typed.account == nil, "a typed relay token pairs to Cloud")
+}
+test("sign-in carries the QR's account as login_hint, and only then") {
+    let cfg = try XCTUnwrap(DriveOAuthConfig(rawClientID: "123-abc.apps.googleusercontent.com"))
+    func items(_ hint: String?) throws -> [String: String] {
+        let url = try XCTUnwrap(cfg.authorizationURL(codeChallenge: "CH", loginHint: hint))
+        let q = try XCTUnwrap(URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems)
+        return Dictionary(q.map { ($0.name, $0.value ?? "") }, uniquingKeysWith: { a, _ in a })
+    }
+    let h = try items("me+x@example.org")
+    check(h["login_hint"] == "me+x@example.org", "hint present, decoded intact")
+    check(h["code_challenge"] == "CH" && h["code_challenge_method"] == "S256" && h["client_id"] == cfg.clientID
+          && h["redirect_uri"] == cfg.redirectURI, "PKCE and client fields unchanged")
+    check(try items(nil)["login_hint"] == nil && (try items("  "))["login_hint"] == nil, "no hint when none or blank")
+}
+
 print("")
 print("\(passes) checks passed, \(failures) failed")
 exit(failures == 0 ? 0 : 1)

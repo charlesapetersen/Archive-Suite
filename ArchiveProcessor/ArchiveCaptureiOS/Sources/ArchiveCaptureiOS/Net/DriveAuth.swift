@@ -28,9 +28,7 @@ final class DriveAuth: ObservableObject {
     nonisolated static let config: DriveOAuthConfig? = .current
     nonisolated static var isConfigured: Bool { config != nil }
 
-    private static let authEndpoint = "https://accounts.google.com/o/oauth2/v2/auth"
     private static let tokenEndpoint = "https://oauth2.googleapis.com/token"
-    private static let scope = "https://www.googleapis.com/auth/drive.file"
 
     // MARK: - Token state
 
@@ -52,24 +50,15 @@ final class DriveAuth: ObservableObject {
 
     // MARK: - Sign in (ASWebAuthenticationSession + PKCE)
 
-    func signIn() async -> (success: Bool, error: String?) {
+    /// `loginHint`: the Google account to pre-select (a cloud QR's `account`), so the phone signs in to the Mac's.
+    func signIn(loginHint: String? = nil) async -> (success: Bool, error: String?) {
         guard let config = Self.config else { return (false, DriveOAuthConfig.unconfiguredMessage) }
         let verifier = Self.generateCodeVerifier()
         let challenge = Self.sha256Base64URL(verifier)
 
-        var comps = URLComponents(string: Self.authEndpoint)!
-        comps.queryItems = [
-            URLQueryItem(name: "client_id", value: config.clientID),
-            URLQueryItem(name: "redirect_uri", value: config.redirectURI),
-            URLQueryItem(name: "response_type", value: "code"),
-            URLQueryItem(name: "scope", value: Self.scope),
-            URLQueryItem(name: "code_challenge", value: challenge),
-            URLQueryItem(name: "code_challenge_method", value: "S256"),
-            URLQueryItem(name: "access_type", value: "offline"),
-            URLQueryItem(name: "prompt", value: "consent"),
-        ]
-
-        guard let authURL = comps.url else { return (false, "Failed to build auth URL") }
+        guard let authURL = config.authorizationURL(codeChallenge: challenge, loginHint: loginHint) else {
+            return (false, "Failed to build auth URL")
+        }
 
         let scheme = config.redirectScheme
 

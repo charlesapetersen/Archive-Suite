@@ -13,6 +13,14 @@ enum ConnectPhase: Equatable {
     case refused(host: String, port: Int)
     case unauthorized(host: String, port: Int)
     case badQR
+    /// Cloud: the Google sign-in sheet is up.
+    case signingIn
+    /// Cloud: the scanned QR has no relay code (the Mac isn't signed into Drive).
+    case noRelay
+    /// Wi-Fi: the scanned QR is a cloud-only code, with no host to dial.
+    case cloudOnlyQR
+    /// Cloud: sign-in failed or this build can't sign in; the message names why.
+    case cloudFailed(String)
 }
 
 /// Owns the capture session: the paired endpoint, the current group, captured items, minimal on-phone
@@ -63,20 +71,18 @@ final class CaptureViewModel: ObservableObject {
     let deviceName = UIDevice.current.name
     let driveAuth = DriveAuth()
 
-    /// Which transport the phone is using to reach the Mac.
-    enum TransportMode: String { case lan, drive }
-    @Published private(set) var transportMode: TransportMode = .lan
-
     private static let endpointKey = "macEndpoint"
-    private static let transportModeKey = "transportMode"
 
     init() {
         endpoint = Self.loadEndpoint()
-        transportMode = TransportMode(rawValue: UserDefaults.standard.string(forKey: Self.transportModeKey) ?? "") ?? .lan
-        // A saved Drive mode only stands while this build can sign in: one made without an OAuth client
-        // (W40.i-fix-ios-drive-oauth-client) could never refresh the token, and offers no sign-out.
-        if transportMode == .drive && !driveAuth.isSignedIn { transportMode = .lan }
-        client = endpoint.map { Self.makeTransport(endpoint: $0, mode: transportMode, driveAuth: driveAuth) }
+        // A saved Cloud pairing only stands while the phone is signed in: without a token (signed out, or a build
+        // with no OAuth client, W40.i-fix-ios-drive-oauth-client) every upload would fail, so return to the
+        // pairing screen instead. The queue is kept and uploads once the phone pairs again.
+        if endpoint?.isCloud == true && !driveAuth.isSignedIn {
+            endpoint = nil
+            UserDefaults.standard.removeObject(forKey: Self.endpointKey)
+        }
+        client = endpoint.map { Self.makeTransport(endpoint: $0, driveAuth: driveAuth) }
         // W23.m8's port: read this BEFORE anything can save. restore() persists, and the first save that lands
         // clears the flag; read later, recovered pages would be adopted as if their classification were known.
         let manifestWasStale = store.manifestIsStale()
@@ -84,22 +90,13 @@ final class CaptureViewModel: ObservableObject {
         startAutoRetry()
     }
 
-    /// Build the appropriate transport for the current mode.
-    private static func makeTransport(endpoint: MacEndpoint, mode: TransportMode, driveAuth: DriveAuth) -> any SegmentTransport {
-        if mode == .drive, let relay = endpoint.relay {
-            return DriveRelayTransport(client: DriveClient(token: { try driveAuth.accessTokenBlocking() }), token: relay)
+    /// The transport the pairing chose: Wi-Fi → `MacClient` (HTTP), Cloud → `DriveRelayTransport` (Google Drive).
+    private static func makeTransport(endpoint: MacEndpoint, driveAuth: DriveAuth) -> any SegmentTransport {
+        if endpoint.isCloud {
+            return DriveRelayTransport(client: DriveClient(token: { try driveAuth.accessTokenBlocking() }),
+                                       token: endpoint.token)
         }
         return MacClient(endpoint: endpoint)
-    }
-
-    /// Switch transport mode (LAN vs Drive). Persists the choice and re-creates the client.
-    func setTransportMode(_ mode: TransportMode) {
-        transportMode = mode
-        UserDefaults.standard.set(mode.rawValue, forKey: Self.transportModeKey)
-        if let ep = endpoint {
-            client = Self.makeTransport(endpoint: ep, mode: mode, driveAuth: driveAuth)
-            resumeUploads()
-        }
     }
 
     // MARK: - Pairing
@@ -111,46 +108,65 @@ final class CaptureViewModel: ObservableObject {
         await attemptConnect(MacEndpoint(host: host, port: port, token: token, name: name))
     }
 
+    /// Wi-Fi pairing from a scanned QR. A cloud-only code has no host to dial, so it is named, not dialled.
     func connectFromQR(_ payload: String) async {
         guard let ep = MacEndpoint.fromQRPayload(payload) else { connectPhase = .badQR; return }
+        if ep.isCloud { connectPhase = .cloudOnlyQR; return }
         await attemptConnect(ep)
     }
 
-    /// Preflight the endpoint with a short-timeout reachability probe, then pair on success or name the
-    /// cause on failure. Sets `.connecting` first so the UI shows "connecting to <ip>:<port>…" immediately.
+    /// Wi-Fi only: preflight the endpoint with a short-timeout reachability probe, then pair on success or name
+    /// the cause on failure. Sets `.connecting` first so the UI shows "connecting to <ip>:<port>…" immediately.
+    /// It never switches to Drive by itself: the operator chooses Cloud on the pairing screen (as on Android).
     private func attemptConnect(_ ep: MacEndpoint) async {
         connectPhase = .connecting(host: ep.host, port: ep.port)
         switch await MacClient(endpoint: ep).reachability() {
         case .ok:
-            retirePreviousPairing()   // the Mac paired before owns nothing from here on
-            endpoint = ep
-            // Auto-select Drive transport when the QR carries a relay token and the user is signed in.
-            if ep.relay != nil && driveAuth.isSignedIn { transportMode = .drive }
-            else { transportMode = .lan }
-            UserDefaults.standard.set(transportMode.rawValue, forKey: Self.transportModeKey)
-            client = Self.makeTransport(endpoint: ep, mode: transportMode, driveAuth: driveAuth)
-            Self.saveEndpoint(ep)
-            statusMessage = ""
-            connectPhase = .idle
-            resumeUploads()
-        case .unreachable:
-            // LAN unreachable but the QR has a relay token + user signed in → try Drive directly.
-            if ep.relay != nil && driveAuth.isSignedIn {
-                retirePreviousPairing()
-                endpoint = ep
-                transportMode = .drive
-                UserDefaults.standard.set(transportMode.rawValue, forKey: Self.transportModeKey)
-                client = Self.makeTransport(endpoint: ep, mode: .drive, driveAuth: driveAuth)
-                Self.saveEndpoint(ep)
-                statusMessage = "Using Google Drive relay (LAN unreachable)"
-                connectPhase = .idle
-                resumeUploads()
-            } else {
-                connectPhase = .unreachable(host: ep.host, port: ep.port)
-            }
+            pair(ep, status: "")
+        case .unreachable:  connectPhase = .unreachable(host: ep.host, port: ep.port)
         case .refused:      connectPhase = .refused(host: ep.host, port: ep.port)
         case .unauthorized: connectPhase = .unauthorized(host: ep.host, port: ep.port)
         }
+    }
+
+    /// Cloud pairing from a scanned QR: the combined QR's `relay` code, or a cloud QR's own token. The QR's
+    /// `account` becomes the sign-in hint. The Wi-Fi part of a combined QR is ignored: the operator chose Cloud.
+    func connectCloudFromQR(_ payload: String) async {
+        guard let ep = MacEndpoint.fromQRPayload(payload) else { connectPhase = .badQR; return }
+        guard let relay = ep.relayToken else { connectPhase = .noRelay; return }
+        await connectCloud(.cloud(relayToken: relay, name: ep.name, account: ep.account))
+    }
+
+    /// Cloud pairing from a typed relay token.
+    func connectCloud(relayToken: String) async {
+        let t = relayToken.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !t.isEmpty else { return }
+        await connectCloud(.cloud(relayToken: t))
+    }
+
+    /// Sign in to Google if the phone isn't already, then pair through the Drive relay. No reachability probe,
+    /// as on Android: the first upload finds the Mac's folder, and if the Mac's cloud session isn't up yet the
+    /// page stays queued and retries, so nothing is lost waiting for it.
+    private func connectCloud(_ ep: MacEndpoint) async {
+        if case .signingIn = connectPhase { return }
+        guard DriveAuth.isConfigured else { connectPhase = .cloudFailed(DriveOAuthConfig.unconfiguredMessage); return }
+        if !driveAuth.isSignedIn {
+            connectPhase = .signingIn
+            let r = await driveAuth.signIn(loginHint: ep.account)
+            guard r.success else { connectPhase = .cloudFailed(r.error ?? "Google sign-in failed"); return }
+        }
+        pair(ep, status: "Cloud relay ready — uploading to Google Drive")
+    }
+
+    /// Make `ep` the pairing: the Mac paired before owns nothing from here on.
+    private func pair(_ ep: MacEndpoint, status: String) {
+        retirePreviousPairing()
+        endpoint = ep
+        client = Self.makeTransport(endpoint: ep, driveAuth: driveAuth)
+        Self.saveEndpoint(ep)
+        statusMessage = status
+        connectPhase = .idle
+        resumeUploads()
     }
 
     func disconnect() {
@@ -170,7 +186,7 @@ final class CaptureViewModel: ObservableObject {
     /// only copy, and each such send returns its page to the queue as it unwinds. Cancelling only stops those sends
     /// sooner: a request already on the wire may still land on the old Mac, which is why the pairing check, not the
     /// cancel, is what makes this safe. Everything here is on the main actor, so a send the new pairing starts
-    /// can't be caught by it. Switching LAN and Drive for the same Mac is not a new pairing and does not call this.
+    /// can't be caught by it.
     private func retirePreviousPairing() {
         queue.rotatePairing()
         uploadTasks.values.forEach { $0.cancel() }

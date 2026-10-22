@@ -70,7 +70,7 @@ iOS, so each was checked against the iOS code.
 | Pending resend (a Q3 toggle or reclassify during an upload) | included in auto-retry and resume | was not in the auto-retry or resume filters; now it is, and a confirmed send with a resend pending goes straight back to pending (`CaptureQueue.prepareDeferredResend`) | **fixed** by `W40.i-fix-ios-heartbeat-count` (2026-10-21) |
 | Google Drive sign-in | client id from `local.properties`; empty disables sign-in with a message (`A/net/DriveAuth.kt:105-113`) | was a hard-coded placeholder id with the sign-in button always shown; now the id comes from the gitignored `Config/DriveLocal.xcconfig` into Info.plist, and with none set sign-in is hidden and the screen says Drive is not configured (`I/Net/DriveOAuthConfig.swift`) | **fixed** by `W40.i-fix-ios-drive-oauth-client` (2026-10-21); a real sign-in still needs the owner's iOS OAuth client (`W40.i5`) |
 | Drive tokens | private SharedPreferences, `allowBackup=false` | was plain `UserDefaults`, which goes into device backups; now one Keychain item, `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`, dropped on the first launch after a reinstall (`I/Net/DriveTokenStore.swift`) | **fixed** by `W40.i-fix-ios-drive-token-keychain` (2026-10-21) |
-| Cloud pairing | an explicit Cloud mode with no LAN probe; relay token from the QR or typed in; Google sign-in launched with the QR's `account` as the login hint (`A/ui/ConnectScreen.kt:183-249`) | no Cloud choice: Drive is used only after a LAN ping, a refused connection never falls back, and a working LAN is passed over for Drive when signed in (`CaptureViewModel.swift:115-146`). A `mode:"cloud"` QR is refused as "not an Archive Processor pairing code" (`I/Net/MacEndpoint.swift:19-32`). No typed relay token | **gap, S3** → `W40.i-fix-ios-cloud-pairing` |
+| Cloud pairing | an explicit Cloud mode with no LAN probe; relay token from the QR or typed in; Google sign-in launched with the QR's `account` as the login hint (`A/ui/ConnectScreen.kt:183-249`) | had no Cloud choice: Drive was used only after a LAN ping, a refused connection never fell back, a working LAN was passed over for Drive when signed in, a `mode:"cloud"` QR was refused, and there was no typed relay token. Now an explicit Wi-Fi/Cloud choice (`I/UI/ConnectScreen.swift`); Cloud takes the combined QR's `relay`, a cloud QR, or a typed relay token, signs in with the QR's `account` as `login_hint`, and pairs with no LAN probe; Wi-Fi never switches to Drive by itself and names a cloud-only QR (`CaptureViewModel.connectCloud`, `MacEndpoint.fromQRPayload`) | **fixed** by `W40.i-fix-ios-cloud-pairing` (2026-10-21); a real sign-in still needs the owner's iOS OAuth client (`W40.i5`) |
 | Deleting a page | confirms whenever the page is unsent *or* has a pending resend; cancels and waits for its upload; "Save to gallery & delete" or "Delete permanently" (`CaptureViewModel.kt:477-563`) | confirms only when the page is unsent, so a pending resend is deleted unasked; no cancel; "Delete permanently" only (`CaptureViewModel.swift:256-281`) | **gap, S3** → `W40.i-fix-ios-delete-confirm` |
 | Tests | ten JVM test files over the queue, delete, recovery, orphans, pairing generation, QR parsing, the Drive transport, relay bytes and the session writer | no test target; four `swiftc` scripts cover only the network layer. None of the view model's safety logic is tested, and there is no runtime to host an XCTest bundle | **gap, S3** → `W40.i-fix-ios-testable-core`, which the S1 and S2 fixes wait on so each lands with a failing test first (rule 8) |
 | Small differences | `savedToPhone` badge; "Segment ended · N" and "No pages in this segment yet"; ended segments kept in order; accessibility labels | none of these; ended segments in a `Dictionary`, so tag cards can reach the Mac out of order; the QR sheet is black with no message when camera access is denied; the recent-year chips can overflow | **gap, S4** → `W40.i-fix-ios-polish` |
@@ -98,7 +98,7 @@ iOS, so each was checked against the iOS code.
 | `W40.i-fix-ios-heartbeat-count` | S2 · Tier-2 | FAILED pages left out of "still to send"; unordered reports; pending resends not retried |
 | `W40.i-fix-ios-session-durability` | S2 · Tier-2 | `W23.m8` and orphan adoption not on iOS; silent save failures |
 | `W40.i-fix-ios-drive-oauth-client` | S2 | placeholder Google client id |
-| `W40.i-fix-ios-cloud-pairing` | S3 | no Cloud mode, cloud QR refused, no typed relay token |
+| `W40.i-fix-ios-cloud-pairing` | S3 | no Cloud mode, cloud QR refused, no typed relay token — fixed 2026-10-21 |
 | `W40.i-fix-ios-drive-token-keychain` | S3 | Drive tokens in `UserDefaults` — fixed 2026-10-21 |
 | `W40.i-fix-ios-delete-confirm` | S3 · Tier-2 | a pending resend deleted unasked; no cancel; no save-and-delete |
 | `W40.i-fix-ios-polish` | S4 | the small differences above |
@@ -441,8 +441,8 @@ action or any runtime evidence: there is no test target and no simulator runtime
 - **Status:** `unproven`
 - **History:**
   - 2026-10-21 W40.b4 — row written, `unproven`.
-- **Notes:** opens on the scanner as promised, and names a bad QR (unlike `C-01`). A cloud-mode QR is refused
-  (`I/Net/MacEndpoint.swift:19-32`) → `W40.i-fix-ios-cloud-pairing`. With camera access denied the scanner is black
+- **Notes:** opens on the scanner as promised, and names a bad QR (unlike `C-01`). A cloud-mode QR was refused; since
+  `W40.i-fix-ios-cloud-pairing` (2026-10-21) Wi-Fi names it as a Cloud code and the Cloud choice accepts it. With camera access denied the scanner is black
   with no message → `W40.i-fix-ios-polish`.
 
 ### C-32 · iOS · Manual entry of host, port and token
@@ -468,8 +468,9 @@ action or any runtime evidence: there is no test target and no simulator runtime
 - **Status:** `unproven`
 - **History:**
   - 2026-10-21 W40.b4 — row written, `unproven`.
-- **Notes:** when the QR carries a relay code and the phone is signed in, an unreachable Mac switches to Drive silently
-  apart from a status line (`:128-138`) → `W40.i-fix-ios-cloud-pairing`.
+- **Notes:** when the QR carried a relay code and the phone was signed in, an unreachable Mac switched to Drive silently
+  apart from a status line. Since `W40.i-fix-ios-cloud-pairing` (2026-10-21) Wi-Fi reports the cause and points at
+  the Cloud choice; it never switches by itself.
 
 ### C-34 · iOS · Saved endpoint and Re-pair
 
@@ -611,9 +612,9 @@ action or any runtime evidence: there is no test target and no simulator runtime
 - **Promise:** as `C-14`, with the iPhone's own iOS OAuth client (bundle `com.archiveprocessor.capture.ios`).
 - **Promised in:** `README.md` §Live Capture (Transports); `CLAUDE.md` §Google Drive cloud relay ("the iOS transport
   is built + mock-tested"); `ArchiveCapture/README-oauth.md` §iPhone companion; `SPEC/relay-object-format.md` §Epoch.
-- **Reached by:** Sign in (`I/UI/ConnectScreen.swift:150` → `DriveAuth.signIn`, `I/Net/DriveAuth.swift:100`) → Drive chosen
-  at connect when the QR has a relay code (`I/Capture/CaptureViewModel.swift:120-121`, `:128-138`) →
-  `DriveRelayTransport` (`:80`).
+- **Reached by:** Cloud on the pairing screen (`I/UI/ConnectScreen.swift`, `cloudSection`) → scan (`vm.connectCloudFromQR`)
+  or typed relay token (`vm.connectCloud(relayToken:)`) → `DriveAuth.signIn(loginHint:)` when signed out → `pair` →
+  `DriveRelayTransport` (`I/Capture/CaptureViewModel.swift`, `makeTransport`).
 - **Real-path test:** `scripts/test-drive-transport.sh` (the iOS Drive transport over a mock; passed 2026-10-21).
   Sign-in has no test.
 - **Runtime evidence:** none.
@@ -621,6 +622,8 @@ action or any runtime evidence: there is no test target and no simulator runtime
 - **History:**
   - 2026-10-21 W40.b4 — row written, `unproven`.
   - 2026-10-21 W40.i-fix-ios-drive-oauth-client — placeholder id replaced by a build setting; still `unproven`.
+  - 2026-10-21 W40.i-fix-ios-cloud-pairing — explicit Cloud choice, cloud QR and typed token, `login_hint`; QR parsing
+    and the hint covered by `scripts/test-ios-capture-queue.sh`; still `unproven`.
 - **Notes:** The id was the placeholder `YOUR_IOS_CLIENT_ID.apps.googleusercontent.com` with the sign-in button always
   shown; fixed by `W40.i-fix-ios-drive-oauth-client` (2026-10-21): the id comes from the gitignored
   `Config/DriveLocal.xcconfig`, and a build without one hides sign-in and says why (`I/Net/DriveOAuthConfig.swift`,

@@ -1,22 +1,27 @@
 import SwiftUI
 
-/// Pairing screen: scan the Mac's Live Capture QR code (or enter host/port/token manually). Driven by
-/// `vm.connectPhase` so it names what it's dialing the instant the QR decodes and, on failure, names the
-/// cause + the fix with a clean "Try again" — never a dead spinner or a wrong "same Wi-Fi" message.
+/// Pairing screen: the operator chooses Wi-Fi or Cloud (Android's ConnectScreen, less Wired: an iPhone has no
+/// adb tunnel), then scans the Mac's Live Capture QR code or types the details. Wi-Fi dials the QR's host;
+/// Cloud uses its relay code through Google Drive, with no LAN probe. Driven by `vm.connectPhase` so it names
+/// what it's doing the instant the QR decodes and, on failure, names the cause + the fix with a clean
+/// "Try again" — never a dead spinner or a wrong "same Wi-Fi" message.
 struct ConnectScreen: View {
     @ObservedObject var vm: CaptureViewModel
+    enum Mode: String, CaseIterable { case wifi = "Wi-Fi", cloud = "Cloud" }
+    @State private var mode: Mode = .wifi
     @State private var showScanner = false
     @State private var showManual = false
     @State private var host = ""
     @State private var port = ""
     @State private var token = ""
+    @State private var relayToken = ""
     @State private var manualError: String?
-    @State private var driveSignInError: String?
-    @State private var signingIn = false
 
     private var isConnecting: Bool {
-        if case .connecting = vm.connectPhase { return true }
-        return false
+        switch vm.connectPhase {
+        case .connecting, .signingIn: return true
+        default: return false
+        }
     }
 
     var body: some View {
@@ -24,18 +29,62 @@ struct ConnectScreen: View {
             Spacer()
             Image(systemName: "qrcode.viewfinder").font(.system(size: 64)).foregroundStyle(.tint)
             Text("Connect to your Mac").font(.title2).bold()
-            Text("Open the Live Capture tab in the Archive Processor Mac app and scan the QR code it shows.")
-                .multilineTextAlignment(.center).foregroundStyle(.secondary).padding(.horizontal)
 
-            Button { presentScanner() } label: {
-                Label("Scan QR code", systemImage: "qrcode.viewfinder").frame(maxWidth: .infinity)
+            Picker("How is this phone connected?", selection: $mode) {
+                ForEach(Mode.allCases, id: \.self) { Text($0.rawValue).tag($0) }
             }
-            .buttonStyle(.borderedProminent).controlSize(.large).padding(.horizontal)
+            .pickerStyle(.segmented).padding(.horizontal)
             .disabled(isConnecting)
+            .onChange(of: mode) { _, _ in
+                vm.resetConnectPhase()
+                manualError = nil
+                showManual = false
+            }
 
-            phaseView
+            switch mode {
+            case .wifi: wifiSection
+            case .cloud: cloudSection
+            }
 
-            DisclosureGroup("Enter manually", isExpanded: $showManual) {
+            Spacer()
+        }
+        .sheet(isPresented: $showScanner) {
+            ZStack(alignment: .topTrailing) {
+                QRScannerView { payload in
+                    showScanner = false
+                    let cloud = mode == .cloud
+                    Task {
+                        if cloud { await vm.connectCloudFromQR(payload) } else { await vm.connectFromQR(payload) }
+                    }
+                }
+                .ignoresSafeArea()
+                Button { showScanner = false } label: {
+                    Image(systemName: "xmark.circle.fill").font(.largeTitle).foregroundStyle(.white)
+                }
+                .padding()
+            }
+        }
+    }
+
+    private var scanButton: some View {
+        Button { presentScanner() } label: {
+            Label("Scan QR code", systemImage: "qrcode.viewfinder").frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.borderedProminent).controlSize(.large).padding(.horizontal)
+        .disabled(isConnecting)
+    }
+
+    // MARK: - Wi-Fi
+
+    @ViewBuilder private var wifiSection: some View {
+        Text("Open the Live Capture tab in the Archive Processor Mac app and scan the QR code it shows. Both devices must be on the same Wi-Fi.")
+            .multilineTextAlignment(.center).foregroundStyle(.secondary).padding(.horizontal)
+
+        scanButton
+
+        phaseView
+
+        DisclosureGroup("Enter manually", isExpanded: $showManual) {
                 VStack(spacing: 8) {
                     TextField("Host (e.g. 192.168.1.5)", text: $host)
                         .textFieldStyle(.roundedBorder).autocorrectionDisabled().textInputAutocapitalization(.never)
@@ -52,24 +101,6 @@ struct ConnectScreen: View {
                 .padding(.top, 6)
             }
             .padding(.horizontal)
-
-            driveSection
-
-            Spacer()
-        }
-        .sheet(isPresented: $showScanner) {
-            ZStack(alignment: .topTrailing) {
-                QRScannerView { payload in
-                    showScanner = false
-                    Task { await vm.connectFromQR(payload) }
-                }
-                .ignoresSafeArea()
-                Button { showScanner = false } label: {
-                    Image(systemName: "xmark.circle.fill").font(.largeTitle).foregroundStyle(.white)
-                }
-                .padding()
-            }
-        }
     }
 
     /// Immediate feedback + cause-named failures, all from the explicit connect phase.
@@ -87,7 +118,7 @@ struct ConnectScreen: View {
                 hotspot (join both devices to it), or check the Mac's Live Capture tab is listening.
 
                 If you tapped Don't Allow on the local-network prompt, enable it in \
-                Settings ▸ Archive Capture ▸ Local Network.
+                Settings ▸ Archive Capture ▸ Local Network. Or choose Cloud above to send through Google Drive.
                 """)
         case .refused(let h, let p):
             failure("Reached the network but nothing is listening at \(h):\(p) — is Live Capture started on the Mac?")
@@ -95,6 +126,14 @@ struct ConnectScreen: View {
             failure("Pairing code rejected — re-scan the QR (it may be stale).")
         case .badQR:
             failure("That isn't an Archive Processor pairing code.")
+        case .signingIn:
+            ProgressView("Signing in to Google…").padding(.horizontal)
+        case .noRelay:
+            failure("That QR has no cloud relay code — sign the Mac into Google Drive (Settings ▸ Live Capture), then rescan.")
+        case .cloudOnlyQR:
+            failure("That's a Cloud pairing code — choose Cloud above and scan it there.")
+        case .cloudFailed(let message):
+            failure(message)
         }
     }
 
@@ -126,49 +165,59 @@ struct ConnectScreen: View {
         }
     }
 
-    // MARK: - Google Drive cloud relay
+    // MARK: - Cloud (Google Drive relay)
 
-    /// Sign-in / status section for the Google Drive cloud relay. When signed in, the phone can reach
-    /// the Mac through Drive even when LAN is blocked (public/guest Wi-Fi). The QR must carry a `relay`
-    /// token (Mac signed into Drive + session active) for it to activate.
-    @ViewBuilder private var driveSection: some View {
-        VStack(spacing: 8) {
-            Divider().padding(.horizontal)
-            if !DriveAuth.isConfigured {
-                // No OAuth client in this build (Config/DriveLocal.xcconfig): a sign-in button could only
-                // draw Google's invalid_client page, so say why the cloud relay is unavailable instead.
-                Label("Google Drive relay not configured in this build", systemImage: "cloud.slash")
-                    .foregroundStyle(.secondary).font(.callout)
-                Text("Wi-Fi capture works as normal. The cloud relay needs an iOS OAuth client — see README-oauth.md.")
-                    .font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.center)
-                    .padding(.horizontal)
-            } else if vm.driveAuth.isSignedIn {
-                Label("Google Drive relay ready", systemImage: "checkmark.circle.fill")
-                    .foregroundStyle(.green).font(.callout)
-                Button("Sign out of Google Drive", role: .destructive) { vm.driveAuth.signOut() }
-                    .font(.caption)
-            } else {
-                Text("On a network that blocks device-to-device? Sign in to Google Drive to relay through the cloud.")
-                    .font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.center)
-                    .padding(.horizontal)
-                Button {
-                    signingIn = true
-                    driveSignInError = nil
-                    Task {
-                        let result = await vm.driveAuth.signIn()
-                        signingIn = false
-                        if !result.success { driveSignInError = result.error }
+    /// Cloud pairing: scan the Mac's QR (it carries the relay code when the Mac is signed into Drive) or type the
+    /// relay token, then sign in to the SAME Google account the Mac uses. Uploads then go through Drive, so this
+    /// works on networks that block device-to-device connections.
+    @ViewBuilder private var cloudSection: some View {
+        if !DriveAuth.isConfigured {
+            // No OAuth client in this build (Config/DriveLocal.xcconfig): a sign-in could only draw Google's
+            // invalid_client page, so say why the cloud relay is unavailable instead.
+            Label("Google Drive relay not configured in this build", systemImage: "cloud.slash")
+                .foregroundStyle(.secondary).font(.callout)
+            Text("Wi-Fi capture works as normal. The cloud relay needs an iOS OAuth client — see README-oauth.md.")
+                .font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                .padding(.horizontal)
+        } else {
+            Text("Sign the Mac into Google Drive (Settings ▸ Live Capture) and Start in Live Capture, then scan the QR it shows — the same code works for Cloud. You'll sign in to the same Google account the Mac uses.")
+                .multilineTextAlignment(.center).foregroundStyle(.secondary).padding(.horizontal)
+
+            scanButton
+
+            phaseView
+
+            DisclosureGroup("Enter relay token", isExpanded: $showManual) {
+                VStack(spacing: 8) {
+                    TextField("Relay token", text: $relayToken)
+                        .textFieldStyle(.roundedBorder).autocorrectionDisabled().textInputAutocapitalization(.never)
+                    Button("Sign in & connect") {
+                        let t = relayToken
+                        Task { await vm.connectCloud(relayToken: t) }
                     }
-                } label: {
-                    Label("Sign in to Google Drive", systemImage: "cloud").frame(maxWidth: .infinity)
+                    .buttonStyle(.bordered)
+                    .disabled(relayToken.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isConnecting)
                 }
-                .buttonStyle(.bordered).padding(.horizontal)
-                .disabled(signingIn)
-                if signingIn { ProgressView().controlSize(.small) }
-                if let driveSignInError {
-                    Text(driveSignInError).foregroundStyle(.red).font(.caption).padding(.horizontal)
-                }
+                .padding(.top, 6)
             }
+            .padding(.horizontal)
+
+            DriveSignInStatus(auth: vm.driveAuth).disabled(isConnecting)
+        }
+    }
+}
+
+/// Signed-in line + sign-out. Its own view so it observes `DriveAuth` directly: `ConnectScreen` observes only the
+/// view model, which doesn't republish a sign-out.
+private struct DriveSignInStatus: View {
+    @ObservedObject var auth: DriveAuth
+
+    var body: some View {
+        if auth.isSignedIn {
+            Label("Signed in to Google Drive", systemImage: "checkmark.circle.fill")
+                .foregroundStyle(.green).font(.callout)
+            Button("Sign out of Google Drive", role: .destructive) { auth.signOut() }
+                .font(.caption)
         }
     }
 }

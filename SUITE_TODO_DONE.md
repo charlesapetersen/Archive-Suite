@@ -12670,3 +12670,15 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   of `DriveAuth.swift`, Foundation+Security only, so the host suite (`scripts/test-ios-capture-queue.sh`) covers it with
   an in-memory vault: 255 checks pass (22 new). iOS generic-simulator build clean. Unverified on a device until `W40.i4`.
   <!-- /W40.i-fix-ios-drive-token-keychain -->
+- [x] **W40.i-fix-ios-cloud-pairing — iOS has no Cloud pairing mode and refuses a cloud QR [S · S3]** · §W40 (lane: processor) (uses: build) (blocked-on: W40.i2, W40.i-fix-ios-drive-oauth-client). Found by `W40.i2` 2026-10-21; detail in `verification/capture.md`. iOS picks Drive only after a LAN ping, never falls back on a refused connection, and passes a working LAN over for Drive when signed in (`CaptureViewModel.swift:115-146`); `MacEndpoint` refuses a `mode:"cloud"` QR and ignores `account` (`Net/MacEndpoint.swift:19-32`); there is no typed relay token. Match Android's ConnectScreen (`ConnectScreen.kt:183-249`): an explicit Wi-Fi/Cloud choice, cloud QRs accepted, the QR's account as the login hint. SHIPPED 2026-10-21.
+  The pairing screen now opens on an explicit Wi-Fi / Cloud choice (`UI/ConnectScreen.swift`), as Android's does less
+  Wired. Cloud takes the combined QR's `relay` code, a `{mode:"cloud"}` QR, or a typed relay token, signs in with the
+  QR's `account` as `login_hint` (`DriveOAuthConfig.authorizationURL`), and pairs with no LAN probe
+  (`CaptureViewModel.connectCloud`); Wi-Fi never switches to Drive by itself, names a cloud-only QR, and its unreachable
+  message points at Cloud. The transport follows the pairing (`MacEndpoint.isCloud`), so the persisted `transportMode`
+  is gone; a saved Cloud pairing while signed out returns to the pairing screen, queue kept. No migration of saved
+  endpoints (nothing to migrate). Host suite 271 checks pass (16 new: QR parsing, round trip, the hint); iOS build
+  clean; `test-drive-transport.sh` passes. Tier-2 review: no defects; noted, all low and as on Android — a phone signed
+  in to the wrong Google account pairs "ready" and its pages wait silently (nothing lost), and the screen always opens
+  on Wi-Fi. Sign-in itself is unverified until the owner's iOS OAuth client (`W40.i5`, `W40.i4`).
+  <!-- /W40.i-fix-ios-cloud-pairing -->
