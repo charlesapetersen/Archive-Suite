@@ -24,6 +24,7 @@ Usage: python3 place_truth.py build                  # writes STORE and the summ
        python3 place_truth.py summary                # prints the summary only
        python3 place_truth.py overlay [page ...]     # STORE/overlay/<page>.jpg: boxes and baselines on the image
        python3 place_truth.py grid PAGE ...          # STORE/grid/<page>.jpg: the image with a permille grid
+       python3 place_truth.py zoom PAGE X0 Y0 X1 Y1   # /tmp: a region enlarged, grid every 10 permille
        python3 place_truth.py bands PAGE X0 X1 [Y0 Y1]   # inked row bands in a strip (permille): where lines sit
        python3 place_truth.py lines PAGE SPEC BY     # redraw a page from a line spec (apply_lines), then overlay it
        python3 place_truth.py audit PAGE VERDICT NOTE BY   # ok | fix | redraw, kept across rebuilds
@@ -57,7 +58,8 @@ N_TYPED = 40
 SHARE_RATIO = 1.6  # a replace block is shared out only when its truth and Vision characters are this close
 BASELINE_FRAC = 0.78
 GAP_LAMBDA = 2.0  # a break one line-height from where the share puts it costs this much; a full gap scores 2
-DESC_FRAC = 0.45  # a drawn line's band reaches this share of its ascender height below the baseline
+GRID_FONT = '/System/Library/Fonts/Supplemental/Arial.ttf'
+DESC_FRAC = 0.7  # a drawn line's band reaches this share of its ascender height below the baseline (descenders)
 BENTHAM_DROP = 0.2  # of a Bentham line polygon's height, below its middle: where the baseline of a hand sits  # of a Vision word box's height, top down: where the baseline sits in a box with descenders
 
 
@@ -699,7 +701,7 @@ def grid(p: dict, out: Path, long_side: int = 1800, step: int = 50) -> Path:
         col = 'blue' if v % 100 == 0 else 'lightblue'
         cmd += ['-stroke', col, '-draw', f'line {v * w / 1000:.0f},0 {v * w / 1000:.0f},{h}',
                 '-draw', f'line 0,{v * h / 1000:.0f} {w},{v * h / 1000:.0f}']
-    cmd += ['-stroke', 'none', '-fill', 'blue', '-pointsize', '14']
+    cmd += ['-stroke', 'none', '-fill', 'blue', '-font', GRID_FONT, '-pointsize', '14']
     for v in range(100, 1000, 100):
         cmd += ['-draw', f'text {v * w / 1000 + 2:.0f},14 "{v}"', '-draw', f'text 2,{v * h / 1000 - 2:.0f} "{v}"']
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -725,13 +727,42 @@ def bands(p: dict, x0: float, x1: float, y0: float = 0, y1: float = 1000, min_ro
     return out
 
 
+def zoom(p: dict, x0: float, y0: float, x1: float, y1: float, out: Path, width: int = 1600) -> Path:
+    """A permille region of the page enlarged, with a grid line every 10 permille labelled every 50: reading
+    coordinates off a close view without doing the crop's arithmetic."""
+    W, H = p['width'], p['height']
+    px0, py0 = round(x0 * W / 1000), round(y0 * H / 1000)
+    pw, ph = max(1, round((x1 - x0) * W / 1000)), max(1, round((y1 - y0) * H / 1000))
+    k = width / pw
+    w, h = width, round(ph * k)
+    sx, sy = w / (x1 - x0), h / (y1 - y0)
+    cmd = ['magick', p['image'], '-crop', f'{pw}x{ph}+{px0}+{py0}', '+repage', '-resize', f'{w}x{h}!',
+           '-fill', 'none', '-strokewidth', '1']
+    labels = []
+    for v in range(int(x0 // 10 + 1) * 10, int(x1), 10):
+        cmd += ['-stroke', 'blue' if v % 50 == 0 else 'lightblue', '-draw', f'line {(v - x0) * sx:.0f},0 {(v - x0) * sx:.0f},{h}']
+        if v % 50 == 0:
+            labels.append(f'text {(v - x0) * sx + 2:.0f},14 "{v}"')
+    for v in range(int(y0 // 10 + 1) * 10, int(y1), 10):
+        cmd += ['-stroke', 'blue' if v % 50 == 0 else 'lightblue', '-draw', f'line 0,{(v - y0) * sy:.0f} {w},{(v - y0) * sy:.0f}']
+        if v % 50 == 0:
+            labels.append(f'text 2,{(v - y0) * sy - 2:.0f} "{v}"')
+    cmd += ['-stroke', 'none', '-fill', 'blue', '-font', GRID_FONT, '-pointsize', '14']
+    for t in labels:
+        cmd += ['-draw', t]
+    out.parent.mkdir(parents=True, exist_ok=True)
+    subprocess.run(cmd + ['-quality', '85', str(out)], check=True)
+    return out
+
+
 def apply_lines(page_id: str, spec_path: Path, by: str) -> dict:
     """Redraw a page from a line spec drawn on its `grid` render: JSON {"lines": [{"text", "baseline": [[x, y],
     ...], "height"}]}, permille of the page's width and height: the baseline under the line from its first letter
     to its last, and the height of its tall letters above the baseline. Lines go in transcript order, their texts
     together exactly the transcript's tokens. A "box": [x0, y0, x1, y1] may stand in for "height" on a level
     line. Word boxes come from `gap_split` in the band along the baseline (or inside the box) (`drawn`);
-    an optional "words": [[x0, y0, x1, y1], ...] per line, one per token, overrides the split. Raises on a text
+    an optional "words": [[x0, y0, x1, y1], ...] per line, one per token, overrides the split; a line with
+    "absent": true holds transcript words the image does not show (left unboxed). Raises on a text
     mismatch, so a spec that drops or reorders words never lands."""
     f = STORE / f"{page_id.replace('/', '__')}.json"
     p = json.loads(f.read_text())
@@ -747,6 +778,12 @@ def apply_lines(page_id: str, spec_path: Path, by: str) -> dict:
     words, lines, i = [], [], 0
     for ln_id, ln in enumerate(spec['lines']):
         lt = ln['text'].split()
+        if ln.get('absent'):  # words the transcript has and the image does not show: no box, unscored
+            for t in lt:
+                words.append({'text': t, 'box': None, 'line': ln_id, 'status': 'missing'})
+                i += 1
+            lines.append({'id': ln_id, 'text': ln['text'], 'box': None, 'baseline': None, 'status': 'absent'})
+            continue
         bl = [[x / 1000, y / 1000] for x, y in ln['baseline']]
         asc = ln['height'] / 1000 if ln.get('height') else None
         box = pm(ln['box']) if ln.get('box') else band_box(bl, asc)
@@ -782,7 +819,7 @@ def load_all() -> list[dict]:
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument('cmd', choices=['build', 'summary', 'overlay', 'grid', 'bands', 'lines', 'audit'])
+    ap.add_argument('cmd', choices=['build', 'summary', 'overlay', 'grid', 'zoom', 'bands', 'lines', 'audit'])
     ap.add_argument('rest', nargs='*', help='overlay, grid: page ids (none = all); bands: page x0 x1 [y0 y1]; '
                                             'lines: page spec by; '
                                             'audit: page verdict note by')
@@ -791,6 +828,11 @@ def main():
         for p in load_all():
             if p['page'] in a.rest:
                 print(grid(p, STORE / 'grid' / f"{p['page'].replace('/', '__')}.jpg"))
+        return
+    if a.cmd == 'zoom':
+        p = next(q for q in load_all() if q['page'] == a.rest[0])
+        x0, y0, x1, y1 = map(float, a.rest[1:5])
+        print(zoom(p, x0, y0, x1, y1, Path('/tmp') / f"place-zoom-{p['page'].replace('/', '__')}-{x0:.0f}-{y0:.0f}.jpg"))
         return
     if a.cmd == 'bands':
         p = next(q for q in load_all() if q['page'] == a.rest[0])

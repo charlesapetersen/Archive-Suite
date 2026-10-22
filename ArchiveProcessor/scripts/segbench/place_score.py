@@ -4,7 +4,9 @@ Three scores, plus the line-level alignment accuracy the line-broken truth makes
 
   functional   Find-in-place on a rendered PDF: `place_functional.swift` (PDFKit), not here.
   word         F1 at IoU 0.5 and 0.7 over word boxes, one-to-one, greedy by IoU (GutenOCR's matching), and mCER
-               over the pairs matched at 0.5.
+               over the pairs matched at 0.5. The truth's boxes are tight round the ink, so a reader or a PDF that
+               pads its boxes loses IoU for its convention, not its placement: F1@centre (a pair counts when
+               each box holds the other's centre) is the figure that does not care about padding.
   baseline     READ-BAD-style coverage R, P, F over baselines: polylines resampled every 2 px; each truth line
                gets a tolerance from its distance to the nearest other truth line (TOL_FRAC of it, at least
                TOL_MIN px); a point within the tolerance counts fully, falling linearly to nothing at twice it.
@@ -65,13 +67,23 @@ def scoreable(truth: dict) -> list[dict]:
     return [w for w in truth['words'] if w.get('box') and w['status'] not in UNSCORED]
 
 
+def inside(p, b) -> bool:
+    return b[0] <= p[0] <= b[0] + b[2] and b[1] <= p[1] <= b[1] + b[3]
+
+
+def centres_meet(a, b) -> bool:
+    """Each box holds the other's centre: the same word whatever padding either box carries."""
+    return inside((a[0] + a[2] / 2, a[1] + a[3] / 2), b) and inside((b[0] + b[2] / 2, b[1] + b[3] / 2), a)
+
+
 def match(truth_words, hyp_words, thr):
-    """One-to-one pairs with IoU >= thr, greedy from the highest IoU down."""
+    """One-to-one pairs with IoU >= thr (or, for thr 'centre', whose centres meet), greedy from the highest IoU
+    down."""
     cands = []
     for i, t in enumerate(truth_words):
         for j, h in enumerate(hyp_words):
             v = iou(t['box'], h['box'])
-            if v >= thr:
+            if (centres_meet(t['box'], h['box']) if thr == 'centre' else v >= thr):
                 cands.append((v, i, j))
     cands.sort(reverse=True)
     used_t, used_h, pairs = set(), set(), []
@@ -87,7 +99,7 @@ def word_scores(truth: dict, hyp: dict) -> dict:
     hw = [w for w in hyp.get('words', []) if w.get('box')]
     out = {'truth_words': len(tw), 'hyp_words': len(hw),
            'unscored_truth_words': len(truth['words']) - len(tw)}
-    for thr in (0.5, 0.7):
+    for thr in (0.5, 0.7, 'centre'):
         pairs = match(tw, hw, thr)
         p = len(pairs) / len(hw) if hw else 0.0
         r = len(pairs) / len(tw) if tw else 0.0
@@ -225,7 +237,7 @@ def pooled(rows: list[dict]) -> dict:
     tw = sum(r['word']['truth_words'] for r in rows)
     hw = sum(r['word']['hyp_words'] for r in rows)
     out['truth_words'] = tw
-    for thr in (0.5, 0.7):
+    for thr in (0.5, 0.7, 'centre'):
         if not tw:  # N6: line geometry only
             out[f'f1@{thr}'] = None
             continue
