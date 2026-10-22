@@ -5,6 +5,10 @@
     python3 date_iitcdip.py fetch-text [--part 6]   # one NIST text tar into the bench cache (resumable)
     python3 date_iitcdip.py fields                  # parse the cached text tars; records.jsonl (private) + stats
     python3 date_iitcdip.py fetch-images [--tar z.s] [--quota shared=14,rjtext=10,single=12]
+    python3 date_iitcdip.py fetch-image-tar a.s b.s y.s z.s   # whole image tars, resumable
+    python3 date_iitcdip.py family-pages --n 134    # every AT family wholly in those tars: first-page PNGs
+    python3 date_iitcdip.py family-batches          # blind batches for the page readers (fam-batches/out<i>.json back)
+    python3 date_iitcdip.py draw [--n 200]          # the set, iitcdip-set.jsonl in the bench cache (private)
     python3 date_iitcdip.py report                  # segbench-results/date-iitcdip.{json,md}
 
 The item asked for about 30 documents with <ag> pulled through the IDL API and judged on page images before any
@@ -369,6 +373,72 @@ def cmd_family_pages(a):
     print(len(fams), "families wholly in", sorted(local), "; sampled", len(pick))
 
 
+def family_members(f):
+    """A sampled family's members in Bates order: the order the page readers saw, and the cover is the first."""
+    return sorted(f["members"], key=lambda x: bates_range(x["bates"]) or (0, 0))
+
+
+def cmd_family_batches(a):
+    """Split family-sample.json into blind batches for page readers: the family id and its first-page PNGs in Bates
+    order, nothing else (no <dd>, no rn, no title). Readers write fam-batches/out<i>.json."""
+    man = json.load(open(os.path.join(CACHE, "family-sample.json")))
+    bdir = os.path.join(CACHE, "fam-batches")
+    os.makedirs(bdir, exist_ok=True)
+    out = [dict(family=f["ag"], pages=[os.path.join(CACHE, "family-png", x["tid"] + ".png") for x in family_members(f)])
+           for f in man]
+    for i in range(0, len(out), a.size):
+        json.dump(out[i:i + a.size], open(os.path.join(bdir, f"batch{i // a.size}.json"), "w"), indent=1)
+    print(len(out), "families in", -(-len(out) // a.size), "batches")
+
+
+def cmd_draw(a):
+    """The set: every document of a family read as a cover with its attachment, then whole families of the other
+    verdicts as negatives, drawn in proportion to their counts, to a.n documents. Private: iitcdip-set.jsonl in the
+    bench cache (tid, family, role, verdict, page date, dd); counts only go to the results page."""
+    import random
+    man = {f["ag"]: f for f in json.load(open(os.path.join(CACHE, "family-sample.json")))}
+    bdir = os.path.join(CACHE, "fam-batches")
+    judged = [j for n in sorted(os.listdir(bdir)) if n.startswith("out") for j in json.load(open(os.path.join(bdir, n)))]
+    json.dump(judged, open(os.path.join(CACHE, "family-judgements-all.json"), "w"), indent=1)
+
+    def rows(j):
+        ms, cov = family_members(man[j["family"]]), j.get("cover")
+        out = []
+        for i, x in enumerate(ms):
+            if j["verdict"] == "cover with attachment":
+                role = "cover" if i == (cov or 0) else "attachment"
+            else:
+                role = "filed with"
+            date = j.get("cover_date") if i == (cov or 0) else j.get("attachment_date") if i == 1 else None
+            out.append(dict(tid=x["tid"], family=j["family"], role=role, verdict=j["verdict"], page_date=date,
+                            dd=x["dd"], bates=x["bates"]))
+        return out
+
+    pos = [j for j in judged if j["verdict"] == "cover with attachment"]
+    neg = collections.defaultdict(list)
+    for j in judged:
+        if j["verdict"] not in ("cover with attachment", "unreadable"):
+            neg[j["verdict"]].append(j)
+    chosen = [r for j in pos for r in rows(j)]
+    room = max(0, a.n - len(chosen))
+    random.seed(46)
+    total_neg = sum(len(v) for v in neg.values())
+    for k, v in sorted(neg.items()):
+        random.shuffle(v)
+        take, got = room * len(v) / max(1, total_neg), 0
+        for j in v:
+            if got >= take or len(chosen) >= a.n:
+                break
+            rs = rows(j)
+            chosen += rs
+            got += len(rs)
+    with open(os.path.join(CACHE, "iitcdip-set.jsonl"), "w") as f:
+        for r in chosen:
+            f.write(json.dumps(r) + "\n")
+    print(len(judged), "families read;", len(chosen), "documents;",
+          dict(collections.Counter(r["role"] for r in chosen)))
+
+
 STOP = set("the of and a an to in for on by with at from is are as or this that report list letter memo".split())
 
 
@@ -394,6 +464,48 @@ def cmd_rj_next(a):
     out = dict(pool=len(pool), counts=dict(res), cases=cases)
     json.dump(out, open(os.path.join(CACHE, "rj-next.json"), "w"), indent=1)
     print(json.dumps(out["counts"]), len(pool))
+
+
+def dd_vs_page(dd, page):
+    """The page's date (YYYY, YYYY-MM or YYYY-MM-DD as read) against <dd>, at the finest level both carry."""
+    if not page:
+        return "page undated"
+    if dd_kind(dd) in ("none", "out of range"):
+        return "dd none"
+    p = page.replace("-", "")
+    if p[:4] != dd[:4]:
+        return "year differs"
+    if len(p) >= 6 and dd[4:6] != "00":
+        if p[4:6] != dd[4:6]:
+            return "month differs"
+        if len(p) >= 8 and dd[6:] != "00":
+            return "same day" if p[6:8] == dd[6:] else "day differs"
+        return "same month"
+    return "same year"
+
+
+def family_summary(first10):
+    """Counts from the blind reading of every family and from the drawn set; no ids of private content beyond tids."""
+    pa, sp = os.path.join(CACHE, "family-judgements-all.json"), os.path.join(CACHE, "iitcdip-set.jsonl")
+    if not os.path.exists(pa):
+        return None
+    allj = json.load(open(pa))
+    by = {j["family"]: j for j in allj}
+    again = [(f["verdict"], by[f["ag"]]["verdict"]) for f in first10 if f["ag"] in by]
+    st = [json.loads(l) for l in open(sp)] if os.path.exists(sp) else []
+    return dict(
+        families=len(allj), verdicts=dict(collections.Counter(j["verdict"] for j in allj).most_common()),
+        cover_not_first=sum(1 for j in allj if j["verdict"] == "cover with attachment" and (j.get("cover") or 0) != 0),
+        rereading_agrees=sum(a == b for a, b in again), rereading_of=len(again),
+        set_documents=len(st), set_roles=dict(collections.Counter(r["role"] for r in st).most_common()),
+        set_families=len({r["family"] for r in st}),
+        set_dd_vs_page={role: dict(collections.Counter(dd_vs_page(r["dd"], r["page_date"]) for r in st
+                                                       if (r["role"] == role)).most_common())
+                        for role in ("cover", "attachment", "filed with")},
+        cover_vs_attachment_year=dict(collections.Counter(
+            "same year" if c[:4] == t[:4] else "attachment earlier" if t[:4] < c[:4] else "attachment later"
+            for j in allj if j["verdict"] == "cover with attachment"
+            and (c := j.get("cover_date")) and (t := j.get("attachment_date"))).most_common()))
 
 
 def cmd_report(_):
@@ -424,6 +536,7 @@ def cmd_report(_):
                       ("family_judged", "family-judgements.json")):
         p = os.path.join(CACHE, name)
         stats[key] = json.load(open(p)) if os.path.exists(p) else None
+    stats["family_all"] = family_summary(stats["family_judged"] or [])
     json.dump(stats, open(os.path.join(RESULTS, "date-iitcdip.json"), "w"), indent=1)
     write_md(stats)
     print(json.dumps({k: v for k, v in stats.items() if k not in ("judged", "neighbour_test", "rj_next")}, indent=1))
@@ -442,11 +555,13 @@ def write_md(st):
          "counts and case ids only.", "",
          "## Verdict: one collection passes", "",
          "`<ag>` means three different things. At American Tobacco it is a family number: documents filed together "
-         "share it, and about half of those families are the cover-with-attachments relation the item hoped for. At "
+         "share it, and three in five of those families are the cover-with-attachments relation the item hoped for. At "
          "Brown & Williamson it is a running record number, and at R.J. Reynolds a free-text list of attachment titles; "
-         "neither links a cover to its attachments. `<dd>` holds up as a year label where the page carries a date. So "
-         "the 200 are drawn from American Tobacco families only. On the page, 5 of 10 sampled families are a cover "
-         "with its attachment, so each family is checked before it counts.", "",
+         "neither links a cover to its attachments. `<dd>` holds up: on AT family members it is the page's own date, "
+         "to the day, on most dated pages. So "
+         "the 200 are drawn from American Tobacco families only, each family checked on its pages: of all 134 families "
+         "in four image tars, 80 are a cover with its attachment. The set is those 160 documents plus 40 from the "
+         "other families as negatives, private in the bench cache.", "",
          "## Where the data came from", "",
          f"The item said to use the Industry Documents Library API. IDL's Solr index has no `<ag>` field: its "
          f"`attachment` field is filled on {st['idl']['industry:Tobacco AND attachment:*']:,} tobacco records, every one "
@@ -521,12 +636,46 @@ def write_md(st):
           "two of them, so the cover is taken from Bates order, not `rn`. So `<ag>` at AT is a filed-together family, a "
           "candidate pool rather than truth: about half are a cover with its attachment, the rest related papers (a reply "
           "with the letter it answers, a memo with an earlier memo, a paper with its outline) or clippings filed together.",
-          "", "## What follows", "",
-          "- The 200 come from AT families sharing `<ag>`, cover taken as the first member in Bates order, and each is "
-          "checked on its pages before it counts, since only about half are a cover with its attachment. A family's "
-          "members lie in image tars a.X, b.X, y.X and z.X for one second letter X; the four `s` tars hold 134 "
-          "families (about 270 documents), enough for 200 documents once each family's pages are checked.",
-          "- `<dd>` is a weak year label, not truth: 21% of records have none, and on undated pages it cannot be checked.",
+          ""]
+    fa = st.get("family_all")
+    if fa:
+        def cc(d):
+            return ", ".join(f"{k} {v}" for k, v in d.items())
+        L += [f"Then every AT family wholly in the a.s, b.s, y.s and z.s image tars, {fa['families']} in all, read by "
+              f"seven subagents in batches of 20, each shown only the members' first pages in Bates order (no `<dd>`, "
+              f"no `rn`, no title), asked to class the family strictly (the later document must be what the first one "
+              f"sends) and to transcribe each page's date: {cc(fa['verdicts'])}. The cover was the first member in "
+              f"Bates order in all but {fa['cover_not_first']}. The blind reread agreed with the session's reading "
+              f"above on {fa['rereading_agrees']} of {fa['rereading_of']}; the one change is a market-lot memo and its "
+              f"table, which the strict reader called related because the memo never says \"attached\". Readers "
+              f"noted that an attachment is usually dated before its cover, by days or weeks; where both carry a "
+              f"date the years are {cc(fa['cover_vs_attachment_year'])}.", "",
+              "## The set", "",
+              f"{fa['set_documents']} documents from {fa['set_families']} families: {cc(fa['set_roles'])}. The "
+              f"covers and attachments are all {fa['verdicts'].get('cover with attachment', 0)} cover families; the "
+              f"negatives are whole families of the other two verdicts, drawn in proportion (seed 46). Private: "
+              f"`iitcdip-set.jsonl` in the bench cache (tid, family, role, verdict, page date as read, `<dd>`, Bates). "
+              f"`<dd>` against the date read on each page, at the finest level both carry:", "",
+              "| role | " + " | ".join(k for k in ("same day", "same month", "same year", "day differs", "month differs",
+                                                    "year differs", "page undated", "dd none")) + " |",
+              "|---|---|---|---|---|---|---|---|---|"]
+        for role, d in fa["set_dd_vs_page"].items():
+            L.append(f"| {role} | " + " | ".join(str(d.get(k, 0)) for k in (
+                "same day", "same month", "same year", "day differs", "month differs", "year differs", "page undated",
+                "dd none")) + " |")
+        L += ["", "On covers `<dd>` is the page's own date almost always; the one year miss is a 1968 memo whose `<dd>` "
+              "reads 1989. On attachments and filed papers the misses are readings the readers flagged as unsure (a "
+              "fax header, a faint handwritten date, a digit hidden by a punch hole) or a document spanning months.", ""]
+    dv = (fa or {}).get("set_dd_vs_page", {})
+    dated = sum(v for d in dv.values() for k, v in d.items() if k not in ("page undated", "dd none"))
+    yrs = sum(d.get("year differs", 0) for d in dv.values())
+    L += ["## What follows", "",
+          "- The set is ready for the dating and relation benches: 80 cover-with-attachment pairs with page-read "
+          "dates and `<dd>`, and 40 negatives that share `<ag>` but are not a cover and its enclosure. It is the "
+          "page images and the set stay in the bench cache, since the documents may not be redistributed.",
+          f"- `<dd>` is close to truth where the page is dated ({dated - yrs} of {dated} dated pages in the set agree on "
+          f"the year), "
+          "but 21% of all records have none, and on undated pages (ads, charts, clippings) it cannot be checked.",
           "- B&W and RJ give no relation. RJ's free text still names what a cover enclosed, a cue a relation classifier "
           "could use, but its attachment was the next record in only 2 of 40.", ""]
     open(os.path.join(RESULTS, "date-iitcdip.md"), "w").write("\n".join(L))
@@ -557,6 +706,12 @@ def main():
     it = s.add_parser("fetch-image-tar", help="whole image tars (about 2 GB each), resumable, into imagetars/")
     it.add_argument("tars", nargs="+", help="e.g. y.s z.s a.s b.s")
     it.set_defaults(f=cmd_fetch_image_tar)
+    fb = s.add_parser("family-batches")
+    fb.add_argument("--size", type=int, default=20)
+    fb.set_defaults(f=cmd_family_batches)
+    dr = s.add_parser("draw")
+    dr.add_argument("--n", type=int, default=200)
+    dr.set_defaults(f=cmd_draw)
     fp = s.add_parser("family-pages")
     fp.add_argument("--n", type=int, default=10)
     fp.set_defaults(f=cmd_family_pages)

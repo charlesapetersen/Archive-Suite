@@ -4,7 +4,7 @@ Written by `scripts/segbench/date_iitcdip.py report`. The question (B-dating.md 
 
 ## Verdict: one collection passes
 
-`<ag>` means three different things. At American Tobacco it is a family number: documents filed together share it, and about half of those families are the cover-with-attachments relation the item hoped for. At Brown & Williamson it is a running record number, and at R.J. Reynolds a free-text list of attachment titles; neither links a cover to its attachments. `<dd>` holds up as a year label where the page carries a date. So the 200 are drawn from American Tobacco families only. On the page, 5 of 10 sampled families are a cover with its attachment, so each family is checked before it counts.
+`<ag>` means three different things. At American Tobacco it is a family number: documents filed together share it, and three in five of those families are the cover-with-attachments relation the item hoped for. At Brown & Williamson it is a running record number, and at R.J. Reynolds a free-text list of attachment titles; neither links a cover to its attachments. `<dd>` holds up: on AT family members it is the page's own date, to the day, on most dated pages. So the 200 are drawn from American Tobacco families only, each family checked on its pages: of all 134 families in four image tars, 80 are a cover with its attachment. The set is those 160 documents plus 40 from the other families as negatives, private in the bench cache.
 
 ## Where the data came from
 
@@ -47,8 +47,22 @@ Where the page carries a date and `<dd>` is set, the years agree on all but one.
 
 10 AT families drawn at random (seed 46) from those whose members all lie in the y.s and z.s image tars, every member's first page read by the session: cover with attachment 5, related, not the enclosure 3, filed together, no cover 2. In every true pair the first member in Bates order is the cover; the `rn` field named the wrong parent in two of them, so the cover is taken from Bates order, not `rn`. So `<ag>` at AT is a filed-together family, a candidate pool rather than truth: about half are a cover with its attachment, the rest related papers (a reply with the letter it answers, a memo with an earlier memo, a paper with its outline) or clippings filed together.
 
+Then every AT family wholly in the a.s, b.s, y.s and z.s image tars, 134 in all, read by seven subagents in batches of 20, each shown only the members' first pages in Bates order (no `<dd>`, no `rn`, no title), asked to class the family strictly (the later document must be what the first one sends) and to transcribe each page's date: cover with attachment 80, related, not the enclosure 33, filed together, no cover 21. The cover was the first member in Bates order in all but 1. The blind reread agreed with the session's reading above on 9 of 10; the one change is a market-lot memo and its table, which the strict reader called related because the memo never says "attached". Readers noted that an attachment is usually dated before its cover, by days or weeks; where both carry a date the years are same year 61, attachment earlier 4.
+
+## The set
+
+200 documents from 99 families: cover 80, attachment 80, filed with 40. The covers and attachments are all 80 cover families; the negatives are whole families of the other two verdicts, drawn in proportion (seed 46). Private: `iitcdip-set.jsonl` in the bench cache (tid, family, role, verdict, page date as read, `<dd>`, Bates). `<dd>` against the date read on each page, at the finest level both carry:
+
+| role | same day | same month | same year | day differs | month differs | year differs | page undated | dd none |
+|---|---|---|---|---|---|---|---|---|
+| cover | 74 | 0 | 0 | 0 | 0 | 1 | 5 | 0 |
+| attachment | 58 | 6 | 2 | 1 | 1 | 0 | 12 | 0 |
+| filed with | 22 | 2 | 1 | 0 | 2 | 1 | 12 | 0 |
+
+On covers `<dd>` is the page's own date almost always; the one year miss is a 1968 memo whose `<dd>` reads 1989. On attachments and filed papers the misses are readings the readers flagged as unsure (a fax header, a faint handwritten date, a digit hidden by a punch hole) or a document spanning months.
+
 ## What follows
 
-- The 200 come from AT families sharing `<ag>`, cover taken as the first member in Bates order, and each is checked on its pages before it counts, since only about half are a cover with its attachment. A family's members lie in image tars a.X, b.X, y.X and z.X for one second letter X; the four `s` tars hold 134 families (about 270 documents), enough for 200 documents once each family's pages are checked.
-- `<dd>` is a weak year label, not truth: 21% of records have none, and on undated pages it cannot be checked.
+- The set is ready for the dating and relation benches: 80 cover-with-attachment pairs with page-read dates and `<dd>`, and 40 negatives that share `<ag>` but are not a cover and its enclosure. It is the page images and the set stay in the bench cache, since the documents may not be redistributed.
+- `<dd>` is close to truth where the page is dated (169 of 171 dated pages in the set agree on the year), but 21% of all records have none, and on undated pages (ads, charts, clippings) it cannot be checked.
 - B&W and RJ give no relation. RJ's free text still names what a cover enclosed, a cue a relation classifier could use, but its attachment was the next record in only 2 of 40.

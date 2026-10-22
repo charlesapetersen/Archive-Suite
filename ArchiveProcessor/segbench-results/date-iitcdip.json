@@ -1281,5 +1281,50 @@
    "cover": null,
    "note": "the same clipping page twice"
   }
- ]
+ ],
+ "family_all": {
+  "families": 134,
+  "verdicts": {
+   "cover with attachment": 80,
+   "related, not the enclosure": 33,
+   "filed together, no cover": 21
+  },
+  "cover_not_first": 1,
+  "rereading_agrees": 9,
+  "rereading_of": 10,
+  "set_documents": 200,
+  "set_roles": {
+   "cover": 80,
+   "attachment": 80,
+   "filed with": 40
+  },
+  "set_families": 99,
+  "set_dd_vs_page": {
+   "cover": {
+    "same day": 74,
+    "page undated": 5,
+    "year differs": 1
+   },
+   "attachment": {
+    "same day": 58,
+    "page undated": 12,
+    "same month": 6,
+    "same year": 2,
+    "day differs": 1,
+    "month differs": 1
+   },
+   "filed with": {
+    "same day": 22,
+    "page undated": 12,
+    "same month": 2,
+    "month differs": 2,
+    "same year": 1,
+    "year differs": 1
+   }
+  },
+  "cover_vs_attachment_year": {
+   "same year": 61,
+   "attachment earlier": 4
+  }
+ }
 }
