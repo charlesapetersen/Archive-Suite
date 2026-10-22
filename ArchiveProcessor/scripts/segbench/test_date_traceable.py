@@ -69,6 +69,13 @@ class Parsers(unittest.TestCase):
         self.assertEqual((t["y"], t["lo"], t["hi"], t["du"], t["bad_interval"]), (1947, 1946, 1949, True, False))
         self.assertEqual(t["evidence"]["neighbour"], "P1")
 
+    def test_shortened_evidence_is_the_same_citation(self):
+        t = T.parse_trace('{"year": 1993, "lo": 1993, "hi": 1993, "date_uncertain": false, '
+                          '"evidence": {"self": "JULY 21, 1993"}}')
+        self.assertEqual((t["evidence"], t["short_evidence"]), ({"neighbour": "self", "quote": "JULY 21, 1993"}, True))
+        t = T.parse_trace('{"year": 1993, "evidence": {"page": "JULY 21, 1993"}}')
+        self.assertEqual((t["evidence"], t["short_evidence"]), ({"page": "JULY 21, 1993"}, False))
+
     def test_interval_not_holding_the_year_becomes_the_point(self):
         t = T.parse_trace('{"year": 1947, "lo": 1950, "hi": 1955, "date_uncertain": false}')
         self.assertEqual((t["lo"], t["hi"], t["bad_interval"], t["du"]), (1947, 1947, True, False))

@@ -160,11 +160,83 @@ def distinct(cands, cap=8):
     return sorted(best.values(), key=lambda c: (c["line_no"], c["pos"]))[:cap]
 
 
+# ---- the Vision-text arm (R1) ---------------------------------------------------------------------------------------
+
+VISION = os.path.join(CACHE, "vision")
+VISION_PAGES = 2           # the rule reads 3,000 characters: the first two pages hold them
+VISION_PX = 2400
+
+
+def vision_page(page):
+    import hashlib
+    h = hashlib.sha1(page.encode()).hexdigest()
+    return os.path.join(VISION, "img", h + ".jpg"), os.path.join(VISION, "txt", h + ".txt")
+
+
+def vision_text(pages):
+    """Apple Vision text of a document's first pages, or None if any is not cached."""
+    out = []
+    for p in pages[:VISION_PAGES]:
+        t = vision_page(p)[1]
+        if not os.path.exists(t):
+            return None
+        out.append(open(t, encoding="utf-8").read())
+    return "\n\n".join(out)
+
+
+def cmd_vision(a):
+    """Render (sips, into the cache; the corpus is only read) and read (segbench's ocr.swift, the app's Vision
+    settings) the first two pages of each owner document and of the three documents before it. Resumable."""
+    import subprocess
+    import corpus_survey as CS
+    import data as D
+    import enclosure_split as ES
+    sample, found = ES.load()
+    pages = []
+    for d in sample:
+        info = found.get(d["id"])
+        if not info:
+            continue
+        k, segs = info["k"], info["segs"]
+        for j in [k] + [j for j in range(k - 1, -1, -1) if segs[j]["kind"] == "doc"][:NEAR]:
+            pages += [p for p in segs[j]["pages"][:VISION_PAGES] if p not in pages]
+    pages = pages[:a.limit or None]
+    tool = D.build_ocr_tool()
+    if tool is None:
+        raise SystemExit("ocr.swift did not compile")
+    os.makedirs(os.path.join(VISION, "img"), exist_ok=True)
+    os.makedirs(os.path.join(VISION, "txt"), exist_ok=True)
+    t0, n = time.monotonic(), 0
+    jobs = os.path.join(VISION, "jobs.tsv")
+    with open(jobs, "w", encoding="utf-8") as fh:
+        for p in pages:
+            img, txt = vision_page(p)
+            if os.path.exists(txt):
+                continue
+            if not os.path.exists(img):
+                subprocess.run(["/usr/bin/sips", "-Z", str(VISION_PX), "-s", "format", "jpeg",
+                                os.path.join(CS.CORPUS, p), "--out", img], capture_output=True, check=False)
+            if os.path.exists(img):
+                fh.write(f"{img}\t{txt}\n")
+                n += 1
+    render_s = time.monotonic() - t0
+    t1 = time.monotonic()
+    subprocess.run([str(tool), jobs], check=False)
+    read_s = time.monotonic() - t1
+    done = sum(os.path.exists(vision_page(p)[1]) for p in pages)
+    rec = {"pages": len(pages), "read_now": n, "cached": done, "render_s": round(render_s, 1), "read_s": round(read_s, 1)}
+    with open(os.path.join(VISION, "timing.jsonl"), "a") as fh:
+        fh.write(json.dumps(rec) + "\n")
+    print(rec)
+
+
 # ---- documents ------------------------------------------------------------------------------------------------------
 
-def owner_docs():
+def owner_docs(source="abbyy"):
     """The owner's 300 with each one's folder neighbours: [{id, set, cls, truth, text, collection, folder, near}],
-    near = [(label, id, text, rule pick)] for up to three documents either side (Box/Folder labels skipped, not counted)."""
+    near = [(label, id, text, rule pick)] for up to three documents either side (Box/Folder labels skipped, not counted).
+    source "vision": Apple Vision text of the first two pages instead of the corpus text cache, for the document and
+    the three before it (propagation looks only back); a document with any of those pages unread is left out."""
     import date_truth as DTr
     import enclosure_split as ES
     sample, found = ES.load()
@@ -178,6 +250,13 @@ def owner_docs():
         k, segs, texts = info["k"], info["segs"], info["texts"]
         before = [j for j in range(k - 1, -1, -1) if segs[j]["kind"] == "doc"][:NEAR]
         after = [j for j in range(k + 1, len(segs)) if segs[j]["kind"] == "doc"][:NEAR]
+        if source == "vision":
+            vt = {j: vision_text(segs[j]["pages"]) for j in [k] + before}
+            if any(v is None for v in vt.values()):
+                continue
+            texts = dict(enumerate(texts))
+            texts.update(vt)
+            after = []
         near = []
         for lab, js in (("P", before), ("N", after)):
             for i, j in enumerate(js, 1):
@@ -329,7 +408,8 @@ def parse_trace(raw):
     becomes the point year (reported as `bad_interval`)."""
     js = reply_json(raw)
     if js is None:
-        return {"parsed": False, "y": None, "lo": None, "hi": None, "du": True, "evidence": None, "bad_interval": False}
+        return {"parsed": False, "y": None, "lo": None, "hi": None, "du": True, "evidence": None, "bad_interval": False,
+                "short_evidence": False}
     y = _int(js.get("year"))
     if y is not None and not LO <= y <= HI:
         y = None
@@ -339,8 +419,13 @@ def parse_trace(raw):
     if y is None:
         lo = hi = None
     ev = js.get("evidence") if isinstance(js.get("evidence"), dict) else None
+    short = False
+    if ev and "quote" not in ev and len(ev) == 1:
+        (k, v), = ev.items()
+        if isinstance(v, str) and re.fullmatch(r"self|[PN]\d", k):
+            ev, short = {"neighbour": k, "quote": v}, True     # {"P1": "May 2, 1947"}: the same citation, shortened
     return {"parsed": True, "y": y, "lo": lo, "hi": hi, "du": js.get("date_uncertain") is not False,
-            "evidence": ev, "bad_interval": bad}
+            "evidence": ev, "bad_interval": bad, "short_evidence": short}
 
 
 def parse_choice(raw, cs):
@@ -514,6 +599,7 @@ def trace_rows(docs, answers, variant):
         v = S.evidence_check(t["y"], t["evidence"], context_of(d, variant))[0]
         r = row(d, "one-shot-trace", t["y"], t["du"], t["parsed"], t["lo"], t["hi"], t["evidence"], v)
         r["bad_interval"] = t["bad_interval"]
+        r["short_evidence"] = t["short_evidence"]
         r["wall_s"] = a.get("wall_s")
         out.append(r)
     return out
@@ -630,6 +716,7 @@ def cmd_score(a):
             if rs and len(rs) == len(docs):
                 s = summary(rs, setname)
                 s["bad_interval"] = sum(r["bad_interval"] for r in rs)
+                s["short_evidence"] = sum(r["short_evidence"] for r in rs)
                 out["trace"][f"{setname}|{v}"] = s
         choosers = [("rules only", None), ("2B chooser", "2b")] + ([("27B chooser", ans)] if ans else [])
         residues = [("no residue stage", None)] + [(f"27B trace-{v}", {d["id"]: ans[f"trace-{v}|{d['id']}"]
@@ -643,6 +730,19 @@ def cmd_score(a):
                     rs = [pipeline(d, ch, res, t, v) for d in docs]
                     key = f"{setname}|{cn}|{rn}|t={t}"
                     out["pipeline"][key] = {**summary(rs, setname), "per_1000": per_1000(rs, secs)}
+    vis = owner_docs("vision")
+    if vis:
+        ids = {d["id"] for d in vis}
+        out["vision"] = {"documents": len(vis), "rules": stage_rule_report(vis)["owner"]}
+        for cn, ch in (("rules only", None), ("2B chooser", "2b")):
+            out["vision"][cn] = summary([pipeline(d, ch, None, NEAR) for d in vis], "owner")
+            out["vision"][cn + " (corpus text, same documents)"] = summary(
+                [pipeline(d, ch, None, NEAR) for d in owner if d["id"] in ids], "owner")
+        tf = os.path.join(VISION, "timing.jsonl")
+        if os.path.exists(tf):
+            ts = [json.loads(l) for l in open(tf)]
+            n = sum(t["read_now"] for t in ts)
+            out["vision"]["seconds_per_page"] = round(sum(t["render_s"] + t["read_s"] for t in ts) / max(1, n), 2)
     for arm in ("choose", "trace-plain", "trace-neigh", "trace-shots"):
         out["cost"][arm] = {"gpu_s_per_reply": secs.get(arm), "n": sum(1 for i in ans if i.startswith(arm + "|"))}
     os.makedirs(os.path.dirname(RESULTS_JSON), exist_ok=True)
@@ -713,6 +813,16 @@ def write_md(out):
               "document printing one when that is at most t documents back, else goes to the residue stage. t=0 "
               "sends every undated document there; t=3 only those propagation cannot reach (it looks three back). "
               "A row with no residue stage gives no year to what propagation does not reach.")
+    if out.get("vision"):
+        v = out["vision"]
+        table("The Vision-text arm (R1), owner set (exact year)",
+              [(k, v[k]) for k in ("rules only", "rules only (corpus text, same documents)", "2B chooser",
+                                   "2B chooser (corpus text, same documents)")], True,
+              f"The rule stage and propagation on Apple Vision text (the app's settings, segbench `ocr.swift`) of the "
+              f"first two pages of each document and of the three before it, {v['documents']} documents, beside the "
+              f"corpus text cache on the same documents. Rendering and reading took {v.get('seconds_per_page', '–')} s "
+              f"a page on this Mac. The 2B chooser's replies were made from the corpus text; on Vision text it is kept "
+              f"only when it names a Vision candidate. The route's own chooser (Foundation Models) is not measured.")
     L += ["## Cost", "", "GPU-seconds a reply: the job's measured wall time on one L40S (16 requests at once), shared "
           "over the arms by tokens. A configuration's cost per 1,000 documents is its calls times these; the 2B "
           "chooser runs on the Mac at 1.39 s a document. No money on any arm.", "",
@@ -737,8 +847,9 @@ def main():
     i = sub.add_parser("import"); i.add_argument("--answers", required=True); i.add_argument("--label", default=LABEL_27B)
     i.add_argument("--summary", help="cluster_text's summary-*.json of the full run (its wall time prices the arms)")
     sub.add_parser("score")
+    v = sub.add_parser("vision"); v.add_argument("--limit", type=int, default=0)
     a = ap.parse_args()
-    {"rules": cmd_rules, "export": cmd_export, "import": cmd_import, "score": cmd_score}[a.cmd](a)
+    {"rules": cmd_rules, "export": cmd_export, "import": cmd_import, "score": cmd_score, "vision": cmd_vision}[a.cmd](a)
 
 
 if __name__ == "__main__":
