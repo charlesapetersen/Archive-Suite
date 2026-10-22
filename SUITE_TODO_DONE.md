@@ -12531,3 +12531,12 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
     which `W40.d2` drives. The flagged-review window ignored the tour's resize (opens filling the screen). None of the
     defect classes is one `W40.e9`'s frame-based layout guard can see, so nothing was added to it.
   <!-- /W40.e12 -->
+- [x] **W40.i-fix-ios-testable-core — a host-testable core for the iOS view model's queue and session logic [S-M · S3]** · §W40 (lane: processor) (uses: build) (blocked-on: W40.i2). Found by `W40.i2` 2026-10-21; detail in `verification/capture.md`. The iOS companion has no test target and no simulator runtime to host one, so none of its queue, restore or pairing logic is tested. Move the item list, id and generation counters, restore and heartbeat count out of `CaptureViewModel.swift` into a file with no UIKit, AVFoundation or Photos import, and test it with `swiftc` on the host, as `scripts/test-relay-golden.sh` does for the network layer; add the script to the gate. Pure refactor: behaviour unchanged, which the first tests pin down. The S1 and S2 fixes below wait on it so each ships with a test that failed first (rule 8). SHIPPED 2026-10-21.
+    Items, seq/id counters, current and tag-sheet groups, ended segments and the in-flight guards moved into
+    `ArchiveCaptureiOS/Sources/ArchiveCaptureiOS/Capture/CaptureQueue.swift` (Foundation only, no I/O; drops return the
+    items so the view model deletes their files). `SessionStore` gained `init(url:)`. Tests in
+    `ArchiveCaptureiOS/HostTests/CaptureQueueTests.swift`, run by `scripts/test-ios-capture-queue.sh` (swiftc, gate step
+    `ios-capture-queue`): 13 tests, 60 checks, a mutated core fails 4 of them. Two CURRENT checks pin the known bugs for
+    the fixes to flip first: the heartbeat leaves FAILED pages out (W40.i-fix-ios-heartbeat-count) and Clear restarts ids
+    at 1 (W40.i-fix-ios-clear-generation). No generation counter exists yet; the pairing and clear fixes add theirs here.
+  <!-- /W40.i-fix-ios-testable-core -->

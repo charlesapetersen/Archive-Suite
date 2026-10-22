@@ -343,6 +343,9 @@ step archivecore bash "$ROOT/ops/autonomous/archivecore-tests.sh"
 step relay-golden bash "$ROOT/ArchiveProcessor/scripts/test-relay-golden.sh"
 # W40.e6: seeded fuzz + round-trip properties of the same format, Mac and iOS copies, ~10 s, free.
 step relay-fuzz bash "$ROOT/ArchiveProcessor/scripts/test-relay-fuzz.sh"
+# W40.i-fix-ios-testable-core: the iOS view model's queue, restore and heartbeat logic (UI-free CaptureQueue),
+# swiftc on the host because the iOS app has no test target or simulator runtime; a few seconds, free.
+step ios-capture-queue bash "$ROOT/ArchiveProcessor/scripts/test-ios-capture-queue.sh"
 # W40.e8: the Android app's whole JVM suite, its Robolectric screen tests and their screenshot goldens; ~1 min, free.
 step android-unit bash "$ROOT/ArchiveProcessor/scripts/test-android-unit.sh"
 # W40.fix-drive-script-path: the Mac cloud relay's DriveObjectStore against a mock Drive; offline, no OAuth, free.
