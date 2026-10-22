@@ -21,7 +21,12 @@ struct CaptureScreen: View {
             ZStack {
                 Color.black
                 if camera.authorized {
-                    CameraPreview(session: camera.session)
+                    // Never attach the preview to a session without a camera (CameraController.hasCamera).
+                    if camera.hasCamera == true {
+                        CameraPreview(session: camera.session)
+                    } else if camera.hasCamera == false {
+                        Text("No camera on this device.").foregroundStyle(.white)
+                    }
                 } else {
                     VStack(spacing: 12) {
                         Text("Camera permission needed to capture.").foregroundStyle(.white)
@@ -227,7 +232,7 @@ struct CaptureScreen: View {
         let docs = E2EHarness.inbox()
         guard !docs.isEmpty else { E2EHarness.status("FAIL inbox empty"); return }
         // Start from a settled, active app, and only once the script has its shot of the connected screen
-        // (e2e-shot-0): driving straight from launch left every screenshot on the launch-time frame.
+        // (e2e-shot-0), so that shot shows no page yet.
         _ = await E2EHarness.wait(30) { UIApplication.shared.applicationState == .active }
         E2EHarness.status("ready")
         _ = await E2EHarness.wait(20) { E2EHarness.shotTaken(0) }
@@ -243,8 +248,8 @@ struct CaptureScreen: View {
                 E2EHarness.status("FAIL capture \(n): \(vm.captureError ?? vm.statusMessage)"); return
             }
             E2EHarness.status("captured \(n)")
-            // Hold the page on screen until the script has its screenshot (it drops e2e-shot-N); a fixed pause
-            // let all five shots of the first run catch one stale frame. Not fatal if it never comes.
+            // Hold the page on screen until the script has its screenshot (it drops e2e-shot-N), so the shot
+            // shows this page and not the tag sheet. Not fatal if it never comes.
             _ = await E2EHarness.wait(20) { E2EHarness.shotTaken(n) }
             vm.finishDocumentSegment()                         // "End segment"
             guard await E2EHarness.wait(5, { vm.pendingTagGroupId != nil }) else {

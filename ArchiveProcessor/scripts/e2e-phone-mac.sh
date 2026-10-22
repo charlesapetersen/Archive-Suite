@@ -257,13 +257,13 @@ for i in $(seq 1 "$ndocs"); do
   [ -s "$SHOTS/doc$i-captured.png" ] || { log "  MISSING screencap: doc$i-captured.png"; PHONE_OK=1; }
 done
 [ -s "$SHOTS/05-connected.png" ] || { log "  MISSING screencap: 05-connected.png (pairing)"; PHONE_OK=1; }
-# iOS: each page's shot shows its own thumbnail, so identical files mean the app drew nothing new while its
-# driver ran: every --ios run on 2026-10-22 had all its shots on one launch-time frame, though the app drew
-# normally once the driver ended. A WARNING until W40.i3-fu-shots finds why; it then becomes a failure.
-# Android is left as it was.
-if [ "$PHONE" = ios ] && [ "$ndocs" -gt 1 ]; then
-  distinct=$(for i in $(seq 1 "$ndocs"); do md5 -q "$SHOTS/doc$i-captured.png" 2>/dev/null; done | sort -u | wc -l | tr -d ' ')
-  [ "$distinct" = "$ndocs" ] || log "  WARN STALE screencaps: $distinct distinct of $ndocs doc shots — the phone UI is NOT evidenced (W40.i3-fu-shots)"
+# iOS: the connected shot and each page's shot (its own thumbnail) all differ, so identical files mean the app
+# drew nothing new while its driver ran. Every --ios run before W40.i3-fu-shots had all its shots on the
+# launch-time frame: attaching the camera preview to a camera-less session froze the main thread's layout
+# (CameraController.hasCamera). A phone-side failure. Android is left as it was.
+if [ "$PHONE" = ios ]; then
+  distinct=$(for f in 05-connected $(seq -f 'doc%g-captured' 1 "$ndocs"); do md5 -q "$SHOTS/$f.png" 2>/dev/null; done | sort -u | wc -l | tr -d ' ')
+  [ "$distinct" = "$((ndocs + 1))" ] || { log "  STALE screencaps: $distinct distinct of $((ndocs + 1)) shots — the app drew no new frame"; PHONE_OK=1; }
 fi
 
 # --- 7. verdict --------------------------------------------------------------

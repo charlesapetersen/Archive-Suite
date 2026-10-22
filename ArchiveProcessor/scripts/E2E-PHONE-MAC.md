@@ -73,8 +73,10 @@ headless iOS simulator (`ios-sim-drive.sh`: `simctl boot`, never Simulator.app).
 DEBUG-only harness (`ArchiveCaptureiOS/.../Debug/E2EHarness.swift`, absent from Release) supplies B1's twin —
 `Documents/test_inject.jpg` at the shutter — plus pairing from a launch payload and a driver that runs shutter,
 End segment and Skip per fixture; the script stages the fixtures and follows `Documents/e2e-status.txt`. It does
-not tap buttons, so the UI wiring is not covered. Its screenshots are currently one stale frame (`WARN STALE
-screencaps`, `W40.i3-fu-shots`). Evidence: `verification/evidence/capture/W40.i3-ios-e2e.md`.
+not tap buttons, so the UI wiring is not covered. The connected shot and each page's shot must all differ, or
+the phone side fails (`STALE screencaps`: the app drew no new frame, `W40.i3-fu-shots`). The camera-less
+simulator shows "No camera on this device." where the preview would be. Evidence:
+`verification/evidence/capture/W40.i3-ios-e2e.md`.
 
 ## Cost
 Tiny — 3 fixtures × `gemini-2.5-flash-lite` (a few cents). Isolated output; never touches the real corpus.

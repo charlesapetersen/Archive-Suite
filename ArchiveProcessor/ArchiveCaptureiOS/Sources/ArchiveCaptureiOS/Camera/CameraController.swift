@@ -20,6 +20,12 @@ final class CameraController: NSObject, ObservableObject {
     /// True when access is .denied/.restricted — the UI offers a route to Settings (a previously-denied
     /// user is otherwise stuck: the shutter is a silent no-op with no way to re-request).
     @Published var accessDenied = false
+    /// Whether the configured session has a back-camera input; nil until it is configured. The preview is
+    /// attached only once this is true: setting `AVCaptureVideoPreviewLayer.session` commits the session on
+    /// the main thread, inside SwiftUI's layout pass, and waits in a nested run loop for its graph to build.
+    /// Without a camera (the simulator) that wait outlasted a whole E2E run: the app froze on its launch
+    /// frame while timers, uploads and the E2E driver ran on inside the nested loop (W40.i3-fu-shots).
+    @Published var hasCamera: Bool?
 
     override init() {
         super.init()
@@ -72,6 +78,8 @@ final class CameraController: NSObject, ObservableObject {
         if session.canAddOutput(photoOutput) { session.addOutput(photoOutput) }
         session.commitConfiguration()
         configured = true
+        let hasCamera = hasVideoInput
+        DispatchQueue.main.async { self.hasCamera = hasCamera }
     }
 
     private func startRunning() { if !session.isRunning { session.startRunning() } }

@@ -12878,3 +12878,15 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   whole download). The owner-approved hook narrowing (headless `simctl boot|launch`) is NOT landed: `.claude/` is
   not writable unattended. Evidence: `verification/evidence/capture/W40.i3-ios-e2e.md`.
   <!-- /W40.i3 -->
+- [x] **W40.i3-fu-shots — iOS E2E screenshots show one stale frame [S]** · §W40 — verification phase (lane: processor) (uses: build). SHIPPED 2026-10-22.
+  Cause: `CameraPreview.makeUIView` set `AVCaptureVideoPreviewLayer.session` inside SwiftUI's layout pass once
+  `camera.authorized` turned true. That commits the session on the main thread and waits in a nested run loop
+  (`_buildAndRunGraph:` → `AVRunLoopCondition`) for its graph, which on the camera-less simulator did not finish
+  while the run lasted. The driver, uploads and timers ran on inside that loop, but no frame was committed. A
+  temporary probe (display-link and run-loop counts, the key window's own layer tree) showed the app stale while the
+  framebuffer was live, and a probe run that aborted gave the stack. Fix: `CameraController.hasCamera` (nil until
+  configured); the capture screen attaches the preview only when the session has a back-camera input, and
+  otherwise says "No camera on this device." (the QR scanner already had this guard). `e2e-phone-mac.sh --ios` now
+  fails the phone side unless the connected shot and every page's shot differ. Two reruns PASS, with 5 distinct
+  shots each, every page's thumbnail visible. Evidence: `verification/evidence/capture/W40.i3-ios-e2e.md` §W40.i3-fu-shots.
+  <!-- /W40.i3-fu-shots -->
