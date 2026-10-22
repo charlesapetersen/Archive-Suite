@@ -10,7 +10,8 @@
 set -euo pipefail
 ROOT="$1"; KIND="$2"; ARG="${3:-}"; SHARD="${4:-0/1}"; SUB="${5:-.}"
 mkdir -p "$ROOT/logs"
-source /home/users/cp1/Archive-Suite/ArchiveProcessor/scripts/segbench/farmshare/fs.env
+# FarmShare's env by default; Sherlock's sherlock/sh.env sets FS_ENV (and FS_CONTAINER: vLLM runs in its image).
+source "${FS_ENV:-/home/users/cp1/Archive-Suite/ArchiveProcessor/scripts/segbench/farmshare/fs.env}"
 if [ "$KIND" = enhance ]; then
   # one process an arm: the restorers' clones each bring top-level modules named utils, models and src
   export PYTHONPATH="$ROOT/pydeps"
@@ -35,9 +36,11 @@ if [ ! -d "$MODEL" ] && [ ! -f "$cache/refs/main" ]; then
 fi
 export FS_MODEL="$MODEL" FS_SERVED="$NAME"
 PORT=$((16000 + SLURM_JOB_ID % 10000)); export FS_URL="http://127.0.0.1:$PORT"
-CUDA=$("$FS_PY" -c 'import nvidia,os;print(os.path.join(list(nvidia.__path__)[0],"cu13"))')
-export CUDA_HOME="$CUDA" PATH="$CUDA/bin:$PATH"
-export FLASHINFER_EXTRA_LDFLAGS="-L$CUDA/lib -L$FS_ROOT/cuda-link"
+if [ -z "${FS_CONTAINER:-}" ]; then   # the image carries its own CUDA toolkit
+  CUDA=$("$FS_PY" -c 'import nvidia,os;print(os.path.join(list(nvidia.__path__)[0],"cu13"))')
+  export CUDA_HOME="$CUDA" PATH="$CUDA/bin:$PATH"
+  export FLASHINFER_EXTRA_LDFLAGS="-L$CUDA/lib -L$FS_ROOT/cuda-link"
+fi
 SERVER_LOG="$ROOT/logs/vllm-${SLURM_JOB_ID}-${ARG}.log"
 # shellcheck disable=SC2086  # ARGS is the recorded word list
 "$FS_VLLM" serve "$MODEL" --served-model-name "$NAME" --host 127.0.0.1 --port "$PORT" $ARGS > "$SERVER_LOG" 2>&1 &

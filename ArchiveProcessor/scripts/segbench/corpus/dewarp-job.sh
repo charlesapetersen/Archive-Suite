@@ -13,7 +13,8 @@ if [ "$ROUTE" = ppocrv6 ]; then
   export HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 OMP_NUM_THREADS="${SLURM_CPUS_PER_TASK:-8}"
   exec "$sweep/venv/bin/python" "$ROOT/dewarp_cluster.py" ppocr --root "$ROOT" --shard "$SHARD" --limit "$LIMIT"
 fi
-source /home/users/cp1/Archive-Suite/ArchiveProcessor/scripts/segbench/farmshare/fs.env
+# FarmShare's env by default; Sherlock's sherlock/sh.env sets FS_ENV (and FS_CONTAINER: vLLM runs in its image).
+source "${FS_ENV:-/home/users/cp1/Archive-Suite/ArchiveProcessor/scripts/segbench/farmshare/fs.env}"
 export HF_HOME HF_HUB_OFFLINE=1 TOKENIZERS_PARALLELISM=false
 get() { "$FS_PY" -c 'import json,sys;print(json.load(open(sys.argv[1]))[sys.argv[2]][sys.argv[3]])' "$ROOT/routes.json" "$ROUTE" "$1"; }
 MODEL=$(get model); NAME=$(get served); ARGS=$(get vllm_args)
@@ -25,9 +26,11 @@ if [ ! -d "$MODEL" ] && [ ! -f "$cache/refs/main" ]; then
 fi
 export FS_MODEL="$MODEL" FS_SERVED="$NAME"
 PORT=$((16000 + SLURM_JOB_ID % 10000)); export FS_URL="http://127.0.0.1:$PORT"
-CUDA=$("$FS_PY" -c 'import nvidia,os;print(os.path.join(list(nvidia.__path__)[0],"cu13"))')
-export CUDA_HOME="$CUDA" PATH="$CUDA/bin:$PATH"
-export FLASHINFER_EXTRA_LDFLAGS="-L$CUDA/lib -L$FS_ROOT/cuda-link"
+if [ -z "${FS_CONTAINER:-}" ]; then   # the image carries its own CUDA toolkit
+  CUDA=$("$FS_PY" -c 'import nvidia,os;print(os.path.join(list(nvidia.__path__)[0],"cu13"))')
+  export CUDA_HOME="$CUDA" PATH="$CUDA/bin:$PATH"
+  export FLASHINFER_EXTRA_LDFLAGS="-L$CUDA/lib -L$FS_ROOT/cuda-link"
+fi
 SERVER_LOG="$ROOT/logs/vllm-${SLURM_JOB_ID}-${ROUTE}.log"
 # shellcheck disable=SC2086  # ARGS is the recorded word list
 "$FS_VLLM" serve "$MODEL" --served-model-name "$NAME" --host 127.0.0.1 --port "$PORT" $ARGS > "$SERVER_LOG" 2>&1 &

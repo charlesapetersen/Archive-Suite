@@ -48,8 +48,17 @@ pack from there into `$SCRATCH` inside a job; do not copy it from FarmShare agai
 - If something on the system looks broken, stop and tell the owner with a short draft for
   srcc-support@stanford.edu. Never contact SRCC or anyone else ourselves.
 
-## Capacity
+## Capacity and the software route
 
-Public `gpu` partition on 2026-10-22 morning: 200 GPUs, 14 idle, 1,216 GPU requests queued; cards include L40S
-(48 GB) and H100 SXM5 (80 GB). Wall limit 2 days. The first probe job and its figures are recorded below once it
-runs.
+Public `gpu` partition on 2026-10-22: 200 GPUs (L40S 48 GB and H100 SXM5 80 GB among them), 14 idle in the morning
+with 1,216 GPU requests queued; wall limit 2 days; the `gpu` QOS allows 16 GPUs, 128 CPUs and 100 submitted jobs
+per user. Four one-GPU probe jobs that day waited 76 s, 7.5 min, 15 min and 7 min.
+
+Sherlock runs CentOS 7 (glibc 2.17) with NVIDIA driver 550, so the pip wheels of vLLM 0.31 / torch 2.13 that
+FarmShare used do not install (49017776). vLLM's own image `vllm/vllm-openai:v0.31.0-x86_64-cu129` does run: built
+as a SIF on the CPU partition (about an hour, 12 GB, `$GROUP_HOME/cp1/images/`; on a GPU node with temp on
+`$L_SCRATCH_JOB` mksquashfs died with 139), torch 2.13 cu129 sees the card on driver 550, and Qwen3-VL 8B served on
+an L40S read 30 of the owner's truth pages in 102 s (about 1,050 pages an hour, 2 capped; job 49048708). One fix is
+needed: the image's torchcodec 0.17 is a CUDA 13 build with no FFmpeg, so a `sitecustomize.py` on PYTHONPATH marks it
+absent (`ArchiveProcessor/scripts/segbench/sherlock/`, which holds the env file, the container wrappers, the stage
+job and the 2026-10-22 restart).
