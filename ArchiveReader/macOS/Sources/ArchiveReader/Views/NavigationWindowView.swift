@@ -304,10 +304,12 @@ struct NavigationWindowView: View {
                             } label: {
                                 Text(item.tag)
                                     .font(.system(size: tagCloudFontSize(item.count, max: maxCount)))
+                                    .lineLimit(2)
+                                    .truncationMode(.middle)
                                     .foregroundStyle(active ? Color.accentColor : .primary)
                             }
                             .buttonStyle(.plain)
-                            .help("\(item.count) file\(item.count == 1 ? "" : "s") · click to \(active ? "remove" : "add") as a tag filter")
+                            .help("\(item.tag) — \(item.count) file\(item.count == 1 ? "" : "s") · click to \(active ? "remove" : "add") as a tag filter")
                             .accessibilityIdentifier("ar.tagCloud.tag")
                             .contextMenu {
                                 Button(active ? "Remove from tag filter" : "Add to tag filter") {
@@ -771,7 +773,7 @@ struct FlowLayout: Layout {
         let maxW = proposal.width ?? .infinity
         var x: CGFloat = 0, y: CGFloat = 0, rowH: CGFloat = 0
         for v in subviews {
-            let s = v.sizeThatFits(.unspecified)
+            let s = Self.size(of: v, within: maxW)
             if x > 0, x + s.width > maxW { x = 0; y += rowH + spacing; rowH = 0 }
             x += s.width + spacing
             rowH = max(rowH, s.height)
@@ -779,11 +781,21 @@ struct FlowLayout: Layout {
         return CGSize(width: maxW.isFinite ? maxW : x, height: y + rowH)
     }
 
+    /// A subview's own width, or the row's width when that is less. Measured at its ideal size alone, a tag wider
+    /// than the tag cloud ran past the panel's edge and was cut without an ellipsis (W40.fix-reader-tagcloud-width);
+    /// offered the row's width instead, its text wraps or truncates as the subview says.
+    static func size(of v: LayoutSubview, within maxW: CGFloat) -> CGSize {
+        let ideal = v.sizeThatFits(.unspecified)
+        guard maxW.isFinite, ideal.width > maxW else { return ideal }
+        let fitted = v.sizeThatFits(ProposedViewSize(width: maxW, height: nil))
+        return CGSize(width: min(fitted.width, maxW), height: fitted.height)
+    }
+
     func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout Void) {
         let maxW = bounds.width
         var x: CGFloat = 0, y: CGFloat = 0, rowH: CGFloat = 0
         for v in subviews {
-            let s = v.sizeThatFits(.unspecified)
+            let s = Self.size(of: v, within: maxW)
             if x > 0, x + s.width > maxW { x = 0; y += rowH + spacing; rowH = 0 }
             v.place(at: CGPoint(x: bounds.minX + x, y: bounds.minY + y), anchor: .topLeading, proposal: ProposedViewSize(s))
             x += s.width + spacing

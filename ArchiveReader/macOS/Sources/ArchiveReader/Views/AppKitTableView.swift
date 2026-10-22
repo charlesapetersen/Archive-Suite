@@ -16,6 +16,8 @@ struct AppKitTableView: NSViewRepresentable {
         let minWidth: CGFloat
         let maxWidth: CGFloat
         let sortField: SortField?
+        /// Gives and takes width when the table's space changes (the tag cloud opening, the window resizing).
+        var flexible = false
     }
 
     /// One source for construction and tests. Provenance is display-only and receives a one-time
@@ -24,13 +26,38 @@ struct AppKitTableView: NSViewRepresentable {
         .init(id: "flag", title: "⚑", width: 26, minWidth: 26, maxWidth: 30, sortField: nil),
         .init(id: "warning", title: "⚠︎", width: 24, minWidth: 24, maxWidth: 28, sortField: nil),
         .init(id: "date", title: "Document date", width: 140, minWidth: 110, maxWidth: 220, sortField: .date),
-        .init(id: "name", title: "File name", width: 320, minWidth: 200, maxWidth: 800, sortField: .name),
+        .init(id: "name", title: "File name", width: 320, minWidth: 200, maxWidth: 800, sortField: .name, flexible: true),
         .init(id: "type", title: "Type", width: 56, minWidth: 44, maxWidth: 80, sortField: .fileType),
         .init(id: "classification", title: "Provenance", width: 132, minWidth: 100, maxWidth: 220, sortField: nil),
-        .init(id: "tags", title: "File tags", width: 300, minWidth: 160, maxWidth: 600, sortField: .subjects),
+        .init(id: "tags", title: "File tags", width: 300, minWidth: 160, maxWidth: 600, sortField: .subjects, flexible: true),
         .init(id: "quality", title: "Quality", width: 72, minWidth: 60, maxWidth: 100, sortField: .quality),
         .init(id: "read", title: "Read", width: 84, minWidth: 70, maxWidth: 110, sortField: .readState),
     ]
+
+    /// The columns. How they share the width is `TableColumnFitter`'s job, started once the table is in its scroll
+    /// view (`fitColumns(of:)`).
+    @MainActor
+    static func addColumns(to tableView: NSTableView) {
+        for col in columnDefinitions {
+            let tc = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(col.id))
+            tc.title = col.title
+            tc.width = col.width
+            tc.minWidth = col.minWidth
+            tc.maxWidth = col.maxWidth
+            tc.resizingMask = .userResizingMask
+            if let sf = col.sortField {
+                tc.sortDescriptorPrototype = NSSortDescriptor(key: sf.rawValue, ascending: true)
+            }
+            tableView.addTableColumn(tc)
+        }
+    }
+
+    /// Start fitting the columns to the scroll view's width (W40.fix-reader-tagcloud-width). The table must
+    /// already be the scroll view's document view; the caller keeps the fitter.
+    @MainActor
+    static func fitColumns(of tableView: NSTableView) -> TableColumnFitter {
+        TableColumnFitter(tableView: tableView, flexibleIDs: columnDefinitions.filter(\.flexible).map(\.id))
+    }
 
     @ObservedObject var model: NavigationModel
     @Binding var selection: Set<ArchiveFile.ID>
@@ -59,7 +86,6 @@ struct AppKitTableView: NSViewRepresentable {
         tableView.allowsMultipleSelection = true
         tableView.allowsColumnReordering = true
         tableView.allowsColumnResizing = true
-        tableView.columnAutoresizingStyle = .lastColumnOnlyAutoresizingStyle
         tableView.rowHeight = max(20, fontSize * 1.8)
         tableView.usesAutomaticRowHeights = true
         tableView.intercellSpacing = NSSize(width: 8, height: 2)
@@ -90,17 +116,7 @@ struct AppKitTableView: NSViewRepresentable {
             coordinator?.parent.buildContextMenu(selIDs)
         }
 
-        for col in Self.columnDefinitions {
-            let tc = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(col.id))
-            tc.title = col.title
-            tc.width = col.width
-            tc.minWidth = col.minWidth
-            tc.maxWidth = col.maxWidth
-            if let sf = col.sortField {
-                tc.sortDescriptorPrototype = NSSortDescriptor(key: sf.rawValue, ascending: true)
-            }
-            tableView.addTableColumn(tc)
-        }
+        Self.addColumns(to: tableView)
 
         let hidden = AppSettings.hiddenColumns
         for col in tableView.tableColumns where hidden.contains(col.identifier.rawValue) {
@@ -109,6 +125,9 @@ struct AppKitTableView: NSViewRepresentable {
 
         scrollView.documentView = tableView
         coordinator.tableView = tableView
+        let fitter = Self.fitColumns(of: tableView)
+        coordinator.columnFitter = fitter
+        headerView.onColumnVisibilityChange = { [weak fitter] in fitter?.fit() }
         coordinator.displayedByID = Dictionary(uniqueKeysWithValues: model.displayed.map { ($0.id, $0) })
 
         let dataSource = SortableDiffableDataSource(tableView: tableView) { tv, column, row, itemID in
@@ -222,6 +241,7 @@ struct AppKitTableView: NSViewRepresentable {
         var lastDisplayedGeneration: Int = -1
         var currentSnapshotIDs: [ArchiveFile.ID] = []
         var editingItemID: ArchiveFile.ID?
+        var columnFitter: TableColumnFitter?
 
         init(_ parent: AppKitTableView) {
             self.parent = parent
@@ -671,6 +691,8 @@ final class ColumnPickerHeaderView: NSTableHeaderView {
     var onRemoveSecondarySort: (() -> Void)?
     /// Callback to reset sort to the default (date, then name).
     var onResetSort: (() -> Void)?
+    /// After the header menu shows or hides a column, so the others can be refitted.
+    var onColumnVisibilityChange: (() -> Void)?
     /// Returns the current sort descriptors so the menu can reflect active state.
     var currentSort: (() -> [ARSortDescriptor])?
 
@@ -741,6 +763,7 @@ final class ColumnPickerHeaderView: NSTableHeaderView {
         var hidden = AppSettings.hiddenColumns
         if col.isHidden { hidden.insert(id) } else { hidden.remove(id) }
         AppSettings.setHiddenColumns(hidden)
+        onColumnVisibilityChange?()
     }
 
     @objc private func setSecondaryAsc(_ sender: NSMenuItem) {
