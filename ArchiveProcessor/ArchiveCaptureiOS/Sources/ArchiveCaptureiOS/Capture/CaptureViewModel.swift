@@ -47,6 +47,10 @@ final class CaptureViewModel: ObservableObject {
     // the Mac can never complete a partial segment, and is retried until acked. Mirrors Android.
 
     private var flashTask: Task<Void, Never>?
+    /// The running photo and segment sends, so Clear can cancel them. Cancelling only stops them sooner: the
+    /// generation check after each send is what keeps a reply that outlives Clear out of the new session.
+    private var uploadTasks: [Int64: Task<Void, Never>] = [:]
+    private var segmentTasks: [String: Task<Void, Never>] = [:]
     private let store = SessionStore()
     /// Unsent photos live in the store's Application Support directory, never Caches (W40.i-fix-ios-photo-storage).
     private var sessionDir: URL { store.photoDirectory }
@@ -314,13 +318,15 @@ final class CaptureViewModel: ObservableObject {
         // Gate: any page of this group not yet UPLOADED (pending/uploading/failed) → wait for it.
         guard let tags = queue.readySegment(group), let c = client else { return }
         guard queue.beginSegmentSend(group) else { return }   // a send for this group is already running
-        Task {
-            defer { queue.endSegmentSend(group) }
+        let generation = queue.generation
+        segmentTasks[group] = Task {
+            defer { if queue.isCurrent(generation) { queue.endSegmentSend(group); segmentTasks[group] = nil } }
             var ok = false, attempt = 0
-            while !ok && attempt < 3 {
+            while !ok && attempt < 3 && !Task.isCancelled {
                 ok = await c.segmentComplete(group: group, quality: tags.quality, year: tags.year, month: tags.month, seqs: tags.seqs)
                 attempt += 1
             }
+            guard queue.isCurrent(generation) else { return }   // Clear took the session while this ran
             if ok { queue.acknowledgeSegment(group); persist() }
         }
     }
@@ -366,21 +372,25 @@ final class CaptureViewModel: ObservableObject {
         sendStatusReport()   // reflect a just-captured/enqueued page on the Mac immediately (not only every 8s)
         let fileURL = item.fileURL
         let replaces = item.replacesGroupId   // durable on the item, so retries keep sending X-Replaces
-        Task {
-            defer { queue.endUpload(item.id) }
+        let generation = queue.generation      // a reply after Clear records nothing (W40.i-fix-ios-clear-generation)
+        uploadTasks[item.id] = Task {
+            defer { if queue.isCurrent(generation) { queue.endUpload(item.id); uploadTasks[item.id] = nil } }
             // Read the multi-MB JPEG off the main actor so the live camera UI doesn't hitch on
             // upload/retry bursts (enqueueUpload runs on the @MainActor view model).
             let data = await Task.detached { try? Data(contentsOf: fileURL) }.value
             var ok = false
             if let data {
                 var attempt = 0
-                while !ok && attempt < 3 {
+                while !ok && attempt < 3 && !Task.isCancelled {
                     ok = await c.postPhoto(jpeg: data, group: item.groupId, seq: item.seq, type: item.type.rawValue,
                                            quality: item.quality, year: item.year, month: item.month, device: deviceName,
                                            replaces: replaces)
                     attempt += 1
                 }
             }
+            // Clear took the session while this upload ran: its photo is gone, and the reply must not mark,
+            // count or report anything in the new one.
+            guard queue.isCurrent(generation) else { return }
             if ok {
                 sentCount += 1
                 setState(item.id, .uploaded)
@@ -484,8 +494,18 @@ final class CaptureViewModel: ObservableObject {
     }
 
     /// Delete every captured photo (files + persisted session) and start clean.
+    /// Clear moves the queue's generation on and never reuses an id, so a send still running records nothing when
+    /// it returns (W40.i-fix-ios-clear-generation). The sends are cancelled but not awaited before the files go:
+    /// everything here runs on the main actor, so no stale reply can interleave with this method, and one that
+    /// lands later is dropped by its generation check. An upload that already read its photo may still deliver
+    /// it to the Mac, under the cleared session's group, as it could before; the Mac's Finish closes that group.
     func clearSession() {
-        for item in queue.clear() { try? FileManager.default.removeItem(at: item.fileURL) }
+        let removed = queue.clear()
+        uploadTasks.values.forEach { $0.cancel() }
+        segmentTasks.values.forEach { $0.cancel() }
+        uploadTasks.removeAll()
+        segmentTasks.removeAll()
+        for item in removed { try? FileManager.default.removeItem(at: item.fileURL) }
         clearSelection()
         sentCount = 0
         transferFlash = nil

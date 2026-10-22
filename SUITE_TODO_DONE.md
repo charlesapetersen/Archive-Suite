@@ -12562,3 +12562,18 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   - The 200 drafted blind by Qwen3.5 4B 4-bit MLX on this Mac, first page, $0 (`date_draft.py`, 1a364828, 89f3a09e and this commit; `segbench-results/date-draft.md`). The guard refused the 8B at every try (5.9-6.1 GB reclaimable of 18). Calibration on the owner's 54: of 26 legible page dates with a year, a date found on 25 and the year right on 20; on the 24 whose year came from elsewhere, a page date claimed on 5, none with the owner's year. On the 200: 105 supported (blind page year = owner's tag), 95 to the audit, filed as W46.date-draft-audit. A year not in the date as read counts as no year (d06: "TUESDAY, MARCH 7" given 1984).
   - IIT-CDIP terms read (fair use, no redistribution; `<ag>` undocumented), the pull split out as W46.date-iitcdip (a93526c4). Sets private in the bench cache; committed files carry counts and case ids only.
   <!-- /W46.fix-date-truth-score -->
+- [x] **W40.i-fix-ios-clear-generation — iOS Clear resets ids to 1 while uploads still run, so a late reply marks a new photo sent [S · S1 · Tier-2]** · §W40 (lane: processor) (uses: build) (blocked-on: W40.i2, W40.i-fix-ios-testable-core). Found by `W40.i2` 2026-10-21; detail in `verification/capture.md`. `clearSession()` (`CaptureViewModel.swift:548-563`) deletes files and resets `nextId = 1` without cancelling in-flight uploads; a reply that lands after the next capture calls `setState(id, .uploaded)` on the new photo with the same id, which is then never sent and is deleted by the next restore. Port Android's fix (2026-07-12): a session generation, cancel and await uploads before deleting, never reuse an id. SHIPPED 2026-10-21.
+    `CaptureQueue` gained a process-local `generation`, bumped by `clear()`, and `nextId` is no longer reset (seqs still
+    restart: the new session's groups are fresh, so (group, seq) stays unique on the Mac). The view model captures the
+    generation when a photo or segment send starts, keeps the send tasks so Clear can cancel them, and once the network
+    call returns records nothing (state, sent count, removal, segment ack, in-flight release) if the generation moved
+    on. Clear cancels but does not await: the view model is main-actor, so no stale reply interleaves with Clear, and
+    one that lands later is dropped by its check. The Drive and file relay send loops now stop when cancelled (their
+    `try? Task.sleep` returned at once, so a cancelled send spun until its 20 s deadline). Host tests: the CURRENT
+    "ids restart at 1" check flipped, plus 2 new tests (20 tests, 88 checks); against the old core the clear and
+    restore tests fail and the generation test does not compile. iOS generic-simulator build green, no new warnings;
+    relay golden and transport round-trip pass (test-filerelay.sh skipped: needs a built Mac app). Tier-2 adversarial
+    review: no blocking defect. It noted the generation test copies the view model's guard by hand, so removing the
+    real guard fails no test (there is no iOS test host). It also noted an upload already past its cancel check can
+    still deliver a cleared photo under its old group, as before; the Mac's Finish closes that group.
+  <!-- /W40.i-fix-ios-clear-generation -->

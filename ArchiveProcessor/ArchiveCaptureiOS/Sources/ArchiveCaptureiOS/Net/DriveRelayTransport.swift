@@ -63,7 +63,7 @@ struct DriveRelayTransport: SegmentTransport {
                 wroteForEpoch = e
             }
             try? await Task.sleep(nanoseconds: UInt64(receiptPollInterval * 1_000_000_000))
-        } while Date() < deadline
+        } while Date() < deadline && !Task.isCancelled   // Clear cancels: stop polling (the sleep returns at once)
         return false   // timeout → .failed → auto-retry re-enters (re-resolves epoch); local copy retained
     }
 

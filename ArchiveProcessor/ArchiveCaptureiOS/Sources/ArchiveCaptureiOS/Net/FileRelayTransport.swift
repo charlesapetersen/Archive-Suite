@@ -62,7 +62,7 @@ struct FileRelayTransport: SegmentTransport {
                 wroteForEpoch = epoch
             }
             try? await Task.sleep(nanoseconds: UInt64(receiptPollInterval * 1_000_000_000))  // (c) poll
-        } while Date() < deadline
+        } while Date() < deadline && !Task.isCancelled   // Clear cancels: stop polling (the sleep returns at once)
         return false   // timeout → item stays .failed → auto-retry re-enters at (a); local copy retained
     }
 

@@ -24,7 +24,13 @@ struct CaptureQueue {
 
     private(set) var items: [CapturedItem] = []
     private(set) var seqCounter = 0
+    /// Never reset, not even by Clear, so an id names one photo for the life of the process: a late reply or a
+    /// delayed removal from a cleared session can never match a new photo (W40.i-fix-ios-clear-generation).
     private(set) var nextId: Int64 = 1
+    /// Bumped by every Clear. A send captures it when it starts and records nothing once it has moved on, so a
+    /// reply that outlives Clear cannot touch the new session. Process-local: no send outlives the process, so
+    /// it is not persisted. Mirrors Android's `sessionGeneration`.
+    private(set) var generation = 0
     private(set) var currentGroupId: String
     /// Non-nil while the tag sheet is open for that group.
     var pendingTagGroupId: String?
@@ -45,6 +51,9 @@ struct CaptureQueue {
     static func randomGroupId() -> String { "g" + UUID().uuidString.prefix(8) }
 
     func item(_ id: Int64) -> CapturedItem? { items.first { $0.id == id } }
+
+    /// True while no Clear has happened since a send captured `generation`.
+    func isCurrent(_ generation: Int) -> Bool { generation == self.generation }
 
     // MARK: - Capture
 
@@ -198,8 +207,8 @@ struct CaptureQueue {
 
     // MARK: - Removal, clear, restore
 
-    /// A photo confirmed by the Mac is durably safe there, so it leaves the phone. Guarded by identity + state so
-    /// a stale timer can't remove a newer photo that reused an id after Clear. Document pages of the current,
+    /// A photo confirmed by the Mac is durably safe there, so it leaves the phone. Guarded by identity + state (ids
+    /// are never reused, and the file must match too) so a stale timer can't remove another photo. Document pages of the current,
     /// un-ended segment stay so the operator sees the segment grow. Returns the removed item, or nil.
     mutating func removeConfirmed(_ item: CapturedItem) -> CapturedItem? {
         guard let i = items.firstIndex(where: { $0.id == item.id && $0.fileURL == item.fileURL }),
@@ -208,15 +217,18 @@ struct CaptureQueue {
         return items.remove(at: i)
     }
 
-    /// Start clean. Returns every item so the caller can delete its file.
+    /// Start clean. Returns every item so the caller can delete its file. Moves the generation on and keeps
+    /// `nextId` running (it used to restart at 1, so a reply to an upload still running marked the new photo
+    /// with the same id as sent: it was never sent, and the next restore deleted it). Seqs restart, which is safe
+    /// because the new session's groups are fresh ids, so (group, seq) on the Mac stays unique.
     mutating func clear() -> [CapturedItem] {
         let removed = items
+        generation += 1
         items.removeAll()
-        inFlightUploads.removeAll()   // ids reset below; don't let a stale in-flight id block a reused id
+        inFlightUploads.removeAll()   // the old sends are stale now; their ids can never come back
         endedSegments.removeAll()
         inFlightSegments.removeAll()
         seqCounter = 0
-        nextId = 1
         currentGroupId = newGroupId()
         pendingTagGroupId = nil
         return removed

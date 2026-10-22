@@ -146,7 +146,7 @@ test("counts and filters by state") {
     check(q.heartbeatCount == 2, "heartbeat = pending + uploading")
 }
 
-test("clear empties the session and resets the counters") {
+test("clear empties the session, restarts seqs and never reuses an id") {
     var q = makeQueue()
     let a = q.addDocument(fileURL: url("a")), b = q.addDocument(fileURL: url("b"))
     _ = q.beginUpload(a.id)
@@ -157,9 +157,40 @@ test("clear empties the session and resets the counters") {
     check(removed.map(\.id) == [a.id, b.id], "every item returned for file deletion")
     check(q.items.isEmpty && q.endedSegments.isEmpty && q.inFlightUploads.isEmpty && q.inFlightSegments.isEmpty, "empty")
     check(q.pendingTagGroupId == nil && q.currentGroupId == "g3", "fresh group")
-    // CURRENT: ids restart at 1, so an id can be reused while an old upload is still running.
-    // W40.i-fix-ios-clear-generation changes this.
-    check(q.addDocument(fileURL: url("c")).id == 1, "next id is 1")
+    let c = q.addDocument(fileURL: url("c"))
+    check(c.id == 3, "ids carry on after Clear: an old upload's id can never name a new photo")
+    check(c.seq == 1, "seqs restart: the new session's groups are fresh, so (group, seq) stays unique")
+}
+
+test("a reply to an upload Clear outlived does not touch the new session") {
+    var q = makeQueue()
+    let old = q.addDocument(fileURL: url("old"))
+    let started = q.generation               // what enqueueUpload captures before the network call
+    check(q.beginUpload(old.id), "upload begins")
+    _ = q.clear()
+    check(!q.isCurrent(started), "Clear moves the generation on")
+    let fresh = q.addDocument(fileURL: url("fresh"))
+    check(fresh.id != old.id, "the new photo has a new id")
+    // The late reply, as the view model handles it: stale generation, so nothing is recorded.
+    if q.isCurrent(started) { q.setState(old.id, .uploaded) }
+    check(q.item(fresh.id)?.state == .pending, "the new photo is still pending, so it is still sent")
+    // Even without the generation check, the old id names nothing now.
+    check(!q.setState(old.id, .uploaded), "the old id matches no item")
+    check(q.item(fresh.id)?.state == .pending, "still pending")
+    q.endUpload(old.id)                      // the old task's defer
+    check(q.beginUpload(fresh.id), "the new photo can upload")
+    check(q.isCurrent(q.generation), "a send started now is current")
+}
+
+test("ids stay unique across Clear and a restored session") {
+    var q = makeQueue()
+    _ = q.addDocument(fileURL: url("a")); _ = q.addDocument(fileURL: url("b"))
+    _ = q.clear()
+    let c = q.addDocument(fileURL: url("c"))
+    var r = makeQueue()
+    _ = r.restore(q.snapshot()) { _ in true }
+    check(c.id == 3, "Clear kept the counter running")
+    check(r.addDocument(fileURL: url("d")).id == 4, "the snapshot carries the id counter past Clear")
 }
 
 test("snapshot round-trips through SessionStore and restore drops confirmed items except the open segment's") {
