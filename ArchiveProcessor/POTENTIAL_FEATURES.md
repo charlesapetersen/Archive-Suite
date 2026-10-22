@@ -30,7 +30,9 @@
 
 ### Collection Management
 - **Collection-level metadata** — assign metadata to entire collections, not just individual documents
-  _(Nested collection hierarchy (Box > Folder > Document) removed 2026-07-15 — owner: out of scope.)_
+  _(Nested collection hierarchy (Box > Folder > Document) removed 2026-07-15 — owner: out of scope. Reversed
+  2026-10-21: the owner approved repository, collection, accession, series, box and folder as W47,
+  `execution-plans/containers/00-plan.md`.)_
 
 ## Lower Priority
 
