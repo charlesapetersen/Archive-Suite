@@ -168,7 +168,20 @@ The measurement comes first and the build waits on the owner's look at it (`W47.
 10. `W47.ct-processor-capture` — label reading at capture and the confirm card (waits on `W46.review-done`).
 11. `W47.ct-processor-intake` — Route B in Process Files: nested directories read with the level map.
 12. `W47.ct-backfill` — read the corpus's marker photos and propose runs for review.
-13. `W47.ct-zotero` — source blocks, and the Zotero export with all gathered metadata.
+13. `W47.item-fields-truth` — title, byline, publication name and date, document type and recipient place: a truth
+    set extending W46's entity set with clippings and reports, and how well the current tagging fills them.
+14. `W47.item-fields-build` — a title for every document and the fields that proved reliable.
+15. `W47.ct-zotero` — source blocks, and the Zotero export with all gathered metadata.
+
+## Item fields
+
+The Zotero export carries the item's own fields as well as its container. Date, author, recipient and sending place
+are already measured by the W46 review (`W46.fix-date-truth-score` and the dating items; `W46.fix-ent-truth`,
+`W46.ent-score`, `W46.ent-robust`, letters, memos and telegrams only). Not measured anywhere on 2026-10-21: title (no
+title field exists; the Processor extracts none), headline, byline, publication name and date for clippings, the
+document's type as a Zotero item type (`W46.kind-atrium` measures page kind for choosing a reader, which is a
+different thing), and recipient place. `W47.item-fields-truth` measures those on an extension of W46's entity set,
+and `W47.item-fields-build` fills only the fields that clear the bar (owner, 2026-10-21).
 
 Cost: `W47.ct-read-paid` under $0.50; a full read of the corpus's 4,500 markers about $2–4 on the gateway, priced
 from `W47.ct-read`'s figures before it runs. The $3 rule applies to each item.
