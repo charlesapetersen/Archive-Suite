@@ -12821,3 +12821,18 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
     W46.date-audit-owner-ok, folded in by W46.date-audit-score. Results: `segbench-results/date-draft-audit.md`;
     ArchiveOCRBench not touched (a truth-set audit, not a measured route).
   <!-- /W46.date-draft-audit -->
+- [x] **W40.fix-reader-phantom-selection — the status bar counts a selection the list does not show, and the selection-wide actions may act on it [S · S3 · Tier-2]** · §W40 — verification phase (lane: reader) (uses: build,vm). SHIPPED 2026-10-22.
+  - Found by `W40.e10` 2026-10-16 (`verification/evidence/reader/visual-2026-10-16-phantom-selection.jpg`, `…-selected-hidden.jpg`).
+  - Established first: `selectedFiles`, the target of Edit Tags, Mark Read/Unread, Open, Preview, Copy Links, Flag and the display
+    calendar, resolved the selection against the WHOLE library, so a filtered-away selection was counted and would be tagged unseen.
+    The unhighlighted "2 selected" was the table's highlight (row indices) not being re-pushed after a snapshot change.
+  - Fix: `recompute()` prunes the selection to the displayed rows and `selectedFiles` resolves against them; the open tag editor
+    holds its (pruned-at-open) targets until it closes; extend-to-document-run adds only visible members; the resume selection
+    restores against the list. Status bar, toolbar, Space and menu enablement read `selectedFiles`. `AppKitTableView` re-pushes the
+    selection after every snapshot and ignores selection callbacks fired by the apply. Accepted trade-off: a narrowing filter (or
+    an intermediate search result) drops the selection for good, as in Finder.
+  - Tier-2: opus adversarial review, no remaining path to a hidden file; its open-editor finding fixed. Tests: `PhantomSelectionTests`
+    (5, scratch fixtures, tags read back from disk); Reader unit bundle 491 green; VM XCUITest
+    `NavigationUITests/testAFilteredAwaySelectionIsNotCountedOrActedOn` green (filter away → no count, Mark Read and ⌘R write
+    nothing, cleared filter brings nothing back; two rows + tag cloud open/close → 2 highlighted, "2 selected").
+  <!-- /W40.fix-reader-phantom-selection -->
