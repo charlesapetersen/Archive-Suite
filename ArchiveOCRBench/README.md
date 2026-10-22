@@ -35,7 +35,9 @@ What the bench has measured, as one page you can read and share. It has seven pa
 6. **Dating.** How well the tagging call dates a document: the app's `generateTags` prompt and default model on 300
    whole corpus documents, scored against the owner's own year, month and Date Uncertain tags. Read from
    `ArchiveProcessor/segbench-results/date-tagging.json` (W41.date-tag-measure; the full tables are
-   `date-tagging.md` there).
+   `date-tagging.md` there). Beside it, the staged pipeline (rule candidates, a chooser, propagation, the residue
+   to Qwen3.6 27B with a quote checked) against one shot, from `date-traceable.json` (W46.date-traceable;
+   `date-traceable.md`).
 7. **Public truth sets.** The reference routes (Gemini 3.8 Flash, Qwen3-VL 235B, and Apple Vision on the
    Latin-script pages) on 440 pages of published transcriptions in seven strata: Dutch and Romance archival hands,
    German Kurrent, charters before 1600, early print with Fraktur, Arabic manuscripts, Greek minuscule and Hebrew

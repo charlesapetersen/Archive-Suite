@@ -10204,6 +10204,1038 @@
    }
   }
  },
+ "dating_traceable": {
+  "rows": [
+   {
+    "kind": "one shot",
+    "name": "gemini-3.8-flash",
+    "exact": {
+     "all year-tagged": [
+      199,
+      250
+     ],
+     "in text": [
+      116,
+      119
+     ],
+     "A+A'+B": [
+      54,
+      75
+     ],
+     "C+D": [
+      29,
+      56
+     ],
+     "not in text": [
+      83,
+      131
+     ]
+    },
+    "valid": 0,
+    "unsupported": 0,
+    "invalid": [
+     0,
+     300
+    ]
+   },
+   {
+    "kind": "one shot",
+    "name": "qwen3.6-27b-nothink (app prompt)",
+    "exact": {
+     "all year-tagged": [
+      171,
+      250
+     ],
+     "in text": [
+      116,
+      119
+     ],
+     "A+A'+B": [
+      41,
+      75
+     ],
+     "C+D": [
+      14,
+      56
+     ],
+     "not in text": [
+      55,
+      131
+     ]
+    },
+    "valid": 0,
+    "unsupported": 0,
+    "invalid": [
+     0,
+     300
+    ]
+   },
+   {
+    "kind": "one shot",
+    "name": "mlx-date-2b-8bit-nothink (app prompt)",
+    "exact": {
+     "all year-tagged": [
+      164,
+      250
+     ],
+     "in text": [
+      113,
+      119
+     ],
+     "A+A'+B": [
+      41,
+      75
+     ],
+     "C+D": [
+      10,
+      56
+     ],
+     "not in text": [
+      51,
+      131
+     ]
+    },
+    "valid": 0,
+    "unsupported": 0,
+    "invalid": [
+     0,
+     300
+    ]
+   },
+   {
+    "kind": "one shot",
+    "name": "qwen3.6-27b-nothink, trace prompt plain",
+    "exact": {
+     "all year-tagged": [
+      170,
+      250
+     ],
+     "in text": [
+      114,
+      119
+     ],
+     "A+A'+B": [
+      44,
+      75
+     ],
+     "C+D": [
+      12,
+      56
+     ],
+     "not in text": [
+      56,
+      131
+     ]
+    },
+    "valid": 198,
+    "unsupported": 101,
+    "invalid": [
+     1,
+     300
+    ]
+   },
+   {
+    "kind": "one shot",
+    "name": "qwen3.6-27b-nothink, trace prompt neigh",
+    "exact": {
+     "all year-tagged": [
+      175,
+      250
+     ],
+     "in text": [
+      115,
+      119
+     ],
+     "A+A'+B": [
+      47,
+      75
+     ],
+     "C+D": [
+      13,
+      56
+     ],
+     "not in text": [
+      60,
+      131
+     ]
+    },
+    "valid": 197,
+    "unsupported": 95,
+    "invalid": [
+     8,
+     300
+    ]
+   },
+   {
+    "kind": "one shot",
+    "name": "qwen3.6-27b-nothink, trace prompt shots",
+    "exact": {
+     "all year-tagged": [
+      170,
+      250
+     ],
+     "in text": [
+      115,
+      119
+     ],
+     "A+A'+B": [
+      42,
+      75
+     ],
+     "C+D": [
+      13,
+      56
+     ],
+     "not in text": [
+      55,
+      131
+     ]
+    },
+    "valid": 192,
+    "unsupported": 100,
+    "invalid": [
+     8,
+     300
+    ]
+   },
+   {
+    "kind": "pipeline",
+    "name": "rules only, no residue stage, t=3",
+    "exact": {
+     "all year-tagged": [
+      147,
+      250
+     ],
+     "in text": [
+      106,
+      119
+     ],
+     "A+A'+B": [
+      37,
+      75
+     ],
+     "C+D": [
+      4,
+      56
+     ],
+     "not in text": [
+      41,
+      131
+     ]
+    },
+    "valid": 270,
+    "unsupported": 11,
+    "invalid": [
+     19,
+     300
+    ],
+    "gpu_s_1000": 0.0,
+    "mac_s_1000": 0.0
+   },
+   {
+    "kind": "pipeline",
+    "name": "rules only, 27B trace-plain, t=0",
+    "exact": {
+     "all year-tagged": [
+      151,
+      250
+     ],
+     "in text": [
+      106,
+      119
+     ],
+     "A+A'+B": [
+      37,
+      75
+     ],
+     "C+D": [
+      8,
+      56
+     ],
+     "not in text": [
+      45,
+      131
+     ]
+    },
+    "valid": 229,
+    "unsupported": 70,
+    "invalid": [
+     1,
+     300
+    ],
+    "gpu_s_1000": 262.6,
+    "mac_s_1000": 0.0
+   },
+   {
+    "kind": "pipeline",
+    "name": "rules only, 27B trace-plain, t=3",
+    "exact": {
+     "all year-tagged": [
+      151,
+      250
+     ],
+     "in text": [
+      106,
+      119
+     ],
+     "A+A'+B": [
+      39,
+      75
+     ],
+     "C+D": [
+      6,
+      56
+     ],
+     "not in text": [
+      45,
+      131
+     ]
+    },
+    "valid": 278,
+    "unsupported": 22,
+    "invalid": [
+     0,
+     300
+    ],
+    "gpu_s_1000": 40.2,
+    "mac_s_1000": 0.0
+   },
+   {
+    "kind": "pipeline",
+    "name": "rules only, 27B trace-neigh, t=0",
+    "exact": {
+     "all year-tagged": [
+      154,
+      250
+     ],
+     "in text": [
+      106,
+      119
+     ],
+     "A+A'+B": [
+      39,
+      75
+     ],
+     "C+D": [
+      9,
+      56
+     ],
+     "not in text": [
+      48,
+      131
+     ]
+    },
+    "valid": 227,
+    "unsupported": 66,
+    "invalid": [
+     7,
+     300
+    ],
+    "gpu_s_1000": 400.7,
+    "mac_s_1000": 0.0
+   },
+   {
+    "kind": "pipeline",
+    "name": "rules only, 27B trace-neigh, t=3",
+    "exact": {
+     "all year-tagged": [
+      152,
+      250
+     ],
+     "in text": [
+      106,
+      119
+     ],
+     "A+A'+B": [
+      40,
+      75
+     ],
+     "C+D": [
+      6,
+      56
+     ],
+     "not in text": [
+      46,
+      131
+     ]
+    },
+    "valid": 278,
+    "unsupported": 22,
+    "invalid": [
+     0,
+     300
+    ],
+    "gpu_s_1000": 61.4,
+    "mac_s_1000": 0.0
+   },
+   {
+    "kind": "pipeline",
+    "name": "rules only, 27B trace-shots, t=0",
+    "exact": {
+     "all year-tagged": [
+      150,
+      250
+     ],
+     "in text": [
+      106,
+      119
+     ],
+     "A+A'+B": [
+      35,
+      75
+     ],
+     "C+D": [
+      9,
+      56
+     ],
+     "not in text": [
+      44,
+      131
+     ]
+    },
+    "valid": 224,
+    "unsupported": 69,
+    "invalid": [
+     7,
+     300
+    ],
+    "gpu_s_1000": 477.0,
+    "mac_s_1000": 0.0
+   },
+   {
+    "kind": "pipeline",
+    "name": "rules only, 27B trace-shots, t=3",
+    "exact": {
+     "all year-tagged": [
+      151,
+      250
+     ],
+     "in text": [
+      106,
+      119
+     ],
+     "A+A'+B": [
+      39,
+      75
+     ],
+     "C+D": [
+      6,
+      56
+     ],
+     "not in text": [
+      45,
+      131
+     ]
+    },
+    "valid": 276,
+    "unsupported": 23,
+    "invalid": [
+     1,
+     300
+    ],
+    "gpu_s_1000": 73.1,
+    "mac_s_1000": 0.0
+   },
+   {
+    "kind": "pipeline",
+    "name": "2B chooser, no residue stage, t=3",
+    "exact": {
+     "all year-tagged": [
+      155,
+      250
+     ],
+     "in text": [
+      113,
+      119
+     ],
+     "A+A'+B": [
+      37,
+      75
+     ],
+     "C+D": [
+      5,
+      56
+     ],
+     "not in text": [
+      42,
+      131
+     ]
+    },
+    "valid": 269,
+    "unsupported": 12,
+    "invalid": [
+     19,
+     300
+    ],
+    "gpu_s_1000": 0.0,
+    "mac_s_1000": 259.5
+   },
+   {
+    "kind": "pipeline",
+    "name": "2B chooser, 27B trace-plain, t=0",
+    "exact": {
+     "all year-tagged": [
+      159,
+      250
+     ],
+     "in text": [
+      113,
+      119
+     ],
+     "A+A'+B": [
+      37,
+      75
+     ],
+     "C+D": [
+      9,
+      56
+     ],
+     "not in text": [
+      46,
+      131
+     ]
+    },
+    "valid": 228,
+    "unsupported": 71,
+    "invalid": [
+     1,
+     300
+    ],
+    "gpu_s_1000": 262.6,
+    "mac_s_1000": 259.5
+   },
+   {
+    "kind": "pipeline",
+    "name": "2B chooser, 27B trace-plain, t=3",
+    "exact": {
+     "all year-tagged": [
+      159,
+      250
+     ],
+     "in text": [
+      113,
+      119
+     ],
+     "A+A'+B": [
+      39,
+      75
+     ],
+     "C+D": [
+      7,
+      56
+     ],
+     "not in text": [
+      46,
+      131
+     ]
+    },
+    "valid": 277,
+    "unsupported": 23,
+    "invalid": [
+     0,
+     300
+    ],
+    "gpu_s_1000": 40.2,
+    "mac_s_1000": 259.5
+   },
+   {
+    "kind": "pipeline",
+    "name": "2B chooser, 27B trace-neigh, t=0",
+    "exact": {
+     "all year-tagged": [
+      162,
+      250
+     ],
+     "in text": [
+      113,
+      119
+     ],
+     "A+A'+B": [
+      39,
+      75
+     ],
+     "C+D": [
+      10,
+      56
+     ],
+     "not in text": [
+      49,
+      131
+     ]
+    },
+    "valid": 226,
+    "unsupported": 67,
+    "invalid": [
+     7,
+     300
+    ],
+    "gpu_s_1000": 400.7,
+    "mac_s_1000": 259.5
+   },
+   {
+    "kind": "pipeline",
+    "name": "2B chooser, 27B trace-neigh, t=3",
+    "exact": {
+     "all year-tagged": [
+      160,
+      250
+     ],
+     "in text": [
+      113,
+      119
+     ],
+     "A+A'+B": [
+      40,
+      75
+     ],
+     "C+D": [
+      7,
+      56
+     ],
+     "not in text": [
+      47,
+      131
+     ]
+    },
+    "valid": 277,
+    "unsupported": 23,
+    "invalid": [
+     0,
+     300
+    ],
+    "gpu_s_1000": 61.4,
+    "mac_s_1000": 259.5
+   },
+   {
+    "kind": "pipeline",
+    "name": "2B chooser, 27B trace-shots, t=0",
+    "exact": {
+     "all year-tagged": [
+      158,
+      250
+     ],
+     "in text": [
+      113,
+      119
+     ],
+     "A+A'+B": [
+      35,
+      75
+     ],
+     "C+D": [
+      10,
+      56
+     ],
+     "not in text": [
+      45,
+      131
+     ]
+    },
+    "valid": 223,
+    "unsupported": 70,
+    "invalid": [
+     7,
+     300
+    ],
+    "gpu_s_1000": 477.0,
+    "mac_s_1000": 259.5
+   },
+   {
+    "kind": "pipeline",
+    "name": "2B chooser, 27B trace-shots, t=3",
+    "exact": {
+     "all year-tagged": [
+      159,
+      250
+     ],
+     "in text": [
+      113,
+      119
+     ],
+     "A+A'+B": [
+      39,
+      75
+     ],
+     "C+D": [
+      7,
+      56
+     ],
+     "not in text": [
+      46,
+      131
+     ]
+    },
+    "valid": 275,
+    "unsupported": 24,
+    "invalid": [
+     1,
+     300
+    ],
+    "gpu_s_1000": 73.1,
+    "mac_s_1000": 259.5
+   },
+   {
+    "kind": "pipeline",
+    "name": "27B chooser, no residue stage, t=3",
+    "exact": {
+     "all year-tagged": [
+      151,
+      250
+     ],
+     "in text": [
+      109,
+      119
+     ],
+     "A+A'+B": [
+      37,
+      75
+     ],
+     "C+D": [
+      5,
+      56
+     ],
+     "not in text": [
+      42,
+      131
+     ]
+    },
+    "valid": 269,
+    "unsupported": 12,
+    "invalid": [
+     19,
+     300
+    ],
+    "gpu_s_1000": 73.1,
+    "mac_s_1000": 0.0
+   },
+   {
+    "kind": "pipeline",
+    "name": "27B chooser, 27B trace-plain, t=0",
+    "exact": {
+     "all year-tagged": [
+      155,
+      250
+     ],
+     "in text": [
+      109,
+      119
+     ],
+     "A+A'+B": [
+      37,
+      75
+     ],
+     "C+D": [
+      9,
+      56
+     ],
+     "not in text": [
+      46,
+      131
+     ]
+    },
+    "valid": 228,
+    "unsupported": 71,
+    "invalid": [
+     1,
+     300
+    ],
+    "gpu_s_1000": 335.7,
+    "mac_s_1000": 0.0
+   },
+   {
+    "kind": "pipeline",
+    "name": "27B chooser, 27B trace-plain, t=3",
+    "exact": {
+     "all year-tagged": [
+      155,
+      250
+     ],
+     "in text": [
+      109,
+      119
+     ],
+     "A+A'+B": [
+      39,
+      75
+     ],
+     "C+D": [
+      7,
+      56
+     ],
+     "not in text": [
+      46,
+      131
+     ]
+    },
+    "valid": 277,
+    "unsupported": 23,
+    "invalid": [
+     0,
+     300
+    ],
+    "gpu_s_1000": 113.3,
+    "mac_s_1000": 0.0
+   },
+   {
+    "kind": "pipeline",
+    "name": "27B chooser, 27B trace-neigh, t=0",
+    "exact": {
+     "all year-tagged": [
+      158,
+      250
+     ],
+     "in text": [
+      109,
+      119
+     ],
+     "A+A'+B": [
+      39,
+      75
+     ],
+     "C+D": [
+      10,
+      56
+     ],
+     "not in text": [
+      49,
+      131
+     ]
+    },
+    "valid": 226,
+    "unsupported": 67,
+    "invalid": [
+     7,
+     300
+    ],
+    "gpu_s_1000": 473.8,
+    "mac_s_1000": 0.0
+   },
+   {
+    "kind": "pipeline",
+    "name": "27B chooser, 27B trace-neigh, t=3",
+    "exact": {
+     "all year-tagged": [
+      156,
+      250
+     ],
+     "in text": [
+      109,
+      119
+     ],
+     "A+A'+B": [
+      40,
+      75
+     ],
+     "C+D": [
+      7,
+      56
+     ],
+     "not in text": [
+      47,
+      131
+     ]
+    },
+    "valid": 277,
+    "unsupported": 23,
+    "invalid": [
+     0,
+     300
+    ],
+    "gpu_s_1000": 134.5,
+    "mac_s_1000": 0.0
+   },
+   {
+    "kind": "pipeline",
+    "name": "27B chooser, 27B trace-shots, t=0",
+    "exact": {
+     "all year-tagged": [
+      154,
+      250
+     ],
+     "in text": [
+      109,
+      119
+     ],
+     "A+A'+B": [
+      35,
+      75
+     ],
+     "C+D": [
+      10,
+      56
+     ],
+     "not in text": [
+      45,
+      131
+     ]
+    },
+    "valid": 223,
+    "unsupported": 70,
+    "invalid": [
+     7,
+     300
+    ],
+    "gpu_s_1000": 550.0,
+    "mac_s_1000": 0.0
+   },
+   {
+    "kind": "pipeline",
+    "name": "27B chooser, 27B trace-shots, t=3",
+    "exact": {
+     "all year-tagged": [
+      155,
+      250
+     ],
+     "in text": [
+      109,
+      119
+     ],
+     "A+A'+B": [
+      39,
+      75
+     ],
+     "C+D": [
+      7,
+      56
+     ],
+     "not in text": [
+      46,
+      131
+     ]
+    },
+    "valid": 275,
+    "unsupported": 24,
+    "invalid": [
+     1,
+     300
+    ],
+    "gpu_s_1000": 146.2,
+    "mac_s_1000": 0.0
+   }
+  ],
+  "vision": {
+   "rules only": {
+    "exact": {
+     "all year-tagged": [
+      165,
+      250
+     ],
+     "in text": [
+      102,
+      119
+     ],
+     "A+A'+B": [
+      46,
+      75
+     ],
+     "C+D": [
+      17,
+      56
+     ],
+     "not in text": [
+      63,
+      131
+     ]
+    },
+    "valid": 268,
+    "unsupported": 25,
+    "invalid": [
+     7,
+     300
+    ]
+   },
+   "rules only (corpus text, same documents)": {
+    "exact": {
+     "all year-tagged": [
+      147,
+      250
+     ],
+     "in text": [
+      106,
+      119
+     ],
+     "A+A'+B": [
+      37,
+      75
+     ],
+     "C+D": [
+      4,
+      56
+     ],
+     "not in text": [
+      41,
+      131
+     ]
+    },
+    "valid": 270,
+    "unsupported": 11,
+    "invalid": [
+     19,
+     300
+    ]
+   },
+   "2B chooser": {
+    "exact": {
+     "all year-tagged": [
+      169,
+      250
+     ],
+     "in text": [
+      107,
+      119
+     ],
+     "A+A'+B": [
+      45,
+      75
+     ],
+     "C+D": [
+      17,
+      56
+     ],
+     "not in text": [
+      62,
+      131
+     ]
+    },
+    "valid": 269,
+    "unsupported": 24,
+    "invalid": [
+     7,
+     300
+    ]
+   },
+   "2B chooser (corpus text, same documents)": {
+    "exact": {
+     "all year-tagged": [
+      155,
+      250
+     ],
+     "in text": [
+      113,
+      119
+     ],
+     "A+A'+B": [
+      37,
+      75
+     ],
+     "C+D": [
+      5,
+      56
+     ],
+     "not in text": [
+      42,
+      131
+     ]
+    },
+    "valid": 269,
+    "unsupported": 12,
+    "invalid": [
+     19,
+     300
+    ]
+   }
+  }
+ },
  "seg_date": {
   "locked_gpu": {
    "boxes": {

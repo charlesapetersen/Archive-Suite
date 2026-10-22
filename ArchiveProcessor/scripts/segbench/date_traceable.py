@@ -756,6 +756,66 @@ def pc(x):
     return f"{100 * x[0] / x[1]:.1f}%" if x and x[1] else "–"
 
 
+def findings(out):
+    """The run's reading, from the figures in `out`; empty until the 27B's replies are in."""
+    P, O = out["pipeline"], out["one_shot"]
+    need = ("owner|2B chooser|no residue stage|t=3", "owner|2B chooser|27B trace-neigh|t=3",
+            "owner|2B chooser|27B trace-neigh|t=0", "owner|27B chooser|no residue stage|t=3")
+    if not all(k in P for k in need) or "owner|neigh" not in out["trace"]:
+        return []
+
+    def f(s, c):
+        return pc(s["exact"][c])
+    g, q = O["owner|" + DT.MODEL], O["owner|qwen3.6-27b-nothink (app prompt)"]
+    base, t3, t0, c27 = (P[k] for k in need)
+    tn, tp = out["trace"]["owner|neigh"], out["trace"]["owner|plain"]
+    cost = out["cost"]
+    L = ["## Findings", "",
+         f"- **The staged pipeline does not beat one shot on the years that matter.** On the 131 documents whose year "
+         f"is not in the corpus text, the best staged configuration (rules, the 2B chooser, the 27B with neighbour "
+         f"dates on what propagation cannot reach, t=3) gets {f(t3, 'not in text')}; Gemini 3.8 Flash one shot gets "
+         f"{f(g, 'not in text')}, the 27B one shot {f(q, 'not in text')} with the app's prompt and "
+         f"{f(tn, 'not in text')} with the trace prompt and neighbour dates. Sending every undated document to the 27B "
+         f"(t=0) gives {f(t0, 'not in text')}.",
+         f"- **It is far cheaper.** The t=3 configuration makes {t3['per_1000']['calls'].get('trace-neigh', 0) * 1000 // 300} "
+         f"27B calls per 1,000 documents ({t3['per_1000']['gpu_s']:.0f} GPU-seconds) against 1,000 for one shot "
+         f"(about {1000 * (cost['trace-neigh']['gpu_s_per_reply'] or 0):.0f} GPU-seconds with the same prompt).",
+         f"- **On printed years the rules plus a small chooser come close to the models.** Rules alone "
+         f"{pc(P['owner|rules only|no residue stage|t=3']['exact']['in text'])}, "
+         f"with the 2B's reply as chooser {f(base, 'in text')} (Gemini {f(g, 'in text')}). The 27B as chooser is worse "
+         f"than the 2B ({f(c27, 'in text')}): where the 2B named the document's own year, the 27B kept or chose a year "
+         f"the text mentions in passing (\"in the spring of 1961\").",
+         f"- **Propagation alone is as good as the models on class A, at no cost.** Taking the nearest earlier dated document's "
+         f"year gets A {f(base, 'A')} and A' {f(base, chr(65) + chr(39))} (Gemini {f(g, 'A')}, the 27B {f(q, 'A')}), "
+         f"but B {f(base, 'B')}, C {f(base, 'C')}: beyond the previous document it mostly propagates a wrong year, "
+         f"and escalating more (lower t) trades A for B. W46.date-enclosure's relation classifier is what would decide "
+         f"which documents to propagate to; it has not shipped.",
+         f"- **A third of the 27B's citations fail the check, and many of those years are right.** Trace-plain: "
+         f"{tp['evidence'].get('valid', 0)} valid, {tp['evidence'].get('unsupported', 0)} unsupported, "
+         f"{tp['right_unsupported']} of them with the right year. Reading the failures, most are a quote that does not "
+         f"carry the year as four digits, often because the model read through OCR damage (\"27 April I 96I4\", \"feb, 2 4 , >964\", "
+         f"\"September 22, 19gS\") or a two-digit date, and the checker, which wants the four digits in the quote, "
+         f"refuses them. The rest quote text that is not in the cited document. {tp.get('short_evidence', 0)} of 300 "
+         f"replies wrote the citation as {{\"self\": quote}} rather than the asked shape and were read as the same "
+         f"citation. Conformal intervals reach about 90% coverage, but the widths (decades on the pipelines) come "
+         f"from a few far-wrong rule picks (1800 from a figure, 2026 from a capture footer), not from honest uncertainty."]
+    v = out.get("vision")
+    if v and "rules only" in v:
+        L.append(f"- **Apple Vision text dates more of the 'unprinted' documents than the corpus text does.** The rule "
+                 f"stage and propagation on Vision text of the first two pages get {f(v['rules only'], 'not in text')} of "
+                 f"the 131 (corpus text {f(v['rules only (corpus text, same documents)'], 'not in text')}), on the Mac "
+                 f"at about {v.get('seconds_per_page', 1):.0f} s a page and $0: many of these documents do print their "
+                 f"date, and ABBYY's layer garbled it (\"ISIS\" for 1915, \"19gS\"). The classes A to D are defined on "
+                 f"the corpus text, so part of the 'not in text' gap is OCR, not dating. On printed years Vision rules "
+                 f"read fewer ({f(v['rules only'], 'in text')} against {f(v['rules only (corpus text, same documents)'], 'in text')}). "
+                 f"Filed: W46.date-traceable-vision, the residue and chooser on Vision text.")
+    L += ["- Not in this run: the Gemini arm (W46.date-traceable-paid, waits for W46.gateway-models-ok), the claude -p "
+          "arm (held for the gateway, CLAUDE.md), the relation classifier (W46.date-enclosure), Foundation Models as "
+          "the R1 chooser. The latest-year rule variant was written after reading the first rule's misses on the "
+          "owner's set, so its owner figure is tuned; the public set is its check.", ""]
+    return L
+
+
 def write_md(out):
     L = ["# Dating: the staged pipeline against one shot, with the evidence checked (W46.date-traceable)", "",
          "Written by `scripts/segbench/date_traceable.py score`. The owner's 300 (W41's sample: 119 print their year, "
@@ -764,6 +824,7 @@ def write_md(out):
          "printed same-year document within three, C four or more away, D none in the folder. $0: the 27B ran on "
          "FarmShare, the 2B's replies are W41's cached ones; the Gemini arm is W46.date-traceable-paid, the claude -p "
          "arm waits for W46.gateway-models-ok.", ""]
+    L += findings(out)
     L += ["## Stage 1: rule candidates", "",
           "Every date printed in the first 3,000 characters (full dates, numeric dates, month-year, bare years "
           "1800-2030), each with its line. The pick is the first dated form in the first 15 lines, else the most "

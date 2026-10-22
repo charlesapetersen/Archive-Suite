@@ -43,6 +43,7 @@ HANDWRITING = HERE / "data" / "vision-ocr-handwriting.json"
 KIND_CLASSIFIER = RESULTS / "kind-classifier.json"  # W41.bench-kind-classifier: kind_classifier.py report
 DATING = RESULTS / "date-tagging.json"  # W41.date-tag-measure: date_tagging.py score
 DATING_PUBLIC = RESULTS / "date-tagging-public.json"
+DATING_TRACEABLE = RESULTS / "date-traceable.json"  # W46.date-traceable: date_traceable.py score
 PUBLIC = RESULTS / "bench-corpus"  # W43.corpus-build: corpus/routes.py report, the public strata
 OCR_SCORERS = RESULTS / "ocr-scorers.json"  # W46.fix-ocr-scorers: ocr_rescore.py, every cached reading re-scored
 TRUTH_BIAS = RESULTS / "ocr-truth-bias.json"  # W46.fix-ocr-truth-bias: ocr_truth_bias.py, agreed v adjudicated words
@@ -96,6 +97,30 @@ def openrouter_price(op, preset, prompt, completion):
     openrouter_open_weights), from a run's mean tokens a request. None for a model that fits on the Mac, which stays free."""
     m = op["models"].get(re.sub(r"-dyn$", "", preset))
     return None if m is None else (prompt * m["in"] + completion * m["out"]) / 1e3
+
+
+def dating_traceable():
+    """The staged dating pipeline's rows for the page: every one-shot and trace row, and every pipeline configuration
+    on the owner's set at the two ends of the threshold (t=0, t=3), with its exact-year shares by class, evidence and
+    GPU-seconds per 1,000 documents."""
+    if not DATING_TRACEABLE.exists():
+        return None
+    d = json.loads(DATING_TRACEABLE.read_text())
+
+    def cut(s):
+        ev = s.get("evidence", {})
+        return {"exact": {k: s["exact"].get(k) for k in ("all year-tagged", "in text", "A+A'+B", "C+D", "not in text")},
+                "valid": ev.get("valid", 0), "unsupported": ev.get("unsupported", 0), "invalid": s["invalid"]}
+    rows = [{"kind": "one shot", "name": k.split("|", 1)[1], **cut(s)} for k, s in d["one_shot"].items()
+            if k.startswith("owner|")]
+    rows += [{"kind": "one shot", "name": "qwen3.6-27b-nothink, trace prompt " + k.split("|", 1)[1], **cut(s)}
+             for k, s in d["trace"].items() if k.startswith("owner|")]
+    for k, s in d["pipeline"].items():
+        setname, chooser, residue, t = k.split("|")
+        if setname == "owner" and t in ("t=0", "t=3"):
+            rows.append({"kind": "pipeline", "name": f"{chooser}, {residue}, {t}", **cut(s),
+                         "gpu_s_1000": s["per_1000"]["gpu_s"], "mac_s_1000": s["per_1000"]["mac_s"]})
+    return {"rows": rows, "vision": {k: cut(v) for k, v in (d.get("vision") or {}).items() if isinstance(v, dict) and "exact" in v}}
 
 
 def money_cells(cell):
@@ -518,6 +543,7 @@ def main():
              "kind_classifier": json.loads(KIND_CLASSIFIER.read_text()) if KIND_CLASSIFIER.exists() else None,
              "dating": dating,
              "dating_public": json.loads(DATING_PUBLIC.read_text()) if DATING_PUBLIC.exists() else None,
+             "dating_traceable": dating_traceable(),
              "seg_date": json.loads((RESULTS / "seg-date-model-final.json").read_text())
                          if (RESULTS / "seg-date-model-final.json").exists() else None,
              "public": public(), "ocr_scorers": ocr_scorers()}

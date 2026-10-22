@@ -12770,3 +12770,19 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   controls instead of assuming agreed pages clean, keeps the top-up out of the share. Not rerun on the cluster: Qwen's
   label existed. Behaviour of the sheet checked in jsdom (keys, clicks, re-answer). No money. Gate W46.mixed-def-owner-ok.
   <!-- /W46.fix-marks-set -->
+- [x] **W46.date-traceable — the staged dating pipeline against one shot, with evidence checked [M]** · §Document processing review — W46 (owner, 2026-10-20) (lane: segbench) (uses: light) (cluster: farmshare) (blocked-on: W46.cluster-waves, W46.fix-date-truth-score) — Rule candidates, a small model choosing, the residue to the pinned 27B and claude -p at $0; scored by class, evidence validity, conformal coverage and cost per 1,000; W46.date-enclosure's classifier arm joins if it has shipped. detail: execution-plans/processing-review/10-gap-audit.md §5 item 14 — Plan-route arm held for the gateway (owner, 2026-10-21; CLAUDE.md "Plan routes wait for the gateway"). SHIPPED 2026-10-22.
+  - `date_traceable.py` (rules / export / import / score / vision) and `test_date_traceable.py` (21 tests); results
+    `segbench-results/date-traceable.md` and `.json`; ArchiveOCRBench Part 6 panel "A staged pipeline against one shot".
+    `date_tagging.document_pool` records now carry `folder` and `position` (not written to sample.jsonl).
+  - The 27B: one FarmShare job (1867528, old `farmshare/` kit in the cluster clone, thinking off), 1,297 prompts, 0 errors,
+    1,056 s on one L40S; replies in the private bench cache `date-tagging/traceable/`. $0.
+  - Owner's 300, not in text (131): best staged configuration (rules, 2B chooser, 27B trace-neigh at t=3) 35.9%, against
+    Gemini one shot 63.4%, the 27B one shot 42.0% (app prompt) and 45.8% (trace prompt with neighbour dates); t=3 makes 63
+    27B calls per 1,000 documents (61 GPU-seconds) against about 969 for one shot. Printed years: rules 89.1%, rules + 2B
+    chooser 95.0%, 27B chooser 91.6% (Gemini 97.5%). Propagation alone: A 75.8%, A' 71.4%, B 20.0%, C 5.7%.
+  - Evidence: trace-plain 198 valid, 101 unsupported, 49 of those with the right year, mostly a quote without the four
+    digits (OCR-damaged or two-digit dates). 146 of 300 replies wrote the citation as {"self": quote}; read as the same.
+  - Vision-text arm (R1, 1,634 pages, about 1 s a page): rules and propagation 48.1% on the 131 against 31.3% on the corpus
+    text; filed W46.date-traceable-vision. Not run here: the Gemini and claude -p arms (W46.date-traceable-paid, after
+    W46.gateway-models-ok), the relation classifier (W46.date-enclosure, not shipped), Foundation Models as chooser.
+  <!-- /W46.date-traceable -->
