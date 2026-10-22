@@ -24,6 +24,13 @@ loop. The Agent Manager engine is that kind of supervisor. So:
 - The owner's shared login is `ssh -o ControlMaster=yes -o ControlPath=~/.ssh/cm-sherlock -o ControlPersist=8h
   cp1@login.sherlock.stanford.edu` (Duo). Nothing keeps it alive unattended: no keepalive loop like FarmShare's.
 
+## Before a submission
+
+Every Sherlock job is reviewed for size and necessity first (root CLAUDE.md, "Every Sherlock job is reviewed"): the
+question and what it would change, why current results do not settle it, job count and pilot GPU-hours, why nothing
+smaller would do, and useful-now or nice-to-have. The owner's session reads the review in the item's notes before
+it submits, and sends a nice-to-have item behind `W46.nice-to-have` instead.
+
 ## Data already on Sherlock
 
 FarmShare's `/scratch/users/cp1/fs-ocr/` as of 2026-10-22 (packs, adapters, checkpoints, results; not the HF weights,

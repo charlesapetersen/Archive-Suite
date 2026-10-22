@@ -247,6 +247,18 @@ depends on the apps' current settings, structure or outputs.
   were cancelled (ids in `~/cancelled-20261022.txt` on FarmShare) and rerun on Sherlock from their staged packs; FarmShare's
   data is on Sherlock, so a session looks for a pack there before rebuilding one. A new cluster item is filed with
   `(cluster: sherlock)` alone.
+- ⛔ **Every Sherlock job is reviewed for size and necessity before it is submitted (owner, 2026-10-22).** The
+  preparing session writes a review in `execution-plans/items/<TAG>.md` before its hand-over, and the owner's session
+  reads it before submitting: (1) the question the run answers and the app route, default or recommendation the
+  answer could change; (2) why the results already in hand do not settle it; (3) the job count and a GPU-hour estimate
+  from a pilot, and why a smaller sample, split or reader set would not answer the question (a public set's training
+  split, a whole mirror or a full grid is the ceiling, not the plan); (4) the verdict, useful now or nice-to-have.
+  Focus on what is really useful now: a nice-to-have item, Sherlock or not, goes behind `W46.nice-to-have` in
+  `SUITE_TODO.md` §"Nice-to-have, end of project" (`(blocked-on: W46.nice-to-have)` in the plan), which the owner
+  opens once the useful work is done. Cases: W46.seg-openpss was filed as the whole 141,668-page mirror and
+  W46.capture-ladder-sherlock as a 360-GPU-hour grid; both were cut down, then deferred with W46.seg-tabme and
+  W46.ocr-new-open-gold. W46.ocr-new-open-sherlock stays useful now: many users of the kit will have a cluster like
+  Sherlock, so a cluster-only reader is a real route for them.
 - ⏸ **Paid hosted benchmarking is on hold (owner, 2026-10-17).** Open-weight models on FarmShare first; paid hosted
   bench runs wait for `W43.sweep` at the end of the queue, behind a full price estimate. A session that wants a paid
   run and defers it adds a line to [`execution-plans/paid-runs-deferred.md`](execution-plans/paid-runs-deferred.md)
