@@ -31,7 +31,8 @@ struct SegmentTagSheet: View {
 
                 Text("Year").font(.headline)
                 if !recentYears.isEmpty {
-                    HStack(spacing: 8) {
+                    // Wraps instead of running off a narrow screen (Android's FlowRow).
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 72), spacing: 8)], alignment: .leading, spacing: 8) {
                         ForEach(recentYears, id: \.self) { y in
                             chip(String(y), selected: year == y && customYear.isEmpty) {
                                 if year == y { year = nil } else { year = y; customYear = "" }

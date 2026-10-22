@@ -12705,3 +12705,11 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   - The fix itself had already landed in `W40.i-fix-ios-heartbeat-count` (e7e0ed69): that branch now calls `CaptureQueue.prepareDeferredResend` (pending + marker cleared in one step, Android's) and persists before the re-enqueue; and `restore` independently restores any `needsResend` page as pending (`W40.i-fix-ios-photo-storage`). No code change was needed here.
   - This item adds the host test that pins the exact crash window: confirm → `prepareDeferredResend` → snapshot → restore keeps the page, not dropped, in `resumeCandidates` (`CaptureQueueTests.swift`; host suite 296 checks pass).
   <!-- /W40.i-fix-ios-resend-window -->
+- [x] **W40.i-fix-ios-polish — small iOS differences from Android [S · S4]** · §W40 (lane: processor) (uses: build) (blocked-on: W40.i2). Found by `W40.i2` 2026-10-21 (`verification/capture.md`). SHIPPED 2026-10-21.
+  - Ended segments: `CaptureQueue.endedSegments` is now `EndedSegments`, insertion-ordered like Android's `LinkedHashMap` (re-ending keeps its place), through snapshot and restore, so tag cards go to the Mac in the order ended.
+  - Group ids: `g` + 8 lowercase hex, as Android. Status lines: "Segment ended · N pages" and "No pages in this segment yet — capture a page first."
+  - Save to phone: a persisted, display-only `CapturedItem.savedToPhone` (`decodeIfPresent`, so older session files load); teal dot + ✓ badge; upload state untouched.
+  - QR scanner: camera denied (or no usable camera) shows a message, with Open Settings for a denial, instead of a black sheet. Recent-year chips wrap in an adaptive grid.
+  - VoiceOver: strip thumbnails labelled type + status (+ Q3, armed, held-for-review) with a "Toggle quality Q3" action; Box/shutter/Folder/Re-pair labelled.
+  - 3 new host tests (358 checks pass); iOS Debug build clean, no new warnings; adversarial review (opus) found no defects, its two wording nits fixed. Not run on a device (W40.i3). No migration: the new field is optional.
+  <!-- /W40.i-fix-ios-polish -->

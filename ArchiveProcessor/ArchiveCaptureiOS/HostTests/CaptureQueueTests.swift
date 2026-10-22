@@ -931,6 +931,58 @@ await asyncTest("the upload is stopped and awaited before the copy, and only a w
     check(outcome == .deleted && last == "other ended", "Delete permanently also waits for the upload")
 }
 
+// W40.i-fix-ios-polish: ended segments keep the order they were ended in, group ids are lowercase like Android's,
+// and the Save-to-phone mark is display only and persisted.
+
+test("ended segments keep their order through acks, re-ending, snapshot and restore") {
+    var q = makeQueue()
+    // Ten segments: a Dictionary's hash order would almost surely scramble at least one pair.
+    for _ in 1...10 {
+        _ = q.addDocument(fileURL: url("p"))
+        q.pendingTagGroupId = q.currentGroupId
+        _ = q.endSegment(quality: nil, year: nil, month: nil)
+    }
+    let all = (1...10).map { "g\($0)" }
+    check(q.endedSegments.keys == all, "in the order ended: \(q.endedSegments.keys)")
+    q.acknowledgeSegment("g4")
+    check(q.endedSegments.keys == all.filter { $0 != "g4" }, "an ack removes only its own")
+    // A recovery review can end a group again; it keeps its place with the new tags (LinkedHashMap put).
+    q.pendingTagGroupId = "g2"
+    _ = q.endSegment(quality: "Q2", year: nil, month: nil)
+    check(q.endedSegments.keys.first(where: { $0 == "g2" }) != nil && q.endedSegments.keys[1] == "g2",
+          "re-ended group stays in place")
+    check(q.endedSegments["g2"]?.quality == "Q2", "with its new tags")
+    check(q.snapshot().endedSegments?.map(\.group) == q.endedSegments.keys, "snapshot keeps the order")
+    var r = makeQueue()
+    _ = r.restore(q.snapshot(), fileExists: { _ in true })
+    check(r.endedSegments == q.endedSegments, "restore keeps the order and tags")
+}
+
+test("random group ids are g + 8 lowercase hex") {
+    for _ in 0..<50 {
+        let g = CaptureQueue.randomGroupId()
+        check(g.count == 9 && g.first == "g" && g.dropFirst().allSatisfy { "0123456789abcdef".contains($0) }, "\(g)")
+    }
+}
+
+test("Save to phone marks only what was saved, changes no upload state, and persists") {
+    try withScratchStore { store, photos in
+        var q = makeQueue()
+        let a = q.addDocument(fileURL: photos.appendingPathComponent("img_A.jpg"))
+        let b = q.addDocument(fileURL: photos.appendingPathComponent("img_B.jpg"))
+        q.setState(a.id, .failed)
+        check(q.markSavedToPhone([a.id, 999]), "a change")
+        check(!q.markSavedToPhone([a.id]), "already marked: nothing to persist")
+        check(q.item(a.id)?.savedToPhone == true && q.item(b.id)?.savedToPhone == nil, "only the saved one")
+        check(q.item(a.id)?.state == .failed && q.failedItems.map(\.id) == [a.id], "still failed, still retried")
+        try Data().write(to: a.fileURL); try Data().write(to: b.fileURL)
+        check(store.save(q.snapshot()), "saved")
+        var r = makeQueue()
+        _ = r.restore(try XCTUnwrap(store.load()), fileExists: { _ in true })
+        check(r.item(a.id)?.savedToPhone == true && r.item(b.id)?.savedToPhone == nil, "the mark survives a restart")
+    }
+}
+
 print("")
 print("\(passes) checks passed, \(failures) failed")
 exit(failures == 0 ? 0 : 1)

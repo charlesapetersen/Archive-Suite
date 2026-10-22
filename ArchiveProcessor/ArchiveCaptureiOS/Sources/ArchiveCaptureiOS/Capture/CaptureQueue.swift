@@ -39,8 +39,10 @@ struct CaptureQueue {
     private(set) var currentGroupId: String
     /// Non-nil while the tag sheet is open for that group.
     var pendingTagGroupId: String?
-    /// Document segments ended (End segment → Apply/Skip) whose segment-complete signal the Mac hasn't acked.
-    private(set) var endedSegments: [String: SegTags] = [:]
+    /// Document segments ended (End segment → Apply/Skip) whose segment-complete signal the Mac hasn't acked, in
+    /// the order they were ended, so resume and restore offer their tag cards to the Mac in that order (Android's
+    /// `LinkedHashMap`; a `Dictionary` here sent them in hash order, W40.i-fix-ios-polish).
+    private(set) var endedSegments = EndedSegments()
     /// Ids uploading right now, so auto-retry, resume and a manual Retry can't send the same item twice at once,
     /// each with the pairing that started it. A send from a retired pairing keeps its claim until it unwinds (only
     /// one task ever holds a photo), and can release only its own (Android's `OutstandingSends`).
@@ -55,9 +57,21 @@ struct CaptureQueue {
         currentGroupId = newGroupId()
     }
 
-    static func randomGroupId() -> String { "g" + UUID().uuidString.prefix(8) }
+    /// `g` + 8 lowercase hex, as Android writes it (the Mac's `isSafeGroupId` takes either case).
+    static func randomGroupId() -> String { "g" + UUID().uuidString.prefix(8).lowercased() }
 
     func item(_ id: Int64) -> CapturedItem? { items.first { $0.id == id } }
+
+    /// Display only: these photos were copied to the Photos library by Save to phone, so their thumbnails read as
+    /// safe rather than failed. Upload state, the queue and the protocol are untouched (Android's `savedToPhone`).
+    /// True if any item changed, for the caller to persist.
+    mutating func markSavedToPhone(_ ids: Set<Int64>) -> Bool {
+        var changed = false
+        for i in items.indices where ids.contains(items[i].id) && items[i].savedToPhone != true {
+            items[i].savedToPhone = true; changed = true
+        }
+        return changed
+    }
 
     /// True while no Clear has happened since a send captured `generation`.
     func isCurrent(_ generation: Int) -> Bool { generation == self.generation }
@@ -482,10 +496,40 @@ struct CaptureQueue {
     }
 
     func snapshot() -> SessionStore.Snapshot {
-        let ended = endedSegments.map { SessionStore.EndedSeg(group: $0.key, quality: $0.value.quality,
-                                                              year: $0.value.year, month: $0.value.month, seqs: $0.value.seqs) }
+        let ended = endedSegments.entries.map { SessionStore.EndedSeg(group: $0.group, quality: $0.tags.quality,
+                                                                      year: $0.tags.year, month: $0.tags.month, seqs: $0.tags.seqs) }
         return .init(items: items, seq: seqCounter, nextId: nextId, groupId: currentGroupId,
                      pendingTagGroupId: pendingTagGroupId, endedSegments: ended)
+    }
+}
+
+/// Ended-but-unacked segments keyed by group, kept in the order they were first ended. Re-ending a group already
+/// here replaces its tags in place, as a `LinkedHashMap` put does.
+struct EndedSegments: Equatable {
+    private(set) var entries: [(group: String, tags: CaptureQueue.SegTags)] = []
+
+    var isEmpty: Bool { entries.isEmpty }
+    var count: Int { entries.count }
+    /// The groups, oldest first.
+    var keys: [String] { entries.map(\.group) }
+
+    subscript(group: String) -> CaptureQueue.SegTags? {
+        get { entries.first { $0.group == group }?.tags }
+        set {
+            let i = entries.firstIndex { $0.group == group }
+            switch (i, newValue) {
+            case let (i?, tags?): entries[i].tags = tags
+            case let (nil, tags?): entries.append((group, tags))
+            case let (i?, nil): entries.remove(at: i)
+            case (nil, nil): break
+            }
+        }
+    }
+
+    mutating func removeAll() { entries.removeAll() }
+
+    static func == (a: EndedSegments, b: EndedSegments) -> Bool {
+        a.entries.count == b.entries.count && zip(a.entries, b.entries).allSatisfy { $0.group == $1.group && $0.tags == $1.tags }
     }
 }
 

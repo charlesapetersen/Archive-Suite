@@ -30,6 +30,9 @@ struct CapturedItem: Identifiable, Codable, Equatable {
     // gone. HELD on the phone (never sent) until the operator says what it is, and persisted, so a further kill
     // can't release it to the Mac under a classification nobody chose. Mirrors Android's `needsReview`.
     var needsReview: Bool? = nil
+    // Display only: copied to the Photos library by Save to phone, so the thumbnail reads as safe, not failed. It
+    // changes nothing about upload state, the queue or the phone↔Mac protocol. Mirrors Android's `savedToPhone`.
+    var savedToPhone: Bool? = nil
 }
 
 extension CapturedItem {
@@ -39,7 +42,7 @@ extension CapturedItem {
     static let photoDirectoryKey = CodingUserInfoKey(rawValue: "capturePhotoDirectory")!
 
     private enum CodingKeys: String, CodingKey {
-        case id, fileName, groupId, seq, type, quality, year, month, state, replacesGroupId, needsResend, needsReview
+        case id, fileName, groupId, seq, type, quality, year, month, state, replacesGroupId, needsResend, needsReview, savedToPhone
     }
 
     init(from decoder: Decoder) throws {
@@ -63,7 +66,8 @@ extension CapturedItem {
                   state: try c.decode(UploadState.self, forKey: .state),
                   replacesGroupId: try c.decodeIfPresent(String.self, forKey: .replacesGroupId),
                   needsResend: try c.decodeIfPresent(Bool.self, forKey: .needsResend),
-                  needsReview: try c.decodeIfPresent(Bool.self, forKey: .needsReview))
+                  needsReview: try c.decodeIfPresent(Bool.self, forKey: .needsReview),
+                  savedToPhone: try c.decodeIfPresent(Bool.self, forKey: .savedToPhone))
     }
 
     func encode(to encoder: Encoder) throws {
@@ -80,5 +84,6 @@ extension CapturedItem {
         try c.encodeIfPresent(replacesGroupId, forKey: .replacesGroupId)
         try c.encodeIfPresent(needsResend, forKey: .needsResend)
         try c.encodeIfPresent(needsReview, forKey: .needsReview)
+        try c.encodeIfPresent(savedToPhone, forKey: .savedToPhone)
     }
 }

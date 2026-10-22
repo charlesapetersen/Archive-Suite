@@ -52,6 +52,7 @@ struct CaptureScreen: View {
                     // Backup safety net: copy what's on the phone to Photos if it won't transfer.
                     if !vm.items.isEmpty { Button("Save to phone") { vm.saveToPhone() }.foregroundStyle(.white) }
                     Button("Re-pair") { showRepairConfirm = true }.foregroundStyle(.white)
+                        .accessibilityLabel("Re-pair with a Mac")
                 }
                 // End segment is the ONLY "done" action: a document is finished when you tap it (there is
                 // no separate "Finish" — its pages already streamed to the Mac, so ending the segment sends
@@ -81,6 +82,7 @@ struct CaptureScreen: View {
                                       armed: vm.selectedItemId == item.id && vm.armed)
                                     .onTapGesture { vm.tapItem(item.id) }
                                     .onLongPressGesture { vm.toggleQ3(item.id) }
+                                    .accessibilityAction(named: "Toggle quality Q3") { vm.toggleQ3(item.id) }
                                     .transition(.opacity.combined(with: .move(edge: .top)))
                             }
                         }
@@ -94,14 +96,19 @@ struct CaptureScreen: View {
                     Button { capture(.box) } label: { Text("Box").frame(width: 66, height: 44) }
                         .background(Color(red: 0.83, green: 0.18, blue: 0.18)).foregroundStyle(.white)
                         .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .accessibilityLabel(vm.selectedItemId != nil ? "Reclassify the selected photo as a box marker"
+                                                                     : "Box. Capture a box-label marker")
                     Spacer()
                     Button { capture(.document) } label: {
                         Circle().fill(.white).frame(width: 68, height: 68).overlay(Circle().stroke(.gray, lineWidth: 3))
                     }
+                    .accessibilityLabel("Shutter. Capture a document page")
                     Spacer()
                     Button { capture(.folder) } label: { Text("Folder").frame(width: 66, height: 44) }
                         .background(Color(red: 0.48, green: 0.12, blue: 0.64)).foregroundStyle(.white)
                         .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .accessibilityLabel(vm.selectedItemId != nil ? "Reclassify the selected photo as a folder marker"
+                                                                     : "Folder. Capture a folder-label marker")
                 }
                 .disabled(isCapturing)
 
@@ -211,7 +218,8 @@ struct CaptureScreen: View {
     }
 }
 
-/// A capture strip thumbnail with an upload-state dot; loads a downsampled image off the main thread.
+/// A capture strip thumbnail with an upload-state dot (teal, with a check badge, once saved to Photos); loads a
+/// downsampled image off the main thread.
 private struct Thumb: View {
     let item: CapturedItem
     let selected: Bool
@@ -223,6 +231,12 @@ private struct Thumb: View {
             if let image { Image(uiImage: image).resizable().scaledToFill() }
             else { Color.gray.opacity(0.4) }
             Circle().fill(stateColor).frame(width: 10, height: 10).padding(3)
+            // Saved to Photos: safe on the phone, so it must not read as failed (Android's saved badge).
+            if item.savedToPhone == true && !armed {
+                Text("✓").font(.caption2.bold()).foregroundStyle(.white)
+                    .frame(width: 14, height: 14).background(Circle().fill(Self.savedTeal))
+                    .padding(2).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+            }
             if armed {
                 Color.black.opacity(0.45)
                 Image(systemName: "xmark").foregroundStyle(.white).font(.headline)
@@ -234,9 +248,41 @@ private struct Thumb: View {
         .clipShape(RoundedRectangle(cornerRadius: 6))
         .overlay(RoundedRectangle(cornerRadius: 6).stroke(ring, lineWidth: ring == .clear ? 0 : 3))
         .task(id: item.fileURL) { image = await Self.loadThumb(item.fileURL) }
+        // VoiceOver: type + status (+ Q3 / delete-armed), Android's TalkBack label, so the strip isn't unlabeled.
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(a11yLabel)
+        .accessibilityAddTraits(.isButton)
+        .accessibilityHint("Select it to reclassify it with Box or Folder. Activate it twice more to delete it.")
+    }
+
+    private static let savedTeal = Color(red: 0x30 / 255, green: 0xB0 / 255, blue: 0xC7 / 255)
+
+    private var a11yLabel: String {
+        let type: String
+        switch item.type {
+        case .document: type = "Document page"
+        case .box: type = "Box marker"
+        case .folder: type = "Folder marker"
+        }
+        let status: String
+        if item.savedToPhone == true { status = "saved to Photos" }
+        else if item.needsReview == true { status = "held for review, not sent" }
+        else {
+            switch item.state {
+            case .uploaded: status = "sent to Mac"
+            case .uploading: status = "sending to Mac"
+            case .failed: status = "upload failed, will retry"
+            case .pending: status = "queued to send"
+            }
+        }
+        var label = "\(type), \(status)"
+        if item.quality == "Q3" { label += ", quality Q3" }
+        if armed { label += ", tap again to delete" }
+        return label
     }
 
     private var stateColor: Color {
+        if item.savedToPhone == true { return Self.savedTeal }
         switch item.state {
         case .uploaded: return .green
         case .uploading: return .yellow

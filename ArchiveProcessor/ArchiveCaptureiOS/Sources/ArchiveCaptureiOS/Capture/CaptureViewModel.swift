@@ -352,7 +352,12 @@ final class CaptureViewModel: ObservableObject {
         // gate the tag sheet on "the current group has any document page," regardless of upload state, so
         // an empty segment just starts a new group but a real one always gets tagged + a completion signal.
         let hasDocs = items.contains { $0.groupId == currentGroupId && $0.type == .document }
-        if hasDocs { queue.pendingTagGroupId = currentGroupId; persist() } else { startNewGroup() }
+        if hasDocs { queue.pendingTagGroupId = currentGroupId; persist() }
+        else {
+            // Tapping End segment with nothing captured was silent and looked broken: say so (Android's wording).
+            statusMessage = "No pages in this segment yet — capture a page first."
+            startNewGroup()
+        }
     }
 
     /// Tag sheet → "Apply & continue" or "Skip" (Skip passes nils): apply the optional pre-fill tags and
@@ -388,6 +393,8 @@ final class CaptureViewModel: ObservableObject {
         // Already-uploaded pages are done (bytes on the Mac; tags via the signal) → they leave the strip now.
         for item in end.confirmed { removeConfirmed(item) }
         trySendSegmentComplete(group: gid)   // sends now iff all pages already uploaded; else deferred to upload/retry
+        // Display only, so ending a segment is never silent; what End segment sends is unchanged.
+        statusMessage = "Segment ended · \(pages) page\(pages == 1 ? "" : "s")"
         if pages > 0 { flash("Segment → Mac · \(pages) page\(pages == 1 ? "" : "s")") }
     }
 
@@ -557,12 +564,15 @@ final class CaptureViewModel: ObservableObject {
                 statusMessage = "Photos access is off — enable it in Settings to save a backup."
                 return
             }
-            var saved = 0
+            var savedIds = Set<Int64>()
             for item in toSave {
                 // Guard the source exists (a concurrent upload-confirmation may have removed it) so a missing
                 // file can't be silently counted as a saved backup — over-reporting a backup that isn't there.
-                if await Self.writeToPhotos(item.fileURL) { saved += 1 }
+                if await Self.writeToPhotos(item.fileURL) { savedIds.insert(item.id) }
             }
+            let saved = savedIds.count
+            // Display only: the saved thumbnails read as safe on the phone, not failed. Upload state is untouched.
+            if queue.markSavedToPhone(savedIds) { persist() }
             statusMessage = saved == toSave.count
                 ? "Saved \(saved) photo(s) to Photos"
                 : "Saved \(saved) of \(toSave.count) — some couldn't be added to Photos"

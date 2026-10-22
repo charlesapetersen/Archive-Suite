@@ -40,8 +40,10 @@ struct QRScannerView: UIViewControllerRepresentable {
             super.viewDidLoad()
             view.backgroundColor = .black
             AVCaptureDevice.requestAccess(for: .video) { granted in
-                guard granted else { return }
-                DispatchQueue.main.async { self.configure() }
+                DispatchQueue.main.async {
+                    // Denied (now or earlier) used to leave a black sheet with nothing on it.
+                    if granted { self.configure() } else { self.showUnavailable(Self.deniedText, settings: true) }
+                }
             }
             bgObserver = NotificationCenter.default.addObserver(
                 forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: .main
@@ -65,7 +67,10 @@ struct QRScannerView: UIViewControllerRepresentable {
         private func configure() {
             guard let device = AVCaptureDevice.default(for: .video),
                   let input = try? AVCaptureDeviceInput(device: device),
-                  session.canAddInput(input) else { return }
+                  session.canAddInput(input) else {
+                showUnavailable("This device's camera can't be used to scan. Close this and enter the details by hand instead.", settings: false)
+                return
+            }
             session.addInput(input)
             let output = AVCaptureMetadataOutput()
             if session.canAddOutput(output) {
@@ -79,6 +84,37 @@ struct QRScannerView: UIViewControllerRepresentable {
             view.layer.addSublayer(preview)
             previewLayer = preview
             DispatchQueue.global(qos: .userInitiated).async { self.session.startRunning() }
+        }
+
+        static let deniedText = "Camera access is off, so the Mac's QR code can't be scanned. Allow it in Settings, or close this and enter the details by hand."
+
+        /// A message (and, for a denial, a way to Settings) in place of the preview that can't run.
+        private func showUnavailable(_ text: String, settings: Bool) {
+            let label = UILabel()
+            label.text = text
+            label.textColor = .white
+            label.textAlignment = .center
+            label.numberOfLines = 0
+            label.font = .preferredFont(forTextStyle: .body)
+            label.adjustsFontForContentSizeCategory = true
+            let stack = UIStackView(arrangedSubviews: [label])
+            stack.axis = .vertical
+            stack.spacing = 16
+            stack.alignment = .center
+            if settings {
+                var config = UIButton.Configuration.filled()
+                config.title = "Open Settings"
+                stack.addArrangedSubview(UIButton(configuration: config, primaryAction: UIAction { _ in
+                    if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
+                }))
+            }
+            stack.translatesAutoresizingMaskIntoConstraints = false
+            view.addSubview(stack)
+            NSLayoutConstraint.activate([
+                stack.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+                stack.leadingAnchor.constraint(equalTo: view.layoutMarginsGuide.leadingAnchor, constant: 16),
+                stack.trailingAnchor.constraint(equalTo: view.layoutMarginsGuide.trailingAnchor, constant: -16),
+            ])
         }
 
         override func viewWillDisappear(_ animated: Bool) {

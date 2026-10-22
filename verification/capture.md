@@ -33,7 +33,7 @@ Checked constant by constant, because a divergence here would corrupt data on th
 | Drive folder and file lookup by `appProperties` (`relayToken`, `relayName`) | `DriveRelayTransport.kt:26-40` | `DriveRelayTransport.swift:22-31` | same |
 | HTTP routes and headers (`/ping`, `/photo` + `X-Group/Seq/Type/Device/Quality/Year/Month/Replaces`, `/segment/complete` + `X-Seqs`, `/phone/status` + `X-Pending`, `/session/complete`, `/session/disconnect`) | `A/net/MacClient.kt:30-126` | `I/Net/MacClient.swift:29-113` | same |
 | Quality values (`Q1`–`Q3`, none for Unrated, long-press sends `Q3`) | `SegmentTagSheet.kt:103` | `SegmentTagSheet.swift:61` | same |
-| Group id | `g` + 8 lowercase hex | `g` + 8 **uppercase** hex | cosmetic: the Mac's `isSafeGroupId` takes both |
+| Group id | `g` + 8 lowercase hex | `g` + 8 lowercase hex (was uppercase) | **aligned** by `W40.i-fix-ios-polish` (2026-10-21) |
 | `segmentComplete` when the Drive write fails | returns `true`: `upsert` swallows the error | returns `false` and retries | **Android defect**, S-021 |
 
 The guards already covering this: Android `RelayObjectFormatTest` (golden bytes); on iOS,
@@ -73,7 +73,7 @@ iOS, so each was checked against the iOS code.
 | Cloud pairing | an explicit Cloud mode with no LAN probe; relay token from the QR or typed in; Google sign-in launched with the QR's `account` as the login hint (`A/ui/ConnectScreen.kt:183-249`) | had no Cloud choice: Drive was used only after a LAN ping, a refused connection never fell back, a working LAN was passed over for Drive when signed in, a `mode:"cloud"` QR was refused, and there was no typed relay token. Now an explicit Wi-Fi/Cloud choice (`I/UI/ConnectScreen.swift`); Cloud takes the combined QR's `relay`, a cloud QR, or a typed relay token, signs in with the QR's `account` as `login_hint`, and pairs with no LAN probe; Wi-Fi never switches to Drive by itself and names a cloud-only QR (`CaptureViewModel.connectCloud`, `MacEndpoint.fromQRPayload`) | **fixed** by `W40.i-fix-ios-cloud-pairing` (2026-10-21); a real sign-in still needs the owner's iOS OAuth client (`W40.i5`) |
 | Deleting a page | confirms whenever the page is unsent *or* has a pending resend; cancels and waits for its upload; "Save to gallery & delete" or "Delete permanently" (`CaptureViewModel.kt:477-563`) | confirmed only when the page was unsent, so a pending resend was deleted unasked; no cancel; "Delete permanently" only. Now confirms on the heartbeat's own condition, cancels and awaits the upload, and offers "Save to Photos & delete" (kept and re-queued if the copy fails) or "Delete permanently" | **fixed** by `W40.i-fix-ios-delete-confirm` (2026-10-21) |
 | Tests | ten JVM test files over the queue, delete, recovery, orphans, pairing generation, QR parsing, the Drive transport, relay bytes and the session writer | no test target; four `swiftc` scripts cover only the network layer. None of the view model's safety logic is tested, and there is no runtime to host an XCTest bundle | **gap, S3** → `W40.i-fix-ios-testable-core`, which the S1 and S2 fixes wait on so each lands with a failing test first (rule 8) |
-| Small differences | `savedToPhone` badge; "Segment ended · N" and "No pages in this segment yet"; ended segments kept in order; accessibility labels | none of these; ended segments in a `Dictionary`, so tag cards can reach the Mac out of order; the QR sheet is black with no message when camera access is denied; the recent-year chips can overflow | **gap, S4** → `W40.i-fix-ios-polish` |
+| Small differences | `savedToPhone` badge; "Segment ended · N" and "No pages in this segment yet"; ended segments kept in order; accessibility labels | all of these now: a persisted `savedToPhone` (teal dot + ✓), both status lines, ended segments in insertion order (`EndedSegments`), VoiceOver labels on the strip and Box/shutter/Folder; the QR sheet says why when camera access is off, with Open Settings; the recent-year chips wrap | **fixed** by `W40.i-fix-ios-polish` (2026-10-21) |
 | Wired (USB) transport | `adb reverse` to `127.0.0.1` | absent; the iOS screen says USB is not available | not a gap: the guides promise USB for Android only |
 | E2E inject seam | DEBUG `files/test_inject.jpg`, used per shutter tap (`A/ui/CaptureScreen.kt:396-411`) | absent | belongs to `W40.i3`, which builds it |
 | Pairing, manual entry, reachability probe | host/port/token, digits-only port; probe reports OK, unauthorised, refused or unreachable | host/port/token with a 1–65535 port check; a refused connection reports as unreachable | same (iOS checks the port better) |
@@ -101,7 +101,7 @@ iOS, so each was checked against the iOS code.
 | `W40.i-fix-ios-cloud-pairing` | S3 | no Cloud mode, cloud QR refused, no typed relay token — fixed 2026-10-21 |
 | `W40.i-fix-ios-drive-token-keychain` | S3 | Drive tokens in `UserDefaults` — fixed 2026-10-21 |
 | `W40.i-fix-ios-delete-confirm` | S3 · Tier-2 | a pending resend deleted unasked; no cancel; no save-and-delete |
-| `W40.i-fix-ios-polish` | S4 | the small differences above |
+| `W40.i-fix-ios-polish` | S4 | the small differences above — fixed 2026-10-21 |
 
 **Doc drift** for `W40.b5`: `ArchiveProcessor/LIVE_CAPTURE_ANDROID_TEST.md` still says the iPhone is deferred, and
 `ArchiveProcessor/README.md` §Transports still says the phone side of the Drive relay is owner-gated on OAuth.
@@ -419,8 +419,8 @@ Paths: `A/` and `I/` as in the parity comparison above; `scripts/` is `ArchivePr
 - **Status:** `unproven`
 - **History:**
   - 2026-10-21 W40.b4 — row written, `unproven`.
-- **Notes:** the one difference is cosmetic: the group id is lowercase hex on Android and uppercase on iOS, which the
-  Mac's `isSafeGroupId` accepts. A real iOS photo reaching the Mac would make this row's evidence (`W40.i3`).
+- **Notes:** the group id was uppercase hex on iOS (lowercase on Android); both are lowercase since
+  `W40.i-fix-ios-polish` (2026-10-21). A real iOS photo reaching the Mac would make this row's evidence (`W40.i3`).
 
 ### iOS
 
@@ -442,8 +442,8 @@ action or any runtime evidence: there is no test target and no simulator runtime
 - **History:**
   - 2026-10-21 W40.b4 — row written, `unproven`.
 - **Notes:** opens on the scanner as promised, and names a bad QR (unlike `C-01`). A cloud-mode QR was refused; since
-  `W40.i-fix-ios-cloud-pairing` (2026-10-21) Wi-Fi names it as a Cloud code and the Cloud choice accepts it. With camera access denied the scanner is black
-  with no message → `W40.i-fix-ios-polish`.
+  `W40.i-fix-ios-cloud-pairing` (2026-10-21) Wi-Fi names it as a Cloud code and the Cloud choice accepts it. With camera access denied the scanner was black
+  with no message; since `W40.i-fix-ios-polish` (2026-10-21) it says so and offers Open Settings.
 
 ### C-32 · iOS · Manual entry of host, port and token
 
@@ -526,8 +526,8 @@ action or any runtime evidence: there is no test target and no simulator runtime
 - **Status:** `unproven`
 - **History:**
   - 2026-10-21 W40.b4 — row written, `unproven`.
-- **Notes:** ended segments are held in a `Dictionary`, so their tag cards can reach the Mac out of order →
-  `W40.i-fix-ios-polish`.
+- **Notes:** ended segments were held in a `Dictionary`, so their tag cards could reach the Mac out of order; since
+  `W40.i-fix-ios-polish` (2026-10-21) they are kept in the order ended, through restore.
 
 ### C-38 · iOS · On-phone tagging: Quality and date
 
