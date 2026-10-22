@@ -273,7 +273,9 @@ final class VisualReviewUITests: FixtureUITestCase {
         }
         // Two files in one document window.
         clickRow(0)
-        XCUIElement.perform(withKeyModifiers: .shift) { table.tableRows.element(boundBy: 1).click() }
+        XCUIElement.perform(withKeyModifiers: .shift) {   // near the left edge, as the row context menu above
+            table.tableRows.element(boundBy: 1).coordinate(withNormalizedOffset: CGVector(dx: 0.1, dy: 0.5)).click()
+        }
         app.typeKey("o", modifierFlags: .command)
         if waitForWindows(2) { shoot("document-multi"); closeDocument() } else { missing.append("document-multi") }
     }

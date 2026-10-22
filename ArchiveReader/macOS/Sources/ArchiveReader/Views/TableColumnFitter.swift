@@ -41,7 +41,9 @@ final class TableColumnFitter: NSObject {
 
     /// The flexible columns' widths when `available` points are left for them: their preferred widths if those
     /// fit, otherwise each gives up a share of the shortfall in proportion to how far it is above its minimum.
-    /// Rounded down, so the result never needs more than `available`.
+    /// Whole points that add up to `available` rounded down, the last column taking the remainder. Rounding each
+    /// share down on its own let the sum, and so where Read starts, jitter by a point as the sidebar slid in
+    /// (TransientStateUITests saw Read go 1007 → 1223 → 1222); while the cut lasts, Read now stays put.
     nonisolated static func widths(preferred: [CGFloat], minimums: [CGFloat], available: CGFloat) -> [CGFloat] {
         let total = preferred.reduce(0, +)
         guard total > available else { return preferred }
@@ -49,7 +51,11 @@ final class TableColumnFitter: NSObject {
         let totalSlack = slack.reduce(0, +)
         guard totalSlack > 0 else { return preferred }
         let cut = min(total - available, totalSlack)
-        return zip(preferred, slack).map { p, s in (p - cut * s / totalSlack).rounded(.down) }
+        var result = zip(preferred, slack).map { p, s in (p - cut * s / totalSlack).rounded(.down) }
+        let last = result.count - 1
+        let sumOfOthers = result.dropLast().reduce(0, +)
+        result[last] = max(minimums[last], (total - cut).rounded(.down) - sumOfOthers)
+        return result
     }
 
     /// Refit to the scroll view's current width. Also called after a column is shown or hidden.

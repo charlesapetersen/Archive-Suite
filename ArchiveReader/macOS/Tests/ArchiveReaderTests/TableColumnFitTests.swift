@@ -58,6 +58,18 @@ final class TableColumnFitTests: XCTestCase {
         XCTAssertEqual(TableColumnFitter.widths(preferred: [200, 300], minimums: [200, 160], available: 400), [200, 200])
     }
 
+    /// While the cut lasts the two columns fill exactly the whole points available, so as the sidebar slides in
+    /// (the table's left edge moving right as fast as its width shrinks) Read's start does not wobble by a point.
+    func testTheCutFillsExactlyTheWholePointsAvailable() {
+        for tenths in stride(from: 6_190, through: 3_600, by: -7) {
+            let available = CGFloat(tenths) / 10
+            let w = TableColumnFitter.widths(preferred: [320, 300], minimums: [200, 160], available: available)
+            XCTAssertEqual(w[0] + w[1], available.rounded(.down), "at \(available)")
+            XCTAssertGreaterThanOrEqual(w[0], 200)
+            XCTAssertGreaterThanOrEqual(w[1], 160)
+        }
+    }
+
     /// The 2026-10-16 reproduction: a 1400-pt window with its 210-pt sidebar, then the cloud's 240 pt and its
     /// divider taken from beside the list.
     func testOpeningTheCloudShrinksNameAndTagsNotQualityAndRead() {
