@@ -6,6 +6,9 @@ import ArchiveCore
 /// edits show Finder-style tri-state: subjects on all vs. some; facets show "(mixed)" when they differ.
 struct TagEditorView: View {
     @ObservedObject var model: NavigationModel
+    /// From `SheetSizing.fitted` over the presenting window, so the sheet never overhangs it (W40.fix-reader-tag-editor-chips).
+    var size: CGSize = TagEditorView.preferredSize
+    static let preferredSize = CGSize(width: 480, height: 620)
     @Environment(\.dismiss) private var dismiss
     @State private var subjectDraft = ""
     @State private var yearDraft = ""
@@ -19,6 +22,7 @@ struct TagEditorView: View {
                 Text(s.count == 1 ? "Edit Tags" : "Edit Tags — \(s.count) files").font(.headline)
                 Spacer()
                 Button("Done") { dismiss() }.keyboardShortcut(.defaultAction)
+                    .accessibilityIdentifier("ar.tagEditor.done")
             }
             .padding()
             Divider()
@@ -39,7 +43,7 @@ struct TagEditorView: View {
                 .padding()
             }
         }
-        .frame(width: 480, height: 620)
+        .frame(width: size.width, height: size.height)
     }
 
     // MARK: Subjects
@@ -50,11 +54,11 @@ struct TagEditorView: View {
             if s.subjectsOnAll.isEmpty && s.subjectsOnSome.isEmpty {
                 Text("None").foregroundStyle(.secondary).font(.callout)
             }
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 6) {
-                    ForEach(s.subjectsOnAll, id: \.self) { chip($0, partial: false) }
-                    ForEach(s.subjectsOnSome, id: \.self) { chip($0, partial: true) }
-                }
+            // Wrapped, not one horizontal row: a row clipped every subject past the first few, so they could not
+            // be removed (W40.fix-reader-tag-editor-chips).
+            FlowLayout(spacing: 6) {
+                ForEach(s.subjectsOnAll, id: \.self) { chip($0, partial: false) }
+                ForEach(s.subjectsOnSome, id: \.self) { chip($0, partial: true) }
             }
             HStack {
                 TextField("Add subject…", text: $subjectDraft)
@@ -72,19 +76,34 @@ struct TagEditorView: View {
                     .font(.caption).foregroundStyle(.orange)
             }
             if !s.subjectsOnSome.isEmpty {
-                Text("Faded tags are on some, not all, selected files.").font(.caption).foregroundStyle(.secondary)
+                Text("Faded, dashed tags are on some, not all, selected files.").font(.caption).foregroundStyle(.secondary)
             }
         }
     }
 
+    /// A removable subject. A partial one (on some of the selected files) is drawn faded with a dashed outline
+    /// and no fill, so it reads as partial on its own: when every chip was partial, a uniform fade showed nothing.
     private func chip(_ subject: String, partial: Bool) -> some View {
         Button { model.applyEdit(.removeSubject(subject)) } label: {
-            HStack(spacing: 3) { Text(subject); Image(systemName: "xmark.circle.fill") }
+            HStack(spacing: 3) {
+                Text(subject).lineLimit(1).truncationMode(.middle)
+                Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
+            }
+            .font(.callout)
+            .foregroundStyle(partial ? .secondary : .primary)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(Capsule().fill(partial ? Color.clear : Color.accentColor.opacity(0.18)))
+            .overlay(Capsule().strokeBorder(partial ? Color.secondary.opacity(0.7) : Color.accentColor.opacity(0.55),
+                                            style: StrokeStyle(lineWidth: 1, dash: partial ? [3, 2] : [])))
+            .contentShape(Capsule())
+            .frame(maxWidth: 420)   // a very long subject truncates rather than overrunning the sheet
         }
-        .buttonStyle(.bordered)
-        .controlSize(.small)
-        .opacity(partial ? 0.55 : 1)
-        .help("Remove “\(subject)”")
+        .buttonStyle(.plain)
+        .help(partial ? "On some of the selected files. Click to remove “\(subject)” from all of them."
+                      : "Remove “\(subject)”")
+        .accessibilityIdentifier("ar.tagEditor.chip." + subject)
+        .accessibilityValue(partial ? "on some selected files" : "on all selected files")
     }
 
     private func addSubject() {
@@ -126,8 +145,7 @@ struct TagEditorView: View {
             HStack {
                 Text("Uncertain").frame(width: 68, alignment: .leading)
                 let allUncertain = !model.selectedFiles.isEmpty && model.selectedFiles.allSatisfy(\.tags.dateUncertain)
-                Button("Mark Uncertain") { model.applyEdit(.setDateUncertain(true)) }
-                    .tint(allUncertain ? .accentColor : nil)
+                facetButton("Mark Uncertain", current: allUncertain) { model.applyEdit(.setDateUncertain(true)) }
                 Button("Clear Uncertain") { model.applyEdit(.setDateUncertain(false)) }
             }
         }
@@ -195,10 +213,18 @@ struct TagEditorView: View {
 
     private func title(_ t: String) -> some View { Text(t).font(.subheadline.bold()) }
 
+    /// The current choice is a filled accent button. A tinted `.bordered` one was blue text on an almost
+    /// invisible tint, so the choice looked weaker than the options around it (W40.fix-reader-tag-editor-chips).
+    @ViewBuilder
     private func facetButton(_ label: String, current: Bool, action: @escaping () -> Void) -> some View {
-        Button(label, action: action)
-            .buttonStyle(.bordered)
-            .tint(current ? .accentColor : nil)
+        if current {
+            Button(label, action: action)
+                .buttonStyle(.borderedProminent)
+                .accessibilityAddTraits(.isSelected)
+        } else {
+            Button(label, action: action)
+                .buttonStyle(.bordered)
+        }
     }
 
     private func yearPlaceholder(_ s: GroupTagSummary) -> String {

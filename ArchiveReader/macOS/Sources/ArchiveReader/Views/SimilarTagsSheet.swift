@@ -8,6 +8,9 @@ import SwiftUI
 /// a rename in the sheet it opens.
 struct SimilarTagsSheet: View {
     @ObservedObject var model: NavigationModel
+    /// From `SheetSizing.fitted` over the presenting window, so the sheet never overhangs it.
+    var size: CGSize = SimilarTagsSheet.preferredSize
+    static let preferredSize = CGSize(width: 520, height: 580)
     @Environment(\.dismiss) private var dismiss
 
     @State private var clusters: [[TagSimilarity.TagVariant]] = []
@@ -20,6 +23,7 @@ struct SimilarTagsSheet: View {
                 Text("Similar tags").font(.headline)
                 Spacer()
                 Button("Done") { dismiss() }.keyboardShortcut(.cancelAction)
+                    .accessibilityIdentifier("ar.similarTags.done")
             }
             Text("Groups of subject tags that look like near-duplicates — typos, or case/spacing variants. Pick the correct spelling to keep, then **Merge** the others into it (renames every file that carries them). Nothing changes until you confirm the rename.")
                 .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
@@ -38,7 +42,7 @@ struct SimilarTagsSheet: View {
             }
         }
         .padding(18)
-        .frame(width: 520, height: 580)
+        .frame(width: size.width, height: size.height)
         .onAppear { refresh() }
         .onChange(of: model.undoDepth) { refresh() }   // a merge (or undo) changed the corpus → recompute
         .sheet(item: $mergeTarget) { t in

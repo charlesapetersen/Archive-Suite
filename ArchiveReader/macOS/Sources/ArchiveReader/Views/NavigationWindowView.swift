@@ -56,12 +56,16 @@ struct NavigationWindowView: View {
         .onChange(of: model.filter) { model.recompute() }
         .onChange(of: model.sort) { model.recompute() }
         .onChange(of: calendarsEnabled) { model.refreshDisplayedRows() }
-        .sheet(isPresented: $model.showingEditor) { TagEditorView(model: model) }
+        .sheet(isPresented: $model.showingEditor) {
+            TagEditorView(model: model, size: SheetSizing.fitted(TagEditorView.preferredSize, in: contentSize))
+        }
         .sheet(isPresented: Binding(get: { model.renamingTag != nil },
                                     set: { if !$0 { model.renamingTag = nil } })) {
             if let t = model.renamingTag { RenameTagSheet(model: model, oldTag: t) }
         }
-        .sheet(isPresented: $model.showingSimilarTags) { SimilarTagsSheet(model: model) }
+        .sheet(isPresented: $model.showingSimilarTags) {
+            SimilarTagsSheet(model: model, size: SheetSizing.fitted(SimilarTagsSheet.preferredSize, in: contentSize))
+        }
         .alert("Save Search", isPresented: $model.showingSaveDialog) {
             TextField("Name", text: $newSearchName)
             Button("Save") { model.saveCurrentSearch(name: newSearchName) }

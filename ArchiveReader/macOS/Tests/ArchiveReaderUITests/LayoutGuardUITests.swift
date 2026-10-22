@@ -1,7 +1,8 @@
 import XCTest
 
 /// W40.e9 — the layout guard (`packages/UITestSupport/LayoutGuard.swift`) over the Reader's main screens: the
-/// navigation window with a document selected, the preview sheet, and the document viewer window. Each at its
+/// navigation window with a document selected, the Edit Tags and Similar Tags sheets, the preview sheet, and the
+/// document viewer window. Each at its
 /// typical and minimum size, on open and once settled; one test per appearance, because the appearance is a
 /// launch argument.
 final class LayoutGuardUITests: FixtureUITestCase {
@@ -38,6 +39,22 @@ final class LayoutGuardUITests: FixtureUITestCase {
         waitForRows(minimum: 3, timeout: 10)
         clickRow(0)
         LayoutGuard.sweep(main, screen: "navigation window, \(appearance)", in: self, ignore: isPDFPage)
+
+        // The tag sheets at the window's size (W40.fix-reader-tag-editor-chips): Edit Tags over every row, so
+        // its subjects are a mix of full and partial chips, then Find Similar Tags. Done only dismisses.
+        app.typeKey("a", modifierFlags: .command)
+        toolbarButton("ar.toolbar.editTags").click()
+        let editorDone = app.buttons["ar.tagEditor.done"]
+        XCTAssertTrue(editorDone.waitForExistence(timeout: 5), "the Edit Tags sheet should open")
+        LayoutGuard.sweep(main, screen: "Edit Tags sheet, \(appearance)", in: self, resize: false)
+        editorDone.click()
+        app.menuBars.menuBarItems["Tags"].click()
+        app.menuItems["Find Similar Tags…"].click()
+        let similarDone = app.buttons["ar.similarTags.done"]
+        XCTAssertTrue(similarDone.waitForExistence(timeout: 5), "the Similar Tags sheet should open")
+        LayoutGuard.sweep(main, screen: "Similar Tags sheet, \(appearance)", in: self, resize: false)
+        similarDone.click()
+        clickRow(0)
 
         toolbarButton("ar.toolbar.preview").click()
         let open = app.buttons["ar.preview.open"]
