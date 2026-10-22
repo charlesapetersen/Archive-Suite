@@ -140,6 +140,14 @@ def cascade_threshold(probs, first_nes, esc_nes, slack=0.005):
     return -1.0, 1.0, sum(esc_nes) / n, target + slack
 
 
+def budget_nes(risk, first_nes, esc_nes, frac=0.2):
+    """Cascade NES when the riskiest `frac` of pages are escalated (ties broken by order): a comparison at equal
+    cost, which a threshold chosen per signal does not give."""
+    n = len(risk); k = round(frac * n)
+    top = set(sorted(range(n), key=lambda i: -risk[i])[:k])
+    return sum(esc_nes[i] if i in top else first_nes[i] for i in range(n)) / n
+
+
 def apply_threshold(t, probs, first_nes, esc_nes):
     n = len(probs)
     esc = [p >= t for p in probs]
@@ -321,6 +329,238 @@ def mac_collect(key, limit=None):
               f"mean lp {sum(lps) / max(1, len(lps)):.3f}", flush=True)
 
 
+# --- the OCR report -------------------------------------------------------------------------------------------
+
+CLUSTER = Path(os.environ.get('OCR_LOGPROB_CLUSTER',
+                              Path.home() / 'Claude/Long term storage/FarmShare-logprob-20261022/out'))
+# route -> (how its reply is read, its pair for the disagreement signal)
+CLUSTER_ROUTES = {'lightonocr3-4b': ('native', 'qwen3.5-9b'), 'qwen3.5-9b': ('panel', 'lightonocr3-4b')}
+MAC_ROUTES = {'lightonocr-3-4b-mlx8': 'qwen3.5-9b-mlx4', 'qwen3.5-9b-mlx4': 'lightonocr-3-4b-mlx8'}
+ESCALATE = 'qwen3.6-27b'            # the escalation route: its cached open-sweep and truth96 readings
+ESCALATE_96 = 'qwen3.6-27b-1849739'
+OCR_JSON = RESULTS / 'ocr-logprob.json'
+OCR_MD = RESULTS / 'ocr-logprob.md'
+OCR_PAGES = RESULTS / 'ocr-logprob-pages.csv'
+LP_SIGNALS = ('first', 'mean', 'min_k', 'low_share')
+SIGNALS = LP_SIGNALS + ('length', 'disagreement', 'failure')
+LABELS = {'nes<70': lambda r: not r['ok'] or r['nes'] < 0.70, 'nes<90': lambda r: not r['ok'] or r['nes'] < 0.90,
+          'failure': lambda r: not r['ok']}
+
+
+def risks(page):
+    """Each signal as a risk (higher = more likely wrong). An empty reading takes the worst value."""
+    f = page.get('features')
+    out = {s: (-f[s] if f else 1e9) for s in LP_SIGNALS}
+    out['length'] = f['tokens'] if f else 1e9
+    out['disagreement'] = -page['agreement'] if page.get('agreement') is not None else 1.0
+    out['failure'] = 0 if page['ok'] else 1
+    return out
+
+
+def _score(truth, text, stratum='S0'):
+    sys.path.insert(0, str(HERE))
+    import ocr_panel_score as S
+    return S.score(truth, text, stratum)
+
+
+def mac_pages(key):
+    """The Mac route's 96 accuracy pages: NES as ocr_mac_local.hw_pairs scores them, plus the token features."""
+    import ocr_mac_local as M
+    import ocr_panel as P
+    by_page, out = {r['page']: r for r in P.rows()}, mac_out(key)
+    rows = []
+    for job in M.jobs():
+        if job['page'] in P.AGREEMENT:
+            continue
+        meta, parsed = M.load_reading(out / (job['id'] + '.json'))
+        if not meta:
+            return None  # not collected yet
+        raw = json.loads((out / (job['id'] + '.raw.json')).read_text())
+        text = parsed['text'] if parsed else ''
+        truth = (P.TRUTH / 'truth' / (job['page'] + '.txt')).read_text()
+        rows.append({'page': job['page'], 'set': '96', 'kind': by_page[job['page']]['kind'], 'ok': bool(parsed),
+                     'nes': _score(truth, text)['nes'], 'text': text, 'features': token_features(raw['logprobs'])})
+    return rows
+
+
+def cluster_pages(route):
+    """The FarmShare route's 895 (scored as the open sweep's expanded report scores them) and 96, with features."""
+    sys.path.insert(0, str(HERE / 'corpus'))
+    import farmshare_results as F
+    import ocr_panel as P
+    import routes as R
+    mode = CLUSTER_ROUTES[route][0]
+    base = CLUSTER / route
+    if not (base / 'public895' / 'summary.json').exists() or not (base / 'truth99' / 'summary.json').exists():
+        return None
+    R.MANIFEST = RESULTS / 'bench-corpus' / 'manifest.jsonl'
+    ref = {R.job_id(r) for r in R.C.read_jsonl(RESULTS / 'bench-corpus' / 'manifest-reference-440.jsonl')}
+    rows = []
+    recs = F.read_records(base / 'public895')
+    for m in R.frozen():
+        jid = R.job_id(m); rec = recs.get(jid)
+        text = F.reading(rec, mode)
+        rows.append({'page': jid, 'set': '440' if jid in ref else '455', 'kind': m['stratum'], 'ok': bool(text),
+                     'nes': _score(Path(m['truth']).read_text(), text, m['stratum'])['nes'], 'text': text,
+                     'features': token_features([x for x in (rec or {}).get('lp') or [] if x is not None])})
+    recs = F.read_records(base / 'truth99')
+    by_page = {r['page']: r for r in P.rows()}
+    for page in sorted(by_page):
+        if page in P.AGREEMENT:
+            continue
+        rec = recs.get(page); text = F.reading(rec, mode)
+        rows.append({'page': page, 'set': '96', 'kind': by_page[page]['kind'], 'ok': bool(text),
+                     'nes': _score((P.TRUTH / 'truth' / (page + '.txt')).read_text(), text)['nes'], 'text': text,
+                     'features': token_features([x for x in (rec or {}).get('lp') or [] if x is not None])})
+    return rows
+
+
+def escalation_nes():
+    """page -> NES of the escalation route: the open sweep's per-page CSV (895) and the truth96 run (96)."""
+    import csv
+    out = {}
+    with open(RESULTS / 'bench-corpus' / 'open-sweep-20261019-pages.csv') as f:
+        for r in csv.DictReader(f):
+            if r['route'] == ESCALATE:
+                out[r['page']] = float(r['nes']) if r['ok'] == 'True' else 0.0
+    with open(RESULTS / 'farmshare' / 'truth' / ESCALATE_96 / 'pages.csv') as f:
+        for r in csv.DictReader(f):
+            out[r['page']] = float(r['nes']) if r['ok'] == 'True' else 0.0
+    return out
+
+
+def add_agreement(rows, pair_rows):
+    """Two-reader disagreement: this reading's NES against the other route's text on the same page (0 if either
+    failed)."""
+    other = {(r['set'], r['page']): r for r in pair_rows or []}
+    for r in rows:
+        o = other.get((r['set'], r['page']))
+        r['agreement'] = None if o is None else (_score(o['text'], r['text'])['nes'] if r['ok'] and o['ok'] else 0.0)
+
+
+def analyse(rows, esc):
+    """AUCs per set and label; isotonic per signal on the 440 (or, for a 96-only route, none); the cascade."""
+    by_set = {}
+    for r in rows:
+        r['risk'] = risks(r)
+        by_set.setdefault(r['set'], []).append(r)
+    res = {'sets': {s: {'pages': len(rr), 'ok': sum(r['ok'] for r in rr),
+                        'nes': sum(r['nes'] for r in rr) / len(rr),
+                        **{f'errors {k}': sum(1 for r in rr if f(r)) for k, f in LABELS.items()}}
+                    for s, rr in by_set.items()},
+           'auc': {s: {k: {sig: auc([r['risk'][sig] for r in rr], [f(r) for r in rr]) for sig in SIGNALS}
+                       for k, f in LABELS.items()} for s, rr in by_set.items()}}
+    if '440' not in by_set or '96' not in by_set or '455' not in by_set:
+        return res
+    y = LABELS['nes<70']
+    cal, casc = {}, {}
+    for sig in SIGNALS:
+        fit = isotonic_fit([r['risk'][sig] for r in by_set['440']], [1 if y(r) else 0 for r in by_set['440']])
+        prob = {s: [isotonic_predict(fit, r['risk'][sig]) for r in rr] for s, rr in by_set.items()}
+        cal[sig] = {s: {'brier': brier(prob[s], [1 if y(r) else 0 for r in by_set[s]]),
+                        'ece': ece(prob[s], [1 if y(r) else 0 for r in by_set[s]])} for s in ('455', '96')}
+        have = {s: [i for i, r in enumerate(by_set[s]) if r['page'] in esc] for s in ('96', '455')}
+        p96 = [prob['96'][i] for i in have['96']]
+        f96 = [by_set['96'][i]['nes'] for i in have['96']]; e96 = [esc[by_set['96'][i]['page']] for i in have['96']]
+        t, share, nes, all_nes = cascade_threshold(p96, f96, e96)
+        p455 = [prob['455'][i] for i in have['455']]
+        f455 = [by_set['455'][i]['nes'] for i in have['455']]; e455 = [esc[by_set['455'][i]['page']] for i in have['455']]
+        test = apply_threshold(t, p455, f455, e455)
+        escd = [i for i, p in zip(have['455'], p455) if p >= t]
+        inv = None
+        if escd:
+            inv = {'pages': len(escd), 'mean_calibrated_p': sum(prob['455'][i] for i in escd) / len(escd),
+                   'observed_error_rate': sum(1 for i in escd if y(by_set['455'][i])) / len(escd),
+                   'escalation_nes_on_escalated': sum(esc[by_set['455'][i]['page']] for i in escd) / len(escd),
+                   'escalation_nes_overall': sum(e455) / len(e455),
+                   'first_nes_on_escalated': sum(by_set['455'][i]['nes'] for i in escd) / len(escd)}
+        r455 = [by_set['455'][i]['risk'][sig] for i in have['455']]
+        test['nes_at_20pct'] = budget_nes(r455, f455, e455)
+        test['oracle_at_20pct'] = budget_nes([e - f for f, e in zip(f455, e455)], f455, e455)
+        casc[sig] = {'threshold': t, 'tune_96': {'share': share, 'nes': nes, 'all_nes': all_nes,
+                                                 'first_nes': sum(f96) / len(f96), 'pages': len(p96)},
+                     'test_455': {**test, 'pages': len(p455)}, 'invariance_455': inv}
+    res.update(calibration=cal, cascade=casc)
+    return res
+
+
+def ocr_report():
+    import csv
+    sys.path.insert(0, str(HERE))
+    out = {'item': 'W46.ocr-logprob', 'escalation_route': ESCALATE, 'routes': {}}
+    esc = escalation_nes()
+    page_rows = []
+    for routes, loader, where in ((MAC_ROUTES, mac_pages, 'Mac mlx-vlm'), (CLUSTER_ROUTES, cluster_pages, 'FarmShare vLLM')):
+        got = {k: loader(k) for k in routes}
+        for k, rows in got.items():
+            if rows is None:
+                out['routes'][k] = {'where': where, 'status': 'not collected'}
+                continue
+            pair = routes[k][1] if isinstance(routes[k], tuple) else routes[k]
+            add_agreement(rows, got.get(pair))
+            out['routes'][k] = {'where': where, **analyse(rows, esc)}
+            for r in rows:
+                page_rows.append({'route': k, 'set': r['set'], 'page': r['page'], 'kind': r['kind'], 'ok': r['ok'],
+                                  'nes': round(r['nes'], 6),
+                                  **{s: (round(r['features'][s], 5) if r['features'] else '') for s in LP_SIGNALS},
+                                  'tokens': r['features']['tokens'] if r['features'] else 0,
+                                  'agreement': '' if r.get('agreement') is None else round(r['agreement'], 6)})
+    OCR_JSON.write_text(json.dumps(out, indent=1) + '\n')
+    with open(OCR_PAGES, 'w', newline='') as f:
+        w = csv.DictWriter(f, ['route', 'set', 'page', 'kind', 'ok', 'nes', *LP_SIGNALS, 'tokens', 'agreement'])
+        w.writeheader(); w.writerows(page_rows)
+    OCR_MD.write_text(render(out))
+    print(OCR_MD.read_text())
+
+
+def render(out):
+    L = ['# W46.ocr-logprob — whether a local route\'s log-probabilities rank its errors', '',
+         'Generated by `scripts/segbench/ocr_logprob.py report` (the method is its docstring). Per-page figures, '
+         'no text: `ocr-logprob-pages.csv`. No money. The seg 2B\'s P(new) is in `ocr-logprob-seg.md`.', '',
+         'Signals are risks (higher = more likely wrong): first = first-token log-probability, mean = mean token '
+         'log-probability, min_k = mean of the lowest 10%, low_share = share of tokens under p 0.5 (all negated); '
+         'length = output tokens; disagreement = this reading\'s NES against the other route\'s reading; failure = '
+         'a cap or an error only.', '']
+    for k, r in out['routes'].items():
+        L += [f'## {k} ({r["where"]})', '']
+        if r.get('status'):
+            L += ['Not collected yet.', '']
+            continue
+        L += ['| set | pages | answered | NES | errors NES<70 | errors NES<90 | failures |', '|---|---:|---:|---:|---:|---:|---:|']
+        for s, d in sorted(r['sets'].items()):
+            L.append(f"| {s} | {d['pages']} | {d['ok']} | {100 * d['nes']:.2f} | {d['errors nes<70']} | "
+                     f"{d['errors nes<90']} | {d['errors failure']} |")
+        L += ['', 'AUC of each signal against each kind of error (0.5 = no ranking):', '',
+              '| set | error | ' + ' | '.join(SIGNALS) + ' |', '|---|---|' + '---:|' * len(SIGNALS)]
+        for s, by in sorted(r['auc'].items()):
+            for lab, a in by.items():
+                L.append(f'| {s} | {lab} | ' + ' | '.join(_f(a[sig]) for sig in SIGNALS) + ' |')
+        if 'cascade' in r:
+            L += ['', f"Isotonic calibration of P(NES<70) on the 440; the escalation threshold chosen on the 96 "
+                  f"(within half a point of escalating every page to {out['escalation_route']}), applied once to the 455:", '',
+                  '| signal | ECE 455 | ECE 96 | 96: escalated | 96: cascade NES | 455: escalated | 455: cascade NES | '
+                  '455: first alone | 455: escalate all | 455: NES, riskiest 20% escalated | oracle 20% |',
+                  '|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|']
+            for sig in SIGNALS:
+                c, k2 = r['cascade'][sig], r['calibration'][sig]
+                L.append(f"| {sig} | {_f(k2['455']['ece'])} | {_f(k2['96']['ece'])} | {_f(c['tune_96']['share'], True)} | "
+                         f"{100 * c['tune_96']['nes']:.2f} | {_f(c['test_455']['share'], True)} | {100 * c['test_455']['nes']:.2f} | "
+                         f"{100 * c['test_455']['first_nes']:.2f} | {100 * c['test_455']['all_nes']:.2f} | "
+                         f"{100 * c['test_455']['nes_at_20pct']:.2f} | {100 * c['test_455']['oracle_at_20pct']:.2f} |")
+            L += ['', 'Invariance check on the 455\'s escalated pages (UCCI assumes the calibrated probability holds '
+                  'there, and the escalation route reads them as well as it reads the rest):', '',
+                  '| signal | escalated | mean calibrated P | observed error rate | first route NES there | '
+                  'escalation NES there | escalation NES overall |', '|---|---:|---:|---:|---:|---:|---:|']
+            for sig in SIGNALS:
+                v = r['cascade'][sig]['invariance_455']
+                if v:
+                    L.append(f"| {sig} | {v['pages']} | {_f(v['mean_calibrated_p'])} | {_f(v['observed_error_rate'])} | "
+                             f"{100 * v['first_nes_on_escalated']:.2f} | {100 * v['escalation_nes_on_escalated']:.2f} | "
+                             f"{100 * v['escalation_nes_overall']:.2f} |")
+        L.append('')
+    return '\n'.join(L)
+
+
 # --- self-test ------------------------------------------------------------------------------------------------
 
 def self_test():
@@ -345,14 +585,36 @@ def self_test():
     # cascade: page 0 is bad for the first reader and fixed by escalation; the cheapest threshold escalates it alone
     t, share, nes, all_nes = cascade_threshold([0.9, 0.1, 0.2], [0.2, 0.95, 0.9], [0.9, 0.95, 0.9])
     assert share == 1 / 3 and abs(nes - all_nes) < 1e-9 and t == 0.9, (t, share, nes)
+    assert budget_nes([3, 1, 2, 0, 0], [0.1, 0.9, 0.5, 0.9, 0.9], [0.9] * 5) == (0.9 + 0.9 + 0.5 + 0.9 + 0.9) / 5
     r = apply_threshold(0.5, [0.9, 0.1], [0.2, 0.9], [0.8, 0.9])
     assert r['share'] == 0.5 and abs(r['nes'] - 0.85) < 1e-9
+    # analyse(): a signal that ranks perfectly gets AUC 1 and a cascade that escalates exactly the bad pages
+    def pg(i, s, bad):
+        lp = [-3.0] * 5 if bad else [-0.01] * 5
+        return {'page': f'{s}{i}', 'set': s, 'kind': 'x', 'ok': True, 'nes': 0.5 if bad else 0.95, 'text': '',
+                'features': token_features(lp), 'agreement': 0.4 if bad else 0.97}
+    rows = [pg(i, s, i % 4 == 0) for s in ('440', '455', '96') for i in range(40)]
+    esc = {r['page']: 0.9 for r in rows}
+    res = analyse(rows, esc)
+    assert res['auc']['455']['nes<70']['mean'] == 1.0 and res['auc']['455']['nes<70']['failure'] == 0.5
+    c = res['cascade']['mean']
+    assert c['tune_96']['share'] == 0.25 and c['test_455']['share'] == 0.25, c
+    assert c['invariance_455']['observed_error_rate'] == 1.0
+    # the cluster collector's request and its reading of a vLLM stream chunk
+    sys.path.insert(0, str(HERE / 'corpus'))
+    import logprob_cluster as LC
+    b = LC.body('', b'x', 'm')
+    assert b['logprobs'] is True and b['top_logprobs'] == 0 and b['temperature'] == 0 and b['max_tokens'] == 8192
+    assert len(b['messages'][0]['content']) == 1  # an empty prompt sends the image alone
+    chunk = {'delta': {'content': 'ab'}, 'logprobs': {'content': [{'token': 'a', 'logprob': -0.1, 'bytes': [97],
+                                                                   'top_logprobs': []}, {'token': 'b', 'logprob': 0.0}]}}
+    assert LC.chunk_logprobs(chunk) == [('a', -0.1), ('b', 0.0)] and LC.chunk_logprobs({'delta': {}}) == []
     print('self-test ok')
 
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument('command', choices=['mac-collect', 'seg', 'self-test'])
+    ap.add_argument('command', choices=['mac-collect', 'seg', 'report', 'self-test'])
     ap.add_argument('--model', choices=MAC_KEYS)
     ap.add_argument('--limit', type=int)
     a = ap.parse_args()
@@ -361,6 +623,8 @@ def main():
         self_test()
     elif a.command == 'seg':
         seg_main()
+    elif a.command == 'report':
+        ocr_report()
     else:
         if not a.model:
             ap.error('mac-collect needs --model')
