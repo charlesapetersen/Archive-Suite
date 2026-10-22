@@ -9,10 +9,10 @@ import Security
 // first, so it fails before the fix and passes after (rule 8).
 
 var failures = 0, passes = 0
-func check(_ ok: Bool, _ what: String, line: Int = #line) {
+@MainActor func check(_ ok: Bool, _ what: String, line: Int = #line) {
     if ok { passes += 1 } else { failures += 1; print("  [FAIL] line \(line): \(what)") }
 }
-func test(_ name: String, _ body: () throws -> Void) {
+@MainActor func test(_ name: String, _ body: () throws -> Void) {
     let before = failures
     do { try body() } catch { failures += 1; print("  [FAIL] \(name): threw \(error)") }
     print(failures == before ? "  [PASS] \(name)" : "  [FAIL] \(name)")
@@ -821,6 +821,100 @@ test("sign-in carries the QR's account as login_hint, and only then") {
     check(h["code_challenge"] == "CH" && h["code_challenge_method"] == "S256" && h["client_id"] == cfg.clientID
           && h["redirect_uri"] == cfg.redirectURI, "PKCE and client fields unchanged")
     check(try items(nil)["login_hint"] == nil && (try items("  "))["login_hint"] == nil, "no hint when none or blank")
+}
+
+// MARK: - Delete (W40.i-fix-ios-delete-confirm)
+
+test("delete asks for every page the Mac doesn't have, a pending resend included") {
+    var q = makeQueue()
+    let a = q.addDocument(fileURL: url("a")), b = q.addDocument(fileURL: url("b")), c = q.addDocument(fileURL: url("c"))
+    let d = q.addDocument(fileURL: url("d")), e = q.addDocument(fileURL: url("e"))
+    q.setState(b.id, .uploading); q.setState(c.id, .failed); q.setState(d.id, .uploaded)
+    q.setState(e.id, .uploaded); _ = q.markNeedsResend(e.id)
+    let ask = { (id: Int64) in CaptureQueue.requiresDeleteConfirmation(q.item(id)!) }
+    check(ask(a.id) && ask(b.id) && ask(c.id), "pending, uploading and failed ask")
+    check(!ask(d.id), "confirmed and current goes at once")
+    // The old predicate (state != .uploaded) let this one go unasked.
+    check(ask(e.id), "confirmed with a resend pending asks")
+    check(q.items.filter { CaptureQueue.requiresDeleteConfirmation($0) }.count == q.heartbeatCount,
+          "same condition as the heartbeat")
+}
+
+test("one delete per page at a time; Clear drops the claims") {
+    var q = makeQueue()
+    let a = q.addDocument(fileURL: url("a"))
+    check(q.beginDelete(a.id) && q.isDeleting(a.id), "first claim")
+    check(!q.beginDelete(a.id), "a re-tap can't start a second delete")
+    check(!q.beginDelete(999), "no claim on an unknown id")
+    q.endDelete(a.id)
+    check(!q.isDeleting(a.id) && q.beginDelete(a.id), "released, then claimable again")
+    _ = q.clear()
+    check(!q.isDeleting(a.id), "Clear empties the claims")
+}
+
+test("a page being deleted is not removed by its upload's confirmation") {
+    var q = makeQueue()
+    let m = q.addMarker(fileURL: url("box"), type: .box)
+    q.setState(m.id, .uploaded)
+    _ = q.beginDelete(m.id)
+    check(q.removeConfirmed(q.item(m.id)!) == nil, "kept while its copy to Photos may be running")
+    q.endDelete(m.id)
+    check(q.removeConfirmed(q.item(m.id)!) != nil, "removed as usual once the delete is done")
+}
+
+test("removeDeleted matches id and file") {
+    var q = makeQueue()
+    let a = q.addDocument(fileURL: url("a"))
+    let other = CapturedItem(id: a.id, fileURL: url("not-a"), groupId: a.groupId, seq: a.seq, type: .document)
+    check(q.removeDeleted(other) == nil && q.item(a.id) != nil, "a different file under the same id is left alone")
+    check(q.removeDeleted(a)?.id == a.id && q.item(a.id) == nil, "the page itself goes")
+}
+
+test("a kept delete puts the page back in the queue only if the Mac still needs it") {
+    var q = makeQueue()
+    let a = q.addDocument(fileURL: url("a")), b = q.addDocument(fileURL: url("b")), c = q.addDocument(fileURL: url("c"))
+    q.setState(a.id, .failed)                                   // the cancelled upload's end
+    q.setState(b.id, .uploaded)                                 // the upload landed before the cancel
+    q.setState(c.id, .uploaded); _ = q.markNeedsResend(c.id)    // landed, but with stale fields
+    let ra = q.requeueAfterKeptDelete(a.id)
+    check(ra?.state == .pending && q.item(a.id)?.state == .pending, "failed → pending, to send")
+    check(q.requeueAfterKeptDelete(b.id) == nil && q.item(b.id)?.state == .uploaded, "the Mac has it: nothing to send")
+    let rc = q.requeueAfterKeptDelete(c.id)
+    check(rc?.state == .pending && rc?.needsResend == nil, "stale bytes → pending, resend folded in")
+    check(q.requeueAfterKeptDelete(999) == nil, "nothing for a gone page")
+}
+
+/// Async: runs `body` to completion before the next test.
+@MainActor func asyncTest(_ name: String, _ body: () async -> Void) async {
+    let before = failures
+    await body()
+    print(failures == before ? "  [PASS] \(name)" : "  [FAIL] \(name)")
+}
+
+/// Records events across tasks.
+actor Log { var events: [String] = []; func add(_ e: String) { events.append(e) } }
+
+await asyncTest("the upload is stopped and awaited before the copy, and only a written copy lets the photo go") {
+    let log = Log()
+    let upload = Task<Void, Never> {
+        while !Task.isCancelled { try? await Task.sleep(nanoseconds: 1_000_000) }
+        // Unwinding after the cancel takes a while; the sleep returns at once once cancelled, so spin instead.
+        let until = Date().addingTimeInterval(0.02); while Date() < until {}
+        await log.add("upload ended")
+    }
+    let saved = await stopUploadThenRetire(upload, copy: { await log.add("copy"); return true })
+    check(saved == .savedToPhotos, "written copy → saved")
+    let order = await log.events
+    check(order == ["upload ended", "copy"], "the copy waited for the upload to end: \(order)")
+    check(await stopUploadThenRetire(nil, copy: { false }) == .keptCopyFailed, "failed copy → kept")
+    check(await stopUploadThenRetire(nil, copy: nil) == .deleted, "Delete permanently → deleted")
+    let other = Task<Void, Never> {
+        while !Task.isCancelled { try? await Task.sleep(nanoseconds: 1_000_000) }
+        await log.add("other ended")
+    }
+    let outcome = await stopUploadThenRetire(other, copy: nil)
+    let last = await log.events.last
+    check(outcome == .deleted && last == "other ended", "Delete permanently also waits for the upload")
 }
 
 print("")

@@ -12682,3 +12682,22 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   in to the wrong Google account pairs "ready" and its pages wait silently (nothing lost), and the screen always opens
   on Wi-Fi. Sign-in itself is unverified until the owner's iOS OAuth client (`W40.i5`, `W40.i4`).
   <!-- /W40.i-fix-ios-cloud-pairing -->
+- [x] **W40.i-fix-ios-delete-confirm — iOS deletes a page with a pending resend without asking, and does not stop its upload [S · S3 · Tier-2]** · §W40 (lane: processor) (uses: build) (blocked-on: W40.i2, W40.i-fix-ios-testable-core). Found by `W40.i2` 2026-10-21; detail in `verification/capture.md`. The confirmation fires only when the page is unsent (`CaptureViewModel.swift:256-281`), not when it is uploaded with a pending resend; the upload is not cancelled; only Delete permanently is offered. Match Android's `W23.h4` (`requiresDeleteConfirmation`, cancel and await, Save to Photos and delete, kept if the copy fails). SHIPPED 2026-10-21.
+  - Shipped: the confirmation now asks on the heartbeat's own condition (`CaptureQueue.requiresDeleteConfirmation` =
+    `macStillNeeds`: unsent, or confirmed with a resend pending). `CaptureViewModel.performDelete` claims the page
+    (`queue.beginDelete`, so a re-tap can't start a second delete), cancels and awaits its upload
+    (`stopUploadThenRetire`, Android's `retireCapture`), then either removes it by id and file (`removeDeleted`) or, if
+    the operator chose "Save to Photos & delete" and the copy failed, keeps it and re-queues it
+    (`requeueAfterKeptDelete`; if the upload landed before the cancel, it leaves as any confirmed page does). While a
+    delete runs, `enqueueUpload` refuses the page, the 650 ms post-confirm removal skips it, and a Q3 toggle or
+    reclassify flags a resend instead of being dropped. Clear empties the claims and the delete records nothing after it.
+  - Tests: 6 host tests (293 checks), `scripts/test-ios-capture-queue.sh`; with the old predicate (`state != .uploaded`)
+    the pending-resend case fails. The async test checks the copy waits for the cancelled upload to end. iOS Debug
+    build (iphoneos, unsigned) clean, no new warnings. Not run on a device: the dialog and the Photos copy are unverified
+    until `W40.i3`.
+  - Tier-2 review (opus): no path deletes an unsent photo or strands a kept one. Fixed from it: a Q3 toggle during a
+    delete was dropped; the status line said "Saving to Photos" while a Drive send was still stopping; a re-tap during a
+    delete re-opened a dialog whose answer was ignored. Noted, not fixed: on the Drive route a send stops only between
+    its blocking requests (up to 65 s each), so the delete can wait minutes on a bad network; the page stays visible
+    and safe meanwhile.
+  <!-- /W40.i-fix-ios-delete-confirm -->

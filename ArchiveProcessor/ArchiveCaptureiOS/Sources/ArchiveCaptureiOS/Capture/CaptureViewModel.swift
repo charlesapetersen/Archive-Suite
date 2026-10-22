@@ -257,8 +257,9 @@ final class CaptureViewModel: ObservableObject {
     /// Re-send a just-changed item: enqueue now if it's idle, else flag it to be re-sent when its in-flight
     /// upload settles. This is the fix for a per-page Q3 toggle / reclassify racing an in-flight upload —
     /// the `inFlightUploads` guard would otherwise suppress the re-enqueue and silently drop the change.
+    /// A page being deleted is flagged too: its send is refused until the delete ends, and a kept delete re-sends it.
     private func resendOrEnqueue(_ item: CapturedItem) {
-        if queue.isUploading(item.id) { markNeedsResend(item.id) } else { enqueueUpload(item) }
+        if queue.isUploading(item.id) || queue.isDeleting(item.id) { markNeedsResend(item.id) } else { enqueueUpload(item) }
     }
 
     private func markNeedsResend(_ id: Int64) { if queue.markNeedsResend(id) { persist() } }
@@ -272,30 +273,64 @@ final class CaptureViewModel: ObservableObject {
         else { deleteItem(id) }
     }
 
+    /// Third tap on an armed thumbnail. A page the Mac has confirmed, with no resend pending, goes at once: its bytes
+    /// are durably on the Mac. Anything else exists only here, so it stops for a confirmation (W40.i-fix-ios-delete-confirm).
     func deleteItem(_ id: Int64) {
         guard let item = queue.item(id) else { clearSelection(); return }
-        // If the photo hasn't been confirmed on the Mac, deleting it locally is irrecoverable.
-        // Show a destructive confirmation instead of silently discarding.
-        if item.state != .uploaded {
-            pendingDeleteId = id
-            return
-        }
-        removeItem(id)
+        // Its delete is already running: asking again would offer a choice that is then ignored.
+        if queue.isDeleting(id) { clearSelection(); statusMessage = "Already deleting this photo…"; return }
+        if CaptureQueue.requiresDeleteConfirmation(item) { pendingDeleteId = id; return }
+        performDelete(id, saveToPhotos: false)
     }
 
-    /// Actually remove an item (file + model). Called after confirmation for un-uploaded items.
-    func confirmDelete() {
+    /// The confirmation's actions. `saveToPhotos` copies the photo into the Photos library first and removes it only
+    /// once that copy is written; false is the operator choosing Delete permanently.
+    func confirmDelete(saveToPhotos: Bool) {
         guard let id = pendingDeleteId else { return }
         pendingDeleteId = nil
-        removeItem(id)
+        performDelete(id, saveToPhotos: saveToPhotos)
     }
 
-    private func removeItem(_ id: Int64) {
-        guard let removed = queue.remove(id) else { return }
-        try? FileManager.default.removeItem(at: removed.fileURL)
-        clearSelection()
-        persist()
-        sendStatusReport()   // the Mac's "phone still has N to send" must stop counting a deleted page
+    /// Delete one page safely: its upload is cancelled and awaited before anything decides the photo's fate
+    /// (`stopUploadThenRetire`), and while that runs the page can be neither re-sent nor removed by a late
+    /// confirmation. A failed Photos copy keeps the photo and puts it back in the queue. Android's `performDelete`.
+    private func performDelete(_ id: Int64, saveToPhotos: Bool) {
+        guard let target = queue.item(id) else { clearSelection(); return }
+        guard queue.beginDelete(id) else { return }   // a delete of this page is already running
+        let upload = uploadTasks[id], generation = queue.generation
+        clearSelection()   // un-arm now: the X must not stay tappable while the upload is stopped
+        // A Drive send can take a while to stop (each request runs to its own timeout), so say that first.
+        if upload != nil { statusMessage = "Stopping the transfer…" }
+        else if saveToPhotos { statusMessage = "Saving a copy to Photos…" }
+        let copy: (() async -> Bool)? = saveToPhotos ? { @MainActor [weak self] in
+            self?.statusMessage = "Saving a copy to Photos…"
+            return await Self.addToPhotos(target.fileURL)
+        } : nil
+        Task {
+            let outcome = await stopUploadThenRetire(upload, copy: copy)
+            guard queue.generation == generation else { return }   // Clear took the session, and the file, meanwhile
+            queue.endDelete(id)
+            switch outcome {
+            case .keptCopyFailed:
+                if let again = queue.requeueAfterKeptDelete(id) {
+                    persist()
+                    enqueueUpload(again)
+                    statusMessage = "Couldn't save a copy to Photos, so the photo was kept. Check Photos access in Settings, then delete again."
+                } else {
+                    // The upload landed before the cancel did: the Mac has it, so it leaves the phone as any confirmed page does.
+                    if let latest = queue.item(id) { removeConfirmed(latest) }
+                    statusMessage = "Couldn't save a copy to Photos. The Mac already has this photo."
+                }
+            case .savedToPhotos, .deleted:
+                if let removed = queue.removeDeleted(target) {
+                    try? FileManager.default.removeItem(at: removed.fileURL)
+                    if selectedItemId == id { clearSelection() }
+                    persist()
+                    sendStatusReport()   // the Mac's "phone still has N to send" must stop counting a deleted page
+                }
+                statusMessage = outcome == .savedToPhotos ? "Copied to Photos and removed" : queue.uploadSummary
+            }
+        }
     }
 
     /// Reclassify the selected photo as a single-image box/folder marker (own group) and upload it.
@@ -433,6 +468,7 @@ final class CaptureViewModel: ObservableObject {
         // that never reached disk carries a group nobody chose, and the Mac's half of filing it has no undo. It
         // waits on the phone, visible and counted as unsent, until the operator classifies it.
         guard CaptureQueue.isSendable(item) else { return }
+        guard !queue.isDeleting(item.id) else { return }   // its delete re-queues it if the photo is kept
         guard queue.beginUpload(item.id) else { return }   // already uploading this id
         setState(item.id, .uploading)
         sendStatusReport()   // reflect a just-captured/enqueued page on the Mac immediately (not only every 8s)
@@ -525,19 +561,31 @@ final class CaptureViewModel: ObservableObject {
             for item in toSave {
                 // Guard the source exists (a concurrent upload-confirmation may have removed it) so a missing
                 // file can't be silently counted as a saved backup — over-reporting a backup that isn't there.
-                guard FileManager.default.fileExists(atPath: item.fileURL.path) else { continue }
-                let ok: Bool = await withCheckedContinuation { cont in
-                    PHPhotoLibrary.shared().performChanges({
-                        PHAssetCreationRequest.creationRequestForAssetFromImage(atFileURL: item.fileURL)
-                    }, completionHandler: { success, _ in cont.resume(returning: success) })
-                }
-                if ok { saved += 1 }
+                if await Self.writeToPhotos(item.fileURL) { saved += 1 }
             }
             statusMessage = saved == toSave.count
                 ? "Saved \(saved) photo(s) to Photos"
                 : "Saved \(saved) of \(toSave.count) — some couldn't be added to Photos"
             flash("Saved \(saved) to Photos")
         }
+    }
+
+    /// One photo into the Photos library, true only once the library reports it written. A missing source file is a
+    /// failure, never a saved backup.
+    private static func writeToPhotos(_ fileURL: URL) async -> Bool {
+        guard FileManager.default.fileExists(atPath: fileURL.path) else { return false }
+        return await withCheckedContinuation { cont in
+            PHPhotoLibrary.shared().performChanges({
+                PHAssetCreationRequest.creationRequestForAssetFromImage(atFileURL: fileURL)
+            }, completionHandler: { success, _ in cont.resume(returning: success) })
+        }
+    }
+
+    /// The copy behind Save to Photos & delete: asks for add-only access first (a no-op once answered).
+    private static func addToPhotos(_ fileURL: URL) async -> Bool {
+        let status = await PHPhotoLibrary.requestAuthorization(for: .addOnly)
+        guard status == .authorized || status == .limited else { return false }
+        return await writeToPhotos(fileURL)
     }
 
     /// Re-send anything the Mac must still receive (in-flight/failed, still-PENDING, or a resend pending). Document pages now

@@ -145,6 +145,39 @@ struct CaptureQueue {
         return items.remove(at: i)
     }
 
+    // MARK: - Delete (W40.i-fix-ios-delete-confirm, Android's W23.h4)
+
+    /// Whether deleting this page must ask first: it exists only on the phone, because the Mac has not confirmed it
+    /// or holds bytes a pending resend has made stale. An archival photo can't be retaken. The same predicate as
+    /// the heartbeat, deliberately: "the Mac still needs this" and "losing this loses it forever" are one condition.
+    /// It used to be `state != .uploaded` alone, so a page with a resend pending was deleted unasked.
+    static func requiresDeleteConfirmation(_ item: CapturedItem) -> Bool { macStillNeeds(item) }
+
+    /// Ids whose delete is running: its upload being stopped, or its copy to Photos being written. While an id is
+    /// here no new send of it starts and a confirmed upload does not remove it, so the file the delete is copying
+    /// stays put. Process-local, and emptied by Clear.
+    private(set) var deleting: Set<Int64> = []
+
+    /// Claims the id for a delete. False if it is gone or a delete of it is already running (a fast re-tap).
+    mutating func beginDelete(_ id: Int64) -> Bool { item(id) != nil && deleting.insert(id).inserted }
+    mutating func endDelete(_ id: Int64) { deleting.remove(id) }
+    func isDeleting(_ id: Int64) -> Bool { deleting.contains(id) }
+
+    /// Drop a page whose delete went through. Guarded by identity (id and file) like `removeConfirmed`, so it can
+    /// never evict a different photo. Returns it so the caller can delete its file.
+    mutating func removeDeleted(_ item: CapturedItem) -> CapturedItem? {
+        guard let i = items.firstIndex(where: { $0.id == item.id && $0.fileURL == item.fileURL }) else { return nil }
+        return items.remove(at: i)
+    }
+
+    /// A delete that kept the photo (its copy to Photos failed) had still stopped its upload. If the Mac still needs
+    /// the page, put it back in the queue with any deferred resend folded in, and return it to send; nil if the
+    /// upload landed before the cancel did, so the Mac already has it.
+    mutating func requeueAfterKeptDelete(_ id: Int64) -> CapturedItem? {
+        guard let page = item(id), Self.macStillNeeds(page) else { return nil }
+        return prepareDeferredResend(id)
+    }
+
     /// Flag an item whose fields changed while its upload was in flight. Returns true if the flag changed.
     mutating func markNeedsResend(_ id: Int64) -> Bool {
         guard let i = items.firstIndex(where: { $0.id == id }), items[i].needsResend != true else { return false }
@@ -381,7 +414,7 @@ struct CaptureQueue {
     /// un-ended segment stay so the operator sees the segment grow. Returns the removed item, or nil.
     mutating func removeConfirmed(_ item: CapturedItem) -> CapturedItem? {
         guard let i = items.firstIndex(where: { $0.id == item.id && $0.fileURL == item.fileURL }),
-              items[i].state == .uploaded else { return nil }
+              items[i].state == .uploaded, !deleting.contains(item.id) else { return nil }
         if items[i].type == .document && items[i].groupId == currentGroupId { return nil }
         return items.remove(at: i)
     }
@@ -397,6 +430,7 @@ struct CaptureQueue {
         inFlightUploads.removeAll()   // the old sends are stale now; their ids can never come back
         endedSegments.removeAll()
         inFlightSegments.removeAll()
+        deleting.removeAll()          // a delete still running sees the generation move and records nothing
         seqCounter = 0
         currentGroupId = newGroupId()
         pendingTagGroupId = nil
@@ -521,4 +555,25 @@ struct SessionWriteMailbox<Snapshot> {
         writerRunning = true
         return true
     }
+}
+
+/// What a confirmed delete settled on, decided before the photo's file is touched (Android's `DeleteOutcome`).
+enum DeleteOutcome: Equatable {
+    /// Copied into the Photos library, so it may leave the queue: recoverable.
+    case savedToPhotos
+    /// Removed outright: the operator chose Delete permanently, or the Mac already has it.
+    case deleted
+    /// The copy to Photos failed, so the photo is KEPT. An unsent page's only copy is never deleted on a failed copy.
+    case keptCopyFailed
+}
+
+/// Stop a page's upload and WAIT for it to finish before deciding the photo's fate (W40.i-fix-ios-delete-confirm,
+/// Android's `retireCapture`). Once the send has unwound, the Mac either has the page or never will from this send,
+/// and no late reply can remove the file under the copy. Then `copy`, when the operator chose Save to Photos &
+/// delete: only a copy that was written lets the photo go. UI-free so the host tests can drive the ordering.
+func stopUploadThenRetire(_ upload: Task<Void, Never>?, copy: (() async -> Bool)?) async -> DeleteOutcome {
+    upload?.cancel()
+    await upload?.value
+    guard let copy else { return .deleted }
+    return await copy() ? .savedToPhotos : .keptCopyFailed
 }

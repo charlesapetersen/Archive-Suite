@@ -169,14 +169,15 @@ struct CaptureScreen: View {
         } message: {
             Text("Disconnects from \(vm.endpoint?.name ?? "the Mac") and returns to the pairing screen so you can scan a QR (e.g. to switch Macs or networks). Captured photos are kept and upload once you reconnect.")
         }
-        .confirmationDialog("Delete un-uploaded photo?", isPresented: Binding(
+        .confirmationDialog("Delete a photo the Mac doesn't have?", isPresented: Binding(
             get: { vm.pendingDeleteId != nil },
             set: { if !$0 { vm.pendingDeleteId = nil } }
         ), titleVisibility: .visible) {
-            Button("Delete permanently", role: .destructive) { vm.confirmDelete() }
+            Button("Save to Photos & delete") { vm.confirmDelete(saveToPhotos: true) }
+            Button("Delete permanently", role: .destructive) { vm.confirmDelete(saveToPhotos: false) }
             Button("Cancel", role: .cancel) { vm.pendingDeleteId = nil }
         } message: {
-            Text("This photo hasn't reached the Mac yet. Deleting it here loses it forever.")
+            Text("This photo, or a change to it, hasn't reached the Mac yet. Its transfer stops first. Deleting it permanently loses it forever; saving it to Photos keeps a copy there.")
         }
         .alert("Photo not saved", isPresented: Binding(
             get: { vm.captureError != nil },
