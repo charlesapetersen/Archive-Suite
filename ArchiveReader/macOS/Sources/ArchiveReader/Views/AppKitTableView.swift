@@ -267,21 +267,7 @@ struct AppKitTableView: NSViewRepresentable {
             if let reused = tableView.makeView(withIdentifier: cellID, owner: nil) as? NSTableCellView {
                 cell = reused
             } else {
-                cell = NSTableCellView()
-                cell.identifier = cellID
-                let tf = NSTextField(labelWithString: "")
-                tf.translatesAutoresizingMaskIntoConstraints = false
-                tf.lineBreakMode = .byTruncatingMiddle
-                tf.cell?.truncatesLastVisibleLine = true
-                cell.addSubview(tf)
-                cell.textField = tf
-                NSLayoutConstraint.activate([
-                    tf.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 2),
-                    tf.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -2),
-                    tf.topAnchor.constraint(greaterThanOrEqualTo: cell.topAnchor, constant: 2),
-                    tf.bottomAnchor.constraint(lessThanOrEqualTo: cell.bottomAnchor, constant: -2),
-                    tf.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
-                ])
+                cell = Self.makeTextCell(identifier: cellID)
             }
 
             guard let file else {
@@ -320,54 +306,13 @@ struct AppKitTableView: NSViewRepresentable {
                 }
 
             case "name":
-                let nameLine = NSMutableAttributedString()
-                if let color = file.color {
-                    let dotColor: NSColor = color == .box ? .systemRed : .systemPurple
-                    nameLine.append(NSAttributedString(string: "● ", attributes: [
-                        .foregroundColor: dotColor,
-                        .font: NSFont.systemFont(ofSize: currentFontSize * 0.7),
-                    ]))
-                }
-                nameLine.append(NSAttributedString(string: file.name, attributes: [
-                    .foregroundColor: NSColor.labelColor,
-                    .font: regularFont,
-                ]))
-                if parent.model.isDuplicatedName(file.name) {
-                    let folder = DuplicateNames.disambiguator(for: file.url)
-                    nameLine.append(NSAttributedString(string: "  ⌕ \(folder)", attributes: [
-                        .foregroundColor: NSColor.secondaryLabelColor,
-                        .font: NSFont.systemFont(ofSize: currentFontSize * 0.85),
-                    ]))
-                }
-                if let segs = parent.model.searchSnippet(for: file.url.path) {
-                    // Full-text search hit: add a dimmed keyword-in-context OCR excerpt beneath the name
-                    // (usesAutomaticRowHeights grows the row). Per-line paragraph styles keep the name
-                    // middle-truncated (extension visible) and the excerpt tail-truncated.
-                    let nameStyle = NSMutableParagraphStyle()
-                    nameStyle.lineBreakMode = .byTruncatingMiddle
-                    nameLine.addAttribute(.paragraphStyle, value: nameStyle,
-                                          range: NSRange(location: 0, length: nameLine.length))
-                    nameLine.append(NSAttributedString(string: "\n"))
-                    nameLine.append(Self.snippetLine(segs, baseSize: currentFontSize))
-                    // Put the field into the same multi-line-capable state the tags cell (TagTokenCellView)
-                    // needs, so `usesAutomaticRowHeights` actually grows the row. A `labelWithString:` field
-                    // is single-line by default (`usesSingleLineMode`/`wraps=false`), so the appended second
-                    // line + "\n" was being clipped and the row never grew — the snippet was invisible.
-                    tf.usesSingleLineMode = false
-                    (tf.cell as? NSTextFieldCell)?.wraps = true
-                    (tf.cell as? NSTextFieldCell)?.isScrollable = false
-                    tf.setContentCompressionResistancePriority(.required, for: .vertical)
-                    tf.maximumNumberOfLines = 2
-                    tf.lineBreakMode = .byTruncatingTail
-                } else {
-                    // Reset to single-line: cells are reused, so a row that was a 2-line hit may now
-                    // render a non-hit row.
-                    tf.usesSingleLineMode = true
-                    (tf.cell as? NSTextFieldCell)?.wraps = false
-                    tf.maximumNumberOfLines = 1
-                    tf.lineBreakMode = .byTruncatingMiddle
-                }
-                tf.attributedStringValue = nameLine
+                let dotColor: NSColor? = file.color.map { $0 == .box ? .systemRed : .systemPurple }
+                let disambiguator = parent.model.isDuplicatedName(file.name)
+                    ? DuplicateNames.disambiguator(for: file.url) : nil
+                Self.configureNameTextField(tf, name: file.name, dotColor: dotColor,
+                                            disambiguator: disambiguator,
+                                            snippet: parent.model.searchSnippet(for: file.url.path),
+                                            fontSize: currentFontSize)
 
             case "type":
                 tf.stringValue = file.fileType
@@ -444,6 +389,86 @@ struct AppKitTableView: NSViewRepresentable {
             guard let file = sender.file else { return }
             let quality = sender.indexOfSelectedItem == 0 ? nil : sender.indexOfSelectedItem
             parent.model.applyEdit(.setQuality(quality), to: file)
+        }
+
+        /// A plain text cell (every column but tags and quality), exposed internally so the headless
+        /// pixel guard lays out the same view the table does.
+        static func makeTextCell(identifier: NSUserInterfaceItemIdentifier) -> NSTableCellView {
+            let cell = NSTableCellView()
+            cell.identifier = identifier
+            let tf = NSTextField(labelWithString: "")
+            tf.translatesAutoresizingMaskIntoConstraints = false
+            tf.lineBreakMode = .byTruncatingMiddle
+            tf.cell?.truncatesLastVisibleLine = true
+            cell.addSubview(tf)
+            cell.textField = tf
+            NSLayoutConstraint.activate([
+                tf.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 2),
+                tf.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -2),
+                tf.topAnchor.constraint(greaterThanOrEqualTo: cell.topAnchor, constant: 2),
+                tf.bottomAnchor.constraint(lessThanOrEqualTo: cell.bottomAnchor, constant: -2),
+                tf.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
+            ])
+            return cell
+        }
+
+        /// The Name cell's formatter, exposed internally so the headless pixel guard renders the same
+        /// field the table draws. W40.fix-reader-long-name-overrun: under `usesAutomaticRowHeights` the
+        /// field's default horizontal compression resistance beat the column's width, so a long name's
+        /// field grew to the whole name (934 pt in a 320-pt column) and drew across Type and File tags.
+        /// The field now yields horizontally, and every line carries its own truncating paragraph style
+        /// (an `attributedStringValue` without one ignores the field's `lineBreakMode`: no ellipsis).
+        static func configureNameTextField(_ tf: NSTextField, name: String, dotColor: NSColor?,
+                                           disambiguator: String?, snippet: [SearchSnippet.Segment]?,
+                                           fontSize: CGFloat) {
+            let nameLine = NSMutableAttributedString()
+            if let dotColor {
+                nameLine.append(NSAttributedString(string: "● ", attributes: [
+                    .foregroundColor: dotColor,
+                    .font: NSFont.systemFont(ofSize: fontSize * 0.7),
+                ]))
+            }
+            nameLine.append(NSAttributedString(string: name, attributes: [
+                .foregroundColor: NSColor.labelColor,
+                .font: NSFont.systemFont(ofSize: fontSize),
+            ]))
+            if let disambiguator {
+                nameLine.append(NSAttributedString(string: "  ⌕ \(disambiguator)", attributes: [
+                    .foregroundColor: NSColor.secondaryLabelColor,
+                    .font: NSFont.systemFont(ofSize: fontSize * 0.85),
+                ]))
+            }
+            // The name middle-truncates (extension visible); a snippet line below it tail-truncates.
+            let nameStyle = NSMutableParagraphStyle()
+            nameStyle.lineBreakMode = .byTruncatingMiddle
+            nameLine.addAttribute(.paragraphStyle, value: nameStyle,
+                                  range: NSRange(location: 0, length: nameLine.length))
+            // The field must never ask for more width than its column gives it.
+            tf.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+            if let snippet {
+                // Full-text search hit: add a dimmed keyword-in-context OCR excerpt beneath the name
+                // (usesAutomaticRowHeights grows the row).
+                nameLine.append(NSAttributedString(string: "\n", attributes: [.paragraphStyle: nameStyle]))
+                nameLine.append(snippetLine(snippet, baseSize: fontSize))
+                // Put the field into the same multi-line-capable state the tags cell (TagTokenCellView)
+                // needs, so `usesAutomaticRowHeights` actually grows the row. A `labelWithString:` field
+                // is single-line by default (`usesSingleLineMode`/`wraps=false`), so the appended second
+                // line + "\n" was being clipped and the row never grew — the snippet was invisible.
+                tf.usesSingleLineMode = false
+                (tf.cell as? NSTextFieldCell)?.wraps = true
+                (tf.cell as? NSTextFieldCell)?.isScrollable = false
+                tf.setContentCompressionResistancePriority(.required, for: .vertical)
+                tf.maximumNumberOfLines = 2
+                tf.lineBreakMode = .byTruncatingTail
+            } else {
+                // Reset to single-line: cells are reused, so a row that was a 2-line hit may now
+                // render a non-hit row.
+                tf.usesSingleLineMode = true
+                (tf.cell as? NSTextFieldCell)?.wraps = false
+                tf.maximumNumberOfLines = 1
+                tf.lineBreakMode = .byTruncatingMiddle
+            }
+            tf.attributedStringValue = nameLine
         }
 
         /// The dimmed keyword-in-context second line for a full-text hit: matched OCR terms emphasised

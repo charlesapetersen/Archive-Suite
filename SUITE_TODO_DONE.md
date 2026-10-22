@@ -12713,3 +12713,19 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   - VoiceOver: strip thumbnails labelled type + status (+ Q3, armed, held-for-review) with a "Toggle quality Q3" action; Box/shutter/Folder/Re-pair labelled.
   - 3 new host tests (358 checks pass); iOS Debug build clean, no new warnings; adversarial review (opus) found no defects, its two wording nits fixed. Not run on a device (W40.i3). No migration: the new field is optional.
   <!-- /W40.i-fix-ios-polish -->
+- [x] **W40.fix-reader-long-name-overrun — a long file name in the Reader list is not truncated: it draws across the Type and File tags columns [S · S3]** · §W40 — verification phase (lane: reader). SHIPPED 2026-10-21.
+  Found by `W40.e10` (`verification/evidence/reader/visual-2026-10-16-long-names.jpg`).
+  - Cause (measured, not the one the entry guessed): under `usesAutomaticRowHeights` the Name field's default
+    horizontal compression resistance beat the column's width, so the field grew to the whole name — 934 pt in a
+    320-pt column — and drew across Type and File tags. The missing paragraph style on the single-line path was a
+    second, smaller fault: without it the name clipped at a word with no ellipsis.
+  - Fix (`AppKitTableView.swift`): the Name field yields horizontally (`.defaultLow` compression resistance) and
+    every name line carries a middle-truncating paragraph style; the cell factory and Name formatter are now the
+    statics `Coordinator.makeTextCell(identifier:)` / `configureNameTextField(...)` so a test can drive them.
+  - Test: `NameCellTruncationTests` — a real `NSTableView` (320-pt Name column, automatic row heights) laid out
+    with the table's own cells, plain and with a search snippet: the field must fit its column and no ink may land
+    past it, with a non-vacuity check. With the fix reverted it fails (field 934 pt, 18-19% ink past the column);
+    with it, both rows read "00085 IMG — Memoran…epartment of Finance.pdf" and the snippet ends in "archive…".
+    Plus a fixed-width cell render. Reader unit suite green (DeepLinkTests skipped as usual), no new warnings.
+    No VM pass: the headless table render shows the bug and the fix directly.
+  <!-- /W40.fix-reader-long-name-overrun -->
