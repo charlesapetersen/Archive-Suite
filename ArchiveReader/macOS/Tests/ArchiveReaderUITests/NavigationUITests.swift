@@ -158,6 +158,34 @@ final class NavigationUITests: FixtureUITestCase {
                       "the in-table Quality picker should write canonical Q3 to the scratch document")
     }
 
+    // MARK: - Save Search takes the keyboard; Quality chips run Q1 → Q3 (W40.fix-reader-visual-polish)
+
+    func testSaveSearchNameFieldHasTheKeyboardAndQualityChipsAscend() throws {
+        waitForRows(minimum: 5, timeout: 10)
+        let chips = (1...3).map { app.descendants(matching: .any)["ar.filter.quality.Q\($0)"] }
+        XCTAssertTrue(chips[2].waitForExistence(timeout: 5), "the Quality chips should be in the filter bar")
+        XCTAssertLessThan(chips[0].frame.minX, chips[1].frame.minX, "Q1 should come before Q2, as in the pop-up")
+        XCTAssertLessThan(chips[1].frame.minX, chips[2].frame.minX, "Q2 should come before Q3, as in the pop-up")
+
+        chips[0].click()
+        let save = app.descendants(matching: .any)["ar.filter.saveSmartFolder"]
+        XCTAssertTrue(save.waitForExistence(timeout: 5), "an active filter should offer Save as Smart Folder")
+        save.click()
+        let field = app.sheets.textFields["ar.saveSearch.name"]
+        XCTAssertTrue(field.waitForExistence(timeout: 5), "Save Search should ask for a name")
+        XCTAssertEqual(field.value as? String, "Q1", "the name is pre-filled from the active filter")
+
+        // No click into the field: the alert this replaced left the keyboard on Cancel, so these keys went nowhere.
+        RunLoop.current.run(until: Date().addingTimeInterval(0.5))
+        pressKey("a", modifiers: .command)
+        app.typeText("Keyboard")
+        XCTAssertEqual(field.value as? String, "Keyboard", "typing on open should reach the name field")
+
+        app.typeKey(.escape, modifierFlags: [])
+        XCTAssertTrue(field.waitForNonExistence(timeout: 5), "Escape should cancel the sheet without saving")
+        chips[0].click()
+    }
+
     // MARK: - Header-click sort (W5.c3)
 
     func testHeaderClickChangesSort() throws {

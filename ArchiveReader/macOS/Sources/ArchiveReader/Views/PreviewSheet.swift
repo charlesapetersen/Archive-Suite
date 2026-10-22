@@ -83,8 +83,8 @@ struct PreviewSheet: View {
                 .keyboardShortcut("c", modifiers: .command)
                 .help("Copy selected text exactly (⌘C)")
             Button { model.copySelection() } label: { Image(systemName: "doc.on.doc.fill") }
-                .keyboardShortcut("c", modifiers: [.command, .shift])
-                .help("Copy selected text cleaned for prose (⌘⇧C)")
+                .keyboardShortcut("c", modifiers: [.command, .option])
+                .help("Copy selected text cleaned for prose (⌥⌘C)")
             Button("Open") { onOpenFull() }
                 .keyboardShortcut("o", modifiers: .command)
                 .help("Open in the full document window (⌘O)")

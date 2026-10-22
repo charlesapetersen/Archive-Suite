@@ -16,7 +16,6 @@ struct NavigationWindowView: View {
     @AppStorage("ar.tagCloudWidth") private var tagCloudWidth = 240.0
     @AppStorage("ar.listFontSize") private var listFontSize = 13.0   // C3 row density / readability
     @AppStorage(DisplayCalendarSettings.enabledKey) private var calendarsEnabled = false   // W24.cal1-reader
-    @State private var newSearchName = ""
     @State private var renameText = ""
     @FocusState private var searchFocused: Bool     // C5: ⌥⌘F focuses OCR search
     @State private var tagFilterFocusToken = 0       // C5: ⌘L focuses the tag filter
@@ -66,17 +65,7 @@ struct NavigationWindowView: View {
         .sheet(isPresented: $model.showingSimilarTags) {
             SimilarTagsSheet(model: model, size: SheetSizing.fitted(SimilarTagsSheet.preferredSize, in: contentSize))
         }
-        .alert("Save Search", isPresented: $model.showingSaveDialog) {
-            TextField("Name", text: $newSearchName)
-            Button("Save") { model.saveCurrentSearch(name: newSearchName) }
-            Button("Cancel", role: .cancel) { }
-        } message: {
-            Text("Save the current filters and text search as a reusable smart folder.")
-        }
-        // Pre-fill the save name from the active filters whenever the dialog opens.
-        .onChange(of: model.showingSaveDialog) { _, showing in
-            if showing { newSearchName = model.suggestedSmartFolderName }
-        }
+        .sheet(isPresented: $model.showingSaveDialog) { SaveSearchSheet(model: model) }
         .alert("Rename Smart Folder", isPresented: Binding(
             get: { model.renamingSearch != nil },
             set: { if !$0 { model.renamingSearch = nil } })) {
@@ -249,21 +238,41 @@ struct NavigationWindowView: View {
             case let .couldNotLook(failure):
                 ContentUnavailableView(failure.message, systemImage: "exclamationmark.triangle.fill",
                                        description: Text(failure.detail))
+            // The second sentence squares the scanned count with the status bar's "0 total", which counts
+            // only listed (tagged) documents; both offer the way out (W40.fix-reader-visual-polish).
+            // The button sits outside the combined element, which UI tests read as one sentence, so it stays
+            // its own pressable control.
             case let .nothingTagged(scanned):
-                ContentUnavailableView(
-                    "No tagged documents", systemImage: "tray",
-                    description: Text("Scanned \(scanned) file\(scanned == 1 ? "" : "s") in this folder; "
-                                      + "none carry a Read or Unread tag."))
-                    .accessibilityElement(children: .combine)
-                    .accessibilityIdentifier("ar.empty.nothingTagged")
+                VStack(spacing: 0) {
+                    ContentUnavailableView(
+                        "No tagged documents", systemImage: "tray",
+                        description: Text("Scanned \(scanned) file\(scanned == 1 ? "" : "s") in this folder; "
+                                          + "none carry a Read or Unread tag. The list shows only documents that do."))
+                        .accessibilityElement(children: .combine)
+                        .accessibilityIdentifier("ar.empty.nothingTagged")
+                    chooseFolderButton.padding(.bottom, 16)
+                }
+                .emptyStateBackdrop()
             case .folderIsEmpty:
-                ContentUnavailableView("Nothing in this folder", systemImage: "tray",
-                                       description: Text("The scan completed and found no files at all."))
+                ContentUnavailableView {
+                    Label("Nothing in this folder", systemImage: "tray")
+                } description: {
+                    Text("The scan completed and found no files at all.")
+                } actions: {
+                    chooseFolderButton
+                }
+                .emptyStateBackdrop()
             case .filteredOut:
                 ContentUnavailableView("No matches", systemImage: "line.3.horizontal.decrease.circle",
                                        description: Text("No files match the current filters or search. Use Clear to reset."))
+                    .emptyStateBackdrop()
             }
         }
+    }
+
+    private var chooseFolderButton: some View {
+        Button("Choose Folder…") { model.chooseRoot() }
+            .accessibilityIdentifier("ar.empty.chooseFolder")
     }
 
     /// Live progress under the first-scan spinner — a real count, which the Spotlight path could never
@@ -385,7 +394,8 @@ struct NavigationWindowView: View {
         .accessibilityIdentifier("ar.filter.readState")
 
         HStack(spacing: 4) {
-            ForEach([3, 2, 1], id: \.self) { q in
+            // Q1 → Q3, the order of the row Quality pop-up and the tag editor (W40.fix-reader-visual-polish).
+            ForEach([1, 2, 3], id: \.self) { q in
                 Toggle("Q\(q)", isOn: Binding(
                     get: { model.filter.qualities.contains(q) },
                     set: { on in
@@ -493,6 +503,9 @@ struct NavigationWindowView: View {
             }
         }
         .padding(12).frame(width: 220)
+        // Opaque: the popover's own vibrant material let the column headers and tag chips behind it read
+        // through the From/To fields in dark mode (W40.fix-reader-visual-polish).
+        .background(Color(nsColor: .windowBackgroundColor))
     }
 
     /// Existing tags offered for autocomplete — the library's distinct topical tags, minus any already
@@ -558,7 +571,7 @@ struct NavigationWindowView: View {
                     }
                 }
                 Divider()
-                Button("Save Current Search…") { newSearchName = ""; model.showingSaveDialog = true }
+                Button("Save Current Search…") { model.showingSaveDialog = true }
             } label: { Label("Saved", systemImage: "bookmark") }
                 .help("Apply, save, or delete a saved search (smart folder)")
                 .accessibilityIdentifier("ar.toolbar.saved")
@@ -743,6 +756,18 @@ private struct PanelDivider: View {
     }
 }
 
+private extension View {
+    /// An opaque card under an empty state drawn over the list. Without it, its secondary text sat directly on
+    /// the alternating row stripes, which in dark mode left it barely legible (W40.fix-reader-visual-polish).
+    /// Sized to its content, not the list, so the column headers stay visible around it.
+    func emptyStateBackdrop() -> some View {
+        fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: 440)
+            .padding(.vertical, 8)
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
+    }
+}
+
 /// A small library-health readout (data-quality counts).
 private struct DataQualityView: View {
     let q: NavigationModel.DataQuality
@@ -753,7 +778,7 @@ private struct DataQualityView: View {
             row("Total files", q.total)
             row("No date", q.noDate)
             row("No quality", q.noQuality)
-            row("Date Uncertain", q.dateUncertain)
+            row("Date uncertain", q.dateUncertain)
             row("Box/folder markers", q.markers)
             row("Both Read + Unread (corrupt)", q.bothReadUnread, warn: q.bothReadUnread > 0)
             row("Non-standard PDFs (need attention)", needsAttention, warn: needsAttention > 0)

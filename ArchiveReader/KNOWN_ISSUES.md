@@ -179,7 +179,7 @@ enables *every* `.disabled(doc == nil)` item in the Document menu while the prev
 `findNext` / `findPrevious` — the invariant belongs to the viewer, not to three `.disabled` modifiers.
 ⚠️ It is **not** derived from `persists`, deliberately: the two co-vary in today's one preview, but a future
 non-persisting viewer that renders a find bar would inherit the wrong answer. Everything else the publication
-enables (zoom / fit, paging, pane focus, ⌘C / ⌘⇧C, *Copy Archive Link to This Page*) is wanted and stays
+enables (zoom / fit, paging, pane focus, ⌘C / ⌥⌘C, *Copy Archive Link to This Page*) is wanted and stays
 enabled — the UITest asserts that pair, because "find disabled" is only meaningful next to "the rest is not".
 
 ## ✅ FIXED (`W26.fsev-fu2`) — a folder that would not open left the list spinning "Scanning…" for ever

@@ -157,8 +157,10 @@ struct ArchiveReaderCommands: Commands {
             .disabled(doc == nil || linkContext?.target == nil)
             Button("Copy") { doc?.copyPlainSelection() }
                 .keyboardShortcut("c", modifiers: .command).disabled(doc == nil)
+            // ⌥⌘C, not ⇧⌘C: ⇧⌘C is Selection ▸ Copy Link(s), and with the preview sheet up both items are
+            // enabled in the nav window at once (W40.fix-reader-visual-polish).
             Button("Copy Cleaned for Prose") { doc?.copySelection() }
-                .keyboardShortcut("c", modifiers: [.command, .shift]).disabled(doc == nil)
+                .keyboardShortcut("c", modifiers: [.command, .option]).disabled(doc == nil)
             // These three need MORE than a published viewer: they need one whose view renders a find bar.
             // The preview sheet publishes a model so zoom/paging/copy/page-link reach it (W26.previewzoom),
             // which enables every `doc == nil` item here — but it has no find bar and no way to type a

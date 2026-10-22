@@ -307,7 +307,7 @@ final class NavigationModel: ObservableObject {
         case .noReadState: parts.append("No read-state")
         }
         if !f.qualities.isEmpty {
-            parts.append(f.qualities.sorted(by: >).map { "Q\($0)" }.joined(separator: "/"))
+            parts.append(f.qualities.sorted().map { "Q\($0)" }.joined(separator: "/"))
         }
         if let years = f.dateYearsSummary { parts.append(years) }
         if !f.subjects.isEmpty {
@@ -333,7 +333,7 @@ final class NavigationModel: ObservableObject {
         case .noReadState: parts.append("No read-state")
         }
         if !f.qualities.isEmpty {
-            parts.append(f.qualities.sorted(by: >).map { "Q\($0)" }.joined(separator: "/"))
+            parts.append(f.qualities.sorted().map { "Q\($0)" }.joined(separator: "/"))
         }
         if let years = f.dateYearsSummary { parts.append(years) }
         if !f.subjects.isEmpty {

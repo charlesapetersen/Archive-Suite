@@ -57,5 +57,7 @@ final class ArchiveReaderUITests: XCTestCase {
                       "the rendered denominator must match the one file actually examined")
         XCTAssertTrue(accessibilityText.contains("none carry a Read or Unread tag"),
                       "the claim about tags is coupled to its measured denominator")
+        XCTAssertTrue(app.buttons["ar.empty.chooseFolder"].exists,
+                      "the empty state should offer the way out: another folder (W40.fix-reader-visual-polish)")
     }
 }

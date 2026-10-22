@@ -222,7 +222,7 @@ struct DocumentWindowView: View {
             Button { model.copyPlainSelection() } label: { Label("Copy", systemImage: "doc.on.doc") }
                 .help("Copy the selected text exactly (⌘C)")
             Button { model.copySelection() } label: { Label("Copy Cleaned", systemImage: "doc.on.doc.fill") }
-                .help("Copy the selected text cleaned for prose — joins lines, de-hyphenates (⌘⇧C)")
+                .help("Copy the selected text cleaned for prose — joins lines, de-hyphenates (⌥⌘C)")
             Button { model.beginFind() } label: { Label("Find", systemImage: "magnifyingglass") }
                 .help("Search for text in this document (⌘F)")
             Button { fraction = defaultFraction; model.leftController.fit(); model.rightController.fit() } label: {

@@ -271,7 +271,7 @@ writes against the real corpus — always a copy.
   and window size then persist as the next viewer's default (DV-1/DV-2; **no** per-document reset).
   `↑/↓` **scroll** the focused pane; `⌘⇧↑/↓` cycle the segment (see §Keyboard). Intelligent copy +
   in-doc Find. Degrades for non-2-page/corrupt.
-- **Intelligent copy** (`⌘⇧C`): collapse single newlines → space; blank line = paragraph break (keep);
+- **Intelligent copy** (`⌥⌘C`): collapse single newlines → space; blank line = paragraph break (keep);
   de-hyphenate line-end hyphens; works in whichever pane holds the selection. `⌘C` copies verbatim.
 - **Options panel (⌘,):** link format, copy-text cleaning, viewer split, nav defaults, list density,
   near-duplicate warning (see **§Options** below).
@@ -302,13 +302,13 @@ writes against the real corpus — always a copy.
 - `⌘⌥←`/`⌘⌥→` focus image pane / focus text pane
 - `⌘↑`/`⌘↓` zoom in/out the focused pane · `⌘0` fit the focused page · `⌥⌘0` reset the split to the saved
   default (not necessarily ⅔) and fit both panes
-- `⌘C` copy verbatim · `⌘⇧C` copy cleaned-for-prose (intelligent)
+- `⌘C` copy verbatim · `⌥⌘C` copy cleaned-for-prose (intelligent; not `⌘⇧C`, which is Copy Link(s))
 - `⌘F` find in the open document(s) · `⌘G`/`⇧⌘G` next/previous match (highlight-all, wraps, "N of M" across open docs)
 - `⌘,` Options (both windows)
 
 *Preview sheet* (opened by `Space`/`⌘Y`)
 - `↑/↓` previous/next file in the list (nav selection follows) · `←/→` cycle within a multi-file selection ·
-  `⌘C`/`⌘⇧C` copy verbatim/cleaned · `⌘O` open the full viewer · `Space`/`Esc` close
+  `⌘C`/`⌥⌘C` copy verbatim/cleaned · `⌘O` open the full viewer · `Space`/`Esc` close
 - `⌘↑`/`⌘↓`/`⌘0` zoom in/out/fit the focused pane — the image pane on open (since `W26.previewzoom`: the
   sheet's viewer model is published by `NavigationWindowView`, so the Document menu acts on it)
 - **No find bar here:** `⌘F`/`⌘G`/`⌘⇧G` are *disabled* in the preview (`DocumentViewerModel.supportsFind`,
@@ -317,7 +317,7 @@ writes against the real corpus — always a copy.
 > **Reconciled with the code, 2026-07-07.** The viewer scheme changed after PLAN was written
 > (shipped UI batch #14): `↑/↓` now **scroll the focused page** instead
 > of cycling documents; cycling moved to `⌘⇧↑/↓`; zoom is `⌘↑/↓` (not `⌘=`/`⌘-`); reset is `⌥⌘0` (not
-> `⌥⌘=`); `⌘C`/`⌘⇧C` are verbatim/cleaned copy. The document window has **no** Mark-Read (`⌘R`) or
+> `⌥⌘=`); `⌘C`/`⌥⌘C` are verbatim/cleaned copy (cleaned was `⌘⇧C` until 2026-10-22). The document window has **no** Mark-Read (`⌘R`) or
 > copy-link shortcut — those are nav-window only.
 
 ## §Options (⌘, — `OptionsView`, read via `AppSettings`)

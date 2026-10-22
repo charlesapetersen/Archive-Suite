@@ -209,7 +209,7 @@ final class DocumentViewerModel: ObservableObject {
         return hasText ? nil : "No OCR text layer — this document is image-only, so text search and copy won’t work here."
     }
 
-    /// Intelligent copy (prose-cleaned) from whichever pane holds the selection — ⌘⇧C.
+    /// Intelligent copy (prose-cleaned) from whichever pane holds the selection — ⌥⌘C.
     func copySelection() {
         let opts = AppSettings.copyOptions
         let text = rightController.cleanedSelection(opts) ?? leftController.cleanedSelection(opts)
