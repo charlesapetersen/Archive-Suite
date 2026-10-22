@@ -74,6 +74,29 @@ class Stitch(unittest.TestCase):
         b = self.tile(1, 0, 'the Comittee met at ten\nMinutes follow\nthe Committee met at ten')
         self.assertEqual(self.R.stitch('tiles', [a, b]), 'the Committee met at ten\nMinutes follow\nthe Committee met at ten')
 
+    def test_a_reflowed_repeat_starting_mid_line_is_dropped(self):
+        # GLM-OCR on the pilot (btp__afc1945001_ms01001-11): each band comes back as paragraphs, so the repeat
+        # starts inside the next tile's first line.
+        a = self.tile(0, 0, 'Material to cover national questions will be sent when analysis demonstrates it is '
+                            'needed. Feature articles, radio talks and speeches before groups should be arranged.\n\n'
+                            'It must be remembered that one of the important jobs of a rumor-control project is to')
+        b = self.tile(1, 0, 'it is needed. Feature articles, radio talks and speeches before groups should be '
+                            'arranged.\n\nIt must be remembered that one of the important jobs of a rumor-control '
+                            'project is to locate weak spots in the community war effort.')
+        got = self.R.stitch('tiles', [a, b])
+        self.assertEqual(got.count('Feature articles'), 1)
+        self.assertTrue(got.endswith('project is to\nlocate weak spots in the community war effort.'))
+
+    def test_a_short_chance_repeat_is_kept(self):
+        a = self.tile(0, 0, 'the report of the'); b = self.tile(1, 0, 'of the Committee on Ways and Means')
+        self.assertEqual(self.R.stitch('tiles', [a, b]), 'the report of the\nof the Committee on Ways and Means')
+
+    def test_a_garbled_first_line_before_the_repeat_is_dropped_with_it(self):
+        a = self.tile(0, 0, 'We met on the fourth of June to settle the accounts of the society')
+        b = self.tile(1, 0, 'xq vvl the fourth of June to settle the accounts of the society and then adjourned.')
+        self.assertEqual(self.R.stitch('tiles', [a, b]),
+                         'We met on the fourth of June to settle the accounts of the society\nand then adjourned.')
+
     def test_a_new_column_is_not_deduplicated_against_the_last(self):
         a = self.tile(0, 0, 'same line'); b = self.tile(1, 0.5, 'same line')
         self.assertEqual(self.R.stitch('tiles', [a, b]), 'same line\nsame line')

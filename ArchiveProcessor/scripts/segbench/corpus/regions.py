@@ -48,44 +48,83 @@ def boxes_pp(found: list[dict]) -> list[dict]:
     return sorted(rows, key=lambda r: r['order'])
 
 
-OVERLAP_LINES = 12   # a tile's last lines that the next tile's first lines may repeat (15% of a band is ~4 lines)
-SAME_LINE = 0.8      # difflib ratio at which two normalised lines are the same line read twice
+TAIL_WORDS = 250     # prev's last words the next tile may repeat (a 30% band overlap is ~120 words of dense type)
+HEAD_EXTRA = 40      # cur's head is searched this many words past the tail's length
+END_SLACK = 8        # the repeat may end this many words before prev's end (prev's last line, cut by the band edge)
+SKIP_COST = 0.5      # each cur word skipped before the repeat starts (cur's first line, cut by the band edge)
+MIN_REPEAT = 4.0     # alignment score (matched words less mismatches and gaps) for a repeat to count
+SAME_WORD = 0.8      # edit ratio at which two normalised words are the same word read twice
 
 
-def norm_line(s: str) -> str:
-    return ' '.join(s.lower().split())
+def _words(text: str) -> list[tuple[str, int]]:
+    """Normalised words with the offset where each ends in text; punctuation-only tokens are left out."""
+    import re
+    out = []
+    for m in re.finditer(r'\S+', text):
+        w = re.sub(r'^\W+|\W+$', '', m.group().lower())
+        if w:
+            out.append((w, m.end()))
+    return out
 
 
-def drop_repeated_head(prev: list[str], cur: list[str]) -> list[str]:
-    """cur without its leading lines that repeat one of prev's last OVERLAP_LINES lines; stops at the first line
-    that is new. A line the band edge cut through stays in prev as read (scored as written, not repaired)."""
-    import difflib
-    tail = [norm_line(x) for x in prev[-OVERLAP_LINES:] if x.strip()]
-    k = 0
-    while k < len(cur) and k < OVERLAP_LINES:
-        line = norm_line(cur[k])
-        if line and not any(difflib.SequenceMatcher(None, line, t).ratio() >= SAME_LINE for t in tail):
-            break
-        k += 1
-    return cur[k:]
+try:
+    from Levenshtein import ratio as _ratio
+except ImportError:   # the scorer venv has it; difflib gives the same verdicts here, slower
+    from difflib import SequenceMatcher
+    _ratio = lambda x, y: SequenceMatcher(None, x, y).ratio()
+
+
+def _same(a: str, b: str) -> bool:
+    if a == b:
+        return True
+    if min(len(a), len(b)) < 4 or abs(len(a) - len(b)) > 2:
+        return False
+    return _ratio(a, b) >= SAME_WORD
+
+
+def drop_repeated_head(prev: str, cur: str) -> str:
+    """cur without the head that repeats prev's tail. The readers reflow a band's lines into paragraphs, so the
+    repeat starts mid-line: words are aligned, not lines. The alignment starts anywhere in prev's tail, at a small
+    cost per cur word skipped first, and must end within END_SLACK words of prev's end; cur is cut where it ends.
+    Below MIN_REPEAT nothing is dropped. A word the band edge cut through stays as read (scored as written)."""
+    pw = [w for w, _ in _words(prev)][-TAIL_WORDS:]
+    cw = _words(cur)[:len(pw) + HEAD_EXTRA]
+    n, m = len(pw), len(cw)
+    if not n or not m:
+        return cur.strip()
+    NEG = float('-inf')
+    H = [[NEG] * (m + 1) for _ in range(n + 1)]
+    best, cut = NEG, 0
+    for i in range(1, n + 1):
+        row, up = H[i], H[i - 1]
+        for j in range(1, m + 1):
+            s = 1.0 if _same(pw[i - 1], cw[j - 1][0]) else -1.0
+            v = max(up[j - 1] + s, up[j] - 1.0, row[j - 1] - 1.0)
+            if s > 0:
+                v = max(v, s - SKIP_COST * (j - 1))
+            row[j] = v
+            if i >= n - END_SLACK and v > best:
+                best, cut = v, j
+    if best < MIN_REPEAT:
+        return cur.strip()
+    return cur[cw[cut - 1][1]:].strip()
 
 
 def stitch(arm: str, crops: list[dict]) -> str:
     """One page's text from its crops' readings ({'index', 'box', 'text'}), in the order they were sent. Regions
-    are joined as paragraphs; tiles in the same column lose the lines their overlap repeats."""
+    are joined as paragraphs; tiles in the same column lose the head their overlap repeats."""
     crops = sorted(crops, key=lambda c: c['index'])
     if arm != 'tiles':
         return '\n\n'.join(c['text'].strip() for c in crops if c['text'].strip())
     out, prev = [], None
     for c in crops:
-        lines = c['text'].strip().splitlines()
+        text = c['text'].strip()
         if prev is not None and prev['box'][0] == c['box'][0]:
-            lines = drop_repeated_head(prev['text'].splitlines(), lines)
-        if lines:
-            out.append('\n'.join(lines))
+            text = drop_repeated_head(prev['text'], text)
+        if text:
+            out.append(text)
         prev = c
     return '\n'.join(out)
-
 
 LO = LTS / 'FarmShare-regions-20261021'
 # Qwen3.6-27B's whole-page readings of the 99: the truth run whose server settings are the regions run's (kv-cache
