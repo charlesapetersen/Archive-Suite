@@ -110,4 +110,19 @@ final class TableColumnFitTests: XCTestCase {
         fitter?.fit()
         XCTAssertLessThanOrEqual(needed(tableView), scrollView.contentSize.width)
     }
+
+    /// A File tags cell narrowed until its tokens wrap asks for a taller row; the VM layout guard saw a second
+    /// line of tokens drawn below a 20-pt row at 160 and 214 pt.
+    func testWrappedTagsAskForATallerCell() {
+        func height(atWidth width: CGFloat) -> CGFloat {
+            let cell = TagTokenCellView(frame: NSRect(x: 0, y: 0, width: width, height: 20))
+            cell.tokenField.font = .systemFont(ofSize: 13)
+            cell.tokenField.objectValue = ["Economics", "1983", "Agricultural Labor Relations", "Brown", "Budget"]
+            cell.layoutSubtreeIfNeeded()
+            return cell.fittingSize.height
+        }
+        let wide = height(atWidth: 900), narrow = height(atWidth: 160)
+        XCTAssertGreaterThan(wide, 0)
+        XCTAssertGreaterThan(narrow, wide * 1.5, "five tags in 160 pt wrap, so the cell should be taller (\(narrow) vs \(wide))")
+    }
 }

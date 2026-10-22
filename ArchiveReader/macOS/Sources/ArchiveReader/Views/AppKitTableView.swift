@@ -648,7 +648,7 @@ final class SortableDiffableDataSource: NSTableViewDiffableDataSource<Int, Archi
 @MainActor
 final class TagTokenCellView: NSTableCellView {
     let tokenField: NSTokenField = {
-        let tf = NSTokenField()
+        let tf = WrappingTokenField()
         tf.translatesAutoresizingMaskIntoConstraints = false
         tf.tokenStyle = .rounded
         tf.isBordered = false
@@ -679,15 +679,40 @@ final class TagTokenCellView: NSTableCellView {
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
-    /// The field wraps its tokens to its width, so the height it asks for must follow that width: a narrower
-    /// File tags column (the tag cloud opening) then gives a taller row rather than a second line drawn below it.
+    /// The field wraps its tokens to its width, so the height it asks for must follow that width, and the row must
+    /// be measured again when it changes: automatic row heights measure a row once, before this cell has a width, so
+    /// a row whose tags wrap stayed one line tall and drew the second line below itself (W40.fix-reader-tagcloud-width,
+    /// seen at File tags 160 and 214 pt). Re-noted on the next turn, not inside this layout pass.
     override func layout() {
         super.layout()
         let width = tokenField.frame.width
-        if width > 0, tokenField.preferredMaxLayoutWidth != width {
-            tokenField.preferredMaxLayoutWidth = width
-            tokenField.invalidateIntrinsicContentSize()
+        guard width > 0, tokenField.preferredMaxLayoutWidth != width else { return }
+        let before = tokenField.intrinsicContentSize.height
+        tokenField.preferredMaxLayoutWidth = width
+        tokenField.invalidateIntrinsicContentSize()
+        guard tokenField.intrinsicContentSize.height != before else { return }
+        DispatchQueue.main.async { [weak self] in
+            guard let self, let table = self.enclosingTableView else { return }
+            let row = table.row(for: self)
+            if row >= 0 { table.noteHeightOfRows(withIndexesChanged: IndexSet(integer: row)) }
         }
+    }
+
+    private var enclosingTableView: NSTableView? {
+        var view = superview
+        while let v = view, !(v is NSTableView) { view = v.superview }
+        return view as? NSTableView
+    }
+}
+
+/// A token field whose height is that of its tokens wrapped to `preferredMaxLayoutWidth`. NSTokenField's own
+/// intrinsic height is one line however many lines its tokens wrap to.
+final class WrappingTokenField: NSTokenField {
+    override var intrinsicContentSize: NSSize {
+        let width = preferredMaxLayoutWidth > 0 ? preferredMaxLayoutWidth : frame.width
+        guard width > 0, let cell else { return super.intrinsicContentSize }
+        let size = cell.cellSize(forBounds: NSRect(x: 0, y: 0, width: width, height: .greatestFiniteMagnitude))
+        return NSSize(width: NSView.noIntrinsicMetric, height: ceil(size.height))
     }
 }
 

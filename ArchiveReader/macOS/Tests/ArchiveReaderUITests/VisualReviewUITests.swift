@@ -182,8 +182,10 @@ final class VisualReviewUITests: FixtureUITestCase {
         shoot("selected-one")
 
         // Row context menu.
+        // Near the left edge, as `clickRow` falls back to: at the 900-pt minimum the row's centre falls in the
+        // gap between File name and Type, where the accessibility hit test finds no row ("Not hittable").
         let row = table.tableRows.element(boundBy: 0)
-        row.rightClick()
+        row.coordinate(withNormalizedOffset: CGVector(dx: 0.1, dy: 0.5)).rightClick()
         if app.menuItems.firstMatch.waitForExistence(timeout: 3) { shoot("row-contextmenu", menu: true) }
         else { missing.append("row context menu") }
         escape()
