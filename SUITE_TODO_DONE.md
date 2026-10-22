@@ -12741,3 +12741,15 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   clicks the image pane and checks ⌘F puts the caret back. VM: passes with the fix (and ×3 iterations); with the fix
   stashed it fails on `"" ≠ "Calif"`, so it discriminates. Reader unit suite green (DeepLinkTests skipped), no new warnings.
   <!-- /W40.fix-reader-doc-find-focus -->
+- [x] **W40.fix-reader-tag-editor-chips — the Edit Tags sheet shows subjects in one clipped row, does not fade partial tags or mark the current choice, and outgrows the window at minimum size [S · S3]** · §W40 (lane: reader) (uses: build,vm). Found by `W40.e10` 2026-10-16; reproduction: `verification/evidence/reader/visual-2026-10-16-tag-editor-many.jpg` and `…-tag-editor-min.jpg`. With 11 files selected the Subjects row shows five chips and cuts the fifth ("Education Polic") at the sheet edge with no ellipsis; the rest are hidden, so a subject cannot be removed unless it is among the first few. One file with 30 subjects shows three ("Coastal Commis" cut). The hint says "Faded tags are on some, not all, selected files", but every chip looks the same although none is on all 11. At the 900×612 window the sheet runs past the window's bottom and the Read state row is cut (it scrolls); the Similar Tags sheet does the same. In the Quality, Color / marker and Read state rows the current choice is drawn as blue text on an almost invisible tint, so it looks weaker than the options that are not chosen (`…-tag-editor-dark.jpg`; light is the same, milder). Fix: wrap the chips, draw partial ones faded, mark the current choice as selected, size the sheet to its window. Add the tag editor and Similar Tags sheets to `LayoutGuardUITests` so the oversize case is guarded like the preview sheet (`oversizeSheet`).
+  SHIPPED 2026-10-21. Subjects wrap (`FlowLayout`) instead of a clipped horizontal row; a long subject truncates in
+  the middle at 420 pt. A partial subject is faded with a dashed outline and no fill, so it reads as partial even
+  when every chip is (the old uniform 0.55 fade showed nothing then); the hint says "Faded, dashed". The current
+  Quality / Color / Read state / Uncertain choice is a filled `.borderedProminent` button with the selected trait.
+  Edit Tags (480×620) and Similar Tags (520×580) take `SheetSizing.fitted` over the window's content size, the
+  preview sheet's rule now shared (`SheetSizing.swift`); at 900×560 content both are 520 tall and scroll inside.
+  Tests: `TagSheetSizeTests` (host); `LayoutGuardUITests` now sweeps both sheets over the 900×612 window, Edit Tags
+  over every row (⌘A): VM, light and dark, 2 tests, 0 violations.
+  VM screenshot tour (`VisualReviewUITests`) read: 12-file sheet at minimum size shows all ten subjects dashed over
+  three rows; the 30-subject volume file shows every chip filled; current choices are solid accent buttons.
+  <!-- /W40.fix-reader-tag-editor-chips -->
