@@ -25,6 +25,11 @@ struct CapturedItem: Identifiable, Codable, Equatable {
     // current fields once the in-flight upload settles — otherwise the change is silently dropped (the
     // in-flight guard suppressed the re-enqueue).
     var needsResend: Bool? = nil
+    // W23.m8's port (W40.i-fix-ios-session-durability): recovered from disk against a session file known to be
+    // older than the state that produced it, so the box/folder, group boundary and tags this page carried are
+    // gone. HELD on the phone (never sent) until the operator says what it is, and persisted, so a further kill
+    // can't release it to the Mac under a classification nobody chose. Mirrors Android's `needsReview`.
+    var needsReview: Bool? = nil
 }
 
 extension CapturedItem {
@@ -34,7 +39,7 @@ extension CapturedItem {
     static let photoDirectoryKey = CodingUserInfoKey(rawValue: "capturePhotoDirectory")!
 
     private enum CodingKeys: String, CodingKey {
-        case id, fileName, groupId, seq, type, quality, year, month, state, replacesGroupId, needsResend
+        case id, fileName, groupId, seq, type, quality, year, month, state, replacesGroupId, needsResend, needsReview
     }
 
     init(from decoder: Decoder) throws {
@@ -57,7 +62,8 @@ extension CapturedItem {
                   month: try c.decodeIfPresent(Int.self, forKey: .month),
                   state: try c.decode(UploadState.self, forKey: .state),
                   replacesGroupId: try c.decodeIfPresent(String.self, forKey: .replacesGroupId),
-                  needsResend: try c.decodeIfPresent(Bool.self, forKey: .needsResend))
+                  needsResend: try c.decodeIfPresent(Bool.self, forKey: .needsResend),
+                  needsReview: try c.decodeIfPresent(Bool.self, forKey: .needsReview))
     }
 
     func encode(to encoder: Encoder) throws {
@@ -73,5 +79,6 @@ extension CapturedItem {
         try c.encode(state, forKey: .state)
         try c.encodeIfPresent(replacesGroupId, forKey: .replacesGroupId)
         try c.encodeIfPresent(needsResend, forKey: .needsResend)
+        try c.encodeIfPresent(needsReview, forKey: .needsReview)
     }
 }

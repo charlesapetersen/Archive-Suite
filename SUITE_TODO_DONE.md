@@ -12609,3 +12609,27 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
     `macStillNeeds`) belongs to `W40.i-fix-ios-delete-confirm`. A FAILED page that can never succeed now holds the
     Mac's Finish while the phone is alive, as on Android; the operator deletes it or cancels Finish.
   <!-- /W40.i-fix-ios-heartbeat-count -->
+- [x] **W40.i-fix-ios-session-durability — port `W23.m8` and orphan adoption to iOS [S-M · S2 · Tier-2]** · §W40 (lane: processor) (uses: build) (blocked-on: W40.i2, W40.i-fix-ios-testable-core). Found by `W40.i2` 2026-10-21; detail in `verification/capture.md`. iOS `SessionStore.save` ignores write errors (`SessionStore.swift:38-41`), writes on the main thread on every change, and a photo on disk that the session does not list (a crash between writing the photo and saving the session) is never seen again. Port Android's: save reports success, a durable stale marker before each write, untracked photos adopted into a recovery segment and held for review when the session was stale, the warning line and Review button (`SessionStore.kt`, `CaptureModels.kt:184-215`, `CaptureOrphanAdoptionTest`). Also (found in the `W40.i-fix-ios-photo-storage` review): a session file that fails to decode loads as nothing and the next save overwrites it; set it aside under a new name instead, so adoption finds its photos and the file survives. SHIPPED 2026-10-21.
+  - `SessionStore.save` returns whether the snapshot landed. A `capture-session.stale` flag is created before each write
+    and removed once it lands (Android's `session.stale`), and is read in `init` before anything can save. The write is
+    temp + fsync + rename (`replaceDurably`, injectable for tests). A session file that exists but can't be read or
+    decoded is moved aside as `capture-session.unreadable-<time>-<id>.json` and reported (`loadSession().unreadable`),
+    so the next save never overwrites it. `clear()` removes the flag with the file.
+  - At launch, `img_*` files in the photo directory that no item names (nor any item restore just dropped) are adopted
+    in name order into one new document group (`CaptureQueue.adoptOrphans`). Against a stale or unreadable session
+    they are held (`needsReview`, persisted): `enqueueUpload` refuses them, resume and auto-retry skip them, the
+    heartbeat still counts them, the summary says "N held". A warning row with a Review button puts the ordinary tag
+    sheet up on the held group; Apply or Skip releases its pages with those tags, and reclassifying a held page as a
+    box or folder also lifts its hold (Android leaves it stranded there: a marker is not a document page). Ending a
+    held group does not rotate the open segment, and restoring a review in progress leaves the open segment current.
+  - Session writes go through one ordered, conflated writer off the main thread (`SessionWriteMailbox`; Clear is an
+    operation in it, so a save from before Clear can't land after it), inside a background task. A "Session not saved"
+    line shows while the latest write has failed.
+  - Review findings fixed: on a stale or unreadable launch the seq counter moves on by 10,000, so a new page in the
+    restored group can't replace a page the Mac already holds (Android has the same flaw → `W40.fix-android-stale-seq`);
+    the writer runs inside `beginBackgroundTask`. Left, both LOW: a transient read error moves a good file aside
+    (photos are then held and re-reviewed, nothing lost), and a failed flag creation followed by a failed write leaves
+    a stale file trusted, as on Android. No migration: no production material.
+  - Host tests: 11 new (220 checks, `scripts/test-ios-capture-queue.sh`); they use the new API, so they don't compile
+    against the old core. iOS generic-simulator build green, no new warnings. Tier-2 adversarial review: no HIGH.
+  <!-- /W40.i-fix-ios-session-durability -->

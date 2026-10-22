@@ -30,6 +30,8 @@ final class CaptureViewModel: ObservableObject {
     var items: [CapturedItem] { queue.items }
     var currentGroupId: String { queue.currentGroupId }
     var pendingTagGroupId: String? { queue.pendingTagGroupId }
+    /// Recovered pages held until reviewed (W40.i-fix-ios-session-durability): their box/folder was never saved.
+    var heldForReviewCount: Int { queue.heldForReviewCount }
     @Published private(set) var statusMessage = ""
     @Published private(set) var selectedItemId: Int64?
     @Published private(set) var armed = false
@@ -37,6 +39,9 @@ final class CaptureViewModel: ObservableObject {
     @Published private(set) var transferFlash: String?
     @Published var captureError: String?   // set when a capture couldn't be written to disk (blocking alert)
     @Published var restoreWarning: String? // set when a restored session lists photos no longer on disk (alert)
+    /// W23.m8's port: the latest session snapshot did not reach phone storage. Its own line, not the status line,
+    /// because the status line is overwritten by the next capture and this lasts until a later save lands.
+    @Published private(set) var sessionNotSaved = false
     @Published var pendingDeleteId: Int64? // set when deleting an un-uploaded item (confirmation dialog)
     @Published private(set) var connectPhase: ConnectPhase = .idle   // drives the pairing screen (P1)
 
@@ -69,7 +74,10 @@ final class CaptureViewModel: ObservableObject {
         endpoint = Self.loadEndpoint()
         transportMode = TransportMode(rawValue: UserDefaults.standard.string(forKey: Self.transportModeKey) ?? "") ?? .lan
         client = endpoint.map { Self.makeTransport(endpoint: $0, mode: transportMode, driveAuth: driveAuth) }
-        restore()
+        // W23.m8's port: read this BEFORE anything can save. restore() persists, and the first save that lands
+        // clears the flag; read later, recovered pages would be adopted as if their classification were known.
+        let manifestWasStale = store.manifestIsStale()
+        restore(manifestWasStale: manifestWasStale)
         startAutoRetry()
     }
 
@@ -305,6 +313,10 @@ final class CaptureViewModel: ObservableObject {
     /// (see CaptureScreen), so this is only reached deliberately.
     func cancelTagSheet() { queue.pendingTagGroupId = nil; persist() }
 
+    /// Review: the ordinary tag sheet on the held recovery segment, so the operator supplies the classification the
+    /// failed save lost. Apply or Skip releases those pages to the Mac; Cancel leaves them held.
+    func reviewRecoveredPhotos() { if queue.beginReview() { persist() } }
+
     /// End the current document segment. Its pages already streamed to the Mac; stamp the optional pre-fill
     /// tags (so any not-yet-uploaded page carries them), open the next segment, and record the segment as
     /// "ended, awaiting Mac ack". The completion signal — which is what makes the Mac present this segment's
@@ -398,6 +410,10 @@ final class CaptureViewModel: ObservableObject {
     /// UPLOADED. Mirrors Android.
     private func enqueueUpload(_ item: CapturedItem) {
         guard let c = client else { return }
+        // W23.m8's port: the one choke point every send passes through. A page recovered against a session file
+        // that never reached disk carries a group nobody chose, and the Mac's half of filing it has no undo. It
+        // waits on the phone, visible and counted as unsent, until the operator classifies it.
+        guard CaptureQueue.isSendable(item) else { return }
         guard queue.beginUpload(item.id) else { return }   // already uploading this id
         setState(item.id, .uploading)
         sendStatusReport()   // reflect a just-captured/enqueued page on the Mac immediately (not only every 8s)
@@ -565,30 +581,79 @@ final class CaptureViewModel: ObservableObject {
         sentCount = 0
         transferFlash = nil
         statusMessage = ""
-        store.clear()
+        // Through the writer, so a save from before Clear still running can't land after it and bring the session
+        // back (Android's StoreOperation.Clear). Nothing is left to have failed to save.
+        if sessionWrites.offerClear() { startSessionWriter() }
+        sessionNotSaved = false
         sendStatusReport()   // a 0 for the cleared session, ordered after any report from before Clear
     }
 
     // MARK: - Persistence / helpers
 
-    private func restore() {
-        guard let snap = store.load() else { return }
-        // The core restores ended-but-unacked segments (their signal is re-sent below, still gated on all
-        // their pages being uploaded), drops items already confirmed on the Mac except the current segment's
-        // untagged document pages, and re-opens the tag card only if the app stopped mid-tagging. A listed photo
-        // whose file is gone is skipped and reported: it never reached the Mac and has to be retaken.
-        let restored = queue.restore(snap) { FileManager.default.fileExists(atPath: $0.fileURL.path) }
-        for item in restored.dropped { try? FileManager.default.removeItem(at: item.fileURL) }
-        if !restored.missing.isEmpty || !restored.dropped.isEmpty { persist() }
-        if !items.isEmpty { statusMessage = "Restored \(items.count) photo(s) from last session" }
-        if !restored.missing.isEmpty {
-            let n = restored.missing.count
-            restoreWarning = "\(n) photo\(n == 1 ? "" : "s") from the last session \(n == 1 ? "is" : "are") no longer on this phone and never reached the Mac. Retake \(n == 1 ? "it" : "them") if the document is still at hand."
+    private func restore(manifestWasStale: Bool) {
+        let loaded = store.loadSession()
+        var dropped: Set<String> = []
+        if let snap = loaded.snapshot {
+            // The core restores ended-but-unacked segments (their signal is re-sent below, still gated on all
+            // their pages being uploaded), drops items already confirmed on the Mac except the current segment's
+            // untagged document pages, and re-opens the tag card only if the app stopped mid-tagging. A listed photo
+            // whose file is gone is skipped and reported: it never reached the Mac and has to be retaken.
+            let restored = queue.restore(snap) { FileManager.default.fileExists(atPath: $0.fileURL.path) }
+            for item in restored.dropped { try? FileManager.default.removeItem(at: item.fileURL) }
+            dropped = Set(restored.dropped.map(\.fileURL.lastPathComponent))
+            if !restored.missing.isEmpty || !restored.dropped.isEmpty { persist() }
+            if !items.isEmpty { statusMessage = "Restored \(items.count) photo(s) from last session" }
+            if !restored.missing.isEmpty {
+                let n = restored.missing.count
+                restoreWarning = "\(n) photo\(n == 1 ? "" : "s") from the last session \(n == 1 ? "is" : "are") no longer on this phone and never reached the Mac. Retake \(n == 1 ? "it" : "them") if the document is still at hand."
+            }
+        }
+        // Self-heal orphans: photos on disk the session doesn't list (a crash between writing a photo and saving the
+        // session, or a session file that could not be read) would otherwise never be shown, sent or cleaned up.
+        // Against a stale or unreadable session file their classification is unknown, so they are held for review.
+        let onDisk = ((try? FileManager.default.contentsOfDirectory(at: sessionDir, includingPropertiesForKeys: nil)) ?? [])
+            .filter { $0.lastPathComponent.hasPrefix("img_") }
+        let held = manifestWasStale || loaded.unreadable
+        if held { queue.skipSeqsAfterStaleRestore() }
+        let adopted = queue.adoptOrphans(onDisk, known: dropped, manifestStale: held)
+        if !adopted.isEmpty {
+            statusMessage = held
+                ? "Recovered \(adopted.count) photo(s) whose box/folder wasn't saved — tap Review to tag and send."
+                : "Recovered \(adopted.count) untracked photo(s)"
+            persist()
         }
         resumeUploads()
     }
 
-    private func persist() { store.save(queue.snapshot()) }
+    /// Hand the snapshot to the session writer: it never blocks, and only the newest waiting snapshot is written.
+    private func persist() { if sessionWrites.offerSave(queue.snapshot()) { startSessionWriter() } }
+
+    private var sessionWrites = SessionWriteMailbox<SessionStore.Snapshot>()
+
+    /// The one session writer, draining the mailbox (W40.i-fix-ios-session-durability). It runs on the main actor, as
+    /// every offer does, so the mailbox needs no lock; each file operation runs on a detached task so the camera UI
+    /// never waits on storage. One writer at a time keeps the writes in order. It is the only place that can tell a
+    /// snapshot that reached disk from one that didn't, so it alone sets `sessionNotSaved`; a later save that lands
+    /// clears what an earlier failure raised.
+    private func startSessionWriter() {
+        let store = store
+        // Ask iOS for time to finish if the app is backgrounded mid-drain, so a queued snapshot still lands. Without
+        // it a suspension before the write starts leaves an older file with no stale flag (the write sets it).
+        let background = UIApplication.shared.beginBackgroundTask(withName: "session-save")
+        Task {
+            defer { if background != .invalid { UIApplication.shared.endBackgroundTask(background) } }
+            while let operation = sessionWrites.take() {
+                switch operation {
+                case .save(let snapshot):
+                    let saved = await Task.detached { store.save(snapshot) }.value
+                    if sessionNotSaved == saved { sessionNotSaved = !saved }
+                case .clear:
+                    await Task.detached { store.clear() }.value
+                    sessionNotSaved = false
+                }
+            }
+        }
+    }
 
     private func setState(_ id: Int64, _ state: UploadState) {
         if queue.setState(id, state) { persist() }

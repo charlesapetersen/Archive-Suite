@@ -253,7 +253,7 @@ test("snapshot round-trips through SessionStore and restore drops confirmed item
     let open = q.addDocument(fileURL: url("open"))             // g2, uploaded but open segment → kept
     q.setState(open.id, .uploaded)
     let pend = q.addDocument(fileURL: url("pend"))             // g2, pending → kept
-    store.save(q.snapshot())
+    check(store.save(q.snapshot()), "saved")
 
     var r = makeQueue()
     let dropped = r.restore(try XCTUnwrap(store.load()), fileExists: { _ in true }).dropped
@@ -297,7 +297,7 @@ test("the session file stores file names only, never an absolute path") {
     try withScratchStore { store, photos in
         var q = makeQueue()
         _ = q.addDocument(fileURL: photos.appendingPathComponent("img_A.jpg"))
-        store.save(q.snapshot())
+        check(store.save(q.snapshot()), "saved")
         let json = try String(contentsOf: photos.deletingLastPathComponent().appendingPathComponent("capture-session.json"), encoding: .utf8)
         check(json.contains("\"fileName\":\"img_A.jpg\""), "name stored")
         check(!json.contains(photos.path.replacingOccurrences(of: "/", with: "\\/")) && !json.contains(photos.path),
@@ -309,7 +309,7 @@ test("a photo saved under one container path restores under the new one (reinsta
     try withScratchStore { oldStore, oldPhotos in
         var q = makeQueue()
         _ = q.addDocument(fileURL: oldPhotos.appendingPathComponent("img_A.jpg"))
-        oldStore.save(q.snapshot())
+        check(oldStore.save(q.snapshot()), "saved")
         // Same session file, but the container moved: the photo directory is now somewhere else.
         let moved = FileManager.default.temporaryDirectory.appendingPathComponent("cq-moved-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: moved, withIntermediateDirectories: true)
@@ -332,7 +332,7 @@ test("restore skips and reports a photo whose file is gone") {
         let here = q.addDocument(fileURL: photos.appendingPathComponent("img_here.jpg"))
         let gone = q.addMarker(fileURL: photos.appendingPathComponent("img_gone.jpg"), type: .box)
         try Data([0xFF, 0xD8]).write(to: here.fileURL)
-        store.save(q.snapshot())
+        check(store.save(q.snapshot()), "saved")
         var r = makeQueue()
         let res = r.restore(try XCTUnwrap(store.load())) { FileManager.default.fileExists(atPath: $0.fileURL.path) }
         check(r.items.map(\.id) == [here.id], "only the photo on disk is restored")
@@ -499,6 +499,173 @@ test("a segment acked by the old Mac stays ended for the new one") {
     check(q.readySegment("g1") != nil && q.beginSegmentSend("g1"), "it can be sent to the new Mac")
     check(q.ackForReply(ok: true, generation: gen, pairing: now) == .confirm, "the new Mac's ack confirms")
     check(q.finishSegmentSend("g1", generation: gen, pairing: now) == .init(released: true, requeued: false), "done")
+}
+
+// W40.i-fix-ios-session-durability: Android's W23.m8 (SessionStoreTest, CaptureOrphanAdoptionTest,
+// CaptureRecoverySequenceTest), ported.
+
+/// A scratch store whose writes go through `publish`, so a test can fail one the way a full volume does.
+func withScratchStore(publish: @escaping (Data, URL) -> Bool, _ body: (SessionStore, URL, URL) throws -> Void) throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent("cq-\(UUID().uuidString)")
+    let photos = root.appendingPathComponent("capture", isDirectory: true)
+    try FileManager.default.createDirectory(at: photos, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let file = root.appendingPathComponent("capture-session.json")
+    try body(SessionStore(url: file, photoDirectory: photos, publish: publish), photos, root)
+}
+
+test("save reports a failed write, and the stale flag outlives the process that raised it") {
+    var fail = false
+    try withScratchStore(publish: { fail ? false : SessionStore.replaceDurably($0, $1) }) { store, photos, root in
+        var q = makeQueue()
+        _ = q.addDocument(fileURL: photos.appendingPathComponent("img_A.jpg"))
+        check(store.save(q.snapshot()), "a write that lands reports true")
+        check(!store.manifestIsStale(), "and leaves no stale flag")
+        fail = true
+        _ = q.addMarker(fileURL: photos.appendingPathComponent("img_B.jpg"), type: .box)
+        check(!store.save(q.snapshot()), "a write that fails reports false")
+        check(store.manifestIsStale(), "and leaves the flag")
+        let restarted = SessionStore(url: root.appendingPathComponent("capture-session.json"), photoDirectory: photos)
+        check(restarted.manifestIsStale(), "a new process sees the flag")
+        check(restarted.load()?.items.count == 1, "the file still holds the older snapshot")
+        check(restarted.save(q.snapshot()) && !restarted.manifestIsStale(), "the next write that lands clears it")
+        check(restarted.load()?.items.count == 2, "and holds the new snapshot")
+        _ = store.save(q.snapshot())                                 // fails again: flag raised
+        store.clear()
+        check(!store.manifestIsStale() && store.load() == nil, "clear removes the file and the flag")
+        let leftovers = try FileManager.default.contentsOfDirectory(atPath: root.path).filter { $0.hasSuffix(".tmp") }
+        check(leftovers.isEmpty, "no temporary files left behind")
+    }
+}
+
+test("a session file that can't be read is set aside, never overwritten") {
+    try withScratchStore { store, photos in
+        let file = photos.deletingLastPathComponent().appendingPathComponent("capture-session.json")
+        let garbage = Data("{\"items\":[{\"id\":1,".utf8)          // a truncated write
+        try garbage.write(to: file)
+        let loaded = store.loadSession()
+        check(loaded.snapshot == nil && loaded.unreadable, "reported unreadable, not as no session")
+        let aside = try XCTUnwrap(loaded.setAside)
+        check((try? Data(contentsOf: aside)) == garbage, "the bytes survive under a new name")
+        check(aside.lastPathComponent.hasPrefix("capture-session.unreadable-"), "named for what it is")
+        var q = makeQueue()
+        _ = q.addDocument(fileURL: photos.appendingPathComponent("img_A.jpg"))
+        check(store.save(q.snapshot()), "the next save writes a fresh file")
+        check((try? Data(contentsOf: aside)) == garbage, "and leaves the set-aside one alone")
+        let fresh = store.loadSession()
+        check(fresh.snapshot != nil && !fresh.unreadable, "the fresh file reads")
+    }
+    try withScratchStore { store, _ in
+        let none = store.loadSession()
+        check(none.snapshot == nil && !none.unreadable && none.setAside == nil, "no file is simply no session")
+    }
+}
+
+test("an unlisted photo is adopted into a recovery segment that sends, against a trustworthy session") {
+    var q = makeQueue()
+    let a = q.addDocument(fileURL: url("img_a"))                 // g1, listed
+    let adopted = q.adoptOrphans([url("img_c"), url("img_a"), url("img_b"), url("img_dropped")],
+                                 known: ["img_dropped.jpg"], manifestStale: false)
+    check(adopted.map { $0.fileURL.lastPathComponent } == ["img_b.jpg", "img_c.jpg"], "unlisted only, in name order")
+    check(adopted.allSatisfy { $0.groupId == "g2" && $0.type == .document }, "one new document group")
+    check(adopted.map(\.id) == [a.id + 1, a.id + 2] && adopted.map(\.seq) == [2, 3], "ids and seqs continue")
+    check(q.currentGroupId == "g1", "the open segment stays open")
+    check(adopted.allSatisfy(CaptureQueue.isSendable), "sendable")
+    check(Set(q.resumeCandidates.map(\.id)) == Set([a.id] + adopted.map(\.id)), "resume sends them")
+    check(q.heldForReviewCount == 0 && !q.uploadSummary.contains("held"), "nothing held")
+    check(q.adoptOrphans([url("img_a"), url("img_b")], manifestStale: false).isEmpty, "adopting twice adopts nothing")
+}
+
+test("against a stale session the adopted pages are held: counted, kept, never sent") {
+    var q = makeQueue()
+    let a = q.addDocument(fileURL: url("img_a"))
+    let held = q.adoptOrphans([url("img_x"), url("img_y")], manifestStale: true)
+    check(held.allSatisfy { $0.needsReview == true && !CaptureQueue.isSendable($0) }, "held")
+    check(q.resumeCandidates.map(\.id) == [a.id], "resume skips them")
+    check(q.autoRetryCandidates.map(\.id) == [a.id], "auto-retry skips them")
+    check(q.heartbeatCount == 3, "the heartbeat still counts them, so the Mac can't finish without them")
+    check(q.heldForReviewCount == 2 && q.heldReviewGroupId == "g2", "two held in g2")
+    check(q.uploadSummary == "1 queued · 2 held", "the summary says held, not queued: \(q.uploadSummary)")
+}
+
+test("the hold survives a further kill") {
+    try withScratchStore { store, photos in
+        var q = makeQueue()
+        _ = q.adoptOrphans([photos.appendingPathComponent("img_x.jpg")], manifestStale: true)
+        check(store.save(q.snapshot()), "saved")
+        var r = makeQueue()
+        _ = r.restore(try XCTUnwrap(store.load()), fileExists: { _ in true })
+        check(r.heldForReviewCount == 1 && r.resumeCandidates.isEmpty, "still held after restore")
+    }
+}
+
+test("Review puts the tag sheet up on the held group; ending it releases the pages and keeps the open segment") {
+    var q = makeQueue()
+    let open = q.addDocument(fileURL: url("img_open"))              // g1, the operator's segment
+    let held = q.adoptOrphans([url("img_x"), url("img_y")], manifestStale: true)   // g2
+    check(q.beginReview() && q.pendingTagGroupId == "g2", "sheet on the held group")
+    let end = try XCTUnwrap(q.endSegment(quality: "Q2", year: 1971, month: 4))
+    check(end.group == "g2" && end.pages == 2, "the held group ended")
+    check(Set(end.toUpload.map(\.id)) == Set(held.map(\.id)), "its pages are sent now")
+    check(end.toUpload.allSatisfy { $0.needsReview == nil && $0.year == 1971 && $0.quality == "Q2" }, "released with the tags")
+    check(q.currentGroupId == "g1", "the open segment was not rotated away")
+    check(q.item(open.id)?.groupId == "g1" && q.heldForReviewCount == 0 && !q.beginReview(), "nothing left to review")
+    check(q.endedSegments["g2"]?.seqs == "2,3", "recorded ended with its seqs")
+
+    var s = makeQueue()
+    _ = s.adoptOrphans([url("img_z")], manifestStale: true)
+    check(s.beginReview(), "review")
+    s.pendingTagGroupId = nil                                       // Cancel
+    check(s.heldForReviewCount == 1, "Cancel leaves them held")
+}
+
+test("reclassifying a held page as a box or folder is its classification") {
+    var q = makeQueue()
+    let held = q.adoptOrphans([url("img_x")], manifestStale: true)[0]
+    let box = try XCTUnwrap(q.reclassify(held.id, to: .box))
+    check(box.needsReview == nil && CaptureQueue.isSendable(box), "the hold lifts")
+}
+
+test("restore brings back a review in progress without making the held group the open segment") {
+    var q = makeQueue()
+    _ = q.addDocument(fileURL: url("img_open"))                     // g1
+    _ = q.adoptOrphans([url("img_x")], manifestStale: true)         // g2
+    check(q.beginReview(), "review")
+    var r = makeQueue()
+    _ = r.restore(q.snapshot(), fileExists: { _ in true })
+    check(r.pendingTagGroupId == "g2", "the review sheet comes back")
+    check(r.currentGroupId == "g1", "the operator's segment stays current")
+}
+
+test("after a stale restore a new page never reuses a seq the open group already sent") {
+    var q = makeQueue()
+    _ = q.addDocument(fileURL: url("img_a"))                         // (g1, 1): the last snapshot that landed
+    let stale = q.snapshot()
+    let lost = q.addDocument(fileURL: url("img_b"))                  // (g1, 2): sent, but its save failed
+    var r = makeQueue()
+    _ = r.restore(stale, fileExists: { _ in true })
+    r.skipSeqsAfterStaleRestore()
+    _ = r.adoptOrphans([url("img_a"), url("img_b")], manifestStale: true)
+    let next = r.addDocument(fileURL: url("img_c"))
+    check(next.groupId == "g1" && next.seq > lost.seq, "(g1, \(next.seq)) can't replace (g1, \(lost.seq)) on the Mac")
+}
+
+test("the session writer keeps only the newest snapshot and orders a Clear") {
+    var m = SessionWriteMailbox<Int>()
+    check(m.offerSave(1), "the first offer starts a writer")
+    check(!m.offerSave(2) && !m.offerSave(3), "later offers join it")
+    if case .save(let n)? = m.take() { check(n == 3, "only the newest is written") } else { check(false, "a save") }
+    check(m.take() == nil && !m.writerRunning, "drained: the writer ends")
+
+    check(m.offerSave(4), "new writer")
+    if case .save(let n)? = m.take() { check(n == 4, "writing 4") } else { check(false, "a save") }
+    check(!m.offerSave(5), "5 waits while 4 is written")
+    check(!m.offerClear(), "a Clear waits too")
+    check(m.waitingSave == nil, "and drops the cleared session's snapshot")
+    check(!m.offerSave(6), "the new session's first snapshot")
+    if case .clear? = m.take() {} else { check(false, "Clear runs first") }
+    if case .save(let n)? = m.take() { check(n == 6, "then the new session") } else { check(false, "a save") }
+    check(m.take() == nil, "drained")
 }
 
 print("")

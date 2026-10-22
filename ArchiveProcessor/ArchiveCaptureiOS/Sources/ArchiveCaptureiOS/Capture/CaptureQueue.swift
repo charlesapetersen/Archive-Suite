@@ -125,6 +125,10 @@ struct CaptureQueue {
         items[i].groupId = newGroupId()
         items[i].quality = nil
         items[i].state = .pending
+        // Choosing Box or Folder IS the classification a held recovered page was waiting for, so the hold lifts
+        // (W40.i-fix-ios-session-durability). Kept, it would strand the page: Review ends a document segment, and
+        // a marker is not a document page.
+        items[i].needsReview = nil
         // Build the full reclassify chain (SPEC A3): G→H→I carries "G,H" so the Mac tombstones every
         // prior group, not just the immediate predecessor. Append the old group to any existing chain.
         if let existing = items[i].replacesGroupId {
@@ -179,9 +183,14 @@ struct CaptureQueue {
             items[i].quality = items[i].quality ?? quality
             items[i].year = year
             items[i].month = month
+            // W23.m8's port: the one place a recovery hold lifts. The operator has now said what these pages
+            // are, so they become sendable with the tags just supplied (Skip included: a deliberate choice).
+            items[i].needsReview = nil
             if items[i].state != .uploaded { toUpload.append(items[i]) }
         }
-        startNewGroup()                                    // gid is now finalized (differs from currentGroupId)
+        // Rotate only when the segment just ended IS the open one. A held recovery segment is reviewed while the
+        // operator's own segment is still open, and rotating there would abandon the segment being shot into.
+        if gid == currentGroupId { startNewGroup() }       // gid is now finalized (differs from currentGroupId)
         let pages = items.filter { $0.groupId == gid && $0.type == .document }
         // SPEC A5: snapshot page seqs at End-segment so the Mac can verify all pages arrived.
         let seqs = pages.map { String($0.seq) }.joined(separator: ",")
@@ -200,6 +209,60 @@ struct CaptureQueue {
 
     /// The Mac acked the group's segment-complete signal.
     mutating func acknowledgeSegment(_ group: String) { endedSegments[group] = nil }
+
+    // MARK: - Recovery (W40.i-fix-ios-session-durability, Android's W23.m8)
+
+    /// Whether a page may go to the Mac now. The one thing that withholds it is an unreviewed recovery: everything
+    /// else in the queue has a classification the operator chose. Android's `isSendable`.
+    static func isSendable(_ item: CapturedItem) -> Bool { item.needsReview != true }
+
+    /// Recovered pages held until the operator classifies them, and the group the Review button shows. Derived from
+    /// the items, so the hold survives a further kill exactly as the per-item flag does; two stale launches leave
+    /// two held groups, reviewed one at a time.
+    var heldForReviewCount: Int { items.filter { $0.needsReview == true }.count }
+    var heldReviewGroupId: String? { items.first { $0.needsReview == true }?.groupId }
+
+    /// Review: put the ordinary tag sheet up on the first held group. Ending it (Apply or Skip) is what releases its
+    /// pages; there is no path that releases them silently. Returns false if nothing is held.
+    mutating func beginReview() -> Bool {
+        guard let group = heldReviewGroupId else { return false }
+        pendingTagGroupId = group
+        return true
+    }
+
+    /// How far a launch against a stale or unreadable session moves the seq counter on. The file's counter may lag
+    /// seqs already sent (to the open segment's group, which the file restores as current), and a new page reusing
+    /// one would replace that page on the Mac, which keys on (group, seq). A gap is harmless: the Mac accepts any
+    /// seq ≥ 0 and orders pages by it.
+    static let staleSeqMargin = 10_000
+
+    /// Called once, at a launch whose session file is stale or unreadable, before anything is adopted or shot.
+    mutating func skipSeqsAfterStaleRestore() { seqCounter += Self.staleSeqMargin }
+
+    /// Adopt the photos on disk that no item names, in file-name order, as one recovery segment of document pages in
+    /// a new group. An archival photo can't be retaken, so an unlisted one is never left invisible; a crash between
+    /// writing a photo and saving the session leaves exactly that. What differs is what the adoption may CLAIM.
+    /// Against a trustworthy session file the photo is one the last save hadn't caught up with, and a fresh segment
+    /// is an honest account of it. Against a stale one (`manifestStale`) the same segment would be a guess standing
+    /// in for a classification lost with the unsaved write, so the pages are held for review instead.
+    /// `known` names extra files that must not be adopted (the restore's dropped items, whose delete may have
+    /// failed: adopted, they would reach the Mac twice under a new group). Returns the adopted items.
+    mutating func adoptOrphans(_ filesOnDisk: [URL], known: Set<String> = [], manifestStale: Bool) -> [CapturedItem] {
+        let listed = known.union(items.map(\.fileURL.lastPathComponent))
+        let orphans = filesOnDisk.filter { !listed.contains($0.lastPathComponent) }
+            .sorted { $0.lastPathComponent < $1.lastPathComponent }
+        guard !orphans.isEmpty else { return [] }
+        let group = newGroupId()
+        var adopted: [CapturedItem] = []
+        for file in orphans {
+            seqCounter += 1
+            adopted.append(CapturedItem(id: nextId, fileURL: file, groupId: group, seq: seqCounter, type: .document,
+                                        needsReview: manifestStale ? true : nil))
+            nextId += 1
+        }
+        items.append(contentsOf: adopted)
+        return adopted
+    }
 
     // MARK: - In-flight guards
 
@@ -280,12 +343,13 @@ struct CaptureQueue {
     /// Android's `pendingReportCount`). It reaches 0 only when every page left is confirmed and current.
     var heartbeatCount: Int { items.filter(Self.macStillNeeds).count }
 
-    /// Everything the Mac must still receive, re-sent on (re)connect.
-    var resumeCandidates: [CapturedItem] { items.filter(Self.macStillNeeds) }
+    /// Everything the Mac must still receive and may be sent now, re-sent on (re)connect. A held page counts in the
+    /// heartbeat above (the Mac must not finish without it) but is never sent until reviewed.
+    var resumeCandidates: [CapturedItem] { items.filter { Self.macStillNeeds($0) && Self.isSendable($0) } }
 
     /// What the auto-retry loop flushes: failed uploads, any still-PENDING page, and any page with a resend pending.
     var autoRetryCandidates: [CapturedItem] {
-        items.filter { $0.state == .failed || $0.state == .pending || $0.needsResend == true }
+        items.filter { ($0.state == .failed || $0.state == .pending || $0.needsResend == true) && Self.isSendable($0) }
     }
 
     /// The Mac confirmed a send whose fields changed while it ran: the bytes it holds are stale, so the page goes
@@ -302,10 +366,11 @@ struct CaptureQueue {
 
     var uploadSummary: String {
         let failed = items.filter { $0.state == .failed }.count
-        let inflight = items.filter { $0.state == .pending || $0.state == .uploading }.count
+        let inflight = items.filter { ($0.state == .pending || $0.state == .uploading) && Self.isSendable($0) }.count
         var parts: [String] = []
         if inflight > 0 { parts.append("\(inflight) queued") }
         if failed > 0 { parts.append("\(failed) failed") }
+        if heldForReviewCount > 0 { parts.append("\(heldForReviewCount) held") }
         return parts.joined(separator: " · ")
     }
 
@@ -372,7 +437,11 @@ struct CaptureQueue {
         items.removeAll { !keep($0) }
         if let taggingGroup = snap.pendingTagGroupId,
            items.contains(where: { $0.groupId == taggingGroup && $0.type == .document }) {
-            currentGroupId = taggingGroup
+            // A held recovery group was under review: bring its sheet back, but leave the operator's segment current,
+            // or ending the review would rotate away from the segment being shot into.
+            if !items.contains(where: { $0.groupId == taggingGroup && $0.needsReview == true }) {
+                currentGroupId = taggingGroup
+            }
             pendingTagGroupId = taggingGroup
         }
         return Restored(dropped: dropped, missing: missing)
@@ -409,5 +478,47 @@ struct HeartbeatMailbox<Report> {
         guard let report = waiting else { writerRunning = false; return nil }
         waiting = nil
         return report
+    }
+}
+
+/// The session file's one ordered writer (W40.i-fix-ios-session-durability, Android's CONFLATED `storeChannel`).
+/// Every change used to write the file on the main thread. Now the view model offers each snapshot here and one
+/// writer saves off the main thread, keeping only the newest snapshot waiting. A Clear is ordered too: it drops the
+/// cleared session's waiting snapshot and runs before any snapshot offered after it, so a save from before Clear
+/// can never bring the cleared session back. Bookkeeping only, so the host tests can drive it.
+struct SessionWriteMailbox<Snapshot> {
+    enum Operation { case save(Snapshot), clear }
+
+    private(set) var waitingSave: Snapshot?
+    private(set) var clearWaiting = false
+    private(set) var writerRunning = false
+
+    /// Keep `snapshot` as the newest, replacing any not yet written. Returns true if the caller must start a writer.
+    mutating func offerSave(_ snapshot: Snapshot) -> Bool {
+        waitingSave = snapshot
+        return startWriterIfIdle()
+    }
+
+    /// Clear the session file once any write in progress ends. A waiting snapshot belongs to the cleared session,
+    /// so it is dropped. Returns true if the caller must start a writer.
+    mutating func offerClear() -> Bool {
+        waitingSave = nil
+        clearWaiting = true
+        return startWriterIfIdle()
+    }
+
+    /// The writer's next operation: a waiting Clear first (any snapshot waiting now was offered after it), then the
+    /// newest snapshot. Nil ends the writer, so the next offer starts a new one.
+    mutating func take() -> Operation? {
+        if clearWaiting { clearWaiting = false; return .clear }
+        guard let snapshot = waitingSave else { writerRunning = false; return nil }
+        waitingSave = nil
+        return .save(snapshot)
+    }
+
+    private mutating func startWriterIfIdle() -> Bool {
+        guard !writerRunning else { return false }
+        writerRunning = true
+        return true
     }
 }

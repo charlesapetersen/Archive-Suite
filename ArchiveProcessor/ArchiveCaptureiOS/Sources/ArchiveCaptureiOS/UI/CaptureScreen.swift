@@ -105,6 +105,26 @@ struct CaptureScreen: View {
                 }
                 .disabled(isCapturing)
 
+                // W23.m8's port (W40.i-fix-ios-session-durability): the session snapshot didn't reach phone storage.
+                // Its own line, because the status line is overwritten by the next capture and this lasts until a
+                // later save lands: until then, an app kill costs the grouping and tags of everything shot since.
+                if vm.sessionNotSaved {
+                    Text("⚠︎ Session not saved to this phone — if the app closes now, recent grouping and tags are lost. Photos are safe; keep the app open.")
+                        .font(.caption2).foregroundStyle(.orange).frame(maxWidth: .infinity, alignment: .leading)
+                }
+
+                // Pages recovered against a session file that never reached disk. Held here, not sent, because their
+                // box/folder is gone and the Mac would file them under a guess. Review is the only way out, and it
+                // is the ordinary tag sheet.
+                if vm.heldForReviewCount > 0 {
+                    HStack {
+                        Text("⚠︎ \(vm.heldForReviewCount) recovered photo(s) held — their box/folder wasn't saved.")
+                            .font(.caption2).foregroundStyle(.orange)
+                        Spacer()
+                        Button("Review") { vm.reviewRecoveredPhotos() }.font(.caption)
+                    }
+                }
+
                 if !vm.statusMessage.isEmpty {
                     Text(vm.statusMessage).font(.caption2).foregroundStyle(.white.opacity(0.6))
                 }

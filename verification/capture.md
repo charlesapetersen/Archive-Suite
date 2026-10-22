@@ -48,7 +48,7 @@ iOS, so each was checked against the iOS code.
 | Android fix | What it did | iOS today | Filed as |
 |---|---|---|---|
 | `W23.m1` (2026-07-30) | a pairing generation on every send, so a reply from the Mac just unpaired from cannot mark a page delivered and delete the phone's copy | absent: `disconnect()` (`I/Capture/CaptureViewModel.swift:148`) leaves uploads running, and their reply still marks the page uploaded | `W40.i-fix-ios-pairing-generation` |
-| `W23.m8` (2026-07-30) | `SessionStore.save` reports failure; a durable stale marker; pages recovered against a stale session are held for review | absent: `SessionStore.save` ignores errors (`I/Capture/SessionStore.swift:38-41`) | `W40.i-fix-ios-session-durability` |
+| `W23.m8` (2026-07-30) | `SessionStore.save` reports failure; a durable stale marker; pages recovered against a stale session are held for review | was absent (`SessionStore.save` ignored errors); now `save` returns whether the snapshot landed, a `capture-session.stale` flag is set before each write, and pages recovered against a stale session are held for review (`SessionStore.swift`, `CaptureQueue.adoptOrphans`) | **fixed** by `W40.i-fix-ios-session-durability` (2026-10-21) |
 | manifest fallback (2026-07-12) | a fallback no longer deletes the last good session before the new one is written | iOS writes `.atomic` and has no fallback path, so this case does not arise | none |
 | pending count (2026-07-12) | auto-retrying FAILED pages count as pending, so they hold the Mac's Finish | was absent (the heartbeat counted only pending and uploading, though auto-retry resends FAILED pages); now it counts every page the Mac must still receive, failed and pending-resend included (`CaptureQueue.heartbeatCount`) | **fixed** by `W40.i-fix-ios-heartbeat-count` (2026-10-21) |
 | Clear race (2026-07-12) | Clear cancels and joins uploads, and item ids are never reused | was absent (`nextId = 1`, uploads left running); now Clear moves a generation on, cancels the sends and never reuses an id, and a reply from an older generation records nothing (`CaptureQueue.clear`, `CaptureViewModel.clearSession`) | **fixed** by `W40.i-fix-ios-clear-generation` (2026-10-21) |
@@ -65,8 +65,8 @@ iOS, so each was checked against the iOS code.
 | Clear session | bumps a session generation, cancels and waits for uploads, never reuses ids (`CaptureViewModel.kt:876-899`) | reset ids to 1 with uploads still running, so a late reply marked a *new* photo with the same id as uploaded; now bumps a generation, cancels the sends (without awaiting: the main actor serialises, and the generation check drops a late reply) and never reuses an id | **fixed** by `W40.i-fix-ios-clear-generation` (2026-10-21) |
 | Re-pairing while uploads run (`W23.m1`) | see above | see above | **gap, S2** → `W40.i-fix-ios-pairing-generation` |
 | "Phone still has N to send" heartbeat | counts every unconfirmed page; one ordered, conflated writer (`CaptureViewModel.kt:736-740`) | excluded FAILED pages and sent one unordered `Task` per report, so the Mac could be told 0 early; now counts every unconfirmed page through one ordered, conflated writer (`HeartbeatMailbox`, 5 s report timeout) | **fixed** by `W40.i-fix-ios-heartbeat-count` (2026-10-21) |
-| Photos on disk the session does not list | adopted into a recovery segment, held for review if the session was stale (`CaptureModels.kt:184-215`) | never seen again: a crash between writing the photo and saving the session strands it | **gap, S2** → `W40.i-fix-ios-session-durability` |
-| Session file writes | off the main thread, temp + fsync + atomic move, reports failure (`A/data/ManifestFileWriter.kt`) | `.atomic` write on the main thread on every change; failure ignored | **gap, S3**, part of `W40.i-fix-ios-session-durability` |
+| Photos on disk the session does not list | adopted into a recovery segment, held for review if the session was stale (`CaptureModels.kt:184-215`) | were never seen again (a crash between writing the photo and saving the session stranded them); now adopted at launch into a recovery segment, held behind a Review button when the session was stale or unreadable (`CaptureQueue.adoptOrphans`, `CaptureViewModel.restore`). A session file that can't be read is moved aside as `capture-session.unreadable-*.json` rather than overwritten | **fixed** by `W40.i-fix-ios-session-durability` (2026-10-21) |
+| Session file writes | off the main thread, temp + fsync + atomic move, reports failure (`A/data/ManifestFileWriter.kt`) | was an `.atomic` write on the main thread on every change, failure ignored; now one ordered, conflated writer off the main thread (`SessionWriteMailbox`, Clear ordered with it), temp + fsync + rename (`SessionStore.replaceDurably`), and a "Session not saved" line while the latest write has failed | **fixed** by `W40.i-fix-ios-session-durability` (2026-10-21) |
 | Pending resend (a Q3 toggle or reclassify during an upload) | included in auto-retry and resume | was not in the auto-retry or resume filters; now it is, and a confirmed send with a resend pending goes straight back to pending (`CaptureQueue.prepareDeferredResend`) | **fixed** by `W40.i-fix-ios-heartbeat-count` (2026-10-21) |
 | Google Drive sign-in | client id from `local.properties`; empty disables sign-in with a message (`A/net/DriveAuth.kt:105-113`) | hard-coded placeholder `YOUR_IOS_CLIENT_ID.apps.googleusercontent.com` (`I/Net/DriveAuth.swift:73`, `project.yml:42`); the sign-in button always shows and Google rejects it | **gap, S2** → `W40.i-fix-ios-drive-oauth-client`. The cloud relay cannot be reached on iOS |
 | Drive tokens | private SharedPreferences, `allowBackup=false` | access and refresh tokens in plain `UserDefaults`, which goes into device backups (`DriveAuth.swift:29-48`) | **gap, S3** → `W40.i-fix-ios-drive-token-keychain` |
@@ -555,8 +555,8 @@ action or any runtime evidence: there is no test target and no simulator runtime
 - **Status:** `unproven`
 - **History:**
   - 2026-10-21 W40.b4 — row written, `unproven`.
-- **Notes:** photos are kept in Caches, which iOS may empty → `W40.i-fix-ios-photo-storage` (S1); session writes ignore
-  failure → `W40.i-fix-ios-session-durability`. Uploads with the app in the background: suspect S-023.
+- **Notes:** photos are kept in Caches, which iOS may empty → `W40.i-fix-ios-photo-storage` (S1); session writes ignored
+  failure (fixed by `W40.i-fix-ios-session-durability`, 2026-10-21). Uploads with the app in the background: suspect S-023.
 
 ### C-40 · iOS · The phone's copy is deleted only after the Mac's durable ack
 
@@ -587,8 +587,8 @@ action or any runtime evidence: there is no test target and no simulator runtime
 - **History:**
   - 2026-10-21 W40.b4 — row written, `unproven`.
 - **Notes:** restore trusts each photo's absolute path, which changes on reinstall (`:567-595`) →
-  `W40.i-fix-ios-photo-storage` (S1); a photo written but not yet listed is never found →
-  `W40.i-fix-ios-session-durability` (S2).
+  `W40.i-fix-ios-photo-storage` (S1, fixed); a photo written but not yet listed is now adopted at launch, held for
+  review when the session was stale (`W40.i-fix-ios-session-durability`, fixed 2026-10-21, host-tested only).
 
 ### C-42 · iOS · Queue-depth heartbeat
 

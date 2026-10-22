@@ -586,6 +586,8 @@ signal either) folds into m5 for the same reason.
 
 ## ✅ FIXED (W23.m8): the phone's crash-durable session save couldn't tell you it hadn't saved
 
+**iOS (W40.i-fix-ios-session-durability, 2026-10-21):** ported — `SessionStore.save` reports failure, a `capture-session.stale` flag, orphans held for review, the warning and Review row; an unreadable session file is set aside. iOS also moves the seq counter on after a stale launch, which Android does not yet (`W40.fix-android-stale-seq`).
+
 **Found 2026-07-29** (owner-commissioned Codex full-suite review; premise re-confirmed by symbol on
 2026-07-30 against `996a58b` before a line was changed — `SessionStore.save` still returned `Unit`).
 
