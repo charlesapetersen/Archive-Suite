@@ -10,6 +10,8 @@ W46.date-draft-audit, the second reader on the rows the first did not support, e
     run-guarded.sh --label date-audit --need-gb 8 -- <lab venv>/bin/python date_draft.py audit-collect [--model K]
     python3 date_draft.py audit-score [--model K]   # segbench-results/date-draft-audit.md; pool/audit-truth.jsonl
                                                     # and the owner's check sheet pool/audit-sheet/index.html
+W46.date-audit-score: once the sheet's answers are saved (pool/audit-sheet/W46-date-audit-answers.json), audit-score
+also folds them in, each classed by hand in OWNER, and writes the final count of the 200.
 
 --model is a key of MODELS (default qwen3-vl-8b-mlx4; qwen3.5-4b-mlx4 runs under --need-gb 5).
 
@@ -409,6 +411,91 @@ OUTCOMES = ("supported by the second reader", "disputed: to the owner", "no year
             "not audited")
 
 
+# W46.date-audit-score: the owner's answers to the sheet, every note read by hand (2026-10-22). Key: document ->
+# (the year picked, the note's sha1[:8] or None, class, the page's year(s), why). The pick and the hash stop the score
+# when an answer changes, so a new note is read before it counts; the notes themselves stay in the private
+# pool/audit-truth.jsonl. Classes: 'dated' the page's dating year; 'context' the same, read with knowledge the page
+# alone does not give; 'inferred' a dating year the owner infers from the page's text; 'mention' a year the page
+# mentions that does not date it; 'bound' only an earliest year; 'illegible' the date is there, its year is one of
+# the candidates. A 1900 tag is judged like any other, from its answer (W46.date-audit-owner-ok).
+ANSWERS = os.path.join(SHEET, "W46-date-audit-answers.json")
+OWNER = {
+    "b7679fc9c60ef2f9": (None, "9359a1d5", "mention", [1985], "the 1985 is mentioned in the text, not a date"),
+    "0f250089c527a25b": ("1981", "e57a5aa2", "dated", [1981], "handwritten in the left margin; both readers missed it"),
+    "e52be3d43346f3a6": ("no date on these pages", "48577ba7", "mention", [1933, 1924],
+                         "the years read are mentioned in passing, not a date for these pages"),
+    "15c3057d93639e52": (None, "72511192", "dated", [1927], "no pick; the note reads 5.11/27 as November 1927"),
+    "904df6db7437826e": ("1969", "dc43fe66", "dated", [1969], "the date as read, September 3, 1969"),
+    "84c3c2cd8bc297fa": ("1981", "541701db", "dated", [1981], "the date as read, June 29, 1981"),
+    "a699e0eeb964511b": ("1984", "01087d98", "mention", [1984], "picked 1984 but the note says it is mentioned, not a date"),
+    "705a5d475e7d4b2d": ("1960", "729c448e", "bound", [1960],
+                         "a review of a book published in 1960: the review is 1960 or later; the note overrides the pick"),
+    "8b8336ab42e50a24": ("1985", "d5fe0072", "mention", [1985], "picked 1985, noted as a mention, not a dating year"),
+    "65622dd6c8a653c5": ("1958", "cd3bd3da", "inferred", [1958],
+                         "a 1957-58 annual report, usually published in 1958"),
+    "cd01d8390ef89fa7": ("1948", "a6a6bf00", "dated", [1948], "March 4, 1948; both readers read 1968"),
+    "4a8775c6635a29b0": ("no year legible", "ac5f9bec", "illegible", [1919, 1929], "obscured: 1919 or 1929"),
+    "60df3c077d20a2d4": ("1916", "efd30267", "dated", [1916], "the date as read, October 6, 1916"),
+    "745940a3485ac18a": ("1973", "2e1d235b", "dated", [1973], "January 31, 1973; both readers read 1978"),
+    "88962ea9b8eabd83": ("1970", "d5fe0072", "mention", [1970], "picked 1970, noted as a mention, not a dating year"),
+    "b5a8fc0a15e7e60f": ("1961", "d5fe0072", "mention", [1961], "picked 1961, noted as a mention, not a dating year"),
+    "18589d1c06105ec7": (None, "3da1fe98", "mention", [1982], "no pick; 1982-3 is a mention, not a dating year"),
+    "63d998727a5ff0ff": ("1979", "85cde903", "context", [1979],
+                         "2-3-79; it looks like 19, and only context makes it 79"),
+    "85c74ee4bbd28c1b": ("1983", "c6a3b7d2", "dated", [1983], "a copyright line, which the owner counts as a dating year"),
+    "172f76141bf8de82": ("1981", "9ab5ea85", "dated", [1981], "the date as read, February 17, 1981"),
+    "2a1a3caec99509a6": (None, "d5d524b0", "dated", [1998],
+                         "no pick; the 1997 read is a mention, the dating year is at the bottom, January 1998"),
+    "ab20e83f94bff0dd": ("1978", "9f29c60c", "dated", [1978], "the date as read, August 1978"),
+    "486fe66f6af2dcbc": ("1982", "93d937cb", "dated", [1982], "the date as read, 01/05/82"),
+    "725b969266e6f40d": ("1983", "d5fe0072", "mention", [1983], "picked 1983, noted as a mention, not a dating year"),
+    "8232d2197e2a0654": (None, "11c7541a", "mention", [1956], "no pick; the owner reads 1956 (the readers 1957), a mention"),
+    "e4be28828f7fd155": ("1976", "96fa5a85", "dated", [1976],
+                         "the boxed date is the manuscript's receipt; the dating year is the citation at the top, June 1976"),
+    "ce070071532a5616": ("1969", "eb3fe3e9", "dated", [1969], "August 26, 1969; the readers read 1953 or no year"),
+    "aeead1cf06ba4269": ("no year legible", "30fb47bf", "illegible", list(range(1970, 1980)),
+                         "September 197x, the last digit not legible"),
+    "692927d512142b83": ("1981", None, "dated", [1981], "picked 1981, no note (the second reader's copyright line)"),
+}
+TAG_VERDICTS = ("supported by the page", "the page's date differs from the tag", "no dating year on the page")
+
+
+def owner_verdict(cls, years, tag):
+    """The tag against the owner's answer. An illegible date whose candidates all differ from the tag still shows
+    the tag is not the page's year; a bound or a mention says nothing against it."""
+    if cls in ("dated", "context", "inferred"):
+        return TAG_VERDICTS[0] if years == [tag] else TAG_VERDICTS[1]
+    if cls == "illegible":
+        return TAG_VERDICTS[2] if tag in years else TAG_VERDICTS[1]
+    return TAG_VERDICTS[2]
+
+
+def fold_answers(rows):
+    """Write the owner's answer, its class and the page's year beside the tag of every disputed row; stop on an
+    answer not read by hand. Rows outside the sheet get the page year the audit gave them."""
+    import hashlib
+    ans = json.load(open(ANSWERS, encoding="utf-8")) if os.path.exists(ANSWERS) else None
+    for r in rows:
+        if r["outcome"] == "supported by the second reader":
+            r.update(page_year=r["owner_year"], tag_verdict=TAG_VERDICTS[0])
+        elif r["outcome"] == "no year on the page: tag unsupported":
+            r.update(page_year=None, tag_verdict=TAG_VERDICTS[2])
+        elif ans is not None and r["outcome"] == "disputed: to the owner":
+            a = ans.get(r["id"])
+            if a is None or r["id"] not in OWNER:
+                raise SystemExit(f"{r['id']}: no answer, or an answer not classed by hand in OWNER: {a!r}")
+            pick, h, cls, years, why = OWNER[r["id"]]
+            got = hashlib.sha1(a["note"].encode()).hexdigest()[:8] if a.get("note") else None
+            if a.get("year") != pick or got != h:
+                raise SystemExit(f"{r['id']}: the answer changed since it was read by hand; read it again: {a!r}")
+            r.update(owner_answer=a, answer_class=cls, answer_years=years, reason=why,
+                     page_year=years[0] if cls in ("dated", "context", "inferred") else None,
+                     tag_verdict=owner_verdict(cls, years, r["owner_year"]))
+    if ans is not None and set(ans) - {r["id"] for r in rows}:
+        raise SystemExit(f"answers for documents not on the sheet: {sorted(set(ans) - {r['id'] for r in rows})}")
+    return ans is not None
+
+
 def cmd_audit_score(a):
     man = audit_manifest()
     rows, sheet = [], []
@@ -423,6 +510,7 @@ def cmd_audit_score(a):
                      "outcome": oc, "pages": len(pages)})
         if oc == "disputed: to the owner":
             sheet.append(rows[-1])
+    answered = fold_answers(rows)
     with open(os.path.join(POOL, "audit-truth.jsonl"), "w", encoding="utf-8") as fh:
         for r in rows:
             fh.write(json.dumps(r, ensure_ascii=False) + "\n")
@@ -438,7 +526,7 @@ def cmd_audit_score(a):
                       and min(x["page"] for x in r["second_readings"] if x["year"] == r["owner_year"]) > 1)
     boxed = sum(1 for r in sheet for x in r["second_readings"] if x["box"])
     # a disputed year one off the tag reads as the tag's year coming from a neighbouring date (publication, filing),
-    # not a misreading; a tag of 1900 looks like a placeholder (5 of the stratified 200 carry it)
+    # not a misreading; a tag of 1900 is sometimes a placeholder and sometimes a real year (5 of the 200 carry it)
     near = sum(1 for r in sheet if r["owner_year"] != 1900 and any(
         x["year"] and abs(x["year"] - r["owner_year"]) == 1 for x in r["second_readings"]))
     placeholder = sum(1 for r in sheet if r["owner_year"] == 1900)
@@ -464,15 +552,90 @@ def cmd_audit_score(a):
           f"{agree['same']} and different years on {agree['other']}. {boxed} of the disputed readings carry the "
           "second reader's box on the sheet; the rest are placed by the reader's own words for where the date is.", "",
           f"Of the {len(sheet)} disputes, {near} have the second reader one year from the tag (the page's date is "
-          f"probably right and the tag took a neighbouring year), and {placeholder} carry the tag 1900, which looks like "
-          "a placeholder rather than a year; both kinds are on the sheet, since only the owner can say what the "
-          "tag should hold.", "",
+          f"probably right and the tag took a neighbouring year), and {placeholder} carry the tag 1900, sometimes a "
+          "placeholder and sometimes a real year (owner, 2026-10-22); both kinds are on the sheet, since only the owner "
+          "can say what the tag should hold.", "",
           "The sheet (private, in the bench cache's `date-tagging/pool/audit-sheet/index.html`) shows each disputed "
           "page with the boxes and asks what year the date says, offering every year read and the owner's tag in "
           "numeric order, unlabelled, so it does not say which is the current truth.", ""]
+    if answered:
+        L += owner_section(rows, sheet)
     with open(AUDIT_RESULTS, "w", encoding="utf-8") as fh:
         fh.write("\n".join(L))
     print(f"{dict(n)}; sheet {len(sheet)}; {AUDIT_RESULTS}")
+
+
+def years_text(ys):
+    """An answer's year(s): one year, a decade (197x), or the candidates."""
+    if len(ys) == 1:
+        return str(ys[0])
+    if ys[0] % 10 == 0 and ys == list(range(ys[0], ys[0] + 10)):
+        return f"{ys[0] // 10}x"
+    return " or ".join(map(str, ys))
+
+
+def owner_section(rows, sheet):
+    """The owner's answers folded in: what each says, the tags it shows wrong, and the final count of the 200."""
+    classes = ("dated", "context", "inferred", "illegible", "bound", "mention")
+    tab = collections.Counter((r["answer_class"], r["tag_verdict"]) for r in sheet)
+    overridden = sum(1 for r in sheet if r["owner_answer"].get("year", "").isdigit()
+                     and r["answer_class"] in ("mention", "bound"))
+    L = ["## The owner's answers (W46.date-audit-score)", "",
+         f"The owner answered all {len(sheet)} on 2026-10-22. "
+         f"{sum(1 for r in sheet if r['owner_answer'].get('note'))} answers carry a note and "
+         f"{sum(1 for r in sheet if not r['owner_answer'].get('year'))} are a note with no year picked, so each was "
+         "read by hand and classed with its reason in `OWNER` (`date_draft.py`); the score stops on an answer that "
+         f"changes. A note overrides the pick: {overridden} picks of a year carry a note that the year is only "
+         "mentioned, or only an earliest year. "
+         "The notes are kept verbatim only in the private `pool/audit-truth.jsonl`, beside the tag and the page's year.",
+         "", "| the answer | " + " | ".join(TAG_VERDICTS) + " |", "|---|" + "---|" * len(TAG_VERDICTS)]
+    for c in classes:
+        L.append(f"| {c} | " + " | ".join(str(tab[(c, v)]) for v in TAG_VERDICTS) + " |")
+    L.append("| all | " + " | ".join(str(sum(tab[(c, v)] for c in classes)) for v in TAG_VERDICTS) + " |")
+    L += ["", "`dated`: the page's dating year; `context`: the same, though the page alone reads otherwise (2-3-79 "
+          "looks like 19); `inferred`: a year the owner infers from the text (a 1957-58 annual report, published "
+          "1958); `illegible`: a date whose year is one of a few (1919 or 1929; 197x); `bound`: only an earliest year "
+          "(a review of a 1960 book); `mention`: a year the page mentions that does not date it.", ""]
+    wrong = [r for r in sheet if r["tag_verdict"] == TAG_VERDICTS[1]]
+    L += [f"### The {len(wrong)} tags the answers show wrong", "",
+          "The page's own date gives another year. The tag may still have come from somewhere else, but it is not "
+          "the page's year; which the tag should hold is the owner's call, and nothing here changes a tag.", "",
+          "| document | tag | the page's year | the answer |", "|---|---|---|---|"]
+    for r in sorted(wrong, key=lambda r: r["id"]):
+        L.append(f"| {r['id']} | {r['owner_year']} | {years_text(r['answer_years'])} | {r['reason']} |")
+    off1 = sum(1 for r in wrong if r["page_year"] and abs(r["page_year"] - r["owner_year"]) == 1)
+    t1900 = [r for r in sheet if r["owner_year"] == 1900]
+    L += ["", f"{off1} of them are one year from the tag. Of the {len(t1900)} tagged 1900, each settled from its "
+          f"answer: " + "; ".join(f"{r['id'][:8]} {r['tag_verdict']} ({years_text(r['answer_years'])})"
+                                    for r in t1900) + ".", ""]
+    # how the readers fared on the rows the owner settled with a dating year
+    dated = [r for r in sheet if r["page_year"]]
+    read = lambda r: {x["year"] for x in r["second_readings"]} | (
+        {r["first_draft"]["year"]} if (r["first_draft"] or {}).get("year") else set())
+    hit = sum(1 for r in dated if r["page_year"] in read(r))
+    sup = [r for r in sheet if r["tag_verdict"] == TAG_VERDICTS[0]]
+    mentions = sum(1 for r in sheet if r["answer_class"] in ("mention", "bound"))
+    L += [f"On the {len(dated)} the owner dated, a reader had read the page's year on {hit}. The {len(sup)} the owner "
+          f"found supported are tags the readers disputed by misreading or missing the date (1948 read as 1968, "
+          f"1973 as 1978, a margin date not seen). {mentions} of the {len(sheet)} disputes were a year the page "
+          "mentions rather than a date of it, or only bounds: the blind question does not tell the two apart, which is the readers' "
+          "main fault here.", ""]
+    n = collections.Counter(r["tag_verdict"] for r in rows)
+    first = sum(1 for l in open(os.path.join(POOL, "draft-truth.jsonl"), encoding="utf-8")
+                if not json.loads(l)["audit"])
+    L += ["### The stratified 200, final", "",
+          "| | documents |", "|---|---|",
+          f"| supported by the page: the first reader | {first} |",
+          f"| supported by the page: the second reader | {sum(1 for r in rows if r['outcome'] == OUTCOMES[0])} |",
+          f"| supported by the page: the owner's answer | {len(sup)} |",
+          f"| the page's date differs from the tag | {n[TAG_VERDICTS[1]]} |",
+          f"| no dating year on the page (the tag stands, unsupported) | {n[TAG_VERDICTS[2]]} |",
+          f"| all | {first + len(rows)} |", "",
+          f"{first + n[TAG_VERDICTS[0]]} of the 200 tags are supported by a date on the document's own pages, "
+          f"{n[TAG_VERDICTS[1]]} are contradicted by it, and {n[TAG_VERDICTS[2]]} have no dating year on the page "
+          f"({sum(1 for r in rows if r['outcome'] == OUTCOMES[2])} where neither reader found a year, "
+          f"{mentions} where the year found was only a mention or a bound).", ""]
+    return L
 
 
 def sheet_items(rows):

@@ -12850,3 +12850,16 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
     `testSaveSearchNameFieldHasTheKeyboardAndQualityChipsAscend` and the Choose Folder assertion; VM dark visual tour
     (`testTourDark`, `testEmptyStatesDark`) green, screenshots read for (6)–(9).
   <!-- /W40.fix-reader-visual-polish -->
+- [x] **W46.date-audit-score — fold the owner's 29 date-audit answers into the stratified 200's truth [S]** · §Document processing review — W46 (owner, 2026-10-20) — SHIPPED 2026-10-22
+  - `date_draft.py audit-score` now folds the owner's sheet answers (`W46-date-audit-answers.json`) into the private
+    `pool/audit-truth.jsonl`: per disputed row the answer verbatim, its hand-read class and reason, the page's year
+    beside the tag, and a tag verdict. Every note was read by hand into the `OWNER` table (28 notes, 5 with no pick);
+    the pick and a note hash stop the score when an answer changes. A note overrides the pick (6 picks are noted as
+    a mention or an earliest year only).
+  - Of the 29: 6 supported by the page (the readers misread or missed the date), 13 tags shown wrong (the page's own
+    date gives another year; 4 one year off; all 4 tagged 1900 settled from their answers as later page years:
+    1998, 1976, 197x, 1981), 10 with no dating year (9 mentions, 1 bound). The stratified 200, final: 135 supported
+    by the document's own pages, 13 contradicted, 52 with no dating year on the page. The readers' main fault was not
+    telling a mentioned year from a dating year (10 of 29). Nothing changes a tag: which year a wrong tag should hold
+    is the owner's call. detail: ArchiveProcessor/segbench-results/date-draft-audit.md
+  <!-- /W46.date-audit-score -->
