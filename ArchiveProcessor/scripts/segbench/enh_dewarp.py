@@ -5,6 +5,8 @@
   $V enh_dewarp.py prepare      # Apple quads, then the arms' images and saved grids (quad, uvdoc, docres)
   $V enh_dewarp.py extras       # hand crops, the app's encoder at three settings, dewarp-then-quarter on the ladder
   $V enh_dewarp.py vision       # Apple Vision lines and word boxes on raw and on every arm
+  $V enh_dewarp.py stage        # the FarmShare pack (corpus/dewarp-submit.sh runs it there)
+  $V enh_dewarp.py fetch        # the FarmShare readings back, then report again
   $V enh_dewarp.py report       # segbench-results/enh-dewarp.md and enh-dewarp-pages.csv
 
 Arms (dewarp_arms.py says how each is made): raw is the panel's frozen 2400 px / JPEG 90 image, the one every
@@ -285,6 +287,69 @@ def prepare_extras():
         freeze(quarter(A.uvdoc_after_quad(img, quad, SRC)[0]), arm_image('uvdoc-quarter', p))
 
 
+FS_ROOT = '/scratch/users/cp1/fs-ocr/dewarp-20261022'
+CLUSTER_ARMS = ('raw', *ARMS, 'enc-2048-q85', 'enc-1600-q90')  # enc-2400-q90 is raw's size and quality
+
+
+def cluster_jobs():
+    """Every image the FarmShare readers get: the 96 in each arm, then the hand crops and the ladder's quarters."""
+    ids = [p for p in pages() if p not in P.AGREEMENT]
+    return [(a, p) for a in CLUSTER_ARMS for p in ids] + [j for j in extra_jobs() if j[0] in ('hand', 'quarter', *LADDER_ARMS)]
+
+
+def stage():
+    """CACHE/stage: the images under <arm>/<page>.jpg and pages.jsonl with their FarmShare paths, ready to copy to
+    FS_ROOT with the two corpus scripts and routes.json (the regions run's, for the two vLLM readers)."""
+    import hashlib
+    import shutil
+    out = CACHE / 'stage'
+    rows = []
+    for arm, p in cluster_jobs():
+        src = arm_image(arm, p)
+        dst = out / 'images' / arm / (p + '.jpg')
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        if not dst.exists():
+            shutil.copyfile(src, dst)
+        rows.append({'id': f'{arm}/{p}', 'image': f'{FS_ROOT}/images/{arm}/{p}.jpg',
+                     'sha256': hashlib.sha256(dst.read_bytes()).hexdigest()})
+    (out / 'pages.jsonl').write_text(''.join(json.dumps(r) + '\n' for r in rows))
+    print(len(rows), 'images ->', out)
+
+
+FETCHED = CACHE / 'farmshare-out'  # a copy of FS_ROOT/out
+READERS = {'qwen3.6-27b': 'panel', 'lightonocr3-4b': 'native', 'ppocrv6': 'pipeline'}  # ocr_rescore.py's modes
+
+
+def fetch():
+    """Copy FS_ROOT/out to FETCHED over the owner's FarmShare socket (execution-plans/farmshare-access.md)."""
+    sock = Path.home() / '.ssh/cm-farmshare'
+    FETCHED.mkdir(parents=True, exist_ok=True)
+    subprocess.run(['gtimeout', '--foreground', '1800', 'scp', '-q', '-r', '-o', f'ControlPath={sock}',
+                    '-o', 'ControlMaster=no', '-o', 'BatchMode=yes', '-o', 'ProxyCommand=false',
+                    f'cp1@login.farmshare.stanford.edu:{FS_ROOT}/out/.', str(FETCHED)], check=True)
+    print(FETCHED)
+
+
+def cluster_rows():
+    """Per reader, {(arm, page): score row} from the fetched records; a missing or failed reading scores empty."""
+    sys.path.insert(0, str(Path(__file__).resolve().parent / 'corpus'))
+    import farmshare_expanded_report as X
+    import ocr_panel_score as S
+    out = {}
+    for route, mode in READERS.items():
+        if not (FETCHED / route).exists():
+            continue
+        by = {}
+        for arm, p in cluster_jobs():
+            f = FETCHED / route / arm / (p + '.json')
+            rec = json.loads(f.read_text()) if f.exists() else None
+            truth = (P.TRUTH / 'truth' / (p + '.txt')).read_text()
+            by[arm, p] = {'page': p, 'arm': arm, 'reader': route, 'read': rec is not None,
+                          **S.score(truth, X.reading(rec, mode))}
+        out[route] = by
+    return out
+
+
 def vision():
     rows = [(arm_image(a, p), CACHE / 'lines' / a / (p + '.json')) for a in ('raw', *ARMS) for p in pages()]
     rows += [(arm_image(a, p), CACHE / 'lines' / a / (p + '.json')) for a, p in extra_jobs()]
@@ -513,15 +578,38 @@ def report():
               "panel's quarter rung of the raw photograph (both LANCZOS to a quarter, JPEG 92, then the panel's "
               'freezing); the original size for reference.', '']
         L += arm_table(by, {'ladder': lad}, ('quarter', *LADDER_ARMS, 'raw'), 'quarter')
+    readers = cluster_rows()
+    if readers:
+        L += ['', '## Open readers on FarmShare', '',
+              "Qwen3.6-27B (the panel prompt), LightOnOCR-3 4B (its own prompt, plain text) and PP-OCRv6 (truth96's "
+              'pinned native pipeline), each reading every image above as it is, raw included, in one run '
+              f'(`corpus/dewarp_cluster.py`, {FS_ROOT}). An image with no reading, or a failed one, scores empty.', '']
+        cluster = RESULTS / 'enh-dewarp-farmshare.csv'
+        with cluster.open('w') as f:
+            w = csv.DictWriter(f, ['reader', 'arm', 'page', 'read', 'nes', 'chrf', 'words', 'hyp_words', 'missed', 'added'],
+                               extrasaction='ignore', lineterminator='\n')
+            w.writeheader()
+            for route, rb in readers.items():
+                for r in rb.values():
+                    w.writerow({k: (round(v, 6) if isinstance(v, float) else v) for k, v in r.items()})
+        for route, rb in readers.items():
+            missing = sum(not r['read'] for r in rb.values())
+            L += ['', f'### {route}' + (f' ({missing} of {len(rb)} images not read yet)' if missing else ''), '']
+            L += arm_table(rb, {**groups, **tag_groups}, ('raw', *ARMS), 'raw')
+            L += [''] + arm_table(rb, groups, ('raw', 'enc-2048-q85', 'enc-1600-q90'), 'raw')
+            if hand:
+                L += [''] + arm_table(rb, {'hand-cropped': hand}, ('raw', 'quad', 'uvdoc', 'hand'), 'raw')
+            if lad:
+                L += [''] + arm_table(rb, {'ladder': lad}, ('quarter', *LADDER_ARMS, 'raw'), 'quarter')
     REPORT.write_text('\n'.join(L) + '\n')
     print(REPORT)
 
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument('cmd', choices=['prepare', 'extras', 'vision', 'report'])
+    ap.add_argument('cmd', choices=['prepare', 'extras', 'vision', 'stage', 'fetch', 'report'])
     a = ap.parse_args()
-    {'prepare': prepare, 'extras': prepare_extras, 'vision': vision, 'report': report}[a.cmd]()
+    {'prepare': prepare, 'extras': prepare_extras, 'vision': vision, 'stage': stage, 'fetch': fetch, 'report': report}[a.cmd]()
 
 
 if __name__ == '__main__':
