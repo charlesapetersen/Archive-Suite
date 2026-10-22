@@ -228,6 +228,16 @@ depends on the apps' current settings, structure or outputs.
   arms of `W46.ocr-regions`, `W46.date-traceable`, `W46.marks-detect`, `W46.ent-robust`, `W46.ent-score` and the
   `claude -p` voter in `W46.kit-gate` are skipped. Coding sessions themselves (the engine running on the plan) are not
   arms and are unaffected.
+- ⛔ **Cluster work runs on Sherlock, in a session the owner starts (owner, 2026-10-22).** Sherlock suits this project
+  better than FarmShare, even when it is slower. FarmShare is used only with the owner's explicit approval, given for
+  that run; any other mention of FarmShare in this file, the queue or a plan is history, not a route. Sherlock's
+  `/etc/agents` rules forbid agent sessions that a supervisor starts or feeds while nobody is there, so the engine
+  never drives Sherlock: every open `(cluster: …)` item is `(cluster: sherlock) (needs: owner)`, and an owner-started
+  session runs it (login needs Duo, as the shared `~/.ssh/cm-sherlock` connection does). The 32 FarmShare jobs pending
+  that morning were cancelled (ids in `~/cancelled-20261022.txt` on FarmShare); their items rerun on Sherlock from their
+  staged packs. An owner-led session was copying most of FarmShare's data to Sherlock the same day, so a Sherlock
+  session looks for a pack on Sherlock before copying or rebuilding one, and never copies in parallel with another
+  transfer. A new cluster item is filed with both markers.
 - ⏸ **Paid hosted benchmarking is on hold (owner, 2026-10-17).** Open-weight models on FarmShare first; paid hosted
   bench runs wait for `W43.sweep` at the end of the queue, behind a full price estimate. A session that wants a paid
   run and defers it adds a line to [`execution-plans/paid-runs-deferred.md`](execution-plans/paid-runs-deferred.md)
