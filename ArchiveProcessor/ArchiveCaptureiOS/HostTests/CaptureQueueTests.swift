@@ -166,7 +166,7 @@ test("snapshot round-trips through SessionStore and restore drops confirmed item
     let dir = FileManager.default.temporaryDirectory.appendingPathComponent("cq-\(UUID().uuidString)")
     try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
     defer { try? FileManager.default.removeItem(at: dir) }
-    let store = SessionStore(url: dir.appendingPathComponent("capture-session.json"))
+    let store = SessionStore(url: dir.appendingPathComponent("capture-session.json"), photoDirectory: url("x").deletingLastPathComponent())
 
     var q = makeQueue()
     let old = q.addDocument(fileURL: url("old"))                // g1, ended + uploaded → dropped
@@ -183,7 +183,7 @@ test("snapshot round-trips through SessionStore and restore drops confirmed item
     store.save(q.snapshot())
 
     var r = makeQueue()
-    let dropped = r.restore(try XCTUnwrap(store.load()))
+    let dropped = r.restore(try XCTUnwrap(store.load()), fileExists: { _ in true }).dropped
     check(Set(dropped.map(\.id)) == [old.id, m.id], "confirmed items outside the open segment dropped")
     check(r.items.map(\.id) == [f.id, open.id, pend.id], "kept in order")
     check(r.currentGroupId == "g2" && r.pendingTagGroupId == nil, "open segment restored, no tag sheet")
@@ -198,14 +198,104 @@ test("restore re-opens the tag sheet only for a group that still has document pa
     q.setState(a.id, .uploaded)
     q.pendingTagGroupId = "g1"
     var r = makeQueue()
-    _ = r.restore(q.snapshot())
+    _ = r.restore(q.snapshot(), fileExists: { _ in true })
     check(r.pendingTagGroupId == "g1" && r.currentGroupId == "g1", "mid-tagging → sheet re-opens")
 
     var s = q.snapshot()
     s.pendingTagGroupId = "gone"
     var r2 = makeQueue()
-    _ = r2.restore(s)
+    _ = r2.restore(s, fileExists: { _ in true })
     check(r2.pendingTagGroupId == nil && r2.currentGroupId == "g1", "no pages in that group → no sheet")
+}
+
+// W40.i-fix-ios-photo-storage: photos are restored by file NAME against the photo directory, a missing file is
+// skipped and reported, and a pending resend survives an uploaded state.
+
+/// A scratch session store with its own photo directory, removed when `body` returns.
+func withScratchStore(_ body: (SessionStore, URL) throws -> Void) throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent("cq-\(UUID().uuidString)")
+    let photos = root.appendingPathComponent("capture", isDirectory: true)
+    try FileManager.default.createDirectory(at: photos, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    try body(SessionStore(url: root.appendingPathComponent("capture-session.json"), photoDirectory: photos), photos)
+}
+
+test("the session file stores file names only, never an absolute path") {
+    try withScratchStore { store, photos in
+        var q = makeQueue()
+        _ = q.addDocument(fileURL: photos.appendingPathComponent("img_A.jpg"))
+        store.save(q.snapshot())
+        let json = try String(contentsOf: photos.deletingLastPathComponent().appendingPathComponent("capture-session.json"), encoding: .utf8)
+        check(json.contains("\"fileName\":\"img_A.jpg\""), "name stored")
+        check(!json.contains(photos.path.replacingOccurrences(of: "/", with: "\\/")) && !json.contains(photos.path),
+              "no directory in the file")
+    }
+}
+
+test("a photo saved under one container path restores under the new one (reinstall)") {
+    try withScratchStore { oldStore, oldPhotos in
+        var q = makeQueue()
+        _ = q.addDocument(fileURL: oldPhotos.appendingPathComponent("img_A.jpg"))
+        oldStore.save(q.snapshot())
+        // Same session file, but the container moved: the photo directory is now somewhere else.
+        let moved = FileManager.default.temporaryDirectory.appendingPathComponent("cq-moved-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: moved, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: moved) }
+        try Data([0xFF, 0xD8]).write(to: moved.appendingPathComponent("img_A.jpg"))
+        let newStore = SessionStore(url: oldPhotos.deletingLastPathComponent().appendingPathComponent("capture-session.json"),
+                                    photoDirectory: moved)
+        let snap = try XCTUnwrap(newStore.load())
+        check(snap.items.first?.fileURL.standardizedFileURL == moved.appendingPathComponent("img_A.jpg").standardizedFileURL,
+              "resolved against the new directory")
+        var r = makeQueue()
+        let res = r.restore(snap) { FileManager.default.fileExists(atPath: $0.fileURL.path) }
+        check(r.items.count == 1 && res.missing.isEmpty, "found and kept")
+    }
+}
+
+test("restore skips and reports a photo whose file is gone") {
+    try withScratchStore { store, photos in
+        var q = makeQueue()
+        let here = q.addDocument(fileURL: photos.appendingPathComponent("img_here.jpg"))
+        let gone = q.addMarker(fileURL: photos.appendingPathComponent("img_gone.jpg"), type: .box)
+        try Data([0xFF, 0xD8]).write(to: here.fileURL)
+        store.save(q.snapshot())
+        var r = makeQueue()
+        let res = r.restore(try XCTUnwrap(store.load())) { FileManager.default.fileExists(atPath: $0.fileURL.path) }
+        check(r.items.map(\.id) == [here.id], "only the photo on disk is restored")
+        check(res.missing.map(\.id) == [gone.id], "the missing one is reported")
+        check(res.dropped.isEmpty, "a missing photo is not reported as confirmed")
+        check(r.nextId == q.nextId && r.seqCounter == q.seqCounter, "counters still restored, so no id or seq is reused")
+    }
+}
+
+test("a page whose resend is pending is kept as pending, not pruned as uploaded") {
+    var q = makeQueue()
+    let a = q.addMarker(fileURL: url("a"), type: .box)   // a marker: an uploaded one is normally pruned
+    q.setState(a.id, .uploaded)
+    _ = q.markNeedsResend(a.id)                          // the app stopped between "uploaded" and the resend
+    let b = q.addMarker(fileURL: url("b"), type: .folder)
+    q.setState(b.id, .uploaded)
+    var r = makeQueue()
+    let res = r.restore(q.snapshot(), fileExists: { _ in true })
+    check(r.item(a.id)?.state == .pending, "resend page restored as pending")
+    check(r.item(a.id)?.needsResend != true, "the marker is consumed: the pending send carries the current fields")
+    check(r.resumeCandidates.map(\.id) == [a.id], "resume re-sends it")
+    check(res.dropped.map(\.id) == [b.id], "a plain uploaded marker is still pruned")
+}
+
+test("a session file naming a path rather than a file name is rejected") {
+    try withScratchStore { store, photos in
+        let file = photos.deletingLastPathComponent().appendingPathComponent("capture-session.json")
+        for bad in ["../escape.jpg", "/abs/img.jpg", "", ".."] {
+            let json = #"{"items":[{"id":1,"fileName":"\#(bad)","groupId":"g1","seq":1,"type":"document","state":"pending"}],"seq":1,"nextId":2}"#
+            try json.write(to: file, atomically: true, encoding: .utf8)
+            check(store.load() == nil, "rejected: \(bad)")
+        }
+        let good = #"{"items":[{"id":1,"fileName":"img_A.jpg","groupId":"g1","seq":1,"type":"document","state":"pending"}],"seq":1,"nextId":2}"#
+        try good.write(to: file, atomically: true, encoding: .utf8)
+        check(store.load()?.items.first?.fileURL.lastPathComponent == "img_A.jpg", "a bare name loads")
+    }
 }
 
 struct Missing: Error {}

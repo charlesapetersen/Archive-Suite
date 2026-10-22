@@ -36,6 +36,7 @@ final class CaptureViewModel: ObservableObject {
     @Published private(set) var sentCount = 0
     @Published private(set) var transferFlash: String?
     @Published var captureError: String?   // set when a capture couldn't be written to disk (blocking alert)
+    @Published var restoreWarning: String? // set when a restored session lists photos no longer on disk (alert)
     @Published var pendingDeleteId: Int64? // set when deleting an un-uploaded item (confirmation dialog)
     @Published private(set) var connectPhase: ConnectPhase = .idle   // drives the pairing screen (P1)
 
@@ -47,7 +48,8 @@ final class CaptureViewModel: ObservableObject {
 
     private var flashTask: Task<Void, Never>?
     private let store = SessionStore()
-    private let sessionDir: URL
+    /// Unsent photos live in the store's Application Support directory, never Caches (W40.i-fix-ios-photo-storage).
+    private var sessionDir: URL { store.photoDirectory }
     let deviceName = UIDevice.current.name
     let driveAuth = DriveAuth()
 
@@ -59,9 +61,6 @@ final class CaptureViewModel: ObservableObject {
     private static let transportModeKey = "transportMode"
 
     init() {
-        sessionDir = (FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
-                      ?? FileManager.default.temporaryDirectory).appendingPathComponent("capture", isDirectory: true)
-        try? FileManager.default.createDirectory(at: sessionDir, withIntermediateDirectories: true)
         endpoint = Self.loadEndpoint()
         transportMode = TransportMode(rawValue: UserDefaults.standard.string(forKey: Self.transportModeKey) ?? "") ?? .lan
         client = endpoint.map { Self.makeTransport(endpoint: $0, mode: transportMode, driveAuth: driveAuth) }
@@ -160,16 +159,15 @@ final class CaptureViewModel: ObservableObject {
     func newCaptureFileURL() -> URL { sessionDir.appendingPathComponent("img_\(UUID().uuidString).jpg") }
 
     /// Durably write a freshly captured JPEG. A capture can't be re-taken, so on a write failure we
-    /// recreate the session directory and retry, then fall back to the temp directory; only if all of
-    /// that fails do we surface a blocking alert (captureError) and return nil — never silently dropping
-    /// the photo. Returns the URL the bytes were written to.
+    /// recreate the session directory and retry; if that fails too we surface a blocking alert (captureError)
+    /// and return nil — never silently dropping the photo. There is no temp-directory fallback: the session
+    /// stores file NAMES resolved against `sessionDir`, so a photo written elsewhere could not be restored, and
+    /// the temp directory sits on the same full volume anyway. Returns the URL the bytes were written to.
     func persistCapturedJPEG(_ data: Data) -> URL? {
         let primary = newCaptureFileURL()
         if (try? data.write(to: primary, options: .atomic)) != nil { return primary }
         try? FileManager.default.createDirectory(at: sessionDir, withIntermediateDirectories: true)
         if (try? data.write(to: primary, options: .atomic)) != nil { return primary }
-        let fallback = FileManager.default.temporaryDirectory.appendingPathComponent(primary.lastPathComponent)
-        if (try? data.write(to: fallback, options: .atomic)) != nil { return fallback }
         captureError = "Couldn't save the last photo (is storage full?). It was NOT captured — free up space and retake it before moving the document."
         return nil
     }
@@ -501,9 +499,16 @@ final class CaptureViewModel: ObservableObject {
         guard let snap = store.load() else { return }
         // The core restores ended-but-unacked segments (their signal is re-sent below, still gated on all
         // their pages being uploaded), drops items already confirmed on the Mac except the current segment's
-        // untagged document pages, and re-opens the tag card only if the app stopped mid-tagging.
-        for item in queue.restore(snap) { try? FileManager.default.removeItem(at: item.fileURL) }
+        // untagged document pages, and re-opens the tag card only if the app stopped mid-tagging. A listed photo
+        // whose file is gone is skipped and reported: it never reached the Mac and has to be retaken.
+        let restored = queue.restore(snap) { FileManager.default.fileExists(atPath: $0.fileURL.path) }
+        for item in restored.dropped { try? FileManager.default.removeItem(at: item.fileURL) }
+        if !restored.missing.isEmpty || !restored.dropped.isEmpty { persist() }
         if !items.isEmpty { statusMessage = "Restored \(items.count) photo(s) from last session" }
+        if !restored.missing.isEmpty {
+            let n = restored.missing.count
+            restoreWarning = "\(n) photo\(n == 1 ? "" : "s") from the last session \(n == 1 ? "is" : "are") no longer on this phone and never reached the Mac. Retake \(n == 1 ? "it" : "them") if the document is still at hand."
+        }
         resumeUploads()
     }
 

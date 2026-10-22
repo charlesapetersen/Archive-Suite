@@ -27,16 +27,26 @@ struct SessionStore {
     }
 
     private let url: URL
+    /// Where unsent photos live: Application Support/capture, which iOS never empties (Caches, where they used to
+    /// be, may be emptied when storage runs low). Excluded from backup: a photo leaves the phone once the Mac
+    /// confirms it. Items persist their file NAME only and are resolved here on load.
+    let photoDirectory: URL
 
     init() {
         let dir = (FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
                    ?? FileManager.default.temporaryDirectory)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         url = dir.appendingPathComponent("capture-session.json")
+        var photos = dir.appendingPathComponent("capture", isDirectory: true)
+        try? FileManager.default.createDirectory(at: photos, withIntermediateDirectories: true)
+        var values = URLResourceValues()
+        values.isExcludedFromBackup = true
+        try? photos.setResourceValues(values)
+        photoDirectory = photos
     }
 
-    /// A store at an explicit file, for the host tests (`scripts/test-ios-capture-queue.sh`).
-    init(url: URL) { self.url = url }
+    /// A store at an explicit file and photo directory, for the host tests (`scripts/test-ios-capture-queue.sh`).
+    init(url: URL, photoDirectory: URL) { self.url = url; self.photoDirectory = photoDirectory }
 
     func save(_ snapshot: Snapshot) {
         guard let data = try? JSONEncoder().encode(snapshot) else { return }
@@ -45,7 +55,9 @@ struct SessionStore {
 
     func load() -> Snapshot? {
         guard let data = try? Data(contentsOf: url) else { return nil }
-        return try? JSONDecoder().decode(Snapshot.self, from: data)
+        let decoder = JSONDecoder()
+        decoder.userInfo[CapturedItem.photoDirectoryKey] = photoDirectory
+        return try? decoder.decode(Snapshot.self, from: data)
     }
 
     func clear() { try? FileManager.default.removeItem(at: url) }

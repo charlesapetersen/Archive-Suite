@@ -222,11 +222,27 @@ struct CaptureQueue {
         return removed
     }
 
-    /// Load a persisted session. Items confirmed on the Mac before the app stopped are dropped (returned, so the
-    /// caller deletes their files) — EXCEPT document pages of the current, un-ended segment, which aren't tagged
-    /// yet. The tag sheet re-opens only if the app stopped mid-tagging a group that still has document pages.
-    mutating func restore(_ snap: SessionStore.Snapshot) -> [CapturedItem] {
-        items = snap.items
+    /// What restoring a persisted session left for the caller.
+    struct Restored {
+        /// Confirmed on the Mac before the app stopped: the caller deletes their files.
+        let dropped: [CapturedItem]
+        /// Listed in the session but their photo is gone from disk: nothing to send, so skipped. The caller
+        /// tells the operator, since these pages never reached the Mac.
+        let missing: [CapturedItem]
+    }
+
+    /// Load a persisted session. Items whose photo file is gone are skipped and reported (as Android's
+    /// SessionStore does). A page with a resend pending is restored as pending, even if a save recorded it
+    /// uploaded: the Mac holds only its stale fields (Android's normalizeForRestore). Items confirmed on the Mac
+    /// are dropped — EXCEPT document pages of the current, un-ended segment, which aren't tagged yet. The tag
+    /// sheet re-opens only if the app stopped mid-tagging a group that still has document pages.
+    mutating func restore(_ snap: SessionStore.Snapshot, fileExists: (CapturedItem) -> Bool) -> Restored {
+        let missing = snap.items.filter { !fileExists($0) }
+        items = snap.items.filter(fileExists).map { item in
+            var item = item
+            if item.needsResend == true { item.state = .pending; item.needsResend = nil }
+            return item
+        }
         seqCounter = snap.seq
         nextId = snap.nextId
         if let g = snap.groupId { currentGroupId = g }
@@ -243,7 +259,7 @@ struct CaptureQueue {
             currentGroupId = taggingGroup
             pendingTagGroupId = taggingGroup
         }
-        return dropped
+        return Restored(dropped: dropped, missing: missing)
     }
 
     func snapshot() -> SessionStore.Snapshot {

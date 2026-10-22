@@ -166,6 +166,14 @@ struct CaptureScreen: View {
         } message: {
             Text(vm.captureError ?? "")
         }
+        .alert("Photos missing", isPresented: Binding(
+            get: { vm.restoreWarning != nil },
+            set: { if !$0 { vm.restoreWarning = nil } }
+        )) {
+            Button("OK", role: .cancel) { vm.restoreWarning = nil }
+        } message: {
+            Text(vm.restoreWarning ?? "")
+        }
     }
 
     /// Reclassify a selected page into a Box/Folder if one is selected; otherwise take a new photo.

@@ -26,3 +26,52 @@ struct CapturedItem: Identifiable, Codable, Equatable {
     // in-flight guard suppressed the re-enqueue).
     var needsResend: Bool? = nil
 }
+
+extension CapturedItem {
+    /// The decoder's photo directory: a persisted item stores only its file NAME, resolved against this on load.
+    /// The app container's absolute path changes on reinstall (a free-account install is reinstalled every
+    /// seven days), so a stored absolute path would point at nothing (W40.i-fix-ios-photo-storage).
+    static let photoDirectoryKey = CodingUserInfoKey(rawValue: "capturePhotoDirectory")!
+
+    private enum CodingKeys: String, CodingKey {
+        case id, fileName, groupId, seq, type, quality, year, month, state, replacesGroupId, needsResend
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        guard let dir = decoder.userInfo[Self.photoDirectoryKey] as? URL else {
+            throw DecodingError.dataCorruptedError(forKey: .fileName, in: c, debugDescription: "no photo directory")
+        }
+        let name = try c.decode(String.self, forKey: .fileName)
+        // A bare name only: anything with a path separator can't be a file this app wrote.
+        guard !name.isEmpty, !name.contains("/"), name != ".", name != ".." else {
+            throw DecodingError.dataCorruptedError(forKey: .fileName, in: c, debugDescription: "not a file name")
+        }
+        self.init(id: try c.decode(Int64.self, forKey: .id),
+                  fileURL: dir.appendingPathComponent(name, isDirectory: false),
+                  groupId: try c.decode(String.self, forKey: .groupId),
+                  seq: try c.decode(Int.self, forKey: .seq),
+                  type: try c.decode(GroupType.self, forKey: .type),
+                  quality: try c.decodeIfPresent(String.self, forKey: .quality),
+                  year: try c.decodeIfPresent(Int.self, forKey: .year),
+                  month: try c.decodeIfPresent(Int.self, forKey: .month),
+                  state: try c.decode(UploadState.self, forKey: .state),
+                  replacesGroupId: try c.decodeIfPresent(String.self, forKey: .replacesGroupId),
+                  needsResend: try c.decodeIfPresent(Bool.self, forKey: .needsResend))
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id, forKey: .id)
+        try c.encode(fileURL.lastPathComponent, forKey: .fileName)
+        try c.encode(groupId, forKey: .groupId)
+        try c.encode(seq, forKey: .seq)
+        try c.encode(type, forKey: .type)
+        try c.encodeIfPresent(quality, forKey: .quality)
+        try c.encodeIfPresent(year, forKey: .year)
+        try c.encodeIfPresent(month, forKey: .month)
+        try c.encode(state, forKey: .state)
+        try c.encodeIfPresent(replacesGroupId, forKey: .replacesGroupId)
+        try c.encodeIfPresent(needsResend, forKey: .needsResend)
+    }
+}
