@@ -43,6 +43,7 @@ HOME_COPY="$SRC/../farmshare-home"
 if [ -d "$HOME_COPY/farmshare" ]; then
   rsync -a --exclude=/fs.env --exclude=__pycache__ "$HOME_COPY/farmshare/" "$FS_ROOT/text-kit/"
   printf 'FS_ROOT=%s\nHF_HOME=%s\nFS_PY=%s\nFS_VLLM=%s\n' "$FS_ROOT" "$HF_HOME" "$FS_PY" "$FS_VLLM" > "$FS_ROOT/text-kit/fs.env"
+  mkdir -p "$FS_ROOT/text-packs"
   for p in fs-tracepack-vision fs-enclosurepack; do rsync -a "$HOME_COPY/$p/" "$FS_ROOT/text-packs/$p/"; done
 fi
 sort -u "$models" | while read -r repo rev; do

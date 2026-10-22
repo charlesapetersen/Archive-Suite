@@ -57,7 +57,9 @@ for route in lightonocr3-4b qwen3.5-4b qwen3-vl-8b qwen3.6-35b-a3b qwen3.6-27b q
 done
 prev=$(IFS=:; echo "${deps[*]}")
 for arm in ngram half; do
-  id=$(run sbatch --parsable "${G4[@]}" --time=06:00:00 --dependency="afterany:$prev" --job-name="loops-ling-$arm" \
+  # Held: an afterany chain runs even when the pilot failed and Slurm cancelled what it gated (2026-10-22, 49050179
+  # reached the head of the queue that way). Release both with scontrol release once the pilot has passed.
+  id=$(run sbatch --parsable --hold "${G4[@]}" --time=06:00:00 --dependency="afterany:$prev" --job-name="loops-ling-$arm" \
     --output="$LOOPS/logs/slurm-%j.out" "$CORPUS/loop-rerun-job.sh" "$LOOPS" ling3-flash-vl-fp8 "$arm")
   rec loops "ling3-flash-vl-fp8/$arm" "$id"; prev="$id"
 done
