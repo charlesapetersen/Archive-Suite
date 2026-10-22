@@ -9,6 +9,11 @@ import tempfile
 import time
 
 
+# hooks.py's HOLD_MARK, and the markers a note must not smuggle into a queue line.
+HOLD = re.compile(r"\[hold\]|needs:\s*owner", re.I)
+MARKERS = re.compile(r"\((?:blocked-on|uses|cluster|lane|needs|effort)\s*:", re.I)
+
+
 def section(text, heading):
     """Use the resolver's fence/blockquote/heading rules, preserving byte spans."""
     offset = 0
@@ -138,6 +143,49 @@ def edit(plan, action, values):
             lo, hi = matches[0]
             line = re.sub(r"^(\s*[-*]\s+)\[ \]", r"\1[x]", body[lo:hi].rstrip("\n"))
             line += " — OWNER ANSWERED " + time.strftime("%Y-%m-%d") + ": " + note.strip()
+            body = body[:lo] + line + "\n" + body[hi:]
+            text = text[:start] + body + text[end:]
+        elif action == "hold":
+            # Hand an item to the owner: append `(needs: owner)` (hooks.py HOLD_MARK) and a dated note, so the queue stops
+            # offering it. A Sherlock item's preparing session ends this way (execution-plans/sherlock-access.md).
+            tag, note = values
+            if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", tag):
+                raise ValueError("invalid tag")
+            if "\n" in note or not note.strip():
+                raise ValueError("note must be one non-empty line")
+            start, end = section(text, "## WORK QUEUE")
+            body = text[start:end]
+            matches = [(lo, hi) for t, lo, hi in pending_entries(body) if t == tag]
+            if len(matches) != 1:
+                raise ValueError("expected exactly one unchecked queue item")
+            lo, hi = matches[0]
+            line = body[lo:hi].rstrip("\n")
+            if HOLD.search(line):
+                raise ValueError("item is already held for the owner")
+            if MARKERS.search(note):
+                raise ValueError("note must not carry a queue marker such as (blocked-on: ...)")
+            line += " (needs: owner) — HELD " + time.strftime("%Y-%m-%d") + ": " + note.strip()
+            body = body[:lo] + line + "\n" + body[hi:]
+            text = text[:start] + body + text[end:]
+        elif action == "release":
+            # Undo a hold once the owner's session has done its part (a Sherlock item's results collected): drop the
+            # `(needs: owner)` marker and say why, keeping the HELD note as history.
+            tag, note = values
+            if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", tag):
+                raise ValueError("invalid tag")
+            if "\n" in note or not note.strip() or MARKERS.search(note):
+                raise ValueError("note must be one non-empty line without queue markers")
+            start, end = section(text, "## WORK QUEUE")
+            body = text[start:end]
+            matches = [(lo, hi) for t, lo, hi in pending_entries(body) if t == tag]
+            if len(matches) != 1:
+                raise ValueError("expected exactly one unchecked queue item")
+            lo, hi = matches[0]
+            line = body[lo:hi].rstrip("\n")
+            if not re.search(r" \(needs:\s*owner\)", line, re.I):
+                raise ValueError("item is not held with (needs: owner)")
+            line = re.sub(r" \(needs:\s*owner\)", "", line, count=1, flags=re.I)
+            line += " — RELEASED " + time.strftime("%Y-%m-%d") + ": " + note.strip()
             body = body[:lo] + line + "\n" + body[hi:]
             text = text[:start] + body + text[end:]
         elif action == "add":

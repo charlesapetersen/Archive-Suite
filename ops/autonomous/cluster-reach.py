@@ -43,12 +43,16 @@ GTIMEOUT = "/opt/homebrew/bin/gtimeout"
 CACHE_SECONDS = 300
 BOX_ITEM = "W46.box-collect"
 
-# name -> (display name, control socket, login). Sherlock's is a placeholder until the owner's account exists
-# (W46.sherlock-ok): with no socket the check fails at once, without touching the network.
+# name -> (display name, control socket, login). Sherlock's entry names it for messages only: it is PREP_ONLY.
 CLUSTERS = {
     "farmshare": ("FarmShare", "~/.ssh/cm-farmshare", "cp1@login.farmshare.stanford.edu"),
     "sherlock": ("Sherlock", "~/.ssh/cm-sherlock", "cp1@login.sherlock.stanford.edu"),
 }
+# Clusters no engine session may contact at all (owner, 2026-10-22; execution-plans/sherlock-access.md): Sherlock's
+# /etc/agents rules forbid agent sessions a supervisor starts or feeds while nobody is there, even over SSH. Their
+# items are offered for the Mac-side preparation only, with no preflight; the session stops at a ready-to-submit
+# hold (plan-edit.sh hold) and an owner-started session submits. preflight() refuses them, so nothing here can SSH.
+PREP_ONLY = {"sherlock"}
 MARKER = re.compile(r"\(cluster:\s*([A-Za-z]+)\s*\)")
 LEDGER_STATES = ("submitted", "finished", "in-box")
 UNREACHABLE = re.compile(r"^cluster ([a-z]+) not reachable")
@@ -64,6 +68,8 @@ def preflight(name):
     """(ok, why): one bounded remote `hostname; id -un; pwd` through the existing master."""
     if name not in CLUSTERS:
         return False, "unknown cluster %r" % name
+    if name in PREP_ONLY:
+        return False, "%s is never contacted by the engine; an owner-started session submits" % CLUSTERS[name][0]
     _, socket, host = CLUSTERS[name]
     socket = os.path.expanduser(socket)
     if not os.path.exists(socket):
@@ -131,6 +137,12 @@ def offer(tag, text, box_collect_done, check=reachable):
     if name is None:
         return True, None
     if box_collect_done and ledger(tag) == "in-box":
+        return True, None
+    if name in PREP_ONLY:
+        # Mac-side work only; no SSH (PREP_ONLY above). Jobs already submitted there are the owner's to collect: a
+        # session offered the item now would find nothing to score, so it waits for `mark TAG finished`.
+        if ledger(tag) == "submitted":
+            return False, "%s jobs submitted; an owner-started session collects them" % CLUSTERS[name][0]
         return True, None
     ok, why = check(name)
     if ok:

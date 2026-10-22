@@ -15,8 +15,10 @@ SSH, not only to tools running there. Read `AGENTS.md` again at the start of eve
 them or feed them new prompts when nobody is there", and sessions picked up day after day without a person in the
 loop. The Agent Manager engine is that kind of supervisor. So:
 
-- No engine session submits, inspects or collects Sherlock work. Every open cluster item carries
-  `(cluster: sherlock) (needs: owner)`, which the queue hook holds for the owner.
+- No engine session submits, inspects or collects Sherlock work, or opens any connection to Sherlock. The engine
+  prepares a `(cluster: sherlock)` item on the Mac and ends with `plan-edit.sh hold`, which adds `(needs: owner)`;
+  the queue hook offers Sherlock items without a preflight (`cluster-reach.py` `PREP_ONLY`). Root CLAUDE.md has the
+  hand-over in full.
 - Sherlock work runs in a session the owner starts. A bounded session may finish its task while the owner is away:
   waiting for a job, fixing what failed and resubmitting, then stopping.
 - The owner's shared login is `ssh -o ControlMaster=yes -o ControlPath=~/.ssh/cm-sherlock -o ControlPersist=8h

@@ -228,16 +228,25 @@ depends on the apps' current settings, structure or outputs.
   arms of `W46.ocr-regions`, `W46.date-traceable`, `W46.marks-detect`, `W46.ent-robust`, `W46.ent-score` and the
   `claude -p` voter in `W46.kit-gate` are skipped. Coding sessions themselves (the engine running on the plan) are not
   arms and are unaffected.
-- ⛔ **Cluster work runs on Sherlock, in a session the owner starts (owner, 2026-10-22).** Sherlock suits this project
-  better than FarmShare, even when it is slower. FarmShare is used only with the owner's explicit approval, given for
-  that run; any other mention of FarmShare in this file, the queue or a plan is history, not a route. Sherlock's
-  `/etc/agents` rules forbid agent sessions that a supervisor starts or feeds while nobody is there, so the engine
-  never drives Sherlock: every open `(cluster: …)` item is `(cluster: sherlock) (needs: owner)`, and an owner-started
-  session runs it (login needs Duo, as the shared `~/.ssh/cm-sherlock` connection does). The 32 FarmShare jobs pending
-  that morning were cancelled (ids in `~/cancelled-20261022.txt` on FarmShare); their items rerun on Sherlock from their
-  staged packs. An owner-led session was copying most of FarmShare's data to Sherlock the same day, so a Sherlock
-  session looks for a pack on Sherlock before copying or rebuilding one, and never copies in parallel with another
-  transfer. A new cluster item is filed with both markers.
+- ⛔ **Cluster work runs on Sherlock; the engine prepares it, the owner's session submits it (owner, 2026-10-22).**
+  Sherlock suits this project better than FarmShare, even when it is slower. FarmShare is used only with the owner's
+  explicit approval, given for that run; any other mention of FarmShare in this file, the queue or a plan is history,
+  not a route. Sherlock's `/etc/agents` rules forbid agent sessions that a supervisor starts or feeds while nobody is
+  there, even over SSH, so **no engine session contacts Sherlock**: no SSH, scp, rsync or DTN, not even a read-only
+  check (`cluster-reach.py` never preflights it). The engine does an open `(cluster: sherlock)` item's Mac-side work:
+  the pack, the scorer, and job and submit scripts against `ArchiveProcessor/scripts/segbench/sherlock/` (sh.env, the
+  container wrappers, `stage-job.sh` for copies and downloads; `restart-20261022.sh` is the pattern), dry-run on the Mac.
+  It then stops and hands over: the exact submit command, the job count and what to collect go in
+  `execution-plans/items/<TAG>.md`, `ops/autonomous/plan-edit.sh .maintenance/AUTONOMOUS_PLAN.md hold TAG 'ready to
+  submit: <command>'` takes the item off the queue, and a Daemon Report line (no decision) names it. An owner-started
+  session submits held items (and runs `ops/autonomous/cluster-reach.py mark TAG submitted`), later collects the
+  results into `$GROUP_HOME` or the Mac, then runs `mark TAG finished` and `plan-edit.sh … release TAG 'results in
+  <path>'`, and the engine scores them; the queue never offers a Sherlock item marked `submitted`. Under
+  `ARCHIVE_UNATTENDED=1`, `.claude/hooks/no-sherlock.sh` refuses any command naming Sherlock's hosts or its socket. Rules for a Sherlock session:
+  [`execution-plans/sherlock-access.md`](execution-plans/sherlock-access.md). The 32 FarmShare jobs pending that morning
+  were cancelled (ids in `~/cancelled-20261022.txt` on FarmShare) and rerun on Sherlock from their staged packs; FarmShare's
+  data is on Sherlock, so a session looks for a pack there before rebuilding one. A new cluster item is filed with
+  `(cluster: sherlock)` alone.
 - ⏸ **Paid hosted benchmarking is on hold (owner, 2026-10-17).** Open-weight models on FarmShare first; paid hosted
   bench runs wait for `W43.sweep` at the end of the queue, behind a full price estimate. A session that wants a paid
   run and defers it adds a line to [`execution-plans/paid-runs-deferred.md`](execution-plans/paid-runs-deferred.md)

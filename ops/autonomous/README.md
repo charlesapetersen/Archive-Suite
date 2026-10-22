@@ -1363,9 +1363,14 @@ An item that needs a cluster says so with a `(cluster: NAME)` marker. It is not 
 `worker-state.py` and the Agent Manager refuse unknown ones. The queue hook (`ops/agent/hooks.py`) offers such an
 item only when `cluster-reach.py`'s `offer()` allows it, and only once its `(blocked-on:)` prerequisites are met:
 
-- **the login answers.** The bounded, read-only preflight of `execution-plans/farmshare-access.md` runs through
-  the owner's existing SSH master (`~/.ssh/cm-farmshare`; Sherlock's `~/.ssh/cm-sherlock` is a placeholder until
-  `W46.sherlock-ok`). With no socket it fails without touching the network; `BatchMode=yes` and
+- **Sherlock: always, for the Mac-side preparation only.** `cluster-reach.py`'s `PREP_ONLY` clusters are never
+  contacted, not even by the preflight, because Sherlock's `/etc/agents` rules forbid supervisor-driven sessions.
+  The session prepares the item and ends with `plan-edit.sh PLAN hold TAG NOTE` (it appends `(needs: owner)`);
+  an owner-started session submits, marks the ledger `submitted` (never offered while so marked), collects, marks
+  `finished` and runs `plan-edit.sh PLAN release TAG NOTE` (root CLAUDE.md, "Cluster work runs on Sherlock").
+  `.claude/hooks/no-sherlock.sh` refuses, in unattended sessions, any command naming Sherlock's hosts or socket.
+- **FarmShare: the login answers.** The bounded, read-only preflight of `execution-plans/farmshare-access.md` runs through
+  the owner's existing SSH master (`~/.ssh/cm-farmshare`). With no socket it fails without touching the network; `BatchMode=yes` and
   `ProxyCommand=false` mean it can never prompt or open a fresh login. The answer is cached for five minutes in
   `$AGENT_STATE/cluster-reach/<NAME>.json`, because the engine runs the queue hook often.
 - **or Box holds the results.** Once `W46.box-collect` is done, an item whose ledger says `in-box` is offered

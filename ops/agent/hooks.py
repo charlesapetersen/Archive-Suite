@@ -9,7 +9,8 @@ the unwalked Daemon Report entries; the status is status-digest.sh's counts. The
 file (../autonomous); the data comes from $AGENT_REPO (the plan is gitignored and lives only in the primary
 checkout) and $AGENT_STATE. Read-only on the repo, stdlib only. The one network call: an open item with a
 `(cluster: NAME)` marker makes the queue run ../autonomous/cluster-reach.py's cached SSH preflight, whose cache is
-in $AGENT_STATE (W46.engine-cluster); the login request it leads to is written by the upkeep hook.
+in $AGENT_STATE (W46.engine-cluster); the login request it leads to is written by the upkeep hook. Sherlock is never
+preflighted: its items are offered for Mac-side preparation only (cluster-reach.py PREP_ONLY).
 """
 import hashlib
 import importlib.util
@@ -101,7 +102,8 @@ _cluster = {}
 
 def cluster_offer(tag, text):
     """cluster-reach.py's offer(): an item with a `(cluster: NAME)` marker is offered only while that cluster's login
-    answers, or once Box holds its finished results (W46.engine-cluster). The module and the done-state of
+    answers, or once Box holds its finished results (W46.engine-cluster); a Sherlock item without a login check, for
+    its Mac-side preparation (PREP_ONLY). The module and the done-state of
     W46.box-collect are loaded on the first marked item, so an unmarked queue costs nothing and touches no network."""
     if "(cluster:" not in text:
         return True, None

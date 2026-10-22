@@ -294,6 +294,62 @@ class Cluster(Fixture):
         items = self.queue()
         self.assertEqual((items["C.got"]["status"], items["C.sub"]["status"]), ("ok", "blocked"))
 
+    def test_sherlock_items_are_offered_for_preparation_without_any_ssh(self):
+        # Owner, 2026-10-22: the engine prepares Sherlock items on the Mac and never contacts Sherlock (its /etc/agents
+        # rules), not even with a live master socket; the held item is not offered and nothing asks for a login.
+        items = ("- [ ] **S.prep — to prepare** (lane: segbench) (uses: light) (cluster: sherlock)\n"
+                 "- [ ] **S.held — ready** (lane: segbench) (uses: light) (cluster: sherlock) (needs: owner)\n")
+        self.write(".maintenance/AUTONOMOUS_PLAN.md", PLAN.replace("- [ ] **A.four", items + "- [ ] **A.four"))
+        os.makedirs(os.path.join(self.tmp, ".ssh"), exist_ok=True)
+        open(os.path.join(self.tmp, ".ssh", "cm-sherlock"), "w").close()
+        got = self.queue()
+        self.assertEqual(got["S.prep"]["status"], "ok", got["S.prep"])
+        self.assertEqual(got["S.held"]["status"], "hold")
+        self.assertEqual(self.ssh_calls(), 0)
+        r = run(["/usr/bin/python3", os.path.join(self.repo, "ops/autonomous/cluster-reach.py"), "check", "sherlock"],
+                env=dict(self.env, CLUSTER_SSH=self.ssh), check=False)
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("never contacted", r.stdout + r.stderr)
+        self.assertEqual(self.ssh_calls(), 0)
+        self.assertIn("nothing to ask", self.upkeep())
+
+    def test_hold_hands_an_item_to_the_owner(self):
+        items = "- [ ] **S.prep — to prepare** (lane: segbench) (uses: light) (cluster: sherlock)\n"
+        self.write(".maintenance/AUTONOMOUS_PLAN.md", PLAN.replace("- [ ] **A.four", items + "- [ ] **A.four"))
+        plan = os.path.join(self.repo, ".maintenance", "AUTONOMOUS_PLAN.md")
+        edit = os.path.join(self.repo, "ops/autonomous/plan-edit.sh")
+        run(["/bin/bash", edit, plan, "hold", "S.prep", "ready to submit: bash x.sh"], env=self.env)
+        self.assertEqual(self.queue()["S.prep"]["status"], "hold")
+        with open(plan) as f:
+            self.assertIn("(needs: owner) — HELD ", f.read())
+        again = run(["/bin/bash", edit, plan, "hold", "S.prep", "twice"], env=self.env, check=False)
+        self.assertNotEqual(again.returncode, 0)            # already held: refused, not doubled
+        self.assertIn("already held", again.stderr)
+        rel = run(["/bin/bash", edit, plan, "release", "S.prep", "results collected"], env=self.env)
+        self.assertEqual(rel.returncode, 0)
+        self.assertEqual(self.queue()["S.prep"]["status"], "ok")
+        with open(plan) as f:
+            body = f.read()
+        self.assertIn("— RELEASED ", body)
+        self.assertNotRegex(body.split("S.prep", 1)[1].split("\n", 1)[0], r"needs:\s*owner")
+        bad = run(["/bin/bash", edit, plan, "release", "S.prep", "again"], env=self.env, check=False)
+        self.assertIn("not held", bad.stderr)                # nothing to lift
+        sneaky = run(["/bin/bash", edit, plan, "hold", "S.prep", "x (blocked-on: Z.never)"], env=self.env, check=False)
+        self.assertIn("queue marker", sneaky.stderr)         # a note cannot add a prerequisite
+        self.mark("S.prep", "submitted")
+        got = self.queue()["S.prep"]
+        self.assertEqual(got["status"], "blocked")           # jobs on Sherlock: the owner's session collects
+        self.assertIn("owner-started session collects", got["reason"])
+        self.assertEqual(self.ssh_calls(), 0)
+
+    def test_hold_refuses_an_item_already_marked_hold(self):
+        items = "- [ ] **S.h — held** (lane: segbench) (uses: light) (cluster: sherlock) [hold]\n"
+        self.write(".maintenance/AUTONOMOUS_PLAN.md", PLAN.replace("- [ ] **A.four", items + "- [ ] **A.four"))
+        plan = os.path.join(self.repo, ".maintenance", "AUTONOMOUS_PLAN.md")
+        r = run(["/bin/bash", os.path.join(self.repo, "ops/autonomous/plan-edit.sh"), plan, "hold", "S.h", "n"],
+                env=self.env, check=False)
+        self.assertIn("already held", r.stderr)
+
     def test_marker_case_and_unknown_clusters(self):
         items = ("- [ ] **C.cap — capitalised** (lane: segbench) (uses: light) (cluster: FarmShare)\n"
                  "- [ ] **C.typo — misspelt** (lane: segbench) (uses: light) (cluster: sherlok)\n")
