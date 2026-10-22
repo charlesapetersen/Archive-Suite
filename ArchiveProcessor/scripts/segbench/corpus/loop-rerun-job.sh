@@ -22,11 +22,19 @@ PORT=$((16000 + SLURM_JOB_ID % 10000)); export FS_URL="http://127.0.0.1:$PORT"
 CUDA=$("$FS_PY" -c 'import nvidia,os;print(os.path.join(list(nvidia.__path__)[0],"cu13"))')
 export CUDA_HOME="$CUDA" PATH="$CUDA/bin:$PATH"
 export FLASHINFER_EXTRA_LDFLAGS="-L$CUDA/lib -L$FS_ROOT/cuda-link"
+# The n-gram processor is a V1 logits processor; vLLM 0.31 defaults to Model Runner V2, which refuses it at
+# start-up (the second pilot, 1863911). Only the ngram arm loads it, on the V1 runner; the half arm keeps the
+# sweep's own runner and loads no processor.
+LP=()
+if [ "$ARM" = ngram ]; then
+  export VLLM_USE_V2_MODEL_RUNNER=0
+  LP=(--logits-processors vllm.model_executor.models.deepseek_ocr:NGramPerReqLogitsProcessor)
+fi
 mkdir -p "$ROOT/logs" "$ROOT/out/$ROUTE"
 SERVER_LOG="$ROOT/logs/vllm-${SLURM_JOB_ID}-${ROUTE}-${ARM}.log"
 # shellcheck disable=SC2086  # ARGS is the recorded word list
 "$FS_VLLM" serve "$MODEL" --served-model-name "$NAME" --host 127.0.0.1 --port "$PORT" $ARGS \
-  --logits-processors vllm.model_executor.models.deepseek_ocr:NGramPerReqLogitsProcessor > "$SERVER_LOG" 2>&1 &
+  "${LP[@]}" > "$SERVER_LOG" 2>&1 &
 server=$!
 trap 'kill "$server" 2>/dev/null || true; wait "$server" 2>/dev/null || true' EXIT
 for i in $(seq 1 360); do
