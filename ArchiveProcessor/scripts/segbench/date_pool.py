@@ -95,7 +95,7 @@ def walk(exclude_sample=True):
             near_texts = (texts[max(0, k - 3):k] + texts[k + 1:k + 4])[:3]
             context = "\n---\n".join(t[:300] for t in near_texts)
             d = {"id": ids[k], "tag_class": cls, "truth": tr, "folder": f, "collection": CP.collection_of(f),
-                 "position": k, "pages": len(s["pages"]),
+                 "position": k, "pages": len(s["pages"]), "first_pages": s["pages"][:2],
                  "year_in_text": str(tr["year"]) in texts[k][:3000]}
             if d["year_in_text"]:
                 d["_text"], d["_context"] = texts[k], context
