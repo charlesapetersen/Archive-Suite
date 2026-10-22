@@ -745,7 +745,8 @@ No device or emulator was needed or used.
 **Two things deliberately left alone.** (a) The **iOS twin is PARKED** per §Project focus — verified still
 present by symbol (`ArchiveCaptureiOS/.../Capture/CaptureViewModel.swift`: `disconnect()` nils
 `endpoint`/`client` without touching the `inFlightUploads` set or any upload task), recorded here rather
-than fixed. (b) The status **heartbeat** (`sendStatusReport` → conflated `statusChannel`) can still deliver
+than fixed. *Ported 2026-10-21 (`W40.i-fix-ios-pairing-generation`): iOS now stamps every send with a pairing
+generation, the same rule.* (b) The status **heartbeat** (`sendStatusReport` → conflated `statusChannel`) can still deliver
 one queued count to the Mac we just unpaired from; it is display-only on the Mac, carries no page bytes and
 licenses no deletion, so it is outside this fix. **Inherent, not a bug:** re-pairing part-way through a
 document leaves the already-confirmed pages on the old Mac and sends the rest to the new one — the phone's

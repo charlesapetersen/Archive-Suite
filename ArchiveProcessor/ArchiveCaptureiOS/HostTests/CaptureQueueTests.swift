@@ -76,10 +76,10 @@ test("needsResend flags report whether they changed") {
 test("in-flight guards refuse a second concurrent send") {
     var q = makeQueue()
     check(q.beginUpload(1) && !q.beginUpload(1) && q.isUploading(1), "upload guard")
-    q.endUpload(1)
+    q.endUpload(1, pairing: q.pairing)
     check(!q.isUploading(1) && q.beginUpload(1), "released")
     check(q.beginSegmentSend("g1") && !q.beginSegmentSend("g1"), "segment guard")
-    q.endSegmentSend("g1")
+    q.endSegmentSend("g1", pairing: q.pairing)
     check(q.beginSegmentSend("g1"), "segment released")
 }
 
@@ -171,13 +171,14 @@ test("a reply to an upload Clear outlived does not touch the new session") {
     check(!q.isCurrent(started), "Clear moves the generation on")
     let fresh = q.addDocument(fileURL: url("fresh"))
     check(fresh.id != old.id, "the new photo has a new id")
-    // The late reply, as the view model handles it: stale generation, so nothing is recorded.
-    if q.isCurrent(started) { q.setState(old.id, .uploaded) }
+    // The late reply: the view model records nothing when ackForReply is nil.
+    check(q.ackForReply(ok: true, generation: started, pairing: q.pairing) == nil, "Clear outlived it: record nothing")
     check(q.item(fresh.id)?.state == .pending, "the new photo is still pending, so it is still sent")
     // Even without the generation check, the old id names nothing now.
     check(!q.setState(old.id, .uploaded), "the old id matches no item")
     check(q.item(fresh.id)?.state == .pending, "still pending")
-    q.endUpload(old.id)                      // the old task's defer
+    check(q.finishUpload(old.id, generation: started, pairing: q.pairing) == .init(released: false, requeued: false),
+          "the old task's defer touches nothing")
     check(q.beginUpload(fresh.id), "the new photo can upload")
     check(q.isCurrent(q.generation), "a send started now is current")
 }
@@ -331,6 +332,133 @@ test("a session file naming a path rather than a file name is rejected") {
 
 struct Missing: Error {}
 func XCTUnwrap<T>(_ v: T?) throws -> T { guard let v else { throw Missing() }; return v }
+
+
+// W40.i-fix-ios-pairing-generation: Android's W23.m1 (CapturePairingGenerationTest), ported.
+
+test("a success reported by a Mac the phone has unpaired from is never a confirmation") {
+    check(CaptureQueue.sendAck(ok: true, pairingIsCurrent: true) == .confirm, "current, ok → confirm")
+    check(CaptureQueue.sendAck(ok: false, pairingIsCurrent: true) == .retry, "current, failed → retry")
+    check(CaptureQueue.sendAck(ok: true, pairingIsCurrent: false) == .requeueStale, "the misroute → requeue")
+    check(CaptureQueue.sendAck(ok: false, pairingIsCurrent: false) == .requeueStale, "stale, failed → requeue")
+}
+
+test("rotating the pairing invalidates every send stamped before it") {
+    var q = makeQueue()
+    let before = q.pairing
+    check(q.isCurrentPairing(before), "current at first")
+    q.rotatePairing()
+    let after = q.pairing
+    check(!q.isCurrentPairing(before) && q.isCurrentPairing(after), "re-pair retires the old stamp")
+    q.rotatePairing()                        // unpair, then pair again
+    check(!q.isCurrentPairing(before) && !q.isCurrentPairing(after), "both stale")
+    check(q.isCurrent(q.generation), "a re-pair is not a Clear")
+}
+
+test("only one send per page is outstanding across a re-pair, and a retired one frees only its own claim") {
+    var q = makeQueue()
+    let old = q.pairing
+    check(q.beginUpload(1), "the old Mac's send claims page 1")
+    q.rotatePairing()
+    check(!q.beginUpload(1), "the new Mac can't send it while the old send still holds the photo")
+    check(q.endUpload(1, pairing: old), "the retired send releases its own claim as it unwinds")
+    check(q.beginUpload(1), "now the new Mac's send claims it")
+    check(!q.endUpload(1, pairing: old), "a second release from the retired send frees nothing")
+    check(q.isUploading(1), "the current send keeps its guard")
+    check(q.endUpload(1, pairing: q.pairing) && !q.isUploading(1), "the current send releases it")
+    let seg = q.pairing
+    check(q.beginSegmentSend("g1"), "segment claim")
+    q.rotatePairing()
+    check(!q.beginSegmentSend("g1"), "segment refused while the retired send runs")
+    check(!q.endSegmentSend("g1", pairing: q.pairing), "the current pairing did not make that claim")
+    check(q.endSegmentSend("g1", pairing: seg) && q.beginSegmentSend("g1"), "released by its owner, then reclaimed")
+}
+
+test("the old Mac's reply cannot mark a page delivered, and the page goes back in the queue") {
+    var q = makeQueue()
+    let page = q.addDocument(fileURL: url("p"))
+    _ = q.addDocument(fileURL: url("next"))
+    // enqueueUpload under the old pairing:
+    let gen = q.generation, stamp = q.pairing
+    check(q.beginUpload(page.id), "send begins")
+    q.setState(page.id, .uploading)
+    q.rotatePairing()                        // the operator re-pairs while it is on the wire
+    // The old Mac answers ok; the view model returns at once on requeueStale, before any state change.
+    check(q.ackForReply(ok: true, generation: gen, pairing: stamp) == .requeueStale, "the misroute is not a confirm")
+    check(q.ackForReply(ok: false, generation: gen, pairing: stamp) == .requeueStale, "nor is a stale failure a retry")
+    check(!q.beginUpload(page.id), "the new Mac's resume is refused while the old send holds the photo")
+    // The task's defer:
+    check(q.finishUpload(page.id, generation: gen, pairing: stamp) == .init(released: true, requeued: true),
+          "it releases its claim and requeues the page")
+    check(q.item(page.id)?.state == .pending, "pending again, never uploaded")
+    check(q.autoRetryCandidates.contains { $0.id == page.id }, "auto-retry sends it to the new Mac")
+    check(q.heartbeatCount == 2, "the new Mac counts it")
+    // The new pairing now delivers it for real.
+    let now = q.pairing
+    check(q.beginUpload(page.id), "new send begins")
+    check(q.ackForReply(ok: true, generation: gen, pairing: now) == .confirm, "only the current Mac's reply confirms")
+    check(q.ackForReply(ok: false, generation: gen, pairing: now) == .retry, "a current failure is a retry")
+    check(q.finishUpload(page.id, generation: gen, pairing: stamp) == .init(released: false, requeued: false),
+          "a second unwind from the old pairing frees nothing")
+    check(q.isUploading(page.id), "the current send keeps its guard")
+    check(q.finishUpload(page.id, generation: gen, pairing: now) == .init(released: true, requeued: false),
+          "the current send's end releases and does not requeue")
+}
+
+test("unpair without re-pair: the page waits as pending for the next pairing") {
+    var q = makeQueue()
+    let page = q.addDocument(fileURL: url("p"))
+    let gen = q.generation, stamp = q.pairing
+    _ = q.beginUpload(page.id); q.setState(page.id, .uploading)
+    q.rotatePairing()                        // disconnect(): cancelled, the send fails
+    check(q.ackForReply(ok: false, generation: gen, pairing: stamp) == .requeueStale, "stale")
+    check(q.finishUpload(page.id, generation: gen, pairing: stamp).requeued, "requeued")
+    check(q.resumeCandidates.map(\.id) == [page.id] && !q.isUploading(page.id), "the next pairing's resume sends it")
+}
+
+test("Clear during a stale send: the defer touches nothing in the new session") {
+    var q = makeQueue()
+    let page = q.addDocument(fileURL: url("p"))
+    let gen = q.generation, stamp = q.pairing
+    _ = q.beginUpload(page.id)
+    q.rotatePairing()
+    _ = q.clear()
+    let fresh = q.addDocument(fileURL: url("fresh"))
+    check(q.ackForReply(ok: true, generation: gen, pairing: stamp) == nil, "Clear outranks the pairing")
+    check(q.finishUpload(page.id, generation: gen, pairing: stamp) == .init(released: false, requeued: false), "no-op")
+    check(q.item(fresh.id)?.state == .pending && q.beginUpload(fresh.id), "the new photo is untouched and can send")
+}
+
+test("a stale send folds a deferred resend into the requeue") {
+    var q = makeQueue()
+    let page = q.addDocument(fileURL: url("p"))
+    q.setState(page.id, .uploading)
+    _ = q.markNeedsResend(page.id)           // a Q3 toggle while the old send ran
+    check(q.requeueAfterStaleSend(page.id), "changed")
+    check(q.item(page.id)?.state == .pending && q.item(page.id)?.needsResend == nil, "pending, marker folded in")
+    check(!q.requeueAfterStaleSend(page.id), "already pending → no change")
+    check(!q.requeueAfterStaleSend(99), "unknown id")
+}
+
+test("a segment acked by the old Mac stays ended for the new one") {
+    var q = makeQueue()
+    let a = q.addDocument(fileURL: url("a"))
+    q.pendingTagGroupId = "g1"
+    _ = q.endSegment(quality: "Q1", year: nil, month: nil)
+    q.setState(a.id, .uploaded)
+    let gen = q.generation, stamp = q.pairing
+    check(q.readySegment("g1") != nil && q.beginSegmentSend("g1"), "signal sent")
+    q.rotatePairing()
+    check(q.ackForReply(ok: true, generation: gen, pairing: stamp) != .confirm, "the old Mac's ack does not confirm")
+    check(q.endedSegments["g1"] != nil, "the new Mac never heard of it: still ended")
+    check(!q.beginSegmentSend("g1"), "no second send while the retired one runs")
+    check(q.finishSegmentSend("g1", generation: gen, pairing: stamp) == .init(released: true, requeued: true),
+          "the retired send releases its claim and asks for a resend")
+    let now = q.pairing
+    check(q.readySegment("g1") != nil && q.beginSegmentSend("g1"), "it can be sent to the new Mac")
+    check(q.ackForReply(ok: true, generation: gen, pairing: now) == .confirm, "the new Mac's ack confirms")
+    check(q.finishSegmentSend("g1", generation: gen, pairing: now) == .init(released: true, requeued: false), "done")
+}
 
 print("")
 print("\(passes) checks passed, \(failures) failed")

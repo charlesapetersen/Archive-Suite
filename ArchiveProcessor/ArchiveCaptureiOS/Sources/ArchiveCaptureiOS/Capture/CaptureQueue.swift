@@ -31,15 +31,22 @@ struct CaptureQueue {
     /// reply that outlives Clear cannot touch the new session. Process-local: no send outlives the process, so
     /// it is not persisted. Mirrors Android's `sessionGeneration`.
     private(set) var generation = 0
+    /// Which Mac owns a send (W23.m1's port, W40.i-fix-ios-pairing-generation). Pairing to a Mac, or unpairing from
+    /// one, moves it on, so a reply to a send stamped with an earlier pairing came from a Mac that is no longer the
+    /// destination: it must not mark the page delivered, which would let the phone delete its only copy. Process-
+    /// local, like `generation`. Mirrors Android's `PairingGeneration`.
+    private(set) var pairing = 0
     private(set) var currentGroupId: String
     /// Non-nil while the tag sheet is open for that group.
     var pendingTagGroupId: String?
     /// Document segments ended (End segment → Apply/Skip) whose segment-complete signal the Mac hasn't acked.
     private(set) var endedSegments: [String: SegTags] = [:]
-    /// Ids uploading right now, so auto-retry, resume and a manual Retry can't send the same item twice at once.
-    private(set) var inFlightUploads = Set<Int64>()
-    /// Groups whose completion signal is being sent right now.
-    private(set) var inFlightSegments = Set<String>()
+    /// Ids uploading right now, so auto-retry, resume and a manual Retry can't send the same item twice at once,
+    /// each with the pairing that started it. A send from a retired pairing keeps its claim until it unwinds (only
+    /// one task ever holds a photo), and can release only its own (Android's `OutstandingSends`).
+    private(set) var inFlightUploads: [Int64: Int] = [:]
+    /// Groups whose completion signal is being sent right now, with the pairing that started each.
+    private(set) var inFlightSegments: [String: Int] = [:]
 
     private let newGroupId: () -> String
 
@@ -54,6 +61,30 @@ struct CaptureQueue {
 
     /// True while no Clear has happened since a send captured `generation`.
     func isCurrent(_ generation: Int) -> Bool { generation == self.generation }
+
+    /// True while the phone is still paired to the Mac a send stamped with `pairing` was started for.
+    func isCurrentPairing(_ pairing: Int) -> Bool { pairing == self.pairing }
+
+    /// A newly paired Mac, or an unpair: nothing sent to the previous one may confirm itself from here on.
+    mutating func rotatePairing() { pairing += 1 }
+
+    /// What a send's reply may do, once the pairing it was sent under is taken into account.
+    enum SendAck: Equatable {
+        /// The Mac that answered is still the paired one and took it: record it delivered.
+        case confirm
+        /// The reply came from a pairing since left. The Mac paired now never received it, so it goes back in
+        /// the queue for that Mac instead of being recorded delivered.
+        case requeueStale
+        /// Still paired, but the send did not land: leave it for the retry loop.
+        case retry
+    }
+
+    /// The ownership rule for both kinds of send. Staleness outranks success on purpose: a success from a Mac the
+    /// phone has unpaired from is exactly the misroute. Mirrors Android's `sendAck`.
+    static func sendAck(ok: Bool, pairingIsCurrent: Bool) -> SendAck {
+        if !pairingIsCurrent { return .requeueStale }
+        return ok ? .confirm : .retry
+    }
 
     // MARK: - Capture
 
@@ -172,14 +203,70 @@ struct CaptureQueue {
 
     // MARK: - In-flight guards
 
-    /// Returns false if the id is already uploading.
-    mutating func beginUpload(_ id: Int64) -> Bool { inFlightUploads.insert(id).inserted }
-    mutating func endUpload(_ id: Int64) { inFlightUploads.remove(id) }
-    func isUploading(_ id: Int64) -> Bool { inFlightUploads.contains(id) }
+    /// Claims the id for a send under the current pairing. Returns false if any send for it is outstanding,
+    /// including one from a retired pairing that is still unwinding.
+    mutating func beginUpload(_ id: Int64) -> Bool {
+        guard inFlightUploads[id] == nil else { return false }
+        inFlightUploads[id] = pairing
+        return true
+    }
+    /// Releases the claim only if `pairing` made it, so a retired send can never free the current one's guard.
+    /// Returns whether it did.
+    @discardableResult
+    mutating func endUpload(_ id: Int64, pairing: Int) -> Bool {
+        guard inFlightUploads[id] == pairing else { return false }
+        inFlightUploads[id] = nil
+        return true
+    }
+    func isUploading(_ id: Int64) -> Bool { inFlightUploads[id] != nil }
 
-    /// Returns false if a signal for the group is already being sent.
-    mutating func beginSegmentSend(_ group: String) -> Bool { inFlightSegments.insert(group).inserted }
-    mutating func endSegmentSend(_ group: String) { inFlightSegments.remove(group) }
+    /// Returns false if a signal for the group is already being sent, under any pairing.
+    mutating func beginSegmentSend(_ group: String) -> Bool {
+        guard inFlightSegments[group] == nil else { return false }
+        inFlightSegments[group] = pairing
+        return true
+    }
+    @discardableResult
+    mutating func endSegmentSend(_ group: String, pairing: Int) -> Bool {
+        guard inFlightSegments[group] == pairing else { return false }
+        inFlightSegments[group] = nil
+        return true
+    }
+
+    /// What a send's reply may do: nil when Clear took the session while it ran (record nothing at all), else the
+    /// pairing ownership rule. The view model calls this once the network call returns.
+    func ackForReply(ok: Bool, generation: Int, pairing: Int) -> SendAck? {
+        guard isCurrent(generation) else { return nil }
+        return Self.sendAck(ok: ok, pairingIsCurrent: isCurrentPairing(pairing))
+    }
+
+    /// What an upload task's end did. `released`: it held the claim (so the caller drops its task handle).
+    /// `requeued`: the pairing outlived it, so its page went back to pending for the Mac paired now.
+    struct SendEnd: Equatable { let released: Bool; let requeued: Bool }
+
+    /// An upload task ending, for any reason (its defer). Nothing if Clear took the session; otherwise releases
+    /// only its own claim, and puts the page back in the queue if the pairing it was sent under has been left.
+    mutating func finishUpload(_ id: Int64, generation: Int, pairing: Int) -> SendEnd {
+        guard isCurrent(generation), endUpload(id, pairing: pairing) else { return .init(released: false, requeued: false) }
+        return .init(released: true, requeued: !isCurrentPairing(pairing) && requeueAfterStaleSend(id))
+    }
+
+    /// A segment send ending (its defer). `requeued` here means the pairing outlived it: the segment stays ended
+    /// and should be sent to the Mac paired now.
+    mutating func finishSegmentSend(_ group: String, generation: Int, pairing: Int) -> SendEnd {
+        guard isCurrent(generation), endSegmentSend(group, pairing: pairing) else { return .init(released: false, requeued: false) }
+        return .init(released: true, requeued: !isCurrentPairing(pairing))
+    }
+
+    /// A send the pairing outlived left its page UPLOADING, which neither resume nor auto-retry sends again: put it
+    /// back to pending, any deferred resend folded in, for the Mac paired now. Returns true if it changed.
+    mutating func requeueAfterStaleSend(_ id: Int64) -> Bool {
+        guard let i = items.firstIndex(where: { $0.id == id }),
+              items[i].state != .pending || items[i].needsResend == true else { return false }
+        items[i].state = .pending
+        items[i].needsResend = nil
+        return true
+    }
 
     // MARK: - Counts and filters
 

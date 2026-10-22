@@ -47,8 +47,9 @@ final class CaptureViewModel: ObservableObject {
     // the Mac can never complete a partial segment, and is retried until acked. Mirrors Android.
 
     private var flashTask: Task<Void, Never>?
-    /// The running photo and segment sends, so Clear can cancel them. Cancelling only stops them sooner: the
-    /// generation check after each send is what keeps a reply that outlives Clear out of the new session.
+    /// The running photo and segment sends, so Clear, unpair and re-pair can cancel them. Cancelling only stops them
+    /// sooner: the generation and pairing checks after each send are what keep a reply that outlives them from
+    /// recording anything.
     private var uploadTasks: [Int64: Task<Void, Never>] = [:]
     private var segmentTasks: [String: Task<Void, Never>] = [:]
     private let store = SessionStore()
@@ -110,6 +111,7 @@ final class CaptureViewModel: ObservableObject {
         connectPhase = .connecting(host: ep.host, port: ep.port)
         switch await MacClient(endpoint: ep).reachability() {
         case .ok:
+            retirePreviousPairing()   // the Mac paired before owns nothing from here on
             endpoint = ep
             // Auto-select Drive transport when the QR carries a relay token and the user is signed in.
             if ep.relay != nil && driveAuth.isSignedIn { transportMode = .drive }
@@ -123,6 +125,7 @@ final class CaptureViewModel: ObservableObject {
         case .unreachable:
             // LAN unreachable but the QR has a relay token + user signed in → try Drive directly.
             if ep.relay != nil && driveAuth.isSignedIn {
+                retirePreviousPairing()
                 endpoint = ep
                 transportMode = .drive
                 UserDefaults.standard.set(transportMode.rawValue, forKey: Self.transportModeKey)
@@ -144,10 +147,23 @@ final class CaptureViewModel: ObservableObject {
         // connection for it to notice the drop). Fire before clearing the client; ignore failure.
         let c = client
         if let c { Task { _ = await c.sessionDisconnect() } }
+        retirePreviousPairing()
         UserDefaults.standard.removeObject(forKey: Self.endpointKey)
         endpoint = nil
         client = nil
         connectPhase = .idle
+    }
+
+    /// Hand the queue to the next endpoint (W40.i-fix-ios-pairing-generation, Android's W23.m1). Moving the pairing
+    /// on means a reply arriving afterwards can no longer confirm a page, so it can never let the phone delete its
+    /// only copy, and each such send returns its page to the queue as it unwinds. Cancelling only stops those sends
+    /// sooner: a request already on the wire may still land on the old Mac, which is why the pairing check, not the
+    /// cancel, is what makes this safe. Everything here is on the main actor, so a send the new pairing starts
+    /// can't be caught by it. Switching LAN and Drive for the same Mac is not a new pairing and does not call this.
+    private func retirePreviousPairing() {
+        queue.rotatePairing()
+        uploadTasks.values.forEach { $0.cancel() }
+        segmentTasks.values.forEach { $0.cancel() }
     }
 
     private static func loadEndpoint() -> MacEndpoint? {
@@ -318,16 +334,25 @@ final class CaptureViewModel: ObservableObject {
         // Gate: any page of this group not yet UPLOADED (pending/uploading/failed) → wait for it.
         guard let tags = queue.readySegment(group), let c = client else { return }
         guard queue.beginSegmentSend(group) else { return }   // a send for this group is already running
-        let generation = queue.generation
+        let generation = queue.generation, pairing = queue.pairing
         segmentTasks[group] = Task {
-            defer { if queue.isCurrent(generation) { queue.endSegmentSend(group); segmentTasks[group] = nil } }
+            defer {
+                let end = queue.finishSegmentSend(group, generation: generation, pairing: pairing)
+                if end.released { segmentTasks[group] = nil }
+                // Unpaired or re-paired while this ran: the segment stays ended, so send it to the Mac paired now (on
+                // a fresh Task, after this one is gone; a no-op while unpaired).
+                if end.requeued { Task { @MainActor in trySendSegmentComplete(group: group) } }
+            }
             var ok = false, attempt = 0
             while !ok && attempt < 3 && !Task.isCancelled {
                 ok = await c.segmentComplete(group: group, quality: tags.quality, year: tags.year, month: tags.month, seqs: tags.seqs)
                 attempt += 1
             }
-            guard queue.isCurrent(generation) else { return }   // Clear took the session while this ran
-            if ok { queue.acknowledgeSegment(group); persist() }
+            // Nothing if Clear took the session while this ran; an ack from a Mac since unpaired from must not drop
+            // the segment either, since the Mac paired now never heard of it.
+            if queue.ackForReply(ok: ok, generation: generation, pairing: pairing) == .confirm {
+                queue.acknowledgeSegment(group); persist()
+            }
         }
     }
 
@@ -373,8 +398,24 @@ final class CaptureViewModel: ObservableObject {
         let fileURL = item.fileURL
         let replaces = item.replacesGroupId   // durable on the item, so retries keep sending X-Replaces
         let generation = queue.generation      // a reply after Clear records nothing (W40.i-fix-ios-clear-generation)
+        let pairing = queue.pairing            // a reply from a Mac since unpaired confirms nothing (W40.i-fix-ios-pairing-generation)
         uploadTasks[item.id] = Task {
-            defer { if queue.isCurrent(generation) { queue.endUpload(item.id); uploadTasks[item.id] = nil } }
+            defer {
+                // Releases only OUR claim: a retired send must never free the guard of the current Mac's send.
+                let end = queue.finishUpload(item.id, generation: generation, pairing: pairing)
+                if end.released { uploadTasks[item.id] = nil }
+                // The pairing outlived this send (a stale reply, or one the re-pair cancelled), which left the page
+                // UPLOADING: it is pending again, so send it to the Mac paired now, on a fresh Task so it runs after
+                // this one is gone (a no-op while unpaired; the next pairing's resume sends it).
+                if end.requeued {
+                    persist()
+                    statusMessage = queue.uploadSummary
+                    Task { @MainActor in
+                        if let latest = queue.item(item.id), latest.state == .pending { enqueueUpload(latest) }
+                        sendStatusReport()   // the Mac paired now has to count this page again
+                    }
+                }
+            }
             // Read the multi-MB JPEG off the main actor so the live camera UI doesn't hitch on
             // upload/retry bursts (enqueueUpload runs on the @MainActor view model).
             let data = await Task.detached { try? Data(contentsOf: fileURL) }.value
@@ -388,10 +429,13 @@ final class CaptureViewModel: ObservableObject {
                     attempt += 1
                 }
             }
-            // Clear took the session while this upload ran: its photo is gone, and the reply must not mark,
-            // count or report anything in the new one.
-            guard queue.isCurrent(generation) else { return }
-            if ok {
+            // Clear took the session while this upload ran (nil): its photo is gone, and the reply must not mark,
+            // count or report anything in the new one. Unpaired or re-paired (requeueStale): whichever Mac answered
+            // is not the destination now, and recording the page uploaded would hide it from the new Mac and delete
+            // the phone's only copy; the defer above puts it back in the queue instead. Android's W23.m1.
+            guard let ack = queue.ackForReply(ok: ok, generation: generation, pairing: pairing),
+                  ack != .requeueStale else { return }
+            if ack == .confirm {
                 sentCount += 1
                 setState(item.id, .uploaded)
                 // A field changed while this upload was in flight (per-page Q3 / reclassify): the bytes just

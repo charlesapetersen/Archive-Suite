@@ -12577,3 +12577,20 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
     real guard fails no test (there is no iOS test host). It also noted an upload already past its cancel check can
     still deliver a cleared photo under its old group, as before; the Mac's Finish closes that group.
   <!-- /W40.i-fix-ios-clear-generation -->
+- [x] **W40.i-fix-ios-pairing-generation — port `W23.m1` to iOS: a reply from the Mac just unpaired from must not mark a page delivered [S · S2 · Tier-2]** · §W40 (lane: processor) (uses: build) (blocked-on: W40.i2, W40.i-fix-ios-testable-core). Found by `W40.i2` 2026-10-21; detail in `verification/capture.md`. `disconnect()` (`CaptureViewModel.swift:148`) leaves uploads running; their reply still marks the page uploaded and deletes the phone's copy, so the page ends up only on the old Mac. Port Android's pairing generation (`CaptureModels.kt:66-128`, `CapturePairingGenerationTest`): stamp each send, discard a stale reply, re-queue the page for the new pairing, cancel in-flight sends on unpair. SHIPPED 2026-10-21.
+    `CaptureQueue` gained a process-local `pairing`, moved on by every pair and unpair (`retirePreviousPairing` in
+    both successful `attemptConnect` branches and in `disconnect()`, which also cancels the running sends; a LAN/Drive
+    switch for the same Mac is not a new pairing). Each photo and segment send captures it. `ackForReply` returns nil
+    after a Clear and `requeueStale` for a reply under a pairing since left, so the old Mac's reply never sets
+    uploaded, counts a send, removes the photo or acks a segment. The in-flight claims record the pairing that made
+    them and only it can release (Android's `OutstandingSends`), so the new Mac's resume waits while a retired send
+    still holds the photo; `finishUpload` (the task's defer) then releases it, puts the page back to pending with any
+    deferred resend folded in, and the view model sends it to the Mac paired now (nothing while unpaired; the next
+    pairing's resume does). A stale segment send leaves the segment ended and re-drives it. Host tests: 8 new tests
+    calling the same queue methods the view model calls (28 tests, 141 checks). iOS generic-simulator build green,
+    no new warnings. Tier-2 adversarial review: no blocking defect; its should-fix (the first tests re-typed the
+    view model's decisions by hand) was fixed by moving those decisions into `ackForReply`/`finishUpload`/
+    `finishSegmentSend`. Its unrelated finding (a crash between recording uploaded and the resend loses a changed
+    field) is filed as `W40.i-fix-ios-resend-window`. As on Android, pages the old Mac confirmed before a re-pair
+    stay there (KNOWN_ISSUES W23.m1, inherent).
+  <!-- /W40.i-fix-ios-pairing-generation -->
