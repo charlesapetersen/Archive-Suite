@@ -24,20 +24,20 @@
   "owner-typed": {
    "pages": 40,
    "words": 14243,
-   "lines": 1987,
-   "baselines": 1980,
+   "lines": 1995,
+   "baselines": 1988,
    "status": {
-    "vision": 10549,
-    "vision-sub": 199,
-    "missing": 181,
+    "vision": 10411,
+    "vision-sub": 197,
+    "missing": 177,
     "split": 95,
-    "drawn": 2978,
+    "drawn": 3124,
     "illegible": 19,
-    "vision-moved": 138,
+    "vision-moved": 136,
     "tesseract": 83,
     "tesseract-sub": 1
    },
-   "median_lines_per_page": 37.0
+   "median_lines_per_page": 36.0
   },
   "owner-hand": {
    "pages": 21,
@@ -445,7 +445,7 @@
    "words": 75,
    "lines": 16,
    "missing": 0,
-   "audit": "redraw"
+   "audit": null
   },
   {
    "page": "p008",
@@ -495,7 +495,7 @@
    "words": 340,
    "lines": 87,
    "missing": 21,
-   "audit": "fix"
+   "audit": "ok"
   },
   {
    "page": "p019",
@@ -545,7 +545,7 @@
    "words": 147,
    "lines": 40,
    "missing": 0,
-   "audit": "fix"
+   "audit": "ok"
   },
   {
    "page": "p026",
@@ -595,7 +595,7 @@
    "words": 28,
    "lines": 12,
    "missing": 0,
-   "audit": "fix"
+   "audit": "ok"
   },
   {
    "page": "p036",
@@ -633,9 +633,9 @@
    "kind": "printed",
    "in_96": true,
    "words": 690,
-   "lines": 109,
+   "lines": 119,
    "missing": 0,
-   "audit": "fix"
+   "audit": "ok"
   },
   {
    "page": "p045",
@@ -895,7 +895,7 @@
    "words": 449,
    "lines": 83,
    "missing": 0,
-   "audit": "fix"
+   "audit": "ok"
   },
   {
    "page": "p086",
@@ -973,8 +973,8 @@
    "kind": "typewritten",
    "in_96": true,
    "words": 320,
-   "lines": 38,
-   "missing": 4,
+   "lines": 36,
+   "missing": 0,
    "audit": "fix"
   },
   {
