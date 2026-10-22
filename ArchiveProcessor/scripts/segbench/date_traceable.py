@@ -828,7 +828,7 @@ def cmd_score(a):
                 [pipeline(d, ch, None, NEAR) for d in owner if d["id"] in ids], "owner")
         tf = os.path.join(VISION, "timing.jsonl")
         if os.path.exists(tf):
-            ts = [json.loads(l) for l in open(tf)]
+            ts = [t for t in (json.loads(l) for l in open(tf)) if not t.get("parallel_render")]   # one renderer only
             n = sum(t["read_now"] for t in ts)
             out["vision"]["seconds_per_page"] = round(sum(t["render_s"] + t["read_s"] for t in ts) / max(1, n), 2)
         out["vision_arms"] = vision_arms(owner, vis, ans)
