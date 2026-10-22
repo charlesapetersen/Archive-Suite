@@ -12836,3 +12836,17 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
     `NavigationUITests/testAFilteredAwaySelectionIsNotCountedOrActedOn` green (filter away → no count, Mark Read and ⌘R write
     nothing, cleared filter brings nothing back; two rows + tag cloud open/close → 2 highlighted, "2 selected").
   <!-- /W40.fix-reader-phantom-selection -->
+- [x] **W40.fix-reader-visual-polish — small Reader inconsistencies the visual review found [S · S4]** · §W40 · SHIPPED 2026-10-22
+  - Found by `W40.e10` 2026-10-16 (`verification/evidence/reader/visual-2026-10-16.md`). Fixed:
+    (1) phantom selection — shipped separately as `W40.fix-reader-phantom-selection`.
+    (2) Copy Cleaned for Prose moved from ⇧⌘C to ⌥⌘C (Document menu + preview sheet); ⇧⌘C is Copy Link(s) only.
+    (3) Save Search is a sheet (`SaveSearchSheet`), not an `.alert`; the name field takes the keyboard on open.
+    (4) Quality chips and the filter summary run Q1 → Q3, as the pop-up does. (5) "Date uncertain" in the health popover.
+    (6) The untagged-folder empty state says the list shows only tagged documents (squares with "0 total"), and it
+    and "Nothing in this folder" offer Choose Folder…. (7) "Save as Smart Folder" no longer truncates: fixed by
+    `W40.fix-reader-filter-focus` (57b9e1e0, `.fixedSize()` in `FilterBarLayout`); confirmed in the dark tour shot.
+    (8) The Year range popover has an opaque background. (9) Empty states sit on a material card over the stripes.
+  - Tests: Reader unit bundle 491 green; VM XCUITest Navigation/ArchiveReader/Viewer/TransientState 31 green, incl. new
+    `testSaveSearchNameFieldHasTheKeyboardAndQualityChipsAscend` and the Choose Folder assertion; VM dark visual tour
+    (`testTourDark`, `testEmptyStatesDark`) green, screenshots read for (6)–(9).
+  <!-- /W40.fix-reader-visual-polish -->
