@@ -17,6 +17,7 @@ classes (D-enhancement.md §6.1):
 """
 from __future__ import annotations
 import importlib.util
+import sys
 from collections import OrderedDict
 from pathlib import Path
 
@@ -113,10 +114,160 @@ def docres(img, task, src: Path):
     return np.ascontiguousarray(out[..., ::-1])
 
 
-def enhance(arm, img, src: Path):
-    """One arm's image from the raw RGB image, the same size."""
+class _inside:
+    """Run a method's own code from its clone: its directory first on sys.path and as the working directory."""
+    def __init__(self, d):
+        self.d = str(d)
+
+    def __enter__(self):
+        import os
+        self.cwd = os.getcwd()
+        sys.path.insert(0, self.d)
+        os.chdir(self.d)
+
+    def __exit__(self, *exc):
+        import os
+        os.chdir(self.cwd)
+        sys.path.remove(self.d)
+
+
+def gcdrnet(img, base: Path):
+    """GCDRNet (MIT, ZZZHANG-jx/GCDRNet 415c97a9; weights from the Hugging Face mirror FahNos/GCDRnet, the README's
+    own link being OneDrive) as infer.py: pad top and left to a multiple of 32, gcnet's shading map divided out,
+    then drnet on the image and the shading-corrected image; full resolution, deterministic."""
+    import torch.nn.functional as F
+    root = base / 'src' / 'GCDRNet'
+    if 'gcdrnet' not in _models:
+        with _inside(root):
+            sys.path.append(str(root / 'models/UNeXt'))
+            from utils import convert_state_dict
+            from models.UNeXt.unext import UNext_full_resolution_padding, UNext_full_resolution_padding_L_py_L
+            m1 = UNext_full_resolution_padding(num_classes=3, input_channels=3, img_size=512)
+            m1.load_state_dict(convert_state_dict(torch.load('checkpoints/gcnet/checkpoint.pkl', map_location='cpu')['model_state']))
+            m2 = UNext_full_resolution_padding_L_py_L(num_classes=3, input_channels=6, img_size=512)
+            m2.load_state_dict(convert_state_dict(torch.load('checkpoints/drnet/checkpoint.pkl', map_location='cpu')['model_state']))
+        _models['gcdrnet'] = (m1.eval().to(DEVICE), m2.eval().to(DEVICE))
+    m1, m2 = _models['gcdrnet']
+    bgr, ph, pw = stride_integral(np.ascontiguousarray(img[..., ::-1]), 32)
+    h, w = bgr.shape[:2]
+    with torch.no_grad():
+        x = torch.from_numpy(bgr.transpose(2, 0, 1) / 255).unsqueeze(0).float().to(DEVICE)
+        sh = F.interpolate(m1(x), (h, w))
+        pred = m2(torch.cat((x, torch.clamp(x / sh, 0, 1)), 1))[0]
+    out = (pred[0].permute(1, 2, 0).cpu().numpy() * 255).astype(np.uint8)[ph:, pw:]  # infer.py: no clamp
+    return np.ascontiguousarray(out[..., ::-1])
+
+
+def seed_all(seed):
+    import random
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+
+
+def resshift(img, base: Path, seed):
+    """PreP-OCR's restorer: ResShift (zsyOAOA/ResShift bb03b7d2, S-Lab non-commercial: a research run only) with
+    PreP-OCR's deblur_gopro256.yaml and its released weights (ShuhaoGuan/prep-ocr-resshift-deblur), 4 steps,
+    256 px chops at stride 224. The paper's multi-direction median fusion is not in the released code, so this is
+    plain chopping. Reseeded before every page, so a page's noise does not depend on the order pages are made."""
+    import tempfile
+    from PIL import Image
+    root = base / 'src' / 'ResShift'
+    with _inside(root):
+        if 'resshift' not in _models:
+            from omegaconf import OmegaConf
+            from sampler import ResShiftSampler
+            cfg = OmegaConf.load(str(base / 'src/PreP-OCR/configs/deblur_gopro256.yaml'))
+            cfg.model.ckpt_path = str(base / 'weights/prep-ocr/resshift_deblur_prep_ocr.pth')
+            cfg.autoencoder.ckpt_path = str(base / 'weights/prep-ocr/autoencoder_vq_f4.pth')
+            _models['resshift'] = ResShiftSampler(cfg, sf=1, chop_size=256, chop_stride=224, chop_bs=1, use_amp=False,
+                                                  seed=seed, padding_offset=cfg.model.params.lq_size)
+        with tempfile.TemporaryDirectory() as d:
+            src, out = Path(d) / 'in.png', Path(d) / 'out'
+            Image.fromarray(img).save(src)
+            seed_all(seed)
+            _models['resshift'].inference(str(src), str(out), bs=1, noise_repeat=False)
+            with Image.open(out / 'in.png') as im:
+                return np.asarray(im.convert('RGB'))
+
+
+def nafdpm(img, base: Path, seed, steps=20):
+    """NAF-DPM (MIT, ispamm/NAF-DPM 06fe76a6) deblurring with its FINETUNING-BEST_CER weights, as Tester.test with
+    NATIVE_RESOLUTION: 256 px tiles without overlap, white-padded, DPM-Solver++ at the conf's 20 steps on the
+    linear 100-step schedule, init predictor plus the sampled residual. torch.manual_seed(seed) before each page."""
+    import types
+    root = base / 'src' / 'NAF-DPM'
+    ck = str(base / 'weights/naf/NAF-DPM/Checkpoints Deblurring/FINETUNING-BEST_CER_model_%s.pth')
+    with _inside(root):
+        if 'nafdpm' not in _models:
+            for m in ('pyiqa', 'wandb'):
+                sys.modules.setdefault(m, types.ModuleType(m))
+            from Deblurring.schedule.schedule import Schedule
+            from Deblurring.model.NAFDPM import NAFDPM
+            from Deblurring.src.tester import dpm_solver
+            net = NAFDPM(input_channels=6, mode=0, n_channels=32, middle_blk_num=1, enc_blk_nums=[1, 1, 1, 1],
+                         dec_blk_nums=[1, 1, 1, 1])
+            net.init_predictor.load_state_dict(torch.load(ck % 'init', map_location='cpu', weights_only=False)['model_state_dict'])
+            net.denoiser.load_state_dict(torch.load(ck % 'denoiser', map_location='cpu', weights_only=False)['model_state_dict'])
+            _models['nafdpm'] = (net.eval().to(DEVICE), Schedule('linear', 100), dpm_solver)
+        net, sched, solver = _models['nafdpm']
+        seed_all(seed)
+        x = torch.from_numpy(img.transpose(2, 0, 1)[None] / 255.).float()
+        H, W = x.shape[2:]
+        S = 256
+        nh, nw = H // S + 1, W // S + 1
+        pad = torch.ones((1, 3, nh * S, nw * S))
+        pad[:, :, :H, :W] = x
+        tiles = [pad[:, :, i * S:(i + 1) * S, j * S:(j + 1) * S] for i in range(nh) for j in range(nw)]
+        res = []
+        with torch.no_grad():
+            for k in range(0, len(tiles), 8):
+                b = torch.cat(tiles[k:k + 8], 0).to(DEVICE)
+                ip = net.init_predictor(b)
+                sm = solver(sched.get_betas(), net.denoiser, torch.randn_like(b), steps, ip, {})
+                res += list(torch.clamp(sm + ip, 0, 1).cpu().split(1, 0))
+        full = torch.cat([torch.cat(res[i * nw:(i + 1) * nw], 3) for i in range(nh)], 2)[0, :, :H, :W]
+        return np.ascontiguousarray((full.numpy() * 255).round().astype(np.uint8).transpose(1, 2, 0))
+
+
+def enhance(arm, img, base: Path):
+    """One arm's image from the raw RGB image, the same size. base holds src/ (the clones) and weights/."""
     if arm == 'shading':
         return shading(img)
     if arm in ('docres-appearance', 'docres-deshadow'):
-        return docres(img, arm.split('-')[1], src)
+        return docres(img, arm.split('-')[1], base / 'src')
+    if arm == 'gcdrnet':
+        return gcdrnet(img, base)
+    method, _, seed = arm.rpartition('-s')
+    if method == 'resshift':
+        return resshift(img, base, int(seed))
+    if method == 'nafdpm':
+        return nafdpm(img, base, int(seed))
     raise KeyError(arm)
+
+
+def main():
+    """enh_ocr_arms.py ARM BASE RAW_DIR OUT_DIR PAGE...: one arm on the Mac or the cluster, in whichever venv has the
+    method's packages; an image already made is skipped. JPEG 90, as the raw image was saved."""
+    from PIL import Image
+    arm, base, raw, out, *ids = sys.argv[1:]
+    for p in ids:
+        dest = Path(out) / arm / f'{p}.jpg'
+        if dest.exists():
+            continue
+        with Image.open(Path(raw) / f'{p}.jpg') as im:
+            img = np.asarray(im.convert('RGB'))
+        res = enhance(arm, img, Path(base))
+        if res.shape != img.shape:
+            raise SystemExit(f'{arm}/{p}: {res.shape} is not the raw image\'s {img.shape}')
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        tmp = dest.with_suffix('.tmp')
+        Image.fromarray(res).save(tmp, 'JPEG', quality=90)
+        tmp.replace(dest)
+        print(arm, p, flush=True)
+
+
+if __name__ == '__main__':
+    main()

@@ -2,15 +2,15 @@
 """W46.enh-ocr-input. Content-removing enhancement as OCR input, on the owner's truth pages.
 
   V=~/Library/Caches/ArchiveSuiteRehearsal/enh-dewarp/venv/bin/python
-  $V enh_ocr_input.py shading    # the classical control on the Mac (no torch)
-  $V enh_ocr_input.py stage      # the FarmShare pack: raw + shading images, regions, code, weights
+  $V enh_ocr_input.py mac-arms   # shading, GCDRNet and SBB on the Mac (their own venvs)
+  $V enh_ocr_input.py stage      # the FarmShare pack: the Mac's arms, regions, code, weights
   $V enh_ocr_input.py fetch      # the enhanced images and every reading back from FarmShare
   $V enh_ocr_input.py vision     # Apple Vision on every arm's image (segbench-dewarp lines)
   $V enh_ocr_input.py report     # segbench-results/enh-ocr-input.md, -pages.csv, .json
 
 Arms (enh_ocr_arms.py says how each is made) all start from the panel's frozen raw image, the 2400 px JPEG 90 every
 saved route read, and keep its size, so a word box, a PP-DocLayoutV3 region or a mark box found on raw applies to
-every arm as it is. raw and shading are made here; docres-appearance, docres-deshadow, gcdrnet and sbb on a
+every arm as it is. raw, shading, gcdrnet and sbb are made here; docres-appearance and docres-deshadow on a
 FarmShare GPU (`corpus/enh_ocr_cluster.py enhance`), because DocRes at 1,600 square does not fit this Mac. Each
 output is saved as JPEG 90, as raw was.
 
@@ -57,8 +57,8 @@ BIN = Path.home() / 'Library/Caches/ArchiveSuiteRehearsal/segbench/bin/segbench-
 REGIONS = Path.home() / 'Claude/Long term storage/FarmShare-regions-20261021/pp-doclayoutv3.json'
 RESULTS = P.RESULTS
 REPORT, PAGES, BENCH = RESULTS / 'enh-ocr-input.md', RESULTS / 'enh-ocr-input-pages.csv', RESULTS / 'enh-ocr-input.json'
-MAC_ARMS = ('shading',)
-CLUSTER_ARMS = ('docres-appearance', 'docres-deshadow', 'gcdrnet', 'sbb')
+MAC_ARMS = ('shading', 'gcdrnet', 'sbb')
+CLUSTER_ARMS = ('docres-appearance', 'docres-deshadow')
 ARMS = ('raw', *MAC_ARMS, *CLUSTER_ARMS)
 PROBE = ('resshift', 'nafdpm')
 SEEDS = (1, 2)
@@ -154,7 +154,33 @@ def save_jpeg(arr, dest):
     tmp.replace(dest)
 
 
-def make_shading():
+SBB = '''
+import os, sys, importlib.util
+from pathlib import Path
+import numpy as np
+from PIL import Image
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+base, raw, out, *ids = sys.argv[1:]
+spec = importlib.util.spec_from_file_location('sbb', base + '/src/sbb_binarization/sbb_binarize/sbb_binarize.py')
+m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+b = m.SbbBinarizer(base + '/weights/sbb/saved_model')
+for p in ids:
+    dest = Path(out) / 'sbb' / (p + '.jpg')
+    if dest.exists():
+        continue
+    tmp = dest.with_suffix('.png'); dest.parent.mkdir(parents=True, exist_ok=True)
+    b.run(image_path=str(Path(raw) / (p + '.jpg')), save=str(tmp))
+    with Image.open(tmp) as im:
+        Image.fromarray(np.asarray(im.convert('RGB'))).save(dest.with_suffix('.tmp'), 'JPEG', quality=90)
+    dest.with_suffix('.tmp').replace(dest); tmp.unlink()
+    print('sbb', p, flush=True)
+'''
+
+
+def mac_arms():
+    """shading here; GCDRNet in the enh-ocr-input venv (timm); SBB's 2022-08-16 model in venv-tf (TensorFlow 2.15,
+    the oldest with an arm64 wheel; its README asks for below 2.13), through sbb_binarize.SbbBinarizer.run, the
+    0/255 result saved as three equal channels."""
     import numpy as np
     from PIL import Image
     import enh_ocr_arms as A
@@ -163,7 +189,18 @@ def make_shading():
         if not d.exists():
             with Image.open(raw_image(p)) as im:
                 save_jpeg(A.shading(np.asarray(im.convert('RGB'))), d)
-    print(len(pages()), 'pages, shading ->', CACHE / 'images/shading')
+    here = Path(__file__).resolve().parent
+    raw = str(P.CACHE / 'images')
+    link = CACHE / 'raw-links'  # <page>.jpg -> the panel's <page>-original.jpg, the name the runners expect
+    link.mkdir(exist_ok=True)
+    for p in pages():
+        if not (link / (p + '.jpg')).exists():
+            (link / (p + '.jpg')).symlink_to(raw_image(p))
+    subprocess.run([str(CACHE / 'venv/bin/python'), str(here / 'enh_ocr_arms.py'), 'gcdrnet', str(CACHE), str(link),
+                    str(CACHE / 'images'), *pages()], check=True)
+    subprocess.run([str(CACHE / 'venv-tf/bin/python'), '-c', SBB, str(CACHE), str(link), str(CACHE / 'images'),
+                    *pages()], check=True)
+    print('shading, gcdrnet, sbb ->', CACHE / 'images')
 
 
 def probe_pages():
@@ -201,9 +238,15 @@ def stage():
     d = out / 'src' / 'DocRes'
     if not d.exists():
         shutil.copytree(DOCRES_SRC / 'DocRes', d, ignore=shutil.ignore_patterns('.git', 'data', 'restorted', 'input'))
-    for name in os.listdir(SRC) if SRC.exists() else []:
+    for name in ('ResShift', 'NAF-DPM'):  # GCDRNet and SBB run on the Mac
         if not (out / 'src' / name).exists():
-            shutil.copytree(SRC / name, out / 'src' / name, ignore=shutil.ignore_patterns('.git'))
+            shutil.copytree(SRC / name, out / 'src' / name, ignore=shutil.ignore_patterns('.git', 'testdata', 'figs'))
+    d = out / 'src' / 'PreP-OCR' / 'configs'  # PreP-OCR's config only; the rest of its clone is synthetic-data tooling
+    if not d.exists():
+        shutil.copytree(SRC / 'PreP-OCR' / 'configs', d)
+    for name in ('prep-ocr', 'naf'):
+        if not (out / 'weights' / name).exists():
+            shutil.copytree(CACHE / 'weights' / name, out / 'weights' / name)
     print(out)
 
 
@@ -450,12 +493,12 @@ def report():
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument('cmd', choices=['shading', 'stage', 'fetch', 'vision', 'report', 'probe-pages'])
+    ap.add_argument('cmd', choices=['mac-arms', 'stage', 'fetch', 'vision', 'report', 'probe-pages'])
     a = ap.parse_args()
     if a.cmd == 'probe-pages':
         print(' '.join(probe_pages()))
         return
-    {'shading': make_shading, 'stage': stage, 'fetch': fetch, 'vision': vision, 'report': report}[a.cmd]()
+    {'mac-arms': mac_arms, 'stage': stage, 'fetch': fetch, 'vision': vision, 'report': report}[a.cmd]()
 
 
 if __name__ == '__main__':

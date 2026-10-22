@@ -5,9 +5,9 @@
   enh_ocr_cluster.py enhance --root ROOT --arms A[,A...]        # GPU: ROOT/images/<arm>/<page>.jpg, then the lists
   enh_ocr_cluster.py lists   --root ROOT                        # the three pages.jsonl from what images exist
 
-ROOT (staged by enh_ocr_input.py stage) holds images/raw and images/shading (made on the Mac), pages.json (the 96
-and the probe's 30), regions/pp-doclayoutv3.json (the regions run's detector output on the raw images), src/ (the
-methods' code and weights), enh_ocr_arms.py, and dewarp_cluster.py and regions_cluster.py, whose readers run
+ROOT (staged by enh_ocr_input.py stage) holds images/ raw, shading, gcdrnet and sbb (made on the Mac), pages.json (the 96
+and the probe's 30), regions/pp-doclayoutv3.json (the regions run's detector output on the raw images), src/ and
+weights/ (DocRes, ResShift with PreP-OCR's config, NAF-DPM), pydeps/ (the restorers' packages), enh_ocr_arms.py, and dewarp_cluster.py and regions_cluster.py, whose readers run
 unchanged on three roots this script lists:
   ROOT/pages.jsonl        every main arm of the 96, "<arm>/<page>": PP-OCRv6 and Qwen3-VL 8B whole page
                           (dewarp_cluster.py ppocr / read, out/<route>/<arm>/<page>.json);
@@ -70,7 +70,7 @@ def cmd_enhance(a):
                 continue
             with Image.open(image(a.root, 'raw', p)) as im:
                 img = np.asarray(im.convert('RGB'))
-            out = A.enhance(arm, img, a.root / 'src')
+            out = A.enhance(arm, img, a.root)
             if out.shape != img.shape:
                 raise SystemExit(f'{arm}/{p}: {out.shape} is not the raw image\'s {img.shape}')
             dest.parent.mkdir(parents=True, exist_ok=True)

@@ -1,6 +1,7 @@
 #!/bin/bash
 # W46.enh-ocr-input: one Slurm job.
-#   sbatch ... enh-ocr-job.sh ROOT enhance ARMS            (ARMS a comma list; GPU; then the three pages.jsonl)
+#   sbatch ... enh-ocr-job.sh ROOT enhance ARMS            (ARMS a comma list; GPU; then the three pages.jsonl;
+#                                                           pydeps/ holds the restorers' packages, pip --target)
 #   sbatch ... enh-ocr-job.sh ROOT ppocr  - SHARD          (PP-OCRv6 on ROOT/pages.jsonl, truth96's pinned pipeline)
 #   sbatch ... enh-ocr-job.sh ROOT whole  ROUTE SHARD SUB  (a vLLM route on SUB/pages.jsonl whole page; SUB . or probe)
 #   sbatch ... enh-ocr-job.sh ROOT regions glm-ocr SHARD   (GLM-OCR on ROOT/glm, PP-DocLayoutV3's regions)
@@ -11,7 +12,10 @@ ROOT="$1"; KIND="$2"; ARG="${3:-}"; SHARD="${4:-0/1}"; SUB="${5:-.}"
 mkdir -p "$ROOT/logs"
 source /home/users/cp1/Archive-Suite/ArchiveProcessor/scripts/segbench/farmshare/fs.env
 if [ "$KIND" = enhance ]; then
-  exec "$FS_PY" "$ROOT/enh_ocr_cluster.py" enhance --root "$ROOT" --arms "$ARG"
+  # one process an arm: the restorers' clones each bring top-level modules named utils, models and src
+  export PYTHONPATH="$ROOT/pydeps"
+  for arm in ${ARG//,/ }; do "$FS_PY" "$ROOT/enh_ocr_cluster.py" enhance --root "$ROOT" --arms "$arm"; done
+  exit 0
 fi
 if [ "$KIND" = ppocr ]; then
   sweep=/scratch/users/cp1/fs-ocr/ppocrv6-20261019
