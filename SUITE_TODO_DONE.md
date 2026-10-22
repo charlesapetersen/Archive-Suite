@@ -12808,3 +12808,16 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   cell ends before the cloud's tags (the guard alone exempts cells inside a scroll view). VM, light and dark:
   2 tests, 0 violations; TransientStateUITests green. Whole Reader UI suite in the VM: 51 tests, red only in the audit and TransientState (fixed above). At the 900-pt minimum the column minimums cannot fit beside sidebar and cloud, by design.
   <!-- /W40.fix-reader-tagcloud-width -->
+- [x] **W46.date-draft-audit — a second reader for the 95 drafted dates the first did not support [S]** · §Document processing review — W46 (owner, 2026-10-20) (lane: segbench) (uses: light) (blocked-on: W46.fix-date-truth-score) — W46.fix-date-truth-score drafted the stratified 200 with Qwen3.5 4B on this Mac (the 8B would not fit beside the load) and accepted 105 where the blind page year equals the owner's tag. The other 95 (33 page year differs, 12 date without a year, 50 no date found on the first page) are `audit: true` in the bench cache's `date-tagging/pool/draft-truth.jsonl`. Read them with a stronger reader, blind, all pages not only the first: Qwen3-VL 8B through `date_draft.py collect --model qwen3-vl-8b-mlx4` when the guard lets it run ($0), else a gateway model; on the owner's 54 the 4B misread a digit four times (1971 for 1975, 1957 for 1967, 1956 and 1976 for 1936), so a differing year is more often a misreading than a conflict. Whatever two readers still dispute goes to the owner as a check sheet with boxes on the page (CLAUDE.md "Owner check sheets point at the text"). detail: ArchiveProcessor/segbench-results/date-draft.md SHIPPED 2026-10-22
+  - Qwen3-VL 8B 4-bit MLX on this Mac, $0, blind, every page of the 95 (310 pages at 1100 px, median 5.7 s a page),
+    asked for a box around any date. The read waited ten guard refusals on 2026-10-21 (4.5-7.3 GB reclaimable of the
+    8 it needs, the owner's own apps open) and ran at 04:00 on 2026-10-22. No gateway, no plan route.
+  - 24 now supported (16 found on a later page than the first), so the stratified 200 has 129 supported; 29 disputed;
+    42 with no year on any page (the tag stands, unsupported). Of the 33 the first reader read as a differing year,
+    the 8B found the owner's year on 9 and agreed with the 4B's other year on 16, so a differing year was a real
+    page-against-tag difference more often than the misreading the item expected. 12 disputes are one year off the
+    tag; 4 carry the tag 1900 (5 of the 200 do), which looks like a placeholder.
+  - Boxes checked by eye on three disputed pages: on or within a line of the date. The owner's sheet of 29 is gated as
+    W46.date-audit-owner-ok, folded in by W46.date-audit-score. Results: `segbench-results/date-draft-audit.md`;
+    ArchiveOCRBench not touched (a truth-set audit, not a measured route).
+  <!-- /W46.date-draft-audit -->

@@ -437,6 +437,11 @@ def cmd_audit_score(a):
     found_later = sum(1 for r in rows if r["outcome"] == "supported by the second reader"
                       and min(x["page"] for x in r["second_readings"] if x["year"] == r["owner_year"]) > 1)
     boxed = sum(1 for r in sheet for x in r["second_readings"] if x["box"])
+    # a disputed year one off the tag reads as the tag's year coming from a neighbouring date (publication, filing),
+    # not a misreading; a tag of 1900 looks like a placeholder (5 of the stratified 200 carry it)
+    near = sum(1 for r in sheet if r["owner_year"] != 1900 and any(
+        x["year"] and abs(x["year"] - r["owner_year"]) == 1 for x in r["second_readings"]))
+    placeholder = sum(1 for r in sheet if r["owner_year"] == 1900)
     L = ["# Dating: the second reader on the 95 the first did not support (W46.date-draft-audit)", "",
          f"Written by `scripts/segbench/date_draft.py audit-score --model {a.model}`. {MODELS[a.model][1]} (this Mac, "
          f"temperature 0, every page at {MAX_SIDE} px, not only the first) asked the same blind question page by page, "
@@ -458,6 +463,10 @@ def cmd_audit_score(a):
           "", f"Where both readers read a year that differs from the tag, they read the same year on "
           f"{agree['same']} and different years on {agree['other']}. {boxed} of the disputed readings carry the "
           "second reader's box on the sheet; the rest are placed by the reader's own words for where the date is.", "",
+          f"Of the {len(sheet)} disputes, {near} have the second reader one year from the tag (the page's date is "
+          f"probably right and the tag took a neighbouring year), and {placeholder} carry the tag 1900, which looks like "
+          "a placeholder rather than a year; both kinds are on the sheet, since only the owner can say what the "
+          "tag should hold.", "",
           "The sheet (private, in the bench cache's `date-tagging/pool/audit-sheet/index.html`) shows each disputed "
           "page with the boxes and asks what year the date says, offering every year read and the owner's tag in "
           "numeric order, unlabelled, so it does not say which is the current truth.", ""]
