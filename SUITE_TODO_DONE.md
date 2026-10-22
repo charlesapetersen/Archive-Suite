@@ -12661,3 +12661,12 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   DriveLocal.xcconfig (id lands in the built Info.plist); parser host tests in `scripts/test-ios-capture-queue.sh`
   (233 checks pass). Real sign-in unverified until the owner mints an iOS OAuth client (`W40.i5` pack, `W40.i4`).
   <!-- /W40.i-fix-ios-drive-oauth-client -->
+- [x] **W40.i-fix-ios-drive-token-keychain — iOS keeps Drive access and refresh tokens in UserDefaults [S · S3]** · §W40 (lane: processor) (uses: build) (blocked-on: W40.i2). Found by `W40.i2` 2026-10-21; detail in `verification/capture.md`. `DriveAuth` stores both tokens in `UserDefaults` (`Net/DriveAuth.swift:29-48`), which is included in device backups. Move them to the Keychain (`kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`).
+  SHIPPED 2026-10-21: the tokens are one JSON record in a Keychain generic-password item (`I/Net/DriveTokenStore.swift`,
+  `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`, not synchronizable), so no backup or other phone gets them. The old
+  `UserDefaults` keys are removed at load and not read (no migration: no production material). An install marker in
+  `UserDefaults` drops any item a deleted copy of the app left behind, so deleting the app signs it out, as on Android
+  (from the adversarial review). A failed Keychain write or delete is logged rather than ignored. `TokenStore` moved out
+  of `DriveAuth.swift`, Foundation+Security only, so the host suite (`scripts/test-ios-capture-queue.sh`) covers it with
+  an in-memory vault: 255 checks pass (22 new). iOS generic-simulator build clean. Unverified on a device until `W40.i4`.
+  <!-- /W40.i-fix-ios-drive-token-keychain -->

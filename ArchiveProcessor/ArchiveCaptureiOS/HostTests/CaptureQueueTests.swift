@@ -1,7 +1,8 @@
 import Foundation
+import Security
 
 // Host tests for the iOS companion's CaptureQueue, compiled with swiftc against the app's real
-// Capture/CaptureQueue.swift, CaptureModels.swift and SessionStore.swift (scripts/test-ios-capture-queue.sh).
+// Capture/CaptureQueue.swift, CaptureModels.swift and SessionStore.swift, and Net/DriveTokenStore.swift (scripts/test-ios-capture-queue.sh).
 // The iOS app has no test target and no simulator runtime to host one (W40.i-fix-ios-testable-core).
 //
 // Tests marked CURRENT pin today's behaviour where a queued fix will change it; that fix flips the assertion
@@ -682,6 +683,97 @@ test("a configured client id yields its reversed-client-id redirect") {
     check(c?.clientID == "1234-abcdef.apps.googleusercontent.com", "trimmed")
     check(c?.redirectScheme == "com.googleusercontent.apps.1234-abcdef", "scheme")
     check(c?.redirectURI == "com.googleusercontent.apps.1234-abcdef:/oauth2redirect", "redirect URI")
+}
+
+// MARK: - Drive token storage (W40.i-fix-ios-drive-token-keychain)
+
+/// Stands in for the Keychain: the host binary is unsigned, and an unattended Keychain prompt would hang.
+final class MemoryVault: DriveTokenVault, @unchecked Sendable {
+    var data: Data?
+    var failWrites = false, failDeletes = false
+    func read() -> Data? { data }
+    func write(_ d: Data) -> Bool { if failWrites { return false }; data = d; return true }
+    func delete() -> Bool { if failDeletes { return false }; data = nil; return true }
+}
+func scratchDefaults() -> (UserDefaults, String) {
+    let name = "archive-capture-hosttest-\(UUID().uuidString)"
+    return (UserDefaults(suiteName: name)!, name)
+}
+
+test("Drive tokens are kept in the vault, not in UserDefaults, and survive a relaunch") {
+    let vault = MemoryVault(); let (ud, name) = scratchDefaults(); defer { ud.removePersistentDomain(forName: name) }
+    let exp = Date(timeIntervalSince1970: 2_000_000_000)
+    let a = TokenStore(vault: vault, defaults: ud); a.load()
+    a.update(accessToken: "AT1", refreshToken: "RT1", expiry: exp)
+    check(a.persist(), "persist succeeds")
+    for key in TokenStore.legacyDefaultsKeys { check(ud.object(forKey: key) == nil, "\(key) not in UserDefaults") }
+    check(Array((ud.persistentDomain(forName: name) ?? [:]).keys) == [TokenStore.installMarkerKey],
+          "UserDefaults holds only the install marker")
+    let b = TokenStore(vault: vault, defaults: ud); b.load()
+    check(b.accessToken == "AT1" && b.refreshToken == "RT1" && b.expiry == exp, "relaunch reads them back")
+}
+test("a refresh without a new refresh token keeps the old one in the vault") {
+    let vault = MemoryVault(); let (ud, name) = scratchDefaults(); defer { ud.removePersistentDomain(forName: name) }
+    let s = TokenStore(vault: vault, defaults: ud); s.load()
+    s.update(accessToken: "AT1", refreshToken: "RT1", expiry: Date())
+    s.persist()
+    s.update(accessToken: "AT2", refreshToken: nil, expiry: Date())
+    s.persist()
+    let r = TokenStore(vault: vault, defaults: ud); r.load()
+    check(r.accessToken == "AT2" && r.refreshToken == "RT1", "AT2 with RT1 kept")
+}
+test("sign-out deletes the vault item, so the next launch is signed out") {
+    let vault = MemoryVault(); let (ud, name) = scratchDefaults(); defer { ud.removePersistentDomain(forName: name) }
+    let s = TokenStore(vault: vault, defaults: ud); s.load()
+    s.update(accessToken: "AT1", refreshToken: "RT1", expiry: Date())
+    s.persist()
+    s.clear()
+    check(s.persist(), "delete succeeds")
+    check(vault.data == nil, "item gone")
+    let r = TokenStore(vault: vault, defaults: ud); r.load()
+    check(r.refreshToken == nil && r.accessToken == nil, "signed out after relaunch")
+}
+test("a vault failure is reported, not swallowed") {
+    let vault = MemoryVault(); let (ud, name) = scratchDefaults(); defer { ud.removePersistentDomain(forName: name) }
+    let s = TokenStore(vault: vault, defaults: ud); s.load()
+    vault.failWrites = true
+    s.update(accessToken: "AT1", refreshToken: "RT1", expiry: Date())
+    check(!s.persist(), "failed write returns false")
+    check(s.refreshToken == "RT1", "tokens still usable this launch")
+    vault.failWrites = false; s.persist(); vault.failDeletes = true; s.clear()
+    check(!s.persist(), "failed delete returns false")
+}
+test("tokens left in UserDefaults by an older build are removed at load, never read") {
+    let vault = MemoryVault(); let (ud, name) = scratchDefaults(); defer { ud.removePersistentDomain(forName: name) }
+    ud.set("OLD-AT", forKey: "driveAccessToken"); ud.set("OLD-RT", forKey: "driveRefreshToken")
+    ud.set(1_900_000_000.0, forKey: "driveTokenExpiry")
+    let s = TokenStore(vault: vault, defaults: ud); s.load()
+    for key in TokenStore.legacyDefaultsKeys { check(ud.object(forKey: key) == nil, "\(key) removed") }
+    check(s.refreshToken == nil, "not carried over (no migration: no production material)")
+}
+test("a reinstall drops the item a deleted copy of the app left in the Keychain") {
+    let vault = MemoryVault(); let (ud, name) = scratchDefaults(); defer { ud.removePersistentDomain(forName: name) }
+    let s = TokenStore(vault: vault, defaults: ud); s.load()
+    s.update(accessToken: "AT1", refreshToken: "RT1", expiry: Date()); s.persist()
+    ud.removePersistentDomain(forName: name)   // the app is deleted: UserDefaults goes, the Keychain item stays
+    let r = TokenStore(vault: vault, defaults: ud); r.load()
+    check(r.refreshToken == nil && vault.data == nil, "signed out and the item deleted")
+    let again = TokenStore(vault: vault, defaults: ud); again.load()
+    again.update(accessToken: "AT2", refreshToken: "RT2", expiry: Date()); again.persist()
+    let next = TokenStore(vault: vault, defaults: ud); next.load()
+    check(next.refreshToken == "RT2", "later launches of the same install keep their sign-in")
+}
+test("an unreadable vault record loads as signed out") {
+    let vault = MemoryVault(); let (ud, name) = scratchDefaults(); defer { ud.removePersistentDomain(forName: name) }
+    ud.set(true, forKey: TokenStore.installMarkerKey); vault.data = Data("not json".utf8)
+    let s = TokenStore(vault: vault, defaults: ud); s.load()
+    check(s.refreshToken == nil && s.accessToken == nil && s.expiry == nil, "signed out")
+}
+test("the Keychain item is this-device-only, readable after first unlock") {
+    let attrs = KeychainTokenVault.writeAttributes(Data("x".utf8))
+    check((attrs[kSecAttrAccessible as String] as? String) == (kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly as String),
+          "kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly")
+    check((attrs[kSecValueData as String] as? Data) == Data("x".utf8), "data set")
 }
 
 print("")

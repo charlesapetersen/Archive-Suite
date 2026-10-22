@@ -5,7 +5,7 @@
 # (Capture/CaptureQueue.swift, with CaptureModels.swift and SessionStore.swift) is compiled standalone with
 # swiftc against ArchiveCaptureiOS/HostTests/CaptureQueueTests.swift and run on the Mac, as
 # test-relay-golden.sh does for the network layer. Anything that imports UIKit, AVFoundation or Photos must
-# stay out of those three files (and Net/DriveOAuthConfig.swift, compiled with them), or this stops compiling. Key-free, offline, $0, a few seconds.
+# stay out of those three files (and Net/DriveOAuthConfig.swift and Net/DriveTokenStore.swift, compiled with them), or this stops compiling. Key-free, offline, $0, a few seconds.
 set -uo pipefail
 . "$(dirname "$0")/../../ops/autonomous/heavy-enter.sh"
 cd "$(dirname "$0")/.."
@@ -15,7 +15,7 @@ cp "$REPO/ArchiveCaptureiOS/HostTests/CaptureQueueTests.swift" "$W/main.swift"
 
 echo "=== iOS CaptureQueue host tests (swiftc standalone) ==="
 if ! swiftc "$CAP/CaptureQueue.swift" "$CAP/CaptureModels.swift" "$CAP/SessionStore.swift" \
-     "$CAP/../Net/DriveOAuthConfig.swift" "$W/main.swift" \
+     "$CAP/../Net/DriveOAuthConfig.swift" "$CAP/../Net/DriveTokenStore.swift" "$W/main.swift" \
      -o "$W/run" 2>"$W/swiftc.err"; then
   echo "  [FAIL] swiftc:"; head -20 "$W/swiftc.err"; echo ""; echo "IOS CAPTURE QUEUE: FAIL ❌"; exit 1
 fi

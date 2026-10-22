@@ -3,59 +3,13 @@ import CryptoKit
 import Foundation
 import UIKit
 
-/// Thread-safe token storage so `DriveClient`'s synchronous token provider (called off the main thread)
-/// can read the current access/refresh tokens without actor-isolation conflicts.
-private final class TokenStore: @unchecked Sendable {
-    private let lock = NSLock()
-    private var _accessToken: String?
-    private var _refreshToken: String?
-    private var _expiry: Date?
-
-    var accessToken: String? { lock.withLock { _accessToken } }
-    var refreshToken: String? { lock.withLock { _refreshToken } }
-    var expiry: Date? { lock.withLock { _expiry } }
-
-    func update(accessToken: String?, refreshToken: String?, expiry: Date?) {
-        lock.withLock {
-            if let at = accessToken { _accessToken = at }
-            if let rt = refreshToken { _refreshToken = rt }
-            _expiry = expiry
-        }
-    }
-
-    func clear() {
-        lock.withLock { _accessToken = nil; _refreshToken = nil; _expiry = nil }
-    }
-
-    func load() {
-        let ud = UserDefaults.standard
-        lock.withLock {
-            _accessToken = ud.string(forKey: "driveAccessToken")
-            _refreshToken = ud.string(forKey: "driveRefreshToken")
-            if let t = ud.object(forKey: "driveTokenExpiry") as? Double {
-                _expiry = Date(timeIntervalSince1970: t)
-            }
-        }
-    }
-
-    func persist() {
-        let ud = UserDefaults.standard
-        lock.withLock {
-            ud.set(_accessToken, forKey: "driveAccessToken")
-            ud.set(_refreshToken, forKey: "driveRefreshToken")
-            if let e = _expiry { ud.set(e.timeIntervalSince1970, forKey: "driveTokenExpiry") }
-            else { ud.removeObject(forKey: "driveTokenExpiry") }
-        }
-    }
-}
-
 /// On-device Google sign-in for the Drive cloud relay, mirroring the Android `DriveAuth.kt`
 /// (PKCE, `drive.file` scope, autonomous token refresh) but using `ASWebAuthenticationSession` —
 /// the RFC 8252 native-app flow for iOS.
 ///
 /// The iOS OAuth client uses **no client secret** (PKCE only; the redirect is the reversed-client-ID
 /// custom scheme, verified by bundle ID in the Google Cloud console). The persisted tokens (access +
-/// refresh) live in UserDefaults; `accessTokenBlocking()` feeds `DriveClient`'s `() -> String` token
+/// refresh) live in the Keychain, this device only (`TokenStore`, `Net/DriveTokenStore.swift`); `accessTokenBlocking()` feeds `DriveClient`'s `() -> String` token
 /// provider and refreshes transparently.
 ///
 /// The phone must sign in to the **same Google account** as the Mac — `drive.file` is per-project, so
@@ -194,7 +148,7 @@ final class DriveAuth: ObservableObject {
             let expiresIn = (json["expires_in"] as? Int) ?? 3600
             let expiry = Date().addingTimeInterval(TimeInterval(expiresIn - 60))
             tokens.update(accessToken: at, refreshToken: rt, expiry: expiry)
-            tokens.persist()
+            if !tokens.persist() { NSLog("DriveAuth: could not save the Drive tokens to the Keychain") }
             isSignedIn = true
             return (true, nil)
         } catch {
@@ -233,7 +187,7 @@ final class DriveAuth: ObservableObject {
 
     func signOut() {
         tokens.clear()
-        tokens.persist()
+        if !tokens.persist() { NSLog("DriveAuth: could not delete the Drive tokens from the Keychain") }
         isSignedIn = false
     }
 

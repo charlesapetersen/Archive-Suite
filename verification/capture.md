@@ -69,7 +69,7 @@ iOS, so each was checked against the iOS code.
 | Session file writes | off the main thread, temp + fsync + atomic move, reports failure (`A/data/ManifestFileWriter.kt`) | was an `.atomic` write on the main thread on every change, failure ignored; now one ordered, conflated writer off the main thread (`SessionWriteMailbox`, Clear ordered with it), temp + fsync + rename (`SessionStore.replaceDurably`), and a "Session not saved" line while the latest write has failed | **fixed** by `W40.i-fix-ios-session-durability` (2026-10-21) |
 | Pending resend (a Q3 toggle or reclassify during an upload) | included in auto-retry and resume | was not in the auto-retry or resume filters; now it is, and a confirmed send with a resend pending goes straight back to pending (`CaptureQueue.prepareDeferredResend`) | **fixed** by `W40.i-fix-ios-heartbeat-count` (2026-10-21) |
 | Google Drive sign-in | client id from `local.properties`; empty disables sign-in with a message (`A/net/DriveAuth.kt:105-113`) | was a hard-coded placeholder id with the sign-in button always shown; now the id comes from the gitignored `Config/DriveLocal.xcconfig` into Info.plist, and with none set sign-in is hidden and the screen says Drive is not configured (`I/Net/DriveOAuthConfig.swift`) | **fixed** by `W40.i-fix-ios-drive-oauth-client` (2026-10-21); a real sign-in still needs the owner's iOS OAuth client (`W40.i5`) |
-| Drive tokens | private SharedPreferences, `allowBackup=false` | access and refresh tokens in plain `UserDefaults`, which goes into device backups (`DriveAuth.swift:29-48`) | **gap, S3** → `W40.i-fix-ios-drive-token-keychain` |
+| Drive tokens | private SharedPreferences, `allowBackup=false` | was plain `UserDefaults`, which goes into device backups; now one Keychain item, `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`, dropped on the first launch after a reinstall (`I/Net/DriveTokenStore.swift`) | **fixed** by `W40.i-fix-ios-drive-token-keychain` (2026-10-21) |
 | Cloud pairing | an explicit Cloud mode with no LAN probe; relay token from the QR or typed in; Google sign-in launched with the QR's `account` as the login hint (`A/ui/ConnectScreen.kt:183-249`) | no Cloud choice: Drive is used only after a LAN ping, a refused connection never falls back, and a working LAN is passed over for Drive when signed in (`CaptureViewModel.swift:115-146`). A `mode:"cloud"` QR is refused as "not an Archive Processor pairing code" (`I/Net/MacEndpoint.swift:19-32`). No typed relay token | **gap, S3** → `W40.i-fix-ios-cloud-pairing` |
 | Deleting a page | confirms whenever the page is unsent *or* has a pending resend; cancels and waits for its upload; "Save to gallery & delete" or "Delete permanently" (`CaptureViewModel.kt:477-563`) | confirms only when the page is unsent, so a pending resend is deleted unasked; no cancel; "Delete permanently" only (`CaptureViewModel.swift:256-281`) | **gap, S3** → `W40.i-fix-ios-delete-confirm` |
 | Tests | ten JVM test files over the queue, delete, recovery, orphans, pairing generation, QR parsing, the Drive transport, relay bytes and the session writer | no test target; four `swiftc` scripts cover only the network layer. None of the view model's safety logic is tested, and there is no runtime to host an XCTest bundle | **gap, S3** → `W40.i-fix-ios-testable-core`, which the S1 and S2 fixes wait on so each lands with a failing test first (rule 8) |
@@ -99,7 +99,7 @@ iOS, so each was checked against the iOS code.
 | `W40.i-fix-ios-session-durability` | S2 · Tier-2 | `W23.m8` and orphan adoption not on iOS; silent save failures |
 | `W40.i-fix-ios-drive-oauth-client` | S2 | placeholder Google client id |
 | `W40.i-fix-ios-cloud-pairing` | S3 | no Cloud mode, cloud QR refused, no typed relay token |
-| `W40.i-fix-ios-drive-token-keychain` | S3 | Drive tokens in `UserDefaults` |
+| `W40.i-fix-ios-drive-token-keychain` | S3 | Drive tokens in `UserDefaults` — fixed 2026-10-21 |
 | `W40.i-fix-ios-delete-confirm` | S3 · Tier-2 | a pending resend deleted unasked; no cancel; no save-and-delete |
 | `W40.i-fix-ios-polish` | S4 | the small differences above |
 
@@ -625,5 +625,5 @@ action or any runtime evidence: there is no test target and no simulator runtime
   shown; fixed by `W40.i-fix-ios-drive-oauth-client` (2026-10-21): the id comes from the gitignored
   `Config/DriveLocal.xcconfig`, and a build without one hides sign-in and says why (`I/Net/DriveOAuthConfig.swift`,
   parser covered by `scripts/test-ios-capture-queue.sh`). The reversed-client-id scheme is no longer registered in
-  Info.plist; `ASWebAuthenticationSession` catches it itself — unverified on a device until `W40.i4`. Tokens are kept in `UserDefaults` →
-  `W40.i-fix-ios-drive-token-keychain`. A real sign-in needs an iOS OAuth client the owner mints (the `W40.i5` pack).
+  Info.plist; `ASWebAuthenticationSession` catches it itself — unverified on a device until `W40.i4`. Tokens are kept in the Keychain, this device only
+  (`W40.i-fix-ios-drive-token-keychain`, 2026-10-21). A real sign-in needs an iOS OAuth client the owner mints (the `W40.i5` pack).
