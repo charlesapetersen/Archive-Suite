@@ -11,46 +11,46 @@ NES follows reading order, so a page whose lines Vision orders differently on a 
 | 96 | 96 | raw | 81.3 | — | 82.5 | — | 8.1 | 11.2 | 0 (0) |
 | 96 | 96 | quad | 80.2 | -1.1 (-3.1 to +1.1, p 0.322) | 81.3 | -1.2 (-2.6 to +0.1, p 0.105) | 7.7 | 12.3 | 44 (11) |
 | 96 | 96 | uvdoc | 78.9 | -2.4 (-5.0 to +0.2, p 0.065) | 79.4 | -3.1 (-5.2 to -1.3, p 0.001) | 7.7 | 14.1 | 429 (45) |
-| 96 | 96 | docres | 67.8 | -13.5 (-19.2 to -8.3, p 0.000) | 67.2 | -15.3 (-20.8 to -10.4, p 0.000) | 9.3 | 32.2 | 4576 (74) |
+| 96 | 96 | docres | 67.8 | -13.5 (-19.2 to -8.3, p 0.000) | 67.2 | -15.3 (-20.8 to -10.4, p 0.000) | 9.3 | 32.2 | 4132 (72) |
 | originals | 63 | raw | 78.2 | — | 78.1 | — | 9.3 | 12.9 | 0 (0) |
 | originals | 63 | quad | 76.9 | -1.4 (-4.1 to +1.7, p 0.380) | 76.7 | -1.4 (-3.4 to +0.5, p 0.186) | 8.3 | 13.7 | 44 (11) |
 | originals | 63 | uvdoc | 76.5 | -1.7 (-5.3 to +1.8, p 0.352) | 75.4 | -2.6 (-5.6 to -0.2, p 0.044) | 8.0 | 14.3 | 170 (31) |
-| originals | 63 | docres | 69.0 | -9.3 (-15.3 to -3.9, p 0.001) | 68.2 | -9.9 (-15.0 to -5.6, p 0.000) | 8.7 | 22.4 | 1337 (43) |
+| originals | 63 | docres | 69.0 | -9.3 (-15.3 to -3.9, p 0.001) | 68.2 | -9.9 (-15.0 to -5.6, p 0.000) | 8.7 | 22.4 | 1081 (41) |
 | PDF images | 33 | raw | 87.2 | — | 91.0 | — | 6.5 | 9.0 | 0 (0) |
 | PDF images | 33 | quad | 86.7 | -0.6 (-3.4 to +2.3, p 0.681) | 90.2 | -0.8 (-2.6 to +0.3, p 0.499) | 6.9 | 10.5 | 0 (0) |
 | PDF images | 33 | uvdoc | 83.5 | -3.8 (-7.3 to -0.2, p 0.045) | 86.9 | -4.0 (-6.8 to -1.6, p 0.002) | 7.2 | 13.9 | 259 (14) |
-| PDF images | 33 | docres | 65.6 | -21.7 (-33.3 to -10.7, p 0.000) | 65.3 | -25.7 (-37.7 to -14.7, p 0.000) | 10.3 | 44.4 | 3239 (31) |
+| PDF images | 33 | docres | 65.6 | -21.7 (-33.3 to -10.7, p 0.000) | 65.3 | -25.7 (-37.7 to -14.7, p 0.000) | 10.3 | 44.4 | 3051 (31) |
 | originals tagged curl | 10 | raw | 85.0 | — | 91.7 | — | 5.0 | 8.0 | 0 (0) |
 | originals tagged curl | 10 | quad | 83.5 | -1.5 (-4.3 to +1.1, p 0.349) | 92.0 | +0.2 (-1.7 to +2.2, p 0.870) | 4.7 | 9.9 | 5 (1) |
 | originals tagged curl | 10 | uvdoc | 86.8 | +1.9 (-0.7 to +4.8, p 0.272) | 92.7 | +1.0 (-0.8 to +3.0, p 0.371) | 4.1 | 8.6 | 28 (3) |
-| originals tagged curl | 10 | docres | 74.6 | -10.4 (-29.4 to +0.8, p 0.206) | 80.1 | -11.6 (-30.0 to -1.1, p 0.041) | 6.6 | 28.2 | 567 (7) |
+| originals tagged curl | 10 | docres | 74.6 | -10.4 (-29.4 to +0.8, p 0.206) | 80.1 | -11.6 (-30.0 to -1.1, p 0.041) | 6.6 | 28.2 | 554 (7) |
 | originals tagged perspective | 18 | raw | 75.7 | — | 85.4 | — | 4.2 | 6.9 | 0 (0) |
 | originals tagged perspective | 18 | quad | 76.3 | +0.6 (-6.3 to +9.5, p 0.956) | 85.5 | +0.0 (-5.0 to +4.4, p 0.979) | 2.6 | 7.5 | 12 (4) |
 | originals tagged perspective | 18 | uvdoc | 77.2 | +1.5 (-5.6 to +10.4, p 0.785) | 84.6 | -0.8 (-6.9 to +4.2, p 0.770) | 3.5 | 8.4 | 45 (8) |
-| originals tagged perspective | 18 | docres | 75.0 | -0.7 (-6.4 to +7.4, p 0.939) | 81.6 | -3.9 (-8.4 to +0.6, p 0.110) | 5.2 | 11.8 | 130 (12) |
+| originals tagged perspective | 18 | docres | 75.0 | -0.7 (-6.4 to +7.4, p 0.939) | 81.6 | -3.9 (-8.4 to +0.6, p 0.110) | 5.2 | 11.8 | 117 (12) |
 | originals tagged edge_cut | 14 | raw | 80.8 | — | 76.6 | — | 12.4 | 16.8 | 0 (0) |
 | originals tagged edge_cut | 14 | quad | 79.9 | -0.9 (-3.0 to +1.3, p 0.435) | 75.7 | -0.9 (-3.3 to +1.1, p 0.489) | 12.2 | 17.3 | 5 (2) |
 | originals tagged edge_cut | 14 | uvdoc | 78.7 | -2.1 (-5.8 to +1.4, p 0.288) | 75.1 | -1.6 (-4.0 to +1.0, p 0.251) | 12.2 | 17.8 | 46 (11) |
-| originals tagged edge_cut | 14 | docres | 65.0 | -15.8 (-30.4 to -3.9, p 0.026) | 64.6 | -12.0 (-22.1 to -3.8, p 0.007) | 11.0 | 26.4 | 507 (13) |
+| originals tagged edge_cut | 14 | docres | 65.0 | -15.8 (-30.4 to -3.9, p 0.026) | 64.6 | -12.0 (-22.1 to -3.8, p 0.007) | 11.0 | 26.4 | 276 (12) |
 | originals tagged neighbour | 52 | raw | 77.3 | — | 78.2 | — | 8.9 | 12.2 | 0 (0) |
 | originals tagged neighbour | 52 | quad | 75.8 | -1.5 (-4.8 to +2.2, p 0.427) | 76.8 | -1.5 (-3.8 to +0.6, p 0.229) | 7.7 | 13.3 | 44 (11) |
 | originals tagged neighbour | 52 | uvdoc | 76.1 | -1.2 (-5.4 to +2.9, p 0.587) | 75.6 | -2.6 (-6.1 to +0.1, p 0.113) | 7.7 | 13.9 | 154 (27) |
-| originals tagged neighbour | 52 | docres | 71.1 | -6.2 (-11.8 to -1.1, p 0.023) | 70.4 | -7.9 (-12.7 to -3.8, p 0.000) | 8.6 | 18.3 | 634 (32) |
+| originals tagged neighbour | 52 | docres | 71.1 | -6.2 (-11.8 to -1.1, p 0.023) | 70.4 | -7.9 (-12.7 to -3.8, p 0.000) | 8.6 | 18.3 | 408 (31) |
 
 Apple's quad was found on 96 of 96 pages; where it was not, the quad arm is the raw image and UVDoc reads the raw image.
 
 ## Line boxes carried back through the saved lattice
 
-Up to 20 of the longest lines a page reads on the arm's image; pixels of the 2400 px image. Corner error is against the same line read on the raw image, so it includes Vision's own box differences between the two readings; inversion is the round trip back and forward again.
+Up to 20 of the longest lines a page reads on the arm's image; pixels of the 2400 px image. Corner error is against the same line read on the raw image, so it includes Vision's own box differences between the two readings. DocRes's map folds faster than the lattice's spacing on about 14 pages (checked once against its dense map, recomputed: per-page p95 above 50 px there, median 0.4 px elsewhere), so on those pages its rows and its edge loss describe its lattice, not the image Vision read; its NES and word figures are unaffected.
 
-| arm | pages | lines | matched | corner error median / p95 | inversion p95 / max | sagitta median / p95 / max | lines with sagitta > 2 px | > ¼ line height | fold-over cells (pages) |
-|---|---|---:|---:|---|---|---|---:|---:|---:|
-| quad | originals | 1074 | 841 | 3.6 / 26.2 | 0.00 / 0.00 | 0.00 / 0.02 / 0.1 | 0% | 0% | 0 (0) |
-| quad | PDF images | 652 | 590 | 2.8 / 8.2 | 0.00 / 0.00 | 0.00 / 0.00 / 0.1 | 0% | 0% | 0 (0) |
-| uvdoc | originals | 1059 | 843 | 5.3 / 33.5 | 0.00 / 0.00 | 4.76 / 14.03 / 51.1 | 84% | 7% | 0 (0) |
-| uvdoc | PDF images | 655 | 562 | 3.9 / 22.0 | 0.00 / 0.00 | 2.90 / 8.90 / 16.2 | 68% | 5% | 0 (0) |
-| docres | originals | 947 | 751 | 8.0 / 42.4 | 0.00 / 664.94 | 8.03 / 32.97 / 154.6 | 94% | 31% | 5498 (22) |
-| docres | PDF images | 518 | 407 | 6.6 / 35.1 | 0.00 / 502.08 | 7.21 / 26.44 / 50.6 | 94% | 40% | 4343 (14) |
+| arm | pages | lines | matched | corner error median / p95 | sagitta median / p95 / max | lines with sagitta > 2 px | > ¼ line height | fold-over cells (pages) |
+|---|---|---:|---:|---|---|---:|---:|---:|
+| quad | originals | 1074 | 841 | 3.6 / 26.2 | 0.00 / 0.02 / 0.1 | 0% | 0% | 0 (0) |
+| quad | PDF images | 652 | 590 | 2.8 / 8.2 | 0.00 / 0.00 / 0.1 | 0% | 0% | 0 (0) |
+| uvdoc | originals | 1059 | 843 | 5.3 / 33.5 | 4.76 / 14.03 / 51.1 | 84% | 7% | 0 (0) |
+| uvdoc | PDF images | 655 | 562 | 3.9 / 22.0 | 2.90 / 8.90 / 16.2 | 68% | 5% | 0 (0) |
+| docres | originals | 947 | 751 | 8.0 / 42.4 | 8.03 / 32.97 / 154.6 | 94% | 31% | 5498 (22) |
+| docres | PDF images | 518 | 407 | 6.6 / 35.1 | 7.21 / 26.44 / 50.6 | 94% | 40% | 4343 (14) |
 
 ## The curvature trigger
 

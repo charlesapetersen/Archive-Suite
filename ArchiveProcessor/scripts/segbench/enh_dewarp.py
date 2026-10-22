@@ -18,15 +18,14 @@ from that lattice, because it is what a page would keep.
 Measures, per arm against raw, on the 96 (the panel's 99 less its three agreement pages), originals and the PDF's
 processed images apart:
   NES and the word rates of ocr_panel_score.score (the panel's scorer), Apple Vision as the reader;
-  edge loss: truth words whose Vision box on the raw image has its centre outside the arm's frame (the lattice's
-    outer ring carried into the source);
+  edge loss: truth words whose Vision box on the raw image has its centre in no cell of the arm's lattice carried
+    into the source (a cell test, not the outer ring: a folding map's ring crosses itself);
   the round trip of up to 20 line boxes per page read on the arm's image and carried back through the lattice:
-    corner error against the same line's box read on the raw image (lines matched by text, ratio >= 90), the
-    inversion error (back, then forward again by inverting the lattice), and the sagitta of the mapped baseline
-    (the largest distance of the carried-back baseline from the straight chord between its ends: the error of a
-    straight run drawn on the original), all in pixels of the 2400 px image;
-  the line-curvature trigger: per page, the median over raw Vision lines of four or more words of the RMS distance
-    of the words' bottom centres from their best straight line, in word heights, against each arm's NES gain.
+    corner error against the same line's box read on the raw image (lines matched by text, ratio >= 90) and the
+    sagitta of the mapped baseline (the largest distance of the carried-back baseline from the straight chord
+    between its ends: the error of a straight run drawn on the original), in pixels of the 2400 px image;
+  the curvature trigger: two reference-free bend signals per page (angle_residual, lattice_bend) against each arm's
+    NES gain.
 
 Raw text and page images stay in CACHE; the committed results hold page ids and numbers only. No network, no money.
 """
@@ -71,31 +70,26 @@ def grid_eval(grid, uv):
     return (a * (1 - fx) + b * fx) * (1 - fy) + (c * (1 - fx) + d * fx) * fy
 
 
-def invert(grid, xy, iters=30):
-    """Output-normalised points whose lattice value is each source point xy (n, 2); Newton from the nearest point
-    of a fine evaluation. Returns (uv, residual in source-normalised units)."""
-    xy = np.asarray(xy, float).reshape(-1, 2)
-    fu, fv = np.meshgrid(np.linspace(0, 1, 121), np.linspace(0, 1, 181))
-    fine = np.stack([fu, fv], -1).reshape(-1, 2)
-    vals = grid_eval(grid, fine)
-    uv = fine[np.argmin(((vals[None] - xy[:, None]) ** 2).sum(-1), 1)].copy()
-    e = 1e-4
-    for _ in range(iters):
-        f = grid_eval(grid, uv) - xy
-        ju = (grid_eval(grid, uv + (e, 0)) - grid_eval(grid, uv - (e, 0))) / (2 * e)
-        jv = (grid_eval(grid, uv + (0, e)) - grid_eval(grid, uv - (0, e))) / (2 * e)
-        J = np.stack([ju, jv], -1)  # (n, 2 outputs, 2 inputs)
-        det = J[:, 0, 0] * J[:, 1, 1] - J[:, 0, 1] * J[:, 1, 0]
-        det = np.where(np.abs(det) < 1e-12, 1e-12, det)
-        du = (J[:, 1, 1] * f[:, 0] - J[:, 0, 1] * f[:, 1]) / det
-        dv = (-J[:, 1, 0] * f[:, 0] + J[:, 0, 0] * f[:, 1]) / det
-        uv = np.clip(uv - np.stack([du, dv], -1), 0, 1)
-    return uv, np.linalg.norm(grid_eval(grid, uv) - xy, axis=1)
-
-
 def frame(grid):
     """The lattice's outer ring in source coordinates: the region of the source the arm's image shows."""
     return np.concatenate([grid[0, :], grid[1:, -1], grid[-1, -2::-1], grid[-2:0:-1, 0]])
+
+
+def covered(grid, pts):
+    """Points (n, 2) inside at least one lattice cell carried into the source. Unlike the outer ring this stays
+    right where the map folds over itself."""
+    pts = np.asarray(pts, float).reshape(-1, 2)
+    a, b, c, d = grid[:-1, :-1], grid[:-1, 1:], grid[1:, 1:], grid[1:, :-1]
+    cells = np.stack([a, b, c, d], -2).reshape(-1, 4, 2)
+    hit = np.zeros(len(pts), bool)
+    for k in range(0, len(cells), 256):
+        q = cells[k:k + 256]
+        lo, hi = q.min(1), q.max(1)
+        near = ((pts[:, None] >= lo[None]) & (pts[:, None] <= hi[None])).all(-1)  # (n, cells): bounding boxes
+        for i, j in zip(*np.nonzero(near & ~hit[:, None])):
+            if not hit[i] and inside(q[j], pts[i:i + 1])[0]:
+                hit[i] = True
+    return hit
 
 
 def inside(poly, pts):
@@ -375,19 +369,17 @@ def truth_words(raw_lines, truth_tokens):
 def edge_loss(grid, centres):
     if not len(centres):
         return 0
-    return int((~inside(frame(grid), centres)).sum())
+    return int((~covered(grid, centres)).sum())
 
 
-def round_trip(grid, arm_lines, raw_lines, scale_src, scale_out):
+def round_trip(grid, arm_lines, raw_lines, scale_src):
     from rapidfuzz import fuzz
     lines = sorted((l for l in arm_lines if len(l['text']) >= 10), key=lambda l: -len(l['text']))[:MAX_LINES]
     out = []
     for l in lines:
         q = np.clip(np.float64(l['quad']), 0, 1)  # Vision's quads can overhang the image by a hair
         back = grid_eval(grid, q)
-        uv, _ = invert(grid, back)
-        row = {'inversion': float(np.linalg.norm((uv - q) * scale_out, axis=1).max()),
-               'sagitta': sagitta(grid, q[3], q[2], scale_src),
+        row = {'sagitta': sagitta(grid, q[3], q[2], scale_src),
                'height': float(np.linalg.norm(((back[3] + back[2]) - (back[0] + back[1])) / 2 * scale_src))}
         best = max(raw_lines, key=lambda r: fuzz.ratio(r['text'], l['text']), default=None)
         if best is not None and fuzz.ratio(best['text'], l['text']) >= 90:
@@ -430,7 +422,7 @@ def measure():
                    'edge_words': len(centres),
                    'found': bool(z['found']) if 'found' in z else '', 'mask': float(z['mask']) if 'mask' in z else '',
                    'foldovers': foldovers(g)}
-            rt = round_trip(g, d['lines'], raw['lines'], scale, (d['width'], d['height']))
+            rt = round_trip(g, d['lines'], raw['lines'], scale)
             for t in rt:
                 trips[arm].append({**t, 'source': base['source'], 'curl': base['curl']})
             row['sagitta_max'] = max((t['sagitta'] for t in rt), default='')
@@ -510,9 +502,12 @@ def report():
           '## Line boxes carried back through the saved lattice', '',
           'Up to 20 of the longest lines a page reads on the arm\'s image; pixels of the 2400 px image. Corner error is '
           'against the same line read on the raw image, so it includes Vision\'s own box differences between the two '
-          'readings; inversion is the round trip back and forward again.', '',
-          '| arm | pages | lines | matched | corner error median / p95 | inversion p95 / max | sagitta median / p95 / max | lines with sagitta > 2 px | > ¼ line height | fold-over cells (pages) |',
-          '|---|---|---:|---:|---|---|---|---:|---:|---:|']
+          "readings. DocRes's map folds faster than the lattice's spacing on about 14 pages (checked once against its "
+          'dense map, recomputed: per-page p95 above 50 px there, median 0.4 px elsewhere), so on those pages its rows '
+          'and its edge loss describe its lattice, not the image Vision read; its NES and word figures are unaffected.',
+          '',
+          '| arm | pages | lines | matched | corner error median / p95 | sagitta median / p95 / max | lines with sagitta > 2 px | > ¼ line height | fold-over cells (pages) |',
+          '|---|---|---:|---:|---|---|---:|---:|---:|']
     for arm in ARMS:
         for name in ('originals', 'PDF images'):
             src = 'original' if name == 'originals' else 'pdf image'
@@ -521,10 +516,9 @@ def report():
                 continue
             corner = [t['corner'] for t in tt if 'corner' in t]
             sag = [t['sagitta'] for t in tt]
-            inv = [t['inversion'] for t in tt]
             fold = [by[arm, p]['foldovers'] for p in groups[name]]
             L.append(f"| {arm} | {name} | {len(tt)} | {len(corner)} | {statistics.median(corner):.1f} / {pctl(corner, .95):.1f} | "
-                     f"{pctl(inv, .95):.2f} / {max(inv):.2f} | {statistics.median(sag):.2f} / {pctl(sag, .95):.2f} / {max(sag):.1f} | "
+                     f"{statistics.median(sag):.2f} / {pctl(sag, .95):.2f} / {max(sag):.1f} | "
                      f"{100 * sum(s > 2 for s in sag) / len(sag):.0f}% | "
                      f"{100 * sum(t['sagitta'] > t['height'] / 4 for t in tt) / len(tt):.0f}% | "
                      f"{sum(fold)} ({sum(f > 0 for f in fold)}) |")

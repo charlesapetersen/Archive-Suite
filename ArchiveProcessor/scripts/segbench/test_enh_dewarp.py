@@ -36,19 +36,24 @@ class Lattice(unittest.TestCase):
         h = homography_grid()
         np.testing.assert_allclose(E.grid_eval(h, [1 / (GW - 1) * 7, 1 / (GH - 1) * 11]), h[11, 7], atol=1e-12)
 
-    def test_invert_round_trip(self):
-        for g in (homography_grid(), bent_grid()):
-            uv = np.array([[0.1, 0.2], [0.9, 0.95], [0.5, 0.5], [0, 1]])
-            back, res = E.invert(g, E.grid_eval(g, uv))
-            np.testing.assert_allclose(back, uv, atol=1e-6)
-            self.assertLess(res.max(), 1e-9)
-
     def test_frame_and_inside(self):
         g = lattice(lambda uv: 0.2 + 0.6 * uv)  # the frame shows the source's middle 60%
         poly = E.frame(g)
         self.assertEqual(len(poly), 2 * (GW + GH) - 4)
         got = E.inside(poly, [[0.5, 0.5], [0.21, 0.79], [0.1, 0.5], [0.5, 0.9], [0.95, 0.05]])
         self.assertEqual(got.tolist(), [True, True, False, False, False])
+        self.assertEqual(E.covered(g, [[0.5, 0.5], [0.21, 0.79], [0.1, 0.5], [0.5, 0.9]]).tolist(), [True, True, False, False])
+
+    def test_covered_survives_a_fold(self):
+        # A lattice whose middle columns double back: the outer ring crosses itself, so the even-odd ring test
+        # calls covered points outside; the cell test does not.
+        def f(uv):
+            x = uv[..., 0]
+            fx = np.where(x < 0.5, x, 1 - x) * 1.6 + 0.1  # goes right, then folds back left
+            return np.stack([fx, 0.1 + 0.8 * uv[..., 1]], -1)
+        g = lattice(f)
+        self.assertGreater(E.foldovers(g), 0)
+        self.assertTrue(E.covered(g, [[0.5, 0.5]])[0])
 
     def test_foldovers(self):
         g = lattice(lambda uv: uv)
