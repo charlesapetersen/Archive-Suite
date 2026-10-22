@@ -1,0 +1,1265 @@
+{
+ "groups": {
+  "L2-bentham": {
+   "pages": 20,
+   "words": 4314,
+   "lines": 517,
+   "baselines": 517,
+   "status": {
+    "line-share": 3698,
+    "page-xml": 616
+   },
+   "median_lines_per_page": 27.0
+  },
+  "N6": {
+   "pages": 40,
+   "words": 5072,
+   "lines": 850,
+   "baselines": 850,
+   "status": {
+    "line-only": 5072
+   },
+   "median_lines_per_page": 20.0
+  },
+  "owner-typed": {
+   "pages": 40,
+   "words": 14243,
+   "lines": 1743,
+   "baselines": 1743,
+   "status": {
+    "vision": 12058,
+    "vision-sub": 337,
+    "missing": 891,
+    "split": 932,
+    "illegible": 25
+   },
+   "median_lines_per_page": 35.0
+  },
+  "owner-hand": {
+   "pages": 21,
+   "words": 3170,
+   "lines": 439,
+   "baselines": 439,
+   "status": {
+    "illegible": 74,
+    "vision": 1152,
+    "split": 1446,
+    "missing": 95,
+    "vision-sub": 403
+   },
+   "median_lines_per_page": 18
+  }
+ },
+ "pages": [
+  {
+   "page": "002_112_001",
+   "group": "L2-bentham",
+   "kind": "handwritten",
+   "in_96": false,
+   "words": 197,
+   "lines": 23,
+   "missing": 0,
+   "audit": null
+  },
+  {
+   "page": "071_109_001",
+   "group": "L2-bentham",
+   "kind": "handwritten",
+   "in_96": false,
+   "words": 188,
+   "lines": 24,
+   "missing": 0,
+   "audit": null
+  },
+  {
+   "page": "071_132_001",
+   "group": "L2-bentham",
+   "kind": "handwritten",
+   "in_96": false,
+   "words": 270,
+   "lines": 28,
+   "missing": 0,
+   "audit": null
+  },
+  {
+   "page": "071_159_002",
+   "group": "L2-bentham",
+   "kind": "handwritten",
+   "in_96": false,
+   "words": 186,
+   "lines": 25,
+   "missing": 0,
+   "audit": null
+  },
+  {
+   "page": "072_099_001",
+   "group": "L2-bentham",
+   "kind": "handwritten",
+   "in_96": false,
+   "words": 192,
+   "lines": 24,
+   "missing": 0,
+   "audit": null
+  },
+  {
+   "page": "072_105_002",
+   "group": "L2-bentham",
+   "kind": "handwritten",
+   "in_96": false,
+   "words": 119,
+   "lines": 25,
+   "missing": 0,
+   "audit": null
+  },
+  {
+   "page": "073_052_001",
+   "group": "L2-bentham",
+   "kind": "handwritten",
+   "in_96": false,
+   "words": 159,
+   "lines": 24,
+   "missing": 0,
+   "audit": null
+  },
+  {
+   "page": "073_053_001",
+   "group": "L2-bentham",
+   "kind": "handwritten",
+   "in_96": false,
+   "words": 206,
+   "lines": 27,
+   "missing": 0,
+   "audit": null
+  },
+  {
+   "page": "073_070_001",
+   "group": "L2-bentham",
+   "kind": "handwritten",
+   "in_96": false,
+   "words": 200,
+   "lines": 28,
+   "missing": 0,
+   "audit": null
+  },
+  {
+   "page": "096_038_003",
+   "group": "L2-bentham",
+   "kind": "handwritten",
+   "in_96": false,
+   "words": 118,
+   "lines": 17,
+   "missing": 0,
+   "audit": null
+  },
+  {
+   "page": "115_007_004",
+   "group": "L2-bentham",
+   "kind": "handwritten",
+   "in_96": false,
+   "words": 231,
+   "lines": 28,
+   "missing": 0,
+   "audit": null
+  },
+  {
+   "page": "115_075_004",
+   "group": "L2-bentham",
+   "kind": "handwritten",
+   "in_96": false,
+   "words": 334,
+   "lines": 32,
+   "missing": 0,
+   "audit": null
+  },
+  {
+   "page": "115_076_003",
+   "group": "L2-bentham",
+   "kind": "handwritten",
+   "in_96": false,
+   "words": 71,
+   "lines": 7,
+   "missing": 0,
+   "audit": null
+  },
+  {
+   "page": "115_080_003",
+   "group": "L2-bentham",
+   "kind": "handwritten",
+   "in_96": false,
+   "words": 219,
+   "lines": 30,
+   "missing": 0,
+   "audit": null
+  },
+  {
+   "page": "115_087_004",
+   "group": "L2-bentham",
+   "kind": "handwritten",
+   "in_96": false,
+   "words": 322,
+   "lines": 32,
+   "missing": 0,
+   "audit": null
+  },
+  {
+   "page": "115_101_003",
+   "group": "L2-bentham",
+   "kind": "handwritten",
+   "in_96": false,
+   "words": 274,
+   "lines": 31,
+   "missing": 0,
+   "audit": null
+  },
+  {
+   "page": "116_244_001",
+   "group": "L2-bentham",
+   "kind": "handwritten",
+   "in_96": false,
+   "words": 159,
+   "lines": 20,
+   "missing": 0,
+   "audit": null
+  },
+  {
+   "page": "116_287_001",
+   "group": "L2-bentham",
+   "kind": "handwritten",
+   "in_96": false,
+   "words": 302,
+   "lines": 33,
+   "missing": 0,
+   "audit": null
+  },
+  {
+   "page": "116_288_001",
+   "group": "L2-bentham",
+   "kind": "handwritten",
+   "in_96": false,
+   "words": 329,
+   "lines": 32,
+   "missing": 0,
+   "audit": null
+  },
+  {
+   "page": "116_405_002",
+   "group": "L2-bentham",
+   "kind": "handwritten",
+   "in_96": false,
+   "words": 238,
+   "lines": 27,
+   "missing": 0,
+   "audit": null
+  },
+  {
+   "page": "dudhadasa1900/07",
+   "group": "N6",
+   "kind": "print",
+   "in_96": false,
+   "words": 213,
+   "lines": 29,
+   "missing": 0,
+   "audit": null
+  },
+  {
+   "page": "dudhadasa1900/08",
+   "group": "N6",
+   "kind": "print",
+   "in_96": false,
+   "words": 238,
+   "lines": 29,
+   "missing": 0,
+   "audit": null
+  },
+  {
+   "page": "dudhadasa1900/16",
+   "group": "N6",
+   "kind": "print",
+   "in_96": false,
+   "words": 225,
+   "lines": 29,
+   "missing": 0,
+   "audit": null
+  },
+  {
+   "page": "giridharadasa1902/06",
+   "group": "N6",
+   "kind": "print",
+   "in_96": false,
+   "words": 126,
+   "lines": 27,
+   "missing": 0,
+   "audit": null
+  },
+  {
+   "page": "giridharadasa1902/08",
+   "group": "N6",
+   "kind": "print",
+   "in_96": false,
+   "words": 123,
+   "lines": 27,
+   "missing": 0,
+   "audit": null
+  },
+  {
+   "page": "giridharadasa1902/12",
+   "group": "N6",
+   "kind": "print",
+   "in_96": false,
+   "words": 113,
+   "lines": 27,
+   "missing": 0,
+   "audit": null
+  },
+  {
+   "page": "giridharadasa1902/13",
+   "group": "N6",
+   "kind": "print",
+   "in_96": false,
+   "words": 124,
+   "lines": 27,
+   "missing": 0,
+   "audit": null
+  },
+  {
+   "page": "hajarilala1919/01",
+   "group": "N6",
+   "kind": "print",
+   "in_96": false,
+   "words": 50,
+   "lines": 15,
+   "missing": 0,
+   "audit": null
+  },
+  {
+   "page": "hajarilala1919/10",
+   "group": "N6",
+   "kind": "print",
+   "in_96": false,
+   "words": 106,
+   "lines": 17,
+   "missing": 0,
+   "audit": null
+  },
+  {
+   "page": "hajarilala1919/12",
+   "group": "N6",
+   "kind": "print",
+   "in_96": false,
+   "words": 108,
+   "lines": 17,
+   "missing": 0,
+   "audit": null
+  },
+  {
+   "page": "jagannatha1955/001",
+   "group": "N6",
+   "kind": "print",
+   "in_96": false,
+   "words": 112,
+   "lines": 18,
+   "missing": 0,
+   "audit": null
+  },
+  {
+   "page": "jagannatha1955/04",
+   "group": "N6",
+   "kind": "print",
+   "in_96": false,
+   "words": 115,
+   "lines": 21,
+   "missing": 0,
+   "audit": null
+  },
+  {
+   "page": "jnanadasa1895/02",
+   "group": "N6",
+   "kind": "print",
+   "in_96": false,
+   "words": 155,
+   "lines": 22,
+   "missing": 0,
+   "audit": null
+  },
+  {
+   "page": "jnanadasa1895/03",
+   "group": "N6",
+   "kind": "print",
+   "in_96": false,
+   "words": 165,
+   "lines": 24,
+   "missing": 0,
+   "audit": null
+  },
+  {
+   "page": "p002",
+   "group": "owner-typed",
+   "kind": "typewritten",
+   "in_96": true,
+   "words": 138,
+   "lines": 24,
+   "missing": 1,
+   "audit": null
+  },
+  {
+   "page": "p004",
+   "group": "owner-typed",
+   "kind": "typewritten",
+   "in_96": true,
+   "words": 285,
+   "lines": 25,
+   "missing": 4,
+   "audit": null
+  },
+  {
+   "page": "p005",
+   "group": "owner-typed",
+   "kind": "typewritten",
+   "in_96": true,
+   "words": 576,
+   "lines": 51,
+   "missing": 0,
+   "audit": null
+  },
+  {
+   "page": "p006",
+   "group": "owner-typed",
+   "kind": "typewritten",
+   "in_96": true,
+   "words": 45,
+   "lines": 8,
+   "missing": 2,
+   "audit": null
+  },
+  {
+   "page": "p007",
+   "group": "owner-hand",
+   "kind": "handwritten",
+   "in_96": true,
+   "words": 75,
+   "lines": 11,
+   "missing": 13,
+   "audit": null
+  },
+  {
+   "page": "p008",
+   "group": "owner-typed",
+   "kind": "typewritten",
+   "in_96": true,
+   "words": 605,
+   "lines": 50,
+   "missing": 34,
+   "audit": null
+  },
+  {
+   "page": "p009",
+   "group": "owner-hand",
+   "kind": "mixed",
+   "in_96": true,
+   "words": 169,
+   "lines": 37,
+   "missing": 6,
+   "audit": null
+  },
+  {
+   "page": "p014",
+   "group": "owner-typed",
+   "kind": "typewritten",
+   "in_96": true,
+   "words": 192,
+   "lines": 23,
+   "missing": 0,
+   "audit": null
+  },
+  {
+   "page": "p015",
+   "group": "owner-hand",
+   "kind": "handwritten",
+   "in_96": true,
+   "words": 234,
+   "lines": 46,
+   "missing": 29,
+   "audit": null
+  },
+  {
+   "page": "p018",
+   "group": "owner-typed",
+   "kind": "printed",
+   "in_96": true,
+   "words": 340,
+   "lines": 46,
+   "missing": 128,
+   "audit": null
+  },
+  {
+   "page": "p019",
+   "group": "owner-typed",
+   "kind": "typewritten",
+   "in_96": true,
+   "words": 127,
+   "lines": 26,
+   "missing": 5,
+   "audit": null
+  },
+  {
+   "page": "p021",
+   "group": "owner-typed",
+   "kind": "printed",
+   "in_96": true,
+   "words": 375,
+   "lines": 28,
+   "missing": 1,
+   "audit": null
+  },
+  {
+   "page": "p022",
+   "group": "owner-hand",
+   "kind": "handwritten",
+   "in_96": true,
+   "words": 290,
+   "lines": 17,
+   "missing": 11,
+   "audit": null
+  },
+  {
+   "page": "p023",
+   "group": "owner-typed",
+   "kind": "typewritten",
+   "in_96": true,
+   "words": 204,
+   "lines": 29,
+   "missing": 0,
+   "audit": null
+  },
+  {
+   "page": "p024",
+   "group": "owner-typed",
+   "kind": "typewritten",
+   "in_96": true,
+   "words": 147,
+   "lines": 31,
+   "missing": 44,
+   "audit": null
+  },
+  {
+   "page": "p026",
+   "group": "owner-typed",
+   "kind": "typewritten",
+   "in_96": true,
+   "words": 429,
+   "lines": 45,
+   "missing": 3,
+   "audit": null
+  },
+  {
+   "page": "p030",
+   "group": "owner-typed",
+   "kind": "typewritten",
+   "in_96": true,
+   "words": 275,
+   "lines": 36,
+   "missing": 0,
+   "audit": null
+  },
+  {
+   "page": "p031",
+   "group": "owner-hand",
+   "kind": "mixed",
+   "in_96": true,
+   "words": 54,
+   "lines": 17,
+   "missing": 2,
+   "audit": null
+  },
+  {
+   "page": "p033",
+   "group": "owner-typed",
+   "kind": "typewritten",
+   "in_96": true,
+   "words": 407,
+   "lines": 31,
+   "missing": 2,
+   "audit": null
+  },
+  {
+   "page": "p034",
+   "group": "owner-typed",
+   "kind": "printed",
+   "in_96": true,
+   "words": 28,
+   "lines": 19,
+   "missing": 3,
+   "audit": null
+  },
+  {
+   "page": "p036",
+   "group": "owner-typed",
+   "kind": "typewritten",
+   "in_96": true,
+   "words": 384,
+   "lines": 29,
+   "missing": 2,
+   "audit": null
+  },
+  {
+   "page": "p040",
+   "group": "owner-hand",
+   "kind": "handwritten",
+   "in_96": true,
+   "words": 188,
+   "lines": 24,
+   "missing": 2,
+   "audit": null
+  },
+  {
+   "page": "p042",
+   "group": "owner-typed",
+   "kind": "printed",
+   "in_96": true,
+   "words": 804,
+   "lines": 106,
+   "missing": 1,
+   "audit": null
+  },
+  {
+   "page": "p044",
+   "group": "owner-typed",
+   "kind": "printed",
+   "in_96": true,
+   "words": 690,
+   "lines": 91,
+   "missing": 112,
+   "audit": null
+  },
+  {
+   "page": "p045",
+   "group": "owner-hand",
+   "kind": "handwritten",
+   "in_96": true,
+   "words": 113,
+   "lines": 14,
+   "missing": 0,
+   "audit": null
+  },
+  {
+   "page": "p046",
+   "group": "owner-hand",
+   "kind": "handwritten",
+   "in_96": true,
+   "words": 86,
+   "lines": 12,
+   "missing": 0,
+   "audit": null
+  },
+  {
+   "page": "p047",
+   "group": "owner-hand",
+   "kind": "handwritten",
+   "in_96": true,
+   "words": 110,
+   "lines": 14,
+   "missing": 0,
+   "audit": null
+  },
+  {
+   "page": "p048",
+   "group": "owner-hand",
+   "kind": "handwritten",
+   "in_96": true,
+   "words": 69,
+   "lines": 21,
+   "missing": 5,
+   "audit": null
+  },
+  {
+   "page": "p049",
+   "group": "owner-hand",
+   "kind": "handwritten",
+   "in_96": true,
+   "words": 87,
+   "lines": 14,
+   "missing": 0,
+   "audit": null
+  },
+  {
+   "page": "p050",
+   "group": "owner-hand",
+   "kind": "handwritten",
+   "in_96": true,
+   "words": 201,
+   "lines": 18,
+   "missing": 20,
+   "audit": null
+  },
+  {
+   "page": "p051",
+   "group": "owner-hand",
+   "kind": "handwritten",
+   "in_96": true,
+   "words": 92,
+   "lines": 16,
+   "missing": 0,
+   "audit": null
+  },
+  {
+   "page": "p052",
+   "group": "owner-hand",
+   "kind": "handwritten",
+   "in_96": true,
+   "words": 154,
+   "lines": 25,
+   "missing": 1,
+   "audit": null
+  },
+  {
+   "page": "p053",
+   "group": "owner-hand",
+   "kind": "handwritten",
+   "in_96": true,
+   "words": 152,
+   "lines": 24,
+   "missing": 0,
+   "audit": null
+  },
+  {
+   "page": "p054",
+   "group": "owner-hand",
+   "kind": "handwritten",
+   "in_96": true,
+   "words": 156,
+   "lines": 18,
+   "missing": 1,
+   "audit": null
+  },
+  {
+   "page": "p055",
+   "group": "owner-hand",
+   "kind": "handwritten",
+   "in_96": true,
+   "words": 92,
+   "lines": 18,
+   "missing": 0,
+   "audit": null
+  },
+  {
+   "page": "p056",
+   "group": "owner-hand",
+   "kind": "handwritten",
+   "in_96": true,
+   "words": 135,
+   "lines": 24,
+   "missing": 2,
+   "audit": null
+  },
+  {
+   "page": "p057",
+   "group": "owner-typed",
+   "kind": "typewritten",
+   "in_96": true,
+   "words": 77,
+   "lines": 18,
+   "missing": 50,
+   "audit": null
+  },
+  {
+   "page": "p058",
+   "group": "owner-typed",
+   "kind": "printed",
+   "in_96": true,
+   "words": 315,
+   "lines": 38,
+   "missing": 4,
+   "audit": null
+  },
+  {
+   "page": "p060",
+   "group": "owner-typed",
+   "kind": "typewritten",
+   "in_96": true,
+   "words": 221,
+   "lines": 30,
+   "missing": 10,
+   "audit": null
+  },
+  {
+   "page": "p062",
+   "group": "owner-typed",
+   "kind": "printed",
+   "in_96": true,
+   "words": 544,
+   "lines": 85,
+   "missing": 22,
+   "audit": null
+  },
+  {
+   "page": "p064",
+   "group": "owner-typed",
+   "kind": "typewritten",
+   "in_96": true,
+   "words": 164,
+   "lines": 34,
+   "missing": 35,
+   "audit": null
+  },
+  {
+   "page": "p066",
+   "group": "owner-typed",
+   "kind": "typewritten",
+   "in_96": true,
+   "words": 71,
+   "lines": 24,
+   "missing": 22,
+   "audit": null
+  },
+  {
+   "page": "p067",
+   "group": "owner-typed",
+   "kind": "printed",
+   "in_96": true,
+   "words": 81,
+   "lines": 17,
+   "missing": 2,
+   "audit": null
+  },
+  {
+   "page": "p069",
+   "group": "owner-typed",
+   "kind": "typewritten",
+   "in_96": true,
+   "words": 128,
+   "lines": 20,
+   "missing": 5,
+   "audit": null
+  },
+  {
+   "page": "p072",
+   "group": "owner-typed",
+   "kind": "printed",
+   "in_96": true,
+   "words": 1071,
+   "lines": 165,
+   "missing": 27,
+   "audit": null
+  },
+  {
+   "page": "p073",
+   "group": "owner-typed",
+   "kind": "printed",
+   "in_96": true,
+   "words": 82,
+   "lines": 19,
+   "missing": 10,
+   "audit": null
+  },
+  {
+   "page": "p074",
+   "group": "owner-typed",
+   "kind": "printed",
+   "in_96": true,
+   "words": 448,
+   "lines": 41,
+   "missing": 0,
+   "audit": null
+  },
+  {
+   "page": "p078",
+   "group": "owner-typed",
+   "kind": "printed",
+   "in_96": true,
+   "words": 926,
+   "lines": 111,
+   "missing": 10,
+   "audit": null
+  },
+  {
+   "page": "p080",
+   "group": "owner-typed",
+   "kind": "printed",
+   "in_96": true,
+   "words": 663,
+   "lines": 39,
+   "missing": 248,
+   "audit": null
+  },
+  {
+   "page": "p081",
+   "group": "owner-typed",
+   "kind": "printed",
+   "in_96": true,
+   "words": 449,
+   "lines": 59,
+   "missing": 1,
+   "audit": null
+  },
+  {
+   "page": "p086",
+   "group": "owner-hand",
+   "kind": "handwritten",
+   "in_96": false,
+   "words": 324,
+   "lines": 29,
+   "missing": 3,
+   "audit": null
+  },
+  {
+   "page": "p087",
+   "group": "owner-typed",
+   "kind": "typewritten",
+   "in_96": true,
+   "words": 661,
+   "lines": 70,
+   "missing": 45,
+   "audit": null
+  },
+  {
+   "page": "p088",
+   "group": "owner-typed",
+   "kind": "typewritten",
+   "in_96": true,
+   "words": 452,
+   "lines": 41,
+   "missing": 17,
+   "audit": null
+  },
+  {
+   "page": "p090",
+   "group": "owner-typed",
+   "kind": "typewritten",
+   "in_96": true,
+   "words": 542,
+   "lines": 62,
+   "missing": 26,
+   "audit": null
+  },
+  {
+   "page": "p094",
+   "group": "owner-hand",
+   "kind": "handwritten",
+   "in_96": false,
+   "words": 90,
+   "lines": 9,
+   "missing": 0,
+   "audit": null
+  },
+  {
+   "page": "p095",
+   "group": "owner-typed",
+   "kind": "typewritten",
+   "in_96": true,
+   "words": 394,
+   "lines": 38,
+   "missing": 3,
+   "audit": null
+  },
+  {
+   "page": "p096",
+   "group": "owner-hand",
+   "kind": "handwritten",
+   "in_96": false,
+   "words": 299,
+   "lines": 31,
+   "missing": 0,
+   "audit": null
+  },
+  {
+   "page": "p097",
+   "group": "owner-typed",
+   "kind": "typewritten",
+   "in_96": true,
+   "words": 320,
+   "lines": 37,
+   "missing": 7,
+   "audit": null
+  },
+  {
+   "page": "p098",
+   "group": "owner-typed",
+   "kind": "typewritten",
+   "in_96": true,
+   "words": 159,
+   "lines": 24,
+   "missing": 3,
+   "audit": null
+  },
+  {
+   "page": "p099",
+   "group": "owner-typed",
+   "kind": "typewritten",
+   "in_96": true,
+   "words": 258,
+   "lines": 27,
+   "missing": 0,
+   "audit": null
+  },
+  {
+   "page": "p100",
+   "group": "owner-typed",
+   "kind": "typewritten",
+   "in_96": true,
+   "words": 166,
+   "lines": 46,
+   "missing": 2,
+   "audit": null
+  },
+  {
+   "page": "paramananda1924/000c",
+   "group": "N6",
+   "kind": "print",
+   "in_96": false,
+   "words": 37,
+   "lines": 14,
+   "missing": 0,
+   "audit": null
+  },
+  {
+   "page": "paramananda1924/001",
+   "group": "N6",
+   "kind": "print",
+   "in_96": false,
+   "words": 149,
+   "lines": 19,
+   "missing": 0,
+   "audit": null
+  },
+  {
+   "page": "paramananda1924/06",
+   "group": "N6",
+   "kind": "print",
+   "in_96": false,
+   "words": 210,
+   "lines": 21,
+   "missing": 0,
+   "audit": null
+  },
+  {
+   "page": "paramananda1924/09",
+   "group": "N6",
+   "kind": "print",
+   "in_96": false,
+   "words": 209,
+   "lines": 21,
+   "missing": 0,
+   "audit": null
+  },
+  {
+   "page": "pyarelala1914/01",
+   "group": "N6",
+   "kind": "print",
+   "in_96": false,
+   "words": 45,
+   "lines": 8,
+   "missing": 0,
+   "audit": null
+  },
+  {
+   "page": "pyarelala1914/04",
+   "group": "N6",
+   "kind": "print",
+   "in_96": false,
+   "words": 90,
+   "lines": 17,
+   "missing": 0,
+   "audit": null
+  },
+  {
+   "page": "pyarelala1914/12",
+   "group": "N6",
+   "kind": "print",
+   "in_96": false,
+   "words": 99,
+   "lines": 17,
+   "missing": 0,
+   "audit": null
+  },
+  {
+   "page": "sankaracarya1925/000c",
+   "group": "N6",
+   "kind": "print",
+   "in_96": false,
+   "words": 26,
+   "lines": 11,
+   "missing": 0,
+   "audit": null
+  },
+  {
+   "page": "sankaracarya1925/04",
+   "group": "N6",
+   "kind": "print",
+   "in_96": false,
+   "words": 278,
+   "lines": 27,
+   "missing": 0,
+   "audit": null
+  },
+  {
+   "page": "sankaracarya1925/05",
+   "group": "N6",
+   "kind": "print",
+   "in_96": false,
+   "words": 222,
+   "lines": 39,
+   "missing": 0,
+   "audit": null
+  },
+  {
+   "page": "simha1914/000_2",
+   "group": "N6",
+   "kind": "print",
+   "in_96": false,
+   "words": 145,
+   "lines": 17,
+   "missing": 0,
+   "audit": null
+  },
+  {
+   "page": "sivaramasukla1900/02",
+   "group": "N6",
+   "kind": "print",
+   "in_96": false,
+   "words": 194,
+   "lines": 27,
+   "missing": 0,
+   "audit": null
+  },
+  {
+   "page": "sivaramasukla1900/04",
+   "group": "N6",
+   "kind": "print",
+   "in_96": false,
+   "words": 208,
+   "lines": 27,
+   "missing": 0,
+   "audit": null
+  },
+  {
+   "page": "sriramastavarajah1898/03",
+   "group": "N6",
+   "kind": "print",
+   "in_96": false,
+   "words": 68,
+   "lines": 20,
+   "missing": 0,
+   "audit": null
+  },
+  {
+   "page": "sriramastavarajah1898/05",
+   "group": "N6",
+   "kind": "print",
+   "in_96": false,
+   "words": 98,
+   "lines": 20,
+   "missing": 0,
+   "audit": null
+  },
+  {
+   "page": "sriramastavarajah1898/08",
+   "group": "N6",
+   "kind": "print",
+   "in_96": false,
+   "words": 99,
+   "lines": 20,
+   "missing": 0,
+   "audit": null
+  },
+  {
+   "page": "sriramastavarajah1898/10",
+   "group": "N6",
+   "kind": "print",
+   "in_96": false,
+   "words": 101,
+   "lines": 20,
+   "missing": 0,
+   "audit": null
+  },
+  {
+   "page": "sriramastavarajah1898/11",
+   "group": "N6",
+   "kind": "print",
+   "in_96": false,
+   "words": 119,
+   "lines": 20,
+   "missing": 0,
+   "audit": null
+  },
+  {
+   "page": "sriramastavarajah1898/12",
+   "group": "N6",
+   "kind": "print",
+   "in_96": false,
+   "words": 123,
+   "lines": 20,
+   "missing": 0,
+   "audit": null
+  },
+  {
+   "page": "sriramastavarajah1898/14",
+   "group": "N6",
+   "kind": "print",
+   "in_96": false,
+   "words": 90,
+   "lines": 20,
+   "missing": 0,
+   "audit": null
+  },
+  {
+   "page": "trisuli1890/11",
+   "group": "N6",
+   "kind": "print",
+   "in_96": false,
+   "words": 179,
+   "lines": 27,
+   "missing": 0,
+   "audit": null
+  },
+  {
+   "page": "vyasa1896/11",
+   "group": "N6",
+   "kind": "print",
+   "in_96": false,
+   "words": 85,
+   "lines": 19,
+   "missing": 0,
+   "audit": null
+  },
+  {
+   "page": "vyasa1896/15",
+   "group": "N6",
+   "kind": "print",
+   "in_96": false,
+   "words": 81,
+   "lines": 19,
+   "missing": 0,
+   "audit": null
+  },
+  {
+   "page": "vyasa1906/02",
+   "group": "N6",
+   "kind": "print",
+   "in_96": false,
+   "words": 46,
+   "lines": 17,
+   "missing": 0,
+   "audit": null
+  },
+  {
+   "page": "vyasa1906/03",
+   "group": "N6",
+   "kind": "print",
+   "in_96": false,
+   "words": 49,
+   "lines": 17,
+   "missing": 0,
+   "audit": null
+  },
+  {
+   "page": "vyasa1906/04",
+   "group": "N6",
+   "kind": "print",
+   "in_96": false,
+   "words": 49,
+   "lines": 17,
+   "missing": 0,
+   "audit": null
+  }
+ ]
+}
