@@ -143,13 +143,20 @@ def draft_of(iid, key=KEY):
     return json.load(open(p, encoding="utf-8")) if os.path.exists(p) else None
 
 
+def year_in_reading(parsed):
+    """Whether the drafted year is in the date as read, in full or as '58: on the owner's d06 the model read
+    "TUESDAY, MARCH 7" and supplied 1984 on its own."""
+    y, read = str(parsed["year"]), str(parsed.get("as_read") or "")
+    return y in read or bool(re.search(r"(?<![0-9])'?" + y[2:] + r"(?![0-9])", read))
+
+
 def verdict(parsed, year):
     """The audited draft class of one document, given the owner's year tag."""
     if parsed is None:
         return "unreadable reply"
     if not parsed["date_on_page"]:
         return "no date found"
-    if parsed["year"] is None:
+    if parsed["year"] is None or not year_in_reading(parsed):
         return "date without a year"
     return "own page (supported)" if parsed["year"] == year else "page year differs"
 
@@ -172,6 +179,20 @@ def calibrate(truth, drafts):
             "other": len(other), "other_claims": sum(1 for r in other if got(r)),
             "other_claims_tag_year": sum(1 for r in other if tag(r)),
             "missing": sum(1 for r in truth if r["id"] not in drafts)}
+
+
+def misses(truth, drafts):
+    """'a06 1971 for 1975 (as read: ...)' for each owner page date with a year the draft got wrong."""
+    out = []
+    for r in truth:
+        d = drafts.get(r["id"])
+        if not (r["page_date"] and r["page_date"]["year"] and d and d["parsed"]):
+            continue
+        p = d["parsed"]
+        if p["year"] != r["page_date"]["year"]:
+            out.append(f"{r['id']} {p['year'] or 'no year'} for {r['page_date']['year']}"
+                       + (f" (read \"{p['as_read']}\")" if p.get("as_read") else ""))
+    return out
 
 
 def cmd_score(a):
@@ -207,9 +228,12 @@ def cmd_score(a):
          f"{cal['other_claims']}, {cal['other_claims_tag_year']} of them with the owner's year (a date the owner may "
          "have had but did not name, or a misreading). "
          + (f"{cal['missing']} owner cases not yet drafted." if cal["missing"] else ""), "",
+         "Where the draft's year differs from the owner's page year: "
+         + ("; ".join(misses(truth, drafts)) or "none") + ".", "",
          "## The 200, drafted and audited", "",
          "`own page (supported)`: the blind reading of the page gives the owner's year, so two independent sources "
-         "agree; accepted as truth with the owner's tag. Every other row goes to the second-reader audit list "
+         "agree; accepted as truth with the owner's tag. A year the model gave that is not in the date it read "
+         "counts as `date without a year`. Every other row goes to the second-reader audit list "
          "(`audit: true` in the private `pool/draft-truth.jsonl`).", "",
          "| class | " + " | ".join(verdicts) + " |", "|---|" + "---|" * len(verdicts)]
     for c in classes:
