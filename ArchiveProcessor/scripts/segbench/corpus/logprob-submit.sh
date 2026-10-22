@@ -12,7 +12,7 @@ run() { if [ "$DRY" = --dry-run ]; then printf '%q ' "$@" >&2; echo >&2; echo 0;
 rec() { if [ "$DRY" = --dry-run ]; then printf '%s\n' "$*" >&2; else printf '%s\t%s\n' "$@" >> jobs.tsv; fi; }
 if [ "$WHAT" = setup ]; then
   id=$(run sbatch --parsable --partition=normal --cpus-per-task=4 --mem=16G --time=02:00:00 --job-name=logprob-setup \
-    --output="$ROOT/logs/slurm-%j.out" --wrap "source /home/users/cp1/Archive-Suite/ArchiveProcessor/scripts/segbench/farmshare/fs.env; export HF_HOME HF_HUB_DOWNLOAD_TIMEOUT=90; unset HF_HUB_OFFLINE; exec \"\$FS_PY\" '$ROOT/logprob_setup.py' '$ROOT'")
+    --output="$ROOT/logs/slurm-%j.out" "$ROOT/logprob-setup-job.sh" "$ROOT")
   rec setup "$id"; cat jobs.tsv 2>/dev/null || true; exit 0
 fi
 setup=$(awk -F'\t' '$1 == "setup" {print $2}' jobs.tsv 2>/dev/null | tail -1)
