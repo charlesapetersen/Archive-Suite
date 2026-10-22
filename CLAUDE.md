@@ -283,6 +283,13 @@ ticked. It is not time while a known defect would get in the way, or while queue
 the review looks at. If it is not time, name what it waits for, block the item on that, and report it (no
 decision). Authority: `~/Claude/CLAUDE.md`, "Owner review sessions"; this project's detail is `execution-plans/verification-phase/01-daemon-plan.md` §G "Is it time?".
 
+**Owner check sheets point at the text (owner, 2026-10-21).** A sheet that asks the owner to judge text against a
+page image (OCR truth checks, blind re-adjudications, transcription disputes) draws a rough box on the image around
+each place, from the word or line coordinates of whichever route has them. A place with no coordinates gets a
+fallback that still narrows the search (the line, or how far through the page it falls), and the sheet says so.
+A box never reveals which reading is the current truth. The pattern is W46's blind sheet
+(`ArchiveProcessor/scripts/segbench/ocr_truth_bias.py`, commit 938bdccf).
+
 **ArchiveOCRBench stays current (owner, 2026-10-15).** `ArchiveOCRBench/` is the readable record of what the
 bench has measured. A change that commits a measured OCR or segmentation result updates it in the same commit.
 That covers a new or rerun panel, a new route or model, a measured price, speed or memory figure, a segmentation
