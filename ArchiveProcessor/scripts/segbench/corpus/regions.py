@@ -48,6 +48,45 @@ def boxes_pp(found: list[dict]) -> list[dict]:
     return sorted(rows, key=lambda r: r['order'])
 
 
+OVERLAP_LINES = 12   # a tile's last lines that the next tile's first lines may repeat (15% of a band is ~4 lines)
+SAME_LINE = 0.8      # difflib ratio at which two normalised lines are the same line read twice
+
+
+def norm_line(s: str) -> str:
+    return ' '.join(s.lower().split())
+
+
+def drop_repeated_head(prev: list[str], cur: list[str]) -> list[str]:
+    """cur without its leading lines that repeat one of prev's last OVERLAP_LINES lines; stops at the first line
+    that is new. A line the band edge cut through stays in prev as read (scored as written, not repaired)."""
+    import difflib
+    tail = [norm_line(x) for x in prev[-OVERLAP_LINES:] if x.strip()]
+    k = 0
+    while k < len(cur) and k < OVERLAP_LINES:
+        line = norm_line(cur[k])
+        if line and not any(difflib.SequenceMatcher(None, line, t).ratio() >= SAME_LINE for t in tail):
+            break
+        k += 1
+    return cur[k:]
+
+
+def stitch(arm: str, crops: list[dict]) -> str:
+    """One page's text from its crops' readings ({'index', 'box', 'text'}), in the order they were sent. Regions
+    are joined as paragraphs; tiles in the same column lose the lines their overlap repeats."""
+    crops = sorted(crops, key=lambda c: c['index'])
+    if arm != 'tiles':
+        return '\n\n'.join(c['text'].strip() for c in crops if c['text'].strip())
+    out, prev = [], None
+    for c in crops:
+        lines = c['text'].strip().splitlines()
+        if prev is not None and prev['box'][0] == c['box'][0]:
+            lines = drop_repeated_head(prev['text'].splitlines(), lines)
+        if lines:
+            out.append('\n'.join(lines))
+        prev = c
+    return '\n'.join(out)
+
+
 def cmd_prepare(a):
     from PIL import Image
     import layout

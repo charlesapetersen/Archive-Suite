@@ -56,5 +56,33 @@ class Regions(unittest.TestCase):
         self.assertEqual(C.crops_for('pp-doclayoutv3', {'id': 'x'}, {'pp-doclayoutv3': {'x': []}}, 100, 100), [])
 
 
+class Stitch(unittest.TestCase):
+    def setUp(self):
+        import regions
+        self.R = regions
+
+    def tile(self, i, x0, text):
+        return {'index': i, 'box': [x0, 0, x0 + 0.5, 1], 'text': text}
+
+    def test_overlap_lines_are_read_once(self):
+        a = self.tile(0, 0, 'Dear Sir,\nI write to say\nthat the meeting is on')
+        b = self.tile(1, 0, 'I write to say\nthat the meeting is on\nTuesday next.')
+        self.assertEqual(self.R.stitch('tiles', [b, a]), 'Dear Sir,\nI write to say\nthat the meeting is on\nTuesday next.')
+
+    def test_near_duplicate_counts_and_new_line_stops_the_drop(self):
+        a = self.tile(0, 0, 'the Committee met at ten')
+        b = self.tile(1, 0, 'the Comittee met at ten\nMinutes follow\nthe Committee met at ten')
+        self.assertEqual(self.R.stitch('tiles', [a, b]), 'the Committee met at ten\nMinutes follow\nthe Committee met at ten')
+
+    def test_a_new_column_is_not_deduplicated_against_the_last(self):
+        a = self.tile(0, 0, 'same line'); b = self.tile(1, 0.5, 'same line')
+        self.assertEqual(self.R.stitch('tiles', [a, b]), 'same line\nsame line')
+
+    def test_regions_join_as_paragraphs_skipping_blanks(self):
+        crops = [{'index': 1, 'box': [0, 0, 1, 1], 'text': 'body'}, {'index': 0, 'box': [0, 0, 1, 1], 'text': 'Title '},
+                 {'index': 2, 'box': [0, 0, 1, 1], 'text': '  '}]
+        self.assertEqual(self.R.stitch('pp-doclayoutv3', crops), 'Title\n\nbody')
+
+
 if __name__ == '__main__':
     unittest.main()
