@@ -481,11 +481,50 @@ def derived_baseline(pts, W, H):
     return [[round(x0 / W, 5), round(f(x0) / H, 5)], [round(x1 / W, 5), round(f(x1) / H, 5)]]
 
 
+def ink_baseline(g: Gray, pts, W, H):
+    """A straight baseline for a hand line known as a polygon, from its ink: the polygon's least-squares slope,
+    then the ink density profile across rows parallel to it; the baseline is the bottom of the dense band (the
+    letters' bodies) that holds the peak, so ascenders and descenders do not pull it. Falls back to
+    `derived_baseline` when the polygon is too small to profile."""
+    n = len(pts)
+    mx = sum(x for x, _ in pts) / n; my = sum(y for _, y in pts) / n
+    sxx = sum((x - mx) ** 2 for x, _ in pts)
+    slope = sum((x - mx) * (y - my) for x, y in pts) / sxx if sxx else 0.0
+    res = sorted(y - (my + slope * (x - mx)) for x, y in pts)
+    half = max(res[-1], -res[0])
+    x0, x1 = min(x for x, _ in pts), max(x for x, _ in pts)
+    sx, sy = g.w / W, g.h / H
+    if half * sy < 6 or (x1 - x0) * sx < 20:
+        return derived_baseline(pts, W, H)
+    box = [x0 / W, (my - half - abs(slope) * (x1 - x0)) / H, (x1 - x0) / W,
+           (2 * half + 2 * abs(slope) * (x1 - x0)) / H]
+    (bx0, by0, bx1, by1), rows = g.ink(box)
+    prof = []
+    offs = range(int(-half * sy), int(half * sy) + 1)
+    for d in offs:
+        tot = 0
+        for c in range(0, bx1 - bx0, 2):
+            xg = (bx0 + c) / sx
+            y = round((my + slope * (xg - mx)) * sy) + d - by0
+            if 0 <= y < len(rows):
+                tot += rows[y][c]
+        prof.append(tot)
+    peak = max(range(len(prof)), key=lambda k: prof[k])
+    if prof[peak] == 0:
+        return derived_baseline(pts, W, H)
+    k = peak
+    while k + 1 < len(prof) and prof[k + 1] >= 0.4 * prof[peak]:
+        k += 1
+    drop = offs[k] / sy
+    f = lambda x: my + slope * (x - mx) + drop
+    return [[round(x0 / W, 5), round(f(x0) / H, 5)], [round(x1 / W, 5), round(f(x1) / H, 5)]]
+
+
 def bentham_page(xml: Path, img: Path) -> dict:
     """Lines and words from a Bentham PAGE 2010 file, in src_bentham's reading order. Word elements carry no text:
     a line's tokens are given to its Word boxes left to right when the counts agree (3 of the 20 pages have Word
-    elements at all); otherwise the line's box is split at its ink gaps (`gap_split`, `line-gaps`, a draft). PAGE 2010 here has no Baseline: `derived_baseline` drafts a
-    straight one per line, so READ-BAD on L2 measures against a draft until the audit passes it."""
+    elements at all); otherwise its words stay unboxed (`line-only`), the line being truth at line level only. PAGE 2010 here has no Baseline: `ink_baseline`
+    fits a straight one per line to the ink, so READ-BAD on L2 measures against a fitted line, audited."""
     import src_bentham as sb
     root = ET.fromstring(xml.read_bytes())
     W, H = image_size(img)
@@ -516,14 +555,14 @@ def bentham_page(xml: Path, img: Path) -> dict:
             ln = len(out_lines)
             toks = text.split()
             ok = len(toks) == len(wboxes)
-            if not ok:
-                g = g or Gray(img)
-            shares = None if ok else gap_split(g, _bbox(pts, W, H), toks)
+            g = g or Gray(img)
+            # Lines without published word boxes keep their words unboxed: split at the ink gaps, a cursive
+            # line's words came out 10-40% wrong in the audit (2026-10-21), too many for truth.
             for k, t in enumerate(toks):
-                words.append({'text': t, 'box': _bbox(wboxes[k], W, H) if ok else shares[k], 'line': ln,
-                              'status': 'page-xml' if ok else 'line-gaps'})
+                words.append({'text': t, 'box': _bbox(wboxes[k], W, H) if ok else None, 'line': ln,
+                              'status': 'page-xml' if ok else 'line-only'})
             out_lines.append({'id': ln, 'text': text, 'box': _bbox(pts, W, H),
-                              'baseline': derived_baseline(pts, W, H), 'status': 'page-xml, baseline derived'})
+                              'baseline': ink_baseline(g, pts, W, H), 'status': 'page-xml, baseline from ink'})
     return {'words': words, 'lines': out_lines, 'width': W, 'height': H}
 
 
@@ -544,6 +583,9 @@ def alto_page(xml: Path, img: Path) -> dict:
         if tl.get('BASELINE') and ',' in tl.get('BASELINE'):
             base = [[round(float(a) / W, 5), round(float(b) / H, 5)]
                     for a, b in (p.split(',') for p in tl.get('BASELINE').split())]
+        if base:  # the published HPOS/WIDTH often cover part of a line its BASELINE spans whole (audit,
+            bx = [a * W for a, _ in base]  # 2026-10-21: 21 of 40 pages): widen the box to the baseline
+            x, w = min(x, min(bx)), max(x + w, max(bx)) - min(x, min(bx))
         ln = len(lines)
         lines.append({'id': ln, 'text': text, 'box': [round(x / W, 5), round(y / H, 5), round(w / W, 5),
                                                        round(h / H, 5)], 'baseline': base, 'status': 'alto'})
@@ -567,8 +609,12 @@ def page2013(xml: Path, img: Path) -> dict:
         text = (eq[0].text or '').strip() if eq else ''
         if not text or coords is None:
             continue
+        cpts = parse(coords.get('points'))
+        if base is not None:  # widened to the baseline's extent, as in alto_page
+            bpts = parse(base.get('points'))
+            cpts = cpts + [(min(x for x, _ in bpts), min(y for _, y in cpts)), (max(x for x, _ in bpts), max(y for _, y in cpts))]
         ln = len(lines)
-        lines.append({'id': ln, 'text': text, 'box': _bbox(parse(coords.get('points')), W, H),
+        lines.append({'id': ln, 'text': text, 'box': _bbox(cpts, W, H),
                       'baseline': [[round(x / W, 5), round(y / H, 5)] for x, y in parse(base.get('points'))]
                       if base is not None else None, 'status': 'page-xml'})
         words += [{'text': t, 'box': None, 'line': ln, 'status': 'line-only'} for t in text.split()]
