@@ -122,7 +122,8 @@ record:
   `ocr-scorers.md` only. `chaos-probe.json` (`chaos_probe.py`) is the altered-word probe on 20 typed owner pages.
   `ocr-truth-bias.json` (`ocr_truth_bias.py`, W46.fix-ocr-truth-bias) splits each route's word accuracy on the 96
   into the words both drafters agreed on and the words the owner adjudicated, strict and with line-end hyphen joins
-  forgiven; the page shows it under the same section, with the blind owner check it feeds.
+  forgiven; the page shows it under the same section, with the blind owner check it feeds. That check's score is
+  `ocr-truth-bias-score.json` (`ocr_truth_bias_score.py`, W46.fix-ocr-truth-bias-score), read into the same note.
 - `ocr-panel-cloud-pilot.md`: the three-page pilot that came before the full cloud run.
 - `options.md`: the segmentation approaches on the test boxes (manual, Claude, Gemini, ChatGPT, Claude and
   ChatGPT together), each at the flag level frozen on the development boxes, with their API cost.

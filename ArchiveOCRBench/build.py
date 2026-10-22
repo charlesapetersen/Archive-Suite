@@ -46,6 +46,7 @@ DATING_PUBLIC = RESULTS / "date-tagging-public.json"
 PUBLIC = RESULTS / "bench-corpus"  # W43.corpus-build: corpus/routes.py report, the public strata
 OCR_SCORERS = RESULTS / "ocr-scorers.json"  # W46.fix-ocr-scorers: ocr_rescore.py, every cached reading re-scored
 TRUTH_BIAS = RESULTS / "ocr-truth-bias.json"  # W46.fix-ocr-truth-bias: ocr_truth_bias.py, agreed v adjudicated words
+TRUTH_BIAS_SCORE = RESULTS / "ocr-truth-bias-score.json"  # W46.fix-ocr-truth-bias-score: the owner's blind check
 CHAOS = RESULTS / "chaos-probe.json"  # W46.fix-ocr-scorers: chaos_probe.py score, the altered-word probe
 OPEN_SWEEP = HERE / "data" / "open-sweep-20261019.json"  # the open-model sweep's receipts (hand-entered, sourced)
 TEMPLATE = HERE / "site" / "template.html"
@@ -423,6 +424,8 @@ def ocr_scorers():
                              "routes": [{**{k: r[k] for k in keep},
                                          "lead_agreed_joined": (r.get("lead") or {}).get("lead_agreed_joined")}
                                         for r in tb["split"]]}
+        if TRUTH_BIAS_SCORE.exists():
+            out["truth_bias"]["score"] = json.loads(TRUTH_BIAS_SCORE.read_text())["summary"]
     return out
 
 

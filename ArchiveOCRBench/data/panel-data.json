@@ -20503,7 +20503,8 @@
     "differences_total": 194,
     "differences_on_chosen": 62,
     "differences_median_page": 1,
-    "mixed_items": 2
+    "mixed_items": 2,
+    "boxed_items": 54
    },
    "routes": [
     {
@@ -20848,7 +20849,77 @@
      "adjudicated_acc": 0.4867986798679868,
      "lead_agreed_joined": -0.20944698885774826
     }
-   ]
+   ],
+   "score": {
+    "reference": "qwen3.6-27b",
+    "places": 59,
+    "pages": 20,
+    "classes": {
+     "truth": {
+      "places": 26,
+      "charged": 37
+     },
+     "frame": {
+      "places": 4,
+      "charged": 0
+     },
+     "either": {
+      "places": 7,
+      "charged": 17
+     },
+     "neither": {
+      "places": 1,
+      "charged": 0
+     },
+     "reader": {
+      "places": 4,
+      "charged": 1
+     },
+     "placement": {
+      "places": 1,
+      "charged": 0
+     },
+     "excluded": {
+      "places": 15,
+      "charged": 23
+     },
+     "unanswered": {
+      "places": 1,
+      "charged": 1
+     }
+    },
+    "judged": 43,
+    "truth_fault_places": 5,
+    "charged_judged": 55,
+    "charged_truth_fault": 1,
+    "truth_fault_share": 0.01818181818181818,
+    "truth_fault_share_ci": [
+     0.0,
+     0.04
+    ],
+    "population": {
+     "places": 194,
+     "charged": 224,
+     "block_places": 18,
+     "block_charged": 209,
+     "moved_charged": 190
+    },
+    "reader_omitted_by_truth": 3,
+    "reference_agreed_n": 29258,
+    "reference_agreed_missed_joined": 399,
+    "reference_miss_joined_pts": 1.3637295782350178,
+    "bias_pts": 0.013920046731585456,
+    "bias_pts_ci": [
+     0.0,
+     0.030624102809488005
+    ],
+    "drafter_lead_joined_pts": 0.8273444178093096,
+    "material_pts": 0.25,
+    "material": false,
+    "excluded": {
+     "p081": "owner: a badly scanned microfilm of an early-20th-century newspaper, far outside the corpus; not answered beyond the note"
+    }
+   }
   }
  }
 }

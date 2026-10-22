@@ -1,0 +1,605 @@
+{
+ "summary": {
+  "reference": "qwen3.6-27b",
+  "places": 59,
+  "pages": 20,
+  "classes": {
+   "truth": {
+    "places": 26,
+    "charged": 37
+   },
+   "frame": {
+    "places": 4,
+    "charged": 0
+   },
+   "either": {
+    "places": 7,
+    "charged": 17
+   },
+   "neither": {
+    "places": 1,
+    "charged": 0
+   },
+   "reader": {
+    "places": 4,
+    "charged": 1
+   },
+   "placement": {
+    "places": 1,
+    "charged": 0
+   },
+   "excluded": {
+    "places": 15,
+    "charged": 23
+   },
+   "unanswered": {
+    "places": 1,
+    "charged": 1
+   }
+  },
+  "judged": 43,
+  "truth_fault_places": 5,
+  "charged_judged": 55,
+  "charged_truth_fault": 1,
+  "truth_fault_share": 0.01818181818181818,
+  "truth_fault_share_ci": [
+   0.0,
+   0.04
+  ],
+  "population": {
+   "places": 194,
+   "charged": 224,
+   "block_places": 18,
+   "block_charged": 209,
+   "moved_charged": 190
+  },
+  "reader_omitted_by_truth": 3,
+  "reference_agreed_n": 29258,
+  "reference_agreed_missed_joined": 399,
+  "reference_miss_joined_pts": 1.3637295782350178,
+  "bias_pts": 0.013920046731585456,
+  "bias_pts_ci": [
+   0.0,
+   0.030624102809488005
+  ],
+  "drafter_lead_joined_pts": 0.8273444178093096,
+  "material_pts": 0.25,
+  "material": false,
+  "excluded": {
+   "p081": "owner: a badly scanned microfilm of an early-20th-century newspaper, far outside the corpus; not answered beyond the note"
+  }
+ },
+ "places": [
+  {
+   "page": "p003",
+   "place": 0,
+   "class": "truth",
+   "mixed": false,
+   "charged": 1,
+   "answer": "b",
+   "why": ""
+  },
+  {
+   "page": "p005",
+   "place": 0,
+   "class": "truth",
+   "mixed": false,
+   "charged": 1,
+   "answer": "a",
+   "why": ""
+  },
+  {
+   "page": "p007",
+   "place": 0,
+   "class": "frame",
+   "mixed": false,
+   "charged": 0,
+   "answer": "=there is an eligible mark to the left. Above on a separate sheet of paper there is typewritten \"…\"",
+   "why": "the date is typed on a separate sheet above the page; the page has only an illegible mark"
+  },
+  {
+   "page": "p007",
+   "place": 1,
+   "class": "either",
+   "mixed": false,
+   "charged": 1,
+   "answer": "either",
+   "why": ""
+  },
+  {
+   "page": "p007",
+   "place": 2,
+   "class": "truth",
+   "mixed": false,
+   "charged": 2,
+   "answer": "a",
+   "why": ""
+  },
+  {
+   "page": "p009",
+   "place": 0,
+   "class": "neither",
+   "mixed": false,
+   "charged": 0,
+   "answer": "=\"…\" or \"…\" probably \"…\"",
+   "why": "owner reads the number as \"…\" or \"…\", probably \"…\"; the truth marks it illegible, qwen reads \"…\""
+  },
+  {
+   "page": "p009",
+   "place": 1,
+   "class": "truth",
+   "mixed": false,
+   "charged": 1,
+   "answer": "b",
+   "why": ""
+  },
+  {
+   "page": "p009",
+   "place": 2,
+   "class": "reader",
+   "mixed": false,
+   "charged": 0,
+   "answer": "b",
+   "why": ""
+  },
+  {
+   "page": "p009",
+   "place": 3,
+   "class": "frame",
+   "mixed": false,
+   "charged": 0,
+   "answer": "=\"…\" appears on the folder label in the background, not part of the page.",
+   "why": "qwen read the folder label in the background; not part of the page"
+  },
+  {
+   "page": "p016",
+   "place": 0,
+   "class": "truth",
+   "mixed": false,
+   "charged": 1,
+   "answer": "b",
+   "why": ""
+  },
+  {
+   "page": "p017",
+   "place": 0,
+   "class": "truth",
+   "mixed": false,
+   "charged": 1,
+   "answer": "a",
+   "why": ""
+  },
+  {
+   "page": "p025",
+   "place": 0,
+   "class": "truth",
+   "mixed": false,
+   "charged": 1,
+   "answer": "=RHV:e1",
+   "why": "owner typed the truth's reading but for the last character (1 for l); the initials qwen misread are the truth's"
+  },
+  {
+   "page": "p030",
+   "place": 0,
+   "class": "truth",
+   "mixed": false,
+   "charged": 3,
+   "answer": "a",
+   "why": ""
+  },
+  {
+   "page": "p037",
+   "place": 0,
+   "class": "truth",
+   "mixed": false,
+   "charged": 1,
+   "answer": "b",
+   "why": ""
+  },
+  {
+   "page": "p041",
+   "place": 0,
+   "class": "frame",
+   "mixed": false,
+   "charged": 0,
+   "answer": "=\"…\" appears on the page in the background behind this page.",
+   "why": "qwen read a number on the page behind this one"
+  },
+  {
+   "page": "p041",
+   "place": 1,
+   "class": "reader",
+   "mixed": false,
+   "charged": 0,
+   "answer": "b",
+   "why": ""
+  },
+  {
+   "page": "p046",
+   "place": 0,
+   "class": "truth",
+   "mixed": false,
+   "charged": 4,
+   "answer": "b",
+   "why": ""
+  },
+  {
+   "page": "p046",
+   "place": 1,
+   "class": "placement",
+   "mixed": false,
+   "charged": 0,
+   "answer": "=Same text, just different placement",
+   "why": "same text, different placement; the pair of p046#0, where the owner chose the truth's place"
+  },
+  {
+   "page": "p054",
+   "place": 0,
+   "class": "truth",
+   "mixed": false,
+   "charged": 1,
+   "answer": "b",
+   "why": ""
+  },
+  {
+   "page": "p054",
+   "place": 1,
+   "class": "reader",
+   "mixed": false,
+   "charged": 1,
+   "answer": "b",
+   "why": ""
+  },
+  {
+   "page": "p054",
+   "place": 2,
+   "class": "truth",
+   "mixed": false,
+   "charged": 1,
+   "answer": "b",
+   "why": ""
+  },
+  {
+   "page": "p054",
+   "place": 3,
+   "class": "truth",
+   "mixed": false,
+   "charged": 1,
+   "answer": "b",
+   "why": ""
+  },
+  {
+   "page": "p054",
+   "place": 4,
+   "class": "truth",
+   "mixed": false,
+   "charged": 0,
+   "answer": "b",
+   "why": ""
+  },
+  {
+   "page": "p054",
+   "place": 5,
+   "class": "truth",
+   "mixed": false,
+   "charged": 1,
+   "answer": "b",
+   "why": ""
+  },
+  {
+   "page": "p054",
+   "place": 6,
+   "class": "truth",
+   "mixed": false,
+   "charged": 1,
+   "answer": "a",
+   "why": ""
+  },
+  {
+   "page": "p054",
+   "place": 7,
+   "class": "either",
+   "mixed": false,
+   "charged": 1,
+   "answer": "either",
+   "why": ""
+  },
+  {
+   "page": "p054",
+   "place": 8,
+   "class": "truth",
+   "mixed": false,
+   "charged": 3,
+   "answer": "b",
+   "why": ""
+  },
+  {
+   "page": "p054",
+   "place": 9,
+   "class": "truth",
+   "mixed": true,
+   "charged": 4,
+   "answer": "a",
+   "why": ""
+  },
+  {
+   "page": "p054",
+   "place": 10,
+   "class": "truth",
+   "mixed": false,
+   "charged": 1,
+   "answer": "a",
+   "why": ""
+  },
+  {
+   "page": "p054",
+   "place": 11,
+   "class": "truth",
+   "mixed": false,
+   "charged": 1,
+   "answer": "a",
+   "why": ""
+  },
+  {
+   "page": "p054",
+   "place": 12,
+   "class": "truth",
+   "mixed": true,
+   "charged": 2,
+   "answer": "=form",
+   "why": "owner typed \"…\", the truth's word; qwen read \"…\" (the truth's neighbouring \"…\" is not in question)"
+  },
+  {
+   "page": "p055",
+   "place": 0,
+   "class": "truth",
+   "mixed": false,
+   "charged": 1,
+   "answer": "b",
+   "why": ""
+  },
+  {
+   "page": "p072",
+   "place": 0,
+   "class": "frame",
+   "mixed": false,
+   "charged": 0,
+   "answer": "=This is a read of the folder title in the background, not the document itself",
+   "why": "qwen read the folder title in the background, not the document"
+  },
+  {
+   "page": "p081",
+   "place": 0,
+   "class": "excluded",
+   "mixed": false,
+   "charged": 3,
+   "answer": "=This entire document is far more difficult than most other items in the corpus. It is a badly scanned microfilm of an early 20th century newspaper. I'd rather not use this as a sample because it is so far outside the norm. Also I can't accurately correct it.",
+   "why": "owner: a badly scanned microfilm of an early-20th-century newspaper, far outside the corpus; not answered beyond the note"
+  },
+  {
+   "page": "p081",
+   "place": 1,
+   "class": "excluded",
+   "mixed": false,
+   "charged": 0,
+   "answer": null,
+   "why": "owner: a badly scanned microfilm of an early-20th-century newspaper, far outside the corpus; not answered beyond the note"
+  },
+  {
+   "page": "p081",
+   "place": 2,
+   "class": "excluded",
+   "mixed": false,
+   "charged": 0,
+   "answer": null,
+   "why": "owner: a badly scanned microfilm of an early-20th-century newspaper, far outside the corpus; not answered beyond the note"
+  },
+  {
+   "page": "p081",
+   "place": 3,
+   "class": "excluded",
+   "mixed": false,
+   "charged": 0,
+   "answer": null,
+   "why": "owner: a badly scanned microfilm of an early-20th-century newspaper, far outside the corpus; not answered beyond the note"
+  },
+  {
+   "page": "p081",
+   "place": 4,
+   "class": "excluded",
+   "mixed": false,
+   "charged": 0,
+   "answer": null,
+   "why": "owner: a badly scanned microfilm of an early-20th-century newspaper, far outside the corpus; not answered beyond the note"
+  },
+  {
+   "page": "p081",
+   "place": 5,
+   "class": "excluded",
+   "mixed": false,
+   "charged": 1,
+   "answer": null,
+   "why": "owner: a badly scanned microfilm of an early-20th-century newspaper, far outside the corpus; not answered beyond the note"
+  },
+  {
+   "page": "p081",
+   "place": 6,
+   "class": "excluded",
+   "mixed": false,
+   "charged": 3,
+   "answer": null,
+   "why": "owner: a badly scanned microfilm of an early-20th-century newspaper, far outside the corpus; not answered beyond the note"
+  },
+  {
+   "page": "p081",
+   "place": 7,
+   "class": "excluded",
+   "mixed": false,
+   "charged": 0,
+   "answer": null,
+   "why": "owner: a badly scanned microfilm of an early-20th-century newspaper, far outside the corpus; not answered beyond the note"
+  },
+  {
+   "page": "p081",
+   "place": 8,
+   "class": "excluded",
+   "mixed": false,
+   "charged": 3,
+   "answer": null,
+   "why": "owner: a badly scanned microfilm of an early-20th-century newspaper, far outside the corpus; not answered beyond the note"
+  },
+  {
+   "page": "p081",
+   "place": 9,
+   "class": "excluded",
+   "mixed": false,
+   "charged": 0,
+   "answer": null,
+   "why": "owner: a badly scanned microfilm of an early-20th-century newspaper, far outside the corpus; not answered beyond the note"
+  },
+  {
+   "page": "p081",
+   "place": 10,
+   "class": "excluded",
+   "mixed": false,
+   "charged": 4,
+   "answer": null,
+   "why": "owner: a badly scanned microfilm of an early-20th-century newspaper, far outside the corpus; not answered beyond the note"
+  },
+  {
+   "page": "p081",
+   "place": 11,
+   "class": "excluded",
+   "mixed": false,
+   "charged": 4,
+   "answer": null,
+   "why": "owner: a badly scanned microfilm of an early-20th-century newspaper, far outside the corpus; not answered beyond the note"
+  },
+  {
+   "page": "p081",
+   "place": 12,
+   "class": "excluded",
+   "mixed": false,
+   "charged": 2,
+   "answer": null,
+   "why": "owner: a badly scanned microfilm of an early-20th-century newspaper, far outside the corpus; not answered beyond the note"
+  },
+  {
+   "page": "p081",
+   "place": 13,
+   "class": "excluded",
+   "mixed": false,
+   "charged": 2,
+   "answer": null,
+   "why": "owner: a badly scanned microfilm of an early-20th-century newspaper, far outside the corpus; not answered beyond the note"
+  },
+  {
+   "page": "p081",
+   "place": 14,
+   "class": "excluded",
+   "mixed": false,
+   "charged": 1,
+   "answer": null,
+   "why": "owner: a badly scanned microfilm of an early-20th-century newspaper, far outside the corpus; not answered beyond the note"
+  },
+  {
+   "page": "p089",
+   "place": 0,
+   "class": "truth",
+   "mixed": false,
+   "charged": 1,
+   "answer": "b",
+   "why": ""
+  },
+  {
+   "page": "p089",
+   "place": 1,
+   "class": "reader",
+   "mixed": false,
+   "charged": 0,
+   "answer": "b",
+   "why": ""
+  },
+  {
+   "page": "p091",
+   "place": 0,
+   "class": "truth",
+   "mixed": false,
+   "charged": 1,
+   "answer": "b",
+   "why": ""
+  },
+  {
+   "page": "p093",
+   "place": 0,
+   "class": "either",
+   "mixed": false,
+   "charged": 3,
+   "answer": "=These are typographical dividers. Either reading is fine.",
+   "why": "typographical dividers; either reading is fine"
+  },
+  {
+   "page": "p093",
+   "place": 1,
+   "class": "either",
+   "mixed": false,
+   "charged": 3,
+   "answer": null,
+   "why": "divider; the owner's note on the page answers it"
+  },
+  {
+   "page": "p093",
+   "place": 2,
+   "class": "either",
+   "mixed": false,
+   "charged": 3,
+   "answer": null,
+   "why": "divider; the owner's note on the page answers it"
+  },
+  {
+   "page": "p093",
+   "place": 3,
+   "class": "unanswered",
+   "mixed": false,
+   "charged": 1,
+   "answer": null,
+   "why": ""
+  },
+  {
+   "page": "p093",
+   "place": 4,
+   "class": "either",
+   "mixed": false,
+   "charged": 3,
+   "answer": null,
+   "why": "divider; the owner's note on the page answers it"
+  },
+  {
+   "page": "p093",
+   "place": 5,
+   "class": "either",
+   "mixed": false,
+   "charged": 3,
+   "answer": null,
+   "why": "divider; the owner's note on the page answers it"
+  },
+  {
+   "page": "p095",
+   "place": 0,
+   "class": "truth",
+   "mixed": false,
+   "charged": 1,
+   "answer": "a",
+   "why": ""
+  },
+  {
+   "page": "p098",
+   "place": 0,
+   "class": "truth",
+   "mixed": false,
+   "charged": 1,
+   "answer": "b",
+   "why": ""
+  }
+ ]
+}
