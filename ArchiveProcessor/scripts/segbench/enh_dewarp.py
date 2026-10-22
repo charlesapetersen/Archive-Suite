@@ -461,6 +461,28 @@ def arm_table(by, groups, arms, base, edge=False):
     return L
 
 
+def arm_summary(by, groups, arms, base, reader):
+    """arm_table's figures as rows for ArchiveOCRBench (enh-dewarp.json)."""
+    import ocr_panel_score as S
+    out = []
+    for name, ps in groups.items():
+        for arm in arms:
+            rr = [by[arm, p] for p in ps]
+            if not rr:
+                continue
+            row = {'reader': reader, 'pages': name, 'n': len(ps), 'arm': arm, 'base': base,
+                   'nes': statistics.mean(r['nes'] for r in rr), 'chrf': statistics.mean(r['chrf'] for r in rr),
+                   'added': sum(r['added'] for r in rr) / (sum(r['hyp_words'] for r in rr) or 1),
+                   'missed': sum(r['missed'] for r in rr) / (sum(r['words'] for r in rr) or 1)}
+            if 'edge_lost' in rr[0]:
+                row['edge_lost'], row['edge_pages'] = sum(r['edge_lost'] for r in rr), sum(r['edge_lost'] > 0 for r in rr)
+            if arm != base:
+                t = S.paired([by[arm, p]['nes'] for p in ps], [by[base, p]['nes'] for p in ps])
+                row.update(d_nes=t['delta'], lo=t['lo'], hi=t['hi'], p=t['p'])
+            out.append({k: round(v, 5) if isinstance(v, float) else v for k, v in row.items()})
+    return out
+
+
 def extra_rows():
     """Scores for the extras' images (text only, no lattice)."""
     import ocr_panel_score as S
@@ -595,6 +617,22 @@ def report():
                 L += [''] + arm_table(rb, {'hand-cropped': hand}, ('raw', 'quad', 'uvdoc', 'hand'), 'raw')
             if lad:
                 L += [''] + arm_table(rb, {'ladder': lad}, ('quarter', *LADDER_ARMS, 'raw'), 'quarter')
+    main3 = {k: groups[k] for k in ('originals', 'PDF images')}
+    bench = arm_summary(by, main3, ('raw', *ARMS), 'raw', 'apple-vision')
+    bench += arm_summary(by, main3, ('raw', *ENCODINGS), 'raw', 'apple-vision')
+    if lad:
+        bench += arm_summary(by, {'ladder': lad}, ('quarter', *LADDER_ARMS), 'quarter', 'apple-vision')
+    for route, rb in readers.items():
+        if all(r['read'] for r in rb.values()):
+            bench += arm_summary(rb, main3, ('raw', *ARMS), 'raw', route)
+            bench += arm_summary(rb, main3, ('raw', 'enc-2048-q85', 'enc-1600-q90'), 'raw', route)
+            if lad:
+                bench += arm_summary(rb, {'ladder': lad}, ('quarter', *LADDER_ARMS), 'quarter', route)
+    found = RESULTS / 'enh-dewarp-uvdoc-bench.md'
+    (RESULTS / 'enh-dewarp.json').write_text(json.dumps({
+        'item': 'W46.enh-dewarp', 'report': REPORT.name, 'readers_pending': [r for r in READERS if r not in readers
+                                                                             or not all(x['read'] for x in readers[r].values())],
+        'uvdoc_benchmark': found.name if found.exists() else None, 'rows': bench}, indent=1) + '\n')
     REPORT.write_text('\n'.join(L) + '\n')
     print(REPORT)
 

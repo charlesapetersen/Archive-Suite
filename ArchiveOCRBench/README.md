@@ -127,6 +127,11 @@ record:
   forgiven; the page shows it under the same section, with the blind owner check it feeds. That check's score is
   `ocr-truth-bias-score.json` (`ocr_truth_bias_score.py`, W46.fix-ocr-truth-bias-score), read into the same note.
 - `ocr-panel-cloud-pilot.md`: the three-page pilot that came before the full cloud run.
+- `enh-dewarp.json` (`scripts/segbench/enh_dewarp.py report`, W46.enh-dewarp): crop, dewarp or nothing before
+  reading, and the app's own encoder, each image against the plain photograph on the 96, per reader (Apple
+  Vision now; the three FarmShare readers when their run is fetched). The page shows its rows as a table; the
+  round trip, curvature and hand-crop tables are in `enh-dewarp.md`, the UVDoc benchmark check in
+  `enh-dewarp-uvdoc-bench.md`.
 - `options.md`: the segmentation approaches on the test boxes (manual, Claude, Gemini, ChatGPT, Claude and
   ChatGPT together), each at the flag level frozen on the development boxes, with their API cost.
 - `cheap-models.md`: the three cheap segmentation finalists (GLM-5.3 Flash, GPT-5.6 Luna, Qwen3.5 Flash) at the

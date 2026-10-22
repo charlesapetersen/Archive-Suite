@@ -49,6 +49,7 @@ OCR_SCORERS = RESULTS / "ocr-scorers.json"  # W46.fix-ocr-scorers: ocr_rescore.p
 TRUTH_BIAS = RESULTS / "ocr-truth-bias.json"  # W46.fix-ocr-truth-bias: ocr_truth_bias.py, agreed v adjudicated words
 TRUTH_BIAS_SCORE = RESULTS / "ocr-truth-bias-score.json"  # W46.fix-ocr-truth-bias-score: the owner's blind check
 CHAOS = RESULTS / "chaos-probe.json"  # W46.fix-ocr-scorers: chaos_probe.py score, the altered-word probe
+DEWARP = RESULTS / "enh-dewarp.json"  # W46.enh-dewarp: enh_dewarp.py report, crop or dewarp against raw, by reader
 OPEN_SWEEP = HERE / "data" / "open-sweep-20261019.json"  # the open-model sweep's receipts (hand-entered, sourced)
 TEMPLATE = HERE / "site" / "template.html"
 OUT_DATA = HERE / "data" / "panel-data.json"
@@ -546,7 +547,8 @@ def main():
              "dating_traceable": dating_traceable(),
              "seg_date": json.loads((RESULTS / "seg-date-model-final.json").read_text())
                          if (RESULTS / "seg-date-model-final.json").exists() else None,
-             "public": public(), "ocr_scorers": ocr_scorers()}
+             "public": public(), "ocr_scorers": ocr_scorers(),
+             "dewarp": json.loads(DEWARP.read_text()) if DEWARP.exists() else None}
     page = TEMPLATE.read_text().replace("__DATA__", json.dumps(built, separators=(",", ":")))
     outputs = {OUT_DATA: json.dumps(built, indent=1) + "\n", OUT_PAGE: page, OUT_DIFFICULTY: difficulty.report(diff)}
 

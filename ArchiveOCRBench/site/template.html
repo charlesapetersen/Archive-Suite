@@ -202,6 +202,12 @@ footer p { font-size: 13px; }
     <div class="tbl"><table><thead><tr><th>Step</th><th>Seconds a page</th><th>Peak memory</th></tr></thead><tbody id="kind-clf-speed"></tbody></table></div>
   </section>
 
+  <section class="panel" id="dewarp" hidden>
+    <div class="head"><h2>Crop, dewarp or nothing, before reading</h2><span class="meta">the 96 · free (W46.enh-dewarp)</span></div>
+    <p class="note" id="dw-note"></p>
+    <div class="tbl"><table><thead><tr><th>Reader</th><th>Pages</th><th>Image</th><th>NES</th><th>Change against the plain image (95% CI)</th><th>chrF2</th><th>Words added</th><th>Words missed</th><th>Truth words cut off (pages)</th></tr></thead><tbody id="dw-rows"></tbody></table></div>
+  </section>
+
   <section class="panel" id="ocr-scorers" hidden>
     <div class="head"><h2>What a reader adds, and whether it reads what is printed</h2><span class="meta">every saved reading re-scored · no new calls (W46.fix-ocr-scorers)</span></div>
     <p class="note">Added words are insertions and rewritten words substitutions more than one letter from the truth word, each over the truth's words, on the pages answered. cMER is HIPE-OCRepair's character error bounded at 100%. NewsBench's bag-of-words F1 ignores order; its gap (bag-of-words F1 less 1 − CER) is the order penalty, Latin-script pages only. Suspect words are those Apple Vision's reading of the page lacks (Gemini 3.8 Flash's, for Vision); precision is the share the truth lacks too, recall the share of the reading's non-truth words caught. The owner's 96 pages:</p>
@@ -549,6 +555,17 @@ if (SC) {
     const pp = v => v === null || v === undefined ? '—' : (100 * v).toFixed(2);
     document.getElementById('sc-bias').innerHTML = TB.routes.map(r => '<tr><td>' + r.route + '</td><td>' + r.family + '</td><td>' + r.pages + '</td><td>' + pp(r.agreed_acc) + '</td><td>' + pp(r.agreed_acc_joined) + '</td><td>' + pp(r.adjudicated_acc) + '</td><td>' + (r.lead_agreed_joined === null ? '—' : (r.lead_agreed_joined >= 0 ? '+' : '−') + Math.abs(100 * r.lead_agreed_joined).toFixed(2)) + '</td></tr>').join('');
   }
+}
+const DW = DATA.dewarp;
+if (DW) {
+  document.getElementById('dewarp').hidden = false;
+  const names = {raw: 'plain photograph (the panel\'s image)', quad: 'Apple\'s page quad, perspective corrected', uvdoc: 'UVDoc after the quad', docres: 'DocRes dewarp',
+    'enc-2048-q85': 'the app\'s encoder, 2048 px, q 0.85', 'enc-2400-q90': 'the app\'s encoder, 2400 px, q 0.90', 'enc-1600-q90': 'the app\'s encoder, 1,600 px, q 0.90',
+    quarter: 'quarter-size photograph', 'quad-quarter': 'quad crop, then quarter size', 'uvdoc-quarter': 'UVDoc, then quarter size'};
+  const q1 = v => v == null ? '—' : (100 * v).toFixed(1);
+  const sg = v => (v >= 0 ? '+' : '−') + Math.abs(100 * v).toFixed(1);
+  document.getElementById('dw-note').textContent = 'Each image of the same page read by the same reader, paired by page against the plain photograph (the quarter-size rows against the quarter-size photograph). NES follows reading order, so chrF2 and the word rates, which do not, are beside it. Cut-off words are truth words whose box on the plain photograph falls outside what the image shows.' + (DW.readers_pending.length ? ' Still to come: ' + DW.readers_pending.join(', ') + ' (FarmShare).' : '') + ' Detail: segbench-results/' + DW.report + (DW.uvdoc_benchmark ? '; our UVDoc reproduces the authors\' published grids on their 50-photo benchmark (' + DW.uvdoc_benchmark + ').' : '.');
+  document.getElementById('dw-rows').innerHTML = DW.rows.map(r => '<tr><td>' + r.reader + '</td><td>' + r.pages + ' (' + r.n + ')</td><td>' + (names[r.arm] || r.arm) + '</td><td>' + q1(r.nes) + '</td><td>' + (r.d_nes == null ? '—' : sg(r.d_nes) + ' (' + sg(r.lo) + ' to ' + sg(r.hi) + ')') + '</td><td>' + q1(r.chrf) + '</td><td>' + q1(r.added) + '</td><td>' + q1(r.missed) + '</td><td>' + (r.edge_lost == null ? '—' : r.edge_lost + ' (' + r.edge_pages + ')') + '</td></tr>').join('');
 }
 const curveCanvas = document.querySelector('#dif-curves canvas'), frontCanvas = document.querySelector('#dif-frontier canvas');
 let curveChart, frontChart;
