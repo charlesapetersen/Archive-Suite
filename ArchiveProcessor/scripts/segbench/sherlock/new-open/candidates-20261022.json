@@ -1,0 +1,57 @@
+[
+ {
+  "key": "teleocr",
+  "model": "XingChen-AGI/TeleOCR",
+  "route": "native-text",
+  "prompt": "Please output the text content from the image.",
+  "card": "https://huggingface.co/XingChen-AGI/TeleOCR"
+ },
+ {
+  "key": "paddleocr-vl16",
+  "model": "PaddlePaddle/PaddleOCR-VL-1.6",
+  "route": "native-ocr",
+  "prompt": "OCR:",
+  "card": "https://huggingface.co/PaddlePaddle/PaddleOCR-VL-1.6"
+ },
+ {
+  "key": "xiaomi-ocr-0",
+  "model": "SeerRay-Lab/Xiaomi-OCR-0",
+  "route": "native-text",
+  "prompt": "Extract all information from the main body of the document image and represent it in markdown format, ignoring headers and footers. Tables should be expressed in OTSL format, formulas in the document should be represented using LATEX format, and the parsing should be organized according to the reading order.",
+  "card": "https://huggingface.co/SeerRay-Lab/Xiaomi-OCR-0"
+ },
+ {
+  "key": "ovisocr2",
+  "model": "ATH-MaaS/OvisOCR2",
+  "route": "native-text",
+  "prompt": "\nExtract all readable content from the image in natural human reading order and output the result as a single Markdown document. For charts or images, represent them using an HTML image tag: <img src=\"images/bbox_{left}_{top}_{right}_{bottom}.jpg\" />, where left, top, right, bottom are bounding box coordinates scaled to [0, 1000). Format formulas as LaTeX. Format tables as HTML: <table>...</table>. Transcribe all other text as standard Markdown. Preserve the original text without translation or paraphrasing.",
+  "card": "https://huggingface.co/ATH-MaaS/OvisOCR2"
+ },
+ {
+  "key": "minicpm-v47-1b",
+  "model": "openbmb/MiniCPM-V-4.7-1B",
+  "route": "panel",
+  "prompt": null,
+  "card": "https://huggingface.co/openbmb/MiniCPM-V-4.7-1B",
+  "vllm_extra": "--trust-remote-code"
+ },
+ {
+  "key": "minicpm-v47-35b-a3b-fp8",
+  "model": "openbmb/MiniCPM-V-4.7-35B-A3B-FP8",
+  "route": "panel",
+  "prompt": null,
+  "card": "https://huggingface.co/openbmb/MiniCPM-V-4.7-35B-A3B",
+  "vllm_extra": "--trust-remote-code",
+  "weight_limit_bytes": 45000000000,
+  "hours": 8
+ },
+ {
+  "key": "qwen38-27b-fp8",
+  "model": "Qwen/Qwen3.8-27B-FP8",
+  "route": "panel",
+  "prompt": null,
+  "card": "https://huggingface.co/Qwen/Qwen3.8-27B-FP8",
+  "weight_limit_bytes": 40000000000,
+  "hours": 8
+ }
+]
