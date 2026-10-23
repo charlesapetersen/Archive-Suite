@@ -272,7 +272,7 @@ def selection(box: Box, ds_p: dict[int, float]) -> dict:
             else:
                 row[str(bud)] = box.exact(corrected(box, new, order[:k]))
         if order is None:
-            t = [to_bar(box, new, o) for o in rand[:10]]
+            t = [to_bar(box, new, o) for o in rand]
             row["to98"] = float(np.mean([x for x in t if x is not None])) if all(x is not None for x in t) else None
         else:
             row["to98"] = to_bar(box, new, order)
@@ -378,8 +378,8 @@ def _review(box: Box, p: dict[int, float], v: float):
 
 def frozen_level(cols: dict, boxes: dict, src: str) -> dict:
     """options.py's figures for one source: the flag level (confidence <= v is checked) is the lowest that brings
-    the pooled development boxes (leave-one-box-out answers) to BAR after checking; then applied once to the test
-    boxes. -1 flags nothing."""
+    every development box (leave-one-box-out answers) to BAR after checking, as ensemble.fit_level; then applied
+    once to the test boxes. -1 flags nothing."""
     p = {n: {int(i): v for i, v in boxes[n]["p"][src].items()} for n in cols}
 
     def pooled(names, v):
@@ -388,7 +388,9 @@ def frozen_level(cols: dict, boxes: dict, src: str) -> dict:
         rev = sum((r[1] for r in rows[1:]), rows[0][1])
         return auto, rev, sum(r[2] for r in rows), sum(r[3] for r in rows)
     levels = sorted({-1.0} | {max(x, 1 - x) for n in data.DEV for x in p[n].values()})
-    v = next((v for v in levels if derived(pooled(data.DEV, v)[1])["pages_in_exact_doc"] >= BAR), levels[-1])
+    # ensemble.fit_level: every development box, not their pool, must reach BAR after checking.
+    v = next((v for v in levels if all(derived(_review(cols[n], p[n], v)[1])["pages_in_exact_doc"] >= BAR
+                                       for n in data.DEV)), levels[-1])
     auto, rev, flagged, acc_err = pooled(data.TEST, v)
     pages = sum(cols[n].pages for n in data.TEST)
     return {"level": v, "nocheck": 100 * derived(auto)["pages_in_exact_doc"], "checks": 100 * flagged / pages,
@@ -474,8 +476,10 @@ def render(boxes: dict, dev_fit: dict, frozen: dict, notes: str) -> str:
     L += ["", f"The development fit (all three dev boxes): scale {dev_fit['scale']:.2f}, bias {dev_fit['bias']:.2f}, "
           f"beta ({', '.join(f'{v:.2f}' for v in dev_fit['beta'])}); the dev boxes' own rows are leave-one-box-out.", "",
           "### options.md's five figures, test boxes (Stanton and RG165)", "",
-          "The flag level fitted on the development boxes (leave-one-box-out answers) for 98% after checking, then "
-          "applied once to the test boxes, as options.py does; the 2B's row reproduces options.md's.", "",
+          "The flag level is the lowest that brings every development box to 98% after checking (ensemble.fit_level), "
+          "then applied once to the test boxes, as options.py does; the 2B's row reproduces options.md's. For "
+          "doc-split-v1's refit row the level is fitted on the dev boxes' leave-one-box-out scores and applied to the "
+          "test boxes' all-dev-fit scores, whose beta calibrations differ slightly.", "",
           "| source | flag level | pages exact, no checking | checks per 100 pages | pages right after checking | "
           "unflagged errors per 500 pages (count) |", "|---|---|---|---|---|---|",
           *[f"| {ZNAMES.get(k, k)} | {_lvl(r['level'])} | {r['nocheck']:.1f}% | {r['checks']:.1f} | "

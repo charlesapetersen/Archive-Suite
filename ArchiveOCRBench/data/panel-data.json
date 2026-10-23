@@ -1531,6 +1531,28 @@
    "batch": null,
    "farmshare": true,
    "source": "seg-students.md"
+  },
+  {
+   "name": "doc-split-v1 zero-shot (open, Mac CPU; not in the app)",
+   "nocheck": 17.3,
+   "checks": 83.2,
+   "after": 100.0,
+   "unflagged": 0,
+   "std": null,
+   "batch": null,
+   "mac": true,
+   "source": "seg-adapt-curve-owner.json"
+  },
+  {
+   "name": "doc-split-v1 refit on the development boxes (open, Mac CPU; not in the app)",
+   "nocheck": 28.5,
+   "checks": 86.8,
+   "after": 100.0,
+   "unflagged": 0,
+   "std": null,
+   "batch": null,
+   "mac": true,
+   "source": "seg-adapt-curve-owner.json"
   }
  ],
  "handwriting": {
