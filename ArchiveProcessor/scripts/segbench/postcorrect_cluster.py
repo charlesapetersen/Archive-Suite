@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""W46.ocr-postcorrect, the cluster half: send postcorrect.py's requests to a local vLLM server; stdlib only.
+"""The cluster half of W46.ocr-postcorrect and W46.date-image: send a pack's requests to a local vLLM server; stdlib only.
 
     python3 postcorrect_cluster.py --root ROOT [--concurrency 8] [--limit N]
 
-ROOT holds requests.jsonl (and images/ for the 96). Each reply is saved as ROOT/out/<id>.json; a request already
+ROOT holds requests.jsonl (and any images the pack uploads). Each reply is saved as ROOT/out/<id>.json; a request already
 answered is not sent again, so a resubmitted job only does what is left. An image whose hash differs from the
 request's is refused, never sent. Temperature 0, thinking off, max_tokens 8192, as the open sweep's collector.
 """
@@ -22,10 +22,14 @@ todo = [r for r in reqs if not (out / f"{r['id']}.json").exists()]
 
 def send(r):
     content = []
-    if r['image']:
-        b = pathlib.Path(r['image']).read_bytes()
-        if hashlib.sha256(b).hexdigest() != r['image_sha256']:
-            raise ValueError('image hash differs: ' + r['image'])
+    # One image (`image`, `image_sha256`) or several in order (`images`, `image_sha256s`), as the pack gives them.
+    pairs = list(zip(r.get('images') or [], r.get('image_sha256s') or []))
+    if r.get('image'):
+        pairs.append((r['image'], r['image_sha256']))
+    for path, digest in pairs:
+        b = pathlib.Path(path).read_bytes()
+        if hashlib.sha256(b).hexdigest() != digest:
+            raise ValueError('image hash differs: ' + path)
         content.append({'type': 'image_url', 'image_url': {'url': 'data:image/jpeg;base64,' + base64.b64encode(b).decode()}})
     content.append({'type': 'text', 'text': r['prompt']})
     body = {'model': model, 'messages': [{'role': 'user', 'content': content}], 'temperature': 0, 'max_tokens': 8192,
