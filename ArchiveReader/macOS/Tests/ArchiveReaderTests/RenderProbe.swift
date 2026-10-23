@@ -196,6 +196,15 @@ struct InkContrast: CustomStringConvertible {
         return InkContrast(background: background, ink: ink)
     }
 
+    /// WCAG 2 relative luminance of an sRGB colour given as 0…1 components.
+    static func relativeLuminance(red: Double, green: Double, blue: Double) -> Double {
+        func linear(_ c: Double) -> Double { c <= 0.04045 ? c / 12.92 : pow((c + 0.055) / 1.055, 2.4) }
+        return 0.2126 * linear(red) + 0.7152 * linear(green) + 0.0722 * linear(blue)
+    }
+
+    /// WCAG 2 contrast ratio of two relative luminances.
+    static func ratio(_ a: Double, _ b: Double) -> Double { (max(a, b) + 0.05) / (min(a, b) + 0.05) }
+
     /// The relative luminance of every opaque pixel, the sRGB channels linearised as WCAG 2 defines.
     static func relativeLuminances(_ cgImage: CGImage) -> [Double] {
         let w = cgImage.width, h = cgImage.height
@@ -207,10 +216,6 @@ struct InkContrast: CustomStringConvertible {
         ctx.draw(cgImage, in: CGRect(x: 0, y: 0, width: w, height: h))
         guard let data = ctx.data else { return [] }
         let ptr = data.bindMemory(to: UInt8.self, capacity: h * bytesPerRow)
-        func linear(_ byte: UInt8) -> Double {
-            let c = Double(byte) / 255
-            return c <= 0.04045 ? c / 12.92 : pow((c + 0.055) / 1.055, 2.4)
-        }
         var lums: [Double] = []
         lums.reserveCapacity(w * h)
         for y in 0..<h {
@@ -218,7 +223,8 @@ struct InkContrast: CustomStringConvertible {
             for x in 0..<w {
                 let o = row + x * 4
                 guard ptr[o + 3] > 0 else { continue }
-                lums.append(0.2126 * linear(ptr[o]) + 0.7152 * linear(ptr[o + 1]) + 0.0722 * linear(ptr[o + 2]))
+                lums.append(relativeLuminance(red: Double(ptr[o]) / 255, green: Double(ptr[o + 1]) / 255,
+                                              blue: Double(ptr[o + 2]) / 255))
             }
         }
         return lums

@@ -7,13 +7,17 @@ import XCTest
 /// tag chips merged into the selection highlight (worst in dark). The layout guard cannot see colour, so this
 /// lays the Reader's own Read and File tags cells out in a real `NSTableView`, selects the row with emphasis,
 /// renders it headlessly and measures the WCAG contrast of the label and of each chip against the row.
+///
+/// What each should measure is worked out from the system colours of the appearance (the selected-row text colour
+/// on the selection colour, the accent on the row), so the test holds whatever accent colour the Mac is set to;
+/// the 3:1 floor is asserted where Apple's own pair clears it, which the blue default does by a wide margin.
 @MainActor
 final class SelectedRowContrastTests: XCTestCase {
 
     private static let subjects = ["Jerry Brown", "Economics", "1983"]
     private static let appearances: [(String, NSAppearance.Name)] = [("light", .aqua), ("dark", .darkAqua)]
-    /// WCAG's floor for large text. Before the fix the accent label measured about 1.7 on the selection; white
-    /// measures about 6.
+    /// WCAG's floor for large text. Before the fix the accent label measured about 1.3–1.6 on the selection;
+    /// white measures 5.4 (light) and 6.3 (dark).
     private static let floor = 3.0
 
     func testUnreadAndChipsReadOnASelectedRow() throws {
@@ -32,23 +36,23 @@ final class SelectedRowContrastTests: XCTestCase {
             XCTAssertEqual(readCell.backgroundStyle, .emphasized, "\(name): the selected row should emphasize its cells")
             XCTAssertTrue(tagCell.tokenField.isEmphasized, "\(name): the field should know its row is selected")
             let field = tagCell.tokenField
-            XCTAssertGreaterThanOrEqual(field.bounds.height + 0.01,
-                                        TagChips.layout(field.chipTitles, font: field.font!, width: field.bounds.width).height,
+            XCTAssertGreaterThanOrEqual(field.bounds.height + 0.01, field.chipsLayout(width: field.bounds.width).height,
                                         "\(name): one line of chips must fit the row's field (\(field.bounds.height) pt)")
 
+            let expected = expectedContrast(.alternateSelectedControlTextColor, over: .selectedContentBackgroundColor,
+                                            in: appearance)
             let label = try XCTUnwrap(readCell.textField)
             let labelContrast = try measure(image, rect: label.bounds, in: label, scroll: scroll, scale: scale)
-            print("[W40.selrow] \(name) selected, Unread: \(labelContrast)")
-            XCTAssertGreaterThan(labelContrast.ratio, Self.floor, "\(name): Unread on the selection: \(labelContrast)")
+            print("[W40.selrow] \(name) selected, Unread: \(labelContrast); system pair \(expected)")
+            assertContrast(labelContrast, expected: expected, "\(name): Unread on the selection")
             // The selection must have drawn behind it, or an accent label on an unselected row would pass.
-            XCTAssert((0.02...0.5).contains(labelContrast.background),
-                      "\(name): the row behind the label is not the selection highlight: \(labelContrast)")
+            XCTAssertEqual(labelContrast.background, luminance(.selectedContentBackgroundColor, in: appearance),
+                           accuracy: 0.02, "\(name): the row behind the label is not the selection highlight")
 
-            for (chip, contrast) in try chipContrasts(image, cell: tagCell, scroll: scroll, scale: scale) {
-                print("[W40.selrow] \(name) selected, chip \(chip.title): \(contrast)")
-                XCTAssertGreaterThan(contrast.ratio, Self.floor, "\(name): chip \(chip.title) on the selection: \(contrast)")
-                XCTAssert((0.02...0.5).contains(contrast.background),
-                          "\(name): chip \(chip.title) is not on the selection highlight: \(contrast)")
+            for chip in try chipContrasts(image, cell: tagCell, scroll: scroll, scale: scale) {
+                print("[W40.selrow] \(name) selected, chip \(chip.title): outline \(chip.whole); title \(chip.text)")
+                assertContrast(chip.whole, expected: expected, "\(name): chip \(chip.title), outline on the selection")
+                assertContrast(chip.text, expected: expected, "\(name): chip \(chip.title), title on the selection")
             }
         }
     }
@@ -65,13 +69,18 @@ final class SelectedRowContrastTests: XCTestCase {
             let (image, scale) = try render(scroll, artifact: "w40-ordinary-row-\(name).png")
             XCTAssertEqual(readCell.backgroundStyle, .normal, "\(name): an unselected row's cells are normal")
             XCTAssertFalse(tagCell.tokenField.isEmphasized)
+
             let label = try XCTUnwrap(readCell.textField)
             let labelContrast = try measure(image, rect: label.bounds, in: label, scroll: scroll, scale: scale)
-            print("[W40.selrow] \(name) ordinary, Unread: \(labelContrast)")
-            XCTAssertGreaterThan(labelContrast.ratio, Self.floor, "\(name): Unread on an ordinary row: \(labelContrast)")
-            for (chip, contrast) in try chipContrasts(image, cell: tagCell, scroll: scroll, scale: scale) {
-                print("[W40.selrow] \(name) ordinary, chip \(chip.title): \(contrast)")
-                XCTAssertGreaterThan(contrast.ratio, Self.floor, "\(name): chip \(chip.title) on its fill: \(contrast)")
+            let labelExpected = expectedContrast(.controlAccentColor, over: .controlBackgroundColor, in: appearance)
+            print("[W40.selrow] \(name) ordinary, Unread: \(labelContrast); system pair \(labelExpected)")
+            assertContrast(labelContrast, expected: labelExpected, "\(name): Unread on an ordinary row")
+
+            let chipExpected = expectedContrast(.labelColor, over: TagChips.fill, over: .controlBackgroundColor,
+                                                in: appearance)
+            for chip in try chipContrasts(image, cell: tagCell, scroll: scroll, scale: scale) {
+                print("[W40.selrow] \(name) ordinary, chip \(chip.title): \(chip.text); system pair \(chipExpected)")
+                assertContrast(chip.text, expected: chipExpected, "\(name): chip \(chip.title), title on its fill")
             }
         }
     }
@@ -79,6 +88,8 @@ final class SelectedRowContrastTests: XCTestCase {
     /// Non-vacuity: the measure must fail the label the Reader used to draw, the accent on the selection.
     func testProbeFailsTheAccentLabelOnTheSelection() throws {
         for (name, appearance) in Self.appearances {
+            let expected = expectedContrast(.controlAccentColor, over: .selectedContentBackgroundColor, in: appearance)
+            try XCTSkipIf(expected >= Self.floor, "\(name): this accent reads on its own selection (\(expected))")
             let size = CGSize(width: 120, height: 24)
             let container = NSView(frame: CGRect(origin: .zero, size: size))
             container.appearance = NSAppearance(named: appearance)
@@ -110,9 +121,9 @@ final class SelectedRowContrastTests: XCTestCase {
         }
     }
 
-    /// One line of the Reader's chips is as tall as one line of native tokens, within a point, at the list text
-    /// sizes the Options offer, so drawing the chips does not change a row's height. (A selection cannot change
-    /// it either: `TagChips.layout` takes no state.)
+    /// One line of the Reader's chips is exactly as tall as one line of native tokens at the list text sizes the
+    /// Options offer, so drawing the chips changes no row's height and starting to edit moves nothing by a point.
+    /// (A selection cannot change it either: `TagChips.layout` takes no state.)
     func testChipsKeepTheNativeRowHeight() {
         for size in [10, 13, 16, 20] as [CGFloat] {
             let cell = TagTokenCellView(frame: NSRect(x: 0, y: 0, width: 900, height: 20))
@@ -120,7 +131,27 @@ final class SelectedRowContrastTests: XCTestCase {
             cell.tokenField.objectValue = Self.subjects
             let native = cell.tokenField.height(editing: true, width: 896)
             let chips = cell.tokenField.height(editing: false, width: 896)
-            XCTAssertEqual(chips, native, accuracy: 1, "at \(size) pt: chips \(chips), native tokens \(native)")
+            XCTAssertEqual(chips, native, accuracy: 0.01, "at \(size) pt: chips \(chips), native tokens \(native)")
+            XCTAssertGreaterThan(chips, size, "at \(size) pt a line of chips should be taller than the text")
+        }
+    }
+
+    /// A row is measured before its field has a width, as one line; once laid out, a field whose chips wrap asks
+    /// the table to measure the row again, and asks once. A field whose chips fit asks for nothing.
+    func testACellTooShortForItsChipsAsksForItsRowHeightAgainOnce() throws {
+        let wrapping = ["Economics", "1983", "Agricultural Labor Relations", "Brown", "Budget", "Legislative Analyst"]
+        for (subjects, expectedNotes) in [(wrapping, [0]), (Self.subjects, [])] {
+            let harness = SelectedRowHarness(subjects: subjects, readState: .read)
+            let scroll = harness.makeScrollView(size: CGSize(width: 420, height: 60), appearance: .aqua, selected: false)
+            let table = try XCTUnwrap(scroll.documentView as? RecordingTableView)
+            let field = try XCTUnwrap(harness.tagCell).tokenField
+            let needed = field.chipsLayout(width: field.bounds.width).height
+            XCTAssertEqual(needed > field.bounds.height, !expectedNotes.isEmpty,
+                           "\(subjects.count) tags in \(field.bounds.width) pt need \(needed) pt of \(field.bounds.height)")
+            RunLoop.main.run(until: Date().addingTimeInterval(0.1))   // the cell re-notes on the next turn
+            scroll.layoutSubtreeIfNeeded()
+            RunLoop.main.run(until: Date().addingTimeInterval(0.1))
+            XCTAssertEqual(table.notedRows, expectedNotes, "\(subjects.count) tags: rows asked to be measured again")
         }
     }
 
@@ -168,19 +199,85 @@ final class SelectedRowContrastTests: XCTestCase {
         return try XCTUnwrap(InkContrast.measure(crop), "too small a crop to measure: \(pixels)")
     }
 
-    /// Every chip's contrast, each measured inside the frame `TagChips` laid it out in.
+    private struct ChipContrast {
+        let title: String
+        /// Over the chip's whole frame: on a selected row the outline is the ink.
+        let whole: InkContrast
+        /// Over the title's rect alone, inside the padding: the lettering is the ink.
+        let text: InkContrast
+    }
+
+    /// Every chip's contrast, each measured inside the frame the field laid it out in.
     private func chipContrasts(_ image: CGImage, cell: TagTokenCellView, scroll: NSScrollView,
-                               scale: CGFloat) throws -> [(TagChips.Chip, InkContrast)] {
+                               scale: CGFloat) throws -> [ChipContrast] {
         let field = cell.tokenField
-        let layout = TagChips.layout(field.chipTitles, font: try XCTUnwrap(field.font), width: field.bounds.width)
+        let layout = field.chipsLayout(width: field.bounds.width)
         XCTAssertEqual(layout.chips.count, Self.subjects.count)
+        let padding = TagChips.horizontalPadding(for: try XCTUnwrap(field.font))
         return try layout.chips.map { chip in
-            // The layout is top-down; the field may not be flipped.
-            let viewRect = field.isFlipped ? chip.frame
-                : CGRect(x: chip.frame.minX, y: field.bounds.height - chip.frame.maxY,
-                         width: chip.frame.width, height: chip.frame.height)
-            return (chip, try measure(image, rect: viewRect, in: field, scroll: scroll, scale: scale))
+            let whole = try measure(image, rect: viewRect(chip.frame, in: field), in: field, scroll: scroll, scale: scale)
+            let text = try measure(image, rect: viewRect(chip.frame.insetBy(dx: padding, dy: 2), in: field),
+                                   in: field, scroll: scroll, scale: scale)
+            return ChipContrast(title: chip.title, whole: whole, text: text)
         }
+    }
+
+    /// `TagChips` lays out top-down; the field may not be flipped.
+    private func viewRect(_ topDown: CGRect, in view: NSView) -> CGRect {
+        view.isFlipped ? topDown
+            : CGRect(x: topDown.minX, y: view.bounds.height - topDown.maxY, width: topDown.width, height: topDown.height)
+    }
+
+    /// The measured contrast must be the system pair's, and clear the floor where that pair does.
+    /// The ink is sampled from antialiased glyphs, whose edges never reach the pure colour, so a thin dark title on
+    /// a pale chip reads up to about a tenth below its pair (9.9 against 10.9, light); the measure may fall short of
+    /// the pair by 15 % but never exceed it by more than 8 %.
+    private func assertContrast(_ measured: InkContrast, expected: Double, _ what: String,
+                                file: StaticString = #filePath, line: UInt = #line) {
+        XCTAssert((expected * 0.85 - 0.5...expected * 1.08 + 0.5).contains(measured.ratio),
+                  "\(what): \(measured), the system pair measures \(expected)", file: file, line: line)
+        if expected >= Self.floor {
+            XCTAssertGreaterThan(measured.ratio, Self.floor, "\(what): \(measured)", file: file, line: line)
+        }
+    }
+
+    /// The WCAG contrast of `ink` drawn over `background` (each composited by its own alpha, `background` first
+    /// over `base`), as the appearance resolves the colours. Quartz blends in the bitmap's gamma-encoded space, as
+    /// this does, before linearising.
+    private func expectedContrast(_ ink: NSColor, over background: NSColor, over base: NSColor? = nil,
+                                  in appearance: NSAppearance.Name) -> Double {
+        let bg = luminance(background, over: base, in: appearance)
+        return InkContrast.ratio(luminance(ink, over: background, over: base, in: appearance), bg)
+    }
+
+    private func luminance(_ color: NSColor, over background: NSColor? = nil, over base: NSColor? = nil,
+                           in appearance: NSAppearance.Name) -> Double {
+        var result = 0.0
+        NSAppearance(named: appearance)!.performAsCurrentDrawingAppearance {
+            func rgb(_ c: NSColor) -> (Double, Double, Double, Double) {
+                let s = c.usingColorSpace(.sRGB)!
+                return (Double(s.redComponent), Double(s.greenComponent), Double(s.blueComponent), Double(s.alphaComponent))
+            }
+            func composite(_ top: (Double, Double, Double, Double), over bottom: (Double, Double, Double)) -> (Double, Double, Double) {
+                (top.3 * top.0 + (1 - top.3) * bottom.0, top.3 * top.1 + (1 - top.3) * bottom.1, top.3 * top.2 + (1 - top.3) * bottom.2)
+            }
+            var stack: (Double, Double, Double) = (1, 1, 1)
+            if let base { let b = rgb(base); stack = (b.0, b.1, b.2) }
+            if let background { stack = composite(rgb(background), over: stack) }
+            let c = composite(rgb(color), over: stack)
+            result = InkContrast.relativeLuminance(red: c.0, green: c.1, blue: c.2)
+        }
+        return result
+    }
+}
+
+/// An `NSTableView` that records which rows were asked to be measured again.
+@MainActor
+private final class RecordingTableView: NSTableView {
+    private(set) var notedRows: [Int] = []
+    override func noteHeightOfRows(withIndexesChanged indexSet: IndexSet) {
+        notedRows += indexSet
+        super.noteHeightOfRows(withIndexesChanged: indexSet)
     }
 }
 
@@ -212,7 +309,7 @@ private final class SelectedRowHarness: NSObject, NSTableViewDataSource, NSTable
     func makeScrollView(size: CGSize, appearance: NSAppearance.Name, selected: Bool) -> NSScrollView {
         let scroll = NSScrollView(frame: CGRect(origin: .zero, size: size))
         scroll.appearance = NSAppearance(named: appearance)
-        let table = NSTableView()
+        let table = RecordingTableView()
         table.style = .plain
         // The app measures its rows automatically, which off-window gives the table's whole height instead; 21 pt
         // is what its rows measure at 13 pt (a label and its 2-pt margins), so the chips have to fit a real row.

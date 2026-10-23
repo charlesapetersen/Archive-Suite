@@ -676,7 +676,7 @@ final class TintedTextCellView: NSTableCellView {
     }
 
     override var backgroundStyle: NSView.BackgroundStyle {
-        didSet { applyTint() }
+        didSet { if backgroundStyle != oldValue { applyTint() } }
     }
 
     private func applyTint() {
@@ -729,10 +729,14 @@ final class TagTokenCellView: NSTableCellView {
     /// filled on an ordinary row, outlined in the selected-row text colour on an emphasized one.
     override var backgroundStyle: NSView.BackgroundStyle {
         didSet {
+            guard backgroundStyle != oldValue else { return }
             tokenField.cell?.backgroundStyle = backgroundStyle
             tokenField.needsDisplay = true
         }
     }
+
+    /// The height this cell last asked its row to grow to, so a table that keeps a row short is asked once.
+    private var lastNotedHeight: CGFloat?
 
     /// The field wraps its tokens to its width, so the height it asks for must follow that width, and the row must
     /// be measured again when it changes: automatic row heights measure a row once, before this cell has a width, so
@@ -741,24 +745,33 @@ final class TagTokenCellView: NSTableCellView {
     override func layout() {
         super.layout()
         let width = tokenField.frame.width
-        guard width > 0, tokenField.preferredMaxLayoutWidth != width else { return }
-        tokenField.preferredMaxLayoutWidth = width
-        noteRowHeightIfStale()
+        guard width > 0 else { return }
+        if tokenField.preferredMaxLayoutWidth != width {
+            let before = tokenField.intrinsicContentSize.height
+            tokenField.preferredMaxLayoutWidth = width
+            tokenField.invalidateIntrinsicContentSize()
+            lastNotedHeight = nil
+            if tokenField.intrinsicContentSize.height != before {
+                noteRowHeight()
+                return
+            }
+        }
+        // Before the field had a width it was measured as one line; a field whose chips wrap is then too short.
+        let needed = tokenField.intrinsicContentSize.height
+        guard tokenField.bounds.height + 0.5 < needed, lastNotedHeight != needed else { return }
+        lastNotedHeight = needed
+        noteRowHeight()
     }
 
     /// The field editor lays the tokens out natively while the Reader's chips are drawn otherwise, and the two can
-    /// need different heights; told after the editor comes or goes.
+    /// wrap differently; told after the editor comes or goes.
     private func editingStateChanged() {
         tokenField.needsDisplay = true
-        noteRowHeightIfStale()
-    }
-
-    /// The row was measured at whatever height the field last reported, before it had a width or in the other
-    /// editing state; if the height it needs now differs, the row is measured again.
-    private func noteRowHeightIfStale() {
-        let measured = tokenField.lastReportedHeight
         tokenField.invalidateIntrinsicContentSize()
-        guard tokenField.intrinsicContentSize.height != measured else { return }
+        let width = tokenField.preferredMaxLayoutWidth > 0 ? tokenField.preferredMaxLayoutWidth : tokenField.frame.width
+        guard width > 0,
+              tokenField.height(editing: true, width: width) != tokenField.height(editing: false, width: width)
+        else { return }
         noteRowHeight()
     }
 
@@ -797,14 +810,25 @@ final class WrappingTokenField: NSTokenField {
 
     private var chipFont: NSFont { font ?? .systemFont(ofSize: NSFont.systemFontSize) }
 
-    /// The height last handed to Auto Layout, so the cell can tell when the row was measured at a stale one.
-    private(set) var lastReportedHeight: CGFloat?
+    /// One line of native tokens, which is the chips' line height too, so a row measured for the chips is the row
+    /// the tokens had, and the field editor needs no other height for one line.
+    private var nativeLineHeight: CGFloat {
+        nativeHeight(width: .greatestFiniteMagnitude) ?? TagChips.chipHeight(for: chipFont)
+    }
+
+    private func nativeHeight(width: CGFloat) -> CGFloat? {
+        guard let cell else { return nil }
+        return ceil(cell.cellSize(forBounds: NSRect(x: 0, y: 0, width: width, height: .greatestFiniteMagnitude)).height)
+    }
+
+    /// The chips as this field lays them out at `width`.
+    func chipsLayout(width: CGFloat) -> TagChips.Layout {
+        TagChips.layout(chipTitles, font: chipFont, width: width, lineHeight: nativeLineHeight)
+    }
 
     override var intrinsicContentSize: NSSize {
         let width = preferredMaxLayoutWidth > 0 ? preferredMaxLayoutWidth : frame.width
-        let height = height(editing: isBeingEdited, width: width)
-        lastReportedHeight = height
-        return NSSize(width: NSView.noIntrinsicMetric, height: height)
+        return NSSize(width: NSView.noIntrinsicMetric, height: height(editing: isBeingEdited, width: width))
     }
 
     /// The height the field needs at `width`: the native tokens' while editing, the Reader's chips' otherwise.
@@ -812,18 +836,19 @@ final class WrappingTokenField: NSTokenField {
     /// wrap is measured again once the cell is laid out (`TagTokenCellView.layout`).
     func height(editing: Bool, width: CGFloat) -> CGFloat {
         let width = width > 0 ? width : CGFloat.greatestFiniteMagnitude
-        if !editing { return TagChips.layout(chipTitles, font: chipFont, width: width).height }
-        guard let cell else { return TagChips.chipHeight(for: chipFont) }
-        let size = cell.cellSize(forBounds: NSRect(x: 0, y: 0, width: width, height: .greatestFiniteMagnitude))
-        return ceil(size.height)
+        if !editing { return chipsLayout(width: width).height }
+        return nativeHeight(width: width) ?? nativeLineHeight
     }
 
     override func draw(_ dirtyRect: NSRect) {
         guard !isBeingEdited else { return super.draw(dirtyRect) }
-        let layout = TagChips.layout(chipTitles, font: chipFont, width: bounds.width)
+        NSGraphicsContext.saveGraphicsState()
+        defer { NSGraphicsContext.restoreGraphicsState() }
+        bounds.clip()
+        let layout = chipsLayout(width: bounds.width)
         if layout.chips.isEmpty {
             TagChips.drawPlaceholder(placeholderString ?? "", in: bounds, flipped: isFlipped,
-                                     font: chipFont, emphasized: isEmphasized)
+                                     font: chipFont, emphasized: isEmphasized, lineHeight: nativeLineHeight)
         } else {
             TagChips.draw(layout, in: bounds, flipped: isFlipped, font: chipFont, emphasized: isEmphasized)
         }

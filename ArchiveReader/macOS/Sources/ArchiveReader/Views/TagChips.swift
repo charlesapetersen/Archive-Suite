@@ -39,9 +39,9 @@ enum TagChips {
     static func chipGap(for font: NSFont) -> CGFloat { ceil(font.pointSize / 2) }
 
     /// Flows the chips left to right, wrapping at `width`. A chip wider than the field is clamped to it and its
-    /// title truncated when drawn.
-    static func layout(_ titles: [String], font: NSFont, width: CGFloat) -> Layout {
-        let height = chipHeight(for: font)
+    /// title truncated when drawn. `lineHeight` is the chips' height; the field passes one line of native tokens.
+    static func layout(_ titles: [String], font: NSFont, width: CGFloat, lineHeight: CGFloat? = nil) -> Layout {
+        let height = lineHeight ?? chipHeight(for: font)
         let padding = horizontalPadding(for: font)
         let gap = chipGap(for: font)
         let maxWidth = max(width - leadingInset, 1)
@@ -70,20 +70,21 @@ enum TagChips {
         let padding = horizontalPadding(for: font)
         for chip in layout.chips {
             let frame = viewRect(chip.frame, in: bounds, flipped: flipped)
-            let path = NSBezierPath(roundedRect: frame.insetBy(dx: 0.5, dy: 0.5),
-                                    xRadius: cornerRadius, yRadius: cornerRadius)
             if emphasized {
+                // Inset by half the line, so the whole 1-pt stroke lies inside the chip's frame.
+                let path = NSBezierPath(roundedRect: frame.insetBy(dx: 0.5, dy: 0.5),
+                                        xRadius: cornerRadius, yRadius: cornerRadius)
                 ink.setStroke()
                 path.lineWidth = 1
                 path.stroke()
             } else {
                 fill.setFill()
-                path.fill()
+                NSBezierPath(roundedRect: frame, xRadius: cornerRadius, yRadius: cornerRadius).fill()
             }
             let title = attributedTitle(chip.title, font: font, color: ink)
             let textHeight = ceil(title.size().height)
             let textRect = CGRect(x: frame.minX + padding,
-                                  y: frame.midY - textHeight / 2,
+                                  y: (frame.midY - textHeight / 2).rounded(),
                                   width: max(frame.width - 2 * padding, 1),
                                   height: textHeight)
             title.draw(with: textRect, options: [.usesLineFragmentOrigin, .truncatesLastVisibleLine])
@@ -91,16 +92,19 @@ enum TagChips {
     }
 
     /// The field's placeholder, on the first chip line, in the placeholder colour of the row's state.
-    static func drawPlaceholder(_ text: String, in bounds: CGRect, flipped: Bool, font: NSFont, emphasized: Bool) {
+    static func drawPlaceholder(_ text: String, in bounds: CGRect, flipped: Bool, font: NSFont, emphasized: Bool,
+                                lineHeight: CGFloat? = nil) {
         let color: NSColor = emphasized
             ? NSColor.alternateSelectedControlTextColor.withAlphaComponent(0.7)
             : .placeholderTextColor
         let title = attributedTitle(text, font: font, color: color)
         let textHeight = ceil(title.size().height)
         let line = viewRect(CGRect(x: leadingInset + 2, y: verticalInset,
-                                   width: max(bounds.width - leadingInset - 2, 1), height: chipHeight(for: font)),
+                                   width: max(bounds.width - leadingInset - 2, 1),
+                                   height: lineHeight ?? chipHeight(for: font)),
                             in: bounds, flipped: flipped)
-        title.draw(with: CGRect(x: line.minX, y: line.midY - textHeight / 2, width: line.width, height: textHeight),
+        title.draw(with: CGRect(x: line.minX, y: (line.midY - textHeight / 2).rounded(),
+                                width: line.width, height: textHeight),
                    options: [.usesLineFragmentOrigin, .truncatesLastVisibleLine])
     }
 
