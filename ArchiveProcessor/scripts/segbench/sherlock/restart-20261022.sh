@@ -12,7 +12,7 @@
 #   W46.enh-dewarp         Qwen3.6-27B and LightOnOCR-3 4B, each a three-image pilot then its shards
 #   W46.enh-ocr-input      the two enhancement jobs, then the three vLLM readers afterok them
 #   W46.ocr-logprob        its two GPU jobs (each runs its own three-page gate)
-# Not here: PP-OCRv6 (dewarp and enh-ocr-input) has no environment on Sherlock yet; W46.date-traceable-vision and
+# PP-OCRv6 (dewarp and enh-ocr-input) is the ppocr section, on its own overlay venv (setup-ppocr-job.sh); W46.date-traceable-vision and
 # W46.date-enclosure use the old kit's text mode, ported separately. Job ids: $FS_ROOT/sherlock-20261022.tsv.
 set -euo pipefail
 DRY="${1:-}"
@@ -40,14 +40,18 @@ hours() { python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))[sys.arg
 # Slurm opens each --output when the job starts; the folders must exist by then, and stage-job.sh only adds to them.
 [ "$DRY" = --dry-run ] || mkdir -p "$LOOPS/logs" "$REG/logs" "$DEW/logs" "$ENH/logs" "$LP/logs"
 
-stage=$(run sbatch --parsable --output="$FS_ROOT/logs/stage-%j.out" "$SH_DIR/stage-job.sh" "$SH_DIR" \
-  loop-rerun-20261021 regions-20261021 dewarp-20261022 enh-ocr-input-20261022 logprob-20261022 \
-  open-sweep-20261019 truth96-20261020 interactive-20261018/ocr interactive-20261019/ocr)   # prompts, readings, page images the packs name
-rec stage - "$stage"
-pilot=$(run sbatch --parsable "${G1[@]}" --time=01:00:00 --dependency="afterok:$stage" --job-name=sh-env-pilot \
-  --output="$FS_ROOT/logs/slurm-%j.out" "$CORPUS/loop-rerun-job.sh" "$LOOPS" pilot ngram)
-rec env-pilot loops "$pilot"
-after=(--dependency="afterok:$pilot")
+# The vLLM sections share one stage job and one environment pilot; ONLY=ppocr needs neither.
+vllm=0; for s in loops regions dewarp enh enhprobe logprob text; do want "$s" && vllm=1; done
+if [ "$vllm" = 1 ]; then
+  stage=$(run sbatch --parsable --output="$FS_ROOT/logs/stage-%j.out" "$SH_DIR/stage-job.sh" "$SH_DIR" \
+    loop-rerun-20261021 regions-20261021 dewarp-20261022 enh-ocr-input-20261022 logprob-20261022 \
+    open-sweep-20261019 truth96-20261020 interactive-20261018/ocr interactive-20261019/ocr)   # prompts, readings, page images the packs name
+  rec stage - "$stage"
+  pilot=$(run sbatch --parsable "${G1[@]}" --time=01:00:00 --dependency="afterok:$stage" --job-name=sh-env-pilot \
+    --output="$FS_ROOT/logs/slurm-%j.out" "$CORPUS/loop-rerun-job.sh" "$LOOPS" pilot ngram)
+  rec env-pilot loops "$pilot"
+  after=(--dependency="afterok:$pilot")
+fi
 
 if want loops; then
 # W46.ocr-loops (routes.json gives each route's hours, as loop-rerun-submit.sh reads them)
@@ -141,6 +145,23 @@ for spec in date-traceable-vision:fs-tracepack-vision date-enclosure:fs-enclosur
     --output="$FS_ROOT/logs/%x-%j.out" "$SH_DIR/text-job.sh")
   rec text "$item" "$id"
 done
+fi
+
+if want ppocr; then
+# PP-OCRv6 for W46.enh-dewarp and W46.enh-ocr-input (owner, 2026-10-22): its overlay venv first (setup-ppocr-job.sh,
+# CPU), then dewarp's three-image pilot, then dewarp's one shard and the enhancement test's reader on the DocRes
+# images (made 2026-10-22 by enh-arms, so no enhancement job is waited on).
+setup=$(run sbatch --parsable --output="$FS_ROOT/logs/ppocr-setup-%j.out" "$SH_DIR/setup-ppocr-job.sh" "$SH_DIR")
+rec ppocr setup "$setup"
+pp=$(run sbatch --parsable "${G1[@]}" --time=01:00:00 --dependency="afterok:$setup" --job-name=dewarp-pilot-ppocrv6 \
+  --output="$DEW/logs/slurm-%j.out" "$CORPUS/dewarp-job.sh" "$DEW" ppocrv6 0/1 3)
+rec ppocr dewarp/pilot "$pp"
+id=$(run sbatch --parsable "${G1[@]}" --time=02:00:00 --dependency="afterok:$pp" --job-name=dewarp-ppocrv6-0 \
+  --output="$DEW/logs/slurm-%j.out" "$CORPUS/dewarp-job.sh" "$DEW" ppocrv6 0/1)
+rec ppocr dewarp/0/1 "$id"
+id=$(run sbatch --parsable "${G1[@]}" --time=02:00:00 --dependency="afterok:$pp" --job-name=enh-ppocr \
+  --output="$ENH/logs/slurm-%j.out" "$CORPUS/enh-ocr-job.sh" "$ENH" ppocr - 0/1)
+rec ppocr enh "$id"
 fi
 
 [ "$DRY" = --dry-run ] || cat "$TSV"

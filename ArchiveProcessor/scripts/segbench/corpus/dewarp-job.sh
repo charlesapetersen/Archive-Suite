@@ -11,7 +11,8 @@ if [ "$ROUTE" = ppocrv6 ]; then
   sweep=/scratch/users/cp1/fs-ocr/ppocrv6-20261019
   export HF_HOME="$sweep/hf" PADDLE_PDX_CACHE_HOME="$ROOT/paddlex-cache" PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK=True
   export HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 OMP_NUM_THREADS="${SLURM_CPUS_PER_TASK:-8}"
-  exec "$sweep/venv/bin/python" "$ROOT/dewarp_cluster.py" ppocr --root "$ROOT" --shard "$SHARD" --limit "$LIMIT"
+  # FS_PPOCR_PY: a cluster env's PP-OCRv6 interpreter (Sherlock: sherlock/bin/ppocr-py); FarmShare's venv otherwise.
+  exec "${FS_PPOCR_PY:-$sweep/venv/bin/python}" "$ROOT/dewarp_cluster.py" ppocr --root "$ROOT" --shard "$SHARD" --limit "$LIMIT"
 fi
 # FarmShare's env by default; Sherlock's sherlock/sh.env sets FS_ENV (and FS_CONTAINER: vLLM runs in its image).
 source "${FS_ENV:-/home/users/cp1/Archive-Suite/ArchiveProcessor/scripts/segbench/farmshare/fs.env}"

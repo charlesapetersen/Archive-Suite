@@ -22,7 +22,8 @@ if [ "$KIND" = ppocr ]; then
   sweep=/scratch/users/cp1/fs-ocr/ppocrv6-20261019
   export HF_HOME="$sweep/hf" PADDLE_PDX_CACHE_HOME="$ROOT/paddlex-cache" PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK=True
   export HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 OMP_NUM_THREADS="${SLURM_CPUS_PER_TASK:-8}"
-  exec "$sweep/venv/bin/python" "$ROOT/dewarp_cluster.py" ppocr --root "$ROOT" --shard "$SHARD"
+  # FS_PPOCR_PY: a cluster env's PP-OCRv6 interpreter (Sherlock: sherlock/bin/ppocr-py); FarmShare's venv otherwise.
+  exec "${FS_PPOCR_PY:-$sweep/venv/bin/python}" "$ROOT/dewarp_cluster.py" ppocr --root "$ROOT" --shard "$SHARD"
 fi
 export HF_HOME HF_HUB_OFFLINE=1 TOKENIZERS_PARALLELISM=false
 RUN="$ROOT/$SUB"; [ "$KIND" = regions ] && RUN="$ROOT/glm"

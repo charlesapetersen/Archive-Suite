@@ -1,0 +1,4 @@
+#!/bin/bash
+# PP-OCRv6's python: the overlay venv (setup-ppocr-job.sh) inside the vLLM image, the torchcodec shim first; see ../sh.env.
+exec apptainer -s exec --nv --bind "$SCRATCH,$GROUP_HOME" --env PYTHONPATH="$SH_SHIM${PYTHONPATH:+:$PYTHONPATH}" "$SH_IMG" \
+  "$SH_PPOCR_ENV/bin/python" "$@"
