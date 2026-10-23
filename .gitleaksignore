@@ -1,3 +1,7 @@
 # gitleaks false positives, one fingerprint a line (commit:file:rule:line), each with its reason.
 # A FarmShare model key name (fs_seg.py KEY default), not a credential:
 37d39a95c3d0bf1ebd38fb864abb5b1cc470e95b:ArchiveProcessor/scripts/segbench/farmshare/fs_seg.py:generic-api-key:47
+
+# Open OCR model key names in the W46.ocr-new-open candidates file (2026-10-22), not credentials:
+0b270175a0fed594e44f60466d5bf3ca80d303df:ArchiveProcessor/scripts/segbench/sherlock/new-open/candidates-20261022.json:generic-api-key:10
+0b270175a0fed594e44f60466d5bf3ca80d303df:ArchiveProcessor/scripts/segbench/sherlock/new-open/candidates-20261022.json:generic-api-key:49
