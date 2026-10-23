@@ -37,7 +37,7 @@ mkdir -p "$ROOT/logs" "$ROOT/out/$ROUTE"
 SERVER_LOG="$ROOT/logs/vllm-${SLURM_JOB_ID}-${ROUTE}-${ARM}.log"
 # shellcheck disable=SC2086  # ARGS is the recorded word list
 "$FS_VLLM" serve "$MODEL" --served-model-name "$NAME" --host 127.0.0.1 --port "$PORT" $ARGS \
-  "${LP[@]}" > "$SERVER_LOG" 2>&1 &
+  ${LP[@]+"${LP[@]}"} > "$SERVER_LOG" 2>&1 &   # Bash 4.2 (Sherlock) calls an empty array unbound under set -u
 server=$!
 trap 'kill "$server" 2>/dev/null || true; wait "$server" 2>/dev/null || true' EXIT
 for i in $(seq 1 360); do

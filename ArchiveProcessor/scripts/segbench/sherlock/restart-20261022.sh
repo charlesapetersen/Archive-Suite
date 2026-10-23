@@ -18,7 +18,10 @@ set -euo pipefail
 DRY="${1:-}"
 SH_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SH_DIR/sh.env"
-TSV="$FS_ROOT/sherlock-20261022.tsv"; [ "$DRY" != --dry-run ] || TSV=/dev/stderr
+# ONLY=loops,regions,... submits those sections alone (a partial resubmission), into its own job list.
+ONLY="${ONLY:-}"
+want() { [ -z "$ONLY" ] || [[ ",$ONLY," == *",$1,"* ]]; }
+TSV="$FS_ROOT/sherlock-20261022${ONLY:+-${ONLY//,/-}}.tsv"; [ "$DRY" != --dry-run ] || TSV=/dev/stderr
 [ "$DRY" = --dry-run ] || [ ! -e "$TSV" ] || { echo "$TSV exists: this restart was submitted already"; exit 2; }
 mkdir -p "$FS_ROOT/logs"
 run() { if [ "$DRY" = --dry-run ]; then printf '%q ' "$@" >&2; echo >&2; echo 0; else "$@"; fi; }
@@ -39,13 +42,14 @@ hours() { python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))[sys.arg
 
 stage=$(run sbatch --parsable --output="$FS_ROOT/logs/stage-%j.out" "$SH_DIR/stage-job.sh" "$SH_DIR" \
   loop-rerun-20261021 regions-20261021 dewarp-20261022 enh-ocr-input-20261022 logprob-20261022 \
-  open-sweep-20261019 truth96-20261020 interactive-20261018/ocr)   # the last three: prompts and readings routes.json names
+  open-sweep-20261019 truth96-20261020 interactive-20261018/ocr interactive-20261019/ocr)   # prompts, readings, page images the packs name
 rec stage - "$stage"
 pilot=$(run sbatch --parsable "${G1[@]}" --time=01:00:00 --dependency="afterok:$stage" --job-name=sh-env-pilot \
   --output="$FS_ROOT/logs/slurm-%j.out" "$CORPUS/loop-rerun-job.sh" "$LOOPS" pilot ngram)
 rec env-pilot loops "$pilot"
 after=(--dependency="afterok:$pilot")
 
+if want loops; then
 # W46.ocr-loops (routes.json gives each route's hours, as loop-rerun-submit.sh reads them)
 deps=()
 for route in lightonocr3-4b qwen3.5-4b qwen3-vl-8b qwen3.6-35b-a3b qwen3.6-27b qwen3.5-27b; do
@@ -64,7 +68,9 @@ for arm in ngram half; do
     --output="$LOOPS/logs/slurm-%j.out" "$CORPUS/loop-rerun-job.sh" "$LOOPS" ling3-flash-vl-fp8 "$arm")
   rec loops "ling3-flash-vl-fp8/$arm" "$id"; prev="$id"
 done
+fi
 
+if want regions; then
 # W46.ocr-regions (regions-submit.sh's shards and hours)
 for spec in glm-ocr:1:6 paddleocr-vl1.5:1:8 lightonocr3-4b:1:8 qwen3.6-27b:4:12; do
   IFS=: read -r route shards h <<< "$spec"
@@ -74,7 +80,9 @@ for spec in glm-ocr:1:6 paddleocr-vl1.5:1:8 lightonocr3-4b:1:8 qwen3.6-27b:4:12;
     rec regions "$route/$i/$shards" "$id"
   done
 done
+fi
 
+if want dewarp; then
 # W46.enh-dewarp (dewarp-submit.sh's pilots and shards, without PP-OCRv6)
 for spec in qwen3.6-27b:4:4 lightonocr3-4b:1:2; do
   IFS=: read -r route shards h <<< "$spec"
@@ -87,24 +95,32 @@ for spec in qwen3.6-27b:4:4 lightonocr3-4b:1:2; do
     rec dewarp "$route/$i/$shards" "$id"
   done
 done
+fi
 
-# W46.enh-ocr-input (enh-ocr-submit.sh's enhancement jobs and vLLM readers, without PP-OCRv6)
+if want enh; then
+# W46.enh-ocr-input (enh-ocr-submit.sh's DocRes job and its vLLM readers, without PP-OCRv6; the probe arm is enhprobe)
 main=$(run sbatch --parsable "${G1[@]}" --time=02:00:00 "${after[@]}" --job-name=enh-arms \
   --output="$ENH/logs/slurm-%j.out" "$CORPUS/enh-ocr-job.sh" "$ENH" enhance docres-appearance,docres-deshadow)
 rec enh enhance/main "$main"
-probe=$(run sbatch --parsable "${G1[@]}" --time=08:00:00 "${after[@]}" --job-name=enh-probe \
-  --output="$ENH/logs/slurm-%j.out" "$CORPUS/enh-ocr-job.sh" "$ENH" enhance resshift-s1,resshift-s2,nafdpm-s1,nafdpm-s2)
-rec enh enhance/probe "$probe"
 for spec in whole:qwen3-vl-8b:4 regions:glm-ocr:4; do
   IFS=: read -r kind route h <<< "$spec"
   id=$(run sbatch --parsable "${G1[@]}" --time="$h:00:00" --dependency="afterok:$main" --job-name="enh-$kind-$route" \
     --output="$ENH/logs/slurm-%j.out" "$CORPUS/enh-ocr-job.sh" "$ENH" "$kind" "$route" 0/1)
   rec enh "$kind/$route" "$id"
 done
+fi
+
+if want enhprobe; then
+# W46.enh-ocr-input's probe arm: the two diffusion restorers on the 30 probe pages, then Qwen3.6-27B on them
+probe=$(run sbatch --parsable "${G1[@]}" --time=08:00:00 "${after[@]}" --job-name=enh-probe \
+  --output="$ENH/logs/slurm-%j.out" "$CORPUS/enh-ocr-job.sh" "$ENH" enhance resshift-s1,resshift-s2,nafdpm-s1,nafdpm-s2)
+rec enh enhance/probe "$probe"
 id=$(run sbatch --parsable "${G1[@]}" --time=05:00:00 --dependency="afterok:$probe" --job-name=enh-probe-qwen3.6-27b \
   --output="$ENH/logs/slurm-%j.out" "$CORPUS/enh-ocr-job.sh" "$ENH" whole qwen3.6-27b 0/1 probe)
 rec enh whole/qwen3.6-27b/probe "$id"
+fi
 
+if want logprob; then
 # W46.ocr-logprob (logprob-submit.sh run; the stage job downloads Qwen3.5-9B, so no setup job)
 for route in lightonocr3-4b qwen3.5-9b; do
   h=$(hours "$LP" "$route")
@@ -112,6 +128,9 @@ for route in lightonocr3-4b qwen3.5-9b; do
     --output="$LP/logs/slurm-%j.out" "$CORPUS/logprob-job.sh" "$LP" "$route")
   rec logprob "$route" "$id"
 done
+fi
+
+if want text; then
 # W46.date-traceable-vision and W46.date-enclosure: the old kit's text mode, Qwen3.6-27B thinking off, an hour each,
 # as their FarmShare commands asked (submit.sh text qwen3.6-27b; job.sbatch reads these variables).
 for spec in date-traceable-vision:fs-tracepack-vision date-enclosure:fs-enclosurepack; do
@@ -122,4 +141,6 @@ for spec in date-traceable-vision:fs-tracepack-vision date-enclosure:fs-enclosur
     --output="$FS_ROOT/logs/%x-%j.out" "$SH_DIR/text-job.sh")
   rec text "$item" "$id"
 done
+fi
+
 [ "$DRY" = --dry-run ] || cat "$TSV"
