@@ -14,7 +14,8 @@ mkdir -p "$ROOT/logs"
 source "${FS_ENV:-/home/users/cp1/Archive-Suite/ArchiveProcessor/scripts/segbench/farmshare/fs.env}"
 if [ "$KIND" = enhance ]; then
   # one process an arm: the restorers' clones each bring top-level modules named utils, models and src
-  export PYTHONPATH="$ROOT/pydeps"
+  # SH_ENH_EXTRA (Sherlock): what the image lacks that FarmShare's venv had, after pydeps
+  export PYTHONPATH="$ROOT/pydeps${SH_ENH_EXTRA:+:$SH_ENH_EXTRA}"
   for arm in ${ARG//,/ }; do "$FS_PY" "$ROOT/enh_ocr_cluster.py" enhance --root "$ROOT" --arms "$arm"; done
   exit 0
 fi

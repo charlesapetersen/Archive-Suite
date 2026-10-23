@@ -38,6 +38,19 @@ venvs or merged models) is in `$GROUP_HOME/cp1/archive-suite/FarmShare-scratch-2
 the 10:48 cancellations, with `farmshare-home/` holding `cancelled-20261022.txt` and `fs-enclosurepack/`. Stage a
 pack from there into `$SCRATCH` inside a job; do not copy it from FarmShare again.
 
+The copy has gaps a pack's paths can fall into (2026-10-23, 23 jobs failed on these overnight):
+- FarmShare's `$HOME/fs-truthpack` (the owner's 99 truth pages, named by the regions, logprob, postcorrect and every
+  96-set run) was never copied. It is now in Sherlock's `$HOME/fs-truthpack`, the same absolute path, rebuilt on the
+  Mac with `institutional-compute/cluster_ocr.py pack`; its 99 images match every hash the packs record.
+- Some images a pack names under `interactive-20261019/ocr/images` sit only in the `interactive-20261018` folder.
+- FarmShare's venvs carried packages the vLLM image does not (scipy); `$SH_ENH_EXTRA` holds them for the
+  enhancement arms.
+Before a submission, check every path the pack's json, jsonl, tsv and sh files name, home paths included, not only
+`/scratch` ones. `sherlock/resubmit-20261023.sh` checks its own inputs before it queues anything.
+
+Results come home to `$GROUP_HOME/cp1/archive-suite/sherlock-results/` (`fix-20261023-job.sh` copies them, without
+models, page images, weights or clones) and to the Mac in `~/Library/Caches/ArchiveSuiteRehearsal/sherlock-results/`.
+
 ## Rules a Sherlock job or session follows
 
 - Login nodes are for editing, inspection and submitting jobs. Installs, compiles, model downloads and copies
