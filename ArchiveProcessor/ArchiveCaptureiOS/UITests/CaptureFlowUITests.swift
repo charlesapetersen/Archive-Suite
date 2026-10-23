@@ -36,6 +36,9 @@ final class CaptureFlowUITests: XCTestCase {
         replace(token, with: "WRONGTOKENWRONGTOKENWRONGTOKEN22")
 
         replace(port, with: "0")
+        // Recorded, not asserted: with the Port field's number pad up, can the operator reach Connect?
+        shot("c32-port-numpad-up")
+        try ctl("mark numpad-up connect-hittable=\(app.buttons["Connect"].isHittable) keyboard=\(app.keyboards.count)")
         connectTap()
         expectText("Port must be a number between 1 and 65535.", timeout: 5)
         shot("c32-port-rejected")
@@ -132,6 +135,8 @@ final class CaptureFlowUITests: XCTestCase {
         Thread.sleep(forTimeInterval: 40)              // five retry periods with the app away
         try ctl("mark before-foreground")              // the script counts what the Mac received by now
         app.activate()
+        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 20), "app did not come back to the foreground")
+        expectText("Connected · Mac", timeout: 20)     // the screen is back, so an empty strip means drained
         expectThumbs("Document page", count: 0, timeout: 40)
         shot("s023-drained-after-foreground")
         try ctl("mark drained")
@@ -236,8 +241,9 @@ final class CaptureFlowUITests: XCTestCase {
         field.typeText(text)
     }
 
-    /// The port field's number pad has no return key and covers Connect, so the keyboard goes away through the
-    /// Token field's return key first (what an operator has to do too; filed as W40.fix-ios-numpad-covers-connect).
+    /// The port field's number pad has no return key, so the keyboard goes away through the Token field's return key
+    /// first. On the iPhone 18 Pro simulator Connect stays visible and hittable above the pad (test1 records it); a
+    /// smaller screen is not checked.
     private func connectTap() {
         let token = app.textFields["Token"]
         token.tap(); token.typeText("\n")

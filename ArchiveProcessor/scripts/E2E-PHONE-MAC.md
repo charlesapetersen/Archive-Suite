@@ -78,5 +78,17 @@ the phone side fails (`STALE screencaps`: the app drew no new frame, `W40.i3-fu-
 simulator shows "No camera on this device." where the preview would be. Evidence:
 `verification/evidence/capture/W40.i3-ios-e2e.md`.
 
+## The iPhone app's own buttons (`e2e-ios-ui.sh`, W40.i-sim-ui)
+`caffeinate -di scripts/e2e-ios-ui.sh` covers what `--ios` does not: it runs `ArchiveCaptureiOSUITests` (XCUITest,
+real taps, in the same headless simulator) against the same real headless Mac. Six tests run in order on one install:
+manual entry and each connect diagnostic; Box, Folder, two pages, End segment and the tag sheet's Q2 + 1962; Retry and
+auto-retry with the Mac stopped and restarted; the app backgrounded and terminated with pages unsent; the Clear and
+delete dialogs and Re-pair. The tests ask the script for Mac stops, restarts and finalizes through files in
+`$RUN/ctl`. The camera seam is a feed directory (`ARCHIVECAP_UITEST_FEED`, DEBUG only). The script checks the Q2/1962
+Finder tags, the heartbeat counts the Mac heard (`LIVECAPTURE_PHONE_PENDING`, headless only), and that every photo
+taken was filed but the one deleted. It also ends the Xcode helpers xcodebuild leaves in its session, so the Mac heavy
+lock is released (`W40.fix-heavy-run-xcode-helpers` is the real fix). Evidence:
+`verification/evidence/capture/W40.i-sim-ui.md`.
+
 ## Cost
 Tiny — 3 fixtures × `gemini-2.5-flash-lite` (a few cents). Isolated output; never touches the real corpus.

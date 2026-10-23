@@ -452,11 +452,12 @@ action or any runtime evidence: there is no test target and no simulator runtime
 - **Promised in:** `README.md` §Live Capture (Pairing).
 - **Reached by:** Connect (`I/UI/ConnectScreen.swift:45`) → `manualConnect` (`:112-124`, port checked 1-65535) →
   `vm.connect` (`I/Capture/CaptureViewModel.swift:104`).
-- **Real-path test:** none.
-- **Runtime evidence:** none.
+- **Real-path test:** `scripts/e2e-ios-ui.sh` (`ArchiveCaptureiOSUITests`, real taps in the simulator against the real Mac).
+- **Runtime evidence:** 2026-10-23 · `W40.i-sim-ui` · [`evidence/capture/W40.i-sim-ui.md`](evidence/capture/W40.i-sim-ui.md).
 - **Status:** `unproven`
 - **History:**
   - 2026-10-21 W40.b4 — row written, `unproven`.
+  - 2026-10-23 W40.i-sim-ui — runtime evidence: manual entry with a bad port, a dead port, a 404 port, a wrong token, then the right one: connected. Stays `unproven` for a separate re-check (rule 6).
 
 ### C-33 · iOS · Honest connect diagnostics
 
@@ -464,11 +465,12 @@ action or any runtime evidence: there is no test target and no simulator runtime
 - **Promised in:** `CLAUDE.md` §Pairing + connect flow.
 - **Reached by:** `attemptConnect` → `MacClient.reachability()` (`I/Capture/CaptureViewModel.swift:117`) → `connectPhase`
   `.unreachable` / `.refused` / `.unauthorized` (`:142-145`) → message (`I/UI/ConnectScreen.swift:77`).
-- **Real-path test:** none.
-- **Runtime evidence:** none.
+- **Real-path test:** `scripts/e2e-ios-ui.sh` (`ArchiveCaptureiOSUITests`, real taps in the simulator against the real Mac).
+- **Runtime evidence:** 2026-10-23 · `W40.i-sim-ui` · [`evidence/capture/W40.i-sim-ui.md`](evidence/capture/W40.i-sim-ui.md).
 - **Status:** `unproven`
 - **History:**
   - 2026-10-21 W40.b4 — row written, `unproven`.
+  - 2026-10-23 W40.i-sim-ui — runtime evidence: each diagnostic shown by touch: port rejected, can't reach, nothing listening, pairing code rejected. Stays `unproven` for a separate re-check (rule 6).
 - **Notes:** when the QR carried a relay code and the phone was signed in, an unreachable Mac switched to Drive silently
   apart from a status line. Since `W40.i-fix-ios-cloud-pairing` (2026-10-21) Wi-Fi reports the cause and points at
   the Cloud choice; it never switches by itself.
@@ -479,11 +481,12 @@ action or any runtime evidence: there is no test target and no simulator runtime
 - **Promised in:** `README.md` §Live Capture (Pairing); `CLAUDE.md` §Pairing + connect flow.
 - **Reached by:** saved endpoint (`I/ContentView.swift:10`) → Re-pair (`I/UI/CaptureScreen.swift:54`) → confirm
   (`:146-150`) → `vm.disconnect()` (`I/Capture/CaptureViewModel.swift:148`); a new connect calls `resumeUploads` (`:126`).
-- **Real-path test:** none.
-- **Runtime evidence:** none.
+- **Real-path test:** `scripts/e2e-ios-ui.sh` (`ArchiveCaptureiOSUITests`, real taps in the simulator against the real Mac).
+- **Runtime evidence:** 2026-10-23 · `W40.i-sim-ui` · [`evidence/capture/W40.i-sim-ui.md`](evidence/capture/W40.i-sim-ui.md).
 - **Status:** `unproven`
 - **History:**
   - 2026-10-21 W40.b4 — row written, `unproven`.
+  - 2026-10-23 W40.i-sim-ui — runtime evidence: relaunch opened straight to capture on the saved endpoint; Re-pair's dialog and pairing screen; an unsent page kept across Re-pair was sent after reconnecting. Stays `unproven` for a separate re-check (rule 6).
 - **Notes:** **Drift.** "Captured photos are kept and upload once you reconnect" (the dialog, `:150`) does not hold for a
   page whose upload is in flight at Re-pair: its reply from the old Mac marks it sent and the phone deletes it
   (code read) → `W40.i-fix-ios-pairing-generation` (S2).
@@ -508,11 +511,12 @@ action or any runtime evidence: there is no test target and no simulator runtime
 - **Promised in:** `README.md` §Live Capture (On the phone); `CLAUDE.md` §On the phone.
 - **Reached by:** Box (`I/UI/CaptureScreen.swift:94`) / Folder (`:102`) → `capture(_:)` (`:172`; reclassifies a selected
   page, `:173`) → `vm.captureMarker` (`I/Capture/CaptureViewModel.swift:204`).
-- **Real-path test:** none.
-- **Runtime evidence:** none.
+- **Real-path test:** `scripts/e2e-ios-ui.sh` (`ArchiveCaptureiOSUITests`, real taps in the simulator against the real Mac).
+- **Runtime evidence:** 2026-10-23 · `W40.i-sim-ui` · [`evidence/capture/W40.i-sim-ui.md`](evidence/capture/W40.i-sim-ui.md).
 - **Status:** `unproven`
 - **History:**
   - 2026-10-21 W40.b4 — row written, `unproven`.
+  - 2026-10-23 W40.i-sim-ui — runtime evidence: Box and Folder pressed; the Mac filed them as markers (`Box` / `Folder` tags), not pages. Stays `unproven` for a separate re-check (rule 6).
 
 ### C-37 · iOS · End segment
 
@@ -522,12 +526,13 @@ action or any runtime evidence: there is no test target and no simulator runtime
 - **Reached by:** End segment (`I/UI/CaptureScreen.swift:63`) → `finishDocumentSegment` (`I/Capture/CaptureViewModel.swift:309`)
   → tag sheet (`I/UI/CaptureScreen.swift:128-132`) → `finalizeSegment` (`:334`) → `trySendSegmentComplete` (`:366`).
 - **Real-path test:** `scripts/test-relay-transport.sh` (the iOS `FileRelayTransport.segmentComplete` writes its object;
-  passed 2026-10-21); the view model is untested; `scripts/e2e-phone-mac.sh --ios`: the app's DEBUG driver calls `finishDocumentSegment` then the sheet's Skip (`applyTagsAndContinue(nil, nil, nil)`) per document; the Mac received three separate segments.
-- **Runtime evidence:** 2026-10-22 · `W40.i3` · [`evidence/capture/W40.i3-ios-e2e.md`](evidence/capture/W40.i3-ios-e2e.md).
+  passed 2026-10-21); the view model is untested; `scripts/e2e-phone-mac.sh --ios`: the app's DEBUG driver calls `finishDocumentSegment` then the sheet's Skip (`applyTagsAndContinue(nil, nil, nil)`) per document; the Mac received three separate segments; `scripts/e2e-ios-ui.sh` (`ArchiveCaptureiOSUITests`, real taps in the simulator against the real Mac).
+- **Runtime evidence:** 2026-10-22 · `W40.i3` · [`evidence/capture/W40.i3-ios-e2e.md`](evidence/capture/W40.i3-ios-e2e.md); 2026-10-23 · `W40.i-sim-ui` · [`evidence/capture/W40.i-sim-ui.md`](evidence/capture/W40.i-sim-ui.md).
 - **Status:** `unproven`
 - **History:**
   - 2026-10-21 W40.b4 — row written, `unproven`.
   - 2026-10-22 W40.i3 — runtime evidence: three segments ended and acknowledged by the Mac; the End segment and Skip buttons were not tapped (the driver calls their actions). Stays `unproven`.
+  - 2026-10-23 W40.i-sim-ui — runtime evidence: End segment and the tag sheet's buttons tapped; the segment ended and the Mac filed it. Stays `unproven` for a separate re-check (rule 6).
 - **Notes:** ended segments were held in a `Dictionary`, so their tag cards could reach the Mac out of order; since
   `W40.i-fix-ios-polish` (2026-10-21) they are kept in the order ended, through restore.
 
@@ -537,11 +542,12 @@ action or any runtime evidence: there is no test target and no simulator runtime
 - **Promised in:** `README.md` §Live Capture (On the phone); `CLAUDE.md` §On the phone.
 - **Reached by:** tag sheet (`I/UI/SegmentTagSheet.swift`; Quality values `:61`) → `applyTagsAndContinue`
   (`I/Capture/CaptureViewModel.swift:319`); long-press (`I/UI/CaptureScreen.swift:83`) → `toggleQ3` (`:217`).
-- **Real-path test:** none.
-- **Runtime evidence:** none.
+- **Real-path test:** `scripts/e2e-ios-ui.sh` (`ArchiveCaptureiOSUITests`, real taps in the simulator against the real Mac).
+- **Runtime evidence:** 2026-10-23 · `W40.i-sim-ui` · [`evidence/capture/W40.i-sim-ui.md`](evidence/capture/W40.i-sim-ui.md).
 - **Status:** `unproven`
 - **History:**
   - 2026-10-21 W40.b4 — row written, `unproven`.
+  - 2026-10-23 W40.i-sim-ui — runtime evidence: Q2 and year 1962 chosen on the tag sheet reached the filed PDFs' Finder tags (suspect S-040 on the day). Stays `unproven` for a separate re-check (rule 6).
 - **Notes:** a Q3 toggled during an upload is a pending resend; the auto-retry and resume filters skipped it until
   `W40.i-fix-ios-heartbeat-count` (2026-10-21), which added it to both.
 
@@ -553,12 +559,13 @@ action or any runtime evidence: there is no test target and no simulator runtime
   (`:418`); `startAutoRetry` (`:512`, every 8 s, started at init `:76`); Retry (`I/UI/CaptureScreen.swift:61` →
   `retryFailed` `:466`).
 - **Real-path test:** `scripts/test-relay-transport.sh` (the transport's retry-safe `postPhoto`; passed 2026-10-21);
-  the queue is untested; `scripts/e2e-phone-mac.sh --ios`: the shutter's `capture(.document)` with the inject seam's bytes → `persistCapturedJPEG` → `addDocumentPhoto` → upload to the real Mac.
-- **Runtime evidence:** 2026-10-22 · `W40.i3` · [`evidence/capture/W40.i3-ios-e2e.md`](evidence/capture/W40.i3-ios-e2e.md).
+  the queue is untested; `scripts/e2e-phone-mac.sh --ios`: the shutter's `capture(.document)` with the inject seam's bytes → `persistCapturedJPEG` → `addDocumentPhoto` → upload to the real Mac; `scripts/e2e-ios-ui.sh` (`ArchiveCaptureiOSUITests`, real taps in the simulator against the real Mac).
+- **Runtime evidence:** 2026-10-22 · `W40.i3` · [`evidence/capture/W40.i3-ios-e2e.md`](evidence/capture/W40.i3-ios-e2e.md); 2026-10-23 · `W40.i-sim-ui` · [`evidence/capture/W40.i-sim-ui.md`](evidence/capture/W40.i-sim-ui.md).
 - **Status:** `unproven`
 - **History:**
   - 2026-10-21 W40.b4 — row written, `unproven`.
   - 2026-10-22 W40.i3 — runtime evidence: uploads as shot reached the real Mac and were OCR'd (3/3 tokens and years); auto-retry and Retry were not exercised. Stays `unproven`.
+  - 2026-10-23 W40.i-sim-ui — runtime evidence: Retry with the Mac down (fails again, nothing lost) and up (sent); auto-retry sent two failed pages untapped; pages sent with the app in the background. Stays `unproven` for a separate re-check (rule 6).
 - **Notes:** photos are kept in Caches, which iOS may empty → `W40.i-fix-ios-photo-storage` (S1); session writes ignored
   failure (fixed by `W40.i-fix-ios-session-durability`, 2026-10-21). Uploads with the app in the background: suspect S-023.
 
@@ -570,12 +577,13 @@ action or any runtime evidence: there is no test target and no simulator runtime
 - **Reached by:** `postPhoto` → `setState(.uploaded)` → `removeConfirmed` (`I/Capture/CaptureViewModel.swift:534`);
   receipt acceptance `I/Net/FileRelayTransport.swift:35-42`, `I/Net/DriveRelayTransport.swift:40-44`.
 - **Real-path test:** `scripts/test-relay-transport.sh` (no receipt or a mismatched one returns `false`); the deletion
-  in the view model is untested; `scripts/e2e-phone-mac.sh --ios`: its driver reports DONE only once no page is left on the phone and every ended segment is acknowledged.
-- **Runtime evidence:** 2026-10-22 · `W40.i3` · [`evidence/capture/W40.i3-ios-e2e.md`](evidence/capture/W40.i3-ios-e2e.md).
+  in the view model is untested; `scripts/e2e-phone-mac.sh --ios`: its driver reports DONE only once no page is left on the phone and every ended segment is acknowledged; `scripts/e2e-ios-ui.sh` (`ArchiveCaptureiOSUITests`, real taps in the simulator against the real Mac).
+- **Runtime evidence:** 2026-10-22 · `W40.i3` · [`evidence/capture/W40.i3-ios-e2e.md`](evidence/capture/W40.i3-ios-e2e.md); 2026-10-23 · `W40.i-sim-ui` · [`evidence/capture/W40.i-sim-ui.md`](evidence/capture/W40.i-sim-ui.md).
 - **Status:** `unproven`
 - **History:**
   - 2026-10-21 W40.b4 — row written, `unproven`.
   - 2026-10-22 W40.i3 — runtime evidence: every page left the phone after the Mac confirmed it; that none leaves before is not what this run shows. Stays `unproven`.
+  - 2026-10-23 W40.i-sim-ui — runtime evidence: 14 photos taken, 1 deleted on purpose, 13 filed; unsent pages stayed on the phone until the Mac took them. Stays `unproven` for a separate re-check (rule 6).
 - **Notes:** two code-read ways an unsent photo is deleted: a late reply after Clear marks a new photo with the reused id
   as sent → `W40.i-fix-ios-clear-generation` (S1); a reply from the Mac just unpaired from →
   `W40.i-fix-ios-pairing-generation` (S2). Until those land this row cannot honestly move to `works`.
@@ -586,11 +594,12 @@ action or any runtime evidence: there is no test target and no simulator runtime
 - **Promised in:** `README.md` §Live Capture (On the phone, "even across an app crash").
 - **Reached by:** init → `restore()` (`I/Capture/CaptureViewModel.swift:75`, `:567`) → `SessionStore.load`
   (`I/Capture/SessionStore.swift`).
-- **Real-path test:** none.
-- **Runtime evidence:** none.
+- **Real-path test:** `scripts/e2e-ios-ui.sh` (`ArchiveCaptureiOSUITests`, real taps in the simulator against the real Mac).
+- **Runtime evidence:** 2026-10-23 · `W40.i-sim-ui` · [`evidence/capture/W40.i-sim-ui.md`](evidence/capture/W40.i-sim-ui.md).
 - **Status:** `unproven`
 - **History:**
   - 2026-10-21 W40.b4 — row written, `unproven`.
+  - 2026-10-23 W40.i-sim-ui — runtime evidence: two unsent pages survived the app being terminated and were sent after relaunch. Stays `unproven` for a separate re-check (rule 6).
 - **Notes:** restore trusts each photo's absolute path, which changes on reinstall (`:567-595`) →
   `W40.i-fix-ios-photo-storage` (S1, fixed); a photo written but not yet listed is now adopted at launch, held for
   review when the session was stale (`W40.i-fix-ios-session-durability`, fixed 2026-10-21, host-tested only).
@@ -601,11 +610,12 @@ action or any runtime evidence: there is no test target and no simulator runtime
 - **Promised in:** `CLAUDE.md` §On the phone, §On the Mac.
 - **Reached by:** `enqueueUpload` and the 8 s loop → `sendStatusReport` (`I/Capture/CaptureViewModel.swift:392`) →
   `MacClient.reportStatus`.
-- **Real-path test:** none.
-- **Runtime evidence:** none.
+- **Real-path test:** `scripts/e2e-ios-ui.sh` (`ArchiveCaptureiOSUITests`, real taps in the simulator against the real Mac).
+- **Runtime evidence:** 2026-10-23 · `W40.i-sim-ui` · [`evidence/capture/W40.i-sim-ui.md`](evidence/capture/W40.i-sim-ui.md).
 - **Status:** `unproven`
 - **History:**
   - 2026-10-21 W40.b4 — row written, `unproven`.
+  - 2026-10-23 W40.i-sim-ui — runtime evidence: the Mac heard non-zero pending counts while pages waited, and 0 last. Stays `unproven` for a separate re-check (rule 6).
 - **Notes:** counted pending and uploading only, not FAILED pages still retrying, and sent each report on its own
   unordered `Task`, so the Mac could be told 0 early. Fixed by `W40.i-fix-ios-heartbeat-count` (2026-10-21): every
   unconfirmed page counts, through one ordered writer (host tests in `CaptureQueueTests.swift`). Still `unproven`

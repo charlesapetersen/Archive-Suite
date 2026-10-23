@@ -453,9 +453,13 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Would confirm it:** in the `W40.i3` simulator E2E, background the app during a multi-page upload and record
   whether in-flight requests fail.
 - **Would clear it:** the uploads finish while the app is in the background.
-- **Status:** `open`
+- **Status:** `open` (narrowed)
 - **History:**
   - 2026-10-21 W40.i2 — raised.
+  - 2026-10-23 W40.i-sim-ui — narrowed in the simulator: with three unsent pages and the Mac down, the app was sent to
+    the background (Home), the Mac restarted, and all three reached the Mac while the app was away (Mac count 3 → 6
+    before the app was brought back; five runs, `evidence/capture/W40.i-sim-ui.md`). Switching apps does not stall
+    uploads there. Left open for a locked real phone, where iOS suspends harder (`sessions/iphone-1.md` task 7).
 
 ### S-024 · The key wizard reports a key as validated when the Keychain refused to save it
 
@@ -690,3 +694,21 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Status:** `open`
 - **History:**
   - 2026-10-21 W40.b3 — raised.
+
+### S-040 · A year typed on the phone keeps the day the OCR read from another date
+
+- **Raised:** 2026-10-23 · W40.i-sim-ui · scripted run, then code reading.
+- **Suspected behaviour:** when the phone's tag sheet gives a year (and no month), Live Capture's finalize replaces
+  only `tags.year` (and the month, when one is given), and keeps the day and any month the model read from the
+  page (`Capture/LiveCaptureProcessor.swift:1145-1148`). An operator who types a year because the page's date was
+  read wrong gets that year combined with the wrong date's day. In run `/tmp/ap-e2e-ui-r5` the phone gave Q2 + 1962
+  to a segment whose pages were the 1974-12-03 report and the 1962-03-14 memo; both PDFs were filed `1962, Day 3`.
+  That segment held two different documents (the test's doing), so the run alone does not prove the case.
+- **Where:** `C-38`, `C-08`; the lines above.
+- **Would confirm it:** a one-document segment whose page reads, say, "December 3, 1974", tagged 1962 on the phone
+  (the UI test's tag-sheet step with that fixture alone), filed with `Day 3` or `12 December`.
+- **Would clear it:** the phone's year drops the day and month the model read (or keeps them only when the model's
+  year matched).
+- **Status:** `open`
+- **History:**
+  - 2026-10-23 W40.i-sim-ui — raised.

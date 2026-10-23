@@ -135,18 +135,22 @@ are in brackets, for the session that files your notes. You don't need them.
    ```
    Every file should start `ffd8ff` (a real JPEG). The landscape page's PDF page should read the right way up.
    [C-35; settles suspect S-022]
-5. **Box and Folder markers (5 min).** Shoot a box label with **Box**, then a folder label with **Folder**, then
-   two pages of a document. On the Mac, do the box and folder land as markers and not as pages? [C-36]
-6. **Lose the network mid-send (10 min).** Shoot five pages quickly, then at once turn off the phone's Wi-Fi, or
-   walk out of range. Shoot two more. Turn Wi-Fi back on. Do the pages go across by themselves, or does it take
-   **Retry**? Does the Mac's pane show that the phone still has pages to send while they wait? Nothing should be
-   missing or doubled at the end. [C-39, C-42]
-7. **Leave the app while it sends (5 min).** Shoot five pages, then at once lock the phone, or switch to another
-   app, for about 30 seconds. Come back. Did the sending carry on, stop, or fail? [C-39; settles suspect S-023 on
-   real hardware]
-8. **Close the app with pages unsent (5 min).** With Wi-Fi off, shoot three pages. Swipe the app away from the app
-   switcher, turn Wi-Fi back on, and open the app again. Are the three pages still there, and do they send?
-   [C-41, C-40]
+
+*Tasks 5 to 8 are short on purpose.* The simulator has already pressed their buttons against the real Mac
+(`W40.i-sim-ui`): Box and Folder, Retry and auto-retry with the Mac stopped, the app sent to the background and
+closed with pages unsent, the Clear and delete dialogs, and Re-pair. What it cannot show is a real camera, a real
+network dropping, and a phone that locks, so these tasks keep only that part.
+
+5. **Box and Folder with the camera (3 min).** Shoot a real box label with **Box** and a folder label with
+   **Folder**. Are the labels readable in what reaches the Mac? [C-36, C-35]
+6. **Lose the network mid-send (5 min).** Shoot five pages quickly, then at once turn off the phone's Wi-Fi, or
+   walk out of range. Turn Wi-Fi back on. Did the pages go across by themselves, and how long after the network came
+   back? Nothing should be missing or doubled at the end. [C-39]
+7. **Lock the phone while it sends (5 min).** Shoot five pages, then at once lock the phone (not only switch apps)
+   for about 30 seconds. Come back. Did the sending carry on while it was locked, stop, or fail? [C-39; settles
+   suspect S-023 on real hardware]
+8. **Close the app with pages unsent (3 min).** With Wi-Fi off, shoot three pages. Swipe the app away from the app
+   switcher, turn Wi-Fi back on, and open the app again. Do the three pages send? [C-41, C-40]
 9. **Optional: the Google Drive relay (10 min).** Only if the client from the preparation is in place. On the Mac,
    make sure Live Capture shows a "Cloud relay code". On the phone, choose **Cloud**, scan the same QR, and
    sign in to Google when asked. Shoot a two-page document and file it. Did the sign-in work on the first try?
