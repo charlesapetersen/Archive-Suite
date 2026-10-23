@@ -126,7 +126,11 @@ def dating_traceable():
         if setname == "owner" and t in ("t=0", "t=3"):
             rows.append({"kind": "pipeline", "name": f"{chooser}, {residue}, {t}", **cut(s),
                          "gpu_s_1000": s["per_1000"]["gpu_s"], "mac_s_1000": s["per_1000"]["mac_s"]})
-    return {"rows": rows, "vision": {k: cut(v) for k, v in (d.get("vision") or {}).items() if isinstance(v, dict) and "exact" in v}}
+    va = d.get("vision_arms") or {}
+    reread = [{"name": k, "corpus": cut(c["corpus"]), "reread": cut(c["reread"]),
+               "gpu_s_1000": (c.get("per_1000") or {}).get("gpu_s")} for k, c in (va.get("configs") or {}).items()]
+    return {"rows": rows, "vision": {k: cut(v) for k, v in (d.get("vision") or {}).items() if isinstance(v, dict) and "exact" in v},
+            "reread": reread, "classes": va.get("classes")}
 
 
 def dating_enclosure():

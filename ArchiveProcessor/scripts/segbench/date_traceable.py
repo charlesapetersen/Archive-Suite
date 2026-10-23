@@ -950,8 +950,37 @@ def findings(out):
                  f"at about {v.get('seconds_per_page', 1):.0f} s a page and $0: many of these documents do print their "
                  f"date, and ABBYY's layer garbled it (\"ISIS\" for 1915, \"19gS\"). The classes A to D are defined on "
                  f"the corpus text, so part of the 'not in text' gap is OCR, not dating. On printed years Vision rules "
-                 f"read fewer ({f(v['rules only'], 'in text')} against {f(v['rules only (corpus text, same documents)'], 'in text')}). "
-                 f"Filed: W46.date-traceable-vision, the residue and chooser on Vision text.")
+                 f"read fewer ({f(v['rules only'], 'in text')} against {f(v['rules only (corpus text, same documents)'], 'in text')}).")
+    va = out.get("vision_arms")
+    C = (va or {}).get("configs", {})
+    keys = ("gemini-3.8-flash (corpus text)", "27B trace-neigh one shot (corpus text)",
+            "27B trace-neigh one shot (Vision text)", "Vision text: 27B chooser|27B trace-neigh|t=3",
+            "Vision text: rules only|no residue stage|t=3", "corpus text: 2B chooser|27B trace-neigh|t=3",
+            "union, Vision first: rules only|no residue stage|t=3")
+    if va and va.get("answers") and all(k in C for k in keys):
+        gm, tc, tv, pv, rv, pc_, un = (C[k] for k in keys)
+        fc = lambda c, k: pc(c["corpus"]["exact"][k])
+        rr = lambda c, k: pc(c["reread"]["exact"][k])
+        nr = va["classes"]["reread"]
+        L.append(f"- **On Vision text the 27B gains on the 'unprinted' years, and most of that gain is OCR, not dating.** "
+                 f"With prompts built from Vision text, the trace-neigh one shot gets {fc(tv, 'not in text')} of the 131 "
+                 f"(corpus text {fc(tc, 'not in text')}, Gemini {fc(gm, 'not in text')}). Re-read with Vision text, "
+                 f"{sum(va['moved'].get(m, 0) for m in va['moved'] if m.endswith('-> in text'))} of the 131 print their "
+                 f"year after all; on the {va['documents'] - nr.get('in text', 0) - nr.get('decade', 0)} that neither text "
+                 f"prints, the same rows give {rr(tv, 'not in text')} against {rr(tc, 'not in text')} and Gemini "
+                 f"{rr(gm, 'not in text')}: the gap to Gemini on genuinely unprinted years is still about "
+                 f"{round(100 * (gm['reread']['exact']['not in text'][0] - tv['reread']['exact']['not in text'][0]) / gm['reread']['exact']['not in text'][1])} "
+                 f"points, so it is a dating gap. The staged pipeline on Vision text (27B chooser, residue at t=3) gets "
+                 f"{fc(pv, 'not in text')} / {rr(pv, 'not in text')} at "
+                 f"{pv['per_1000']['gpu_s']:.0f} GPU-seconds per 1,000 (the corpus-text pipeline {fc(pc_, 'not in text')} / "
+                 f"{rr(pc_, 'not in text')}); its residue is called on few documents because Vision rules leave few undated. "
+                 f"On years printed in either text the trace one shot reads {rr(tv, 'in text')} on Vision text and "
+                 f"{rr(tc, 'in text')} on the corpus text. Rule candidates from the union of both texts do worse than Vision "
+                 f"alone ({fc(un, 'not in text')} against {fc(rv, 'not in text')} on the 131): the corpus text's garbled head "
+                 f"dates win the pick. Citations check better on Vision text ({tv['corpus']['evidence'].get('valid', 0)} valid / "
+                 f"{tv['corpus']['evidence'].get('unsupported', 0)} unsupported, corpus {tc['corpus']['evidence'].get('valid', 0)} / "
+                 f"{tc['corpus']['evidence'].get('unsupported', 0)}). The bench's dating classes stay defined on the corpus text; "
+                 f"W46.date-image reads the re-read table.")
     L += ["- Not in this run: the Gemini arm (W46.date-traceable-paid, waits for W46.gateway-models-ok), the claude -p "
           "arm (held for the gateway, CLAUDE.md), the relation classifier (W46.date-enclosure), Foundation Models as "
           "the R1 chooser. The latest-year rule variant was written after reading the first rule's misses on the "
@@ -1034,7 +1063,8 @@ def write_md(out):
               f"The 27B's choose and trace-neigh prompts built from Apple Vision text ({va['answers']} replies, the "
               f"same model and settings as the corpus-text run); the rule stage reading the candidates of both texts "
               f"(union, the named text's first); and the classes re-read with a year counting as printed when it is in "
-              f"the corpus text or in Vision's text of the first two pages. Vision text covers the 300 and the three "
+              f"the corpus text or in Vision's text of the first two pages. The Vision prompts ran on one Sherlock L40S "
+              f"(job 49088016, thinking off, $0). Vision text covers the 300 and the three "
               f"documents either side of each, so C against D (the nearest printed same-year document anywhere in the "
               f"folder) still reads the corpus text beyond them. {va['documents']} documents.", "",
               "| classes | " + " | ".join(order) + " |", "|---|" + "---:|" * len(order)]

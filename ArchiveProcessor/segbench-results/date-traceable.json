@@ -90,7 +90,7 @@
      "sure right": 1
     }
    },
-   "ms_per_doc": 0.36
+   "ms_per_doc": 0.38
   },
   "public": {
    "by_class": {
@@ -10509,7 +10509,7 @@
      "sure right": 2
     }
    },
-   "ms_per_doc": 0.34
+   "ms_per_doc": 0.45
   },
   "rules only": {
    "n": 300,
@@ -11330,5 +11330,12927 @@
    }
   },
   "seconds_per_page": 1.02
+ },
+ "vision_arms": {
+  "documents": 300,
+  "answers": 344,
+  "configs": {
+   "gemini-3.8-flash (corpus text)": {
+    "corpus": {
+     "n": 300,
+     "exact": {
+      "in text": [
+       116,
+       119
+      ],
+      "A": [
+       27,
+       33
+      ],
+      "A'": [
+       5,
+       7
+      ],
+      "B": [
+       22,
+       35
+      ],
+      "C": [
+       16,
+       35
+      ],
+      "D": [
+       13,
+       21
+      ],
+      "decade": [
+       34,
+       50
+      ],
+      "A+A'+B": [
+       54,
+       75
+      ],
+      "C+D": [
+       29,
+       56
+      ],
+      "not in text": [
+       83,
+       131
+      ],
+      "all year-tagged": [
+       199,
+       250
+      ],
+      "all": [
+       233,
+       300
+      ]
+     },
+     "within1": {
+      "in text": [
+       118,
+       119
+      ],
+      "A": [
+       31,
+       33
+      ],
+      "A'": [
+       7,
+       7
+      ],
+      "B": [
+       31,
+       35
+      ],
+      "C": [
+       32,
+       35
+      ],
+      "D": [
+       19,
+       21
+      ],
+      "decade": [
+       40,
+       50
+      ],
+      "A+A'+B": [
+       69,
+       75
+      ],
+      "C+D": [
+       51,
+       56
+      ],
+      "not in text": [
+       120,
+       131
+      ],
+      "all year-tagged": [
+       238,
+       250
+      ],
+      "all": [
+       278,
+       300
+      ]
+     },
+     "invalid": [
+      0,
+      300
+     ],
+     "stages": {
+      "one-shot": 300
+     },
+     "evidence": {
+      "none": 300
+     },
+     "right_unsupported": 0,
+     "conformal": {
+      "in text": {
+       "n": 119,
+       "alpha": 0.1,
+       "q": [
+        0,
+        0
+       ],
+       "coverage": [
+        116,
+        119
+       ],
+       "width": 0.0,
+       "winkler": 0.6722689075630253,
+       "no_year": 0
+      },
+      "A+A'+B": {
+       "n": 75,
+       "alpha": 0.1,
+       "q": [
+        1,
+        4
+       ],
+       "coverage": [
+        70,
+        75
+       ],
+       "width": 4.96,
+       "winkler": 11.093333333333334,
+       "no_year": 0
+      },
+      "C+D": {
+       "n": 56,
+       "alpha": 0.1,
+       "q": [
+        1,
+        3
+       ],
+       "coverage": [
+        52,
+        56
+       ],
+       "width": 4.0,
+       "winkler": 6.857142857142857,
+       "no_year": 0
+      },
+      "not in text": {
+       "n": 131,
+       "alpha": 0.1,
+       "q": [
+        1,
+        2
+       ],
+       "coverage": [
+        121,
+        131
+       ],
+       "width": 2.9923664122137406,
+       "winkler": 7.7251908396946565,
+       "no_year": 0
+      },
+      "all": {
+       "n": 300,
+       "alpha": 0.1,
+       "q": [
+        3,
+        5
+       ],
+       "coverage": [
+        275,
+        300
+       ],
+       "width": 8.0,
+       "winkler": 20.6,
+       "no_year": 0
+      }
+     },
+     "du": {
+      "certain_flagged_uncertain": [
+       63,
+       200
+      ],
+      "uncertain_flagged_certain": [
+       6,
+       50
+      ]
+     }
+    },
+    "reread": {
+     "n": 300,
+     "exact": {
+      "in text": [
+       133,
+       143
+      ],
+      "A": [
+       28,
+       35
+      ],
+      "A'": [
+       5,
+       8
+      ],
+      "B": [
+       15,
+       24
+      ],
+      "C": [
+       10,
+       25
+      ],
+      "D": [
+       8,
+       15
+      ],
+      "decade": [
+       34,
+       50
+      ],
+      "A+A'+B": [
+       48,
+       67
+      ],
+      "C+D": [
+       18,
+       40
+      ],
+      "not in text": [
+       66,
+       107
+      ],
+      "all year-tagged": [
+       199,
+       250
+      ],
+      "all": [
+       233,
+       300
+      ]
+     },
+     "within1": {
+      "in text": [
+       142,
+       143
+      ],
+      "A": [
+       33,
+       35
+      ],
+      "A'": [
+       7,
+       8
+      ],
+      "B": [
+       20,
+       24
+      ],
+      "C": [
+       23,
+       25
+      ],
+      "D": [
+       13,
+       15
+      ],
+      "decade": [
+       40,
+       50
+      ],
+      "A+A'+B": [
+       60,
+       67
+      ],
+      "C+D": [
+       36,
+       40
+      ],
+      "not in text": [
+       96,
+       107
+      ],
+      "all year-tagged": [
+       238,
+       250
+      ],
+      "all": [
+       278,
+       300
+      ]
+     },
+     "invalid": [
+      0,
+      300
+     ],
+     "stages": {
+      "one-shot": 300
+     },
+     "evidence": {
+      "none": 300
+     },
+     "right_unsupported": 0,
+     "conformal": {
+      "in text": {
+       "n": 143,
+       "alpha": 0.1,
+       "q": [
+        0,
+        0
+       ],
+       "coverage": [
+        133,
+        143
+       ],
+       "width": 0.0,
+       "winkler": 1.5384615384615385,
+       "no_year": 0
+      },
+      "A+A'+B": {
+       "n": 67,
+       "alpha": 0.1,
+       "q": [
+        1,
+        4
+       ],
+       "coverage": [
+        61,
+        67
+       ],
+       "width": 4.955223880597015,
+       "winkler": 11.82089552238806,
+       "no_year": 0
+      },
+      "C+D": {
+       "n": 40,
+       "alpha": 0.1,
+       "q": [
+        2,
+        3
+       ],
+       "coverage": [
+        38,
+        40
+       ],
+       "width": 5.0,
+       "winkler": 6.0,
+       "no_year": 0
+      },
+      "not in text": {
+       "n": 107,
+       "alpha": 0.1,
+       "q": [
+        3,
+        1
+       ],
+       "coverage": [
+        99,
+        107
+       ],
+       "width": 4.018691588785047,
+       "winkler": 9.25233644859813,
+       "no_year": 0
+      },
+      "all": {
+       "n": 300,
+       "alpha": 0.1,
+       "q": [
+        3,
+        5
+       ],
+       "coverage": [
+        275,
+        300
+       ],
+       "width": 8.0,
+       "winkler": 20.6,
+       "no_year": 0
+      }
+     },
+     "du": {
+      "certain_flagged_uncertain": [
+       63,
+       200
+      ],
+      "uncertain_flagged_certain": [
+       6,
+       50
+      ]
+     }
+    },
+    "per_1000": null
+   },
+   "27B one shot, app prompt (corpus text)": {
+    "corpus": {
+     "n": 300,
+     "exact": {
+      "in text": [
+       116,
+       119
+      ],
+      "A": [
+       22,
+       33
+      ],
+      "A'": [
+       5,
+       7
+      ],
+      "B": [
+       14,
+       35
+      ],
+      "C": [
+       7,
+       35
+      ],
+      "D": [
+       7,
+       21
+      ],
+      "decade": [
+       29,
+       50
+      ],
+      "A+A'+B": [
+       41,
+       75
+      ],
+      "C+D": [
+       14,
+       56
+      ],
+      "not in text": [
+       55,
+       131
+      ],
+      "all year-tagged": [
+       171,
+       250
+      ],
+      "all": [
+       200,
+       300
+      ]
+     },
+     "within1": {
+      "in text": [
+       118,
+       119
+      ],
+      "A": [
+       26,
+       33
+      ],
+      "A'": [
+       6,
+       7
+      ],
+      "B": [
+       24,
+       35
+      ],
+      "C": [
+       21,
+       35
+      ],
+      "D": [
+       13,
+       21
+      ],
+      "decade": [
+       36,
+       50
+      ],
+      "A+A'+B": [
+       56,
+       75
+      ],
+      "C+D": [
+       34,
+       56
+      ],
+      "not in text": [
+       90,
+       131
+      ],
+      "all year-tagged": [
+       208,
+       250
+      ],
+      "all": [
+       244,
+       300
+      ]
+     },
+     "invalid": [
+      0,
+      300
+     ],
+     "stages": {
+      "one-shot": 300
+     },
+     "evidence": {
+      "none": 300
+     },
+     "right_unsupported": 0,
+     "conformal": {
+      "in text": {
+       "n": 119,
+       "alpha": 0.1,
+       "q": [
+        0,
+        0
+       ],
+       "coverage": [
+        116,
+        119
+       ],
+       "width": 0.0,
+       "winkler": 1.0084033613445378,
+       "no_year": 0
+      },
+      "A+A'+B": {
+       "n": 75,
+       "alpha": 0.1,
+       "q": [
+        4,
+        8
+       ],
+       "coverage": [
+        66,
+        75
+       ],
+       "width": 11.946666666666667,
+       "winkler": 24.746666666666666,
+       "no_year": 0
+      },
+      "C+D": {
+       "n": 56,
+       "alpha": 0.1,
+       "q": [
+        15,
+        4
+       ],
+       "coverage": [
+        50,
+        56
+       ],
+       "width": 19.0,
+       "winkler": 35.42857142857143,
+       "no_year": 0
+      },
+      "not in text": {
+       "n": 131,
+       "alpha": 0.1,
+       "q": [
+        6,
+        5
+       ],
+       "coverage": [
+        120,
+        131
+       ],
+       "width": 11.007633587786259,
+       "winkler": 22.458015267175572,
+       "no_year": 0
+      },
+      "all": {
+       "n": 300,
+       "alpha": 0.1,
+       "q": [
+        5,
+        6
+       ],
+       "coverage": [
+        275,
+        300
+       ],
+       "width": 11.0,
+       "winkler": 27.2,
+       "no_year": 0
+      }
+     },
+     "du": {
+      "certain_flagged_uncertain": [
+       52,
+       200
+      ],
+      "uncertain_flagged_certain": [
+       18,
+       50
+      ]
+     }
+    },
+    "reread": {
+     "n": 300,
+     "exact": {
+      "in text": [
+       129,
+       143
+      ],
+      "A": [
+       22,
+       35
+      ],
+      "A'": [
+       4,
+       8
+      ],
+      "B": [
+       10,
+       24
+      ],
+      "C": [
+       2,
+       25
+      ],
+      "D": [
+       4,
+       15
+      ],
+      "decade": [
+       29,
+       50
+      ],
+      "A+A'+B": [
+       36,
+       67
+      ],
+      "C+D": [
+       6,
+       40
+      ],
+      "not in text": [
+       42,
+       107
+      ],
+      "all year-tagged": [
+       171,
+       250
+      ],
+      "all": [
+       200,
+       300
+      ]
+     },
+     "within1": {
+      "in text": [
+       137,
+       143
+      ],
+      "A": [
+       27,
+       35
+      ],
+      "A'": [
+       6,
+       8
+      ],
+      "B": [
+       15,
+       24
+      ],
+      "C": [
+       14,
+       25
+      ],
+      "D": [
+       9,
+       15
+      ],
+      "decade": [
+       36,
+       50
+      ],
+      "A+A'+B": [
+       48,
+       67
+      ],
+      "C+D": [
+       23,
+       40
+      ],
+      "not in text": [
+       71,
+       107
+      ],
+      "all year-tagged": [
+       208,
+       250
+      ],
+      "all": [
+       244,
+       300
+      ]
+     },
+     "invalid": [
+      0,
+      300
+     ],
+     "stages": {
+      "one-shot": 300
+     },
+     "evidence": {
+      "none": 300
+     },
+     "right_unsupported": 0,
+     "conformal": {
+      "in text": {
+       "n": 143,
+       "alpha": 0.1,
+       "q": [
+        1,
+        0
+       ],
+       "coverage": [
+        133,
+        143
+       ],
+       "width": 1.006993006993007,
+       "winkler": 6.881118881118881,
+       "no_year": 0
+      },
+      "A+A'+B": {
+       "n": 67,
+       "alpha": 0.1,
+       "q": [
+        5,
+        8
+       ],
+       "coverage": [
+        61,
+        67
+       ],
+       "width": 12.955223880597014,
+       "winkler": 21.611940298507463,
+       "no_year": 0
+      },
+      "C+D": {
+       "n": 40,
+       "alpha": 0.1,
+       "q": [
+        4,
+        11
+       ],
+       "coverage": [
+        36,
+        40
+       ],
+       "width": 15.0,
+       "winkler": 29.0,
+       "no_year": 0
+      },
+      "not in text": {
+       "n": 107,
+       "alpha": 0.1,
+       "q": [
+        5,
+        7
+       ],
+       "coverage": [
+        98,
+        107
+       ],
+       "width": 11.981308411214954,
+       "winkler": 22.635514018691588,
+       "no_year": 0
+      },
+      "all": {
+       "n": 300,
+       "alpha": 0.1,
+       "q": [
+        5,
+        6
+       ],
+       "coverage": [
+        275,
+        300
+       ],
+       "width": 11.0,
+       "winkler": 27.2,
+       "no_year": 0
+      }
+     },
+     "du": {
+      "certain_flagged_uncertain": [
+       52,
+       200
+      ],
+      "uncertain_flagged_certain": [
+       18,
+       50
+      ]
+     }
+    },
+    "per_1000": null
+   },
+   "2B one shot, app prompt (corpus text)": {
+    "corpus": {
+     "n": 300,
+     "exact": {
+      "in text": [
+       113,
+       119
+      ],
+      "A": [
+       23,
+       33
+      ],
+      "A'": [
+       5,
+       7
+      ],
+      "B": [
+       13,
+       35
+      ],
+      "C": [
+       4,
+       35
+      ],
+      "D": [
+       6,
+       21
+      ],
+      "decade": [
+       28,
+       50
+      ],
+      "A+A'+B": [
+       41,
+       75
+      ],
+      "C+D": [
+       10,
+       56
+      ],
+      "not in text": [
+       51,
+       131
+      ],
+      "all year-tagged": [
+       164,
+       250
+      ],
+      "all": [
+       192,
+       300
+      ]
+     },
+     "within1": {
+      "in text": [
+       118,
+       119
+      ],
+      "A": [
+       28,
+       33
+      ],
+      "A'": [
+       6,
+       7
+      ],
+      "B": [
+       23,
+       35
+      ],
+      "C": [
+       22,
+       35
+      ],
+      "D": [
+       11,
+       21
+      ],
+      "decade": [
+       36,
+       50
+      ],
+      "A+A'+B": [
+       57,
+       75
+      ],
+      "C+D": [
+       33,
+       56
+      ],
+      "not in text": [
+       90,
+       131
+      ],
+      "all year-tagged": [
+       208,
+       250
+      ],
+      "all": [
+       244,
+       300
+      ]
+     },
+     "invalid": [
+      0,
+      300
+     ],
+     "stages": {
+      "one-shot": 300
+     },
+     "evidence": {
+      "none": 300
+     },
+     "right_unsupported": 0,
+     "conformal": {
+      "in text": {
+       "n": 119,
+       "alpha": 0.1,
+       "q": [
+        0,
+        0
+       ],
+       "coverage": [
+        113,
+        119
+       ],
+       "width": 0.0,
+       "winkler": 1.5126050420168067,
+       "no_year": 0
+      },
+      "A+A'+B": {
+       "n": 75,
+       "alpha": 0.1,
+       "q": [
+        3,
+        7
+       ],
+       "coverage": [
+        66,
+        75
+       ],
+       "width": 9.946666666666667,
+       "winkler": 21.413333333333334,
+       "no_year": 0
+      },
+      "C+D": {
+       "n": 56,
+       "alpha": 0.1,
+       "q": [
+        20,
+        33
+       ],
+       "coverage": [
+        54,
+        56
+       ],
+       "width": 53.0,
+       "winkler": 62.285714285714285,
+       "no_year": 0
+      },
+      "not in text": {
+       "n": 131,
+       "alpha": 0.1,
+       "q": [
+        9,
+        7
+       ],
+       "coverage": [
+        121,
+        131
+       ],
+       "width": 16.015267175572518,
+       "winkler": 32.80916030534351,
+       "no_year": 0
+      },
+      "all": {
+       "n": 300,
+       "alpha": 0.1,
+       "q": [
+        6,
+        7
+       ],
+       "coverage": [
+        275,
+        300
+       ],
+       "width": 13.0,
+       "winkler": 30.866666666666667,
+       "no_year": 0
+      }
+     },
+     "du": {
+      "certain_flagged_uncertain": [
+       0,
+       200
+      ],
+      "uncertain_flagged_certain": [
+       50,
+       50
+      ]
+     }
+    },
+    "reread": {
+     "n": 300,
+     "exact": {
+      "in text": [
+       124,
+       143
+      ],
+      "A": [
+       26,
+       35
+      ],
+      "A'": [
+       3,
+       8
+      ],
+      "B": [
+       7,
+       24
+      ],
+      "C": [
+       1,
+       25
+      ],
+      "D": [
+       3,
+       15
+      ],
+      "decade": [
+       28,
+       50
+      ],
+      "A+A'+B": [
+       36,
+       67
+      ],
+      "C+D": [
+       4,
+       40
+      ],
+      "not in text": [
+       40,
+       107
+      ],
+      "all year-tagged": [
+       164,
+       250
+      ],
+      "all": [
+       192,
+       300
+      ]
+     },
+     "within1": {
+      "in text": [
+       135,
+       143
+      ],
+      "A": [
+       31,
+       35
+      ],
+      "A'": [
+       5,
+       8
+      ],
+      "B": [
+       15,
+       24
+      ],
+      "C": [
+       15,
+       25
+      ],
+      "D": [
+       7,
+       15
+      ],
+      "decade": [
+       36,
+       50
+      ],
+      "A+A'+B": [
+       51,
+       67
+      ],
+      "C+D": [
+       22,
+       40
+      ],
+      "not in text": [
+       73,
+       107
+      ],
+      "all year-tagged": [
+       208,
+       250
+      ],
+      "all": [
+       244,
+       300
+      ]
+     },
+     "invalid": [
+      0,
+      300
+     ],
+     "stages": {
+      "one-shot": 300
+     },
+     "evidence": {
+      "none": 300
+     },
+     "right_unsupported": 0,
+     "conformal": {
+      "in text": {
+       "n": 143,
+       "alpha": 0.1,
+       "q": [
+        1,
+        1
+       ],
+       "coverage": [
+        135,
+        143
+       ],
+       "width": 2.0,
+       "winkler": 12.06993006993007,
+       "no_year": 0
+      },
+      "A+A'+B": {
+       "n": 67,
+       "alpha": 0.1,
+       "q": [
+        9,
+        6
+       ],
+       "coverage": [
+        63,
+        67
+       ],
+       "width": 15.044776119402986,
+       "winkler": 24.0,
+       "no_year": 0
+      },
+      "C+D": {
+       "n": 40,
+       "alpha": 0.1,
+       "q": [
+        20,
+        9
+       ],
+       "coverage": [
+        38,
+        40
+       ],
+       "width": 29.0,
+       "winkler": 46.5,
+       "no_year": 0
+      },
+      "not in text": {
+       "n": 107,
+       "alpha": 0.1,
+       "q": [
+        6,
+        7
+       ],
+       "coverage": [
+        95,
+        107
+       ],
+       "width": 12.990654205607477,
+       "winkler": 29.065420560747665,
+       "no_year": 0
+      },
+      "all": {
+       "n": 300,
+       "alpha": 0.1,
+       "q": [
+        6,
+        7
+       ],
+       "coverage": [
+        275,
+        300
+       ],
+       "width": 13.0,
+       "winkler": 30.866666666666667,
+       "no_year": 0
+      }
+     },
+     "du": {
+      "certain_flagged_uncertain": [
+       0,
+       200
+      ],
+      "uncertain_flagged_certain": [
+       50,
+       50
+      ]
+     }
+    },
+    "per_1000": null
+   },
+   "27B trace-neigh one shot (corpus text)": {
+    "corpus": {
+     "n": 300,
+     "exact": {
+      "in text": [
+       115,
+       119
+      ],
+      "A": [
+       24,
+       33
+      ],
+      "A'": [
+       5,
+       7
+      ],
+      "B": [
+       18,
+       35
+      ],
+      "C": [
+       6,
+       35
+      ],
+      "D": [
+       7,
+       21
+      ],
+      "decade": [
+       27,
+       50
+      ],
+      "A+A'+B": [
+       47,
+       75
+      ],
+      "C+D": [
+       13,
+       56
+      ],
+      "not in text": [
+       60,
+       131
+      ],
+      "all year-tagged": [
+       175,
+       250
+      ],
+      "all": [
+       202,
+       300
+      ]
+     },
+     "within1": {
+      "in text": [
+       118,
+       119
+      ],
+      "A": [
+       29,
+       33
+      ],
+      "A'": [
+       7,
+       7
+      ],
+      "B": [
+       28,
+       35
+      ],
+      "C": [
+       21,
+       35
+      ],
+      "D": [
+       11,
+       21
+      ],
+      "decade": [
+       35,
+       50
+      ],
+      "A+A'+B": [
+       64,
+       75
+      ],
+      "C+D": [
+       32,
+       56
+      ],
+      "not in text": [
+       96,
+       131
+      ],
+      "all year-tagged": [
+       214,
+       250
+      ],
+      "all": [
+       249,
+       300
+      ]
+     },
+     "invalid": [
+      8,
+      300
+     ],
+     "stages": {
+      "one-shot-trace": 300
+     },
+     "evidence": {
+      "valid": 197,
+      "unsupported": 95
+     },
+     "right_unsupported": 51,
+     "conformal": {
+      "in text": {
+       "n": 119,
+       "alpha": 0.1,
+       "q": [
+        0,
+        0
+       ],
+       "coverage": [
+        115,
+        119
+       ],
+       "width": 0.025210084033613446,
+       "winkler": 1.2016806722689075,
+       "no_year": 0
+      },
+      "A+A'+B": {
+       "n": 75,
+       "alpha": 0.1,
+       "q": [
+        2,
+        9
+       ],
+       "coverage": [
+        70,
+        75
+       ],
+       "width": 11.58904109589041,
+       "winkler": 18.986301369863014,
+       "no_year": 2
+      },
+      "C+D": {
+       "n": 56,
+       "alpha": 0.1,
+       "q": [
+        Infinity,
+        34
+       ],
+       "coverage": [
+        53,
+        56
+       ],
+       "width": 69.11538461538461,
+       "winkler": 69.11538461538461,
+       "no_year": 3
+      },
+      "not in text": {
+       "n": 131,
+       "alpha": 0.1,
+       "q": [
+        9,
+        4
+       ],
+       "coverage": [
+        117,
+        131
+       ],
+       "width": 13.777777777777779,
+       "winkler": 24.571428571428573,
+       "no_year": 5
+      },
+      "all": {
+       "n": 300,
+       "alpha": 0.1,
+       "q": [
+        5,
+        5
+       ],
+       "coverage": [
+        273,
+        300
+       ],
+       "width": 10.503424657534246,
+       "winkler": 27.695205479452056,
+       "no_year": 8
+      }
+     },
+     "du": {
+      "certain_flagged_uncertain": [
+       38,
+       200
+      ],
+      "uncertain_flagged_certain": [
+       25,
+       50
+      ]
+     }
+    },
+    "reread": {
+     "n": 300,
+     "exact": {
+      "in text": [
+       129,
+       143
+      ],
+      "A": [
+       25,
+       35
+      ],
+      "A'": [
+       4,
+       8
+      ],
+      "B": [
+       11,
+       24
+      ],
+      "C": [
+       2,
+       25
+      ],
+      "D": [
+       4,
+       15
+      ],
+      "decade": [
+       27,
+       50
+      ],
+      "A+A'+B": [
+       40,
+       67
+      ],
+      "C+D": [
+       6,
+       40
+      ],
+      "not in text": [
+       46,
+       107
+      ],
+      "all year-tagged": [
+       175,
+       250
+      ],
+      "all": [
+       202,
+       300
+      ]
+     },
+     "within1": {
+      "in text": [
+       135,
+       143
+      ],
+      "A": [
+       31,
+       35
+      ],
+      "A'": [
+       8,
+       8
+      ],
+      "B": [
+       17,
+       24
+      ],
+      "C": [
+       15,
+       25
+      ],
+      "D": [
+       8,
+       15
+      ],
+      "decade": [
+       35,
+       50
+      ],
+      "A+A'+B": [
+       56,
+       67
+      ],
+      "C+D": [
+       23,
+       40
+      ],
+      "not in text": [
+       79,
+       107
+      ],
+      "all year-tagged": [
+       214,
+       250
+      ],
+      "all": [
+       249,
+       300
+      ]
+     },
+     "invalid": [
+      8,
+      300
+     ],
+     "stages": {
+      "one-shot-trace": 300
+     },
+     "evidence": {
+      "valid": 197,
+      "unsupported": 95
+     },
+     "right_unsupported": 51,
+     "conformal": {
+      "in text": {
+       "n": 143,
+       "alpha": 0.1,
+       "q": [
+        1,
+        0
+       ],
+       "coverage": [
+        132,
+        143
+       ],
+       "width": 1.070921985815603,
+       "winkler": 7.170212765957447,
+       "no_year": 2
+      },
+      "A+A'+B": {
+       "n": 67,
+       "alpha": 0.1,
+       "q": [
+        3,
+        4
+       ],
+       "coverage": [
+        62,
+        67
+       ],
+       "width": 7.833333333333333,
+       "winkler": 12.681818181818182,
+       "no_year": 1
+      },
+      "C+D": {
+       "n": 40,
+       "alpha": 0.1,
+       "q": [
+        34,
+        8
+       ],
+       "coverage": [
+        36,
+        40
+       ],
+       "width": 42.921052631578945,
+       "winkler": 58.71052631578947,
+       "no_year": 2
+      },
+      "not in text": {
+       "n": 107,
+       "alpha": 0.1,
+       "q": [
+        8,
+        5
+       ],
+       "coverage": [
+        99,
+        107
+       ],
+       "width": 13.865384615384615,
+       "winkler": 22.903846153846153,
+       "no_year": 3
+      },
+      "all": {
+       "n": 300,
+       "alpha": 0.1,
+       "q": [
+        5,
+        5
+       ],
+       "coverage": [
+        273,
+        300
+       ],
+       "width": 10.503424657534246,
+       "winkler": 27.695205479452056,
+       "no_year": 8
+      }
+     },
+     "du": {
+      "certain_flagged_uncertain": [
+       38,
+       200
+      ],
+      "uncertain_flagged_certain": [
+       25,
+       50
+      ]
+     }
+    },
+    "per_1000": null
+   },
+   "27B trace-neigh one shot (Vision text)": {
+    "corpus": {
+     "n": 300,
+     "exact": {
+      "in text": [
+       111,
+       119
+      ],
+      "A": [
+       24,
+       33
+      ],
+      "A'": [
+       7,
+       7
+      ],
+      "B": [
+       20,
+       35
+      ],
+      "C": [
+       14,
+       35
+      ],
+      "D": [
+       9,
+       21
+      ],
+      "decade": [
+       31,
+       50
+      ],
+      "A+A'+B": [
+       51,
+       75
+      ],
+      "C+D": [
+       23,
+       56
+      ],
+      "not in text": [
+       74,
+       131
+      ],
+      "all year-tagged": [
+       185,
+       250
+      ],
+      "all": [
+       216,
+       300
+      ]
+     },
+     "within1": {
+      "in text": [
+       115,
+       119
+      ],
+      "A": [
+       30,
+       33
+      ],
+      "A'": [
+       7,
+       7
+      ],
+      "B": [
+       28,
+       35
+      ],
+      "C": [
+       26,
+       35
+      ],
+      "D": [
+       13,
+       21
+      ],
+      "decade": [
+       36,
+       50
+      ],
+      "A+A'+B": [
+       65,
+       75
+      ],
+      "C+D": [
+       39,
+       56
+      ],
+      "not in text": [
+       104,
+       131
+      ],
+      "all year-tagged": [
+       219,
+       250
+      ],
+      "all": [
+       255,
+       300
+      ]
+     },
+     "invalid": [
+      4,
+      300
+     ],
+     "stages": {
+      "one-shot-trace": 300
+     },
+     "evidence": {
+      "unsupported": 80,
+      "valid": 216
+     },
+     "right_unsupported": 49,
+     "conformal": {
+      "in text": {
+       "n": 119,
+       "alpha": 0.1,
+       "q": [
+        0,
+        0
+       ],
+       "coverage": [
+        111,
+        119
+       ],
+       "width": 0.0,
+       "winkler": 7.73109243697479,
+       "no_year": 0
+      },
+      "A+A'+B": {
+       "n": 75,
+       "alpha": 0.1,
+       "q": [
+        3,
+        2
+       ],
+       "coverage": [
+        70,
+        75
+       ],
+       "width": 5.472972972972973,
+       "winkler": 7.905405405405405,
+       "no_year": 1
+      },
+      "C+D": {
+       "n": 56,
+       "alpha": 0.1,
+       "q": [
+        20,
+        12
+       ],
+       "coverage": [
+        53,
+        56
+       ],
+       "width": 32.49090909090909,
+       "winkler": 38.30909090909091,
+       "no_year": 1
+      },
+      "not in text": {
+       "n": 131,
+       "alpha": 0.1,
+       "q": [
+        5,
+        4
+       ],
+       "coverage": [
+        122,
+        131
+       ],
+       "width": 9.534883720930232,
+       "winkler": 17.131782945736433,
+       "no_year": 2
+      },
+      "all": {
+       "n": 300,
+       "alpha": 0.1,
+       "q": [
+        5,
+        5
+       ],
+       "coverage": [
+        274,
+        300
+       ],
+       "width": 10.402027027027026,
+       "winkler": 24.861486486486488,
+       "no_year": 4
+      }
+     },
+     "du": {
+      "certain_flagged_uncertain": [
+       24,
+       200
+      ],
+      "uncertain_flagged_certain": [
+       29,
+       50
+      ]
+     }
+    },
+    "reread": {
+     "n": 300,
+     "exact": {
+      "in text": [
+       134,
+       143
+      ],
+      "A": [
+       24,
+       35
+      ],
+      "A'": [
+       6,
+       8
+      ],
+      "B": [
+       12,
+       24
+      ],
+      "C": [
+       5,
+       25
+      ],
+      "D": [
+       4,
+       15
+      ],
+      "decade": [
+       31,
+       50
+      ],
+      "A+A'+B": [
+       42,
+       67
+      ],
+      "C+D": [
+       9,
+       40
+      ],
+      "not in text": [
+       51,
+       107
+      ],
+      "all year-tagged": [
+       185,
+       250
+      ],
+      "all": [
+       216,
+       300
+      ]
+     },
+     "within1": {
+      "in text": [
+       139,
+       143
+      ],
+      "A": [
+       32,
+       35
+      ],
+      "A'": [
+       8,
+       8
+      ],
+      "B": [
+       17,
+       24
+      ],
+      "C": [
+       16,
+       25
+      ],
+      "D": [
+       7,
+       15
+      ],
+      "decade": [
+       36,
+       50
+      ],
+      "A+A'+B": [
+       57,
+       67
+      ],
+      "C+D": [
+       23,
+       40
+      ],
+      "not in text": [
+       80,
+       107
+      ],
+      "all year-tagged": [
+       219,
+       250
+      ],
+      "all": [
+       255,
+       300
+      ]
+     },
+     "invalid": [
+      4,
+      300
+     ],
+     "stages": {
+      "one-shot-trace": 300
+     },
+     "evidence": {
+      "unsupported": 80,
+      "valid": 216
+     },
+     "right_unsupported": 49,
+     "conformal": {
+      "in text": {
+       "n": 143,
+       "alpha": 0.1,
+       "q": [
+        0,
+        0
+       ],
+       "coverage": [
+        134,
+        143
+       ],
+       "width": 0.0,
+       "winkler": 6.573426573426573,
+       "no_year": 0
+      },
+      "A+A'+B": {
+       "n": 67,
+       "alpha": 0.1,
+       "q": [
+        2,
+        4
+       ],
+       "coverage": [
+        63,
+        67
+       ],
+       "width": 6.590909090909091,
+       "winkler": 9.318181818181818,
+       "no_year": 1
+      },
+      "C+D": {
+       "n": 40,
+       "alpha": 0.1,
+       "q": [
+        12,
+        20
+       ],
+       "coverage": [
+        38,
+        40
+       ],
+       "width": 32.94871794871795,
+       "winkler": 37.05128205128205,
+       "no_year": 1
+      },
+      "not in text": {
+       "n": 107,
+       "alpha": 0.1,
+       "q": [
+        4,
+        12
+       ],
+       "coverage": [
+        101,
+        107
+       ],
+       "width": 16.723809523809525,
+       "winkler": 24.533333333333335,
+       "no_year": 2
+      },
+      "all": {
+       "n": 300,
+       "alpha": 0.1,
+       "q": [
+        5,
+        5
+       ],
+       "coverage": [
+        274,
+        300
+       ],
+       "width": 10.402027027027026,
+       "winkler": 24.861486486486488,
+       "no_year": 4
+      }
+     },
+     "du": {
+      "certain_flagged_uncertain": [
+       24,
+       200
+      ],
+      "uncertain_flagged_certain": [
+       29,
+       50
+      ]
+     }
+    },
+    "per_1000": null
+   },
+   "corpus text: 2B chooser|27B trace-neigh|t=3": {
+    "corpus": {
+     "n": 300,
+     "exact": {
+      "in text": [
+       113,
+       119
+      ],
+      "A": [
+       25,
+       33
+      ],
+      "A'": [
+       5,
+       7
+      ],
+      "B": [
+       10,
+       35
+      ],
+      "C": [
+       4,
+       35
+      ],
+      "D": [
+       3,
+       21
+      ],
+      "decade": [
+       21,
+       50
+      ],
+      "A+A'+B": [
+       40,
+       75
+      ],
+      "C+D": [
+       7,
+       56
+      ],
+      "not in text": [
+       47,
+       131
+      ],
+      "all year-tagged": [
+       160,
+       250
+      ],
+      "all": [
+       181,
+       300
+      ]
+     },
+     "within1": {
+      "in text": [
+       117,
+       119
+      ],
+      "A": [
+       27,
+       33
+      ],
+      "A'": [
+       6,
+       7
+      ],
+      "B": [
+       20,
+       35
+      ],
+      "C": [
+       16,
+       35
+      ],
+      "D": [
+       7,
+       21
+      ],
+      "decade": [
+       27,
+       50
+      ],
+      "A+A'+B": [
+       53,
+       75
+      ],
+      "C+D": [
+       23,
+       56
+      ],
+      "not in text": [
+       76,
+       131
+      ],
+      "all year-tagged": [
+       193,
+       250
+      ],
+      "all": [
+       220,
+       300
+      ]
+     },
+     "invalid": [
+      0,
+      300
+     ],
+     "stages": {
+      "chooser": 39,
+      "propagated": 105,
+      "rule": 137,
+      "residue": 19
+     },
+     "evidence": {
+      "valid": 277,
+      "unsupported": 23
+     },
+     "right_unsupported": 13,
+     "conformal": {
+      "in text": {
+       "n": 119,
+       "alpha": 0.1,
+       "q": [
+        0,
+        0
+       ],
+       "coverage": [
+        113,
+        119
+       ],
+       "width": 0.0,
+       "winkler": 11.092436974789916,
+       "no_year": 0
+      },
+      "A+A'+B": {
+       "n": 75,
+       "alpha": 0.1,
+       "q": [
+        11,
+        60
+       ],
+       "coverage": [
+        68,
+        75
+       ],
+       "width": 70.42666666666666,
+       "winkler": 146.96,
+       "no_year": 0
+      },
+      "C+D": {
+       "n": 56,
+       "alpha": 0.1,
+       "q": [
+        18,
+        117
+       ],
+       "coverage": [
+        49,
+        56
+       ],
+       "width": 135.25,
+       "winkler": 278.82142857142856,
+       "no_year": 0
+      },
+      "not in text": {
+       "n": 131,
+       "alpha": 0.1,
+       "q": [
+        32,
+        34
+       ],
+       "coverage": [
+        120,
+        131
+       ],
+       "width": 66.13740458015268,
+       "winkler": 143.08396946564886,
+       "no_year": 0
+      },
+      "all": {
+       "n": 300,
+       "alpha": 0.1,
+       "q": [
+        15,
+        21
+       ],
+       "coverage": [
+        274,
+        300
+       ],
+       "width": 36.096666666666664,
+       "winkler": 96.89666666666666,
+       "no_year": 0
+      }
+     },
+     "du": {
+      "certain_flagged_uncertain": [
+       58,
+       200
+      ],
+      "uncertain_flagged_certain": [
+       17,
+       50
+      ]
+     }
+    },
+    "reread": {
+     "n": 300,
+     "exact": {
+      "in text": [
+       122,
+       143
+      ],
+      "A": [
+       25,
+       35
+      ],
+      "A'": [
+       5,
+       8
+      ],
+      "B": [
+       5,
+       24
+      ],
+      "C": [
+       1,
+       25
+      ],
+      "D": [
+       2,
+       15
+      ],
+      "decade": [
+       21,
+       50
+      ],
+      "A+A'+B": [
+       35,
+       67
+      ],
+      "C+D": [
+       3,
+       40
+      ],
+      "not in text": [
+       38,
+       107
+      ],
+      "all year-tagged": [
+       160,
+       250
+      ],
+      "all": [
+       181,
+       300
+      ]
+     },
+     "within1": {
+      "in text": [
+       132,
+       143
+      ],
+      "A": [
+       28,
+       35
+      ],
+      "A'": [
+       7,
+       8
+      ],
+      "B": [
+       11,
+       24
+      ],
+      "C": [
+       11,
+       25
+      ],
+      "D": [
+       4,
+       15
+      ],
+      "decade": [
+       27,
+       50
+      ],
+      "A+A'+B": [
+       46,
+       67
+      ],
+      "C+D": [
+       15,
+       40
+      ],
+      "not in text": [
+       61,
+       107
+      ],
+      "all year-tagged": [
+       193,
+       250
+      ],
+      "all": [
+       220,
+       300
+      ]
+     },
+     "invalid": [
+      0,
+      300
+     ],
+     "stages": {
+      "chooser": 39,
+      "propagated": 105,
+      "rule": 137,
+      "residue": 19
+     },
+     "evidence": {
+      "valid": 277,
+      "unsupported": 23
+     },
+     "right_unsupported": 13,
+     "conformal": {
+      "in text": {
+       "n": 143,
+       "alpha": 0.1,
+       "q": [
+        1,
+        3
+       ],
+       "coverage": [
+        132,
+        143
+       ],
+       "width": 3.986013986013986,
+       "winkler": 49.44055944055944,
+       "no_year": 0
+      },
+      "A+A'+B": {
+       "n": 67,
+       "alpha": 0.1,
+       "q": [
+        46,
+        12
+       ],
+       "coverage": [
+        61,
+        67
+       ],
+       "width": 58.6865671641791,
+       "winkler": 128.23880597014926,
+       "no_year": 0
+      },
+      "C+D": {
+       "n": 40,
+       "alpha": 0.1,
+       "q": [
+        34,
+        68
+       ],
+       "coverage": [
+        37,
+        40
+       ],
+       "width": 102.2,
+       "winkler": 189.2,
+       "no_year": 0
+      },
+      "not in text": {
+       "n": 107,
+       "alpha": 0.1,
+       "q": [
+        15,
+        68
+       ],
+       "coverage": [
+        100,
+        107
+       ],
+       "width": 82.69158878504673,
+       "winkler": 179.3271028037383,
+       "no_year": 0
+      },
+      "all": {
+       "n": 300,
+       "alpha": 0.1,
+       "q": [
+        15,
+        21
+       ],
+       "coverage": [
+        274,
+        300
+       ],
+       "width": 36.096666666666664,
+       "winkler": 96.89666666666666,
+       "no_year": 0
+      }
+     },
+     "du": {
+      "certain_flagged_uncertain": [
+       58,
+       200
+      ],
+      "uncertain_flagged_certain": [
+       17,
+       50
+      ]
+     }
+    },
+    "per_1000": {
+     "gpu_s": 62.0,
+     "mac_s": 259.5,
+     "calls": {
+      "2b": 56,
+      "trace-neigh": 19
+     }
+    }
+   },
+   "Vision text: rules only|no residue stage|t=3": {
+    "corpus": {
+     "n": 300,
+     "exact": {
+      "in text": [
+       102,
+       119
+      ],
+      "A": [
+       26,
+       33
+      ],
+      "A'": [
+       5,
+       7
+      ],
+      "B": [
+       15,
+       35
+      ],
+      "C": [
+       9,
+       35
+      ],
+      "D": [
+       8,
+       21
+      ],
+      "decade": [
+       12,
+       50
+      ],
+      "A+A'+B": [
+       46,
+       75
+      ],
+      "C+D": [
+       17,
+       56
+      ],
+      "not in text": [
+       63,
+       131
+      ],
+      "all year-tagged": [
+       165,
+       250
+      ],
+      "all": [
+       177,
+       300
+      ]
+     },
+     "within1": {
+      "in text": [
+       107,
+       119
+      ],
+      "A": [
+       28,
+       33
+      ],
+      "A'": [
+       7,
+       7
+      ],
+      "B": [
+       23,
+       35
+      ],
+      "C": [
+       16,
+       35
+      ],
+      "D": [
+       10,
+       21
+      ],
+      "decade": [
+       18,
+       50
+      ],
+      "A+A'+B": [
+       58,
+       75
+      ],
+      "C+D": [
+       26,
+       56
+      ],
+      "not in text": [
+       84,
+       131
+      ],
+      "all year-tagged": [
+       191,
+       250
+      ],
+      "all": [
+       209,
+       300
+      ]
+     },
+     "invalid": [
+      7,
+      300
+     ],
+     "stages": {
+      "rule": 202,
+      "propagated": 91,
+      "none": 7
+     },
+     "evidence": {
+      "unsupported": 25,
+      "valid": 268
+     },
+     "right_unsupported": 16,
+     "conformal": {
+      "in text": {
+       "n": 119,
+       "alpha": 0.1,
+       "q": [
+        1,
+        3
+       ],
+       "coverage": [
+        108,
+        119
+       ],
+       "width": 3.9831932773109244,
+       "winkler": 38.60504201680672,
+       "no_year": 0
+      },
+      "A+A'+B": {
+       "n": 75,
+       "alpha": 0.1,
+       "q": [
+        55,
+        46
+       ],
+       "coverage": [
+        71,
+        75
+       ],
+       "width": 101.24324324324324,
+       "winkler": 126.64864864864865,
+       "no_year": 1
+      },
+      "C+D": {
+       "n": 56,
+       "alpha": 0.1,
+       "q": [
+        Infinity,
+        35
+       ],
+       "coverage": [
+        53,
+        56
+       ],
+       "width": 70.0,
+       "winkler": 70.0,
+       "no_year": 3
+      },
+      "not in text": {
+       "n": 131,
+       "alpha": 0.1,
+       "q": [
+        50,
+        34
+       ],
+       "coverage": [
+        121,
+        131
+       ],
+       "width": 84.37795275590551,
+       "winkler": 125.48031496062993,
+       "no_year": 4
+      },
+      "all": {
+       "n": 300,
+       "alpha": 0.1,
+       "q": [
+        23,
+        30
+       ],
+       "coverage": [
+        268,
+        300
+       ],
+       "width": 53.02389078498293,
+       "winkler": 96.02730375426621,
+       "no_year": 7
+      }
+     },
+     "du": {
+      "certain_flagged_uncertain": [
+       39,
+       200
+      ],
+      "uncertain_flagged_certain": [
+       17,
+       50
+      ]
+     }
+    },
+    "reread": {
+     "n": 300,
+     "exact": {
+      "in text": [
+       124,
+       143
+      ],
+      "A": [
+       26,
+       35
+      ],
+      "A'": [
+       3,
+       8
+      ],
+      "B": [
+       7,
+       24
+      ],
+      "C": [
+       3,
+       25
+      ],
+      "D": [
+       2,
+       15
+      ],
+      "decade": [
+       12,
+       50
+      ],
+      "A+A'+B": [
+       36,
+       67
+      ],
+      "C+D": [
+       5,
+       40
+      ],
+      "not in text": [
+       41,
+       107
+      ],
+      "all year-tagged": [
+       165,
+       250
+      ],
+      "all": [
+       177,
+       300
+      ]
+     },
+     "within1": {
+      "in text": [
+       131,
+       143
+      ],
+      "A": [
+       29,
+       35
+      ],
+      "A'": [
+       5,
+       8
+      ],
+      "B": [
+       13,
+       24
+      ],
+      "C": [
+       9,
+       25
+      ],
+      "D": [
+       4,
+       15
+      ],
+      "decade": [
+       18,
+       50
+      ],
+      "A+A'+B": [
+       47,
+       67
+      ],
+      "C+D": [
+       13,
+       40
+      ],
+      "not in text": [
+       60,
+       107
+      ],
+      "all year-tagged": [
+       191,
+       250
+      ],
+      "all": [
+       209,
+       300
+      ]
+     },
+     "invalid": [
+      7,
+      300
+     ],
+     "stages": {
+      "rule": 202,
+      "propagated": 91,
+      "none": 7
+     },
+     "evidence": {
+      "unsupported": 25,
+      "valid": 268
+     },
+     "right_unsupported": 16,
+     "conformal": {
+      "in text": {
+       "n": 143,
+       "alpha": 0.1,
+       "q": [
+        1,
+        3
+       ],
+       "coverage": [
+        131,
+        143
+       ],
+       "width": 3.986013986013986,
+       "winkler": 32.93706293706294,
+       "no_year": 0
+      },
+      "A+A'+B": {
+       "n": 67,
+       "alpha": 0.1,
+       "q": [
+        50,
+        50
+       ],
+       "coverage": [
+        63,
+        67
+       ],
+       "width": 100.0,
+       "winkler": 125.23076923076923,
+       "no_year": 2
+      },
+      "C+D": {
+       "n": 40,
+       "alpha": 0.1,
+       "q": [
+        34,
+        Infinity
+       ],
+       "coverage": [
+        37,
+        40
+       ],
+       "width": 68.0,
+       "winkler": 69.11111111111111,
+       "no_year": 2
+      },
+      "not in text": {
+       "n": 107,
+       "alpha": 0.1,
+       "q": [
+        55,
+        24
+       ],
+       "coverage": [
+        95,
+        107
+       ],
+       "width": 80.50485436893204,
+       "winkler": 139.72815533980582,
+       "no_year": 4
+      },
+      "all": {
+       "n": 300,
+       "alpha": 0.1,
+       "q": [
+        23,
+        30
+       ],
+       "coverage": [
+        268,
+        300
+       ],
+       "width": 53.02389078498293,
+       "winkler": 96.02730375426621,
+       "no_year": 7
+      }
+     },
+     "du": {
+      "certain_flagged_uncertain": [
+       39,
+       200
+      ],
+      "uncertain_flagged_certain": [
+       17,
+       50
+      ]
+     }
+    },
+    "per_1000": null
+   },
+   "Vision text: rules only|27B trace-neigh|t=0": {
+    "corpus": {
+     "n": 300,
+     "exact": {
+      "in text": [
+       101,
+       119
+      ],
+      "A": [
+       21,
+       33
+      ],
+      "A'": [
+       6,
+       7
+      ],
+      "B": [
+       17,
+       35
+      ],
+      "C": [
+       12,
+       35
+      ],
+      "D": [
+       8,
+       21
+      ],
+      "decade": [
+       21,
+       50
+      ],
+      "A+A'+B": [
+       44,
+       75
+      ],
+      "C+D": [
+       20,
+       56
+      ],
+      "not in text": [
+       64,
+       131
+      ],
+      "all year-tagged": [
+       165,
+       250
+      ],
+      "all": [
+       186,
+       300
+      ]
+     },
+     "within1": {
+      "in text": [
+       107,
+       119
+      ],
+      "A": [
+       27,
+       33
+      ],
+      "A'": [
+       7,
+       7
+      ],
+      "B": [
+       27,
+       35
+      ],
+      "C": [
+       22,
+       35
+      ],
+      "D": [
+       12,
+       21
+      ],
+      "decade": [
+       27,
+       50
+      ],
+      "A+A'+B": [
+       61,
+       75
+      ],
+      "C+D": [
+       34,
+       56
+      ],
+      "not in text": [
+       95,
+       131
+      ],
+      "all year-tagged": [
+       202,
+       250
+      ],
+      "all": [
+       229,
+       300
+      ]
+     },
+     "invalid": [
+      4,
+      300
+     ],
+     "stages": {
+      "rule": 202,
+      "residue": 98
+     },
+     "evidence": {
+      "unsupported": 58,
+      "valid": 238
+     },
+     "right_unsupported": 33,
+     "conformal": {
+      "in text": {
+       "n": 119,
+       "alpha": 0.1,
+       "q": [
+        1,
+        3
+       ],
+       "coverage": [
+        108,
+        119
+       ],
+       "width": 3.9831932773109244,
+       "winkler": 38.60504201680672,
+       "no_year": 0
+      },
+      "A+A'+B": {
+       "n": 75,
+       "alpha": 0.1,
+       "q": [
+        50,
+        46
+       ],
+       "coverage": [
+        72,
+        75
+       ],
+       "width": 96.4054054054054,
+       "winkler": 119.37837837837837,
+       "no_year": 1
+      },
+      "C+D": {
+       "n": 56,
+       "alpha": 0.1,
+       "q": [
+        20,
+        169
+       ],
+       "coverage": [
+        52,
+        56
+       ],
+       "width": 192.2,
+       "winkler": 251.83636363636364,
+       "no_year": 1
+      },
+      "not in text": {
+       "n": 131,
+       "alpha": 0.1,
+       "q": [
+        20,
+        21
+       ],
+       "coverage": [
+        121,
+        131
+       ],
+       "width": 41.372093023255815,
+       "winkler": 100.90697674418605,
+       "no_year": 2
+      },
+      "all": {
+       "n": 300,
+       "alpha": 0.1,
+       "q": [
+        15,
+        20
+       ],
+       "coverage": [
+        272,
+        300
+       ],
+       "width": 35.25337837837838,
+       "winkler": 84.7804054054054,
+       "no_year": 4
+      }
+     },
+     "du": {
+      "certain_flagged_uncertain": [
+       20,
+       200
+      ],
+      "uncertain_flagged_certain": [
+       33,
+       50
+      ]
+     }
+    },
+    "reread": {
+     "n": 300,
+     "exact": {
+      "in text": [
+       123,
+       143
+      ],
+      "A": [
+       20,
+       35
+      ],
+      "A'": [
+       5,
+       8
+      ],
+      "B": [
+       11,
+       24
+      ],
+      "C": [
+       3,
+       25
+      ],
+      "D": [
+       3,
+       15
+      ],
+      "decade": [
+       21,
+       50
+      ],
+      "A+A'+B": [
+       36,
+       67
+      ],
+      "C+D": [
+       6,
+       40
+      ],
+      "not in text": [
+       42,
+       107
+      ],
+      "all year-tagged": [
+       165,
+       250
+      ],
+      "all": [
+       186,
+       300
+      ]
+     },
+     "within1": {
+      "in text": [
+       131,
+       143
+      ],
+      "A": [
+       28,
+       35
+      ],
+      "A'": [
+       8,
+       8
+      ],
+      "B": [
+       17,
+       24
+      ],
+      "C": [
+       12,
+       25
+      ],
+      "D": [
+       6,
+       15
+      ],
+      "decade": [
+       27,
+       50
+      ],
+      "A+A'+B": [
+       53,
+       67
+      ],
+      "C+D": [
+       18,
+       40
+      ],
+      "not in text": [
+       71,
+       107
+      ],
+      "all year-tagged": [
+       202,
+       250
+      ],
+      "all": [
+       229,
+       300
+      ]
+     },
+     "invalid": [
+      4,
+      300
+     ],
+     "stages": {
+      "rule": 202,
+      "residue": 98
+     },
+     "evidence": {
+      "unsupported": 58,
+      "valid": 238
+     },
+     "right_unsupported": 33,
+     "conformal": {
+      "in text": {
+       "n": 143,
+       "alpha": 0.1,
+       "q": [
+        1,
+        3
+       ],
+       "coverage": [
+        131,
+        143
+       ],
+       "width": 3.986013986013986,
+       "winkler": 32.93706293706294,
+       "no_year": 0
+      },
+      "A+A'+B": {
+       "n": 67,
+       "alpha": 0.1,
+       "q": [
+        46,
+        50
+       ],
+       "coverage": [
+        63,
+        67
+       ],
+       "width": 96.42424242424242,
+       "winkler": 122.18181818181819,
+       "no_year": 1
+      },
+      "C+D": {
+       "n": 40,
+       "alpha": 0.1,
+       "q": [
+        34,
+        21
+       ],
+       "coverage": [
+        37,
+        40
+       ],
+       "width": 55.205128205128204,
+       "winkler": 137.76923076923077,
+       "no_year": 1
+      },
+      "not in text": {
+       "n": 107,
+       "alpha": 0.1,
+       "q": [
+        10,
+        50
+       ],
+       "coverage": [
+        98,
+        107
+       ],
+       "width": 60.84761904761905,
+       "winkler": 127.32380952380953,
+       "no_year": 2
+      },
+      "all": {
+       "n": 300,
+       "alpha": 0.1,
+       "q": [
+        15,
+        20
+       ],
+       "coverage": [
+        272,
+        300
+       ],
+       "width": 35.25337837837838,
+       "winkler": 84.7804054054054,
+       "no_year": 4
+      }
+     },
+     "du": {
+      "certain_flagged_uncertain": [
+       20,
+       200
+      ],
+      "uncertain_flagged_certain": [
+       33,
+       50
+      ]
+     }
+    },
+    "per_1000": {
+     "gpu_s": 320.0,
+     "mac_s": 0.0,
+     "calls": {
+      "trace-neigh": 98
+     }
+    }
+   },
+   "Vision text: rules only|27B trace-neigh|t=3": {
+    "corpus": {
+     "n": 300,
+     "exact": {
+      "in text": [
+       102,
+       119
+      ],
+      "A": [
+       26,
+       33
+      ],
+      "A'": [
+       5,
+       7
+      ],
+      "B": [
+       15,
+       35
+      ],
+      "C": [
+       10,
+       35
+      ],
+      "D": [
+       8,
+       21
+      ],
+      "decade": [
+       15,
+       50
+      ],
+      "A+A'+B": [
+       46,
+       75
+      ],
+      "C+D": [
+       18,
+       56
+      ],
+      "not in text": [
+       64,
+       131
+      ],
+      "all year-tagged": [
+       166,
+       250
+      ],
+      "all": [
+       181,
+       300
+      ]
+     },
+     "within1": {
+      "in text": [
+       107,
+       119
+      ],
+      "A": [
+       28,
+       33
+      ],
+      "A'": [
+       7,
+       7
+      ],
+      "B": [
+       23,
+       35
+      ],
+      "C": [
+       18,
+       35
+      ],
+      "D": [
+       10,
+       21
+      ],
+      "decade": [
+       21,
+       50
+      ],
+      "A+A'+B": [
+       58,
+       75
+      ],
+      "C+D": [
+       28,
+       56
+      ],
+      "not in text": [
+       86,
+       131
+      ],
+      "all year-tagged": [
+       193,
+       250
+      ],
+      "all": [
+       214,
+       300
+      ]
+     },
+     "invalid": [
+      0,
+      300
+     ],
+     "stages": {
+      "rule": 202,
+      "propagated": 91,
+      "residue": 7
+     },
+     "evidence": {
+      "unsupported": 28,
+      "valid": 272
+     },
+     "right_unsupported": 18,
+     "conformal": {
+      "in text": {
+       "n": 119,
+       "alpha": 0.1,
+       "q": [
+        1,
+        3
+       ],
+       "coverage": [
+        108,
+        119
+       ],
+       "width": 3.9831932773109244,
+       "winkler": 38.60504201680672,
+       "no_year": 0
+      },
+      "A+A'+B": {
+       "n": 75,
+       "alpha": 0.1,
+       "q": [
+        50,
+        46
+       ],
+       "coverage": [
+        72,
+        75
+       ],
+       "width": 96.08,
+       "winkler": 121.14666666666666,
+       "no_year": 0
+      },
+      "C+D": {
+       "n": 56,
+       "alpha": 0.1,
+       "q": [
+        19,
+        35
+       ],
+       "coverage": [
+        51,
+        56
+       ],
+       "width": 54.142857142857146,
+       "winkler": 121.28571428571429,
+       "no_year": 0
+      },
+      "not in text": {
+       "n": 131,
+       "alpha": 0.1,
+       "q": [
+        20,
+        24
+       ],
+       "coverage": [
+        118,
+        131
+       ],
+       "width": 44.045801526717554,
+       "winkler": 110.1526717557252,
+       "no_year": 0
+      },
+      "all": {
+       "n": 300,
+       "alpha": 0.1,
+       "q": [
+        18,
+        24
+       ],
+       "coverage": [
+        271,
+        300
+       ],
+       "width": 42.03666666666667,
+       "winkler": 93.57,
+       "no_year": 0
+      }
+     },
+     "du": {
+      "certain_flagged_uncertain": [
+       39,
+       200
+      ],
+      "uncertain_flagged_certain": [
+       17,
+       50
+      ]
+     }
+    },
+    "reread": {
+     "n": 300,
+     "exact": {
+      "in text": [
+       124,
+       143
+      ],
+      "A": [
+       26,
+       35
+      ],
+      "A'": [
+       4,
+       8
+      ],
+      "B": [
+       7,
+       24
+      ],
+      "C": [
+       3,
+       25
+      ],
+      "D": [
+       2,
+       15
+      ],
+      "decade": [
+       15,
+       50
+      ],
+      "A+A'+B": [
+       37,
+       67
+      ],
+      "C+D": [
+       5,
+       40
+      ],
+      "not in text": [
+       42,
+       107
+      ],
+      "all year-tagged": [
+       166,
+       250
+      ],
+      "all": [
+       181,
+       300
+      ]
+     },
+     "within1": {
+      "in text": [
+       131,
+       143
+      ],
+      "A": [
+       29,
+       35
+      ],
+      "A'": [
+       6,
+       8
+      ],
+      "B": [
+       13,
+       24
+      ],
+      "C": [
+       10,
+       25
+      ],
+      "D": [
+       4,
+       15
+      ],
+      "decade": [
+       21,
+       50
+      ],
+      "A+A'+B": [
+       48,
+       67
+      ],
+      "C+D": [
+       14,
+       40
+      ],
+      "not in text": [
+       62,
+       107
+      ],
+      "all year-tagged": [
+       193,
+       250
+      ],
+      "all": [
+       214,
+       300
+      ]
+     },
+     "invalid": [
+      0,
+      300
+     ],
+     "stages": {
+      "rule": 202,
+      "propagated": 91,
+      "residue": 7
+     },
+     "evidence": {
+      "unsupported": 28,
+      "valid": 272
+     },
+     "right_unsupported": 18,
+     "conformal": {
+      "in text": {
+       "n": 143,
+       "alpha": 0.1,
+       "q": [
+        1,
+        3
+       ],
+       "coverage": [
+        131,
+        143
+       ],
+       "width": 3.986013986013986,
+       "winkler": 32.93706293706294,
+       "no_year": 0
+      },
+      "A+A'+B": {
+       "n": 67,
+       "alpha": 0.1,
+       "q": [
+        46,
+        50
+       ],
+       "coverage": [
+        63,
+        67
+       ],
+       "width": 96.02985074626865,
+       "winkler": 124.08955223880596,
+       "no_year": 0
+      },
+      "C+D": {
+       "n": 40,
+       "alpha": 0.1,
+       "q": [
+        34,
+        24
+       ],
+       "coverage": [
+        37,
+        40
+       ],
+       "width": 58.1,
+       "winkler": 136.1,
+       "no_year": 0
+      },
+      "not in text": {
+       "n": 107,
+       "alpha": 0.1,
+       "q": [
+        34,
+        24
+       ],
+       "coverage": [
+        97,
+        107
+       ],
+       "width": 58.18691588785047,
+       "winkler": 126.22429906542057,
+       "no_year": 0
+      },
+      "all": {
+       "n": 300,
+       "alpha": 0.1,
+       "q": [
+        18,
+        24
+       ],
+       "coverage": [
+        271,
+        300
+       ],
+       "width": 42.03666666666667,
+       "winkler": 93.57,
+       "no_year": 0
+      }
+     },
+     "du": {
+      "certain_flagged_uncertain": [
+       39,
+       200
+      ],
+      "uncertain_flagged_certain": [
+       17,
+       50
+      ]
+     }
+    },
+    "per_1000": {
+     "gpu_s": 22.9,
+     "mac_s": 0.0,
+     "calls": {
+      "trace-neigh": 7
+     }
+    }
+   },
+   "Vision text: 2B chooser|no residue stage|t=3": {
+    "corpus": {
+     "n": 300,
+     "exact": {
+      "in text": [
+       107,
+       119
+      ],
+      "A": [
+       26,
+       33
+      ],
+      "A'": [
+       5,
+       7
+      ],
+      "B": [
+       14,
+       35
+      ],
+      "C": [
+       9,
+       35
+      ],
+      "D": [
+       8,
+       21
+      ],
+      "decade": [
+       12,
+       50
+      ],
+      "A+A'+B": [
+       45,
+       75
+      ],
+      "C+D": [
+       17,
+       56
+      ],
+      "not in text": [
+       62,
+       131
+      ],
+      "all year-tagged": [
+       169,
+       250
+      ],
+      "all": [
+       181,
+       300
+      ]
+     },
+     "within1": {
+      "in text": [
+       112,
+       119
+      ],
+      "A": [
+       28,
+       33
+      ],
+      "A'": [
+       7,
+       7
+      ],
+      "B": [
+       22,
+       35
+      ],
+      "C": [
+       17,
+       35
+      ],
+      "D": [
+       10,
+       21
+      ],
+      "decade": [
+       19,
+       50
+      ],
+      "A+A'+B": [
+       57,
+       75
+      ],
+      "C+D": [
+       27,
+       56
+      ],
+      "not in text": [
+       84,
+       131
+      ],
+      "all year-tagged": [
+       196,
+       250
+      ],
+      "all": [
+       215,
+       300
+      ]
+     },
+     "invalid": [
+      7,
+      300
+     ],
+     "stages": {
+      "rule": 174,
+      "propagated": 91,
+      "chooser": 28,
+      "none": 7
+     },
+     "evidence": {
+      "unsupported": 24,
+      "valid": 269
+     },
+     "right_unsupported": 16,
+     "conformal": {
+      "in text": {
+       "n": 119,
+       "alpha": 0.1,
+       "q": [
+        1,
+        0
+       ],
+       "coverage": [
+        109,
+        119
+       ],
+       "width": 1.0084033613445378,
+       "winkler": 18.65546218487395,
+       "no_year": 0
+      },
+      "A+A'+B": {
+       "n": 75,
+       "alpha": 0.1,
+       "q": [
+        55,
+        46
+       ],
+       "coverage": [
+        71,
+        75
+       ],
+       "width": 101.24324324324324,
+       "winkler": 126.64864864864865,
+       "no_year": 1
+      },
+      "C+D": {
+       "n": 56,
+       "alpha": 0.1,
+       "q": [
+        Infinity,
+        35
+       ],
+       "coverage": [
+        53,
+        56
+       ],
+       "width": 70.0,
+       "winkler": 70.0,
+       "no_year": 3
+      },
+      "not in text": {
+       "n": 131,
+       "alpha": 0.1,
+       "q": [
+        50,
+        34
+       ],
+       "coverage": [
+        121,
+        131
+       ],
+       "width": 84.37795275590551,
+       "winkler": 125.48031496062993,
+       "no_year": 4
+      },
+      "all": {
+       "n": 300,
+       "alpha": 0.1,
+       "q": [
+        21,
+        29
+       ],
+       "coverage": [
+        270,
+        300
+       ],
+       "width": 50.027303754266214,
+       "winkler": 90.36860068259385,
+       "no_year": 7
+      }
+     },
+     "du": {
+      "certain_flagged_uncertain": [
+       39,
+       200
+      ],
+      "uncertain_flagged_certain": [
+       17,
+       50
+      ]
+     }
+    },
+    "reread": {
+     "n": 300,
+     "exact": {
+      "in text": [
+       128,
+       143
+      ],
+      "A": [
+       26,
+       35
+      ],
+      "A'": [
+       3,
+       8
+      ],
+      "B": [
+       7,
+       24
+      ],
+      "C": [
+       3,
+       25
+      ],
+      "D": [
+       2,
+       15
+      ],
+      "decade": [
+       12,
+       50
+      ],
+      "A+A'+B": [
+       36,
+       67
+      ],
+      "C+D": [
+       5,
+       40
+      ],
+      "not in text": [
+       41,
+       107
+      ],
+      "all year-tagged": [
+       169,
+       250
+      ],
+      "all": [
+       181,
+       300
+      ]
+     },
+     "within1": {
+      "in text": [
+       135,
+       143
+      ],
+      "A": [
+       29,
+       35
+      ],
+      "A'": [
+       5,
+       8
+      ],
+      "B": [
+       13,
+       24
+      ],
+      "C": [
+       10,
+       25
+      ],
+      "D": [
+       4,
+       15
+      ],
+      "decade": [
+       19,
+       50
+      ],
+      "A+A'+B": [
+       47,
+       67
+      ],
+      "C+D": [
+       14,
+       40
+      ],
+      "not in text": [
+       61,
+       107
+      ],
+      "all year-tagged": [
+       196,
+       250
+      ],
+      "all": [
+       215,
+       300
+      ]
+     },
+     "invalid": [
+      7,
+      300
+     ],
+     "stages": {
+      "rule": 174,
+      "propagated": 91,
+      "chooser": 28,
+      "none": 7
+     },
+     "evidence": {
+      "unsupported": 24,
+      "valid": 269
+     },
+     "right_unsupported": 16,
+     "conformal": {
+      "in text": {
+       "n": 143,
+       "alpha": 0.1,
+       "q": [
+        1,
+        1
+       ],
+       "coverage": [
+        135,
+        143
+       ],
+       "width": 2.0,
+       "winkler": 16.265734265734267,
+       "no_year": 0
+      },
+      "A+A'+B": {
+       "n": 67,
+       "alpha": 0.1,
+       "q": [
+        50,
+        50
+       ],
+       "coverage": [
+        63,
+        67
+       ],
+       "width": 100.0,
+       "winkler": 125.23076923076923,
+       "no_year": 2
+      },
+      "C+D": {
+       "n": 40,
+       "alpha": 0.1,
+       "q": [
+        34,
+        Infinity
+       ],
+       "coverage": [
+        37,
+        40
+       ],
+       "width": 68.0,
+       "winkler": 69.11111111111111,
+       "no_year": 2
+      },
+      "not in text": {
+       "n": 107,
+       "alpha": 0.1,
+       "q": [
+        55,
+        24
+       ],
+       "coverage": [
+        95,
+        107
+       ],
+       "width": 80.50485436893204,
+       "winkler": 139.72815533980582,
+       "no_year": 4
+      },
+      "all": {
+       "n": 300,
+       "alpha": 0.1,
+       "q": [
+        21,
+        29
+       ],
+       "coverage": [
+        270,
+        300
+       ],
+       "width": 50.027303754266214,
+       "winkler": 90.36860068259385,
+       "no_year": 7
+      }
+     },
+     "du": {
+      "certain_flagged_uncertain": [
+       39,
+       200
+      ],
+      "uncertain_flagged_certain": [
+       17,
+       50
+      ]
+     }
+    },
+    "per_1000": {
+     "gpu_s": 0.0,
+     "mac_s": 203.9,
+     "calls": {
+      "2b": 44
+     }
+    }
+   },
+   "Vision text: 2B chooser|27B trace-neigh|t=0": {
+    "corpus": {
+     "n": 300,
+     "exact": {
+      "in text": [
+       106,
+       119
+      ],
+      "A": [
+       21,
+       33
+      ],
+      "A'": [
+       6,
+       7
+      ],
+      "B": [
+       16,
+       35
+      ],
+      "C": [
+       12,
+       35
+      ],
+      "D": [
+       8,
+       21
+      ],
+      "decade": [
+       21,
+       50
+      ],
+      "A+A'+B": [
+       43,
+       75
+      ],
+      "C+D": [
+       20,
+       56
+      ],
+      "not in text": [
+       63,
+       131
+      ],
+      "all year-tagged": [
+       169,
+       250
+      ],
+      "all": [
+       190,
+       300
+      ]
+     },
+     "within1": {
+      "in text": [
+       112,
+       119
+      ],
+      "A": [
+       27,
+       33
+      ],
+      "A'": [
+       7,
+       7
+      ],
+      "B": [
+       26,
+       35
+      ],
+      "C": [
+       23,
+       35
+      ],
+      "D": [
+       12,
+       21
+      ],
+      "decade": [
+       28,
+       50
+      ],
+      "A+A'+B": [
+       60,
+       75
+      ],
+      "C+D": [
+       35,
+       56
+      ],
+      "not in text": [
+       95,
+       131
+      ],
+      "all year-tagged": [
+       207,
+       250
+      ],
+      "all": [
+       235,
+       300
+      ]
+     },
+     "invalid": [
+      4,
+      300
+     ],
+     "stages": {
+      "rule": 174,
+      "residue": 98,
+      "chooser": 28
+     },
+     "evidence": {
+      "unsupported": 57,
+      "valid": 239
+     },
+     "right_unsupported": 33,
+     "conformal": {
+      "in text": {
+       "n": 119,
+       "alpha": 0.1,
+       "q": [
+        1,
+        1
+       ],
+       "coverage": [
+        112,
+        119
+       ],
+       "width": 2.0,
+       "winkler": 18.470588235294116,
+       "no_year": 0
+      },
+      "A+A'+B": {
+       "n": 75,
+       "alpha": 0.1,
+       "q": [
+        50,
+        46
+       ],
+       "coverage": [
+        72,
+        75
+       ],
+       "width": 96.4054054054054,
+       "winkler": 119.37837837837837,
+       "no_year": 1
+      },
+      "C+D": {
+       "n": 56,
+       "alpha": 0.1,
+       "q": [
+        20,
+        169
+       ],
+       "coverage": [
+        52,
+        56
+       ],
+       "width": 192.2,
+       "winkler": 251.83636363636364,
+       "no_year": 1
+      },
+      "not in text": {
+       "n": 131,
+       "alpha": 0.1,
+       "q": [
+        20,
+        21
+       ],
+       "coverage": [
+        121,
+        131
+       ],
+       "width": 41.372093023255815,
+       "winkler": 100.90697674418605,
+       "no_year": 2
+      },
+      "all": {
+       "n": 300,
+       "alpha": 0.1,
+       "q": [
+        12,
+        18
+       ],
+       "coverage": [
+        273,
+        300
+       ],
+       "width": 30.24662162162162,
+       "winkler": 77.47635135135135,
+       "no_year": 4
+      }
+     },
+     "du": {
+      "certain_flagged_uncertain": [
+       20,
+       200
+      ],
+      "uncertain_flagged_certain": [
+       33,
+       50
+      ]
+     }
+    },
+    "reread": {
+     "n": 300,
+     "exact": {
+      "in text": [
+       127,
+       143
+      ],
+      "A": [
+       20,
+       35
+      ],
+      "A'": [
+       5,
+       8
+      ],
+      "B": [
+       11,
+       24
+      ],
+      "C": [
+       3,
+       25
+      ],
+      "D": [
+       3,
+       15
+      ],
+      "decade": [
+       21,
+       50
+      ],
+      "A+A'+B": [
+       36,
+       67
+      ],
+      "C+D": [
+       6,
+       40
+      ],
+      "not in text": [
+       42,
+       107
+      ],
+      "all year-tagged": [
+       169,
+       250
+      ],
+      "all": [
+       190,
+       300
+      ]
+     },
+     "within1": {
+      "in text": [
+       135,
+       143
+      ],
+      "A": [
+       28,
+       35
+      ],
+      "A'": [
+       8,
+       8
+      ],
+      "B": [
+       17,
+       24
+      ],
+      "C": [
+       13,
+       25
+      ],
+      "D": [
+       6,
+       15
+      ],
+      "decade": [
+       28,
+       50
+      ],
+      "A+A'+B": [
+       53,
+       67
+      ],
+      "C+D": [
+       19,
+       40
+      ],
+      "not in text": [
+       72,
+       107
+      ],
+      "all year-tagged": [
+       207,
+       250
+      ],
+      "all": [
+       235,
+       300
+      ]
+     },
+     "invalid": [
+      4,
+      300
+     ],
+     "stages": {
+      "rule": 174,
+      "residue": 98,
+      "chooser": 28
+     },
+     "evidence": {
+      "unsupported": 57,
+      "valid": 239
+     },
+     "right_unsupported": 33,
+     "conformal": {
+      "in text": {
+       "n": 143,
+       "alpha": 0.1,
+       "q": [
+        1,
+        1
+       ],
+       "coverage": [
+        135,
+        143
+       ],
+       "width": 2.0,
+       "winkler": 16.265734265734267,
+       "no_year": 0
+      },
+      "A+A'+B": {
+       "n": 67,
+       "alpha": 0.1,
+       "q": [
+        46,
+        50
+       ],
+       "coverage": [
+        63,
+        67
+       ],
+       "width": 96.42424242424242,
+       "winkler": 122.18181818181819,
+       "no_year": 1
+      },
+      "C+D": {
+       "n": 40,
+       "alpha": 0.1,
+       "q": [
+        34,
+        21
+       ],
+       "coverage": [
+        37,
+        40
+       ],
+       "width": 55.205128205128204,
+       "winkler": 137.76923076923077,
+       "no_year": 1
+      },
+      "not in text": {
+       "n": 107,
+       "alpha": 0.1,
+       "q": [
+        10,
+        50
+       ],
+       "coverage": [
+        98,
+        107
+       ],
+       "width": 60.84761904761905,
+       "winkler": 127.32380952380953,
+       "no_year": 2
+      },
+      "all": {
+       "n": 300,
+       "alpha": 0.1,
+       "q": [
+        12,
+        18
+       ],
+       "coverage": [
+        273,
+        300
+       ],
+       "width": 30.24662162162162,
+       "winkler": 77.47635135135135,
+       "no_year": 4
+      }
+     },
+     "du": {
+      "certain_flagged_uncertain": [
+       20,
+       200
+      ],
+      "uncertain_flagged_certain": [
+       33,
+       50
+      ]
+     }
+    },
+    "per_1000": {
+     "gpu_s": 320.0,
+     "mac_s": 203.9,
+     "calls": {
+      "trace-neigh": 98,
+      "2b": 44
+     }
+    }
+   },
+   "Vision text: 2B chooser|27B trace-neigh|t=3": {
+    "corpus": {
+     "n": 300,
+     "exact": {
+      "in text": [
+       107,
+       119
+      ],
+      "A": [
+       26,
+       33
+      ],
+      "A'": [
+       5,
+       7
+      ],
+      "B": [
+       14,
+       35
+      ],
+      "C": [
+       10,
+       35
+      ],
+      "D": [
+       8,
+       21
+      ],
+      "decade": [
+       15,
+       50
+      ],
+      "A+A'+B": [
+       45,
+       75
+      ],
+      "C+D": [
+       18,
+       56
+      ],
+      "not in text": [
+       63,
+       131
+      ],
+      "all year-tagged": [
+       170,
+       250
+      ],
+      "all": [
+       185,
+       300
+      ]
+     },
+     "within1": {
+      "in text": [
+       112,
+       119
+      ],
+      "A": [
+       28,
+       33
+      ],
+      "A'": [
+       7,
+       7
+      ],
+      "B": [
+       22,
+       35
+      ],
+      "C": [
+       19,
+       35
+      ],
+      "D": [
+       10,
+       21
+      ],
+      "decade": [
+       22,
+       50
+      ],
+      "A+A'+B": [
+       57,
+       75
+      ],
+      "C+D": [
+       29,
+       56
+      ],
+      "not in text": [
+       86,
+       131
+      ],
+      "all year-tagged": [
+       198,
+       250
+      ],
+      "all": [
+       220,
+       300
+      ]
+     },
+     "invalid": [
+      0,
+      300
+     ],
+     "stages": {
+      "rule": 174,
+      "propagated": 91,
+      "chooser": 28,
+      "residue": 7
+     },
+     "evidence": {
+      "unsupported": 27,
+      "valid": 273
+     },
+     "right_unsupported": 18,
+     "conformal": {
+      "in text": {
+       "n": 119,
+       "alpha": 0.1,
+       "q": [
+        1,
+        0
+       ],
+       "coverage": [
+        109,
+        119
+       ],
+       "width": 1.0084033613445378,
+       "winkler": 18.65546218487395,
+       "no_year": 0
+      },
+      "A+A'+B": {
+       "n": 75,
+       "alpha": 0.1,
+       "q": [
+        50,
+        46
+       ],
+       "coverage": [
+        72,
+        75
+       ],
+       "width": 96.08,
+       "winkler": 121.14666666666666,
+       "no_year": 0
+      },
+      "C+D": {
+       "n": 56,
+       "alpha": 0.1,
+       "q": [
+        19,
+        35
+       ],
+       "coverage": [
+        51,
+        56
+       ],
+       "width": 54.142857142857146,
+       "winkler": 121.28571428571429,
+       "no_year": 0
+      },
+      "not in text": {
+       "n": 131,
+       "alpha": 0.1,
+       "q": [
+        20,
+        24
+       ],
+       "coverage": [
+        118,
+        131
+       ],
+       "width": 44.045801526717554,
+       "winkler": 110.1526717557252,
+       "no_year": 0
+      },
+      "all": {
+       "n": 300,
+       "alpha": 0.1,
+       "q": [
+        15,
+        20
+       ],
+       "coverage": [
+        269,
+        300
+       ],
+       "width": 35.03666666666667,
+       "winkler": 87.50333333333333,
+       "no_year": 0
+      }
+     },
+     "du": {
+      "certain_flagged_uncertain": [
+       39,
+       200
+      ],
+      "uncertain_flagged_certain": [
+       17,
+       50
+      ]
+     }
+    },
+    "reread": {
+     "n": 300,
+     "exact": {
+      "in text": [
+       128,
+       143
+      ],
+      "A": [
+       26,
+       35
+      ],
+      "A'": [
+       4,
+       8
+      ],
+      "B": [
+       7,
+       24
+      ],
+      "C": [
+       3,
+       25
+      ],
+      "D": [
+       2,
+       15
+      ],
+      "decade": [
+       15,
+       50
+      ],
+      "A+A'+B": [
+       37,
+       67
+      ],
+      "C+D": [
+       5,
+       40
+      ],
+      "not in text": [
+       42,
+       107
+      ],
+      "all year-tagged": [
+       170,
+       250
+      ],
+      "all": [
+       185,
+       300
+      ]
+     },
+     "within1": {
+      "in text": [
+       135,
+       143
+      ],
+      "A": [
+       29,
+       35
+      ],
+      "A'": [
+       6,
+       8
+      ],
+      "B": [
+       13,
+       24
+      ],
+      "C": [
+       11,
+       25
+      ],
+      "D": [
+       4,
+       15
+      ],
+      "decade": [
+       22,
+       50
+      ],
+      "A+A'+B": [
+       48,
+       67
+      ],
+      "C+D": [
+       15,
+       40
+      ],
+      "not in text": [
+       63,
+       107
+      ],
+      "all year-tagged": [
+       198,
+       250
+      ],
+      "all": [
+       220,
+       300
+      ]
+     },
+     "invalid": [
+      0,
+      300
+     ],
+     "stages": {
+      "rule": 174,
+      "propagated": 91,
+      "chooser": 28,
+      "residue": 7
+     },
+     "evidence": {
+      "unsupported": 27,
+      "valid": 273
+     },
+     "right_unsupported": 18,
+     "conformal": {
+      "in text": {
+       "n": 143,
+       "alpha": 0.1,
+       "q": [
+        1,
+        1
+       ],
+       "coverage": [
+        135,
+        143
+       ],
+       "width": 2.0,
+       "winkler": 16.265734265734267,
+       "no_year": 0
+      },
+      "A+A'+B": {
+       "n": 67,
+       "alpha": 0.1,
+       "q": [
+        46,
+        50
+       ],
+       "coverage": [
+        63,
+        67
+       ],
+       "width": 96.02985074626865,
+       "winkler": 124.08955223880596,
+       "no_year": 0
+      },
+      "C+D": {
+       "n": 40,
+       "alpha": 0.1,
+       "q": [
+        34,
+        24
+       ],
+       "coverage": [
+        37,
+        40
+       ],
+       "width": 58.1,
+       "winkler": 136.1,
+       "no_year": 0
+      },
+      "not in text": {
+       "n": 107,
+       "alpha": 0.1,
+       "q": [
+        34,
+        24
+       ],
+       "coverage": [
+        97,
+        107
+       ],
+       "width": 58.18691588785047,
+       "winkler": 126.22429906542057,
+       "no_year": 0
+      },
+      "all": {
+       "n": 300,
+       "alpha": 0.1,
+       "q": [
+        15,
+        20
+       ],
+       "coverage": [
+        269,
+        300
+       ],
+       "width": 35.03666666666667,
+       "winkler": 87.50333333333333,
+       "no_year": 0
+      }
+     },
+     "du": {
+      "certain_flagged_uncertain": [
+       39,
+       200
+      ],
+      "uncertain_flagged_certain": [
+       17,
+       50
+      ]
+     }
+    },
+    "per_1000": {
+     "gpu_s": 22.9,
+     "mac_s": 203.9,
+     "calls": {
+      "2b": 44,
+      "trace-neigh": 7
+     }
+    }
+   },
+   "Vision text: 27B chooser|no residue stage|t=3": {
+    "corpus": {
+     "n": 300,
+     "exact": {
+      "in text": [
+       105,
+       119
+      ],
+      "A": [
+       26,
+       33
+      ],
+      "A'": [
+       6,
+       7
+      ],
+      "B": [
+       16,
+       35
+      ],
+      "C": [
+       9,
+       35
+      ],
+      "D": [
+       8,
+       21
+      ],
+      "decade": [
+       12,
+       50
+      ],
+      "A+A'+B": [
+       48,
+       75
+      ],
+      "C+D": [
+       17,
+       56
+      ],
+      "not in text": [
+       65,
+       131
+      ],
+      "all year-tagged": [
+       170,
+       250
+      ],
+      "all": [
+       182,
+       300
+      ]
+     },
+     "within1": {
+      "in text": [
+       109,
+       119
+      ],
+      "A": [
+       28,
+       33
+      ],
+      "A'": [
+       7,
+       7
+      ],
+      "B": [
+       23,
+       35
+      ],
+      "C": [
+       16,
+       35
+      ],
+      "D": [
+       10,
+       21
+      ],
+      "decade": [
+       18,
+       50
+      ],
+      "A+A'+B": [
+       58,
+       75
+      ],
+      "C+D": [
+       26,
+       56
+      ],
+      "not in text": [
+       84,
+       131
+      ],
+      "all year-tagged": [
+       193,
+       250
+      ],
+      "all": [
+       211,
+       300
+      ]
+     },
+     "invalid": [
+      7,
+      300
+     ],
+     "stages": {
+      "rule": 182,
+      "propagated": 91,
+      "chooser": 20,
+      "none": 7
+     },
+     "evidence": {
+      "unsupported": 25,
+      "valid": 268
+     },
+     "right_unsupported": 17,
+     "conformal": {
+      "in text": {
+       "n": 119,
+       "alpha": 0.1,
+       "q": [
+        1,
+        3
+       ],
+       "coverage": [
+        110,
+        119
+       ],
+       "width": 3.9831932773109244,
+       "winkler": 21.462184873949578,
+       "no_year": 0
+      },
+      "A+A'+B": {
+       "n": 75,
+       "alpha": 0.1,
+       "q": [
+        55,
+        46
+       ],
+       "coverage": [
+        71,
+        75
+       ],
+       "width": 101.24324324324324,
+       "winkler": 126.64864864864865,
+       "no_year": 1
+      },
+      "C+D": {
+       "n": 56,
+       "alpha": 0.1,
+       "q": [
+        Infinity,
+        35
+       ],
+       "coverage": [
+        53,
+        56
+       ],
+       "width": 70.0,
+       "winkler": 70.0,
+       "no_year": 3
+      },
+      "not in text": {
+       "n": 131,
+       "alpha": 0.1,
+       "q": [
+        50,
+        34
+       ],
+       "coverage": [
+        121,
+        131
+       ],
+       "width": 84.37795275590551,
+       "winkler": 125.48031496062993,
+       "no_year": 4
+      },
+      "all": {
+       "n": 300,
+       "alpha": 0.1,
+       "q": [
+        23,
+        29
+       ],
+       "coverage": [
+        269,
+        300
+       ],
+       "width": 52.02047781569966,
+       "winkler": 90.45051194539249,
+       "no_year": 7
+      }
+     },
+     "du": {
+      "certain_flagged_uncertain": [
+       39,
+       200
+      ],
+      "uncertain_flagged_certain": [
+       17,
+       50
+      ]
+     }
+    },
+    "reread": {
+     "n": 300,
+     "exact": {
+      "in text": [
+       128,
+       143
+      ],
+      "A": [
+       26,
+       35
+      ],
+      "A'": [
+       4,
+       8
+      ],
+      "B": [
+       7,
+       24
+      ],
+      "C": [
+       3,
+       25
+      ],
+      "D": [
+       2,
+       15
+      ],
+      "decade": [
+       12,
+       50
+      ],
+      "A+A'+B": [
+       37,
+       67
+      ],
+      "C+D": [
+       5,
+       40
+      ],
+      "not in text": [
+       42,
+       107
+      ],
+      "all year-tagged": [
+       170,
+       250
+      ],
+      "all": [
+       182,
+       300
+      ]
+     },
+     "within1": {
+      "in text": [
+       133,
+       143
+      ],
+      "A": [
+       29,
+       35
+      ],
+      "A'": [
+       5,
+       8
+      ],
+      "B": [
+       13,
+       24
+      ],
+      "C": [
+       9,
+       25
+      ],
+      "D": [
+       4,
+       15
+      ],
+      "decade": [
+       18,
+       50
+      ],
+      "A+A'+B": [
+       47,
+       67
+      ],
+      "C+D": [
+       13,
+       40
+      ],
+      "not in text": [
+       60,
+       107
+      ],
+      "all year-tagged": [
+       193,
+       250
+      ],
+      "all": [
+       211,
+       300
+      ]
+     },
+     "invalid": [
+      7,
+      300
+     ],
+     "stages": {
+      "rule": 182,
+      "propagated": 91,
+      "chooser": 20,
+      "none": 7
+     },
+     "evidence": {
+      "unsupported": 25,
+      "valid": 268
+     },
+     "right_unsupported": 17,
+     "conformal": {
+      "in text": {
+       "n": 143,
+       "alpha": 0.1,
+       "q": [
+        1,
+        1
+       ],
+       "coverage": [
+        133,
+        143
+       ],
+       "width": 2.0,
+       "winkler": 17.524475524475523,
+       "no_year": 0
+      },
+      "A+A'+B": {
+       "n": 67,
+       "alpha": 0.1,
+       "q": [
+        50,
+        50
+       ],
+       "coverage": [
+        63,
+        67
+       ],
+       "width": 100.0,
+       "winkler": 125.23076923076923,
+       "no_year": 2
+      },
+      "C+D": {
+       "n": 40,
+       "alpha": 0.1,
+       "q": [
+        34,
+        Infinity
+       ],
+       "coverage": [
+        37,
+        40
+       ],
+       "width": 68.0,
+       "winkler": 69.11111111111111,
+       "no_year": 2
+      },
+      "not in text": {
+       "n": 107,
+       "alpha": 0.1,
+       "q": [
+        55,
+        24
+       ],
+       "coverage": [
+        95,
+        107
+       ],
+       "width": 80.50485436893204,
+       "winkler": 139.72815533980582,
+       "no_year": 4
+      },
+      "all": {
+       "n": 300,
+       "alpha": 0.1,
+       "q": [
+        23,
+        29
+       ],
+       "coverage": [
+        269,
+        300
+       ],
+       "width": 52.02047781569966,
+       "winkler": 90.45051194539249,
+       "no_year": 7
+      }
+     },
+     "du": {
+      "certain_flagged_uncertain": [
+       39,
+       200
+      ],
+      "uncertain_flagged_certain": [
+       17,
+       50
+      ]
+     }
+    },
+    "per_1000": {
+     "gpu_s": 62.1,
+     "mac_s": 0.0,
+     "calls": {
+      "choose": 44
+     }
+    }
+   },
+   "Vision text: 27B chooser|27B trace-neigh|t=0": {
+    "corpus": {
+     "n": 300,
+     "exact": {
+      "in text": [
+       104,
+       119
+      ],
+      "A": [
+       21,
+       33
+      ],
+      "A'": [
+       7,
+       7
+      ],
+      "B": [
+       18,
+       35
+      ],
+      "C": [
+       12,
+       35
+      ],
+      "D": [
+       8,
+       21
+      ],
+      "decade": [
+       21,
+       50
+      ],
+      "A+A'+B": [
+       46,
+       75
+      ],
+      "C+D": [
+       20,
+       56
+      ],
+      "not in text": [
+       66,
+       131
+      ],
+      "all year-tagged": [
+       170,
+       250
+      ],
+      "all": [
+       191,
+       300
+      ]
+     },
+     "within1": {
+      "in text": [
+       109,
+       119
+      ],
+      "A": [
+       27,
+       33
+      ],
+      "A'": [
+       7,
+       7
+      ],
+      "B": [
+       27,
+       35
+      ],
+      "C": [
+       22,
+       35
+      ],
+      "D": [
+       12,
+       21
+      ],
+      "decade": [
+       27,
+       50
+      ],
+      "A+A'+B": [
+       61,
+       75
+      ],
+      "C+D": [
+       34,
+       56
+      ],
+      "not in text": [
+       95,
+       131
+      ],
+      "all year-tagged": [
+       204,
+       250
+      ],
+      "all": [
+       231,
+       300
+      ]
+     },
+     "invalid": [
+      4,
+      300
+     ],
+     "stages": {
+      "rule": 182,
+      "residue": 98,
+      "chooser": 20
+     },
+     "evidence": {
+      "unsupported": 58,
+      "valid": 238
+     },
+     "right_unsupported": 34,
+     "conformal": {
+      "in text": {
+       "n": 119,
+       "alpha": 0.1,
+       "q": [
+        1,
+        3
+       ],
+       "coverage": [
+        110,
+        119
+       ],
+       "width": 3.9831932773109244,
+       "winkler": 21.462184873949578,
+       "no_year": 0
+      },
+      "A+A'+B": {
+       "n": 75,
+       "alpha": 0.1,
+       "q": [
+        50,
+        46
+       ],
+       "coverage": [
+        72,
+        75
+       ],
+       "width": 96.4054054054054,
+       "winkler": 119.37837837837837,
+       "no_year": 1
+      },
+      "C+D": {
+       "n": 56,
+       "alpha": 0.1,
+       "q": [
+        20,
+        169
+       ],
+       "coverage": [
+        52,
+        56
+       ],
+       "width": 192.2,
+       "winkler": 251.83636363636364,
+       "no_year": 1
+      },
+      "not in text": {
+       "n": 131,
+       "alpha": 0.1,
+       "q": [
+        20,
+        21
+       ],
+       "coverage": [
+        121,
+        131
+       ],
+       "width": 41.372093023255815,
+       "winkler": 100.90697674418605,
+       "no_year": 2
+      },
+      "all": {
+       "n": 300,
+       "alpha": 0.1,
+       "q": [
+        15,
+        18
+       ],
+       "coverage": [
+        272,
+        300
+       ],
+       "width": 33.266891891891895,
+       "winkler": 78.40202702702703,
+       "no_year": 4
+      }
+     },
+     "du": {
+      "certain_flagged_uncertain": [
+       20,
+       200
+      ],
+      "uncertain_flagged_certain": [
+       33,
+       50
+      ]
+     }
+    },
+    "reread": {
+     "n": 300,
+     "exact": {
+      "in text": [
+       127,
+       143
+      ],
+      "A": [
+       20,
+       35
+      ],
+      "A'": [
+       6,
+       8
+      ],
+      "B": [
+       11,
+       24
+      ],
+      "C": [
+       3,
+       25
+      ],
+      "D": [
+       3,
+       15
+      ],
+      "decade": [
+       21,
+       50
+      ],
+      "A+A'+B": [
+       37,
+       67
+      ],
+      "C+D": [
+       6,
+       40
+      ],
+      "not in text": [
+       43,
+       107
+      ],
+      "all year-tagged": [
+       170,
+       250
+      ],
+      "all": [
+       191,
+       300
+      ]
+     },
+     "within1": {
+      "in text": [
+       133,
+       143
+      ],
+      "A": [
+       28,
+       35
+      ],
+      "A'": [
+       8,
+       8
+      ],
+      "B": [
+       17,
+       24
+      ],
+      "C": [
+       12,
+       25
+      ],
+      "D": [
+       6,
+       15
+      ],
+      "decade": [
+       27,
+       50
+      ],
+      "A+A'+B": [
+       53,
+       67
+      ],
+      "C+D": [
+       18,
+       40
+      ],
+      "not in text": [
+       71,
+       107
+      ],
+      "all year-tagged": [
+       204,
+       250
+      ],
+      "all": [
+       231,
+       300
+      ]
+     },
+     "invalid": [
+      4,
+      300
+     ],
+     "stages": {
+      "rule": 182,
+      "residue": 98,
+      "chooser": 20
+     },
+     "evidence": {
+      "unsupported": 58,
+      "valid": 238
+     },
+     "right_unsupported": 34,
+     "conformal": {
+      "in text": {
+       "n": 143,
+       "alpha": 0.1,
+       "q": [
+        1,
+        1
+       ],
+       "coverage": [
+        133,
+        143
+       ],
+       "width": 2.0,
+       "winkler": 17.524475524475523,
+       "no_year": 0
+      },
+      "A+A'+B": {
+       "n": 67,
+       "alpha": 0.1,
+       "q": [
+        46,
+        50
+       ],
+       "coverage": [
+        63,
+        67
+       ],
+       "width": 96.42424242424242,
+       "winkler": 122.18181818181819,
+       "no_year": 1
+      },
+      "C+D": {
+       "n": 40,
+       "alpha": 0.1,
+       "q": [
+        34,
+        21
+       ],
+       "coverage": [
+        37,
+        40
+       ],
+       "width": 55.205128205128204,
+       "winkler": 137.76923076923077,
+       "no_year": 1
+      },
+      "not in text": {
+       "n": 107,
+       "alpha": 0.1,
+       "q": [
+        9,
+        50
+       ],
+       "coverage": [
+        98,
+        107
+       ],
+       "width": 59.857142857142854,
+       "winkler": 127.66666666666667,
+       "no_year": 2
+      },
+      "all": {
+       "n": 300,
+       "alpha": 0.1,
+       "q": [
+        15,
+        18
+       ],
+       "coverage": [
+        272,
+        300
+       ],
+       "width": 33.266891891891895,
+       "winkler": 78.40202702702703,
+       "no_year": 4
+      }
+     },
+     "du": {
+      "certain_flagged_uncertain": [
+       20,
+       200
+      ],
+      "uncertain_flagged_certain": [
+       33,
+       50
+      ]
+     }
+    },
+    "per_1000": {
+     "gpu_s": 382.1,
+     "mac_s": 0.0,
+     "calls": {
+      "trace-neigh": 98,
+      "choose": 44
+     }
+    }
+   },
+   "Vision text: 27B chooser|27B trace-neigh|t=3": {
+    "corpus": {
+     "n": 300,
+     "exact": {
+      "in text": [
+       105,
+       119
+      ],
+      "A": [
+       26,
+       33
+      ],
+      "A'": [
+       6,
+       7
+      ],
+      "B": [
+       16,
+       35
+      ],
+      "C": [
+       10,
+       35
+      ],
+      "D": [
+       8,
+       21
+      ],
+      "decade": [
+       15,
+       50
+      ],
+      "A+A'+B": [
+       48,
+       75
+      ],
+      "C+D": [
+       18,
+       56
+      ],
+      "not in text": [
+       66,
+       131
+      ],
+      "all year-tagged": [
+       171,
+       250
+      ],
+      "all": [
+       186,
+       300
+      ]
+     },
+     "within1": {
+      "in text": [
+       109,
+       119
+      ],
+      "A": [
+       28,
+       33
+      ],
+      "A'": [
+       7,
+       7
+      ],
+      "B": [
+       23,
+       35
+      ],
+      "C": [
+       18,
+       35
+      ],
+      "D": [
+       10,
+       21
+      ],
+      "decade": [
+       21,
+       50
+      ],
+      "A+A'+B": [
+       58,
+       75
+      ],
+      "C+D": [
+       28,
+       56
+      ],
+      "not in text": [
+       86,
+       131
+      ],
+      "all year-tagged": [
+       195,
+       250
+      ],
+      "all": [
+       216,
+       300
+      ]
+     },
+     "invalid": [
+      0,
+      300
+     ],
+     "stages": {
+      "rule": 182,
+      "propagated": 91,
+      "chooser": 20,
+      "residue": 7
+     },
+     "evidence": {
+      "unsupported": 28,
+      "valid": 272
+     },
+     "right_unsupported": 19,
+     "conformal": {
+      "in text": {
+       "n": 119,
+       "alpha": 0.1,
+       "q": [
+        1,
+        3
+       ],
+       "coverage": [
+        110,
+        119
+       ],
+       "width": 3.9831932773109244,
+       "winkler": 21.462184873949578,
+       "no_year": 0
+      },
+      "A+A'+B": {
+       "n": 75,
+       "alpha": 0.1,
+       "q": [
+        50,
+        46
+       ],
+       "coverage": [
+        72,
+        75
+       ],
+       "width": 96.08,
+       "winkler": 121.14666666666666,
+       "no_year": 0
+      },
+      "C+D": {
+       "n": 56,
+       "alpha": 0.1,
+       "q": [
+        19,
+        35
+       ],
+       "coverage": [
+        51,
+        56
+       ],
+       "width": 54.142857142857146,
+       "winkler": 121.28571428571429,
+       "no_year": 0
+      },
+      "not in text": {
+       "n": 131,
+       "alpha": 0.1,
+       "q": [
+        20,
+        24
+       ],
+       "coverage": [
+        118,
+        131
+       ],
+       "width": 44.045801526717554,
+       "winkler": 110.1526717557252,
+       "no_year": 0
+      },
+      "all": {
+       "n": 300,
+       "alpha": 0.1,
+       "q": [
+        18,
+        20
+       ],
+       "coverage": [
+        270,
+        300
+       ],
+       "width": 38.03666666666667,
+       "winkler": 87.30333333333333,
+       "no_year": 0
+      }
+     },
+     "du": {
+      "certain_flagged_uncertain": [
+       39,
+       200
+      ],
+      "uncertain_flagged_certain": [
+       17,
+       50
+      ]
+     }
+    },
+    "reread": {
+     "n": 300,
+     "exact": {
+      "in text": [
+       128,
+       143
+      ],
+      "A": [
+       26,
+       35
+      ],
+      "A'": [
+       5,
+       8
+      ],
+      "B": [
+       7,
+       24
+      ],
+      "C": [
+       3,
+       25
+      ],
+      "D": [
+       2,
+       15
+      ],
+      "decade": [
+       15,
+       50
+      ],
+      "A+A'+B": [
+       38,
+       67
+      ],
+      "C+D": [
+       5,
+       40
+      ],
+      "not in text": [
+       43,
+       107
+      ],
+      "all year-tagged": [
+       171,
+       250
+      ],
+      "all": [
+       186,
+       300
+      ]
+     },
+     "within1": {
+      "in text": [
+       133,
+       143
+      ],
+      "A": [
+       29,
+       35
+      ],
+      "A'": [
+       6,
+       8
+      ],
+      "B": [
+       13,
+       24
+      ],
+      "C": [
+       10,
+       25
+      ],
+      "D": [
+       4,
+       15
+      ],
+      "decade": [
+       21,
+       50
+      ],
+      "A+A'+B": [
+       48,
+       67
+      ],
+      "C+D": [
+       14,
+       40
+      ],
+      "not in text": [
+       62,
+       107
+      ],
+      "all year-tagged": [
+       195,
+       250
+      ],
+      "all": [
+       216,
+       300
+      ]
+     },
+     "invalid": [
+      0,
+      300
+     ],
+     "stages": {
+      "rule": 182,
+      "propagated": 91,
+      "chooser": 20,
+      "residue": 7
+     },
+     "evidence": {
+      "unsupported": 28,
+      "valid": 272
+     },
+     "right_unsupported": 19,
+     "conformal": {
+      "in text": {
+       "n": 143,
+       "alpha": 0.1,
+       "q": [
+        1,
+        1
+       ],
+       "coverage": [
+        133,
+        143
+       ],
+       "width": 2.0,
+       "winkler": 17.524475524475523,
+       "no_year": 0
+      },
+      "A+A'+B": {
+       "n": 67,
+       "alpha": 0.1,
+       "q": [
+        46,
+        50
+       ],
+       "coverage": [
+        63,
+        67
+       ],
+       "width": 96.02985074626865,
+       "winkler": 124.08955223880596,
+       "no_year": 0
+      },
+      "C+D": {
+       "n": 40,
+       "alpha": 0.1,
+       "q": [
+        34,
+        24
+       ],
+       "coverage": [
+        37,
+        40
+       ],
+       "width": 58.1,
+       "winkler": 136.1,
+       "no_year": 0
+      },
+      "not in text": {
+       "n": 107,
+       "alpha": 0.1,
+       "q": [
+        34,
+        24
+       ],
+       "coverage": [
+        97,
+        107
+       ],
+       "width": 58.18691588785047,
+       "winkler": 126.22429906542057,
+       "no_year": 0
+      },
+      "all": {
+       "n": 300,
+       "alpha": 0.1,
+       "q": [
+        18,
+        20
+       ],
+       "coverage": [
+        270,
+        300
+       ],
+       "width": 38.03666666666667,
+       "winkler": 87.30333333333333,
+       "no_year": 0
+      }
+     },
+     "du": {
+      "certain_flagged_uncertain": [
+       39,
+       200
+      ],
+      "uncertain_flagged_certain": [
+       17,
+       50
+      ]
+     }
+    },
+    "per_1000": {
+     "gpu_s": 84.9,
+     "mac_s": 0.0,
+     "calls": {
+      "choose": 44,
+      "trace-neigh": 7
+     }
+    }
+   },
+   "union, corpus first: rules only|no residue stage|t=3": {
+    "corpus": {
+     "n": 300,
+     "exact": {
+      "in text": [
+       107,
+       119
+      ],
+      "A": [
+       23,
+       33
+      ],
+      "A'": [
+       4,
+       7
+      ],
+      "B": [
+       12,
+       35
+      ],
+      "C": [
+       9,
+       35
+      ],
+      "D": [
+       7,
+       21
+      ],
+      "decade": [
+       13,
+       50
+      ],
+      "A+A'+B": [
+       39,
+       75
+      ],
+      "C+D": [
+       16,
+       56
+      ],
+      "not in text": [
+       55,
+       131
+      ],
+      "all year-tagged": [
+       162,
+       250
+      ],
+      "all": [
+       175,
+       300
+      ]
+     },
+     "within1": {
+      "in text": [
+       111,
+       119
+      ],
+      "A": [
+       25,
+       33
+      ],
+      "A'": [
+       6,
+       7
+      ],
+      "B": [
+       21,
+       35
+      ],
+      "C": [
+       17,
+       35
+      ],
+      "D": [
+       9,
+       21
+      ],
+      "decade": [
+       19,
+       50
+      ],
+      "A+A'+B": [
+       52,
+       75
+      ],
+      "C+D": [
+       26,
+       56
+      ],
+      "not in text": [
+       78,
+       131
+      ],
+      "all year-tagged": [
+       189,
+       250
+      ],
+      "all": [
+       208,
+       300
+      ]
+     },
+     "invalid": [
+      6,
+      300
+     ],
+     "stages": {
+      "rule": 207,
+      "propagated": 87,
+      "none": 6
+     },
+     "evidence": {
+      "unsupported": 23,
+      "valid": 271
+     },
+     "right_unsupported": 16,
+     "conformal": {
+      "in text": {
+       "n": 119,
+       "alpha": 0.1,
+       "q": [
+        1,
+        0
+       ],
+       "coverage": [
+        108,
+        119
+       ],
+       "width": 1.0084033613445378,
+       "winkler": 18.319327731092436,
+       "no_year": 0
+      },
+      "A+A'+B": {
+       "n": 75,
+       "alpha": 0.1,
+       "q": [
+        55,
+        50
+       ],
+       "coverage": [
+        70,
+        75
+       ],
+       "width": 105.13513513513513,
+       "winkler": 131.35135135135135,
+       "no_year": 1
+      },
+      "C+D": {
+       "n": 56,
+       "alpha": 0.1,
+       "q": [
+        Infinity,
+        73
+       ],
+       "coverage": [
+        53,
+        56
+       ],
+       "width": 146.0,
+       "winkler": 146.0,
+       "no_year": 3
+      },
+      "not in text": {
+       "n": 131,
+       "alpha": 0.1,
+       "q": [
+        55,
+        65
+       ],
+       "coverage": [
+        121,
+        131
+       ],
+       "width": 119.76377952755905,
+       "winkler": 156.14173228346456,
+       "no_year": 4
+      },
+      "all": {
+       "n": 300,
+       "alpha": 0.1,
+       "q": [
+        35,
+        32
+       ],
+       "coverage": [
+        272,
+        300
+       ],
+       "width": 67.0,
+       "winkler": 109.65306122448979,
+       "no_year": 6
+      }
+     },
+     "du": {
+      "certain_flagged_uncertain": [
+       37,
+       200
+      ],
+      "uncertain_flagged_certain": [
+       19,
+       50
+      ]
+     }
+    },
+    "reread": {
+     "n": 300,
+     "exact": {
+      "in text": [
+       126,
+       143
+      ],
+      "A": [
+       23,
+       35
+      ],
+      "A'": [
+       3,
+       8
+      ],
+      "B": [
+       6,
+       24
+      ],
+      "C": [
+       3,
+       25
+      ],
+      "D": [
+       1,
+       15
+      ],
+      "decade": [
+       13,
+       50
+      ],
+      "A+A'+B": [
+       32,
+       67
+      ],
+      "C+D": [
+       4,
+       40
+      ],
+      "not in text": [
+       36,
+       107
+      ],
+      "all year-tagged": [
+       162,
+       250
+      ],
+      "all": [
+       175,
+       300
+      ]
+     },
+     "within1": {
+      "in text": [
+       132,
+       143
+      ],
+      "A": [
+       26,
+       35
+      ],
+      "A'": [
+       5,
+       8
+      ],
+      "B": [
+       13,
+       24
+      ],
+      "C": [
+       10,
+       25
+      ],
+      "D": [
+       3,
+       15
+      ],
+      "decade": [
+       19,
+       50
+      ],
+      "A+A'+B": [
+       44,
+       67
+      ],
+      "C+D": [
+       13,
+       40
+      ],
+      "not in text": [
+       57,
+       107
+      ],
+      "all year-tagged": [
+       189,
+       250
+      ],
+      "all": [
+       208,
+       300
+      ]
+     },
+     "invalid": [
+      6,
+      300
+     ],
+     "stages": {
+      "rule": 207,
+      "propagated": 87,
+      "none": 6
+     },
+     "evidence": {
+      "unsupported": 23,
+      "valid": 271
+     },
+     "right_unsupported": 16,
+     "conformal": {
+      "in text": {
+       "n": 143,
+       "alpha": 0.1,
+       "q": [
+        0,
+        4
+       ],
+       "coverage": [
+        130,
+        143
+       ],
+       "width": 3.972027972027972,
+       "winkler": 27.46853146853147,
+       "no_year": 0
+      },
+      "A+A'+B": {
+       "n": 67,
+       "alpha": 0.1,
+       "q": [
+        69,
+        55
+       ],
+       "coverage": [
+        62,
+        67
+       ],
+       "width": 124.21538461538462,
+       "winkler": 153.75384615384615,
+       "no_year": 2
+      },
+      "C+D": {
+       "n": 40,
+       "alpha": 0.1,
+       "q": [
+        34,
+        Infinity
+       ],
+       "coverage": [
+        34,
+        40
+       ],
+       "width": 68.0,
+       "winkler": 171.33333333333334,
+       "no_year": 2
+      },
+      "not in text": {
+       "n": 107,
+       "alpha": 0.1,
+       "q": [
+        55,
+        68
+       ],
+       "coverage": [
+        96,
+        107
+       ],
+       "width": 122.36893203883496,
+       "winkler": 170.1359223300971,
+       "no_year": 4
+      },
+      "all": {
+       "n": 300,
+       "alpha": 0.1,
+       "q": [
+        35,
+        32
+       ],
+       "coverage": [
+        272,
+        300
+       ],
+       "width": 67.0,
+       "winkler": 109.65306122448979,
+       "no_year": 6
+      }
+     },
+     "du": {
+      "certain_flagged_uncertain": [
+       37,
+       200
+      ],
+      "uncertain_flagged_certain": [
+       19,
+       50
+      ]
+     }
+    },
+    "per_1000": null
+   },
+   "union, corpus first: rules only|27B trace-neigh|t=3": {
+    "corpus": {
+     "n": 300,
+     "exact": {
+      "in text": [
+       107,
+       119
+      ],
+      "A": [
+       23,
+       33
+      ],
+      "A'": [
+       4,
+       7
+      ],
+      "B": [
+       12,
+       35
+      ],
+      "C": [
+       10,
+       35
+      ],
+      "D": [
+       7,
+       21
+      ],
+      "decade": [
+       15,
+       50
+      ],
+      "A+A'+B": [
+       39,
+       75
+      ],
+      "C+D": [
+       17,
+       56
+      ],
+      "not in text": [
+       56,
+       131
+      ],
+      "all year-tagged": [
+       163,
+       250
+      ],
+      "all": [
+       178,
+       300
+      ]
+     },
+     "within1": {
+      "in text": [
+       111,
+       119
+      ],
+      "A": [
+       25,
+       33
+      ],
+      "A'": [
+       6,
+       7
+      ],
+      "B": [
+       21,
+       35
+      ],
+      "C": [
+       19,
+       35
+      ],
+      "D": [
+       9,
+       21
+      ],
+      "decade": [
+       21,
+       50
+      ],
+      "A+A'+B": [
+       52,
+       75
+      ],
+      "C+D": [
+       28,
+       56
+      ],
+      "not in text": [
+       80,
+       131
+      ],
+      "all year-tagged": [
+       191,
+       250
+      ],
+      "all": [
+       212,
+       300
+      ]
+     },
+     "invalid": [
+      0,
+      300
+     ],
+     "stages": {
+      "rule": 207,
+      "propagated": 87,
+      "residue": 6
+     },
+     "evidence": {
+      "unsupported": 27,
+      "valid": 273
+     },
+     "right_unsupported": 19,
+     "conformal": {
+      "in text": {
+       "n": 119,
+       "alpha": 0.1,
+       "q": [
+        1,
+        0
+       ],
+       "coverage": [
+        108,
+        119
+       ],
+       "width": 1.0084033613445378,
+       "winkler": 18.319327731092436,
+       "no_year": 0
+      },
+      "A+A'+B": {
+       "n": 75,
+       "alpha": 0.1,
+       "q": [
+        50,
+        50
+       ],
+       "coverage": [
+        71,
+        75
+       ],
+       "width": 100.02666666666667,
+       "winkler": 128.56,
+       "no_year": 0
+      },
+      "C+D": {
+       "n": 56,
+       "alpha": 0.1,
+       "q": [
+        20,
+        73
+       ],
+       "coverage": [
+        50,
+        56
+       ],
+       "width": 93.17857142857143,
+       "winkler": 204.60714285714286,
+       "no_year": 0
+      },
+      "not in text": {
+       "n": 131,
+       "alpha": 0.1,
+       "q": [
+        50,
+        50
+       ],
+       "coverage": [
+        122,
+        131
+       ],
+       "width": 100.09160305343511,
+       "winkler": 144.21374045801528,
+       "no_year": 0
+      },
+      "all": {
+       "n": 300,
+       "alpha": 0.1,
+       "q": [
+        20,
+        27
+       ],
+       "coverage": [
+        269,
+        300
+       ],
+       "width": 47.04666666666667,
+       "winkler": 106.98,
+       "no_year": 0
+      }
+     },
+     "du": {
+      "certain_flagged_uncertain": [
+       37,
+       200
+      ],
+      "uncertain_flagged_certain": [
+       19,
+       50
+      ]
+     }
+    },
+    "reread": {
+     "n": 300,
+     "exact": {
+      "in text": [
+       126,
+       143
+      ],
+      "A": [
+       23,
+       35
+      ],
+      "A'": [
+       4,
+       8
+      ],
+      "B": [
+       6,
+       24
+      ],
+      "C": [
+       3,
+       25
+      ],
+      "D": [
+       1,
+       15
+      ],
+      "decade": [
+       15,
+       50
+      ],
+      "A+A'+B": [
+       33,
+       67
+      ],
+      "C+D": [
+       4,
+       40
+      ],
+      "not in text": [
+       37,
+       107
+      ],
+      "all year-tagged": [
+       163,
+       250
+      ],
+      "all": [
+       178,
+       300
+      ]
+     },
+     "within1": {
+      "in text": [
+       132,
+       143
+      ],
+      "A": [
+       26,
+       35
+      ],
+      "A'": [
+       6,
+       8
+      ],
+      "B": [
+       13,
+       24
+      ],
+      "C": [
+       11,
+       25
+      ],
+      "D": [
+       3,
+       15
+      ],
+      "decade": [
+       21,
+       50
+      ],
+      "A+A'+B": [
+       45,
+       67
+      ],
+      "C+D": [
+       14,
+       40
+      ],
+      "not in text": [
+       59,
+       107
+      ],
+      "all year-tagged": [
+       191,
+       250
+      ],
+      "all": [
+       212,
+       300
+      ]
+     },
+     "invalid": [
+      0,
+      300
+     ],
+     "stages": {
+      "rule": 207,
+      "propagated": 87,
+      "residue": 6
+     },
+     "evidence": {
+      "unsupported": 27,
+      "valid": 273
+     },
+     "right_unsupported": 19,
+     "conformal": {
+      "in text": {
+       "n": 143,
+       "alpha": 0.1,
+       "q": [
+        0,
+        4
+       ],
+       "coverage": [
+        130,
+        143
+       ],
+       "width": 3.972027972027972,
+       "winkler": 27.46853146853147,
+       "no_year": 0
+      },
+      "A+A'+B": {
+       "n": 67,
+       "alpha": 0.1,
+       "q": [
+        65,
+        50
+       ],
+       "coverage": [
+        64,
+        67
+       ],
+       "width": 115.31343283582089,
+       "winkler": 148.44776119402985,
+       "no_year": 0
+      },
+      "C+D": {
+       "n": 40,
+       "alpha": 0.1,
+       "q": [
+        34,
+        68
+       ],
+       "coverage": [
+        35,
+        40
+       ],
+       "width": 102.15,
+       "winkler": 199.15,
+       "no_year": 0
+      },
+      "not in text": {
+       "n": 107,
+       "alpha": 0.1,
+       "q": [
+        34,
+        68
+       ],
+       "coverage": [
+        97,
+        107
+       ],
+       "width": 101.79439252336448,
+       "winkler": 181.98130841121494,
+       "no_year": 0
+      },
+      "all": {
+       "n": 300,
+       "alpha": 0.1,
+       "q": [
+        20,
+        27
+       ],
+       "coverage": [
+        269,
+        300
+       ],
+       "width": 47.04666666666667,
+       "winkler": 106.98,
+       "no_year": 0
+      }
+     },
+     "du": {
+      "certain_flagged_uncertain": [
+       37,
+       200
+      ],
+      "uncertain_flagged_certain": [
+       19,
+       50
+      ]
+     }
+    },
+    "per_1000": {
+     "gpu_s": 19.6,
+     "mac_s": 0.0,
+     "calls": {
+      "trace-neigh": 6
+     }
+    }
+   },
+   "union, corpus first: 2B chooser|no residue stage|t=3": {
+    "corpus": {
+     "n": 300,
+     "exact": {
+      "in text": [
+       112,
+       119
+      ],
+      "A": [
+       23,
+       33
+      ],
+      "A'": [
+       4,
+       7
+      ],
+      "B": [
+       12,
+       35
+      ],
+      "C": [
+       9,
+       35
+      ],
+      "D": [
+       8,
+       21
+      ],
+      "decade": [
+       13,
+       50
+      ],
+      "A+A'+B": [
+       39,
+       75
+      ],
+      "C+D": [
+       17,
+       56
+      ],
+      "not in text": [
+       56,
+       131
+      ],
+      "all year-tagged": [
+       168,
+       250
+      ],
+      "all": [
+       181,
+       300
+      ]
+     },
+     "within1": {
+      "in text": [
+       117,
+       119
+      ],
+      "A": [
+       25,
+       33
+      ],
+      "A'": [
+       6,
+       7
+      ],
+      "B": [
+       21,
+       35
+      ],
+      "C": [
+       18,
+       35
+      ],
+      "D": [
+       10,
+       21
+      ],
+      "decade": [
+       20,
+       50
+      ],
+      "A+A'+B": [
+       52,
+       75
+      ],
+      "C+D": [
+       28,
+       56
+      ],
+      "not in text": [
+       80,
+       131
+      ],
+      "all year-tagged": [
+       197,
+       250
+      ],
+      "all": [
+       217,
+       300
+      ]
+     },
+     "invalid": [
+      6,
+      300
+     ],
+     "stages": {
+      "rule": 172,
+      "propagated": 87,
+      "chooser": 35,
+      "none": 6
+     },
+     "evidence": {
+      "unsupported": 23,
+      "valid": 271
+     },
+     "right_unsupported": 16,
+     "conformal": {
+      "in text": {
+       "n": 119,
+       "alpha": 0.1,
+       "q": [
+        0,
+        0
+       ],
+       "coverage": [
+        112,
+        119
+       ],
+       "width": 0.0,
+       "winkler": 12.268907563025211,
+       "no_year": 0
+      },
+      "A+A'+B": {
+       "n": 75,
+       "alpha": 0.1,
+       "q": [
+        55,
+        50
+       ],
+       "coverage": [
+        70,
+        75
+       ],
+       "width": 105.13513513513513,
+       "winkler": 131.35135135135135,
+       "no_year": 1
+      },
+      "C+D": {
+       "n": 56,
+       "alpha": 0.1,
+       "q": [
+        Infinity,
+        73
+       ],
+       "coverage": [
+        53,
+        56
+       ],
+       "width": 146.0,
+       "winkler": 146.0,
+       "no_year": 3
+      },
+      "not in text": {
+       "n": 131,
+       "alpha": 0.1,
+       "q": [
+        55,
+        65
+       ],
+       "coverage": [
+        121,
+        131
+       ],
+       "width": 119.76377952755905,
+       "winkler": 156.14173228346456,
+       "no_year": 4
+      },
+      "all": {
+       "n": 300,
+       "alpha": 0.1,
+       "q": [
+        34,
+        32
+       ],
+       "coverage": [
+        274,
+        300
+       ],
+       "width": 66.0,
+       "winkler": 107.70068027210884,
+       "no_year": 6
+      }
+     },
+     "du": {
+      "certain_flagged_uncertain": [
+       37,
+       200
+      ],
+      "uncertain_flagged_certain": [
+       19,
+       50
+      ]
+     }
+    },
+    "reread": {
+     "n": 300,
+     "exact": {
+      "in text": [
+       131,
+       143
+      ],
+      "A": [
+       23,
+       35
+      ],
+      "A'": [
+       3,
+       8
+      ],
+      "B": [
+       6,
+       24
+      ],
+      "C": [
+       3,
+       25
+      ],
+      "D": [
+       2,
+       15
+      ],
+      "decade": [
+       13,
+       50
+      ],
+      "A+A'+B": [
+       32,
+       67
+      ],
+      "C+D": [
+       5,
+       40
+      ],
+      "not in text": [
+       37,
+       107
+      ],
+      "all year-tagged": [
+       168,
+       250
+      ],
+      "all": [
+       181,
+       300
+      ]
+     },
+     "within1": {
+      "in text": [
+       138,
+       143
+      ],
+      "A": [
+       26,
+       35
+      ],
+      "A'": [
+       5,
+       8
+      ],
+      "B": [
+       13,
+       24
+      ],
+      "C": [
+       11,
+       25
+      ],
+      "D": [
+       4,
+       15
+      ],
+      "decade": [
+       20,
+       50
+      ],
+      "A+A'+B": [
+       44,
+       67
+      ],
+      "C+D": [
+       15,
+       40
+      ],
+      "not in text": [
+       59,
+       107
+      ],
+      "all year-tagged": [
+       197,
+       250
+      ],
+      "all": [
+       217,
+       300
+      ]
+     },
+     "invalid": [
+      6,
+      300
+     ],
+     "stages": {
+      "rule": 172,
+      "propagated": 87,
+      "chooser": 35,
+      "none": 6
+     },
+     "evidence": {
+      "unsupported": 23,
+      "valid": 271
+     },
+     "right_unsupported": 16,
+     "conformal": {
+      "in text": {
+       "n": 143,
+       "alpha": 0.1,
+       "q": [
+        0,
+        1
+       ],
+       "coverage": [
+        135,
+        143
+       ],
+       "width": 0.993006993006993,
+       "winkler": 18.755244755244757,
+       "no_year": 0
+      },
+      "A+A'+B": {
+       "n": 67,
+       "alpha": 0.1,
+       "q": [
+        69,
+        55
+       ],
+       "coverage": [
+        62,
+        67
+       ],
+       "width": 124.21538461538462,
+       "winkler": 153.75384615384615,
+       "no_year": 2
+      },
+      "C+D": {
+       "n": 40,
+       "alpha": 0.1,
+       "q": [
+        34,
+        Infinity
+       ],
+       "coverage": [
+        35,
+        40
+       ],
+       "width": 68.0,
+       "winkler": 150.22222222222223,
+       "no_year": 2
+      },
+      "not in text": {
+       "n": 107,
+       "alpha": 0.1,
+       "q": [
+        55,
+        68
+       ],
+       "coverage": [
+        96,
+        107
+       ],
+       "width": 122.36893203883496,
+       "winkler": 170.1359223300971,
+       "no_year": 4
+      },
+      "all": {
+       "n": 300,
+       "alpha": 0.1,
+       "q": [
+        34,
+        32
+       ],
+       "coverage": [
+        274,
+        300
+       ],
+       "width": 66.0,
+       "winkler": 107.70068027210884,
+       "no_year": 6
+      }
+     },
+     "du": {
+      "certain_flagged_uncertain": [
+       37,
+       200
+      ],
+      "uncertain_flagged_certain": [
+       19,
+       50
+      ]
+     }
+    },
+    "per_1000": {
+     "gpu_s": 0.0,
+     "mac_s": 227.0,
+     "calls": {
+      "2b": 49
+     }
+    }
+   },
+   "union, corpus first: 2B chooser|27B trace-neigh|t=3": {
+    "corpus": {
+     "n": 300,
+     "exact": {
+      "in text": [
+       112,
+       119
+      ],
+      "A": [
+       23,
+       33
+      ],
+      "A'": [
+       4,
+       7
+      ],
+      "B": [
+       12,
+       35
+      ],
+      "C": [
+       10,
+       35
+      ],
+      "D": [
+       8,
+       21
+      ],
+      "decade": [
+       15,
+       50
+      ],
+      "A+A'+B": [
+       39,
+       75
+      ],
+      "C+D": [
+       18,
+       56
+      ],
+      "not in text": [
+       57,
+       131
+      ],
+      "all year-tagged": [
+       169,
+       250
+      ],
+      "all": [
+       184,
+       300
+      ]
+     },
+     "within1": {
+      "in text": [
+       117,
+       119
+      ],
+      "A": [
+       25,
+       33
+      ],
+      "A'": [
+       6,
+       7
+      ],
+      "B": [
+       21,
+       35
+      ],
+      "C": [
+       20,
+       35
+      ],
+      "D": [
+       10,
+       21
+      ],
+      "decade": [
+       22,
+       50
+      ],
+      "A+A'+B": [
+       52,
+       75
+      ],
+      "C+D": [
+       30,
+       56
+      ],
+      "not in text": [
+       82,
+       131
+      ],
+      "all year-tagged": [
+       199,
+       250
+      ],
+      "all": [
+       221,
+       300
+      ]
+     },
+     "invalid": [
+      0,
+      300
+     ],
+     "stages": {
+      "rule": 172,
+      "propagated": 87,
+      "chooser": 35,
+      "residue": 6
+     },
+     "evidence": {
+      "unsupported": 27,
+      "valid": 273
+     },
+     "right_unsupported": 19,
+     "conformal": {
+      "in text": {
+       "n": 119,
+       "alpha": 0.1,
+       "q": [
+        0,
+        0
+       ],
+       "coverage": [
+        112,
+        119
+       ],
+       "width": 0.0,
+       "winkler": 12.268907563025211,
+       "no_year": 0
+      },
+      "A+A'+B": {
+       "n": 75,
+       "alpha": 0.1,
+       "q": [
+        50,
+        50
+       ],
+       "coverage": [
+        71,
+        75
+       ],
+       "width": 100.02666666666667,
+       "winkler": 128.56,
+       "no_year": 0
+      },
+      "C+D": {
+       "n": 56,
+       "alpha": 0.1,
+       "q": [
+        20,
+        73
+       ],
+       "coverage": [
+        51,
+        56
+       ],
+       "width": 93.17857142857143,
+       "winkler": 192.82142857142858,
+       "no_year": 0
+      },
+      "not in text": {
+       "n": 131,
+       "alpha": 0.1,
+       "q": [
+        46,
+        50
+       ],
+       "coverage": [
+        122,
+        131
+       ],
+       "width": 96.06106870229007,
+       "winkler": 143.38931297709922,
+       "no_year": 0
+      },
+      "all": {
+       "n": 300,
+       "alpha": 0.1,
+       "q": [
+        18,
+        28
+       ],
+       "coverage": [
+        269,
+        300
+       ],
+       "width": 46.04666666666667,
+       "winkler": 105.58,
+       "no_year": 0
+      }
+     },
+     "du": {
+      "certain_flagged_uncertain": [
+       37,
+       200
+      ],
+      "uncertain_flagged_certain": [
+       19,
+       50
+      ]
+     }
+    },
+    "reread": {
+     "n": 300,
+     "exact": {
+      "in text": [
+       131,
+       143
+      ],
+      "A": [
+       23,
+       35
+      ],
+      "A'": [
+       4,
+       8
+      ],
+      "B": [
+       6,
+       24
+      ],
+      "C": [
+       3,
+       25
+      ],
+      "D": [
+       2,
+       15
+      ],
+      "decade": [
+       15,
+       50
+      ],
+      "A+A'+B": [
+       33,
+       67
+      ],
+      "C+D": [
+       5,
+       40
+      ],
+      "not in text": [
+       38,
+       107
+      ],
+      "all year-tagged": [
+       169,
+       250
+      ],
+      "all": [
+       184,
+       300
+      ]
+     },
+     "within1": {
+      "in text": [
+       138,
+       143
+      ],
+      "A": [
+       26,
+       35
+      ],
+      "A'": [
+       6,
+       8
+      ],
+      "B": [
+       13,
+       24
+      ],
+      "C": [
+       12,
+       25
+      ],
+      "D": [
+       4,
+       15
+      ],
+      "decade": [
+       22,
+       50
+      ],
+      "A+A'+B": [
+       45,
+       67
+      ],
+      "C+D": [
+       16,
+       40
+      ],
+      "not in text": [
+       61,
+       107
+      ],
+      "all year-tagged": [
+       199,
+       250
+      ],
+      "all": [
+       221,
+       300
+      ]
+     },
+     "invalid": [
+      0,
+      300
+     ],
+     "stages": {
+      "rule": 172,
+      "propagated": 87,
+      "chooser": 35,
+      "residue": 6
+     },
+     "evidence": {
+      "unsupported": 27,
+      "valid": 273
+     },
+     "right_unsupported": 19,
+     "conformal": {
+      "in text": {
+       "n": 143,
+       "alpha": 0.1,
+       "q": [
+        0,
+        1
+       ],
+       "coverage": [
+        135,
+        143
+       ],
+       "width": 0.993006993006993,
+       "winkler": 18.755244755244757,
+       "no_year": 0
+      },
+      "A+A'+B": {
+       "n": 67,
+       "alpha": 0.1,
+       "q": [
+        65,
+        50
+       ],
+       "coverage": [
+        64,
+        67
+       ],
+       "width": 115.31343283582089,
+       "winkler": 148.44776119402985,
+       "no_year": 0
+      },
+      "C+D": {
+       "n": 40,
+       "alpha": 0.1,
+       "q": [
+        34,
+        68
+       ],
+       "coverage": [
+        36,
+        40
+       ],
+       "width": 102.15,
+       "winkler": 189.65,
+       "no_year": 0
+      },
+      "not in text": {
+       "n": 107,
+       "alpha": 0.1,
+       "q": [
+        34,
+        68
+       ],
+       "coverage": [
+        98,
+        107
+       ],
+       "width": 101.79439252336448,
+       "winkler": 178.42990654205607,
+       "no_year": 0
+      },
+      "all": {
+       "n": 300,
+       "alpha": 0.1,
+       "q": [
+        18,
+        28
+       ],
+       "coverage": [
+        269,
+        300
+       ],
+       "width": 46.04666666666667,
+       "winkler": 105.58,
+       "no_year": 0
+      }
+     },
+     "du": {
+      "certain_flagged_uncertain": [
+       37,
+       200
+      ],
+      "uncertain_flagged_certain": [
+       19,
+       50
+      ]
+     }
+    },
+    "per_1000": {
+     "gpu_s": 19.6,
+     "mac_s": 227.0,
+     "calls": {
+      "2b": 49,
+      "trace-neigh": 6
+     }
+    }
+   },
+   "union, Vision first: rules only|no residue stage|t=3": {
+    "corpus": {
+     "n": 300,
+     "exact": {
+      "in text": [
+       104,
+       119
+      ],
+      "A": [
+       25,
+       33
+      ],
+      "A'": [
+       4,
+       7
+      ],
+      "B": [
+       13,
+       35
+      ],
+      "C": [
+       9,
+       35
+      ],
+      "D": [
+       7,
+       21
+      ],
+      "decade": [
+       13,
+       50
+      ],
+      "A+A'+B": [
+       42,
+       75
+      ],
+      "C+D": [
+       16,
+       56
+      ],
+      "not in text": [
+       58,
+       131
+      ],
+      "all year-tagged": [
+       162,
+       250
+      ],
+      "all": [
+       175,
+       300
+      ]
+     },
+     "within1": {
+      "in text": [
+       109,
+       119
+      ],
+      "A": [
+       27,
+       33
+      ],
+      "A'": [
+       6,
+       7
+      ],
+      "B": [
+       22,
+       35
+      ],
+      "C": [
+       17,
+       35
+      ],
+      "D": [
+       9,
+       21
+      ],
+      "decade": [
+       19,
+       50
+      ],
+      "A+A'+B": [
+       55,
+       75
+      ],
+      "C+D": [
+       26,
+       56
+      ],
+      "not in text": [
+       81,
+       131
+      ],
+      "all year-tagged": [
+       190,
+       250
+      ],
+      "all": [
+       209,
+       300
+      ]
+     },
+     "invalid": [
+      6,
+      300
+     ],
+     "stages": {
+      "rule": 207,
+      "propagated": 87,
+      "none": 6
+     },
+     "evidence": {
+      "unsupported": 24,
+      "valid": 270
+     },
+     "right_unsupported": 15,
+     "conformal": {
+      "in text": {
+       "n": 119,
+       "alpha": 0.1,
+       "q": [
+        1,
+        3
+       ],
+       "coverage": [
+        110,
+        119
+       ],
+       "width": 3.9831932773109244,
+       "winkler": 28.689075630252102,
+       "no_year": 0
+      },
+      "A+A'+B": {
+       "n": 75,
+       "alpha": 0.1,
+       "q": [
+        55,
+        50
+       ],
+       "coverage": [
+        71,
+        75
+       ],
+       "width": 105.13513513513513,
+       "winkler": 130.0,
+       "no_year": 1
+      },
+      "C+D": {
+       "n": 56,
+       "alpha": 0.1,
+       "q": [
+        Infinity,
+        73
+       ],
+       "coverage": [
+        53,
+        56
+       ],
+       "width": 146.0,
+       "winkler": 146.0,
+       "no_year": 3
+      },
+      "not in text": {
+       "n": 131,
+       "alpha": 0.1,
+       "q": [
+        53,
+        65
+       ],
+       "coverage": [
+        121,
+        131
+       ],
+       "width": 117.71653543307086,
+       "winkler": 155.66929133858267,
+       "no_year": 4
+      },
+      "all": {
+       "n": 300,
+       "alpha": 0.1,
+       "q": [
+        35,
+        30
+       ],
+       "coverage": [
+        272,
+        300
+       ],
+       "width": 65.0,
+       "winkler": 108.87755102040816,
+       "no_year": 6
+      }
+     },
+     "du": {
+      "certain_flagged_uncertain": [
+       37,
+       200
+      ],
+      "uncertain_flagged_certain": [
+       19,
+       50
+      ]
+     }
+    },
+    "reread": {
+     "n": 300,
+     "exact": {
+      "in text": [
+       125,
+       143
+      ],
+      "A": [
+       24,
+       35
+      ],
+      "A'": [
+       3,
+       8
+      ],
+      "B": [
+       6,
+       24
+      ],
+      "C": [
+       3,
+       25
+      ],
+      "D": [
+       1,
+       15
+      ],
+      "decade": [
+       13,
+       50
+      ],
+      "A+A'+B": [
+       33,
+       67
+      ],
+      "C+D": [
+       4,
+       40
+      ],
+      "not in text": [
+       37,
+       107
+      ],
+      "all year-tagged": [
+       162,
+       250
+      ],
+      "all": [
+       175,
+       300
+      ]
+     },
+     "within1": {
+      "in text": [
+       132,
+       143
+      ],
+      "A": [
+       27,
+       35
+      ],
+      "A'": [
+       5,
+       8
+      ],
+      "B": [
+       13,
+       24
+      ],
+      "C": [
+       10,
+       25
+      ],
+      "D": [
+       3,
+       15
+      ],
+      "decade": [
+       19,
+       50
+      ],
+      "A+A'+B": [
+       45,
+       67
+      ],
+      "C+D": [
+       13,
+       40
+      ],
+      "not in text": [
+       58,
+       107
+      ],
+      "all year-tagged": [
+       190,
+       250
+      ],
+      "all": [
+       209,
+       300
+      ]
+     },
+     "invalid": [
+      6,
+      300
+     ],
+     "stages": {
+      "rule": 207,
+      "propagated": 87,
+      "none": 6
+     },
+     "evidence": {
+      "unsupported": 24,
+      "valid": 270
+     },
+     "right_unsupported": 15,
+     "conformal": {
+      "in text": {
+       "n": 143,
+       "alpha": 0.1,
+       "q": [
+        0,
+        3
+       ],
+       "coverage": [
+        129,
+        143
+       ],
+       "width": 2.979020979020979,
+       "winkler": 27.454545454545453,
+       "no_year": 0
+      },
+      "A+A'+B": {
+       "n": 67,
+       "alpha": 0.1,
+       "q": [
+        69,
+        50
+       ],
+       "coverage": [
+        62,
+        67
+       ],
+       "width": 119.29230769230769,
+       "winkler": 153.44615384615383,
+       "no_year": 2
+      },
+      "C+D": {
+       "n": 40,
+       "alpha": 0.1,
+       "q": [
+        34,
+        Infinity
+       ],
+       "coverage": [
+        34,
+        40
+       ],
+       "width": 68.0,
+       "winkler": 171.33333333333334,
+       "no_year": 2
+      },
+      "not in text": {
+       "n": 107,
+       "alpha": 0.1,
+       "q": [
+        55,
+        68
+       ],
+       "coverage": [
+        97,
+        107
+       ],
+       "width": 122.36893203883496,
+       "winkler": 169.16504854368932,
+       "no_year": 4
+      },
+      "all": {
+       "n": 300,
+       "alpha": 0.1,
+       "q": [
+        35,
+        30
+       ],
+       "coverage": [
+        272,
+        300
+       ],
+       "width": 65.0,
+       "winkler": 108.87755102040816,
+       "no_year": 6
+      }
+     },
+     "du": {
+      "certain_flagged_uncertain": [
+       37,
+       200
+      ],
+      "uncertain_flagged_certain": [
+       19,
+       50
+      ]
+     }
+    },
+    "per_1000": null
+   },
+   "union, Vision first: rules only|27B trace-neigh|t=3": {
+    "corpus": {
+     "n": 300,
+     "exact": {
+      "in text": [
+       104,
+       119
+      ],
+      "A": [
+       25,
+       33
+      ],
+      "A'": [
+       4,
+       7
+      ],
+      "B": [
+       13,
+       35
+      ],
+      "C": [
+       10,
+       35
+      ],
+      "D": [
+       7,
+       21
+      ],
+      "decade": [
+       15,
+       50
+      ],
+      "A+A'+B": [
+       42,
+       75
+      ],
+      "C+D": [
+       17,
+       56
+      ],
+      "not in text": [
+       59,
+       131
+      ],
+      "all year-tagged": [
+       163,
+       250
+      ],
+      "all": [
+       178,
+       300
+      ]
+     },
+     "within1": {
+      "in text": [
+       109,
+       119
+      ],
+      "A": [
+       27,
+       33
+      ],
+      "A'": [
+       6,
+       7
+      ],
+      "B": [
+       22,
+       35
+      ],
+      "C": [
+       19,
+       35
+      ],
+      "D": [
+       9,
+       21
+      ],
+      "decade": [
+       21,
+       50
+      ],
+      "A+A'+B": [
+       55,
+       75
+      ],
+      "C+D": [
+       28,
+       56
+      ],
+      "not in text": [
+       83,
+       131
+      ],
+      "all year-tagged": [
+       192,
+       250
+      ],
+      "all": [
+       213,
+       300
+      ]
+     },
+     "invalid": [
+      0,
+      300
+     ],
+     "stages": {
+      "rule": 207,
+      "propagated": 87,
+      "residue": 6
+     },
+     "evidence": {
+      "unsupported": 26,
+      "valid": 274
+     },
+     "right_unsupported": 16,
+     "conformal": {
+      "in text": {
+       "n": 119,
+       "alpha": 0.1,
+       "q": [
+        1,
+        3
+       ],
+       "coverage": [
+        110,
+        119
+       ],
+       "width": 3.9831932773109244,
+       "winkler": 28.689075630252102,
+       "no_year": 0
+      },
+      "A+A'+B": {
+       "n": 75,
+       "alpha": 0.1,
+       "q": [
+        50,
+        50
+       ],
+       "coverage": [
+        72,
+        75
+       ],
+       "width": 100.02666666666667,
+       "winkler": 125.89333333333333,
+       "no_year": 0
+      },
+      "C+D": {
+       "n": 56,
+       "alpha": 0.1,
+       "q": [
+        20,
+        73
+       ],
+       "coverage": [
+        50,
+        56
+       ],
+       "width": 93.14285714285714,
+       "winkler": 204.57142857142858,
+       "no_year": 0
+      },
+      "not in text": {
+       "n": 131,
+       "alpha": 0.1,
+       "q": [
+        46,
+        50
+       ],
+       "coverage": [
+        122,
+        131
+       ],
+       "width": 96.04580152671755,
+       "winkler": 142.3053435114504,
+       "no_year": 0
+      },
+      "all": {
+       "n": 300,
+       "alpha": 0.1,
+       "q": [
+        28,
+        24
+       ],
+       "coverage": [
+        272,
+        300
+       ],
+       "width": 52.03666666666667,
+       "winkler": 105.83666666666667,
+       "no_year": 0
+      }
+     },
+     "du": {
+      "certain_flagged_uncertain": [
+       37,
+       200
+      ],
+      "uncertain_flagged_certain": [
+       19,
+       50
+      ]
+     }
+    },
+    "reread": {
+     "n": 300,
+     "exact": {
+      "in text": [
+       125,
+       143
+      ],
+      "A": [
+       24,
+       35
+      ],
+      "A'": [
+       4,
+       8
+      ],
+      "B": [
+       6,
+       24
+      ],
+      "C": [
+       3,
+       25
+      ],
+      "D": [
+       1,
+       15
+      ],
+      "decade": [
+       15,
+       50
+      ],
+      "A+A'+B": [
+       34,
+       67
+      ],
+      "C+D": [
+       4,
+       40
+      ],
+      "not in text": [
+       38,
+       107
+      ],
+      "all year-tagged": [
+       163,
+       250
+      ],
+      "all": [
+       178,
+       300
+      ]
+     },
+     "within1": {
+      "in text": [
+       132,
+       143
+      ],
+      "A": [
+       27,
+       35
+      ],
+      "A'": [
+       6,
+       8
+      ],
+      "B": [
+       13,
+       24
+      ],
+      "C": [
+       11,
+       25
+      ],
+      "D": [
+       3,
+       15
+      ],
+      "decade": [
+       21,
+       50
+      ],
+      "A+A'+B": [
+       46,
+       67
+      ],
+      "C+D": [
+       14,
+       40
+      ],
+      "not in text": [
+       60,
+       107
+      ],
+      "all year-tagged": [
+       192,
+       250
+      ],
+      "all": [
+       213,
+       300
+      ]
+     },
+     "invalid": [
+      0,
+      300
+     ],
+     "stages": {
+      "rule": 207,
+      "propagated": 87,
+      "residue": 6
+     },
+     "evidence": {
+      "unsupported": 26,
+      "valid": 274
+     },
+     "right_unsupported": 16,
+     "conformal": {
+      "in text": {
+       "n": 143,
+       "alpha": 0.1,
+       "q": [
+        0,
+        3
+       ],
+       "coverage": [
+        129,
+        143
+       ],
+       "width": 2.979020979020979,
+       "winkler": 27.454545454545453,
+       "no_year": 0
+      },
+      "A+A'+B": {
+       "n": 67,
+       "alpha": 0.1,
+       "q": [
+        65,
+        50
+       ],
+       "coverage": [
+        64,
+        67
+       ],
+       "width": 115.31343283582089,
+       "winkler": 148.44776119402985,
+       "no_year": 0
+      },
+      "C+D": {
+       "n": 40,
+       "alpha": 0.1,
+       "q": [
+        34,
+        68
+       ],
+       "coverage": [
+        35,
+        40
+       ],
+       "width": 102.1,
+       "winkler": 199.1,
+       "no_year": 0
+      },
+      "not in text": {
+       "n": 107,
+       "alpha": 0.1,
+       "q": [
+        34,
+        68
+       ],
+       "coverage": [
+        98,
+        107
+       ],
+       "width": 101.77570093457943,
+       "winkler": 177.10280373831776,
+       "no_year": 0
+      },
+      "all": {
+       "n": 300,
+       "alpha": 0.1,
+       "q": [
+        28,
+        24
+       ],
+       "coverage": [
+        272,
+        300
+       ],
+       "width": 52.03666666666667,
+       "winkler": 105.83666666666667,
+       "no_year": 0
+      }
+     },
+     "du": {
+      "certain_flagged_uncertain": [
+       37,
+       200
+      ],
+      "uncertain_flagged_certain": [
+       19,
+       50
+      ]
+     }
+    },
+    "per_1000": {
+     "gpu_s": 19.6,
+     "mac_s": 0.0,
+     "calls": {
+      "trace-neigh": 6
+     }
+    }
+   },
+   "union, Vision first: 2B chooser|no residue stage|t=3": {
+    "corpus": {
+     "n": 300,
+     "exact": {
+      "in text": [
+       112,
+       119
+      ],
+      "A": [
+       25,
+       33
+      ],
+      "A'": [
+       4,
+       7
+      ],
+      "B": [
+       12,
+       35
+      ],
+      "C": [
+       9,
+       35
+      ],
+      "D": [
+       8,
+       21
+      ],
+      "decade": [
+       13,
+       50
+      ],
+      "A+A'+B": [
+       41,
+       75
+      ],
+      "C+D": [
+       17,
+       56
+      ],
+      "not in text": [
+       58,
+       131
+      ],
+      "all year-tagged": [
+       170,
+       250
+      ],
+      "all": [
+       183,
+       300
+      ]
+     },
+     "within1": {
+      "in text": [
+       117,
+       119
+      ],
+      "A": [
+       27,
+       33
+      ],
+      "A'": [
+       6,
+       7
+      ],
+      "B": [
+       21,
+       35
+      ],
+      "C": [
+       18,
+       35
+      ],
+      "D": [
+       10,
+       21
+      ],
+      "decade": [
+       20,
+       50
+      ],
+      "A+A'+B": [
+       54,
+       75
+      ],
+      "C+D": [
+       28,
+       56
+      ],
+      "not in text": [
+       82,
+       131
+      ],
+      "all year-tagged": [
+       199,
+       250
+      ],
+      "all": [
+       219,
+       300
+      ]
+     },
+     "invalid": [
+      6,
+      300
+     ],
+     "stages": {
+      "rule": 172,
+      "propagated": 87,
+      "chooser": 35,
+      "none": 6
+     },
+     "evidence": {
+      "unsupported": 24,
+      "valid": 270
+     },
+     "right_unsupported": 16,
+     "conformal": {
+      "in text": {
+       "n": 119,
+       "alpha": 0.1,
+       "q": [
+        0,
+        0
+       ],
+       "coverage": [
+        112,
+        119
+       ],
+       "width": 0.0,
+       "winkler": 12.268907563025211,
+       "no_year": 0
+      },
+      "A+A'+B": {
+       "n": 75,
+       "alpha": 0.1,
+       "q": [
+        55,
+        50
+       ],
+       "coverage": [
+        71,
+        75
+       ],
+       "width": 105.13513513513513,
+       "winkler": 130.0,
+       "no_year": 1
+      },
+      "C+D": {
+       "n": 56,
+       "alpha": 0.1,
+       "q": [
+        Infinity,
+        73
+       ],
+       "coverage": [
+        53,
+        56
+       ],
+       "width": 146.0,
+       "winkler": 146.0,
+       "no_year": 3
+      },
+      "not in text": {
+       "n": 131,
+       "alpha": 0.1,
+       "q": [
+        50,
+        65
+       ],
+       "coverage": [
+        121,
+        131
+       ],
+       "width": 114.64566929133858,
+       "winkler": 154.96062992125985,
+       "no_year": 4
+      },
+      "all": {
+       "n": 300,
+       "alpha": 0.1,
+       "q": [
+        28,
+        30
+       ],
+       "coverage": [
+        270,
+        300
+       ],
+       "width": 58.0,
+       "winkler": 103.78231292517007,
+       "no_year": 6
+      }
+     },
+     "du": {
+      "certain_flagged_uncertain": [
+       37,
+       200
+      ],
+      "uncertain_flagged_certain": [
+       19,
+       50
+      ]
+     }
+    },
+    "reread": {
+     "n": 300,
+     "exact": {
+      "in text": [
+       132,
+       143
+      ],
+      "A": [
+       24,
+       35
+      ],
+      "A'": [
+       3,
+       8
+      ],
+      "B": [
+       6,
+       24
+      ],
+      "C": [
+       3,
+       25
+      ],
+      "D": [
+       2,
+       15
+      ],
+      "decade": [
+       13,
+       50
+      ],
+      "A+A'+B": [
+       33,
+       67
+      ],
+      "C+D": [
+       5,
+       40
+      ],
+      "not in text": [
+       38,
+       107
+      ],
+      "all year-tagged": [
+       170,
+       250
+      ],
+      "all": [
+       183,
+       300
+      ]
+     },
+     "within1": {
+      "in text": [
+       139,
+       143
+      ],
+      "A": [
+       27,
+       35
+      ],
+      "A'": [
+       5,
+       8
+      ],
+      "B": [
+       13,
+       24
+      ],
+      "C": [
+       11,
+       25
+      ],
+      "D": [
+       4,
+       15
+      ],
+      "decade": [
+       20,
+       50
+      ],
+      "A+A'+B": [
+       45,
+       67
+      ],
+      "C+D": [
+       15,
+       40
+      ],
+      "not in text": [
+       60,
+       107
+      ],
+      "all year-tagged": [
+       199,
+       250
+      ],
+      "all": [
+       219,
+       300
+      ]
+     },
+     "invalid": [
+      6,
+      300
+     ],
+     "stages": {
+      "rule": 172,
+      "propagated": 87,
+      "chooser": 35,
+      "none": 6
+     },
+     "evidence": {
+      "unsupported": 24,
+      "valid": 270
+     },
+     "right_unsupported": 16,
+     "conformal": {
+      "in text": {
+       "n": 143,
+       "alpha": 0.1,
+       "q": [
+        0,
+        0
+       ],
+       "coverage": [
+        132,
+        143
+       ],
+       "width": 0.0,
+       "winkler": 13.986013986013987,
+       "no_year": 0
+      },
+      "A+A'+B": {
+       "n": 67,
+       "alpha": 0.1,
+       "q": [
+        69,
+        50
+       ],
+       "coverage": [
+        62,
+        67
+       ],
+       "width": 119.29230769230769,
+       "winkler": 153.44615384615383,
+       "no_year": 2
+      },
+      "C+D": {
+       "n": 40,
+       "alpha": 0.1,
+       "q": [
+        34,
+        Infinity
+       ],
+       "coverage": [
+        35,
+        40
+       ],
+       "width": 68.0,
+       "winkler": 150.22222222222223,
+       "no_year": 2
+      },
+      "not in text": {
+       "n": 107,
+       "alpha": 0.1,
+       "q": [
+        55,
+        68
+       ],
+       "coverage": [
+        97,
+        107
+       ],
+       "width": 122.36893203883496,
+       "winkler": 169.16504854368932,
+       "no_year": 4
+      },
+      "all": {
+       "n": 300,
+       "alpha": 0.1,
+       "q": [
+        28,
+        30
+       ],
+       "coverage": [
+        270,
+        300
+       ],
+       "width": 58.0,
+       "winkler": 103.78231292517007,
+       "no_year": 6
+      }
+     },
+     "du": {
+      "certain_flagged_uncertain": [
+       37,
+       200
+      ],
+      "uncertain_flagged_certain": [
+       19,
+       50
+      ]
+     }
+    },
+    "per_1000": {
+     "gpu_s": 0.0,
+     "mac_s": 227.0,
+     "calls": {
+      "2b": 49
+     }
+    }
+   },
+   "union, Vision first: 2B chooser|27B trace-neigh|t=3": {
+    "corpus": {
+     "n": 300,
+     "exact": {
+      "in text": [
+       112,
+       119
+      ],
+      "A": [
+       25,
+       33
+      ],
+      "A'": [
+       4,
+       7
+      ],
+      "B": [
+       12,
+       35
+      ],
+      "C": [
+       10,
+       35
+      ],
+      "D": [
+       8,
+       21
+      ],
+      "decade": [
+       15,
+       50
+      ],
+      "A+A'+B": [
+       41,
+       75
+      ],
+      "C+D": [
+       18,
+       56
+      ],
+      "not in text": [
+       59,
+       131
+      ],
+      "all year-tagged": [
+       171,
+       250
+      ],
+      "all": [
+       186,
+       300
+      ]
+     },
+     "within1": {
+      "in text": [
+       117,
+       119
+      ],
+      "A": [
+       27,
+       33
+      ],
+      "A'": [
+       6,
+       7
+      ],
+      "B": [
+       21,
+       35
+      ],
+      "C": [
+       20,
+       35
+      ],
+      "D": [
+       10,
+       21
+      ],
+      "decade": [
+       22,
+       50
+      ],
+      "A+A'+B": [
+       54,
+       75
+      ],
+      "C+D": [
+       30,
+       56
+      ],
+      "not in text": [
+       84,
+       131
+      ],
+      "all year-tagged": [
+       201,
+       250
+      ],
+      "all": [
+       223,
+       300
+      ]
+     },
+     "invalid": [
+      0,
+      300
+     ],
+     "stages": {
+      "rule": 172,
+      "propagated": 87,
+      "chooser": 35,
+      "residue": 6
+     },
+     "evidence": {
+      "unsupported": 26,
+      "valid": 274
+     },
+     "right_unsupported": 17,
+     "conformal": {
+      "in text": {
+       "n": 119,
+       "alpha": 0.1,
+       "q": [
+        0,
+        0
+       ],
+       "coverage": [
+        112,
+        119
+       ],
+       "width": 0.0,
+       "winkler": 12.268907563025211,
+       "no_year": 0
+      },
+      "A+A'+B": {
+       "n": 75,
+       "alpha": 0.1,
+       "q": [
+        50,
+        50
+       ],
+       "coverage": [
+        72,
+        75
+       ],
+       "width": 100.02666666666667,
+       "winkler": 125.89333333333333,
+       "no_year": 0
+      },
+      "C+D": {
+       "n": 56,
+       "alpha": 0.1,
+       "q": [
+        20,
+        73
+       ],
+       "coverage": [
+        51,
+        56
+       ],
+       "width": 93.14285714285714,
+       "winkler": 192.78571428571428,
+       "no_year": 0
+      },
+      "not in text": {
+       "n": 131,
+       "alpha": 0.1,
+       "q": [
+        28,
+        50
+       ],
+       "coverage": [
+        121,
+        131
+       ],
+       "width": 77.90839694656489,
+       "winkler": 142.18320610687022,
+       "no_year": 0
+      },
+      "all": {
+       "n": 300,
+       "alpha": 0.1,
+       "q": [
+        18,
+        24
+       ],
+       "coverage": [
+        270,
+        300
+       ],
+       "width": 42.03666666666667,
+       "winkler": 101.70333333333333,
+       "no_year": 0
+      }
+     },
+     "du": {
+      "certain_flagged_uncertain": [
+       37,
+       200
+      ],
+      "uncertain_flagged_certain": [
+       19,
+       50
+      ]
+     }
+    },
+    "reread": {
+     "n": 300,
+     "exact": {
+      "in text": [
+       132,
+       143
+      ],
+      "A": [
+       24,
+       35
+      ],
+      "A'": [
+       4,
+       8
+      ],
+      "B": [
+       6,
+       24
+      ],
+      "C": [
+       3,
+       25
+      ],
+      "D": [
+       2,
+       15
+      ],
+      "decade": [
+       15,
+       50
+      ],
+      "A+A'+B": [
+       34,
+       67
+      ],
+      "C+D": [
+       5,
+       40
+      ],
+      "not in text": [
+       39,
+       107
+      ],
+      "all year-tagged": [
+       171,
+       250
+      ],
+      "all": [
+       186,
+       300
+      ]
+     },
+     "within1": {
+      "in text": [
+       139,
+       143
+      ],
+      "A": [
+       27,
+       35
+      ],
+      "A'": [
+       6,
+       8
+      ],
+      "B": [
+       13,
+       24
+      ],
+      "C": [
+       12,
+       25
+      ],
+      "D": [
+       4,
+       15
+      ],
+      "decade": [
+       22,
+       50
+      ],
+      "A+A'+B": [
+       46,
+       67
+      ],
+      "C+D": [
+       16,
+       40
+      ],
+      "not in text": [
+       62,
+       107
+      ],
+      "all year-tagged": [
+       201,
+       250
+      ],
+      "all": [
+       223,
+       300
+      ]
+     },
+     "invalid": [
+      0,
+      300
+     ],
+     "stages": {
+      "rule": 172,
+      "propagated": 87,
+      "chooser": 35,
+      "residue": 6
+     },
+     "evidence": {
+      "unsupported": 26,
+      "valid": 274
+     },
+     "right_unsupported": 17,
+     "conformal": {
+      "in text": {
+       "n": 143,
+       "alpha": 0.1,
+       "q": [
+        0,
+        0
+       ],
+       "coverage": [
+        132,
+        143
+       ],
+       "width": 0.0,
+       "winkler": 13.986013986013987,
+       "no_year": 0
+      },
+      "A+A'+B": {
+       "n": 67,
+       "alpha": 0.1,
+       "q": [
+        65,
+        50
+       ],
+       "coverage": [
+        64,
+        67
+       ],
+       "width": 115.31343283582089,
+       "winkler": 148.44776119402985,
+       "no_year": 0
+      },
+      "C+D": {
+       "n": 40,
+       "alpha": 0.1,
+       "q": [
+        34,
+        68
+       ],
+       "coverage": [
+        36,
+        40
+       ],
+       "width": 102.1,
+       "winkler": 189.6,
+       "no_year": 0
+      },
+      "not in text": {
+       "n": 107,
+       "alpha": 0.1,
+       "q": [
+        34,
+        68
+       ],
+       "coverage": [
+        99,
+        107
+       ],
+       "width": 101.77570093457943,
+       "winkler": 173.55140186915887,
+       "no_year": 0
+      },
+      "all": {
+       "n": 300,
+       "alpha": 0.1,
+       "q": [
+        18,
+        24
+       ],
+       "coverage": [
+        270,
+        300
+       ],
+       "width": 42.03666666666667,
+       "winkler": 101.70333333333333,
+       "no_year": 0
+      }
+     },
+     "du": {
+      "certain_flagged_uncertain": [
+       37,
+       200
+      ],
+      "uncertain_flagged_certain": [
+       19,
+       50
+      ]
+     }
+    },
+    "per_1000": {
+     "gpu_s": 19.6,
+     "mac_s": 227.0,
+     "calls": {
+      "2b": 49,
+      "trace-neigh": 6
+     }
+    }
+   },
+   "fallback, corpus else the other: rules only|no residue stage|t=3": {
+    "corpus": {
+     "n": 300,
+     "exact": {
+      "in text": [
+       106,
+       119
+      ],
+      "A": [
+       22,
+       33
+      ],
+      "A'": [
+       4,
+       7
+      ],
+      "B": [
+       11,
+       35
+      ],
+      "C": [
+       6,
+       35
+      ],
+      "D": [
+       7,
+       21
+      ],
+      "decade": [
+       14,
+       50
+      ],
+      "A+A'+B": [
+       37,
+       75
+      ],
+      "C+D": [
+       13,
+       56
+      ],
+      "not in text": [
+       50,
+       131
+      ],
+      "all year-tagged": [
+       156,
+       250
+      ],
+      "all": [
+       170,
+       300
+      ]
+     },
+     "within1": {
+      "in text": [
+       112,
+       119
+      ],
+      "A": [
+       25,
+       33
+      ],
+      "A'": [
+       6,
+       7
+      ],
+      "B": [
+       19,
+       35
+      ],
+      "C": [
+       15,
+       35
+      ],
+      "D": [
+       9,
+       21
+      ],
+      "decade": [
+       19,
+       50
+      ],
+      "A+A'+B": [
+       50,
+       75
+      ],
+      "C+D": [
+       24,
+       56
+      ],
+      "not in text": [
+       74,
+       131
+      ],
+      "all year-tagged": [
+       186,
+       250
+      ],
+      "all": [
+       205,
+       300
+      ]
+     },
+     "invalid": [
+      6,
+      300
+     ],
+     "stages": {
+      "rule": 207,
+      "propagated": 87,
+      "none": 6
+     },
+     "evidence": {
+      "valid": 278,
+      "unsupported": 16
+     },
+     "right_unsupported": 12,
+     "conformal": {
+      "in text": {
+       "n": 119,
+       "alpha": 0.1,
+       "q": [
+        1,
+        1
+       ],
+       "coverage": [
+        112,
+        119
+       ],
+       "width": 2.0,
+       "winkler": 42.33613445378151,
+       "no_year": 0
+      },
+      "A+A'+B": {
+       "n": 75,
+       "alpha": 0.1,
+       "q": [
+        55,
+        60
+       ],
+       "coverage": [
+        70,
+        75
+       ],
+       "width": 114.86486486486487,
+       "winkler": 154.05405405405406,
+       "no_year": 1
+      },
+      "C+D": {
+       "n": 56,
+       "alpha": 0.1,
+       "q": [
+        Infinity,
+        117
+       ],
+       "coverage": [
+        53,
+        56
+       ],
+       "width": 234.0,
+       "winkler": 234.0,
+       "no_year": 3
+      },
+      "not in text": {
+       "n": 131,
+       "alpha": 0.1,
+       "q": [
+        69,
+        65
+       ],
+       "coverage": [
+        121,
+        131
+       ],
+       "width": 134.09448818897638,
+       "winkler": 176.77165354330708,
+       "no_year": 4
+      },
+      "all": {
+       "n": 300,
+       "alpha": 0.1,
+       "q": [
+        34,
+        33
+       ],
+       "coverage": [
+        272,
+        300
+       ],
+       "width": 67.0,
+       "winkler": 127.8843537414966,
+       "no_year": 6
+      }
+     },
+     "du": {
+      "certain_flagged_uncertain": [
+       37,
+       200
+      ],
+      "uncertain_flagged_certain": [
+       19,
+       50
+      ]
+     }
+    },
+    "reread": {
+     "n": 300,
+     "exact": {
+      "in text": [
+       122,
+       143
+      ],
+      "A": [
+       22,
+       35
+      ],
+      "A'": [
+       3,
+       8
+      ],
+      "B": [
+       6,
+       24
+      ],
+      "C": [
+       2,
+       25
+      ],
+      "D": [
+       1,
+       15
+      ],
+      "decade": [
+       14,
+       50
+      ],
+      "A+A'+B": [
+       31,
+       67
+      ],
+      "C+D": [
+       3,
+       40
+      ],
+      "not in text": [
+       34,
+       107
+      ],
+      "all year-tagged": [
+       156,
+       250
+      ],
+      "all": [
+       170,
+       300
+      ]
+     },
+     "within1": {
+      "in text": [
+       130,
+       143
+      ],
+      "A": [
+       26,
+       35
+      ],
+      "A'": [
+       5,
+       8
+      ],
+      "B": [
+       12,
+       24
+      ],
+      "C": [
+       10,
+       25
+      ],
+      "D": [
+       3,
+       15
+      ],
+      "decade": [
+       19,
+       50
+      ],
+      "A+A'+B": [
+       43,
+       67
+      ],
+      "C+D": [
+       13,
+       40
+      ],
+      "not in text": [
+       56,
+       107
+      ],
+      "all year-tagged": [
+       186,
+       250
+      ],
+      "all": [
+       205,
+       300
+      ]
+     },
+     "invalid": [
+      6,
+      300
+     ],
+     "stages": {
+      "rule": 207,
+      "propagated": 87,
+      "none": 6
+     },
+     "evidence": {
+      "valid": 278,
+      "unsupported": 16
+     },
+     "right_unsupported": 12,
+     "conformal": {
+      "in text": {
+       "n": 143,
+       "alpha": 0.1,
+       "q": [
+        1,
+        12
+       ],
+       "coverage": [
+        131,
+        143
+       ],
+       "width": 12.923076923076923,
+       "winkler": 73.9020979020979,
+       "no_year": 0
+      },
+      "A+A'+B": {
+       "n": 67,
+       "alpha": 0.1,
+       "q": [
+        69,
+        60
+       ],
+       "coverage": [
+        61,
+        67
+       ],
+       "width": 129.13846153846154,
+       "winkler": 169.13846153846154,
+       "no_year": 2
+      },
+      "C+D": {
+       "n": 40,
+       "alpha": 0.1,
+       "q": [
+        34,
+        Infinity
+       ],
+       "coverage": [
+        35,
+        40
+       ],
+       "width": 68.0,
+       "winkler": 170.22222222222223,
+       "no_year": 2
+      },
+      "not in text": {
+       "n": 107,
+       "alpha": 0.1,
+       "q": [
+        55,
+        69
+       ],
+       "coverage": [
+        95,
+        107
+       ],
+       "width": 123.32038834951456,
+       "winkler": 183.32038834951456,
+       "no_year": 4
+      },
+      "all": {
+       "n": 300,
+       "alpha": 0.1,
+       "q": [
+        34,
+        33
+       ],
+       "coverage": [
+        272,
+        300
+       ],
+       "width": 67.0,
+       "winkler": 127.8843537414966,
+       "no_year": 6
+      }
+     },
+     "du": {
+      "certain_flagged_uncertain": [
+       37,
+       200
+      ],
+      "uncertain_flagged_certain": [
+       19,
+       50
+      ]
+     }
+    },
+    "per_1000": null
+   },
+   "fallback, corpus else the other: rules only|27B trace-neigh|t=3": {
+    "corpus": {
+     "n": 300,
+     "exact": {
+      "in text": [
+       106,
+       119
+      ],
+      "A": [
+       22,
+       33
+      ],
+      "A'": [
+       4,
+       7
+      ],
+      "B": [
+       11,
+       35
+      ],
+      "C": [
+       7,
+       35
+      ],
+      "D": [
+       7,
+       21
+      ],
+      "decade": [
+       16,
+       50
+      ],
+      "A+A'+B": [
+       37,
+       75
+      ],
+      "C+D": [
+       14,
+       56
+      ],
+      "not in text": [
+       51,
+       131
+      ],
+      "all year-tagged": [
+       157,
+       250
+      ],
+      "all": [
+       173,
+       300
+      ]
+     },
+     "within1": {
+      "in text": [
+       112,
+       119
+      ],
+      "A": [
+       25,
+       33
+      ],
+      "A'": [
+       6,
+       7
+      ],
+      "B": [
+       19,
+       35
+      ],
+      "C": [
+       17,
+       35
+      ],
+      "D": [
+       9,
+       21
+      ],
+      "decade": [
+       21,
+       50
+      ],
+      "A+A'+B": [
+       50,
+       75
+      ],
+      "C+D": [
+       26,
+       56
+      ],
+      "not in text": [
+       76,
+       131
+      ],
+      "all year-tagged": [
+       188,
+       250
+      ],
+      "all": [
+       209,
+       300
+      ]
+     },
+     "invalid": [
+      0,
+      300
+     ],
+     "stages": {
+      "rule": 207,
+      "propagated": 87,
+      "residue": 6
+     },
+     "evidence": {
+      "valid": 280,
+      "unsupported": 20
+     },
+     "right_unsupported": 15,
+     "conformal": {
+      "in text": {
+       "n": 119,
+       "alpha": 0.1,
+       "q": [
+        1,
+        1
+       ],
+       "coverage": [
+        112,
+        119
+       ],
+       "width": 2.0,
+       "winkler": 42.33613445378151,
+       "no_year": 0
+      },
+      "A+A'+B": {
+       "n": 75,
+       "alpha": 0.1,
+       "q": [
+        50,
+        60
+       ],
+       "coverage": [
+        71,
+        75
+       ],
+       "width": 109.89333333333333,
+       "winkler": 152.56,
+       "no_year": 0
+      },
+      "C+D": {
+       "n": 56,
+       "alpha": 0.1,
+       "q": [
+        20,
+        117
+       ],
+       "coverage": [
+        50,
+        56
+       ],
+       "width": 137.17857142857142,
+       "winkler": 277.89285714285717,
+       "no_year": 0
+      },
+      "not in text": {
+       "n": 131,
+       "alpha": 0.1,
+       "q": [
+        53,
+        50
+       ],
+       "coverage": [
+        120,
+        131
+       ],
+       "width": 103.1145038167939,
+       "winkler": 165.55725190839695,
+       "no_year": 0
+      },
+      "all": {
+       "n": 300,
+       "alpha": 0.1,
+       "q": [
+        20,
+        30
+       ],
+       "coverage": [
+        268,
+        300
+       ],
+       "width": 50.04666666666667,
+       "winkler": 127.04666666666667,
+       "no_year": 0
+      }
+     },
+     "du": {
+      "certain_flagged_uncertain": [
+       37,
+       200
+      ],
+      "uncertain_flagged_certain": [
+       19,
+       50
+      ]
+     }
+    },
+    "reread": {
+     "n": 300,
+     "exact": {
+      "in text": [
+       122,
+       143
+      ],
+      "A": [
+       22,
+       35
+      ],
+      "A'": [
+       4,
+       8
+      ],
+      "B": [
+       6,
+       24
+      ],
+      "C": [
+       2,
+       25
+      ],
+      "D": [
+       1,
+       15
+      ],
+      "decade": [
+       16,
+       50
+      ],
+      "A+A'+B": [
+       32,
+       67
+      ],
+      "C+D": [
+       3,
+       40
+      ],
+      "not in text": [
+       35,
+       107
+      ],
+      "all year-tagged": [
+       157,
+       250
+      ],
+      "all": [
+       173,
+       300
+      ]
+     },
+     "within1": {
+      "in text": [
+       130,
+       143
+      ],
+      "A": [
+       26,
+       35
+      ],
+      "A'": [
+       6,
+       8
+      ],
+      "B": [
+       12,
+       24
+      ],
+      "C": [
+       11,
+       25
+      ],
+      "D": [
+       3,
+       15
+      ],
+      "decade": [
+       21,
+       50
+      ],
+      "A+A'+B": [
+       44,
+       67
+      ],
+      "C+D": [
+       14,
+       40
+      ],
+      "not in text": [
+       58,
+       107
+      ],
+      "all year-tagged": [
+       188,
+       250
+      ],
+      "all": [
+       209,
+       300
+      ]
+     },
+     "invalid": [
+      0,
+      300
+     ],
+     "stages": {
+      "rule": 207,
+      "propagated": 87,
+      "residue": 6
+     },
+     "evidence": {
+      "valid": 280,
+      "unsupported": 20
+     },
+     "right_unsupported": 15,
+     "conformal": {
+      "in text": {
+       "n": 143,
+       "alpha": 0.1,
+       "q": [
+        1,
+        12
+       ],
+       "coverage": [
+        131,
+        143
+       ],
+       "width": 12.923076923076923,
+       "winkler": 73.9020979020979,
+       "no_year": 0
+      },
+      "A+A'+B": {
+       "n": 67,
+       "alpha": 0.1,
+       "q": [
+        65,
+        55
+       ],
+       "coverage": [
+        63,
+        67
+       ],
+       "width": 120.23880597014926,
+       "winkler": 164.71641791044777,
+       "no_year": 0
+      },
+      "C+D": {
+       "n": 40,
+       "alpha": 0.1,
+       "q": [
+        34,
+        68
+       ],
+       "coverage": [
+        36,
+        40
+       ],
+       "width": 102.15,
+       "winkler": 198.65,
+       "no_year": 0
+      },
+      "not in text": {
+       "n": 107,
+       "alpha": 0.1,
+       "q": [
+        18,
+        69
+       ],
+       "coverage": [
+        96,
+        107
+       ],
+       "width": 86.6355140186916,
+       "winkler": 212.61682242990653,
+       "no_year": 0
+      },
+      "all": {
+       "n": 300,
+       "alpha": 0.1,
+       "q": [
+        20,
+        30
+       ],
+       "coverage": [
+        268,
+        300
+       ],
+       "width": 50.04666666666667,
+       "winkler": 127.04666666666667,
+       "no_year": 0
+      }
+     },
+     "du": {
+      "certain_flagged_uncertain": [
+       37,
+       200
+      ],
+      "uncertain_flagged_certain": [
+       19,
+       50
+      ]
+     }
+    },
+    "per_1000": {
+     "gpu_s": 19.6,
+     "mac_s": 0.0,
+     "calls": {
+      "trace-neigh": 6
+     }
+    }
+   },
+   "fallback, corpus else the other: 2B chooser|no residue stage|t=3": {
+    "corpus": {
+     "n": 300,
+     "exact": {
+      "in text": [
+       113,
+       119
+      ],
+      "A": [
+       22,
+       33
+      ],
+      "A'": [
+       4,
+       7
+      ],
+      "B": [
+       11,
+       35
+      ],
+      "C": [
+       6,
+       35
+      ],
+      "D": [
+       8,
+       21
+      ],
+      "decade": [
+       14,
+       50
+      ],
+      "A+A'+B": [
+       37,
+       75
+      ],
+      "C+D": [
+       14,
+       56
+      ],
+      "not in text": [
+       51,
+       131
+      ],
+      "all year-tagged": [
+       164,
+       250
+      ],
+      "all": [
+       178,
+       300
+      ]
+     },
+     "within1": {
+      "in text": [
+       117,
+       119
+      ],
+      "A": [
+       25,
+       33
+      ],
+      "A'": [
+       6,
+       7
+      ],
+      "B": [
+       19,
+       35
+      ],
+      "C": [
+       16,
+       35
+      ],
+      "D": [
+       10,
+       21
+      ],
+      "decade": [
+       20,
+       50
+      ],
+      "A+A'+B": [
+       50,
+       75
+      ],
+      "C+D": [
+       26,
+       56
+      ],
+      "not in text": [
+       76,
+       131
+      ],
+      "all year-tagged": [
+       193,
+       250
+      ],
+      "all": [
+       213,
+       300
+      ]
+     },
+     "invalid": [
+      6,
+      300
+     ],
+     "stages": {
+      "chooser": 40,
+      "propagated": 87,
+      "rule": 167,
+      "none": 6
+     },
+     "evidence": {
+      "valid": 277,
+      "unsupported": 17
+     },
+     "right_unsupported": 13,
+     "conformal": {
+      "in text": {
+       "n": 119,
+       "alpha": 0.1,
+       "q": [
+        0,
+        0
+       ],
+       "coverage": [
+        113,
+        119
+       ],
+       "width": 0.0,
+       "winkler": 11.092436974789916,
+       "no_year": 0
+      },
+      "A+A'+B": {
+       "n": 75,
+       "alpha": 0.1,
+       "q": [
+        55,
+        60
+       ],
+       "coverage": [
+        70,
+        75
+       ],
+       "width": 114.86486486486487,
+       "winkler": 154.05405405405406,
+       "no_year": 1
+      },
+      "C+D": {
+       "n": 56,
+       "alpha": 0.1,
+       "q": [
+        Infinity,
+        117
+       ],
+       "coverage": [
+        53,
+        56
+       ],
+       "width": 234.0,
+       "winkler": 234.0,
+       "no_year": 3
+      },
+      "not in text": {
+       "n": 131,
+       "alpha": 0.1,
+       "q": [
+        69,
+        65
+       ],
+       "coverage": [
+        121,
+        131
+       ],
+       "width": 134.09448818897638,
+       "winkler": 176.77165354330708,
+       "no_year": 4
+      },
+      "all": {
+       "n": 300,
+       "alpha": 0.1,
+       "q": [
+        20,
+        32
+       ],
+       "coverage": [
+        265,
+        300
+       ],
+       "width": 52.0,
+       "winkler": 117.91836734693878,
+       "no_year": 6
+      }
+     },
+     "du": {
+      "certain_flagged_uncertain": [
+       37,
+       200
+      ],
+      "uncertain_flagged_certain": [
+       19,
+       50
+      ]
+     }
+    },
+    "reread": {
+     "n": 300,
+     "exact": {
+      "in text": [
+       129,
+       143
+      ],
+      "A": [
+       22,
+       35
+      ],
+      "A'": [
+       3,
+       8
+      ],
+      "B": [
+       6,
+       24
+      ],
+      "C": [
+       2,
+       25
+      ],
+      "D": [
+       2,
+       15
+      ],
+      "decade": [
+       14,
+       50
+      ],
+      "A+A'+B": [
+       31,
+       67
+      ],
+      "C+D": [
+       4,
+       40
+      ],
+      "not in text": [
+       35,
+       107
+      ],
+      "all year-tagged": [
+       164,
+       250
+      ],
+      "all": [
+       178,
+       300
+      ]
+     },
+     "within1": {
+      "in text": [
+       135,
+       143
+      ],
+      "A": [
+       26,
+       35
+      ],
+      "A'": [
+       5,
+       8
+      ],
+      "B": [
+       12,
+       24
+      ],
+      "C": [
+       11,
+       25
+      ],
+      "D": [
+       4,
+       15
+      ],
+      "decade": [
+       20,
+       50
+      ],
+      "A+A'+B": [
+       43,
+       67
+      ],
+      "C+D": [
+       15,
+       40
+      ],
+      "not in text": [
+       58,
+       107
+      ],
+      "all year-tagged": [
+       193,
+       250
+      ],
+      "all": [
+       213,
+       300
+      ]
+     },
+     "invalid": [
+      6,
+      300
+     ],
+     "stages": {
+      "chooser": 40,
+      "propagated": 87,
+      "rule": 167,
+      "none": 6
+     },
+     "evidence": {
+      "valid": 277,
+      "unsupported": 17
+     },
+     "right_unsupported": 13,
+     "conformal": {
+      "in text": {
+       "n": 143,
+       "alpha": 0.1,
+       "q": [
+        0,
+        1
+       ],
+       "coverage": [
+        133,
+        143
+       ],
+       "width": 0.993006993006993,
+       "winkler": 41.27272727272727,
+       "no_year": 0
+      },
+      "A+A'+B": {
+       "n": 67,
+       "alpha": 0.1,
+       "q": [
+        69,
+        60
+       ],
+       "coverage": [
+        61,
+        67
+       ],
+       "width": 129.13846153846154,
+       "winkler": 169.13846153846154,
+       "no_year": 2
+      },
+      "C+D": {
+       "n": 40,
+       "alpha": 0.1,
+       "q": [
+        34,
+        Infinity
+       ],
+       "coverage": [
+        36,
+        40
+       ],
+       "width": 68.0,
+       "winkler": 149.11111111111111,
+       "no_year": 2
+      },
+      "not in text": {
+       "n": 107,
+       "alpha": 0.1,
+       "q": [
+        55,
+        69
+       ],
+       "coverage": [
+        95,
+        107
+       ],
+       "width": 123.32038834951456,
+       "winkler": 183.32038834951456,
+       "no_year": 4
+      },
+      "all": {
+       "n": 300,
+       "alpha": 0.1,
+       "q": [
+        20,
+        32
+       ],
+       "coverage": [
+        265,
+        300
+       ],
+       "width": 52.0,
+       "winkler": 117.91836734693878,
+       "no_year": 6
+      }
+     },
+     "du": {
+      "certain_flagged_uncertain": [
+       37,
+       200
+      ],
+      "uncertain_flagged_certain": [
+       19,
+       50
+      ]
+     }
+    },
+    "per_1000": {
+     "gpu_s": 0.0,
+     "mac_s": 273.4,
+     "calls": {
+      "2b": 59
+     }
+    }
+   },
+   "fallback, corpus else the other: 2B chooser|27B trace-neigh|t=3": {
+    "corpus": {
+     "n": 300,
+     "exact": {
+      "in text": [
+       113,
+       119
+      ],
+      "A": [
+       22,
+       33
+      ],
+      "A'": [
+       4,
+       7
+      ],
+      "B": [
+       11,
+       35
+      ],
+      "C": [
+       7,
+       35
+      ],
+      "D": [
+       8,
+       21
+      ],
+      "decade": [
+       16,
+       50
+      ],
+      "A+A'+B": [
+       37,
+       75
+      ],
+      "C+D": [
+       15,
+       56
+      ],
+      "not in text": [
+       52,
+       131
+      ],
+      "all year-tagged": [
+       165,
+       250
+      ],
+      "all": [
+       181,
+       300
+      ]
+     },
+     "within1": {
+      "in text": [
+       117,
+       119
+      ],
+      "A": [
+       25,
+       33
+      ],
+      "A'": [
+       6,
+       7
+      ],
+      "B": [
+       19,
+       35
+      ],
+      "C": [
+       18,
+       35
+      ],
+      "D": [
+       10,
+       21
+      ],
+      "decade": [
+       22,
+       50
+      ],
+      "A+A'+B": [
+       50,
+       75
+      ],
+      "C+D": [
+       28,
+       56
+      ],
+      "not in text": [
+       78,
+       131
+      ],
+      "all year-tagged": [
+       195,
+       250
+      ],
+      "all": [
+       217,
+       300
+      ]
+     },
+     "invalid": [
+      0,
+      300
+     ],
+     "stages": {
+      "chooser": 40,
+      "propagated": 87,
+      "rule": 167,
+      "residue": 6
+     },
+     "evidence": {
+      "valid": 279,
+      "unsupported": 21
+     },
+     "right_unsupported": 16,
+     "conformal": {
+      "in text": {
+       "n": 119,
+       "alpha": 0.1,
+       "q": [
+        0,
+        0
+       ],
+       "coverage": [
+        113,
+        119
+       ],
+       "width": 0.0,
+       "winkler": 11.092436974789916,
+       "no_year": 0
+      },
+      "A+A'+B": {
+       "n": 75,
+       "alpha": 0.1,
+       "q": [
+        50,
+        60
+       ],
+       "coverage": [
+        71,
+        75
+       ],
+       "width": 109.89333333333333,
+       "winkler": 152.56,
+       "no_year": 0
+      },
+      "C+D": {
+       "n": 56,
+       "alpha": 0.1,
+       "q": [
+        20,
+        117
+       ],
+       "coverage": [
+        51,
+        56
+       ],
+       "width": 137.17857142857142,
+       "winkler": 266.10714285714283,
+       "no_year": 0
+      },
+      "not in text": {
+       "n": 131,
+       "alpha": 0.1,
+       "q": [
+        50,
+        50
+       ],
+       "coverage": [
+        121,
+        131
+       ],
+       "width": 100.09160305343511,
+       "winkler": 164.36641221374046,
+       "no_year": 0
+      },
+      "all": {
+       "n": 300,
+       "alpha": 0.1,
+       "q": [
+        18,
+        29
+       ],
+       "coverage": [
+        269,
+        300
+       ],
+       "width": 47.04666666666667,
+       "winkler": 116.44666666666667,
+       "no_year": 0
+      }
+     },
+     "du": {
+      "certain_flagged_uncertain": [
+       37,
+       200
+      ],
+      "uncertain_flagged_certain": [
+       19,
+       50
+      ]
+     }
+    },
+    "reread": {
+     "n": 300,
+     "exact": {
+      "in text": [
+       129,
+       143
+      ],
+      "A": [
+       22,
+       35
+      ],
+      "A'": [
+       4,
+       8
+      ],
+      "B": [
+       6,
+       24
+      ],
+      "C": [
+       2,
+       25
+      ],
+      "D": [
+       2,
+       15
+      ],
+      "decade": [
+       16,
+       50
+      ],
+      "A+A'+B": [
+       32,
+       67
+      ],
+      "C+D": [
+       4,
+       40
+      ],
+      "not in text": [
+       36,
+       107
+      ],
+      "all year-tagged": [
+       165,
+       250
+      ],
+      "all": [
+       181,
+       300
+      ]
+     },
+     "within1": {
+      "in text": [
+       135,
+       143
+      ],
+      "A": [
+       26,
+       35
+      ],
+      "A'": [
+       6,
+       8
+      ],
+      "B": [
+       12,
+       24
+      ],
+      "C": [
+       12,
+       25
+      ],
+      "D": [
+       4,
+       15
+      ],
+      "decade": [
+       22,
+       50
+      ],
+      "A+A'+B": [
+       44,
+       67
+      ],
+      "C+D": [
+       16,
+       40
+      ],
+      "not in text": [
+       60,
+       107
+      ],
+      "all year-tagged": [
+       195,
+       250
+      ],
+      "all": [
+       217,
+       300
+      ]
+     },
+     "invalid": [
+      0,
+      300
+     ],
+     "stages": {
+      "chooser": 40,
+      "propagated": 87,
+      "rule": 167,
+      "residue": 6
+     },
+     "evidence": {
+      "valid": 279,
+      "unsupported": 21
+     },
+     "right_unsupported": 16,
+     "conformal": {
+      "in text": {
+       "n": 143,
+       "alpha": 0.1,
+       "q": [
+        0,
+        1
+       ],
+       "coverage": [
+        133,
+        143
+       ],
+       "width": 0.993006993006993,
+       "winkler": 41.27272727272727,
+       "no_year": 0
+      },
+      "A+A'+B": {
+       "n": 67,
+       "alpha": 0.1,
+       "q": [
+        65,
+        55
+       ],
+       "coverage": [
+        63,
+        67
+       ],
+       "width": 120.23880597014926,
+       "winkler": 164.71641791044777,
+       "no_year": 0
+      },
+      "C+D": {
+       "n": 40,
+       "alpha": 0.1,
+       "q": [
+        34,
+        68
+       ],
+       "coverage": [
+        37,
+        40
+       ],
+       "width": 102.15,
+       "winkler": 189.15,
+       "no_year": 0
+      },
+      "not in text": {
+       "n": 107,
+       "alpha": 0.1,
+       "q": [
+        18,
+        69
+       ],
+       "coverage": [
+        97,
+        107
+       ],
+       "width": 86.6355140186916,
+       "winkler": 206.07476635514018,
+       "no_year": 0
+      },
+      "all": {
+       "n": 300,
+       "alpha": 0.1,
+       "q": [
+        18,
+        29
+       ],
+       "coverage": [
+        269,
+        300
+       ],
+       "width": 47.04666666666667,
+       "winkler": 116.44666666666667,
+       "no_year": 0
+      }
+     },
+     "du": {
+      "certain_flagged_uncertain": [
+       37,
+       200
+      ],
+      "uncertain_flagged_certain": [
+       19,
+       50
+      ]
+     }
+    },
+    "per_1000": {
+     "gpu_s": 19.6,
+     "mac_s": 273.4,
+     "calls": {
+      "2b": 59,
+      "trace-neigh": 6
+     }
+    }
+   },
+   "fallback, Vision else the other: rules only|no residue stage|t=3": {
+    "corpus": {
+     "n": 300,
+     "exact": {
+      "in text": [
+       102,
+       119
+      ],
+      "A": [
+       25,
+       33
+      ],
+      "A'": [
+       5,
+       7
+      ],
+      "B": [
+       14,
+       35
+      ],
+      "C": [
+       9,
+       35
+      ],
+      "D": [
+       8,
+       21
+      ],
+      "decade": [
+       13,
+       50
+      ],
+      "A+A'+B": [
+       44,
+       75
+      ],
+      "C+D": [
+       17,
+       56
+      ],
+      "not in text": [
+       61,
+       131
+      ],
+      "all year-tagged": [
+       163,
+       250
+      ],
+      "all": [
+       176,
+       300
+      ]
+     },
+     "within1": {
+      "in text": [
+       107,
+       119
+      ],
+      "A": [
+       28,
+       33
+      ],
+      "A'": [
+       7,
+       7
+      ],
+      "B": [
+       23,
+       35
+      ],
+      "C": [
+       16,
+       35
+      ],
+      "D": [
+       10,
+       21
+      ],
+      "decade": [
+       19,
+       50
+      ],
+      "A+A'+B": [
+       58,
+       75
+      ],
+      "C+D": [
+       26,
+       56
+      ],
+      "not in text": [
+       84,
+       131
+      ],
+      "all year-tagged": [
+       191,
+       250
+      ],
+      "all": [
+       210,
+       300
+      ]
+     },
+     "invalid": [
+      6,
+      300
+     ],
+     "stages": {
+      "rule": 207,
+      "propagated": 87,
+      "none": 6
+     },
+     "evidence": {
+      "unsupported": 25,
+      "valid": 269
+     },
+     "right_unsupported": 16,
+     "conformal": {
+      "in text": {
+       "n": 119,
+       "alpha": 0.1,
+       "q": [
+        1,
+        3
+       ],
+       "coverage": [
+        108,
+        119
+       ],
+       "width": 3.9831932773109244,
+       "winkler": 38.60504201680672,
+       "no_year": 0
+      },
+      "A+A'+B": {
+       "n": 75,
+       "alpha": 0.1,
+       "q": [
+        55,
+        46
+       ],
+       "coverage": [
+        71,
+        75
+       ],
+       "width": 101.24324324324324,
+       "winkler": 126.64864864864865,
+       "no_year": 1
+      },
+      "C+D": {
+       "n": 56,
+       "alpha": 0.1,
+       "q": [
+        Infinity,
+        73
+       ],
+       "coverage": [
+        53,
+        56
+       ],
+       "width": 146.0,
+       "winkler": 146.0,
+       "no_year": 3
+      },
+      "not in text": {
+       "n": 131,
+       "alpha": 0.1,
+       "q": [
+        50,
+        35
+       ],
+       "coverage": [
+        120,
+        131
+       ],
+       "width": 85.35433070866142,
+       "winkler": 129.4488188976378,
+       "no_year": 4
+      },
+      "all": {
+       "n": 300,
+       "alpha": 0.1,
+       "q": [
+        23,
+        30
+       ],
+       "coverage": [
+        269,
+        300
+       ],
+       "width": 53.0,
+       "winkler": 99.19047619047619,
+       "no_year": 6
+      }
+     },
+     "du": {
+      "certain_flagged_uncertain": [
+       37,
+       200
+      ],
+      "uncertain_flagged_certain": [
+       19,
+       50
+      ]
+     }
+    },
+    "reread": {
+     "n": 300,
+     "exact": {
+      "in text": [
+       124,
+       143
+      ],
+      "A": [
+       25,
+       35
+      ],
+      "A'": [
+       3,
+       8
+      ],
+      "B": [
+       6,
+       24
+      ],
+      "C": [
+       3,
+       25
+      ],
+      "D": [
+       2,
+       15
+      ],
+      "decade": [
+       13,
+       50
+      ],
+      "A+A'+B": [
+       34,
+       67
+      ],
+      "C+D": [
+       5,
+       40
+      ],
+      "not in text": [
+       39,
+       107
+      ],
+      "all year-tagged": [
+       163,
+       250
+      ],
+      "all": [
+       176,
+       300
+      ]
+     },
+     "within1": {
+      "in text": [
+       131,
+       143
+      ],
+      "A": [
+       29,
+       35
+      ],
+      "A'": [
+       5,
+       8
+      ],
+      "B": [
+       13,
+       24
+      ],
+      "C": [
+       9,
+       25
+      ],
+      "D": [
+       4,
+       15
+      ],
+      "decade": [
+       19,
+       50
+      ],
+      "A+A'+B": [
+       47,
+       67
+      ],
+      "C+D": [
+       13,
+       40
+      ],
+      "not in text": [
+       60,
+       107
+      ],
+      "all year-tagged": [
+       191,
+       250
+      ],
+      "all": [
+       210,
+       300
+      ]
+     },
+     "invalid": [
+      6,
+      300
+     ],
+     "stages": {
+      "rule": 207,
+      "propagated": 87,
+      "none": 6
+     },
+     "evidence": {
+      "unsupported": 25,
+      "valid": 269
+     },
+     "right_unsupported": 16,
+     "conformal": {
+      "in text": {
+       "n": 143,
+       "alpha": 0.1,
+       "q": [
+        1,
+        3
+       ],
+       "coverage": [
+        131,
+        143
+       ],
+       "width": 3.986013986013986,
+       "winkler": 32.93706293706294,
+       "no_year": 0
+      },
+      "A+A'+B": {
+       "n": 67,
+       "alpha": 0.1,
+       "q": [
+        50,
+        50
+       ],
+       "coverage": [
+        63,
+        67
+       ],
+       "width": 100.0,
+       "winkler": 125.23076923076923,
+       "no_year": 2
+      },
+      "C+D": {
+       "n": 40,
+       "alpha": 0.1,
+       "q": [
+        34,
+        Infinity
+       ],
+       "coverage": [
+        36,
+        40
+       ],
+       "width": 68.0,
+       "winkler": 112.44444444444444,
+       "no_year": 2
+      },
+      "not in text": {
+       "n": 107,
+       "alpha": 0.1,
+       "q": [
+        55,
+        35
+       ],
+       "coverage": [
+        96,
+        107
+       ],
+       "width": 90.97087378640776,
+       "winkler": 142.4271844660194,
+       "no_year": 4
+      },
+      "all": {
+       "n": 300,
+       "alpha": 0.1,
+       "q": [
+        23,
+        30
+       ],
+       "coverage": [
+        269,
+        300
+       ],
+       "width": 53.0,
+       "winkler": 99.19047619047619,
+       "no_year": 6
+      }
+     },
+     "du": {
+      "certain_flagged_uncertain": [
+       37,
+       200
+      ],
+      "uncertain_flagged_certain": [
+       19,
+       50
+      ]
+     }
+    },
+    "per_1000": null
+   },
+   "fallback, Vision else the other: rules only|27B trace-neigh|t=3": {
+    "corpus": {
+     "n": 300,
+     "exact": {
+      "in text": [
+       102,
+       119
+      ],
+      "A": [
+       25,
+       33
+      ],
+      "A'": [
+       5,
+       7
+      ],
+      "B": [
+       14,
+       35
+      ],
+      "C": [
+       10,
+       35
+      ],
+      "D": [
+       8,
+       21
+      ],
+      "decade": [
+       15,
+       50
+      ],
+      "A+A'+B": [
+       44,
+       75
+      ],
+      "C+D": [
+       18,
+       56
+      ],
+      "not in text": [
+       62,
+       131
+      ],
+      "all year-tagged": [
+       164,
+       250
+      ],
+      "all": [
+       179,
+       300
+      ]
+     },
+     "within1": {
+      "in text": [
+       107,
+       119
+      ],
+      "A": [
+       28,
+       33
+      ],
+      "A'": [
+       7,
+       7
+      ],
+      "B": [
+       23,
+       35
+      ],
+      "C": [
+       18,
+       35
+      ],
+      "D": [
+       10,
+       21
+      ],
+      "decade": [
+       21,
+       50
+      ],
+      "A+A'+B": [
+       58,
+       75
+      ],
+      "C+D": [
+       28,
+       56
+      ],
+      "not in text": [
+       86,
+       131
+      ],
+      "all year-tagged": [
+       193,
+       250
+      ],
+      "all": [
+       214,
+       300
+      ]
+     },
+     "invalid": [
+      0,
+      300
+     ],
+     "stages": {
+      "rule": 207,
+      "propagated": 87,
+      "residue": 6
+     },
+     "evidence": {
+      "unsupported": 27,
+      "valid": 273
+     },
+     "right_unsupported": 17,
+     "conformal": {
+      "in text": {
+       "n": 119,
+       "alpha": 0.1,
+       "q": [
+        1,
+        3
+       ],
+       "coverage": [
+        108,
+        119
+       ],
+       "width": 3.9831932773109244,
+       "winkler": 38.60504201680672,
+       "no_year": 0
+      },
+      "A+A'+B": {
+       "n": 75,
+       "alpha": 0.1,
+       "q": [
+        50,
+        46
+       ],
+       "coverage": [
+        72,
+        75
+       ],
+       "width": 96.08,
+       "winkler": 121.14666666666666,
+       "no_year": 0
+      },
+      "C+D": {
+       "n": 56,
+       "alpha": 0.1,
+       "q": [
+        19,
+        73
+       ],
+       "coverage": [
+        51,
+        56
+       ],
+       "width": 92.14285714285714,
+       "winkler": 176.78571428571428,
+       "no_year": 0
+      },
+      "not in text": {
+       "n": 131,
+       "alpha": 0.1,
+       "q": [
+        20,
+        34
+       ],
+       "coverage": [
+        119,
+        131
+       ],
+       "width": 53.969465648854964,
+       "winkler": 120.83969465648855,
+       "no_year": 0
+      },
+      "all": {
+       "n": 300,
+       "alpha": 0.1,
+       "q": [
+        18,
+        24
+       ],
+       "coverage": [
+        270,
+        300
+       ],
+       "width": 42.03666666666667,
+       "winkler": 97.03666666666666,
+       "no_year": 0
+      }
+     },
+     "du": {
+      "certain_flagged_uncertain": [
+       37,
+       200
+      ],
+      "uncertain_flagged_certain": [
+       19,
+       50
+      ]
+     }
+    },
+    "reread": {
+     "n": 300,
+     "exact": {
+      "in text": [
+       124,
+       143
+      ],
+      "A": [
+       25,
+       35
+      ],
+      "A'": [
+       4,
+       8
+      ],
+      "B": [
+       6,
+       24
+      ],
+      "C": [
+       3,
+       25
+      ],
+      "D": [
+       2,
+       15
+      ],
+      "decade": [
+       15,
+       50
+      ],
+      "A+A'+B": [
+       35,
+       67
+      ],
+      "C+D": [
+       5,
+       40
+      ],
+      "not in text": [
+       40,
+       107
+      ],
+      "all year-tagged": [
+       164,
+       250
+      ],
+      "all": [
+       179,
+       300
+      ]
+     },
+     "within1": {
+      "in text": [
+       131,
+       143
+      ],
+      "A": [
+       29,
+       35
+      ],
+      "A'": [
+       6,
+       8
+      ],
+      "B": [
+       13,
+       24
+      ],
+      "C": [
+       10,
+       25
+      ],
+      "D": [
+       4,
+       15
+      ],
+      "decade": [
+       21,
+       50
+      ],
+      "A+A'+B": [
+       48,
+       67
+      ],
+      "C+D": [
+       14,
+       40
+      ],
+      "not in text": [
+       62,
+       107
+      ],
+      "all year-tagged": [
+       193,
+       250
+      ],
+      "all": [
+       214,
+       300
+      ]
+     },
+     "invalid": [
+      0,
+      300
+     ],
+     "stages": {
+      "rule": 207,
+      "propagated": 87,
+      "residue": 6
+     },
+     "evidence": {
+      "unsupported": 27,
+      "valid": 273
+     },
+     "right_unsupported": 17,
+     "conformal": {
+      "in text": {
+       "n": 143,
+       "alpha": 0.1,
+       "q": [
+        1,
+        3
+       ],
+       "coverage": [
+        131,
+        143
+       ],
+       "width": 3.986013986013986,
+       "winkler": 32.93706293706294,
+       "no_year": 0
+      },
+      "A+A'+B": {
+       "n": 67,
+       "alpha": 0.1,
+       "q": [
+        46,
+        50
+       ],
+       "coverage": [
+        63,
+        67
+       ],
+       "width": 96.02985074626865,
+       "winkler": 124.08955223880596,
+       "no_year": 0
+      },
+      "C+D": {
+       "n": 40,
+       "alpha": 0.1,
+       "q": [
+        34,
+        35
+       ],
+       "coverage": [
+        37,
+        40
+       ],
+       "width": 69.1,
+       "winkler": 156.1,
+       "no_year": 0
+      },
+      "not in text": {
+       "n": 107,
+       "alpha": 0.1,
+       "q": [
+        34,
+        35
+       ],
+       "coverage": [
+        98,
+        107
+       ],
+       "width": 69.08411214953271,
+       "winkler": 133.57009345794393,
+       "no_year": 0
+      },
+      "all": {
+       "n": 300,
+       "alpha": 0.1,
+       "q": [
+        18,
+        24
+       ],
+       "coverage": [
+        270,
+        300
+       ],
+       "width": 42.03666666666667,
+       "winkler": 97.03666666666666,
+       "no_year": 0
+      }
+     },
+     "du": {
+      "certain_flagged_uncertain": [
+       37,
+       200
+      ],
+      "uncertain_flagged_certain": [
+       19,
+       50
+      ]
+     }
+    },
+    "per_1000": {
+     "gpu_s": 19.6,
+     "mac_s": 0.0,
+     "calls": {
+      "trace-neigh": 6
+     }
+    }
+   },
+   "fallback, Vision else the other: 2B chooser|no residue stage|t=3": {
+    "corpus": {
+     "n": 300,
+     "exact": {
+      "in text": [
+       107,
+       119
+      ],
+      "A": [
+       25,
+       33
+      ],
+      "A'": [
+       5,
+       7
+      ],
+      "B": [
+       13,
+       35
+      ],
+      "C": [
+       9,
+       35
+      ],
+      "D": [
+       8,
+       21
+      ],
+      "decade": [
+       13,
+       50
+      ],
+      "A+A'+B": [
+       43,
+       75
+      ],
+      "C+D": [
+       17,
+       56
+      ],
+      "not in text": [
+       60,
+       131
+      ],
+      "all year-tagged": [
+       167,
+       250
+      ],
+      "all": [
+       180,
+       300
+      ]
+     },
+     "within1": {
+      "in text": [
+       112,
+       119
+      ],
+      "A": [
+       28,
+       33
+      ],
+      "A'": [
+       7,
+       7
+      ],
+      "B": [
+       22,
+       35
+      ],
+      "C": [
+       17,
+       35
+      ],
+      "D": [
+       10,
+       21
+      ],
+      "decade": [
+       20,
+       50
+      ],
+      "A+A'+B": [
+       57,
+       75
+      ],
+      "C+D": [
+       27,
+       56
+      ],
+      "not in text": [
+       84,
+       131
+      ],
+      "all year-tagged": [
+       196,
+       250
+      ],
+      "all": [
+       216,
+       300
+      ]
+     },
+     "invalid": [
+      6,
+      300
+     ],
+     "stages": {
+      "rule": 179,
+      "propagated": 87,
+      "chooser": 28,
+      "none": 6
+     },
+     "evidence": {
+      "unsupported": 24,
+      "valid": 270
+     },
+     "right_unsupported": 16,
+     "conformal": {
+      "in text": {
+       "n": 119,
+       "alpha": 0.1,
+       "q": [
+        1,
+        0
+       ],
+       "coverage": [
+        109,
+        119
+       ],
+       "width": 1.0084033613445378,
+       "winkler": 18.65546218487395,
+       "no_year": 0
+      },
+      "A+A'+B": {
+       "n": 75,
+       "alpha": 0.1,
+       "q": [
+        55,
+        46
+       ],
+       "coverage": [
+        71,
+        75
+       ],
+       "width": 101.24324324324324,
+       "winkler": 126.64864864864865,
+       "no_year": 1
+      },
+      "C+D": {
+       "n": 56,
+       "alpha": 0.1,
+       "q": [
+        Infinity,
+        73
+       ],
+       "coverage": [
+        53,
+        56
+       ],
+       "width": 146.0,
+       "winkler": 146.0,
+       "no_year": 3
+      },
+      "not in text": {
+       "n": 131,
+       "alpha": 0.1,
+       "q": [
+        50,
+        35
+       ],
+       "coverage": [
+        120,
+        131
+       ],
+       "width": 85.35433070866142,
+       "winkler": 129.4488188976378,
+       "no_year": 4
+      },
+      "all": {
+       "n": 300,
+       "alpha": 0.1,
+       "q": [
+        21,
+        29
+       ],
+       "coverage": [
+        271,
+        300
+       ],
+       "width": 50.0,
+       "winkler": 93.5374149659864,
+       "no_year": 6
+      }
+     },
+     "du": {
+      "certain_flagged_uncertain": [
+       37,
+       200
+      ],
+      "uncertain_flagged_certain": [
+       19,
+       50
+      ]
+     }
+    },
+    "reread": {
+     "n": 300,
+     "exact": {
+      "in text": [
+       128,
+       143
+      ],
+      "A": [
+       25,
+       35
+      ],
+      "A'": [
+       3,
+       8
+      ],
+      "B": [
+       6,
+       24
+      ],
+      "C": [
+       3,
+       25
+      ],
+      "D": [
+       2,
+       15
+      ],
+      "decade": [
+       13,
+       50
+      ],
+      "A+A'+B": [
+       34,
+       67
+      ],
+      "C+D": [
+       5,
+       40
+      ],
+      "not in text": [
+       39,
+       107
+      ],
+      "all year-tagged": [
+       167,
+       250
+      ],
+      "all": [
+       180,
+       300
+      ]
+     },
+     "within1": {
+      "in text": [
+       135,
+       143
+      ],
+      "A": [
+       29,
+       35
+      ],
+      "A'": [
+       5,
+       8
+      ],
+      "B": [
+       13,
+       24
+      ],
+      "C": [
+       10,
+       25
+      ],
+      "D": [
+       4,
+       15
+      ],
+      "decade": [
+       20,
+       50
+      ],
+      "A+A'+B": [
+       47,
+       67
+      ],
+      "C+D": [
+       14,
+       40
+      ],
+      "not in text": [
+       61,
+       107
+      ],
+      "all year-tagged": [
+       196,
+       250
+      ],
+      "all": [
+       216,
+       300
+      ]
+     },
+     "invalid": [
+      6,
+      300
+     ],
+     "stages": {
+      "rule": 179,
+      "propagated": 87,
+      "chooser": 28,
+      "none": 6
+     },
+     "evidence": {
+      "unsupported": 24,
+      "valid": 270
+     },
+     "right_unsupported": 16,
+     "conformal": {
+      "in text": {
+       "n": 143,
+       "alpha": 0.1,
+       "q": [
+        1,
+        1
+       ],
+       "coverage": [
+        135,
+        143
+       ],
+       "width": 2.0,
+       "winkler": 16.265734265734267,
+       "no_year": 0
+      },
+      "A+A'+B": {
+       "n": 67,
+       "alpha": 0.1,
+       "q": [
+        50,
+        50
+       ],
+       "coverage": [
+        63,
+        67
+       ],
+       "width": 100.0,
+       "winkler": 125.23076923076923,
+       "no_year": 2
+      },
+      "C+D": {
+       "n": 40,
+       "alpha": 0.1,
+       "q": [
+        34,
+        Infinity
+       ],
+       "coverage": [
+        36,
+        40
+       ],
+       "width": 68.0,
+       "winkler": 112.44444444444444,
+       "no_year": 2
+      },
+      "not in text": {
+       "n": 107,
+       "alpha": 0.1,
+       "q": [
+        55,
+        35
+       ],
+       "coverage": [
+        96,
+        107
+       ],
+       "width": 90.97087378640776,
+       "winkler": 142.4271844660194,
+       "no_year": 4
+      },
+      "all": {
+       "n": 300,
+       "alpha": 0.1,
+       "q": [
+        21,
+        29
+       ],
+       "coverage": [
+        271,
+        300
+       ],
+       "width": 50.0,
+       "winkler": 93.5374149659864,
+       "no_year": 6
+      }
+     },
+     "du": {
+      "certain_flagged_uncertain": [
+       37,
+       200
+      ],
+      "uncertain_flagged_certain": [
+       19,
+       50
+      ]
+     }
+    },
+    "per_1000": {
+     "gpu_s": 0.0,
+     "mac_s": 203.9,
+     "calls": {
+      "2b": 44
+     }
+    }
+   },
+   "fallback, Vision else the other: 2B chooser|27B trace-neigh|t=3": {
+    "corpus": {
+     "n": 300,
+     "exact": {
+      "in text": [
+       107,
+       119
+      ],
+      "A": [
+       25,
+       33
+      ],
+      "A'": [
+       5,
+       7
+      ],
+      "B": [
+       13,
+       35
+      ],
+      "C": [
+       10,
+       35
+      ],
+      "D": [
+       8,
+       21
+      ],
+      "decade": [
+       15,
+       50
+      ],
+      "A+A'+B": [
+       43,
+       75
+      ],
+      "C+D": [
+       18,
+       56
+      ],
+      "not in text": [
+       61,
+       131
+      ],
+      "all year-tagged": [
+       168,
+       250
+      ],
+      "all": [
+       183,
+       300
+      ]
+     },
+     "within1": {
+      "in text": [
+       112,
+       119
+      ],
+      "A": [
+       28,
+       33
+      ],
+      "A'": [
+       7,
+       7
+      ],
+      "B": [
+       22,
+       35
+      ],
+      "C": [
+       19,
+       35
+      ],
+      "D": [
+       10,
+       21
+      ],
+      "decade": [
+       22,
+       50
+      ],
+      "A+A'+B": [
+       57,
+       75
+      ],
+      "C+D": [
+       29,
+       56
+      ],
+      "not in text": [
+       86,
+       131
+      ],
+      "all year-tagged": [
+       198,
+       250
+      ],
+      "all": [
+       220,
+       300
+      ]
+     },
+     "invalid": [
+      0,
+      300
+     ],
+     "stages": {
+      "rule": 179,
+      "propagated": 87,
+      "chooser": 28,
+      "residue": 6
+     },
+     "evidence": {
+      "unsupported": 26,
+      "valid": 274
+     },
+     "right_unsupported": 17,
+     "conformal": {
+      "in text": {
+       "n": 119,
+       "alpha": 0.1,
+       "q": [
+        1,
+        0
+       ],
+       "coverage": [
+        109,
+        119
+       ],
+       "width": 1.0084033613445378,
+       "winkler": 18.65546218487395,
+       "no_year": 0
+      },
+      "A+A'+B": {
+       "n": 75,
+       "alpha": 0.1,
+       "q": [
+        50,
+        46
+       ],
+       "coverage": [
+        72,
+        75
+       ],
+       "width": 96.08,
+       "winkler": 121.14666666666666,
+       "no_year": 0
+      },
+      "C+D": {
+       "n": 56,
+       "alpha": 0.1,
+       "q": [
+        19,
+        73
+       ],
+       "coverage": [
+        51,
+        56
+       ],
+       "width": 92.14285714285714,
+       "winkler": 176.78571428571428,
+       "no_year": 0
+      },
+      "not in text": {
+       "n": 131,
+       "alpha": 0.1,
+       "q": [
+        20,
+        34
+       ],
+       "coverage": [
+        119,
+        131
+       ],
+       "width": 53.969465648854964,
+       "winkler": 120.83969465648855,
+       "no_year": 0
+      },
+      "all": {
+       "n": 300,
+       "alpha": 0.1,
+       "q": [
+        15,
+        21
+       ],
+       "coverage": [
+        269,
+        300
+       ],
+       "width": 36.03666666666667,
+       "winkler": 91.37,
+       "no_year": 0
+      }
+     },
+     "du": {
+      "certain_flagged_uncertain": [
+       37,
+       200
+      ],
+      "uncertain_flagged_certain": [
+       19,
+       50
+      ]
+     }
+    },
+    "reread": {
+     "n": 300,
+     "exact": {
+      "in text": [
+       128,
+       143
+      ],
+      "A": [
+       25,
+       35
+      ],
+      "A'": [
+       4,
+       8
+      ],
+      "B": [
+       6,
+       24
+      ],
+      "C": [
+       3,
+       25
+      ],
+      "D": [
+       2,
+       15
+      ],
+      "decade": [
+       15,
+       50
+      ],
+      "A+A'+B": [
+       35,
+       67
+      ],
+      "C+D": [
+       5,
+       40
+      ],
+      "not in text": [
+       40,
+       107
+      ],
+      "all year-tagged": [
+       168,
+       250
+      ],
+      "all": [
+       183,
+       300
+      ]
+     },
+     "within1": {
+      "in text": [
+       135,
+       143
+      ],
+      "A": [
+       29,
+       35
+      ],
+      "A'": [
+       6,
+       8
+      ],
+      "B": [
+       13,
+       24
+      ],
+      "C": [
+       11,
+       25
+      ],
+      "D": [
+       4,
+       15
+      ],
+      "decade": [
+       22,
+       50
+      ],
+      "A+A'+B": [
+       48,
+       67
+      ],
+      "C+D": [
+       15,
+       40
+      ],
+      "not in text": [
+       63,
+       107
+      ],
+      "all year-tagged": [
+       198,
+       250
+      ],
+      "all": [
+       220,
+       300
+      ]
+     },
+     "invalid": [
+      0,
+      300
+     ],
+     "stages": {
+      "rule": 179,
+      "propagated": 87,
+      "chooser": 28,
+      "residue": 6
+     },
+     "evidence": {
+      "unsupported": 26,
+      "valid": 274
+     },
+     "right_unsupported": 17,
+     "conformal": {
+      "in text": {
+       "n": 143,
+       "alpha": 0.1,
+       "q": [
+        1,
+        1
+       ],
+       "coverage": [
+        135,
+        143
+       ],
+       "width": 2.0,
+       "winkler": 16.265734265734267,
+       "no_year": 0
+      },
+      "A+A'+B": {
+       "n": 67,
+       "alpha": 0.1,
+       "q": [
+        46,
+        50
+       ],
+       "coverage": [
+        63,
+        67
+       ],
+       "width": 96.02985074626865,
+       "winkler": 124.08955223880596,
+       "no_year": 0
+      },
+      "C+D": {
+       "n": 40,
+       "alpha": 0.1,
+       "q": [
+        34,
+        35
+       ],
+       "coverage": [
+        37,
+        40
+       ],
+       "width": 69.1,
+       "winkler": 156.1,
+       "no_year": 0
+      },
+      "not in text": {
+       "n": 107,
+       "alpha": 0.1,
+       "q": [
+        34,
+        35
+       ],
+       "coverage": [
+        98,
+        107
+       ],
+       "width": 69.08411214953271,
+       "winkler": 133.57009345794393,
+       "no_year": 0
+      },
+      "all": {
+       "n": 300,
+       "alpha": 0.1,
+       "q": [
+        15,
+        21
+       ],
+       "coverage": [
+        269,
+        300
+       ],
+       "width": 36.03666666666667,
+       "winkler": 91.37,
+       "no_year": 0
+      }
+     },
+     "du": {
+      "certain_flagged_uncertain": [
+       37,
+       200
+      ],
+      "uncertain_flagged_certain": [
+       19,
+       50
+      ]
+     }
+    },
+    "per_1000": {
+     "gpu_s": 19.6,
+     "mac_s": 203.9,
+     "calls": {
+      "2b": 44,
+      "trace-neigh": 6
+     }
+    }
+   }
+  },
+  "classes": {
+   "corpus": {
+    "in text": 119,
+    "A": 33,
+    "C": 35,
+    "D": 21,
+    "B": 35,
+    "A'": 7,
+    "decade": 50
+   },
+   "reread": {
+    "in text": 143,
+    "A": 35,
+    "C": 25,
+    "B": 24,
+    "A'": 8,
+    "D": 15,
+    "decade": 50
+   }
+  },
+  "moved": {
+   "D -> in text": 5,
+   "B -> in text": 10,
+   "A' -> A": 3,
+   "A -> in text": 4,
+   "B -> A'": 3,
+   "C -> in text": 5,
+   "C -> B": 4,
+   "B -> A": 2,
+   "D -> A": 1,
+   "C -> A'": 1
+  },
+  "cost": {
+   "choose": {
+    "gpu_s_per_reply": 0.4231392239529816,
+    "n": 44
+   },
+   "trace-neigh": {
+    "gpu_s_per_reply": 0.9796062471535627,
+    "n": 300
+   }
+  }
  }
 }
