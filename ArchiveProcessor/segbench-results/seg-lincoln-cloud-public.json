@@ -503,10 +503,109 @@
        "mndd_per_100_pages": 4.980842911877395
       }
      }
+    },
+    "window-cues-claude-cue": {
+     "counts": {
+      "pages": 261,
+      "doc_pages": 261,
+      "pages_exact": 235,
+      "docs": 81,
+      "docs_exact": 79,
+      "folders": 1,
+      "folders_perfect": 0,
+      "gaps": 260,
+      "truth_bounds": 80,
+      "tp": 80,
+      "false_splits": 2,
+      "false_merges": 0,
+      "edits": 2,
+      "photos": 0,
+      "photos_exact": 0,
+      "photo_type_swaps": 0,
+      "photos_missed": 0,
+      "false_photos": 0,
+      "pk_windows": 259,
+      "pk_errors": 2,
+      "wd_errors": 4,
+      "pred_docs": 83,
+      "pq_tp": 81,
+      "pq_iou": 80.70454545454545,
+      "mndd": 2,
+      "collections": [
+       "Lincoln"
+      ]
+     },
+     "metrics": {
+      "collections": "Lincoln",
+      "pages": 261,
+      "doc_pages": 261,
+      "docs": 81,
+      "pages_in_exact_doc": 0.9003831417624522,
+      "docs_exact": 0.9753086419753086,
+      "folders": 1,
+      "folders_perfect": 0.0,
+      "false_splits": 2,
+      "false_merges": 0,
+      "boundary_precision": 0.975609756097561,
+      "boundary_recall": 1.0,
+      "boundary_f1": 0.9876543209876543,
+      "pk": 0.007722007722007722,
+      "windowdiff": 0.015444015444015444,
+      "edits_per_100_pages": 0.7662835249042146,
+      "photos": 0,
+      "photo_accuracy": null,
+      "photo_type_swaps": 0,
+      "photos_missed": 0,
+      "false_photos": 0,
+      "kappa": 0.9820689655172414,
+      "doc_precision": 0.9518072289156626,
+      "doc_f1": 0.9634146341463414,
+      "pq": 0.9842017738359201,
+      "rq": 0.9878048780487805,
+      "sq": 0.9963524130190796,
+      "stp": 0.0,
+      "mndd": 2,
+      "mndd_per_100_pages": 0.7662835249042146
+     },
+     "review_load": 19,
+     "prior": {
+      "count": 72,
+      "metrics": {
+       "collections": "Lincoln",
+       "pages": 261,
+       "doc_pages": 261,
+       "docs": 81,
+       "pages_in_exact_doc": 0.7969348659003831,
+       "docs_exact": 0.7777777777777778,
+       "folders": 1,
+       "folders_perfect": 0.0,
+       "false_splits": 0,
+       "false_merges": 9,
+       "boundary_precision": 1.0,
+       "boundary_recall": 0.8875,
+       "boundary_f1": 0.9403973509933775,
+       "pk": 0.03474903474903475,
+       "windowdiff": 0.0694980694980695,
+       "edits_per_100_pages": 3.4482758620689653,
+       "photos": 0,
+       "photo_accuracy": null,
+       "photo_type_swaps": 0,
+       "photos_missed": 0,
+       "false_photos": 0,
+       "kappa": 0.9161290322580645,
+       "doc_precision": 0.875,
+       "doc_f1": 0.823529411764706,
+       "pq": 0.8714596949891068,
+       "rq": 0.8888888888888888,
+       "sq": 0.9803921568627452,
+       "stp": 0.0,
+       "mndd": 13,
+       "mndd_per_100_pages": 4.980842911877395
+      }
+     }
     }
    },
    "missing": {
-    "window-cues-claude-cue": "Lincoln: window 1-4 not collected; run `method_window.py collect` first",
     "window-cues-codex": "Lincoln: window 1-4 not collected; run `method_window.py collect` first",
     "window-cues-codex-cue": "Lincoln: window 1-4 not collected; run `method_window.py collect` first"
    }
@@ -1017,7 +1116,7 @@
     }
    },
    "missing": {
-    "window-cues-claude-cue": "CREST: window 1-4 not collected; run `method_window.py collect` first",
+    "window-cues-claude-cue": "CREST: window 97-103 not collected; run `method_window.py collect` first",
     "window-cues-codex": "CREST: window 1-4 not collected; run `method_window.py collect` first",
     "window-cues-codex-cue": "CREST: window 1-4 not collected; run `method_window.py collect` first"
    }

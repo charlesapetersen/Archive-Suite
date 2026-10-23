@@ -16,8 +16,8 @@ Made by `scripts/segbench/rescore.py` (owner, public, report) from the response 
 | window-or-glm5.3-flash | window, OpenRouter | 90.2% | 0.937 | 0.027 | 0.027 | 0.952 | 0.958 | 0.994 | 0.942 | 66.7% | 4.0 |
 | window-or-fs-qwen3.5-27b | window, FarmShare | 90.2% | 0.933 | 0.029 | 0.029 | 0.956 | 0.963 | 0.993 | 0.941 | 66.7% | 3.8 |
 | window-or-gpt5.6-luna | window, OpenRouter | 90.0% | 0.945 | 0.024 | 0.024 | 0.958 | 0.967 | 0.991 | 0.942 | 66.7% | 3.6 |
-| window-local-seg-date-2b-8bit | window, Mac local | 89.4% | 0.921 | 0.035 | 0.035 | 0.935 | 0.941 | 0.993 | 0.919 | 50.0% | 4.2 |
 | whole-gemini-c10 | whole folder, Gemini API | 89.4% | 0.941 | 0.026 | 0.026 | 0.954 | 0.962 | 0.991 | 0.937 | 62.5% | 3.8 |
+| window-local-seg-date-2b-8bit | window, Mac local | 89.4% | 0.921 | 0.035 | 0.035 | 0.935 | 0.941 | 0.993 | 0.919 | 50.0% | 4.2 |
 | window-or-fs-seg-4b | window, FarmShare | 89.2% | 0.941 | 0.026 | 0.026 | 0.956 | 0.965 | 0.990 | 0.937 | 58.3% | 3.8 |
 | window-local-seg-4b-8bit | window, Mac local | 87.8% | 0.929 | 0.031 | 0.031 | 0.946 | 0.954 | 0.992 | 0.929 | 58.3% | 4.5 |
 | spring-v1 | spring 2026 Gemini (own photo labels) | 86.9% | 0.890 | 0.053 | 0.053 | 0.921 | 0.926 | 0.994 | 0.901 | 45.8% | 5.1 |
@@ -59,6 +59,8 @@ Made by `scripts/segbench/rescore.py` (owner, public, report) from the response 
 
 | source | family | pages exact | kappa | Pk | WD | PQ | RQ | SQ | doc F1 | STP | MNDD/100 p |
 |---|---|---|---|---|---|---|---|---|---|---|---|
+| window-cues-claude | window, subscription | 90.0% | 0.973 | 0.004 | 0.023 | 0.956 | 0.957 | 0.999 | 0.944 | 0.0% | 1.1 |
+| window-cues-claude-cue | window, subscription | 90.0% | 0.982 | 0.008 | 0.015 | 0.984 | 0.988 | 0.996 | 0.963 | 0.0% | 0.8 |
 | window-or-fs-seg-4b | window, FarmShare | 46.7% | 0.722 | 0.089 | 0.255 | 0.643 | 0.688 | 0.935 | 0.490 | 0.0% | 13.4 |
 | window-or-fs-qwen3.5-27b | window, FarmShare | 39.5% | 0.683 | 0.093 | 0.301 | 0.579 | 0.624 | 0.928 | 0.426 | 0.0% | 15.7 |
 | window-or-fs-seg-2b | window, FarmShare | 34.9% | 0.638 | 0.100 | 0.332 | 0.517 | 0.559 | 0.925 | 0.373 | 0.0% | 17.6 |
@@ -76,6 +78,7 @@ Made by `scripts/segbench/rescore.py` (owner, public, report) from the response 
 | window-or-fs-qwen3.5-27b | window, FarmShare | 95.3% | 0.957 | 0.008 | 0.032 | 0.930 | 0.938 | 0.992 | 0.906 | 0.0% | 1.6 |
 | window-or-fs-seg-2b | window, FarmShare | 91.4% | 0.913 | 0.032 | 0.056 | 0.860 | 0.871 | 0.988 | 0.839 | 0.0% | 3.9 |
 | window-or-fs-seg-date-2b | window, FarmShare | 85.2% | 0.935 | 0.016 | 0.048 | 0.908 | 0.921 | 0.986 | 0.857 | 0.0% | 2.3 |
+| window-cues-claude | window, subscription | 84.4% | 0.937 | 0.016 | 0.048 | 0.913 | 0.923 | 0.989 | 0.862 | 0.0% | 2.3 |
 | rule-cues | baseline | 11.7% | 0.074 | 0.524 | 0.817 | 0.162 | 0.166 | 0.979 | 0.152 | 0.0% | 65.6 |
 | all-new | baseline | 7.0% | 0.000 | 0.595 | 0.937 | 0.113 | 0.113 | 1.000 | 0.113 | 0.0% | 75.8 |
 | rule-cues-sketch | baseline | 7.0% | 0.041 | 0.556 | 0.889 | 0.119 | 0.119 | 1.000 | 0.119 | 0.0% | 71.9 |
@@ -117,18 +120,24 @@ Each source's per-gap P(new) ranked, and exactly `count − streams` document ga
 
 | box | source | count | as answered: pages exact | with the prior | PQ as answered | PQ with the prior |
 |---|---|---|---|---|---|---|
+| Lincoln | window-cues-claude | 72 (finding aid) | 90.0% | 81.2% | 0.956 | 0.862 |
+| Lincoln | window-cues-claude-cue | 72 (finding aid) | 90.0% | 79.7% | 0.984 | 0.871 |
 | Lincoln | window-or-fs-qwen3.5-27b | 72 (finding aid) | 39.5% | 45.2% | 0.579 | 0.697 |
 | Lincoln | window-or-fs-seg-2b | 72 (finding aid) | 34.9% | 36.0% | 0.517 | 0.542 |
 | Lincoln | window-or-fs-seg-4b | 72 (finding aid) | 46.7% | 57.9% | 0.643 | 0.694 |
 | Lincoln | window-or-fs-seg-date-2b | 72 (finding aid) | 34.1% | 41.8% | 0.529 | 0.568 |
+| CREST | window-cues-claude | 22 (finding aid) | 84.4% | 55.5% | 0.913 | 0.728 |
 | CREST | window-or-fs-qwen3.5-27b | 22 (finding aid) | 95.3% | 48.4% | 0.930 | 0.756 |
 | CREST | window-or-fs-seg-2b | 22 (finding aid) | 91.4% | 32.8% | 0.860 | 0.719 |
 | CREST | window-or-fs-seg-4b | 22 (finding aid) | 98.4% | 54.7% | 0.952 | 0.686 |
 | CREST | window-or-fs-seg-date-2b | 22 (finding aid) | 85.2% | 45.3% | 0.908 | 0.719 |
+| Lincoln | window-cues-claude | 81 (oracle) | 90.0% | 88.5% | 0.956 | 0.938 |
+| Lincoln | window-cues-claude-cue | 81 (oracle) | 90.0% | 90.8% | 0.984 | 0.975 |
 | Lincoln | window-or-fs-qwen3.5-27b | 81 (oracle) | 39.5% | 55.6% | 0.579 | 0.753 |
 | Lincoln | window-or-fs-seg-2b | 81 (oracle) | 34.9% | 50.2% | 0.517 | 0.623 |
 | Lincoln | window-or-fs-seg-4b | 81 (oracle) | 46.7% | 62.8% | 0.643 | 0.763 |
 | Lincoln | window-or-fs-seg-date-2b | 81 (oracle) | 34.1% | 49.8% | 0.529 | 0.625 |
+| CREST | window-cues-claude | 31 (oracle) | 84.4% | 87.5% | 0.913 | 0.933 |
 | CREST | window-or-fs-qwen3.5-27b | 31 (oracle) | 95.3% | 92.2% | 0.930 | 0.954 |
 | CREST | window-or-fs-seg-2b | 31 (oracle) | 91.4% | 91.4% | 0.860 | 0.860 |
 | CREST | window-or-fs-seg-4b | 31 (oracle) | 98.4% | 93.8% | 0.952 | 0.930 |
@@ -148,8 +157,8 @@ Development boxes, the oracle count (pooled):
 | window-or-glm5.3-flash | 90.2% | 85.5% | -4.6 pts |
 | window-or-fs-qwen3.5-27b | 90.2% | 88.8% | -1.4 pts |
 | window-or-gpt5.6-luna | 90.0% | 89.2% | -0.8 pts |
-| window-local-seg-date-2b-8bit | 89.4% | 85.7% | -3.7 pts |
 | whole-gemini-c10 | 89.4% | 90.3% | +1.0 pts |
+| window-local-seg-date-2b-8bit | 89.4% | 85.7% | -3.7 pts |
 | window-or-fs-seg-4b | 89.2% | 87.1% | -2.1 pts |
 | window-local-seg-4b-8bit | 87.8% | 87.6% | -0.2 pts |
 | window-local-seg-4b | 86.5% | 85.1% | -1.4 pts |
@@ -160,5 +169,5 @@ Development boxes, the oracle count (pooled):
 
 ## Sources with an incomplete cache somewhere
 
-Not collected on every box (each box lists only what it holds): whole-gemini (Lincoln, CREST), whole-gemini-c10 (Stanton, RG165, Lincoln, CREST), window-claude (Lincoln, CREST), window-cues-claude (Dean, Herrnstein, Stanton, RG165, Lincoln, CREST), window-cues-codex (Lincoln, CREST), window-cues-opus (Dean, Herrnstein, Stanton, RG165, Lincoln, CREST), window-gemini-3.1-flash-lite-minimal (Stanton, RG165, Lincoln, CREST), window-gemini-3.5-flash-lite-minimal (Dean, Herrnstein, Stanton, RG165, Lincoln, CREST), window-gemini-3.8-flash-high (Dean, Herrnstein, Stanton, RG165, Lincoln, CREST), window-gemini-3.8-flash-low (Lincoln, CREST), window-local-gemma4-12b (Dean, Herrnstein, Stanton, RG165, Lincoln, CREST), window-local-qwen3-vl-8b (Dean, Herrnstein, Stanton, RG165, Lincoln, CREST), window-local-qwen3.5-4b (Dean, Herrnstein, Stanton, RG165, Lincoln, CREST), window-local-seg-2b (Stanton, RG165, Lincoln, CREST), window-local-seg-2b-8bit (Stanton, RG165, Lincoln, CREST), window-local-seg-4b (Stanton, RG165, Lincoln, CREST), window-local-seg-4b-8bit (Stanton, RG165, Lincoln, CREST), window-local-seg-date-2b-8bit (Stanton, RG165, Lincoln, CREST), window-or-fs-qwen3.5-2b (Dean, Deaver, Herrnstein, Stanton, RG165, Lincoln, CREST), window-or-fs-qwen3.5-4b (Stanton, RG165, Lincoln, CREST), window-or-fs-seg-4b-pilot (Stanton, RG165, Lincoln, CREST), window-or-fs-seg-date-2b (Dean, Deaver, Herrnstein, Stanton, RG165), window-or-gemini3.1-flash-lite (Dean, Herrnstein, Stanton, RG165, Lincoln, CREST), window-or-gemini3.5-flash-lite (Dean, Herrnstein, Stanton, RG165, Lincoln, CREST), window-or-gemma4-26b-a4b (Dean, Herrnstein, Stanton, RG165, Lincoln, CREST), window-or-gemma4-31b (Dean, Herrnstein, Stanton, RG165, Lincoln, CREST), window-or-glm5.3-flash (Lincoln, CREST), window-or-gpt5.4-mini (Dean, Deaver, Herrnstein, Stanton, RG165, Lincoln, CREST), window-or-gpt5.4-nano (Dean, Herrnstein, Stanton, RG165, Lincoln, CREST), window-or-gpt5.6-luna (Lincoln, CREST), window-or-llama4-maverick (Dean, Herrnstein, Stanton, RG165, Lincoln, CREST), window-or-mistral-small (Dean, Deaver, Herrnstein, Stanton, RG165, Lincoln, CREST), window-or-qwen3.5-122b-a10b (Dean, Herrnstein, Stanton, RG165, Lincoln, CREST), window-or-qwen3.5-27b (Dean, Herrnstein, Stanton, RG165, Lincoln, CREST), window-or-qwen3.5-flash (Lincoln, CREST), window-or-qwen3.6-35b-a3b (Dean, Herrnstein, Stanton, RG165, Lincoln, CREST), window-or-qwen3.6-35b-a3b-fp4 (Dean, Herrnstein, Stanton, RG165, Lincoln, CREST), window-or-qwen3.6-flash (Dean, Herrnstein, Stanton, RG165, Lincoln, CREST).
+Not collected on every box (each box lists only what it holds): whole-gemini (Lincoln, CREST), whole-gemini-c10 (Stanton, RG165, Lincoln, CREST), window-claude (Lincoln, CREST), window-cues-claude (Dean, Herrnstein, Stanton, RG165), window-cues-claude-cue (CREST), window-cues-codex (Lincoln, CREST), window-cues-codex-cue (Lincoln, CREST), window-cues-opus (Dean, Herrnstein, Stanton, RG165, Lincoln, CREST), window-gemini-3.1-flash-lite-minimal (Stanton, RG165, Lincoln, CREST), window-gemini-3.5-flash-lite-minimal (Dean, Herrnstein, Stanton, RG165, Lincoln, CREST), window-gemini-3.8-flash-high (Dean, Herrnstein, Stanton, RG165, Lincoln, CREST), window-gemini-3.8-flash-low (Lincoln, CREST), window-local-gemma4-12b (Dean, Herrnstein, Stanton, RG165, Lincoln, CREST), window-local-qwen3-vl-8b (Dean, Herrnstein, Stanton, RG165, Lincoln, CREST), window-local-qwen3.5-4b (Dean, Herrnstein, Stanton, RG165, Lincoln, CREST), window-local-seg-2b (Stanton, RG165, Lincoln, CREST), window-local-seg-2b-8bit (Stanton, RG165, Lincoln, CREST), window-local-seg-4b (Stanton, RG165, Lincoln, CREST), window-local-seg-4b-8bit (Stanton, RG165, Lincoln, CREST), window-local-seg-date-2b-8bit (Stanton, RG165, Lincoln, CREST), window-or-fs-qwen3.5-2b (Dean, Deaver, Herrnstein, Stanton, RG165, Lincoln, CREST), window-or-fs-qwen3.5-4b (Stanton, RG165, Lincoln, CREST), window-or-fs-seg-4b-pilot (Stanton, RG165, Lincoln, CREST), window-or-fs-seg-date-2b (Dean, Deaver, Herrnstein, Stanton, RG165), window-or-gemini3.1-flash-lite (Dean, Herrnstein, Stanton, RG165, Lincoln, CREST), window-or-gemini3.5-flash-lite (Dean, Herrnstein, Stanton, RG165, Lincoln, CREST), window-or-gemma4-26b-a4b (Dean, Herrnstein, Stanton, RG165, Lincoln, CREST), window-or-gemma4-31b (Dean, Herrnstein, Stanton, RG165, Lincoln, CREST), window-or-glm5.3-flash (Lincoln, CREST), window-or-gpt5.4-mini (Dean, Deaver, Herrnstein, Stanton, RG165, Lincoln, CREST), window-or-gpt5.4-nano (Dean, Herrnstein, Stanton, RG165, Lincoln, CREST), window-or-gpt5.6-luna (Lincoln, CREST), window-or-llama4-maverick (Dean, Herrnstein, Stanton, RG165, Lincoln, CREST), window-or-mistral-small (Dean, Deaver, Herrnstein, Stanton, RG165, Lincoln, CREST), window-or-qwen3.5-122b-a10b (Dean, Herrnstein, Stanton, RG165, Lincoln, CREST), window-or-qwen3.5-27b (Dean, Herrnstein, Stanton, RG165, Lincoln, CREST), window-or-qwen3.5-flash (Lincoln, CREST), window-or-qwen3.6-35b-a3b (Dean, Herrnstein, Stanton, RG165, Lincoln, CREST), window-or-qwen3.6-35b-a3b-fp4 (Dean, Herrnstein, Stanton, RG165, Lincoln, CREST), window-or-qwen3.6-flash (Dean, Herrnstein, Stanton, RG165, Lincoln, CREST).
 
