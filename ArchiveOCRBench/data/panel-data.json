@@ -22536,5 +22536,807 @@
     "p": 0.81532
    }
   ]
+ },
+ "loops": {
+  "report": "bench-corpus/loop-rerun-20261021.md",
+  "retry_first": [
+   "ngram",
+   "half",
+   "second",
+   "kraken-ppocrv6",
+   "ppocrv6"
+  ],
+  "reader_first": [
+   "kraken-ppocrv6",
+   "second",
+   "ngram",
+   "ppocrv6"
+  ],
+  "public895": [
+   {
+    "route": "glm-ocr",
+    "caps": 215,
+    "arms": {
+     "ngram": {
+      "nes": 0.2676,
+      "ok": 208,
+      "n": 215
+     },
+     "half": {
+      "nes": 0.029,
+      "ok": 45,
+      "n": 215
+     },
+     "second": {
+      "nes": 0.4747,
+      "ok": 176,
+      "n": 215
+     },
+     "kraken-ppocrv6": {
+      "nes": 0.7066,
+      "ok": 78,
+      "n": 78
+     },
+     "ppocrv6": {
+      "nes": 0.1336,
+      "ok": 215,
+      "n": 215
+     },
+     "cascade": {
+      "nes": 0.2871,
+      "ok": 215,
+      "n": 215
+     },
+     "cascade-readers": {
+      "nes": 0.5645,
+      "ok": 215,
+      "n": 215
+     }
+    },
+    "before": 0.4861,
+    "after_cascade": 0.5551,
+    "after_cascade-readers": 0.6217,
+    "gpu_s": {
+     "ngram": 422.36,
+     "half": 1064.29
+    }
+   },
+   {
+    "route": "lightonocr3-4b",
+    "caps": 76,
+    "arms": {
+     "ngram": {
+      "nes": 0.3197,
+      "ok": 76,
+      "n": 76
+     },
+     "half": {
+      "nes": 0.0692,
+      "ok": 19,
+      "n": 76
+     },
+     "second": {
+      "nes": 0.2782,
+      "ok": 46,
+      "n": 76
+     },
+     "kraken-ppocrv6": {
+      "nes": 0.6741,
+      "ok": 17,
+      "n": 17
+     },
+     "ppocrv6": {
+      "nes": 0.1241,
+      "ok": 76,
+      "n": 76
+     },
+     "cascade": {
+      "nes": 0.3197,
+      "ok": 76,
+      "n": 76
+     },
+     "cascade-readers": {
+      "nes": 0.4512,
+      "ok": 76,
+      "n": 76
+     }
+    },
+    "before": 0.6288,
+    "after_cascade": 0.6559,
+    "after_cascade-readers": 0.6671,
+    "gpu_s": {
+     "ngram": 196.49,
+     "half": 933.52
+    }
+   },
+   {
+    "route": "lightonocr3-0.8b",
+    "caps": 145,
+    "arms": {
+     "ngram": {
+      "nes": 0.2934,
+      "ok": 143,
+      "n": 145
+     },
+     "half": {
+      "nes": 0.0853,
+      "ok": 38,
+      "n": 145
+     },
+     "second": {
+      "nes": 0.2594,
+      "ok": 86,
+      "n": 145
+     },
+     "kraken-ppocrv6": {
+      "nes": 0.6247,
+      "ok": 61,
+      "n": 61
+     },
+     "ppocrv6": {
+      "nes": 0.1497,
+      "ok": 144,
+      "n": 145
+     },
+     "cascade": {
+      "nes": 0.2946,
+      "ok": 145,
+      "n": 145
+     },
+     "cascade-readers": {
+      "nes": 0.4334,
+      "ok": 145,
+      "n": 145
+     }
+    },
+    "before": 0.5666,
+    "after_cascade": 0.6144,
+    "after_cascade-readers": 0.6369,
+    "gpu_s": {
+     "ngram": 180.42,
+     "half": 497.34
+    }
+   },
+   {
+    "route": "paddleocr-vl1.5",
+    "caps": 350,
+    "arms": {
+     "ngram": {
+      "nes": 0.2024,
+      "ok": 346,
+      "n": 350
+     },
+     "half": {
+      "nes": 0.0617,
+      "ok": 62,
+      "n": 350
+     },
+     "second": {
+      "nes": 0.4745,
+      "ok": 285,
+      "n": 350
+     },
+     "kraken-ppocrv6": {
+      "nes": 0.6396,
+      "ok": 223,
+      "n": 223
+     },
+     "ppocrv6": {
+      "nes": 0.2238,
+      "ok": 350,
+      "n": 350
+     },
+     "cascade": {
+      "nes": 0.2087,
+      "ok": 350,
+      "n": 350
+     },
+     "cascade-readers": {
+      "nes": 0.534,
+      "ok": 350,
+      "n": 350
+     }
+    },
+    "before": 0.3885,
+    "after_cascade": 0.4702,
+    "after_cascade-readers": 0.5974,
+    "gpu_s": {
+     "ngram": 193.74,
+     "half": 846.5
+    }
+   },
+   {
+    "route": "qwen3-vl-8b",
+    "caps": 236,
+    "arms": {
+     "ngram": {
+      "nes": 0.2739,
+      "ok": 192,
+      "n": 236
+     },
+     "half": {
+      "nes": 0.081,
+      "ok": 39,
+      "n": 236
+     },
+     "second": {
+      "nes": 0.3676,
+      "ok": 173,
+      "n": 236
+     },
+     "kraken-ppocrv6": {
+      "nes": 0.6262,
+      "ok": 129,
+      "n": 129
+     },
+     "ppocrv6": {
+      "nes": 0.1908,
+      "ok": 236,
+      "n": 236
+     },
+     "cascade": {
+      "nes": 0.3322,
+      "ok": 236,
+      "n": 236
+     },
+     "cascade-readers": {
+      "nes": 0.5119,
+      "ok": 236,
+      "n": 236
+     }
+    },
+    "before": 0.5325,
+    "after_cascade": 0.6201,
+    "after_cascade-readers": 0.6675,
+    "gpu_s": {
+     "ngram": 3142.68,
+     "half": 6475.89
+    }
+   },
+   {
+    "route": "qwen3.5-4b",
+    "caps": 247,
+    "arms": {
+     "ngram": {
+      "nes": 0.2785,
+      "ok": 242,
+      "n": 247
+     },
+     "half": {
+      "nes": 0.0675,
+      "ok": 38,
+      "n": 247
+     },
+     "second": {
+      "nes": 0.3797,
+      "ok": 182,
+      "n": 247
+     },
+     "kraken-ppocrv6": {
+      "nes": 0.6793,
+      "ok": 128,
+      "n": 128
+     },
+     "ppocrv6": {
+      "nes": 0.1775,
+      "ok": 247,
+      "n": 247
+     },
+     "cascade": {
+      "nes": 0.2849,
+      "ok": 247,
+      "n": 247
+     },
+     "cascade-readers": {
+      "nes": 0.5194,
+      "ok": 247,
+      "n": 247
+     }
+    },
+    "before": 0.5104,
+    "after_cascade": 0.5891,
+    "after_cascade-readers": 0.6537,
+    "gpu_s": {
+     "ngram": 802.21,
+     "half": 3661.83
+    }
+   },
+   {
+    "route": "qwen3.6-27b",
+    "caps": 97,
+    "arms": {
+     "ngram": {
+      "nes": 0.3919,
+      "ok": 96,
+      "n": 97
+     },
+     "half": {
+      "nes": 0.1692,
+      "ok": 42,
+      "n": 97
+     },
+     "second": {
+      "nes": 0.3084,
+      "ok": 65,
+      "n": 97
+     },
+     "kraken-ppocrv6": {
+      "nes": 0.5556,
+      "ok": 55,
+      "n": 55
+     },
+     "ppocrv6": {
+      "nes": 0.2011,
+      "ok": 97,
+      "n": 97
+     },
+     "cascade": {
+      "nes": 0.3923,
+      "ok": 97,
+      "n": 97
+     },
+     "cascade-readers": {
+      "nes": 0.478,
+      "ok": 97,
+      "n": 97
+     }
+    },
+    "before": 0.6326,
+    "after_cascade": 0.6751,
+    "after_cascade-readers": 0.6844,
+    "gpu_s": {
+     "ngram": 1118.42,
+     "half": 2937.91
+    }
+   },
+   {
+    "route": "qwen3.5-27b",
+    "caps": 131,
+    "arms": {
+     "ngram": {
+      "nes": 0.3375,
+      "ok": 128,
+      "n": 131
+     },
+     "half": {
+      "nes": 0.0986,
+      "ok": 35,
+      "n": 131
+     },
+     "second": {
+      "nes": 0.2864,
+      "ok": 87,
+      "n": 131
+     },
+     "kraken-ppocrv6": {
+      "nes": 0.5843,
+      "ok": 76,
+      "n": 76
+     },
+     "ppocrv6": {
+      "nes": 0.1899,
+      "ok": 131,
+      "n": 131
+     },
+     "cascade": {
+      "nes": 0.3448,
+      "ok": 131,
+      "n": 131
+     },
+     "cascade-readers": {
+      "nes": 0.4791,
+      "ok": 131,
+      "n": 131
+     }
+    },
+    "before": 0.6218,
+    "after_cascade": 0.6723,
+    "after_cascade-readers": 0.692,
+    "gpu_s": {
+     "ngram": 447.07,
+     "half": 4752.07
+    }
+   },
+   {
+    "route": "qwen3.6-35b-a3b",
+    "caps": 76,
+    "arms": {
+     "ngram": {
+      "nes": 0.3807,
+      "ok": 75,
+      "n": 76
+     },
+     "half": {
+      "nes": 0.1342,
+      "ok": 33,
+      "n": 76
+     },
+     "second": {
+      "nes": 0.3068,
+      "ok": 47,
+      "n": 76
+     },
+     "kraken-ppocrv6": {
+      "nes": 0.6286,
+      "ok": 43,
+      "n": 44
+     },
+     "ppocrv6": {
+      "nes": 0.194,
+      "ok": 76,
+      "n": 76
+     },
+     "cascade": {
+      "nes": 0.3819,
+      "ok": 76,
+      "n": 76
+     },
+     "cascade-readers": {
+      "nes": 0.5109,
+      "ok": 76,
+      "n": 76
+     }
+    },
+    "before": 0.639,
+    "after_cascade": 0.6715,
+    "after_cascade-readers": 0.6824,
+    "gpu_s": {
+     "ngram": 321.7,
+     "half": 849.74
+    }
+   },
+   {
+    "route": "ling3-flash-vl-fp8",
+    "caps": 79,
+    "arms": {
+     "second": {
+      "nes": 0.2142,
+      "ok": 41,
+      "n": 79
+     },
+     "kraken-ppocrv6": {
+      "nes": 0.5272,
+      "ok": 40,
+      "n": 40
+     },
+     "ppocrv6": {
+      "nes": 0.161,
+      "ok": 79,
+      "n": 79
+     },
+     "cascade": {
+      "nes": 0.3028,
+      "ok": 79,
+      "n": 79
+     },
+     "cascade-readers": {
+      "nes": 0.357,
+      "ok": 79,
+      "n": 79
+     }
+    },
+    "before": 0.6023,
+    "after_cascade": 0.6291,
+    "after_cascade-readers": 0.6338,
+    "gpu_s": {
+     "ngram": null,
+     "half": null
+    }
+   }
+  ],
+  "truth96": [
+   {
+    "route": "t96-glm-ocr",
+    "caps": 1,
+    "arms": {
+     "ngram": {
+      "nes": 0.5504,
+      "ok": 1,
+      "n": 1
+     },
+     "half": {
+      "nes": 0.5149,
+      "ok": 1,
+      "n": 1
+     },
+     "second": {
+      "nes": 0.6785,
+      "ok": 1,
+      "n": 1
+     },
+     "kraken-ppocrv6": {
+      "nes": 0.9241,
+      "ok": 1,
+      "n": 1
+     },
+     "ppocrv6": {
+      "nes": 0.5297,
+      "ok": 1,
+      "n": 1
+     },
+     "cascade": {
+      "nes": 0.5504,
+      "ok": 1,
+      "n": 1
+     },
+     "cascade-readers": {
+      "nes": 0.9241,
+      "ok": 1,
+      "n": 1
+     }
+    }
+   },
+   {
+    "route": "t96-lightonocr3-0.8b",
+    "caps": 1,
+    "arms": {
+     "ngram": {
+      "nes": 0.3631,
+      "ok": 1,
+      "n": 1
+     },
+     "half": {
+      "nes": 0.5873,
+      "ok": 1,
+      "n": 1
+     },
+     "second": {
+      "nes": 0.756,
+      "ok": 1,
+      "n": 1
+     },
+     "kraken-ppocrv6": {
+      "nes": 0.0,
+      "ok": 1,
+      "n": 1
+     },
+     "ppocrv6": {
+      "nes": 0.2976,
+      "ok": 1,
+      "n": 1
+     },
+     "cascade": {
+      "nes": 0.3631,
+      "ok": 1,
+      "n": 1
+     },
+     "cascade-readers": {
+      "nes": 0.0,
+      "ok": 1,
+      "n": 1
+     }
+    }
+   },
+   {
+    "route": "t96-paddleocr-vl1.5",
+    "caps": 11,
+    "arms": {
+     "ngram": {
+      "nes": 0.5839,
+      "ok": 11,
+      "n": 11
+     },
+     "half": {
+      "nes": 0.2298,
+      "ok": 4,
+      "n": 11
+     },
+     "second": {
+      "nes": 0.7765,
+      "ok": 11,
+      "n": 11
+     },
+     "kraken-ppocrv6": {
+      "nes": 0.626,
+      "ok": 11,
+      "n": 11
+     },
+     "ppocrv6": {
+      "nes": 0.5224,
+      "ok": 11,
+      "n": 11
+     },
+     "cascade": {
+      "nes": 0.5839,
+      "ok": 11,
+      "n": 11
+     },
+     "cascade-readers": {
+      "nes": 0.626,
+      "ok": 11,
+      "n": 11
+     }
+    }
+   },
+   {
+    "route": "t96-qwen3-vl-8b",
+    "caps": 1,
+    "arms": {
+     "ngram": {
+      "nes": 0.4651,
+      "ok": 1,
+      "n": 1
+     },
+     "half": {
+      "nes": 0.5694,
+      "ok": 1,
+      "n": 1
+     },
+     "second": {
+      "nes": 0.6709,
+      "ok": 1,
+      "n": 1
+     },
+     "kraken-ppocrv6": {
+      "nes": 0.5523,
+      "ok": 1,
+      "n": 1
+     },
+     "ppocrv6": {
+      "nes": 0.5323,
+      "ok": 1,
+      "n": 1
+     },
+     "cascade": {
+      "nes": 0.4651,
+      "ok": 1,
+      "n": 1
+     },
+     "cascade-readers": {
+      "nes": 0.5523,
+      "ok": 1,
+      "n": 1
+     }
+    }
+   },
+   {
+    "route": "t96-qwen3.5-4b",
+    "caps": 1,
+    "arms": {
+     "ngram": {
+      "nes": 0.2553,
+      "ok": 1,
+      "n": 1
+     },
+     "half": {
+      "nes": 0.0,
+      "ok": 0,
+      "n": 1
+     },
+     "second": {
+      "nes": 0.3331,
+      "ok": 1,
+      "n": 1
+     },
+     "kraken-ppocrv6": {
+      "nes": 0.9254,
+      "ok": 1,
+      "n": 1
+     },
+     "ppocrv6": {
+      "nes": 0.4424,
+      "ok": 1,
+      "n": 1
+     },
+     "cascade": {
+      "nes": 0.2553,
+      "ok": 1,
+      "n": 1
+     },
+     "cascade-readers": {
+      "nes": 0.9254,
+      "ok": 1,
+      "n": 1
+     }
+    }
+   },
+   {
+    "route": "mlx-qwen3-vl-8b-4bit",
+    "caps": 3,
+    "arms": {
+     "ngram": {
+      "nes": 0.7581,
+      "ok": 3,
+      "n": 3
+     },
+     "half": {
+      "nes": 0.8747,
+      "ok": 3,
+      "n": 3
+     },
+     "second": {
+      "nes": 0.833,
+      "ok": 3,
+      "n": 3
+     },
+     "kraken-ppocrv6": {
+      "nes": 0.731,
+      "ok": 3,
+      "n": 3
+     },
+     "ppocrv6": {
+      "nes": 0.7595,
+      "ok": 3,
+      "n": 3
+     },
+     "bf16-vllm": {
+      "nes": 0.6145,
+      "ok": 2,
+      "n": 3
+     },
+     "cascade": {
+      "nes": 0.7581,
+      "ok": 3,
+      "n": 3
+     },
+     "cascade-readers": {
+      "nes": 0.731,
+      "ok": 3,
+      "n": 3
+     }
+    }
+   }
+  ],
+  "pooled": {
+   "latin": {
+    "ngram": {
+     "nes": 0.3193,
+     "n": 811
+    },
+    "half": {
+     "nes": 0.1098,
+     "n": 811
+    },
+    "second": {
+     "nes": 0.4655,
+     "n": 851
+    },
+    "kraken-ppocrv6": {
+     "nes": 0.6331,
+     "n": 851
+    },
+    "ppocrv6": {
+     "nes": 0.2764,
+     "n": 851
+    },
+    "cascade": {
+     "nes": 0.3433,
+     "n": 851
+    },
+    "cascade-readers": {
+     "nes": 0.6336,
+     "n": 851
+    }
+   },
+   "other": {
+    "ngram": {
+     "nes": 0.2373,
+     "n": 762
+    },
+    "half": {
+     "nes": 0.0416,
+     "n": 762
+    },
+    "second": {
+     "nes": 0.2733,
+     "n": 801
+    },
+    "ppocrv6": {
+     "nes": 0.0796,
+     "n": 801
+    },
+    "cascade": {
+     "nes": 0.2429,
+     "n": 801
+    },
+    "cascade-readers": {
+     "nes": 0.364,
+     "n": 801
+    }
+   }
+  },
+  "not_run": {
+   "ling3-flash-vl-fp8": "n-gram and half arms cancelled by the owner, 2026-10-23"
+  }
  }
 }

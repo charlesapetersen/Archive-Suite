@@ -278,6 +278,13 @@ footer p { font-size: 13px; }
     <p class="note" id="pub-open-note"></p>
   </section>
 
+  <section class="panel" id="pub-loops" hidden>
+    <div class="head"><h2>Reading the looping pages again</h2><span class="meta">every capped page of the sweep · free (W46.ocr-loops)</span></div>
+    <p class="note" id="loops-note"></p>
+    <div class="tbl"><table><thead><tr><th>Route</th><th>Capped pages</th><th>Same model, n-gram blocked</th><th>Same model, half size</th><th>Second reader</th><th>kraken PP-OCRv6 (Latin)</th><th>Stock PP-OCRv6</th><th>Retry first</th><th>Readers first</th><th>895 NES before</th><th>After, retry first</th><th>After, readers first</th><th>GPU minutes, n-gram · half</th></tr></thead><tbody id="loops-rows"></tbody></table></div>
+    <div class="tbl"><table><thead><tr><th>The 96's caps</th><th>Capped pages</th><th>Same model, n-gram blocked</th><th>Same model, half size</th><th>Second reader</th><th>kraken PP-OCRv6</th><th>Stock PP-OCRv6</th><th>Retry first</th><th>Readers first</th></tr></thead><tbody id="loops-96"></tbody></table></div>
+  </section>
+
   <section class="panel" id="pub-spec" hidden>
     <div class="head"><h2>Models built for the script</h2><span class="meta">NES %, failures as 0; paired differences in NES points</span></div>
     <div class="tbl"><table><thead><tr><th>Stratum</th><th>Model</th><th>Trained on a test source</th><th>Answered</th><th>NES</th><th>Second score</th><th>chrF</th><th>Minus Gemini (95%)</th><th>Minus Qwen (95%)</th></tr></thead><tbody id="pub-spec-rows"></tbody></table></div>
@@ -572,6 +579,20 @@ if (DW) {
   const sg = v => (v >= 0 ? '+' : '−') + Math.abs(100 * v).toFixed(1);
   document.getElementById('dw-note').textContent = 'Each image of the same page read by the same reader, paired by page against the plain photograph (the quarter-size rows against the quarter-size photograph). NES follows reading order, so chrF2 and the word rates, which do not, are beside it. Cut-off words are truth words whose box on the plain photograph falls outside what the image shows.' + (DW.readers_pending.length ? ' Still to come: ' + DW.readers_pending.join(', ') + ' (FarmShare).' : '') + ' Detail: segbench-results/' + DW.report + (DW.uvdoc_benchmark ? '; our UVDoc reproduces the authors\' published grids on their 50-photo benchmark (' + DW.uvdoc_benchmark + ').' : '.');
   document.getElementById('dw-rows').innerHTML = DW.rows.map(r => '<tr><td>' + r.reader + '</td><td>' + r.pages + ' (' + r.n + ')</td><td>' + (names[r.arm] || r.arm) + '</td><td>' + q1(r.nes) + '</td><td>' + (r.d_nes == null ? '—' : sg(r.d_nes) + ' (' + sg(r.lo) + ' to ' + sg(r.hi) + ')') + '</td><td>' + q1(r.chrf) + '</td><td>' + q1(r.added) + '</td><td>' + q1(r.missed) + '</td><td>' + (r.edge_lost == null ? '—' : r.edge_lost + ' (' + r.edge_pages + ')') + '</td></tr>').join('');
+}
+const LP = DATA.loops;
+if (LP) {
+  document.getElementById('pub-loops').hidden = false;
+  const ARMS = ['ngram', 'half', 'second', 'kraken-ppocrv6', 'ppocrv6', 'cascade', 'cascade-readers'];
+  const c = a => a ? (100 * a.nes).toFixed(1) + ' (' + a.ok + '/' + a.n + ')' : '–';
+  const q = v => v == null ? '–' : (100 * v).toFixed(1);
+  const m = v => v == null ? '–' : (v / 60).toFixed(0);
+  const pool = (s, k) => LP.pooled[s][k] ? (100 * LP.pooled[s][k].nes).toFixed(1) : '–';
+  document.getElementById('loops-note').textContent = 'Each route\'s pages that ran to the 8,192-token limit in the open sweep (nearly all repetition loops; each scored 0 there), read again five ways and scored on those pages only, failures as 0, answered / pages in brackets. The same model was rerun on FarmShare and Sherlock with vLLM\'s n-gram blocking (no 4-token sequence twice) and at half size (1,200 px); the second reader is LightOnOCR-3 4B\'s saved reading of the page (Qwen3.6 27B\'s for LightOnOCR-3 4B\'s caps); kraken PP-OCRv6 medium read blla lines of the Latin-script pages on the Mac; stock PP-OCRv6 is the sweep\'s own line pipeline. Retry first takes the first arm that answered in the order ' + LP.retry_first.join(', ') + '; readers first in the order ' + LP.reader_first.join(', ') + ', an order chosen after scoring, on these pages. Pooled over routes, readers first scores ' + pool('latin', 'cascade-readers') + ' on Latin pages and ' + pool('other', 'cascade-readers') + ' on the others, against ' + pool('latin', 'cascade') + ' and ' + pool('other', 'cascade') + ' retry first. The half-size retry mostly loops again or returns nothing. Ling 3 Flash VL\'s two rerun arms were not run (' + LP.not_run['ling3-flash-vl-fp8'] + '). GPU minutes are the arm\'s span on one card, model load excluded. Detail: segbench-results/' + LP.report + '.';
+  document.getElementById('loops-rows').innerHTML = LP.public895.map(r => '<tr><td>' + r.route + '</td><td>' + r.caps + '</td>' + ARMS.map(k => '<td>' + c(r.arms[k]) + '</td>').join('') +
+    '<td>' + q(r.before) + '</td><td>' + q(r.after_cascade) + '</td><td>' + q(r['after_cascade-readers']) + '</td><td>' + m(r.gpu_s.ngram) + ' · ' + m(r.gpu_s.half) + '</td></tr>').join('');
+  document.getElementById('loops-96').innerHTML = LP.truth96.map(r => '<tr><td>' + r.route.replace(/^t96-/, '') + (r.route.startsWith('mlx') ? ' (on the Mac)' : '') + '</td><td>' + r.caps + '</td>' +
+    ARMS.map(k => '<td>' + c(r.arms[k]) + '</td>').join('') + '</tr>').join('');
 }
 const curveCanvas = document.querySelector('#dif-curves canvas'), frontCanvas = document.querySelector('#dif-frontier canvas');
 let curveChart, frontChart;

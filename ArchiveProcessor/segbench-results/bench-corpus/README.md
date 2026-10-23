@@ -120,3 +120,7 @@ kraken, in [`specialists.md`](specialists.md) (`specialists.csv`, `specialists-p
 Open-model FarmShare sweep (2026-10-19 runs, scored 2026-10-20, a review baseline): GLM-OCR, LightOnOCR-3 0.8B and
 4B, PaddleOCR-VL 1.5, Qwen3-VL 8B, Qwen3.5 4B, Ling 3 Flash VL (4 GPUs) and stock PP-OCRv6 on all 895 pages, beside the Qwen 27B/35B FarmShare rows, in
 [`open-sweep-20261019.md`](open-sweep-20261019.md) (`open-sweep-20261019.csv`, `-pages.csv`, `.json`).
+
+The sweep's capped pages read again (W46.ocr-loops, 2026-10-21 to 23): n-gram blocking, half size, a second reader,
+kraken PP-OCRv6 and two cascades, on the 895 and the 96, in [`loop-rerun-20261021.md`](loop-rerun-20261021.md)
+(`loop-rerun-20261021.csv`, `-pages.csv`, `-tables.md`, `.json`).

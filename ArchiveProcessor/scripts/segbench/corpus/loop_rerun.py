@@ -10,7 +10,8 @@ is a reading whose status is `cap` (8,192 tokens without a stop). The cluster ha
 under `loop-rerun-job.sh`: arm `ngram` (no 4-token sequence repeated, at full size) and arm `half` (1200 px).
 The report adds, with no new calls, the second-reader arm (another open route's saved reading of the same page)
 and kraken PP-OCRv6 on blla lines where `loop_kraken.py` has read them, and scores every arm with the panel's
-scorer on the capped pages only, failures as 0. No money; raw text stays outside git.
+scorer on the capped pages only, failures as 0, with two cascades over the arms (RETRY_FIRST as filed and
+READER_FIRST). No money; raw text stays outside git.
 """
 from pathlib import Path
 import argparse
@@ -130,10 +131,16 @@ def mlx_readings(d):
     return out
 
 
-def cascade(texts):
-    """The first arm, in the order a route would try them, that gave a reading: own route again with n-gram
-    blocking, then at half size, then the second open reader, then the reader that cannot loop."""
-    for arm in ('ngram', 'half', 'second', 'kraken-ppocrv6', 'ppocrv6'):
+RETRY_FIRST = ('ngram', 'half', 'second', 'kraken-ppocrv6', 'ppocrv6')
+# Chosen after the arms were scored (on the 895's pooled arms, so it is fitted there; the 96 is the check):
+# kraken PP-OCRv6 where it read the page (Latin strata), then the second reader, then n-gram, then stock PP-OCRv6.
+READER_FIRST = ('kraken-ppocrv6', 'second', 'ngram', 'ppocrv6')
+
+
+def cascade(texts, order=RETRY_FIRST):
+    """The first arm, in the given order, that gave a reading. RETRY_FIRST is the order filed: own route again with
+    n-gram blocking, then at half size, then the second open reader, then the readers that cannot loop."""
+    for arm in order:
         if texts.get(arm):
             return texts[arm]
     return ''
@@ -144,7 +151,7 @@ def score_route(set_name, route, ids, ref_of, texts_of, meta_of):
     for jid in ids:
         ref, stratum = ref_of(jid)
         texts = {k: v for k, v in texts_of(jid, stratum).items() if v is not None}
-        texts['cascade'] = cascade(texts)
+        texts['cascade'], texts['cascade-readers'] = cascade(texts), cascade(texts, READER_FIRST)
         for arm, text in texts.items():
             m = meta_of(arm, jid)
             row = {'set': set_name, 'route': route, 'arm': arm, 'page': jid, 'stratum': stratum, 'ok': bool(text),
@@ -233,11 +240,13 @@ def cmd_report(a):
                 ['set', 'route', 'arm', 'page', 'stratum', 'source', 'ok', 'status', 'tokens', 'wall_s', 'nes', 'chrf', 'words',
                  'missed', 'added'])
     (a.out / f'{a.name}-tables.md').write_text(tables(rows, pages))
+    (a.out / f'{a.name}.json').write_text(json.dumps(summary(rows, pages, a.runs, a.name), indent=1) + '\n')
     print(f'{len(rows)} rows, {len(pages)} page rows -> {a.out}')
 
 
 SWEEP = HERE.parents[2] / 'segbench-results/bench-corpus/open-sweep-20261019.json'
-ARM_ORDER = ('ngram', 'half', 'second', 'kraken-ppocrv6', 'ppocrv6', 'bf16-vllm', 'cascade')
+ARM_ORDER = ('ngram', 'half', 'second', 'kraken-ppocrv6', 'ppocrv6', 'bf16-vllm', 'cascade', 'cascade-readers')
+POOLED = tuple(a for a in ARM_ORDER if a != 'bf16-vllm')
 
 
 def tables(rows, pages):
@@ -247,21 +256,24 @@ def tables(rows, pages):
     by = {(r['set'], r['route'], r['arm']): r for r in rows}
     cell = lambda r: '–' if r is None else f"{100 * r['nes']:.1f} ({r['ok']}/{r['n']})"
     out = ['NES % on the capped pages only (answered / pages); the original reading of every one of them scores 0.', '',
-           '| route | caps | ' + ' | '.join(ARM_ORDER) + ' | 895 NES before | after the cascade |',
-           '|---|---:|' + '---:|' * len(ARM_ORDER) + '---:|---:|']
+           '| route | caps | ' + ' | '.join(ARM_ORDER) + ' | 895 NES before | after cascade | after cascade-readers |',
+           '|---|---:|' + '---:|' * len(ARM_ORDER) + '---:|---:|---:|']
     for route in ROUTES:
         rs = [by.get(('public895', route, arm)) for arm in ARM_ORDER]
         caps_n = next(r['caps'] for r in rs if r)
-        casc = by.get(('public895', route, 'cascade'))
         before = overall.get(route)
-        after = before + casc['nes'] * casc['n'] / 895 if before is not None and casc else None
+        afters = []
+        for arm in ('cascade', 'cascade-readers'):
+            casc = by.get(('public895', route, arm))
+            after = before + casc['nes'] * casc['n'] / 895 if before is not None and casc else None
+            afters.append('–' if after is None else f'{100 * after:.1f}')
         out.append(f'| {route} | {caps_n} | ' + ' | '.join(cell(r) for r in rs) +
-                   f" | {'–' if before is None else f'{100 * before:.1f}'} | {'–' if after is None else f'{100 * after:.1f}'} |")
+                   f" | {'–' if before is None else f'{100 * before:.1f}'} | " + ' | '.join(afters) + ' |')
     out += ['', 'By script, the cascade and its parts, all routes pooled (pages, NES %):', '',
-            '| strata | ' + ' | '.join(ARM_ORDER[:-2] + ('cascade',)) + ' |', '|---|' + '---:|' * (len(ARM_ORDER) - 1) + '']
+            '| strata | ' + ' | '.join(POOLED) + ' |', '|---|' + '---:|' * len(POOLED)]
     for label, test in (('Latin (L1-L9)', lambda s: s in LATIN), ('other scripts (N1-N6)', lambda s: s not in LATIN)):
         cells = []
-        for arm in ARM_ORDER[:-2] + ('cascade',):
+        for arm in POOLED:
             pr = [p for p in pages if p['set'] == 'public895' and p['arm'] == arm and test(p['stratum'])]
             cells.append('–' if not pr else f"{100 * sum(p['nes'] for p in pr) / len(pr):.1f} ({len(pr)})")
         out.append(f'| {label} | ' + ' | '.join(cells) + ' |')
@@ -270,7 +282,7 @@ def tables(rows, pages):
                         ('not in its public training list', lambda p: p.get('source') not in KRAKEN_TRAINED_ON)):
         pr = [p for p in kp if test(p)]
         if pr:
-            out.append(f'| kraken PP-OCRv6, {label} | – | – | – | {100 * sum(p["nes"] for p in pr) / len(pr):.1f} ({len(pr)}) | – | – |')
+            out.append(f'| kraken PP-OCRv6, {label} | – | – | – | {100 * sum(p["nes"] for p in pr) / len(pr):.1f} ({len(pr)}) | – | – | – |')
     out += ['', 'The 96 (the owner\'s truth pages), the same arms:', '',
             '| route | caps | ' + ' | '.join(ARM_ORDER) + ' |', '|---|---:|' + '---:|' * len(ARM_ORDER)]
     for route in [*T96, 'mlx-qwen3-vl-8b-4bit']:
@@ -278,6 +290,49 @@ def tables(rows, pages):
         if any(rs):
             out.append(f"| {route} | {next(r['caps'] for r in rs if r)} | " + ' | '.join(cell(r) for r in rs) + ' |')
     return '\n'.join(out) + '\n'
+
+
+def arm_wall(runs, route, arm):
+    """The cluster arm's wall seconds on one GPU (summary.json; vLLM's start-up excluded), None if it never ran."""
+    f = runs / 'out' / route / arm / 'summary.json'
+    return json.loads(f.read_text())['wall_s'] if f.exists() else None
+
+
+def summary(rows, pages, runs, name):
+    """The figures ArchiveOCRBench draws (build.py → loops): per route and arm NES on the caps, answered / pages,
+    the 895 before and after each cascade, the GPU seconds of the two cluster arms, and the arms pooled by script."""
+    overall = {m['route']: m['nes'] for m in json.loads(SWEEP.read_text())['models']
+               if m['subset'] == 'full895' and m['stratum'] == 'all'}
+    by = {(r['set'], r['route'], r['arm']): r for r in rows}
+    arm = lambda r: None if r is None else {'nes': round(r['nes'], 4), 'ok': r['ok'], 'n': r['n']}
+
+    def route_rows(set_name, routes):
+        out = []
+        for route in routes:
+            rs = {k: by.get((set_name, route, k)) for k in ARM_ORDER}
+            if not any(rs.values()):
+                continue
+            row = {'route': route, 'caps': next(r['caps'] for r in rs.values() if r),
+                   'arms': {k: arm(v) for k, v in rs.items() if v}}
+            if set_name == 'public895':
+                before = overall.get(route)
+                row['before'] = None if before is None else round(before, 4)
+                for k in ('cascade', 'cascade-readers'):
+                    c = rs[k]
+                    row['after_' + k] = None if before is None or not c else round(before + c['nes'] * c['n'] / 895, 4)
+                row['gpu_s'] = {k: arm_wall(runs, route, k) for k in ARMS}
+            out.append(row)
+        return out
+    pooled = {}
+    for label, test in (('latin', lambda s: s in LATIN), ('other', lambda s: s not in LATIN)):
+        pooled[label] = {}
+        for k in POOLED:
+            pr = [p for p in pages if p['set'] == 'public895' and p['arm'] == k and test(p['stratum'])]
+            if pr:
+                pooled[label][k] = {'nes': round(sum(p['nes'] for p in pr) / len(pr), 4), 'n': len(pr)}
+    return {'report': f'bench-corpus/{name}.md', 'retry_first': list(RETRY_FIRST), 'reader_first': list(READER_FIRST),
+            'public895': route_rows('public895', ROUTES), 'truth96': route_rows('truth96', [*T96, 'mlx-qwen3-vl-8b-4bit']),
+            'pooled': pooled, 'not_run': {'ling3-flash-vl-fp8': 'n-gram and half arms cancelled by the owner, 2026-10-23'}}
 
 
 def main():
