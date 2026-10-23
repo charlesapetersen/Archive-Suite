@@ -22,6 +22,13 @@
    "batch": 1.61
   },
   {
+   "id": "gemini3.7-flash-gw",
+   "name": "Gemini 3.7 Flash (Stanford gateway, price estimated)",
+   "panel": "cloud",
+   "std": 3.89,
+   "batch": null
+  },
+  {
    "id": "qwen3.5-397b",
    "name": "Qwen3.5 397B",
    "panel": "cloud",
@@ -589,6 +596,11 @@
      96,
      96
     ],
+    "gemini3.7-flash-gw": [
+     96.74,
+     96,
+     96
+    ],
     "qwen3.5-9b": [
      89.43,
      92,
@@ -754,6 +766,11 @@
     ],
     "gemini3.8-flash": [
      98.74,
+     50,
+     50
+    ],
+    "gemini3.7-flash-gw": [
+     98.81,
      50,
      50
     ],
@@ -975,6 +992,11 @@
      26,
      28
     ],
+    "gemini3.7-flash-gw": [
+     94.91,
+     28,
+     28
+    ],
     "qwen3.5-397b": [
      93.72,
      28,
@@ -1190,6 +1212,11 @@
     ],
     "gemini3.8-flash": [
      95.97,
+     16,
+     16
+    ],
+    "gemini3.7-flash-gw": [
+     95.07,
      16,
      16
     ],
@@ -21594,6 +21621,17 @@
      "unread": 0,
      "recall": 0.8888888888888888,
      "nes": 0.9531027659678395
+    },
+    {
+     "route": "gemini3.7-flash-gw",
+     "pages": 20,
+     "words": 54,
+     "copied": 34,
+     "corrected": 20,
+     "other": 0,
+     "unread": 0,
+     "recall": 0.6296296296296297,
+     "nes": 0.9784675474179068
     },
     {
      "route": "glm-ocr",

@@ -30,6 +30,9 @@ CLOUD_MD = RESULTS / "ocr-panel-cloud.md"
 LOCAL_MD = RESULTS / "ocr-panel-local.md"
 CLOUD_CSV = RESULTS / "ocr-panel-cloud-groups.csv"
 LOCAL_CSV = RESULTS / "ocr-panel-local-groups.csv"
+GATEWAY_MD = RESULTS / "gemini37-vs-38.md"  # W46.fix-ocr-scorers-paid: gateway_gemini.py report, Gemini 3.7 Flash
+GATEWAY_CSV = RESULTS / "gemini37-vs-38-groups.csv"
+GATEWAY_ROUTES = {"gemini3.7-flash-gw"}
 MAC_MD = RESULTS / "ocr-mac-local.md"
 MAC_CSV = RESULTS / "ocr-mac-local-groups.csv"
 FARMSHARE = RESULTS / "farmshare" / "truth"
@@ -482,6 +485,12 @@ def main():
         overall[rid] = [float(cells[2]), int(done), int(total)]
         std[rid] = dollars_per_1000(cells[-1])
         panel[rid] = "cloud"
+    for cells in table_after(GATEWAY_MD.read_text(), "## Original pages"):
+        rid = route_id(cells[0])
+        done, _, total = cells[1].split("/")
+        overall[rid] = [float(cells[2]), int(done), int(total)]
+        std[rid] = dollars_per_1000(cells[-1])  # an estimate: the gateway returns no cost (the route's name says so)
+        panel[rid] = "cloud"
     for cells in table_after(local_md, "## Original pages"):
         rid = route_id(cells[0])
         done, _, total = cells[1].split("/")
@@ -500,7 +509,7 @@ def main():
         sys.exit(f"no price for: {[k for k, v in std.items() if v is None]}")
 
     kinds = {}
-    for path, key in ((CLOUD_CSV, "route"), (LOCAL_CSV, "model")):
+    for path, key in ((CLOUD_CSV, "route"), (LOCAL_CSV, "model"), (GATEWAY_CSV, "route")):
         with path.open(newline="") as f:
             for row in csv.DictReader(f):
                 if row["attribute"] == "kind" and row[key] in names:
@@ -543,8 +552,10 @@ def main():
                 or any(e["scores"][c["key"]][2] != c["n"] for e in extra):
             sys.exit(f"a FarmShare run's {c['key']} page count differs from the panel's {c['n']}")
 
+    # The difficulty and cascade analysis reads ocr-pages.csv's per-page rows, which hold the panels' routes but not
+    # the later gateway reading of Gemini 3.7 Flash, so that route is drawn on the charts and left out here.
     diff = difficulty.analyse({r["id"]: r["std"] for r in routes}, {r["id"]: r["name"] for r in routes},
-                              [r["id"] for r in routes if r["panel"] != "farmshare"])
+                              [r["id"] for r in routes if r["panel"] != "farmshare" and r["id"] not in GATEWAY_ROUTES])
     dating = json.loads(DATING.read_text()) if DATING.exists() else None
     if dating:  # FarmShare dating runs too large for the Mac, at OpenRouter's rate for their cached token means
         for k, m in dating.get("open_models", {}).items():

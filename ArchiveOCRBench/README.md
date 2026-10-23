@@ -122,6 +122,10 @@ record:
   bag-of-words F1 and gap, the two-reader suspect check, OmniDocBench's reading-order edit). The page shows the
   whole-set rows of every route that answered; the strata, preservation, markup and restoration-only tables are in
   `ocr-scorers.md` only. `chaos-probe.json` (`chaos_probe.py`) is the altered-word probe on 20 typed owner pages.
+- `gemini37-vs-38.md` and `-groups.csv` (`scripts/segbench/gateway_gemini.py report`, W46.fix-ocr-scorers-paid):
+  Gemini 3.7 Flash through the Stanford gateway on the 96, in the cloud panel's two formats, so `build.py` draws it
+  on the 96's charts. Its price is an estimate (the gateway returns no cost), and the route's name says so. It is
+  not in `ocr-pages.csv`, so the difficulty and cascade analysis leaves it out.
   `ocr-truth-bias.json` (`ocr_truth_bias.py`, W46.fix-ocr-truth-bias) splits each route's word accuracy on the 96
   into the words both drafters agreed on and the words the owner adjudicated, strict and with line-end hyphen joins
   forgiven; the page shows it under the same section, with the blind owner check it feeds. That check's score is

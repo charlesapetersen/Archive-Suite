@@ -16,6 +16,17 @@
    "nes": 0.9531027659678395
   },
   {
+   "route": "gemini3.7-flash-gw",
+   "pages": 20,
+   "words": 54,
+   "copied": 34,
+   "corrected": 20,
+   "other": 0,
+   "unread": 0,
+   "recall": 0.6296296296296297,
+   "nes": 0.9784675474179068
+  },
+  {
    "route": "glm-ocr",
    "pages": 20,
    "words": 54,

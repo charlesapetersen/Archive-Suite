@@ -5,6 +5,7 @@
     "claude-sonnet5.5": {"name": "Claude Sonnet 5.5"},
     "gemini3.1-pro": {"name": "Gemini 3.1 Pro"},
     "gemini3.8-flash": {"name": "Gemini 3.8 Flash"},
+    "gemini3.7-flash-gw": {"name": "Gemini 3.7 Flash (Stanford gateway, price estimated)"},
     "qwen3.5-397b": {"name": "Qwen3.5 397B"},
     "qwen3-vl-235b": {"name": "Qwen3-VL 235B"},
     "qwen3.8-flash": {"name": "Qwen3.8 Flash"},
