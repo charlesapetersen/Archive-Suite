@@ -16,7 +16,10 @@ set -euo pipefail
 SH_DIR="$1"; CANDS="$2"; source "$SH_DIR/sh.env"
 OS="$FS_ROOT/open-sweep-20261019" T96="$FS_ROOT/truth96-20261020" A="$FS_ROOT/new-open-895" B="$FS_ROOT/new-open-96"
 mkdir -p "$A/recovery" "$A/logs" "$B/recovery" "$B/logs"
-cp "$OS/public895.jsonl" "$OS/pilot3.jsonl" "$A/"; cp "$OS/recovery/open_sweep_run.py" "$OS/recovery/open_sweep_setup.py" "$A/recovery/"
+cp "$OS/public895.jsonl" "$OS/pilot3.jsonl" "$A/"; cp "$OS/recovery/open_sweep_run.py" "$A/recovery/"
+# This checkout's open_sweep_setup.py, not the FarmShare pack's copy: that one capped every model at 25 GB and ignored
+# a candidate's weight_limit_bytes (2026-10-22: Qwen3.8-27B and MiniCPM-V 4.7 35B-A3B were skipped by it).
+cp "$SH_DIR/../corpus/open_sweep_setup.py" "$A/recovery/"
 cp "$T96/truth99.jsonl" "$T96/pilot3.jsonl" "$B/"; cp "$T96/recovery/open_sweep_run.py" "$B/recovery/"
 cp "$CANDS" "$A/candidates.json"
 PANEL="$OS/qwen3-vl-8b/ocr/panel-prompt.txt" COLLECTOR="$OS/qwen3-vl-8b/ocr/ocr_run.py"
