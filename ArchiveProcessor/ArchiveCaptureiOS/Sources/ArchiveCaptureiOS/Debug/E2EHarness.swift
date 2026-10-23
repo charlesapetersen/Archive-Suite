@@ -17,6 +17,9 @@ import Foundation
 ///   own actions rather than synthesising touches; the shutter goes through the screen's `capture(.document)`.
 ///   Progress goes to `Documents/e2e-status.txt`, one line per step, which the script polls; after each
 ///   capture the driver waits for the script's `Documents/e2e-shot-<n>` so the screenshot shows that page.
+/// - **Feed (W40.i-sim-ui).** `ARCHIVECAP_UITEST_FEED=<dir>` makes every shutter, Box and Folder press take the
+///   next JPEG of that host directory in name order, moving it out first, when no `test_inject.jpg` waits. The
+///   UI test (`ArchiveCaptureiOSUITests`) taps the real buttons; this is only the camera the simulator lacks.
 enum E2EHarness {
     private static var env: [String: String] { ProcessInfo.processInfo.environment }
 
@@ -32,8 +35,23 @@ enum E2EHarness {
 
     /// The injected shot, consumed: nil when no file is waiting (the real camera path runs).
     static func takeInjected() -> Data? {
-        guard let data = try? Data(contentsOf: injectURL) else { return nil }
+        guard let data = try? Data(contentsOf: injectURL) else { return takeFed() }
         try? FileManager.default.removeItem(at: injectURL)
+        return data
+    }
+
+    /// The UI test's feed: the next JPEG of `ARCHIVECAP_UITEST_FEED`, consumed (renamed `.used`, so the script
+    /// can count what the shutter took). Nil when the feed is unset or empty.
+    private static func takeFed() -> Data? {
+        guard let dir = env["ARCHIVECAP_UITEST_FEED"], !dir.isEmpty else { return nil }
+        let feed = URL(fileURLWithPath: dir, isDirectory: true)
+        let names = (try? FileManager.default.contentsOfDirectory(at: feed, includingPropertiesForKeys: nil)) ?? []
+        guard let next = names.filter({ $0.pathExtension.lowercased() == "jpg" })
+                .sorted(by: { $0.lastPathComponent < $1.lastPathComponent }).first,
+              let data = try? Data(contentsOf: next) else { return nil }
+        let used = next.appendingPathExtension("used")
+        guard (try? FileManager.default.moveItem(at: next, to: used)) != nil else { return nil }
+        NSLog("[e2e] fed %@", next.lastPathComponent)
         return data
     }
 

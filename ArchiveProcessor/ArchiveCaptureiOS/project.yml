@@ -44,3 +44,33 @@ targets:
         # redirect: ASWebAuthenticationSession catches its own callbackURLScheme without one, and a
         # registered scheme cannot be derived from the id in a build setting.
         DriveOAuthClientID: $(DRIVE_OAUTH_CLIENT_ID)
+  # W40.i-sim-ui: the app's own controls pressed by touch in a headless simulator, against the real Mac.
+  # Driven only by scripts/e2e-ios-ui.sh (it boots the device headless, runs the Mac and serves the control
+  # files these tests wait on); not a unit bundle, and not run by any gate.
+  ArchiveCaptureiOSUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - UITests
+    dependencies:
+      - target: ArchiveCaptureiOS
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.archiveprocessor.capture.ios.uitests
+        CODE_SIGN_IDENTITY: "-"
+        CODE_SIGNING_REQUIRED: NO
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: ArchiveCaptureiOS
+schemes:
+  ArchiveCaptureiOS:
+    build:
+      targets:
+        ArchiveCaptureiOS: all
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - ArchiveCaptureiOSUITests
+    archive:
+      config: Release

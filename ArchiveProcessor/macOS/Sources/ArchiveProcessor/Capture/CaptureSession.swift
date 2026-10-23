@@ -39,6 +39,8 @@ final class CaptureSession: ObservableObject {
     func updatePhonePending(_ count: Int) {
         phonePendingCount = count
         phonePendingAt = Date()
+        // Headless E2E only (W40.i-sim-ui): the count as the Mac received it, for the harness's log.
+        if headlessAutostart { FileHandle.standardError.write(Data("LIVECAPTURE_PHONE_PENDING \(count)\n".utf8)) }
         notePhoneContact()
         if processingMode == .live { liveProcessor.phoneStatusChanged() }
     }
