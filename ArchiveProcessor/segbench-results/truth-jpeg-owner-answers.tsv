@@ -1,0 +1,26 @@
+page	corpus_pdf	owner_answer	original	corr	turn	original_px	pdf_px	use	note
+p008	Complete Journals/Microelectronics News/0 OCRed/1980 — Microelectronic News — 00190.pdf	named	Archival Photos/Complete Journals/Microelectronics News/10 Originals/1980 — Microelectronic News — 00190.jpg	0.79	0	534x705	1076x1416	swap in	the PDF image is an upscale of this original (FineReader), not a sharper copy
+p010	General Clippings/Admissions Related/SF Chronicle/SF Chronicle clippings — IMG 00022.pdf	no JPEG exists					1064x3176	keep PDF image	
+p014	Hoover Institute/Zschau/01092 — Zschau.pdf	named	Archival Photos JPEGS/Hoover Institute/Ed Zschau papers/01092 — Zschau.pdf				974x1296	keep PDF image	the named file is itself a FineReader PDF with the same 974x1296 image; no camera original
+p016	Library of Congress/Arendt/Riesman/00063 IMG — Arendt Papers, Riesman File.pdf	no JPEG exists					2772x3572	keep PDF image	
+p019	NYPL/Fromm papers/Fromm, Box 2, Folder 4.pdf/Fromm, Box 2, Folder 4 - 0024.pdf	no JPEG exists					5005x7045	keep PDF image	
+p027	UC Santa Cruz/Bateson/00138 — Bateson.pdf	a JPEG should exist; not found yet					1560x2056	keep PDF image until found	Need to look a bit more for this.
+p028	UIUC/00092 — UIUC.pdf	named	Archival Photos JPEGS/University of Illinois/UIUC — 00092.HEIC	0.89	270	4032x3024	6081x8089	swap in	HEIC; the truth builder reads only .jpg/.jpeg, so convert first; the PDF image is an upscale of this original (FineReader), not a sharper copy
+p042	Northwestern University/Dill Scott materials/Northwestern_published_as_The_Northwestern.___October_16_1891.pdf	no JPEG exists					1836x2408	keep PDF image	
+p043	Northwestern University/Dill Scott materials/Northwestern_published_as_The_Northwestern.___November_15_1894.pdf	no JPEG exists					1715x2309	keep PDF image	
+p044	Northwestern University/Dill Scott materials/Northwestern_published_as_The_Northwestern.___April_28_1893.pdf	no JPEG exists					1856x2456	keep PDF image	
+p067	Complete Journals/Public Interest/Public Interest — Issue 133.pdf	no JPEG exists					1688x2688	keep PDF image	
+p073	Complete Journals/Public Interest/Public Interest — Issue 120.pdf	no JPEG exists					1731x2634	keep PDF image	
+p075	General Clippings/Admissions Related/SF Chronicle/SF Chronicle clippings — IMG 00028.pdf	no JPEG exists					1057x1720	keep PDF image	
+p076	NYPL/Fromm papers/Fromm, Box 3, Folder 16.pdf/Fromm, Box 3, Folder 16 - 0011.pdf	no JPEG exists					5136x7135	keep PDF image	
+p081	General Clippings/Admissions Related/SF Chronicle/SF Chronicle clippings — IMG 00033.pdf	no JPEG exists					1064x2538	keep PDF image	
+p083	USC/Brown/02362 IMG — Brown.pdf	named	Archival Photos JPEGS/USC/Jerry Brown papers — on backup drive/02362 IMG — Brown.jpg	0.48	0	2592x1936	1352x964	swap in	same clipping, owner-confirmed; low score because the PDF is cropped and deskewed and the JPEG keeps the margins (checked by eye)
+p084	Huntington Library/LA Times — Brown.pdf/00022 — LA Times, Brown related.pdf	named	Archival Photos JPEGS/Huntington/LA Times — Brown related/00022 — LA Times, Brown related.jpg	0.43	0	2592x1936	1232x998	swap in	same clipping, owner-confirmed; low score because the PDF is cropped and deskewed and the JPEG keeps the margins (checked by eye)
+p085	General Clippings/Admissions Related/SF Chronicle/SF Chronicle clippings — IMG 00020.pdf	no JPEG exists					1068x2051	keep PDF image	
+p087	Cambridge/Young papers.pdf/00163 — Young papers.pdf	no JPEG exists					2668x3561	keep PDF image	
+p088	Complete Journals/Microelectronics News/0 OCRed/1979 — Microelectronic News — 00083.pdf	named	Archival Photos/Complete Journals/Microelectronics News/10 Originals/1979 — Microelectronic News — 00083.jpg	0.79	0	559x727	1118x1454	swap in	the PDF image is an upscale of this original (FineReader), not a sharper copy
+p090	Cambridge/Young papers.pdf/00530 — Young papers.pdf	no JPEG exists					2632x3513	keep PDF image	
+p091	Complete Journals/Microelectronics News/0 OCRed/1979 — Microelectronic News — 00236.pdf	named	Archival Photos/Complete Journals/Microelectronics News/10 Originals/1979 — Microelectronic News — 00236.jpg	0.73	0	551x717	1102x1434	swap in	the PDF image is an upscale of this original (FineReader), not a sharper copy
+p092	Cambridge/Young papers.pdf/00109 — Young papers.pdf	no JPEG exists					2476x3265	keep PDF image	
+p093	Complete Journals/Microelectronics News/0 OCRed/1978 — Microelectronic News — 00250.pdf	named	Archival Photos/Complete Journals/Microelectronics News/10 Originals/1978 — Microelectronic News — 00250.jpg	0.86	0	534x707	1073x1418	swap in	the PDF image is an upscale of this original (FineReader), not a sharper copy
+p095	Cambridge/Young papers.pdf/00590 — Young papers.pdf	no JPEG exists					2454x3264	keep PDF image	
