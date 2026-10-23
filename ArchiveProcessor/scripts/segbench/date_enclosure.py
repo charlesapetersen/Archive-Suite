@@ -5,7 +5,7 @@
     python3 date_enclosure.py render      # each candidate's first page as JPEG (sips, read-only on the corpus)
     run-guarded.sh --label date-enclosure --need-gb 8 -- <lab venv>/bin/python date_enclosure.py marker [--model K]
     run-guarded.sh --label date-enclosure --need-gb 4 -- <lab venv>/bin/python date_enclosure.py relate [--model K]
-    python3 date_enclosure.py export --out DIR             # the FarmShare pack (relation prompts; private)
+    python3 date_enclosure.py export --out DIR             # the cluster pack (relation prompts; private)
     python3 date_enclosure.py import --answers F --label L
     python3 date_enclosure.py score       # segbench-results/date-enclosure.md and .json
 
@@ -28,7 +28,7 @@ Arms (all $0, no plan route, CLAUDE.md "Plan routes wait for the gateway"):
             on this Mac; only the header is generated (the marker sits on line 1), parsed by the app's own
             parseEnclosureFlag. The Gemini arm is W46.date-enclosure-paid.
   relate    a relation classifier over the cover's text and the candidate's first page, yes or no with the quoted cue
-            and a confidence: the trained 2B on this Mac (MLX), Qwen3.6-27B on FarmShare (export/import)
+            and a confidence: the trained 2B on this Mac (MLX), Qwen3.6-27B on Sherlock (export/import)
   cue       the rule baseline: the cover's last 600 characters announce an enclosure (enclose, attached, herewith, Enc.)
 Propagation: for each proposal, whether the cover's own rule-picked year (date_traceable.rule_pick) equals the
 candidate's owner year, i.e. whether the Sent With year and the Year tag the app would write match the owner's.
@@ -240,7 +240,11 @@ def parse_relate(raw):
     try:
         j = json.loads(m.group(0))
     except json.JSONDecodeError:
-        return None
+        # Qwen3.6-27B often quotes two cues unjoined ("cue": "Dear Michael:" and "Dear Dave,"), which is not JSON but
+        # still carries a verdict; salvage the verdict and confidence rather than counting the reply as none.
+        j = _salvage_relate(m.group(0))
+        if j is None:
+            return None
     v = j.get("sent_with")
     if isinstance(v, str):
         v = {"true": True, "false": False, "yes": True, "no": False}.get(v.strip().lower())
@@ -253,6 +257,17 @@ def parse_relate(raw):
         c = None
     cue = j.get("cue") if isinstance(j.get("cue"), str) and j.get("cue").strip() else None
     return {"sent_with": v, "cue": cue, "confidence": c}
+
+
+def _salvage_relate(s):
+    """The fields of a malformed reply object, read one by one; None without a literal true/false verdict."""
+    v = re.search(r'"sent_with"\s*:\s*(true|false)\b', s)
+    if not v:
+        return None
+    c = re.search(r'"confidence"\s*:\s*([0-9]*\.?[0-9]+)', s)
+    cue = re.search(r'"cue"\s*:\s*(.*?)\s*,\s*"confidence"', s, flags=re.S)
+    cue = cue.group(1) if cue and cue.group(1) != "null" else None
+    return {"sent_with": v.group(1) == "true", "cue": cue, "confidence": c.group(1) if c else None}
 
 
 def _norm(s):
@@ -338,7 +353,7 @@ def cmd_relate(a):
         print(f"[{k}/{len(todo)}] {d['id']} {secs}s {'ok' if parse_relate(raw) else 'unparsed'}", flush=True)
 
 
-# ---------------------------------------------------------------------------------------------------- FarmShare
+# ---------------------------------------------------------------------------------------------------- cluster
 def cmd_export(a):
     os.makedirs(a.out, exist_ok=True)
     items = load_set()
@@ -524,7 +539,7 @@ def arm_name(arm):
         return "cue words in the cover's last 600 characters (rule)"
     if kind == "cue-any":
         return "cue words anywhere in the cover (rule)"
-    label = MODELS[key][1] if key in MODELS else "Qwen3.6-27B, thinking off (FarmShare)"
+    label = MODELS[key][1] if key in MODELS else "Qwen3.6-27B, thinking off (Sherlock, one L40S)"
     return ("[enclosure] marker, app OCR prompt, " if kind == "marker" else "relation classifier, ") + label
 
 
@@ -560,7 +575,7 @@ def pc(k, n):
     return f"{100 * k / n:.1f}%" if n else "–"
 
 
-FINDINGS = [   # written by hand from the scored run of 2026-10-22, one string per bullet
+FINDINGS = [   # written by hand from the scored runs of 2026-10-22 (Mac) and 2026-10-23 (Sherlock), one string per bullet
     "The marker, on the local route: Qwen3-VL 8B 4-bit, given the app's exact OCR prompt (compiled from "
     "`OCRPrompt.swift`), wrote `[enclosure]` on none of the 225 pages, including none of the owner's 3 confirmed "
     "enclosures. On the Mac route the app therefore proposes no relation at all: recall 0 of 3, precision undefined. "
@@ -575,11 +590,21 @@ FINDINGS = [   # written by hand from the scored run of 2026-10-22, one string p
     "the negatives than on A and A' (AUC 0.45). None of the owner's 3 enclosures is announced in its cover's tail. "
     "This fits the owner's answers: most strict-class documents are not enclosures (date-truth-sets.md), so a "
     "cover that says \"I enclose\" is usually followed by something other than what it enclosed, or by nothing.",
+    "Qwen3.6-27B (FP8, thinking off, one L40S on Sherlock, job 49088017; 225 pairs in 151 s at 32 at a time, after "
+    "201 s to start the server) is the only free arm that proposes a relation, and it does so rarely: 2 of 60 A, 1 of "
+    "45 A' and 1 of 105 negatives, AUC 0.67 for its confidence. On the owner's 15 it found 1 of the 3 enclosures "
+    "(a22, quoting the enclosed document's own heading) and wrote one false Sent With (a25, a reply that discusses "
+    "the draft it answers rather than enclosing it); precision 1 of 2 is a count, not a rate. Every yes quoted a "
+    "cue, and the cue was in the documents on 5 of 6. Of its 5 proposals on A, A' and the owner's set, 4 covers "
+    "print a year and all 4 are the owner's year; its one negative proposal would have written a wrong year. 43 of "
+    "its 225 replies quoted two cues unjoined (not valid JSON); all were false verdicts, and `parse_relate` reads "
+    "their verdict rather than counting them as no reply.",
     "The limit is the truth, not the arms: 3 owner-confirmed enclosures cannot give a precision for any arm that "
-    "fires, and the structural classes are not relation truth. Still to run: Qwen3.6-27B on the same 225 pairs (the "
-    "pack is built; cluster work now waits for an owner-started Sherlock session, owner 2026-10-22) and the Gemini "
-    "arm with images (W46.date-enclosure-paid). For the app now: on local routes the marker is inert, so `Sent With` "
-    "is never proposed there, and nothing the free arms showed argues for proposing it by rule instead.",
+    "fires, and the structural classes are not relation truth. Still to run: the Gemini arm with images "
+    "(W46.date-enclosure-paid). For the app now: on local routes the marker is inert, so `Sent With` is never "
+    "proposed there, and nothing the free arms showed argues for proposing it by rule instead. A 27B relation pass "
+    "is conservative enough not to hurt (one wrong Sent With among the 105 negatives and one among the owner's 12 noes) but finds too little to "
+    "be worth a stage of its own on a laptop route, where it cannot run anyway.",
 ]
 
 
@@ -588,7 +613,7 @@ def write_md(out):
     L = ["# Dating: the enclosure marker and a relation classifier (W46.date-enclosure)", "",
          "Written by `scripts/segbench/date_enclosure.py score`. The first measurement of the app's `[enclosure]` "
          "marker (10-gap-audit.md §5 item 15, B-dating.md §3). All arms $0: local models on this Mac and Qwen3.6-27B "
-         "on FarmShare; no plan route (CLAUDE.md, \"Plan routes wait for the gateway\"); the Gemini arm is "
+         "on Sherlock; no plan route (CLAUDE.md, \"Plan routes wait for the gateway\"); the Gemini arm is "
          "W46.date-enclosure-paid. The set and the replies stay private in the bench cache "
          "(`date-tagging/enclosure/`); this page carries counts only.", "",
          "## The set", "",

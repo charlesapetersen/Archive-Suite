@@ -29,8 +29,15 @@ class ParseRelate(unittest.TestCase):
         self.assertTrue(p["sent_with"])
         self.assertEqual(p["confidence"], 1.0)
 
+    def test_two_unjoined_cues_keep_the_verdict(self):
+        p = E.parse_relate('{\n"sent_with": false,\n"cue": "Dear Michael:" and "Dear Dave,",\n"confidence": 0.95\n}')
+        self.assertEqual(p, {"sent_with": False, "cue": '"Dear Michael:" and "Dear Dave,"', "confidence": 0.95})
+        p = E.parse_relate('{"sent_with": true, "cue": "a" vs "b", "confidence": 2}')
+        self.assertEqual((p["sent_with"], p["confidence"]), (True, 1.0))
+
     def test_no_verdict_is_no_reply(self):
-        for raw in ("", "no json here", '{"cue": "x"}', '{"sent_with": "maybe"}', "{broken"):
+        for raw in ("", "no json here", '{"cue": "x"}', '{"sent_with": "maybe"}', "{broken",
+                    '{"sent_with": maybe, "cue": "a" "b"}'):
             self.assertIsNone(E.parse_relate(raw), raw)
 
 

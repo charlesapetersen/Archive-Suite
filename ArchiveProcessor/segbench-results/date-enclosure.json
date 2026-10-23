@@ -337,6 +337,102 @@
     0,
     0
    ]
+  },
+  "relate:qwen3.6-27b-nothink": {
+   "name": "relation classifier, Qwen3.6-27B, thinking off (Sherlock, one L40S)",
+   "n": 225,
+   "owner": {
+    "confusion": {
+     "TN": 11,
+     "FP": 1,
+     "FN": 2,
+     "TP": 1
+    },
+    "precision": [
+     1,
+     2
+    ],
+    "recall": [
+     1,
+     3
+    ]
+   },
+   "owner_no_bound": {
+    "confusion": {
+     "TN": 10,
+     "FP": 1,
+     "FN": 1,
+     "TP": 1
+    },
+    "precision": [
+     1,
+     2
+    ],
+    "recall": [
+     1,
+     2
+    ]
+   },
+   "rate": {
+    "A": {
+     "fired": 2,
+     "of": 60,
+     "no_reply": 0,
+     "ci": [
+      0.009,
+      0.114
+     ]
+    },
+    "A'": {
+     "fired": 1,
+     "of": 45,
+     "no_reply": 0,
+     "ci": [
+      0.004,
+      0.116
+     ]
+    },
+    "neg": {
+     "fired": 1,
+     "of": 105,
+     "no_reply": 0,
+     "ci": [
+      0.002,
+      0.052
+     ]
+    },
+    "owner": {
+     "fired": 2,
+     "of": 15,
+     "no_reply": 0,
+     "ci": [
+      0.037,
+      0.379
+     ]
+    }
+   },
+   "auc_proxy": 0.674,
+   "propagation": {
+    "pos_proposed": 5,
+    "pos_cover_dated": 4,
+    "pos_year_right": 4,
+    "neg_proposed": 1,
+    "neg_cover_dated": 1,
+    "neg_year_right": 0
+   },
+   "cue_quoted": [
+    6,
+    6
+   ],
+   "cue_found": [
+    5,
+    6
+   ],
+   "seconds_mean": null,
+   "neg_fired_cover_cue": [
+    0,
+    1
+   ]
   }
  }
 }
