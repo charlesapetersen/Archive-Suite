@@ -267,6 +267,20 @@ def segmentation(op):
                 continue
             seg.append({"name": c[0] + suffix, **row, "std": teacher_usd if md == TEACHER_MD else None, "batch": None,
                         "farmshare": True, "source": md.name})
+    # W46.seg-adapt-curve: doc-split-v1 (open ONNX, the Mac's CPU), scored the same way; its 2B row must reproduce
+    # options.md's, which checks the reimplemented level fit.
+    adapt = RESULTS / "seg-adapt-curve-owner.json"
+    if adapt.exists():
+        fz = json.loads(adapt.read_text())["frozen"]
+        r2 = fz["2B"]
+        if shipped_mac and (round(r2["nocheck"], 1), round(r2["checks"], 1)) != (shipped_mac["nocheck"], shipped_mac["checks"]):
+            sys.exit(f"seg-adapt-curve-owner.json's 2B row no longer matches options.md: {r2}")
+        for k, label in (("doc-split-v1, zero-shot", "doc-split-v1 zero-shot (open, Mac CPU; not in the app)"),
+                         ("doc-split-v1, dev refit", "doc-split-v1 refit on the development boxes (open, Mac CPU; not in the app)")):
+            r = fz[k]
+            seg.append({"name": label, "nocheck": round(r["nocheck"], 1), "checks": round(r["checks"], 1),
+                        "after": round(r["after"], 1), "unflagged": r["unflagged"], "std": None, "batch": None,
+                        "mac": True, "source": adapt.name})
     return seg
 
 
