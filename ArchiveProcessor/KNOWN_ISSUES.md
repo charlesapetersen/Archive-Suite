@@ -2,6 +2,15 @@
 
 Tracked bugs we've chosen to come back to later. Each entry has enough context to resume cold.
 
+## OPEN (W46.fix-postcorrect-pack, 2026-10-24): post-correction pack repeats route/page requests
+
+At baseline `076b3d84`, `scripts/segbench/postcorrect.py::cmd_pack` selects `ocr-scorers-pages.csv` by route alone
+and `owner_src` discards the source family. The collected Sherlock pack has 464 rows but 434 unique IDs; 30 rows
+repeat identical model inputs, 14 with conflicting baseline NES. All 434 replies are present. Deduplicate source
+selection, preserve the source family, and derive baseline scores from the actual reading supplied to the model.
+The W46.ocr-postcorrect scorer must count each request once and recompute its baseline before publishing a result;
+no model rerun is needed for identical inputs. Details: `../execution-plans/items/W46.ocr-postcorrect.md`.
+
 
 ## ✅ VERIFIED (W41.app-local-seg-proof, 2026-10-17): the local 8-bit segmenter reaches the app's review stage
 
