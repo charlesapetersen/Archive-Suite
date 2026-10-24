@@ -1,0 +1,30 @@
+Test Suite 'Selected tests' started at 2026-10-24 21:12:31.059.
+Test Suite 'ArchiveReaderUITests.xctest' started at 2026-10-24 21:12:31.059.
+Test Suite 'VisualReviewUITests' started at 2026-10-24 21:12:31.059.
+Test Case '-[ArchiveReaderUITests.VisualReviewUITests testSelectedRowContrastLightAndDark]' started.
+[visual] main window contrast-light requested (1400.0, 860.0) got (1402.0, 862.0)
+[shot] visual-contrast-light-selected-one-open: wrote /Users/admin/Library/Containers/com.archivereader.uitests.xctrunner/Data/tmp/uitest-visual-contrast-light-selected-one-open.png
+[shot] visual-contrast-light-selected-one-idle: wrote /Users/admin/Library/Containers/com.archivereader.uitests.xctrunner/Data/tmp/uitest-visual-contrast-light-selected-one-idle.png
+[shot] visual-contrast-light-selected-all-open: wrote /Users/admin/Library/Containers/com.archivereader.uitests.xctrunner/Data/tmp/uitest-visual-contrast-light-selected-all-open.png
+[shot] visual-contrast-light-selected-all-idle: wrote /Users/admin/Library/Containers/com.archivereader.uitests.xctrunner/Data/tmp/uitest-visual-contrast-light-selected-all-idle.png
+[shot] visual-contrast-light-inactive-selection-open: wrote /Users/admin/Library/Containers/com.archivereader.uitests.xctrunner/Data/tmp/uitest-visual-contrast-light-inactive-selection-open.png
+[shot] visual-contrast-light-inactive-selection-idle: wrote /Users/admin/Library/Containers/com.archivereader.uitests.xctrunner/Data/tmp/uitest-visual-contrast-light-inactive-selection-idle.png
+[shot] visual-contrast-light-selected-again-open: wrote /Users/admin/Library/Containers/com.archivereader.uitests.xctrunner/Data/tmp/uitest-visual-contrast-light-selected-again-open.png
+[shot] visual-contrast-light-selected-again-idle: wrote /Users/admin/Library/Containers/com.archivereader.uitests.xctrunner/Data/tmp/uitest-visual-contrast-light-selected-again-idle.png
+[visual] main window contrast-dark requested (1400.0, 860.0) got (1402.0, 862.0)
+[shot] visual-contrast-dark-selected-one-open: wrote /Users/admin/Library/Containers/com.archivereader.uitests.xctrunner/Data/tmp/uitest-visual-contrast-dark-selected-one-open.png
+[shot] visual-contrast-dark-selected-one-idle: wrote /Users/admin/Library/Containers/com.archivereader.uitests.xctrunner/Data/tmp/uitest-visual-contrast-dark-selected-one-idle.png
+[shot] visual-contrast-dark-selected-all-open: wrote /Users/admin/Library/Containers/com.archivereader.uitests.xctrunner/Data/tmp/uitest-visual-contrast-dark-selected-all-open.png
+[shot] visual-contrast-dark-selected-all-idle: wrote /Users/admin/Library/Containers/com.archivereader.uitests.xctrunner/Data/tmp/uitest-visual-contrast-dark-selected-all-idle.png
+[shot] visual-contrast-dark-inactive-selection-open: wrote /Users/admin/Library/Containers/com.archivereader.uitests.xctrunner/Data/tmp/uitest-visual-contrast-dark-inactive-selection-open.png
+[shot] visual-contrast-dark-inactive-selection-idle: wrote /Users/admin/Library/Containers/com.archivereader.uitests.xctrunner/Data/tmp/uitest-visual-contrast-dark-inactive-selection-idle.png
+[shot] visual-contrast-dark-selected-again-open: wrote /Users/admin/Library/Containers/com.archivereader.uitests.xctrunner/Data/tmp/uitest-visual-contrast-dark-selected-again-open.png
+[shot] visual-contrast-dark-selected-again-idle: wrote /Users/admin/Library/Containers/com.archivereader.uitests.xctrunner/Data/tmp/uitest-visual-contrast-dark-selected-again-idle.png
+Test Case '-[ArchiveReaderUITests.VisualReviewUITests testSelectedRowContrastLightAndDark]' passed (70.334 seconds).
+Test Suite 'VisualReviewUITests' passed at 2026-10-24 21:13:41.393.
+	 Executed 1 test, with 0 failures (0 unexpected) in 70.334 (70.334) seconds
+Test Suite 'ArchiveReaderUITests.xctest' passed at 2026-10-24 21:13:41.394.
+	 Executed 1 test, with 0 failures (0 unexpected) in 70.334 (70.335) seconds
+Test Suite 'Selected tests' passed at 2026-10-24 21:13:41.394.
+	 Executed 1 test, with 0 failures (0 unexpected) in 70.334 (70.336) seconds
+** TEST SUCCEEDED **

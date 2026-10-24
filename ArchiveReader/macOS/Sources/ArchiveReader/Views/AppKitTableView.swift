@@ -451,8 +451,10 @@ struct AppKitTableView: NSViewRepresentable {
         static func configureReadStateCell(_ cell: TintedTextCellView, state: ReadState?) {
             cell.textField?.stringValue = state?.rawValue ?? "—"
             cell.tint = state == .unread
-                ? (normal: .controlAccentColor, emphasized: .alternateSelectedControlTextColor)
-                : (normal: .secondaryLabelColor, emphasized: .secondaryLabelColor)
+                ? (normal: .controlAccentColor, emphasized: .alternateSelectedControlTextColor,
+                   inactiveSelected: .unemphasizedSelectedTextColor)
+                : (normal: .secondaryLabelColor, emphasized: .secondaryLabelColor,
+                   inactiveSelected: .secondaryLabelColor)
         }
 
         /// The Name cell's formatter, exposed internally so the headless pixel guard renders the same
@@ -667,21 +669,31 @@ final class SortableDiffableDataSource: NSTableViewDiffableDataSource<Int, Archi
 /// `NSTableCellView` hands the row's background style to its text field, and AppKit then draws `labelColor` and
 /// `secondaryLabelColor` in the selected-row text colours itself; an explicit colour such as the accent it leaves
 /// alone, which is how the Read column's blue "Unread" came to be drawn on the blue selection. A cell with a `tint`
-/// draws `tint.normal` on an ordinary row and `tint.emphasized` on a selected, emphasized one; without one it is a
-/// plain text cell whose caller sets the colour.
+/// draws `tint.normal` on an ordinary row, `tint.emphasized` on an active selection, and `tint.inactiveSelected`
+/// on an inactive selection; without one it is a plain text cell whose caller sets the colour.
 @MainActor
 final class TintedTextCellView: NSTableCellView {
-    var tint: (normal: NSColor, emphasized: NSColor)? {
+    var tint: (normal: NSColor, emphasized: NSColor, inactiveSelected: NSColor)? {
         didSet { applyTint() }
     }
 
     override var backgroundStyle: NSView.BackgroundStyle {
-        didSet { if backgroundStyle != oldValue { applyTint() } }
+        didSet { applyTint() }
+    }
+
+    override func viewWillDraw() {
+        super.viewWillDraw()
+        // AppKit gives both an ordinary row and an inactive selection `.normal`. Recheck the row before
+        // drawing as well, so selecting/deselecting while the table lacks focus cannot leave the old tint.
+        applyTint()
     }
 
     private func applyTint() {
         guard let tint, let textField else { return }
-        textField.textColor = backgroundStyle == .emphasized ? tint.emphasized : tint.normal
+        let selected = (superview as? NSTableRowView)?.isSelected == true
+        let color = backgroundStyle == .emphasized
+            ? tint.emphasized : (selected ? tint.inactiveSelected : tint.normal)
+        if textField.textColor != color { textField.textColor = color }
     }
 }
 

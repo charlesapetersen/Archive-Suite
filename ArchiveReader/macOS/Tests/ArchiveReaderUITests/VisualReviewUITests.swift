@@ -60,6 +60,39 @@ final class VisualReviewUITests: FixtureUITestCase {
     func testEmptyStatesLight() throws { try emptyStates(dark: false) }
     func testEmptyStatesDark() throws { try emptyStates(dark: true) }
 
+    /// Focused W40.fix-reader-selected-row-contrast recheck without repeating the whole screen tour.
+    /// Pixels are inspected after the run; selection assertions ensure each capture has the intended state.
+    func testSelectedRowContrastLightAndDark() {
+        for dark in [false, true] {
+            relaunch(root: Self.fixturePath, dark: dark, size: .typical)
+            prefix = "contrast-\(dark ? "dark" : "light")"
+            resizeMainWindow(to: WindowSize.typical.main)
+            let first = table.tableRows.element(boundBy: 0)
+            first.coordinate(withNormalizedOffset: CGVector(dx: 0.1, dy: 0.5)).click()
+            XCTAssertTrue(first.isSelected)
+            shoot("selected-one")
+            app.typeKey("a", modifierFlags: .command)
+            XCTAssertGreaterThan(table.tableRows.count, 1)
+            XCTAssertTrue(table.tableRows.allElementsBoundByIndex.allSatisfy { $0.isSelected })
+            shoot("selected-all")
+
+            // Moving focus to a filter dims the selection without changing it or writing tags.
+            let filter = app.textFields["ar.filter.name"]
+            XCTAssertTrue(filter.waitForExistence(timeout: 3))
+            filter.click()
+            XCTAssertTrue((filter.value(forKey: "hasKeyboardFocus") as? Bool) ?? false)
+            XCTAssertTrue(first.isSelected)
+            shoot("inactive-selection")
+
+            // A first click into an inactive multiselection can preserve the group. Move with the keyboard
+            // after returning focus to the table to deliberately collapse it to one selected row.
+            first.coordinate(withNormalizedOffset: CGVector(dx: 0.1, dy: 0.5)).click()
+            app.typeKey(XCUIKeyboardKey.upArrow.rawValue, modifierFlags: [])
+            XCTAssertEqual(table.tableRows.allElementsBoundByIndex.filter { $0.isSelected }.count, 1)
+            shoot("selected-again")
+        }
+    }
+
     private enum WindowSize: String, CaseIterable {
         case min, typical
         /// Requested main-window size; `min` drags past the 900×560 floor so the app's own minimum wins.

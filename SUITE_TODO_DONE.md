@@ -12918,3 +12918,12 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   Measured: the app's `[enclosure]` marker (Qwen3-VL 8B 4-bit, the app's exact prompt) fired on 0 of 225, 0 of the owner's 3 enclosures, so local routes never propose Sent With; the trained 2B as relation classifier said false on all 225 (AUC 0.48); cue words fire more on negatives than on A/A' (AUC 0.45). Qwen3.6-27B is the only free arm that proposes a relation, rarely: 2/60 A, 1/45 A', 1/105 negatives (AUC 0.67); owner set 1 of 3 enclosures found (a22), 1 false Sent With (a25); 4 of its 5 A/A'/owner proposals carry the owner's year. 43 of its replies quoted two cues unjoined (invalid JSON, all false verdicts); `parse_relate` now salvages the verdict.
   For the app: the marker is inert on local routes; nothing argues for a rule instead; a 27B relation stage is safe but finds too little. Still open: W46.date-enclosure-paid (Gemini with images).
   <!-- /W46.date-enclosure -->
+
+- [x] **W40.fix-reader-selected-row-contrast — on a selected row the blue "Unread" and the tag chips nearly vanish [S · S3]** · §W40 — SHIPPED 2026-10-24 (this commit). (lane: reader) (uses: build,vm). Found by `W40.e10` 2026-10-16; reproduction: `verification/evidence/reader/visual-2026-10-16-selected-dark.jpg` (all 11 rows selected, dark). The Read column's link-blue "Unread" draws blue on the blue selection highlight, so on a selected row Read and Unread can only be told apart by squinting. The tag chips' pale blue fill merges into the highlight too. Light is the same, slightly less so. Use the selected-row (emphasized) text colour for the Read label and an outlined chip style on selected rows, as `NSTableView` does for its own text. Add a check to the headless render guards that samples the label's contrast on a selected row.
+  Completed checkpoints `c6bc8c6b` and `19fd2c3f`: active selected Unread and outlined chip lettering/borders
+  measure 5.37:1 light / 6.27:1 dark. This commit also fixes inactive selected Unread (15.31:1 / 9.44:1),
+  keeping the accent on ordinary rows and native secondary text for Read. The guard reuses cells through focus,
+  deselection and same-style reselection; the focused off-screen VM capture covers one/all/inactive selections.
+  Evidence: `verification/evidence/reader/selected-row-contrast-2026-10-24.md`. Reader smoke: 507 tests,
+  3 skipped, 0 failures; independent diff review and write-surface lint plus its 22/22 mutation checks pass.
+  <!-- /W40.fix-reader-selected-row-contrast -->

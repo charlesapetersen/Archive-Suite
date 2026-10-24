@@ -2,6 +2,19 @@
 
 Running log of quirks, risks, and things verified/unverified. Keep current.
 
+## ✅ CLOSED (W40.fix-reader-selected-row-contrast, 2026-10-24) — selected Read labels and tag chips
+
+The Read column's accent-blue “Unread” and native token fills merged into the active selection highlight.
+`TintedTextCellView` now follows active and inactive selection text colours; “Read” keeps AppKit's secondary
+label mapping. `WrappingTokenField` draws filled chips on ordinary/inactive rows and outlined chips with
+selection text on active rows, returning to native tokens during editing. Selection does not change chip
+geometry. A wrapping cell asks for its row height again after layout rather than drawing below its row.
+
+`SelectedRowContrastTests` samples the real cells' label, chip lettering and outline in light/dark; it also
+reuses the cells through active, inactive, deselected and reselected states, and rejects the old accent label.
+The focused VM screenshot check and its measured results are kept in
+[`selected-row-contrast-2026-10-24.md`](../verification/evidence/reader/selected-row-contrast-2026-10-24.md).
+
 ## ✅ CLOSED (gate-fix, 2026-10-17) — write-surface lint allowances lagged the fresh-URL writer
 
 `W40.fix-identity-url-cache` (`20e8f078`) moved the three audited tag/label setters from the

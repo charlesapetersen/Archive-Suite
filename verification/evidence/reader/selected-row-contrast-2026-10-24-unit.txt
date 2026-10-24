@@ -1,0 +1,57 @@
+Test Suite 'SelectedRowContrastTests' started at 2026-10-24 14:07:33.575.
+Test Case '-[ArchiveReaderTests.SelectedRowContrastTests testACellTooShortForItsChipsAsksForItsRowHeightAgainOnce]' started.
+Test Case '-[ArchiveReaderTests.SelectedRowContrastTests testACellTooShortForItsChipsAsksForItsRowHeightAgainOnce]' passed (0.433 seconds).
+Test Case '-[ArchiveReaderTests.SelectedRowContrastTests testChipLayoutWrapsAndClamps]' started.
+Test Case '-[ArchiveReaderTests.SelectedRowContrastTests testChipLayoutWrapsAndClamps]' passed (0.005 seconds).
+Test Case '-[ArchiveReaderTests.SelectedRowContrastTests testChipsKeepTheNativeRowHeight]' started.
+Test Case '-[ArchiveReaderTests.SelectedRowContrastTests testChipsKeepTheNativeRowHeight]' passed (0.009 seconds).
+Test Case '-[ArchiveReaderTests.SelectedRowContrastTests testProbeFailsTheAccentLabelOnTheSelection]' started.
+[W40.selrow] light the old accent label on the selection: contrast 1.34 (background L=0.146, ink L=0.211)
+[W40.selrow] dark the old accent label on the selection: contrast 1.56 (background L=0.117, ink L=0.211)
+Test Case '-[ArchiveReaderTests.SelectedRowContrastTests testProbeFailsTheAccentLabelOnTheSelection]' passed (0.028 seconds).
+Test Case '-[ArchiveReaderTests.SelectedRowContrastTests testReadStatesAndChipsFollowSelectionChanges]' started.
+[W40.selrow] light Read active: contrast 4.79 (background L=0.146, ink L=0.886)
+[W40.selrow] light Read inactive: contrast 6.99 (background L=0.716, ink L=0.060)
+[W40.selrow] light Read ordinary: contrast 7.94 (background L=1.000, ink L=0.082)
+[W40.selrow] light Read inactive-again: contrast 6.99 (background L=0.716, ink L=0.060)
+[W40.selrow] light Read active-again: contrast 4.79 (background L=0.146, ink L=0.886)
+[W40.selrow] light Unread active: contrast 5.37 (background L=0.146, ink L=1.000)
+[W40.selrow] light Unread inactive: contrast 15.31 (background L=0.716, ink L=0.000)
+[W40.selrow] light Unread ordinary: contrast 4.02 (background L=1.000, ink L=0.211)
+[W40.selrow] light Unread inactive-again: contrast 15.31 (background L=0.716, ink L=0.000)
+[W40.selrow] light Unread active-again: contrast 5.37 (background L=0.146, ink L=1.000)
+[W40.selrow] dark Read active: contrast 5.58 (background L=0.117, ink L=0.885)
+[W40.selrow] dark Read inactive: contrast 7.02 (background L=0.061, ink L=0.730)
+[W40.selrow] dark Read ordinary: contrast 11.81 (background L=0.013, ink L=0.694)
+[W40.selrow] dark Read inactive-again: contrast 7.02 (background L=0.061, ink L=0.730)
+[W40.selrow] dark Read active-again: contrast 5.58 (background L=0.117, ink L=0.885)
+[W40.selrow] dark Unread active: contrast 6.27 (background L=0.117, ink L=1.000)
+[W40.selrow] dark Unread inactive: contrast 9.44 (background L=0.061, ink L=1.000)
+[W40.selrow] dark Unread ordinary: contrast 4.15 (background L=0.013, ink L=0.211)
+[W40.selrow] dark Unread inactive-again: contrast 9.44 (background L=0.061, ink L=1.000)
+[W40.selrow] dark Unread active-again: contrast 6.27 (background L=0.117, ink L=1.000)
+Test Case '-[ArchiveReaderTests.SelectedRowContrastTests testReadStatesAndChipsFollowSelectionChanges]' passed (0.604 seconds).
+Test Case '-[ArchiveReaderTests.SelectedRowContrastTests testUnreadAndChipsReadOnAnOrdinaryRow]' started.
+[W40.selrow] light ordinary, Unread: contrast 4.02 (background L=1.000, ink L=0.211); system pair 4.016975780478911
+[W40.selrow] light ordinary, chip Jerry Brown: contrast 9.92 (background L=0.681, ink L=0.024); system pair 10.887708171449303
+[W40.selrow] light ordinary, chip Economics: contrast 9.92 (background L=0.681, ink L=0.024); system pair 10.887708171449303
+[W40.selrow] light ordinary, chip 1983: contrast 9.92 (background L=0.681, ink L=0.024); system pair 10.887708171449303
+[W40.selrow] dark ordinary, Unread: contrast 4.15 (background L=0.013, ink L=0.211); system pair 4.150176049189515
+[W40.selrow] dark ordinary, chip Jerry Brown: contrast 8.61 (background L=0.047, ink L=0.782); system pair 8.827541253491933
+[W40.selrow] dark ordinary, chip Economics: contrast 8.61 (background L=0.047, ink L=0.782); system pair 8.827541253491933
+[W40.selrow] dark ordinary, chip 1983: contrast 8.61 (background L=0.047, ink L=0.782); system pair 8.827541253491933
+Test Case '-[ArchiveReaderTests.SelectedRowContrastTests testUnreadAndChipsReadOnAnOrdinaryRow]' passed (0.061 seconds).
+Test Case '-[ArchiveReaderTests.SelectedRowContrastTests testUnreadAndChipsReadOnASelectedRow]' started.
+[W40.selrow] light selected, Unread: contrast 5.37 (background L=0.146, ink L=1.000); system pair 5.370682973141324
+[W40.selrow] light selected, chip Jerry Brown: outline contrast 5.37 (background L=0.146, ink L=1.000); title contrast 5.37 (background L=0.146, ink L=1.000)
+[W40.selrow] light selected, chip Economics: outline contrast 5.37 (background L=0.146, ink L=1.000); title contrast 5.37 (background L=0.146, ink L=1.000)
+[W40.selrow] light selected, chip 1983: outline contrast 5.37 (background L=0.146, ink L=1.000); title contrast 5.37 (background L=0.146, ink L=1.000)
+[W40.selrow] dark selected, Unread: contrast 6.27 (background L=0.117, ink L=1.000); system pair 6.269327818116277
+[W40.selrow] dark selected, chip Jerry Brown: outline contrast 6.27 (background L=0.118, ink L=1.000); title contrast 6.27 (background L=0.118, ink L=1.000)
+[W40.selrow] dark selected, chip Economics: outline contrast 6.27 (background L=0.117, ink L=1.000); title contrast 6.27 (background L=0.118, ink L=1.000)
+[W40.selrow] dark selected, chip 1983: outline contrast 6.27 (background L=0.118, ink L=1.000); title contrast 6.27 (background L=0.118, ink L=1.000)
+Test Case '-[ArchiveReaderTests.SelectedRowContrastTests testUnreadAndChipsReadOnASelectedRow]' passed (0.065 seconds).
+Test Suite 'SelectedRowContrastTests' passed at 2026-10-24 14:07:34.786.
+	 Executed 507 tests, with 3 tests skipped and 0 failures (0 unexpected) in 87.917 (88.116) seconds
+	 Executed 507 tests, with 3 tests skipped and 0 failures (0 unexpected) in 87.917 (88.117) seconds
+** TEST SUCCEEDED **

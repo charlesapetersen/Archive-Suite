@@ -57,6 +57,54 @@ final class SelectedRowContrastTests: XCTestCase {
         }
     }
 
+    /// Reuse the same cells as emphasis/selection changes, including Read's AppKit-provided secondary tint.
+    func testReadStatesAndChipsFollowSelectionChanges() throws {
+        for (name, appearance) in Self.appearances {
+            for state in [ReadState.read, .unread] {
+                let harness = SelectedRowHarness(subjects: Self.subjects, readState: state)
+                let scroll = harness.makeScrollView(size: CGSize(width: 420, height: 60), appearance: appearance,
+                                                    selected: false)
+                let table = try XCTUnwrap(scroll.documentView as? NSTableView)
+                let row = try XCTUnwrap(table.rowView(atRow: 0, makeIfNecessary: true))
+                let cell = try XCTUnwrap(harness.readCell)
+                let tags = try XCTUnwrap(harness.tagCell)
+                for (phase, selected, emphasized) in [("active", true, true), ("inactive", true, false),
+                                                      ("ordinary", false, false), ("inactive-again", true, false),
+                                                      ("active-again", true, true)] {
+                    table.selectRowIndexes(selected ? IndexSet(integer: 0) : [], byExtendingSelection: false)
+                    row.isEmphasized = emphasized
+                    row.needsDisplay = true
+                    let (image, scale) = try render(scroll, artifact: "w40-\(name)-\(state.rawValue)-\(phase).png")
+                    XCTAssertEqual(cell.backgroundStyle, emphasized ? .emphasized : .normal)
+                    XCTAssertEqual(tags.tokenField.isEmphasized, emphasized)
+                    let label = try XCTUnwrap(cell.textField)
+                    let contrast = try measure(image, rect: label.bounds, in: label, scroll: scroll, scale: scale)
+                    print("[W40.selrow] \(name) \(state.rawValue) \(phase): \(contrast)")
+                    let background: NSColor = selected
+                        ? (emphasized ? .selectedContentBackgroundColor : .unemphasizedSelectedContentBackgroundColor)
+                        : .controlBackgroundColor
+                    XCTAssertEqual(contrast.background, luminance(background, in: appearance), accuracy: 0.02)
+                    if state == .unread {
+                        let ink: NSColor = selected
+                            ? (emphasized ? .alternateSelectedControlTextColor : .unemphasizedSelectedTextColor)
+                            : .controlAccentColor
+                        assertContrast(contrast, expected: expectedContrast(ink, over: background, in: appearance),
+                                       "\(name) Unread \(phase)")
+                    } else {
+                        // Secondary labels are remapped by AppKit under emphasis; measure the actual drawing.
+                        XCTAssertGreaterThan(contrast.ratio, Self.floor, "\(name) Read \(phase): \(contrast)")
+                    }
+                    for chip in try chipContrasts(image, cell: tags, scroll: scroll, scale: scale) {
+                        let expected = emphasized
+                            ? expectedContrast(.alternateSelectedControlTextColor, over: background, in: appearance)
+                            : expectedContrast(.labelColor, over: TagChips.fill, over: background, in: appearance)
+                        assertContrast(chip.text, expected: expected, "\(name) \(phase) chip \(chip.title)")
+                    }
+                }
+            }
+        }
+    }
+
     /// An ordinary row keeps readable chips (the title on the tinted fill) and the accent label on the row.
     func testUnreadAndChipsReadOnAnOrdinaryRow() throws {
         for (name, appearance) in Self.appearances {
