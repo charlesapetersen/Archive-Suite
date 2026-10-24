@@ -318,6 +318,26 @@ def public_segmentation():
                 if f["counts"]["pages_exact"] != r["counts"]["pages_exact"]:
                     sys.exit(f"seg-scorers-public.json disagrees with {b['box']}-scores.json on {k}")
                 r["field"] = {m: f["metrics"][m] for m in ("pq", "kappa", "mndd", "mndd_per_100_pages")}
+    gateway = RESULTS / "seg-lincoln-gateway.json"
+    if gateway.exists():
+        gateway_data = json.loads(gateway.read_text())
+        scored = gateway_data["boxes"]
+        for b in boxes:
+            sources = next(v for k, v in scored.items() if k.lower() == b["box"].lower())["sources"]
+            for k, f in sources.items():
+                r = b["models"].get(k)
+                if r is None or {a: v for a, v in r["counts"].items() if a != "collections"} != {
+                        a: v for a, v in f["counts"].items() if a != "collections"}:
+                    sys.exit(f"seg-lincoln-gateway.json disagrees with {b['box']}-scores.json on {k}")
+                r["field"] = {m: f["metrics"][m] for m in ("pq", "kappa", "mndd", "mndd_per_100_pages")}
+                route = {"gateway-gemini": "gemini", "gateway-glm": "glm",
+                         "gateway-gemini-whole": "gemini", "window-cues-claude-cue": "claude-cue"}[k]
+                calls = [c for c in gateway_data["calls"] if c["box"].lower() == b["box"].lower()
+                         and c["route"] == route and c["whole"] == k.endswith("-whole")]
+                if calls:
+                    timed = [c["wall_s"] for c in calls if "wall_s" in c]
+                    r["gateway"] = {"calls": len(calls), "cost_estimate": sum(c["charge"] for c in calls),
+                                    "mean_s": sum(timed) / len(timed) if timed else None}
     return boxes
 
 

@@ -135,7 +135,15 @@ def score(col, manifest, key, output_dir=None):
             route = key.removeprefix("window-cues-")
             if route not in WC.ROUTES:
                 raise ValueError(f"unknown window-cues route {route}")
-            predictions[key] = W.assemble(col, W.combine(col, WC.judge(route)), False)  # combine never calls
+            if route == "claude-cue":
+                from seg_lincoln_gateway import claude_cue
+                judge = claude_cue  # cached plan answers plus the explicitly separate gateway holes
+            else:
+                judge = WC.judge(route)
+            predictions[key] = W.assemble(col, W.combine(col, judge), False)  # combine never calls
+        elif key.startswith("gateway-"):
+            import seg_lincoln_gateway as GW
+            predictions[key] = GW.predictors()[key](col)  # strict, cache-only
         else:
             import method_openrouter as R
             predictions[key] = W.assemble(col, W.combine(col, R.judge(key)), False)

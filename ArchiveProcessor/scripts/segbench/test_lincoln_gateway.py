@@ -10,6 +10,20 @@ import seg_lincoln_gateway as M
 
 
 class Money(unittest.TestCase):
+    def test_only_explicit_preinference_size_rejection_releases_reservation(self):
+        with tempfile.TemporaryDirectory() as d, patch.object(M, 'STORE', Path(d)):
+            M.append({'id': 'a', 'event': 'settle', 'http': 413, 'charge': .9, 'request_sha256': 'key'})
+            with patch.object(M, 'cached', return_value={'response': {'error': 'other'}}):
+                with self.assertRaises(RuntimeError):
+                    M.reconcile_413()
+            self.assertEqual(M.spent(), .9)
+            with patch.object(M, 'cached', return_value={
+                    'response': {'error': 'Request size is too large. Max size is 32 MB'}}):
+                M.reconcile_413()
+                M.reconcile_413()
+            self.assertEqual(M.spent(), 0)
+            self.assertEqual(len(M.records()), 2)
+
     def test_reservations_survive_interruption_and_settle_once(self):
         rows = [{'id': 'a', 'charge': .4}, {'id': 'b', 'charge': .7},
                 {'id': 'a', 'charge': .03}]
@@ -74,6 +88,16 @@ class Money(unittest.TestCase):
 
 
 class Inputs(unittest.TestCase):
+    def test_complete_whole_json_fence_parses_but_missing_gap_does_not(self):
+        raw = '```json\n' + json.dumps({'boundaries': [
+            {'between': [1, 2], 'decision': 'new', 'confidence': .9}]}) + '\n```'
+        self.assertEqual(M.parse(raw, [1, 2], True)[1]['decision'], 'new')
+        with self.assertRaises(M.W.ParseError):
+            M.parse(raw, [1, 2, 3], True)
+        typo = raw.replace('"between": [1, 2]', '"between": 1, 2]')
+        with self.assertRaises(M.W.ParseError):
+            M.parse(typo, [1, 2], True)  # never invent missing JSON delimiters or values
+
     def test_missing_ocr_stops_before_build_or_send(self):
         col = SimpleNamespace(name='Toy', pages=[SimpleNamespace(n=1), SimpleNamespace(n=2)])
         with tempfile.TemporaryDirectory() as d, patch.object(M.data, 'CACHE_DIR', Path(d)), \
