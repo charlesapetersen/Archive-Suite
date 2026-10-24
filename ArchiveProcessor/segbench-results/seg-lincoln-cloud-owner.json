@@ -274,6 +274,71 @@
      },
      "review_load": 16
     },
+    "window-cues-claude-cue": {
+     "counts": {
+      "pages": 149,
+      "doc_pages": 141,
+      "pages_exact": 138,
+      "docs": 89,
+      "docs_exact": 87,
+      "folders": 5,
+      "folders_perfect": 4,
+      "gaps": 136,
+      "truth_bounds": 84,
+      "tp": 83,
+      "false_splits": 0,
+      "false_merges": 1,
+      "edits": 1,
+      "photos": 8,
+      "photos_exact": 8,
+      "photo_type_swaps": 0,
+      "photos_missed": 0,
+      "false_photos": 0,
+      "pk_windows": 148,
+      "pk_errors": 1,
+      "wd_errors": 1,
+      "pred_docs": 88,
+      "pq_tp": 88,
+      "pq_iou": 87.66666666666667,
+      "mndd": 1,
+      "collections": [
+       "Deaver"
+      ]
+     },
+     "metrics": {
+      "collections": "Deaver",
+      "pages": 149,
+      "doc_pages": 141,
+      "docs": 89,
+      "pages_in_exact_doc": 0.9787234042553191,
+      "docs_exact": 0.9775280898876404,
+      "folders": 5,
+      "folders_perfect": 0.8,
+      "false_splits": 0,
+      "false_merges": 1,
+      "boundary_precision": 1.0,
+      "boundary_recall": 0.9880952380952381,
+      "boundary_f1": 0.9940119760479043,
+      "pk": 0.006756756756756757,
+      "windowdiff": 0.006756756756756757,
+      "edits_per_100_pages": 0.6711409395973155,
+      "photos": 8,
+      "photo_accuracy": 1.0,
+      "photo_type_swaps": 0,
+      "photos_missed": 0,
+      "false_photos": 0,
+      "kappa": 0.9844890510948906,
+      "doc_precision": 0.9886363636363636,
+      "doc_f1": 0.983050847457627,
+      "pq": 0.9905838041431262,
+      "rq": 0.9943502824858758,
+      "sq": 0.9962121212121212,
+      "stp": 0.8,
+      "mndd": 1,
+      "mndd_per_100_pages": 0.6711409395973155
+     },
+     "review_load": 22
+    },
     "window-cues-codex": {
      "counts": {
       "pages": 149,
@@ -341,7 +406,6 @@
     }
    },
    "missing": {
-    "window-cues-claude-cue": "Deaver: window 139-145 not collected; run `method_window.py collect` first",
     "window-cues-codex-cue": "Deaver: window 1-4 not collected; run `method_window.py collect` first"
    },
    "split": "dev"

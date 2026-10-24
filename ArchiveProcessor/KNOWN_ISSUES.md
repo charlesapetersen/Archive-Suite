@@ -2,6 +2,15 @@
 
 Tracked bugs we've chosen to come back to later. Each entry has enough context to resume cold.
 
+## RESOLVED (W46.seg-lincoln-cloud-paid, 2026-10-24): public comparison confidence and unreachable review targets
+
+`scripts/segbench/seg_lincoln_cloud.py::public` now uses the committed owner-only rule fit and its precisions:
+the public cache has no owner OCR, so refitting there trained on empty text. Public window comparisons use
+model photo calls, matching `public_segmentation.py`; `review_load` returns null when free-gap corrections
+cannot reach 98%, rather than reporting all gaps as if they reached it. Scratch regressions cover unreachable
+fixed errors and gateway cap/cache failures. The private item ledger keeps failed calls and full unknown-usage
+allowances; `segbench-results/seg-lincoln-gateway.json` publishes the completed cue arm at this checkpoint.
+
 ## OPEN (W46.fix-postcorrect-pack, 2026-10-24): post-correction pack repeats route/page requests
 
 At baseline `076b3d84`, `scripts/segbench/postcorrect.py::cmd_pack` selects `ocr-scorers-pages.csv` by route alone

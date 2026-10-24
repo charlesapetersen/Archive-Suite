@@ -65,7 +65,7 @@ def review_load(truth: list[str], pred) -> int | None:
             i = order[k]
             if labels[i + 1] in ("New", "Cont"):
                 labels[i + 1] = "New" if truth[i + 1] == "New" else "Cont"
-    return len(order)
+    return None  # fixed/photo errors cannot be repaired by reviewing the free document gaps
 
 
 def score_sources(col, srcs: dict, prior_count: int | None) -> dict:
@@ -113,9 +113,24 @@ def public(root: Path) -> None:
         raise SystemExit(f"set SEGBENCH_CACHE={root / 'cache'}")
     import rescore
     import public_segmentation as P
-    from methods import METHODS
+    from methods import from_labels
+    import method_openrouter as R
+    import rules
     rescore.no_network()
-    srcs = {"rule-cues": METHODS["rule-cues"].predict,   # as rescore.py scores it
+    frozen = R.committed(P.MANIFESTS / "rule-cues-frozen.json")
+    params = rules.Params(**{**frozen["params"], "rules": tuple(frozen["params"]["rules"])})
+
+    def frozen_rule(col):
+        # The public cache has only public OCR. Refitting here would train on empty owner
+        # text and give spurious rule precisions. Use the already frozen owner-only fit.
+        features = rules._features(col, params.top_lines, params.end_lines, params.blank_chars)
+        labels, deciders = rules.predict_labels(features, params)
+        pred = from_labels(labels)
+        for b, rule in zip(pred.boundaries, deciders[1:]):
+            b.update(cue=rule, confidence=rules.precision(frozen["stats"], rule))
+        return pred
+
+    srcs = {"rule-cues": frozen_rule,
             **window_sources(list(OPEN) + [f"window-cues-{r}" for r in ROUTES])}
     result = {"boxes": {}}
     for box in ("lincoln", "crest"):
@@ -189,6 +204,10 @@ def render(pub: dict, owner: dict, notes: str) -> str:
          "Same Sonnet 5.5, inline images instead of tool reads; c2 is a mixed-transport result. "
          "The ChatGPT arm was dropped by the owner. Same 7-page windows, stride "
          "3, combining and assembly as every window source; FarmShare rows are the committed open-model caches.", "",
+         "Public window rows use the models' own photo calls, matching the public scorer. A dash in the review "
+         "column means correcting free document gaps alone cannot reach 98% (including false photo/fixed errors). "
+         "The rule baseline and its confidence estimates come from the committed owner-only frozen fit, "
+         "rather than refitting against the public cache, which has no owner OCR.", "",
          notes.strip(), "", "## Lincoln and CREST, every source, old and new scorers", ""]
     for box, b in pub["boxes"].items():
         L += public_table(box, b)

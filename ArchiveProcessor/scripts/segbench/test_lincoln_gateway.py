@@ -10,6 +10,29 @@ import seg_lincoln_gateway as M
 
 
 class Money(unittest.TestCase):
+    def test_explicit_transport_retry_keeps_old_allowance_and_allows_only_one_retry(self):
+        with tempfile.TemporaryDirectory() as d, patch.object(M, 'STORE', Path(d)):
+            M.append({'id': 'a', 'event': 'reserve', 'request_sha256': 'key', 'whole': False,
+                      't': M.time.time() - 400, 'charge': .1})
+            M.retry_unsettled_once()
+            self.assertEqual(M.spent(), .1)
+            self.assertEqual(M.effective_records()[0]['event'], 'retry-approved')
+            M.append({'id': 'b', 'event': 'unknown', 'request_sha256': 'key', 'whole': False,
+                      't': M.time.time() - 400, 'charge': .1})
+            M.append({'id': 'b', 'event': 'reserve', 'request_sha256': 'key', 'whole': False,
+                      't': M.time.time() - 400, 'charge': .1})
+            with self.assertRaisesRegex(RuntimeError, 'already retried'):
+                M.retry_unsettled_once()
+            self.assertEqual(M.spent(), .2)
+
+    def test_transport_retry_never_overlaps_the_timeout(self):
+        with tempfile.TemporaryDirectory() as d, patch.object(M, 'STORE', Path(d)):
+            M.append({'id': 'a', 'event': 'reserve', 'request_sha256': 'key', 'whole': False,
+                      't': M.time.time(), 'charge': .1})
+            with self.assertRaisesRegex(RuntimeError, 'timeout has not elapsed'):
+                M.retry_unsettled_once()
+            self.assertEqual(len(M.records()), 1)
+
     def test_only_explicit_preinference_size_rejection_releases_reservation(self):
         with tempfile.TemporaryDirectory() as d, patch.object(M, 'STORE', Path(d)):
             M.append({'id': 'a', 'event': 'settle', 'http': 413, 'charge': .9, 'request_sha256': 'key'})
@@ -88,6 +111,39 @@ class Money(unittest.TestCase):
 
 
 class Inputs(unittest.TestCase):
+    def test_json_mode_reuses_valid_pilot_only_and_never_reuses_failure(self):
+        body = {'model': 'gemini', 'messages': [], 'response_format': {'type': 'json_object'}}
+        for valid in (True, False):
+            with self.subTest(valid=valid), patch.object(M, 'cached', side_effect=[None, {'valid': valid}]) as read:
+                self.assertEqual(M.cache_hit(body, 'new'), {'valid': True} if valid else None)
+                self.assertNotEqual(read.call_args_list[1].args[0], 'new')
+
+    def test_missing_second_box_does_not_overwrite_first_box_or_leave_stale_scores(self):
+        import hashlib
+        import public_segmentation as P
+        import rescore
+        import seg_lincoln_cloud as S
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            manifest = {'frozen': True}
+            digest = hashlib.sha256(json.dumps(manifest, sort_keys=True).encode()).hexdigest()
+            (root / 'lincoln.json').write_text(json.dumps(manifest))
+            old = json.dumps({'truth_sha256': digest, 'pages': 1, 'models': {}})
+            path = root / 'lincoln-scores.json'
+            path.write_text(old)
+            cols = [SimpleNamespace(name=n, pages=[None]) for n in ('Lincoln', 'CREST')]
+            good = {'sources': {'gateway-gemini': {'counts': {'collections': ['Lincoln']}, 'metrics': {}}},
+                    'missing': {}}
+            bad = {'sources': {}, 'missing': {'gateway-glm': 'hole'}}
+            with patch.object(M, 'public_columns', return_value=cols), patch.object(M, 'use_cache'), \
+                    patch.object(M, 'RESULTS', root), patch.object(P, 'MANIFESTS', root), \
+                    patch.object(M, 'spent', return_value=0), patch.object(M, 'effective_records', return_value=[]), \
+                    patch.object(rescore, 'no_network'), patch.object(S, 'score_sources', side_effect=[good, bad]):
+                with self.assertRaisesRegex(ValueError, 'incomplete sources'):
+                    M.score(root)
+            self.assertEqual(path.read_text(), old)
+            self.assertFalse((root / 'seg-lincoln-gateway.json').exists())
+
     def test_complete_whole_json_fence_parses_but_missing_gap_does_not(self):
         raw = '```json\n' + json.dumps({'boundaries': [
             {'between': [1, 2], 'decision': 'new', 'confidence': .9}]}) + '\n```'

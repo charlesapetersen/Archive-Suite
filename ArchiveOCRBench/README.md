@@ -57,7 +57,12 @@ built are in [`POTENTIAL_FEATURES.md`](POTENTIAL_FEATURES.md).
 
 Part 2 also reports the public/easier CREST and Lincoln segmentation boxes separately, from their frozen
 `public-segmentation/*-scores.json` files. Every supplied page was audited before collection; source gaps
-and ambiguous wrappers are disclosed beside the figures. Paid reference calls remain deferred.
+and ambiguous wrappers are disclosed beside the figures. W46.seg-lincoln-cloud-paid adds the completed
+Claude cue arm's gateway holes; its Gemini and GLM arms are still being collected at this checkpoint.
+`seg-lincoln-gateway.json` joins each completed public route's field metrics, additional gateway calls,
+mean response time and estimated token cost into that table. Gateway costs use checked list rates,
+including reasoning, because the gateway supplies no bill; they are explicitly estimates. The Claude cue
+row combines plan replies and 9 gateway windows on CREST (2 more on Deaver are in the full report).
 
 ## Completeness rule
 

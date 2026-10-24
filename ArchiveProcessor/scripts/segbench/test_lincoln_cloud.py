@@ -53,6 +53,13 @@ class Guard(unittest.TestCase):
 
 
 class ReviewLoad(unittest.TestCase):
+    def test_unrepairable_fixed_gap_does_not_claim_the_target_was_reached(self):
+        truth = ["New", "Cont", "Cont", "New", "Cont"] * 2
+        labels = list(truth)
+        labels[1] = "New"
+        bounds = [{"decision": "x", "confidence": .9, "fixed": i == 0} for i in range(9)]
+        self.assertIsNone(S.review_load(truth, Prediction(labels, bounds)))
+
     def test_least_confident_wrong_gap_first(self):
         truth = ["New", "Cont", "Cont", "New", "Cont"] * 2
         labels = list(truth)

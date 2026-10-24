@@ -99,9 +99,8 @@ def request(route, col, a, b, whole=False):
     parts.append({'type': 'text', 'text': prompt})
     body = {'model': MODELS[route], 'temperature': 0, 'max_tokens': 32768 if whole else 4096,
             'messages': [{'role': 'user', 'content': parts}]}
-    if whole:
-        body['response_format'] = {'type': 'json_object'}
     if route != 'claude-cue':
+        body['response_format'] = {'type': 'json_object'}
         body['reasoning_effort'] = 'low' if route == 'gemini' else 'minimal'
     if len(json.dumps(body).encode()) > 32_000_000:
         raise ValueError('body exceeds the gateway 32 MB limit; no call sent')
@@ -126,13 +125,17 @@ def parse(raw, nums, whole):
 
 
 def reservation(route, body):
-    # Conservative input allowance: one token per UTF-8 text byte + 8192 per <=1600px
-    # image + message overhead, bounded by the models' published 1M context. It is an
-    # allowance, not a gateway billing guarantee; rates above are explicitly estimates.
+    # Input allowance: one token per UTF-8 text byte + image allowance + message overhead,
+    # bounded by the published 1M context. Gemini's pilot (including all 261 whole images)
+    # bills 1066-1098/image at 1600px (whole ~1084): allow 2048/image (>1.86x).
+    # Other models keep 8192.
+    # This is a conservative estimate, not a gateway billing guarantee. Every call also
+    # reserves the full output-token cap and stops if actual usage exceeds its allowance.
     parts = body['messages'][0]['content']
     text = sum(len(p['text'].encode()) for p in parts if p['type'] == 'text')
     images = sum(p['type'] == 'image_url' for p in parts)
-    tokens = min(1_048_576, text + 8192 * images + 2048)
+    image_allowance = 2048 if route == 'gemini' else 8192
+    tokens = min(1_048_576, text + image_allowance * images + 2048)
     pi, po = PRICES[route]
     return (tokens * pi + body['max_tokens'] * po) / 1e6
 
@@ -140,6 +143,19 @@ def reservation(route, body):
 def cached(key):
     p = STORE / 'replies' / f'{key}.json'
     return json.loads(p.read_text()) if p.exists() else None
+
+
+def cache_hit(body, key):
+    hit = cached(key)
+    if hit is None and body.get('response_format') == {'type': 'json_object'}:
+        # The earlier unconstrained-output pilot has identical model, images and prompt.
+        # Keep its valid responses; failed replies remain charged and are never silently used.
+        old_body = {k: v for k, v in body.items() if k != 'response_format'}
+        old_key = hashlib.sha256(json.dumps(old_body, sort_keys=True).encode()).hexdigest()
+        old = cached(old_key)
+        if old and old.get('valid'):
+            hit = old
+    return hit
 
 
 def reconcile_413():
@@ -184,10 +200,29 @@ def revalidate():
                           'no values changed, no new inference or charge'})
 
 
+def retry_unsettled_once():
+    """Explicit single retry after a transport failure; keep the entire original allowance charged."""
+    rows = records()
+    for rec in effective_records():
+        if rec['event'] not in ('reserve', 'unknown'):
+            continue
+        key = rec['request_sha256']
+        if cached(key) is not None:
+            continue
+        attempts = sum(r['event'] == 'reserve' and r.get('request_sha256') == key for r in rows)
+        if attempts != 1:
+            raise RuntimeError('already retried this unknown request once; no further retry')
+        timeout = 900 if rec['whole'] else 300
+        if time.time() - rec['t'] < timeout + 5:
+            raise RuntimeError('request timeout has not elapsed; do not overlap inference')
+        append({**rec, 'event': 'retry-approved',
+                'reason': 'one explicit retry after transport ended without usage; original allowance retained'})
+
+
 def judge(route, whole=False):
     def one(col, a, b, allow_call=False):
         body, key, nums = request(route, col, a, b, whole)
-        hit = cached(key)
+        hit = cache_hit(body, key)
         return parse(hit['raw'], nums, whole) if hit and hit.get('valid') else None
     return one
 
@@ -199,12 +234,16 @@ def claude_cue(col, a, b, allow_call=False):
 
 def call(route, col, a, b, whole=False):
     body, key, nums = request(route, col, a, b, whole)
-    hit = cached(key)
+    hit = cache_hit(body, key)
     if hit is not None:
         if not hit.get('valid'):
             raise RuntimeError(f'{col.name} {nums[0]}-{nums[-1]}: recorded failure; inspect before retry')
         return
-    if any(r.get('request_sha256') == key and r['event'] == 'reserve' for r in records()):
+    rows = records()
+    attempts = sum(r.get('request_sha256') == key and r['event'] == 'reserve' for r in rows)
+    retry = attempts == 1 and any(r.get('request_sha256') == key and r['event'] == 'retry-approved'
+                                  for r in effective_records())
+    if attempts and not retry:
         raise RuntimeError('request was already sent without a cached reply; inspect ledger before retry')
     reserve = reservation(route, body)
     if spent() + reserve > CAP:
@@ -213,8 +252,14 @@ def call(route, col, a, b, whole=False):
            'model': MODELS[route], 'box': col.name, 'span': [nums[0], nums[-1]], 'whole': whole,
            'request_sha256': key, 't': time.time()}
     append(rec)                    # before sending, so a killed process still counts its possible spend
-    r = GW.request('/chat/completions', body, timeout=900 if whole else 300)
-    got = r.json()                 # an invalid/unknown reply leaves the reservation intact
+    r = None
+    try:
+        r = GW.request('/chat/completions', body, timeout=900 if whole else 300)
+        got = r.json()
+    except Exception as e:
+        append({**rec, 'event': 'unknown', 'http': r.status_code if r is not None else None,
+                'error': type(e).__name__, 'wall_s': round(time.time() - rec['t'], 3)})
+        raise RuntimeError('transport ended without decodable usage; full allowance retained') from e
     usage = got.get('usage') or {}
     pi, po = PRICES[route]
     known = all(isinstance(usage.get(k), int) and usage[k] >= 0 for k in ('prompt_tokens', 'completion_tokens'))
@@ -290,17 +335,19 @@ def predictors():
             'gateway-gemini-whole': lambda col: H.assemble(col, H.predict_gaps(col, 'whole', judge('gemini', True)))}
 
 
-def score(root):
+def score(root, claude_only=False):
     import rescore
     import seg_lincoln_cloud as S
     import public_segmentation as P
     rescore.no_network()
     out = {'price_note': __doc__.split('The gateway publishes')[1].strip(), 'cost_estimate': spent(),
-           'calls': effective_records(), 'boxes': {}}
+           'partial': claude_only,
+           'calls': [r for r in effective_records() if not claude_only or r['route'] == 'claude-cue'], 'boxes': {}}
     staged = []
     for col in public_columns(root):
         use_cache(root / 'cache')
-        srcs = {**predictors(), 'window-cues-claude-cue': lambda c: W.assemble(c, W.combine(c, claude_cue), False)}
+        srcs = {**({} if claude_only else predictors()),
+                'window-cues-claude-cue': lambda c: W.assemble(c, W.combine(c, claude_cue), False)}
         rows = S.score_sources(col, srcs, rescore.CATALOGUE_COUNT[col.name])
         if rows['missing']:
             raise ValueError(f'{col.name}: incomplete sources {rows["missing"]}; no scores written')
@@ -319,6 +366,8 @@ def score(root):
         path.write_text(json.dumps(previous, indent=2) + '\n')
     (RESULTS / 'seg-lincoln-gateway.json').write_text(json.dumps(out, indent=1) + '\n')
     lines = ['# Lincoln and CREST through the gateway (W46.seg-lincoln-cloud-paid)', '',
+             'PARTIAL CHECKPOINT: Claude cue arm only; Gemini/GLM collection continues.' if claude_only else
+             'All assigned arms collected; earlier failed attempts remain in the price/attempt totals.', '',
              'Gemini 3.7 Flash (not 3.8), GLM 5.3 Flash, low/minimal reasoning, temperature 0; '
              '1600px images plus cached Vision text. Frozen g1 windows (7 pages, stride 3), wh1 whole streams. '
              'Windows use the model photo labels; whole streams take the known absence of label photos. '
@@ -351,19 +400,21 @@ def score(root):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument('command', choices=('inventory', 'collect', 'score', 'reconcile-413', 'revalidate'))
+    ap.add_argument('command', choices=('inventory', 'collect', 'score', 'reconcile-413', 'revalidate', 'retry-unsettled'))
     ap.add_argument('root', type=Path)
     ap.add_argument('--limit', type=int)
     ap.add_argument('--windows-only', action='store_true', help='Defer whole streams while measuring window cost')
+    ap.add_argument('--claude-only', action='store_true', help='Score the completed cue arm as a partial checkpoint')
     args = ap.parse_args()
-    if args.command in ('reconcile-413', 'revalidate'):
+    if args.command in ('reconcile-413', 'revalidate', 'retry-unsettled'):
         STORE.mkdir(parents=True, exist_ok=True)
         with (STORE / 'collect.lock').open('a') as lock:
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            (reconcile_413 if args.command == 'reconcile-413' else revalidate)()
+            {'reconcile-413': reconcile_413, 'revalidate': revalidate,
+             'retry-unsettled': retry_unsettled_once}[args.command]()
         return
     if args.command == 'score':
-        score(args.root)
+        score(args.root, args.claude_only)
         return
     use_cache(args.root / 'cache')
     todo = jobs(args.root)
@@ -372,7 +423,7 @@ def main():
         if args.windows_only and job[4]:
             continue
         body, key, nums = job_request(job)
-        hit = cached(key)
+        hit = cache_hit(body, key)
         if hit is None or not hit.get('valid'):
             pending.append(job)
     print(f'{len(todo)} jobs, {len(pending)} uncached, item spent ${spent():.4f}', flush=True)
