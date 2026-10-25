@@ -1,0 +1,59 @@
+{
+  "item": "W46.fix-marks-set-draft",
+  "status": "prepared; owner-attended pilot not submitted",
+  "protocol": "marks-preflag-pilot-v1",
+  "seed": "W46.fix-marks-set-draft-20261025",
+  "collection_scope": "Established five segmentation collections; wider original trees, not only the 914 fixed pages. Inferred from data.py and the review.",
+  "canonical_candidate_pages": 3110,
+  "candidate_counts": {
+    "Dean": 1162,
+    "Deaver": 644,
+    "Herrnstein": 940,
+    "Stanton": 250,
+    "RG165": 114
+  },
+  "pilot_pages": 15,
+  "pilot_per_collection": 3,
+  "pilot_image_bytes": 19573481,
+  "jobs": {
+    "cpu_stage": 1,
+    "gpu_pilot": 1,
+    "allocated_gpu_hours_ceiling": 1,
+    "full_sweep": 0
+  },
+  "model": "Qwen/Qwen3.6-27B-FP8",
+  "vllm_args": [
+    "--max-model-len",
+    "8192",
+    "--gpu-memory-utilization",
+    "0.88",
+    "--max-num-seqs",
+    "1",
+    "--enforce-eager"
+  ],
+  "max_tokens": 1024,
+  "timeout_seconds": 90,
+  "image_long_side_max": 2400,
+  "jpeg_quality": 95,
+  "freeze_sha256": "09977f3b5d790730cda93c8599d6963036185a30662aa4e0be639c2c1e89841e",
+  "inventory_sha256": "492240a960e5e46d72b7721c1e98e47be079b82c99231b3f9e74695cfdd676c7",
+  "pilot_sha256": "5b5c363a509eb6ee20cff4bddfdcb8e3e99653ca37154d0b621330fe3f308de7",
+  "support_sha256": {
+    "support/marks-pilot-job.sh": "846152fbecc01159d68d0e1024b30716c69ea20a44702e8580439e5a9f38d352",
+    "support/marks-pilot-stage-job.sh": "36f3188b9bd4eed90e4715b757c346e5acebface485ac4a2531e0612feba5e76",
+    "support/marks-pilot-submit.sh": "cabfcc11417cb1b7c991fe7de56a708ac9e14ada2cd7099acd32dbef33c11cd8",
+    "support/marks_pilot.py": "98ba854e5ef173c14ca19ec53ac89bb6f5a5491dd5ef674dc2a14ac0706303d5",
+    "support/sherlock/bin/py": "dcaf43541f46d2a06ae0a4ecd162ae575add562529f5bd9571a5f0f24e675a48",
+    "support/sherlock/bin/vllm": "747beafdbdded93aa37dd49a6294dbc269f21336eea3cf7b46ac4125fad27941",
+    "support/sherlock/sh.env": "436979182606893682738eeef958ef13bb26c2d83835ced329b9111a493e68aa"
+  },
+  "money_spent_usd": 0,
+  "marks_truth_pages": 0,
+  "owner_core_pages": 0,
+  "limitations": [
+    "No model inference or accuracy result; no mark boxes or transcriptions yet.",
+    "Inventory fixes candidate identities and source metadata, not all 3110 image bytes; only 15 inputs have original/image hashes.",
+    "Prior bulk OCR throughput is a proxy only; use the new pilot receipts and Slurm elapsed time before expansion.",
+    "Private images, source paths and text remain outside the public repository."
+  ]
+}
