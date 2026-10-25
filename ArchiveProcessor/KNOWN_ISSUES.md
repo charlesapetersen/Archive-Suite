@@ -2,6 +2,14 @@
 
 Tracked bugs we've chosen to come back to later. Each entry has enough context to resume cold.
 
+## FIXED (W46.ocr-regions, 2026-10-25): incomplete crop collections could shrink the scoring denominator
+
+`scripts/segbench/corpus/regions.py::cmd_report` now refuses missing whole-page receipts, incomplete crop
+indices, mismatched identities/geometry and unknown token usage before exporting a comparison. Empty detector
+output remains a zero-scoring page; capped crops contribute no text and their token usage is retained. The
+collected 354-page run was complete, so this guard does not change its scores. Exact panel-kind groups are
+exported separately from overlapping annotation groups; order means include their matched-page counts.
+
 ## RESOLVED (W46.seg-lincoln-cloud-paid, 2026-10-24): public comparison confidence and unreachable review targets
 
 `scripts/segbench/seg_lincoln_cloud.py::public` now uses the committed owner-only rule fit and its precisions:

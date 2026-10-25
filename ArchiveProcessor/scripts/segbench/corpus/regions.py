@@ -154,7 +154,34 @@ def page_reading(arm: str, records: list[dict], expected: int | None, mode: str,
             good.append({'index': r['index'], 'box': r['box'], 'text': text})
     n = expected if expected is not None else len(records)
     return {'text': stitch(arm, good) if good else '', 'crops': n, 'crops_failed': n - len(good),
+            'prompt_tokens': sum((r.get('usage') or {}).get('prompt_tokens') or 0 for r in records),
             'completion_tokens': sum((r.get('usage') or {}).get('completion_tokens') or 0 for r in records)}
+
+
+def validate_crops(route: str, arm: str, pid: str, records: list[dict], regions: dict) -> int:
+    """Refuse an incomplete collection instead of silently scoring only the pages/crops that came back.
+    Tiles retain their exact fractional boxes and pixel bounds, so the page size and complete grid can be
+    recovered without opening an image. Caps remain failed crops when scored; unknown token usage is refused
+    rather than assigning an optimistic price to a transport failure.
+    """
+    label = f'{route}/{arm}/{pid}'
+    if arm == 'tiles':
+        if not records:
+            raise ValueError(f'{label}: missing tile receipts')
+        w = max(r['px'][2] for r in records)
+        h = max(r['px'][3] for r in records)
+        boxes = C.tile_boxes(w, h)
+    else:
+        boxes = [r['box'] for r in C.keep_regions(regions[arm][pid])]
+    if [r['index'] for r in records] != list(range(len(boxes))):
+        raise ValueError(f'{label}: incomplete crop indices (expected {len(boxes)}, got {len(records)})')
+    for i, (r, box) in enumerate(zip(records, boxes)):
+        if ((r['page'], r['route'], r['arm']) != (pid, route, arm) or len(r['box']) != 4
+                or any(abs(a - b) > 1e-8 for a, b in zip(r['box'], box))):
+            raise ValueError(f'{label}/{i}: crop identity or geometry differs from pack')
+        if any(not isinstance((r.get('usage') or {}).get(k), int) for k in ('prompt_tokens', 'completion_tokens')):
+            raise ValueError(f'{label}/{i}: missing token usage')
+    return len(boxes)
 
 
 def crop_records(runs: Path, route: str, arm: str, pid: str) -> list[dict]:
@@ -175,7 +202,9 @@ def score_rows(rr: list[dict], S) -> dict:
     return {'n': agg['n'], 'ok': agg['ok'], 'nes': round(agg['nes'], 4), 'nes_answered': round(agg['nes_answered'], 4),
             'chrf': round(agg['chrf'], 4), 'order_edit': round(sum(edits) / len(edits), 4) if edits else '',
             'order_pages': len(edits), 'crops': sum(r.get('crops') or 0 for r in rr),
-            'crops_failed': sum(r.get('crops_failed') or 0 for r in rr)}
+            'crops_failed': sum(r.get('crops_failed') or 0 for r in rr),
+            'prompt_tokens': sum(r.get('prompt_tokens') or 0 for r in rr),
+            'completion_tokens': sum(r.get('completion_tokens') or 0 for r in rr)}
 
 
 def whole96(route: str, L, F):
@@ -184,9 +213,22 @@ def whole96(route: str, L, F):
         for f in QWEN96.glob('*.json'):
             j = json.loads(f.read_text())
             out[f.stem] = {'raw': j['reply'].get('raw', ''), 'status': j['meta'].get('status'),
-                           'finish': j['meta'].get('finish'), 'usage': {'completion_tokens': j['meta'].get('completion_tokens')}}
+                           'finish': j['meta'].get('finish'),
+                           'usage': {k: j['meta'].get(k) for k in ('prompt_tokens', 'completion_tokens')}}
         return out
     return F.read_records(L.T96[T96_DIR[route]]['dir'])
+
+
+def markup_summary(table_markup: list[dict]) -> list[dict]:
+    out = []
+    for route in C.READERS:
+        for arm in ('whole', *C.ARMS):
+            rr = [r for r in table_markup if (r['route'], r['arm']) == (route, arm)]
+            if rr:
+                out.append({'route': route, 'arm': arm, 'n': len(rr),
+                            **{k: round(sum(r[k] for r in rr) / len(rr), 6) for k in ('strict', 'markup_stripped')},
+                            'markup_pages': sum(r['has_markup'] for r in rr)})
+    return out
 
 
 def cmd_report(a):
@@ -201,8 +243,9 @@ def cmd_report(a):
     R.MANIFEST = MANIFEST
     truth = {R.job_id(r): r for r in R.frozen()}
     panel = {r['page']: r for r in P.rows()}
-    rows, page_rows = [], []
+    rows, page_rows, table_markup = [], [], []
     for route in C.READERS:
+        print(f'{route}: scoring whole page and three crop arms', flush=True)
         mode = L.ROUTES[route]['mode']
         whole = {'public895': F.read_records(L.ROUTES[route]['dir']), 'owner99': whole96(route, L, F)}
         for p in pages:
@@ -214,20 +257,26 @@ def cmd_report(a):
                 ref, stratum = (P.TRUTH / 'truth' / (pid + '.txt')).read_text(), None
                 if pid in P.AGREEMENT:
                     continue   # the three agreement-only letters: not truth the 96 can rank readers on
-                groups = ['the 96', *kinds_of(panel[pid])]
+                groups = ['the 96', *kinds_of(panel[pid]), 'kind:' + panel[pid]['kind']]
+            if pid not in whole[set_]:
+                raise ValueError(f'{route}/whole/{pid}: missing whole-page receipt')
             readings = {'whole': {'text': X.reading(whole[set_].get(pid), mode), 'crops': '', 'crops_failed': '',
+                                  'prompt_tokens': ((whole[set_].get(pid) or {}).get('usage') or {}).get('prompt_tokens', ''),
                                   'completion_tokens': ((whole[set_].get(pid) or {}).get('usage') or {}).get('completion_tokens', '')}}
             for arm in C.ARMS:
-                expected = None if arm == 'tiles' else len(C.keep_regions(regions[arm][pid]))   # every page was detected
                 recs = crop_records(runs, route, arm, pid)
-                if recs or expected == 0:
-                    readings[arm] = page_reading(arm, recs, expected, mode, X.reading)
+                expected = validate_crops(route, arm, pid, recs, regions)
+                readings[arm] = page_reading(arm, recs, expected, mode, X.reading)
             for arm, got in readings.items():
                 sc = S.score(ref, got['text'], stratum) if stratum else S.score(ref, got['text'])
+                if set_ == 'owner99' and 'tables' in groups:
+                    table_markup.append({'route': route, 'arm': arm, 'page': pid, 'strict': sc['nes'],
+                                         'markup_stripped': S.score(ref, O.strip_markup(got['text']))['nes'],
+                                         'has_markup': O.has_markup(got['text'])})
                 order = O.reading_order_edit(ref, got['text']) if got['text'] else None
                 page_rows.append({'set': set_, 'groups': ';'.join(groups), 'route': route, 'arm': arm, 'page': pid,
                                   'ok': bool(got['text']), **sc, 'order_edit': (order or {}).get('edit'),
-                                  **{k: got[k] for k in ('crops', 'crops_failed', 'completion_tokens')}})
+                                  **{k: got[k] for k in ('crops', 'crops_failed', 'prompt_tokens', 'completion_tokens')}})
     for route in C.READERS:
         for arm in ('whole', *C.ARMS):
             mine = [r for r in page_rows if r['route'] == route and r['arm'] == arm]
@@ -241,12 +290,18 @@ def cmd_report(a):
     gpu = gpu_hours(runs)
     a.out.mkdir(parents=True, exist_ok=True)
     S.write_csv(a.out / f'{a.name}.csv', rows, ['group', 'route', 'arm', 'n', 'ok', 'nes', 'nes_answered', 'chrf',
-                                                'order_edit', 'order_pages', 'crops', 'crops_failed', 'whole_nes_same'])
+                                                'order_edit', 'order_pages', 'crops', 'crops_failed', 'whole_nes_same',
+                                                'prompt_tokens', 'completion_tokens'])
     S.write_csv(a.out / f'{a.name}-pages.csv', [{k: round(v, 6) if isinstance(v, float) else v for k, v in r.items()}
                                                 for r in page_rows],
                 ['set', 'groups', 'route', 'arm', 'page', 'ok', 'nes', 'chrf', 'words', 'missed', 'added', 'order_edit',
-                 'crops', 'crops_failed', 'completion_tokens'])
+                 'crops', 'crops_failed', 'prompt_tokens', 'completion_tokens'])
     (a.out / f'{a.name}-tables.md').write_text(tables(rows, gpu))
+    (a.out / f'{a.name}.json').write_text(json.dumps({
+        'report': f'bench-corpus/{a.name}.md', 'rows': rows, 'gpu_hours': gpu,
+        'pages': len(pages), 'scored_pages': len(page_rows) // (len(C.READERS) * (1 + len(C.ARMS))),
+        'arms': list(C.ARMS), 'readers': list(C.READERS), 'table_markup': markup_summary(table_markup),
+    }, indent=2) + '\n')
     print(f'{len(rows)} rows, {len(page_rows)} page rows -> {a.out}')
 
 
@@ -268,7 +323,8 @@ def tables(rows: list[dict], gpu: dict) -> str:
     by = {(r['group'], r['route'], r['arm']): r for r in rows}
     arms = ('whole', *C.ARMS)
     out = ['NES % (pages answered / pages); a failed page scores 0. Δ is the arm against whole page on the same pages, in points.',
-           'Order: mean reading-order edit over the pages with two or more matched truth blocks (lower is better);',
+           'Order: mean reading-order edit (matched-page count) over pages with two or more matched truth blocks;',
+           'lower is better, but each arm has its own matched-page subset, so these means are not paired.',
            'not scorable on the 96, whose truth is kept as one line with no paragraph breaks.', '']
     for g in [g for g in GROUP_ORDER if any(k[0] == g for k in by)]:
         out += [f'### {g}', '', '| reader | ' + ' | '.join(arms) + ' | ' + ' | '.join(f'Δ {a}' for a in C.ARMS) +
@@ -280,7 +336,8 @@ def tables(rows: list[dict], gpu: dict) -> str:
             cell = lambda r: '–' if r is None else f"{100 * r['nes']:.1f} ({r['ok']}/{r['n']})"
             delta = lambda r: '–' if r is None or r['whole_nes_same'] == '' else \
                 f"{100 * (r['nes'] - r['whole_nes_same']):+.1f}"
-            order = ' / '.join('–' if r is None or r['order_edit'] == '' else f"{r['order_edit']:.2f}" for r in rs)
+            order = ' / '.join('–' if r is None or r['order_edit'] == '' else
+                               f"{r['order_edit']:.2f} ({r['order_pages']})" for r in rs)
             out.append(f'| {route} | ' + ' | '.join(cell(r) for r in rs) + ' | ' +
                        ' | '.join(delta(r) for r in rs[1:]) + f' | {order} |')
         out.append('')

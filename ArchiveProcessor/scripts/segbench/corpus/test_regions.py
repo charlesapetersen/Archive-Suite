@@ -118,7 +118,7 @@ class Report(unittest.TestCase):
 
     def rec(self, i, raw, status='ok', finish='stop'):
         return {'index': i, 'box': [0, i / 4, 1, (i + 1) / 4], 'raw': raw, 'status': status, 'finish': finish,
-                'usage': {'completion_tokens': 10}}
+                'usage': {'prompt_tokens': 20, 'completion_tokens': 10}}
 
     def test_kind_groups(self):
         k = self.R.kinds_of
@@ -138,6 +138,57 @@ class Report(unittest.TestCase):
     def test_no_regions_is_an_empty_reading(self):
         self.assertEqual(self.R.page_reading('pp-doclayoutv3', [], 0, 'native', self.reading)['text'], '')
 
+    def test_token_totals_include_caps(self):
+        got = self.R.page_reading('tiles', [self.rec(0, 'read'), self.rec(1, 'loop', 'cap', 'length')],
+                                  2, 'native', self.reading)
+        self.assertEqual((got['prompt_tokens'], got['completion_tokens']), (40, 20))
+
+    def tiles(self):
+        return [dict(self.rec(i, 'read'), page='p001', route='glm-ocr', arm='tiles', box=b,
+                     px=C.pixel_box(b, 1700, 2400, 0)) for i, b in enumerate(C.tile_boxes(1700, 2400))]
+
+    def test_complete_tiles_validate(self):
+        self.assertEqual(self.R.validate_crops('glm-ocr', 'tiles', 'p001', self.tiles(), {}), 3)
+
+    def test_missing_tile_page_or_last_tile_is_rejected(self):
+        for recs in ([], self.tiles()[:-1]):
+            with self.subTest(n=len(recs)), self.assertRaises(ValueError):
+                self.R.validate_crops('glm-ocr', 'tiles', 'p001', recs, {})
+
+    def test_missing_positive_detector_page_is_rejected_but_empty_detection_is_valid(self):
+        regions = {'doclayout_yolo': {'p001': [{'label': 'text', 'box': [0, 0, 1, 1]}]}}
+        with self.assertRaises(ValueError):
+            self.R.validate_crops('glm-ocr', 'doclayout_yolo', 'p001', [], regions)
+        regions['doclayout_yolo']['p001'] = []
+        self.assertEqual(self.R.validate_crops('glm-ocr', 'doclayout_yolo', 'p001', [], regions), 0)
+
+    def test_wrong_crop_identity_is_rejected(self):
+        recs = self.tiles(); recs[1]['route'] = 'another-reader'
+        with self.assertRaisesRegex(ValueError, 'identity'):
+            self.R.validate_crops('glm-ocr', 'tiles', 'p001', recs, {})
+
+    def test_unknown_usage_is_rejected_instead_of_priced_as_zero(self):
+        recs = self.tiles(); recs[1]['usage'] = {}
+        with self.assertRaisesRegex(ValueError, 'token usage'):
+            self.R.validate_crops('glm-ocr', 'tiles', 'p001', recs, {})
+
+    def test_qwen_whole_receipt_keeps_both_token_counts(self):
+        import json, tempfile
+        from pathlib import Path
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as t, patch.object(self.R, 'QWEN96', Path(t)):
+            (Path(t) / 'p001.json').write_text(json.dumps({'reply': {'raw': 'read'}, 'meta': {
+                'status': 'ok', 'finish': 'stop', 'prompt_tokens': 123, 'completion_tokens': 456}}))
+            r = self.R.whole96('qwen3.6-27b', None, None)['p001']
+        self.assertEqual(r['usage'], {'prompt_tokens': 123, 'completion_tokens': 456})
+
+    def test_table_markup_summary_keeps_diagnostic_separate_and_handles_no_table_pages(self):
+        self.assertEqual(self.R.markup_summary([]), [])
+        got = self.R.markup_summary([dict(route='lightonocr3-4b', arm='whole', strict=.6,
+                                          markup_stripped=.9, has_markup=True)])
+        self.assertEqual(got[0], dict(route='lightonocr3-4b', arm='whole', n=1, strict=.6,
+                                     markup_stripped=.9, markup_pages=1))
+
     def test_a_retried_crop_uses_its_reading_not_its_error(self):
         import json, tempfile
         from pathlib import Path
@@ -151,7 +202,7 @@ class Report(unittest.TestCase):
 
     def test_table_shows_the_change_on_whole_page(self):
         row = lambda arm, nes, same='': {'group': 'L4', 'route': 'glm-ocr', 'arm': arm, 'n': 80, 'ok': 80, 'nes': nes,
-                                         'order_edit': 0.1, 'whole_nes_same': same}
+                                         'order_edit': 0.1, 'order_pages': 80, 'whole_nes_same': same}
         # tiles cover fewer pages than whole here: its Δ is against whole page on those pages (0.6), not all (0.5)
         md = self.R.tables([row('whole', 0.5), row('doclayout_yolo', 0.9, 0.5), row('tiles', 0.45, 0.6)],
                            {'glm-ocr': 1.234})
