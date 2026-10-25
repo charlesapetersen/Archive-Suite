@@ -485,6 +485,10 @@ def score(root, claude_only=False, record_glm_failure=False):
                 rows['failed'] = {'gateway-glm': failure}
         if set(rows['missing']) - set(rows.get('failed', {})):
             raise ValueError(f'{col.name}: incomplete sources {rows["missing"]}; no scores written')
+        if 'gateway-glm' in rows.get('failed', {}):
+            for rec in out['calls']:
+                if rec['box'] == col.name and rec['route'] == 'glm':
+                    rec['used'] = False  # cached windows never became a scored full-box prediction
         out['boxes'][col.name] = rows
         # Reuse the normal public output format and its frozen truth guard, without baseline refitting.
         path = P.MANIFESTS / f'{col.name.lower()}-scores.json'
@@ -531,7 +535,7 @@ def score(root, claude_only=False, record_glm_failure=False):
               'Lincoln\'s saved whole reply required exactly two opening array brackets restored at gaps 82/83 and '
               '122/123. This repair is restricted to its SHA-256, keeps all 260 stated decisions/confidences '
               'unchanged, and passes the complete strict gap validator; it was not a raw-valid JSON reply.', '',
-              '| box | route | whole | attempts | usable replies | used replies | input tokens | output tokens | cost estimate | mean seconds |',
+              '| box | route | whole | attempts | parsed replies | used replies | input tokens | output tokens | cost estimate | mean seconds |',
               '|---|---|---|---:|---:|---:|---:|---:|---:|---:|']
     for box, route, whole in sorted({(r['box'], r['route'], r['whole']) for r in out['calls']}):
         cs = [r for r in out['calls'] if (r['box'], r['route'], r['whole']) == (box, route, whole)]

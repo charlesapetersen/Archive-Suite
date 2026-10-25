@@ -9,7 +9,17 @@ the public cache has no owner OCR, so refitting there trained on empty text. Pub
 model photo calls, matching `public_segmentation.py`; `review_load` returns null when free-gap corrections
 cannot reach 98%, rather than reporting all gaps as if they reached it. Scratch regressions cover unreachable
 fixed errors and gateway cap/cache failures. The private item ledger keeps failed calls and full unknown-usage
-allowances; `segbench-results/seg-lincoln-gateway.json` publishes the completed cue arm at this checkpoint.
+allowances; `segbench-results/seg-lincoln-gateway.json` publishes the completed arms and the terminal Lincoln
+GLM missing-gap failure without inventing a vote or full-box score. The bench displays that failed arm too.
+
+## OPEN (W46.fix-window-duplicates, 2026-10-25): window parser overwrites repeated page/gap entries
+
+At baseline `f0bec0f4`, `scripts/segbench/method_window.py::parse_answer` builds dictionaries without rejecting
+duplicate page/gap entries. A cached Lincoln GLM reply for pages 151–157 repeats gap 156–157 and passes;
+the terminal 163–169 replies duplicate 168–169 and omit 167–168 (the missing gap is correctly rejected).
+No Lincoln GLM full-box score is published, and an independent scan found no duplicate in the scored Gemini,
+Claude or CREST GLM replies. Reject duplicates before insertion, with equal/conflicting duplicate regressions;
+audit cached scored routes and disclose affected results before any rerun. Track: `../SUITE_TODO.md`.
 
 ## OPEN (W46.fix-postcorrect-pack, 2026-10-24): post-correction pack repeats route/page requests
 

@@ -323,7 +323,17 @@ def public_segmentation():
         gateway_data = json.loads(gateway.read_text())
         scored = gateway_data["boxes"]
         for b in boxes:
-            sources = next(v for k, v in scored.items() if k.lower() == b["box"].lower())["sources"]
+            box_result = next(v for k, v in scored.items() if k.lower() == b["box"].lower())
+            b["failed"] = box_result.get("failed", {})
+            for key, failure in b["failed"].items():
+                if key in b["models"]:
+                    sys.exit(f"failed gateway arm {b['box']}/{key} has a numeric score")
+                calls = [c for c in gateway_data["calls"] if c["box"].lower() == b["box"].lower()
+                         and c["route"] == "glm" and not c["whole"]]
+                timed = [c["wall_s"] for c in calls if "wall_s" in c]
+                failure["gateway"] = {"calls": len(calls), "cost_estimate": sum(c["charge"] for c in calls),
+                                      "mean_s": sum(timed) / len(timed) if timed else None}
+            sources = box_result["sources"]
             for k, f in sources.items():
                 r = b["models"].get(k)
                 if r is None or {a: v for a, v in r["counts"].items() if a != "collections"} != {

@@ -58,7 +58,11 @@ built are in [`POTENTIAL_FEATURES.md`](POTENTIAL_FEATURES.md).
 Part 2 also reports the public/easier CREST and Lincoln segmentation boxes separately, from their frozen
 `public-segmentation/*-scores.json` files. Every supplied page was audited before collection; source gaps
 and ambiguous wrappers are disclosed beside the figures. W46.seg-lincoln-cloud-paid adds the completed
-Claude cue arm's gateway holes; its Gemini and GLM arms are still being collected at this checkpoint.
+Claude cue arm's gateway holes, Gemini windows and whole streams on both boxes, and GLM windows on CREST.
+Lincoln GLM failed the unchanged gap validator twice at pages 163–169; its remaining windows stopped and
+the table shows the failure and attempted-call cost without a numeric full-box score. Lincoln's whole reply
+required a SHA-specific repair of two opening array brackets, with all decisions unchanged. Whole-stream
+images use JPEG quality 45, so the window comparison also changes encoding and photo assumptions.
 `seg-lincoln-gateway.json` joins each completed public route's field metrics, additional gateway calls,
 mean response time and estimated token cost into that table. Gateway costs use checked list rates,
 including reasoning, because the gateway supplies no bill; they are explicitly estimates. The Claude cue

@@ -12941,3 +12941,30 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   captures: verification/evidence/reader/W40.fix-reader-a11y-labels.md. Separate measured contrast failures stay
   under W40.fix-reader-a11y-contrast. No real corpus or host display was touched. In-flight note deleted.
   <!-- /W40.fix-reader-a11y-labels -->
+- [x] **W46.seg-lincoln-cloud-paid — Gemini and GLM-5.3 Flash windows on Lincoln and CREST through the gateway [S]** (lane: segbench) (uses: light,paid) (blocked-on: W46.seg-lincoln-cloud, W46.gateway-models-ok) — The gateway arm of W46.seg-lincoln-cloud: Gemini windows and whole-folder calls (about $1.40 at list) and the GLM-5.3 Flash arm (about $0.45). Also the rest of the Claude c2 arm (stated letter cues), moved here by the plan-routes rule (root CLAUDE.md, 2026-10-21): the 9 CREST windows and the last Deaver windows (139 on) that `claude -p` had not reached when it was stopped, through the gateway's claude-sonnet-5-5 (the same model), about 12 windows, roughly $0.50; then seg_lincoln_cloud.py public/owner/report and public_segmentation.py score --key window-cues-claude-cue on CREST. Add it to the Gemini and GLM spend before the $3 check. detail: execution-plans/processing-review/10-gap-audit.md §5 item 6 · §Document processing review — W46 · SHIPPED 2026-10-25 (this commit)
+  Final gateway results: Lincoln Gemini windows 227/261 = 87.0% pages exact; whole stream
+  230/261 = 88.1% (the saved reply had two SHA-specific opening-array-bracket repairs, no changed
+  decisions). CREST Gemini windows 108/128 = 84.4%, whole 122/128 = 95.3%, GLM windows
+  122/128 = 95.3%. All public streams retain source page order, with no truth-boundary cuts.
+  Lincoln GLM failed twice at 163–169 (missing 167–168); its tail stopped and no full-box score or
+  missing vote is supplied. The bench shows the failure and attempted-call cost explicitly.
+  The final 11 Claude c2 holes (9 CREST, 2 Deaver) preserve 84.4% and 97.9%; same Sonnet 5.5,
+  inline-image gateway transport mixed with prior plan replies. ChatGPT arm remained dropped.
+  Item ledger estimate $2.8940361 at checked list token rates, including failures and $0.09475825
+  retained allowances for two interrupted unknown-usage requests (one exact-input retry apiece).
+  No gateway bill or batch discount claimed; hard $3 guard remains. Quality-45 whole images and
+  different photo assumptions prevent attributing differences to context length alone. GLM low
+  reasoning reused completed 8192/16384-token windows, final cap32768; minimal probes excluded.
+  Rebuilt public/owner/cue reports and ArchiveOCRBench. Verification:25 Lincoln/gateway tests,
+  14 whole tests,16 public tests; frozen truth/count joins;189 used gateway replies independently
+  audited for duplicate pages/gaps; bench build/--check; headless Chrome DOM shows24 public rows
+  including the failure. Pixel screenshot remains blank (same existing headless Chrome issue),
+  so pixel layout is unverified. Independent final diff review has no open finding. Parser duplicate
+  acceptance in an unscored Lincoln GLM reply filed as W46.fix-window-duplicates in both trackers
+  and KNOWN_ISSUES. Published bench copy remains behind; unattended session did not republish.
+  Collector, reports and receipts: ArchiveProcessor/scripts/segbench/seg_lincoln_gateway.py and
+  ArchiveProcessor/segbench-results/seg-lincoln-gateway.{json,md}; private raw replies and append-only
+  ledger remain at ~/Library/Caches/ArchiveSuiteRehearsal/seg-lincoln-gateway/. Public inputs remain
+  at ~/Claude/Long term storage/FarmShare-20261018/public-segmentation/. Earlier checkpoints:
+  0ad09b26, db4724e7, e2ffd541,48a6a3bd,07539c06,3dc79f20,f0bec0f4.
+  <!-- /W46.seg-lincoln-cloud-paid -->
