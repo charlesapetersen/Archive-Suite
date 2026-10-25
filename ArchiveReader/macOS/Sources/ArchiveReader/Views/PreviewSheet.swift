@@ -38,6 +38,9 @@ struct PreviewSheet: View {
             content
         }
         .frame(width: size.width, height: size.height)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Document preview")
+        .accessibilityIdentifier("ar.preview.content")
         .archiveLinkCopyError(model: model)
         .onAppear {
             model.load(selection)

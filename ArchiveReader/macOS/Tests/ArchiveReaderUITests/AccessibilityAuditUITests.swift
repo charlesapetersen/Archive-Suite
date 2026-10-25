@@ -66,10 +66,13 @@ final class AccessibilityAuditUITests: FixtureUITestCase {
         let open = app.buttons["ar.preview.open"]
         XCTAssertTrue(open.waitForExistence(timeout: 5), "the preview sheet should open")
         LayoutGuard.waitUntilSettled(main)
-        let sheet = main.sheets.firstMatch
-        XCTAssertTrue(sheet.exists, "the preview should expose its sheet container")
-        assertPageTitles(in: sheet)
-        sweep.audit(sheet, screen: "preview sheet")
+        // macOS exposes an empty AXSheet wrapper; the actual content is a separate SwiftUI group.
+        // Assert a real control is inside our group, so an empty wrapper can never make the audit pass.
+        let preview = main.groups["ar.preview.content"]
+        XCTAssertTrue(preview.waitForExistence(timeout: 5))
+        XCTAssertTrue(preview.buttons["ar.preview.open"].exists)
+        assertPageTitles(in: preview)
+        sweep.audit(preview, screen: "preview sheet")
 
         open.click()
         let viewer = app.windows.matching(NSPredicate(format: "title != %@", "Archive Reader")).firstMatch
@@ -89,10 +92,13 @@ final class AccessibilityAuditUITests: FixtureUITestCase {
     }
 
     private func assertPageTitles(in container: XCUIElement) {
+        // XCUITest prints AXTitle in the snapshot but does not expose it as label/value/identifier.
+        // Check the actual element subtree, excluding the query chain that follows it.
+        let tree = container.debugDescription.components(separatedBy: "Path to element:").first ?? ""
         for title in ["Original image page", "OCR text page"] {
-            XCTAssertTrue(container.descendants(matching: .any)
-                .matching(NSPredicate(format: "label == %@", title)).firstMatch.exists,
-                          "the PDF page must have a name in the external accessibility tree: \(title)")
+            let present = tree.contains("title: '\(title)'")
+            print("[pdf-external] \(title): \(present ? "present" : "MISSING")")
+            XCTAssertTrue(present, "the PDF page must have an AXTitle in the external tree: \(title)")
         }
     }
 

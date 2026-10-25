@@ -21,7 +21,7 @@ struct PanelDivider: View {
                 else { NSCursor.pop() }
             }
             .gesture(
-                DragGesture(minimumDistance: 1)
+                DragGesture(minimumDistance: 1, coordinateSpace: .global)
                     .onChanged { value in
                         if startWidth == nil { startWidth = CGFloat(width) }
                         let delta = panelOnLeft
