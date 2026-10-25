@@ -1,5 +1,7 @@
 import Testing
 import Foundation
+import AppKit
+import SwiftUI
 @testable import ArchiveNotes
 
 // W7-S1a — the note-body load/save path on `NotesModel` (`loadBody`/`setBody`). Drives it against a
@@ -42,6 +44,58 @@ struct NotesModelBodyTests {
                         unknownFrontMatter: [], trailingBodyRaw: body)
         _ = try await env.store.create(item)
         return item.id
+    }
+
+    @Test("disabling for a slow switch flushes earlier typing but refuses input in the gap")
+    func slowSwitchPreservesOnlyAcceptedInput() async throws {
+        let env = try await makeEnv(); defer { Task { await cleanup(env) } }
+        let a = try await makeNote(env, title: "A", body: "A body")
+        let b = try await makeNote(env, title: "B", body: String(repeating: "Large B body. ", count: 80_000))
+        let editor = NoteBodyEditorModel()
+        editor.saveDebounce = .seconds(60)
+        editor.checkedSave = { await env.model.saveEditorBody($1, basedOn: $2, for: $0) }
+        var release: CheckedContinuation<Void, Never>?
+        var started: AsyncStream<Void>.Continuation!
+        let stream = AsyncStream<Void> { started = $0 }
+        var events = stream.makeAsyncIterator()
+        editor.load = { id in
+            if id == b {
+                started.yield(())
+                await withCheckedContinuation { release = $0 }
+            }
+            return await env.model.loadBody(for: id)
+        }
+        await editor.select(a)
+        let view = MarkdownEditorView(markdown: Binding(
+            get: { editor.markdown }, set: { editor.acceptEditorMarkdown($0, for: a) }), isRaw: .constant(true))
+        let coordinator = view.makeCoordinator()
+        let tv = EditorTextView()
+        tv.applyRawMode(true, fontSize: 14)
+        tv.string = editor.markdown
+        coordinator.textView = tv
+        coordinator.recordAppliedSerialization()
+        editor.flushEditor = { coordinator.flushWriteBack() }
+        tv.setSelectedRange(NSRange(location: tv.string.utf16.count, length: 0))
+        tv.insertPlainText(" before switch")   // still in TextKit's buffer when selection changes
+        tv.isEditable = false
+        let switching = Task { await editor.select(b) }
+        _ = await events.next()
+        #expect(editor.loadedID == a)
+        #expect(await env.model.loadBody(for: a) == "A body before switch")
+        let aFile = try await env.store.mdURL(for: a)
+        let bFile = try await env.store.mdURL(for: b)
+        let beforeA = try Data(contentsOf: aFile), beforeB = try Data(contentsOf: bFile)
+        tv.insertText("rejected keystroke", replacementRange: tv.selectedRange())
+        tv.insertPlainText("rejected paste")
+        await editor.flushPending()
+        release?.resume()
+        await switching.value
+        await editor.flushPending()
+        #expect(editor.loadedID == b)
+        #expect(try Data(contentsOf: aFile) == beforeA)
+        #expect(try Data(contentsOf: bFile) == beforeB)
+        #expect(tv.string == "A body before switch")
+        editor.flushEditor = {}
     }
 
     @Test("plain prose body round-trips idempotently through load→save→load")

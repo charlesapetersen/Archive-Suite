@@ -101,61 +101,61 @@ final class FormattingContext: ObservableObject {
     }
 
     func toggleBold() {
-        guard let tv = textView else { return }
+        guard let tv = textView, tv.isEditable else { return }
         EditorFormatting.toggleBold(tv, fontSize: fontSize)
         updateState()
     }
 
     func toggleItalic() {
-        guard let tv = textView else { return }
+        guard let tv = textView, tv.isEditable else { return }
         EditorFormatting.toggleItalic(tv, fontSize: fontSize)
         updateState()
     }
 
     func toggleInlineCode() {
-        guard let tv = textView else { return }
+        guard let tv = textView, tv.isEditable else { return }
         EditorFormatting.toggleInlineCode(tv, fontSize: fontSize)
         updateState()
     }
 
     func insertLink() {
-        guard let tv = textView else { return }
+        guard let tv = textView, tv.isEditable else { return }
         EditorFormatting.insertLink(tv)
         updateState()
     }
 
     func setHeading(_ level: Int) {
-        guard let tv = textView else { return }
+        guard let tv = textView, tv.isEditable else { return }
         EditorFormatting.setHeading(tv, level: level, fontSize: fontSize)
         updateState()
     }
 
     func setPlain() {
-        guard let tv = textView else { return }
+        guard let tv = textView, tv.isEditable else { return }
         EditorFormatting.setPlain(tv, fontSize: fontSize)
         updateState()
     }
 
     func toggleUnorderedList() {
-        guard let tv = textView else { return }
+        guard let tv = textView, tv.isEditable else { return }
         EditorFormatting.toggleUnorderedList(tv, fontSize: fontSize)
         updateState()
     }
 
     func toggleOrderedList() {
-        guard let tv = textView else { return }
+        guard let tv = textView, tv.isEditable else { return }
         EditorFormatting.toggleOrderedList(tv, fontSize: fontSize)
         updateState()
     }
 
     func toggleBlockquote() {
-        guard let tv = textView else { return }
+        guard let tv = textView, tv.isEditable else { return }
         EditorFormatting.toggleBlockquote(tv, fontSize: fontSize)
         updateState()
     }
 
     func toggleCodeBlock() {
-        guard let tv = textView else { return }
+        guard let tv = textView, tv.isEditable else { return }
         EditorFormatting.toggleCodeBlock(tv, fontSize: fontSize)
         updateState()
     }

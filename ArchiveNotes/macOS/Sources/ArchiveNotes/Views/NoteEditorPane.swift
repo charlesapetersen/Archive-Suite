@@ -60,6 +60,10 @@ struct NoteEditorPane: View {
     @State private var testCopyOutcome = "-"
     /// Same for the IMAGE paste (W9.g4-flake).
     @State private var testPasteImageOutcome = "-"
+    /// Hold one selected body's read open so UI tests can send real input during the load.
+    @State private var testBodyLoadRelease: CheckedContinuation<Void, Never>?
+    @State private var testBodyLoadWasHeld = false
+    @State private var testEditorFocusOutcome = "-"
 #endif
 
     var body: some View {
@@ -93,7 +97,7 @@ struct NoteEditorPane: View {
                 .id(bodyEditor.reloadGeneration)
                 .id(bodyEditor.loadedID)
                 .id(extractEditorGeneration)
-                .disabled(nav.selectedItemID == nil || bodyEditor.loadedID != nav.selectedItemID)   // nothing single-selected → no editable target
+                .disabled(!editorIsReady)
 #if DEBUG
             uiTestControlStrip
 #endif
@@ -199,6 +203,10 @@ struct NoteEditorPane: View {
         }
     }
 
+    private var editorIsReady: Bool {
+        nav.selectedItemID != nil && bodyEditor.loadedID == nav.selectedItemID
+    }
+
     /// The Markdown editor. Extracted from `body` so the DEBUG UITest seam (W8-S7 §3.3) can be attached
     /// to the value-type representable before it's returned; Release omits the seam entirely (the editor
     /// is byte-identical to the previous inline construction).
@@ -280,6 +288,17 @@ struct NoteEditorPane: View {
             // one off-window again. Labels stay short for the same reason.
             VStack(spacing: 2) {
                 HStack(spacing: 2) {
+                    if UserDefaults.standard.string(forKey: "ANUITestHoldBodyID") != nil {
+                        Button("release") {
+                            testBodyLoadRelease?.resume()
+                            testBodyLoadRelease = nil
+                        }
+                        .accessibilityIdentifier("an.editor.test.releaseBodyLoad")
+                        .accessibilityValue(testBodyLoadRelease == nil ? "idle" : "waiting")
+                        Button("focus") { testEditorFocusOutcome = testBox.focus?() ?? "noTextView" }
+                            .accessibilityIdentifier("an.editor.test.focus")
+                            .accessibilityValue(testEditorFocusOutcome)
+                    }
                     TextField("", text: $testCommitInput)
                         .accessibilityIdentifier("an.editor.test.input")
                     Button("commit") { testBox.replaceMarkdown?(testCommitInput) }
@@ -412,7 +431,16 @@ struct NoteEditorPane: View {
         // Capture the shared model strongly: it lives for the app's lifetime (no meaningful cycle — it
         // does not reference this pane), and strong capture avoids `String??` / `Void?` seam types.
         let model = nav.model
-        bodyEditor.load = { id in await model.loadBody(for: id) }
+        bodyEditor.load = { id in
+#if DEBUG
+            if Self.isUITestHarness, !testBodyLoadWasHeld,
+               UserDefaults.standard.string(forKey: "ANUITestHoldBodyID") == id.uuidString.lowercased() {
+                testBodyLoadWasHeld = true
+                await withCheckedContinuation { testBodyLoadRelease = $0 }
+            }
+#endif
+            return await model.loadBody(for: id)
+        }
         bodyEditor.checkedSave = { id, markdown, expected in
             await model.saveEditorBody(markdown, basedOn: expected, for: id)
         }
@@ -524,6 +552,7 @@ struct NoteEditorPane: View {
         HStack {
             Spacer()
             Button {
+                guard editorIsReady else { return }
                 isRaw.toggle()
             } label: {
                 Image(systemName: isRaw ? "doc.plaintext" : "doc.richtext")

@@ -3,6 +3,22 @@
 Running log of quirks, risks, and things verified/unverified for the Notes app. Keep current.
 (Sibling logs: `../ArchiveReader/KNOWN_ISSUES.md`, `../ArchiveProcessor/KNOWN_ISSUES.md`.)
 
+## ✅ CODE FIXED; VM recheck pending (W40.fix-notes-stale-body-on-switch, 2026-10-25) — the outgoing editor remained writable during loading
+
+The earlier inspector-jitter fix kept the previous note whole while the next body loaded, but SwiftUI's
+`.disabled` never set the AppKit text view's `isEditable`. The custom image-paste handler could still
+write an asset and later save its reference into the outgoing note. `MarkdownEditorView` now bridges
+the enabled environment to AppKit; keyboard, menu, formatting and paste paths refuse disabled edits,
+including asset imports. An editor-scoped undo manager gates both Undo/Redo availability and execution
+while retaining history; SwiftUI's menu bypasses the text view's own validation. Serialization still
+flushes edits accepted before the switch. The raw/styled
+action is also gated without briefly dimming the toolbar on each selection change.
+
+Regression coverage holds a ~1 MB note's load open, tests a retained first responder with real input,
+checks both scratch files and asset directories, and proves editing resumes. The scratch-store unit
+case preserves pending pre-switch typing. Baseline reproduction and runtime evidence:
+[`W40.fix-notes-stale-body-on-switch.md`](../verification/evidence/notes/W40.fix-notes-stale-body-on-switch.md).
+
 ## ✅ FIXED (W40.fix-notes-narrow-window, 2026-10-25) — panes overflowed the window at minimum width
 
 The list's implicit SwiftUI minimum was smaller than its rendered filter bar. Both Notes and Extracts

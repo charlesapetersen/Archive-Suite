@@ -3,6 +3,10 @@ import AppKit
 /// NSTextView subclass enforcing TextKit 2. Never access `layoutManager` — it silently
 /// downgrades to TextKit 1 and disables NSTextAttachmentViewProvider (future chips).
 final class EditorTextView: NSTextView {
+    // SwiftUI's Undo/Redo menu can query and invoke the manager directly, bypassing NSTextView's
+    // validation. Keep one history for this editor, including across a cancelled selection load.
+    private lazy var editingUndoManager = EditorUndoManager(editor: self)
+    override var undoManager: UndoManager? { editingUndoManager }
 
 #if DEBUG
     /// A non-interactive AX child that exposes a cached snapshot of this *already-rendered* text storage.
@@ -163,6 +167,7 @@ final class EditorTextView: NSTextView {
     /// write-back behave as for a keystroke; the caret ends after the inserted text, scrolled into view once
     /// laid out. It also skips `insertText`'s typingAttributes merge entirely.
     func insertStyled(_ attributed: NSAttributedString, replacementRange range: NSRange) {
+        guard isEditable else { return }
         if hasMarkedText() { unmarkText() }   // `insertText` commits an IME composition first
         breakUndoCoalescing()                  // a paste is its own undo step, not part of typing
         guard let storage = textStorage, NSMaxRange(range) <= storage.length,
@@ -546,9 +551,35 @@ final class EditorTextView: NSTextView {
         }
     }
 
+    // MARK: - Disabled editor (selection / body load in flight)
+
+    // Menu commands (including Undo/Redo) can bypass keyDown and normal text insertion.
+    override func validateUserInterfaceItem(_ item: any NSValidatedUserInterfaceItem) -> Bool {
+        isEditable && super.validateUserInterfaceItem(item)
+    }
+
+    override func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
+        isEditable && super.validateMenuItem(menuItem)
+    }
+
+    override func keyDown(with event: NSEvent) {
+        guard isEditable else { return }
+        super.keyDown(with: event)
+    }
+
+    override func insertText(_ insertString: Any, replacementRange: NSRange) {
+        guard isEditable else { return }
+        super.insertText(insertString, replacementRange: replacementRange)
+    }
+
+    override func shouldChangeText(in affectedCharRange: NSRange, replacementString: String?) -> Bool {
+        isEditable && super.shouldChangeText(in: affectedCharRange, replacementString: replacementString)
+    }
+
     // MARK: - List keyboard behavior (Tab / Return / Backspace)
 
     override func insertTab(_ sender: Any?) {
+        guard isEditable else { return }
         guard let storage = textStorage,
               storage.length > 0,
               let kind = storage.attribute(.noteBlockKind,
@@ -562,6 +593,7 @@ final class EditorTextView: NSTextView {
     }
 
     override func insertBacktab(_ sender: Any?) {
+        guard isEditable else { return }
         guard let storage = textStorage,
               storage.length > 0,
               let kind = storage.attribute(.noteBlockKind,
@@ -575,6 +607,7 @@ final class EditorTextView: NSTextView {
     }
 
     override func insertNewline(_ sender: Any?) {
+        guard isEditable else { return }
         guard let storage = textStorage, storage.length > 0 else {
             super.insertNewline(sender)
             return
@@ -621,6 +654,7 @@ final class EditorTextView: NSTextView {
     }
 
     override func deleteBackward(_ sender: Any?) {
+        guard isEditable else { return }
         guard let storage = textStorage, storage.length > 0 else {
             super.deleteBackward(sender)
             return
@@ -697,6 +731,7 @@ final class EditorTextView: NSTextView {
     }
 
     override func paste(_ sender: Any?) {
+        guard isEditable else { return }
         let pb = NSPasteboard.general
         if isUnsupportedImage(pb) { NSSound.beep(); return }
         if tryPasteImage(from: pb) { return }
@@ -737,6 +772,7 @@ final class EditorTextView: NSTextView {
     }
 
     override func performDragOperation(_ sender: any NSDraggingInfo) -> Bool {
+        guard isEditable else { return false }
         let pb = sender.draggingPasteboard
         if rejectImagePaste {
             if isUnsupportedImage(pb) { return false }
@@ -752,7 +788,8 @@ final class EditorTextView: NSTextView {
     /// an inline image attachment. Returns true if an image was handled.
     @discardableResult
     private func tryPasteImage(from pb: NSPasteboard) -> Bool {
-        guard let store = assetStore else { return false }
+        // Refuse before reserving a filename or writing bytes, including the direct UITest seam.
+        guard isEditable, let store = assetStore else { return false }
 
         // Try reading image data from the pasteboard
         let imageData: Data?
@@ -810,6 +847,7 @@ final class EditorTextView: NSTextView {
     /// For large pastes in styled mode, schedules Markdown conversion after the paste callback.
     /// The conversion still runs on the main actor and may pause the UI for a very large paste.
     func insertPlainText(_ text: String) {
+        guard isEditable else { return }
         if isRichText, text.count > Self.largePasteThreshold {
             insertLargeTextAsync(text)
             return
@@ -1114,3 +1152,32 @@ private final class PassageChipStateProbe: NSAccessibilityElement {
     }
 }
 #endif
+
+/// A disabled editor keeps its undo history but cannot expose or execute it until editable again.
+@MainActor
+private final class EditorUndoManager: UndoManager {
+    private weak var editor: EditorTextView?
+
+    init(editor: EditorTextView) {
+        self.editor = editor
+        super.init()
+    }
+
+    override var canUndo: Bool { editor?.isEditable == true && super.canUndo }
+    override var canRedo: Bool { editor?.isEditable == true && super.canRedo }
+
+    override func undo() {
+        guard editor?.isEditable == true else { return }
+        super.undo()
+    }
+
+    override func redo() {
+        guard editor?.isEditable == true else { return }
+        super.redo()
+    }
+
+    override func undoNestedGroup() {
+        guard editor?.isEditable == true else { return }
+        super.undoNestedGroup()
+    }
+}

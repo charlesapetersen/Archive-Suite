@@ -21,6 +21,8 @@ final class EditorTestBox {
     var replaceMarkdown: ((String) -> Void)?
     var insertMarkdown: ((String) -> Void)?
     var setSelection: ((Int, Int) -> Void)?
+    /// Exercise input with the outgoing editor still first responder during a held selection load.
+    var focus: (() -> String)?
     /// Returns a DIAGNOSIS, not Void (W9.g4-flake) — the image paste has the same silent-decline shape as
     /// `pastePassage`: `tryPasteImage` answers through a `Bool` this seam used to drop with `_ =`, so a G4
     /// failure could not say whether the paste declined or the bytes never landed.
@@ -57,6 +59,7 @@ struct EditorScrollRequest: Equatable {
 /// Two-way binding to a Markdown string, with debounced write-back, freeze-during-edit,
 /// undo/find, and a raw-Markdown toggle (⌘/).
 struct MarkdownEditorView: NSViewRepresentable {
+    @Environment(\.isEnabled) private var isEnabled
     @Binding var markdown: String
     @Binding var isRaw: Bool
     var fontSize: CGFloat = 14
@@ -123,6 +126,7 @@ struct MarkdownEditorView: NSViewRepresentable {
         textView.delegate = context.coordinator
         textView.configuredFontSize = fontSize
         textView.applyRawMode(isRaw, fontSize: fontSize)
+        textView.isEditable = isEnabled
 
         // Wire formatting context + asset store
         if let fmt = formatting {
@@ -146,6 +150,11 @@ struct MarkdownEditorView: NSViewRepresentable {
         }
         testBox?.insertMarkdown = { [weak coordinator = context.coordinator] in
             coordinator?.uiTestInsertMarkdown($0)
+        }
+        testBox?.focus = { [weak textView] in
+            guard let textView else { return "noTextView" }
+            let focused = textView.window?.makeFirstResponder(textView) == true
+            return "editable=\(textView.isEditable) focused=\(focused)"
         }
         testBox?.setSelection = { [weak coordinator = context.coordinator] loc, len in
             coordinator?.uiTestSetSelection(loc, len)
@@ -224,6 +233,9 @@ struct MarkdownEditorView: NSViewRepresentable {
         let coordinator = context.coordinator
         guard let textView = coordinator.textView else { return }
         coordinator.parent = self
+        // SwiftUI's .disabled does not disable an AppKit document view automatically. Keep the old
+        // body readable during a switch, but refuse input until its identity matches the selection.
+        textView.isEditable = isEnabled
         // Keep the block-chip callbacks + live summaries current (the struct is recreated each render).
         coordinator.onRevealBlock = onRevealBlock
         coordinator.onPreviewBlock = onPreviewBlock
@@ -576,7 +588,7 @@ struct MarkdownEditorView: NSViewRepresentable {
 
         /// Insert a source-block chip at the current caret position.
         func insertBlock(kind: Block.Kind = .readerPage, anchor: SourceAnchor) {
-            guard let textView, !currentIsRaw else { return }
+            guard let textView, textView.isEditable, !currentIsRaw else { return }
             let chipStr = MarkdownBridge.buildInsertableBlock(
                 kind: kind, anchor: anchor, fontSize: currentFontSize, assetStore: assetStore,
                 onReveal: onRevealBlock, onPreview: onPreviewBlock
@@ -595,7 +607,7 @@ struct MarkdownEditorView: NSViewRepresentable {
         /// never make a user paste disappear. A stable temporary attribute identifies each inserted
         /// chip when its image becomes available, even if the user keeps typing or moves the caret.
         func handleSourceBlockPaste(_ entries: [SourceBlockPaster.PasteEntry]) -> Bool {
-            guard let textView, !currentIsRaw, !entries.isEmpty else { return false }
+            guard let textView, textView.isEditable, !currentIsRaw, !entries.isEmpty else { return false }
             // Extracts reference NOTES only (§D7): a Reader/zotero link paste must not attach an
             // outside-document source block to an extract — decline so it degrades to plain text.
             if formattingContext?.currentItemKind == .extract { return false }
@@ -773,7 +785,7 @@ struct MarkdownEditorView: NSViewRepresentable {
         /// passage payload is present; the markdown is coerced to notes-only + rendered exactly as a
         /// saved-then-reloaded extract would render (chip + body).
         func handlePassagePaste() -> Bool {
-            guard let textView, !currentIsRaw, formattingContext?.currentItemKind == .extract,
+            guard let textView, textView.isEditable, !currentIsRaw, formattingContext?.currentItemKind == .extract,
                   let payload = PassagePasteboard.read() else { return false }
             // Copy the payload's inline-image BYTES into THIS extract's own assets/ (reserve→write,
             // no-overwrite guard) and rewrite refs on collision, so pasted images persist instead of
@@ -843,6 +855,7 @@ struct MarkdownEditorView: NSViewRepresentable {
         /// agree, or the bytes went into another note's `assets/`.
         func uiTestPasteImage() -> String {
             guard let textView else { return "declined:noTextView" }
+            guard textView.isEditable else { return "declined:disabled" }
             let handled = textView.uiTestPasteImage()
             let store = textView.assetStore
             let target: String
