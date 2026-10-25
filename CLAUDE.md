@@ -128,8 +128,10 @@ spin up a worktree just to answer a question.)
 # Run from the checkout you were launched in. Creates a worktree ONLY if you're not already in one.
 if [ "$(git rev-parse --git-dir)" = "$(git rev-parse --git-common-dir)" ]; then
   stamp="$(date +%Y%m%d-%H%M%S)-$$"
-  git worktree add "../suite-wt-$stamp" -b "wt/<task-slug>-$stamp"   # repo path has a space → keep quotes
-  cd "../suite-wt-$stamp"
+  worktree_root="/Users/cp1/Claude/.worktrees/archive-suite"
+  mkdir -p "$worktree_root"
+  git worktree add "$worktree_root/suite-wt-$stamp" -b "wt/<task-slug>-$stamp"
+  cd "$worktree_root/suite-wt-$stamp"
 else
   echo "Already isolated in $(git rev-parse --show-toplevel) — keep working here."
 fi
@@ -137,8 +139,17 @@ fi
 Then do **all** edits, builds, and commits from that worktree (use its absolute paths for Read/Edit/Write),
 and run `xcodegen generate` there before building (the `.xcodeproj` is gitignored). Push as normal — every
 worktree shares one `origin/main`. **When your task is pushed, remove your own worktree** so they don't pile
-up for the owner: from the primary checkout, `git worktree remove "../suite-wt-…"` (`./build` is gitignored,
+up for the owner: from the primary checkout, `git worktree remove "/absolute/path/to/your/worktree"` (`./build` is gitignored,
 so it won't block); `git worktree list` / `git worktree prune` clear strays.
+
+Engine sessions use this dedicated parent, not loose folders in `~/Claude`. Register the worktree in
+`$AGENT_WORKER_STATE/worktree` immediately. If a session is interrupted, the engine preserves its inactive
+checkout intact in `~/.local/state/archive-autonomous/retired-worktrees/`, including ignored results, Git
+administration and staged changes, and removes its worktree registration. A retry receives pointers for
+its own item. Codex retries start inside the previous checkout or a restored copy, including uncommitted and
+staged changes (`AGENT_RESUME_WORKTREE`); continue there and reconcile newer main changes before shipping.
+Failed restoration stops the launch instead of silently starting over. These recovery copies are ordinary
+directories and must not be edited or deleted by a session. Active or claimed worktrees are left alone.
 
 **Subagents that write files** must be isolated the same way — pass `isolation: "worktree"` to the Agent
 tool (or `{isolation: 'worktree'}` on a `Workflow` `agent()` call) so each gets its own scratch worktree

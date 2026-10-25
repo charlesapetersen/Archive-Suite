@@ -53,7 +53,9 @@ After that, "Continue" is enough to resume after an interruption.
 3. **Isolate.** From the primary checkout:
    ```bash
    stamp="$(date +%Y%m%d-%H%M%S)"
-   git worktree add "../suite-wt-<slug>-$stamp" -b "codex/<slug>-$stamp"
+   worktree_path="/Users/cp1/Claude/.worktrees/archive-suite/suite-wt-<slug>-$stamp"
+   mkdir -p "$(dirname "$worktree_path")"
+   git worktree add "$worktree_path" -b "codex/<slug>-$stamp"
    ```
    Work only in that worktree. Run `xcodegen generate` in each app you build.
 4. **Do and verify.** Clean build with no new warnings, then the touched app's smoke test
@@ -84,7 +86,7 @@ After that, "Continue" is enough to resume after an interruption.
    primary="$(dirname "$(git rev-parse --git-common-dir)")"
    git -C "$primary" merge --ff-only origin/main
    "$primary/ops/autonomous/check-handoff.sh"
-   git -C "$primary" worktree remove "../suite-wt-<slug>-$stamp"
+   git -C "$primary" worktree remove "$worktree_path"
    git -C "$primary" branch -d "codex/<slug>-$stamp"
    "$primary/ops/autonomous/tidy.sh"
    ```

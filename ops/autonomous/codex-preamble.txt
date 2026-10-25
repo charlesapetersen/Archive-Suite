@@ -21,9 +21,13 @@ are more specific; the prompt that follows was written for Claude Code and binds
    prove harnesses (`ops/autonomous/tests/prove-*.sh`) pass, and an adversarial review of the diff finds nothing
    open, BEFORE you push.
 
-4. WHERE YOU MAY WRITE. The engine makes ~/Claude writable for you, because this project's worktrees live beside
-   the checkout (`../suite-wt-*`, the CLAUDE.md worktree-first step). Other folders in ~/Claude belong to other
-   projects: never edit them. Network access (fetch, push) needs an escalation each time.
+4. WHERE YOU MAY WRITE. New worktrees go under /Users/cp1/Claude/.worktrees/archive-suite (the CLAUDE.md
+   worktree-first step), which the engine makes writable. Never create loose suite-wt folders in ~/Claude.
+   Register your worktree immediately in $AGENT_WORKER_STATE/worktree. If AGENT_RESUME_WORKTREE is set,
+   you are already inside your item's recovered checkout, with uncommitted and staged changes restored.
+   Continue there; do not create a replacement or discard those changes. Reconcile newer origin/main work
+   before shipping, leaving recovery copies untouched. The engine preserves and unregisters inactive interrupted
+   worktrees itself. Other projects' folders are not yours. Network access (fetch, push) needs an escalation.
 
 4b. APPS DO NOT START INSIDE THE SANDBOX. Any command that launches an app (the Processor's
    `ArchiveProcessor/scripts/test-*.sh` and `e2e-phone-mac.sh`, `xcodebuild test`, any `test-smoke.sh`) must run
