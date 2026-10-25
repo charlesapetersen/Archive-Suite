@@ -151,6 +151,17 @@ class Money(unittest.TestCase):
 
 
 class Inputs(unittest.TestCase):
+    def test_failed_arm_requires_two_matching_billed_stopped_low_replies(self):
+        rec = {'route': 'glm', 'box': 'Lincoln', 'whole': False, 'valid': False,
+               'settings': {'reasoning_effort': 'low'}, 'http': 200, 'finish': 'stop',
+               'error': 'boundaries for [1], wanted [1, 2]', 'request_sha256': 'key',
+               'span': [1, 3], 'usage': {'prompt_tokens': 100, 'completion_tokens': 100}, 'id': 'a'}
+        for rows, expected in (([rec], False), ([rec, {**rec, 'id': 'b'}], True),
+                               ([rec, {**rec, 'id': 'b', 'http': 503}], False),
+                               ([rec, {**rec, 'id': 'b', 'request_sha256': 'other'}], False)):
+            with patch.object(M, 'effective_records', return_value=rows):
+                self.assertEqual(M.confirmed_glm_failure('Lincoln') is not None, expected)
+
     def test_glm_larger_cap_reuses_only_valid_low_replies(self):
         import hashlib
         body = {'model': M.MODELS['glm'], 'max_tokens': 32768, 'reasoning_effort': 'low',

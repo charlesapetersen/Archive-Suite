@@ -450,7 +450,20 @@ def used_request_ids(root, claude_only):
     return ids
 
 
-def score(root, claude_only=False):
+def confirmed_glm_failure(box):
+    groups = {}
+    for r in effective_records():
+        if (r.get('route') == 'glm' and r.get('box') == box and not r.get('whole')
+                and r.get('settings', {}).get('reasoning_effort') == 'low'
+                and r.get('http') == 200 and r.get('finish') == 'stop' and not r.get('valid')
+                and str(r.get('error', '')).startswith('boundaries for ')
+                and all(isinstance(r.get('usage', {}).get(k), int) for k in ('prompt_tokens', 'completion_tokens'))):
+            groups.setdefault(r['request_sha256'], []).append(r)
+    return next(({'request_sha256': key, 'span': cs[0]['span'], 'attempt_ids': [r['id'] for r in cs],
+                  'reason': cs[-1]['error']} for key, cs in groups.items() if len(cs) == 2), None)
+
+
+def score(root, claude_only=False, record_glm_failure=False):
     import rescore
     import seg_lincoln_cloud as S
     import public_segmentation as P
@@ -466,7 +479,11 @@ def score(root, claude_only=False):
         srcs = {**({} if claude_only else predictors()),
                 'window-cues-claude-cue': lambda c: W.assemble(c, W.combine(c, claude_cue), False)}
         rows = S.score_sources(col, srcs, rescore.CATALOGUE_COUNT[col.name])
-        if rows['missing']:
+        if rows['missing'] and record_glm_failure and set(rows['missing']) == {'gateway-glm'}:
+            failure = confirmed_glm_failure(col.name)
+            if failure:
+                rows['failed'] = {'gateway-glm': failure}
+        if set(rows['missing']) - set(rows.get('failed', {})):
             raise ValueError(f'{col.name}: incomplete sources {rows["missing"]}; no scores written')
         out['boxes'][col.name] = rows
         # Reuse the normal public output format and its frozen truth guard, without baseline refitting.
@@ -476,6 +493,8 @@ def score(root, claude_only=False):
         digest = hashlib.sha256(json.dumps(manifest, sort_keys=True).encode()).hexdigest()
         if previous['truth_sha256'] != digest or previous['pages'] != len(col.pages):
             raise ValueError('existing public scores disagree with the frozen truth')
+        for name in rows.get('failed', {}):
+            previous['models'].pop(name, None)
         for name, row in rows['sources'].items():
             previous['models'][name] = {'counts': {**row['counts'], 'collections': []}, 'metrics': row['metrics']}
         staged.append((path, previous))
@@ -484,7 +503,8 @@ def score(root, claude_only=False):
     (RESULTS / 'seg-lincoln-gateway.json').write_text(json.dumps(out, indent=1) + '\n')
     lines = ['# Lincoln and CREST through the gateway (W46.seg-lincoln-cloud-paid)', '',
              'PARTIAL CHECKPOINT: Claude cue arm only; Gemini/GLM collection continues.' if claude_only else
-             'All assigned arms collected; earlier failed attempts remain in the price/attempt totals.', '',
+             'Completed arms are scored below. A GLM full-box arm that failed validation twice is explicitly '
+             'reported without a score; no missing vote is invented. Earlier failed attempts remain charged.', '',
              'Gemini 3.7 Flash (not 3.8), GLM 5.3 Flash, low reasoning, temperature 0; '
              '1600px images plus cached Vision text. Frozen g1 windows (7 pages, stride 3), wh1 whole streams. '
              'Windows use the model photo labels; whole streams take the known absence of label photos. '
@@ -524,15 +544,16 @@ def score(root, claude_only=False):
     if not claude_only:
         L, C = (out['boxes'][b]['sources'] for b in ('Lincoln', 'CREST'))
         exact = lambda rows, key: 100 * rows[key]['metrics']['pages_in_exact_doc']
+        glm = lambda rows: f"{exact(rows, 'gateway-glm'):.1f}%" if 'gateway-glm' in rows else 'failed validation (no score)'
         lines += ['## Findings', '',
                   f"On Lincoln, Gemini windows put {exact(L, 'gateway-gemini'):.1f}% of pages in the exact "
                   f"document and the repaired whole reply {exact(L, 'gateway-gemini-whole'):.1f}%; "
-                  f"GLM windows {exact(L, 'gateway-glm'):.1f}%. The existing open models were at "
+                  f"GLM windows: {glm(L)}. The existing open models were at "
                   '34.9–46.7%, while Claude c1 and c2 were 90.0%. The large open-model drop is not '
                   'a ceiling imposed by the material. Small differences among cloud results on one '
                   'agent-audited box do not establish a general ranking.', '',
                   f"On CREST, Gemini windows score {exact(C, 'gateway-gemini'):.1f}% and the whole reply "
-                  f"{exact(C, 'gateway-gemini-whole'):.1f}%; GLM windows {exact(C, 'gateway-glm'):.1f}%. "
+                  f"{exact(C, 'gateway-gemini-whole'):.1f}%; GLM windows: {glm(C)}. "
                   'The existing trained 4B is 98.4%, teacher 95.3%, and Claude c1/c2 84.4%. '
                   'The whole-stream arm scores higher here, but changed JPEG encoding and photo assumptions '
                   'mean this run does not isolate context length.', '',
@@ -545,6 +566,11 @@ def score(root, claude_only=False):
                   '10.7 to 14.8, with unchanged error counts. See seg-lincoln-cloud.md for all owner '
                   'boxes and the original plan comparisons.', '']
     for box, rows in out['boxes'].items():
+        for name, failure in rows.get('failed', {}).items():
+            lines += [f"{box} GLM FAILED: two stopped, billed replies for pages {failure['span']} "
+                      f"failed the unchanged strict gap validator: {failure['reason']}. "
+                      'No full-box metric is reported. Further windows in that box were not requested '
+                      'because they cannot repair this failed window; no prompt or score rule was changed.', '']
         lines += S.public_table(box, rows)
     (RESULTS / 'seg-lincoln-gateway.md').write_text('\n'.join(lines) + '\n')
 
@@ -559,6 +585,7 @@ def main():
     ap.add_argument('--route', choices=MODELS, help='Collect/inventory only this route')
     ap.add_argument('--box', choices=('Lincoln', 'CREST', 'Deaver'), help='Collect/inventory only this box')
     ap.add_argument('--claude-only', action='store_true', help='Score the completed cue arm as a partial checkpoint')
+    ap.add_argument('--record-glm-failure', action='store_true', help='Report a twice-confirmed missing-gap GLM arm without a metric')
     args = ap.parse_args()
     if args.command == 'retry-incomplete' and not args.request_sha:
         ap.error('retry-incomplete requires --request-sha')
@@ -571,7 +598,7 @@ def main():
              'retry-incomplete': lambda: retry_incomplete(args.request_sha)}[args.command]()
         return
     if args.command == 'score':
-        score(args.root, args.claude_only)
+        score(args.root, args.claude_only, args.record_glm_failure)
         return
     use_cache(args.root / 'cache')
     todo = jobs(args.root)

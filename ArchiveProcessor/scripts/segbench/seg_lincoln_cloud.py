@@ -175,7 +175,8 @@ def public_table(box: str, b: dict) -> list[str]:
                  f"{c['false_merges']} | {c['tp']}/{c['truth_bounds']} | {_f(m['pq'])} | {_f(m['kappa'])} | {m['mndd']} | "
                  f"{_pct(prior)} | {'—' if load is None else f'{100 * load / b['pages']:.1f}'} |")
     for name in b["missing"]:
-        L.append(f"| {NAMES.get(name, name)} | not collected | | | | | | | | |")
+        status = "failed validation; no score" if name in b.get("failed", {}) else "not collected"
+        L.append(f"| {NAMES.get(name, name)} | {status} | | | | | | | | |")
     return L + [""]
 
 
