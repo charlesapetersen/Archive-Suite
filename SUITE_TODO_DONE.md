@@ -12968,3 +12968,9 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   at ~/Claude/Long term storage/FarmShare-20261018/public-segmentation/. Earlier checkpoints:
   0ad09b26, db4724e7, e2ffd541,48a6a3bd,07539c06,3dc79f20,f0bec0f4.
   <!-- /W46.seg-lincoln-cloud-paid -->
+
+- [x] **W46.fix-window-duplicates — reject duplicate page and gap entries in window replies [S]** · §Processing review — W46 (lane: segbench) (uses: light) — SHIPPED 2026-10-25 (this commit).
+  Baseline f0bec0f4: `method_window.py::parse_answer` silently overwrote repeated page/gap keys. It now rejects equal and conflicting duplicates before insertion, including IDs normalized from strings. Cache hits fail without a model call or cache write.
+  Two independent read-only scans covered 10,319 window records: only three duplicate-bearing Lincoln GLM records, all explicitly unscored; no published score is affected. Preserved every cache/ledger record; no paid rerun. Full scope and exclusions: `ArchiveProcessor/segbench-results/window-duplicates-audit.md`; issue closed in Processor KNOWN_ISSUES.
+  Verified 70 window/Gemini/whole/Lincoln/gateway/public tests and 11 failing subtests against the original parser, plus separate adversarial review. Python bench only; native app sources and published benchmark metrics unchanged.
+  <!-- /W46.fix-window-duplicates -->

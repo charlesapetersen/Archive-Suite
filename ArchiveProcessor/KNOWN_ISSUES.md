@@ -12,14 +12,14 @@ fixed errors and gateway cap/cache failures. The private item ledger keeps faile
 allowances; `segbench-results/seg-lincoln-gateway.json` publishes the completed arms and the terminal Lincoln
 GLM missing-gap failure without inventing a vote or full-box score. The bench displays that failed arm too.
 
-## OPEN (W46.fix-window-duplicates, 2026-10-25): window parser overwrites repeated page/gap entries
+## FIXED (W46.fix-window-duplicates, 2026-10-25): reject repeated page/gap entries
 
-At baseline `f0bec0f4`, `scripts/segbench/method_window.py::parse_answer` builds dictionaries without rejecting
-duplicate page/gap entries. A cached Lincoln GLM reply for pages 151–157 repeats gap 156–157 and passes;
-the terminal 163–169 replies duplicate 168–169 and omit 167–168 (the missing gap is correctly rejected).
-No Lincoln GLM full-box score is published, and an independent scan found no duplicate in the scored Gemini,
-Claude or CREST GLM replies. Reject duplicates before insertion, with equal/conflicting duplicate regressions;
-audit cached scored routes and disclose affected results before any rerun. Track: `../SUITE_TODO.md`.
+`scripts/segbench/method_window.py::parse_answer` rejects duplicate integer page/gap keys before insertion,
+including equal entries. Regressions cover conflicts, normalized string IDs, missing entries and cache hits
+that must fail without a new call or write. The read-only audit of 10,319 stored window replies found only
+three duplicate-bearing records, all in the unscored Lincoln GLM arm; no published score is affected.
+All three now fail; caches and the paid ledger remain intact. No model call or paid rerun was made.
+Audit scope, failed-record exclusions and exact cache keys: `segbench-results/window-duplicates-audit.md`.
 
 ## OPEN (W46.fix-postcorrect-pack, 2026-10-24): post-correction pack repeats route/page requests
 

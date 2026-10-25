@@ -1,7 +1,9 @@
 """Windows, parsing and the two-window combination of approach A (W36.seg-window), on toy data.
 Run: <lab venv>/bin/python test_window.py   (no bench data, no model call)."""
+import json
 import unittest
 from types import SimpleNamespace
+from unittest.mock import patch
 
 import method_window as W
 from methods import METHODS
@@ -40,6 +42,46 @@ class Parse(unittest.TestCase):
                 W.parse_answer(bad, [4, 5])
         with self.assertRaises(W.ParseError):
             W.parse_answer(self.reply(), [4, 5, 6])   # a gap missing
+
+    def duplicate_reply(self, field, **changes):
+        obj = json.loads(self.reply().removeprefix("```json\n").removesuffix("\n```"))
+        obj[field].append(dict(obj[field][0], **changes))
+        return json.dumps(obj)
+
+    def test_rejects_equal_and_conflicting_duplicate_pages(self):
+        for kind in ("document", "box"):
+            for page in (4, "4"):
+                with self.subTest(kind=kind, page=page):
+                    with self.assertRaisesRegex(W.ParseError, "duplicate page 4"):
+                        W.parse_answer(self.duplicate_reply("pages", page=page, kind=kind), [4, 5])
+
+    def test_rejects_equal_and_conflicting_duplicate_boundaries(self):
+        for changes in ({}, {"decision": "continue"}, {"confidence": 0.6}, {"cue": "different"},
+                        {"between": ["4", "5"]}):
+            with self.subTest(changes=changes):
+                with self.assertRaisesRegex(W.ParseError, r"duplicate boundary \[4, 5\]"):
+                    W.parse_answer(self.duplicate_reply("boundaries", **changes), [4, 5])
+
+    def test_duplicate_does_not_fill_a_missing_entry(self):
+        for field in ("pages", "boundaries"):
+            with self.subTest(field=field):
+                obj = json.loads(self.duplicate_reply(field))
+                if field == "boundaries":
+                    obj["pages"].append({"page": 6, "kind": "document"})
+                with self.assertRaisesRegex(W.ParseError, "duplicate"):
+                    W.parse_answer(json.dumps(obj), [4, 5, 6])
+
+    def test_cached_duplicates_fail_without_a_call_or_cache_write(self):
+        for field in ("pages", "boundaries"):
+            with self.subTest(field=field), \
+                 patch.object(W, "build_request", return_value=("prompt", [], [4, 5])), \
+                 patch.object(W.CACHE, "get", return_value={"result": self.duplicate_reply(field)}), \
+                 patch.object(W.CACHE, "put") as put, patch.object(W, "call_claude") as call:
+                # Even collect's allow_call=True must preserve the bad cache and fail closed.
+                with self.assertRaisesRegex(W.ParseError, "duplicate"):
+                    W.judge_window(toy(["New", "New"]), 0, 2, allow_call=True)
+                call.assert_not_called()
+                put.assert_not_called()
 
 
 class Combine(unittest.TestCase):

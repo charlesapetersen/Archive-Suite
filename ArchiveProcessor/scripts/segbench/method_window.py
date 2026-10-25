@@ -211,10 +211,13 @@ def parse_answer(text: str, nums: list[int]) -> dict:
         raise ParseError(f"bad JSON: {e}") from e
     pages = {}
     for p in obj.get("pages", []):
+        n = int(p["page"])
+        if n in pages:
+            raise ParseError(f"duplicate page {n}")
         k = p.get("kind")
         if k not in ("box", "folder", "document"):
             raise ParseError(f"page {p.get('page')}: kind {k!r}")
-        pages[int(p["page"])] = k
+        pages[n] = k
     if sorted(pages) != nums:
         raise ParseError(f"pages {sorted(pages)} for {nums}")
     bounds = {}
@@ -222,6 +225,8 @@ def parse_answer(text: str, nums: list[int]) -> dict:
         x, y = (int(v) for v in bd["between"])
         if y != x + 1 or x not in nums[:-1]:
             raise ParseError(f"boundary {[x, y]} not in the window")
+        if x in bounds:
+            raise ParseError(f"duplicate boundary {[x, y]}")
         d = bd.get("decision")
         if d not in ("new", "continue"):
             raise ParseError(f"boundary {x}: decision {d!r}")
