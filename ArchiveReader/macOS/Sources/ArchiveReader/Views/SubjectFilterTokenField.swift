@@ -40,6 +40,7 @@ struct SubjectFilterTokenField: NSViewRepresentable {
         // (and thus the content column) wider. This is what keeps the file table from shifting.
         tf.setContentHuggingPriority(.defaultLow, for: .horizontal)
         tf.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        tf.setAccessibilityLabel("Filter by tags")
         tf.setAccessibilityIdentifier("ar.filter.tagField")
         tf.objectValue = subjects.sorted()
         return tf

@@ -157,7 +157,9 @@ struct PDFPaneView: NSViewRepresentable {
     }
 
     func makeNSView(context: Context) -> PDFView {
-        let view = PDFView()
+        let view = ReaderPDFView()
+        view.pageAccessibilityTitle = controller.key == "left" ? "Original image page" : "OCR text page"
+        view.setAccessibilityLabel(view.pageAccessibilityTitle)
         view.displayMode = .singlePage
         view.displaysPageBreaks = false
         view.autoScales = true
@@ -196,5 +198,28 @@ struct PDFPaneView: NSViewRepresentable {
         }
         view.layoutDocumentView()
         controller.applyToView()   // restore the persisted/current zoom + pin the page top
+    }
+}
+
+/// PDFKit supplies an AXPage node below the PDFView, with its selectable text underneath. Naming the
+/// outer view does not name that page, and PDFKit ignores the node's label setter. Its public title
+/// setter works: name only AXPage nodes and leave PDFKit's content, actions and parentage intact.
+final class ReaderPDFView: PDFView {
+    var pageAccessibilityTitle = "PDF page"
+
+    override func accessibilityChildren() -> [Any]? {
+        let children = super.accessibilityChildren()
+        namePages(in: children ?? [])
+        return children
+    }
+
+    private func namePages(in children: [Any]) {
+        for case let element as any NSAccessibilityProtocol in children {
+            if element.accessibilityRole() == .pageRole {
+                element.setAccessibilityTitle(pageAccessibilityTitle)
+            } else if let descendants = element.accessibilityChildren() {
+                namePages(in: descendants)
+            }
+        }
     }
 }

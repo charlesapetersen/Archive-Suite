@@ -30,7 +30,7 @@ struct NavigationWindowView: View {
                 SidebarView(model: model)
                     .frame(width: sidebarWidth)
                     .transition(.move(edge: .leading))
-                PanelDivider(width: $sidebarWidth, panelOnLeft: true, range: 140...350, id: "ar.divider.sidebar")
+                PanelDivider(width: $sidebarWidth, panelOnLeft: true, range: 140...350, label: "Sidebar width", id: "ar.divider.sidebar")
             }
             VStack(spacing: 0) {
                 filterBar
@@ -38,7 +38,7 @@ struct NavigationWindowView: View {
                 HStack(spacing: 0) {
                     table
                     if showingTagCloud {
-                        PanelDivider(width: $tagCloudWidth, panelOnLeft: false, range: 160...400, id: "ar.divider.tagCloud")
+                        PanelDivider(width: $tagCloudWidth, panelOnLeft: false, range: 160...400, label: "Tags in view width", id: "ar.divider.tagCloud")
                         tagCloudPanel
                             .transition(.move(edge: .trailing))
                     }
@@ -433,15 +433,19 @@ struct NavigationWindowView: View {
             .textFieldStyle(.roundedBorder)
             .frame(minWidth: 90, maxWidth: 160)   // a full bar must not squeeze it to nothing
             .help("Filter the list by file name")
+            .accessibilityLabel("Filter file name")
             .accessibilityIdentifier("ar.filter.name")
 
         HStack(spacing: 3) {
-            Image(systemName: "text.magnifyingglass").foregroundStyle(model.ftsPaths != nil ? Color.accentColor : .secondary)
+            Image(systemName: "text.magnifyingglass")
+                .foregroundStyle(model.ftsPaths != nil ? Color.accentColor : .secondary)
+                .accessibilityHidden(true)
             TextField("Search OCR text…", text: $model.fullTextQuery)
                 .textFieldStyle(.roundedBorder)
                 .frame(minWidth: 100, maxWidth: 180)
                 .focused($searchFocused)
                 .help("Search the full OCR text of documents")
+                .accessibilityLabel("Search OCR text")
                 .accessibilityIdentifier("ar.filter.ocr")
             if model.ftsPaths != nil {
                 Button { model.fullTextQuery = ""; model.runFullTextSearch() } label: {
@@ -717,42 +721,6 @@ struct NavigationWindowView: View {
         let sel = model.documentSelection()
         guard !sel.filePaths.isEmpty else { return }
         openWindow(id: WindowID.document, value: sel)
-    }
-}
-
-/// A thin divider that can be dragged to resize an adjacent panel.
-private struct PanelDivider: View {
-    @Binding var width: Double
-    /// `true` when the resizable panel is to the left of this divider (sidebar).
-    let panelOnLeft: Bool
-    let range: ClosedRange<CGFloat>
-    var id: String = ""
-
-    @State private var startWidth: CGFloat?
-
-    var body: some View {
-        Color(nsColor: .separatorColor)
-            .frame(width: 1)
-            .padding(.horizontal, 3)
-            .contentShape(Rectangle())
-            .onHover { inside in
-                if inside { NSCursor.resizeLeftRight.push() }
-                else { NSCursor.pop() }
-            }
-            .gesture(
-                DragGesture(minimumDistance: 1)
-                    .onChanged { value in
-                        if startWidth == nil { startWidth = CGFloat(width) }
-                        let delta = panelOnLeft
-                            ? value.translation.width
-                            : -value.translation.width
-                        let clamped = min(range.upperBound, max(range.lowerBound,
-                                          (startWidth ?? CGFloat(width)) + delta))
-                        width = Double(clamped)
-                    }
-                    .onEnded { _ in startWidth = nil }
-            )
-            .accessibilityIdentifier(id)
     }
 }
 

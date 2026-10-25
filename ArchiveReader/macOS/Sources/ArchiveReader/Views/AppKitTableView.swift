@@ -83,6 +83,7 @@ struct AppKitTableView: NSViewRepresentable {
 
         let tableView = ContextMenuTableView()
         tableView.setAccessibilityIdentifier("ar.table")
+        tableView.setAccessibilityLabel("Archive files")
         tableView.style = .plain
         tableView.usesAlternatingRowBackgroundColors = true
         tableView.allowsMultipleSelection = true
@@ -314,11 +315,14 @@ struct AppKitTableView: NSViewRepresentable {
             cell.tint = nil
             tf.textColor = .labelColor
             tf.toolTip = nil
+            tf.setAccessibilityLabel(nil)
+            tf.setAccessibilityIdentifier("ar.cell.\(colID).\(itemID.path)")
 
             switch colID {
             case "flag":
                 let flagged = parent.model.notes.isFlagged(file.url.path)
                 tf.stringValue = flagged ? "⚑" : ""
+                tf.setAccessibilityLabel(flagged ? "Flagged" : "Not flagged")
                 tf.textColor = flagged ? .systemOrange : .secondaryLabelColor
 
             case "warning":
@@ -326,8 +330,10 @@ struct AppKitTableView: NSViewRepresentable {
                     tf.stringValue = "⚠"
                     tf.textColor = .systemOrange
                     tf.toolTip = status.label
+                    tf.setAccessibilityLabel("OCR warning")
                 } else {
                     tf.stringValue = ""
+                    tf.setAccessibilityLabel("No OCR warning")
                 }
 
             case "date":
