@@ -6,8 +6,10 @@ Public windows: Gemini 3.7 Flash and GLM 5.3 Flash, g1, 1600px, 7 pages/stride 3
 Whole folders: Gemini, wh1, ONE uninterrupted stream per public box (no truth document cuts).
 Claude c2: only holes in the pre-existing plan cache, on CREST and Deaver. The gateway
 uses inline images rather than tool reads, and its cache and provenance remain separate.
-No subscription calls, personal keys, corpus writes, or automatic retries. A non-parsing
-reply remains a recorded failure, never a neutral vote. Scoring cannot make calls.
+No subscription calls, personal keys, corpus writes, or automatic retries. Failed replies
+are never neutral votes. One exact-hash audited whole reply has only two missing array
+brackets restored, without changing any values; raw bytes and the repair remain recorded.
+Scoring cannot make calls.
 
 The gateway publishes no price: costs are estimates at list token rates, reasoning included.
 Gemini .75/3.75, GLM .15/.50, Claude 2/10 USD/M, checked against OpenRouter /models
@@ -42,6 +44,10 @@ CAP = 3.00
 MODELS = {'gemini': 'gemini-3.7-flash', 'glm': 'GLM 5.3 Flash', 'claude-cue': 'claude-sonnet-5-5'}
 PRICES = {'gemini': (.75, 3.75), 'glm': (.15, .50), 'claude-cue': (2., 10.)}
 PUBLIC_KEYS = ('gateway-gemini', 'gateway-glm', 'gateway-gemini-whole')
+# Audited saved Lincoln reply: exactly two omitted '[' delimiters; no value is supplied/changed.
+# Scope the normalization to these exact bytes, never to an unseen model response.
+AUDITED_WHOLE_SHA = '39c6a2d43022cc70b97e4b414bd3bc516f16c55fbe7839f64b7be28ef9a3bb72'
+AUDITED_PAIRS = [[82, 83], [122, 123]]
 
 
 def records():
@@ -97,11 +103,17 @@ def request(route, col, a, b, whole=False):
                   {'type': 'image_url', 'image_url': {'url': 'data:image/jpeg;base64,' +
                     base64.b64encode(image).decode()}}]
     parts.append({'type': 'text', 'text': prompt})
-    body = {'model': MODELS[route], 'temperature': 0, 'max_tokens': 32768 if whole else 4096,
+    # Pilot whole output used ~41 tokens/gap, with no reasoning tokens reported. Freeze
+    # 64/gap, at least 8192, before the JSON-mode whole calls; no need for 32768 on CREST.
+    # GLM also exhausted 8192 on a reasoning-only reply. Keep successful low/8192
+    # replies, but give unfinished windows a fixed 16384 ceiling (including reasoning).
+    output_cap = max(8192, 64 * (len(nums) - 1)) if whole else 16384 if route == 'glm' else 4096
+    body = {'model': MODELS[route], 'temperature': 0, 'max_tokens': output_cap,
             'messages': [{'role': 'user', 'content': parts}]}
     if route != 'claude-cue':
         body['response_format'] = {'type': 'json_object'}
-        body['reasoning_effort'] = 'low' if route == 'gemini' else 'minimal'
+        # GLM-5.3's native documented minimum is low, not minimal (docs.z.ai, 2026-10-24).
+        body['reasoning_effort'] = 'low'
     if len(json.dumps(body).encode()) > 32_000_000:
         raise ValueError('body exceeds the gateway 32 MB limit; no call sent')
     key = hashlib.sha256(json.dumps(body, sort_keys=True).encode()).hexdigest()
@@ -112,10 +124,17 @@ def normalized(raw, whole):
     # Gemini can wrap an otherwise complete JSON reply even when asked for no fence.
     # Strip only a single surrounding fence; H still requires every gap exactly once.
     text = raw.strip()
-    note = {'parser': 'gw2', 'fence': False}
+    note = {'parser': 'gw3', 'fence': False, 'audited_array_open': []}
     if whole and (m := re.fullmatch(r'```(?:json)?\s*\n(.*?)\n```', text, re.S)):
         text = m[1]
         note['fence'] = True
+    if whole and hashlib.sha256(raw.encode()).hexdigest() == AUDITED_WHOLE_SHA:
+        pattern = r'"between":\s*(\d+),\s*(\d+)\]'
+        pairs = [list(map(int, m)) for m in re.findall(pattern, text)]
+        if pairs != AUDITED_PAIRS:
+            raise W.ParseError('audited syntax offsets changed')
+        text = re.sub(pattern, r'"between": [\1, \2]', text)
+        note['audited_array_open'] = pairs
     return text, note
 
 
@@ -124,7 +143,7 @@ def parse(raw, nums, whole):
     return H.parse_answer(text, nums) if whole else W.parse_answer(text, nums)
 
 
-def reservation(route, body):
+def reservation(route, body, input_bound=None):
     # Input allowance: one token per UTF-8 text byte + image allowance + message overhead,
     # bounded by the published 1M context. Gemini's pilot (including all 261 whole images)
     # bills 1066-1098/image at 1600px (whole ~1084): allow 2048/image (>1.86x).
@@ -136,8 +155,40 @@ def reservation(route, body):
     images = sum(p['type'] == 'image_url' for p in parts)
     image_allowance = 2048 if route == 'gemini' else 8192
     tokens = min(1_048_576, text + image_allowance * images + 2048)
+    if input_bound is not None:
+        tokens = min(tokens, input_bound)
     pi, po = PRICES[route]
     return (tokens * pi + body['max_tokens'] * po) / 1e6
+
+
+def covering_window_bound(col):
+    """Whole-input allowance from measured Gemini windows covering every page.
+
+    These repeat full g1 instructions and overlap images/text; wh1 removes label-photo
+    instructions. Both use the same OCR truncation and 1600px images. Summing the covering
+    requests overcounted the measured Lincoln pilot (460333 vs 335266 tokens).
+    This is an empirical allowance, not a tokenizer guarantee; add 10% margin and
+    reserve the full output cap. Actual usage above the allowance stops collection.
+    Only use this after complete successful cached windows, on a long (>14-page) stream.
+    """
+    if len(col.pages) <= 2 * W.WINDOW:
+        return None
+    covered, tokens, refs = 0, 0, []
+    windows = W.windows(len(col.pages))
+    while covered < len(col.pages):
+        a, b = max((w for w in windows if w[0] <= covered < w[1]), key=lambda w: w[1])
+        body, key, _ = request('gemini', col, a, b)
+        hit = cache_hit(body, key)
+        if not hit or not hit.get('valid'):
+            return None
+        n = hit.get('response', {}).get('usage', {}).get('prompt_tokens')
+        if not isinstance(n, int) or n <= 0:
+            return None
+        tokens += n
+        refs.append(hit['request']['id'])
+        covered = b
+    return {'tokens': (tokens * 11 + 9) // 10, 'measured_covering_tokens': tokens,
+            'margin': 1.1, 'covering_request_ids': refs}
 
 
 def cached(key):
@@ -147,14 +198,27 @@ def cached(key):
 
 def cache_hit(body, key):
     hit = cached(key)
-    if hit is None and body.get('response_format') == {'type': 'json_object'}:
-        # The earlier unconstrained-output pilot has identical model, images and prompt.
-        # Keep its valid responses; failed replies remain charged and are never silently used.
-        old_body = {k: v for k, v in body.items() if k != 'response_format'}
+    if hit is None and body.get('model') == MODELS['glm'] and body.get('max_tokens') == 16384:
+        # A completed stop answer at the old cap has the identical input/settings.
+        # Never reuse the earlier minimal-effort pilot or a truncated low reply.
+        old_body = {**body, 'max_tokens': 8192}
         old_key = hashlib.sha256(json.dumps(old_body, sort_keys=True).encode()).hexdigest()
         old = cached(old_key)
         if old and old.get('valid'):
             hit = old
+    if hit is None and body.get('response_format') == {'type': 'json_object'}:
+        # The earlier unconstrained-output pilot has identical model, images and prompt.
+        # Keep its valid responses; failed replies remain charged and are never silently used.
+        old_body = {k: v for k, v in body.items() if k != 'response_format'}
+        candidates = [old_body]
+        if body['max_tokens'] > 8192:  # whole pilot used the larger cap, with otherwise identical input/settings
+            candidates.append({**old_body, 'max_tokens': 32768})
+        for candidate in candidates:
+            old_key = hashlib.sha256(json.dumps(candidate, sort_keys=True).encode()).hexdigest()
+            old = cached(old_key)
+            if old and old.get('valid'):
+                hit = old
+                break
     return hit
 
 
@@ -179,7 +243,7 @@ def reconcile_413():
 def revalidate():
     """Reparse saved successful HTTP responses after a parser fix; never send another paid call."""
     for rec in effective_records():
-        if rec.get('valid') or rec.get('http') != 200 or rec.get('finish') != 'stop':
+        if not rec.get('whole') or rec.get('valid') or rec.get('http') != 200 or rec.get('finish') != 'stop':
             continue
         if not all(isinstance(rec.get('usage', {}).get(k), int) for k in ('prompt_tokens', 'completion_tokens')):
             continue  # unknown usage remains reserved and unaccepted
@@ -196,7 +260,7 @@ def revalidate():
         tmp.write_text(json.dumps(hit, ensure_ascii=False))
         tmp.replace(dest)
         append({**rec, 'event': 'revalidated', 'valid': True, 'error': None, 'normalization': note,
-                'reason': 'saved HTTP200/stop reply reparsed; whole JSON fence normalization only; '
+                'reason': 'saved HTTP200/stop reply reparsed; audited two-array delimiter normalization; '
                           'no values changed, no new inference or charge'})
 
 
@@ -245,11 +309,15 @@ def call(route, col, a, b, whole=False):
                                   for r in effective_records())
     if attempts and not retry:
         raise RuntimeError('request was already sent without a cached reply; inspect ledger before retry')
-    reserve = reservation(route, body)
+    bound = covering_window_bound(col) if whole and route == 'gemini' else None
+    reserve = reservation(route, body, bound['tokens'] if bound else None)
     if spent() + reserve > CAP:
         raise RuntimeError(f'cap: ${spent():.4f} + ${reserve:.4f} allowance exceeds ${CAP:.2f}')
     rec = {'id': uuid.uuid4().hex, 'event': 'reserve', 'charge': reserve, 'route': route,
            'model': MODELS[route], 'box': col.name, 'span': [nums[0], nums[-1]], 'whole': whole,
+           'settings': {'max_tokens': body['max_tokens'], 'reasoning_effort': body.get('reasoning_effort'),
+                        'response_format': body.get('response_format'), 'whole_jpeg_quality': 45 if whole else None},
+           'input_bound': bound,
            'request_sha256': key, 't': time.time()}
     append(rec)                    # before sending, so a killed process still counts its possible spend
     r = None
@@ -335,14 +403,28 @@ def predictors():
             'gateway-gemini-whole': lambda col: H.assemble(col, H.predict_gaps(col, 'whole', judge('gemini', True)))}
 
 
+def used_request_ids(root, claude_only):
+    ids = set()
+    for job in jobs(root):
+        if claude_only and job[0] != 'claude-cue':
+            continue
+        body, key, _ = job_request(job)
+        hit = cache_hit(body, key)
+        if hit and hit.get('valid'):
+            ids.add(hit['request']['id'])
+    return ids
+
+
 def score(root, claude_only=False):
     import rescore
     import seg_lincoln_cloud as S
     import public_segmentation as P
     rescore.no_network()
+    used = used_request_ids(root, claude_only)
     out = {'price_note': __doc__.split('The gateway publishes')[1].strip(), 'cost_estimate': spent(),
            'partial': claude_only,
-           'calls': [r for r in effective_records() if not claude_only or r['route'] == 'claude-cue'], 'boxes': {}}
+           'calls': [{**r, 'used': r['id'] in used} for r in effective_records()
+                     if not claude_only or r['route'] == 'claude-cue'], 'boxes': {}}
     staged = []
     for col in public_columns(root):
         use_cache(root / 'cache')
@@ -368,11 +450,18 @@ def score(root, claude_only=False):
     lines = ['# Lincoln and CREST through the gateway (W46.seg-lincoln-cloud-paid)', '',
              'PARTIAL CHECKPOINT: Claude cue arm only; Gemini/GLM collection continues.' if claude_only else
              'All assigned arms collected; earlier failed attempts remain in the price/attempt totals.', '',
-             'Gemini 3.7 Flash (not 3.8), GLM 5.3 Flash, low/minimal reasoning, temperature 0; '
+             'Gemini 3.7 Flash (not 3.8), GLM 5.3 Flash, low reasoning, temperature 0; '
              '1600px images plus cached Vision text. Frozen g1 windows (7 pages, stride 3), wh1 whole streams. '
              'Windows use the model photo labels; whole streams take the known absence of label photos. '
              'Whole images are JPEG quality 45 to fit the gateway 32 MB body limit; windows retain the '
              'original benchmark thumbnails. No page is resized or dropped. No prompt fitted to these answers.', '',
+             'GLM uses the documented native minimum, `reasoning_effort=low`, with 16384 output tokens '
+             '(completed low/8192 replies are reused; both caps include reasoning). '
+             'Earlier `minimal` probes (including a reasoning-only capped reply) are included in item cost, '
+             'but none enters the low-setting predictions. Source: '
+             '[Z.ai thinking parameters](https://docs.z.ai/guides/capabilities/thinking), checked 2026-10-24. '
+             'Gemini whole JSON-mode caps are 64 tokens/gap, minimum 8192, based on the pilot\'s ~41/gap; '
+             'the saved Lincoln pilot had a 32768 cap.', '',
              'Claude c2 combines earlier plan windows with gateway holes, same Sonnet 5.5 and stated cues, '
              'but inline-image delivery replaces tool reads. It is a mixed-transport result.', '',
              f'Item cost estimate ${spent():.4f}, at list token prices; gateway billing is unavailable. '
@@ -382,16 +471,19 @@ def score(root, claude_only=False):
     lines += ['The initial uncompressed Lincoln request was rejected before inference (HTTP 413, '
               '32 MB body limit, zero token cost); its reservation was released with an append-only '
               'ledger correction. Both whole-stream calls use JPEG quality 45, so their comparison '
-              'with windows also changes JPEG encoding and cannot isolate context length alone.', '',
-              '| box | route | whole | attempts | valid | input tokens | output tokens | cost estimate | mean seconds |',
-              '|---|---|---|---:|---:|---:|---:|---:|---:|']
+              'with windows also changes JPEG encoding and photo assumptions, and cannot isolate context length alone. '
+              'Lincoln\'s saved whole reply required exactly two opening array brackets restored at gaps 82/83 and '
+              '122/123. This repair is restricted to its SHA-256, keeps all 260 stated decisions/confidences '
+              'unchanged, and passes the complete strict gap validator; it was not a raw-valid JSON reply.', '',
+              '| box | route | whole | attempts | valid replies | used replies | input tokens | output tokens | cost estimate | mean seconds |',
+              '|---|---|---|---:|---:|---:|---:|---:|---:|---:|']
     for box, route, whole in sorted({(r['box'], r['route'], r['whole']) for r in out['calls']}):
         cs = [r for r in out['calls'] if (r['box'], r['route'], r['whole']) == (box, route, whole)]
         tin = sum(r.get('usage', {}).get('prompt_tokens', 0) for r in cs)
         tout = sum(r.get('usage', {}).get('completion_tokens', 0) for r in cs)
         lines.append(f'| {box} | {route} | {whole} | {len(cs)} | {sum(bool(r.get("valid")) for r in cs)} | '
-                     f'{tin} | {tout} | ${sum(r["charge"] for r in cs):.4f} | '
-                     f'{sum(r.get("wall_s", 0) for r in cs) / len(cs):.1f} |')
+                     f'{sum(r["used"] for r in cs)} | {tin} | {tout} | ${sum(r["charge"] for r in cs):.4f} | '
+                     f'{sum(r["wall_s"] for r in cs if "wall_s" in r) / max(1, sum("wall_s" in r for r in cs)):.1f} |')
     lines.append('')
     for box, rows in out['boxes'].items():
         lines += S.public_table(box, rows)
@@ -404,6 +496,8 @@ def main():
     ap.add_argument('root', type=Path)
     ap.add_argument('--limit', type=int)
     ap.add_argument('--windows-only', action='store_true', help='Defer whole streams while measuring window cost')
+    ap.add_argument('--route', choices=MODELS, help='Collect/inventory only this route')
+    ap.add_argument('--box', choices=('Lincoln', 'CREST', 'Deaver'), help='Collect/inventory only this box')
     ap.add_argument('--claude-only', action='store_true', help='Score the completed cue arm as a partial checkpoint')
     args = ap.parse_args()
     if args.command in ('reconcile-413', 'revalidate', 'retry-unsettled'):
@@ -420,6 +514,8 @@ def main():
     todo = jobs(args.root)
     pending = []
     for job in todo:
+        if args.route and job[0] != args.route or args.box and job[1].name != args.box:
+            continue
         if args.windows_only and job[4]:
             continue
         body, key, nums = job_request(job)

@@ -111,12 +111,51 @@ class Money(unittest.TestCase):
 
 
 class Inputs(unittest.TestCase):
+    def test_glm_larger_cap_reuses_only_valid_low_replies(self):
+        import hashlib
+        body = {'model': M.MODELS['glm'], 'max_tokens': 16384, 'reasoning_effort': 'low',
+                'response_format': {'type': 'json_object'}}
+        old_key = hashlib.sha256(json.dumps({**body, 'max_tokens': 8192}, sort_keys=True).encode()).hexdigest()
+        for valid in (True, False):
+            def read(key):
+                return {'valid': valid} if key == old_key else None
+            with self.subTest(valid=valid), patch.object(M, 'cached', side_effect=read):
+                self.assertEqual(M.cache_hit(body, 'new'), {'valid': True} if valid else None)
+
+    def test_whole_input_bound_covers_every_page_and_requires_measured_replies(self):
+        col = SimpleNamespace(pages=[None] * 20)
+        def req(route, col, a, b):
+            return {}, f'{a}-{b}', []
+        def hit(body, key):
+            return {'valid': True, 'response': {'usage': {'prompt_tokens': 100}}, 'request': {'id': key}}
+        with patch.object(M, 'request', side_effect=req), patch.object(M, 'cache_hit', side_effect=hit):
+            bound = M.covering_window_bound(col)
+            ranges = [tuple(map(int, s.split('-'))) for s in bound['covering_request_ids']]
+            self.assertEqual({i for a, b in ranges for i in range(a, b)}, set(range(20)))
+            self.assertEqual(bound['measured_covering_tokens'], 100 * len(ranges))
+            self.assertEqual(bound['tokens'], 110 * len(ranges))
+        with patch.object(M, 'request', side_effect=req), patch.object(M, 'cache_hit', return_value=None):
+            self.assertIsNone(M.covering_window_bound(col))
+
     def test_json_mode_reuses_valid_pilot_only_and_never_reuses_failure(self):
-        body = {'model': 'gemini', 'messages': [], 'response_format': {'type': 'json_object'}}
+        body = {'model': 'gemini', 'messages': [], 'max_tokens': 4096, 'response_format': {'type': 'json_object'}}
         for valid in (True, False):
             with self.subTest(valid=valid), patch.object(M, 'cached', side_effect=[None, {'valid': valid}]) as read:
                 self.assertEqual(M.cache_hit(body, 'new'), {'valid': True} if valid else None)
                 self.assertNotEqual(read.call_args_list[1].args[0], 'new')
+
+    def test_audited_two_bracket_repair_changes_no_values_and_rejects_unseen_bytes(self):
+        import hashlib
+        obj = {'boundaries': [{'between': [1, 2], 'decision': 'new', 'confidence': .95},
+                              {'between': [2, 3], 'decision': 'continue', 'confidence': .8}]}
+        valid = json.dumps(obj)
+        raw = valid.replace('"between": [1, 2]', '"between": 1, 2]').replace('"between": [2, 3]', '"between": 2, 3]')
+        with patch.object(M, 'AUDITED_WHOLE_SHA', hashlib.sha256(raw.encode()).hexdigest()), \
+                patch.object(M, 'AUDITED_PAIRS', [[1, 2], [2, 3]]):
+            self.assertEqual(M.parse(raw, [1, 2, 3], True), M.parse(valid, [1, 2, 3], True))
+            self.assertEqual(M.normalized(raw, True)[1]['audited_array_open'], [[1, 2], [2, 3]])
+            with self.assertRaises(M.W.ParseError):
+                M.parse(raw + ' ', [1, 2, 3], True)  # different raw bytes never receive this repair
 
     def test_missing_second_box_does_not_overwrite_first_box_or_leave_stale_scores(self):
         import hashlib
@@ -136,6 +175,7 @@ class Inputs(unittest.TestCase):
                     'missing': {}}
             bad = {'sources': {}, 'missing': {'gateway-glm': 'hole'}}
             with patch.object(M, 'public_columns', return_value=cols), patch.object(M, 'use_cache'), \
+                    patch.object(M, 'used_request_ids', return_value=set()), \
                     patch.object(M, 'RESULTS', root), patch.object(P, 'MANIFESTS', root), \
                     patch.object(M, 'spent', return_value=0), patch.object(M, 'effective_records', return_value=[]), \
                     patch.object(rescore, 'no_network'), patch.object(S, 'score_sources', side_effect=[good, bad]):
