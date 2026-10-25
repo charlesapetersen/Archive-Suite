@@ -1,0 +1,109 @@
+{
+  "status": "frozen pilot bank; no OCR result",
+  "protocol": "oracle-cells-v1",
+  "truth_sha256": "acb6b5c5b99c2d322120245bf64869577a33f82ba4dd63f37a63d2a3b4f6ce4b",
+  "freeze_sha256": "b926bc484f9a12160baf1aaa32368294b29f480f7a536261836302d45921e73f",
+  "code_sha256": {
+    "regions_cells.py": "68eec11c4162c3db294f82f6698783e2accc86037c989c0f1d86f2e6aa793605",
+    "regions_cluster.py": "1aa66ee5b4c21772c3a76670cbd64d91138f7586b3d6b96e5379bff686e95ff6"
+  },
+  "selection": {
+    "date": "2026-10-25",
+    "excluded": {
+      "L4": [
+        "si__NMAAHC-007630087_00354"
+      ],
+      "owner96": [
+        "p025",
+        "p059",
+        "p060",
+        "p061",
+        "p062",
+        "p063"
+      ]
+    },
+    "exclusion_reason": "No front-side table in those seed/candidate images; L4 source63356 is paired prose. Not a replacement population survey.",
+    "geometry": "Selected logical field/subfield boxes; no detector involved; no min-side expansion. Original page JPEGs match parent SHA256. Medium print includes typewriting.",
+    "parent": "787f291f; ce0aa207 crop validation",
+    "reviewers": "Codex primary, independent read-only source survey",
+    "selection": "Prior deterministic one-per-project four L4 seeds, three table-positive retained; all twelve owner table-tagged candidates audited, six table/schedule-positive retained. Selected legible fields and verified blanks, not an accuracy sample or full grid.",
+    "truth": "Direct pixel reading before inference; public volunteers expand abbreviations and are not cell truth. Narrow unambiguous fields chosen, no inferred names. Handwritten headings retained as hand."
+  },
+  "pages": [
+    {
+      "id": "si__NMAAHC-007630087_00447",
+      "set": "L4",
+      "image_sha256": "2dddcffe49a5aaf815d2c9081930de91adaa94b77dc59ced978f6bc663ca8076",
+      "capability": true,
+      "fields": 8
+    },
+    {
+      "id": "si__NMAAHC-007630088_00156",
+      "set": "L4",
+      "image_sha256": "3ddd3a68a01c731fb0316bcc66286d6ea61d14a4ef0033cdc6b3ae0b347558fc",
+      "capability": false,
+      "fields": 9
+    },
+    {
+      "id": "si__NMAAHC-007630088_00337",
+      "set": "L4",
+      "image_sha256": "bb5f55e3f30aabe2878d4e2440056e8a632f04b492645d6899085d393277c76e",
+      "capability": false,
+      "fields": 10
+    },
+    {
+      "id": "p024",
+      "set": "owner96",
+      "image_sha256": "3abe8e8b2df543135441626bba54e058d2c33d8bd17a0a829917bb8375005808",
+      "capability": true,
+      "fields": 8
+    },
+    {
+      "id": "p057",
+      "set": "owner96",
+      "image_sha256": "31077474383d430979d8e92b5945e600713f379f1e52b1d0352e0923152955f5",
+      "capability": false,
+      "fields": 7
+    },
+    {
+      "id": "p058",
+      "set": "owner96",
+      "image_sha256": "34e9fba7abf0b61901b9e2c35ff81918653d296bdbf1e5bd105a4e3dfc808af9",
+      "capability": false,
+      "fields": 8
+    },
+    {
+      "id": "p064",
+      "set": "owner96",
+      "image_sha256": "5e114b87afb92866b8fcd863ae3a3851ad608379da91b8a7e6cb9d242f8ed184",
+      "capability": false,
+      "fields": 8
+    },
+    {
+      "id": "p065",
+      "set": "owner96",
+      "image_sha256": "1ab8dc37340ed8b04e2dce5698c894ca25054336eff76254e1298e8a019c6262",
+      "capability": false,
+      "fields": 7
+    },
+    {
+      "id": "p066",
+      "set": "owner96",
+      "image_sha256": "79163f62bd9bb028314f5bc10cdfbe8e9b2081f5c97a6bd2aec7371102ba35a5",
+      "capability": false,
+      "fields": 7
+    }
+  ],
+  "support_sha256": {
+    "support/corpus/regions-cells-job.sh": "1eadda95eca4121b4cf436745723244141a8dc8a3901a15ef5af15ec16a5a614",
+    "support/corpus/regions-cells-stage-job.sh": "3fe7353ca1029509445b7de86b92cd164c3cfb6a7ace94a6e1bbdf6aa97ad7ff",
+    "support/corpus/regions-cells-submit.sh": "32da1660dfbba4e90266c2969a03b18a2b535846e10acaf783c9e99cf0c7d636",
+    "support/corpus/regions_cells.py": "68eec11c4162c3db294f82f6698783e2accc86037c989c0f1d86f2e6aa793605",
+    "support/corpus/regions_cluster.py": "1aa66ee5b4c21772c3a76670cbd64d91138f7586b3d6b96e5379bff686e95ff6",
+    "support/sherlock/bin/py": "dcaf43541f46d2a06ae0a4ecd162ae575add562529f5bd9571a5f0f24e675a48",
+    "support/sherlock/bin/vllm": "747beafdbdded93aa37dd49a6294dbc269f21336eea3cf7b46ac4125fad27941",
+    "support/sherlock/sh.env": "436979182606893682738eeef958ef13bb26c2d83835ced329b9111a493e68aa"
+  },
+  "artifact_sha256": "0f46b7251a493d093d6734335b9c921664a8d7caa698baa2351257cc276941bd",
+  "artifact_bytes": 26161401
+}
