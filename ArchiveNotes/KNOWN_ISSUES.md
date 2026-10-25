@@ -3,7 +3,7 @@
 Running log of quirks, risks, and things verified/unverified for the Notes app. Keep current.
 (Sibling logs: `../ArchiveReader/KNOWN_ISSUES.md`, `../ArchiveProcessor/KNOWN_ISSUES.md`.)
 
-## ✅ CODE FIXED; VM recheck pending (W40.fix-notes-stale-body-on-switch, 2026-10-25) — the outgoing editor remained writable during loading
+## ✅ FIXED (W40.fix-notes-stale-body-on-switch, 2026-10-25) — the outgoing editor remained writable during loading
 
 The earlier inspector-jitter fix kept the previous note whole while the next body loaded, but SwiftUI's
 `.disabled` never set the AppKit text view's `isEditable`. The custom image-paste handler could still
