@@ -24,7 +24,7 @@ struct DisabledEditorTests {
         #expect(tv.string == "accepted")
         tv.isEditable = true
         #expect(manager.canUndo)
-        manager.undo()
+        tv.undo(nil)
         #expect(tv.string.isEmpty)
         #expect(manager.canRedo)
         tv.isEditable = false
@@ -32,7 +32,7 @@ struct DisabledEditorTests {
         manager.redo()
         #expect(tv.string.isEmpty)
         tv.isEditable = true
-        manager.redo()
+        tv.redo(nil)
         #expect(tv.string == "accepted")
     }
 

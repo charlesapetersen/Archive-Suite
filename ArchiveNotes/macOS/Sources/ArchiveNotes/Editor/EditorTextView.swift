@@ -554,12 +554,28 @@ final class EditorTextView: NSTextView {
     // MARK: - Disabled editor (selection / body load in flight)
 
     // Menu commands (including Undo/Redo) can bypass keyDown and normal text insertion.
+    @objc func undo(_ sender: Any?) {
+        guard let manager = undoManager, manager.canUndo else { return }
+        manager.undo()
+    }
+
+    @objc func redo(_ sender: Any?) {
+        guard let manager = undoManager, manager.canRedo else { return }
+        manager.redo()
+    }
+
     override func validateUserInterfaceItem(_ item: any NSValidatedUserInterfaceItem) -> Bool {
-        isEditable && super.validateUserInterfaceItem(item)
+        guard isEditable else { return false }
+        if item.action == #selector(undo(_:)) { return undoManager?.canUndo == true }
+        if item.action == #selector(redo(_:)) { return undoManager?.canRedo == true }
+        return super.validateUserInterfaceItem(item)
     }
 
     override func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
-        isEditable && super.validateMenuItem(menuItem)
+        guard isEditable else { return false }
+        if menuItem.action == #selector(undo(_:)) { return undoManager?.canUndo == true }
+        if menuItem.action == #selector(redo(_:)) { return undoManager?.canRedo == true }
+        return super.validateMenuItem(menuItem)
     }
 
     override func keyDown(with event: NSEvent) {

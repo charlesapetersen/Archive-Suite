@@ -10,7 +10,8 @@ The earlier inspector-jitter fix kept the previous note whole while the next bod
 write an asset and later save its reference into the outgoing note. `MarkdownEditorView` now bridges
 the enabled environment to AppKit; keyboard, menu, formatting and paste paths refuse disabled edits,
 including asset imports. An editor-scoped undo manager gates both Undo/Redo availability and execution
-while retaining history; SwiftUI's menu bypasses the text view's own validation. Serialization still
+while retaining history; explicit Undo/Redo responder actions route the standard Edit menu to it.
+SwiftUI's menu bypasses the text view's own validation. Serialization still
 flushes edits accepted before the switch. The raw/styled
 action is also gated without briefly dimming the toolbar on each selection change.
 
