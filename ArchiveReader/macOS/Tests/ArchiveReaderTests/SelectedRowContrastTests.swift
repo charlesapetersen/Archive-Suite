@@ -9,16 +9,14 @@ import XCTest
 /// renders it headlessly and measures the WCAG contrast of the label and of each chip against the row.
 ///
 /// What each should measure is worked out from the system colours of the appearance (the selected-row text colour
-/// on the selection colour, the accent on the row), so the test holds whatever accent colour the Mac is set to;
-/// the 3:1 floor is asserted where Apple's own pair clears it, which the blue default does by a wide margin.
+/// on the selection colour, primary text on the row). Small text must clear 4.5:1 in every row state.
 @MainActor
 final class SelectedRowContrastTests: XCTestCase {
 
     private static let subjects = ["Jerry Brown", "Economics", "1983"]
     private static let appearances: [(String, NSAppearance.Name)] = [("light", .aqua), ("dark", .darkAqua)]
-    /// WCAG's floor for large text. Before the fix the accent label measured about 1.3–1.6 on the selection;
-    /// white measures 5.4 (light) and 6.3 (dark).
-    private static let floor = 3.0
+    /// WCAG AA for the Reader's small labels, including the chips.
+    private static let floor = 4.5
 
     func testUnreadAndChipsReadOnASelectedRow() throws {
         for (name, appearance) in Self.appearances {
@@ -57,7 +55,7 @@ final class SelectedRowContrastTests: XCTestCase {
         }
     }
 
-    /// Reuse the same cells as emphasis/selection changes, including Read's AppKit-provided secondary tint.
+    /// Reuse the same cells as emphasis/selection changes, with both read states using AA text colours.
     func testReadStatesAndChipsFollowSelectionChanges() throws {
         for (name, appearance) in Self.appearances {
             for state in [ReadState.read, .unread] {
@@ -84,16 +82,9 @@ final class SelectedRowContrastTests: XCTestCase {
                         ? (emphasized ? .selectedContentBackgroundColor : .unemphasizedSelectedContentBackgroundColor)
                         : .controlBackgroundColor
                     XCTAssertEqual(contrast.background, luminance(background, in: appearance), accuracy: 0.02)
-                    if state == .unread {
-                        let ink: NSColor = selected
-                            ? (emphasized ? .alternateSelectedControlTextColor : .unemphasizedSelectedTextColor)
-                            : .controlAccentColor
-                        assertContrast(contrast, expected: expectedContrast(ink, over: background, in: appearance),
-                                       "\(name) Unread \(phase)")
-                    } else {
-                        // Secondary labels are remapped by AppKit under emphasis; measure the actual drawing.
-                        XCTAssertGreaterThan(contrast.ratio, Self.floor, "\(name) Read \(phase): \(contrast)")
-                    }
+                    // NSTextField resolves semantic labelColor in its own background style; its pixels can be
+                    // more opaque than resolving the bare NSColor outside a text field. Assert the actual ink.
+                    XCTAssertGreaterThanOrEqual(contrast.ratio, Self.floor, "\(name) \(state.rawValue) \(phase)")
                     for chip in try chipContrasts(image, cell: tags, scroll: scroll, scale: scale) {
                         let expected = emphasized
                             ? expectedContrast(.alternateSelectedControlTextColor, over: background, in: appearance)
@@ -105,7 +96,7 @@ final class SelectedRowContrastTests: XCTestCase {
         }
     }
 
-    /// An ordinary row keeps readable chips (the title on the tinted fill) and the accent label on the row.
+    /// An ordinary row keeps readable chips (the title on the tinted fill) and primary Unread text on the row.
     func testUnreadAndChipsReadOnAnOrdinaryRow() throws {
         for (name, appearance) in Self.appearances {
             let harness = SelectedRowHarness(subjects: Self.subjects, readState: .unread)
@@ -120,15 +111,43 @@ final class SelectedRowContrastTests: XCTestCase {
 
             let label = try XCTUnwrap(readCell.textField)
             let labelContrast = try measure(image, rect: label.bounds, in: label, scroll: scroll, scale: scale)
-            let labelExpected = expectedContrast(.controlAccentColor, over: .controlBackgroundColor, in: appearance)
-            print("[W40.selrow] \(name) ordinary, Unread: \(labelContrast); system pair \(labelExpected)")
-            assertContrast(labelContrast, expected: labelExpected, "\(name): Unread on an ordinary row")
+            print("[W40.selrow] \(name) ordinary, Unread: \(labelContrast)")
+            XCTAssertGreaterThanOrEqual(labelContrast.ratio, Self.floor)
 
             let chipExpected = expectedContrast(.labelColor, over: TagChips.fill, over: .controlBackgroundColor,
                                                 in: appearance)
             for chip in try chipContrasts(image, cell: tagCell, scroll: scroll, scale: scale) {
                 print("[W40.selrow] \(name) ordinary, chip \(chip.title): \(chip.text); system pair \(chipExpected)")
                 assertContrast(chip.text, expected: chipExpected, "\(name): chip \(chip.title), title on its fill")
+            }
+        }
+    }
+
+    /// The same table/text-field drawing path used by Type and the warning glyph, including inactive rows.
+    /// The warning is sampled as text too: the small triangle must meet the stronger 4.5:1 text floor.
+    func testTypeAndWarningReadInEveryRowState() throws {
+        for (name, appearance) in Self.appearances {
+            for (title, tint) in [("PDF", ReaderColors.informationalCellTint),
+                                  ("⚠", ReaderColors.warningCellTint)] {
+                let harness = SelectedRowHarness(subjects: Self.subjects, readState: .read)
+                let scroll = harness.makeScrollView(size: CGSize(width: 420, height: 60), appearance: appearance,
+                                                    selected: false)
+                let table = try XCTUnwrap(scroll.documentView as? NSTableView)
+                let row = try XCTUnwrap(table.rowView(atRow: 0, makeIfNecessary: true))
+                let cell = try XCTUnwrap(harness.readCell)
+                let label = try XCTUnwrap(cell.textField)
+                label.stringValue = title
+                cell.tint = tint
+                for (phase, selected, emphasized) in [("ordinary", false, false), ("active", true, true),
+                                                      ("inactive", true, false), ("ordinary-again", false, false)] {
+                    table.selectRowIndexes(selected ? IndexSet(integer: 0) : [], byExtendingSelection: false)
+                    row.isEmphasized = emphasized
+                    row.needsDisplay = true
+                    let (image, scale) = try render(scroll, artifact: "w40-aa-\(name)-\(title)-\(phase).png")
+                    let contrast = try measure(image, rect: label.bounds, in: label, scroll: scroll, scale: scale)
+                    print("[W40.aa] \(name) \(title) \(phase): \(contrast)")
+                    XCTAssertGreaterThanOrEqual(contrast.ratio, Self.floor)
+                }
             }
         }
     }
@@ -276,7 +295,7 @@ final class SelectedRowContrastTests: XCTestCase {
             : CGRect(x: topDown.minX, y: view.bounds.height - topDown.maxY, width: topDown.width, height: topDown.height)
     }
 
-    /// The measured contrast must be the system pair's, and clear the floor where that pair does.
+    /// A selected label or chip must match its explicit system pair and clear AA.
     /// The ink is sampled from antialiased glyphs, whose edges never reach the pure colour, so a thin dark title on
     /// a pale chip reads up to about a tenth below its pair (9.9 against 10.9, light); the measure may fall short of
     /// the pair by 15 % but never exceed it by more than 8 %.
@@ -284,9 +303,7 @@ final class SelectedRowContrastTests: XCTestCase {
                                 file: StaticString = #filePath, line: UInt = #line) {
         XCTAssert((expected * 0.85 - 0.5...expected * 1.08 + 0.5).contains(measured.ratio),
                   "\(what): \(measured), the system pair measures \(expected)", file: file, line: line)
-        if expected >= Self.floor {
-            XCTAssertGreaterThan(measured.ratio, Self.floor, "\(what): \(measured)", file: file, line: line)
-        }
+        XCTAssertGreaterThanOrEqual(measured.ratio, Self.floor, "\(what): \(measured)", file: file, line: line)
     }
 
     /// The WCAG contrast of `ink` drawn over `background` (each composited by its own alpha, `background` first

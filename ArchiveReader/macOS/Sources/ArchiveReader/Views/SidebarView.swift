@@ -97,7 +97,7 @@ struct SidebarView: View {
             Label(name, systemImage: systemImage)
             Spacer(minLength: 6)
             if let count {
-                Text("\(count)").foregroundStyle(.secondary).font(.caption).monospacedDigit()
+                Text("\(count)").foregroundStyle(.primary).font(.caption).monospacedDigit()
             }
         }
     }

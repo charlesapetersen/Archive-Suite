@@ -451,8 +451,9 @@ Views/
                               ContextMenuTableView + ContextMenuActions trampoline to NavigationModel;
                               optional default-hidden Provenance column uses the existing header picker.
                               Text cells are TintedTextCellView: a `tint` (normal, emphasized) follows the
-                              row's selection, so the Read column's "Unread" is the accent on an ordinary row
-                              and the selected-row text colour on a selected one (W40.fix-reader-selected-row-contrast).
+                              row's selection. Type and Read labels use primary/selected text colours;
+                              Unread is semibold (W40.fix-reader-a11y-contrast). ReaderColors supplies
+                              adaptive warning ink; a selected warning uses selected text colour.
   TagChips.swift              The File tags chips the Reader draws itself while a row's token field is not
                               being edited: filled with an accent tint on an ordinary row, outlined in the
                               selected-row text colour on a selected one, same geometry in both (NSTokenField
@@ -522,8 +523,8 @@ Build: `xcodegen generate && xcodebuild -scheme ArchiveReader … build/test`.
 2-page PDF SPEC (page 0 scan / page 1 OCR) headlessly and, for W9.b4, decodes a copied Reader page-link's
 PNG to prove it is nonblank — no app launch, no TCC prompt, health-gate-safe. `InkContrast` (same file) is the
 WCAG contrast of one ink on one background in a crop; `SelectedRowContrastTests` lays the Read and File tags
-cells out in a real, emphasized-selected `NSTableView` and asserts the "Unread" label and every chip clear 3:1
-against the selection in light and dark, and that the probe fails the accent label the Reader used to draw.
+cells out in a real `NSTableView` and asserts both read states, the Type/warning inks and every chip clear
+4.5:1 in light and dark through active/inactive selection changes, and rejects the old accent-on-selection label.
 Reference-image diffs: `SnapshotTests.swift` (swift-snapshot-testing SPM dep; refs in `__Snapshots__/`).
 The Tart VM is its reference renderer: it compares there and deliberately skips on the host; see
 `ops/gui/README.md` for the guarded guest-only re-recording flow.

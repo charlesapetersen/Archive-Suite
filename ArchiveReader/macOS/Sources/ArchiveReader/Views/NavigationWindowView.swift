@@ -294,7 +294,7 @@ struct NavigationWindowView: View {
             HStack {
                 Text("Tags in view").font(.headline)
                 Spacer()
-                Text("\(cloud.count)").foregroundStyle(.secondary).font(.caption)
+                Text("\(cloud.count)").foregroundStyle(.primary).font(.caption)
             }
             .padding(10)
             Divider()
@@ -647,19 +647,19 @@ struct NavigationWindowView: View {
                 Text("Scanning…").accessibilityIdentifier("ar.status.scanning")
             }
             Text("\(model.displayed.count) shown · \(model.library.files.count) total in \(model.library.scopeDescription)")
-                .foregroundStyle(.secondary)
+                .foregroundStyle(.primary)
             if model.library.jpegPartnerScanStatus == .scanning {
                 ProgressView().controlSize(.small)
                 Text("Checking JPEG partners…")
                     .accessibilityIdentifier("ar.status.jpegScanning")
             } else if model.library.jpegPartnerScanStatus == .needsCommonParentGrant {
                 Label("Choose the common folder to enable JPEG partners", systemImage: "exclamationmark.triangle.fill")
-                    .foregroundStyle(.orange).lineLimit(1).truncationMode(.tail)
+                    .foregroundStyle(ReaderColors.warning).lineLimit(1).truncationMode(.tail)
                     .help("Choose the parent folder containing both Archival Photos and Archival Photos JPEGS.")
                     .accessibilityIdentifier("ar.status.jpegNeedsCommonRoot")
             } else if model.library.jpegPartnerScanStatus == .incomplete {
                 Label("JPEG partner status is unknown; rescan to retry", systemImage: "exclamationmark.triangle.fill")
-                    .foregroundStyle(.orange).lineLimit(1).truncationMode(.tail)
+                    .foregroundStyle(ReaderColors.warning).lineLimit(1).truncationMode(.tail)
                     .accessibilityIdentifier("ar.status.jpegIndexIncomplete")
             }
             // Degraded discovery says so here rather than leaving a confident-looking count over a list
@@ -667,24 +667,24 @@ struct NavigationWindowView: View {
             // content index below, W23.m9).
             if let f = model.library.discoveryFailure {
                 Label(f.message, systemImage: "exclamationmark.triangle.fill")
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(ReaderColors.warning)
                     .lineLimit(1).truncationMode(.tail)
                     .help(f.detail)
                     .accessibilityIdentifier("ar.status.discoveryFailure")
             }
             if let summary = model.activeFilterSummary {
-                Text("· \(summary)").foregroundStyle(.secondary).lineLimit(1).truncationMode(.tail)
+                Text("· \(summary)").foregroundStyle(.primary).lineLimit(1).truncationMode(.tail)
                     .help("Active filter")
             }
             if let p = model.indexingProgress {
                 ProgressView(value: Double(p.done), total: Double(max(1, p.total))).frame(width: 70)
-                Text("Indexing \(p.done)/\(p.total)").foregroundStyle(.secondary)
+                Text("Indexing \(p.done)/\(p.total)").foregroundStyle(.primary)
             }
             // A degraded content index says so here instead of leaving an idle status bar over an
             // empty index, where "no results" is indistinguishable from "no matches" (W23.m9).
             if let f = model.indexFailure {
                 Label(f.message, systemImage: "exclamationmark.triangle.fill")
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(ReaderColors.warning)
                     .lineLimit(1).truncationMode(.tail)
                     .help(f.detail)
                     .accessibilityIdentifier("ar.status.indexFailure")
@@ -699,13 +699,13 @@ struct NavigationWindowView: View {
             // which is the only on-screen evidence that a cache row was re-verified rather than
             // written blind (`W26.verify-fu2`).
             if !model.statusMessage.isEmpty {
-                Text(model.statusMessage).foregroundStyle(.secondary)
+                Text(model.statusMessage).foregroundStyle(.primary)
                     .accessibilityIdentifier("ar.status.message")
             }
             // Counts what the actions will act on (`selectedFiles`, visible rows only), so the number can
             // never name a file the list does not show (`W40.fix-reader-phantom-selection`).
             if !model.selectedFiles.isEmpty {
-                Text("\(model.selectedFiles.count) selected").foregroundStyle(.secondary)
+                Text("\(model.selectedFiles.count) selected").foregroundStyle(.primary)
                     .accessibilityIdentifier("ar.status.selectedCount")
             }
         }

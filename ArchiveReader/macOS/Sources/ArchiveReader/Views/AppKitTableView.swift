@@ -323,12 +323,12 @@ struct AppKitTableView: NSViewRepresentable {
                 let flagged = parent.model.notes.isFlagged(file.url.path)
                 tf.stringValue = flagged ? "⚑" : ""
                 tf.setAccessibilityLabel(flagged ? "Flagged" : "Not flagged")
-                tf.textColor = flagged ? .systemOrange : .secondaryLabelColor
+                cell.tint = flagged ? ReaderColors.warningCellTint : nil
 
             case "warning":
                 if let status = parent.model.formatStatus(for: file.url.path), status.needsAttention {
                     tf.stringValue = "⚠"
-                    tf.textColor = .systemOrange
+                    cell.tint = ReaderColors.warningCellTint
                     tf.toolTip = status.label
                     tf.setAccessibilityLabel("OCR warning")
                 } else {
@@ -356,7 +356,7 @@ struct AppKitTableView: NSViewRepresentable {
 
             case "type":
                 tf.stringValue = file.fileType
-                tf.textColor = .secondaryLabelColor
+                cell.tint = ReaderColors.informationalCellTint
 
             case "classification":
                 Self.configureProvenanceTextField(
@@ -450,17 +450,13 @@ struct AppKitTableView: NSViewRepresentable {
             return cell
         }
 
-        /// The Read column's label, exposed internally so the headless contrast guard renders the same cell the
-        /// table does. W40.fix-reader-selected-row-contrast: "Unread" is the accent on an ordinary row and the
-        /// selected-row text colour on an emphasized one, where the accent was a blue label on the blue selection.
-        /// "Read" stays secondary; AppKit dims that itself under emphasis, so the two still differ on a selected row.
+        /// Small labels need AA text contrast even on the selected row. Weight distinguishes Unread without
+        /// relying on the system accent, whose contrast against an ordinary row can be below 4.5:1.
         static func configureReadStateCell(_ cell: TintedTextCellView, state: ReadState?) {
             cell.textField?.stringValue = state?.rawValue ?? "—"
-            cell.tint = state == .unread
-                ? (normal: .controlAccentColor, emphasized: .alternateSelectedControlTextColor,
-                   inactiveSelected: .unemphasizedSelectedTextColor)
-                : (normal: .secondaryLabelColor, emphasized: .secondaryLabelColor,
-                   inactiveSelected: .secondaryLabelColor)
+            let size = cell.textField?.font?.pointSize ?? NSFont.systemFontSize
+            cell.textField?.font = .systemFont(ofSize: size, weight: state == .unread ? .semibold : .regular)
+            cell.tint = ReaderColors.informationalCellTint
         }
 
         /// The Name cell's formatter, exposed internally so the headless pixel guard renders the same

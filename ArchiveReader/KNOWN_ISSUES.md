@@ -13,14 +13,25 @@ text descendants (PDFKit ignores the page label setter, but accepts its public t
 The light/dark main-screen VM audits pass with the labels KnownIssue removed, including external PDF titles,
 preview content containment and both directions of pointer resize. Native PDF/splitter regressions and the
 full Reader smoke pass. Evidence: [`W40.fix-reader-a11y-labels.md`](../verification/evidence/reader/W40.fix-reader-a11y-labels.md).
-The separate W40.fix-reader-a11y-contrast remains open; reading order and whole-task keyboard access were not
-established by these audits.
+The separate contrast finding was closed by W40.fix-reader-a11y-contrast below; reading order and whole-task
+keyboard access were not established by these audits.
+
+## ✅ CLOSED (W40.fix-reader-a11y-contrast, 2026-10-25) — small labels and warnings below AA
+
+Sidebar/tag-cloud counts, navigation status text and preview/viewer page counters use primary text. Type and
+both read states use primary text plus active/inactive selection colours; Unread is semibold rather than accent
+blue. ReaderColors gives warnings a darker amber in light mode and a pale orange in dark, yielding to selection
+text when selected. This changes presentation only.
+
+The 4.5:1 pixel guard covers read states, Type/warning inks and chip text through selection transitions. The
+main-screen accessibility audit has no contrast KnownIssue exemption. Verification results and screenshots:
+[`W40.fix-reader-a11y-contrast.md`](../verification/evidence/reader/W40.fix-reader-a11y-contrast.md).
 
 ## ✅ CLOSED (W40.fix-reader-selected-row-contrast, 2026-10-24) — selected Read labels and tag chips
 
 The Read column's accent-blue “Unread” and native token fills merged into the active selection highlight.
-`TintedTextCellView` now follows active and inactive selection text colours; “Read” keeps AppKit's secondary
-label mapping. `WrappingTokenField` draws filled chips on ordinary/inactive rows and outlined chips with
+`TintedTextCellView` follows active and inactive selection text colours. W40.fix-reader-a11y-contrast later
+replaced the secondary “Read” and ordinary accent “Unread” with primary text (Unread semibold). `WrappingTokenField` draws filled chips on ordinary/inactive rows and outlined chips with
 selection text on active rows, returning to native tokens during editing. Selection does not change chip
 geometry. A wrapping cell asks for its row height again after layout rather than drawing below its row.
 

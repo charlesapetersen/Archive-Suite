@@ -63,7 +63,7 @@ struct PreviewSheet: View {
             Image(systemName: "eye")
             Text(model.title).lineLimit(1).truncationMode(.middle).font(.headline)
             if !model.positionLabel.isEmpty {
-                Text(model.positionLabel).foregroundStyle(.secondary)
+                Text(model.positionLabel).foregroundStyle(.primary)
             }
             Spacer()
             // ↑/↓ move up/down the file list (live preview follows the selection).

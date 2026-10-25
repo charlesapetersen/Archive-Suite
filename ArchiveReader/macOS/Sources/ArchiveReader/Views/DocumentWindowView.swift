@@ -142,7 +142,7 @@ struct DocumentWindowView: View {
     /// Slim warning strip shown above the panes when the document is image-only (no OCR text layer).
     private func formatBanner(_ text: String) -> some View {
         HStack(spacing: 6) {
-            Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+            Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(ReaderColors.warning)
             Text(text).font(.callout)
             Spacer()
         }
@@ -237,7 +237,7 @@ struct DocumentWindowView: View {
         HStack {
             Text(model.title).lineLimit(1).truncationMode(.middle)
             Spacer()
-            Text(model.positionLabel).foregroundStyle(.secondary)
+            Text(model.positionLabel).foregroundStyle(.primary)
         }
         .font(.callout)
         .padding(.horizontal, 10).padding(.vertical, 6)

@@ -32,6 +32,10 @@ final class AccessibilityAuditUITests: FixtureUITestCase {
         let sweep = AccessibilityAudit(app, appearance: appearance, in: self,
                                        known: Self.known)
         let main = app.windows["Archive Reader"]
+        // The saved 900-pt window scrolls Type/Read off screen once both side panels are open. A wide window
+        // keeps the actual table factories under the pixel check, rather than silently auditing only counts.
+        let wide = LayoutGuard.dragCorner(of: main, to: CGPoint(x: main.frame.minX + 1800, y: main.frame.minY + 760))
+        XCTAssertGreaterThan(wide.width, 1700)
         waitForRows(minimum: 3, timeout: 10)
         clickRow(0)
         LayoutGuard.waitUntilSettled(main)
@@ -60,7 +64,9 @@ final class AccessibilityAuditUITests: FixtureUITestCase {
             LayoutGuard.waitUntilSettled(main)
             XCTAssertEqual(splitter.frame.midX, before, accuracy: 2)
         }
+        assertSmallTextContrast(in: main, appearance: appearance, requiresTableLabels: true)
         sweep.audit(main, screen: "navigation window")
+        captureScreenshot("reader-aa-navigation-\(appearance)")
 
         toolbarButton("ar.toolbar.preview").click()
         let open = app.buttons["ar.preview.open"]
@@ -72,14 +78,18 @@ final class AccessibilityAuditUITests: FixtureUITestCase {
         XCTAssertTrue(preview.waitForExistence(timeout: 5))
         XCTAssertTrue(preview.buttons["ar.preview.open"].exists)
         assertPageTitles(in: preview)
+        assertSmallTextContrast(in: preview, appearance: appearance)
         sweep.audit(preview, screen: "preview sheet")
+        captureScreenshot("reader-aa-preview-\(appearance)")
 
         open.click()
         let viewer = app.windows.matching(NSPredicate(format: "title != %@", "Archive Reader")).firstMatch
         XCTAssertTrue(viewer.waitForExistence(timeout: 10), "Open in Viewer should bring up the document window")
         LayoutGuard.waitUntilSettled(viewer)
         assertPageTitles(in: viewer)
+        assertSmallTextContrast(in: viewer, appearance: appearance)
         sweep.audit(viewer, screen: "document viewer")
+        captureScreenshot("reader-aa-viewer-\(appearance)")
         viewer.typeKey("w", modifierFlags: .command)
         XCTAssertTrue(viewer.waitForNonExistence(timeout: 5), "the viewer should close")
 
@@ -88,7 +98,57 @@ final class AccessibilityAuditUITests: FixtureUITestCase {
         XCTAssertTrue(settings.waitForExistence(timeout: 10), "Settings should open")
         LayoutGuard.waitUntilSettled(settings)
         sweep.audit(settings, screen: "settings")
+        captureScreenshot("reader-aa-settings-\(appearance)")
         sweep.finish()
+    }
+
+    /// Check the assigned small labels even when Xcode does not nominate them as contrast issues. The
+    /// general audit's 24-pt-frame heuristic is unsuitable here: these are all small text, so AA is 4.5:1.
+    private func assertSmallTextContrast(in container: XCUIElement, appearance: String, requiresTableLabels: Bool = false) {
+        guard let tree = try? container.snapshot(), let pixels = ScreenPixels(XCUIScreen.main.screenshot()) else {
+            XCTFail("Could not capture the small-text contrast check")
+            return
+        }
+        var measured = 0
+        var tableLabels = Set<String>()
+        var families = Set<String>()
+        func visit(_ node: XCUIElementSnapshot) {
+            defer { node.children.forEach(visit) }
+            // SwiftUI exposes static text as AXValue in snapshots; AppKit's warning uses AXLabel.
+            let label = node.label.isEmpty ? (node.value as? String ?? "") : node.label
+            guard node.elementType == .staticText, !label.isEmpty, tree.frame.contains(node.frame) else { return }
+            let id = node.identifier
+            let target = ["ar.sidebar.allFiles", "ar.sidebar.folder", "ar.sidebar.smart", "ar.tagCloud"].contains(id)
+                || id.hasPrefix("ar.cell.type.") || id.hasPrefix("ar.cell.read.")
+                || (id.hasPrefix("ar.cell.warning.") && label == "OCR warning")
+                || label.range(of: #"^\d+ of \d+$"#, options: .regularExpression) != nil
+                || label.contains(" shown · ") || label.hasSuffix(" selected")
+            guard target else { return }
+            let ratio = pixels.contrast(under: node.frame)
+            print("[reader-aa] \(appearance) \(id) \(label) frame=\(node.frame): \(ratio ?? 0)")
+            XCTAssertGreaterThanOrEqual(ratio ?? 0, 4.5, "\(appearance) \(id) \(label) small text must clear AA")
+            measured += 1
+            if Int(label) != nil {
+                if id == "ar.sidebar.allFiles" { families.insert("allFilesCount") }
+                if id == "ar.sidebar.folder" { families.insert("folderCount") }
+                if id == "ar.tagCloud" { families.insert("tagCloudCount") }
+            }
+            if label.contains(" shown · ") { families.insert("summary") }
+            if label.hasSuffix(" selected") { families.insert("selectedCount") }
+            if label.range(of: #"^\d+ of \d+$"#, options: .regularExpression) != nil { families.insert("pageCounter") }
+            for column in ["type", "read", "warning"] where id.hasPrefix("ar.cell.\(column).") {
+                tableLabels.insert(column)
+            }
+        }
+        visit(tree)
+        XCTAssertGreaterThan(measured, 0, "Each navigation/preview/viewer screen must expose the small text being checked")
+        if requiresTableLabels {
+            XCTAssertEqual(tableLabels, ["type", "read", "warning"], "Type, Read and a real warning must all be visible")
+            XCTAssertTrue(Set(["allFilesCount", "folderCount", "tagCloudCount", "summary", "selectedCount"])
+                .isSubset(of: families), "All assigned counts/status labels must be measured: \(families)")
+        } else {
+            XCTAssertTrue(families.contains("pageCounter"), "The preview/viewer page counter must be measured")
+        }
     }
 
     private func assertPageTitles(in container: XCUIElement) {
@@ -102,18 +162,6 @@ final class AccessibilityAuditUITests: FixtureUITestCase {
         }
     }
 
-    // Filed 2026-10-16 from the first VM runs; each fix's session deletes its entry (the audit fails once it
-    // stops reproducing).
-    @MainActor static let known: [AccessibilityAudit.KnownIssue] = [
-        // Original light-mode secondary text/orange warnings, plus Type/Read cells confirmed in both
-        // appearances by this item's VM recheck (evidence: reader/W40.fix-reader-a11y-labels.md).
-        AccessibilityAudit.KnownIssue(tag: "W40.fix-reader-a11y-contrast") { f in
-            guard f.audit == .contrast, f.type == .staticText else { return false }
-            return ["ar.sidebar.allFiles", "ar.sidebar.folder", "ar.tagCloud"].contains(f.identifier)   // the counts beside them
-                || f.identifier.hasPrefix("ar.cell.warning.")                        // a row's OCR warning
-                || f.identifier.hasPrefix("ar.cell.type.") || f.identifier.hasPrefix("ar.cell.read.")
-                || f.label.range(of: #"^\d+ of \d+$"#, options: .regularExpression) != nil   // page counter
-                || f.label.contains(" shown · ") || f.label.hasSuffix(" selected")  // status bar
-        },
-    ]
+    // No contrast exemptions: counts, status, page counters, Type/Read and warnings are audited in both modes.
+    @MainActor static let known: [AccessibilityAudit.KnownIssue] = []
 }
