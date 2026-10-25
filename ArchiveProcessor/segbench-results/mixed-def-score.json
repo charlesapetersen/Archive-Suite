@@ -1,0 +1,166 @@
+{
+ "answered": 170,
+ "sheet": 170,
+ "strata": {
+  "clean": 1212,
+  "disagree": 630,
+  "hand": 105,
+  "mixed": 39,
+  "open": 14
+ },
+ "hand": {
+  "disagree": {
+   "passage": 5,
+   "none": 29,
+   "few": 44,
+   "signature": 17,
+   "handpage": 2,
+   "long": 3
+  },
+  "mixed": {
+   "passage": 8,
+   "few": 19,
+   "handpage": 1,
+   "long": 8,
+   "signature": 3
+  },
+  "control": {
+   "none": 17,
+   "signature": 1,
+   "few": 2
+  },
+  "mixed-both": {
+   "few": 8,
+   "signature": 1,
+   "passage": 2
+  }
+ },
+ "by_threshold": [
+  {
+   "at_least": "signature",
+   "pages": 660,
+   "share": 0.3302,
+   "open_assumed": 10,
+   "strata": {
+    "disagree": {
+     "answered": 100,
+     "rate": 0.684
+    },
+    "mixed": {
+     "answered": 39,
+     "rate": 0.974
+    },
+    "clean": {
+     "answered": 20,
+     "rate": 0.15
+    }
+   }
+  },
+  {
+   "at_least": "few",
+   "pages": 487,
+   "share": 0.2436,
+   "open_assumed": 7,
+   "strata": {
+    "disagree": {
+     "answered": 100,
+     "rate": 0.514
+    },
+    "mixed": {
+     "answered": 39,
+     "rate": 0.897
+    },
+    "clean": {
+     "answered": 20,
+     "rate": 0.1
+    }
+   }
+  },
+  {
+   "at_least": "passage",
+   "pages": 68,
+   "share": 0.0341,
+   "open_assumed": 1,
+   "strata": {
+    "disagree": {
+     "answered": 100,
+     "rate": 0.081
+    },
+    "mixed": {
+     "answered": 39,
+     "rate": 0.41
+    },
+    "clean": {
+     "answered": 20,
+     "rate": 0.0
+    }
+   }
+  },
+  {
+   "at_least": "long",
+   "pages": 24,
+   "share": 0.0122,
+   "open_assumed": 0,
+   "strata": {
+    "disagree": {
+     "answered": 100,
+     "rate": 0.025
+    },
+    "mixed": {
+     "answered": 39,
+     "rate": 0.205
+    },
+    "clean": {
+     "answered": 20,
+     "rate": 0.0
+    }
+   }
+  }
+ ],
+ "labelers": {
+  "regression": {
+   "spoke": 170,
+   "mixed_pages": 121,
+   "found": 46,
+   "false": 6
+  },
+  "sorter": {
+   "spoke": 170,
+   "mixed_pages": 121,
+   "found": 7,
+   "false": 6
+  },
+  "atrium": {
+   "spoke": 161,
+   "mixed_pages": 116,
+   "found": 103,
+   "false": 26
+  },
+  "qwen": {
+   "spoke": 169,
+   "mixed_pages": 120,
+   "found": 66,
+   "false": 1
+  }
+ },
+ "owner_mixed": 119,
+ "called_mixed_by_hand": {
+  "signature": [
+   21,
+   22
+  ],
+  "few": [
+   72,
+   73
+  ],
+  "passage": [
+   15,
+   15
+  ],
+  "long": [
+   11,
+   11
+  ]
+ },
+ "cut": "signature"
+}
