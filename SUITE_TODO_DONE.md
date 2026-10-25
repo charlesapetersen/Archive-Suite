@@ -12927,3 +12927,17 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   Evidence: `verification/evidence/reader/selected-row-contrast-2026-10-24.md`. Reader smoke: 507 tests,
   3 skipped, 0 failures; independent diff review and write-surface lint plus its 22/22 mutation checks pass.
   <!-- /W40.fix-reader-selected-row-contrast -->
+
+- [x] **W40.fix-reader-a11y-labels — VoiceOver gets no name for the Reader's filter fields, list, pane dividers, PDF pages and empty row cells [S · S3]** · §W40 · SHIPPED 2026-10-25 (this commit)
+  (lane: reader) (uses: build,vm). Found by `W40.e3` 2026-10-16; reproduction: `ArchiveReaderUITests/AccessibilityAuditUITests` in the VM (it carries this as a `KnownIssue`; detail `verification/evidence/core/W40.e3-accessibility-audit.md`). Xcode's audit: the tag, file-name and OCR filter fields (`ar.filter.tagField`, `.name`, `.ocr`) have no description — SwiftUI exposes their prompt text as a placeholder only (`NavigationWindowView.swift:387`, `:395`; `SubjectFilterTokenField.swift`); the OCR field's magnifier image is announced as "text.magnifyingglass" (`:394`, decorative: hide it); the list (`ar.table`) has no name; the two `PanelDivider`s have no role (`NavigationWindowView.swift:32`, `:40`: give them the splitter role and a label); the flag and OCR-warning cells of a row with neither are empty text elements; and the preview's and viewer's PDF page views have no name. Add labels (and hide the decorative image), then delete the `KnownIssue` so the audit proves it.
+  Implemented in 994f7def and 379eb19a: explicit filter/list/status-cell names, hidden OCR decoration,
+  native named panel splitters with bounded AX actions and stable global-coordinate drags, and titles on
+  PDFKit's actual AXPage nodes preserving native selectable text descendants. The final VM run passes both
+  light/dark main-screen sweeps with the labels KnownIssue deleted, both native regression tests and all eight
+  external page-title checks. Both splitter pointer directions pass; preview audit asserts real Open-button
+  containment rather than trusting macOS's empty AXSheet wrapper. Independent review finds no actionable issue.
+  Final full Reader smoke: 509 tests, 3 skipped, 0 failures. Write-surface lint and 22/22 mutation proofs pass;
+  durable transcripts and inspected screen
+  captures: verification/evidence/reader/W40.fix-reader-a11y-labels.md. Separate measured contrast failures stay
+  under W40.fix-reader-a11y-contrast. No real corpus or host display was touched. In-flight note deleted.
+  <!-- /W40.fix-reader-a11y-labels -->

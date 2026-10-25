@@ -1,0 +1,42 @@
+W40.fix-reader-a11y-labels — final VM r4
+Implementation: 994f7def + 379eb19a; generated scratch fixture only.
+Raw xcuitest.log SHA-256: 1bcbf3420763dbd8c27464d56d0b8e2c0a358714580a9f3827e4b353e6dd0660
+
+Test Suite 'Selected tests' started at 2026-10-25 02:27:15.390.
+Test Suite 'ArchiveReaderTests.xctest' started at 2026-10-25 02:27:15.390.
+Test Suite 'PDFPaneAccessibilityTests' started at 2026-10-25 02:27:15.390.
+Test Suite 'PDFPaneAccessibilityTests' passed at 2026-10-25 02:27:15.430.
+	 Executed 1 test, with 0 failures (0 unexpected) in 0.039 (0.040) seconds
+Test Suite 'PanelDividerAccessibilityTests' started at 2026-10-25 02:27:15.431.
+Test Suite 'PanelDividerAccessibilityTests' passed at 2026-10-25 02:27:15.432.
+	 Executed 1 test, with 0 failures (0 unexpected) in 0.001 (0.002) seconds
+Test Suite 'ArchiveReaderTests.xctest' passed at 2026-10-25 02:27:15.433.
+	 Executed 2 tests, with 0 failures (0 unexpected) in 0.040 (0.042) seconds
+Test Suite 'Selected tests' passed at 2026-10-25 02:27:15.434.
+	 Executed 2 tests, with 0 failures (0 unexpected) in 0.040 (0.044) seconds
+Test Suite 'Selected tests' started at 2026-10-25 02:27:16.441.
+Test Suite 'ArchiveReaderUITests.xctest' started at 2026-10-25 02:27:16.441.
+Test Suite 'AccessibilityAuditUITests' started at 2026-10-25 02:27:16.441.
+[a11y-audit] navigation window, dark: 11 new issue(s), 0 unexpected, 7 from W40.fix-reader-a11y-contrast (1 seen on an earlier screen, 1 outside this window, 0 contrast off the visible window, 4 contrast not reproduced, 0 contrast covered)
+[pdf-external] Original image page: present
+[pdf-external] OCR text page: present
+[a11y-audit] preview sheet, dark: 0 new issue(s), 0 unexpected (0 seen on an earlier screen, 24 outside this window, 0 contrast off the visible window, 3 contrast not reproduced, 0 contrast covered)
+[pdf-external] Original image page: present
+[pdf-external] OCR text page: present
+[a11y-audit] document viewer, dark: 1 new issue(s), 0 unexpected (1 seen on an earlier screen, 23 outside this window, 0 contrast off the visible window, 1 contrast not reproduced, 0 contrast covered)
+[a11y-audit] settings, dark: 3 new issue(s), 0 unexpected (1 seen on an earlier screen, 24 outside this window, 0 contrast off the visible window, 0 contrast not reproduced, 0 contrast covered)
+[a11y-audit] navigation window, light: 34 new issue(s), 0 unexpected, 30 from W40.fix-reader-a11y-contrast (1 seen on an earlier screen, 1 outside this window, 0 contrast off the visible window, 2 contrast not reproduced, 0 contrast covered)
+[pdf-external] Original image page: present
+[pdf-external] OCR text page: present
+[a11y-audit] preview sheet, light: 1 new issue(s), 0 unexpected, 1 from W40.fix-reader-a11y-contrast (0 seen on an earlier screen, 48 outside this window, 0 contrast off the visible window, 2 contrast not reproduced, 0 contrast covered)
+[pdf-external] Original image page: present
+[pdf-external] OCR text page: present
+[a11y-audit] document viewer, light: 2 new issue(s), 0 unexpected, 1 from W40.fix-reader-a11y-contrast (1 seen on an earlier screen, 43 outside this window, 0 contrast off the visible window, 1 contrast not reproduced, 0 contrast covered)
+[a11y-audit] settings, light: 3 new issue(s), 0 unexpected (1 seen on an earlier screen, 36 outside this window, 0 contrast off the visible window, 0 contrast not reproduced, 0 contrast covered)
+Test Suite 'AccessibilityAuditUITests' passed at 2026-10-25 02:30:32.291.
+	 Executed 2 tests, with 0 failures (0 unexpected) in 195.848 (195.850) seconds
+Test Suite 'ArchiveReaderUITests.xctest' passed at 2026-10-25 02:30:32.291.
+	 Executed 2 tests, with 0 failures (0 unexpected) in 195.848 (195.850) seconds
+Test Suite 'Selected tests' passed at 2026-10-25 02:30:32.292.
+	 Executed 2 tests, with 0 failures (0 unexpected) in 195.848 (195.851) seconds
+** TEST SUCCEEDED **

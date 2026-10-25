@@ -1,0 +1,18 @@
+W40.fix-reader-a11y-labels — final host smoke
+Source baseline: f0bec0f4 (Reader implementation 994f7def + 379eb19a).
+Command: ARCHIVE_UNATTENDED=1 ./test-smoke.sh reader
+Raw smoke log SHA-256: e254b7f35b51d0425b705e4072e6d9bc5c0c67846d6930e58eab1e52800f1d86
+
+2026-10-25 00:04:30.438 appintentsmetadataprocessor[98275:77950076] warning: Metadata extraction skipped, no AppIntents.framework dependency found
+2026-10-25 00:04:30.898 appintentsmetadataprocessor[98281:77950120] warning: Metadata extraction skipped, no AppIntents.framework dependency found
+2026-10-25 00:04:31.751 appintentsmetadataprocessor[98306:77950248] warning: Metadata extraction skipped, no AppIntents.framework dependency found
+/Users/cp1/Claude/suite-wt-reader-a11y-20261025-000248-97084/ArchiveReader/macOS/Tests/ArchiveReaderTests/LibraryIndexScaleTests.swift:308: warning: -[ArchiveReaderTests.LibraryIndexScaleTests testColdBuildWarmStartAndSteadyRevalidationAt150kRows] : Thread running at User-initiated quality-of-service class waiting on a lower QoS thread running at Utility quality-of-service class. Investigate ways to avoid priority inversions
+Test Case '-[ArchiveReaderTests.ReaderAtSizeTests testIndexSearchAndHealthOnTheRealSample]' skipped (0.005 seconds).
+Test Case '-[ArchiveReaderTests.ReaderAtSizeTests testListAtOneHundredFiftyThousandFiles]' skipped (0.106 seconds).
+Test Case '-[ArchiveReaderTests.SnapshotTests testDeterministicViewMatchesReference]' skipped (0.001 seconds).
+	 Executed 509 tests, with 3 tests skipped and 0 failures (0 unexpected) in 110.479 (110.665) seconds
+	 Executed 509 tests, with 3 tests skipped and 0 failures (0 unexpected) in 110.479 (110.667) seconds
+** TEST SUCCEEDED **
+
+Write-surface lint: clean.
+test-lint-write-surface.sh: 22/22 planted mutation/control checks passed.

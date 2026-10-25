@@ -2,6 +2,20 @@
 
 Running log of quirks, risks, and things verified/unverified. Keep current.
 
+## ✅ CLOSED (W40.fix-reader-a11y-labels, 2026-10-25) — unnamed Reader controls and PDF pages
+
+The tag/name/OCR filters and file list have explicit names; the OCR magnifier is decorative. Flag and warning
+cells announce their state even when visually empty, resetting labels on reuse. Both panel dividers expose
+native named splitter roles and bounded width actions; pointer resizing uses global coordinates. PDFKit's
+actual AXPage nodes carry “Original image page” / “OCR text page” titles without replacing their selectable
+text descendants (PDFKit ignores the page label setter, but accepts its public title setter).
+
+The light/dark main-screen VM audits pass with the labels KnownIssue removed, including external PDF titles,
+preview content containment and both directions of pointer resize. Native PDF/splitter regressions and the
+full Reader smoke pass. Evidence: [`W40.fix-reader-a11y-labels.md`](../verification/evidence/reader/W40.fix-reader-a11y-labels.md).
+The separate W40.fix-reader-a11y-contrast remains open; reading order and whole-task keyboard access were not
+established by these audits.
+
 ## ✅ CLOSED (W40.fix-reader-selected-row-contrast, 2026-10-24) — selected Read labels and tag chips
 
 The Read column's accent-blue “Unread” and native token fills merged into the active selection highlight.
