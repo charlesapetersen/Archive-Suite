@@ -113,14 +113,16 @@ class Money(unittest.TestCase):
 class Inputs(unittest.TestCase):
     def test_glm_larger_cap_reuses_only_valid_low_replies(self):
         import hashlib
-        body = {'model': M.MODELS['glm'], 'max_tokens': 16384, 'reasoning_effort': 'low',
+        body = {'model': M.MODELS['glm'], 'max_tokens': 32768, 'reasoning_effort': 'low',
                 'response_format': {'type': 'json_object'}}
         old_key = hashlib.sha256(json.dumps({**body, 'max_tokens': 8192}, sort_keys=True).encode()).hexdigest()
-        for valid in (True, False):
-            def read(key):
-                return {'valid': valid} if key == old_key else None
-            with self.subTest(valid=valid), patch.object(M, 'cached', side_effect=read):
-                self.assertEqual(M.cache_hit(body, 'new'), {'valid': True} if valid else None)
+        for cap in (8192, 16384):
+            old_key = hashlib.sha256(json.dumps({**body, 'max_tokens': cap}, sort_keys=True).encode()).hexdigest()
+            for valid in (True, False):
+                def read(key):
+                    return {'valid': valid} if key == old_key else None
+                with self.subTest(cap=cap, valid=valid), patch.object(M, 'cached', side_effect=read):
+                    self.assertEqual(M.cache_hit(body, 'new'), {'valid': True} if valid else None)
 
     def test_whole_input_bound_covers_every_page_and_requires_measured_replies(self):
         col = SimpleNamespace(pages=[None] * 20)

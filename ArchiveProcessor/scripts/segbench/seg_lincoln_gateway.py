@@ -105,9 +105,9 @@ def request(route, col, a, b, whole=False):
     parts.append({'type': 'text', 'text': prompt})
     # Pilot whole output used ~41 tokens/gap, with no reasoning tokens reported. Freeze
     # 64/gap, at least 8192, before the JSON-mode whole calls; no need for 32768 on CREST.
-    # GLM also exhausted 8192 on a reasoning-only reply. Keep successful low/8192
-    # replies, but give unfinished windows a fixed 16384 ceiling (including reasoning).
-    output_cap = max(8192, 64 * (len(nums) - 1)) if whole else 16384 if route == 'glm' else 4096
+    # GLM exhausted both 8192 and 16384 on reasoning-only replies. Keep completed
+    # low replies, but give unfinished windows one final fixed 32768 ceiling.
+    output_cap = max(8192, 64 * (len(nums) - 1)) if whole else 32768 if route == 'glm' else 4096
     body = {'model': MODELS[route], 'temperature': 0, 'max_tokens': output_cap,
             'messages': [{'role': 'user', 'content': parts}]}
     if route != 'claude-cue':
@@ -198,14 +198,16 @@ def cached(key):
 
 def cache_hit(body, key):
     hit = cached(key)
-    if hit is None and body.get('model') == MODELS['glm'] and body.get('max_tokens') == 16384:
+    if hit is None and body.get('model') == MODELS['glm'] and body.get('max_tokens') == 32768:
         # A completed stop answer at the old cap has the identical input/settings.
         # Never reuse the earlier minimal-effort pilot or a truncated low reply.
-        old_body = {**body, 'max_tokens': 8192}
-        old_key = hashlib.sha256(json.dumps(old_body, sort_keys=True).encode()).hexdigest()
-        old = cached(old_key)
-        if old and old.get('valid'):
-            hit = old
+        for cap in (16384, 8192):
+            old_body = {**body, 'max_tokens': cap}
+            old_key = hashlib.sha256(json.dumps(old_body, sort_keys=True).encode()).hexdigest()
+            old = cached(old_key)
+            if old and old.get('valid'):
+                hit = old
+                break
     if hit is None and body.get('response_format') == {'type': 'json_object'}:
         # The earlier unconstrained-output pilot has identical model, images and prompt.
         # Keep its valid responses; failed replies remain charged and are never silently used.
@@ -455,8 +457,9 @@ def score(root, claude_only=False):
              'Windows use the model photo labels; whole streams take the known absence of label photos. '
              'Whole images are JPEG quality 45 to fit the gateway 32 MB body limit; windows retain the '
              'original benchmark thumbnails. No page is resized or dropped. No prompt fitted to these answers.', '',
-             'GLM uses the documented native minimum, `reasoning_effort=low`, with 16384 output tokens '
-             '(completed low/8192 replies are reused; both caps include reasoning). '
+             'GLM uses the documented native minimum, `reasoning_effort=low`, with a final 32768-token cap '
+             '(completed low/8192 and low/16384 replies are reused; all caps include reasoning). '
+             'Reasoning-only failures at 8192 and 16384 remain charged and unscored. '
              'Earlier `minimal` probes (including a reasoning-only capped reply) are included in item cost, '
              'but none enters the low-setting predictions. Source: '
              '[Z.ai thinking parameters](https://docs.z.ai/guides/capabilities/thinking), checked 2026-10-24. '
@@ -475,7 +478,7 @@ def score(root, claude_only=False):
               'Lincoln\'s saved whole reply required exactly two opening array brackets restored at gaps 82/83 and '
               '122/123. This repair is restricted to its SHA-256, keeps all 260 stated decisions/confidences '
               'unchanged, and passes the complete strict gap validator; it was not a raw-valid JSON reply.', '',
-              '| box | route | whole | attempts | valid replies | used replies | input tokens | output tokens | cost estimate | mean seconds |',
+              '| box | route | whole | attempts | usable replies | used replies | input tokens | output tokens | cost estimate | mean seconds |',
               '|---|---|---|---:|---:|---:|---:|---:|---:|---:|']
     for box, route, whole in sorted({(r['box'], r['route'], r['whole']) for r in out['calls']}):
         cs = [r for r in out['calls'] if (r['box'], r['route'], r['whole']) == (box, route, whole)]
@@ -485,6 +488,29 @@ def score(root, claude_only=False):
                      f'{sum(r["used"] for r in cs)} | {tin} | {tout} | ${sum(r["charge"] for r in cs):.4f} | '
                      f'{sum(r["wall_s"] for r in cs if "wall_s" in r) / max(1, sum("wall_s" in r for r in cs)):.1f} |')
     lines.append('')
+    if not claude_only:
+        L, C = (out['boxes'][b]['sources'] for b in ('Lincoln', 'CREST'))
+        exact = lambda rows, key: 100 * rows[key]['metrics']['pages_in_exact_doc']
+        lines += ['## Findings', '',
+                  f"On Lincoln, Gemini windows put {exact(L, 'gateway-gemini'):.1f}% of pages in the exact "
+                  f"document and the repaired whole reply {exact(L, 'gateway-gemini-whole'):.1f}%; "
+                  f"GLM windows {exact(L, 'gateway-glm'):.1f}%. The existing open models were at "
+                  '34.9–46.7%, while Claude c1 and c2 were 90.0%. The large open-model drop is not '
+                  'a ceiling imposed by the material. Small differences among cloud results on one '
+                  'agent-audited box do not establish a general ranking.', '',
+                  f"On CREST, Gemini windows score {exact(C, 'gateway-gemini'):.1f}% and the whole reply "
+                  f"{exact(C, 'gateway-gemini-whole'):.1f}%; GLM windows {exact(C, 'gateway-glm'):.1f}%. "
+                  'The existing trained 4B is 98.4%, teacher 95.3%, and Claude c1/c2 84.4%. '
+                  'The whole-stream arm scores higher here, but changed JPEG encoding and photo assumptions '
+                  'mean this run does not isolate context length.', '',
+                  'The table below reports least-confidence-first checking against the truth. '
+                  'High boundary agreement or PQ does not mean those confidence values rank the few '
+                  'errors well; check the review load separately. The finding-aid count is a measured '
+                  'variant, not a setting selected on these public answers.', '',
+                  'The final 11 Claude c2 gateway holes leave CREST at 84.4% and Deaver at 97.9%. '
+                  'The cue cuts CREST checking from 3.9 to 2.3 per 100 pages, but raises Deaver from '
+                  '10.7 to 14.8, with unchanged error counts. See seg-lincoln-cloud.md for all owner '
+                  'boxes and the original plan comparisons.', '']
     for box, rows in out['boxes'].items():
         lines += S.public_table(box, rows)
     (RESULTS / 'seg-lincoln-gateway.md').write_text('\n'.join(lines) + '\n')
@@ -514,7 +540,7 @@ def main():
     todo = jobs(args.root)
     pending = []
     for job in todo:
-        if args.route and job[0] != args.route or args.box and job[1].name != args.box:
+        if (args.route and job[0] != args.route) or (args.box and job[1].name != args.box):
             continue
         if args.windows_only and job[4]:
             continue
