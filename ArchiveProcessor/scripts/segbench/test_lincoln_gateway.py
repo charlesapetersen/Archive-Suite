@@ -10,6 +10,46 @@ import seg_lincoln_gateway as M
 
 
 class Money(unittest.TestCase):
+    def test_incomplete_retry_archives_raw_keeps_charge_and_cannot_repeat(self):
+        with tempfile.TemporaryDirectory() as d, patch.object(M, 'STORE', Path(d)):
+            rec = {'id': 'a', 'request_sha256': 'key', 'event': 'reserve', 'charge': .01}
+            M.append(rec)
+            rec = {**rec, 'event': 'settle', 'route': 'glm', 'http': 200, 'finish': 'stop',
+                   'whole': False, 'valid': False, 'error': 'boundaries for [1], wanted [1, 2]',
+                   'usage': {'prompt_tokens': 100, 'completion_tokens': 100}}
+            M.append(rec)
+            path = Path(d) / 'replies/key.json'
+            path.parent.mkdir()
+            raw = json.dumps({'valid': False, 'raw': 'incomplete answer', 'request': {'id': 'a'}})
+            path.write_text(raw)
+            M.retry_incomplete('key')
+            self.assertEqual((Path(d) / 'failed-replies/a.json').read_text(), raw)
+            self.assertFalse(path.exists())
+            self.assertEqual(M.spent(), .01)
+            self.assertEqual(M.effective_records()[0]['event'], 'retry-approved')
+            with self.assertRaises(RuntimeError):
+                M.retry_incomplete('key')
+            body = {'max_tokens': 32768, 'messages': [{'content': [{'type': 'text', 'text': 'P'}]}]}
+            raw_ok = json.dumps({'pages': [{'page': n, 'kind': 'document'} for n in (1, 2)],
+                                 'boundaries': [{'between': [1, 2], 'decision': 'continue', 'confidence': .9}]})
+            reply = SimpleNamespace(status_code=200, json=lambda: {
+                'usage': {'prompt_tokens': 100, 'completion_tokens': 50},
+                'choices': [{'finish_reason': 'stop', 'message': {'content': raw_ok}}]})
+            with patch.object(M, 'request', return_value=(body, 'key', [1, 2])), \
+                    patch.object(M.GW, 'request', return_value=reply) as send:
+                with patch.object(M, 'CAP', .01), self.assertRaisesRegex(RuntimeError, 'cap:'):
+                    M.call('glm', SimpleNamespace(name='Toy'), 0, 2)
+                send.assert_not_called()
+                self.assertEqual(M.spent(), .01)
+                M.call('glm', SimpleNamespace(name='Toy'), 0, 2)
+                M.call('glm', SimpleNamespace(name='Toy'), 0, 2)
+                self.assertEqual(send.call_count, 1)
+                self.assertNotEqual(M.cached('key')['request']['id'], 'a')
+                self.assertEqual((Path(d) / 'failed-replies/a.json').read_text(), raw)
+            with self.assertRaises(RuntimeError):
+                M.retry_incomplete('key')
+            self.assertAlmostEqual(M.spent(), .01004)
+
     def test_explicit_transport_retry_keeps_old_allowance_and_allows_only_one_retry(self):
         with tempfile.TemporaryDirectory() as d, patch.object(M, 'STORE', Path(d)):
             M.append({'id': 'a', 'event': 'reserve', 'request_sha256': 'key', 'whole': False,

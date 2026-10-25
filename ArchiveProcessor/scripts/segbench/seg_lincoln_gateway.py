@@ -293,6 +293,39 @@ def judge(route, whole=False):
     return one
 
 
+def retry_incomplete(key):
+    """Explicit one-time retry of a billed, stopped GLM reply missing required gaps.
+
+    Archive the failed bytes before freeing the exact cache key. Its full charge stays
+    in the ledger; call() still reserves the next attempt and enforces the item cap.
+    This does not repair a decision, retry a cap/transport error, or permit a third send.
+    """
+    rows = records()
+    attempts = [r for r in rows if r.get('request_sha256') == key and r['event'] == 'reserve']
+    recs = [r for r in effective_records() if r.get('request_sha256') == key]
+    if len(attempts) != 1 or len(recs) != 1:
+        raise RuntimeError('incomplete retry requires exactly one prior send')
+    rec = recs[0]
+    if not (rec['event'] == 'settle' and rec.get('http') == 200 and rec.get('finish') == 'stop'
+            and rec.get('route') == 'glm' and not rec.get('whole') and not rec.get('valid')
+            and str(rec.get('error', '')).startswith('boundaries for ')
+            and all(isinstance(rec.get('usage', {}).get(k), int) and rec['usage'][k] >= 0
+                    for k in ('prompt_tokens', 'completion_tokens'))):
+        raise RuntimeError('only a billed, stopped GLM reply missing gaps qualifies')
+    src = STORE / 'replies' / f'{key}.json'
+    archive = STORE / 'failed-replies' / f'{rec["id"]}.json'
+    hit = json.loads((src if src.exists() else archive).read_text())
+    if hit.get('valid') or hit['request']['id'] != rec['id']:
+        raise RuntimeError('failed reply provenance disagrees with ledger')
+    archive.parent.mkdir(parents=True, exist_ok=True)
+    if src.exists():
+        if archive.exists():
+            raise RuntimeError('archive already exists; inspect without replacing it')
+        src.rename(archive)
+    append({**rec, 'event': 'retry-approved', 'failure_archive': str(archive.relative_to(STORE)),
+            'reason': 'one explicit same-settings retry of missing gaps; failed raw and charge retained'})
+
+
 def claude_cue(col, a, b, allow_call=False):
     old = C.judge('claude-cue')(col, a, b, allow_call=False)
     return old if old is not None else judge('claude-cue')(col, a, b)
@@ -518,20 +551,24 @@ def score(root, claude_only=False):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument('command', choices=('inventory', 'collect', 'score', 'reconcile-413', 'revalidate', 'retry-unsettled'))
+    ap.add_argument('command', choices=('inventory', 'collect', 'score', 'reconcile-413', 'revalidate', 'retry-unsettled', 'retry-incomplete'))
     ap.add_argument('root', type=Path)
     ap.add_argument('--limit', type=int)
+    ap.add_argument('--request-sha', help='Exact failed request for retry-incomplete')
     ap.add_argument('--windows-only', action='store_true', help='Defer whole streams while measuring window cost')
     ap.add_argument('--route', choices=MODELS, help='Collect/inventory only this route')
     ap.add_argument('--box', choices=('Lincoln', 'CREST', 'Deaver'), help='Collect/inventory only this box')
     ap.add_argument('--claude-only', action='store_true', help='Score the completed cue arm as a partial checkpoint')
     args = ap.parse_args()
-    if args.command in ('reconcile-413', 'revalidate', 'retry-unsettled'):
+    if args.command == 'retry-incomplete' and not args.request_sha:
+        ap.error('retry-incomplete requires --request-sha')
+    if args.command in ('reconcile-413', 'revalidate', 'retry-unsettled', 'retry-incomplete'):
         STORE.mkdir(parents=True, exist_ok=True)
         with (STORE / 'collect.lock').open('a') as lock:
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
             {'reconcile-413': reconcile_413, 'revalidate': revalidate,
-             'retry-unsettled': retry_unsettled_once}[args.command]()
+             'retry-unsettled': retry_unsettled_once,
+             'retry-incomplete': lambda: retry_incomplete(args.request_sha)}[args.command]()
         return
     if args.command == 'score':
         score(args.root, args.claude_only)
