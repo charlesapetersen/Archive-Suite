@@ -243,9 +243,6 @@ final class VisualReviewUITests: NotesFixtureUITestCase {
             newFolder.click()
             if waitForAlert() { shoot("new-folder-alert") } else { missing.append("New Folder alert") }
             dismissAlert()
-        } else if newFolder.exists {
-            // Off the window at minimum width: the known W40.fix-notes-narrow-window, not a tour failure.
-            print("[visual] \(prefix) new-folder button not hittable (W40.fix-notes-narrow-window)")
         } else { missing.append("new-folder button") }
 
         let templates = mainWindow.descendants(matching: .any)["an.sidebar.templates"].firstMatch

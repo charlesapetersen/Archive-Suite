@@ -9,8 +9,13 @@ import XCTest
 final class LayoutGuardUITests: NotesFixtureUITestCase {
 
     private var dark = false
+    private var restoreWidePanes = false
     override var extraLaunchArguments: [String] {
-        dark ? LayoutGuard.darkModeArguments : LayoutGuard.lightModeArguments
+        let appearance = dark ? LayoutGuard.darkModeArguments : LayoutGuard.lightModeArguments
+        return appearance + (restoreWidePanes ? [
+            "-an.windowWidth", "640", "-an.windowHeight", "660",
+            "-an.treeWidth", "300", "-an.detailWidth", "420",
+        ] : [])
     }
 
     func testMainScreensLayOutInLightMode() throws {
@@ -22,11 +27,28 @@ final class LayoutGuardUITests: NotesFixtureUITestCase {
         try withFixture { sweepMainScreens(appearance: "dark") }
     }
 
+    func testUndersizedSavedWindowWithWidePanes() throws {
+        restoreWidePanes = true
+        try withFixture {
+            sweepMainScreens(appearance: "restored-wide-panes")
+            let extracts = app.windows["Extracts"]
+            for state in ["hidden", "shown"] {
+                extracts.buttons["an.toggleTree"].firstMatch.click()
+                LayoutGuard.waitUntilSettled(extracts)
+                XCTAssertEqual(extracts.descendants(matching: .any)["an.sidebar.newFolder"].firstMatch.exists,
+                               state == "shown", "the sidebar must actually be \(state)")
+                LayoutGuard.sweep(extracts, screen: "wide panes, sidebar \(state)", in: self, ignore: isHarness)
+            }
+            checkMinimumControls(extracts, name: "sidebar-restored")
+        }
+    }
+
     private func sweepMainScreens(appearance: String) {
         continueAfterFailure = true   // a layout failure on one screen must not hide the next screen's
         open(Self.idPlain, in: mainWindow)
         LayoutGuard.sweep(mainWindow, screen: "note window, \(appearance)", in: self,
-                          known: [narrowWindow], ignore: isHarness)
+                          ignore: isHarness)
+        checkMinimumControls(mainWindow, name: "note-\(appearance)")
 
         let windowMenu = app.menuBars.menuBarItems["Window"]
         XCTAssertTrue(windowMenu.waitForExistence(timeout: 10), "the Window menu should exist")
@@ -38,22 +60,32 @@ final class LayoutGuardUITests: NotesFixtureUITestCase {
         XCTAssertTrue(extracts.waitForExistence(timeout: 15), "the Extracts window should be open")
         open(Self.idExtract, in: extracts)
         LayoutGuard.sweep(extracts, screen: "extracts window, \(appearance)", in: self,
-                          known: [narrowWindow], ignore: isHarness)
+                          ignore: isHarness)
+        checkMinimumControls(extracts, name: "extracts-\(appearance)")
     }
 
-    /// At its minimum width (1053 pt in the VM) the window is narrower than its three panes: the sidebar's scroll
-    /// view starts 34 pt off the left edge and the inspector's scroll views end 34 pt past the right one, taking
-    /// the new-folder button, a location's remove button and the raw/styled toggle wholly off the window (VM,
-    /// 2026-10-11, screenshot in the evidence file). Only at minimum size, and only sideways. Its fix deletes
-    /// this entry.
-    private let narrowWindow = LayoutGuard.KnownIssue(tag: "W40.fix-notes-narrow-window") {
-        let v = $0
-        let sideways = v.frame.minX < v.bounds.minX || v.frame.maxX > v.bounds.maxX
-        let insideVertically = v.frame.minY >= v.bounds.minY - 2 && v.frame.maxY <= v.bounds.maxY + 2
-        // The panes' scroll views, and the three controls they push entirely off the window with them.
-        let casualty = v.type == .scrollView || v.identifier == "an.sidebar.newFolder"
-            || v.identifier == "an.editor.rawToggle" || v.identifier.hasPrefix("an.locations.remove.")
-        return v.state.hasPrefix("minimum") && v.kind == .window && casualty && sideways && insideVertically
+    /// These controls were entirely off-window before W40.fix-notes-narrow-window. Check reachability
+    /// as well as the sweep's geometry, and retain the actual minimum-size pixels on green runs too.
+    private func checkMinimumControls(_ window: XCUIElement, name: String) {
+        let frame = window.frame
+        LayoutGuard.dragCorner(of: window, to: CGPoint(x: frame.minX + 40, y: frame.minY + 40))
+        LayoutGuard.waitUntilSettled(window)
+        for id in ["an.sidebar.newFolder", "an.editor.rawToggle"] {
+            let control = window.descendants(matching: .any)[id].firstMatch
+            XCTAssertTrue(control.exists && control.isHittable, "\(id) must be reachable at minimum width")
+        }
+        let removes = window.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "an.locations.remove."))
+        XCTAssertGreaterThan(removes.count, 0, "the selected fixture item has a location")
+        for control in removes.allElementsBoundByIndex {
+            XCTAssertTrue(control.isHittable, "a location's remove button must be reachable at minimum width")
+        }
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("uitest-minimum-\(name).png")
+        do {
+            try window.screenshot().pngRepresentation.write(to: url, options: .atomic)
+            print("[shot] minimum-\(name): wrote \(url.path)")
+        } catch {
+            XCTFail("could not retain minimum-window screenshot: \(error)")
+        }
     }
 
     /// UI-test-only harness elements (`ArchiveNotesApp` adds them only under the UITest launch arguments): the

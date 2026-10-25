@@ -3,6 +3,18 @@
 Running log of quirks, risks, and things verified/unverified for the Notes app. Keep current.
 (Sibling logs: `../ArchiveReader/KNOWN_ISSUES.md`, `../ArchiveProcessor/KNOWN_ISSUES.md`.)
 
+## ✅ FIXED (W40.fix-notes-narrow-window, 2026-10-25) — panes overflowed the window at minimum width
+
+The list's implicit SwiftUI minimum was smaller than its rendered filter bar. Both Notes and Extracts
+could shrink to 1053 pt around 1121 pt of content, centring the panes 34 pt outside each edge. Add Folder,
+Remove Location and the raw/styled toggle became unreachable. `NotesBrowserView` now gives the list a
+540 pt minimum (the fixture's filter bar needs 527 pt); the shell's minimum still follows the current
+sidebar/detail widths and sidebar visibility. Restored frames are also clamped to the window's current
+minimum; restoring 640 pt with wider panes otherwise hit an AppKit constraint-update crash on launch.
+`LayoutGuardUITests` no longer exempts this overflow and checks the affected controls at minimum size,
+including wider restored panes and hiding/showing the sidebar. Runtime results and screenshots:
+[`W40.fix-notes-narrow-window.md`](../verification/evidence/notes/W40.fix-notes-narrow-window.md).
+
 ## ✅ FIXED (W40.fix-notes-chips-overdrawn, 2026-10-20) — file icon painted over source chips
 
 `BlockHeaderAttachment` has a view provider but inherited AppKit's image fallback. With nil data/type,

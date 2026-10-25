@@ -44,21 +44,17 @@ struct NotesBrowserView: View {
                              range: NotesLayoutSettings.treeWidthRange, id: "an.divider.tree")
             }
             ItemListPane(model: model, nav: nav, selectedTemplateID: $selectedTemplateID)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .frame(minWidth: 540, maxWidth: .infinity, maxHeight: .infinity)
             PanelDivider(width: $detailWidth, panelOnLeft: false,
                          range: NotesLayoutSettings.detailWidthRange, id: "an.divider.detail")
             DetailPane(nav: nav, selectedTemplateID: $selectedTemplateID)
                 .frame(width: detailWidth)
         }
-        // NO `minWidth:` ON PURPOSE — the shell's minimum width is whatever its three panes need
-        // (tree + list + detail + 2 dividers ≈ 1085 pt at the default widths), and SwiftUI derives that
-        // from the children. The old `minWidth: 900` understated it, and a frame minimum BELOW the
-        // content's own minimum does not shrink the content — it lets the content overflow and be
-        // clipped. Measured in the headless VM on 2026-08-01 (W21.vmgui-c): the window opened at exactly
-        // 900 pt, SwiftUI centred the 1084 pt of panes inside it, and ~92 pt was cut off EACH side — the
-        // sidebar's "Add folder" button sat at x = −19 and the editor's raw-Markdown toggle at x = 1033,
-        // both off-window and unclickable. Four UITests failed as "not hittable" and were filed as
-        // product bugs for two days. Height keeps a floor: nothing there overflows.
+        // The list needs 527 pt for its fixed filter controls in the VM; reserve 540 so its
+        // minimum proposal agrees with what it actually draws. Without that floor SwiftUI reports
+        // a 1053 pt window minimum but centres 1121 pt of panes inside it, clipping both edges.
+        // Keep the floor on the LIST: the shell's minimum then follows the current sidebar/detail
+        // widths and whether the sidebar is visible, rather than understating their total again.
         .frame(minHeight: 560)
         .animation(.easeInOut(duration: 0.18), value: showingTree)
         .background(indexReadyProbe)                               // hidden XCUITest index-ready signal (§3.4)
@@ -213,7 +209,11 @@ struct NotesBrowserView: View {
         // attach, so waiting for a transition would report a permanent "notkey" for it (W14.4 b).
         isKeyWindow = window.isKeyWindow
 #endif
-        guard let size = NotesAppSettings.windowSize else { return }
+        guard var size = NotesAppSettings.windowSize else { return }
+        // A remembered frame may predate wider panes. Programmatic setFrame can bypass the drag
+        // minimum; keep restoration inside the window's current content constraints as well.
+        size.width = max(size.width, window.minSize.width)
+        size.height = max(size.height, window.minSize.height)
         if abs(window.frame.width - size.width) > 2 || abs(window.frame.height - size.height) > 2 {
             var frame = window.frame
             frame.size = size

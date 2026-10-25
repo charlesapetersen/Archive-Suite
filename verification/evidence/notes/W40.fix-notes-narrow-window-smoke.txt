@@ -1,0 +1,6 @@
+2026-10-25, final source in this commit
+bash ArchiveNotes/test-smoke.sh
+	 Executed 221 tests, with 0 failures (0 unexpected) in 0.515 (0.629) seconds
+	 Executed 221 tests, with 0 failures (0 unexpected) in 0.515 (0.630) seconds
+━ Test run with 994 tests in 98 suites passed after 60.356 seconds with 2 known issues.
+** TEST SUCCEEDED **
