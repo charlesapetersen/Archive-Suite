@@ -142,6 +142,8 @@ must_exist "three-owner-gates-named" 'Still owner-gated — these three' 1
 must_exist "real-corpus-still-gated" 'REAL corpus|real corpus' 5
 must_exist "tier3-release-still-gated" 'Tier-3 release|gh release' 2
 must_exist "tier2-still-mandatory" 'Tier-2' 8
+# Owner, 2026-10-25: comparable gateway benchmark uploads must not acquire a new per-run permission gate.
+must_exist "benchmark-upload-standing-approval" 'Benchmark uploads are authorized \(owner, 2026-10-25\)' 1
 
 # W40.root-marker: the Core Directive must disclose the owner's one root-file exception.
 # Pin its presence in the authoritative guide (another file mentioning it cannot substitute).

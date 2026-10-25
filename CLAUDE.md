@@ -219,6 +219,13 @@ depends on the apps' current settings, structure or outputs.
   about $8 list / $4 batch. Newer gateway models need the owner to request access; on 2026-10-21 the key had only
   older ones (Gemini 2.0 Flash/2.5 Pro, Claude 4.5 Sonnet/Opus 4.6, GPT-5/5.2), not Gemini 3.7 Flash, Claude 5
   Sonnet, GPT 5.6 Luna or GLM 5.3 Flash.
+- ✅ **Benchmark uploads are authorized (owner, 2026-10-25).** The owner approved sending the frozen 96 owner
+  benchmark pages and 12 public pages, including their region and tile crops, to
+  `https://aiapi-prod.stanford.edu/v1/chat/completions` using the Processor Gateway key and Gemini 3.7 Flash,
+  starting with the eight-page cost pilot; adjudicated truth text is not sent. His standing direction was:
+  "Approve this upload and this work generally. There's no need to check in with me for this kind of thing."
+  Comparable benchmark image uploads and experiment work through the approved gateway proceed without another
+  upload-permission question. The existing spending limits, corpus safety rules and Sherlock handoff remain.
 - ⛔ **Plan routes wait for the gateway (owner, 2026-10-21).** No bench or experiment arm runs a model through the
   Claude or ChatGPT plan (`claude -p`, `codex exec`, the app's Local Agent backend) until `W46.gateway-models-ok` is
   ticked; that model's arm then runs through the gateway, in the item's `-paid` half. The Phase 3 queue was filed
