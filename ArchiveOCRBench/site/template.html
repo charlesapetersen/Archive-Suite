@@ -202,6 +202,15 @@ footer p { font-size: 13px; }
     <div class="tbl"><table><thead><tr><th>Step</th><th>Seconds a page</th><th>Peak memory</th></tr></thead><tbody id="kind-clf-speed"></tbody></table></div>
   </section>
 
+  <section class="panel" id="ocr-regions" hidden>
+    <div class="head"><h2>Read the page whole, in regions or in tiles</h2><span class="meta">255 public pages + the 96 · W46.ocr-regions</span></div>
+    <p class="note">Regions rescue GLM-OCR and PaddleOCR on newspaper scans; they usually lose on the other material. DocLayout-YOLO drops many hands and forms as figures. Whole-page reading remains the general choice. These are the same frozen images: 4,096 tokens per crop versus 8,192 per whole page. A capped crop gives no text; other crops may still give a partial page. Empty detection scores zero. Annotation groups overlap; the charts above use the exact panel kinds.</p>
+    <label for="regions-group">Page group </label><select id="regions-group"></select>
+    <div class="tbl"><table><thead><tr><th>Reader</th><th>Arm</th><th>NES %</th><th>Answered</th><th>Δ whole (points)</th><th>Failed / crops</th><th>Order edit (n)</th></tr></thead><tbody id="regions-rows"></tbody></table></div>
+    <p class="note" id="regions-note"></p>
+    <details><summary>LightOnOCR's table gap: formatting diagnostic</summary><p class="note" id="regions-markup"></p></details>
+  </section>
+
   <section class="panel" id="dewarp" hidden>
     <div class="head"><h2>Crop, dewarp or nothing, before reading</h2><span class="meta">the 96 · free (W46.enh-dewarp)</span></div>
     <p class="note" id="dw-note"></p>
@@ -313,8 +322,10 @@ const money = v => v === 0 ? 'free' : '$' + v.toFixed(2);
 const OWN = { mac: 'on our Mac', farmshare: 'Stanford FarmShare' };
 const priceCell = r => r.free_cluster ? 'no hosted price (free on the cluster)' : money(r.std) + (r.id === 'claude-sonnet5.5' ? ' (est.)' : r.panel === 'farmshare' ? ' (OpenRouter rate)' : '');
 const FREE_CLUSTER = 0.19;  // just right of the Mac routes in the free column, so the two kinds of free stay apart
+const clusterName = r => r.cluster || 'Stanford FarmShare';
+const gpuText = r => r.hw.gpu_hours_per_100k == null ? 'per-arm throughput not measured' : Math.round(r.hw.gpu_hours_per_100k) + ' GPU-hours per 100,000 photos';
 const hwText = r => r.panel === 'mac' ? r.hw.seconds.toFixed(0) + ' s a page · ' + r.hw.peak_gb.toFixed(1) + ' GB peak (' + r.hw.peak_max_gb.toFixed(1) + ' max) · ' + r.machine
-  : r.panel === 'farmshare' ? Math.round(r.hw.photos_per_hour).toLocaleString() + ' photos an hour · ' + Math.round(r.hw.gpu_hours_per_100k) + ' GPU-hours per 100,000 · ' + r.machine : '—';
+  : r.panel === 'farmshare' ? (r.hw.photos_per_hour == null ? gpuText(r) : Math.round(r.hw.photos_per_hour).toLocaleString() + ' photos an hour · ' + gpuText(r)) + ' · ' + r.machine + ' · ' + clusterName(r) : '—';
 const overallRank = DATA.charts[0].scores;
 const routes = DATA.routes.slice().sort((a, b) => overallRank[b.id][0] - overallRank[a.id][0]);
 routes.forEach((r, i) => r.num = i + 1);
@@ -409,10 +420,10 @@ function render() {
           label: i => { const p = i.raw, r = p.r; if (o.seg) return [p.y.toFixed(1) + '% of pages in the exact document, no checking',
             money(p.x) + ' per 1,000 pages' + (p.b ? ' by batch' : (r.batch ? ' at list price' : '')), r.checks.toFixed(1) + ' checks per 100 pages to reach ' + pct1(r.after)];
             return ['NES ' + p.y.toFixed(2) + ' (' + p.s[1] + ' of ' + p.s[2] + ' pages answered)',
-            r.free_cluster ? 'no hosted price: free on a university cluster · ' + Math.round(r.hw.gpu_hours_per_100k) + ' GPU-hours per 100,000 photos on FarmShare'
-              : r.panel === 'farmshare' ? money(p.x) + ' per 1,000 pages at OpenRouter\'s rate for the same model · ' + Math.round(r.hw.gpu_hours_per_100k) + ' GPU-hours per 100,000 photos on FarmShare' : r.std === 0 ? 'free, on device' : money(p.x) + ' per 1,000 pages' + (p.b ? ' by batch' : (r.batch ? ' standard' : '')) + (r.id === 'claude-sonnet5.5' ? ', estimated' : ''),
+            r.free_cluster ? 'no hosted price: free on a university cluster · ' + gpuText(r)
+              : r.panel === 'farmshare' ? money(p.x) + ' per 1,000 pages at OpenRouter\'s rate for the same model · ' + gpuText(r) : r.std === 0 ? 'free, on device' : money(p.x) + ' per 1,000 pages' + (p.b ? ' by batch' : (r.batch ? ' standard' : '')) + (r.id === 'claude-sonnet5.5' ? ', estimated' : ''),
             r.pair ? 'run ' + OWN[r.panel] + '; hosted as ' + byId[r.pair].num + ', NES ' + o.c.scores[r.pair][0].toFixed(2)
-              : r.panel === 'mac' ? 'run on our Mac; no hosted route serves it' : r.panel === 'farmshare' ? 'run on Stanford FarmShare' : r.panel === 'local' ? 'local panel, run hosted' : 'cloud panel']; } } } },
+              : r.panel === 'mac' ? 'run on our Mac; no hosted route serves it' : r.panel === 'farmshare' ? 'run on ' + clusterName(r) : r.panel === 'local' ? 'local panel, run hosted' : 'cloud panel']; } } } },
         scales: {
           x: { type: 'logarithmic', min: o.seg ? 0.35 : 0.14, max: o.seg ? 40 : 30, title: { display: true, text: 'Dollars per 1,000 pages (log scale)', color: sec },
             grid: { color: grid }, border: { color: grid },
@@ -583,6 +594,33 @@ if (SC) {
     document.getElementById('sc-bias').innerHTML = TB.routes.map(r => '<tr><td>' + r.route + '</td><td>' + r.family + '</td><td>' + r.pages + '</td><td>' + pp(r.agreed_acc) + '</td><td>' + pp(r.agreed_acc_joined) + '</td><td>' + pp(r.adjudicated_acc) + '</td><td>' + (r.lead_agreed_joined === null ? '—' : (r.lead_agreed_joined >= 0 ? '+' : '−') + Math.abs(100 * r.lead_agreed_joined).toFixed(2)) + '</td></tr>').join('');
   }
 }
+const RG = DATA.regions;
+if (RG) {
+  document.getElementById('ocr-regions').hidden = false;
+  const groups = ['the 96', 'L9', 'L4', 'L3', 'L1', 'clippings', 'tables', 'handwritten', 'typed, no table or clipping'];
+  const select = document.getElementById('regions-group');
+  select.innerHTML = groups.map(g => '<option>' + g + '</option>').join('');
+  const readerNames = {'glm-ocr': 'GLM-OCR', 'paddleocr-vl1.5': 'PaddleOCR-VL 1.5', 'lightonocr3-4b': 'LightOnOCR-3 4B', 'qwen3.6-27b': 'Qwen3.6 27B'};
+  const armNames = {whole: 'whole page', doclayout_yolo: 'YOLO regions', 'pp-doclayoutv3': 'PP regions', tiles: 'overlapping tiles'};
+  const fillRegions = () => {
+    document.getElementById('regions-rows').innerHTML = RG.rows.filter(r => r.group === select.value).map(r =>
+      '<tr><td>' + readerNames[r.route] + '</td><td>' + armNames[r.arm] + '</td><td>' + (100 * r.nes).toFixed(1) + '</td><td>' + r.ok + '/' + r.n + '</td><td>' +
+      (r.arm === 'whole' ? '—' : (100 * (r.nes - r.whole_nes_same)).toFixed(1)) + '</td><td>' +
+      (r.arm === 'whole' ? '—' : r.crops_failed + '/' + r.crops) + '</td><td>' +
+      (r.order_edit === '' ? '—' : r.order_edit.toFixed(2) + ' (' + r.order_pages + ')') + '</td></tr>').join('');
+  };
+  select.addEventListener('change', fillRegions); fillRegions();
+  const tableWhole = RG.table_markup.find(r => r.route === 'lightonocr3-4b' && r.arm === 'whole');
+  const tablePP = RG.table_markup.find(r => r.route === 'lightonocr3-4b' && r.arm === 'pp-doclayoutv3');
+  document.getElementById('regions-markup').textContent = 'On the ' + tableWhole.n + ' table pages, LightOnOCR whole scores ' +
+    (100 * tableWhole.strict).toFixed(2) + ' strict and ' + (100 * tableWhole.markup_stripped).toFixed(2) +
+    ' after stripping markup; PP regions score ' + (100 * tablePP.strict).toFixed(2) + ' strict and ' + (100 * tablePP.markup_stripped).toFixed(2) +
+    ' stripped. Formatting explains much of the apparent gap, and the strict region gain does not establish better word reading. The diagnostic leaves the strict comparison unchanged. Table-region-only and per-cell OCR remain unmeasured, tracked as W46.ocr-regions-cells; hosted readers are W46.ocr-regions-paid.';
+  document.getElementById('regions-note').textContent = 'NES changes pair the same pages. Order means use each arm\'s own matched-page subset, not paired samples; the 96\'s one-line truth has no order score. Active reading GPU-hours across all three arms and all 354 inputs, startup excluded: ' +
+    Object.entries(RG.gpu_hours).map(([route, hours]) => route + ' ' + hours).join(', ') +
+    '. Per-arm speed is unknown. The crop routes are on all four eligible OCR charts above, priced from their own 96-page tokens including caps; part 5 excludes them because they are absent from ocr-pages.csv. Qwen\'s whole baseline here uses auto KV, distinct from the fp8 KV chart baseline. Detail: segbench-results/' + RG.report + '.';
+}
+
 const DW = DATA.dewarp;
 if (DW) {
   document.getElementById('dewarp').hidden = false;

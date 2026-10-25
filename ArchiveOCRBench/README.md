@@ -145,6 +145,15 @@ record:
   Vision now; the three FarmShare readers when their run is fetched). The page shows its rows as a table; the
   round trip, curvature and hand-crop tables are in `enh-dewarp.md`, the UVDoc benchmark check in
   `enh-dewarp-uvdoc-bench.md`.
+- `bench-corpus/regions-20261021.json` (`corpus/regions.py report`, W46.ocr-regions): whole page against
+  DocLayout-YOLO regions, PP-DocLayoutV3 regions and overlapping tiles, four readers on L9/L4/L3/L1 (255
+  public pages) and the 96. Its experiment section selects public strata and overlapping annotation groups;
+  all twelve crop routes also enter the four eligible OCR charts using the exact panel-kind groups, including
+  capped crop costs in Qwen's own-token OpenRouter-rate prices. Other readers have no hosted price and use
+  the free-cluster marker. These crops ran on Sherlock, with 38 reused GLM pilot crops from FarmShare.
+  Per-arm speed is unknown: concurrent job summaries combine all arms and both sets. Part 5 excludes them
+  because they are absent from `ocr-pages.csv`. The JSON also holds a separate table-markup diagnostic;
+  strict NES stays unchanged. `regions-20261021.md` gives provenance, limits and the unmeasured L4 cell arm.
 - `options.md`: the segmentation approaches on the test boxes (manual, Claude, Gemini, ChatGPT, Claude and
   ChatGPT together), each at the flag level frozen on the development boxes, with their API cost.
 - `cheap-models.md`: the three cheap segmentation finalists (GLM-5.3 Flash, GPT-5.6 Luna, Qwen3.5 Flash) at the

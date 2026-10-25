@@ -55,6 +55,7 @@ TRUTH_BIAS_SCORE = RESULTS / "ocr-truth-bias-score.json"  # W46.fix-ocr-truth-bi
 CHAOS = RESULTS / "chaos-probe.json"  # W46.fix-ocr-scorers: chaos_probe.py score, the altered-word probe
 DEWARP = RESULTS / "enh-dewarp.json"  # W46.enh-dewarp: enh_dewarp.py report, crop or dewarp against raw, by reader
 LOOPS = PUBLIC / "loop-rerun-20261021.json"  # W46.ocr-loops: corpus/loop_rerun.py report, the capped pages read again
+REGIONS = PUBLIC / "regions-20261021.json"  # W46.ocr-regions: whole page, detector regions and overlapping tiles
 OPEN_SWEEP = HERE / "data" / "open-sweep-20261019.json"  # the open-model sweep's receipts (hand-entered, sourced)
 TEMPLATE = HERE / "site" / "template.html"
 OUT_DATA = HERE / "data" / "panel-data.json"
@@ -521,6 +522,34 @@ def ocr_scorers():
     return out
 
 
+def region_chart_routes(data, kinds, op):
+    """Crop routes on the exact panel-kind subsets, priced from all attempted crops of the 96 accuracy pages.
+    Concurrent job spans combine all arms and sets, so no per-arm throughput is inferred from them.
+    """
+    if data is None:
+        return []
+    by = {(r["route"], r["arm"], r["group"]): r for r in data["rows"]}
+    names = {"glm-ocr": "GLM-OCR", "paddleocr-vl1.5": "PaddleOCR-VL 1.5",
+             "lightonocr3-4b": "LightOnOCR-3 4B", "qwen3.6-27b": "Qwen3.6 27B"}
+    arms = {"doclayout_yolo": "DocLayout-YOLO", "pp-doclayoutv3": "PP-DocLayoutV3", "tiles": "overlapping tiles"}
+    out = []
+    for route in data["readers"]:
+        for arm in data["arms"]:
+            overall = by[(route, arm, "the 96")]
+            price = openrouter_price(op, route, overall["prompt_tokens"] / overall["n"],
+                                     overall["completion_tokens"] / overall["n"])
+            scores = {}
+            for key, group in [("overall", "the 96"), *((k, "kind:" + k) for k in kinds)]:
+                r = by[(route, arm, group)]
+                scores[key] = [round(100 * r["nes"], 2), r["ok"], r["n"]]
+            out.append({"id": f"regions-{route}-{arm}", "name": names[route] + " · " + arms[arm],
+                        "panel": "farmshare", "cluster": "Sherlock" + (" (38 pilot crops on FarmShare)" if route == "glm-ocr" else ""),
+                        "std": cents(price) if price is not None else 0.0, "batch": None,
+                        "free_cluster": price is None, "machine": "one NVIDIA L40S per job",
+                        "hw": {"photos_per_hour": None, "gpu_hours_per_100k": None}, "scores": scores})
+    return out
+
+
 def main():
     check = "--check" in sys.argv[1:]
     inputs = json.loads(INPUTS.read_text())
@@ -578,6 +607,7 @@ def main():
     # Routes on our own hardware: free in money, so drawn in the free column with their own marker.
     own = inputs["own_hardware"]
     op = inputs["openrouter_open_weights"]
+    regions = json.loads(REGIONS.read_text()) if REGIONS.exists() else None
     extra = []
     for rid, spec in own["routes"].items():
         if spec["where"] == "mac":
@@ -596,6 +626,11 @@ def main():
         scores, hw = farmshare_run(spec["run"], inputs["kinds"], op)
         extra.append({"name": spec["name"], "panel": "farmshare", "under": spec["under"], "std": cents(hw["usd_per_1000"]), "machine": spec["machine"],
                       "hw": hw, "scores": scores})
+    for route in region_chart_routes(regions, inputs["kinds"], op):
+        scores = route.pop("scores")
+        routes.append(route)
+        for c in charts:
+            c["scores"][route["id"]] = scores[c["key"]]
     for c in charts:
         if any(c["scores"][r["id"]][2] != c["n"] for r in routes if r["panel"] == "farmshare") \
                 or any(e["scores"][c["key"]][2] != c["n"] for e in extra):
@@ -624,7 +659,7 @@ def main():
                          if (RESULTS / "seg-date-model-final.json").exists() else None,
              "public": public(), "ocr_scorers": ocr_scorers(),
              "dewarp": json.loads(DEWARP.read_text()) if DEWARP.exists() else None,
-             "loops": json.loads(LOOPS.read_text()) if LOOPS.exists() else None}
+             "loops": json.loads(LOOPS.read_text()) if LOOPS.exists() else None, "regions": regions}
     page = TEMPLATE.read_text().replace("__DATA__", json.dumps(built, separators=(",", ":")))
     outputs = {OUT_DATA: json.dumps(built, indent=1) + "\n", OUT_PAGE: page, OUT_DIFFICULTY: difficulty.report(diff)}
 

@@ -12974,3 +12974,21 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   Two independent read-only scans covered 10,319 window records: only three duplicate-bearing Lincoln GLM records, all explicitly unscored; no published score is affected. Preserved every cache/ledger record; no paid rerun. Full scope and exclusions: `ArchiveProcessor/segbench-results/window-duplicates-audit.md`; issue closed in Processor KNOWN_ISSUES.
   Verified 70 window/Gemini/whole/Lincoln/gateway/public tests and 11 failing subtests against the original parser, plus separate adversarial review. Python bench only; native app sources and published benchmark metrics unchanged.
   <!-- /W46.fix-window-duplicates -->
+
+- [x] **W46.ocr-regions — whole page against detector regions against tiles, four open readers [M]** · §Document processing review — W46 (lane: segbench) (uses: light) (cluster: sherlock) · SHIPPED 2026-10-25 (this commit).
+  GLM-OCR, PaddleOCR-VL 1.5, LightOnOCR-3 4B and Qwen3.6-27B on 255 public pages (L9/L4/L3/L1)
+  and the 96, by exact chart kind and overlapping annotations. Collected all 5,487 crops per reader;
+  no new model calls, cluster contact or money. Results: `ArchiveProcessor/segbench-results/bench-corpus/regions-20261021.md`.
+  YOLO regions rescue GLM/Paddle on L9 (29.2→91.1 / 0.0→92.3 NES); whole generally wins elsewhere.
+  LightOn's table gap is partly markup (68.17 strict→86.85 stripped, 12 pages); the diagnostic does not
+  replace strict scores. All twelve crop routes enter the four eligible OCR charts, with Qwen priced
+  from its own tokens including caps; per-arm speed remains unknown. Published bench copy is behind.
+  Checkpoint ce0aa207 makes missing collections/unknown usage fail export rather than shrinking denominators;
+  matched-page order counts prevent treating unmatched order means as paired. Independent reviews clear;
+  27 corpus + 17 scorer + 2 bench regressions pass; export reproduces all 144 prior strict summaries.
+  Headless browser: 4 charts, 12 added routes, 9 group options × 16 rows, zero runtime exceptions; screenshots inspected.
+  L4 table-region-only/per-cell OCR was not in the collected run and remains queued as W46.ocr-regions-cells;
+  Gemini and the held Claude arm remain with W46.ocr-regions-paid, through the gateway rather than the plan.
+  Original preparation/collection checkpoints: 33e45014, 677a85ef, 53158ee5, 0116398e, 6a1a2d2e, 3887adac,
+  ae109087, 00b5fd91; GLM's 38 FarmShare pilot crops were reused with the Sherlock collection.
+  <!-- /W46.ocr-regions -->
