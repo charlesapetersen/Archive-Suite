@@ -345,15 +345,33 @@ def batch_ask(plan_text, today=None):
             return None
         os.remove(lock)                        # a run that died holding it
         return None
+    previous = None
     try:
-        p = subprocess.run(["/bin/bash", os.path.join(HERE, "plan-edit.sh"), PLAN, "report", text],
-                           capture_output=True, text=True, errors="replace", timeout=120)
-        if p.returncode != 0:
-            raise RuntimeError("report failed (%d): %s" % (p.returncode, p.stderr.strip()[:200]))
+        # The stamp first, so a report that is written cannot be followed by a stamp that is not (which would email
+        # again at the next upkeep); a failed report puts the previous stamp back.
+        try:
+            with open(stamp) as f:
+                previous = f.read()
+        except OSError:
+            pass
         fd, tmp = tempfile.mkstemp(dir=STATE, prefix="sherlock-batch-ask.")
         with os.fdopen(fd, "w") as f:
             json.dump({"day": today, "tags": tags}, f)
         os.replace(tmp, stamp)
+        p = subprocess.run(["/bin/bash", os.path.join(HERE, "plan-edit.sh"), PLAN, "report", text],
+                           capture_output=True, text=True, errors="replace", timeout=120)
+        if p.returncode != 0:
+            raise RuntimeError("report failed (%d): %s" % (p.returncode, p.stderr.strip()[:200]))
+    except BaseException:
+        if previous is None:
+            try:
+                os.remove(stamp)
+            except OSError:
+                pass
+        else:
+            with open(stamp, "w") as f:
+                f.write(previous)
+        raise
     finally:
         os.remove(lock)
     return text

@@ -51,6 +51,48 @@ Before a submission, check every path the pack's json, jsonl, tsv and sh files n
 Results come home to `$GROUP_HOME/cp1/archive-suite/sherlock-results/` (`fix-20261023-job.sh` copies them, without
 models, page images, weights or clones) and to the Mac in `~/Library/Caches/ArchiveSuiteRehearsal/sherlock-results/`.
 
+## Batches
+
+Owner, 2026-10-28 (W46.sherlock-batch): ready packs are submitted and collected in batches, so the owner logs in
+once per batch rather than once per item.
+
+- **Hand-over.** A preparing engine session still ends with `plan-edit.sh hold TAG 'ready to submit: …'` and the
+  review in `execution-plans/items/<TAG>.md`, and also commits the batch manifest
+  `ArchiveProcessor/scripts/segbench/sherlock/packs/<TAG>.json` (fields in that folder's README). Without one, the
+  batch leaves the pack out. Its own Daemon Report line stays a mention (no decision).
+- **The request.** `cluster-reach.py ask` (the upkeep hook) writes one `[Sherlock batch]` entry, emailed, when 3 packs
+  are ready, the oldest has waited 5 days, or a submission has waited 5 days to be collected. It names each pack with
+  its jobs and GPU-hour ceiling, and the collections waiting; the same packs are not asked about again for 5 days.
+  `cluster-reach.py ready` lists them at any time.
+- **The session**, owner-started, after the shared login is open (`batch_mac.py` refuses under
+  `ARCHIVE_UNATTENDED=1`):
+  1. `python3 ArchiveProcessor/scripts/segbench/sherlock/batch_mac.py plan` makes a batch of every ready pack with a
+     manifest and prints each review. Read them (§"Before a submission"); `--leave-out TAG` drops a pack, and a
+     nice-to-have one goes behind `W46.nice-to-have` instead.
+  2. `batch_mac.py send STAMP` copies the packs to `$GROUP_HOME/$USER/archive-suite/<pack>/`, and the batch with this
+     kit to `…/archive-suite/batches/STAMP/` (over 2 GB, it refuses: use the DTN).
+  3. On Sherlock, read `/etc/agents/AGENTS.md`, then `bash …/batches/STAMP/kit/batch.sh check …/batches/STAMP` and
+     `… submit …`. `submit` checks every path each pack's json, jsonl, tsv, sh and env files name (home paths too);
+     a pack that fails is left out. The rest run their own submit scripts unchanged, with every job held, and one CPU
+     job imports each pack's chain in the vLLM image, then releases that pack's jobs or cancels them. So no GPU job
+     starts before its pack's inputs and imports are checked, and one broken pack does not stop the others. Jobs a
+     pack holds itself stay held for the session to release.
+  4. `batch_mac.py mark STAMP` marks each submitted pack `submitted` and releases each left-out one back to the
+     engine with its reason. The session can then log out; nothing waits on the login.
+  5. In a later session (the next batch's, usually): `bash …/kit/batch.sh collect …/batches/STAMP` submits one CPU
+     job that reads sacct once and copies each finished pack's `jobs.tsv`, scratch logs and an `sacct.tsv` into its
+     results folder; when it has ended, `batch_mac.py fetch STAMP` copies the results into each pack's Mac folder
+     (`--ignore-existing`: the freeze and inputs are never overwritten), marks it `finished` and releases it for
+     scoring; when some of its jobs did not complete, the release note says so, and the failures are inspected
+     before scoring. A returned file that differs from one already in the Mac folder blocks `finished`: the session
+     compares them and marks by hand. A pack whose import failed is released back with the reason; one still
+     running, or not yet recorded by the import job, is left for the next collect (a pending job whose dependency
+     failed counts as ended).
+- Nothing here polls: the import and collect jobs run once each, and stages chain by `--dependency` inside each pack's
+  own script. A batch's `submitted.tsv` is reserved before anything is queued, so a batch is never submitted twice.
+  The older one-off scripts (`restart-20261022.sh`, `resubmit-20261023.sh`) stay as the record of those nights.
+- Tests: `ops/agent/tests/test_sherlock_batch.py`, the whole round trip on the Mac with fake Slurm commands.
+
 ## Rules a Sherlock job or session follows
 
 - Login nodes are for editing, inspection and submitting jobs. Installs, compiles, model downloads and copies

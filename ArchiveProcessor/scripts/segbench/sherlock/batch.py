@@ -46,7 +46,9 @@ PATH_VARS = ("HOME", "USER", "GROUP_HOME", "SCRATCH", "FS_ROOT", "HF_HOME", "SH_
 SCANNED = (".json", ".jsonl", ".tsv", ".sh", ".env")
 IGNORED_PREFIXES = ("/dev/", "/proc/", "/tmp/", "/sys/", "/etc/agents")
 TERMINAL = ("COMPLETED", "FAILED", "CANCELLED", "TIMEOUT", "OUT_OF_MEMORY", "NODE_FAIL", "PREEMPTED", "BOOT_FAIL",
-            "DEADLINE")
+            "DEADLINE", "REVOKED", "SPECIAL_EXIT")
+# A pending job whose dependency failed never runs (when the cluster does not cancel it): it has ended, unrun.
+NEVER = "DependencyNeverSatisfied"
 VAR = re.compile(r"\$\{?([A-Za-z_][A-Za-z0-9_]*)\}?")
 # A path-looking token in a shell file: absolute, ~/, or starting with a variable, at the start of a shell word (so
 # not `sherlock/bin/py` or the `/v1/models` of a URL). Quotes and the characters that end a shell word stop it.
@@ -266,10 +268,15 @@ def cmd_submit(batch, dry):
         review = man.get("review")
         print("== %s (%s): %s jobs, at most %s GPU-hours; review %s"
               % (man["tag"], man["pack"], man.get("jobs", "?"), man.get("gpu_hours", "?"), review or "(none)"))
-        problems = check_pack(man)
+        try:
+            problems = check_pack(man)
+        except Exception as e:                 # one unreadable pack leaves that pack out, not the batch
+            problems = ["the check failed: %s: %s" % (type(e).__name__, e)]
         if problems:
             rows.append([man["tag"], man["pack"], "left-out", "-", "inputs: " + "; ".join(problems[:5])])
             print("   left out: %s" % "; ".join(problems[:5]))
+            if not dry:
+                write_tsv(out, rows)
             continue
         rc, ids, own, err = submit_pack(man, batch, dry)
         if rc != 0:
@@ -277,12 +284,14 @@ def cmd_submit(batch, dry):
             rows.append([man["tag"], man["pack"], "left-out", ",".join(ids + own) or "-",
                          "submit script exited %d: %s" % (rc, " ".join(err.split())[-200:])])
             print("   left out: its submit script exited %d (held jobs cancelled: %s)" % (rc, ids + own or "none"))
+            if not dry:
+                write_tsv(out, rows)
             continue
         rows.append([man["tag"], man["pack"], "submitted", ",".join(ids) + ("|" + ",".join(own) if own else ""), ""])
         ids_all += ids + own
+        if not dry:
+            write_tsv(out, rows)               # after each pack, so a crash later still leaves its ids on record
         print("   submitted, held: %s%s" % (" ".join(ids), " (its own holds: %s)" % " ".join(own) if own else ""))
-    if not dry:
-        write_tsv(out, rows)
     if not ids_all and not dry:
         print("nothing submitted")
         return 1 if any(r[2] == "left-out" for r in rows) else 0
@@ -360,22 +369,30 @@ def cmd_imports(batch, dry):
         tag, status, ids = r[0], r[2], r[3]
         if status != "submitted" or tag not in packs:
             continue
-        held = ids.split("|")[0].split(",") if ids not in ("", "-") else []
-        ok, why = import_check(packs[tag])
+        held = [i for i in ids.split("|")[0].split(",") if i.isdigit()]
+        try:
+            ok, why = import_check(packs[tag])
+        except Exception as e:
+            ok, why = False, "the import check failed: %s: %s" % (type(e).__name__, e)
         if ok:
-            rc, so, se = (0, "", "") if dry else run(["scontrol", "release", ",".join(held)])
+            rc, so, se = (0, "", "") if dry or not held else run(["scontrol", "release", ",".join(held)])
             if rc != 0:
                 rows.append([tag, "held", "imports ok, but scontrol release failed: %s; release by hand"
                              % " ".join(se.split())[-200:]])
             else:
                 rows.append([tag, "released", ""])
         else:
-            if not dry:
-                run(["scancel"] + held + (ids.split("|")[1].split(",") if "|" in ids else []))
+            own = [i for i in ids.split("|")[1].split(",") if i.isdigit()] if "|" in ids else []
+            if not dry and held + own:
+                run(["scancel"] + held + own)
             rows.append([tag, "cancelled", why])
         print("\t".join(rows[-1]))
+        if not dry:                            # after each pack: collect reads it, and the job may be killed
+            write_tsv(os.path.join(batch, "imports.tsv"), rows)
     if not dry:
         write_tsv(os.path.join(batch, "imports.tsv"), rows)
+        with open(os.path.join(batch, "imports-done"), "w") as f:
+            f.write(time.strftime("%Y-%m-%dT%H:%M:%S") + "\n")
     return 0
 
 
@@ -402,15 +419,19 @@ def cmd_collect(batch, dry):
 
 
 def sacct_states(ids):
-    """{job id: (state, elapsed, alloc tres)}, from one sacct call (array and step rows folded into their job)."""
+    """{job id: (state, elapsed, alloc tres)}, from one sacct call (array and step rows folded into their job). A
+    pending job whose dependency can never be met is reported as NEVER_RUN, which has ended."""
     if not ids:
         return {}
-    rc, so, se = run(["sacct", "-X", "-n", "-P", "-j", ",".join(ids), "-o", "JobID,State,Elapsed,AllocTRES"])
+    rc, so, se = run(["sacct", "-X", "-n", "-P", "-j", ",".join(ids), "-o", "JobID,State,Elapsed,AllocTRES,Reason"])
     out = {}
     for ln in so.splitlines():
         f = ln.split("|")
         if len(f) >= 4:
-            out[f[0].split("_")[0].split(".")[0]] = (f[1].split()[0] if f[1] else "", f[2], f[3])
+            state = f[1].split()[0] if f[1] else ""
+            if state == "PENDING" and len(f) > 4 and NEVER in f[4]:
+                state = "NEVER_RUN"
+            out[f[0].split("_")[0].split(".")[0]] = (state, f[2], f[3])
     return out
 
 
@@ -427,14 +448,18 @@ def cmd_copy(batch, dry):
         man = packs[tag]
         imp = imports.get(tag)
         if not imp:
-            rows.append([tag, "not-run", "the import job has not recorded this pack (imports.tsv)"])
+            # Not recorded yet (the import job is pending or running) or never (it died): either way its jobs may be
+            # on Sherlock, so this is not a failure to hand back; the session looks at squeue.
+            done = os.path.exists(os.path.join(batch, "imports-done"))
+            rows.append([tag, "waiting", "the import job %s this pack (imports.tsv); see squeue"
+                         % ("ended without recording" if done else "has not yet recorded")])
             continue
         if imp[1] == "cancelled":
             rows.append([tag, "not-run", "import check failed: " + (imp[2] if len(imp) > 2 else "")])
             continue
         jobs = [j for j in ids.replace("|", ",").split(",") if j.isdigit()]
         st = sacct_states(jobs) if not dry else {j: ("COMPLETED", "0", "") for j in jobs}
-        open_ = [j for j in jobs if (st.get(j) or ("PENDING",))[0] not in TERMINAL]
+        open_ = [j for j in jobs if (st.get(j) or ("PENDING",))[0] not in TERMINAL + ("NEVER_RUN",)]
         summary = ",".join("%s:%s" % (j, (st.get(j) or ("?",))[0]) for j in jobs)
         if open_:
             rows.append([tag, "waiting", summary])
@@ -452,7 +477,8 @@ def cmd_copy(batch, dry):
                          os.path.join(dest, "scratch", os.path.basename(s.rstrip("/"))) + ("/" if os.path.isdir(s) else "")])
             write_tsv(os.path.join(dest, "sacct.tsv"),
                       [["job", "state", "elapsed", "alloc_tres"]] + [[j] + list(st.get(j, ("?", "", ""))) for j in jobs])
-        rows.append([tag, "collected", summary])
+        failed = [j for j in jobs if (st.get(j) or ("?",))[0] != "COMPLETED"]
+        rows.append([tag, "collected" if not failed else "collected-with-failures", summary])
     for r in rows:
         print("\t".join(r))
     if not dry:

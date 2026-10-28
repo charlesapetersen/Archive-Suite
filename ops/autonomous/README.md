@@ -1368,6 +1368,10 @@ item only when `cluster-reach.py`'s `offer()` allows it, and only once its `(blo
   The session prepares the item and ends with `plan-edit.sh PLAN hold TAG NOTE` (it appends `(needs: owner)`);
   an owner-started session submits, marks the ledger `submitted` (never offered while so marked), collects, marks
   `finished` and runs `plan-edit.sh PLAN release TAG NOTE` (root CLAUDE.md, "Cluster work runs on Sherlock").
+  Since W46.sherlock-batch (2026-10-28) that is done in batches: the preparing session also commits the pack's
+  manifest `ArchiveProcessor/scripts/segbench/sherlock/packs/<TAG>.json`, and the owner-started session runs
+  `sherlock/batch_mac.py` and `batch.sh`, which submit, mark, collect and release every ready pack at once
+  (execution-plans/sherlock-access.md §"Batches").
   `.claude/hooks/no-sherlock.sh` refuses, in unattended sessions, any command naming Sherlock's hosts or socket.
 - **FarmShare: the login answers.** The bounded, read-only preflight of `execution-plans/farmshare-access.md` runs through
   the owner's existing SSH master (`~/.ssh/cm-farmshare`). With no socket it fails without touching the network; `BatchMode=yes` and
@@ -1382,11 +1386,14 @@ silently. The queue hook stays read-only on the repo (the Agent Manager's contra
 entry opener under both of `hooks.py`'s report rules, without "no decision", so the owner is emailed) naming each
 cluster with the items ready to submit and the items submitted or finished to collect; a day's stamp is
 `$AGENT_STATE/cluster-ask-DATE`. Nothing waiting on the login means no line. Upkeep never runs while a session of
-this project runs, so on a busy day the line comes at the next gap between sessions.
+this project runs, so on a busy day the line comes at the next gap between sessions. Sherlock is not in that
+daily line: the same `ask` writes one `- **[Sherlock batch]** (DATE) — …` entry, also emailed, when 3 packs are held
+ready to submit, the oldest has waited 5 days, or a submission has waited 5 days to be collected, and not again for
+the same packs within 5 days (stamp `$AGENT_STATE/sherlock-batch-ask`). `cluster-reach.py ready` lists the packs.
 
 **The ledger** is one word per item in `$AGENT_STATE/cluster-jobs/<TAG>`, written with
 `ops/autonomous/cluster-reach.py mark TAG submitted|finished|in-box|clear`. A session that submits an item's jobs
 marks it `submitted` (the ask counts it as one to collect, because only a login can tell it has finished); one that sees them
 finish marks `finished`; the Box pickup marks `in-box`; the item's completing session marks `clear`. No file means
 nothing submitted yet. `ops/autonomous/cluster-reach.py check farmshare` runs the cached preflight by hand.
-Tests: `ops/agent/tests/test_hooks.py` class `Cluster`.
+Tests: `ops/agent/tests/test_hooks.py` class `Cluster`; the batch, `ops/agent/tests/test_sherlock_batch.py`.

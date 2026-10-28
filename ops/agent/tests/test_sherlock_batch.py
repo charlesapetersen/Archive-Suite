@@ -65,7 +65,7 @@ echo "sbatch $*" >> "$FAKE_LOG"; echo $n
     "sacct": r"""#!/bin/bash
 echo "sacct $*" >> "$FAKE_LOG"
 while [ $# -gt 0 ]; do [ "$1" = -j ] && ids="$2"; shift; done
-for j in ${ids//,/ }; do echo "$j|${FAKE_STATE:-COMPLETED}|00:12:00|cpu=8,gres/gpu=1"; done
+for j in ${ids//,/ }; do echo "$j|${FAKE_STATE:-COMPLETED}|00:12:00|cpu=8,gres/gpu=1|${FAKE_REASON:-None}"; done
 """,
 }
 
@@ -225,7 +225,6 @@ class TestBatchRoundTrip(BatchFixture):
         # the results the GPU jobs would have copied home, and one returned file that differs from the Mac copy
         res = os.path.join(self.gh, "cp1", "archive-suite", "sherlock-results", "good-1")
         self.write(os.path.join(res, "out", "r1.json"), "{}")
-        self.write(os.path.join(res, "truth.json"), '{"changed": 1}')
         cp = self.sherlock("copy", rb)                    # the collect job
         self.assertEqual(cp.returncode, 0, cp.stdout + cp.stderr)
         self.assertIn("W9.good\tcollected", cp.stdout)
@@ -236,9 +235,6 @@ class TestBatchRoundTrip(BatchFixture):
         fe = self.mac("fetch", stamp)
         mac = os.path.join(self.state, "artifacts", "good-1")
         self.assertTrue(os.path.isfile(os.path.join(mac, "out", "r1.json")))
-        with open(os.path.join(mac, "truth.json")) as f:
-            self.assertEqual(f.read(), "{}", "a Mac file is never overwritten by a returned one")
-        self.assertIn("truth.json", fe.stdout)
         self.assertEqual(self.ledger("W9.good"), "finished")
         self.assertNotIn("(needs: owner)", self.plan_line("W9.good"))
         self.assertIsNone(self.ledger("W9.badimport"))
@@ -258,6 +254,63 @@ class TestBatchRoundTrip(BatchFixture):
         fe = self.mac("fetch", stamp)
         self.assertIn("still running", fe.stdout)
         self.assertIsNone(self.ledger("W9.good"))         # never marked: nothing was collected
+
+    def one_pack_batch(self):
+        out = self.mac("plan", "--leave-out", "W9.badpath", "--leave-out", "W9.badimport").stdout
+        stamp = out.split("batch ", 1)[1].split(":", 1)[0]
+        self.mac("send", stamp)
+        rb = os.path.join(self.gh, "cp1", "archive-suite", "batches", stamp)
+        self.remote_kit = os.path.join(rb, "kit")
+        return stamp, rb
+
+    def test_collect_before_the_import_job_waits(self):
+        stamp, rb = self.one_pack_batch()
+        self.assertEqual(self.sherlock("submit", rb).returncode, 0)
+        self.mac("mark", stamp)
+        cp = self.sherlock("copy", rb)                    # the import job has not run yet
+        self.assertIn("W9.good\twaiting", cp.stdout)
+        self.mac("fetch", stamp)
+        self.assertEqual(self.ledger("W9.good"), "submitted", "never cleared while its jobs may be on Sherlock")
+        self.assertIn("(needs: owner)", self.plan_line("W9.good"))
+
+    def test_failed_jobs_are_released_with_a_warning(self):
+        stamp, rb = self.one_pack_batch()
+        self.sherlock("submit", rb)
+        self.mac("mark", stamp)
+        self.sherlock("imports", rb)
+        self.env["FAKE_STATE"] = "FAILED"
+        cp = self.sherlock("copy", rb)
+        self.assertIn("W9.good\tcollected-with-failures", cp.stdout)
+        self.mac("fetch", stamp)
+        self.assertIn("did not complete", self.plan_line("W9.good"))
+
+    def test_dependency_never_satisfied_has_ended(self):
+        stamp, rb = self.one_pack_batch()
+        self.sherlock("submit", rb)
+        self.sherlock("imports", rb)
+        self.env["FAKE_STATE"], self.env["FAKE_REASON"] = "PENDING", "DependencyNeverSatisfied"
+        cp = self.sherlock("copy", rb)
+        self.assertIn("W9.good\tcollected-with-failures", cp.stdout)
+
+    def test_differing_returned_file_blocks_finished(self):
+        stamp, rb = self.one_pack_batch()
+        self.sherlock("submit", rb)
+        self.mac("mark", stamp)
+        self.sherlock("imports", rb)
+        res = os.path.join(self.gh, "cp1", "archive-suite", "sherlock-results", "good-1")
+        self.write(os.path.join(res, "truth.json"), '{"changed": 1}')
+        self.sherlock("copy", rb)
+        fe = self.mac("fetch", stamp)
+        with open(os.path.join(self.state, "artifacts", "good-1", "truth.json")) as f:
+            self.assertEqual(f.read(), "{}", "a Mac file is never overwritten by a returned one")
+        self.assertIn("truth.json", fe.stdout)
+        self.assertEqual(self.ledger("W9.good"), "submitted")
+        self.assertIn("(needs: owner)", self.plan_line("W9.good"))
+
+    def test_a_pack_is_in_one_unmarked_batch_at_a_time(self):
+        self.one_pack_batch()
+        out = self.mac("plan", "--leave-out", "W9.badpath", "--leave-out", "W9.badimport", ok=False).stdout
+        self.assertIn("already in batch", out)
 
     def test_submit_failure_cancels_what_was_accepted(self):
         mac = os.path.join(self.state, "artifacts", "good-1", "support", "submit.sh")

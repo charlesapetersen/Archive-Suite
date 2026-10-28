@@ -255,9 +255,9 @@ depends on the apps' current settings, structure or outputs.
   the pack, the scorer, and job and submit scripts against `ArchiveProcessor/scripts/segbench/sherlock/` (sh.env, the
   container wrappers, `stage-job.sh` for copies and downloads; `restart-20261022.sh` is the pattern), dry-run on the Mac.
   It then stops and hands over: the exact submit command, the job count and what to collect go in
-  `execution-plans/items/<TAG>.md`, `ops/autonomous/plan-edit.sh .maintenance/AUTONOMOUS_PLAN.md hold TAG 'ready to
+  `execution-plans/items/<TAG>.md`, its batch manifest in `ArchiveProcessor/scripts/segbench/sherlock/packs/`, `ops/autonomous/plan-edit.sh .maintenance/AUTONOMOUS_PLAN.md hold TAG 'ready to
   submit: <command>'` takes the item off the queue, and a Daemon Report line (no decision) names it. An owner-started
-  session submits held items (and runs `ops/autonomous/cluster-reach.py mark TAG submitted`), later collects the
+  session submits held items in batches (execution-plans/sherlock-access.md §"Batches"; runs `ops/autonomous/cluster-reach.py mark TAG submitted`), later collects the
   results into `$GROUP_HOME` or the Mac, then runs `mark TAG finished` and `plan-edit.sh … release TAG 'results in
   <path>'`, and the engine scores them; the queue never offers a Sherlock item marked `submitted`. Under
   `ARCHIVE_UNATTENDED=1`, `.claude/hooks/no-sherlock.sh` refuses any command naming Sherlock's hosts or its socket. Rules for a Sherlock session:

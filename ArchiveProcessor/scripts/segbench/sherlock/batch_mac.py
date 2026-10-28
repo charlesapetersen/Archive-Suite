@@ -162,9 +162,17 @@ def release(tag, note, dry):
 def cmd_plan(args, dry):
     leave = {a for a in args if not a.startswith("--")}
     ready, collect = cluster_reach().sherlock_state(open(PLAN, errors="replace").read())
+    pending = {}                       # packs in a batch that was made but not yet marked
+    for b in sorted(os.listdir(BATCHES)) if os.path.isdir(BATCHES) else []:
+        if not os.path.exists(os.path.join(BATCHES, b, "submitted.tsv")):
+            for r in tsv(os.path.join(BATCHES, b, "batch.tsv")):
+                pending[r[0]] = b
     rows, notes = [], []
     for tag, since, man in ready:
-        if tag in leave:
+        if tag in pending:
+            notes.append("%s: already in batch %s, not yet marked; mark it (or delete that batch folder if it was "
+                         "never sent)" % (tag, pending[tag]))
+        elif tag in leave:
             notes.append("%s: left out (--leave-out)" % tag)
         elif man is None:
             notes.append("%s: no manifest packs/%s.json; left out (the preparing session writes one)" % (tag, tag))
@@ -271,6 +279,10 @@ def cmd_fetch(args, dry):
             print("%s: not run, handed back to the engine: %s" % (tag, detail))
             continue
         results = man["results"].replace("$GROUP_HOME/$USER/archive-suite", archive_root(dry))
+        if "$" in results:
+            print("%s: its manifest's results folder %s is not under $GROUP_HOME/$USER/archive-suite; fetch it by hand"
+                  % (tag, man["results"]))
+            continue
         mac = os.path.join(STATE, man["mac"])
         rsync(results.rstrip("/") + "/", mac + "/", dry, False, ["--ignore-existing"])
         differ = []
@@ -278,11 +290,19 @@ def cmd_fetch(args, dry):
             out = rsync(results.rstrip("/") + "/", mac + "/", False, False,
                         ["--dry-run", "--checksum", "--itemize-changes"])
             differ = [ln.split(" ", 1)[1] for ln in out.splitlines() if ln.startswith(">f") and "+++++++" not in ln]
+        if differ:
+            # A returned file with the name of one already here was not copied; scoring the old one would be wrong,
+            # so the item is not released until the session has looked (the Mac copy is kept as it was).
+            print("%s: copied into %s, but %d returned file%s differ from the Mac copy and were not copied: %s. Not "
+                  "marked finished: compare them, then mark and release by hand." % (tag, mac, len(differ),
+                  "" if len(differ) == 1 else "s", ", ".join(differ[:10])))
+            continue
+        note = man.get("release", "results collected")
+        if status != "collected":
+            note += "; some jobs did not complete (%s): inspect the failures before scoring" % detail
         mark(tag, "finished", dry)
-        release(tag, "%s (Sherlock batch %s; results in %s)" % (man.get("release", "results collected"), stamp, mac),
-                dry)
-        print("%s: collected into %s%s" % (tag, mac, "; returned files differing from the Mac copy, kept as they "
-                                           "were: " + ", ".join(differ[:10]) if differ else ""))
+        release(tag, "%s (Sherlock batch %s; results in %s)" % (note, stamp, mac), dry)
+        print("%s: collected into %s%s" % (tag, mac, "" if status == "collected" else " (%s)" % detail))
     return 0
 
 
