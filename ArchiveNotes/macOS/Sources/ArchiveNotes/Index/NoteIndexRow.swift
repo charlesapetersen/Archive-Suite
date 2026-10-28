@@ -99,6 +99,20 @@ struct ItemSummary: Sendable, Identifiable {
 }
 
 extension ItemSummary {
+    /// The summary straight from an on-disk `Item`, for listing the notes while the index cannot be
+    /// opened (W40.fix-notes-index-failure-empty). Field-for-field what `NotesIndex.readSummaryRow`
+    /// reads back from the row `NoteIndexRow(item:mtime:)` writes, so the list looks the same either way.
+    init(item: Item, mtime: Double) {
+        self.init(id: item.id, title: item.title, kind: item.kind, date: item.date,
+                  datePrecision: item.datePrecision, dateUncertain: item.dateUncertain,
+                  authors: item.authors, sortDate: item.sortDate, quality: item.quality,
+                  created: item.created, modified: item.modified, mtime: mtime,
+                  managedTags: item.tags, sourceNoteCount: item.blocks.distinctSourceNoteCount,
+                  roundup: item.roundup, sentWith: item.sentWith,
+                  sentWithUncertain: item.sentWith != nil && item.sentWithUncertain,
+                  displayCalendar: item.displayCalendar)
+    }
+
     /// The own date's sort key alone, never the fallback. Without a sent-with date the stored
     /// `sortDate` IS the own key (so a summary built from just a sort key keeps filtering as before);
     /// with one, re-derive it from `date`/`datePrecision` by the same parse `Item.ownSortDate` uses.

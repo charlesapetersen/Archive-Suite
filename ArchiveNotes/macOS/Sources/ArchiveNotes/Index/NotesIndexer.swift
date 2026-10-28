@@ -44,8 +44,8 @@ final class NotesIndexer: ObservableObject {
         var message: String {
             switch self {
             case .unavailable(let d):
-                return "Search index unavailable (\(d)) — search and the note list may be incomplete. "
-                     + "Your notes on disk are unaffected."
+                return "Search index unavailable (\(d)) — keyword search finds nothing and folders "
+                     + "can't be changed until it opens. Your notes are listed from disk, unaffected."
             case .incomplete(let n):
                 return "Search index incomplete — \(n) note\(n == 1 ? "" : "s") couldn't be indexed, so "
                      + "search may miss \(n == 1 ? "it" : "them")."

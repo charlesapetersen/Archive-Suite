@@ -147,9 +147,66 @@ struct NotesIndexerFailureTests {
         await model.buildIndexFromDisk()
 
         #expect(model.isIndexReady, "settled must still be signalled")
-        #expect(model.allItems.isEmpty, "the index is dead, so the list really is empty…")
-        #expect(model.indexFailure != nil, "…and that emptiness must be reported, not presented as Ready")
+        #expect(model.indexFailure != nil, "a dead index must be reported, not presented as Ready")
+        // W40.fix-notes-index-failure-empty: the list no longer goes empty with the index.
+        #expect(Set(model.allItems.map(\.title)) == ["Alpha", "Beta"], "the notes are listed from disk")
         #expect(model.statusMessage?.isEmpty == false, "the sidebar banner needs a message")
+    }
+
+    /// W40.fix-notes-index-failure-empty — the folder graph lives in the index, so a dead index used to
+    /// empty the sidebar too. It is shown from `organization.json`, read-only, and becomes the real graph
+    /// once the index opens again.
+    @Test("a dead index shows the folders from the mirror, read-only, until it recovers")
+    func deadIndexShowsMirrorFoldersReadOnlyUntilRecovery() async throws {
+        let dir = try scratchDir(); defer { try? FileManager.default.removeItem(at: dir) }
+        // Write the mirror the way the app does: a healthy store creates a folder and exports it.
+        let healthyDir = try scratchDir(); defer { try? FileManager.default.removeItem(at: healthyDir) }
+        let healthy = NotesIndex(url: healthyDir.appendingPathComponent("index.sqlite3"))
+        try await healthy.open()
+        let writer = OrganizationStore(index: healthy)
+        try await writer.load(storeRoot: dir)
+        let budget = try await writer.createFolder(name: "Budget")
+        await healthy.close()
+        let mirrorURL = dir.appendingPathComponent("organization.json")
+        let mirrorBefore = try Data(contentsOf: mirrorURL)
+
+        let url = dir.appendingPathComponent("index.sqlite3")
+        try writeGarbage(to: url)
+        let index = NotesIndex(url: url)
+        let org = OrganizationStore(index: index)
+        org.loadReadOnlyMirror(storeRoot: dir)
+        #expect(org.isReadOnlyMirror)
+        #expect(org.folders.contains { $0.id == budget.id }, "the user's folder is shown")
+        #expect(org.folders.contains { $0.id == OrganizationStore.allNotesFolderId })
+
+        await #expect(throws: OrganizationError.readOnlyWhileIndexUnavailable) {
+            _ = try await org.createFolder(name: "Lost")
+        }
+        await #expect(throws: OrganizationError.readOnlyWhileIndexUnavailable) {
+            try await org.addMembership(item: UUID(), folder: budget.id)
+        }
+        #expect(!org.folders.contains { $0.name == "Lost" }, "a refused write changes nothing in memory")
+        #expect(try Data(contentsOf: mirrorURL) == mirrorBefore, "nor the mirror on disk")
+        #expect(org.retryStaleMirrorExport() == false)
+
+        let store = NoteStore(root: dir)
+        _ = try await store.create(makeItem("Alpha"))
+        let model = NotesModel(organization: org, index: index, noteStore: store,
+                               indexer: NotesIndexer(index: index))
+        await model.buildIndexFromDisk()
+        #expect(model.normalTree.contains { $0.id == budget.id }, "the sidebar keeps the folder")
+        #expect(model.allItems.map(\.title) == ["Alpha"])
+
+        // Repair the cache (an empty file opens as a new database), then a query notices.
+        try Data().write(to: url, options: .atomic)
+        _ = await model.search("alpha")
+        await model.inFlightIndexRecoveryTask?.value
+        #expect(!org.isReadOnlyMirror, "the recovered index holds the real graph")
+        #expect(org.folders.contains { $0.id == budget.id }, "imported from the mirror, not lost")
+        #expect(model.indexFailure == nil)
+        _ = try await org.createFolder(name: "Writable again")
+        #expect(org.folders.contains { $0.name == "Writable again" })
+        await index.close()
     }
 
     /// The healthy counterpart — no false banner on a normal launch.

@@ -372,6 +372,15 @@ actor NoteStore {
         return refs
     }
 
+    /// Every on-disk item that parses, as a list summary — the note list's source while the index is
+    /// unavailable (W40.fix-notes-index-failure-empty). Reads each `.md`; an unreadable one is skipped,
+    /// as the indexer skips it.
+    func allItemSummaries() -> [ItemSummary] {
+        allItemRefs().compactMap { ref in
+            (try? load(ref.id)).map { ItemSummary(item: $0, mtime: ref.mtime) }
+        }
+    }
+
     // MARK: - CRUD (templates — same primitives, stored under Templates/)
 
     func createTemplate(_ item: Item) throws -> ItemRef {

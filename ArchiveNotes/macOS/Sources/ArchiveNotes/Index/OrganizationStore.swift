@@ -67,6 +67,10 @@ enum OrganizationError: Error, LocalizedError, Equatable {
     case itemBeingDeleted(UUID)
     case confirmedDeleteRequired(UUID)
     case folderBeingDeleted(UUID)
+    /// The graph was read from `organization.json` because the index holding it could not be opened
+    /// (W40.fix-notes-index-failure-empty). It is shown, never changed: a write has no table to land
+    /// in, and the mirror must not be overwritten from a graph the database never confirmed.
+    case readOnlyWhileIndexUnavailable
 
     var errorDescription: String? {
         switch self {
@@ -80,6 +84,8 @@ enum OrganizationError: Error, LocalizedError, Equatable {
             return "The note's delete must be confirmed before its folder placements are removed."
         case .folderBeingDeleted:
             return "That folder is being deleted — the note can't be filed into it."
+        case .readOnlyWhileIndexUnavailable:
+            return "Folders can't be changed while the search index is unavailable."
         }
     }
 }
@@ -180,6 +186,12 @@ enum OrganizationMirrorFailure: Sendable, Equatable {
     /// the user's `organization.json` with a half-built forest.
     private var didLoadGraph = false
 
+    /// `true` while the graph on show came from `loadReadOnlyMirror(storeRoot:)` rather than the
+    /// database. Every mutation refuses while it is set, and `storeRoot` stays nil, so no export can
+    /// write the mirror either (W40.fix-notes-index-failure-empty).
+    private(set) var isReadOnlyMirror = false
+    private var readOnlyMirrorRoot: URL?
+
     /// The Extracts system folder ID (§16.1 / §16.6).
     var extractsHomeFolderId: UUID { Self.extractsFolderId }
 
@@ -251,6 +263,39 @@ enum OrganizationMirrorFailure: Sendable, Equatable {
         if shouldExportOrganization { exportOrganization() }
 
         didLoadGraph = true
+        isReadOnlyMirror = false
+        readOnlyMirrorRoot = nil
+    }
+
+    /// Show the folders while the index cannot be opened (W40.fix-notes-index-failure-empty). Reads
+    /// `organization.json` (or the system folders when there is none) into memory and writes nothing:
+    /// not the database, which is unopenable, and not the mirror, which is the only copy of the graph
+    /// on disk until the index is back. `reloadAfterIndexRecovery()` replaces it with a real `load`.
+    func loadReadOnlyMirror(storeRoot: URL) {
+        guard !didLoadGraph else { return }
+        if let file = OrganizationFile.load(from: storeRoot) {
+            folders = file.folders + missingSystemFolders(in: file.folders)
+            let live = Set(folders.map(\.id))
+            memberships = file.memberships.filter { live.contains($0.folderId) }
+            assignments = file.assignments.filter { live.contains($0.folderId) }
+        } else {
+            folders = Self.systemFolderSeeds
+            memberships = []
+            assignments = []
+        }
+        isReadOnlyMirror = true
+        readOnlyMirrorRoot = storeRoot
+    }
+
+    /// The index opened again after `loadReadOnlyMirror`: do the real `load`, which imports the mirror
+    /// into an empty database or adopts the graph a recovered one already holds. A no-op otherwise.
+    func reloadAfterIndexRecovery() async throws {
+        guard isReadOnlyMirror, let root = readOnlyMirrorRoot else { return }
+        try await load(storeRoot: root)
+    }
+
+    private func refuseWhileReadOnly() throws {
+        if isReadOnlyMirror { throw OrganizationError.readOnlyWhileIndexUnavailable }
     }
 
     // MARK: - Folder operations
@@ -293,6 +338,7 @@ enum OrganizationMirrorFailure: Sendable, Equatable {
                       queryJSON: String? = nil) async throws -> VFolder {
         await beginFolderGraphWrite()
         defer { endFolderGraphWrite() }
+        try refuseWhileReadOnly()
         if let parent { try requireFolderExists(parent) }
         let folder = VFolder(
             id: UUID(), name: name, parentId: parent,
@@ -309,6 +355,7 @@ enum OrganizationMirrorFailure: Sendable, Equatable {
     func renameFolder(_ id: UUID, to name: String) async throws {
         await beginFolderGraphWrite()
         defer { endFolderGraphWrite() }
+        try refuseWhileReadOnly()
         try refuseSystemFolder(id)
         guard let i = folders.firstIndex(where: { $0.id == id }) else { return }
         var updated = folders[i]
@@ -325,6 +372,7 @@ enum OrganizationMirrorFailure: Sendable, Equatable {
     func moveFolder(_ id: UUID, newParent: UUID?, sortOrder: Int) async throws {
         await beginFolderGraphWrite()
         defer { endFolderGraphWrite() }
+        try refuseWhileReadOnly()
         guard let i = folders.firstIndex(where: { $0.id == id }) else { return }
         if let newParent { try requireFolderExists(newParent) }
         guard !wouldCreateCycle(moving: id, to: newParent) else { return }
@@ -356,6 +404,7 @@ enum OrganizationMirrorFailure: Sendable, Equatable {
     func deleteFolder(_ id: UUID) async throws -> [UUID] {
         await beginFolderGraphWrite()
         defer { endFolderGraphWrite() }
+        try refuseWhileReadOnly()
         try refuseSystemFolder(id)
         guard folders.contains(where: { $0.id == id }) else { return [] }
         try beginFolderDeletion(id)
@@ -413,6 +462,7 @@ enum OrganizationMirrorFailure: Sendable, Equatable {
     /// **Refuses an item whose confirmed hard delete is in flight (W23.h3-fu)** — see the hard-delete
     /// guard below.
     func addMembership(item: UUID, folder: UUID) async throws {
+        try refuseWhileReadOnly()
         try requireFolderExists(folder)
         guard !memberships.contains(where: { $0.itemId == item && $0.folderId == folder }) else { return }
         try beginMembershipWrite(item, into: folder)
@@ -435,6 +485,7 @@ enum OrganizationMirrorFailure: Sendable, Equatable {
     /// what let a stale confirmation trash a live note (W23.h3). With the pair proven present,
     /// `count == 1` provably means *this* pair is the only one.
     func removeMembership(item: UUID, folder: UUID) async throws -> RemoveResult {
+        try refuseWhileReadOnly()
         guard memberships.contains(where: { $0.itemId == item && $0.folderId == folder }) else {
             return .notPresent
         }
@@ -457,6 +508,7 @@ enum OrganizationMirrorFailure: Sendable, Equatable {
     /// last-instance verdict is read from what survives, so a membership that appeared while the DB write
     /// was in flight counts too and downgrades the outcome to `.unlinkedNotLast` (keep the file).
     func removeConfirmedLastMembership(item: UUID, folder: UUID) async throws -> ConfirmedRemoveResult {
+        try refuseWhileReadOnly()
         guard memberships.contains(where: { $0.itemId == item && $0.folderId == folder }) else {
             return .notPresent
         }
@@ -470,6 +522,7 @@ enum OrganizationMirrorFailure: Sendable, Equatable {
     /// hard-delete window first, so a concurrent replicate or move cannot add a placement while this
     /// transaction runs or while the note is being sent to Trash. Database first, memory after commit.
     func removeAllMembershipsForConfirmedDelete(item: UUID) async throws {
+        try refuseWhileReadOnly()
         try await drainMembershipWritesForConfirmedDelete(item: item)
         try await index.deleteMembershipsForItem(item)
         memberships.removeAll { $0.itemId == item }
@@ -500,6 +553,7 @@ enum OrganizationMirrorFailure: Sendable, Equatable {
     /// hard delete is in flight (W23.h3-fu). Nothing is lost by refusing: a guarded item is one the
     /// store just proved has zero memberships, so there is no `source` row to move.
     func moveMembership(item: UUID, from source: UUID, to target: UUID) async throws {
+        try refuseWhileReadOnly()
         guard source != target else { return try await addMembership(item: item, folder: target) }
         try requireFolderExists(target)
         let inSource = memberships.contains { $0.itemId == item && $0.folderId == source }
@@ -656,6 +710,7 @@ enum OrganizationMirrorFailure: Sendable, Equatable {
     func assignTemplate(_ template: UUID, to folder: UUID) async throws {
         await beginFolderGraphWrite()
         defer { endFolderGraphWrite() }
+        try refuseWhileReadOnly()
         try requireFolderExists(folder)
         let a = TemplateAssignment(folderId: folder, templateId: template)
         try await index.insertTemplateAssignment(a)
@@ -670,6 +725,7 @@ enum OrganizationMirrorFailure: Sendable, Equatable {
     func removeTemplateAssignment(folder: UUID) async throws {
         await beginFolderGraphWrite()
         defer { endFolderGraphWrite() }
+        try refuseWhileReadOnly()
         try await index.deleteTemplateAssignment(folder: folder)
         assignments.removeAll { $0.folderId == folder }
         exportOrganization()
@@ -682,6 +738,7 @@ enum OrganizationMirrorFailure: Sendable, Equatable {
         guard !folderIds.isEmpty else { return }
         await beginFolderGraphWrite()
         defer { endFolderGraphWrite() }
+        try refuseWhileReadOnly()
         try await index.deleteTemplateAssignments(folders: folderIds)
         let cleared = Set(folderIds)
         assignments.removeAll { cleared.contains($0.folderId) }

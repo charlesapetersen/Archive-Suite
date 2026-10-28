@@ -295,9 +295,16 @@ final class NotesModel: ObservableObject {
         noteStore = NoteStore(root: root)
         do {
             try await index.open()
-            try await organization.load(storeRoot: root)
+            do {
+                try await organization.load(storeRoot: root)
+            } catch {
+                report(error, "open the notes store")
+            }
         } catch {
-            report(error, "open the notes store")
+            // The folder graph lives in the index. Show it from its `organization.json` mirror rather
+            // than an empty sidebar; the index failure itself is reported by the build below
+            // (W40.fix-notes-index-failure-empty).
+            organization.loadReadOnlyMirror(storeRoot: root)
         }
         rebuild()
         await reloadItems()          // fast first paint from whatever is already indexed
@@ -314,8 +321,17 @@ final class NotesModel: ObservableObject {
     /// published: `allSummaries()` returns `[]` for an unopenable index exactly as it does for an empty
     /// one, and publishing that would erase the visible library on the strength of a query that never
     /// ran (W23.m9-fu). A *successful* read still publishes whatever it found, empty included.
+    ///
+    /// An index that cannot be opened at all leaves the list to the notes on disk, read directly, so
+    /// the library does not look empty when it is not (W40.fix-notes-index-failure-empty). Only the
+    /// `unavailable` case: an `incomplete` index opened, and its read is answered above.
     func reloadItems() async {
-        guard let index = await openIndexForQuery() else { return }
+        guard let index = await openIndexForQuery() else {
+            if case .unavailable = indexFailure, let noteStore {
+                replaceItems(await noteStore.allItemSummaries())
+            }
+            return
+        }
         let items = await index.allSummaries()
         replaceItems(items)
     }
@@ -425,7 +441,9 @@ final class NotesModel: ObservableObject {
             }
         }
         guard opened else { return nil }
-        if wasUnavailable { scheduleIndexRepopulationAfterRecovery() }
+        // Also when only the folders are still the read-only mirror: bootstrap's open failed but the
+        // driver's has since succeeded, so `wasUnavailable` never saw the dead index.
+        if wasUnavailable || organization.isReadOnlyMirror { scheduleIndexRepopulationAfterRecovery() }
         return index
     }
 
@@ -477,6 +495,13 @@ final class NotesModel: ObservableObject {
     /// Internal so a test can drive the rebuild deterministically instead of racing the scheduler.
     func repopulateIndexAfterRecovery() async {
         guard indexer != nil, noteStore != nil else { return }
+        // A graph shown read-only from the mirror becomes the real one now there is a table to hold it.
+        do {
+            try await organization.reloadAfterIndexRecovery()
+            rebuild()
+        } catch {
+            report(error, "load the folders")
+        }
         await buildIndexFromDisk()
     }
 

@@ -255,8 +255,11 @@ private struct ItemListPane: View {
                     .overlay {
                         // Wait for the first index pass so an empty table during startup does not
                         // announce an empty library. The table stays mounted for stable selection
-                        // and column state when the result set changes.
-                        if model.isIndexReady && model.indexFailure == nil && nav.displayed.isEmpty {
+                        // and column state when the result set changes. An unopenable index still
+                        // gets one: the list then comes from disk, so its emptiness is real, except
+                        // for a keyword search, which says why it found nothing (W40.fix-notes-index-
+                        // failure-empty). An incomplete index keeps the table bare, as before.
+                        if model.isIndexReady && nav.displayed.isEmpty && showsEmptyStateForIndexHealth {
                             emptyState
                                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                                 .background(Color(nsColor: .textBackgroundColor))
@@ -268,8 +271,21 @@ private struct ItemListPane: View {
         .background(Color(nsColor: .textBackgroundColor))
     }
 
+    private var indexUnavailable: Bool {
+        if case .unavailable = model.indexFailure { return true }
+        return false
+    }
+
+    private var showsEmptyStateForIndexHealth: Bool { model.indexFailure == nil || indexUnavailable }
+
     @ViewBuilder private var emptyState: some View {
-        if model.allItems.isEmpty {
+        if indexUnavailable && !nav.searchText.trimmingCharacters(in: .whitespaces).isEmpty {
+            ContentUnavailableView("Search is unavailable", systemImage: "exclamationmark.magnifyingglass",
+                                   description: Text("The search index can't be opened, so a keyword search "
+                                                     + "finds nothing. Clear the search to see your notes."))
+                .accessibilityElement(children: .combine)
+                .accessibilityIdentifier("an.list.empty.searchUnavailable")
+        } else if model.allItems.isEmpty {
             ContentUnavailableView("No notes or extracts yet", systemImage: "note.text",
                                    description: Text("Use New in the toolbar to create one."))
                 .accessibilityElement(children: .combine)
