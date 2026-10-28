@@ -116,7 +116,11 @@ enum MarkdownBridge {
     /// separator of the line it ends, which `serializeParagraph` drops, so the saved Markdown is unchanged.
     @MainActor
     private static func endLine(of text: NSMutableAttributedString, fontSize: CGFloat) {
-        guard text.length > 0, !BlockParser.endsWithLineTerminator(text.string) else { return }
+        // The last UTF-16 unit, not `text.string` as a Swift String: this runs once per block, and a note can
+        // be a megabyte with hundreds of them. LF and CR are `BlockParser`'s only line terminators.
+        guard text.length > 0 else { return }
+        let last = (text.string as NSString).character(at: text.length - 1)
+        guard last != 0x0A, last != 0x0D else { return }
         let previous = text.attributes(at: text.length - 1, effectiveRange: nil)
         text.append(NSAttributedString(string: "\n", attributes: MarkdownStyler.separatorAttributes(
             after: previous, bodyFont: NSFont.systemFont(ofSize: fontSize))))

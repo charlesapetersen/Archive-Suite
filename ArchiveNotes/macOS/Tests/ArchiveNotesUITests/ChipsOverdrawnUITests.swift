@@ -62,6 +62,50 @@ final class ChipsOverdrawnUITests: NotesFixtureUITestCase {
         }
     }
 
+    /// W40.fix-notes-chip-inline-layout — each reader-page chip after the first, and the note-passage chip,
+    /// were laid out beside the short last line of the block before, half a line up, their names cut to
+    /// "sample.pdf…". Once the note has settled at its end (the reported place), every laid-out chip must
+    /// start at the same x with the same width (the editor's chip-geometry probe, read from TextKit's own
+    /// attachment frames). Only chips whose fragment TextKit has laid out report a frame.
+    /// Measured in the VM before this check was tightened: x 17, width 309 for all five laid-out chips.
+    func testManyChipNoteLaysEachChipOnItsOwnLine() throws {
+        try withFixture {
+            try requireCanonicalScratchFixtureForStoreWrites()
+            try Self.writeManyChipsNote(id: Self.idManyChips, title: "Many chips — layout check")
+            app.terminate()
+            app.launch()
+            app.activate()
+            XCTAssertTrue(mainWindow.waitForExistence(timeout: 20), "main window after relaunch")
+            selectItem(uuid: Self.idManyChips.uppercased(), timeout: 25)
+            XCTAssertTrue(editor.waitForExistence(timeout: 10), "editor for the many-chip note")
+            editor.click()
+            editor.typeKey(.downArrow, modifierFlags: .command)
+            Thread.sleep(forTimeInterval: 3)
+            Self.save(XCUIScreen.main.screenshot().pngRepresentation, as: "layout-page-chips")
+
+            let probe = mainWindow.descendants(matching: .any)["an.editor.test.chipGeometry"]
+            XCTAssertTrue(probe.waitForExistence(timeout: 5), "chip-geometry probe")
+            let data = Data(((probe.value as? String) ?? "[]").utf8)
+            let states = (try? JSONSerialization.jsonObject(with: data) as? [[String: Any]]) ?? []
+            let slots = states.compactMap { slot -> (loc: Int, x: Double, w: Double)? in
+                guard let loc = slot["loc"] as? Int, let x = slot["slotX"] as? Double,
+                      let w = slot["slotW"] as? Double, w > 0 else { return nil }
+                return (loc, x, w)
+            }
+            print("[chip-layout] \(slots.map { "\($0.loc): x \($0.x) w \($0.w)" }.joined(separator: "; "))")
+            // The view is at the note's end, so the last chips — the reported ones — must be among those laid
+            // out (the VM's short editor showed five of the 30 in its first run: the top three and the last two).
+            let lastHeader = states.compactMap { $0["loc"] as? Int }.max()
+            XCTAssertGreaterThanOrEqual(slots.count, 2, "the chips in view must report their slots")
+            XCTAssertEqual(slots.map(\.loc).max(), lastHeader, "the last chip, the note-passage one, must be laid out")
+            guard let first = slots.first else { return }
+            for slot in slots {
+                XCTAssertEqual(slot.x, first.x, accuracy: 0.5, "the chip at \(slot.loc) is not at the line start")
+                XCTAssertEqual(slot.w, first.w, accuracy: 0.5, "the chip at \(slot.loc) is not full width")
+            }
+        }
+    }
+
     // MARK: - Pixels
 
     /// A run this long of pale pixels on one row is no glyph and no chip; the icon makes runs of 100–250.

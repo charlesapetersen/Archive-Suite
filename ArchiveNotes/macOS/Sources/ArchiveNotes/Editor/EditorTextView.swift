@@ -114,6 +114,11 @@ final class EditorTextView: NSTextView {
                 slot["fragY"] = Double(fragment.layoutFragmentFrame.minY + textContainerOrigin.y)
                 slot["slotY"] = Double(fragment.frameForTextAttachment(at: location).minY
                                        + fragment.layoutFragmentFrame.minY + textContainerOrigin.y)
+                // W40.fix-notes-chip-inline-layout — a chip laid out beside the text before it starts right of
+                // the line start and is narrower than the rest.
+                let slotFrame = fragment.frameForTextAttachment(at: location)
+                slot["slotX"] = Double(slotFrame.minX + fragment.layoutFragmentFrame.minX + textContainerOrigin.x)
+                slot["slotW"] = Double(slotFrame.width)
                 slot["providers"] = providers.count
                 slot["installed"] = providers.filter { $0.view?.superview != nil }.count
             }
