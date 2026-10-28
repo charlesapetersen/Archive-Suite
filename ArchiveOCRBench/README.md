@@ -145,6 +145,12 @@ record:
   Vision now; the three FarmShare readers when their run is fetched). The page shows its rows as a table; the
   round trip, curvature and hand-crop tables are in `enh-dewarp.md`, the UVDoc benchmark check in
   `enh-dewarp-uvdoc-bench.md`.
+- `enh-ocr-input.json` (`scripts/segbench/enh_ocr_input.py report`, W46.enh-ocr-input): content-removing
+  enhancement (shading division, GCDRNet, SBB, DocRes appearance and deshadow) before Apple Vision, PP-OCRv6,
+  Qwen3-VL 8B and GLM-OCR on PP-DocLayoutV3 regions, on the 96, and the two-seed ResShift/NAF-DPM probe on the 30
+  hardest pages. The page shows its summary rows as a table with a page-group picker; every arm read on all 96
+  enters the four OCR charts (`enh-` ids, kept out of the difficulty analysis). Tag, repair-by-tag and gate tables
+  are in `enh-ocr-input.md`.
 - `bench-corpus/regions-20261021.json` (`corpus/regions.py report`, W46.ocr-regions): whole page against
   DocLayout-YOLO regions, PP-DocLayoutV3 regions and overlapping tiles, four readers on L9/L4/L3/L1 (255
   public pages) and the 96. Its experiment section selects public strata and overlapping annotation groups;
