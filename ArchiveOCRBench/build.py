@@ -54,6 +54,7 @@ TRUTH_BIAS = RESULTS / "ocr-truth-bias.json"  # W46.fix-ocr-truth-bias: ocr_trut
 TRUTH_BIAS_SCORE = RESULTS / "ocr-truth-bias-score.json"  # W46.fix-ocr-truth-bias-score: the owner's blind check
 CHAOS = RESULTS / "chaos-probe.json"  # W46.fix-ocr-scorers: chaos_probe.py score, the altered-word probe
 DEWARP = RESULTS / "enh-dewarp.json"  # W46.enh-dewarp: enh_dewarp.py report, crop or dewarp against raw, by reader
+ENH_OCR = RESULTS / "enh-ocr-input.json"  # W46.enh-ocr-input: enh_ocr_input.py report, content-removing enhancement
 LOOPS = PUBLIC / "loop-rerun-20261021.json"  # W46.ocr-loops: corpus/loop_rerun.py report, the capped pages read again
 REGIONS = PUBLIC / "regions-20261021.json"  # W46.ocr-regions: whole page, detector regions and overlapping tiles
 REGIONS_GW = PUBLIC / "regions-gateway-20261028.json"  # W46.ocr-regions-paid: corpus/regions_gateway.py score, Gemini 3.7
@@ -607,6 +608,34 @@ def dewarp_chart_routes(data, kinds, op):
     return out
 
 
+def enh_ocr_chart_routes(data, kinds, op):
+    """Content-removing enhancement arms on the 96 (W46.enh-ocr-input): Apple Vision's free, the Sherlock readers'
+    priced like the crop routes (GLM-OCR from its region crops' tokens, PP-OCRv6 free on a cluster). Raw is each
+    reader's own route on the charts already; the two-seed probe's 30 pages are too few for a chart."""
+    if data is None or data["readers_pending"]:
+        return []
+    by = {(r["route"], r["arm"], r["group"]): r for r in data["chart_rows"]}
+    names = {"apple-vision": "Apple Vision", "ppocrv6": "PP-OCRv6", "qwen3-vl-8b": "Qwen3-VL 8B",
+             "glm-ocr": "GLM-OCR · PP-DocLayoutV3 regions"}
+    arms = {"shading": "shading division", "gcdrnet": "GCDRNet", "sbb": "SBB binarisation",
+            "docres-appearance": "DocRes appearance", "docres-deshadow": "DocRes deshadow"}
+    out = []
+    for route, arm in dict.fromkeys((r["route"], r["arm"]) for r in data["chart_rows"]):
+        overall = by[(route, arm, "the 96")]
+        scores = {key: [round(100 * by[(route, arm, g)]["nes"], 2), by[(route, arm, g)]["ok"], by[(route, arm, g)]["n"]]
+                  for key, g in [("overall", "the 96"), *((k, "kind:" + k) for k in kinds)]}
+        common = {"id": f"enh-{route}-{arm}", "name": names[route] + " · " + arms[arm], "batch": None, "scores": scores}
+        if route == "apple-vision":
+            out.append({**common, "panel": "local", "std": 0.0})
+            continue
+        price = openrouter_price(op, route, overall["prompt_tokens"] / overall["n"],
+                                 overall["completion_tokens"] / overall["n"])
+        out.append({**common, "panel": "farmshare", "cluster": "Sherlock", "std": cents(price) if price is not None else 0.0,
+                    "free_cluster": price is None, "machine": "one NVIDIA L40S per job",
+                    "hw": {"photos_per_hour": None, "gpu_hours_per_100k": None}})
+    return out
+
+
 def main():
     check = "--check" in sys.argv[1:]
     inputs = json.loads(INPUTS.read_text())
@@ -694,6 +723,12 @@ def main():
         routes.append(route)
         for c in charts:
             c["scores"][route["id"]] = scores[c["key"]]
+    enh_ocr = json.loads(ENH_OCR.read_text()) if ENH_OCR.exists() else None
+    for route in enh_ocr_chart_routes(enh_ocr, inputs["kinds"], op):
+        scores = route.pop("scores")
+        routes.append(route)
+        for c in charts:
+            c["scores"][route["id"]] = scores[c["key"]]
     regions_gw = json.loads(REGIONS_GW.read_text()) if REGIONS_GW.exists() else None
     for route in gateway_region_routes(regions_gw, inputs["kinds"]):
         scores = route.pop("scores")
@@ -715,7 +750,7 @@ def main():
     # the later gateway reading of Gemini 3.7 Flash, so that route is drawn on the charts and left out here.
     diff = difficulty.analyse({r["id"]: r["std"] for r in routes}, {r["id"]: r["name"] for r in routes},
                               [r["id"] for r in routes if r["panel"] != "farmshare" and r["id"] not in GATEWAY_ROUTES
-                               and not r["id"].startswith(("gw-regions-", "dewarp-"))])
+                               and not r["id"].startswith(("gw-regions-", "dewarp-", "enh-"))])
     dating = json.loads(DATING.read_text()) if DATING.exists() else None
     if dating:  # FarmShare dating runs too large for the Mac, at OpenRouter's rate for their cached token means
         for k, m in dating.get("open_models", {}).items():
@@ -734,7 +769,7 @@ def main():
              "seg_date": json.loads((RESULTS / "seg-date-model-final.json").read_text())
                          if (RESULTS / "seg-date-model-final.json").exists() else None,
              "public": public(), "ocr_scorers": ocr_scorers(),
-             "dewarp": dewarp,
+             "dewarp": dewarp, "enh_ocr": enh_ocr,
              "loops": json.loads(LOOPS.read_text()) if LOOPS.exists() else None, "regions": regions}
     page = TEMPLATE.read_text().replace("__DATA__", json.dumps(built, separators=(",", ":")))
     outputs = {OUT_DATA: json.dumps(built, indent=1) + "\n", OUT_PAGE: page, OUT_DIFFICULTY: difficulty.report(diff)}

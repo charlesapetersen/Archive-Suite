@@ -907,6 +907,223 @@
    "std": 3.58
   },
   {
+   "id": "enh-apple-vision-shading",
+   "name": "Apple Vision \u00b7 shading division",
+   "batch": null,
+   "panel": "local",
+   "std": 0.0
+  },
+  {
+   "id": "enh-apple-vision-gcdrnet",
+   "name": "Apple Vision \u00b7 GCDRNet",
+   "batch": null,
+   "panel": "local",
+   "std": 0.0
+  },
+  {
+   "id": "enh-apple-vision-sbb",
+   "name": "Apple Vision \u00b7 SBB binarisation",
+   "batch": null,
+   "panel": "local",
+   "std": 0.0
+  },
+  {
+   "id": "enh-apple-vision-docres-appearance",
+   "name": "Apple Vision \u00b7 DocRes appearance",
+   "batch": null,
+   "panel": "local",
+   "std": 0.0
+  },
+  {
+   "id": "enh-apple-vision-docres-deshadow",
+   "name": "Apple Vision \u00b7 DocRes deshadow",
+   "batch": null,
+   "panel": "local",
+   "std": 0.0
+  },
+  {
+   "id": "enh-ppocrv6-shading",
+   "name": "PP-OCRv6 \u00b7 shading division",
+   "batch": null,
+   "panel": "farmshare",
+   "cluster": "Sherlock",
+   "std": 0.0,
+   "free_cluster": true,
+   "machine": "one NVIDIA L40S per job",
+   "hw": {
+    "photos_per_hour": null,
+    "gpu_hours_per_100k": null
+   }
+  },
+  {
+   "id": "enh-ppocrv6-gcdrnet",
+   "name": "PP-OCRv6 \u00b7 GCDRNet",
+   "batch": null,
+   "panel": "farmshare",
+   "cluster": "Sherlock",
+   "std": 0.0,
+   "free_cluster": true,
+   "machine": "one NVIDIA L40S per job",
+   "hw": {
+    "photos_per_hour": null,
+    "gpu_hours_per_100k": null
+   }
+  },
+  {
+   "id": "enh-ppocrv6-sbb",
+   "name": "PP-OCRv6 \u00b7 SBB binarisation",
+   "batch": null,
+   "panel": "farmshare",
+   "cluster": "Sherlock",
+   "std": 0.0,
+   "free_cluster": true,
+   "machine": "one NVIDIA L40S per job",
+   "hw": {
+    "photos_per_hour": null,
+    "gpu_hours_per_100k": null
+   }
+  },
+  {
+   "id": "enh-qwen3-vl-8b-shading",
+   "name": "Qwen3-VL 8B \u00b7 shading division",
+   "batch": null,
+   "panel": "farmshare",
+   "cluster": "Sherlock",
+   "std": 0.0,
+   "free_cluster": true,
+   "machine": "one NVIDIA L40S per job",
+   "hw": {
+    "photos_per_hour": null,
+    "gpu_hours_per_100k": null
+   }
+  },
+  {
+   "id": "enh-qwen3-vl-8b-gcdrnet",
+   "name": "Qwen3-VL 8B \u00b7 GCDRNet",
+   "batch": null,
+   "panel": "farmshare",
+   "cluster": "Sherlock",
+   "std": 0.0,
+   "free_cluster": true,
+   "machine": "one NVIDIA L40S per job",
+   "hw": {
+    "photos_per_hour": null,
+    "gpu_hours_per_100k": null
+   }
+  },
+  {
+   "id": "enh-qwen3-vl-8b-sbb",
+   "name": "Qwen3-VL 8B \u00b7 SBB binarisation",
+   "batch": null,
+   "panel": "farmshare",
+   "cluster": "Sherlock",
+   "std": 0.0,
+   "free_cluster": true,
+   "machine": "one NVIDIA L40S per job",
+   "hw": {
+    "photos_per_hour": null,
+    "gpu_hours_per_100k": null
+   }
+  },
+  {
+   "id": "enh-qwen3-vl-8b-docres-appearance",
+   "name": "Qwen3-VL 8B \u00b7 DocRes appearance",
+   "batch": null,
+   "panel": "farmshare",
+   "cluster": "Sherlock",
+   "std": 0.0,
+   "free_cluster": true,
+   "machine": "one NVIDIA L40S per job",
+   "hw": {
+    "photos_per_hour": null,
+    "gpu_hours_per_100k": null
+   }
+  },
+  {
+   "id": "enh-qwen3-vl-8b-docres-deshadow",
+   "name": "Qwen3-VL 8B \u00b7 DocRes deshadow",
+   "batch": null,
+   "panel": "farmshare",
+   "cluster": "Sherlock",
+   "std": 0.0,
+   "free_cluster": true,
+   "machine": "one NVIDIA L40S per job",
+   "hw": {
+    "photos_per_hour": null,
+    "gpu_hours_per_100k": null
+   }
+  },
+  {
+   "id": "enh-glm-ocr-shading",
+   "name": "GLM-OCR \u00b7 PP-DocLayoutV3 regions \u00b7 shading division",
+   "batch": null,
+   "panel": "farmshare",
+   "cluster": "Sherlock",
+   "std": 0.0,
+   "free_cluster": true,
+   "machine": "one NVIDIA L40S per job",
+   "hw": {
+    "photos_per_hour": null,
+    "gpu_hours_per_100k": null
+   }
+  },
+  {
+   "id": "enh-glm-ocr-gcdrnet",
+   "name": "GLM-OCR \u00b7 PP-DocLayoutV3 regions \u00b7 GCDRNet",
+   "batch": null,
+   "panel": "farmshare",
+   "cluster": "Sherlock",
+   "std": 0.0,
+   "free_cluster": true,
+   "machine": "one NVIDIA L40S per job",
+   "hw": {
+    "photos_per_hour": null,
+    "gpu_hours_per_100k": null
+   }
+  },
+  {
+   "id": "enh-glm-ocr-sbb",
+   "name": "GLM-OCR \u00b7 PP-DocLayoutV3 regions \u00b7 SBB binarisation",
+   "batch": null,
+   "panel": "farmshare",
+   "cluster": "Sherlock",
+   "std": 0.0,
+   "free_cluster": true,
+   "machine": "one NVIDIA L40S per job",
+   "hw": {
+    "photos_per_hour": null,
+    "gpu_hours_per_100k": null
+   }
+  },
+  {
+   "id": "enh-glm-ocr-docres-appearance",
+   "name": "GLM-OCR \u00b7 PP-DocLayoutV3 regions \u00b7 DocRes appearance",
+   "batch": null,
+   "panel": "farmshare",
+   "cluster": "Sherlock",
+   "std": 0.0,
+   "free_cluster": true,
+   "machine": "one NVIDIA L40S per job",
+   "hw": {
+    "photos_per_hour": null,
+    "gpu_hours_per_100k": null
+   }
+  },
+  {
+   "id": "enh-glm-ocr-docres-deshadow",
+   "name": "GLM-OCR \u00b7 PP-DocLayoutV3 regions \u00b7 DocRes deshadow",
+   "batch": null,
+   "panel": "farmshare",
+   "cluster": "Sherlock",
+   "std": 0.0,
+   "free_cluster": true,
+   "machine": "one NVIDIA L40S per job",
+   "hw": {
+    "photos_per_hour": null,
+    "gpu_hours_per_100k": null
+   }
+  },
+  {
    "id": "gw-regions-tiles",
    "name": "Gemini 3.7 Flash (Stanford gateway, price estimated) \u00b7 overlapping tiles",
    "panel": "cloud",
@@ -1398,6 +1615,96 @@
      96,
      96
     ],
+    "enh-apple-vision-shading": [
+     80.73,
+     96,
+     96
+    ],
+    "enh-apple-vision-gcdrnet": [
+     79.64,
+     96,
+     96
+    ],
+    "enh-apple-vision-sbb": [
+     76.09,
+     96,
+     96
+    ],
+    "enh-apple-vision-docres-appearance": [
+     81.99,
+     96,
+     96
+    ],
+    "enh-apple-vision-docres-deshadow": [
+     81.61,
+     96,
+     96
+    ],
+    "enh-ppocrv6-shading": [
+     76.6,
+     96,
+     96
+    ],
+    "enh-ppocrv6-gcdrnet": [
+     76.53,
+     96,
+     96
+    ],
+    "enh-ppocrv6-sbb": [
+     74.97,
+     96,
+     96
+    ],
+    "enh-qwen3-vl-8b-shading": [
+     92.26,
+     95,
+     96
+    ],
+    "enh-qwen3-vl-8b-gcdrnet": [
+     92.84,
+     95,
+     96
+    ],
+    "enh-qwen3-vl-8b-sbb": [
+     91.64,
+     94,
+     96
+    ],
+    "enh-qwen3-vl-8b-docres-appearance": [
+     90.51,
+     93,
+     96
+    ],
+    "enh-qwen3-vl-8b-docres-deshadow": [
+     92.01,
+     94,
+     96
+    ],
+    "enh-glm-ocr-shading": [
+     84.88,
+     95,
+     96
+    ],
+    "enh-glm-ocr-gcdrnet": [
+     85.39,
+     95,
+     96
+    ],
+    "enh-glm-ocr-sbb": [
+     84.96,
+     95,
+     96
+    ],
+    "enh-glm-ocr-docres-appearance": [
+     85.0,
+     95,
+     96
+    ],
+    "enh-glm-ocr-docres-deshadow": [
+     84.99,
+     95,
+     96
+    ],
     "gw-regions-tiles": [
      91.05,
      96,
@@ -1813,6 +2120,96 @@
     ],
     "dewarp-gemini3.7-flash-gw-enc-1600-q90": [
      98.69,
+     50,
+     50
+    ],
+    "enh-apple-vision-shading": [
+     91.55,
+     50,
+     50
+    ],
+    "enh-apple-vision-gcdrnet": [
+     89.13,
+     50,
+     50
+    ],
+    "enh-apple-vision-sbb": [
+     85.56,
+     50,
+     50
+    ],
+    "enh-apple-vision-docres-appearance": [
+     92.1,
+     50,
+     50
+    ],
+    "enh-apple-vision-docres-deshadow": [
+     91.83,
+     50,
+     50
+    ],
+    "enh-ppocrv6-shading": [
+     90.55,
+     50,
+     50
+    ],
+    "enh-ppocrv6-gcdrnet": [
+     90.12,
+     50,
+     50
+    ],
+    "enh-ppocrv6-sbb": [
+     88.41,
+     50,
+     50
+    ],
+    "enh-qwen3-vl-8b-shading": [
+     93.48,
+     49,
+     50
+    ],
+    "enh-qwen3-vl-8b-gcdrnet": [
+     96.84,
+     50,
+     50
+    ],
+    "enh-qwen3-vl-8b-sbb": [
+     97.15,
+     50,
+     50
+    ],
+    "enh-qwen3-vl-8b-docres-appearance": [
+     91.92,
+     48,
+     50
+    ],
+    "enh-qwen3-vl-8b-docres-deshadow": [
+     96.0,
+     50,
+     50
+    ],
+    "enh-glm-ocr-shading": [
+     91.54,
+     50,
+     50
+    ],
+    "enh-glm-ocr-gcdrnet": [
+     92.47,
+     50,
+     50
+    ],
+    "enh-glm-ocr-sbb": [
+     92.19,
+     50,
+     50
+    ],
+    "enh-glm-ocr-docres-appearance": [
+     91.64,
+     50,
+     50
+    ],
+    "enh-glm-ocr-docres-deshadow": [
+     91.53,
      50,
      50
     ],
@@ -2234,6 +2631,96 @@
      28,
      28
     ],
+    "enh-apple-vision-shading": [
+     76.78,
+     28,
+     28
+    ],
+    "enh-apple-vision-gcdrnet": [
+     74.31,
+     28,
+     28
+    ],
+    "enh-apple-vision-sbb": [
+     73.79,
+     28,
+     28
+    ],
+    "enh-apple-vision-docres-appearance": [
+     77.28,
+     28,
+     28
+    ],
+    "enh-apple-vision-docres-deshadow": [
+     78.25,
+     28,
+     28
+    ],
+    "enh-ppocrv6-shading": [
+     61.42,
+     28,
+     28
+    ],
+    "enh-ppocrv6-gcdrnet": [
+     61.21,
+     28,
+     28
+    ],
+    "enh-ppocrv6-sbb": [
+     60.85,
+     28,
+     28
+    ],
+    "enh-qwen3-vl-8b-shading": [
+     93.2,
+     28,
+     28
+    ],
+    "enh-qwen3-vl-8b-gcdrnet": [
+     94.92,
+     28,
+     28
+    ],
+    "enh-qwen3-vl-8b-sbb": [
+     90.83,
+     27,
+     28
+    ],
+    "enh-qwen3-vl-8b-docres-appearance": [
+     90.65,
+     27,
+     28
+    ],
+    "enh-qwen3-vl-8b-docres-deshadow": [
+     91.17,
+     27,
+     28
+    ],
+    "enh-glm-ocr-shading": [
+     82.76,
+     28,
+     28
+    ],
+    "enh-glm-ocr-gcdrnet": [
+     83.06,
+     28,
+     28
+    ],
+    "enh-glm-ocr-sbb": [
+     82.83,
+     28,
+     28
+    ],
+    "enh-glm-ocr-docres-appearance": [
+     83.19,
+     28,
+     28
+    ],
+    "enh-glm-ocr-docres-deshadow": [
+     83.23,
+     28,
+     28
+    ],
     "gw-regions-tiles": [
      79.3,
      28,
@@ -2650,6 +3137,96 @@
     "dewarp-gemini3.7-flash-gw-enc-1600-q90": [
      95.91,
      16,
+     16
+    ],
+    "enh-apple-vision-shading": [
+     56.45,
+     16,
+     16
+    ],
+    "enh-apple-vision-gcdrnet": [
+     60.43,
+     16,
+     16
+    ],
+    "enh-apple-vision-sbb": [
+     52.92,
+     16,
+     16
+    ],
+    "enh-apple-vision-docres-appearance": [
+     59.91,
+     16,
+     16
+    ],
+    "enh-apple-vision-docres-deshadow": [
+     56.64,
+     16,
+     16
+    ],
+    "enh-ppocrv6-shading": [
+     61.91,
+     16,
+     16
+    ],
+    "enh-ppocrv6-gcdrnet": [
+     62.71,
+     16,
+     16
+    ],
+    "enh-ppocrv6-sbb": [
+     59.48,
+     16,
+     16
+    ],
+    "enh-qwen3-vl-8b-shading": [
+     90.38,
+     16,
+     16
+    ],
+    "enh-qwen3-vl-8b-gcdrnet": [
+     80.76,
+     15,
+     16
+    ],
+    "enh-qwen3-vl-8b-sbb": [
+     80.47,
+     15,
+     16
+    ],
+    "enh-qwen3-vl-8b-docres-appearance": [
+     89.68,
+     16,
+     16
+    ],
+    "enh-qwen3-vl-8b-docres-deshadow": [
+     84.73,
+     15,
+     16
+    ],
+    "enh-glm-ocr-shading": [
+     70.11,
+     15,
+     16
+    ],
+    "enh-glm-ocr-gcdrnet": [
+     69.64,
+     15,
+     16
+    ],
+    "enh-glm-ocr-sbb": [
+     68.98,
+     15,
+     16
+    ],
+    "enh-glm-ocr-docres-appearance": [
+     69.77,
+     15,
+     16
+    ],
+    "enh-glm-ocr-docres-deshadow": [
+     70.12,
+     15,
      16
     ],
     "gw-regions-tiles": [
@@ -28915,6 +29492,2158 @@
     "lo": -0.05523,
     "hi": 0.01869,
     "p": 0.46515
+   }
+  ]
+ },
+ "enh_ocr": {
+  "item": "W46.enh-ocr-input",
+  "report": "enh-ocr-input.md",
+  "readers_pending": [],
+  "not_run": {
+   "ppocrv6": [
+    "docres-appearance",
+    "docres-deshadow"
+   ]
+  },
+  "probe_pages": 30,
+  "rows": [
+   {
+    "reader": "apple-vision",
+    "pages": "96",
+    "n": 96,
+    "arm": "raw",
+    "base": "raw",
+    "nes": 0.81336,
+    "chrf": 0.82499,
+    "inserted": 0.07223,
+    "rewritten": 0.03416,
+    "restoration_only_k": 0.0,
+    "suspect_k": 0.0
+   },
+   {
+    "reader": "apple-vision",
+    "pages": "96",
+    "n": 96,
+    "arm": "shading",
+    "base": "raw",
+    "nes": 0.80727,
+    "chrf": 0.81488,
+    "inserted": 0.07266,
+    "rewritten": 0.03286,
+    "restoration_only_k": 30.61932,
+    "suspect_k": 40.19003,
+    "d_nes": -0.00609,
+    "lo": -0.01906,
+    "hi": 0.00862,
+    "p": 0.42906
+   },
+   {
+    "reader": "apple-vision",
+    "pages": "96",
+    "n": 96,
+    "arm": "gcdrnet",
+    "base": "raw",
+    "nes": 0.7964,
+    "chrf": 0.81062,
+    "inserted": 0.07663,
+    "rewritten": 0.03973,
+    "restoration_only_k": 55.80583,
+    "suspect_k": 70.54304,
+    "d_nes": -0.01696,
+    "lo": -0.03578,
+    "hi": 0.00176,
+    "p": 0.07999
+   },
+   {
+    "reader": "apple-vision",
+    "pages": "96",
+    "n": 96,
+    "arm": "sbb",
+    "base": "raw",
+    "nes": 0.76085,
+    "chrf": 0.7528,
+    "inserted": 0.07309,
+    "rewritten": 0.06056,
+    "restoration_only_k": 120.93745,
+    "suspect_k": 134.22649,
+    "d_nes": -0.05252,
+    "lo": -0.07525,
+    "hi": -0.02765,
+    "p": 0.0001
+   },
+   {
+    "reader": "apple-vision",
+    "pages": "96",
+    "n": 96,
+    "arm": "docres-appearance",
+    "base": "raw",
+    "nes": 0.8199,
+    "chrf": 0.82858,
+    "inserted": 0.07716,
+    "rewritten": 0.034,
+    "restoration_only_k": 41.6509,
+    "suspect_k": 54.96131,
+    "d_nes": 0.00654,
+    "lo": -0.00797,
+    "hi": 0.02217,
+    "p": 0.41696
+   },
+   {
+    "reader": "apple-vision",
+    "pages": "96",
+    "n": 96,
+    "arm": "docres-deshadow",
+    "base": "raw",
+    "nes": 0.81606,
+    "chrf": 0.82636,
+    "inserted": 0.07396,
+    "rewritten": 0.03213,
+    "restoration_only_k": 28.49042,
+    "suspect_k": 36.7886,
+    "d_nes": 0.00269,
+    "lo": -0.00574,
+    "hi": 0.01491,
+    "p": 0.82122
+   },
+   {
+    "reader": "apple-vision",
+    "pages": "originals",
+    "n": 63,
+    "arm": "raw",
+    "base": "raw",
+    "nes": 0.78245,
+    "chrf": 0.7805,
+    "inserted": 0.06533,
+    "rewritten": 0.04115,
+    "restoration_only_k": 0.0,
+    "suspect_k": 0.0
+   },
+   {
+    "reader": "apple-vision",
+    "pages": "originals",
+    "n": 63,
+    "arm": "shading",
+    "base": "raw",
+    "nes": 0.76565,
+    "chrf": 0.76454,
+    "inserted": 0.07307,
+    "rewritten": 0.04121,
+    "restoration_only_k": 41.25465,
+    "suspect_k": 53.72551,
+    "d_nes": -0.0168,
+    "lo": -0.03282,
+    "hi": -0.0038,
+    "p": 0.0209
+   },
+   {
+    "reader": "apple-vision",
+    "pages": "originals",
+    "n": 63,
+    "arm": "gcdrnet",
+    "base": "raw",
+    "nes": 0.76258,
+    "chrf": 0.76873,
+    "inserted": 0.06647,
+    "rewritten": 0.04613,
+    "restoration_only_k": 60.85798,
+    "suspect_k": 78.81711,
+    "d_nes": -0.01987,
+    "lo": -0.0421,
+    "hi": 0.00043,
+    "p": 0.07929
+   },
+   {
+    "reader": "apple-vision",
+    "pages": "originals",
+    "n": 63,
+    "arm": "sbb",
+    "base": "raw",
+    "nes": 0.7182,
+    "chrf": 0.71341,
+    "inserted": 0.0751,
+    "rewritten": 0.05267,
+    "restoration_only_k": 102.89953,
+    "suspect_k": 120.43156,
+    "d_nes": -0.06426,
+    "lo": -0.08832,
+    "hi": -0.04164,
+    "p": 0.0001
+   },
+   {
+    "reader": "apple-vision",
+    "pages": "originals",
+    "n": 63,
+    "arm": "docres-appearance",
+    "base": "raw",
+    "nes": 0.79003,
+    "chrf": 0.78519,
+    "inserted": 0.07259,
+    "rewritten": 0.04163,
+    "restoration_only_k": 52.26935,
+    "suspect_k": 69.13442,
+    "d_nes": 0.00758,
+    "lo": -0.00494,
+    "hi": 0.02116,
+    "p": 0.26907
+   },
+   {
+    "reader": "apple-vision",
+    "pages": "originals",
+    "n": 63,
+    "arm": "docres-deshadow",
+    "base": "raw",
+    "nes": 0.77966,
+    "chrf": 0.78279,
+    "inserted": 0.07642,
+    "rewritten": 0.03833,
+    "restoration_only_k": 35.18658,
+    "suspect_k": 45.89281,
+    "d_nes": -0.0028,
+    "lo": -0.00992,
+    "hi": 0.00374,
+    "p": 0.42126
+   },
+   {
+    "reader": "apple-vision",
+    "pages": "PDF images",
+    "n": 33,
+    "arm": "raw",
+    "base": "raw",
+    "nes": 0.87237,
+    "chrf": 0.90992,
+    "inserted": 0.08085,
+    "rewritten": 0.02543,
+    "restoration_only_k": 0.0,
+    "suspect_k": 0.0
+   },
+   {
+    "reader": "apple-vision",
+    "pages": "PDF images",
+    "n": 33,
+    "arm": "shading",
+    "base": "raw",
+    "nes": 0.88673,
+    "chrf": 0.91099,
+    "inserted": 0.07215,
+    "rewritten": 0.02243,
+    "restoration_only_k": 17.59124,
+    "suspect_k": 23.60929,
+    "d_nes": 0.01436,
+    "lo": -0.00128,
+    "hi": 0.04395,
+    "p": 0.45975
+   },
+   {
+    "reader": "apple-vision",
+    "pages": "PDF images",
+    "n": 33,
+    "arm": "gcdrnet",
+    "base": "raw",
+    "nes": 0.86097,
+    "chrf": 0.89059,
+    "inserted": 0.08933,
+    "rewritten": 0.03173,
+    "restoration_only_k": 49.62336,
+    "suspect_k": 60.4178,
+    "d_nes": -0.01139,
+    "lo": -0.04555,
+    "hi": 0.02929,
+    "p": 0.54145
+   },
+   {
+    "reader": "apple-vision",
+    "pages": "PDF images",
+    "n": 33,
+    "arm": "sbb",
+    "base": "raw",
+    "nes": 0.84226,
+    "chrf": 0.82799,
+    "inserted": 0.07058,
+    "rewritten": 0.07043,
+    "restoration_only_k": 141.73534,
+    "suspect_k": 150.13217,
+    "d_nes": -0.0301,
+    "lo": -0.07542,
+    "hi": 0.02792,
+    "p": 0.31777
+   },
+   {
+    "reader": "apple-vision",
+    "pages": "PDF images",
+    "n": 33,
+    "arm": "docres-appearance",
+    "base": "raw",
+    "nes": 0.87693,
+    "chrf": 0.91141,
+    "inserted": 0.08288,
+    "rewritten": 0.02445,
+    "restoration_only_k": 28.42357,
+    "suspect_k": 37.30594,
+    "d_nes": 0.00456,
+    "lo": -0.03036,
+    "hi": 0.04446,
+    "p": 0.69043
+   },
+   {
+    "reader": "apple-vision",
+    "pages": "PDF images",
+    "n": 33,
+    "arm": "docres-deshadow",
+    "base": "raw",
+    "nes": 0.88555,
+    "chrf": 0.90955,
+    "inserted": 0.07088,
+    "rewritten": 0.02438,
+    "restoration_only_k": 20.23166,
+    "suspect_k": 25.55985,
+    "d_nes": 0.01318,
+    "lo": -0.00375,
+    "hi": 0.04392,
+    "p": 0.74433
+   },
+   {
+    "reader": "ppocrv6",
+    "pages": "96",
+    "n": 96,
+    "arm": "raw",
+    "base": "raw",
+    "nes": 0.76853,
+    "chrf": 0.83501,
+    "inserted": 0.15848,
+    "rewritten": 0.02843,
+    "restoration_only_k": 0.0,
+    "suspect_k": 0.0
+   },
+   {
+    "reader": "ppocrv6",
+    "pages": "96",
+    "n": 96,
+    "arm": "shading",
+    "base": "raw",
+    "nes": 0.766,
+    "chrf": 0.83257,
+    "inserted": 0.15598,
+    "rewritten": 0.0289,
+    "restoration_only_k": 27.13098,
+    "suspect_k": 27.68047,
+    "d_nes": -0.00253,
+    "lo": -0.00705,
+    "hi": 0.00148,
+    "p": 0.26367
+   },
+   {
+    "reader": "ppocrv6",
+    "pages": "96",
+    "n": 96,
+    "arm": "gcdrnet",
+    "base": "raw",
+    "nes": 0.76528,
+    "chrf": 0.82241,
+    "inserted": 0.15662,
+    "rewritten": 0.03043,
+    "restoration_only_k": 41.79721,
+    "suspect_k": 41.0742,
+    "d_nes": -0.00325,
+    "lo": -0.01148,
+    "hi": 0.0062,
+    "p": 0.50435
+   },
+   {
+    "reader": "ppocrv6",
+    "pages": "96",
+    "n": 96,
+    "arm": "sbb",
+    "base": "raw",
+    "nes": 0.74966,
+    "chrf": 0.78834,
+    "inserted": 0.16095,
+    "rewritten": 0.0486,
+    "restoration_only_k": 101.96375,
+    "suspect_k": 98.73661,
+    "d_nes": -0.01888,
+    "lo": -0.03019,
+    "hi": -0.00786,
+    "p": 0.0009
+   },
+   {
+    "reader": "ppocrv6",
+    "pages": "originals",
+    "n": 63,
+    "arm": "raw",
+    "base": "raw",
+    "nes": 0.74367,
+    "chrf": 0.78739,
+    "inserted": 0.15387,
+    "rewritten": 0.03899,
+    "restoration_only_k": 0.0,
+    "suspect_k": 0.0
+   },
+   {
+    "reader": "ppocrv6",
+    "pages": "originals",
+    "n": 63,
+    "arm": "shading",
+    "base": "raw",
+    "nes": 0.73894,
+    "chrf": 0.78326,
+    "inserted": 0.15099,
+    "rewritten": 0.04073,
+    "restoration_only_k": 36.82329,
+    "suspect_k": 37.32514,
+    "d_nes": -0.00474,
+    "lo": -0.01148,
+    "hi": 0.00074,
+    "p": 0.14479
+   },
+   {
+    "reader": "ppocrv6",
+    "pages": "originals",
+    "n": 63,
+    "arm": "gcdrnet",
+    "base": "raw",
+    "nes": 0.73498,
+    "chrf": 0.7713,
+    "inserted": 0.15279,
+    "rewritten": 0.04145,
+    "restoration_only_k": 50.63291,
+    "suspect_k": 50.19208,
+    "d_nes": -0.00869,
+    "lo": -0.01866,
+    "hi": 0.00045,
+    "p": 0.07829
+   },
+   {
+    "reader": "ppocrv6",
+    "pages": "originals",
+    "n": 63,
+    "arm": "sbb",
+    "base": "raw",
+    "nes": 0.7202,
+    "chrf": 0.74696,
+    "inserted": 0.15435,
+    "rewritten": 0.05159,
+    "restoration_only_k": 85.42141,
+    "suspect_k": 84.72539,
+    "d_nes": -0.02348,
+    "lo": -0.03858,
+    "hi": -0.01034,
+    "p": 0.0004
+   },
+   {
+    "reader": "ppocrv6",
+    "pages": "PDF images",
+    "n": 33,
+    "arm": "raw",
+    "base": "raw",
+    "nes": 0.816,
+    "chrf": 0.92593,
+    "inserted": 0.16425,
+    "rewritten": 0.01523,
+    "restoration_only_k": 0.0,
+    "suspect_k": 0.0
+   },
+   {
+    "reader": "ppocrv6",
+    "pages": "PDF images",
+    "n": 33,
+    "arm": "shading",
+    "base": "raw",
+    "nes": 0.81768,
+    "chrf": 0.92671,
+    "inserted": 0.16223,
+    "rewritten": 0.0141,
+    "restoration_only_k": 15.40563,
+    "suspect_k": 16.01275,
+    "d_nes": 0.00168,
+    "lo": -0.00146,
+    "hi": 0.00605,
+    "p": 0.52535
+   },
+   {
+    "reader": "ppocrv6",
+    "pages": "PDF images",
+    "n": 33,
+    "arm": "gcdrnet",
+    "base": "raw",
+    "nes": 0.82313,
+    "chrf": 0.91998,
+    "inserted": 0.1614,
+    "rewritten": 0.01665,
+    "restoration_only_k": 31.14082,
+    "suspect_k": 30.07747,
+    "d_nes": 0.00713,
+    "lo": -0.00355,
+    "hi": 0.02626,
+    "p": 0.92911
+   },
+   {
+    "reader": "ppocrv6",
+    "pages": "PDF images",
+    "n": 33,
+    "arm": "sbb",
+    "base": "raw",
+    "nes": 0.8059,
+    "chrf": 0.86735,
+    "inserted": 0.1692,
+    "rewritten": 0.04485,
+    "restoration_only_k": 121.58511,
+    "suspect_k": 115.35575,
+    "d_nes": -0.0101,
+    "lo": -0.02686,
+    "hi": 0.01054,
+    "p": 0.32127
+   },
+   {
+    "reader": "qwen3-vl-8b",
+    "pages": "96",
+    "n": 96,
+    "arm": "raw",
+    "base": "raw",
+    "nes": 0.91545,
+    "chrf": 0.93234,
+    "inserted": 0.02183,
+    "rewritten": 0.00977,
+    "restoration_only_k": 0.0,
+    "suspect_k": 0.0
+   },
+   {
+    "reader": "qwen3-vl-8b",
+    "pages": "96",
+    "n": 96,
+    "arm": "shading",
+    "base": "raw",
+    "nes": 0.92258,
+    "chrf": 0.94175,
+    "inserted": 0.02353,
+    "rewritten": 0.0096,
+    "restoration_only_k": 1.79575,
+    "suspect_k": 4.95494,
+    "d_nes": 0.00713,
+    "lo": -0.02166,
+    "hi": 0.03779,
+    "p": 0.54575
+   },
+   {
+    "reader": "qwen3-vl-8b",
+    "pages": "96",
+    "n": 96,
+    "arm": "gcdrnet",
+    "base": "raw",
+    "nes": 0.92844,
+    "chrf": 0.94239,
+    "inserted": 0.01743,
+    "rewritten": 0.0102,
+    "restoration_only_k": 5.52357,
+    "suspect_k": 8.60337,
+    "d_nes": 0.01299,
+    "lo": -0.02277,
+    "hi": 0.05083,
+    "p": 0.50885
+   },
+   {
+    "reader": "qwen3-vl-8b",
+    "pages": "96",
+    "n": 96,
+    "arm": "sbb",
+    "base": "raw",
+    "nes": 0.91643,
+    "chrf": 0.92658,
+    "inserted": 0.01557,
+    "rewritten": 0.0135,
+    "restoration_only_k": 9.58401,
+    "suspect_k": 11.14736,
+    "d_nes": 0.00098,
+    "lo": -0.02945,
+    "hi": 0.03382,
+    "p": 0.959
+   },
+   {
+    "reader": "qwen3-vl-8b",
+    "pages": "96",
+    "n": 96,
+    "arm": "docres-appearance",
+    "base": "raw",
+    "nes": 0.9051,
+    "chrf": 0.92451,
+    "inserted": 0.02053,
+    "rewritten": 0.00823,
+    "restoration_only_k": 3.00886,
+    "suspect_k": 7.11184,
+    "d_nes": -0.01035,
+    "lo": -0.05388,
+    "hi": 0.0313,
+    "p": 0.63844
+   },
+   {
+    "reader": "qwen3-vl-8b",
+    "pages": "96",
+    "n": 96,
+    "arm": "docres-deshadow",
+    "base": "raw",
+    "nes": 0.92005,
+    "chrf": 0.93754,
+    "inserted": 0.02166,
+    "rewritten": 0.00947,
+    "restoration_only_k": 1.81549,
+    "suspect_k": 2.3198,
+    "d_nes": 0.0046,
+    "lo": -0.02081,
+    "hi": 0.03223,
+    "p": 0.61044
+   },
+   {
+    "reader": "qwen3-vl-8b",
+    "pages": "originals",
+    "n": 63,
+    "arm": "raw",
+    "base": "raw",
+    "nes": 0.89681,
+    "chrf": 0.9181,
+    "inserted": 0.02394,
+    "rewritten": 0.00966,
+    "restoration_only_k": 0.0,
+    "suspect_k": 0.0
+   },
+   {
+    "reader": "qwen3-vl-8b",
+    "pages": "originals",
+    "n": 63,
+    "arm": "shading",
+    "base": "raw",
+    "nes": 0.90756,
+    "chrf": 0.93207,
+    "inserted": 0.02717,
+    "rewritten": 0.00966,
+    "restoration_only_k": 2.34671,
+    "suspect_k": 7.88254,
+    "d_nes": 0.01075,
+    "lo": -0.03433,
+    "hi": 0.05619,
+    "p": 0.56244
+   },
+   {
+    "reader": "qwen3-vl-8b",
+    "pages": "originals",
+    "n": 63,
+    "arm": "gcdrnet",
+    "base": "raw",
+    "nes": 0.90784,
+    "chrf": 0.93083,
+    "inserted": 0.02675,
+    "rewritten": 0.00888,
+    "restoration_only_k": 7.20764,
+    "suspect_k": 12.25299,
+    "d_nes": 0.01103,
+    "lo": -0.03915,
+    "hi": 0.06581,
+    "p": 0.75142
+   },
+   {
+    "reader": "qwen3-vl-8b",
+    "pages": "originals",
+    "n": 63,
+    "arm": "sbb",
+    "base": "raw",
+    "nes": 0.88535,
+    "chrf": 0.90234,
+    "inserted": 0.02334,
+    "rewritten": 0.01218,
+    "restoration_only_k": 11.19149,
+    "suspect_k": 13.78841,
+    "d_nes": -0.01146,
+    "lo": -0.05482,
+    "hi": 0.03328,
+    "p": 0.53375
+   },
+   {
+    "reader": "qwen3-vl-8b",
+    "pages": "originals",
+    "n": 63,
+    "arm": "docres-appearance",
+    "base": "raw",
+    "nes": 0.89129,
+    "chrf": 0.91564,
+    "inserted": 0.02358,
+    "rewritten": 0.00834,
+    "restoration_only_k": 4.24746,
+    "suspect_k": 11.51123,
+    "d_nes": -0.00552,
+    "lo": -0.06488,
+    "hi": 0.05238,
+    "p": 0.71483
+   },
+   {
+    "reader": "qwen3-vl-8b",
+    "pages": "originals",
+    "n": 63,
+    "arm": "docres-deshadow",
+    "base": "raw",
+    "nes": 0.89966,
+    "chrf": 0.92061,
+    "inserted": 0.0237,
+    "rewritten": 0.00924,
+    "restoration_only_k": 1.90254,
+    "suspect_k": 2.33215,
+    "d_nes": 0.00285,
+    "lo": -0.0362,
+    "hi": 0.04524,
+    "p": 0.71973
+   },
+   {
+    "reader": "qwen3-vl-8b",
+    "pages": "PDF images",
+    "n": 33,
+    "arm": "raw",
+    "base": "raw",
+    "nes": 0.95105,
+    "chrf": 0.95952,
+    "inserted": 0.0192,
+    "rewritten": 0.0099,
+    "restoration_only_k": 0.0,
+    "suspect_k": 0.0
+   },
+   {
+    "reader": "qwen3-vl-8b",
+    "pages": "PDF images",
+    "n": 33,
+    "arm": "shading",
+    "base": "raw",
+    "nes": 0.95126,
+    "chrf": 0.96022,
+    "inserted": 0.01898,
+    "rewritten": 0.00953,
+    "restoration_only_k": 1.11508,
+    "suspect_k": 1.33809,
+    "d_nes": 0.00021,
+    "lo": -0.00027,
+    "hi": 0.00094,
+    "p": 0.78682
+   },
+   {
+    "reader": "qwen3-vl-8b",
+    "pages": "PDF images",
+    "n": 33,
+    "arm": "gcdrnet",
+    "base": "raw",
+    "nes": 0.96777,
+    "chrf": 0.96445,
+    "inserted": 0.00578,
+    "rewritten": 0.01185,
+    "restoration_only_k": 3.40316,
+    "suspect_k": 4.00817,
+    "d_nes": 0.01672,
+    "lo": -0.00279,
+    "hi": 0.05394,
+    "p": 0.91861
+   },
+   {
+    "reader": "qwen3-vl-8b",
+    "pages": "PDF images",
+    "n": 33,
+    "arm": "sbb",
+    "base": "raw",
+    "nes": 0.97577,
+    "chrf": 0.97287,
+    "inserted": 0.00585,
+    "rewritten": 0.01515,
+    "restoration_only_k": 7.62207,
+    "suspect_k": 7.92393,
+    "d_nes": 0.02472,
+    "lo": -0.00509,
+    "hi": 0.0706,
+    "p": 0.42276
+   },
+   {
+    "reader": "qwen3-vl-8b",
+    "pages": "PDF images",
+    "n": 33,
+    "arm": "docres-appearance",
+    "base": "raw",
+    "nes": 0.93147,
+    "chrf": 0.94143,
+    "inserted": 0.01673,
+    "rewritten": 0.0081,
+    "restoration_only_k": 1.46131,
+    "suspect_k": 1.61514,
+    "d_nes": -0.01958,
+    "lo": -0.08102,
+    "hi": 0.02296,
+    "p": 0.54595
+   },
+   {
+    "reader": "qwen3-vl-8b",
+    "pages": "PDF images",
+    "n": 33,
+    "arm": "docres-deshadow",
+    "base": "raw",
+    "nes": 0.95899,
+    "chrf": 0.96987,
+    "inserted": 0.01913,
+    "rewritten": 0.00975,
+    "restoration_only_k": 1.71004,
+    "suspect_k": 2.30483,
+    "d_nes": 0.00794,
+    "lo": -0.00085,
+    "hi": 0.02468,
+    "p": 0.65963
+   },
+   {
+    "reader": "glm-ocr",
+    "pages": "96",
+    "n": 96,
+    "arm": "raw",
+    "base": "raw",
+    "nes": 0.84906,
+    "chrf": 0.86648,
+    "inserted": 0.02403,
+    "rewritten": 0.01883,
+    "restoration_only_k": 0.0,
+    "suspect_k": 0.0
+   },
+   {
+    "reader": "glm-ocr",
+    "pages": "96",
+    "n": 96,
+    "arm": "shading",
+    "base": "raw",
+    "nes": 0.84877,
+    "chrf": 0.8663,
+    "inserted": 0.0243,
+    "rewritten": 0.01883,
+    "restoration_only_k": 2.26436,
+    "suspect_k": 2.44127,
+    "d_nes": -0.00029,
+    "lo": -0.00125,
+    "hi": 0.00067,
+    "p": 0.56514
+   },
+   {
+    "reader": "glm-ocr",
+    "pages": "96",
+    "n": 96,
+    "arm": "gcdrnet",
+    "base": "raw",
+    "nes": 0.85386,
+    "chrf": 0.866,
+    "inserted": 0.0205,
+    "rewritten": 0.01893,
+    "restoration_only_k": 4.61435,
+    "suspect_k": 5.14677,
+    "d_nes": 0.00481,
+    "lo": -0.00205,
+    "hi": 0.01565,
+    "p": 0.46925
+   },
+   {
+    "reader": "glm-ocr",
+    "pages": "96",
+    "n": 96,
+    "arm": "sbb",
+    "base": "raw",
+    "nes": 0.84963,
+    "chrf": 0.8592,
+    "inserted": 0.01906,
+    "rewritten": 0.0205,
+    "restoration_only_k": 8.3473,
+    "suspect_k": 8.7397,
+    "d_nes": 0.00057,
+    "lo": -0.00673,
+    "hi": 0.01195,
+    "p": 0.9951
+   },
+   {
+    "reader": "glm-ocr",
+    "pages": "96",
+    "n": 96,
+    "arm": "docres-appearance",
+    "base": "raw",
+    "nes": 0.85004,
+    "chrf": 0.86734,
+    "inserted": 0.02453,
+    "rewritten": 0.01876,
+    "restoration_only_k": 3.64073,
+    "suspect_k": 4.27698,
+    "d_nes": 0.00099,
+    "lo": -0.00158,
+    "hi": 0.00398,
+    "p": 0.53235
+   },
+   {
+    "reader": "glm-ocr",
+    "pages": "96",
+    "n": 96,
+    "arm": "docres-deshadow",
+    "base": "raw",
+    "nes": 0.84986,
+    "chrf": 0.86652,
+    "inserted": 0.0244,
+    "rewritten": 0.01876,
+    "restoration_only_k": 2.89927,
+    "suspect_k": 3.18212,
+    "d_nes": 0.0008,
+    "lo": -0.00082,
+    "hi": 0.00341,
+    "p": 0.80892
+   },
+   {
+    "reader": "glm-ocr",
+    "pages": "originals",
+    "n": 63,
+    "arm": "raw",
+    "base": "raw",
+    "nes": 0.83014,
+    "chrf": 0.8459,
+    "inserted": 0.02999,
+    "rewritten": 0.02148,
+    "restoration_only_k": 0.0,
+    "suspect_k": 0.0
+   },
+   {
+    "reader": "glm-ocr",
+    "pages": "originals",
+    "n": 63,
+    "arm": "shading",
+    "base": "raw",
+    "nes": 0.82991,
+    "chrf": 0.84565,
+    "inserted": 0.02993,
+    "rewritten": 0.02148,
+    "restoration_only_k": 2.71602,
+    "suspect_k": 2.90551,
+    "d_nes": -0.00023,
+    "lo": -0.00147,
+    "hi": 0.00109,
+    "p": 0.75002
+   },
+   {
+    "reader": "glm-ocr",
+    "pages": "originals",
+    "n": 63,
+    "arm": "gcdrnet",
+    "base": "raw",
+    "nes": 0.8304,
+    "chrf": 0.84299,
+    "inserted": 0.02915,
+    "rewritten": 0.0216,
+    "restoration_only_k": 6.37989,
+    "suspect_k": 7.20106,
+    "d_nes": 0.00026,
+    "lo": -0.00377,
+    "hi": 0.00464,
+    "p": 0.90841
+   },
+   {
+    "reader": "glm-ocr",
+    "pages": "originals",
+    "n": 63,
+    "arm": "sbb",
+    "base": "raw",
+    "nes": 0.82418,
+    "chrf": 0.835,
+    "inserted": 0.02687,
+    "rewritten": 0.02316,
+    "restoration_only_k": 10.05793,
+    "suspect_k": 10.75816,
+    "d_nes": -0.00596,
+    "lo": -0.01053,
+    "hi": -0.00164,
+    "p": 0.0106
+   },
+   {
+    "reader": "glm-ocr",
+    "pages": "originals",
+    "n": 63,
+    "arm": "docres-appearance",
+    "base": "raw",
+    "nes": 0.83117,
+    "chrf": 0.84678,
+    "inserted": 0.03053,
+    "rewritten": 0.0213,
+    "restoration_only_k": 4.73485,
+    "suspect_k": 5.74495,
+    "d_nes": 0.00103,
+    "lo": -0.00258,
+    "hi": 0.00528,
+    "p": 0.66043
+   },
+   {
+    "reader": "glm-ocr",
+    "pages": "originals",
+    "n": 63,
+    "arm": "docres-deshadow",
+    "base": "raw",
+    "nes": 0.8317,
+    "chrf": 0.84621,
+    "inserted": 0.03023,
+    "rewritten": 0.0213,
+    "restoration_only_k": 3.02801,
+    "suspect_k": 3.53268,
+    "d_nes": 0.00156,
+    "lo": -0.00078,
+    "hi": 0.00531,
+    "p": 0.59774
+   },
+   {
+    "reader": "glm-ocr",
+    "pages": "PDF images",
+    "n": 33,
+    "arm": "raw",
+    "base": "raw",
+    "nes": 0.88518,
+    "chrf": 0.90578,
+    "inserted": 0.01658,
+    "rewritten": 0.01553,
+    "restoration_only_k": 0.0,
+    "suspect_k": 0.0
+   },
+   {
+    "reader": "glm-ocr",
+    "pages": "PDF images",
+    "n": 33,
+    "arm": "shading",
+    "base": "raw",
+    "nes": 0.88477,
+    "chrf": 0.90572,
+    "inserted": 0.01725,
+    "rewritten": 0.01553,
+    "restoration_only_k": 1.68919,
+    "suspect_k": 1.85006,
+    "d_nes": -0.00041,
+    "lo": -0.00183,
+    "hi": 0.00088,
+    "p": 0.60334
+   },
+   {
+    "reader": "glm-ocr",
+    "pages": "PDF images",
+    "n": 33,
+    "arm": "gcdrnet",
+    "base": "raw",
+    "nes": 0.89866,
+    "chrf": 0.90992,
+    "inserted": 0.00968,
+    "rewritten": 0.0156,
+    "restoration_only_k": 2.3497,
+    "suspect_k": 2.51175,
+    "d_nes": 0.01348,
+    "lo": -0.00214,
+    "hi": 0.04189,
+    "p": 0.51545
+   },
+   {
+    "reader": "glm-ocr",
+    "pages": "PDF images",
+    "n": 33,
+    "arm": "sbb",
+    "base": "raw",
+    "nes": 0.89822,
+    "chrf": 0.90542,
+    "inserted": 0.0093,
+    "rewritten": 0.01718,
+    "restoration_only_k": 6.16683,
+    "suspect_k": 6.16683,
+    "d_nes": 0.01303,
+    "lo": -0.00299,
+    "hi": 0.04241,
+    "p": 0.73273
+   },
+   {
+    "reader": "glm-ocr",
+    "pages": "PDF images",
+    "n": 33,
+    "arm": "docres-appearance",
+    "base": "raw",
+    "nes": 0.88608,
+    "chrf": 0.9066,
+    "inserted": 0.01703,
+    "rewritten": 0.0156,
+    "restoration_only_k": 2.24882,
+    "suspect_k": 2.40945,
+    "d_nes": 0.0009,
+    "lo": -0.00123,
+    "hi": 0.00323,
+    "p": 0.46225
+   },
+   {
+    "reader": "glm-ocr",
+    "pages": "PDF images",
+    "n": 33,
+    "arm": "docres-deshadow",
+    "base": "raw",
+    "nes": 0.88453,
+    "chrf": 0.90529,
+    "inserted": 0.0171,
+    "rewritten": 0.0156,
+    "restoration_only_k": 2.7351,
+    "suspect_k": 2.7351,
+    "d_nes": -0.00065,
+    "lo": -0.00169,
+    "hi": -2e-05,
+    "p": 0.07529
+   },
+   {
+    "reader": "apple-vision",
+    "pages": "probe 30",
+    "n": 30,
+    "arm": "raw",
+    "base": "raw",
+    "nes": 0.61242,
+    "chrf": 0.62757,
+    "inserted": 0.17309,
+    "rewritten": 0.08736,
+    "restoration_only_k": 0.0,
+    "suspect_k": 0.0
+   },
+   {
+    "reader": "apple-vision",
+    "pages": "probe 30",
+    "n": 30,
+    "arm": "resshift-s1",
+    "base": "raw",
+    "nes": 0.56224,
+    "chrf": 0.60449,
+    "inserted": 0.274,
+    "rewritten": 0.11073,
+    "restoration_only_k": 231.39226,
+    "suspect_k": 265.46572,
+    "d_nes": -0.05018,
+    "lo": -0.12423,
+    "hi": 0.02036,
+    "p": 0.19908
+   },
+   {
+    "reader": "apple-vision",
+    "pages": "probe 30",
+    "n": 30,
+    "arm": "resshift-s2",
+    "base": "raw",
+    "nes": 0.56025,
+    "chrf": 0.60438,
+    "inserted": 0.29409,
+    "rewritten": 0.1024,
+    "restoration_only_k": 222.70498,
+    "suspect_k": 259.28521,
+    "d_nes": -0.05218,
+    "lo": -0.12446,
+    "hi": 0.01879,
+    "p": 0.18308
+   },
+   {
+    "reader": "apple-vision",
+    "pages": "probe 30",
+    "n": 30,
+    "arm": "nafdpm-s1",
+    "base": "raw",
+    "nes": 0.59188,
+    "chrf": 0.58588,
+    "inserted": 0.18143,
+    "rewritten": 0.0954,
+    "restoration_only_k": 135.00165,
+    "suspect_k": 153.27626,
+    "d_nes": -0.02054,
+    "lo": -0.06427,
+    "hi": 0.02755,
+    "p": 0.42226
+   },
+   {
+    "reader": "apple-vision",
+    "pages": "probe 30",
+    "n": 30,
+    "arm": "nafdpm-s2",
+    "base": "raw",
+    "nes": 0.58998,
+    "chrf": 0.58979,
+    "inserted": 0.18172,
+    "rewritten": 0.09213,
+    "restoration_only_k": 123.71985,
+    "suspect_k": 145.02808,
+    "d_nes": -0.02245,
+    "lo": -0.06666,
+    "hi": 0.02654,
+    "p": 0.37906
+   },
+   {
+    "reader": "qwen3.6-27b",
+    "pages": "probe 30",
+    "n": 30,
+    "arm": "raw",
+    "base": "raw",
+    "nes": 0.85358,
+    "chrf": 0.90798,
+    "inserted": 0.08513,
+    "rewritten": 0.0323,
+    "restoration_only_k": 0.0,
+    "suspect_k": 0.0
+   },
+   {
+    "reader": "qwen3.6-27b",
+    "pages": "probe 30",
+    "n": 30,
+    "arm": "resshift-s1",
+    "base": "raw",
+    "nes": 0.78317,
+    "chrf": 0.84931,
+    "inserted": 0.13395,
+    "rewritten": 0.04316,
+    "restoration_only_k": 63.87115,
+    "suspect_k": 65.6762,
+    "d_nes": -0.07041,
+    "lo": -0.10813,
+    "hi": -0.03561,
+    "p": 0.0004
+   },
+   {
+    "reader": "qwen3.6-27b",
+    "pages": "probe 30",
+    "n": 30,
+    "arm": "resshift-s2",
+    "base": "raw",
+    "nes": 0.78065,
+    "chrf": 0.85476,
+    "inserted": 0.16252,
+    "rewritten": 0.0445,
+    "restoration_only_k": 60.34602,
+    "suspect_k": 58.13149,
+    "d_nes": -0.07293,
+    "lo": -0.12002,
+    "hi": -0.03207,
+    "p": 0.0017
+   },
+   {
+    "reader": "qwen3.6-27b",
+    "pages": "probe 30",
+    "n": 30,
+    "arm": "nafdpm-s1",
+    "base": "raw",
+    "nes": 0.86891,
+    "chrf": 0.90391,
+    "inserted": 0.06742,
+    "rewritten": 0.03185,
+    "restoration_only_k": 11.81102,
+    "suspect_k": 14.4357,
+    "d_nes": 0.01533,
+    "lo": -0.00689,
+    "hi": 0.04621,
+    "p": 0.41176
+   },
+   {
+    "reader": "qwen3.6-27b",
+    "pages": "probe 30",
+    "n": 30,
+    "arm": "nafdpm-s2",
+    "base": "raw",
+    "nes": 0.85372,
+    "chrf": 0.90112,
+    "inserted": 0.07977,
+    "rewritten": 0.03185,
+    "restoration_only_k": 13.71049,
+    "suspect_k": 16.74123,
+    "d_nes": 0.00014,
+    "lo": -0.01132,
+    "hi": 0.01446,
+    "p": 0.9862
+   }
+  ],
+  "chart_rows": [
+   {
+    "route": "apple-vision",
+    "arm": "shading",
+    "group": "the 96",
+    "n": 96,
+    "ok": 96,
+    "nes": 0.80727,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "apple-vision",
+    "arm": "shading",
+    "group": "kind:handwritten",
+    "n": 16,
+    "ok": 16,
+    "nes": 0.56445,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "apple-vision",
+    "arm": "shading",
+    "group": "kind:mixed",
+    "n": 2,
+    "ok": 2,
+    "nes": 0.59698,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "apple-vision",
+    "arm": "shading",
+    "group": "kind:printed",
+    "n": 28,
+    "ok": 28,
+    "nes": 0.76784,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "apple-vision",
+    "arm": "shading",
+    "group": "kind:typewritten",
+    "n": 50,
+    "ok": 50,
+    "nes": 0.91547,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "apple-vision",
+    "arm": "gcdrnet",
+    "group": "the 96",
+    "n": 96,
+    "ok": 96,
+    "nes": 0.7964,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "apple-vision",
+    "arm": "gcdrnet",
+    "group": "kind:handwritten",
+    "n": 16,
+    "ok": 16,
+    "nes": 0.60426,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "apple-vision",
+    "arm": "gcdrnet",
+    "group": "kind:mixed",
+    "n": 2,
+    "ok": 2,
+    "nes": 0.70877,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "apple-vision",
+    "arm": "gcdrnet",
+    "group": "kind:printed",
+    "n": 28,
+    "ok": 28,
+    "nes": 0.74307,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "apple-vision",
+    "arm": "gcdrnet",
+    "group": "kind:typewritten",
+    "n": 50,
+    "ok": 50,
+    "nes": 0.89126,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "apple-vision",
+    "arm": "sbb",
+    "group": "the 96",
+    "n": 96,
+    "ok": 96,
+    "nes": 0.76085,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "apple-vision",
+    "arm": "sbb",
+    "group": "kind:handwritten",
+    "n": 16,
+    "ok": 16,
+    "nes": 0.52919,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "apple-vision",
+    "arm": "sbb",
+    "group": "kind:mixed",
+    "n": 2,
+    "ok": 2,
+    "nes": 0.56498,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "apple-vision",
+    "arm": "sbb",
+    "group": "kind:printed",
+    "n": 28,
+    "ok": 28,
+    "nes": 0.73793,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "apple-vision",
+    "arm": "sbb",
+    "group": "kind:typewritten",
+    "n": 50,
+    "ok": 50,
+    "nes": 0.85564,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "apple-vision",
+    "arm": "docres-appearance",
+    "group": "the 96",
+    "n": 96,
+    "ok": 96,
+    "nes": 0.8199,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "apple-vision",
+    "arm": "docres-appearance",
+    "group": "kind:handwritten",
+    "n": 16,
+    "ok": 16,
+    "nes": 0.59915,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "apple-vision",
+    "arm": "docres-appearance",
+    "group": "kind:mixed",
+    "n": 2,
+    "ok": 2,
+    "nes": 0.71856,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "apple-vision",
+    "arm": "docres-appearance",
+    "group": "kind:printed",
+    "n": 28,
+    "ok": 28,
+    "nes": 0.77275,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "apple-vision",
+    "arm": "docres-appearance",
+    "group": "kind:typewritten",
+    "n": 50,
+    "ok": 50,
+    "nes": 0.92101,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "apple-vision",
+    "arm": "docres-deshadow",
+    "group": "the 96",
+    "n": 96,
+    "ok": 96,
+    "nes": 0.81606,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "apple-vision",
+    "arm": "docres-deshadow",
+    "group": "kind:handwritten",
+    "n": 16,
+    "ok": 16,
+    "nes": 0.56637,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "apple-vision",
+    "arm": "docres-deshadow",
+    "group": "kind:mixed",
+    "n": 2,
+    "ok": 2,
+    "nes": 0.72709,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "apple-vision",
+    "arm": "docres-deshadow",
+    "group": "kind:printed",
+    "n": 28,
+    "ok": 28,
+    "nes": 0.78246,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "apple-vision",
+    "arm": "docres-deshadow",
+    "group": "kind:typewritten",
+    "n": 50,
+    "ok": 50,
+    "nes": 0.91833,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "ppocrv6",
+    "arm": "shading",
+    "group": "the 96",
+    "n": 96,
+    "ok": 96,
+    "nes": 0.766,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "ppocrv6",
+    "arm": "shading",
+    "group": "kind:handwritten",
+    "n": 16,
+    "ok": 16,
+    "nes": 0.61907,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "ppocrv6",
+    "arm": "shading",
+    "group": "kind:mixed",
+    "n": 2,
+    "ok": 2,
+    "nes": 0.57988,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "ppocrv6",
+    "arm": "shading",
+    "group": "kind:printed",
+    "n": 28,
+    "ok": 28,
+    "nes": 0.61417,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "ppocrv6",
+    "arm": "shading",
+    "group": "kind:typewritten",
+    "n": 50,
+    "ok": 50,
+    "nes": 0.9055,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "ppocrv6",
+    "arm": "gcdrnet",
+    "group": "the 96",
+    "n": 96,
+    "ok": 96,
+    "nes": 0.76528,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "ppocrv6",
+    "arm": "gcdrnet",
+    "group": "kind:handwritten",
+    "n": 16,
+    "ok": 16,
+    "nes": 0.62714,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "ppocrv6",
+    "arm": "gcdrnet",
+    "group": "kind:mixed",
+    "n": 2,
+    "ok": 2,
+    "nes": 0.61617,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "ppocrv6",
+    "arm": "gcdrnet",
+    "group": "kind:printed",
+    "n": 28,
+    "ok": 28,
+    "nes": 0.61207,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "ppocrv6",
+    "arm": "gcdrnet",
+    "group": "kind:typewritten",
+    "n": 50,
+    "ok": 50,
+    "nes": 0.90125,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "ppocrv6",
+    "arm": "sbb",
+    "group": "the 96",
+    "n": 96,
+    "ok": 96,
+    "nes": 0.74966,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "ppocrv6",
+    "arm": "sbb",
+    "group": "kind:handwritten",
+    "n": 16,
+    "ok": 16,
+    "nes": 0.59477,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "ppocrv6",
+    "arm": "sbb",
+    "group": "kind:mixed",
+    "n": 2,
+    "ok": 2,
+    "nes": 0.60387,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "ppocrv6",
+    "arm": "sbb",
+    "group": "kind:printed",
+    "n": 28,
+    "ok": 28,
+    "nes": 0.60847,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "ppocrv6",
+    "arm": "sbb",
+    "group": "kind:typewritten",
+    "n": 50,
+    "ok": 50,
+    "nes": 0.88412,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "qwen3-vl-8b",
+    "arm": "shading",
+    "group": "the 96",
+    "n": 96,
+    "ok": 95,
+    "nes": 0.92258,
+    "prompt_tokens": 391370,
+    "completion_tokens": 52761
+   },
+   {
+    "route": "qwen3-vl-8b",
+    "arm": "shading",
+    "group": "kind:handwritten",
+    "n": 16,
+    "ok": 16,
+    "nes": 0.90384,
+    "prompt_tokens": 72896,
+    "completion_tokens": 3476
+   },
+   {
+    "route": "qwen3-vl-8b",
+    "arm": "shading",
+    "group": "kind:mixed",
+    "n": 2,
+    "ok": 2,
+    "nes": 0.63585,
+    "prompt_tokens": 9112,
+    "completion_tokens": 479
+   },
+   {
+    "route": "qwen3-vl-8b",
+    "arm": "shading",
+    "group": "kind:printed",
+    "n": 28,
+    "ok": 28,
+    "nes": 0.93201,
+    "prompt_tokens": 105891,
+    "completion_tokens": 18623
+   },
+   {
+    "route": "qwen3-vl-8b",
+    "arm": "shading",
+    "group": "kind:typewritten",
+    "n": 50,
+    "ok": 49,
+    "nes": 0.93477,
+    "prompt_tokens": 203471,
+    "completion_tokens": 30183
+   },
+   {
+    "route": "qwen3-vl-8b",
+    "arm": "gcdrnet",
+    "group": "the 96",
+    "n": 96,
+    "ok": 95,
+    "nes": 0.92844,
+    "prompt_tokens": 391370,
+    "completion_tokens": 52571
+   },
+   {
+    "route": "qwen3-vl-8b",
+    "arm": "gcdrnet",
+    "group": "kind:handwritten",
+    "n": 16,
+    "ok": 15,
+    "nes": 0.80757,
+    "prompt_tokens": 72896,
+    "completion_tokens": 11602
+   },
+   {
+    "route": "qwen3-vl-8b",
+    "arm": "gcdrnet",
+    "group": "kind:mixed",
+    "n": 2,
+    "ok": 2,
+    "nes": 0.60531,
+    "prompt_tokens": 9112,
+    "completion_tokens": 478
+   },
+   {
+    "route": "qwen3-vl-8b",
+    "arm": "gcdrnet",
+    "group": "kind:printed",
+    "n": 28,
+    "ok": 28,
+    "nes": 0.94922,
+    "prompt_tokens": 105891,
+    "completion_tokens": 18535
+   },
+   {
+    "route": "qwen3-vl-8b",
+    "arm": "gcdrnet",
+    "group": "kind:typewritten",
+    "n": 50,
+    "ok": 50,
+    "nes": 0.96841,
+    "prompt_tokens": 203471,
+    "completion_tokens": 21956
+   },
+   {
+    "route": "qwen3-vl-8b",
+    "arm": "sbb",
+    "group": "the 96",
+    "n": 96,
+    "ok": 94,
+    "nes": 0.91643,
+    "prompt_tokens": 391370,
+    "completion_tokens": 60138
+   },
+   {
+    "route": "qwen3-vl-8b",
+    "arm": "sbb",
+    "group": "kind:handwritten",
+    "n": 16,
+    "ok": 15,
+    "nes": 0.80475,
+    "prompt_tokens": 72896,
+    "completion_tokens": 11505
+   },
+   {
+    "route": "qwen3-vl-8b",
+    "arm": "sbb",
+    "group": "kind:mixed",
+    "n": 2,
+    "ok": 2,
+    "nes": 0.54633,
+    "prompt_tokens": 9112,
+    "completion_tokens": 483
+   },
+   {
+    "route": "qwen3-vl-8b",
+    "arm": "sbb",
+    "group": "kind:printed",
+    "n": 28,
+    "ok": 27,
+    "nes": 0.90831,
+    "prompt_tokens": 105891,
+    "completion_tokens": 26160
+   },
+   {
+    "route": "qwen3-vl-8b",
+    "arm": "sbb",
+    "group": "kind:typewritten",
+    "n": 50,
+    "ok": 50,
+    "nes": 0.97152,
+    "prompt_tokens": 203471,
+    "completion_tokens": 21990
+   },
+   {
+    "route": "qwen3-vl-8b",
+    "arm": "docres-appearance",
+    "group": "the 96",
+    "n": 96,
+    "ok": 93,
+    "nes": 0.9051,
+    "prompt_tokens": 391370,
+    "completion_tokens": 67956
+   },
+   {
+    "route": "qwen3-vl-8b",
+    "arm": "docres-appearance",
+    "group": "kind:handwritten",
+    "n": 16,
+    "ok": 16,
+    "nes": 0.89678,
+    "prompt_tokens": 72896,
+    "completion_tokens": 3451
+   },
+   {
+    "route": "qwen3-vl-8b",
+    "arm": "docres-appearance",
+    "group": "kind:mixed",
+    "n": 2,
+    "ok": 2,
+    "nes": 0.6002,
+    "prompt_tokens": 9112,
+    "completion_tokens": 468
+   },
+   {
+    "route": "qwen3-vl-8b",
+    "arm": "docres-appearance",
+    "group": "kind:printed",
+    "n": 28,
+    "ok": 27,
+    "nes": 0.90654,
+    "prompt_tokens": 105891,
+    "completion_tokens": 26238
+   },
+   {
+    "route": "qwen3-vl-8b",
+    "arm": "docres-appearance",
+    "group": "kind:typewritten",
+    "n": 50,
+    "ok": 48,
+    "nes": 0.91916,
+    "prompt_tokens": 203471,
+    "completion_tokens": 37799
+   },
+   {
+    "route": "qwen3-vl-8b",
+    "arm": "docres-deshadow",
+    "group": "the 96",
+    "n": 96,
+    "ok": 94,
+    "nes": 0.92005,
+    "prompt_tokens": 391370,
+    "completion_tokens": 60642
+   },
+   {
+    "route": "qwen3-vl-8b",
+    "arm": "docres-deshadow",
+    "group": "kind:handwritten",
+    "n": 16,
+    "ok": 15,
+    "nes": 0.84732,
+    "prompt_tokens": 72896,
+    "completion_tokens": 11513
+   },
+   {
+    "route": "qwen3-vl-8b",
+    "arm": "docres-deshadow",
+    "group": "kind:mixed",
+    "n": 2,
+    "ok": 2,
+    "nes": 0.62112,
+    "prompt_tokens": 9112,
+    "completion_tokens": 488
+   },
+   {
+    "route": "qwen3-vl-8b",
+    "arm": "docres-deshadow",
+    "group": "kind:printed",
+    "n": 28,
+    "ok": 27,
+    "nes": 0.91168,
+    "prompt_tokens": 105891,
+    "completion_tokens": 26248
+   },
+   {
+    "route": "qwen3-vl-8b",
+    "arm": "docres-deshadow",
+    "group": "kind:typewritten",
+    "n": 50,
+    "ok": 50,
+    "nes": 0.95998,
+    "prompt_tokens": 203471,
+    "completion_tokens": 22393
+   },
+   {
+    "route": "glm-ocr",
+    "arm": "shading",
+    "group": "the 96",
+    "n": 96,
+    "ok": 95,
+    "nes": 0.84877,
+    "prompt_tokens": 245382,
+    "completion_tokens": 41367
+   },
+   {
+    "route": "glm-ocr",
+    "arm": "shading",
+    "group": "kind:handwritten",
+    "n": 16,
+    "ok": 15,
+    "nes": 0.70108,
+    "prompt_tokens": 45929,
+    "completion_tokens": 2733
+   },
+   {
+    "route": "glm-ocr",
+    "arm": "shading",
+    "group": "kind:mixed",
+    "n": 2,
+    "ok": 2,
+    "nes": 0.6619,
+    "prompt_tokens": 3548,
+    "completion_tokens": 358
+   },
+   {
+    "route": "glm-ocr",
+    "arm": "shading",
+    "group": "kind:printed",
+    "n": 28,
+    "ok": 28,
+    "nes": 0.82759,
+    "prompt_tokens": 71335,
+    "completion_tokens": 17558
+   },
+   {
+    "route": "glm-ocr",
+    "arm": "shading",
+    "group": "kind:typewritten",
+    "n": 50,
+    "ok": 50,
+    "nes": 0.91536,
+    "prompt_tokens": 124570,
+    "completion_tokens": 20718
+   },
+   {
+    "route": "glm-ocr",
+    "arm": "gcdrnet",
+    "group": "the 96",
+    "n": 96,
+    "ok": 95,
+    "nes": 0.85386,
+    "prompt_tokens": 245382,
+    "completion_tokens": 45265
+   },
+   {
+    "route": "glm-ocr",
+    "arm": "gcdrnet",
+    "group": "kind:handwritten",
+    "n": 16,
+    "ok": 15,
+    "nes": 0.69636,
+    "prompt_tokens": 45929,
+    "completion_tokens": 2600
+   },
+   {
+    "route": "glm-ocr",
+    "arm": "gcdrnet",
+    "group": "kind:mixed",
+    "n": 2,
+    "ok": 2,
+    "nes": 0.66864,
+    "prompt_tokens": 3548,
+    "completion_tokens": 4427
+   },
+   {
+    "route": "glm-ocr",
+    "arm": "gcdrnet",
+    "group": "kind:printed",
+    "n": 28,
+    "ok": 28,
+    "nes": 0.83064,
+    "prompt_tokens": 71335,
+    "completion_tokens": 17590
+   },
+   {
+    "route": "glm-ocr",
+    "arm": "gcdrnet",
+    "group": "kind:typewritten",
+    "n": 50,
+    "ok": 50,
+    "nes": 0.92468,
+    "prompt_tokens": 124570,
+    "completion_tokens": 20648
+   },
+   {
+    "route": "glm-ocr",
+    "arm": "sbb",
+    "group": "the 96",
+    "n": 96,
+    "ok": 95,
+    "nes": 0.84963,
+    "prompt_tokens": 245382,
+    "completion_tokens": 45059
+   },
+   {
+    "route": "glm-ocr",
+    "arm": "sbb",
+    "group": "kind:handwritten",
+    "n": 16,
+    "ok": 15,
+    "nes": 0.6898,
+    "prompt_tokens": 45929,
+    "completion_tokens": 2526
+   },
+   {
+    "route": "glm-ocr",
+    "arm": "sbb",
+    "group": "kind:mixed",
+    "n": 2,
+    "ok": 2,
+    "nes": 0.6205,
+    "prompt_tokens": 3548,
+    "completion_tokens": 369
+   },
+   {
+    "route": "glm-ocr",
+    "arm": "sbb",
+    "group": "kind:printed",
+    "n": 28,
+    "ok": 28,
+    "nes": 0.82831,
+    "prompt_tokens": 71335,
+    "completion_tokens": 17517
+   },
+   {
+    "route": "glm-ocr",
+    "arm": "sbb",
+    "group": "kind:typewritten",
+    "n": 50,
+    "ok": 50,
+    "nes": 0.92188,
+    "prompt_tokens": 124570,
+    "completion_tokens": 24647
+   },
+   {
+    "route": "glm-ocr",
+    "arm": "docres-appearance",
+    "group": "the 96",
+    "n": 96,
+    "ok": 95,
+    "nes": 0.85004,
+    "prompt_tokens": 245382,
+    "completion_tokens": 41328
+   },
+   {
+    "route": "glm-ocr",
+    "arm": "docres-appearance",
+    "group": "kind:handwritten",
+    "n": 16,
+    "ok": 15,
+    "nes": 0.69768,
+    "prompt_tokens": 45929,
+    "completion_tokens": 2660
+   },
+   {
+    "route": "glm-ocr",
+    "arm": "docres-appearance",
+    "group": "kind:mixed",
+    "n": 2,
+    "ok": 2,
+    "nes": 0.66422,
+    "prompt_tokens": 3548,
+    "completion_tokens": 346
+   },
+   {
+    "route": "glm-ocr",
+    "arm": "docres-appearance",
+    "group": "kind:printed",
+    "n": 28,
+    "ok": 28,
+    "nes": 0.83195,
+    "prompt_tokens": 71335,
+    "completion_tokens": 17587
+   },
+   {
+    "route": "glm-ocr",
+    "arm": "docres-appearance",
+    "group": "kind:typewritten",
+    "n": 50,
+    "ok": 50,
+    "nes": 0.91637,
+    "prompt_tokens": 124570,
+    "completion_tokens": 20735
+   },
+   {
+    "route": "glm-ocr",
+    "arm": "docres-deshadow",
+    "group": "the 96",
+    "n": 96,
+    "ok": 95,
+    "nes": 0.84986,
+    "prompt_tokens": 245382,
+    "completion_tokens": 41414
+   },
+   {
+    "route": "glm-ocr",
+    "arm": "docres-deshadow",
+    "group": "kind:handwritten",
+    "n": 16,
+    "ok": 15,
+    "nes": 0.70125,
+    "prompt_tokens": 45929,
+    "completion_tokens": 2743
+   },
+   {
+    "route": "glm-ocr",
+    "arm": "docres-deshadow",
+    "group": "kind:mixed",
+    "n": 2,
+    "ok": 2,
+    "nes": 0.64793,
+    "prompt_tokens": 3548,
+    "completion_tokens": 354
+   },
+   {
+    "route": "glm-ocr",
+    "arm": "docres-deshadow",
+    "group": "kind:printed",
+    "n": 28,
+    "ok": 28,
+    "nes": 0.83228,
+    "prompt_tokens": 71335,
+    "completion_tokens": 17560
+   },
+   {
+    "route": "glm-ocr",
+    "arm": "docres-deshadow",
+    "group": "kind:typewritten",
+    "n": 50,
+    "ok": 50,
+    "nes": 0.91534,
+    "prompt_tokens": 124570,
+    "completion_tokens": 20757
    }
   ]
  },

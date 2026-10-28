@@ -3,18 +3,18 @@
 
   V=~/Library/Caches/ArchiveSuiteRehearsal/enh-dewarp/venv/bin/python
   $V enh_ocr_input.py mac-arms   # shading, GCDRNet and SBB on the Mac (their own venvs)
-  $V enh_ocr_input.py stage      # the FarmShare pack: the Mac's arms, regions, code, weights
-  $V enh_ocr_input.py fetch      # the enhanced images and every reading back from FarmShare
+  $V enh_ocr_input.py stage      # the cluster pack: the Mac's arms, regions, code, weights
+  $V enh_ocr_input.py fetch      # link the cluster's enhanced images from the collected Sherlock tree (COLLECTED)
   $V enh_ocr_input.py vision     # Apple Vision on every arm's image (segbench-dewarp lines)
   $V enh_ocr_input.py report     # segbench-results/enh-ocr-input.md, -pages.csv, .json
 
 Arms (enh_ocr_arms.py says how each is made) all start from the panel's frozen raw image, the 2400 px JPEG 90 every
 saved route read, and keep its size, so a word box, a PP-DocLayoutV3 region or a mark box found on raw applies to
 every arm as it is. raw, shading, gcdrnet and sbb are made here; docres-appearance and docres-deshadow on a
-FarmShare GPU (`corpus/enh_ocr_cluster.py enhance`), because DocRes at 1,600 square does not fit this Mac. Each
-output is saved as JPEG 90, as raw was.
+Sherlock GPU (`corpus/enh_ocr_cluster.py enhance`; the pack was staged for FarmShare first), because DocRes at
+1,600 square does not fit this Mac. Each output is saved as JPEG 90, as raw was.
 
-Readers: Apple Vision here with the app's settings; on FarmShare, in one run after the enhancement job,
+Readers: Apple Vision here with the app's settings; on Sherlock, in one run after the enhancement job,
 PP-OCRv6 (truth96's pinned pipeline), Qwen3-VL 8B (whole page, the panel prompt) and GLM-OCR on PP-DocLayoutV3's
 regions of the raw image (the regions run's detector output, crops of each arm's image at the same boxes), each
 reading raw again so every comparison is inside one run. The two-seed hallucination probe: ResShift (PreP-OCR) and
@@ -33,8 +33,7 @@ PDF images apart and by capture-defect tag (capture-tags.json, W46.fix-capture-t
     gate an app would apply with no truth;
   for the probe, the reseeding instability: words that differ between the two seeds' readings, per 1,000 words.
 
-Page images and raw text stay in CACHE; committed results hold page ids and numbers only. No network beyond the
-FarmShare socket, no money.
+Page images and raw text stay in CACHE; committed results hold page ids and numbers only. No network, no money.
 """
 from __future__ import annotations
 import argparse
@@ -64,11 +63,19 @@ PROBE = ('resshift', 'nafdpm')
 SEEDS = (1, 2)
 PROBE_ARMS = tuple(f'{m}-s{s}' for m in PROBE for s in SEEDS)
 PROBE_N = 30
-FS_ROOT = '/scratch/users/cp1/fs-ocr/enh-ocr-input-20261022'
-FETCHED = CACHE / 'farmshare' / 'out'  # a copy of FS_ROOT/out
+FS_ROOT = '/scratch/users/cp1/fs-ocr/enh-ocr-input-20261022'  # the pack's root, on FarmShare and then Sherlock
+# Sherlock's run of the pack, collected by an owner session through the DTN (2026-10-24; no engine session contacts
+# Sherlock): out/<reader>/<arm>/<page>.json, glm/out/glm-ocr/pp-doclayoutv3/<arm>/<page>/NNN.json,
+# probe/out/qwen3.6-27b/<arm>/<page>.json and images/<arm>/<page>.jpg.
+COLLECTED = Path(os.environ.get('ENH_OCR_COLLECTED', Path.home() / 'Library/Caches/ArchiveSuiteRehearsal/'
+                                'sherlock-results/enh-ocr-input-20261022'))
+FETCHED = COLLECTED / 'out'
 # reader -> (farmshare_expanded_report mode, what it reads)
 READERS = {'ppocrv6': 'pipeline', 'qwen3-vl-8b': 'panel', 'glm-ocr': 'native'}
 PROBE_READER = 'qwen3.6-27b'
+# The arms each cluster reader was given. PP-OCRv6's job (49137314) read a list built before DocRes's images were
+# made, so it has the four Mac arms only; its DocRes rows are reported as not run, not as pending.
+READER_ARMS = {'ppocrv6': ('raw', *MAC_ARMS)}
 TAGS = {'shadow or low light': ('shadow', 'low_light'), 'faint ink': ('faint_ink',), 'show-through': ('show_through',),
         'colour': ('colour',), 'blur': ('defocus', 'motion_blur'), 'glare': ('glare',)}
 
@@ -213,7 +220,7 @@ def probe_pages():
     return sorted(by, key=lambda p: (statistics.median(by[p]), p))[:PROBE_N]
 
 
-# ---------- FarmShare ----------
+# ---------- the cluster ----------
 
 def stage():
     """CACHE/stage: images/raw and images/shading, pages.json (the 96 and the probe's 30), regions, the DocRes
@@ -250,49 +257,66 @@ def stage():
     print(out)
 
 
-def ssh_opts():
-    sock = Path.home() / '.ssh/cm-farmshare'
-    return ['-o', f'ControlPath={sock}', '-o', 'ControlMaster=no', '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=5',
-            '-o', 'ProxyCommand=false']
-
-
 def fetch():
-    """FS_ROOT/out and FS_ROOT/images (the cluster's arms) to CACHE, over the owner's FarmShare socket."""
-    for sub, dest in (('out', FETCHED), ('images', CACHE / 'images')):
-        dest.mkdir(parents=True, exist_ok=True)
-        subprocess.run(['gtimeout', '--foreground', '1800', 'rsync', '-a', '-e', 'ssh ' + ' '.join(ssh_opts()),
-                        f'cp1@login.farmshare.stanford.edu:{FS_ROOT}/{sub}/', f'{dest}/'], check=True)
-    print(FETCHED)
+    """Link the cluster's arms (DocRes and the probe's restorers) from COLLECTED/images into CACHE/images, checking
+    each keeps the raw image's size. The Mac's own arms are already there (the collected copies are the staged ones)."""
+    from PIL import Image
+    n = 0
+    for arm, ids in [(a, pages()) for a in CLUSTER_ARMS] + [(a, probe_pages()) for a in PROBE_ARMS]:
+        for p in ids:
+            src, dst = COLLECTED / 'images' / arm / (p + '.jpg'), arm_image(arm, p)
+            if dst.exists():
+                continue
+            with Image.open(src) as a, Image.open(raw_image(p)) as b:
+                if a.size != b.size:
+                    raise SystemExit(f'{arm} {p}: {a.size} is not the raw size {b.size}')
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            dst.symlink_to(src)
+            n += 1
+    print(n, 'images linked from', COLLECTED / 'images')
 
 
 def cluster_readings():
-    """{reader: {(arm, page): text or None}}; None = no record (not read yet). A failed reading is ''."""
+    """({reader: {(arm, page): text or None}}, {reader: {(arm, page): (prompt, completion tokens)}}); None = no
+    record. A failed or capped reading is ''."""
     sys.path.insert(0, str(Path(__file__).resolve().parent / 'corpus'))
     import farmshare_expanded_report as X
     import regions as RG
-    out = {}
+
+    def toks(recs):
+        return (sum((r.get('usage') or {}).get('prompt_tokens') or 0 for r in recs),
+                sum((r.get('usage') or {}).get('completion_tokens') or 0 for r in recs))
+
+    glm_regions = {'pp-doclayoutv3': json.loads((COLLECTED / 'glm' / 'regions' / 'pp-doclayoutv3.json').read_text())['pages']}
+    out, tokens = {}, {}
     for route, mode in READERS.items():
-        if not (FETCHED / route).exists():
+        if not (FETCHED / route).exists() and not (COLLECTED / 'glm' / 'out' / route).exists():
             continue
-        by = {}
-        for arm in ARMS:
+        by, tk = {}, {}
+        for arm in READER_ARMS.get(route, ARMS):
             for p in pages():
                 if route == 'glm-ocr':
-                    recs = RG.crop_records(FETCHED.parent, route, arm, p) if (FETCHED / route / arm / p).is_dir() else None
-                    by[arm, p] = RG.page_reading('pp-doclayoutv3', recs, None, mode, X.reading)['text'] if recs else None
+                    # every kept region's crop must be there (validate_crops refuses a gap); a page where the
+                    # detector kept none (p047) reads as empty and scores 0, the regions run's convention
+                    recs = RG.crop_records(COLLECTED / 'glm', route, f'pp-doclayoutv3/{arm}', p)
+                    n = RG.validate_crops(route, 'pp-doclayoutv3', f'{arm}/{p}', recs, glm_regions)
+                    by[arm, p] = RG.page_reading('pp-doclayoutv3', recs, n, mode, X.reading)['text']
+                    tk[arm, p] = toks(recs)
                 else:
                     f = FETCHED / route / arm / (p + '.json')
-                    by[arm, p] = X.reading(json.loads(f.read_text()), mode) if f.exists() else None
-        out[route] = by
+                    rec = json.loads(f.read_text()) if f.exists() else None
+                    by[arm, p] = X.reading(rec, mode) if rec else None
+                    tk[arm, p] = toks([rec] if rec else [])
+        out[route], tokens[route] = by, tk
     route = PROBE_READER
-    if (FETCHED / route).exists():
+    if (COLLECTED / 'probe' / 'out' / route).exists():
         by = {}
         for arm in ('raw', *PROBE_ARMS):
             for p in probe_pages():
-                f = FETCHED / route / arm / (p + '.json')
+                f = COLLECTED / 'probe' / 'out' / route / arm / (p + '.json')
                 by[arm, p] = X.reading(json.loads(f.read_text()), 'panel') if f.exists() else None
         out[route] = by
-    return out
+    return out, tokens
 
 
 # ---------- Vision ----------
@@ -384,6 +408,26 @@ def summary(by, groups, arms, reader, base='raw'):
     return out
 
 
+def chart_rows(by, reader, arms, ids, tokens):
+    """The full-96 and panel-kind rows for the bench page's OCR charts, one per enhanced arm (raw is each reader's
+    own route there). ok = a reading with text; tokens include caps."""
+    kind = {r['page']: r['kind'] for r in P.rows()}
+    groups = {'the 96': ids, **{f'kind:{k}': [p for p in ids if kind[p] == k] for k in sorted({kind[p] for p in ids})}}
+    out = []
+    for arm in arms:
+        if arm == 'raw':
+            continue
+        for group, ps in groups.items():
+            rr = [by[arm, p] for p in ps if (arm, p) in by]
+            if len(rr) != len(ps):
+                raise SystemExit(f'{reader} {arm}: {len(rr)} of {len(ps)} pages in {group}')
+            tk = [tokens.get((arm, p), (0, 0)) for p in ps]
+            out.append({'route': reader, 'arm': arm, 'group': group, 'n': len(rr), 'ok': sum(r['read'] > 0 for r in rr),
+                        'nes': round(statistics.mean(r['nes'] for r in rr), 5),
+                        'prompt_tokens': sum(a for a, _ in tk), 'completion_tokens': sum(b for _, b in tk)})
+    return out
+
+
 FIELDS = ['reader', 'page', 'arm', 'source', 'nes', 'raw_nes', 'chrf', 'words', 'read', 'missed', 'added', 'inserted',
           'rewritten', 'restoration_only', 'suspect', 'suspect_k']
 THRESHOLDS = (0, 5, 10, 20, 40, 80, 160, 1e9)
@@ -395,7 +439,8 @@ def report():
     ids = pages()
     vision_raw = {p: vision_text('raw', p) for p in ids}
     readers = {'apple-vision': {(a, p): vision_text(a, p) for a in ARMS for p in ids}}
-    readers.update(cluster_readings())
+    cluster, tokens = cluster_readings()
+    readers.update(cluster)
     origin = lambda p: 'original' if panel[p]['source'] == 'original' else 'pdf image'
     groups = {'96': ids, 'originals': [p for p in ids if origin(p) == 'original'],
               'PDF images': [p for p in ids if origin(p) != 'original']}
@@ -406,26 +451,30 @@ def report():
          'bootstrap interval and a permutation p. inserted and rewritten are per truth word, from a word alignment; '
          'restoration-only words are in neither the truth nor the same reader\'s raw reading; suspect words are in '
          'neither the same reader\'s raw reading nor Vision\'s (no truth needed), both per 1,000 words read.', '']
-    allrows, bench, pending = [], [], []
+    allrows, bench, pending, charts = [], [], [], []
     for reader in (*['apple-vision'], *READERS):
         if reader not in readers:
             pending.append(reader)
-            L += [f'## {reader}', '', 'Not read yet (the FarmShare run has not been fetched).', '']
+            L += [f'## {reader}', '', 'Not read yet (no collected cluster reading).', '']
             continue
         rd = readers[reader]
+        arms = READER_ARMS.get(reader, ARMS)
         missing = sum(v is None for (a, p), v in rd.items())
-        by = measure(rd, ARMS, ids, vision_raw)
+        by = measure(rd, arms, ids, vision_raw)
         if missing:
             pending.append(reader)
         L += [f'## {reader}' + (f' ({missing} of {len(rd)} images not read yet)' if missing else ''), '']
-        L += table(by, groups, ARMS) + ['', 'By capture-defect tag (any page carrying the tag):', '']
-        L += table(by, tag_groups, ARMS)
+        if arms != ARMS:
+            L += ['Not run: ' + ', '.join(a for a in ARMS if a not in arms) + ' (its job read a list made before '
+                  'those images existed).', '']
+        L += table(by, groups, arms) + ['', 'By capture-defect tag (any page carrying the tag):', '']
+        L += table(by, tag_groups, arms)
         # repair by tag: an enhancement only on the pages its defect calls for, raw elsewhere
         L += ['', 'Repair by tag: the arm on pages tagged shadow or low light only, raw on the rest; blur-tagged '
               'pages always raw.', '', '| arm | NES % by tag | Δ vs raw (CI, p) |', '|---|---:|---|']
         import ocr_panel_score as S
         target = set(tag_groups['tagged shadow or low light']) - set(tag_groups['tagged blur'])
-        for arm in ARMS[1:]:
+        for arm in arms[1:]:
             qs = [p for p in ids if (arm, p) in by and ('raw', p) in by]
             if not qs:
                 continue
@@ -438,7 +487,7 @@ def report():
               'otherwise. Set on these same pages, so the best t is in-sample.', '',
               '| arm | always raw | always arm | ' + ' | '.join(f't={t:g}' if t < 1e9 else 't=∞' for t in THRESHOLDS[:-1]) + ' |',
               '|---|---:|---:|' + '---:|' * (len(THRESHOLDS) - 1)]
-        for arm in ARMS[1:]:
+        for arm in arms[1:]:
             rr = [by[arm, p] for p in ids if (arm, p) in by]
             if not rr:
                 continue
@@ -449,7 +498,9 @@ def report():
         L.append('')
         for (arm, p), r in by.items():
             allrows.append({**r, 'reader': reader, 'source': origin(p)})
-        bench += summary(by, {k: groups[k] for k in ('originals', 'PDF images')}, ARMS, reader)
+        bench += summary(by, {k: groups[k] for k in ('96', 'originals', 'PDF images')}, arms, reader)
+        if not missing:
+            charts += chart_rows(by, reader, arms, ids, tokens.get(reader, {}))
     # the two-seed probe
     probe = probe_pages()
     L += ['## The two-seed hallucination probe', '',
@@ -486,7 +537,9 @@ def report():
         for r in allrows:
             w.writerow({k: (round(v, 6) if isinstance(v, float) else v) for k, v in r.items()})
     BENCH.write_text(json.dumps({'item': 'W46.enh-ocr-input', 'report': REPORT.name,
-                                 'readers_pending': sorted(set(pending)), 'rows': bench}, indent=1) + '\n')
+                                 'readers_pending': sorted(set(pending)),
+                                 'not_run': {k: [a for a in ARMS if a not in v] for k, v in READER_ARMS.items()},
+                                 'probe_pages': len(probe), 'rows': bench, 'chart_rows': charts}, indent=1) + '\n')
     REPORT.write_text('\n'.join(L) + '\n')
     print(REPORT)
 

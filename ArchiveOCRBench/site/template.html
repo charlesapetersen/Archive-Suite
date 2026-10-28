@@ -217,6 +217,13 @@ footer p { font-size: 13px; }
     <div class="tbl"><table><thead><tr><th>Reader</th><th>Pages</th><th>Image</th><th>NES</th><th>Change against the plain image (95% CI)</th><th>chrF2</th><th>Words added</th><th>Words missed</th><th>Truth words cut off (pages)</th></tr></thead><tbody id="dw-rows"></tbody></table></div>
   </section>
 
+  <section class="panel" id="enh-ocr" hidden>
+    <div class="head"><h2>Clean the image before reading?</h2><span class="meta">the 96 + the 30 hardest · open readers, free (W46.enh-ocr-input)</span></div>
+    <p class="note" id="eo-note"></p>
+    <label for="eo-group">Pages </label><select id="eo-group"></select>
+    <div class="tbl"><table><thead><tr><th>Reader</th><th>Pages</th><th>Image</th><th>NES</th><th>Change against the plain image (95% CI)</th><th>chrF2</th><th>Inserted</th><th>Rewritten</th><th>New words /1k</th><th>Suspect /1k</th></tr></thead><tbody id="eo-rows"></tbody></table></div>
+  </section>
+
   <section class="panel" id="ocr-scorers" hidden>
     <div class="head"><h2>What a reader adds, and whether it reads what is printed</h2><span class="meta">every saved reading re-scored · no new calls (W46.fix-ocr-scorers)</span></div>
     <p class="note">Added words are insertions and rewritten words substitutions more than one letter from the truth word, each over the truth's words, on the pages answered. cMER is HIPE-OCRepair's character error bounded at 100%. NewsBench's bag-of-words F1 ignores order; its gap (bag-of-words F1 less 1 − CER) is the order penalty, Latin-script pages only. Suspect words are those Apple Vision's reading of the page lacks (Gemini 3.8 Flash's, for Vision); precision is the share the truth lacks too, recall the share of the reading's non-truth words caught. The owner's 96 pages:</p>
@@ -631,6 +638,24 @@ if (DW) {
   const sg = v => (v >= 0 ? '+' : '−') + Math.abs(100 * v).toFixed(1);
   document.getElementById('dw-note').textContent = 'Each image of the same page read by the same reader, paired by page against the plain photograph (the quarter-size rows against the quarter-size photograph). NES follows reading order, so chrF2 and the word rates, which do not, are beside it. Cut-off words are truth words whose box on the plain photograph falls outside what the image shows.' + (DW.readers_pending.length ? ' Still to come: ' + DW.readers_pending.join(', ') + ' (Sherlock).' : ' The open readers ran on Sherlock, each on all ' + DW.cluster.images_per_reader + ' images; a capped, blank or failed reading scores 0. Every arm read on the whole 96 is also on the four charts above (the Sherlock readers priced like the crop routes, Apple Vision free); the plain photograph is each reader\'s own route there, and the hand crops and the quarter-size rows are too few pages for a chart.') + (DW.gateway && DW.gateway.coverage ? ' Gemini 3.7 Flash read the same ' + DW.cluster.images_per_reader + ' images through the Stanford gateway with the cloud panel\'s request (its plain photograph is the reading it already had; ' + DW.gateway.calls + ' new calls, about $' + DW.gateway.cost_estimate.toFixed(2) + ' estimated from its tokens) and is on the charts at that estimated price.' : '') + ' Detail: segbench-results/' + DW.report + (DW.uvdoc_benchmark ? '; our UVDoc reproduces the authors\' published grids on their 50-photo benchmark (' + DW.uvdoc_benchmark + ').' : '.');
   document.getElementById('dw-rows').innerHTML = DW.rows.map(r => '<tr><td>' + r.reader + '</td><td>' + r.pages + ' (' + r.n + ')</td><td>' + (names[r.arm] || r.arm) + '</td><td>' + q1(r.nes) + '</td><td>' + (r.d_nes == null ? '—' : sg(r.d_nes) + ' (' + sg(r.lo) + ' to ' + sg(r.hi) + ')') + '</td><td>' + q1(r.chrf) + '</td><td>' + q1(r.added) + '</td><td>' + q1(r.missed) + '</td><td>' + (r.edge_lost == null ? '—' : r.edge_lost + ' (' + r.edge_pages + ')') + '</td></tr>').join('');
+}
+const EO = DATA.enh_ocr;
+if (EO) {
+  document.getElementById('enh-ocr').hidden = false;
+  const names = {raw: 'plain photograph (the panel\'s image)', shading: 'shading division (contrast only)', gcdrnet: 'GCDRNet', sbb: 'SBB binarisation',
+    'docres-appearance': 'DocRes appearance', 'docres-deshadow': 'DocRes deshadow', 'resshift-s1': 'ResShift, seed 1', 'resshift-s2': 'ResShift, seed 2',
+    'nafdpm-s1': 'NAF-DPM, seed 1', 'nafdpm-s2': 'NAF-DPM, seed 2'};
+  const q1 = v => v == null ? '—' : (100 * v).toFixed(1);
+  const k1 = v => v == null ? '—' : v.toFixed(1);
+  const sg = v => (v >= 0 ? '+' : '−') + Math.abs(100 * v).toFixed(1);
+  const notRun = Object.entries(EO.not_run).filter(([, a]) => a.length).map(([r, a]) => r + ' did not read ' + a.join(' or ')).join('; ');
+  document.getElementById('eo-note').textContent = 'Each enhanced image of a page read by the same reader, paired by page against the plain photograph. Every method keeps the image\'s size, so GLM-OCR reads the same PP-DocLayoutV3 regions on each. No method helps any reader by a margin its interval can tell from nothing; SBB binarisation costs Apple Vision 5 points and PP-OCRv6 2. On the ' + EO.probe_pages + ' pages with the lowest scores across all routes, two diffusion restorers each ran with two seeds: ResShift costs Qwen3.6 27B 7 points and its two seeds disagree on many words, NAF-DPM changes little. Inserted and rewritten words are per truth word; new words are in neither the truth nor the reader\'s plain reading, suspect words in neither the reader\'s nor Apple Vision\'s plain reading, both per 1,000 words read. The arms read on all 96 are on the four charts above (Apple Vision free, the Sherlock readers free on a cluster).' + (notRun ? ' Not run: ' + notRun + '.' : '') + ' Detail: segbench-results/' + EO.report + '.';
+  const groups = [...new Set(EO.rows.map(r => r.pages))];
+  const sel = document.getElementById('eo-group');
+  sel.innerHTML = groups.map(g => '<option>' + g + '</option>').join('');
+  const draw = () => { document.getElementById('eo-rows').innerHTML = EO.rows.filter(r => r.pages === sel.value).map(r => '<tr><td>' + r.reader + '</td><td>' + r.n + '</td><td>' + (names[r.arm] || r.arm) + '</td><td>' + q1(r.nes) + '</td><td>' + (r.d_nes == null ? '—' : sg(r.d_nes) + ' (' + sg(r.lo) + ' to ' + sg(r.hi) + ')') + '</td><td>' + q1(r.chrf) + '</td><td>' + q1(r.inserted) + '</td><td>' + q1(r.rewritten) + '</td><td>' + k1(r.restoration_only_k) + '</td><td>' + k1(r.suspect_k) + '</td></tr>').join(''); };
+  sel.addEventListener('change', draw);
+  draw();
 }
 const LP = DATA.loops;
 if (LP) {
