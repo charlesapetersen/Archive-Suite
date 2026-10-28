@@ -1,0 +1,21 @@
+{
+  "tag": "W46.ocr-regions-cells",
+  "pack": "ocr-regions-cells-20261025",
+  "mac": "artifacts/ocr-regions-cells-20261025",
+  "submit": "support/corpus/regions-cells-submit.sh",
+  "jobs": 3,
+  "gpu_hours": 2,
+  "review": "execution-plans/items/W46.ocr-regions-cells.md",
+  "imports": [
+    {"dir": "support/corpus", "modules": ["regions_cluster", "regions_cells"]},
+    {"modules": ["vllm"]}
+  ],
+  "creates": [
+    "$FS_ROOT/ocr-regions-cells-20261025",
+    "$GROUP_HOME/$USER/archive-suite/sherlock-results/ocr-regions-cells-20261025"
+  ],
+  "provenance": [],
+  "results": "$GROUP_HOME/$USER/archive-suite/sherlock-results/ocr-regions-cells-20261025",
+  "collect": ["$FS_ROOT/ocr-regions-cells-20261025/jobs.tsv", "$FS_ROOT/ocr-regions-cells-20261025/logs"],
+  "release": "capability results collected into the Mac artifact; score and inspect before expansion"
+}

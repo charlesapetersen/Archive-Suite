@@ -3,7 +3,9 @@
 
     cluster-reach.py check NAME          exit 0 if NAME's login answers, else 1; prints why
     cluster-reach.py mark TAG STATE      record where TAG's cluster jobs are: submitted|finished|in-box|clear
-    cluster-reach.py ask                 the upkeep hook's once-a-day login request in the Daemon Report
+    cluster-reach.py ask                 the upkeep hook's login requests in the Daemon Report (FarmShare daily,
+                                         Sherlock once per batch)
+    cluster-reach.py ready               the Sherlock packs ready to submit and the collections waiting, as TSV
 
 An item names its cluster with a `(cluster: farmshare)` or `(cluster: sherlock)` marker. It is not a uses value,
 because worker-state.py and the Agent Manager refuse unknown ones. The queue hook (ops/agent/hooks.py) offers such
@@ -17,6 +19,15 @@ Otherwise the item is `blocked` with a reason starting `cluster NAME not reachab
 an alert. The upkeep hook then runs `ask`, which writes at most one Daemon Report line a day, without the words
 that mark a mention, so the owner is emailed: which clusters to log in to, with the items ready to submit and the
 items submitted or finished to collect. An item still waiting on a prerequisite is not counted: there is nothing to submit yet.
+
+Sherlock is asked in batches instead (owner, 2026-10-28, W46.sherlock-batch), so the owner logs in once per batch
+rather than once per item. A Sherlock pack is ready when its plan line is held `(needs: owner)` with a last note
+`HELD <date>: ready to submit: …` (plan-edit.sh hold) and its ledger is empty. `ask` writes one `[Sherlock batch]`
+entry, emailed, when BATCH_READY packs are ready or the oldest has waited BATCH_WAIT_DAYS, or a submission has
+waited that long to be collected; it names each pack with its jobs and GPU-hour ceiling from its manifest
+(ArchiveProcessor/scripts/segbench/sherlock/packs/<TAG>.json) and the collections waiting. It does not ask again
+for the same packs until BATCH_WAIT_DAYS more have passed. The batch itself is
+ArchiveProcessor/scripts/segbench/sherlock/batch_mac.py; execution-plans/sherlock-access.md §"Batches".
 
 The ledger is one file per item, `$AGENT_STATE/cluster-jobs/<TAG>`, holding one word. A session that submits an
 item's jobs writes `submitted`; one that sees them finish writes `finished`; the Box pickup (W46.box-collect)
@@ -42,6 +53,9 @@ SSH = os.environ.get("CLUSTER_SSH") or "/usr/bin/ssh"          # the tests point
 GTIMEOUT = "/opt/homebrew/bin/gtimeout"
 CACHE_SECONDS = 300
 BOX_ITEM = "W46.box-collect"
+PACKS = os.path.join(REPO, "ArchiveProcessor", "scripts", "segbench", "sherlock", "packs")
+BATCH_READY = 3
+BATCH_WAIT_DAYS = 5
 
 # name -> (display name, control socket, login). Sherlock's entry names it for messages only: it is PREP_ONLY.
 CLUSTERS = {
@@ -56,6 +70,8 @@ PREP_ONLY = {"sherlock"}
 MARKER = re.compile(r"\(cluster:\s*([A-Za-z]+)\s*\)")
 LEDGER_STATES = ("submitted", "finished", "in-box")
 UNREACHABLE = re.compile(r"^cluster ([a-z]+) not reachable")
+OPEN_ITEM = re.compile(r"^- \[ \] \*\*`?([A-Za-z0-9][A-Za-z0-9._-]*)`?")
+NOTE = re.compile(r" — (HELD|RELEASED) (\d{4}-\d{2}-\d{2}): ")
 
 
 def cluster_of(text):
@@ -162,8 +178,8 @@ def ask_text(rows, today):
         if d.get("status") != "blocked" or not m or d.get("blocked_on"):
             continue
         state = ledger(d["tag"])
-        if m.group(1) not in CLUSTERS:
-            continue                           # a misspelt marker: nobody to ask to log in
+        if m.group(1) not in CLUSTERS or m.group(1) in PREP_ONLY:
+            continue                           # a misspelt marker: nobody to ask; Sherlock is asked by batch_ask_text
         c = counts.setdefault(m.group(1), [0, 0])
         c[0 if state is None else 1] += 1
     parts = []
@@ -211,6 +227,143 @@ def ask(rows, today=None):
     return text
 
 
+# ---- Sherlock batches ---------------------------------------------------------------------------------------
+
+def held_ready(line):
+    """The date a plan line was held ready to submit, or None: it must still carry `(needs: owner)` and its last
+    plan-edit.sh note must be `HELD <date>: ready to submit`."""
+    if "(needs: owner)" not in line:
+        return None
+    notes = list(NOTE.finditer(line))
+    if not notes or notes[-1].group(1) != "HELD" or not line[notes[-1].end():].startswith("ready to submit"):
+        return None
+    return notes[-1].group(2)
+
+
+def manifest(tag):
+    try:
+        with open(os.path.join(PACKS, tag + ".json")) as f:
+            m = json.load(f)
+        return m if isinstance(m, dict) and m.get("tag") == tag else None
+    except (OSError, ValueError):
+        return None
+
+
+def ledger_since(tag):
+    """The day TAG's ledger file was last written, or None."""
+    try:
+        return datetime.date.fromtimestamp(os.path.getmtime(os.path.join(STATE, "cluster-jobs", tag))).isoformat()
+    except OSError:
+        return None
+
+
+def sherlock_state(plan_text):
+    """(ready, collect): ready = [(tag, held date, manifest or None)] oldest first, for Sherlock items held ready to
+    submit with nothing in the ledger; collect = [(tag, since)] for Sherlock items whose jobs are `submitted`."""
+    ready, collect = [], []
+    for line in plan_text.splitlines():
+        m = OPEN_ITEM.match(line)
+        if not m or cluster_of(line) != "sherlock":
+            continue
+        tag, state = m.group(1), ledger(m.group(1))
+        if state == "submitted":
+            collect.append((tag, ledger_since(tag) or "?"))
+        elif state is None:
+            since = held_ready(line)
+            if since:
+                ready.append((tag, since, manifest(tag)))
+    ready.sort(key=lambda r: r[1])
+    collect.sort(key=lambda r: r[1])
+    return ready, collect
+
+
+def _days(since, today):
+    try:
+        return (datetime.date.fromisoformat(today) - datetime.date.fromisoformat(since)).days
+    except ValueError:
+        return 0
+
+
+def batch_due(ready, collect, today):
+    """Why a batch is due today, or None."""
+    if len(ready) >= BATCH_READY:
+        return "%d packs are ready" % len(ready)
+    if ready and _days(ready[0][1], today) >= BATCH_WAIT_DAYS:
+        return "the oldest ready pack has waited %d days" % _days(ready[0][1], today)
+    if collect and _days(collect[0][1], today) >= BATCH_WAIT_DAYS:
+        return "a submission has waited %d days to be collected" % _days(collect[0][1], today)
+    return None
+
+
+def batch_ask_text(ready, collect, today):
+    """The `[Sherlock batch]` entry, or None when no batch is due. Without the words that mark a mention: the owner is
+    emailed, because only he can start the session."""
+    why = batch_due(ready, collect, today)
+    if why is None:
+        return None
+    packs = []
+    for tag, since, man in ready:
+        if man is None:
+            packs.append("%s (ready since %s; no manifest packs/%s.json, so the batch leaves it out)" % (tag, since, tag))
+        else:
+            packs.append("%s (%s jobs, at most %s GPU-hours, ready since %s)"
+                         % (tag, man.get("jobs", "?"), man.get("gpu_hours", "?"), since))
+    total = sum(float(m.get("gpu_hours") or 0) for _, _, m in ready if m)
+    parts = ["%d pack%s ready to submit, at most %g GPU-hours in all: %s"
+             % (len(ready), "" if len(ready) == 1 else "s", total, "; ".join(packs))] if ready else []
+    if collect:
+        parts.append("to collect: " + "; ".join("%s (submitted %s)" % c for c in collect))
+    return ("- **[Sherlock batch]** (%s) — please start one Sherlock session for this batch (%s): %s. The session "
+            "follows execution-plans/sherlock-access.md \"Batches\" (ArchiveProcessor/scripts/segbench/sherlock/"
+            "batch_mac.py plan, then send, submit and mark; fetch for collections). Asked once per batch."
+            % (today, why, ". ".join(parts)))
+
+
+def batch_ask(plan_text, today=None):
+    """Write batch_ask_text to the Daemon Report when a batch is due and this set of packs was not asked about in the
+    last BATCH_WAIT_DAYS days. The stamp `sherlock-batch-ask` holds the day and the tags asked about; it is written
+    with O_EXCL under a lock file, so two upkeep runs cannot both ask."""
+    today = today or datetime.date.today().isoformat()
+    ready, collect = sherlock_state(plan_text)
+    text = batch_ask_text(ready, collect, today)
+    if text is None:
+        return None
+    tags = sorted(t for t, _, _ in ready) + sorted(t for t, _ in collect)
+    stamp = os.path.join(STATE, "sherlock-batch-ask")
+    try:
+        with open(stamp) as f:
+            last = json.load(f)
+        if _days(last["day"], today) < BATCH_WAIT_DAYS and set(tags) <= set(last["tags"]):
+            return None                        # asked already about every pack in this batch
+    except (OSError, ValueError, KeyError, TypeError):
+        pass
+    lock = stamp + ".lock"
+    try:
+        os.close(os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644))
+    except FileExistsError:
+        if time.time() - os.path.getmtime(lock) < 600:
+            return None
+        os.remove(lock)                        # a run that died holding it
+        return None
+    try:
+        p = subprocess.run(["/bin/bash", os.path.join(HERE, "plan-edit.sh"), PLAN, "report", text],
+                           capture_output=True, text=True, errors="replace", timeout=120)
+        if p.returncode != 0:
+            raise RuntimeError("report failed (%d): %s" % (p.returncode, p.stderr.strip()[:200]))
+        fd, tmp = tempfile.mkstemp(dir=STATE, prefix="sherlock-batch-ask.")
+        with os.fdopen(fd, "w") as f:
+            json.dump({"day": today, "tags": tags}, f)
+        os.replace(tmp, stamp)
+    finally:
+        os.remove(lock)
+    return text
+
+
+def read_plan():
+    with open(PLAN, errors="replace") as f:
+        return f.read()
+
+
 def queue_rows():
     p = subprocess.run(["/usr/bin/python3", os.path.join(HERE, "..", "agent", "hooks.py"), "queue"],
                        capture_output=True, text=True, errors="replace", timeout=240)
@@ -240,6 +393,15 @@ def main(argv):
     if len(argv) == 2 and argv[1] == "ask":
         text = ask(queue_rows())
         print("cluster-reach: asked the owner to log in" if text else "cluster-reach: nothing to ask")
+        text = batch_ask(read_plan())
+        print("cluster-reach: asked for a Sherlock batch" if text else "cluster-reach: no Sherlock batch due")
+        return 0
+    if len(argv) == 2 and argv[1] == "ready":
+        ready, collect = sherlock_state(read_plan())
+        for tag, since, man in ready:
+            print("ready\t%s\t%s\t%s" % (tag, since, "manifest" if man else "no-manifest"))
+        for tag, since in collect:
+            print("collect\t%s\t%s" % (tag, since))
         return 0
     print(__doc__.split("\n\n")[1], file=sys.stderr)
     return 64

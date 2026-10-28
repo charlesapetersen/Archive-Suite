@@ -1,0 +1,21 @@
+{
+  "tag": "W46.fix-marks-set-draft",
+  "pack": "marks-preflag-20261025",
+  "mac": "artifacts/marks-preflag-20261025",
+  "submit": "support/marks-pilot-submit.sh",
+  "jobs": 2,
+  "gpu_hours": 1,
+  "review": "execution-plans/items/W46.fix-marks-set-draft.md",
+  "imports": [
+    {"dir": "support", "modules": ["marks_pilot"]},
+    {"modules": ["vllm"]}
+  ],
+  "creates": [
+    "$FS_ROOT/marks-preflag-20261025",
+    "$GROUP_HOME/$USER/archive-suite/sherlock-results/marks-preflag-20261025"
+  ],
+  "provenance": ["inventory.json"],
+  "results": "$GROUP_HOME/$USER/archive-suite/sherlock-results/marks-preflag-20261025",
+  "collect": ["$FS_ROOT/marks-preflag-20261025/jobs.tsv", "$FS_ROOT/marks-preflag-20261025/logs"],
+  "release": "15-page presence pilot collected into state/artifacts/marks-preflag-20261025; inspect before expansion"
+}

@@ -1,0 +1,17 @@
+#!/bin/bash
+# sbatch for a pack's own submit script inside batch.py submit (W46.sherlock-batch): the real sbatch with --hold
+# added, and each accepted job id recorded in $BATCH_IDS, so the batch's import job can release the pack's jobs once
+# its chain imports, or cancel them if it does not. A job the pack holds itself (--hold / -H) is recorded as
+# own-hold, and stays held for the owner's session to release, as the pack's hand-over says.
+# Output is passed through unchanged, so a pack that parses `--parsable` ids still works.
+set -euo pipefail
+: "${BATCH_REAL_SBATCH:?batch.py sets the real sbatch}" "${BATCH_IDS:?batch.py sets the id file}"
+own=job
+for a in "$@"; do
+  case "$a" in --hold|-H) own=own-hold ;; esac
+done
+out="$("$BATCH_REAL_SBATCH" --hold "$@")"
+printf '%s\n' "$out"
+id="$(printf '%s\n' "$out" | sed -nE 's/^Submitted batch job ([0-9]+).*/\1/p; s/^([0-9]+)(;.*)?$/\1/p' | head -1)"
+[ -n "$id" ] || { echo "batch-shim: no job id in sbatch's output: $out" >&2; exit 1; }
+printf '%s\t%s\n' "$id" "$own" >> "$BATCH_IDS"
