@@ -303,10 +303,9 @@ struct NotesTableView: NSViewRepresentable {
                 let n = parent.model.instanceCounts[item.id] ?? 0
                 tf.stringValue = n > 1 ? "▣ \(n)" : ""
                 tf.textColor = .secondaryLabelColor
-                // VoiceOver reads the count in words, and skips the blank cell of an item in one folder.
-                // Both are set on every pass because the cell is reused.
-                tf.setAccessibilityElement(n > 1)
-                tf.setAccessibilityLabel(n > 1 ? "In \(n) folders" : nil)
+                // VoiceOver reads the count in words; the blank cell still needs a name (the table exposes it
+                // whether or not it is marked an element). Set on every pass because the cell is reused.
+                tf.setAccessibilityLabel(n > 1 ? "In \(n) folders" : "Not replicated")
                 tf.setAccessibilityIdentifier("an.cell.instances.\(item.id.uuidString)")
 
             case "date":
