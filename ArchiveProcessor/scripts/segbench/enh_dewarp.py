@@ -574,7 +574,7 @@ def chart_rows(by, readers, ids):
                 out.append({'route': route, 'arm': arm, 'group': group, 'n': len(rr),
                             'ok': sum(r.get('ok', r['hyp_words'] > 0) for r in rr),
                             'nes': statistics.mean(r['nes'] for r in rr),
-                            **{k: sum(r.get(k, 0) for r in rr) for k in ('prompt_tokens', 'completion_tokens')}})
+                            **{k: sum(r.get(k, 0) for r in rr) for k in ('prompt_tokens', 'completion_tokens', 'cost')}})
     return out
 
 
@@ -583,6 +583,9 @@ def report(cluster_root=CLUSTER_ROOT):
     # Validate/score the complete collection before replacing any committed output.
     P.manifest()  # includes frozen pages/truth checksums; source truth remains read-only
     readers = cluster_rows(cluster_root)
+    import enh_dewarp_gateway as GW
+    gateway = GW.rows()  # None until every image is read (W46.enh-dewarp-paid)
+    everyone = {**readers, **({GW.ROUTE: gateway} if gateway else {})}
     rows, trips = measure()
     with PAGES.open('w') as f:
         w = csv.DictWriter(f, FIELDS, extrasaction='ignore', lineterminator='\n')
@@ -680,6 +683,17 @@ def report(cluster_root=CLUSTER_ROOT):
               "panel's quarter rung of the raw photograph (both LANCZOS to a quarter, JPEG 92, then the panel's "
               'freezing); the original size for reference.', '']
         L += arm_table(by, {'ladder': lad}, ('quarter', *LADDER_ARMS, 'raw'), 'quarter')
+    def reader_tables(route, rb):
+        missing = sum(not r['read'] for r in rb.values())
+        T = ['', f'### {route}' + (f' ({missing} of {len(rb)} images not read yet)' if missing else ''), '']
+        T += arm_table(rb, {**groups, **tag_groups}, ('raw', *ARMS), 'raw')
+        T += [''] + arm_table(rb, groups, ('raw', 'enc-2048-q85', 'enc-1600-q90'), 'raw')
+        if hand:
+            T += [''] + arm_table(rb, {'hand-cropped': hand}, ('raw', 'quad', 'uvdoc', 'hand'), 'raw')
+        if lad:
+            T += [''] + arm_table(rb, {'ladder': lad}, ('quarter', *LADDER_ARMS, 'raw'), 'quarter')
+        return T
+
     if readers:
         L += ['', '## Open readers on Sherlock', '',
               "Qwen3.6-27B (the panel prompt), LightOnOCR-3 4B (its own prompt, plain text) and PP-OCRv6 (truth96's "
@@ -711,20 +725,33 @@ def report(cluster_root=CLUSTER_ROOT):
                 for r in rb.values():
                     w.writerow({k: (round(v, 6) if isinstance(v, float) else v) for k, v in r.items()})
         for route, rb in readers.items():
-            missing = sum(not r['read'] for r in rb.values())
-            L += ['', f'### {route}' + (f' ({missing} of {len(rb)} images not read yet)' if missing else ''), '']
-            L += arm_table(rb, {**groups, **tag_groups}, ('raw', *ARMS), 'raw')
-            L += [''] + arm_table(rb, groups, ('raw', 'enc-2048-q85', 'enc-1600-q90'), 'raw')
-            if hand:
-                L += [''] + arm_table(rb, {'hand-cropped': hand}, ('raw', 'quad', 'uvdoc', 'hand'), 'raw')
-            if lad:
-                L += [''] + arm_table(rb, {'ladder': lad}, ('quarter', *LADDER_ARMS, 'raw'), 'quarter')
+            L += reader_tables(route, rb)
+    if gateway:
+        counts = collections.Counter(r['status'] for r in gateway.values())
+        usable = sum(r['ok'] for r in gateway.values())
+        L += ['', '## Gemini 3.7 Flash through the Stanford gateway', '',
+              "The same 640 images, read with the cloud panel's request (`enh_dewarp_gateway.py`, W46.enh-dewarp-paid): "
+              'its prompt, temperature 0, low reasoning, 8,192 output tokens. The raw arm is the reading '
+              'W46.fix-ocr-scorers-paid made of the identical image (hash checked), not a second call. '
+              f"{usable} of {len(gateway)} replies usable ({counts.get('ok', 0)} parsed, {counts.get('cap', 0)} capped, "
+              f"{counts.get('blank', 0)} unparsed, {counts.get('error', 0)} errors); a failed reply scores empty. "
+              f"Estimated cost of the {len(GW.jobs())} new calls ${GW.spent():.2f}, at 3.8 Flash's list price "
+              '($0.75 / $3.75 per million tokens), which the gateway, returning no bill, is taken not to exceed. '
+              'Page-level numbers: `enh-dewarp-gateway.csv`.']
+        L += reader_tables(GW.ROUTE, gateway)
+        with (RESULTS / 'enh-dewarp-gateway.csv').open('w') as f:
+            w = csv.DictWriter(f, ['reader', 'arm', 'page', 'status', 'ok', 'nes', 'chrf', 'words', 'hyp_words', 'missed',
+                                   'added', 'prompt_tokens', 'completion_tokens', 'cost'],
+                               extrasaction='ignore', lineterminator='\n')
+            w.writeheader()
+            for r in gateway.values():
+                w.writerow({k: (round(v, 6) if isinstance(v, float) else v) for k, v in r.items()})
     main3 = {k: groups[k] for k in ('originals', 'PDF images')}
     bench = arm_summary(by, main3, ('raw', *ARMS), 'raw', 'apple-vision')
     bench += arm_summary(by, main3, ('raw', *ENCODINGS), 'raw', 'apple-vision')
     if lad:
         bench += arm_summary(by, {'ladder': lad}, ('quarter', *LADDER_ARMS), 'quarter', 'apple-vision')
-    for route, rb in readers.items():
+    for route, rb in everyone.items():
         if all(r['read'] for r in rb.values()):
             bench += arm_summary(rb, main3, ('raw', *ARMS), 'raw', route)
             bench += arm_summary(rb, main3, ('raw', 'enc-2048-q85', 'enc-1600-q90'), 'raw', route)
@@ -733,11 +760,15 @@ def report(cluster_root=CLUSTER_ROOT):
     found = RESULTS / 'enh-dewarp-uvdoc-bench.md'
     (RESULTS / 'enh-dewarp.json').write_text(json.dumps({
         'item': 'W46.enh-dewarp', 'report': REPORT.name, 'readers_pending': [r for r in READERS if r not in readers
-                                                                             or not all(x['read'] for x in readers[r].values())],
+                                                                             or not all(x['read'] for x in readers[r].values())]
+        + ([] if gateway else [GW.ROUTE]),
+        'gateway': {'item': 'W46.enh-dewarp-paid', 'model': GW.G.MODEL, 'route': GW.ROUTE, 'calls': len(GW.jobs()),
+                    'cost_estimate': round(GW.spent(), 4), 'price_assumed': GW.G.PRICE,
+                    'coverage': dict(collections.Counter(r['status'] for r in gateway.values())) if gateway else None},
         'cluster': {'name': 'Sherlock', 'pack': cluster_root.name,
                     'manifest_sha256': hashlib.sha256((cluster_root / 'pages.jsonl').read_bytes()).hexdigest(),
                     'models': CLUSTER_MODELS, 'images_per_reader': len(cluster_jobs()), 'coverage': coverage},
-        'chart_rows': chart_rows(by, readers, ids),
+        'chart_rows': chart_rows(by, everyone, ids),
         'uvdoc_benchmark': found.name if found.exists() else None, 'rows': bench}, indent=1) + '\n')
     REPORT.write_text('\n'.join(L) + '\n')
     print(REPORT)

@@ -574,13 +574,14 @@ def gateway_region_routes(data, kinds):
 
 def dewarp_chart_routes(data, kinds, op):
     """Crop, dewarp and encoder arms on the 96 (W46.enh-dewarp): Apple Vision's at no cost, like its plain route, and
-    the Sherlock readers' priced like the crop routes above. The plain photograph is left off: each reader's own
+    the Sherlock readers' priced like the crop routes above, Gemini 3.7 Flash (W46.enh-dewarp-paid) from its own
+    estimated token cost like the gateway's region arms. The plain photograph is left off: each reader's own
     route already draws it. The hand crops and the ladder are small subsets and stay in the table."""
     if data is None or data["readers_pending"]:
         return []
     by = {(r["route"], r["arm"], r["group"]): r for r in data["chart_rows"]}
     names = {"apple-vision": "Apple Vision", "lightonocr3-4b": "LightOnOCR-3 4B", "qwen3.6-27b": "Qwen3.6 27B",
-             "ppocrv6": "PP-OCRv6"}
+             "ppocrv6": "PP-OCRv6", "gemini3.7-flash-gw": "Gemini 3.7 Flash (Stanford gateway, price estimated)"}
     arms = {"quad": "Apple quad crop", "uvdoc": "UVDoc dewarp", "docres": "DocRes dewarp",
             "enc-2048-q85": "app encoder 2048 px q0.85", "enc-2400-q90": "app encoder 2400 px q0.90",
             "enc-1600-q90": "app encoder 1600 px q0.90"}
@@ -594,6 +595,9 @@ def dewarp_chart_routes(data, kinds, op):
         common = {"id": f"dewarp-{route}-{arm}", "name": names[route] + " · " + arms[arm], "batch": None, "scores": scores}
         if route == "apple-vision":
             out.append({**common, "panel": "local", "std": 0.0})
+            continue
+        if route in GATEWAY_ROUTES:
+            out.append({**common, "panel": "cloud", "std": cents(1000 * overall["cost"] / overall["n"])})
             continue
         price = openrouter_price(op, route, overall["prompt_tokens"] / overall["n"],
                                  overall["completion_tokens"] / overall["n"])
