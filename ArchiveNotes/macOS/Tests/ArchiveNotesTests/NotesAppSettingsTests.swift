@@ -186,4 +186,17 @@ struct NotesAppSettingsTests {
         #expect(NotesAppSettings.windowHiddenColumns(for: .note, from: d) == ["tags", "sources"])
         #expect(NotesAppSettings.windowHiddenColumns(for: .extract, from: d) == ["tags"])
     }
+
+    /// W40.fix-notes-editor-squeezed: the metadata inspector takes a quarter of the detail pane, between
+    /// a floor and the old 280 pt ceiling, so a short window no longer leaves the editor about 100 pt.
+    @Test func metadataHeightScalesWithThePane() {
+        #expect(DetailPaneLayout.metadataMaxHeight(paneHeight: 500) == 125)   // minimum window
+        #expect(DetailPaneLayout.metadataMaxHeight(paneHeight: 840) == 210)   // 1440×900
+        #expect(DetailPaneLayout.metadataMaxHeight(paneHeight: 2000) == 280)  // capped
+        #expect(DetailPaneLayout.metadataMaxHeight(paneHeight: 200) == 90)    // floored
+        // The editor keeps the larger share of what the metadata could take.
+        for h in stride(from: CGFloat(500), through: 1400, by: 100) {
+            #expect(DetailPaneLayout.metadataMaxHeight(paneHeight: h) <= h / 2)
+        }
+    }
 }

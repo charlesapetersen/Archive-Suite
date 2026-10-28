@@ -310,6 +310,7 @@ private struct ItemListPane: View {
 private struct DetailPane: View {
     @ObservedObject var nav: NotesNavigationModel
     @AppStorage(DisplayCalendarSettings.enabledKey) private var calendarsEnabled = false
+    @AppStorage(NotesLayoutSettingsKey.metadataCollapsed) private var metadataCollapsed = false
     @Binding var selectedTemplateID: UUID?
 
     var body: some View {
@@ -339,26 +340,54 @@ private struct DetailPane: View {
     }
 
     private var noteDetail: some View {
-        VStack(spacing: 0) {
-            selectedHeader
-            if let id = nav.detailItemID {
-                Divider()
-                LocationsInspector(nav: nav, itemId: id)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-            }
-            if let summary = nav.detailSummary {
-                Divider()
-                // Keep the editor usable at the minimum window height, even with many references.
-                ScrollView {
-                    NoteMetadataInspector(nav: nav, item: summary)
+        GeometryReader { geo in
+            VStack(spacing: 0) {
+                selectedHeader
+                if let id = nav.detailItemID {
+                    Divider()
+                    LocationsInspector(nav: nav, itemId: id)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
                 }
-                .frame(maxHeight: 280)
-                .accessibilityIdentifier("an.detail.metadataScroll")
+                if let summary = nav.detailSummary {
+                    Divider()
+                    metadataToggle
+                    if !metadataCollapsed {
+                        // Keep the editor the larger share at every window height (W40.fix-notes-editor-squeezed).
+                        ScrollView {
+                            NoteMetadataInspector(nav: nav, item: summary)
+                        }
+                        .frame(maxHeight: DetailPaneLayout.metadataMaxHeight(paneHeight: geo.size.height))
+                        .accessibilityIdentifier("an.detail.metadataScroll")
+                    }
+                }
+                Divider()
+                NoteEditorPane(nav: nav)
             }
-            Divider()
-            NoteEditorPane(nav: nav)
         }
+    }
+
+    /// Folds the metadata inspector away so the editor gets the whole pane below the locations.
+    private var metadataToggle: some View {
+        Button {
+            metadataCollapsed.toggle()
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: metadataCollapsed ? "chevron.right" : "chevron.down")
+                    .font(.caption2.weight(.semibold))
+                    .frame(width: 10)
+                Text("Details").font(.caption.weight(.semibold))
+                Spacer()
+            }
+            .foregroundStyle(.secondary)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 4)
+        .help(metadataCollapsed ? "Show the note's details" : "Hide the note's details to give the editor more room")
+        .accessibilityLabel(metadataCollapsed ? "Show details" : "Hide details")
+        .accessibilityIdentifier("an.detail.metadataToggle")
     }
 
     @ViewBuilder private var selectedHeader: some View {

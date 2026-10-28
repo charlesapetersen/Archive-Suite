@@ -23,6 +23,23 @@ enum NotesLayoutSettingsKey {
     // legacy key (now read-only — it seeds a first-open per-window default).
     static let noteWindowHiddenColumns = "an.noteWindow.hiddenColumns"
     static let extractWindowHiddenColumns = "an.extractWindow.hiddenColumns"
+    /// The detail pane's metadata inspector folded away (W40.fix-notes-editor-squeezed), shared by both windows.
+    static let metadataCollapsed = "an.detail.metadataCollapsed"
+}
+
+/// How much of the detail pane's height the metadata inspector may take (W40.fix-notes-editor-squeezed).
+/// It used to be a flat 280 pt, which left the editor about 100 pt at the minimum window height.
+enum DetailPaneLayout {
+    /// The inspector's ceiling in a tall pane; it scrolls beyond this.
+    static let metadataCeiling: CGFloat = 280
+    /// Enough for its first section and the start of the next, so it never shrinks to a sliver.
+    static let metadataFloor: CGFloat = 90
+    /// Its share of the pane; the editor keeps well over half after the header and locations.
+    static let metadataShare: CGFloat = 0.25
+
+    static func metadataMaxHeight(paneHeight: CGFloat) -> CGFloat {
+        min(metadataCeiling, max(metadataFloor, paneHeight * metadataShare))
+    }
 }
 
 /// Resolved, validated Notes layout/window settings. A pure value type so the resolution logic is
