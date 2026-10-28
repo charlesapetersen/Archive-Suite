@@ -158,6 +158,50 @@ struct EditorBindingTests {
         #expect(failureMessage == nil, "a successful retry clears the banner")
     }
 
+    /// W40.fix-notes-chip-inline-layout — a chip inserted after text on its line (the caret at the end of a
+    /// sentence, or right after the image line of the page chip inserted before it) begins a line of its own,
+    /// and the saved Markdown is what it was before: one line break before each header, no blank line.
+    @Test @MainActor
+    func insertedChipsEachBeginALine() {
+        let holder = BindingHolder("Existing note text")
+        let formatting = FormattingContext()
+        formatting.currentItemID = UUID()
+        formatting.currentItemKind = .note
+        let view = MarkdownEditorView(
+            markdown: Binding(get: { holder.markdown }, set: { holder.markdown = $0 }),
+            isRaw: Binding(get: { holder.isRaw }, set: { holder.isRaw = $0 }),
+            formatting: formatting
+        )
+        let coordinator = view.makeCoordinator()
+        let textView = EditorTextView()
+        textView.textStorage?.setAttributedString(MarkdownBridge.parse(markdown: holder.markdown))
+        coordinator.textView = textView
+        coordinator.parent = view
+        coordinator.formattingContext = formatting
+        textView.setSelectedRange(NSRange(location: textView.string.utf16.count, length: 0))
+
+        for page in 1...2 {
+            var anchor = SourceAnchor(link: "archivereader://reveal?root=TEST&rel=Scan.pdf&page=\(page)",
+                                      display: "Scan — p. \(page)", page: page)
+            anchor.thumbRef = "assets/p\(page)-thumb.png"
+            coordinator.insertBlock(anchor: anchor)
+        }
+        coordinator.flushWriteBack()
+
+        guard let storage = textView.textStorage else { Issue.record("no text storage"); return }
+        let text = storage.string as NSString
+        var headers = 0
+        storage.enumerateAttribute(.attachment, in: NSRange(location: 0, length: storage.length)) { value, range, _ in
+            guard value is BlockHeaderAttachment else { return }
+            headers += 1
+            #expect(range.location > 0 && text.character(at: range.location - 1) == 0x0A,
+                    "the chip at \(range.location) does not begin a line")
+        }
+        #expect(headers == 2)
+        #expect(holder.markdown.hasPrefix("Existing note text\n<!-- block: reader-page"))
+        #expect(!holder.markdown.contains("\n\n<!-- block:"), "a saved header gained a blank line:\n\(holder.markdown)")
+    }
+
     @Test @MainActor
     func sourcePasteKeepsItsStableBlockWhenTheCaretMovesBeforeThumbnailRendering() async {
         let holder = BindingHolder("Existing note text")

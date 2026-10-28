@@ -116,9 +116,11 @@ struct EditorPassageSource: PassageSelectionSource {
     /// coercion exists to hold. Re-emitting it is pure duplication anyway: the passage's own
     /// `note-passage` anchor already records which note and which block ordinal it came from.
     ///
-    /// A chip that OPENS the snapshot also owns the `\n` `MarkdownBridge.parse` put after it, so both go
-    /// (otherwise the passage body starts with a blank line). An interior chip's newline is the boundary
-    /// with the body before it, so that one stays. Text is never dropped — only provenance markup is.
+    /// A chip that begins a line — it OPENS the snapshot, or follows a line break — also owns the `\n`
+    /// `MarkdownBridge.parse` put after it, so both go (otherwise the passage body starts with, or gains, a
+    /// blank line). Since W40.fix-notes-chip-inline-layout the editor ends the line before every chip, so
+    /// that is every chip it lays out; a chip typed onto the end of a line keeps its newline, the boundary
+    /// with the text before it. Text is never dropped — only provenance markup is.
     private static func strippingBlockChips(_ sub: NSAttributedString) -> NSAttributedString {
         var chips: [NSRange] = []
         sub.enumerateAttribute(.noteBlockSource,
@@ -132,7 +134,9 @@ struct EditorPassageSource: PassageSelectionSource {
         let original = sub.string as NSString          // immutable snapshot: chip ranges index THIS
         for chip in chips.reversed() {                 // back-to-front: earlier ranges stay valid
             var cut = chip
-            if chip.location == 0, NSMaxRange(chip) < original.length,
+            let beginsLine = chip.location == 0
+                || BlockParser.endsWithLineTerminator(original.substring(with: NSRange(location: chip.location - 1, length: 1)))
+            if beginsLine, NSMaxRange(chip) < original.length,
                original.character(at: NSMaxRange(chip)) == 0x0A {   // '\n'
                 cut.length += 1
             }

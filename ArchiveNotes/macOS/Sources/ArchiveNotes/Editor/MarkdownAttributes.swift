@@ -91,7 +91,7 @@ enum MarkdownStyler {
     /// as that paragraph's trailing newline), but it must not inherit that block's last INLINE run:
     /// a `\n\n` carrying `.link`, `.noteInlineCode` or a bold font would be serialized inside the
     /// construct — `"…**bold**"` would come back as `"**bold\n\n**"`.
-    private static func separatorAttributes(after attrs: [NSAttributedString.Key: Any],
+    static func separatorAttributes(after attrs: [NSAttributedString.Key: Any],
                                             bodyFont: NSFont) -> [NSAttributedString.Key: Any] {
         var separatorAttrs: [NSAttributedString.Key: Any] = [
             .font: bodyFont,

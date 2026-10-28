@@ -594,9 +594,27 @@ struct MarkdownEditorView: NSViewRepresentable {
                 onReveal: onRevealBlock, onPreview: onPreviewBlock
             )
             textView.undoManager?.beginUndoGrouping()
-            textView.insertText(chipStr, replacementRange: textView.selectedRange())
+            textView.insertText(startingALine(chipStr, in: textView), replacementRange: textView.selectedRange())
             textView.undoManager?.endUndoGrouping()
             scheduleWriteBack()
+        }
+
+        /// W40.fix-notes-chip-inline-layout — a chip takes the width left on its line, so one inserted after
+        /// text on the same line (a caret mid-line, or the image line of the page chip pasted just before it)
+        /// was laid out beside that text with its name cut short. Starting it on a line of its own changes no
+        /// saved byte: the serializer already writes a header on a new line.
+        private func startingALine(_ block: NSAttributedString, in textView: NSTextView) -> NSAttributedString {
+            let location = textView.selectedRange().location
+            guard location > 0, let storage = textView.textStorage, location <= storage.length else { return block }
+            let previous = (storage.string as NSString).substring(with: NSRange(location: location - 1, length: 1))
+            guard !BlockParser.endsWithLineTerminator(previous) else { return block }
+            let line = NSMutableAttributedString(string: "\n", attributes: [
+                .font: NSFont.systemFont(ofSize: currentFontSize),
+                .foregroundColor: NSColor.textColor,
+                .noteBlockKind: BlockKind.plain
+            ])
+            line.append(block)
+            return line
         }
 
         // MARK: Source-block paste (W4-S6)
@@ -715,7 +733,7 @@ struct MarkdownEditorView: NSViewRepresentable {
                     chipStr.addAttribute(.notePendingThumbnailID, value: pendingID,
                                          range: NSRange(location: 0, length: chipStr.length))
                 }
-                textView.insertText(chipStr, replacementRange: textView.selectedRange())
+                textView.insertText(startingALine(chipStr, in: textView), replacementRange: textView.selectedRange())
             }
             textView.undoManager?.endUndoGrouping()
             scheduleWriteBack()

@@ -89,6 +89,7 @@ enum MarkdownBridge {
 
         // Each block: chip attachment + body
         for block in blocks {
+            endLine(of: result, fontSize: fontSize)
             let chipStr = buildChipAttributedString(
                 block: block, fontSize: fontSize, onReveal: onRevealBlock,
                 onPreview: onPreviewBlock, onJump: onJumpBlock, passageSummaries: passageSummaries
@@ -106,6 +107,19 @@ enum MarkdownBridge {
         }
 
         return ParseOutcome(attributed: result, failed: failed)
+    }
+
+    /// W40.fix-notes-chip-inline-layout — end the last line of `text` so the chip appended next begins one.
+    /// A parsed body ends without a line break (Apple's parser drops trailing newlines, and the styler writes
+    /// separators only BETWEEN blocks), and a chip takes the width left on its line, so a chip after a short
+    /// passage or an image line was laid out beside it with its name cut short. The break is a trailing block
+    /// separator of the line it ends, which `serializeParagraph` drops, so the saved Markdown is unchanged.
+    @MainActor
+    private static func endLine(of text: NSMutableAttributedString, fontSize: CGFloat) {
+        guard text.length > 0, !BlockParser.endsWithLineTerminator(text.string) else { return }
+        let previous = text.attributes(at: text.length - 1, effectiveRange: nil)
+        text.append(NSAttributedString(string: "\n", attributes: MarkdownStyler.separatorAttributes(
+            after: previous, bodyFont: NSFont.systemFont(ofSize: fontSize))))
     }
 
     /// Build an `NSAttributedString` containing a single chip attachment character

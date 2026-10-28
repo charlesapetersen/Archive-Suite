@@ -128,6 +128,68 @@ final class BlockChipTests: XCTestCase {
         }
     }
 
+    /// W40.fix-notes-chip-inline-layout — a chip takes the width left on its line (`attachmentBounds`), and a
+    /// block's parsed body ends without a line break, so a chip after a SHORT last line was laid out beside it:
+    /// half a line up, its name cut to "sample.pdf…". Only a last line too long to leave 200 pt hid it. Every
+    /// chip after a short passage, an image line or a note-passage block must start its own line at full width.
+    func testConsecutiveChipsAfterShortPassagesEachStartTheirOwnLine() throws {
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 600, height: 800),
+                              styleMask: [.titled], backing: .buffered, defer: true)
+        window.isReleasedWhenClosed = false
+        defer { window.close() }
+        func chips(in view: NSView) -> [BlockHeaderChipView] {
+            view.subviews.flatMap { ($0 as? BlockHeaderChipView).map { [$0] } ?? chips(in: $0) }
+        }
+        var markdown = ""
+        for p in 1...3 {
+            markdown += "<!-- block: reader-page\n     link: archivereader://reveal?root=TEST&rel=sample.pdf&page=\(p)\n"
+                + "     display: \"sample.pdf — p. \(p)\"\n     page: \(p)\n     thumb: assets/p\(p)-thumb.png -->\n"
+                + "![sample.pdf — p. \(p)](assets/p\(p)-thumb.png)\n\nPage passage \(p).\n\n"
+        }
+        markdown += "<!-- block: reader-doc\n     link: archivereader://reveal?root=TEST&rel=a.pdf\n"
+            + "     display: \"a.pdf\" -->\nShort.\n\n"
+            + "<!-- block: note-passage\n     display: \"Moore on Intel culture — 1968\"\n"
+            + "     note: archivenotes://open?id=00000000-0000-4000-8000-000000000001#block-0 -->\nMoore.\n"
+        let parsed = MarkdownBridge.parse(markdown: markdown)
+
+        // The text itself: every chip begins a line.
+        var headers: [Int] = []
+        parsed.enumerateAttribute(.attachment, in: NSRange(location: 0, length: parsed.length)) { value, range, _ in
+            if value is BlockHeaderAttachment { headers.append(range.location) }
+        }
+        XCTAssertEqual(headers.count, 5)
+        let text = parsed.string as NSString
+        for location in headers where location > 0 {
+            XCTAssertEqual(text.character(at: location - 1), 0x0A, "the chip at \(location) does not begin a line")
+        }
+        // …and the break is not saved: no header gains a blank line above it, and a second load and save
+        // writes the same bytes as the first.
+        let saved = MarkdownBridge.serialize(parsed)
+        XCTAssertFalse(saved.contains("\n\n<!-- block:"), "a saved header gained a blank line above it:\n\(saved)")
+        XCTAssertTrue(saved.contains("Page passage 1.\n<!-- block: reader-page"))
+        XCTAssertEqual(MarkdownBridge.serialize(MarkdownBridge.parse(markdown: saved)), saved)
+
+        // The layout: one column of full-width chips, each below the last.
+        let scroll = NSScrollView(frame: NSRect(x: 0, y: 0, width: 600, height: 800))
+        let textView = EditorTextView()
+        textView.frame = NSRect(x: 0, y: 0, width: 600, height: 800)
+        textView.autoresizingMask = [.width]
+        textView.textContainer?.widthTracksTextView = true
+        scroll.documentView = textView
+        textView.replaceStyledDocument(with: parsed)
+        window.contentView = scroll
+        window.contentView?.layoutSubtreeIfNeeded()
+        let frames = chips(in: textView).filter { !$0.frame.isEmpty }
+            .map { $0.convert($0.bounds, to: textView) }.sorted { $0.minY < $1.minY }
+        XCTAssertEqual(frames.count, 5, "every chip view must be installed")
+        guard let first = frames.first else { return }
+        for (k, frame) in frames.enumerated().dropFirst() {
+            XCTAssertEqual(frame.minX, first.minX, accuracy: 0.5, "chip \(k) is not at the line start: \(frames)")
+            XCTAssertEqual(frame.width, first.width, accuracy: 0.5, "chip \(k) is not full width: \(frames)")
+            XCTAssertGreaterThanOrEqual(frame.minY, frames[k - 1].maxY, "chip \(k) overlaps the one above: \(frames)")
+        }
+    }
+
     // MARK: - Multi-block body
 
     func testMultiBlockBodyRoundTrip() {
