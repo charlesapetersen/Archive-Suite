@@ -50,5 +50,8 @@ struct LocationsInspector: View {
                 }
             }
         }
+        // Leading, like the inspector's other sections; with no folder rows to fill the width the
+        // block was centred (W40.fix-notes-visual-polish).
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }

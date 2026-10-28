@@ -45,20 +45,20 @@ struct TemplatesManagerView: View {
         .onChange(of: model.templates.map(\.id)) { _, ids in
             if let selected, !ids.contains(selected) { self.selected = nil }
         }
-        .alert("New Template", isPresented: $showNew) {
-            TextField("Name", text: $newName)
-            Button("Create") {
-                let name = newName
-                Task { if let id = await model.createTemplate(name: name, kind: nav.windowKind) { selected = id } }
+        .sheet(isPresented: $showNew) {
+            let kind = nav.windowKind
+            NameEntrySheet(title: "New Template",
+                           message: "Create a \(kind == .extract ? "extract" : "note") template.",
+                           confirmLabel: "Create", name: $newName) { name in
+                Task { if let id = await model.createTemplate(name: name, kind: kind) { selected = id } }
             }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("Create a \(nav.windowKind == .extract ? "extract" : "note") template.")
         }
-        .alert("Rename Template", isPresented: boolBinding($renameID), presenting: renameID) { id in
-            TextField("Name", text: $renameText)
-            Button("Rename") { Task { await model.renameTemplate(id, to: renameText) } }
-            Button("Cancel", role: .cancel) {}
+        .sheet(isPresented: boolBinding($renameID)) {
+            let id = renameID
+            NameEntrySheet(title: "Rename Template", confirmLabel: "Rename", name: $renameText) { name in
+                guard let id else { return }
+                Task { await model.renameTemplate(id, to: name) }
+            }
         }
         .confirmationDialog("Delete this template?", isPresented: boolBinding($deleteID),
                             presenting: deleteID) { id in
@@ -122,7 +122,7 @@ struct TemplatesManagerView: View {
                 .help("Delete").disabled(selected == nil)
             Spacer()
             Text(selected == nil ? "Select a template to edit its body." : "Body edits save automatically.")
-                .font(.caption).foregroundStyle(.tertiary)
+                .font(.callout).foregroundStyle(.secondary)
         }
         .buttonStyle(.borderless)
         .padding(.horizontal, 10).padding(.vertical, 6)
@@ -134,7 +134,7 @@ struct TemplatesManagerView: View {
             Image(systemName: "square.on.square").font(.title).foregroundStyle(.tertiary)
             Text("No templates yet").foregroundStyle(.secondary)
             Text("Create one with +, then assign it to a folder via its “Template ▸” menu.")
-                .font(.caption).foregroundStyle(.tertiary).multilineTextAlignment(.center)
+                .font(.callout).foregroundStyle(.secondary).multilineTextAlignment(.center)
         }
         .padding()
     }

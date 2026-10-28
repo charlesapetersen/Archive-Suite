@@ -73,7 +73,9 @@ struct NoteEditorPane: View {
                 Divider()
             }
             if !isRaw {
+                // Nothing to format until a note's body is loaded (W40.fix-notes-visual-polish).
                 FormattingToolbar(context: formatting)
+                    .disabled(!editorIsReady)
                 Divider()
             }
             rawToggleBar

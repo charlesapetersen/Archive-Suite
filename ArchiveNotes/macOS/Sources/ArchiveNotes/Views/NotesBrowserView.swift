@@ -287,7 +287,7 @@ private struct ItemListPane: View {
                 .accessibilityIdentifier("an.list.empty.searchUnavailable")
         } else if model.allItems.isEmpty {
             ContentUnavailableView("No notes or extracts yet", systemImage: "note.text",
-                                   description: Text("Use New in the toolbar to create one."))
+                                   description: Text("Press ⌘N, or click the pencil button in the toolbar, to create one."))
                 .accessibilityElement(children: .combine)
                 .accessibilityIdentifier("an.list.empty.library")
         } else if let folder = selectedNormalFolder, folder.itemCount == 0 {
@@ -342,7 +342,7 @@ private struct DetailPane: View {
                         .padding(.horizontal, 10).padding(.vertical, 6)
                     } else {
                         Text("No template selected")
-                            .font(.caption).foregroundStyle(.tertiary)
+                            .font(.callout).foregroundStyle(.secondary)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(.horizontal, 10).padding(.vertical, 6)
                     }
@@ -433,8 +433,8 @@ private struct DetailPane: View {
             .accessibilityIdentifier("an.detail.header")
         } else {
             Text(nav.selection.count > 1 ? "\(nav.selection.count) items selected" : "No note selected")
-                .font(.caption)
-                .foregroundStyle(.tertiary)
+                .font(.callout)
+                .foregroundStyle(.secondary)
                 .opacity(nav.detailSwitchPending ? 0 : 1)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 10)

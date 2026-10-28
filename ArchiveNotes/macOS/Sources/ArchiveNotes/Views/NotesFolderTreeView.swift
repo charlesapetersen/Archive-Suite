@@ -51,25 +51,25 @@ struct NotesFolderTreeView: View {
         .onChange(of: model.selectedSmartId) { _, _ in syncSelectionFromModel() }
         .onChange(of: nav.showingTemplates) { _, _ in syncSelectionFromModel() }
         // Rename
-        .alert("Rename Folder", isPresented: boolBinding($renameID), presenting: renameID) { id in
-            TextField("Name", text: $renameText)
-            Button("Rename") { Task { await model.renameFolder(id, to: renameText) } }
-            Button("Cancel", role: .cancel) {}
+        .sheet(isPresented: boolBinding($renameID)) {
+            let id = renameID
+            NameEntrySheet(title: "Rename Folder", confirmLabel: "Rename", name: $renameText) { name in
+                guard let id else { return }
+                Task { await model.renameFolder(id, to: name) }
+            }
         }
         // New Folder
-        .alert("New Folder", isPresented: $showNewFolder) {
-            TextField("Name", text: $newFolderText)
-            Button("Create") {
-                let parent = newFolderParentID
+        .sheet(isPresented: $showNewFolder) {
+            let parent = newFolderParentID
+            NameEntrySheet(title: "New Folder",
+                           message: parent == nil ? "Create a top-level folder." : "Create a subfolder.",
+                           confirmLabel: "Create", name: $newFolderText) { name in
                 Task {
-                    if let id = await model.createFolder(name: newFolderText, under: parent) {
+                    if let id = await model.createFolder(name: name, under: parent) {
                         model.setFolderScope(id)
                     }
                 }
             }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text(newFolderParentID == nil ? "Create a top-level folder." : "Create a subfolder.")
         }
         // Delete — batched delete-last-instance guard (§3.6, §5). If deleting the folder would strand
         // sole-instance notes, the button + message name the permanent deletion; otherwise it's a plain
@@ -136,7 +136,8 @@ struct NotesFolderTreeView: View {
         let shown = titles.prefix(8).joined(separator: ", ")
         let list = titles.count > 8 ? "\(shown), …" : shown
         let n = deleteStranded.count
-        return "Deleting this folder will permanently delete \(n) note\(n == 1 ? "" : "s") that exist nowhere else: \(list)."
+        let noun = n == 1 ? "1 note that exists" : "\(n) notes that exist"
+        return "Deleting this folder will permanently delete \(noun) nowhere else: \(list)."
     }
 
     /// Handle a table→folder drop: plain = MOVE (from the current scope), ⌥ = REPLICATE. Reads the

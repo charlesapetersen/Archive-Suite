@@ -53,6 +53,8 @@ struct QualityInlineMenu: View {
             .contentShape(Rectangle())
         }
         .menuStyle(.borderlessButton)
+        // The label already draws its own small chevron; the menu's indicator made it "⌄ ★★★ ⌄".
+        .menuIndicator(.hidden)
         .controlSize(.small)
         .accessibilityLabel("Quality")
         .accessibilityValue(quality.map { "Quality \($0)" } ?? "None")

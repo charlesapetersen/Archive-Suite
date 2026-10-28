@@ -34,16 +34,15 @@ struct NotesFilterBar: View {
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 6)
-        .alert("Save as Smart Folder", isPresented: $showingSaveSheet) {
-            TextField("Name", text: $smartFolderName)
-            Button("Cancel", role: .cancel) { smartFolderName = "" }
-            Button("Save") {
-                let name = smartFolderName
-                smartFolderName = ""
-                Task { await nav.saveAsSmartFolder(named: name) }
-            }
-        } message: {
-            Text("Saves the current filters and keyword as a reusable smart folder.")
+        .sheet(isPresented: $showingSaveSheet) {
+            NameEntrySheet(title: "Save as Smart Folder",
+                           message: "Saves the current filters and keyword as a reusable smart folder.",
+                           confirmLabel: "Save", name: $smartFolderName,
+                           onConfirm: { name in
+                               smartFolderName = ""
+                               Task { await nav.saveAsSmartFolder(named: name) }
+                           },
+                           onCancel: { smartFolderName = "" })
         }
     }
 
@@ -88,7 +87,7 @@ struct NotesFilterBar: View {
     }
 
     private var keywordField: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: 6) {
             Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
             TextField("Search notes…", text: $nav.searchText)
                 .textFieldStyle(.plain)

@@ -236,7 +236,7 @@ struct NotesTableView: NSViewRepresentable {
             if let reused = tableView.makeView(withIdentifier: cellID, owner: nil) as? NSTableCellView {
                 cell = reused
             } else {
-                cell = NSTableCellView()
+                cell = colID == "title" ? NotesTitleCellView() : NSTableCellView()
                 cell.identifier = cellID
                 let tf = colID == "title"
                     ? NoteTitleTextField(labelWithString: "") : NSTextField(labelWithString: "")
@@ -285,8 +285,9 @@ struct NotesTableView: NSViewRepresentable {
                 // replicant reads as one at a glance (the "In" column shows the count). W6-S5, §5.
                 if (parent.model.instanceCounts[item.id] ?? 0) > 1 {
                     let styled = NSMutableAttributedString(
-                        string: "⧉ ",
-                        attributes: [.foregroundColor: NSColor.controlAccentColor, .font: regularFont])
+                        string: NotesTitleCellView.replicatedGlyph,
+                        attributes: [.foregroundColor: NotesTitleCellView.glyphColor(for: cell.backgroundStyle),
+                                     .font: regularFont])
                     styled.append(NSAttributedString(
                         string: displayTitle,
                         attributes: [.foregroundColor: NSColor.labelColor, .font: regularFont]))
@@ -560,5 +561,30 @@ final class ContextMenuTableView: NSTableView {
         var selIDs = Set<UUID>()
         for i in selectedRowIndexes where i < allIDs.count { selIDs.insert(allIDs[i]) }
         return contextMenuProvider?(selIDs)
+    }
+}
+
+/// The title column's cell. A replicated item's title starts with an accent-coloured glyph, which an
+/// attributed colour keeps on a selected row, where the accent selection hid it; the cell re-tints it
+/// as the row's background style changes (W40.fix-notes-visual-polish).
+final class NotesTitleCellView: NSTableCellView {
+    static let replicatedGlyph = "⧉ "
+
+    static func glyphColor(for style: NSView.BackgroundStyle) -> NSColor {
+        style == .emphasized ? .alternateSelectedControlTextColor : .controlAccentColor
+    }
+
+    override var backgroundStyle: NSView.BackgroundStyle {
+        didSet { if backgroundStyle != oldValue { retintGlyph() } }
+    }
+
+    private func retintGlyph() {
+        guard let field = textField, !((field as? NoteTitleTextField)?.isRenaming ?? false) else { return }
+        let current = field.attributedStringValue
+        guard current.string.hasPrefix(Self.replicatedGlyph) else { return }
+        let styled = NSMutableAttributedString(attributedString: current)
+        styled.addAttribute(.foregroundColor, value: Self.glyphColor(for: backgroundStyle),
+                            range: NSRange(location: 0, length: (Self.replicatedGlyph as NSString).length))
+        field.attributedStringValue = styled
     }
 }

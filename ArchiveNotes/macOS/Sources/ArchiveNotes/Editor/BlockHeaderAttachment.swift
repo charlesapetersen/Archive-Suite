@@ -219,7 +219,9 @@ final class BlockHeaderChipView: NSView {
         let label = NSTextField(labelWithString: displayText)
         label.font = .systemFont(ofSize: 11, weight: .medium)
         label.textColor = tint
-        label.lineBreakMode = .byTruncatingTail
+        // Middle, as Finder does: a file name's end ("….pdf — p. 3") says which page it is, and
+        // cutting the tail left fragments such as "Dean Papers (moved)…." (W40.fix-notes-visual-polish).
+        label.lineBreakMode = .byTruncatingMiddle
         label.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
         // Assemble action buttons by what the block actually supports:

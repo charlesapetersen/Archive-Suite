@@ -205,9 +205,11 @@ final class FormattingContext: ObservableObject {
         alert.accessoryView = input
         alert.window.initialFirstResponder = input
 
-        guard alert.runModal() == .alertFirstButtonReturn,
-              let ref = ZoteroSelectLink.parse(input.stringValue) else { return }
-        insertZoteroBlock(ref)
+        alert.presentAsSheet(on: textView?.window ?? NSApp.keyWindow) { [weak self] response in
+            guard response == .alertFirstButtonReturn,
+                  let ref = ZoteroSelectLink.parse(input.stringValue) else { return }
+            self?.insertZoteroBlock(ref)
+        }
     }
 
     /// Insert a Zotero source block (§6 `zotero:` header) at the caret. The chip
@@ -331,13 +333,16 @@ final class FormattingContext: ObservableObject {
             model.statusMessage = "There are no extracts yet — use Create Extract first."
             return
         }
-        guard let chosen = Self.chooseExtract(from: extracts) else { return }
-        Task { await model.appendToExtract(chosen, from: source) }
+        Self.chooseExtract(from: extracts, on: textView?.window ?? NSApp.keyWindow) { [weak model] chosen in
+            guard let chosen, let model else { return }
+            Task { await model.appendToExtract(chosen, from: source) }
+        }
     }
 
-    /// Modal picker for "Append to Extract…" (mirrors the NSAlert idiom in `attachZoteroLink` /
-    /// `insertLink`). Returns the chosen extract id, or nil when cancelled / nothing valid picked.
-    private static func chooseExtract(from extracts: [(id: UUID, title: String)]) -> UUID? {
+    /// Picker sheet for "Append to Extract…" (mirrors the NSAlert idiom in `attachZoteroLink` /
+    /// `insertLink`). Calls back with the chosen extract id, or nil when cancelled / nothing valid picked.
+    private static func chooseExtract(from extracts: [(id: UUID, title: String)], on window: NSWindow?,
+                                      completion: @escaping (UUID?) -> Void) {
         let alert = NSAlert()
         alert.messageText = "Append to Extract"
         alert.informativeText = "Choose the extract to append this passage to."
@@ -346,10 +351,13 @@ final class FormattingContext: ObservableObject {
         let popup = NSPopUpButton(frame: NSRect(x: 0, y: 0, width: 320, height: 24))
         for e in extracts { popup.addItem(withTitle: e.title) }
         alert.accessoryView = popup
-        guard alert.runModal() == .alertFirstButtonReturn else { return nil }
-        let idx = popup.indexOfSelectedItem
-        guard extracts.indices.contains(idx) else { return nil }
-        return extracts[idx].id
+        alert.presentAsSheet(on: window) { response in
+            let idx = popup.indexOfSelectedItem
+            guard response == .alertFirstButtonReturn, extracts.indices.contains(idx) else {
+                completion(nil); return
+            }
+            completion(extracts[idx].id)
+        }
     }
 }
 
@@ -508,11 +516,12 @@ enum EditorFormatting {
         alert.accessoryView = input
         alert.window.initialFirstResponder = input
 
-        guard alert.runModal() == .alertFirstButtonReturn else { return }
-        let url = input.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !url.isEmpty else { return }
-
-        applyLink(textView, url: url)
+        alert.presentAsSheet(on: textView.window) { [weak textView] response in
+            guard response == .alertFirstButtonReturn, let textView else { return }
+            let url = input.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !url.isEmpty else { return }
+            applyLink(textView, url: url)
+        }
     }
 
     /// Apply a link attribute (testable, no dialog).
@@ -809,5 +818,20 @@ enum EditorFormatting {
     static func paragraphRange(for selectedRange: NSRange,
                                 in storage: NSAttributedString) -> NSRange {
         (storage.string as NSString).paragraphRange(for: selectedRange)
+    }
+}
+
+extension NSAlert {
+    /// Run the alert as a sheet on `window`, so it sits under the window's title bar like the app's
+    /// SwiftUI prompts instead of floating off-centre over it (W40.fix-notes-visual-polish). The
+    /// sheet is window-modal, and the window's selection cannot move while it is up. With no window,
+    /// or one already showing a sheet, it falls back to the app-modal run it replaced.
+    func presentAsSheet(on window: NSWindow?,
+                        completion: @escaping (NSApplication.ModalResponse) -> Void) {
+        if let window, window.attachedSheet == nil {
+            beginSheetModal(for: window, completionHandler: completion)
+        } else {
+            completion(runModal())
+        }
     }
 }

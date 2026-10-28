@@ -30,9 +30,10 @@ final class NotesModel: ObservableObject {
     private var smartCountGeneration = 0
     private var smartCountWorker: Task<[UUID: Int]?, Never>?
     private var smartCountApply: Task<Void, Never>?
-    /// Distinct items across the whole store — the badge on the "All Notes" pseudo-row. (Membership-
-    /// based here; the exact index-served count arrives with the item list in W6-S4.)
-    @Published private(set) var allNotesCount: Int = 0
+    /// Every item in the store — the badge on the "All Notes" pseudo-row, counted from the same item
+    /// list All Notes shows. It was counted from folder memberships, so a note in no folder was listed
+    /// but not counted (W40.fix-notes-visual-polish).
+    var allNotesCount: Int { allItems.count }
 
     // MARK: Item list source (W6-S3)
 
@@ -1382,7 +1383,6 @@ final class NotesModel: ObservableObject {
         normalTree = NotesFolderNode.buildNormalForest(folders: folders, memberships: memberships)
         smartFolders = NotesFolderNode.smartFolderNodes(
             folders: folders, excluding: [OrganizationStore.allNotesFolderId])
-        allNotesCount = Set(memberships.map(\.itemId)).count
         refreshSmartFolderCounts()
     }
 
