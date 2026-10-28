@@ -83,8 +83,8 @@ struct HardDeleteWindowTests {
     }
 
     /// The memberships SQLite actually holds for `id` — the durable answer, not the in-memory one.
-    private func persistedFolders(_ env: Env, _ id: UUID) async -> [UUID] {
-        await env.index.allMemberships().filter { $0.itemId == id }.map(\.folderId)
+    private func persistedFolders(_ env: Env, _ id: UUID) async throws -> [UUID] {
+        try await env.index.allMemberships().filter { $0.itemId == id }.map(\.folderId)
     }
 
     /// Drive `item` to a pending §3.6 delete-last-instance confirmation, as the sidebar does.
@@ -114,7 +114,7 @@ struct HardDeleteWindowTests {
             try await env.org.moveMembership(item: b, from: f1, to: f2)
         }
         #expect(env.org.foldersContaining(item: b).isEmpty)
-        let persisted = await persistedFolders(env, b)
+        let persisted = try await persistedFolders(env, b)
         #expect(persisted.isEmpty, "the refusal must also mean nothing reached SQLite")
     }
 
@@ -213,7 +213,7 @@ struct HardDeleteWindowTests {
         #expect(windowWasOpen, "non-vacuity: the replicate really did run inside an open window")
         #expect(!itemDirExists(env, b), "the confirmed delete still happens — it was genuinely the last")
         #expect(env.org.foldersContaining(item: b).isEmpty, "NO membership may point at a trashed note")
-        let persisted = await persistedFolders(env, b)
+        let persisted = try await persistedFolders(env, b)
         #expect(persisted.isEmpty, "and none may survive in SQLite either")
         #expect(env.model.statusMessage == "That note is being deleted — it can't be filed into a folder.",
                 "the refused drag says why, instead of silently doing nothing")
@@ -235,7 +235,7 @@ struct HardDeleteWindowTests {
 
         #expect(!itemDirExists(env, b))
         #expect(env.org.foldersContaining(item: b).isEmpty)
-        let persisted = await persistedFolders(env, b)
+        let persisted = try await persistedFolders(env, b)
         #expect(persisted.isEmpty)
         #expect(env.model.statusMessage?.contains("Couldn't move") == true,
                 "a refused move is reported, never presented as a completed one")
@@ -263,7 +263,7 @@ struct HardDeleteWindowTests {
         #expect(windowWasOpen)
         #expect(!itemDirExists(env, b))
         #expect(env.org.foldersContaining(item: b).isEmpty)
-        let persisted = await persistedFolders(env, b)
+        let persisted = try await persistedFolders(env, b)
         #expect(persisted.isEmpty)
     }
 

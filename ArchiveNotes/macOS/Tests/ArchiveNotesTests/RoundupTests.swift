@@ -54,7 +54,7 @@ struct RoundupTests {
         await index.close()
         try await index.open()
         #expect(await index.summary(for: item.id)?.roundup == true)
-        #expect(await index.allFolders().contains { $0.id == folderID })
+        #expect(try await index.allFolders().contains { $0.id == folderID })
         #expect(await model.setRoundup(false, for: item.id))
         let ordinary = try #require(await index.summary(for: item.id))
         #expect(!decoded.matches(ordinary, folderItemIDs: nil))
@@ -89,7 +89,7 @@ struct RoundupTests {
         #expect(await index.existingMTimes()[item.id.uuidString] == nil,
                 "the indexer must not skip a pre-roundup row even when disk mtime is unchanged")
         #expect(await index.search("RoundupSearchMarker") == [item.id])
-        #expect(await index.allFolders().contains { $0.id == folder.id })
+        #expect(try await index.allFolders().contains { $0.id == folder.id })
         try await index.upsertBatch([row])
         #expect(await index.summary(for: item.id)?.roundup == true)
         #expect(await index.existingMTimes()[item.id.uuidString] == ref.mtime)

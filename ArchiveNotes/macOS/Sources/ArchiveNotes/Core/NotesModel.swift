@@ -298,6 +298,8 @@ final class NotesModel: ObservableObject {
             do {
                 try await organization.load(storeRoot: root)
             } catch {
+                // `load` has left the folders on show read-only from the mirror rather than adopt a
+                // graph it could not read whole (W40.fix-notes-index-failure-empty-fu1).
                 report(error, "open the notes store")
             }
         } catch {

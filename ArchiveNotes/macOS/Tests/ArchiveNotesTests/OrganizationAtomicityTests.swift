@@ -94,16 +94,16 @@ struct OrganizationAtomicityTests {
 
     // MARK: - Readers that ask the DISK, not memory
 
-    private func dbFolder(_ id: UUID, _ index: NotesIndex) async -> VFolder? {
-        await index.allFolders().first { $0.id == id }
+    private func dbFolder(_ id: UUID, _ index: NotesIndex) async throws -> VFolder? {
+        try await index.allFolders().first { $0.id == id }
     }
 
-    private func dbFolders(of item: UUID, _ index: NotesIndex) async -> Set<UUID> {
-        Set(await index.allMemberships().filter { $0.itemId == item }.map(\.folderId))
+    private func dbFolders(of item: UUID, _ index: NotesIndex) async throws -> Set<UUID> {
+        Set(try await index.allMemberships().filter { $0.itemId == item }.map(\.folderId))
     }
 
-    private func dbAssignedFolders(_ index: NotesIndex) async -> Set<UUID> {
-        Set(await index.allTemplateAssignments().map(\.folderId))
+    private func dbAssignedFolders(_ index: NotesIndex) async throws -> Set<UUID> {
+        Set(try await index.allTemplateAssignments().map(\.folderId))
     }
 
     // MARK: - The fixture is honest
@@ -116,7 +116,7 @@ struct OrganizationAtomicityTests {
 
         try await breakDeletes(on: "folders", env.index)
         await #expect(throws: (any Error).self) { try await env.index.deleteFolder(id: folder.id) }
-        #expect(await dbFolder(folder.id, env.index) != nil,
+        #expect(try await dbFolder(folder.id, env.index) != nil,
                 "the premise: the row survives a refused delete")
     }
 
@@ -154,11 +154,11 @@ struct OrganizationAtomicityTests {
         try await breakDeletes(on: "folders", env.index)
         await #expect(throws: (any Error).self) { _ = try await env.org.deleteFolder(folder.id) }
 
-        #expect(await dbFolders(of: a, env.index) == [folder.id], "membership must roll back with it")
-        #expect(await dbFolders(of: b, env.index) == [folder.id])
-        #expect(await dbAssignedFolders(env.index).contains(folder.id),
+        #expect(try await dbFolders(of: a, env.index) == [folder.id], "membership must roll back with it")
+        #expect(try await dbFolders(of: b, env.index) == [folder.id])
+        #expect(try await dbAssignedFolders(env.index).contains(folder.id),
                 "the template assignment must roll back too")
-        #expect(await dbFolder(folder.id, env.index) != nil)
+        #expect(try await dbFolder(folder.id, env.index) != nil)
     }
 
     /// The property the finding is really about, stated directly: **memory and the DB must still say
@@ -183,10 +183,10 @@ struct OrganizationAtomicityTests {
         // …and the disk says the same. Pre-fix the memberships and the assignment were already gone
         // from the DB while these in-memory checks all still passed, and `load()` prefers the DB — so
         // the next launch would have adopted the lossy half and orphaned the item with no §3.6 prompt.
-        #expect(await dbFolders(of: item, env.index) == Set(env.org.foldersContaining(item: item)),
+        #expect(try await dbFolders(of: item, env.index) == Set(env.org.foldersContaining(item: item)),
                 "memory must not describe memberships the DB has already dropped")
-        #expect(await dbAssignedFolders(env.index) == Set(env.org.assignments.map(\.folderId)))
-        #expect(await Set(env.index.allFolders().map(\.id)) == Set(env.org.folders.map(\.id)))
+        #expect(try await dbAssignedFolders(env.index) == Set(env.org.assignments.map(\.folderId)))
+        #expect(try await Set(env.index.allFolders().map(\.id)) == Set(env.org.folders.map(\.id)))
     }
 
     /// The finding's first bullet, directly: the child used to be reparented in memory *before* the DB
@@ -204,7 +204,7 @@ struct OrganizationAtomicityTests {
 
         #expect(env.org.folders.first { $0.id == child.id }?.parentId == doomed.id,
                 "memory must not run ahead of a reparent the disk refused")
-        #expect(await dbFolder(child.id, env.index)?.parentId == doomed.id)
+        #expect(try await dbFolder(child.id, env.index)?.parentId == doomed.id)
     }
 
     @Test("a healthy folder delete still reparents, unlinks and reports its orphans")
@@ -225,11 +225,11 @@ struct OrganizationAtomicityTests {
 
         #expect(orphaned == [orphan], "only the sole-instance item is reported stranded")
         #expect(env.org.folders.first { $0.id == child.id }?.parentId == parent.id)
-        #expect(await dbFolder(child.id, env.index)?.parentId == parent.id)
-        #expect(await dbFolder(doomed.id, env.index) == nil)
-        #expect(await dbFolders(of: survivor, env.index) == [keeper.id])
-        #expect(await dbFolders(of: orphan, env.index).isEmpty)
-        #expect(await dbAssignedFolders(env.index).contains(doomed.id) == false)
+        #expect(try await dbFolder(child.id, env.index)?.parentId == parent.id)
+        #expect(try await dbFolder(doomed.id, env.index) == nil)
+        #expect(try await dbFolders(of: survivor, env.index) == [keeper.id])
+        #expect(try await dbFolders(of: orphan, env.index).isEmpty)
+        #expect(try await dbAssignedFolders(env.index).contains(doomed.id) == false)
         #expect(env.org.mirrorFailure == nil, "a writable fixture must not raise a mirror warning")
     }
 
@@ -249,8 +249,8 @@ struct OrganizationAtomicityTests {
 
         let orphaned = try await env.org.deleteFolder(folder.id)
         #expect(orphaned == [item])
-        #expect(await dbFolder(folder.id, env.index) == nil)
-        #expect(await dbFolders(of: item, env.index).isEmpty)
+        #expect(try await dbFolder(folder.id, env.index) == nil)
+        #expect(try await dbFolders(of: item, env.index).isEmpty)
     }
 
     // MARK: - move — never replicated in both folders
@@ -271,7 +271,7 @@ struct OrganizationAtomicityTests {
             try await env.org.moveMembership(item: item, from: source.id, to: target.id)
         }
 
-        #expect(await dbFolders(of: item, env.index) == [source.id],
+        #expect(try await dbFolders(of: item, env.index) == [source.id],
                 "the target add must roll back with the refused source removal")
         #expect(env.org.foldersContaining(item: item) == [source.id])
     }
@@ -287,7 +287,7 @@ struct OrganizationAtomicityTests {
 
         try await env.org.moveMembership(item: item, from: source.id, to: target.id)
 
-        #expect(await dbFolders(of: item, env.index) == [target.id])
+        #expect(try await dbFolders(of: item, env.index) == [target.id])
         #expect(env.org.foldersContaining(item: item) == [target.id])
     }
 
@@ -320,7 +320,7 @@ struct OrganizationAtomicityTests {
 
         try await env.org.moveMembership(item: item, from: source.id, to: target.id)
 
-        #expect(await dbFolders(of: item, env.index) == [target.id])
+        #expect(try await dbFolders(of: item, env.index) == [target.id])
     }
 
     // MARK: - move — what the operator is told
@@ -357,7 +357,7 @@ struct OrganizationAtomicityTests {
         await env.nav.move([item], to: target.id, from: source.id)
 
         #expect(env.model.statusMessage == nil, "got: \(env.model.statusMessage ?? "nil")")
-        #expect(await dbFolders(of: item, env.index) == [target.id])
+        #expect(try await dbFolders(of: item, env.index) == [target.id])
     }
 
     // MARK: - deleteTemplate — the trash decides
@@ -382,7 +382,7 @@ struct OrganizationAtomicityTests {
         await env.model.deleteTemplate(template.id)
 
         #expect(FileManager.default.fileExists(atPath: dir.path), "the template survived the refusal")
-        #expect(await dbAssignedFolders(env.index) == [a.id, b.id],
+        #expect(try await dbAssignedFolders(env.index) == [a.id, b.id],
                 "so its assignments must survive with it")
         #expect(Set(env.org.assignments.map(\.folderId)) == [a.id, b.id])
         #expect(env.model.statusMessage?.contains("delete the template") == true,
@@ -406,7 +406,7 @@ struct OrganizationAtomicityTests {
 
         await env.model.deleteTemplate(template.id)
 
-        #expect(await dbAssignedFolders(env.index) == [other.id],
+        #expect(try await dbAssignedFolders(env.index) == [other.id],
                 "only the deleted template's assignments go")
         #expect(env.org.assignments.map(\.folderId) == [other.id])
         #expect(env.model.statusMessage == nil, "got: \(env.model.statusMessage ?? "nil")")
@@ -433,7 +433,7 @@ struct OrganizationAtomicityTests {
             try await env.org.removeTemplateAssignments(folders: [a.id, b.id])
         }
 
-        #expect(await dbAssignedFolders(env.index) == [a.id, b.id],
+        #expect(try await dbAssignedFolders(env.index) == [a.id, b.id],
                 "the first folder's clear must roll back with the second one's refusal")
         #expect(Set(env.org.assignments.map(\.folderId)) == [a.id, b.id])
     }

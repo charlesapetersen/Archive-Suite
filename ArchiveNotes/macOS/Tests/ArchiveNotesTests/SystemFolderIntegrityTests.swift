@@ -68,8 +68,8 @@ struct SystemFolderIntegrityTests {
             """)
     }
 
-    private func dbMembershipCount(_ index: NotesIndex, folder: UUID) async -> Int {
-        await index.allMemberships().count { $0.folderId == folder }
+    private func dbMembershipCount(_ index: NotesIndex, folder: UUID) async throws -> Int {
+        try await index.allMemberships().count { $0.folderId == folder }
     }
 
     // MARK: - (a) Rename / delete are refused on the fixed ids
@@ -89,12 +89,12 @@ struct SystemFolderIntegrityTests {
                 _ = try await env.org.deleteFolder(id)
             }
             #expect(env.org.folders.contains { $0.id == id })
-            #expect(await env.index.allFolders().contains { $0.id == id })
+            #expect(try await env.index.allFolders().contains { $0.id == id })
         }
 
         // The refusal is total: the memberships the delete would have swept are untouched.
         #expect(env.org.items(in: OrganizationStore.inboxFolderId) == [item])
-        #expect(await dbMembershipCount(env.index, folder: OrganizationStore.inboxFolderId) == 1)
+        #expect(try await dbMembershipCount(env.index, folder: OrganizationStore.inboxFolderId) == 1)
     }
 
     @Test("renameFolder refuses a system folder")
@@ -119,7 +119,7 @@ struct SystemFolderIntegrityTests {
         #expect(env.org.folders.first { $0.id == f.id }?.name == "Sources")
         _ = try await env.org.deleteFolder(f.id)
         #expect(!env.org.folders.contains { $0.id == f.id })
-        #expect(await !env.index.allFolders().contains { $0.id == f.id })
+        #expect(try await !env.index.allFolders().contains { $0.id == f.id })
     }
 
     @Test("the model reports the refusal in words and deletes nothing")
@@ -176,7 +176,7 @@ struct SystemFolderIntegrityTests {
         // "seed only when the table is empty" rule never fired again.
         _ = try await env.org.createFolder(name: "Research")
         try await deleteFolderRowDirectly(OrganizationStore.inboxFolderId, in: env.index)
-        #expect(await !env.index.allFolders().contains { $0.id == OrganizationStore.inboxFolderId })
+        #expect(try await !env.index.allFolders().contains { $0.id == OrganizationStore.inboxFolderId })
 
         let reloaded = try await relaunch(env)
 
@@ -184,7 +184,7 @@ struct SystemFolderIntegrityTests {
         #expect(inbox?.name == "Inbox")
         #expect(inbox?.kind == .normal)
         #expect(inbox?.parentId == nil)
-        #expect(await env.index.allFolders().contains { $0.id == OrganizationStore.inboxFolderId })
+        #expect(try await env.index.allFolders().contains { $0.id == OrganizationStore.inboxFolderId })
         // Restored, not duplicated.
         #expect(reloaded.folders.count(where: { $0.id == OrganizationStore.inboxFolderId }) == 1)
         #expect(reloaded.folders.count == 4)
@@ -310,9 +310,9 @@ struct SystemFolderIntegrityTests {
         #expect(org.assignments.isEmpty)
 
         // Memory and the DB agree — the import must not leave the store holding rows SQLite refused.
-        let dbMemberships = await index.allMemberships()
+        let dbMemberships = try await index.allMemberships()
         #expect(Set(dbMemberships.map(\.itemId)) == Set([keptItem, inboxItem]))
-        #expect(await index.allTemplateAssignments().isEmpty)
+        #expect(try await index.allTemplateAssignments().isEmpty)
     }
 
     // MARK: - (c) A membership can't name a folder that doesn't exist
@@ -327,7 +327,7 @@ struct SystemFolderIntegrityTests {
             try await env.org.addMembership(item: UUID(), folder: ghostFolder)
         }
         #expect(env.org.memberships.isEmpty)
-        #expect(await env.index.allMemberships().isEmpty)
+        #expect(try await env.index.allMemberships().isEmpty)
     }
 
     @Test("moveMembership refuses an unknown target and leaves the source membership intact")
@@ -342,7 +342,7 @@ struct SystemFolderIntegrityTests {
                                              from: OrganizationStore.inboxFolderId, to: UUID())
         }
         #expect(env.org.items(in: OrganizationStore.inboxFolderId) == [item])
-        #expect(await dbMembershipCount(env.index, folder: OrganizationStore.inboxFolderId) == 1)
+        #expect(try await dbMembershipCount(env.index, folder: OrganizationStore.inboxFolderId) == 1)
     }
 
     /// Non-vacuity for the guard above: a membership to a folder that DOES exist still lands.
@@ -355,7 +355,7 @@ struct SystemFolderIntegrityTests {
         let item = UUID()
         try await env.org.addMembership(item: item, folder: f.id)
         #expect(env.org.items(in: f.id) == [item])
-        #expect(await dbMembershipCount(env.index, folder: f.id) == 1)
+        #expect(try await dbMembershipCount(env.index, folder: f.id) == 1)
     }
 
     // MARK: - (c) The SQL layer refuses it too
@@ -371,7 +371,7 @@ struct SystemFolderIntegrityTests {
         await #expect(throws: NotesIndex.IndexError.self) {
             try await env.index.insertMembership(ghost)
         }
-        #expect(await env.index.allMemberships().isEmpty)
+        #expect(try await env.index.allMemberships().isEmpty)
     }
 
     /// The other half of the constraint: a folder row cannot be dropped out from under its contents.
@@ -385,7 +385,7 @@ struct SystemFolderIntegrityTests {
         await #expect(throws: NotesIndex.IndexError.self) {
             try await env.index.deleteFolder(id: f.id)
         }
-        #expect(await env.index.allFolders().contains { $0.id == f.id })
+        #expect(try await env.index.allFolders().contains { $0.id == f.id })
     }
 
     /// Non-vacuity for the refusal above — the app's own delete path still works, because
@@ -403,11 +403,11 @@ struct SystemFolderIntegrityTests {
 
         let orphaned = try await env.org.deleteFolder(f.id)
         #expect(orphaned.isEmpty)                       // still in `child`
-        #expect(await !env.index.allFolders().contains { $0.id == f.id })
-        #expect(await dbMembershipCount(env.index, folder: f.id) == 0)
+        #expect(try await !env.index.allFolders().contains { $0.id == f.id })
+        #expect(try await dbMembershipCount(env.index, folder: f.id) == 0)
         // The child was reparented to root, and — the REPLACE trap — kept its membership.
-        #expect(await env.index.allFolders().first { $0.id == child.id }?.parentId == nil)
-        #expect(await dbMembershipCount(env.index, folder: child.id) == 1)
+        #expect(try await env.index.allFolders().first { $0.id == child.id }?.parentId == nil)
+        #expect(try await dbMembershipCount(env.index, folder: child.id) == 1)
     }
 
     /// A guard, not a reproduction: `INSERT OR REPLACE` survives the NO ACTION foreign key (SQLite
@@ -426,12 +426,12 @@ struct SystemFolderIntegrityTests {
         try await env.org.addMembership(item: b, folder: f.id)
 
         try await env.org.renameFolder(f.id, to: "Sources")
-        #expect(await dbMembershipCount(env.index, folder: f.id) == 2)
-        #expect(await env.index.allFolders().first { $0.id == f.id }?.name == "Sources")
+        #expect(try await dbMembershipCount(env.index, folder: f.id) == 2)
+        #expect(try await env.index.allFolders().first { $0.id == f.id }?.name == "Sources")
 
         try await env.org.moveFolder(f.id, newParent: parent.id, sortOrder: 0)
-        #expect(await dbMembershipCount(env.index, folder: f.id) == 2)
-        let moved = await env.index.allFolders().first { $0.id == f.id }
+        #expect(try await dbMembershipCount(env.index, folder: f.id) == 2)
+        let moved = try await env.index.allFolders().first { $0.id == f.id }
         #expect(moved?.parentId == parent.id)
         #expect(moved?.name == "Sources")               // the UPDATE wrote every column, not just one
     }
@@ -446,12 +446,12 @@ struct SystemFolderIntegrityTests {
 
         let f = try await env.org.createFolder(name: "Research")
         try await env.index.deleteFolder(id: f.id)      // no memberships, so the FK allows it
-        #expect(await !env.index.allFolders().contains { $0.id == f.id })
+        #expect(try await !env.index.allFolders().contains { $0.id == f.id })
 
         var stale = f
         stale.name = "Sources"
         try await env.index.updateFolder(stale)
-        #expect(await !env.index.allFolders().contains { $0.id == f.id })
+        #expect(try await !env.index.allFolders().contains { $0.id == f.id })
     }
 
     /// A DB written before the FK existed must open, keep every row — **including** the ghosts that are
@@ -490,7 +490,7 @@ struct SystemFolderIntegrityTests {
         try await index.open()                          // the migration runs here
         defer { Task { await index.close() } }
 
-        let rows = await index.allMemberships()
+        let rows = try await index.allMemberships()
         #expect(rows.count == 2)                        // nothing was dropped to satisfy the constraint
         #expect(rows.contains { $0.itemId == realItem })
         #expect(rows.contains { $0.itemId == ghostItem && $0.folderId == ghostFolder })
@@ -522,8 +522,8 @@ struct SystemFolderIntegrityTests {
             memberships: [Membership(itemId: item, folderId: fresh.id, addedAt: Date())],
             assignments: [])
 
-        #expect(await env.index.allFolders().map(\.id) == [fresh.id])
-        #expect(await env.index.allMemberships().map(\.itemId) == [item])
-        #expect(await env.index.allTemplateAssignments().isEmpty)
+        #expect(try await env.index.allFolders().map(\.id) == [fresh.id])
+        #expect(try await env.index.allMemberships().map(\.itemId) == [item])
+        #expect(try await env.index.allTemplateAssignments().isEmpty)
     }
 }

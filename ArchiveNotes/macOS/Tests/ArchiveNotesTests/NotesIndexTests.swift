@@ -496,17 +496,17 @@ import Foundation
         let index2 = NotesIndex(url: dbURL)
         try await index2.open()
 
-        let folders = await index2.allFolders()
+        let folders = try await index2.allFolders()
         #expect(folders.contains { $0.id == parentID && $0.name == "Research" && $0.parentId == nil })
         #expect(folders.contains { $0.id == childID && $0.parentId == parentID && $0.sortOrder == 1 })
 
-        let memberships = await index2.allMemberships()
+        let memberships = try await index2.allMemberships()
         let reloaded = memberships.first { $0.itemId == itemID }
         #expect(reloaded?.folderId == childID)
         #expect(reloaded.map { abs($0.addedAt.timeIntervalSince(addedAt)) < 1 } == true,
                 "addedAt round-trips to within epoch-seconds precision")
 
-        let assignments = await index2.allTemplateAssignments()
+        let assignments = try await index2.allTemplateAssignments()
         #expect(assignments.contains { $0.folderId == parentID && $0.templateId == templateID })
 
         await index2.close()

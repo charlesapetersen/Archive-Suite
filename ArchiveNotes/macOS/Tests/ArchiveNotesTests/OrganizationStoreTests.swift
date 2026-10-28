@@ -52,7 +52,7 @@ struct OrganizationStoreTests {
         #expect(folder.parentId == nil)
 
         // Persisted to DB
-        let dbFolders = await index.allFolders()
+        let dbFolders = try await index.allFolders()
         #expect(dbFolders.contains { $0.id == folder.id })
     }
 
@@ -220,7 +220,7 @@ struct OrganizationStoreTests {
 
         #expect(result == .deletedLastInstance)                       // caller may trash the note
         #expect(store.membershipCount(item: itemId) == 0)
-        #expect(await index.allMemberships().isEmpty)                 // and it left the DB
+        #expect(try await index.allMemberships().isEmpty)                 // and it left the DB
     }
 
     /// A replicate admitted before Delete opens must finish publishing before the whole-item unlink
@@ -263,7 +263,7 @@ struct OrganizationStoreTests {
 
         store.membershipWriteAfterIndexHookForTesting = nil
         #expect(store.membershipCount(item: itemId) == 0)
-        #expect(await index.allMemberships().allSatisfy { $0.itemId != itemId })
+        #expect(try await index.allMemberships().allSatisfy { $0.itemId != itemId })
     }
 
     /// A placement aimed at a folder cannot publish a dangling edge after that folder is deleted.
@@ -304,7 +304,7 @@ struct OrganizationStoreTests {
         store.membershipWriteAfterIndexHookForTesting = nil
         #expect(!store.folders.contains { $0.id == folder.id })
         #expect(store.memberships.allSatisfy { $0.folderId != folder.id })
-        #expect(await index.allMemberships().allSatisfy { $0.folderId != folder.id })
+        #expect(try await index.allMemberships().allSatisfy { $0.folderId != folder.id })
     }
 
     /// The pair existed but another membership appeared in between: unlink only, never trash.
@@ -381,8 +381,8 @@ struct OrganizationStoreTests {
         store.folderGraphWaiterEnqueuedHookForTesting = nil
         #expect(store.folders.contains { $0.id == sibling.id && $0.name == "Sibling" })
         #expect(!store.folders.contains { $0.id == target.id })
-        #expect((await index.allFolders()).contains { $0.id == sibling.id })
-        #expect(!(await index.allFolders()).contains { $0.id == target.id })
+        #expect((try await index.allFolders()).contains { $0.id == sibling.id })
+        #expect(!(try await index.allFolders()).contains { $0.id == target.id })
     }
 
     /// A move paused after its DB write must finish before the target can be deleted.
@@ -421,7 +421,7 @@ struct OrganizationStoreTests {
         store.folderGraphWaiterEnqueuedHookForTesting = nil
         #expect(store.folders.contains { $0.id == sibling.id })
         #expect(!store.folders.contains { $0.id == target.id })
-        #expect(!(await index.allFolders()).contains { $0.id == target.id })
+        #expect(!(try await index.allFolders()).contains { $0.id == target.id })
     }
 
     /// A child creation queued behind deletion must recheck its parent after the lock handoff.
@@ -459,7 +459,7 @@ struct OrganizationStoreTests {
         store.folderGraphAfterIndexHookForTesting = nil
         store.folderGraphWaiterEnqueuedHookForTesting = nil
         #expect(!store.folders.contains { $0.name == "Late Child" })
-        #expect(!(await index.allFolders()).contains { $0.name == "Late Child" })
+        #expect(!(try await index.allFolders()).contains { $0.name == "Late Child" })
     }
 
     /// A template assignment queued behind deletion cannot resurrect a stale graph edge.
@@ -497,7 +497,7 @@ struct OrganizationStoreTests {
         store.folderGraphAfterIndexHookForTesting = nil
         store.folderGraphWaiterEnqueuedHookForTesting = nil
         #expect(store.assignments.allSatisfy { $0.folderId != folder.id })
-        #expect((await index.allTemplateAssignments()).allSatisfy { $0.folderId != folder.id })
+        #expect((try await index.allTemplateAssignments()).allSatisfy { $0.folderId != folder.id })
     }
 
     // MARK: - Templates

@@ -208,10 +208,28 @@ enum OrganizationMirrorFailure: Sendable, Equatable {
     /// deleted Inbox or Extracts — permanently, since nothing else ever recreated them while the app
     /// kept filing new notes and extracts under their fixed ids. Restoration is by id, so it is a no-op
     /// for a healthy store and cannot clobber a rename.
+    ///
+    /// **A graph it could not read whole is refused, not adopted (W40.fix-notes-index-failure-empty-fu1).**
+    /// The index reads throw on a failed step, and the DB-first branch reads folders, memberships and
+    /// assignments before it touches any state. Any throw leaves the store showing the mirror read-only,
+    /// as `loadReadOnlyMirror` does, with `storeRoot` cleared: no later mutation or speculative retry can
+    /// write the database or export what this call left half-built over `organization.json`.
     func load(storeRoot: URL) async throws {
         self.storeRoot = storeRoot
+        do {
+            try await loadGraph(storeRoot: storeRoot)
+        } catch {
+            didLoadGraph = false
+            showMirrorReadOnly(storeRoot: storeRoot)
+            throw error
+        }
+        didLoadGraph = true
+        isReadOnlyMirror = false
+        readOnlyMirrorRoot = nil
+    }
 
-        let dbFolders = await index.allFolders()
+    private func loadGraph(storeRoot: URL) async throws {
+        let dbFolders = try await index.allFolders()
         var shouldExportOrganization = false
         if dbFolders.isEmpty {
             if let file = OrganizationFile.load(from: storeRoot) {
@@ -240,9 +258,11 @@ enum OrganizationMirrorFailure: Sendable, Equatable {
                 for f in folders { try await index.insertFolder(f) }
             }
         } else {
+            let dbMemberships = try await index.allMemberships()
+            let dbAssignments = try await index.allTemplateAssignments()
             folders = dbFolders
-            memberships = await index.allMemberships()
-            assignments = await index.allTemplateAssignments()
+            memberships = dbMemberships
+            assignments = dbAssignments
 
             let restored = missingSystemFolders(in: dbFolders)
             if !restored.isEmpty {
@@ -258,13 +278,9 @@ enum OrganizationMirrorFailure: Sendable, Equatable {
             if swept > 0 {
                 NSLog("OrganizationStore: swept %d membership(s) for folders no longer in the organization", swept)
             }
-            memberships = await index.allMemberships()
+            memberships = try await index.allMemberships()
         }
         if shouldExportOrganization { exportOrganization() }
-
-        didLoadGraph = true
-        isReadOnlyMirror = false
-        readOnlyMirrorRoot = nil
     }
 
     /// Show the folders while the index cannot be opened (W40.fix-notes-index-failure-empty). Reads
@@ -273,6 +289,10 @@ enum OrganizationMirrorFailure: Sendable, Equatable {
     /// on disk until the index is back. `reloadAfterIndexRecovery()` replaces it with a real `load`.
     func loadReadOnlyMirror(storeRoot: URL) {
         guard !didLoadGraph else { return }
+        showMirrorReadOnly(storeRoot: storeRoot)
+    }
+
+    private func showMirrorReadOnly(storeRoot: URL) {
         if let file = OrganizationFile.load(from: storeRoot) {
             folders = file.folders + missingSystemFolders(in: file.folders)
             let live = Set(folders.map(\.id))
@@ -283,12 +303,14 @@ enum OrganizationMirrorFailure: Sendable, Equatable {
             memberships = []
             assignments = []
         }
+        self.storeRoot = nil
         isReadOnlyMirror = true
         readOnlyMirrorRoot = storeRoot
     }
 
     /// The index opened again after `loadReadOnlyMirror`: do the real `load`, which imports the mirror
     /// into an empty database or adopts the graph a recovered one already holds. A no-op otherwise.
+    /// If that `load` fails, `load` leaves the mirror on show, read-only, as before.
     func reloadAfterIndexRecovery() async throws {
         guard isReadOnlyMirror, let root = readOnlyMirrorRoot else { return }
         try await load(storeRoot: root)

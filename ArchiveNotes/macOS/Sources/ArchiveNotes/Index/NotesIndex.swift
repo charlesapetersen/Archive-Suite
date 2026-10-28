@@ -486,11 +486,17 @@ actor NotesIndex {
 
     // MARK: - Folder CRUD (organizational tables — app-owned, NOT pruned by mtime)
 
-    func allFolders() -> [VFolder] {
-        guard let stmt = prepare("SELECT id, name, parent_id, sort_order, kind, query_json FROM folders;") else { return [] }
+    /// The three organization reads throw on a failed prepare or step rather than returning the rows
+    /// read so far: `OrganizationStore.load` adopts what they return as the folder graph and may export
+    /// it over `organization.json`, so a half-read must not look like a whole one
+    /// (W40.fix-notes-index-failure-empty-fu1).
+    func allFolders() throws -> [VFolder] {
+        guard let stmt = prepare("SELECT id, name, parent_id, sort_order, kind, query_json FROM folders;") else { throw IndexError.sql(lastMessage) }
         defer { sqlite3_finalize(stmt) }
         var result: [VFolder] = []
-        while sqlite3_step(stmt) == SQLITE_ROW {
+        var rc = sqlite3_step(stmt)
+        while rc == SQLITE_ROW {
+            defer { rc = sqlite3_step(stmt) }
             guard let c0 = sqlite3_column_text(stmt, 0),
                   let uuid = UUID(uuidString: String(cString: c0)) else { continue }
             let name = sqlite3_column_text(stmt, 1).map { String(cString: $0) } ?? ""
@@ -504,6 +510,7 @@ actor NotesIndex {
             result.append(VFolder(id: uuid, name: name, parentId: parentId,
                                   sortOrder: sortOrder, kind: kind, queryJSON: queryJSON))
         }
+        guard rc == SQLITE_DONE else { throw IndexError.sql(lastMessage) }
         return result
     }
 
@@ -558,11 +565,13 @@ actor NotesIndex {
 
     // MARK: - Membership CRUD
 
-    func allMemberships() -> [Membership] {
-        guard let stmt = prepare("SELECT item_id, folder_id, added_at FROM memberships;") else { return [] }
+    func allMemberships() throws -> [Membership] {
+        guard let stmt = prepare("SELECT item_id, folder_id, added_at FROM memberships;") else { throw IndexError.sql(lastMessage) }
         defer { sqlite3_finalize(stmt) }
         var result: [Membership] = []
-        while sqlite3_step(stmt) == SQLITE_ROW {
+        var rc = sqlite3_step(stmt)
+        while rc == SQLITE_ROW {
+            defer { rc = sqlite3_step(stmt) }
             guard let c0 = sqlite3_column_text(stmt, 0),
                   let itemId = UUID(uuidString: String(cString: c0)),
                   let c1 = sqlite3_column_text(stmt, 1),
@@ -570,6 +579,7 @@ actor NotesIndex {
             let addedAt = Date(timeIntervalSince1970: sqlite3_column_double(stmt, 2))
             result.append(Membership(itemId: itemId, folderId: folderId, addedAt: addedAt))
         }
+        guard rc == SQLITE_DONE else { throw IndexError.sql(lastMessage) }
         return result
     }
 
@@ -641,17 +651,20 @@ actor NotesIndex {
 
     // MARK: - Template assignment CRUD
 
-    func allTemplateAssignments() -> [TemplateAssignment] {
-        guard let stmt = prepare("SELECT folder_id, template_id FROM template_assignments;") else { return [] }
+    func allTemplateAssignments() throws -> [TemplateAssignment] {
+        guard let stmt = prepare("SELECT folder_id, template_id FROM template_assignments;") else { throw IndexError.sql(lastMessage) }
         defer { sqlite3_finalize(stmt) }
         var result: [TemplateAssignment] = []
-        while sqlite3_step(stmt) == SQLITE_ROW {
+        var rc = sqlite3_step(stmt)
+        while rc == SQLITE_ROW {
+            defer { rc = sqlite3_step(stmt) }
             guard let c0 = sqlite3_column_text(stmt, 0),
                   let folderId = UUID(uuidString: String(cString: c0)),
                   let c1 = sqlite3_column_text(stmt, 1),
                   let templateId = UUID(uuidString: String(cString: c1)) else { continue }
             result.append(TemplateAssignment(folderId: folderId, templateId: templateId))
         }
+        guard rc == SQLITE_DONE else { throw IndexError.sql(lastMessage) }
         return result
     }
 
