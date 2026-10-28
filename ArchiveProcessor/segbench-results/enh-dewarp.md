@@ -302,3 +302,66 @@ A status OK is a completed decoder reply, not necessarily usable text; such empt
 | ladder | 20 | quad-quarter | 69.2 | -2.4 (-6.0 to +0.4, p 0.185) | 71.0 | -3.5 (-7.0 to -0.6, p 0.032) | 19.3 | 38.4 |
 | ladder | 20 | uvdoc-quarter | 70.8 | -0.8 (-5.5 to +3.3, p 0.735) | 72.6 | -1.8 (-5.4 to +1.5, p 0.359) | 15.1 | 36.3 |
 | ladder | 20 | raw | 84.7 | +13.0 (+4.2 to +22.9, p 0.015) | 89.8 | +15.4 (+5.6 to +26.8, p 0.004) | 7.5 | 10.9 |
+
+## Gemini 3.7 Flash through the Stanford gateway
+
+The same 640 images, read with the cloud panel's request (`enh_dewarp_gateway.py`, W46.enh-dewarp-paid): its prompt, temperature 0, low reasoning, 8,192 output tokens. The raw arm is the reading W46.fix-ocr-scorers-paid made of the identical image (hash checked), not a second call. 633 of 640 replies usable (640 parsed, 0 capped, 0 unparsed, 0 errors); a failed reply scores empty. Estimated cost of the 544 new calls $1.94, at 3.8 Flash's list price ($0.75 / $3.75 per million tokens), which the gateway, returning no bill, is taken not to exceed. Page-level numbers: `enh-dewarp-gateway.csv`.
+
+### gemini3.7-flash-gw
+
+| pages | n | arm | NES % | Δ NES vs raw | chrF2 % | Δ chrF2 | words added % | words missed % |
+|---|---:|---|---:|---|---:|---|---:|---:|
+| 96 | 96 | raw | 96.7 | — | 97.5 | — | 1.0 | 0.6 |
+| 96 | 96 | quad | 96.5 | -0.2 (-1.0 to +0.9, p 0.761) | 97.1 | -0.4 (-0.9 to +0.1, p 0.110) | 1.0 | 0.9 |
+| 96 | 96 | uvdoc | 94.2 | -2.5 (-4.7 to -0.6, p 0.006) | 94.6 | -2.9 (-4.8 to -1.4, p 0.000) | 1.5 | 3.2 |
+| 96 | 96 | docres | 80.2 | -16.5 (-23.0 to -10.6, p 0.000) | 80.8 | -16.7 (-23.1 to -10.9, p 0.000) | 2.0 | 20.4 |
+| originals | 63 | raw | 95.3 | — | 96.4 | — | 1.4 | 0.8 |
+| originals | 63 | quad | 95.0 | -0.3 (-1.6 to +1.3, p 0.784) | 95.9 | -0.5 (-1.3 to +0.1, p 0.155) | 1.2 | 1.2 |
+| originals | 63 | uvdoc | 92.9 | -2.4 (-5.5 to +0.2, p 0.090) | 93.5 | -2.9 (-5.7 to -1.0, p 0.001) | 1.4 | 2.7 |
+| originals | 63 | docres | 83.2 | -12.1 (-19.7 to -5.7, p 0.000) | 83.5 | -12.9 (-20.5 to -6.5, p 0.000) | 1.2 | 11.3 |
+| PDF images | 33 | raw | 99.4 | — | 99.5 | — | 0.5 | 0.2 |
+| PDF images | 33 | quad | 99.4 | -0.0 (-0.2 to +0.0, p 0.476) | 99.3 | -0.1 (-0.4 to +0.1, p 0.451) | 0.7 | 0.6 |
+| PDF images | 33 | uvdoc | 96.8 | -2.7 (-5.1 to -0.7, p 0.019) | 96.6 | -2.8 (-5.3 to -0.8, p 0.003) | 1.7 | 3.7 |
+| PDF images | 33 | docres | 74.5 | -24.9 (-37.5 to -13.9, p 0.000) | 75.5 | -23.9 (-36.3 to -13.1, p 0.000) | 3.4 | 31.8 |
+| originals tagged curl | 10 | raw | 97.2 | — | 98.1 | — | 1.4 | 0.8 |
+| originals tagged curl | 10 | quad | 96.9 | -0.4 (-2.9 to +1.6, p 0.778) | 98.1 | +0.0 (-0.5 to +0.4, p 0.836) | 1.0 | 0.9 |
+| originals tagged curl | 10 | uvdoc | 96.5 | -0.8 (-2.9 to +0.5, p 0.840) | 97.5 | -0.6 (-1.4 to +0.0, p 0.316) | 0.4 | 2.0 |
+| originals tagged curl | 10 | docres | 85.4 | -11.8 (-32.0 to -0.7, p 0.009) | 86.8 | -11.2 (-31.3 to -0.6, p 0.018) | 1.7 | 19.7 |
+| originals tagged perspective | 18 | raw | 92.5 | — | 94.6 | — | 1.3 | 0.6 |
+| originals tagged perspective | 18 | quad | 94.5 | +2.0 (-1.0 to +6.9, p 0.659) | 94.9 | +0.3 (-1.0 to +1.7, p 0.531) | 0.4 | 0.8 |
+| originals tagged perspective | 18 | uvdoc | 93.6 | +1.1 (-2.7 to +6.8, p 0.923) | 94.3 | -0.3 (-2.1 to +2.1, p 0.845) | 0.4 | 1.7 |
+| originals tagged perspective | 18 | docres | 92.7 | +0.2 (-2.8 to +4.6, p 0.981) | 93.5 | -1.1 (-2.2 to -0.1, p 0.072) | 1.1 | 1.8 |
+| originals tagged edge_cut | 14 | raw | 95.8 | — | 97.7 | — | 0.8 | 0.9 |
+| originals tagged edge_cut | 14 | quad | 95.6 | -0.2 (-0.6 to +0.1, p 0.247) | 97.4 | -0.3 (-0.7 to +0.1, p 0.262) | 0.9 | 1.5 |
+| originals tagged edge_cut | 14 | uvdoc | 93.7 | -2.1 (-3.9 to -0.7, p 0.005) | 94.6 | -3.1 (-5.6 to -1.1, p 0.002) | 1.2 | 4.0 |
+| originals tagged edge_cut | 14 | docres | 75.8 | -20.0 (-39.5 to -5.3, p 0.001) | 77.5 | -20.2 (-39.2 to -5.4, p 0.001) | 2.2 | 13.6 |
+| originals tagged neighbour | 52 | raw | 95.1 | — | 96.2 | — | 1.5 | 0.8 |
+| originals tagged neighbour | 52 | quad | 94.8 | -0.3 (-1.8 to +1.7, p 0.815) | 95.4 | -0.7 (-1.6 to +0.0, p 0.084) | 1.3 | 1.3 |
+| originals tagged neighbour | 52 | uvdoc | 92.3 | -2.8 (-6.5 to +0.3, p 0.109) | 92.9 | -3.2 (-6.5 to -0.9, p 0.004) | 1.6 | 3.0 |
+| originals tagged neighbour | 52 | docres | 86.6 | -8.5 (-15.5 to -2.7, p 0.003) | 86.9 | -9.3 (-16.2 to -3.7, p 0.000) | 1.2 | 6.2 |
+
+| pages | n | arm | NES % | Δ NES vs raw | chrF2 % | Δ chrF2 | words added % | words missed % |
+|---|---:|---|---:|---|---:|---|---:|---:|
+| 96 | 96 | raw | 96.7 | — | 97.5 | — | 1.0 | 0.6 |
+| 96 | 96 | enc-2048-q85 | 96.7 | -0.0 (-0.3 to +0.3, p 0.841) | 97.6 | +0.1 (-0.2 to +0.5, p 0.670) | 0.9 | 0.5 |
+| 96 | 96 | enc-1600-q90 | 96.6 | -0.1 (-0.7 to +0.4, p 0.618) | 98.0 | +0.5 (-0.2 to +1.8, p 0.468) | 0.9 | 0.5 |
+| originals | 63 | raw | 95.3 | — | 96.4 | — | 1.4 | 0.8 |
+| originals | 63 | enc-2048-q85 | 95.4 | +0.0 (-0.4 to +0.5, p 0.874) | 96.6 | +0.2 (-0.3 to +0.7, p 0.731) | 1.2 | 0.7 |
+| originals | 63 | enc-1600-q90 | 95.2 | -0.1 (-0.9 to +0.7, p 0.723) | 97.3 | +0.9 (-0.3 to +2.7, p 0.450) | 1.2 | 0.7 |
+| PDF images | 33 | raw | 99.4 | — | 99.5 | — | 0.5 | 0.2 |
+| PDF images | 33 | enc-2048-q85 | 99.3 | -0.2 (-0.6 to +0.1, p 0.598) | 99.5 | +0.0 (-0.0 to +0.1, p 0.324) | 0.5 | 0.2 |
+| PDF images | 33 | enc-1600-q90 | 99.3 | -0.2 (-0.6 to +0.0, p 0.637) | 99.4 | -0.1 (-0.2 to +0.1, p 0.846) | 0.5 | 0.3 |
+
+| pages | n | arm | NES % | Δ NES vs raw | chrF2 % | Δ chrF2 | words added % | words missed % |
+|---|---:|---|---:|---|---:|---|---:|---:|
+| hand-cropped | 4 | raw | 92.9 | — | 98.9 | — | 0.1 | 1.0 |
+| hand-cropped | 4 | quad | 88.8 | -4.2 (-8.7 to +0.4, p 0.370) | 97.5 | -1.4 (-1.8 to -1.0, p 0.120) | 3.1 | 2.2 |
+| hand-cropped | 4 | uvdoc | 91.0 | -1.9 (-6.3 to +0.5, p 1.000) | 92.3 | -6.6 (-13.2 to +0.0, p 0.500) | 1.7 | 10.9 |
+| hand-cropped | 4 | hand | 92.3 | -0.6 (-1.3 to +0.1, p 0.497) | 97.8 | -1.2 (-2.6 to -0.2, p 0.250) | 7.3 | 4.3 |
+
+| pages | n | arm | NES % | Δ NES vs quarter | chrF2 % | Δ chrF2 | words added % | words missed % |
+|---|---:|---|---:|---|---:|---|---:|---:|
+| ladder | 20 | quarter | 95.8 | — | 97.2 | — | 3.3 | 1.4 |
+| ladder | 20 | quad-quarter | 96.4 | +0.6 (-0.9 to +2.1, p 0.476) | 97.0 | -0.3 (-1.3 to +0.5, p 0.594) | 2.6 | 2.0 |
+| ladder | 20 | uvdoc-quarter | 94.3 | -1.6 (-5.5 to +1.9, p 0.465) | 94.7 | -2.5 (-6.0 to -0.0, p 0.090) | 2.3 | 5.3 |
+| ladder | 20 | raw | 97.4 | +1.6 (+0.2 to +3.6, p 0.041) | 98.0 | +0.8 (+0.2 to +1.6, p 0.027) | 2.0 | 0.5 |

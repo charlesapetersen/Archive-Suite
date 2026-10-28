@@ -872,6 +872,41 @@
    }
   },
   {
+   "id": "dewarp-gemini3.7-flash-gw-quad",
+   "name": "Gemini 3.7 Flash (Stanford gateway, price estimated) \u00b7 Apple quad crop",
+   "batch": null,
+   "panel": "cloud",
+   "std": 3.54
+  },
+  {
+   "id": "dewarp-gemini3.7-flash-gw-uvdoc",
+   "name": "Gemini 3.7 Flash (Stanford gateway, price estimated) \u00b7 UVDoc dewarp",
+   "batch": null,
+   "panel": "cloud",
+   "std": 3.72
+  },
+  {
+   "id": "dewarp-gemini3.7-flash-gw-docres",
+   "name": "Gemini 3.7 Flash (Stanford gateway, price estimated) \u00b7 DocRes dewarp",
+   "batch": null,
+   "panel": "cloud",
+   "std": 3.48
+  },
+  {
+   "id": "dewarp-gemini3.7-flash-gw-enc-2048-q85",
+   "name": "Gemini 3.7 Flash (Stanford gateway, price estimated) \u00b7 app encoder 2048 px q0.85",
+   "batch": null,
+   "panel": "cloud",
+   "std": 3.7
+  },
+  {
+   "id": "dewarp-gemini3.7-flash-gw-enc-1600-q90",
+   "name": "Gemini 3.7 Flash (Stanford gateway, price estimated) \u00b7 app encoder 1600 px q0.90",
+   "batch": null,
+   "panel": "cloud",
+   "std": 3.58
+  },
+  {
    "id": "gw-regions-tiles",
    "name": "Gemini 3.7 Flash (Stanford gateway, price estimated) \u00b7 overlapping tiles",
    "panel": "cloud",
@@ -1338,6 +1373,31 @@
      96,
      96
     ],
+    "dewarp-gemini3.7-flash-gw-quad": [
+     96.53,
+     96,
+     96
+    ],
+    "dewarp-gemini3.7-flash-gw-uvdoc": [
+     94.22,
+     96,
+     96
+    ],
+    "dewarp-gemini3.7-flash-gw-docres": [
+     80.24,
+     89,
+     96
+    ],
+    "dewarp-gemini3.7-flash-gw-enc-2048-q85": [
+     96.7,
+     96,
+     96
+    ],
+    "dewarp-gemini3.7-flash-gw-enc-1600-q90": [
+     96.61,
+     96,
+     96
+    ],
     "gw-regions-tiles": [
      91.05,
      96,
@@ -1728,6 +1788,31 @@
     ],
     "dewarp-ppocrv6-enc-1600-q90": [
      90.99,
+     50,
+     50
+    ],
+    "dewarp-gemini3.7-flash-gw-quad": [
+     98.4,
+     50,
+     50
+    ],
+    "dewarp-gemini3.7-flash-gw-uvdoc": [
+     98.3,
+     50,
+     50
+    ],
+    "dewarp-gemini3.7-flash-gw-docres": [
+     92.32,
+     49,
+     50
+    ],
+    "dewarp-gemini3.7-flash-gw-enc-2048-q85": [
+     98.75,
+     50,
+     50
+    ],
+    "dewarp-gemini3.7-flash-gw-enc-1600-q90": [
+     98.69,
      50,
      50
     ],
@@ -2124,6 +2209,31 @@
      28,
      28
     ],
+    "dewarp-gemini3.7-flash-gw-quad": [
+     95.47,
+     28,
+     28
+    ],
+    "dewarp-gemini3.7-flash-gw-uvdoc": [
+     90.11,
+     28,
+     28
+    ],
+    "dewarp-gemini3.7-flash-gw-docres": [
+     67.87,
+     24,
+     28
+    ],
+    "dewarp-gemini3.7-flash-gw-enc-2048-q85": [
+     95.24,
+     28,
+     28
+    ],
+    "dewarp-gemini3.7-flash-gw-enc-1600-q90": [
+     94.07,
+     28,
+     28
+    ],
     "gw-regions-tiles": [
      79.3,
      28,
@@ -2514,6 +2624,31 @@
     ],
     "dewarp-ppocrv6-enc-1600-q90": [
      69.45,
+     16,
+     16
+    ],
+    "dewarp-gemini3.7-flash-gw-quad": [
+     93.97,
+     16,
+     16
+    ],
+    "dewarp-gemini3.7-flash-gw-uvdoc": [
+     92.05,
+     16,
+     16
+    ],
+    "dewarp-gemini3.7-flash-gw-docres": [
+     67.02,
+     14,
+     16
+    ],
+    "dewarp-gemini3.7-flash-gw-enc-2048-q85": [
+     94.0,
+     16,
+     16
+    ],
+    "dewarp-gemini3.7-flash-gw-enc-1600-q90": [
+     95.91,
      16,
      16
     ],
@@ -25857,6 +25992,20 @@
   "item": "W46.enh-dewarp",
   "report": "enh-dewarp.md",
   "readers_pending": [],
+  "gateway": {
+   "item": "W46.enh-dewarp-paid",
+   "model": "gemini-3.7-flash",
+   "route": "gemini3.7-flash-gw",
+   "calls": 544,
+   "cost_estimate": 1.94,
+   "price_assumed": [
+    0.75,
+    3.75
+   ],
+   "coverage": {
+    "ok": 640
+   }
+  },
   "cluster": {
    "name": "Sherlock",
    "pack": "dewarp-20261022",
@@ -25897,7 +26046,8 @@
     "ok": 96,
     "nes": 0.8024831735976145,
     "prompt_tokens": 0,
-    "completion_tokens": 0
+    "completion_tokens": 0,
+    "cost": 0
    },
    {
     "route": "apple-vision",
@@ -25907,7 +26057,8 @@
     "ok": 16,
     "nes": 0.5682232372016326,
     "prompt_tokens": 0,
-    "completion_tokens": 0
+    "completion_tokens": 0,
+    "cost": 0
    },
    {
     "route": "apple-vision",
@@ -25917,7 +26068,8 @@
     "ok": 2,
     "nes": 0.6108454528090808,
     "prompt_tokens": 0,
-    "completion_tokens": 0
+    "completion_tokens": 0,
+    "cost": 0
    },
    {
     "route": "apple-vision",
@@ -25927,7 +26079,8 @@
     "ok": 28,
     "nes": 0.7541426459786081,
     "prompt_tokens": 0,
-    "completion_tokens": 0
+    "completion_tokens": 0,
+    "cost": 0
    },
    {
     "route": "apple-vision",
@@ -25937,7 +26090,8 @@
     "ok": 50,
     "nes": 0.9121825575425135,
     "prompt_tokens": 0,
-    "completion_tokens": 0
+    "completion_tokens": 0,
+    "cost": 0
    },
    {
     "route": "apple-vision",
@@ -25947,7 +26101,8 @@
     "ok": 96,
     "nes": 0.7890580296118105,
     "prompt_tokens": 0,
-    "completion_tokens": 0
+    "completion_tokens": 0,
+    "cost": 0
    },
    {
     "route": "apple-vision",
@@ -25957,7 +26112,8 @@
     "ok": 16,
     "nes": 0.5466017742980437,
     "prompt_tokens": 0,
-    "completion_tokens": 0
+    "completion_tokens": 0,
+    "cost": 0
    },
    {
     "route": "apple-vision",
@@ -25967,7 +26123,8 @@
     "ok": 2,
     "nes": 0.6085602608529564,
     "prompt_tokens": 0,
-    "completion_tokens": 0
+    "completion_tokens": 0,
+    "cost": 0
    },
    {
     "route": "apple-vision",
@@ -25977,7 +26134,8 @@
     "ok": 28,
     "nes": 0.7317308451557194,
     "prompt_tokens": 0,
-    "completion_tokens": 0
+    "completion_tokens": 0,
+    "cost": 0
    },
    {
     "route": "apple-vision",
@@ -25987,7 +26145,8 @@
     "ok": 50,
     "nes": 0.9059671653579809,
     "prompt_tokens": 0,
-    "completion_tokens": 0
+    "completion_tokens": 0,
+    "cost": 0
    },
    {
     "route": "apple-vision",
@@ -25997,7 +26156,8 @@
     "ok": 85,
     "nes": 0.677892275646451,
     "prompt_tokens": 0,
-    "completion_tokens": 0
+    "completion_tokens": 0,
+    "cost": 0
    },
    {
     "route": "apple-vision",
@@ -26007,7 +26167,8 @@
     "ok": 12,
     "nes": 0.4099899310855312,
     "prompt_tokens": 0,
-    "completion_tokens": 0
+    "completion_tokens": 0,
+    "cost": 0
    },
    {
     "route": "apple-vision",
@@ -26017,7 +26178,8 @@
     "ok": 2,
     "nes": 0.46198054517176457,
     "prompt_tokens": 0,
-    "completion_tokens": 0
+    "completion_tokens": 0,
+    "cost": 0
    },
    {
     "route": "apple-vision",
@@ -26027,7 +26189,8 @@
     "ok": 22,
     "nes": 0.5502365846429295,
     "prompt_tokens": 0,
-    "completion_tokens": 0
+    "completion_tokens": 0,
+    "cost": 0
    },
    {
     "route": "apple-vision",
@@ -26037,7 +26200,8 @@
     "ok": 49,
     "nes": 0.843744682086905,
     "prompt_tokens": 0,
-    "completion_tokens": 0
+    "completion_tokens": 0,
+    "cost": 0
    },
    {
     "route": "apple-vision",
@@ -26047,7 +26211,8 @@
     "ok": 96,
     "nes": 0.8179928400644794,
     "prompt_tokens": 0,
-    "completion_tokens": 0
+    "completion_tokens": 0,
+    "cost": 0
    },
    {
     "route": "apple-vision",
@@ -26057,7 +26222,8 @@
     "ok": 16,
     "nes": 0.5784571982696947,
     "prompt_tokens": 0,
-    "completion_tokens": 0
+    "completion_tokens": 0,
+    "cost": 0
    },
    {
     "route": "apple-vision",
@@ -26067,7 +26233,8 @@
     "ok": 2,
     "nes": 0.6981875358127098,
     "prompt_tokens": 0,
-    "completion_tokens": 0
+    "completion_tokens": 0,
+    "cost": 0
    },
    {
     "route": "apple-vision",
@@ -26077,7 +26244,8 @@
     "ok": 28,
     "nes": 0.7860634974541579,
     "prompt_tokens": 0,
-    "completion_tokens": 0
+    "completion_tokens": 0,
+    "cost": 0
    },
    {
     "route": "apple-vision",
@@ -26087,7 +26255,8 @@
     "ok": 50,
     "nes": 0.9173168894706613,
     "prompt_tokens": 0,
-    "completion_tokens": 0
+    "completion_tokens": 0,
+    "cost": 0
    },
    {
     "route": "apple-vision",
@@ -26097,7 +26266,8 @@
     "ok": 96,
     "nes": 0.8125689376620894,
     "prompt_tokens": 0,
-    "completion_tokens": 0
+    "completion_tokens": 0,
+    "cost": 0
    },
    {
     "route": "apple-vision",
@@ -26107,7 +26277,8 @@
     "ok": 16,
     "nes": 0.5851011009542615,
     "prompt_tokens": 0,
-    "completion_tokens": 0
+    "completion_tokens": 0,
+    "cost": 0
    },
    {
     "route": "apple-vision",
@@ -26117,7 +26288,8 @@
     "ok": 2,
     "nes": 0.6536058282627084,
     "prompt_tokens": 0,
-    "completion_tokens": 0
+    "completion_tokens": 0,
+    "cost": 0
    },
    {
     "route": "apple-vision",
@@ -26127,7 +26299,8 @@
     "ok": 28,
     "nes": 0.7640670091266049,
     "prompt_tokens": 0,
-    "completion_tokens": 0
+    "completion_tokens": 0,
+    "cost": 0
    },
    {
     "route": "apple-vision",
@@ -26137,7 +26310,8 @@
     "ok": 50,
     "nes": 0.9188782497644409,
     "prompt_tokens": 0,
-    "completion_tokens": 0
+    "completion_tokens": 0,
+    "cost": 0
    },
    {
     "route": "apple-vision",
@@ -26147,7 +26321,8 @@
     "ok": 96,
     "nes": 0.8166637240051593,
     "prompt_tokens": 0,
-    "completion_tokens": 0
+    "completion_tokens": 0,
+    "cost": 0
    },
    {
     "route": "apple-vision",
@@ -26157,7 +26332,8 @@
     "ok": 16,
     "nes": 0.5782004817385287,
     "prompt_tokens": 0,
-    "completion_tokens": 0
+    "completion_tokens": 0,
+    "cost": 0
    },
    {
     "route": "apple-vision",
@@ -26167,7 +26343,8 @@
     "ok": 2,
     "nes": 0.712048759857022,
     "prompt_tokens": 0,
-    "completion_tokens": 0
+    "completion_tokens": 0,
+    "cost": 0
    },
    {
     "route": "apple-vision",
@@ -26177,7 +26354,8 @@
     "ok": 28,
     "nes": 0.7792417026189221,
     "prompt_tokens": 0,
-    "completion_tokens": 0
+    "completion_tokens": 0,
+    "cost": 0
    },
    {
     "route": "apple-vision",
@@ -26187,7 +26365,8 @@
     "ok": 50,
     "nes": 0.9181128920726994,
     "prompt_tokens": 0,
-    "completion_tokens": 0
+    "completion_tokens": 0,
+    "cost": 0
    },
    {
     "route": "qwen3.6-27b",
@@ -26197,7 +26376,8 @@
     "ok": 96,
     "nes": 0.953777295327726,
     "prompt_tokens": 393002,
-    "completion_tokens": 44512
+    "completion_tokens": 44512,
+    "cost": 0
    },
    {
     "route": "qwen3.6-27b",
@@ -26207,7 +26387,8 @@
     "ok": 16,
     "nes": 0.9105030038764811,
     "prompt_tokens": 73168,
-    "completion_tokens": 3634
+    "completion_tokens": 3634,
+    "cost": 0
    },
    {
     "route": "qwen3.6-27b",
@@ -26217,7 +26398,8 @@
     "ok": 2,
     "nes": 0.7939973509608899,
     "prompt_tokens": 9146,
-    "completion_tokens": 529
+    "completion_tokens": 529,
+    "cost": 0
    },
    {
     "route": "qwen3.6-27b",
@@ -26227,7 +26409,8 @@
     "ok": 28,
     "nes": 0.9496661746272537,
     "prompt_tokens": 106367,
-    "completion_tokens": 18085
+    "completion_tokens": 18085,
+    "cost": 0
    },
    {
     "route": "qwen3.6-27b",
@@ -26237,7 +26420,8 @@
     "ok": 50,
     "nes": 0.9763184939590623,
     "prompt_tokens": 204321,
-    "completion_tokens": 22264
+    "completion_tokens": 22264,
+    "cost": 0
    },
    {
     "route": "qwen3.6-27b",
@@ -26247,7 +26431,8 @@
     "ok": 96,
     "nes": 0.9514489832322309,
     "prompt_tokens": 378548,
-    "completion_tokens": 44088
+    "completion_tokens": 44088,
+    "cost": 0
    },
    {
     "route": "qwen3.6-27b",
@@ -26257,7 +26442,8 @@
     "ok": 16,
     "nes": 0.9189147795839815,
     "prompt_tokens": 71035,
-    "completion_tokens": 3545
+    "completion_tokens": 3545,
+    "cost": 0
    },
    {
     "route": "qwen3.6-27b",
@@ -26267,7 +26453,8 @@
     "ok": 2,
     "nes": 0.8282354225217605,
     "prompt_tokens": 8471,
-    "completion_tokens": 475
+    "completion_tokens": 475,
+    "cost": 0
    },
    {
     "route": "qwen3.6-27b",
@@ -26277,7 +26464,8 @@
     "ok": 28,
     "nes": 0.938017722242607,
     "prompt_tokens": 101396,
-    "completion_tokens": 17764
+    "completion_tokens": 17764,
+    "cost": 0
    },
    {
     "route": "qwen3.6-27b",
@@ -26287,7 +26475,8 @@
     "ok": 50,
     "nes": 0.974309976982279,
     "prompt_tokens": 197646,
-    "completion_tokens": 22304
+    "completion_tokens": 22304,
+    "cost": 0
    },
    {
     "route": "qwen3.6-27b",
@@ -26297,7 +26486,8 @@
     "ok": 95,
     "nes": 0.9204960894311692,
     "prompt_tokens": 378548,
-    "completion_tokens": 51094
+    "completion_tokens": 51094,
+    "cost": 0
    },
    {
     "route": "qwen3.6-27b",
@@ -26307,7 +26497,8 @@
     "ok": 15,
     "nes": 0.8401505779117013,
     "prompt_tokens": 71035,
-    "completion_tokens": 11398
+    "completion_tokens": 11398,
+    "cost": 0
    },
    {
     "route": "qwen3.6-27b",
@@ -26317,7 +26508,8 @@
     "ok": 2,
     "nes": 0.7951922289830555,
     "prompt_tokens": 8471,
-    "completion_tokens": 454
+    "completion_tokens": 454,
+    "cost": 0
    },
    {
     "route": "qwen3.6-27b",
@@ -26327,7 +26519,8 @@
     "ok": 28,
     "nes": 0.8913937619173986,
     "prompt_tokens": 101396,
-    "completion_tokens": 17170
+    "completion_tokens": 17170,
+    "cost": 0
    },
    {
     "route": "qwen3.6-27b",
@@ -26337,7 +26530,8 @@
     "ok": 50,
     "nes": 0.967516110943035,
     "prompt_tokens": 197646,
-    "completion_tokens": 22072
+    "completion_tokens": 22072,
+    "cost": 0
    },
    {
     "route": "qwen3.6-27b",
@@ -26347,7 +26541,8 @@
     "ok": 94,
     "nes": 0.8141487778435348,
     "prompt_tokens": 393002,
-    "completion_tokens": 36331
+    "completion_tokens": 36331,
+    "cost": 0
    },
    {
     "route": "qwen3.6-27b",
@@ -26357,7 +26552,8 @@
     "ok": 15,
     "nes": 0.6638639534722977,
     "prompt_tokens": 73168,
-    "completion_tokens": 2622
+    "completion_tokens": 2622,
+    "cost": 0
    },
    {
     "route": "qwen3.6-27b",
@@ -26367,7 +26563,8 @@
     "ok": 2,
     "nes": 0.5720619935059619,
     "prompt_tokens": 9146,
-    "completion_tokens": 204
+    "completion_tokens": 204,
+    "cost": 0
    },
    {
     "route": "qwen3.6-27b",
@@ -26377,7 +26574,8 @@
     "ok": 27,
     "nes": 0.702166021217421,
     "prompt_tokens": 106367,
-    "completion_tokens": 12775
+    "completion_tokens": 12775,
+    "cost": 0
    },
    {
     "route": "qwen3.6-27b",
@@ -26387,7 +26585,8 @@
     "ok": 50,
     "nes": 0.9346337367264572,
     "prompt_tokens": 204321,
-    "completion_tokens": 20730
+    "completion_tokens": 20730,
+    "cost": 0
    },
    {
     "route": "qwen3.6-27b",
@@ -26397,7 +26596,8 @@
     "ok": 96,
     "nes": 0.9504773117061301,
     "prompt_tokens": 303109,
-    "completion_tokens": 44373
+    "completion_tokens": 44373,
+    "cost": 0
    },
    {
     "route": "qwen3.6-27b",
@@ -26407,7 +26607,8 @@
     "ok": 16,
     "nes": 0.9221411456251843,
     "prompt_tokens": 55120,
-    "completion_tokens": 3557
+    "completion_tokens": 3557,
+    "cost": 0
    },
    {
     "route": "qwen3.6-27b",
@@ -26417,7 +26618,8 @@
     "ok": 2,
     "nes": 0.7122977434582117,
     "prompt_tokens": 6890,
-    "completion_tokens": 484
+    "completion_tokens": 484,
+    "cost": 0
    },
    {
     "route": "qwen3.6-27b",
@@ -26427,7 +26629,8 @@
     "ok": 28,
     "nes": 0.9472011637238268,
     "prompt_tokens": 83079,
-    "completion_tokens": 18048
+    "completion_tokens": 18048,
+    "cost": 0
    },
    {
     "route": "qwen3.6-27b",
@@ -26437,7 +26640,8 @@
     "ok": 50,
     "nes": 0.9709067104520394,
     "prompt_tokens": 158020,
-    "completion_tokens": 22284
+    "completion_tokens": 22284,
+    "cost": 0
    },
    {
     "route": "qwen3.6-27b",
@@ -26447,7 +26651,8 @@
     "ok": 96,
     "nes": 0.9485322768947981,
     "prompt_tokens": 204859,
-    "completion_tokens": 44421
+    "completion_tokens": 44421,
+    "cost": 0
    },
    {
     "route": "qwen3.6-27b",
@@ -26457,7 +26662,8 @@
     "ok": 16,
     "nes": 0.9041038867102185,
     "prompt_tokens": 35768,
-    "completion_tokens": 3644
+    "completion_tokens": 3644,
+    "cost": 0
    },
    {
     "route": "qwen3.6-27b",
@@ -26467,7 +26673,8 @@
     "ok": 2,
     "nes": 0.7473771453518514,
     "prompt_tokens": 4496,
-    "completion_tokens": 486
+    "completion_tokens": 486,
+    "cost": 0
    },
    {
     "route": "qwen3.6-27b",
@@ -26477,7 +26684,8 @@
     "ok": 28,
     "nes": 0.948796817842866,
     "prompt_tokens": 56985,
-    "completion_tokens": 18047
+    "completion_tokens": 18047,
+    "cost": 0
    },
    {
     "route": "qwen3.6-27b",
@@ -26487,7 +26695,8 @@
     "ok": 50,
     "nes": 0.9706474240846634,
     "prompt_tokens": 107610,
-    "completion_tokens": 22244
+    "completion_tokens": 22244,
+    "cost": 0
    },
    {
     "route": "lightonocr3-4b",
@@ -26497,7 +26706,8 @@
     "ok": 96,
     "nes": 0.8934603972880646,
     "prompt_tokens": 358538,
-    "completion_tokens": 43995
+    "completion_tokens": 43995,
+    "cost": 0
    },
    {
     "route": "lightonocr3-4b",
@@ -26507,7 +26717,8 @@
     "ok": 16,
     "nes": 0.8844836588421955,
     "prompt_tokens": 67424,
-    "completion_tokens": 2997
+    "completion_tokens": 2997,
+    "cost": 0
    },
    {
     "route": "lightonocr3-4b",
@@ -26517,7 +26728,8 @@
     "ok": 2,
     "nes": 0.5999407356811379,
     "prompt_tokens": 8428,
-    "completion_tokens": 450
+    "completion_tokens": 450,
+    "cost": 0
    },
    {
     "route": "lightonocr3-4b",
@@ -26527,7 +26739,8 @@
     "ok": 28,
     "nes": 0.885362550522127,
     "prompt_tokens": 96315,
-    "completion_tokens": 18208
+    "completion_tokens": 18208,
+    "cost": 0
    },
    {
     "route": "lightonocr3-4b",
@@ -26537,7 +26750,8 @@
     "ok": 50,
     "nes": 0.9126085342439448,
     "prompt_tokens": 186371,
-    "completion_tokens": 22340
+    "completion_tokens": 22340,
+    "cost": 0
    },
    {
     "route": "lightonocr3-4b",
@@ -26547,7 +26761,8 @@
     "ok": 95,
     "nes": 0.8862603201759583,
     "prompt_tokens": 344084,
-    "completion_tokens": 43635
+    "completion_tokens": 43635,
+    "cost": 0
    },
    {
     "route": "lightonocr3-4b",
@@ -26557,7 +26772,8 @@
     "ok": 16,
     "nes": 0.8763926796185397,
     "prompt_tokens": 65291,
-    "completion_tokens": 3069
+    "completion_tokens": 3069,
+    "cost": 0
    },
    {
     "route": "lightonocr3-4b",
@@ -26567,7 +26783,8 @@
     "ok": 2,
     "nes": 0.5885051433872684,
     "prompt_tokens": 7753,
-    "completion_tokens": 447
+    "completion_tokens": 447,
+    "cost": 0
    },
    {
     "route": "lightonocr3-4b",
@@ -26577,7 +26794,8 @@
     "ok": 27,
     "nes": 0.8676119784726145,
     "prompt_tokens": 91344,
-    "completion_tokens": 17766
+    "completion_tokens": 17766,
+    "cost": 0
    },
    {
     "route": "lightonocr3-4b",
@@ -26587,7 +26805,8 @@
     "ok": 50,
     "nes": 0.9117712435797525,
     "prompt_tokens": 179696,
-    "completion_tokens": 22353
+    "completion_tokens": 22353,
+    "cost": 0
    },
    {
     "route": "lightonocr3-4b",
@@ -26597,7 +26816,8 @@
     "ok": 95,
     "nes": 0.8744651974827843,
     "prompt_tokens": 344084,
-    "completion_tokens": 43545
+    "completion_tokens": 43545,
+    "cost": 0
    },
    {
     "route": "lightonocr3-4b",
@@ -26607,7 +26827,8 @@
     "ok": 16,
     "nes": 0.8571445090885902,
     "prompt_tokens": 65291,
-    "completion_tokens": 3180
+    "completion_tokens": 3180,
+    "cost": 0
    },
    {
     "route": "lightonocr3-4b",
@@ -26617,7 +26838,8 @@
     "ok": 2,
     "nes": 0.5863700237387104,
     "prompt_tokens": 7753,
-    "completion_tokens": 470
+    "completion_tokens": 470,
+    "cost": 0
    },
    {
     "route": "lightonocr3-4b",
@@ -26627,7 +26849,8 @@
     "ok": 27,
     "nes": 0.8396244324140125,
     "prompt_tokens": 91344,
-    "completion_tokens": 17503
+    "completion_tokens": 17503,
+    "cost": 0
    },
    {
     "route": "lightonocr3-4b",
@@ -26637,7 +26860,8 @@
     "ok": 50,
     "nes": 0.9110424531572016,
     "prompt_tokens": 179696,
-    "completion_tokens": 22392
+    "completion_tokens": 22392,
+    "cost": 0
    },
    {
     "route": "lightonocr3-4b",
@@ -26647,7 +26871,8 @@
     "ok": 82,
     "nes": 0.7380219571386312,
     "prompt_tokens": 358538,
-    "completion_tokens": 34635
+    "completion_tokens": 34635,
+    "cost": 0
    },
    {
     "route": "lightonocr3-4b",
@@ -26657,7 +26882,8 @@
     "ok": 12,
     "nes": 0.6486099734534502,
     "prompt_tokens": 67424,
-    "completion_tokens": 2178
+    "completion_tokens": 2178,
+    "cost": 0
    },
    {
     "route": "lightonocr3-4b",
@@ -26667,7 +26893,8 @@
     "ok": 2,
     "nes": 0.4929920780012188,
     "prompt_tokens": 8428,
-    "completion_tokens": 215
+    "completion_tokens": 215,
+    "cost": 0
    },
    {
     "route": "lightonocr3-4b",
@@ -26677,7 +26904,8 @@
     "ok": 21,
     "nes": 0.6063441242285685,
     "prompt_tokens": 96315,
-    "completion_tokens": 11556
+    "completion_tokens": 11556,
+    "cost": 0
    },
    {
     "route": "lightonocr3-4b",
@@ -26687,7 +26915,8 @@
     "ok": 47,
     "nes": 0.8501745735130207,
     "prompt_tokens": 186371,
-    "completion_tokens": 20686
+    "completion_tokens": 20686,
+    "cost": 0
    },
    {
     "route": "lightonocr3-4b",
@@ -26697,7 +26926,8 @@
     "ok": 96,
     "nes": 0.8895755505163454,
     "prompt_tokens": 268645,
-    "completion_tokens": 43732
+    "completion_tokens": 43732,
+    "cost": 0
    },
    {
     "route": "lightonocr3-4b",
@@ -26707,7 +26937,8 @@
     "ok": 16,
     "nes": 0.897321522155729,
     "prompt_tokens": 49376,
-    "completion_tokens": 3026
+    "completion_tokens": 3026,
+    "cost": 0
    },
    {
     "route": "lightonocr3-4b",
@@ -26717,7 +26948,8 @@
     "ok": 2,
     "nes": 0.5876285846817102,
     "prompt_tokens": 6172,
-    "completion_tokens": 446
+    "completion_tokens": 446,
+    "cost": 0
    },
    {
     "route": "lightonocr3-4b",
@@ -26727,7 +26959,8 @@
     "ok": 28,
     "nes": 0.8700576217658103,
     "prompt_tokens": 73027,
-    "completion_tokens": 18147
+    "completion_tokens": 18147,
+    "cost": 0
    },
    {
     "route": "lightonocr3-4b",
@@ -26737,7 +26970,8 @@
     "ok": 50,
     "nes": 0.9101047583254278,
     "prompt_tokens": 140070,
-    "completion_tokens": 22113
+    "completion_tokens": 22113,
+    "cost": 0
    },
    {
     "route": "lightonocr3-4b",
@@ -26747,7 +26981,8 @@
     "ok": 95,
     "nes": 0.8820684360707806,
     "prompt_tokens": 170395,
-    "completion_tokens": 44135
+    "completion_tokens": 44135,
+    "cost": 0
    },
    {
     "route": "lightonocr3-4b",
@@ -26757,7 +26992,8 @@
     "ok": 16,
     "nes": 0.8860981965082267,
     "prompt_tokens": 30024,
-    "completion_tokens": 3179
+    "completion_tokens": 3179,
+    "cost": 0
    },
    {
     "route": "lightonocr3-4b",
@@ -26767,7 +27003,8 @@
     "ok": 2,
     "nes": 0.553451677991751,
     "prompt_tokens": 3778,
-    "completion_tokens": 659
+    "completion_tokens": 659,
+    "cost": 0
    },
    {
     "route": "lightonocr3-4b",
@@ -26777,7 +27014,8 @@
     "ok": 27,
     "nes": 0.850176251558508,
     "prompt_tokens": 46933,
-    "completion_tokens": 17925
+    "completion_tokens": 17925,
+    "cost": 0
    },
    {
     "route": "lightonocr3-4b",
@@ -26787,7 +27025,8 @@
     "ok": 50,
     "nes": 0.9117832063808315,
     "prompt_tokens": 89660,
-    "completion_tokens": 22372
+    "completion_tokens": 22372,
+    "cost": 0
    },
    {
     "route": "ppocrv6",
@@ -26797,7 +27036,8 @@
     "ok": 96,
     "nes": 0.7685339477011393,
     "prompt_tokens": 0,
-    "completion_tokens": 0
+    "completion_tokens": 0,
+    "cost": 0
    },
    {
     "route": "ppocrv6",
@@ -26807,7 +27047,8 @@
     "ok": 16,
     "nes": 0.6278832664522016,
     "prompt_tokens": 0,
-    "completion_tokens": 0
+    "completion_tokens": 0,
+    "cost": 0
    },
    {
     "route": "ppocrv6",
@@ -26817,7 +27058,8 @@
     "ok": 2,
     "nes": 0.6250750361537831,
     "prompt_tokens": 0,
-    "completion_tokens": 0
+    "completion_tokens": 0,
+    "cost": 0
    },
    {
     "route": "ppocrv6",
@@ -26827,7 +27069,8 @@
     "ok": 28,
     "nes": 0.6144064285129575,
     "prompt_tokens": 0,
-    "completion_tokens": 0
+    "completion_tokens": 0,
+    "cost": 0
    },
    {
     "route": "ppocrv6",
@@ -26837,7 +27080,8 @@
     "ok": 50,
     "nes": 0.9055919329080754,
     "prompt_tokens": 0,
-    "completion_tokens": 0
+    "completion_tokens": 0,
+    "cost": 0
    },
    {
     "route": "ppocrv6",
@@ -26847,7 +27091,8 @@
     "ok": 96,
     "nes": 0.7621809930187381,
     "prompt_tokens": 0,
-    "completion_tokens": 0
+    "completion_tokens": 0,
+    "cost": 0
    },
    {
     "route": "ppocrv6",
@@ -26857,7 +27102,8 @@
     "ok": 16,
     "nes": 0.6124821585729668,
     "prompt_tokens": 0,
-    "completion_tokens": 0
+    "completion_tokens": 0,
+    "cost": 0
    },
    {
     "route": "ppocrv6",
@@ -26867,7 +27113,8 @@
     "ok": 2,
     "nes": 0.6364191383120958,
     "prompt_tokens": 0,
-    "completion_tokens": 0
+    "completion_tokens": 0,
+    "cost": 0
    },
    {
     "route": "ppocrv6",
@@ -26877,7 +27124,8 @@
     "ok": 28,
     "nes": 0.6157458395547184,
     "prompt_tokens": 0,
-    "completion_tokens": 0
+    "completion_tokens": 0,
+    "cost": 0
    },
    {
     "route": "ppocrv6",
@@ -26887,7 +27135,8 @@
     "ok": 50,
     "nes": 0.8971187801695016,
     "prompt_tokens": 0,
-    "completion_tokens": 0
+    "completion_tokens": 0,
+    "cost": 0
    },
    {
     "route": "ppocrv6",
@@ -26897,7 +27146,8 @@
     "ok": 96,
     "nes": 0.757415208742826,
     "prompt_tokens": 0,
-    "completion_tokens": 0
+    "completion_tokens": 0,
+    "cost": 0
    },
    {
     "route": "ppocrv6",
@@ -26907,7 +27157,8 @@
     "ok": 16,
     "nes": 0.6161308931813375,
     "prompt_tokens": 0,
-    "completion_tokens": 0
+    "completion_tokens": 0,
+    "cost": 0
    },
    {
     "route": "ppocrv6",
@@ -26917,7 +27168,8 @@
     "ok": 2,
     "nes": 0.5963634751289257,
     "prompt_tokens": 0,
-    "completion_tokens": 0
+    "completion_tokens": 0,
+    "cost": 0
    },
    {
     "route": "ppocrv6",
@@ -26927,7 +27179,8 @@
     "ok": 28,
     "nes": 0.5684490884596745,
     "prompt_tokens": 0,
-    "completion_tokens": 0
+    "completion_tokens": 0,
+    "cost": 0
    },
    {
     "route": "ppocrv6",
@@ -26937,7 +27190,8 @@
     "ok": 50,
     "nes": 0.9148892864256233,
     "prompt_tokens": 0,
-    "completion_tokens": 0
+    "completion_tokens": 0,
+    "cost": 0
    },
    {
     "route": "ppocrv6",
@@ -26947,7 +27201,8 @@
     "ok": 88,
     "nes": 0.5500653614184666,
     "prompt_tokens": 0,
-    "completion_tokens": 0
+    "completion_tokens": 0,
+    "cost": 0
    },
    {
     "route": "ppocrv6",
@@ -26957,7 +27212,8 @@
     "ok": 13,
     "nes": 0.41817968645949766,
     "prompt_tokens": 0,
-    "completion_tokens": 0
+    "completion_tokens": 0,
+    "cost": 0
    },
    {
     "route": "ppocrv6",
@@ -26967,7 +27223,8 @@
     "ok": 2,
     "nes": 0.46917378373216184,
     "prompt_tokens": 0,
-    "completion_tokens": 0
+    "completion_tokens": 0,
+    "cost": 0
    },
    {
     "route": "ppocrv6",
@@ -26977,7 +27234,8 @@
     "ok": 24,
     "nes": 0.4052512715147241,
     "prompt_tokens": 0,
-    "completion_tokens": 0
+    "completion_tokens": 0,
+    "cost": 0
    },
    {
     "route": "ppocrv6",
@@ -26987,7 +27245,8 @@
     "ok": 49,
     "nes": 0.6766003308588846,
     "prompt_tokens": 0,
-    "completion_tokens": 0
+    "completion_tokens": 0,
+    "cost": 0
    },
    {
     "route": "ppocrv6",
@@ -26997,7 +27256,8 @@
     "ok": 96,
     "nes": 0.7766194733886854,
     "prompt_tokens": 0,
-    "completion_tokens": 0
+    "completion_tokens": 0,
+    "cost": 0
    },
    {
     "route": "ppocrv6",
@@ -27007,7 +27267,8 @@
     "ok": 16,
     "nes": 0.6662495519854815,
     "prompt_tokens": 0,
-    "completion_tokens": 0
+    "completion_tokens": 0,
+    "cost": 0
    },
    {
     "route": "ppocrv6",
@@ -27017,7 +27278,8 @@
     "ok": 2,
     "nes": 0.574169827280417,
     "prompt_tokens": 0,
-    "completion_tokens": 0
+    "completion_tokens": 0,
+    "cost": 0
    },
    {
     "route": "ppocrv6",
@@ -27027,7 +27289,8 @@
     "ok": 28,
     "nes": 0.6204958742566327,
     "prompt_tokens": 0,
-    "completion_tokens": 0
+    "completion_tokens": 0,
+    "cost": 0
    },
    {
     "route": "ppocrv6",
@@ -27037,7 +27300,8 @@
     "ok": 50,
     "nes": 0.907465049595991,
     "prompt_tokens": 0,
-    "completion_tokens": 0
+    "completion_tokens": 0,
+    "cost": 0
    },
    {
     "route": "ppocrv6",
@@ -27047,7 +27311,8 @@
     "ok": 96,
     "nes": 0.7807059274945173,
     "prompt_tokens": 0,
-    "completion_tokens": 0
+    "completion_tokens": 0,
+    "cost": 0
    },
    {
     "route": "ppocrv6",
@@ -27057,7 +27322,8 @@
     "ok": 16,
     "nes": 0.694510566265354,
     "prompt_tokens": 0,
-    "completion_tokens": 0
+    "completion_tokens": 0,
+    "cost": 0
    },
    {
     "route": "ppocrv6",
@@ -27067,7 +27333,8 @@
     "ok": 2,
     "nes": 0.5569217441130727,
     "prompt_tokens": 0,
-    "completion_tokens": 0
+    "completion_tokens": 0,
+    "cost": 0
    },
    {
     "route": "ppocrv6",
@@ -27077,7 +27344,8 @@
     "ok": 28,
     "nes": 0.6152085530730286,
     "prompt_tokens": 0,
-    "completion_tokens": 0
+    "completion_tokens": 0,
+    "cost": 0
    },
    {
     "route": "ppocrv6",
@@ -27087,7 +27355,338 @@
     "ok": 50,
     "nes": 0.9099183400991411,
     "prompt_tokens": 0,
-    "completion_tokens": 0
+    "completion_tokens": 0,
+    "cost": 0
+   },
+   {
+    "route": "gemini3.7-flash-gw",
+    "arm": "raw",
+    "group": "the 96",
+    "n": 96,
+    "ok": 96,
+    "nes": 0.967380754219082,
+    "prompt_tokens": 137639,
+    "completion_tokens": 71985,
+    "cost": 0.373176
+   },
+   {
+    "route": "gemini3.7-flash-gw",
+    "arm": "raw",
+    "group": "kind:handwritten",
+    "n": 16,
+    "ok": 16,
+    "nes": 0.9506855218610777,
+    "prompt_tokens": 22796,
+    "completion_tokens": 11814,
+    "cost": 0.061401
+   },
+   {
+    "route": "gemini3.7-flash-gw",
+    "arm": "raw",
+    "group": "kind:mixed",
+    "n": 2,
+    "ok": 2,
+    "nes": 0.8384468722219622,
+    "prompt_tokens": 2840,
+    "completion_tokens": 554,
+    "cost": 0.004208
+   },
+   {
+    "route": "gemini3.7-flash-gw",
+    "arm": "raw",
+    "group": "kind:printed",
+    "n": 28,
+    "ok": 28,
+    "nes": 0.9491250844116822,
+    "prompt_tokens": 40254,
+    "completion_tokens": 20810,
+    "cost": 0.108229
+   },
+   {
+    "route": "gemini3.7-flash-gw",
+    "arm": "raw",
+    "group": "kind:typewritten",
+    "n": 50,
+    "ok": 50,
+    "nes": 0.988103758945672,
+    "prompt_tokens": 71749,
+    "completion_tokens": 38807,
+    "cost": 0.199338
+   },
+   {
+    "route": "gemini3.7-flash-gw",
+    "arm": "quad",
+    "group": "the 96",
+    "n": 96,
+    "ok": 96,
+    "nes": 0.9653355516938881,
+    "prompt_tokens": 138459,
+    "completion_tokens": 62901,
+    "cost": 0.339728
+   },
+   {
+    "route": "gemini3.7-flash-gw",
+    "arm": "quad",
+    "group": "kind:handwritten",
+    "n": 16,
+    "ok": 16,
+    "nes": 0.9397091501543319,
+    "prompt_tokens": 22947,
+    "completion_tokens": 10988,
+    "cost": 0.058417
+   },
+   {
+    "route": "gemini3.7-flash-gw",
+    "arm": "quad",
+    "group": "kind:mixed",
+    "n": 2,
+    "ok": 2,
+    "nes": 0.8520436097026828,
+    "prompt_tokens": 2860,
+    "completion_tokens": 553,
+    "cost": 0.004219
+   },
+   {
+    "route": "gemini3.7-flash-gw",
+    "arm": "quad",
+    "group": "kind:printed",
+    "n": 28,
+    "ok": 28,
+    "nes": 0.9547224038320609,
+    "prompt_tokens": 40433,
+    "completion_tokens": 22493,
+    "cost": 0.114675
+   },
+   {
+    "route": "gemini3.7-flash-gw",
+    "arm": "quad",
+    "group": "kind:typewritten",
+    "n": 50,
+    "ok": 50,
+    "nes": 0.9840110406688174,
+    "prompt_tokens": 72219,
+    "completion_tokens": 28867,
+    "cost": 0.162417
+   },
+   {
+    "route": "gemini3.7-flash-gw",
+    "arm": "uvdoc",
+    "group": "the 96",
+    "n": 96,
+    "ok": 96,
+    "nes": 0.9422292834295164,
+    "prompt_tokens": 138459,
+    "completion_tokens": 67601,
+    "cost": 0.357346
+   },
+   {
+    "route": "gemini3.7-flash-gw",
+    "arm": "uvdoc",
+    "group": "kind:handwritten",
+    "n": 16,
+    "ok": 16,
+    "nes": 0.9204760223990911,
+    "prompt_tokens": 22947,
+    "completion_tokens": 10823,
+    "cost": 0.057794
+   },
+   {
+    "route": "gemini3.7-flash-gw",
+    "arm": "uvdoc",
+    "group": "kind:mixed",
+    "n": 2,
+    "ok": 2,
+    "nes": 0.6712598135065293,
+    "prompt_tokens": 2860,
+    "completion_tokens": 1724,
+    "cost": 0.008609
+   },
+   {
+    "route": "gemini3.7-flash-gw",
+    "arm": "uvdoc",
+    "group": "kind:printed",
+    "n": 28,
+    "ok": 28,
+    "nes": 0.9011496054572532,
+    "prompt_tokens": 40433,
+    "completion_tokens": 22649,
+    "cost": 0.115262
+   },
+   {
+    "route": "gemini3.7-flash-gw",
+    "arm": "uvdoc",
+    "group": "kind:typewritten",
+    "n": 50,
+    "ok": 50,
+    "nes": 0.9830337254206395,
+    "prompt_tokens": 72219,
+    "completion_tokens": 32405,
+    "cost": 0.175681
+   },
+   {
+    "route": "gemini3.7-flash-gw",
+    "arm": "docres",
+    "group": "the 96",
+    "n": 96,
+    "ok": 89,
+    "nes": 0.8024438125543081,
+    "prompt_tokens": 137639,
+    "completion_tokens": 61543,
+    "cost": 0.334016
+   },
+   {
+    "route": "gemini3.7-flash-gw",
+    "arm": "docres",
+    "group": "kind:handwritten",
+    "n": 16,
+    "ok": 14,
+    "nes": 0.6702492451229692,
+    "prompt_tokens": 22796,
+    "completion_tokens": 5797,
+    "cost": 0.038836
+   },
+   {
+    "route": "gemini3.7-flash-gw",
+    "arm": "docres",
+    "group": "kind:mixed",
+    "n": 2,
+    "ok": 2,
+    "nes": 0.5728635160577369,
+    "prompt_tokens": 2840,
+    "completion_tokens": 1875,
+    "cost": 0.009162
+   },
+   {
+    "route": "gemini3.7-flash-gw",
+    "arm": "docres",
+    "group": "kind:printed",
+    "n": 28,
+    "ok": 24,
+    "nes": 0.678663670696019,
+    "prompt_tokens": 40254,
+    "completion_tokens": 22674,
+    "cost": 0.115216
+   },
+   {
+    "route": "gemini3.7-flash-gw",
+    "arm": "docres",
+    "group": "kind:typewritten",
+    "n": 50,
+    "ok": 49,
+    "nes": 0.9232461654328411,
+    "prompt_tokens": 71749,
+    "completion_tokens": 31197,
+    "cost": 0.170802
+   },
+   {
+    "route": "gemini3.7-flash-gw",
+    "arm": "enc-2048-q85",
+    "group": "the 96",
+    "n": 96,
+    "ok": 96,
+    "nes": 0.9670467068245211,
+    "prompt_tokens": 137639,
+    "completion_tokens": 67255,
+    "cost": 0.355441
+   },
+   {
+    "route": "gemini3.7-flash-gw",
+    "arm": "enc-2048-q85",
+    "group": "kind:handwritten",
+    "n": 16,
+    "ok": 16,
+    "nes": 0.9399687495980754,
+    "prompt_tokens": 22796,
+    "completion_tokens": 10666,
+    "cost": 0.057096
+   },
+   {
+    "route": "gemini3.7-flash-gw",
+    "arm": "enc-2048-q85",
+    "group": "kind:mixed",
+    "n": 2,
+    "ok": 2,
+    "nes": 0.8785118525021949,
+    "prompt_tokens": 2840,
+    "completion_tokens": 2101,
+    "cost": 0.010008
+   },
+   {
+    "route": "gemini3.7-flash-gw",
+    "arm": "enc-2048-q85",
+    "group": "kind:printed",
+    "n": 28,
+    "ok": 28,
+    "nes": 0.9523810520502698,
+    "prompt_tokens": 40254,
+    "completion_tokens": 20367,
+    "cost": 0.106569
+   },
+   {
+    "route": "gemini3.7-flash-gw",
+    "arm": "enc-2048-q85",
+    "group": "kind:typewritten",
+    "n": 50,
+    "ok": 50,
+    "nes": 0.9874658139834575,
+    "prompt_tokens": 71749,
+    "completion_tokens": 34121,
+    "cost": 0.181768
+   },
+   {
+    "route": "gemini3.7-flash-gw",
+    "arm": "enc-1600-q90",
+    "group": "the 96",
+    "n": 96,
+    "ok": 96,
+    "nes": 0.9660672391941457,
+    "prompt_tokens": 137639,
+    "completion_tokens": 64036,
+    "cost": 0.343365
+   },
+   {
+    "route": "gemini3.7-flash-gw",
+    "arm": "enc-1600-q90",
+    "group": "kind:handwritten",
+    "n": 16,
+    "ok": 16,
+    "nes": 0.9590868336876375,
+    "prompt_tokens": 22796,
+    "completion_tokens": 9729,
+    "cost": 0.053579
+   },
+   {
+    "route": "gemini3.7-flash-gw",
+    "arm": "enc-1600-q90",
+    "group": "kind:mixed",
+    "n": 2,
+    "ok": 2,
+    "nes": 0.8571998188477139,
+    "prompt_tokens": 2840,
+    "completion_tokens": 2261,
+    "cost": 0.010609
+   },
+   {
+    "route": "gemini3.7-flash-gw",
+    "arm": "enc-1600-q90",
+    "group": "kind:printed",
+    "n": 28,
+    "ok": 28,
+    "nes": 0.940674141408327,
+    "prompt_tokens": 40254,
+    "completion_tokens": 21639,
+    "cost": 0.111337
+   },
+   {
+    "route": "gemini3.7-flash-gw",
+    "arm": "enc-1600-q90",
+    "group": "kind:typewritten",
+    "n": 50,
+    "ok": 50,
+    "nes": 0.9868758005301441,
+    "prompt_tokens": 71749,
+    "completion_tokens": 30407,
+    "cost": 0.16784
    }
   ],
   "uvdoc_benchmark": "enh-dewarp-uvdoc-bench.md",
@@ -28081,6 +28680,241 @@
     "lo": -0.05491,
     "hi": 0.03313,
     "p": 0.73493
+   },
+   {
+    "reader": "gemini3.7-flash-gw",
+    "pages": "originals",
+    "n": 63,
+    "arm": "raw",
+    "base": "raw",
+    "nes": 0.95322,
+    "chrf": 0.96434,
+    "added": 0.01378,
+    "missed": 0.00822
+   },
+   {
+    "reader": "gemini3.7-flash-gw",
+    "pages": "originals",
+    "n": 63,
+    "arm": "quad",
+    "base": "raw",
+    "nes": 0.95035,
+    "chrf": 0.95901,
+    "added": 0.0117,
+    "missed": 0.01182,
+    "d_nes": -0.00287,
+    "lo": -0.01552,
+    "hi": 0.01343,
+    "p": 0.78412
+   },
+   {
+    "reader": "gemini3.7-flash-gw",
+    "pages": "originals",
+    "n": 63,
+    "arm": "uvdoc",
+    "base": "raw",
+    "nes": 0.92896,
+    "chrf": 0.93518,
+    "added": 0.01429,
+    "missed": 0.02741,
+    "d_nes": -0.02425,
+    "lo": -0.05485,
+    "hi": 0.002,
+    "p": 0.09029
+   },
+   {
+    "reader": "gemini3.7-flash-gw",
+    "pages": "originals",
+    "n": 63,
+    "arm": "docres",
+    "base": "raw",
+    "nes": 0.83242,
+    "chrf": 0.83529,
+    "added": 0.01189,
+    "missed": 0.11254,
+    "d_nes": -0.1208,
+    "lo": -0.19716,
+    "hi": -0.05666,
+    "p": 0.0003
+   },
+   {
+    "reader": "gemini3.7-flash-gw",
+    "pages": "PDF images",
+    "n": 33,
+    "arm": "raw",
+    "base": "raw",
+    "nes": 0.99442,
+    "chrf": 0.99452,
+    "added": 0.00464,
+    "missed": 0.00225
+   },
+   {
+    "reader": "gemini3.7-flash-gw",
+    "pages": "PDF images",
+    "n": 33,
+    "arm": "quad",
+    "base": "raw",
+    "nes": 0.99395,
+    "chrf": 0.99343,
+    "added": 0.00719,
+    "missed": 0.00638,
+    "d_nes": -0.00047,
+    "lo": -0.00175,
+    "hi": 0.00047,
+    "p": 0.47595
+   },
+   {
+    "reader": "gemini3.7-flash-gw",
+    "pages": "PDF images",
+    "n": 33,
+    "arm": "uvdoc",
+    "base": "raw",
+    "nes": 0.96755,
+    "chrf": 0.96607,
+    "added": 0.01655,
+    "missed": 0.03713,
+    "d_nes": -0.02687,
+    "lo": -0.05103,
+    "hi": -0.00686,
+    "p": 0.0186
+   },
+   {
+    "reader": "gemini3.7-flash-gw",
+    "pages": "PDF images",
+    "n": 33,
+    "arm": "docres",
+    "base": "raw",
+    "nes": 0.74522,
+    "chrf": 0.75521,
+    "added": 0.03369,
+    "missed": 0.31801,
+    "d_nes": -0.2492,
+    "lo": -0.37538,
+    "hi": -0.13877,
+    "p": 0.0001
+   },
+   {
+    "reader": "gemini3.7-flash-gw",
+    "pages": "originals",
+    "n": 63,
+    "arm": "raw",
+    "base": "raw",
+    "nes": 0.95322,
+    "chrf": 0.96434,
+    "added": 0.01378,
+    "missed": 0.00822
+   },
+   {
+    "reader": "gemini3.7-flash-gw",
+    "pages": "originals",
+    "n": 63,
+    "arm": "enc-2048-q85",
+    "base": "raw",
+    "nes": 0.9536,
+    "chrf": 0.96588,
+    "added": 0.01153,
+    "missed": 0.0075,
+    "d_nes": 0.00039,
+    "lo": -0.00376,
+    "hi": 0.00504,
+    "p": 0.87401
+   },
+   {
+    "reader": "gemini3.7-flash-gw",
+    "pages": "originals",
+    "n": 63,
+    "arm": "enc-1600-q90",
+    "base": "raw",
+    "nes": 0.95219,
+    "chrf": 0.97296,
+    "added": 0.0117,
+    "missed": 0.00726,
+    "d_nes": -0.00102,
+    "lo": -0.00922,
+    "hi": 0.00671,
+    "p": 0.72333
+   },
+   {
+    "reader": "gemini3.7-flash-gw",
+    "pages": "PDF images",
+    "n": 33,
+    "arm": "raw",
+    "base": "raw",
+    "nes": 0.99442,
+    "chrf": 0.99452,
+    "added": 0.00464,
+    "missed": 0.00225
+   },
+   {
+    "reader": "gemini3.7-flash-gw",
+    "pages": "PDF images",
+    "n": 33,
+    "arm": "enc-2048-q85",
+    "base": "raw",
+    "nes": 0.99271,
+    "chrf": 0.99498,
+    "added": 0.00508,
+    "missed": 0.0018,
+    "d_nes": -0.00171,
+    "lo": -0.00609,
+    "hi": 0.00112,
+    "p": 0.59784
+   },
+   {
+    "reader": "gemini3.7-flash-gw",
+    "pages": "PDF images",
+    "n": 33,
+    "arm": "enc-1600-q90",
+    "base": "raw",
+    "nes": 0.99255,
+    "chrf": 0.99402,
+    "added": 0.00546,
+    "missed": 0.00293,
+    "d_nes": -0.00187,
+    "lo": -0.00593,
+    "hi": 0.00034,
+    "p": 0.63724
+   },
+   {
+    "reader": "gemini3.7-flash-gw",
+    "pages": "ladder",
+    "n": 20,
+    "arm": "quarter",
+    "base": "quarter",
+    "nes": 0.95846,
+    "chrf": 0.97239,
+    "added": 0.0328,
+    "missed": 0.01404
+   },
+   {
+    "reader": "gemini3.7-flash-gw",
+    "pages": "ladder",
+    "n": 20,
+    "arm": "quad-quarter",
+    "base": "quarter",
+    "nes": 0.96421,
+    "chrf": 0.96959,
+    "added": 0.02576,
+    "missed": 0.02023,
+    "d_nes": 0.00575,
+    "lo": -0.00926,
+    "hi": 0.02106,
+    "p": 0.47565
+   },
+   {
+    "reader": "gemini3.7-flash-gw",
+    "pages": "ladder",
+    "n": 20,
+    "arm": "uvdoc-quarter",
+    "base": "quarter",
+    "nes": 0.94257,
+    "chrf": 0.94689,
+    "added": 0.02344,
+    "missed": 0.05299,
+    "d_nes": -0.0159,
+    "lo": -0.05523,
+    "hi": 0.01869,
+    "p": 0.46515
    }
   ]
  },

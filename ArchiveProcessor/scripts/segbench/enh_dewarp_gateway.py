@@ -1,7 +1,7 @@
 #!/usr/local/bin/python3
 """W46.enh-dewarp-paid. Gemini 3.7 Flash through the Stanford AI API gateway on the dewarp arms of W46.enh-dewarp.
 
-  V=~/Library/Caches/ArchiveSuiteRehearsal/enh-dewarp/venv/bin/python
+  V=/usr/local/bin/python3           # needs requests; the enh-dewarp venv has none
   $V enh_dewarp_gateway.py probe     # one image, to check the request and the ledger
   $V enh_dewarp_gateway.py run       # every image the Sherlock readers read, raw excepted
   $V enh_dewarp.py report            # then adds the gemini3.7-flash-gw reader to enh-dewarp.md / .json
