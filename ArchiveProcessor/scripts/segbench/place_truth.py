@@ -840,7 +840,14 @@ def apply_lines(page_id: str, spec_path: Path, by: str) -> dict:
             continue
         bl = [[x / 1000, y / 1000] for x, y in ln['baseline']]
         asc = ln['height'] / 1000 if ln.get('height') else None
-        box = pm(ln['box']) if ln.get('box') else band_box(bl, asc)
+        if ln.get('box'):
+            box = pm(ln['box'])
+        elif asc is not None:
+            box = band_box(bl, asc)
+        elif ln.get('words') and any(ln['words']):
+            box = None  # the words' union, below
+        else:
+            raise SystemExit(f'{page_id} line {ln_id}: give "box", "height" or "words"')
         wb = [b and pm(b) for b in ln['words']] if ln.get('words') else gap_split(g, box, lt, bl, asc)
         if len(wb) != len(lt):
             raise SystemExit(f'{page_id} line {ln_id}: {len(wb)} word boxes for {len(lt)} words')
