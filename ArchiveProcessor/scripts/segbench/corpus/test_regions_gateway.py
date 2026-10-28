@@ -158,9 +158,31 @@ class Collector(unittest.TestCase):
                 B.call(self.m, self.job)
             net.assert_not_called()
 
+    def test_json_gateway_refusal_is_zero_and_not_cached_as_a_reading(self):
+        err = {'error': {'message': 'the authentication database is temporarily unreachable', 'code': '503'}}
+        bad = Mock(status_code=503, json=lambda: err)
+        with patch.object(B.G, 'request', return_value=bad):
+            with self.assertRaisesRegex(RuntimeError, 'gateway refused'):
+                B.call(self.m, self.job)
+        self.assertEqual(B.spent(), 0)
+        self.assertFalse((self.store / 'replies' / (self.key + '.json')).exists())
+        self.assertFalse(B.gateway_refusal(500, err))
+        self.assertFalse(B.gateway_refusal(503, {**err, 'usage': {'prompt_tokens': 5}}))
+
+    def test_reclassify_moves_a_recorded_refusal_reply_aside(self):
+        (self.store / 'replies').mkdir()
+        f = self.store / 'replies' / 'k.json'
+        f.write_text(json.dumps({'response': {'error': {'message': 'x'}}}))
+        B.append({'id': 'a', 'event': 'settle', 'charge': .04, 'request_sha256': 'k', 'allowance': .04,
+                  'http': 503, 'known': False})
+        B.reclassify()
+        self.assertEqual(B.spent(), 0)
+        self.assertFalse(f.exists()); self.assertTrue((self.store / 'replies' / 'k.refused.json').exists())
+
     def test_transport_failure_or_json_error_body_stays_charged(self):
         for r in ({'http': None, 'error': 'ConnectionError', 'body': ''},
                   {'http': 502, 'error': 'KeyError', 'body': '{"error": "x"}'},
+                  {'http': 504, 'error': 'JSONDecodeError', 'body': '<html>'},
                   {'http': 200, 'error': 'JSONDecodeError', 'body': '<html>'}):
             self.assertFalse(B.front_end_error(r))
         B.append({'id': 'a', 'event': 'unknown', 'charge': .04, 'request_sha256': 'k', 'allowance': .04,

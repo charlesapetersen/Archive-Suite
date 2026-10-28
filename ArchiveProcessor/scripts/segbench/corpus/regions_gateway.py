@@ -195,21 +195,39 @@ def reservation(body):
     return ((text + 8192 + 2048) * PRICE[0] + body['max_tokens'] * PRICE[1]) / 1e6
 
 
+REFUSED = (429, 502, 503)   # rate limit, front-end/proxy refusal, service unavailable: no model is reached
+
+
 def front_end_error(r):
-    """A 429/5xx whose body is an HTML error page, not JSON: the gateway's front end answered and no model ran
+    """A 429/502/503 whose body is an HTML error page, not JSON: the gateway's front end answered and no model ran
     (2026-10-28: /models itself returned the same 502 page during the outage). Charged $0. A transport failure
-    with no status, or a JSON error body, stays unknown at its full allowance."""
-    return (r.get('http') in (429, 500, 502, 503, 504) and r.get('error') == 'JSONDecodeError'
+    with no status, a 500/504 (upstream work may have run) or any other body stays unknown at its full allowance."""
+    return (r.get('http') in REFUSED and r.get('error') == 'JSONDecodeError'
             and '<html' in (r.get('body') or '').lower())
 
 
+def gateway_refusal(status, got):
+    """A 429/502/503 JSON error with no choices and no usage, e.g. 2026-10-28's 503 'authentication database is
+    temporarily unreachable': refused before any model ran. $0, and never cached as a reading of the crop."""
+    return (status in REFUSED and isinstance(got, dict) and isinstance(got.get('error'), dict)
+            and not got.get('choices') and not got.get('usage'))
+
+
 def reclassify():
-    """Append $0 'rejected' lines for recorded unknowns that front_end_error identifies; never edits a line."""
+    """Append $0 'rejected' lines for recorded unknowns that front_end_error identifies, and for settled replies
+    that gateway_refusal identifies (whose reply file is renamed *.refused.json so it is not scored as a reading
+    and the request may be sent again with --retry-unknown). Never edits a ledger line."""
     n = 0
     for r in effective():
         if r['event'] == 'unknown' and front_end_error(r):
             append({**r, 'event': 'rejected', 'charge': 0.0}); n += 1
-    print(f'{n} front-end errors reclassified at $0; item ${spent():.4f}')
+        elif r['event'] == 'settle' and not r.get('known'):
+            f = STORE / 'replies' / (r['request_sha256'] + '.json')
+            hit = json.loads(f.read_text()) if f.exists() else None
+            if hit and gateway_refusal(r.get('http'), hit['response']):
+                f.rename(f.with_suffix('.refused.json'))
+                append({**r, 'event': 'rejected', 'charge': 0.0, 'body': json.dumps(hit['response'])[:500]}); n += 1
+    print(f'{n} gateway refusals reclassified at $0; item ${spent():.4f}')
 
 
 def call(m, job):
@@ -245,6 +263,12 @@ def call(m, job):
                 append({**u, 'event': 'rejected', 'charge': 0.0})
                 raise RuntimeError(f"gateway front end refused ({u['http']}); nothing served, stopped") from e
         raise RuntimeError('unknown usage: full reservation retained; inspect before any retry') from e
+    if gateway_refusal(response.status_code, got):
+        with LOCK:
+            STOP.set()
+            append({**rec, 'event': 'rejected', 'charge': 0.0, 'http': response.status_code,
+                    'body': json.dumps(got)[:500]})
+        raise RuntimeError(f'gateway refused ({response.status_code}); nothing served, stopped')
     u = got.get('usage') or {}
     known = all(type(u.get(k)) is int and u[k] >= 0 for k in ('prompt_tokens', 'completion_tokens'))
     cost = G.cost(u) if known else reserve
@@ -352,6 +376,14 @@ def receipt(m, job, ledger):
     return {'text': parsed['text'] if valid else '', 'usage': u, 'cost': led['charge'], 'new': led['charge']}
 
 
+def present(m, p, arm, ledger):
+    """Every receipt of one page's arm is on disk and settled (the reused whole readings of the 96 always are)."""
+    if arm == 'whole' and p['set'] == 'owner99':
+        return True
+    return all((STORE / 'replies' / (request(m, (p, arm, i, c))[1] + '.json')).exists()
+               and request(m, (p, arm, i, c))[1] in ledger for i, c in enumerate(p['crops'][arm]))
+
+
 def score():
     """Network-free: the 96 owner pages (all three arms) and the public pilot pages, a labelled subset."""
     import ocr_panel_score as S
@@ -361,14 +393,23 @@ def score():
     ledger = {r['request_sha256']: r for r in effective() if r['event'] == 'settle'}
     panel = {r['page']: r for r in P.rows()}
     pages = [p for p in m['pages'] if p['set'] == 'owner99' or p['id'] in m['pilot']]
+    owner = [p for p in pages if p['set'] == 'owner99']
+    # An arm is on the 96 only when every owner page has every receipt; otherwise only its pilot pages are scored.
+    full = [a for a in ARMS if all(present(m, p, a, ledger) for p in owner)]
+    if 'whole' not in full:
+        raise ValueError('whole-page readings of the 96 are incomplete')
     page_rows, table_markup = [], []
     for p in pages:
         ref = Path(p['truth']).read_text()
-        if p['set'] == 'owner99':
-            groups = ['the 96', *D.kinds_of(panel[p['id']]), 'kind:' + panel[p['id']]['kind']]
-        else:
-            groups = [p['stratum']]
+        pilot = p['id'] in m['pilot']
         for arm in ARMS:
+            if p['set'] == 'owner99':
+                groups = (['the 96', *D.kinds_of(panel[p['id']]), 'kind:' + panel[p['id']]['kind']] if arm in full else [])
+                groups += ['owner pilot'] if pilot else []
+            else:
+                groups = [p['stratum']]
+            if not groups:
+                continue
             got = [{'index': i, 'box': c['box'], **receipt(m, (p, arm, i, c), ledger)} for i, c in enumerate(p['crops'][arm])]
             good = [g for g in got if g['text']]
             text = D.stitch(arm, good) if good else ''
@@ -391,6 +432,8 @@ def score():
             rr = [r for r in mine if g in r['groups'].split(';')]
             ids = {r['page'] for r in rr}
             same = [r for r in page_rows if r['arm'] == 'whole' and r['page'] in ids]
+            if len(same) != len(rr):
+                raise ValueError(f'{arm}/{g}: whole-page pairs missing')
             row = {'group': g, 'route': ROUTE, 'arm': arm, **D.score_rows(rr, S),
                    'whole_nes_same': round(S.aggregate(same)['nes'], 4), 'cost': round(sum(r['cost'] for r in rr), 6)}
             if arm != 'whole':
@@ -398,8 +441,6 @@ def score():
                              [r['nes'] for r in sorted(same, key=lambda r: r['page'])])
                 row['paired'] = {k: round(v, 4) for k, v in d.items()}
             rows.append(row)
-    if sum(r['set'] == 'owner99' for r in page_rows) != 96 * len(ARMS):
-        raise ValueError('the 96 are not complete on every arm')
     OUT.mkdir(parents=True, exist_ok=True)
     S.write_csv(OUT / f'{NAME}-pages.csv', [{k: round(v, 6) if isinstance(v, float) else v for k, v in r.items()}
                                             for r in page_rows],
@@ -411,7 +452,8 @@ def score():
                              **{k: round(sum(r[k] for r in t) / len(t), 6) for k in ('strict', 'markup_stripped')},
                              'markup_pages': sum(r['has_markup'] for r in t)}
                             for arm in ARMS for t in [[r for r in table_markup if r['arm'] == arm]] if t],
-           'owner_pages': 96, 'public_pilot_pages': sorted(p['id'] for p in pages if p['set'] == 'public895'),
+           'owner_pages': 96, 'arms_on_the_96': full,
+           'owner_pilot_pages': sorted(p['id'] for p in owner if p['id'] in m['pilot']), 'public_pilot_pages': sorted(p['id'] for p in pages if p['set'] == 'public895'),
            'price_estimate_usd_per_m': list(PRICE), 'item_spend_estimate': round(item, 4),
            'calls_new': len(effective())}
     (OUT / f'{NAME}.json').write_text(json.dumps(out, indent=2) + '\n')
@@ -443,6 +485,17 @@ def report_md(out):
             L.append(f"| {g} ({r['n']}) | {arm[a]} | {100 * r['nes']:.1f} | {r['ok']}/{r['n']} | {delta} | "
                      f"{'—' if a == 'whole' else str(r['crops_failed']) + '/' + str(r['crops'])} | "
                      f"${1000 * r['cost'] / r['n']:.2f} |")
+    missing = [arm[a] for a in ARMS if a not in out['arms_on_the_96']]
+    if missing:
+        L += ['', f"Not read on the 96: {', '.join(missing)} — the item's $3 cap did not fit it (residual W46.ocr-regions-paid-pp).",
+              '', f"## Owner pilot pages ({len(out['owner_pilot_pages'])}, one an annotation group — every arm, a labelled sample)", '',
+              '| arm | NES % | Δ whole (points) | failed / crops |', '|---|---:|---:|---:|']
+        for a in ARMS:
+            r = by.get(('owner pilot', a))
+            if r:
+                delta = '—' if a == 'whole' else f"{100 * (r['nes'] - r['whole_nes_same']):+.1f}"
+                crops = '—' if a == 'whole' else f"{r['crops_failed']}/{r['crops']}"
+                L.append(f"| {arm[a]} | {100 * r['nes']:.1f} | {delta} | {crops} |")
     L += ['', f"## Public pilot pages ({len(out['public_pilot_pages'])}, one a stratum — a labelled sample, not a set result)",
           '', 'The other eight frozen public pages were not read: the full scope projected above the $3 item cap.', '',
           '| stratum | arm | NES % | failed / crops | order edit |', '|---|---|---:|---:|---:|']
