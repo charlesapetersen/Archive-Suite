@@ -21,6 +21,19 @@ class RegionCharts(unittest.TestCase):
         self.assertIsNone(r['hw']['gpu_hours_per_100k'])
         self.assertFalse(r['free_cluster'])
 
+    def test_gateway_arms_priced_from_own_cost_and_refuse_a_partial_96(self):
+        rows = [dict(arm=a, group=g, n=n, ok=n, nes=.8, cost=n*.02)
+                for a in ('pp-doclayoutv3', 'tiles')
+                for g,n in [('the 96',96),('kind:typewritten',50),('kind:printed',28),('kind:handwritten',16),('L9',1)]]
+        out = build.gateway_region_routes(dict(rows=rows), ['typewritten','printed','handwritten'])
+        self.assertEqual([r['id'] for r in out], ['gw-regions-pp-doclayoutv3', 'gw-regions-tiles'])
+        self.assertEqual(out[0]['std'], 20.0)  # $0.02 a page -> $20 per 1,000
+        self.assertEqual(out[0]['scores']['printed'], [80.0, 28, 28])
+        self.assertNotIn('L9', out[0]['scores'])
+        rows[0]['n'] = 95
+        with self.assertRaises(SystemExit):
+            build.gateway_region_routes(dict(rows=rows), ['typewritten','printed','handwritten'])
+
     def test_committed_run_has_twelve_routes_on_all_four_eligible_charts(self):
         root = Path(__file__).parent
         d = json.loads((root/'data/panel-data.json').read_text())

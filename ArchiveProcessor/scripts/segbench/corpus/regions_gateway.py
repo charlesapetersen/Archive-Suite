@@ -37,6 +37,7 @@ ARMS = ('whole', 'pp-doclayoutv3', 'tiles')
 PRICE = G.PRICE  # estimate at the prior bench's conservative .75/3.75 USD/M, not a gateway bill
 LOCK = threading.Lock()
 STOP = threading.Event()
+RETRY_UNKNOWN = False  # set only by an explicit --retry-unknown, after the unknown lines were inspected
 
 
 def sha(b):
@@ -202,8 +203,10 @@ def call(m, job):
         hit = cached(m, job, body, key)
         if hit is not None:
             return hit
-        if any(r['request_sha256'] == key for r in effective()):
+        tried = [r for r in effective() if r['request_sha256'] == key]
+        if tried and not (RETRY_UNKNOWN and all(r['event'] == 'unknown' for r in tried)):
             raise RuntimeError('already attempted without a cached reply; no automatic retry')
+        # A deliberate retry of an unknown request keeps the earlier full allowance charged: never optimistic.
         reserve = reservation(body)
         if spent() + reserve > CAP:
             raise RuntimeError(f'cap: ${spent():.4f} + ${reserve:.4f} > ${CAP}')
@@ -218,7 +221,9 @@ def call(m, job):
     except Exception as e:
         with LOCK:
             STOP.set()
-            append({**rec, 'event': 'unknown', 'error': type(e).__name__})
+            append({**rec, 'event': 'unknown', 'error': type(e).__name__,
+                    'http': getattr(response, 'status_code', None),
+                    'body': (getattr(response, 'text', '') or '')[:500]})
         raise RuntimeError('unknown usage: full reservation retained; inspect before any retry') from e
     u = got.get('usage') or {}
     known = all(type(u.get(k)) is int and u[k] >= 0 for k in ('prompt_tokens', 'completion_tokens'))
@@ -263,7 +268,8 @@ def inventory():
 
 def collect(pilot=False, sets=None, arms=ARMS):
     m = manifest()
-    if spent() > CAP or any(r['event'] != 'settle' or not r.get('known')
+    if spent() > CAP or any((r['event'] != 'settle' and not (RETRY_UNKNOWN and r['event'] == 'unknown'))
+                           or (r['event'] == 'settle' and not r.get('known'))
                            or r['charge'] > r['allowance'] for r in effective()):
         raise RuntimeError('unsettled/unknown earlier request; inspect ledger, do not resend')
     verify()
@@ -295,19 +301,163 @@ def verify():
     print('offline input/cache checks passed:', len(m['pages']), 'pages', flush=True)
 
 
+ROUTE = 'gemini-3.7-flash-gw'
+OUT = G.RESULTS / 'bench-corpus'
+NAME = 'regions-gateway-20261028'
+
+
+def receipt(m, job, ledger):
+    """A crop's reading, re-checked from the stored response and its settled ledger line, not the stored flag.
+    A missing receipt is an error (no silent partial export); an invalid or capped reply is a failed crop."""
+    p, arm, i, _ = job
+    body, key = request(m, job)
+    if arm == 'whole' and p['set'] == 'owner99':
+        hit = cached(m, job, body, key)   # raises unless the exact earlier request, HTTP 200, stop, parsed
+        return {'text': G.parsed(hit)['text'], 'usage': hit['usage'], 'cost': hit['cost_estimate'], 'new': 0.0}
+    f = STORE / 'replies' / (key + '.json')
+    if not f.exists():
+        raise ValueError(f'missing receipt: {p["id"]}/{arm}/{i}')
+    hit = json.loads(f.read_text())
+    led = ledger.get(key)
+    if hit['key'] != key or hit['request_sha256'] != body_key(body) or led is None or led['event'] != 'settle':
+        raise ValueError(f'receipt identity or ledger differs: {p["id"]}/{arm}/{i}')
+    got, u = hit['response'], hit['usage']
+    choice = (got.get('choices') or [{}])[0]
+    known = all(type(u.get(k)) is int and u[k] >= 0 for k in ('prompt_tokens', 'completion_tokens'))
+    parsed = G.parsed({'raw': hit['raw']}) if isinstance(hit['raw'], str) else None
+    valid = (led['http'] == 200 and got.get('model') == G.MODEL and choice.get('finish_reason') == 'stop'
+             and bool(parsed) and known)
+    if valid != hit['valid'] or not known or abs(led['charge'] - G.cost(u)) > 1e-9:
+        raise ValueError(f'receipt does not re-validate: {p["id"]}/{arm}/{i}')
+    return {'text': parsed['text'] if valid else '', 'usage': u, 'cost': led['charge'], 'new': led['charge']}
+
+
+def score():
+    """Network-free: the 96 owner pages (all three arms) and the public pilot pages, a labelled subset."""
+    import ocr_panel_score as S
+    import ocr_scorers as O
+    m = manifest()
+    verify()
+    ledger = {r['request_sha256']: r for r in effective() if r['event'] == 'settle'}
+    panel = {r['page']: r for r in P.rows()}
+    pages = [p for p in m['pages'] if p['set'] == 'owner99' or p['id'] in m['pilot']]
+    page_rows, table_markup = [], []
+    for p in pages:
+        ref = Path(p['truth']).read_text()
+        if p['set'] == 'owner99':
+            groups = ['the 96', *D.kinds_of(panel[p['id']]), 'kind:' + panel[p['id']]['kind']]
+        else:
+            groups = [p['stratum']]
+        for arm in ARMS:
+            got = [{'index': i, 'box': c['box'], **receipt(m, (p, arm, i, c), ledger)} for i, c in enumerate(p['crops'][arm])]
+            good = [g for g in got if g['text']]
+            text = D.stitch(arm, good) if good else ''
+            sc = S.score(ref, text, p['stratum']) if p['set'] == 'public895' else S.score(ref, text)
+            if 'tables' in groups:
+                table_markup.append({'route': ROUTE, 'arm': arm, 'page': p['id'], 'strict': sc['nes'],
+                                     'markup_stripped': S.score(ref, O.strip_markup(text))['nes'],
+                                     'has_markup': O.has_markup(text)})
+            order = O.reading_order_edit(ref, text) if text else None
+            page_rows.append({'set': p['set'], 'groups': ';'.join(groups), 'route': ROUTE, 'arm': arm, 'page': p['id'],
+                              'ok': bool(text), **sc, 'order_edit': (order or {}).get('edit'),
+                              'crops': len(got) if arm != 'whole' else '', 'crops_failed': len(got) - len(good) if arm != 'whole' else '',
+                              'prompt_tokens': sum(g['usage']['prompt_tokens'] for g in got),
+                              'completion_tokens': sum(g['usage']['completion_tokens'] for g in got),
+                              'cost': round(sum(g['cost'] for g in got), 6), 'new_cost': round(sum(g['new'] for g in got), 6)})
+    rows = []
+    for arm in ARMS:
+        mine = [r for r in page_rows if r['arm'] == arm]
+        for g in sorted({g for r in mine for g in r['groups'].split(';')}):
+            rr = [r for r in mine if g in r['groups'].split(';')]
+            ids = {r['page'] for r in rr}
+            same = [r for r in page_rows if r['arm'] == 'whole' and r['page'] in ids]
+            row = {'group': g, 'route': ROUTE, 'arm': arm, **D.score_rows(rr, S),
+                   'whole_nes_same': round(S.aggregate(same)['nes'], 4), 'cost': round(sum(r['cost'] for r in rr), 6)}
+            if arm != 'whole':
+                d = S.paired([r['nes'] for r in sorted(rr, key=lambda r: r['page'])],
+                             [r['nes'] for r in sorted(same, key=lambda r: r['page'])])
+                row['paired'] = {k: round(v, 4) for k, v in d.items()}
+            rows.append(row)
+    if sum(r['set'] == 'owner99' for r in page_rows) != 96 * len(ARMS):
+        raise ValueError('the 96 are not complete on every arm')
+    OUT.mkdir(parents=True, exist_ok=True)
+    S.write_csv(OUT / f'{NAME}-pages.csv', [{k: round(v, 6) if isinstance(v, float) else v for k, v in r.items()}
+                                            for r in page_rows],
+                ['set', 'groups', 'route', 'arm', 'page', 'ok', 'nes', 'chrf', 'words', 'missed', 'added', 'order_edit',
+                 'crops', 'crops_failed', 'prompt_tokens', 'completion_tokens', 'cost', 'new_cost'])
+    item = sum(r['charge'] for r in effective())
+    out = {'report': f'bench-corpus/{NAME}.md', 'route': ROUTE, 'model': G.MODEL, 'arms': list(ARMS), 'rows': rows,
+           'table_markup': [{'route': ROUTE, 'arm': arm, 'n': len(t),
+                             **{k: round(sum(r[k] for r in t) / len(t), 6) for k in ('strict', 'markup_stripped')},
+                             'markup_pages': sum(r['has_markup'] for r in t)}
+                            for arm in ARMS for t in [[r for r in table_markup if r['arm'] == arm]] if t],
+           'owner_pages': 96, 'public_pilot_pages': sorted(p['id'] for p in pages if p['set'] == 'public895'),
+           'price_estimate_usd_per_m': list(PRICE), 'item_spend_estimate': round(item, 4),
+           'calls_new': len(effective())}
+    (OUT / f'{NAME}.json').write_text(json.dumps(out, indent=2) + '\n')
+    (OUT / f'{NAME}.md').write_text(report_md(out))
+    print(report_md(out))
+
+
+def report_md(out):
+    by = {(r['group'], r['arm']): r for r in out['rows']}
+    arm = {'whole': 'whole page', 'pp-doclayoutv3': 'PP-DocLayoutV3 regions', 'tiles': 'overlapping tiles'}
+    L = ['# Gemini 3.7 Flash on the whole page, PP-DocLayoutV3 regions and overlapping tiles (W46.ocr-regions-paid)', '',
+         'Stanford AI API gateway, temperature 0, low reasoning, 8,192 output tokens, the panel prompt, the same frozen '
+         '2,400 px images and crop geometry as W46.ocr-regions (`corpus/regions_gateway.py`). NES is the panel scorer; '
+         'a page or crop that returned nothing counts as empty. Whole-page readings of the 96 are the earlier gateway '
+         'item\'s, reused after exact request-hash checks. Prices are estimates at '
+         f"${out['price_estimate_usd_per_m'][0]}/${out['price_estimate_usd_per_m'][1]} per million tokens; the gateway "
+         f"returns no bill. This item's new calls: {out['calls_new']}, about ${out['item_spend_estimate']:.2f}.", '',
+         '## The 96 owner pages', '',
+         '| group | arm | NES % | answered | Δ whole (points, 95% CI) | failed / crops | cost / 1,000 pages |',
+         '|---|---|---:|---:|---:|---:|---:|']
+    groups = ['the 96', 'kind:typewritten', 'kind:printed', 'kind:handwritten', *D.KINDS]
+    for g in groups:
+        for a in ARMS:
+            r = by.get((g, a))
+            if not r:
+                continue
+            d = r.get('paired')
+            delta = '—' if not d else f"{100 * d['delta']:+.1f} ({100 * d['lo']:+.1f} to {100 * d['hi']:+.1f})"
+            L.append(f"| {g} ({r['n']}) | {arm[a]} | {100 * r['nes']:.1f} | {r['ok']}/{r['n']} | {delta} | "
+                     f"{'—' if a == 'whole' else str(r['crops_failed']) + '/' + str(r['crops'])} | "
+                     f"${1000 * r['cost'] / r['n']:.2f} |")
+    L += ['', f"## Public pilot pages ({len(out['public_pilot_pages'])}, one a stratum — a labelled sample, not a set result)",
+          '', 'The other eight frozen public pages were not read: the full scope projected above the $3 item cap.', '',
+          '| stratum | arm | NES % | failed / crops | order edit |', '|---|---|---:|---:|---:|']
+    for g in ('L9', 'L4', 'L3', 'L1'):
+        for a in ARMS:
+            r = by.get((g, a))
+            if r:
+                L.append(f"| {g} | {arm[a]} | {100 * r['nes']:.1f} | "
+                         f"{'—' if a == 'whole' else str(r['crops_failed']) + '/' + str(r['crops'])} | "
+                         f"{r['order_edit'] if r['order_edit'] != '' else '—'} |")
+    t = {r['arm']: r for r in out['table_markup']}
+    if t:
+        L += ['', '## Table pages: strict NES against NES with markup stripped (diagnostic)', '',
+              '| arm | pages | strict | markup stripped | pages with markup |', '|---|---:|---:|---:|---:|']
+        L += [f"| {arm[a]} | {r['n']} | {100 * r['strict']:.1f} | {100 * r['markup_stripped']:.1f} | {r['markup_pages']} |"
+              for a, r in t.items()]
+    return '\n'.join(L) + '\n'
+
+
 def main():
-    global STORE
+    global STORE, RETRY_UNKNOWN
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument('cmd', choices=['prepare', 'verify', 'inventory', 'pilot', 'collect'])
+    ap.add_argument('cmd', choices=['prepare', 'verify', 'inventory', 'pilot', 'collect', 'score'])
     ap.add_argument('--store', type=Path, default=STORE)
     ap.add_argument('--set', action='append', choices=['owner99', 'public895'], help='collect only these sets')
     ap.add_argument('--arm', action='append', choices=ARMS, help='collect only these arms')
+    ap.add_argument('--retry-unknown', action='store_true',
+                    help='resend requests whose only attempts are unknown; their allowances stay charged')
     a = ap.parse_args(); STORE = a.store
+    RETRY_UNKNOWN = a.retry_unknown
     STORE.mkdir(parents=True, exist_ok=True)
     with (STORE / 'collector.lock').open('a') as f:
         fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
         {'prepare': prepare, 'verify': verify, 'inventory': inventory,
-         'pilot': lambda: collect(True), 'collect': lambda: collect(False, a.set, tuple(a.arm or ARMS))}[a.cmd]()
+         'pilot': lambda: collect(True), 'collect': lambda: collect(False, a.set, tuple(a.arm or ARMS)), 'score': score}[a.cmd]()
 
 
 if __name__ == '__main__':

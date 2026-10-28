@@ -56,6 +56,7 @@ CHAOS = RESULTS / "chaos-probe.json"  # W46.fix-ocr-scorers: chaos_probe.py scor
 DEWARP = RESULTS / "enh-dewarp.json"  # W46.enh-dewarp: enh_dewarp.py report, crop or dewarp against raw, by reader
 LOOPS = PUBLIC / "loop-rerun-20261021.json"  # W46.ocr-loops: corpus/loop_rerun.py report, the capped pages read again
 REGIONS = PUBLIC / "regions-20261021.json"  # W46.ocr-regions: whole page, detector regions and overlapping tiles
+REGIONS_GW = PUBLIC / "regions-gateway-20261028.json"  # W46.ocr-regions-paid: corpus/regions_gateway.py score, Gemini 3.7
 OPEN_SWEEP = HERE / "data" / "open-sweep-20261019.json"  # the open-model sweep's receipts (hand-entered, sourced)
 TEMPLATE = HERE / "site" / "template.html"
 OUT_DATA = HERE / "data" / "panel-data.json"
@@ -550,6 +551,25 @@ def region_chart_routes(data, kinds, op):
     return out
 
 
+def gateway_region_routes(data, kinds):
+    """Gemini 3.7 Flash's crop arms on the 96 (W46.ocr-regions-paid), priced from their own estimated token cost
+    (the gateway returns no bill). Only exact 96-page groups reach the charts; the public pilot rows stay in the table."""
+    if data is None:
+        return []
+    by = {(r["arm"], r["group"]): r for r in data["rows"]}
+    arms = {"pp-doclayoutv3": "PP-DocLayoutV3 regions", "tiles": "overlapping tiles"}
+    out = []
+    for arm, label in arms.items():
+        overall = by[(arm, "the 96")]
+        if overall["n"] != 96:
+            sys.exit(f"gateway {arm} covers {overall['n']} of the 96")
+        scores = {key: [round(100 * by[(arm, g)]["nes"], 2), by[(arm, g)]["ok"], by[(arm, g)]["n"]]
+                  for key, g in [("overall", "the 96"), *((k, "kind:" + k) for k in kinds)]}
+        out.append({"id": f"gw-regions-{arm}", "name": "Gemini 3.7 Flash (Stanford gateway, price estimated) · " + label,
+                    "panel": "cloud", "std": cents(1000 * overall["cost"] / overall["n"]), "batch": None, "scores": scores})
+    return out
+
+
 def main():
     check = "--check" in sys.argv[1:]
     inputs = json.loads(INPUTS.read_text())
@@ -631,6 +651,17 @@ def main():
         routes.append(route)
         for c in charts:
             c["scores"][route["id"]] = scores[c["key"]]
+    regions_gw = json.loads(REGIONS_GW.read_text()) if REGIONS_GW.exists() else None
+    for route in gateway_region_routes(regions_gw, inputs["kinds"]):
+        scores = route.pop("scores")
+        routes.append(route)
+        for c in charts:
+            c["scores"][route["id"]] = scores[c["key"]]
+            if scores[c["key"]][2] != c["n"]:
+                sys.exit(f"{route['id']}'s {c['key']} page count differs from the panel's {c['n']}")
+    if regions and regions_gw:  # the open readers' table gains Gemini's rows; its public rows are pilot pages only
+        regions = {**regions, "rows": regions["rows"] + regions_gw["rows"], "gateway": {
+            k: regions_gw[k] for k in ("report", "public_pilot_pages", "item_spend_estimate", "calls_new", "table_markup")}}
     for c in charts:
         if any(c["scores"][r["id"]][2] != c["n"] for r in routes if r["panel"] == "farmshare") \
                 or any(e["scores"][c["key"]][2] != c["n"] for e in extra):
@@ -639,7 +670,8 @@ def main():
     # The difficulty and cascade analysis reads ocr-pages.csv's per-page rows, which hold the panels' routes but not
     # the later gateway reading of Gemini 3.7 Flash, so that route is drawn on the charts and left out here.
     diff = difficulty.analyse({r["id"]: r["std"] for r in routes}, {r["id"]: r["name"] for r in routes},
-                              [r["id"] for r in routes if r["panel"] != "farmshare" and r["id"] not in GATEWAY_ROUTES])
+                              [r["id"] for r in routes if r["panel"] != "farmshare" and r["id"] not in GATEWAY_ROUTES
+                               and not r["id"].startswith("gw-regions-")])
     dating = json.loads(DATING.read_text()) if DATING.exists() else None
     if dating:  # FarmShare dating runs too large for the Mac, at OpenRouter's rate for their cached token means
         for k, m in dating.get("open_models", {}).items():

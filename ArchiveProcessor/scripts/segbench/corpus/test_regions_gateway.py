@@ -126,6 +126,24 @@ class Collector(unittest.TestCase):
         jobs = B.tasks({'pages': [p], 'pilot': ['empty']})
         self.assertEqual([j[1] for j in jobs], ['whole', 'tiles', 'tiles'])
 
+    def test_retry_unknown_is_explicit_and_keeps_the_first_allowance(self):
+        bad = Mock(status_code=502, text='<html>Bad gateway</html>', json=Mock(side_effect=ValueError))
+        with patch.object(B.G, 'request', return_value=bad):
+            with self.assertRaisesRegex(RuntimeError, 'unknown usage'):
+                B.call(self.m, self.job)
+        u, = B.effective()
+        self.assertEqual((u['event'], u['http'], u['body']), ('unknown', 502, '<html>Bad gateway</html>'))
+        B.STOP.clear()
+        with patch.object(B.G, 'request') as net:
+            with self.assertRaisesRegex(RuntimeError, 'already attempted'):
+                B.call(self.m, self.job)
+            net.assert_not_called()
+        with patch.object(B, 'RETRY_UNKNOWN', True), patch.object(B.G, 'request', return_value=self.reply()) as net:
+            self.assertTrue(B.call(self.m, self.job)['valid'])
+            B.call(self.m, self.job)
+        self.assertEqual(net.call_count, 1)
+        self.assertAlmostEqual(B.spent(), B.reservation(self.body) + (100*.75+200*3.75)/1e6)
+
     def test_set_and_arm_filters_select_a_complete_slice(self):
         crops = {'whole': [{}], 'pp-doclayoutv3': [{}], 'tiles': [{}, {}]}
         pages = [{'id': 'o', 'set': 'owner99', 'crops': crops}, {'id': 'p', 'set': 'public895', 'crops': crops}]
