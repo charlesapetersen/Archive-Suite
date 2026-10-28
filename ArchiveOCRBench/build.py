@@ -572,6 +572,37 @@ def gateway_region_routes(data, kinds):
     return out
 
 
+def dewarp_chart_routes(data, kinds, op):
+    """Crop, dewarp and encoder arms on the 96 (W46.enh-dewarp): Apple Vision's at no cost, like its plain route, and
+    the Sherlock readers' priced like the crop routes above. The plain photograph is left off: each reader's own
+    route already draws it. The hand crops and the ladder are small subsets and stay in the table."""
+    if data is None or data["readers_pending"]:
+        return []
+    by = {(r["route"], r["arm"], r["group"]): r for r in data["chart_rows"]}
+    names = {"apple-vision": "Apple Vision", "lightonocr3-4b": "LightOnOCR-3 4B", "qwen3.6-27b": "Qwen3.6 27B",
+             "ppocrv6": "PP-OCRv6"}
+    arms = {"quad": "Apple quad crop", "uvdoc": "UVDoc dewarp", "docres": "DocRes dewarp",
+            "enc-2048-q85": "app encoder 2048 px q0.85", "enc-2400-q90": "app encoder 2400 px q0.90",
+            "enc-1600-q90": "app encoder 1600 px q0.90"}
+    out = []
+    for route, arm in dict.fromkeys((r["route"], r["arm"]) for r in data["chart_rows"]):
+        if arm == "raw":
+            continue
+        overall = by[(route, arm, "the 96")]
+        scores = {key: [round(100 * by[(route, arm, g)]["nes"], 2), by[(route, arm, g)]["ok"], by[(route, arm, g)]["n"]]
+                  for key, g in [("overall", "the 96"), *((k, "kind:" + k) for k in kinds)]}
+        common = {"id": f"dewarp-{route}-{arm}", "name": names[route] + " · " + arms[arm], "batch": None, "scores": scores}
+        if route == "apple-vision":
+            out.append({**common, "panel": "local", "std": 0.0})
+            continue
+        price = openrouter_price(op, route, overall["prompt_tokens"] / overall["n"],
+                                 overall["completion_tokens"] / overall["n"])
+        out.append({**common, "panel": "farmshare", "cluster": "Sherlock", "std": cents(price) if price is not None else 0.0,
+                    "free_cluster": price is None, "machine": "one NVIDIA L40S per job",
+                    "hw": {"photos_per_hour": None, "gpu_hours_per_100k": None}})
+    return out
+
+
 def main():
     check = "--check" in sys.argv[1:]
     inputs = json.loads(INPUTS.read_text())
@@ -653,6 +684,12 @@ def main():
         routes.append(route)
         for c in charts:
             c["scores"][route["id"]] = scores[c["key"]]
+    dewarp = json.loads(DEWARP.read_text()) if DEWARP.exists() else None
+    for route in dewarp_chart_routes(dewarp, inputs["kinds"], op):
+        scores = route.pop("scores")
+        routes.append(route)
+        for c in charts:
+            c["scores"][route["id"]] = scores[c["key"]]
     regions_gw = json.loads(REGIONS_GW.read_text()) if REGIONS_GW.exists() else None
     for route in gateway_region_routes(regions_gw, inputs["kinds"]):
         scores = route.pop("scores")
@@ -674,7 +711,7 @@ def main():
     # the later gateway reading of Gemini 3.7 Flash, so that route is drawn on the charts and left out here.
     diff = difficulty.analyse({r["id"]: r["std"] for r in routes}, {r["id"]: r["name"] for r in routes},
                               [r["id"] for r in routes if r["panel"] != "farmshare" and r["id"] not in GATEWAY_ROUTES
-                               and not r["id"].startswith("gw-regions-")])
+                               and not r["id"].startswith(("gw-regions-", "dewarp-"))])
     dating = json.loads(DATING.read_text()) if DATING.exists() else None
     if dating:  # FarmShare dating runs too large for the Mac, at OpenRouter's rate for their cached token means
         for k, m in dating.get("open_models", {}).items():
@@ -693,7 +730,7 @@ def main():
              "seg_date": json.loads((RESULTS / "seg-date-model-final.json").read_text())
                          if (RESULTS / "seg-date-model-final.json").exists() else None,
              "public": public(), "ocr_scorers": ocr_scorers(),
-             "dewarp": json.loads(DEWARP.read_text()) if DEWARP.exists() else None,
+             "dewarp": dewarp,
              "loops": json.loads(LOOPS.read_text()) if LOOPS.exists() else None, "regions": regions}
     page = TEMPLATE.read_text().replace("__DATA__", json.dumps(built, separators=(",", ":")))
     outputs = {OUT_DATA: json.dumps(built, indent=1) + "\n", OUT_PAGE: page, OUT_DIFFICULTY: difficulty.report(diff)}

@@ -1,5 +1,10 @@
 """Synthetic tests for enh_dewarp's lattice geometry: evaluation, inversion, frame, fold-overs, sagitta, curvature."""
 import unittest
+import hashlib
+import json
+import tempfile
+from pathlib import Path
+from unittest.mock import patch
 
 import numpy as np
 
@@ -92,6 +97,92 @@ class Lattice(unittest.TestCase):
                  {'words': [w('The', 0.3), w('cat', 0.4), w('sat', 0.5)]}]
         c = E.truth_words(lines, ['the', 'cat', 'sat'])
         np.testing.assert_allclose(c[:, 0], [0.325, 0.425, 0.525])  # the page's own 'The', not the neighbour's
+
+
+class CollectedPack(unittest.TestCase):
+    """Never publish a collection error as evidence that preprocessing hurt OCR."""
+
+    def setUp(self):
+        temp = tempfile.TemporaryDirectory()
+        self.addCleanup(temp.cleanup)
+        self.root = Path(temp.name)
+        self.jobs = [('raw', 'p001'), ('docres', 'p001')]
+        self.image = self.root / 'image.jpg'
+        self.image.write_bytes(b'frozen test image')
+        self.digest = hashlib.sha256(self.image.read_bytes()).hexdigest()
+        self.manifest = [{'id': f'{a}/{p}', 'sha256': self.digest} for a, p in self.jobs]
+        (self.root / 'pages.jsonl').write_text(''.join(json.dumps(r) + '\n' for r in self.manifest))
+        (self.root / 'routes.json').write_text(json.dumps({r: {'model': m} for r, m in E.CLUSTER_MODELS.items()}))
+        for route, mode in E.READERS.items():
+            for arm, p in self.jobs:
+                rec = {'id': f'{arm}/{p}', 'sha256': self.digest, 'route': route,
+                       'model': E.CLUSTER_MODELS[route], 'status': 'ok', 'error': None,
+                       'finish': None if mode == 'pipeline' else 'stop', 'max_tokens': 8192,
+                       'prompt_sha256': hashlib.sha256((E.P.PROMPT if mode == 'panel' else '').encode()).hexdigest(),
+                       'raw': 'KIND: typed\nTABLE: no\nTEXT:\nThe cat sat.' if mode == 'panel' else 'The cat sat.'}
+                f = self.path(route, arm)
+                f.parent.mkdir(parents=True, exist_ok=True)
+                f.write_text(json.dumps(rec))
+        self.addCleanup(patch.stopall)
+        patch.object(E, 'arm_image', return_value=self.image).start()
+
+    def path(self, route='qwen3.6-27b', arm='raw'):
+        return self.root / 'out' / route / arm / 'p001.json'
+
+    def update(self, **fields):
+        f = self.path()
+        rec = json.loads(f.read_text()); rec.update(fields)
+        f.write_text(json.dumps(rec))
+
+    def test_complete_pack_keeps_cap_and_blank_as_empty_scores(self):
+        self.update(status='cap', finish='length')
+        f = self.path('ppocrv6', 'docres')
+        rec = json.loads(f.read_text()); rec.update(status='blank', raw='')
+        f.write_text(json.dumps(rec))
+        truth = self.root / 'truth'; truth.mkdir()
+        (truth / 'p001.txt').write_text('The cat sat.')
+        with patch.object(E, 'cluster_jobs', return_value=self.jobs), patch.object(E.P, 'TRUTH', self.root):
+            rows = E.cluster_rows(self.root)
+        for route, arm in [('qwen3.6-27b', 'raw'), ('ppocrv6', 'docres')]:
+            row = rows[route][arm, 'p001']
+            self.assertTrue(row['read'])  # terminal attempt, not an incomplete collection
+            self.assertFalse(row['ok'])
+            self.assertEqual(row['nes'], 0)
+            self.assertEqual(row['missed'], row['words'])
+        self.assertEqual(rows['lightonocr3-4b']['raw', 'p001']['nes'], 1)
+
+    def test_missing_record_refuses_publication(self):
+        self.path().unlink()
+        with self.assertRaisesRegex(ValueError, 'incomplete collection'):
+            E.cluster_records(self.root, self.jobs)
+
+    def test_manifest_requires_exact_unique_image_set(self):
+        for rows in [self.manifest * 2, self.manifest[:1], self.manifest + [{'id': 'raw/p999'}]]:
+            with self.subTest(rows=rows):
+                (self.root / 'pages.jsonl').write_text(''.join(json.dumps(r) + '\n' for r in rows))
+                with self.assertRaisesRegex(ValueError, 'manifest'):
+                    E.cluster_records(self.root, self.jobs)
+
+    def test_changed_local_image_refuses_publication(self):
+        self.image.write_bytes(b'changed after inference')
+        with self.assertRaisesRegex(ValueError, 'local frozen image'):
+            E.cluster_records(self.root, self.jobs)
+
+    def test_misidentified_record_or_decoder_refuses_publication(self):
+        original = self.path().read_text()
+        for fields in [{'id': 'raw/p999'}, {'sha256': '0' * 64}, {'route': 'ppocrv6'}, {'model': 'other'},
+                       {'finish': 'length'}, {'max_tokens': 4000}, {'prompt_sha256': '0' * 64},
+                       {'status': 'unknown'}, {'raw': None}, {'error': 'provider failed'}]:
+            with self.subTest(fields=fields):
+                self.path().write_text(original)
+                self.update(**fields)
+                with self.assertRaises(ValueError):
+                    E.cluster_records(self.root, self.jobs)
+
+    def test_duplicate_record_refuses_publication(self):
+        self.path().with_name('p002.json').write_text(self.path().read_text())
+        with self.assertRaises(ValueError):
+            E.cluster_records(self.root, self.jobs)
 
 
 if __name__ == '__main__':

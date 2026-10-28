@@ -6,8 +6,7 @@
   $V enh_dewarp.py extras       # hand crops, the app's encoder at three settings, dewarp-then-quarter on the ladder
   $V enh_dewarp.py vision       # Apple Vision lines and word boxes on raw and on every arm
   $V enh_dewarp.py stage        # the FarmShare pack (corpus/dewarp-submit.sh runs it there)
-  $V enh_dewarp.py fetch        # the FarmShare readings back, then report again
-  $V enh_dewarp.py report       # segbench-results/enh-dewarp.md and enh-dewarp-pages.csv
+  $V enh_dewarp.py report --cluster-root PATH  # owner-collected Sherlock pack (pages.jsonl, routes.json, out/)
 
 Arms (dewarp_arms.py says how each is made): raw is the panel's frozen 2400 px / JPEG 90 image, the one every
 saved route read; quad, uvdoc and docres are made from the full-resolution truth image and then frozen the same way
@@ -33,6 +32,7 @@ from __future__ import annotations
 import argparse
 import collections
 import csv
+import hashlib
 import json
 import os
 import statistics
@@ -312,6 +312,9 @@ def stage():
 
 FETCHED = CACHE / 'farmshare-out'  # a copy of FS_ROOT/out
 READERS = {'qwen3.6-27b': 'panel', 'lightonocr3-4b': 'native', 'ppocrv6': 'pipeline'}  # ocr_rescore.py's modes
+CLUSTER_ROOT = Path.home() / 'Library/Caches/ArchiveSuiteRehearsal/sherlock-results/dewarp-20261022'
+CLUSTER_MODELS = {'qwen3.6-27b': 'Qwen/Qwen3.6-27B-FP8', 'lightonocr3-4b': 'lightonai/LightOnOCR-3-4B',
+                  'ppocrv6': 'ppocrv6-medium-native'}
 
 
 def fetch():
@@ -324,22 +327,79 @@ def fetch():
     print(FETCHED)
 
 
-def cluster_rows():
-    """Per reader, {(arm, page): score row} from the fetched records; a missing or failed reading scores empty."""
+def cluster_records(root, jobs):
+    """Validate an owner-collected pack before scoring. Terminal failures stay in the denominator;
+    an incomplete collection or mismatched image/identity is an import error, never a reader failure.
+    Remote paths in the manifest are provenance only: images are checked against our frozen local arms.
+    """
+    manifest = [json.loads(line) for line in (root / 'pages.jsonl').read_text().splitlines() if line.strip()]
+    expected = {f'{a}/{p}' for a, p in jobs}
+    by = {r['id']: r for r in manifest}
+    if len(by) != len(manifest) or set(by) != expected:
+        raise ValueError('dewarp manifest has duplicate, missing or unexpected image IDs')
+    for arm, p in jobs:
+        digest = hashlib.sha256(arm_image(arm, p).read_bytes()).hexdigest()
+        if by[f'{arm}/{p}']['sha256'] != digest:
+            raise ValueError(f'{arm}/{p}: local frozen image differs from collected manifest')
+    specs = json.loads((root / 'routes.json').read_text())
+    out = {}
+    for route, mode in READERS.items():
+        folder = root / 'out' / route
+        records = {}
+        for f in sorted(folder.glob('*/*.json')):
+            rec = json.loads(f.read_text())
+            ident = rec.get('id')
+            if ident not in expected or ident in records:
+                raise ValueError(f'{route}: duplicate or unexpected result ID {ident}')
+            arm, p = ident.split('/')
+            filename = p + ('.error.json' if rec.get('status') == 'error' else '.json')
+            model = CLUSTER_MODELS[route]
+            if mode != 'pipeline' and specs[route]['model'] != model:
+                raise ValueError(f'{route}: model differs from the frozen experiment')
+            if (f != folder / arm / filename or rec.get('route') != route
+                    or rec.get('sha256') != by[ident]['sha256'] or rec.get('model') != model):
+                raise ValueError(f'{route}/{ident}: result identity, model or image hash mismatch')
+            status = rec.get('status')
+            if status not in {'ok', 'cap', 'blank', 'error'} or not isinstance(rec.get('raw'), str):
+                raise ValueError(f'{route}/{ident}: invalid result status or text')
+            if mode == 'pipeline':
+                valid = status != 'cap' and rec.get('finish') is None
+            else:
+                valid = (rec.get('max_tokens') == 8192 and
+                         ((status == 'ok' and rec.get('finish') == 'stop')
+                          or (status == 'cap' and rec.get('finish') == 'length') or status == 'error'))
+            if not valid or (status != 'error' and rec.get('error') is not None):
+                raise ValueError(f'{route}/{ident}: inconsistent decoder result')
+            records[ident] = rec
+        if set(records) != expected:
+            raise ValueError(f'{route}: incomplete collection ({len(records)}/{len(expected)} records)')
+        if mode != 'pipeline':
+            prompts = {r.get('prompt_sha256') for r in records.values()}
+            prompt = P.PROMPT if mode == 'panel' else ''
+            if prompts != {hashlib.sha256(prompt.encode()).hexdigest()}:
+                raise ValueError(f'{route}: prompt differs from the frozen experiment')
+        out[route] = records
+    return out
+
+
+def cluster_rows(root):
+    """Per reader, {(arm, page): score row}; capped, blank and failed attempts score empty."""
     sys.path.insert(0, str(Path(__file__).resolve().parent / 'corpus'))
     import farmshare_expanded_report as X
     import ocr_panel_score as S
+    jobs = cluster_jobs()
+    records = cluster_records(root, jobs)
     out = {}
     for route, mode in READERS.items():
-        if not (FETCHED / route).exists():
-            continue
         by = {}
-        for arm, p in cluster_jobs():
-            f = FETCHED / route / arm / (p + '.json')
-            rec = json.loads(f.read_text()) if f.exists() else None
+        for arm, p in jobs:
+            rec = records[route][f'{arm}/{p}']
+            text = X.reading(rec, mode)
             truth = (P.TRUTH / 'truth' / (p + '.txt')).read_text()
-            by[arm, p] = {'page': p, 'arm': arm, 'reader': route, 'read': rec is not None,
-                          **S.score(truth, X.reading(rec, mode))}
+            by[arm, p] = {'page': p, 'arm': arm, 'reader': route, 'read': True, 'status': rec['status'],
+                          'ok': bool(text),
+                          **{k: (rec.get('usage') or {}).get(k, 0) for k in ('prompt_tokens', 'completion_tokens')},
+                          **S.score(truth, text)}
         out[route] = by
     return out
 
@@ -496,8 +556,33 @@ def extra_rows():
     return out
 
 
-def report():
+def chart_rows(by, readers, ids):
+    """Exact full-96/kind subsets for all eligible OCR charts; small crop/ladder subsets stay in the experiment.
+    Own-token totals include caps. No per-arm speed is inferred from concurrent jobs mixing the arms.
+    """
+    groups = {'the 96': ids}
+    groups.update({f'kind:{k}': [p for p in ids if by['raw', p]['kind'] == k]
+                   for k in sorted({by['raw', p]['kind'] for p in ids})})
+    out = []
+    for route, rb in {'apple-vision': by, **readers}.items():
+        arms = ('raw', *ARMS, *ENCODINGS) if route == 'apple-vision' else CLUSTER_ARMS
+        for arm in arms:
+            if route == 'apple-vision' and arm == 'raw':
+                continue  # already drawn by the unchanged panel's Apple Vision row
+            for group, ps in groups.items():
+                rr = [rb[arm, p] for p in ps]
+                out.append({'route': route, 'arm': arm, 'group': group, 'n': len(rr),
+                            'ok': sum(r.get('ok', r['hyp_words'] > 0) for r in rr),
+                            'nes': statistics.mean(r['nes'] for r in rr),
+                            **{k: sum(r.get(k, 0) for r in rr) for k in ('prompt_tokens', 'completion_tokens')}})
+    return out
+
+
+def report(cluster_root=CLUSTER_ROOT):
     from scipy.stats import spearmanr
+    # Validate/score the complete collection before replacing any committed output.
+    P.manifest()  # includes frozen pages/truth checksums; source truth remains read-only
+    readers = cluster_rows(cluster_root)
     rows, trips = measure()
     with PAGES.open('w') as f:
         w = csv.DictWriter(f, FIELDS, extrasaction='ignore', lineterminator='\n')
@@ -515,8 +600,9 @@ def report():
          '`dewarp_arms.py`. Reader: Apple Vision with the app\'s settings. Page-level numbers: `enh-dewarp-pages.csv`.', '',
          '## NES and words, each arm against raw', '',
          'NES follows reading order, so a page whose lines Vision orders differently on a near-identical image can '
-         'swing by tens of points (p008, a flat PDF image the quad leaves whole, is one); chrF and the word rates '
-         'do not depend on order. Δ is paired by page: the mean, a 95% bootstrap interval and a permutation p.', '']
+         'swing by tens of points (p008, a flat PDF image the quad leaves whole, is one); chrF is less sensitive '
+         'to reading order and the word rates ignore it. Δ is paired by page: the mean, a 95% bootstrap interval '
+         'and a permutation p.', '']
     L += arm_table(by, {**groups, **tag_groups}, ('raw', *ARMS), 'raw', edge=True)
     found = sum(by['quad', p]['found'] for p in ids)
     L += ['', f'Apple\'s quad was found on {found} of {len(ids)} pages; where it was not, the quad arm is the raw image '
@@ -594,15 +680,31 @@ def report():
               "panel's quarter rung of the raw photograph (both LANCZOS to a quarter, JPEG 92, then the panel's "
               'freezing); the original size for reference.', '']
         L += arm_table(by, {'ladder': lad}, ('quarter', *LADDER_ARMS, 'raw'), 'quarter')
-    readers = cluster_rows()
     if readers:
-        L += ['', '## Open readers on FarmShare', '',
+        L += ['', '## Open readers on Sherlock', '',
               "Qwen3.6-27B (the panel prompt), LightOnOCR-3 4B (its own prompt, plain text) and PP-OCRv6 (truth96's "
               'pinned native pipeline), each reading every image above as it is, raw included, in one run '
-              f'(`corpus/dewarp_cluster.py`, {FS_ROOT}). An image with no reading, or a failed one, scores empty.', '']
-        cluster = RESULTS / 'enh-dewarp-farmshare.csv'
+              '(`corpus/dewarp_cluster.py`). The pack was staged for FarmShare, then run on Sherlock; the owner '
+              'collected it as `sherlock-results/dewarp-20261022`. All 640 image hashes match the local frozen arms; '
+              'all 1,920 records match the manifest, reader and model. Caps, blanks and errors score empty, '
+              'with every scheduled image retained in the denominator. The encoding pass includes 2048/0.85 and '
+              '1600/0.90; 2400/0.90 through the app encoder was Vision-only.', '',
+              '| reader | attempted / expected | usable | empty or failed | status OK | capped | status blank | error |',
+              '|---|---:|---:|---:|---:|---:|---:|---:|']
+        coverage = {route: dict(collections.Counter(r['status'] for r in rb.values())) for route, rb in readers.items()}
+        for route, counts in coverage.items():
+            counts['usable'] = sum(r['ok'] for r in readers[route].values())
+            counts['unusable'] = len(readers[route]) - counts['usable']
+            L.append(f"| {route} | {len(readers[route])} / {len(cluster_jobs())} | "
+                     f"{counts['usable']} | {counts['unusable']} | "
+                     + ' | '.join(str(counts.get(k, 0)) for k in ('ok', 'cap', 'blank', 'error')) + ' |')
+        empty_ok = {route: sum(r['status'] == 'ok' and not r['ok'] for r in rb.values()) for route, rb in readers.items()}
+        L += ['', 'A status OK is a completed decoder reply, not necessarily usable text; such empty replies ('
+              + ', '.join(f'{route} {n}' for route, n in empty_ok.items()) + ') score empty too. '
+              '`enh-dewarp-cluster.csv` records status and usable (`ok`) separately for every attempt.', '']
+        cluster = RESULTS / 'enh-dewarp-cluster.csv'
         with cluster.open('w') as f:
-            w = csv.DictWriter(f, ['reader', 'arm', 'page', 'read', 'nes', 'chrf', 'words', 'hyp_words', 'missed', 'added'],
+            w = csv.DictWriter(f, ['reader', 'arm', 'page', 'read', 'status', 'ok', 'nes', 'chrf', 'words', 'hyp_words', 'missed', 'added'],
                                extrasaction='ignore', lineterminator='\n')
             w.writeheader()
             for route, rb in readers.items():
@@ -632,6 +734,10 @@ def report():
     (RESULTS / 'enh-dewarp.json').write_text(json.dumps({
         'item': 'W46.enh-dewarp', 'report': REPORT.name, 'readers_pending': [r for r in READERS if r not in readers
                                                                              or not all(x['read'] for x in readers[r].values())],
+        'cluster': {'name': 'Sherlock', 'pack': cluster_root.name,
+                    'manifest_sha256': hashlib.sha256((cluster_root / 'pages.jsonl').read_bytes()).hexdigest(),
+                    'models': CLUSTER_MODELS, 'images_per_reader': len(cluster_jobs()), 'coverage': coverage},
+        'chart_rows': chart_rows(by, readers, ids),
         'uvdoc_benchmark': found.name if found.exists() else None, 'rows': bench}, indent=1) + '\n')
     REPORT.write_text('\n'.join(L) + '\n')
     print(REPORT)
@@ -640,8 +746,13 @@ def report():
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('cmd', choices=['prepare', 'extras', 'vision', 'stage', 'fetch', 'report'])
+    ap.add_argument('--cluster-root', type=Path, default=CLUSTER_ROOT,
+                    help='local owner-collected pack, including pages.jsonl, routes.json and out/')
     a = ap.parse_args()
-    {'prepare': prepare, 'extras': prepare_extras, 'vision': vision, 'stage': stage, 'fetch': fetch, 'report': report}[a.cmd]()
+    if a.cmd == 'report':
+        report(a.cluster_root)
+    else:
+        {'prepare': prepare, 'extras': prepare_extras, 'vision': vision, 'stage': stage, 'fetch': fetch}[a.cmd]()
 
 
 if __name__ == '__main__':

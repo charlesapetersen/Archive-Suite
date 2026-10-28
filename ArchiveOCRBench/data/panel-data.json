@@ -620,6 +620,258 @@
    }
   },
   {
+   "id": "dewarp-apple-vision-quad",
+   "name": "Apple Vision \u00b7 Apple quad crop",
+   "batch": null,
+   "panel": "local",
+   "std": 0.0
+  },
+  {
+   "id": "dewarp-apple-vision-uvdoc",
+   "name": "Apple Vision \u00b7 UVDoc dewarp",
+   "batch": null,
+   "panel": "local",
+   "std": 0.0
+  },
+  {
+   "id": "dewarp-apple-vision-docres",
+   "name": "Apple Vision \u00b7 DocRes dewarp",
+   "batch": null,
+   "panel": "local",
+   "std": 0.0
+  },
+  {
+   "id": "dewarp-apple-vision-enc-2048-q85",
+   "name": "Apple Vision \u00b7 app encoder 2048 px q0.85",
+   "batch": null,
+   "panel": "local",
+   "std": 0.0
+  },
+  {
+   "id": "dewarp-apple-vision-enc-2400-q90",
+   "name": "Apple Vision \u00b7 app encoder 2400 px q0.90",
+   "batch": null,
+   "panel": "local",
+   "std": 0.0
+  },
+  {
+   "id": "dewarp-apple-vision-enc-1600-q90",
+   "name": "Apple Vision \u00b7 app encoder 1600 px q0.90",
+   "batch": null,
+   "panel": "local",
+   "std": 0.0
+  },
+  {
+   "id": "dewarp-qwen3.6-27b-quad",
+   "name": "Qwen3.6 27B \u00b7 Apple quad crop",
+   "batch": null,
+   "panel": "farmshare",
+   "cluster": "Sherlock",
+   "std": 1.9,
+   "free_cluster": false,
+   "machine": "one NVIDIA L40S per job",
+   "hw": {
+    "photos_per_hour": null,
+    "gpu_hours_per_100k": null
+   }
+  },
+  {
+   "id": "dewarp-qwen3.6-27b-uvdoc",
+   "name": "Qwen3.6 27B \u00b7 UVDoc dewarp",
+   "batch": null,
+   "panel": "farmshare",
+   "cluster": "Sherlock",
+   "std": 2.05,
+   "free_cluster": false,
+   "machine": "one NVIDIA L40S per job",
+   "hw": {
+    "photos_per_hour": null,
+    "gpu_hours_per_100k": null
+   }
+  },
+  {
+   "id": "dewarp-qwen3.6-27b-docres",
+   "name": "Qwen3.6 27B \u00b7 DocRes dewarp",
+   "batch": null,
+   "panel": "farmshare",
+   "cluster": "Sherlock",
+   "std": 1.78,
+   "free_cluster": false,
+   "machine": "one NVIDIA L40S per job",
+   "hw": {
+    "photos_per_hour": null,
+    "gpu_hours_per_100k": null
+   }
+  },
+  {
+   "id": "dewarp-qwen3.6-27b-enc-2048-q85",
+   "name": "Qwen3.6 27B \u00b7 app encoder 2048 px q0.85",
+   "batch": null,
+   "panel": "farmshare",
+   "cluster": "Sherlock",
+   "std": 1.71,
+   "free_cluster": false,
+   "machine": "one NVIDIA L40S per job",
+   "hw": {
+    "photos_per_hour": null,
+    "gpu_hours_per_100k": null
+   }
+  },
+  {
+   "id": "dewarp-qwen3.6-27b-enc-1600-q90",
+   "name": "Qwen3.6 27B \u00b7 app encoder 1600 px q0.90",
+   "batch": null,
+   "panel": "farmshare",
+   "cluster": "Sherlock",
+   "std": 1.46,
+   "free_cluster": false,
+   "machine": "one NVIDIA L40S per job",
+   "hw": {
+    "photos_per_hour": null,
+    "gpu_hours_per_100k": null
+   }
+  },
+  {
+   "id": "dewarp-lightonocr3-4b-quad",
+   "name": "LightOnOCR-3 4B \u00b7 Apple quad crop",
+   "batch": null,
+   "panel": "farmshare",
+   "cluster": "Sherlock",
+   "std": 0.0,
+   "free_cluster": true,
+   "machine": "one NVIDIA L40S per job",
+   "hw": {
+    "photos_per_hour": null,
+    "gpu_hours_per_100k": null
+   }
+  },
+  {
+   "id": "dewarp-lightonocr3-4b-uvdoc",
+   "name": "LightOnOCR-3 4B \u00b7 UVDoc dewarp",
+   "batch": null,
+   "panel": "farmshare",
+   "cluster": "Sherlock",
+   "std": 0.0,
+   "free_cluster": true,
+   "machine": "one NVIDIA L40S per job",
+   "hw": {
+    "photos_per_hour": null,
+    "gpu_hours_per_100k": null
+   }
+  },
+  {
+   "id": "dewarp-lightonocr3-4b-docres",
+   "name": "LightOnOCR-3 4B \u00b7 DocRes dewarp",
+   "batch": null,
+   "panel": "farmshare",
+   "cluster": "Sherlock",
+   "std": 0.0,
+   "free_cluster": true,
+   "machine": "one NVIDIA L40S per job",
+   "hw": {
+    "photos_per_hour": null,
+    "gpu_hours_per_100k": null
+   }
+  },
+  {
+   "id": "dewarp-lightonocr3-4b-enc-2048-q85",
+   "name": "LightOnOCR-3 4B \u00b7 app encoder 2048 px q0.85",
+   "batch": null,
+   "panel": "farmshare",
+   "cluster": "Sherlock",
+   "std": 0.0,
+   "free_cluster": true,
+   "machine": "one NVIDIA L40S per job",
+   "hw": {
+    "photos_per_hour": null,
+    "gpu_hours_per_100k": null
+   }
+  },
+  {
+   "id": "dewarp-lightonocr3-4b-enc-1600-q90",
+   "name": "LightOnOCR-3 4B \u00b7 app encoder 1600 px q0.90",
+   "batch": null,
+   "panel": "farmshare",
+   "cluster": "Sherlock",
+   "std": 0.0,
+   "free_cluster": true,
+   "machine": "one NVIDIA L40S per job",
+   "hw": {
+    "photos_per_hour": null,
+    "gpu_hours_per_100k": null
+   }
+  },
+  {
+   "id": "dewarp-ppocrv6-quad",
+   "name": "PP-OCRv6 \u00b7 Apple quad crop",
+   "batch": null,
+   "panel": "farmshare",
+   "cluster": "Sherlock",
+   "std": 0.0,
+   "free_cluster": true,
+   "machine": "one NVIDIA L40S per job",
+   "hw": {
+    "photos_per_hour": null,
+    "gpu_hours_per_100k": null
+   }
+  },
+  {
+   "id": "dewarp-ppocrv6-uvdoc",
+   "name": "PP-OCRv6 \u00b7 UVDoc dewarp",
+   "batch": null,
+   "panel": "farmshare",
+   "cluster": "Sherlock",
+   "std": 0.0,
+   "free_cluster": true,
+   "machine": "one NVIDIA L40S per job",
+   "hw": {
+    "photos_per_hour": null,
+    "gpu_hours_per_100k": null
+   }
+  },
+  {
+   "id": "dewarp-ppocrv6-docres",
+   "name": "PP-OCRv6 \u00b7 DocRes dewarp",
+   "batch": null,
+   "panel": "farmshare",
+   "cluster": "Sherlock",
+   "std": 0.0,
+   "free_cluster": true,
+   "machine": "one NVIDIA L40S per job",
+   "hw": {
+    "photos_per_hour": null,
+    "gpu_hours_per_100k": null
+   }
+  },
+  {
+   "id": "dewarp-ppocrv6-enc-2048-q85",
+   "name": "PP-OCRv6 \u00b7 app encoder 2048 px q0.85",
+   "batch": null,
+   "panel": "farmshare",
+   "cluster": "Sherlock",
+   "std": 0.0,
+   "free_cluster": true,
+   "machine": "one NVIDIA L40S per job",
+   "hw": {
+    "photos_per_hour": null,
+    "gpu_hours_per_100k": null
+   }
+  },
+  {
+   "id": "dewarp-ppocrv6-enc-1600-q90",
+   "name": "PP-OCRv6 \u00b7 app encoder 1600 px q0.90",
+   "batch": null,
+   "panel": "farmshare",
+   "cluster": "Sherlock",
+   "std": 0.0,
+   "free_cluster": true,
+   "machine": "one NVIDIA L40S per job",
+   "hw": {
+    "photos_per_hour": null,
+    "gpu_hours_per_100k": null
+   }
+  },
+  {
    "id": "gw-regions-tiles",
    "name": "Gemini 3.7 Flash (Stanford gateway, price estimated) \u00b7 overlapping tiles",
    "panel": "cloud",
@@ -981,6 +1233,111 @@
      96,
      96
     ],
+    "dewarp-apple-vision-quad": [
+     80.25,
+     96,
+     96
+    ],
+    "dewarp-apple-vision-uvdoc": [
+     78.91,
+     96,
+     96
+    ],
+    "dewarp-apple-vision-docres": [
+     67.79,
+     85,
+     96
+    ],
+    "dewarp-apple-vision-enc-2048-q85": [
+     81.8,
+     96,
+     96
+    ],
+    "dewarp-apple-vision-enc-2400-q90": [
+     81.26,
+     96,
+     96
+    ],
+    "dewarp-apple-vision-enc-1600-q90": [
+     81.67,
+     96,
+     96
+    ],
+    "dewarp-qwen3.6-27b-quad": [
+     95.14,
+     96,
+     96
+    ],
+    "dewarp-qwen3.6-27b-uvdoc": [
+     92.05,
+     95,
+     96
+    ],
+    "dewarp-qwen3.6-27b-docres": [
+     81.41,
+     94,
+     96
+    ],
+    "dewarp-qwen3.6-27b-enc-2048-q85": [
+     95.05,
+     96,
+     96
+    ],
+    "dewarp-qwen3.6-27b-enc-1600-q90": [
+     94.85,
+     96,
+     96
+    ],
+    "dewarp-lightonocr3-4b-quad": [
+     88.63,
+     95,
+     96
+    ],
+    "dewarp-lightonocr3-4b-uvdoc": [
+     87.45,
+     95,
+     96
+    ],
+    "dewarp-lightonocr3-4b-docres": [
+     73.8,
+     82,
+     96
+    ],
+    "dewarp-lightonocr3-4b-enc-2048-q85": [
+     88.96,
+     96,
+     96
+    ],
+    "dewarp-lightonocr3-4b-enc-1600-q90": [
+     88.21,
+     95,
+     96
+    ],
+    "dewarp-ppocrv6-quad": [
+     76.22,
+     96,
+     96
+    ],
+    "dewarp-ppocrv6-uvdoc": [
+     75.74,
+     96,
+     96
+    ],
+    "dewarp-ppocrv6-docres": [
+     55.01,
+     88,
+     96
+    ],
+    "dewarp-ppocrv6-enc-2048-q85": [
+     77.66,
+     96,
+     96
+    ],
+    "dewarp-ppocrv6-enc-1600-q90": [
+     78.07,
+     96,
+     96
+    ],
     "gw-regions-tiles": [
      91.05,
      96,
@@ -1266,6 +1623,111 @@
     ],
     "regions-qwen3.6-27b-tiles": [
      96.42,
+     50,
+     50
+    ],
+    "dewarp-apple-vision-quad": [
+     91.22,
+     50,
+     50
+    ],
+    "dewarp-apple-vision-uvdoc": [
+     90.6,
+     50,
+     50
+    ],
+    "dewarp-apple-vision-docres": [
+     84.37,
+     49,
+     50
+    ],
+    "dewarp-apple-vision-enc-2048-q85": [
+     91.73,
+     50,
+     50
+    ],
+    "dewarp-apple-vision-enc-2400-q90": [
+     91.89,
+     50,
+     50
+    ],
+    "dewarp-apple-vision-enc-1600-q90": [
+     91.81,
+     50,
+     50
+    ],
+    "dewarp-qwen3.6-27b-quad": [
+     97.43,
+     50,
+     50
+    ],
+    "dewarp-qwen3.6-27b-uvdoc": [
+     96.75,
+     50,
+     50
+    ],
+    "dewarp-qwen3.6-27b-docres": [
+     93.46,
+     50,
+     50
+    ],
+    "dewarp-qwen3.6-27b-enc-2048-q85": [
+     97.09,
+     50,
+     50
+    ],
+    "dewarp-qwen3.6-27b-enc-1600-q90": [
+     97.06,
+     50,
+     50
+    ],
+    "dewarp-lightonocr3-4b-quad": [
+     91.18,
+     50,
+     50
+    ],
+    "dewarp-lightonocr3-4b-uvdoc": [
+     91.1,
+     50,
+     50
+    ],
+    "dewarp-lightonocr3-4b-docres": [
+     85.02,
+     47,
+     50
+    ],
+    "dewarp-lightonocr3-4b-enc-2048-q85": [
+     91.01,
+     50,
+     50
+    ],
+    "dewarp-lightonocr3-4b-enc-1600-q90": [
+     91.18,
+     50,
+     50
+    ],
+    "dewarp-ppocrv6-quad": [
+     89.71,
+     50,
+     50
+    ],
+    "dewarp-ppocrv6-uvdoc": [
+     91.49,
+     50,
+     50
+    ],
+    "dewarp-ppocrv6-docres": [
+     67.66,
+     49,
+     50
+    ],
+    "dewarp-ppocrv6-enc-2048-q85": [
+     90.75,
+     50,
+     50
+    ],
+    "dewarp-ppocrv6-enc-1600-q90": [
+     90.99,
      50,
      50
     ],
@@ -1557,6 +2019,111 @@
      28,
      28
     ],
+    "dewarp-apple-vision-quad": [
+     75.41,
+     28,
+     28
+    ],
+    "dewarp-apple-vision-uvdoc": [
+     73.17,
+     28,
+     28
+    ],
+    "dewarp-apple-vision-docres": [
+     55.02,
+     22,
+     28
+    ],
+    "dewarp-apple-vision-enc-2048-q85": [
+     78.61,
+     28,
+     28
+    ],
+    "dewarp-apple-vision-enc-2400-q90": [
+     76.41,
+     28,
+     28
+    ],
+    "dewarp-apple-vision-enc-1600-q90": [
+     77.92,
+     28,
+     28
+    ],
+    "dewarp-qwen3.6-27b-quad": [
+     93.8,
+     28,
+     28
+    ],
+    "dewarp-qwen3.6-27b-uvdoc": [
+     89.14,
+     28,
+     28
+    ],
+    "dewarp-qwen3.6-27b-docres": [
+     70.22,
+     27,
+     28
+    ],
+    "dewarp-qwen3.6-27b-enc-2048-q85": [
+     94.72,
+     28,
+     28
+    ],
+    "dewarp-qwen3.6-27b-enc-1600-q90": [
+     94.88,
+     28,
+     28
+    ],
+    "dewarp-lightonocr3-4b-quad": [
+     86.76,
+     27,
+     28
+    ],
+    "dewarp-lightonocr3-4b-uvdoc": [
+     83.96,
+     27,
+     28
+    ],
+    "dewarp-lightonocr3-4b-docres": [
+     60.63,
+     21,
+     28
+    ],
+    "dewarp-lightonocr3-4b-enc-2048-q85": [
+     87.01,
+     28,
+     28
+    ],
+    "dewarp-lightonocr3-4b-enc-1600-q90": [
+     85.02,
+     27,
+     28
+    ],
+    "dewarp-ppocrv6-quad": [
+     61.57,
+     28,
+     28
+    ],
+    "dewarp-ppocrv6-uvdoc": [
+     56.84,
+     28,
+     28
+    ],
+    "dewarp-ppocrv6-docres": [
+     40.53,
+     24,
+     28
+    ],
+    "dewarp-ppocrv6-enc-2048-q85": [
+     62.05,
+     28,
+     28
+    ],
+    "dewarp-ppocrv6-enc-1600-q90": [
+     61.52,
+     28,
+     28
+    ],
     "gw-regions-tiles": [
      79.3,
      28,
@@ -1842,6 +2409,111 @@
     ],
     "regions-qwen3.6-27b-tiles": [
      87.64,
+     16,
+     16
+    ],
+    "dewarp-apple-vision-quad": [
+     56.82,
+     16,
+     16
+    ],
+    "dewarp-apple-vision-uvdoc": [
+     54.66,
+     16,
+     16
+    ],
+    "dewarp-apple-vision-docres": [
+     41.0,
+     12,
+     16
+    ],
+    "dewarp-apple-vision-enc-2048-q85": [
+     57.85,
+     16,
+     16
+    ],
+    "dewarp-apple-vision-enc-2400-q90": [
+     58.51,
+     16,
+     16
+    ],
+    "dewarp-apple-vision-enc-1600-q90": [
+     57.82,
+     16,
+     16
+    ],
+    "dewarp-qwen3.6-27b-quad": [
+     91.89,
+     16,
+     16
+    ],
+    "dewarp-qwen3.6-27b-uvdoc": [
+     84.02,
+     15,
+     16
+    ],
+    "dewarp-qwen3.6-27b-docres": [
+     66.39,
+     15,
+     16
+    ],
+    "dewarp-qwen3.6-27b-enc-2048-q85": [
+     92.21,
+     16,
+     16
+    ],
+    "dewarp-qwen3.6-27b-enc-1600-q90": [
+     90.41,
+     16,
+     16
+    ],
+    "dewarp-lightonocr3-4b-quad": [
+     87.64,
+     16,
+     16
+    ],
+    "dewarp-lightonocr3-4b-uvdoc": [
+     85.71,
+     16,
+     16
+    ],
+    "dewarp-lightonocr3-4b-docres": [
+     64.86,
+     12,
+     16
+    ],
+    "dewarp-lightonocr3-4b-enc-2048-q85": [
+     89.73,
+     16,
+     16
+    ],
+    "dewarp-lightonocr3-4b-enc-1600-q90": [
+     88.61,
+     16,
+     16
+    ],
+    "dewarp-ppocrv6-quad": [
+     61.25,
+     16,
+     16
+    ],
+    "dewarp-ppocrv6-uvdoc": [
+     61.61,
+     16,
+     16
+    ],
+    "dewarp-ppocrv6-docres": [
+     41.82,
+     13,
+     16
+    ],
+    "dewarp-ppocrv6-enc-2048-q85": [
+     66.62,
+     16,
+     16
+    ],
+    "dewarp-ppocrv6-enc-1600-q90": [
+     69.45,
      16,
      16
     ],
@@ -25184,10 +25856,1239 @@
  "dewarp": {
   "item": "W46.enh-dewarp",
   "report": "enh-dewarp.md",
-  "readers_pending": [
-   "qwen3.6-27b",
-   "lightonocr3-4b",
-   "ppocrv6"
+  "readers_pending": [],
+  "cluster": {
+   "name": "Sherlock",
+   "pack": "dewarp-20261022",
+   "manifest_sha256": "d509e5914eaa63b0c948829f554451bc715137463373fe096b6e7e4b17a5523d",
+   "models": {
+    "qwen3.6-27b": "Qwen/Qwen3.6-27B-FP8",
+    "lightonocr3-4b": "lightonai/LightOnOCR-3-4B",
+    "ppocrv6": "ppocrv6-medium-native"
+   },
+   "images_per_reader": 640,
+   "coverage": {
+    "qwen3.6-27b": {
+     "ok": 627,
+     "cap": 13,
+     "usable": 625,
+     "unusable": 15
+    },
+    "lightonocr3-4b": {
+     "ok": 631,
+     "cap": 9,
+     "usable": 609,
+     "unusable": 31
+    },
+    "ppocrv6": {
+     "ok": 632,
+     "blank": 8,
+     "usable": 632,
+     "unusable": 8
+    }
+   }
+  },
+  "chart_rows": [
+   {
+    "route": "apple-vision",
+    "arm": "quad",
+    "group": "the 96",
+    "n": 96,
+    "ok": 96,
+    "nes": 0.8024831735976145,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "apple-vision",
+    "arm": "quad",
+    "group": "kind:handwritten",
+    "n": 16,
+    "ok": 16,
+    "nes": 0.5682232372016326,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "apple-vision",
+    "arm": "quad",
+    "group": "kind:mixed",
+    "n": 2,
+    "ok": 2,
+    "nes": 0.6108454528090808,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "apple-vision",
+    "arm": "quad",
+    "group": "kind:printed",
+    "n": 28,
+    "ok": 28,
+    "nes": 0.7541426459786081,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "apple-vision",
+    "arm": "quad",
+    "group": "kind:typewritten",
+    "n": 50,
+    "ok": 50,
+    "nes": 0.9121825575425135,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "apple-vision",
+    "arm": "uvdoc",
+    "group": "the 96",
+    "n": 96,
+    "ok": 96,
+    "nes": 0.7890580296118105,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "apple-vision",
+    "arm": "uvdoc",
+    "group": "kind:handwritten",
+    "n": 16,
+    "ok": 16,
+    "nes": 0.5466017742980437,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "apple-vision",
+    "arm": "uvdoc",
+    "group": "kind:mixed",
+    "n": 2,
+    "ok": 2,
+    "nes": 0.6085602608529564,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "apple-vision",
+    "arm": "uvdoc",
+    "group": "kind:printed",
+    "n": 28,
+    "ok": 28,
+    "nes": 0.7317308451557194,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "apple-vision",
+    "arm": "uvdoc",
+    "group": "kind:typewritten",
+    "n": 50,
+    "ok": 50,
+    "nes": 0.9059671653579809,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "apple-vision",
+    "arm": "docres",
+    "group": "the 96",
+    "n": 96,
+    "ok": 85,
+    "nes": 0.677892275646451,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "apple-vision",
+    "arm": "docres",
+    "group": "kind:handwritten",
+    "n": 16,
+    "ok": 12,
+    "nes": 0.4099899310855312,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "apple-vision",
+    "arm": "docres",
+    "group": "kind:mixed",
+    "n": 2,
+    "ok": 2,
+    "nes": 0.46198054517176457,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "apple-vision",
+    "arm": "docres",
+    "group": "kind:printed",
+    "n": 28,
+    "ok": 22,
+    "nes": 0.5502365846429295,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "apple-vision",
+    "arm": "docres",
+    "group": "kind:typewritten",
+    "n": 50,
+    "ok": 49,
+    "nes": 0.843744682086905,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "apple-vision",
+    "arm": "enc-2048-q85",
+    "group": "the 96",
+    "n": 96,
+    "ok": 96,
+    "nes": 0.8179928400644794,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "apple-vision",
+    "arm": "enc-2048-q85",
+    "group": "kind:handwritten",
+    "n": 16,
+    "ok": 16,
+    "nes": 0.5784571982696947,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "apple-vision",
+    "arm": "enc-2048-q85",
+    "group": "kind:mixed",
+    "n": 2,
+    "ok": 2,
+    "nes": 0.6981875358127098,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "apple-vision",
+    "arm": "enc-2048-q85",
+    "group": "kind:printed",
+    "n": 28,
+    "ok": 28,
+    "nes": 0.7860634974541579,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "apple-vision",
+    "arm": "enc-2048-q85",
+    "group": "kind:typewritten",
+    "n": 50,
+    "ok": 50,
+    "nes": 0.9173168894706613,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "apple-vision",
+    "arm": "enc-2400-q90",
+    "group": "the 96",
+    "n": 96,
+    "ok": 96,
+    "nes": 0.8125689376620894,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "apple-vision",
+    "arm": "enc-2400-q90",
+    "group": "kind:handwritten",
+    "n": 16,
+    "ok": 16,
+    "nes": 0.5851011009542615,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "apple-vision",
+    "arm": "enc-2400-q90",
+    "group": "kind:mixed",
+    "n": 2,
+    "ok": 2,
+    "nes": 0.6536058282627084,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "apple-vision",
+    "arm": "enc-2400-q90",
+    "group": "kind:printed",
+    "n": 28,
+    "ok": 28,
+    "nes": 0.7640670091266049,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "apple-vision",
+    "arm": "enc-2400-q90",
+    "group": "kind:typewritten",
+    "n": 50,
+    "ok": 50,
+    "nes": 0.9188782497644409,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "apple-vision",
+    "arm": "enc-1600-q90",
+    "group": "the 96",
+    "n": 96,
+    "ok": 96,
+    "nes": 0.8166637240051593,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "apple-vision",
+    "arm": "enc-1600-q90",
+    "group": "kind:handwritten",
+    "n": 16,
+    "ok": 16,
+    "nes": 0.5782004817385287,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "apple-vision",
+    "arm": "enc-1600-q90",
+    "group": "kind:mixed",
+    "n": 2,
+    "ok": 2,
+    "nes": 0.712048759857022,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "apple-vision",
+    "arm": "enc-1600-q90",
+    "group": "kind:printed",
+    "n": 28,
+    "ok": 28,
+    "nes": 0.7792417026189221,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "apple-vision",
+    "arm": "enc-1600-q90",
+    "group": "kind:typewritten",
+    "n": 50,
+    "ok": 50,
+    "nes": 0.9181128920726994,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "qwen3.6-27b",
+    "arm": "raw",
+    "group": "the 96",
+    "n": 96,
+    "ok": 96,
+    "nes": 0.953777295327726,
+    "prompt_tokens": 393002,
+    "completion_tokens": 44512
+   },
+   {
+    "route": "qwen3.6-27b",
+    "arm": "raw",
+    "group": "kind:handwritten",
+    "n": 16,
+    "ok": 16,
+    "nes": 0.9105030038764811,
+    "prompt_tokens": 73168,
+    "completion_tokens": 3634
+   },
+   {
+    "route": "qwen3.6-27b",
+    "arm": "raw",
+    "group": "kind:mixed",
+    "n": 2,
+    "ok": 2,
+    "nes": 0.7939973509608899,
+    "prompt_tokens": 9146,
+    "completion_tokens": 529
+   },
+   {
+    "route": "qwen3.6-27b",
+    "arm": "raw",
+    "group": "kind:printed",
+    "n": 28,
+    "ok": 28,
+    "nes": 0.9496661746272537,
+    "prompt_tokens": 106367,
+    "completion_tokens": 18085
+   },
+   {
+    "route": "qwen3.6-27b",
+    "arm": "raw",
+    "group": "kind:typewritten",
+    "n": 50,
+    "ok": 50,
+    "nes": 0.9763184939590623,
+    "prompt_tokens": 204321,
+    "completion_tokens": 22264
+   },
+   {
+    "route": "qwen3.6-27b",
+    "arm": "quad",
+    "group": "the 96",
+    "n": 96,
+    "ok": 96,
+    "nes": 0.9514489832322309,
+    "prompt_tokens": 378548,
+    "completion_tokens": 44088
+   },
+   {
+    "route": "qwen3.6-27b",
+    "arm": "quad",
+    "group": "kind:handwritten",
+    "n": 16,
+    "ok": 16,
+    "nes": 0.9189147795839815,
+    "prompt_tokens": 71035,
+    "completion_tokens": 3545
+   },
+   {
+    "route": "qwen3.6-27b",
+    "arm": "quad",
+    "group": "kind:mixed",
+    "n": 2,
+    "ok": 2,
+    "nes": 0.8282354225217605,
+    "prompt_tokens": 8471,
+    "completion_tokens": 475
+   },
+   {
+    "route": "qwen3.6-27b",
+    "arm": "quad",
+    "group": "kind:printed",
+    "n": 28,
+    "ok": 28,
+    "nes": 0.938017722242607,
+    "prompt_tokens": 101396,
+    "completion_tokens": 17764
+   },
+   {
+    "route": "qwen3.6-27b",
+    "arm": "quad",
+    "group": "kind:typewritten",
+    "n": 50,
+    "ok": 50,
+    "nes": 0.974309976982279,
+    "prompt_tokens": 197646,
+    "completion_tokens": 22304
+   },
+   {
+    "route": "qwen3.6-27b",
+    "arm": "uvdoc",
+    "group": "the 96",
+    "n": 96,
+    "ok": 95,
+    "nes": 0.9204960894311692,
+    "prompt_tokens": 378548,
+    "completion_tokens": 51094
+   },
+   {
+    "route": "qwen3.6-27b",
+    "arm": "uvdoc",
+    "group": "kind:handwritten",
+    "n": 16,
+    "ok": 15,
+    "nes": 0.8401505779117013,
+    "prompt_tokens": 71035,
+    "completion_tokens": 11398
+   },
+   {
+    "route": "qwen3.6-27b",
+    "arm": "uvdoc",
+    "group": "kind:mixed",
+    "n": 2,
+    "ok": 2,
+    "nes": 0.7951922289830555,
+    "prompt_tokens": 8471,
+    "completion_tokens": 454
+   },
+   {
+    "route": "qwen3.6-27b",
+    "arm": "uvdoc",
+    "group": "kind:printed",
+    "n": 28,
+    "ok": 28,
+    "nes": 0.8913937619173986,
+    "prompt_tokens": 101396,
+    "completion_tokens": 17170
+   },
+   {
+    "route": "qwen3.6-27b",
+    "arm": "uvdoc",
+    "group": "kind:typewritten",
+    "n": 50,
+    "ok": 50,
+    "nes": 0.967516110943035,
+    "prompt_tokens": 197646,
+    "completion_tokens": 22072
+   },
+   {
+    "route": "qwen3.6-27b",
+    "arm": "docres",
+    "group": "the 96",
+    "n": 96,
+    "ok": 94,
+    "nes": 0.8141487778435348,
+    "prompt_tokens": 393002,
+    "completion_tokens": 36331
+   },
+   {
+    "route": "qwen3.6-27b",
+    "arm": "docres",
+    "group": "kind:handwritten",
+    "n": 16,
+    "ok": 15,
+    "nes": 0.6638639534722977,
+    "prompt_tokens": 73168,
+    "completion_tokens": 2622
+   },
+   {
+    "route": "qwen3.6-27b",
+    "arm": "docres",
+    "group": "kind:mixed",
+    "n": 2,
+    "ok": 2,
+    "nes": 0.5720619935059619,
+    "prompt_tokens": 9146,
+    "completion_tokens": 204
+   },
+   {
+    "route": "qwen3.6-27b",
+    "arm": "docres",
+    "group": "kind:printed",
+    "n": 28,
+    "ok": 27,
+    "nes": 0.702166021217421,
+    "prompt_tokens": 106367,
+    "completion_tokens": 12775
+   },
+   {
+    "route": "qwen3.6-27b",
+    "arm": "docres",
+    "group": "kind:typewritten",
+    "n": 50,
+    "ok": 50,
+    "nes": 0.9346337367264572,
+    "prompt_tokens": 204321,
+    "completion_tokens": 20730
+   },
+   {
+    "route": "qwen3.6-27b",
+    "arm": "enc-2048-q85",
+    "group": "the 96",
+    "n": 96,
+    "ok": 96,
+    "nes": 0.9504773117061301,
+    "prompt_tokens": 303109,
+    "completion_tokens": 44373
+   },
+   {
+    "route": "qwen3.6-27b",
+    "arm": "enc-2048-q85",
+    "group": "kind:handwritten",
+    "n": 16,
+    "ok": 16,
+    "nes": 0.9221411456251843,
+    "prompt_tokens": 55120,
+    "completion_tokens": 3557
+   },
+   {
+    "route": "qwen3.6-27b",
+    "arm": "enc-2048-q85",
+    "group": "kind:mixed",
+    "n": 2,
+    "ok": 2,
+    "nes": 0.7122977434582117,
+    "prompt_tokens": 6890,
+    "completion_tokens": 484
+   },
+   {
+    "route": "qwen3.6-27b",
+    "arm": "enc-2048-q85",
+    "group": "kind:printed",
+    "n": 28,
+    "ok": 28,
+    "nes": 0.9472011637238268,
+    "prompt_tokens": 83079,
+    "completion_tokens": 18048
+   },
+   {
+    "route": "qwen3.6-27b",
+    "arm": "enc-2048-q85",
+    "group": "kind:typewritten",
+    "n": 50,
+    "ok": 50,
+    "nes": 0.9709067104520394,
+    "prompt_tokens": 158020,
+    "completion_tokens": 22284
+   },
+   {
+    "route": "qwen3.6-27b",
+    "arm": "enc-1600-q90",
+    "group": "the 96",
+    "n": 96,
+    "ok": 96,
+    "nes": 0.9485322768947981,
+    "prompt_tokens": 204859,
+    "completion_tokens": 44421
+   },
+   {
+    "route": "qwen3.6-27b",
+    "arm": "enc-1600-q90",
+    "group": "kind:handwritten",
+    "n": 16,
+    "ok": 16,
+    "nes": 0.9041038867102185,
+    "prompt_tokens": 35768,
+    "completion_tokens": 3644
+   },
+   {
+    "route": "qwen3.6-27b",
+    "arm": "enc-1600-q90",
+    "group": "kind:mixed",
+    "n": 2,
+    "ok": 2,
+    "nes": 0.7473771453518514,
+    "prompt_tokens": 4496,
+    "completion_tokens": 486
+   },
+   {
+    "route": "qwen3.6-27b",
+    "arm": "enc-1600-q90",
+    "group": "kind:printed",
+    "n": 28,
+    "ok": 28,
+    "nes": 0.948796817842866,
+    "prompt_tokens": 56985,
+    "completion_tokens": 18047
+   },
+   {
+    "route": "qwen3.6-27b",
+    "arm": "enc-1600-q90",
+    "group": "kind:typewritten",
+    "n": 50,
+    "ok": 50,
+    "nes": 0.9706474240846634,
+    "prompt_tokens": 107610,
+    "completion_tokens": 22244
+   },
+   {
+    "route": "lightonocr3-4b",
+    "arm": "raw",
+    "group": "the 96",
+    "n": 96,
+    "ok": 96,
+    "nes": 0.8934603972880646,
+    "prompt_tokens": 358538,
+    "completion_tokens": 43995
+   },
+   {
+    "route": "lightonocr3-4b",
+    "arm": "raw",
+    "group": "kind:handwritten",
+    "n": 16,
+    "ok": 16,
+    "nes": 0.8844836588421955,
+    "prompt_tokens": 67424,
+    "completion_tokens": 2997
+   },
+   {
+    "route": "lightonocr3-4b",
+    "arm": "raw",
+    "group": "kind:mixed",
+    "n": 2,
+    "ok": 2,
+    "nes": 0.5999407356811379,
+    "prompt_tokens": 8428,
+    "completion_tokens": 450
+   },
+   {
+    "route": "lightonocr3-4b",
+    "arm": "raw",
+    "group": "kind:printed",
+    "n": 28,
+    "ok": 28,
+    "nes": 0.885362550522127,
+    "prompt_tokens": 96315,
+    "completion_tokens": 18208
+   },
+   {
+    "route": "lightonocr3-4b",
+    "arm": "raw",
+    "group": "kind:typewritten",
+    "n": 50,
+    "ok": 50,
+    "nes": 0.9126085342439448,
+    "prompt_tokens": 186371,
+    "completion_tokens": 22340
+   },
+   {
+    "route": "lightonocr3-4b",
+    "arm": "quad",
+    "group": "the 96",
+    "n": 96,
+    "ok": 95,
+    "nes": 0.8862603201759583,
+    "prompt_tokens": 344084,
+    "completion_tokens": 43635
+   },
+   {
+    "route": "lightonocr3-4b",
+    "arm": "quad",
+    "group": "kind:handwritten",
+    "n": 16,
+    "ok": 16,
+    "nes": 0.8763926796185397,
+    "prompt_tokens": 65291,
+    "completion_tokens": 3069
+   },
+   {
+    "route": "lightonocr3-4b",
+    "arm": "quad",
+    "group": "kind:mixed",
+    "n": 2,
+    "ok": 2,
+    "nes": 0.5885051433872684,
+    "prompt_tokens": 7753,
+    "completion_tokens": 447
+   },
+   {
+    "route": "lightonocr3-4b",
+    "arm": "quad",
+    "group": "kind:printed",
+    "n": 28,
+    "ok": 27,
+    "nes": 0.8676119784726145,
+    "prompt_tokens": 91344,
+    "completion_tokens": 17766
+   },
+   {
+    "route": "lightonocr3-4b",
+    "arm": "quad",
+    "group": "kind:typewritten",
+    "n": 50,
+    "ok": 50,
+    "nes": 0.9117712435797525,
+    "prompt_tokens": 179696,
+    "completion_tokens": 22353
+   },
+   {
+    "route": "lightonocr3-4b",
+    "arm": "uvdoc",
+    "group": "the 96",
+    "n": 96,
+    "ok": 95,
+    "nes": 0.8744651974827843,
+    "prompt_tokens": 344084,
+    "completion_tokens": 43545
+   },
+   {
+    "route": "lightonocr3-4b",
+    "arm": "uvdoc",
+    "group": "kind:handwritten",
+    "n": 16,
+    "ok": 16,
+    "nes": 0.8571445090885902,
+    "prompt_tokens": 65291,
+    "completion_tokens": 3180
+   },
+   {
+    "route": "lightonocr3-4b",
+    "arm": "uvdoc",
+    "group": "kind:mixed",
+    "n": 2,
+    "ok": 2,
+    "nes": 0.5863700237387104,
+    "prompt_tokens": 7753,
+    "completion_tokens": 470
+   },
+   {
+    "route": "lightonocr3-4b",
+    "arm": "uvdoc",
+    "group": "kind:printed",
+    "n": 28,
+    "ok": 27,
+    "nes": 0.8396244324140125,
+    "prompt_tokens": 91344,
+    "completion_tokens": 17503
+   },
+   {
+    "route": "lightonocr3-4b",
+    "arm": "uvdoc",
+    "group": "kind:typewritten",
+    "n": 50,
+    "ok": 50,
+    "nes": 0.9110424531572016,
+    "prompt_tokens": 179696,
+    "completion_tokens": 22392
+   },
+   {
+    "route": "lightonocr3-4b",
+    "arm": "docres",
+    "group": "the 96",
+    "n": 96,
+    "ok": 82,
+    "nes": 0.7380219571386312,
+    "prompt_tokens": 358538,
+    "completion_tokens": 34635
+   },
+   {
+    "route": "lightonocr3-4b",
+    "arm": "docres",
+    "group": "kind:handwritten",
+    "n": 16,
+    "ok": 12,
+    "nes": 0.6486099734534502,
+    "prompt_tokens": 67424,
+    "completion_tokens": 2178
+   },
+   {
+    "route": "lightonocr3-4b",
+    "arm": "docres",
+    "group": "kind:mixed",
+    "n": 2,
+    "ok": 2,
+    "nes": 0.4929920780012188,
+    "prompt_tokens": 8428,
+    "completion_tokens": 215
+   },
+   {
+    "route": "lightonocr3-4b",
+    "arm": "docres",
+    "group": "kind:printed",
+    "n": 28,
+    "ok": 21,
+    "nes": 0.6063441242285685,
+    "prompt_tokens": 96315,
+    "completion_tokens": 11556
+   },
+   {
+    "route": "lightonocr3-4b",
+    "arm": "docres",
+    "group": "kind:typewritten",
+    "n": 50,
+    "ok": 47,
+    "nes": 0.8501745735130207,
+    "prompt_tokens": 186371,
+    "completion_tokens": 20686
+   },
+   {
+    "route": "lightonocr3-4b",
+    "arm": "enc-2048-q85",
+    "group": "the 96",
+    "n": 96,
+    "ok": 96,
+    "nes": 0.8895755505163454,
+    "prompt_tokens": 268645,
+    "completion_tokens": 43732
+   },
+   {
+    "route": "lightonocr3-4b",
+    "arm": "enc-2048-q85",
+    "group": "kind:handwritten",
+    "n": 16,
+    "ok": 16,
+    "nes": 0.897321522155729,
+    "prompt_tokens": 49376,
+    "completion_tokens": 3026
+   },
+   {
+    "route": "lightonocr3-4b",
+    "arm": "enc-2048-q85",
+    "group": "kind:mixed",
+    "n": 2,
+    "ok": 2,
+    "nes": 0.5876285846817102,
+    "prompt_tokens": 6172,
+    "completion_tokens": 446
+   },
+   {
+    "route": "lightonocr3-4b",
+    "arm": "enc-2048-q85",
+    "group": "kind:printed",
+    "n": 28,
+    "ok": 28,
+    "nes": 0.8700576217658103,
+    "prompt_tokens": 73027,
+    "completion_tokens": 18147
+   },
+   {
+    "route": "lightonocr3-4b",
+    "arm": "enc-2048-q85",
+    "group": "kind:typewritten",
+    "n": 50,
+    "ok": 50,
+    "nes": 0.9101047583254278,
+    "prompt_tokens": 140070,
+    "completion_tokens": 22113
+   },
+   {
+    "route": "lightonocr3-4b",
+    "arm": "enc-1600-q90",
+    "group": "the 96",
+    "n": 96,
+    "ok": 95,
+    "nes": 0.8820684360707806,
+    "prompt_tokens": 170395,
+    "completion_tokens": 44135
+   },
+   {
+    "route": "lightonocr3-4b",
+    "arm": "enc-1600-q90",
+    "group": "kind:handwritten",
+    "n": 16,
+    "ok": 16,
+    "nes": 0.8860981965082267,
+    "prompt_tokens": 30024,
+    "completion_tokens": 3179
+   },
+   {
+    "route": "lightonocr3-4b",
+    "arm": "enc-1600-q90",
+    "group": "kind:mixed",
+    "n": 2,
+    "ok": 2,
+    "nes": 0.553451677991751,
+    "prompt_tokens": 3778,
+    "completion_tokens": 659
+   },
+   {
+    "route": "lightonocr3-4b",
+    "arm": "enc-1600-q90",
+    "group": "kind:printed",
+    "n": 28,
+    "ok": 27,
+    "nes": 0.850176251558508,
+    "prompt_tokens": 46933,
+    "completion_tokens": 17925
+   },
+   {
+    "route": "lightonocr3-4b",
+    "arm": "enc-1600-q90",
+    "group": "kind:typewritten",
+    "n": 50,
+    "ok": 50,
+    "nes": 0.9117832063808315,
+    "prompt_tokens": 89660,
+    "completion_tokens": 22372
+   },
+   {
+    "route": "ppocrv6",
+    "arm": "raw",
+    "group": "the 96",
+    "n": 96,
+    "ok": 96,
+    "nes": 0.7685339477011393,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "ppocrv6",
+    "arm": "raw",
+    "group": "kind:handwritten",
+    "n": 16,
+    "ok": 16,
+    "nes": 0.6278832664522016,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "ppocrv6",
+    "arm": "raw",
+    "group": "kind:mixed",
+    "n": 2,
+    "ok": 2,
+    "nes": 0.6250750361537831,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "ppocrv6",
+    "arm": "raw",
+    "group": "kind:printed",
+    "n": 28,
+    "ok": 28,
+    "nes": 0.6144064285129575,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "ppocrv6",
+    "arm": "raw",
+    "group": "kind:typewritten",
+    "n": 50,
+    "ok": 50,
+    "nes": 0.9055919329080754,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "ppocrv6",
+    "arm": "quad",
+    "group": "the 96",
+    "n": 96,
+    "ok": 96,
+    "nes": 0.7621809930187381,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "ppocrv6",
+    "arm": "quad",
+    "group": "kind:handwritten",
+    "n": 16,
+    "ok": 16,
+    "nes": 0.6124821585729668,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "ppocrv6",
+    "arm": "quad",
+    "group": "kind:mixed",
+    "n": 2,
+    "ok": 2,
+    "nes": 0.6364191383120958,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "ppocrv6",
+    "arm": "quad",
+    "group": "kind:printed",
+    "n": 28,
+    "ok": 28,
+    "nes": 0.6157458395547184,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "ppocrv6",
+    "arm": "quad",
+    "group": "kind:typewritten",
+    "n": 50,
+    "ok": 50,
+    "nes": 0.8971187801695016,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "ppocrv6",
+    "arm": "uvdoc",
+    "group": "the 96",
+    "n": 96,
+    "ok": 96,
+    "nes": 0.757415208742826,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "ppocrv6",
+    "arm": "uvdoc",
+    "group": "kind:handwritten",
+    "n": 16,
+    "ok": 16,
+    "nes": 0.6161308931813375,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "ppocrv6",
+    "arm": "uvdoc",
+    "group": "kind:mixed",
+    "n": 2,
+    "ok": 2,
+    "nes": 0.5963634751289257,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "ppocrv6",
+    "arm": "uvdoc",
+    "group": "kind:printed",
+    "n": 28,
+    "ok": 28,
+    "nes": 0.5684490884596745,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "ppocrv6",
+    "arm": "uvdoc",
+    "group": "kind:typewritten",
+    "n": 50,
+    "ok": 50,
+    "nes": 0.9148892864256233,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "ppocrv6",
+    "arm": "docres",
+    "group": "the 96",
+    "n": 96,
+    "ok": 88,
+    "nes": 0.5500653614184666,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "ppocrv6",
+    "arm": "docres",
+    "group": "kind:handwritten",
+    "n": 16,
+    "ok": 13,
+    "nes": 0.41817968645949766,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "ppocrv6",
+    "arm": "docres",
+    "group": "kind:mixed",
+    "n": 2,
+    "ok": 2,
+    "nes": 0.46917378373216184,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "ppocrv6",
+    "arm": "docres",
+    "group": "kind:printed",
+    "n": 28,
+    "ok": 24,
+    "nes": 0.4052512715147241,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "ppocrv6",
+    "arm": "docres",
+    "group": "kind:typewritten",
+    "n": 50,
+    "ok": 49,
+    "nes": 0.6766003308588846,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "ppocrv6",
+    "arm": "enc-2048-q85",
+    "group": "the 96",
+    "n": 96,
+    "ok": 96,
+    "nes": 0.7766194733886854,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "ppocrv6",
+    "arm": "enc-2048-q85",
+    "group": "kind:handwritten",
+    "n": 16,
+    "ok": 16,
+    "nes": 0.6662495519854815,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "ppocrv6",
+    "arm": "enc-2048-q85",
+    "group": "kind:mixed",
+    "n": 2,
+    "ok": 2,
+    "nes": 0.574169827280417,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "ppocrv6",
+    "arm": "enc-2048-q85",
+    "group": "kind:printed",
+    "n": 28,
+    "ok": 28,
+    "nes": 0.6204958742566327,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "ppocrv6",
+    "arm": "enc-2048-q85",
+    "group": "kind:typewritten",
+    "n": 50,
+    "ok": 50,
+    "nes": 0.907465049595991,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "ppocrv6",
+    "arm": "enc-1600-q90",
+    "group": "the 96",
+    "n": 96,
+    "ok": 96,
+    "nes": 0.7807059274945173,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "ppocrv6",
+    "arm": "enc-1600-q90",
+    "group": "kind:handwritten",
+    "n": 16,
+    "ok": 16,
+    "nes": 0.694510566265354,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "ppocrv6",
+    "arm": "enc-1600-q90",
+    "group": "kind:mixed",
+    "n": 2,
+    "ok": 2,
+    "nes": 0.5569217441130727,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "ppocrv6",
+    "arm": "enc-1600-q90",
+    "group": "kind:printed",
+    "n": 28,
+    "ok": 28,
+    "nes": 0.6152085530730286,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   },
+   {
+    "route": "ppocrv6",
+    "arm": "enc-1600-q90",
+    "group": "kind:typewritten",
+    "n": 50,
+    "ok": 50,
+    "nes": 0.9099183400991411,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+   }
   ],
   "uvdoc_benchmark": "enh-dewarp-uvdoc-bench.md",
   "rows": [
@@ -25475,6 +27376,711 @@
     "lo": -0.06256,
     "hi": 0.06799,
     "p": 0.81532
+   },
+   {
+    "reader": "qwen3.6-27b",
+    "pages": "originals",
+    "n": 63,
+    "arm": "raw",
+    "base": "raw",
+    "nes": 0.93858,
+    "chrf": 0.957,
+    "added": 0.03674,
+    "missed": 0.03263
+   },
+   {
+    "reader": "qwen3.6-27b",
+    "pages": "originals",
+    "n": 63,
+    "arm": "quad",
+    "base": "raw",
+    "nes": 0.94192,
+    "chrf": 0.94589,
+    "added": 0.02517,
+    "missed": 0.03593,
+    "d_nes": 0.00334,
+    "lo": -0.02302,
+    "hi": 0.02783,
+    "p": 0.81702
+   },
+   {
+    "reader": "qwen3.6-27b",
+    "pages": "originals",
+    "n": 63,
+    "arm": "uvdoc",
+    "base": "raw",
+    "nes": 0.91077,
+    "chrf": 0.90786,
+    "added": 0.02628,
+    "missed": 0.05981,
+    "d_nes": -0.02781,
+    "lo": -0.07369,
+    "hi": 0.01096,
+    "p": 0.21068
+   },
+   {
+    "reader": "qwen3.6-27b",
+    "pages": "originals",
+    "n": 63,
+    "arm": "docres",
+    "base": "raw",
+    "nes": 0.82825,
+    "chrf": 0.83132,
+    "added": 0.0208,
+    "missed": 0.13317,
+    "d_nes": -0.11033,
+    "lo": -0.18492,
+    "hi": -0.04619,
+    "p": 0.0021
+   },
+   {
+    "reader": "qwen3.6-27b",
+    "pages": "PDF images",
+    "n": 33,
+    "arm": "raw",
+    "base": "raw",
+    "nes": 0.98279,
+    "chrf": 0.98257,
+    "added": 0.02102,
+    "missed": 0.02535
+   },
+   {
+    "reader": "qwen3.6-27b",
+    "pages": "PDF images",
+    "n": 33,
+    "arm": "quad",
+    "base": "raw",
+    "nes": 0.96965,
+    "chrf": 0.9792,
+    "added": 0.02697,
+    "missed": 0.02603,
+    "d_nes": -0.01315,
+    "lo": -0.03896,
+    "hi": -1e-05,
+    "p": 0.13439
+   },
+   {
+    "reader": "qwen3.6-27b",
+    "pages": "PDF images",
+    "n": 33,
+    "arm": "uvdoc",
+    "base": "raw",
+    "nes": 0.93906,
+    "chrf": 0.94293,
+    "added": 0.04283,
+    "missed": 0.0579,
+    "d_nes": -0.04374,
+    "lo": -0.08903,
+    "hi": -0.00914,
+    "p": 0.0257
+   },
+   {
+    "reader": "qwen3.6-27b",
+    "pages": "PDF images",
+    "n": 33,
+    "arm": "docres",
+    "base": "raw",
+    "nes": 0.78723,
+    "chrf": 0.7839,
+    "added": 0.06764,
+    "missed": 0.30728,
+    "d_nes": -0.19556,
+    "lo": -0.30951,
+    "hi": -0.09682,
+    "p": 0.0001
+   },
+   {
+    "reader": "qwen3.6-27b",
+    "pages": "originals",
+    "n": 63,
+    "arm": "raw",
+    "base": "raw",
+    "nes": 0.93858,
+    "chrf": 0.957,
+    "added": 0.03674,
+    "missed": 0.03263
+   },
+   {
+    "reader": "qwen3.6-27b",
+    "pages": "originals",
+    "n": 63,
+    "arm": "enc-2048-q85",
+    "base": "raw",
+    "nes": 0.93973,
+    "chrf": 0.95558,
+    "added": 0.02985,
+    "missed": 0.03113,
+    "d_nes": 0.00115,
+    "lo": -0.00955,
+    "hi": 0.01397,
+    "p": 0.87461
+   },
+   {
+    "reader": "qwen3.6-27b",
+    "pages": "originals",
+    "n": 63,
+    "arm": "enc-1600-q90",
+    "base": "raw",
+    "nes": 0.9361,
+    "chrf": 0.95447,
+    "added": 0.03564,
+    "missed": 0.03413,
+    "d_nes": -0.00248,
+    "lo": -0.00844,
+    "hi": 0.00318,
+    "p": 0.42056
+   },
+   {
+    "reader": "qwen3.6-27b",
+    "pages": "PDF images",
+    "n": 33,
+    "arm": "raw",
+    "base": "raw",
+    "nes": 0.98279,
+    "chrf": 0.98257,
+    "added": 0.02102,
+    "missed": 0.02535
+   },
+   {
+    "reader": "qwen3.6-27b",
+    "pages": "PDF images",
+    "n": 33,
+    "arm": "enc-2048-q85",
+    "base": "raw",
+    "nes": 0.97099,
+    "chrf": 0.97798,
+    "added": 0.02573,
+    "missed": 0.02595,
+    "d_nes": -0.0118,
+    "lo": -0.03482,
+    "hi": 5e-05,
+    "p": 0.09899
+   },
+   {
+    "reader": "qwen3.6-27b",
+    "pages": "PDF images",
+    "n": 33,
+    "arm": "enc-1600-q90",
+    "base": "raw",
+    "nes": 0.97227,
+    "chrf": 0.97839,
+    "added": 0.0264,
+    "missed": 0.02655,
+    "d_nes": -0.01052,
+    "lo": -0.03487,
+    "hi": 0.00363,
+    "p": 0.50475
+   },
+   {
+    "reader": "qwen3.6-27b",
+    "pages": "ladder",
+    "n": 20,
+    "arm": "quarter",
+    "base": "quarter",
+    "nes": 0.70015,
+    "chrf": 0.72105,
+    "added": 0.08826,
+    "missed": 0.38348
+   },
+   {
+    "reader": "qwen3.6-27b",
+    "pages": "ladder",
+    "n": 20,
+    "arm": "quad-quarter",
+    "base": "quarter",
+    "nes": 0.67924,
+    "chrf": 0.68877,
+    "added": 0.15938,
+    "missed": 0.43748,
+    "d_nes": -0.02091,
+    "lo": -0.10597,
+    "hi": 0.05198,
+    "p": 0.63214
+   },
+   {
+    "reader": "qwen3.6-27b",
+    "pages": "ladder",
+    "n": 20,
+    "arm": "uvdoc-quarter",
+    "base": "quarter",
+    "nes": 0.69822,
+    "chrf": 0.70893,
+    "added": 0.07886,
+    "missed": 0.40639,
+    "d_nes": -0.00193,
+    "lo": -0.01882,
+    "hi": 0.01746,
+    "p": 0.85201
+   },
+   {
+    "reader": "lightonocr3-4b",
+    "pages": "originals",
+    "n": 63,
+    "arm": "raw",
+    "base": "raw",
+    "nes": 0.8678,
+    "chrf": 0.88779,
+    "added": 0.05745,
+    "missed": 0.07001
+   },
+   {
+    "reader": "lightonocr3-4b",
+    "pages": "originals",
+    "n": 63,
+    "arm": "quad",
+    "base": "raw",
+    "nes": 0.8551,
+    "chrf": 0.87925,
+    "added": 0.05504,
+    "missed": 0.07409,
+    "d_nes": -0.0127,
+    "lo": -0.03546,
+    "hi": 0.00234,
+    "p": 0.21268
+   },
+   {
+    "reader": "lightonocr3-4b",
+    "pages": "originals",
+    "n": 63,
+    "arm": "uvdoc",
+    "base": "raw",
+    "nes": 0.84996,
+    "chrf": 0.87228,
+    "added": 0.06145,
+    "missed": 0.07912,
+    "d_nes": -0.01784,
+    "lo": -0.04257,
+    "hi": -8e-05,
+    "p": 0.08789
+   },
+   {
+    "reader": "lightonocr3-4b",
+    "pages": "originals",
+    "n": 63,
+    "arm": "docres",
+    "base": "raw",
+    "nes": 0.74846,
+    "chrf": 0.76354,
+    "added": 0.06053,
+    "missed": 0.17696,
+    "d_nes": -0.11934,
+    "lo": -0.18966,
+    "hi": -0.05873,
+    "p": 0.0001
+   },
+   {
+    "reader": "lightonocr3-4b",
+    "pages": "PDF images",
+    "n": 33,
+    "arm": "raw",
+    "base": "raw",
+    "nes": 0.94245,
+    "chrf": 0.95634,
+    "added": 0.04528,
+    "missed": 0.0417
+   },
+   {
+    "reader": "lightonocr3-4b",
+    "pages": "PDF images",
+    "n": 33,
+    "arm": "quad",
+    "base": "raw",
+    "nes": 0.94574,
+    "chrf": 0.95787,
+    "added": 0.04228,
+    "missed": 0.04013,
+    "d_nes": 0.0033,
+    "lo": -0.00428,
+    "hi": 0.01213,
+    "p": 0.46695
+   },
+   {
+    "reader": "lightonocr3-4b",
+    "pages": "PDF images",
+    "n": 33,
+    "arm": "uvdoc",
+    "base": "raw",
+    "nes": 0.92124,
+    "chrf": 0.93401,
+    "added": 0.04867,
+    "missed": 0.0588,
+    "d_nes": -0.02121,
+    "lo": -0.04534,
+    "hi": -0.0015,
+    "p": 0.06769
+   },
+   {
+    "reader": "lightonocr3-4b",
+    "pages": "PDF images",
+    "n": 33,
+    "arm": "docres",
+    "base": "raw",
+    "nes": 0.71809,
+    "chrf": 0.7337,
+    "added": 0.0632,
+    "missed": 0.35626,
+    "d_nes": -0.22436,
+    "lo": -0.35864,
+    "hi": -0.10564,
+    "p": 0.0001
+   },
+   {
+    "reader": "lightonocr3-4b",
+    "pages": "originals",
+    "n": 63,
+    "arm": "raw",
+    "base": "raw",
+    "nes": 0.8678,
+    "chrf": 0.88779,
+    "added": 0.05745,
+    "missed": 0.07001
+   },
+   {
+    "reader": "lightonocr3-4b",
+    "pages": "originals",
+    "n": 63,
+    "arm": "enc-2048-q85",
+    "base": "raw",
+    "nes": 0.86145,
+    "chrf": 0.89024,
+    "added": 0.0548,
+    "missed": 0.07079,
+    "d_nes": -0.00635,
+    "lo": -0.02219,
+    "hi": 0.00417,
+    "p": 0.51635
+   },
+   {
+    "reader": "lightonocr3-4b",
+    "pages": "originals",
+    "n": 63,
+    "arm": "enc-1600-q90",
+    "base": "raw",
+    "nes": 0.85039,
+    "chrf": 0.8767,
+    "added": 0.05763,
+    "missed": 0.07007,
+    "d_nes": -0.01741,
+    "lo": -0.04473,
+    "hi": 0.00334,
+    "p": 0.19498
+   },
+   {
+    "reader": "lightonocr3-4b",
+    "pages": "PDF images",
+    "n": 33,
+    "arm": "raw",
+    "base": "raw",
+    "nes": 0.94245,
+    "chrf": 0.95634,
+    "added": 0.04528,
+    "missed": 0.0417
+   },
+   {
+    "reader": "lightonocr3-4b",
+    "pages": "PDF images",
+    "n": 33,
+    "arm": "enc-2048-q85",
+    "base": "raw",
+    "nes": 0.94327,
+    "chrf": 0.9569,
+    "added": 0.0433,
+    "missed": 0.04208,
+    "d_nes": 0.00082,
+    "lo": -0.00284,
+    "hi": 0.00558,
+    "p": 0.77962
+   },
+   {
+    "reader": "lightonocr3-4b",
+    "pages": "PDF images",
+    "n": 33,
+    "arm": "enc-1600-q90",
+    "base": "raw",
+    "nes": 0.94255,
+    "chrf": 0.95547,
+    "added": 0.04394,
+    "missed": 0.04208,
+    "d_nes": 0.0001,
+    "lo": -0.00356,
+    "hi": 0.00477,
+    "p": 0.973
+   },
+   {
+    "reader": "lightonocr3-4b",
+    "pages": "ladder",
+    "n": 20,
+    "arm": "quarter",
+    "base": "quarter",
+    "nes": 0.5501,
+    "chrf": 0.60316,
+    "added": 0.16574,
+    "missed": 0.47242
+   },
+   {
+    "reader": "lightonocr3-4b",
+    "pages": "ladder",
+    "n": 20,
+    "arm": "quad-quarter",
+    "base": "quarter",
+    "nes": 0.55059,
+    "chrf": 0.58492,
+    "added": 0.15975,
+    "missed": 0.4786,
+    "d_nes": 0.00049,
+    "lo": -0.04056,
+    "hi": 0.04177,
+    "p": 0.9821
+   },
+   {
+    "reader": "lightonocr3-4b",
+    "pages": "ladder",
+    "n": 20,
+    "arm": "uvdoc-quarter",
+    "base": "quarter",
+    "nes": 0.5646,
+    "chrf": 0.60815,
+    "added": 0.1724,
+    "missed": 0.46473,
+    "d_nes": 0.0145,
+    "lo": -0.01856,
+    "hi": 0.05934,
+    "p": 0.58574
+   },
+   {
+    "reader": "ppocrv6",
+    "pages": "originals",
+    "n": 63,
+    "arm": "raw",
+    "base": "raw",
+    "nes": 0.74367,
+    "chrf": 0.78739,
+    "added": 0.09209,
+    "missed": 0.12879
+   },
+   {
+    "reader": "ppocrv6",
+    "pages": "originals",
+    "n": 63,
+    "arm": "quad",
+    "base": "raw",
+    "nes": 0.73566,
+    "chrf": 0.76696,
+    "added": 0.08465,
+    "missed": 0.14763,
+    "d_nes": -0.00801,
+    "lo": -0.03057,
+    "hi": 0.0174,
+    "p": 0.53455
+   },
+   {
+    "reader": "ppocrv6",
+    "pages": "originals",
+    "n": 63,
+    "arm": "uvdoc",
+    "base": "raw",
+    "nes": 0.74785,
+    "chrf": 0.7721,
+    "added": 0.08382,
+    "missed": 0.14241,
+    "d_nes": 0.00417,
+    "lo": -0.03516,
+    "hi": 0.04233,
+    "p": 0.83992
+   },
+   {
+    "reader": "ppocrv6",
+    "pages": "originals",
+    "n": 63,
+    "arm": "docres",
+    "base": "raw",
+    "nes": 0.56928,
+    "chrf": 0.59642,
+    "added": 0.08515,
+    "missed": 0.34199,
+    "d_nes": -0.17439,
+    "lo": -0.23964,
+    "hi": -0.11452,
+    "p": 0.0001
+   },
+   {
+    "reader": "ppocrv6",
+    "pages": "PDF images",
+    "n": 33,
+    "arm": "raw",
+    "base": "raw",
+    "nes": 0.816,
+    "chrf": 0.92593,
+    "added": 0.05336,
+    "missed": 0.06203
+   },
+   {
+    "reader": "ppocrv6",
+    "pages": "PDF images",
+    "n": 33,
+    "arm": "quad",
+    "base": "raw",
+    "nes": 0.8128,
+    "chrf": 0.92288,
+    "added": 0.05891,
+    "missed": 0.06308,
+    "d_nes": -0.00319,
+    "lo": -0.01032,
+    "hi": 0.0015,
+    "p": 0.41506
+   },
+   {
+    "reader": "ppocrv6",
+    "pages": "PDF images",
+    "n": 33,
+    "arm": "uvdoc",
+    "base": "raw",
+    "nes": 0.77568,
+    "chrf": 0.8852,
+    "added": 0.05435,
+    "missed": 0.1074,
+    "d_nes": -0.04031,
+    "lo": -0.07398,
+    "hi": -0.01114,
+    "p": 0.014
+   },
+   {
+    "reader": "ppocrv6",
+    "pages": "PDF images",
+    "n": 33,
+    "arm": "docres",
+    "base": "raw",
+    "nes": 0.51338,
+    "chrf": 0.54288,
+    "added": 0.06371,
+    "missed": 0.54256,
+    "d_nes": -0.30262,
+    "lo": -0.3998,
+    "hi": -0.20876,
+    "p": 0.0001
+   },
+   {
+    "reader": "ppocrv6",
+    "pages": "originals",
+    "n": 63,
+    "arm": "raw",
+    "base": "raw",
+    "nes": 0.74367,
+    "chrf": 0.78739,
+    "added": 0.09209,
+    "missed": 0.12879
+   },
+   {
+    "reader": "ppocrv6",
+    "pages": "originals",
+    "n": 63,
+    "arm": "enc-2048-q85",
+    "base": "raw",
+    "nes": 0.75634,
+    "chrf": 0.79317,
+    "added": 0.09398,
+    "missed": 0.12561,
+    "d_nes": 0.01267,
+    "lo": 0.00392,
+    "hi": 0.02234,
+    "p": 0.0073
+   },
+   {
+    "reader": "ppocrv6",
+    "pages": "originals",
+    "n": 63,
+    "arm": "enc-1600-q90",
+    "base": "raw",
+    "nes": 0.76245,
+    "chrf": 0.80107,
+    "added": 0.09915,
+    "missed": 0.11764,
+    "d_nes": 0.01878,
+    "lo": 0.00491,
+    "hi": 0.03361,
+    "p": 0.0129
+   },
+   {
+    "reader": "ppocrv6",
+    "pages": "PDF images",
+    "n": 33,
+    "arm": "raw",
+    "base": "raw",
+    "nes": 0.816,
+    "chrf": 0.92593,
+    "added": 0.05336,
+    "missed": 0.06203
+   },
+   {
+    "reader": "ppocrv6",
+    "pages": "PDF images",
+    "n": 33,
+    "arm": "enc-2048-q85",
+    "base": "raw",
+    "nes": 0.81533,
+    "chrf": 0.92509,
+    "added": 0.05586,
+    "missed": 0.06195,
+    "d_nes": -0.00067,
+    "lo": -0.0039,
+    "hi": 0.00172,
+    "p": 0.76652
+   },
+   {
+    "reader": "ppocrv6",
+    "pages": "PDF images",
+    "n": 33,
+    "arm": "enc-1600-q90",
+    "base": "raw",
+    "nes": 0.81556,
+    "chrf": 0.92512,
+    "added": 0.05546,
+    "missed": 0.05985,
+    "d_nes": -0.00044,
+    "lo": -0.00416,
+    "hi": 0.00317,
+    "p": 0.73653
+   },
+   {
+    "reader": "ppocrv6",
+    "pages": "ladder",
+    "n": 20,
+    "arm": "quarter",
+    "base": "quarter",
+    "nes": 0.71628,
+    "chrf": 0.74434,
+    "added": 0.18288,
+    "missed": 0.33149
+   },
+   {
+    "reader": "ppocrv6",
+    "pages": "ladder",
+    "n": 20,
+    "arm": "quad-quarter",
+    "base": "quarter",
+    "nes": 0.69223,
+    "chrf": 0.70958,
+    "added": 0.19334,
+    "missed": 0.38415,
+    "d_nes": -0.02405,
+    "lo": -0.05997,
+    "hi": 0.00423,
+    "p": 0.18528
+   },
+   {
+    "reader": "ppocrv6",
+    "pages": "ladder",
+    "n": 20,
+    "arm": "uvdoc-quarter",
+    "base": "quarter",
+    "nes": 0.70798,
+    "chrf": 0.72631,
+    "added": 0.15148,
+    "missed": 0.36326,
+    "d_nes": -0.0083,
+    "lo": -0.05491,
+    "hi": 0.03313,
+    "p": 0.73493
    }
   ]
  },
