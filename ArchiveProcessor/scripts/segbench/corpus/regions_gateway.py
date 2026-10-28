@@ -195,6 +195,23 @@ def reservation(body):
     return ((text + 8192 + 2048) * PRICE[0] + body['max_tokens'] * PRICE[1]) / 1e6
 
 
+def front_end_error(r):
+    """A 429/5xx whose body is an HTML error page, not JSON: the gateway's front end answered and no model ran
+    (2026-10-28: /models itself returned the same 502 page during the outage). Charged $0. A transport failure
+    with no status, or a JSON error body, stays unknown at its full allowance."""
+    return (r.get('http') in (429, 500, 502, 503, 504) and r.get('error') == 'JSONDecodeError'
+            and '<html' in (r.get('body') or '').lower())
+
+
+def reclassify():
+    """Append $0 'rejected' lines for recorded unknowns that front_end_error identifies; never edits a line."""
+    n = 0
+    for r in effective():
+        if r['event'] == 'unknown' and front_end_error(r):
+            append({**r, 'event': 'rejected', 'charge': 0.0}); n += 1
+    print(f'{n} front-end errors reclassified at $0; item ${spent():.4f}')
+
+
 def call(m, job):
     body, key = request(m, job)
     with LOCK:
@@ -204,7 +221,7 @@ def call(m, job):
         if hit is not None:
             return hit
         tried = [r for r in effective() if r['request_sha256'] == key]
-        if tried and not (RETRY_UNKNOWN and all(r['event'] == 'unknown' for r in tried)):
+        if tried and not (RETRY_UNKNOWN and all(r['event'] in ('unknown', 'rejected') for r in tried)):
             raise RuntimeError('already attempted without a cached reply; no automatic retry')
         # A deliberate retry of an unknown request keeps the earlier full allowance charged: never optimistic.
         reserve = reservation(body)
@@ -221,9 +238,12 @@ def call(m, job):
     except Exception as e:
         with LOCK:
             STOP.set()
-            append({**rec, 'event': 'unknown', 'error': type(e).__name__,
-                    'http': getattr(response, 'status_code', None),
-                    'body': (getattr(response, 'text', '') or '')[:500]})
+            u = {**rec, 'event': 'unknown', 'error': type(e).__name__,
+                 'http': getattr(response, 'status_code', None), 'body': (getattr(response, 'text', '') or '')[:500]}
+            append(u)
+            if front_end_error(u):
+                append({**u, 'event': 'rejected', 'charge': 0.0})
+                raise RuntimeError(f"gateway front end refused ({u['http']}); nothing served, stopped") from e
         raise RuntimeError('unknown usage: full reservation retained; inspect before any retry') from e
     u = got.get('usage') or {}
     known = all(type(u.get(k)) is int and u[k] >= 0 for k in ('prompt_tokens', 'completion_tokens'))
@@ -268,7 +288,7 @@ def inventory():
 
 def collect(pilot=False, sets=None, arms=ARMS):
     m = manifest()
-    if spent() > CAP or any((r['event'] != 'settle' and not (RETRY_UNKNOWN and r['event'] == 'unknown'))
+    if spent() > CAP or any((r['event'] != 'settle' and not (RETRY_UNKNOWN and r['event'] in ('unknown', 'rejected')))
                            or (r['event'] == 'settle' and not r.get('known'))
                            or r['charge'] > r['allowance'] for r in effective()):
         raise RuntimeError('unsettled/unknown earlier request; inspect ledger, do not resend')
@@ -445,7 +465,7 @@ def report_md(out):
 def main():
     global STORE, RETRY_UNKNOWN
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument('cmd', choices=['prepare', 'verify', 'inventory', 'pilot', 'collect', 'score'])
+    ap.add_argument('cmd', choices=['prepare', 'verify', 'inventory', 'pilot', 'collect', 'score', 'reclassify'])
     ap.add_argument('--store', type=Path, default=STORE)
     ap.add_argument('--set', action='append', choices=['owner99', 'public895'], help='collect only these sets')
     ap.add_argument('--arm', action='append', choices=ARMS, help='collect only these arms')
@@ -457,7 +477,7 @@ def main():
     with (STORE / 'collector.lock').open('a') as f:
         fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
         {'prepare': prepare, 'verify': verify, 'inventory': inventory,
-         'pilot': lambda: collect(True), 'collect': lambda: collect(False, a.set, tuple(a.arm or ARMS)), 'score': score}[a.cmd]()
+         'pilot': lambda: collect(True), 'collect': lambda: collect(False, a.set, tuple(a.arm or ARMS)), 'score': score, 'reclassify': reclassify}[a.cmd]()
 
 
 if __name__ == '__main__':

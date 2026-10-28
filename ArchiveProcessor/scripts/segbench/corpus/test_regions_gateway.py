@@ -144,6 +144,33 @@ class Collector(unittest.TestCase):
         self.assertEqual(net.call_count, 1)
         self.assertAlmostEqual(B.spent(), B.reservation(self.body) + (100*.75+200*3.75)/1e6)
 
+    def test_front_end_error_page_is_rejected_at_zero_but_still_stops_and_needs_explicit_retry(self):
+        bad = Mock(status_code=502, text='<html>502 Server Error</html>', json=Mock(side_effect=json.JSONDecodeError('x', '', 0)))
+        with patch.object(B.G, 'request', return_value=bad):
+            with self.assertRaisesRegex(RuntimeError, 'front end refused'):
+                B.call(self.m, self.job)
+            with self.assertRaisesRegex(RuntimeError, 'stopped'):
+                B.call(self.m, self.job)
+        self.assertEqual(B.effective()[0]['event'], 'rejected'); self.assertEqual(B.spent(), 0)
+        B.STOP.clear()
+        with patch.object(B.G, 'request') as net:
+            with self.assertRaisesRegex(RuntimeError, 'already attempted'):
+                B.call(self.m, self.job)
+            net.assert_not_called()
+
+    def test_transport_failure_or_json_error_body_stays_charged(self):
+        for r in ({'http': None, 'error': 'ConnectionError', 'body': ''},
+                  {'http': 502, 'error': 'KeyError', 'body': '{"error": "x"}'},
+                  {'http': 200, 'error': 'JSONDecodeError', 'body': '<html>'}):
+            self.assertFalse(B.front_end_error(r))
+        B.append({'id': 'a', 'event': 'unknown', 'charge': .04, 'request_sha256': 'k', 'allowance': .04,
+                  'http': 502, 'error': 'JSONDecodeError', 'body': '<HTML>err</HTML>'})
+        B.append({'id': 'b', 'event': 'unknown', 'charge': .04, 'request_sha256': 'j', 'allowance': .04,
+                  'http': None, 'error': 'JSONDecodeError', 'body': ''})
+        B.reclassify()
+        self.assertAlmostEqual(B.spent(), .04)
+        self.assertEqual(len(B.records()), 3)   # append-only
+
     def test_set_and_arm_filters_select_a_complete_slice(self):
         crops = {'whole': [{}], 'pp-doclayoutv3': [{}], 'tiles': [{}, {}]}
         pages = [{'id': 'o', 'set': 'owner99', 'crops': crops}, {'id': 'p', 'set': 'public895', 'crops': crops}]
