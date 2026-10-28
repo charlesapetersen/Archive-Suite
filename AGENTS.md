@@ -92,8 +92,8 @@ the signature bought nothing Tier-2 did not — which is why five items sat park
 money, *"the daemon only spends tiny amounts and the keys are capped"*; on the SPEC, *"nothing real has been
 created by these apps yet."* **Cost discipline is NOT lifted:** cheapest capable model, smallest input set,
 state the cost of a big run. No permission, no blank cheque. **One limit does need permission (owner,
-2026-10-11):** never spend more than $3 of real money on one piece of work (an item across all its sessions)
-without asking him first; over $3, ask in the Daemon Report and move on. Subscription usage is not money.
+2026-10-11, raised from $3 on 2026-10-28):** never spend more than $7 of real money on one piece of work (an item across all its sessions)
+without asking him first; over $7, ask in the Daemon Report and move on. Subscription usage is not money.
 
 **A POLICY change is itself Tier-2, and its blast radius is PROSE.** On 2026-08-13 the change was made in four
 files and the old rule was restated in **ten more** — including the plan's general decision rule,

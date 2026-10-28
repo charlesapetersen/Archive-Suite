@@ -216,9 +216,9 @@ depends on the apps' current settings, structure or outputs.
   guide — cheapest capable model, smallest input set that proves the behaviour, and say what a run will cost
   before a big one. Not-permission, but not a blank cheque either. See §*Gating baseline* in
   [`AGENTS.md`](AGENTS.md).
-- ⛔ **But $3 is the ceiling without asking (owner, 2026-10-11).** Never spend more than $3 of real money on one
+- ⛔ **But $7 is the ceiling without asking (owner, 2026-10-11; raised from $3 on 2026-10-28).** Never spend more than $7 of real money on one
   piece of work (an item across all its sessions) without asking him first. Subscription usage is not money. Over
-  $3, an unattended session asks in the Daemon Report and moves on. The rule's authority is `~/Claude/CLAUDE.md`,
+  $7, an unattended session asks in the Daemon Report and moves on. The rule's authority is `~/Claude/CLAUDE.md`,
   section "Spending money".
 - ✅ **The W46 processing review's paid arms are released (owner, 2026-10-21).** The hold below no longer covers the
   review's items (`execution-plans/processing-review/10-gap-audit.md` §5). Route order: the **Stanford AI API gateway**
@@ -226,7 +226,7 @@ depends on the apps' current settings, structure or outputs.
   Claude and ChatGPT plan routes and ahead of personal keys. The gateway is real money on a Stanford PTA, not the
   owner's: up to its $50 a month may go to the review, but none is spent for its own sake. Personal keys only for what
   the gateway cannot serve (Azure, Textract, Document AI checks; one Gemini 3.7-against-3.8 Flash check on the 96).
-  The $3-per-item rule still applies to each item, except W46.seg-window-modality's full 551-page sweep, approved at
+  The $7-per-item rule still applies to each item, except W46.seg-window-modality's full 551-page sweep, approved at
   about $8 list / $4 batch. Newer gateway models need the owner to request access; on 2026-10-21 the key had only
   older ones (Gemini 2.0 Flash/2.5 Pro, Claude 4.5 Sonnet/Opus 4.6, GPT-5/5.2), not Gemini 3.7 Flash, Claude 5
   Sonnet, GPT 5.6 Luna or GLM 5.3 Flash.

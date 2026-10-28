@@ -14,10 +14,10 @@ blocker may leave it partial. An item too big to finish in ~2 sessions is mis-si
   WALKTHROUGH"). Do not merge the two: you append and move on. You never compose a walkthrough here, because
   nobody is awake to be walked through it.
 
-  !! MONEY: never spend more than $3 of real money (API keys, paid batches, purchases) on one piece of work — an
-  item across all its sessions — without asking the owner first (owner, 2026-10-11; authority: ~/Claude/CLAUDE.md,
+  !! MONEY: never spend more than $7 of real money (API keys, paid batches, purchases) on one piece of work — an
+  item across all its sessions — without asking the owner first (owner, 2026-10-11, raised from $3 on 2026-10-28; authority: ~/Claude/CLAUDE.md,
   "Spending money"). Before a paid run, add what the item has already spent to what the run will cost; if the
-  total would pass $3, do not run it: ask in the Daemon Report (a question, so no "no decision") and move on.
+  total would pass $7, do not run it: ask in the Daemon Report (a question, so no "no decision") and move on.
   Subscription usage is not money.
 
   !! An entry that asks the owner nothing (a mention, an FYI) MUST say "no decision" in its first line. The
