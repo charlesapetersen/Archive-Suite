@@ -150,9 +150,10 @@ def manifest():
     return m
 
 
-def tasks(m, pilot=False):
-    return [(p, a, i, c) for p in m['pages'] if not pilot or p['id'] in m['pilot']
-            for a in ARMS for i, c in enumerate(p['crops'][a])]
+def tasks(m, pilot=False, sets=None, arms=ARMS):
+    """sets/arms narrow a collection to a complete slice (e.g. the 96's tiles) when the cap fits no more."""
+    return [(p, a, i, c) for p in m['pages'] if (not pilot or p['id'] in m['pilot']) and (not sets or p['set'] in sets)
+            for a in arms for i, c in enumerate(p['crops'][a])]
 
 
 def request(m, job):
@@ -260,14 +261,14 @@ def inventory():
                   {k: len(v) for k, v in counts.items()})
 
 
-def collect(pilot=False):
+def collect(pilot=False, sets=None, arms=ARMS):
     m = manifest()
     if spent() > CAP or any(r['event'] != 'settle' or not r.get('known')
                            or r['charge'] > r['allowance'] for r in effective()):
         raise RuntimeError('unsettled/unknown earlier request; inspect ledger, do not resend')
     verify()
     G.api_key()
-    jobs = tasks(m, pilot)
+    jobs = tasks(m, pilot, sets, arms)
     with ThreadPoolExecutor(max_workers=4) as ex:
         futures = [ex.submit(call, m, job) for job in jobs]
         try:
@@ -299,12 +300,14 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument('cmd', choices=['prepare', 'verify', 'inventory', 'pilot', 'collect'])
     ap.add_argument('--store', type=Path, default=STORE)
+    ap.add_argument('--set', action='append', choices=['owner99', 'public895'], help='collect only these sets')
+    ap.add_argument('--arm', action='append', choices=ARMS, help='collect only these arms')
     a = ap.parse_args(); STORE = a.store
     STORE.mkdir(parents=True, exist_ok=True)
     with (STORE / 'collector.lock').open('a') as f:
         fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
         {'prepare': prepare, 'verify': verify, 'inventory': inventory,
-         'pilot': lambda: collect(True), 'collect': collect}[a.cmd]()
+         'pilot': lambda: collect(True), 'collect': lambda: collect(False, a.set, tuple(a.arm or ARMS))}[a.cmd]()
 
 
 if __name__ == '__main__':

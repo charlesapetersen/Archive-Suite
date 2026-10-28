@@ -126,6 +126,13 @@ class Collector(unittest.TestCase):
         jobs = B.tasks({'pages': [p], 'pilot': ['empty']})
         self.assertEqual([j[1] for j in jobs], ['whole', 'tiles', 'tiles'])
 
+    def test_set_and_arm_filters_select_a_complete_slice(self):
+        crops = {'whole': [{}], 'pp-doclayoutv3': [{}], 'tiles': [{}, {}]}
+        pages = [{'id': 'o', 'set': 'owner99', 'crops': crops}, {'id': 'p', 'set': 'public895', 'crops': crops}]
+        jobs = B.tasks({'pages': pages, 'pilot': []}, sets=['owner99'], arms=('tiles',))
+        self.assertEqual([(j[0]['id'], j[1], j[2]) for j in jobs], [('o', 'tiles', 0), ('o', 'tiles', 1)])
+        self.assertEqual(len(B.tasks({'pages': pages, 'pilot': []})), 8)
+
     def test_whole_baseline_requires_exact_hash(self):
         own = ({**self.job[0], 'set': 'owner99'}, *self.job[1:])
         cache = self.store/'baseline'; (cache/'panel').mkdir(parents=True)
