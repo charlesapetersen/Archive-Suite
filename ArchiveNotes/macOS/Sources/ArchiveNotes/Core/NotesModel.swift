@@ -442,9 +442,23 @@ final class NotesModel: ObservableObject {
         }
         guard opened else { return nil }
         // Also when only the folders are still the read-only mirror: bootstrap's open failed but the
-        // driver's has since succeeded, so `wasUnavailable` never saw the dead index.
-        if wasUnavailable || organization.isReadOnlyMirror { scheduleIndexRepopulationAfterRecovery() }
+        // driver's has since succeeded, so `wasUnavailable` never saw the dead index. Once only: a
+        // reload that failed is reported, not retried on every keystroke.
+        if wasUnavailable || (organization.isReadOnlyMirror && !mirrorReloadFailed) {
+            scheduleIndexRepopulationAfterRecovery()
+        }
         return index
+    }
+
+    /// Set when the folders shown read-only from `organization.json` could not be loaded into the
+    /// recovered index, so the query path stops rescheduling that reload (W40.fix-notes-index-failure-empty).
+    private var mirrorReloadFailed = false
+
+    /// Report and refuse a create while the folders are read-only; `true` means refused.
+    private func refuseWhileFoldersReadOnly(_ action: String) -> Bool {
+        guard organization.isReadOnlyMirror else { return false }
+        report(OrganizationError.readOnlyWhileIndexUnavailable, action)
+        return true
     }
 
     /// The in-flight post-recovery rebuild (W23.m9-fu2) — `nil` when none is running.
@@ -500,6 +514,7 @@ final class NotesModel: ObservableObject {
             try await organization.reloadAfterIndexRecovery()
             rebuild()
         } catch {
+            mirrorReloadFailed = true
             report(error, "load the folders")
         }
         await buildIndexFromDisk()
@@ -725,6 +740,9 @@ final class NotesModel: ObservableObject {
     @discardableResult
     func newItem(kind: Item.Kind, in folderId: UUID?, from templateId: UUID?) async -> UUID? {
         guard let noteStore else { return nil }
+        // Before the file is written: with the folders read-only, its filing would be refused and every
+        // press of New would leave another unfiled note behind (W40.fix-notes-index-failure-empty).
+        guard !refuseWhileFoldersReadOnly("create the note") else { return nil }
         var item: Item
         if let templateId {
             do { item = try await noteStore.loadTemplate(templateId) }
@@ -796,6 +814,7 @@ final class NotesModel: ObservableObject {
             statusMessage = "Select text in a note to make an extract."
             return nil
         }
+        guard !refuseWhileFoldersReadOnly("make the extract") else { return nil }
         do {
             let created = try await ExtractBuilder(store: noteStore).createExtract(from: passages)
             let projectionTx = try await reconcileFacetProjection(

@@ -935,6 +935,15 @@ final class NotesGUITests: NotesFixtureUITestCase {
             XCTAssertTrue((warning.label + " " + (warning.value as? String ?? ""))
                               .contains("Search index unavailable"),
                           "the status line should name the failed index")
+            // W40.fix-notes-index-failure-empty: the dead index no longer empties the library. The
+            // notes come from disk and the folders from organization.json, before any repair.
+            XCTAssertTrue(window.descendants(matching: .any)["an.cell.title.11111111-1111-1111-1111-111111111111"]
+                              .waitForExistence(timeout: 15),
+                          "the fixture's notes should be listed from disk while the index is down")
+            let reading = window.descendants(matching: .any).matching(identifier: "an.sidebar.folder")
+                .matching(NSPredicate(format: "value ==[c] %@", "Reading")).firstMatch
+            XCTAssertTrue(reading.waitForExistence(timeout: 10),
+                          "the fixture's own folders should stay in the sidebar while the index is down")
             // Replace the failed-open DB in the marker-checked scratch fixture. The next FTS query
             // must reopen it, retract the warning and schedule a full rebuild without relaunching.
             try Data().write(to: indexURL, options: .atomic)

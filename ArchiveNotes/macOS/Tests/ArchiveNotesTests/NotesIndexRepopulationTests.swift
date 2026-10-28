@@ -100,8 +100,9 @@ struct NotesIndexRepopulationTests {
     }
 
     /// The other model-level read drives the same recovery — the seam is shared, so the note LIST must
-    /// come back too, not only search. (`reloadItems` over a dead index publishes nothing at all, by
-    /// W23.m9-fu, so pre-fix the library stayed empty for the session.)
+    /// come back too, not only search. (`reloadItems` over a dead index publishes nothing from the
+    /// index, by W23.m9-fu; since W40.fix-notes-index-failure-empty it lists the notes from disk
+    /// meanwhile, and after the repair the index answers again.)
     @Test("reloadItems after a repair republishes the rebuilt library")
     func reloadItemsAfterRepairRepublishesTheLibrary() async throws {
         let dir = try scratchDir(); defer { try? FileManager.default.removeItem(at: dir) }
@@ -111,13 +112,15 @@ struct NotesIndexRepopulationTests {
         let model = model(over: index, store: try await store(in: dir, titles: ["Ptolemy", "Quintessence"]))
 
         await model.buildIndexFromDisk()
-        #expect(model.allItems.isEmpty, "precondition: a read that never ran published nothing")
+        #expect(model.allItems.count == 2, "precondition: a dead index lists the notes from disk")
+        #expect(model.indexFailure != nil)
 
         try repairToEmptyDatabase(at: url)
         await model.reloadItems()
         await awaitRecovery(model)
 
         #expect(model.allItems.count == 2, "the rebuild must repopulate the visible library")
+        #expect(model.indexFailure == nil, "and the list now comes from the index again")
         await index.close()
     }
 

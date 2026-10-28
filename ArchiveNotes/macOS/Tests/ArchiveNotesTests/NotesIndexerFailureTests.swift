@@ -196,6 +196,9 @@ struct NotesIndexerFailureTests {
         await model.buildIndexFromDisk()
         #expect(model.normalTree.contains { $0.id == budget.id }, "the sidebar keeps the folder")
         #expect(model.allItems.map(\.title) == ["Alpha"])
+        #expect(await model.newItem(kind: .note, in: nil, from: nil) == nil,
+                "New is refused before a file is written, since its filing would be")
+        #expect(await store.allItemIDs().count == 1, "no unfiled note left behind")
 
         // Repair the cache (an empty file opens as a new database), then a query notices.
         try Data().write(to: url, options: .atomic)
