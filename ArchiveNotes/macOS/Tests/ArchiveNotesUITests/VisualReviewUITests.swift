@@ -65,6 +65,34 @@ final class VisualReviewUITests: NotesFixtureUITestCase {
     func testEmptyStatesLight() throws { try optIn(); try withFixture { try emptyStates(dark: false) } }
     func testEmptyStatesDark() throws { try optIn(); try withFixture { try emptyStates(dark: true) } }
 
+    /// Focused pixel review for W40.fix-notes-list-overrun. The headless unit guard asserts
+    /// escaped ink; these whole-window shots retain the actual ellipses and neighbouring columns.
+    func testListTruncation() throws {
+        try optIn()
+        try withFixture {
+            try seedVolumeNotes()
+            let file = URL(fileURLWithPath: Self.canonicalFixturePath)
+                .appendingPathComponent("items/\(Self.idLongTitle)/Long title.md")
+            var text = try String(contentsOf: file, encoding: .utf8)
+            text = text.replacingOccurrences(of: "date: 1968-07\ndate_precision: month",
+                with: "date: 1965-11-17\ndate_precision: day\nadditional_dates:\n"
+                    + "  - role: sent_with\n    date: 1966\n    precision: year")
+            text = text.replacingOccurrences(of: "tags: [proposition 13, budget office]",
+                with: "tags: [proposition 13, budget office, county services, school districts, local government finance]")
+            try Data(text.utf8).write(to: file)
+            for dark in [false, true] {
+                XCTAssertTrue(relaunch(store: Self.fixturePath, dark: dark, readyRow: Self.idLongTitle))
+                for size in WindowSize.allCases {
+                    prefix = "list-truncation-\(dark ? "dark" : "light")-\(size.rawValue)"
+                    resizeMainWindow(to: size.main)
+                    select(Self.idLongTitle)
+                    shoot("long-title-date-tags")
+                }
+            }
+            reportMissing()
+        }
+    }
+
     private func optIn() throws {
         try XCTSkipUnless(FileManager.default.fileExists(atPath: Self.flagPath),
                           "visual review is opt-in — VISUAL_REVIEW=1 in vm-gui-runner.sh")
