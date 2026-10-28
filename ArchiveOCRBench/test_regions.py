@@ -25,14 +25,19 @@ class RegionCharts(unittest.TestCase):
         rows = [dict(arm=a, group=g, n=n, ok=n, nes=.8, cost=n*.02)
                 for a in ('pp-doclayoutv3', 'tiles')
                 for g,n in [('the 96',96),('kind:typewritten',50),('kind:printed',28),('kind:handwritten',16),('L9',1)]]
-        out = build.gateway_region_routes(dict(rows=rows), ['typewritten','printed','handwritten'])
+        out = build.gateway_region_routes(dict(rows=rows, arms_on_the_96=['whole', 'pp-doclayoutv3', 'tiles']),
+                                          ['typewritten','printed','handwritten'])
         self.assertEqual([r['id'] for r in out], ['gw-regions-pp-doclayoutv3', 'gw-regions-tiles'])
         self.assertEqual(out[0]['std'], 20.0)  # $0.02 a page -> $20 per 1,000
         self.assertEqual(out[0]['scores']['printed'], [80.0, 28, 28])
         self.assertNotIn('L9', out[0]['scores'])
+        only, = build.gateway_region_routes(dict(rows=[r for r in rows if r['arm'] == 'tiles'],
+                                                 arms_on_the_96=['whole', 'tiles']), ['typewritten','printed','handwritten'])
+        self.assertEqual(only['id'], 'gw-regions-tiles')
         rows[0]['n'] = 95
         with self.assertRaises(SystemExit):
-            build.gateway_region_routes(dict(rows=rows), ['typewritten','printed','handwritten'])
+            build.gateway_region_routes(dict(rows=rows, arms_on_the_96=['whole', 'pp-doclayoutv3', 'tiles']),
+                                        ['typewritten','printed','handwritten'])
 
     def test_committed_run_has_twelve_routes_on_all_four_eligible_charts(self):
         root = Path(__file__).parent

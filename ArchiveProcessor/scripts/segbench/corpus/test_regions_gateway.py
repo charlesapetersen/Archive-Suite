@@ -144,7 +144,7 @@ class Collector(unittest.TestCase):
         self.assertEqual(net.call_count, 1)
         self.assertAlmostEqual(B.spent(), B.reservation(self.body) + (100*.75+200*3.75)/1e6)
 
-    def test_front_end_error_page_is_rejected_at_zero_but_still_stops_and_needs_explicit_retry(self):
+    def test_front_end_error_page_is_rejected_at_zero_stops_and_may_be_resent(self):
         bad = Mock(status_code=502, text='<html>502 Server Error</html>', json=Mock(side_effect=json.JSONDecodeError('x', '', 0)))
         with patch.object(B.G, 'request', return_value=bad):
             with self.assertRaisesRegex(RuntimeError, 'front end refused'):
@@ -153,10 +153,16 @@ class Collector(unittest.TestCase):
                 B.call(self.m, self.job)
         self.assertEqual(B.effective()[0]['event'], 'rejected'); self.assertEqual(B.spent(), 0)
         B.STOP.clear()
-        with patch.object(B.G, 'request') as net:
-            with self.assertRaisesRegex(RuntimeError, 'already attempted'):
+        with patch.object(B.G, 'request', return_value=self.reply()) as net:  # nothing was served: no flag needed
+            self.assertTrue(B.call(self.m, self.job)['valid'])
+        self.assertEqual(net.call_count, 1)
+
+    def test_non_object_json_reply_is_unknown_and_stops(self):
+        with patch.object(B.G, 'request', return_value=Mock(status_code=200, text='[]', json=lambda: [])):
+            with self.assertRaisesRegex(RuntimeError, 'unknown usage'):
                 B.call(self.m, self.job)
-            net.assert_not_called()
+        self.assertTrue(B.STOP.is_set())
+        self.assertEqual(B.spent(), B.reservation(self.body))
 
     def test_json_gateway_refusal_is_zero_and_not_cached_as_a_reading(self):
         err = {'error': {'message': 'the authentication database is temporarily unreachable', 'code': '503'}}

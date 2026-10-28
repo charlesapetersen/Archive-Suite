@@ -560,6 +560,8 @@ def gateway_region_routes(data, kinds):
     arms = {"pp-doclayoutv3": "PP-DocLayoutV3 regions", "tiles": "overlapping tiles"}
     out = []
     for arm, label in arms.items():
+        if arm not in data["arms_on_the_96"]:
+            continue  # read on the pilot pages only: stays in the table, off the charts
         overall = by[(arm, "the 96")]
         if overall["n"] != 96:
             sys.exit(f"gateway {arm} covers {overall['n']} of the 96")
@@ -661,7 +663,8 @@ def main():
                 sys.exit(f"{route['id']}'s {c['key']} page count differs from the panel's {c['n']}")
     if regions and regions_gw:  # the open readers' table gains Gemini's rows; its public rows are pilot pages only
         regions = {**regions, "rows": regions["rows"] + regions_gw["rows"], "gateway": {
-            k: regions_gw[k] for k in ("report", "public_pilot_pages", "item_spend_estimate", "calls_new", "table_markup")}}
+            k: regions_gw[k] for k in ("report", "arms_on_the_96", "owner_pilot_pages", "public_pilot_pages",
+                                       "item_spend_estimate", "calls_new", "table_markup")}}
     for c in charts:
         if any(c["scores"][r["id"]][2] != c["n"] for r in routes if r["panel"] == "farmshare") \
                 or any(e["scores"][c["key"]][2] != c["n"] for e in extra):

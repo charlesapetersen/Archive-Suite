@@ -239,7 +239,8 @@ def call(m, job):
         if hit is not None:
             return hit
         tried = [r for r in effective() if r['request_sha256'] == key]
-        if tried and not (RETRY_UNKNOWN and all(r['event'] in ('unknown', 'rejected') for r in tried)):
+        # A $0 refusal (nothing served) may be sent again; an unknown only with the explicit flag.
+        if tried and not all(r['event'] == 'rejected' or (RETRY_UNKNOWN and r['event'] == 'unknown') for r in tried):
             raise RuntimeError('already attempted without a cached reply; no automatic retry')
         # A deliberate retry of an unknown request keeps the earlier full allowance charged: never optimistic.
         reserve = reservation(body)
@@ -253,6 +254,8 @@ def call(m, job):
     try:
         response = G.request('/chat/completions', body)
         got = response.json()
+        if not isinstance(got, dict):
+            raise TypeError('reply is not a JSON object')
     except Exception as e:
         with LOCK:
             STOP.set()
@@ -312,9 +315,12 @@ def inventory():
 
 def collect(pilot=False, sets=None, arms=ARMS):
     m = manifest()
-    if spent() > CAP or any((r['event'] != 'settle' and not (RETRY_UNKNOWN and r['event'] in ('unknown', 'rejected')))
+    rows = effective()
+    settled = {r['request_sha256'] for r in rows if r['event'] == 'settle'}
+    if spent() > CAP or any(r['event'] == 'reserve'
+                           or (r['event'] == 'unknown' and r['request_sha256'] not in settled and not RETRY_UNKNOWN)
                            or (r['event'] == 'settle' and not r.get('known'))
-                           or r['charge'] > r['allowance'] for r in effective()):
+                           or r['charge'] > r['allowance'] for r in rows):
         raise RuntimeError('unsettled/unknown earlier request; inspect ledger, do not resend')
     verify()
     G.api_key()
@@ -357,7 +363,7 @@ def receipt(m, job, ledger):
     body, key = request(m, job)
     if arm == 'whole' and p['set'] == 'owner99':
         hit = cached(m, job, body, key)   # raises unless the exact earlier request, HTTP 200, stop, parsed
-        return {'text': G.parsed(hit)['text'], 'usage': hit['usage'], 'cost': hit['cost_estimate'], 'new': 0.0}
+        return {'text': G.parsed(hit)['text'], 'valid': True, 'usage': hit['usage'], 'cost': hit['cost_estimate'], 'new': 0.0}
     f = STORE / 'replies' / (key + '.json')
     if not f.exists():
         raise ValueError(f'missing receipt: {p["id"]}/{arm}/{i}')
@@ -373,7 +379,7 @@ def receipt(m, job, ledger):
              and bool(parsed) and known)
     if valid != hit['valid'] or not known or abs(led['charge'] - G.cost(u)) > 1e-9:
         raise ValueError(f'receipt does not re-validate: {p["id"]}/{arm}/{i}')
-    return {'text': parsed['text'] if valid else '', 'usage': u, 'cost': led['charge'], 'new': led['charge']}
+    return {'text': parsed['text'] if valid else '', 'valid': valid, 'usage': u, 'cost': led['charge'], 'new': led['charge']}
 
 
 def present(m, p, arm, ledger):
@@ -421,7 +427,7 @@ def score():
             order = O.reading_order_edit(ref, text) if text else None
             page_rows.append({'set': p['set'], 'groups': ';'.join(groups), 'route': ROUTE, 'arm': arm, 'page': p['id'],
                               'ok': bool(text), **sc, 'order_edit': (order or {}).get('edit'),
-                              'crops': len(got) if arm != 'whole' else '', 'crops_failed': len(got) - len(good) if arm != 'whole' else '',
+                              'crops': len(got) if arm != 'whole' else '', 'crops_failed': sum(not g['valid'] for g in got) if arm != 'whole' else '',
                               'prompt_tokens': sum(g['usage']['prompt_tokens'] for g in got),
                               'completion_tokens': sum(g['usage']['completion_tokens'] for g in got),
                               'cost': round(sum(g['cost'] for g in got), 6), 'new_cost': round(sum(g['new'] for g in got), 6)})
@@ -455,7 +461,7 @@ def score():
            'owner_pages': 96, 'arms_on_the_96': full,
            'owner_pilot_pages': sorted(p['id'] for p in owner if p['id'] in m['pilot']), 'public_pilot_pages': sorted(p['id'] for p in pages if p['set'] == 'public895'),
            'price_estimate_usd_per_m': list(PRICE), 'item_spend_estimate': round(item, 4),
-           'calls_new': len(effective())}
+           'calls_new': sum(r['event'] == 'settle' for r in effective())}
     (OUT / f'{NAME}.json').write_text(json.dumps(out, indent=2) + '\n')
     (OUT / f'{NAME}.md').write_text(report_md(out))
     print(report_md(out))
@@ -470,7 +476,7 @@ def report_md(out):
          'a page or crop that returned nothing counts as empty. Whole-page readings of the 96 are the earlier gateway '
          'item\'s, reused after exact request-hash checks. Prices are estimates at '
          f"${out['price_estimate_usd_per_m'][0]}/${out['price_estimate_usd_per_m'][1]} per million tokens; the gateway "
-         f"returns no bill. This item's new calls: {out['calls_new']}, about ${out['item_spend_estimate']:.2f}.", '',
+         f"returns no bill. This item's settled new calls: {out['calls_new']}, about ${out['item_spend_estimate']:.2f}.", '',
          '## The 96 owner pages', '',
          '| group | arm | NES % | answered | Δ whole (points, 95% CI) | failed / crops | cost / 1,000 pages |',
          '|---|---|---:|---:|---:|---:|---:|']
