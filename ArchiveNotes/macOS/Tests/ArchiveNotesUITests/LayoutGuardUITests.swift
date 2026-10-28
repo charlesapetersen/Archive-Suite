@@ -67,6 +67,7 @@ final class LayoutGuardUITests: NotesFixtureUITestCase {
     /// These controls were entirely off-window before W40.fix-notes-narrow-window. Check reachability
     /// as well as the sweep's geometry, and retain the actual minimum-size pixels on green runs too.
     private func checkMinimumControls(_ window: XCUIElement, name: String) {
+        checkEditorShare(window, name: "\(name)-typical")
         let frame = window.frame
         LayoutGuard.dragCorner(of: window, to: CGPoint(x: frame.minX + 40, y: frame.minY + 40))
         LayoutGuard.waitUntilSettled(window)
@@ -79,6 +80,7 @@ final class LayoutGuardUITests: NotesFixtureUITestCase {
         for control in removes.allElementsBoundByIndex {
             XCTAssertTrue(control.isHittable, "a location's remove button must be reachable at minimum width")
         }
+        checkEditorShare(window, name: name)
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("uitest-minimum-\(name).png")
         do {
             try window.screenshot().pngRepresentation.write(to: url, options: .atomic)
@@ -86,6 +88,34 @@ final class LayoutGuardUITests: NotesFixtureUITestCase {
         } catch {
             XCTFail("could not retain minimum-window screenshot: \(error)")
         }
+    }
+
+    /// W40.fix-notes-editor-squeezed: at minimum size the metadata inspector used to take about two-thirds of
+    /// the right pane. The editor must now be the larger of the two, and folding the metadata must give it the room.
+    private func checkEditorShare(_ window: XCUIElement, name: String) {
+        let editor = window.scrollViews.containing(.textView, identifier: "an.editor.text").firstMatch
+        let metadata = window.scrollViews["an.detail.metadataScroll"]
+        let toggle = window.buttons["an.detail.metadataToggle"]
+        guard editor.exists, metadata.exists, toggle.exists else {
+            XCTFail("\(name): the editor, the metadata scroll and its toggle should all be shown")
+            return
+        }
+        let shown = editor.frame.height
+        print("[layout] \(name): editor \(Int(shown)) pt, metadata \(Int(metadata.frame.height)) pt, " +
+              "window \(Int(window.frame.height)) pt")
+        XCTAssertGreaterThan(shown, metadata.frame.height,
+                             "\(name): the editor should get the larger share of the right pane")
+        toggle.click()
+        LayoutGuard.waitUntilSettled(window)
+        XCTAssertFalse(metadata.exists, "\(name): Hide details should fold the metadata away")
+        let folded = editor.frame.height
+        print("[layout] \(name): editor with details hidden \(Int(folded)) pt")
+        XCTAssertGreaterThan(folded, shown + 60, "\(name): folding the metadata should give the editor its room")
+        let foldedURL = FileManager.default.temporaryDirectory.appendingPathComponent("uitest-minimum-\(name)-folded.png")
+        try? window.screenshot().pngRepresentation.write(to: foldedURL, options: .atomic)
+        toggle.click()   // the choice is remembered; leave it as later tests expect
+        LayoutGuard.waitUntilSettled(window)
+        XCTAssertTrue(metadata.waitForExistence(timeout: 5), "\(name): Show details should bring the metadata back")
     }
 
     /// UI-test-only harness elements (`ArchiveNotesApp` adds them only under the UITest launch arguments): the
