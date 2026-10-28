@@ -241,6 +241,7 @@ struct NoteMetadataInspector: View {
                                 id: \.month) { c in Text(c.name).tag(c.month) }
                     }
                     .labelsHidden().frame(width: 150)
+                    .accessibilityLabel("Month")
                     .accessibilityIdentifier("an.detail.date.month")
                 }
             }
@@ -250,6 +251,7 @@ struct NoteMetadataInspector: View {
                     Text("Day").frame(width: 54, alignment: .leading)
                     TextField("1–31", text: $dayText).textFieldStyle(.roundedBorder).frame(width: 60)
                         .onSubmit { commit() }
+                        .accessibilityLabel("Day")
                         .accessibilityIdentifier("an.detail.date.day")
                     Button("Set") { commit() }
                         .disabled(!dayFieldCommittable)
