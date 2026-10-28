@@ -33,6 +33,10 @@ final class ReaderPreviewPopover {
     }
     private var currentLink: LinkContext?
 
+    /// The `.needsRootGrant` message: the longest a message popover shows, so the one its sizing is tested on.
+    static let noAccessMessage = "Archive Notes has not been given access to this archive folder.\n"
+        + "Granting it in Reader is not enough \u{2014} choose the same folder here."
+
     init(resolver: ReaderLinkResolver, chooser: ReaderRootChooser) {
         self.resolver = resolver
         self.chooser = chooser
@@ -110,8 +114,7 @@ final class ReaderPreviewPopover {
             // halves are fixed here: the sentence names Notes' own menu item, and the button does
             // it without leaving the popover.
             showMessage(
-                "Archive Notes has not been given access to this archive folder.\n"
-                    + "Granting it in Reader is not enough \u{2014} choose the same folder here.",
+                Self.noAccessMessage,
                 relativeTo: view,
                 actionTitle: "Choose Archive Folder\u{2026}",
                 action: grantAction(fallbackTo: resolution, relativeTo: view)
@@ -253,9 +256,14 @@ final class ReaderPreviewPopover {
         }()
         let content = PreviewMessageView(message: text, action: button)
         let pop = NSPopover()
-        pop.contentSize = NSSize(width: 300, height: button == nil ? 100 : 140)
         pop.behavior = .transient
-        pop.contentViewController = NSHostingController(rootView: content)
+        // Sized by its content, not a fixed height: in a fixed 300 × 140 the no-access message's last
+        // line was truncated to "…not enough — choose…", so it never said which folder to choose
+        // (W40.fix-notes-preview-popover-text). The view fixes the width and keeps the text's full
+        // wrapped height (`fixedSize`), and the popover takes whatever height that comes to.
+        let host = NSHostingController(rootView: content)
+        host.sizingOptions = [.preferredContentSize]
+        pop.contentViewController = host
         pop.show(relativeTo: anchorView.bounds, of: anchorView, preferredEdge: .maxY)
         popover = pop
     }
@@ -337,30 +345,33 @@ private struct PreviewSearchingView: View {
     }
 }
 
-private struct PreviewMessageView: View {
+struct PreviewMessageView: View {
     struct Action {
         let title: String
         let perform: () -> Void
     }
+
+    /// The popover's width. Its height follows the wrapped message.
+    static let width: CGFloat = 300
 
     let message: String
     var action: Action?
 
     var body: some View {
         VStack(spacing: 12) {
-            Spacer(minLength: 0)
             Text(message)
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
                 .padding(.horizontal)
             if let action {
                 Button(action.title, action: action.perform)
                     .buttonStyle(.bordered)
             }
-            Spacer(minLength: 0)
         }
         .padding(.vertical)
+        .frame(width: Self.width)
     }
 }
 
