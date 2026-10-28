@@ -1,6 +1,10 @@
 """Tests for place_truth.py's drafting and place_score.py's scorers, on synthetic pages (no cache needed)."""
 import copy
+import json
+import tempfile
 import unittest
+from pathlib import Path
+from unittest import mock
 
 import place_score as ps
 import place_truth as pt
@@ -113,10 +117,22 @@ class Drafting(unittest.TestCase):
         self.assertEqual(words[0]['status'], 'illegible')
         self.assertIsNone(words[0]['box'])
 
-    def test_line_share_fills_the_line(self):
-        b = pt.line_share(['ab', 'cd'], [0.0, 0.0, 0.5, 0.1])
-        self.assertAlmostEqual(b[0][2], 0.2)
-        self.assertAlmostEqual(b[1][0] + b[1][2], 0.5)
+    def test_a_line_given_only_word_boxes_takes_their_union(self):
+        with tempfile.TemporaryDirectory() as d:
+            store = Path(d)
+            (store / 'xml').mkdir()
+            page = {'page': 'p', 'group': 'owner-hand', 'image': '/nonexistent.jpg', 'width': 1000, 'height': 1000,
+                    'words': [{'text': t, 'box': None, 'line': 0, 'status': 'missing'} for t in ('ab', 'cd')],
+                    'lines': [], 'audit': {'verdict': 'fix'}}
+            (store / 'p.json').write_text(json.dumps(page))
+            spec = store / 'spec.json'
+            spec.write_text(json.dumps({'lines': [{'text': 'ab cd', 'baseline': [[100, 200], [500, 200]],
+                                                   'words': [[100, 150, 250, 210], [300, 140, 500, 205]]}]}))
+            with mock.patch.object(pt, 'STORE', store), mock.patch.object(pt, 'Gray', lambda img: None):
+                p = pt.apply_lines('p', spec, 'test')
+        self.assertEqual([round(v, 5) for v in p['lines'][0]['box']], [0.1, 0.14, 0.4, 0.07])
+        self.assertEqual([w['status'] for w in p['words']], ['drawn', 'drawn'])
+        self.assertIsNone(p['audit'])
 
 
 if __name__ == '__main__':

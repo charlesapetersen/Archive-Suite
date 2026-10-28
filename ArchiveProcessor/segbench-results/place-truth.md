@@ -9,10 +9,10 @@ in `place-truth.json`. No money was spent: drawing and auditing ran on the codin
 
 | group | pages | words | words boxed | lines (with baseline) | audit: ok / fix / redraw / none |
 |---|---:|---:|---:|---:|---|
-| owner-typed | 40 | 14,243 | 14,043 (2,978 drawn) | 1,987 | 26 / 13 / 0 / 1 |
-| owner-hand | 21 | 3,170 | 2,925 (2,307 drawn) | 564 | 4 / 9 / 5 / 3 |
-| L2-bentham | 20 | 4,314 | 616 (published word boxes) | 517 | 14 / 6 / 0 / 0 |
-| N6 | 40 | 5,072 | none (line-level set) | 850 | 28 / 12 / 0 / 0 |
+| owner-typed | 40 | 14,243 | 14,124 (3,585 drawn) | 2,022 (2,015) | 40 / 0 / 0 / 0 |
+| owner-hand | 21 | 3,170 | 3,158 (3,023 drawn) | 588 (582) | 20 / 1 / 0 / 0 |
+| L2-bentham | 20 | 4,314 | 616 (published word boxes) | 517 (517) | 14 / 6 / 0 / 0 |
+| N6 | 40 | 5,072 | none (line-level set) | 850 (850) | 28 / 12 / 0 / 0 |
 
 The owner-typed 40 are drawn by a fixed seed from the 96 in its mix (26 typewritten, 14 printed); owner-hand is every
 handwritten or mixed truth page (19 + 2; 18 of them are in the 96). The 20 L1/L2 public pages are L2's Bentham pages,
@@ -27,7 +27,9 @@ are unscored).
 How the owner pages were made: Vision's words aligned to the truth text; a third pass over Tesseract 5's words
 (290 more typed words); then 30 pages redrawn by Claude Opus 5.5 subagents on a permille grid (`grid`, `zoom`,
 `bands`, `lines`): the 24 with the most unboxed words, and 6 of the 16 the first audit sent back. Hand pages
-mostly needed every word placed by hand: ink gaps do not separate cursive words.
+mostly needed every word placed by hand: ink gaps do not separate cursive words. W46.fix-place-truth-fu then
+redrew the 27 faulted owner pages and drew the four left over (31 in all; a drawer patches only a page's faulted
+lines, from `spec`), with second and third redraws where the re-audit still said fix.
 
 ## The audit
 
@@ -41,16 +43,19 @@ and note stored on the page (`audit`). Two rounds on the public pages, one or tw
 - **Bentham**, round 1: 0 ok. Derived straight baselines ran through the letters and the ink-gap word split of
   cursive was 10-40% wrong. Baselines are now fitted to the ink (`ink_baseline`); words outside the 3 pages with
   published word boxes are line-level only. Round 2: 14 ok.
-- **Owner-typed**: 26 ok. The 13 fixes are mostly baselines joined across a gutter or slanting through a table
-  (Vision's lines), and on the drawn newspaper pages p080 and p081 loose boxes in broken type.
-- **Owner-hand**: 4 ok. On looped cursive a tight ink box overlaps its neighbours by design, which the auditor
+- **Owner-typed**: 26 ok in the first round. The 13 fixes were mostly baselines joined across a gutter or slanting
+  through a table (Vision's lines), and on the drawn newspaper pages p080 and p081 loose boxes in broken type.
+  After W46.fix-place-truth-fu's redraws and a Sonnet re-audit of every redrawn page: 40 ok.
+- **Owner-hand**: 4 ok in the first round; 20 ok after the redraws and re-audit. p054 is still fix after three
+  redraws: loose or over-tall boxes on the right words (the re-audit's estimate went ~8%, ~5%, ~10% across the
+  rounds, so further redraws were not converging), and `--verdict ok` leaves it out. On looped cursive a tight ink box overlaps its neighbours by design, which the auditor
   often counted against a page: p007, which it called redraw, has every box on its word (checked by the
-  coordinating session), with large boxes where a loop is large. The hand set's word boxes are usable with
-  F1@centre and not yet with IoU.
+  coordinating session), with large boxes where a loop is large; the re-audits judged cursive by whether each box
+  is on its word, not by overlap. The hand set's word boxes are best used with F1@centre; IoU on cursive measures
+  how loops are boxed.
 
-Not done, filed as `W46.fix-place-truth-fu`: the 13 typed and 14 hand pages marked fix or redraw, and the
-unaudited p040, p045, p066 and p094 (their drawing was stopped to keep the session inside its budget). Until then,
-`place_score.py --verdict ok` scores only the pages the audit passed.
+`place_score.py --verdict ok` scores only the pages the audit passed: all 40 typed pages, 20 of the 21 hand pages,
+14 Bentham and 28 N6.
 
 ## The scorers
 
@@ -60,11 +65,12 @@ unaudited p040, p045, p066 and p094 (their drawing was stopped to keep the sessi
 - `place_score.py` — word F1 at IoU 0.5 and 0.7 and at centre (each box holds the other's centre), with mCER at
   0.5; READ-BAD-style baseline R, P, F (a simplified reimplementation, not interchangeable with the Transkribus
   tool's figures); line-level alignment accuracy. A reader's word on ink the truth calls illegible is left out.
-  The truth scored against itself: 1.0 on every figure in every group, except owner-hand word F1 0.9998 (one pair
-  of drawn words share a box).
-- **Box convention dominates IoU.** Vision's own padded word boxes against this truth (owner-typed, all 40):
-  F1 0.627 at IoU 0.5, 0.192 at 0.7, 0.947 at centre; baselines F 0.909; alignment 0.880. On the 26 audited-ok
-  pages: 0.630, 0.176, 0.980. So a padded reader or a PDF's font-height rectangles lose IoU for their convention,
+  The truth scored against itself: 1.0 on every figure in every group (the one pair of hand words that shared a box
+  was redrawn).
+- **Box convention dominates IoU.** Vision's own padded word boxes against this truth (owner-typed, all 40, every
+  one audited ok): F1 0.626 at IoU 0.5, 0.185 at 0.7, 0.959 at centre; baselines F 0.930; alignment 0.910 (before
+  the redraws: 0.627, 0.192, 0.947, 0.909, 0.880). On owner-hand, where Vision is not a usable reader of the text:
+  0.339, 0.107, 0.755, baselines F 0.733, alignment 0.698 (the 20 audited ok: 0.343, 0.109, 0.761). So a padded reader or a PDF's font-height rectangles lose IoU for their convention,
   not their placement (the PDFKit oracle read-back, 0.85 at 0.5 and 0.12 at 0.7 on the draft truth, said the same).
   W46.place-print compares writers on F1@centre, the functional score and baselines; IoU figures are reported
   beside them, not ranked on.
