@@ -228,10 +228,12 @@ struct NotesFolderTreeView: View {
     private func folderRow(_ node: NotesFolderNode) -> some View {
         row(name: node.name, systemImage: "folder", count: node.itemCount)
             .contentShape(Rectangle())
-            .tag(node.id.uuidString)
             .accessibilityIdentifier("an.sidebar.folder")
             .contextMenu { folderMenu(node) }
             .onTapGesture {
+                // The tap takes the click from the List, so select the row here too: scoping alone
+                // left no sidebar row highlighted (W40.fix-notes-visual-polish).
+                selection = node.id.uuidString
                 nav.showingTemplates = false
                 model.setFolderScope(node.id)
             }
@@ -242,6 +244,8 @@ struct NotesFolderTreeView: View {
                     _ = handleDrop([payload], onto: node.id, replicate: replicate, source: source)
                 },
                 reorder: { payload, after in placeFolder(payload, beside: node.id, after: after) }))
+            // Outermost, so the List matches the selection to this row through the drag/drop wrappers.
+            .tag(node.id.uuidString)
     }
 
     /// A folder dropped on a row's top or bottom edge lands beside that row, in its level (W9.e2-fu1).

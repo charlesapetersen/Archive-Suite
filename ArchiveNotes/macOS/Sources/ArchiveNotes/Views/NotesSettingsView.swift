@@ -52,6 +52,6 @@ struct NotesSettingsView: View {
         }
         .formStyle(.grouped)
         // Tall enough that the Dates footer, the last section, shows whole (W40.fix-notes-visual-polish).
-        .frame(width: 460, height: 560)
+        .frame(width: 460, height: 520)
     }
 }

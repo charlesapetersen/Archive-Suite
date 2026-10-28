@@ -400,6 +400,8 @@ macOS/Sources/ArchiveNotes/
     NotesFilterBar.swift           Item-list filter bar: kind segmented control · keyword search (FTS,
                                    bm25 relevance as-you-type) · quality ★1–★3 toggles · tag ALL/ANY +
                                    chips · year date range · Save-as-Smart-Folder / Clear (W6-S4)
+    NameEntrySheet.swift           The one "give it a name" sheet (folders, templates, smart folders):
+                                   focused field, Return/Escape, no blank names (W40.fix-notes-visual-polish)
     LocationsInspector.swift       Detail-pane "Locations" — every folder the selected item is in, each
                                    a scope shortcut + guarded Remove (replicant→quiet, last→modal) (W6-S5)
     DateFieldEntry.swift           Pure rules behind NoteMetadataInspector's DATE row (year text +

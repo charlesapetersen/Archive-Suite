@@ -73,9 +73,11 @@ struct NoteEditorPane: View {
                 Divider()
             }
             if !isRaw {
-                // Nothing to format until a note's body is loaded (W40.fix-notes-visual-polish).
+                // Nothing to format with no note shown (W40.fix-notes-visual-polish). Keyed to the loaded
+                // body, not `editorIsReady`: that is false for a moment on every note switch, and the
+                // toolbar then flickered disabled between two notes (TransientStateUITests).
                 FormattingToolbar(context: formatting)
-                    .disabled(!editorIsReady)
+                    .disabled(bodyEditor.loadedID == nil)
                 Divider()
             }
             rawToggleBar

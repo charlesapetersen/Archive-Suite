@@ -51,14 +51,31 @@ final class VisualPolishUITests: NotesFixtureUITestCase {
     /// After a click on a folder, that folder's row is the selected sidebar row, and All Notes is not.
     func testClickedFolderIsTheHighlightedRow() throws {
         try withFixture {
-            let reading = sidebarRow(named: "Reading")
+            let reading = mainWindow.descendants(matching: .any).matching(identifier: "an.sidebar.folder")
+                .matching(NSPredicate(format: "value ==[c] %@ OR label ==[c] %@", "Reading", "Reading")).firstMatch
             XCTAssertTrue(reading.waitForExistence(timeout: 10), mainWindow.debugDescription)
             reading.click()
+            // Reading holds two of the three notes, so the list scoping proves the click landed.
+            let notInReading = [Self.idPlain, Self.idReader, Self.idZotero].map {
+                mainWindow.descendants(matching: .any)["an.cell.title.\($0)"].firstMatch
+            }
+            XCTAssertTrue(pollUntil(timeout: 10) { notInReading.filter(\.exists).count == 2 },
+                          "the click should scope the list to Reading")
             pause(1)
             shot("folder-clicked")
-            XCTAssertTrue(pollUntil(timeout: 5) { reading.isSelected },
-                          "the clicked folder's row should be selected")
-            XCTAssertFalse(sidebarRow(named: "All Notes").isSelected, "All Notes should not stay selected")
+            let rows = mainWindow.outlines.firstMatch.outlineRows.allElementsBoundByIndex
+            let selected = rows.filter(\.isSelected)
+            let summary = rows.map { row in
+                let names = row.descendants(matching: .any).matching(identifier: "an.sidebar.folder")
+                    .allElementsBoundByIndex.map { ($0.value as? String) ?? $0.label }
+                    + row.descendants(matching: .any).matching(identifier: "an.sidebar.allNotes")
+                    .allElementsBoundByIndex.map { _ in "All Notes" }
+                return "\(names)\(row.isSelected ? "*" : "")"
+            }
+            XCTAssertEqual(selected.count, 1, "one sidebar row should be selected, saw \(summary)")
+            let selectedReading = selected.first?.descendants(matching: .any).matching(identifier: "an.sidebar.folder")
+                .matching(NSPredicate(format: "value ==[c] %@ OR label ==[c] %@", "Reading", "Reading")).firstMatch
+            XCTAssertTrue(selectedReading?.exists ?? false, "the selected row should be Reading, saw \(summary)")
         }
     }
 
@@ -100,12 +117,6 @@ final class VisualPolishUITests: NotesFixtureUITestCase {
     }
 
     // MARK: - Helpers
-
-    private func sidebarRow(named name: String) -> XCUIElement {
-        let outline = mainWindow.outlines.firstMatch
-        return outline.outlineRows.containing(NSPredicate(format: "value ==[c] %@ OR label ==[c] %@", name, name))
-            .firstMatch
-    }
 
     private func folderNames() -> [String] {
         let path = Self.fixturePath + "/organization.json"
