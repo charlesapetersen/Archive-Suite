@@ -91,6 +91,7 @@ struct NotesFilterBar: View {
             Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
             TextField("Search notes…", text: $nav.searchText)
                 .textFieldStyle(.plain)
+                .accessibilityLabel("Search notes")
                 .accessibilityIdentifier("an.filter.search")
             if !nav.searchText.isEmpty {
                 Button { nav.searchText = "" } label: {
@@ -156,6 +157,7 @@ struct NotesFilterBar: View {
                 .textFieldStyle(.roundedBorder)
                 .frame(width: 90)
                 .onSubmit(addPendingTag)
+                .accessibilityLabel("Add tag filter")
                 .accessibilityIdentifier("an.filter.tagInput")
 
             ForEach(nav.filter.tags, id: \.self) { tag in
@@ -182,12 +184,14 @@ struct NotesFilterBar: View {
                 .frame(width: 54)
                 .textFieldStyle(.roundedBorder)
                 .help("From year")
+                .accessibilityLabel("From year")
                 .accessibilityIdentifier("an.filter.dateFrom")
             Text("–").foregroundStyle(.secondary)
             TextField("To", text: toYearText)
                 .frame(width: 54)
                 .textFieldStyle(.roundedBorder)
                 .help("To year")
+                .accessibilityLabel("To year")
                 .accessibilityIdentifier("an.filter.dateTo")
         }
     }

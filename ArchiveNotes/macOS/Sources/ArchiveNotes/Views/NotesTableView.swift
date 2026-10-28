@@ -36,6 +36,7 @@ struct NotesTableView: NSViewRepresentable {
         scrollView.borderType = .noBorder
 
         let tableView = ContextMenuTableView()
+        tableView.setAccessibilityLabel("Notes")
         tableView.setAccessibilityIdentifier("an.table")
         tableView.style = .plain
         tableView.usesAlternatingRowBackgroundColors = true
@@ -302,6 +303,10 @@ struct NotesTableView: NSViewRepresentable {
                 let n = parent.model.instanceCounts[item.id] ?? 0
                 tf.stringValue = n > 1 ? "▣ \(n)" : ""
                 tf.textColor = .secondaryLabelColor
+                // VoiceOver reads the count in words, and skips the blank cell of an item in one folder.
+                // Both are set on every pass because the cell is reused.
+                tf.setAccessibilityElement(n > 1)
+                tf.setAccessibilityLabel(n > 1 ? "In \(n) folders" : nil)
                 tf.setAccessibilityIdentifier("an.cell.instances.\(item.id.uuidString)")
 
             case "date":

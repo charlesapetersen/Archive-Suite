@@ -184,6 +184,7 @@ struct NoteMetadataInspector: View {
             TextField("One author per line", text: $authorsText, axis: .vertical)
                 .lineLimit(2...4)
                 .textFieldStyle(.roundedBorder)
+                .accessibilityLabel("Authors")
                 .accessibilityIdentifier("an.detail.authors")
             HStack {
                 Button("Set") { commitAuthors() }
@@ -220,6 +221,7 @@ struct NoteMetadataInspector: View {
                 TextField(precision == .decade ? "e.g. 1970" : "e.g. 1968", text: $yearText)
                     .textFieldStyle(.roundedBorder).frame(width: 90)
                     .onSubmit { commit() }
+                    .accessibilityLabel(precision == .decade ? "Decade" : "Year")
                     .accessibilityIdentifier("an.detail.date.year")
                 Button("Set") { commit() }
                     .disabled((Int(yearText.trimmingCharacters(in: .whitespaces)) ?? 0) <= 0)

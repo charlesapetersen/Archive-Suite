@@ -69,18 +69,6 @@ final class AccessibilityAuditUITests: NotesFixtureUITestCase {
     // Filed 2026-10-16 from the first VM runs; each fix's session deletes its entry (the audit fails once it
     // stops reproducing).
     @MainActor static let known: [AccessibilityAudit.KnownIssue] = [
-        AccessibilityAudit.KnownIssue(tag: "W40.fix-notes-a11y-labels") { f in
-            switch f.audit {
-            case .sufficientElementDescription:
-                return f.identifier.hasPrefix("an.divider.")              // the two pane dividers
-                    || ["an.filter.search", "an.filter.tagInput", "an.filter.dateFrom", "an.filter.dateTo",
-                        "an.list.table", "an.detail.authors", "an.detail.date.year"].contains(f.identifier)
-                    || (f.identifier.hasPrefix("an.cell.instances.") && f.label.isEmpty)   // a row with none
-                    || (f.identifier == "an.detail.header" && f.type == .image)          // the extract's quote mark
-            default:
-                return false
-            }
-        },
         // Measured failures are all light-mode secondary text: 3.95–4.21:1, and the date range's "–" 3.23:1.
         AccessibilityAudit.KnownIssue(tag: "W40.fix-notes-a11y-contrast", appearances: ["light"]) { f in
             guard f.audit == .contrast, f.type == .staticText else { return false }

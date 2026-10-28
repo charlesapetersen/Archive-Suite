@@ -41,12 +41,14 @@ struct NotesBrowserView: View {
                     .frame(width: treeWidth)
                     .transition(.move(edge: .leading))
                 PanelDivider(width: $treeWidth, panelOnLeft: true,
-                             range: NotesLayoutSettings.treeWidthRange, id: "an.divider.tree")
+                             range: NotesLayoutSettings.treeWidthRange, label: "Folder list width",
+                             id: "an.divider.tree")
             }
             ItemListPane(model: model, nav: nav, selectedTemplateID: $selectedTemplateID)
                 .frame(minWidth: 540, maxWidth: .infinity, maxHeight: .infinity)
             PanelDivider(width: $detailWidth, panelOnLeft: false,
-                         range: NotesLayoutSettings.detailWidthRange, id: "an.divider.detail")
+                         range: NotesLayoutSettings.detailWidthRange, label: "Detail pane width",
+                         id: "an.divider.detail")
             DetailPane(nav: nav, selectedTemplateID: $selectedTemplateID)
                 .frame(width: detailWidth)
         }
@@ -251,6 +253,7 @@ private struct ItemListPane: View {
                         buildContextMenu: { sel in NotesItemContextMenu.make(nav: nav, selection: sel) },  // W6-S5
                         calendarsEnabled: calendarsEnabled
                     )
+                    .accessibilityLabel("Notes")
                     .accessibilityIdentifier("an.list.table")
                     .overlay {
                         // Wait for the first index pass so an empty table during startup does not
@@ -412,6 +415,7 @@ private struct DetailPane: View {
                 HStack(spacing: 6) {
                     Image(systemName: item.kind == .extract ? "quote.opening" : "doc.text")
                         .foregroundStyle(.secondary)
+                        .accessibilityHidden(true)   // decorative
                     Text(item.title.isEmpty ? "Untitled" : item.title)
                         .font(.headline)
                         .lineLimit(1)
