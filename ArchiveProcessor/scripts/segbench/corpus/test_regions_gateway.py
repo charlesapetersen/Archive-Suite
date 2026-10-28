@@ -20,6 +20,7 @@ class Collector(unittest.TestCase):
         self.patch = patch.object(B, 'STORE', self.store)
         self.patch.start(); self.addCleanup(self.patch.stop)
         B.STOP.clear()
+        self.wait = patch.object(B, 'REFUSAL_WAIT', 0); self.wait.start(); self.addCleanup(self.wait.stop)
         buf = io.BytesIO(); Image.new('RGB', (100, 200), 'white').save(buf, 'JPEG')
         b = buf.getvalue(); image = self.store / 'page.jpg'; image.write_bytes(b)
         self.job = ({'id': 'test', 'set': 'public895', 'image': str(image), 'sha256': B.sha(b)},
@@ -146,16 +147,23 @@ class Collector(unittest.TestCase):
 
     def test_front_end_error_page_is_rejected_at_zero_stops_and_may_be_resent(self):
         bad = Mock(status_code=502, text='<html>502 Server Error</html>', json=Mock(side_effect=json.JSONDecodeError('x', '', 0)))
-        with patch.object(B.G, 'request', return_value=bad):
+        with patch.object(B.G, 'request', return_value=bad) as net:
             with self.assertRaisesRegex(RuntimeError, 'front end refused'):
                 B.call(self.m, self.job)
+            self.assertEqual(net.call_count, B.REFUSAL_TRIES)   # waited out and resent, then the run stops
             with self.assertRaisesRegex(RuntimeError, 'stopped'):
                 B.call(self.m, self.job)
-        self.assertEqual(B.effective()[0]['event'], 'rejected'); self.assertEqual(B.spent(), 0)
+        self.assertTrue(all(r['event'] == 'rejected' for r in B.effective())); self.assertEqual(B.spent(), 0)
         B.STOP.clear()
         with patch.object(B.G, 'request', return_value=self.reply()) as net:  # nothing was served: no flag needed
             self.assertTrue(B.call(self.m, self.job)['valid'])
         self.assertEqual(net.call_count, 1)
+
+    def test_a_refusal_then_a_reply_completes_without_stopping(self):
+        bad = Mock(status_code=503, json=lambda: {'error': {'message': 'auth db unreachable'}})
+        with patch.object(B.G, 'request', side_effect=[bad, self.reply()]) as net:
+            self.assertTrue(B.call(self.m, self.job)['valid'])
+        self.assertEqual(net.call_count, 2); self.assertFalse(B.STOP.is_set())
 
     def test_non_object_json_reply_is_unknown_and_stops(self):
         with patch.object(B.G, 'request', return_value=Mock(status_code=200, text='[]', json=lambda: [])):

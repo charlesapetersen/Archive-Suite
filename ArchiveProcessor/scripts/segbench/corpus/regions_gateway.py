@@ -230,7 +230,27 @@ def reclassify():
     print(f'{n} gateway refusals reclassified at $0; item ${spent():.4f}')
 
 
+class Refused(RuntimeError):
+    """The gateway refused before any model ran ($0, ledgered 'rejected')."""
+
+
+REFUSAL_TRIES = 5    # a $0 refusal is waited out and resent this many times before the run stops
+REFUSAL_WAIT = 60    # seconds; 2026-10-28's 502/503 outages cleared within minutes
+
+
 def call(m, job):
+    """One crop's reading. Only a certain $0 refusal is resent automatically; anything uncertain stops at once."""
+    for attempt in range(REFUSAL_TRIES):
+        try:
+            return call_once(m, job)
+        except Refused:
+            if attempt == REFUSAL_TRIES - 1:
+                STOP.set()
+                raise
+            time.sleep(REFUSAL_WAIT)
+
+
+def call_once(m, job):
     body, key = request(m, job)
     with LOCK:
         if STOP.is_set():
@@ -258,20 +278,19 @@ def call(m, job):
             raise TypeError('reply is not a JSON object')
     except Exception as e:
         with LOCK:
-            STOP.set()
             u = {**rec, 'event': 'unknown', 'error': type(e).__name__,
                  'http': getattr(response, 'status_code', None), 'body': (getattr(response, 'text', '') or '')[:500]}
             append(u)
             if front_end_error(u):
                 append({**u, 'event': 'rejected', 'charge': 0.0})
-                raise RuntimeError(f"gateway front end refused ({u['http']}); nothing served, stopped") from e
+                raise Refused(f"gateway front end refused ({u['http']}); nothing served") from e
+            STOP.set()
         raise RuntimeError('unknown usage: full reservation retained; inspect before any retry') from e
     if gateway_refusal(response.status_code, got):
         with LOCK:
-            STOP.set()
             append({**rec, 'event': 'rejected', 'charge': 0.0, 'http': response.status_code,
                     'body': json.dumps(got)[:500]})
-        raise RuntimeError(f'gateway refused ({response.status_code}); nothing served, stopped')
+        raise Refused(f'gateway refused ({response.status_code}); nothing served')
     u = got.get('usage') or {}
     known = all(type(u.get(k)) is int and u[k] >= 0 for k in ('prompt_tokens', 'completion_tokens'))
     cost = G.cost(u) if known else reserve
