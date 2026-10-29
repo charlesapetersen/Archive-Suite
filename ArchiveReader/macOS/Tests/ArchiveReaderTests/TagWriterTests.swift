@@ -472,6 +472,28 @@ final class TagWriterTests: XCTestCase {
         }
     }
 
+    /// A change that added two copies of a token already present once, then one copy removed elsewhere:
+    /// the removal budget is the surplus over the count before the change (one), not the listed count
+    /// (two), so the copy that predates the change survives (W40.fix-mut-reader-undo-tests, mutant R03).
+    func testUndoStripsOnlyTheSurplusLeftSinceTheChange() throws {
+        let url = try makeFile("surplus.pdf", tags: ["A", "A"])                          // [A] + 2A − 1A since
+        let inverse = TagOccurrenceDelta(remove: ["A", "A"])
+        _ = try TagWriter.applyOccurrence(inverse, to: url, undoing: .init(before: ["A"], afterLabel: nil))
+        XCTAssertEqual(multiset(try readTags(url)), ["A": 1])
+    }
+
+    /// A change that stripped both copies of a duplicated token, then one copy put back elsewhere: undo
+    /// re-adds only the one still missing, so the count before the change is not overshot (mutant R06).
+    func testUndoReAddsOnlyTheCopiesStillMissing() throws {
+        let url = try makeFile("partial.pdf", tags: ["A", "A", "B"])
+        let r = try TagWriter.apply(TagDelta(remove: ["A"]), to: url)                    // → [B]
+        XCTAssertEqual(r.occurrenceInverse.add, ["A", "A"], "precondition: the inverse lists both copies")
+        try editElsewhere(url, tags: ["B", "A"])                                          // one copy re-added by hand
+
+        _ = try TagWriter.applyOccurrence(r.occurrenceInverse, to: url, undoing: .init(r))
+        XCTAssertEqual(multiset(try readTags(url)), ["A": 2, "B": 1])
+    }
+
     /// A colour someone changed since is kept: neither the old label nor the old colour token is put back.
     func testUndoLeavesAColourChangedSince() throws {
         let url = try makeFile("recolour.pdf", tags: ["Purple", "Unread"], label: 3)

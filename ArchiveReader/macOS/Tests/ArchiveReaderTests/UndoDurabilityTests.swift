@@ -193,4 +193,45 @@ final class UndoDurabilityTests: XCTestCase {
         XCTAssertTrue(first.statusMessage.contains("Could not record undo safely"))
     }
 
+    /// Two undoable steps: Undo reverses the later one and leaves the earlier one undoable
+    /// (W40.fix-mut-reader-undo-tests, mutant R08).
+    func testUndoReversesTheLatestOfTwoSteps() throws {
+        let fixture = try makeRoot(files: ["a.pdf", "b.pdf"])
+        let model = fixtureNavigationModel(pinnedTo: fixture.root)
+        try select([fixture.files[0]], in: model)
+        model.mark(.read)
+        try select([fixture.files[1]], in: model)
+        model.mark(.read)
+        XCTAssertEqual(model.undoDepth, 2, "precondition: two separate undo steps")
+
+        model.undoLast()
+        XCTAssertEqual(try tags(fixture.files[1]), ["Unread"], "the later step is undone")
+        XCTAssertEqual(try tags(fixture.files[0]), ["Read"], "the earlier step is left alone")
+        XCTAssertEqual(model.undoDepth, 1)
+
+        model.undoLast()
+        XCTAssertEqual(try tags(fixture.files[0]), ["Unread"])
+    }
+
+    /// A marked file moved out of the archive since: its bookmark still finds it, but undo refuses to
+    /// write outside the current archive (mutant R09).
+    func testUndoRefusesAFileMovedOutsideTheArchive() throws {
+        let fixture = try makeRoot(files: ["a.pdf"])
+        let model = fixtureNavigationModel(pinnedTo: fixture.root)
+        try select(fixture.files, in: model)
+        model.mark(.read)
+        XCTAssertEqual(model.undoDepth, 1, "precondition: the mark is undoable")
+
+        let outsideDir = fixture.root.deletingLastPathComponent()
+            .appendingPathComponent("UndoOutside-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: outsideDir, withIntermediateDirectories: true)
+        addTeardownBlock { try? FileManager.default.removeItem(at: outsideDir) }
+        let moved = outsideDir.appendingPathComponent("a.pdf")
+        try FileManager.default.moveItem(at: fixture.files[0], to: moved)
+
+        model.undoLast()
+        XCTAssertEqual(try tags(moved), ["Read"], "a file outside the archive must not be re-tagged")
+        XCTAssertTrue(model.statusMessage.contains("1 could not be undone"), "the refusal is surfaced")
+    }
+
 }

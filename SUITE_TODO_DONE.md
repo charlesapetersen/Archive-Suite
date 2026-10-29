@@ -13299,3 +13299,6 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   The `(blocked-on: W42.int-done)` still on this entry and on W40.i4 was stale: the owner took i1–i5 off that wait on
   2026-10-20 (SUITE_TODO §W46 note, 6fc8c7b0), so it was removed from W40.i4, which now waits only on the owner.
   <!-- /W40.i5 -->
+- [x] **W40.fix-mut-reader-undo-tests — four undo mutants survive the Reader suite [S · S3]** · §W40 · SHIPPED 2026-10-29
+  `ops/verify/mutation-sample.sh reader --only R03,R06,R08,R09` now reports 4/4 killed (green baseline 129 s, 505 tests; each mutant's object file changed). R03: `TagWriterTests.testUndoStripsOnlyTheSurplusLeftSinceTheChange`, a removal budget of one against a listed count of two, so the copy that predates the change survives. R06: `testUndoReAddsOnlyTheCopiesStillMissing`, two copies stripped, one put back by hand, and undo re-adds only one. R08: `UndoDurabilityTests.testUndoReversesTheLatestOfTwoSteps`, two marks on two files, and Undo reverses the later one first. R09: `testUndoRefusesAFileMovedOutsideTheArchive`, the marked file moved out of the archive root; undo leaves it alone and reports "1 could not be undone". Tests only; no product change.
+  <!-- /W40.fix-mut-reader-undo-tests -->
