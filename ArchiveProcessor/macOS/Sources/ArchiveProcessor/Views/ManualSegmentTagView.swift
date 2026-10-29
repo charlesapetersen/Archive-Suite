@@ -94,7 +94,7 @@ struct ManualSegmentTagView: View {
                 .controlSize(.small)
                 .help("Discard this run and return to the file list. (Esc while browsing.)")
             Button("Finish ▸") { processor.confirmManualSegTag() }
-                .buttonStyle(.borderedProminent)
+                .prominentButtonStyle()
                 .controlSize(.small)
                 .keyboardShortcut(.return, modifiers: .command)
                 .disabled(!processor.manualSegCanFinish)
@@ -281,7 +281,7 @@ struct ManualSegmentTagView: View {
                 Text("Current segment: \(pages) page\(pages == 1 ? "" : "s")")
                     .font(.caption).foregroundStyle(.primary)
                 Button("End segment & tag ▸") { processor.manualSegEndAndTag() }
-                    .buttonStyle(.borderedProminent)
+                    .prominentButtonStyle()
                     .disabled(tagging)
             }
         }
@@ -396,7 +396,7 @@ private struct ManualSegTagCard: View {
                 Spacer()
                 Button("Save ▸") { processor.manualSegCommitPendingSegment() }
                     .disabled(!processor.manualSegDraftTags.sentWithIsValid)
-                    .buttonStyle(.borderedProminent)
+                    .prominentButtonStyle()
             }
         }
         .padding(20)

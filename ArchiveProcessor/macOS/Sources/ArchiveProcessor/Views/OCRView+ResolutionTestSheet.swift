@@ -104,7 +104,7 @@ struct ResolutionTestSheet: View {
                 }
                 Spacer()
                 Button("Use") { onSelect(scale) }
-                    .buttonStyle(.borderedProminent)
+                    .prominentButtonStyle()
                     .controlSize(.small)
             }
             if let diff = diffResult {

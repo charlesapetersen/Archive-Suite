@@ -84,7 +84,7 @@ struct ModelSelectionSheet: View {
                     UserDefaults.standard.set(selections, forKey: DefaultsKeys.modelTestSelections)
                     onStart(selectedEntries)
                 }
-                .buttonStyle(.borderedProminent)
+                .prominentButtonStyle()
                 .disabled(selectedEntries.count < 2)
             }
             .padding()

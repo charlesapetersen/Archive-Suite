@@ -118,7 +118,7 @@ struct FlaggedBoundaryReviewSheet: View {
                 .foregroundStyle(.primary)
                 .accessibilityIdentifier("flaggedReview.answered")
             Button("Done") { processor.confirmFlaggedReview() }
-                .buttonStyle(.borderedProminent)
+                .prominentButtonStyle()
                 .disabled(!FlaggedReview.isComplete(items))
                 .accessibilityIdentifier("flaggedReview.done")
         }

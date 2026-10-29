@@ -84,7 +84,7 @@ private struct LocalAgentStep: View {
                 Button { openURL(spec.installURL) } label: {
                     Label("Install \(spec.displayName)", systemImage: "arrow.down.circle")
                 }
-                .buttonStyle(.borderedProminent)
+                .prominentButtonStyle()
                 .accessibilityIdentifier("ap.localAgentWizard.install")
                 if let docs = spec.docsURL {
                     Button { openURL(docs) } label: { Label("Docs", systemImage: "book") }
@@ -107,7 +107,7 @@ private struct LocalAgentStep: View {
             Button { detectAndVerify() } label: {
                 if checking { ProgressView().controlSize(.small) } else { Text("Detect & Verify") }
             }
-            .buttonStyle(.borderedProminent)
+            .prominentButtonStyle()
             .disabled(checking)
 
             if let status { statusView(status) }

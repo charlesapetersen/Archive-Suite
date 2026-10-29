@@ -464,7 +464,7 @@ struct OCRView: View {
                                 .foregroundStyle(.primary)
                             HStack {
                                 Button("Resume Batch") { resumePendingBatch() }
-                                    .buttonStyle(.borderedProminent)
+                                    .prominentButtonStyle()
                                     .disabled(apiKey.isEmpty || processor.isProcessing)
                                 Button("Dismiss") { processor.dismissPendingBatch() }
                                     .buttonStyle(.bordered)
@@ -485,7 +485,7 @@ struct OCRView: View {
                                 .foregroundStyle(.primary)
                             HStack {
                                 Button("Resume Run") { resumePendingRun() }
-                                    .buttonStyle(.borderedProminent)
+                                    .prominentButtonStyle()
                                     .disabled(apiKey.isEmpty || processor.isProcessing)
                                 Button("Dismiss") { processor.dismissPendingRun() }
                                     .buttonStyle(.bordered)
@@ -503,7 +503,7 @@ struct OCRView: View {
                                 .font(.caption2).foregroundStyle(.primary)
                             HStack {
                                 Button("Resume PDFs") { resumePendingMixedPDF() }
-                                    .buttonStyle(.borderedProminent)
+                                    .prominentButtonStyle()
                                     .disabled(processor.isProcessing || !processor.canResumePendingMixedPDF)
                                 Button("Dismiss") { processor.dismissPendingMixedPDF() }
                                     .buttonStyle(.bordered)
@@ -777,7 +777,7 @@ struct OCRView: View {
                     Label("Start", systemImage: "play.fill")
                         .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.borderedProminent)
+                .prominentButtonStyle()
                 .disabled(!canStartProcessing)
 
                 if processor.isProcessing || isInReviewMode {
@@ -872,7 +872,7 @@ struct OCRView: View {
                                 Label("Complete", systemImage: "checkmark.circle.fill")
                                     .frame(maxWidth: .infinity)
                             }
-                            .buttonStyle(.borderedProminent)
+                            .prominentButtonStyle()
                         }
                     }
                 }
@@ -1180,7 +1180,7 @@ struct OCRView: View {
                 keychainExplained = true
                 showKeychainSheet = false
             }
-            .buttonStyle(.borderedProminent)
+            .prominentButtonStyle()
             .controlSize(.large)
             .padding(.bottom, 4)
         }

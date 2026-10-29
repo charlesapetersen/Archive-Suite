@@ -140,7 +140,7 @@ struct DocumentSegmentReviewSheet: View {
                 Button("Confirm") {
                     processor.confirmDocumentReview()
                 }
-                .buttonStyle(.borderedProminent)
+                .prominentButtonStyle()
                 .controlSize(.large)
                 .keyboardShortcut(.return, modifiers: [])
             }

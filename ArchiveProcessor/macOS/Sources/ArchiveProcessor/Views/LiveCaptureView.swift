@@ -199,7 +199,7 @@ struct LiveCaptureView: View {
                                 Button("Stop") { session.stop() }
                             } else {
                                 Button("Start") { session.start() }
-                                    .buttonStyle(.borderedProminent)
+                                    .prominentButtonStyle()
                                     .accessibilityIdentifier("live.start")
                             }
                         }
@@ -538,7 +538,7 @@ struct LiveCaptureView: View {
             Button(liveProc.staged.isEmpty ? "Finish session →" : "Finish session (\(liveProc.staged.count)) →") {
                 liveProc.requestFinish()
             }
-            .buttonStyle(.borderedProminent)
+            .prominentButtonStyle()
             // Enabled once anything is captured (not only when staged): Finish also recovers an un-ended/
             // un-tagged segment (completeAllOpenDocGroups). Kept TAPPABLE while a finish is pending so a
             // newly-added, still-un-tagged segment can be recovered by re-tapping (no deadlock) — new photos
@@ -574,14 +574,14 @@ struct LiveCaptureView: View {
                     clearButton
                     if liveProcessingMode != LiveProcessingMode.live.rawValue {
                         Button("Process \(session.photos.count) →") { stageForProcessing() }
-                            .buttonStyle(.borderedProminent)
+                            .prominentButtonStyle()
                             .disabled(processor.isProcessing)
                     } else if session.processingMode == .undecided {
                         // Live mode, but the session was never activated — e.g. photos recovered after
                         // a restart. Resume the live pipeline (OCR + per-segment tag cards) so these
                         // photos can be processed instead of only cleared.
                         Button("Process \(session.photos.count) →") { session.activateProcessingIfNeeded() }
-                            .buttonStyle(.borderedProminent)
+                            .prominentButtonStyle()
                     } else {
                         liveFinishControls
                     }
@@ -970,7 +970,7 @@ private struct SegmentTagCard: View {
                 Button("Skip") { skip() }
                 Spacer()
                 Button("Save ▸") { save() }
-                    .buttonStyle(.borderedProminent)
+                    .prominentButtonStyle()
             }
         }
         .padding(20)
@@ -1182,7 +1182,7 @@ struct LiveRotationReviewSheet: View {
                 Button("Cancel") { liveProc.cancelRotationReview() }
                     .keyboardShortcut(.cancelAction)
                 Button("Continue") { liveProc.applyRotationReviewAndFinalize() }
-                    .buttonStyle(.borderedProminent)
+                    .prominentButtonStyle()
                     .controlSize(.large)
                     .keyboardShortcut(.return, modifiers: [])
             }
@@ -1378,7 +1378,7 @@ private struct SegmentTextViewerSheet: View {
             HStack {
                 Spacer()
                 Button("Done") { onDismiss() }
-                    .buttonStyle(.borderedProminent)
+                    .prominentButtonStyle()
                     .keyboardShortcut(.defaultAction)
             }
         }

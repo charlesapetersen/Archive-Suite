@@ -76,7 +76,7 @@ struct CollectionReviewSheet: View {
                 Button("Confirm and Organize") {
                     processor.confirmCollectionReview()
                 }
-                .buttonStyle(.borderedProminent)
+                .prominentButtonStyle()
                 .controlSize(.large)
             }
             .padding()

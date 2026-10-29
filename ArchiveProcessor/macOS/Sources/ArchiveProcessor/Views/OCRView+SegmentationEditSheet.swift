@@ -58,7 +58,7 @@ struct SegmentationEditSheet: View {
                     }
                     onDismiss()
                 }
-                .buttonStyle(.borderedProminent)
+                .prominentButtonStyle()
                 .keyboardShortcut(.defaultAction)
             }
         }

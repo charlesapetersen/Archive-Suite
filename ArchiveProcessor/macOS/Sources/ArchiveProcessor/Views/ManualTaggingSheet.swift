@@ -71,7 +71,7 @@ struct ManualTaggingSheet: View {
                 Spacer()
                 Button(isLast ? "Finish" : "Next") { processor.advanceManualSegment() }
                     .disabled(!currentSentWithValid)
-                    .buttonStyle(.borderedProminent)
+                    .prominentButtonStyle()
                     .controlSize(.large)
                     .keyboardShortcut(.return, modifiers: [])
             }

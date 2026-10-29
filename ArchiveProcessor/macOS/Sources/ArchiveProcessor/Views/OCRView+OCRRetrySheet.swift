@@ -79,7 +79,7 @@ struct OCRRetrySheet: View {
                 Button("Retry \(processor.failedFileIndices.count) File(s)") {
                     processor.retryFailedFiles()
                 }
-                .buttonStyle(.borderedProminent)
+                .prominentButtonStyle()
             }
             .padding()
         }

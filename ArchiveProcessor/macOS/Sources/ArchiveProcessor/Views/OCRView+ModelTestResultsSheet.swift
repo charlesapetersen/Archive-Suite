@@ -121,7 +121,7 @@ struct ModelTestResultsSheet: View {
                     .foregroundStyle(.primary)
                 Spacer()
                 Button("Use") { onSelect(entry.provider, entry.model) }
-                    .buttonStyle(.borderedProminent)
+                    .prominentButtonStyle()
                     .controlSize(.small)
             }
 

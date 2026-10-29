@@ -155,7 +155,7 @@ struct FileTextViewerSheet: View {
             HStack {
                 Spacer()
                 Button("Done") { onDismiss() }
-                    .buttonStyle(.borderedProminent)
+                    .prominentButtonStyle()
                     .keyboardShortcut(.defaultAction)
             }
         }

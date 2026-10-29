@@ -95,7 +95,7 @@ private struct ProviderKeyStep: View {
             Button { openURL(spec.signInURL) } label: {
                 Label("Open \(spec.displayName)", systemImage: "safari")
             }
-            .buttonStyle(.borderedProminent)
+            .prominentButtonStyle()
             .accessibilityIdentifier("ap.keyWizard.openConsole")
 
             if let card = spec.cardNote {
@@ -148,7 +148,7 @@ private struct ProviderKeyStep: View {
             Button { validate() } label: {
                 if validating { ProgressView().controlSize(.small) } else { Text("Validate key") }
             }
-            .buttonStyle(.borderedProminent)
+            .prominentButtonStyle()
             .disabled(key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || validating)
 
             if let status { statusView(status) }

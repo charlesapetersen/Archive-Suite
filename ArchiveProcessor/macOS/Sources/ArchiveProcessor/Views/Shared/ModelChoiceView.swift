@@ -54,7 +54,7 @@ struct RotationRetrySheet: View {
                     .keyboardShortcut(.cancelAction)
                 Spacer()
                 Button("Re-run") { onApply(rotation) }
-                    .buttonStyle(.borderedProminent)
+                    .prominentButtonStyle()
             }
             .padding()
         }

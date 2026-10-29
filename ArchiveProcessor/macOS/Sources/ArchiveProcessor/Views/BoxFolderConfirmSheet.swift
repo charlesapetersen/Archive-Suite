@@ -50,7 +50,7 @@ struct BoxFolderConfirmSheet: View {
                 Button("Confirm") {
                     processor.confirmBoxFolderReview()
                 }
-                .buttonStyle(.borderedProminent)
+                .prominentButtonStyle()
                 .controlSize(.large)
                 .keyboardShortcut(.return, modifiers: [])
             }

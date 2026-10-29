@@ -47,7 +47,7 @@ struct CollectionFinalizeSheet: View {
                 Spacer()
                 if liveProc.isFinalizing { ProgressView().controlSize(.small).padding(.trailing, 6) }
                 Button("Finalize & move files") { liveProc.finalize(drafts) }
-                    .buttonStyle(.borderedProminent)
+                    .prominentButtonStyle()
                     .disabled(!canConfirm || liveProc.isFinalizing)
             }
             .padding(20)
