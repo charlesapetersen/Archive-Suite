@@ -31,11 +31,11 @@ peft_version=$(run python3 -c 'import json,sys;print(json.load(open(sys.argv[1])
 if [ ! -x "$ENV/bin/python" ]; then
   run python3 -m venv --system-site-packages "$ENV"
 fi
-# Direct-reference lines (pkg @ file://...) are not valid constraints; the version lines hold torch and the rest.
-run python3 -m pip freeze | grep -v ' @ ' > "$SCRATCH/peft-constraints-$SLURM_JOB_ID.txt"
-run "$ENV/bin/python" -m pip install -q --disable-pip-version-check -c "$SCRATCH/peft-constraints-$SLURM_JOB_ID.txt" \
-  "peft${peft_version:+==$peft_version}" accelerate
-rm -f "$SCRATCH/peft-constraints-$SLURM_JOB_ID.txt"
+# peft alone, --no-deps: the image already has accelerate and every peft dependency, and resolving them fails, since
+# the image's torch 2.13.0+cu129 declares nvidia-nccl-cu12==2.29.7 while the image ships 2.30.7 (job 50126559). Without
+# the image's freeze as constraints pip would instead install a second nccl into the overlay (job 50136932).
+run "$ENV/bin/python" -m pip install -q --disable-pip-version-check --no-deps "peft${peft_version:+==$peft_version}"
+run "$ENV/bin/python" -c 'import accelerate, safetensors, huggingface_hub'
 run "$ENV/bin/python" -c 'import torch, transformers, peft
 print("torch", torch.__version__, "transformers", transformers.__version__, "peft", peft.__version__)
 assert torch.__version__.endswith("+cu129"), "the overlay replaced the image torch"'
