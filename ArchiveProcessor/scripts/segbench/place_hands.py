@@ -742,6 +742,9 @@ def score():
                  'placed': fun_of[(hyp_dir.name, t['page'])].get('placed', 0)}
                 for t in ps if t['group'] == 'owner-hand' and (hyp_dir / f'{key(t)}.json').exists()]
     res['gate'] = {pick: {feat: gate_sweep(res, feat, pick) for feat in GATE_FEATURES} for pick in GATE_PICKS}
+    # only the gate's own route keeps its per-page rows in the results file
+    res['per_page'] = {k: v for k, v in res['per_page'].items()
+                       if any(k.startswith(GATE_ROUTE.format(pick=p) + '.') for p in GATE_PICKS)}
     RESULTS.mkdir(parents=True, exist_ok=True)
     (RESULTS / 'place-hands.json').write_text(json.dumps(res, indent=1) + '\n')
     (RESULTS / 'place-hands.md').write_text(write_md(res))
