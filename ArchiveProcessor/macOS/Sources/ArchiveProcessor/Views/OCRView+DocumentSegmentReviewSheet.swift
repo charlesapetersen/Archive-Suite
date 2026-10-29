@@ -58,7 +58,7 @@ struct DocumentSegmentReviewSheet: View {
                             ? "Keys: 1=New Doc  2=Continuation  3=Box  4=Folder  X=Remove  \u{2191}\u{2193}=Navigate  Return=Confirm"
                             : "Keys: 3=Box  4=Folder  X=Remove  \u{2191}\u{2193}=Navigate  Return=Confirm"))
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(.primary)
                 }
                 Spacer()
             }
@@ -77,7 +77,7 @@ struct DocumentSegmentReviewSheet: View {
                     .foregroundStyle(.secondary)
                 Text("\(Int(thumbnailSize))px")
                     .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.primary)
                     .frame(width: 40)
             }
             .padding(.horizontal)
@@ -130,7 +130,7 @@ struct DocumentSegmentReviewSheet: View {
             HStack {
                 Text(footerSummary)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.primary)
                 Spacer()
                 Button("Cancel") {
                     confirmDiscardRun("Your review progress will be lost.") { processor.cancel() }
@@ -276,7 +276,7 @@ struct DocumentReviewRow: View {
                     if checked {
                         Label("Checked", systemImage: "checkmark.seal")
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(.primary)
                             .help("You answered the flagged boundary before this page.")
                     }
                 }
@@ -298,7 +298,7 @@ struct DocumentReviewRow: View {
                     HStack(spacing: 8) {
                         Text("Rotate:")
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(.primary)
                         rotationRadio(label: "0°", degrees: 0)
                         rotationRadio(label: "90°", degrees: 90)
                         rotationRadio(label: "180°", degrees: 180)
@@ -342,7 +342,7 @@ struct DocumentReviewRow: View {
                     .font(.system(size: 10))
                 Text(label)
                     .font(.caption2)
-                    .foregroundStyle(item.rotationDegrees == degrees ? .orange : .secondary)
+                    .foregroundStyle(item.rotationDegrees == degrees ? .orange : .primary)
             }
         }
         .buttonStyle(.plain)
@@ -391,7 +391,7 @@ struct DocumentReviewRow: View {
                     .font(.system(size: 12))
                 Text(label)
                     .font(.caption)
-                    .foregroundStyle(selected ? color : .secondary)
+                    .foregroundStyle(selected ? color : .primary)
             }
         }
         .buttonStyle(.plain)

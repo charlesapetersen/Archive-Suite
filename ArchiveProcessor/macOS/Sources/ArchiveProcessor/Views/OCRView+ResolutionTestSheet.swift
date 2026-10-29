@@ -45,7 +45,7 @@ struct ResolutionTestSheet: View {
                     VStack {
                         Text("Original Image")
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(.primary)
                         if let url = imageURL, let nsImage = NSImage(contentsOf: url) {
                             Image(nsImage: nsImage)
                                 .resizable()
@@ -129,7 +129,7 @@ struct ResolutionTestSheet: View {
             if scale == 100 && showDiff {
                 Text("Baseline")
                     .font(.system(size: 9))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.primary)
                     .italic()
             }
             Divider()
@@ -149,7 +149,7 @@ struct ResolutionTestSheet: View {
                 } else {
                     Text("No text returned")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(.primary)
                         .italic()
                 }
             }

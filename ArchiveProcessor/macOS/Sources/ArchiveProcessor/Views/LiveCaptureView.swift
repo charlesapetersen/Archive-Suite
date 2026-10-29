@@ -81,7 +81,7 @@ struct LiveCaptureView: View {
                     Color.black.opacity(0.2).ignoresSafeArea()
                     VStack(spacing: 10) {
                         ProgressView().controlSize(.large)
-                        Text("Finishing — processing segments…").font(.callout).foregroundStyle(.secondary)
+                        Text("Finishing — processing segments…").font(.callout).foregroundStyle(.primary)
                             // The VM UI test waits on this, then confirms the underlying Start control remains
                             // visible but accessibility-disabled. It is the rendered counterpart of
                             // `LiveCaptureProcessor.isFinishingScrimUp`.
@@ -217,7 +217,7 @@ struct LiveCaptureView: View {
                                      ? (session.connectedDeviceName.map { "Connected · \($0)" } ?? "Connected")
                                      : "No phone connected")
                                     .font(.caption)
-                                    .foregroundStyle(session.phoneConnected ? .primary : .secondary)
+                                    .foregroundStyle(.primary)
                             }
                             HStack(spacing: 6) {
                                 Circle().fill(session.serverRunning ? .green : .secondary).frame(width: 6, height: 6)
@@ -233,7 +233,7 @@ struct LiveCaptureView: View {
                             }
                         }
                         Text(session.statusMessage)
-                            .font(.caption).foregroundStyle(.secondary)
+                            .font(.caption).foregroundStyle(.primary)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     .padding(6)
@@ -278,7 +278,7 @@ struct LiveCaptureView: View {
                         }
                         if liveProcessingMode != LiveProcessingMode.live.rawValue {
                             Text("Set in Process Files for staged captures — they're filed there, not here.")
-                                .font(.caption2).foregroundStyle(.secondary)
+                                .font(.caption2).foregroundStyle(.primary)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
                     }
@@ -318,7 +318,7 @@ struct LiveCaptureView: View {
                                     .frame(width: 200, height: 200)
                             }
                             Text("Scan in Archive Capture — one code works over USB, Wi-Fi, or Cloud (Google Drive).")
-                                .font(.caption).foregroundStyle(.secondary)
+                                .font(.caption).foregroundStyle(.primary)
                                 .fixedSize(horizontal: false, vertical: true)
                             let ips = Self.allIPv4Candidates()
                             if let ip = Self.primaryIPv4() ?? ips.first {
@@ -331,7 +331,7 @@ struct LiveCaptureView: View {
                             if session.isDriveSignedIn {
                                 Text("Cloud relay code: \(session.token)")
                                     .font(.system(.caption2, design: .monospaced))
-                                    .foregroundStyle(.secondary).textSelection(.enabled)
+                                    .foregroundStyle(.primary).textSelection(.enabled)
                             }
                             // Other interfaces (e.g. bridge100 when the Mac itself is the hotspot) — the
                             // QR uses the primary, but the operator can try an alternate via manual entry.
@@ -347,7 +347,7 @@ struct LiveCaptureView: View {
                             // just does nothing. Name the fix so the operator isn't stuck.
                             Text("Phone not connecting? This Wi-Fi may block device-to-device connections (common on public / guest / hotel networks). Fixes: use a **USB cable** (Android), or turn on a **personal hotspot** and join both devices to it.")
                                 .font(.caption2)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(.primary)
                                 .fixedSize(horizontal: false, vertical: true)
                                 .padding(.top, 2)
                         }
@@ -414,10 +414,10 @@ struct LiveCaptureView: View {
         ProgressView().controlSize(.small)
         if session.phonePendingActive {
             Text("Finishing — the phone still has \(session.phonePendingCount) photo(s) to send. Waiting for them to arrive…")
-                .font(.caption).foregroundStyle(.secondary)
+                .font(.caption).foregroundStyle(.primary)
         } else if liveProc.processingCount > 0 {
             Text("Finishing when processing completes (\(liveProc.processingCount) left). Keep shooting to add another segment; tap Finish again to include one you didn't tag.")
-                .font(.caption).foregroundStyle(.secondary)
+                .font(.caption).foregroundStyle(.primary)
         } else {
             // W3.cap-r3-fu12's adversarial pass — the third branch, added because the count branch LIED here.
             // `processingCount` excludes rows whose group has left the session, and `pendingFinish` is lowered
@@ -433,7 +433,7 @@ struct LiveCaptureView: View {
             // that is what turned "not worth a third branch" into "worth a third branch". Bounded, never a
             // hang: every arming starts a watchdog and the watchdog lowers the flag unconditionally.
             Text("Finishing — nothing left to process. Completing as soon as the session settles (a few seconds); Cancel finish if you'd rather not wait.")
-                .font(.caption).foregroundStyle(.secondary)
+                .font(.caption).foregroundStyle(.primary)
         }
         Button("Cancel finish") { liveProc.cancelPendingFinish() }
             .accessibilityIdentifier("live.cancel-finish")
@@ -533,7 +533,7 @@ struct LiveCaptureView: View {
                 pendingFinishRow
             } else if processing && liveProc.staged.isEmpty {
                 ProgressView().controlSize(.small)
-                Text("Processing…").font(.caption).foregroundStyle(.secondary)
+                Text("Processing…").font(.caption).foregroundStyle(.primary)
             }
             Button(liveProc.staged.isEmpty ? "Finish session →" : "Finish session (\(liveProc.staged.count)) →") {
                 liveProc.requestFinish()
@@ -564,7 +564,7 @@ struct LiveCaptureView: View {
                 Text("Captured")
                     .font(.headline)
                 Text("\(session.photos.count) photo\(session.photos.count == 1 ? "" : "s") · \(session.groups.count) group\(session.groups.count == 1 ? "" : "s")")
-                    .font(.caption).foregroundStyle(.secondary)
+                    .font(.caption).foregroundStyle(.primary)
                 if session.phonePendingActive {
                     Label("phone sending \(session.phonePendingCount)", systemImage: "iphone.and.arrow.forward")
                         .font(.caption).foregroundStyle(.orange)
@@ -646,7 +646,7 @@ struct LiveCaptureView: View {
                         Text(summary)
                             .font(.title3).multilineTextAlignment(.center)
                         Text("Shoot on the phone to start a new batch.")
-                            .font(.caption).foregroundStyle(.secondary)
+                            .font(.caption).foregroundStyle(.primary)
                     }
                 } else {
                     VStack(spacing: 8) {
@@ -654,7 +654,7 @@ struct LiveCaptureView: View {
                         Text(session.receiverActive ? "Waiting for photos…\nShoot on the phone; they'll appear here grouped."
                                                    : "Start the server, then pair the phone.")
                             .multilineTextAlignment(.center)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(.primary)
                     }
                 }
                 Spacer()
@@ -681,7 +681,7 @@ struct LiveCaptureView: View {
                 Text("Group \(index) · \(group.type.rawValue.capitalized)")
                     .font(.subheadline).fontWeight(.medium)
                 Text("\(group.photos.count)")
-                    .font(.caption).foregroundStyle(.secondary)
+                    .font(.caption).foregroundStyle(.primary)
             }
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 120), spacing: 8)], spacing: 8) {
                 ForEach(group.photos) { photo in
@@ -828,12 +828,12 @@ private struct LiveProcessingBox: View {
                     .font(.callout).fontWeight(.medium)
                 Text(liveMode ? "Each segment is OCR'd & tagged as you capture; finish the session to name collections."
                               : "Captures collect here; use Process to send them to the Files tab.")
-                    .font(.caption).foregroundStyle(.secondary)
+                    .font(.caption).foregroundStyle(.primary)
                     .fixedSize(horizontal: false, vertical: true)
                 Text("Change in Settings (⌘,).").font(.caption2).foregroundStyle(.primary)
 
                 if liveMode, let cfg = session.config {
-                    Text(cfg.summary).font(.caption2).foregroundStyle(.secondary)
+                    Text(cfg.summary).font(.caption2).foregroundStyle(.primary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 if liveMode, !liveProc.statuses.isEmpty {
@@ -844,7 +844,7 @@ private struct LiveProcessingBox: View {
                         $0.phase == .staged || $0.phase == .succeededNoText || $0.phase == .succeededPlaceholderImage
                     }.count
                     Text("\(done)/\(liveProc.statuses.count) segments processed")
-                        .font(.caption).foregroundStyle(.secondary)
+                        .font(.caption).foregroundStyle(.primary)
                     // Shared, detailed, retry-capable list (reasons + per-item actions on expand).
                     // Min height + internal scroll so the box hosts disclosure without collapsing.
                     ScrollView {
@@ -920,7 +920,7 @@ private struct SegmentTagCard: View {
         VStack(alignment: .leading, spacing: 14) {
             Text("Tag this segment").font(.title2).fontWeight(.semibold)
             Text("\(group.photos.count) page\(group.photos.count == 1 ? "" : "s"). Subjects become archive tags; date & Quality came from the phone.")
-                .font(.caption).foregroundStyle(.secondary)
+                .font(.caption).foregroundStyle(.primary)
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
@@ -937,13 +937,13 @@ private struct SegmentTagCard: View {
 
             HStack(spacing: 16) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Year").font(.caption).foregroundStyle(.secondary)
+                    Text("Year").font(.caption).foregroundStyle(.primary)
                     TextField("YYYY", text: $yearText)
                         .frame(width: 70)
                         .onChange(of: yearText) { _, v in yearText = String(v.filter(\.isNumber).prefix(4)) }
                 }
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Month").font(.caption).foregroundStyle(.secondary)
+                    Text("Month").font(.caption).foregroundStyle(.primary)
                     Picker("", selection: $month) {
                         Text("—").tag(Int?.none)
                         ForEach(1...12, id: \.self) { m in Text(monthNames[m - 1]).tag(Int?.some(m)) }
@@ -997,7 +997,7 @@ private struct SegmentTagCard: View {
                 // Since W26.vocab the vocabulary is PERSISTED, so this shows once, not on every launch.
                 if !tagsProvider.isReady {
                     ProgressView().controlSize(.small)
-                    Text("building tag suggestions…").font(.caption2).foregroundStyle(.secondary)
+                    Text("building tag suggestions…").font(.caption2).foregroundStyle(.primary)
                 }
             }
             FlowLayout(spacing: 6) {
@@ -1028,7 +1028,7 @@ private struct SegmentTagCard: View {
                             Text(s).font(.caption)
                             Spacer()
                             if idx == highlighted {
-                                Text("⏎").font(.caption2).foregroundStyle(.secondary)
+                                Text("⏎").font(.caption2).foregroundStyle(.primary)
                             }
                         }
                         .padding(.vertical, 4).padding(.horizontal, 8)
@@ -1139,7 +1139,7 @@ struct LiveRotationReviewSheet: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Review Rotation").font(.title2).fontWeight(.semibold)
                     Text("Keys: \u{2190}\u{2192} or [ ]=Rotate  \u{2191}\u{2193}=Navigate  Return=Continue")
-                        .font(.caption).foregroundStyle(.secondary)
+                        .font(.caption).foregroundStyle(.primary)
                 }
                 Spacer()
             }
@@ -1151,7 +1151,7 @@ struct LiveRotationReviewSheet: View {
                 Image(systemName: "photo.artframe").font(.caption2).foregroundStyle(.secondary)
                 Slider(value: $thumbnailSize, in: 60...800, step: 10)
                 Image(systemName: "photo.artframe").font(.body).foregroundStyle(.secondary)
-                Text("\(Int(thumbnailSize))px").font(.caption2).foregroundStyle(.secondary).frame(width: 40)
+                Text("\(Int(thumbnailSize))px").font(.caption2).foregroundStyle(.primary).frame(width: 40)
             }
             .padding(.horizontal).padding(.vertical, 6)
 
@@ -1177,7 +1177,7 @@ struct LiveRotationReviewSheet: View {
 
             HStack {
                 Text("\(liveProc.rotationReviewPages.count) page\(liveProc.rotationReviewPages.count == 1 ? "" : "s")")
-                    .font(.caption).foregroundStyle(.secondary)
+                    .font(.caption).foregroundStyle(.primary)
                 Spacer()
                 Button("Cancel") { liveProc.cancelRotationReview() }
                     .keyboardShortcut(.cancelAction)
@@ -1221,7 +1221,7 @@ private struct LiveRotationRow: View {
                     .lineLimit(1).truncationMode(.middle)
                     .frame(minWidth: 180, alignment: .leading)
                 HStack(spacing: 8) {
-                    Text("Rotate:").font(.caption).foregroundStyle(.secondary)
+                    Text("Rotate:").font(.caption).foregroundStyle(.primary)
                     ForEach([0, 90, 180, 270], id: \.self) { deg in
                         Button { page.rotationDegrees = deg } label: {
                             HStack(spacing: 3) {
@@ -1229,7 +1229,7 @@ private struct LiveRotationRow: View {
                                     .foregroundStyle(page.rotationDegrees == deg ? .orange : .secondary)
                                     .font(.system(size: 10))
                                 Text("\(deg)°").font(.caption2)
-                                    .foregroundStyle(page.rotationDegrees == deg ? .orange : .secondary)
+                                    .foregroundStyle(page.rotationDegrees == deg ? .orange : .primary)
                             }
                         }
                         .buttonStyle(.plain)
@@ -1366,7 +1366,7 @@ private struct SegmentTextViewerSheet: View {
                 }
             } else {
                 Text("No OCR text was returned for this segment.")
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.primary)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
             if let errorMessage, !errorMessage.isEmpty {

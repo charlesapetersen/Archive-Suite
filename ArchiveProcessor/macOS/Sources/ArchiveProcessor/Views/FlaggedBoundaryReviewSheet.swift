@@ -46,7 +46,7 @@ struct FlaggedBoundaryReviewSheet: View {
                 Text("\(processor.flaggedReviewApproachName) was unsure about these boundaries. "
                      + "Keys: Return=Keep  S=Split  J=Join  \u{2190}\u{2192}=Move")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.primary)
             }
             Spacer()
             Text("\(focus + 1) of \(items.count)")
@@ -65,7 +65,7 @@ struct FlaggedBoundaryReviewSheet: View {
                     .accessibilityIdentifier("flaggedReview.proposal")
                 Text(item.confidenceText + (item.shortCue.isEmpty ? "" : " · \(item.shortCue)"))
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.primary)
                     .lineLimit(2)
                     .multilineTextAlignment(.center)
             }
@@ -90,7 +90,7 @@ struct FlaggedBoundaryReviewSheet: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             Text("\(caption): \(url.lastPathComponent)")
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(.primary)
                 .lineLimit(1)
         }
     }
@@ -115,7 +115,7 @@ struct FlaggedBoundaryReviewSheet: View {
             Spacer()
             Text("\(answered) of \(items.count) answered")
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(.primary)
                 .accessibilityIdentifier("flaggedReview.answered")
             Button("Done") { processor.confirmFlaggedReview() }
                 .buttonStyle(.borderedProminent)

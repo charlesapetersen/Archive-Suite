@@ -131,7 +131,7 @@ struct PageKindRowLine: View {
         let text: String
         let routed: Bool
         var body: some View {
-            Text(text).font(.caption2).foregroundStyle(routed ? Color.accentColor : .secondary)
+            Text(text).font(.caption2).foregroundStyle(routed ? Color.accentColor : .primary)
         }
     }
 
@@ -187,12 +187,12 @@ struct PageKindBatchControl: View {
             if !routed.isEmpty {
                 Text("Read by another model, in the totals: "
                      + routed.map { "\($0.1) by \($0.0.displayName)" }.joined(separator: ", ") + ".")
-                    .font(.caption2).foregroundStyle(.secondary)
+                    .font(.caption2).foregroundStyle(.primary)
                     .fixedSize(horizontal: false, vertical: true)
             }
             if store.pending > 0 {
                 Text("Telling \(store.pending) \(store.pending == 1 ? "page's" : "pages'") kind; a page not told by Start keeps the run's model.")
-                    .font(.caption2).foregroundStyle(.secondary)
+                    .font(.caption2).foregroundStyle(.primary)
             }
         }
     }

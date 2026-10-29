@@ -35,7 +35,7 @@ struct ManualTaggingSheet: View {
                         .fontWeight(.semibold)
                     Text("Segment \(min(processor.currentManualIndex + 1, count)) of \(count)")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(.primary)
                 }
                 Spacer()
                 Text("← → image   Space = preview")
@@ -147,7 +147,7 @@ struct ManualTagSegmentView: View {
                                     } else {
                                         Text(img.url.lastPathComponent)
                                             .font(.caption2)
-                                            .foregroundStyle(idx == focusedImage ? Color.accentColor : .secondary)
+                                            .foregroundStyle(idx == focusedImage ? Color.accentColor : .primary)
                                             .lineLimit(1)
                                             .truncationMode(.middle)
                                             .frame(maxWidth: 560)
@@ -173,7 +173,7 @@ struct ManualTagSegmentView: View {
                         Toggle("Date uncertain", isOn: $segment.dateUncertain)
                         if segment.dateLoading {
                             ProgressView().scaleEffect(0.6)
-                            Text("estimating…").font(.caption2).foregroundStyle(.secondary)
+                            Text("estimating…").font(.caption2).foregroundStyle(.primary)
                         }
                         Spacer()
                     }
@@ -238,7 +238,7 @@ struct ManualTagSegmentView: View {
 
     private func dateField(_ label: String, text: Binding<String>, width: CGFloat, prompt: String) -> some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(label).font(.caption2).foregroundStyle(.secondary)
+            Text(label).font(.caption2).foregroundStyle(.primary)
             TextField(prompt, text: text)
                 .textFieldStyle(.roundedBorder)
                 .frame(width: width)
@@ -255,9 +255,9 @@ struct SentWithHint: View {
     var body: some View {
         switch EnclosureDates.parseManual(text) {
         case .empty:
-            Text(fallback).font(.caption2).foregroundStyle(.secondary)
+            Text(fallback).font(.caption2).foregroundStyle(.primary)
         case .valid(let date):
-            Text("Sent with: \(date.display)").font(.caption2).foregroundStyle(.secondary)
+            Text("Sent with: \(date.display)").font(.caption2).foregroundStyle(.primary)
         case .invalid:
             Label("Not a valid date — use 1958, 1958-03, 1958-03-12 or 1950s. It will not be saved.",
                   systemImage: "exclamationmark.triangle.fill")

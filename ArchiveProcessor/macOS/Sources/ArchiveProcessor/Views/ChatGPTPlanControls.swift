@@ -36,7 +36,7 @@ struct ChatGPTPlanControls: View {
                     }
                     Link("Manage usage", destination: ChatGPTAuth.manageUsageURL).font(.caption)
                     Spacer()
-                    Text(account).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+                    Text(account).font(.caption2).foregroundStyle(.primary).lineLimit(1)
                     Button("Sign out") {
                         Task {
                             await ChatGPTAuth.shared.signOut()

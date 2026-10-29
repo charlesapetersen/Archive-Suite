@@ -23,7 +23,7 @@ struct BoxFolderConfirmSheet: View {
                         .fontWeight(.semibold)
                     Text("Verify each identification. Choose “Not a label” for anything that is actually a document.")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(.primary)
                 }
                 Spacer()
             }
@@ -45,7 +45,7 @@ struct BoxFolderConfirmSheet: View {
             HStack {
                 Text("\(boxCount) box\(boxCount == 1 ? "" : "es"), \(folderCount) folder\(folderCount == 1 ? "" : "s")")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.primary)
                 Spacer()
                 Button("Confirm") {
                     processor.confirmBoxFolderReview()

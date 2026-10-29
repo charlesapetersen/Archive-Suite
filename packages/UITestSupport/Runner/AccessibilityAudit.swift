@@ -20,8 +20,13 @@
 // texts it failed on 2026-10-16, "Inbox" measured 7.4:1 from the screenshot, a list date 14.9:1, the window title
 // 10:1 — while the real failures were secondary text at 3.2–4.2:1. So every contrast issue is measured from a
 // screenshot taken after the audit (`ScreenPixels`: the commonest colour under the frame is the background, the
-// pixel farthest from it in luminance is the text). Measured at or above WCAG AA — 4.5:1, or 3:1 for text 24 pt
-// tall or more — it is printed as not reproduced and does not fail; below, it stays a finding, with its ratio.
+// pixel farthest from it in luminance is the text). Measured at or above WCAG AA — 4.5:1, or 3:1 for large text —
+// it is printed as not reproduced and does not fail; below, it stays a finding, with its ratio. Large text is
+// judged by the size of the letters, not of the frame (W40.fix-processor-a11y-secondary): a two-line caption has a
+// 24 pt frame and 10 pt letters, and the frame rule passed "No saved profiles yet…" at 3.90:1. The tallest run of
+// pixel rows with ink in them is one line's letters, ascender to descender, about 0.95 of the font size in SF; at
+// 17 pt or more the text is taken as 18 pt, WCAG's large. Letters with no ascender or descender measure shorter,
+// and 14 pt bold (also large) is not recognised, so the rule errs towards failing.
 // Anti-aliasing can only pull the text pixel towards the background, so the measure errs towards failing.
 // Under 1.1:1 nothing is drawn under the frame at all — text a sheet covers (the Reader's "Tags in view" behind
 // its preview sheet measured 1.01:1) — so it is counted as covered, not failed.
@@ -206,7 +211,8 @@ final class AccessibilityAudit {
                     print("[a11y-audit] \(screen): contrast not measurable, nothing drawn under the frame \(f)")
                     continue
                 }
-                if ratio >= (f.frame.height >= 24 ? 3 : 4.5) {
+                let large = (pixels?.inkHeight(under: f.frame) ?? 0) >= AccessibilityAudit.largeTextInkHeight
+                if ratio >= (large ? 3 : 4.5) {
                     notReproduced += 1
                     print("[a11y-audit] \(screen): contrast not reproduced from the screenshot \(f)")
                     continue
@@ -247,6 +253,9 @@ final class AccessibilityAudit {
             }
         }
     }
+
+    /// Ink height, in points, at which a line of text counts as WCAG large (18 pt): see the header.
+    static let largeTextInkHeight: CGFloat = 17
 
     private static let each: [XCUIAccessibilityAuditType] =
         [.contrast, .elementDetection, .hitRegion, .sufficientElementDescription, .action, .parentChild]
@@ -332,6 +341,39 @@ struct ScreenPixels {
         let lb = Self.luminance(background)
         let lt = counts.keys.map(Self.luminance).max(by: { abs($0 - lb) < abs($1 - lb) }) ?? lb
         return (max(lb, lt) + 0.05) / (min(lb, lt) + 0.05)
+    }
+
+    /// Height, in points, of the tallest run of pixel rows under `frame` holding ink: any pixel at 1.5:1 or more
+    /// against the commonest colour. For text that is one line's letters, ascender to descender; the gap between
+    /// lines ends a run. nil when the frame is not on the screenshot.
+    func inkHeight(under frame: CGRect) -> CGFloat? {
+        let x0 = Int((frame.minX * scale).rounded()), y0 = Int((frame.minY * scale).rounded())
+        let x1 = Int((frame.maxX * scale).rounded()), y1 = Int((frame.maxY * scale).rounded())
+        guard x0 >= 0, y0 >= 0, x1 <= width, y1 <= height, x1 > x0, y1 > y0 else { return nil }
+        func rgb(_ x: Int, _ y: Int) -> UInt32 {
+            let i = (y * width + x) * 4
+            return UInt32(rgba[i]) << 16 | UInt32(rgba[i + 1]) << 8 | UInt32(rgba[i + 2])
+        }
+        var counts: [UInt32: Int] = [:]
+        for y in y0..<y1 { for x in x0..<x1 { counts[rgb(x, y), default: 0] += 1 } }
+        guard let background = counts.max(by: { $0.value < $1.value })?.key else { return nil }
+        let lb = Self.luminance(background)
+        var ink: [UInt32: Bool] = [:]
+        func isInk(_ c: UInt32) -> Bool {
+            if let known = ink[c] { return known }
+            let l = Self.luminance(c)
+            let v = (max(lb, l) + 0.05) / (min(lb, l) + 0.05) >= 1.5
+            ink[c] = v
+            return v
+        }
+        var tallest = 0, run = 0
+        for y in y0..<y1 {
+            var any = false
+            for x in x0..<x1 where isInk(rgb(x, y)) { any = true; break }
+            run = any ? run + 1 : 0
+            tallest = max(tallest, run)
+        }
+        return CGFloat(tallest) / scale
     }
 
     private static func luminance(_ rgb: UInt32) -> Double {

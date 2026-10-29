@@ -22,7 +22,7 @@ struct CollectionFinalizeSheet: View {
             Text("Finish session — name collections").font(.title2).fontWeight(.semibold)
                 .padding([.top, .horizontal], 20)
             Text("Confirm a name for each collection, or add it to an existing folder (new photos continue that folder's numbering).")
-                .font(.caption).foregroundStyle(.secondary)
+                .font(.caption).foregroundStyle(.primary)
                 .padding(.horizontal, 20).padding(.bottom, 10)
             if !liveProc.failedGroupIds.isEmpty {
                 Label("\(liveProc.failedGroupIds.count) segment(s) failed to process and are NOT filed — kept in the Backup Folder. Retry them from the Live Capture panel before finalizing.",
@@ -64,7 +64,7 @@ struct CollectionFinalizeSheet: View {
         GroupBox {
             VStack(alignment: .leading, spacing: 8) {
                 Text("\(d.segmentCount) segment\(d.segmentCount == 1 ? "" : "s") · \(d.photoCount) photo\(d.photoCount == 1 ? "" : "s")")
-                    .font(.caption).foregroundStyle(.secondary)
+                    .font(.caption).foregroundStyle(.primary)
 
                 Picker("Add to", selection: Binding(
                     get: { draft.wrappedValue.chosenExisting?.path ?? "__new__" },
@@ -86,7 +86,7 @@ struct CollectionFinalizeSheet: View {
                         .textFieldStyle(.roundedBorder).frame(maxWidth: 420)
                 } else {
                     Text("Appending to “\(d.chosenExisting!.lastPathComponent)” — new files continue its numbering.")
-                        .font(.caption).foregroundStyle(.secondary)
+                        .font(.caption).foregroundStyle(.primary)
                 }
             }
             .padding(6)

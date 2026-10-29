@@ -64,7 +64,7 @@ struct ToolsView: View {
             VStack(alignment: .leading, spacing: 16) {
                 Text("Tools").font(.title).fontWeight(.bold)
                 Text("One-off diagnostics. They use your current API key (set in Settings, ⌘,).")
-                    .font(.callout).foregroundStyle(.secondary)
+                    .font(.callout).foregroundStyle(.primary)
 
                 toolCard(
                     title: "Compare Models",
@@ -177,7 +177,7 @@ struct ToolsView: View {
                 Image(systemName: systemImage).font(.title2).foregroundStyle(.tint).frame(width: 30)
                 VStack(alignment: .leading, spacing: 6) {
                     Text(title).font(.headline)
-                    Text(detail).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                    Text(detail).font(.caption).foregroundStyle(.primary).fixedSize(horizontal: false, vertical: true)
                     Button(buttonTitle, action: action).disabled(disabled).padding(.top, 2)
                 }
                 Spacer()

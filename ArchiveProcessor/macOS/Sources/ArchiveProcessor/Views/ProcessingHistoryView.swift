@@ -39,7 +39,7 @@ struct ProcessingHistoryView: View {
                 Text("Processing History").font(.title2).fontWeight(.bold)
                 if !store.runs.isEmpty {
                     Text("\(store.runs.count) \(store.runs.count == 1 ? "run" : "runs") · \(store.totalFiles) files · \(Self.moneyTotal(store.totalCost)) est. total")
-                        .font(.callout).foregroundStyle(.secondary)
+                        .font(.callout).foregroundStyle(.primary)
                 }
             }
             Spacer()
@@ -54,7 +54,7 @@ struct ProcessingHistoryView: View {
             Image(systemName: "clock.arrow.circlepath").font(.largeTitle).foregroundStyle(.secondary)
             Text("No processing runs yet").font(.headline)
             Text("Completed Process-Files runs will appear here with their cost estimate.")
-                .font(.callout).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                .font(.callout).foregroundStyle(.primary).multilineTextAlignment(.center)
             Spacer()
         }
         .frame(maxWidth: .infinity)
@@ -64,7 +64,7 @@ struct ProcessingHistoryView: View {
     private var footer: some View {
         HStack {
             Text("Cost is estimated from each run's settings using per-model pricing — a close estimate, not a billed figure.")
-                .font(.caption2).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                .font(.caption2).foregroundStyle(.primary).fixedSize(horizontal: false, vertical: true)
             Spacer()
             Button(role: .destructive) { showClearConfirm = true } label: {
                 Label("Clear History", systemImage: "trash")
@@ -99,7 +99,7 @@ private struct ProcessingHistoryRow: View {
                         .background(Color.secondary.opacity(0.15), in: Capsule())
                 }
                 Text(run.date.formatted(date: .abbreviated, time: .shortened))
-                    .font(.caption).foregroundStyle(.secondary)
+                    .font(.caption).foregroundStyle(.primary)
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 3) {
@@ -123,7 +123,7 @@ private struct ProcessingHistoryRow: View {
                 Text("· \(n) read by the reader their kind chose")
             }
         }
-        .font(.caption).foregroundStyle(.secondary)
+        .font(.caption).foregroundStyle(.primary)
     }
 
     /// Per-run cost: four decimal places, matching the pre-run cost-estimate pane's precision.

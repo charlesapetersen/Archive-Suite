@@ -86,7 +86,7 @@ struct ManualSegmentTagView: View {
     private var header: some View {
         HStack(spacing: 10) {
             Text("Segment & Tag").font(.headline)
-            Text(progressLine).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+            Text(progressLine).font(.caption).foregroundStyle(.primary).lineLimit(1)
             Spacer(minLength: 12)
             Text("← → photo · ⏎ end & tag · B/F/D · X remove · Space preview")
                 .font(.caption2).foregroundStyle(.primary).lineLimit(1).layoutPriority(-1)
@@ -127,7 +127,7 @@ struct ManualSegmentTagView: View {
                     Color(nsColor: .textBackgroundColor).opacity(0.4)
                     VStack(spacing: 8) {
                         Image(systemName: "checkmark.circle").font(.system(size: 40)).foregroundStyle(.secondary)
-                        Text("All documents tagged — click Finish ▸").foregroundStyle(.secondary)
+                        Text("All documents tagged — click Finish ▸").foregroundStyle(.primary)
                     }
                 }
             }
@@ -192,7 +192,7 @@ struct ManualSegmentTagView: View {
         switch img.kind {
         case .box: return .red
         case .folder: return .purple
-        case .document: return inPending ? Color.accentColor : .secondary
+        case .document: return inPending ? Color.accentColor : .primary
         }
     }
 
@@ -207,7 +207,7 @@ struct ManualSegmentTagView: View {
                     }
                     if remainingDocs == 0 {
                         Text("All documents tagged — click Finish ▸")
-                            .font(.caption).foregroundStyle(.secondary)
+                            .font(.caption).foregroundStyle(.primary)
                             .padding(.horizontal, 12)
                     }
                 }
@@ -233,7 +233,7 @@ struct ManualSegmentTagView: View {
                 .overlay(RoundedRectangle(cornerRadius: 5).stroke(border, lineWidth: isFocus ? 3 : 1.5))
                 .overlay(alignment: .topLeading) { kindGlyph(img, removed: removed).padding(3) }
                 .opacity(removed ? 0.4 : 1)
-            Text("\(i + 1)").font(.caption2).foregroundStyle(isFocus ? Color.accentColor : .secondary)
+            Text("\(i + 1)").font(.caption2).foregroundStyle(isFocus ? Color.accentColor : .primary)
         }
         .contentShape(Rectangle())
         .onTapGesture { processor.manualSegFocus = i; canvasFocused = true }
@@ -279,7 +279,7 @@ struct ManualSegmentTagView: View {
             if let range = pendingRange {
                 let pages = range.count
                 Text("Current segment: \(pages) page\(pages == 1 ? "" : "s")")
-                    .font(.caption).foregroundStyle(.secondary)
+                    .font(.caption).foregroundStyle(.primary)
                 Button("End segment & tag ▸") { processor.manualSegEndAndTag() }
                     .buttonStyle(.borderedProminent)
                     .disabled(tagging)
@@ -334,7 +334,7 @@ private struct ManualSegTagCard: View {
         VStack(alignment: .leading, spacing: 14) {
             Text("Tag this segment").font(.title2).fontWeight(.semibold)
             Text("\(pageCount) page\(pageCount == 1 ? "" : "s"). Subjects become archive tags; a trailing “Unread” tag is added automatically.")
-                .font(.caption).foregroundStyle(.secondary)
+                .font(.caption).foregroundStyle(.primary)
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
@@ -353,7 +353,7 @@ private struct ManualSegTagCard: View {
             // Date first — the user reviews/enters the date (Year is focused on open) before subjects.
             HStack(alignment: .top, spacing: 12) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Year").font(.caption2).foregroundStyle(.secondary)
+                    Text("Year").font(.caption2).foregroundStyle(.primary)
                     TextField("1968 or 1970s", text: $processor.manualSegDraftTags.year)
                         .textFieldStyle(.roundedBorder).frame(width: 90)
                         .focused($yearFocused)
@@ -365,7 +365,7 @@ private struct ManualSegTagCard: View {
             // W37.dual-date — the covering letter's date, for an enclosure with its own date.
             HStack(alignment: .bottom, spacing: 12) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Sent with (covering letter's date)").font(.caption2).foregroundStyle(.secondary)
+                    Text("Sent with (covering letter's date)").font(.caption2).foregroundStyle(.primary)
                     TextField("1958-03-12", text: $processor.manualSegDraftTags.sentWith)
                         .textFieldStyle(.roundedBorder).frame(width: 120)
                 }
@@ -377,7 +377,7 @@ private struct ManualSegTagCard: View {
                 HStack(spacing: 6) {
                     if processor.manualSegDateFetching {
                         ProgressView().scaleEffect(0.6)
-                        Text("fetching date…").font(.caption2).foregroundStyle(.secondary)
+                        Text("fetching date…").font(.caption2).foregroundStyle(.primary)
                     } else {
                         Text("date auto-filled — edit if needed").font(.caption2).foregroundStyle(.primary)
                     }
@@ -442,7 +442,7 @@ private struct ManualSegTagCard: View {
                             Image(systemName: "tag").font(.caption2).foregroundStyle(.secondary)
                             Text(s).font(.caption)
                             Spacer()
-                            if idx == highlighted { Text("⏎").font(.caption2).foregroundStyle(.secondary) }
+                            if idx == highlighted { Text("⏎").font(.caption2).foregroundStyle(.primary) }
                         }
                         .padding(.vertical, 4).padding(.horizontal, 8)
                         .background(idx == highlighted ? Color.accentColor.opacity(0.25) : Color.clear)
@@ -545,7 +545,7 @@ private struct MonthField: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text("Month").font(.caption2).foregroundStyle(.secondary)
+            Text("Month").font(.caption2).foregroundStyle(.primary)
             TextField("", text: $text)
                 .textFieldStyle(.roundedBorder).frame(width: 118)
                 .focused($focused)
@@ -602,7 +602,7 @@ private struct DayField: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text("Day").font(.caption2).foregroundStyle(.secondary)
+            Text("Day").font(.caption2).foregroundStyle(.primary)
             TextField("", text: $digits)
                 .textFieldStyle(.roundedBorder).frame(width: 78)
                 .onChange(of: digits) { _, v in

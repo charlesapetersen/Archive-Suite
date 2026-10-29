@@ -48,7 +48,7 @@ struct ModelTestResultsSheet: View {
                     VStack {
                         Text("Original Image")
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(.primary)
                         if let url = imageURL, let nsImage = NSImage(contentsOf: url) {
                             Image(nsImage: nsImage)
                                 .resizable()
@@ -102,7 +102,7 @@ struct ModelTestResultsSheet: View {
             VStack(alignment: .leading, spacing: 1) {
                 Text(entry.provider.rawValue)
                     .font(.system(size: 9))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.primary)
                 HStack {
                     Text(entry.model.displayName)
                         .font(.caption)
@@ -128,7 +128,7 @@ struct ModelTestResultsSheet: View {
             if isBaseline && showDiff {
                 Text("Baseline (most expensive)")
                     .font(.system(size: 9))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.primary)
                     .italic()
             }
 
@@ -178,12 +178,12 @@ struct ModelTestResultsSheet: View {
                             .fontWeight(.semibold)
                         Text(err)
                             .font(.system(size: 10))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(.primary)
                     }
                 } else {
                     Text("No text returned")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(.primary)
                         .italic()
                 }
             }

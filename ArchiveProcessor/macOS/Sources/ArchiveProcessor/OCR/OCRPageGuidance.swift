@@ -107,7 +107,7 @@ struct OCRPageGuidanceNote: View {
             }
             Text(guidance.footnote)
                 .font(.caption2)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(.primary)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .accessibilityElement(children: .combine)

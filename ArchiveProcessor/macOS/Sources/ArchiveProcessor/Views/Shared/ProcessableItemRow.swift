@@ -104,7 +104,7 @@ struct ProcessableItemRow: View {
                 }
                 if !showTagsList, !item.appliedTags.isEmpty {
                     Text(item.appliedTags.prefix(2).joined(separator: " \u{00B7} "))
-                        .font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+                        .font(.caption2).foregroundStyle(.primary).lineLimit(1)
                 }
             }
 
@@ -126,7 +126,7 @@ struct ProcessableItemRow: View {
             if item.subtitle != nil || item.providerModel != nil {
                 HStack(spacing: 6) {
                     if let subtitle = item.subtitle {
-                        Text(subtitle).font(.caption2).foregroundStyle(.secondary)
+                        Text(subtitle).font(.caption2).foregroundStyle(.primary)
                     }
                     if item.subtitle != nil && item.providerModel != nil {
                         Text("·").font(.caption2).foregroundStyle(.primary)

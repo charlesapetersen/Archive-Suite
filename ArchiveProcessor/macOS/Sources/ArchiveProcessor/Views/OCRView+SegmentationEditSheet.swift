@@ -21,7 +21,7 @@ struct SegmentationEditSheet: View {
 
             Text(fileName)
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(.primary)
                 .lineLimit(1)
                 .truncationMode(.middle)
 

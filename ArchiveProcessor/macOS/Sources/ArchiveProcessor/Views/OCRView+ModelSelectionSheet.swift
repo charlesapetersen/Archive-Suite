@@ -73,7 +73,7 @@ struct ModelSelectionSheet: View {
                 let count = selectedEntries.count
                 Text("\(count) model\(count == 1 ? "" : "s") selected")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.primary)
                 if !missingKeys.isEmpty {
                     Text("— missing API key for: \(missingKeys.sorted().joined(separator: ", "))")
                         .font(.caption)
@@ -132,7 +132,7 @@ struct ModelSelectionSheet: View {
                     Spacer()
                     Text(formatCost(model))
                         .font(.system(size: 10, design: .monospaced))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(.primary)
                 }
                 .padding(.leading, 16)
             }

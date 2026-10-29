@@ -33,7 +33,7 @@ struct ResolutionDropSheet: View {
                         .foregroundStyle(.secondary)
                     Text("Drop an image here")
                         .font(.body)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(.primary)
                     Text("JPEG, PNG, TIFF, or HEIC")
                         .font(.caption)
                         .foregroundStyle(.primary)

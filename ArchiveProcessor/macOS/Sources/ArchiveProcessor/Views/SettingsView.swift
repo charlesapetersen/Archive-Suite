@@ -265,7 +265,7 @@ struct SettingsView: View {
         VStack(alignment: .leading, spacing: 6) {
             Text("Estimate — 1,000 files").font(.headline)
             Text("~\(String(format: "%.2g", effectiveStandardImageMB)) MB each")
-                .font(.caption2).foregroundStyle(.secondary)
+                .font(.caption2).foregroundStyle(.primary)
 
             if useAppleVision {
                 segmentationCostBlock
@@ -288,7 +288,7 @@ struct SettingsView: View {
                     preOCRedInput: preOCRedInput, useGateway: useGateway, ocrWorkers: ocrWorkerCount)
 
                 Divider().padding(.vertical, 2)
-                Text("COST").font(.caption2).fontWeight(.bold).foregroundStyle(.secondary)
+                Text("COST").font(.caption2).fontWeight(.bold).foregroundStyle(.primary)
                 // Segmentation's window calls are in addition to OCR and are never batched (the engine sends
                 // each window interactively), so they add the same dollars to both totals.
                 let seg = segmentationRow?.apiDollars ?? 0
@@ -303,7 +303,7 @@ struct SettingsView: View {
                 if let row = segmentationRow { costRow("· Segmentation", row.costSummary) }
 
                 Divider().padding(.vertical, 2)
-                Text("TIME (processing only)").font(.caption2).fontWeight(.bold).foregroundStyle(.secondary)
+                Text("TIME (processing only)").font(.caption2).fontWeight(.bold).foregroundStyle(.primary)
                 costRow("Total", time.totalFormatted, bold: true)
                 if time.ocrSeconds > 0 { costRow("· OCR", time.ocrFormatted) }
                 if time.rotationSeconds > 0 { costRow("· Rotation*", time.rotationFormatted) }
@@ -321,7 +321,7 @@ struct SettingsView: View {
                 Text("Approximate; varies with model, content & network.")
                     .font(.caption2).foregroundStyle(.primary)
             } else {
-                Text("Enter gateway model pricing to estimate cost.").font(.caption).foregroundStyle(.secondary)
+                Text("Enter gateway model pricing to estimate cost.").font(.caption).foregroundStyle(.primary)
                 Spacer()
             }
         }
@@ -339,7 +339,7 @@ struct SettingsView: View {
     /// usage limits apply" branch — plus the usage-window + low-concurrency pacing reality instead.
     @ViewBuilder private var localAgentCostPane: some View {
         Divider().padding(.vertical, 2)
-        Text("COST").font(.caption2).fontWeight(.bold).foregroundStyle(.secondary)
+        Text("COST").font(.caption2).fontWeight(.bold).foregroundStyle(.primary)
         HStack(alignment: .top, spacing: 6) {
             Image(systemName: "infinity.circle").foregroundStyle(.secondary)
             Text("Included in your subscription — usage limits apply.")
@@ -348,14 +348,14 @@ struct SettingsView: View {
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("ap.settings.localAgentCost")
         Text("The \(localAgentTool.displayName) CLI uses your existing subscription login, so there's no per-page charge. Hit your plan's usage window and the app paces automatically, then resumes when it resets.")
-            .font(.caption2).foregroundStyle(.secondary)
+            .font(.caption2).foregroundStyle(.primary)
             .accessibilityElement(children: .combine)
             .accessibilityIdentifier("ap.settings.localAgentPacing")
 
         Divider().padding(.vertical, 2)
-        Text("PACING").font(.caption2).fontWeight(.bold).foregroundStyle(.secondary)
+        Text("PACING").font(.caption2).fontWeight(.bold).foregroundStyle(.primary)
         Text("Runs one CLI agent turn per page, capped at a low concurrency (1–2) so it never hammers your subscription — expect it to be slower than a metered API.")
-            .font(.caption2).foregroundStyle(.secondary)
+            .font(.caption2).foregroundStyle(.primary)
 
         Spacer()
         Text("No API cost; time varies with the CLI, content & your plan's limits.")
@@ -366,7 +366,7 @@ struct SettingsView: View {
     /// subscription nor reaches a network service: it uses the Mac's performance cores directly.
     @ViewBuilder private var appleVisionCostPane: some View {
         Divider().padding(.vertical, 2)
-        Text("COST").font(.caption2).fontWeight(.bold).foregroundStyle(.secondary)
+        Text("COST").font(.caption2).fontWeight(.bold).foregroundStyle(.primary)
         HStack(alignment: .top, spacing: 6) {
             Image(systemName: "cpu").foregroundStyle(.secondary)
             Text("Free — runs on this Mac.").font(.caption)
@@ -376,13 +376,13 @@ struct SettingsView: View {
         Text(visionUseLLMJudgment
              ? "Apple Vision transcribes locally. Only the resulting text is sent to the selected direct LLM for judgement; no image or Vision setting leaves this Mac."
              : "Apple Vision transcribes locally using the Mac's performance cores. It sends no image, text, or API key off this Mac.")
-            .font(.caption2).foregroundStyle(.secondary)
+            .font(.caption2).foregroundStyle(.primary)
         Divider().padding(.vertical, 2)
-        Text("SCOPE").font(.caption2).fontWeight(.bold).foregroundStyle(.secondary)
+        Text("SCOPE").font(.caption2).fontWeight(.bold).foregroundStyle(.primary)
         Text(visionUseLLMJudgment
              ? "Vision stays free for transcription. The selected LLM is charged only for text-only classification, segmentation, dates, and generated tags."
              : "This backend transcribes only. Enable Vision + LLM judgement below to classify, segment, date, or generate tags.")
-            .font(.caption2).foregroundStyle(.secondary)
+            .font(.caption2).foregroundStyle(.primary)
         Spacer()
     }
 
@@ -390,14 +390,14 @@ struct SettingsView: View {
     @ViewBuilder private var segmentationCostBlock: some View {
         if let row = segmentationRow, row.approach.proposesBoundaries {
             Divider().padding(.vertical, 2)
-            Text("SEGMENTATION").font(.caption2).fontWeight(.bold).foregroundStyle(.secondary)
+            Text("SEGMENTATION").font(.caption2).fontWeight(.bold).foregroundStyle(.primary)
             costRow(row.label, row.costSummary)
         }
     }
 
     private func costRow(_ label: String, _ value: String, bold: Bool = false) -> some View {
         HStack {
-            Text(label).font(.caption).foregroundStyle(bold ? .primary : .secondary)
+            Text(label).font(.caption).foregroundStyle(.primary)
             Spacer()
             Text(value).font(.caption).fontWeight(bold ? .semibold : .regular)
         }
@@ -501,7 +501,7 @@ struct SettingsView: View {
                 }
                 if let route = OpenRouterRoute.forModel(selectedModel.id), selectedProvider == .openrouter {
                     Text(route.settingsNote)
-                        .font(.caption).foregroundStyle(.secondary)
+                        .font(.caption).foregroundStyle(.primary)
                         .fixedSize(horizontal: false, vertical: true)
                         .accessibilityIdentifier("ap.settings.openRouterRoute")
                 }
@@ -543,7 +543,7 @@ struct SettingsView: View {
         if let target = OCRCascade(routeID: ocrCascadeRoute).escalationModel {
             if OCRCascade.routeID(for: target) == OCRCascade.routeID(for: selectedModel) {
                 Text("That is the model above, so nothing is escalated.")
-                    .font(.caption).foregroundStyle(.secondary)
+                    .font(.caption).foregroundStyle(.primary)
             } else if storedKey(for: target.provider).isEmpty {
                 Text("No \(target.provider.rawValue) key is saved: escalated pages will fail until one is.")
                     .font(.caption).foregroundStyle(.orange)
@@ -585,7 +585,7 @@ struct SettingsView: View {
     /// exposed here rather than hidden as constants: they materially affect what on-device OCR returns.
     @ViewBuilder private var appleVisionControls: some View {
         Text("Free on-device transcription with macOS Vision. It does not use an API key or send images over the network.")
-            .font(.caption).foregroundStyle(.secondary)
+            .font(.caption).foregroundStyle(.primary)
         TextField("Languages (comma-separated BCP-47 tags)", text: $visionLanguages)
             .accessibilityIdentifier("ap.settings.visionLanguages")
         Toggle("Fast recognition", isOn: $visionFastRecognition)
@@ -595,7 +595,7 @@ struct SettingsView: View {
                 Text("Minimum confidence")
                 Spacer()
                 Text("\(Int((visionMinimumConfidence * 100).rounded()))%")
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.primary)
             }
             Slider(value: $visionMinimumConfidence, in: 0...1, step: 0.05)
                 .accessibilityIdentifier("ap.settings.visionMinimumConfidence")
@@ -606,7 +606,7 @@ struct SettingsView: View {
             .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color.secondary.opacity(0.3)))
             .accessibilityIdentifier("ap.settings.visionCustomVocabulary")
         Text("Custom vocabulary — one word per line or comma-separated.")
-            .font(.caption2).foregroundStyle(.secondary)
+            .font(.caption2).foregroundStyle(.primary)
         Toggle("Use an LLM for text-only judgement", isOn: $visionUseLLMJudgment)
             .accessibilityIdentifier("ap.settings.visionUseLLMJudgment")
         if visionUseLLMJudgment {
@@ -626,10 +626,10 @@ struct SettingsView: View {
                 }
             }
             Text("Vision performs every image read locally. Only its extracted text is sent to this LLM for classification, segmentation, dates, and tags. Add this provider's API key below.")
-                .font(.caption2).foregroundStyle(.secondary)
+                .font(.caption2).foregroundStyle(.primary)
         } else {
             Text("Transcription-only is fully offline and free. Use No tagging or Copy source file tags in Process Files.")
-                .font(.caption2).foregroundStyle(.secondary)
+                .font(.caption2).foregroundStyle(.primary)
         }
     }
 
@@ -662,10 +662,10 @@ struct SettingsView: View {
             HelpButton(text: "Step-by-step setup for Claude Code or the Gemini CLI: how to install, sign in with your subscription, and verify — no API key needed.")
         }
         if !localAgentStatus.isEmpty {
-            Text(localAgentStatus).font(.caption).foregroundStyle(.secondary)
+            Text(localAgentStatus).font(.caption).foregroundStyle(.primary)
         }
         Text("No API key needed — the CLI uses your existing subscription login. Personal use of your own subscription on your own archive is intended use.")
-            .font(.caption).foregroundStyle(.secondary)
+            .font(.caption).foregroundStyle(.primary)
     }
 
     /// Run detect-and-verify off the main actor and surface the plain-English result. Spawns the CLI
@@ -738,7 +738,7 @@ struct SettingsView: View {
             Label("Validated", systemImage: "checkmark.seal.fill")
                 .labelStyle(.titleAndIcon).font(.caption).foregroundStyle(.green)
         } else if hasKey {
-            Text("Saved").font(.caption).foregroundStyle(.secondary)
+            Text("Saved").font(.caption).foregroundStyle(.primary)
         }
     }
 
@@ -768,7 +768,7 @@ struct SettingsView: View {
                     Text("Image resolution")
                     HelpButton(text: "A size target, not a fixed dimension %. At \(Int(imageScale))% it targets \(String(format: "%.2g", imageScale / 100 * effectiveStandardImageMB)) MB per image — larger files are downscaled more, while files already at/under target are left full-resolution. Not used for pre-OCRed input (no images are sent).")
                     Spacer()
-                    Text("\(Int(imageScale))% of standard").foregroundStyle(.secondary)
+                    Text("\(Int(imageScale))% of standard").foregroundStyle(.primary)
                 }
                 Slider(value: $imageScale, in: 5...100, step: 5)
             }
@@ -779,7 +779,7 @@ struct SettingsView: View {
                 Spacer()
                 TextField("", value: $standardImageSizeMB, format: .number.precision(.fractionLength(0...1)))
                     .frame(width: 52).multilineTextAlignment(.trailing)
-                Text("MB").foregroundStyle(.secondary)
+                Text("MB").foregroundStyle(.primary)
                 Stepper("", value: $standardImageSizeMB, in: SizingBounds.imageMB, step: 0.5).labelsHidden()
             }
             .disabled(preOCRedInput)
@@ -796,7 +796,7 @@ struct SettingsView: View {
                 Spacer()
                 TextField("", value: $pdfImageSizeMB, format: .number.precision(.fractionLength(0...1)))
                     .frame(width: 52).multilineTextAlignment(.trailing)
-                Text("MB").foregroundStyle(.secondary)
+                Text("MB").foregroundStyle(.primary)
                 Stepper("", value: $pdfImageSizeMB, in: SizingBounds.imageMB, step: 0.5).labelsHidden()
             }
             .disabled(preOCRedInput)
@@ -819,7 +819,7 @@ struct SettingsView: View {
                 Spacer()
                 TextField("", value: $exportedImageSizeMB, format: .number.precision(.fractionLength(0...1)))
                     .frame(width: 52).multilineTextAlignment(.trailing)
-                Text("MB").foregroundStyle(.secondary)
+                Text("MB").foregroundStyle(.primary)
                 Stepper("", value: $exportedImageSizeMB, in: SizingBounds.imageMB, step: 0.5).labelsHidden()
             }
             .disabled(!outputImageFile || preOCRedInput)
@@ -1004,7 +1004,7 @@ struct SettingsView: View {
                     Spacer()
                 }
                 if !driveStatus.isEmpty {
-                    Text(driveStatus).font(.caption).foregroundStyle(.secondary)
+                    Text(driveStatus).font(.caption).foregroundStyle(.primary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 Text("Sign in with the same Google account on the Mac and the phone. Then Start in Live Capture — the Mac watches Drive automatically while a session is active, and the phone can pick Cloud when it scans the QR.")

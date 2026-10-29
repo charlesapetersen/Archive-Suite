@@ -31,7 +31,7 @@ struct ContentView: View {
                 VStack(spacing: 8) {
                     ProgressView()
                     Text("Headless Process Files test in progress…")
-                    Text("This window intentionally shows no UI.").font(.caption).foregroundStyle(.secondary)
+                    Text("This window intentionally shows no UI.").font(.caption).foregroundStyle(.primary)
                 }
                 .frame(minWidth: 480, minHeight: 220)
             } else {

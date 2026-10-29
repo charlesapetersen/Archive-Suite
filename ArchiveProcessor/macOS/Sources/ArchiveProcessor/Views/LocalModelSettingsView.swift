@@ -35,11 +35,11 @@ struct LocalModelSettingsView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             Text(LocalModelRoute.recommendationNote(memoryGB: memoryGB))
-                .font(.caption).foregroundStyle(.secondary)
+                .font(.caption).foregroundStyle(.primary)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier("ap.settings.localModelRecommendation")
             Text(LocalModelRoute.newspaperNote)
-                .font(.caption).foregroundStyle(.secondary)
+                .font(.caption).foregroundStyle(.primary)
                 .fixedSize(horizontal: false, vertical: true)
             Picker("Server", selection: $server) {
                 ForEach(LocalModelRoute.Server.allCases) { Text($0.rawValue).tag($0) }
@@ -52,7 +52,7 @@ struct LocalModelSettingsView: View {
                     }
                 }
                 if let pick, pick.id != picks.first?.id {
-                    Text(pick.summary).font(.caption).foregroundStyle(.secondary)
+                    Text(pick.summary).font(.caption).foregroundStyle(.primary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
@@ -70,7 +70,7 @@ struct LocalModelSettingsView: View {
                 .disabled(checking || gatewayBaseURL.isEmpty)
             }
             if let checkStatus {
-                Text(checkStatus).font(.caption).foregroundStyle(.secondary)
+                Text(checkStatus).font(.caption).foregroundStyle(.primary)
                     .fixedSize(horizontal: false, vertical: true)
                     .textSelection(.enabled)
             }

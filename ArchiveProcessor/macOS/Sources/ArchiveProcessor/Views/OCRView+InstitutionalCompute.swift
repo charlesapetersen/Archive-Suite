@@ -28,7 +28,7 @@ struct InstitutionalComputeImportControl: View {
             if let imported {
                 Text("Pages whose image matches a page the cluster read (by its bytes) take that text and cost only a short classification call; the rest are read by the run's model. The totals above still count every page.\(imported.unmatchable > 0 ? " \(imported.unmatchable) cluster page\(imported.unmatchable == 1 ? "" : "s") have incomplete provenance or missing text and match nothing." : "")")
                     .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.primary)
             } else if let problem {
                 Text(problem)
                     .font(.caption2)

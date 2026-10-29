@@ -15,7 +15,7 @@ struct ManageModelsView: View {
             if store.allCustomModels.isEmpty {
                 VStack(spacing: 8) {
                     Text("No custom models added.")
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(.primary)
                     Text("Add models here when new Anthropic or Gemini models are released, without waiting for an app update.")
                         .font(.caption)
                         .foregroundStyle(.primary)
@@ -34,7 +34,7 @@ struct ManageModelsView: View {
                                             .font(.body)
                                         Text(model.id)
                                             .font(.caption)
-                                            .foregroundStyle(.secondary)
+                                            .foregroundStyle(.primary)
                                         HStack(spacing: 12) {
                                             Text("In: $\(model.inputCostPer1M, specifier: "%.2f")/1M")
                                             Text("Out: $\(model.outputCostPer1M, specifier: "%.2f")/1M")
@@ -47,7 +47,7 @@ struct ManageModelsView: View {
                                             }
                                         }
                                         .font(.caption2)
-                                        .foregroundStyle(.secondary)
+                                        .foregroundStyle(.primary)
                                     }
                                     Spacer()
                                     Button(role: .destructive) {

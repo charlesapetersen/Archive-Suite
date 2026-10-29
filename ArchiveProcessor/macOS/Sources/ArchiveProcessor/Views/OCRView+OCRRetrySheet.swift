@@ -17,7 +17,7 @@ struct OCRRetrySheet: View {
                         .fontWeight(.semibold)
                     Text("\(processor.failedFileIndices.count) file(s) failed to produce OCR text. Retry reuses the run's original backend, or continue without them.")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(.primary)
                 }
                 Spacer()
             }
@@ -41,7 +41,7 @@ struct OCRRetrySheet: View {
                             if let msg = job.result?.errorMessage {
                                 Text(String(msg.prefix(50)))
                                     .font(.caption2)
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(.primary)
                                     .lineLimit(1)
                             }
                         }
@@ -60,7 +60,7 @@ struct OCRRetrySheet: View {
                     .font(.headline)
                 Label("Uses the same backend: \(processor.retryBackendDescription)", systemImage: "lock.fill")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.primary)
                     .fixedSize(horizontal: false, vertical: true)
             }
             .frame(maxWidth: .infinity, alignment: .leading)

@@ -143,7 +143,7 @@ struct FileTextViewerSheet: View {
                 }
             } else {
                 Text("No OCR text was returned for this file.")
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.primary)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
             if let errorMessage, !errorMessage.isEmpty {

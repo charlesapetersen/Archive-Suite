@@ -76,7 +76,7 @@ private struct ProviderKeyStep: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text(spec.blurb).font(.callout).foregroundStyle(.secondary)
+            Text(spec.blurb).font(.callout).foregroundStyle(.primary)
 
             VStack(alignment: .leading, spacing: 6) {
                 ForEach(Array(spec.steps.enumerated()), id: \.offset) { i, step in
@@ -187,7 +187,7 @@ private struct ProviderKeyStep: View {
     private func noteRow(_ icon: String, _ text: String, identifier: String) -> some View {
         HStack(alignment: .top, spacing: 6) {
             Image(systemName: icon).foregroundStyle(.secondary)
-            Text(text).font(.caption).foregroundStyle(.secondary)
+            Text(text).font(.caption).foregroundStyle(.primary)
         }
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier(identifier)

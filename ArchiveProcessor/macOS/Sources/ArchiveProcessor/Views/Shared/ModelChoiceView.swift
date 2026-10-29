@@ -28,7 +28,7 @@ struct RotationRetrySheet: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(title).font(.title2).fontWeight(.semibold)
                 if let subtitle {
-                    Text(subtitle).font(.caption).foregroundStyle(.secondary)
+                    Text(subtitle).font(.caption).foregroundStyle(.primary)
                 }
             }
             .padding()
@@ -38,7 +38,7 @@ struct RotationRetrySheet: View {
             VStack(alignment: .leading, spacing: 12) {
                 Label("Uses the same backend: \(backendDescription)", systemImage: "lock.fill")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.primary)
                     .fixedSize(horizontal: false, vertical: true)
                 Stepper(value: $rotation, in: 0...270, step: 90) {
                     Text("Rotation: \(rotation)°")

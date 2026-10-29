@@ -263,7 +263,7 @@ struct OCRView: View {
     @ViewBuilder private var segmentationCostLine: some View {
         if let row = segmentationRow {
             HStack {
-                Text("Segmentation (\(row.label)):").foregroundStyle(.secondary)
+                Text("Segmentation (\(row.label)):").foregroundStyle(.primary)
                 Spacer()
                 Text(row.costSummary)
                     .accessibilityIdentifier("ap.ocr.segmentationCost")
@@ -461,7 +461,7 @@ struct OCRView: View {
                                 .font(.caption)
                             Text("Enter your API key above, then click Resume.")
                                 .font(.caption2)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(.primary)
                             HStack {
                                 Button("Resume Batch") { resumePendingBatch() }
                                     .buttonStyle(.borderedProminent)
@@ -482,7 +482,7 @@ struct OCRView: View {
                                 .font(.caption)
                             Text("Enter your API key above, then click Resume to continue processing remaining files.")
                                 .font(.caption2)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(.primary)
                             HStack {
                                 Button("Resume Run") { resumePendingRun() }
                                     .buttonStyle(.borderedProminent)
@@ -500,7 +500,7 @@ struct OCRView: View {
                         VStack(alignment: .leading, spacing: 6) {
                             Text(info).font(.caption)
                             Text("Enter the API key above to resume saved PDF pages. If a page may have been billed without a saved result, review it before dismissing this record.")
-                                .font(.caption2).foregroundStyle(.secondary)
+                                .font(.caption2).foregroundStyle(.primary)
                             HStack {
                                 Button("Resume PDFs") { resumePendingMixedPDF() }
                                     .buttonStyle(.borderedProminent)
@@ -572,20 +572,20 @@ struct OCRView: View {
                                 .padding(.top, 2)
                             if visionUseLLMJudgment, let est = costEstimate {
                                 HStack {
-                                    Text("Text-only judgement:").foregroundStyle(.secondary)
+                                    Text("Text-only judgement:").foregroundStyle(.primary)
                                     Spacer()
                                     Text(est.classificationFormatted)
                                 }
                                 if taggingMode.llmTags {
                                     HStack {
-                                        Text("Tags / dates:").foregroundStyle(.secondary)
+                                        Text("Tags / dates:").foregroundStyle(.primary)
                                         Spacer()
                                         Text(est.taggingFormatted)
                                     }
                                 }
                                 if enableCollectionSegmentation {
                                     HStack {
-                                        Text("Collection ID:").foregroundStyle(.secondary)
+                                        Text("Collection ID:").foregroundStyle(.primary)
                                         Spacer()
                                         Text(est.collectionFormatted)
                                     }
@@ -625,7 +625,7 @@ struct OCRView: View {
                         VStack(alignment: .leading, spacing: 4) {
                             Text("Enter model pricing in Gateway Configuration above to see cost estimates.")
                                 .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(.primary)
                             segmentationCostLine
                         }
                         .padding(4)
@@ -634,14 +634,14 @@ struct OCRView: View {
                     GroupBox("Cost Estimate") {
                         VStack(alignment: .leading, spacing: 4) {
                             HStack {
-                                Text("Files:").foregroundStyle(.secondary)
+                                Text("Files:").foregroundStyle(.primary)
                                 Spacer()
                                 Text("\(droppedFiles.count)")
                             }
                             if let pdf = pdfPageEstimate {
                                 HStack {
                                     Text("PDF pages (\(droppedPDFPageCount) in \(droppedPDFFileCount) PDF\(droppedPDFFileCount == 1 ? "" : "s"), direct):")
-                                        .foregroundStyle(.secondary)
+                                        .foregroundStyle(.primary)
                                     Spacer()
                                     Text(pdf.totalStandardFormatted)
                                         .accessibilityIdentifier("ap.ocr.pdfPageCost")
@@ -650,42 +650,42 @@ struct OCRView: View {
                             if let est = costEstimate {
                                 if pdfPageEstimate != nil {
                                     HStack {
-                                        Text("Images:").foregroundStyle(.secondary)
+                                        Text("Images:").foregroundStyle(.primary)
                                         Spacer()
                                         Text("\(est.fileCount)")
                                     }
                                 }
                                 if !preOCRedInput {
                                     HStack {
-                                        Text("OCR + classification:").foregroundStyle(.secondary)
+                                        Text("OCR + classification:").foregroundStyle(.primary)
                                         Spacer()
                                         Text(est.ocrFormatted)
                                     }
                                 }
                                 if preOCRedInput && (enableTagging || enableCollectionSegmentation) {
                                     HStack {
-                                        Text("Classification (text-only):").foregroundStyle(.secondary)
+                                        Text("Classification (text-only):").foregroundStyle(.primary)
                                         Spacer()
                                         Text(est.classificationFormatted)
                                     }
                                 }
                                 if taggingMode.llmTags {
                                     HStack {
-                                        Text("Tagging (~\(max(1, est.fileCount / 3)) segments):").foregroundStyle(.secondary)
+                                        Text("Tagging (~\(max(1, est.fileCount / 3)) segments):").foregroundStyle(.primary)
                                         Spacer()
                                         Text(est.taggingFormatted)
                                     }
                                 }
                                 if enableCollectionSegmentation {
                                     HStack {
-                                        Text("Collection ID:").foregroundStyle(.secondary)
+                                        Text("Collection ID:").foregroundStyle(.primary)
                                         Spacer()
                                         Text(est.collectionFormatted)
                                     }
                                 }
                                 if est.rotationCost > 0 {
                                     HStack {
-                                        Text("Rotation:").foregroundStyle(.secondary)
+                                        Text("Rotation:").foregroundStyle(.primary)
                                         Spacer()
                                         Text(est.rotationFormatted)
                                     }
@@ -704,7 +704,7 @@ struct OCRView: View {
                             if !useGateway && batchMode && !preOCRedInput && costEstimate != nil {
                                 HStack {
                                     Text(pdfPageEstimate == nil ? "Total (batch):" : "Total (batch images + direct PDF pages):")
-                                        .foregroundStyle(.secondary)
+                                        .foregroundStyle(.primary)
                                     Spacer()
                                     // Segmentation windows are never batched, so they add the same dollars.
                                     Text(CostEstimate.money(CostEstimator.runTotal(
@@ -719,7 +719,7 @@ struct OCRView: View {
                                 let range = OCRRefusalFallback.pageCostRange(imageScale: imageScale / 100.0)
                                 Text("Pages Gemini refuses are read by a second reader: \(CostEstimate.money(range.lowerBound))–\(CostEstimate.money(range.upperBound)) a page with a key, free with claude by plan. Not in the totals.")
                                     .font(.caption2)
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(.primary)
                                     .accessibilityIdentifier("ap.ocr.secondReaderCost")
                             }
                             if pageKindsActive && !droppedFiles.isEmpty {
@@ -737,7 +737,7 @@ struct OCRView: View {
                                 // W41.app-ocr-cascade — escalated pages are read again, outside the totals above.
                                 Text("Pages \(effectiveModel.displayName) fails\(cascade.onDisagreement ? ", or whose word count disagrees with Apple Vision's," : "") are read again by \(target.provider.rawValue) · \(target.displayName): about \(CostEstimate.money(page)) a page. Not in the totals.")
                                     .font(.caption2)
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(.primary)
                                     .accessibilityIdentifier("ap.ocr.cascadeCost")
                             }
                             Text(useGateway ? "Estimates based on user-provided pricing. Actual gateway costs may differ." : "Estimates calibrated from actual API usage with high-resolution archival photos. Actual costs may vary with image resolution.")
@@ -763,7 +763,7 @@ struct OCRView: View {
                 GroupBox("Output Folder") {
                     HStack {
                         Text(outputDirectory?.lastPathComponent ?? "Not set")
-                            .foregroundStyle(outputDirectory == nil ? .secondary : .primary)
+                            .foregroundStyle(.primary)
                             .lineLimit(1)
                             .truncationMode(.middle)
                         Spacer()
@@ -861,7 +861,7 @@ struct OCRView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Review tags and segmentation below. Arrow keys to navigate, 1-4 to classify, Enter to edit.")
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(.primary)
                         HStack(spacing: 12) {
                             Button(action: { processor.redoTagging() }) {
                                 Label("Redo Segmentation & Tagging", systemImage: "arrow.counterclockwise")
@@ -884,7 +884,7 @@ struct OCRView: View {
                         ProgressView(value: processor.progress)
                         Text(processor.statusMessage)
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(.primary)
                     }
                 }
             }
@@ -1086,7 +1086,7 @@ struct OCRView: View {
             Text("Document Segments (\(processor.segments.count))")
                 .font(.caption)
                 .fontWeight(.semibold)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(.primary)
             VStack(alignment: .leading, spacing: 2) {
                 ForEach(Array(processor.segments.enumerated()), id: \.offset) { index, seg in
                     HStack(spacing: 6) {
@@ -1116,7 +1116,7 @@ struct OCRView: View {
             Text("Collections (\(processor.collectionSegments.count))")
                 .font(.caption)
                 .fontWeight(.semibold)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(.primary)
             VStack(alignment: .leading, spacing: 2) {
                 ForEach(Array(processor.collectionSegments.enumerated()), id: \.offset) { _, seg in
                     HStack(spacing: 6) {
@@ -1172,7 +1172,7 @@ struct OCRView: View {
 
             Text("macOS may ask you to allow Keychain access for each provider item. Click \"Always Allow\" for every prompt; Settings may read several keys at once.")
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(.primary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 8)
 
@@ -1200,7 +1200,7 @@ struct OCRView: View {
                     .fontWeight(.medium)
                 Text(detail)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.primary)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }

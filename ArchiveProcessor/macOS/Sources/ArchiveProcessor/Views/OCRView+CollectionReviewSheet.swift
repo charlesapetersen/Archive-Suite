@@ -23,11 +23,11 @@ struct CollectionReviewSheet: View {
                     if hasBoxes {
                         Text("Verify and correct collection names for each box. Files between boxes are automatically assigned to the preceding box's collection.")
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(.primary)
                     } else {
                         Text("No box labels were identified. Enter a name for this collection.")
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(.primary)
                     }
                 }
                 Spacer()
@@ -57,7 +57,7 @@ struct CollectionReviewSheet: View {
                         .frame(maxWidth: 400)
                     Text("All \(processor.jobs.count) files will be organized into this collection.")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(.primary)
                     Spacer()
                 }
                 .frame(maxWidth: .infinity)
@@ -70,7 +70,7 @@ struct CollectionReviewSheet: View {
                 if hasBoxes {
                     Text("\(processor.collectionReviewItems.count) box\(processor.collectionReviewItems.count == 1 ? "" : "es")")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(.primary)
                 }
                 Spacer()
                 Button("Confirm and Organize") {

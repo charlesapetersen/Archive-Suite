@@ -77,7 +77,7 @@ struct SegmentationChooserView: View {
                 }
             } else {
                 Text("The segmentation figures are missing from this build; only Full manual is offered.")
-                    .font(.caption2).foregroundStyle(.secondary)
+                    .font(.caption2).foregroundStyle(.primary)
             }
         }
         .sheet(isPresented: Binding(get: { !wizardSpecs.isEmpty }, set: { if !$0 { wizardSpecs = [] } })) {
@@ -119,11 +119,11 @@ struct LocalSegmenterControls: View {
                     .controlSize(.small).disabled(checking)
                     .accessibilityIdentifier("ap.segmentation.local.check")
                 if let checkResult {
-                    Text(checkResult).font(.caption2).foregroundStyle(.secondary)
+                    Text(checkResult).font(.caption2).foregroundStyle(.primary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
-            Text(LocalSegmenter.startHint).font(.caption2).foregroundStyle(.secondary)
+            Text(LocalSegmenter.startHint).font(.caption2).foregroundStyle(.primary)
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
@@ -176,10 +176,10 @@ struct SegmentationRowCard: View {
                         figure("Cost", line)
                     }
                     ForEach(row.priceNotes, id: \.self) { note in
-                        Text(note).font(.caption2).foregroundStyle(.secondary)
+                        Text(note).font(.caption2).foregroundStyle(.primary)
                     }
                     ForEach(row.notes, id: \.self) { note in
-                        Text(note).font(.caption2).foregroundStyle(.secondary)
+                        Text(note).font(.caption2).foregroundStyle(.primary)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
@@ -194,7 +194,7 @@ struct SegmentationRowCard: View {
     }
 
     private func figure(_ label: String, _ value: String) -> some View {
-        Text("\(Text(label + ": ").foregroundStyle(.secondary))\(value)")
+        Text("\(Text(label + ": ").foregroundStyle(.primary))\(value)")
             .font(.caption)
             .fixedSize(horizontal: false, vertical: true)
     }

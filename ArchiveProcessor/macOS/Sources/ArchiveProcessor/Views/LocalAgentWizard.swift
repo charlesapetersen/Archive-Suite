@@ -66,7 +66,7 @@ private struct LocalAgentStep: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text(spec.blurb).font(.callout).foregroundStyle(.secondary)
+            Text(spec.blurb).font(.callout).foregroundStyle(.primary)
 
             VStack(alignment: .leading, spacing: 6) {
                 ForEach(Array(spec.steps.enumerated()), id: \.offset) { i, step in
@@ -113,7 +113,7 @@ private struct LocalAgentStep: View {
             if let status { statusView(status) }
 
             Text("No API key needed — the CLI uses your existing subscription login.")
-                .font(.caption).foregroundStyle(.secondary)
+                .font(.caption).foregroundStyle(.primary)
         }
         .onAppear {
             // Pre-fill from the current Settings config so the wizard reflects what's already set.
@@ -127,7 +127,7 @@ private struct LocalAgentStep: View {
     private func noteRow(_ icon: String, _ text: String, identifier: String) -> some View {
         HStack(alignment: .top, spacing: 6) {
             Image(systemName: icon).foregroundStyle(.secondary)
-            Text(text).font(.caption).foregroundStyle(.secondary)
+            Text(text).font(.caption).foregroundStyle(.primary)
         }
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier(identifier)
