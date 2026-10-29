@@ -18,15 +18,17 @@ baseline R, P, F against the hand baselines, and the share of truth word boxes w
 
 Step two, readings placed on the lines (every detector, so the pick is visible, not assumed):
 
-  prop      our proportional aligner: the reading's lines matched in order to the detected lines by a monotone
-            dynamic programme on length (characters against the line's length, page-relative), words placed along
-            the baseline in proportion to their characters. What every production writer does within a line.
+  prop      our proportional aligner: the reading's lines matched in order to runs of consecutive detected lines
+            (one to SPAN of them, since a reader may reflow a paragraph into one line, as LightOnOCR-3 does) by a
+            monotone dynamic programme on length (characters against the lines' length, page-relative); a run's
+            words shared out by the lines' lengths, then placed along each baseline in proportion to their
+            characters. What every production writer does within a line.
   flow      the reading's words poured across the detected lines in order, by the lines' lengths; ignores the
             reading's line breaks.
   ctc-<m>   forced alignment through a kraken CTC recogniser <m>: each detected line is recognised, the reading's
-            lines are matched to them by the same programme on character error instead of length, and each
-            matched line's text is placed by kraken's `ForcedAlignmentTaskModel` (character cuts along the
-            baseline); a line it cannot align falls back to proportional. Models: `revcity` (zenodo 19238205, an
+            lines are matched to runs of them by the same programme on character error instead of length, and each
+            reading line is force-aligned over its run's frames joined end to end, which also decides where a
+            reflowed line breaks (ctc_char_spans); a run it cannot align falls back to proportional. Models: `revcity` (zenodo 19238205, an
             English 18th-century archival hand) and `mccatmus` (McCATMuS, zenodo 13788177, 16th-21st c.). The
             alignment runs on the recogniser's logits (see ctc_char_spans: kraken 7.1.1's own cut positions are
             wrong); word boxes take the line's height as `prop` does, so the two differ only in where along the
@@ -57,6 +59,7 @@ import subprocess
 import sys
 import time
 import xml.etree.ElementTree as ET
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -342,9 +345,14 @@ def px_lines(det, W, H):
     return out
 
 
+SPAN = 8          # a reading line may cover up to this many consecutive detected lines (a reader that reflows)
+SPAN_COST = 0.05  # per extra line covered, so a one-to-one reading is preferred when the costs tie
+
+
 def dp_match(n_read, n_det, cost, skip):
-    """Monotone one-to-one matching of reading lines to detected lines; unmatched either side costs `skip`.
-    Returns {reading index: detected index}."""
+    """Monotone matching of reading lines to runs of consecutive detected lines: reading line i covers detected
+    lines j..j+k-1 (k = 1..SPAN) at cost(i, j, k); a reading line or a detected line left unmatched costs `skip`.
+    Returns {reading index: (first detected index, count)}."""
     INF = float('inf')
     D = [[INF] * (n_det + 1) for _ in range(n_read + 1)]
     B = [[None] * (n_det + 1) for _ in range(n_read + 1)]
@@ -354,24 +362,44 @@ def dp_match(n_read, n_det, cost, skip):
             d = D[i][j]
             if d == INF:
                 continue
-            if i < n_read and j < n_det and d + cost(i, j) < D[i + 1][j + 1]:
-                D[i + 1][j + 1], B[i + 1][j + 1] = d + cost(i, j), (i, j, 'm')
-            if i < n_read and d + skip < D[i + 1][j]:
-                D[i + 1][j], B[i + 1][j] = d + skip, (i, j, 'r')
+            if i < n_read:
+                for k in range(1, min(SPAN, n_det - j) + 1):
+                    c = d + cost(i, j, k) + SPAN_COST * (k - 1)
+                    if c < D[i + 1][j + k]:
+                        D[i + 1][j + k], B[i + 1][j + k] = c, (i, j, k)
+                if d + skip < D[i + 1][j]:
+                    D[i + 1][j], B[i + 1][j] = d + skip, (i, j, 0)
             if j < n_det and d + skip < D[i][j + 1]:
-                D[i][j + 1], B[i][j + 1] = d + skip, (i, j, 'd')
+                D[i][j + 1], B[i][j + 1] = d + skip, (i, j, -1)
     out, i, j = {}, n_read, n_det
     while B[i][j]:
-        pi, pj, mv = B[i][j]
-        if mv == 'm':
-            out[pi] = pj
+        pi, pj, k = B[i][j]
+        if k > 0:
+            out[pi] = (pj, k)
         i, j = pi, pj
     return out
 
 
 def length_cost(rl, dl):
     rho = sum(len(r) for r in rl) / sum(d['len'] for d in dl)
-    return lambda i, j: abs(math.log((len(rl[i]) + 1) / (dl[j]['len'] * rho + 1)))
+    return lambda i, j, k: abs(math.log((len(rl[i]) + 1) / (sum(d['len'] for d in dl[j:j + k]) * rho + 1)))
+
+
+def split_by_length(text, lens):
+    """A reading line's words shared out over consecutive lines by their lengths: each word goes to the line in
+    which its first character falls."""
+    toks = text.split()
+    total = sum(len(w) + 1 for w in toks)
+    bounds, acc = [], 0.0
+    for L in lens:
+        acc += L / sum(lens)
+        bounds.append(acc)
+    out, pos = [[] for _ in lens], 0
+    for w in toks:
+        f = pos / total
+        out[next((k for k, b_ in enumerate(bounds) if f < b_), len(lens) - 1)].append(w)
+        pos += len(w) + 1
+    return [' '.join(x) for x in out]
 
 
 def prop_words(text, ln, W, H):
@@ -407,8 +435,12 @@ def place_prop(t, det, rl):
     dl = px_lines(det, W, H)
     if not dl:
         return {'words': [], 'lines': []}
-    m = dp_match(len(rl), len(dl), length_cost(rl, dl), SKIP['length'])
-    return hyp_page({j: rl[i] for i, j in m.items()}, dl, W, H, lambda j, s: prop_words(s, dl[j], W, H))
+    assigned = {}
+    for i, (j, k) in dp_match(len(rl), len(dl), length_cost(rl, dl), SKIP['length']).items():
+        for n, chunk in enumerate(split_by_length(rl[i], [d['len'] for d in dl[j:j + k]])):
+            if chunk:
+                assigned[j + n] = chunk
+    return hyp_page(assigned, dl, W, H, lambda j, s: prop_words(s, dl[j], W, H))
 
 
 def place_flow(t, det, rl):
@@ -431,39 +463,48 @@ def place_flow(t, det, rl):
     return hyp_page(assigned, dl, W, H, lambda j, s: prop_words(s, dl[j], W, H))
 
 
-def ctc_char_spans(net, logits, text, pad):
-    """Each character of `text` as a (start, end) fraction of the line, by CTC forced alignment over the
-    recogniser's own output. kraken.tasks.align's trellis and backtrack, but the frames are scaled to the line as
-    kraken's recogniser scales its own cuts. ForcedAlignmentTaskModel.predict in kraken 7.1.1 packs the text at the
-    line's start (p049's first line ends at 264 px where its recognition ends at 1307): it takes log_softmax of
-    record.logits, which are already probabilities, so every frame is near uniform. A character the model's codec lacks takes its place between its neighbours.
-    None when the line is too short for the text (kraken's own guard: fewer than two frames a label)."""
+def ctc_char_spans(net, logits_list, text, pad):
+    """Each character of `text` as (line, start, end): which of the consecutive lines it falls on and where, as a
+    fraction of that line, by CTC forced alignment over the recogniser's own output with the lines' frames joined
+    end to end (so a reading line that runs over several written lines is split where the ink says).
+    kraken.tasks.align's trellis and backtrack, with the frames scaled to each line as kraken's recogniser scales
+    its own cuts. ForcedAlignmentTaskModel.predict in kraken 7.1.1 packs the text at the line's start (p049's first
+    line ends at 264 px where its recognition ends at 1307): it takes log_softmax of record.logits, which are
+    already probabilities, so every frame is near uniform. A character the model's codec lacks takes its place
+    after its predecessor. None when the lines are too short for the text (kraken's own guard: fewer than two
+    frames a label)."""
+    import torch
     from kraken.tasks.align import get_trellis, backtrack, merge_repeats
     keep = [k for k, c in enumerate(text) if c in net.codec.c2l]
     if not keep:
         return None
     sub = ''.join(text[k] for k in keep)
     labels = net.codec.encode(sub).long()
-    logits = logits.detach().float().cpu()
-    T = logits.shape[-1]
-    if len(labels) != len(sub) or T < 2 * len(labels):
+    parts = [lg.detach().float().cpu().squeeze() for lg in logits_list]
+    lens = [x.shape[-1] for x in parts]
+    if len(labels) != len(sub) or sum(lens) < 2 * len(labels):
         return None
-    # kraken's `logits` are the softmax output (each frame sums to 1); log_softmax over them, as
-    # tasks/align.py does, flattens every frame and the path packs the text at the line's start
-    emission = logits.squeeze().clamp_min(1e-12).log().T
+    # kraken's `logits` are the softmax output (each frame sums to 1): their log, not log_softmax
+    emission = torch.cat(parts, dim=-1).clamp_min(1e-12).log().T
     segs = merge_repeats(backtrack(get_trellis(emission, labels), emission, labels), sub)
     if len(segs) != len(sub):
         return None
-    win = T * net.net_scale
-    frac = lambda f: max(0.0, min(1.0, (f * net.net_scale - pad) / max(1.0, win - 2 * pad)))
+    starts = [sum(lens[:n]) for n in range(len(lens))]
+
+    def where(f):
+        n = max(k for k, s0 in enumerate(starts) if s0 <= f)
+        T = lens[n]
+        local = f - starts[n]
+        return n, max(0.0, min(1.0, (local * net.net_scale - pad) / max(1.0, T * net.net_scale - 2 * pad)))
     spans = [None] * len(text)
     for k, sg in zip(keep, segs):
-        spans[k] = (frac(sg.start), frac(sg.end))
-    for k in range(len(text)):  # unencodable characters: between the known neighbours
+        n, s0 = where(sg.start)
+        n1, s1 = where(max(sg.start, sg.end - 1))
+        spans[k] = (n, s0, s1 if n1 == n else 1.0)
+    for k in range(len(text)):
         if spans[k] is None:
-            prev = next((spans[i][1] for i in range(k - 1, -1, -1) if spans[i]), 0.0)
-            nxt = next((spans[i][0] for i in range(k + 1, len(text)) if spans[i]), 1.0)
-            spans[k] = (prev, max(prev, nxt))
+            prev = next((spans[i] for i in range(k - 1, -1, -1) if spans[i]), (0, 0.0, 0.0))
+            spans[k] = (prev[0], prev[2], prev[2])
     return spans
 
 
@@ -503,28 +544,34 @@ def place_ctc(model_name, todo, det_name, routes):
             out = CACHE / 'hyp' / f'{det_name}.ctc-{model_name}.{route}' / f'{key(t)}.json'
             if rl is None:
                 continue
-            cost = lambda i, j: min(1.0, place_score.cer(recog.get(j, ''), rl[i]))
+            cost = lambda i, j, k: min(1.0, place_score.cer(' '.join(recog.get(j + n, '') for n in range(k)), rl[i]))
             m = dp_match(len(rl), len(dl), cost, SKIP['text'])
-            assigned = {j: rl[i] for i, j in m.items()}
             t1 = time.time()
-            fallback = 0
-
-            def words_of(j, text):
-                nonlocal fallback
-                r = recs.get(j)
-                spans = ctc_char_spans(net, r.logits, text, cfg.padding) if r is not None and r.logits is not None else None
+            assigned, placed, fallback = {}, {}, 0
+            for i, (j, k) in m.items():
+                text, span = rl[i], range(j, j + k)
+                spans = None
+                if all(recs.get(n) is not None and recs[n].logits is not None for n in span):
+                    spans = ctc_char_spans(net, [recs[n].logits for n in span], text, cfg.padding)
                 if spans is None:
                     fallback += 1
-                    return prop_words(text, dl[j], W, H)
-                d, ws = dl[j], []
+                    for n, chunk in zip(span, split_by_length(text, [dl[n]['len'] for n in span])):
+                        if chunk:
+                            assigned[n], placed[n] = chunk, prop_words(chunk, dl[n], W, H)
+                    continue
                 for mt in re.finditer(r'\S+', text):
-                    s0, s1 = spans[mt.start()][0] * d['len'], spans[mt.end() - 1][1] * d['len']
-                    a_, b_ = at(d['baseline'], s0), at(d['baseline'], max(s1, s0 + 1))
+                    n0, s0, _ = spans[mt.start()]
+                    n1, _, e1 = spans[mt.end() - 1]
+                    e1 = e1 if n1 == n0 else 1.0
+                    d = dl[j + n0]
+                    a_, b_ = at(d['baseline'], s0 * d['len']), at(d['baseline'], max(e1 * d['len'], s0 * d['len'] + 1))
                     top = min(a_[1], b_[1]) - FRAC * d['h']
                     bot = max(a_[1], b_[1]) + (1 - FRAC) * d['h']
                     x0, x1 = min(a_[0], b_[0]), max(a_[0], b_[0])
-                    ws.append({'text': mt.group(), 'box': [x0 / W, top / H, max(x1 - x0, 1) / W, (bot - top) / H]})
-                return ws
+                    assigned[j + n0] = (assigned.get(j + n0, '') + ' ' + mt.group()).strip()
+                    placed.setdefault(j + n0, []).append(
+                        {'text': mt.group(), 'box': [x0 / W, top / H, max(x1 - x0, 1) / W, (bot - top) / H]})
+            words_of = lambda j, s_: placed[j]
             hyp = hyp_page(assigned, dl, W, H, words_of)
             hyp['meta'] = {'recognise_s': rsec, 'align_s': time.time() - t1, 'matched_lines': len(assigned),
                            'fallback_lines': fallback, 'model': model_name}
@@ -560,9 +607,12 @@ def align(det_name, method, routes, only=None):
 FUNCTIONAL_BIN = CACHE / 'place_functional'
 
 
-def functional(t, hyp_file: Path) -> dict | None:
+def functional_bin():
     if not FUNCTIONAL_BIN.exists() or FUNCTIONAL_BIN.stat().st_mtime < (HERE / 'place_functional.swift').stat().st_mtime:
         subprocess.run(['swiftc', '-O', str(HERE / 'place_functional.swift'), '-o', str(FUNCTIONAL_BIN)], check=True)
+
+
+def functional(t, hyp_file: Path) -> dict:
     truth = place_truth.STORE / f"{key(t)}.json"
     pdf = CACHE / 'pdf' / hyp_file.parent.name / f'{key(t)}.pdf'
     pdf.parent.mkdir(parents=True, exist_ok=True)
@@ -612,31 +662,87 @@ def score():
                                      'lines': len(det['lines']), 'truth_lines': b['truth_baselines'],
                                      'seconds': det.get('seconds'), 'device': det.get('device')})
         res['detectors'][name] = {g: summarise_det(r) for g, r in rows.items() if r}
+    functional_bin()
+    jobs = [(d, t) for d in sorted((CACHE / 'hyp').iterdir()) for t in ps if (d / f'{key(t)}.json').exists()]
+    with ThreadPoolExecutor(8) as ex:
+        fun_of = dict(zip(((d.name, t['page']) for d, t in jobs), ex.map(lambda dt: functional(dt[1], dt[0] / f'{key(dt[1])}.json'), jobs)))
     for hyp_dir in sorted((CACHE / 'hyp').iterdir()):
         det_name, method, route = hyp_dir.name.split('.', 2)
-        rows, fun = [], {g: {'n': 0, 'find': 0, 'placed': 0} for g in GROUPS}
+        rows, fun = [], {g: {'n': 0, 'find': 0, 'placed': 0, 'pages_placed_80': 0} for g in GROUPS}
         for t in ps:
             f = hyp_dir / f'{key(t)}.json'
             if not f.exists():
                 continue
             rows.append(place_score.score_page(t, json.loads(f.read_text())))
-            fr = functional(t, f)
+            fr = fun_of[(hyp_dir.name, t['page'])]
             g = fun[t['group']]
             g['n'] += fr.get('words', 0)
             g['find'] += fr.get('found', 0)
             g['placed'] += fr.get('placed', 0)
+            # a page whose highlight lands on the word for at least 80% of the words Find finds
+            g['pages_placed_80'] += fr.get('found', 0) > 0 and fr['placed'] >= 0.8 * fr['found']
         by = {}
         for g in GROUPS:
             gr = [r for r in rows if r['group'] == g]
             if gr:
-                p = place_score.pooled(gr)
-                by[g] = {k: p[k] for k in ('pages', 'truth_words', 'f1@centre', 'f1@0.5', 'f1@0.7', 'alignment')}
+                pl = place_score.pooled(gr)
+                by[g] = {k: pl[k] for k in ('pages', 'truth_words', 'f1@centre', 'f1@0.5', 'f1@0.7', 'alignment')}
                 by[g]['functional'] = fun[g]
         res['placement'][hyp_dir.name] = {'detector': det_name, 'method': method, 'reading': route, 'by_group': by}
     RESULTS.mkdir(parents=True, exist_ok=True)
     (RESULTS / 'place-hands.json').write_text(json.dumps(res, indent=1) + '\n')
+    (RESULTS / 'place-hands.md').write_text(write_md(res))
     print(json.dumps(res['detectors'], indent=1))
     return res
+
+
+FINDINGS = (HERE / 'place_hands_findings.md')
+
+
+def write_md(res) -> str:
+    f = lambda x, d=3: '—' if x is None else f'{x:.{d}f}'
+    pc = lambda a, b: f'{a} / {b} ({100 * a / b:.0f}%)' if b else '—'
+    out = ['# W46.place-hands — whether handwritten pages can leave the text page', '',
+           'Generated by `ArchiveProcessor/scripts/segbench/place_hands.py score` (F-placement §7 test 4, 10-gap-audit §5 '
+           'item 23). Pages: the placement truth\'s hand pages the audit passed (`--verdict ok`): '
+           f"{res['pages']['owner-hand']} of the owner's 21 handwritten or mixed pages and {res['pages']['L2-bentham']} "
+           'of the 20 Bentham pages (L2; L1 has no geometry, so these are the plan\'s "160 L1/L2" that can be scored). '
+           'Bentham\'s audited pages carry line geometry only, so its word and functional figures are empty. '
+           'Everything ran on the Mac (M3 Pro, 18 GB) or from saved runs; no money, no cluster.', '']
+    if FINDINGS.exists():
+        out += [FINDINGS.read_text().strip(), '']
+    out += ['## Step one: line detectors', '',
+            '| detector | group | baseline R | P | F | truth words inside a line | lines found / truth | s a page | where |',
+            '|---|---|---:|---:|---:|---:|---:|---:|---|']
+    for name, by in res['detectors'].items():
+        for g, d in by.items():
+            out.append(f"| {name} | {g} | {f(d['R'])} | {f(d['P'])} | {f(d['F'])} | {f(d['words_inside'])} | "
+                       f"{d['lines']} / {d['truth_lines']} | {f(d['seconds_per_page'], 1)} | {d['device']} |")
+    out += ['', 'Reference, same truth and scorer (segbench-results/place-truth.md): Apple Vision\'s own lines on the '
+            'owner-hand pages, baseline F 0.733.', '']
+    for route in READINGS:
+        rows = {k: v for k, v in res['placement'].items() if v['reading'] == route}
+        if not rows:
+            continue
+        out += [f'## Step two: `{route}` placed on the lines', '',
+                '| detector | method | owner-hand F1@centre | F1@0.5 | line alignment | Find | placed on the word | '
+                'pages placed ≥80% of found | Bentham line alignment |',
+                '|---|---|---:|---:|---:|---:|---:|---:|---:|']
+        for k, v in sorted(rows.items(), key=lambda kv: -(kv[1]['by_group'].get('owner-hand', {}).get('f1@centre') or 0)):
+            o, b = v['by_group'].get('owner-hand'), v['by_group'].get('L2-bentham')
+            if o:
+                fu = o['functional']
+                cells = [f(o['f1@centre']), f(o['f1@0.5']), f(o['alignment']), pc(fu['find'], fu['n']),
+                         pc(fu['placed'], fu['n']), f"{fu['pages_placed_80']} / {o['pages']}"]
+            else:
+                cells = ['—'] * 6
+            out.append(f"| {v['detector']} | {v['method']} | " + ' | '.join(cells) + f" | {f(b['alignment']) if b else '—'} |")
+        out.append('')
+    out += ['Reference: Vision\'s own words on the owner-hand pages (it reads as well as places): F1@centre 0.761, '
+            'line alignment 0.698 (place-truth.md, the 20 audited ok). Find counts truth words of four or more letters; '
+            '"placed" is a Find hit whose highlight meets the word\'s truth box (`place_functional.swift`, writer `--fit`).',
+            '']
+    return '\n'.join(out) + '\n'
 
 
 def summarise_det(rows):
