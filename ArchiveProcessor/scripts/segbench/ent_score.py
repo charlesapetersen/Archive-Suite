@@ -1,10 +1,15 @@
 #!/usr/bin/env python3
 """W46.ent-score: what the entity fields the app extracts are worth, scored against W46.fix-ent-truth's truth.
 
-    python3 ent_score.py nltag                    # Apple NLTagger name spans + the position rule (nltag_names.swift)
-    GLINER_PY ent_score.py gliner --size small    # GLiNER2.5 small|base|multi, schema and label calls (venv below)
-    python3 ent_score.py nowhere                  # replies' names found nowhere in the prompt: classify, judge, audit
+    python3 ent_score.py nltag [--cap 3000]       # Apple NLTagger name spans + the position rule (nltag_names.swift)
+    GLINER_PY ent_score.py gliner --size small [--cap 3000]   # GLiNER2.5 small|base|multi, schema and label calls
+    python3 ent_score.py nowhere                  # replies' names found nowhere in the text: classify, judge, audit
     python3 ent_score.py report                   # segbench-results/ent-score.md and .json
+
+The local extractors run twice: on the truth readers' text (the first TEXT_CAP = 8,000 characters, scored on all
+138) and with --cap 3000 on the first 3,000 characters, which is all of the document the app's tagging prompt
+carries (date_tagging.build_prompt), so the 82-document table compares the replies and the local extractors on the
+same input. The --cap run is stored under the extractor's name with an "@3000" suffix.
 
 GLINER_PY is ~/Library/Caches/ArchiveSuiteRehearsal/ent-score/gliner-venv/bin/python, a uv venv holding
 `gliner2[local]` (2.1.0; the 2.5 checkpoints load through `AutoExtractor`, which picks the boundary architecture).
@@ -18,25 +23,35 @@ The extractors (gap audit section 5 item 31, G-entities.md tests 1, 5 and 8):
   TEXT_CAP characters), two ways: the schema call (`create_schema().structure("letter")` with three described
   fields, the first instance taken) and the label call (`extract_entities` with the three fields as described
   labels). Threshold: the package default.
-- Apple NLTagger (`nameType`, joined names) gives person, place and organisation spans, not roles, so a position
-  rule assigns them (G-entities R1): the sender is the last person after a closing phrase, else the last person in
-  the final lines, else the first organisation in the letterhead lines; the recipient is the person in the lines
-  between the top and the salutation (the inside address), else the person on the salutation line; the sending
-  place is the first place in the letterhead lines. The same rule over GLiNER's plain person / organisation /
-  location spans is scored too, so the rule's share of the error can be told from the tagger's.
+- Apple NLTagger (`nameType`, joined names, language fixed to English so noisy OCR is not guessed as another
+  language) gives person, place and organisation spans, not roles, so a position rule assigns them (G-entities R1):
+  the sender is the first person at or after a closing phrase (cc lines and typist initials come later), else the
+  last person in the final lines below the salutation, else the first organisation in the letterhead lines; the
+  recipient is the last person in the lines between the top and the salutation (the inside address), else the
+  person on the salutation line, and with no salutation the first person in the letterhead lines who is not the
+  sender; the sending place is the first place in the letterhead lines. The same rule over GLiNER's plain person /
+  organisation / location spans is scored too, so the rule's share of the error can be told from the tagger's, and
+  the report gives each tagger's ceiling: the named truth entities some span of its matches at all.
 
 Scoring is ent_truth.score_rows unchanged (exact, overlap and edit-distance-2 F1 per field over named truth
 entities, null and wrong-when-filled counts, evidence validity). The replies give a single string per field, so a
-document with several truth recipients caps their recall; the report counts those documents.
+document with several truth recipients caps their recall; the report counts those documents. "Null when any truth"
+counts documents with any truth entity, inferred ones included, since a null there is still a miss for the user.
+The "names in the text it saw" column tests each predicted name against the text that extractor was given.
 
-Names found nowhere in the prompt (G test 8). A reply's name is "nowhere" when ent_truth.in_text fails on the
-prompt the model was given. Each is first classed against the truth: it matches (ed2) a truth entity whose quote is
-in the text, so the model corrected or completed a name the text has (text_corrected); it matches a truth entity not written in the text (image-only
-or inferred), so the model inferred it from knowledge or context and was right; or it matches nothing, which is
-doubtful (a place is looked for by its city alone, since the prompt asks for "City, State"). Every doubtful name goes to Claude Sonnet 5 through the Stanford gateway with the document's text and its
-first and last page images, which classes it as ocr_garble, knowledge (right), knowledge (wrong), wrong_role or
-invention; a second family, GPT 5.6 Luna, audits each one blind, and the two are reported with their agreement.
-The judges share families with the truth's drafters but not with any scored model.
+Names found nowhere in the text (G test 8). A reply's name is "nowhere" when ent_truth.in_text fails on the document
+text the prompt carried (apostrophes dropped first, so "O'Brien" is found in "O'Brien"). Each is classed, in order:
+it matches (ed2) a truth entity whose quote is in that text, so the model corrected or completed a name the text has
+(text_corrected); it matches a truth entity not written in the text it saw (image-only, inferred, or past the
+3,000th character), so the model inferred it and was right (knowledge_right); it has no token of three letters
+(initials only, which in_text cannot place); it is one of the prompt template's example names ("John Smith",
+"Washington, D.C."); it is written in one of the nearby documents' snippets the prompt also carries, so it was lifted
+from the wrong document (neighbour_context); or it matches nothing, which is doubtful (a place is looked for by its
+city alone, since the prompt asks for "City, State"). Every doubtful name goes to Claude Sonnet 5 through the
+Stanford gateway with the document's text and its first and last page images, which classes it as ocr_garble,
+knowledge (right), knowledge (wrong), wrong_role or invention; a second family, GPT 5.6 Luna, audits each one blind,
+and the two are reported with their agreement. The judges share families with the truth's drafters but not with any
+scored model.
 
 The gateway is real money on a Stanford PTA: CAP bounds this item's spend, counted from token usage at the PRICE
 table of ent_truth (an estimate; the gateway returns no cost). Texts, images, predictions and judgements stay in
@@ -87,8 +102,21 @@ def truth_rows():
     return [(r, docs[r["id"]]) for r in rows if r["is_correspondence"]]
 
 
-def text_of(d):
-    return d["text"][:ET.TEXT_CAP]
+REPLY_CAP = 3000          # date_tagging.build_prompt's text[:3000]: all of the document the tagging prompt carries
+
+
+def text_of(d, cap=ET.TEXT_CAP):
+    return d["text"][:cap]
+
+
+def seen_text(d):
+    """The document text inside the tagging prompt the cached replies answered (the first REPLY_CAP characters)."""
+    import date_tagging as DT
+    return DT.doc_text(d["prompt"])
+
+
+def pred_name(name, cap):
+    return name if cap == ET.TEXT_CAP else f"{name}@{cap}"
 
 
 def reply_json(path):
@@ -170,7 +198,8 @@ def merge_spans(spans, text):
             joins = (len(gap) <= 6 and re.fullmatch(r"[ \t]*([A-Z]\.?[ \t]*)*", gap)) or \
                 (s["tag"] == "place" and re.fullmatch(r"[ \t]*,[ \t]*", gap))
             if joins:
-                out[-1] = {**out[-1], "end": s["end"], "text": text[out[-1]["start"]:s["end"]]}
+                end = max(out[-1]["end"], s["end"])      # a nested span must not shrink the merged one
+                out[-1] = {**out[-1], "end": end, "text": text[out[-1]["start"]:end]}
                 continue
         out.append(dict(s))
     return out
@@ -224,18 +253,22 @@ def cmd_nltag(a):
         os.makedirs(CACHE, exist_ok=True)
         subprocess.run(["swiftc", "-O", NLTAG_SRC, "-o", NLTAG_BIN], check=True)
     rows = truth_rows()
-    inp = "".join(json.dumps({"id": r["id"], "text": text_of(d)}) + "\n" for r, d in rows)
+    inp = "".join(json.dumps({"id": r["id"], "text": text_of(d, a.cap)}) + "\n" for r, d in rows)
     t = time.time()
     out = subprocess.run([NLTAG_BIN], input=inp, capture_output=True, text=True, check=True).stdout
     wall = time.time() - t
     spans = {x["id"]: x["spans"] for x in map(json.loads, out.splitlines())}
+    missing = [r["id"] for r, _ in rows if r["id"] not in spans]
+    if missing:
+        raise SystemExit(f"nltag_names returned nothing for {len(missing)} documents: {missing[:5]}")
     recs = []
     for r, d in rows:
-        sp = [{**s, "tag": NL_TAG[s["tag"]]} for s in spans.get(r["id"], [])]
-        recs.append({"id": r["id"], "pred": position_rule(sp, text_of(d))})
-    save_preds("nltagger", recs)
-    json.dump({"docs": len(rows), "wall_s": round(wall, 2)}, open(os.path.join(CACHE, "preds", "nltagger.time"), "w"))
-    print(f"nltagger: {len(recs)} documents, {wall:.2f} s in all")
+        sp = [{**s, "tag": NL_TAG[s["tag"]]} for s in spans[r["id"]]]
+        recs.append({"id": r["id"], "pred": position_rule(sp, text_of(d, a.cap))})
+    name = pred_name("nltagger", a.cap)
+    save_preds(name, recs)
+    json.dump({"docs": len(rows), "wall_s": round(wall, 2)}, open(os.path.join(CACHE, "preds", name + ".time"), "w"))
+    print(f"{name}: {len(recs)} documents, {wall:.2f} s in all")
 
 
 # --- GLiNER2.5 (run with the venv's python) ------------------------------------------------------
@@ -254,15 +287,19 @@ def cmd_gliner(a):
     rows = truth_rows()
     out = {"schema": [], "labels": [], "spans-rule": []}
     secs = collections.Counter()
-    for r, d in rows:
-        text = text_of(d)
-        t = time.time()
+
+    def schema():
         s = m.create_schema()
-        b = s.structure("letter")
-        b.field("sender", dtype="list", description=DESC["sender"]) \
+        s.structure("letter").field("sender", dtype="list", description=DESC["sender"]) \
          .field("recipient", dtype="list", description=DESC["recipient"]) \
          .field("sending_place", dtype="str", description=DESC["sending_place"])
-        inst = (m.extract(text, s).get("letter") or [{}])[0] or {}
+        return s
+    warm = text_of(rows[0][1], a.cap)       # the first forward pass and the collator's setup stay out of the timing
+    m.extract(warm, schema()); m.extract_entities(warm, ["person"], include_spans=True)
+    for r, d in rows:
+        text = text_of(d, a.cap)
+        t = time.time()
+        inst = (m.extract(text, schema()).get("letter") or [{}])[0] or {}
         out["schema"].append({"id": r["id"], "pred": {f: first_text(inst.get(f)) for f in ET.FIELDS}})
         secs["schema"] += time.time() - t
         t = time.time()
@@ -276,10 +313,11 @@ def cmd_gliner(a):
         out["spans-rule"].append({"id": r["id"], "pred": position_rule(spans, text)})
         secs["spans-rule"] += time.time() - t
     for mode, recs in out.items():
-        save_preds(f"gliner2.5-{a.size}-{mode}", recs)
+        name = pred_name(f"gliner2.5-{a.size}-{mode}", a.cap)
+        save_preds(name, recs)
         json.dump({"docs": len(rows), "wall_s": round(secs[mode], 2)},
-                  open(os.path.join(CACHE, "preds", f"gliner2.5-{a.size}-{mode}.time"), "w"))
-    print(f"gliner2.5-{a.size}: {len(rows)} documents;", {k: round(v, 1) for k, v in secs.items()}, "s")
+                  open(os.path.join(CACHE, "preds", name + ".time"), "w"))
+    print(f"gliner2.5-{a.size}@{a.cap}: {len(rows)} documents;", {k: round(v, 1) for k, v in secs.items()}, "s")
 
 
 # --- names found nowhere in the prompt (G test 8) ------------------------------------------------
@@ -341,8 +379,17 @@ def call(model, key, b, dest):
     return out
 
 
+TEMPLATE_NAMES = ("John Smith", "Jane Doe", "Washington, D.C.", "New York, NY")   # the prompt's example JSON
+
+
+def found(name, text):
+    return ET.in_text(name, text.replace("'", "").replace("’", ""))
+
+
 def nowhere_names():
-    """Every reply name not found in its prompt, classed against the truth where the truth settles it."""
+    """Every reply name not found in the document text the prompt carried, classed where the truth or the prompt
+    settles it (by_truth: text_corrected, knowledge_right, initials_only, template_example, neighbour_context) and
+    left None where it is doubtful and goes to the judges."""
     rows = {r["id"]: (r, d) for r, d in truth_rows()}
     out = []
     for model, got in reply_preds().items():
@@ -350,19 +397,25 @@ def nowhere_names():
             if not p:
                 continue
             r, d = rows[i]
+            seen = seen_text(d)
             for f in ET.FIELDS:
                 for e in ET.ent_names(p.get(f)):
                     core = e["name"].split(",")[0] if f == "sending_place" else e["name"]
-                    if ET.in_text(core, d["prompt"]):
+                    if found(core, seen):
                         continue          # a place counts by its city: an added state or country is normalising
                     hit = next((t for t in r[f] if ET.match(e["name"], t["name"], "ed2", t.get("alternates", ()))),
                                None)
-                    if hit is None:
-                        how = None
-                    elif hit.get("quote"):
-                        how = "text_corrected"
+                    if hit is not None:
+                        how = "text_corrected" if hit.get("quote") and ET.squash(hit["quote"]) in ET.squash(seen) \
+                            else "knowledge_right"
+                    elif not any(len(x) >= 3 for x in ET.tokens(core)):
+                        how = "initials_only"
+                    elif any(ET.tokens(core) == ET.tokens(t) for t in TEMPLATE_NAMES):
+                        how = "template_example"
+                    elif found(core, d["prompt"]):
+                        how = "neighbour_context"
                     else:
-                        how = "knowledge_right"
+                        how = None
                     out.append({"model": model, "id": i, "field": f, "name": e["name"], "by_truth": how})
     return out
 
@@ -407,9 +460,16 @@ LOCAL = ["nltagger"] + [f"gliner2.5-{s}-{m}" for s in ("small", "base", "multi")
                         for m in ("schema", "labels", "spans-rule")]
 
 
-def scored(preds, rows):
-    rs = [{"truth": r, "pred": (preds.get(r["id"]) or {}), "text": d["text"]} for r, d in rows if r["id"] in preds]
+def scored(preds, rows, text_fn):
+    """text_fn(d) is the text that extractor was given, for the names-in-text column."""
+    rs = [{"truth": r, "pred": (preds.get(r["id"]) or {}), "text": text_fn(d)} for r, d in rows if r["id"] in preds]
     return ET.score_rows(rs), len(rs)
+
+
+def f1_of(x, level):
+    """score_rows leaves F1 None when nothing was predicted; with named truth present that is a 0."""
+    v = x[level]["f1"]
+    return v if v is not None else (0.0 if x[level]["recall"] is not None else None)
 
 
 def city(name):
@@ -424,7 +484,10 @@ def span_ceiling(preds, rows):
         want = ("place",) if f == "sending_place" else ("person", "organization")
         hit = tot = 0
         for r, _ in rows:
-            sp = [t for tag, t in (preds.get(r["id"]) or {}).get("spans", []) if tag in want]
+            p = preds.get(r["id"]) or {}
+            if "spans" not in p:
+                raise SystemExit(f"no spans stored for {r['id']}: rerun that extractor")
+            sp = [city(t) if f == "sending_place" else t for tag, t in p["spans"] if tag in want]
             for e in r[f]:
                 if e["class"] != "named":
                     continue
@@ -438,34 +501,44 @@ def span_ceiling(preds, rows):
 def cmd_report(a):
     rows = truth_rows()
     s88 = [(r, d) for r, d in rows if r["set"] == "sample88"]
-    ext = {m: dict(got) for m, got in reply_preds().items()}
+    ext = {m: dict(got) for m, got in reply_preds().items()}       # the replies, scored on the 82
+    ext3 = {}                                                       # the local extractors at REPLY_CAP, on the 82
     secs = {}
     for name in LOCAL:
-        p = load_preds(name)
-        if p is None:
-            continue
+        p, p3 = load_preds(name), load_preds(pred_name(name, REPLY_CAP))
+        if p is None or p3 is None:
+            raise SystemExit(f"missing run: {name} at {ET.TEXT_CAP} and {REPLY_CAP} are both needed")
         ext[name] = {i: x["pred"] for i, x in p.items()}
+        ext3[name] = {i: x["pred"] for i, x in p3.items()}
         secs[name] = json.load(open(os.path.join(CACHE, "preds", name + ".time")))
-    out = {"documents": len(rows), "sample88": len(s88), "unparsed_replies": {
+    def sc(m, p, sub):
+        return scored(p, sub, seen_text if m in REPLIES or p is ext3.get(m) else text_of)[0]
+    out = {"documents": len(rows), "sample88": len(s88), "reply_cap": REPLY_CAP, "unparsed_replies": {
         m: sum(v is None for v in ext[m].values()) for m in REPLIES}, "scores_82": {}, "scores_138": {},
         "seconds_per_doc": {k: round(v["wall_s"] / v["docs"], 4) for k, v in secs.items()},
-        "multi_recipient_docs_82": sum(sum(e["class"] == "named" for e in r["recipient"]) > 1 for r, _ in s88)}
-    for m, p in ext.items():
-        out["scores_82"][m] = scored(p, s88)[0]
+        "multi_recipient_docs_82": sum(sum(e["class"] == "named" for e in r["recipient"]) > 1 for r, _ in s88),
+        "longer_than_cap_82": sum(len(d["text"]) > REPLY_CAP for _, d in s88),
+        "named_sender_quotes_past_cap_82": sum(
+            1 for r, d in s88 for e in r["sender"] if e["class"] == "named" and e.get("quote")
+            and ET.squash(e["quote"]) not in ET.squash(seen_text(d)))}
+    for m in ext:
+        out["scores_82"][m] = sc(m, ext3.get(m, ext[m]), s88)
         if m not in REPLIES:
-            out["scores_138"][m] = scored(p, rows)[0]
+            out["scores_138"][m] = sc(m, ext[m], rows)
     out["place_city_82"], out["place_city_138"], out["span_ceiling_138"] = {}, {}, {}
-    for m, p in ext.items():
-        cp = {i: {"sending_place": [city(n["name"]) for n in ET.ent_names((v or {}).get("sending_place"))]}
-              for i, v in p.items()}
-        ct = [({**r, "sending_place": [{**e, "name": city(e["name"])} for e in r["sending_place"]]}, d)
-              for r, d in rows]
-        x = scored(cp, [t for t in ct if t[0]["set"] == "sample88"])[0]["sending_place"]["ed2"]
-        out["place_city_82"][m] = x["f1"]
+    ct = [({**r, "sending_place": [{**e, "name": city(e["name"]),
+                                    "alternates": [city(x) for x in e.get("alternates", ())]}
+                                   for e in r["sending_place"]]}, d) for r, d in rows]
+    ct88 = [t for t in ct if t[0]["set"] == "sample88"]
+    for m in ext:
+        def cities(p):
+            return {i: {"sending_place": [city(n["name"]) for n in ET.ent_names((v or {}).get("sending_place"))]}
+                    for i, v in p.items()}
+        out["place_city_82"][m] = f1_of(sc(m, cities(ext3.get(m, ext[m])), ct88)["sending_place"], "ed2")
         if m not in REPLIES:
-            out["place_city_138"][m] = scored(cp, ct)[0]["sending_place"]["ed2"]["f1"]
+            out["place_city_138"][m] = f1_of(sc(m, cities(ext[m]), ct)["sending_place"], "ed2")
         if m.endswith("spans-rule") or m == "nltagger":
-            out["span_ceiling_138"][m] = span_ceiling(p, rows)
+            out["span_ceiling_138"][m] = span_ceiling(ext[m], rows)
     strata = {"handwritten or mixed hand": lambda r: r["hand"] in ("handwritten", "mixed"),
               "role-addressed": lambda r: r["role_addressed"], "unsigned": lambda r: not r["signed"],
               "typed, signed, addressed by name": lambda r: r["hand"] in ("typed", "printed") and r["signed"]
@@ -475,15 +548,17 @@ def cmd_report(a):
         sub88 = [(r, d) for r, d in s88 if keep(r)]
         sub = [(r, d) for r, d in rows if keep(r)]
         out["strata"][st] = {"docs_82": len(sub88), "docs_138": len(sub), "ed2_f1": {
-            m: {f: scored(p, sub88 if m in REPLIES else sub)[0][f]["ed2"]["f1"] for f in ET.FIELDS}
-            for m, p in ext.items()}}
+            m: {f: f1_of(sc(m, ext[m], sub88 if m in REPLIES else sub)[f], "ed2") for f in ET.FIELDS}
+            for m in ext}}
+    out["strata_overlap_docs"] = sum(sum(keep(r) for keep in strata.values()) > 1 for r, _ in rows)
     names = nowhere_names()
     rows_by_id = {r["id"]: r for r, _ in rows}
     tab = collections.defaultdict(collections.Counter)
     agree = collections.Counter()
     for n in names:
         if n["by_truth"]:
-            tab[n["model"]]["truth: " + n["by_truth"]] += 1
+            key = "truth: " if n["by_truth"] in ("text_corrected", "knowledge_right") else "prompt: "
+            tab[n["model"]][key + n["by_truth"]] += 1
             continue
         c, l = judged("claude", n), judged("luna", n)
         tab[n["model"]]["judged: " + (c or "unjudged")] += 1
@@ -514,15 +589,20 @@ def f3(x):
 
 
 def score_table(scores):
-    L = ["| extractor | field | exact F1 | overlap F1 | ed2 F1 | null when truth | wrong-when-filled docs (ed2) "
-         "| names in the text |", "|---|---|---|---|---|---|---|---|"]
+    L = ["| extractor | field | exact F1 | overlap F1 | ed2 F1 | null when any truth | wrong-when-filled docs (ed2) "
+         "| names in the text it saw |", "|---|---|---|---|---|---|---|---|"]
     for m, s in scores.items():
         for f in ET.FIELDS:
             x = s[f]
-            L.append(f"| {m} | {f} | {f3(x['exact']['f1'])} | {f3(x['overlap']['f1'])} | {f3(x['ed2']['f1'])} "
+            L.append(f"| {m} | {f} | {f3(f1_of(x, 'exact'))} | {f3(f1_of(x, 'overlap'))} | {f3(f1_of(x, 'ed2'))} "
                      f"| {x['null_when_truth']}/{x['truth_nonempty']} | {x['ed2']['wrong_when_filled_docs']} "
                      f"| {x['names_in_text']}/{x['names']} |")
     return L
+
+
+NOWHERE_COLS = ["truth: text_corrected", "truth: knowledge_right", "prompt: initials_only",
+                "prompt: template_example", "prompt: neighbour_context"] + \
+               [f"judged: {c}" for c in NOWHERE_CLASSES] + ["auditor disagrees", "judged right, truth disagrees"]
 
 
 def report(s):
@@ -534,21 +614,29 @@ def report(s):
          f"## The app's tagging replies and the local extractors, on the {s['sample88']} documents with cached replies",
          "", "The replies are text-only answers to the app's tagging prompt (author_name, recipient_name, "
          "author_location). Unparsed replies: " + ", ".join(f"{m} {n}" for m, n in s["unparsed_replies"].items())
-         + f". {s['multi_recipient_docs_82']} of the documents have more than one named recipient.", ""]
+         + f". {s['multi_recipient_docs_82']} of the documents have more than one named recipient. The tagging "
+         f"prompt carries only the first {s['reply_cap']:,} characters of the OCR text; {s['longer_than_cap_82']} of "
+         f"the {s['sample88']} documents are longer, and {s['named_sender_quotes_past_cap_82']} named senders are "
+         f"written only past that point, so no reply could have read them. In this table the local extractors are "
+         f"run on the same first {s['reply_cap']:,} characters.", ""]
     L += score_table(s["scores_82"])
-    L += ["", f"## The local extractors on all {s['documents']} documents", ""]
+    L += ["", f"## The local extractors on all {s['documents']} documents, on the text the truth readers saw "
+          f"(first {ET.TEXT_CAP:,} characters)", ""]
     L += score_table(s["scores_138"])
-    L += ["", "Seconds a document on this Mac (M3 Pro, CPU; GLiNER through PyTorch, NLTagger compiled Swift):", "",
+    L += ["", "Seconds a document on this Mac (M3 Pro, CPU; GLiNER through PyTorch after one warm-up call, NLTagger "
+          "compiled Swift including its process start). Measured in an unattended engine session, which macOS runs at "
+          "background QoS, so read the ratios, not the seconds:", "",
           "| extractor | s/doc |", "|---|---|"]
     L += [f"| {k} | {v:.3f} |" for k, v in s["seconds_per_doc"].items()]
     L += ["", "The ed2 level compares the whole normalised place, so \"Cambridge\" misses \"Cambridge, "
           "Massachusetts\"; overlap passes any shared word, \"California\" included. The city alone, at ed2 "
-          "(truth and prediction cut at the first comma):", "",
+          "(truth, its alternates and the prediction cut at the first comma):", "",
           "| extractor | city ed2 F1 (82) | city ed2 F1 (138) |", "|---|---|---|"]
     L += [f"| {m} | {f3(v)} | {f3(s['place_city_138'].get(m))} |" for m, v in s["place_city_82"].items()]
     L += ["", "How much a better position rule could buy: named truth entities matched (ed2) by any of the "
           "tagger's spans, over all 138 (a person or organisation span for sender and recipient, a place span by "
-          "its city).", "", "| tagger | sender | recipient | sending place |", "|---|---|---|---|"]
+          "its city, both sides cut at the comma).", "", "| tagger | sender | recipient | sending place |",
+          "|---|---|---|---|"]
     L += [f"| {m} | " + " | ".join(f"{h}/{t}" for h, t in v.values()) + " |"
           for m, v in s["span_ceiling_138"].items()]
     L += ["", "## By kind of letter (ed2 F1: sender / recipient / place)", "",
@@ -558,33 +646,37 @@ def report(s):
         L.append(f"| {m} | " + " | ".join(
             " / ".join(f3(v["ed2_f1"][m][f]) for f in ET.FIELDS) for v in s["strata"].values()) + " |")
     L += ["", "Document counts in the header are (with replies / all); the replies are scored on the first, the "
-          "local extractors on the second.", "",
-          "## Names found nowhere in the prompt", "",
-          "A reply's name is counted here when some word of three or more letters in it is not in the prompt the "
-          "model was given (`ent_truth.in_text`); "
-          "classed by the truth where a truth entity matches it, otherwise judged with the page images by Claude "
-          "Sonnet 5 and audited blind by GPT 5.6 Luna.", "",
-          "| model | nowhere names | " + " | ".join(
-              ["truth: text_corrected", "truth: knowledge_right"] + [f"judged: {c}" for c in NOWHERE_CLASSES]
-              + ["auditor disagrees", "judged right, truth disagrees"]) + " |",
-          "|---|---|" + "---|" * (len(NOWHERE_CLASSES) + 4)]
+          f"local extractors on the second (at {ET.TEXT_CAP:,} characters). The first three kinds overlap: "
+          f"{s['strata_overlap_docs']} documents are in more than one; the fourth is disjoint from them.", "",
+          "## Names found nowhere in the text", "",
+          "A reply's name is counted here when some word of three or more letters in it is not in the document "
+          f"text the prompt carried (`ent_truth.in_text` on the first {s['reply_cap']:,} characters); classed by the "
+          "truth where a truth entity matches it, by the prompt where the name is initials only, one of the "
+          "template's examples, or written in a nearby document's snippet the prompt also carries, and otherwise "
+          "judged with the page images by Claude Sonnet 5 and audited blind by GPT 5.6 Luna.", "",
+          "| model | nowhere names | " + " | ".join(NOWHERE_COLS) + " |", "|---|---|" + "---|" * len(NOWHERE_COLS)]
     for m in REPLIES:
         t = s["nowhere"]["by_model"].get(m, {})
-        L.append(f"| {m} | {s['nowhere']['totals'][m]} | " + " | ".join(str(t.get(k, 0)) for k in (
-            ["truth: text_corrected", "truth: knowledge_right"] + [f"judged: {c}" for c in NOWHERE_CLASSES]
-            + ["auditor disagrees", "judged right, truth disagrees"])) + " |")
+        L.append(f"| {m} | {s['nowhere']['totals'][m]} | " + " | ".join(str(t.get(k, 0)) for k in NOWHERE_COLS)
+                 + " |")
     L += ["", f"Judge agreement over the doubtful names: {s['nowhere']['judge_agreement']}; disagreements (Claude / "
           f"Luna): {s['nowhere']['disagreements']}.", "",
           f"Spend: ${s['spend_usd']:.2f} estimated over {s['calls']} gateway calls at ceiling prices.", ""]
+    L += READING
     return "\n".join(L) + "\n"
+
+
+READING = ["## Reading", "", "(to be written once the figures are final)", ""]
 
 
 def main():
     ap = argparse.ArgumentParser()
     sub = ap.add_subparsers(dest="cmd", required=True)
-    sub.add_parser("nltag")
+    n = sub.add_parser("nltag")
+    n.add_argument("--cap", type=int, default=ET.TEXT_CAP)
     g = sub.add_parser("gliner")
     g.add_argument("--size", choices=sorted(GLINER), required=True)
+    g.add_argument("--cap", type=int, default=ET.TEXT_CAP)
     sub.add_parser("nowhere")
     sub.add_parser("report")
     a = ap.parse_args()

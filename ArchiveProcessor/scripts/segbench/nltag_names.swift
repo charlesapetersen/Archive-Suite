@@ -11,6 +11,8 @@ while let line = readLine(strippingNewline: true) {
           let id = obj["id"] as? String, let text = obj["text"] as? String else { continue }
     let tagger = NLTagger(tagSchemes: [.nameType])
     tagger.string = text
+    // Fixed, not guessed: noisy OCR of an English letter can be taken for another language and lose every name.
+    tagger.setLanguage(.english, range: text.startIndex..<text.endIndex)
     var spans: [[String: Any]] = []
     let opts: NLTagger.Options = [.omitPunctuation, .omitWhitespace, .joinNames]
     tagger.enumerateTags(in: text.startIndex..<text.endIndex, unit: .word, scheme: .nameType,
