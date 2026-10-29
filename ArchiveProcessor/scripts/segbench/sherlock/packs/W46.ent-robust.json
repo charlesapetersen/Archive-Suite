@@ -1,0 +1,21 @@
+{
+  "tag": "W46.ent-robust",
+  "pack": "ent-robust-20261029",
+  "mac": "artifacts/ent-robust-20261029",
+  "submit": "support/job/submit.sh",
+  "jobs": 2,
+  "gpu_hours": 2,
+  "review": "execution-plans/items/W46.ent-robust.md",
+  "imports": [
+    {"modules": ["vllm"]}
+  ],
+  "creates": [
+    "$FS_ROOT/ent-robust-20261029",
+    "$GROUP_HOME/$USER/archive-suite/sherlock-results/ent-robust-20261029"
+  ],
+  "provenance": [],
+  "requires": [],
+  "results": "$GROUP_HOME/$USER/archive-suite/sherlock-results/ent-robust-20261029",
+  "collect": ["$FS_ROOT/ent-robust-20261029/jobs.tsv", "$FS_ROOT/ent-robust-20261029/logs"],
+  "release": "answers collected into the Mac artifact; the engine scores them with ent_g17.py score and ent_robust.py report"
+}
