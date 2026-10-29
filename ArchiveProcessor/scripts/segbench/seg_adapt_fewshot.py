@@ -120,6 +120,16 @@ def fewshot(col, k):
         BLOCKS.pop(col.name, None)
 
 
+@contextmanager
+def patch_store():
+    saved = SL.STORE
+    SL.STORE = STORE
+    try:
+        yield
+    finally:
+        SL.STORE = saved
+
+
 def p_new(col, judge):
     comb = W.combine(col, judge)
     return {i: float(g['p_new']) for i, g in enumerate(comb['gaps'])}
@@ -137,6 +147,7 @@ def pending(col, k):
 
 
 def collect(col, k, limit=None):
+    import requests  # noqa: F401 -- fail before a reservation, not after (the first pilot reserved without sending)
     todo = pending(col, k)
     with fewshot(col, k):
         print(f'{col.name} k={k}: {len(todo)} windows uncached, item spent ${SL.spent():.4f}', flush=True)
@@ -189,13 +200,9 @@ def score(root):
             skipped.append([box, k])
             continue
         done.append(score_box(col, k))
-    saved = SL.STORE
-    SL.STORE = STORE
-    try:
+    with patch_store():
         calls = SL.effective_records()
         total = SL.spent()
-    finally:
-        SL.STORE = saved
     by = {}
     for r in calls:
         s = by.setdefault(r['box'], {'calls': 0, 'valid': 0, 'in': 0, 'out': 0, 'cost': 0.0})
@@ -211,6 +218,29 @@ def score(root):
     print(render(out))
 
 
+FINDINGS = """## Findings (2026-10-29)
+
+1. **The examples change almost nothing, because zero-shot Gemini already makes very few errors here.** Gemini 3.7
+   Flash windows get 2-5 of the held-out gaps wrong on these boxes (about 2 per 100). With the examples:
+   - Lincoln, k=25: 5 errors become 4. The examples fixed two over-splits and made one new false merge (pages 76/77).
+   - CREST, k=25: no held-out decision changed.
+   - CREST, k=50: one over-split went (pages 87/88). That single gap rejoins a long document, so pages exact rises
+     from 85.9% to 96.9%.
+   Each difference is one or two gaps on one draw, which is within what a different draw would move. This run is
+   no evidence that few-shot examples help, and none that they hurt.
+2. **The examples did not override the archivist.** Where a listed gap fell inside a window, the model gave the
+   archivist's decision every time, as asked. So the examples need no separate guard.
+3. **What follows for the kit.** A user's corrections set the gaps they correct; feeding them back into the cloud
+   prompt buys no measurable accuracy here, and it costs input tokens on every window: 1.43x the zero-shot arm's
+   input on Lincoln at k=25 ($1.18 for the box), 1.51x on CREST at k=25 ($0.68) and 2.01x at k=50 ($0.88). The review screen's disagreement rule
+   (W46.seg-adapt-curve) remains the way corrections pay off. Where few-shot might still matter is a box on which
+   the cloud model errs often, as the local models do on Lincoln. No such box is in hand for Gemini.
+4. **Limits.** One random draw per setting; two public boxes; text-only examples (300 characters of OCR either
+   side), with no example images; Gemini 3.7, not 3.8. Lincoln k=50 (about $1.40) was not run, to keep the item
+   under its $3 cap.
+"""
+
+
 def render(out):
     pct = lambda x: f'{100 * x:.1f}%'
     L = ['# Few-shot examples in the Gemini window prompt (W46.seg-adapt-curve-paid)', '',
@@ -219,6 +249,7 @@ def render(out):
          "W46.seg-lincoln-cloud-paid's cached arm; the few-shot column is the same requests with the box's k checked "
          'gaps added as text examples (OCR either side of the gap and the archivist\'s decision). The k gaps are '
          "W46.seg-adapt-curve's first random draw, and both columns count them as corrected.", '',
+         FINDINGS,
          '| box | k checked | held-out gaps | arm | held-out errors | per 100 held-out | false splits | false merges | pages exact | PQ |',
          '|---|---:|---:|---|---:|---:|---:|---:|---:|---:|']
     for s in out['settings']:
@@ -234,10 +265,13 @@ def render(out):
                  f"examples changed: {s['held_decisions_changed'] or 'none'}; listed gaps answered against the archivist: "
                  f"{s['listed_gaps_answered_against_the_archivist'] or 'none'}.")
     if out['not_collected']:
-        L += ['', f"Not collected (the item cap): {out['not_collected']}."]
+        L += ['', f"Not collected: {out['not_collected']}."]
     L += ['', '| box | calls | valid | input tokens | output tokens | cost estimate |', '|---|---:|---:|---:|---:|---:|']
     for box, s in out['calls_by_box'].items():
         L.append(f"| {box} | {s['calls']} | {s['valid']} | {s['in']:,} | {s['out']:,} | ${s['cost']:.4f} |")
+    L += ['', 'Calls count every reservation, so a box\'s calls can exceed its valid replies: Lincoln\'s first pilot reserved '
+          'and then failed before sending (no requests module in that Python); its allowance stays charged. A box\'s cost '
+          'covers all its settings.']
     L += ['', f"Item cost estimate ${out['item_cost_estimate']:.4f} of the ${out['cap']:.2f} cap, at Gemini's list rate "
           '($0.75 / $3.75 per million input / output tokens, reasoning included); the gateway returns no cost.', '']
     return '\n'.join(L)
@@ -245,7 +279,7 @@ def render(out):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument('command', choices=('inventory', 'collect', 'score', 'show-block'))
+    ap.add_argument('command', choices=('inventory', 'collect', 'score', 'show-block', 'retry-unsettled'))
     ap.add_argument('root', type=Path)
     ap.add_argument('--box', choices=('Lincoln', 'CREST'))
     ap.add_argument('--k', type=int)
@@ -253,6 +287,12 @@ def main():
     args = ap.parse_args()
     if args.command == 'score':
         return score(args.root)
+    if args.command == 'retry-unsettled':
+        # SL's one explicit retry of a reservation whose send never returned usage; the allowance stays charged.
+        with (STORE / 'collect.lock').open('a') as lock, patch_store():
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            SL.retry_unsettled_once()
+        return
     if not args.box or not args.k or (args.box, args.k) not in SETTINGS:
         ap.error(f'--box and --k must name one of {SETTINGS}')
     cols = {c.name: c for c in SL.public_columns(args.root)}

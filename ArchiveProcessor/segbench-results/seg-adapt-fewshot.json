@@ -1,0 +1,205 @@
+{
+ "model": "gemini-3.7-flash",
+ "item_cost_estimate": 2.7409365,
+ "cap": 3.0,
+ "settings": [
+  {
+   "box": "Lincoln",
+   "k": 25,
+   "gaps": 260,
+   "held": 235,
+   "labelled_new": 11,
+   "zero_shot": {
+    "held_errors": 5,
+    "err_per_100_held": 2.127659574468085,
+    "false_splits_held": 5,
+    "false_merges_held": 0,
+    "wrong_gaps": [
+     [
+      57,
+      58
+     ],
+     [
+      58,
+      59
+     ],
+     [
+      86,
+      87
+     ],
+     [
+      234,
+      235
+     ],
+     [
+      240,
+      241
+     ]
+    ],
+    "exact": 0.8697318007662835,
+    "pq": 0.9515514425694066,
+    "false_splits": 5,
+    "false_merges": 0
+   },
+   "few_shot": {
+    "held_errors": 4,
+    "err_per_100_held": 1.702127659574468,
+    "false_splits_held": 3,
+    "false_merges_held": 1,
+    "wrong_gaps": [
+     [
+      58,
+      59
+     ],
+     [
+      76,
+      77
+     ],
+     [
+      234,
+      235
+     ],
+     [
+      240,
+      241
+     ]
+    ],
+    "exact": 0.8773946360153256,
+    "pq": 0.9476164079822617,
+    "false_splits": 3,
+    "false_merges": 1
+   },
+   "held_decisions_changed": [
+    [
+     57,
+     58
+    ],
+    [
+     76,
+     77
+    ],
+    [
+     86,
+     87
+    ]
+   ],
+   "listed_gaps_answered_against_the_archivist": []
+  },
+  {
+   "box": "CREST",
+   "k": 25,
+   "gaps": 127,
+   "held": 102,
+   "labelled_new": 5,
+   "zero_shot": {
+    "held_errors": 2,
+    "err_per_100_held": 1.9607843137254901,
+    "false_splits_held": 2,
+    "false_merges_held": 0,
+    "wrong_gaps": [
+     [
+      45,
+      46
+     ],
+     [
+      87,
+      88
+     ]
+    ],
+    "exact": 0.859375,
+    "pq": 0.9587053571428571,
+    "false_splits": 2,
+    "false_merges": 0
+   },
+   "few_shot": {
+    "held_errors": 2,
+    "err_per_100_held": 1.9607843137254901,
+    "false_splits_held": 2,
+    "false_merges_held": 0,
+    "wrong_gaps": [
+     [
+      45,
+      46
+     ],
+     [
+      87,
+      88
+     ]
+    ],
+    "exact": 0.859375,
+    "pq": 0.9587053571428571,
+    "false_splits": 2,
+    "false_merges": 0
+   },
+   "held_decisions_changed": [],
+   "listed_gaps_answered_against_the_archivist": []
+  },
+  {
+   "box": "CREST",
+   "k": 50,
+   "gaps": 127,
+   "held": 77,
+   "labelled_new": 10,
+   "zero_shot": {
+    "held_errors": 2,
+    "err_per_100_held": 2.5974025974025974,
+    "false_splits_held": 2,
+    "false_merges_held": 0,
+    "wrong_gaps": [
+     [
+      45,
+      46
+     ],
+     [
+      87,
+      88
+     ]
+    ],
+    "exact": 0.859375,
+    "pq": 0.9587053571428571,
+    "false_splits": 2,
+    "false_merges": 0
+   },
+   "few_shot": {
+    "held_errors": 1,
+    "err_per_100_held": 1.2987012987012987,
+    "false_splits_held": 1,
+    "false_merges_held": 0,
+    "wrong_gaps": [
+     [
+      45,
+      46
+     ]
+    ],
+    "exact": 0.96875,
+    "pq": 0.9761904761904762,
+    "false_splits": 1,
+    "false_merges": 0
+   },
+   "held_decisions_changed": [
+    [
+     87,
+     88
+    ]
+   ],
+   "listed_gaps_answered_against_the_archivist": []
+  }
+ ],
+ "not_collected": [],
+ "calls_by_box": {
+  "Lincoln": {
+   "calls": 89,
+   "valid": 88,
+   "in": 1318145,
+   "out": 39268,
+   "cost": 1.1777445
+  },
+  "CREST": {
+   "calls": 88,
+   "valid": 88,
+   "in": 1888736,
+   "out": 39104,
+   "cost": 1.5631919999999997
+  }
+ }
+}

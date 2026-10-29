@@ -353,6 +353,18 @@ def public_segmentation():
                     timed = [c["wall_s"] for c in calls if "wall_s" in c]
                     r["gateway"] = {"calls": len(calls), "cost_estimate": sum(c["charge"] for c in calls),
                                     "mean_s": sum(timed) / len(timed) if timed else None}
+    # W46.seg-adapt-curve-paid: the same Gemini windows with a box's k checked gaps as text examples. Scored with the
+    # k gaps set to the truth in both arms, so its rows sit in their own table, not beside the unchecked ones.
+    fewshot = RESULTS / "seg-adapt-fewshot.json"
+    if fewshot.exists():
+        fs = json.loads(fewshot.read_text())
+        for b in boxes:
+            b["fewshot"] = [s for s in fs["settings"] if s["box"].lower() == b["box"].lower()]
+            for s in b["fewshot"]:
+                g = b["models"].get("gateway-gemini")
+                if g and s["zero_shot"]["held_errors"] > g["counts"]["false_splits"] + g["counts"]["false_merges"]:
+                    sys.exit(f"seg-adapt-fewshot.json's zero-shot arm on {b['box']} is not the gateway-gemini row")
+                s["cost_estimate"] = fs["calls_by_box"].get(b["box"], {}).get("cost")
     return boxes
 
 
