@@ -354,7 +354,7 @@ struct SettingsView: View {
 
         Divider().padding(.vertical, 2)
         Text("PACING").font(.caption2).fontWeight(.bold).foregroundStyle(.primary)
-        Text("Runs one CLI agent turn per page, capped at a low concurrency (1–2) so it never hammers your subscription — expect it to be slower than a metered API.")
+        Text("Runs one CLI agent turn per page, at most two pages at a time, so it never hammers your subscription — expect it to be slower than a metered API.")
             .font(.caption2).foregroundStyle(.primary)
 
         Spacer()
@@ -591,6 +591,18 @@ struct SettingsView: View {
         }
     }
 
+    /// Why the batch toggle cannot apply to this run, or nil when it can (W40.fix-processor-settings-backend-mismatch).
+    /// Mirrors the pipeline, which batches only `batchMode && provider.supportsBatch` off the gateway and the Local
+    /// Agent, so an enabled toggle never promises a discount the run will not take.
+    private var batchUnavailableReason: String? {
+        if useAppleVision { return "Not used: Apple Vision reads every page on this Mac, with nothing to batch." }
+        if useLocalAgent { return "Not used: the CLI runs on your subscription, so there is no batch discount." }
+        if useGateway { return "Not used: the API gateway has no batch endpoint." }
+        if preOCRedInput { return "Not used for pre-OCRed input." }
+        if !selectedProvider.supportsBatch { return "Not used: \(selectedProvider.rawValue) has no batch API here." }
+        return nil
+    }
+
     /// Local Vision controls. The language, speed, confidence, and vocabulary knobs are intentionally
     /// exposed here rather than hidden as constants: they materially affect what on-device OCR returns.
     @ViewBuilder private var appleVisionControls: some View {
@@ -642,6 +654,24 @@ struct SettingsView: View {
         } else {
             Text("Transcription-only is fully offline and free. Use No tagging or Copy source file tags in Process Files.")
                 .font(.caption2).foregroundStyle(.primary)
+            // W40.fix-processor-settings-backend-mismatch — the line above used to sit beside a Tagging mode that
+            // needs an LLM, with nothing saying the run could not start. Say so, and offer the switch.
+            if taggingMode != .none && taggingMode != .copySource {
+                HStack(alignment: .firstTextBaseline) {
+                    Text("Tagging is set to \(taggingMode.displayName), which Apple Vision cannot do on its own, so Start stays off.")
+                        .font(.caption2).foregroundStyle(.primary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("ap.settings.visionTaggingConflict")
+                    Spacer()
+                    Button("Use No tagging") { taggingModeRaw = TaggingMode.none.rawValue }
+                        .accessibilityIdentifier("ap.settings.visionUseNoTagging")
+                }
+            }
+            if enableCollectionSegmentation {
+                Text("Collection ID needs an LLM as well. Turn it off in the Tagging section, or turn on LLM judgement.")
+                    .font(.caption2).foregroundStyle(.primary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
     }
 
@@ -789,10 +819,17 @@ struct SettingsView: View {
             Toggle(isOn: $batchMode) {
                 HStack {
                     Text("Batch mode (slower, ~50% cheaper)")
-                    HelpButton(text: "Batch jobs are queued and returned asynchronously — results can take minutes to hours — in exchange for ~50% lower cost. Not available with an API Gateway or pre-OCRed input.\n\nGemini caveat: Gemini batch jobs occasionally get stuck in a pending state due to known Google API reliability issues. If a batch doesn't complete within a few hours, cancel and retry, or switch to non-batch mode.")
+                    HelpButton(text: "Batch jobs are queued and returned asynchronously — results can take minutes to hours — in exchange for ~50% lower cost. Not available with Apple Vision, the Local CLI Agent, an API Gateway, pre-OCRed input, or a provider without a batch API.\n\nGemini caveat: Gemini batch jobs occasionally get stuck in a pending state due to known Google API reliability issues. If a batch doesn't complete within a few hours, cancel and retry, or switch to non-batch mode.")
                 }
             }
-            .disabled(useGateway || useAppleVision || preOCRedInput)
+            .disabled(batchUnavailableReason != nil)
+            .accessibilityIdentifier("ap.settings.batchMode")
+            if let reason = batchUnavailableReason {
+                Text(reason)
+                    .font(.caption2).foregroundStyle(.primary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("ap.settings.batchModeUnavailable")
+            }
             Toggle(isOn: $skipAlreadyProcessed) {
                 HStack {
                     Text("Skip already-processed files")
@@ -859,11 +896,22 @@ struct SettingsView: View {
                 Stepper("", value: $exportedImageSizeMB, in: SizingBounds.imageMB, step: 0.5).labelsHidden()
             }
             .disabled(!outputImageFile || preOCRedInput)
-            HStack {
-                Text("Parallel OCR workers: \(ocrWorkerCount)")
-                HelpButton(text: "More workers process OCR faster (roughly halving time going 4 → 8), but raise the chance of provider rate-limit errors (429/503); those are auto-retried with backoff. 4 is safe; 6–8 is usually fine.")
-                Spacer()
-                Stepper("", value: $ocrWorkerCount, in: SizingBounds.ocrWorkers).labelsHidden()
+            // W40.fix-processor-settings-backend-mismatch — Apple Vision sizes its workers from the Mac's
+            // performance cores and the Local Agent never runs more than two CLI calls at once
+            // (`LocalAgentClient.concurrencyLimiter`), so neither reads this stepper; show what the run will use.
+            if useAppleVision {
+                LabeledContent("Parallel OCR workers", value: "\(VisionClient.recommendedConcurrency), one per performance core")
+                    .accessibilityIdentifier("ap.settings.ocrWorkersFixed")
+            } else if useLocalAgent {
+                LabeledContent("Parallel OCR workers", value: "At most 2, set by the CLI cap")
+                    .accessibilityIdentifier("ap.settings.ocrWorkersFixed")
+            } else {
+                HStack {
+                    Text("Parallel OCR workers: \(ocrWorkerCount)")
+                    HelpButton(text: "More workers process OCR faster (roughly halving time going 4 → 8), but raise the chance of provider rate-limit errors (429/503); those are auto-retried with backoff. 4 is safe; 6–8 is usually fine.")
+                    Spacer()
+                    Stepper("", value: $ocrWorkerCount, in: SizingBounds.ocrWorkers).labelsHidden()
+                }
             }
             Toggle(isOn: $writeLogEnabled) {
                 HStack {

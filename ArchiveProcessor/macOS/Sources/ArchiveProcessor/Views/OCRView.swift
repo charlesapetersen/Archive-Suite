@@ -181,6 +181,11 @@ struct OCRView: View {
         !useAppleVision || visionUseLLMJudgment || ((taggingMode == .none || taggingMode == .copySource)
             && !enableCollectionSegmentation)
     }
+    /// The Tagging mode is one transcription-only Apple Vision cannot run, so the Tagging box says so instead of
+    /// describing what the mode would do (W40.fix-processor-settings-backend-mismatch).
+    private var visionTaggingUnavailable: Bool {
+        useAppleVision && !visionUseLLMJudgment && taggingMode != .none && taggingMode != .copySource
+    }
     /// Whether this run needs the key `reloadAPIKey()` loads (W40.fix-processor-localagent-key). Apple Vision needs
     /// it only for its LLM judgement. The Local Agent needs none: its CLI signs in with the subscription, and no
     /// route of a Local Agent run reaches the direct provider — the OCR call, classification and tagging take the
@@ -553,8 +558,11 @@ struct OCRView: View {
                              ? "Applies to images only. Multi-page PDFs are rebuilt without tags."
                              : isPDFOnlyReOCR
                                ? "Not applied to a multi-page PDF — it is re-OCR'd into one alternating image/OCR-text PDF (a pure document rebuild, no tagging)."
-                               : taggingMode.detail)
+                               : visionTaggingUnavailable
+                                 ? "Apple Vision only transcribes, so this mode cannot run. Choose No tagging or Copy source file tags, or turn on LLM judgement in Settings (⌘,)."
+                                 : taggingMode.detail)
                             .font(.caption2).foregroundStyle(.primary)
+                            .fixedSize(horizontal: false, vertical: true)
                             .accessibilityIdentifier("ap.ocr.reOCRExplanation")
                     }
                     .padding(4)
@@ -647,7 +655,7 @@ struct OCRView: View {
                                     .accessibilityIdentifier("ap.ocr.localAgentCost")
                                 Spacer()
                             }
-                            Text("The \(localAgentTool.displayName) CLI uses your subscription login — no per-page charge. If you hit your plan's usage window, the app paces and resumes when it resets. It runs at a low concurrency (1–2), so expect it to be slower than a metered API.")
+                            Text("The \(localAgentTool.displayName) CLI uses your subscription login — no per-page charge. If you hit your plan's usage window, the app paces and resumes when it resets. It reads at most two pages at a time, so expect it to be slower than a metered API.")
                                 .font(.caption2)
                                 .foregroundStyle(.primary)
                                 .padding(.top, 2)
