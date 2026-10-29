@@ -50,6 +50,7 @@ TARGETS=(
   ArchiveNotes/CLAUDE.md ArchiveNotes/AGENTS.md ArchiveNotes/KNOWN_ISSUES.md
   ops/autonomous/README.md ops/autonomous/resume-prompt.txt ops/autonomous/CODEX_RUNBOOK.md
   ArchiveProcessor/scripts/E2E-PHONE-MAC.md
+  REFERENCE.md ArchiveProcessor/REFERENCE.md ArchiveReader/REFERENCE.md ArchiveNotes/REFERENCE.md
 )
 # Absolute, because it never lives in a worktree.
 [ -n "${PRIMARY:-}" ] && [ -f "$PRIMARY/.maintenance/AUTONOMOUS_PLAN.md" ] && TARGETS+=("$PRIMARY/.maintenance/AUTONOMOUS_PLAN.md")

@@ -42,12 +42,13 @@ STEP 1 — RECOVER STATE (always, first):
   paths are NO LONGER hold-queue** (owner, 2026-08-13 — TIER-2 IS THE GATE; see `AGENTS.md` §*Gating baseline*).
   If the plan's "RUN STATUS:" line reads COMPLETE, there is nothing to do — stop immediately.
 
-STEP 1.5 — DOC BUDGET FIX (only when the daemon has asked for one — it PREEMPTS the work queue):
-  Look for `~/.local/state/archive-autonomous/doc-budget-fix`. Absent is the normal case: skip to STEP 2.0.
-  If it EXISTS, a guarded document is at or over its size budget, and bringing it back under is your ONE item
-  this session — do NOT also pick a queue item. Line 1 is REQUIRED (something is OVER; the health gate stays
-  RED until it is under) or ADVISORY (nothing is over yet, but it is close enough that trimming now is what
-  prevents a park). `FILES:` names them; the rest is the `context-budget.sh` report with every size and budget.
+STEP 1.5 — DOC-FIX AND GATE-FIX ASSIGNMENTS. The engine picks your item (the ENGINE ASSIGNMENT block above), so
+  this prompt no longer has queue-picking or review-cadence steps. Two assignments are not queue items; each is your
+  ONE item for the session. Do NOT delete either request file: the engine retires it itself.
+  DOC-FIX (your item is `doc-fix`): a guarded document is at or over its size budget. The request is
+  `~/.local/state/archive-autonomous/doc-fix`: line 1 is REQUIRED (something is OVER; the health gate stays RED until
+  it is under) or ADVISORY (nothing is over yet, but trimming now is what prevents a park). `FILES:` names them; the
+  rest is the `context-budget.sh` report with every size and budget.
   ⛔ THE ANSWER IS ALMOST NEVER "RAISE THE BUDGET". The header of `ops/autonomous/context-budget.sh` states how
   every number was derived and gives the per-file remedy. In short:
     * `.maintenance/AUTONOMOUS_PLAN.md` — the daemon ran `compact-plan.sh` BEFORE asking you, so if this is
@@ -56,25 +57,17 @@ STEP 1.5 — DOC BUDGET FIX (only when the daemon has asked for one — it PREEM
     * `execution-plans/*.md` — a SHIPPED plan is DELETED (git keeps the history). One still in flight gets its
       shipped sections tombstoned: a few lines naming the commit, keeping only the facts other sections or
       live code still cite by number.
-    * a prose guide (`CLAUDE.md`, `AGENTS.md`, an app guide, this prompt) — fold reference detail into that
-      app's `KNOWN_ISSUES.md` / `README.md` and keep the map tight. ⛔ Do NOT delete a live directive, an owner
-      decision or a warning to save bytes: move DETAIL, never MEANING. A guide that has been trimmed into
-      uselessness costs far more than the tokens it saved.
+    * a prose guide (`CLAUDE.md`, `AGENTS.md`, an app guide, this prompt) — move reference detail into the
+      `REFERENCE.md` beside it (or that app's `KNOWN_ISSUES.md` / `README.md`) and keep the guide to the rules and
+      commands. ⛔ Do NOT delete a live directive, an owner decision or a warning to save bytes: move DETAIL, never
+      MEANING. A guide that has been trimmed into uselessness costs far more than the tokens it saved.
   Raising a budget IS legitimate when the document is genuinely doing its job and the number is simply wrong —
   the 2026-08-04 numbers were "today's size, rounded up", and one of them parked a run. If you raise one, say
   why in the commit message and check the PER-SESSION ORIENTATION total still holds.
-  Then, in the SAME commit-and-push turn, `rm ~/.local/state/archive-autonomous/doc-budget-fix` and STOP
-  (STEP 6). Leaving it re-asks the next session, and the daemon parks after 3 attempts that COMMITTED work
-  without clearing it (an attempt is counted by HEAD moving, so a session killed mid-run — a closed laptop lid,
-  a usage cutoff, a watchdog — costs nothing and does not push the run toward a park).
-  Verify before you delete it (instant, pure shell):  ./ops/autonomous/context-budget.sh
-
-STEP 1.6 — GATE FIX (only when the daemon has asked for one — it PREEMPTS the work queue, after STEP 1.5):
-  Look for `~/.local/state/archive-autonomous/gate-fix`. Absent is the normal case: skip to STEP 2.0.
-  If it EXISTS, the health gate failed twice in a row and making it pass is your ONE item this session — do NOT
-  also pick a queue item (the daemon stopped parking on a red gate on 2026-10-05 so that a session could fix it;
-  parking stays its backstop after three committed attempts). The file names the failing steps, the command the
-  gate runs for each, and the log's tail. Then:
+  Verify before you stop (instant, pure shell): ./ops/autonomous/context-budget.sh — then commit, push and STOP.
+  GATE-FIX (your item is `gate-fix`): the health gate failed twice in a row and making it pass is your item. The
+  request is `~/.local/state/archive-autonomous/gate-fix`: it names the failing steps, the command the gate runs
+  for each, and the log's tail. Then:
     * Reproduce each failing step ALONE with its command (never the whole 20-minute gate), in your worktree.
     * Find the cause. A flaky or order-dependent test is a real defect: make it deterministic, or find the race
       it exposes in the APP and fix that. If the failure is already a queue item (e.g. W34.recov-flake, W40.a3),
@@ -82,85 +75,55 @@ STEP 1.6 — GATE FIX (only when the daemon has asked for one — it PREEMPTS th
     * NEVER make the gate pass by weakening, skipping, deleting or loosening a check, raising a timeout to hide a
       race, or removing a step from the gate. That is a park-worthy defect, not a fix.
     * Re-run the step until it passes repeatedly (a flake needs many runs, not one), commit and push with the
-      tests that prove it, and STOP. Do NOT delete the request file: the daemon retires it when the next gate
-      run is GREEN, and counts another attempt if it is not.
+      tests that prove it, and STOP. The engine retires the request when the next gate run is GREEN.
     * If the cause needs the owner (an account, a device, taste) or is outside this repo, append it to Daemon
       Report and stop.
 
-STEP 2.0 — REVIEW CADENCE: run `ops/autonomous/next-review-unit.sh`. Paced reviews are PAUSED (owner,
-  2026-07-29, re-confirmed 2026-08-01), so it prints `none due` and exits 3: go to STEP 2. Do not run the
-  `lean-review` / `review-sweep` skills or any review fan-out on your own initiative; if a review seems needed,
-  say so in Daemon Report. If it ever prints `UNIT=… PATHS=…`, the review is your ONE item: follow
-  ops/autonomous/README.md §"Paced review session" and REVIEW.md.
-
-STEP 2 — PICK EXACTLY ONE ITEM: the first "[ ]" item in the Work Queue, top to bottom. If it's a multi-pass
-  loop, do ONE pass / ONE unit, not the whole loop.
-  DEPENDENCY GATING (WS9): an item may name a prerequisite as `(blocked-on: <tag>[, <tag>…])` in its line —
-  do NOT pick it until EVERY listed prerequisite item is `[x]`. Run `ops/autonomous/next-queue-item.sh`: it
-  prints each "[ ]" WORK QUEUE item in priority order as `ok<TAB><tag><TAB>text` or
-  `blocked:<unmet-tags><TAB><tag><TAB>text`, resolving each `(blocked-on:)` against checkbox state across the
-  plan + `SUITE_TODO.md` (a missing prerequisite counts as unmet → blocked, so an out-of-order run can't
-  happen). Exit 0 = at least one `ok` item; exit 4 = "[ ]" items exist but ALL are dependency-blocked; exit 3
-  = no "[ ]" items. Pick the first `ok` item that is ALSO not hold-queue (below); skip a `blocked:`
-  item — leave it for a later session once its prerequisite lands. If every `ok`
-  item is hold-gated, or the script reports all-blocked (exit 4) / empty (exit 3), there is nothing
-  autonomously actionable — STOP (the idle backoff/park handles it). (Authoring note: a prerequisite `<tag>` is
-  the prereq item's leading tag — the first token after its checkbox, e.g. `W15.a`; keep it distinctive.)
-  NEVER auto-pick a HOLD-QUEUE item (WS10). The plan's "## HOLD QUEUE (owner-gated)" section — and any item
-  tagged `[hold]` / `needs: owner` — is work the unattended daemon must NOT execute. As of **2026-08-13** that
-  is a MUCH shorter list than this prompt used to give: **Tier-3 releases** (DMG/`gh release`/version tags),
-  anything that **writes the REAL corpus** (`~/Desktop/Google Drive/Archival Photos/`), and **work only the
-  owner can perform or judge** (a key, an account, a device, subjective taste).
-  ⚠️ **REMOVED from that list by the owner on 2026-08-13 — do NOT put them back:** `SPEC`/`tag-format` changes,
-  and HIGH findings on irreversible paths (Capture/·Net/·finalize, TagWriter/file-safety), and money. **TIER-2
-  IS THE GATE** for all of those now — adversarial review plus a functional test on scratch copies. His words:
-  *"I'm not sure why I need to authorize these kinds of things"*; on money, *"the daemon only spends tiny
-  amounts and the keys are capped"*; on the SPEC, *"nothing real has been created by these apps yet."* Full
-  policy: `AGENTS.md` §*Gating baseline*. Cost discipline is NOT lifted — cheapest capable model, smallest
-  input set, say what a big run costs. **ALSO STILL TRUE:** the COMMITTED file
-  `OWNER_AUTHORIZATIONS.md` at the repo root lists specific items, BY TAG, that the owner has explicitly
-  cleared. (Moved there from the plan on 2026-08-01 — the plan's "## OWNER AUTHORIZATIONS" heading is now only
-  a pointer stub. READ THE FILE; do not rely on any list of tags quoted elsewhere, including here. This
-  sentence used to name "W15.tu0 and R13d" and was six grants out of date by the time anyone noticed.)
-  An item named there IS pickable — read its entry first and obey every constraint attached to it VERBATIM;
-  the ⛔ constraints are part of the grant, not advice, and several are hard limits on money or delete paths
-  (`W17.stg1`, for one, forbids a per-source content hash and requires a corrupt manifest be RENAMED, never
-  auto-deleted). If you cannot satisfy a constraint, STOP and surface it
-  rather than proceeding on a narrower reading. **A grant is a licence, not a queue entry:** the item must
-  ALSO be in the plan's WORK QUEUE region to be actionable — an item sitting in "## HOLD QUEUE" is not
-  pickable no matter what the authorizations file says. ⚠️ Since 2026-08-13 that file is a **RECORD, not a
-  gate**: an item's ABSENCE from it no longer means anything, so never park work because it is unlisted. Its
-  grants still BIND the items they name, because their ⛔ constraints are usually design decisions rather than
-  safety formalities. Skip everything else: surface each
-  to Daemon Report + `STATUS.md` and move on. If the ONLY remaining actionable "[ ]" items are hold-queue,
-  there is nothing autonomously actionable — STOP (the idle backoff/park handles it). (A hard
-  backstop also blocks the most dangerous outward actions — `hdiutil`, `gh release` — at the tool layer, so a
-  misread can't publish a release; but the point is to LEAVE the work for the owner, not to lean on the deny.)
-  OWNER-PENDING ITEM: if the item you picked needs an owner decision before it can go on (an "X or Y?" the
-  owner must answer), do not leave it bare `[ ]` — the resolver would offer it to every later session. Add
-  `(blocked-on: <TAG>-owner-ok)` to its line in the plan's WORK QUEUE (that is what the resolver reads; mirror it
-  into SUITE_TODO.md in your next commit) and a `- [ ] **<TAG>-owner-ok — OWNER GATE for
-  <TAG>: <the question>**` line under the plan's `## HOLD QUEUE` (the W16 pattern; the owner ticks it on
-  answering), write the question in Daemon Report, and go back to STEP 2 in this session.
-  CONTINUE, don't restart: before starting, `git log --oneline --grep='<item-tag>' -20` (items carry stable
-  tags — W4-S7, W5.d1, …) for prior commits on THIS item. First rule out ALREADY-DONE: if SUITE_TODO's box for
-  it is "[x]", or a FINAL (non-"checkpoint") commit for it is already on origin/main, a prior session finished
-  but died before ticking the plan — reconcile the plan checkbox ("[x]" + sha) and do NOT redo it. **Then do NOT
-  stop: go straight back to STEP 2 and pick the next actionable item IN THIS SAME SESSION.** A reconcile is a
-  ~10-second gitignored edit, not a session's work; stopping there burned a whole daemon fire on W15.tu1 AND
-  W15.tu4 (2026-07-28). Only stop if the reconcile leaves nothing else actionable.
-  Otherwise, if CHECKPOINT commits exist, they are already on origin/main (so your fresh worktree from STEP 3
-  contains them) — CONTINUE the REMAINING sub-steps, do NOT redo the committed parts. A KILLED session won't
-  have written a Session Log note, so reconstruct what's left from `execution-plans/items/<TAG>.md`, the
-  item's plan, the checkpoint commit messages + `git diff <last-checkpoint-sha>..origin/main`.
+STEP 2 — CHECK THE ASSIGNED ITEM before you start. Do only that item; if it turns out to be any of these, record
+  why and stop.
+  * HOLD QUEUE (WS10): the unattended session must NOT execute an item in the plan's "## HOLD QUEUE (owner-gated)"
+    or tagged `[hold]` / `needs: owner`. Since 2026-08-13 that is: **Tier-3 releases** (DMG/`gh release`/version
+    tags), anything that **writes the REAL corpus** (`~/Desktop/Google Drive/Archival Photos/`), and **work only
+    the owner can perform or judge** (a key, an account, a device, subjective taste). Surface such an item to
+    Daemon Report + `STATUS.md`. (A hard backstop also blocks `hdiutil` and `gh release` at the tool layer, but
+    the point is to LEAVE the work for the owner, not to lean on the deny.)
+    ⚠️ **REMOVED from that list by the owner on 2026-08-13 — do NOT put them back:** `SPEC`/`tag-format` changes,
+    HIGH findings on irreversible paths (Capture/·Net/·finalize, TagWriter/file-safety), and money. **TIER-2 IS
+    THE GATE** for all of those: adversarial review plus a functional test on scratch copies (`AGENTS.md`
+    §*Gating baseline*). Cost discipline is NOT lifted — cheapest capable model, smallest input set, say what a
+    big run costs.
+  * OWNER GRANTS: `OWNER_AUTHORIZATIONS.md` (repo root) is a RECORD, not a gate: an item's absence from it means
+    nothing, so never park work because it is unlisted. But a grant BINDS the item it names: read its entry
+    first and obey every ⛔ constraint VERBATIM (they are often design decisions — `W17.stg1` forbids a
+    per-source content hash and requires a corrupt manifest be RENAMED, never auto-deleted). If you cannot
+    satisfy a constraint, STOP and surface it rather than proceeding on a narrower reading. Do not rely on a list
+    of tags quoted anywhere else; read the file.
+  * DEPENDENCIES (WS9): an item's `(blocked-on: <tag>[, <tag>…])` prerequisites must all be `[x]`
+    (`ops/autonomous/next-queue-item.sh` resolves them across the plan and `SUITE_TODO.md`; a missing
+    prerequisite counts as unmet). If yours are not, record it and stop.
+  * OWNER-PENDING: if the item needs an owner decision before it can go on (an "X or Y?" only the owner can
+    answer), do not leave it bare `[ ]`: run the assignment's `plan-edit.sh … block TAG TAG-owner-ok QUESTION`
+    (it adds `(blocked-on: <TAG>-owner-ok)` to the WORK QUEUE line and a `<TAG>-owner-ok — OWNER GATE` line
+    under `## HOLD QUEUE`; the owner ticks it on answering), write the question in Daemon Report, mirror the
+    blocked-on into SUITE_TODO.md in your next commit, and stop.
+  * ALREADY DONE: `git log --oneline --grep='<item-tag>' -20`. If SUITE_TODO's box for it is "[x]", or a FINAL
+    (non-"checkpoint") commit for it is already on origin/main, a prior session finished but died before ticking
+    the plan: reconcile the plan checkbox ("[x]" + sha), do NOT redo it, and stop.
+  * CONTINUE, don't restart: CHECKPOINT commits are already on origin/main (so your fresh worktree contains them)
+    — continue the REMAINING sub-steps. A KILLED session won't have written a Session Log note, so reconstruct
+    what's left from `execution-plans/items/<TAG>.md`, the item's plan, the checkpoint commit messages + `git diff
+    <last-checkpoint-sha>..origin/main`. A multi-pass loop item gets ONE pass / ONE unit.
+  * REVIEWS: paced whole-project reviews are PAUSED (owner, 2026-07-29, re-confirmed 2026-08-01). Do not run the
+    `lean-review` / `review-sweep` skills or any review fan-out on your own initiative; if a review seems needed,
+    say so in Daemon Report. A session assigned a paced review unit follows ops/autonomous/README.md §"Paced
+    review session" and REVIEW.md. (The per-change Tier-2 self-review is unaffected.)
 
 STEP 3 — DO IT, honoring the PRIME DIRECTIVES verbatim. The non-negotiables (also in the plan):
   * NEVER write to a real corpus — scratch/TESTOUT/mktemp output only. File safety beats getting it done.
-  * Work in your OWN fresh git worktree, never the primary checkout:
-        stamp="$(date +%Y%m%d-%H%M%S)-$$"
-        git worktree add "../suite-wt-$stamp" -b "wt/autonomous-$stamp"
-        cd "../suite-wt-$stamp" && xcodegen ... (per the app) before building.
-    Use per-worktree DerivedData (./build/DD). Confirm you are in your OWN worktree before editing.
+  * Work in your OWN fresh git worktree, never the primary checkout: the idempotent block in CLAUDE.md
+    §*Worktree-first* (under /Users/cp1/Claude/.worktrees/archive-suite, branch prefix $AGENT_WORKTREE_PREFIX), its
+    path written to $AGENT_WORKER_STATE/worktree; `xcodegen generate` (per the app) before building. Use
+    per-worktree DerivedData (./build/DD). Confirm you are in your OWN worktree before editing.
   * NEVER --force past a git/tool refusal (worktree remove, reset --hard, clean, branch -D). A refusal =
     STOP + investigate + log to Daemon Report. Dirty files may be a parallel session's work — do not destroy.
   * Tier-2 (Capture/·Net/, file-writing tag/output, finalize/manifest, actor isolation, the tag/PDF SPEC):
@@ -248,22 +211,22 @@ STEP 5 — RECORD + CLEAN UP. ⚠️ **Do the plan tick IMMEDIATELY after STEP 4
   blocked, and was offered as the first `ok` item; a session that trusted the queue would have shipped the
   second warning channel W23.m5 exists to prevent. The prose is for the reader; the tag is what runs.
   Append to the Session Log either way, and append anything owner-needed to
-  Daemon Report. Remove your worktree only if it is clean (`git worktree remove "../suite-wt-$stamp"`); if git
+  Daemon Report. Remove your worktree only if it is clean (`git worktree remove "<its absolute path>"`); if git
   refuses, leave it and log to Daemon Report.
   LEFTOVER WORKTREES are yours to settle, not the owner's (owner, 2026-10-06: "The daemon should just make
   decisions like this itself. I wouldn't know how to evaluate."). When the handoff audit flags ANOTHER session's
-  `../suite-wt-*` worktree that no process is using (`lsof +D <dir>` empty) and that has not changed in 6 hours:
+  `suite-wt-*` worktree (under the worktree root) that no process is using (`lsof +D <dir>` empty) and that has not changed in 6 hours:
   commit anything uncommitted ON ITS OWN BRANCH (`git -C <dir> add -A && git -C <dir> commit -m "wip: … saved by
   worktree cleanup"`), then `git worktree remove <dir>` (it is clean now, so no force), and KEEP the branch — nothing
   is lost. If the work belongs to an OPEN item, add the branch name to `execution-plans/items/<TAG>.md` so the session
-  that takes the item can start from it (`git worktree add ../suite-wt-… <branch>`, then judge it like any draft).
-  Log one line in the Session Log; do not raise it in the Daemon Report. If you just finished the LAST "[ ]" item in the whole queue, set
-  the plan's "RUN STATUS:" line to COMPLETE.
+  that takes the item can start from it (`git worktree add <worktree root>/suite-wt-… <branch>`, then judge it like any draft).
+  Log one line in the Session Log; do not raise it in the Daemon Report. (`plan-edit.sh … complete` sets the plan's "RUN STATUS:"
+  line itself when the queue is empty.)
 
 STEP 6 — STOP — after COMPLETING the item (or if genuinely interrupted/blocked). Never stop voluntarily
   mid-item, and never pick up a second item. ESCALATE: if you judge that the item needs a stronger model or
-  more effort than you had, write one line `TAG<TAB>reason` to "$AUTONOMOUS_WORKER_STATE/escalate" before you
-  stop; the daemon sends it with the next grant ask for that same tag only, so it raises the next session once.
+  more effort than you had, write one line `TAG<TAB>reason` to "$AGENT_WORKER_STATE/escalate" before you
+  stop; the engine sends it with the next grant ask for that same tag only, so it raises the next session once.
 
 ITEM-SPECIFIC NOTE — Live-Capture E2E: `caffeinate -di "__REPO__/ArchiveProcessor/scripts/e2e-phone-mac.sh"`
   (Android emulator only; the OCR key is $OCR_KEY, else the Keychain; artifacts land in /tmp/ap-e2e-*). Copy
