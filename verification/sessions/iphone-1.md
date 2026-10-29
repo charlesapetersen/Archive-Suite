@@ -1,21 +1,15 @@
 # Borrowed-iPhone session 1
 
-> **Not handed over yet (2026-10-22).** This pack is drafted, but it is not time for the session. Three Mac-side
-> Live Capture fixes are queued and would get in the way of every task that ends in filing on the Mac
-> (`W40.fix-live-vision-drops-card-tags`, `W40.fix-processor-live-emptied-mixed`,
-> `W40.fix-live-finalize-failure-silent`). The simulator has also not yet shown the parts of the app it can show
-> (`W40.i-sim-ui`): the buttons pressed by touch, Retry, backgrounding, relaunch, and the dialogs. `W40.i5` waits
-> on all four items. The session that closes it refreshes this pack against what they found, removes this note,
-> and only then hands it over (`execution-plans/verification-phase/01-daemon-plan.md` §G "Is it time?").
-
 About 60 to 90 minutes with a borrowed iPhone. Most of it is testing, plus 20 to 30 minutes of setup on the day.
 The phone is borrowed for one concentrated period, so this session covers only what a simulator cannot: the
 camera, a real network, and the device itself. Everything else about the iPhone app was checked in the simulator
-first (`../evidence/capture/W40.i3-ios-e2e.md`, and `W40.i-sim-ui` once it ships). Whenever something confuses
+first (`../evidence/capture/W40.i3-ios-e2e.md` and `../evidence/capture/W40.i-sim-ui.md`). Whenever something confuses
 you, is slow, or gets something wrong, write one line on the form at the end. The next daemon session turns each
 note into a reproduced bug, a design question for you, or a suspect (`../SUSPECTS.md`).
 
-Prepared by `W40.i5` on 2026-10-22, at the commit that added this file. The capture apps' state is in
+Prepared by `W40.i5` on 2026-10-22 and handed over on 2026-10-29, after the three Mac-side Live Capture fixes
+(`W40.fix-live-vision-drops-card-tags`, `W40.fix-processor-live-emptied-mixed`,
+`W40.fix-live-finalize-failure-silent`) and the simulator pass (`W40.i-sim-ui`) had shipped. The capture apps' state is in
 [`../capture.md`](../capture.md) (the feature ledger; the iPhone's rows are C-31 to C-44).
 
 ## A few days before (at home, no phone needed)
@@ -101,13 +95,18 @@ the capture, not of the material. Include one in landscape.
 
 ## Problems we already know about
 
-Each of these has a fix item filed. If you hit one, you don't need to describe it, but **do write how much it got in
-your way**.
+No fix for the iPhone app or for Live Capture is queued. What remains are three unconfirmed suspects
+(`../SUSPECTS.md`), each raised by reading the code or by a simulator run. If you hit one, you don't need to
+describe it, but **do write how much it got in your way**.
 
-- *(The session that hands this pack over fills this in from the items that are still open by then. Only problems
-  that will stay open for a while belong here, each with the tasks it touches.)*
 - **The Mac's QR does not appear** if the Mac's network address is not on its main Wi-Fi or Ethernet port
-  (suspect S-037, unconfirmed). If that happens, type the address by hand on the phone (task 2) and note it.
+  (S-037). This is most likely when the Mac is joined to the phone's hotspot. If it happens, type the address by
+  hand on the phone and note it. Touches task 2.
+- **A year you give on the phone may keep the day the OCR read** from a different date on the page (S-040). For
+  example, a page dated "December 3, 1974" that you tag 1962 may be filed "1962, Day 3". In task 3, look at the
+  filed PDF's tags and note whether the day or month is one you did not give.
+- **Over the Google Drive relay, Finish session may not wait for pages still on the phone** (S-038). In task 9,
+  wait until the last page has reached the Mac before you press Finish, then note whether the PDF has every page.
 
 ## The tasks (60 to 90 minutes)
 
@@ -212,5 +211,6 @@ For each line on the form:
 - **A judgement call** ("I expected X"): put a question in the Daemon Report, one per note.
 - **Not reproducible yet:** add a `SUSPECTS.md` entry with "Raised: owner session iphone-1".
 - Move the ledger rows the session showed working to `works`, citing the returned form as evidence (phase
-  rule 1). The owner is not the builder, so rule 6 allows it. Settle S-022 and S-023 from tasks 4 and 7.
+  rule 1). The owner is not the builder, so rule 6 allows it. Settle S-022 and S-023 from tasks 4 and 7. Where the notes bear on them, add history to S-037
+  (task 2), S-040 (task 3) and S-038 (task 9).
 - Keep the returned form as `verification/sessions/iphone-1-returned.md`.

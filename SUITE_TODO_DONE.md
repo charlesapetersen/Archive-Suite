@@ -13286,3 +13286,16 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   refused and stays prepared. `ops/verify/mutation-sample.sh processor --only P01,P02,P06,P08,P11,P12` → 6/6 killed,
   each by its own check (default drivers; a kill there is a kill under `MUT_DRIVERS=all`, which only adds drivers).
   <!-- /W40.fix-mut-processor-trash-tests -->
+- [x] **W40.i5 — borrowed-iPhone session pack [S]** · §W40 — verification phase (lane: docs) (uses: light) (blocked-on: W40.i3, W40.i3-fu-shots, W40.i-sim-ui, W40.fix-live-vision-drops-card-tags, W40.fix-processor-live-emptied-mixed, W40.fix-live-finalize-failure-silent). SHIPPED 2026-10-29.
+  The pack is `verification/sessions/iphone-1.md`: setup at home (the optional iOS OAuth client into the gitignored
+  `Config/DriveLocal.xcconfig`, an Apple ID in Xcode), the free-Apple-ID install on the day (the device code-signing
+  override, because `project.yml` sets `CODE_SIGN_IDENTITY: "-"` / `CODE_SIGNING_REQUIRED: NO` for the simulator;
+  Personal Team; Developer Mode; trusting the developer; all marked untested, no device here), Wi-Fi or hotspot
+  pairing (USB pairing does not exist for iPhone by design, `capture.md`), and ten device-only tasks, tasks 5–8 cut to
+  the hardware part by `W40.i-sim-ui`. Drafted 2026-10-22 (16b0fc43) and held until the three Mac-side Live Capture
+  fixes and the simulator pass shipped. Handed over 2026-10-29: "Is it time?" (§G) judged yes, since no iPhone or
+  Live Capture fix is queued; the only capture-touching items (W47.ct-processor-capture and its followers) wait on
+  W46.review-done and are not near. Known problems listed: suspects S-037 (task 2), S-040 (task 3), S-038 (task 9).
+  The `(blocked-on: W42.int-done)` still on this entry and on W40.i4 was stale: the owner took i1–i5 off that wait on
+  2026-10-20 (SUITE_TODO §W46 note, 6fc8c7b0), so it was removed from W40.i4, which now waits only on the owner.
+  <!-- /W40.i5 -->
