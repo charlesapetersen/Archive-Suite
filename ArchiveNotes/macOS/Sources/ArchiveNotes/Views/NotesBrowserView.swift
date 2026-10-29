@@ -60,6 +60,7 @@ struct NotesBrowserView: View {
                     .frame(minWidth: 540, maxWidth: .infinity, maxHeight: .infinity)
                     .frame(height: stacked
                            ? NotesLayoutSettings.stackedListHeight(stored: listHeight, paneHeight: panesHeight) : nil)
+                    .clipped()   // never drawn outside its share, under the toolbar or the note
                 PanelDivider(size: stacked ? $listHeight : $detailWidth, panelBefore: stacked,
                              axis: stacked ? .vertical : .horizontal,
                              range: stacked ? NotesLayoutSettings.stackedListRange(paneHeight: panesHeight)

@@ -94,9 +94,9 @@ final class StackedLayoutUITests: NotesFixtureUITestCase {
             XCTAssertEqual(divider.label, "Item list height")
 
             drag(divider, by: -300)
-            XCTAssertEqual(height(divider), 140, accuracy: 0.5, "the list height should clamp at its minimum")
+            XCTAssertEqual(height(divider), 220, accuracy: 0.5, "the list height should clamp at its minimum")
             drag(divider, by: 60)
-            XCTAssertEqual(height(divider), 200, accuracy: 6, "dragging down should grow the list")
+            XCTAssertEqual(height(divider), 280, accuracy: 6, "dragging down should grow the list")
             let list = mainWindow.tables.firstMatch
             XCTAssertEqual(list.frame.maxY, divider.frame.minY, accuracy: 4, "the list should end at the divider")
             // Down as far as it goes: at most 440, and less when the window is too short to keep the note's
@@ -105,7 +105,7 @@ final class StackedLayoutUITests: NotesFixtureUITestCase {
             let top = height(divider)
             print("[w48] list height at the bottom of the drag: \(top) in a \(mainWindow.frame.height) pt window")
             XCTAssertLessThanOrEqual(top, 440.5, "the list height should clamp at its maximum")
-            XCTAssertGreaterThan(top, 200, "dragging down should grow the list up to what fits")
+            XCTAssertGreaterThan(top, 280, "dragging down should grow the list up to what fits")
             drag(divider, by: 200)
             XCTAssertEqual(height(divider), top, accuracy: 0.5, "past its limit the list should stay where it stopped")
             let shownEditor = mainWindow.scrollViews.containing(.textView, identifier: "an.editor.text").firstMatch

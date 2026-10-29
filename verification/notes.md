@@ -393,9 +393,9 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
     `W48.notes-stacked-layout-verify`.
 - **Notes:**
   - One choice for both windows, like the panel widths.
-  - The VM runs while it was built found four things, fixed in the same item: the note was squeezed to a 9 pt
-    editor in a short window (the list now gives way, the note keeps 480 pt, the stacked window minimum is
-    627 pt), and three accessibility-audit findings the side-by-side audit never reached because the narrower
+  - The VM runs while it was built found five things, fixed in the same item: the note was squeezed to a 9 pt
+    editor in a short window (the list now gives way, the note keeps 480 pt, the list 220 pt, the stacked
+    panes' minimum 707 pt), the list's filter bar spilling under the toolbar at a 140 pt list, and three accessibility-audit findings the side-by-side audit never reached because the narrower
     list kept those columns off screen: the Quality cell's unnamed group, empty Tags and Sources cells, and the
     filter bar's decorative date dash. The builder's runs: [`evidence/notes/W48.notes-stacked-layout.md`](evidence/notes/W48.notes-stacked-layout.md).
 
@@ -407,7 +407,7 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
   divider, then the note, and Tab still reaches the note from the list.
 - **Promised in:** `SUITE_TODO.md` `W48.notes-stacked-layout`.
 - **Reached by:** `PanelDivider(axis: .vertical)` (`Views/PanelDivider.swift`) over `an.listHeight`, clamped
-  140–440 pt by `NotesLayoutSettings.clampedListHeight` (`Core/NotesAppSettings.swift`), and further by
+  220–440 pt by `NotesLayoutSettings.clampedListHeight` (`Core/NotesAppSettings.swift`), and further by
   `stackedListRange(paneHeight:)` so the note below keeps 480 pt; the remembered height is kept for a taller window.
 - **Real-path test:** `ArchiveNotesTests/PanelDividerAccessibilityTests.testStackedDividerIsAHorizontalSplitterOverTheListHeight`
   and `NotesAppSettingsTests.listHeightClampsLikeTheWidths` (unit). `ArchiveNotesUITests/StackedLayoutUITests.testStackedDividerDragsClampsAndSurvivesRelaunch`
