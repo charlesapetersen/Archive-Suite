@@ -641,12 +641,22 @@ struct LiveCaptureView: View {
                 if let summary = liveProc.finalizeSummary {
                     // Session complete: the captured photos have been processed & filed, so the pane
                     // shows the result here in their place until the next photo starts a new batch.
+                    // W40.fix-processor-live-emptied-mixed — the green check only for a clean finish: a
+                    // summary that reports something not filed (or kept, or untagged) gets the warning
+                    // triangle instead, so a success mark never sits over a failure. And the next-step hint
+                    // follows the connection, since "shoot on the phone" is wrong while the server is stopped.
+                    let problem = LiveCaptureProcessor.summaryReportsProblem(summary)
                     VStack(spacing: 10) {
-                        Image(systemName: "checkmark.circle.fill").font(.system(size: 40)).foregroundStyle(.green)
+                        Image(systemName: problem ? "exclamationmark.triangle.fill" : "checkmark.circle.fill")
+                            .font(.system(size: 40)).foregroundStyle(problem ? .orange : .green)
+                            .accessibilityLabel(problem ? "Finished with problems" : "Finished")
+                            .accessibilityIdentifier(problem ? "live.summary-warning" : "live.summary-done")
                         Text(summary)
                             .font(.title3).multilineTextAlignment(.center)
-                        Text("Shoot on the phone to start a new batch.")
+                        Text(session.receiverActive ? "Shoot on the phone to start a new batch."
+                                                    : "Start the server, then shoot on the phone to start a new batch.")
                             .font(.caption).foregroundStyle(.primary)
+                            .accessibilityIdentifier("live.summary-next")
                     }
                 } else {
                     VStack(spacing: 8) {

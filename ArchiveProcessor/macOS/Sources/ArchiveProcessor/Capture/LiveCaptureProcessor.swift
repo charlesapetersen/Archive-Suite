@@ -236,6 +236,13 @@ final class LiveCaptureProcessor: ObservableObject {
     }
 #endif
     @Published private(set) var finalizeSummary: String?
+    /// W40.fix-processor-live-emptied-mixed — whether the finish summary reports something that went wrong,
+    /// so the emptied pane draws a warning instead of the success check. `executePlans`' base summary
+    /// ("Finalized N collections · M files moved.") never carries "⚠️", and every problem `finalizeSegment`
+    /// reports (unfiled segments, a straggler, a failed sidecar move, a placeholder scan, an untagged file,
+    /// an unsaved ledger) is appended as " ⚠️ …" — so the marker is the one signal all of them share.
+    /// A new problem line must keep that marker, or this reads it as a clean finish.
+    nonisolated static func summaryReportsProblem(_ summary: String) -> Bool { summary.contains("⚠️") }
     /// Document segments whose OCR produced no text (filed as image-only PDFs; retryable).
     @Published private(set) var failedGroupIds: Set<String> = []
 

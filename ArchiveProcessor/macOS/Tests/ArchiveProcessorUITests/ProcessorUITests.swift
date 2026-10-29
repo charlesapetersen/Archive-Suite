@@ -287,6 +287,17 @@ final class ProcessorUITests: XCTestCase {
         XCTAssertEqual(clear.label, "Discard 3 processed documents + 1 Box/Folder marker",
                        "the button must count documents separately from the staged Box marker")
 
+        // W40.fix-processor-live-emptied-mixed: the fixture's summary reports an unfiled segment and the
+        // server is stopped, so the pane must show a warning (not the success check) and must not tell the
+        // user to shoot on the phone as if the server were running.
+        XCTAssertTrue(element("live.summary-warning").exists, "a partial finish must draw the warning icon")
+        XCTAssertFalse(element("live.summary-done").exists, "a partial finish must not draw the success check")
+        let next = element("live.summary-next")
+        XCTAssertTrue(next.exists, "the emptied pane must say what to do next")
+        XCTAssertTrue(renderedText(of: next).hasPrefix("Start the server"),
+                      "with the server stopped, the hint must start from starting it")
+        attachScreenshot("processor-live-emptied-partial-finish")
+
         clear.click()
         let confirmation = app.sheets.firstMatch
         XCTAssertTrue(confirmation.waitForExistence(timeout: 5), "Clear must ask before dropping processed work")
