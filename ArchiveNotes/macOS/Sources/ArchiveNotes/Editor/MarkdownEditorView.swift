@@ -197,7 +197,7 @@ struct MarkdownEditorView: NSViewRepresentable {
         context.coordinator.lastAppliedMarkdown = markdown
         context.coordinator.lastPassageGeneration = passageGeneration
 
-        let scrollView = NSScrollView()
+        let scrollView = EditorScrollView()
         scrollView.hasVerticalScroller = true
         scrollView.hasHorizontalScroller = false
         scrollView.drawsBackground = false
