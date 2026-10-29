@@ -856,7 +856,12 @@ final class NotesGUITests: NotesFixtureUITestCase {
             XCTAssertTrue(precision.waitForExistence(timeout: 8), "date precision control should be visible")
             let dayPrecision = precision.radioButtons["Day"]
             XCTAssertTrue(dayPrecision.waitForExistence(timeout: 5), "Day precision should be selectable")
+            // The pane is 140 pt tall in the VM and the date section starts below its fold, so an unrevealed
+            // click landed outside it and precision stayed Year (W40.fix-notes-date-day-uitest).
+            revealInMetadataScroll(precision)
             dayPrecision.click()
+            XCTAssertTrue(pollUntil(timeout: 5) { (dayPrecision.value as? Int) == 1 },
+                          "the Day click should select day precision: \(precision.debugDescription)")
 
             let year = mainWindow.textFields["an.detail.date.year"]
             XCTAssertTrue(year.waitForExistence(timeout: 5), "the date year field should be visible")
