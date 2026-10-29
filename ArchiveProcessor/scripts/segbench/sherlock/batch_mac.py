@@ -80,7 +80,11 @@ def remote(script, dry):
 
 
 def rsync(src, dst, dry, to_remote, extra=()):
-    """rsync -a between the Mac and the login node; dst/src on the remote side is an absolute path."""
+    """rsync -a between the Mac and the login node; dst/src on the remote side is an absolute path. Sherlock's rsync
+    creates only the last folder of dst, so its parent must already exist. The Mac's openrsync makes the whole path,
+    so the local seam refuses a missing parent itself, as the login node would."""
+    if LOCAL and to_remote and not dry and not os.path.isdir(os.path.dirname(dst.rstrip("/"))):
+        raise SystemExit("rsync failed (11): mkdir %s failed: No such file or directory" % dst)
     if LOCAL:
         cmd = ["rsync", "-a"] + list(extra) + [src, dst]
     else:
@@ -93,8 +97,6 @@ def rsync(src, dst, dry, to_remote, extra=()):
     if dry:
         show(cmd)
         return ""
-    if LOCAL and to_remote:
-        os.makedirs(os.path.dirname(dst.rstrip("/")), exist_ok=True)
     p = subprocess.run(cmd, capture_output=True, text=True, errors="replace")
     if p.returncode != 0:
         raise SystemExit("rsync failed (%d): %s" % (p.returncode, p.stderr.strip()[-300:]))
@@ -221,6 +223,7 @@ def cmd_send(args, dry):
         raise SystemExit("%.1f GB is too much for the login node; send the packs through the DTN" % (size / 1024 ** 3))
     root = archive_root(dry)
     rb = "%s/batches/%s" % (root, stamp)
+    remote("mkdir -p %s" % shlex.quote(root + "/batches"), dry)   # rsync makes only the last folder of each copy
     for man in packs:
         rsync(os.path.join(STATE, man["mac"]) + "/", "%s/%s/" % (root, man["pack"]), dry, True)
     rsync(d + "/", rb + "/", dry, True, ["--exclude=*.tsv.remote"])
