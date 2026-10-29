@@ -651,6 +651,21 @@ def spans(a: list[str], b: list[str]) -> list[dict]:
     return out
 
 
+# Corrections made after the adjudication, applied to the merged text by `apply` (W46.truth-edits, owner
+# 2026-10-29): found by W46.truth-jpeg-upgrade's check against the JPEG originals. Each (old, new) must occur
+# exactly once. Fragments only, because the repo is public. p088: the handwritten "don't" is in the truth twice
+# (the page has it once). p025: the original and the letterhead read "San Francisco 6".
+CORRECTIONS = {"p088": [(" don t", "")], "p025": [("San Francisco 4,", "San Francisco 6,")]}
+
+
+def correct(page: str, text: str) -> str:
+    for old, new in CORRECTIONS.get(page, []):
+        if text.count(old) != 1:
+            raise SystemExit(f"{page}: correction {old!r} does not match the merged text exactly once")
+        text = text.replace(old, new)
+    return text
+
+
 def merge(sp: list[dict], answers: dict) -> str | None:
     """Truth text from the spans and the answers ({span index: "a" | "b" | typed text}); None if any is open."""
     parts = []
@@ -865,6 +880,8 @@ def cmd_apply(args):
             continue
         a = answers.get(p["page"], {})
         text = merge(p["spans"], a)
+        if text is not None:
+            text = correct(p["page"], text)
         kind = a.get("kind") or (p["kind"]["claude"] if p["kind"]["claude"] == p["kind"]["gemini"] else None)
         status = "done" if text is not None and kind else "open"
         if status == "done":
