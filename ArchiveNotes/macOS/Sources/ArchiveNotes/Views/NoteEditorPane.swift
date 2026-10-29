@@ -526,7 +526,7 @@ struct NoteEditorPane: View {
                 .font(.callout)
             Text(ref.itemKey)
                 .font(.callout)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(.primary)
             Spacer()
             Button("Attach") {
                 formatting.attachZoteroLink()
@@ -606,7 +606,7 @@ struct TemplateBodyEditorPane: View {
                 Divider()
             }
             HStack {
-                Text("Template body").font(.caption).foregroundStyle(.secondary)
+                Text("Template body").font(.caption).foregroundStyle(.primary)
                     .help("Edit Markdown here. Add images after creating a note from this template.")
                 Spacer()
                 Button { isRaw.toggle() } label: {

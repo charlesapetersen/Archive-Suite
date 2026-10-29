@@ -21,7 +21,7 @@ struct NameEntrySheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(title).font(.headline)
-            if let message { Text(message).font(.callout).foregroundStyle(.secondary) }
+            if let message { Text(message).font(.callout).foregroundStyle(.primary) }
             TextField("Name", text: $name)
                 .textFieldStyle(.roundedBorder)
                 .labelsHidden()

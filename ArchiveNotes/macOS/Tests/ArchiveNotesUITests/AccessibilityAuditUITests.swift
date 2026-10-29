@@ -67,14 +67,7 @@ final class AccessibilityAuditUITests: NotesFixtureUITestCase {
     }
 
     // Filed 2026-10-16 from the first VM runs; each fix's session deletes its entry (the audit fails once it
-    // stops reproducing).
-    @MainActor static let known: [AccessibilityAudit.KnownIssue] = [
-        // Measured failures are all light-mode secondary text: 3.95–4.21:1, and the date range's "–" 3.23:1.
-        AccessibilityAudit.KnownIssue(tag: "W40.fix-notes-a11y-contrast", appearances: ["light"]) { f in
-            guard f.audit == .contrast, f.type == .staticText else { return false }
-            return ["an.sidebar.", "an.filter.count", "an.cell.instances.", "an.detail."]
-                .contains { f.identifier.hasPrefix($0) }
-                || f.label == "–" || f.label.hasSuffix(" note") || f.label.hasSuffix(" notes")
-        },
-    ]
+    // stops reproducing). None open: the last, light-mode secondary text under AA, was fixed by
+    // W40.fix-notes-a11y-contrast (informational text is primary).
+    @MainActor static let known: [AccessibilityAudit.KnownIssue] = []
 }

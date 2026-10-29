@@ -44,7 +44,7 @@ struct QualityInlineMenu: View {
         } label: {
             HStack(spacing: 3) {
                 Text(quality.map { String(repeating: "★", count: $0) } ?? "—")
-                    .foregroundStyle(quality == nil ? Color.secondary : Color.yellow)
+                    .foregroundStyle(quality == nil ? Color.primary : Color.yellow)
                 Image(systemName: "chevron.down")
                     .font(.system(size: 9))
                     .foregroundStyle(.secondary)

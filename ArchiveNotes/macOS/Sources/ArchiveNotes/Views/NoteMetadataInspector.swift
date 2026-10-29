@@ -109,7 +109,7 @@ struct NoteMetadataInspector: View {
             if item.roundup, let year = roundupYear,
                item.date != String(year) || item.datePrecision != .year {
                 Text("Linked PDFs share the year \(String(year)).")
-                    .font(.caption).foregroundStyle(.secondary)
+                    .font(.caption).foregroundStyle(.primary)
                 Button("Use \(String(year)) as note date") {
                     precision = .year
                     entryCalendar = .standard   // a year is always Gregorian
@@ -133,12 +133,12 @@ struct NoteMetadataInspector: View {
                 Spacer()
                 if let extractSources {
                     Text("\(extractSources.count) note\(extractSources.count == 1 ? "" : "s")")
-                        .font(.caption).foregroundStyle(.secondary)
+                        .font(.caption).foregroundStyle(.primary)
                 }
             }
             if let extractSources {
                 if extractSources.isEmpty {
-                    Text("No note passages yet.").font(.caption).foregroundStyle(.secondary)
+                    Text("No note passages yet.").font(.caption).foregroundStyle(.primary)
                 }
                 ForEach(extractSources) { source in
                     let resolved = sourceDisplay(source)
@@ -150,18 +150,18 @@ struct NoteMetadataInspector: View {
                                 .accessibilityIdentifier("an.detail.sources.note.\(source.id.uuidString).title")
                             if resolved.missing {
                                 Text("Source note missing")
-                                    .font(.caption2).foregroundStyle(.secondary)
+                                    .font(.caption2).foregroundStyle(.primary)
                             }
                         }
                         Spacer(minLength: 4)
                         Text("\(source.passageCount) passage\(source.passageCount == 1 ? "" : "s")")
-                            .font(.caption).foregroundStyle(.secondary)
+                            .font(.caption).foregroundStyle(.primary)
                             .fixedSize()
                             .accessibilityIdentifier("an.detail.sources.note.\(source.id.uuidString).count")
                     }
                 }
             } else if extractSourcesFailed {
-                Text("Sources could not be loaded.").font(.caption).foregroundStyle(.secondary)
+                Text("Sources could not be loaded.").font(.caption).foregroundStyle(.primary)
             } else {
                 ProgressView("Loading sources…").controlSize(.small)
             }
@@ -271,7 +271,7 @@ struct NoteMetadataInspector: View {
                 }
                 if let note = Self.entryNote(entryCalendar, active: activeCalendar) {
                     Text(note)
-                        .font(.caption).foregroundStyle(.secondary)
+                        .font(.caption).foregroundStyle(.primary)
                         .fixedSize(horizontal: false, vertical: true)
                         .accessibilityIdentifier("an.detail.date.entryCalendar")
                 }
@@ -301,7 +301,7 @@ struct NoteMetadataInspector: View {
         }
         if let note = calendarNote {
             Text(note)
-                .font(.caption).foregroundStyle(.secondary)
+                .font(.caption).foregroundStyle(.primary)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier("an.detail.date.calendarShown")
         }
@@ -390,7 +390,7 @@ struct NoteMetadataInspector: View {
                 }
                 if let note = Self.entryNote(swEntryCalendar, active: activeCalendar) {
                     Text(note)
-                        .font(.caption).foregroundStyle(.secondary)
+                        .font(.caption).foregroundStyle(.primary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
@@ -403,7 +403,7 @@ struct NoteMetadataInspector: View {
                 Text(item.sortsBySentWith
                      ? "Sent with: \(sent) — sorted by this date (no own date)."
                      : "Sent with: \(sent)")
-                    .font(.caption).foregroundStyle(.secondary)
+                    .font(.caption).foregroundStyle(.primary)
                     .accessibilityIdentifier("an.detail.sentWith.summary")
             }
         }

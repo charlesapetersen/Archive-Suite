@@ -17,7 +17,7 @@ struct LocationsInspector: View {
                     .foregroundStyle(folders.count > 1 ? Color.accentColor : .secondary)
                 Text(folders.count > 1 ? "Replicated — in \(folders.count) folders"
                                        : (folders.isEmpty ? "Locations" : "Location"))
-                    .font(.caption).foregroundStyle(.secondary)
+                    .font(.caption).foregroundStyle(.primary)
             }
             // Section marker goes on the HEADER row, NOT the enclosing VStack: an
             // `.accessibilityIdentifier` on a container propagates to every descendant AX element
@@ -27,7 +27,7 @@ struct LocationsInspector: View {
             .accessibilityIdentifier("an.detail.locations")
             if folders.isEmpty {
                 Text("Not in any folder — reachable under All Notes.")
-                    .font(.caption).foregroundStyle(.tertiary)
+                    .font(.caption).foregroundStyle(.primary)
             } else {
                 ForEach(folders) { folder in
                     HStack(spacing: 6) {

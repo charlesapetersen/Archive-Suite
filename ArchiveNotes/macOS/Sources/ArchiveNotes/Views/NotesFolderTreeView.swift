@@ -219,7 +219,7 @@ struct NotesFolderTreeView: View {
             Label(name, systemImage: systemImage).lineLimit(1).truncationMode(.middle)
             Spacer(minLength: 4)
             if let count, count > 0 || showZero {
-                Text("\(count)").font(.caption).monospacedDigit().foregroundStyle(.secondary)
+                Text("\(count)").font(.caption).monospacedDigit().foregroundStyle(.primary)
             }
         }
         .help(name)
@@ -379,7 +379,7 @@ struct NotesFolderTreeView: View {
                 Divider()
                 HStack(spacing: 6) {
                     Image(systemName: "info.circle").foregroundStyle(.secondary)
-                    Text(msg).font(.caption).foregroundStyle(.secondary)
+                    Text(msg).font(.caption).foregroundStyle(.primary)
                         .fixedSize(horizontal: false, vertical: true)
                     Spacer(minLength: 0)
                 }

@@ -302,7 +302,7 @@ struct NotesTableView: NSViewRepresentable {
             case "instances":
                 let n = parent.model.instanceCounts[item.id] ?? 0
                 tf.stringValue = n > 1 ? "▣ \(n)" : ""
-                tf.textColor = .secondaryLabelColor
+                tf.textColor = .labelColor
                 // VoiceOver reads the count in words; the blank cell still needs a name (the table exposes it
                 // whether or not it is marked an element). Set on every pass because the cell is reused.
                 tf.setAccessibilityLabel(n > 1 ? "In \(n) folders" : "Not replicated")
@@ -310,7 +310,7 @@ struct NotesTableView: NSViewRepresentable {
 
             case "date":
                 tf.stringValue = item.dateColumnText(calendarsEnabled: parent.calendarsEnabled) ?? "—"
-                tf.textColor = item.sortDate == nil ? .secondaryLabelColor : .labelColor
+                tf.textColor = .labelColor
                 if item.sortDateUncertain {
                     tf.font = NSFontManager.shared.convert(regularFont, toHaveTrait: .italicFontMask)
                 }
@@ -320,12 +320,12 @@ struct NotesTableView: NSViewRepresentable {
                 // Distinct source notes for a segmented extract; blank for notes / source-less
                 // extracts. The Extracts window features this; a notes list shows it empty (W7-S4, §4).
                 tf.stringValue = item.sourcesText
-                tf.textColor = .secondaryLabelColor
+                tf.textColor = .labelColor
                 tf.setAccessibilityIdentifier("an.cell.sources.\(item.id.uuidString)")
 
             case "tags":
                 tf.stringValue = item.displayTags
-                tf.textColor = .secondaryLabelColor
+                tf.textColor = .labelColor
                 tf.setAccessibilityIdentifier("an.cell.tags.\(item.id.uuidString)")
 
             default:

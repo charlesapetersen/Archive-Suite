@@ -345,7 +345,7 @@ private struct DetailPane: View {
                         .padding(.horizontal, 10).padding(.vertical, 6)
                     } else {
                         Text("No template selected")
-                            .font(.callout).foregroundStyle(.secondary)
+                            .font(.callout).foregroundStyle(.primary)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(.horizontal, 10).padding(.vertical, 6)
                     }
@@ -398,7 +398,7 @@ private struct DetailPane: View {
                 Text("Details").font(.caption.weight(.semibold))
                 Spacer()
             }
-            .foregroundStyle(.secondary)
+            .foregroundStyle(.primary)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -429,7 +429,7 @@ private struct DetailPane: View {
                     }
                 }
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(.primary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 10)
@@ -438,7 +438,7 @@ private struct DetailPane: View {
         } else {
             Text(nav.selection.count > 1 ? "\(nav.selection.count) items selected" : "No note selected")
                 .font(.callout)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(.primary)
                 .opacity(nav.detailSwitchPending ? 0 : 1)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 10)

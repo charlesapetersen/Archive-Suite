@@ -333,12 +333,12 @@ private struct PreviewSearchingView: View {
             ProgressView().controlSize(.small)
             Text(headline)
                 .font(.callout)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(.primary)
                 .multilineTextAlignment(.center)
             Text(model.scanned > 0 ? "\(model.scanned) items checked" : " ")
                 .font(.caption)
                 .monospacedDigit()
-                .foregroundStyle(.tertiary)
+                .foregroundStyle(.primary)
             Spacer(minLength: 0)
         }
         .padding(8)
@@ -361,7 +361,7 @@ struct PreviewMessageView: View {
         VStack(spacing: 12) {
             Text(message)
                 .font(.callout)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(.primary)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.horizontal)

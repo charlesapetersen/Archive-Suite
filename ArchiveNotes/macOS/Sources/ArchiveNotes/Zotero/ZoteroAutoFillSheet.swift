@@ -16,10 +16,10 @@ struct ZoteroAutoFillSheet: View {
                 .accessibilityIdentifier("an.zotero.autofill.sheet")
             if model.plan.changes.isEmpty {
                 Text("The note's title, authors, and date already match Zotero. Applying will refresh its citation.")
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.primary)
             } else {
                 Text("Choose which metadata changes to apply. Empty fields are selected; replacements require opt-in.")
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.primary)
                 VStack(alignment: .leading, spacing: 10) {
                     ForEach(model.plan.changes, id: \.field) { change in
                         Toggle(isOn: selection(for: change.field)) {
@@ -27,7 +27,7 @@ struct ZoteroAutoFillSheet: View {
                                 Text(change.field.displayName)
                                 Text("\(display(change.currentDisplay)) → \(display(change.proposedDisplay))")
                                     .font(.caption)
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(.primary)
                             }
                         }
                         .accessibilityIdentifier("an.zotero.autofill.field.\(change.field.rawValue)")

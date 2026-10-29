@@ -27,7 +27,7 @@ struct NotesSettingsView: View {
                    + "note's author/date/title and a formatted citation. Attaching a link and opening "
                    + "a citation in Zotero work even when Zotero isn't running.")
                     .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.primary)
             }
 
             Section("Advanced") {
@@ -47,7 +47,7 @@ struct NotesSettingsView: View {
                    + "for showing its dates. Dates are always stored in ISO 8601; choosing a calendar "
                    + "changes only how they are shown.")
                     .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.primary)
             }
         }
         .formStyle(.grouped)

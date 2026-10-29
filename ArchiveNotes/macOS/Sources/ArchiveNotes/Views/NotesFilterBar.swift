@@ -64,7 +64,7 @@ struct NotesFilterBar: View {
 
             Text("\(nav.displayed.count)")
                 .font(.callout.monospacedDigit())
-                .foregroundStyle(.secondary)
+                .foregroundStyle(.primary)
                 .help("Items shown")
                 .accessibilityIdentifier("an.filter.count")
 
@@ -186,7 +186,7 @@ struct NotesFilterBar: View {
                 .help("From year")
                 .accessibilityLabel("From year")
                 .accessibilityIdentifier("an.filter.dateFrom")
-            Text("–").foregroundStyle(.secondary)
+            Text("–").foregroundStyle(.primary)
             TextField("To", text: toYearText)
                 .frame(width: 54)
                 .textFieldStyle(.roundedBorder)

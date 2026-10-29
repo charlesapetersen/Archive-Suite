@@ -30,7 +30,7 @@ struct TemplatesManagerView: View {
                         Text(t.name.isEmpty ? "Untitled" : t.name).lineLimit(1)
                         Spacer(minLength: 4)
                         Text(t.kind == .extract ? "Extract" : "Note")
-                            .font(.caption).foregroundStyle(.tertiary)
+                            .font(.caption).foregroundStyle(.primary)
                     }
                     .tag(t.id)
                     .accessibilityIdentifier("an.template.row.\(t.id.uuidString)")
@@ -122,7 +122,7 @@ struct TemplatesManagerView: View {
                 .help("Delete").disabled(selected == nil)
             Spacer()
             Text(selected == nil ? "Select a template to edit its body." : "Body edits save automatically.")
-                .font(.callout).foregroundStyle(.secondary)
+                .font(.callout).foregroundStyle(.primary)
         }
         .buttonStyle(.borderless)
         .padding(.horizontal, 10).padding(.vertical, 6)
@@ -132,9 +132,9 @@ struct TemplatesManagerView: View {
     private var emptyState: some View {
         VStack(spacing: 6) {
             Image(systemName: "square.on.square").font(.title).foregroundStyle(.tertiary)
-            Text("No templates yet").foregroundStyle(.secondary)
+            Text("No templates yet").foregroundStyle(.primary)
             Text("Create one with +, then assign it to a folder via its “Template ▸” menu.")
-                .font(.callout).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                .font(.callout).foregroundStyle(.primary).multilineTextAlignment(.center)
         }
         .padding()
     }
