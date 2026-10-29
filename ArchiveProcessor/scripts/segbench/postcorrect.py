@@ -3,7 +3,7 @@
 
     python3 postcorrect.py pack --out DIR --public-manifest public895.jsonl   # on the Mac; no model call
     uv run --offline --with rapidfuzz --with 'sacrebleu==2.5.1' --with regex --with numpy \
-        python3 postcorrect.py score --pack DIR                               # the collected replies; no model call
+        python3 postcorrect.py score --pack DIR [--results]                   # the collected replies; no model call
 
 The pack is chosen from segbench-results/ocr-scorers-pages.csv, the rescorer's own per-page NES, and the readings come
 from ocr_rescore.py's loaders, so the input is exactly the text those scores were computed on:
@@ -181,10 +181,33 @@ def cmd_pack(a):
 
 SCORE_FIELDS = ['id', 'set', 'route', 'family', 'page', 'stratum', 'kind', 'arm', 'finish', 'stored_nes', 'in_band',
                 'nes_before', 'nes_after', 'nes_gain', 'cmer_before', 'cmer_after', 'inserted_before',
-                'inserted_after', 'rewritten_before', 'rewritten_after', 'reading_words', 'reply_words', 'changed', 'words_changed']
+                'inserted_after', 'rewritten_before', 'rewritten_after', 'reading_words', 'reply_words', 'changed', 'words_changed',
+                'trimmed_chars', 'nes_trim', 'nes_trim_gain', 'cmer_trim', 'inserted_trim', 'trim_words',
+                'nes_guard', 'nes_guard_gain', 'nes_direct']
+# The corrector's own reading of the page from scratch, as ocr_rescore.py scored it: the escalation a correction stage
+# competes with, since either way the page goes once to Qwen3.6-27B with its image.
+DIRECT = {'owner96': ('qwen3.6-27b', 'local panel'), 'public895': ('qwen3.6-27b', 'FarmShare panel')}
+TRIM_BLOCK = 4   # the shortest run of characters, shared by reading and reply, that anchors the trimmed span
 
 
-def score_rows(requests, replies, truth_of, source_of=None):
+def trim(reading: str, reply: str) -> str:
+    """No Free Lunches' alignment trimming (§4.3, C claim 29): keep the reply between its first and last characters
+    aligned to the reading, dropping a preamble, a trailing explanation or a loop's run past the page. The alignment is
+    global (Indel, so in order), anchored on shared runs of TRIM_BLOCK characters or more, and the span is widened to the
+    reply's word boundaries so a corrected first or last word is not cut through."""
+    from rapidfuzz.distance import Indel
+    blocks = [b for b in Indel.opcodes(reading, reply).as_matching_blocks() if b.size >= TRIM_BLOCK]
+    if not blocks:
+        return reply
+    start, end = blocks[0].b, blocks[-1].b + blocks[-1].size
+    while start > 0 and not reply[start - 1].isspace():
+        start -= 1
+    while end < len(reply) and not reply[end].isspace():
+        end += 1
+    return reply[start:end]
+
+
+def score_rows(requests, replies, truth_of, source_of=None, direct_of=None):
     """One row per unique request id that has a reply: the reading's NES (recomputed against truth, from the reading
     the prompt carried) beside the corrected reply's. source_of(request) -> the pinned source's text, when given, must
     equal that reading, so a row's family is the one its input came from."""
@@ -203,6 +226,8 @@ def score_rows(requests, replies, truth_of, source_of=None):
         reply = (got.get('text') or '').strip()
         before = X.page_row(truth, reading.strip(), stratum, None, latin)
         after = X.page_row(truth, reply, stratum, None, latin)
+        trimmed = trim(reading.strip(), reply)
+        cut = after if trimmed == reply else X.page_row(truth, trimmed, stratum, None, latin)
         rows.append({'id': r['id'], 'set': r['set'], 'route': r['route'], 'family': family, 'page': r['page'],
                      'stratum': stratum, 'kind': r['kind'], 'arm': r['arm'], 'finish': got.get('finish'),
                      'stored_nes': r.get('nes'), 'in_band': LOW <= before['nes'] <= HIGH,
@@ -212,7 +237,16 @@ def score_rows(requests, replies, truth_of, source_of=None):
                      'rewritten_before': before['rewritten'], 'rewritten_after': after['rewritten'],
                      'reading_words': before['reading_words'], 'reply_words': after['reading_words'],
                      'changed': reply != reading.strip(),
-                     'words_changed': X.words(reply, stratum) != X.words(reading, stratum)})
+                     'words_changed': X.words(reply, stratum) != X.words(reading, stratum),
+                     'trimmed_chars': len(reply) - len(trimmed), 'nes_trim': cut['nes'],
+                     'nes_trim_gain': cut['nes'] - before['nes'], 'cmer_trim': cut['cmer'],
+                     'inserted_trim': cut['inserted'], 'trim_words': cut['reading_words'],
+                     # The cascade's rule, a cap is a failure: a reply that hit max_tokens is dropped for the reading.
+                     'nes_guard': after['nes'] if got.get('finish') == 'stop' else before['nes'],
+                     'nes_guard_gain': (after['nes'] - before['nes']) if got.get('finish') == 'stop' else 0.0,
+                     # A failed direct reading (cap or error) falls back to the cheap one, as the guarded arm does.
+                     'nes_direct': None if direct_of is None or (d := direct_of(r)) is None
+                                   else (d if d is not False else before['nes'])})
     return rows, repeats, missing
 
 
@@ -231,8 +265,43 @@ def summarise(rows):
              'cmer_before': mean(rr, 'cmer_before'), 'cmer_after': mean(rr, 'cmer_after'),
              'added_before': sum(x['inserted_before'] for x in rr) / max(1, sum(x['reading_words'] for x in rr)),
              'added_after': sum(x['inserted_after'] for x in rr) / max(1, sum(x['reply_words'] for x in rr)),
-             'changed': mean(rr, 'changed'), 'words_changed': mean(rr, 'words_changed'), 'worse': sum(1 for x in rr if x['nes_gain'] < 0)}
+             'changed': mean(rr, 'changed'), 'words_changed': mean(rr, 'words_changed'), 'worse': sum(1 for x in rr if x['nes_gain'] < 0),
+             'trimmed': sum(1 for x in rr if x['trimmed_chars']), 'nes_trim': mean(rr, 'nes_trim'),
+             'nes_trim_gain': mean(rr, 'nes_trim_gain'), 'cmer_trim': mean(rr, 'cmer_trim'),
+             'added_trim': sum(x['inserted_trim'] for x in rr) / max(1, sum(x['trim_words'] for x in rr)),
+             'worse_trim': sum(1 for x in rr if x['nes_trim_gain'] < 0), 'nes_guard': mean(rr, 'nes_guard'),
+             'nes_guard_gain': mean(rr, 'nes_guard_gain'), 'worse_guard': sum(1 for x in rr if x['nes_guard_gain'] < 0),
+             'nes_direct': statistics.fmean(d) if (d := [x['nes_direct'] for x in rr if x['nes_direct'] is not None]) else None}
             for (s, k, route, arm), rr in sorted(groups.items())]
+
+
+def interval(values, seed=SEED, n=4000):
+    """The mean and its 95% percentile-bootstrap interval, seeded so a rerun prints the same figures."""
+    import statistics
+    rng = random.Random(seed)
+    boot = sorted(statistics.fmean(rng.choices(values, k=len(values))) for _ in range(n))
+    return {'n': len(values), 'mean': statistics.fmean(values), 'lo': boot[int(0.025 * n)], 'hi': boot[int(0.975 * n) - 1]}
+
+
+def intervals(rows):
+    """Over all routes: each arm's gain (as sent, and cap-guarded), image against text on the same reading, and the
+    image arm's cap-guarded gain by public stratum."""
+    out = {}
+    for s, k in sorted({(r['set'], r['kind']) for r in rows}):
+        rr = [r for r in rows if (r['set'], r['kind']) == (s, k)]
+        arm = {a: {(r['route'], r['page']): r for r in rr if r['arm'] == a} for a in ('image', 'text')}
+        both = sorted(arm['image'].keys() & arm['text'].keys())
+        out[f'{s}/{k}'] = {
+            **{f'{a}_{g}': interval([x[f'nes_{g}'] for x in arm[a].values()]) for a in arm for g in ('gain', 'guard_gain')},
+            'image_minus_text': interval([arm['image'][p]['nes_guard'] - arm['text'][p]['nes_guard'] for p in both])}
+        direct = [x for x in arm['image'].values() if x['nes_direct'] is not None]
+        if direct:
+            out[f'{s}/{k}'] |= {'direct_gain': interval([x['nes_direct'] - x['nes_before'] for x in direct]),
+                                'image_minus_direct': interval([x['nes_guard'] - x['nes_direct'] for x in direct])}
+    for st in sorted({r['stratum'] for r in rows if r['set'] == 'public895'}):
+        out[f'public895/band/{st}'] = {f'{a}_guard_gain': interval([r['nes_guard_gain'] for r in rows if r['set'] == 'public895'
+                                       and r['stratum'] == st and r['arm'] == a]) for a in ('image', 'text')}
+    return out
 
 
 def cmd_score(a):
@@ -253,25 +322,31 @@ def cmd_score(a):
     if not a.no_source_check:
         src = {'owner96': X.owner_sources(), 'public895': X.public_sources(frozen)}
         source_of = lambda r: src[r['set']][(r['route'], r.get('family') or FAMILY[(r['set'], r['route'])])].get(r['page'])
-    rows, repeats, missing = score_rows(requests, replies, truth_of, source_of)
-    out = a.out or a.pack
+    scored = {(r['set'], r['route'], r['family'], r['page']): r for r in csv.DictReader((RESULTS / 'ocr-scorers-pages.csv').open())}
+    def direct_of(r):
+        d = scored.get((r['set'], *DIRECT[r['set']], r['page']))
+        return None if d is None else (float(d['nes']) if d['ok'] == 'True' else False)
+    rows, repeats, missing = score_rows(requests, replies, truth_of, source_of, direct_of)
+    out = RESULTS if a.results else (a.out or a.pack)
     out.mkdir(parents=True, exist_ok=True)
-    with (out / 'scores.csv').open('w', newline='') as f:
+    pages, report = ('ocr-postcorrect-pages.csv', 'ocr-postcorrect.json') if a.results else ('scores.csv', 'scores.json')
+    with (out / pages).open('w', newline='') as f:
         w = csv.DictWriter(f, SCORE_FIELDS)
         w.writeheader()
         for r in rows:
             w.writerow({k: (f'{v:.6f}' if isinstance(v, float) else v) for k, v in r.items()})
     summary = summarise(rows)
-    (out / 'scores.json').write_text(json.dumps({'pack_rows': len(requests), 'unique': len(requests) - repeats,
+    (out / report).write_text(json.dumps({'corrector': 'Qwen3.6-27B FP8 (Sherlock vLLM, thinking off, temperature 0)',
+        'pack': a.pack.name, 'pack_rows': len(requests), 'unique': len(requests) - repeats,
         'repeats_dropped': repeats, 'scored': len(rows), 'missing': missing,
         'stored_nes_differs': sum(1 for r in rows if abs(float(r['stored_nes']) - r['nes_before']) > 1e-4),
-        'summary': summary}, indent=1) + '\n')
+        'summary': summary, 'intervals': intervals(rows)}, indent=1) + '\n')
     print(f'{len(requests)} pack rows, {len(requests) - repeats} unique, {len(rows)} scored, {len(missing)} missing '
           f'-> {out}')
     for g in summary:
         if g['route'] == 'all':
             print(f"{g['set']:9} {g['kind']:4} {g['arm']:5} n={g['n']:3} NES {g['nes_before']:.3f} -> "
-                  f"{g['nes_after']:.3f}  changed {g['changed']:.0%} (words {g['words_changed']:.0%})  worse {g['worse']}  off-band {g['off_band']}")
+                  f"{g['nes_after']:.3f} (trimmed {g['nes_trim']:.3f}, {g['trimmed']} cut; cap-guarded {g['nes_guard']:.3f})  changed {g['changed']:.0%} (words {g['words_changed']:.0%})  worse {g['worse']}  off-band {g['off_band']}")
 
 
 def main():
@@ -282,6 +357,8 @@ def main():
     p.add_argument('--public-manifest', type=Path, required=True, help="open-sweep-20261019/public895.jsonl")
     p = sub.add_parser('score'); p.add_argument('--pack', type=Path, required=True, help='requests.jsonl and out/')
     p.add_argument('--out', type=Path, help='where scores.csv and scores.json go (default: the pack)')
+    p.add_argument('--results', action='store_true',
+                   help='write segbench-results/ocr-postcorrect.json and ocr-postcorrect-pages.csv instead')
     p.add_argument('--no-source-check', action='store_true', help="skip matching each reading to its source's text")
     a = ap.parse_args()
     {'pack': cmd_pack, 'score': cmd_score}[a.cmd](a)

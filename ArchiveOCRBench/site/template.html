@@ -196,6 +196,12 @@ footer p { font-size: 13px; }
     <div class="tbl"><table><thead><tr><th>Reader</th><th>Reader alone</th><th>Mean</th><th>Cap or error, then mean</th><th>Cap or error alone</th><th>Length</th><th>Disagreement</th><th>Best 20%, hindsight</th><th>Escalate all</th></tr></thead><tbody id="dif-logprob-budget"></tbody></table></div>
     <p class="note" id="dif-logprob-note"></p>
   </section>
+  <section class="panel" id="dif-postcorrect">
+    <div class="head"><h2>Correcting a cheap reading in the 70-90 band</h2><span class="meta">corrector: Qwen3.6-27B on Sherlock</span></div>
+    <p class="note">W46.ocr-postcorrect sent cheap readings that scored NES 70-90 to Qwen3.6-27B to correct, once with the page image and once as text only; the easy pages, readings already at 97 or more, are the check that it leaves clean text alone. Image is cap-guarded: a reply that hit the token cap keeps the reading. Trimmed is the image reply cut to the span aligned with the reading. Direct is the same 27B reading the page from scratch, the escalation a correction stage competes with.</p>
+    <div class="tbl"><table><thead><tr><th>Pages</th><th>Reader</th><th>Readings</th><th>Reading</th><th>Image</th><th>Trimmed</th><th>Text only</th><th>Worse, image / text</th><th>Direct 27B</th></tr></thead><tbody id="dif-postcorrect-rows"></tbody></table></div>
+    <p class="note" id="dif-postcorrect-note"></p>
+  </section>
   <section class="panel" id="dif-vision">
     <div class="head"><h2>Vision OCR's page kind, a label no model gives</h2><span class="meta">free, on the Mac, before any reading</span></div>
     <p class="note">The Vision OCR lab's page sorter calls a page newspaper, photograph, handwriting or other from Apple Vision's reading of it: its lines' number and width, the paper's light and colour, and the shape of the ink. It needs no model and no paid call, and it does not depend on the route being judged. On the panel's accuracy pages, against the truth's kind, with the mean NES of all routes:</p>
@@ -590,6 +596,14 @@ if (LGP) {
   document.getElementById('dif-logprob-budget').innerHTML = LGP.budget.map(b => '<tr><td>' + b.route + '</td><td>' + p2(b.first) + '</td><td>' + p2(b.mean) + '</td><td>' + p2(b['fail+mean']) + '</td><td>' + p2(b.failure) + '</td><td>' + p2(b.length) + '</td><td>' + p2(b.disagreement) + '</td><td>' + p2(b.oracle) + '</td><td>' + p2(b.all) + '</td></tr>').join('');
   document.getElementById('dif-logprob-note').textContent = 'What it shows: on answered pages, mean log-probability ranks a reader\'s poor readings about as well as a second reader\'s disagreement, for the cost of one reading; the first token and length do not. It misses loops, which are confident, so caps and errors have to go first. And it does not pick the pages worth escalating: low confidence marks pages that are hard for every reader, so escalating them gains less than escalating others, and with caps first it does no better than caps alone. It is a "check this reading" flag, not an escalation trigger; the cascade rule above is unchanged. Limits: two readers and one escalation route; the Mac\'s 4-bit log-probabilities come in steps of an eighth of a nat. Full report: segbench-results/ocr-logprob.md.';
 } else document.getElementById('dif-logprob').hidden = true;
+const PCR = DATA.postcorrect;
+if (PCR) {
+  const p1 = v => v === null || v === undefined ? '—' : (100 * v).toFixed(1);
+  document.getElementById('dif-postcorrect-rows').innerHTML = PCR.rows.map(r => '<tr><td>' + r.set + ', ' + r.kind + '</td><td>' + r.route + '</td><td>' + r.n + '</td><td>' + p1(r.before) + '</td><td>' + p1(r.image) + '</td><td>' + p1(r.trim) + '</td><td>' + p1(r.text) + '</td><td>' + r.worse + ' / ' + r.worse_text + '</td><td>' + p1(r.direct) + '</td></tr>').join('');
+  const sg = x => { const m = (100 * x).toFixed(1); return m === '-0.0' ? '0.0' : m; };
+  const iv = (k, a) => { const v = PCR.intervals[k][a]; return (v[0] >= 0 ? '+' : '') + sg(v[0]) + ' [' + (100 * v[1]).toFixed(1) + ', ' + (100 * v[2]).toFixed(1) + ']'; };
+  document.getElementById('dif-postcorrect-note').textContent = 'What it shows: with the image the corrector lifts band readings ' + iv('owner96/band', 'image_guard_gain') + ' NES on the 96 and ' + iv('public895/band', 'image_guard_gain') + ' on the public hands, registers and Kurrent; as text only it gains ' + iv('owner96/band', 'text_guard_gain') + ' and ' + iv('public895/band', 'text_guard_gain') + '. But on the 96 the 27B reading from scratch does as well (corrected minus direct ' + iv('owner96/band', 'image_minus_direct') + '), so for the owner\'s pages escalation already covers it; on the public band correction beats it by ' + iv('public895/band', 'image_minus_direct') + '. On easy pages it changes words but not for the worse (' + iv('owner96/easy', 'image_guard_gain') + '). Trimming does nothing for this model, which writes no preamble; the cap guard rescues the two loops. Limits: one corrector, 57 band readings on the 96, 6 Kurrent pages. Full report: segbench-results/ocr-postcorrect.md.';
+} else document.getElementById('dif-postcorrect').hidden = true;
 const VK = DF.vision_kind;
 if (VK) {
   document.getElementById('dif-vision-head').innerHTML = '<tr><th>Vision\'s kind</th><th>Pages</th>' + VK.truth_kinds.map(k => '<th>' + k + '</th>').join('') + '<th>Mean NES</th><th>Route failures</th></tr>';

@@ -1,8 +1,9 @@
-"""W46.fix-postcorrect-pack: a pack's repeated ids and the reading a request carried, on hand-made requests.
-Run: python3 test_postcorrect.py   (no bench data, no cache, no network)."""
+"""W46.fix-postcorrect-pack and W46.ocr-postcorrect: a pack's repeated ids, the reading a request carried and alignment
+trimming, on hand-made requests.
+Run: uv run --offline --with rapidfuzz python3 test_postcorrect.py   (no bench data, no cache, no network)."""
 import unittest
 
-from postcorrect import FAMILY, PROMPT_IMAGE, PROMPT_TEXT, reading_of, unique_requests
+from postcorrect import FAMILY, PROMPT_IMAGE, PROMPT_TEXT, reading_of, trim, unique_requests
 
 
 def req(rid, reading, arm='image', **kw):
@@ -36,6 +37,25 @@ class ReadingOf(unittest.TestCase):
         r = req('a', 'x', arm='text'); r['arm'] = 'image'
         with self.assertRaises(SystemExit):
             reading_of(r)
+
+
+class Trim(unittest.TestCase):
+    reading = 'Tbe quick brown fox jumps over the lazy dog.'
+
+    def test_drops_a_preamble_and_a_trailing_note(self):
+        reply = 'Here is the corrected text:\nThe quick brown fox jumps over the lazy dog.\n\nNote: I fixed one word.'
+        self.assertEqual(trim(self.reading, reply), 'The quick brown fox jumps over the lazy dog.')
+
+    def test_keeps_a_corrected_first_word_whole(self):
+        self.assertEqual(trim(self.reading, 'The quick brown fox jumps over the lazy dog.'),
+                         'The quick brown fox jumps over the lazy dog.')
+
+    def test_cuts_a_loop_that_runs_past_the_page(self):
+        reply = self.reading + ' ' + ' '.join(['the end'] * 30)
+        self.assertEqual(trim(self.reading, reply), self.reading)
+
+    def test_leaves_an_unanchored_reply_alone(self):
+        self.assertEqual(trim('abc', 'xyz'), 'xyz')
 
 
 class Families(unittest.TestCase):

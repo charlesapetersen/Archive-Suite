@@ -55,6 +55,7 @@ TRUTH_BIAS_SCORE = RESULTS / "ocr-truth-bias-score.json"  # W46.fix-ocr-truth-bi
 CHAOS = RESULTS / "chaos-probe.json"  # W46.fix-ocr-scorers: chaos_probe.py score, the altered-word probe
 DEWARP = RESULTS / "enh-dewarp.json"  # W46.enh-dewarp: enh_dewarp.py report, crop or dewarp against raw, by reader
 ENH_OCR = RESULTS / "enh-ocr-input.json"  # W46.enh-ocr-input: enh_ocr_input.py report, content-removing enhancement
+POSTCORRECT = RESULTS / "ocr-postcorrect.json"  # W46.ocr-postcorrect: postcorrect.py score --results, the band corrector
 LOGPROB = RESULTS / "ocr-logprob.json"  # W46.ocr-logprob: ocr_logprob.py report, log-probabilities as an error flag
 LAYOUT_ORDER = RESULTS / "layout-order.json"  # W46.layout-order: layout_order.py run, ordering with detection fixed
 LOOPS = PUBLIC / "loop-rerun-20261021.json"  # W46.ocr-loops: corpus/loop_rerun.py report, the capped pages read again
@@ -566,6 +567,30 @@ def logprob():
     return {"escalation_route": d["escalation_route"], "rows": rows, "budget": budget}
 
 
+def postcorrect():
+    """W46.ocr-postcorrect: Qwen3.6-27B correcting cheap readings in the NES 70-90 band, with the image and text only,
+    beside the same model's own reading; the easy pages are the abstention check. None until it has run."""
+    if not POSTCORRECT.exists():
+        return None
+    d = json.loads(POSTCORRECT.read_text())
+    names = {"apple-vision": "Apple Vision", "lightonocr-3-4b-mlx8": "LightOnOCR-3 4B, Mac", "qwen3-vl-8b": "Qwen3-VL 8B",
+             "gemini3.5-flash-lite": "Gemini 3.5 Flash-Lite", "glm-ocr": "GLM-OCR", "lightonocr3-4b": "LightOnOCR-3 4B",
+             "all": "All readers"}
+    by = {(g["set"], g["kind"], g["route"], g["arm"]): g for g in d["summary"]}
+    rows = []
+    for (s, k, route, arm), g in by.items():
+        if arm != "image":
+            continue
+        t = by[(s, k, route, "text")]
+        rows.append({"set": "the 96" if s == "owner96" else "public 895", "kind": k, "route": names.get(route, route),
+                     "n": g["n"], "before": g["nes_before"], "image": g["nes_guard"], "trim": g["nes_trim"],
+                     "text": t["nes_after"], "worse": g["worse_guard"], "worse_text": t["worse"],
+                     "direct": g["nes_direct"]})
+    return {"corrector": d["corrector"], "rows": rows,
+            "intervals": {k: {a: [v["mean"], v["lo"], v["hi"]] for a, v in iv.items()}
+                          for k, iv in d["intervals"].items() if k.count("/") == 1}}
+
+
 def layout_order():
     """W46.layout-order's summaries (the per-page rows stay in the result file). None until it has run."""
     if not LAYOUT_ORDER.exists():
@@ -827,7 +852,7 @@ def main():
              "public": public(), "ocr_scorers": ocr_scorers(),
              "dewarp": dewarp, "enh_ocr": enh_ocr,
              "loops": json.loads(LOOPS.read_text()) if LOOPS.exists() else None, "regions": regions,
-             "layout_order": layout_order(), "logprob": logprob()}
+             "layout_order": layout_order(), "logprob": logprob(), "postcorrect": postcorrect()}
     page = TEMPLATE.read_text().replace("__DATA__", json.dumps(built, separators=(",", ":")))
     outputs = {OUT_DATA: json.dumps(built, indent=1) + "\n", OUT_PAGE: page, OUT_DIFFICULTY: difficulty.report(diff)}
 

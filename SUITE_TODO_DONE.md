@@ -13191,3 +13191,18 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   <!-- /W46.seg-adapt-curve-paid -->
 - [x] **W46.fix-postcorrect-pack — remove duplicate source rows and ambiguous baseline scores from the post-correction pack [S]** · §Document processing review — W46 (owner, 2026-10-20) (lane: segbench) — SHIPPED 2026-10-29. Cause: `postcorrect.py::cmd_pack` keyed readings by route alone, so the 96's two Qwen3-VL 8B families (local panel, FarmShare panel) collapsed: every request carried the FarmShare panel's reading, while 30 rows repeated an id and some carried the local panel's NES. Fix: routes are pinned (route, family) pairs (Qwen3-VL 8B on the 96 = FarmShare panel, the reading actually sent), each request records its family, an id with two different model inputs is refused, each request is written once. New `postcorrect.py score --pack DIR`: drops identical repeats (refusing differing ones), checks each prompt's reading equals its pinned source's text, recomputes the baseline NES from that reading against truth (never the stored `nes`) and scores each reply once (scores.csv + scores.json beside the pack, by set/kind/route/arm). On the collected Sherlock pack: 464 rows → 434 unique, 434 scored, 0 missing, every reading matched its source, every band reading recomputes inside 0.70–0.90; the stored NES of the kept copy was wrong on 2 rows (p071 easy). A rebuilt pack has 434 unique requests, 414 identical to collected ones; the other 20 are a different Qwen3-VL 8B easy sample (the candidate list changed), so score the collected pack and do not rebuild or rerun for it. Tests: `scripts/segbench/test_postcorrect.py`. The write-up (comparisons, bench page) stays with W46.ocr-postcorrect.
   <!-- /W46.fix-postcorrect-pack -->
+- [x] **W46.ocr-postcorrect — image-grounded post-correction in the NES 70-90 band only [S]** · §Document processing review — W46 (owner, 2026-10-20) (lane: segbench) (uses: light) (cluster: sherlock) (blocked-on: W46.cluster-waves, W46.fix-ocr-scorers) — Qwen3.6-27B with image and text, text-only control, alignment trimming, the abstention check on easy pages. detail: execution-plans/processing-review/10-gap-audit.md §5 item 29 — SHIPPED 2026-10-29.
+  Pack and Sherlock run 9d2fba7e (jobs 49139316, 49139318, resubmission 49202351; collected 2026-10-24 into
+  `~/Library/Caches/ArchiveSuiteRehearsal/sherlock-results/postcorrect-20261022`); duplicates and scorer W46.fix-postcorrect-pack
+  (078615d2). This commit: `postcorrect.py score` gains alignment trimming (No Free Lunches §4.3), the cap guard, the
+  27B's own direct reading as the comparison and seeded bootstrap intervals; `--results` writes
+  `segbench-results/ocr-postcorrect.json` and `-pages.csv`; report `ocr-postcorrect.md`; ArchiveOCRBench part 5 panel.
+  Results (434 requests, no money): with the image the corrector lifts band readings +5.8 NES [+3.3, +8.0] on the 96
+  (57 readings) and +3.6 [+2.9, +4.3] on the public L1/L2/L4/L6 band (120, cap-guarded); text only +1.6 and 0.0 (47 of
+  120 worse). On the 96 the 27B reading from scratch does as well (corrected minus direct -0.4 [-1.5, +0.6]), so no
+  correction stage for the owner's material; on the public band correction beats direct by +1.5 [+0.6, +2.6]. Easy
+  pages: words change in 65% but the score rises (+0.3, worst -0.8), so harmless rather than abstaining. Trimming is a
+  no-op for this model (no preambles); the two GLM-OCR L2 loops are what hurt, and keeping the reading on a cap fixes
+  them. One large loss: Apple Vision p025, where the corrector read a second letter in the photograph (80 added words).
+  The Gemini corrector arm stays W46.ocr-postcorrect-paid.
+  <!-- /W46.ocr-postcorrect -->

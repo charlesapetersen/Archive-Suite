@@ -161,6 +161,11 @@ record:
   `qwen3.5-9b-sherlock` at OpenRouter's DeepInfra bf16 rate. Its 895 (NES 48.3; 31.2 on the 440, 64.9 on the 455;
   237 caps) stay off the public tables, which are the open sweep's report (`open-sweep-20261019.*`), not a list
   routes can join; the figures are in `ocr-logprob.md`. Calibration, threshold and invariance tables are there too.
+- `ocr-postcorrect.json` (`scripts/segbench/postcorrect.py score --results`, W46.ocr-postcorrect): Qwen3.6-27B on
+  Sherlock correcting cheap readings in the NES 70-90 band of the 96 and of L1, L2, L4 and L6, with the image and as
+  text only, trimmed and cap-guarded, beside the same model's direct reading from `ocr-scorers-pages.csv`; part 5's
+  post-correction panel. A table panel, not chart routes: a corrector is a stage on another reader's text, not a
+  reader. The figures are in `ocr-postcorrect.md`.
 - `bench-corpus/regions-20261021.json` (`corpus/regions.py report`, W46.ocr-regions): whole page against
   DocLayout-YOLO regions, PP-DocLayoutV3 regions and overlapping tiles, four readers on L9/L4/L3/L1 (255
   public pages) and the 96. Its experiment section selects public strata and overlapping annotation groups;
