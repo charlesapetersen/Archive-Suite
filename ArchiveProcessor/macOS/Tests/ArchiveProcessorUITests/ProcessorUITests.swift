@@ -211,6 +211,12 @@ final class ProcessorUITests: XCTestCase {
                       "the OCR Files card must state the subscription cost model")
         XCTAssertTrue(renderedText(of: element("ap.ocr.localAgentPacing")).contains("paces and resumes"),
                       "the OCR Files card must explain subscription-window pacing")
+        // W40.fix-processor-localagent-key: the UI test saves no key, and the Local Agent needs none, so with a
+        // file and an output folder Start is enabled and gives no reason.
+        let start = element("ap.ocr.start")
+        XCTAssertTrue(start.exists && start.isEnabled, "the Local Agent must not wait for a direct provider's API key")
+        XCTAssertFalse(element("ap.ocr.startBlockedReason").exists,
+                       "no reason line while Start is enabled: \(renderedText(of: element("ap.ocr.startBlockedReason")))")
 
         openSettings()
         XCTAssertTrue(element("ap.settings.localAgentToolPicker").waitForExistence(timeout: 10),

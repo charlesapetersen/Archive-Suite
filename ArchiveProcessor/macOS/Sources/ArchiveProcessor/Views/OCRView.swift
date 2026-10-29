@@ -181,7 +181,14 @@ struct OCRView: View {
         !useAppleVision || visionUseLLMJudgment || ((taggingMode == .none || taggingMode == .copySource)
             && !enableCollectionSegmentation)
     }
-    private var visionJudgementKeyIsPresent: Bool { !apiKey.isEmpty }
+    /// Whether this run needs the key `reloadAPIKey()` loads (W40.fix-processor-localagent-key). Apple Vision needs
+    /// it only for its LLM judgement. The Local Agent needs none: its CLI signs in with the subscription, and no
+    /// route of a Local Agent run reaches the direct provider — the OCR call, classification and tagging take the
+    /// CLI first; rotation, the cascade, the refusal fallback, page readers and the institutional import are all
+    /// skipped off the direct route; segmentation windows read their own keys.
+    private var runNeedsAPIKey: Bool {
+        useAppleVision ? visionUseLLMJudgment : !useLocalAgent
+    }
 
     private func reloadAPIKey() {
         apiKey = useAppleVision
@@ -788,6 +795,7 @@ struct OCRView: View {
                 }
                 .prominentButtonStyle()
                 .disabled(!canStartProcessing)
+                .accessibilityIdentifier("ap.ocr.start")
 
                 if let reason = startBlockedReason {
                     Label(reason, systemImage: "info.circle")
@@ -816,7 +824,7 @@ struct OCRView: View {
     /// state and the ⌘R "Start Processing" shortcut (so the shortcut can never start a run the button
     /// wouldn't allow: no files, no key, no output folder, already busy, or mid-review).
     private var canStartProcessing: Bool {
-        !droppedFiles.isEmpty && (useAppleVision ? (!visionUseLLMJudgment || visionJudgementKeyIsPresent) : !apiKey.isEmpty) && visionWorkflowIsSupported && outputDirectory != nil
+        !droppedFiles.isEmpty && (!runNeedsAPIKey || !apiKey.isEmpty) && visionWorkflowIsSupported && outputDirectory != nil
             && !processor.isProcessing && !isInReviewMode
             && processor.pendingBatchInfo == nil && processor.pendingRunInfo == nil
             && processor.pendingMixedPDFInfo == nil
@@ -836,7 +844,7 @@ struct OCRView: View {
             return "Apple Vision only transcribes: set Tagging to No tagging or Copy source file tags"
                 + (enableCollectionSegmentation ? ", and turn off Collection ID in Settings." : ".")
         }
-        if useAppleVision ? (visionUseLLMJudgment && !visionJudgementKeyIsPresent) : apiKey.isEmpty {
+        if runNeedsAPIKey && apiKey.isEmpty {
             if useGateway && !useAppleVision { return "No gateway key is saved. Add it in Settings (⌘,)." }
             return "No \(selectedProvider.rawValue) API key is saved. Add one in Settings (⌘,)."
         }
