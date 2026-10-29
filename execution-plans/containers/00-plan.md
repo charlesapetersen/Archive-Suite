@@ -37,8 +37,9 @@ Zotero; it formats no citations.
 - Corpus PDFs are one page with an ABBYY or Acrobat text layer (394 of a sample of 400), not the Processor's
   two-page format.
 - Level 1 of `Archival Photos/` names the repository for about 87% of PDFs. The rest sit under workflow folders
-  ("05 Final Tagging", which nests the repository a level lower; "03 Unconverted…") or topical ones ("Complete
-  Journals", "General Clippings").
+  ("05 Final Tagging", "03 Unconverted…") or topical ones ("Complete Journals", "General Clippings"). Under the
+  workflow folders level 2 is a priority folder ("5 Priority 5") or "Re-OCR" and level 3 the collection: no
+  repository level at all (W47.ct-truth, 2026-10-29; this line first said the repository sat a level lower).
 - Level 2 names the collection informally ("Hoover Institute/Zschau"). A formal number (SC0122, M0333, RU 732,
   R-MC 118) is in the path for 12.8%, almost all Stanford. Lower levels hold accessions ("Initial Accession",
   "2005 Accession") and ad hoc groups.

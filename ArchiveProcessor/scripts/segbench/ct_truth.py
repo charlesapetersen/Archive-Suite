@@ -13,9 +13,11 @@
 <lab venv> is ~/.local/share/visionocr-ocrlab/venv (mlx_vlm 0.7.4). --model is a key of MODELS; both are run.
 
 The corpus is read, never written: tags with getxattr(2) (corpus_survey.read_tags), pages with sips into the
-cache. A marker is a Red (box) or Purple (folder) photo; the seven carrying both are left out. The repository is
-the level-1 directory, or level 2 under a workflow folder ("05 Final Tagging", "03 Unconverted…"). Each class is
-allocated across repositories with a floor of two, the rest in proportion to the square root of the marker count,
+cache. A marker is a Red (box) or Purple (folder) photo; the seven carrying both are left out. The stratum is the
+level-1 directory, which names the repository, or level 2 under a workflow folder ("05 Final Tagging",
+"03 Unconverted…"). There level 2 turned out to be a priority folder ("5 Priority 5") or "Re-OCR", with the
+collection below it and no repository level at all, so those strata are flagged `workflow` and stand for no
+repository. Each class is allocated across strata with a floor of two, the rest in proportion to the square root of the marker count,
 so the large Harvard and Stanford sets do not swamp the small repositories; inside a repository the photos are
 drawn round-robin across collection directories with a fixed seed.
 
@@ -152,7 +154,8 @@ def cmd_sample(a):
                 continue
             rel = os.path.join(folder, n)
             rows.append({"id": marker_id(rel), "path": rel, "colour": got.pop(), "position": i, "of": len(names),
-                         "repository": repository_of(folder), "collection": collection_dir(folder)})
+                         "repository": repository_of(folder), "collection": collection_dir(folder),
+                         "workflow": bool(WORKFLOW.match(folder.split(os.sep)[0]))})
     rng = random.Random(SEED)
     picked = []
     for colour in ("Red", "Purple"):
@@ -167,7 +170,7 @@ def cmd_sample(a):
             fh.write(json.dumps(r, ensure_ascii=False) + "\n")
     c = collections.Counter(r["colour"] for r in picked)
     print(f"{len(rows)} single-colour markers; sampled {c['Red']} Red, {c['Purple']} Purple across "
-          f"{len({r['repository'] for r in picked})} repositories; {SAMPLE}")
+          f"{len({r['repository'] for r in picked})} strata; {SAMPLE}")
 
 
 def sample():
@@ -462,7 +465,7 @@ def fold(rows, answers):
                 fields[d["field"]] = clean(ans.get("text"))
             else:
                 fields[d["field"]] = pick
-        truth.append({"id": r["id"], "path": r["path"], "colour": r["colour"], "repository": r["repository"],
+        truth.append({"id": r["id"], "path": r["path"], "colour": r["colour"], "stratum": r["repository"],
                       "fields": fields, "complete": len(fields) == len(FIELDS) + 1})
     return truth, missing
 
@@ -493,11 +496,14 @@ def write_results(rows):
          f"and the owner sees only the disputes.", "",
          f"Drafted by both: {len(drafted)}; a reply that did not parse: {len(unparsed)}. Apple Vision lines for "
          f"the sheet's boxes: {lines_n} photos.", "",
-         "## Repositories in the sample", "",
-         "| repository | box (Red) | folder (Purple) |", "|---|---|---|"]
+         "## Strata in the sample", "",
+         "A stratum is the repository's directory, except under a workflow folder, where the level below it is a "
+         "priority folder or Re-OCR and the corpus has no repository level (marked *workflow*).", "",
+         "| stratum | box (Red) | folder (Purple) |", "|---|---|---|"]
     reps = collections.Counter((r["repository"], r["colour"]) for r in rows)
+    wf = {r["repository"] for r in rows if r.get("workflow")}
     for rep in sorted({r["repository"] for r in rows}):
-        L.append(f"| {rep} | {reps[(rep, 'Red')]} | {reps[(rep, 'Purple')]} |")
+        L.append(f"| {rep}{' (*workflow*)' if rep in wf else ''} | {reps[(rep, 'Red')]} | {reps[(rep, 'Purple')]} |")
     L += ["", "## Agreement per field", "",
           "Disputed / with a value from both readers agreed / both empty, out of the photos both drafted.", "",
           "| field | box: disputed | box: agreed, a value | box: agreed, empty | folder: disputed | "
