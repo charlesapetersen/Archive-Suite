@@ -18,7 +18,7 @@ struct ManageModelsView: View {
                         .foregroundStyle(.secondary)
                     Text("Add models here when new Anthropic or Gemini models are released, without waiting for an app update.")
                         .font(.caption)
-                        .foregroundStyle(.tertiary)
+                        .foregroundStyle(.primary)
                         .multilineTextAlignment(.center)
                 }
                 .frame(maxHeight: .infinity)

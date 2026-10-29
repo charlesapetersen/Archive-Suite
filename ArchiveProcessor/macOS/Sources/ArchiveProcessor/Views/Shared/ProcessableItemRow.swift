@@ -129,10 +129,10 @@ struct ProcessableItemRow: View {
                         Text(subtitle).font(.caption2).foregroundStyle(.secondary)
                     }
                     if item.subtitle != nil && item.providerModel != nil {
-                        Text("·").font(.caption2).foregroundStyle(.tertiary)
+                        Text("·").font(.caption2).foregroundStyle(.primary)
                     }
                     if let pm = item.providerModel {
-                        Text(pm).font(.caption2).foregroundStyle(.tertiary).lineLimit(1).truncationMode(.middle)
+                        Text(pm).font(.caption2).foregroundStyle(.primary).lineLimit(1).truncationMode(.middle)
                     }
                     Spacer(minLength: 0)
                 }

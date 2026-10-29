@@ -151,7 +151,7 @@ struct PageKindRowLine: View {
             .fixedSize()
             .accessibilityIdentifier("ap.ocr.pageKind")
         } else if !PageKindStore.isPDF(url) {
-            Text("Telling the page's kind…").font(.caption2).foregroundStyle(.tertiary)
+            Text("Telling the page's kind…").font(.caption2).foregroundStyle(.primary)
         }
     }
 }

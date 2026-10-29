@@ -89,7 +89,7 @@ struct ManualSegmentTagView: View {
             Text(progressLine).font(.caption).foregroundStyle(.secondary).lineLimit(1)
             Spacer(minLength: 12)
             Text("← → photo · ⏎ end & tag · B/F/D · X remove · Space preview")
-                .font(.caption2).foregroundStyle(.tertiary).lineLimit(1).layoutPriority(-1)
+                .font(.caption2).foregroundStyle(.primary).lineLimit(1).layoutPriority(-1)
             Button("Cancel") { confirmDiscardRun("Your tagging progress in this review will be lost.") { processor.cancel() } }
                 .controlSize(.small)
                 .help("Discard this run and return to the file list. (Esc while browsing.)")
@@ -379,7 +379,7 @@ private struct ManualSegTagCard: View {
                         ProgressView().scaleEffect(0.6)
                         Text("fetching date…").font(.caption2).foregroundStyle(.secondary)
                     } else {
-                        Text("date auto-filled — edit if needed").font(.caption2).foregroundStyle(.tertiary)
+                        Text("date auto-filled — edit if needed").font(.caption2).foregroundStyle(.primary)
                     }
                 }
             }
@@ -389,7 +389,7 @@ private struct ManualSegTagCard: View {
             subjectsSection
 
             Text("↑↓ pick · ⇥ complete · ⏎ add (⏎ on empty saves) · ⌫ delete last · esc back")
-                .font(.caption2).foregroundStyle(.tertiary)
+                .font(.caption2).foregroundStyle(.primary)
 
             HStack {
                 Button("◂ Back") { processor.manualSegCancelTagging() }

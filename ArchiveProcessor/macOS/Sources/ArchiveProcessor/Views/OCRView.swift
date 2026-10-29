@@ -527,7 +527,7 @@ struct OCRView: View {
                              : isPDFOnlyReOCR
                                ? "Not applied to a multi-page PDF — it is re-OCR'd into one alternating image/OCR-text PDF (a pure document rebuild, no tagging)."
                                : taggingMode.detail)
-                            .font(.caption2).foregroundStyle(.tertiary)
+                            .font(.caption2).foregroundStyle(.primary)
                             .accessibilityIdentifier("ap.ocr.reOCRExplanation")
                     }
                     .padding(4)
@@ -568,7 +568,7 @@ struct OCRView: View {
                                     : "Apple Vision transcribes locally with no API key or network request. It uses the Mac's performance cores.")
                                  : "Apple Vision is transcription-only. Select No tagging or Copy source file tags, and turn off Collection ID, before starting.")
                                 .font(.caption2)
-                                .foregroundStyle(.tertiary)
+                                .foregroundStyle(.primary)
                                 .padding(.top, 2)
                             if visionUseLLMJudgment, let est = costEstimate {
                                 HStack {
@@ -613,7 +613,7 @@ struct OCRView: View {
                             }
                             Text("The \(localAgentTool.displayName) CLI uses your subscription login — no per-page charge. If you hit your plan's usage window, the app paces and resumes when it resets. It runs at a low concurrency (1–2), so expect it to be slower than a metered API.")
                                 .font(.caption2)
-                                .foregroundStyle(.tertiary)
+                                .foregroundStyle(.primary)
                                 .padding(.top, 2)
                                 .accessibilityIdentifier("ap.ocr.localAgentPacing")
                             segmentationCostLine
@@ -742,7 +742,7 @@ struct OCRView: View {
                             }
                             Text(useGateway ? "Estimates based on user-provided pricing. Actual gateway costs may differ." : "Estimates calibrated from actual API usage with high-resolution archival photos. Actual costs may vary with image resolution.")
                                 .font(.caption2)
-                                .foregroundStyle(.tertiary)
+                                .foregroundStyle(.primary)
                                 .padding(.top, 2)
                             if let t = timeEstimate {
                                 Divider()
@@ -752,7 +752,7 @@ struct OCRView: View {
                                     Text(t.totalFormatted).fontWeight(.medium)
                                 }
                                 Text("Processing time only (no user interaction). OCR \(t.ocrFormatted)\(t.rotationSeconds > 0 ? " · rotation \(t.rotationFormatted) (overlaps OCR)" : "")\(taggingMode.llmTags ? " · tagging \(t.taggingFormatted)" : "").")
-                                    .font(.caption2).foregroundStyle(.tertiary)
+                                    .font(.caption2).foregroundStyle(.primary)
                             }
                         }
                         .padding(4)
@@ -915,10 +915,10 @@ struct OCRView: View {
                     .accessibilityHidden(true)   // decorative; the text below says what the zone is for
                 Text(preOCRedInput ? "Drop PDFs here" : "Drop images or PDFs here")
                     .font(.headline)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.primary)
                 Text("or use Add Files…")
                     .font(.caption)
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(.primary)
             }
             .allowsHitTesting(false)
             DropReceiver(isTargeted: $isTargeted) { urls in

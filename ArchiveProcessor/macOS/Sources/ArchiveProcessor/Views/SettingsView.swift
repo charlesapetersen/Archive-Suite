@@ -213,7 +213,7 @@ struct SettingsView: View {
         Section {
             if profileStore.profiles.isEmpty {
                 Text("No saved profiles yet. Save the current settings to switch between reusable configurations in one click.")
-                    .font(.caption).foregroundStyle(.secondary)
+                    .font(.caption).foregroundStyle(.primary)
             } else {
                 ForEach(profileStore.profiles) { profile in
                     HStack {
@@ -310,7 +310,7 @@ struct SettingsView: View {
                 if tagging { costRow("· Tagging", time.taggingFormatted) }
                 if enableCollectionSegmentation { costRow("· Collection", time.collectionFormatted) }
                 if time.rotationSeconds > 0 {
-                    Text("*runs during OCR").font(.caption2).foregroundStyle(.tertiary)
+                    Text("*runs during OCR").font(.caption2).foregroundStyle(.primary)
                 }
                 if batchMode && !useGateway && !preOCRedInput {
                     Text("Batch mode returns asynchronously (minutes–hours); the time above is the equivalent interactive run.")
@@ -319,7 +319,7 @@ struct SettingsView: View {
 
                 Spacer()
                 Text("Approximate; varies with model, content & network.")
-                    .font(.caption2).foregroundStyle(.tertiary)
+                    .font(.caption2).foregroundStyle(.primary)
             } else {
                 Text("Enter gateway model pricing to estimate cost.").font(.caption).foregroundStyle(.secondary)
                 Spacer()
@@ -359,7 +359,7 @@ struct SettingsView: View {
 
         Spacer()
         Text("No API cost; time varies with the CLI, content & your plan's limits.")
-            .font(.caption2).foregroundStyle(.tertiary)
+            .font(.caption2).foregroundStyle(.primary)
     }
 
     /// Cost/pacing summary for the in-process Vision backend. Unlike the CLI path it neither consumes a
@@ -1008,7 +1008,7 @@ struct SettingsView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 Text("Sign in with the same Google account on the Mac and the phone. Then Start in Live Capture — the Mac watches Drive automatically while a session is active, and the phone can pick Cloud when it scans the QR.")
-                    .font(.caption2).foregroundStyle(.tertiary)
+                    .font(.caption2).foregroundStyle(.primary)
             }
             .onAppear { loadDriveState() }
         } header: {

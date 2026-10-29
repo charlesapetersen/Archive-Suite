@@ -185,7 +185,7 @@ struct SegmentationRowCard: View {
                 }
                 .opacity(row.canRun ? 1 : 0.5)
                 Text("Scaled \(scaleCaption). \(row.footnote)")
-                    .font(.caption2).foregroundStyle(.tertiary)
+                    .font(.caption2).foregroundStyle(.primary)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }

@@ -39,7 +39,7 @@ struct ManualTaggingSheet: View {
                 }
                 Spacer()
                 Text("← → image   Space = preview")
-                    .font(.caption2).foregroundStyle(.tertiary)
+                    .font(.caption2).foregroundStyle(.primary)
             }
             .padding()
 
@@ -214,7 +214,7 @@ struct ManualTagSegmentView: View {
                         TagInputField(tags: $segment.subjectTags, placeholder: "Type a subject and press Return…")
                         Text("Suggestions come from Finder tags already in use on your Mac.")
                             .font(.caption2)
-                            .foregroundStyle(.tertiary)
+                            .foregroundStyle(.primary)
                     }
                     .padding(6)
                 }

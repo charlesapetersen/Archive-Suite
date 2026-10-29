@@ -36,7 +36,7 @@ struct ResolutionDropSheet: View {
                         .foregroundStyle(.secondary)
                     Text("JPEG, PNG, TIFF, or HEIC")
                         .font(.caption)
-                        .foregroundStyle(.tertiary)
+                        .foregroundStyle(.primary)
                 }
             }
             .frame(height: 160)

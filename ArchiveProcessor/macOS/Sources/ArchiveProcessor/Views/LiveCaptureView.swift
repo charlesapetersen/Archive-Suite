@@ -339,7 +339,7 @@ struct LiveCaptureView: View {
                             if !others.isEmpty {
                                 Text("also: " + others.joined(separator: ", "))
                                     .font(.system(.caption2, design: .monospaced))
-                                    .foregroundStyle(.tertiary)
+                                    .foregroundStyle(.primary)
                                     .textSelection(.enabled)
                             }
                             // The airport-Wi-Fi failure mode we hit: many public/guest networks isolate
@@ -830,7 +830,7 @@ private struct LiveProcessingBox: View {
                               : "Captures collect here; use Process to send them to the Files tab.")
                     .font(.caption).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
-                Text("Change in Settings (⌘,).").font(.caption2).foregroundStyle(.tertiary)
+                Text("Change in Settings (⌘,).").font(.caption2).foregroundStyle(.primary)
 
                 if liveMode, let cfg = session.config {
                     Text(cfg.summary).font(.caption2).foregroundStyle(.secondary)
@@ -955,7 +955,7 @@ private struct SegmentTagCard: View {
             }
 
             Text("↑↓ pick · ⇥ complete · ⏎ add (⏎ on empty saves) · ⌫ delete last · esc clear draft")
-                .font(.caption2).foregroundStyle(.tertiary)
+                .font(.caption2).foregroundStyle(.primary)
 
             if let persistFailure {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {

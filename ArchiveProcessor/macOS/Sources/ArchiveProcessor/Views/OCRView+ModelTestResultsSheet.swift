@@ -118,7 +118,7 @@ struct ModelTestResultsSheet: View {
                 // Cost indicator
                 Text(formatCost(entry.model))
                     .font(.system(size: 9, design: .monospaced))
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(.primary)
                 Spacer()
                 Button("Use") { onSelect(entry.provider, entry.model) }
                     .buttonStyle(.borderedProminent)
