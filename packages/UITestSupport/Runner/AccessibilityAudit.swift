@@ -60,6 +60,8 @@ struct AuditFinding: CustomStringConvertible {
     var labelledDescendants = 0
     /// For a contrast issue: the contrast ratio measured from the screenshot (see `ScreenPixels`).
     var measured: Double?
+    /// For a measured contrast issue: the height of its tallest line of letters, in points (see `inkHeight`).
+    var inkHeight: CGFloat?
 
     var auditName: String { AccessibilityAudit.name(audit) }
     var element: String {
@@ -74,7 +76,9 @@ struct AuditFinding: CustomStringConvertible {
         "\(audit.rawValue)|\(type?.rawValue ?? 0)|\(identifier)|\(label)|\(Int(frame.width))×\(Int(frame.height))"
     }
     var description: String {
-        "[\(auditName)] \(element): \(compact)" + (measured.map { String(format: " (measured %.2f:1)", $0) } ?? "")
+        guard let measured else { return "[\(auditName)] \(element): \(compact)" }
+        let letters = inkHeight.map { String(format: ", letters %.0f pt", $0) } ?? ""
+        return "[\(auditName)] \(element): \(compact)" + String(format: " (measured %.2f:1", measured) + letters + ")"
     }
 }
 
@@ -211,7 +215,8 @@ final class AccessibilityAudit {
                     print("[a11y-audit] \(screen): contrast not measurable, nothing drawn under the frame \(f)")
                     continue
                 }
-                let large = (pixels?.inkHeight(under: f.frame) ?? 0) >= AccessibilityAudit.largeTextInkHeight
+                f.inkHeight = pixels?.inkHeight(under: f.frame)
+                let large = (f.inkHeight ?? 0) >= Self.largeTextInkHeight
                 if ratio >= (large ? 3 : 4.5) {
                     notReproduced += 1
                     print("[a11y-audit] \(screen): contrast not reproduced from the screenshot \(f)")
