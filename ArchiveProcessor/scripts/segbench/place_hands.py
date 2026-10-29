@@ -34,6 +34,12 @@ Step two, readings placed on the lines (every detector, so the pick is visible, 
             wrong); word boxes take the line's height as `prop` does, so the two differ only in where along the
             line each word falls.
 
+Matchers (W46.place-hands-fu): `prop` and `ctc-<m>` each write `-s1` (one reading line to one detected line) and
+`-s8` (to a run of up to 8); `ctc-<m>` also writes three per-page picks between them, `-lines` (the reading's line
+count against the detected lines), `-conf` (mean CTC confidence) and `-cer` (the matched runs' character error).
+Every ctc hypothesis carries the gate's features in its `meta`: `page_cer` (the recogniser against the whole
+reading), `ctc_conf` and `match_cer`; `score` sweeps each as the per-page gate that sends a page to the text page.
+
 Readings: `truth` (the line-broken truth text itself: what the geometry and the aligner lose with a perfect
 reader), `lightonocr3-4b` (FarmShare's saved readings, both groups) and `gemini3.8-flash` (the cloud panel's,
 owner pages only: no Gemini reading of the Bentham pages exists and this item has no paid arm). Scores: place_score's
@@ -735,7 +741,7 @@ def score():
                  'found': fun_of[(hyp_dir.name, t['page'])].get('found', 0),
                  'placed': fun_of[(hyp_dir.name, t['page'])].get('placed', 0)}
                 for t in ps if t['group'] == 'owner-hand' and (hyp_dir / f'{key(t)}.json').exists()]
-    res['gate'] = {feat: gate_sweep(res, feat) for feat in GATE_FEATURES}
+    res['gate'] = {pick: {feat: gate_sweep(res, feat, pick) for feat in GATE_FEATURES} for pick in GATE_PICKS}
     RESULTS.mkdir(parents=True, exist_ok=True)
     (RESULTS / 'place-hands.json').write_text(json.dumps(res, indent=1) + '\n')
     (RESULTS / 'place-hands.md').write_text(write_md(res))
@@ -744,16 +750,36 @@ def score():
 
 
 GATE_ROUTE = 'blla.ctc-mccatmus-{pick}'  # the hand route the gate is set for (the best detector and recogniser)
-GATE_PICK = 'cer'  # the matcher pick the gate is set on; the sweep pools every reading, so it is reader-agnostic
+GATE_PICKS = ('cer', 'conf')  # the matcher picks the gate is tried on; each sweep pools every reading
+GATE_PICK = 'conf'  # the one whose sweeps the page shows in full
 GATE_FEATURES = {'page_cer': -1, 'ctc_conf': 1, 'match_cer': -1}  # +1: higher is better, -1: lower is better
 
 
-def gate_sweep(res, feat):
+GATE_OFF = 0.10  # the gate's bar: on the pages it keeps, at most this share of Find's hits highlight off the word
+
+
+def gate_rows(res, pick=None):
+    pick = pick or GATE_PICK
+    return [dict(r, reading=name.split('.', 2)[2]) for name, rs in res['per_page'].items()
+            if '.'.join(name.split('.', 2)[:2]) == GATE_ROUTE.format(pick=pick) for r in rs]
+
+
+def gate_choose(rows, feat):
+    """The loosest threshold at which the kept page readings' pooled off-word share is within GATE_OFF."""
+    sign, best = GATE_FEATURES[feat], None
+    for th in sorted({r[feat] for r in rows}, key=lambda v: sign * v, reverse=True):
+        kept = [r for r in rows if sign * r[feat] >= sign * th]
+        found = sum(r['found'] for r in kept)
+        if found and (found - sum(r['placed'] for r in kept)) <= GATE_OFF * found:
+            best = th
+    return best
+
+
+def gate_sweep(res, feat, pick=None):
     """Every threshold on one feature, over the gate route's owner-hand page readings pooled across readings: a page
-    passing it keeps its placed layer, the rest go to the text page (Find still works there; no highlight)."""
-    rows = [dict(r, reading=name.split('.', 2)[2]) for name, rs in res['per_page'].items()
-            if name.rsplit('.', 1)[0] == GATE_ROUTE.format(pick=GATE_PICK) for r in rs]
-    rows = [r for r in rows if r[feat] is not None]
+    passing it keeps its placed layer, the rest go to the text page (Find still works there; no highlight). Also the
+    chosen threshold, and the same choice made leaving each page out (all its readings) and applied to it."""
+    rows = [r for r in gate_rows(res, pick) if r[feat] is not None]
     sign = GATE_FEATURES[feat]
     out = []
     for th in sorted({r[feat] for r in rows}, key=lambda v: sign * v, reverse=True):
@@ -764,7 +790,20 @@ def gate_sweep(res, feat):
                     'kept_under_80': sum(r['placed'] < 0.8 * r['found'] for r in kept),
                     'sent_at_80': sum(r['placed'] >= 0.8 * r['found'] for r in rows if r not in kept),
                     'by_reading': {rd: sum(r['reading'] == rd for r in kept) for rd in READINGS}})
-    return out
+    chosen = gate_choose(rows, feat)
+    loo = []
+    for pg in sorted({r['page'] for r in rows}):
+        th = gate_choose([r for r in rows if r['page'] != pg], feat)
+        loo += [dict(r, kept=th is not None and sign * r[feat] >= sign * th) for r in rows if r['page'] == pg]
+
+    def tally(rs):
+        k = [r for r in rs if r['kept']]
+        return {'kept': len(k), 'of': len(rs), 'found': sum(r['found'] for r in k),
+                'placed': sum(r['placed'] for r in k), 'words': sum(r['words'] for r in rs)}
+    return {'sweep': out, 'chosen': chosen,
+            'in_sample': {rd: tally([dict(r, kept=chosen is not None and sign * r[feat] >= sign * chosen)
+                                     for r in rows if r['reading'] == rd]) for rd in READINGS},
+            'leave_one_page_out': {rd: tally([r for r in loo if r['reading'] == rd]) for rd in READINGS}}
 
 
 FINDINGS = (HERE / 'place_hands_findings.md')
@@ -858,8 +897,24 @@ GATE_SHOW = 12  # rows of each sweep shown; the json has every threshold
 
 
 def gate_tables(res, f, pc):
-    out = []
-    for feat, sweep in res.get('gate', {}).items():
+    out = ['## The gate, every pick and feature', '',
+           f"Each feature's threshold is the loosest with at most {GATE_OFF:.0%} of the kept pages' Find hits highlighting "
+           'off the word, fitted on every reading\'s page readings together (one gate for any reader). Figures are '
+           'leave one page out: the threshold fitted without a page (all its readings), then applied to it. Kept pages, '
+           'words placed on the word (of 1,584), and Find hits off the word on the kept pages.', '',
+           '| pick | feature | threshold | ' + ' | '.join(f'`{r}`' for r in READINGS) + ' |',
+           '|---|---|---:|' + '---|' * len(READINGS)]
+    for pick, gates in res.get('gate', {}).items():
+        for feat, gate in gates.items():
+            cells = []
+            for r in READINGS:
+                b = gate['leave_one_page_out'][r]
+                cells.append(f"{b['kept']} / {b['of']}, {pc(b['placed'], b['words'])}, {b['found'] - b['placed']} off"
+                             if b['of'] else '—')
+            out.append(f"| {pick} | {feat} | {f(gate['chosen'])} | " + ' | '.join(cells) + ' |')
+    out.append('')
+    for feat, gate in res.get('gate', {}).get(GATE_PICK, {}).items():
+        sweep = gate['sweep']
         if not sweep:
             continue
         step = max(1, len(sweep) // GATE_SHOW)
@@ -874,6 +929,16 @@ def gate_tables(res, f, pc):
             out.append(f"| {f(g['threshold'])} | {g['kept']} / {g['of']} | {pc(g['placed'], g['words'])} | "
                        f"{g['found'] - g['placed']} | {g['kept_under_80']} | {g['sent_at_80']} | "
                        + ' / '.join(str(g['by_reading'][r]) for r in READINGS) + ' |')
+        out += ['', f"Chosen (the loosest threshold with at most {GATE_OFF:.0%} of the kept pages' Find hits off the "
+                f"word): **{f(gate['chosen'])}**. Per reading, pages kept and words placed on the word, with the "
+                'threshold fitted on all pages, and fitted without each page then applied to it:', '',
+                '| reading | in sample: kept | placed | off the word | leave one page out: kept | placed | off the word |',
+                '|---|---:|---:|---:|---:|---:|---:|']
+        for r in READINGS:
+            a, b = gate['in_sample'][r], gate['leave_one_page_out'][r]
+            if a['of']:
+                out.append(f"| `{r}` | {a['kept']} / {a['of']} | {pc(a['placed'], a['words'])} | {a['found'] - a['placed']} "
+                           f"| {b['kept']} / {b['of']} | {pc(b['placed'], b['words'])} | {b['found'] - b['placed']} |")
         out.append('')
     return out
 
