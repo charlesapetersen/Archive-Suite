@@ -183,7 +183,8 @@ final class VisualReviewUITests: NotesFixtureUITestCase {
 
     private func listAndFilterSurfaces() {
         select(Self.idPlain)
-        table.click()
+        // Selecting the row already focuses the table; stacked, the table's own centre is not hittable (W48).
+        if table.isHittable { table.click() }
         app.typeKey("a", modifierFlags: .command)
         pause(1)
         shoot("selected-all")

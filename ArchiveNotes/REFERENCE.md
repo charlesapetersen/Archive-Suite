@@ -15,7 +15,8 @@ macOS/Sources/ArchiveNotes/
                                    applicationShouldTerminate bounded editor-flush on quit (W7-S6)
   ArchiveNotesCommands.swift       Format menu, SourceBlockCommands (⌘⇧V), ZoteroCommands
                                    (Note ▸ Attach Zotero Link…), ExtractCommands (Extract ▸ Create
-                                   Extract ⌘⌥E / Append to Extract…, W7-S2), DebugBlockCommands
+                                   Extract ⌘⌥E / Append to Extract…, W7-S2), LayoutCommands (View ▸
+                                   Side by Side / List Above Note, W48), DebugBlockCommands
   Models/
     NotesFilter.swift              Filter type (§16.3) + matches(_:folderItemIDs:) (kind/quality/
                                    date-range — own OR sent-with date, same value both bounds (W37) —
@@ -167,6 +168,7 @@ macOS/Sources/ArchiveNotes/
     NotesAppSettings.swift         Browser layout/window persistence: NotesLayoutSettingsKey (an.* keys)
                                    + NotesLayoutSettings(reading:) (validated, clamped) + NotesAppSettings
                                    point-of-use accessor (window size, hidden columns) — mirrors Reader AppSettings;
+                                   NotesLayoutMode + the stacked list's clamp/stackedListRange (W48);
                                    fixture-harness window closes cannot overwrite the shared size (W21);
                                    windowKindFilter(for:)/setWindowKindFilter per-window kind featuring (W7-S4);
                                    windowHiddenColumns(for:)/setWindowHiddenColumns per-window column visibility —
@@ -296,7 +298,9 @@ macOS/Sources/ArchiveNotes/
                                    code/link, heading menu, lists, blockquote, code block — no indent)
   Views/
     NotesBrowserView.swift         3-pane browsing shell (folder tree │ item list │ detail) for the
-                                   Notes + Extracts windows (W6-S1); @AppStorage panel widths + tree
+                                   Notes + Extracts windows (W6-S1); list/divider/detail in one AnyLayout,
+                                   side by side or stacked (list above note, an.layoutMode/an.listHeight;
+                                   the list gives way so the note keeps 480 pt; W48); @AppStorage panel widths + tree
                                    toggle, NotesWindowAccessor window-size persistence; owns a per-window
                                    NotesNavigationModel (@StateObject seeded from window kind); item pane =
                                    kind Picker + NotesTableView, detail = selected-item header + bounded
@@ -366,7 +370,8 @@ macOS/Sources/ArchiveNotes/
                                    Reveal (NSWorkspace.open) + Preview (popover) callbacks; W7-S3 jump-to-
                                    source: onJumpBlock→NotesModel.openItem (publish) + observes pendingOpen
                                    → openAction → select + scroll-to-block (consume, gated on loadedID)
-    PanelDivider.swift             Draggable divider (copied from Reader)
+    PanelDivider.swift             Draggable divider (copied from Reader), either axis: a native AX splitter
+                                   over a width, or (axis .vertical) the stacked list's height (W48)
     NotesSettingsView.swift        ⌘, Options — Zotero section (enable / clipboard-detect / citation
                                    style / advanced host+port), @AppStorage-bound (§D.8); Dates
                                    section "Show dates in other calendars" (W24.cal1-toggle). Enable,

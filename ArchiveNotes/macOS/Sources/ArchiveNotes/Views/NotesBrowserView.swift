@@ -67,6 +67,8 @@ struct NotesBrowserView: View {
                              label: stacked ? "Item list height" : "Detail pane width",
                              id: stacked ? "an.divider.list" : "an.divider.detail")
                 DetailPane(nav: nav, selectedTemplateID: $selectedTemplateID)
+                    // Opaque, like the list: stacked, the shell's centre (where the UITest probes sit) is here.
+                    .background(Color(nsColor: .windowBackgroundColor))
                     .frame(width: stacked ? nil : detailWidth)
                     .frame(minHeight: stacked ? NotesLayoutSettings.stackedDetailMinHeight : nil,
                            maxHeight: stacked ? .infinity : nil)

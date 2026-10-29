@@ -397,7 +397,7 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
     editor in a short window (the list now gives way, the note keeps 480 pt, the stacked window minimum is
     627 pt), and three accessibility-audit findings the side-by-side audit never reached because the narrower
     list kept those columns off screen: the Quality cell's unnamed group, empty Tags and Sources cells, and the
-    filter bar's decorative date dash.
+    filter bar's decorative date dash. The builder's runs: [`evidence/notes/W48.notes-stacked-layout.md`](evidence/notes/W48.notes-stacked-layout.md).
 
 ### N-50 · The stacked layout's divider
 
