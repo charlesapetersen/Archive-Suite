@@ -1,0 +1,1562 @@
+{
+ "pages": {
+  "owner-hand": 20,
+  "L2-bentham": 14
+ },
+ "detectors": {
+  "blla": {
+   "owner-hand": {
+    "pages": 20,
+    "R": 0.8542476658834481,
+    "P": 0.9137447570158959,
+    "F": 0.8577643957661774,
+    "words_inside": 0.9038199181446112,
+    "lines": 590,
+    "truth_lines": 553,
+    "seconds_per_page": 6.051906632214058,
+    "device": "cpu (one core per call)"
+   },
+   "L2-bentham": {
+    "pages": 14,
+    "R": 0.8992894704429297,
+    "P": 0.786598996069159,
+    "F": 0.8303043215693281,
+    "words_inside": null,
+    "lines": 413,
+    "truth_lines": 359,
+    "seconds_per_page": 6.051906632214058,
+    "device": "cpu (one core per call)"
+   }
+  },
+  "orli": {
+   "owner-hand": {
+    "pages": 20,
+    "R": 0.8528004641714878,
+    "P": 0.9437688747858882,
+    "F": 0.8646020455725054,
+    "words_inside": 0.7759208731241474,
+    "lines": 453,
+    "truth_lines": 553,
+    "seconds_per_page": 6.216951930522919,
+    "device": "mps bf16-true"
+   },
+   "L2-bentham": {
+    "pages": 14,
+    "R": 0.9251706403224972,
+    "P": 0.8816648781397872,
+    "F": 0.9007015601709698,
+    "words_inside": null,
+    "lines": 386,
+    "truth_lines": 359,
+    "seconds_per_page": 7.753954802240644,
+    "device": "mps bf16-true"
+   }
+  },
+  "ppocrv6": {
+   "owner-hand": {
+    "pages": 20,
+    "R": 0.877562185327369,
+    "P": 0.8684470204086114,
+    "F": 0.8645429718190568,
+    "words_inside": 0.9123465211459755,
+    "lines": 475,
+    "truth_lines": 553,
+    "seconds_per_page": null,
+    "device": "saved FarmShare run on a 1807x2400 copy"
+   },
+   "L2-bentham": {
+    "pages": 14,
+    "R": 0.9432169641121184,
+    "P": 0.7953341719000256,
+    "F": 0.8500401021047888,
+    "words_inside": null,
+    "lines": 390,
+    "truth_lines": 359,
+    "seconds_per_page": null,
+    "device": "saved FarmShare run on a 1600x2400 copy"
+   }
+  },
+  "surya": {
+   "owner-hand": {
+    "pages": 20,
+    "R": 0.8081030797068236,
+    "P": 0.8350696119944738,
+    "F": 0.8041377971549466,
+    "words_inside": 0.9890859481582538,
+    "lines": 448,
+    "truth_lines": 553,
+    "seconds_per_page": 3.636804473400116,
+    "device": "mps"
+   },
+   "L2-bentham": {
+    "pages": 14,
+    "R": 0.8490894344791039,
+    "P": 0.8237198714324935,
+    "F": 0.8252521649575433,
+    "words_inside": null,
+    "lines": 339,
+    "truth_lines": 359,
+    "seconds_per_page": 7.515452061380659,
+    "device": "mps"
+   }
+  }
+ },
+ "placement": {
+  "blla.ctc-mccatmus.gemini3.8-flash": {
+   "detector": "blla",
+   "method": "ctc-mccatmus",
+   "reading": "gemini3.8-flash",
+   "by_group": {
+    "owner-hand": {
+     "pages": 20,
+     "truth_words": 2932,
+     "f1@centre": 0.665798772549749,
+     "f1@0.5": 0.34033847870559786,
+     "f1@0.7": 0.07773851590106007,
+     "alignment": 0.8012033979084698,
+     "functional": {
+      "n": 1584,
+      "find": 1284,
+      "placed": 1145,
+      "pages_placed_80": 16
+     }
+    }
+   }
+  },
+  "blla.ctc-mccatmus.lightonocr3-4b": {
+   "detector": "blla",
+   "method": "ctc-mccatmus",
+   "reading": "lightonocr3-4b",
+   "by_group": {
+    "owner-hand": {
+     "pages": 20,
+     "truth_words": 2932,
+     "f1@centre": 0.4605995332974331,
+     "f1@0.5": 0.22868425776341772,
+     "f1@0.7": 0.04308023694130318,
+     "alignment": 0.6994432274976334,
+     "functional": {
+      "n": 1584,
+      "find": 1295,
+      "placed": 601,
+      "pages_placed_80": 6
+     }
+    },
+    "L2-bentham": {
+     "pages": 14,
+     "truth_words": 0,
+     "f1@centre": null,
+     "f1@0.5": null,
+     "f1@0.7": null,
+     "alignment": 0.8006543239648417,
+     "functional": {
+      "n": 0,
+      "find": 0,
+      "placed": 0,
+      "pages_placed_80": 0
+     }
+    }
+   }
+  },
+  "blla.ctc-mccatmus.truth": {
+   "detector": "blla",
+   "method": "ctc-mccatmus",
+   "reading": "truth",
+   "by_group": {
+    "owner-hand": {
+     "pages": 20,
+     "truth_words": 2932,
+     "f1@centre": 0.6683177748142503,
+     "f1@0.5": 0.35511526004953325,
+     "f1@0.7": 0.0788721661268813,
+     "alignment": 0.8305370876792031,
+     "functional": {
+      "n": 1584,
+      "find": 1269,
+      "placed": 1146,
+      "pages_placed_80": 16
+     }
+    },
+    "L2-bentham": {
+     "pages": 14,
+     "truth_words": 0,
+     "f1@centre": null,
+     "f1@0.5": null,
+     "f1@0.7": null,
+     "alignment": 0.9267983874879375,
+     "functional": {
+      "n": 0,
+      "find": 0,
+      "placed": 0,
+      "pages_placed_80": 0
+     }
+    }
+   }
+  },
+  "blla.ctc-revcity.gemini3.8-flash": {
+   "detector": "blla",
+   "method": "ctc-revcity",
+   "reading": "gemini3.8-flash",
+   "by_group": {
+    "owner-hand": {
+     "pages": 20,
+     "truth_words": 2932,
+     "f1@centre": 0.6695586571105243,
+     "f1@0.5": 0.36325914749151267,
+     "f1@0.7": 0.0905318747642399,
+     "alignment": 0.7682244841207324,
+     "functional": {
+      "n": 1584,
+      "find": 1239,
+      "placed": 1078,
+      "pages_placed_80": 15
+     }
+    }
+   }
+  },
+  "blla.ctc-revcity.lightonocr3-4b": {
+   "detector": "blla",
+   "method": "ctc-revcity",
+   "reading": "lightonocr3-4b",
+   "by_group": {
+    "owner-hand": {
+     "pages": 20,
+     "truth_words": 2932,
+     "f1@centre": 0.4545791620318873,
+     "f1@0.5": 0.24619948090470892,
+     "f1@0.7": 0.06266221727845754,
+     "alignment": 0.6968208778716767,
+     "functional": {
+      "n": 1584,
+      "find": 1214,
+      "placed": 530,
+      "pages_placed_80": 5
+     }
+    },
+    "L2-bentham": {
+     "pages": 14,
+     "truth_words": 0,
+     "f1@centre": null,
+     "f1@0.5": null,
+     "f1@0.7": null,
+     "alignment": 0.7985709906315084,
+     "functional": {
+      "n": 0,
+      "find": 0,
+      "placed": 0,
+      "pages_placed_80": 0
+     }
+    }
+   }
+  },
+  "blla.ctc-revcity.truth": {
+   "detector": "blla",
+   "method": "ctc-revcity",
+   "reading": "truth",
+   "by_group": {
+    "owner-hand": {
+     "pages": 20,
+     "truth_words": 2932,
+     "f1@centre": 0.6595080046856696,
+     "f1@0.5": 0.373291682936353,
+     "f1@0.7": 0.09488481062085125,
+     "alignment": 0.8117607371120938,
+     "functional": {
+      "n": 1584,
+      "find": 1197,
+      "placed": 1067,
+      "pages_placed_80": 15
+     }
+    },
+    "L2-bentham": {
+     "pages": 14,
+     "truth_words": 0,
+     "f1@centre": null,
+     "f1@0.5": null,
+     "f1@0.7": null,
+     "alignment": 0.9267983874879375,
+     "functional": {
+      "n": 0,
+      "find": 0,
+      "placed": 0,
+      "pages_placed_80": 0
+     }
+    }
+   }
+  },
+  "blla.flow.gemini3.8-flash": {
+   "detector": "blla",
+   "method": "flow",
+   "reading": "gemini3.8-flash",
+   "by_group": {
+    "owner-hand": {
+     "pages": 20,
+     "truth_words": 2932,
+     "f1@centre": 0.49198214580922467,
+     "f1@0.5": 0.14018846090262857,
+     "f1@0.7": 0.019837989750371963,
+     "alignment": 0.33896477694926785,
+     "functional": {
+      "n": 1584,
+      "find": 1557,
+      "placed": 303,
+      "pages_placed_80": 1
+     }
+    }
+   }
+  },
+  "blla.flow.lightonocr3-4b": {
+   "detector": "blla",
+   "method": "flow",
+   "reading": "lightonocr3-4b",
+   "by_group": {
+    "owner-hand": {
+     "pages": 20,
+     "truth_words": 2932,
+     "f1@centre": 0.4924137931034483,
+     "f1@0.5": 0.14655172413793102,
+     "f1@0.7": 0.024137931034482762,
+     "alignment": 0.30861295168112884,
+     "functional": {
+      "n": 1584,
+      "find": 1411,
+      "placed": 296,
+      "pages_placed_80": 1
+     }
+    },
+    "L2-bentham": {
+     "pages": 14,
+     "truth_words": 0,
+     "f1@centre": null,
+     "f1@0.5": null,
+     "f1@0.7": null,
+     "alignment": 0.671721774975875,
+     "functional": {
+      "n": 0,
+      "find": 0,
+      "placed": 0,
+      "pages_placed_80": 0
+     }
+    }
+   }
+  },
+  "blla.flow.truth": {
+   "detector": "blla",
+   "method": "flow",
+   "reading": "truth",
+   "by_group": {
+    "owner-hand": {
+     "pages": 20,
+     "truth_words": 2932,
+     "f1@centre": 0.48960270498732034,
+     "f1@0.5": 0.13491124260355028,
+     "f1@0.7": 0.02265426880811496,
+     "alignment": 0.34479430394377963,
+     "functional": {
+      "n": 1584,
+      "find": 1584,
+      "placed": 280,
+      "pages_placed_80": 0
+     }
+    },
+    "L2-bentham": {
+     "pages": 14,
+     "truth_words": 0,
+     "f1@centre": null,
+     "f1@0.5": null,
+     "f1@0.7": null,
+     "alignment": 0.7228028195637981,
+     "functional": {
+      "n": 0,
+      "find": 0,
+      "placed": 0,
+      "pages_placed_80": 0
+     }
+    }
+   }
+  },
+  "blla.prop.gemini3.8-flash": {
+   "detector": "blla",
+   "method": "prop",
+   "reading": "gemini3.8-flash",
+   "by_group": {
+    "owner-hand": {
+     "pages": 20,
+     "truth_words": 2932,
+     "f1@centre": 0.6387897331293557,
+     "f1@0.5": 0.30154682984871667,
+     "f1@0.7": 0.07207207207207207,
+     "alignment": 0.6931233752992837,
+     "functional": {
+      "n": 1584,
+      "find": 1515,
+      "placed": 1167,
+      "pages_placed_80": 12
+     }
+    }
+   }
+  },
+  "blla.prop.lightonocr3-4b": {
+   "detector": "blla",
+   "method": "prop",
+   "reading": "lightonocr3-4b",
+   "by_group": {
+    "owner-hand": {
+     "pages": 20,
+     "truth_words": 2932,
+     "f1@centre": 0.42763611302549964,
+     "f1@0.5": 0.1330117160578911,
+     "f1@0.7": 0.024121295658166782,
+     "alignment": 0.38098085098493273,
+     "functional": {
+      "n": 1584,
+      "find": 1411,
+      "placed": 304,
+      "pages_placed_80": 1
+     }
+    },
+    "L2-bentham": {
+     "pages": 14,
+     "truth_words": 0,
+     "f1@centre": null,
+     "f1@0.5": null,
+     "f1@0.7": null,
+     "alignment": 0.5479336689873081,
+     "functional": {
+      "n": 0,
+      "find": 0,
+      "placed": 0,
+      "pages_placed_80": 0
+     }
+    }
+   }
+  },
+  "blla.prop.truth": {
+   "detector": "blla",
+   "method": "prop",
+   "reading": "truth",
+   "by_group": {
+    "owner-hand": {
+     "pages": 20,
+     "truth_words": 2932,
+     "f1@centre": 0.6449488823427482,
+     "f1@0.5": 0.3105181077802807,
+     "f1@0.7": 0.07347080228729856,
+     "alignment": 0.7060151108194875,
+     "functional": {
+      "n": 1584,
+      "find": 1524,
+      "placed": 1169,
+      "pages_placed_80": 11
+     }
+    },
+    "L2-bentham": {
+     "pages": 14,
+     "truth_words": 0,
+     "f1@centre": null,
+     "f1@0.5": null,
+     "f1@0.7": null,
+     "alignment": 0.9087342729532347,
+     "functional": {
+      "n": 0,
+      "find": 0,
+      "placed": 0,
+      "pages_placed_80": 0
+     }
+    }
+   }
+  },
+  "orli.ctc-mccatmus.gemini3.8-flash": {
+   "detector": "orli",
+   "method": "ctc-mccatmus",
+   "reading": "gemini3.8-flash",
+   "by_group": {
+    "owner-hand": {
+     "pages": 20,
+     "truth_words": 2932,
+     "f1@centre": 0.6438779451525685,
+     "f1@0.5": 0.3012746234067207,
+     "f1@0.7": 0.06759366550791812,
+     "alignment": 0.752162056673652,
+     "functional": {
+      "n": 1584,
+      "find": 1189,
+      "placed": 1081,
+      "pages_placed_80": 15
+     }
+    }
+   }
+  },
+  "orli.ctc-mccatmus.lightonocr3-4b": {
+   "detector": "orli",
+   "method": "ctc-mccatmus",
+   "reading": "lightonocr3-4b",
+   "by_group": {
+    "owner-hand": {
+     "pages": 20,
+     "truth_words": 2932,
+     "f1@centre": 0.4634862385321101,
+     "f1@0.5": 0.1948623853211009,
+     "f1@0.7": 0.0363302752293578,
+     "alignment": 0.621252506760882,
+     "functional": {
+      "n": 1584,
+      "find": 1223,
+      "placed": 566,
+      "pages_placed_80": 6
+     }
+    },
+    "L2-bentham": {
+     "pages": 14,
+     "truth_words": 0,
+     "f1@centre": null,
+     "f1@0.5": null,
+     "f1@0.7": null,
+     "alignment": 0.8345772917345498,
+     "functional": {
+      "n": 0,
+      "find": 0,
+      "placed": 0,
+      "pages_placed_80": 0
+     }
+    }
+   }
+  },
+  "orli.ctc-mccatmus.truth": {
+   "detector": "orli",
+   "method": "ctc-mccatmus",
+   "reading": "truth",
+   "by_group": {
+    "owner-hand": {
+     "pages": 20,
+     "truth_words": 2932,
+     "f1@centre": 0.6357299342760406,
+     "f1@0.5": 0.2991435968930492,
+     "f1@0.7": 0.06731726747659829,
+     "alignment": 0.7917853772671738,
+     "functional": {
+      "n": 1584,
+      "find": 1150,
+      "placed": 1044,
+      "pages_placed_80": 16
+     }
+    },
+    "L2-bentham": {
+     "pages": 14,
+     "truth_words": 0,
+     "f1@centre": null,
+     "f1@0.5": null,
+     "f1@0.7": null,
+     "alignment": 0.9493670285807383,
+     "functional": {
+      "n": 0,
+      "find": 0,
+      "placed": 0,
+      "pages_placed_80": 0
+     }
+    }
+   }
+  },
+  "orli.ctc-revcity.gemini3.8-flash": {
+   "detector": "orli",
+   "method": "ctc-revcity",
+   "reading": "gemini3.8-flash",
+   "by_group": {
+    "owner-hand": {
+     "pages": 20,
+     "truth_words": 2932,
+     "f1@centre": 0.6256128652676994,
+     "f1@0.5": 0.30790351049225334,
+     "f1@0.7": 0.07530888409492056,
+     "alignment": 0.713381958775907,
+     "functional": {
+      "n": 1584,
+      "find": 1151,
+      "placed": 965,
+      "pages_placed_80": 12
+     }
+    }
+   }
+  },
+  "orli.ctc-revcity.lightonocr3-4b": {
+   "detector": "orli",
+   "method": "ctc-revcity",
+   "reading": "lightonocr3-4b",
+   "by_group": {
+    "owner-hand": {
+     "pages": 20,
+     "truth_words": 2932,
+     "f1@centre": 0.45118980700768224,
+     "f1@0.5": 0.20086190743863594,
+     "f1@0.7": 0.04272062956717257,
+     "alignment": 0.6142103685871648,
+     "functional": {
+      "n": 1584,
+      "find": 1173,
+      "placed": 475,
+      "pages_placed_80": 5
+     }
+    },
+    "L2-bentham": {
+     "pages": 14,
+     "truth_words": 0,
+     "f1@centre": null,
+     "f1@0.5": null,
+     "f1@0.7": null,
+     "alignment": 0.7989664388075204,
+     "functional": {
+      "n": 0,
+      "find": 0,
+      "placed": 0,
+      "pages_placed_80": 0
+     }
+    }
+   }
+  },
+  "orli.ctc-revcity.truth": {
+   "detector": "orli",
+   "method": "ctc-revcity",
+   "reading": "truth",
+   "by_group": {
+    "owner-hand": {
+     "pages": 20,
+     "truth_words": 2932,
+     "f1@centre": 0.6226870474658085,
+     "f1@0.5": 0.3089300080450523,
+     "f1@0.7": 0.07683024939662107,
+     "alignment": 0.7630935712518384,
+     "functional": {
+      "n": 1584,
+      "find": 1121,
+      "placed": 961,
+      "pages_placed_80": 13
+     }
+    },
+    "L2-bentham": {
+     "pages": 14,
+     "truth_words": 0,
+     "f1@centre": null,
+     "f1@0.5": null,
+     "f1@0.7": null,
+     "alignment": 0.9296348857235953,
+     "functional": {
+      "n": 0,
+      "find": 0,
+      "placed": 0,
+      "pages_placed_80": 0
+     }
+    }
+   }
+  },
+  "orli.flow.gemini3.8-flash": {
+   "detector": "orli",
+   "method": "flow",
+   "reading": "gemini3.8-flash",
+   "by_group": {
+    "owner-hand": {
+     "pages": 20,
+     "truth_words": 2932,
+     "f1@centre": 0.4504056963073357,
+     "f1@0.5": 0.10763371419109123,
+     "f1@0.7": 0.019539658883921177,
+     "alignment": 0.3508836706665654,
+     "functional": {
+      "n": 1584,
+      "find": 1557,
+      "placed": 231,
+      "pages_placed_80": 0
+     }
+    }
+   }
+  },
+  "orli.flow.lightonocr3-4b": {
+   "detector": "orli",
+   "method": "flow",
+   "reading": "lightonocr3-4b",
+   "by_group": {
+    "owner-hand": {
+     "pages": 20,
+     "truth_words": 2932,
+     "f1@centre": 0.4474365613671672,
+     "f1@0.5": 0.1059899879164509,
+     "f1@0.7": 0.01519074745382358,
+     "alignment": 0.3141457057304581,
+     "functional": {
+      "n": 1584,
+      "find": 1411,
+      "placed": 186,
+      "pages_placed_80": 0
+     }
+    },
+    "L2-bentham": {
+     "pages": 14,
+     "truth_words": 0,
+     "f1@centre": null,
+     "f1@0.5": null,
+     "f1@0.7": null,
+     "alignment": 0.7072724775801491,
+     "functional": {
+      "n": 0,
+      "find": 0,
+      "placed": 0,
+      "pages_placed_80": 0
+     }
+    }
+   }
+  },
+  "orli.flow.truth": {
+   "detector": "orli",
+   "method": "flow",
+   "reading": "truth",
+   "by_group": {
+    "owner-hand": {
+     "pages": 20,
+     "truth_words": 2932,
+     "f1@centre": 0.4480892796753467,
+     "f1@0.5": 0.11024687182955699,
+     "f1@0.7": 0.01927629354075076,
+     "alignment": 0.3331217022428323,
+     "functional": {
+      "n": 1584,
+      "find": 1584,
+      "placed": 204,
+      "pages_placed_80": 0
+     }
+    },
+    "L2-bentham": {
+     "pages": 14,
+     "truth_words": 0,
+     "f1@centre": null,
+     "f1@0.5": null,
+     "f1@0.7": null,
+     "alignment": 0.6589607852753353,
+     "functional": {
+      "n": 0,
+      "find": 0,
+      "placed": 0,
+      "pages_placed_80": 0
+     }
+    }
+   }
+  },
+  "orli.prop.gemini3.8-flash": {
+   "detector": "orli",
+   "method": "prop",
+   "reading": "gemini3.8-flash",
+   "by_group": {
+    "owner-hand": {
+     "pages": 20,
+     "truth_words": 2932,
+     "f1@centre": 0.5918795939796989,
+     "f1@0.5": 0.25061253062653127,
+     "f1@0.7": 0.05215260763038152,
+     "alignment": 0.7354752779583742,
+     "functional": {
+      "n": 1584,
+      "find": 1401,
+      "placed": 1119,
+      "pages_placed_80": 13
+     }
+    }
+   }
+  },
+  "orli.prop.lightonocr3-4b": {
+   "detector": "orli",
+   "method": "prop",
+   "reading": "lightonocr3-4b",
+   "by_group": {
+    "owner-hand": {
+     "pages": 20,
+     "truth_words": 2932,
+     "f1@centre": 0.39650561597432693,
+     "f1@0.5": 0.09021215903013015,
+     "f1@0.7": 0.011766803351756108,
+     "alignment": 0.3509940474329019,
+     "functional": {
+      "n": 1584,
+      "find": 1310,
+      "placed": 169,
+      "pages_placed_80": 0
+     }
+    },
+    "L2-bentham": {
+     "pages": 14,
+     "truth_words": 0,
+     "f1@centre": null,
+     "f1@0.5": null,
+     "f1@0.7": null,
+     "alignment": 0.6008497011544923,
+     "functional": {
+      "n": 0,
+      "find": 0,
+      "placed": 0,
+      "pages_placed_80": 0
+     }
+    }
+   }
+  },
+  "orli.prop.truth": {
+   "detector": "orli",
+   "method": "prop",
+   "reading": "truth",
+   "by_group": {
+    "owner-hand": {
+     "pages": 20,
+     "truth_words": 2932,
+     "f1@centre": 0.6086330935251798,
+     "f1@0.5": 0.2535971223021583,
+     "f1@0.7": 0.05431654676258992,
+     "alignment": 0.724382143713413,
+     "functional": {
+      "n": 1584,
+      "find": 1400,
+      "placed": 1086,
+      "pages_placed_80": 11
+     }
+    },
+    "L2-bentham": {
+     "pages": 14,
+     "truth_words": 0,
+     "f1@centre": null,
+     "f1@0.5": null,
+     "f1@0.7": null,
+     "alignment": 0.9249887217024314,
+     "functional": {
+      "n": 0,
+      "find": 0,
+      "placed": 0,
+      "pages_placed_80": 0
+     }
+    }
+   }
+  },
+  "ppocrv6.ctc-mccatmus.gemini3.8-flash": {
+   "detector": "ppocrv6",
+   "method": "ctc-mccatmus",
+   "reading": "gemini3.8-flash",
+   "by_group": {
+    "owner-hand": {
+     "pages": 20,
+     "truth_words": 2932,
+     "f1@centre": 0.6594996090695856,
+     "f1@0.5": 0.20797498045347929,
+     "f1@0.7": 0.023064894448788113,
+     "alignment": 0.7536851117594882,
+     "functional": {
+      "n": 1584,
+      "find": 1163,
+      "placed": 1001,
+      "pages_placed_80": 13
+     }
+    }
+   }
+  },
+  "ppocrv6.ctc-mccatmus.lightonocr3-4b": {
+   "detector": "ppocrv6",
+   "method": "ctc-mccatmus",
+   "reading": "lightonocr3-4b",
+   "by_group": {
+    "owner-hand": {
+     "pages": 20,
+     "truth_words": 2932,
+     "f1@centre": 0.48708220415537484,
+     "f1@0.5": 0.14345076784101174,
+     "f1@0.7": 0.018428184281842817,
+     "alignment": 0.6105323284921684,
+     "functional": {
+      "n": 1584,
+      "find": 1281,
+      "placed": 506,
+      "pages_placed_80": 6
+     }
+    },
+    "L2-bentham": {
+     "pages": 14,
+     "truth_words": 0,
+     "f1@centre": null,
+     "f1@0.5": null,
+     "f1@0.7": null,
+     "alignment": 0.8104064203067998,
+     "functional": {
+      "n": 0,
+      "find": 0,
+      "placed": 0,
+      "pages_placed_80": 0
+     }
+    }
+   }
+  },
+  "ppocrv6.ctc-mccatmus.truth": {
+   "detector": "ppocrv6",
+   "method": "ctc-mccatmus",
+   "reading": "truth",
+   "by_group": {
+    "owner-hand": {
+     "pages": 20,
+     "truth_words": 2932,
+     "f1@centre": 0.6561058752757168,
+     "f1@0.5": 0.2133547222779226,
+     "f1@0.7": 0.024864648085021052,
+     "alignment": 0.7705743582026513,
+     "functional": {
+      "n": 1584,
+      "find": 1151,
+      "placed": 986,
+      "pages_placed_80": 14
+     }
+    },
+    "L2-bentham": {
+     "pages": 14,
+     "truth_words": 0,
+     "f1@centre": null,
+     "f1@0.5": null,
+     "f1@0.7": null,
+     "alignment": 0.9066679161074661,
+     "functional": {
+      "n": 0,
+      "find": 0,
+      "placed": 0,
+      "pages_placed_80": 0
+     }
+    }
+   }
+  },
+  "ppocrv6.ctc-revcity.gemini3.8-flash": {
+   "detector": "ppocrv6",
+   "method": "ctc-revcity",
+   "reading": "gemini3.8-flash",
+   "by_group": {
+    "owner-hand": {
+     "pages": 20,
+     "truth_words": 2932,
+     "f1@centre": 0.6713511343103794,
+     "f1@0.5": 0.22204376631198552,
+     "f1@0.7": 0.03212206384260189,
+     "alignment": 0.7297470931874299,
+     "functional": {
+      "n": 1584,
+      "find": 1096,
+      "placed": 921,
+      "pages_placed_80": 12
+     }
+    }
+   }
+  },
+  "ppocrv6.ctc-revcity.lightonocr3-4b": {
+   "detector": "ppocrv6",
+   "method": "ctc-revcity",
+   "reading": "lightonocr3-4b",
+   "by_group": {
+    "owner-hand": {
+     "pages": 20,
+     "truth_words": 2932,
+     "f1@centre": 0.4916406393532978,
+     "f1@0.5": 0.15175454712474737,
+     "f1@0.7": 0.023883887562006243,
+     "alignment": 0.6049111250881944,
+     "functional": {
+      "n": 1584,
+      "find": 1236,
+      "placed": 453,
+      "pages_placed_80": 5
+     }
+    },
+    "L2-bentham": {
+     "pages": 14,
+     "truth_words": 0,
+     "f1@centre": null,
+     "f1@0.5": null,
+     "f1@0.7": null,
+     "alignment": 0.8087364467618263,
+     "functional": {
+      "n": 0,
+      "find": 0,
+      "placed": 0,
+      "pages_placed_80": 0
+     }
+    }
+   }
+  },
+  "ppocrv6.ctc-revcity.truth": {
+   "detector": "ppocrv6",
+   "method": "ctc-revcity",
+   "reading": "truth",
+   "by_group": {
+    "owner-hand": {
+     "pages": 20,
+     "truth_words": 2932,
+     "f1@centre": 0.6609053497942387,
+     "f1@0.5": 0.22592592592592592,
+     "f1@0.7": 0.03292181069958848,
+     "alignment": 0.7695139099619868,
+     "functional": {
+      "n": 1584,
+      "find": 1071,
+      "placed": 900,
+      "pages_placed_80": 12
+     }
+    },
+    "L2-bentham": {
+     "pages": 14,
+     "truth_words": 0,
+     "f1@centre": null,
+     "f1@0.5": null,
+     "f1@0.7": null,
+     "alignment": 0.9221705616101116,
+     "functional": {
+      "n": 0,
+      "find": 0,
+      "placed": 0,
+      "pages_placed_80": 0
+     }
+    }
+   }
+  },
+  "ppocrv6.flow.gemini3.8-flash": {
+   "detector": "ppocrv6",
+   "method": "flow",
+   "reading": "gemini3.8-flash",
+   "by_group": {
+    "owner-hand": {
+     "pages": 20,
+     "truth_words": 2932,
+     "f1@centre": 0.4941176470588235,
+     "f1@0.5": 0.06926263463131731,
+     "f1@0.7": 0.004308202154101076,
+     "alignment": 0.28742443752951813,
+     "functional": {
+      "n": 1584,
+      "find": 1557,
+      "placed": 244,
+      "pages_placed_80": 0
+     }
+    }
+   }
+  },
+  "ppocrv6.flow.lightonocr3-4b": {
+   "detector": "ppocrv6",
+   "method": "flow",
+   "reading": "lightonocr3-4b",
+   "by_group": {
+    "owner-hand": {
+     "pages": 20,
+     "truth_words": 2932,
+     "f1@centre": 0.49265849024011055,
+     "f1@0.5": 0.07151494213162896,
+     "f1@0.7": 0.005182242183451373,
+     "alignment": 0.2681936922542682,
+     "functional": {
+      "n": 1584,
+      "find": 1411,
+      "placed": 214,
+      "pages_placed_80": 0
+     }
+    },
+    "L2-bentham": {
+     "pages": 14,
+     "truth_words": 0,
+     "f1@centre": null,
+     "f1@0.5": null,
+     "f1@0.7": null,
+     "alignment": 0.47192935189716156,
+     "functional": {
+      "n": 0,
+      "find": 0,
+      "placed": 0,
+      "pages_placed_80": 0
+     }
+    }
+   }
+  },
+  "ppocrv6.flow.truth": {
+   "detector": "ppocrv6",
+   "method": "flow",
+   "reading": "truth",
+   "by_group": {
+    "owner-hand": {
+     "pages": 20,
+     "truth_words": 2932,
+     "f1@centre": 0.48789571694599626,
+     "f1@0.5": 0.06365329270357203,
+     "f1@0.7": 0.0037243947858473,
+     "alignment": 0.30463612467797146,
+     "functional": {
+      "n": 1584,
+      "find": 1584,
+      "placed": 271,
+      "pages_placed_80": 0
+     }
+    },
+    "L2-bentham": {
+     "pages": 14,
+     "truth_words": 0,
+     "f1@centre": null,
+     "f1@0.5": null,
+     "f1@0.7": null,
+     "alignment": 0.45917369261161617,
+     "functional": {
+      "n": 0,
+      "find": 0,
+      "placed": 0,
+      "pages_placed_80": 0
+     }
+    }
+   }
+  },
+  "ppocrv6.prop.gemini3.8-flash": {
+   "detector": "ppocrv6",
+   "method": "prop",
+   "reading": "gemini3.8-flash",
+   "by_group": {
+    "owner-hand": {
+     "pages": 20,
+     "truth_words": 2932,
+     "f1@centre": 0.6123082227202206,
+     "f1@0.5": 0.14721599724185486,
+     "f1@0.7": 0.02516807446991898,
+     "alignment": 0.5017241214492076,
+     "functional": {
+      "n": 1584,
+      "find": 1468,
+      "placed": 1024,
+      "pages_placed_80": 10
+     }
+    }
+   }
+  },
+  "ppocrv6.prop.lightonocr3-4b": {
+   "detector": "ppocrv6",
+   "method": "prop",
+   "reading": "lightonocr3-4b",
+   "by_group": {
+    "owner-hand": {
+     "pages": 20,
+     "truth_words": 2932,
+     "f1@centre": 0.4644467568505029,
+     "f1@0.5": 0.08463406174124176,
+     "f1@0.7": 0.014221297259798819,
+     "alignment": 0.37867180132362094,
+     "functional": {
+      "n": 1584,
+      "find": 1403,
+      "placed": 267,
+      "pages_placed_80": 0
+     }
+    },
+    "L2-bentham": {
+     "pages": 14,
+     "truth_words": 0,
+     "f1@centre": null,
+     "f1@0.5": null,
+     "f1@0.7": null,
+     "alignment": 0.5201718774019872,
+     "functional": {
+      "n": 0,
+      "find": 0,
+      "placed": 0,
+      "pages_placed_80": 0
+     }
+    }
+   }
+  },
+  "ppocrv6.prop.truth": {
+   "detector": "ppocrv6",
+   "method": "prop",
+   "reading": "truth",
+   "by_group": {
+    "owner-hand": {
+     "pages": 20,
+     "truth_words": 2932,
+     "f1@centre": 0.6229625649292495,
+     "f1@0.5": 0.16084542360737955,
+     "f1@0.7": 0.027583736342468208,
+     "alignment": 0.5145176635618689,
+     "functional": {
+      "n": 1584,
+      "find": 1459,
+      "placed": 989,
+      "pages_placed_80": 7
+     }
+    },
+    "L2-bentham": {
+     "pages": 14,
+     "truth_words": 0,
+     "f1@centre": null,
+     "f1@0.5": null,
+     "f1@0.7": null,
+     "alignment": 0.8499333940158011,
+     "functional": {
+      "n": 0,
+      "find": 0,
+      "placed": 0,
+      "pages_placed_80": 0
+     }
+    }
+   }
+  },
+  "surya.ctc-mccatmus.gemini3.8-flash": {
+   "detector": "surya",
+   "method": "ctc-mccatmus",
+   "reading": "gemini3.8-flash",
+   "by_group": {
+    "owner-hand": {
+     "pages": 20,
+     "truth_words": 2932,
+     "f1@centre": 0.6029706945002008,
+     "f1@0.5": 0.2404656764351666,
+     "f1@0.7": 0.059413890004014445,
+     "alignment": 0.6809327181751901,
+     "functional": {
+      "n": 1584,
+      "find": 1127,
+      "placed": 937,
+      "pages_placed_80": 13
+     }
+    }
+   }
+  },
+  "surya.ctc-mccatmus.lightonocr3-4b": {
+   "detector": "surya",
+   "method": "ctc-mccatmus",
+   "reading": "lightonocr3-4b",
+   "by_group": {
+    "owner-hand": {
+     "pages": 20,
+     "truth_words": 2932,
+     "f1@centre": 0.44644167278063096,
+     "f1@0.5": 0.16397652237710933,
+     "f1@0.7": 0.052090975788701394,
+     "alignment": 0.5822485866659665,
+     "functional": {
+      "n": 1584,
+      "find": 1256,
+      "placed": 460,
+      "pages_placed_80": 1
+     }
+    },
+    "L2-bentham": {
+     "pages": 14,
+     "truth_words": 0,
+     "f1@centre": null,
+     "f1@0.5": null,
+     "f1@0.7": null,
+     "alignment": 0.7815084181277594,
+     "functional": {
+      "n": 0,
+      "find": 0,
+      "placed": 0,
+      "pages_placed_80": 0
+     }
+    }
+   }
+  },
+  "surya.ctc-mccatmus.truth": {
+   "detector": "surya",
+   "method": "ctc-mccatmus",
+   "reading": "truth",
+   "by_group": {
+    "owner-hand": {
+     "pages": 20,
+     "truth_words": 2932,
+     "f1@centre": 0.5959451157075568,
+     "f1@0.5": 0.24616014745033785,
+     "f1@0.7": 0.06512389924226909,
+     "alignment": 0.7277184603792466,
+     "functional": {
+      "n": 1584,
+      "find": 1106,
+      "placed": 912,
+      "pages_placed_80": 12
+     }
+    },
+    "L2-bentham": {
+     "pages": 14,
+     "truth_words": 0,
+     "f1@centre": null,
+     "f1@0.5": null,
+     "f1@0.7": null,
+     "alignment": 0.8622347482492508,
+     "functional": {
+      "n": 0,
+      "find": 0,
+      "placed": 0,
+      "pages_placed_80": 0
+     }
+    }
+   }
+  },
+  "surya.ctc-revcity.gemini3.8-flash": {
+   "detector": "surya",
+   "method": "ctc-revcity",
+   "reading": "gemini3.8-flash",
+   "by_group": {
+    "owner-hand": {
+     "pages": 20,
+     "truth_words": 2932,
+     "f1@centre": 0.6112130479102956,
+     "f1@0.5": 0.24709480122324157,
+     "f1@0.7": 0.06483180428134556,
+     "alignment": 0.6669427280968259,
+     "functional": {
+      "n": 1584,
+      "find": 1095,
+      "placed": 885,
+      "pages_placed_80": 12
+     }
+    }
+   }
+  },
+  "surya.ctc-revcity.lightonocr3-4b": {
+   "detector": "surya",
+   "method": "ctc-revcity",
+   "reading": "lightonocr3-4b",
+   "by_group": {
+    "owner-hand": {
+     "pages": 20,
+     "truth_words": 2932,
+     "f1@centre": 0.44561535566428306,
+     "f1@0.5": 0.16296575084681972,
+     "f1@0.7": 0.04365826119683854,
+     "alignment": 0.5800075713919324,
+     "functional": {
+      "n": 1584,
+      "find": 1187,
+      "placed": 404,
+      "pages_placed_80": 1
+     }
+    },
+    "L2-bentham": {
+     "pages": 14,
+     "truth_words": 0,
+     "f1@centre": null,
+     "f1@0.5": null,
+     "f1@0.7": null,
+     "alignment": 0.7943012368681588,
+     "functional": {
+      "n": 0,
+      "find": 0,
+      "placed": 0,
+      "pages_placed_80": 0
+     }
+    }
+   }
+  },
+  "surya.ctc-revcity.truth": {
+   "detector": "surya",
+   "method": "ctc-revcity",
+   "reading": "truth",
+   "by_group": {
+    "owner-hand": {
+     "pages": 20,
+     "truth_words": 2932,
+     "f1@centre": 0.6081700708628596,
+     "f1@0.5": 0.2501042100875364,
+     "f1@0.7": 0.06752813672363485,
+     "alignment": 0.6870195489965117,
+     "functional": {
+      "n": 1584,
+      "find": 1077,
+      "placed": 869,
+      "pages_placed_80": 13
+     }
+    },
+    "L2-bentham": {
+     "pages": 14,
+     "truth_words": 0,
+     "f1@centre": null,
+     "f1@0.5": null,
+     "f1@0.7": null,
+     "alignment": 0.8622347482492508,
+     "functional": {
+      "n": 0,
+      "find": 0,
+      "placed": 0,
+      "pages_placed_80": 0
+     }
+    }
+   }
+  },
+  "surya.flow.gemini3.8-flash": {
+   "detector": "surya",
+   "method": "flow",
+   "reading": "gemini3.8-flash",
+   "by_group": {
+    "owner-hand": {
+     "pages": 20,
+     "truth_words": 2932,
+     "f1@centre": 0.44665012406947896,
+     "f1@0.5": 0.08866832092638544,
+     "f1@0.7": 0.013895781637717122,
+     "alignment": 0.30825107774495153,
+     "functional": {
+      "n": 1584,
+      "find": 1557,
+      "placed": 269,
+      "pages_placed_80": 0
+     }
+    }
+   }
+  },
+  "surya.flow.lightonocr3-4b": {
+   "detector": "surya",
+   "method": "flow",
+   "reading": "lightonocr3-4b",
+   "by_group": {
+    "owner-hand": {
+     "pages": 20,
+     "truth_words": 2932,
+     "f1@centre": 0.44279551337359796,
+     "f1@0.5": 0.08559102674719585,
+     "f1@0.7": 0.013114754098360656,
+     "alignment": 0.27129395863999956,
+     "functional": {
+      "n": 1584,
+      "find": 1411,
+      "placed": 223,
+      "pages_placed_80": 0
+     }
+    },
+    "L2-bentham": {
+     "pages": 14,
+     "truth_words": 0,
+     "f1@centre": null,
+     "f1@0.5": null,
+     "f1@0.7": null,
+     "alignment": 0.4496161447635424,
+     "functional": {
+      "n": 0,
+      "find": 0,
+      "placed": 0,
+      "pages_placed_80": 0
+     }
+    }
+   }
+  },
+  "surya.flow.truth": {
+   "detector": "surya",
+   "method": "flow",
+   "reading": "truth",
+   "by_group": {
+    "owner-hand": {
+     "pages": 20,
+     "truth_words": 2932,
+     "f1@centre": 0.4565731666103413,
+     "f1@0.5": 0.09564041906049339,
+     "f1@0.7": 0.020615072659682324,
+     "alignment": 0.32341091581126047,
+     "functional": {
+      "n": 1584,
+      "find": 1584,
+      "placed": 299,
+      "pages_placed_80": 0
+     }
+    },
+    "L2-bentham": {
+     "pages": 14,
+     "truth_words": 0,
+     "f1@centre": null,
+     "f1@0.5": null,
+     "f1@0.7": null,
+     "alignment": 0.515503862183518,
+     "functional": {
+      "n": 0,
+      "find": 0,
+      "placed": 0,
+      "pages_placed_80": 0
+     }
+    }
+   }
+  },
+  "surya.prop.gemini3.8-flash": {
+   "detector": "surya",
+   "method": "prop",
+   "reading": "gemini3.8-flash",
+   "by_group": {
+    "owner-hand": {
+     "pages": 20,
+     "truth_words": 2932,
+     "f1@centre": 0.5348878290054762,
+     "f1@0.5": 0.1939586645468998,
+     "f1@0.7": 0.06041335453100159,
+     "alignment": 0.48416752052751527,
+     "functional": {
+      "n": 1584,
+      "find": 1430,
+      "placed": 783,
+      "pages_placed_80": 6
+     }
+    }
+   }
+  },
+  "surya.prop.lightonocr3-4b": {
+   "detector": "surya",
+   "method": "prop",
+   "reading": "lightonocr3-4b",
+   "by_group": {
+    "owner-hand": {
+     "pages": 20,
+     "truth_words": 2932,
+     "f1@centre": 0.401040763226366,
+     "f1@0.5": 0.08083261058109281,
+     "f1@0.7": 0.017346053772766698,
+     "alignment": 0.33259407371878164,
+     "functional": {
+      "n": 1584,
+      "find": 1395,
+      "placed": 200,
+      "pages_placed_80": 0
+     }
+    },
+    "L2-bentham": {
+     "pages": 14,
+     "truth_words": 0,
+     "f1@centre": null,
+     "f1@0.5": null,
+     "f1@0.7": null,
+     "alignment": 0.5297382872992794,
+     "functional": {
+      "n": 0,
+      "find": 0,
+      "placed": 0,
+      "pages_placed_80": 0
+     }
+    }
+   }
+  },
+  "surya.prop.truth": {
+   "detector": "surya",
+   "method": "prop",
+   "reading": "truth",
+   "by_group": {
+    "owner-hand": {
+     "pages": 20,
+     "truth_words": 2932,
+     "f1@centre": 0.5474637681159421,
+     "f1@0.5": 0.1931159420289855,
+     "f1@0.7": 0.05688405797101449,
+     "alignment": 0.4788752435172056,
+     "functional": {
+      "n": 1584,
+      "find": 1430,
+      "placed": 765,
+      "pages_placed_80": 5
+     }
+    },
+    "L2-bentham": {
+     "pages": 14,
+     "truth_words": 0,
+     "f1@centre": null,
+     "f1@0.5": null,
+     "f1@0.7": null,
+     "alignment": 0.8035628995814683,
+     "functional": {
+      "n": 0,
+      "find": 0,
+      "placed": 0,
+      "pages_placed_80": 0
+     }
+    }
+   }
+  }
+ }
+}

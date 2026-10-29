@@ -345,7 +345,8 @@ def px_lines(det, W, H):
     return out
 
 
-SPAN = 8          # a reading line may cover up to this many consecutive detected lines (a reader that reflows)
+SPAN = int(os.environ.get('PLACE_HANDS_SPAN', 8))  # a reading line may cover up to this many consecutive detected
+#   lines (a reader that reflows); PLACE_HANDS_SPAN=1 is one-to-one, better for readers that keep the page's lines
 SPAN_COST = 0.05  # per extra line covered, so a one-to-one reading is preferred when the costs tie
 
 
