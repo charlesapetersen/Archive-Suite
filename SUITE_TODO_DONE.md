@@ -13159,3 +13159,30 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
 - [x] **W40.fix-live-vision-drops-card-tags — with Apple Vision and No tagging, Live Capture still shows the tag card, then writes none of what the operator typed [S · S2]** · §W40 · SHIPPED 2026-10-29
   Decided: No tagging means no GENERATED tag (no LLM subject or date, no app colour, no Unread); what a person set (the card's subjects, its or the phone's date and Quality) is written to the PDF, the image mirror and a merged PDF, and a page with nothing set gets no Finder write. Box and folder photos stay untagged in this mode. Fix and the Q0-over-phone-Q2 bug the review found: checkpoint fa51fc3f (SPEC rule 6, KNOWN_ISSUES, six new test-recovery.sh checks). The VM journey's live phase now runs in the default mode (`-taggingModeRaw automatic`, run as No tagging) and asserts no Unread: run 6 green, 442 s, PDFs `1973`/`W40d5 Dean Alpha`/`Q2`, none (Skip), `W40d5 Dean Bravo`, colour 0 on every tag (`verification/evidence/processor/W40.d5-live-capture.md` run 6). Ledger P-47 now `works`.
   <!-- /W40.fix-live-vision-drops-card-tags -->
+- [x] **W40.docs-startup-size — cut what every session loads: the three app guides, the root guide and the session prompt [M]** · §W40 — verification phase (lane: docs) (uses: light) — Owner, 2026-10-28. An engine session's first call already carries about 56k tokens, about 23k of them project text (~/Claude/CLAUDE.md 10.6 KB, CLAUDE.md 40 KB, ops/autonomous/resume-prompt.txt 30 KB, the project memory index 10 KB), and Claude Code adds an app's guide the first time the session touches that app's files: ArchiveProcessor/CLAUDE.md 75 KB (~19k tokens), ArchiveNotes/CLAUDE.md 70 KB (~18k), ArchiveReader/CLAUDE.md 50 KB (~13k). Every later turn re-reads all of it. Rewrite by hand, no pattern edits: each app guide keeps only the rules a session must obey and the commands it runs (target under 20 KB); the reference material (the Processor's 17 KB Implementation map and its per-function sections, Notes' and Reader's file maps) moves to a doc beside the guide that the guide names and sessions read on demand. In CLAUDE.md, the 10 KB "no production material" section and the 3 KB history-rewrite note get the same treatment; the walkthrough section stays (interactive sessions need it). Trim resume-prompt.txt of steps the engine assignment already overrides (item selection, cadence). No rule may be lost: list every rule before and after, and have an adversarial reviewer check the list. Measure the first-call context of three engine sessions before and after.
+  SHIPPED 2026-10-29 (checkpoints f0e7c556, 91d85373, 45938b25, 07008337 and this commit). Sizes, before -> after:
+  ArchiveProcessor/CLAUDE.md 75,096 -> 21,967 B; ArchiveNotes/CLAUDE.md 70,208 -> 13,481 B; ArchiveReader/CLAUDE.md
+  50,481 -> 19,769 B; CLAUDE.md 39,997 -> 35,971 B; ops/autonomous/resume-prompt.txt 30,610 -> 28,301 B. Reference
+  detail moved verbatim, under its original headings, to a REFERENCE.md beside each guide (root, Processor, Notes,
+  Reader), each guide ending in a "Reference (read on demand)" index so old "CLAUDE.md §X" pointers resolve; each
+  REFERENCE.md says it never relaxes a guide rule and a stricter statement there binds. check-policy-coherence.sh
+  reads all four. The prompt lost its queue-picking (STEP 2) and review-cadence (STEP 2.0) steps, which the engine
+  assignment overrides; what still binds an assigned item stays as STEP 2, and STEP 1.5 is now the doc-fix/gate-fix
+  assignments with the engine's file names and no delete step.
+  Rules: each app rewrite wrote a ledger of every rule in the original with where it went (Processor 198, Reader
+  127, Notes 86); an Opus adversarial reviewer per guide, plus one for the root guide and prompt, walked the original
+  against the ledger and the new files. None found a rule deleted from both files; they found rules left only in
+  REFERENCE.md or weakened (Processor 34 incl. 10 serious on Capture/Net/tagging/signing, Notes ~30 code invariants,
+  Reader 17 why-clauses and guardrails, root+prompt 21). All were restored, which is why the Processor guide sits
+  ~2 KB over the 20 KB target: rules took precedence over the number. The ledgers and reviews are in the session
+  transcript, not the repo.
+  Measured first-call context, the same probe run three times on each tree (rendered engine-style prompt, then one
+  Read in each app's folder so Claude Code loads that app's guide; claude -p, Opus, no memory index in either):
+  before (fa51fc3f) [58,312 -> 88,404 -> 112,309 -> 131,962] tokens, identical on all three runs; after (07008337)
+  [55,671 -> 65,021 -> 70,682 -> 78,427]. First call -2,641; touching the Processor +9.3k instead of +30.1k; all three
+  apps 78k instead of 132k (-41%). Real engine sessions measured 56,028-56,090 on first call before (three on
+  2026-10-29); W40.token-pass's audit measures them after.
+  Budgets (context-budget.sh): app guides 24000 each (was 77000); CLAUDE.md 40000 (was 34000, already exceeded at
+  39,997); ORIENT_TOTAL 455000 (was 500000), 16 KB under the per-file sum, actual 417,426 B. These are the figures
+  W40.token-pass should use.
+  <!-- /W40.docs-startup-size -->
