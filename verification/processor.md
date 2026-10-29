@@ -986,11 +986,14 @@ cover the Mac: the receiver, the tag card, the drain gate, staging, finalize and
   quality).
 - **Runtime evidence:** 2026-10-21 · W40.d5 · [`evidence/processor/W40.d5-live-capture.md`](evidence/processor/W40.d5-live-capture.md): with Copy source file tags, the typed subject, typed year and
   picked Q2 landed as `W40d5 Dean Alpha`, `1973`, `Q2` on their PDF, a skipped card's PDF carried none. With Apple
-  Vision's default No tagging the same card values were written nowhere.
-- **Status:** `broken` — `W40.fix-live-vision-drops-card-tags` (S2).
+  Vision's default No tagging the same card values were written nowhere. 2026-10-29 · W40.fix-live-vision-drops-card-tags
+  · same file, run 6: in the default No tagging the same cards gave `1973`, `W40d5 Dean Alpha`, `Q2` / none /
+  `W40d5 Dean Bravo`, with no Unread and no colour.
+- **Status:** `works`.
 - **History:**
   - 2026-10-21 W40.b3 — row written, `unproven`.
   - 2026-10-21 W40.d5 — `broken`: works in Copy source mode, the card's tags are dropped in No tagging.
+  - 2026-10-29 W40.fix-live-vision-drops-card-tags — `works`: No tagging writes what a person set, never a generated tag.
 - **Notes:** **Drift.** "Fully keyboard-driven": ⏎ on an empty field saves (`Views/LiveCaptureView.swift:1086-1089`),
   but Skip has no keyboard route and esc only clears the draft (`:1102-1107`). S-021 (Android relay) can stop a card
   appearing.
