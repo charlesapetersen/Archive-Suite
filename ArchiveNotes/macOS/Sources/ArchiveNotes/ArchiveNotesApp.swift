@@ -64,6 +64,7 @@ struct ArchiveNotesApp: App {
             SourceBlockCommands()
             ZoteroCommands()
             ExtractCommands()
+            LayoutCommands()
             #if DEBUG
             DebugBlockCommands()
             #endif

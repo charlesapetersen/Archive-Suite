@@ -71,6 +71,24 @@ struct ReaderRootCommands: Commands {
     }
 }
 
+/// View menu: side by side, or the list above the note (W48.notes-stacked-layout). Both windows follow the
+/// one remembered choice; `NotesBrowserView` reads the same key.
+struct LayoutCommands: Commands {
+    @AppStorage(NotesLayoutSettingsKey.layoutMode) private var layoutMode: NotesLayoutMode = .sideBySide
+
+    var body: some Commands {
+        CommandGroup(before: .toolbar) {
+            Picker("Layout", selection: $layoutMode) {
+                ForEach(NotesLayoutMode.allCases, id: \.self) { mode in
+                    Text(mode.title).tag(mode)
+                }
+            }
+            .pickerStyle(.inline)
+            Divider()
+        }
+    }
+}
+
 /// Edit-menu additions: paste archive links as source blocks.
 struct SourceBlockCommands: Commands {
     @FocusedValue(\.formattingContext) private var formatting

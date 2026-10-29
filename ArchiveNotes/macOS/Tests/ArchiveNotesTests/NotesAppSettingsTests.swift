@@ -199,4 +199,45 @@ struct NotesAppSettingsTests {
             #expect(DetailPaneLayout.metadataMaxHeight(paneHeight: h) <= h / 2)
         }
     }
+
+    // MARK: stacked layout (W48.notes-stacked-layout)
+
+    @Test func layoutModeDefaultsToSideBySideAndRoundTrips() {
+        let d = scratchDefaults()
+        #expect(NotesLayoutSettings(reading: d).layoutMode == .sideBySide)
+        #expect(NotesLayoutSettings(reading: d).listHeight == NotesLayoutSettings.defaultListHeight)
+        // `@AppStorage` stores the enum's raw value under the same key the settings read.
+        d.set(NotesLayoutMode.stacked.rawValue, forKey: NotesLayoutSettingsKey.layoutMode)
+        #expect(NotesLayoutSettings(reading: d).layoutMode == .stacked)
+        d.set("diagonal", forKey: NotesLayoutSettingsKey.layoutMode)   // foreign value → the default
+        #expect(NotesLayoutSettings(reading: d).layoutMode == .sideBySide)
+    }
+
+    @Test func layoutModeKeysAreDistinctAndPrefixed() {
+        let keys = [NotesLayoutSettingsKey.layoutMode, NotesLayoutSettingsKey.listHeight]
+        #expect(keys == ["an.layoutMode", "an.listHeight"])
+        let others = [NotesLayoutSettingsKey.windowW, NotesLayoutSettingsKey.windowH, NotesLayoutSettingsKey.treeWidth,
+                      NotesLayoutSettingsKey.detailWidth, NotesLayoutSettingsKey.showTree,
+                      NotesLayoutSettingsKey.metadataCollapsed]
+        #expect(Set(keys).isDisjoint(with: others))
+        #expect(NotesLayoutMode.allCases.map(\.title) == ["Side by Side", "List Above Note"])
+    }
+
+    @Test func listHeightClampsLikeTheWidths() {
+        let d = scratchDefaults()
+        d.set(10.0, forKey: NotesLayoutSettingsKey.listHeight)
+        #expect(NotesLayoutSettings(reading: d).listHeight == NotesLayoutSettings.listHeightMin)
+        d.set(5000.0, forKey: NotesLayoutSettingsKey.listHeight)
+        #expect(NotesLayoutSettings(reading: d).listHeight == NotesLayoutSettings.listHeightMax)
+        d.set(300.0, forKey: NotesLayoutSettingsKey.listHeight)
+        #expect(NotesLayoutSettings(reading: d).listHeight == 300)
+        // The view lays out through the same clamp, and a non-number never becomes a height.
+        #expect(NotesLayoutSettings.clampedListHeight(-1) == NotesLayoutSettings.listHeightMin)
+        #expect(NotesLayoutSettings.clampedListHeight(.nan) == NotesLayoutSettings.defaultListHeight)
+        #expect(NotesLayoutSettings.clampedListHeight(.infinity) == NotesLayoutSettings.defaultListHeight)
+        #expect(NotesLayoutSettings.listHeightRange == 140...440)
+        #expect(NotesLayoutSettings.listHeightRange.contains(CGFloat(NotesLayoutSettings.defaultListHeight)))
+        // At its tallest the list still leaves the note its floor inside a laptop-height window.
+        #expect(NotesLayoutSettings.listHeightMax + 7 + NotesLayoutSettings.stackedDetailMinHeight < 800)
+    }
 }

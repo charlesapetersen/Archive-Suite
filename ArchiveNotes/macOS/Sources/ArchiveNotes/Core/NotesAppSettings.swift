@@ -25,6 +25,19 @@ enum NotesLayoutSettingsKey {
     static let extractWindowHiddenColumns = "an.extractWindow.hiddenColumns"
     /// The detail pane's metadata inspector folded away (W40.fix-notes-editor-squeezed), shared by both windows.
     static let metadataCollapsed = "an.detail.metadataCollapsed"
+    /// Side by side or list above note (W48.notes-stacked-layout), shared by both windows; a `NotesLayoutMode` raw value.
+    static let layoutMode = "an.layoutMode"
+    /// The item list's height in the stacked layout (W48.notes-stacked-layout).
+    static let listHeight = "an.listHeight"
+}
+
+/// How the browser arranges the item list and the note (W48.notes-stacked-layout). The folder tree stays on the
+/// left in both; `stacked` puts the list above the note with a horizontal divider between them.
+enum NotesLayoutMode: String, CaseIterable, Sendable {
+    case sideBySide, stacked
+
+    /// The View menu's name for the mode.
+    var title: String { self == .stacked ? "List Above Note" : "Side by Side" }
 }
 
 /// How much of the detail pane's height the metadata inspector may take (W40.fix-notes-editor-squeezed).
@@ -54,15 +67,29 @@ struct NotesLayoutSettings: Equatable, Sendable {
     var detailWidth: Double
     var showTree: Bool
     var hiddenColumns: Set<String>
+    var layoutMode: NotesLayoutMode
+    var listHeight: Double
 
     static let defaultTreeWidth = 220.0,  treeWidthMin = 160.0,  treeWidthMax = 400.0
     static let defaultDetailWidth = 360.0, detailWidthMin = 260.0, detailWidthMax = 700.0
+    /// The stacked list keeps its filter bar, header and a few rows; at the top of its range the note below still
+    /// gets `stackedDetailMinHeight`, so the window stays shorter than a laptop screen.
+    static let defaultListHeight = 240.0, listHeightMin = 140.0, listHeightMax = 440.0
+    /// The note pane's floor in the stacked layout, for its header, inspectors and some editor.
+    static let stackedDetailMinHeight = 300.0
     /// A saved window dimension below this is treated as "unset" (guards a zero/garbage frame).
     static let windowFloor = 200.0
 
     /// The divider clamp ranges, as `CGFloat` for `PanelDivider` (the layout's single source of truth).
     static var treeWidthRange: ClosedRange<CGFloat> { CGFloat(treeWidthMin)...CGFloat(treeWidthMax) }
     static var detailWidthRange: ClosedRange<CGFloat> { CGFloat(detailWidthMin)...CGFloat(detailWidthMax) }
+    static var listHeightRange: ClosedRange<CGFloat> { CGFloat(listHeightMin)...CGFloat(listHeightMax) }
+
+    /// The stacked list height to lay out with: a stored value outside the divider's range, or not a number,
+    /// lands inside it, so a corrupt key cannot hide the list or the note.
+    static func clampedListHeight(_ h: Double) -> Double {
+        h.isFinite ? min(listHeightMax, max(listHeightMin, h)) : defaultListHeight
+    }
 
     /// Read + validate from a defaults store (point-of-use).
     init(reading d: UserDefaults) {
@@ -78,6 +105,11 @@ struct NotesLayoutSettings: Equatable, Sendable {
 
         showTree = d.object(forKey: NotesLayoutSettingsKey.showTree) as? Bool ?? true
         hiddenColumns = Set(d.stringArray(forKey: NotesLayoutSettingsKey.hiddenColumns) ?? [])
+
+        layoutMode = d.string(forKey: NotesLayoutSettingsKey.layoutMode).flatMap(NotesLayoutMode.init(rawValue:))
+            ?? .sideBySide
+        listHeight = Self.clampedListHeight(d.object(forKey: NotesLayoutSettingsKey.listHeight) as? Double
+            ?? Self.defaultListHeight)
     }
 }
 

@@ -12,6 +12,11 @@ import AppKit
 ///
 /// Persistence (W6-S1): panel widths + tree-visibility survive relaunch via `@AppStorage`; window size
 /// via `NotesAppSettings`; hidden item-list columns via `NotesAppSettings.hiddenColumns` (W6-S3).
+///
+/// Two layouts (W48.notes-stacked-layout, View menu): side by side, or the list above the note with a horizontal
+/// divider. The tree stays on the left in both. The list, divider and detail sit in one `AnyLayout`, so a switch
+/// changes only how they are arranged: the editor is not rebuilt, and its selection, unsaved text and scroll
+/// position stay.
 struct NotesBrowserView: View {
     /// The shared UI façade (folder tree + scope + item source), passed from the app.
     @ObservedObject private var model: NotesModel
@@ -21,6 +26,8 @@ struct NotesBrowserView: View {
     @AppStorage(NotesLayoutSettingsKey.showTree)    private var showingTree = true
     @AppStorage(NotesLayoutSettingsKey.treeWidth)   private var treeWidth   = NotesLayoutSettings.defaultTreeWidth
     @AppStorage(NotesLayoutSettingsKey.detailWidth) private var detailWidth = NotesLayoutSettings.defaultDetailWidth
+    @AppStorage(NotesLayoutSettingsKey.layoutMode)  private var layoutMode: NotesLayoutMode = .sideBySide
+    @AppStorage(NotesLayoutSettingsKey.listHeight)  private var listHeight  = NotesLayoutSettings.defaultListHeight
 
     @State private var window: NSWindow?
     @State private var didConfigureWindow = false
@@ -40,17 +47,26 @@ struct NotesBrowserView: View {
                 NotesFolderTreeView(model: model, nav: nav)
                     .frame(width: treeWidth)
                     .transition(.move(edge: .leading))
-                PanelDivider(width: $treeWidth, panelOnLeft: true,
+                PanelDivider(size: $treeWidth, panelBefore: true,
                              range: NotesLayoutSettings.treeWidthRange, label: "Folder list width",
                              id: "an.divider.tree")
             }
-            ItemListPane(model: model, nav: nav, selectedTemplateID: $selectedTemplateID)
-                .frame(minWidth: 540, maxWidth: .infinity, maxHeight: .infinity)
-            PanelDivider(width: $detailWidth, panelOnLeft: false,
-                         range: NotesLayoutSettings.detailWidthRange, label: "Detail pane width",
-                         id: "an.divider.detail")
-            DetailPane(nav: nav, selectedTemplateID: $selectedTemplateID)
-                .frame(width: detailWidth)
+            let stacked = layoutMode == .stacked
+            let panes = stacked ? AnyLayout(VStackLayout(spacing: 0)) : AnyLayout(HStackLayout(spacing: 0))
+            panes {
+                ItemListPane(model: model, nav: nav, selectedTemplateID: $selectedTemplateID)
+                    .frame(minWidth: 540, maxWidth: .infinity, maxHeight: .infinity)
+                    .frame(height: stacked ? NotesLayoutSettings.clampedListHeight(listHeight) : nil)
+                PanelDivider(size: stacked ? $listHeight : $detailWidth, panelBefore: stacked,
+                             axis: stacked ? .vertical : .horizontal,
+                             range: stacked ? NotesLayoutSettings.listHeightRange : NotesLayoutSettings.detailWidthRange,
+                             label: stacked ? "Item list height" : "Detail pane width",
+                             id: stacked ? "an.divider.list" : "an.divider.detail")
+                DetailPane(nav: nav, selectedTemplateID: $selectedTemplateID)
+                    .frame(width: stacked ? nil : detailWidth)
+                    .frame(minHeight: stacked ? NotesLayoutSettings.stackedDetailMinHeight : nil,
+                           maxHeight: stacked ? .infinity : nil)
+            }
         }
         // The list needs 527 pt for its fixed filter controls in the VM; reserve 540 so its
         // minimum proposal agrees with what it actually draws. Without that floor SwiftUI reports
