@@ -280,8 +280,8 @@ footer p { font-size: 13px; }
 
   <section class="panel" id="date-traceable" hidden>
     <div class="head"><h2>A staged pipeline against one shot</h2><span class="meta">the owner's 300 · evidence checked · W46.date-traceable</span></div>
-    <div class="tbl"><table><thead><tr><th>Configuration</th><th>Year exact</th><th>Printed in the text</th><th>Not in the text</th><th>Neighbour within three (A, A', B)</th><th>Far or none (C, D)</th><th>Evidence valid / unsupported</th><th>27B GPU-seconds per 1,000</th></tr></thead><tbody id="date-traceable-rows"></tbody></table></div>
-    <p class="note">Rule candidates from the text, each with its line; where the rule is not sure, a chooser (the 2B's own reply when it names a candidate, or Qwen3.6 27B picking a numbered candidate); a document that prints no date takes the year of the nearest earlier one that does, when that is at most t documents back; the rest go to Qwen3.6 27B with a prompt that asks for the year, an interval, Date Uncertain and a quote from a named document, which is then checked against the text it was given. A quote of a two-digit date ("8/31/67") fails the check, which needs the four-digit year. All free on FarmShare and the Mac; the Gemini arm is W46.date-traceable-paid. Full tables, conformal coverage and the public set: <code>ArchiveProcessor/segbench-results/date-traceable.md</code>.</p>
+    <div class="tbl"><table><thead><tr><th>Configuration</th><th>Year exact</th><th>Printed in the text</th><th>Not in the text</th><th>Neighbour within three (A, A', B)</th><th>Far or none (C, D)</th><th>Evidence valid / unsupported</th><th>Per 1,000 documents: 27B GPU-seconds, or Gemini dollars (estimate)</th></tr></thead><tbody id="date-traceable-rows"></tbody></table></div>
+    <p class="note">Rule candidates from the text, each with its line; where the rule is not sure, a chooser (the 2B's own reply when it names a candidate, or Qwen3.6 27B picking a numbered candidate); a document that prints no date takes the year of the nearest earlier one that does, when that is at most t documents back; the rest go to Qwen3.6 27B with a prompt that asks for the year, an interval, Date Uncertain and a quote from a named document, which is then checked against the text it was given. A quote of a two-digit date ("8/31/67") fails the check, which needs the four-digit year. The 27B rows are free on FarmShare and the Mac. The Gemini 3.7 Flash rows (W46.date-traceable-paid) ran through the Stanford AI API gateway at about $2.90 per 1,000 replies, an estimate at 3.8's list price; the gateway serves no 3.8, so the app-prompt Gemini row is 3.8 on OpenRouter. A Gemini trace one shot was asked only of the 131 not in the text. Full tables, conformal coverage and the public set: <code>ArchiveProcessor/segbench-results/date-traceable.md</code>.</p>
   </section>
 
   <section class="panel" id="date-reread" hidden>
@@ -831,7 +831,7 @@ if (DTR && DTR.rows.length) {
     '</td><td>' + pct(r.exact['all year-tagged']) + '</td><td>' + pct(r.exact['in text']) + '</td><td>' + pct(r.exact['not in text']) +
     '</td><td>' + pct(r.exact["A+A'+B"]) + '</td><td>' + pct(r.exact['C+D']) + '</td><td>' +
     (r.valid || r.unsupported ? r.valid + ' / ' + r.unsupported : 'none asked') + '</td><td>' +
-    (r.gpu_s_1000 == null ? '–' : Math.round(r.gpu_s_1000).toLocaleString()) + '</td></tr>').join('');
+    (r.usd_1000 != null ? '$' + r.usd_1000.toFixed(2) : r.gpu_s_1000 == null ? '–' : Math.round(r.gpu_s_1000).toLocaleString()) + '</td></tr>').join('');
   document.getElementById('date-traceable').hidden = false;
 }
 if (DTR && DTR.reread && DTR.reread.length) {

@@ -13260,3 +13260,18 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   oversized results were persisted to file (a 1.07M-char git diff), and step-1 recovery greps of SUITE_TODO.md return
   21-29k characters because entries are one long line each.
   <!-- /W40.token-pass -->
+- [x] **W46.date-traceable-paid — Gemini on the class C and D residue [S]** · §Document processing review — W46 (owner, 2026-10-20) (lane: segbench) (uses: light,paid) (blocked-on: W46.date-traceable, W46.gateway-models-ok) — The gateway arm of W46.date-traceable, three variants, about $1.60; the stated-confidence rerun dropped or in batch. detail: execution-plans/processing-review/10-gap-audit.md §5 item 14. SHIPPED 2026-10-29.
+  - `date_traceable_gateway.py` (run / score) and `test_date_traceable_gateway.py` (3 tests); results
+    `segbench-results/date-traceable-paid.md` and `.json`; ArchiveOCRBench's "A staged pipeline against one shot" panel
+    gains the Gemini rows and a dollars-per-1,000 column. Gemini 3.7 Flash on the Stanford gateway (no 3.8 there),
+    temperature 0, reasoning low, text only; replies in the private bench cache `date-tagging/traceable/gateway/`.
+  - Spend: about $1.39 (estimate at 3.8's list price as a ceiling) for 483 replies, 161 documents (every one the rules
+    leave undated plus every one whose year is not in the corpus text) by three trace variants; 0 errors, all parsed.
+    $2.88 per 1,000 replies. Stated-confidence rerun dropped (the trace prompt's 90% interval is what conformal reads).
+  - On the 131 not in text: Gemini trace-neigh 61.8%, plain 58.0%, shots 57.3% (3.8 app prompt 63.4%; the 27B
+    42.7-45.8%). Neighbour dates help A'/B and hurt C+D (44.6% -> 39.3%; app prompt 51.8%); shots add nothing.
+    Citations 86 valid / 45 unsupported (27B 65 / 61); conformal width about 4 years (27B 10-16).
+  - Staged with Gemini as the residue: t=0 49.6%, t=3 38.9% of the 131, against 61.8% one shot; at t=0 the loss is all
+    the rule stage (37 of the 131 print another year; rule right on 2, Gemini on 19). For the Gemini profile, one shot.
+    Public set not sent: the trace-neigh/shots variants and the C/D residue exist only on the owner's set.
+  <!-- /W46.date-traceable-paid -->

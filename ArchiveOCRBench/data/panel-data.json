@@ -13904,6 +13904,288 @@
     ],
     "gpu_s_1000": 146.2,
     "mac_s_1000": 0.0
+   },
+   {
+    "kind": "one shot",
+    "name": "Gemini 3.7 Flash (gateway), trace-plain, on the 131 not in the text",
+    "exact": {
+     "all year-tagged": null,
+     "in text": null,
+     "A+A'+B": [
+      51,
+      75
+     ],
+     "C+D": [
+      25,
+      56
+     ],
+     "not in text": [
+      76,
+      131
+     ]
+    },
+    "valid": 78,
+    "unsupported": 50,
+    "invalid": [
+     3,
+     131
+    ]
+   },
+   {
+    "kind": "one shot",
+    "name": "Gemini 3.7 Flash (gateway), trace-neigh, on the 131 not in the text",
+    "exact": {
+     "all year-tagged": null,
+     "in text": null,
+     "A+A'+B": [
+      59,
+      75
+     ],
+     "C+D": [
+      22,
+      56
+     ],
+     "not in text": [
+      81,
+      131
+     ]
+    },
+    "valid": 86,
+    "unsupported": 45,
+    "invalid": [
+     0,
+     131
+    ]
+   },
+   {
+    "kind": "one shot",
+    "name": "Gemini 3.7 Flash (gateway), trace-shots, on the 131 not in the text",
+    "exact": {
+     "all year-tagged": null,
+     "in text": null,
+     "A+A'+B": [
+      52,
+      75
+     ],
+     "C+D": [
+      23,
+      56
+     ],
+     "not in text": [
+      75,
+      131
+     ]
+    },
+    "valid": 76,
+    "unsupported": 52,
+    "invalid": [
+     3,
+     131
+    ]
+   },
+   {
+    "kind": "pipeline",
+    "name": "2B chooser, Gemini 3.7 trace-plain, t=0",
+    "exact": {
+     "all year-tagged": [
+      175,
+      250
+     ],
+     "in text": [
+      113,
+      119
+     ],
+     "A+A'+B": [
+      44,
+      75
+     ],
+     "C+D": [
+      18,
+      56
+     ],
+     "not in text": [
+      62,
+      131
+     ]
+    },
+    "valid": 246,
+    "unsupported": 49,
+    "invalid": [
+     5,
+     300
+    ],
+    "gpu_s_1000": null,
+    "usd_1000": 1.19
+   },
+   {
+    "kind": "pipeline",
+    "name": "2B chooser, Gemini 3.7 trace-plain, t=3",
+    "exact": {
+     "all year-tagged": [
+      161,
+      250
+     ],
+     "in text": [
+      113,
+      119
+     ],
+     "A+A'+B": [
+      40,
+      75
+     ],
+     "C+D": [
+      8,
+      56
+     ],
+     "not in text": [
+      48,
+      131
+     ]
+    },
+    "valid": 279,
+    "unsupported": 19,
+    "invalid": [
+     2,
+     300
+    ],
+    "gpu_s_1000": null,
+    "usd_1000": 0.18
+   },
+   {
+    "kind": "pipeline",
+    "name": "2B chooser, Gemini 3.7 trace-neigh, t=0",
+    "exact": {
+     "all year-tagged": [
+      178,
+      250
+     ],
+     "in text": [
+      113,
+      119
+     ],
+     "A+A'+B": [
+      49,
+      75
+     ],
+     "C+D": [
+      16,
+      56
+     ],
+     "not in text": [
+      65,
+      131
+     ]
+    },
+    "valid": 255,
+    "unsupported": 44,
+    "invalid": [
+     1,
+     300
+    ],
+    "gpu_s_1000": null,
+    "usd_1000": 1.19
+   },
+   {
+    "kind": "pipeline",
+    "name": "2B chooser, Gemini 3.7 trace-neigh, t=3",
+    "exact": {
+     "all year-tagged": [
+      164,
+      250
+     ],
+     "in text": [
+      113,
+      119
+     ],
+     "A+A'+B": [
+      42,
+      75
+     ],
+     "C+D": [
+      9,
+      56
+     ],
+     "not in text": [
+      51,
+      131
+     ]
+    },
+    "valid": 281,
+    "unsupported": 19,
+    "invalid": [
+     0,
+     300
+    ],
+    "gpu_s_1000": null,
+    "usd_1000": 0.18
+   },
+   {
+    "kind": "pipeline",
+    "name": "2B chooser, Gemini 3.7 trace-shots, t=0",
+    "exact": {
+     "all year-tagged": [
+      173,
+      250
+     ],
+     "in text": [
+      113,
+      119
+     ],
+     "A+A'+B": [
+      44,
+      75
+     ],
+     "C+D": [
+      16,
+      56
+     ],
+     "not in text": [
+      60,
+      131
+     ]
+    },
+    "valid": 245,
+    "unsupported": 50,
+    "invalid": [
+     5,
+     300
+    ],
+    "gpu_s_1000": null,
+    "usd_1000": 1.19
+   },
+   {
+    "kind": "pipeline",
+    "name": "2B chooser, Gemini 3.7 trace-shots, t=3",
+    "exact": {
+     "all year-tagged": [
+      162,
+      250
+     ],
+     "in text": [
+      113,
+      119
+     ],
+     "A+A'+B": [
+      40,
+      75
+     ],
+     "C+D": [
+      9,
+      56
+     ],
+     "not in text": [
+      49,
+      131
+     ]
+    },
+    "valid": 277,
+    "unsupported": 21,
+    "invalid": [
+     2,
+     300
+    ],
+    "gpu_s_1000": null,
+    "usd_1000": 0.18
    }
   ],
   "vision": {

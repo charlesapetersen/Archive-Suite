@@ -47,6 +47,7 @@ KIND_CLASSIFIER = RESULTS / "kind-classifier.json"  # W41.bench-kind-classifier:
 DATING = RESULTS / "date-tagging.json"  # W41.date-tag-measure: date_tagging.py score
 DATING_PUBLIC = RESULTS / "date-tagging-public.json"
 DATING_TRACEABLE = RESULTS / "date-traceable.json"  # W46.date-traceable: date_traceable.py score
+DATING_TRACEABLE_PAID = RESULTS / "date-traceable-paid.json"  # W46.date-traceable-paid: date_traceable_gateway.py score
 DATING_ENCLOSURE = RESULTS / "date-enclosure.json"  # W46.date-enclosure: date_enclosure.py score
 PUBLIC = RESULTS / "bench-corpus"  # W43.corpus-build: corpus/routes.py report, the public strata
 OCR_SCORERS = RESULTS / "ocr-scorers.json"  # W46.fix-ocr-scorers: ocr_rescore.py, every cached reading re-scored
@@ -133,6 +134,20 @@ def dating_traceable():
         if setname == "owner" and t in ("t=0", "t=3"):
             rows.append({"kind": "pipeline", "name": f"{chooser}, {residue}, {t}", **cut(s),
                          "gpu_s_1000": s["per_1000"]["gpu_s"], "mac_s_1000": s["per_1000"]["mac_s"]})
+    if DATING_TRACEABLE_PAID.exists():
+        # Gemini 3.7 Flash on the gateway: its one-shot rows were asked only for the 131 not in the text, so the
+        # columns over all year-tagged and printed documents are left empty rather than read on a subset
+        p = json.loads(DATING_TRACEABLE_PAID.read_text())
+        for k, s in p["one_shot"].items():
+            if k.startswith("Gemini 3.7"):
+                c = cut(s)
+                c["exact"].update({"all year-tagged": None, "in text": None})
+                rows.append({"kind": "one shot", "name": k + ", on the 131 not in the text", **c})
+        for k, s in p["pipeline"].items():
+            chooser, residue, t = k.split("|")
+            if residue.startswith("Gemini") and t in ("t=0", "t=3"):
+                rows.append({"kind": "pipeline", "name": f"{chooser}, {residue}, {t}", **cut(s), "gpu_s_1000": None,
+                             "usd_1000": round(1000 * p["usd_per_reply"] * s["residue_calls"] / s["n"], 2)})
     va = d.get("vision_arms") or {}
     reread = [{"name": k, "corpus": cut(c["corpus"]), "reread": cut(c["reread"]),
                "gpu_s_1000": (c.get("per_1000") or {}).get("gpu_s")} for k, c in (va.get("configs") or {}).items()]
