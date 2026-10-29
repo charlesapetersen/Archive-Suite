@@ -27,7 +27,10 @@ Step two, readings placed on the lines (every detector, so the pick is visible, 
             lines are matched to them by the same programme on character error instead of length, and each
             matched line's text is placed by kraken's `ForcedAlignmentTaskModel` (character cuts along the
             baseline); a line it cannot align falls back to proportional. Models: `revcity` (zenodo 19238205, an
-            English 18th-century archival hand) and `mccatmus` (McCATMuS, zenodo 13788177, 16th-21st c.).
+            English 18th-century archival hand) and `mccatmus` (McCATMuS, zenodo 13788177, 16th-21st c.). The
+            alignment runs on the recogniser's logits (see ctc_char_spans: kraken 7.1.1's own cut positions are
+            wrong); word boxes take the line's height as `prop` does, so the two differ only in where along the
+            line each word falls.
 
 Readings: `truth` (the line-broken truth text itself: what the geometry and the aligner lose with a perfect
 reader), `lightonocr3-4b` (FarmShare's saved readings, both groups) and `gemini3.8-flash` (the cloud panel's,
@@ -428,65 +431,99 @@ def place_flow(t, det, rl):
     return hyp_page(assigned, dl, W, H, lambda j, s: prop_words(s, dl[j], W, H))
 
 
+def ctc_char_spans(net, logits, text, pad):
+    """Each character of `text` as a (start, end) fraction of the line, by CTC forced alignment over the
+    recogniser's own output. kraken.tasks.align's trellis and backtrack, but the frames are scaled to the line as
+    kraken's recogniser scales its own cuts. ForcedAlignmentTaskModel.predict in kraken 7.1.1 packs the text at the
+    line's start (p049's first line ends at 264 px where its recognition ends at 1307): it takes log_softmax of
+    record.logits, which are already probabilities, so every frame is near uniform. A character the model's codec lacks takes its place between its neighbours.
+    None when the line is too short for the text (kraken's own guard: fewer than two frames a label)."""
+    from kraken.tasks.align import get_trellis, backtrack, merge_repeats
+    keep = [k for k, c in enumerate(text) if c in net.codec.c2l]
+    if not keep:
+        return None
+    sub = ''.join(text[k] for k in keep)
+    labels = net.codec.encode(sub).long()
+    logits = logits.detach().float().cpu()
+    T = logits.shape[-1]
+    if len(labels) != len(sub) or T < 2 * len(labels):
+        return None
+    # kraken's `logits` are the softmax output (each frame sums to 1); log_softmax over them, as
+    # tasks/align.py does, flattens every frame and the path packs the text at the line's start
+    emission = logits.squeeze().clamp_min(1e-12).log().T
+    segs = merge_repeats(backtrack(get_trellis(emission, labels), emission, labels), sub)
+    if len(segs) != len(sub):
+        return None
+    win = T * net.net_scale
+    frac = lambda f: max(0.0, min(1.0, (f * net.net_scale - pad) / max(1.0, win - 2 * pad)))
+    spans = [None] * len(text)
+    for k, sg in zip(keep, segs):
+        spans[k] = (frac(sg.start), frac(sg.end))
+    for k in range(len(text)):  # unencodable characters: between the known neighbours
+        if spans[k] is None:
+            prev = next((spans[i][1] for i in range(k - 1, -1, -1) if spans[i]), 0.0)
+            nxt = next((spans[i][0] for i in range(k + 1, len(text)) if spans[i]), 1.0)
+            spans[k] = (prev, max(prev, nxt))
+    return spans
+
+
 def place_ctc(model_name, todo, det_name, routes):
-    """Runs under the kraken venv: recognise each detected line, match the reading's lines to them by character
-    error, force-align each matched line's text; one recognition pass per page shared by every reading."""
+    """Runs under the kraken venv: recognise each detected line once (text, logits and line image), match the
+    reading's lines to the recognised ones by character error, and force-align each matched line's text on its
+    logits; every reading of the page shares the one recognition pass."""
     from PIL import Image
     from kraken.containers import Segmentation, BaselineLine
     from kraken.configs import RecognitionInferenceConfig
-    from kraken.tasks import RecognitionTaskModel, ForcedAlignmentTaskModel
-    rec = RecognitionTaskModel.load_model(MODELS[model_name])
-    ali = ForcedAlignmentTaskModel.load_model(MODELS[model_name])
+    from kraken.tasks import ForcedAlignmentTaskModel
+    net = ForcedAlignmentTaskModel.load_model(MODELS[model_name]).net
+    cfg = RecognitionInferenceConfig()
+    cfg.return_logits = True
+    cfg.return_line_image = True
+    net.prepare_for_inference(cfg)
     for t in todo:
         det = json.loads((CACHE / 'lines' / det_name / f'{key(t)}.json').read_text())
         W, H = t['width'], t['height']
         dl = px_lines(det, W, H)
         im = Image.open(t['image'])
 
-        def kline(d, text=None):
+        def kline(d):
             bd = d['boundary'] or [(x, y - FRAC * d['h']) for x, y in d['baseline']] + \
                 [(x, y + (1 - FRAC) * d['h']) for x, y in d['baseline'][::-1]]
             return BaselineLine(id=None, baseline=[tuple(map(int, p)) for p in d['baseline']],
-                                boundary=[tuple(map(int, p)) for p in bd], text=text)
+                                boundary=[tuple(map(int, p)) for p in bd])
         usable = [j for j, d in enumerate(dl) if len(d['baseline']) >= 2]
         t0 = time.time()
-        seg = Segmentation(type='baselines', imagename=t['image'], text_direction='horizontal-lr', script_detection=False,
-                           lines=[kline(dl[j]) for j in usable])
-        recog = {j: r.prediction for j, r in zip(usable, rec.predict(im, seg, RecognitionInferenceConfig()))}
+        seg = Segmentation(type='baselines', imagename=t['image'], text_direction='horizontal-lr',
+                           script_detection=False, lines=[kline(dl[j]) for j in usable])
+        recs = dict(zip(usable, net.predict(im=im, segmentation=seg)))
+        recog = {j: r.prediction for j, r in recs.items()}
         rsec = time.time() - t0
         for route in routes:
             rl = reading(t, route)
             out = CACHE / 'hyp' / f'{det_name}.ctc-{model_name}.{route}' / f'{key(t)}.json'
-            if rl is None or out.exists():
+            if rl is None:
                 continue
             cost = lambda i, j: min(1.0, place_score.cer(recog.get(j, ''), rl[i]))
             m = dp_match(len(rl), len(dl), cost, SKIP['text'])
             assigned = {j: rl[i] for i, j in m.items()}
-            todo_j = [j for j in assigned if j in recog]
             t1 = time.time()
-            aseg = Segmentation(type='baselines', imagename=t['image'], text_direction='horizontal-lr',
-                                script_detection=False, lines=[kline(dl[j], assigned[j]) for j in todo_j])
-            cuts = {}
-            for j, r in zip(todo_j, ali.predict(im, aseg, RecognitionInferenceConfig()).lines):
-                cuts[j] = r
             fallback = 0
 
             def words_of(j, text):
                 nonlocal fallback
-                r = cuts.get(j)
-                pred = getattr(r, 'prediction', '') if r is not None else ''
-                if not pred.strip():
+                r = recs.get(j)
+                spans = ctc_char_spans(net, r.logits, text, cfg.padding) if r is not None and r.logits is not None else None
+                if spans is None:
                     fallback += 1
                     return prop_words(text, dl[j], W, H)
-                same = pred == text
-                ws = []
-                for mt in re.finditer(r'\S+', pred):
-                    _, poly, _ = r[mt.start():mt.end()]
-                    x, y, w, h = bbox([tuple(p) for p in poly])
-                    ws.append({'text': mt.group(), 'box': [x / W, y / H, max(w, 1) / W, max(h, 1) / H]})
-                if same:  # the cut text is the given text: keep its words (it differs only where the codec
-                    for w, s in zip(ws, text.split()):  # dropped a character)
-                        w['text'] = s
+                d, ws = dl[j], []
+                for mt in re.finditer(r'\S+', text):
+                    s0, s1 = spans[mt.start()][0] * d['len'], spans[mt.end() - 1][1] * d['len']
+                    a_, b_ = at(d['baseline'], s0), at(d['baseline'], max(s1, s0 + 1))
+                    top = min(a_[1], b_[1]) - FRAC * d['h']
+                    bot = max(a_[1], b_[1]) + (1 - FRAC) * d['h']
+                    x0, x1 = min(a_[0], b_[0]), max(a_[0], b_[0])
+                    ws.append({'text': mt.group(), 'box': [x0 / W, top / H, max(x1 - x0, 1) / W, (bot - top) / H]})
                 return ws
             hyp = hyp_page(assigned, dl, W, H, words_of)
             hyp['meta'] = {'recognise_s': rsec, 'align_s': time.time() - t1, 'matched_lines': len(assigned),
