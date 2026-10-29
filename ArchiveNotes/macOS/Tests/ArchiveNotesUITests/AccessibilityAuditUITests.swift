@@ -8,6 +8,9 @@ import XCTest
 final class AccessibilityAuditUITests: NotesFixtureUITestCase {
 
     private var dark = false
+    /// W48.notes-stacked-layout: every screen is audited in both layouts.
+    private var layout = Layout.sideBySide
+    override var layoutLaunchArguments: [String] { Self.layoutArguments(layout) }
     override var extraLaunchArguments: [String] {
         // Without the editor's two 1×1 test probes: with them Xcode's contrast audit never finishes
         // (`EditorTextView.accessibilityChildren`).
@@ -24,9 +27,21 @@ final class AccessibilityAuditUITests: NotesFixtureUITestCase {
         try withFixture { auditMainScreens(appearance: "dark") }
     }
 
+    func testMainScreensPassAuditStackedInLightMode() throws {
+        layout = .stacked
+        try withFixture { auditMainScreens(appearance: "light-stacked") }
+    }
+
+    func testMainScreensPassAuditStackedInDarkMode() throws {
+        dark = true
+        layout = .stacked
+        try withFixture { auditMainScreens(appearance: "dark-stacked") }
+    }
+
     private func auditMainScreens(appearance: String) {
         continueAfterFailure = true   // an issue on one screen must not hide the next screen's
         let sweep = AccessibilityAudit(app, appearance: appearance, in: self, known: Self.known, exempt: [harness])
+        assertLayout(layout, in: mainWindow)
         open(Self.idPlain, in: mainWindow)
         LayoutGuard.waitUntilSettled(mainWindow)
         sweep.audit(mainWindow, screen: "note window")
@@ -39,6 +54,7 @@ final class AccessibilityAuditUITests: NotesFixtureUITestCase {
         item.click()
         let extracts = app.windows["Extracts"]
         XCTAssertTrue(extracts.waitForExistence(timeout: 15), "the Extracts window should be open")
+        assertLayout(layout, in: extracts)
         open(Self.idExtract, in: extracts)
         LayoutGuard.waitUntilSettled(extracts)
         sweep.audit(extracts, screen: "extracts window")

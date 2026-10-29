@@ -59,6 +59,24 @@ class NotesFixtureUITestCase: XCTestCase {
     /// Launch arguments a subclass adds to every launch of its tests (W9.e2-paste's folder-pick stand-in).
     var extraLaunchArguments: [String] { [] }
 
+    /// The browser layout of every launch (W48.notes-stacked-layout). The choice persists in the app's defaults,
+    /// which the fixture restore does not reach, so it is pinned like the kind filters: side by side unless a
+    /// subclass runs its checks stacked. A test that switches layouts through the View menu returns `[]`, because
+    /// an argument-domain value overrides what the menu writes.
+    var layoutLaunchArguments: [String] { Self.layoutArguments(.sideBySide) }
+
+    enum Layout: String { case sideBySide, stacked }
+    static func layoutArguments(_ layout: Layout) -> [String] { ["-an.layoutMode", layout.rawValue] }
+
+    /// Assert which layout `window` shows, by its divider: the stacked layout's is `an.divider.list`.
+    func assertLayout(_ layout: Layout, in window: XCUIElement, file: StaticString = #filePath, line: UInt = #line) {
+        let shown = window.descendants(matching: .any)[layout == .stacked ? "an.divider.list" : "an.divider.detail"]
+        let other = window.descendants(matching: .any)[layout == .stacked ? "an.divider.detail" : "an.divider.list"]
+        XCTAssertTrue(shown.waitForExistence(timeout: 5), "\(window.title) should show the \(layout) layout",
+                      file: file, line: line)
+        XCTAssertFalse(other.exists, "\(window.title) should not show the other layout's divider", file: file, line: line)
+    }
+
     /// The Zotero arguments of every launch. In-process only by default — `ZoteroUITestTransport` never
     /// opens a socket. The style value is deliberately non-default so G15 proves the production command
     /// forwards Settings' styleID into `fetchCitation`, rather than merely receiving a canned citation.
@@ -191,7 +209,7 @@ class NotesFixtureUITestCase: XCTestCase {
             "-an.noteWindow.kindFilter", "notes",
             "-an.extractWindow.kindFilter", "extracts",
         ]
-        app.launchArguments += extraLaunchArguments
+        app.launchArguments += layoutLaunchArguments + extraLaunchArguments
         app.launch()
         app.activate()
 

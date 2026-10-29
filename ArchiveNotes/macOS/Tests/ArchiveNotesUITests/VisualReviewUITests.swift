@@ -24,7 +24,7 @@ import Darwin   // getpwuid / getuid — the rehearsal store lives in the REAL h
 /// folder, template or note is created, renamed or deleted.
 ///
 /// Shots are cropped to the app's windows and popovers (plus a margin; menus and the open panel keep the whole
-/// screen). Names: `uitest-visual-<appearance>-<size>-<surface>-<open|idle>`.
+/// screen). Names: `uitest-visual-<appearance>[-stacked]-<size>-<surface>-<open|idle>`.
 final class VisualReviewUITests: NotesFixtureUITestCase {
 
     static var flagPath: String { canonicalFixturePath + "/.visual-review" }
@@ -54,12 +54,17 @@ final class VisualReviewUITests: NotesFixtureUITestCase {
     let idleDelay: TimeInterval = 3
 
     private var missing: [String] = []
+    private var layout = Layout.sideBySide
+    override var layoutLaunchArguments: [String] { Self.layoutArguments(layout) }
     private var prefix = ""
 
     // MARK: - The tours
 
     func testTourLight() throws { try optIn(); try withFixture { try tour(dark: false) } }
     func testTourDark() throws { try optIn(); try withFixture { try tour(dark: true) } }
+    // W48.notes-stacked-layout: every surface again with the list above the note.
+    func testTourStackedLight() throws { try optIn(); layout = .stacked; try withFixture { try tour(dark: false) } }
+    func testTourStackedDark() throws { try optIn(); layout = .stacked; try withFixture { try tour(dark: true) } }
     func testVolumeLight() throws { try optIn(); try withFixture { volumeTour(dark: false) } }
     func testVolumeDark() throws { try optIn(); try withFixture { volumeTour(dark: true) } }
     func testEmptyStatesLight() throws { try optIn(); try withFixture { try emptyStates(dark: false) } }
@@ -109,8 +114,9 @@ final class VisualReviewUITests: NotesFixtureUITestCase {
         try seedVolumeNotes()
         for size in WindowSize.allCases {
             relaunch(store: Self.fixturePath, dark: dark, readyRow: Self.idPlain)
-            prefix = "\(dark ? "dark" : "light")-\(size.rawValue)"
+            prefix = "\(dark ? "dark" : "light")\(layout == .stacked ? "-stacked" : "")-\(size.rawValue)"
             resizeMainWindow(to: size.main)
+            assertLayout(layout, in: mainWindow)
             noteSurfaces()
             listAndFilterSurfaces()
             sidebarSurfaces()
@@ -509,7 +515,7 @@ final class VisualReviewUITests: NotesFixtureUITestCase {
         app.launchArguments += ["-ANUITestStorePath", store] + zoteroLaunchArguments + [
             "-an.noteWindow.kindFilter", "notes",
             "-an.extractWindow.kindFilter", "extracts",
-        ] + (dark ? LayoutGuard.darkModeArguments : LayoutGuard.lightModeArguments) + extra
+        ] + layoutLaunchArguments + (dark ? LayoutGuard.darkModeArguments : LayoutGuard.lightModeArguments) + extra
         app.launch()
         app.activate()
         guard mainWindow.waitForExistence(timeout: 20) else { missing.append("main window on \(store)"); return false }

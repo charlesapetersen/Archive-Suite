@@ -1,4 +1,5 @@
 import XCTest
+import AppKit   // NSScreen — the narrow-and-tall stacked sweep
 
 /// W40.e9 — the layout guard (`packages/UITestSupport/LayoutGuard.swift`) over Notes' main screens: the note
 /// window with a note open in the editor and inspector, and the Extracts window with an extract open (the owner's
@@ -10,6 +11,9 @@ final class LayoutGuardUITests: NotesFixtureUITestCase {
 
     private var dark = false
     private var restoreWidePanes = false
+    /// W48.notes-stacked-layout: the sweeps also run with the list above the note.
+    private var layout = Layout.sideBySide
+    override var layoutLaunchArguments: [String] { Self.layoutArguments(layout) }
     override var extraLaunchArguments: [String] {
         let appearance = dark ? LayoutGuard.darkModeArguments : LayoutGuard.lightModeArguments
         return appearance + (restoreWidePanes ? [
@@ -25,6 +29,38 @@ final class LayoutGuardUITests: NotesFixtureUITestCase {
     func testMainScreensLayOutInDarkMode() throws {
         dark = true
         try withFixture { sweepMainScreens(appearance: "dark") }
+    }
+
+    func testMainScreensLayOutStackedInLightMode() throws {
+        layout = .stacked
+        try withFixture { sweepMainScreens(appearance: "light-stacked"); sweepNarrowAndTall(appearance: "light-stacked") }
+    }
+
+    func testMainScreensLayOutStackedInDarkMode() throws {
+        dark = true
+        layout = .stacked
+        try withFixture { sweepMainScreens(appearance: "dark-stacked"); sweepNarrowAndTall(appearance: "dark-stacked") }
+    }
+
+    /// The stacked layout's other extreme: as narrow as the window goes and as tall as the screen allows. The list
+    /// and the note then share one column, so the sweep checks neither is squeezed out.
+    private func sweepNarrowAndTall(appearance: String) {
+        let window = mainWindow
+        app.activate()
+        window.click()
+        let screen = NSScreen.main?.visibleFrame.height ?? 1000
+        LayoutGuard.dragCorner(of: window, to: CGPoint(x: window.frame.minX + 40, y: screen - 4))
+        LayoutGuard.waitUntilSettled(window)
+        print("[layout] narrow and tall, \(appearance): window \(window.frame.size)")
+        LayoutGuard.sweep(window, screen: "note window, narrow and tall, \(appearance)", in: self, ignore: isHarness)
+        let list = window.tables.firstMatch
+        let divider = window.descendants(matching: .any)["an.divider.list"]
+        let editor = window.scrollViews.containing(.textView, identifier: "an.editor.text").firstMatch
+        XCTAssertTrue(list.exists && divider.exists && editor.exists, "the list, divider and editor should all show")
+        XCTAssertLessThanOrEqual(list.frame.maxY, divider.frame.midY, "the list should sit above the divider")
+        XCTAssertGreaterThan(editor.frame.height, 150, "the note should keep a usable editor when tall and narrow")
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("uitest-narrow-tall-\(appearance).png")
+        try? window.screenshot().pngRepresentation.write(to: url, options: .atomic)
     }
 
     func testUndersizedSavedWindowWithWidePanes() throws {
@@ -45,6 +81,7 @@ final class LayoutGuardUITests: NotesFixtureUITestCase {
 
     private func sweepMainScreens(appearance: String) {
         continueAfterFailure = true   // a layout failure on one screen must not hide the next screen's
+        assertLayout(layout, in: mainWindow)
         open(Self.idPlain, in: mainWindow)
         LayoutGuard.sweep(mainWindow, screen: "note window, \(appearance)", in: self,
                           ignore: isHarness)

@@ -14,7 +14,12 @@ import Darwin   // getxattr / chmod — read the note's Finder-tag xattr, lock t
 /// and the point of that check is the write failure, not the gesture.
 ///
 /// Scratch fixture only (`AN-GUI-Fixture`, restored from its pristine copy before every test).
-final class WritingJourneyUITests: NotesFixtureUITestCase {
+class WritingJourneyUITests: NotesFixtureUITestCase {
+
+    /// The layout the journey runs in; `WritingJourneyStackedUITests` runs it again with the list above the note
+    /// (W48.notes-stacked-layout).
+    var journeyLayout: Layout { .sideBySide }
+    override var layoutLaunchArguments: [String] { Self.layoutArguments(journeyLayout) }
 
     /// N-12/N-14/N-02 — type, autosave, ⌘Q within the debounce, relaunch: the file holds every keystroke, the
     /// relaunched editor shows it, and the relaunch itself writes nothing.
@@ -303,6 +308,7 @@ final class WritingJourneyUITests: NotesFixtureUITestCase {
     private func log(_ line: String) { print(line); NSLog("%@", line) }
 
     private func loadNote(_ id: String) throws {
+        assertLayout(journeyLayout, in: mainWindow)
         selectItem(uuid: id)
         XCTAssertTrue(editor.waitForExistence(timeout: 10), "the editor should exist")
         XCTAssertTrue(pollUntil(timeout: 10) { self.editorText.contains("A plain note") },
@@ -402,4 +408,9 @@ final class WritingJourneyUITests: NotesFixtureUITestCase {
             .allElementsBoundByIndex.map { ($0.value as? String) ?? $0.label }.filter { !$0.isEmpty }
         return texts.isEmpty ? nil : texts.joined(separator: " ")
     }
+}
+
+/// W48.notes-stacked-layout — the whole W40.d9 writing journey once more, with the list above the note.
+final class WritingJourneyStackedUITests: WritingJourneyUITests {
+    override var journeyLayout: Layout { .stacked }
 }
