@@ -5,9 +5,14 @@
 //     place_functional words  <truth.json> <page.pdf> <hyp.json> [--page N] [--baseline-frac F]
 //                                                                         -> the PDF's own word and line boxes, in
 //                                                                            place_score.py's hypothesis form
-//     place_functional oracle <truth.json> <out.pdf> [--dx X] [--dy Y]     -> the page image with invisible text at
+//     place_functional oracle <truth.json> <out.pdf> [--dx X] [--dy Y] [--words hyp.json]
+//                                                                         -> the page image with invisible text at
 //                                                                            the truth boxes (shifted by X, Y of
-//                                                                            the page), for the self-test
+//                                                                            the page), for the self-test; with
+//                                                                            --words, at a hypothesis's word boxes
+//                                                                            instead (W46.place-hands); --fit
+//                                                                            sizes each word's font to its box
+//                                                                            rather than stretching it
 //
 // Score: for every scoreable truth word (a box, not missing or illegible) with four or more letters once its
 // leading and trailing punctuation is stripped, ask PDFKit `findString` (case-insensitive) for it. `find` = some
@@ -123,7 +128,7 @@ func words(_ doc: PDFDocument, _ pageIndex: Int, baselineFrac: Double) -> [Strin
     return ["words": outWords, "lines": outLines]
 }
 
-func oracle(_ truth: [String: Any], _ out: String, dx: Double, dy: Double) {
+func oracle(_ truth: [String: Any], _ out: String, dx: Double, dy: Double, hypWords: [[String: Any]]? = nil, fit: Bool = false) {
     guard let path = truth["image"] as? String,
           let src = CGImageSourceCreateWithURL(URL(fileURLWithPath: path) as CFURL, nil),
           let img = CGImageSourceCreateImageAtIndex(src, 0, nil) else { fail("cannot read the page image") }
@@ -132,17 +137,24 @@ func oracle(_ truth: [String: Any], _ out: String, dx: Double, dy: Double) {
     ctx.beginPDFPage(nil)
     ctx.draw(img, in: media)
     ctx.setTextDrawingMode(.invisible)
-    for w in truth["words"] as? [[String: Any]] ?? [] {
+    for w in hypWords ?? truth["words"] as? [[String: Any]] ?? [] {
         guard var b = box(w["box"]), let text = w["text"] as? String, b.w > 0, b.h > 0 else { continue }
         b.x += dx; b.y += dy
         let r = pageRect(b, media)
         // 0.8 of the box: filling it makes neighbouring lines' text touch, and PDFKit then welds them.
-        let font = CTFontCreateWithName("Helvetica" as CFString, r.height * 0.8, nil)
-        let line = CTLineCreateWithAttributedString(NSAttributedString(
-            string: text, attributes: [NSAttributedString.Key(kCTFontAttributeName as String): font]))
-        let width = CTLineGetTypographicBounds(line, nil, nil, nil)
+        func run(_ size: CGFloat) -> (CTLine, Double) {
+            let font = CTFontCreateWithName("Helvetica" as CFString, size, nil)
+            let line = CTLineCreateWithAttributedString(NSAttributedString(
+                string: text, attributes: [NSAttributedString.Key(kCTFontAttributeName as String): font]))
+            return (line, CTLineGetTypographicBounds(line, nil, nil, nil))
+        }
+        var (line, width) = run(r.height * 0.8)
+        // --fit: no horizontal stretch. A word stretched far past its natural width (a tall handwritten box, a
+        // proportional share) reads back from PDFKit as spaced letters, so Find misses it; shrink the font to the
+        // box's width instead, and leave a narrow word at its natural width from the box's left edge.
+        if fit && width > r.width && width > 0 { (line, width) = run(r.height * 0.8 * r.width / width) }
         ctx.saveGState()
-        ctx.textMatrix = CGAffineTransform(scaleX: width > 0 ? r.width / width : 1, y: 1)
+        ctx.textMatrix = fit ? .identity : CGAffineTransform(scaleX: width > 0 ? r.width / width : 1, y: 1)
         ctx.textPosition = CGPoint(x: r.minX, y: r.minY + r.height * 0.2)
         CTLineDraw(line, ctx)
         ctx.restoreGState()
@@ -169,7 +181,9 @@ case "words":
     try! JSONSerialization.data(withJSONObject: hyp).write(to: URL(fileURLWithPath: args[4]))
     result = ["words": (hyp["words"] as! [Any]).count, "lines": (hyp["lines"] as! [Any]).count]
 case "oracle":
-    oracle(truth, args[3], dx: Double(option(args, "--dx") ?? "0") ?? 0, dy: Double(option(args, "--dy") ?? "0") ?? 0)
+    let hypWords = option(args, "--words").map { loadJSON($0)["words"] as? [[String: Any]] ?? [] }
+    oracle(truth, args[3], dx: Double(option(args, "--dx") ?? "0") ?? 0, dy: Double(option(args, "--dy") ?? "0") ?? 0,
+           hypWords: hypWords, fit: args.contains("--fit"))
     result = ["wrote": args[3]]
 default:
     fail("unknown mode \(args[1])")
