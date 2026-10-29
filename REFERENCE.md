@@ -1,8 +1,7 @@
 # Archive Suite — reference detail for the root guide
 
 Reference detail moved out of `CLAUDE.md` by W40.docs-startup-size (2026-10-29), so that every session does not load
-it. `CLAUDE.md` holds the rules and is authoritative where the two differ; this file keeps the full wording, history
-and cases behind them. Read it on demand.
+it. `CLAUDE.md` holds the rules; this file keeps the full wording, history and cases behind them. It adds mechanism and history; it never relaxes a rule in `CLAUDE.md`, and a rule stated more strictly here still binds. Read it on demand.
 
 ## No production material — the full record
 
