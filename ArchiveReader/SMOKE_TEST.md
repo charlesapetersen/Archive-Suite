@@ -139,8 +139,9 @@ sheet-confirm flows (save-smart-folder, tag-rename) are `[~]` — verified by un
 - [~] **Open in Default App (C7)** — read-only `NSWorkspace.open` in the row context menu.
 - [x] **Read single-click toggle (C8)** — clicking a Read cell flips Unread↔Read (00015 Unread→Read on
       disk + re-rendered); right-click for explicit set/clear. **PASS** (GUI + `xattr`).
-      *(Since lost: this ran on the SwiftUI `Table`; the AppKit table's Read column is a plain label, so
-      the gesture is unreachable until `W40.fix-reader-read-toggle`.)*
+      *(Lost with the move to the AppKit table and restored by `W40.fix-reader-read-toggle`, 2026-10-29:
+      `ReadToggleTests` + the VM `NavigationUITests/testReadCell…`. A click now waits out the double-click
+      interval, so a double-click on the cell opens the file instead.)*
 - [~] **Corpus-wide tag rename (D1, Tier-2)** — unit tests assert the primitive swaps only that tag,
       preserves other tags, leaves bytes unchanged, and undo (inverse delta) restores it; the rename
       **sheet opens with the correct affected count** ("Affects 27 files. Undoable as a single step").

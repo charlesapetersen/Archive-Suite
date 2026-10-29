@@ -301,11 +301,12 @@ struct AppKitTableView: NSViewRepresentable {
             if let reused = tableView.makeView(withIdentifier: cellID, owner: nil) as? TintedTextCellView {
                 cell = reused
             } else {
-                cell = Self.makeTextCell(identifier: cellID)
+                cell = colID == "read" ? Self.makeReadStateCell(identifier: cellID) : Self.makeTextCell(identifier: cellID)
             }
 
             guard let file else {
                 cell.textField?.stringValue = ""
+                (cell as? ReadStateCellView)?.file = nil
                 return cell
             }
 
@@ -366,6 +367,11 @@ struct AppKitTableView: NSViewRepresentable {
 
             case "read":
                 Self.configureReadStateCell(cell, state: file.readState)
+                if let readCell = cell as? ReadStateCellView {
+                    readCell.file = file
+                    readCell.onAction = { [weak self] action, file in self?.performReadAction(action, on: file) }
+                }
+                tf.toolTip = "Click to switch Read and Unread · right-click for more"
 
             default:
                 tf.stringValue = ""
@@ -429,10 +435,29 @@ struct AppKitTableView: NSViewRepresentable {
             parent.model.applyEdit(.setQuality(quality), to: file)
         }
 
+        /// The Read cell's gestures write through the same `TagWriter` read-state path as ⌘R and ⌘U, for
+        /// the one file the cell shows (W40.fix-reader-read-toggle).
+        private func performReadAction(_ action: ReadStateCellView.Action, on file: ArchiveFile) {
+            switch action {
+            case .toggle: parent.model.toggleReadState(for: file)
+            case .set(let state): parent.model.setReadStateInline(state, for: file)
+            case .clear: parent.model.clearReadState(for: file)
+            }
+        }
+
         /// A plain text cell (every column but tags and quality), exposed internally so the headless
         /// pixel guard lays out the same view the table does.
         static func makeTextCell(identifier: NSUserInterfaceItemIdentifier) -> TintedTextCellView {
-            let cell = TintedTextCellView()
+            installLabel(in: TintedTextCellView(), identifier: identifier)
+        }
+
+        /// The Read column's text cell, which also takes the column's click and right-click.
+        static func makeReadStateCell(identifier: NSUserInterfaceItemIdentifier) -> ReadStateCellView {
+            installLabel(in: ReadStateCellView(), identifier: identifier)
+        }
+
+        private static func installLabel<Cell: TintedTextCellView>(in cell: Cell,
+                                                                   identifier: NSUserInterfaceItemIdentifier) -> Cell {
             cell.identifier = identifier
             let tf = NSTextField(labelWithString: "")
             tf.translatesAutoresizingMaskIntoConstraints = false
@@ -674,7 +699,7 @@ final class SortableDiffableDataSource: NSTableViewDiffableDataSource<Int, Archi
 /// draws `tint.normal` on an ordinary row, `tint.emphasized` on an active selection, and `tint.inactiveSelected`
 /// on an inactive selection; without one it is a plain text cell whose caller sets the colour.
 @MainActor
-final class TintedTextCellView: NSTableCellView {
+class TintedTextCellView: NSTableCellView {
     var tint: (normal: NSColor, emphasized: NSColor, inactiveSelected: NSColor)? {
         didSet { applyTint() }
     }
@@ -696,6 +721,115 @@ final class TintedTextCellView: NSTableCellView {
         let color = backgroundStyle == .emphasized
             ? tint.emphasized : (selected ? tint.inactiveSelected : tint.normal)
         if textField.textColor != color { textField.textColor = color }
+    }
+}
+
+// MARK: - Read cell: click to switch, right-click for the menu
+
+/// The Read column's cell (W40.fix-reader-read-toggle, ledger R-25). A click on the cell switches its file between
+/// Unread and Read; a right-click or Control-click offers Read, Unread and Clear Read State, the only way to clear
+/// the state. It acts on its own row's file and leaves the selection alone, so a click elsewhere in the row still only
+/// selects, and ⌘- or ⇧-clicks on it go to the table to extend the selection.
+///
+/// A double-click goes to the table, which opens the file, and writes nothing: the switch waits out the double-click
+/// interval and a second click cancels it. The switch is made on the release, inside the cell, and a press that drags
+/// writes nothing. Every gesture acts on the file the cell showed when it began, so a row
+/// refresh that reuses the cell for another file while a menu is open or a switch is waiting cannot retarget it.
+@MainActor
+final class ReadStateCellView: TintedTextCellView {
+    enum Action: Equatable { case toggle, set(ReadState), clear }
+
+    /// The file the row shows; nil on a row with no file, which leaves every click to the table.
+    var file: ArchiveFile?
+    var onAction: ((Action, ArchiveFile) -> Void)?
+    /// How long a click waits to find out whether it is the first of a double-click.
+    var toggleDelay: TimeInterval = NSEvent.doubleClickInterval
+    private var pendingToggle: DispatchWorkItem?
+    /// The file a plain press began on, until its release.
+    private var armedFile: ArchiveFile?
+
+    /// The label is the deepest view under the pointer; the cell takes the gesture itself.
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        guard let hit = super.hitTest(point) else { return nil }
+        return file == nil ? hit : self
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        guard let file else { return super.mouseDown(with: event) }
+        let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        if modifiers.contains(.control), let menu = menu(for: event) {
+            return NSMenu.popUpContextMenu(menu, with: event, for: self)
+        }
+        if !modifiers.isDisjoint(with: [.command, .shift]) { return super.mouseDown(with: event) }
+        pendingToggle?.cancel()
+        pendingToggle = nil
+        armedFile = nil
+        guard event.clickCount == 1 else {
+            // The table opens the selection, and the first click selected nothing: select this row first.
+            if let table = enclosingTable, case let row = table.row(for: self), row >= 0 {
+                table.selectRowIndexes(IndexSet(integer: row), byExtendingSelection: false)
+            }
+            return super.mouseDown(with: event)
+        }
+        armedFile = file
+    }
+
+    /// A press that moves is not a click: it writes nothing.
+    override func mouseDragged(with event: NSEvent) {
+        armedFile = nil
+        super.mouseDragged(with: event)
+    }
+
+    /// The switch is armed by the press and made by a release inside the cell, so a press that slides off and is
+    /// released elsewhere writes nothing; it then waits out the double-click interval.
+    override func mouseUp(with event: NSEvent) {
+        guard let file = armedFile else { return super.mouseUp(with: event) }
+        armedFile = nil
+        guard bounds.contains(convert(event.locationInWindow, from: nil)) else { return }
+        let toggle = DispatchWorkItem { [weak self] in
+            self?.pendingToggle = nil
+            self?.onAction?(.toggle, file)
+        }
+        pendingToggle = toggle
+        DispatchQueue.main.asyncAfter(deadline: .now() + toggleDelay, execute: toggle)
+    }
+
+    private var enclosingTable: NSTableView? {
+        var view = superview
+        while let v = view, !(v is NSTableView) { view = v.superview }
+        return view as? NSTableView
+    }
+
+    override func menu(for event: NSEvent) -> NSMenu? {
+        guard let file else { return super.menu(for: event) }
+        let menu = NSMenu(title: "Read State")
+        menu.autoenablesItems = false
+        func add(_ title: String, _ action: Action, on: Bool = false) {
+            let item = NSMenuItem(title: title, action: #selector(choose(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = Choice(action: action, file: file)
+            item.state = on ? .on : .off
+            menu.addItem(item)
+        }
+        add("Read", .set(.read), on: file.readState == .read)
+        add("Unread", .set(.unread), on: file.readState == .unread)
+        if file.readState != nil {
+            menu.addItem(.separator())
+            add("Clear Read State", .clear)
+        }
+        return menu
+    }
+
+    /// What a menu item does, and to the file the menu was opened on.
+    private final class Choice: NSObject {
+        let action: Action
+        let file: ArchiveFile
+        init(action: Action, file: ArchiveFile) { self.action = action; self.file = file }
+    }
+
+    @objc private func choose(_ sender: NSMenuItem) {
+        guard let choice = sender.representedObject as? Choice else { return }
+        onAction?(choice.action, choice.file)
     }
 }
 

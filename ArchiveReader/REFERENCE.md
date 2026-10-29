@@ -428,6 +428,10 @@ Views/
   AppKitTableView.swift       NSViewRepresentable over NSScrollView+NSTableView (NSTableViewDiffableDataSource):
                               virtualized rows, incremental snapshot apply, 150ms-debounced filter;
                               the Quality-column popup is the per-file Quality editor;
+                              the Read column's ReadStateCellView is the per-file read-state editor (a
+                              click (on release, inside the cell; a drag writes nothing) switches Unread↔Read once the double-click interval passes, a
+                              double-click goes to the table, a right-click sets or clears; it acts
+                              on its own file, never the selection — W40.fix-reader-read-toggle);
                               ContextMenuTableView + ContextMenuActions trampoline to NavigationModel;
                               optional default-hidden Provenance column uses the existing header picker.
                               Text cells are TintedTextCellView: a `tint` (normal, emphasized) follows the
@@ -443,13 +447,11 @@ Views/
   SidebarView.swift           Left sidebar: Smart Folders (saved searches) + a navigable folder tree
                               (List(selection:)+OutlineGroup). Durable smart-folder highlight; folder
                               selection exits the scope.
-  InlineEditCells.swift       DEAD CODE: SwiftUI cells left from the pre-AppKit table, referenced nowhere
-                              (the AppKit Read and Date columns are plain labels). ReadStateCell stays until
-                              W40.fix-reader-read-toggle wires the click/right-click into the AppKit Read
-                              column. DateCell was deleted by W40.fix-reader-sent-with-date. Dates (incl.
-                              Sent-With) are edited in the ⌘I sheet, the one date
-                              editor (owner, 2026-10-12); there is no inline date editing in the list.
-                              The inline per-row subject editor is AppKitTableView's TagTokenCellView
+  (inline cells)              InlineEditCells.swift (the SwiftUI cells left from the pre-AppKit table) is
+                              gone: DateCell deleted by W40.fix-reader-sent-with-date, ReadStateCell by
+                              W40.fix-reader-read-toggle. Dates (incl. Sent-With) are edited in the ⌘I
+                              sheet, the one date editor (owner, 2026-10-12); there is no inline date
+                              editing in the list. The inline per-row subject editor is AppKitTableView's TagTokenCellView
                               (NSTokenField): autocomplete from the corpus; edit-start-base diff → ONE
                               TagWriter delta; commits the field's tokens on blur — WYSIWYG, so a
                               typed-but-not-Return'd word sticks (owner 2026-07-08). Adds only route

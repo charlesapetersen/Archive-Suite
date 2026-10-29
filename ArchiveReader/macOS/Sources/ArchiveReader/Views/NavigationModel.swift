@@ -1365,18 +1365,17 @@ final class NavigationModel: ObservableObject {
         catch { statusMessage = "Could not update \(file.name)."; announce(statusMessage) }
     }
 
-    /// Single-click toggle for the Read cell: Read → Unread; Unread/none → Read.
+    /// A click on the Read cell: Read → Unread; Unread/none → Read.
     func toggleReadState(for file: ArchiveFile) {
         guard let file = reverifyCacheRow(file) else { return }
         setReadStateInline(file.readState == .read ? .unread : .read, for: file)
     }
 
+    /// The Read cell's Clear Read State. Both tokens are named, not the row's: `TagWriter` re-reads the file and
+    /// matches Read/Unread in any case, so a row that is behind the file still clears whatever the file holds.
     func clearReadState(for file: ArchiveFile) {
         guard let file = reverifyCacheRow(file) else { return }
-        let toks = file.tags.raw.filter { t in
-            ReadState.allCases.contains { $0.rawValue.caseInsensitiveCompare(t) == .orderedSame }
-        }
-        applyDelta(TagDelta(remove: toks), to: file)
+        applyDelta(TagDelta(remove: ReadState.allCases.map(\.rawValue)), to: file)
     }
 
     private func applyDelta(_ delta: TagDelta, to file: ArchiveFile) {

@@ -158,6 +158,76 @@ final class NavigationUITests: FixtureUITestCase {
                       "the in-table Quality picker should write canonical Q3 to the scratch document")
     }
 
+    // MARK: - The Read column: a click switches, a right-click sets or clears (W40.fix-reader-read-toggle)
+
+    /// Ledger R-25. The column was a plain label, so the click did nothing and there was no menu. Drives the real
+    /// gestures on one scratch document and reads its tags back after each; the row selection must not move.
+    func testReadCellClickAndRightClickWriteThatScratchDocument() throws {
+        try requireGeneratedScratchFixtureForTagWrites()
+        let name = "00004 IMG — Brown.pdf"   // Unread, and no other test writes it
+        let url = URL(fileURLWithPath: Self.fixturePath).appendingPathComponent(name)
+        let original = (try? URL(fileURLWithPath: url.path).resourceValues(forKeys: [.tagNamesKey]))?.tagNames ?? []
+        // Clear Read State takes the document out of the list, so put its tags back for the tests after this one.
+        addTeardownBlock { try? (URL(fileURLWithPath: url.path) as NSURL).setResourceValue(original, forKey: .tagNamesKey) }
+
+        typeInField("ar.filter.name", text: "00004")
+        XCTAssertTrue(waitForRowCount(1), "name filter should isolate the scratch document")
+        XCTAssertTrue(waitForTags(on: name, containing: ["Unread"]), "the generated scratch fixture should begin Unread")
+        let cell = app.staticTexts.matching(NSPredicate(
+            format: "identifier BEGINSWITH 'ar.cell.read.' AND identifier ENDSWITH %@", name)).firstMatch
+        XCTAssertTrue(cell.waitForExistence(timeout: 5), "the Read column should show the document's state")
+        let highlighted = table.tableRows.matching(NSPredicate(format: "isSelected == true"))
+        let selectedBefore = highlighted.count
+
+        cell.click()
+        XCTAssertTrue(waitForTags(on: name, containing: ["Read"], excluding: ["Unread"]),
+                      "a click on the Read cell should mark the document Read")
+        XCTAssertEqual(highlighted.count, selectedBefore, "the click acts on the cell, not the row selection")
+        cell.click()
+        XCTAssertTrue(waitForTags(on: name, containing: ["Unread"], excluding: ["Read"]),
+                      "a second click should mark it Unread again")
+
+        cell.rightClick()
+        let read = app.menuItems["Read"]
+        XCTAssertTrue(read.waitForExistence(timeout: 5), "a right-click should offer Read")
+        XCTAssertTrue(app.menuItems["Clear Read State"].exists, "and Clear Read State")
+        captureScreenshot("w40-read-toggle-menu")
+        read.click()
+        XCTAssertTrue(waitForTags(on: name, containing: ["Read"], excluding: ["Unread"]), "Read from the menu sets it")
+
+        cell.rightClick()
+        let clear = app.menuItems["Clear Read State"]
+        XCTAssertTrue(clear.waitForExistence(timeout: 5))
+        clear.click()
+        XCTAssertTrue(waitForTags(on: name, containing: ["DP chapters"], excluding: ["Read", "Unread"]),
+                      "Clear Read State removes the state and keeps the other tags")
+        XCTAssertEqual(highlighted.count, selectedBefore, "the menu acts on the cell, not the row selection")
+    }
+
+    /// A double-click on the Read cell is the table's, as on any other cell: it opens the document and writes nothing.
+    func testReadCellDoubleClickOpensWithoutWriting() throws {
+        try requireGeneratedScratchFixtureForTagWrites()
+        let name = "00006 IMG — Brown.pdf"   // Unread, and no other test writes it
+        typeInField("ar.filter.name", text: "00006")
+        XCTAssertTrue(waitForRowCount(1), "name filter should isolate the scratch document")
+        XCTAssertTrue(waitForTags(on: name, containing: ["Unread"]), "the generated scratch fixture should begin Unread")
+        let cell = app.staticTexts.matching(NSPredicate(
+            format: "identifier BEGINSWITH 'ar.cell.read.' AND identifier ENDSWITH %@", name)).firstMatch
+        XCTAssertTrue(cell.waitForExistence(timeout: 5), "the Read column should show the document's state")
+        let windowsBefore = app.windows.count
+
+        cell.doubleClick()
+        let deadline = Date().addingTimeInterval(10)
+        while app.windows.count <= windowsBefore, Date() < deadline {
+            RunLoop.current.run(until: Date().addingTimeInterval(0.25))
+        }
+        XCTAssertGreaterThan(app.windows.count, windowsBefore, "a double-click on the Read cell opens the document")
+        RunLoop.current.run(until: Date().addingTimeInterval(1))   // past the double-click interval
+        XCTAssertTrue(waitForTags(on: name, containing: ["Unread"], excluding: ["Read"], timeout: 1),
+                      "and leaves its read state alone")
+        captureScreenshot("w40-read-toggle-double-click")
+    }
+
     // MARK: - Save Search takes the keyboard; Quality chips run Q1 → Q3 (W40.fix-reader-visual-polish)
 
     func testSaveSearchNameFieldHasTheKeyboardAndQualityChipsAscend() throws {
