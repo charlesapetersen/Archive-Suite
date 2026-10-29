@@ -686,6 +686,7 @@ struct LiveCaptureView: View {
                             .accessibilityIdentifier(problem ? "live.summary-warning" : "live.summary-done")
                         Text(summary)
                             .font(.title3).multilineTextAlignment(.center)
+                            .accessibilityIdentifier("live.summary-text")
                         Text(session.receiverActive ? "Shoot on the phone to start a new batch."
                                                     : "Start the server, then shoot on the phone to start a new batch.")
                             .font(.caption).foregroundStyle(.primary)
@@ -702,6 +703,31 @@ struct LiveCaptureView: View {
                 }
                 Spacer()
             } else {
+                // W40.fix-live-finalize-failure-silent — a finalize that filed nothing (or only part) leaves
+                // the unfiled photos in place, so the emptied-pane summary above never drew and a failed
+                // Finalize looked like a click that did nothing. The summary now draws over the photos too.
+                // A new photo still clears it (`CaptureSession` → `clearFinalizeSummary`), as before.
+                // ⚠️ No `.fixedSize(vertical:)` on the Text: it made SwiftUI size the long summary at its
+                // narrowest width, and that minimum height (~3,500 pt) pushed the whole window's content
+                // off-screen — a blank window in the VM until it was removed. Plain wrapping is enough here.
+                if let summary = liveProc.finalizeSummary {
+                    let problem = LiveCaptureProcessor.summaryReportsProblem(summary)
+                    HStack(alignment: .top, spacing: 8) {
+                        Image(systemName: problem ? "exclamationmark.triangle.fill" : "checkmark.circle.fill")
+                            .foregroundStyle(problem ? .orange : .green)
+                            .accessibilityLabel(problem ? "Finished with problems" : "Finished")
+                            .accessibilityIdentifier(problem ? "live.summary-warning" : "live.summary-done")
+                        Text(summary)
+                            .font(.callout)
+                            .textSelection(.enabled)
+                            .accessibilityIdentifier("live.summary-text")
+                        Spacer(minLength: 0)
+                    }
+                    .padding(10)
+                    .background((problem ? Color.orange : Color.green).opacity(0.1))
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .padding(.top, 8)
+                }
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 16) {
                         ForEach(Array(session.groups.enumerated()), id: \.element.id) { idx, group in

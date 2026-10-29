@@ -110,7 +110,20 @@ final class LiveCaptureJourneyUITests: XCTestCase {
         try finishAndFinalize(staged: 2, collection: "W40d5 Dean fail")
         // Give finalize the same time the live phase needed to move files and trash originals.
         RunLoop.current.run(until: Date().addingTimeInterval(15))
+        // W40.fix-live-finalize-failure-silent — the photos stay in the pane, and the reason must be on it.
+        let summaryText = element("live.summary-text")
+        XCTAssertTrue(summaryText.waitForExistence(timeout: 10),
+                      "a finalize that filed nothing must show its summary over the kept photos")
         attachScreenshot("w40d5-fail-finalized")
+        // Exists is not drawn: a first version laid the window's content out 3,724 pt tall and off-window
+        // (blank screenshot, every element still in the AX tree). The summary must sit inside the window.
+        let window = app.windows.firstMatch.frame
+        XCTAssertTrue(window.contains(summaryText.frame) && window.contains(element("live.finish").frame),
+                      "the summary and Finish must be inside the window: window=\(window) summary=\(summaryText.frame)")
+        XCTAssertTrue(element("live.summary-warning").exists, "a finalize that filed nothing must draw the warning")
+        XCTAssertFalse(element("live.summary-done").exists, "a finalize that filed nothing must not draw the success check")
+        let shown = (summaryText.value as? String).flatMap { $0.isEmpty ? nil : $0 } ?? summaryText.label
+        XCTAssertTrue(shown.contains("could NOT be filed"), "the summary must say the photos were not filed: \(shown)")
         let after = originals(under: backup)
         print("[w40d5] fail out=\(out.path) backup=\(backup.path) originals-after=\(after.map(\.lastPathComponent))")
         XCTAssertEqual(Set(after.map(\.lastPathComponent)), Set(before.map(\.lastPathComponent)),
