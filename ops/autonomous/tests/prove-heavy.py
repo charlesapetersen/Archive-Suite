@@ -288,6 +288,9 @@ health_watchdog {waiter.pid} /dev/null 0
         fake = root / "fake-xcodebuild"
         fake.write_text("#!/bin/bash\necho real-ran\n")
         fake.chmod(0o755)
+        # macOS assesses a newly written executable on its first exec; measured 0.9-3.4 s here (later execs
+        # 0.05 s), which tripped the 3 s bounds below on half the gate runs (29 Oct). Pay it once, outside them.
+        subprocess.run([str(fake)], capture_output=True, timeout=60)
         shim = HERE / "bin/xcodebuild"
         for args, extra, expected in ((["test"], {"CODEX_SANDBOX": "seatbelt"}, 3),
                                      (["test"], {"CODEX_SANDBOX": ""}, 74)):
