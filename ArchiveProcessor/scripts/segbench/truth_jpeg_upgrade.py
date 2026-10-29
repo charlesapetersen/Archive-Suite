@@ -4,6 +4,13 @@
     truth_jpeg_upgrade.py build     # the 15 originals -> ocr-truth/pages-jpeg/<page>.jpg (+ jpeg-upgrade.json)
     truth_jpeg_upgrade.py swap      # pages/<page>.jpg -> pages-pdf/, pages-jpeg/<page>.jpg -> pages/ (reversible)
     truth_jpeg_upgrade.py unswap    # the reverse
+    truth_jpeg_upgrade.py pack      # the new images frozen at 2,400 px in a scratch panel cache (PACK)
+    truth_jpeg_upgrade.py gateway   # Gemini 3.7 Flash (Stanford gateway, about $0.004 a page) on them
+    OCR_PANEL_CACHE=<PACK> heavy-run.py run -- python3 ocr_panel.py vision          # Apple Vision, free
+    OCR_PANEL_CACHE=<PACK> heavy-run.py run -- <lab venv>/bin/python ocr_mac_local.py collect --model KEY
+                                    # qwen3-vl-8b-mlx4, lightonocr-3-4b-mlx8, qwen3.5-9b-mlx4: free, on this Mac
+    uv run --offline --with rapidfuzz --with 'sacrebleu==2.5.1' --with regex --with numpy --with pillow \
+        python truth_jpeg_upgrade.py score   # -> segbench-results/truth-jpeg-upgrade.json
 
 Owner, 2026-10-22: the truth images are the JPEG originals, never the ABBYY-processed corpus PDFs. 33 of the
 truth pages were built from the image inside the PDF because ocr_truth.source_of found no original with the PDF's
@@ -178,7 +185,8 @@ OUT = HERE.parents[1] / "segbench-results" / "truth-jpeg-upgrade"
 
 
 def reading(route, base, job):
-    """(ok, text) of one cached reading; base is the panel cache (old images) or the scratch pack (new)."""
+    """(read, text) of one cached reading; base is the panel cache (old images) or the scratch pack (new). A page
+    read but not parsed has text "" and so scores 0, the panel's rule for a failed page."""
     if route == "apple-vision":
         f = base / "vision" / f"{job}.txt"
         return (f.exists(), f.read_text() if f.exists() else "")
@@ -188,7 +196,7 @@ def reading(route, base, job):
     else:
         f = base / "local" / route / f"{job}.json"
         got = json.loads(f.read_text()).get("parsed") if f.exists() else None
-    return (bool(got), got["text"] if got else "")
+    return (f.exists(), got["text"] if got else "")
 
 
 def cmd_score(_):

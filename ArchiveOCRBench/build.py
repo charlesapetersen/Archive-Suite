@@ -51,6 +51,7 @@ DATING_ENCLOSURE = RESULTS / "date-enclosure.json"  # W46.date-enclosure: date_e
 PUBLIC = RESULTS / "bench-corpus"  # W43.corpus-build: corpus/routes.py report, the public strata
 OCR_SCORERS = RESULTS / "ocr-scorers.json"  # W46.fix-ocr-scorers: ocr_rescore.py, every cached reading re-scored
 TRUTH_BIAS = RESULTS / "ocr-truth-bias.json"  # W46.fix-ocr-truth-bias: ocr_truth_bias.py, agreed v adjudicated words
+TRUTH_JPEG = RESULTS / "truth-jpeg-upgrade.json"  # W46.truth-jpeg-upgrade: truth_jpeg_upgrade.py score, PDF image v JPEG
 TRUTH_BIAS_SCORE = RESULTS / "ocr-truth-bias-score.json"  # W46.fix-ocr-truth-bias-score: the owner's blind check
 CHAOS = RESULTS / "chaos-probe.json"  # W46.fix-ocr-scorers: chaos_probe.py score, the altered-word probe
 DEWARP = RESULTS / "enh-dewarp.json"  # W46.enh-dewarp: enh_dewarp.py report, crop or dewarp against raw, by reader
@@ -536,6 +537,10 @@ def ocr_scorers():
                                         for r in tb["split"]]}
         if TRUTH_BIAS_SCORE.exists():
             out["truth_bias"]["score"] = json.loads(TRUTH_BIAS_SCORE.read_text())["summary"]
+    if TRUTH_JPEG.exists():
+        tj = json.loads(TRUTH_JPEG.read_text())
+        out["truth_jpeg"] = {"pages": tj["pages"], "routes": {k: {f: v for f, v in r.items() if f != "per_page"}
+                                                              for k, r in tj["routes"].items()}}
     return out
 
 

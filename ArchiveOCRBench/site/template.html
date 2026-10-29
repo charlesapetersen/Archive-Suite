@@ -251,6 +251,8 @@ footer p { font-size: 13px; }
     <div class="tbl"><table><thead><tr><th>Route</th><th>Pages read</th><th>Copied as printed</th><th>Corrected to the expected word</th><th>Other</th><th>NES</th></tr></thead><tbody id="sc-chaos"></tbody></table></div>
     <p class="note" id="sc-bias-note"></p>
     <div class="tbl"><table><thead><tr><th>Route</th><th>Family</th><th>Pages</th><th>Agreed words</th><th>Joins forgiven</th><th>Adjudicated words</th><th>Lead on agreed, joins forgiven</th></tr></thead><tbody id="sc-bias"></tbody></table></div>
+    <p class="note" id="sc-jpeg-note" hidden></p>
+    <div class="tbl" id="sc-jpeg-tbl" hidden><table><thead><tr><th>Route</th><th>Pages</th><th>PDF image</th><th>JPEG original</th><th>Change</th><th>Sharper originals</th><th>Upscaled PDFs</th><th>The 96: PDF → JPEG</th></tr></thead><tbody id="sc-jpeg"></tbody></table></div>
   </section>
 
   <header class="part" id="dating">
@@ -644,6 +646,15 @@ if (SC) {
     if (BS) document.getElementById('sc-bias-note').textContent = document.getElementById('sc-bias-note').textContent.replace(/A blind owner check.*$/, 'The owner\'s blind check of ' + BS.places + ' places on ' + BS.pages + ' pages where ' + TB.reference + ' reads the agreed words differently (' + BS.judged + ' judged; one microfilm newspaper page left out as far outside the corpus): the truth was right at ' + BS.classes.truth.places + ', the reader at ' + BS.classes.reader.places + ', either would do at ' + BS.classes.either.places + ', and at ' + BS.classes.frame.places + ' the reader read a folder label or a sheet behind the page. The truth\'s own mistakes cost ' + TB.reference + ' about ' + BS.bias_pts.toFixed(2) + ' points [' + BS.bias_pts_ci[0].toFixed(2) + ', ' + BS.bias_pts_ci[1].toFixed(2) + '] of the ' + BS.drafter_lead_joined_pts.toFixed(2) + '-point drafter lead, so the truth stands; most of the lead is passages read but placed elsewhere on the page (reading order). Detail: segbench-results/ocr-truth-bias-score.md.');
     const pp = v => v === null || v === undefined ? '—' : (100 * v).toFixed(2);
     document.getElementById('sc-bias').innerHTML = TB.routes.map(r => '<tr><td>' + r.route + '</td><td>' + r.family + '</td><td>' + r.pages + '</td><td>' + pp(r.agreed_acc) + '</td><td>' + pp(r.agreed_acc_joined) + '</td><td>' + pp(r.adjudicated_acc) + '</td><td>' + (r.lead_agreed_joined === null ? '—' : (r.lead_agreed_joined >= 0 ? '+' : '−') + Math.abs(100 * r.lead_agreed_joined).toFixed(2)) + '</td></tr>').join('');
+  }
+  const TJ = SC.truth_jpeg;
+  if (TJ) {
+    const q = v => v == null ? '—' : (100 * v).toFixed(1);
+    const sg = v => (v >= 0 ? '+' : '−') + Math.abs(100 * v).toFixed(1);
+    const n = Object.keys(TJ.pages).length, up = Object.values(TJ.pages).filter(p => p.upscaled_pdf).length;
+    document.getElementById('sc-jpeg-note').hidden = document.getElementById('sc-jpeg-tbl').hidden = false;
+    document.getElementById('sc-jpeg-note').textContent = 'What the corpus PDFs\' images cost (W46.truth-jpeg-upgrade): ' + n + ' of the 96 were built from the image inside the ABBYY-processed PDF, and have now been swapped for the camera\'s JPEG original. The same truth, each route reading both images (2,400 px ceiling). For ' + up + ' of them the PDF image is a FineReader upscale of a small original, so the original is smaller, not sharper; those are apart. The truth was drafted from the PDF images, which favours them. Every other route on this page still reads the PDF images of these pages. Detail: segbench-results/truth-jpeg-upgrade.md.';
+    document.getElementById('sc-jpeg').innerHTML = Object.entries(TJ.routes).map(([k, r]) => '<tr><td>' + k + '</td><td>' + r.n + '</td><td>' + q(r.pdf_mean) + '</td><td>' + q(r.jpeg_mean) + '</td><td>' + sg(r.jpeg_mean - r.pdf_mean) + '</td><td>' + q(r.sharper_pdf) + ' → ' + q(r.sharper_jpeg) + ' (' + r.sharper_n + ')</td><td>' + q(r.upscaled_pdf) + ' → ' + q(r.upscaled_jpeg) + ' (' + r.upscaled_n + ')</td><td>' + q(r.all96_pdf) + ' → ' + q(r.all96_jpeg) + '</td></tr>').join('');
   }
 }
 const RG = DATA.regions;

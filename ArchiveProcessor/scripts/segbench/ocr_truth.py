@@ -39,6 +39,8 @@ THE DRAW RULE — written before the draw was run, and not changed after (seed `
     year-taken tertile and camera, of the pages already drawn sharing that value; ties at random).
   * The image: the original photograph in ``ORIGINALS`` with the PDF's file name (any extension), when
     exactly one exists; otherwise the image inside the PDF, and the row says why. EXIF orientation applied.
+    (W46.truth-jpeg-upgrade, 2026-10-29: 15 of those PDF images were since replaced in pages/ by their JPEG
+    originals, found by corpus_pairs.py or named by the owner; truth_jpeg_upgrade.py, jpeg-upgrade.json.)
   * Photo attributes, measured from the file: pixel size (long side), sharpness (variance of a Laplacian on
     the grey image at 1024 px), the year taken (EXIF DateTimeOriginal, else the file's mtime) and the camera
     (EXIF Make and Model). Tertile cut points come from ``calibrate``'s random sample of originals.
