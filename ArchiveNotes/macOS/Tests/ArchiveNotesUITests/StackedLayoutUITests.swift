@@ -1,4 +1,5 @@
 import XCTest
+import AppKit   // NSScreen — room for the divider drag
 
 /// W48.notes-stacked-layout — View ▸ List Above Note, in the VM. Written from the item's promise (ledger rows N-49,
 /// N-50, N-51): the folder tree stays on the left, the list sits above the note with a horizontal divider that drags,
@@ -83,6 +84,11 @@ final class StackedLayoutUITests: NotesFixtureUITestCase {
             chooseLayout(.stacked)
             assertLayout(.stacked, in: mainWindow)
             _ = selectItem(uuid: Self.idPlain)
+            // Room for the list to grow: at the window's minimum height the note's floor leaves it none.
+            let frame = mainWindow.frame
+            let screen = NSScreen.main?.frame.height ?? 1000
+            LayoutGuard.dragCorner(of: mainWindow, to: CGPoint(x: frame.maxX, y: min(screen - 8, frame.maxY + 400)))
+            print("[w48] window for the drag: \(mainWindow.frame.size)")
             let divider = splitter(.stacked, in: mainWindow)
             XCTAssertEqual(divider.label, "Item list height")
 
@@ -245,11 +251,12 @@ final class StackedLayoutUITests: NotesFixtureUITestCase {
         assertLayout(layout, in: mainWindow)
     }
 
-    /// Click the list, then Tab until the editor holds keyboard focus; the presses it took, or nil within 12.
+    /// Click the list, then Tab until the editor holds keyboard focus; the presses it took, or nil within 30
+    /// (with full keyboard access Tab also stops on every filter and editor-toolbar control).
     private func tabsFromListToEditor() -> Int? {
         func focused() -> Bool { (editor.value(forKey: "hasKeyboardFocus") as? Bool) == true }
         mainWindow.descendants(matching: .any)["an.cell.title.\(Self.idPlain)"].click()
-        for n in 1...12 {
+        for n in 1...30 {
             app.typeKey(.tab, modifierFlags: [])
             if pollUntil(timeout: 0.5, focused) { return n }
         }

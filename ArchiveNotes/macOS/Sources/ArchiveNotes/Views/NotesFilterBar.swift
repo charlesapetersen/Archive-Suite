@@ -187,6 +187,7 @@ struct NotesFilterBar: View {
                 .accessibilityLabel("From year")
                 .accessibilityIdentifier("an.filter.dateFrom")
             Text("–").foregroundStyle(.primary)
+                .accessibilityHidden(true)   // decorative: the fields are named From year and To year
             TextField("To", text: toYearText)
                 .frame(width: 54)
                 .textFieldStyle(.roundedBorder)

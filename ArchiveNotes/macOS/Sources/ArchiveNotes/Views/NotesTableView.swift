@@ -349,6 +349,9 @@ struct NotesTableView: NSViewRepresentable {
             } else {
                 hosting = NSHostingView(rootView: menu)
                 hosting.identifier = cellID
+                // The cell's group needs its own name: the audit flagged it once the stacked layout's wider
+                // list showed the Quality column on screen (W48.notes-stacked-layout).
+                hosting.setAccessibilityLabel("Quality")
             }
             return hosting
         }

@@ -48,8 +48,9 @@ final class LayoutGuardUITests: NotesFixtureUITestCase {
         let window = mainWindow
         app.activate()
         window.click()
-        let screen = NSScreen.main?.visibleFrame.height ?? 1000
-        LayoutGuard.dragCorner(of: window, to: CGPoint(x: window.frame.minX + 40, y: screen - 4))
+        let screen = NSScreen.main?.frame.height ?? 1000
+        LayoutGuard.dragCorner(of: window, to: CGPoint(x: window.frame.minX + 40,
+                                                       y: min(screen - 8, window.frame.maxY + 400)))
         LayoutGuard.waitUntilSettled(window)
         print("[layout] narrow and tall, \(appearance): window \(window.frame.size)")
         LayoutGuard.sweep(window, screen: "note window, narrow and tall, \(appearance)", in: self, ignore: isHarness)

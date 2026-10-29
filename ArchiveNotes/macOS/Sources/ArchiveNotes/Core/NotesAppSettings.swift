@@ -75,8 +75,9 @@ struct NotesLayoutSettings: Equatable, Sendable {
     /// The stacked list keeps its filter bar, header and a few rows.
     static let defaultListHeight = 240.0, listHeightMin = 140.0, listHeightMax = 440.0
     /// The note pane's floor in the stacked layout: its header, locations and details inspector, and an editor
-    /// still larger than the details (measured in the VM: at 313 pt the editor got 9). The list gives way first.
-    static let stackedDetailMinHeight = 440.0
+    /// still larger than the details (measured in the VM: at 313 pt the editor got 9, and at 440 an extract's got
+    /// 103 against 110 for its details). The list gives way first.
+    static let stackedDetailMinHeight = 480.0
     /// The divider's own thickness, between the list and the note.
     static let stackedDividerHeight = 7.0
     /// The stacked panes' minimum height: the list at its floor and the note at its.

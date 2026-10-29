@@ -237,7 +237,7 @@ struct NotesAppSettingsTests {
         #expect(NotesLayoutSettings.clampedListHeight(.infinity) == NotesLayoutSettings.defaultListHeight)
         #expect(NotesLayoutSettings.listHeightRange == 140...440)
         #expect(NotesLayoutSettings.listHeightRange.contains(CGFloat(NotesLayoutSettings.defaultListHeight)))
-        #expect(NotesLayoutSettings.stackedMinHeight == 587)
+        #expect(NotesLayoutSettings.stackedMinHeight == 627)
     }
 
     /// The VM's 612 pt window squeezed the stacked editor to 9 pt: the list must give way to the note first.
@@ -248,9 +248,9 @@ struct NotesAppSettingsTests {
         // Tall panes: the whole range fits.
         #expect(NotesLayoutSettings.stackedListHeight(stored: 440, paneHeight: 1200) == 440)
         #expect(NotesLayoutSettings.stackedListRange(paneHeight: 1200) == 140...440)
-        // A 700 pt pane: the note keeps 440, the list gets what is left, never below its floor.
-        #expect(NotesLayoutSettings.stackedListHeight(stored: 300, paneHeight: 700) == 253)
-        #expect(NotesLayoutSettings.stackedListRange(paneHeight: 700) == 140...253)
+        // A 700 pt pane: the note keeps 480, the list gets what is left, never below its floor.
+        #expect(NotesLayoutSettings.stackedListHeight(stored: 300, paneHeight: 700) == 213)
+        #expect(NotesLayoutSettings.stackedListRange(paneHeight: 700) == 140...213)
         #expect(NotesLayoutSettings.stackedListHeight(stored: 300, paneHeight: 400) == 140)
         #expect(NotesLayoutSettings.stackedListRange(paneHeight: 400) == 140...140)
         // Whatever the pane, list + divider + note fit whenever the pane is at least the stacked minimum.
