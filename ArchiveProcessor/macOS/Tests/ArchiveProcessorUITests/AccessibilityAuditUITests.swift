@@ -64,19 +64,6 @@ final class AccessibilityAuditUITests: XCTestCase {
     // Filed 2026-10-16 from the first VM runs; each fix's session deletes its entry (the audit fails once it
     // stops reproducing).
     static let known: [AccessibilityAudit.KnownIssue] = [
-        AccessibilityAudit.KnownIssue(tag: "W40.fix-processor-a11y-labels") { f in
-            switch f.audit {
-            case .sufficientElementDescription:
-                return f.identifier == "questionmark.circle"                     // the (?) help buttons
-                    || f.identifier == "ap.ocr.dropZone" && f.type == .image      // the drop zone's picture
-                    || f.type == .textField && f.identifier.isEmpty              // Settings' Google client ID,
-                        && f.compact.contains("not human-readable")             // named by its value
-            case .elementDetection:
-                return f.identifier == "ap.ocr.dropZone" && f.type == .image
-            default:
-                return false
-            }
-        },
         // Measured 1.87–2.26:1 for the explanation lines and the drop zone's hint, 3.95:1 for its title.
         AccessibilityAudit.KnownIssue(tag: "W40.fix-processor-a11y-contrast") { f in
             guard f.audit == .contrast, f.type == .staticText else { return false }

@@ -18,6 +18,7 @@ struct HelpButton: View {
         }
         .buttonStyle(.plain)
         .help(text)
+        .accessibilityLabel("Help")   // otherwise VoiceOver reads the symbol name (W40.fix-processor-a11y-labels)
         .popover(isPresented: $show, arrowEdge: .bottom) {
             Text(text)
                 .font(.callout)
@@ -982,6 +983,7 @@ struct SettingsView: View {
                 }
                 TextField("…apps.googleusercontent.com", text: $driveClientId)
                     .textFieldStyle(.roundedBorder)
+                    .accessibilityLabel("Google client ID")
                 HStack {
                     Text("Client secret").font(.caption)
                     HelpButton(text: "The OAuth Desktop-app client secret (GOCSPX-…). Saved to the macOS Keychain, never written to disk or settings.")
@@ -989,6 +991,7 @@ struct SettingsView: View {
                 }
                 SecureField("GOCSPX-…", text: $driveClientSecret)
                     .textFieldStyle(.roundedBorder)
+                    .accessibilityLabel("Client secret")
                     .onChange(of: driveClientSecret) { _, v in _ = KeychainHelper.save(account: "DriveClientSecret", password: v) }
                 HStack(spacing: 10) {
                     Button(driveSignedIn ? "Re-sign in" : "Sign in to Google Drive") { signInToDrive() }

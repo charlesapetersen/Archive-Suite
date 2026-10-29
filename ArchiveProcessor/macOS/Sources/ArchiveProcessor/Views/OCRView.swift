@@ -912,6 +912,7 @@ struct OCRView: View {
                 Image(systemName: preOCRedInput ? "doc.text" : "photo.stack")
                     .font(.system(size: 40))
                     .foregroundStyle(.secondary)
+                    .accessibilityHidden(true)   // decorative; the text below says what the zone is for
                 Text(preOCRedInput ? "Drop PDFs here" : "Drop images or PDFs here")
                     .font(.headline)
                     .foregroundStyle(.secondary)
