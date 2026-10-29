@@ -152,6 +152,15 @@ record:
   hardest pages. The page shows its summary rows as a table with a page-group picker; every arm read on all 96
   enters the four OCR charts (`enh-` ids, kept out of the difficulty analysis). Tag, repair-by-tag and gate tables
   are in `enh-ocr-input.md`.
+- `ocr-logprob.json` (`scripts/segbench/ocr_logprob.py report`, W46.ocr-logprob): LightOnOCR-3 4B and Qwen3.5-9B
+  read again with token log-probabilities (mlx-vlm on the Mac for the 96, vLLM on Sherlock for the 96 and the 895).
+  Part 5 shows each signal's AUC against an answered page under 90 NES and the 455's 20%-budget cascade into
+  Qwen3.6-27B. Three of its four readings rerun routes already on the charts (same settings, NES within about a
+  point) and add no chart route. The fourth, Qwen3.5-9B through vLLM on Sherlock with the panel prompt, is new: its
+  96 are `farmshare/truth/qwen3.5-9b-49202328` (scored by `corpus/farmshare_truth96.py`), on the four OCR charts as
+  `qwen3.5-9b-sherlock` at OpenRouter's DeepInfra bf16 rate. Its 895 (NES 48.3; 31.2 on the 440, 64.9 on the 455;
+  237 caps) stay off the public tables, which are the open sweep's report (`open-sweep-20261019.*`), not a list
+  routes can join; the figures are in `ocr-logprob.md`. Calibration, threshold and invariance tables are there too.
 - `bench-corpus/regions-20261021.json` (`corpus/regions.py report`, W46.ocr-regions): whole page against
   DocLayout-YOLO regions, PP-DocLayoutV3 regions and overlapping tiles, four readers on L9/L4/L3/L1 (255
   public pages) and the 96. Its experiment section selects public strata and overlapping annotation groups;

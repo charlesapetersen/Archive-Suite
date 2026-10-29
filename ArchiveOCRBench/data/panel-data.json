@@ -340,6 +340,22 @@
    }
   },
   {
+   "id": "qwen3.5-9b-sherlock",
+   "name": "Qwen3.5 9B (Sherlock)",
+   "panel": "farmshare",
+   "pair": "qwen3.5-9b",
+   "std": 0.48,
+   "batch": null,
+   "free_cluster": false,
+   "machine": "one GPU, Stanford Sherlock (W46.ocr-logprob's run, log-probabilities on)",
+   "hw": {
+    "photos_per_hour": 3898.9,
+    "gpus": 1,
+    "gpu_hours_per_100k": 25.648259765574906,
+    "usd_per_1000": 0.48352989690721654
+   }
+  },
+  {
    "id": "qwen3.5-4b-farmshare",
    "name": "Qwen3.5 4B (FarmShare)",
    "panel": "farmshare",
@@ -1432,6 +1448,11 @@
      95,
      96
     ],
+    "qwen3.5-9b-sherlock": [
+     93.1,
+     94,
+     96
+    ],
     "qwen3.5-4b-farmshare": [
      90.95,
      95,
@@ -1968,6 +1989,11 @@
     "qwen3-vl-8b-farmshare": [
      95.37,
      50,
+     50
+    ],
+    "qwen3.5-9b-sherlock": [
+     95.64,
+     49,
      50
     ],
     "qwen3.5-4b-farmshare": [
@@ -2508,6 +2534,11 @@
      27,
      28
     ],
+    "qwen3.5-9b-sherlock": [
+     91.15,
+     27,
+     28
+    ],
     "qwen3.5-4b-farmshare": [
      90.78,
      28,
@@ -3043,6 +3074,11 @@
     ],
     "qwen3-vl-8b-farmshare": [
      89.72,
+     16,
+     16
+    ],
+    "qwen3.5-9b-sherlock": [
+     90.7,
      16,
      16
     ],
@@ -3711,6 +3747,19 @@
     "per_hour": 649.2,
     "gpu_hours_100k": 154,
     "usd_1000": 1.95
+   },
+   {
+    "label": "qwen3.5-9b-49202328",
+    "name": "qwen3.5-9b",
+    "kv": "bf16",
+    "gpus": 1,
+    "nes": 93.1,
+    "ok": 94,
+    "n": 96,
+    "clippings": 93.13,
+    "per_hour": 3898.9,
+    "gpu_hours_100k": 26,
+    "usd_1000": 0.48
    },
    {
     "label": "qwen3.8-27b-1850053",
@@ -38544,5 +38593,130 @@
     }
    }
   }
+ },
+ "logprob": {
+  "escalation_route": "qwen3.6-27b",
+  "rows": [
+   {
+    "route": "LightOnOCR-3 4B, Mac 8-bit",
+    "set": "96",
+    "poor": 27,
+    "answered": 96,
+    "first": 0.7120236178207193,
+    "mean": 0.7595276435856146,
+    "min_k": 0.7549651100375738,
+    "low_share": 0.7482555018786903,
+    "length": 0.41626409017713367,
+    "disagreement": 0.9366612989801396
+   },
+   {
+    "route": "Qwen3.5-9B, Mac 4-bit",
+    "set": "96",
+    "poor": 19,
+    "answered": 95,
+    "first": 0.46710526315789475,
+    "mean": 0.8940443213296398,
+    "min_k": 0.8964681440443213,
+    "low_share": 0.8292936288088643,
+    "length": 0.30713296398891965,
+    "disagreement": 0.8947368421052632
+   },
+   {
+    "route": "LightOnOCR-3 4B, Sherlock",
+    "set": "96",
+    "poor": 27,
+    "answered": 96,
+    "first": 0.6865271068169619,
+    "mean": 0.7702630166398282,
+    "min_k": 0.7707997852925389,
+    "low_share": 0.7925389157273215,
+    "length": 0.4194847020933977,
+    "disagreement": 0.9420289855072463
+   },
+   {
+    "route": "LightOnOCR-3 4B, Sherlock",
+    "set": "455",
+    "poor": 267,
+    "answered": 431,
+    "first": 0.653592308394994,
+    "mean": 0.8678861788617886,
+    "min_k": 0.8672238969580707,
+    "low_share": 0.8615259888553942,
+    "length": 0.5835388690965562,
+    "disagreement": 0.9184479766145976
+   },
+   {
+    "route": "LightOnOCR-3 4B, Sherlock",
+    "set": "440",
+    "poor": 343,
+    "answered": 389,
+    "first": 0.7263277982000254,
+    "mean": 0.9404867537076943,
+    "min_k": 0.9465711750538724,
+    "low_share": 0.9403916846241602,
+    "length": 0.6407339333248827,
+    "disagreement": 0.7384332615033591
+   },
+   {
+    "route": "Qwen3.5-9B, Sherlock",
+    "set": "96",
+    "poor": 17,
+    "answered": 94,
+    "first": 0.7051184110007639,
+    "mean": 0.8479755538579068,
+    "min_k": 0.8441558441558441,
+    "low_share": 0.8418640183346066,
+    "length": 0.3456837280366692,
+    "disagreement": 0.8418640183346066
+   },
+   {
+    "route": "Qwen3.5-9B, Sherlock",
+    "set": "455",
+    "poor": 210,
+    "answered": 370,
+    "first": 0.4691815476190476,
+    "mean": 0.8950595238095238,
+    "min_k": 0.8958630952380953,
+    "low_share": 0.8900148809523809,
+    "length": 0.5043303571428571,
+    "disagreement": 0.8988095238095238
+   },
+   {
+    "route": "Qwen3.5-9B, Sherlock",
+    "set": "440",
+    "poor": 193,
+    "answered": 219,
+    "first": 0.39826624153049023,
+    "mean": 0.9380231167795935,
+    "min_k": 0.9372259864487844,
+    "low_share": 0.9382223993622958,
+    "length": 0.5962534874451972,
+    "disagreement": 0.9798724591470706
+   }
+  ],
+  "budget": [
+   {
+    "route": "LightOnOCR-3 4B, Sherlock",
+    "first": 0.7168998982496696,
+    "all": 0.7478137626373627,
+    "oracle": 0.7734279339677312,
+    "mean": 0.7149441406978421,
+    "fail+mean": 0.7247741212739073,
+    "length": 0.7334970583468993,
+    "disagreement": 0.7178637599165361,
+    "failure": 0.7263273410490066
+   },
+   {
+    "route": "Qwen3.5-9B, Sherlock",
+    "first": 0.6488746175399828,
+    "all": 0.7478137626373627,
+    "oracle": 0.7552790332255479,
+    "mean": 0.6527162235856556,
+    "fail+mean": 0.7352527173170834,
+    "length": 0.6968047721468708,
+    "disagreement": 0.7348450050492386,
+    "failure": 0.7371844595877187
+   }
+  ]
  }
 }

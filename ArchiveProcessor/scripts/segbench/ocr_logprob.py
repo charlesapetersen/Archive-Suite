@@ -15,7 +15,8 @@ THE SIGNALS, per page, over every generated token (the panel header included; it
 first-token log-probability, mean log-probability, minimum-k (the mean of the lowest 10% of token log-probabilities,
 at least one token) and the low-probability share (tokens under p 0.5). Beside them, the signals already measured
 without log-probabilities: output length in tokens, two-reader disagreement (one reader's NES against the other's
-text) and escalate-on-failure (a cap or an error only).
+text) and escalate-on-failure (a cap or an error only). And fail+mean: a cap or an error first, then mean
+log-probability, since a looping reading that hits the cap is confident.
 
 THE TESTS. AUC of each signal against NES under 70 (the audit's line), NES under 90 (H test 3's) and failure.
 Isotonic calibration fitted on the 440 (the open sweep's original strata), with Brier and ten-bin ECE on the 455 and
@@ -331,8 +332,8 @@ def mac_collect(key, limit=None):
 
 # --- the OCR report -------------------------------------------------------------------------------------------
 
-CLUSTER = Path(os.environ.get('OCR_LOGPROB_CLUSTER',
-                              Path.home() / 'Claude/Long term storage/FarmShare-logprob-20261022/out'))
+CLUSTER = Path(os.environ.get('OCR_LOGPROB_CLUSTER',  # the Sherlock collection of 2026-10-24 (jobs 49202324, 49202328)
+                              Path.home() / 'Library/Caches/ArchiveSuiteRehearsal/sherlock-results/logprob-20261022/out'))
 # route -> (how its reply is read, its pair for the disagreement signal)
 CLUSTER_ROUTES = {'lightonocr3-4b': ('native', 'qwen3.5-9b'), 'qwen3.5-9b': ('panel', 'lightonocr3-4b')}
 MAC_ROUTES = {'lightonocr-3-4b-mlx8': 'qwen3.5-9b-mlx4', 'qwen3.5-9b-mlx4': 'lightonocr-3-4b-mlx8'}
@@ -342,7 +343,7 @@ OCR_JSON = RESULTS / 'ocr-logprob.json'
 OCR_MD = RESULTS / 'ocr-logprob.md'
 OCR_PAGES = RESULTS / 'ocr-logprob-pages.csv'
 LP_SIGNALS = ('first', 'mean', 'min_k', 'low_share')
-SIGNALS = LP_SIGNALS + ('length', 'disagreement', 'failure')
+SIGNALS = LP_SIGNALS + ('fail+mean', 'length', 'disagreement', 'failure')
 LABELS = {'nes<70': lambda r: not r['ok'] or r['nes'] < 0.70, 'nes<90': lambda r: not r['ok'] or r['nes'] < 0.90,
           'failure': lambda r: not r['ok']}
 
@@ -354,6 +355,8 @@ def risks(page):
     out['length'] = f['tokens'] if f else 1e9
     out['disagreement'] = -page['agreement'] if page.get('agreement') is not None else 1.0
     out['failure'] = 0 if page['ok'] else 1
+    # a cap or an error first (a looping reading is confident, so its log-probabilities hide it), then mean
+    out['fail+mean'] = out['mean'] if page['ok'] else 1e9
     return out
 
 
@@ -449,7 +452,13 @@ def analyse(rows, esc):
                         **{f'errors {k}': sum(1 for r in rr if f(r)) for k, f in LABELS.items()}}
                     for s, rr in by_set.items()},
            'auc': {s: {k: {sig: auc([r['risk'][sig] for r in rr], [f(r) for r in rr]) for sig in SIGNALS}
-                       for k, f in LABELS.items()} for s, rr in by_set.items()}}
+                       for k, f in LABELS.items()} for s, rr in by_set.items()},
+           # the bench's flag question (ArchiveOCRBench part 5): among answered pages only, so a cap or an error,
+           # which a cascade already sees, does not count for or against a signal
+           'auc_answered': {s: {k: {'poor': sum(1 for r in rr if r['ok'] and f(r)), 'answered': sum(r['ok'] for r in rr),
+                                    **{sig: auc([r['risk'][sig] for r in rr if r['ok']], [f(r) for r in rr if r['ok']])
+                                       for sig in SIGNALS if sig != 'failure'}}
+                                for k, f in LABELS.items() if k != 'failure'} for s, rr in by_set.items()}}
     if '440' not in by_set or '96' not in by_set or '455' not in by_set:
         return res
     y = LABELS['nes<70']
@@ -480,7 +489,19 @@ def analyse(rows, esc):
         casc[sig] = {'threshold': t, 'tune_96': {'share': share, 'nes': nes, 'all_nes': all_nes,
                                                  'first_nes': sum(f96) / len(f96), 'pages': len(p96)},
                      'test_455': {**test, 'pages': len(p455)}, 'invariance_455': inv}
-    res.update(calibration=cal, cascade=casc)
+    # Whether a signal finds the pages escalation helps, or only the pages that are hard for both readers: on the
+    # 455's answered pages, AUC against the escalation route also reading under 90, and the mean NES gain from
+    # escalating the riskiest fifth against the rest.
+    ans = [r for r in by_set['455'] if r['ok'] and r['page'] in esc]
+    gain = {}
+    for sig in SIGNALS:
+        if sig == 'failure':
+            continue
+        q = sorted(ans, key=lambda r: -r['risk'][sig]); n = len(q) // 5
+        g = lambda rr: sum(esc[r['page']] - r['nes'] for r in rr) / len(rr)
+        gain[sig] = {'auc_escalation_poor': auc([r['risk'][sig] for r in ans], [esc[r['page']] < 0.90 for r in ans]),
+                     'gain_riskiest_fifth': g(q[:n]), 'gain_rest': g(q[n:]), 'pages': len(ans)}
+    res.update(calibration=cal, cascade=casc, escalation_gain_455=gain)
     return res
 
 
@@ -490,7 +511,7 @@ def ocr_report():
     out = {'item': 'W46.ocr-logprob', 'escalation_route': ESCALATE, 'routes': {}}
     esc = escalation_nes()
     page_rows = []
-    for routes, loader, where in ((MAC_ROUTES, mac_pages, 'Mac mlx-vlm'), (CLUSTER_ROUTES, cluster_pages, 'FarmShare vLLM')):
+    for routes, loader, where in ((MAC_ROUTES, mac_pages, 'Mac mlx-vlm'), (CLUSTER_ROUTES, cluster_pages, 'Sherlock vLLM')):
         got = {k: loader(k) for k in routes}
         for k, rows in got.items():
             if rows is None:
@@ -520,7 +541,7 @@ def render(out):
          'Signals are risks (higher = more likely wrong): first = first-token log-probability, mean = mean token '
          'log-probability, min_k = mean of the lowest 10%, low_share = share of tokens under p 0.5 (all negated); '
          'length = output tokens; disagreement = this reading\'s NES against the other route\'s reading; failure = '
-         'a cap or an error only.', '']
+         'a cap or an error only; fail+mean = a cap or an error first, then mean.', '']
     for k, r in out['routes'].items():
         L += [f'## {k} ({r["where"]})', '']
         if r.get('status'):
@@ -535,6 +556,12 @@ def render(out):
         for s, by in sorted(r['auc'].items()):
             for lab, a in by.items():
                 L.append(f'| {s} | {lab} | ' + ' | '.join(_f(a[sig]) for sig in SIGNALS) + ' |')
+        sig_a = [x for x in SIGNALS if x != 'failure']
+        L += ['', 'The same AUCs on answered pages only (a cap or an error, which a cascade already sees, left out):', '',
+              '| set | error | poor of answered | ' + ' | '.join(sig_a) + ' |', '|---|---|---:|' + '---:|' * len(sig_a)]
+        for s, by in sorted(r['auc_answered'].items()):
+            for lab, a in by.items():
+                L.append(f"| {s} | {lab} | {a['poor']} of {a['answered']} | " + ' | '.join(_f(a[sig]) for sig in sig_a) + ' |')
         if 'cascade' in r:
             L += ['', f"Isotonic calibration of P(NES<70) on the 440; the escalation threshold chosen on the 96 "
                   f"(within half a point of escalating every page to {out['escalation_route']}), applied once to the 455:", '',
@@ -557,8 +584,47 @@ def render(out):
                     L.append(f"| {sig} | {v['pages']} | {_f(v['mean_calibrated_p'])} | {_f(v['observed_error_rate'])} | "
                              f"{100 * v['first_nes_on_escalated']:.2f} | {100 * v['escalation_nes_on_escalated']:.2f} | "
                              f"{100 * v['escalation_nes_overall']:.2f} |")
+        if r.get('escalation_gain_455'):
+            L += ['', 'Does a signal find the pages escalation helps? On the 455\'s answered pages: AUC against '
+                  f"{out['escalation_route']} also reading under 90 NES, and the mean NES points gained by escalating the "
+                  'riskiest fifth against the rest:', '',
+                  '| signal | AUC, escalation also poor | gain, riskiest fifth | gain, the rest |', '|---|---:|---:|---:|']
+            for sig, v in r['escalation_gain_455'].items():
+                L.append(f"| {sig} | {_f(v['auc_escalation_poor'])} | {100 * v['gain_riskiest_fifth']:+.2f} | "
+                         f"{100 * v['gain_rest']:+.2f} |")
         L.append('')
-    return '\n'.join(L)
+    return '\n'.join(L + CONCLUSION)
+
+
+CONCLUSION = [
+    '## Conclusion (scored 2026-10-28: the Mac runs and the Sherlock collection of 2026-10-24)', '',
+    '- **Log-probabilities do rank a reader\'s own errors, once its caps are set aside.** On answered pages, mean '
+    'token log-probability (or min-k, or the low-probability share, all within a few hundredths of each other) has AUC '
+    '0.76-0.94 against a reading under 90 NES, for both readers, on the Mac and on Sherlock. That is about as good as '
+    'two-reader disagreement (0.74-0.98) for the price of one reading. The first token and output length do not rank '
+    'them.',
+    '- **They miss the worst failure.** A reading that loops to the cap is confident: against failure on the public '
+    'sets, mean log-probability has AUC 0.04-0.26, the wrong way round. Any use has to escalate caps and errors first '
+    '(fail+mean); length and disagreement catch loops directly.',
+    '- **Calibration does not travel across a stratum mix.** Isotonic on the 440 (the original strata, far more '
+    'errors) leaves Qwen3.5-9B\'s mean ECE at 0.38 on the 455 and 0.71 on the 96, and the escalated pages\' '
+    'calibrated P overstates their error rate (0.78 against 0.40): UCCI\'s invariance assumption fails. With caps '
+    'first it mostly holds: fail+mean\'s ECE is 0.05 on the 455 and 0.04 on the 96 for Qwen (escalated pages 0.64 '
+    'calibrated against 0.62 observed), 0.11 and 0.02 for LightOnOCR.',
+    '- **But it does not choose the pages worth escalating.** Low confidence marks pages that are hard for every '
+    'reader: AUC about 0.88 against Qwen3.6-27B also reading under 90. Escalating the least confident fifth of '
+    'answered pages gains less than escalating the rest (LightOnOCR: -2.0 NES points there against +3.2; Qwen3.5-9B: '
+    '+0.4 against +1.6). In the 20%-budget cascade '
+    'on the 455, fail+mean (72.48, 73.53) does no better than escalating caps and errors alone (72.63, 73.72), '
+    'against 77.34 and 75.53 for hindsight. The threshold chosen on the 96 escalates every page for most signals, '
+    'because the 27B reads nearly every one of the 96 a little better.',
+    '- **For the app:** no change to W41.app-ocr-cascade\'s proposed rule (cheap reader, escalate failures, '
+    'optionally disagreement). A local route\'s confidence is worth showing as a per-page "check this reading" flag '
+    '(it ranks the reader\'s own errors), not as an escalation trigger. Limits: two readers, one escalation route; '
+    'the Mac\'s mlx 4-bit log-probabilities come in bf16 steps (1/8 nat), yet rank as well as Sherlock\'s; the 96 '
+    'hold only 17-27 poor readings per reader.',
+    '- **The seg 2B\'s P(new)** (`ocr-logprob-seg.md`): AUC 0.76 development / 0.70 test against a wrong gap '
+    'decision; isotonic on development makes test ECE worse (0.048 to 0.060).', '']
 
 
 # --- self-test ------------------------------------------------------------------------------------------------
@@ -597,6 +663,7 @@ def self_test():
     esc = {r['page']: 0.9 for r in rows}
     res = analyse(rows, esc)
     assert res['auc']['455']['nes<70']['mean'] == 1.0 and res['auc']['455']['nes<70']['failure'] == 0.5
+    assert res['auc_answered']['455']['nes<70']['mean'] == 1.0 and res['auc_answered']['455']['nes<70']['poor'] == 10
     c = res['cascade']['mean']
     assert c['tune_96']['share'] == 0.25 and c['test_455']['share'] == 0.25, c
     assert c['invariance_455']['observed_error_rate'] == 1.0

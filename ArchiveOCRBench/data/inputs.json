@@ -67,6 +67,7 @@
       "qwen3.8-27b-farmshare": {"name": "Qwen3.8 27B (FarmShare)", "where": "farmshare", "run": "qwen3.8-27b-1850053", "pair": null, "machine": "one NVIDIA L40S, Stanford FarmShare"},
       "ling3-flash-vl-farmshare": {"name": "Ling 3 Flash VL fp8 (FarmShare)", "where": "farmshare", "run": "ling3-flash-vl-fp8-1861703", "pair": null, "machine": "four NVIDIA L40S, Stanford FarmShare"},
       "qwen3-vl-8b-farmshare": {"name": "Qwen3-VL 8B (FarmShare)", "where": "farmshare", "run": "qwen3-vl-8b-1861701", "pair": "qwen3-vl-8b", "machine": "one NVIDIA L40S, Stanford FarmShare", "price": {"openrouter": "qwen/qwen3-vl-8b-instruct", "in": 0.25, "out": 0.75, "read": "2026-10-21"}},
+      "qwen3.5-9b-sherlock": {"name": "Qwen3.5 9B (Sherlock)", "where": "farmshare", "run": "qwen3.5-9b-49202328", "pair": "qwen3.5-9b", "machine": "one GPU, Stanford Sherlock (W46.ocr-logprob's run, log-probabilities on)", "price": {"openrouter": "qwen/qwen3.5-9b", "in": 0.10, "out": 0.15, "read": "2026-10-28"}},
       "qwen3.5-4b-farmshare": {"name": "Qwen3.5 4B (FarmShare)", "where": "farmshare", "run": "qwen3.5-4b-1861700", "pair": null, "machine": "one NVIDIA L40S, Stanford FarmShare"},
       "glm-ocr-farmshare": {"name": "GLM-OCR, native prompt (FarmShare)", "where": "farmshare", "run": "glm-ocr-1861696", "pair": null, "machine": "one NVIDIA L40S, Stanford FarmShare"},
       "lightonocr3-4b-farmshare": {"name": "LightOnOCR-3 4B, native (FarmShare)", "where": "farmshare", "run": "lightonocr3-4b-1861698", "pair": null, "machine": "one NVIDIA L40S, Stanford FarmShare"},

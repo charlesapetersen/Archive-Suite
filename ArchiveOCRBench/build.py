@@ -55,6 +55,7 @@ TRUTH_BIAS_SCORE = RESULTS / "ocr-truth-bias-score.json"  # W46.fix-ocr-truth-bi
 CHAOS = RESULTS / "chaos-probe.json"  # W46.fix-ocr-scorers: chaos_probe.py score, the altered-word probe
 DEWARP = RESULTS / "enh-dewarp.json"  # W46.enh-dewarp: enh_dewarp.py report, crop or dewarp against raw, by reader
 ENH_OCR = RESULTS / "enh-ocr-input.json"  # W46.enh-ocr-input: enh_ocr_input.py report, content-removing enhancement
+LOGPROB = RESULTS / "ocr-logprob.json"  # W46.ocr-logprob: ocr_logprob.py report, log-probabilities as an error flag
 LAYOUT_ORDER = RESULTS / "layout-order.json"  # W46.layout-order: layout_order.py run, ordering with detection fixed
 LOOPS = PUBLIC / "loop-rerun-20261021.json"  # W46.ocr-loops: corpus/loop_rerun.py report, the capped pages read again
 REGIONS = PUBLIC / "regions-20261021.json"  # W46.ocr-regions: whole page, detector regions and overlapping tiles
@@ -525,6 +526,34 @@ def ocr_scorers():
     return out
 
 
+def logprob():
+    """W46.ocr-logprob: per route and page set, AUC of each signal against an answered page under 90 NES (part 5's
+    poor reading), and on the 455 the NES with the riskiest 20% sent to the escalation route. None until it has run."""
+    if not LOGPROB.exists():
+        return None
+    d = json.loads(LOGPROB.read_text())
+    names = {"lightonocr-3-4b-mlx8": "LightOnOCR-3 4B, Mac 8-bit", "qwen3.5-9b-mlx4": "Qwen3.5-9B, Mac 4-bit",
+             "lightonocr3-4b": "LightOnOCR-3 4B, Sherlock", "qwen3.5-9b": "Qwen3.5-9B, Sherlock"}
+    sigs = ("first", "mean", "min_k", "low_share", "length", "disagreement")
+    rows, budget = [], []
+    for k, r in d["routes"].items():
+        if "auc_answered" not in r:
+            continue
+        for s in ("96", "455", "440"):
+            a = r["auc_answered"].get(s, {}).get("nes<90")
+            if a:
+                rows.append({"route": names.get(k, k), "set": s, "poor": a["poor"], "answered": a["answered"],
+                             **{g: a[g] for g in sigs}})
+        c = r.get("cascade")
+        if c:
+            t = c["mean"]["test_455"]
+            budget.append({"route": names.get(k, k), "first": t["first_nes"], "all": t["all_nes"],
+                           "oracle": t["oracle_at_20pct"],
+                           **{g: c[g]["test_455"]["nes_at_20pct"]
+                              for g in ("mean", "fail+mean", "length", "disagreement", "failure")}})
+    return {"escalation_route": d["escalation_route"], "rows": rows, "budget": budget}
+
+
 def layout_order():
     """W46.layout-order's summaries (the per-page rows stay in the result file). None until it has run."""
     if not LAYOUT_ORDER.exists():
@@ -786,7 +815,7 @@ def main():
              "public": public(), "ocr_scorers": ocr_scorers(),
              "dewarp": dewarp, "enh_ocr": enh_ocr,
              "loops": json.loads(LOOPS.read_text()) if LOOPS.exists() else None, "regions": regions,
-             "layout_order": layout_order()}
+             "layout_order": layout_order(), "logprob": logprob()}
     page = TEMPLATE.read_text().replace("__DATA__", json.dumps(built, separators=(",", ":")))
     outputs = {OUT_DATA: json.dumps(built, indent=1) + "\n", OUT_PAGE: page, OUT_DIFFICULTY: difficulty.report(diff)}
 
