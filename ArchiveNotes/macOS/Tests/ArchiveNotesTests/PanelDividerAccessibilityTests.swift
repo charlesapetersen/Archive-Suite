@@ -60,6 +60,13 @@ final class PanelDividerAccessibilityTests: XCTestCase {
         divider.setAccessibilityValue(0)
         XCTAssertEqual(height, NotesLayoutSettings.listHeightMin)
 
+        // A short window cuts the range below the remembered height: VoiceOver hears the drawn one, and steps from it.
+        height = 400
+        divider.range = NotesLayoutSettings.stackedListRange(paneHeight: 700)   // 140...213
+        XCTAssertEqual(divider.accessibilityValue() as? Double, 213)
+        XCTAssertTrue(divider.accessibilityPerformDecrement())
+        XCTAssertEqual(height, 203)
+
         divider.axis = .horizontal   // switching back to side by side restores the vertical orientation
         XCTAssertEqual(divider.accessibilityOrientation(), .vertical)
     }

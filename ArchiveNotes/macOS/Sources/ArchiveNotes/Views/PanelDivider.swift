@@ -93,7 +93,10 @@ final class PanelDividerView: NSView {
         }
     }
 
-    override func accessibilityValue() -> Any? { size.wrappedValue }
+    /// The size as drawn: a remembered one can sit beyond a range a short window has cut.
+    private var shown: Double { min(Double(range.upperBound), max(Double(range.lowerBound), size.wrappedValue)) }
+
+    override func accessibilityValue() -> Any? { shown }
     override func accessibilityMinValue() -> Any? { Double(range.lowerBound) }
     override func accessibilityMaxValue() -> Any? { Double(range.upperBound) }
 
@@ -103,12 +106,12 @@ final class PanelDividerView: NSView {
     }
 
     override func accessibilityPerformIncrement() -> Bool {
-        setAccessibilityValue(size.wrappedValue + 10)
+        setAccessibilityValue(shown + 10)
         return true
     }
 
     override func accessibilityPerformDecrement() -> Bool {
-        setAccessibilityValue(size.wrappedValue - 10)
+        setAccessibilityValue(shown - 10)
         return true
     }
 }
