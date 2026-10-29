@@ -620,13 +620,15 @@ def dewarp_chart_routes(data, kinds, op):
 
 def enh_ocr_chart_routes(data, kinds, op):
     """Content-removing enhancement arms on the 96 (W46.enh-ocr-input): Apple Vision's free, the Sherlock readers'
-    priced like the crop routes (GLM-OCR from its region crops' tokens, PP-OCRv6 free on a cluster). Raw is each
+    priced like the crop routes (GLM-OCR from its region crops' tokens, PP-OCRv6 free on a cluster), Gemini 3.7 Flash
+    (W46.enh-ocr-input-paid) from its own estimated token cost like the gateway's region arms. Raw is each
     reader's own route on the charts already; the two-seed probe's 30 pages are too few for a chart."""
     if data is None or data["readers_pending"]:
         return []
     by = {(r["route"], r["arm"], r["group"]): r for r in data["chart_rows"]}
     names = {"apple-vision": "Apple Vision", "ppocrv6": "PP-OCRv6", "qwen3-vl-8b": "Qwen3-VL 8B",
-             "glm-ocr": "GLM-OCR · PP-DocLayoutV3 regions"}
+             "glm-ocr": "GLM-OCR · PP-DocLayoutV3 regions",
+             "gemini3.7-flash-gw": "Gemini 3.7 Flash (Stanford gateway, price estimated)"}
     arms = {"shading": "shading division", "gcdrnet": "GCDRNet", "sbb": "SBB binarisation",
             "docres-appearance": "DocRes appearance", "docres-deshadow": "DocRes deshadow"}
     out = []
@@ -637,6 +639,9 @@ def enh_ocr_chart_routes(data, kinds, op):
         common = {"id": f"enh-{route}-{arm}", "name": names[route] + " · " + arms[arm], "batch": None, "scores": scores}
         if route == "apple-vision":
             out.append({**common, "panel": "local", "std": 0.0})
+            continue
+        if route in GATEWAY_ROUTES:
+            out.append({**common, "panel": "cloud", "std": cents(1000 * overall["cost"] / overall["n"])})
             continue
         price = openrouter_price(op, route, overall["prompt_tokens"] / overall["n"],
                                  overall["completion_tokens"] / overall["n"])

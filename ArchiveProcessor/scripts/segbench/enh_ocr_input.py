@@ -20,6 +20,8 @@ regions of the raw image (the regions run's detector output, crops of each arm's
 reading raw again so every comparison is inside one run. The two-seed hallucination probe: ResShift (PreP-OCR) and
 NAF-DPM, each twice with a different seed, on the 30 pages with the lowest median NES over the saved routes,
 read by Qwen3.6-27B and by Vision.
+Gemini 3.7 Flash through the Stanford gateway reads every arm on the 96 (`enh_ocr_input_gateway.py`,
+W46.enh-ocr-input-paid); its section appears once every image is read.
 
 Measures, per reader and arm against raw, on the 96 (the panel's 99 less its three agreement pages), originals and
 PDF images apart and by capture-defect tag (capture-tags.json, W46.fix-capture-tags):
@@ -408,9 +410,10 @@ def summary(by, groups, arms, reader, base='raw'):
     return out
 
 
-def chart_rows(by, reader, arms, ids, tokens):
+def chart_rows(by, reader, arms, ids, tokens, price=None):
     """The full-96 and panel-kind rows for the bench page's OCR charts, one per enhanced arm (raw is each reader's
-    own route there). ok = a reading with text; tokens include caps."""
+    own route there). ok = a reading with text; tokens include caps. price: ($ per million prompt, completion
+    tokens) for a route billed per token here (the gateway), which adds an estimated cost."""
     kind = {r['page']: r['kind'] for r in P.rows()}
     groups = {'the 96': ids, **{f'kind:{k}': [p for p in ids if kind[p] == k] for k in sorted({kind[p] for p in ids})}}
     out = []
@@ -424,7 +427,8 @@ def chart_rows(by, reader, arms, ids, tokens):
             tk = [tokens.get((arm, p), (0, 0)) for p in ps]
             out.append({'route': reader, 'arm': arm, 'group': group, 'n': len(rr), 'ok': sum(r['read'] > 0 for r in rr),
                         'nes': round(statistics.mean(r['nes'] for r in rr), 5),
-                        'prompt_tokens': sum(a for a, _ in tk), 'completion_tokens': sum(b for _, b in tk)})
+                        'prompt_tokens': sum(a for a, _ in tk), 'completion_tokens': sum(b for _, b in tk),
+                        **({'cost': round(sum(a * price[0] + b * price[1] for a, b in tk) / 1e6, 6)} if price else {})})
     return out
 
 
@@ -441,6 +445,10 @@ def report():
     readers = {'apple-vision': {(a, p): vision_text(a, p) for a in ARMS for p in ids}}
     cluster, tokens = cluster_readings()
     readers.update(cluster)
+    import enh_ocr_input_gateway as GW
+    gateway = GW.readings()  # None until every image is read (W46.enh-ocr-input-paid)
+    if gateway:
+        readers[GW.ROUTE], tokens[GW.ROUTE], gw_status = gateway
     origin = lambda p: 'original' if panel[p]['source'] == 'original' else 'pdf image'
     groups = {'96': ids, 'originals': [p for p in ids if origin(p) == 'original'],
               'PDF images': [p for p in ids if origin(p) != 'original']}
@@ -452,10 +460,11 @@ def report():
          'restoration-only words are in neither the truth nor the same reader\'s raw reading; suspect words are in '
          'neither the same reader\'s raw reading nor Vision\'s (no truth needed), both per 1,000 words read.', '']
     allrows, bench, pending, charts = [], [], [], []
-    for reader in (*['apple-vision'], *READERS):
+    for reader in ('apple-vision', *READERS, GW.ROUTE):
         if reader not in readers:
             pending.append(reader)
-            L += [f'## {reader}', '', 'Not read yet (no collected cluster reading).', '']
+            L += [f'## {reader}', '', 'Not read yet (no collected cluster reading).' if reader != GW.ROUTE else
+                  'Not read yet (`enh_ocr_input_gateway.py run`).', '']
             continue
         rd = readers[reader]
         arms = READER_ARMS.get(reader, ARMS)
@@ -464,6 +473,15 @@ def report():
         if missing:
             pending.append(reader)
         L += [f'## {reader}' + (f' ({missing} of {len(rd)} images not read yet)' if missing else ''), '']
+        if reader == GW.ROUTE:
+            L += ["Gemini 3.7 Flash through the Stanford gateway, with the cloud panel's request "
+                  "(`enh_ocr_input_gateway.py`, W46.enh-ocr-input-paid), every arm on the 96; raw is "
+                  "W46.fix-ocr-scorers-paid's reading of the same image, hash checked. "
+                  f"{gw_status['ok']} of {sum(gw_status.values())} replies parsed ({gw_status['cap']} capped, "
+                  f"{gw_status['blank']} unparsed, {gw_status['error']} failed; those score empty). Estimated cost "
+                  f"of the {len(GW.jobs())} new calls ${GW.spent():.2f}, at 3.8 Flash's list price ($0.75 / $3.75 "
+                  "per million tokens), which the gateway, returning no bill, is taken not to exceed. Its suspect "
+                  "rate is against Vision's raw reading, as for every reader.", '']
         if arms != ARMS:
             L += ['Not run: ' + ', '.join(a for a in ARMS if a not in arms) + ' (its job read a list made before '
                   'those images existed).', '']
@@ -500,7 +518,8 @@ def report():
             allrows.append({**r, 'reader': reader, 'source': origin(p)})
         bench += summary(by, {k: groups[k] for k in ('96', 'originals', 'PDF images')}, arms, reader)
         if not missing:
-            charts += chart_rows(by, reader, arms, ids, tokens.get(reader, {}))
+            charts += chart_rows(by, reader, arms, ids, tokens.get(reader, {}),
+                                 GW.G.PRICE if reader == GW.ROUTE else None)
     # the two-seed probe
     probe = probe_pages()
     L += ['## The two-seed hallucination probe', '',
@@ -539,7 +558,11 @@ def report():
     BENCH.write_text(json.dumps({'item': 'W46.enh-ocr-input', 'report': REPORT.name,
                                  'readers_pending': sorted(set(pending)),
                                  'not_run': {k: [a for a in ARMS if a not in v] for k, v in READER_ARMS.items()},
-                                 'probe_pages': len(probe), 'rows': bench, 'chart_rows': charts}, indent=1) + '\n')
+                                 'probe_pages': len(probe), 'rows': bench, 'chart_rows': charts,
+                                 'gateway': {'item': 'W46.enh-ocr-input-paid', 'model': GW.G.MODEL, 'route': GW.ROUTE,
+                                             'calls': len(GW.jobs()), 'cost_estimate': round(GW.spent(), 4),
+                                             'price_assumed': GW.G.PRICE,
+                                             'coverage': dict(gw_status) if gateway else None}}, indent=1) + '\n')
     REPORT.write_text('\n'.join(L) + '\n')
     print(REPORT)
 
