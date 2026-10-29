@@ -9,7 +9,7 @@ Format and statuses: [`README.md`](README.md). Written by `W40.b1`, 2026-10-12.
   `W23.m9`, `W24.jpeg1`, `W24.cal1-reader`, `W26.walk2`, `W14.2-fu`). `SPEC/tag-format.md` is the contract
   behind R-05 and R-45.
 - **Sources and code read at:** `caefe33a`.
-- **Count:** `unproven 36 · works 3 · broken 4 · unreachable 2 · fixed-pending-recheck 1 · dropped 1` (works: R-21, R-28, R-29; broken: R-11, R-13, R-23, R-45; unreachable: R-25, R-47; fixed-pending-recheck: R-46; dropped: R-26). Updated by `W40.fix-reader-sent-with-date`, 2026-10-29.
+- **Count:** `unproven 36 · works 4 · broken 4 · unreachable 1 · fixed-pending-recheck 1 · dropped 1` (works: R-21, R-25, R-28, R-29; broken: R-11, R-13, R-23, R-45; unreachable: R-47; fixed-pending-recheck: R-46; dropped: R-26). Updated by `W40.fix-reader-read-toggle`, 2026-10-29.
 
 **Runtime evidence, for every row below: none yet.** The W40.a3 full VM suite
 ([`evidence/reader/W40.a3-full-ui.md`](evidence/reader/W40.a3-full-ui.md), `a5ab9e3c`) passed every UITest
@@ -513,25 +513,25 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
 
 - **Promise:** clicking a row's Read cell flips it between Unread and Read. A right-click on the cell sets or
   clears the read state explicitly.
-- **Promised in:** `SMOKE_TEST.md` Batch 2 (C8, recorded PASS on 2026-07-05); `CLAUDE.md` Implementation map
-  (`InlineEditCells.swift`: `ReadStateCell`).
-- **Reached by:** **none found.** The only implementation is `ReadStateCell` (`Views/InlineEditCells.swift:9-28`),
-  which calls `toggleReadState`, `setReadStateInline` and `clearReadState` (`Views/NavigationModel.swift:1295-1308`).
-  No code outside `InlineEditCells.swift` names `ReadStateCell`, and those three methods have no other caller.
-  Searched: every `.swift` file in the repo for `ReadStateCell`, `DateCell`, `TagsCell`, `WarningBadgeCell` and
-  `InlineEditCells`. The AppKit table's Read column is a plain label with no click or right-click action
-  (`Views/AppKitTableView.swift:339-343`). Its comment at `:394-396` says the SwiftUI cells left with the
-  move to AppKit.
-- **Real-path test:** none.
-- **Runtime evidence:** none. The 2026-07-05 PASS was on the SwiftUI `Table`, which `W2c` (`435b8c4`) replaced.
-- **Status:** `unreachable`
+- **Promised in:** `SMOKE_TEST.md` Batch 2 (C8, recorded PASS on 2026-07-05); `ArchiveReader/REFERENCE.md`
+  Implementation map (`AppKitTableView.swift`: `ReadStateCellView`).
+- **Reached by:** the AppKit table's Read column, whose cell is `ReadStateCellView` (`Views/AppKitTableView.swift`).
+  NSTableView takes a press on a plain cell view itself, so `ContextMenuTableView`'s `mouseDown`/`mouseUp`/`menu(for:)`
+  hand a press inside a Read cell to that cell. A click (made on release inside the cell, after the double-click
+  interval) calls `NavigationModel.toggleReadState`; the right-click or Control-click menu calls `setReadStateInline`
+  or `clearReadState`. All three write through `TagWriter.setReadState` / the delta path, as ⌘R and ⌘U do, on the
+  cell's own file; the row selection does not move. A double-click selects the row and opens it, writing nothing;
+  a drag or a release off the cell writes nothing.
+- **Real-path test:** `ArchiveReaderUITests/NavigationUITests.testReadCellClickAndRightClickWriteThatScratchDocument`
+  (click, click, menu Read, menu Clear Read State; tags read back from the scratch file after each) and
+  `.testReadCellDoubleClickOpensWithoutWriting`. Unit: `ArchiveReaderTests/ReadToggleTests`.
+- **Runtime evidence:** 2026-10-29 · [`evidence/reader/W40.fix-reader-read-toggle.md`](evidence/reader/W40.fix-reader-read-toggle.md):
+  both VM tests passed; the screenshot shows the menu with Unread checked and the row unselected.
+- **Status:** `works`
 - **History:**
   - 2026-10-12 W40.b1 — row written, `unreachable`.
-- **Notes:** a Daemon Report decision (2026-10-12): wire it into the AppKit table or drop it. ⌘R and ⌘U do the
-  same state change for the selection, but they are not the promised gesture. "Clear read state" has no live
-  entry point at all. 2026-10-16 `W40.e5` (Periphery) also found `ReadStateCell`, `toggleReadState` and
-  `clearReadState` unused and kept them for `W40.fix-reader-read-toggle`; it deleted the other dead SwiftUI cells
-  (`TagsCell`, `WarningBadgeCell`). `DateCell` was not flagged; `W40.fix-reader-sent-with-date` deleted it (R-26).
+  - 2026-10-29 W40.fix-reader-read-toggle — wired into the AppKit Read column (owner ruling, 2026-10-12
+    walkthrough: wire it, not drop it); the dead SwiftUI `ReadStateCell` and `InlineEditCells.swift` deleted. `works`.
 
 ### R-26 · Inline date editing in the list
 

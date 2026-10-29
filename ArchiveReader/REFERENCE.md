@@ -429,9 +429,11 @@ Views/
                               virtualized rows, incremental snapshot apply, 150ms-debounced filter;
                               the Quality-column popup is the per-file Quality editor;
                               the Read column's ReadStateCellView is the per-file read-state editor (a
-                              click (on release, inside the cell; a drag writes nothing) switches Unread↔Read once the double-click interval passes, a
-                              double-click goes to the table, a right-click sets or clears; it acts
-                              on its own file, never the selection — W40.fix-reader-read-toggle);
+                              click, made on release inside the cell, switches Unread↔Read once the
+                              double-click interval passes; a drag writes nothing; a double-click
+                              selects and opens; a right-click sets or clears; it acts
+                              on its own file, never the selection; NSTableView takes a press on a plain
+                              cell view itself, so ContextMenuTableView hands it on — W40.fix-reader-read-toggle);
                               ContextMenuTableView + ContextMenuActions trampoline to NavigationModel;
                               optional default-hidden Provenance column uses the existing header picker.
                               Text cells are TintedTextCellView: a `tint` (normal, emphasized) follows the
