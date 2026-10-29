@@ -747,9 +747,9 @@ def main():
             c["scores"][route["id"]] = scores[c["key"]]
             if scores[c["key"]][2] != c["n"]:
                 sys.exit(f"{route['id']}'s {c['key']} page count differs from the panel's {c['n']}")
-    if regions and regions_gw:  # the open readers' table gains Gemini's rows; its public rows are pilot pages only
+    if regions and regions_gw:  # the open readers' table gains Gemini's rows; its public rows are a labelled sample of pages
         regions = {**regions, "rows": regions["rows"] + regions_gw["rows"], "gateway": {
-            k: regions_gw[k] for k in ("report", "arms_on_the_96", "owner_pilot_pages", "public_pilot_pages",
+            k: regions_gw[k] for k in ("report", "arms_on_the_96", "owner_pilot_pages", "public_pages", "public_per_stratum",
                                        "item_spend_estimate", "calls_new", "table_markup")}}
     for c in charts:
         if any(c["scores"][r["id"]][2] != c["n"] for r in routes if r["panel"] == "farmshare") \

@@ -69,7 +69,7 @@ class Collector(unittest.TestCase):
         self.assertTrue(B.STOP.is_set())
 
     def test_cap_refuses_before_network(self):
-        B.append({'id': 'previous', 'event': 'settle', 'charge': 2.99, 'request_sha256': 'old'})
+        B.append({'id': 'previous', 'event': 'settle', 'charge': B.CAP - 0.01, 'request_sha256': 'old'})
         with patch.object(B.G, 'request') as net:
             with self.assertRaisesRegex(RuntimeError, 'cap:'):
                 B.call(self.m, self.job)

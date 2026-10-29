@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""W46.ocr-regions-paid: Gemini 3.7 Flash, gateway only, one durable $3 ledger.
+"""W46.ocr-regions-paid: Gemini 3.7 Flash, gateway only, one durable ledger ($3 cap, raised to the owner-approved $4.30 for W46.ocr-regions-paid-pp).
 
 prepare freezes all 96 owner pages + 3 hash-selected pages of each L9/L4/L3/L1.
 The primary comparison is whole / PP regions / tiles. Pilot first (one page per
@@ -32,7 +32,7 @@ import ocr_panel as P
 
 STORE = G.REHEARSAL / 'ocr-regions-gateway'
 PACK = G.REHEARSAL / 'sherlock-results/regions-20261021'
-CAP = 3.0
+CAP = 4.30  # owner-approved total for W46.ocr-regions-paid + -pp (2026-10-28 walkthrough); was 3.0
 ARMS = ('whole', 'pp-doclayoutv3', 'tiles')
 PRICE = G.PRICE  # estimate at the prior bench's conservative .75/3.75 USD/M, not a gateway bill
 LOCK = threading.Lock()
@@ -410,14 +410,17 @@ def present(m, p, arm, ledger):
 
 
 def score():
-    """Network-free: the 96 owner pages (all three arms) and the public pilot pages, a labelled subset."""
+    """Network-free: the 96 owner pages (all three arms) and the public pages, a labelled subset: all 12 frozen
+    public pages (three a stratum) once every arm of each is read, otherwise the 4 pilot pages (one a stratum)."""
     import ocr_panel_score as S
     import ocr_scorers as O
     m = manifest()
     verify()
     ledger = {r['request_sha256']: r for r in effective() if r['event'] == 'settle'}
     panel = {r['page']: r for r in P.rows()}
-    pages = [p for p in m['pages'] if p['set'] == 'owner99' or p['id'] in m['pilot']]
+    public = [p for p in m['pages'] if p['set'] == 'public895']
+    all_public = all(present(m, p, a, ledger) for p in public for a in ARMS)
+    pages = [p for p in m['pages'] if p['set'] == 'owner99' or all_public or p['id'] in m['pilot']]
     owner = [p for p in pages if p['set'] == 'owner99']
     # An arm is on the 96 only when every owner page has every receipt; otherwise only its pilot pages are scored.
     full = [a for a in ARMS if all(present(m, p, a, ledger) for p in owner)]
@@ -478,7 +481,9 @@ def score():
                              'markup_pages': sum(r['has_markup'] for r in t)}
                             for arm in ARMS for t in [[r for r in table_markup if r['arm'] == arm]] if t],
            'owner_pages': 96, 'arms_on_the_96': full,
-           'owner_pilot_pages': sorted(p['id'] for p in owner if p['id'] in m['pilot']), 'public_pilot_pages': sorted(p['id'] for p in pages if p['set'] == 'public895'),
+           'owner_pilot_pages': sorted(p['id'] for p in owner if p['id'] in m['pilot']),
+           'public_pages': sorted(p['id'] for p in pages if p['set'] == 'public895'),
+           'public_per_stratum': 3 if all_public else 1,
            'price_estimate_usd_per_m': list(PRICE), 'item_spend_estimate': round(item, 4),
            'calls_new': sum(r['event'] == 'settle' for r in effective())}
     (OUT / f'{NAME}.json').write_text(json.dumps(out, indent=2) + '\n')
@@ -521,8 +526,10 @@ def report_md(out):
                 delta = '—' if a == 'whole' else f"{100 * (r['nes'] - r['whole_nes_same']):+.1f}"
                 crops = '—' if a == 'whole' else f"{r['crops_failed']}/{r['crops']}"
                 L.append(f"| {arm[a]} | {100 * r['nes']:.1f} | {delta} | {crops} |")
-    L += ['', f"## Public pilot pages ({len(out['public_pilot_pages'])}, one a stratum — a labelled sample, not a set result)",
-          '', 'The other eight frozen public pages were not read: the full scope projected above the $3 item cap.', '',
+    k = out['public_per_stratum']
+    L += ['', f"## Public pages ({len(out['public_pages'])}, {'one' if k == 1 else k} a stratum — a labelled sample, not a set result)",
+          '', ('The other eight frozen public pages were not read: the full scope projected above the $3 item cap.' if k == 1 else
+               'Three pages a stratum drawn by stable id hash (W46.ocr-regions-paid-pp read the eight beyond the pilot).'), '',
           '| stratum | arm | NES % | failed / crops | order edit |', '|---|---|---:|---:|---:|']
     for g in ('L9', 'L4', 'L3', 'L1'):
         for a in ARMS:
