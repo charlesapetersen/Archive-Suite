@@ -75,9 +75,11 @@ same key sort or control-char casing).
    C0 (< 0x20)→`\u00xx` (**lowercase** hex); **everything else — including `/` and all non-ASCII —
    verbatim.**
 
-**Reading is lenient (A6):** parse to `[String:String]` via `JSONSerialization`/manual, **stringifying
-number-or-string values** so a non-canonical writer's bare `"seq":7` is tolerated rather than throwing
-and silently stalling one platform. Parse is order-independent. On Drive the map becomes `appProperties`
+**Reading is lenient (A6):** parse to `[String:String]`, **stringifying number-or-string values** so a
+non-canonical writer's bare `"seq":7` is tolerated rather than throwing and silently stalling one platform.
+Strings read back byte for byte, a leading U+FEFF included (Swift uses `JSONDecoder`: `JSONSerialization`
+strips it). A boolean, `null`, array or object value is dropped, never coerced (`true` is not `"1"`).
+A name's `<seq>` is read only as the canonical decimal `String(seq)` (`g__007.jpg` has no identity). Parse is order-independent. On Drive the map becomes `appProperties`
 and byte-order is a non-issue, so `canonicalJSON` is FileRelay/CI-internal.
 
 ## Object bodies (SHIPPED shapes — keys shown pre-sorted; `?` = nil-omittable)
@@ -172,8 +174,9 @@ Skip dotfiles and `*.part`, then:
 6. remaining `*.json` → photo sidecar
 
 A photo is "ready" only when **both** the `.jpg` and its sidecar exist (the sidecar, written last, is the
-commit marker). **A10:** the receiver cross-checks the filename's leading `<group>__<seq>` against the
-body's `(group, seq)` and quarantines a mismatch; the body stays authoritative.
+commit marker). **A10:** the receiver requires the sidecar's filename to be exactly `<group>__<seq>.json`
+for the body's `(group, seq)`, `<seq>` in canonical decimal, and quarantines a mismatch; the body stays
+authoritative.
 
 ## Write / delete ordering (D3)
 
@@ -230,7 +233,7 @@ contract. Severity in brackets.
 | **A7** [MEDIUM] | Golden asserts **byte-equality** against committed files (+ the non-ASCII/astral/C0 `nasty` fixture); values must be raw JSON **string** tokens. | `SPEC/relay-golden/`, `test-relay-golden.sh` |
 | **A8** [HIGH] | Same-language **round-trip** tests (real transport ⇄ real receiver), not only format-module goldens. | iOS XCTest, Android JVM, Mac driver |
 | **A9** [MEDIUM] | Orphan sweep **age-gates** the jpeg-orphan clause (only delete a sidecar-less `.jpg` older than `sweepRetention`), symmetric for media-less sidecars. | `FileRelayReceiver` sweep |
-| **A10** [LOW] | Filename `<group>__<seq>` is cross-checked against the body; mismatch ⇒ **quarantine**. Body authoritative. | `RelayObjectFormat.identityFromName` (Mac) |
+| **A10** [LOW] | A sidecar's filename must be the canonical `<group>__<seq>.json` for its body; mismatch ⇒ **quarantine**. Body authoritative. | `RelayObjectFormat.identityFromName` (Mac) |
 | **A11** [MEDIUM] | Reclassify-after-finalize duplicate is a **documented residual**, deferred to the Drive milestone (tracked in `KNOWN_ISSUES.md`); the Mac logs the collision, no new silent duplication. | — (residual) |
 
 ---

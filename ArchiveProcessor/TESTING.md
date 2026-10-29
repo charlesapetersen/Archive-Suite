@@ -243,8 +243,9 @@ Most are **key-free / \$0 / offline**; only the live one touches Google:
   of the Mac and iOS `RelayObjectFormat` (each compiled standalone from `scripts/relay-fuzz/main.swift`):
   `parse(canonicalJSON(m)) == m` for random string maps, every encoder field and fingerprint reads back,
   20,000 truncated / bit-flipped / spliced / deeply nested bodies parse or refuse without crashing, names
-  read back as their identity, and both platforms emit identical bytes for 4,000 seeded objects. Prints the
-  `W40.fix-processor-relay-parse-lenient` cases as `KNOWN` rather than failing on them.
+  read back as their identity, and both platforms emit identical bytes for 4,000 seeded objects. Also fails
+  on a dropped leading U+FEFF, a boolean read as a number, and a non-canonical seq in a name
+  (`W40.fix-processor-relay-parse-lenient`, once printed as `KNOWN`).
 - **`test-relay-transport.sh`** — key-free. The phone-side never-lose contract of the iOS
   `FileRelayTransport`: a photo is only considered sent once a matching receipt comes back, never on a
   write alone.

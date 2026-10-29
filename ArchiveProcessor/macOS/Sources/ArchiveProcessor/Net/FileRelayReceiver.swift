@@ -145,15 +145,18 @@ final class FileRelayReceiver: @unchecked Sendable, CaptureReceiver {
             let type = meta["type"] ?? "document"
             let replaces = (meta["replaces"]?.isEmpty == false) ? meta["replaces"] : nil
             let chain = replaces?.split(separator: ",").map(String.init).filter { !$0.isEmpty } ?? []
-            let nameId = RelayObjectFormat.identityFromName(sidecar)
             let safe = CaptureValidation.isSafeGroupId(group) && seq >= 0
                 && chain.allSatisfy { CaptureValidation.isSafeGroupId($0) }
                 && CaptureValidation.isWireQuality(meta["quality"])
-                && (nameId == nil || (nameId!.group == group && nameId!.seq == seq))   // A10
+            let canonicalSidecar = RelayObjectFormat.sidecarName(group: group, seq: seq)
+            let named = sidecar == canonicalSidecar      // A10: the canonical name for the body
             let mine = meta["token"] == token && meta["epoch"] == epoch
             guard mine else { continue }   // other run's epoch/token → ignore (never destroy), let sweep age it out
-            guard safe else {              // our run but unsafe (traversal/mismatch) → quarantine, never ingest
-                store.quarantine(sidecar); store.quarantine(jpg); report.rejectedUnsafe.append(sidecar); continue
+            guard safe, named else {       // our run but unsafe (traversal/mismatch) → quarantine, never ingest
+                store.quarantine(sidecar)
+                // A stray copy (`g__7 copy.json`) beside the real, safe sidecar leaves that photo's jpeg alone.
+                if !(safe && store.exists(canonicalSidecar)) { store.quarantine(jpg) }
+                report.rejectedUnsafe.append(sidecar); continue
             }
 
             let k = key(group, seq)

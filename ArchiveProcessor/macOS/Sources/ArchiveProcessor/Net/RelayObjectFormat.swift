@@ -9,7 +9,7 @@ import CryptoKit
 ///
 /// All object metadata is a **string→string** map (so it maps 1:1 onto Drive `appProperties` later),
 /// serialized with `canonicalJSON` (sorted keys, nil-omitted, fixed escaping, UTF-8) so three platforms
-/// agree on the bytes. Reading is lenient (number-or-string tolerated, A6).
+/// agree on the bytes. Reading is lenient (number-or-string tolerated, A6), but keeps every string verbatim.
 enum RelayObjectFormat {
 
     // MARK: - Object names
@@ -37,15 +37,16 @@ enum RelayObjectFormat {
 
     /// Parse the leading `<group>__<seq>` from a media/sidecar/receipt filename, for the A10 filename↔body
     /// identity cross-check. `nil` if the name doesn't fit the pattern. Group ids may contain `_`, so split
-    /// on the LAST `__` before the extension.
+    /// on the LAST `__` before the extension. The seq must be the canonical non-negative decimal.
     static func identityFromName(_ name: String) -> (group: String, seq: Int)? {
-        var base = name
-        for suffix in [".receipt.json", ".jpg", ".json"] where base.hasSuffix(suffix) {
-            base = String(base.dropLast(suffix.count)); break
-        }
+        guard let suffix = [".receipt.json", ".jpg", ".json"].first(where: { name.hasSuffix($0) }) else { return nil }
+        let base = String(name.dropLast(suffix.count))
         guard let r = base.range(of: "__", options: .backwards) else { return nil }
         let group = String(base[..<r.lowerBound])
-        guard let seq = Int(base[r.upperBound...]) else { return nil }
+        // Only the canonical decimal `String(seq)` writes: `Int(_:)` alone would read `007`, `+7` or `-1` as a
+        // seq, and the receiver's cleanup deletes a name by the identity it reads.
+        let digits = base[r.upperBound...]
+        guard let seq = Int(digits), String(seq) == digits, seq >= 0 else { return nil }
         return (group, seq)
     }
 
@@ -136,13 +137,24 @@ enum RelayObjectFormat {
 
     /// Parse an object body to `[String:String]`, stringifying numeric values so a bare `"seq":7` from a
     /// non-canonical writer is tolerated (not a fatal skip that would silently stall one platform, H7).
+    /// Strings come back byte-for-byte; a boolean, null, array or object value is dropped, never coerced.
     static func parse(_ data: Data) -> [String: String]? {
-        guard let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return nil }
-        var out: [String: String] = [:]
-        for (k, v) in obj {
-            if let s = v as? String { out[k] = s }
-            else if let n = v as? NSNumber { out[k] = n.stringValue }
+        guard let obj = try? JSONDecoder().decode([String: BodyValue].self, from: data) else { return nil }
+        return obj.compactMapValues { if case .text(let s) = $0 { return s } else { return nil } }
+    }
+
+    /// One body value as read: a string kept verbatim, a JSON number stringified (A6), anything else
+    /// (boolean, null, array, object) dropped. `JSONDecoder`, not `JSONSerialization`: the latter strips a
+    /// leading U+FEFF from every key and value (changing the receiver's recomputed fp) and hands a boolean
+    /// over as an NSNumber, so `true` read as `"1"` (W40.fix-processor-relay-parse-lenient).
+    private enum BodyValue: Decodable {
+        case text(String), dropped
+        init(from decoder: Decoder) throws {
+            let c = try decoder.singleValueContainer()
+            if let s = try? c.decode(String.self) { self = .text(s) }
+            else if let i = try? c.decode(Int64.self) { self = .text(String(i)) }    // a boolean never decodes as a number
+            else if let d = try? c.decode(Double.self) { self = .text(NSNumber(value: d).stringValue) }
+            else { self = .dropped }
         }
-        return out
     }
 }

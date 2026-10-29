@@ -194,10 +194,21 @@ enum FileRelayTestDriver {
             try? RelayObjectFormat.encodeSidecar(token: token, epoch: epoch, group: "c8bad", seq: 0, type: "document",
                                                  quality: nil, year: nil, month: nil, replaces: nil)
                 .write(to: d.appendingPathComponent("c8ok__0.json"))
+            // A10: a non-canonical seq in the name (`c8z__007`, body seq 7) is not the body's name either
+            try? Data("j".utf8).write(to: d.appendingPathComponent("c8z__7.jpg"))
+            try? RelayObjectFormat.encodeSidecar(token: token, epoch: epoch, group: "c8z", seq: 7, type: "document",
+                                                 quality: nil, year: nil, month: nil, replaces: nil)
+                .write(to: d.appendingPathComponent("c8z__007.json"))
+            // A10: a stray copy beside the real sidecar is quarantined alone (or left, once the real one drained)
+            writePhoto(d, "c8y", 3, "document")
+            try? Data(contentsOf: d.appendingPathComponent("c8y__3.json")).write(to: d.appendingPathComponent("c8y__3 copy.json"))
             // wrong-epoch object → ignored (never ingested, never destroyed)
             writePhoto(d, "c8ep", 0, "document", ep: "OLD-EPOCH")
             let a = await r.scanOnce()
             let a10 = a.rejectedUnsafe.contains("c8ok__0.json") && photoCount("c8bad") == 0
+                && a.rejectedUnsafe.contains("c8z__007.json") && photoCount("c8z") == 0
+                && photoCount("c8y") == 1   // whichever is listed first, the copy never takes the jpeg with it
+                && !FileManager.default.fileExists(atPath: d.appendingPathComponent(".rejected/c8y__3.jpg").path)
             let wrongEpochIgnored = !a.ingested.contains("c8ep\u{1}0") && photoCount("c8ep") == 0
                 && has(d, RelayObjectFormat.jpegName(group: "c8ep", seq: 0))   // left in place
             rec("traversal+epoch-guards(A2/A10)", epochPublished && a10 && wrongEpochIgnored,

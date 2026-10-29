@@ -19,9 +19,7 @@ struct RNG: RandomNumberGenerator {
 }
 
 var failures = 0
-var known: [String: Int] = [:]
 func fail(_ s: String) { failures += 1; if failures <= 20 { print("  FAIL \(s)") } }
-func knownIssue(_ tag: String) { known[tag, default: 0] += 1 }
 
 let keys = ["kind", "token", "epoch", "group", "seq", "type", "quality", "year", "month", "replaces", "device",
             "fp", "received", "seqs", "x", "ü", "a\"b", "k\\", "\u{01}"]
@@ -56,19 +54,12 @@ for i in 0..<20_000 {
     let want = m.compactMapValues { $0 }
     let bytes = RelayObjectFormat.canonicalJSON(m)
     guard let got = RelayObjectFormat.parse(bytes) else { fail("round trip \(i): parse refused its own encoding of \(want)"); continue }
-    if got != want {
-        // JSONSerialization drops a LEADING U+FEFF from every key and value, escaped or not (JSONDecoder
-        // keeps it), so `"\u{FEFF}x"` reads back as `"x"` — and a key `"\u{FEFF}token"` as `"token"`.
-        func strip(_ s: String) -> String { s.hasPrefix("\u{FEFF}") ? String(s.unicodeScalars.dropFirst()) : s }
-        let stripped = Dictionary(want.map { (strip($0.key), strip($0.value)) }, uniquingKeysWith: { a, _ in a })
-        if got == stripped { knownIssue("W40.fix-processor-relay-parse-lenient (leading U+FEFF dropped)") }
-        else { fail("round trip \(i): \(want) → \(got)") }
-    }
+    // Includes a leading U+FEFF, which JSONSerialization used to drop (W40.fix-processor-relay-parse-lenient).
+    if got != want { fail("round trip \(i): \(want) → \(got)") }
 }
 
-// 2. Encoders: every field reads back, and the receiver recomputes the same fingerprint. (Values here never
-//    start with U+FEFF — section 1 counts that known issue; a dropped one also changes the recomputed fp.)
-func fieldValue(_ r: inout RNG) -> String { let v = value(&r); return v.hasPrefix("\u{FEFF}") ? "x" + v : v }
+// 2. Encoders: every field reads back, and the receiver recomputes the same fingerprint — a leading U+FEFF too.
+func fieldValue(_ r: inout RNG) -> String { r.chance(0.1) ? "\u{FEFF}" + value(&r) : value(&r) }
 for i in 0..<5_000 {
     let q: String? = r.chance(0.5) ? "Q\(r.int(1...3))" : nil
     let y: String? = r.chance(0.5) ? String(r.int(800...2099)) : nil
@@ -114,14 +105,19 @@ for i in 0..<20_000 {
     let d = damage(base, &r)
     guard let m = RelayObjectFormat.parse(d) else { continue }
     parsedDamaged += 1
-    if RelayObjectFormat.parse(RelayObjectFormat.canonicalJSON(m)) != m, !m.contains(where: { $0.key.hasPrefix("\u{FEFF}") || $0.value.hasPrefix("\u{FEFF}") }) {
+    if RelayObjectFormat.parse(RelayObjectFormat.canonicalJSON(m)) != m {
         fail("damage \(i): \(m) does not survive a canonical re-encode")
     }
 }
-// Bare numbers are tolerated on read (A6). A JSON boolean is not a number, but JSONSerialization hands it over
-// as an NSNumber, so `true` reads as "1" — a silent wrong value for any field compared to a number.
-if RelayObjectFormat.parse(Data("{\"seq\":true}".utf8))?["seq"] == "1" { knownIssue("W40.fix-processor-relay-parse-lenient (JSON true read as \"1\")") }
-if RelayObjectFormat.parse(Data("{\"seq\":7}".utf8))?["seq"] != "7" { fail("A6: a bare number seq is not tolerated") }
+// Bare numbers are tolerated on read (A6). A JSON boolean is not a number: it is dropped, never read as "1"
+// or "0" (JSONSerialization handed it over as an NSNumber). Null, arrays and objects are dropped too.
+for b in ["true", "false", "null", "[1]", "{\"a\":1}"] {
+    if let m = RelayObjectFormat.parse(Data("{\"seq\":\(b),\"k\":\"v\"}".utf8)), m != ["k": "v"] { fail("A6: {\"seq\":\(b)} read as \(m)") }
+}
+for (n, want) in [("7", "7"), ("0", "0"), ("-3", "-3"), ("1e3", "1000"), ("7.5", "7.5")] {
+    if RelayObjectFormat.parse(Data("{\"seq\":\(n)}".utf8))?["seq"] != want { fail("A6: a bare number \(n) is not read as \(want)") }
+}
+if RelayObjectFormat.parse(Data("{\"a\":\"\\ufeffx\"}".utf8))?["a"] != "\u{FEFF}x" { fail("an escaped leading U+FEFF is dropped") }
 
 #if !IOS
 // 4. Names (Mac only — the iOS copy has no classify/identityFromName). The name built for (group, seq) reads
@@ -154,16 +150,17 @@ for i in 0..<20_000 {
         let canonical = [RelayObjectFormat.jpegName(group: id.group, seq: id.seq),
                          RelayObjectFormat.sidecarName(group: id.group, seq: id.seq),
                          RelayObjectFormat.receiptName(group: id.group, seq: id.seq)]
-        if !canonical.contains(name) {
-            // `Int(_:)` takes `+7`, `007` and `-1`, so `g__007.jpg` is read as (g, 7) — and the receiver's
-            // cleanup deletes a name by the identity it reads (FileRelayReceiver.swift:305).
-            knownIssue("W40.fix-processor-relay-parse-lenient (non-canonical seq in a name)")
-        }
+        // The receiver's cleanup deletes a name by the identity it reads (FileRelayReceiver), so a name like
+        // `g__007.jpg` must not read as (g, 7).
+        if !canonical.contains(name) { fail("name \(i): non-canonical \(name) read as (\(id.group), \(id.seq))") }
     }
 }
+for name in ["g__007.jpg", "g__+7.jpg", "g__-1.jpg", "g__-0.json", "g__ 7.json", "g__.jpg", "g__7a.receipt.json"] {
+    if let id = RelayObjectFormat.identityFromName(name) { fail("\(name) read as (\(id.group), \(id.seq))") }
+}
+if RelayObjectFormat.identityFromName("g__0.jpg")?.seq != 0 { fail("g__0.jpg not read as seq 0") }
 #endif
 
 print("  parsed \(parsedDamaged)/20000 damaged bodies without crashing (the rest refused cleanly)")
-for (k, n) in known.sorted(by: { $0.key < $1.key }) { print("  KNOWN \(k): \(n) case(s)") }
 print(failures == 0 ? "  properties: PASS" : "  properties: \(failures) FAILURE(S)")
 exit(failures == 0 ? 0 : 1)

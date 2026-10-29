@@ -77,12 +77,22 @@ enum RelayObjectFormat {
 
     // MARK: - Parse (lenient — number-or-string tolerated). The phone reads the receipt + the epoch marker.
     static func parse(_ data: Data) -> [String: String]? {
-        guard let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return nil }
-        var out: [String: String] = [:]
-        for (k, v) in obj {
-            if let s = v as? String { out[k] = s }
-            else if let n = v as? NSNumber { out[k] = n.stringValue }
+        guard let obj = try? JSONDecoder().decode([String: BodyValue].self, from: data) else { return nil }
+        return obj.compactMapValues { if case .text(let s) = $0 { return s } else { return nil } }
+    }
+
+    /// One body value as read: a string kept verbatim, a JSON number stringified (A6), anything else
+    /// (boolean, null, array, object) dropped. `JSONDecoder`, not `JSONSerialization`: the latter strips a
+    /// leading U+FEFF from every key and value (changing the receiver's recomputed fp) and hands a boolean
+    /// over as an NSNumber, so `true` read as `"1"` (W40.fix-processor-relay-parse-lenient).
+    private enum BodyValue: Decodable {
+        case text(String), dropped
+        init(from decoder: Decoder) throws {
+            let c = try decoder.singleValueContainer()
+            if let s = try? c.decode(String.self) { self = .text(s) }
+            else if let i = try? c.decode(Int64.self) { self = .text(String(i)) }    // a boolean never decodes as a number
+            else if let d = try? c.decode(Double.self) { self = .text(NSNumber(value: d).stringValue) }
+            else { self = .dropped }
         }
-        return out
     }
 }
