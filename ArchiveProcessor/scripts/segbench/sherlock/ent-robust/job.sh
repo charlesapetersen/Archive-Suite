@@ -1,5 +1,5 @@
 #!/bin/bash
-# W46.ent-robust on one GPU: serve Qwen3.6-27B-FP8 as the bench's readers were served (seg-context/job.sh's flags,
+# W46.ent-robust on one GPU: serve Qwen3.6-27B-FP8 with seg-context/job.sh's flags (context raised to 32,768 for G17's 16,384-token cap,
 # images allowed for the G17 letters), send each arm's 8-request pilot, and only if at least 6 of the 8 stop
 # cleanly, every request, through postcorrect_cluster.py (temperature 0, thinking off).
 #   sbatch ... job.sh ROOT
@@ -14,7 +14,7 @@ cache="$HF_HOME/hub/models--Qwen--Qwen3.6-27B-FP8"
 if [ -f "$cache/refs/main" ]; then MODEL="$cache/snapshots/$(cat "$cache/refs/main")"
 else snaps=("$cache"/snapshots/*); [ "${#snaps[@]}" -eq 1 ] || { echo 'ambiguous snapshot'; exit 2; }; MODEL="${snaps[0]}"; fi
 [ -f "$MODEL/config.json" ] || { echo "model incomplete: $MODEL"; exit 2; }
-VLLM_ARGS=(--tensor-parallel-size 1 --max-model-len 20480 --kv-cache-dtype fp8 --gpu-memory-utilization 0.92
+VLLM_ARGS=(--tensor-parallel-size 1 --max-model-len 32768 --kv-cache-dtype fp8 --gpu-memory-utilization 0.92
            --max-num-seqs 32 --limit-mm-per-prompt '{"image":7}')
 SAVED="$GROUP_HOME/$USER/archive-suite/sherlock-results/ent-robust-20261029"
 mkdir -p "$ROOT/logs" "$ROOT/runtime"

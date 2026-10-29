@@ -6,7 +6,8 @@
 ROOT holds requests.jsonl (and any images the pack uploads). Each reply is saved as ROOT/out/<id>.json; a request already
 answered is not sent again, so a resubmitted job only does what is left. An image whose hash differs from the
 request's is refused, never sent. Temperature 0, thinking off, max_tokens 8192, as the open sweep's collector; a
-request's `response_format`, when the pack gives one, is passed through unchanged.
+request's `response_format`, `system`, `max_tokens` and `content_order: "text-first"` (prompt before the images),
+when the pack gives them, are honoured (W46.ent-robust's G17 requests, as the benchmark harness sends them).
 """
 import argparse, base64, concurrent.futures as cf, hashlib, json, os, pathlib, time, urllib.request
 
@@ -32,8 +33,11 @@ def send(r):
         if hashlib.sha256(b).hexdigest() != digest:
             raise ValueError('image hash differs: ' + path)
         content.append({'type': 'image_url', 'image_url': {'url': 'data:image/jpeg;base64,' + base64.b64encode(b).decode()}})
-    content.append({'type': 'text', 'text': r['prompt']})
-    body = {'model': model, 'messages': [{'role': 'user', 'content': content}], 'temperature': 0, 'max_tokens': 8192,
+    text = {'type': 'text', 'text': r['prompt']}
+    content = [text] + content if r.get('content_order') == 'text-first' else content + [text]
+    messages = ([{'role': 'system', 'content': r['system']}] if r.get('system') else []) + \
+        [{'role': 'user', 'content': content}]
+    body = {'model': model, 'messages': messages, 'temperature': 0, 'max_tokens': r.get('max_tokens', 8192),
             'chat_template_kwargs': {'enable_thinking': False}}
     if r.get('response_format'):   # W46.ent-robust's G17 requests: the benchmark harness's structured output, verbatim
         body['response_format'] = r['response_format']
