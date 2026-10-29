@@ -186,8 +186,32 @@ class FiguresTest(Fixture):
         self.assertIn("| `cat big.txt` | 1 | 30,000 |", rep)
         self.assertNotIn("99,000", rep)
 
+    def test_probes_placeholders_media_and_persisted_results(self):
+        self.build()
+        s = NOW - 2 * DAY
+        # A probe: an ENGINE ASSIGNMENT prompt with no ledger row. Not measured (it would be the smallest first call).
+        self.engine_session("PR", "W40.probe", s + 9000, 1000, [1000])
+        with open(os.path.join(self.folder, "C.jsonl"), "a") as f:
+            for r in (
+                # A zero-usage placeholder record is not a call, even carrying tool uses.
+                call("C-syn", s + 7300, 0, 0, 0, 0, [use("C-png", "Read", file_path="/x/shots/a.png"),
+                                                      use("C-diff", "Bash", command="git diff")]),
+                result(s + 7301, "C-png", ""),
+                dict(result(s + 7302, "C-diff", "p" * 2000), toolUseResult={"persistedOutputSize": 600000}),
+            ):
+                f.write(json.dumps(r) + "\n")
+        ta.main(["run", "--no-open"] + self.args())
+        rec = json.loads(open(os.path.join(self.state, "token-audit", "passes.jsonl")).read().splitlines()[-1])
+        self.assertEqual((rec["sessions"], rec["calls"], rec["first_call_min"]), (3, 8, 50000))
+        rep = open(os.path.join(self.state, "token-audit", "latest.md")).read()
+        self.assertIn("| `git diff [persisted]` | 1 | 600,000 |", rep)
+        self.assertIn("left out (1 in the window)", rep)
+        self.assertNotIn("a.png", rep)
+        self.assertIn("1 engine-prompt transcripts with no ledger row", rep)
+
     def test_partial_reads_are_not_whole(self):
         s = NOW - DAY
+        self.ledger_rows([{"item": "W1.a", "started": s - 5, "at": s + 100}])
         write(os.path.join(self.folder, "P.jsonl"), [
             {"type": "queue-operation", "timestamp": iso(s), "content": "ENGINE ASSIGNMENT\nYour item: W1.a - t"},
             call("m0", s + 1, 1, 100, 0, 1, [use("u1", "Read", file_path=os.path.join(self.repo, "CLAUDE.md"), offset=5, limit=9)]),
@@ -203,17 +227,69 @@ class FiguresTest(Fixture):
 
 
 class VerdictTest(Fixture):
-    def last(self, **fig):
+    def setUp(self):
+        super().setUp()
+        self.min_compare = ta.MIN_COMPARE
+        ta.MIN_COMPARE = 1                                      # one session is enough to compare, here
+
+    def tearDown(self):
+        ta.MIN_COMPARE = self.min_compare
+        super().tearDown()
+
+    def last(self, *lines, **fig):
         os.makedirs(os.path.join(self.state, "token-audit"), exist_ok=True)
         with open(os.path.join(self.state, "token-audit", "passes.jsonl"), "w") as f:
-            f.write(json.dumps(dict({"at": NOW - 8 * DAY}, **fig)) + "\n")
+            for line in lines:
+                f.write(line + "\n")
+            f.write(json.dumps(dict({"at": NOW - 8 * DAY, "date": "2026-10-21"}, **fig)) + "\n")
+
+    def session(self, first, later, start=NOW - DAY, sid="A"):
+        self.engine_session(sid, "W1.a", start, first, later)
+        os.utime(os.path.join(self.folder, sid + ".jsonl"), (start + 200, start + 200))   # written during its run
+        self.ledger_rows([{"item": "W1.a", "started": start - 5, "at": start + 100}])
+
+    def test_too_few_sessions_compare_no_trend(self):
+        ta.MIN_COMPARE = 2
+        self.session(90000, [90000])
+        self.last(first_call_median=50000, context_per_call=50000)
+        self.assertEqual(self.run_pass()["breaches"], [])
+        self.assertIn("recorded but not compared", open(os.path.join(self.state, "token-audit", "latest.md")).read())
+
+    def test_a_regression_nobody_was_handed_stays_out_of_the_baseline(self):
+        self.last(first_call_median=50000, context_per_call=50000)
+        self.session(60000, [60000])
+        rec = self.run_pass("--no-open")                        # found, not handed on: not a baseline
+        self.assertEqual(len(rec["breaches"]), 2)
+        self.assertFalse(rec["baseline"])
+        shutil.rmtree(self.folder)
+        self.session(60000, [60000], start=NOW + DAY, sid="B")
+        a = self.args()
+        a[a.index("--now") + 1] = str(NOW + 2 * DAY)
+        ta.main(["run"] + a)
+        rec = json.loads(open(os.path.join(self.state, "token-audit", "passes.jsonl")).read().splitlines()[-1])
+        self.assertEqual(len(rec["breaches"]), 2)               # still compared with 50,000, not 60,000
+        self.assertTrue(rec["opened"])
+        self.assertTrue(rec["baseline"])
+
+    def test_a_corrupt_line_is_skipped_not_the_history(self):
+        self.last("{not json", first_call_median=50000, context_per_call=50000)
+        self.session(60000, [60000])
+        self.assertEqual(len(self.run_pass()["breaches"]), 2)
+
+    def test_a_gate_left_ticked_is_reported(self):
+        self.session(50000, [50000])
+        self.last(first_call_median=50000, context_per_call=50000)
+        subprocess.run(["/bin/bash", os.path.join(AUTONOMOUS, "plan-edit.sh"), self.plan, "due", "W40.token-fix-due", "x"], check=True)
+        rec = self.run_pass()
+        self.assertTrue(rec["stale_gate"])
+        self.assertIn("did not re-arm it", open(os.path.join(self.state, "token-audit", "latest.md")).read())
 
     def run_pass(self, *extra):
         ta.main(["run"] + list(extra) + self.args())
         return json.loads(open(os.path.join(self.state, "token-audit", "passes.jsonl")).read().splitlines()[-1])
 
     def test_ten_percent_worse_opens_the_fix(self):
-        self.engine_session("A", "W1.a", NOW - DAY, 55000, [60000])
+        self.session(55000, [60000])
         self.last(first_call_median=50000, context_per_call=60000)    # 55,000 is +10%; 57,500 is -4%
         rec = self.run_pass()
         self.assertEqual(len(rec["breaches"]), 1)
@@ -224,7 +300,7 @@ class VerdictTest(Fixture):
         self.assertRegex(plan, r"- \[x\] \*\*W40\.token-fix-due\*\* — DUE \d{4}-\d\d-\d\d: token pass")
 
     def test_nine_percent_worse_does_not(self):
-        self.engine_session("A", "W1.a", NOW - DAY, 54500, [54500])
+        self.session(54500, [54500])
         self.last(first_call_median=50000, context_per_call=50000)
         rec = self.run_pass()
         self.assertEqual(rec["breaches"], [])
@@ -284,6 +360,18 @@ class CadenceTest(Fixture):
         self.assertEqual(len(self.passes()), 1)
         self.upkeep(NOW + 7 * DAY + 60)
         self.assertEqual(len(self.passes()), 2)
+
+    def test_a_manual_run_counts_as_the_last_pass(self):
+        self.sessions_in_ledger(25, NOW - 2 * DAY)
+        ta.main(["run", "--no-open"] + self.args())
+        self.sessions_in_ledger(1, NOW)
+        self.upkeep(NOW + 3600)
+        self.assertEqual(len(self.passes()), 1)                 # not due: the manual run was an hour ago
+
+    def test_codex_sessions_do_not_count_toward_the_threshold(self):
+        self.ledger_rows([{"item": "W1.a", "agent": "codex", "started": NOW - DAY + i, "at": NOW - DAY + i + 5} for i in range(30)])
+        self.upkeep()
+        self.assertEqual(self.passes(), [])
 
     def test_sessions_are_counted_since_the_last_pass(self):
         self.sessions_in_ledger(20, NOW - DAY)
@@ -381,6 +469,14 @@ class GateFilingTest(Fixture):
         open(self.plan, "w").write(PLAN.replace("RUN STATUS: IN_PROGRESS — fixture", "RUN STATUS: COMPLETE"))
         self.edit("due", "W40.token-fix-due", "token pass")
         self.assertIn("RUN STATUS: IN_PROGRESS", open(self.plan).read())
+
+    def test_a_standing_item_cannot_be_completed(self):
+        self.edit("rearm", "W40.token-fix-due", "filed")
+        p = subprocess.run(["/bin/bash", os.path.join(AUTONOMOUS, "plan-edit.sh"), self.plan, "complete", "W40.token-fix",
+                            "abc1234", "done"], capture_output=True, text=True)
+        self.assertNotEqual(p.returncode, 0)
+        self.assertIn("standing item", p.stderr)
+        self.edit("complete", "W1.a", "abc1234", "done")         # an ordinary item still completes
 
     def test_compactor_knows_the_section(self):
         self.assertIn("|RECURRING|", open(os.path.join(AUTONOMOUS, "compact-plan.sh")).read())
