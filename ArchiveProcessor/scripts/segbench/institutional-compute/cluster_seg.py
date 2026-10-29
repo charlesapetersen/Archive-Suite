@@ -94,11 +94,14 @@ def send(url, body, timeout=900):
 
 
 def read_window(url, pack, w):
-    """The window's answer as ``collect`` gets it: a retry at twice the token limit if the first does not parse."""
-    urls = [R.data_url((pack / "images" / w["box"] / f"{n}.jpg").read_bytes()) for n in w["window"]]
+    """The window's answer as ``collect`` gets it: a retry at twice the token limit if the first does not parse.
+    A request may name the pages whose images it carries (``images``; [] for a text-only window, W46.seg-window-modality)
+    and its own token limit (``max_tokens``, for a whole folder); without them, every page's image and R.MAX_TOKENS."""
+    urls = [R.data_url((pack / "images" / w["box"] / f"{n}.jpg").read_bytes()) for n in w.get("images", w["window"])]
     rec = {"cache_key": w["cache_key"], "collection": w["box"], "window": w["window"], "status": R.FAILED}
     t0 = time.time()
-    for attempt, max_tokens in enumerate((R.MAX_TOKENS, 2 * R.MAX_TOKENS)):
+    limit = w.get("max_tokens", R.MAX_TOKENS)
+    for attempt, max_tokens in enumerate((limit, 2 * limit)):
         j, status = send(url, R.request_body(KEY, w["prompt"], urls, max_tokens))
         if status != "ok":
             return {**rec, "status": status, "error": j["error"], "wall_s": round(time.time() - t0, 1)}
