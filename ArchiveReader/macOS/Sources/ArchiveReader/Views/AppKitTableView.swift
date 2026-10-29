@@ -754,13 +754,30 @@ final class ReadStateCellView: TintedTextCellView {
         return file == nil ? hit : self
     }
 
+    // NSTableView may take a press on a plain (non-control) cell view itself, so the gestures are written as
+    // `handle…` methods that both this view's overrides and `ContextMenuTableView`'s call; whichever receives the
+    // event, the cell acts once. Each returns false when the event belongs to the table.
+
     override func mouseDown(with event: NSEvent) {
-        guard let file else { return super.mouseDown(with: event) }
+        if !handleMouseDown(event) { super.mouseDown(with: event) }
+    }
+
+    override func mouseDragged(with event: NSEvent) {
+        if !handleMouseDragged() { super.mouseDragged(with: event) }
+    }
+
+    override func mouseUp(with event: NSEvent) {
+        if !handleMouseUp(event) { super.mouseUp(with: event) }
+    }
+
+    func handleMouseDown(_ event: NSEvent) -> Bool {
+        guard let file else { return false }
         let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
         if modifiers.contains(.control), let menu = menu(for: event) {
-            return NSMenu.popUpContextMenu(menu, with: event, for: self)
+            NSMenu.popUpContextMenu(menu, with: event, for: self)
+            return true
         }
-        if !modifiers.isDisjoint(with: [.command, .shift]) { return super.mouseDown(with: event) }
+        if !modifiers.isDisjoint(with: [.command, .shift]) { return false }   // the table extends the selection
         pendingToggle?.cancel()
         pendingToggle = nil
         armedFile = nil
@@ -769,29 +786,32 @@ final class ReadStateCellView: TintedTextCellView {
             if let table = enclosingTable, case let row = table.row(for: self), row >= 0 {
                 table.selectRowIndexes(IndexSet(integer: row), byExtendingSelection: false)
             }
-            return super.mouseDown(with: event)
+            return false
         }
         armedFile = file
+        return true
     }
 
     /// A press that moves is not a click: it writes nothing.
-    override func mouseDragged(with event: NSEvent) {
+    func handleMouseDragged() -> Bool {
+        guard armedFile != nil else { return false }
         armedFile = nil
-        super.mouseDragged(with: event)
+        return true
     }
 
     /// The switch is armed by the press and made by a release inside the cell, so a press that slides off and is
     /// released elsewhere writes nothing; it then waits out the double-click interval.
-    override func mouseUp(with event: NSEvent) {
-        guard let file = armedFile else { return super.mouseUp(with: event) }
+    func handleMouseUp(_ event: NSEvent) -> Bool {
+        guard let file = armedFile else { return false }
         armedFile = nil
-        guard bounds.contains(convert(event.locationInWindow, from: nil)) else { return }
+        guard bounds.contains(convert(event.locationInWindow, from: nil)) else { return true }
         let toggle = DispatchWorkItem { [weak self] in
             self?.pendingToggle = nil
             self?.onAction?(.toggle, file)
         }
         pendingToggle = toggle
         DispatchQueue.main.asyncAfter(deadline: .now() + toggleDelay, execute: toggle)
+        return true
     }
 
     private var enclosingTable: NSTableView? {
@@ -1130,8 +1150,43 @@ private final class QualityPopUpButton: NSPopUpButton {
 @MainActor
 final class ContextMenuTableView: NSTableView {
     var contextMenuProvider: ((Set<ArchiveFile.ID>) -> NSMenu?)?
+    /// The Read cell a press began on, which gets the rest of that press (W40.fix-reader-read-toggle).
+    private var readCellPress: ReadStateCellView?
+
+    /// The Read cell under `event`, if the press is inside one that shows a file.
+    private func readCell(at event: NSEvent) -> ReadStateCellView? {
+        let point = convert(event.locationInWindow, from: nil)
+        let (row, column) = (row(at: point), column(at: point))
+        guard row >= 0, column >= 0, tableColumns[column].identifier.rawValue == "read",
+              let cell = view(atColumn: column, row: row, makeIfNecessary: false) as? ReadStateCellView,
+              cell.file != nil, cell.bounds.contains(cell.convert(event.locationInWindow, from: nil)) else { return nil }
+        return cell
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        readCellPress = nil
+        if let cell = readCell(at: event), cell.handleMouseDown(event) {
+            readCellPress = cell
+            return
+        }
+        super.mouseDown(with: event)
+    }
+
+    override func mouseDragged(with event: NSEvent) {
+        if let cell = readCellPress, cell.handleMouseDragged() { return }
+        super.mouseDragged(with: event)
+    }
+
+    override func mouseUp(with event: NSEvent) {
+        if let cell = readCellPress {
+            readCellPress = nil
+            if cell.handleMouseUp(event) { return }
+        }
+        super.mouseUp(with: event)
+    }
 
     override func menu(for event: NSEvent) -> NSMenu? {
+        if let cell = readCell(at: event) { return cell.menu(for: event) }   // the cell's own Read / Unread / Clear
         let point = convert(event.locationInWindow, from: nil)
         let clickedRow = row(at: point)
 

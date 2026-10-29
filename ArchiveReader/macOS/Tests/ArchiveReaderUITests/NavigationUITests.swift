@@ -176,12 +176,14 @@ final class NavigationUITests: FixtureUITestCase {
         let cell = app.staticTexts.matching(NSPredicate(
             format: "identifier BEGINSWITH 'ar.cell.read.' AND identifier ENDSWITH %@", name)).firstMatch
         XCTAssertTrue(cell.waitForExistence(timeout: 5), "the Read column should show the document's state")
+        try revealReadColumn(cell)
         let highlighted = table.tableRows.matching(NSPredicate(format: "isSelected == true"))
         let selectedBefore = highlighted.count
 
         cell.click()
-        XCTAssertTrue(waitForTags(on: name, containing: ["Read"], excluding: ["Unread"]),
-                      "a click on the Read cell should mark the document Read")
+        let marked = waitForTags(on: name, containing: ["Read"], excluding: ["Unread"])
+        captureScreenshot("w40-read-toggle-after-click")
+        XCTAssertTrue(marked, "a click on the Read cell should mark the document Read")
         XCTAssertEqual(highlighted.count, selectedBefore, "the click acts on the cell, not the row selection")
         cell.click()
         XCTAssertTrue(waitForTags(on: name, containing: ["Unread"], excluding: ["Read"]),
@@ -214,6 +216,7 @@ final class NavigationUITests: FixtureUITestCase {
         let cell = app.staticTexts.matching(NSPredicate(
             format: "identifier BEGINSWITH 'ar.cell.read.' AND identifier ENDSWITH %@", name)).firstMatch
         XCTAssertTrue(cell.waitForExistence(timeout: 5), "the Read column should show the document's state")
+        try revealReadColumn(cell)
         let windowsBefore = app.windows.count
 
         cell.doubleClick()
@@ -226,6 +229,16 @@ final class NavigationUITests: FixtureUITestCase {
         XCTAssertTrue(waitForTags(on: name, containing: ["Unread"], excluding: ["Read"], timeout: 1),
                       "and leaves its read state alone")
         captureScreenshot("w40-read-toggle-double-click")
+    }
+
+    /// The tag cloud's visibility is @AppStorage, and an earlier test can leave it open; it then narrows the table
+    /// until the Read column, the last one, is off screen and a click on its cell lands elsewhere.
+    private func revealReadColumn(_ cell: XCUIElement) throws {
+        if app.buttons.matching(identifier: "ar.tagCloud.tag").count > 0 {
+            toolbarButton("ar.toolbar.tagCloud").click()
+            RunLoop.current.run(until: Date().addingTimeInterval(1))
+        }
+        XCTAssertTrue(cell.isHittable, "the Read cell should be on screen to be clicked")
     }
 
     // MARK: - Save Search takes the keyboard; Quality chips run Q1 → Q3 (W40.fix-reader-visual-polish)
@@ -590,10 +603,11 @@ final class NavigationUITests: FixtureUITestCase {
                              containing required: [String],
                              excluding forbidden: [String] = [],
                              timeout: TimeInterval = 10) -> Bool {
-        let file = URL(fileURLWithPath: Self.fixturePath).appendingPathComponent(filename)
+        let path = URL(fileURLWithPath: Self.fixturePath).appendingPathComponent(filename).path
         let deadline = Date().addingTimeInterval(timeout)
         repeat {
-            let names = ((try? file.resourceValues(forKeys: [.tagNamesKey]))?.tagNames) ?? []
+            // A fresh URL each pass: a reused one caches its resource values and never sees a later write.
+            let names = ((try? URL(fileURLWithPath: path).resourceValues(forKeys: [.tagNamesKey]))?.tagNames) ?? []
             let containsRequired = required.allSatisfy { wanted in
                 names.contains { $0.caseInsensitiveCompare(wanted) == .orderedSame }
             }
