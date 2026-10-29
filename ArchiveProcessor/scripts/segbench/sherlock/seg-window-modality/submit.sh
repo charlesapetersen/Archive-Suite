@@ -5,8 +5,8 @@
 #   stage     CPU: copy the frozen pack into scratch, check its hashes, fetch the three base models if absent
 #   teacher   one GPU, afterok stage: Qwen3.5-27B-FP8, the vote's 1,260 units (6 runs x 210 windows)
 #   merge-2b  CPU, afterok stage: the trained 2B's FarmShare adapter onto Qwen3.5-2B
-#   2b        one GPU, afterok merge-2b: vote 1,260, sweep 2,312, folder 42
-#   merge-4b  CPU, afterany merge-2b (never two venv builds at once): the trained 4B onto Qwen3.5-4B
+#   2b        one GPU, afterok merge-2b: vote 1,260, sweep 2,288, folder 42
+#   merge-4b  CPU, afterok stage and afterany merge-2b (never two venv builds at once): the trained 4B onto Qwen3.5-4B
 #   4b        one GPU, afterok merge-4b: vote 1,260
 # The teacher waits on no merge, and a failed 4B merge costs only the 4B's arm.
 set -euo pipefail
@@ -50,7 +50,7 @@ merge2=$(run sbatch --parsable --dependency="afterok:$stage" --kill-on-invalid-d
 record merge-2b "$merge2"
 s2=$(gpu 2b "afterok:$merge2" 01:30:00 2b)
 record 2b "$s2"
-merge4=$(run sbatch --parsable --dependency="afterany:$merge2" --kill-on-invalid-dep=yes \
+merge4=$(run sbatch --parsable --dependency="afterok:$stage,afterany:$merge2" --kill-on-invalid-dep=yes \
   --output="$ROOT/logs/merge-4b-%j.out" "$JOB/merge-job.sh" "$ROOT" "$JOB" 4b)
 record merge-4b "$merge4"
 s4=$(gpu 4b "afterok:$merge4" 01:00:00 4b)

@@ -21,7 +21,8 @@ FIXED BEFORE ANY ANSWER (nothing is chosen on the test boxes):
 - The whole-folder unit is method_whole's: a run of two or more document pages between the truth's label photos. The
   development boxes are scored with truth photos anyway, so the unit gives nothing the score does not already assume.
   A gap beside a label photo is in no unit and is new by construction. Its token limit is 150 a page (a 7-page window
-  answers in about 400 tokens; the bench's 1,500 stays the floor).
+  answers in about 400 tokens; the bench's 1,500 stays the floor). A folder with a unit still unparsed after the retry
+  is reported as incomplete, not scored: its 0.5 votes would split every page.
 - Text-only drops the images and replaces the prompt's one paragraph about them; every other word is the bench's.
 - The vote: each run's windows are combined as method_window.combine does; a gap's decision is the majority of the six
   runs' decisions, a 3-3 tie going to their mean P(new). Also reported: the three offsets on l1 alone, the two prompts
@@ -366,7 +367,7 @@ def judges(pack, results, name):
     """judge(arm) for one part, answering from runs/<name>/answers.jsonl through the pack's own cache keys."""
     _, L, R, W, _, SC = _seg()
     ws = {w["cache_key"]: w for w in map(json.loads, (Path(pack) / name / "windows.jsonl").read_text().splitlines())}
-    got, failed = {}, Counter()
+    got, failed = {}, Counter()      # failed: (arm, box) -> units still unparsed after the retry
     path = Path(results) / name / "answers.jsonl"
     for r in (SC.read_answers(path) if path.exists() else []):
         w = ws.get(r["cache_key"])
@@ -374,7 +375,7 @@ def judges(pack, results, name):
             raise SystemExit(f"{name}: an answer for a request this pack never made ({r['window']})")
         for arm in w["arms"]:
             got[(arm, w["box"], tuple(w["window"]))] = r
-            failed[arm] += r["status"] != "ok"
+            failed[(arm, w["box"])] += r["status"] != "ok"
 
     def judge_for(arm):
         def judge(col, a, b):
@@ -406,23 +407,28 @@ def cmd_score(a):
     for name, p in freeze["packs"].items():
         role, part = p["role"], p["part"]
         judge_for, failed, n = judges(a.pack, a.results, name)
-        runs.append({"pack": name, "answers": n, "failed_units": dict(failed)})
+        runs.append({"pack": name, "answers": n, "failed_units": {f"{k[0]} {k[1]}": v for k, v in failed.items() if v}})
         for box in part_boxes(part):
             col, _ = SC.load(box, a.public_root)
             truth_photos = box not in PUBLIC
             combs = {}
             for arm in part_arms(part):
+                bad = failed[(arm, box)]
+                if bad and arm.startswith("folder"):
+                    # A failed folder votes 0.5 on every gap and so splits every page: not a score (review, 2026-10-29)
+                    missing.append(f"{name} {arm} {box}: {bad} folder units failed")
+                    continue
                 try:
                     combs[arm] = combine_units(col, units(col, arm), judge_for(arm), arm.startswith("folder"))
                 except RuntimeError as e:
                     missing.append(f"{name} {arm} {e}")
                     continue
-                rows.append({"model": role, "part": part, "box": box, "arm": arm,
+                rows.append({"model": role, "part": part, "box": box, "arm": arm, "failed_units": bad,
                              **score_row(col, combs[arm], truth_photos)})
             if part != "vote":
                 continue
             singles = [r for r in rows if r["model"] == role and r["part"] == "vote" and r["box"] == box]
-            if singles:
+            if len(singles) == len(vote_arms()):
                 rows.append({"model": role, "part": part, "box": box, "arm": "mean-of-singles",
                              "pages_exact": sum(r["pages_exact"] for r in singles) / len(singles),
                              "boundary_f1": sum(r["boundary_f1"] for r in singles) / len(singles), "runs": len(singles)})
@@ -436,7 +442,8 @@ def cmd_score(a):
     out = {"tag": TAG, "boxes": freeze["boxes"], "rows": rows, "runs": runs, "incomplete": missing}
     (RESULTS / "seg-window-modality.json").write_text(json.dumps(out, indent=1) + "\n")
     for r in rows:
-        print(f"{r['model']:8} {r['box']:11} {r['arm']:16} pages exact {r['pages_exact']:.3f}  F1 {r['boundary_f1']:.3f}")
+        print(f"{r['model']:8} {r['box']:11} {r['arm']:16} pages exact {r['pages_exact']:.3f}  F1 {r['boundary_f1']:.3f}"
+              + (f"  ({r['failed_units']} failed units)" if r.get("failed_units") else ""))
 
 
 def cmd_plan(a):

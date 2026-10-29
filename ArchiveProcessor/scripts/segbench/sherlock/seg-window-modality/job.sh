@@ -1,7 +1,7 @@
 #!/bin/bash
 # W46.seg-window-modality, one model on one GPU: serve it as every FarmShare row was served (7 images a prompt, 20,480
 # tokens, fp8 KV), except that a role whose pack holds longer requests (the 2B's K = 10 and whole-folder units) gets the
-# image limit its longest unit needs and 131,072 tokens (or the model's own maximum, if lower). Then a 4-unit pilot on
+# image limit its longest unit needs and 262,144 tokens (or the model's own maximum, if lower). Then a 4-unit pilot on
 # the role's first part, and only if at least 3 of the 4 parse, every part in turn through cluster_seg.py run (the
 # folder part last: one request the server refuses stops a run). A failed part does not stop the next.
 #   sbatch ... job.sh ROOT 2b|4b|teacher
@@ -27,7 +27,8 @@ import json, sys
 cfg = json.load(open(sys.argv[1]))
 images = max([7] + [json.load(open(p + "/pack.json"))["max_images"] for p in sys.argv[2:]])
 own = (cfg.get("text_config") or {}).get("max_position_embeddings") or cfg.get("max_position_embeddings") or 131072
-print(images, 20480 if images <= 7 else min(131072, own))
+# The longest folder (82 pages) is about 112,700 prompt tokens and its retry asks for 24,600 more (review, 2026-10-29).
+print(images, 20480 if images <= 7 else min(262144, own))
 PY
 )
 [[ "$IMAGES" =~ ^[0-9]+$ && "$MAXLEN" =~ ^[0-9]+$ ]] || { echo 'could not size the server from the packs'; exit 2; }
