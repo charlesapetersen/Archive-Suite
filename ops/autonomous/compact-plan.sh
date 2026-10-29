@@ -126,7 +126,7 @@ DR_HEADER_RE='^## (Daemon Report|Morning Review)'
 # makes that abort LOUD instead of a log line nobody reads. Add new '## ' sections here when the plan grows one.
 # Passed to awk via -v, which is safe ONLY because this pattern contains no backslashes (BSD awk strips
 # backslashes from -v values — see the note in Pass 2's header).
-SEC_HEADER_RE='^## (PRIME DIRECTIVES|RESUME PROTOCOL|WORK QUEUE|HOLD QUEUE|E2E findings|Session Log|Daemon Report|Morning Review|GUI VERIFICATION|OWNER AUTHORIZATIONS)'
+SEC_HEADER_RE='^## (PRIME DIRECTIVES|RESUME PROTOCOL|WORK QUEUE|HOLD QUEUE|RECURRING|E2E findings|Session Log|Daemon Report|Morning Review|GUI VERIFICATION|OWNER AUTHORIZATIONS)'
 DR_ARCHIVE="${AUTONOMOUS_DR_ARCHIVE:-${AUTONOMOUS_MR_ARCHIVE:-$REPO/.maintenance/AUTONOMOUS_DAEMON_REPORT_ARCHIVE.md}}"
 DR_KEEP="${DR_KEEP:-${MR_KEEP:-8}}"         # recent Daemon Report entries to retain inline
 DR_TRIGGER="${DR_TRIGGER:-${MR_TRIGGER:-12}}" # only rotate when the section exceeds this many entries (else no-op)

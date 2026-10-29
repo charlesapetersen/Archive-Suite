@@ -188,6 +188,40 @@ def edit(plan, action, values):
             line += " — RELEASED " + time.strftime("%Y-%m-%d") + ": " + note.strip()
             body = body[:lo] + line + "\n" + body[hi:]
             text = text[:start] + body + text[end:]
+        elif action in ("due", "rearm"):
+            # A machine-ticked gate in `## RECURRING` (W40.token-pass): `due` ticks it, so the standing WORK QUEUE
+            # item blocked on it runs; `rearm` unticks it once that item's session has done its pass (or files it unticked). Not a HOLD QUEUE
+            # gate: the owner is never asked about it (hooks.py holds reads the HOLD QUEUE only). The section is
+            # created after the HOLD QUEUE the first time.
+            tag, note = values
+            if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", tag):
+                raise ValueError("invalid tag")
+            if "\n" in note or not note.strip() or MARKERS.search(note):
+                raise ValueError("note must be one non-empty line without queue markers")
+            try:
+                start, end = section(text, "## RECURRING")
+            except ValueError:
+                if re.search(r"(?m)^## RECURRING", text):
+                    raise
+                _, hold_end = section(text, "## HOLD QUEUE")
+                head = "## RECURRING (machine-ticked gates of standing items: plan-edit.sh due|rearm, never the owner's)\n\n"
+                text = text[:hold_end] + head + "\n" + text[hold_end:]
+                start = end = hold_end + len(head)
+            body = text[start:end]
+            mine = [(lo, hi) for t, lo, hi in entries(body) if t == tag]
+            if len(mine) > 1:
+                raise ValueError("expected at most one line for the gate")
+            line = "- [%s] **%s** — %s %s: %s" % ("x" if action == "due" else " ", tag,
+                                                 "DUE" if action == "due" else "rearmed", time.strftime("%Y-%m-%d"),
+                                                 note.strip())
+            if mine:
+                lo, hi = mine[0]
+                body = body[:lo] + line + "\n" + body[hi:]
+            else:
+                body = line + "\n" + body
+            text = text[:start] + body + text[end:]
+            if action == "due":
+                text = re.sub(r"(?m)^RUN STATUS: COMPLETE[ \t]*$", "RUN STATUS: IN_PROGRESS", text)
         elif action == "add":
             # File new work into the WORK QUEUE after AFTER-TAG, so an item filed in SUITE_TODO reaches the resolver.
             tag, after, item = values
