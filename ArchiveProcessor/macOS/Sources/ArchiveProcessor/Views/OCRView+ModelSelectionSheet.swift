@@ -36,6 +36,18 @@ struct ModelSelectionSheet: View {
             }
     }
 
+    /// Every ticked model, with or without a key. `selectedEntries` drops the keyless ones, so counting it
+    /// read "0 models selected" with a model ticked (W40.fix-processor-compare-count).
+    private var tickedCount: Int {
+        allModels.filter { selections[$0.model.id] == true }.count
+    }
+
+    /// "1 model selected", or "3 models selected, 2 can run" when some ticked models have no key.
+    static func selectionSummary(ticked: Int, runnable: Int) -> String {
+        let selected = "\(ticked) model\(ticked == 1 ? "" : "s") selected"
+        return runnable == ticked ? selected : "\(selected), \(runnable) can run"
+    }
+
     private var missingKeys: Set<String> {
         var providers = Set<String>()
         for pair in allModels where selections[pair.model.id] == true {
@@ -70,8 +82,8 @@ struct ModelSelectionSheet: View {
             Divider()
 
             HStack {
-                let count = selectedEntries.count
-                Text("\(count) model\(count == 1 ? "" : "s") selected")
+                Text(Self.selectionSummary(ticked: tickedCount, runnable: selectedEntries.count))
+                    .accessibilityIdentifier("compareModels.selectionSummary")
                     .font(.caption)
                     .foregroundStyle(.primary)
                 if !missingKeys.isEmpty {

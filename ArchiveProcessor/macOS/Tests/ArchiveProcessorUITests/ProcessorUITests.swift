@@ -382,6 +382,32 @@ final class ProcessorUITests: XCTestCase {
                       "the caption must name the run's provider: \(caption)")
     }
 
+    /// W40.fix-processor-compare-count: the Compare Models footer counts every ticked model, and says how many
+    /// can run. Headless, no provider has a key, so a ticked model is selected but cannot run.
+    func testCompareModelsCountsTickedModelsWithoutKeys() throws {
+        let window = app.windows.firstMatch
+        let tools = [window.radioButtons["Tools"], window.buttons["Tools"]].first { $0.exists }
+        guard let tools else { return XCTFail("the main window must offer the Tools mode") }
+        tools.click()
+        let compare = window.buttons["Compare Models…"]
+        XCTAssertTrue(compare.waitForExistence(timeout: 5), "Tools must offer Compare Models")
+        compare.click()
+
+        let sheet = app.sheets.firstMatch
+        XCTAssertTrue(sheet.waitForExistence(timeout: 5), "Compare Models must open its selection sheet")
+        let ticked = { sheet.checkBoxes.allElementsBoundByIndex.filter { ($0.value as? Int) == 1 }.count }
+        if ticked() == 0 { sheet.checkBoxes.firstMatch.click() }
+        let count = ticked()
+        XCTAssertGreaterThan(count, 0, "the test needs a ticked model")
+
+        let summary = element("compareModels.selectionSummary")
+        XCTAssertTrue(summary.waitForExistence(timeout: 5), "the footer must show the selection summary")
+        XCTAssertEqual(renderedText(of: summary), "\(count) model\(count == 1 ? "" : "s") selected, 0 can run",
+                       "a ticked model without a key is selected, not missing from the count")
+        attachScreenshot("processor-compare-models-count")
+        sheet.buttons["Cancel"].click()
+    }
+
     func testFinishingScrimBlocksLiveCaptureKeyboardAndAccessibilityRoutes() throws {
         relaunch(extra: ["-APUITestLiveCaptureFinishingScrim"])
 
