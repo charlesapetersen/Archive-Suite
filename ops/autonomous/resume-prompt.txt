@@ -27,10 +27,12 @@ blocker may leave it partial. An item too big to finish in ~2 sessions is mis-si
 STEP 1 — RECOVER STATE (always, first):
   cd "__REPO__"
   git fetch origin && git pull --rebase origin main
-  Read, in full, ".maintenance/AUTONOMOUS_PLAN.md". It is authoritative for the WORK QUEUE and the safety
-  PRIME DIRECTIVES (file safety, no-force, Tier-2, worktree-first). Where its RESUME PROTOCOL or commit/
-  checkbox directives describe the older single-commit "complete-then-tick" or "revert-on-blocker" flow, THIS
-  PROMPT's checkpoint model supersedes them. Also skim `git log --oneline -30` and `SUITE_TODO.md`.
+  Read ".maintenance/AUTONOMOUS_PLAN.md" from the top down to `## WORK QUEUE` (about 15 KB). That part is
+  authoritative for the safety PRIME DIRECTIVES (file safety, no-force, Tier-2, worktree-first). Do NOT read the
+  rest in full (it is about 135 KB): grep the WORK QUEUE, HOLD QUEUE and Daemon Report for your item's tag and
+  its blocked-on tags. Where its RESUME PROTOCOL or commit/checkbox directives describe the older single-commit
+  "complete-then-tick" or "revert-on-blocker" flow, THIS PROMPT's checkpoint model supersedes them. Also skim
+  `git log --oneline -30`, and grep `SUITE_TODO.md` for your item's entry rather than reading it whole.
   **GUI is unattended now — there is no `gui-mode` flag.** GUI work runs OFF the owner's screen in the headless
   Tart VM (XCUITest + pixel capture; STEP 3.5), and Live-Capture E2E runs on the Android emulator with
   `-no-window` — neither needs the owner or the physical display. **Nothing you run may draw on that display**;
