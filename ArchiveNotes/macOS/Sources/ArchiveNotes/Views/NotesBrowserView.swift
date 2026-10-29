@@ -54,12 +54,11 @@ struct NotesBrowserView: View {
                              id: "an.divider.tree")
             }
             let stacked = layoutMode == .stacked
-            let panes = stacked ? AnyLayout(VStackLayout(spacing: 0)) : AnyLayout(HStackLayout(spacing: 0))
+            let panes = stacked ? AnyLayout(StackedPanesLayout(listHeight: listHeight))
+                                : AnyLayout(HStackLayout(spacing: 0))
             panes {
                 ItemListPane(model: model, nav: nav, selectedTemplateID: $selectedTemplateID)
                     .frame(minWidth: 540, maxWidth: .infinity, maxHeight: .infinity)
-                    .frame(height: stacked
-                           ? NotesLayoutSettings.stackedListHeight(stored: listHeight, paneHeight: panesHeight) : nil)
                     .clipped()   // never drawn outside its share, under the toolbar or the note
                 PanelDivider(size: stacked ? $listHeight : $detailWidth, panelBefore: stacked,
                              axis: stacked ? .vertical : .horizontal,
@@ -71,9 +70,10 @@ struct NotesBrowserView: View {
                     // Opaque, like the list: stacked, the shell's centre (where the UITest probes sit) is here.
                     .background(Color(nsColor: .windowBackgroundColor))
                     .frame(width: stacked ? nil : detailWidth)
-                    .frame(minHeight: stacked ? NotesLayoutSettings.stackedDetailMinHeight : nil,
-                           maxHeight: stacked ? .infinity : nil)
             }
+            // Only the divider's range reads this; the stacked height itself is cut by `StackedPanesLayout` while
+            // it places the panes, so no state written here feeds back into layout (a feedback loop through the
+            // list's frame crashed AppKit's layout pass on an animated tree toggle).
             .onGeometryChange(for: Double.self) { Double($0.size.height) } action: { panesHeight = $0 }
         }
         // The list needs 527 pt for its fixed filter controls in the VM; reserve 540 so its
@@ -249,6 +249,39 @@ struct NotesBrowserView: View {
             }
             window.setFrame(frame, display: true)
         }
+    }
+}
+
+// MARK: - Stacked panes (W48.notes-stacked-layout)
+
+/// The stacked arrangement of the list, the divider and the note: the list on top at its remembered height, cut while
+/// placing so the note keeps `stackedDetailMinHeight` (`NotesLayoutSettings.stackedListHeight`), the divider, then the
+/// note in the rest. A `Layout` rather than a frame fed from measured state, so nothing it decides writes back into
+/// the layout that measured it.
+struct StackedPanesLayout: Layout {
+    var listHeight: Double
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        // The widest pane's floor (the list's filter controls) for a minimum probe; otherwise what is offered.
+        let floorWidth = subviews.map { $0.sizeThatFits(ProposedViewSize(width: 0, height: nil)).width }.max() ?? 0
+        let idealWidth = subviews.map { $0.sizeThatFits(.unspecified).width }.max() ?? floorWidth
+        let width = max(floorWidth, proposal.width ?? idealWidth)
+        let ideal = NotesLayoutSettings.clampedListHeight(listHeight) + NotesLayoutSettings.stackedDividerHeight
+            + NotesLayoutSettings.stackedDetailMinHeight
+        let height = max(NotesLayoutSettings.stackedMinHeight, proposal.height ?? ideal)
+        return CGSize(width: width, height: height)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        guard subviews.count == 3 else { return }
+        let list = CGFloat(NotesLayoutSettings.stackedListHeight(stored: listHeight, paneHeight: Double(bounds.height)))
+        let divider = CGFloat(NotesLayoutSettings.stackedDividerHeight)
+        subviews[0].place(at: bounds.origin, proposal: ProposedViewSize(width: bounds.width, height: list))
+        subviews[1].place(at: CGPoint(x: bounds.minX, y: bounds.minY + list),
+                          proposal: ProposedViewSize(width: bounds.width, height: divider))
+        subviews[2].place(at: CGPoint(x: bounds.minX, y: bounds.minY + list + divider),
+                          proposal: ProposedViewSize(width: bounds.width,
+                                                     height: max(0, bounds.height - list - divider)))
     }
 }
 

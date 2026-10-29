@@ -124,8 +124,8 @@ final class StackedLayoutUITests: NotesFixtureUITestCase {
         }
     }
 
-    /// N-51 — reading and keyboard order: the list, then the divider, then the note; Tab still reaches the editor
-    /// from the list in the stacked layout whenever it does side by side.
+    /// N-51 — reading and keyboard order: the list, then the divider, then the note; the tree hides and shows;
+    /// Tab still reaches the editor from the list in the stacked layout whenever it does side by side.
     func testStackedOrderIsListThenNoteAndFocusCrossesTheDivider() throws {
         pinned = .stacked
         try withFixture {
@@ -139,6 +139,18 @@ final class StackedLayoutUITests: NotesFixtureUITestCase {
             let list = mainWindow.tables.firstMatch, divider = splitter(.stacked, in: mainWindow)
             XCTAssertLessThanOrEqual(list.frame.maxY, divider.frame.midY, "the list is above the divider")
             XCTAssertGreaterThanOrEqual(editor.frame.minY, divider.frame.midY, "the note is below the divider")
+
+            // The folder tree's animated hide and show, stacked: this crashed AppKit's layout pass once (a feedback
+            // loop through measured state), found by the stacked visual tour.
+            let toggle = mainWindow.buttons["an.toggleTree"].firstMatch
+            for state in ["hidden", "shown", "hidden", "shown"] {
+                toggle.click()
+                RunLoop.current.run(until: Date().addingTimeInterval(1))
+                XCTAssertEqual(app.state, .runningForeground, "the app must survive the tree being \(state), stacked")
+                XCTAssertEqual(mainWindow.descendants(matching: .any)["an.sidebar.newFolder"].firstMatch.exists,
+                               state == "shown", "the tree should be \(state)")
+            }
+            assertLayout(.stacked, in: mainWindow)
 
             let stackedTabs = tabsFromListToEditor()
             relaunchPinned(.sideBySide)
