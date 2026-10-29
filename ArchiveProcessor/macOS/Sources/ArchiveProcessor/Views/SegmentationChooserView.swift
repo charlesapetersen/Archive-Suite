@@ -33,11 +33,20 @@ struct SegmentationChooserView: View {
         let rows = rows
         VStack(alignment: .leading, spacing: 6) {
             Picker(selection: $approachRaw) {
-                ForEach(rows, id: \.approach) { row in
-                    // Every approach is selectable, so its figures, cost and reason (and the key wizard) can be
-                    // read before it can run; the card greys out one that cannot. Running it is gated where the
-                    // run starts (W36.seg-opt-review).
-                    Text(row.canRun ? row.label : "\(row.label) (unavailable)").tag(row.approach.rawValue)
+                // Every approach is selectable, so its figures, cost and reason (and the key wizard) can be
+                // read before it can run; the card greys out one that cannot. Running it is gated where the
+                // run starts (W36.seg-opt-review). The ones that cannot run sit apart under their own heading,
+                // so they no longer look like the ones that can (W40.fix-processor-start-why).
+                ForEach(rows.filter(\.canRun), id: \.approach) { row in
+                    Text(row.label).tag(row.approach.rawValue)
+                }
+                let unavailable = rows.filter { !$0.canRun }
+                if !unavailable.isEmpty {
+                    Section("Not ready yet. Choose one to see what it needs") {
+                        ForEach(unavailable, id: \.approach) { row in
+                            Text("\(row.label) (unavailable)").tag(row.approach.rawValue)
+                        }
+                    }
                 }
                 if rows.isEmpty { Text("Full manual").tag(SegmentationApproach.manual.rawValue) }
             } label: {

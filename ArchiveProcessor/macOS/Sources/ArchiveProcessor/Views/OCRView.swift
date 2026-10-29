@@ -539,16 +539,25 @@ struct OCRView: View {
                 // gave them. Linked to Settings → Segmentation.
                 if captureBoundaries.isEmpty {
                     GroupBox("Segmentation") {
-                        SegmentationChooserView(
-                            pageCount: segmentationPageCount > 0 ? segmentationPageCount : 100,
-                            scaleCaption: segmentationPageCount > 0
-                                ? "for the \(segmentationPageCount) page\(segmentationPageCount == 1 ? "" : "s") dropped"
-                                : "per 100 pages",
-                            routes: $segmentationRoutes)
-                            .padding(4)
+                        VStack(alignment: .leading, spacing: 4) {
+                            SegmentationChooserView(
+                                pageCount: segmentationPageCount > 0 ? segmentationPageCount : 100,
+                                scaleCaption: segmentationPageCount > 0
+                                    ? "for the \(segmentationPageCount) page\(segmentationPageCount == 1 ? "" : "s") dropped"
+                                    : "per 100 pages",
+                                routes: $segmentationRoutes)
+                                .disabled(isPDFOnlyReOCR)
+                            // A greyed chooser says why, as Tagging does (W40.fix-processor-start-why).
+                            if isPDFOnlyReOCR {
+                                Text("Not used for a multi-page PDF: it is rebuilt as one file, so there are no boundaries to propose.")
+                                    .font(.caption2).foregroundStyle(.primary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                    .accessibilityIdentifier("ap.ocr.segmentationDisabledReason")
+                            }
+                        }
+                        .padding(4)
                     }
                     .accessibilityIdentifier("ap.ocr.segmentationPanel")
-                    .disabled(isPDFOnlyReOCR)
                 }
 
 
@@ -780,6 +789,13 @@ struct OCRView: View {
                 .prominentButtonStyle()
                 .disabled(!canStartProcessing)
 
+                if let reason = startBlockedReason {
+                    Label(reason, systemImage: "info.circle")
+                        .font(.caption).foregroundStyle(.primary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("ap.ocr.startBlockedReason")
+                }
+
                 if processor.isProcessing || isInReviewMode {
                     Button("Cancel") { processor.cancel() }
                         .buttonStyle(.bordered)
@@ -804,6 +820,28 @@ struct OCRView: View {
             && !processor.isProcessing && !isInReviewMode
             && processor.pendingBatchInfo == nil && processor.pendingRunInfo == nil
             && processor.pendingMixedPDFInfo == nil
+    }
+
+    /// Why Start is disabled, shown under the button (W40.fix-processor-start-why): the first unmet condition of
+    /// `canStartProcessing`, in the order the user would fix them. Nil while a run is going (Cancel shows) and
+    /// whenever Start is enabled. Keep the two in step: every condition there has a sentence here.
+    private var startBlockedReason: String? {
+        guard !canStartProcessing, !processor.isProcessing else { return nil }
+        if isInReviewMode { return "Finish the review on the right before starting another run." }
+        if processor.pendingBatchInfo != nil { return "Resume or dismiss the pending batch above first." }
+        if processor.pendingRunInfo != nil { return "Resume or dismiss the interrupted run above first." }
+        if processor.pendingMixedPDFInfo != nil { return "Resume or dismiss the interrupted PDF run above first." }
+        if droppedFiles.isEmpty { return "Add images or PDFs to process." }
+        if !visionWorkflowIsSupported {
+            return "Apple Vision only transcribes: set Tagging to No tagging or Copy source file tags"
+                + (enableCollectionSegmentation ? ", and turn off Collection ID in Settings." : ".")
+        }
+        if useAppleVision ? (visionUseLLMJudgment && !visionJudgementKeyIsPresent) : apiKey.isEmpty {
+            if useGateway && !useAppleVision { return "No gateway key is saved. Add it in Settings (⌘,)." }
+            return "No \(selectedProvider.rawValue) API key is saved. Add one in Settings (⌘,)."
+        }
+        if outputDirectory == nil { return "Choose an output folder." }
+        return nil
     }
 
     /// Re-point the API-key field after `selectedProvider` changes from anywhere (the ⌘⌥P cycle

@@ -77,6 +77,31 @@ final class ProcessorUITests: XCTestCase {
         attachScreenshot("processor-multipage-auto-reocr")
     }
 
+    /// W40.fix-processor-start-why: a disabled Start says which condition is missing, and so does the greyed
+    /// Segmentation chooser. The UI test reads no Keychain, so with a file dropped the missing thing is the key.
+    func testDisabledStartAndSegmentationSayWhy() throws {
+        let start = element("ap.ocr.startBlockedReason")
+        XCTAssertTrue(start.waitForExistence(timeout: 10), "an empty window says why Start is disabled")
+        XCTAssertTrue(renderedText(of: start).contains("Add images or PDFs"),
+                      "with nothing dropped the reason is the files: \(renderedText(of: start))")
+        // The approaches that cannot run (no key in a UI test) sit under their own heading.
+        element("ap.segmentation.picker").click()
+        XCTAssertTrue(app.menuItems.matching(NSPredicate(format: "title BEGINSWITH %@", "Gemini only")).firstMatch
+            .waitForExistence(timeout: 5), "the menu opens")
+        attachScreenshot("processor-segmentation-menu-unavailable-section")
+        app.typeKey(.escape, modifierFlags: [])
+
+        relaunch(extra: ["-APUITestSyntheticMultiPagePDF"])
+        let reason = element("ap.ocr.startBlockedReason")
+        XCTAssertTrue(reason.waitForExistence(timeout: 10), "a file is queued and Start is still disabled, so say why")
+        XCTAssertTrue(renderedText(of: reason).contains("API key"),
+                      "with no key saved the reason names the key: \(renderedText(of: reason))")
+        let seg = element("ap.ocr.segmentationDisabledReason")
+        XCTAssertTrue(seg.exists, "the greyed Segmentation chooser says why for a multi-page PDF")
+        XCTAssertTrue(renderedText(of: seg).contains("multi-page PDF"), "reason text: \(renderedText(of: seg))")
+        attachScreenshot("processor-start-blocked-reason")
+    }
+
     func testInstitutionalComputingImportOffersNeutralFolderChooser() throws {
         relaunch(extra: ["-APUITestSyntheticMultiPagePDF"])
         let choose = element("ap.ocr.institutionalComputeChoose")
