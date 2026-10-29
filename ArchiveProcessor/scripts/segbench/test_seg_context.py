@@ -51,17 +51,17 @@ class Facts(unittest.TestCase):
 
 
 class Request(unittest.TestCase):
-    def test_block_goes_before_the_first_page_and_nothing_else_changes(self):
-        base = "PROMPT HEAD\n--- page 4 ---\ntext four\n--- page 5 ---\ntext five\nTAIL"
+    def test_block_goes_above_the_ocr_heading_and_nothing_else_changes(self):
+        base = "PROMPT HEAD\nTHE OCR TEXT OF EACH PAGE (truncated)\n--- page 4 ---\ntext four\nTAIL"
         L = SimpleNamespace(request=lambda col, a, b: (base, ["t4", "t5"], [4, 5]))
         with mock.patch.object(S, "_seg", return_value=(None, L, None, None, None)):
             self.assertEqual(S.request(None, 3, 5)[0], base)
             p, thumbs, nums = S.request(None, 3, 5, "COLLECTION FACTS. x")
-        self.assertEqual(p, base.replace("--- page 4 ---", "COLLECTION FACTS. x\n\n--- page 4 ---"))
+        self.assertEqual(p, base.replace("THE OCR TEXT", "COLLECTION FACTS. x\n\nTHE OCR TEXT"))
         self.assertEqual((thumbs, nums), (["t4", "t5"], [4, 5]))
 
-    def test_ambiguous_marker_refuses(self):
-        base = "--- page 4 ---\nquoted: --- page 4 ---\n"
+    def test_ambiguous_heading_refuses(self):
+        base = "THE OCR TEXT OF EACH PAGE (a)\n--- page 4 ---\nquoted: THE OCR TEXT OF EACH PAGE (b)\n"
         L = SimpleNamespace(request=lambda col, a, b: (base, [], [4, 5]))
         with mock.patch.object(S, "_seg", return_value=(None, L, None, None, None)):
             with self.assertRaises(ValueError):

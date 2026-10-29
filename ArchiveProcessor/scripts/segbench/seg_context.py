@@ -55,6 +55,7 @@ CATALOGUE = {
     "Lincoln": "Library of Congress, Abraham Lincoln Papers, General Correspondence, consecutive catalogue items in "
                "shelf order: manuscript letters and papers",
 }
+OCR_HEADING = "THE OCR TEXT OF EACH PAGE ("   # method_gemini.PROMPT's heading above the pages' text
 HEADER = ("COLLECTION FACTS. What is known about the whole box these pages come from, from its catalogue or label "
           "photos and from a pass over all of its OCR text. They describe the box, not this window: take them as "
           "background, and decide each gap from the pages themselves.")
@@ -165,15 +166,14 @@ def all_facts(public_root):
 
 def request(col, a, b, block=None):
     """The window's request: the bench's own (method_local.request), and in the block arm the same prompt with the
-    block set immediately before the first page's text."""
+    block set just above the OCR section's heading, so it is not read as page text."""
     _, L, *_ = _seg()
     prompt, thumbs, nums = L.request(col, a, b)
     if block is None:
         return prompt, thumbs, nums
-    first = f"--- page {nums[0]} ---\n"
-    if prompt.count(first) != 1:
-        raise ValueError(f"{col.name} {nums}: the first page's marker is not unique in the prompt")
-    return prompt.replace(first, block + "\n\n" + first, 1), thumbs, nums
+    if prompt.count(OCR_HEADING) != 1:
+        raise ValueError(f"{col.name} {nums}: the OCR section's heading is not unique in the prompt")
+    return prompt.replace(OCR_HEADING, block + "\n\n" + OCR_HEADING, 1), thumbs, nums
 
 
 def sha(path):
@@ -219,7 +219,13 @@ def cmd_pack(a):
                 prompt, thumbs, nums = request(col, lo, hi, block if arm == "block" else None)
                 for n, t in zip(nums, thumbs):
                     if n not in done:
-                        write_new(out / "images" / box / f"{n}.jpg", R.image_jpeg(t, L.MAX_SIDE))
+                        jpeg = R.image_jpeg(t, L.MAX_SIDE)
+                        if box in PUBLIC:  # the bytes the node sends, not only the thumbnails the key hashes
+                            for key, _ in MODELS.values():
+                                old = Path(a.public_root) / "packs" / f"{box.lower()}-{key}" / "images" / box / f"{n}.jpg"
+                                if old.read_bytes() != jpeg:
+                                    raise SystemExit(f"{box} page {n}: image bytes differ from the scored {key} pack")
+                        write_new(out / "images" / box / f"{n}.jpg", jpeg)
                         done.add(n)
                 for role, (key, _) in MODELS.items():
                     k = R.cache_key(key, prompt, thumbs)

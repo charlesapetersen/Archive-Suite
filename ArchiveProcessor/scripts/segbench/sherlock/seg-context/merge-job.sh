@@ -19,28 +19,35 @@ OUT="$ROOT/seg-2b-merged"
 ENV="$GROUP_HOME/$USER/envs/peft-overlay"
 [ -s "$ADAPTER/adapter_config.json" ] && [ -s "$ADAPTER/../train.json" ] || {
   echo "no seg-2b adapter (adapter_config.json and ../train.json) at $ADAPTER; set SEG_CONTEXT_ADAPTER"; exit 2; }
+# The merge writes into $OUT.tmp and is moved into place whole, so a merge that died mid-save is never served.
 [ ! -e "$OUT/config.json" ] || { echo "merged model already at $OUT"; exit 0; }
+rm -rf "$OUT.tmp"
 mkdir -p "$SCRATCH/cache/pip" "$ROOT/runtime"
 run() { apptainer -s exec --bind "$SCRATCH,$GROUP_HOME" --env PIP_CACHE_DIR="$SCRATCH/cache/pip" \
   --env PYTHONPATH="$SH_SHIM" --env HF_HOME="$HF_HOME" "$SH_IMG" "$@"; }
 peft_version=$(run python3 -c 'import json,sys;print(json.load(open(sys.argv[1])).get("peft_version") or "")' \
   "$ADAPTER/adapter_config.json")
+[[ -z "$peft_version" || "$peft_version" =~ ^[0-9]+(\.[0-9]+)*$ ]] || { echo "unpinnable peft_version $peft_version"; exit 2; }
 if [ ! -x "$ENV/bin/python" ]; then
   run python3 -m venv --system-site-packages "$ENV"
 fi
-run python3 -m pip freeze > "$SCRATCH/peft-constraints-$SLURM_JOB_ID.txt"
+# Direct-reference lines (pkg @ file://...) are not valid constraints; the version lines hold torch and the rest.
+run python3 -m pip freeze | grep -v ' @ ' > "$SCRATCH/peft-constraints-$SLURM_JOB_ID.txt"
 run "$ENV/bin/python" -m pip install -q --disable-pip-version-check -c "$SCRATCH/peft-constraints-$SLURM_JOB_ID.txt" \
   "peft${peft_version:+==$peft_version}" accelerate
 rm -f "$SCRATCH/peft-constraints-$SLURM_JOB_ID.txt"
 run "$ENV/bin/python" -c 'import torch, transformers, peft
-print("torch", torch.__version__, "transformers", transformers.__version__, "peft", peft.__version__)'
-run env HF_HUB_OFFLINE=1 "$ENV/bin/python" "$ROOT/support/segbench/train_seg.py" merge --adapter "$ADAPTER" --out "$OUT"
+print("torch", torch.__version__, "transformers", transformers.__version__, "peft", peft.__version__)
+assert torch.__version__.endswith("+cu129"), "the overlay replaced the image torch"'
+run env HF_HUB_OFFLINE=1 "$ENV/bin/python" "$ROOT/support/segbench/train_seg.py" merge --adapter "$ADAPTER" --out "$OUT.tmp"
+mv "$OUT.tmp" "$OUT"
 run python3 - "$ADAPTER" "$OUT" "$ROOT/runtime/merge-$SLURM_JOB_ID.json" <<'PY'
 import hashlib, json, sys
 from pathlib import Path
 adapter, out, rec = map(Path, sys.argv[1:])
 h = lambda p: hashlib.sha256(p.read_bytes()).hexdigest()
-json.dump({"adapter": str(adapter), "train_json": json.loads((adapter.parent / "train.json").read_text()),
+base = Path(__import__("os").environ["HF_HOME"]) / "hub/models--Qwen--Qwen3.5-2B/refs/main"
+json.dump({"adapter": str(adapter), "base_revision": base.read_text().strip() if base.exists() else None, "train_json": json.loads((adapter.parent / "train.json").read_text()),
            "adapter_files": {p.name: h(p) for p in sorted(adapter.iterdir()) if p.is_file()},
            "merged_files": {p.name: h(p) for p in sorted(out.iterdir()) if p.is_file() and p.stat().st_size < 2**33}},
           open(rec, "x"), indent=1)

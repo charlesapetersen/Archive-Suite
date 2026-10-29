@@ -37,13 +37,13 @@ record() {
 stage=$(run sbatch --parsable --output="$ROOT/logs/stage-%j.out" "$JOB/stage-job.sh" "$SOURCE" "$ROOT" "$JOB")
 record stage "$stage"
 teacher=$(run sbatch --parsable --partition=gpu -G 1 -C "$SH_GPU_C" --cpus-per-task=8 --mem=64G --time=02:30:00 \
-  --dependency="afterok:$stage" --job-name=ctx-teacher --output="$ROOT/logs/teacher-%j.out" \
+  --dependency="afterok:$stage" --kill-on-invalid-dep=yes --job-name=ctx-teacher --output="$ROOT/logs/teacher-%j.out" \
   "$JOB/job.sh" "$ROOT" teacher)
 record teacher "$teacher"
-merge=$(run sbatch --parsable --dependency="afterok:$stage" --output="$ROOT/logs/merge-%j.out" \
+merge=$(run sbatch --parsable --dependency="afterok:$stage" --kill-on-invalid-dep=yes --output="$ROOT/logs/merge-%j.out" \
   "$JOB/merge-job.sh" "$ROOT" "$JOB")
 record merge "$merge"
 student=$(run sbatch --parsable --partition=gpu -G 1 -C "$SH_GPU_C" --cpus-per-task=8 --mem=64G --time=01:00:00 \
-  --dependency="afterok:$merge" --job-name=ctx-student --output="$ROOT/logs/student-%j.out" \
+  --dependency="afterok:$merge" --kill-on-invalid-dep=yes --job-name=ctx-student --output="$ROOT/logs/student-%j.out" \
   "$JOB/job.sh" "$ROOT" student)
 record student "$student"

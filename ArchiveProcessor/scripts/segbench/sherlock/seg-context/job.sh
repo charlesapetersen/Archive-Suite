@@ -19,7 +19,10 @@ case "$ROLE" in
   *) echo "unknown role $ROLE"; exit 2 ;;
 esac
 [ -f "$MODEL/config.json" ] || { echo "model incomplete: $MODEL"; exit 2; }
-export IC_SEG_KEY="$KEY"
+VLLM_ARGS=(--tensor-parallel-size 1 --max-model-len 20480 --kv-cache-dtype fp8 --gpu-memory-utilization 0.92
+           --max-num-seqs 32 --limit-mm-per-prompt '{"image":7}')
+# cluster_seg.py's run summaries record these (env_info), as on FarmShare.
+export IC_SEG_KEY="$KEY" IC_MODEL="$MODEL" IC_VLLM_ARGS="${VLLM_ARGS[*]}"
 SAVED="$GROUP_HOME/$USER/archive-suite/sherlock-results/seg-context-20261029"
 mkdir -p "$ROOT/logs" "$ROOT/runs" "$ROOT/runtime"
 "$FS_PY" "$ROOT/support/segbench/seg_context.py" check --root "$ROOT"
@@ -27,12 +30,13 @@ PORT=$((16000 + SLURM_JOB_ID % 10000)); URL="http://127.0.0.1:$PORT"
 LOG="$ROOT/logs/vllm-$ROLE-$SLURM_JOB_ID.log"
 "$FS_PY" - "$MODEL" "$ROOT/runtime/$ROLE-$SLURM_JOB_ID.json" <<'PY'
 import importlib.metadata as m, json, os, sys
-json.dump({"model": sys.argv[1], "job": os.environ["SLURM_JOB_ID"], "vllm": m.version("vllm"),
+# The teacher's snapshot hash is the path's last part: no FarmShare record of its revision survives, so this
+# is the only record of which weights were read.
+json.dump({"model": sys.argv[1], "gpu": os.popen("nvidia-smi --query-gpu=name --format=csv,noheader").read().strip(), "job": os.environ["SLURM_JOB_ID"], "vllm": m.version("vllm"),
            "transformers": m.version("transformers")}, open(sys.argv[2], "x"), indent=1)
 PY
-"$FS_VLLM" serve "$MODEL" --served-model-name "$SERVED" --host 127.0.0.1 --port "$PORT" \
-  --tensor-parallel-size 1 --max-model-len 20480 --kv-cache-dtype fp8 --gpu-memory-utilization 0.92 \
-  --max-num-seqs 32 --limit-mm-per-prompt '{"image":7}' > "$LOG" 2>&1 &
+"$FS_VLLM" serve "$MODEL" --served-model-name "$SERVED" --host 127.0.0.1 --port "$PORT" "${VLLM_ARGS[@]}" \
+  > "$LOG" 2>&1 &
 server=$!
 finish() {
   rc=$?; trap - EXIT

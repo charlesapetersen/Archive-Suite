@@ -27,4 +27,6 @@ for repo in Qwen/Qwen3.5-27B-FP8 Qwen/Qwen3.5-2B; do
   echo "download $repo"
   apptainer -s exec --bind "$SCRATCH,$GROUP_HOME" --env HF_HOME="$HF_HOME" "$SH_IMG" hf download "$repo" > /dev/null
 done
+# FarmShare kept no record of the revisions it read, so these are "main at staging"; the jobs record the hashes.
+for repo in Qwen--Qwen3.5-27B-FP8 Qwen--Qwen3.5-2B; do echo "$repo $(cat "$HF_HOME/hub/models--$repo/refs/main")"; done
 du -sh "$HF_HOME"; echo "staged $ROOT"

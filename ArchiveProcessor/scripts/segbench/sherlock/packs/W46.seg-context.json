@@ -1,0 +1,26 @@
+{
+  "tag": "W46.seg-context",
+  "pack": "seg-context-20261029",
+  "mac": "artifacts/seg-context-20261029",
+  "submit": "support/job/submit.sh",
+  "jobs": 4,
+  "gpu_hours": 3.5,
+  "review": "execution-plans/items/W46.seg-context.md",
+  "imports": [
+    {"dir": "support/segbench", "modules": ["seg_context", "cluster_seg", "train_seg"]},
+    {"modules": ["vllm"]}
+  ],
+  "creates": [
+    "$FS_ROOT/seg-context-20261029",
+    "$GROUP_HOME/$USER/archive-suite/sherlock-results/seg-context-20261029",
+    "$GROUP_HOME/$USER/envs/peft-overlay"
+  ],
+  "provenance": [],
+  "requires": [
+    "$GROUP_HOME/$USER/archive-suite/FarmShare-scratch-20261022/fs-ocr/train/seg-2b/adapter/adapter_config.json",
+    "$GROUP_HOME/$USER/archive-suite/FarmShare-scratch-20261022/fs-ocr/train/seg-2b/train.json"
+  ],
+  "results": "$GROUP_HOME/$USER/archive-suite/sherlock-results/seg-context-20261029",
+  "collect": ["$FS_ROOT/seg-context-20261029/jobs.tsv", "$FS_ROOT/seg-context-20261029/logs"],
+  "release": "answers collected into the Mac artifact; the engine scores them with seg_context.py score"
+}
