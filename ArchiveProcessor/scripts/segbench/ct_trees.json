@@ -1,0 +1,2077 @@
+{
+ "about": "W47.ct-truth Route B test set: synthetic trees, written by ct_truth.py trees. `levels` is the expected level map (a field, 'container+folder' for a name that carries both, or 'ignore'); `expect` lists only the fields the tree carries.",
+ "trees": [
+  {
+   "id": "t01a",
+   "convention": "Repository/Collection/Box N/Folder M",
+   "levels": [
+    "repository",
+    "collection",
+    "container",
+    "folder"
+   ],
+   "files": [
+    {
+     "path": "Hoover Institution Archives/Albert Glotzer papers/Box 26/Folder 1/IMG_0001.pdf",
+     "expect": {
+      "repository": "Hoover Institution Archives",
+      "collection_title": "Albert Glotzer papers",
+      "container": "Box 26",
+      "folder": "1"
+     }
+    },
+    {
+     "path": "Hoover Institution Archives/Albert Glotzer papers/Box 26/Folder 1/IMG_0002.pdf",
+     "expect": {
+      "repository": "Hoover Institution Archives",
+      "collection_title": "Albert Glotzer papers",
+      "container": "Box 26",
+      "folder": "1"
+     }
+    },
+    {
+     "path": "Hoover Institution Archives/Albert Glotzer papers/Box 26/Folder 2/IMG_0001.pdf",
+     "expect": {
+      "repository": "Hoover Institution Archives",
+      "collection_title": "Albert Glotzer papers",
+      "container": "Box 26",
+      "folder": "2"
+     }
+    },
+    {
+     "path": "Hoover Institution Archives/Albert Glotzer papers/Box 26/Folder 2/IMG_0002.pdf",
+     "expect": {
+      "repository": "Hoover Institution Archives",
+      "collection_title": "Albert Glotzer papers",
+      "container": "Box 26",
+      "folder": "2"
+     }
+    },
+    {
+     "path": "Hoover Institution Archives/Albert Glotzer papers/Box 19/Folder 1/IMG_0001.pdf",
+     "expect": {
+      "repository": "Hoover Institution Archives",
+      "collection_title": "Albert Glotzer papers",
+      "container": "Box 19",
+      "folder": "1"
+     }
+    },
+    {
+     "path": "Hoover Institution Archives/Albert Glotzer papers/Box 19/Folder 1/IMG_0002.pdf",
+     "expect": {
+      "repository": "Hoover Institution Archives",
+      "collection_title": "Albert Glotzer papers",
+      "container": "Box 19",
+      "folder": "1"
+     }
+    },
+    {
+     "path": "Hoover Institution Archives/Albert Glotzer papers/Box 19/Folder 2/IMG_0001.pdf",
+     "expect": {
+      "repository": "Hoover Institution Archives",
+      "collection_title": "Albert Glotzer papers",
+      "container": "Box 19",
+      "folder": "2"
+     }
+    },
+    {
+     "path": "Hoover Institution Archives/Albert Glotzer papers/Box 19/Folder 2/IMG_0002.pdf",
+     "expect": {
+      "repository": "Hoover Institution Archives",
+      "collection_title": "Albert Glotzer papers",
+      "container": "Box 19",
+      "folder": "2"
+     }
+    }
+   ]
+  },
+  {
+   "id": "t01b",
+   "convention": "Collection/B17F8",
+   "levels": [
+    "collection",
+    "container+folder"
+   ],
+   "files": [
+    {
+     "path": "Albert Glotzer papers/B43F12/IMG_0001.pdf",
+     "expect": {
+      "collection_title": "Albert Glotzer papers",
+      "container": "Box 43",
+      "folder": "12"
+     }
+    },
+    {
+     "path": "Albert Glotzer papers/B43F12/IMG_0002.pdf",
+     "expect": {
+      "collection_title": "Albert Glotzer papers",
+      "container": "Box 43",
+      "folder": "12"
+     }
+    },
+    {
+     "path": "Albert Glotzer papers/B43F12/IMG_0003.pdf",
+     "expect": {
+      "collection_title": "Albert Glotzer papers",
+      "container": "Box 43",
+      "folder": "12"
+     }
+    },
+    {
+     "path": "Albert Glotzer papers/B56F8/IMG_0001.pdf",
+     "expect": {
+      "collection_title": "Albert Glotzer papers",
+      "container": "Box 56",
+      "folder": "8"
+     }
+    },
+    {
+     "path": "Albert Glotzer papers/B56F8/IMG_0002.pdf",
+     "expect": {
+      "collection_title": "Albert Glotzer papers",
+      "container": "Box 56",
+      "folder": "8"
+     }
+    },
+    {
+     "path": "Albert Glotzer papers/B56F8/IMG_0003.pdf",
+     "expect": {
+      "collection_title": "Albert Glotzer papers",
+      "container": "Box 56",
+      "folder": "8"
+     }
+    }
+   ]
+  },
+  {
+   "id": "t01c",
+   "convention": "\"Box 10 - Folder 3\"",
+   "levels": [
+    "collection",
+    "container+folder"
+   ],
+   "files": [
+    {
+     "path": "Albert Glotzer papers/Box 12 - Folder 13/IMG_0001.pdf",
+     "expect": {
+      "collection_title": "Albert Glotzer papers",
+      "container": "Box 12",
+      "folder": "13"
+     }
+    },
+    {
+     "path": "Albert Glotzer papers/Box 12 - Folder 13/IMG_0002.pdf",
+     "expect": {
+      "collection_title": "Albert Glotzer papers",
+      "container": "Box 12",
+      "folder": "13"
+     }
+    },
+    {
+     "path": "Albert Glotzer papers/Box 20 - Folder 12 - Reports 1959-1960/IMG_0001.pdf",
+     "expect": {
+      "collection_title": "Albert Glotzer papers",
+      "container": "Box 20",
+      "folder": "12",
+      "folder_title": "Reports 1959-1960"
+     }
+    },
+    {
+     "path": "Albert Glotzer papers/Box 20 - Folder 12 - Reports 1959-1960/IMG_0002.pdf",
+     "expect": {
+      "collection_title": "Albert Glotzer papers",
+      "container": "Box 20",
+      "folder": "12",
+      "folder_title": "Reports 1959-1960"
+     }
+    }
+   ]
+  },
+  {
+   "id": "t01d",
+   "convention": "filenames carry box and folder",
+   "levels": [
+    "repository",
+    "collection"
+   ],
+   "files": [
+    {
+     "path": "Hoover Institution Archives/Albert Glotzer papers/Glotzer, Box 2, Folder 4 - 0001.pdf",
+     "expect": {
+      "repository": "Hoover Institution Archives",
+      "collection_title": "Albert Glotzer papers",
+      "container": "Box 2",
+      "folder": "4"
+     }
+    },
+    {
+     "path": "Hoover Institution Archives/Albert Glotzer papers/Glotzer, Box 2, Folder 4 - 0002.pdf",
+     "expect": {
+      "repository": "Hoover Institution Archives",
+      "collection_title": "Albert Glotzer papers",
+      "container": "Box 2",
+      "folder": "4"
+     }
+    },
+    {
+     "path": "Hoover Institution Archives/Albert Glotzer papers/Glotzer, Box 2, Folder 5 - 0001.pdf",
+     "expect": {
+      "repository": "Hoover Institution Archives",
+      "collection_title": "Albert Glotzer papers",
+      "container": "Box 2",
+      "folder": "5"
+     }
+    },
+    {
+     "path": "Hoover Institution Archives/Albert Glotzer papers/Glotzer, Box 2, Folder 5 - 0002.pdf",
+     "expect": {
+      "repository": "Hoover Institution Archives",
+      "collection_title": "Albert Glotzer papers",
+      "container": "Box 2",
+      "folder": "5"
+     }
+    },
+    {
+     "path": "Hoover Institution Archives/Albert Glotzer papers/Glotzer, Box 3, Folder 1 - 0001.pdf",
+     "expect": {
+      "repository": "Hoover Institution Archives",
+      "collection_title": "Albert Glotzer papers",
+      "container": "Box 3",
+      "folder": "1"
+     }
+    },
+    {
+     "path": "Hoover Institution Archives/Albert Glotzer papers/Glotzer, Box 3, Folder 1 - 0002.pdf",
+     "expect": {
+      "repository": "Hoover Institution Archives",
+      "collection_title": "Albert Glotzer papers",
+      "container": "Box 3",
+      "folder": "1"
+     }
+    }
+   ]
+  },
+  {
+   "id": "t01e",
+   "convention": "workflow levels to skip, with a series or accession level",
+   "levels": [
+    "ignore",
+    "repository",
+    "collection",
+    "accession",
+    "container",
+    "ignore"
+   ],
+   "files": [
+    {
+     "path": "05 Final Tagging/Hoover Institution Archives/Albert Glotzer papers/Accession 91006/Box 1/scans/IMG_0001.pdf",
+     "expect": {
+      "repository": "Hoover Institution Archives",
+      "collection_title": "Albert Glotzer papers",
+      "container": "Box 1",
+      "accession": "91006"
+     }
+    },
+    {
+     "path": "05 Final Tagging/Hoover Institution Archives/Albert Glotzer papers/Accession 91006/Box 1/scans/IMG_0002.pdf",
+     "expect": {
+      "repository": "Hoover Institution Archives",
+      "collection_title": "Albert Glotzer papers",
+      "container": "Box 1",
+      "accession": "91006"
+     }
+    },
+    {
+     "path": "05 Final Tagging/Hoover Institution Archives/Albert Glotzer papers/Accession 91006/Box 2/scans/IMG_0001.pdf",
+     "expect": {
+      "repository": "Hoover Institution Archives",
+      "collection_title": "Albert Glotzer papers",
+      "container": "Box 2",
+      "accession": "91006"
+     }
+    },
+    {
+     "path": "05 Final Tagging/Hoover Institution Archives/Albert Glotzer papers/Accession 91006/Box 2/scans/IMG_0002.pdf",
+     "expect": {
+      "repository": "Hoover Institution Archives",
+      "collection_title": "Albert Glotzer papers",
+      "container": "Box 2",
+      "accession": "91006"
+     }
+    }
+   ]
+  },
+  {
+   "id": "t02a",
+   "convention": "Repository/Collection/Box N/Folder M",
+   "levels": [
+    "repository",
+    "collection",
+    "container",
+    "folder"
+   ],
+   "files": [
+    {
+     "path": "Wisconsin Historical Society/Irving Kristol papers, Mss 1036/Box 24/Folder 1/IMG_0001.pdf",
+     "expect": {
+      "repository": "Wisconsin Historical Society",
+      "collection_title": "Irving Kristol papers",
+      "container": "Box 24",
+      "folder": "1",
+      "collection_number": "Mss 1036"
+     }
+    },
+    {
+     "path": "Wisconsin Historical Society/Irving Kristol papers, Mss 1036/Box 24/Folder 1/IMG_0002.pdf",
+     "expect": {
+      "repository": "Wisconsin Historical Society",
+      "collection_title": "Irving Kristol papers",
+      "container": "Box 24",
+      "folder": "1",
+      "collection_number": "Mss 1036"
+     }
+    },
+    {
+     "path": "Wisconsin Historical Society/Irving Kristol papers, Mss 1036/Box 24/Folder 2/IMG_0001.pdf",
+     "expect": {
+      "repository": "Wisconsin Historical Society",
+      "collection_title": "Irving Kristol papers",
+      "container": "Box 24",
+      "folder": "2",
+      "collection_number": "Mss 1036"
+     }
+    },
+    {
+     "path": "Wisconsin Historical Society/Irving Kristol papers, Mss 1036/Box 24/Folder 2/IMG_0002.pdf",
+     "expect": {
+      "repository": "Wisconsin Historical Society",
+      "collection_title": "Irving Kristol papers",
+      "container": "Box 24",
+      "folder": "2",
+      "collection_number": "Mss 1036"
+     }
+    },
+    {
+     "path": "Wisconsin Historical Society/Irving Kristol papers, Mss 1036/Box 35/Folder 1/IMG_0001.pdf",
+     "expect": {
+      "repository": "Wisconsin Historical Society",
+      "collection_title": "Irving Kristol papers",
+      "container": "Box 35",
+      "folder": "1",
+      "collection_number": "Mss 1036"
+     }
+    },
+    {
+     "path": "Wisconsin Historical Society/Irving Kristol papers, Mss 1036/Box 35/Folder 1/IMG_0002.pdf",
+     "expect": {
+      "repository": "Wisconsin Historical Society",
+      "collection_title": "Irving Kristol papers",
+      "container": "Box 35",
+      "folder": "1",
+      "collection_number": "Mss 1036"
+     }
+    },
+    {
+     "path": "Wisconsin Historical Society/Irving Kristol papers, Mss 1036/Box 35/Folder 2/IMG_0001.pdf",
+     "expect": {
+      "repository": "Wisconsin Historical Society",
+      "collection_title": "Irving Kristol papers",
+      "container": "Box 35",
+      "folder": "2",
+      "collection_number": "Mss 1036"
+     }
+    },
+    {
+     "path": "Wisconsin Historical Society/Irving Kristol papers, Mss 1036/Box 35/Folder 2/IMG_0002.pdf",
+     "expect": {
+      "repository": "Wisconsin Historical Society",
+      "collection_title": "Irving Kristol papers",
+      "container": "Box 35",
+      "folder": "2",
+      "collection_number": "Mss 1036"
+     }
+    }
+   ]
+  },
+  {
+   "id": "t02b",
+   "convention": "Collection/B17F8",
+   "levels": [
+    "collection",
+    "container+folder"
+   ],
+   "files": [
+    {
+     "path": "Irving Kristol papers, Mss 1036/B35F19/IMG_0001.pdf",
+     "expect": {
+      "collection_title": "Irving Kristol papers",
+      "container": "Box 35",
+      "folder": "19",
+      "collection_number": "Mss 1036"
+     }
+    },
+    {
+     "path": "Irving Kristol papers, Mss 1036/B35F19/IMG_0002.pdf",
+     "expect": {
+      "collection_title": "Irving Kristol papers",
+      "container": "Box 35",
+      "folder": "19",
+      "collection_number": "Mss 1036"
+     }
+    },
+    {
+     "path": "Irving Kristol papers, Mss 1036/B35F19/IMG_0003.pdf",
+     "expect": {
+      "collection_title": "Irving Kristol papers",
+      "container": "Box 35",
+      "folder": "19",
+      "collection_number": "Mss 1036"
+     }
+    },
+    {
+     "path": "Irving Kristol papers, Mss 1036/B44F6/IMG_0001.pdf",
+     "expect": {
+      "collection_title": "Irving Kristol papers",
+      "container": "Box 44",
+      "folder": "6",
+      "collection_number": "Mss 1036"
+     }
+    },
+    {
+     "path": "Irving Kristol papers, Mss 1036/B44F6/IMG_0002.pdf",
+     "expect": {
+      "collection_title": "Irving Kristol papers",
+      "container": "Box 44",
+      "folder": "6",
+      "collection_number": "Mss 1036"
+     }
+    },
+    {
+     "path": "Irving Kristol papers, Mss 1036/B44F6/IMG_0003.pdf",
+     "expect": {
+      "collection_title": "Irving Kristol papers",
+      "container": "Box 44",
+      "folder": "6",
+      "collection_number": "Mss 1036"
+     }
+    }
+   ]
+  },
+  {
+   "id": "t02c",
+   "convention": "\"Box 10 - Folder 3\"",
+   "levels": [
+    "collection",
+    "container+folder"
+   ],
+   "files": [
+    {
+     "path": "Irving Kristol papers, Mss 1036/Box 52 - Folder 16/IMG_0001.pdf",
+     "expect": {
+      "collection_title": "Irving Kristol papers",
+      "container": "Box 52",
+      "folder": "16",
+      "collection_number": "Mss 1036"
+     }
+    },
+    {
+     "path": "Irving Kristol papers, Mss 1036/Box 52 - Folder 16/IMG_0002.pdf",
+     "expect": {
+      "collection_title": "Irving Kristol papers",
+      "container": "Box 52",
+      "folder": "16",
+      "collection_number": "Mss 1036"
+     }
+    },
+    {
+     "path": "Irving Kristol papers, Mss 1036/Box 22 - Folder 11 - Speeches/IMG_0001.pdf",
+     "expect": {
+      "collection_title": "Irving Kristol papers",
+      "container": "Box 22",
+      "folder": "11",
+      "folder_title": "Speeches",
+      "collection_number": "Mss 1036"
+     }
+    },
+    {
+     "path": "Irving Kristol papers, Mss 1036/Box 22 - Folder 11 - Speeches/IMG_0002.pdf",
+     "expect": {
+      "collection_title": "Irving Kristol papers",
+      "container": "Box 22",
+      "folder": "11",
+      "folder_title": "Speeches",
+      "collection_number": "Mss 1036"
+     }
+    }
+   ]
+  },
+  {
+   "id": "t02d",
+   "convention": "filenames carry box and folder",
+   "levels": [
+    "repository",
+    "collection"
+   ],
+   "files": [
+    {
+     "path": "Wisconsin Historical Society/Irving Kristol papers, Mss 1036/Kristol, Box 2, Folder 4 - 0001.pdf",
+     "expect": {
+      "repository": "Wisconsin Historical Society",
+      "collection_title": "Irving Kristol papers",
+      "container": "Box 2",
+      "folder": "4",
+      "collection_number": "Mss 1036"
+     }
+    },
+    {
+     "path": "Wisconsin Historical Society/Irving Kristol papers, Mss 1036/Kristol, Box 2, Folder 4 - 0002.pdf",
+     "expect": {
+      "repository": "Wisconsin Historical Society",
+      "collection_title": "Irving Kristol papers",
+      "container": "Box 2",
+      "folder": "4",
+      "collection_number": "Mss 1036"
+     }
+    },
+    {
+     "path": "Wisconsin Historical Society/Irving Kristol papers, Mss 1036/Kristol, Box 2, Folder 5 - 0001.pdf",
+     "expect": {
+      "repository": "Wisconsin Historical Society",
+      "collection_title": "Irving Kristol papers",
+      "container": "Box 2",
+      "folder": "5",
+      "collection_number": "Mss 1036"
+     }
+    },
+    {
+     "path": "Wisconsin Historical Society/Irving Kristol papers, Mss 1036/Kristol, Box 2, Folder 5 - 0002.pdf",
+     "expect": {
+      "repository": "Wisconsin Historical Society",
+      "collection_title": "Irving Kristol papers",
+      "container": "Box 2",
+      "folder": "5",
+      "collection_number": "Mss 1036"
+     }
+    },
+    {
+     "path": "Wisconsin Historical Society/Irving Kristol papers, Mss 1036/Kristol, Box 3, Folder 1 - 0001.pdf",
+     "expect": {
+      "repository": "Wisconsin Historical Society",
+      "collection_title": "Irving Kristol papers",
+      "container": "Box 3",
+      "folder": "1",
+      "collection_number": "Mss 1036"
+     }
+    },
+    {
+     "path": "Wisconsin Historical Society/Irving Kristol papers, Mss 1036/Kristol, Box 3, Folder 1 - 0002.pdf",
+     "expect": {
+      "repository": "Wisconsin Historical Society",
+      "collection_title": "Irving Kristol papers",
+      "container": "Box 3",
+      "folder": "1",
+      "collection_number": "Mss 1036"
+     }
+    }
+   ]
+  },
+  {
+   "id": "t02e",
+   "convention": "workflow levels to skip, with a series or accession level",
+   "levels": [
+    "ignore",
+    "repository",
+    "collection",
+    "series",
+    "container",
+    "ignore"
+   ],
+   "files": [
+    {
+     "path": "05 Final Tagging/Wisconsin Historical Society/Irving Kristol papers, Mss 1036/Series II/Box 1/scans/IMG_0001.pdf",
+     "expect": {
+      "repository": "Wisconsin Historical Society",
+      "collection_title": "Irving Kristol papers",
+      "container": "Box 1",
+      "series": "Series II",
+      "collection_number": "Mss 1036"
+     }
+    },
+    {
+     "path": "05 Final Tagging/Wisconsin Historical Society/Irving Kristol papers, Mss 1036/Series II/Box 1/scans/IMG_0002.pdf",
+     "expect": {
+      "repository": "Wisconsin Historical Society",
+      "collection_title": "Irving Kristol papers",
+      "container": "Box 1",
+      "series": "Series II",
+      "collection_number": "Mss 1036"
+     }
+    },
+    {
+     "path": "05 Final Tagging/Wisconsin Historical Society/Irving Kristol papers, Mss 1036/Series II/Box 2/scans/IMG_0001.pdf",
+     "expect": {
+      "repository": "Wisconsin Historical Society",
+      "collection_title": "Irving Kristol papers",
+      "container": "Box 2",
+      "series": "Series II",
+      "collection_number": "Mss 1036"
+     }
+    },
+    {
+     "path": "05 Final Tagging/Wisconsin Historical Society/Irving Kristol papers, Mss 1036/Series II/Box 2/scans/IMG_0002.pdf",
+     "expect": {
+      "repository": "Wisconsin Historical Society",
+      "collection_title": "Irving Kristol papers",
+      "container": "Box 2",
+      "series": "Series II",
+      "collection_number": "Mss 1036"
+     }
+    }
+   ]
+  },
+  {
+   "id": "t03a",
+   "convention": "Repository/Collection/Box N/Folder M",
+   "levels": [
+    "repository",
+    "collection",
+    "container",
+    "folder"
+   ],
+   "files": [
+    {
+     "path": "Stanford University Archives/Stanford News Service records, SC0122/Box 38/Folder 1/IMG_0001.pdf",
+     "expect": {
+      "repository": "Stanford University Archives",
+      "collection_title": "Stanford News Service records",
+      "container": "Box 38",
+      "folder": "1",
+      "collection_number": "SC0122"
+     }
+    },
+    {
+     "path": "Stanford University Archives/Stanford News Service records, SC0122/Box 38/Folder 1/IMG_0002.pdf",
+     "expect": {
+      "repository": "Stanford University Archives",
+      "collection_title": "Stanford News Service records",
+      "container": "Box 38",
+      "folder": "1",
+      "collection_number": "SC0122"
+     }
+    },
+    {
+     "path": "Stanford University Archives/Stanford News Service records, SC0122/Box 38/Folder 2/IMG_0001.pdf",
+     "expect": {
+      "repository": "Stanford University Archives",
+      "collection_title": "Stanford News Service records",
+      "container": "Box 38",
+      "folder": "2",
+      "collection_number": "SC0122"
+     }
+    },
+    {
+     "path": "Stanford University Archives/Stanford News Service records, SC0122/Box 38/Folder 2/IMG_0002.pdf",
+     "expect": {
+      "repository": "Stanford University Archives",
+      "collection_title": "Stanford News Service records",
+      "container": "Box 38",
+      "folder": "2",
+      "collection_number": "SC0122"
+     }
+    },
+    {
+     "path": "Stanford University Archives/Stanford News Service records, SC0122/Box 23/Folder 1/IMG_0001.pdf",
+     "expect": {
+      "repository": "Stanford University Archives",
+      "collection_title": "Stanford News Service records",
+      "container": "Box 23",
+      "folder": "1",
+      "collection_number": "SC0122"
+     }
+    },
+    {
+     "path": "Stanford University Archives/Stanford News Service records, SC0122/Box 23/Folder 1/IMG_0002.pdf",
+     "expect": {
+      "repository": "Stanford University Archives",
+      "collection_title": "Stanford News Service records",
+      "container": "Box 23",
+      "folder": "1",
+      "collection_number": "SC0122"
+     }
+    },
+    {
+     "path": "Stanford University Archives/Stanford News Service records, SC0122/Box 23/Folder 2/IMG_0001.pdf",
+     "expect": {
+      "repository": "Stanford University Archives",
+      "collection_title": "Stanford News Service records",
+      "container": "Box 23",
+      "folder": "2",
+      "collection_number": "SC0122"
+     }
+    },
+    {
+     "path": "Stanford University Archives/Stanford News Service records, SC0122/Box 23/Folder 2/IMG_0002.pdf",
+     "expect": {
+      "repository": "Stanford University Archives",
+      "collection_title": "Stanford News Service records",
+      "container": "Box 23",
+      "folder": "2",
+      "collection_number": "SC0122"
+     }
+    }
+   ]
+  },
+  {
+   "id": "t03b",
+   "convention": "Collection/B17F8",
+   "levels": [
+    "collection",
+    "container+folder"
+   ],
+   "files": [
+    {
+     "path": "Stanford News Service records, SC0122/B81F1/IMG_0001.pdf",
+     "expect": {
+      "collection_title": "Stanford News Service records",
+      "container": "Box 81",
+      "folder": "1",
+      "collection_number": "SC0122"
+     }
+    },
+    {
+     "path": "Stanford News Service records, SC0122/B81F1/IMG_0002.pdf",
+     "expect": {
+      "collection_title": "Stanford News Service records",
+      "container": "Box 81",
+      "folder": "1",
+      "collection_number": "SC0122"
+     }
+    },
+    {
+     "path": "Stanford News Service records, SC0122/B81F1/IMG_0003.pdf",
+     "expect": {
+      "collection_title": "Stanford News Service records",
+      "container": "Box 81",
+      "folder": "1",
+      "collection_number": "SC0122"
+     }
+    },
+    {
+     "path": "Stanford News Service records, SC0122/B95F20/IMG_0001.pdf",
+     "expect": {
+      "collection_title": "Stanford News Service records",
+      "container": "Box 95",
+      "folder": "20",
+      "collection_number": "SC0122"
+     }
+    },
+    {
+     "path": "Stanford News Service records, SC0122/B95F20/IMG_0002.pdf",
+     "expect": {
+      "collection_title": "Stanford News Service records",
+      "container": "Box 95",
+      "folder": "20",
+      "collection_number": "SC0122"
+     }
+    },
+    {
+     "path": "Stanford News Service records, SC0122/B95F20/IMG_0003.pdf",
+     "expect": {
+      "collection_title": "Stanford News Service records",
+      "container": "Box 95",
+      "folder": "20",
+      "collection_number": "SC0122"
+     }
+    }
+   ]
+  },
+  {
+   "id": "t03c",
+   "convention": "\"Box 10 - Folder 3\"",
+   "levels": [
+    "collection",
+    "container+folder"
+   ],
+   "files": [
+    {
+     "path": "Stanford News Service records, SC0122/Box 13 - Folder 13/IMG_0001.pdf",
+     "expect": {
+      "collection_title": "Stanford News Service records",
+      "container": "Box 13",
+      "folder": "13",
+      "collection_number": "SC0122"
+     }
+    },
+    {
+     "path": "Stanford News Service records, SC0122/Box 13 - Folder 13/IMG_0002.pdf",
+     "expect": {
+      "collection_title": "Stanford News Service records",
+      "container": "Box 13",
+      "folder": "13",
+      "collection_number": "SC0122"
+     }
+    },
+    {
+     "path": "Stanford News Service records, SC0122/Box 54 - Folder 19 - Clippings/IMG_0001.pdf",
+     "expect": {
+      "collection_title": "Stanford News Service records",
+      "container": "Box 54",
+      "folder": "19",
+      "folder_title": "Clippings",
+      "collection_number": "SC0122"
+     }
+    },
+    {
+     "path": "Stanford News Service records, SC0122/Box 54 - Folder 19 - Clippings/IMG_0002.pdf",
+     "expect": {
+      "collection_title": "Stanford News Service records",
+      "container": "Box 54",
+      "folder": "19",
+      "folder_title": "Clippings",
+      "collection_number": "SC0122"
+     }
+    }
+   ]
+  },
+  {
+   "id": "t03d",
+   "convention": "filenames carry box and folder",
+   "levels": [
+    "repository",
+    "collection"
+   ],
+   "files": [
+    {
+     "path": "Stanford University Archives/Stanford News Service records, SC0122/Service, Box 2, Folder 4 - 0001.pdf",
+     "expect": {
+      "repository": "Stanford University Archives",
+      "collection_title": "Stanford News Service records",
+      "container": "Box 2",
+      "folder": "4",
+      "collection_number": "SC0122"
+     }
+    },
+    {
+     "path": "Stanford University Archives/Stanford News Service records, SC0122/Service, Box 2, Folder 4 - 0002.pdf",
+     "expect": {
+      "repository": "Stanford University Archives",
+      "collection_title": "Stanford News Service records",
+      "container": "Box 2",
+      "folder": "4",
+      "collection_number": "SC0122"
+     }
+    },
+    {
+     "path": "Stanford University Archives/Stanford News Service records, SC0122/Service, Box 2, Folder 5 - 0001.pdf",
+     "expect": {
+      "repository": "Stanford University Archives",
+      "collection_title": "Stanford News Service records",
+      "container": "Box 2",
+      "folder": "5",
+      "collection_number": "SC0122"
+     }
+    },
+    {
+     "path": "Stanford University Archives/Stanford News Service records, SC0122/Service, Box 2, Folder 5 - 0002.pdf",
+     "expect": {
+      "repository": "Stanford University Archives",
+      "collection_title": "Stanford News Service records",
+      "container": "Box 2",
+      "folder": "5",
+      "collection_number": "SC0122"
+     }
+    },
+    {
+     "path": "Stanford University Archives/Stanford News Service records, SC0122/Service, Box 3, Folder 1 - 0001.pdf",
+     "expect": {
+      "repository": "Stanford University Archives",
+      "collection_title": "Stanford News Service records",
+      "container": "Box 3",
+      "folder": "1",
+      "collection_number": "SC0122"
+     }
+    },
+    {
+     "path": "Stanford University Archives/Stanford News Service records, SC0122/Service, Box 3, Folder 1 - 0002.pdf",
+     "expect": {
+      "repository": "Stanford University Archives",
+      "collection_title": "Stanford News Service records",
+      "container": "Box 3",
+      "folder": "1",
+      "collection_number": "SC0122"
+     }
+    }
+   ]
+  },
+  {
+   "id": "t03e",
+   "convention": "workflow levels to skip, with a series or accession level",
+   "levels": [
+    "ignore",
+    "repository",
+    "collection",
+    "series",
+    "container",
+    "ignore"
+   ],
+   "files": [
+    {
+     "path": "05 Final Tagging/Stanford University Archives/Stanford News Service records, SC0122/Series 1/Box 1/scans/IMG_0001.pdf",
+     "expect": {
+      "repository": "Stanford University Archives",
+      "collection_title": "Stanford News Service records",
+      "container": "Box 1",
+      "series": "Series 1",
+      "collection_number": "SC0122"
+     }
+    },
+    {
+     "path": "05 Final Tagging/Stanford University Archives/Stanford News Service records, SC0122/Series 1/Box 1/scans/IMG_0002.pdf",
+     "expect": {
+      "repository": "Stanford University Archives",
+      "collection_title": "Stanford News Service records",
+      "container": "Box 1",
+      "series": "Series 1",
+      "collection_number": "SC0122"
+     }
+    },
+    {
+     "path": "05 Final Tagging/Stanford University Archives/Stanford News Service records, SC0122/Series 1/Box 2/scans/IMG_0001.pdf",
+     "expect": {
+      "repository": "Stanford University Archives",
+      "collection_title": "Stanford News Service records",
+      "container": "Box 2",
+      "series": "Series 1",
+      "collection_number": "SC0122"
+     }
+    },
+    {
+     "path": "05 Final Tagging/Stanford University Archives/Stanford News Service records, SC0122/Series 1/Box 2/scans/IMG_0002.pdf",
+     "expect": {
+      "repository": "Stanford University Archives",
+      "collection_title": "Stanford News Service records",
+      "container": "Box 2",
+      "series": "Series 1",
+      "collection_number": "SC0122"
+     }
+    }
+   ]
+  },
+  {
+   "id": "t04a",
+   "convention": "Repository/Collection/Box N/Folder M",
+   "levels": [
+    "repository",
+    "collection",
+    "container",
+    "folder"
+   ],
+   "files": [
+    {
+     "path": "University of Chicago Library/Edward Shils papers/Box 18/Folder 1/IMG_0001.pdf",
+     "expect": {
+      "repository": "University of Chicago Library",
+      "collection_title": "Edward Shils papers",
+      "container": "Box 18",
+      "folder": "1"
+     }
+    },
+    {
+     "path": "University of Chicago Library/Edward Shils papers/Box 18/Folder 1/IMG_0002.pdf",
+     "expect": {
+      "repository": "University of Chicago Library",
+      "collection_title": "Edward Shils papers",
+      "container": "Box 18",
+      "folder": "1"
+     }
+    },
+    {
+     "path": "University of Chicago Library/Edward Shils papers/Box 18/Folder 2/IMG_0001.pdf",
+     "expect": {
+      "repository": "University of Chicago Library",
+      "collection_title": "Edward Shils papers",
+      "container": "Box 18",
+      "folder": "2"
+     }
+    },
+    {
+     "path": "University of Chicago Library/Edward Shils papers/Box 18/Folder 2/IMG_0002.pdf",
+     "expect": {
+      "repository": "University of Chicago Library",
+      "collection_title": "Edward Shils papers",
+      "container": "Box 18",
+      "folder": "2"
+     }
+    },
+    {
+     "path": "University of Chicago Library/Edward Shils papers/Box 2/Folder 1/IMG_0001.pdf",
+     "expect": {
+      "repository": "University of Chicago Library",
+      "collection_title": "Edward Shils papers",
+      "container": "Box 2",
+      "folder": "1"
+     }
+    },
+    {
+     "path": "University of Chicago Library/Edward Shils papers/Box 2/Folder 1/IMG_0002.pdf",
+     "expect": {
+      "repository": "University of Chicago Library",
+      "collection_title": "Edward Shils papers",
+      "container": "Box 2",
+      "folder": "1"
+     }
+    },
+    {
+     "path": "University of Chicago Library/Edward Shils papers/Box 2/Folder 2/IMG_0001.pdf",
+     "expect": {
+      "repository": "University of Chicago Library",
+      "collection_title": "Edward Shils papers",
+      "container": "Box 2",
+      "folder": "2"
+     }
+    },
+    {
+     "path": "University of Chicago Library/Edward Shils papers/Box 2/Folder 2/IMG_0002.pdf",
+     "expect": {
+      "repository": "University of Chicago Library",
+      "collection_title": "Edward Shils papers",
+      "container": "Box 2",
+      "folder": "2"
+     }
+    }
+   ]
+  },
+  {
+   "id": "t04b",
+   "convention": "Collection/B17F8",
+   "levels": [
+    "collection",
+    "container+folder"
+   ],
+   "files": [
+    {
+     "path": "Edward Shils papers/B34F18/IMG_0001.pdf",
+     "expect": {
+      "collection_title": "Edward Shils papers",
+      "container": "Box 34",
+      "folder": "18"
+     }
+    },
+    {
+     "path": "Edward Shils papers/B34F18/IMG_0002.pdf",
+     "expect": {
+      "collection_title": "Edward Shils papers",
+      "container": "Box 34",
+      "folder": "18"
+     }
+    },
+    {
+     "path": "Edward Shils papers/B34F18/IMG_0003.pdf",
+     "expect": {
+      "collection_title": "Edward Shils papers",
+      "container": "Box 34",
+      "folder": "18"
+     }
+    },
+    {
+     "path": "Edward Shils papers/B22F2/IMG_0001.pdf",
+     "expect": {
+      "collection_title": "Edward Shils papers",
+      "container": "Box 22",
+      "folder": "2"
+     }
+    },
+    {
+     "path": "Edward Shils papers/B22F2/IMG_0002.pdf",
+     "expect": {
+      "collection_title": "Edward Shils papers",
+      "container": "Box 22",
+      "folder": "2"
+     }
+    },
+    {
+     "path": "Edward Shils papers/B22F2/IMG_0003.pdf",
+     "expect": {
+      "collection_title": "Edward Shils papers",
+      "container": "Box 22",
+      "folder": "2"
+     }
+    }
+   ]
+  },
+  {
+   "id": "t04c",
+   "convention": "\"Box 10 - Folder 3\"",
+   "levels": [
+    "collection",
+    "container+folder"
+   ],
+   "files": [
+    {
+     "path": "Edward Shils papers/Box 9 - Folder 17/IMG_0001.pdf",
+     "expect": {
+      "collection_title": "Edward Shils papers",
+      "container": "Box 9",
+      "folder": "17"
+     }
+    },
+    {
+     "path": "Edward Shils papers/Box 9 - Folder 17/IMG_0002.pdf",
+     "expect": {
+      "collection_title": "Edward Shils papers",
+      "container": "Box 9",
+      "folder": "17"
+     }
+    },
+    {
+     "path": "Edward Shils papers/Box 13 - Folder 10 - Minutes, 1948/IMG_0001.pdf",
+     "expect": {
+      "collection_title": "Edward Shils papers",
+      "container": "Box 13",
+      "folder": "10",
+      "folder_title": "Minutes, 1948"
+     }
+    },
+    {
+     "path": "Edward Shils papers/Box 13 - Folder 10 - Minutes, 1948/IMG_0002.pdf",
+     "expect": {
+      "collection_title": "Edward Shils papers",
+      "container": "Box 13",
+      "folder": "10",
+      "folder_title": "Minutes, 1948"
+     }
+    }
+   ]
+  },
+  {
+   "id": "t04d",
+   "convention": "filenames carry box and folder",
+   "levels": [
+    "repository",
+    "collection"
+   ],
+   "files": [
+    {
+     "path": "University of Chicago Library/Edward Shils papers/Shils, Box 2, Folder 4 - 0001.pdf",
+     "expect": {
+      "repository": "University of Chicago Library",
+      "collection_title": "Edward Shils papers",
+      "container": "Box 2",
+      "folder": "4"
+     }
+    },
+    {
+     "path": "University of Chicago Library/Edward Shils papers/Shils, Box 2, Folder 4 - 0002.pdf",
+     "expect": {
+      "repository": "University of Chicago Library",
+      "collection_title": "Edward Shils papers",
+      "container": "Box 2",
+      "folder": "4"
+     }
+    },
+    {
+     "path": "University of Chicago Library/Edward Shils papers/Shils, Box 2, Folder 5 - 0001.pdf",
+     "expect": {
+      "repository": "University of Chicago Library",
+      "collection_title": "Edward Shils papers",
+      "container": "Box 2",
+      "folder": "5"
+     }
+    },
+    {
+     "path": "University of Chicago Library/Edward Shils papers/Shils, Box 2, Folder 5 - 0002.pdf",
+     "expect": {
+      "repository": "University of Chicago Library",
+      "collection_title": "Edward Shils papers",
+      "container": "Box 2",
+      "folder": "5"
+     }
+    },
+    {
+     "path": "University of Chicago Library/Edward Shils papers/Shils, Box 3, Folder 1 - 0001.pdf",
+     "expect": {
+      "repository": "University of Chicago Library",
+      "collection_title": "Edward Shils papers",
+      "container": "Box 3",
+      "folder": "1"
+     }
+    },
+    {
+     "path": "University of Chicago Library/Edward Shils papers/Shils, Box 3, Folder 1 - 0002.pdf",
+     "expect": {
+      "repository": "University of Chicago Library",
+      "collection_title": "Edward Shils papers",
+      "container": "Box 3",
+      "folder": "1"
+     }
+    }
+   ]
+  },
+  {
+   "id": "t04e",
+   "convention": "workflow levels to skip, with a series or accession level",
+   "levels": [
+    "ignore",
+    "repository",
+    "collection",
+    "series",
+    "container",
+    "ignore"
+   ],
+   "files": [
+    {
+     "path": "05 Final Tagging/University of Chicago Library/Edward Shils papers/Series II/Box 1/scans/IMG_0001.pdf",
+     "expect": {
+      "repository": "University of Chicago Library",
+      "collection_title": "Edward Shils papers",
+      "container": "Box 1",
+      "series": "Series II"
+     }
+    },
+    {
+     "path": "05 Final Tagging/University of Chicago Library/Edward Shils papers/Series II/Box 1/scans/IMG_0002.pdf",
+     "expect": {
+      "repository": "University of Chicago Library",
+      "collection_title": "Edward Shils papers",
+      "container": "Box 1",
+      "series": "Series II"
+     }
+    },
+    {
+     "path": "05 Final Tagging/University of Chicago Library/Edward Shils papers/Series II/Box 2/scans/IMG_0001.pdf",
+     "expect": {
+      "repository": "University of Chicago Library",
+      "collection_title": "Edward Shils papers",
+      "container": "Box 2",
+      "series": "Series II"
+     }
+    },
+    {
+     "path": "05 Final Tagging/University of Chicago Library/Edward Shils papers/Series II/Box 2/scans/IMG_0002.pdf",
+     "expect": {
+      "repository": "University of Chicago Library",
+      "collection_title": "Edward Shils papers",
+      "container": "Box 2",
+      "series": "Series II"
+     }
+    }
+   ]
+  },
+  {
+   "id": "t05a",
+   "convention": "Repository/Collection/Box N/Folder M",
+   "levels": [
+    "repository",
+    "collection",
+    "container",
+    "folder"
+   ],
+   "files": [
+    {
+     "path": "National Archives/Records of the War Department General Staff, RG 165/Box 23/Folder 1/IMG_0001.pdf",
+     "expect": {
+      "repository": "National Archives",
+      "collection_title": "Records of the War Department General Staff",
+      "container": "Box 23",
+      "folder": "1",
+      "collection_number": "RG 165"
+     }
+    },
+    {
+     "path": "National Archives/Records of the War Department General Staff, RG 165/Box 23/Folder 1/IMG_0002.pdf",
+     "expect": {
+      "repository": "National Archives",
+      "collection_title": "Records of the War Department General Staff",
+      "container": "Box 23",
+      "folder": "1",
+      "collection_number": "RG 165"
+     }
+    },
+    {
+     "path": "National Archives/Records of the War Department General Staff, RG 165/Box 23/Folder 2/IMG_0001.pdf",
+     "expect": {
+      "repository": "National Archives",
+      "collection_title": "Records of the War Department General Staff",
+      "container": "Box 23",
+      "folder": "2",
+      "collection_number": "RG 165"
+     }
+    },
+    {
+     "path": "National Archives/Records of the War Department General Staff, RG 165/Box 23/Folder 2/IMG_0002.pdf",
+     "expect": {
+      "repository": "National Archives",
+      "collection_title": "Records of the War Department General Staff",
+      "container": "Box 23",
+      "folder": "2",
+      "collection_number": "RG 165"
+     }
+    },
+    {
+     "path": "National Archives/Records of the War Department General Staff, RG 165/Box 33/Folder 1/IMG_0001.pdf",
+     "expect": {
+      "repository": "National Archives",
+      "collection_title": "Records of the War Department General Staff",
+      "container": "Box 33",
+      "folder": "1",
+      "collection_number": "RG 165"
+     }
+    },
+    {
+     "path": "National Archives/Records of the War Department General Staff, RG 165/Box 33/Folder 1/IMG_0002.pdf",
+     "expect": {
+      "repository": "National Archives",
+      "collection_title": "Records of the War Department General Staff",
+      "container": "Box 33",
+      "folder": "1",
+      "collection_number": "RG 165"
+     }
+    },
+    {
+     "path": "National Archives/Records of the War Department General Staff, RG 165/Box 33/Folder 2/IMG_0001.pdf",
+     "expect": {
+      "repository": "National Archives",
+      "collection_title": "Records of the War Department General Staff",
+      "container": "Box 33",
+      "folder": "2",
+      "collection_number": "RG 165"
+     }
+    },
+    {
+     "path": "National Archives/Records of the War Department General Staff, RG 165/Box 33/Folder 2/IMG_0002.pdf",
+     "expect": {
+      "repository": "National Archives",
+      "collection_title": "Records of the War Department General Staff",
+      "container": "Box 33",
+      "folder": "2",
+      "collection_number": "RG 165"
+     }
+    }
+   ]
+  },
+  {
+   "id": "t05b",
+   "convention": "Collection/B17F8",
+   "levels": [
+    "collection",
+    "container+folder"
+   ],
+   "files": [
+    {
+     "path": "Records of the War Department General Staff, RG 165/B43F3/IMG_0001.pdf",
+     "expect": {
+      "collection_title": "Records of the War Department General Staff",
+      "container": "Box 43",
+      "folder": "3",
+      "collection_number": "RG 165"
+     }
+    },
+    {
+     "path": "Records of the War Department General Staff, RG 165/B43F3/IMG_0002.pdf",
+     "expect": {
+      "collection_title": "Records of the War Department General Staff",
+      "container": "Box 43",
+      "folder": "3",
+      "collection_number": "RG 165"
+     }
+    },
+    {
+     "path": "Records of the War Department General Staff, RG 165/B43F3/IMG_0003.pdf",
+     "expect": {
+      "collection_title": "Records of the War Department General Staff",
+      "container": "Box 43",
+      "folder": "3",
+      "collection_number": "RG 165"
+     }
+    },
+    {
+     "path": "Records of the War Department General Staff, RG 165/B34F24/IMG_0001.pdf",
+     "expect": {
+      "collection_title": "Records of the War Department General Staff",
+      "container": "Box 34",
+      "folder": "24",
+      "collection_number": "RG 165"
+     }
+    },
+    {
+     "path": "Records of the War Department General Staff, RG 165/B34F24/IMG_0002.pdf",
+     "expect": {
+      "collection_title": "Records of the War Department General Staff",
+      "container": "Box 34",
+      "folder": "24",
+      "collection_number": "RG 165"
+     }
+    },
+    {
+     "path": "Records of the War Department General Staff, RG 165/B34F24/IMG_0003.pdf",
+     "expect": {
+      "collection_title": "Records of the War Department General Staff",
+      "container": "Box 34",
+      "folder": "24",
+      "collection_number": "RG 165"
+     }
+    }
+   ]
+  },
+  {
+   "id": "t05c",
+   "convention": "\"Box 10 - Folder 3\"",
+   "levels": [
+    "collection",
+    "container+folder"
+   ],
+   "files": [
+    {
+     "path": "Records of the War Department General Staff, RG 165/Box 2 - Folder 19/IMG_0001.pdf",
+     "expect": {
+      "collection_title": "Records of the War Department General Staff",
+      "container": "Box 2",
+      "folder": "19",
+      "collection_number": "RG 165"
+     }
+    },
+    {
+     "path": "Records of the War Department General Staff, RG 165/Box 2 - Folder 19/IMG_0002.pdf",
+     "expect": {
+      "collection_title": "Records of the War Department General Staff",
+      "container": "Box 2",
+      "folder": "19",
+      "collection_number": "RG 165"
+     }
+    },
+    {
+     "path": "Records of the War Department General Staff, RG 165/Box 45 - Folder 7 - Correspondence 1952/IMG_0001.pdf",
+     "expect": {
+      "collection_title": "Records of the War Department General Staff",
+      "container": "Box 45",
+      "folder": "7",
+      "folder_title": "Correspondence 1952",
+      "collection_number": "RG 165"
+     }
+    },
+    {
+     "path": "Records of the War Department General Staff, RG 165/Box 45 - Folder 7 - Correspondence 1952/IMG_0002.pdf",
+     "expect": {
+      "collection_title": "Records of the War Department General Staff",
+      "container": "Box 45",
+      "folder": "7",
+      "folder_title": "Correspondence 1952",
+      "collection_number": "RG 165"
+     }
+    }
+   ]
+  },
+  {
+   "id": "t05d",
+   "convention": "filenames carry box and folder",
+   "levels": [
+    "repository",
+    "collection"
+   ],
+   "files": [
+    {
+     "path": "National Archives/Records of the War Department General Staff, RG 165/General, Box 2, Folder 4 - 0001.pdf",
+     "expect": {
+      "repository": "National Archives",
+      "collection_title": "Records of the War Department General Staff",
+      "container": "Box 2",
+      "folder": "4",
+      "collection_number": "RG 165"
+     }
+    },
+    {
+     "path": "National Archives/Records of the War Department General Staff, RG 165/General, Box 2, Folder 4 - 0002.pdf",
+     "expect": {
+      "repository": "National Archives",
+      "collection_title": "Records of the War Department General Staff",
+      "container": "Box 2",
+      "folder": "4",
+      "collection_number": "RG 165"
+     }
+    },
+    {
+     "path": "National Archives/Records of the War Department General Staff, RG 165/General, Box 2, Folder 5 - 0001.pdf",
+     "expect": {
+      "repository": "National Archives",
+      "collection_title": "Records of the War Department General Staff",
+      "container": "Box 2",
+      "folder": "5",
+      "collection_number": "RG 165"
+     }
+    },
+    {
+     "path": "National Archives/Records of the War Department General Staff, RG 165/General, Box 2, Folder 5 - 0002.pdf",
+     "expect": {
+      "repository": "National Archives",
+      "collection_title": "Records of the War Department General Staff",
+      "container": "Box 2",
+      "folder": "5",
+      "collection_number": "RG 165"
+     }
+    },
+    {
+     "path": "National Archives/Records of the War Department General Staff, RG 165/General, Box 3, Folder 1 - 0001.pdf",
+     "expect": {
+      "repository": "National Archives",
+      "collection_title": "Records of the War Department General Staff",
+      "container": "Box 3",
+      "folder": "1",
+      "collection_number": "RG 165"
+     }
+    },
+    {
+     "path": "National Archives/Records of the War Department General Staff, RG 165/General, Box 3, Folder 1 - 0002.pdf",
+     "expect": {
+      "repository": "National Archives",
+      "collection_title": "Records of the War Department General Staff",
+      "container": "Box 3",
+      "folder": "1",
+      "collection_number": "RG 165"
+     }
+    }
+   ]
+  },
+  {
+   "id": "t05e",
+   "convention": "workflow levels to skip, with a series or accession level",
+   "levels": [
+    "ignore",
+    "repository",
+    "collection",
+    "series",
+    "container",
+    "ignore"
+   ],
+   "files": [
+    {
+     "path": "05 Final Tagging/National Archives/Records of the War Department General Staff, RG 165/Series 1/Box 1/scans/IMG_0001.pdf",
+     "expect": {
+      "repository": "National Archives",
+      "collection_title": "Records of the War Department General Staff",
+      "container": "Box 1",
+      "series": "Series 1",
+      "collection_number": "RG 165"
+     }
+    },
+    {
+     "path": "05 Final Tagging/National Archives/Records of the War Department General Staff, RG 165/Series 1/Box 1/scans/IMG_0002.pdf",
+     "expect": {
+      "repository": "National Archives",
+      "collection_title": "Records of the War Department General Staff",
+      "container": "Box 1",
+      "series": "Series 1",
+      "collection_number": "RG 165"
+     }
+    },
+    {
+     "path": "05 Final Tagging/National Archives/Records of the War Department General Staff, RG 165/Series 1/Box 2/scans/IMG_0001.pdf",
+     "expect": {
+      "repository": "National Archives",
+      "collection_title": "Records of the War Department General Staff",
+      "container": "Box 2",
+      "series": "Series 1",
+      "collection_number": "RG 165"
+     }
+    },
+    {
+     "path": "05 Final Tagging/National Archives/Records of the War Department General Staff, RG 165/Series 1/Box 2/scans/IMG_0002.pdf",
+     "expect": {
+      "repository": "National Archives",
+      "collection_title": "Records of the War Department General Staff",
+      "container": "Box 2",
+      "series": "Series 1",
+      "collection_number": "RG 165"
+     }
+    }
+   ]
+  },
+  {
+   "id": "t06a",
+   "convention": "Repository/Collection/Box N/Folder M",
+   "levels": [
+    "repository",
+    "collection",
+    "container",
+    "folder"
+   ],
+   "files": [
+    {
+     "path": "Harvard University Archives/Papers of Talcott Parsons, HUG(FP) 15.2/Box 1/Folder 1/IMG_0001.pdf",
+     "expect": {
+      "repository": "Harvard University Archives",
+      "collection_title": "Papers of Talcott Parsons",
+      "container": "Box 1",
+      "folder": "1",
+      "collection_number": "HUG(FP) 15.2"
+     }
+    },
+    {
+     "path": "Harvard University Archives/Papers of Talcott Parsons, HUG(FP) 15.2/Box 1/Folder 1/IMG_0002.pdf",
+     "expect": {
+      "repository": "Harvard University Archives",
+      "collection_title": "Papers of Talcott Parsons",
+      "container": "Box 1",
+      "folder": "1",
+      "collection_number": "HUG(FP) 15.2"
+     }
+    },
+    {
+     "path": "Harvard University Archives/Papers of Talcott Parsons, HUG(FP) 15.2/Box 1/Folder 2/IMG_0001.pdf",
+     "expect": {
+      "repository": "Harvard University Archives",
+      "collection_title": "Papers of Talcott Parsons",
+      "container": "Box 1",
+      "folder": "2",
+      "collection_number": "HUG(FP) 15.2"
+     }
+    },
+    {
+     "path": "Harvard University Archives/Papers of Talcott Parsons, HUG(FP) 15.2/Box 1/Folder 2/IMG_0002.pdf",
+     "expect": {
+      "repository": "Harvard University Archives",
+      "collection_title": "Papers of Talcott Parsons",
+      "container": "Box 1",
+      "folder": "2",
+      "collection_number": "HUG(FP) 15.2"
+     }
+    },
+    {
+     "path": "Harvard University Archives/Papers of Talcott Parsons, HUG(FP) 15.2/Box 33/Folder 1/IMG_0001.pdf",
+     "expect": {
+      "repository": "Harvard University Archives",
+      "collection_title": "Papers of Talcott Parsons",
+      "container": "Box 33",
+      "folder": "1",
+      "collection_number": "HUG(FP) 15.2"
+     }
+    },
+    {
+     "path": "Harvard University Archives/Papers of Talcott Parsons, HUG(FP) 15.2/Box 33/Folder 1/IMG_0002.pdf",
+     "expect": {
+      "repository": "Harvard University Archives",
+      "collection_title": "Papers of Talcott Parsons",
+      "container": "Box 33",
+      "folder": "1",
+      "collection_number": "HUG(FP) 15.2"
+     }
+    },
+    {
+     "path": "Harvard University Archives/Papers of Talcott Parsons, HUG(FP) 15.2/Box 33/Folder 2/IMG_0001.pdf",
+     "expect": {
+      "repository": "Harvard University Archives",
+      "collection_title": "Papers of Talcott Parsons",
+      "container": "Box 33",
+      "folder": "2",
+      "collection_number": "HUG(FP) 15.2"
+     }
+    },
+    {
+     "path": "Harvard University Archives/Papers of Talcott Parsons, HUG(FP) 15.2/Box 33/Folder 2/IMG_0002.pdf",
+     "expect": {
+      "repository": "Harvard University Archives",
+      "collection_title": "Papers of Talcott Parsons",
+      "container": "Box 33",
+      "folder": "2",
+      "collection_number": "HUG(FP) 15.2"
+     }
+    }
+   ]
+  },
+  {
+   "id": "t06b",
+   "convention": "Collection/B17F8",
+   "levels": [
+    "collection",
+    "container+folder"
+   ],
+   "files": [
+    {
+     "path": "Papers of Talcott Parsons, HUG(FP) 15.2/B51F11/IMG_0001.pdf",
+     "expect": {
+      "collection_title": "Papers of Talcott Parsons",
+      "container": "Box 51",
+      "folder": "11",
+      "collection_number": "HUG(FP) 15.2"
+     }
+    },
+    {
+     "path": "Papers of Talcott Parsons, HUG(FP) 15.2/B51F11/IMG_0002.pdf",
+     "expect": {
+      "collection_title": "Papers of Talcott Parsons",
+      "container": "Box 51",
+      "folder": "11",
+      "collection_number": "HUG(FP) 15.2"
+     }
+    },
+    {
+     "path": "Papers of Talcott Parsons, HUG(FP) 15.2/B51F11/IMG_0003.pdf",
+     "expect": {
+      "collection_title": "Papers of Talcott Parsons",
+      "container": "Box 51",
+      "folder": "11",
+      "collection_number": "HUG(FP) 15.2"
+     }
+    },
+    {
+     "path": "Papers of Talcott Parsons, HUG(FP) 15.2/B94F26/IMG_0001.pdf",
+     "expect": {
+      "collection_title": "Papers of Talcott Parsons",
+      "container": "Box 94",
+      "folder": "26",
+      "collection_number": "HUG(FP) 15.2"
+     }
+    },
+    {
+     "path": "Papers of Talcott Parsons, HUG(FP) 15.2/B94F26/IMG_0002.pdf",
+     "expect": {
+      "collection_title": "Papers of Talcott Parsons",
+      "container": "Box 94",
+      "folder": "26",
+      "collection_number": "HUG(FP) 15.2"
+     }
+    },
+    {
+     "path": "Papers of Talcott Parsons, HUG(FP) 15.2/B94F26/IMG_0003.pdf",
+     "expect": {
+      "collection_title": "Papers of Talcott Parsons",
+      "container": "Box 94",
+      "folder": "26",
+      "collection_number": "HUG(FP) 15.2"
+     }
+    }
+   ]
+  },
+  {
+   "id": "t06c",
+   "convention": "\"Box 10 - Folder 3\"",
+   "levels": [
+    "collection",
+    "container+folder"
+   ],
+   "files": [
+    {
+     "path": "Papers of Talcott Parsons, HUG(FP) 15.2/Box 46 - Folder 11/IMG_0001.pdf",
+     "expect": {
+      "collection_title": "Papers of Talcott Parsons",
+      "container": "Box 46",
+      "folder": "11",
+      "collection_number": "HUG(FP) 15.2"
+     }
+    },
+    {
+     "path": "Papers of Talcott Parsons, HUG(FP) 15.2/Box 46 - Folder 11/IMG_0002.pdf",
+     "expect": {
+      "collection_title": "Papers of Talcott Parsons",
+      "container": "Box 46",
+      "folder": "11",
+      "collection_number": "HUG(FP) 15.2"
+     }
+    },
+    {
+     "path": "Papers of Talcott Parsons, HUG(FP) 15.2/Box 10 - Folder 13 - Reports 1959-1960/IMG_0001.pdf",
+     "expect": {
+      "collection_title": "Papers of Talcott Parsons",
+      "container": "Box 10",
+      "folder": "13",
+      "folder_title": "Reports 1959-1960",
+      "collection_number": "HUG(FP) 15.2"
+     }
+    },
+    {
+     "path": "Papers of Talcott Parsons, HUG(FP) 15.2/Box 10 - Folder 13 - Reports 1959-1960/IMG_0002.pdf",
+     "expect": {
+      "collection_title": "Papers of Talcott Parsons",
+      "container": "Box 10",
+      "folder": "13",
+      "folder_title": "Reports 1959-1960",
+      "collection_number": "HUG(FP) 15.2"
+     }
+    }
+   ]
+  },
+  {
+   "id": "t06d",
+   "convention": "filenames carry box and folder",
+   "levels": [
+    "repository",
+    "collection"
+   ],
+   "files": [
+    {
+     "path": "Harvard University Archives/Papers of Talcott Parsons, HUG(FP) 15.2/Talcott, Box 2, Folder 4 - 0001.pdf",
+     "expect": {
+      "repository": "Harvard University Archives",
+      "collection_title": "Papers of Talcott Parsons",
+      "container": "Box 2",
+      "folder": "4",
+      "collection_number": "HUG(FP) 15.2"
+     }
+    },
+    {
+     "path": "Harvard University Archives/Papers of Talcott Parsons, HUG(FP) 15.2/Talcott, Box 2, Folder 4 - 0002.pdf",
+     "expect": {
+      "repository": "Harvard University Archives",
+      "collection_title": "Papers of Talcott Parsons",
+      "container": "Box 2",
+      "folder": "4",
+      "collection_number": "HUG(FP) 15.2"
+     }
+    },
+    {
+     "path": "Harvard University Archives/Papers of Talcott Parsons, HUG(FP) 15.2/Talcott, Box 2, Folder 5 - 0001.pdf",
+     "expect": {
+      "repository": "Harvard University Archives",
+      "collection_title": "Papers of Talcott Parsons",
+      "container": "Box 2",
+      "folder": "5",
+      "collection_number": "HUG(FP) 15.2"
+     }
+    },
+    {
+     "path": "Harvard University Archives/Papers of Talcott Parsons, HUG(FP) 15.2/Talcott, Box 2, Folder 5 - 0002.pdf",
+     "expect": {
+      "repository": "Harvard University Archives",
+      "collection_title": "Papers of Talcott Parsons",
+      "container": "Box 2",
+      "folder": "5",
+      "collection_number": "HUG(FP) 15.2"
+     }
+    },
+    {
+     "path": "Harvard University Archives/Papers of Talcott Parsons, HUG(FP) 15.2/Talcott, Box 3, Folder 1 - 0001.pdf",
+     "expect": {
+      "repository": "Harvard University Archives",
+      "collection_title": "Papers of Talcott Parsons",
+      "container": "Box 3",
+      "folder": "1",
+      "collection_number": "HUG(FP) 15.2"
+     }
+    },
+    {
+     "path": "Harvard University Archives/Papers of Talcott Parsons, HUG(FP) 15.2/Talcott, Box 3, Folder 1 - 0002.pdf",
+     "expect": {
+      "repository": "Harvard University Archives",
+      "collection_title": "Papers of Talcott Parsons",
+      "container": "Box 3",
+      "folder": "1",
+      "collection_number": "HUG(FP) 15.2"
+     }
+    }
+   ]
+  },
+  {
+   "id": "t06e",
+   "convention": "workflow levels to skip, with a series or accession level",
+   "levels": [
+    "ignore",
+    "repository",
+    "collection",
+    "series",
+    "container",
+    "ignore"
+   ],
+   "files": [
+    {
+     "path": "05 Final Tagging/Harvard University Archives/Papers of Talcott Parsons, HUG(FP) 15.2/Series II/Box 1/scans/IMG_0001.pdf",
+     "expect": {
+      "repository": "Harvard University Archives",
+      "collection_title": "Papers of Talcott Parsons",
+      "container": "Box 1",
+      "series": "Series II",
+      "collection_number": "HUG(FP) 15.2"
+     }
+    },
+    {
+     "path": "05 Final Tagging/Harvard University Archives/Papers of Talcott Parsons, HUG(FP) 15.2/Series II/Box 1/scans/IMG_0002.pdf",
+     "expect": {
+      "repository": "Harvard University Archives",
+      "collection_title": "Papers of Talcott Parsons",
+      "container": "Box 1",
+      "series": "Series II",
+      "collection_number": "HUG(FP) 15.2"
+     }
+    },
+    {
+     "path": "05 Final Tagging/Harvard University Archives/Papers of Talcott Parsons, HUG(FP) 15.2/Series II/Box 2/scans/IMG_0001.pdf",
+     "expect": {
+      "repository": "Harvard University Archives",
+      "collection_title": "Papers of Talcott Parsons",
+      "container": "Box 2",
+      "series": "Series II",
+      "collection_number": "HUG(FP) 15.2"
+     }
+    },
+    {
+     "path": "05 Final Tagging/Harvard University Archives/Papers of Talcott Parsons, HUG(FP) 15.2/Series II/Box 2/scans/IMG_0002.pdf",
+     "expect": {
+      "repository": "Harvard University Archives",
+      "collection_title": "Papers of Talcott Parsons",
+      "container": "Box 2",
+      "series": "Series II",
+      "collection_number": "HUG(FP) 15.2"
+     }
+    }
+   ]
+  },
+  {
+   "id": "u01",
+   "convention": "other spellings: B82/F15",
+   "levels": [
+    "collection",
+    "container",
+    "folder"
+   ],
+   "files": [
+    {
+     "path": "SC0122/B82/F15/IMG_0001.pdf",
+     "expect": {
+      "collection_number": "SC0122",
+      "container": "Box 82",
+      "folder": "15"
+     }
+    },
+    {
+     "path": "SC0122/B82/F15/IMG_0002.pdf",
+     "expect": {
+      "collection_number": "SC0122",
+      "container": "Box 82",
+      "folder": "15"
+     }
+    }
+   ]
+  },
+  {
+   "id": "u02",
+   "convention": "other spellings: Carton 9",
+   "levels": [
+    "collection",
+    "container"
+   ],
+   "files": [
+    {
+     "path": "Kristol, Mss 1036/Carton 9/IMG_0001.pdf",
+     "expect": {
+      "collection_title": "Kristol",
+      "collection_number": "Mss 1036",
+      "container": "Carton 9"
+     }
+    },
+    {
+     "path": "Kristol, Mss 1036/Carton 9/IMG_0002.pdf",
+     "expect": {
+      "collection_title": "Kristol",
+      "collection_number": "Mss 1036",
+      "container": "Carton 9"
+     }
+    }
+   ]
+  },
+  {
+   "id": "u03",
+   "convention": "other spellings: Folio 3/f. 5",
+   "levels": [
+    "collection",
+    "container",
+    "folder"
+   ],
+   "files": [
+    {
+     "path": "Parsons/Folio 3/f. 5/IMG_0001.pdf",
+     "expect": {
+      "collection_title": "Parsons",
+      "container": "Folio 3",
+      "folder": "5"
+     }
+    },
+    {
+     "path": "Parsons/Folio 3/f. 5/IMG_0002.pdf",
+     "expect": {
+      "collection_title": "Parsons",
+      "container": "Folio 3",
+      "folder": "5"
+     }
+    }
+   ]
+  },
+  {
+   "id": "u04",
+   "convention": "other spellings: Entry 77/Box 412",
+   "levels": [
+    "collection",
+    "series",
+    "container"
+   ],
+   "files": [
+    {
+     "path": "RG 165/Entry 77/Box 412/IMG_0001.pdf",
+     "expect": {
+      "collection_number": "RG 165",
+      "series": "Entry 77",
+      "container": "Box 412"
+     }
+    },
+    {
+     "path": "RG 165/Entry 77/Box 412/IMG_0002.pdf",
+     "expect": {
+      "collection_number": "RG 165",
+      "series": "Entry 77",
+      "container": "Box 412"
+     }
+    }
+   ]
+  },
+  {
+   "id": "u05",
+   "convention": "other spellings: box_17/folder_08",
+   "levels": [
+    "collection",
+    "container",
+    "folder"
+   ],
+   "files": [
+    {
+     "path": "glotzer/box_17/folder_08/IMG_0001.pdf",
+     "expect": {
+      "collection_title": "glotzer",
+      "container": "Box 17",
+      "folder": "8"
+     }
+    },
+    {
+     "path": "glotzer/box_17/folder_08/IMG_0002.pdf",
+     "expect": {
+      "collection_title": "glotzer",
+      "container": "Box 17",
+      "folder": "8"
+     }
+    }
+   ]
+  },
+  {
+   "id": "u06",
+   "convention": "other spellings: Bx 3 Fd 12",
+   "levels": [
+    "collection",
+    "container+folder"
+   ],
+   "files": [
+    {
+     "path": "Shils/Bx 3 Fd 12/IMG_0001.pdf",
+     "expect": {
+      "collection_title": "Shils",
+      "container": "Box 3",
+      "folder": "12"
+     }
+    },
+    {
+     "path": "Shils/Bx 3 Fd 12/IMG_0002.pdf",
+     "expect": {
+      "collection_title": "Shils",
+      "container": "Box 3",
+      "folder": "12"
+     }
+    }
+   ]
+  }
+ ]
+}
