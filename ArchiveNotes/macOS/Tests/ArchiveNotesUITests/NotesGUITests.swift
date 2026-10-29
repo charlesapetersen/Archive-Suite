@@ -66,7 +66,10 @@ class NotesFixtureUITestCase: XCTestCase {
     var layoutLaunchArguments: [String] { Self.layoutArguments(.sideBySide) }
 
     enum Layout: String { case sideBySide, stacked }
-    static func layoutArguments(_ layout: Layout) -> [String] { ["-an.layoutMode", layout.rawValue] }
+    /// The stacked list's height is pinned with it, so no earlier drag decides a later test's geometry.
+    static func layoutArguments(_ layout: Layout) -> [String] {
+        ["-an.layoutMode", layout.rawValue] + (layout == .stacked ? ["-an.listHeight", "240"] : [])
+    }
 
     /// Assert which layout `window` shows, by its divider: the stacked layout's is `an.divider.list`.
     func assertLayout(_ layout: Layout, in window: XCUIElement, file: StaticString = #filePath, line: UInt = #line) {

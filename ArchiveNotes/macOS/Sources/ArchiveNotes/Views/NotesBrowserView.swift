@@ -29,6 +29,8 @@ struct NotesBrowserView: View {
     @AppStorage(NotesLayoutSettingsKey.layoutMode)  private var layoutMode: NotesLayoutMode = .sideBySide
     @AppStorage(NotesLayoutSettingsKey.listHeight)  private var listHeight  = NotesLayoutSettings.defaultListHeight
 
+    /// The right-hand panes' height, so the stacked list gives way before the note is squeezed.
+    @State private var panesHeight = 0.0
     @State private var window: NSWindow?
     @State private var didConfigureWindow = false
     @State private var selectedTemplateID: UUID?
@@ -56,10 +58,12 @@ struct NotesBrowserView: View {
             panes {
                 ItemListPane(model: model, nav: nav, selectedTemplateID: $selectedTemplateID)
                     .frame(minWidth: 540, maxWidth: .infinity, maxHeight: .infinity)
-                    .frame(height: stacked ? NotesLayoutSettings.clampedListHeight(listHeight) : nil)
+                    .frame(height: stacked
+                           ? NotesLayoutSettings.stackedListHeight(stored: listHeight, paneHeight: panesHeight) : nil)
                 PanelDivider(size: stacked ? $listHeight : $detailWidth, panelBefore: stacked,
                              axis: stacked ? .vertical : .horizontal,
-                             range: stacked ? NotesLayoutSettings.listHeightRange : NotesLayoutSettings.detailWidthRange,
+                             range: stacked ? NotesLayoutSettings.stackedListRange(paneHeight: panesHeight)
+                                            : NotesLayoutSettings.detailWidthRange,
                              label: stacked ? "Item list height" : "Detail pane width",
                              id: stacked ? "an.divider.list" : "an.divider.detail")
                 DetailPane(nav: nav, selectedTemplateID: $selectedTemplateID)
@@ -67,13 +71,15 @@ struct NotesBrowserView: View {
                     .frame(minHeight: stacked ? NotesLayoutSettings.stackedDetailMinHeight : nil,
                            maxHeight: stacked ? .infinity : nil)
             }
+            .onGeometryChange(for: Double.self) { Double($0.size.height) } action: { panesHeight = $0 }
         }
         // The list needs 527 pt for its fixed filter controls in the VM; reserve 540 so its
         // minimum proposal agrees with what it actually draws. Without that floor SwiftUI reports
         // a 1053 pt window minimum but centres 1121 pt of panes inside it, clipping both edges.
         // Keep the floor on the LIST: the shell's minimum then follows the current sidebar/detail
         // widths and whether the sidebar is visible, rather than understating their total again.
-        .frame(minHeight: 560)
+        // Stacked, the list's floor and the note's must both fit (W48.notes-stacked-layout).
+        .frame(minHeight: layoutMode == .stacked ? NotesLayoutSettings.stackedMinHeight : 560)
         .animation(.easeInOut(duration: 0.18), value: showingTree)
         .background(indexReadyProbe)                               // hidden XCUITest index-ready signal (§3.4)
         .background(NotesWindowAccessor { configureWindow($0) })   // restore/remember window size (DV-1)

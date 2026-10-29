@@ -92,12 +92,20 @@ final class StackedLayoutUITests: NotesFixtureUITestCase {
             XCTAssertEqual(height(divider), 200, accuracy: 6, "dragging down should grow the list")
             let list = mainWindow.tables.firstMatch
             XCTAssertEqual(list.frame.maxY, divider.frame.minY, accuracy: 4, "the list should end at the divider")
+            // Down as far as it goes: at most 440, and less when the window is too short to keep the note's
+            // floor below it (the VM's is); the note keeps a usable editor either way.
             drag(divider, by: 400)
-            XCTAssertEqual(height(divider), 440, accuracy: 0.5, "the list height should clamp at its maximum")
-            XCTAssertTrue(editor.exists && editor.frame.height > 100, "at the maximum the note keeps its editor")
-            drag(divider, by: -130)
+            let top = height(divider)
+            print("[w48] list height at the bottom of the drag: \(top) in a \(mainWindow.frame.height) pt window")
+            XCTAssertLessThanOrEqual(top, 440.5, "the list height should clamp at its maximum")
+            XCTAssertGreaterThan(top, 200, "dragging down should grow the list up to what fits")
+            drag(divider, by: 200)
+            XCTAssertEqual(height(divider), top, accuracy: 0.5, "past its limit the list should stay where it stopped")
+            let shownEditor = mainWindow.scrollViews.containing(.textView, identifier: "an.editor.text").firstMatch
+            XCTAssertGreaterThan(shownEditor.frame.height, 100, "at the list's maximum the note keeps its editor")
+            drag(divider, by: -40)
             let kept = height(divider)
-            XCTAssertEqual(kept, 310, accuracy: 6)
+            XCTAssertEqual(kept, top - 40, accuracy: 6)
 
             app.terminate()
             app.launch()
@@ -117,9 +125,9 @@ final class StackedLayoutUITests: NotesFixtureUITestCase {
             assertLayout(.stacked, in: mainWindow)
             _ = selectItem(uuid: Self.idPlain)
             XCTAssertTrue(editor.waitForExistence(timeout: 10))
-            let order = accessibilityOrder(of: mainWindow, ids: ["an.table", "an.divider.list", "an.editor.text"])
+            let order = accessibilityOrder(of: mainWindow, ids: ["an.divider.list", "an.editor.text"])
             print("[w48] accessibility order: \(order)")
-            XCTAssertEqual(order, ["an.table", "an.divider.list", "an.editor.text"],
+            XCTAssertEqual(order, ["table", "an.divider.list", "an.editor.text"],
                            "VoiceOver should meet the list, then the divider, then the note")
             let list = mainWindow.tables.firstMatch, divider = splitter(.stacked, in: mainWindow)
             XCTAssertLessThanOrEqual(list.frame.maxY, divider.frame.midY, "the list is above the divider")
@@ -249,13 +257,14 @@ final class StackedLayoutUITests: NotesFixtureUITestCase {
         return nil
     }
 
-    /// The order the given identifiers first appear in a depth-first walk of the window's accessibility tree,
-    /// which is the order VoiceOver reads them.
+    /// The order the item table ("table") and the given identifiers first appear in a depth-first walk of the
+    /// window's accessibility tree, which is the order VoiceOver reads them.
     private func accessibilityOrder(of window: XCUIElement, ids: Set<String>) -> [String] {
         guard let root = try? window.snapshot() else { return [] }
         var seen = [String]()
         func walk(_ node: any XCUIElementSnapshot) {
-            if ids.contains(node.identifier), !seen.contains(node.identifier) { seen.append(node.identifier) }
+            let name = node.elementType == .table ? "table" : node.identifier
+            if (name == "table" || ids.contains(name)), !seen.contains(name) { seen.append(name) }
             node.children.forEach(walk)
         }
         walk(root)

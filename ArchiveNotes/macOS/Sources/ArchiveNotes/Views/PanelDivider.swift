@@ -30,7 +30,8 @@ struct PanelDivider: View {
                 // Global coordinates, so moving the divider does not feed back into its own translation.
                 DragGesture(minimumDistance: 1, coordinateSpace: .global)
                     .onChanged { value in
-                        if startSize == nil { startSize = CGFloat(size) }
+                        // From where it is drawn: a remembered size can sit beyond a range a short window has cut.
+                        if startSize == nil { startSize = min(range.upperBound, max(range.lowerBound, CGFloat(size))) }
                         let moved = axis == .horizontal ? value.translation.width : value.translation.height
                         let delta = panelBefore ? moved : -moved
                         let clamped = min(range.upperBound, max(range.lowerBound,

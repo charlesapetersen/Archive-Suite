@@ -72,11 +72,15 @@ struct NotesLayoutSettings: Equatable, Sendable {
 
     static let defaultTreeWidth = 220.0,  treeWidthMin = 160.0,  treeWidthMax = 400.0
     static let defaultDetailWidth = 360.0, detailWidthMin = 260.0, detailWidthMax = 700.0
-    /// The stacked list keeps its filter bar, header and a few rows; at the top of its range the note below still
-    /// gets `stackedDetailMinHeight`, so the window stays shorter than a laptop screen.
+    /// The stacked list keeps its filter bar, header and a few rows.
     static let defaultListHeight = 240.0, listHeightMin = 140.0, listHeightMax = 440.0
-    /// The note pane's floor in the stacked layout, for its header, inspectors and some editor.
-    static let stackedDetailMinHeight = 300.0
+    /// The note pane's floor in the stacked layout: its header, locations and details inspector, and an editor
+    /// still larger than the details (measured in the VM: at 313 pt the editor got 9). The list gives way first.
+    static let stackedDetailMinHeight = 440.0
+    /// The divider's own thickness, between the list and the note.
+    static let stackedDividerHeight = 7.0
+    /// The stacked panes' minimum height: the list at its floor and the note at its.
+    static var stackedMinHeight: Double { listHeightMin + stackedDividerHeight + stackedDetailMinHeight }
     /// A saved window dimension below this is treated as "unset" (guards a zero/garbage frame).
     static let windowFloor = 200.0
 
@@ -89,6 +93,21 @@ struct NotesLayoutSettings: Equatable, Sendable {
     /// lands inside it, so a corrupt key cannot hide the list or the note.
     static func clampedListHeight(_ h: Double) -> Double {
         h.isFinite ? min(listHeightMax, max(listHeightMin, h)) : defaultListHeight
+    }
+
+    /// How tall the stacked list may be in panes `paneHeight` tall: its range, cut so the note below keeps
+    /// `stackedDetailMinHeight`, never below the list's own floor. `paneHeight` 0 (not measured yet) cuts nothing.
+    static func stackedListRange(paneHeight: Double) -> ClosedRange<CGFloat> {
+        guard paneHeight > 0, paneHeight.isFinite else { return listHeightRange }
+        let fits = paneHeight - stackedDividerHeight - stackedDetailMinHeight
+        return CGFloat(listHeightMin)...CGFloat(max(listHeightMin, min(listHeightMax, fits)))
+    }
+
+    /// The list height the stacked layout draws: the remembered one, inside what fits. The remembered value is
+    /// left alone, so a window made taller again gives the list back its height.
+    static func stackedListHeight(stored: Double, paneHeight: Double) -> Double {
+        let range = stackedListRange(paneHeight: paneHeight)
+        return min(Double(range.upperBound), clampedListHeight(stored))
     }
 
     /// Read + validate from a defaults store (point-of-use).

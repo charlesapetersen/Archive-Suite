@@ -13,7 +13,7 @@ Format and statuses: [`README.md`](README.md). Written by `W40.b2`, 2026-10-12.
   `W23.m9`/`-fu3`, `W23.m14`/`-fu`, `W37.dual-date`, `W24.cal1`, `W24.cal1-toggle`, `W24.cal1-validator`,
   and the W0–W8 records under §*Archive Notes — NEW APP*.
 - **Sources and code read at:** `9e8959ef`.
-- **Count:** `unproven 44 · works 2 · broken 2 · unreachable 0` (works: N-34, N-45; broken: N-12, N-44). Updated by `W40.fix-notes-choose-store`, 2026-10-29 (N-48 wired).
+- **Count:** `unproven 47 · works 2 · broken 2 · unreachable 0` (works: N-34, N-45; broken: N-12, N-44). Updated by `W48.notes-stacked-layout`, 2026-10-29 (N-49–N-51 added).
 
 **Runtime evidence, for every row below: none yet.** The W40.a3 full VM suite
 ([`evidence/notes/W40.a3-full-ui.md`](evidence/notes/W40.a3-full-ui.md)) and the `W9.e2` runtime sweep passed
@@ -369,6 +369,62 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
   - "Folder is empty" is decided by `folder.itemCount == 0` (`Views/NotesBrowserView.swift:281`). A folder holding only items of the other
     kind reads as "No matches".
   - W9.e2 result: `W9.e2-notes` verified the empty states with `NotesGUITests.testW9D8_…`.
+
+### N-49 · The stacked layout: list above the note
+
+- **Promise:** besides side by side, the Notes and Extracts windows offer a stacked layout: the folder tree stays on
+  the left, the item list sits on top of the right-hand area and the note below it. Switching keeps the selection,
+  the open note's unsaved edits and the scroll position. The audit, layout sweep, visual review and writing journey
+  that cover the side-by-side windows hold in the stacked one too, light and dark.
+- **Promised in:** `SUITE_TODO.md` `W48.notes-stacked-layout` (owner, 2026-10-28).
+- **Reached by:** View ▸ List Above Note (`ArchiveNotesCommands.swift`, `LayoutCommands`) writes `an.layoutMode`;
+  `NotesBrowserView` lays the list, divider and detail out in one `AnyLayout` (`VStackLayout` when stacked), so the
+  editor is not rebuilt by a switch.
+- **Real-path test:** `ArchiveNotesUITests/StackedLayoutUITests.testSwitchingLayoutsKeepsSelectionUnsavedTextAndScroll`
+  (VM: four switches with a line typed inside the autosave delay before each, in the Notes window, then both ways in
+  the Extracts window). `AccessibilityAuditUITests.testMainScreensPassAuditStacked{Light,Dark}Mode`,
+  `LayoutGuardUITests.testMainScreensLayOutStacked{Light,Dark}Mode` (typical, minimum, and narrow-and-tall),
+  `VisualReviewUITests.testTourStacked{Light,Dark}` (opt-in) and `WritingJourneyStackedUITests` (the whole W40.d9
+  journey stacked).
+- **Runtime evidence:** none (a green suite is not runtime evidence, README §Statuses).
+- **Status:** `unproven`
+- **History:**
+  - 2026-10-29 W48.notes-stacked-layout — row written and the layout built, `unproven`; the re-check is
+    `W48.notes-stacked-layout-verify`.
+- **Notes:** one choice for both windows, like the panel widths.
+
+### N-50 · The stacked layout's divider
+
+- **Promise:** a horizontal divider between the list and the note drags to resize the list, clamps at both ends,
+  and its height is remembered across relaunches. It is the same accessible splitter as the vertical dividers
+  (role splitter, a value, increment and decrement), oriented horizontally; VoiceOver meets the list, then the
+  divider, then the note, and Tab still reaches the note from the list.
+- **Promised in:** `SUITE_TODO.md` `W48.notes-stacked-layout`.
+- **Reached by:** `PanelDivider(axis: .vertical)` (`Views/PanelDivider.swift`) over `an.listHeight`, clamped
+  140–440 pt by `NotesLayoutSettings.clampedListHeight` (`Core/NotesAppSettings.swift`); the note below keeps at
+  least 300 pt.
+- **Real-path test:** `ArchiveNotesTests/PanelDividerAccessibilityTests.testStackedDividerIsAHorizontalSplitterOverTheListHeight`
+  and `NotesAppSettingsTests.listHeightClampsLikeTheWidths` (unit). `ArchiveNotesUITests/StackedLayoutUITests.testStackedDividerDragsClampsAndSurvivesRelaunch`
+  and `.testStackedOrderIsListThenNoteAndFocusCrossesTheDivider` (VM).
+- **Runtime evidence:** none.
+- **Status:** `unproven`
+- **History:**
+  - 2026-10-29 W48.notes-stacked-layout — row written, `unproven`.
+
+### N-51 · The layout choice is remembered
+
+- **Promise:** the layout is a View menu choice (Side by Side / List Above Note), remembered across relaunches, and
+  both windows follow it.
+- **Promised in:** `SUITE_TODO.md` `W48.notes-stacked-layout`.
+- **Reached by:** `LayoutCommands` and `NotesBrowserView` share `@AppStorage(an.layoutMode)`; a foreign value reads
+  as side by side (`NotesLayoutSettings`).
+- **Real-path test:** `ArchiveNotesTests/NotesAppSettingsTests.layoutModeDefaultsToSideBySideAndRoundTrips` (unit);
+  `StackedLayoutUITests.testStackedDividerDragsClampsAndSurvivesRelaunch` (VM: stacked and its height after a
+  relaunch) and `.testSwitchingLayoutsKeepsSelectionUnsavedTextAndScroll` (both windows switch together).
+- **Runtime evidence:** none.
+- **Status:** `unproven`
+- **History:**
+  - 2026-10-29 W48.notes-stacked-layout — row written, `unproven`.
 
 ## Writing and editing
 
