@@ -1,7 +1,7 @@
 {
   "_about": "Which OCR model reads which kind of page best, shown under the Processor's OCR model picker (W41.app-ocr-hierarchy). Every figure is copied from the file named in its source, and scripts/test-ocr-page-guidance.sh checks it against that file. From W41-answers.md section 2. app_model is the Processor's LLMModel id when the app offers that model; omit it when it does not.",
   "measured": "2026-10-15",
-  "footnote": "Measured on one corpus, about 100 pages; the reference text was drafted by Claude and Gemini, which may flatter both. Scores are NES out of 100.",
+  "footnote": "Measured on one corpus, about 100 pages; the reference text was drafted by Claude and Gemini, which may flatter both. Scores are out of 100: how closely a model's text matches the reference text, word for word (normalized edit similarity, NES); 100 is an exact match.",
   "kinds": [
     {
       "id": "handwritten",

@@ -21,6 +21,11 @@ struct LiveCaptureView: View {
     // A1 — shared Processing-list state: which segment is expanded.
     @State private var expandedSegmentID: String?
     @State private var confirmingEmptyPaneClear = false
+    /// The control panel's width with its padding, so the finishing card centres on the capture pane rather than
+    /// the window: centred on the window it straddled the divider and cut the start off the pane's hint
+    /// (W40.fix-processor-visual-polish).
+    @State private var controlPanelWidth: CGFloat = 0
+    @Environment(\.colorScheme) private var colorScheme
 
     // W3.cap-r3-fu9 — the two per-item action sheets' targets are NOT `@State` here: they live on
     // `liveProc`, because the finish flow has to be able to see that one of them is up before it raises the
@@ -33,6 +38,11 @@ struct LiveCaptureView: View {
             controlPanel
                 .frame(minWidth: 300, maxWidth: 360)
                 .padding()
+                .background(GeometryReader { proxy in
+                    Color.clear
+                        .onAppear { controlPanelWidth = proxy.size.width }
+                        .onChange(of: proxy.size.width) { _, width in controlPanelWidth = width }
+                })
             capturePanel
                 .padding()
         }
@@ -77,8 +87,9 @@ struct LiveCaptureView: View {
         .disabled(liveProc.isFinishingScrimUp)
         .overlay {
             if liveProc.isFinishingScrimUp {
-                ZStack {
-                    Color.black.opacity(0.2).ignoresSafeArea()
+                ZStack(alignment: .top) {
+                    // 0.2 black barely showed on the dark appearance's dark grey; 0.45 reads as dimmed there.
+                    Color.black.opacity(colorScheme == .dark ? 0.45 : 0.2).ignoresSafeArea()
                     VStack(spacing: 10) {
                         ProgressView().controlSize(.large)
                         Text("Finishing — processing segments…").font(.callout).foregroundStyle(.primary)
@@ -89,6 +100,10 @@ struct LiveCaptureView: View {
                     }
                     .padding(24)
                     .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+                    // In the capture pane (the leading padding moves its centre past the control panel and
+                    // the divider), below the pane's header and above its centred empty-state hint.
+                    .padding(.top, 110)
+                    .padding(.leading, controlPanelWidth + 1)
                 }
                 // The decision, in code rather than only in the comment: the whole overlay is one hit target.
                 // Same shape the app already uses to absorb clicks deliberately
@@ -469,13 +484,21 @@ struct LiveCaptureView: View {
     /// the staged-document count and confirms the action; that confirmation explicitly says the finish summary
     /// is cleared too.
     @ViewBuilder private var clearButton: some View {
-        Button(clearButtonTitle) {
+        Button {
             if session.photos.isEmpty {
                 confirmingEmptyPaneClear = true
             } else {
                 liveProc.clearSession()
             }
+        } label: {
+            // At the window's minimum width the full count truncated to "Discard 3 processed…"; the short form
+            // keeps both counts whole (W40.fix-processor-visual-polish). VoiceOver always hears the full title.
+            ViewThatFits(in: .horizontal) {
+                Text(clearButtonTitle)
+                Text(clearButtonShortTitle)
+            }
         }
+            .accessibilityLabel(clearButtonTitle)
             .disabled(liveProc.isFinalizing || liveProc.stagingRecoveryBlocked)
             .accessibilityIdentifier("live.clear")
             .help("Abandon this session: received photos go to the Trash (recoverable) and the app forgets every processed segment. Already-processed PDFs stay in the Backup Folder's _processed subfolder — but they are no longer offered for filing.")
@@ -497,6 +520,16 @@ struct LiveCaptureView: View {
         if documents == 0 && markers == 0 { return "Discard session" }
         if markers == 0 { return "Discard \(documents) processed document\(documents == 1 ? "" : "s")" }
         return "Discard \(documents) processed document\(documents == 1 ? "" : "s") + \(markers) Box/Folder marker\(markers == 1 ? "" : "s")"
+    }
+
+    /// `clearButtonTitle` for a narrow header: the same counts, shorter nouns.
+    private var clearButtonShortTitle: String {
+        guard session.photos.isEmpty else { return "Clear" }
+        let documents = stagedDocumentCount
+        let markers = liveProc.staged.count - documents
+        if documents == 0 && markers == 0 { return "Discard" }
+        if markers == 0 { return "Discard \(documents) document\(documents == 1 ? "" : "s")" }
+        return "Discard \(documents) doc\(documents == 1 ? "" : "s") + \(markers) marker\(markers == 1 ? "" : "s")"
     }
 
     private var emptyPaneClearTitle: String {
@@ -896,6 +929,8 @@ private struct LiveProcessingBox: View {
                 }
             }
             .padding(6)
+            // Full width, like the Connection and Output folder cards around it (W40.fix-processor-visual-polish).
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 }

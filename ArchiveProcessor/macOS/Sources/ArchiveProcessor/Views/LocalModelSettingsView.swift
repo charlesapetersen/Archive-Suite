@@ -28,6 +28,11 @@ struct LocalModelSettingsView: View {
             }
         }
         .accessibilityIdentifier("ap.settings.localModel")
+        Text(gatewayLocalModel
+             ? "The gateway below is a model served on this Mac: no key, no charge, one page at a time."
+             : "Turn on to read pages with an open-weight model served on this Mac (LM Studio, Ollama or mlx-vlm) instead of a hosted gateway: no key and no charge.")
+            .font(.caption).foregroundStyle(.primary)
+            .fixedSize(horizontal: false, vertical: true)
         if gatewayLocalModel {
             if !gatewayBaseURL.isEmpty, !LocalModelRoute.isLoopback(gatewayBaseURL) {
                 Text("The Gateway URL is not on this Mac. A remote gateway reads pages faster in parallel, and is not free: turn this off for it.")

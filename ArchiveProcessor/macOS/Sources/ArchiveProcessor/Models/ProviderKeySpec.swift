@@ -90,22 +90,23 @@ struct ProviderKeySpec: Identifiable, Sendable {
     // Live-flow check 2026-09-26: the legacy console.anthropic.com URLs redirect to platform.claude.com;
     // the official docs still use Settings → API keys and Billing. New accounts may receive limited test
     // credits, so explain those separately from the absence of an ongoing free tier. A paid run needs
-    // billing enabled; GET /v1/models still validates the key itself.
+    // billing enabled; GET /v1/models still validates the key itself. The test credits are said once, in the cost
+    // note: the page said so four times (W40.fix-processor-visual-polish).
     static let anthropic = ProviderKeySpec(
         provider: .anthropic,
         account: LLMProvider.anthropic.rawValue,
-        blurb: "Archive Processor can also use Anthropic's Claude to read your archive photos. You'll make your own key so you control cost and privacy. New API accounts may receive a small amount of test credits; after those run out, usage is billed by Anthropic, never by this app.",
+        blurb: "Archive Processor can also use Anthropic's Claude to read your archive photos. You'll make your own key so you control cost and privacy, and usage is billed by Anthropic, never by this app.",
         signInURL: URL(string: "https://platform.claude.com/settings/keys")!,
         billingURL: URL(string: "https://platform.claude.com/settings/billing")!,
         steps: [
             "Sign in to Claude Console at platform.claude.com (create an account if you don't have one).",
-            "Open “Billing” to check for test credits and set up payment for later use (a card, invoicing, or prepaid credits, depending on your account).",
+            "Open “Billing” and set up payment.",
             "Open “API keys” → “Create key”, then copy the secret and store it safely (it starts with “sk-ant-api”).",
             "Come back here and paste it below."
         ],
         costNote: "Pay-as-you-go. New API accounts may receive a small amount of test credits; after those run out, Anthropic bills for usage, not this app.",
         privacyNote: "Anthropic does not use data sent through its API to train its models by default. API inputs/outputs may be retained for a limited period for trust-and-safety monitoring, then deleted; zero-retention is available to eligible accounts on request.",
-        cardNote: "Set up billing before paid API use. Standard accounts can use a card; invoicing and prepaid credits depend on the account.",
+        cardNote: "Set up billing before paid API use: a card on a standard account; invoicing or prepaid credits depend on the account.",
         keyPrecheck: { $0.hasPrefix("sk-ant-") && $0.count >= 20 && !$0.contains(" ") },
         validate: { await KeyValidator.validateAnthropic(key: $0) }
     )

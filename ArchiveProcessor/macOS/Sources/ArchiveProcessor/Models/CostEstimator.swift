@@ -13,7 +13,8 @@ struct CostEstimate {
     var totalStandard: Double { ocrCost + classificationCost + taggingCost + collectionCost + rotationCost }
     var totalBatch: Double { batchOcrCost + classificationCost + taggingCost + collectionCost + rotationCost }
 
-    static func money(_ v: Double) -> String { "$" + String(format: "%.4f", v) }
+    /// Dollars and cents from $1 up ("$34.65"); four decimals below it, where a page's cost lives ("$0.0012").
+    static func money(_ v: Double) -> String { "$" + String(format: abs(v) >= 1 ? "%.2f" : "%.4f", v) }
     var ocrFormatted: String { Self.money(ocrCost) }
     var classificationFormatted: String { Self.money(classificationCost) }
     var taggingFormatted: String { Self.money(taggingCost) }

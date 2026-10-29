@@ -566,6 +566,9 @@ struct OCRView: View {
                             .accessibilityIdentifier("ap.ocr.reOCRExplanation")
                     }
                     .padding(4)
+                    // Full width, so the card ends where the cards above and below it do (it stopped about
+                    // 24 pt short when its text was narrower; W40.fix-processor-visual-polish).
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .accessibilityIdentifier("ap.ocr.taggingPanel")
                 .disabled(isPDFOnlyReOCR)
@@ -761,7 +764,7 @@ struct OCRView: View {
                                 && effectiveModel.provider == .gemini {
                                 // W41.app-ocr-default-fu1 — a refused page is read again, outside the totals above.
                                 let range = OCRRefusalFallback.pageCostRange(imageScale: imageScale / 100.0)
-                                Text("Pages Gemini refuses are read by a second reader: \(CostEstimate.money(range.lowerBound))–\(CostEstimate.money(range.upperBound)) a page with a key, free with claude by plan. Not in the totals.")
+                                Text("Pages Gemini refuses are read by a second reader: \(CostEstimate.money(range.lowerBound))–\(CostEstimate.money(range.upperBound)) a page with a key, free with a Claude subscription. Not in the totals.")
                                     .font(.caption2)
                                     .foregroundStyle(.primary)
                                     .accessibilityIdentifier("ap.ocr.secondReaderCost")
@@ -889,76 +892,79 @@ struct OCRView: View {
     }
 
     private var filePanel: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    Text("Files")
-                        .font(.title2)
-                        .fontWeight(.semibold)
-                    Spacer()
-                    if !isInReviewMode {
-                        Button(action: selectFiles) {
-                            Label("Add Files…", systemImage: "plus")
-                        }
-                        .buttonStyle(.bordered)
-                        .disabled(processor.isProcessing)   // don't mutate the input set mid-run
-                        if !droppedFiles.isEmpty {
-                            Button("Clear") { droppedFiles = []; captureBoundaries = []; captureTypes = []; captureQualities = []; captureYears = []; captureMonths = []; captureSubjects = []; processor.jobs = []; processor.segments = []; processor.collectionSegments = []; processor.progress = 0; processor.statusMessage = ""; processor.failedFiles = [] }
-                                .buttonStyle(.bordered)
-                                .disabled(processor.isProcessing)   // Clear mid-run would wipe processor.jobs out from under the running task (wasted paid calls, discarded output)
-                        }
+        // The header stays put above the list, so Add Files… and Clear are in reach at any scroll position
+        // (it scrolled away with 60 files; W40.fix-processor-visual-polish).
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("Files")
+                    .font(.title2)
+                    .fontWeight(.semibold)
+                Spacer()
+                if !isInReviewMode {
+                    Button(action: selectFiles) {
+                        Label("Add Files…", systemImage: "plus")
                     }
-                }
-
-                if droppedFiles.isEmpty {
-                    dropZone
-                        .frame(minHeight: 300)
-                } else {
-                    fileList
-                }
-
-                // Segment summary
-                if !processor.segments.isEmpty {
-                    Divider()
-                    segmentSummary
-                }
-
-                // Collection summary
-                if !processor.collectionSegments.isEmpty {
-                    Divider()
-                    collectionSummary
-                }
-
-                // Review action buttons
-                if processor.awaitingFinalReview {
-                    Divider()
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Review tags and segmentation below. Arrow keys to navigate, 1-4 to classify, Enter to edit.")
-                            .font(.caption)
-                            .foregroundStyle(.primary)
-                        HStack(spacing: 12) {
-                            Button(action: { processor.redoTagging() }) {
-                                Label("Redo Segmentation & Tagging", systemImage: "arrow.counterclockwise")
-                                    .frame(maxWidth: .infinity)
-                            }
+                    .buttonStyle(.bordered)
+                    .disabled(processor.isProcessing)   // don't mutate the input set mid-run
+                    if !droppedFiles.isEmpty {
+                        Button("Clear") { droppedFiles = []; captureBoundaries = []; captureTypes = []; captureQualities = []; captureYears = []; captureMonths = []; captureSubjects = []; processor.jobs = []; processor.segments = []; processor.collectionSegments = []; processor.progress = 0; processor.statusMessage = ""; processor.failedFiles = [] }
                             .buttonStyle(.bordered)
-                            Button(action: { processor.confirmFinalReview() }) {
-                                Label("Complete", systemImage: "checkmark.circle.fill")
-                                    .frame(maxWidth: .infinity)
-                            }
-                            .prominentButtonStyle()
-                        }
+                            .disabled(processor.isProcessing)   // Clear mid-run would wipe processor.jobs out from under the running task (wasted paid calls, discarded output)
                     }
                 }
+            }
+            ScrollView {
+                VStack(alignment: .leading, spacing: 12) {
+                    if droppedFiles.isEmpty {
+                        dropZone
+                            .frame(minHeight: 300)
+                    } else {
+                        fileList
+                    }
 
-                // Progress
-                if processor.isProcessing || (!processor.statusMessage.isEmpty && !isInReviewMode) {
-                    Divider()
-                    VStack(alignment: .leading, spacing: 6) {
-                        ProgressView(value: processor.progress)
-                        Text(processor.statusMessage)
-                            .font(.caption)
-                            .foregroundStyle(.primary)
+                    // Segment summary
+                    if !processor.segments.isEmpty {
+                        Divider()
+                        segmentSummary
+                    }
+
+                    // Collection summary
+                    if !processor.collectionSegments.isEmpty {
+                        Divider()
+                        collectionSummary
+                    }
+
+                    // Review action buttons
+                    if processor.awaitingFinalReview {
+                        Divider()
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Review tags and segmentation below. Arrow keys to navigate, 1-4 to classify, Enter to edit.")
+                                .font(.caption)
+                                .foregroundStyle(.primary)
+                            HStack(spacing: 12) {
+                                Button(action: { processor.redoTagging() }) {
+                                    Label("Redo Segmentation & Tagging", systemImage: "arrow.counterclockwise")
+                                        .frame(maxWidth: .infinity)
+                                }
+                                .buttonStyle(.bordered)
+                                Button(action: { processor.confirmFinalReview() }) {
+                                    Label("Complete", systemImage: "checkmark.circle.fill")
+                                        .frame(maxWidth: .infinity)
+                                }
+                                .prominentButtonStyle()
+                            }
+                        }
+                    }
+
+                    // Progress
+                    if processor.isProcessing || (!processor.statusMessage.isEmpty && !isInReviewMode) {
+                        Divider()
+                        VStack(alignment: .leading, spacing: 6) {
+                            ProgressView(value: processor.progress)
+                            Text(processor.statusMessage)
+                                .font(.caption)
+                                .foregroundStyle(.primary)
+                        }
                     }
                 }
             }

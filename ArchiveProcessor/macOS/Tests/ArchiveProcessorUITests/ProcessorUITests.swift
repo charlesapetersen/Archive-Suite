@@ -109,7 +109,7 @@ final class ProcessorUITests: XCTestCase {
         XCTAssertEqual(choose.label, "Use institutional computing text…")
         attachScreenshot("processor-institutional-computing-import")
         choose.click()
-        let confirm = app.buttons["Use Cluster Folder"]
+        let confirm = app.buttons["Use This Folder"]
         XCTAssertTrue(confirm.waitForExistence(timeout: 5), "the import must open the folder chooser")
         attachScreenshot("processor-institutional-computing-folder")
         app.typeKey(.escape, modifierFlags: [])

@@ -46,7 +46,9 @@ struct ProviderKeyWizard: View {
                 }
             }
         }
-        .frame(minWidth: 540, minHeight: 620)
+        // One fixed height for every provider's page, so the sheet no longer jumps as the tabs change; a page
+        // longer than this scrolls inside it (W40.fix-processor-visual-polish).
+        .frame(minWidth: 540, idealWidth: 560, minHeight: 640, idealHeight: 640, maxHeight: 640)
     }
 }
 

@@ -247,7 +247,7 @@ final class VisualReviewUITests: XCTestCase {
             let choose = element("ap.ocr.institutionalComputeChoose")
             if size == .typical, choose.waitForExistence(timeout: 3) {
                 choose.click()
-                if app.buttons["Use Cluster Folder"].waitForExistence(timeout: 5) {
+                if app.buttons["Use This Folder"].waitForExistence(timeout: 5) {
                     pause(1)
                     shootOnce("files-institutional-folder-panel")
                 } else { missing.append("institutional folder panel") }

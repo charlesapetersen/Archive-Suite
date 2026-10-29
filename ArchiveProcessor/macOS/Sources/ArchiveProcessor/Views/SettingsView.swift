@@ -116,6 +116,10 @@ struct SettingsView: View {
     @State private var newProfileName = ""
     @State private var renamingProfileID: UUID? = nil
     @State private var renameProfileName = ""
+    /// Where the keyboard focus starts when Settings opens: on the first real control, not the Profiles "?"
+    /// (W40.fix-processor-visual-polish: the help button held the focus ring on open).
+    private enum InitialFocus: Hashable { case saveProfile }
+    @FocusState private var initialFocus: InitialFocus?
 
     private var models: [LLMModel] {
         selectedProvider.models   // already includes this provider's custom models — don't concat (dupes)
@@ -175,6 +179,7 @@ struct SettingsView: View {
             }
             .formStyle(.grouped)
             .frame(minWidth: 400)
+            .defaultFocus($initialFocus, .saveProfile)
 
             Divider()
             costPane
@@ -193,19 +198,16 @@ struct SettingsView: View {
         .sheet(isPresented: $showLocalAgentWizard) {
             LocalAgentWizard { showLocalAgentWizard = false }
         }
-        .alert("Save Processing Profile", isPresented: $showSaveProfileAlert) {
-            TextField("Profile name", text: $newProfileName)
-            Button("Save") { profileStore.saveCurrent(as: newProfileName) }
-                .disabled(newProfileName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("Save the current processing settings as a reusable profile. API keys are never included.")
+        .sheet(isPresented: $showSaveProfileAlert) {
+            NameEntrySheet(title: "Save Processing Profile",
+                           message: "Save the current processing settings as a reusable profile. API keys are never included.",
+                           confirmLabel: "Save", name: $newProfileName) { profileStore.saveCurrent(as: $0) }
         }
-        .alert("Rename Profile", isPresented: Binding(get: { renamingProfileID != nil }, set: { if !$0 { renamingProfileID = nil } })) {
-            TextField("Profile name", text: $renameProfileName)
-            Button("Rename") { if let id = renamingProfileID { profileStore.rename(id, to: renameProfileName) }; renamingProfileID = nil }
-                .disabled(renameProfileName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-            Button("Cancel", role: .cancel) { renamingProfileID = nil }
+        .sheet(isPresented: Binding(get: { renamingProfileID != nil }, set: { if !$0 { renamingProfileID = nil } })) {
+            NameEntrySheet(title: "Rename Profile", confirmLabel: "Rename", name: $renameProfileName) { name in
+                if let id = renamingProfileID { profileStore.rename(id, to: name) }
+                renamingProfileID = nil
+            }
         }
     }
 
@@ -238,6 +240,7 @@ struct SettingsView: View {
             } label: {
                 Label("Save current settings as a profile…", systemImage: "plus")
             }
+            .focused($initialFocus, equals: .saveProfile)
         } header: {
             HStack {
                 Text("Profiles")

@@ -52,8 +52,8 @@ struct InstitutionalComputeImportControl: View {
         let panel = NSOpenPanel()
         panel.canChooseFiles = false
         panel.canChooseDirectories = true
-        panel.prompt = "Use Cluster Folder"
-        panel.message = "Choose an institutional-computing bulk run's --out folder (the one holding _meta)."
+        panel.prompt = "Use This Folder"
+        panel.message = "Choose the output folder of an institutional-computing run: the folder that holds its _meta folder."
         guard panel.runModal() == .OK, let folder = panel.url else { return }
         loading = true
         problem = nil
