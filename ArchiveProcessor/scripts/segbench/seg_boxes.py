@@ -14,8 +14,8 @@ Every sheet is blind: it shows the two photos either side of a gap and never the
 so the owner's ruling leans on nothing a later bench run is scored against (the same reason the W46 OCR sheets
 never reveal the current reading). The key, with the draft and the teacher's P(new), stays beside the sheet.
 
-READ ONLY on the corpus and the JPEG tree: getxattr(2) for tags (corpus_survey.read_tags), `sips` reading a
-JPEG and writing a thumbnail into the cache. No model calls: the teacher's answers were made by the
+READ ONLY on the corpus and the JPEG tree: getxattr(2) for tags (corpus_survey.read_tags), Pillow reading a
+JPEG and writing an upright thumbnail into the cache. No model calls: the teacher's answers were made by the
 W41.seg-label-clean run and are read from the corpus-pairs cache. Nothing is written under `Test Files/`; the
 lock item (W46.fix-seg-boxes-lock) folds the owner's rulings in and freezes the boxes there.
 
@@ -43,6 +43,7 @@ PAIRS_CACHE = os.path.expanduser("~/Library/Caches/ArchiveSuiteRehearsal/corpus-
 CACHE = os.path.expanduser("~/Library/Caches/ArchiveSuiteRehearsal/seg-boxes")
 RESULTS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "segbench-results", "seg-boxes.md")
 THUMB_PX = 1100
+ORIENT_MIN = 0.65   # ocr_truth.orient_like_pdf: true pairs measured 0.69-0.98, mismatches 0.16-0.48
 LEAD = re.compile(r"^\s*(\d{3,})")
 
 BOXES = {
@@ -212,13 +213,25 @@ def write_results(out):
         f.write("\n".join(lines))
 
 
-def thumb(key, row):
+def thumb_of(key, row, orient):
+    """The photo's thumbnail, upright: EXIF orientation applied, then turned to match its corpus PDF, since only the
+    PDFs were turned upright (ocr_truth.orient_like_pdf). `orient` collects {n: [turn, correlation]} per box; a
+    correlation under ORIENT_MIN means the pairing itself is doubtful, and cmd_sheet reports it."""
+    import tempfile
+    from pathlib import Path
+    from PIL import Image, ImageOps
+    import ocr_truth
     d = os.path.join(CACHE, key, "thumbs")
     os.makedirs(d, exist_ok=True)
     dst = os.path.join(d, f"{row['n']:04d}.jpg")
-    if not os.path.exists(dst):
-        subprocess.run(["/usr/bin/sips", "-s", "format", "jpeg", "-Z", str(THUMB_PX), os.path.join(JPEGS, row["jpeg"]),
-                        "--out", dst], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    if not os.path.exists(dst) or str(row["n"]) not in orient:
+        with tempfile.TemporaryDirectory() as tmp, Image.open(os.path.join(JPEGS, row["jpeg"])) as im:
+            up = ImageOps.exif_transpose(im).convert("RGB")
+            deg, corr = ocr_truth.orient_like_pdf(up, Path(CORPUS) / row["pdf"], Path(tmp))
+            up = up.rotate(deg, expand=True)
+            up.thumbnail((THUMB_PX, THUMB_PX))
+            up.save(dst, "JPEG", quality=88)
+        orient[str(row["n"])] = [deg, round(corr, 3)]
     return f"thumbs/{row['n']:04d}.jpg"
 
 
@@ -266,6 +279,12 @@ def cmd_sheet(a):
     for key in BOXES:
         with open(os.path.join(CACHE, key, "draft.json"), encoding="utf-8") as f:
             rows = json.load(f)["pages"]
+        orient_path = os.path.join(CACHE, key, "orient.json")
+        orient = {}
+        if os.path.exists(orient_path):
+            with open(orient_path) as f:
+                orient = json.load(f)
+        thumb = lambda key, row: thumb_of(key, row, orient)
         cases, keyrows = [], []
         for i, r in enumerate(rows):
             if not r["ask"]:
@@ -280,7 +299,12 @@ def cmd_sheet(a):
             json.dump(keyrows, f, indent=0)
         with open(os.path.join(CACHE, key, "sheet.html"), "w", encoding="utf-8") as f:
             f.write(sheet_html(key, cases, len(rows) - 1))
-        print(f"{key}: {len(cases)} gaps -> {os.path.join(CACHE, key, 'sheet.html')}")
+        with open(orient_path, "w") as f:
+            json.dump(orient, f, indent=0)
+        turned = sum(1 for deg, _ in orient.values() if deg)
+        doubtful = sorted((int(n) for n, (_, c) in orient.items() if c < ORIENT_MIN))
+        print(f"{key}: {len(cases)} gaps -> {os.path.join(CACHE, key, 'sheet.html')}; {turned} of {len(orient)} "
+              f"photos turned upright; pairing doubtful (correlation < {ORIENT_MIN}): {doubtful or 'none'}")
 
 
 def fold(rows, keyrows, answers):
