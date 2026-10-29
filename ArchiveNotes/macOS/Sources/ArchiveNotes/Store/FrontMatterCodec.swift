@@ -391,23 +391,37 @@ enum FrontMatterCodec {
 
         var elements: [String] = []
         var current = ""
+        // Length of `current` up to its last character read inside quotes: only whitespace OUTSIDE
+        // the quotes is trimmed, so a quoted element keeps an edge space (`" Draft"`; W40.e7 N11).
+        var keptLength = 0
         var inDouble = false
         var inSingle = false
         var escape = false
 
+        func isSpace(_ c: Character) -> Bool { c.unicodeScalars.allSatisfy(CharacterSet.whitespaces.contains) }
+        func finish() -> String {
+            var s = current
+            while s.count > keptLength, let c = s.last, isSpace(c) { s.removeLast() }
+            return s
+        }
+
         for ch in inner {
-            if escape { current.append(ch); escape = false; continue }
+            if escape { current.append(ch); keptLength = current.count; escape = false; continue }
             if ch == "\\" && inDouble { escape = true; continue }
             if ch == "\"" && !inSingle { inDouble.toggle(); continue }
             if ch == "'" && !inDouble { inSingle.toggle(); continue }
             if ch == "," && !inDouble && !inSingle {
-                elements.append(current.trimmingCharacters(in: .whitespaces))
+                elements.append(finish())
                 current = ""
+                keptLength = 0
                 continue
             }
+            let quoted = inDouble || inSingle
+            if !quoted && current.isEmpty && isSpace(ch) { continue }
             current.append(ch)
+            if quoted { keptLength = current.count }
         }
-        let last = current.trimmingCharacters(in: .whitespaces)
+        let last = finish()
         if !last.isEmpty || !elements.isEmpty { elements.append(last) }
 
         return elements.filter { !$0.isEmpty }

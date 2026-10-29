@@ -514,6 +514,32 @@ struct NoteStoreTests {
         #expect(loaded.title == "Renamed")
     }
 
+    /// One `.md` per item folder holds by construction, but a stray file (a Finder copy, a sync tool)
+    /// can already hold the new title's name. The rename must pick a fresh name, never fail or
+    /// overwrite the stray (W40.e7 mutant N05 removed the disambiguation and nothing noticed).
+    @Test("retitle onto a name a stray .md already holds disambiguates")
+    func saveRetitleOntoStrayFile() async throws {
+        let (store, tmp) = try makeScratchStore()
+        defer { cleanup(tmp) }
+
+        var item = makeItem(title: "Original")
+        _ = try await store.create(item)
+        let dir = await store.itemDir(item.id)
+        let strayURL = dir.appendingPathComponent("Renamed.md")
+        let strayText = "stray file, not a note\n"
+        try Data(strayText.utf8).write(to: strayURL)
+
+        item.title = "Renamed"
+        item.modified = Date()
+        let ref = try await store.save(item)
+
+        #expect(ref.url.lastPathComponent == "Renamed (2).md")
+        #expect(try String(contentsOf: strayURL, encoding: .utf8) == strayText)
+        #expect(!FileManager.default.fileExists(atPath: dir.appendingPathComponent("Original.md").path))
+        let loaded = try await store.load(item.id)
+        #expect(loaded.title == "Renamed")
+    }
+
     @Test("save without title change preserves filename")
     func saveNoRetitle() async throws {
         let (store, tmp) = try makeScratchStore()

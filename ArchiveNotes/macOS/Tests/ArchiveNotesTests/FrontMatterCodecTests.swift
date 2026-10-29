@@ -376,6 +376,26 @@ final class FrontMatterCodecTests: XCTestCase {
         XCTAssertEqual(roundTripped.title, "Part 1: The Beginning")
     }
 
+    /// The decoder trims unquoted values, so a value with a space at ONE edge only must be quoted or
+    /// the space is lost on reload (W40.e7 mutant N11 turned `||` into `&&` and nothing noticed).
+    func testSingleEdgeSpaceRoundTrips() throws {
+        let item = try FrontMatterCodec.decode(minimalFixture)
+        for title in ["Draft ", " Draft", " Draft "] {
+            var modified = item
+            modified.title = title
+            modified.authors = [title]
+            let encoded = FrontMatterCodec.encode(modified)
+            XCTAssertTrue(encoded.contains("title: \"\(title)\""), "unquoted: \(title.debugDescription)")
+            let roundTripped = try FrontMatterCodec.decode(encoded)
+            XCTAssertEqual(roundTripped.title, title)
+            XCTAssertEqual(roundTripped.authors, [title])
+        }
+        // Whitespace OUTSIDE a flow element's quotes is still layout, not content.
+        let handWritten = minimalFixture.replacingOccurrences(
+            of: "title:", with: "authors: [  \" A\" ,  B  , 'C '  ]\ntitle:")
+        XCTAssertEqual(try FrontMatterCodec.decode(handWritten).authors, [" A", "B", "C "])
+    }
+
     func testEmptyTitleQuoted() throws {
         let item = try FrontMatterCodec.decode(minimalFixture)
         var modified = item
