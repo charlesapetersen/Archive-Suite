@@ -300,6 +300,17 @@ homography keeps lines straight, so a sloped straight run per line suffices) and
 run across a curved line, the error being the sagitta of the curve in pixels; test 8 measures it). PAGE-XML cannot
 record the transform, so the grid is stored beside the page [M OCR-D via D note].
 
+**Straightening may pay for selection though not for OCR (owner, 2026-10-29).** W46.enh-dewarp settled that no crop or
+dewarp helps OCR, so OCR stays on the raw photograph; it did not measure selection. Under §6.2's line rule (a drag
+along a line must return its words in order as one line) a skewed or curled page is where straight runs fail: the
+words of a sloped or curved line sit on runs that PDFKit groups with the line above or below. A reading copy
+straightened after OCR, with the layer carried onto it, puts each line on a straight horizontal run, which is the case
+the writer handles best. So the choice of reading copy is decided by the line pass rate, by tag, not by OCR accuracy
+or Find: raw with today's layer, raw with one sloped straight run per line (OCRmyPDF's design, no image change),
+deskew only (a rotation on an enlarged canvas, which removes nothing), the Apple quad plus perspective, and UVDoc
+after the quad. Words lost at the crop edge still count against an arm, because the reading-copy rule forbids removing
+content (W46.place-geom).
+
 ### 6.6 Viewer behaviour, PDF/A and PDF/UA
 
 What is established:
