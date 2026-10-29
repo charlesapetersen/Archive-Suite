@@ -450,11 +450,21 @@ struct SettingsView: View {
                     }
                     HelpButton(text: "One-click fill for OpenAI's public API: sets the Gateway URL to https://api.openai.com/v1, a cost-effective OpenAI model, a display name, and its pricing. Paste your OpenAI key into the Gateway key field below. The gateway sends standard chat-completions requests, so this fills a non-reasoning model; for GPT-5 reasoning models pick OpenAI under the Direct API mode instead. For Azure OpenAI or another OpenAI-compatible proxy, apply this then edit the Gateway URL to your endpoint.")
                 }
-                TextField("Gateway URL", text: $gatewayBaseURL)
-                TextField("Model ID", text: $gatewayModelID)
-                TextField("Display name (for PDF headers)", text: $gatewayDisplayName)
-                TextField("Input $/1M tokens", value: Binding(get: { gatewayInputCost >= 0 ? gatewayInputCost : nil }, set: { gatewayInputCost = $0 ?? -1 }), format: .number)
-                TextField("Output $/1M tokens", value: Binding(get: { gatewayOutputCost >= 0 ? gatewayOutputCost : nil }, set: { gatewayOutputCost = $0 ?? -1 }), format: .number)
+                settingsField("Gateway URL") {
+                    TextField("Gateway URL", text: $gatewayBaseURL, prompt: Text("https://…/v1"))
+                }
+                settingsField("Model ID") {
+                    TextField("Model ID", text: $gatewayModelID, prompt: Text("The model name the gateway expects"))
+                }
+                settingsField("Display name") {
+                    TextField("Display name", text: $gatewayDisplayName, prompt: Text("Shown in PDF headers"))
+                }
+                settingsField("Input $/1M tokens") {
+                    TextField("Input $/1M tokens", value: Binding(get: { gatewayInputCost >= 0 ? gatewayInputCost : nil }, set: { gatewayInputCost = $0 ?? -1 }), format: .number, prompt: Text("For the cost estimate"))
+                }
+                settingsField("Output $/1M tokens") {
+                    TextField("Output $/1M tokens", value: Binding(get: { gatewayOutputCost >= 0 ? gatewayOutputCost : nil }, set: { gatewayOutputCost = $0 ?? -1 }), format: .number, prompt: Text("For the cost estimate"))
+                }
                 Picker(selection: $gatewayUpstreamProvider) {
                     ForEach(LLMProvider.allCases.filter { $0 != .appleVision }) { Text($0.rawValue).tag($0) }
                 } label: {
@@ -586,8 +596,10 @@ struct SettingsView: View {
     @ViewBuilder private var appleVisionControls: some View {
         Text("Free on-device transcription with macOS Vision. It does not use an API key or send images over the network.")
             .font(.caption).foregroundStyle(.primary)
-        TextField("Languages (comma-separated BCP-47 tags)", text: $visionLanguages)
-            .accessibilityIdentifier("ap.settings.visionLanguages")
+        settingsField("Languages") {
+            TextField("Languages", text: $visionLanguages, prompt: Text("Comma-separated BCP-47 tags, e.g. en-US, fr-FR"))
+                .accessibilityIdentifier("ap.settings.visionLanguages")
+        }
         Toggle("Fast recognition", isOn: $visionFastRecognition)
             .accessibilityIdentifier("ap.settings.visionFastRecognition")
         VStack(alignment: .leading, spacing: 4) {
@@ -645,8 +657,12 @@ struct SettingsView: View {
             }
         }
         .accessibilityIdentifier("ap.settings.localAgentToolPicker")
-        TextField("CLI path (optional — auto-detected if blank)", text: $localAgentBinaryPath)
-        TextField("Model (optional — CLI default if blank)", text: $localAgentModel)
+        settingsField("CLI path") {
+            TextField("CLI path", text: $localAgentBinaryPath, prompt: Text("Optional — auto-detected if blank"))
+        }
+        settingsField("Model") {
+            TextField("Model", text: $localAgentModel, prompt: Text("Optional — the CLI's default if blank"))
+        }
         HStack {
             Button {
                 runLocalAgentDetectVerify()
@@ -706,10 +722,30 @@ struct SettingsView: View {
         }
     }
 
+    /// W40.fix-processor-settings-fields — in a grouped `Form` a `TextField`'s title becomes the row label and
+    /// the field itself draws borderless and right-aligned, so an empty field showed only its label (and a title
+    /// used as a placeholder landed, clipped, in the label column). Each text row puts its label on the left and
+    /// the field, bordered and with its placeholder inside, on the right; the field keeps its title as its
+    /// accessibility label.
+    private func settingsField<Field: View>(_ label: String, @ViewBuilder field: () -> Field) -> some View {
+        LabeledContent(label) {
+            field()
+                .labelsHidden()
+                .textFieldStyle(.roundedBorder)
+                .multilineTextAlignment(.leading)
+                .frame(width: 260)
+        }
+    }
+
     @ViewBuilder private func keyField(_ label: String, account: String, text: Binding<String>) -> some View {
         HStack {
             Text(label).frame(width: 84, alignment: .leading)
-            SecureField("\(label) API key", text: text)
+            // The title is only the accessibility label; the field draws bordered with an empty-state prompt,
+            // so an unset key no longer reads like a stored one (W40.fix-processor-settings-fields).
+            SecureField("\(label) API key", text: text, prompt: Text("Not set — paste a key"))
+                .labelsHidden()
+                .textFieldStyle(.roundedBorder)
+                .multilineTextAlignment(.leading)
                 .onChange(of: text.wrappedValue) { _, k in
                     let t = k.trimmingCharacters(in: .whitespaces)
                     // Ignore programmatic reloads (e.g. after the wizard saves, or on appear): if the value
@@ -778,7 +814,7 @@ struct SettingsView: View {
                 HelpButton(text: "The reference size the resolution slider targets (default 3 MB). Set it to your collection's typical image size.")
                 Spacer()
                 TextField("", value: $standardImageSizeMB, format: .number.precision(.fractionLength(0...1)))
-                    .frame(width: 52).multilineTextAlignment(.trailing)
+                    .textFieldStyle(.roundedBorder).frame(width: 52).multilineTextAlignment(.trailing)
                 Text("MB").foregroundStyle(.primary)
                 Stepper("", value: $standardImageSizeMB, in: SizingBounds.imageMB, step: 0.5).labelsHidden()
             }
@@ -795,7 +831,7 @@ struct SettingsView: View {
                 HelpButton(text: "Target size for the image embedded in each output PDF (default 2 MB). Independent of both the image sent to the LLM and the source resolution — larger images are downscaled toward this target, while smaller ones are embedded as-is. Not used for pre-OCRed input.")
                 Spacer()
                 TextField("", value: $pdfImageSizeMB, format: .number.precision(.fractionLength(0...1)))
-                    .frame(width: 52).multilineTextAlignment(.trailing)
+                    .textFieldStyle(.roundedBorder).frame(width: 52).multilineTextAlignment(.trailing)
                 Text("MB").foregroundStyle(.primary)
                 Stepper("", value: $pdfImageSizeMB, in: SizingBounds.imageMB, step: 0.5).labelsHidden()
             }
@@ -818,7 +854,7 @@ struct SettingsView: View {
                 HelpButton(text: "Target size for the separately-exported image file (default 3 MB). Independent of the camera/source resolution — larger images are downscaled toward this target, while already-small JPEGs are kept byte-for-byte. Only applies when \"Also export a separate image file\" is on.")
                 Spacer()
                 TextField("", value: $exportedImageSizeMB, format: .number.precision(.fractionLength(0...1)))
-                    .frame(width: 52).multilineTextAlignment(.trailing)
+                    .textFieldStyle(.roundedBorder).frame(width: 52).multilineTextAlignment(.trailing)
                 Text("MB").foregroundStyle(.primary)
                 Stepper("", value: $exportedImageSizeMB, in: SizingBounds.imageMB, step: 0.5).labelsHidden()
             }
@@ -981,17 +1017,17 @@ struct SettingsView: View {
                     HelpButton(text: "The OAuth Desktop-app client ID for the Drive relay (from your Google Cloud project, ending in .apps.googleusercontent.com). Stored in app settings; the matching secret goes in the Keychain.")
                     Spacer()
                 }
-                TextField("…apps.googleusercontent.com", text: $driveClientId)
+                TextField("Google client ID", text: $driveClientId, prompt: Text("…apps.googleusercontent.com"))
+                    .labelsHidden()
                     .textFieldStyle(.roundedBorder)
-                    .accessibilityLabel("Google client ID")
                 HStack {
                     Text("Client secret").font(.caption)
                     HelpButton(text: "The OAuth Desktop-app client secret (GOCSPX-…). Saved to the macOS Keychain, never written to disk or settings.")
                     Spacer()
                 }
-                SecureField("GOCSPX-…", text: $driveClientSecret)
+                SecureField("Client secret", text: $driveClientSecret, prompt: Text("GOCSPX-…"))
+                    .labelsHidden()
                     .textFieldStyle(.roundedBorder)
-                    .accessibilityLabel("Client secret")
                     .onChange(of: driveClientSecret) { _, v in _ = KeychainHelper.save(account: "DriveClientSecret", password: v) }
                 HStack(spacing: 10) {
                     Button(driveSignedIn ? "Re-sign in" : "Sign in to Google Drive") { signInToDrive() }

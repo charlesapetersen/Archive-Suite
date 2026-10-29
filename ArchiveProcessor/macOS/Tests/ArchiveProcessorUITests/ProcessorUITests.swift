@@ -246,6 +246,64 @@ final class ProcessorUITests: XCTestCase {
         attachScreenshot("processor-local-agent-cost-and-wizard")
     }
 
+    /// W40.fix-processor-settings-fields: each Settings text field is a field of its own, with its placeholder
+    /// inside it, not a label alone on its row. The accessibility tree cannot see a border, so the screenshots
+    /// are the visual half of this check.
+    func testSettingsTextFieldsShowTheirFieldAndPlaceholder() throws {
+        openSettings()
+        let settings = app.windows.containing(.any, identifier: "ap.settings.guidedKeySetup").firstMatch
+        XCTAssertTrue(settings.waitForExistence(timeout: 10), "Settings must open")
+        defer { chooseBackend("Direct API", in: settings) }
+
+        let anthropicKey = settings.secureTextFields["Anthropic API key"]
+        XCTAssertTrue(anthropicKey.waitForExistence(timeout: 5), "the Anthropic key row needs its field")
+        XCTAssertEqual(anthropicKey.placeholderValue, "Not set — paste a key",
+                       "an empty key field must say it is empty, not read like a stored key")
+
+        chooseBackend("API Gateway", in: settings)
+        let gatewayFields = ["Gateway URL": "https://…/v1",
+                             "Model ID": "The model name the gateway expects",
+                             "Display name": "Shown in PDF headers",
+                             "Input $/1M tokens": "For the cost estimate",
+                             "Output $/1M tokens": "For the cost estimate"]
+        for (label, prompt) in gatewayFields {
+            let field = settings.textFields[label]
+            XCTAssertTrue(field.waitForExistence(timeout: 5), "the \(label) row needs its field")
+            XCTAssertEqual(field.placeholderValue, prompt, "\(label) must keep its placeholder inside the field")
+            XCTAssertGreaterThanOrEqual(field.frame.width, 200, "\(label) must draw a usable field")
+        }
+        settings.scrollViews.firstMatch.scroll(byDeltaX: 0, deltaY: -450)   // bring the rows into the shot
+        attachScreenshot("processor-settings-gateway-fields")
+
+        chooseBackend("Local CLI Agent", in: settings)
+        for label in ["CLI path", "Model"] {
+            let field = settings.textFields[label]
+            XCTAssertTrue(field.waitForExistence(timeout: 5), "the Local CLI \(label) row needs its field")
+            XCTAssertTrue((field.placeholderValue ?? "").hasPrefix("Optional"),
+                          "the Local CLI \(label) must say it is optional inside the field")
+        }
+        attachScreenshot("processor-settings-local-cli-fields")
+        settings.scrollViews.firstMatch.scroll(byDeltaX: 0, deltaY: -450)   // down to the image-size fields
+        attachScreenshot("processor-settings-size-fields")
+
+        settings.scrollViews.firstMatch.scroll(byDeltaX: 0, deltaY: 8000)   // Live Capture is near the top
+        let clientID = settings.textFields["Google client ID"]
+        XCTAssertTrue(clientID.waitForExistence(timeout: 5), "the Google client ID needs its field")
+        XCTAssertEqual(clientID.placeholderValue, "…apps.googleusercontent.com",
+                       "the client-ID placeholder belongs inside its field, not in the label column")
+        attachScreenshot("processor-settings-drive-fields")
+    }
+
+    private func chooseBackend(_ title: String, in settings: XCUIElement) {
+        let picker = element("ap.settings.backendPicker")
+        if !picker.isHittable { settings.scrollViews.firstMatch.scroll(byDeltaX: 0, deltaY: 8000) }
+        guard picker.waitForExistence(timeout: 5) else { return XCTFail("Settings needs its backend picker") }
+        picker.click()
+        let item = app.menuItems[title]
+        guard item.waitForExistence(timeout: 3) else { return XCTFail("the backend picker must offer \(title)") }
+        item.click()
+    }
+
     /// W40.fix-processor-resume-run-key: Resume Run follows the interrupted run's own backend. A Local Agent run
     /// resumes with no key in the field, even with the direct route selected now; a direct run still waits for its
     /// provider's key and says which one.
