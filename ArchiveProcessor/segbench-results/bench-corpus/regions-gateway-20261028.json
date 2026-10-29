@@ -178,7 +178,7 @@
       "ok": 50,
       "nes": 0.9881,
       "nes_answered": 0.9881,
-      "chrf": 0.9944,
+      "chrf": 0.9942,
       "order_edit": "",
       "order_pages": 0,
       "crops": 0,
@@ -212,16 +212,16 @@
       "arm": "whole",
       "n": 12,
       "ok": 12,
-      "nes": 0.9899,
-      "nes_answered": 0.9899,
-      "chrf": 0.9933,
+      "nes": 0.9897,
+      "nes_answered": 0.9897,
+      "chrf": 0.9924,
       "order_edit": "",
       "order_pages": 0,
       "crops": 0,
       "crops_failed": 0,
       "prompt_tokens": 17143,
       "completion_tokens": 6848,
-      "whole_nes_same": 0.9899,
+      "whole_nes_same": 0.9897,
       "cost": 0.038535
     },
     {
@@ -232,7 +232,7 @@
       "ok": 96,
       "nes": 0.9674,
       "nes_answered": 0.9674,
-      "chrf": 0.9747,
+      "chrf": 0.9746,
       "order_edit": "",
       "order_pages": 0,
       "crops": 0,
@@ -248,8 +248,8 @@
       "arm": "whole",
       "n": 41,
       "ok": 41,
-      "nes": 0.9881,
-      "nes_answered": 0.9881,
+      "nes": 0.9882,
+      "nes_answered": 0.9882,
       "chrf": 0.9948,
       "order_edit": "",
       "order_pages": 0,
@@ -257,7 +257,7 @@
       "crops_failed": 0,
       "prompt_tokens": 58893,
       "completion_tokens": 33677,
-      "whole_nes_same": 0.9881,
+      "whole_nes_same": 0.9882,
       "cost": 0.17046
     },
     {
@@ -491,9 +491,9 @@
       "arm": "pp-doclayoutv3",
       "n": 50,
       "ok": 50,
-      "nes": 0.9223,
-      "nes_answered": 0.9223,
-      "chrf": 0.9475,
+      "nes": 0.9224,
+      "nes_answered": 0.9224,
+      "chrf": 0.9473,
       "order_edit": "",
       "order_pages": 0,
       "crops": 367,
@@ -504,9 +504,9 @@
       "cost": 0.707141,
       "paired": {
         "n": 50,
-        "delta": -0.0658,
+        "delta": -0.0657,
         "p": 0.0001,
-        "lo": -0.1054,
+        "lo": -0.1053,
         "hi": -0.0326
       }
     },
@@ -541,22 +541,22 @@
       "arm": "pp-doclayoutv3",
       "n": 12,
       "ok": 12,
-      "nes": 0.8344,
-      "nes_answered": 0.8344,
-      "chrf": 0.8902,
+      "nes": 0.8343,
+      "nes_answered": 0.8343,
+      "chrf": 0.8894,
       "order_edit": "",
       "order_pages": 0,
       "crops": 111,
       "crops_failed": 0,
       "prompt_tokens": 158517,
       "completion_tokens": 23707,
-      "whole_nes_same": 0.9899,
+      "whole_nes_same": 0.9897,
       "cost": 0.20779,
       "paired": {
         "n": 12,
-        "delta": -0.1555,
+        "delta": -0.1554,
         "p": 0.0016,
-        "lo": -0.2838,
+        "lo": -0.2836,
         "hi": -0.0472
       }
     },
@@ -581,7 +581,7 @@
         "n": 96,
         "delta": -0.1189,
         "p": 0.0001,
-        "lo": -0.1563,
+        "lo": -0.1562,
         "hi": -0.085
       }
     },
@@ -600,7 +600,7 @@
       "crops_failed": 0,
       "prompt_tokens": 417343,
       "completion_tokens": 70588,
-      "whole_nes_same": 0.9881,
+      "whole_nes_same": 0.9882,
       "cost": 0.57771,
       "paired": {
         "n": 41,
@@ -841,9 +841,9 @@
       "arm": "tiles",
       "n": 50,
       "ok": 50,
-      "nes": 0.9853,
-      "nes_answered": 0.9853,
-      "chrf": 0.9928,
+      "nes": 0.9852,
+      "nes_answered": 0.9852,
+      "chrf": 0.9926,
       "order_edit": "",
       "order_pages": 0,
       "crops": 149,
@@ -854,10 +854,10 @@
       "cost": 0.465537,
       "paired": {
         "n": 50,
-        "delta": -0.0028,
-        "p": 0.475,
-        "lo": -0.0099,
-        "hi": 0.0034
+        "delta": -0.0029,
+        "p": 0.4601,
+        "lo": -0.01,
+        "hi": 0.0033
       }
     },
     {
@@ -891,16 +891,16 @@
       "arm": "tiles",
       "n": 12,
       "ok": 12,
-      "nes": 0.9777,
-      "nes_answered": 0.9777,
-      "chrf": 0.9853,
+      "nes": 0.9774,
+      "nes_answered": 0.9774,
+      "chrf": 0.9844,
       "order_edit": "",
       "order_pages": 0,
       "crops": 35,
       "crops_failed": 0,
       "prompt_tokens": 50085,
       "completion_tokens": 14745,
-      "whole_nes_same": 0.9899,
+      "whole_nes_same": 0.9897,
       "cost": 0.092858,
       "paired": {
         "n": 12,
@@ -918,7 +918,7 @@
       "ok": 96,
       "nes": 0.9105,
       "nes_answered": 0.9105,
-      "chrf": 0.9554,
+      "chrf": 0.9553,
       "order_edit": "",
       "order_pages": 0,
       "crops": 292,
@@ -929,9 +929,9 @@
       "cost": 0.890224,
       "paired": {
         "n": 96,
-        "delta": -0.0568,
+        "delta": -0.0569,
         "p": 0.0001,
-        "lo": -0.0834,
+        "lo": -0.0835,
         "hi": -0.0331
       }
     },
@@ -950,14 +950,14 @@
       "crops_failed": 0,
       "prompt_tokens": 176013,
       "completion_tokens": 68853,
-      "whole_nes_same": 0.9881,
+      "whole_nes_same": 0.9882,
       "cost": 0.39021,
       "paired": {
         "n": 41,
-        "delta": -0.0039,
-        "p": 0.4032,
-        "lo": -0.0124,
-        "hi": 0.0034
+        "delta": -0.004,
+        "p": 0.3886,
+        "lo": -0.0125,
+        "hi": 0.0033
       }
     }
   ],
@@ -966,24 +966,24 @@
       "route": "gemini-3.7-flash-gw",
       "arm": "whole",
       "n": 12,
-      "strict": 0.989867,
-      "markup_stripped": 0.991656,
+      "strict": 0.989659,
+      "markup_stripped": 0.991449,
       "markup_pages": 1
     },
     {
       "route": "gemini-3.7-flash-gw",
       "arm": "pp-doclayoutv3",
       "n": 12,
-      "strict": 0.834402,
-      "markup_stripped": 0.835318,
+      "strict": 0.834309,
+      "markup_stripped": 0.835224,
       "markup_pages": 3
     },
     {
       "route": "gemini-3.7-flash-gw",
       "arm": "tiles",
       "n": 12,
-      "strict": 0.977657,
-      "markup_stripped": 0.979447,
+      "strict": 0.97745,
+      "markup_stripped": 0.979239,
       "markup_pages": 1
     }
   ],

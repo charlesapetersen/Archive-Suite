@@ -23,7 +23,7 @@ claude-sonnet5.5,p021,printed,printed,photograph,True,1.0,0,374,374,,
 claude-sonnet5.5,p022,handwritten,handwritten,handwriting,True,0.998775,0,290,290,,
 claude-sonnet5.5,p023,typewritten,mixed,photograph,True,0.998569,0,204,204,,
 claude-sonnet5.5,p024,typewritten,typewritten,photograph,True,0.974529,0,143,144,,
-claude-sonnet5.5,p025,typewritten,typewritten,photograph,True,0.997512,0,69,69,,
+claude-sonnet5.5,p025,typewritten,typewritten,photograph,True,0.995025,0,69,69,,
 claude-sonnet5.5,p026,typewritten,typewritten,photograph,True,0.995905,0,426,427,,
 claude-sonnet5.5,p027,typewritten,typewritten,photograph,True,0.999148,0,222,222,,
 claude-sonnet5.5,p028,typewritten,typewritten,photograph,True,0.999214,0,202,202,,
@@ -84,7 +84,7 @@ claude-sonnet5.5,p083,printed,printed,photograph,True,0.987792,0,631,607,,
 claude-sonnet5.5,p084,printed,printed,photograph,True,0.998748,0,567,568,,
 claude-sonnet5.5,p085,printed,printed,other,True,1.0,0,330,330,,
 claude-sonnet5.5,p087,typewritten,typewritten,photograph,True,1.0,0,656,656,,
-claude-sonnet5.5,p088,typewritten,typewritten,other,True,0.99588,0,452,450,,
+claude-sonnet5.5,p088,typewritten,typewritten,other,True,0.993994,0,450,450,,
 claude-sonnet5.5,p089,typewritten,typewritten,photograph,True,0.993081,0,295,295,,
 claude-sonnet5.5,p090,typewritten,typewritten,photograph,True,0.997824,0,528,528,,
 claude-sonnet5.5,p091,typewritten,typewritten,other,True,1.0,0,664,664,,
@@ -119,7 +119,7 @@ gemini3.1-pro,p021,printed,printed,photograph,True,1.0,0.034126,374,374,2607,sto
 gemini3.1-pro,p022,handwritten,mixed,handwriting,True,0.996936,0.01957,290,289,1394,stop
 gemini3.1-pro,p023,typewritten,mixed,photograph,True,1.0,0.020102,204,204,1432,stop
 gemini3.1-pro,p024,typewritten,typewritten,photograph,True,0.890365,0.034606,143,146,2647,stop
-gemini3.1-pro,p025,typewritten,typewritten,photograph,True,1.0,0.013618,69,69,898,stop
+gemini3.1-pro,p025,typewritten,typewritten,photograph,True,0.997512,0.013618,69,69,898,stop
 gemini3.1-pro,p026,typewritten,typewritten,photograph,True,0.995532,0.01009,426,426,604,stop
 gemini3.1-pro,p027,typewritten,typewritten,photograph,True,0.999148,0.017138,222,222,1185,stop
 gemini3.1-pro,p028,typewritten,typewritten,photograph,True,0.999214,0.015194,202,202,1023,stop
@@ -180,7 +180,7 @@ gemini3.1-pro,p083,printed,printed,photograph,True,1.0,0.035898,631,631,2750,sto
 gemini3.1-pro,p084,printed,printed,photograph,True,1.0,0.031446,567,567,2376,stop
 gemini3.1-pro,p085,printed,printed,other,True,0.999515,0.01887,330,330,1329,stop
 gemini3.1-pro,p087,typewritten,typewritten,photograph,True,0.983133,0.038278,656,656,2953,stop
-gemini3.1-pro,p088,typewritten,typewritten,other,True,0.983919,0.030098,452,450,2265,stop
+gemini3.1-pro,p088,typewritten,typewritten,other,True,0.986163,0.030098,450,450,2265,stop
 gemini3.1-pro,p089,typewritten,typewritten,photograph,True,0.993081,0.020902,295,295,1505,stop
 gemini3.1-pro,p090,typewritten,typewritten,photograph,True,0.998095,0.039286,528,528,3037,stop
 gemini3.1-pro,p091,typewritten,typewritten,other,True,1.0,0.031754,664,664,2403,stop
@@ -215,7 +215,7 @@ gemini3.8-flash,p021,printed,printed,photograph,True,1.0,0.00315825,374,374,558,
 gemini3.8-flash,p022,handwritten,mixed,handwriting,True,0.997549,0.002592,290,288,407,stop
 gemini3.8-flash,p023,typewritten,mixed,photograph,True,0.998571,0.002478,204,204,369,stop
 gemini3.8-flash,p024,typewritten,mixed,photograph,True,0.972315,0.0029895,143,146,513,stop
-gemini3.8-flash,p025,typewritten,typewritten,photograph,True,0.997512,0.0015045,69,69,117,stop
+gemini3.8-flash,p025,typewritten,typewritten,photograph,True,1.0,0.0015045,69,69,117,stop
 gemini3.8-flash,p026,typewritten,typewritten,photograph,True,0.995905,0.0033495,426,427,609,stop
 gemini3.8-flash,p027,typewritten,typewritten,photograph,True,1.0,0.002253,222,222,309,stop
 gemini3.8-flash,p028,typewritten,typewritten,photograph,True,0.999214,0.0021405,202,202,279,stop
@@ -276,7 +276,7 @@ gemini3.8-flash,p083,printed,printed,photograph,True,1.0,0.0045705,631,631,929,s
 gemini3.8-flash,p084,printed,printed,photograph,True,0.999373,0.00406275,567,567,790,stop
 gemini3.8-flash,p085,printed,printed,other,True,1.0,0.0029595,330,330,497,stop
 gemini3.8-flash,p087,typewritten,typewritten,photograph,True,1.0,0.0044895,656,656,913,stop
-gemini3.8-flash,p088,typewritten,typewritten,other,True,0.995138,0.003648,452,450,681,stop
+gemini3.8-flash,p088,typewritten,typewritten,other,True,0.99439,0.003648,450,450,681,stop
 gemini3.8-flash,p089,typewritten,mixed,photograph,True,0.993081,0.002622,295,295,415,stop
 gemini3.8-flash,p090,typewritten,typewritten,photograph,True,0.995926,0.00409575,528,528,808,stop
 gemini3.8-flash,p091,typewritten,typewritten,other,True,1.0,0.004443,664,664,893,stop
@@ -372,7 +372,7 @@ qwen3.5-397b,p083,printed,printed,photograph,True,0.987792,0.00291675,631,607,77
 qwen3.5-397b,p084,printed,printed,photograph,True,0.999374,0.00299925,567,567,801,stop
 qwen3.5-397b,p085,printed,printed,other,True,1.0,0.00211755,330,330,508,stop
 qwen3.5-397b,p087,typewritten,typewritten,photograph,True,0.99922,0.00333825,656,656,911,stop
-qwen3.5-397b,p088,typewritten,typewritten,other,True,0.986517,0.0025641,452,449,657,stop
+qwen3.5-397b,p088,typewritten,typewritten,other,True,0.984985,0.0025641,450,449,657,stop
 qwen3.5-397b,p089,typewritten,typewritten,photograph,True,0.992549,0.00188025,295,295,425,stop
 qwen3.5-397b,p090,typewritten,typewritten,photograph,True,0.996184,0.00307425,528,527,823,stop
 qwen3.5-397b,p091,typewritten,typewritten,other,True,1.0,0.0032361,664,664,881,stop
@@ -468,7 +468,7 @@ qwen3-vl-235b,p083,printed,printed,photograph,True,0.987532,0.00099112,631,607,7
 qwen3-vl-235b,p084,printed,printed,photograph,True,0.987907,0.00098176,567,572,767,stop
 qwen3-vl-235b,p085,printed,printed,other,True,1.0,0.0009248,330,330,490,stop
 qwen3-vl-235b,p087,typewritten,typewritten,photograph,True,0.99948,0.00169792,656,656,894,stop
-qwen3-vl-235b,p088,typewritten,typewritten,other,True,0.988033,0.00097756,452,450,672,stop
+qwen3-vl-235b,p088,typewritten,typewritten,other,True,0.986911,0.00097756,450,450,672,stop
 qwen3-vl-235b,p089,typewritten,typewritten,photograph,True,0.993081,0.0012808,295,295,420,stop
 qwen3-vl-235b,p090,typewritten,typewritten,photograph,True,0.998092,0.00157384,528,528,753,stop
 qwen3-vl-235b,p091,typewritten,typewritten,other,True,1.0,0.0011384,664,664,865,stop
@@ -503,7 +503,7 @@ qwen3.8-flash,p021,printed,printed,photograph,True,1.0,0.00069661,374,374,563,st
 qwen3.8-flash,p022,handwritten,mixed,handwriting,True,0.996324,0.00062423,290,288,409,stop
 qwen3.8-flash,p023,typewritten,,photograph,False,0.0,0,204,0,321,error
 qwen3.8-flash,p024,typewritten,typewritten,photograph,True,0.910773,0.00069144,143,142,552,stop
-qwen3.8-flash,p025,typewritten,mixed,photograph,True,0.995025,0.00022266,69,69,123,stop
+qwen3.8-flash,p025,typewritten,mixed,photograph,True,0.992537,0.00022266,69,69,123,stop
 qwen3.8-flash,p026,typewritten,typewritten,photograph,True,0.995905,0.00070272,426,427,576,stop
 qwen3.8-flash,p027,typewritten,typewritten,photograph,True,0.94061,0.00059298,222,233,324,stop
 qwen3.8-flash,p028,typewritten,typewritten,photograph,True,0.997643,0.00055467,202,201,261,stop
@@ -564,7 +564,7 @@ qwen3.8-flash,p083,printed,printed,photograph,True,1.0,0.00068635,631,631,935,st
 qwen3.8-flash,p084,printed,printed,photograph,True,0.976533,0.00055514,567,553,682,stop
 qwen3.8-flash,p085,printed,printed,other,True,0.985929,0.00058103,330,318,439,stop
 qwen3.8-flash,p087,typewritten,typewritten,photograph,True,0.996621,0.00081834,656,649,822,stop
-qwen3.8-flash,p088,typewritten,typewritten,other,True,0.986891,0.00062221,452,451,698,stop
+qwen3.8-flash,p088,typewritten,typewritten,other,True,0.989114,0.00062221,450,451,698,stop
 qwen3.8-flash,p089,typewritten,typewritten,photograph,True,0.993081,0.00063081,295,295,423,stop
 qwen3.8-flash,p090,typewritten,typewritten,photograph,True,0.995368,0.0007892,528,527,760,stop
 qwen3.8-flash,p091,typewritten,typewritten,other,True,0.998372,0.00070147,664,664,881,stop
@@ -660,7 +660,7 @@ gpt5.4-mini,p083,printed,printed,photograph,True,0.995328,0.0104985,631,630,2008
 gpt5.4-mini,p084,printed,printed,photograph,True,0.996241,0.0114165,567,567,2229,stop
 gpt5.4-mini,p085,printed,printed,other,True,0.999515,0.00489,330,330,593,stop
 gpt5.4-mini,p087,typewritten,typewritten,photograph,True,0.998701,0.007365,656,656,1088,stop
-gpt5.4-mini,p088,typewritten,typewritten,other,True,0.978652,0.00513225,452,437,760,stop
+gpt5.4-mini,p088,typewritten,typewritten,other,True,0.978228,0.00513225,450,437,760,stop
 gpt5.4-mini,p089,typewritten,mixed,photograph,True,0.993081,0.005187,295,295,604,stop
 gpt5.4-mini,p090,typewritten,typewritten,photograph,True,0.991006,0.006339,528,530,860,stop
 gpt5.4-mini,p091,typewritten,typewritten,other,True,0.998372,0.00638325,664,664,1045,stop
@@ -695,7 +695,7 @@ gemini3.5-flash,p021,printed,printed,photograph,True,1.0,0.0071535,374,374,558,s
 gemini3.5-flash,p022,handwritten,mixed,handwriting,True,0.996936,0.0057945,290,288,407,stop
 gemini3.5-flash,p023,typewritten,mixed,photograph,True,0.998571,0.0055095,204,204,369,stop
 gemini3.5-flash,p024,typewritten,typewritten,photograph,True,0.922992,0.0069015,143,149,530,stop
-gemini3.5-flash,p025,typewritten,typewritten,photograph,True,0.178667,0.0067485,69,397,513,stop
+gemini3.5-flash,p025,typewritten,typewritten,photograph,True,0.178222,0.0067485,69,397,513,stop
 gemini3.5-flash,p026,typewritten,typewritten,photograph,True,0.99516,0.0075765,426,426,605,stop
 gemini3.5-flash,p027,typewritten,typewritten,photograph,True,0.94146,0.0051495,222,234,329,stop
 gemini3.5-flash,p028,typewritten,typewritten,photograph,True,0.999214,0.0046995,202,202,279,stop
@@ -756,7 +756,7 @@ gemini3.5-flash,p083,printed,printed,photograph,True,0.987792,0.0091935,631,607,
 gemini3.5-flash,p084,printed,printed,photograph,True,1.0,0.0093285,567,567,792,stop
 gemini3.5-flash,p085,printed,printed,other,True,0.999515,0.0066645,330,330,497,stop
 gemini3.5-flash,p087,typewritten,typewritten,photograph,True,0.99974,0.0101325,656,656,889,stop
-gemini3.5-flash,p088,typewritten,typewritten,other,True,0.990637,0.0081915,452,452,667,stop
+gemini3.5-flash,p088,typewritten,typewritten,other,True,0.992876,0.0081915,450,452,667,stop
 gemini3.5-flash,p089,typewritten,typewritten,photograph,True,0.996275,0.0058215,295,294,410,stop
 gemini3.5-flash,p090,typewritten,typewritten,photograph,True,0.993731,0.0094125,528,525,809,stop
 gemini3.5-flash,p091,typewritten,typewritten,other,True,1.0,0.0102165,664,664,892,stop
@@ -852,7 +852,7 @@ mistral-large4,p083,printed,printed,photograph,True,0.987792,0.00304974,631,607,
 mistral-large4,p084,printed,printed,photograph,True,0.483083,0.00276279,567,549,679,stop
 mistral-large4,p085,printed,printed,other,True,1.0,0.00237982,330,330,486,stop
 mistral-large4,p087,typewritten,typewritten,photograph,True,0.996101,0.00358916,656,649,832,stop
-mistral-large4,p088,typewritten,typewritten,other,True,0.993633,0.00301481,452,448,633,stop
+mistral-large4,p088,typewritten,typewritten,other,True,0.993243,0.00301481,450,448,633,stop
 mistral-large4,p089,typewritten,typewritten,photograph,True,0.990953,0.00263403,295,293,375,stop
 mistral-large4,p090,typewritten,typewritten,photograph,True,0.996184,0.00344704,528,530,764,stop
 mistral-large4,p091,typewritten,typewritten,other,True,0.999729,0.00345789,664,663,845,stop
@@ -887,7 +887,7 @@ gemini3.5-flash-lite,p021,printed,printed,photograph,True,0.998047,0.0018238,374
 gemini3.5-flash-lite,p022,handwritten,mixed,handwriting,True,0.996936,0.0014413,290,289,406,stop
 gemini3.5-flash-lite,p023,typewritten,mixed,photograph,True,0.999285,0.0013577,204,204,368,stop
 gemini3.5-flash-lite,p024,typewritten,typewritten,photograph,True,0.971207,0.0016938,143,143,507,stop
-gemini3.5-flash-lite,p025,typewritten,typewritten,photograph,True,0.982587,0.0007063,69,68,112,stop
+gemini3.5-flash-lite,p025,typewritten,typewritten,photograph,True,0.9801,0.0007063,69,68,112,stop
 gemini3.5-flash-lite,p026,typewritten,typewritten,photograph,True,0.99516,0.0019363,426,425,604,stop
 gemini3.5-flash-lite,p027,typewritten,typewritten,photograph,True,0.931836,0.0012277,222,234,316,stop
 gemini3.5-flash-lite,p028,typewritten,typewritten,photograph,True,0.999214,0.0011452,202,202,283,stop
@@ -948,7 +948,7 @@ gemini3.5-flash-lite,p083,printed,printed,photograph,True,0.987273,0.0023947,631
 gemini3.5-flash-lite,p084,printed,printed,photograph,True,0.996867,0.0024626,567,565,809,stop
 gemini3.5-flash-lite,p085,printed,printed,other,True,0.99903,0.0016833,330,330,498,stop
 gemini3.5-flash-lite,p087,typewritten,typewritten,photograph,True,1.0,0.0026538,656,656,891,stop
-gemini3.5-flash-lite,p088,typewritten,typewritten,other,True,0.98764,0.0021627,452,448,690,stop
+gemini3.5-flash-lite,p088,typewritten,typewritten,other,True,0.989865,0.0021627,450,448,690,stop
 gemini3.5-flash-lite,p089,typewritten,typewritten,photograph,True,0.996275,0.0014513,295,294,410,stop
 gemini3.5-flash-lite,p090,typewritten,typewritten,photograph,True,0.995921,0.0024413,528,529,806,stop
 gemini3.5-flash-lite,p091,typewritten,typewritten,other,True,1.0,0.0027152,664,664,911,stop
@@ -983,7 +983,7 @@ mistral-ocr-4-1,p021,printed,,photograph,True,1.0,0.004,374,374,,
 mistral-ocr-4-1,p022,handwritten,,handwriting,True,0.992647,0.004,290,291,,
 mistral-ocr-4-1,p023,typewritten,,photograph,True,0.997139,0.004,204,203,,
 mistral-ocr-4-1,p024,typewritten,,photograph,True,0.900332,0.004,143,140,,
-mistral-ocr-4-1,p025,typewritten,,photograph,True,0.425985,0.004,69,159,,
+mistral-ocr-4-1,p025,typewritten,,photograph,True,0.42705,0.004,69,159,,
 mistral-ocr-4-1,p026,typewritten,,photograph,True,0.994415,0.004,426,426,,
 mistral-ocr-4-1,p027,typewritten,,photograph,True,0.962171,0.004,222,228,,
 mistral-ocr-4-1,p028,typewritten,,photograph,True,0.997643,0.004,202,201,,
@@ -1044,7 +1044,7 @@ mistral-ocr-4-1,p083,printed,,photograph,True,0.987273,0.004,631,609,,
 mistral-ocr-4-1,p084,printed,,photograph,True,0.97871,0.004,567,555,,
 mistral-ocr-4-1,p085,printed,,other,True,0.985929,0.004,330,318,,
 mistral-ocr-4-1,p087,typewritten,,photograph,True,0.996101,0.004,656,649,,
-mistral-ocr-4-1,p088,typewritten,,other,True,0.986517,0.004,452,449,,
+mistral-ocr-4-1,p088,typewritten,,other,True,0.985736,0.004,450,449,,
 mistral-ocr-4-1,p089,typewritten,,photograph,True,0.990953,0.004,295,293,,
 mistral-ocr-4-1,p090,typewritten,,photograph,True,0.996184,0.004,528,530,,
 mistral-ocr-4-1,p091,typewritten,,other,True,0.999729,0.004,664,663,,
@@ -1140,7 +1140,7 @@ gpt5.6-luna,p083,printed,printed,photograph,True,0.981039,0.00138975,631,606,752
 gpt5.6-luna,p084,printed,printed,photograph,True,0.991228,0.00136785,567,568,755,stop
 gpt5.6-luna,p085,printed,printed,other,True,0.999515,0.00131755,330,330,481,stop
 gpt5.6-luna,p087,typewritten,typewritten,photograph,True,0.998441,0.00192205,656,657,916,stop
-gpt5.6-luna,p088,typewritten,mixed,other,True,0.97786,0.001401,452,454,692,stop
+gpt5.6-luna,p088,typewritten,mixed,other,True,0.976015,0.001401,450,454,692,stop
 gpt5.6-luna,p089,typewritten,mixed,photograph,True,0.986779,0.00131005,295,295,406,stop
 gpt5.6-luna,p090,typewritten,typewritten,photograph,True,0.979558,0.00177685,528,524,795,stop
 gpt5.6-luna,p091,typewritten,typewritten,other,True,0.995662,0.0015837,664,665,853,stop
@@ -1175,7 +1175,7 @@ mistral-medium3.5,p021,printed,printed,photograph,True,0.984586,0.0082245,374,37
 mistral-medium3.5,p022,handwritten,handwritten,handwriting,True,0.990196,0.007182,290,289,411,stop
 mistral-medium3.5,p023,typewritten,typewritten,photograph,True,0.881974,0.0069045,204,201,374,stop
 mistral-medium3.5,p024,typewritten,typewritten,photograph,True,0.831858,0.0082995,143,142,560,stop
-mistral-medium3.5,p025,typewritten,typewritten,photograph,True,0.222028,0.005304,69,311,432,stop
+mistral-medium3.5,p025,typewritten,typewritten,photograph,True,0.221445,0.005304,69,311,432,stop
 mistral-medium3.5,p026,typewritten,typewritten,photograph,True,0.995532,0.0083445,426,426,566,stop
 mistral-medium3.5,p027,typewritten,typewritten,photograph,True,0.936393,0.006477,222,233,317,stop
 mistral-medium3.5,p028,typewritten,typewritten,photograph,True,0.989002,0.0060345,202,201,258,stop
@@ -1236,7 +1236,7 @@ mistral-medium3.5,p083,printed,printed,photograph,True,0.985714,0.008937,631,606
 mistral-medium3.5,p084,printed,printed,photograph,True,0.982143,0.0079845,567,547,667,stop
 mistral-medium3.5,p085,printed,printed,other,True,0.98787,0.0062895,330,318,435,stop
 mistral-medium3.5,p087,typewritten,printed,photograph,True,0.99818,0.0108645,656,656,902,stop
-mistral-medium3.5,p088,typewritten,typewritten,other,True,0.986142,0.00864,452,446,652,stop
+mistral-medium3.5,p088,typewritten,typewritten,other,True,0.988363,0.00864,450,446,652,stop
 mistral-medium3.5,p089,typewritten,typewritten,photograph,True,0.948995,0.0070095,295,301,388,stop
 mistral-medium3.5,p090,typewritten,typewritten,photograph,True,0.990733,0.0101445,528,527,806,stop
 mistral-medium3.5,p091,typewritten,typewritten,other,True,0.998915,0.010095,664,663,846,stop
@@ -1332,7 +1332,7 @@ qwen3.6-27b,p083,printed,printed,photograph,True,0.987792,0.00195225,631,607,772
 qwen3.6-27b,p084,printed,printed,photograph,True,0.988722,0.00174975,567,548,681,stop
 qwen3.6-27b,p085,printed,printed,other,True,0.999515,0.00163725,330,330,508,stop
 qwen3.6-27b,p087,typewritten,typewritten,photograph,True,1.0,0.00296125,656,656,909,stop
-qwen3.6-27b,p088,typewritten,typewritten,other,True,0.986517,0.001791,452,446,652,stop
+qwen3.6-27b,p088,typewritten,typewritten,other,True,0.988739,0.001791,450,446,652,stop
 qwen3.6-27b,p089,typewritten,typewritten,photograph,True,0.992549,0.00199325,295,295,425,stop
 qwen3.6-27b,p090,typewritten,typewritten,photograph,True,0.99782,0.00266125,528,530,759,stop
 qwen3.6-27b,p091,typewritten,typewritten,other,True,0.998915,0.00215375,664,663,839,stop
@@ -1428,7 +1428,7 @@ qwen3.6-35b-a3b,p083,printed,printed,photograph,True,0.999481,0.00102175,631,631
 qwen3.6-35b-a3b,p084,printed,printed,photograph,True,0.998121,0.00089345,567,567,801,stop
 qwen3.6-35b-a3b,p085,printed,printed,other,True,1.0,0.0006145,330,330,508,stop
 qwen3.6-35b-a3b,p087,typewritten,typewritten,photograph,True,0.99844,0.0009971,656,655,908,stop
-qwen3.6-35b-a3b,p088,typewritten,typewritten,other,True,0.986142,0.00079395,452,450,697,stop
+qwen3.6-35b-a3b,p088,typewritten,typewritten,other,True,0.985736,0.00079395,450,450,697,stop
 qwen3.6-35b-a3b,p089,typewritten,typewritten,photograph,True,0.99042,0.0005126,295,293,398,stop
 qwen3.6-35b-a3b,p090,typewritten,typewritten,photograph,True,0.993186,0.0009154,528,529,822,stop
 qwen3.6-35b-a3b,p091,typewritten,typewritten,other,True,0.999729,0.0009697,664,664,882,stop
@@ -1524,7 +1524,7 @@ qwen3-vl-8b,p083,printed,printed,photograph,True,0.984416,0.00097475,631,608,761
 qwen3-vl-8b,p084,printed,typewritten,photograph,True,0.986667,0.00095875,567,572,767,stop
 qwen3-vl-8b,p085,printed,printed,other,True,0.999515,0.0009845,330,330,490,stop
 qwen3-vl-8b,p087,typewritten,typewritten,photograph,True,0.99974,0.00180725,656,656,891,stop
-qwen3-vl-8b,p088,typewritten,typewritten,other,True,0.985393,0.0009635,452,448,641,stop
+qwen3-vl-8b,p088,typewritten,typewritten,other,True,0.984985,0.0009635,450,448,641,stop
 qwen3-vl-8b,p089,typewritten,typewritten,photograph,True,0.994146,0.001445,295,292,408,stop
 qwen3-vl-8b,p090,typewritten,typewritten,photograph,True,0.99782,0.00170375,528,528,753,stop
 qwen3-vl-8b,p091,typewritten,typewritten,other,True,0.999729,0.00109325,664,663,829,stop
@@ -1559,7 +1559,7 @@ gemini3.1-flash-lite,p021,printed,printed,photograph,True,1.0,0.00119225,374,374
 gemini3.1-flash-lite,p022,handwritten,mixed,handwriting,True,0.995711,0.00096125,290,288,404,stop
 gemini3.1-flash-lite,p023,typewritten,mixed,photograph,True,1.0,0.00091825,204,204,369,stop
 gemini3.1-flash-lite,p024,typewritten,typewritten,photograph,True,0.9701,0.00111125,143,143,504,stop
-gemini3.1-flash-lite,p025,typewritten,typewritten,photograph,True,0.263228,0.00094025,69,266,390,stop
+gemini3.1-flash-lite,p025,typewritten,typewritten,photograph,True,0.262566,0.00094025,69,266,390,stop
 gemini3.1-flash-lite,p026,typewritten,typewritten,photograph,True,0.995905,0.00126875,426,427,609,stop
 gemini3.1-flash-lite,p027,typewritten,typewritten,photograph,True,0.934242,0.00085825,222,234,329,stop
 gemini3.1-flash-lite,p028,typewritten,typewritten,photograph,True,0.999214,0.00078325,202,202,279,stop
@@ -1620,7 +1620,7 @@ gemini3.1-flash-lite,p083,printed,printed,photograph,True,0.987792,0.00153225,63
 gemini3.1-flash-lite,p084,printed,printed,photograph,True,1.0,0.00155475,567,567,792,stop
 gemini3.1-flash-lite,p085,printed,printed,other,True,0.999515,0.00111075,330,330,497,stop
 gemini3.1-flash-lite,p087,typewritten,typewritten,photograph,True,1.0,0.00168875,656,656,889,stop
-gemini3.1-flash-lite,p088,typewritten,typewritten,other,True,0.993633,0.00130225,452,448,625,stop
+gemini3.1-flash-lite,p088,typewritten,typewritten,other,True,0.992868,0.00130225,450,448,625,stop
 gemini3.1-flash-lite,p089,typewritten,typewritten,photograph,True,0.993081,0.00097925,295,295,416,stop
 gemini3.1-flash-lite,p090,typewritten,typewritten,photograph,True,0.996187,0.00155975,528,529,803,stop
 gemini3.1-flash-lite,p091,typewritten,typewritten,other,True,1.0,0.00170275,664,664,892,stop
@@ -1716,7 +1716,7 @@ qwen3.5-35b-a3b,p083,printed,printed,photograph,True,0.987792,0.00095904,631,607
 qwen3.5-35b-a3b,p084,printed,printed,photograph,True,0.986658,0.00099064,567,571,805,stop
 qwen3.5-35b-a3b,p085,printed,printed,other,True,0.99903,0.0006928,330,330,508,stop
 qwen3.5-35b-a3b,p087,typewritten,typewritten,photograph,True,0.998181,0.00109944,656,656,911,stop
-qwen3.5-35b-a3b,p088,typewritten,typewritten,other,True,0.987266,0.00088266,452,450,698,stop
+qwen3.5-35b-a3b,p088,typewritten,typewritten,other,True,0.986862,0.00088266,450,450,698,stop
 qwen3.5-35b-a3b,p089,typewritten,typewritten,photograph,True,0.992549,0.00061344,295,295,425,stop
 qwen3.5-35b-a3b,p090,typewritten,typewritten,photograph,True,0.995912,0.00101444,528,530,826,stop
 qwen3.5-35b-a3b,p091,typewritten,typewritten,other,True,0.999457,0.00106666,664,664,882,stop
@@ -1812,7 +1812,7 @@ gemma4-31b,p083,printed,printed,photograph,True,0.981818,0.00046158,631,629,931,
 gemma4-31b,p084,printed,printed,photograph,True,0.995614,0.00040654,567,566,792,stop
 gemma4-31b,p085,printed,printed,other,True,0.991779,0.00028938,330,331,497,stop
 gemma4-31b,p087,typewritten,typewritten,photograph,True,0.942149,0.00044838,656,654,898,stop
-gemma4-31b,p088,typewritten,typewritten,other,True,0.98427,0.00035998,452,451,677,stop
+gemma4-31b,p088,typewritten,typewritten,other,True,0.983483,0.00035998,450,451,677,stop
 gemma4-31b,p089,typewritten,typewritten,photograph,True,0.993081,0.00025598,295,295,417,stop
 gemma4-31b,p090,typewritten,typewritten,photograph,True,0.925593,0.00040198,528,524,782,stop
 gemma4-31b,p091,typewritten,typewritten,other,True,0.985683,0.00044758,664,666,896,stop
@@ -1908,7 +1908,7 @@ qwen3-vl-30b-a3b,p083,printed,printed,photograph,True,0.98,0.0007662,631,620,873
 qwen3-vl-30b-a3b,p084,printed,typewritten,photograph,True,0.975251,0.0006303,567,554,667,stop
 qwen3-vl-30b-a3b,p085,printed,typewritten,other,True,0.98787,0.0006288,330,318,431,stop
 qwen3-vl-30b-a3b,p087,typewritten,typewritten,photograph,True,0.997401,0.0012156,656,655,887,stop
-qwen3-vl-30b-a3b,p088,typewritten,typewritten,other,True,0.987266,0.00067485,452,447,642,stop
+qwen3-vl-30b-a3b,p088,typewritten,typewritten,other,True,0.986862,0.00067485,450,447,642,stop
 qwen3-vl-30b-a3b,p089,typewritten,typewritten,photograph,True,0.98992,0.0009372,295,296,423,stop
 qwen3-vl-30b-a3b,p090,typewritten,typewritten,photograph,True,0.996184,0.0011646,528,527,802,stop
 qwen3-vl-30b-a3b,p091,typewritten,typewritten,other,True,0.999729,0.0007803,664,663,829,stop
@@ -2004,7 +2004,7 @@ qwen3.5-9b,p083,printed,printed,photograph,True,0.987532,0.0002493,631,607,772,s
 qwen3.5-9b,p084,printed,printed,photograph,True,0.483396,0.00023465,567,548,681,stop
 qwen3.5-9b,p085,printed,printed,other,True,0.999515,0.0002081,330,330,508,stop
 qwen3.5-9b,p087,typewritten,typewritten,photograph,True,0.996361,0.0002578,656,649,822,stop
-qwen3.5-9b,p088,typewritten,typewritten,other,True,0.985393,0.00022945,452,446,651,stop
+qwen3.5-9b,p088,typewritten,typewritten,other,True,0.987613,0.00022945,450,446,651,stop
 qwen3.5-9b,p089,typewritten,typewritten,photograph,True,0.99042,0.0001939,295,293,396,stop
 qwen3.5-9b,p090,typewritten,typewritten,photograph,True,0.995367,0.0002482,528,530,758,stop
 qwen3.5-9b,p091,typewritten,typewritten,other,True,0.998372,0.00025765,664,662,839,stop
@@ -2100,7 +2100,7 @@ mistral-small-24b,p083,printed,printed,photograph,True,0.985195,0.00031155,631,6
 mistral-small-24b,p084,printed,printed,photograph,True,0.980417,0.0002888,567,569,703,stop
 mistral-small-24b,p085,printed,printed,other,True,0.9869,0.00023785,330,318,437,stop
 mistral-small-24b,p087,typewritten,printed,photograph,True,0.993241,0.000368075,656,648,820,stop
-mistral-small-24b,p088,typewritten,typewritten,other,True,0.979026,0.0003098,452,428,616,stop
+mistral-small-24b,p088,typewritten,typewritten,other,True,0.981231,0.0003098,450,428,616,stop
 mistral-small-24b,p089,typewritten,typewritten,photograph,True,0.994146,0.000279875,295,292,379,stop
 mistral-small-24b,p090,typewritten,typewritten,photograph,True,0.994276,0.000365475,528,528,807,stop
 mistral-small-24b,p091,typewritten,typewritten,other,True,0.999457,0.0003558,664,663,846,stop
@@ -2196,7 +2196,7 @@ gemma4-26b-a4b,p083,printed,printed,photograph,True,0.95013,0.0003372,631,615,90
 gemma4-26b-a4b,p084,printed,printed,photograph,True,0.989662,0.00029949,567,564,791,stop
 gemma4-26b-a4b,p085,printed,printed,other,True,0.989326,0.00020283,330,327,497,stop
 gemma4-26b-a4b,p087,typewritten,typewritten,photograph,True,0.921757,0.0003273,656,644,876,stop
-gemma4-26b-a4b,p088,typewritten,typewritten,other,True,0.977903,0.0002613,452,449,676,stop
+gemma4-26b-a4b,p088,typewritten,typewritten,other,True,0.976387,0.0002613,450,449,676,stop
 gemma4-26b-a4b,p089,typewritten,typewritten,photograph,True,0.993081,0.00017583,295,295,417,stop
 gemma4-26b-a4b,p090,typewritten,typewritten,photograph,True,0.889616,0.00029397,528,517,775,stop
 gemma4-26b-a4b,p091,typewritten,typewritten,other,True,0.98323,0.00033291,664,664,893,stop
@@ -2292,7 +2292,7 @@ qwen3.5-27b,p083,printed,printed,photograph,True,0.987792,0.00195025,631,607,771
 qwen3.5-27b,p084,printed,printed,photograph,True,0.987469,0.00174375,567,548,678,stop
 qwen3.5-27b,p085,printed,printed,other,True,0.999515,0.00163525,330,330,507,stop
 qwen3.5-27b,p087,typewritten,typewritten,photograph,True,1.0,0.00295925,656,656,908,stop
-qwen3.5-27b,p088,typewritten,typewritten,other,True,0.987266,0.001799,452,449,656,stop
+qwen3.5-27b,p088,typewritten,typewritten,other,True,0.985736,0.001799,450,449,656,stop
 qwen3.5-27b,p089,typewritten,typewritten,photograph,True,0.993081,0.00199125,295,295,424,stop
 qwen3.5-27b,p090,typewritten,typewritten,photograph,True,0.997547,0.00265925,528,528,758,stop
 qwen3.5-27b,p091,typewritten,typewritten,other,True,0.999729,0.00215175,664,663,838,stop
@@ -2388,7 +2388,7 @@ apple-vision,p083,printed,,photograph,True,0.342338,0,631,623,,
 apple-vision,p084,printed,,photograph,True,0.990915,0,567,566,,
 apple-vision,p085,printed,,other,True,0.939835,0,330,314,,
 apple-vision,p087,typewritten,,photograph,True,0.946452,0,656,627,,
-apple-vision,p088,typewritten,,other,True,0.959551,0,452,436,,
+apple-vision,p088,typewritten,,other,True,0.961712,0,450,436,,
 apple-vision,p089,typewritten,,photograph,True,0.992549,0,295,295,,
 apple-vision,p090,typewritten,,photograph,True,0.952303,0,528,515,,
 apple-vision,p091,typewritten,,other,True,0.976126,0,664,664,,
@@ -2484,7 +2484,7 @@ qwen3-vl-8b-mlx4,p083,printed,printed,photograph,True,0.987273,0,631,608,761,sto
 qwen3-vl-8b-mlx4,p084,printed,typewritten,photograph,True,0.977465,0,567,554,666,stop
 qwen3-vl-8b-mlx4,p085,printed,typewritten,other,True,0.999515,0,330,330,492,stop
 qwen3-vl-8b-mlx4,p087,typewritten,typewritten,photograph,True,0.99922,0,656,656,893,stop
-qwen3-vl-8b-mlx4,p088,typewritten,typewritten,other,True,0.985768,0,452,446,641,stop
+qwen3-vl-8b-mlx4,p088,typewritten,typewritten,other,True,0.987988,0,450,446,641,stop
 qwen3-vl-8b-mlx4,p089,typewritten,typewritten,photograph,True,0.994146,0,295,292,408,stop
 qwen3-vl-8b-mlx4,p090,typewritten,typewritten,photograph,True,0.997547,0,528,528,808,stop
 qwen3-vl-8b-mlx4,p091,typewritten,typewritten,other,True,1.0,0,664,664,865,stop
@@ -2580,7 +2580,7 @@ lightonocr-3-4b-mlx8,p083,printed,,photograph,True,0.983896,0,631,607,766,stop
 lightonocr-3-4b-mlx8,p084,printed,,photograph,True,0.97871,0,567,555,675,stop
 lightonocr-3-4b-mlx8,p085,printed,,other,True,0.980107,0,330,318,429,stop
 lightonocr-3-4b-mlx8,p087,typewritten,,photograph,True,0.994541,0,656,649,814,stop
-lightonocr-3-4b-mlx8,p088,typewritten,,other,True,0.986142,0,452,446,636,stop
+lightonocr-3-4b-mlx8,p088,typewritten,,other,True,0.988363,0,450,446,636,stop
 lightonocr-3-4b-mlx8,p089,typewritten,,photograph,True,0.766324,0,295,384,518,stop
 lightonocr-3-4b-mlx8,p090,typewritten,,photograph,True,0.992368,0,528,524,740,stop
 lightonocr-3-4b-mlx8,p091,typewritten,,other,True,0.999729,0,664,663,825,stop
@@ -2676,7 +2676,7 @@ qwen3.5-9b-mlx4,p083,printed,printed,photograph,True,0.987792,0,631,607,772,stop
 qwen3.5-9b-mlx4,p084,printed,typewritten,photograph,True,0.978104,0,567,555,689,stop
 qwen3.5-9b-mlx4,p085,printed,printed,other,True,0.99903,0,330,330,508,stop
 qwen3.5-9b-mlx4,p087,typewritten,typewritten,photograph,True,0.99948,0,656,656,914,stop
-qwen3.5-9b-mlx4,p088,typewritten,typewritten,other,True,0.986517,0,452,446,651,stop
+qwen3.5-9b-mlx4,p088,typewritten,typewritten,other,True,0.988739,0,450,446,651,stop
 qwen3.5-9b-mlx4,p089,typewritten,typewritten,photograph,True,0.993081,0,295,295,425,stop
 qwen3.5-9b-mlx4,p090,typewritten,typewritten,photograph,True,0.998092,0,528,527,765,stop
 qwen3.5-9b-mlx4,p091,typewritten,typewritten,other,True,0.999457,0,664,663,839,stop

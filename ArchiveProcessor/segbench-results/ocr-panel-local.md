@@ -23,15 +23,15 @@ Every source is converted to JPEG quality 90 and capped at 2400 pixels on its lo
 | qwen3.5-9b | 92/96/96 | 89.43 | 91.32 | 9.42 | 3.26 | $0.000250 |
 | qwen3.5-27b | 82/96/96 | 81.80 | 82.61 | 15.39 | 1.72 | $0.001796 |
 | qwen3.5-35b-a3b | 94/96/96 | 90.83 | 93.61 | 3.91 | 3.30 | $0.000829 |
-| qwen3.6-27b | 95/96/96 | 94.28 | 95.55 | 3.36 | 2.73 | $0.001940 |
-| qwen3.6-35b-a3b | 96/96/96 | 93.02 | 95.65 | 2.07 | 3.82 | $0.000599 |
+| qwen3.6-27b | 95/96/96 | 94.28 | 95.56 | 3.36 | 2.73 | $0.001940 |
+| qwen3.6-35b-a3b | 96/96/96 | 93.02 | 95.65 | 2.06 | 3.82 | $0.000599 |
 | gemma4-26b-a4b | 86/96/96 | 82.73 | 84.41 | 19.64 | 3.74 | $0.000412 |
 | gemma4-31b | 93/96/96 | 90.55 | 91.51 | 7.72 | 4.61 | $0.000379 |
 | qwen3-vl-8b | 94/96/96 | 91.81 | 93.33 | 3.65 | 2.62 | $0.001492 |
-| qwen3-vl-30b-a3b | 94/96/96 | 89.82 | 92.68 | 5.78 | 3.40 | $0.000984 |
-| mistral-small-24b | 94/96/96 | 89.34 | 90.86 | 6.16 | 4.00 | $0.000316 |
-| gemini3.1-flash-lite | 93/96/96 | 91.61 | 93.68 | 4.70 | 2.54 | $0.001168 |
-| apple-vision | 96/96/96 | 81.34 | 82.50 | 11.20 | 7.79 | $0.000000 |
+| qwen3-vl-30b-a3b | 94/96/96 | 89.82 | 92.68 | 5.77 | 3.41 | $0.000984 |
+| mistral-small-24b | 94/96/96 | 89.34 | 90.87 | 6.15 | 4.00 | $0.000316 |
+| gemini3.1-flash-lite | 93/96/96 | 91.61 | 93.67 | 4.70 | 2.54 | $0.001168 |
+| apple-vision | 96/96/96 | 81.34 | 82.50 | 11.19 | 7.79 | $0.000000 |
 
 ## Completed original responses only (coverage differs)
 
@@ -39,18 +39,18 @@ These conditional scores diagnose transcription quality apart from response fail
 
 | model | completed / 96 | NES % | chrF2 % | missed % | added % |
 |---|---:|---:|---:|---:|---:|
-| qwen3.5-9b | 92/96 | 93.32 | 95.29 | 3.10 | 3.49 |
-| qwen3.5-27b | 82/96 | 95.76 | 96.71 | 2.46 | 1.98 |
-| qwen3.5-35b-a3b | 94/96 | 92.76 | 95.60 | 2.33 | 3.35 |
-| qwen3.6-27b | 95/96 | 95.27 | 96.56 | 2.90 | 2.75 |
-| qwen3.6-35b-a3b | 96/96 | 93.02 | 95.65 | 2.07 | 3.82 |
-| gemma4-26b-a4b | 86/96 | 92.35 | 94.23 | 3.93 | 4.47 |
-| gemma4-31b | 93/96 | 93.47 | 94.46 | 4.34 | 4.78 |
+| qwen3.5-9b | 92/96 | 93.32 | 95.29 | 3.09 | 3.49 |
+| qwen3.5-27b | 82/96 | 95.76 | 96.72 | 2.46 | 1.99 |
+| qwen3.5-35b-a3b | 94/96 | 92.76 | 95.60 | 2.33 | 3.36 |
+| qwen3.6-27b | 95/96 | 95.27 | 96.56 | 2.89 | 2.75 |
+| qwen3.6-35b-a3b | 96/96 | 93.02 | 95.65 | 2.06 | 3.82 |
+| gemma4-26b-a4b | 86/96 | 92.35 | 94.23 | 3.92 | 4.47 |
+| gemma4-31b | 93/96 | 93.47 | 94.46 | 4.33 | 4.78 |
 | qwen3-vl-8b | 94/96 | 93.76 | 95.32 | 2.30 | 2.66 |
 | qwen3-vl-30b-a3b | 94/96 | 91.73 | 94.65 | 3.15 | 3.50 |
 | mistral-small-24b | 94/96 | 91.24 | 92.80 | 5.00 | 4.05 |
-| gemini3.1-flash-lite | 93/96 | 94.57 | 96.70 | 1.66 | 2.62 |
-| apple-vision | 96/96 | 81.34 | 82.50 | 11.20 | 7.79 |
+| gemini3.1-flash-lite | 93/96 | 94.56 | 96.69 | 1.66 | 2.62 |
+| apple-vision | 96/96 | 81.34 | 82.50 | 11.19 | 7.79 |
 
 ## All 99 pages, agreement-only letters, and the matched ladder
 
@@ -58,64 +58,64 @@ These conditional scores diagnose transcription quality apart from response fail
 |---|---|---:|---:|---:|---:|---:|
 | qwen3.5-9b | all-99 | 95/99 | 88.84 | 90.33 | 9.67 | 3.84 |
 | qwen3.5-9b | agreement-only | 3/3 | 69.85 | 58.65 | 21.31 | 31.10 |
-| qwen3.5-9b | ladder-original | 19/20 | 89.23 | 90.73 | 7.69 | 3.46 |
-| qwen3.5-9b | ladder-half | 19/20 | 89.78 | 90.91 | 10.05 | 3.34 |
-| qwen3.5-9b | ladder-quarter | 15/20 | 69.13 | 69.43 | 45.17 | 2.09 |
-| qwen3.5-27b | all-99 | 85/99 | 81.62 | 82.11 | 15.37 | 2.25 |
+| qwen3.5-9b | ladder-original | 19/20 | 89.24 | 90.74 | 7.66 | 3.46 |
+| qwen3.5-9b | ladder-half | 19/20 | 89.78 | 90.91 | 10.02 | 3.34 |
+| qwen3.5-9b | ladder-quarter | 15/20 | 69.13 | 69.43 | 45.15 | 2.09 |
+| qwen3.5-27b | all-99 | 85/99 | 81.62 | 82.11 | 15.37 | 2.26 |
 | qwen3.5-27b | agreement-only | 3/3 | 75.79 | 66.14 | 14.62 | 27.22 |
-| qwen3.5-27b | ladder-original | 18/20 | 85.46 | 87.36 | 8.88 | 2.44 |
-| qwen3.5-27b | ladder-half | 19/20 | 93.52 | 93.35 | 5.35 | 2.94 |
-| qwen3.5-27b | ladder-quarter | 13/20 | 58.27 | 58.35 | 46.71 | 7.15 |
+| qwen3.5-27b | ladder-original | 18/20 | 85.45 | 87.37 | 8.86 | 2.46 |
+| qwen3.5-27b | ladder-half | 19/20 | 93.51 | 93.35 | 5.32 | 2.94 |
+| qwen3.5-27b | ladder-quarter | 13/20 | 58.27 | 58.35 | 46.69 | 7.16 |
 | qwen3.5-35b-a3b | all-99 | 97/99 | 90.23 | 92.62 | 4.18 | 3.85 |
 | qwen3.5-35b-a3b | agreement-only | 3/3 | 71.25 | 61.01 | 16.95 | 29.55 |
-| qwen3.5-35b-a3b | ladder-original | 20/20 | 95.02 | 96.98 | 2.27 | 2.86 |
-| qwen3.5-35b-a3b | ladder-half | 20/20 | 94.84 | 96.49 | 3.09 | 3.48 |
-| qwen3.5-35b-a3b | ladder-quarter | 16/20 | 72.32 | 72.96 | 38.18 | 4.75 |
+| qwen3.5-35b-a3b | ladder-original | 20/20 | 95.02 | 96.98 | 2.26 | 2.88 |
+| qwen3.5-35b-a3b | ladder-half | 20/20 | 94.84 | 96.50 | 3.06 | 3.48 |
+| qwen3.5-35b-a3b | ladder-quarter | 16/20 | 72.32 | 72.96 | 38.16 | 4.75 |
 | qwen3.6-27b | all-99 | 98/99 | 93.58 | 94.57 | 3.64 | 3.23 |
 | qwen3.6-27b | agreement-only | 3/3 | 71.28 | 62.96 | 16.80 | 26.28 |
-| qwen3.6-27b | ladder-original | 20/20 | 96.07 | 97.39 | 2.16 | 2.64 |
-| qwen3.6-27b | ladder-half | 20/20 | 95.33 | 96.54 | 3.19 | 3.56 |
-| qwen3.6-27b | ladder-quarter | 17/20 | 71.70 | 73.86 | 36.58 | 7.72 |
+| qwen3.6-27b | ladder-original | 20/20 | 96.08 | 97.39 | 2.12 | 2.64 |
+| qwen3.6-27b | ladder-half | 20/20 | 95.32 | 96.55 | 3.16 | 3.56 |
+| qwen3.6-27b | ladder-quarter | 17/20 | 71.70 | 73.86 | 36.56 | 7.73 |
 | qwen3.6-35b-a3b | all-99 | 99/99 | 92.39 | 94.63 | 2.39 | 4.34 |
 | qwen3.6-35b-a3b | agreement-only | 3/3 | 72.27 | 61.80 | 17.57 | 28.77 |
-| qwen3.6-35b-a3b | ladder-original | 20/20 | 94.77 | 96.95 | 1.79 | 2.96 |
-| qwen3.6-35b-a3b | ladder-half | 20/20 | 94.87 | 96.59 | 2.36 | 2.96 |
-| qwen3.6-35b-a3b | ladder-quarter | 15/20 | 68.97 | 69.44 | 45.29 | 2.71 |
+| qwen3.6-35b-a3b | ladder-original | 20/20 | 94.77 | 96.96 | 1.77 | 2.98 |
+| qwen3.6-35b-a3b | ladder-half | 20/20 | 94.88 | 96.59 | 2.32 | 2.96 |
+| qwen3.6-35b-a3b | ladder-quarter | 15/20 | 68.97 | 69.44 | 45.27 | 2.71 |
 | gemma4-26b-a4b | all-99 | 88/99 | 81.61 | 83.12 | 20.36 | 4.00 |
 | gemma4-26b-a4b | agreement-only | 2/3 | 45.80 | 41.67 | 53.97 | 16.17 |
-| gemma4-26b-a4b | ladder-original | 16/20 | 77.84 | 77.85 | 29.82 | 2.14 |
-| gemma4-26b-a4b | ladder-half | 18/20 | 84.86 | 86.38 | 21.28 | 3.61 |
-| gemma4-26b-a4b | ladder-quarter | 17/20 | 81.90 | 81.94 | 24.42 | 3.54 |
+| gemma4-26b-a4b | ladder-original | 16/20 | 77.83 | 77.85 | 29.82 | 2.16 |
+| gemma4-26b-a4b | ladder-half | 18/20 | 84.85 | 86.39 | 21.27 | 3.63 |
+| gemma4-26b-a4b | ladder-quarter | 17/20 | 81.89 | 81.95 | 24.41 | 3.56 |
 | gemma4-31b | all-99 | 96/99 | 89.90 | 90.47 | 8.10 | 5.28 |
 | gemma4-31b | agreement-only | 3/3 | 69.10 | 57.33 | 25.82 | 36.55 |
-| gemma4-31b | ladder-original | 19/20 | 90.27 | 90.83 | 15.45 | 4.28 |
-| gemma4-31b | ladder-half | 20/20 | 92.61 | 94.15 | 7.47 | 7.05 |
-| gemma4-31b | ladder-quarter | 19/20 | 86.02 | 88.58 | 12.77 | 8.81 |
+| gemma4-31b | ladder-original | 19/20 | 90.27 | 90.84 | 15.42 | 4.28 |
+| gemma4-31b | ladder-half | 20/20 | 92.61 | 94.15 | 7.44 | 7.06 |
+| gemma4-31b | ladder-quarter | 19/20 | 86.02 | 88.59 | 12.74 | 8.81 |
 | qwen3-vl-8b | all-99 | 97/99 | 91.26 | 92.39 | 3.91 | 3.16 |
 | qwen3-vl-8b | agreement-only | 3/3 | 73.70 | 62.32 | 16.02 | 28.30 |
-| qwen3-vl-8b | ladder-original | 20/20 | 95.14 | 97.22 | 1.74 | 2.42 |
-| qwen3-vl-8b | ladder-half | 20/20 | 93.36 | 95.90 | 2.76 | 3.38 |
-| qwen3-vl-8b | ladder-quarter | 14/20 | 66.74 | 66.44 | 47.44 | 1.69 |
-| qwen3-vl-30b-a3b | all-99 | 97/99 | 88.96 | 91.47 | 6.18 | 3.89 |
+| qwen3-vl-8b | ladder-original | 20/20 | 95.14 | 97.23 | 1.72 | 2.44 |
+| qwen3-vl-8b | ladder-half | 20/20 | 93.36 | 95.90 | 2.73 | 3.38 |
+| qwen3-vl-8b | ladder-quarter | 14/20 | 66.74 | 66.44 | 47.42 | 1.69 |
+| qwen3-vl-30b-a3b | all-99 | 97/99 | 88.96 | 91.47 | 6.17 | 3.90 |
 | qwen3-vl-30b-a3b | agreement-only | 3/3 | 61.34 | 52.59 | 24.88 | 26.75 |
-| qwen3-vl-30b-a3b | ladder-original | 19/20 | 89.61 | 91.65 | 13.56 | 2.41 |
-| qwen3-vl-30b-a3b | ladder-half | 20/20 | 93.06 | 95.36 | 3.93 | 3.11 |
-| qwen3-vl-30b-a3b | ladder-quarter | 14/20 | 64.46 | 64.58 | 41.29 | 3.88 |
-| mistral-small-24b | all-99 | 96/99 | 87.90 | 89.14 | 7.18 | 4.33 |
+| qwen3-vl-30b-a3b | ladder-original | 19/20 | 89.61 | 91.65 | 13.55 | 2.42 |
+| qwen3-vl-30b-a3b | ladder-half | 20/20 | 93.07 | 95.37 | 3.90 | 3.11 |
+| qwen3-vl-30b-a3b | ladder-quarter | 14/20 | 64.46 | 64.58 | 41.27 | 3.88 |
+| mistral-small-24b | all-99 | 96/99 | 87.91 | 89.14 | 7.18 | 4.33 |
 | mistral-small-24b | agreement-only | 2/3 | 41.92 | 34.05 | 55.05 | 20.06 |
-| mistral-small-24b | ladder-original | 20/20 | 91.66 | 94.32 | 6.95 | 4.25 |
-| mistral-small-24b | ladder-half | 20/20 | 90.53 | 93.55 | 7.99 | 6.24 |
-| mistral-small-24b | ladder-quarter | 16/20 | 62.97 | 67.09 | 46.47 | 11.12 |
-| gemini3.1-flash-lite | all-99 | 96/99 | 91.25 | 92.99 | 4.78 | 2.91 |
+| mistral-small-24b | ladder-original | 20/20 | 91.68 | 94.33 | 6.92 | 4.25 |
+| mistral-small-24b | ladder-half | 20/20 | 90.54 | 93.56 | 7.96 | 6.24 |
+| mistral-small-24b | ladder-quarter | 16/20 | 62.96 | 67.09 | 46.45 | 11.12 |
+| gemini3.1-flash-lite | all-99 | 96/99 | 91.25 | 92.99 | 4.78 | 2.92 |
 | gemini3.1-flash-lite | agreement-only | 3/3 | 79.70 | 71.06 | 8.55 | 20.37 |
-| gemini3.1-flash-lite | ladder-original | 20/20 | 95.73 | 97.08 | 1.10 | 2.24 |
-| gemini3.1-flash-lite | ladder-half | 19/20 | 90.75 | 92.01 | 7.79 | 2.81 |
-| gemini3.1-flash-lite | ladder-quarter | 19/20 | 89.74 | 91.51 | 8.11 | 3.79 |
-| apple-vision | all-99 | 99/99 | 79.93 | 80.57 | 12.59 | 8.65 |
+| gemini3.1-flash-lite | ladder-original | 20/20 | 95.73 | 97.09 | 1.09 | 2.26 |
+| gemini3.1-flash-lite | ladder-half | 19/20 | 90.74 | 92.01 | 7.79 | 2.84 |
+| gemini3.1-flash-lite | ladder-quarter | 19/20 | 89.74 | 91.51 | 8.08 | 3.80 |
+| apple-vision | all-99 | 99/99 | 79.94 | 80.58 | 12.58 | 8.65 |
 | apple-vision | agreement-only | 3/3 | 35.07 | 18.98 | 77.60 | 48.99 |
-| apple-vision | ladder-original | 20/20 | 80.13 | 84.98 | 12.64 | 8.91 |
-| apple-vision | ladder-half | 20/20 | 79.47 | 83.54 | 14.64 | 9.78 |
-| apple-vision | ladder-quarter | 20/20 | 52.69 | 51.90 | 57.14 | 9.39 |
+| apple-vision | ladder-original | 20/20 | 80.14 | 84.99 | 12.61 | 8.91 |
+| apple-vision | ladder-half | 20/20 | 79.48 | 83.55 | 14.62 | 9.78 |
+| apple-vision | ladder-quarter | 20/20 | 52.69 | 51.90 | 57.12 | 9.40 |
 
 The [attribute table](ocr-panel-local-groups.csv) includes collection, source, historical period, owner-confirmed kind, tag strata, table/form flag, camera, capture year, pixel/sharpness/year tertiles, ladder membership and every tag (overlapping groups). Small groups are descriptive, not reliable rankings. Page/folder/file identity fields are private; the per-page table allows any further grouping.
 

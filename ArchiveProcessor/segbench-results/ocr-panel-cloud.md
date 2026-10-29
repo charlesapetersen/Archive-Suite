@@ -7,7 +7,7 @@ Question 2 of the W41 bake-off: how the paid and subscription leaders read the 9
 ## Findings
 
 - Highest on the 96 accuracy pages: **claude-sonnet5.5** (96.47 NES, subscription route).
-- Best paid route: **gemini3.1-pro**, 94.85 NES at $0.02192 a page. Cheapest paid route within 1.5 points of it: **qwen3-vl-235b**, 93.95 at $0.00122.
+- Best paid route: **gemini3.1-pro**, 94.84 NES at $0.02192 a page. Cheapest paid route within 1.5 points of it: **qwen3-vl-235b**, 93.95 at $0.00122.
 - Best open-weight route (the FarmShare-scale ceiling): **qwen3.5-397b**, 93.98 NES at $0.00202 a page, against the local panel’s best, qwen3.6-27b, at 94.28.
 - The spread among the paid leaders is about two points on one corpus of 96 pages; the truth leans toward Gemini 3.8 Flash and Claude (its drafters), so read the order of close rows as provisional.
 
@@ -26,36 +26,36 @@ The local panel’s [normalization, NES, chrF2 and word rates](ocr-panel-local.m
 
 | route | completed / attempted / 96 | NES % | chrF2 % | words missed % | words added % | kind right % | cost / page |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| claude-sonnet5.5 · `claude -p`, subscription | 96/96/96 | 96.47 | 97.93 | 0.72 | 1.02 | 96 | subscription |
-| gemini3.1-pro · OpenRouter google-ai-studio | 94/96/96 | 94.85 | 95.85 | 3.02 | 0.95 | 95 | $0.02192 |
-| gemini3.8-flash · OpenRouter google-ai-studio | 94/96/96 | 94.47 | 95.96 | 2.99 | 1.12 | 93 | $0.00322 |
-| qwen3.5-397b · OpenRouter deepinfra/fp8 | 96/96/96 | 93.98 | 95.82 | 2.10 | 2.68 | 89 | $0.00202 |
-| qwen3-vl-235b · OpenRouter deepinfra/fp8 | 96/96/96 | 93.95 | 96.08 | 2.40 | 2.43 | 98 | $0.00122 |
-| gpt5.4-mini · OpenRouter openai | 95/96/96 | 93.55 | 93.96 | 3.56 | 1.93 | 85 | $0.00555 |
-| gemini3.5-flash · OpenRouter google-ai-studio | 94/96/96 | 93.48 | 94.52 | 4.08 | 2.98 | 95 | $0.00623 |
+| claude-sonnet5.5 · `claude -p`, subscription | 96/96/96 | 96.47 | 97.92 | 0.72 | 1.02 | 96 | subscription |
+| gemini3.1-pro · OpenRouter google-ai-studio | 94/96/96 | 94.84 | 95.84 | 3.02 | 0.96 | 95 | $0.02192 |
+| gemini3.8-flash · OpenRouter google-ai-studio | 94/96/96 | 94.47 | 95.97 | 2.99 | 1.12 | 93 | $0.00322 |
+| qwen3.5-397b · OpenRouter deepinfra/fp8 | 96/96/96 | 93.98 | 95.82 | 2.09 | 2.68 | 89 | $0.00202 |
+| qwen3-vl-235b · OpenRouter deepinfra/fp8 | 96/96/96 | 93.95 | 96.09 | 2.39 | 2.43 | 98 | $0.00122 |
+| gpt5.4-mini · OpenRouter openai | 95/96/96 | 93.55 | 93.97 | 3.55 | 1.93 | 85 | $0.00555 |
+| gemini3.5-flash · OpenRouter google-ai-studio | 94/96/96 | 93.48 | 94.52 | 4.08 | 2.99 | 95 | $0.00623 |
 | mistral-large4 · OpenRouter mistral | 96/96/96 | 93.15 | 95.83 | 3.16 | 3.57 | 91 | $0.00269 |
-| gemini3.5-flash-lite · OpenRouter google-ai-studio | 94/96/96 | 93.13 | 94.85 | 4.38 | 2.09 | 82 | $0.00157 |
-| mistral-ocr-4-1 · Mistral OCR API, app client | 96/96/96 | 92.91 | 94.50 | 4.07 | 4.09 | — | $0.00400 |
-| gpt5.6-luna · OpenRouter openai | 95/96/96 | 92.13 | 93.21 | 4.80 | 2.73 | 73 | $0.00141 |
-| qwen3.8-flash · OpenRouter alibaba | 93/96/96 | 91.88 | 92.69 | 6.74 | 2.42 | 92 | $0.00060 |
-| mistral-medium3.5 · OpenRouter mistral | 96/96/96 | 90.65 | 92.56 | 5.60 | 5.13 | 94 | $0.00729 |
+| gemini3.5-flash-lite · OpenRouter google-ai-studio | 94/96/96 | 93.13 | 94.84 | 4.38 | 2.09 | 82 | $0.00157 |
+| mistral-ocr-4-1 · Mistral OCR API, app client | 96/96/96 | 92.91 | 94.51 | 4.06 | 4.09 | — | $0.00400 |
+| gpt5.6-luna · OpenRouter openai | 95/96/96 | 92.13 | 93.21 | 4.79 | 2.73 | 73 | $0.00141 |
+| qwen3.8-flash · OpenRouter alibaba | 93/96/96 | 91.88 | 92.68 | 6.74 | 2.43 | 92 | $0.00060 |
+| mistral-medium3.5 · OpenRouter mistral | 96/96/96 | 90.65 | 92.55 | 5.60 | 5.14 | 94 | $0.00729 |
 
 The local panel on the same 96 pages, for comparison (its own report has the detail):
 
 | local-panel route | completed / 96 | NES % | chrF2 % | words missed % | words added % |
 |---|---:|---:|---:|---:|---:|
-| qwen3.6-27b | 95/96 | 94.28 | 95.55 | 3.36 | 2.73 |
-| qwen3.6-35b-a3b | 96/96 | 93.02 | 95.65 | 2.07 | 3.82 |
+| qwen3.6-27b | 95/96 | 94.28 | 95.56 | 3.36 | 2.73 |
+| qwen3.6-35b-a3b | 96/96 | 93.02 | 95.65 | 2.06 | 3.82 |
 | qwen3-vl-8b | 94/96 | 91.81 | 93.33 | 3.65 | 2.62 |
-| gemini3.1-flash-lite | 93/96 | 91.61 | 93.68 | 4.70 | 2.54 |
+| gemini3.1-flash-lite | 93/96 | 91.61 | 93.67 | 4.70 | 2.54 |
 | qwen3.5-35b-a3b | 94/96 | 90.83 | 93.61 | 3.91 | 3.30 |
 | gemma4-31b | 93/96 | 90.55 | 91.51 | 7.72 | 4.61 |
-| qwen3-vl-30b-a3b | 94/96 | 89.82 | 92.68 | 5.78 | 3.40 |
+| qwen3-vl-30b-a3b | 94/96 | 89.82 | 92.68 | 5.77 | 3.41 |
 | qwen3.5-9b | 92/96 | 89.43 | 91.32 | 9.42 | 3.26 |
-| mistral-small-24b | 94/96 | 89.34 | 90.86 | 6.16 | 4.00 |
+| mistral-small-24b | 94/96 | 89.34 | 90.87 | 6.15 | 4.00 |
 | gemma4-26b-a4b | 86/96 | 82.73 | 84.41 | 19.64 | 3.74 |
 | qwen3.5-27b | 82/96 | 81.80 | 82.61 | 15.39 | 1.72 |
-| apple-vision | 96/96 | 81.34 | 82.50 | 11.20 | 7.79 |
+| apple-vision | 96/96 | 81.34 | 82.50 | 11.19 | 7.79 |
 
 ## Completed readings only, and the agreement-only letters
 

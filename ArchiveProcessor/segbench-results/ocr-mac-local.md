@@ -9,7 +9,7 @@ Reproduce: `ocr_mac_local.py collect` under the Vision OCR lab's `run-guarded.sh
 | route | completed / n | NES % | chrF2 % | words missed % | words added % | kind correct |
 |---|---:|---:|---:|---:|---:|---:|
 | hosted bf16 (qwen3-vl-8b) | 94/96 | 91.81 | 93.33 | 3.65 | 2.62 | 75/94 |
-| Mac MLX 4-bit (qwen3-vl-8b-mlx4) | 92/96 | 89.66 | 91.12 | 6.72 | 2.93 | 68/92 |
+| Mac MLX 4-bit (qwen3-vl-8b-mlx4) | 92/96 | 89.66 | 91.12 | 6.71 | 2.93 | 68/92 |
 
 **4-bit penalty (local − hosted NES): -2.15 points** over 96 pages (paired SD 18.61, so the mean's standard error is about 1.90); median page +0.00. Pages where both routes completed: 91, mean -0.17. Local better on 11, within half a point on 64, worse on 21.
 
@@ -28,7 +28,7 @@ Largest drops (NES points; page ids are private-cache keys, not corpus names):
 | handwritten | 16 | 84.83 | 89.16 | +4.33 |
 | mixed | 2 | 62.08 | 16.84 | -45.24 |
 | printed | 28 | 91.23 | 91.69 | +0.46 |
-| typewritten | 50 | 95.56 | 91.59 | -3.97 |
+| typewritten | 50 | 95.56 | 91.59 | -3.96 |
 
 ## Speed and memory on the 18 GB M3 Pro
 

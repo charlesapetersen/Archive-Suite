@@ -214,14 +214,14 @@
  "routes": {
   "apple-vision": {
    "n": 15,
-   "pdf_mean": 0.8889,
-   "jpeg_mean": 0.8467,
+   "pdf_mean": 0.889,
+   "jpeg_mean": 0.8468,
    "sharper_n": 10,
    "sharper_pdf": 0.8531,
    "sharper_jpeg": 0.8208,
    "upscaled_n": 5,
-   "upscaled_pdf": 0.9605,
-   "upscaled_jpeg": 0.8984,
+   "upscaled_pdf": 0.9609,
+   "upscaled_jpeg": 0.8988,
    "all96_pdf": 0.8134,
    "all96_jpeg": 0.8068,
    "per_page": {
@@ -270,8 +270,8 @@
      0.9966
     ],
     "p088": [
-     0.9596,
-     0.9243
+     0.9617,
+     0.9264
     ],
     "p091": [
      0.9761,
@@ -289,14 +289,14 @@
   },
   "qwen3-vl-8b-mlx4": {
    "n": 15,
-   "pdf_mean": 0.9389,
-   "jpeg_mean": 0.9371,
+   "pdf_mean": 0.939,
+   "jpeg_mean": 0.9373,
    "sharper_n": 10,
    "sharper_pdf": 0.9106,
-   "sharper_jpeg": 0.9152,
+   "sharper_jpeg": 0.9153,
    "upscaled_n": 5,
-   "upscaled_pdf": 0.9954,
-   "upscaled_jpeg": 0.981,
+   "upscaled_pdf": 0.9958,
+   "upscaled_jpeg": 0.9814,
    "all96_pdf": 0.8966,
    "all96_jpeg": 0.8963,
    "per_page": {
@@ -310,7 +310,7 @@
     ],
     "p025": [
      0.2807,
-     0.2551
+     0.2557
     ],
     "p028": [
      0.9992,
@@ -345,8 +345,8 @@
      0.9744
     ],
     "p088": [
-     0.9858,
-     0.982
+     0.988,
+     0.9842
     ],
     "p091": [
      1.0,
@@ -364,14 +364,14 @@
   },
   "lightonocr-3-4b-mlx8": {
    "n": 15,
-   "pdf_mean": 0.9331,
-   "jpeg_mean": 0.92,
+   "pdf_mean": 0.9332,
+   "jpeg_mean": 0.9201,
    "sharper_n": 10,
    "sharper_pdf": 0.9038,
    "sharper_jpeg": 0.8977,
    "upscaled_n": 5,
-   "upscaled_pdf": 0.9917,
-   "upscaled_jpeg": 0.9645,
+   "upscaled_pdf": 0.9922,
+   "upscaled_jpeg": 0.9649,
    "all96_pdf": 0.8913,
    "all96_jpeg": 0.8892,
    "per_page": {
@@ -420,8 +420,8 @@
      0.9663
     ],
     "p088": [
-     0.9861,
-     0.9839
+     0.9884,
+     0.9861
     ],
     "p091": [
      0.9997,
@@ -439,14 +439,14 @@
   },
   "qwen3.5-9b-mlx4": {
    "n": 15,
-   "pdf_mean": 0.871,
-   "jpeg_mean": 0.8698,
+   "pdf_mean": 0.8711,
+   "jpeg_mean": 0.8697,
    "sharper_n": 10,
    "sharper_pdf": 0.8164,
-   "sharper_jpeg": 0.8132,
+   "sharper_jpeg": 0.8133,
    "upscaled_n": 5,
-   "upscaled_pdf": 0.9801,
-   "upscaled_jpeg": 0.9829,
+   "upscaled_pdf": 0.9805,
+   "upscaled_jpeg": 0.9824,
    "all96_pdf": 0.9191,
    "all96_jpeg": 0.9189,
    "per_page": {
@@ -460,7 +460,7 @@
     ],
     "p025": [
      0.2704,
-     0.2472
+     0.2479
     ],
     "p028": [
      0.9992,
@@ -495,8 +495,8 @@
      0.9764
     ],
     "p088": [
-     0.9865,
-     0.969
+     0.9887,
+     0.9668
     ],
     "p091": [
      0.9995,
@@ -515,13 +515,13 @@
   "gemini3.7-flash-gw": {
    "n": 15,
    "pdf_mean": 0.9978,
-   "jpeg_mean": 0.9917,
+   "jpeg_mean": 0.9918,
    "sharper_n": 10,
-   "sharper_pdf": 0.9973,
-   "sharper_jpeg": 0.9937,
+   "sharper_pdf": 0.9971,
+   "sharper_jpeg": 0.9939,
    "upscaled_n": 5,
-   "upscaled_pdf": 0.9988,
-   "upscaled_jpeg": 0.9878,
+   "upscaled_pdf": 0.9993,
+   "upscaled_jpeg": 0.9876,
    "all96_pdf": 0.9674,
    "all96_jpeg": 0.9664,
    "per_page": {
@@ -534,8 +534,8 @@
      0.9986
     ],
     "p025": [
-     0.9975,
-     0.995
+     0.995,
+     0.9975
     ],
     "p028": [
      0.9992,
@@ -570,8 +570,8 @@
      0.9738
     ],
     "p088": [
-     0.9963,
-     0.9892
+     0.9985,
+     0.9881
     ],
     "p091": [
      1.0,

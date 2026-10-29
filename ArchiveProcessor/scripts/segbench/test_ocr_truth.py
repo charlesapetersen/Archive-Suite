@@ -82,6 +82,15 @@ class Compare(unittest.TestCase):
         self.assertEqual(sp, [{"agreed": "a b c"}])
         self.assertEqual(T.merge(sp, {}), "a b c")
 
+    def test_corrections_apply_once_or_refuse(self):
+        self.assertEqual(T.correct("p025", "Street San Francisco 4, California"), "Street San Francisco 6, California")
+        self.assertEqual(T.correct("p088", "we do not know don t"), "we do not know")
+        self.assertEqual(T.correct("p001", "San Francisco 4,"), "San Francisco 4,")  # other pages untouched
+        with self.assertRaises(SystemExit):
+            T.correct("p025", "San Francisco 6, California")  # already applied or changed: refuse, never guess
+        with self.assertRaises(SystemExit):
+            T.correct("p088", "we don t go, don t")  # ambiguous: two matches
+
 
 if __name__ == "__main__":
     unittest.main()

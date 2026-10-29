@@ -11,7 +11,7 @@ The Vision OCR lab's handwriting pick (LightOnOCR-3-4B, 8-bit) and runner-up (Qw
 
 | route | completed / n | NES % | chrF2 % | words missed % | words added % | kind correct |
 |---|---:|---:|---:|---:|---:|---:|
-| Mac MLX (lightonocr-3-4b-mlx8) | 96/96 | 89.13 | 91.32 | 5.81 | 5.04 | – |
+| Mac MLX (lightonocr-3-4b-mlx8) | 96/96 | 89.13 | 91.32 | 5.80 | 5.04 | – |
 
 | kind | n | Mac MLX NES % |
 |---|---:|---:|
@@ -57,7 +57,7 @@ The memory guard's whole-process view of each collect run (date, exit, seconds, 
 | handwritten | 16 | 90.92 | 87.92 |
 | mixed | 2 | 69.42 | 76.22 |
 | printed | 28 | 89.65 | 92.78 |
-| typewritten | 50 | 89.62 | 93.33 |
+| typewritten | 50 | 89.63 | 93.33 |
 
 ## Speed and memory: qwen3.5-9b-mlx4
 

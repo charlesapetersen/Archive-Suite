@@ -22,8 +22,8 @@ Stanford AI API gateway, temperature 0, low reasoning, 8,192 output tokens, the 
 | clippings (13) | PP-DocLayoutV3 regions | 79.7 | 13/13 | -16.0 (-26.9 to -7.9) | 0/167 | $27.78 |
 | clippings (13) | overlapping tiles | 76.9 | 13/13 | -18.7 (-30.6 to -7.4) | 0/44 | $10.47 |
 | tables (12) | whole page | 99.0 | 12/12 | — | — | $3.21 |
-| tables (12) | PP-DocLayoutV3 regions | 83.4 | 12/12 | -15.6 (-28.4 to -4.7) | 0/111 | $17.32 |
-| tables (12) | overlapping tiles | 97.8 | 12/12 | -1.2 (-3.7 to +0.6) | 0/35 | $7.74 |
+| tables (12) | PP-DocLayoutV3 regions | 83.4 | 12/12 | -15.5 (-28.4 to -4.7) | 0/111 | $17.32 |
+| tables (12) | overlapping tiles | 97.7 | 12/12 | -1.2 (-3.7 to +0.6) | 0/35 | $7.74 |
 | handwritten (16) | whole page | 95.1 | 16/16 | — | — | $3.84 |
 | handwritten (16) | PP-DocLayoutV3 regions | 70.3 | 15/16 | -24.8 (-39.1 to -12.4) | 0/74 | $11.06 |
 | handwritten (16) | overlapping tiles | 90.6 | 16/16 | -4.5 (-9.1 to -1.1) | 0/48 | $9.29 |
@@ -54,6 +54,6 @@ Three pages a stratum drawn by stable id hash (W46.ocr-regions-paid-pp read the 
 
 | arm | pages | strict | markup stripped | pages with markup |
 |---|---:|---:|---:|---:|
-| whole page | 12 | 99.0 | 99.2 | 1 |
+| whole page | 12 | 99.0 | 99.1 | 1 |
 | PP-DocLayoutV3 regions | 12 | 83.4 | 83.5 | 3 |
-| overlapping tiles | 12 | 97.8 | 97.9 | 1 |
+| overlapping tiles | 12 | 97.7 | 97.9 | 1 |
