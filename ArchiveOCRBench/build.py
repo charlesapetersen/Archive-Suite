@@ -55,6 +55,7 @@ TRUTH_BIAS_SCORE = RESULTS / "ocr-truth-bias-score.json"  # W46.fix-ocr-truth-bi
 CHAOS = RESULTS / "chaos-probe.json"  # W46.fix-ocr-scorers: chaos_probe.py score, the altered-word probe
 DEWARP = RESULTS / "enh-dewarp.json"  # W46.enh-dewarp: enh_dewarp.py report, crop or dewarp against raw, by reader
 ENH_OCR = RESULTS / "enh-ocr-input.json"  # W46.enh-ocr-input: enh_ocr_input.py report, content-removing enhancement
+LAYOUT_ORDER = RESULTS / "layout-order.json"  # W46.layout-order: layout_order.py run, ordering with detection fixed
 LOOPS = PUBLIC / "loop-rerun-20261021.json"  # W46.ocr-loops: corpus/loop_rerun.py report, the capped pages read again
 REGIONS = PUBLIC / "regions-20261021.json"  # W46.ocr-regions: whole page, detector regions and overlapping tiles
 REGIONS_GW = PUBLIC / "regions-gateway-20261028.json"  # W46.ocr-regions-paid: corpus/regions_gateway.py score, Gemini 3.7
@@ -524,6 +525,15 @@ def ocr_scorers():
     return out
 
 
+def layout_order():
+    """W46.layout-order's summaries (the per-page rows stay in the result file). None until it has run."""
+    if not LAYOUT_ORDER.exists():
+        return None
+    d = json.loads(LAYOUT_ORDER.read_text())
+    return {"guard": d["guard"], "sources": d["sources"],
+            **{k: d[k]["summary"] for k in ("bench_lines", "bench_regions", "l9")}}
+
+
 def region_chart_routes(data, kinds, op):
     """Crop routes on the exact panel-kind subsets, priced from all attempted crops of the 96 accuracy pages.
     Concurrent job spans combine all arms and sets, so no per-arm throughput is inferred from them.
@@ -770,7 +780,8 @@ def main():
                          if (RESULTS / "seg-date-model-final.json").exists() else None,
              "public": public(), "ocr_scorers": ocr_scorers(),
              "dewarp": dewarp, "enh_ocr": enh_ocr,
-             "loops": json.loads(LOOPS.read_text()) if LOOPS.exists() else None, "regions": regions}
+             "loops": json.loads(LOOPS.read_text()) if LOOPS.exists() else None, "regions": regions,
+             "layout_order": layout_order()}
     page = TEMPLATE.read_text().replace("__DATA__", json.dumps(built, separators=(",", ":")))
     outputs = {OUT_DATA: json.dumps(built, indent=1) + "\n", OUT_PAGE: page, OUT_DIFFICULTY: difficulty.report(diff)}
 

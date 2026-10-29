@@ -307,6 +307,12 @@ footer p { font-size: 13px; }
     <div class="tbl"><table><thead><tr><th>The 96's caps</th><th>Capped pages</th><th>Same model, n-gram blocked</th><th>Same model, half size</th><th>Second reader</th><th>kraken PP-OCRv6</th><th>Stock PP-OCRv6</th><th>Retry first</th><th>Readers first</th></tr></thead><tbody id="loops-96"></tbody></table></div>
   </section>
 
+  <section class="panel" id="pub-order" hidden>
+    <div class="head"><h2>Reading order with detection held fixed</h2><span class="meta">Kendall tau on pages passing the validity guard [valid / pages] · free, on the Mac (W46.layout-order)</span></div>
+    <p class="note" id="order-note"></p>
+    <div class="tbl"><table><thead><tr><th>Ordering stage</th><th>Benchmark lines, multi-column</th><th>Single-column</th><th>Word error from order, multi-column</th><th>DocLayout-YOLO regions, multi-column</th><th>Single-column</th><th>Lines inside a region</th><th>L9 newspapers</th><th>L9 order gap</th></tr></thead><tbody id="order-rows"></tbody></table></div>
+  </section>
+
   <section class="panel" id="pub-spec" hidden>
     <div class="head"><h2>Models built for the script</h2><span class="meta">NES %, failures as 0; paired differences in NES points</span></div>
     <div class="tbl"><table><thead><tr><th>Stratum</th><th>Model</th><th>Trained on a test source</th><th>Answered</th><th>NES</th><th>Second score</th><th>chrF</th><th>Minus Gemini (95%)</th><th>Minus Qwen (95%)</th></tr></thead><tbody id="pub-spec-rows"></tbody></table></div>
@@ -670,6 +676,20 @@ if (LP) {
     '<td>' + q(r.before) + '</td><td>' + q(r.after_cascade) + '</td><td>' + q(r['after_cascade-readers']) + '</td><td>' + m(r.gpu_s.ngram) + ' · ' + m(r.gpu_s.half) + '</td></tr>').join('');
   document.getElementById('loops-96').innerHTML = LP.truth96.map(r => '<tr><td>' + r.route.replace(/^t96-/, '') + (r.route.startsWith('mlx') ? ' (on the Mac)' : '') + '</td><td>' + r.caps + '</td>' +
     ARMS.map(k => '<td>' + c(r.arms[k]) + '</td>').join('') + '</tr>').join('');
+}
+const LO = DATA.layout_order;
+if (LO) {
+  document.getElementById('pub-order').hidden = false;
+  const NAMES = {topbottom: 'Top to bottom', columns: 'Benchmark column clustering', xycut: 'Benchmark XY-cut', xycut_yfirst: 'XY-cut, rows first (MinerU, PaddleX)',
+    app_regions: 'App region sort (LayoutModel.crops)', hdbscan: 'HDBSCAN on x-centres (our reading of Harvard\'s rule)', app_columns: 'App line column sort (columnOrdered)',
+    app_columns_lines: 'App line column sort on Vision lines, no detector', kraken_native: 'kraken blla, its own lines and order', pp_native: 'PP-DocLayoutV3, its own regions and order'};
+  const t = c => c && c.tau != null ? c.tau.toFixed(3) + ' [' + c.valid + '/' + c.pages + ']' : '–';
+  const p = v => v == null ? '–' : (100 * v).toFixed(1) + '%';
+  const arms = [...new Set([...Object.keys(LO.bench_lines), ...Object.keys(LO.bench_regions), ...Object.keys(LO.l9)])];
+  document.getElementById('order-rows').innerHTML = arms.map(a => { const bl = LO.bench_lines[a], br = LO.bench_regions[a], l9 = LO.l9[a];
+    const own = l9 && l9.all.covered != null ? ' (own lines ' + p(l9.all.covered) + ', tau ' + l9.all.tau_own.toFixed(3) + ')' : '';
+    return '<tr><td>' + (NAMES[a] || a) + '</td><td>' + t(bl && bl.multi) + '</td><td>' + t(bl && bl.single) + '</td><td>' + p(bl && bl.multi.oiwer) + '</td><td>' + t(br && br.multi) + '</td><td>' + t(br && br.single) + '</td><td>' + p(br && br.all.coverage) + '</td><td>' + t(l9 && l9.all) + own + '</td><td>' + (l9 ? (100 * l9.all.gap).toFixed(1) : '–') + '</td></tr>'; }).join('');
+  document.getElementById('order-note').textContent = 'Each ordering stage orders the same boxes. Benchmark lines: the 40 scored pages of the historical reading-order benchmark (Jha, MIT) on its own YOLOv8m line boxes; this reproduces its published 0.50 and 0.99. DocLayout-YOLO regions: the same pages, each ground-truth body line read in its region\'s place, top to bottom inside it; the detector finds no body region on the Swedish court hand and the Middle-French manuscripts, so most multi-column pages fail the guard (' + (100 * LO.guard.min_frac) + '% of the lines and at least ' + LO.guard.min_n + '). The benchmark\'s XY-cut never cuts a gutter (its threshold is 1.2 median box widths), so it equals top to bottom; the rows-first XY-cut is the method itself. L9: NewsBench\'s 15 Library of Congress pages, Vision\'s lines inside DocLayout-YOLO\'s body regions, tau over the lines found in the volunteer transcription; the order gap is the order-free bag-of-words F1 less word accuracy, in points, with recognition the same in every row. Word error from order assumes perfect recognition. Detail: segbench-results/layout-order.md.';
 }
 const curveCanvas = document.querySelector('#dif-curves canvas'), frontCanvas = document.querySelector('#dif-frontier canvas');
 let curveChart, frontChart;
