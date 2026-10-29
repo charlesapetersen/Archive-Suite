@@ -650,13 +650,14 @@ def cmd_build(a):
         "by_set": dict(collections.Counter(r["set"] for r in kept)),
         "dropped_not_correspondence": dict(collections.Counter(r["set"] for r in rows if not r["is_correspondence"])),
         "strata_truth": {
-            "handwritten": sum(r["hand"] in ("handwritten", "mixed") for r in kept),
+            "handwritten": sum(r["hand"] == "handwritten" for r in kept),
+            "mixed hand (mostly typed with a handwritten signature or notes)": sum(r["hand"] == "mixed" for r in kept),
             "role-addressed": sum(r["role_addressed"] for r in kept),
             "unsigned": sum(not r["signed"] for r in kept),
             "no dateline": sum(not r["dateline"] for r in kept)},
         "cue_hits": {st: [sum(1 for r in rows if r["cue_stratum"] == st),
                           sum(1 for r in kept if r["cue_stratum"] == st and {
-                              "handwritten": r["hand"] in ("handwritten", "mixed"), "role-addressed": r["role_addressed"],
+                              "handwritten": r["hand"] == "handwritten", "role-addressed": r["role_addressed"],
                               "unsigned": not r["signed"], "no dateline": not r["dateline"]}[st])] for st in STRATA},
         "entities": {f: {c: sum(1 for r in kept for e in r[f] if e["class"] == c) for c in CLASSES} for f in FIELDS},
         "empty": {f: sum(not r[f] for r in kept) for f in FIELDS},
@@ -720,6 +721,15 @@ def report(s):
                      f"{r['null_when_truth']}/{r['truth_nonempty']} | {r['ed2']['wrong_when_filled_docs']} | "
                      f"{r['quotes_valid']}/{r['quotes']} |")
     L += ["", "## Limits", "",
+          f"- Handwriting is thin: {s['strata_truth']['handwritten']} handwritten letters. The agreed pool needs "
+          "ABBYY text, and most handwritten pages have little or none, so the garbled-text cue found few and most "
+          "of what it found were not letters. A handwritten set would have to come from the JPEG mirror's "
+          "Handwritten-tagged pages, which have no ABBYY text to score text extractors on.",
+          "- The no-dateline cue confirmed none of its 18 (a date line the OCR mangled is still a date line to a "
+          "reader of the image); the no-dateline count above is what the readers found across the whole set.",
+          f"- {s['stats'].get('missing draft', 0)} document left out: the gateway's content filter refused reader "
+          "B on it three times (a Stanford admissions memo; nothing in it is sensitive). One other document's B "
+          "draft came back empty twice at low effort and was drafted at default reasoning.",
           "- Model-drafted and model-adjudicated (STATE Phase 2 decision 2); no owner pass. The session that built it "
           "spot-checked a sample against the page images (W46.fix-ent-truth's DONE entry).",
           "- Only the first and last page images were shown; a name only legible on a middle page is missed.",

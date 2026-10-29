@@ -1,0 +1,338 @@
+{
+ "documents": 159,
+ "correspondence": 138,
+ "stats": {
+  "adjudicated": 86,
+  "agreed, form flags differ": 34,
+  "agreed": 73,
+  "missing draft": 1
+ },
+ "sides": {
+  "B": 51,
+  "A": 18,
+  "mixed": 10,
+  "neither": 7
+ },
+ "disputed": {
+  "hand": 54,
+  "sender": 26,
+  "sending_place": 49,
+  "recipient": 35,
+  "role_addressed": 27,
+  "dateline": 5,
+  "signed": 7,
+  "is_correspondence": 4
+ },
+ "by_set": {
+  "sample88": 82,
+  "added": 56
+ },
+ "dropped_not_correspondence": {
+  "sample88": 5,
+  "added": 16
+ },
+ "strata_truth": {
+  "handwritten": 5,
+  "mixed hand (mostly typed with a handwritten signature or notes)": 35,
+  "role-addressed": 33,
+  "unsigned": 29,
+  "no dateline": 11
+ },
+ "cue_hits": {
+  "handwritten": [
+   18,
+   3
+  ],
+  "role-addressed": [
+   18,
+   13
+  ],
+  "unsigned": [
+   18,
+   5
+  ],
+  "no dateline": [
+   18,
+   0
+  ]
+ },
+ "entities": {
+  "sender": {
+   "named": 138,
+   "role-inferred": 0,
+   "correspondence-inferred": 3
+  },
+  "recipient": {
+   "named": 173,
+   "role-inferred": 7,
+   "correspondence-inferred": 3
+  },
+  "sending_place": {
+   "named": 72,
+   "role-inferred": 9,
+   "correspondence-inferred": 23
+  }
+ },
+ "empty": {
+  "sender": 9,
+  "recipient": 6,
+  "sending_place": 34
+ },
+ "quoted": {
+  "sender": 84,
+  "recipient": 163,
+  "sending_place": 72
+ },
+ "readers_vs_truth": {
+  "luna": {
+   "sender": {
+    "docs": 138,
+    "exact": {
+     "tp": 109,
+     "fp": 27,
+     "fn": 29,
+     "precision": 0.8014705882352942,
+     "recall": 0.7898550724637681,
+     "f1": 0.7956204379562044,
+     "inferred_matched": 1,
+     "wrong_when_filled_docs": 27
+    },
+    "overlap": {
+     "tp": 126,
+     "fp": 10,
+     "fn": 12,
+     "precision": 0.9264705882352942,
+     "recall": 0.9130434782608695,
+     "f1": 0.9197080291970804,
+     "inferred_matched": 1,
+     "wrong_when_filled_docs": 10
+    },
+    "ed2": {
+     "tp": 122,
+     "fp": 14,
+     "fn": 16,
+     "precision": 0.8970588235294118,
+     "recall": 0.8840579710144928,
+     "f1": 0.8905109489051095,
+     "inferred_matched": 1,
+     "wrong_when_filled_docs": 14
+    },
+    "truth_nonempty": 129,
+    "null_when_truth": 3,
+    "filled_when_empty": 0,
+    "quotes": 91,
+    "quotes_valid": 86,
+    "names": 137,
+    "names_in_text": 75
+   },
+   "recipient": {
+    "docs": 138,
+    "exact": {
+     "tp": 146,
+     "fp": 20,
+     "fn": 27,
+     "precision": 0.8795180722891566,
+     "recall": 0.8439306358381503,
+     "f1": 0.8613569321533923,
+     "inferred_matched": 8,
+     "wrong_when_filled_docs": 19
+    },
+    "overlap": {
+     "tp": 158,
+     "fp": 7,
+     "fn": 15,
+     "precision": 0.9575757575757575,
+     "recall": 0.9132947976878613,
+     "f1": 0.9349112426035504,
+     "inferred_matched": 9,
+     "wrong_when_filled_docs": 7
+    },
+    "ed2": {
+     "tp": 156,
+     "fp": 10,
+     "fn": 17,
+     "precision": 0.9397590361445783,
+     "recall": 0.9017341040462428,
+     "f1": 0.920353982300885,
+     "inferred_matched": 8,
+     "wrong_when_filled_docs": 9
+    },
+    "truth_nonempty": 132,
+    "null_when_truth": 1,
+    "filled_when_empty": 1,
+    "quotes": 166,
+    "quotes_valid": 164,
+    "names": 174,
+    "names_in_text": 118
+   },
+   "sending_place": {
+    "docs": 138,
+    "exact": {
+     "tp": 62,
+     "fp": 10,
+     "fn": 10,
+     "precision": 0.8611111111111112,
+     "recall": 0.8611111111111112,
+     "f1": 0.8611111111111112,
+     "inferred_matched": 6,
+     "wrong_when_filled_docs": 10
+    },
+    "overlap": {
+     "tp": 70,
+     "fp": 1,
+     "fn": 2,
+     "precision": 0.9859154929577465,
+     "recall": 0.9722222222222222,
+     "f1": 0.979020979020979,
+     "inferred_matched": 7,
+     "wrong_when_filled_docs": 1
+    },
+    "ed2": {
+     "tp": 62,
+     "fp": 10,
+     "fn": 10,
+     "precision": 0.8611111111111112,
+     "recall": 0.8611111111111112,
+     "f1": 0.8611111111111112,
+     "inferred_matched": 6,
+     "wrong_when_filled_docs": 10
+    },
+    "truth_nonempty": 104,
+    "null_when_truth": 26,
+    "filled_when_empty": 0,
+    "quotes": 63,
+    "quotes_valid": 54,
+    "names": 78,
+    "names_in_text": 44
+   }
+  },
+  "claude": {
+   "sender": {
+    "docs": 138,
+    "exact": {
+     "tp": 124,
+     "fp": 16,
+     "fn": 14,
+     "precision": 0.8857142857142857,
+     "recall": 0.8985507246376812,
+     "f1": 0.8920863309352518,
+     "inferred_matched": 3,
+     "wrong_when_filled_docs": 15
+    },
+    "overlap": {
+     "tp": 133,
+     "fp": 7,
+     "fn": 5,
+     "precision": 0.95,
+     "recall": 0.9637681159420289,
+     "f1": 0.9568345323741007,
+     "inferred_matched": 3,
+     "wrong_when_filled_docs": 7
+    },
+    "ed2": {
+     "tp": 134,
+     "fp": 6,
+     "fn": 4,
+     "precision": 0.9571428571428572,
+     "recall": 0.9710144927536232,
+     "f1": 0.9640287769784173,
+     "inferred_matched": 3,
+     "wrong_when_filled_docs": 6
+    },
+    "truth_nonempty": 129,
+    "null_when_truth": 1,
+    "filled_when_empty": 0,
+    "quotes": 130,
+    "quotes_valid": 85,
+    "names": 143,
+    "names_in_text": 77
+   },
+   "recipient": {
+    "docs": 138,
+    "exact": {
+     "tp": 152,
+     "fp": 14,
+     "fn": 21,
+     "precision": 0.9156626506024096,
+     "recall": 0.8786127167630058,
+     "f1": 0.896755162241888,
+     "inferred_matched": 5,
+     "wrong_when_filled_docs": 13
+    },
+    "overlap": {
+     "tp": 159,
+     "fp": 5,
+     "fn": 14,
+     "precision": 0.9695121951219512,
+     "recall": 0.9190751445086706,
+     "f1": 0.9436201780415432,
+     "inferred_matched": 7,
+     "wrong_when_filled_docs": 5
+    },
+    "ed2": {
+     "tp": 155,
+     "fp": 11,
+     "fn": 18,
+     "precision": 0.9337349397590361,
+     "recall": 0.8959537572254336,
+     "f1": 0.9144542772861357,
+     "inferred_matched": 5,
+     "wrong_when_filled_docs": 11
+    },
+    "truth_nonempty": 132,
+    "null_when_truth": 2,
+    "filled_when_empty": 1,
+    "quotes": 169,
+    "quotes_valid": 127,
+    "names": 171,
+    "names_in_text": 115
+   },
+   "sending_place": {
+    "docs": 138,
+    "exact": {
+     "tp": 69,
+     "fp": 8,
+     "fn": 3,
+     "precision": 0.8961038961038961,
+     "recall": 0.9583333333333334,
+     "f1": 0.9261744966442952,
+     "inferred_matched": 30,
+     "wrong_when_filled_docs": 8
+    },
+    "overlap": {
+     "tp": 72,
+     "fp": 3,
+     "fn": 0,
+     "precision": 0.96,
+     "recall": 1.0,
+     "f1": 0.9795918367346939,
+     "inferred_matched": 32,
+     "wrong_when_filled_docs": 3
+    },
+    "ed2": {
+     "tp": 69,
+     "fp": 8,
+     "fn": 3,
+     "precision": 0.8961038961038961,
+     "recall": 0.9583333333333334,
+     "f1": 0.9261744966442952,
+     "inferred_matched": 30,
+     "wrong_when_filled_docs": 8
+    },
+    "truth_nonempty": 104,
+    "null_when_truth": 0,
+    "filled_when_empty": 3,
+    "quotes": 86,
+    "quotes_valid": 72,
+    "names": 107,
+    "names_in_text": 50
+   }
+  }
+ },
+ "spend_usd": 4.7597,
+ "calls": 412,
+ "spend_by_stage": {
+  "draft": 2.3509,
+  "adjudicate": 2.4088
+ }
+}
