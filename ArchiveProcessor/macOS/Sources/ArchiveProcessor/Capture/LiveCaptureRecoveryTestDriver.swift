@@ -14,6 +14,9 @@ import ArchiveCore
 ///   3. Numbering ALWAYS continues from the folder's existing max, so a retry / same-name never overwrites
 ///      an already-filed file.
 ///   4. `CaptureSession.trashOrRemove` moves a file to the Trash instead of hard-deleting it (recoverable).
+///      Tests 4b–4d (W40.fix-mut-processor-trash-tests) see which primitive ran through a recording
+///      FileManager, inject a failed Trash and failed moves into finalize, plant a destination collision, and
+///      check that a Clear commits only with its prepare's token.
 ///   5. Legacy staging-manifest migration (KNOWN_ISSUES #1) drops a re-processable segment (sources present →
 ///      stale output deleted so resume regenerates it) but KEEPS one whose source is gone (never deletes
 ///      output it can no longer rebuild).
@@ -99,6 +102,40 @@ import ArchiveCore
 ///      (W22.localagent-provenance; Test 29).
 ///
 /// Writes a PASS/FAIL report to `LIVECAPTURE_RECOVERYTEST_OUT` (or a temp file) + NSLog. Test scaffolding.
+/// A FileManager that records which deletion primitive ran and can be told to fail (W40.fix-mut-processor-trash-tests).
+/// A file gone from its path looks the same after a Trash move and a hard delete, so the driver needs to see the
+/// call. Its "Trash" is a scratch folder, so nothing reaches the real Trash. Test scaffolding; single-threaded use.
+final class RecoveryTestFileManager: FileManager, @unchecked Sendable {
+    let fakeTrash: URL
+    var failTrash = false
+    var failMoveWhen: (URL) -> Bool = { _ in false }
+    private(set) var trashed: [URL] = []
+    private(set) var landedInTrash: [URL] = []
+    private(set) var removed: [URL] = []
+
+    init(fakeTrash: URL) { self.fakeTrash = fakeTrash; super.init() }
+
+    override func trashItem(at url: URL, resultingItemURL outResultingURL: AutoreleasingUnsafeMutablePointer<NSURL?>?) throws {
+        trashed.append(url)
+        if failTrash { throw CocoaError(.fileWriteNoPermission) }
+        try super.createDirectory(at: fakeTrash, withIntermediateDirectories: true, attributes: nil)
+        let dest = fakeTrash.appendingPathComponent("\(UUID().uuidString)-\(url.lastPathComponent)")
+        try super.moveItem(at: url, to: dest)
+        landedInTrash.append(dest)
+        outResultingURL?.pointee = dest as NSURL
+    }
+
+    override func removeItem(at url: URL) throws {
+        removed.append(url)
+        try super.removeItem(at: url)
+    }
+
+    override func moveItem(at srcURL: URL, to dstURL: URL) throws {
+        if failMoveWhen(dstURL) { throw CocoaError(.fileWriteUnknown) }
+        try super.moveItem(at: srcURL, to: dstURL)
+    }
+}
+
 @MainActor
 enum LiveCaptureRecoveryTestDriver {
     private static var didRun = false
@@ -266,6 +303,96 @@ enum LiveCaptureRecoveryTestDriver {
         let trashed = CaptureSession.trashOrRemove(victim)
         check("trashOrRemove removes the file from its original path", !fm.fileExists(atPath: victim.path))
         check("trashOrRemove reports it went to the Trash (not a fallback hard delete)", trashed)
+
+        // --- Test 4b (W40.fix-mut-processor-trash-tests): Test 4 cannot tell a Trash move from a hard rm — the
+        // file leaves its path either way — and a hard `removeItem` that returns true passed it (mutant P01).
+        // A recording FileManager sees WHICH primitive ran and keeps the "Trash" in scratch, so the original
+        // must be found there intact. Then the Trash is made to fail (mutant P02): the fallback must remove
+        // the file and say so with `false`, never report a Trash move that did not happen.
+        let rfm = RecoveryTestFileManager(fakeTrash: tmp.appendingPathComponent("fake-trash", isDirectory: true))
+        let victim4b = tmp.appendingPathComponent("victim4b.txt")
+        try? Data("keep me".utf8).write(to: victim4b)
+        let trashed4b = CaptureSession.trashOrRemove(victim4b, rfm)
+        check("W40 P01: trashOrRemove uses trashItem, never removeItem, when the Trash works",
+              trashed4b && rfm.trashed.map(\.lastPathComponent) == ["victim4b.txt"] && rfm.removed.isEmpty)
+        check("W40 P01: the original is recoverable — found in the Trash, contents intact",
+              rfm.landedInTrash.count == 1
+                && (try? Data(contentsOf: rfm.landedInTrash[0])) == Data("keep me".utf8)
+                && !fm.fileExists(atPath: victim4b.path))
+        let rfmFail = RecoveryTestFileManager(fakeTrash: tmp.appendingPathComponent("fake-trash-fail", isDirectory: true))
+        rfmFail.failTrash = true
+        let victim4c = tmp.appendingPathComponent("victim4c.txt")
+        try? Data("no trash here".utf8).write(to: victim4c)
+        let trashed4c = CaptureSession.trashOrRemove(victim4c, rfmFail)
+        check("W40 P02: a failed Trash move returns false (fell back), never claims the Trash",
+              trashed4c == false && rfmFail.trashed.count == 1)
+        check("W40 P02: the fallback removes the file rather than leave it half-deleted",
+              !fm.fileExists(atPath: victim4c.path) && rfmFail.removed.map(\.lastPathComponent) == ["victim4c.txt"])
+
+        // --- Test 4c (W40.fix-mut-processor-trash-tests): the finalize move under injected failures.
+        // P12 — a PDF whose move FAILS must not count as landed: the group is not filed, so its source photo is
+        //       kept, and the PDF is still in staging.
+        let out4p = tmp.appendingPathComponent("out4p", isDirectory: true)
+        let pdfF = staging.appendingPathComponent("F.pdf"); try? Data("pdfF".utf8).write(to: pdfF)
+        let rfmPdf = RecoveryTestFileManager(fakeTrash: tmp.appendingPathComponent("fake-trash-p12", isDirectory: true))
+        rfmPdf.failMoveWhen = { $0.pathExtension == "pdf" }
+        let pdfFailed = LiveCaptureProcessor._recoveryTestFinalizeMove([
+            (folder: out4p, name: "Stuck", appending: false,
+             segments: [(groupId: "F", pdfURLs: [pdfF], imageURLs: [], jsonURL: nil, complete: true)])
+        ], fm: rfmPdf)
+        check("W40 P12: a failed PDF move is counted failed and its group is NOT filed",
+              pdfFailed.failedMoves == 1 && pdfFailed.movedFiles == 0 && pdfFailed.filedGroupIds.isEmpty
+                && !pdfFailed.allFiled && fm.fileExists(atPath: pdfF.path))
+        // P08 — every group files (its PDF landed) but a secondary move (the JSON) failed: that is NOT
+        //       "all filed", since the caller reclaims staging on allFiled and the JSON is still in it.
+        let out4j = tmp.appendingPathComponent("out4j", isDirectory: true)
+        let pdfG = staging.appendingPathComponent("G.pdf"); try? Data("pdfG".utf8).write(to: pdfG)
+        let jsonG = staging.appendingPathComponent("G.json"); try? Data("{}".utf8).write(to: jsonG)
+        let rfmJson = RecoveryTestFileManager(fakeTrash: tmp.appendingPathComponent("fake-trash-p08", isDirectory: true))
+        rfmJson.failMoveWhen = { $0.pathExtension == "json" }
+        let jsonFailed = LiveCaptureProcessor._recoveryTestFinalizeMove([
+            (folder: out4j, name: "Half", appending: false,
+             segments: [(groupId: "G", pdfURLs: [pdfG], imageURLs: [], jsonURL: jsonG, complete: true)])
+        ], fm: rfmJson)
+        check("W40 P08: every group filed but a move failed is NOT allFiled",
+              jsonFailed.filedGroupIds == ["G"] && jsonFailed.failedMoves == 1 && jsonFailed.allFiled == false
+                && fm.fileExists(atPath: jsonG.path))
+        // P11 — a destination collision. Numbering continues from the collection folder's highest number, but
+        //       `JSON Output/` is not counted, so a stray `00001 <name>.json` there collides with the next
+        //       segment's JSON. The displaced file must go to the Trash (recoverable), never a hard delete.
+        let out4c = tmp.appendingPathComponent("out4c", isDirectory: true)
+        let jsonDir4c = out4c.appendingPathComponent("JSON Output", isDirectory: true)
+        try? fm.createDirectory(at: jsonDir4c, withIntermediateDirectories: true)
+        let displaced = jsonDir4c.appendingPathComponent("00001 Clash.json")
+        try? Data("old json".utf8).write(to: displaced)
+        let pdfH = staging.appendingPathComponent("H.pdf"); try? Data("pdfH".utf8).write(to: pdfH)
+        let jsonH = staging.appendingPathComponent("H.json"); try? Data("new json".utf8).write(to: jsonH)
+        let rfmClash = RecoveryTestFileManager(fakeTrash: tmp.appendingPathComponent("fake-trash-p11", isDirectory: true))
+        let clash = LiveCaptureProcessor._recoveryTestFinalizeMove([
+            (folder: out4c, name: "Clash", appending: false,
+             segments: [(groupId: "H", pdfURLs: [pdfH], imageURLs: [], jsonURL: jsonH, complete: true)])
+        ], fm: rfmClash)
+        check("W40 P11: the collision really happened and the new JSON took the slot",
+              clash.allFiled && (try? Data(contentsOf: displaced)) == Data("new json".utf8))
+        check("W40 P11: a displaced destination goes to the Trash, never a hard delete",
+              rfmClash.trashed.map(\.lastPathComponent) == ["00001 Clash.json"] && rfmClash.removed.isEmpty
+                && rfmClash.landedInTrash.count == 1
+                && (try? Data(contentsOf: rfmClash.landedInTrash[0])) == Data("old json".utf8))
+
+        // --- Test 4d (W40.fix-mut-processor-trash-tests, mutant P06): a Clear commits only with the token its
+        // prepare wrote. A stale token is refused and leaves the transaction prepared, so recovery still
+        // restores the photos; only the matching token commits. Manifest writes go nowhere: this session
+        // proves the token guard alone and touches no session folder.
+        let tokenSession = CaptureSession()
+        tokenSession.manifestWriteOverride = { _, _ in true }
+        let prepared4d = tokenSession.prepareClear(token: "token-A")
+        let staleCommit = tokenSession.commitPreparedClear(token: "token-B")
+        check("W40 P06: a Clear commit with a stale token is refused and stays prepared",
+              prepared4d && !staleCommit && tokenSession.clearPhase == "prepared" && tokenSession.clearToken == "token-A")
+        let goodCommit = tokenSession.commitPreparedClear(token: "token-A")
+        check("W40 P06: the matching token commits", goodCommit && tokenSession.clearPhase == "committed")
+        tokenSession.restoreManifestAfterClearFailure()
+        tokenSession.manifestWriteOverride = nil
 
         // --- Test 8 (W23.h1): launch-time pruneEmptySessions must never hard-delete non-session or
         // recoverable content. It reclaims ONLY positively-identified, spent session folders, via the Trash.

@@ -2330,8 +2330,7 @@ final class LiveCaptureProcessor: ObservableObject {
 
     private enum MoveResult { case moved, absent, failed }
 
-    nonisolated private static func executePlans(_ plans: [MovePlan]) -> FinalizeOutcome {
-        let fm = FileManager.default
+    nonisolated private static func executePlans(_ plans: [MovePlan], fm: FileManager = .default) -> FinalizeOutcome {
         var movedFiles = 0
         var failedMoves = 0
         var filedGroupIds = Set<String>()
@@ -2352,7 +2351,7 @@ final class LiveCaptureProcessor: ObservableObject {
             // partial finalize, or the operator reusing a name — must NOT restart at 00001 and collide with
             // (and overwrite) an already-filed file. `appending` no longer affects numbering; both paths are
             // now collision-proof.
-            var seq = CollectionNumbering.highestLeadingNumber(in: plan.folder)
+            var seq = CollectionNumbering.highestLeadingNumber(in: plan.folder, fm: fm)
             for seg in plan.segments {
                 totalSegments += 1
                 // An INCOMPLETE segment (a source page produced no PDF) is NEVER filed: skip it entirely so no
@@ -2609,9 +2608,12 @@ final class LiveCaptureProcessor: ObservableObject {
     /// Test-only ($0, no OCR/session): run the finalize move/gate on synthetic staged files so a headless
     /// driver can assert the data-safety invariant — a segment whose PDF is MISSING must NOT be reported as
     /// filed (otherwise finalize would delete its irreplaceable source). Mirrors what `finalize` consumes.
+    /// `fm` lets the driver make a move or a Trash fail and see which deletion primitive ran
+    /// (W40.fix-mut-processor-trash-tests); production always uses `.default`.
     nonisolated static func _recoveryTestFinalizeMove(
         _ plans: [(folder: URL, name: String, appending: Bool,
-                   segments: [(groupId: String, pdfURLs: [URL], imageURLs: [URL], jsonURL: URL?, complete: Bool)])]
+                   segments: [(groupId: String, pdfURLs: [URL], imageURLs: [URL], jsonURL: URL?, complete: Bool)])],
+        fm: FileManager = .default
     ) -> (movedFiles: Int, failedMoves: Int, filedGroupIds: Set<String>, allFiled: Bool) {
         let mapped: [MovePlan] = plans.map { p in
             MovePlan(folder: p.folder, name: p.name, appending: p.appending,
@@ -2621,7 +2623,7 @@ final class LiveCaptureProcessor: ObservableObject {
                                        imageURLs: s.imageURLs, jsonURL: s.jsonURL, boxLabelText: nil,
                                        pagesComplete: s.complete) })
         }
-        let o = executePlans(mapped)
+        let o = executePlans(mapped, fm: fm)
         return (o.movedFiles, o.failedMoves, o.filedGroupIds, o.allFiled)
     }
 
