@@ -10,6 +10,9 @@ struct ArchiveThumbnail: View {
     let url: URL
     var maxSize: Int = 800
     var rotationDegrees: Int = 0
+    /// Outline and shadow the image itself, so a white page shows its edge on a white background
+    /// (W40.fix-processor-flagged-page-edges). Drawn on the fitted image, not the frame around it.
+    var framed: Bool = false
     @State private var image: NSImage?
 
     var body: some View {
@@ -18,6 +21,12 @@ struct ArchiveThumbnail: View {
                 Image(nsImage: image)
                     .resizable()
                     .aspectRatio(contentMode: .fit)
+                    .overlay {
+                        if framed {
+                            Rectangle().strokeBorder(Color.primary.opacity(0.35), lineWidth: 1)
+                        }
+                    }
+                    .shadow(color: framed ? .black.opacity(0.25) : .clear, radius: 3, y: 1)
                     .rotationEffect(.degrees(Double(rotationDegrees)))
             } else {
                 Rectangle()

@@ -86,7 +86,8 @@ struct FlaggedBoundaryReviewSheet: View {
 
     private func page(_ url: URL, rotation: Int, caption: String) -> some View {
         VStack(spacing: 4) {
-            ArchiveThumbnail(url: url, maxSize: 1600, rotationDegrees: rotation)
+            ArchiveThumbnail(url: url, maxSize: 1600, rotationDegrees: rotation, framed: true)
+                .padding(4)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             Text("\(caption): \(url.lastPathComponent)")
                 .font(.caption)
@@ -95,14 +96,18 @@ struct FlaggedBoundaryReviewSheet: View {
         }
     }
 
+    /// The chosen answer is drawn accent-filled, the others plain, so the pick reads at a glance and is not
+    /// confused with Keep's focus ring (W40.fix-processor-flagged-page-edges).
     private func choice(_ title: String, _ a: FlaggedGapAnswer, _ item: FlaggedGapItem, help: String) -> some View {
-        Button { answer(a) } label: {
-            Label(title, systemImage: item.answer == a ? "checkmark.circle.fill" : "circle")
+        let chosen = item.answer == a
+        return Button { answer(a) } label: {
+            Label(title, systemImage: chosen ? "checkmark.circle.fill" : "circle")
                 .frame(minWidth: 90)
         }
-        .controlSize(.large)
+        .buttonStyle(FlaggedChoiceButtonStyle(chosen: chosen))
         .help(help)
         .accessibilityIdentifier("flaggedReview.\(a.rawValue)")
+        .accessibilityAddTraits(chosen ? .isSelected : [])
     }
 
     private var footer: some View {
@@ -136,5 +141,24 @@ struct FlaggedBoundaryReviewSheet: View {
 
     private func move(_ d: Int) {
         processor.flaggedGapFocus = min(max(0, focus + d), max(0, items.count - 1))
+    }
+}
+
+/// Keep / Split / Join. `.borderedProminent` would mark the pick, but macOS greys it out whenever the
+/// window is not key, which leaves picked and unpicked alike again; this fill holds in either state.
+private struct FlaggedChoiceButtonStyle: ButtonStyle {
+    let chosen: Bool
+
+    func makeBody(configuration: Configuration) -> some View {
+        let shape = RoundedRectangle(cornerRadius: 7, style: .continuous)
+        configuration.label
+            .fontWeight(chosen ? .semibold : .regular)
+            .foregroundStyle(chosen ? Color.white : Color.primary)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(shape.fill(chosen ? Color.accentColor : Color(nsColor: .controlColor)))
+            .overlay(shape.strokeBorder(chosen ? Color.clear : Color.primary.opacity(0.2), lineWidth: 1))
+            .opacity(configuration.isPressed ? 0.75 : 1)
+            .contentShape(shape)
     }
 }
