@@ -57,6 +57,14 @@ mirrored by the `W40` section of `SUITE_TODO.md`, tags byte-identical. `next-que
    Notes ledgers `W40.b1`/`b2` on `W24.cal1`, whose journeys follow through the ledgers. Gate, tooling and
    suspicion items (`a1`–`a5`, `b0`, `d6`, `e*`, `f*`) do not wait for features. Until 2026-10-07 `W40.a1` waited on
    every open feature item and the whole phase hung off it.
+   **An owner-requested feature during the phase (owner, 2026-10-28)** is the exception the freeze allows, and it
+   may not leave its app less verified than before. Its item adds a ledger row, `unproven`, for each new promise. It
+   extends the checks that already cover the area it changes to run in the new mode or state as well as the old: the
+   app's `AccessibilityAuditUITests` and `VisualReviewUITests`, and the journey that passes through that screen. A test
+   for the new path alone is not enough. It runs the app's whole UITest suite in the VM before it ships. The session
+   that files the feature also files a separate `<TAG>-verify` item (rule 6, builder is not verifier), blocked on the
+   feature, which re-runs those checks at HEAD and moves the rows to `works` or files `W40.fix-*`. The app's
+   guided-session pack (`W40.g*`) is blocked on the verify item.
 8. **Severity orders fixes.** Reproduced bugs are filed as `W40.fix-<slug>` with a severity:
    `S1` data loss or a write to the wrong file · `S2` a promised feature broken or unreachable · `S3` wrong but
    recoverable · `S4` cosmetic. `S1` goes to the TOP of TIER 7; `S2`–`S4` go to the `W40 fixes` sub-block, above
