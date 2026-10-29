@@ -9,7 +9,7 @@ Format and statuses: [`README.md`](README.md). Written by `W40.b1`, 2026-10-12.
   `W23.m9`, `W24.jpeg1`, `W24.cal1-reader`, `W26.walk2`, `W14.2-fu`). `SPEC/tag-format.md` is the contract
   behind R-05 and R-45.
 - **Sources and code read at:** `caefe33a`.
-- **Count:** `unproven 36 · works 3 · broken 4 · unreachable 3 · fixed-pending-recheck 1` (works: R-21, R-28, R-29; broken: R-11, R-13, R-23, R-45; unreachable: R-25, R-26, R-47; fixed-pending-recheck: R-46). Updated by `W40.audit-ledger`, 2026-10-17.
+- **Count:** `unproven 36 · works 3 · broken 4 · unreachable 2 · fixed-pending-recheck 1 · dropped 1` (works: R-21, R-28, R-29; broken: R-11, R-13, R-23, R-45; unreachable: R-25, R-47; fixed-pending-recheck: R-46; dropped: R-26). Updated by `W40.fix-reader-sent-with-date`, 2026-10-29.
 
 **Runtime evidence, for every row below: none yet.** The W40.a3 full VM suite
 ([`evidence/reader/W40.a3-full-ui.md`](evidence/reader/W40.a3-full-ui.md), `a5ab9e3c`) passed every UITest
@@ -449,8 +449,8 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
 
 ### R-22 · Tag editor sheet
 
-- **Promise:** ⌘I opens a tag editor for one file or a group. It edits subjects, Year/Month/Day, Quality and
-  color. A group shows tri-state presence (on all, some or none of the files). Each change is one
+- **Promise:** ⌘I opens a tag editor for one file or a group. It edits subjects, Year/Month/Day, the Sent-With
+  date, Quality and color. A group shows tri-state presence (on all, some or none of the files). Each change is one
   `TagWriter` delta.
 - **Promised in:** `CLAUDE.md` Core Directive, Safety Protocol §10, §Keyboard map, §Decisions; `README.md`
   §What it does; `SMOKE_TEST.md` step Q.
@@ -459,8 +459,9 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
   sheet calls `NavigationModel.applyEdit(_:)` (`Views/NavigationModel.swift:1186`).
 - **Real-path test:** `ArchiveReaderUITests/TriageJourneyUITests.testTriageWritesKeepEveryOtherTagColourAndByte` (step 3, 6a); `ArchiveReaderUITests/NavigationUITests.testMatchedIdentityWritesSucceedOnScratchFixture`
   (adds a subject in the sheet, reads it back from disk); `ArchiveReaderTests/TagEditingIntegrationTests.testApplySetYearOnDisk`,
-  `.testApplySetQualityWritesCanonicalTokenAndPreservesBytes` (writer level). Nothing tests Month, Day, color
-  or group tri-state.
+  `.testApplySetQualityWritesCanonicalTokenAndPreservesBytes` (writer level);
+  `NavigationUITests.testSheetSetsAndClearsASentWithDate` (Sent-With set, flagged, cleared, read back from disk;
+  added by `W40.fix-reader-sent-with-date`, 2026-10-29). Nothing tests Month, Day, color or group tri-state.
 - **Runtime evidence:** 2026-10-15 · `f5c31a95` · [`evidence/reader/W40.d8-triage.md`](evidence/reader/W40.d8-triage.md): ⌘I on three selected files added a subject to all three and nothing else; ⌘I on one file did the same.
 - **Status:** `unproven`
 - **History:**
@@ -530,25 +531,26 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
   same state change for the selection, but they are not the promised gesture. "Clear read state" has no live
   entry point at all. 2026-10-16 `W40.e5` (Periphery) also found `ReadStateCell`, `toggleReadState` and
   `clearReadState` unused and kept them for `W40.fix-reader-read-toggle`; it deleted the other dead SwiftUI cells
-  (`TagsCell`, `WarningBadgeCell`). `DateCell` was not flagged and stays for `W40.fix-reader-sent-with-date`.
+  (`TagsCell`, `WarningBadgeCell`). `DateCell` was not flagged; `W40.fix-reader-sent-with-date` deleted it (R-26).
 
 ### R-26 · Inline date editing in the list
 
-- **Promise:** the list's date cell can be edited in place through a date pop-up.
+- **Promise:** the list's date cell can be edited in place through a date pop-up. **Withdrawn** by the owner
+  (2026-10-12 walkthrough, option (b)): the ⌘I sheet (R-22) is the one date editor.
 - **Promised in:** `CLAUDE.md` Implementation map (`InlineEditCells.swift`: `DateCell`); `SUITE_TODO_DONE.md`
   `W6.2` (InlineEditCells year bounds); the W40 survey in `execution-plans/verification-phase/01-daemon-plan.md`.
-- **Reached by:** **none found.** `DateCell` (`Views/InlineEditCells.swift:31-120`) has no reference outside its
-  file (same search as R-25). The Date column is a plain label with a tooltip (`Views/AppKitTableView.swift:313-318`).
-  Dates can be edited only in the ⌘I sheet (R-22). The dead `DateCell` also edits Sent-With, which the sheet
-  lacks.
-- **Real-path test:** none. `ArchiveReaderTests/DualDateLibraryTests.testDateCellLabelsEachRole` tests
-  `ArchiveFile.dateCellText`, not the view.
-- **Runtime evidence:** none.
-- **Status:** `unreachable`
+  The guides now say dates are edited only in the ⌘I sheet (`ArchiveReader/CLAUDE.md`, `REFERENCE.md`).
+- **Reached by:** nothing, by decision. `DateCell` was deleted by `W40.fix-reader-sent-with-date`; the Date column
+  stays a plain label with a tooltip (`Views/AppKitTableView.swift`). The Sent-With date it alone edited is now in
+  the ⌘I sheet's Date section (`Views/TagEditorView.swift`, `ar.tagEditor.sentWith`).
+- **Real-path test:** for the replacement, `ArchiveReaderUITests/NavigationUITests.testSheetSetsAndClearsASentWithDate`
+  (sets a Sent-With date in the sheet, flags it uncertain, clears it, reading each back from the scratch file).
+- **Runtime evidence:** none for the row; it is dropped.
+- **Status:** `dropped`
 - **History:**
   - 2026-10-12 W40.b1 — row written, `unreachable`.
-- **Notes:** a Daemon Report decision (2026-10-12): wire it or drop it. Sent-With dates have no live editor in
-  the Reader.
+  - 2026-10-29 W40.fix-reader-sent-with-date — `dropped` (inline), per the owner's 2026-10-12 walkthrough ruling;
+    `DateCell` deleted, Sent-With added to the ⌘I sheet.
 
 ### R-27 · Warning on a subject that differs only by case
 

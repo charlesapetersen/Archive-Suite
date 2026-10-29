@@ -399,6 +399,47 @@ final class NavigationUITests: FixtureUITestCase {
         captureScreenshot("w40-audit-ledger-undo-verified")
     }
 
+    /// W40.fix-reader-sent-with-date (ledger R-26): the ⌘I sheet is the one date editor, so it sets, flags and
+    /// clears a Sent-With date. Each step is read back from the scratch file; the last leaves it as it began.
+    func testSheetSetsAndClearsASentWithDate() throws {
+        try requireGeneratedScratchFixtureForTagWrites()
+        let name = "00003 IMG — Brown.pdf"
+        // A failure part-way must not leave the date on the shared fixture for the next run.
+        let url = URL(fileURLWithPath: Self.fixturePath).appendingPathComponent(name)
+        addTeardownBlock {
+            let tags = (try? url.resourceValues(forKeys: [.tagNamesKey]))?.tagNames ?? []
+            let kept = tags.filter { $0 != "Sent With 1958-03-12" && $0 != "Sent With Date Uncertain" }
+            if kept != tags { try? (url as NSURL).setResourceValue(kept, forKey: .tagNamesKey) }
+        }
+        typeInField("ar.filter.name", text: "00003")
+        XCTAssertTrue(waitForRowCount(1), "name filter should isolate the scratch document")
+        clickRow(0)
+        XCTAssertTrue(waitForTags(on: name, containing: ["842"], excluding: ["Sent With 1958-03-12"]),
+                      "precondition: the scratch document has its own date and no Sent-With date")
+
+        toolbarButton("ar.toolbar.editTags").click()
+        let field = app.textFields["ar.tagEditor.sentWith"]
+        XCTAssertTrue(field.waitForExistence(timeout: 5), "the ⌘I sheet should offer a Sent-With field")
+        field.click()
+        field.typeText("1958-03-12")
+        let set = app.buttons["ar.tagEditor.sentWithSet"]
+        XCTAssertTrue(set.isEnabled, "a valid Sent-With date enables Set")
+        set.click()
+        XCTAssertTrue(waitForTags(on: name, containing: ["842", "Sent With 1958-03-12"]),
+                      "Set should write the Sent-With date and keep the document's own date")
+
+        app.buttons["ar.tagEditor.sentWithUncertain"].click()
+        XCTAssertTrue(waitForTags(on: name, containing: ["Sent With 1958-03-12", "Sent With Date Uncertain"]),
+                      "Mark Uncertain should flag the Sent-With date")
+        captureScreenshot("w40-sent-with-date-in-sheet")
+
+        app.buttons["ar.tagEditor.sentWithClear"].click()
+        XCTAssertTrue(waitForTags(on: name, containing: ["842"],
+                                  excluding: ["Sent With 1958-03-12", "Sent With Date Uncertain"]),
+                      "Clear should remove the Sent-With date and its flag")
+        app.buttons["ar.tagEditor.done"].click()
+    }
+
     // MARK: - Phantom selection (W40.fix-reader-phantom-selection)
 
     /// The selection is never wider than the list. Select a row, filter it away: the status bar must

@@ -13,6 +13,7 @@ struct TagEditorView: View {
     @State private var subjectDraft = ""
     @State private var yearDraft = ""
     @State private var dayDraft = ""
+    @State private var sentWithDraft = ""
     @State private var noteDraft = ""
 
     var body: some View {
@@ -148,7 +149,53 @@ struct TagEditorView: View {
                 facetButton("Mark Uncertain", current: allUncertain) { model.applyEdit(.setDateUncertain(true)) }
                 Button("Clear Uncertain") { model.applyEdit(.setDateUncertain(false)) }
             }
+            Divider()
+            // W37: the covering letter's date, for an enclosure that has its own date above. The sheet is the one
+            // date editor (owner, 2026-10-12), so Sent-With lives here too (W40.fix-reader-sent-with-date).
+            HStack {
+                Text("Sent with").frame(width: 68, alignment: .leading)
+                TextField(sentWithPlaceholder(), text: $sentWithDraft).textFieldStyle(.roundedBorder).frame(width: 110)
+                    .onSubmit(setSentWith)
+                    .help("The date of the letter this was enclosed with: 1958, 1958-03, 1958-03-12 or 1950s")
+                    .accessibilityIdentifier("ar.tagEditor.sentWith")
+                Button("Set", action: setSentWith)
+                    .disabled(parsedSentWith == nil)
+                    .accessibilityIdentifier("ar.tagEditor.sentWithSet")
+                // Also clears a stray uncertain flag left on a file with no Sent-With date.
+                Button("Clear") { model.applyEdit(.setSentWith(nil)); sentWithDraft = "" }
+                    .disabled(!model.selectedFiles.contains { $0.tags.sentWith != nil || $0.tags.sentWithUncertain })
+                    .accessibilityIdentifier("ar.tagEditor.sentWithClear")
+            }
+            if !sentWithDraft.trimmingCharacters(in: .whitespaces).isEmpty, parsedSentWith == nil {
+                Text("Use 1958, 1958-03, 1958-03-12 or 1950s").font(.caption).foregroundStyle(.red)
+            }
+            HStack {
+                Text("Uncertain").frame(width: 68, alignment: .leading)
+                let dated = model.selectedFiles.filter { $0.tags.sentWith != nil }
+                let allUncertain = !dated.isEmpty && dated.allSatisfy(\.tags.sentWithUncertain)
+                facetButton("Mark Uncertain", current: allUncertain) { model.applyEdit(.setSentWithUncertain(true)) }
+                    .disabled(dated.isEmpty)
+                    .accessibilityIdentifier("ar.tagEditor.sentWithUncertain")
+                Button("Clear Uncertain") { model.applyEdit(.setSentWithUncertain(false)) }
+                    .disabled(!model.selectedFiles.contains(where: \.tags.sentWithUncertain))
+            }
         }
+    }
+
+    private var parsedSentWith: ArchiveDate? {
+        ArchiveDate.parse(wireValue: sentWithDraft.trimmingCharacters(in: .whitespaces))
+    }
+
+    private func setSentWith() {
+        guard let d = parsedSentWith else { return }
+        model.applyEdit(.setSentWith(d))
+        sentWithDraft = ""
+    }
+
+    private func sentWithPlaceholder() -> String {
+        let values = Set(model.selectedFiles.map { $0.tags.sentWith?.wireValue })
+        guard values.count == 1, let only = values.first else { return values.isEmpty ? "1958-03-12" : "mixed" }
+        return only ?? "1958-03-12"
     }
 
     // MARK: Quality

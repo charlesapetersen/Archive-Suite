@@ -446,8 +446,8 @@ Views/
   InlineEditCells.swift       DEAD CODE: SwiftUI cells left from the pre-AppKit table, referenced nowhere
                               (the AppKit Read and Date columns are plain labels). ReadStateCell stays until
                               W40.fix-reader-read-toggle wires the click/right-click into the AppKit Read
-                              column; DateCell is deleted by W40.fix-reader-sent-with-date. Dates (incl.
-                              Sent-With, once that item ships) are edited in the ⌘I sheet, the one date
+                              column. DateCell was deleted by W40.fix-reader-sent-with-date. Dates (incl.
+                              Sent-With) are edited in the ⌘I sheet, the one date
                               editor (owner, 2026-10-12); there is no inline date editing in the list.
                               The inline per-row subject editor is AppKitTableView's TagTokenCellView
                               (NSTokenField): autocomplete from the corpus; edit-start-base diff → ONE
