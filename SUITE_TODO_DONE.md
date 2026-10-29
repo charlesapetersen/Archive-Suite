@@ -13275,3 +13275,14 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
     the rule stage (37 of the 131 print another year; rule right on 2, Gemini on 19). For the Gemini profile, one shot.
     Public set not sent: the trace-neigh/shots variants and the C/D residue exist only on the owner's set.
   <!-- /W46.date-traceable-paid -->
+- [x] **W40.fix-mut-processor-trash-tests — six finalize/Trash mutants survive the Processor drivers [S-M · S3]** · §W40 · SHIPPED 2026-10-29 (lane: processor)
+  Found by `W40.e7` 2026-10-20. Recovery driver Tests 4b–4d (`LiveCaptureRecoveryTestDriver.swift`) use a recording,
+  fault-injecting `RecoveryTestFileManager` (scratch "Trash", `failTrash`, `failMoveWhen`); `executePlans` and
+  `_recoveryTestFinalizeMove` take an `fm` (default `.default`, so production is unchanged). P01: `trashOrRemove` must
+  call `trashItem`, never `removeItem`, and the original must be found intact in the Trash. P02: a failed Trash returns
+  `false` and the fallback removes the file. P12: a failed PDF move leaves the group unfiled and the PDF in staging. P08:
+  a failed JSON move with every group filed is not `allFiled`. P11: a stray `JSON Output/00001 <name>.json` (not counted
+  by the numbering) collides, and the displaced file goes to the Trash. P06: `commitPreparedClear` with a stale token is
+  refused and stays prepared. `ops/verify/mutation-sample.sh processor --only P01,P02,P06,P08,P11,P12` → 6/6 killed,
+  each by its own check (default drivers; a kill there is a kill under `MUT_DRIVERS=all`, which only adds drivers).
+  <!-- /W40.fix-mut-processor-trash-tests -->
