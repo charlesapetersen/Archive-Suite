@@ -322,11 +322,14 @@ struct NotesTableView: NSViewRepresentable {
                 tf.stringValue = item.sourcesText
                 tf.textColor = .labelColor
                 tf.setAccessibilityIdentifier("an.cell.sources.\(item.id.uuidString)")
+                // An empty cell still says what it is (the audit, once the stacked list showed it; W48).
+                tf.setAccessibilityLabel(item.sourcesText.isEmpty ? "No sources" : nil)
 
             case "tags":
                 tf.stringValue = item.displayTags
                 tf.textColor = .labelColor
                 tf.setAccessibilityIdentifier("an.cell.tags.\(item.id.uuidString)")
+                tf.setAccessibilityLabel(item.displayTags.isEmpty ? "No tags" : nil)
 
             default:
                 tf.stringValue = ""

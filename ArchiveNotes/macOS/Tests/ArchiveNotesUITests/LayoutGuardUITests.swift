@@ -47,13 +47,19 @@ final class LayoutGuardUITests: NotesFixtureUITestCase {
     private func sweepNarrowAndTall(appearance: String) {
         let window = mainWindow
         app.activate()
-        window.click()
-        let screen = NSScreen.main?.frame.height ?? 1000
-        LayoutGuard.dragCorner(of: window, to: CGPoint(x: window.frame.minX + 40,
-                                                       y: min(screen - 8, window.frame.maxY + 400)))
+        // To the top of the screen first: a window reaching past the bottom edge has no corner to drag.
+        let title = window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0)).withOffset(CGVector(dx: 0, dy: 12))
+        title.press(forDuration: 0.3, thenDragTo: title.withOffset(CGVector(dx: 0, dy: 40 - window.frame.minY)))
         LayoutGuard.waitUntilSettled(window)
-        print("[layout] narrow and tall, \(appearance): window \(window.frame.size)")
-        LayoutGuard.sweep(window, screen: "note window, narrow and tall, \(appearance)", in: self, ignore: isHarness)
+        let screen = NSScreen.main?.frame.height ?? 1000
+        let before = window.frame
+        LayoutGuard.dragCorner(of: window, to: CGPoint(x: before.maxX, y: screen - 8))
+        LayoutGuard.waitUntilSettled(window)
+        print("[layout] narrow and tall, \(appearance): window \(before.size) → \(window.frame.size), screen \(screen)")
+        XCTAssertGreaterThan(window.frame.height, before.height + 100, "the window should have been made taller")
+        // The minimum size was swept above; this is one more size, not a resize check.
+        LayoutGuard.sweep(window, screen: "note window, narrow and tall, \(appearance)", in: self, resize: false,
+                          ignore: isHarness)
         let list = window.tables.firstMatch
         let divider = window.descendants(matching: .any)["an.divider.list"]
         let editor = window.scrollViews.containing(.textView, identifier: "an.editor.text").firstMatch
