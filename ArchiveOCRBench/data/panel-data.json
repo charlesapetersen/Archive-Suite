@@ -1124,6 +1124,41 @@
    }
   },
   {
+   "id": "enh-gemini3.7-flash-gw-shading",
+   "name": "Gemini 3.7 Flash (Stanford gateway, price estimated) \u00b7 shading division",
+   "batch": null,
+   "panel": "cloud",
+   "std": 3.53
+  },
+  {
+   "id": "enh-gemini3.7-flash-gw-gcdrnet",
+   "name": "Gemini 3.7 Flash (Stanford gateway, price estimated) \u00b7 GCDRNet",
+   "batch": null,
+   "panel": "cloud",
+   "std": 3.61
+  },
+  {
+   "id": "enh-gemini3.7-flash-gw-sbb",
+   "name": "Gemini 3.7 Flash (Stanford gateway, price estimated) \u00b7 SBB binarisation",
+   "batch": null,
+   "panel": "cloud",
+   "std": 3.48
+  },
+  {
+   "id": "enh-gemini3.7-flash-gw-docres-appearance",
+   "name": "Gemini 3.7 Flash (Stanford gateway, price estimated) \u00b7 DocRes appearance",
+   "batch": null,
+   "panel": "cloud",
+   "std": 3.61
+  },
+  {
+   "id": "enh-gemini3.7-flash-gw-docres-deshadow",
+   "name": "Gemini 3.7 Flash (Stanford gateway, price estimated) \u00b7 DocRes deshadow",
+   "batch": null,
+   "panel": "cloud",
+   "std": 3.62
+  },
+  {
    "id": "gw-regions-pp-doclayoutv3",
    "name": "Gemini 3.7 Flash (Stanford gateway, price estimated) \u00b7 PP-DocLayoutV3 regions",
    "panel": "cloud",
@@ -1712,6 +1747,31 @@
      95,
      96
     ],
+    "enh-gemini3.7-flash-gw-shading": [
+     95.53,
+     96,
+     96
+    ],
+    "enh-gemini3.7-flash-gw-gcdrnet": [
+     96.37,
+     96,
+     96
+    ],
+    "enh-gemini3.7-flash-gw-sbb": [
+     94.85,
+     96,
+     96
+    ],
+    "enh-gemini3.7-flash-gw-docres-appearance": [
+     96.53,
+     96,
+     96
+    ],
+    "enh-gemini3.7-flash-gw-docres-deshadow": [
+     96.51,
+     96,
+     96
+    ],
     "gw-regions-pp-doclayoutv3": [
      84.85,
      95,
@@ -2222,6 +2282,31 @@
     ],
     "enh-glm-ocr-docres-deshadow": [
      91.53,
+     50,
+     50
+    ],
+    "enh-gemini3.7-flash-gw-shading": [
+     97.39,
+     50,
+     50
+    ],
+    "enh-gemini3.7-flash-gw-gcdrnet": [
+     97.8,
+     50,
+     50
+    ],
+    "enh-gemini3.7-flash-gw-sbb": [
+     96.74,
+     50,
+     50
+    ],
+    "enh-gemini3.7-flash-gw-docres-appearance": [
+     98.61,
+     50,
+     50
+    ],
+    "enh-gemini3.7-flash-gw-docres-deshadow": [
+     98.8,
      50,
      50
     ],
@@ -2738,6 +2823,31 @@
      28,
      28
     ],
+    "enh-gemini3.7-flash-gw-shading": [
+     93.73,
+     28,
+     28
+    ],
+    "enh-gemini3.7-flash-gw-gcdrnet": [
+     96.02,
+     28,
+     28
+    ],
+    "enh-gemini3.7-flash-gw-sbb": [
+     94.28,
+     28,
+     28
+    ],
+    "enh-gemini3.7-flash-gw-docres-appearance": [
+     94.46,
+     28,
+     28
+    ],
+    "enh-gemini3.7-flash-gw-docres-deshadow": [
+     93.75,
+     28,
+     28
+    ],
     "gw-regions-pp-doclayoutv3": [
      81.07,
      28,
@@ -3249,6 +3359,31 @@
     "enh-glm-ocr-docres-deshadow": [
      70.12,
      15,
+     16
+    ],
+    "enh-gemini3.7-flash-gw-shading": [
+     94.32,
+     16,
+     16
+    ],
+    "enh-gemini3.7-flash-gw-gcdrnet": [
+     93.8,
+     16,
+     16
+    ],
+    "enh-gemini3.7-flash-gw-sbb": [
+     92.19,
+     16,
+     16
+    ],
+    "enh-gemini3.7-flash-gw-docres-appearance": [
+     94.86,
+     16,
+     16
+    ],
+    "enh-gemini3.7-flash-gw-docres-deshadow": [
+     95.79,
+     16,
      16
     ],
     "gw-regions-pp-doclayoutv3": [
@@ -30609,6 +30744,300 @@
     "p": 0.07529
    },
    {
+    "reader": "gemini3.7-flash-gw",
+    "pages": "96",
+    "n": 96,
+    "arm": "raw",
+    "base": "raw",
+    "nes": 0.96738,
+    "chrf": 0.97472,
+    "inserted": 0.0098,
+    "rewritten": 0.00177,
+    "restoration_only_k": 0.0,
+    "suspect_k": 0.0
+   },
+   {
+    "reader": "gemini3.7-flash-gw",
+    "pages": "96",
+    "n": 96,
+    "arm": "shading",
+    "base": "raw",
+    "nes": 0.9553,
+    "chrf": 0.97541,
+    "inserted": 0.01357,
+    "rewritten": 0.00343,
+    "restoration_only_k": 5.36637,
+    "suspect_k": 5.20074,
+    "d_nes": -0.01208,
+    "lo": -0.0285,
+    "hi": -0.00193,
+    "p": 0.0029
+   },
+   {
+    "reader": "gemini3.7-flash-gw",
+    "pages": "96",
+    "n": 96,
+    "arm": "gcdrnet",
+    "base": "raw",
+    "nes": 0.96369,
+    "chrf": 0.97356,
+    "inserted": 0.01307,
+    "rewritten": 0.0043,
+    "restoration_only_k": 7.84379,
+    "suspect_k": 6.45375,
+    "d_nes": -0.00369,
+    "lo": -0.01588,
+    "hi": 0.01075,
+    "p": 0.65593
+   },
+   {
+    "reader": "gemini3.7-flash-gw",
+    "pages": "96",
+    "n": 96,
+    "arm": "sbb",
+    "base": "raw",
+    "nes": 0.94854,
+    "chrf": 0.96409,
+    "inserted": 0.0176,
+    "rewritten": 0.0041,
+    "restoration_only_k": 9.92096,
+    "suspect_k": 8.63124,
+    "d_nes": -0.01884,
+    "lo": -0.0379,
+    "hi": -0.0001,
+    "p": 0.0465
+   },
+   {
+    "reader": "gemini3.7-flash-gw",
+    "pages": "96",
+    "n": 96,
+    "arm": "docres-appearance",
+    "base": "raw",
+    "nes": 0.96532,
+    "chrf": 0.98058,
+    "inserted": 0.0103,
+    "rewritten": 0.00157,
+    "restoration_only_k": 2.75162,
+    "suspect_k": 3.1163,
+    "d_nes": -0.00206,
+    "lo": -0.00834,
+    "hi": 0.00307,
+    "p": 0.50795
+   },
+   {
+    "reader": "gemini3.7-flash-gw",
+    "pages": "96",
+    "n": 96,
+    "arm": "docres-deshadow",
+    "base": "raw",
+    "nes": 0.96512,
+    "chrf": 0.97349,
+    "inserted": 0.01357,
+    "rewritten": 0.00413,
+    "restoration_only_k": 5.08187,
+    "suspect_k": 4.019,
+    "d_nes": -0.00226,
+    "lo": -0.00939,
+    "hi": 0.00364,
+    "p": 0.51345
+   },
+   {
+    "reader": "gemini3.7-flash-gw",
+    "pages": "originals",
+    "n": 63,
+    "arm": "raw",
+    "base": "raw",
+    "nes": 0.95322,
+    "chrf": 0.96434,
+    "inserted": 0.0147,
+    "rewritten": 0.00246,
+    "restoration_only_k": 0.0,
+    "suspect_k": 0.0
+   },
+   {
+    "reader": "gemini3.7-flash-gw",
+    "pages": "originals",
+    "n": 63,
+    "arm": "shading",
+    "base": "raw",
+    "nes": 0.94576,
+    "chrf": 0.97048,
+    "inserted": 0.01656,
+    "rewritten": 0.0039,
+    "restoration_only_k": 5.7869,
+    "suspect_k": 5.01134,
+    "d_nes": -0.00746,
+    "lo": -0.01508,
+    "hi": -0.00155,
+    "p": 0.0126
+   },
+   {
+    "reader": "gemini3.7-flash-gw",
+    "pages": "originals",
+    "n": 63,
+    "arm": "gcdrnet",
+    "base": "raw",
+    "nes": 0.956,
+    "chrf": 0.96698,
+    "inserted": 0.01842,
+    "rewritten": 0.00294,
+    "restoration_only_k": 7.71605,
+    "suspect_k": 5.22317,
+    "d_nes": 0.00278,
+    "lo": -0.01323,
+    "hi": 0.02308,
+    "p": 0.86331
+   },
+   {
+    "reader": "gemini3.7-flash-gw",
+    "pages": "originals",
+    "n": 63,
+    "arm": "sbb",
+    "base": "raw",
+    "nes": 0.93656,
+    "chrf": 0.95401,
+    "inserted": 0.02454,
+    "rewritten": 0.00486,
+    "restoration_only_k": 12.17484,
+    "suspect_k": 9.56171,
+    "d_nes": -0.01666,
+    "lo": -0.0382,
+    "hi": 0.00737,
+    "p": 0.17528
+   },
+   {
+    "reader": "gemini3.7-flash-gw",
+    "pages": "originals",
+    "n": 63,
+    "arm": "docres-appearance",
+    "base": "raw",
+    "nes": 0.94992,
+    "chrf": 0.97293,
+    "inserted": 0.01524,
+    "rewritten": 0.00222,
+    "restoration_only_k": 4.10983,
+    "suspect_k": 4.28852,
+    "d_nes": -0.0033,
+    "lo": -0.0123,
+    "hi": 0.00434,
+    "p": 0.49185
+   },
+   {
+    "reader": "gemini3.7-flash-gw",
+    "pages": "originals",
+    "n": 63,
+    "arm": "docres-deshadow",
+    "base": "raw",
+    "nes": 0.94994,
+    "chrf": 0.96246,
+    "inserted": 0.02124,
+    "rewritten": 0.00642,
+    "restoration_only_k": 8.4842,
+    "suspect_k": 6.45277,
+    "d_nes": -0.00328,
+    "lo": -0.01368,
+    "hi": 0.00573,
+    "p": 0.53755
+   },
+   {
+    "reader": "gemini3.7-flash-gw",
+    "pages": "PDF images",
+    "n": 33,
+    "arm": "raw",
+    "base": "raw",
+    "nes": 0.99442,
+    "chrf": 0.99452,
+    "inserted": 0.00368,
+    "rewritten": 0.0009,
+    "restoration_only_k": 0.0,
+    "suspect_k": 0.0
+   },
+   {
+    "reader": "gemini3.7-flash-gw",
+    "pages": "PDF images",
+    "n": 33,
+    "arm": "shading",
+    "base": "raw",
+    "nes": 0.97352,
+    "chrf": 0.98483,
+    "inserted": 0.00983,
+    "rewritten": 0.00285,
+    "restoration_only_k": 4.84135,
+    "suspect_k": 5.43721,
+    "d_nes": -0.0209,
+    "lo": -0.0617,
+    "hi": 0.00035,
+    "p": 0.17018
+   },
+   {
+    "reader": "gemini3.7-flash-gw",
+    "pages": "PDF images",
+    "n": 33,
+    "arm": "gcdrnet",
+    "base": "raw",
+    "nes": 0.97836,
+    "chrf": 0.98612,
+    "inserted": 0.00638,
+    "rewritten": 0.006,
+    "restoration_only_k": 8.00479,
+    "suspect_k": 8.00479,
+    "d_nes": -0.01606,
+    "lo": -0.03417,
+    "hi": -0.00406,
+    "p": 0.001
+   },
+   {
+    "reader": "gemini3.7-flash-gw",
+    "pages": "PDF images",
+    "n": 33,
+    "arm": "sbb",
+    "base": "raw",
+    "nes": 0.97142,
+    "chrf": 0.98332,
+    "inserted": 0.00893,
+    "rewritten": 0.00315,
+    "restoration_only_k": 7.08902,
+    "suspect_k": 7.46213,
+    "d_nes": -0.023,
+    "lo": -0.05916,
+    "hi": -0.00319,
+    "p": 0.0002
+   },
+   {
+    "reader": "gemini3.7-flash-gw",
+    "pages": "PDF images",
+    "n": 33,
+    "arm": "docres-appearance",
+    "base": "raw",
+    "nes": 0.99471,
+    "chrf": 0.9952,
+    "inserted": 0.00413,
+    "rewritten": 0.00075,
+    "restoration_only_k": 1.04673,
+    "suspect_k": 1.64486,
+    "d_nes": 0.00029,
+    "lo": -0.00088,
+    "hi": 0.00159,
+    "p": 0.65183
+   },
+   {
+    "reader": "gemini3.7-flash-gw",
+    "pages": "PDF images",
+    "n": 33,
+    "arm": "docres-deshadow",
+    "base": "raw",
+    "nes": 0.9941,
+    "chrf": 0.99455,
+    "inserted": 0.00398,
+    "rewritten": 0.00128,
+    "restoration_only_k": 0.82274,
+    "suspect_k": 0.97233,
+    "d_nes": -0.00032,
+    "lo": -0.00119,
+    "hi": 0.00033,
+    "p": 0.50385
+   },
+   {
     "reader": "apple-vision",
     "pages": "probe 30",
     "n": 30,
@@ -31671,8 +32100,297 @@
     "nes": 0.91534,
     "prompt_tokens": 124570,
     "completion_tokens": 20757
+   },
+   {
+    "route": "gemini3.7-flash-gw",
+    "arm": "shading",
+    "group": "the 96",
+    "n": 96,
+    "ok": 96,
+    "nes": 0.9553,
+    "prompt_tokens": 137639,
+    "completion_tokens": 62894,
+    "cost": 0.339082
+   },
+   {
+    "route": "gemini3.7-flash-gw",
+    "arm": "shading",
+    "group": "kind:handwritten",
+    "n": 16,
+    "ok": 16,
+    "nes": 0.9432,
+    "prompt_tokens": 22796,
+    "completion_tokens": 11273,
+    "cost": 0.059371
+   },
+   {
+    "route": "gemini3.7-flash-gw",
+    "arm": "shading",
+    "group": "kind:mixed",
+    "n": 2,
+    "ok": 2,
+    "nes": 0.83828,
+    "prompt_tokens": 2840,
+    "completion_tokens": 1004,
+    "cost": 0.005895
+   },
+   {
+    "route": "gemini3.7-flash-gw",
+    "arm": "shading",
+    "group": "kind:printed",
+    "n": 28,
+    "ok": 28,
+    "nes": 0.93731,
+    "prompt_tokens": 40254,
+    "completion_tokens": 19579,
+    "cost": 0.103612
+   },
+   {
+    "route": "gemini3.7-flash-gw",
+    "arm": "shading",
+    "group": "kind:typewritten",
+    "n": 50,
+    "ok": 50,
+    "nes": 0.97394,
+    "prompt_tokens": 71749,
+    "completion_tokens": 31038,
+    "cost": 0.170204
+   },
+   {
+    "route": "gemini3.7-flash-gw",
+    "arm": "gcdrnet",
+    "group": "the 96",
+    "n": 96,
+    "ok": 96,
+    "nes": 0.96369,
+    "prompt_tokens": 137639,
+    "completion_tokens": 64824,
+    "cost": 0.346319
+   },
+   {
+    "route": "gemini3.7-flash-gw",
+    "arm": "gcdrnet",
+    "group": "kind:handwritten",
+    "n": 16,
+    "ok": 16,
+    "nes": 0.93799,
+    "prompt_tokens": 22796,
+    "completion_tokens": 9409,
+    "cost": 0.052381
+   },
+   {
+    "route": "gemini3.7-flash-gw",
+    "arm": "gcdrnet",
+    "group": "kind:mixed",
+    "n": 2,
+    "ok": 2,
+    "nes": 0.85946,
+    "prompt_tokens": 2840,
+    "completion_tokens": 1115,
+    "cost": 0.006311
+   },
+   {
+    "route": "gemini3.7-flash-gw",
+    "arm": "gcdrnet",
+    "group": "kind:printed",
+    "n": 28,
+    "ok": 28,
+    "nes": 0.96016,
+    "prompt_tokens": 40254,
+    "completion_tokens": 23031,
+    "cost": 0.116557
+   },
+   {
+    "route": "gemini3.7-flash-gw",
+    "arm": "gcdrnet",
+    "group": "kind:typewritten",
+    "n": 50,
+    "ok": 50,
+    "nes": 0.97805,
+    "prompt_tokens": 71749,
+    "completion_tokens": 31269,
+    "cost": 0.17107
+   },
+   {
+    "route": "gemini3.7-flash-gw",
+    "arm": "sbb",
+    "group": "the 96",
+    "n": 96,
+    "ok": 96,
+    "nes": 0.94854,
+    "prompt_tokens": 137639,
+    "completion_tokens": 61566,
+    "cost": 0.334102
+   },
+   {
+    "route": "gemini3.7-flash-gw",
+    "arm": "sbb",
+    "group": "kind:handwritten",
+    "n": 16,
+    "ok": 16,
+    "nes": 0.92187,
+    "prompt_tokens": 22796,
+    "completion_tokens": 7561,
+    "cost": 0.045451
+   },
+   {
+    "route": "gemini3.7-flash-gw",
+    "arm": "sbb",
+    "group": "kind:mixed",
+    "n": 2,
+    "ok": 2,
+    "nes": 0.77214,
+    "prompt_tokens": 2840,
+    "completion_tokens": 1466,
+    "cost": 0.007627
+   },
+   {
+    "route": "gemini3.7-flash-gw",
+    "arm": "sbb",
+    "group": "kind:printed",
+    "n": 28,
+    "ok": 28,
+    "nes": 0.94277,
+    "prompt_tokens": 40254,
+    "completion_tokens": 22615,
+    "cost": 0.114997
+   },
+   {
+    "route": "gemini3.7-flash-gw",
+    "arm": "sbb",
+    "group": "kind:typewritten",
+    "n": 50,
+    "ok": 50,
+    "nes": 0.96737,
+    "prompt_tokens": 71749,
+    "completion_tokens": 29924,
+    "cost": 0.166027
+   },
+   {
+    "route": "gemini3.7-flash-gw",
+    "arm": "docres-appearance",
+    "group": "the 96",
+    "n": 96,
+    "ok": 96,
+    "nes": 0.96532,
+    "prompt_tokens": 137639,
+    "completion_tokens": 64830,
+    "cost": 0.346342
+   },
+   {
+    "route": "gemini3.7-flash-gw",
+    "arm": "docres-appearance",
+    "group": "kind:handwritten",
+    "n": 16,
+    "ok": 16,
+    "nes": 0.94862,
+    "prompt_tokens": 22796,
+    "completion_tokens": 12619,
+    "cost": 0.064418
+   },
+   {
+    "route": "gemini3.7-flash-gw",
+    "arm": "docres-appearance",
+    "group": "kind:mixed",
+    "n": 2,
+    "ok": 2,
+    "nes": 0.86929,
+    "prompt_tokens": 2840,
+    "completion_tokens": 1390,
+    "cost": 0.007343
+   },
+   {
+    "route": "gemini3.7-flash-gw",
+    "arm": "docres-appearance",
+    "group": "kind:printed",
+    "n": 28,
+    "ok": 28,
+    "nes": 0.94464,
+    "prompt_tokens": 40254,
+    "completion_tokens": 20779,
+    "cost": 0.108112
+   },
+   {
+    "route": "gemini3.7-flash-gw",
+    "arm": "docres-appearance",
+    "group": "kind:typewritten",
+    "n": 50,
+    "ok": 50,
+    "nes": 0.98608,
+    "prompt_tokens": 71749,
+    "completion_tokens": 30042,
+    "cost": 0.166469
+   },
+   {
+    "route": "gemini3.7-flash-gw",
+    "arm": "docres-deshadow",
+    "group": "the 96",
+    "n": 96,
+    "ok": 96,
+    "nes": 0.96512,
+    "prompt_tokens": 137639,
+    "completion_tokens": 65111,
+    "cost": 0.347396
+   },
+   {
+    "route": "gemini3.7-flash-gw",
+    "arm": "docres-deshadow",
+    "group": "kind:handwritten",
+    "n": 16,
+    "ok": 16,
+    "nes": 0.95792,
+    "prompt_tokens": 22796,
+    "completion_tokens": 7704,
+    "cost": 0.045987
+   },
+   {
+    "route": "gemini3.7-flash-gw",
+    "arm": "docres-deshadow",
+    "group": "kind:mixed",
+    "n": 2,
+    "ok": 2,
+    "nes": 0.83669,
+    "prompt_tokens": 2840,
+    "completion_tokens": 502,
+    "cost": 0.004012
+   },
+   {
+    "route": "gemini3.7-flash-gw",
+    "arm": "docres-deshadow",
+    "group": "kind:printed",
+    "n": 28,
+    "ok": 28,
+    "nes": 0.93752,
+    "prompt_tokens": 40254,
+    "completion_tokens": 23083,
+    "cost": 0.116752
+   },
+   {
+    "route": "gemini3.7-flash-gw",
+    "arm": "docres-deshadow",
+    "group": "kind:typewritten",
+    "n": 50,
+    "ok": 50,
+    "nes": 0.98802,
+    "prompt_tokens": 71749,
+    "completion_tokens": 33822,
+    "cost": 0.180644
    }
-  ]
+  ],
+  "gateway": {
+   "item": "W46.enh-ocr-input-paid",
+   "model": "gemini-3.7-flash",
+   "route": "gemini3.7-flash-gw",
+   "calls": 480,
+   "cost_estimate": 1.7132,
+   "price_assumed": [
+    0.75,
+    3.75
+   ],
+   "coverage": {
+    "ok": 576
+   }
+  }
  },
  "loops": {
   "report": "bench-corpus/loop-rerun-20261021.md",

@@ -2111,6 +2111,582 @@ glm-ocr,p100,gcdrnet,original,0.517567,0.517567,0.533724,165,190,29,54,27,27,0,0
 glm-ocr,p100,sbb,original,0.517567,0.517567,0.533724,165,190,29,54,27,27,0,0,0.0
 glm-ocr,p100,docres-appearance,original,0.517567,0.517567,0.533724,165,190,29,54,27,27,0,0,0.0
 glm-ocr,p100,docres-deshadow,original,0.517567,0.517567,0.533724,165,190,29,54,27,27,0,0,0.0
+gemini3.7-flash-gw,p001,raw,original,0.960519,0.960519,0.991867,295,295,1,1,5,0,0,0,0.0
+gemini3.7-flash-gw,p001,shading,original,0.959391,0.960519,0.98895,295,294,2,1,5,1,1,2,6.802721
+gemini3.7-flash-gw,p001,gcdrnet,original,0.99718,0.960519,0.996136,295,294,1,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p001,sbb,original,0.960519,0.960519,0.991867,295,295,1,1,5,0,0,0,0.0
+gemini3.7-flash-gw,p001,docres-appearance,original,0.99436,0.960519,0.99424,295,295,1,1,1,0,1,1,3.389831
+gemini3.7-flash-gw,p001,docres-deshadow,original,0.959955,0.960519,0.990398,295,295,0,0,5,0,0,1,3.389831
+gemini3.7-flash-gw,p002,raw,original,1.0,1.0,1.0,135,135,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p002,shading,original,1.0,1.0,1.0,135,135,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p002,gcdrnet,original,1.0,1.0,1.0,135,135,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p002,sbb,original,1.0,1.0,1.0,135,135,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p002,docres-appearance,original,1.0,1.0,1.0,135,135,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p002,docres-deshadow,original,1.0,1.0,1.0,135,135,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p003,raw,original,0.998411,0.998411,0.997451,589,589,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p003,shading,original,0.981162,0.998411,0.978938,589,577,12,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p003,gcdrnet,original,0.998146,0.998411,0.996864,589,589,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p003,sbb,original,0.995773,0.998411,0.989172,589,589,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p003,docres-appearance,original,0.998411,0.998411,0.997451,589,589,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p003,docres-deshadow,original,0.998411,0.998411,0.997451,589,589,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p004,raw,original,1.0,1.0,1.0,282,282,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p004,shading,original,0.999424,1.0,1.0,282,281,2,1,0,1,1,1,3.558719
+gemini3.7-flash-gw,p004,gcdrnet,original,1.0,1.0,1.0,282,282,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p004,sbb,original,1.0,1.0,1.0,282,282,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p004,docres-appearance,original,1.0,1.0,1.0,282,282,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p004,docres-deshadow,original,1.0,1.0,1.0,282,282,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p005,raw,original,1.0,1.0,1.0,576,576,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p005,shading,original,1.0,1.0,1.0,576,576,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p005,gcdrnet,original,1.0,1.0,1.0,576,576,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p005,sbb,original,1.0,1.0,1.0,576,576,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p005,docres-appearance,original,1.0,1.0,1.0,576,576,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p005,docres-deshadow,original,1.0,1.0,1.0,576,576,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p006,raw,original,1.0,1.0,1.0,45,45,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p006,shading,original,1.0,1.0,1.0,45,45,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p006,gcdrnet,original,1.0,1.0,1.0,45,45,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p006,sbb,original,0.99361,1.0,0.989758,45,45,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p006,docres-appearance,original,1.0,1.0,1.0,45,45,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p006,docres-deshadow,original,1.0,1.0,1.0,45,45,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p007,raw,original,0.994709,0.994709,0.987514,73,73,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p007,shading,original,0.962766,0.994709,0.948156,73,74,1,2,1,0,2,2,27.027027
+gemini3.7-flash-gw,p007,gcdrnet,original,0.844186,0.994709,0.862099,73,93,1,21,20,0,16,14,150.537634
+gemini3.7-flash-gw,p007,sbb,original,0.840278,0.994709,0.860975,73,93,1,21,20,0,15,12,129.032258
+gemini3.7-flash-gw,p007,docres-appearance,original,0.968085,0.994709,0.970399,73,73,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p007,docres-deshadow,original,0.962766,0.994709,0.943823,73,74,1,2,1,0,2,2,27.027027
+gemini3.7-flash-gw,p008,raw,pdf image,0.999413,0.999413,0.999035,605,605,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p008,shading,pdf image,0.999413,0.999413,0.999035,605,605,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p008,gcdrnet,pdf image,0.998532,0.999413,0.995424,605,605,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p008,sbb,pdf image,0.998826,0.999413,0.996533,605,605,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p008,docres-appearance,pdf image,0.999119,0.999413,0.997784,605,605,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p008,docres-deshadow,pdf image,0.999413,0.999413,0.999035,605,605,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p009,raw,original,0.688088,0.688088,0.769924,160,214,9,63,58,8,0,0,0.0
+gemini3.7-flash-gw,p009,shading,original,0.684022,0.688088,0.765266,160,186,7,33,35,8,20,22,118.27957
+gemini3.7-flash-gw,p009,gcdrnet,original,0.741316,0.688088,0.765199,160,170,11,21,12,11,9,4,23.529412
+gemini3.7-flash-gw,p009,sbb,original,0.615174,0.688088,0.738743,160,166,13,19,21,6,12,12,72.289157
+gemini3.7-flash-gw,p009,docres-appearance,original,0.749778,0.688088,0.908678,160,172,8,20,23,7,10,7,40.697674
+gemini3.7-flash-gw,p009,docres-deshadow,original,0.6883,0.688088,0.754536,160,175,9,24,21,9,10,10,57.142857
+gemini3.7-flash-gw,p010,raw,pdf image,0.999449,0.999449,0.998005,601,601,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p010,shading,pdf image,0.999449,0.999449,0.998005,601,601,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p010,gcdrnet,pdf image,0.998897,0.999449,0.995635,601,601,2,2,0,0,1,0,0.0
+gemini3.7-flash-gw,p010,sbb,pdf image,0.998897,0.999449,0.995635,601,601,2,2,0,0,2,2,3.327787
+gemini3.7-flash-gw,p010,docres-appearance,pdf image,0.998622,0.999449,0.994532,601,601,3,3,0,0,2,1,1.663894
+gemini3.7-flash-gw,p010,docres-deshadow,pdf image,0.999449,0.999449,0.998005,601,601,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p011,raw,original,0.975155,0.975155,0.965101,83,83,0,0,1,0,0,0,0.0
+gemini3.7-flash-gw,p011,shading,original,0.881988,0.975155,0.937844,83,83,0,0,8,0,0,0,0.0
+gemini3.7-flash-gw,p011,gcdrnet,original,0.975155,0.975155,0.965101,83,83,0,0,1,0,0,0,0.0
+gemini3.7-flash-gw,p011,sbb,original,0.790456,0.975155,0.95911,83,83,0,0,8,0,0,0,0.0
+gemini3.7-flash-gw,p011,docres-appearance,original,0.975155,0.975155,0.965101,83,83,0,0,1,0,0,0,0.0
+gemini3.7-flash-gw,p011,docres-deshadow,original,0.969136,0.975155,0.965101,83,86,3,6,4,1,2,2,23.255814
+gemini3.7-flash-gw,p012,raw,original,1.0,1.0,1.0,400,400,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p012,shading,original,1.0,1.0,1.0,400,400,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p012,gcdrnet,original,1.0,1.0,1.0,400,400,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p012,sbb,original,0.986158,1.0,0.997133,400,405,0,5,5,0,3,2,4.938272
+gemini3.7-flash-gw,p012,docres-appearance,original,1.0,1.0,1.0,400,400,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p012,docres-deshadow,original,1.0,1.0,1.0,400,400,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p013,raw,original,0.765773,0.765773,0.990222,412,411,1,0,41,0,0,0,0.0
+gemini3.7-flash-gw,p013,shading,original,0.766186,0.765773,0.988574,412,411,1,0,41,0,0,0,0.0
+gemini3.7-flash-gw,p013,gcdrnet,original,0.764536,0.765773,0.986714,412,411,1,0,41,0,0,0,0.0
+gemini3.7-flash-gw,p013,sbb,original,0.745567,0.765773,0.969418,412,411,9,8,41,8,8,8,19.46472
+gemini3.7-flash-gw,p013,docres-appearance,original,0.764948,0.765773,0.990238,412,411,1,0,41,0,0,0,0.0
+gemini3.7-flash-gw,p013,docres-deshadow,original,0.765361,0.765773,0.988574,412,411,1,0,41,0,0,0,0.0
+gemini3.7-flash-gw,p014,raw,pdf image,0.990662,0.990662,0.99084,192,192,1,1,0,0,0,0,0.0
+gemini3.7-flash-gw,p014,shading,pdf image,0.990662,0.990662,0.99084,192,192,1,1,0,0,0,0,0.0
+gemini3.7-flash-gw,p014,gcdrnet,pdf image,0.990662,0.990662,0.99084,192,192,1,1,0,0,0,0,0.0
+gemini3.7-flash-gw,p014,sbb,pdf image,0.990662,0.990662,0.99084,192,192,1,1,0,0,0,0,0.0
+gemini3.7-flash-gw,p014,docres-appearance,pdf image,0.990662,0.990662,0.99084,192,192,1,1,0,0,0,0,0.0
+gemini3.7-flash-gw,p014,docres-deshadow,pdf image,0.989813,0.990662,0.989822,192,192,1,1,0,0,1,1,5.208333
+gemini3.7-flash-gw,p015,raw,original,0.945243,0.945243,0.992176,217,217,0,0,4,0,0,0,0.0
+gemini3.7-flash-gw,p015,shading,original,0.942568,0.945243,0.980281,217,220,1,4,9,1,3,3,13.636364
+gemini3.7-flash-gw,p015,gcdrnet,original,0.911765,0.945243,0.978114,217,217,1,1,8,1,0,0,0.0
+gemini3.7-flash-gw,p015,sbb,original,0.935418,0.945243,0.92781,217,208,13,4,1,3,3,3,14.423077
+gemini3.7-flash-gw,p015,docres-appearance,original,0.94898,0.945243,0.980471,217,217,0,0,6,0,0,0,0.0
+gemini3.7-flash-gw,p015,docres-deshadow,original,0.920927,0.945243,0.977385,217,217,0,0,10,0,0,0,0.0
+gemini3.7-flash-gw,p016,raw,pdf image,0.995565,0.995565,0.988783,171,171,1,1,0,1,0,0,0.0
+gemini3.7-flash-gw,p016,shading,pdf image,0.979258,0.995565,0.985039,171,172,1,2,1,1,2,2,11.627907
+gemini3.7-flash-gw,p016,gcdrnet,pdf image,0.998891,0.995565,0.99519,171,171,0,0,0,0,0,1,5.847953
+gemini3.7-flash-gw,p016,sbb,pdf image,0.990088,0.995565,0.991959,171,171,1,1,0,1,1,1,5.847953
+gemini3.7-flash-gw,p016,docres-appearance,pdf image,0.997783,0.995565,0.994506,171,171,1,1,0,1,1,1,5.847953
+gemini3.7-flash-gw,p016,docres-deshadow,pdf image,0.998891,0.995565,0.99519,171,171,0,0,0,0,0,1,5.847953
+gemini3.7-flash-gw,p017,raw,original,0.991162,0.991162,0.990499,237,236,3,2,1,0,0,0,0.0
+gemini3.7-flash-gw,p017,shading,original,0.990483,0.991162,0.991144,237,235,3,1,0,0,0,1,4.255319
+gemini3.7-flash-gw,p017,gcdrnet,original,0.991162,0.991162,0.988604,237,236,4,3,0,2,0,0,0.0
+gemini3.7-flash-gw,p017,sbb,original,0.988443,0.991162,0.987377,237,235,4,2,0,1,1,1,4.255319
+gemini3.7-flash-gw,p017,docres-appearance,original,0.991842,0.991162,0.989848,237,236,2,1,0,1,0,2,8.474576
+gemini3.7-flash-gw,p017,docres-deshadow,original,0.991162,0.991162,0.990499,237,236,3,2,1,0,0,0,0.0
+gemini3.7-flash-gw,p018,raw,original,0.803615,0.803615,0.864595,330,321,17,8,6,1,0,0,0.0
+gemini3.7-flash-gw,p018,shading,original,0.789515,0.803615,0.878528,330,321,17,8,7,1,4,4,12.461059
+gemini3.7-flash-gw,p018,gcdrnet,original,0.884681,0.803615,0.902804,330,324,16,10,9,1,4,5,15.432099
+gemini3.7-flash-gw,p018,sbb,original,0.575358,0.803615,0.806061,330,373,44,87,90,8,35,29,77.747989
+gemini3.7-flash-gw,p018,docres-appearance,original,0.878723,0.803615,0.891125,330,329,17,16,14,1,8,8,24.316109
+gemini3.7-flash-gw,p018,docres-deshadow,original,0.885532,0.803615,0.902888,330,324,17,11,9,1,4,4,12.345679
+gemini3.7-flash-gw,p019,raw,pdf image,0.991561,0.991561,0.988813,125,124,1,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p019,shading,pdf image,0.991561,0.991561,0.988813,125,124,1,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p019,gcdrnet,pdf image,0.991561,0.991561,0.988813,125,124,1,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p019,sbb,pdf image,0.991561,0.991561,0.988813,125,124,1,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p019,docres-appearance,pdf image,0.991561,0.991561,0.988813,125,124,1,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p019,docres-deshadow,pdf image,0.991561,0.991561,0.988813,125,124,1,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p020,raw,original,0.974565,0.974565,0.982128,266,267,2,3,2,1,0,0,0.0
+gemini3.7-flash-gw,p020,shading,original,0.973896,0.974565,0.981469,266,268,1,3,3,1,1,2,7.462687
+gemini3.7-flash-gw,p020,gcdrnet,original,0.973896,0.974565,0.979258,266,267,3,4,2,1,1,1,3.745318
+gemini3.7-flash-gw,p020,sbb,original,0.981195,0.974565,0.982439,266,267,0,1,1,0,0,2,7.490637
+gemini3.7-flash-gw,p020,docres-appearance,original,0.973896,0.974565,0.981469,266,268,1,3,3,1,1,2,7.462687
+gemini3.7-flash-gw,p020,docres-deshadow,original,0.985274,0.974565,0.98828,266,267,0,1,1,0,0,2,7.490637
+gemini3.7-flash-gw,p021,raw,original,1.0,1.0,1.0,374,374,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p021,shading,original,1.0,1.0,1.0,374,374,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p021,gcdrnet,original,1.0,1.0,1.0,374,374,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p021,sbb,original,1.0,1.0,1.0,374,374,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p021,docres-appearance,original,1.0,1.0,1.0,374,374,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p021,docres-deshadow,original,1.0,1.0,1.0,374,374,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p022,raw,original,0.996936,0.996936,0.99276,290,288,5,3,0,2,0,0,0.0
+gemini3.7-flash-gw,p022,shading,original,0.996324,0.996936,0.994775,290,289,6,5,1,3,1,1,3.460208
+gemini3.7-flash-gw,p022,gcdrnet,original,0.998163,0.996936,0.994775,290,291,1,2,1,1,1,4,13.745704
+gemini3.7-flash-gw,p022,sbb,original,0.998163,0.996936,0.99276,290,290,0,0,0,0,0,3,10.344828
+gemini3.7-flash-gw,p022,docres-appearance,original,0.998162,0.996936,0.997387,290,290,4,4,1,2,1,2,6.896552
+gemini3.7-flash-gw,p022,docres-deshadow,original,0.997549,0.996936,0.994775,290,288,4,2,0,2,0,1,3.472222
+gemini3.7-flash-gw,p023,raw,pdf image,0.99857,0.99857,0.997063,204,204,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p023,shading,pdf image,0.999285,0.99857,0.997063,204,204,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p023,gcdrnet,pdf image,1.0,0.99857,1.0,204,204,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p023,sbb,pdf image,0.997143,0.99857,0.994126,204,204,2,2,0,0,2,2,9.803922
+gemini3.7-flash-gw,p023,docres-appearance,pdf image,1.0,0.99857,1.0,204,204,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p023,docres-deshadow,pdf image,0.998569,0.99857,0.994293,204,205,1,2,1,1,1,0,0.0
+gemini3.7-flash-gw,p024,raw,original,0.934479,0.934479,0.95769,143,150,0,7,7,0,0,0,0.0
+gemini3.7-flash-gw,p024,shading,original,0.9701,0.934479,0.958673,143,143,2,2,1,1,1,1,6.993007
+gemini3.7-flash-gw,p024,gcdrnet,original,0.972315,0.934479,0.963085,143,144,0,1,1,0,0,0,0.0
+gemini3.7-flash-gw,p024,sbb,original,0.9701,0.934479,0.958673,143,143,2,2,1,1,1,1,6.993007
+gemini3.7-flash-gw,p024,docres-appearance,original,0.972315,0.934479,0.971903,143,146,2,5,3,2,4,2,13.69863
+gemini3.7-flash-gw,p024,docres-deshadow,original,0.972315,0.934479,0.971903,143,146,2,5,3,2,4,2,13.69863
+gemini3.7-flash-gw,p025,raw,pdf image,0.997512,0.997512,0.994466,69,69,1,1,0,0,0,0,0.0
+gemini3.7-flash-gw,p025,shading,pdf image,0.340678,0.997512,0.695567,69,146,1,78,77,0,41,41,280.821918
+gemini3.7-flash-gw,p025,gcdrnet,pdf image,0.746741,0.997512,0.917112,69,83,1,15,14,0,8,9,108.433735
+gemini3.7-flash-gw,p025,sbb,pdf image,0.429646,0.997512,0.75195,69,118,2,51,49,1,26,27,228.813559
+gemini3.7-flash-gw,p025,docres-appearance,pdf image,1.0,0.997512,1.0,69,69,0,0,0,0,0,1,14.492754
+gemini3.7-flash-gw,p025,docres-deshadow,pdf image,0.997512,0.997512,0.994466,69,69,1,1,0,0,0,0,0.0
+gemini3.7-flash-gw,p026,raw,original,0.988148,0.988148,0.988351,426,427,6,7,1,0,0,0,0.0
+gemini3.7-flash-gw,p026,shading,original,0.99516,0.988148,0.996095,426,425,2,1,0,0,1,1,2.352941
+gemini3.7-flash-gw,p026,gcdrnet,original,0.995532,0.988148,0.996095,426,426,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p026,sbb,original,0.995905,0.988148,0.995741,426,427,0,1,1,0,0,0,0.0
+gemini3.7-flash-gw,p026,docres-appearance,original,0.995532,0.988148,0.996095,426,426,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p026,docres-deshadow,original,0.994788,0.988148,0.996095,426,424,4,2,0,0,1,1,2.358491
+gemini3.7-flash-gw,p027,raw,pdf image,0.999148,0.999148,0.996307,222,222,1,1,0,0,0,0,0.0
+gemini3.7-flash-gw,p027,shading,pdf image,1.0,0.999148,1.0,222,222,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p027,gcdrnet,pdf image,0.94146,0.999148,0.984695,222,234,0,12,12,0,6,4,17.094017
+gemini3.7-flash-gw,p027,sbb,pdf image,0.952149,0.999148,0.984755,222,231,0,9,9,0,6,5,21.645022
+gemini3.7-flash-gw,p027,docres-appearance,pdf image,1.0,0.999148,1.0,222,222,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p027,docres-deshadow,pdf image,0.999148,0.999148,0.996307,222,222,1,1,0,0,0,0,0.0
+gemini3.7-flash-gw,p028,raw,pdf image,0.999214,0.999214,0.996716,202,202,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p028,shading,pdf image,0.999214,0.999214,0.996716,202,202,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p028,gcdrnet,pdf image,0.999214,0.999214,0.996716,202,202,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p028,sbb,pdf image,0.96,0.999214,0.988007,202,203,0,1,1,0,0,0,0.0
+gemini3.7-flash-gw,p028,docres-appearance,pdf image,0.999214,0.999214,0.996716,202,202,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p028,docres-deshadow,pdf image,0.999214,0.999214,0.996716,202,202,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p029,raw,original,0.997801,0.997801,0.998074,307,307,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p029,shading,original,0.997801,0.997801,0.998074,307,307,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p029,gcdrnet,original,0.997801,0.997801,0.998074,307,307,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p029,sbb,original,0.990634,0.997801,0.989431,307,304,3,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p029,docres-appearance,original,0.997801,0.997801,0.998074,307,307,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p029,docres-deshadow,original,0.997801,0.997801,0.998074,307,307,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p030,raw,original,0.998762,0.998762,0.997954,275,275,1,1,0,1,0,0,0.0
+gemini3.7-flash-gw,p030,shading,original,0.99876,0.998762,0.99753,275,275,0,0,0,0,0,1,3.636364
+gemini3.7-flash-gw,p030,gcdrnet,original,0.982864,0.998762,0.99107,275,276,2,3,3,0,0,1,3.623188
+gemini3.7-flash-gw,p030,sbb,original,0.989461,0.998762,0.986337,275,274,3,2,0,2,1,1,3.649635
+gemini3.7-flash-gw,p030,docres-appearance,original,0.99938,0.998762,0.997754,275,275,0,0,0,0,0,1,3.636364
+gemini3.7-flash-gw,p030,docres-deshadow,original,0.998762,0.998762,0.997954,275,275,1,1,0,1,0,0,0.0
+gemini3.7-flash-gw,p031,raw,original,0.988806,0.988806,0.955873,50,50,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p031,shading,original,0.992537,0.988806,0.972409,50,50,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p031,gcdrnet,original,0.977612,0.988806,0.939336,50,49,2,1,0,1,1,1,20.408163
+gemini3.7-flash-gw,p031,sbb,original,0.929104,0.988806,0.91396,50,48,6,4,0,4,4,4,83.333333
+gemini3.7-flash-gw,p031,docres-appearance,original,0.988806,0.988806,0.955873,50,50,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p031,docres-deshadow,original,0.985075,0.988806,0.972409,50,49,2,1,0,1,1,1,20.408163
+gemini3.7-flash-gw,p032,raw,original,1.0,1.0,1.0,327,327,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p032,shading,original,0.977175,1.0,0.992146,327,330,0,3,3,0,3,3,9.090909
+gemini3.7-flash-gw,p032,gcdrnet,original,0.999028,1.0,0.996866,327,327,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p032,sbb,original,0.976236,1.0,0.991913,327,333,0,6,6,0,6,6,18.018018
+gemini3.7-flash-gw,p032,docres-appearance,original,0.988456,1.0,0.994443,327,327,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p032,docres-deshadow,original,0.973934,1.0,0.992903,327,332,0,5,5,0,4,4,12.048193
+gemini3.7-flash-gw,p033,raw,original,0.999122,0.999122,0.996682,406,406,1,1,0,0,0,0,0.0
+gemini3.7-flash-gw,p033,shading,original,0.999123,0.999122,1.0,406,408,2,4,2,2,3,2,4.901961
+gemini3.7-flash-gw,p033,gcdrnet,original,1.0,0.999122,1.0,406,406,0,0,0,0,0,1,2.463054
+gemini3.7-flash-gw,p033,sbb,original,1.0,0.999122,1.0,406,406,0,0,0,0,0,1,2.463054
+gemini3.7-flash-gw,p033,docres-appearance,original,0.999561,0.999122,1.0,406,407,1,2,1,1,2,1,2.457002
+gemini3.7-flash-gw,p033,docres-deshadow,original,0.999561,0.999122,1.0,406,406,0,0,0,0,0,1,2.463054
+gemini3.7-flash-gw,p034,raw,original,0.404624,0.404624,0.416787,28,14,15,1,0,0,0,0,0.0
+gemini3.7-flash-gw,p034,shading,original,0.213873,0.404624,0.921802,28,28,2,2,13,0,1,4,142.857143
+gemini3.7-flash-gw,p034,gcdrnet,original,0.919075,0.404624,0.905768,28,24,4,0,0,0,0,3,125.0
+gemini3.7-flash-gw,p034,sbb,original,0.942197,0.404624,0.914207,28,26,3,1,0,1,1,4,153.846154
+gemini3.7-flash-gw,p034,docres-appearance,original,0.213873,0.404624,0.918325,28,27,3,2,12,0,2,5,185.185185
+gemini3.7-flash-gw,p034,docres-deshadow,original,0.410405,0.404624,0.440036,28,14,15,1,0,0,0,0,0.0
+gemini3.7-flash-gw,p035,raw,original,0.999423,0.999423,0.99809,316,315,2,1,0,1,0,0,0.0
+gemini3.7-flash-gw,p035,shading,original,1.0,0.999423,1.0,316,316,0,0,0,0,0,2,6.329114
+gemini3.7-flash-gw,p035,gcdrnet,original,1.0,0.999423,1.0,316,316,0,0,0,0,0,2,6.329114
+gemini3.7-flash-gw,p035,sbb,original,0.908698,0.999423,0.950257,316,321,14,19,11,5,14,12,37.383178
+gemini3.7-flash-gw,p035,docres-appearance,original,0.999423,0.999423,0.99809,316,315,2,1,0,1,0,0,0.0
+gemini3.7-flash-gw,p035,docres-deshadow,original,0.999423,0.999423,0.99809,316,315,2,1,0,1,0,0,0.0
+gemini3.7-flash-gw,p036,raw,original,1.0,1.0,1.0,382,382,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p036,shading,original,1.0,1.0,1.0,382,382,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p036,gcdrnet,original,1.0,1.0,1.0,382,382,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p036,sbb,original,0.982119,1.0,0.983003,382,375,7,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p036,docres-appearance,original,1.0,1.0,1.0,382,382,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p036,docres-deshadow,original,1.0,1.0,1.0,382,382,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p037,raw,original,0.999687,0.999687,0.998692,508,508,1,1,0,0,0,0,0.0
+gemini3.7-flash-gw,p037,shading,original,1.0,0.999687,1.0,508,508,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p037,gcdrnet,original,1.0,0.999687,1.0,508,508,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p037,sbb,original,0.999687,0.999687,0.998692,508,508,1,1,0,0,1,1,1.968504
+gemini3.7-flash-gw,p037,docres-appearance,original,0.999687,0.999687,0.998692,508,508,1,1,0,0,0,0,0.0
+gemini3.7-flash-gw,p037,docres-deshadow,original,1.0,0.999687,1.0,508,508,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p039,raw,original,1.0,1.0,1.0,317,317,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p039,shading,original,1.0,1.0,1.0,317,317,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p039,gcdrnet,original,1.0,1.0,1.0,317,317,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p039,sbb,original,1.0,1.0,1.0,317,317,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p039,docres-appearance,original,1.0,1.0,1.0,317,317,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p039,docres-deshadow,original,1.0,1.0,1.0,317,317,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p040,raw,original,0.994577,0.994577,0.981913,185,185,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p040,shading,original,0.996743,0.994577,0.986709,185,185,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p040,gcdrnet,original,0.966351,0.994577,0.984724,185,189,0,4,4,0,3,1,5.291005
+gemini3.7-flash-gw,p040,sbb,original,0.952332,0.994577,0.981523,185,191,0,6,6,0,5,3,15.706806
+gemini3.7-flash-gw,p040,docres-appearance,original,0.967368,0.994577,0.988395,185,189,0,4,4,0,3,1,5.291005
+gemini3.7-flash-gw,p040,docres-deshadow,original,0.995666,0.994577,0.984339,185,185,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p041,raw,original,0.995365,0.995365,0.993694,385,386,0,1,1,0,0,0,0.0
+gemini3.7-flash-gw,p041,shading,original,0.994522,0.995365,0.991828,385,386,0,1,1,0,0,0,0.0
+gemini3.7-flash-gw,p041,gcdrnet,original,0.9941,0.995365,0.99055,385,386,1,2,1,0,2,2,5.181347
+gemini3.7-flash-gw,p041,sbb,original,0.979634,0.995365,0.993512,385,391,0,6,6,0,3,2,5.11509
+gemini3.7-flash-gw,p041,docres-appearance,original,0.994522,0.995365,0.991828,385,385,2,2,1,1,1,1,2.597403
+gemini3.7-flash-gw,p041,docres-deshadow,original,0.995365,0.995365,0.993694,385,386,0,1,1,0,0,0,0.0
+gemini3.7-flash-gw,p042,raw,pdf image,0.999781,0.999781,1.0,804,805,1,2,1,1,0,0,0.0
+gemini3.7-flash-gw,p042,shading,pdf image,0.999563,0.999781,1.0,804,806,2,4,2,2,2,2,2.48139
+gemini3.7-flash-gw,p042,gcdrnet,pdf image,0.999563,0.999781,1.0,804,806,2,4,2,2,2,2,2.48139
+gemini3.7-flash-gw,p042,sbb,pdf image,0.999344,0.999781,0.999283,804,806,2,4,2,2,2,2,2.48139
+gemini3.7-flash-gw,p042,docres-appearance,pdf image,0.999781,0.999781,1.0,804,805,1,2,1,1,0,0,0.0
+gemini3.7-flash-gw,p042,docres-deshadow,pdf image,0.999781,0.999781,1.0,804,805,1,2,1,1,0,0,0.0
+gemini3.7-flash-gw,p043,raw,pdf image,0.999788,0.999788,0.999302,836,836,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p043,shading,pdf image,0.999788,0.999788,0.999302,836,836,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p043,gcdrnet,pdf image,0.999575,0.999788,1.0,836,837,1,2,1,0,2,2,2.389486
+gemini3.7-flash-gw,p043,sbb,pdf image,0.999575,0.999788,0.998837,836,836,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p043,docres-appearance,pdf image,1.0,0.999788,1.0,836,836,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p043,docres-deshadow,pdf image,0.999788,0.999788,0.999302,836,836,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p044,raw,pdf image,1.0,1.0,1.0,690,690,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p044,shading,pdf image,0.999749,1.0,0.998936,690,690,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p044,gcdrnet,pdf image,0.999749,1.0,0.999179,690,690,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p044,sbb,pdf image,0.998995,1.0,0.995743,690,690,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p044,docres-appearance,pdf image,0.999749,1.0,0.998936,690,690,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p044,docres-deshadow,pdf image,0.999498,1.0,0.998115,690,690,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p045,raw,original,0.960331,0.960331,0.944402,113,117,1,5,4,0,0,0,0.0
+gemini3.7-flash-gw,p045,shading,original,0.960265,0.960331,0.94445,113,117,1,5,4,0,0,0,0.0
+gemini3.7-flash-gw,p045,gcdrnet,original,0.956954,0.960331,0.930365,113,117,1,5,4,0,0,0,0.0
+gemini3.7-flash-gw,p045,sbb,original,0.939394,0.960331,0.913765,113,114,3,4,2,1,1,1,8.77193
+gemini3.7-flash-gw,p045,docres-appearance,original,0.97973,0.960331,0.957241,113,114,1,2,1,0,0,0,0.0
+gemini3.7-flash-gw,p045,docres-deshadow,original,0.97973,0.960331,0.966431,113,114,0,1,1,1,0,1,8.77193
+gemini3.7-flash-gw,p046,raw,original,0.994094,0.994094,0.99706,86,85,2,1,0,0,0,0,0.0
+gemini3.7-flash-gw,p046,shading,original,0.990196,0.994094,0.990147,86,85,2,1,0,0,0,0,0.0
+gemini3.7-flash-gw,p046,gcdrnet,original,0.982318,0.994094,0.968449,86,86,0,0,0,0,0,2,23.255814
+gemini3.7-flash-gw,p046,sbb,original,0.986275,0.994094,0.981803,86,85,3,2,0,0,1,1,11.764706
+gemini3.7-flash-gw,p046,docres-appearance,original,0.992141,0.994094,0.996586,86,85,2,1,0,0,0,0,0.0
+gemini3.7-flash-gw,p046,docres-deshadow,original,0.980315,0.994094,0.974419,86,85,2,1,0,0,0,0,0.0
+gemini3.7-flash-gw,p047,raw,original,0.922835,0.922835,0.920107,106,100,7,1,0,1,0,0,0.0
+gemini3.7-flash-gw,p047,shading,original,0.910236,0.922835,0.890761,106,100,7,1,0,0,1,2,20.0
+gemini3.7-flash-gw,p047,gcdrnet,original,0.910236,0.922835,0.900479,106,100,6,0,0,0,0,1,10.0
+gemini3.7-flash-gw,p047,sbb,original,0.669291,0.922835,0.608526,106,83,36,13,1,10,12,12,144.578313
+gemini3.7-flash-gw,p047,docres-appearance,original,0.914961,0.922835,0.9043,106,100,6,0,0,0,0,1,10.0
+gemini3.7-flash-gw,p047,docres-deshadow,original,0.922835,0.922835,0.919786,106,100,6,0,0,0,0,1,10.0
+gemini3.7-flash-gw,p048,raw,original,0.845783,0.845783,0.789268,67,68,0,1,1,0,0,0,0.0
+gemini3.7-flash-gw,p048,shading,original,0.819277,0.845783,0.80297,67,67,0,0,2,0,0,0,0.0
+gemini3.7-flash-gw,p048,gcdrnet,original,0.845783,0.845783,0.78975,67,68,0,1,1,0,1,1,14.705882
+gemini3.7-flash-gw,p048,sbb,original,0.86747,0.845783,0.806356,67,67,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p048,docres-appearance,original,0.840964,0.845783,0.790233,67,67,1,1,0,1,1,1,14.925373
+gemini3.7-flash-gw,p048,docres-deshadow,original,0.872289,0.845783,0.824815,67,67,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p049,raw,original,0.968872,0.968872,0.946208,83,83,3,3,1,1,0,0,0.0
+gemini3.7-flash-gw,p049,shading,original,0.957198,0.968872,0.924393,83,84,2,3,1,2,1,3,35.714286
+gemini3.7-flash-gw,p049,gcdrnet,original,0.966926,0.968872,0.939906,83,84,2,3,1,2,2,4,47.619048
+gemini3.7-flash-gw,p049,sbb,original,0.966926,0.968872,0.943298,83,83,3,3,1,1,1,1,12.048193
+gemini3.7-flash-gw,p049,docres-appearance,original,0.959144,0.968872,0.93068,83,83,4,4,1,2,0,0,0.0
+gemini3.7-flash-gw,p049,docres-deshadow,original,0.966926,0.968872,0.944914,83,84,1,2,1,1,0,3,35.714286
+gemini3.7-flash-gw,p050,raw,original,0.76746,0.76746,0.881678,199,193,17,11,23,7,0,0,0.0
+gemini3.7-flash-gw,p050,shading,original,0.718342,0.76746,0.913283,199,195,13,9,25,4,1,8,41.025641
+gemini3.7-flash-gw,p050,gcdrnet,original,0.795088,0.76746,0.88166,199,202,11,14,26,6,4,11,54.455446
+gemini3.7-flash-gw,p050,sbb,original,0.798926,0.76746,0.860842,199,185,27,13,13,8,2,5,27.027027
+gemini3.7-flash-gw,p050,docres-appearance,original,0.823918,0.76746,0.898375,199,202,10,13,17,7,1,10,49.50495
+gemini3.7-flash-gw,p050,docres-deshadow,original,0.887183,0.76746,0.899731,199,204,14,19,12,10,8,14,68.627451
+gemini3.7-flash-gw,p051,raw,original,0.986538,0.986538,1.0,91,98,2,9,7,1,0,0,0.0
+gemini3.7-flash-gw,p051,shading,original,0.994175,0.986538,0.99355,91,92,4,5,2,2,2,3,32.608696
+gemini3.7-flash-gw,p051,gcdrnet,original,0.949907,0.986538,0.986032,91,100,4,13,10,2,1,1,10.0
+gemini3.7-flash-gw,p051,sbb,original,0.9606,0.986538,0.986032,91,94,3,6,4,1,1,2,21.276596
+gemini3.7-flash-gw,p051,docres-appearance,original,0.9606,0.986538,0.986032,91,94,3,6,4,1,1,2,21.276596
+gemini3.7-flash-gw,p051,docres-deshadow,original,0.996109,0.986538,0.99355,91,91,3,3,1,1,1,2,21.978022
+gemini3.7-flash-gw,p052,raw,original,0.992754,0.992754,0.979156,154,153,2,1,0,1,0,0,0.0
+gemini3.7-flash-gw,p052,shading,original,0.997585,0.992754,0.989578,154,154,0,0,0,0,0,1,6.493506
+gemini3.7-flash-gw,p052,gcdrnet,original,0.992754,0.992754,0.977669,154,153,2,1,0,1,0,0,0.0
+gemini3.7-flash-gw,p052,sbb,original,0.957143,0.992754,0.934425,154,153,5,4,0,3,3,4,26.143791
+gemini3.7-flash-gw,p052,docres-appearance,original,0.991546,0.992754,0.974691,154,153,3,2,0,1,1,1,6.535948
+gemini3.7-flash-gw,p052,docres-deshadow,original,0.993961,0.992754,0.983127,154,153,3,2,0,2,1,1,6.535948
+gemini3.7-flash-gw,p053,raw,original,0.981504,0.981504,0.967316,151,151,3,3,1,2,0,0,0.0
+gemini3.7-flash-gw,p053,shading,original,0.979038,0.981504,0.957604,151,152,1,2,1,1,2,4,26.315789
+gemini3.7-flash-gw,p053,gcdrnet,original,0.98397,0.981504,0.970529,151,153,0,2,2,0,2,4,26.143791
+gemini3.7-flash-gw,p053,sbb,original,0.982737,0.981504,0.969597,151,151,3,3,1,2,2,3,19.86755
+gemini3.7-flash-gw,p053,docres-appearance,original,0.98397,0.981504,0.970529,151,153,0,2,2,0,2,4,26.143791
+gemini3.7-flash-gw,p053,docres-deshadow,original,0.980271,0.981504,0.962318,151,151,3,3,1,2,1,2,13.245033
+gemini3.7-flash-gw,p054,raw,original,0.942564,0.942564,0.912697,145,148,6,9,5,5,0,0,0.0
+gemini3.7-flash-gw,p054,shading,original,0.952183,0.942564,0.910144,145,145,7,7,2,6,4,5,34.482759
+gemini3.7-flash-gw,p054,gcdrnet,original,0.951042,0.942564,0.917349,145,142,8,5,1,4,4,6,42.253521
+gemini3.7-flash-gw,p054,sbb,original,0.955208,0.942564,0.917056,145,143,6,4,1,3,1,2,13.986014
+gemini3.7-flash-gw,p054,docres-appearance,original,0.943983,0.942564,0.915116,145,144,4,3,1,2,0,3,20.833333
+gemini3.7-flash-gw,p054,docres-deshadow,original,0.948958,0.942564,0.914599,145,144,5,4,1,4,2,3,20.833333
+gemini3.7-flash-gw,p055,raw,original,0.935238,0.935238,0.947172,90,92,8,10,4,5,0,0,0.0
+gemini3.7-flash-gw,p055,shading,original,0.931429,0.935238,0.940572,90,92,8,10,4,5,0,1,10.869565
+gemini3.7-flash-gw,p055,gcdrnet,original,0.986667,0.935238,0.975764,90,91,3,4,1,1,1,3,32.967033
+gemini3.7-flash-gw,p055,sbb,original,0.975332,0.935238,0.965374,90,95,4,9,5,3,0,2,21.052632
+gemini3.7-flash-gw,p055,docres-appearance,original,0.933453,0.935238,0.950105,90,101,3,14,11,2,5,5,49.50495
+gemini3.7-flash-gw,p055,docres-deshadow,original,0.940952,0.935238,0.948683,90,86,7,3,1,0,1,1,11.627907
+gemini3.7-flash-gw,p056,raw,original,0.98153,0.98153,0.967831,132,133,1,2,1,1,0,0,0.0
+gemini3.7-flash-gw,p056,shading,original,0.98285,0.98153,0.968143,132,133,1,2,1,1,0,0,0.0
+gemini3.7-flash-gw,p056,gcdrnet,original,0.965699,0.98153,0.961811,132,132,3,3,1,1,2,0,0.0
+gemini3.7-flash-gw,p056,sbb,original,0.96438,0.98153,0.96916,132,132,2,2,1,1,2,0,0.0
+gemini3.7-flash-gw,p056,docres-appearance,original,0.970976,0.98153,0.952067,132,133,2,3,1,2,1,1,7.518797
+gemini3.7-flash-gw,p056,docres-deshadow,original,0.980211,0.98153,0.968098,132,134,2,4,2,1,2,0,0.0
+gemini3.7-flash-gw,p057,raw,original,0.975248,0.975248,0.986419,77,77,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p057,shading,original,0.975248,0.975248,0.986419,77,77,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p057,gcdrnet,original,0.975248,0.975248,0.986419,77,77,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p057,sbb,original,0.979849,0.975248,0.974962,77,76,2,1,0,1,1,1,13.157895
+gemini3.7-flash-gw,p057,docres-appearance,original,0.975248,0.975248,0.986419,77,77,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p057,docres-deshadow,original,1.0,0.975248,1.0,77,77,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p058,raw,pdf image,0.998601,0.998601,1.0,315,318,3,6,3,3,0,0,0.0
+gemini3.7-flash-gw,p058,shading,pdf image,0.999533,0.998601,0.998191,315,316,1,2,1,1,0,2,6.329114
+gemini3.7-flash-gw,p058,gcdrnet,pdf image,0.998601,0.998601,1.0,315,318,3,6,3,3,0,0,0.0
+gemini3.7-flash-gw,p058,sbb,pdf image,1.0,0.998601,1.0,315,315,0,0,0,0,0,3,9.52381
+gemini3.7-flash-gw,p058,docres-appearance,pdf image,1.0,0.998601,1.0,315,315,0,0,0,0,0,3,9.52381
+gemini3.7-flash-gw,p058,docres-deshadow,pdf image,0.998601,0.998601,1.0,315,318,3,6,3,3,0,0,0.0
+gemini3.7-flash-gw,p059,raw,original,0.988275,0.988275,0.994064,101,101,1,1,0,1,0,0,0.0
+gemini3.7-flash-gw,p059,shading,original,1.0,0.988275,1.0,101,101,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p059,gcdrnet,original,1.0,0.988275,1.0,101,101,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p059,sbb,original,0.988275,0.988275,0.994064,101,101,1,1,0,1,0,0,0.0
+gemini3.7-flash-gw,p059,docres-appearance,original,0.994941,0.988275,0.996101,101,101,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p059,docres-deshadow,original,0.988275,0.988275,0.994064,101,101,1,1,0,1,0,0,0.0
+gemini3.7-flash-gw,p060,raw,original,1.0,1.0,1.0,211,211,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p060,shading,original,1.0,1.0,1.0,211,211,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p060,gcdrnet,original,1.0,1.0,1.0,211,211,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p060,sbb,original,0.990506,1.0,0.988714,211,210,2,1,0,1,1,1,4.761905
+gemini3.7-flash-gw,p060,docres-appearance,original,1.0,1.0,1.0,211,211,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p060,docres-deshadow,original,1.0,1.0,1.0,211,211,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p061,raw,pdf image,0.999578,0.999578,0.998229,388,388,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p061,shading,pdf image,0.999578,0.999578,0.998229,388,388,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p061,gcdrnet,pdf image,0.999578,0.999578,0.998229,388,388,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p061,sbb,pdf image,0.999578,0.999578,0.998229,388,388,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p061,docres-appearance,pdf image,0.999578,0.999578,0.998229,388,388,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p061,docres-deshadow,pdf image,0.999578,0.999578,0.998229,388,388,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p062,raw,pdf image,0.984707,0.984707,0.988782,535,534,1,0,3,0,0,0,0.0
+gemini3.7-flash-gw,p062,shading,pdf image,0.974095,0.984707,0.989891,535,534,2,1,7,1,1,2,3.745318
+gemini3.7-flash-gw,p062,gcdrnet,pdf image,0.941428,0.984707,0.958319,535,526,17,8,7,5,7,5,9.505703
+gemini3.7-flash-gw,p062,sbb,pdf image,0.970706,0.984707,0.978254,535,531,8,4,4,2,2,2,3.766478
+gemini3.7-flash-gw,p062,docres-appearance,pdf image,0.973783,0.984707,0.988648,535,534,2,1,7,1,1,2,3.745318
+gemini3.7-flash-gw,p062,docres-deshadow,pdf image,0.974095,0.984707,0.989891,535,534,2,1,7,1,1,2,3.745318
+gemini3.7-flash-gw,p063,raw,pdf image,1.0,1.0,1.0,589,589,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p063,shading,pdf image,1.0,1.0,1.0,589,589,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p063,gcdrnet,pdf image,0.99946,1.0,0.998584,589,589,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p063,sbb,pdf image,1.0,1.0,1.0,589,589,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p063,docres-appearance,pdf image,1.0,1.0,1.0,589,589,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p063,docres-deshadow,pdf image,1.0,1.0,1.0,589,589,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p064,raw,original,1.0,1.0,1.0,129,129,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p064,shading,original,1.0,1.0,1.0,129,129,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p064,gcdrnet,original,1.0,1.0,1.0,129,129,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p064,sbb,original,0.998861,1.0,1.0,129,128,2,1,0,1,0,0,0.0
+gemini3.7-flash-gw,p064,docres-appearance,original,1.0,1.0,1.0,129,129,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p064,docres-deshadow,original,1.0,1.0,1.0,129,129,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p065,raw,original,1.0,1.0,1.0,58,58,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p065,shading,original,1.0,1.0,1.0,58,58,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p065,gcdrnet,original,0.990937,1.0,0.977913,58,58,1,1,0,0,1,1,17.241379
+gemini3.7-flash-gw,p065,sbb,original,0.990937,1.0,0.977913,58,58,1,1,0,0,1,1,17.241379
+gemini3.7-flash-gw,p065,docres-appearance,original,0.990937,1.0,0.977913,58,58,1,1,0,0,1,1,17.241379
+gemini3.7-flash-gw,p065,docres-deshadow,original,1.0,1.0,1.0,58,58,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p066,raw,original,1.0,1.0,1.0,69,69,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p066,shading,original,1.0,1.0,1.0,69,69,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p066,gcdrnet,original,1.0,1.0,1.0,69,69,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p066,sbb,original,1.0,1.0,1.0,69,69,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p066,docres-appearance,original,1.0,1.0,1.0,69,69,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p066,docres-deshadow,original,0.97136,1.0,0.978282,69,69,0,0,1,0,0,0,0.0
+gemini3.7-flash-gw,p067,raw,pdf image,1.0,1.0,1.0,79,79,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p067,shading,pdf image,1.0,1.0,1.0,79,79,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p067,gcdrnet,pdf image,1.0,1.0,1.0,79,79,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p067,sbb,pdf image,1.0,1.0,1.0,79,79,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p067,docres-appearance,pdf image,1.0,1.0,1.0,79,79,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p067,docres-deshadow,pdf image,1.0,1.0,1.0,79,79,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p068,raw,original,0.996773,0.996773,0.986602,333,326,7,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p068,shading,original,0.996773,0.996773,0.986602,333,326,7,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p068,gcdrnet,original,0.996773,0.996773,0.986602,333,326,7,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p068,sbb,original,0.996773,0.996773,0.986602,333,326,7,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p068,docres-appearance,original,0.996773,0.996773,0.986602,333,326,7,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p068,docres-deshadow,original,0.996773,0.996773,0.986602,333,326,7,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p069,raw,original,0.993797,0.993797,0.9741,128,123,5,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p069,shading,original,0.993797,0.993797,0.9741,128,123,5,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p069,gcdrnet,original,0.851222,0.993797,0.943528,128,142,5,19,19,0,12,3,21.126761
+gemini3.7-flash-gw,p069,sbb,original,0.868764,0.993797,0.948138,128,142,5,19,19,0,12,3,21.126761
+gemini3.7-flash-gw,p069,docres-appearance,original,0.850318,0.993797,0.943258,128,142,5,19,19,0,12,3,21.126761
+gemini3.7-flash-gw,p069,docres-deshadow,original,0.993797,0.993797,0.9741,128,123,5,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p070,raw,original,0.993056,0.993056,0.9906,330,328,2,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p070,shading,original,0.993056,0.993056,0.9906,330,328,2,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p070,gcdrnet,original,0.993552,0.993056,0.994766,330,329,2,1,0,1,0,0,0.0
+gemini3.7-flash-gw,p070,sbb,original,0.987103,0.993056,0.989423,330,328,4,2,1,1,0,0,0.0
+gemini3.7-flash-gw,p070,docres-appearance,original,0.994048,0.993056,0.994766,330,330,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p070,docres-deshadow,original,0.993056,0.993056,0.9906,330,328,2,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p071,raw,original,1.0,1.0,1.0,529,529,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p071,shading,original,0.985807,1.0,0.997232,529,529,0,0,4,0,0,0,0.0
+gemini3.7-flash-gw,p071,gcdrnet,original,1.0,1.0,1.0,529,529,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p071,sbb,original,0.985807,1.0,0.997232,529,529,0,0,4,0,0,0,0.0
+gemini3.7-flash-gw,p071,docres-appearance,original,1.0,1.0,1.0,529,529,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p071,docres-deshadow,original,1.0,1.0,1.0,529,529,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p072,raw,original,0.995357,0.995357,0.993001,1071,1071,1,1,0,1,0,0,0.0
+gemini3.7-flash-gw,p072,shading,original,0.988518,0.995357,0.99159,1071,1076,1,6,6,1,5,5,4.64684
+gemini3.7-flash-gw,p072,gcdrnet,original,0.985872,0.995357,0.990834,1071,1075,1,5,5,1,3,3,2.790698
+gemini3.7-flash-gw,p072,sbb,original,0.992068,0.995357,0.991584,1071,1071,2,2,1,1,2,2,1.867414
+gemini3.7-flash-gw,p072,docres-appearance,original,0.989108,0.995357,0.992113,1071,1076,1,6,6,1,5,5,4.64684
+gemini3.7-flash-gw,p072,docres-deshadow,original,0.974655,0.995357,0.961449,1071,1024,106,59,5,53,39,39,38.085938
+gemini3.7-flash-gw,p073,raw,pdf image,1.0,1.0,1.0,81,81,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p073,shading,pdf image,1.0,1.0,1.0,81,81,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p073,gcdrnet,pdf image,1.0,1.0,1.0,81,81,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p073,sbb,pdf image,1.0,1.0,1.0,81,81,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p073,docres-appearance,pdf image,1.0,1.0,1.0,81,81,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p073,docres-deshadow,pdf image,1.0,1.0,1.0,81,81,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p074,raw,original,0.980347,0.980347,0.972732,448,448,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p074,shading,original,0.980347,0.980347,0.972732,448,448,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p074,gcdrnet,original,0.979961,0.980347,0.971178,448,448,1,1,0,0,1,1,2.232143
+gemini3.7-flash-gw,p074,sbb,original,0.979961,0.980347,0.971178,448,448,1,1,0,0,1,1,2.232143
+gemini3.7-flash-gw,p074,docres-appearance,original,0.980347,0.980347,0.972732,448,448,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p074,docres-deshadow,original,0.980347,0.980347,0.972732,448,448,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p075,raw,pdf image,0.998149,0.998149,0.995894,252,252,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p075,shading,pdf image,0.999382,0.998149,0.99758,252,252,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p075,gcdrnet,pdf image,0.996912,0.998149,0.991787,252,252,1,1,0,1,1,0,0.0
+gemini3.7-flash-gw,p075,sbb,pdf image,0.999382,0.998149,0.99758,252,252,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p075,docres-appearance,pdf image,1.0,0.998149,1.0,252,252,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p075,docres-deshadow,pdf image,0.996912,0.998149,0.991787,252,252,1,1,0,1,1,0,0.0
+gemini3.7-flash-gw,p076,raw,pdf image,0.941744,0.941744,0.986631,470,497,1,28,27,0,0,0,0.0
+gemini3.7-flash-gw,p076,shading,pdf image,0.94142,0.941744,0.986631,470,498,2,30,28,1,0,0,0.0
+gemini3.7-flash-gw,p076,gcdrnet,pdf image,0.93879,0.941744,0.984287,470,497,3,30,27,2,0,0,0.0
+gemini3.7-flash-gw,p076,sbb,pdf image,0.941055,0.941744,0.983708,470,497,2,29,27,0,1,1,2.012072
+gemini3.7-flash-gw,p076,docres-appearance,pdf image,0.941095,0.941744,0.986631,470,499,3,32,29,2,1,1,2.004008
+gemini3.7-flash-gw,p076,docres-deshadow,pdf image,0.9414,0.941744,0.985096,470,497,1,28,27,0,0,0,0.0
+gemini3.7-flash-gw,p077,raw,pdf image,0.996009,0.996009,0.990364,321,321,1,1,0,1,0,0,0.0
+gemini3.7-flash-gw,p077,shading,pdf image,0.996009,0.996009,0.990364,321,321,1,1,0,1,0,0,0.0
+gemini3.7-flash-gw,p077,gcdrnet,pdf image,0.997143,0.996009,0.990922,321,321,1,1,0,1,1,1,3.115265
+gemini3.7-flash-gw,p077,sbb,pdf image,0.99317,0.996009,0.990226,321,322,1,2,1,1,1,1,3.10559
+gemini3.7-flash-gw,p077,docres-appearance,pdf image,0.994869,0.996009,0.990504,321,322,1,2,1,1,1,1,3.10559
+gemini3.7-flash-gw,p077,docres-deshadow,pdf image,0.996009,0.996009,0.990364,321,321,1,1,0,1,0,0,0.0
+gemini3.7-flash-gw,p078,raw,original,0.994818,0.994818,0.991189,922,922,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p078,shading,original,0.994818,0.994818,0.991189,922,922,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p078,gcdrnet,original,0.994818,0.994818,0.991189,922,922,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p078,sbb,original,0.994818,0.994818,0.991189,922,922,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p078,docres-appearance,original,0.998618,0.994818,0.998183,922,922,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p078,docres-deshadow,original,0.802239,0.994818,0.983683,922,922,0,0,93,0,0,0,0.0
+gemini3.7-flash-gw,p079,raw,original,0.999471,0.999471,1.0,274,275,1,2,1,0,0,0,0.0
+gemini3.7-flash-gw,p079,shading,original,1.0,0.999471,1.0,274,274,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p079,gcdrnet,original,1.0,0.999471,1.0,274,274,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p079,sbb,original,1.0,0.999471,1.0,274,274,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p079,docres-appearance,original,1.0,0.999471,1.0,274,274,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p079,docres-deshadow,original,1.0,0.999471,1.0,274,274,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p080,raw,original,0.941231,0.941231,0.984477,662,696,1,35,35,0,0,0,0.0
+gemini3.7-flash-gw,p080,shading,original,0.943852,0.941231,0.98492,662,697,0,35,35,0,0,0,0.0
+gemini3.7-flash-gw,p080,gcdrnet,original,0.943633,0.941231,0.98414,662,697,0,35,35,0,0,0,0.0
+gemini3.7-flash-gw,p080,sbb,original,0.930498,0.941231,0.983833,662,706,0,44,44,0,5,1,1.416431
+gemini3.7-flash-gw,p080,docres-appearance,original,0.935187,0.941231,0.98388,662,707,0,45,45,0,6,2,2.828854
+gemini3.7-flash-gw,p080,docres-deshadow,original,0.943852,0.941231,0.98492,662,697,0,35,35,0,0,0,0.0
+gemini3.7-flash-gw,p081,raw,pdf image,0.934713,0.934713,0.922584,437,440,15,18,13,5,0,0,0.0
+gemini3.7-flash-gw,p081,shading,pdf image,0.95041,0.934713,0.931301,437,448,8,19,12,6,6,10,22.321429
+gemini3.7-flash-gw,p081,gcdrnet,pdf image,0.911167,0.934713,0.902513,437,444,25,32,15,22,14,18,40.540541
+gemini3.7-flash-gw,p081,sbb,pdf image,0.916875,0.934713,0.917279,437,440,25,28,19,11,7,9,20.454545
+gemini3.7-flash-gw,p081,docres-appearance,pdf image,0.950767,0.934713,0.929657,437,451,5,19,14,4,7,11,24.390244
+gemini3.7-flash-gw,p081,docres-deshadow,pdf image,0.938637,0.934713,0.930125,437,444,11,18,12,8,6,8,18.018018
+gemini3.7-flash-gw,p082,raw,original,0.570175,0.570175,0.837084,54,88,0,34,34,0,0,0,0.0
+gemini3.7-flash-gw,p082,shading,original,0.56338,0.570175,0.817442,54,87,1,34,34,0,0,0,0.0
+gemini3.7-flash-gw,p082,gcdrnet,original,0.389021,0.570175,0.739489,54,139,0,85,85,0,40,7,50.359712
+gemini3.7-flash-gw,p082,sbb,original,0.362336,0.570175,0.679752,54,135,6,87,85,2,41,9,66.666667
+gemini3.7-flash-gw,p082,docres-appearance,original,0.570175,0.570175,0.837084,54,88,0,34,34,0,0,0,0.0
+gemini3.7-flash-gw,p082,docres-deshadow,original,0.385986,0.570175,0.738283,54,139,0,85,85,0,40,9,64.748201
+gemini3.7-flash-gw,p083,raw,pdf image,1.0,1.0,1.0,631,631,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p083,shading,pdf image,0.987792,1.0,0.976348,631,607,48,24,0,24,13,13,21.416804
+gemini3.7-flash-gw,p083,gcdrnet,pdf image,0.987792,1.0,0.976348,631,607,48,24,0,24,13,13,21.416804
+gemini3.7-flash-gw,p083,sbb,pdf image,0.987273,1.0,0.974218,631,607,48,24,0,24,13,13,21.416804
+gemini3.7-flash-gw,p083,docres-appearance,pdf image,1.0,1.0,1.0,631,631,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p083,docres-deshadow,pdf image,1.0,1.0,1.0,631,631,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p084,raw,pdf image,1.0,1.0,1.0,567,567,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p084,shading,pdf image,1.0,1.0,1.0,567,567,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p084,gcdrnet,pdf image,0.993151,1.0,0.996865,567,569,1,3,2,1,1,1,1.757469
+gemini3.7-flash-gw,p084,sbb,pdf image,0.982132,1.0,0.989844,567,572,0,5,5,0,3,3,5.244755
+gemini3.7-flash-gw,p084,docres-appearance,pdf image,0.999687,1.0,0.998742,567,567,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p084,docres-deshadow,pdf image,0.996255,1.0,0.99821,567,567,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p085,raw,pdf image,0.999515,0.999515,0.998919,330,330,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p085,shading,pdf image,1.0,0.999515,1.0,330,330,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p085,gcdrnet,pdf image,0.999515,0.999515,0.998919,330,330,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p085,sbb,pdf image,1.0,0.999515,1.0,330,330,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p085,docres-appearance,pdf image,1.0,0.999515,1.0,330,330,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p085,docres-deshadow,pdf image,0.999515,0.999515,0.998919,330,330,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p087,raw,pdf image,1.0,1.0,1.0,656,656,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p087,shading,pdf image,0.99948,1.0,0.999152,656,656,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p087,gcdrnet,pdf image,0.997147,1.0,0.998022,656,656,1,1,0,1,1,1,1.52439
+gemini3.7-flash-gw,p087,sbb,pdf image,0.978377,1.0,0.990596,656,656,5,5,0,0,5,4,6.097561
+gemini3.7-flash-gw,p087,docres-appearance,pdf image,1.0,1.0,1.0,656,656,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p087,docres-deshadow,pdf image,0.99974,1.0,1.0,656,656,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p088,raw,pdf image,0.996255,0.996255,0.995155,452,452,2,2,2,1,0,0,0.0
+gemini3.7-flash-gw,p088,shading,pdf image,0.983619,0.996255,0.992325,452,450,2,0,2,0,0,1,2.222222
+gemini3.7-flash-gw,p088,gcdrnet,pdf image,0.918657,0.996255,0.909719,452,451,51,50,1,17,49,49,108.64745
+gemini3.7-flash-gw,p088,sbb,pdf image,0.98764,0.996255,0.977036,452,452,21,21,2,0,20,21,46.460177
+gemini3.7-flash-gw,p088,docres-appearance,pdf image,0.991386,0.996255,0.993137,452,451,3,2,3,0,1,1,2.217295
+gemini3.7-flash-gw,p088,docres-deshadow,pdf image,0.99588,0.996255,0.994478,452,452,2,2,2,1,1,1,2.212389
+gemini3.7-flash-gw,p089,raw,original,0.993081,0.993081,0.994618,295,295,0,0,1,0,0,0,0.0
+gemini3.7-flash-gw,p089,shading,original,0.993081,0.993081,0.994618,295,295,0,0,1,0,0,0,0.0
+gemini3.7-flash-gw,p089,gcdrnet,original,0.993081,0.993081,0.994618,295,295,0,0,1,0,0,0,0.0
+gemini3.7-flash-gw,p089,sbb,original,0.988347,0.993081,0.993738,295,297,0,2,3,0,2,2,6.734007
+gemini3.7-flash-gw,p089,docres-appearance,original,0.993081,0.993081,0.994618,295,295,0,0,1,0,0,0,0.0
+gemini3.7-flash-gw,p089,docres-deshadow,original,0.993081,0.993081,0.994618,295,295,0,0,1,0,0,0,0.0
+gemini3.7-flash-gw,p090,raw,pdf image,0.999183,0.999183,0.996896,528,528,1,1,0,0,0,0,0.0
+gemini3.7-flash-gw,p090,shading,pdf image,0.99673,0.999183,0.991999,528,529,2,3,1,1,0,0,0.0
+gemini3.7-flash-gw,p090,gcdrnet,pdf image,0.997005,0.999183,0.990529,528,529,2,3,1,1,1,1,1.890359
+gemini3.7-flash-gw,p090,sbb,pdf image,0.996729,0.999183,0.988485,528,528,1,1,0,0,1,1,1.893939
+gemini3.7-flash-gw,p090,docres-appearance,pdf image,0.998366,0.999183,0.995905,528,528,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p090,docres-deshadow,pdf image,0.996466,0.999183,0.995042,528,528,2,2,0,0,0,0,0.0
+gemini3.7-flash-gw,p091,raw,pdf image,1.0,1.0,1.0,664,664,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p091,shading,pdf image,1.0,1.0,1.0,664,664,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p091,gcdrnet,pdf image,1.0,1.0,1.0,664,664,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p091,sbb,pdf image,1.0,1.0,1.0,664,664,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p091,docres-appearance,pdf image,1.0,1.0,1.0,664,664,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p091,docres-deshadow,pdf image,1.0,1.0,1.0,664,664,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p092,raw,pdf image,1.0,1.0,1.0,352,352,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p092,shading,pdf image,1.0,1.0,1.0,352,352,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p092,gcdrnet,pdf image,1.0,1.0,1.0,352,352,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p092,sbb,pdf image,1.0,1.0,1.0,352,352,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p092,docres-appearance,pdf image,1.0,1.0,1.0,352,352,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p092,docres-deshadow,pdf image,1.0,1.0,1.0,352,352,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p093,raw,pdf image,0.999183,0.999183,0.998569,419,419,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p093,shading,pdf image,1.0,0.999183,1.0,419,419,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p093,gcdrnet,pdf image,0.95103,0.999183,0.985856,419,419,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p093,sbb,pdf image,1.0,0.999183,1.0,419,419,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p093,docres-appearance,pdf image,1.0,0.999183,1.0,419,419,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p093,docres-deshadow,pdf image,1.0,0.999183,1.0,419,419,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p095,raw,pdf image,0.999516,0.999516,0.997906,391,391,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p095,shading,pdf image,0.999516,0.999516,0.997906,391,391,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p095,gcdrnet,pdf image,0.999516,0.999516,0.997906,391,391,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p095,sbb,pdf image,0.999033,0.999516,0.995813,391,391,1,1,0,0,1,1,2.557545
+gemini3.7-flash-gw,p095,docres-appearance,pdf image,0.999516,0.999516,0.997906,391,391,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p095,docres-deshadow,pdf image,0.999516,0.999516,0.997906,391,391,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p097,raw,original,1.0,1.0,1.0,320,320,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p097,shading,original,1.0,1.0,1.0,320,320,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p097,gcdrnet,original,1.0,1.0,1.0,320,320,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p097,sbb,original,1.0,1.0,1.0,320,320,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p097,docres-appearance,original,1.0,1.0,1.0,320,320,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p097,docres-deshadow,original,1.0,1.0,1.0,320,320,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p098,raw,pdf image,0.998045,0.998045,1.0,155,155,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p098,shading,pdf image,1.0,0.998045,1.0,155,155,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p098,gcdrnet,pdf image,0.994158,0.998045,0.999535,155,155,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p098,sbb,pdf image,0.998041,0.998045,0.991857,155,155,2,2,0,0,2,2,12.903226
+gemini3.7-flash-gw,p098,docres-appearance,pdf image,1.0,0.998045,1.0,155,155,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p098,docres-deshadow,pdf image,1.0,0.998045,1.0,155,155,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p099,raw,original,0.998635,0.998635,0.994849,258,258,1,1,0,0,0,0,0.0
+gemini3.7-flash-gw,p099,shading,original,0.998634,0.998635,0.994184,258,258,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p099,gcdrnet,original,0.998635,0.998635,0.994849,258,258,1,1,0,0,0,0,0.0
+gemini3.7-flash-gw,p099,sbb,original,0.998634,0.998635,0.994184,258,258,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p099,docres-appearance,original,0.998634,0.998635,0.994184,258,258,0,0,0,0,0,0,0.0
+gemini3.7-flash-gw,p099,docres-deshadow,original,0.999317,0.998635,0.997092,258,258,1,1,0,0,0,0,0.0
+gemini3.7-flash-gw,p100,raw,original,0.957952,0.957952,0.992872,165,164,2,1,0,1,0,0,0.0
+gemini3.7-flash-gw,p100,shading,original,0.919416,0.957952,0.983655,165,189,24,48,24,24,39,0,0.0
+gemini3.7-flash-gw,p100,gcdrnet,original,0.962977,0.957952,0.983477,165,177,12,24,12,12,19,1,5.649718
+gemini3.7-flash-gw,p100,sbb,original,0.923687,0.957952,0.934079,165,164,2,1,0,1,0,0,0.0
+gemini3.7-flash-gw,p100,docres-appearance,original,0.922932,0.957952,0.934746,165,164,2,1,0,1,0,0,0.0
+gemini3.7-flash-gw,p100,docres-deshadow,original,0.926332,0.957952,0.939074,165,176,14,25,12,13,19,1,5.681818
 apple-vision (probe),p025,raw,pdf image,0.858537,0.858537,0.723328,69,70,20,21,2,11,0,0,0.0
 apple-vision (probe),p025,resshift-s1,pdf image,0.178648,0.858537,0.328006,69,337,39,307,272,30,265,267,792.284866
 apple-vision (probe),p025,resshift-s2,pdf image,0.180336,0.858537,0.35082,69,337,34,302,272,29,261,266,789.317507

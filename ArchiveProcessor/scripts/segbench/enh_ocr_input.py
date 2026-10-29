@@ -470,6 +470,8 @@ def report():
         arms = READER_ARMS.get(reader, ARMS)
         missing = sum(v is None for (a, p), v in rd.items())
         by = measure(rd, arms, ids, vision_raw)
+        if reader == 'apple-vision':
+            vision_by = by
         if missing:
             pending.append(reader)
         L += [f'## {reader}' + (f' ({missing} of {len(rd)} images not read yet)' if missing else ''), '']
@@ -482,6 +484,17 @@ def report():
                   f"of the {len(GW.jobs())} new calls ${GW.spent():.2f}, at 3.8 Flash's list price ($0.75 / $3.75 "
                   "per million tokens), which the gateway, returning no bill, is taken not to exceed. Its suspect "
                   "rate is against Vision's raw reading, as for every reader.", '']
+            # the filed question: does Gemini gain where Vision gained most (picked on Vision's noise, so biased up)
+            L += ['The filed question, the 50 pages where Vision gained most from each arm:', '',
+                  "| arm | Vision's Δ on its top 50 | Gemini's Δ on those pages | pages where Gemini gains a point |",
+                  '|---|---:|---:|---:|']
+            for arm in arms[1:]:
+                top = sorted((v for v in vision_by if v[0] == arm), key=lambda k: vision_by[k]['nes'] - vision_by[k]['raw_nes'],
+                             reverse=True)[:50]
+                g = [by[arm, p]['nes'] - by[arm, p]['raw_nes'] for _, p in top]
+                L.append(f"| {arm} | {100 * statistics.mean(vision_by[k]['nes'] - vision_by[k]['raw_nes'] for k in top):+.1f} | "
+                         f"{100 * statistics.mean(g):+.1f} | {sum(x > 0.01 for x in g)} |")
+            L.append('')
         if arms != ARMS:
             L += ['Not run: ' + ', '.join(a for a in ARMS if a not in arms) + ' (its job read a list made before '
                   'those images existed).', '']

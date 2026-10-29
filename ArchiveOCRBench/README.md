@@ -147,7 +147,8 @@ record:
   `enh-dewarp-uvdoc-bench.md`.
 - `enh-ocr-input.json` (`scripts/segbench/enh_ocr_input.py report`, W46.enh-ocr-input): content-removing
   enhancement (shading division, GCDRNet, SBB, DocRes appearance and deshadow) before Apple Vision, PP-OCRv6,
-  Qwen3-VL 8B and GLM-OCR on PP-DocLayoutV3 regions, on the 96, and the two-seed ResShift/NAF-DPM probe on the 30
+  Qwen3-VL 8B, GLM-OCR on PP-DocLayoutV3 regions and Gemini 3.7 Flash through the Stanford gateway
+  (W46.enh-ocr-input-paid, priced from its estimated tokens), on the 96, and the two-seed ResShift/NAF-DPM probe on the 30
   hardest pages. The page shows its summary rows as a table with a page-group picker; every arm read on all 96
   enters the four OCR charts (`enh-` ids, kept out of the difficulty analysis). Tag, repair-by-tag and gate tables
   are in `enh-ocr-input.md`.

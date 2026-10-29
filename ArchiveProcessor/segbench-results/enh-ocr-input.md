@@ -318,6 +318,102 @@ The reference-free gate: the enhanced reading unless its suspect rate is above t
 | docres-appearance | 84.9 | 85.0 | 84.9 (53) | 84.9 (68) | 84.9 (77) | 85.0 (81) | 85.1 (89) | 85.1 (93) | 85.0 (96) |
 | docres-deshadow | 84.9 | 85.0 | 85.0 (63) | 85.0 (75) | 85.0 (83) | 85.0 (89) | 85.0 (90) | 85.0 (93) | 85.0 (96) |
 
+## gemini3.7-flash-gw
+
+Gemini 3.7 Flash through the Stanford gateway, with the cloud panel's request (`enh_ocr_input_gateway.py`, W46.enh-ocr-input-paid), every arm on the 96; raw is W46.fix-ocr-scorers-paid's reading of the same image, hash checked. 576 of 576 replies parsed (0 capped, 0 unparsed, 0 failed; those score empty). Estimated cost of the 480 new calls $1.71, at 3.8 Flash's list price ($0.75 / $3.75 per million tokens), which the gateway, returning no bill, is taken not to exceed. Its suspect rate is against Vision's raw reading, as for every reader.
+
+The filed question, the 50 pages where Vision gained most from each arm:
+
+| arm | Vision's Δ on its top 50 | Gemini's Δ on those pages | pages where Gemini gains a point |
+|---|---:|---:|---:|
+| shading | +1.7 | -1.5 | 1 |
+| gcdrnet | +2.7 | -0.9 | 3 |
+| sbb | +1.5 | -0.5 | 2 |
+| docres-appearance | +3.6 | -0.4 | 2 |
+| docres-deshadow | +1.9 | -0.1 | 3 |
+
+| pages | n | arm | NES % | Δ NES vs raw (95% CI, p) | chrF2 % | inserted % | rewritten % | restoration-only /1k | suspect /1k |
+|---|---:|---|---:|---|---:|---:|---:|---:|---:|
+| 96 | 96 | raw | 96.7 | — | 97.5 | 1.0 | 0.2 | 0.0 | 0.0 |
+| 96 | 96 | shading | 95.5 | -1.2 (-2.8 to -0.2, p 0.003) | 97.5 | 1.4 | 0.3 | 5.4 | 5.2 |
+| 96 | 96 | gcdrnet | 96.4 | -0.4 (-1.6 to +1.1, p 0.656) | 97.4 | 1.3 | 0.4 | 7.8 | 6.5 |
+| 96 | 96 | sbb | 94.9 | -1.9 (-3.8 to -0.0, p 0.046) | 96.4 | 1.8 | 0.4 | 9.9 | 8.6 |
+| 96 | 96 | docres-appearance | 96.5 | -0.2 (-0.8 to +0.3, p 0.508) | 98.1 | 1.0 | 0.2 | 2.8 | 3.1 |
+| 96 | 96 | docres-deshadow | 96.5 | -0.2 (-0.9 to +0.4, p 0.513) | 97.3 | 1.4 | 0.4 | 5.1 | 4.0 |
+| originals | 63 | raw | 95.3 | — | 96.4 | 1.5 | 0.2 | 0.0 | 0.0 |
+| originals | 63 | shading | 94.6 | -0.7 (-1.5 to -0.2, p 0.013) | 97.0 | 1.7 | 0.4 | 5.8 | 5.0 |
+| originals | 63 | gcdrnet | 95.6 | +0.3 (-1.3 to +2.3, p 0.863) | 96.7 | 1.8 | 0.3 | 7.7 | 5.2 |
+| originals | 63 | sbb | 93.7 | -1.7 (-3.8 to +0.7, p 0.175) | 95.4 | 2.5 | 0.5 | 12.2 | 9.6 |
+| originals | 63 | docres-appearance | 95.0 | -0.3 (-1.2 to +0.4, p 0.492) | 97.3 | 1.5 | 0.2 | 4.1 | 4.3 |
+| originals | 63 | docres-deshadow | 95.0 | -0.3 (-1.4 to +0.6, p 0.538) | 96.2 | 2.1 | 0.6 | 8.5 | 6.5 |
+| PDF images | 33 | raw | 99.4 | — | 99.5 | 0.4 | 0.1 | 0.0 | 0.0 |
+| PDF images | 33 | shading | 97.4 | -2.1 (-6.2 to +0.0, p 0.170) | 98.5 | 1.0 | 0.3 | 4.8 | 5.4 |
+| PDF images | 33 | gcdrnet | 97.8 | -1.6 (-3.4 to -0.4, p 0.001) | 98.6 | 0.6 | 0.6 | 8.0 | 8.0 |
+| PDF images | 33 | sbb | 97.1 | -2.3 (-5.9 to -0.3, p 0.000) | 98.3 | 0.9 | 0.3 | 7.1 | 7.5 |
+| PDF images | 33 | docres-appearance | 99.5 | +0.0 (-0.1 to +0.2, p 0.652) | 99.5 | 0.4 | 0.1 | 1.0 | 1.6 |
+| PDF images | 33 | docres-deshadow | 99.4 | -0.0 (-0.1 to +0.0, p 0.504) | 99.5 | 0.4 | 0.1 | 0.8 | 1.0 |
+
+By capture-defect tag (any page carrying the tag):
+
+| pages | n | arm | NES % | Δ NES vs raw (95% CI, p) | chrF2 % | inserted % | rewritten % | restoration-only /1k | suspect /1k |
+|---|---:|---|---:|---|---:|---:|---:|---:|---:|
+| tagged shadow or low light | 11 | raw | 99.1 | — | 99.7 | 0.2 | 0.2 | 0.0 | 0.0 |
+| tagged shadow or low light | 11 | shading | 98.7 | -0.4 (-1.1 to +0.0, p 0.418) | 99.6 | 1.1 | 0.9 | 13.2 | 2.2 |
+| tagged shadow or low light | 11 | gcdrnet | 98.1 | -1.0 (-2.2 to -0.1, p 0.109) | 99.2 | 1.2 | 0.5 | 8.3 | 3.4 |
+| tagged shadow or low light | 11 | sbb | 98.0 | -1.1 (-2.0 to -0.3, p 0.031) | 98.1 | 0.3 | 0.2 | 4.0 | 5.6 |
+| tagged shadow or low light | 11 | docres-appearance | 98.7 | -0.3 (-1.0 to +0.1, p 0.498) | 99.0 | 0.2 | 0.1 | 0.6 | 2.2 |
+| tagged shadow or low light | 11 | docres-deshadow | 98.6 | -0.5 (-1.2 to +0.0, p 0.497) | 99.1 | 0.8 | 0.6 | 5.9 | 0.6 |
+| tagged faint ink | 16 | raw | 94.9 | — | 95.0 | 0.4 | 0.1 | 0.0 | 0.0 |
+| tagged faint ink | 16 | shading | 89.7 | -5.2 (-14.5 to +0.4, p 0.344) | 96.4 | 2.5 | 0.6 | 16.5 | 10.9 |
+| tagged faint ink | 16 | gcdrnet | 96.3 | +1.4 (-4.7 to +9.4, p 0.865) | 97.2 | 0.8 | 0.7 | 9.2 | 7.6 |
+| tagged faint ink | 16 | sbb | 93.4 | -1.5 (-11.7 to +8.8, p 0.524) | 95.5 | 1.7 | 0.5 | 12.9 | 13.3 |
+| tagged faint ink | 16 | docres-appearance | 93.9 | -1.0 (-3.7 to +0.7, p 0.747) | 97.9 | 0.6 | 0.2 | 2.7 | 3.8 |
+| tagged faint ink | 16 | docres-deshadow | 95.0 | +0.1 (-0.5 to +0.8, p 0.572) | 95.0 | 0.6 | 0.5 | 5.9 | 2.3 |
+| tagged show-through | 61 | raw | 97.4 | — | 98.0 | 1.3 | 0.2 | 0.0 | 0.0 |
+| tagged show-through | 61 | shading | 95.9 | -1.4 (-3.8 to -0.1, p 0.032) | 97.4 | 1.8 | 0.4 | 7.7 | 6.7 |
+| tagged show-through | 61 | gcdrnet | 96.6 | -0.7 (-1.8 to +0.2, p 0.201) | 97.7 | 1.4 | 0.3 | 4.7 | 3.8 |
+| tagged show-through | 61 | sbb | 94.7 | -2.6 (-5.0 to -0.9, p 0.001) | 96.3 | 1.7 | 0.4 | 9.0 | 8.9 |
+| tagged show-through | 61 | docres-appearance | 97.3 | -0.1 (-0.7 to +0.4, p 0.826) | 98.1 | 1.2 | 0.2 | 3.3 | 3.4 |
+| tagged show-through | 61 | docres-deshadow | 97.6 | +0.2 (-0.2 to +0.7, p 0.395) | 98.0 | 1.0 | 0.3 | 3.5 | 3.3 |
+| tagged colour | 52 | raw | 95.6 | — | 96.8 | 1.1 | 0.2 | 0.0 | 0.0 |
+| tagged colour | 52 | shading | 93.6 | -2.0 (-5.0 to -0.2, p 0.025) | 97.1 | 1.8 | 0.3 | 7.8 | 6.6 |
+| tagged colour | 52 | gcdrnet | 95.7 | +0.0 (-2.1 to +2.7, p 0.979) | 97.1 | 1.5 | 0.4 | 10.0 | 7.2 |
+| tagged colour | 52 | sbb | 93.5 | -2.2 (-5.5 to +1.2, p 0.238) | 96.0 | 2.3 | 0.3 | 12.7 | 10.0 |
+| tagged colour | 52 | docres-appearance | 95.4 | -0.2 (-1.4 to +0.7, p 0.652) | 97.9 | 1.2 | 0.2 | 3.5 | 3.5 |
+| tagged colour | 52 | docres-deshadow | 95.2 | -0.4 (-1.7 to +0.6, p 0.486) | 96.5 | 1.9 | 0.6 | 8.5 | 5.9 |
+| tagged blur | 8 | raw | 99.0 | — | 98.8 | 0.4 | 0.2 | 0.0 | 0.0 |
+| tagged blur | 8 | shading | 99.1 | +0.1 (-0.4 to +0.6, p 0.688) | 98.9 | 0.4 | 0.2 | 1.6 | 3.0 |
+| tagged blur | 8 | gcdrnet | 97.1 | -1.9 (-3.9 to -0.3, p 0.016) | 97.2 | 0.5 | 1.0 | 17.7 | 18.5 |
+| tagged blur | 8 | sbb | 98.5 | -0.5 (-1.1 to -0.0, p 0.109) | 98.4 | 0.7 | 0.3 | 9.1 | 9.7 |
+| tagged blur | 8 | docres-appearance | 99.2 | +0.1 (-0.2 to +0.6, p 0.735) | 98.8 | 0.5 | 0.1 | 2.9 | 3.8 |
+| tagged blur | 8 | docres-deshadow | 99.1 | +0.1 (-0.0 to +0.2, p 0.252) | 98.9 | 0.4 | 0.2 | 1.9 | 2.4 |
+| tagged glare | 6 | raw | 98.6 | — | 98.9 | 0.4 | 0.1 | 0.0 | 0.0 |
+| tagged glare | 6 | shading | 98.7 | +0.1 (-1.0 to +1.6, p 1.000) | 98.6 | 0.4 | 0.2 | 1.3 | 1.7 |
+| tagged glare | 6 | gcdrnet | 98.4 | -0.2 (-2.2 to +1.8, p 0.687) | 98.4 | 0.5 | 0.3 | 3.9 | 4.3 |
+| tagged glare | 6 | sbb | 97.9 | -0.6 (-2.3 to +1.3, p 0.566) | 98.3 | 0.5 | 0.1 | 2.6 | 3.9 |
+| tagged glare | 6 | docres-appearance | 99.0 | +0.5 (-0.5 to +1.9, p 0.750) | 99.2 | 0.5 | 0.2 | 2.6 | 2.6 |
+| tagged glare | 6 | docres-deshadow | 99.0 | +0.4 (-0.5 to +1.8, p 0.875) | 99.1 | 0.4 | 0.2 | 2.1 | 2.1 |
+
+Repair by tag: the arm on pages tagged shadow or low light only, raw on the rest; blur-tagged pages always raw.
+
+| arm | NES % by tag | Δ vs raw (CI, p) |
+|---|---:|---|
+| shading | 96.7 | -0.0 (-0.1 to +0.0, p 0.421) |
+| gcdrnet | 96.6 | -0.1 (-0.3 to -0.0, p 0.107) |
+| sbb | 96.6 | -0.1 (-0.3 to -0.0, p 0.029) |
+| docres-appearance | 96.7 | -0.0 (-0.1 to +0.0, p 0.503) |
+| docres-deshadow | 96.7 | -0.1 (-0.1 to +0.0, p 0.504) |
+
+The reference-free gate: the enhanced reading unless its suspect rate is above t per 1,000, raw otherwise. Set on these same pages, so the best t is in-sample.
+
+| arm | always raw | always arm | t=0 | t=5 | t=10 | t=20 | t=40 | t=80 | t=160 |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| shading | 96.7 | 95.5 | 96.6 (63) | 96.5 (73) | 96.5 (80) | 96.5 (85) | 96.5 (92) | 96.4 (93) | 96.2 (95) |
+| gcdrnet | 96.7 | 96.4 | 96.7 (56) | 96.7 (67) | 96.6 (75) | 96.6 (80) | 96.5 (87) | 96.3 (92) | 96.4 (96) |
+| sbb | 96.7 | 94.9 | 96.4 (40) | 96.4 (56) | 96.3 (66) | 96.2 (78) | 95.9 (87) | 95.4 (91) | 95.4 (95) |
+| docres-appearance | 96.7 | 96.5 | 96.7 (62) | 96.7 (73) | 96.7 (82) | 96.7 (86) | 96.6 (92) | 96.7 (95) | 96.7 (95) |
+| docres-deshadow | 96.7 | 96.5 | 96.5 (67) | 96.5 (73) | 96.5 (80) | 96.6 (86) | 96.6 (93) | 96.5 (96) | 96.5 (96) |
+
 ## The two-seed hallucination probe
 
 ResShift (PreP-OCR) and NAF-DPM, each run twice with seeds (1, 2), on the 30 pages with the lowest median NES over the saved routes. Instability: words that differ between the two seeds' readings of a page, per 1,000 words read.
