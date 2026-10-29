@@ -1440,6 +1440,864 @@
     "owner96": "5-10%",
     "public-latin": "2-5%"
    }
+  },
+  "qwen3.6-27b-entity-prompt": {
+   "by_bin": {
+    "both": {
+     "0-2%": {
+      "f1": 0.96,
+      "hyp": 3321,
+      "p": 0.964,
+      "pages": 277,
+      "r": 0.956,
+      "ref": 3349
+     },
+     "10-20%": {
+      "f1": 0.612,
+      "hyp": 1734,
+      "p": 0.591,
+      "pages": 201,
+      "r": 0.633,
+      "ref": 1618
+     },
+     "2-5%": {
+      "f1": 0.863,
+      "hyp": 507,
+      "p": 0.888,
+      "pages": 58,
+      "r": 0.84,
+      "ref": 536
+     },
+     "20-40%": {
+      "f1": 0.347,
+      "hyp": 2231,
+      "p": 0.302,
+      "pages": 182,
+      "r": 0.408,
+      "ref": 1652
+     },
+     "5-10%": {
+      "f1": 0.781,
+      "hyp": 1160,
+      "p": 0.781,
+      "pages": 155,
+      "r": 0.781,
+      "ref": 1160
+     },
+     "over 40%": {
+      "f1": 0.158,
+      "hyp": 4875,
+      "p": 0.188,
+      "pages": 650,
+      "r": 0.136,
+      "ref": 6754
+     }
+    },
+    "owner96": {
+     "0-2%": {
+      "f1": 0.964,
+      "hyp": 3259,
+      "p": 0.966,
+      "pages": 266,
+      "r": 0.961,
+      "ref": 3275
+     },
+     "10-20%": {
+      "f1": 0.745,
+      "hyp": 219,
+      "p": 0.767,
+      "pages": 31,
+      "r": 0.724,
+      "ref": 232
+     },
+     "2-5%": {
+      "f1": 0.931,
+      "hyp": 374,
+      "p": 0.922,
+      "pages": 36,
+      "r": 0.94,
+      "ref": 367
+     },
+     "20-40%": {
+      "f1": 0.739,
+      "hyp": 157,
+      "p": 0.713,
+      "pages": 15,
+      "r": 0.767,
+      "ref": 146
+     },
+     "5-10%": {
+      "f1": 0.812,
+      "hyp": 433,
+      "p": 0.815,
+      "pages": 48,
+      "r": 0.81,
+      "ref": 436
+     },
+     "over 40%": {
+      "f1": 0.626,
+      "hyp": 221,
+      "p": 0.701,
+      "pages": 34,
+      "r": 0.566,
+      "ref": 274
+     }
+    },
+    "public-latin": {
+     "0-2%": {
+      "f1": 0.794,
+      "hyp": 62,
+      "p": 0.871,
+      "pages": 11,
+      "r": 0.73,
+      "ref": 74
+     },
+     "10-20%": {
+      "f1": 0.591,
+      "hyp": 1515,
+      "p": 0.566,
+      "pages": 170,
+      "r": 0.618,
+      "ref": 1386
+     },
+     "2-5%": {
+      "f1": 0.695,
+      "hyp": 133,
+      "p": 0.789,
+      "pages": 22,
+      "r": 0.621,
+      "ref": 169
+     },
+     "20-40%": {
+      "f1": 0.314,
+      "hyp": 2074,
+      "p": 0.271,
+      "pages": 167,
+      "r": 0.373,
+      "ref": 1506
+     },
+     "5-10%": {
+      "f1": 0.762,
+      "hyp": 727,
+      "p": 0.761,
+      "pages": 107,
+      "r": 0.764,
+      "ref": 724
+     },
+     "over 40%": {
+      "f1": 0.137,
+      "hyp": 4654,
+      "p": 0.164,
+      "pages": 616,
+      "r": 0.117,
+      "ref": 6480
+     }
+    }
+   },
+   "by_group": {
+    "owner96": {
+     "apple-vision | handwritten": {
+      "f1": 0.522,
+      "hyp": 71,
+      "p": 0.592,
+      "pages": 16,
+      "r": 0.467,
+      "ref": 90
+     },
+     "apple-vision | mixed": {
+      "f1": 0.743,
+      "hyp": 16,
+      "p": 0.812,
+      "pages": 2,
+      "r": 0.684,
+      "ref": 19
+     },
+     "apple-vision | printed": {
+      "f1": 0.846,
+      "hyp": 429,
+      "p": 0.862,
+      "pages": 26,
+      "r": 0.83,
+      "ref": 446
+     },
+     "apple-vision | typewritten": {
+      "f1": 0.88,
+      "hyp": 402,
+      "p": 0.868,
+      "pages": 42,
+      "r": 0.893,
+      "ref": 391
+     },
+     "claude-sonnet5.5 | handwritten": {
+      "f1": 0.884,
+      "hyp": 100,
+      "p": 0.84,
+      "pages": 16,
+      "r": 0.933,
+      "ref": 90
+     },
+     "claude-sonnet5.5 | mixed": {
+      "f1": 0.872,
+      "hyp": 20,
+      "p": 0.85,
+      "pages": 2,
+      "r": 0.895,
+      "ref": 19
+     },
+     "claude-sonnet5.5 | printed": {
+      "f1": 0.943,
+      "hyp": 445,
+      "p": 0.944,
+      "pages": 26,
+      "r": 0.942,
+      "ref": 446
+     },
+     "claude-sonnet5.5 | typewritten": {
+      "f1": 0.98,
+      "hyp": 399,
+      "p": 0.97,
+      "pages": 42,
+      "r": 0.99,
+      "ref": 391
+     },
+     "gemini3.8-flash | handwritten": {
+      "f1": 0.944,
+      "hyp": 88,
+      "p": 0.955,
+      "pages": 16,
+      "r": 0.933,
+      "ref": 90
+     },
+     "gemini3.8-flash | mixed": {
+      "f1": 0.919,
+      "hyp": 18,
+      "p": 0.944,
+      "pages": 2,
+      "r": 0.895,
+      "ref": 19
+     },
+     "gemini3.8-flash | printed": {
+      "f1": 0.942,
+      "hyp": 439,
+      "p": 0.95,
+      "pages": 26,
+      "r": 0.935,
+      "ref": 446
+     },
+     "gemini3.8-flash | typewritten": {
+      "f1": 0.983,
+      "hyp": 396,
+      "p": 0.977,
+      "pages": 42,
+      "r": 0.99,
+      "ref": 391
+     },
+     "qwen3-vl-8b-mlx4 | handwritten": {
+      "f1": 0.793,
+      "hyp": 84,
+      "p": 0.821,
+      "pages": 16,
+      "r": 0.767,
+      "ref": 90
+     },
+     "qwen3-vl-8b-mlx4 | mixed": {
+      "f1": 0.833,
+      "hyp": 17,
+      "p": 0.882,
+      "pages": 2,
+      "r": 0.789,
+      "ref": 19
+     },
+     "qwen3-vl-8b-mlx4 | printed": {
+      "f1": 0.926,
+      "hyp": 431,
+      "p": 0.942,
+      "pages": 26,
+      "r": 0.91,
+      "ref": 446
+     },
+     "qwen3-vl-8b-mlx4 | typewritten": {
+      "f1": 0.941,
+      "hyp": 391,
+      "p": 0.941,
+      "pages": 42,
+      "r": 0.941,
+      "ref": 391
+     },
+     "qwen3.6-27b | handwritten": {
+      "f1": 0.825,
+      "hyp": 87,
+      "p": 0.839,
+      "pages": 16,
+      "r": 0.811,
+      "ref": 90
+     },
+     "qwen3.6-27b | mixed": {
+      "f1": 0.811,
+      "hyp": 18,
+      "p": 0.833,
+      "pages": 2,
+      "r": 0.789,
+      "ref": 19
+     },
+     "qwen3.6-27b | printed": {
+      "f1": 0.88,
+      "hyp": 436,
+      "p": 0.89,
+      "pages": 26,
+      "r": 0.87,
+      "ref": 446
+     },
+     "qwen3.6-27b | typewritten": {
+      "f1": 0.939,
+      "hyp": 376,
+      "p": 0.957,
+      "pages": 42,
+      "r": 0.921,
+      "ref": 391
+     }
+    },
+    "public-latin": {
+     "apple-vision | L5": {
+      "f1": 0.068,
+      "hyp": 523,
+      "p": 0.078,
+      "pages": 57,
+      "r": 0.06,
+      "ref": 685
+     },
+     "apple-vision | L6": {
+      "f1": 0.053,
+      "hyp": 473,
+      "p": 0.066,
+      "pages": 79,
+      "r": 0.044,
+      "ref": 697
+     },
+     "apple-vision | L7": {
+      "f1": 0.1,
+      "hyp": 405,
+      "p": 0.148,
+      "pages": 78,
+      "r": 0.076,
+      "ref": 793
+     },
+     "apple-vision | L8": {
+      "f1": 0.441,
+      "hyp": 522,
+      "p": 0.391,
+      "pages": 59,
+      "r": 0.505,
+      "ref": 404
+     },
+     "gemini3.8-flash | L5": {
+      "f1": 0.259,
+      "hyp": 1283,
+      "p": 0.193,
+      "pages": 55,
+      "r": 0.397,
+      "ref": 622
+     },
+     "gemini3.8-flash | L6": {
+      "f1": 0.566,
+      "hyp": 622,
+      "p": 0.6,
+      "pages": 79,
+      "r": 0.535,
+      "ref": 697
+     },
+     "gemini3.8-flash | L7": {
+      "f1": 0.456,
+      "hyp": 777,
+      "p": 0.461,
+      "pages": 78,
+      "r": 0.451,
+      "ref": 793
+     },
+     "gemini3.8-flash | L8": {
+      "f1": 0.739,
+      "hyp": 424,
+      "p": 0.722,
+      "pages": 59,
+      "r": 0.757,
+      "ref": 404
+     },
+     "qwen3-vl-8b | L5": {
+      "f1": 0.194,
+      "hyp": 214,
+      "p": 0.421,
+      "pages": 58,
+      "r": 0.126,
+      "ref": 715
+     },
+     "qwen3-vl-8b | L6": {
+      "f1": 0.118,
+      "hyp": 268,
+      "p": 0.213,
+      "pages": 79,
+      "r": 0.082,
+      "ref": 697
+     },
+     "qwen3-vl-8b | L7": {
+      "f1": 0.139,
+      "hyp": 1005,
+      "p": 0.124,
+      "pages": 78,
+      "r": 0.158,
+      "ref": 793
+     },
+     "qwen3-vl-8b | L8": {
+      "f1": 0.684,
+      "hyp": 435,
+      "p": 0.66,
+      "pages": 59,
+      "r": 0.71,
+      "ref": 404
+     },
+     "qwen3.6-27b | L5": {
+      "f1": 0.154,
+      "hyp": 665,
+      "p": 0.162,
+      "pages": 59,
+      "r": 0.146,
+      "ref": 741
+     },
+     "qwen3.6-27b | L6": {
+      "f1": 0.222,
+      "hyp": 594,
+      "p": 0.241,
+      "pages": 79,
+      "r": 0.205,
+      "ref": 697
+     },
+     "qwen3.6-27b | L7": {
+      "f1": 0.253,
+      "hyp": 545,
+      "p": 0.31,
+      "pages": 78,
+      "r": 0.213,
+      "ref": 793
+     },
+     "qwen3.6-27b | L8": {
+      "f1": 0.72,
+      "hyp": 410,
+      "p": 0.715,
+      "pages": 59,
+      "r": 0.725,
+      "ref": 404
+     }
+    }
+   },
+   "by_route": {
+    "owner96": {
+     "apple-vision": {
+      "f1": 0.83,
+      "hyp": 918,
+      "p": 0.843,
+      "pages": 86,
+      "r": 0.818,
+      "ref": 946
+     },
+     "claude-sonnet5.5": {
+      "f1": 0.951,
+      "hyp": 964,
+      "p": 0.942,
+      "pages": 86,
+      "r": 0.96,
+      "ref": 946
+     },
+     "gemini3.8-flash": {
+      "f1": 0.959,
+      "hyp": 941,
+      "p": 0.962,
+      "pages": 86,
+      "r": 0.957,
+      "ref": 946
+     },
+     "qwen3-vl-8b-mlx4": {
+      "f1": 0.918,
+      "hyp": 923,
+      "p": 0.93,
+      "pages": 86,
+      "r": 0.907,
+      "ref": 946
+     },
+     "qwen3.6-27b": {
+      "f1": 0.897,
+      "hyp": 917,
+      "p": 0.912,
+      "pages": 86,
+      "r": 0.884,
+      "ref": 946
+     }
+    },
+    "public-latin": {
+     "apple-vision": {
+      "f1": 0.149,
+      "hyp": 1923,
+      "p": 0.175,
+      "pages": 273,
+      "r": 0.13,
+      "ref": 2579
+     },
+     "gemini3.8-flash": {
+      "f1": 0.457,
+      "hyp": 3106,
+      "p": 0.413,
+      "pages": 271,
+      "r": 0.51,
+      "ref": 2516
+     },
+     "qwen3-vl-8b": {
+      "f1": 0.247,
+      "hyp": 1922,
+      "p": 0.291,
+      "pages": 274,
+      "r": 0.214,
+      "ref": 2609
+     },
+     "qwen3.6-27b": {
+      "f1": 0.294,
+      "hyp": 2214,
+      "p": 0.322,
+      "pages": 275,
+      "r": 0.271,
+      "ref": 2635
+     }
+    }
+   },
+   "failed": {
+    "owner96": {
+     "gemini3.8-flash": 2,
+     "qwen3-vl-8b-mlx4": 4,
+     "qwen3.6-27b": 1
+    },
+    "public-latin": {
+     "gemini3.8-flash": 16,
+     "qwen3-vl-8b": 93,
+     "qwen3.6-27b": 39
+    }
+   },
+   "postcorrect": {
+    "owner96, pc-image": {
+     "corrected": {
+      "f1": 0.942,
+      "hyp": 232,
+      "p": 0.944,
+      "pages": 29,
+      "r": 0.94,
+      "ref": 233
+     },
+     "raw": {
+      "f1": 0.84,
+      "hyp": 229,
+      "p": 0.847,
+      "pages": 29,
+      "r": 0.833,
+      "ref": 233
+     }
+    },
+    "owner96, pc-text": {
+     "corrected": {
+      "f1": 0.877,
+      "hyp": 223,
+      "p": 0.897,
+      "pages": 29,
+      "r": 0.858,
+      "ref": 233
+     },
+     "raw": {
+      "f1": 0.84,
+      "hyp": 229,
+      "p": 0.847,
+      "pages": 29,
+      "r": 0.833,
+      "ref": 233
+     }
+    },
+    "public-latin, pc-image": {
+     "corrected": {
+      "f1": 0.625,
+      "hyp": 8,
+      "p": 0.625,
+      "pages": 1,
+      "r": 0.625,
+      "ref": 8
+     },
+     "raw": {
+      "f1": 0.667,
+      "hyp": 10,
+      "p": 0.6,
+      "pages": 1,
+      "r": 0.75,
+      "ref": 8
+     }
+    },
+    "public-latin, pc-text": {
+     "corrected": {
+      "f1": 0.667,
+      "hyp": 10,
+      "p": 0.6,
+      "pages": 1,
+      "r": 0.75,
+      "ref": 8
+     },
+     "raw": {
+      "f1": 0.667,
+      "hyp": 10,
+      "p": 0.6,
+      "pages": 1,
+      "r": 0.75,
+      "ref": 8
+     }
+    }
+   },
+   "roles": {
+    "apple-vision | recipient": {
+     "null": 4,
+     "ref": 18,
+     "same": 12
+    },
+    "apple-vision | sender": {
+     "extra": 1,
+     "null": 5,
+     "ref": 17,
+     "same": 8
+    },
+    "apple-vision | sending_place": {
+     "extra": 2,
+     "null": 2,
+     "ref": 14,
+     "same": 11
+    },
+    "apple-vision+pc-image | recipient": {
+     "null": 0,
+     "ref": 8,
+     "same": 8
+    },
+    "apple-vision+pc-image | sender": {
+     "extra": 1,
+     "null": 0,
+     "ref": 6,
+     "same": 5
+    },
+    "apple-vision+pc-image | sending_place": {
+     "extra": 1,
+     "null": 0,
+     "ref": 5,
+     "same": 4
+    },
+    "apple-vision+pc-text | recipient": {
+     "null": 0,
+     "ref": 8,
+     "same": 6
+    },
+    "apple-vision+pc-text | sender": {
+     "extra": 1,
+     "null": 2,
+     "ref": 6,
+     "same": 3
+    },
+    "apple-vision+pc-text | sending_place": {
+     "extra": 1,
+     "null": 0,
+     "ref": 5,
+     "same": 5
+    },
+    "claude-sonnet5.5 | recipient": {
+     "null": 0,
+     "ref": 18,
+     "same": 18
+    },
+    "claude-sonnet5.5 | sender": {
+     "extra": 2,
+     "null": 2,
+     "ref": 17,
+     "same": 15
+    },
+    "claude-sonnet5.5 | sending_place": {
+     "null": 1,
+     "ref": 14,
+     "same": 12
+    },
+    "gemini3.8-flash | recipient": {
+     "null": 0,
+     "ref": 18,
+     "same": 17
+    },
+    "gemini3.8-flash | sender": {
+     "extra": 1,
+     "null": 0,
+     "ref": 17,
+     "same": 16
+    },
+    "gemini3.8-flash | sending_place": {
+     "null": 0,
+     "ref": 14,
+     "same": 13
+    },
+    "qwen3-vl-8b-mlx4 | recipient": {
+     "extra": 1,
+     "null": 0,
+     "ref": 18,
+     "same": 14
+    },
+    "qwen3-vl-8b-mlx4 | sender": {
+     "extra": 1,
+     "null": 2,
+     "ref": 17,
+     "same": 14
+    },
+    "qwen3-vl-8b-mlx4 | sending_place": {
+     "extra": 3,
+     "null": 1,
+     "ref": 14,
+     "same": 12
+    },
+    "qwen3-vl-8b-mlx4+pc-image | recipient": {
+     "null": 0,
+     "ref": 1,
+     "same": 1
+    },
+    "qwen3-vl-8b-mlx4+pc-image | sender": {
+     "null": 0,
+     "ref": 1,
+     "same": 1
+    },
+    "qwen3-vl-8b-mlx4+pc-image | sending_place": {},
+    "qwen3-vl-8b-mlx4+pc-text | recipient": {
+     "null": 0,
+     "ref": 1,
+     "same": 1
+    },
+    "qwen3-vl-8b-mlx4+pc-text | sender": {
+     "null": 0,
+     "ref": 1,
+     "same": 1
+    },
+    "qwen3-vl-8b-mlx4+pc-text | sending_place": {},
+    "qwen3.6-27b | recipient": {
+     "null": 0,
+     "ref": 17,
+     "same": 13
+    },
+    "qwen3.6-27b | sender": {
+     "extra": 2,
+     "null": 0,
+     "ref": 16,
+     "same": 14
+    },
+    "qwen3.6-27b | sending_place": {
+     "extra": 2,
+     "null": 0,
+     "ref": 13,
+     "same": 11
+    }
+   },
+   "route_cer": {
+    "owner96": {
+     "apple-vision": 0.186,
+     "claude-sonnet5.5": 0.035,
+     "gemini3.8-flash": 0.059,
+     "qwen3-vl-8b-mlx4": 0.129,
+     "qwen3.6-27b": 0.065
+    },
+    "public-latin": {
+     "apple-vision": 0.731,
+     "gemini3.8-flash": 0.363,
+     "qwen3-vl-8b": 0.572,
+     "qwen3.6-27b": 0.612
+    }
+   },
+   "switch_off": {
+    "both": "5-10%",
+    "owner96": "10-20%",
+    "public-latin": "0-2%"
+   },
+   "unparsed": 10
+  }
+ },
+ "g17": {
+  "qwen3.6-27b": {
+   "categories": {
+    "receiver_persons": {
+     "f1": 0.5854,
+     "fn": 3,
+     "fp": 31,
+     "tp": 24
+    },
+    "send_date": {
+     "f1": 0.9298,
+     "fn": 4,
+     "fp": 4,
+     "tp": 53
+    },
+    "sender_persons": {
+     "f1": 0.1121,
+     "fn": 49,
+     "fp": 46,
+     "tp": 6
+    }
+   },
+   "f1_macro": 0.54,
+   "f1_micro": 0.55,
+   "letters": 57,
+   "missing_replies": 0,
+   "note": "f1 values from BusinessLetters.score_benchmark (rounded to 2 dp, as published); signed/unsigned = the card's skip_non_signatures / skip_signatures variants",
+   "root": "/Users/cp1/Library/Caches/ArchiveSuiteRehearsal/sherlock-results/ent-robust-20261029/g17",
+   "signed": {
+    "categories": {
+     "receiver_persons": {
+      "f1": 0.7037,
+      "fn": 2,
+      "fp": 14,
+      "tp": 19
+     },
+     "send_date": {
+      "f1": 0.9375,
+      "fn": 2,
+      "fp": 2,
+      "tp": 30
+     },
+     "sender_persons": {
+      "f1": 0.0976,
+      "fn": 46,
+      "fp": 28,
+      "tp": 4
+     }
+    },
+    "f1_macro": 0.58,
+    "f1_micro": 0.53,
+    "letters": 32
+   },
+   "truncated": 0,
+   "unparsed": 0,
+   "unparsed_letters": [],
+   "unsigned": {
+    "categories": {
+     "receiver_persons": {
+      "f1": 0.3571,
+      "fn": 1,
+      "fp": 17,
+      "tp": 5
+     },
+     "send_date": {
+      "f1": 0.92,
+      "fn": 2,
+      "fp": 2,
+      "tp": 23
+     },
+     "sender_persons": {
+      "f1": 0.16,
+      "fn": 3,
+      "fp": 18,
+      "tp": 2
+     }
+    },
+    "f1_macro": 0.48,
+    "f1_micro": 0.58,
+    "letters": 25
+   }
   }
  },
  "office": {

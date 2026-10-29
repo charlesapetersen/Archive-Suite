@@ -122,9 +122,94 @@ By kind (owner) and stratum (public), F1 per route:
 | qwen3-vl-8b | 0.19 (77) | 0.09 (80) | 0.13 (77) | 0.61 (68) |
 | qwen3.6-27b | 0.22 (77) | 0.23 (80) | 0.17 (77) | 0.62 (68) |
 
-## Qwen3.6 27B through the entity prompt
+## qwen3.6-27b-entity-prompt
 
-Not yet run: the Sherlock pack (2,078 requests) waits for an owner session (`execution-plans/items/W46.ent-robust.md`). Its replies go into this page when they are home.
+By route, the owner's 96 (mean page CER of the scored pages):
+
+| route | pages | failed readings | mean CER | names on truth | names on route | P | R | F1 |
+|---|---|---|---|---|---|---|---|---|
+| apple-vision | 86 | 0 | 0.186 | 946 | 918 | 0.843 | 0.818 | 0.830 |
+| claude-sonnet5.5 | 86 | 0 | 0.035 | 946 | 964 | 0.942 | 0.960 | 0.951 |
+| gemini3.8-flash | 86 | 2 | 0.059 | 946 | 941 | 0.962 | 0.957 | 0.959 |
+| qwen3-vl-8b-mlx4 | 86 | 4 | 0.129 | 946 | 923 | 0.930 | 0.907 | 0.918 |
+| qwen3.6-27b | 86 | 1 | 0.065 | 946 | 917 | 0.912 | 0.884 | 0.897 |
+
+By route, the public Latin pages (mean page CER of the scored pages):
+
+| route | pages | failed readings | mean CER | names on truth | names on route | P | R | F1 |
+|---|---|---|---|---|---|---|---|---|
+| apple-vision | 273 | 0 | 0.731 | 2579 | 1923 | 0.175 | 0.130 | 0.149 |
+| gemini3.8-flash | 271 | 16 | 0.363 | 2516 | 3106 | 0.413 | 0.510 | 0.457 |
+| qwen3-vl-8b | 274 | 93 | 0.572 | 2609 | 1922 | 0.291 | 0.214 | 0.247 |
+| qwen3.6-27b | 275 | 39 | 0.612 | 2635 | 2214 | 0.322 | 0.271 | 0.294 |
+
+By page CER, every route pooled (route readings / F1):
+
+| CER | 0-2% | 2-5% | 5-10% | 10-20% | 20-40% | over 40% |
+|---|---|---|---|---|---|---|
+| the owner's 96 | 266 / 0.96 | 36 / 0.93 | 48 / 0.81 | 31 / 0.74 | 15 / 0.74 | 34 / 0.63 |
+| the public Latin pages | 11 / 0.79 | 22 / 0.69 | 107 / 0.76 | 170 / 0.59 | 167 / 0.31 | 616 / 0.14 |
+| both sets | 277 / 0.96 | 58 / 0.86 | 155 / 0.78 | 201 / 0.61 | 182 / 0.35 | 650 / 0.16 |
+
+First CER bin (10 readings or more) below F1 0.8: the owner's 96 10-20%, the public Latin pages 0-2%, both sets 5-10%.
+
+By kind (owner) and stratum (public), F1 per route:
+
+| route | handwritten | mixed | printed | typewritten |
+|---|---|---|---|---|
+| apple-vision | 0.52 (16) | 0.74 (2) | 0.85 (26) | 0.88 (42) |
+| claude-sonnet5.5 | 0.88 (16) | 0.87 (2) | 0.94 (26) | 0.98 (42) |
+| gemini3.8-flash | 0.94 (16) | 0.92 (2) | 0.94 (26) | 0.98 (42) |
+| qwen3-vl-8b-mlx4 | 0.79 (16) | 0.83 (2) | 0.93 (26) | 0.94 (42) |
+| qwen3.6-27b | 0.82 (16) | 0.81 (2) | 0.88 (26) | 0.94 (42) |
+
+| route | L5 | L6 | L7 | L8 |
+|---|---|---|---|---|
+| apple-vision | 0.07 (57) | 0.05 (79) | 0.10 (78) | 0.44 (59) |
+| gemini3.8-flash | 0.26 (55) | 0.57 (79) | 0.46 (78) | 0.74 (59) |
+| qwen3-vl-8b | 0.19 (58) | 0.12 (79) | 0.14 (78) | 0.68 (59) |
+| qwen3.6-27b | 0.15 (59) | 0.22 (79) | 0.25 (78) | 0.72 (59) |
+
+Post-correction by the 27B (W46.ocr-postcorrect's readings, on the pages it corrected):
+
+| set, arm | pages | raw F1 | corrected F1 |
+|---|---|---|---|
+| owner96, pc-image | 29 | 0.840 | 0.942 |
+| owner96, pc-text | 29 | 0.840 | 0.877 |
+
+Letter fields (owner 96): the reply on the route against its reply on the truth text.
+
+| route | field | truth reply named | same (ed2) | null on route | named only on route |
+|---|---|---|---|---|---|
+| apple-vision | recipient | 18 | 12 | 4 | 0 |
+| apple-vision | sender | 17 | 8 | 5 | 1 |
+| apple-vision | sending_place | 14 | 11 | 2 | 2 |
+| apple-vision+pc-image | recipient | 8 | 8 | 0 | 0 |
+| apple-vision+pc-image | sender | 6 | 5 | 0 | 1 |
+| apple-vision+pc-image | sending_place | 5 | 4 | 0 | 1 |
+| apple-vision+pc-text | recipient | 8 | 6 | 0 | 0 |
+| apple-vision+pc-text | sender | 6 | 3 | 2 | 1 |
+| apple-vision+pc-text | sending_place | 5 | 5 | 0 | 1 |
+| claude-sonnet5.5 | recipient | 18 | 18 | 0 | 0 |
+| claude-sonnet5.5 | sender | 17 | 15 | 2 | 2 |
+| claude-sonnet5.5 | sending_place | 14 | 12 | 1 | 0 |
+| gemini3.8-flash | recipient | 18 | 17 | 0 | 0 |
+| gemini3.8-flash | sender | 17 | 16 | 0 | 1 |
+| gemini3.8-flash | sending_place | 14 | 13 | 0 | 0 |
+| qwen3-vl-8b-mlx4 | recipient | 18 | 14 | 0 | 1 |
+| qwen3-vl-8b-mlx4 | sender | 17 | 14 | 2 | 1 |
+| qwen3-vl-8b-mlx4 | sending_place | 14 | 12 | 1 | 3 |
+| qwen3-vl-8b-mlx4+pc-image | recipient | 1 | 1 | 0 | 0 |
+| qwen3-vl-8b-mlx4+pc-image | sender | 1 | 1 | 0 | 0 |
+| qwen3-vl-8b-mlx4+pc-image | sending_place | 0 | 0 | 0 | 0 |
+| qwen3-vl-8b-mlx4+pc-text | recipient | 1 | 1 | 0 | 0 |
+| qwen3-vl-8b-mlx4+pc-text | sender | 1 | 1 | 0 | 0 |
+| qwen3-vl-8b-mlx4+pc-text | sending_place | 0 | 0 | 0 | 0 |
+| qwen3.6-27b | recipient | 17 | 13 | 0 | 0 |
+| qwen3.6-27b | sender | 16 | 14 | 0 | 2 |
+| qwen3.6-27b | sending_place | 13 | 11 | 0 | 2 |
+
+Unparsed replies: 10.
 
 ## Office holders as dating evidence (G test 7)
 
@@ -132,15 +217,37 @@ Not yet run: the Sherlock pack (2,078 requests) waits for an owner session (`exe
 
 ## G17 Business Letters
 
-Not yet run: its 27B arm is in the same Sherlock pack; Gemini is W46.ent-robust-paid; Claude through the plan waits for W46.gateway-models-ok.
+- qwen3.6-27b: F1 macro 0.54, F1 micro 0.55 (published median 0.55, IQR 0.51-0.59, over 96 configurations); 57 letters, 0 unparsed, 0 truncated
+  - signed (32 letters): F1 macro 0.58, micro 0.53
+  - unsigned (25 letters): F1 macro 0.48, micro 0.58
+  - by field: send_date 0.93 (53 right, 4 wrong or extra, 4 missed), sender_persons 0.11 (6 right, 46 wrong or extra, 49 missed), receiver_persons 0.59 (24 right, 31 wrong or extra, 3 missed)
 
 ## Reading
 
-**Taggers so far; the LLM extractor the app would use is the Sherlock arm.** These figures are for Apple NLTagger
-and GLiNER2.5, which W46.ent-score found unusable as extractors (ed2 F1 0.24 at best), so they measure how much a
-route's text changes what a name tagger sees, not what the app's fields would lose. The 27B's entity prompt on the
-same 2,078 texts, and G17's Business Letters through the 27B, are packed for Sherlock; their rows come into this
-page when the answers are home, and the switch-off rule below is provisional until then.
+**The LLM extractor the app would use holds up better than the taggers, one CER bin longer.** Qwen3.6 27B through
+the page entity prompt (Sherlock job 50126556, one L40S, 26 minutes for 2,078 texts and 57 G17 letters; 10 replies
+unparsed) is the extractor the laptop route would ship, as W46.ent-score found the taggers unusable (ed2 F1 0.24 at
+best). On the owner's 96, its names on a route agree with its names on the truth text at F1 0.95 to 0.96 for Claude
+Sonnet 5.5 and Gemini 3.8 Flash, 0.92 for Qwen3-VL 8B, 0.90 for the 27B's own reading and 0.83 for Apple Vision,
+against the taggers' 0.74 to 0.78 for Vision. By page CER: 0.96 under 2%, 0.93 at 2 to 5%, 0.81 at 5 to 10%, 0.74
+at 10 to 40% and 0.63 over 40%, so it first drops below 0.8 at 10 to 20%, where the taggers drop at 5 to 10%. The
+gain is largest where the text is worst: on handwritten pages the 27B keeps 0.52 of Vision's names (the taggers 0.28
+to 0.31), 0.79 of the 8B's, 0.82 of its own and 0.88 to 0.94 of the API routes'.
+
+**The letter fields are where Vision's text still fails.** Sender, recipient and place from the 27B's reply on a
+route against its reply on the truth text: through Claude, Gemini, the 8B and the 27B, 11 to 18 of 13 to 18 named
+fields match on each route; through Vision only 12 of 18 recipients, 8 of 17 senders and 11 of 14 places, with 4 to 5
+recipients and senders lost outright. A sender is often a signature or letterhead, exactly what Vision misreads.
+
+**G17 places the 27B at the published median.** On Business Letters' 57 letters (all pages in one request, the
+harness's own prompt and scorer) the 27B scores F1 macro 0.54, micro 0.55, against a published median of 0.55 over
+96 configurations. Dates are nearly solved (0.93); recipients 0.59; senders 0.11, because it names the firm on the
+letterhead (the benchmark wants the signing person), which is the same sender/firm ambiguity W46.ent-score met.
+So the prompt is an ordinary one by an external measure, not a weak one, and the switch-off rule below does not hang
+on a poor extractor.
+
+**The taggers, for comparison.** These measure how much a route's text changes what a name tagger sees, not what
+the app's fields would lose.
 
 **On the owner's pages the names survive the API and 27B routes and not Apple Vision.** Against the names a tagger
 finds in the truth text, the names it finds in Gemini 3.8 Flash's and Claude Sonnet 5.5's readings agree at F1 0.93
@@ -150,22 +257,26 @@ kind of page carries most of it: on handwritten pages Vision's text keeps 0.28 t
 to 0.70, the 27B's 0.74 and Gemini's 0.84 to 0.89; on typed and printed pages every route but Vision keeps 0.89 or
 more and Vision 0.76 to 0.83.
 
-**The provisional switch-off rule.** The app does not know a page's CER, but it knows the page's kind and route. So:
-show extracted names from the API and 27B routes on every kind; from the Mac route's Vision text only on typed and
-printed pages, marked as read from OCR, and never on handwritten pages, where three names in four would be lost or
-wrong; from the 8B on handwritten pages only with the quote check W46.ent-score set. A page whose route reading
+**The switch-off rule, confirmed by the LLM arm.** The app does not know a page's CER, but it knows the page's kind
+and route. So: show extracted names from the API and 27B routes on every kind; from the Mac route's Vision text only
+on typed and printed pages (the 27B's agreement there 0.85 to 0.88), marked as read from OCR, and never on handwritten
+pages, where about half the names would be lost or wrong even through the LLM (0.52), and never the sender field from
+Vision text on any kind; from the 8B on handwritten pages (0.79) only with the quote check W46.ent-score set. A page whose route reading
 failed (length-capped or unparsed: the 8B 4 of 96 here) gives no names at all and should say so.
 
 **Post-correction pays for names when it sees the image.** On the 30 to 32 owner pages W46.ocr-postcorrect corrected
 (Vision and the 8B, in its 0.7 to 0.9 NES band), the 27B's image-grounded correction lifts the tagger agreement
-from 0.74-0.76 to 0.92; the text-only correction to 0.82 to 0.87. That is the OCR finding again, measured on
-names: where a page is corrected anyway, extract after the image-grounded correction.
+from 0.74-0.76 to 0.92; the text-only correction to 0.82 to 0.87. The 27B extractor shows the same on its 29 pages:
+0.84 raw, 0.94 after the image-grounded correction, 0.88 after the text-only one. That is the OCR finding again,
+measured on names: where a page is corrected anyway, extract after the image-grounded correction.
 
 **The public Latin pages are another matter.** The same comparison on the 440's Latin strata gives 0.09 to 0.53 by
 route: early print (L8) keeps 0.60 to 0.70 through the model routes, the medieval and early-modern hands (L5, L7)
 0.02 to 0.37 and the nineteenth-century hands (L6) up to 0.56 through Gemini. The taggers were not built for
 medieval Latin and the routes' CER there is 0.35 to 0.72, so this says only that entity extraction is not a feature
-for such pages on any route tested, which matches what the readers make of them.
+for such pages on any route tested, which matches what the readers make of them. The 27B extractor does no better
+there (0.15 to 0.46 by route; early print 0.44 to 0.74, the hands 0.05 to 0.57), and even its under-2% bin is only
+0.79 on 11 readings, so on these pages the LLM's own disagreement with itself is part of the figure.
 
 **Office holders do not date this corpus.** Of the 54 owner-answered dating documents, 9 name a person with an office,
 3 of those 19 mentions link unambiguously to Wikidata and 2 documents are bracketed by a term (median 14 years wide);
@@ -178,8 +289,9 @@ Noise costs a tagger 0.03 to 0.09 on typed pages through the model routes, while
 points short on clean text, because they do not mark most names in letter text at all; a fine-tune against OCR
 degradation cannot close that, and the laptop route for these fields is the local LLM through the prompt.
 
-**Limits.** The reference is the tagger's own output on the truth text, so a name a tagger misses on both sides is
-invisible here. Readings that failed count as pages with no names, which lowers the 8B's public figure most (77 to 94
+**Limits.** The reference is the extractor's own output on the truth text, so a name it misses on both sides is
+invisible here. Gemini on the scans and on G17 is W46.ent-robust-paid; Claude through the plan
+waits for W46.gateway-models-ok (owner, 2026-10-21), so the only G17 row is the 27B's. Readings that failed count as pages with no names, which lowers the 8B's public figure most (77 to 94
 of 232 to 302 public pages failed). Two edits are allowed only on names of five letters or more. Post-correction rows
 come from W46.ocr-postcorrect's band sample, so they say what correction buys where it is applied, not on an average
 page. Not an OCR or segmentation result, so ArchiveOCRBench is unchanged.

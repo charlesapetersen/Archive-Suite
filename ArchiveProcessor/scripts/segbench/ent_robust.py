@@ -657,8 +657,8 @@ def markdown(s):
             L.append("")
         if r.get("roles"):
             L += ["Letter fields (owner 96): the reply on the route against its reply on the truth text.", "",
-                  "| route, field | truth reply named | same (ed2) | null on route | named only on route |",
-                  "|---|---|---|---|---|"]
+                  "| route | field | truth reply named | same (ed2) | null on route | named only on route |",
+                  "|---|---|---|---|---|---|"]
             for k, v in r["roles"].items():
                 L.append(f"| {k} | {v.get('ref', 0)} | {v.get('same', 0)} | {v.get('null', 0)} | {v.get('extra', 0)} |")
             L += ["", f"Unparsed replies: {r.get('unparsed', 0)}.", ""]
@@ -682,7 +682,16 @@ def markdown(s):
         L += ["## G17 Business Letters", ""]
         for label, v in s["g17"].items():
             L.append(f"- {label}: F1 macro {v.get('f1_macro')}, F1 micro {v.get('f1_micro')} (published median 0.55, "
-                     f"IQR 0.51-0.59, over 96 configurations)")
+                     f"IQR 0.51-0.59, over 96 configurations); {v.get('letters')} letters, "
+                     f"{v.get('unparsed', 0)} unparsed, {v.get('truncated', 0)} truncated")
+            for part in ("signed", "unsigned"):
+                if part in v:
+                    L.append(f"  - {part} ({v[part]['letters']} letters): F1 macro {v[part]['f1_macro']}, "
+                             f"micro {v[part]['f1_micro']}")
+            cats = v.get("categories", {})
+            if cats:
+                L.append("  - by field: " + ", ".join(f"{c} {x['f1']:.2f} ({x['tp']} right, {x['fp']} wrong or extra, "
+                                                     f"{x['fn']} missed)" for c, x in cats.items()))
         L.append("")
     else:
         L += ["## G17 Business Letters", "", "Not yet run: its 27B arm is in the same Sherlock pack; Gemini is "
@@ -692,11 +701,27 @@ def markdown(s):
 
 
 READING = ["## Reading", "", """\
-**Taggers so far; the LLM extractor the app would use is the Sherlock arm.** These figures are for Apple NLTagger
-and GLiNER2.5, which W46.ent-score found unusable as extractors (ed2 F1 0.24 at best), so they measure how much a
-route's text changes what a name tagger sees, not what the app's fields would lose. The 27B's entity prompt on the
-same 2,078 texts, and G17's Business Letters through the 27B, are packed for Sherlock; their rows come into this
-page when the answers are home, and the switch-off rule below is provisional until then.""", "", """\
+**The LLM extractor the app would use holds up better than the taggers, one CER bin longer.** Qwen3.6 27B through
+the page entity prompt (Sherlock job 50126556, one L40S, 26 minutes for 2,078 texts and 57 G17 letters; 10 replies
+unparsed) is the extractor the laptop route would ship, as W46.ent-score found the taggers unusable (ed2 F1 0.24 at
+best). On the owner's 96, its names on a route agree with its names on the truth text at F1 0.95 to 0.96 for Claude
+Sonnet 5.5 and Gemini 3.8 Flash, 0.92 for Qwen3-VL 8B, 0.90 for the 27B's own reading and 0.83 for Apple Vision,
+against the taggers' 0.74 to 0.78 for Vision. By page CER: 0.96 under 2%, 0.93 at 2 to 5%, 0.81 at 5 to 10%, 0.74
+at 10 to 40% and 0.63 over 40%, so it first drops below 0.8 at 10 to 20%, where the taggers drop at 5 to 10%. The
+gain is largest where the text is worst: on handwritten pages the 27B keeps 0.52 of Vision's names (the taggers 0.28
+to 0.31), 0.79 of the 8B's, 0.82 of its own and 0.88 to 0.94 of the API routes'.""", "", """\
+**The letter fields are where Vision's text still fails.** Sender, recipient and place from the 27B's reply on a
+route against its reply on the truth text: through Claude, Gemini, the 8B and the 27B, 11 to 18 of 13 to 18 named
+fields match on each route; through Vision only 12 of 18 recipients, 8 of 17 senders and 11 of 14 places, with 4 to 5
+recipients and senders lost outright. A sender is often a signature or letterhead, exactly what Vision misreads.""", "", """\
+**G17 places the 27B at the published median.** On Business Letters' 57 letters (all pages in one request, the
+harness's own prompt and scorer) the 27B scores F1 macro 0.54, micro 0.55, against a published median of 0.55 over
+96 configurations. Dates are nearly solved (0.93); recipients 0.59; senders 0.11, because it names the firm on the
+letterhead (the benchmark wants the signing person), which is the same sender/firm ambiguity W46.ent-score met.
+So the prompt is an ordinary one by an external measure, not a weak one, and the switch-off rule below does not hang
+on a poor extractor.""", "", """\
+**The taggers, for comparison.** These measure how much a route's text changes what a name tagger sees, not what
+the app's fields would lose.""", "", """\
 **On the owner's pages the names survive the API and 27B routes and not Apple Vision.** Against the names a tagger
 finds in the truth text, the names it finds in Gemini 3.8 Flash's and Claude Sonnet 5.5's readings agree at F1 0.93
 to 0.95, Qwen3.6 27B's and Qwen3-VL 8B's at 0.89 to 0.91, Apple Vision's at 0.74 to 0.78. By page CER the agreement
@@ -704,20 +729,24 @@ is 0.96 under 2%, 0.86 to 0.87 at 2 to 5%, and falls below 0.8 at 5 to 10% (0.76
 kind of page carries most of it: on handwritten pages Vision's text keeps 0.28 to 0.31 of the names, the 8B's 0.66
 to 0.70, the 27B's 0.74 and Gemini's 0.84 to 0.89; on typed and printed pages every route but Vision keeps 0.89 or
 more and Vision 0.76 to 0.83.""", "", """\
-**The provisional switch-off rule.** The app does not know a page's CER, but it knows the page's kind and route. So:
-show extracted names from the API and 27B routes on every kind; from the Mac route's Vision text only on typed and
-printed pages, marked as read from OCR, and never on handwritten pages, where three names in four would be lost or
-wrong; from the 8B on handwritten pages only with the quote check W46.ent-score set. A page whose route reading
+**The switch-off rule, confirmed by the LLM arm.** The app does not know a page's CER, but it knows the page's kind
+and route. So: show extracted names from the API and 27B routes on every kind; from the Mac route's Vision text only
+on typed and printed pages (the 27B's agreement there 0.85 to 0.88), marked as read from OCR, and never on handwritten
+pages, where about half the names would be lost or wrong even through the LLM (0.52), and never the sender field from
+Vision text on any kind; from the 8B on handwritten pages (0.79) only with the quote check W46.ent-score set. A page whose route reading
 failed (length-capped or unparsed: the 8B 4 of 96 here) gives no names at all and should say so.""", "", """\
 **Post-correction pays for names when it sees the image.** On the 30 to 32 owner pages W46.ocr-postcorrect corrected
 (Vision and the 8B, in its 0.7 to 0.9 NES band), the 27B's image-grounded correction lifts the tagger agreement
-from 0.74-0.76 to 0.92; the text-only correction to 0.82 to 0.87. That is the OCR finding again, measured on
-names: where a page is corrected anyway, extract after the image-grounded correction.""", "", """\
+from 0.74-0.76 to 0.92; the text-only correction to 0.82 to 0.87. The 27B extractor shows the same on its 29 pages:
+0.84 raw, 0.94 after the image-grounded correction, 0.88 after the text-only one. That is the OCR finding again,
+measured on names: where a page is corrected anyway, extract after the image-grounded correction.""", "", """\
 **The public Latin pages are another matter.** The same comparison on the 440's Latin strata gives 0.09 to 0.53 by
 route: early print (L8) keeps 0.60 to 0.70 through the model routes, the medieval and early-modern hands (L5, L7)
 0.02 to 0.37 and the nineteenth-century hands (L6) up to 0.56 through Gemini. The taggers were not built for
 medieval Latin and the routes' CER there is 0.35 to 0.72, so this says only that entity extraction is not a feature
-for such pages on any route tested, which matches what the readers make of them.""", "", """\
+for such pages on any route tested, which matches what the readers make of them. The 27B extractor does no better
+there (0.15 to 0.46 by route; early print 0.44 to 0.74, the hands 0.05 to 0.57), and even its under-2% bin is only
+0.79 on 11 readings, so on these pages the LLM's own disagreement with itself is part of the figure.""", "", """\
 **Office holders do not date this corpus.** Of the 54 owner-answered dating documents, 9 name a person with an office,
 3 of those 19 mentions link unambiguously to Wikidata and 2 documents are bracketed by a term (median 14 years wide);
 one link excludes the year, a past officeholder named in retrospect, so a link is weak evidence, not a constraint.
@@ -727,8 +756,9 @@ not earn a line in Phase 4.""", "", """\
 Noise costs a tagger 0.03 to 0.09 on typed pages through the model routes, while W46.ent-score found the taggers 30
 points short on clean text, because they do not mark most names in letter text at all; a fine-tune against OCR
 degradation cannot close that, and the laptop route for these fields is the local LLM through the prompt.""", "", """\
-**Limits.** The reference is the tagger's own output on the truth text, so a name a tagger misses on both sides is
-invisible here. Readings that failed count as pages with no names, which lowers the 8B's public figure most (77 to 94
+**Limits.** The reference is the extractor's own output on the truth text, so a name it misses on both sides is
+invisible here. Gemini on the scans and on G17 is W46.ent-robust-paid; Claude through the plan
+waits for W46.gateway-models-ok (owner, 2026-10-21), so the only G17 row is the 27B's. Readings that failed count as pages with no names, which lowers the 8B's public figure most (77 to 94
 of 232 to 302 public pages failed). Two edits are allowed only on names of five letters or more. Post-correction rows
 come from W46.ocr-postcorrect's band sample, so they say what correction buys where it is applied, not on an average
 page. Not an OCR or segmentation result, so ArchiveOCRBench is unchanged.""", ""]
