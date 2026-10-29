@@ -75,6 +75,10 @@ MODELS = {  # key -> (weights, label, arm)
     "date-2b-mlx8": (os.path.join(LTS, "date-2b-8bit"), "the trained 2B date model, 8-bit MLX", "relate"),
 }
 LABEL_27B = "qwen3.6-27b-nothink"
+GATEWAY = {  # W46.date-enclosure-paid's arms (date_enclosure_gateway.py) -> (label, arm)
+    "gemini3.7-flash-gw-marker": ("Gemini 3.7 Flash, the page at 2048 px (gateway)", "marker"),
+    "gemini3.7-flash-gw-relate": ("Gemini 3.7 Flash with both pages' images (gateway)", "relate"),
+}
 CUE = re.compile(r"\b(enclos\w*|attach\w*|herewith|enc\.|encl\.?|encs?\b)", re.I)
 
 
@@ -421,14 +425,15 @@ def arm_predictions(items):
                              "cue_found": None, "secs": None, "cls": None} for d in items}
             for name, tail in (("cue", 600), ("cue-any", 0))}
     by_id = {d["id"]: d for d in items}
-    for key, (_, _, kind) in MODELS.items():
+    for key, kind in [(k, v[2]) for k, v in MODELS.items()] + [(k, v[1]) for k, v in GATEWAY.items()]:
         ans = load_answers(key)
         if kind == "marker" and ans:
             parsed = run_helper("parse", [{"id": i, "raw": r["raw"]} for i, r in ans.items()])
             arms["marker:" + key] = {i: {"yes": parsed[i]["enclosure"], "score": float(parsed[i]["enclosure"]),
                                          "cue": None, "cue_found": None, "secs": r.get("wall_s"),
                                          "cls": parsed[i]["classification"]} for i, r in ans.items() if i in by_id}
-    relate = [k for k, v in MODELS.items() if v[2] == "relate"] + [LABEL_27B]
+    relate = [k for k, v in MODELS.items() if v[2] == "relate"] + [LABEL_27B] + [k for k, v in GATEWAY.items()
+                                                                                 if v[1] == "relate"]
     for key in relate:
         ans = load_answers(key)
         if not ans:
@@ -539,7 +544,8 @@ def arm_name(arm):
         return "cue words in the cover's last 600 characters (rule)"
     if kind == "cue-any":
         return "cue words anywhere in the cover (rule)"
-    label = MODELS[key][1] if key in MODELS else "Qwen3.6-27B, thinking off (Sherlock, one L40S)"
+    label = (MODELS[key][1] if key in MODELS else GATEWAY[key][0] if key in GATEWAY
+             else "Qwen3.6-27B, thinking off (Sherlock, one L40S)")
     return ("[enclosure] marker, app OCR prompt, " if kind == "marker" else "relation classifier, ") + label
 
 
@@ -549,6 +555,9 @@ def cmd_score(a):
     out = {"set": dict(collections.Counter(d["group"] for d in items)),
            "same_collection_negatives": sum(d.get("same_collection", False) for d in items),
            "arms": {arm: {"name": arm_name(arm), **score_arm(items, pred)} for arm, pred in arms.items()}}
+    for arm, cost in gateway_cost().items():
+        if arm in out["arms"]:
+            out["arms"][arm]["cost"] = cost
     # Private: every proposal on a negative and every owner case, with the reply, for reading.
     by_id = {d["id"]: d for d in items}
     with open(os.path.join(OUT, "inspect.jsonl"), "w", encoding="utf-8") as fh:
@@ -564,6 +573,21 @@ def cmd_score(a):
         json.dump(out, fh, indent=1, ensure_ascii=False)
     write_md(out)
     print(f"-> {RESULTS} and {RESULTS_JSON}; private inspection {os.path.join(OUT, 'inspect.jsonl')}")
+
+
+def gateway_cost():
+    """{arm: {"calls", "usd", "per_1000"}} from the gateway ledger (date_enclosure_gateway.py): token usage at the list
+    price taken as a ceiling, an estimate (the gateway returns no cost); failed calls are counted, retries included."""
+    p = os.path.join(OUT, "gateway", "calls.jsonl")
+    if not os.path.exists(p):
+        return {}
+    acc = collections.defaultdict(lambda: [0, 0.0])
+    for line in open(p, encoding="utf-8"):
+        r = json.loads(line)
+        k = next(v[1] + ":" + key for key, v in GATEWAY.items() if v[1] == r["arm"])
+        acc[k][0] += 1
+        acc[k][1] += r.get("cost", 0)
+    return {k: {"calls": n, "usd": round(c, 4), "per_1000": round(1000 * c / n, 2)} for k, (n, c) in acc.items()}
 
 
 def frac(kn):
@@ -666,6 +690,13 @@ def write_md(out):
             if "cue_found" in r:
                 L.append(f"- {r['name']}: a cue quoted on {frac(r['cue_quoted'])} yes replies; the quote found in the "
                          f"documents as sent on {frac(r['cue_found'])}.")
+    costed = [(arm, r) for arm, r in out["arms"].items() if "cost" in r]
+    if costed:
+        L += ["", "## Cost", "",
+              "From the gateway's token usage at Gemini 3.8 Flash's list price taken as a ceiling (the gateway returns no "
+              "cost), so an estimate; every call counted, the pilot's included.", ""]
+        L += [f"- {r['name']}: {r['cost']['calls']} calls, ${r['cost']['usd']:.2f}, about ${r['cost']['per_1000']:.2f} "
+              "per 1,000 documents." for arm, r in costed]
     if FINDINGS:
         L += ["", "## Findings", ""] + [f"- {f}" for f in FINDINGS]
     with open(RESULTS, "w", encoding="utf-8") as fh:
