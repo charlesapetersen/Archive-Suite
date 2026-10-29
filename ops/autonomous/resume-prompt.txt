@@ -40,7 +40,8 @@ STEP 1 — RECOVER STATE (always, first):
   (owner-gated: **Tier-3 releases**, a **write to the REAL corpus**, and work only the owner can perform or
   judge) and `(blocked-on:)`-dependent items — both below. ⚠️ **SPEC changes and HIGH findings on irreversible
   paths are NO LONGER hold-queue** (owner, 2026-08-13 — TIER-2 IS THE GATE; see `AGENTS.md` §*Gating baseline*).
-  If the plan's "RUN STATUS:" line reads COMPLETE, there is nothing to do — stop immediately.
+  If the plan's "RUN STATUS:" line reads COMPLETE, there is nothing to do — stop immediately, unless your
+  assignment is `doc-fix` or `gate-fix` (those are handed out even with an empty queue).
 
 STEP 1.5 — DOC-FIX AND GATE-FIX ASSIGNMENTS. The engine picks your item (the ENGINE ASSIGNMENT block above), so
   this prompt no longer has queue-picking or review-cadence steps. Two assignments are not queue items; each is your
@@ -65,7 +66,9 @@ STEP 1.5 — DOC-FIX AND GATE-FIX ASSIGNMENTS. The engine picks your item (the E
   the 2026-08-04 numbers were "today's size, rounded up", and one of them parked a run. If you raise one, say
   why in the commit message and check the PER-SESSION ORIENTATION total still holds.
   Verify before you stop (instant, pure shell): ./ops/autonomous/context-budget.sh — then commit, push and STOP.
-  GATE-FIX (your item is `gate-fix`): the health gate failed twice in a row and making it pass is your item. The
+  GATE-FIX (your item is `gate-fix`): the health gate failed twice in a row and making it pass is your item (the
+  daemon stopped parking on a red gate on 2026-10-05 so that a session could fix it; parking stays its backstop
+  after three committed attempts). The
   request is `~/.local/state/archive-autonomous/gate-fix`: it names the failing steps, the command the gate runs
   for each, and the log's tail. Then:
     * Reproduce each failing step ALONE with its command (never the whole 20-minute gate), in your worktree.
@@ -80,7 +83,8 @@ STEP 1.5 — DOC-FIX AND GATE-FIX ASSIGNMENTS. The engine picks your item (the E
       Report and stop.
 
 STEP 2 — CHECK THE ASSIGNED ITEM before you start. Do only that item; if it turns out to be any of these, record
-  why and stop.
+  why and stop (write `$AGENT_WORKER_STATE/blocked` when the cause is something unavailable rather than
+  owner-gated, so the session is not counted as one without progress).
   * HOLD QUEUE (WS10): the unattended session must NOT execute an item in the plan's "## HOLD QUEUE (owner-gated)"
     or tagged `[hold]` / `needs: owner`. Since 2026-08-13 that is: **Tier-3 releases** (DMG/`gh release`/version
     tags), anything that **writes the REAL corpus** (`~/Desktop/Google Drive/Archival Photos/`), and **work only
@@ -90,17 +94,23 @@ STEP 2 — CHECK THE ASSIGNED ITEM before you start. Do only that item; if it tu
     ⚠️ **REMOVED from that list by the owner on 2026-08-13 — do NOT put them back:** `SPEC`/`tag-format` changes,
     HIGH findings on irreversible paths (Capture/·Net/·finalize, TagWriter/file-safety), and money. **TIER-2 IS
     THE GATE** for all of those: adversarial review plus a functional test on scratch copies (`AGENTS.md`
-    §*Gating baseline*). Cost discipline is NOT lifted — cheapest capable model, smallest input set, say what a
+    §*Gating baseline*). His words: *"I'm not sure why I need to authorize these kinds of things"*; on money,
+    *"the daemon only spends tiny amounts and the keys are capped"*; on the SPEC, *"nothing real has been created
+    by these apps yet."* Cost discipline is NOT lifted — cheapest capable model, smallest input set, say what a
     big run costs.
   * OWNER GRANTS: `OWNER_AUTHORIZATIONS.md` (repo root) is a RECORD, not a gate: an item's absence from it means
     nothing, so never park work because it is unlisted. But a grant BINDS the item it names: read its entry
-    first and obey every ⛔ constraint VERBATIM (they are often design decisions — `W17.stg1` forbids a
+    first and obey every ⛔ constraint VERBATIM (several are hard limits on money or delete paths, and they are
+    often design decisions — `W17.stg1` forbids a
     per-source content hash and requires a corrupt manifest be RENAMED, never auto-deleted). If you cannot
     satisfy a constraint, STOP and surface it rather than proceeding on a narrower reading. Do not rely on a list
-    of tags quoted anywhere else; read the file.
+    of tags quoted anywhere else; read the file (the plan's "## OWNER AUTHORIZATIONS" heading is only a pointer
+    stub). **A grant is a licence, not a queue entry:** an item sitting in "## HOLD QUEUE" is not actionable no
+    matter what the authorizations file says.
   * DEPENDENCIES (WS9): an item's `(blocked-on: <tag>[, <tag>…])` prerequisites must all be `[x]`
     (`ops/autonomous/next-queue-item.sh` resolves them across the plan and `SUITE_TODO.md`; a missing
-    prerequisite counts as unmet). If yours are not, record it and stop.
+    prerequisite counts as unmet). If yours are not, record it and stop. When you file one, the prerequisite
+    `<tag>` is that item's leading tag — the first token after its checkbox, e.g. `W15.a`; keep it distinctive.
   * OWNER-PENDING: if the item needs an owner decision before it can go on (an "X or Y?" only the owner can
     answer), do not leave it bare `[ ]`: run the assignment's `plan-edit.sh … block TAG TAG-owner-ok QUESTION`
     (it adds `(blocked-on: <TAG>-owner-ok)` to the WORK QUEUE line and a `<TAG>-owner-ok — OWNER GATE` line
@@ -115,8 +125,9 @@ STEP 2 — CHECK THE ASSIGNED ITEM before you start. Do only that item; if it tu
     <last-checkpoint-sha>..origin/main`. A multi-pass loop item gets ONE pass / ONE unit.
   * REVIEWS: paced whole-project reviews are PAUSED (owner, 2026-07-29, re-confirmed 2026-08-01). Do not run the
     `lean-review` / `review-sweep` skills or any review fan-out on your own initiative; if a review seems needed,
-    say so in Daemon Report. A session assigned a paced review unit follows ops/autonomous/README.md §"Paced
-    review session" and REVIEW.md. (The per-change Tier-2 self-review is unaffected.)
+    say so in Daemon Report. The engine never assigns a review unit (its queue hook does not call
+    `next-review-unit.sh`), so lifting the pause also needs an engine change; a review session follows
+    ops/autonomous/README.md §"Paced review session" and REVIEW.md. (The per-change Tier-2 self-review is unaffected.)
 
 STEP 3 — DO IT, honoring the PRIME DIRECTIVES verbatim. The non-negotiables (also in the plan):
   * NEVER write to a real corpus — scratch/TESTOUT/mktemp output only. File safety beats getting it done.

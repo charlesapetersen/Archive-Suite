@@ -194,7 +194,8 @@ real corpus).
 
 **Owner directive, 2026-08-01.** No app in this suite has produced data he intends to keep, and **the entire corpus
 predates these apps**. So stop designing for continuity: **no migration paths** (change a schema, don't version it),
-**no backward‑compatible parsing**, **no inert‑legacy carve‑outs**; settings and structure are free to change. Prefer
+**no backward‑compatible parsing** (a link/tag/PDF format may change shape outright), **no inert‑legacy
+carve‑outs** (rules that exist to avoid disturbing already‑written app output are moot); settings and structure are free to change. Prefer
 the right end state to the compatible one, and say in the commit that no migration was written *because there is
 nothing to migrate*.
 
@@ -203,16 +204,18 @@ stated as a rule; its full wording, history and the cases behind it are in [`REF
 §"No production material — the full record".
 - ⛔ **The real corpus stays sacred.** `~/Desktop/Google Drive/Archival Photos/` (~102k PDFs) is irreplaceable. The
   Reader's Core Directive and scratch‑copy‑only testing are untouched.
-- ✅ **Money paths NO LONGER need a per-item owner grant (owner, 2026-08-13).** The *authorization gate* is removed; the
-  cost discipline stands (cheapest capable model, smallest input set that proves the behaviour, say what a big run
+- ✅ **Money paths NO LONGER need a per-item owner grant (owner, 2026-08-13).** The *authorization gate* is removed (a money-touching item no
+  longer waits on a named entry in `OWNER_AUTHORIZATIONS.md`); the cost discipline in each app's guide stands (cheapest capable model, smallest input set that proves the behaviour, say what a big run
   costs). Not-permission, but not a blank cheque. §*Gating baseline* in [`AGENTS.md`](AGENTS.md).
-- ⛔ **But $7 is the ceiling without asking (owner, 2026-10-11; raised from $3 on 2026-10-28)** for one piece of work
-  (an item across all its sessions). Subscription usage is not money. Over $7, an unattended session asks in the
+- ⛔ **But $7 is the ceiling without asking (owner, 2026-10-11; raised from $3 on 2026-10-28)** of real money for one piece of
+  work (an item across all its sessions). Subscription usage is not money. Over $7, an unattended session asks in the
   Daemon Report and moves on. Authority: `~/Claude/CLAUDE.md`, "Spending money".
-- ✅ **The W46 processing review's paid arms are released (owner, 2026-10-21).** Route order: the **Stanford AI API
+- ✅ **The W46 processing review's paid arms are released (owner, 2026-10-21).** The paid-benchmarking hold below
+  no longer covers the review's items (`execution-plans/processing-review/10-gap-audit.md` §5). Route order: the **Stanford AI API
   gateway** first (`https://aiapi-prod.stanford.edu/v1`, the Processor's gateway key in Keychain, account `Gateway`),
   ahead of the Claude and ChatGPT plan routes and ahead of personal keys. It is real money on a Stanford PTA: up to its
-  $50 a month may go to the review, none for its own sake. Personal keys only for what the gateway cannot serve. The
+  $50 a month may go to the review, none for its own sake. Personal keys only for what the gateway cannot serve (Azure, Textract, Document AI checks;
+  one Gemini 3.7-against-3.8 Flash check on the 96). The
   $7-per-item rule still applies, except W46.seg-window-modality's full 551-page sweep (approved at about $8 list /
   $4 batch). Newer gateway models need the owner to request access.
 - ✅ **Benchmark uploads are authorized (owner, 2026-10-25).** The frozen 96 owner benchmark pages and 12 public pages,
@@ -225,36 +228,44 @@ stated as a rule; its full wording, history and the cases behind it are in [`REF
   ticked; that arm then runs through the gateway, in the item's `-paid` half. Held: `W46.seg-lincoln-cloud` and
   `W46.seg-lincoln-cloud-codex` outright; the plan-route arms of `W46.ocr-regions`, `W46.date-traceable`,
   `W46.marks-detect`, `W46.ent-robust`, `W46.ent-score` and the `claude -p` voter in `W46.kit-gate` are skipped, and
-  the rest of each item goes ahead. Coding sessions (the engine running on the plan) are not arms.
+  the rest of each item goes ahead (the Claude c1
+  windows of 14:31 stay as results). Coding sessions (the engine running on the plan) are not arms.
 - ⛔ **Cluster work runs on Sherlock; the engine prepares it, the owner's session submits it (owner, 2026-10-22).**
-  FarmShare only with the owner's explicit approval for that run; other FarmShare mentions are history, not a route.
+  Sherlock suits this project better than FarmShare, even when it is slower. FarmShare only with the owner's
+  explicit approval for that run; other FarmShare mentions are history, not a route.
   **No engine session contacts Sherlock**: no SSH, scp, rsync or DTN, not even a read-only check (Sherlock's
-  `/etc/agents` rules; `.claude/hooks/no-sherlock.sh` refuses it under `ARCHIVE_UNATTENDED=1`). The engine does the
+  `/etc/agents` rules forbid agent sessions that a supervisor starts or feeds while nobody is there, even over SSH;
+  `cluster-reach.py` never preflights it; `.claude/hooks/no-sherlock.sh` refuses it under `ARCHIVE_UNATTENDED=1`). The engine does the
   Mac-side work of an open `(cluster: sherlock)` item (pack, scorer, job and submit scripts against
-  `ArchiveProcessor/scripts/segbench/sherlock/`, dry-run on the Mac), then hands over: submit command, job count and
+  `ArchiveProcessor/scripts/segbench/sherlock/` — sh.env, the container wrappers, `stage-job.sh` for copies and
+  downloads; `restart-20261022.sh` is the pattern — dry-run on the Mac), then hands over: submit command, job count and
   what to collect in `execution-plans/items/<TAG>.md`, the batch manifest in
   `ArchiveProcessor/scripts/segbench/sherlock/packs/`, `ops/autonomous/plan-edit.sh .maintenance/AUTONOMOUS_PLAN.md
   hold TAG 'ready to submit: <command>'`, and a Daemon Report line (no decision). The owner's session submits
-  (`cluster-reach.py mark TAG submitted`), collects, runs `mark TAG finished` and `plan-edit.sh … release TAG
-  'results in <path>'`; the engine scores. Look for an existing pack on Sherlock before rebuilding one. File a new
+  held items in batches (`execution-plans/sherlock-access.md` §"Batches"; `cluster-reach.py mark TAG submitted`),
+  collects the results into `$GROUP_HOME` or the Mac, runs `mark TAG finished` and `plan-edit.sh … release TAG
+  'results in <path>'`; the engine scores. FarmShare's data is on Sherlock, so a pack may already exist there: the engine never checks, it names the
+  possible pack in the hand-over and the owner's session looks before one is rebuilt. File a new
   cluster item with `(cluster: sherlock)` alone. Rules for a Sherlock session:
   [`execution-plans/sherlock-access.md`](execution-plans/sherlock-access.md).
 - ⛔ **Every Sherlock job is reviewed for size and necessity before it is submitted (owner, 2026-10-22).** The
   preparing session writes, in `execution-plans/items/<TAG>.md` before its hand-over: (1) the question and the route,
   default or recommendation the answer could change; (2) why results in hand do not settle it; (3) the job count and
-  a GPU-hour estimate from a pilot, and why a smaller sample, split or reader set would not do (a full set, mirror or
-  grid is the ceiling, not the plan); (4) the verdict, useful now or nice-to-have. The owner's session reads it before
-  submitting. A nice-to-have item, Sherlock or not, goes behind `W46.nice-to-have` (`(blocked-on: W46.nice-to-have)`;
-  `SUITE_TODO.md` §"Nice-to-have, end of project").
+  a GPU-hour estimate from a pilot, and why a smaller sample, split or reader set would not do (a public set's training
+  split, a whole mirror or a full grid is the ceiling, not the plan); (4) the verdict, useful now or nice-to-have. The owner's session reads it before
+  submitting. Focus on what is really useful now: a nice-to-have item, Sherlock or not, goes behind
+  `W46.nice-to-have` (`(blocked-on: W46.nice-to-have)`; `SUITE_TODO.md` §"Nice-to-have, end of project"), which the
+  owner opens once the useful work is done. W46.ocr-new-open-sherlock stays useful now: many users of the kit will
+  have a cluster like Sherlock, so a cluster-only reader is a real route for them.
 - ⏸ **Paid hosted benchmarking is on hold (owner, 2026-10-17).** Open-weight models first; paid hosted bench runs wait
-  for `W43.sweep`, behind a full price estimate. A session that defers a paid run adds a line to
-  [`execution-plans/paid-runs-deferred.md`](execution-plans/paid-runs-deferred.md) in the same commit.
+  for `W43.sweep` at the end of the queue, behind a full price estimate. A session that defers a paid run adds a line to
+  [`execution-plans/paid-runs-deferred.md`](execution-plans/paid-runs-deferred.md) in the same commit, so none is lost.
 - ⛔ **Tier‑2 review, scratch‑only tests and no‑force git discipline all stand.** "No production data" means **no
   compatibility burden** — not less care, and it skips no gate.
 
 ⏸ **Related: the DEVONthink import is ON HOLD** (owner, 2026-08-01) until Notes' basic structure is settled, and **its
 plans are retained in full** (an explicit exception to "delete a shipped plan"). See `SUITE_TODO.md` §"Archive Notes —
-DEVONthink import".
+DEVONthink import". Restructuring Notes is free *now* and stops being free once 7.5 GB lands in it.
 
 ## Conventions
 
@@ -360,11 +371,14 @@ record). De‑nesting shipped (`7706368`); `packages/ArchiveCore` shipped in the
 
 All 1,017 earlier commits were rewritten with `git-filter-repo` (`W29.pub1`–`pub3`). **A commit hash cited in an
 older doc will not resolve**: it is historically accurate and deliberately left alone, so don't "fix" it and don't
-treat a failed `git show <old-sha>` as corruption; find the commit by its message or `git log -S`. Any old clone or
+treat a failed `git show <old-sha>` as corruption; find the commit by its message or `git log -S`. `git log`
+blames one identity for everything: the rewrite merged two spellings of one author, it did not squash history. Any old clone or
 worktree is on an unrelated history: re‑clone rather than merge.
 
 The pre‑rewrite history is a local bundle **outside the repo**:
 `~/Claude/Long term storage/Preserved Bundles/archive-suite-full-backup-2026-08-11.bundle` (**quote the path** — it has
-spaces). **⛔ Never push it, commit it, or merge from it**: it is the un‑scrubbed history and is treated as
-credential‑bearing. It is a read‑only archive, not a remote. What changed in the rewrite, the bundle's reference facts
+spaces; older docs quote its pre-2026-08-13 path in `~/Claude/`). **⛔ Never push it, commit it, or merge from it**: it is the un‑scrubbed history and is treated as
+credential‑bearing: it held an OAuth client secret (since deactivated), and the next thing to land in a planning
+doc might not be dead. `.gitignore` refuses `*.bundle` only inside this checkout; its real protection is living
+outside it. It is a read‑only archive, not a remote. What changed in the rewrite, the bundle's reference facts
 and how to read it: [`REFERENCE.md`](REFERENCE.md) §"The history rewrite — the full record".

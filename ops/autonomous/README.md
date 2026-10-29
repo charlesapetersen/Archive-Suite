@@ -398,7 +398,7 @@ Watch the first real codex run's `daemon.log` and `last-session.log` for both.
 could have repaired (a fixture count, a flaky Processor recovery check, Notes' order-dependent VM suite), and a
 parked daemon repairs nothing. So a code red that survives the gate's own retry no longer parks: the daemon
 writes `$STATE/gate-fix` — the failing steps, the command the gate runs for each, the log's tail — and the next
-session takes it as its ONE item (resume prompt STEP 1.6). The request is retired when a gate run is GREEN. Parking
+session takes it as its ONE item (resume prompt STEP 1.5, GATE-FIX). The request is retired when a gate run is GREEN. Parking
 remains the backstop: after `AUTONOMOUS_GATEFIX_MAX` (3) fix sessions that committed and left the gate red, the
 run parks with a note saying so; a session that commits nothing (killed, cut off) does not use up an attempt.
 `AUTONOMOUS_GATEFIX_MAX=0` restores the old park-at-once. Proof: `tests/prove-gate-fix.sh` (a gate step).
@@ -1008,8 +1008,8 @@ fan-out, refute-verify; never the retired 15-finder monolith.
 
 **⏸ Paced reviews are currently OFF (owner directive, 2026-07-29).** `next-review-unit.sh` carries a **master
 switch** (`REVIEW_ENABLED_DEFAULT=0`, overridable per-run with `AUTONOMOUS_REVIEW_ENABLED=1`) that makes it
-always report `none due` / exit 3 — the path STEP 2.0 of the resume prompt already handles, so sessions simply
-go on to pick a normal queue item. **Nothing was removed:** the unit table, risk-ordered never-reviewed-first
+always report `none due` / exit 3 — the path the resume prompt's old STEP 2.0 handled (the engine, which now picks every item, never asks for a
+review unit; W40.docs-startup-size removed that step), so sessions simply go on to a normal queue item. **Nothing was removed:** the unit table, risk-ordered never-reviewed-first
 ranking, cooldown, fail-open stale-sha handling, `--status` and `--record` are all intact and still proven by
 `tests/prove-review-cadence.sh` (17 assertions, which forces the switch on for the machinery cases and has a
 dedicated case [10] for the switch itself). **Why:** the owner-commissioned Codex full-suite review of
