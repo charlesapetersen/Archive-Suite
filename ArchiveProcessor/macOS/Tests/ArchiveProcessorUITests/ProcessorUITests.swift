@@ -418,7 +418,44 @@ final class ProcessorUITests: XCTestCase {
         // The assertion deliberately checks SwiftUI's enabled state, not only pointer hit-testing: disabled
         // is the shared gate that excludes macOS keyboard navigation and VoiceOver activation behind the scrim.
         XCTAssertFalse(start.isEnabled, "the finishing scrim must disable underlying keyboard/AX controls")
+        // W40.fix-processor-visual-polish: the card sits in the capture pane, clear of the control panel (centred
+        // on the window it straddled the divider).
+        XCTAssertGreaterThan(element("live.finishing-throbber").frame.minX, start.frame.maxX,
+                             "the finishing card must sit right of the control panel, in the capture pane")
         attachScreenshot("processor-live-capture-finishing-scrim")
+    }
+
+    /// W40.fix-processor-visual-polish: the Save Processing Profile prompt takes typing at once (as an alert it
+    /// opened with the focus on Cancel and no caret in the field).
+    func testSaveProfileTakesTheNameWithoutAClick() throws {
+        openSettings()
+        let save = app.buttons["Save current settings as a profile…"]
+        XCTAssertTrue(save.waitForExistence(timeout: 10), "Settings must offer Save profile")
+        save.click()
+        let field = element("ap.nameSheet.field")
+        XCTAssertTrue(field.waitForExistence(timeout: 5), "Save profile must open the name sheet")
+        Thread.sleep(forTimeInterval: 0.5)   // the sheet focuses its field one run-loop turn after it appears
+        app.typeText("Box 12")
+        XCTAssertEqual(field.value as? String, "Box 12", "the name field must hold the caret when the sheet opens")
+        attachScreenshot("processor-save-profile-sheet")
+        app.typeKey(.escape, modifierFlags: [])
+        let gone = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: field)
+        XCTAssertEqual(XCTWaiter.wait(for: [gone], timeout: 5), .completed, "Escape must cancel the sheet")
+    }
+
+    /// W40.fix-processor-visual-polish: the Files header with Add Files… stays put when the list scrolls.
+    func testFilesHeaderStaysAboveTheScrolledList() throws {
+        relaunch(extra: ["-APUITestSyntheticVolume"])
+        let add = app.buttons["Add Files…"]
+        XCTAssertTrue(add.waitForExistence(timeout: 10), "the Files header must offer Add Files…")
+        let before = add.frame.minY
+        for list in app.windows.firstMatch.scrollViews.allElementsBoundByIndex {
+            list.scroll(byDeltaX: 0, deltaY: -40000)
+        }
+        Thread.sleep(forTimeInterval: 0.5)
+        XCTAssertTrue(add.isHittable, "Add Files… must stay in reach with the list scrolled to its end")
+        XCTAssertEqual(add.frame.minY, before, accuracy: 1, "the Files header must not scroll with the list")
+        attachScreenshot("processor-files-header-pinned")
     }
 
     func testEmptyPaneClearNamesCountAndConfirmsSummaryLoss() throws {
