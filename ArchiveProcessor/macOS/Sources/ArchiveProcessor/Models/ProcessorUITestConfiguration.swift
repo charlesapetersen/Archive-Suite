@@ -38,6 +38,17 @@ enum ProcessorUITestConfiguration {
     static var showsFlaggedReview: Bool {
         isActive && arguments.contains("-APUITestFlaggedReview")
     }
+    /// Shows the Interrupted Run box for a synthetic record (W40.fix-processor-resume-run-key):
+    /// `-APUITestPendingRun localAgent` or `-APUITestPendingRun <provider rawValue>`. Nothing is written to the
+    /// pending-run file, so Resume Run finds no record and does nothing; the test reads only the box.
+    static var syntheticPendingRun: (info: String, backend: OCRProcessor.PendingRunBackend)? {
+        guard isActive, let index = arguments.firstIndex(of: "-APUITestPendingRun"),
+              arguments.indices.contains(index + 1) else { return nil }
+        let value = arguments[index + 1]
+        if value == "localAgent" { return ("Interrupted run (UI test): 0/2 files completed via the Local Agent.", .localAgent) }
+        guard let provider = LLMProvider(rawValue: value) else { return nil }
+        return ("Interrupted run (UI test): 0/2 files completed via \(provider.rawValue).", .direct(provider))
+    }
     static var droppedPDF: URL? {
         if let path = urlValue(after: "-APUITestDroppedPDFPath") { return path }
         guard arguments.contains("-APUITestSyntheticMultiPagePDF") else { return nil }

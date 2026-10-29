@@ -246,6 +246,26 @@ final class ProcessorUITests: XCTestCase {
         attachScreenshot("processor-local-agent-cost-and-wizard")
     }
 
+    /// W40.fix-processor-resume-run-key: Resume Run follows the interrupted run's own backend. A Local Agent run
+    /// resumes with no key in the field, even with the direct route selected now; a direct run still waits for its
+    /// provider's key and says which one.
+    func testInterruptedRunAsksForTheRunsOwnBackendKey() throws {
+        relaunch(extra: ["-APUITestPendingRun", "localAgent"])
+        let resume = element("ap.ocr.resumeRun")
+        XCTAssertTrue(resume.waitForExistence(timeout: 10), "the synthetic Local Agent run must show the Interrupted Run box")
+        XCTAssertTrue(resume.isEnabled, "a Local Agent run must not wait for a direct provider's API key")
+        XCTAssertTrue(renderedText(of: element("ap.ocr.pendingRunCaption")).contains("No API key is needed"),
+                      "the caption must name the run's backend: \(renderedText(of: element("ap.ocr.pendingRunCaption")))")
+        attachScreenshot("processor-interrupted-run-local-agent")
+
+        relaunch(extra: ["-APUITestPendingRun", "Anthropic"])
+        XCTAssertTrue(resume.waitForExistence(timeout: 10), "the synthetic direct run must show the Interrupted Run box")
+        XCTAssertFalse(resume.isEnabled, "a direct run with no key in the field cannot resume")
+        let caption = renderedText(of: element("ap.ocr.pendingRunCaption"))
+        XCTAssertTrue(caption.contains("Anthropic") && caption.contains("API key"),
+                      "the caption must name the run's provider: \(caption)")
+    }
+
     func testFinishingScrimBlocksLiveCaptureKeyboardAndAccessibilityRoutes() throws {
         relaunch(extra: ["-APUITestLiveCaptureFinishingScrim"])
 

@@ -688,6 +688,17 @@ class OCRProcessor: ObservableObject {
 
 
     @Published var pendingRunInfo: String?
+    /// The backend the interrupted run recorded (W40.fix-processor-resume-run-key). `resumeRun` replays the
+    /// record's own backend, so the Interrupted Run box asks for that backend's key, not the one the field holds.
+    /// Set beside `pendingRunInfo` by `checkForPendingBatch`; nil when the record cannot be verified.
+    @Published var pendingRunBackend: PendingRunBackend?
+
+    enum PendingRunBackend: Equatable {
+        case localAgent
+        case appleVision
+        case gateway(GatewayConfig)
+        case direct(LLMProvider)
+    }
 
 
 

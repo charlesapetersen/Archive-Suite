@@ -1278,6 +1278,36 @@ extension OCRProcessor {
         guard Self.pendingRunIsSelfConsistent(pending) else { return nil }
         return Self.mixedInputURLs(images: pending.fileURLs, pdfs: pending.mixedPDFOutcomes)
     }
+    /// The backend a pending run replays, in `performOCRCall`'s precedence: the Local Agent, then the gateway,
+    /// then the direct provider (W40.fix-processor-resume-run-key).
+    nonisolated static func pendingRunBackend(of run: PendingRun) -> PendingRunBackend {
+        if run.localAgent != nil { return .localAgent }
+        if let gateway = run.gatewayConfig { return .gateway(gateway) }
+        return run.provider == .appleVision ? .appleVision : .direct(run.provider)
+    }
+    /// Why Resume Run cannot start yet, or nil when it can. `fieldProvider` is the provider whose key the API
+    /// key field holds, nil when it holds a gateway key or none. Only a direct-provider run needs that field; the
+    /// Local Agent and Apple Vision need no key, and a gateway run reads its own saved key on resume.
+    func pendingRunResumeBlockReason(fieldKey: String, fieldProvider: LLMProvider?) -> String? {
+        guard let backend = pendingRunBackend else { return "This run's record could not be verified." }
+        guard case .direct(let provider) = backend else { return nil }
+        if fieldProvider == provider && !fieldKey.isEmpty { return nil }
+        return fieldProvider == provider
+            ? "Enter your \(provider.rawValue) API key above, then click Resume."
+            : "Select \(provider.rawValue) and enter its API key above, then click Resume."
+    }
+    /// The key `resumeRun` gets for the pending run's backend, or nil (with the reason in `statusMessage`) when a
+    /// gateway run's saved key is missing. A direct run takes the field's key, which the button has already
+    /// checked belongs to the run's provider.
+    func pendingRunResumeKey(fieldKey: String) -> String? {
+        guard case .gateway(let gateway) = pendingRunBackend else { return fieldKey }
+        let key = gateway.apiKey
+        guard !key.isEmpty else {
+            statusMessage = "Restore the saved gateway key before resuming this run."
+            return nil
+        }
+        return key
+    }
     /// Check for persisted pending batch or run on launch.
     func checkForPendingBatch() {
         // Check for pending batch. A manifest that fails to decode (corrupt JSON) already loads as nil;
@@ -1318,13 +1348,22 @@ extension OCRProcessor {
                 let completed = pending.completedResults.count
                 let total = pending.fileURLs.count
                 pendingRunInfo = "Interrupted run from \(dateStr): \(completed)/\(total) files completed via \(pending.provider.rawValue) \(pending.model.displayName)."
+                pendingRunBackend = Self.pendingRunBackend(of: pending)
             } else {
+                pendingRunBackend = nil
                 NSLog("[ArchiveProcessor] WARNING: pending RUN manifest failed the self-consistency check but is being PRESERVED (kept on disk so its cached results are not lost/re-charged).")
                 pendingRunInfo = "An interrupted run was found but its manifest failed a self-consistency check (it may be torn or tampered). It has NOT been discarded; the manifest was kept for recovery."
             }
         } else {
             pendingRunInfo = nil
+            pendingRunBackend = nil
         }
+        #if DEBUG
+        if let synthetic = ProcessorUITestConfiguration.syntheticPendingRun {
+            pendingRunInfo = synthetic.info
+            pendingRunBackend = synthetic.backend
+        }
+        #endif
         // A crash between saving the image journal and retiring the PDF journal leaves both.
         // Prefer the validated image journal once it contains this exact completed PDF set.
         if let mixed = Self.loadPendingMixedPDF(), Self.pendingMixedPDFIsSelfConsistent(mixed),

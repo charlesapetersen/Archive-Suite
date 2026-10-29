@@ -190,6 +190,24 @@ struct OCRView: View {
         useAppleVision ? visionUseLLMJudgment : !useLocalAgent
     }
 
+    /// The provider whose key `reloadAPIKey()` put in the field, nil when it holds a gateway key or none.
+    private var apiKeyFieldProvider: LLMProvider? {
+        useAppleVision ? (visionUseLLMJudgment ? selectedProvider : nil) : (useGateway ? nil : selectedProvider)
+    }
+    private var pendingRunResumeBlockReason: String? {
+        processor.pendingRunResumeBlockReason(fieldKey: apiKey, fieldProvider: apiKeyFieldProvider)
+    }
+    /// Worded by the interrupted run's own backend (W40.fix-processor-resume-run-key), not the one selected now.
+    private var pendingRunResumeCaption: String {
+        if let reason = pendingRunResumeBlockReason { return reason }
+        switch processor.pendingRunBackend {
+        case .localAgent: return "Click Resume to continue with the Local Agent. No API key is needed."
+        case .gateway: return "Click Resume to continue through the gateway with its saved key."
+        case .appleVision: return "Click Resume to continue with Apple Vision."
+        case .direct, nil: return "Click Resume to continue processing remaining files."
+        }
+    }
+
     private func reloadAPIKey() {
         apiKey = useAppleVision
             ? (visionUseLLMJudgment ? (KeychainHelper.load(account: selectedProvider.rawValue) ?? "") : "")
@@ -487,13 +505,15 @@ struct OCRView: View {
                         VStack(alignment: .leading, spacing: 6) {
                             Text(info)
                                 .font(.caption)
-                            Text("Enter your API key above, then click Resume to continue processing remaining files.")
+                            Text(pendingRunResumeCaption)
                                 .font(.caption2)
                                 .foregroundStyle(.primary)
+                                .accessibilityIdentifier("ap.ocr.pendingRunCaption")
                             HStack {
                                 Button("Resume Run") { resumePendingRun() }
                                     .prominentButtonStyle()
-                                    .disabled(apiKey.isEmpty || processor.isProcessing)
+                                    .disabled(processor.isProcessing || pendingRunResumeBlockReason != nil)
+                                    .accessibilityIdentifier("ap.ocr.resumeRun")
                                 Button("Dismiss") { processor.dismissPendingRun() }
                                     .buttonStyle(.bordered)
                             }
@@ -1327,6 +1347,7 @@ struct OCRView: View {
     }
 
     private func resumePendingRun() {
+        guard let key = processor.pendingRunResumeKey(fieldKey: apiKey) else { return }
         if let urls = processor.pendingRunFileURLs {
             droppedFiles = urls
         }
@@ -1341,7 +1362,7 @@ struct OCRView: View {
             .map { $0.trimmingCharacters(in: .whitespaces) }
             .filter { !$0.isEmpty }
         processor.processingTask = Task {
-            await processor.resumeRun(apiKey: apiKey)
+            await processor.resumeRun(apiKey: key)
         }
     }
 
