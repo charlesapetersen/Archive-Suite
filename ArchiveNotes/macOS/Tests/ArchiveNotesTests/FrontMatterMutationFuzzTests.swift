@@ -134,20 +134,58 @@ struct FrontMatterMutationFuzzTests {
         }
     }
 
-    /// KNOWN ISSUE `W40.fix-notes-block-marker-in-text`: a line of note text that reads as a block header
-    /// is taken as one on the next read, so the line disappears from the text and the block splits in two.
-    /// The format has no escape for it.
+    /// W40.fix-notes-block-marker-in-text: a line of note text that reads as a block header is written with
+    /// one more backslash and read back with one fewer, so it stays text and the block stays whole. The
+    /// operator's own backslashes before the marker survive, and so does a CR or CRLF line end before it.
     @Test
-    func blockHeaderLineInTextKnownIssue() throws {
-        var rng = NoteFuzzRNG(seed: 1)
-        var item = NoteFuzz.item(&rng, tricky: false)
-        item.blocks = [Block(kind: .freeform, source: nil, markdown: "a\n<!-- block: freeform -->\nb\n", unknownHeaderFields: [])]
-        item.trailingBodyRaw = nil
-        let back = try FrontMatterCodec.decode(FrontMatterCodec.encode(item))
-        withKnownIssue("W40.fix-notes-block-marker-in-text") {
-            #expect(back.blocks.count == 1)
-            #expect(back.blocks.first?.markdown == item.blocks[0].markdown)
+    func blockHeaderLineInTextStaysText() throws {
+        let texts = ["a\n<!-- block: freeform -->\nb\n", "<!-- block: reader-page\n     link: x -->\n",
+                     "a\n\\<!-- block: freeform -->\n", "a\n\\\\\\<!-- block: freeform -->", "a\r<!-- block: x -->",
+                     "a\r\n<!-- block: x -->\r\n", "x <!-- block: mid-line -->\n", "<!-- block:\u{301} x -->\n"]
+        // Each ends a line: a block that does not is given one before the next header, which is not this bug.
+        for text in texts.map({ BlockParser.endsWithLineTerminator($0) ? $0 : $0 + "\n" }) {
+            var rng = NoteFuzzRNG(seed: 1)
+            var item = NoteFuzz.item(&rng, tricky: false)
+            item.blocks = [Block(kind: .freeform, source: nil, markdown: text, unknownHeaderFields: []),
+                           Block(kind: .readerPage, source: SourceAnchor(link: "l", page: 2), markdown: text,
+                                 unknownHeaderFields: [])]
+            item.trailingBodyRaw = text
+            let encoded = FrontMatterCodec.encode(item)
+            let back = try FrontMatterCodec.decode(encoded)
+            #expect(back.blocks == item.blocks, "\(text.debugDescription) → \(encoded.debugDescription)")
+            #expect(back.trailingBodyRaw == text, "\(text.debugDescription) → \(encoded.debugDescription)")
+            #expect(FrontMatterCodec.encode(back) == encoded)
         }
+    }
+
+    /// The same line typed in the editor: the save escapes it, the reload shows it as typed, and a second
+    /// save writes the same bytes.
+    @Test @MainActor
+    func blockHeaderLineTypedInTheEditorStaysText() {
+        for body in ["<!-- block: freeform -->\nFirst.\n\\<!-- block: freeform -->\nSecond.\n",
+                     "Intro.\n\\<!-- block: zotero-item -->\n",
+                     "<!-- block: freeform -->\n```\n\\<!-- block: freeform -->\n```\n"] {
+            let before = BlockParser.parse(body)
+            let once = MarkdownBridge.serialize(MarkdownBridge.parse(markdown: body))
+            let twice = MarkdownBridge.serialize(MarkdownBridge.parse(markdown: once))
+            #expect(once == twice, "\(body.debugDescription): \(once.debugDescription) → \(twice.debugDescription)")
+            let after = BlockParser.parse(once)
+            #expect(after.blocks.count == before.blocks.count, "\(body.debugDescription) → \(once.debugDescription)")
+            #expect(MarkdownBridge.parse(markdown: once).string.contains("<!-- block:"),
+                    "the line is no longer shown: \(once.debugDescription)")
+            #expect(!MarkdownBridge.parse(markdown: once).string.contains("\\<!--"),
+                    "the escape is shown: \(once.debugDescription)")
+        }
+    }
+
+    /// Typed straight into the styled editor (no escape anywhere yet), the line is written escaped.
+    @Test @MainActor
+    func blockHeaderLineTypedFreshIsEscapedOnSave() {
+        let typed = NSAttributedString(string: "Note.\n<!-- block: freeform -->\nMore.")
+        let saved = MarkdownBridge.serialize(typed)
+        #expect(BlockParser.parse(saved).blocks.isEmpty, "\(saved.debugDescription)")
+        #expect(BlockParser.parse(saved).leadingText?.contains("\n<!-- block: freeform -->") == true,
+                "\(saved.debugDescription)")
     }
 }
 
@@ -210,9 +248,7 @@ enum NoteFuzz {
                 display: rng.chance(0.8) ? token(&rng, tricky: tricky) : nil,
                 page: rng.chance(0.6) ? rng.int(1...400) : nil,
                 thumbRef: nil, zoteroSelect: nil, noteRef: nil)
-            // A text line that IS a block header is the known issue in `blockHeaderLineInTextKnownIssue`.
             let lines = (0..<rng.int(1...3)).map { _ in string(&rng, tricky: tricky) }
-                .map { $0.hasPrefix("<!-- block:") ? "> " + $0 : $0 }
             return Block(kind: kind, source: source, markdown: lines.joined(separator: "\n") + "\n",
                          unknownHeaderFields: [])
         }

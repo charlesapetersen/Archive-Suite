@@ -73,8 +73,9 @@ enum MarkdownBridge {
         let (leadingText, blocks) = BlockParser.parse(markdown)
 
         // If no block headers, parse the whole thing as a single body
+        // `parse` hands back text with its header-line escapes removed (W40.fix-notes-block-marker-in-text).
         if blocks.isEmpty {
-            return parseSingleBodyWithStatus(markdown, fontSize: fontSize, assetStore: assetStore)
+            return parseSingleBodyWithStatus(leadingText ?? markdown, fontSize: fontSize, assetStore: assetStore)
         }
 
         let result = NSMutableAttributedString()
@@ -359,11 +360,13 @@ enum MarkdownBridge {
         var result = ""
         var i = 0
         let fullLen = attributed.length
+        var afterHeaderlessChip = false
 
         while i < fullLen {
             // Check for a block-header chip at this position
             if let box = attributed.attribute(.noteBlockSource, at: i,
                                               effectiveRange: nil) as? SourceAnchorBox {
+                afterHeaderlessChip = box.headerless
                 // W3.notes-chip-header-needs-a-line-break — a header must BEGIN A LINE. `BlockParser
                 // .parse` only recognises `<!-- block:` at a line start (`BlockParser.swift:56-58`),
                 // and `serializeBodySegment` joins paragraphs with `\n` without a trailing one — so
@@ -399,7 +402,12 @@ enum MarkdownBridge {
             // Serialize this body segment
             let bodyRange = NSRange(location: i, length: end - i)
             let bodyStr = serializeBodySegment(attributed, range: bodyRange)
-            result += bodyStr
+            // W40.fix-notes-block-marker-in-text — a typed line that reads as a header is text, so it is
+            // written escaped, as `BlockParser.serialize` writes it, or the save would split the block there.
+            // A headerless chip's text begins with its own unclosed opener, which must stay one.
+            let midLine = !result.isEmpty && !BlockParser.endsWithLineTerminator(result)
+            result += BlockParser.escapingHeaderLines(bodyStr, skippingFirstLine: afterHeaderlessChip || midLine)
+            afterHeaderlessChip = false
             i = end
         }
 

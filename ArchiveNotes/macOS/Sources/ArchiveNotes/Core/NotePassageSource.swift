@@ -92,7 +92,10 @@ struct EditorPassageSource: PassageSelectionSource {
         guard clamped.length > 0 else { return ("", [:]) }
 
         let sub = Self.strippingBlockChips(rendered.attributedSubstring(from: clamped))
-        let markdown = MarkdownBridge.serialize(sub)
+        // The bridge writes the on-disk form, and this becomes one block's text: no chip is left, so every
+        // header-looking line in it is escaped text, and the block holds it unescaped
+        // (W40.fix-notes-block-marker-in-text).
+        let markdown = BlockParser.unescapingHeaderLines(MarkdownBridge.serialize(sub))
 
         var assets: [String: Data] = [:]
         sub.enumerateAttribute(.noteImageRelPath,

@@ -64,12 +64,12 @@ enum BlockParser {
         }
 
         if positions.isEmpty {
-            return (body, [])
+            return (unescapingHeaderLines(body), [])
         }
 
         let leadingText: String? = positions[0] == body.startIndex
             ? nil
-            : String(body[body.startIndex..<positions[0]])
+            : unescapingHeaderLines(String(body[body.startIndex..<positions[0]]))
 
         var blocks: [Block] = []
         for i in 0..<positions.count {
@@ -94,12 +94,14 @@ enum BlockParser {
     ///
     /// "Lacks one" is decided by `endsWithLineTerminator`, not `hasSuffix("\n")` — see the line-
     /// terminator section below (`W3.notes-cr-line-start`).
+    ///
+    /// Text is written through `escapingHeaderLines`, so a line of it that reads as a header stays text.
     static func serialize(leadingText: String?, blocks: [Block]) -> String {
-        var out = leadingText ?? ""
+        var out = escapingHeaderLines(leadingText ?? "")
         if !blocks.isEmpty, !out.isEmpty, !endsWithLineTerminator(out) { out += "\n" }
         for (i, block) in blocks.enumerated() {
             if !block.headerless { out += serializeHeader(block) }
-            out += block.markdown
+            out += escapingHeaderLines(block.markdown, skippingFirstLine: block.headerless)
             if i + 1 < blocks.count, !block.markdown.isEmpty, !endsWithLineTerminator(block.markdown) {
                 out += "\n"
             }
@@ -199,11 +201,59 @@ enum BlockParser {
         return isLineTerminator(previous)
     }
 
+    // MARK: - Header-line escape (W40.fix-notes-block-marker-in-text)
+
+    /// A line of TEXT that begins with `<!-- block:` would be read back as a header: the line left the
+    /// text and the block split in two. So a line that begins with any number of backslashes and then the
+    /// marker is written with one MORE backslash, and read back with one fewer. That is a bijection on every
+    /// string, so the operator's own `\<!-- block:` survives too, and one backslash before `<` is
+    /// CommonMark's escape for it, so `MarkdownBridge` renders the written form as the typed text.
+    ///
+    /// `skippingFirstLine` is for text that does not begin a line where it is written, and for a headerless
+    /// block, whose first line is the unclosed opener that must be read back as one.
+    static func escapingHeaderLines(_ text: String, skippingFirstLine: Bool = false) -> String {
+        rewritingHeaderLines(text, skippingFirstLine: skippingFirstLine, escape: true)
+    }
+
+    /// The inverse of `escapingHeaderLines`. `parse` applies it to every piece of text it returns.
+    static func unescapingHeaderLines(_ text: String) -> String {
+        rewritingHeaderLines(text, skippingFirstLine: false, escape: false)
+    }
+
+    private static let headerMarkerScalars = Array("<!-- block:".unicodeScalars)
+    private static let headerMarkerUTF8 = Array("<!-- block:".utf8)
+
+    private static func rewritingHeaderLines(_ text: String, skippingFirstLine: Bool, escape: Bool) -> String {
+        // Bytes, not `Character`s: `"<!-- block:\u{301}"` holds the marker for `parse`, but its last
+        // Character is not ":". The marker is ASCII, so its UTF-8 bytes are its scalars. No marker at all is
+        // the common, byte-identical path.
+        guard text.utf8.firstRange(of: headerMarkerUTF8) != nil else { return text }
+        let scalars = Array(text.unicodeScalars)
+        var out = String.UnicodeScalarView()
+        var i = 0
+        var atLineStart = !skippingFirstLine
+        while i < scalars.count {
+            if atLineStart {
+                var k = i
+                while k < scalars.count, scalars[k] == "\\" { k += 1 }
+                if scalars[k...].starts(with: headerMarkerScalars) {
+                    if escape { out.append("\\") } else if k > i { i += 1 }
+                }
+            }
+            out.append(scalars[i])
+            atLineStart = isLineTerminator(scalars[i])
+            i += 1
+        }
+        return String(out)
+    }
+
     // MARK: - Internal
 
     private static func parseSegment(_ text: String) -> Block {
         guard let closeRange = text.range(of: "-->") else {
-            return Block(kind: .freeform, source: nil, markdown: text, unknownHeaderFields: [], headerless: true)
+            // The opener on the first line has no backslash, so unescaping leaves it alone.
+            return Block(kind: .freeform, source: nil, markdown: unescapingHeaderLines(text),
+                         unknownHeaderFields: [], headerless: true)
         }
 
         let headerRaw = String(text[text.startIndex..<closeRange.upperBound])
@@ -213,7 +263,7 @@ enum BlockParser {
         if mdStart < text.endIndex, isLineBreak(text[mdStart]) {
             mdStart = text.index(after: mdStart)
         }
-        let markdown = mdStart < text.endIndex ? String(text[mdStart...]) : ""
+        let markdown = mdStart < text.endIndex ? unescapingHeaderLines(String(text[mdStart...])) : ""
 
         let (kind, source, unknownFields) = parseHeader(headerRaw)
         return Block(kind: kind, source: source, markdown: markdown, unknownHeaderFields: unknownFields)

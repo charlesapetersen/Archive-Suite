@@ -176,45 +176,23 @@ struct ExtractBuilder {
     // MARK: - Extract-references-notes-only invariant (the single choke-point, §Risks)
 
     /// Coerce any block that is NOT a resolvable note-passage (a reader-page/-doc, a zotero-*, or a
-    /// note-passage with a malformed target) into a plain `freeform` block with no source, and strip
-    /// any block header nested *inside* a block's markdown. Both the paste path and `persist` (i.e.
-    /// every durable extract write) route through here, so an outside-document source cannot attach to
-    /// an extract at either level (extracts reference NOTES only — §D7).
+    /// note-passage with a malformed target) into a plain `freeform` block with no source. Both the paste
+    /// path and `persist` (i.e. every durable extract write) route through here, so an outside-document
+    /// source cannot attach to an extract (extracts reference NOTES only — §D7).
+    ///
+    /// One level down needs nothing: a `<!-- block: …` line inside a block's markdown is TEXT, and
+    /// `BlockParser.serialize` writes it escaped, so it cannot become a block on reload. This used to strip
+    /// such lines (W3.notes-extract-smuggles-a-source-header), from before the format had the escape; that
+    /// dropped the operator's own line from the extract (W40.fix-notes-block-marker-in-text). The chip a
+    /// whole-block selection covers is still left out, by `EditorPassageSource.snapshotMarkdown`.
     nonisolated static func coercedToNotesOnly(_ blocks: [Block]) -> [Block] {
         blocks.map { block in
-            let markdown = flattenedNestedHeaders(block.markdown)
             if block.kind == .notePassage, block.source?.notePassageTarget != nil {
-                var kept = block
-                kept.markdown = markdown
-                return kept
+                return block
             }
             return Block(kind: .freeform, source: nil,
-                         markdown: markdown, unknownHeaderFields: [])
+                         markdown: block.markdown, unknownHeaderFields: [])
         }
-    }
-
-    /// Drop `<!-- block: … -->` headers nested inside ONE block's markdown, keeping every scrap of
-    /// text (W3.notes-extract-smuggles-a-source-header).
-    ///
-    /// Kind coercion above inspects the block list, so it is blind one level down — and a header at a
-    /// line start inside a block's markdown is not inert text: `BlockParser.parse` splits on it, so on
-    /// reload it becomes a *real* foreign block inside the extract. The root cause was
-    /// `EditorPassageSource.snapshotMarkdown` re-serializing the source note's own chip (fixed there,
-    /// where the chip is still an attribute rather than text); this is the choke-point half, so the
-    /// invariant does not rest on every future producer of a passage markdown being careful.
-    /// `BlockParser` is the authority on what counts as a header, so the split is delegated to it and
-    /// cannot drift from the reader.
-    nonisolated private static func flattenedNestedHeaders(_ markdown: String) -> String {
-        let (leading, nested) = BlockParser.parse(markdown)
-        guard !nested.isEmpty else { return markdown }   // the common path: no header, byte-identical
-        var out = leading ?? ""
-        for block in nested where !block.markdown.isEmpty {
-            // Same authority on what ends a line as everywhere else — `hasSuffix("\n")` is false for
-            // CR/CRLF-terminated text and would insert a blank line (`W3.notes-cr-line-start`).
-            if !out.isEmpty, !BlockParser.endsWithLineTerminator(out) { out += "\n" }
-            out += block.markdown
-        }
-        return out
     }
 
     // MARK: - Default title
@@ -242,11 +220,6 @@ struct ExtractBuilder {
     /// though CommonMark renders it literally (`` `[a](b)` `` titles as `a`, not `[a](b)`). Only the
     /// escape/emphasis half of the pass knows about code spans. Tracked as
     /// `W3.notes-extract-title-code-span-references`.
-    ///
-    /// Takes the blocks as **persisted** (i.e. post-`coercedToNotesOnly`), not the raw passages: a
-    /// `<!-- block: …` line nested in the markdown is not title material, and reading it as one put
-    /// the smuggled header back into the front matter even once the body was clean
-    /// (W3.notes-extract-smuggles-a-source-header).
     ///
     /// The line split goes through `BlockParser.splitLines` — the same authority the rest of this family
     /// routes through — because Swift compares GRAPHEMES: `"\r\n"` is not `"\n"` and a lone `"\r"` is not

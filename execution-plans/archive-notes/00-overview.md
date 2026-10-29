@@ -258,6 +258,13 @@ Round-trip rule: the parser tolerates missing optional fields and **preserves an
 verbatim**. If the header is absent, the region is treated as a single `freeform` block (graceful
 degradation — matches the SPEC's "consumers must degrade, never assume structure" ethos).
 
+Escape rule (W40.fix-notes-block-marker-in-text): a header is recognized only where `<!-- block:` begins a
+line. A line of block TEXT that begins with `<!-- block:` after any number of backslashes is written with one
+more backslash (`\<!-- block: freeform -->`), and the reader takes one away, so such a line stays text and the
+block stays whole. Applies to the leading prose and every block's text, not to the opener a headerless block
+(an unclosed header read back as text) begins with. One backslash before `<` is also CommonMark's own escape,
+so a rendered view shows the line as the operator typed it.
+
 ---
 
 ## 7. Dates

@@ -787,10 +787,12 @@ struct ExtractRejectsNonNoteAnchorsTests {
         #expect(ExtractBuilder.coercedToNotesOnly([b]).first?.kind == .freeform)
     }
 
-    // W3.notes-extract-smuggles-a-source-header — the coercion also looks one level DOWN.
+    // W40.fix-notes-block-marker-in-text — a header-looking line one level DOWN is text: the coercion keeps
+    // it (it used to strip it, which dropped the operator's line), and the save escapes it, so it never
+    // becomes a foreign block (W3.notes-extract-smuggles-a-source-header).
 
-    @Test("a header nested inside a kept passage's markdown is stripped; the text stays")
-    func flattensNestedHeaderInsideAKeptPassage() throws {
+    @Test("a header-looking line inside a kept passage stays its text, and stays one block on reload")
+    func keepsHeaderLookingLineInsideAKeptPassage() throws {
         let nested = Block(kind: .readerPage,
                            source: SourceAnchor(link: "archivereader://reveal?x=1", display: "Doc",
                                                 page: 3, thumbRef: nil, zoteroSelect: nil, noteRef: nil),
@@ -798,26 +800,14 @@ struct ExtractRejectsNonNoteAnchorsTests {
         let passage = Block(kind: .notePassage,
                             source: SourceAnchor.notePassage(sourceNoteId: UUID(), sourceBlockIndex: 1,
                                                              sourceTitle: "T", sourceDateDisplay: "1968"),
-                            markdown: BlockParser.serialize(leadingText: nil, blocks: [nested]),
+                            markdown: "Lead.\n" + BlockParser.serialize(leadingText: nil, blocks: [nested]),
                             unknownHeaderFields: [])
         let out = try #require(ExtractBuilder.coercedToNotesOnly([passage]).first)
         #expect(out.kind == .notePassage)                     // still a passage…
         #expect(out.source?.notePassageTarget != nil)         // …with its own anchor intact
-        #expect(!out.markdown.contains("<!-- block:"))        // …and no foreign header inside it
-        #expect(out.markdown == "Quoted body.\n")             // text preserved verbatim
-    }
-
-    @Test("leading text before a nested header survives, on its own line")
-    func flattensKeepingLeadingText() throws {
-        let nested = Block(kind: .zoteroItem,
-                           source: SourceAnchor(link: nil, display: "cite", page: nil, thumbRef: nil,
-                                                zoteroSelect: "zotero://select/items/ABC", noteRef: nil),
-                           markdown: "Cited.", unknownHeaderFields: [])
-        let b = Block(kind: .freeform, source: nil,
-                      markdown: BlockParser.serialize(leadingText: "Lead.\n", blocks: [nested]),
-                      unknownHeaderFields: [])
-        let out = try #require(ExtractBuilder.coercedToNotesOnly([b]).first)
-        #expect(out.markdown == "Lead.\nCited.")
+        #expect(out.markdown == passage.markdown)             // …and every line of its text
+        let back = BlockParser.parse(BlockParser.serialize(leadingText: nil, blocks: [out]))
+        #expect(back.blocks == [out])                         // no foreign block on reload
     }
 
     @Test("markdown with no nested header is returned byte-identical")
@@ -984,7 +974,7 @@ struct ExtractNestedSourceHeaderTests {
     /// The choke-point half: even a passage handed straight to `createExtract` — bypassing the
     /// selection snapshot entirely — cannot write a foreign header, because `persist` runs the
     /// coercion. This is the case the paste path's `coercedToNotesOnly` never covered.
-    @Test("a hand-built passage carrying a nested header still persists clean")
+    @Test("a hand-built passage carrying a nested header persists it as text, not as a block")
     func handBuiltPassageIsCoercedOnPersist() async throws {
         let (store, tmp) = try scratch(); defer { cleanup(tmp) }
         let nested = Block(kind: .readerPage,
@@ -1000,13 +990,13 @@ struct ExtractNestedSourceHeaderTests {
         let created = try await builder.createExtract(from: [ExtractPassageBlock(block: passage)])
 
         let raw = try String(contentsOf: await store.mdURL(for: created.id), encoding: .utf8)
-        #expect(!raw.contains("block: reader-page"), "reader-page header smuggled into:\n\(raw)")
+        #expect(!raw.contains("\n<!-- block: reader-page"), "reader-page header smuggled into:\n\(raw)")
         #expect(raw.contains("Smuggled body."))
-        #expect(created.title == "Smuggled body.")     // the header is not title material either
         let reloaded = try await store.load(created.id)
         #expect(reloaded.blocks.count == 1)
         #expect(reloaded.blocks.first?.kind == .notePassage)
         #expect(reloaded.blocks.first?.source?.notePassageTarget?.block == 4)
+        #expect(reloaded.blocks.first?.markdown == passage.markdown)   // kept as text (W40.fix-notes-block-marker-in-text)
     }
 
     @Test("append to an existing extract cannot smuggle one either")
