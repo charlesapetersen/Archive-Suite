@@ -1,0 +1,1529 @@
+{
+ "extractors": {
+  "gliner2.5-base": {
+   "by_bin": {
+    "both": {
+     "0-2%": {
+      "f1": 0.961,
+      "hyp": 2768,
+      "p": 0.962,
+      "pages": 303,
+      "r": 0.959,
+      "ref": 2778
+     },
+     "10-20%": {
+      "f1": 0.681,
+      "hyp": 219,
+      "p": 0.712,
+      "pages": 32,
+      "r": 0.653,
+      "ref": 239
+     },
+     "2-5%": {
+      "f1": 0.861,
+      "hyp": 345,
+      "p": 0.835,
+      "pages": 38,
+      "r": 0.889,
+      "ref": 324
+     },
+     "20-40%": {
+      "f1": 0.63,
+      "hyp": 119,
+      "p": 0.571,
+      "pages": 15,
+      "r": 0.701,
+      "ref": 97
+     },
+     "5-10%": {
+      "f1": 0.76,
+      "hyp": 430,
+      "p": 0.747,
+      "pages": 50,
+      "r": 0.773,
+      "ref": 415
+     },
+     "over 40%": {
+      "f1": 0.486,
+      "hyp": 189,
+      "p": 0.593,
+      "pages": 37,
+      "r": 0.412,
+      "ref": 272
+     }
+    },
+    "owner96": {
+     "0-2%": {
+      "f1": 0.961,
+      "hyp": 2768,
+      "p": 0.962,
+      "pages": 303,
+      "r": 0.959,
+      "ref": 2778
+     },
+     "10-20%": {
+      "f1": 0.681,
+      "hyp": 219,
+      "p": 0.712,
+      "pages": 32,
+      "r": 0.653,
+      "ref": 239
+     },
+     "2-5%": {
+      "f1": 0.861,
+      "hyp": 345,
+      "p": 0.835,
+      "pages": 38,
+      "r": 0.889,
+      "ref": 324
+     },
+     "20-40%": {
+      "f1": 0.63,
+      "hyp": 119,
+      "p": 0.571,
+      "pages": 15,
+      "r": 0.701,
+      "ref": 97
+     },
+     "5-10%": {
+      "f1": 0.76,
+      "hyp": 430,
+      "p": 0.747,
+      "pages": 50,
+      "r": 0.773,
+      "ref": 415
+     },
+     "over 40%": {
+      "f1": 0.486,
+      "hyp": 189,
+      "p": 0.593,
+      "pages": 37,
+      "r": 0.412,
+      "ref": 272
+     }
+    },
+    "public-latin": {
+     "0-2%": {
+      "f1": 0.0,
+      "hyp": 0,
+      "p": 0.0,
+      "pages": 0,
+      "r": 0.0,
+      "ref": 0
+     },
+     "10-20%": {
+      "f1": 0.0,
+      "hyp": 0,
+      "p": 0.0,
+      "pages": 0,
+      "r": 0.0,
+      "ref": 0
+     },
+     "2-5%": {
+      "f1": 0.0,
+      "hyp": 0,
+      "p": 0.0,
+      "pages": 0,
+      "r": 0.0,
+      "ref": 0
+     },
+     "20-40%": {
+      "f1": 0.0,
+      "hyp": 0,
+      "p": 0.0,
+      "pages": 0,
+      "r": 0.0,
+      "ref": 0
+     },
+     "5-10%": {
+      "f1": 0.0,
+      "hyp": 0,
+      "p": 0.0,
+      "pages": 0,
+      "r": 0.0,
+      "ref": 0
+     },
+     "over 40%": {
+      "f1": 0.0,
+      "hyp": 0,
+      "p": 0.0,
+      "pages": 0,
+      "r": 0.0,
+      "ref": 0
+     }
+    }
+   },
+   "by_group": {
+    "owner96": {
+     "apple-vision | handwritten": {
+      "f1": 0.306,
+      "hyp": 70,
+      "p": 0.343,
+      "pages": 16,
+      "r": 0.276,
+      "ref": 87
+     },
+     "apple-vision | mixed": {
+      "f1": 0.615,
+      "hyp": 12,
+      "p": 0.667,
+      "pages": 2,
+      "r": 0.571,
+      "ref": 14
+     },
+     "apple-vision | printed": {
+      "f1": 0.762,
+      "hyp": 301,
+      "p": 0.777,
+      "pages": 28,
+      "r": 0.748,
+      "ref": 313
+     },
+     "apple-vision | typewritten": {
+      "f1": 0.815,
+      "hyp": 401,
+      "p": 0.825,
+      "pages": 49,
+      "r": 0.805,
+      "ref": 411
+     },
+     "claude-sonnet5.5 | handwritten": {
+      "f1": 0.82,
+      "hyp": 96,
+      "p": 0.781,
+      "pages": 16,
+      "r": 0.862,
+      "ref": 87
+     },
+     "claude-sonnet5.5 | mixed": {
+      "f1": 0.963,
+      "hyp": 13,
+      "p": 1.0,
+      "pages": 2,
+      "r": 0.929,
+      "ref": 14
+     },
+     "claude-sonnet5.5 | printed": {
+      "f1": 0.937,
+      "hyp": 308,
+      "p": 0.945,
+      "pages": 28,
+      "r": 0.93,
+      "ref": 313
+     },
+     "claude-sonnet5.5 | typewritten": {
+      "f1": 0.95,
+      "hyp": 416,
+      "p": 0.945,
+      "pages": 49,
+      "r": 0.956,
+      "ref": 411
+     },
+     "gemini3.8-flash | handwritten": {
+      "f1": 0.889,
+      "hyp": 93,
+      "p": 0.86,
+      "pages": 16,
+      "r": 0.92,
+      "ref": 87
+     },
+     "gemini3.8-flash | mixed": {
+      "f1": 0.929,
+      "hyp": 14,
+      "p": 0.929,
+      "pages": 2,
+      "r": 0.929,
+      "ref": 14
+     },
+     "gemini3.8-flash | printed": {
+      "f1": 0.941,
+      "hyp": 299,
+      "p": 0.963,
+      "pages": 28,
+      "r": 0.92,
+      "ref": 313
+     },
+     "gemini3.8-flash | typewritten": {
+      "f1": 0.954,
+      "hyp": 419,
+      "p": 0.945,
+      "pages": 49,
+      "r": 0.964,
+      "ref": 411
+     },
+     "qwen3-vl-8b-mlx4 | handwritten": {
+      "f1": 0.703,
+      "hyp": 98,
+      "p": 0.663,
+      "pages": 16,
+      "r": 0.747,
+      "ref": 87
+     },
+     "qwen3-vl-8b-mlx4 | mixed": {
+      "f1": 0.72,
+      "hyp": 11,
+      "p": 0.818,
+      "pages": 2,
+      "r": 0.643,
+      "ref": 14
+     },
+     "qwen3-vl-8b-mlx4 | printed": {
+      "f1": 0.92,
+      "hyp": 302,
+      "p": 0.937,
+      "pages": 28,
+      "r": 0.904,
+      "ref": 313
+     },
+     "qwen3-vl-8b-mlx4 | typewritten": {
+      "f1": 0.919,
+      "hyp": 403,
+      "p": 0.928,
+      "pages": 49,
+      "r": 0.91,
+      "ref": 411
+     },
+     "qwen3.6-27b | handwritten": {
+      "f1": 0.736,
+      "hyp": 95,
+      "p": 0.705,
+      "pages": 16,
+      "r": 0.77,
+      "ref": 87
+     },
+     "qwen3.6-27b | mixed": {
+      "f1": 0.889,
+      "hyp": 13,
+      "p": 0.923,
+      "pages": 2,
+      "r": 0.857,
+      "ref": 14
+     },
+     "qwen3.6-27b | printed": {
+      "f1": 0.892,
+      "hyp": 306,
+      "p": 0.902,
+      "pages": 28,
+      "r": 0.882,
+      "ref": 313
+     },
+     "qwen3.6-27b | typewritten": {
+      "f1": 0.93,
+      "hyp": 400,
+      "p": 0.943,
+      "pages": 49,
+      "r": 0.917,
+      "ref": 411
+     }
+    },
+    "public-latin": {}
+   },
+   "by_route": {
+    "owner96": {
+     "apple-vision": {
+      "f1": 0.742,
+      "hyp": 784,
+      "p": 0.761,
+      "pages": 95,
+      "r": 0.724,
+      "ref": 825
+     },
+     "claude-sonnet5.5": {
+      "f1": 0.931,
+      "hyp": 833,
+      "p": 0.927,
+      "pages": 95,
+      "r": 0.936,
+      "ref": 825
+     },
+     "gemini3.8-flash": {
+      "f1": 0.942,
+      "hyp": 825,
+      "p": 0.942,
+      "pages": 95,
+      "r": 0.942,
+      "ref": 825
+     },
+     "qwen3-vl-8b-mlx4": {
+      "f1": 0.892,
+      "hyp": 814,
+      "p": 0.898,
+      "pages": 95,
+      "r": 0.886,
+      "ref": 825
+     },
+     "qwen3.6-27b": {
+      "f1": 0.893,
+      "hyp": 814,
+      "p": 0.899,
+      "pages": 95,
+      "r": 0.887,
+      "ref": 825
+     }
+    },
+    "public-latin": {}
+   },
+   "failed": {
+    "owner96": {
+     "gemini3.8-flash": 2,
+     "qwen3-vl-8b-mlx4": 4,
+     "qwen3.6-27b": 1
+    },
+    "public-latin": {}
+   },
+   "postcorrect": {
+    "owner96, pc-image": {
+     "corrected": {
+      "f1": 0.922,
+      "hyp": 227,
+      "p": 0.916,
+      "pages": 32,
+      "r": 0.929,
+      "ref": 224
+     },
+     "raw": {
+      "f1": 0.759,
+      "hyp": 216,
+      "p": 0.773,
+      "pages": 32,
+      "r": 0.746,
+      "ref": 224
+     }
+    },
+    "owner96, pc-text": {
+     "corrected": {
+      "f1": 0.869,
+      "hyp": 220,
+      "p": 0.877,
+      "pages": 32,
+      "r": 0.862,
+      "ref": 224
+     },
+     "raw": {
+      "f1": 0.759,
+      "hyp": 216,
+      "p": 0.773,
+      "pages": 32,
+      "r": 0.746,
+      "ref": 224
+     }
+    }
+   },
+   "route_cer": {
+    "owner96": {
+     "apple-vision": 0.194,
+     "claude-sonnet5.5": 0.032,
+     "gemini3.8-flash": 0.054,
+     "qwen3-vl-8b-mlx4": 0.117,
+     "qwen3.6-27b": 0.059
+    },
+    "public-latin": {}
+   },
+   "switch_off": {
+    "both": "5-10%",
+    "owner96": "5-10%",
+    "public-latin": null
+   }
+  },
+  "gliner2.5-multi": {
+   "by_bin": {
+    "both": {
+     "0-2%": {
+      "f1": 0.828,
+      "hyp": 63,
+      "p": 0.841,
+      "pages": 11,
+      "r": 0.815,
+      "ref": 65
+     },
+     "10-20%": {
+      "f1": 0.437,
+      "hyp": 1403,
+      "p": 0.421,
+      "pages": 202,
+      "r": 0.454,
+      "ref": 1302
+     },
+     "2-5%": {
+      "f1": 0.677,
+      "hyp": 171,
+      "p": 0.655,
+      "pages": 29,
+      "r": 0.7,
+      "ref": 160
+     },
+     "20-40%": {
+      "f1": 0.264,
+      "hyp": 1181,
+      "p": 0.269,
+      "pages": 189,
+      "r": 0.258,
+      "ref": 1231
+     },
+     "5-10%": {
+      "f1": 0.674,
+      "hyp": 777,
+      "p": 0.667,
+      "pages": 128,
+      "r": 0.682,
+      "ref": 760
+     },
+     "over 40%": {
+      "f1": 0.122,
+      "hyp": 2841,
+      "p": 0.159,
+      "pages": 649,
+      "r": 0.098,
+      "ref": 4614
+     }
+    },
+    "owner96": {
+     "0-2%": {
+      "f1": 0.0,
+      "hyp": 0,
+      "p": 0.0,
+      "pages": 0,
+      "r": 0.0,
+      "ref": 0
+     },
+     "10-20%": {
+      "f1": 0.0,
+      "hyp": 0,
+      "p": 0.0,
+      "pages": 0,
+      "r": 0.0,
+      "ref": 0
+     },
+     "2-5%": {
+      "f1": 0.0,
+      "hyp": 0,
+      "p": 0.0,
+      "pages": 0,
+      "r": 0.0,
+      "ref": 0
+     },
+     "20-40%": {
+      "f1": 0.0,
+      "hyp": 0,
+      "p": 0.0,
+      "pages": 0,
+      "r": 0.0,
+      "ref": 0
+     },
+     "5-10%": {
+      "f1": 0.0,
+      "hyp": 0,
+      "p": 0.0,
+      "pages": 0,
+      "r": 0.0,
+      "ref": 0
+     },
+     "over 40%": {
+      "f1": 0.0,
+      "hyp": 0,
+      "p": 0.0,
+      "pages": 0,
+      "r": 0.0,
+      "ref": 0
+     }
+    },
+    "public-latin": {
+     "0-2%": {
+      "f1": 0.828,
+      "hyp": 63,
+      "p": 0.841,
+      "pages": 11,
+      "r": 0.815,
+      "ref": 65
+     },
+     "10-20%": {
+      "f1": 0.437,
+      "hyp": 1403,
+      "p": 0.421,
+      "pages": 202,
+      "r": 0.454,
+      "ref": 1302
+     },
+     "2-5%": {
+      "f1": 0.677,
+      "hyp": 171,
+      "p": 0.655,
+      "pages": 29,
+      "r": 0.7,
+      "ref": 160
+     },
+     "20-40%": {
+      "f1": 0.264,
+      "hyp": 1181,
+      "p": 0.269,
+      "pages": 189,
+      "r": 0.258,
+      "ref": 1231
+     },
+     "5-10%": {
+      "f1": 0.674,
+      "hyp": 777,
+      "p": 0.667,
+      "pages": 128,
+      "r": 0.682,
+      "ref": 760
+     },
+     "over 40%": {
+      "f1": 0.122,
+      "hyp": 2841,
+      "p": 0.159,
+      "pages": 649,
+      "r": 0.098,
+      "ref": 4614
+     }
+    }
+   },
+   "by_group": {
+    "owner96": {},
+    "public-latin": {
+     "apple-vision | L5": {
+      "f1": 0.045,
+      "hyp": 340,
+      "p": 0.062,
+      "pages": 77,
+      "r": 0.035,
+      "ref": 593
+     },
+     "apple-vision | L6": {
+      "f1": 0.021,
+      "hyp": 467,
+      "p": 0.024,
+      "pages": 80,
+      "r": 0.019,
+      "ref": 565
+     },
+     "apple-vision | L7": {
+      "f1": 0.029,
+      "hyp": 134,
+      "p": 0.067,
+      "pages": 77,
+      "r": 0.018,
+      "ref": 495
+     },
+     "apple-vision | L8": {
+      "f1": 0.29,
+      "hyp": 288,
+      "p": 0.337,
+      "pages": 68,
+      "r": 0.255,
+      "ref": 380
+     },
+     "gemini3.8-flash | L5": {
+      "f1": 0.335,
+      "hyp": 650,
+      "p": 0.32,
+      "pages": 77,
+      "r": 0.351,
+      "ref": 593
+     },
+     "gemini3.8-flash | L6": {
+      "f1": 0.54,
+      "hyp": 509,
+      "p": 0.57,
+      "pages": 80,
+      "r": 0.513,
+      "ref": 565
+     },
+     "gemini3.8-flash | L7": {
+      "f1": 0.373,
+      "hyp": 417,
+      "p": 0.408,
+      "pages": 77,
+      "r": 0.343,
+      "ref": 495
+     },
+     "gemini3.8-flash | L8": {
+      "f1": 0.629,
+      "hyp": 396,
+      "p": 0.616,
+      "pages": 68,
+      "r": 0.642,
+      "ref": 380
+     },
+     "qwen3-vl-8b | L5": {
+      "f1": 0.192,
+      "hyp": 420,
+      "p": 0.231,
+      "pages": 77,
+      "r": 0.164,
+      "ref": 593
+     },
+     "qwen3-vl-8b | L6": {
+      "f1": 0.092,
+      "hyp": 264,
+      "p": 0.144,
+      "pages": 80,
+      "r": 0.067,
+      "ref": 565
+     },
+     "qwen3-vl-8b | L7": {
+      "f1": 0.126,
+      "hyp": 332,
+      "p": 0.157,
+      "pages": 77,
+      "r": 0.105,
+      "ref": 495
+     },
+     "qwen3-vl-8b | L8": {
+      "f1": 0.61,
+      "hyp": 407,
+      "p": 0.59,
+      "pages": 68,
+      "r": 0.632,
+      "ref": 380
+     },
+     "qwen3.6-27b | L5": {
+      "f1": 0.222,
+      "hyp": 516,
+      "p": 0.238,
+      "pages": 77,
+      "r": 0.207,
+      "ref": 593
+     },
+     "qwen3.6-27b | L6": {
+      "f1": 0.234,
+      "hyp": 514,
+      "p": 0.245,
+      "pages": 80,
+      "r": 0.223,
+      "ref": 565
+     },
+     "qwen3.6-27b | L7": {
+      "f1": 0.165,
+      "hyp": 367,
+      "p": 0.193,
+      "pages": 77,
+      "r": 0.143,
+      "ref": 495
+     },
+     "qwen3.6-27b | L8": {
+      "f1": 0.624,
+      "hyp": 415,
+      "p": 0.598,
+      "pages": 68,
+      "r": 0.653,
+      "ref": 380
+     }
+    }
+   },
+   "by_route": {
+    "owner96": {},
+    "public-latin": {
+     "apple-vision": {
+      "f1": 0.085,
+      "hyp": 1229,
+      "p": 0.112,
+      "pages": 302,
+      "r": 0.068,
+      "ref": 2033
+     },
+     "gemini3.8-flash": {
+      "f1": 0.455,
+      "hyp": 1972,
+      "p": 0.462,
+      "pages": 302,
+      "r": 0.449,
+      "ref": 2033
+     },
+     "qwen3-vl-8b": {
+      "f1": 0.247,
+      "hyp": 1423,
+      "p": 0.3,
+      "pages": 302,
+      "r": 0.21,
+      "ref": 2033
+     },
+     "qwen3.6-27b": {
+      "f1": 0.295,
+      "hyp": 1812,
+      "p": 0.313,
+      "pages": 302,
+      "r": 0.279,
+      "ref": 2033
+     }
+    }
+   },
+   "failed": {
+    "owner96": {},
+    "public-latin": {
+     "gemini3.8-flash": 16,
+     "qwen3-vl-8b": 94,
+     "qwen3.6-27b": 39
+    }
+   },
+   "postcorrect": {
+    "public-latin, pc-image": {
+     "corrected": {
+      "f1": 0.769,
+      "hyp": 6,
+      "p": 0.833,
+      "pages": 1,
+      "r": 0.714,
+      "ref": 7
+     },
+     "raw": {
+      "f1": 0.714,
+      "hyp": 7,
+      "p": 0.714,
+      "pages": 1,
+      "r": 0.714,
+      "ref": 7
+     }
+    },
+    "public-latin, pc-text": {
+     "corrected": {
+      "f1": 0.714,
+      "hyp": 7,
+      "p": 0.714,
+      "pages": 1,
+      "r": 0.714,
+      "ref": 7
+     },
+     "raw": {
+      "f1": 0.714,
+      "hyp": 7,
+      "p": 0.714,
+      "pages": 1,
+      "r": 0.714,
+      "ref": 7
+     }
+    }
+   },
+   "route_cer": {
+    "owner96": {},
+    "public-latin": {
+     "apple-vision": 0.72,
+     "gemini3.8-flash": 0.352,
+     "qwen3-vl-8b": 0.545,
+     "qwen3.6-27b": 0.57
+    }
+   },
+   "switch_off": {
+    "both": "2-5%",
+    "owner96": null,
+    "public-latin": "2-5%"
+   }
+  },
+  "nltagger": {
+   "by_bin": {
+    "both": {
+     "0-2%": {
+      "f1": 0.961,
+      "hyp": 3157,
+      "p": 0.959,
+      "pages": 286,
+      "r": 0.962,
+      "ref": 3145
+     },
+     "10-20%": {
+      "f1": 0.565,
+      "hyp": 1800,
+      "p": 0.518,
+      "pages": 187,
+      "r": 0.621,
+      "ref": 1502
+     },
+     "2-5%": {
+      "f1": 0.778,
+      "hyp": 601,
+      "p": 0.757,
+      "pages": 74,
+      "r": 0.8,
+      "ref": 569
+     },
+     "20-40%": {
+      "f1": 0.356,
+      "hyp": 1210,
+      "p": 0.336,
+      "pages": 147,
+      "r": 0.378,
+      "ref": 1077
+     },
+     "5-10%": {
+      "f1": 0.714,
+      "hyp": 1653,
+      "p": 0.662,
+      "pages": 171,
+      "r": 0.774,
+      "ref": 1415
+     },
+     "over 40%": {
+      "f1": 0.119,
+      "hyp": 2894,
+      "p": 0.153,
+      "pages": 508,
+      "r": 0.098,
+      "ref": 4542
+     }
+    },
+    "owner96": {
+     "0-2%": {
+      "f1": 0.962,
+      "hyp": 3056,
+      "p": 0.96,
+      "pages": 275,
+      "r": 0.964,
+      "ref": 3045
+     },
+     "10-20%": {
+      "f1": 0.714,
+      "hyp": 178,
+      "p": 0.736,
+      "pages": 31,
+      "r": 0.693,
+      "ref": 189
+     },
+     "2-5%": {
+      "f1": 0.866,
+      "hyp": 310,
+      "p": 0.874,
+      "pages": 38,
+      "r": 0.858,
+      "ref": 316
+     },
+     "20-40%": {
+      "f1": 0.719,
+      "hyp": 121,
+      "p": 0.686,
+      "pages": 15,
+      "r": 0.755,
+      "ref": 110
+     },
+     "5-10%": {
+      "f1": 0.778,
+      "hyp": 356,
+      "p": 0.753,
+      "pages": 49,
+      "r": 0.805,
+      "ref": 333
+     },
+     "over 40%": {
+      "f1": 0.536,
+      "hyp": 260,
+      "p": 0.554,
+      "pages": 37,
+      "r": 0.52,
+      "ref": 277
+     }
+    },
+    "public-latin": {
+     "0-2%": {
+      "f1": 0.915,
+      "hyp": 101,
+      "p": 0.911,
+      "pages": 11,
+      "r": 0.92,
+      "ref": 100
+     },
+     "10-20%": {
+      "f1": 0.546,
+      "hyp": 1622,
+      "p": 0.494,
+      "pages": 156,
+      "r": 0.61,
+      "ref": 1313
+     },
+     "2-5%": {
+      "f1": 0.676,
+      "hyp": 291,
+      "p": 0.632,
+      "pages": 36,
+      "r": 0.727,
+      "ref": 253
+     },
+     "20-40%": {
+      "f1": 0.315,
+      "hyp": 1089,
+      "p": 0.298,
+      "pages": 132,
+      "r": 0.335,
+      "ref": 967
+     },
+     "5-10%": {
+      "f1": 0.695,
+      "hyp": 1297,
+      "p": 0.638,
+      "pages": 122,
+      "r": 0.764,
+      "ref": 1082
+     },
+     "over 40%": {
+      "f1": 0.087,
+      "hyp": 2634,
+      "p": 0.114,
+      "pages": 471,
+      "r": 0.07,
+      "ref": 4265
+     }
+    }
+   },
+   "by_group": {
+    "owner96": {
+     "apple-vision | handwritten": {
+      "f1": 0.283,
+      "hyp": 57,
+      "p": 0.298,
+      "pages": 16,
+      "r": 0.27,
+      "ref": 63
+     },
+     "apple-vision | mixed": {
+      "f1": 0.593,
+      "hyp": 12,
+      "p": 0.667,
+      "pages": 2,
+      "r": 0.533,
+      "ref": 15
+     },
+     "apple-vision | printed": {
+      "f1": 0.812,
+      "hyp": 434,
+      "p": 0.811,
+      "pages": 28,
+      "r": 0.813,
+      "ref": 433
+     },
+     "apple-vision | typewritten": {
+      "f1": 0.827,
+      "hyp": 351,
+      "p": 0.818,
+      "pages": 43,
+      "r": 0.837,
+      "ref": 343
+     },
+     "claude-sonnet5.5 | handwritten": {
+      "f1": 0.763,
+      "hyp": 68,
+      "p": 0.735,
+      "pages": 16,
+      "r": 0.794,
+      "ref": 63
+     },
+     "claude-sonnet5.5 | mixed": {
+      "f1": 0.71,
+      "hyp": 16,
+      "p": 0.688,
+      "pages": 2,
+      "r": 0.733,
+      "ref": 15
+     },
+     "claude-sonnet5.5 | printed": {
+      "f1": 0.968,
+      "hyp": 437,
+      "p": 0.963,
+      "pages": 28,
+      "r": 0.972,
+      "ref": 433
+     },
+     "claude-sonnet5.5 | typewritten": {
+      "f1": 0.971,
+      "hyp": 347,
+      "p": 0.965,
+      "pages": 43,
+      "r": 0.977,
+      "ref": 343
+     },
+     "gemini3.8-flash | handwritten": {
+      "f1": 0.839,
+      "hyp": 61,
+      "p": 0.852,
+      "pages": 16,
+      "r": 0.825,
+      "ref": 63
+     },
+     "gemini3.8-flash | mixed": {
+      "f1": 0.875,
+      "hyp": 17,
+      "p": 0.824,
+      "pages": 2,
+      "r": 0.933,
+      "ref": 15
+     },
+     "gemini3.8-flash | printed": {
+      "f1": 0.956,
+      "hyp": 429,
+      "p": 0.96,
+      "pages": 28,
+      "r": 0.952,
+      "ref": 433
+     },
+     "gemini3.8-flash | typewritten": {
+      "f1": 0.968,
+      "hyp": 347,
+      "p": 0.963,
+      "pages": 43,
+      "r": 0.974,
+      "ref": 343
+     },
+     "qwen3-vl-8b-mlx4 | handwritten": {
+      "f1": 0.661,
+      "hyp": 52,
+      "p": 0.731,
+      "pages": 16,
+      "r": 0.603,
+      "ref": 63
+     },
+     "qwen3-vl-8b-mlx4 | mixed": {
+      "f1": 0.609,
+      "hyp": 8,
+      "p": 0.875,
+      "pages": 2,
+      "r": 0.467,
+      "ref": 15
+     },
+     "qwen3-vl-8b-mlx4 | printed": {
+      "f1": 0.922,
+      "hyp": 437,
+      "p": 0.918,
+      "pages": 28,
+      "r": 0.926,
+      "ref": 433
+     },
+     "qwen3-vl-8b-mlx4 | typewritten": {
+      "f1": 0.905,
+      "hyp": 340,
+      "p": 0.909,
+      "pages": 43,
+      "r": 0.901,
+      "ref": 343
+     },
+     "qwen3.6-27b | handwritten": {
+      "f1": 0.739,
+      "hyp": 56,
+      "p": 0.786,
+      "pages": 16,
+      "r": 0.698,
+      "ref": 63
+     },
+     "qwen3.6-27b | mixed": {
+      "f1": 0.667,
+      "hyp": 18,
+      "p": 0.611,
+      "pages": 2,
+      "r": 0.733,
+      "ref": 15
+     },
+     "qwen3.6-27b | printed": {
+      "f1": 0.923,
+      "hyp": 455,
+      "p": 0.901,
+      "pages": 28,
+      "r": 0.947,
+      "ref": 433
+     },
+     "qwen3.6-27b | typewritten": {
+      "f1": 0.935,
+      "hyp": 339,
+      "p": 0.941,
+      "pages": 43,
+      "r": 0.93,
+      "ref": 343
+     }
+    },
+    "public-latin": {
+     "apple-vision | L5": {
+      "f1": 0.024,
+      "hyp": 336,
+      "p": 0.021,
+      "pages": 54,
+      "r": 0.028,
+      "ref": 253
+     },
+     "apple-vision | L6": {
+      "f1": 0.018,
+      "hyp": 319,
+      "p": 0.038,
+      "pages": 80,
+      "r": 0.012,
+      "ref": 1015
+     },
+     "apple-vision | L7": {
+      "f1": 0.05,
+      "hyp": 53,
+      "p": 0.057,
+      "pages": 23,
+      "r": 0.045,
+      "ref": 67
+     },
+     "apple-vision | L8": {
+      "f1": 0.325,
+      "hyp": 719,
+      "p": 0.312,
+      "pages": 75,
+      "r": 0.339,
+      "ref": 660
+     },
+     "gemini3.8-flash | L5": {
+      "f1": 0.146,
+      "hyp": 362,
+      "p": 0.124,
+      "pages": 54,
+      "r": 0.178,
+      "ref": 253
+     },
+     "gemini3.8-flash | L6": {
+      "f1": 0.564,
+      "hyp": 893,
+      "p": 0.602,
+      "pages": 80,
+      "r": 0.53,
+      "ref": 1015
+     },
+     "gemini3.8-flash | L7": {
+      "f1": 0.125,
+      "hyp": 77,
+      "p": 0.117,
+      "pages": 23,
+      "r": 0.134,
+      "ref": 67
+     },
+     "gemini3.8-flash | L8": {
+      "f1": 0.69,
+      "hyp": 815,
+      "p": 0.625,
+      "pages": 75,
+      "r": 0.771,
+      "ref": 660
+     },
+     "qwen3-vl-8b | L5": {
+      "f1": 0.112,
+      "hyp": 156,
+      "p": 0.147,
+      "pages": 54,
+      "r": 0.091,
+      "ref": 253
+     },
+     "qwen3-vl-8b | L6": {
+      "f1": 0.054,
+      "hyp": 328,
+      "p": 0.11,
+      "pages": 80,
+      "r": 0.035,
+      "ref": 1015
+     },
+     "qwen3-vl-8b | L7": {
+      "f1": 0.101,
+      "hyp": 72,
+      "p": 0.097,
+      "pages": 23,
+      "r": 0.104,
+      "ref": 67
+     },
+     "qwen3-vl-8b | L8": {
+      "f1": 0.605,
+      "hyp": 844,
+      "p": 0.539,
+      "pages": 75,
+      "r": 0.689,
+      "ref": 660
+     },
+     "qwen3.6-27b | L5": {
+      "f1": 0.128,
+      "hyp": 200,
+      "p": 0.145,
+      "pages": 54,
+      "r": 0.115,
+      "ref": 253
+     },
+     "qwen3.6-27b | L6": {
+      "f1": 0.14,
+      "hyp": 925,
+      "p": 0.147,
+      "pages": 80,
+      "r": 0.134,
+      "ref": 1015
+     },
+     "qwen3.6-27b | L7": {
+      "f1": 0.084,
+      "hyp": 100,
+      "p": 0.07,
+      "pages": 23,
+      "r": 0.104,
+      "ref": 67
+     },
+     "qwen3.6-27b | L8": {
+      "f1": 0.652,
+      "hyp": 835,
+      "p": 0.583,
+      "pages": 75,
+      "r": 0.738,
+      "ref": 660
+     }
+    }
+   },
+   "by_route": {
+    "owner96": {
+     "apple-vision": {
+      "f1": 0.778,
+      "hyp": 854,
+      "p": 0.778,
+      "pages": 89,
+      "r": 0.778,
+      "ref": 854
+     },
+     "claude-sonnet5.5": {
+      "f1": 0.949,
+      "hyp": 868,
+      "p": 0.941,
+      "pages": 89,
+      "r": 0.957,
+      "ref": 854
+     },
+     "gemini3.8-flash": {
+      "f1": 0.951,
+      "hyp": 854,
+      "p": 0.951,
+      "pages": 89,
+      "r": 0.951,
+      "ref": 854
+     },
+     "qwen3-vl-8b-mlx4": {
+      "f1": 0.893,
+      "hyp": 837,
+      "p": 0.902,
+      "pages": 89,
+      "r": 0.884,
+      "ref": 854
+     },
+     "qwen3.6-27b": {
+      "f1": 0.911,
+      "hyp": 868,
+      "p": 0.903,
+      "pages": 89,
+      "r": 0.918,
+      "ref": 854
+     }
+    },
+    "public-latin": {
+     "apple-vision": {
+      "f1": 0.144,
+      "hyp": 1427,
+      "p": 0.172,
+      "pages": 232,
+      "r": 0.123,
+      "ref": 1995
+     },
+     "gemini3.8-flash": {
+      "f1": 0.532,
+      "hyp": 2147,
+      "p": 0.513,
+      "pages": 232,
+      "r": 0.552,
+      "ref": 1995
+     },
+     "qwen3-vl-8b": {
+      "f1": 0.307,
+      "hyp": 1400,
+      "p": 0.372,
+      "pages": 232,
+      "r": 0.261,
+      "ref": 1995
+     },
+     "qwen3.6-27b": {
+      "f1": 0.325,
+      "hyp": 2060,
+      "p": 0.32,
+      "pages": 232,
+      "r": 0.33,
+      "ref": 1995
+     }
+    }
+   },
+   "failed": {
+    "owner96": {
+     "gemini3.8-flash": 2,
+     "qwen3-vl-8b-mlx4": 4,
+     "qwen3.6-27b": 1
+    },
+    "public-latin": {
+     "gemini3.8-flash": 15,
+     "qwen3-vl-8b": 77,
+     "qwen3.6-27b": 30
+    }
+   },
+   "postcorrect": {
+    "owner96, pc-image": {
+     "corrected": {
+      "f1": 0.916,
+      "hyp": 193,
+      "p": 0.902,
+      "pages": 30,
+      "r": 0.93,
+      "ref": 187
+     },
+     "raw": {
+      "f1": 0.739,
+      "hyp": 192,
+      "p": 0.729,
+      "pages": 30,
+      "r": 0.749,
+      "ref": 187
+     }
+    },
+    "owner96, pc-text": {
+     "corrected": {
+      "f1": 0.817,
+      "hyp": 185,
+      "p": 0.822,
+      "pages": 30,
+      "r": 0.813,
+      "ref": 187
+     },
+     "raw": {
+      "f1": 0.739,
+      "hyp": 192,
+      "p": 0.729,
+      "pages": 30,
+      "r": 0.749,
+      "ref": 187
+     }
+    },
+    "public-latin, pc-image": {
+     "corrected": {
+      "f1": 0.778,
+      "hyp": 9,
+      "p": 0.778,
+      "pages": 1,
+      "r": 0.778,
+      "ref": 9
+     },
+     "raw": {
+      "f1": 0.737,
+      "hyp": 10,
+      "p": 0.7,
+      "pages": 1,
+      "r": 0.778,
+      "ref": 9
+     }
+    },
+    "public-latin, pc-text": {
+     "corrected": {
+      "f1": 0.737,
+      "hyp": 10,
+      "p": 0.7,
+      "pages": 1,
+      "r": 0.778,
+      "ref": 9
+     },
+     "raw": {
+      "f1": 0.737,
+      "hyp": 10,
+      "p": 0.7,
+      "pages": 1,
+      "r": 0.778,
+      "ref": 9
+     }
+    }
+   },
+   "route_cer": {
+    "owner96": {
+     "apple-vision": 0.204,
+     "claude-sonnet5.5": 0.034,
+     "gemini3.8-flash": 0.057,
+     "qwen3-vl-8b-mlx4": 0.125,
+     "qwen3.6-27b": 0.063
+    },
+    "public-latin": {
+     "apple-vision": 0.654,
+     "gemini3.8-flash": 0.367,
+     "qwen3-vl-8b": 0.54,
+     "qwen3.6-27b": 0.516
+    }
+   },
+   "switch_off": {
+    "both": "2-5%",
+    "owner96": "5-10%",
+    "public-latin": "2-5%"
+   }
+  }
+ },
+ "office": {
+  "class_A": {
+   "ambiguous": 4,
+   "bracket": 1,
+   "bracket_width_le_10": 0,
+   "bracket_width_le_4": 0,
+   "bracket_width_median": 20,
+   "documents": 33,
+   "documents_bracketed": 1,
+   "documents_only_excluding": 1,
+   "documents_with_link": 2,
+   "documents_with_mention": 6,
+   "exclude": 1,
+   "form_comma": 3,
+   "form_title": 9,
+   "linked": 2,
+   "mentions": 12,
+   "nil": 6,
+   "nil_no_human_with_P39": 1,
+   "nil_no_search_hit": 5
+  },
+  "class_D": {
+   "bracket": 1,
+   "bracket_width_le_10": 1,
+   "bracket_width_le_4": 0,
+   "bracket_width_median": 8,
+   "documents": 21,
+   "documents_bracketed": 1,
+   "documents_only_excluding": 0,
+   "documents_with_link": 1,
+   "documents_with_mention": 3,
+   "form_comma": 4,
+   "form_title": 3,
+   "linked": 1,
+   "mentions": 7,
+   "nil": 6,
+   "nil_no_human_with_P39": 3,
+   "nil_no_search_hit": 3
+  },
+  "overall": {
+   "ambiguous": 4,
+   "bracket": 2,
+   "bracket_width_le_10": 1,
+   "bracket_width_le_4": 0,
+   "bracket_width_median": 14.0,
+   "documents": 54,
+   "documents_bracketed": 2,
+   "documents_only_excluding": 1,
+   "documents_with_link": 3,
+   "documents_with_mention": 9,
+   "exclude": 1,
+   "form_comma": 7,
+   "form_title": 12,
+   "linked": 3,
+   "mentions": 19,
+   "nil": 12,
+   "nil_no_human_with_P39": 4,
+   "nil_no_search_hit": 8
+  },
+  "spend": {
+   "usd": 0,
+   "wikidata_calls": 52,
+   "wikidata_calls_last_run": 19
+  }
+ },
+ "texts": {
+  "owner96/apple-vision": 96,
+  "owner96/apple-vision+pc-image": 26,
+  "owner96/apple-vision+pc-text": 26,
+  "owner96/claude-sonnet5.5": 96,
+  "owner96/gemini3.8-flash": 96,
+  "owner96/qwen3-vl-8b-mlx4": 96,
+  "owner96/qwen3-vl-8b-mlx4+pc-image": 6,
+  "owner96/qwen3-vl-8b-mlx4+pc-text": 6,
+  "owner96/qwen3.6-27b": 96,
+  "owner96/truth": 96,
+  "public-latin/apple-vision": 320,
+  "public-latin/gemini3.8-flash": 320,
+  "public-latin/qwen3-vl-8b": 320,
+  "public-latin/qwen3-vl-8b+pc-image": 1,
+  "public-latin/qwen3-vl-8b+pc-text": 1,
+  "public-latin/qwen3.6-27b": 320,
+  "public-latin/truth": 320
+ }
+}

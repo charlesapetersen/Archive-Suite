@@ -21,7 +21,8 @@ rejected if any token is a stopword (The, United, University, Committee, a month
 
 Linking (Wikidata, free public API; every response cached as JSON under CACHE/wikidata/, so a rerun makes no call;
 a descriptive User-Agent; at most 2 requests a second):
-  1. wbsearchentities(name, language en, type item, limit 10)
+  1. wbsearchentities(name, language en, type item, limit 10); for a surname alone, which that search rarely
+     ranks, the full-text search "<surname> haswbstatement:P31=Q5 haswbstatement:P39" (50 results) instead
   2. wbgetentities on the candidates: keep humans (P31 = Q5) with at least one P39 (position held) statement
   3. wbgetentities for the labels of those P39 positions and of their P642 (of) / P1001 (jurisdiction) qualifiers
   A P39 statement MATCHES when the office's key (ALIASES: Congressman -> representative, Chairman -> chair, ...) is
@@ -217,8 +218,15 @@ def qual_ids(stmt, props=("P642", "P1001")):
 
 def link(m):
     """Resolve one mention; returns the outcome record (evidence kept)."""
-    s = wd({"action": "wbsearchentities", "search": m["name"], "language": "en", "type": "item", "limit": "10"})
-    cands = [c["id"] for c in s.get("search", [])]
+    if len(m["name"].split()) == 1:
+        # A surname alone ("Governor Reagan") rarely puts the person in wbsearchentities' top ten, so search the
+        # full text for people of that name who hold any position; the office match below then chooses.
+        s = wd({"action": "query", "list": "search", "srlimit": "50", "srnamespace": "0",
+                "srsearch": f'{m["name"]} haswbstatement:P31=Q5 haswbstatement:P39'})
+        cands = [c["title"] for c in s.get("query", {}).get("search", [])]
+    else:
+        s = wd({"action": "wbsearchentities", "search": m["name"], "language": "en", "type": "item", "limit": "10"})
+        cands = [c["id"] for c in s.get("search", [])]
     if not cands:
         return {"outcome": "nil", "why": "no search hit", "candidates": 0}
     ents = entities(cands)

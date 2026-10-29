@@ -60,6 +60,7 @@ PY
 # The arms are independent: a failed pilot or run in one does not stop the other; the job fails if either did.
 failed=0
 for arm in ent g17; do
+  [ -s "$ROOT/$arm/requests.jsonl" ] || { echo "$arm: no requests in this pack"; failed=1; continue; }
   "$FS_PY" "$PC" --root "$ROOT/$arm" --limit 8 || true
   if pilot_ok "$ROOT/$arm"; then "$FS_PY" "$PC" --root "$ROOT/$arm" --concurrency 32 || failed=1; else failed=1; fi
 done

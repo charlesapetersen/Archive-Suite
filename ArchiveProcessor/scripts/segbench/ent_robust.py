@@ -36,10 +36,11 @@ temperature 0) whose replies the report reads once the pack is collected. Every 
 to single spaces (the owner's truth is one line a page and the readings are not, so layout would otherwise count as
 an OCR error) and is cut at TEXT_CAP characters.
 
-Scoring. Names are compared with ent_truth.match at ed2 (tokens folded, titles dropped, edit distance 2 per token)
-and within one type; each truth-text name is matched to at most one route name, greedily in text order. Per page
+Scoring. Names are compared with ent_truth.match at ed2 (tokens folded, titles dropped, whole-name edit distance 2),
+exactly when either side is four letters or fewer, and within one type; each truth-text name is matched to at most one route name, greedily in text order. Per page
 the reference is the extractor's names on the truth text; precision, recall and F1 are micro-averaged over names.
-A page whose truth text yields no names for that extractor is left out for it. CER bins: 0-2, 2-5, 5-10, 10-20,
+A page whose truth text yields no names for that extractor is left out for it. A route reading that failed (no text:
+length-capped or unparsed; the OCR scorer gives it CER 1.0) counts as a reading with no names, for every extractor. CER bins: 0-2, 2-5, 5-10, 10-20,
 20-40, over 40 percent. The switch-off level is the lowest CER bin whose F1 falls below SWITCH_F1.
 Texts, spans and replies stay in the bench cache; the committed report carries aggregates only.
 """
@@ -194,8 +195,20 @@ def postcorrected():
         rec = json.load(open(p, encoding="utf-8"))
         if rec.get("finish") != "stop" or not rec.get("text"):
             continue
-        out[(r["set"], r["route"], r["page"])]["pc-" + r["arm"]] = rec["text"]
+        out[(r["set"], r["route"], r["page"])]["pc-" + r["arm"]] = (rec["text"], r["prompt"])
     return out
+
+
+def pc_for(pc, st, route, page, raw):
+    """The corrected readings of this route's reading of the page. The pack's owner route "qwen3-vl-8b" mixes the
+    Mac MLX reading and a FarmShare one, so it counts for qwen3-vl-8b-mlx4 only where the prompt carries that very
+    reading."""
+    got = dict(pc.get((st, route, page), {}))
+    if route == "qwen3-vl-8b-mlx4" and raw and raw.strip():
+        for arm, (ct, prompt) in pc.get((st, "qwen3-vl-8b", page), {}).items():
+            if re.sub(r"\s+", " ", raw).strip() in re.sub(r"\s+", " ", prompt):
+                got[arm] = (ct, prompt)
+    return {arm: ct for arm, (ct, _) in got.items()}
 
 
 def cmd_texts(a):
@@ -209,12 +222,14 @@ def cmd_texts(a):
         recs.append({"set": "owner96", "page": page, "group": kind, "source": "truth", "cer": 0.0, "text": clean(truth)})
         for route, (cr, read) in OWNER_ROUTES.items():
             t = read(page)
-            if t is None or (("owner96", cr, page) not in cer):
+            if ("owner96", cr, page) not in cer:
                 missing[("owner96", route)] += 1
                 continue
-            recs.append({"set": "owner96", "page": page, "group": kind, "source": route,
+            # A reading that failed (length-capped, unparsed) is scored as a page that yields no names, as the
+            # OCR scorer scores it at CER 1.0, so a route is not flattered by the pages it could not read.
+            recs.append({"set": "owner96", "page": page, "group": kind, "source": route, "failed": t is None,
                          "cer": cer[("owner96", cr, page)], "text": clean(t)})
-            for arm, ct in pc.get(("owner96", route, page), {}).items():
+            for arm, ct in pc_for(pc, "owner96", route, page, t).items():
                 recs.append({"set": "owner96", "page": page, "group": kind, "source": f"{route}+{arm}",
                              "cer": cer[("owner96", cr, page)], "text": clean(ct)})
     for job, stratum in sorted(public_pages().items()):
@@ -226,12 +241,14 @@ def cmd_texts(a):
                      "text": clean(truth)})
         for route, (cr, read) in PUBLIC_ROUTES.items():
             t = read(job)
-            if t is None or (("public895", cr, job) not in cer):
+            if ("public895", cr, job) not in cer:
                 missing[("public-latin", route)] += 1
                 continue
-            recs.append({"set": "public-latin", "page": job, "group": stratum, "source": route,
+            # A reading that failed (length-capped, unparsed) is scored as a page that yields no names, as the
+            # OCR scorer scores it at CER 1.0, so a route is not flattered by the pages it could not read.
+            recs.append({"set": "public-latin", "page": job, "group": stratum, "source": route, "failed": t is None,
                          "cer": cer[("public895", cr, job)], "text": clean(t)})
-            for arm, ct in pc.get(("public895", route, job), {}).items():
+            for arm, ct in pc_for(pc, "public895", route, job, t).items():
                 recs.append({"set": "public-latin", "page": job, "group": stratum, "source": f"{route}+{arm}",
                              "cer": cer[("public895", cr, job)], "text": clean(ct)})
     for r in recs:
@@ -324,6 +341,7 @@ def cmd_pack(a):
             continue
         h = hashlib.sha256(r["id"].encode()).hexdigest()[:16]
         reqs.append({"id": f"ent-{h}", "key": r["id"], "set": r["set"], "source": r["source"],
+                     "text_sha256": hashlib.sha256(r["text"].encode()).hexdigest(),
                      "prompt": ENTITY_PROMPT.format(text=r["text"])})
     with open(os.path.join(PACK, "ent", "requests.jsonl"), "w", encoding="utf-8") as fh:
         for q in reqs:
@@ -393,8 +411,11 @@ def load_llm():
     p = os.path.join(PACK, "ent", "requests.jsonl")
     if not os.path.exists(p):
         return None
+    now = {r["id"]: hashlib.sha256(r["text"].encode()).hexdigest() for r in texts()}
     out, bad = {}, 0
     for q in map(json.loads, open(p, encoding="utf-8")):
+        if now.get(q["key"]) != q["text_sha256"]:
+            raise SystemExit(f"{q['key']}: the text changed since the pack was built; its reply cannot be scored")
         op = os.path.join(BACK, "ent", "out", q["id"] + ".json")
         if not os.path.exists(op):
             continue
@@ -419,13 +440,22 @@ def norm_names(names):
     return out
 
 
+def same_name(a, b):
+    """ent_truth.match at ed2, except that a name of four letters or fewer (folded, titles dropped) must match
+    exactly: two edits of a short name turn "Kerr" into "Bert" and "K" into "Ko"."""
+    ta, tb = " ".join(ET.tokens(a)), " ".join(ET.tokens(b))
+    if min(len(ta), len(tb)) <= 4:
+        return ta == tb
+    return ET.match(a, b, "ed2")
+
+
 def match_count(ref, hyp):
-    """Greedy one-to-one ed2 matches within a type."""
+    """Greedy one-to-one matches within a type (same_name)."""
     used = set()
     hits = 0
     for tag, n in ref:
         for j, (t2, m) in enumerate(hyp):
-            if j not in used and t2 == tag and ET.match(m, n, "ed2"):
+            if j not in used and t2 == tag and same_name(m, n):
                 used.add(j)
                 hits += 1
                 break
@@ -440,7 +470,7 @@ def page_scores(rows, names, types=None):
             by_page[(r["set"], r["page"])] = r
     out = []
     for r in rows:
-        if r["source"] == "truth" or r["id"] not in names:
+        if r["source"] == "truth" or (r["id"] not in names and r["text"].strip()):
             continue
         t = by_page.get((r["set"], r["page"]))
         if t is None or t["id"] not in names:
@@ -448,7 +478,7 @@ def page_scores(rows, names, types=None):
         ref = norm_names([x for x in names[t["id"]] if types is None or x[0] in types])
         if not ref:
             continue
-        hyp = norm_names([x for x in names[r["id"]] if types is None or x[0] in types])
+        hyp = norm_names([x for x in names.get(r["id"], []) if types is None or x[0] in types])
         out.append((r, match_count(ref, hyp), len(ref), len(hyp)))
     return out
 
@@ -499,6 +529,8 @@ def score_all(rows, names):
             res["postcorrect"][f"{st}, {arm}"] = {"raw": prf(same), "corrected": prf(items)}
     allraw = [x for x in ps if "+" not in x[0]["source"]]
     res["by_bin"]["both"] = {bin_label(b): prf([x for x in allraw if bin_of(x[0]["cer"]) == b]) for b in BINS}
+    res["failed"] = {st: dict(collections.Counter(x[0]["source"] for x in ps if x[0]["set"] == st and x[0].get("failed")))
+                     for st in ("owner96", "public-latin")}
     res["switch_off"] = {}
     for st, bins in res["by_bin"].items():
         res["switch_off"][st] = next((bin_label(b) for b in BINS
@@ -526,7 +558,7 @@ def role_scores(rows, names):
             c = out[(r["source"], f)]
             if ref:
                 c["ref"] += 1
-                c["same"] += bool(hyp and ET.match(hyp[0], ref[0], "ed2"))
+                c["same"] += bool(hyp and same_name(hyp[0], ref[0]))
                 c["null"] += not hyp
             elif hyp:
                 c["extra"] += 1
@@ -539,6 +571,11 @@ def cmd_report(a):
     for name in ("nltagger", "gliner2.5-base", "gliner2.5-multi"):
         n = load_spans(name)
         if n:
+            want = [r["id"] for r in rows if name == "nltagger" or GLINER_SET[r["set"]] == name.split("-")[-1]]
+            lacking = [i for i in want if i not in n]
+            if lacking:      # a run still going or stopped part-way: never report it as if complete
+                print(f"{name}: {len(lacking)} of {len(want)} texts have no spans; left out of the report")
+                continue
             s["extractors"][name] = score_all(rows, n)
     llm = load_llm()
     if llm:
@@ -555,6 +592,11 @@ def cmd_report(a):
     json.dump(s, open(os.path.join(RESULTS, "ent-robust.json"), "w"), indent=1, sort_keys=True)
     open(os.path.join(RESULTS, "ent-robust.md"), "w").write(markdown(s))
     print(json.dumps({k: v.get("switch_off") for k, v in s["extractors"].items()}))
+
+
+def pack_requests():
+    p = os.path.join(PACK, "ent", "requests.jsonl")
+    return sum(1 for _ in open(p, encoding="utf-8")) if os.path.exists(p) else 0
 
 
 SET_NAME = {"owner96": "the owner's 96", "public-latin": "the public Latin pages"}
@@ -574,20 +616,24 @@ def markdown(s):
             if not routes:
                 continue
             L += [f"By route, {SET_NAME[st]} (mean page CER of the scored pages):", "",
-                  "| route | pages | mean CER | names on truth | names on route | P | R | F1 |", "|---|---|---|---|---|---|---|---|"]
+                  "| route | pages | failed readings | mean CER | names on truth | names on route | P | R | F1 |",
+                  "|---|---|---|---|---|---|---|---|---|"]
             for src, v in routes.items():
-                L.append(f"| {src} | {v['pages']} | {r['route_cer'][st].get(src, 0):.3f} | {v['ref']} | {v['hyp']} | "
+                L.append(f"| {src} | {v['pages']} | {r['failed'][st].get(src, 0)} | {r['route_cer'][st].get(src, 0):.3f} | "
+                         f"{v['ref']} | {v['hyp']} | "
                          f"{v['p']:.3f} | {v['r']:.3f} | {v['f1']:.3f} |")
             L.append("")
-        L += ["By page CER, every route pooled (pages / F1):", "",
+        L += ["By page CER, every route pooled (route readings / F1):", "",
               "| CER | " + " | ".join(bin_label(b) for b in BINS) + " |", "|---|" + "---|" * len(BINS)]
-        for st in ("owner96", "public-latin", "both"):
+        sets = [st for st in ("owner96", "public-latin") if r["by_route"].get(st)]
+        for st in sets + (["both"] if len(sets) == 2 else []):
             bins = r["by_bin"].get(st) or {}
             L.append(f"| {SET_NAME.get(st, 'both sets')} | " + " | ".join(
                 f"{bins[bin_label(b)]['pages']} / {bins[bin_label(b)]['f1']:.2f}" if bins[bin_label(b)]["pages"] else "–"
                 for b in BINS) + " |")
-        L += ["", "First CER bin (10 pages or more) below F1 " + f"{SWITCH_F1}: " + ", ".join(
-            f"{SET_NAME.get(k, 'both sets')} {v or 'none'}" for k, v in r["switch_off"].items()) + ".", ""]
+        L += ["", "First CER bin (10 readings or more) below F1 " + f"{SWITCH_F1}: " + ", ".join(
+            f"{SET_NAME.get(k, 'both sets')} {r['switch_off'][k] or 'none'}"
+            for k in sets + (["both"] if len(sets) == 2 else [])) + ".", ""]
         L += ["By kind (owner) and stratum (public), F1 per route:", ""]
         for st in ("owner96", "public-latin"):
             g = r["by_group"].get(st) or {}
@@ -601,10 +647,12 @@ def markdown(s):
                     f"{g[f'{src} | {gr}']['f1']:.2f} ({g[f'{src} | {gr}']['pages']})" if f"{src} | {gr}" in g else "–"
                     for gr in groups) + " |")
             L.append("")
-        if r["postcorrect"]:
+        if any(v["raw"]["pages"] >= 10 for v in r["postcorrect"].values()):
             L += ["Post-correction by the 27B (W46.ocr-postcorrect's readings, on the pages it corrected):", "",
                   "| set, arm | pages | raw F1 | corrected F1 |", "|---|---|---|---|"]
             for k, v in r["postcorrect"].items():
+                if v["raw"]["pages"] < 10:
+                    continue
                 L.append(f"| {k} | {v['raw']['pages']} | {v['raw']['f1']:.3f} | {v['corrected']['f1']:.3f} |")
             L.append("")
         if r.get("roles"):
@@ -616,7 +664,7 @@ def markdown(s):
             L += ["", f"Unparsed replies: {r.get('unparsed', 0)}.", ""]
     if "qwen3.6-27b-entity-prompt" not in ex:
         L += ["## Qwen3.6 27B through the entity prompt", "",
-              "Not yet run: the Sherlock pack (2,066 requests) waits for an owner session "
+              f"Not yet run: the Sherlock pack ({pack_requests():,} requests) waits for an owner session "
               "(`execution-plans/items/W46.ent-robust.md`). Its replies go into this page when they are home.", ""]
     if "office" in s:
         o = s["office"]["overall"]
@@ -626,8 +674,8 @@ def markdown(s):
               f"{o['linked']} linked unambiguously to Wikidata, {o['ambiguous']} ambiguous, {o['nil']} not found "
               f"({o.get('nil_no_search_hit', 0)} no search hit, {o.get('nil_no_human_with_P39', 0)} no person with a "
               f"position held, {o.get('nil_no_matching_position', 0)} no matching position). Of the links, "
-              f"{o['bracket']} brackets the owner's year (width {o.get('bracket_width_median')} years) and "
-              f"{o['exclude']} excludes it (a past office holder named in retrospect). Documents dated by a "
+              f"{o['bracket']} bracket the owner's year (median width {o.get('bracket_width_median'):g} years) and "
+              f"{o['exclude']} excludes it. Documents dated by a "
               f"bracketing link: {o['documents_bracketed']} of {o['documents']}. Wikidata calls: "
               f"{s['office']['spend']['wikidata_calls']}, $0.", ""]
     if "g17" in s:
@@ -643,7 +691,47 @@ def markdown(s):
     return "\n".join(L) + "\n"
 
 
-READING = []
+READING = ["## Reading", "", """\
+**Taggers so far; the LLM extractor the app would use is the Sherlock arm.** These figures are for Apple NLTagger
+and GLiNER2.5, which W46.ent-score found unusable as extractors (ed2 F1 0.24 at best), so they measure how much a
+route's text changes what a name tagger sees, not what the app's fields would lose. The 27B's entity prompt on the
+same 2,078 texts, and G17's Business Letters through the 27B, are packed for Sherlock; their rows come into this
+page when the answers are home, and the switch-off rule below is provisional until then.""", "", """\
+**On the owner's pages the names survive the API and 27B routes and not Apple Vision.** Against the names a tagger
+finds in the truth text, the names it finds in Gemini 3.8 Flash's and Claude Sonnet 5.5's readings agree at F1 0.93
+to 0.95, Qwen3.6 27B's and Qwen3-VL 8B's at 0.89 to 0.91, Apple Vision's at 0.74 to 0.78. By page CER the agreement
+is 0.96 under 2%, 0.86 to 0.87 at 2 to 5%, and falls below 0.8 at 5 to 10% (0.76 to 0.78), to about 0.5 over 40%. The
+kind of page carries most of it: on handwritten pages Vision's text keeps 0.28 to 0.31 of the names, the 8B's 0.66
+to 0.70, the 27B's 0.74 and Gemini's 0.84 to 0.89; on typed and printed pages every route but Vision keeps 0.89 or
+more and Vision 0.76 to 0.83.""", "", """\
+**The provisional switch-off rule.** The app does not know a page's CER, but it knows the page's kind and route. So:
+show extracted names from the API and 27B routes on every kind; from the Mac route's Vision text only on typed and
+printed pages, marked as read from OCR, and never on handwritten pages, where three names in four would be lost or
+wrong; from the 8B on handwritten pages only with the quote check W46.ent-score set. A page whose route reading
+failed (length-capped or unparsed: the 8B 4 of 96 here) gives no names at all and should say so.""", "", """\
+**Post-correction pays for names when it sees the image.** On the 30 to 32 owner pages W46.ocr-postcorrect corrected
+(Vision and the 8B, in its 0.7 to 0.9 NES band), the 27B's image-grounded correction lifts the tagger agreement
+from 0.74-0.76 to 0.92; the text-only correction to 0.82 to 0.87. That is the OCR finding again, measured on
+names: where a page is corrected anyway, extract after the image-grounded correction.""", "", """\
+**The public Latin pages are another matter.** The same comparison on the 440's Latin strata gives 0.09 to 0.53 by
+route: early print (L8) keeps 0.60 to 0.70 through the model routes, the medieval and early-modern hands (L5, L7)
+0.02 to 0.37 and the nineteenth-century hands (L6) up to 0.56 through Gemini. The taggers were not built for
+medieval Latin and the routes' CER there is 0.35 to 0.72, so this says only that entity extraction is not a feature
+for such pages on any route tested, which matches what the readers make of them.""", "", """\
+**Office holders do not date this corpus.** Of the 54 owner-answered dating documents, 9 name a person with an office,
+3 of those 19 mentions link unambiguously to Wikidata and 2 documents are bracketed by a term (median 14 years wide);
+one link excludes the year, a past officeholder named in retrospect, so a link is weak evidence, not a constraint.
+Most named people (business, university and local figures) have no position held in Wikidata. Linking for dating does
+not earn a line in Phase 4.""", "", """\
+**The noise-aware fine-tune (G test 9) is not run.** It was conditional on a gap worth closing for profile 1 or 5.
+Noise costs a tagger 0.03 to 0.09 on typed pages through the model routes, while W46.ent-score found the taggers 30
+points short on clean text, because they do not mark most names in letter text at all; a fine-tune against OCR
+degradation cannot close that, and the laptop route for these fields is the local LLM through the prompt.""", "", """\
+**Limits.** The reference is the tagger's own output on the truth text, so a name a tagger misses on both sides is
+invisible here. Readings that failed count as pages with no names, which lowers the 8B's public figure most (77 to 94
+of 232 to 302 public pages failed). Two edits are allowed only on names of five letters or more. Post-correction rows
+come from W46.ocr-postcorrect's band sample, so they say what correction buys where it is applied, not on an average
+page. Not an OCR or segmentation result, so ArchiveOCRBench is unchanged.""", ""]
 
 
 def main():
