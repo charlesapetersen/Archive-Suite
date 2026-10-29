@@ -241,7 +241,7 @@ class VerdictTest(Fixture):
         with open(os.path.join(self.state, "token-audit", "passes.jsonl"), "w") as f:
             for line in lines:
                 f.write(line + "\n")
-            f.write(json.dumps(dict({"at": NOW - 8 * DAY, "date": "2026-10-21"}, **fig)) + "\n")
+            f.write(json.dumps(dict({"at": NOW - 8 * DAY, "date": "2026-10-21", "sessions": 25}, **fig)) + "\n")
 
     def session(self, first, later, start=NOW - DAY, sid="A"):
         self.engine_session(sid, "W1.a", start, first, later)
@@ -270,6 +270,16 @@ class VerdictTest(Fixture):
         self.assertEqual(len(rec["breaches"]), 2)               # still compared with 50,000, not 60,000
         self.assertTrue(rec["opened"])
         self.assertTrue(rec["baseline"])
+
+    def test_a_thin_pass_is_not_a_baseline(self):
+        ta.MIN_COMPARE = 2
+        self.last(first_call_median=50000, context_per_call=50000, sessions=25)
+        with open(os.path.join(self.state, "token-audit", "passes.jsonl"), "a") as f:
+            f.write(json.dumps({"at": NOW - 4 * DAY, "date": "2026-10-25", "sessions": 1, "first_call_median": 40000,
+                                "context_per_call": 40000, "baseline": True}) + "\n")
+        self.session(52000, [52000])
+        self.session(52000, [52000], start=NOW - DAY + 600, sid="B")
+        self.assertEqual(self.run_pass()["breaches"], [])       # +4% on the 25-session pass, not +30% on the thin one
 
     def test_a_corrupt_line_is_skipped_not_the_history(self):
         self.last("{not json", first_call_median=50000, context_per_call=50000)

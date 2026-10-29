@@ -426,9 +426,10 @@ def passes(env):
 def baseline(history):
     """The pass trends compare against: the newest whose figures were accepted, i.e. it found nothing or it opened the
     fix. A pass that found a regression and did not hand it on (--no-open, a failed plan edit) is skipped, so the
-    regression is not absorbed into the baseline."""
+    regression is not absorbed into the baseline. A pass with fewer than MIN_COMPARE sessions compares nothing, so it
+    is no baseline either: a thin manual run must not become the figure a full week is held to."""
     for d in reversed(history):
-        if d.get("baseline", True):
+        if d.get("baseline", True) and (d.get("sessions") or 0) >= MIN_COMPARE:
             return d
     return None
 

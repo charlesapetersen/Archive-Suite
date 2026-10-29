@@ -112,9 +112,13 @@ def edit(plan, action, values):
                 raise ValueError("expected exactly one unchecked queue item")
             lo, hi = matches[0]
             line = body[lo:hi].rstrip("\n")
-            if action == "complete" and re.search(r"(?m)^## RECURRING", text):
+            try:
+                recurring = section(text, "## RECURRING") if action == "complete" else None
+            except ValueError:  # no (unfenced) RECURRING section: nothing can be standing
+                recurring = None
+            if recurring:
                 # A standing item waits on a RECURRING gate and is never ticked: ticking it would end its loop silently.
-                r_start, r_end = section(text, "## RECURRING")
+                r_start, r_end = recurring
                 gates = {t for t, _, _ in entries(text[r_start:r_end])}
                 waits = {t.replace("`", "").strip() for c in re.findall(r"\(blocked-on:([^)]*)\)", line) for t in c.split(",")}
                 if gates & waits:

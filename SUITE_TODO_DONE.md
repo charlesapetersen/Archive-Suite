@@ -13227,3 +13227,36 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   Scorer `ent_truth.score_rows`: exact (with alternates), overlap, ed2 F1 per field over named truth; inferred classes are counted apart (G18); null-when-truth, filled-when-empty, wrong-when-filled, quote validity and names-in-text. Readers against the truth (an upper bound, not accuracy): sender ed2 F1 Luna 0.891 / Claude 0.964, recipient 0.920 / 0.914, place 0.861 / 0.926.
   Limits for W46.ent-score: only 5 handwritten letters (ABBYY-text pool; the JPEG mirror's Handwritten pages have no text); the no-dateline cue confirmed 0 of 18; the cached tagging replies cover the 88 only, so the additions need fresh replies (ent-score's planned Gemini rerun). Spot check by the building session: 4 rows against the page images (2 adjudicated, 1 agreed handwritten, 1 memo), all right. The exact level counts a dropped middle initial as a miss; overlap and ed2 do not. Not an OCR or segmentation result, so ArchiveOCRBench is unchanged.
   <!-- /W46.fix-ent-truth -->
+
+- [x] **W40.token-pass — a weekly token-efficiency pass that measures the engine's sessions and fixes what it finds [M · Tier-2]** · §W40 — verification phase (lane: ops) (uses: light) (blocked-on: W40.docs-startup-size) — Owner, 2026-10-28: the engine assesses its own token efficiency at a regular cadence, and the assessment includes fixing the problems it finds, not only reporting them. Build three parts. (1) `ops/agent/token-audit.py`, free and deterministic: from this project's session transcripts since the last pass (the ~/.claude/projects folders for the primary checkout and for ~/Claude/.worktrees/archive-suite/*) and the engine ledger it reports the first-call context per session (today about 56k tokens), context per call and tokens per finished item with their trend against the last pass, the always-loaded files against a budget (each app guide 20 KB, CLAUDE.md, the session prompt, ~/Claude/CLAUDE.md and the memory index each named with a figure set from W40.docs-startup-size's result), the files sessions read whole most often with their size, tool results over 20k characters by command, and the same file read whole twice in one session. It writes the report to the state folder, not the repo. (2) The cadence: the upkeep hook runs it at most once every 7 days (a dated O_EXCL stamp, as cluster-reach.py does) and only when at least 20 sessions have run since the last pass, so a quiet week costs nothing. When a budget is passed or a figure is 10% or more worse than the last pass, it opens the fix item; otherwise it records the figures and stops. Choose a filing for the repeating item that passes check-tracker-sync.sh and check-todo-stubs.sh, and say which in the DONE entry. (3) The fix session the pass opens reads the report and fixes what it can in one session: guides trimmed by hand with every rule listed before and after and an adversarial reviewer checking that list, prompt steps the engine overrides removed, a noisy script given a summary on stdout and its full output in a log, a hook that dumps a large file narrowed. It re-measures and records the before and after figures. Anything larger than one session is filed as its own item. A rule may move but never disappear. Ship the audit's unit tests (a synthetic transcript folder with known figures) and run one real pass as the item's proof.
+  SHIPPED 2026-10-29 (checkpoints 1952d904, 763045ef and this commit). (1) `ops/agent/token-audit.py` (`upkeep` | `run
+  [--no-open]` | `sizes`), stdlib, no model or network: reads the transcripts of the primary checkout's and every
+  engine worktree's ~/.claude/projects folder plus subagent transcripts, and the ledger; measures only engine sessions
+  the ledger knows (probes and the Codex rows, which leave no transcript, are counted apart). Writes
+  `$AGENT_STATE/token-audit/` only: report-<timestamp>.md, latest.md, passes.jsonl, pass-DATE stamps. Budgets for the
+  repo guides are read from context-budget.sh's BUDGETS table (app guides 24000, CLAUDE.md 40000, prompt 31000, per
+  W40.docs-startup-size); ~/Claude/CLAUDE.md and the memory index 12000 each; the 20 KB app-guide target is reported
+  but opens nothing, because the Processor guide is over it by rules a reviewer restored. (2) The upkeep hook runs it
+  warn-only; at most every 7 days from the last recorded pass, after 20+ Claude engine sessions, an O_EXCL dated stamp
+  making a day's pass exclusive. Trends compare only with 20+ measured sessions, against the last baseline pass (found
+  nothing or opened the fix, and itself 20+ sessions). FILING of the repeating fix: a standing `W40.token-fix`, open in
+  both SUITE_TODO.md and the plan's WORK QUEUE, `(blocked-on: W40.token-fix-due)`; the gate is a checkbox in a new plan
+  section `## RECURRING` (added to compact-plan.sh's section list) that `plan-edit.sh due` ticks and `rearm` unticks.
+  Both trackers keep the item open, so check-tracker-sync.sh agrees; SUITE_TODO.md never holds a tick, so
+  check-todo-stubs.sh passes; the gate is outside the HOLD QUEUE, so the owner is never asked about it. Each fix
+  session appends a dated `W40.token-fix-YYYYMMDD` DONE entry, names the bare tag in its commit subject (the engine's
+  progress test), and rearms; plan-edit.py refuses to `complete` an item that waits on a RECURRING gate. Known: RUN
+  STATUS is no longer set COMPLETE while the standing item exists (only the retired supervisor acted on it).
+  (3) The fix session's procedure is in the W40.token-fix entry and every report.
+  Review: an Opus adversarial reviewer found 12 (one HIGH: a manual run followed by upkeep passed over a one-session
+  window and opened a spurious fix, because cadence and window read different "last pass"); all fixed but the
+  plan-edit flock timeout (LOW, no engine holds that lock); its refute-verify confirmed 10 closed and found one new
+  (a thin pass becoming the baseline), fixed with a test. 27 tests in ops/agent/tests/test_token_audit.py; the 78
+  ops/agent tests, prove-worker-claims (104), prove-compact (102), prove-tracker-sync (32) green.
+  The real pass (the proof), 2026-10-29 03:38, window 2026-10-22..29: 104 engine sessions measured, 4,776 calls; first
+  call median 56,067 tokens (52,951-60,601), context per call 121,951 mean, tokens per finished item 6,514,221 median
+  (62 items); no budget passed, nothing compared (first pass): figures recorded, no fix item. Most of that window is
+  before W40.docs-startup-size shipped, so the 2026-11-05 pass is the first to show its effect. Noted in the report: 12
+  oversized results were persisted to file (a 1.07M-char git diff), and step-1 recovery greps of SUITE_TODO.md return
+  21-29k characters because entries are one long line each.
+  <!-- /W40.token-pass -->
