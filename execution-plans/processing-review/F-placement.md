@@ -213,6 +213,16 @@ Three levels, from cheapest truth to most, all computable on the 96 truth pages 
   rate, placed-hit rate, and the lab's three instruments (`words=`, `merged=`/`welded=`, run width). Truth needed:
   a word box per truth word for a subset of pages. `HW-PLACE` already computes Find without boxes; the box adds
   "in the right place".
+- **Selection is a line, not a word (owner, 2026-10-29).** What matters for selection is that the user can select
+  every word of a line of text, in order, as one line. On skewed or warped pages each word is often selectable on its
+  own while a drag along the line returns the words out of order, mixed with a neighbouring line, or broken across
+  lines, so a per-word score (Find, placed-hit, word F1) is no evidence of selection. The selection score is per truth
+  line: a PDFKit drag (`selection(from:to:)`) from the start of the line's first truth word to the end of its last, and
+  the line passes when the selected string, whitespace collapsed, is the truth line's words in their order, with no
+  line break inside, no word from another line and none missing. Report the share of truth lines that pass, by tag
+  (skew, perspective, curl, hand). Find and highlight stay as scores of their own and are never reported as
+  selection. Prior instrument: vision-ocr `Tools/pdfkit-drag.swift` (column drags; its note on `characterBounds`
+  falling out of step with `page.string` applies here).
 - **Word level, F1@IoU 0.5 and 0.7** as in GutenOCR, over the layer's word rectangles (our writer draws a line run;
   its word rectangles come from the run's glyph advances, which `score-run-width` already reads back) against truth
   word boxes; and mCER@0.5 over matched pairs. Truth needed: word boxes.
