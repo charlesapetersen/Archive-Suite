@@ -13,7 +13,7 @@ Format and statuses: [`README.md`](README.md). Written by `W40.b2`, 2026-10-12.
   `W23.m9`/`-fu3`, `W23.m14`/`-fu`, `W37.dual-date`, `W24.cal1`, `W24.cal1-toggle`, `W24.cal1-validator`,
   and the W0–W8 records under §*Archive Notes — NEW APP*.
 - **Sources and code read at:** `9e8959ef`.
-- **Count:** `unproven 43 · works 2 · broken 2 · unreachable 1` (works: N-34, N-45; broken: N-12, N-44; unreachable: N-48). Updated by `W40.d10`, 2026-10-15.
+- **Count:** `unproven 44 · works 2 · broken 2 · unreachable 0` (works: N-34, N-45; broken: N-12, N-44). Updated by `W40.fix-notes-choose-store`, 2026-10-29 (N-48 wired).
 
 **Runtime evidence, for every row below: none yet.** The W40.a3 full VM suite
 ([`evidence/notes/W40.a3-full-ui.md`](evidence/notes/W40.a3-full-ui.md)) and the `W9.e2` runtime sweep passed
@@ -46,23 +46,19 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
   That resolves a saved bookmark (`:63`) or creates `Application Support/ArchiveNotes/Store` (`:88-102`). Either
   way it calls `RootMarkerStore.ensureMarker` (`:104-112`, `Store/RootMarkerStore.swift:16`). The first window's
   `.task` then runs `NotesModel.bootstrap` (`Views/NotesBrowserView.swift:70`, `Core/NotesModel.swift:288`).
-  **The user pick: none found.** `RootFolderStore.setRoot` (`Store/RootFolderStore.swift:38`) has no caller.
-  Searched all of `ArchiveNotes/macOS/Sources` for `Store Folder`, `setRoot(` and `NSOpenPanel`. The only open
-  panel is `ReaderRootChooser.runOpenPanel` (`Links/ReaderRootChooser.swift:111`), and it picks the *Reader*
-  archive. The only File-menu addition is "Choose Archive Folder…" (`ArchiveNotesCommands.swift:61-63`), which is
-  the same Reader grant.
+  The user pick is `N-48` (File ▸ Choose Store Folder…, wired by `W40.fix-notes-choose-store`). A chosen store
+  whose bookmark no longer opens, or that no longer passes the store check, now leaves no store open rather than
+  the default store in its place.
 - **Real-path test:** `ArchiveNotesTests/RootMarkerStoreTests.idempotent` and `.corruptThrows` (the marker writer
   the launch path calls). `ArchiveNotesTests/NotesStoreLocatorOverrideTests.testAdoptTestStoreDoesNotPersistBookmark`
-  covers the DEBUG UITest override, not the real resolve. No test resolves a saved store bookmark or drives a store
-  pick.
+  covers the DEBUG UITest override. The real resolve of a saved store bookmark is `N-48`'s tests.
 - **Runtime evidence:** none.
 - **Status:** `unproven`
 - **History:**
   - 2026-10-12 W40.b2 — row written, `unproven`.
   - 2026-10-12 W40.b2 — split: the user-picked store moved to `N-48` (`unreachable`).
 - **Notes:** **Drift.**
-  - There is no File ▸ Choose Store Folder… and no other way to pick a store: that half of the promise is
-    `N-48` (`unreachable`).
+  - The user-picked half of the promise is `N-48`, reachable since `W40.fix-notes-choose-store`.
   - The app is sandboxed (`ArchiveNotes.entitlements`), so the default store is in the app container,
     `~/Library/Containers/com.archivenotes.app/Data/Library/Application Support/ArchiveNotes/Store`. It is not under
     `~/Library/Application Support/ArchiveNotes/`.
@@ -79,18 +75,27 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
   remembered across relaunches, so a store copied from another computer can be adopted where it lies.
 - **Promised in:** `CLAUDE.md` §Core Directive, Impl Map `RootFolderStore`; `SMOKE_TEST.md` safety block (names
   File ▸ Choose Store Folder…); `00-overview.md` §4, §8.1, D5.
-- **Reached by:** none found. `RootFolderStore.setRoot` (`Store/RootFolderStore.swift:38`) has no caller in
-  `ArchiveNotes/macOS/Sources`; searched for `Store Folder`, `setRoot(` and `NSOpenPanel`. The only open panel is
-  `ReaderRootChooser.runOpenPanel` (`Links/ReaderRootChooser.swift:111`) and the only File-menu addition is
-  "Choose Archive Folder…" (`ArchiveNotesCommands.swift:61-63`); both pick the *Reader* archive. Only `setRoot`
-  writes the bookmark `resolveSaved` reads, so "remembered across relaunches" is unreachable too.
-- **Real-path test:** none. The store picker is never driven by tests, by design (`GUI_SAFETY.md`).
-- **Runtime evidence:** none.
-- **Status:** `unreachable`
+- **Reached by:** File ▸ Choose Store Folder… (`ArchiveNotesCommands.swift`, `ReaderRootCommands`) →
+  `NotesModel.storeFolderChooser` → `StoreFolderChooser.choose` (`Store/StoreFolderChooser.swift`): the panel, the
+  store check, a confirmation, `RootFolderStore.rememberRootAtQuit`, then the app quits. The bookmark is written in
+  `willTerminate`, so a quit that is called off switches nothing. The next launch's `RootFolderStore.resolveSaved`
+  opens the folder after checking it again, and `NotesModel.indexFileName` gives it its own index, so its own
+  `organization.json` is read rather than the previous store's folders.
+- **Real-path test:** `ArchiveNotesTests/StoreFolderChooserTests` (14 tests on scratch stores and a throwaway
+  defaults suite: the pick survives a relaunch and the notes are read from it; an empty folder becomes a store;
+  a Reader archive, a folder inside one or inside another store, a folder of other files, a linked `items/` and
+  a broken marker are refused and nothing is written; a called-off quit remembers nothing; a remembered folder
+  that has since become an archive, or sits inside a granted one, is not opened; one index per store).
+  `ArchiveNotesUITests/ChooseStoreFolderUITests` (VM): the menu, the confirmation, the quit and the relaunch into
+  the fixture's adopted store, with `-ANUITestStorePickPath` standing in for the panel.
+- **Runtime evidence:** none (a green suite is not runtime evidence, README §Statuses).
+- **Status:** `unproven`
 - **History:**
   - 2026-10-12 W40.b2 — split from `N-01`, `unreachable`.
-- **Notes:** goes to the Daemon Report as a wire-or-drop decision. With no picker, a store from another computer
-  can only be adopted by copying it into the sandbox container path (see `N-01`).
+  - 2026-10-29 W40.fix-notes-choose-store — wired (owner ruling, 2026-10-12 walkthrough: wire it), `unproven`.
+- **Notes:** the check cannot always see an archive enclosing the picked folder: the sandbox does not let Notes
+  read the folder's parents, so an empty folder inside an archive never granted to Notes is accepted
+  (`ArchiveNotes/KNOWN_ISSUES.md`, LIMIT W40.fix-notes-choose-store).
 
 ### N-02 · Items are plain Markdown, legible without the app
 

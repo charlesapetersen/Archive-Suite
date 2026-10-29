@@ -431,6 +431,10 @@ final class SourceBlockPreviewState: ObservableObject {
         await RoundupYearSuggestion.commonYear(links: links, roots: rootStore.knownRoots)
     }
 
+    /// The Reader archive folders granted so far. Choose Store Folder… refuses any of them, or a folder
+    /// inside one, as the notes store (W40.fix-notes-choose-store).
+    var grantedArchiveFolders: [URL] { Array(rootStore.knownRoots.values) }
+
     /// File ▸ Choose Archive Folder… — grant a Reader root with no link in hand.
     func chooseArchiveFolder() {
         chooser.chooseRoot()

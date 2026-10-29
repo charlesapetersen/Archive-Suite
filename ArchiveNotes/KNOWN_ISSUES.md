@@ -3,6 +3,17 @@
 Running log of quirks, risks, and things verified/unverified for the Notes app. Keep current.
 (Sibling logs: `../ArchiveReader/KNOWN_ISSUES.md`, `../ArchiveProcessor/KNOWN_ISSUES.md`.)
 
+## ⚠️ LIMIT (W40.fix-notes-choose-store, 2026-10-29) — Choose Store Folder… cannot always see an enclosing archive
+
+File ▸ Choose Store Folder… refuses a Reader archive, any folder inside one, a folder inside another store and a
+folder that already holds other files (`StoreFolderChooser.check`; the next launch checks again). A folder
+counts as inside an archive when a parent holds an `.archive-suite-root.json`, or when it is under an archive
+granted to Notes with Choose Archive Folder…. The sandbox gives Notes the picked folder only, not its parents,
+so in the shipping app the first sign is usually unreadable. An **empty** folder inside an archive that was
+never granted to Notes is therefore accepted as a new store. Nothing already in the archive is changed then:
+the store's marker, `items/` and `organization.json` are added inside that empty folder. Granting the archive
+to Notes first closes the gap.
+
 ## ✅ FIXED (W40.fix-notes-stale-body-on-switch, 2026-10-25) — the outgoing editor remained writable during loading
 
 The earlier inspector-jitter fix kept the previous note whole while the next body loaded, but SwiftUI's

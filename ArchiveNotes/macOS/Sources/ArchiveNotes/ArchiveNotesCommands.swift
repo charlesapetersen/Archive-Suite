@@ -54,12 +54,19 @@ struct FormatCommands: Commands {
 /// Takes `SourceBlockPreviewState` directly rather than via `@FocusedValue` — `previewState` is a
 /// single app-lifetime `@StateObject` the App itself owns, not per-window editor state, and
 /// SwiftUI's `.commands` builder does not inherit `@EnvironmentObject`s set on a window's content.
+///
+/// Also File ▸ Choose Store Folder… (W40.fix-notes-choose-store), in the same group so the two folder
+/// choices sit together. `notesModel` is passed in for the same reason as `previewState`.
 struct ReaderRootCommands: Commands {
     let previewState: SourceBlockPreviewState
+    let notesModel: NotesModel
 
     var body: some Commands {
         CommandGroup(after: .newItem) {
             Button("Choose Archive Folder\u{2026}") { previewState.chooseArchiveFolder() }
+            Button("Choose Store Folder\u{2026}") {
+                notesModel.storeFolderChooser?.choose(readerRoots: previewState.grantedArchiveFolders)
+            }
         }
     }
 }

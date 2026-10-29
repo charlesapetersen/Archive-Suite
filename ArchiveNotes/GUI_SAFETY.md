@@ -27,7 +27,10 @@ suite therefore routes through the projector against **scratch copies only**.
    the owner's real `notesStoreRootBookmark`. GUI runs point the app at scratch via the **volatile**
    `-ANUITestStorePath` launch argument (`RootFolderStore.adoptTestStore`, DEBUG-only), which sets the
    store root **in memory only** and **never** writes a bookmark. `NotesStoreLocatorOverrideTests` keeps
-   the bookmark-untouched invariant green.
+   the bookmark-untouched invariant green. The one exception is `ChooseStoreFolderUITests` (VM), which
+   drives it with `-ANUITestStoreBookmarkSuite <suite>` so the pick lands in a throwaway defaults suite,
+   never `notesStoreRootBookmark`, and `-ANUITestStorePickPath` in place of the panel
+   (W40.fix-notes-choose-store). Without that argument the rule stands.
 4. **The harness only READS tags to assert.** `gui-drive-notes.sh` uses `tag -l` (read) to verify a
    write landed; it never writes tags itself — writes go through the app's projector.
 

@@ -13,6 +13,7 @@
 	<key>com.apple.security.temporary-exception.files.absolute-path.read-only</key>
 	<array>
 		<string>/Users/admin/Library/Application Support/ArchiveNotes/AN-GUI-Fixture.pristine/</string>
+		<string>/Users/admin/Library/Application Support/ArchiveNotes/AN-GUI-Fixture Adopted Store/</string>
 	</array>
 	<!-- The integration journey (W40.d10) asks the VM's real Zotero, on 127.0.0.1, which item it seeded. -->
 	<key>com.apple.security.network.client</key>

@@ -113,7 +113,7 @@ final class ReaderRootStore: ObservableObject {
 
     /// Live access keyed by GUID, so we can stop what we started — and only that.
     private var activeScopes: [UUID: Scope] = [:]
-    private let defaultsKey = "readerRootBookmarks"
+    private let defaultsKey = "readerRootBookmarks"   // also read by `savedRootFolders`
     private let defaults: UserDefaults
 
     /// How `grantRoot` mints its security-scoped bookmark.
@@ -146,6 +146,18 @@ final class ReaderRootStore: ObservableObject {
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         loadSaved()
+    }
+
+    /// The folders of every granted root, resolved and nothing more: no scope started, no bookmark
+    /// refreshed. For the Notes store check at launch, which runs before any `ReaderRootStore` exists and
+    /// refuses a store inside a granted archive (`RootFolderStore`, W40.fix-notes-choose-store).
+    nonisolated static func savedRootFolders(defaults: UserDefaults = .standard) -> [URL] {
+        let saved = defaults.dictionary(forKey: "readerRootBookmarks") as? [String: Data] ?? [:]
+        return saved.values.compactMap { data in
+            var stale = false
+            return try? URL(resolvingBookmarkData: data, options: .withSecurityScope,
+                            relativeTo: nil, bookmarkDataIsStale: &stale)
+        }
     }
 
     /// Returns a granted root without changing this store's live-scope ownership.
@@ -240,8 +252,7 @@ final class ReaderRootStore: ObservableObject {
 
             // Re-granting the same GUID at a different path must release the scope it replaces —
             // `activeScopes` holds one URL per GUID, so overwriting it would drop the only reference
-            // that could ever balance the old `start`. (`RootFolderStore.setRoot` does the same, in
-            // the same order: new access live before the old one is let go.)
+            // that could ever balance the old `start`: new access live before the old one is let go.
             let previous = activeScopes[marker.guid]
             let started: Bool
             if let previous, previous.url == target, previous.started {

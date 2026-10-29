@@ -35,7 +35,8 @@ worktree." Notes depends on the local `packages/ArchiveCore` Swift package.
   scratch under a test / GUI-drive context — see [GUI_SAFETY.md](GUI_SAFETY.md).
 - **Never drive the store picker** (File ▸ Choose Store Folder…) in a GUI run — it persists a bookmark
   over the owner's real `notesStoreRootBookmark`. Point the app at scratch via the DEBUG
-  `-ANUITestStorePath` launch arg (in-memory only; never writes a bookmark).
+  `-ANUITestStorePath` launch arg (in-memory only; never writes a bookmark). The exception is
+  `ChooseStoreFolderUITests`, whose `-ANUITestStoreBookmarkSuite` keeps the pick out of the real key.
 - `NotesTagProjector`, `NoteStore` writes, `FrontMatterCodec`, and anything touching them are **Tier-2**
   (adversarial review + scratch-copy tests) on every change — see Verification below.
 

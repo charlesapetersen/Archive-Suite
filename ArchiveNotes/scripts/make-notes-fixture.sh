@@ -342,6 +342,35 @@ rm -rf "$PRISTINE"
 ditto "$DST" "$PRISTINE"
 echo "make-notes-fixture: wrote pristine snapshot ($PRISTINE)" >&2
 
+# --- A second store, to adopt (W40.fix-notes-choose-store) --------------------
+# ChooseStoreFolderUITests picks this with File ▸ Choose Store Folder… and relaunches into it. It sits
+# BESIDE the fixture, not inside it: a store inside another store is refused. Rebuilt on every run, as a
+# store copied from another computer arrives: marker, one note, no index, no organization.json.
+ADOPT="$DST Adopted Store"
+case "$ADOPT" in
+  */"$FIXTURE_NAME Adopted Store") : ;;
+  *) echo "make-notes-fixture: REFUSING — unexpected adopted-store path: $ADOPT" >&2; exit 2 ;;
+esac
+ADOPT_ID="55555555-5555-5555-5555-555555555555"
+rm -rf "$ADOPT"
+mkdir -p "$ADOPT/items/$ADOPT_ID/assets"
+cat > "$ADOPT/.archive-suite-root.json" <<EOF
+{"guid":"5707e000-5000-4000-8000-000000000005","name":"$FIXTURE_NAME Adopted Store","kind":"notes","createdAt":"$CREATED"}
+EOF
+cat > "$ADOPT/items/$ADOPT_ID/Written on another Mac.md" <<EOF
+---
+schema: 1
+id: $ADOPT_ID
+kind: note
+title: Written on another Mac
+roundup: false
+created: $CREATED
+modified: $CREATED
+---
+A note from a store copied over from another computer.
+EOF
+echo "make-notes-fixture: wrote the store to adopt ($ADOPT)" >&2
+
 echo "make-notes-fixture: ready ($DST)" >&2
 # The fixture path on stdout, for `-ANUITestStorePath`.
 echo "$DST"

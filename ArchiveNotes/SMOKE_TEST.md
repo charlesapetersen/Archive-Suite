@@ -24,8 +24,8 @@ step.
 > sandbox container at `~/Library/Containers/com.archivenotes.app/Data/Library/Application
 > Support/ArchiveNotes/Store`), built by `scripts/make-notes-fixture.sh` and reached via the DEBUG
 > `-ANUITestStorePath` launch arg (in-memory only — **never** drive File ▸ Choose Store Folder…, which
-> would persist a bookmark over the owner's real store; the item is not wired yet,
-> `W40.fix-notes-choose-store`, and the rule stands for when it is). A DEBUG scratch-write guard in `NotesTagProjector` mechanically aborts
+> would persist a bookmark over the owner's real store; only `ChooseStoreFolderUITests` drives it, with
+> `-ANUITestStoreBookmarkSuite` sending the pick to a throwaway suite). A DEBUG scratch-write guard in `NotesTagProjector` mechanically aborts
 > any tag write outside scratch under a test/GUI-drive context. Assert tag writes by **reading**
 > (`tag -l`); writes go only through the app.
 

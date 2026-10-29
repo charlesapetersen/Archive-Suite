@@ -1,6 +1,7 @@
 import AppKit
 import Foundation
 import ArchiveCore
+import CryptoKit
 
 /// The UI façade every Notes view binds to (00-overview §16.1). It owns the single organization graph
 /// (`OrganizationStore`) and — in the app path — the backing index + store-root, and exposes the
@@ -212,10 +213,49 @@ final class NotesModel: ObservableObject {
         let appSupport = FileManager.default
             .urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
             .appendingPathComponent("ArchiveNotes", isDirectory: true)
-        let index = NotesIndex(url: Self.indexDatabaseURL(inAppSupport: appSupport))
+        let rootStore = RootFolderStore(readerRoots: ReaderRootStore.savedRootFolders())
+        let index = NotesIndex(url: Self.indexDatabaseURL(
+            inAppSupport: appSupport, storeRoot: rootStore.root, storeGUID: rootStore.marker?.guid))
         self.init(organization: OrganizationStore(index: index),
                   index: index,
-                  rootStore: RootFolderStore())
+                  rootStore: rootStore)
+    }
+
+    /// File ▸ Choose Store Folder… (W40.fix-notes-choose-store). `nil` for an injected (test) store.
+    lazy var storeFolderChooser: StoreFolderChooser? = {
+        guard let rootStore else { return nil }
+        let chooser = StoreFolderChooser(rootStore: rootStore)
+#if DEBUG
+        // The NSOpenPanel is the one step an XCUITest cannot drive: under the harness,
+        // `-ANUITestStorePickPath` stands in for the folder a person would pick, as
+        // `-ANUITestRootPickPath` does for Choose Archive Folder…. The check, confirmation, bookmark and
+        // quit after it are the production path.
+        if let p = UserDefaults.standard.string(forKey: "ANUITestStorePath"), !p.isEmpty,
+           let pick = UserDefaults.standard.string(forKey: "ANUITestStorePickPath"), !pick.isEmpty {
+            chooser.pickFolder = { URL(fileURLWithPath: pick, isDirectory: true) }
+        }
+#endif
+        return chooser
+    }()
+
+    /// The index database for a store. The folder graph lives in the index first and in the store's
+    /// `organization.json` second (`OrganizationStore.load`), so two stores must never share one: the
+    /// second would show the first one's folders and then write them over its own mirror. The default
+    /// store keeps `notes-index-v1.sqlite3`; any other gets a file named for its marker's GUID and its
+    /// path together, so a store picked for the first time (one copied from another computer, or a
+    /// different store later put at the same path) starts from an empty index and reads its own
+    /// `organization.json` (W40.fix-notes-choose-store). The index is a rebuildable cache, so a store
+    /// that moves only costs a rebuild.
+    nonisolated static func indexFileName(storeRoot: URL?, storeGUID: UUID?,
+                                          defaultRoot: URL? = RootFolderStore.standardDefaultRoot) -> String {
+        func canonical(_ url: URL) -> String { url.resolvingSymlinksInPath().standardizedFileURL.path }
+        guard let storeRoot, let defaultRoot, canonical(storeRoot) != canonical(defaultRoot) else {
+            return "notes-index-v1.sqlite3"
+        }
+        let identity = (storeGUID?.uuidString.lowercased() ?? "no-marker") + "\n" + canonical(storeRoot)
+        let digest = SHA256.hash(data: Data(identity.utf8))
+        let hex = digest.prefix(8).map { String(format: "%02x", $0) }.joined()
+        return "notes-index-v1-\(hex).sqlite3"
     }
 
     /// The content-index database URL. Normally `notes-index-v1.sqlite3` in Application Support (the
@@ -228,7 +268,7 @@ final class NotesModel: ObservableObject {
     /// rebuildable cache — resetting it loses nothing — and the distinct filename keeps the owner's real
     /// `notes-index-v1.sqlite3` untouched. DEBUG-only: the override is compiled out of Release, so the
     /// shipping app can only ever open `notes-index-v1.sqlite3`.
-    private static func indexDatabaseURL(inAppSupport appSupport: URL) -> URL {
+    private static func indexDatabaseURL(inAppSupport appSupport: URL, storeRoot: URL?, storeGUID: UUID?) -> URL {
 #if DEBUG
         if let path = UserDefaults.standard.string(forKey: "ANUITestStorePath"), !path.isEmpty {
             let fixtureRoot = URL(fileURLWithPath: path).standardizedFileURL
@@ -245,7 +285,7 @@ final class NotesModel: ObservableObject {
             return uitestURL
         }
 #endif
-        return appSupport.appendingPathComponent("notes-index-v1.sqlite3")
+        return appSupport.appendingPathComponent(indexFileName(storeRoot: storeRoot, storeGUID: storeGUID))
     }
 
 #if DEBUG
@@ -291,6 +331,10 @@ final class NotesModel: ObservableObject {
         didBootstrap = true
         guard let index, let rootStore, let root = rootStore.root else {
             // No store chosen yet: nothing to index. Still flip ready so the probe resolves.
+            if rootStore?.savedRootUnavailable == true {
+                statusMessage = "The chosen store folder can't be opened, or no longer holds a notes store. "
+                    + "Choose a store with File ▸ Choose Store Folder…."
+            }
             rebuild(); markIndexReady(generation: max(indexGeneration, 1)); return
         }
         noteStore = NoteStore(root: root)
