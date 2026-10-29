@@ -5,7 +5,8 @@
 
 ROOT holds requests.jsonl (and any images the pack uploads). Each reply is saved as ROOT/out/<id>.json; a request already
 answered is not sent again, so a resubmitted job only does what is left. An image whose hash differs from the
-request's is refused, never sent. Temperature 0, thinking off, max_tokens 8192, as the open sweep's collector.
+request's is refused, never sent. Temperature 0, thinking off, max_tokens 8192, as the open sweep's collector; a
+request's `response_format`, when the pack gives one, is passed through unchanged.
 """
 import argparse, base64, concurrent.futures as cf, hashlib, json, os, pathlib, time, urllib.request
 
@@ -34,6 +35,8 @@ def send(r):
     content.append({'type': 'text', 'text': r['prompt']})
     body = {'model': model, 'messages': [{'role': 'user', 'content': content}], 'temperature': 0, 'max_tokens': 8192,
             'chat_template_kwargs': {'enable_thinking': False}}
+    if r.get('response_format'):   # W46.ent-robust's G17 requests: the benchmark harness's structured output, verbatim
+        body['response_format'] = r['response_format']
     t = time.time()
     q = urllib.request.Request(url + '/v1/chat/completions', json.dumps(body).encode(), {'Content-Type': 'application/json'})
     got = json.load(urllib.request.urlopen(q, timeout=1800))
