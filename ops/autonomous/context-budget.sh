@@ -91,21 +91,26 @@ ACT_PCT="${ACT_PCT:-93}"
 # than an imperative or a ⛔ constraint recovered EIGHTY-NINE BYTES. The document is not bloated: it is ~25.6 KB
 # of repo map, standing owner directives and hard-won traps for a three-app monorepo. So the number moved, not
 # the document — and the trim that "should" have fixed this would have been 93 bytes of theatre to dodge a warn.
+# W40.docs-startup-size (2026-10-29) then moved the reference detail of its two biggest sections into the root
+# REFERENCE.md: 39,997 -> ~36,000 B, the rest being owner decisions stated as rules. The budget is 40000 so the
+# guide sits at ~90%: the sections added since 2026-08-12 are standing owner directives, not drift.
 BUDGETS=$(cat <<'EOF'
 .maintenance/AUTONOMOUS_PLAN.md	150000
 SUITE_TODO.md	205000
-CLAUDE.md	34000
+CLAUDE.md	40000
 AGENTS.md	21000
 REVIEW.md	20000
-ArchiveReader/CLAUDE.md	77000
-ArchiveProcessor/CLAUDE.md	77000
-ArchiveNotes/CLAUDE.md	77000
+ArchiveReader/CLAUDE.md	24000
+ArchiveProcessor/CLAUDE.md	24000
+ArchiveNotes/CLAUDE.md	24000
 ops/autonomous/resume-prompt.txt	31000
 EOF
 )
-# The three app guides share ONE number, and it is derived from the LARGEST of them (+~30%) rather than from a
-# round figure — that is the whole fix for the 2026-08-04 spread, where the same 64000 left the Processor at 92%
-# and the Reader at 65%. No app guide is on a knife-edge because another app's guide happens to be smaller.
+# The three app guides share ONE number. Since W40.docs-startup-size (owner, 2026-10-28) each guide holds only the
+# rules a session must obey and the commands it runs, with a target UNDER 20 KB; its file map and other reference
+# detail live in the REFERENCE.md beside it, read on demand. 24000 leaves ~20% over that target, so a guide
+# growing past 20 KB warns and one past ~22 KB asks for a trim: the remedy is moving detail to REFERENCE.md.
+# (Before, the number was the largest guide +~30%, 77000, which let all three reach 50-75 KB.)
 #
 # Every in-flight execution plan shares one per-file budget (they are read whole when their wave is worked).
 PLAN_BUDGET="${PLAN_BUDGET:-125000}"
@@ -116,15 +121,15 @@ ORIENT_ALWAYS=".maintenance/AUTONOMOUS_PLAN.md SUITE_TODO.md CLAUDE.md AGENTS.md
 # …plus exactly ONE app guide (a change loads one app), so the worst case is the LARGEST of them. REVIEW.md is
 # deliberately NOT in the set: it is read when a paced review runs, and those are paused by owner directive.
 ORIENT_APP_GUIDES="ArchiveReader/CLAUDE.md ArchiveProcessor/CLAUDE.md ArchiveNotes/CLAUDE.md"
-# 500000 B ~= 125k tokens. Two properties make this the real guard rather than decoration:
-#   * it is TIGHTER THAN THE SUM of the per-file budgets for the same set (514000) ON PURPOSE — that 14 KB gap
+# 455000 B ~= 114k tokens (500000 until W40.docs-startup-size cut the app guides, 2026-10-29). Two properties make this the real guard rather than decoration:
+#   * it is TIGHTER THAN THE SUM of the per-file budgets for the same set (471000) ON PURPOSE — that 16 KB gap
 #     is what still catches aggregate creep once individual files have been given honest room. If you raise a
 #     per-file budget, this is the number that stops all of them being maxed at once;
-#   * today's actual is 434506 B (87%), so it fails on GROWTH, not on the status quo.
-# ⚠️ Its warn threshold is deliberately HIGHER than the per-file $WARN_PCT: at 87% today, an 85% warn would
+#   * the actual on 2026-10-29 was 417426 B (92%), so it fails on GROWTH, not on the status quo.
+# ⚠️ Its warn threshold is deliberately HIGHER than the per-file $WARN_PCT: at ~90%, an 85% warn would
 # fire on day one and never stop, and doc_pregate() ACTS on warnings — a permanent warn would mean a permanent
-# trim session. Warn at 95% instead, which is ~50 KB of real creep away.
-ORIENT_TOTAL="${ORIENT_TOTAL:-500000}"
+# trim session. Warn at 95% instead, which is ~15 KB of real creep away.
+ORIENT_TOTAL="${ORIENT_TOTAL:-455000}"
 TOTAL_WARN_PCT="${TOTAL_WARN_PCT:-95}"
 
 over=""; warned=""; total=0
