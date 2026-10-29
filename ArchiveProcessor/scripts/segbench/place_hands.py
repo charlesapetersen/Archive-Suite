@@ -19,7 +19,7 @@ baseline R, P, F against the hand baselines, and the share of truth word boxes w
 Step two, readings placed on the lines (every detector, so the pick is visible, not assumed):
 
   prop      our proportional aligner: the reading's lines matched in order to runs of consecutive detected lines
-            (one to SPAN of them, since a reader may reflow a paragraph into one line, as LightOnOCR-3 does) by a
+            (one to 8 of them, the `-s8` methods beside the one-to-one `-s1`, since a reader may reflow a paragraph into one line, as LightOnOCR-3 does) by a
             monotone dynamic programme on length (characters against the lines' length, page-relative); a run's
             words shared out by the lines' lengths, then placed along each baseline in proportion to their
             characters. What every production writer does within a line.
@@ -345,14 +345,16 @@ def px_lines(det, W, H):
     return out
 
 
-SPAN = int(os.environ.get('PLACE_HANDS_SPAN', 8))  # a reading line may cover up to this many consecutive detected
-#   lines (a reader that reflows); PLACE_HANDS_SPAN=1 is one-to-one, better for readers that keep the page's lines
+SPANS = (1, 8)  # the two matchers: one-to-one, and a reading line over up to 8 consecutive detected lines (a reader
+#   that reflows a paragraph, as LightOnOCR-3 does). W46.place-hands: the span matcher lifts a reflowing reader and
+#   costs a line-faithful one, so every placer writes both (method suffix -s1, -s8) and the CTC placer a per-page pick.
 SPAN_COST = 0.05  # per extra line covered, so a one-to-one reading is preferred when the costs tie
+REFLOW = 0.7  # the line-count pick: a reading with fewer lines than this share of the detected ones has reflowed
 
 
-def dp_match(n_read, n_det, cost, skip):
+def dp_match(n_read, n_det, cost, skip, span):
     """Monotone matching of reading lines to runs of consecutive detected lines: reading line i covers detected
-    lines j..j+k-1 (k = 1..SPAN) at cost(i, j, k); a reading line or a detected line left unmatched costs `skip`.
+    lines j..j+k-1 (k = 1..span) at cost(i, j, k); a reading line or a detected line left unmatched costs `skip`.
     Returns {reading index: (first detected index, count)}."""
     INF = float('inf')
     D = [[INF] * (n_det + 1) for _ in range(n_read + 1)]
@@ -364,7 +366,7 @@ def dp_match(n_read, n_det, cost, skip):
             if d == INF:
                 continue
             if i < n_read:
-                for k in range(1, min(SPAN, n_det - j) + 1):
+                for k in range(1, min(span, n_det - j) + 1):
                     c = d + cost(i, j, k) + SPAN_COST * (k - 1)
                     if c < D[i + 1][j + k]:
                         D[i + 1][j + k], B[i + 1][j + k] = c, (i, j, k)
@@ -431,20 +433,20 @@ def hyp_page(assigned, dl, W, H, words_of):
     return {'words': words, 'lines': lines}
 
 
-def place_prop(t, det, rl):
+def place_prop(t, det, rl, span):
     W, H = t['width'], t['height']
     dl = px_lines(det, W, H)
     if not dl:
         return {'words': [], 'lines': []}
     assigned = {}
-    for i, (j, k) in dp_match(len(rl), len(dl), length_cost(rl, dl), SKIP['length']).items():
+    for i, (j, k) in dp_match(len(rl), len(dl), length_cost(rl, dl), SKIP['length'], span).items():
         for n, chunk in enumerate(split_by_length(rl[i], [d['len'] for d in dl[j:j + k]])):
             if chunk:
                 assigned[j + n] = chunk
     return hyp_page(assigned, dl, W, H, lambda j, s: prop_words(s, dl[j], W, H))
 
 
-def place_flow(t, det, rl):
+def place_flow(t, det, rl, span=None):
     W, H = t['width'], t['height']
     dl = px_lines(det, W, H)
     toks = ' '.join(rl).split()
@@ -472,8 +474,9 @@ def ctc_char_spans(net, logits_list, text, pad):
     its own cuts. ForcedAlignmentTaskModel.predict in kraken 7.1.1 packs the text at the line's start (p049's first
     line ends at 264 px where its recognition ends at 1307): it takes log_softmax of record.logits, which are
     already probabilities, so every frame is near uniform. A character the model's codec lacks takes its place
-    after its predecessor. None when the lines are too short for the text (kraken's own guard: fewer than two
-    frames a label)."""
+    after its predecessor. Also returns the aligned characters' confidences (kraken's Segment.score: the mean
+    probability of the frames each character holds). None when the lines are too short for the text (kraken's own
+    guard: fewer than two frames a label)."""
     import torch
     from kraken.tasks.align import get_trellis, backtrack, merge_repeats
     keep = [k for k, c in enumerate(text) if c in net.codec.c2l]
@@ -506,7 +509,7 @@ def ctc_char_spans(net, logits_list, text, pad):
         if spans[k] is None:
             prev = next((spans[i] for i in range(k - 1, -1, -1) if spans[i]), (0, 0.0, 0.0))
             spans[k] = (prev[0], prev[2], prev[2])
-    return spans
+    return spans, [sg.score for sg in segs]
 
 
 def place_ctc(model_name, todo, det_name, routes):
@@ -540,26 +543,25 @@ def place_ctc(model_name, todo, det_name, routes):
         recs = dict(zip(usable, net.predict(im=im, segmentation=seg)))
         recog = {j: r.prediction for j, r in recs.items()}
         rsec = time.time() - t0
-        for route in routes:
-            rl = reading(t, route)
-            out = CACHE / 'hyp' / f'{det_name}.ctc-{model_name}.{route}' / f'{key(t)}.json'
-            if rl is None:
-                continue
+        page_recog = ' '.join(recog.get(j, '') for j in range(len(dl)))
+
+        def place(rl, span):
             cost = lambda i, j, k: min(1.0, place_score.cer(' '.join(recog.get(j + n, '') for n in range(k)), rl[i]))
-            m = dp_match(len(rl), len(dl), cost, SKIP['text'])
-            t1 = time.time()
-            assigned, placed, fallback = {}, {}, 0
+            m = dp_match(len(rl), len(dl), cost, SKIP['text'], span)
+            assigned, placed, fallback, conf = {}, {}, 0, []
             for i, (j, k) in m.items():
-                text, span = rl[i], range(j, j + k)
-                spans = None
-                if all(recs.get(n) is not None and recs[n].logits is not None for n in span):
-                    spans = ctc_char_spans(net, [recs[n].logits for n in span], text, cfg.padding)
-                if spans is None:
+                text, run = rl[i], range(j, j + k)
+                got = None
+                if all(recs.get(n) is not None and recs[n].logits is not None for n in run):
+                    got = ctc_char_spans(net, [recs[n].logits for n in run], text, cfg.padding)
+                if got is None:
                     fallback += 1
-                    for n, chunk in zip(span, split_by_length(text, [dl[n]['len'] for n in span])):
+                    for n, chunk in zip(run, split_by_length(text, [dl[n]['len'] for n in run])):
                         if chunk:
                             assigned[n], placed[n] = chunk, prop_words(chunk, dl[n], W, H)
                     continue
+                spans, scores = got
+                conf += scores
                 for mt in re.finditer(r'\S+', text):
                     n0, s0, _ = spans[mt.start()]
                     n1, _, e1 = spans[mt.end() - 1]
@@ -572,11 +574,38 @@ def place_ctc(model_name, todo, det_name, routes):
                     assigned[j + n0] = (assigned.get(j + n0, '') + ' ' + mt.group()).strip()
                     placed.setdefault(j + n0, []).append(
                         {'text': mt.group(), 'box': [x0 / W, top / H, max(x1 - x0, 1) / W, (bot - top) / H]})
-            words_of = lambda j, s_: placed[j]
-            hyp = hyp_page(assigned, dl, W, H, words_of)
-            hyp['meta'] = {'recognise_s': rsec, 'align_s': time.time() - t1, 'matched_lines': len(assigned),
-                           'fallback_lines': fallback, 'model': model_name}
-            save(out, hyp)
+            hyp = hyp_page(assigned, dl, W, H, lambda j, s_: placed[j])
+            n_chars = sum(len(r.replace(' ', '')) for r in rl)
+            # the match's own character error: each reading line against its run's recognition, weighted by length,
+            # a reading line left unmatched counting as all wrong
+            err = sum(len(rl[i]) * (min(1.0, cost(i, *m[i])) if i in m else 1.0) for i in range(len(rl)))
+            # the gate's features: the recogniser's character error against the whole reading (independent of the
+            # matcher), and the alignment's confidence over the reading's characters, an unaligned one counting 0
+            hyp['meta'] = {'matched_lines': len(assigned), 'fallback_lines': fallback, 'model': model_name,
+                           'span': span, 'reading_lines': len(rl), 'detected_lines': len(dl),
+                           'page_cer': place_score.cer(page_recog, ' '.join(rl)),
+                           'ctc_conf': sum(conf) / max(1, n_chars), 'aligned_chars': len(conf),
+                           'match_cer': err / max(1, sum(len(r) for r in rl))}
+            return hyp
+
+        for route in routes:
+            rl = reading(t, route)
+            if rl is None:
+                continue
+            t1 = time.time()
+            by_span = {sp: place(rl, sp) for sp in SPANS}
+            for sp, hyp in by_span.items():
+                hyp['meta'].update(recognise_s=rsec, align_s=(time.time() - t1) / len(SPANS))
+                save(CACHE / 'hyp' / f'{det_name}.ctc-{model_name}-s{sp}.{route}' / f'{key(t)}.json', hyp)
+            one, many = by_span[1], by_span[max(SPANS)]
+            # the line-count pick: span when the reading has far fewer lines than the page shows
+            lines_pick = many if len(rl) < REFLOW * max(1, len(dl)) else one
+            # the confidence pick: whichever matcher aligns more of the reading more surely; ties go one-to-one
+            conf_pick = many if many['meta']['ctc_conf'] > one['meta']['ctc_conf'] + 1e-9 else one
+            # the error pick: whichever matcher's runs read closer to the reading; ties go one-to-one
+            cer_pick = many if many['meta']['match_cer'] < one['meta']['match_cer'] - 1e-9 else one
+            for name, hyp in (('lines', lines_pick), ('conf', conf_pick), ('cer', cer_pick)):
+                save(CACHE / 'hyp' / f'{det_name}.ctc-{model_name}-{name}.{route}' / f'{key(t)}.json', hyp)
         print(t['page'], f'{time.time() - t0:.0f}s', flush=True)
 
 
@@ -599,8 +628,13 @@ def align(det_name, method, routes, only=None):
         det = json.loads((CACHE / 'lines' / det_name / f'{key(t)}.json').read_text())
         for route in routes:
             rl = reading(t, route)
-            if rl is not None:
-                save(CACHE / 'hyp' / f'{det_name}.{method}.{route}' / f'{key(t)}.json', PLACERS[method](t, det, rl))
+            if rl is None:
+                continue
+            if method == 'flow':
+                save(CACHE / 'hyp' / f'{det_name}.flow.{route}' / f'{key(t)}.json', place_flow(t, det, rl))
+                continue
+            for sp in SPANS:
+                save(CACHE / 'hyp' / f'{det_name}.{method}-s{sp}.{route}' / f'{key(t)}.json', PLACERS[method](t, det, rl, sp))
 
 
 # ---------------------------------------------------------------- scoring
@@ -649,7 +683,8 @@ def keep(t):
 
 def score():
     ps = [t for t in pages() if keep(t)]
-    res = {'pages': {g: sum(t['group'] == g for t in ps) for g in GROUPS}, 'detectors': {}, 'placement': {}}
+    res = {'pages': {g: sum(t['group'] == g for t in ps) for g in GROUPS}, 'detectors': {}, 'placement': {},
+           'per_page': {}}
     for det_dir in sorted((CACHE / 'lines').iterdir()):
         name, rows = det_dir.name, {g: [] for g in GROUPS}
         for t in ps:
@@ -690,11 +725,46 @@ def score():
                 by[g] = {k: pl[k] for k in ('pages', 'truth_words', 'f1@centre', 'f1@0.5', 'f1@0.7', 'alignment')}
                 by[g]['functional'] = fun[g]
         res['placement'][hyp_dir.name] = {'detector': det_name, 'method': method, 'reading': route, 'by_group': by}
+        if method.startswith('ctc-'):
+            # per page, for the gate: its features from the placer and what Find and the highlight did with it
+            res['per_page'][hyp_dir.name] = [
+                {'page': t['page'], **{k: json.loads((hyp_dir / f'{key(t)}.json').read_text())['meta'].get(k)
+                                       for k in ('span', 'page_cer', 'ctc_conf', 'match_cer', 'reading_lines',
+                                                 'detected_lines')},
+                 'words': fun_of[(hyp_dir.name, t['page'])].get('words', 0),
+                 'found': fun_of[(hyp_dir.name, t['page'])].get('found', 0),
+                 'placed': fun_of[(hyp_dir.name, t['page'])].get('placed', 0)}
+                for t in ps if t['group'] == 'owner-hand' and (hyp_dir / f'{key(t)}.json').exists()]
+    res['gate'] = {feat: gate_sweep(res, feat) for feat in GATE_FEATURES}
     RESULTS.mkdir(parents=True, exist_ok=True)
     (RESULTS / 'place-hands.json').write_text(json.dumps(res, indent=1) + '\n')
     (RESULTS / 'place-hands.md').write_text(write_md(res))
     print(json.dumps(res['detectors'], indent=1))
     return res
+
+
+GATE_ROUTE = 'blla.ctc-mccatmus-{pick}'  # the hand route the gate is set for (the best detector and recogniser)
+GATE_PICK = 'cer'  # the matcher pick the gate is set on; the sweep pools every reading, so it is reader-agnostic
+GATE_FEATURES = {'page_cer': -1, 'ctc_conf': 1, 'match_cer': -1}  # +1: higher is better, -1: lower is better
+
+
+def gate_sweep(res, feat):
+    """Every threshold on one feature, over the gate route's owner-hand page readings pooled across readings: a page
+    passing it keeps its placed layer, the rest go to the text page (Find still works there; no highlight)."""
+    rows = [dict(r, reading=name.split('.', 2)[2]) for name, rs in res['per_page'].items()
+            if name.rsplit('.', 1)[0] == GATE_ROUTE.format(pick=GATE_PICK) for r in rs]
+    rows = [r for r in rows if r[feat] is not None]
+    sign = GATE_FEATURES[feat]
+    out = []
+    for th in sorted({r[feat] for r in rows}, key=lambda v: sign * v, reverse=True):
+        kept = [r for r in rows if sign * r[feat] >= sign * th]
+        out.append({'threshold': th, 'kept': len(kept), 'of': len(rows),
+                    'found': sum(r['found'] for r in kept), 'placed': sum(r['placed'] for r in kept),
+                    'words': sum(r['words'] for r in rows),
+                    'kept_under_80': sum(r['placed'] < 0.8 * r['found'] for r in kept),
+                    'sent_at_80': sum(r['placed'] >= 0.8 * r['found'] for r in rows if r not in kept),
+                    'by_reading': {rd: sum(r['reading'] == rd for r in kept) for rd in READINGS}})
+    return out
 
 
 FINDINGS = (HERE / 'place_hands_findings.md')
@@ -721,11 +791,13 @@ def write_md(res) -> str:
                        f"{d['lines']} / {d['truth_lines']} | {f(d['seconds_per_page'], 1)} | {d['device']} |")
     out += ['', 'Reference, same truth and scorer (segbench-results/place-truth.md): Apple Vision\'s own lines on the '
             'owner-hand pages, baseline F 0.733.', '']
+    out += matcher_table(res, pc) + gate_tables(res, f, pc)
     for route in READINGS:
-        rows = {k: v for k, v in res['placement'].items() if v['reading'] == route}
+        rows = {k: v for k, v in res['placement'].items() if v['reading'] == route and
+                (v['method'] == 'flow' or v['method'].endswith(('-s1', '-' + GATE_PICK)))}
         if not rows:
             continue
-        out += [f'## Step two: `{route}` placed on the lines', '',
+        out += [f'## Step two: `{route}` placed on the lines (one-to-one, the `{GATE_PICK}` pick, flow; every arm in the json)', '',
                 '| detector | method | owner-hand F1@centre | F1@0.5 | line alignment | Find | placed on the word | '
                 'pages placed ≥80% of found | Bentham line alignment |',
                 '|---|---|---:|---:|---:|---:|---:|---:|---:|']
@@ -744,6 +816,66 @@ def write_md(res) -> str:
             '"placed" is a Find hit whose highlight meets the word\'s truth box (`place_functional.swift`, writer `--fit`).',
             '']
     return '\n'.join(out) + '\n'
+
+
+MATCHERS = ('s1', 's8', 'lines', 'conf', 'cer')
+
+
+def matcher_table(res, pc):
+    """Both matchers and the three per-page picks side by side, every reading in one row."""
+    P = res['placement']
+    out = ['## The matcher, per reading', '',
+           'Placed on the word, owner-hand (of 1,584 truth words; pages placed ≥80% of found in brackets), and line '
+           'alignment on Bentham. `s1` one-to-one, `s8` a reading line over up to 8 detected lines; the picks choose '
+           f'between them per page: `lines` takes `s8` when the reading has fewer than {REFLOW:.0%} of the detected '
+           'lines, `conf` the one with the higher mean CTC confidence over the reading\'s characters, `cer` the one whose '
+           'matched runs\' recognition reads closer to the reading (an unmatched line counting as all wrong).', '',
+           '| detector | placer | matcher | ' + ' | '.join(f'`{r}`' for r in READINGS) +
+           ' | Bentham `truth` | Bentham `lightonocr3-4b` |',
+           '|---|---|---|' + '---:|' * (len(READINGS) + 2)]
+    dets = sorted({v['detector'] for v in P.values()})
+    for d in dets:
+        for placer in ('ctc-mccatmus', 'ctc-revcity', 'prop'):
+            for m in MATCHERS:
+                cells, any_ = [], False
+                for r in READINGS:
+                    o = P.get(f'{d}.{placer}-{m}.{r}', {}).get('by_group', {}).get('owner-hand')
+                    if o:
+                        any_ = True
+                        fu = o['functional']
+                        cells.append(f"{pc(fu['placed'], fu['n'])} ({fu['pages_placed_80']})")
+                    else:
+                        cells.append('—')
+                for r in ('truth', 'lightonocr3-4b'):
+                    b = P.get(f'{d}.{placer}-{m}.{r}', {}).get('by_group', {}).get('L2-bentham')
+                    cells.append(f"{b['alignment']:.3f}" if b else '—')
+                if any_:
+                    out.append(f'| {d} | {placer} | {m} | ' + ' | '.join(cells) + ' |')
+    return out + ['']
+
+
+GATE_SHOW = 12  # rows of each sweep shown; the json has every threshold
+
+
+def gate_tables(res, f, pc):
+    out = []
+    for feat, sweep in res.get('gate', {}).items():
+        if not sweep:
+            continue
+        step = max(1, len(sweep) // GATE_SHOW)
+        rows = sweep[::step] + ([sweep[-1]] if (len(sweep) - 1) % step else [])
+        out += [f'## The gate on `{feat}` ({GATE_ROUTE.format(pick=GATE_PICK)}, every reading pooled)', '',
+                'A page reading at or past the threshold keeps its placed layer; the rest go to the text page. '
+                '"Placed" and "found" count on the kept pages only.', '',
+                '| threshold | pages kept | placed on the word | found but highlight off the word | kept pages under 80% | '
+                'sent pages that were ≥80% | kept: ' + ' / '.join(READINGS) + ' |',
+                '|---:|---:|---:|---:|---:|---:|---|']
+        for g in rows:
+            out.append(f"| {f(g['threshold'])} | {g['kept']} / {g['of']} | {pc(g['placed'], g['words'])} | "
+                       f"{g['found'] - g['placed']} | {g['kept_under_80']} | {g['sent_at_80']} | "
+                       + ' / '.join(str(g['by_reading'][r]) for r in READINGS) + ' |')
+        out.append('')
+    return out
 
 
 def summarise_det(rows):
