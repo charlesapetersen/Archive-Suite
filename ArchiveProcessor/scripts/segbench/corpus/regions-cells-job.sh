@@ -1,14 +1,16 @@
 #!/bin/bash
-# One reader on the two frozen capability pages, all three arms. No expansion.
+# One reader, all three arms, on the pages of one phase: capability (the two pilot
+# pages, the default) or all (the frozen nine-page bank). Nothing outside the freeze.
 set -euo pipefail
-ROOT="$1"; ROUTE="$2"
+ROOT="$1"; ROUTE="$2"; PHASE="${3:-capability}"
 : "${SLURM_JOB_ID:?must run as a Slurm job}"
 : "${FS_ENV:?source sherlock/sh.env before submission}"
 source "$FS_ENV"
 case "$ROUTE" in glm-ocr|qwen3.6-27b) ;; *) echo 'unsupported reader'; exit 2;; esac
+case "$PHASE" in capability|all) ;; *) echo 'unsupported phase'; exit 2;; esac
 export HF_HOME HF_HUB_OFFLINE=1 TOKENIZERS_PARALLELISM=false
 mkdir -p "$ROOT/logs" "$ROOT/runtime/$ROUTE"
-"$FS_PY" "$ROOT/regions_cells.py" check --root "$ROOT"
+"$FS_PY" "$ROOT/regions_cells.py" check --root "$ROOT" --phase "$PHASE"
 get() { "$FS_PY" -c 'import json,sys;print(json.load(open(sys.argv[1]))["routes"][sys.argv[2]][sys.argv[3]])' "$ROOT/freeze.json" "$ROUTE" "$1"; }
 REPO=$(get model); NAME=$(get served); ARG_TEXT=$(get vllm_args)
 cache="$HF_HOME/hub/models--${REPO//\//--}"
@@ -44,7 +46,8 @@ finish() {
   kill "$server" 2>/dev/null || true; wait "$server" 2>/dev/null || true
   # Preserve successful and failed receipts promptly outside purged scratch.
   # Each reader owns its subfolders, so the two jobs never overwrite each other.
-  saved="$GROUP_HOME/$USER/archive-suite/sherlock-results/ocr-regions-cells-20261025"
+  # Named after the staged pack, so the bank never lands on top of the pilot's receipts.
+  saved="$GROUP_HOME/$USER/archive-suite/sherlock-results/$(basename "$ROOT")"
   mkdir -p "$saved/out/$ROUTE" "$saved/runtime/$ROUTE" "$saved/logs/$ROUTE"
   if [ -d "$ROOT/out/$ROUTE" ]; then rsync -a "$ROOT/out/$ROUTE/" "$saved/out/$ROUTE/"; fi
   rsync -a "$ROOT/runtime/$ROUTE/" "$saved/runtime/$ROUTE/"
@@ -66,5 +69,5 @@ for ((i=0;i<180;i++)); do
 done
 health || { echo 'server health timed out'; exit 1; }
 for arm in whole table cell; do
-  "$FS_PY" "$ROOT/regions_cells.py" read --root "$ROOT" --route "$ROUTE" --arm "$arm" --runtime "$RUNTIME"
+  "$FS_PY" "$ROOT/regions_cells.py" read --root "$ROOT" --route "$ROUTE" --arm "$arm" --runtime "$RUNTIME" --phase "$PHASE"
 done
