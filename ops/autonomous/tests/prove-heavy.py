@@ -51,6 +51,7 @@ with tempfile.TemporaryDirectory(prefix="heavy work [scratch] ") as scratch:
     env["AGENT_MANAGER_HEAVY_LOCK"] = str(root / "no manager installed")
     children = []
     groups = []
+    survivor_pids = root / "survivor-pids"
 
     def spawn(*command, extra=None, ready=None):
         args = [sys.executable, str(HELPER), "--state", str(state)]
@@ -206,6 +207,74 @@ health_watchdog {waiter.pid} /dev/null 0
         detached.communicate()
         check(after_detached.exists(), "detached nested ownership retires after its real process exits")
         check(detached_result.read_text() == "0", "surviving registered session can nest after its original ancestor exits")
+        # W40.fix-heavy-run-xcode-helpers: an Xcode helper left in the session (DTServiceHub, 2026-10-22) is
+        # ended once the command has exited and nothing else survives; any other survivor still holds the lock.
+        fake_bin = root / "xcode helpers"
+        fake_bin.mkdir()
+        fake_hub = fake_bin / "DTServiceHub"
+        # A real executable with that basename, as ps reports it. A copy of /bin/sleep is killed at launch (its
+        # platform signature does not survive the copy), so build one.
+        source_c = fake_bin / "hub.c"
+        source_c.write_text("#include <stdlib.h>\n#include <unistd.h>\n"
+                            "int main(int c, char **v) { sleep(c > 1 ? atoi(v[1]) : 600); return 0; }\n")
+        subprocess.run(["cc", "-o", str(fake_hub), str(source_c)], check=True, capture_output=True)
+        quiet = " >/dev/null 2>&1 </dev/null & echo $! >> " + shlex.quote(str(survivor_pids))
+
+        def alive(pid):
+            try:
+                os.kill(pid, 0)
+                return True
+            except ProcessLookupError:
+                return False
+
+        def pids():
+            return [int(x) for x in survivor_pids.read_text().split()]
+        survivor_pids.write_text("")
+        helpers_log = state / "helpers.log"
+        started = time.monotonic()
+        p = spawn("bash", "-c", shlex.quote(str(fake_hub)) + " 600" + quiet + "; exit 0")
+        check(until(lambda: p.poll() is not None, 30), "the helper fixture's supervisor exits")
+        finish(p, 0)
+        hub = pids()[-1]
+        check(not alive(hub) and time.monotonic() - started < 25
+              and not (state / "owner.json").exists(),
+              "a DTServiceHub left in the finished command's session is ended and the lock released")
+        check(helpers_log.exists() and "DTServiceHub" in helpers_log.read_text() and str(hub) in helpers_log.read_text(),
+              "the ended helper is logged with its pid and name")
+        survivor_ready = root / "survivor-ready"
+        p = spawn("bash", "-c", shlex.quote(str(fake_hub)) + " 600" + quiet + "; sleep 600" + quiet + "; exit 0",
+                  ready=survivor_ready)
+        check(until(survivor_ready.exists), "survivor fixture acquired lock")
+        owner()
+        check(until(lambda: len(pids()) == 3), "survivor fixture started its helper and its ordinary survivor")
+        hub, other = pids()[1:3]
+        after_survivor = root / "after-survivor"
+        waiter = spawn("true", ready=after_survivor)
+        time.sleep(helper.HELPER_GRACE + helper.HELPER_TERM + 2)
+        check(p.poll() is None and alive(hub) and alive(other) and not after_survivor.exists(),
+              "an ordinary background survivor still holds the lock, and its session's helper is left alone")
+        os.kill(other, signal.SIGTERM)
+        check(until(lambda: p.poll() is not None, 30) and not alive(hub), "once only the helper is left it is ended")
+        finish(p, 0)
+        finish(waiter)
+        check(after_survivor.exists(), "the waiter then takes the lock")
+        # A supervisor killed during the grace leaves only a helper, which holds heavy.lock's inherited descriptor:
+        # the next job's waiter ends it rather than waiting for ever.
+        crash_ready = root / "crash-helper-ready"
+        p = spawn("bash", "-c", shlex.quote(str(fake_hub)) + " 600" + quiet + "; exit 0", ready=crash_ready)
+        check(until(crash_ready.exists) and until(lambda: len(pids()) == 4), "crash-helper fixture acquired lock")
+        owner()
+        time.sleep(1)
+        p.kill()
+        p.wait()
+        hub = pids()[-1]
+        after_crash_helper = root / "after-crash-helper"
+        waiter = spawn("true", ready=after_crash_helper)
+        check(until(lambda: waiter.poll() is not None, 30), "the next job is not held for ever by an orphaned helper")
+        finish(waiter)
+        check(after_crash_helper.exists() and not alive(hub) and "owner pid" in helpers_log.read_text(),
+              "a helper orphaned by a dead supervisor is ended and logged by the next job's waiter")
+        p.communicate()
         # A poisoned record refuses, rather than silently admitting two owners.
         (state / "owner.json").write_text("not json")
         finish(spawn("true"), 2)
@@ -425,6 +494,11 @@ echo "gate-rc=$GATE_RC"
         # Release crash fixtures even if an assertion interrupted the proof.
         for name in ("release-survivor", "release-detached"):
             (root / name).touch()
+        for pid in (survivor_pids.read_text().split() if survivor_pids.exists() else ()):
+            try:
+                os.kill(int(pid), signal.SIGKILL)
+            except ProcessLookupError:
+                pass
         for pid, birth in groups:
             try:
                 if helper.identity(pid) == birth:

@@ -90,7 +90,13 @@ record per job to the manager's `heavy-jobs.log`; a scratch `MAC_HEAVY_LOCK` wit
 ### One heavy job per Mac, shared with Vision OCR (W35.machine-lock)
 
 `heavy.lock` serialises only this project. With it, `heavy-run.py` also takes the Mac-wide lock and holds
-it until the child session ends. Since Agent Manager R6 (2026-10-08) that is the manager's `bin/heavy-lock`
+it until the child session ends. Xcode helpers do not count (W40.fix-heavy-run-xcode-helpers: a finished
+`xcodebuild test` left DTServiceHub in its session and held the lock 8.5 h on 2026-10-22): once the command
+has exited and only `XCODE_HELPERS` (DTServiceHub, SimulatorTrampoline, XCBBuildService, SWBBuildService)
+are left, with no nested member live, they get a 5 s grace and are then ended, each logged to stderr and
+`heavy/helpers.log`; any other survivor still holds the lock. If the supervisor died first, the helpers hold
+`heavy.lock`'s inherited descriptor, so a blocked waiter checks every 5 s and ends them once the owner is
+otherwise gone. Since Agent Manager R6 (2026-10-08) that is the manager's `bin/heavy-lock`
 whenever it is installed (`AGENT_MANAGER_HEAVY_LOCK`, default `~/Claude/Agent Manager/bin/heavy-lock`):
 `heavy-run.py` loads it as a module and drives one `Taker` per job, so there is one lock implementation on
 the Mac. The job is then the holder `heavy-lock status` names (project `archive-suite`, the supervisor's

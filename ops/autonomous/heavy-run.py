@@ -96,18 +96,86 @@ def publish(path, record):
 def session_live(r):
     # Child PID is also its session ID. A new process reusing that PID is
     # conservatively protected; there is never a reason to evict a live group.
-    p = subprocess.run(["ps", "-ax", "-o", "pid=,stat="], capture_output=True, text=True)
+    # Xcode helpers alone do not count, so a supervisor that died before ending them leaves no lock behind.
+    return any(not xcode_helper(comm) for _, comm in session_members(r["child"]))
+
+
+# Xcode and CoreSimulator daemons that a finished xcodebuild leaves in its session (W40.fix-heavy-run-xcode-helpers:
+# DTServiceHub, reparented to launchd, held the Mac lock for 8.5 h on 2026-10-22). Matched by executable basename.
+XCODE_HELPERS = frozenset(("DTServiceHub", "SimulatorTrampoline", "XCBBuildService", "SWBBuildService"))
+HELPER_GRACE = 5.0    # seconds only helpers are left before they are ended: one that is exiting by itself may
+HELPER_TERM = 5.0     # seconds from SIGTERM to SIGKILL
+ORPHAN_CHECK_EVERY = 5.0  # a waiter blocked on heavy.lock checks this often for helpers a dead supervisor left
+
+
+def xcode_helper(comm):
+    return os.path.basename(comm) in XCODE_HELPERS
+
+
+def session_members(sid):
+    """(pid, executable) of every live, non-zombie process in session sid."""
+    p = subprocess.run(["ps", "-ax", "-o", "pid=,stat=,comm="], capture_output=True, text=True)
     if p.returncode != 0 or p.stderr.strip():
         raise RuntimeError("cannot inspect heavy child session")
+    found = []
     for line in p.stdout.splitlines():
-        fields = line.split()
-        if len(fields) == 2 and "Z" not in fields[1]:
+        fields = line.split(None, 2)
+        if len(fields) == 3 and "Z" not in fields[1]:
             try:
-                if os.getsid(int(fields[0])) == r["child"]:
-                    return True
+                if os.getsid(int(fields[0])) == sid:
+                    found.append((int(fields[0]), fields[2]))
             except ProcessLookupError:
                 continue
-    return False
+    return found
+
+
+def end_helpers(state, sid, survivors, command):
+    """End Xcode helpers left in the finished command's session, and log each one signalled."""
+    if any(pid == sid for pid, _ in survivors):
+        return  # a live leader: the session ID was reused by a service of its own, not left by the command
+    ended = []
+
+    def signal_helpers(signum):
+        # Re-check right before signalling: the pid must still be that helper, in this session.
+        live = dict(session_members(sid))
+        for pid, comm in survivors:
+            if pid in live and xcode_helper(live[pid]):
+                try:
+                    os.kill(pid, signum)
+                    if signum == signal.SIGTERM:
+                        ended.append((pid, comm))
+                except (ProcessLookupError, PermissionError):
+                    pass
+    signal_helpers(signal.SIGTERM)
+    deadline = time.monotonic() + HELPER_TERM
+    while time.monotonic() < deadline and any(p in dict(session_members(sid)) for p, _ in ended):
+        time.sleep(.25)
+    signal_helpers(signal.SIGKILL)
+    for pid, comm in ended:
+        note = "ended Xcode helper %d %s left in the session of '%s' after it exited" % (
+            pid, comm, " ".join(command)[:200])
+        print("heavy-run: " + note, file=sys.stderr, flush=True)
+        try:
+            with metadata_lock(state), (state / "helpers.log").open("a", errors="backslashreplace") as log:
+                log.write("%s\t%s\n" % (time.strftime("%F %T"), note.replace("\t", " ").replace("\n", " ")))
+        except (OSError, ValueError):
+            pass
+
+
+def end_orphaned_helpers(state):
+    """For a waiter: helpers whose supervisor died after its command exited hold heavy.lock's inherited
+    descriptor, so the kernel lock never frees. With the owner otherwise gone, end them. Best effort: the
+    record can vanish or change under a waiter (the owner unlinks it holding heavy.lock), and the decision
+    that counts is still made under the flock."""
+    try:
+        r = read(state / "owner.json")
+        if not r or active(state, r):
+            return
+        survivors = session_members(r["child"])
+        if survivors and all(xcode_helper(comm) for _, comm in survivors):
+            end_helpers(state, r["child"], survivors, ["(owner pid %d, gone)" % r["owner"]])
+    except (OSError, ValueError, RuntimeError):
+        pass
 
 
 def basic_active(r):
@@ -323,6 +391,7 @@ def run(state, command, ready):
         try:
             blocked_by_mac = False
             queued = None  # the pid of the earlier waiter this job deferred to, when that is what blocked it
+            orphans_checked = time.monotonic()
             while not interrupted:
                 blocker = None
                 try:
@@ -358,7 +427,11 @@ def run(state, command, ready):
                     queued = (int(blocker["pid"]) if blocker and str(blocker.get("label", "")).endswith(", queued first")
                               and str(blocker.get("pid", "")).isdigit() else None)
                 except BlockingIOError:
-                    pass  # another worker's turn at heavy.lock: what this one waits on is unchanged
+                    # Another worker's turn at heavy.lock: what this one waits on is unchanged. Now and then,
+                    # check it is not only Xcode helpers left by a dead supervisor (W40.fix-heavy-run-xcode-helpers).
+                    if time.monotonic() - orphans_checked >= ORPHAN_CHECK_EVERY:
+                        orphans_checked = time.monotonic()
+                        end_orphaned_helpers(state)
                 if blocker and taker:
                     # In heavy-lock's queue (and its `status`); refreshed only on a poll the Mac lock blocked,
                     # so a wait on this project's heavy.lock alone does not keep a place in the Mac queue.
@@ -419,8 +492,21 @@ def run(state, command, ready):
                 os.close(wr)
             rc = child.wait()
             # A background tool can survive a successful shell. Retain both
-            # metadata and kernel ownership until the whole child session ends.
-            while session_live(record) or members_live(state, token):
+            # metadata and kernel ownership until the whole child session ends, except for Xcode helpers: once
+            # they are all that is left (no other survivor, no nested member), they are ended, not waited for.
+            helpers_since = None
+            while True:
+                survivors = session_members(record["child"])
+                nested = members_live(state, token)
+                if not survivors and not nested:
+                    break
+                if survivors and not nested and all(xcode_helper(comm) for _, comm in survivors):
+                    helpers_since = helpers_since or time.monotonic()
+                    if time.monotonic() - helpers_since >= HELPER_GRACE:
+                        end_helpers(state, record["child"], survivors, command)
+                        helpers_since = None
+                else:
+                    helpers_since = None
                 time.sleep(.25)
             session_done = True
             if held_from is not None:
