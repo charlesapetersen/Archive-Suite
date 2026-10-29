@@ -294,6 +294,64 @@ final class ProcessorUITests: XCTestCase {
         attachScreenshot("processor-settings-drive-fields")
     }
 
+    /// W40.fix-processor-settings-backend-mismatch: a backend that does not use batch mode or the worker stepper
+    /// says so instead of offering them, and transcription-only Apple Vision names a Tagging mode it cannot run.
+    func testSettingsShowOnlyWhatTheBackendUses() throws {
+        chooseTagging("Automatic (LLM)")
+        defer { chooseTagging("Automatic (LLM)") }
+        openSettings()
+        let settings = app.windows.containing(.any, identifier: "ap.settings.guidedKeySetup").firstMatch
+        XCTAssertTrue(settings.waitForExistence(timeout: 10), "Settings must open")
+        defer { chooseBackend("Direct API", in: settings) }
+
+        chooseBackend("Apple Vision (on this Mac)", in: settings)
+        let batchReason = element("ap.settings.batchModeUnavailable")
+        XCTAssertTrue(batchReason.waitForExistence(timeout: 5), "Apple Vision must say batch mode is not used")
+        XCTAssertTrue(renderedText(of: batchReason).contains("Apple Vision"), renderedText(of: batchReason))
+        XCTAssertFalse(element("ap.settings.batchMode").isEnabled, "Apple Vision must not offer batch mode")
+        XCTAssertTrue(renderedText(of: element("ap.settings.ocrWorkersFixed")).contains("performance core"),
+                      "Apple Vision's worker row must show the count it uses, not a stepper it ignores")
+        let conflict = element("ap.settings.visionTaggingConflict")
+        XCTAssertTrue(conflict.waitForExistence(timeout: 5), "an LLM Tagging mode must be named beside transcription-only")
+        XCTAssertTrue(renderedText(of: element("ap.ocr.reOCRExplanation")).contains("only transcribes"),
+                      "the main window's Tagging box must say the mode cannot run: \(renderedText(of: element("ap.ocr.reOCRExplanation")))")
+        let useNoTagging = element("ap.settings.visionUseNoTagging")
+        scrollUntilHittable(useNoTagging, in: settings)
+        attachScreenshot("processor-settings-apple-vision-backend-match")
+        useNoTagging.click()
+        XCTAssertTrue(waitUntil { !conflict.exists }, "No tagging must clear the conflict line")
+
+        chooseBackend("Local CLI Agent", in: settings)
+        XCTAssertTrue(waitUntil { renderedText(of: batchReason).contains("subscription") },
+                      "the Local CLI Agent must say batch mode is not used: \(renderedText(of: batchReason))")
+        XCTAssertFalse(element("ap.settings.batchMode").isEnabled, "the Local CLI Agent must not offer batch mode")
+        XCTAssertTrue(renderedText(of: element("ap.settings.ocrWorkersFixed")).contains("At most 2"),
+                      "the Local CLI Agent's worker row must match its cap")
+        XCTAssertTrue(renderedText(of: element("ap.settings.costPane")).contains("at most two pages at a time"),
+                      "the pacing pane must state the same cap")
+        scrollUntilHittable(element("ap.settings.ocrWorkersFixed"), in: settings)
+        attachScreenshot("processor-settings-local-cli-backend-match")
+
+        chooseBackend("Direct API", in: settings)
+        XCTAssertTrue(waitUntil { !element("ap.settings.ocrWorkersFixed").exists },
+                      "the direct route keeps its worker stepper")
+    }
+
+    private func chooseTagging(_ title: String) {
+        let picker = element("ap.ocr.taggingPicker")
+        guard picker.waitForExistence(timeout: 5) else { return XCTFail("Process Files needs its Tagging picker") }
+        picker.click()
+        let item = app.menuItems[title]
+        guard item.waitForExistence(timeout: 3) else { return XCTFail("the Tagging picker must offer \(title)") }
+        item.click()
+    }
+
+    private func scrollUntilHittable(_ target: XCUIElement, in settings: XCUIElement) {
+        for _ in 0..<12 where target.exists && !target.isHittable {
+            settings.scrollViews.firstMatch.scroll(byDeltaX: 0, deltaY: -150)
+        }
+    }
+
     private func chooseBackend(_ title: String, in settings: XCUIElement) {
         let picker = element("ap.settings.backendPicker")
         if !picker.isHittable { settings.scrollViews.firstMatch.scroll(byDeltaX: 0, deltaY: 8000) }
