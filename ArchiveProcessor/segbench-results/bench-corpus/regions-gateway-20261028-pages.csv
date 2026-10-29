@@ -1,209 +1,325 @@
 set,groups,route,arm,page,ok,nes,chrf,words,missed,added,order_edit,crops,crops_failed,prompt_tokens,completion_tokens,cost,new_cost
 owner99,"the 96;typed, no table or clipping;kind:typewritten;owner pilot",gemini-3.7-flash-gw,whole,p001,True,0.960519,0.991867,295,1,1,,,,1420,398,0.002557,0.0
-owner99,owner pilot,gemini-3.7-flash-gw,pp-doclayoutv3,p001,True,0.922166,0.943309,295,19,0,,9,0,12853,1427,0.014991,0.014991
+owner99,"the 96;typed, no table or clipping;kind:typewritten;owner pilot",gemini-3.7-flash-gw,pp-doclayoutv3,p001,True,0.922166,0.943309,295,19,0,,9,0,12853,1427,0.014991,0.014991
 owner99,"the 96;typed, no table or clipping;kind:typewritten;owner pilot",gemini-3.7-flash-gw,tiles,p001,True,0.99436,0.994578,295,1,1,,3,0,4293,1351,0.008286,0.008286
 owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,whole,p002,True,1.0,1.0,135,0,0,,,,1420,203,0.001826,0.0
+owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,pp-doclayoutv3,p002,True,0.986364,0.993562,135,0,0,,9,0,12916,1423,0.015023,0.015023
 owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,tiles,p002,True,1.0,1.0,135,0,0,,3,0,4293,688,0.0058,0.0058
 owner99,the 96;kind:printed,gemini-3.7-flash-gw,whole,p003,True,0.998411,0.997451,589,0,0,,,,1420,945,0.004609,0.0
+owner99,the 96;kind:printed,gemini-3.7-flash-gw,pp-doclayoutv3,p003,True,0.840276,0.907868,589,54,32,,16,0,22767,3944,0.031865,0.031865
 owner99,the 96;kind:printed,gemini-3.7-flash-gw,tiles,p003,True,0.5741,0.933841,589,0,187,,3,0,4293,1915,0.010401,0.010401
 owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,whole,p004,True,1.0,1.0,282,0,0,,,,1420,392,0.002535,0.0
+owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,pp-doclayoutv3,p004,True,0.997697,0.998322,282,0,0,,4,0,5782,660,0.006811,0.006811
 owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,tiles,p004,True,0.998849,0.997034,282,0,0,,3,0,4293,2328,0.01195,0.01195
 owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,whole,p005,True,1.0,1.0,576,0,0,,,,1420,739,0.003836,0.0
+owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,pp-doclayoutv3,p005,True,1.0,1.0,576,0,0,,8,0,11432,2375,0.01748,0.01748
 owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,tiles,p005,True,1.0,1.0,576,0,0,,3,0,4293,1098,0.007337,0.007337
 owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,whole,p006,True,1.0,1.0,45,0,0,,,,1420,640,0.003465,0.0
+owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,pp-doclayoutv3,p006,True,0.990354,0.993941,45,1,0,,1,0,1420,730,0.003802,0.003802
 owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,tiles,p006,True,0.99361,0.989758,45,0,0,,3,0,4293,359,0.004566,0.004566
 owner99,the 96;handwritten;kind:handwritten;owner pilot,gemini-3.7-flash-gw,whole,p007,True,0.994709,0.987514,73,0,0,,,,1458,297,0.002207,0.0
-owner99,owner pilot,gemini-3.7-flash-gw,pp-doclayoutv3,p007,True,0.918987,0.927775,73,1,7,,3,0,4314,578,0.005403,0.005403
+owner99,the 96;handwritten;kind:handwritten;owner pilot,gemini-3.7-flash-gw,pp-doclayoutv3,p007,True,0.918987,0.927775,73,1,7,,3,0,4314,578,0.005403,0.005403
 owner99,the 96;handwritten;kind:handwritten;owner pilot,gemini-3.7-flash-gw,tiles,p007,True,0.962766,0.95786,73,0,0,,3,0,4293,935,0.006726,0.006726
 owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,whole,p008,True,0.999413,0.999035,605,0,0,,,,1458,927,0.00457,0.0
+owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,pp-doclayoutv3,p008,True,0.936858,0.94492,605,35,0,,12,0,16995,2755,0.023078,0.023078
 owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,tiles,p008,True,0.999413,0.999035,605,0,0,,3,0,4293,1384,0.00841,0.00841
 owner99,the 96;kind:mixed,gemini-3.7-flash-gw,whole,p009,True,0.688088,0.769924,160,9,63,,,,1420,449,0.002749,0.0
+owner99,the 96;kind:mixed,gemini-3.7-flash-gw,pp-doclayoutv3,p009,True,0.574954,0.650665,160,44,11,,16,0,22992,4471,0.03401,0.03401
 owner99,the 96;kind:mixed,gemini-3.7-flash-gw,tiles,p009,True,0.597576,0.858817,160,5,102,,3,0,4293,2755,0.013551,0.013551
 owner99,the 96;clippings;kind:printed;owner pilot,gemini-3.7-flash-gw,whole,p010,True,0.999449,0.998005,601,0,0,,,,1439,938,0.004597,0.0
-owner99,owner pilot,gemini-3.7-flash-gw,pp-doclayoutv3,p010,True,0.907975,0.973471,601,3,46,,15,0,21361,4148,0.031576,0.031576
+owner99,the 96;clippings;kind:printed;owner pilot,gemini-3.7-flash-gw,pp-doclayoutv3,p010,True,0.907975,0.973471,601,3,46,,15,0,21361,4148,0.031576,0.031576
 owner99,the 96;clippings;kind:printed;owner pilot,gemini-3.7-flash-gw,tiles,p010,True,0.98638,0.98981,601,2,0,,6,0,8586,2270,0.014952,0.014952
 owner99,the 96;kind:printed,gemini-3.7-flash-gw,whole,p011,True,0.975155,0.965101,83,0,0,,,,1420,514,0.002992,0.0
+owner99,the 96;kind:printed,gemini-3.7-flash-gw,pp-doclayoutv3,p011,True,0.788382,0.789364,83,13,0,,2,0,2858,192,0.002863,0.002863
 owner99,the 96;kind:printed,gemini-3.7-flash-gw,tiles,p011,True,0.824957,0.933242,83,3,30,,3,0,4293,585,0.005413,0.005413
 owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,whole,p012,True,1.0,1.0,400,0,0,,,,1420,562,0.003172,0.0
+owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,pp-doclayoutv3,p012,True,0.943974,0.98532,400,2,25,,8,0,11409,3253,0.020755,0.020755
 owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,tiles,p012,True,1.0,1.0,400,0,0,,3,0,4293,1471,0.008736,0.008736
 owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,whole,p013,True,0.765773,0.990222,412,1,0,,,,1420,568,0.003195,0.0
+owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,pp-doclayoutv3,p013,True,0.754639,0.901878,412,44,1,,4,0,5727,1627,0.010396,0.010396
 owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,tiles,p013,True,0.842474,0.93318,412,17,4,,3,0,4293,2508,0.012625,0.012625
 owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,whole,p014,True,0.990662,0.99084,192,1,1,,,,1458,1175,0.0055,0.0
+owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,pp-doclayoutv3,p014,True,1.0,1.0,192,0,0,,4,0,5793,835,0.007476,0.007476
 owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,tiles,p014,True,0.980508,0.994713,192,1,1,,3,0,4293,472,0.00499,0.00499
 owner99,the 96;handwritten;kind:handwritten,gemini-3.7-flash-gw,whole,p015,True,0.945243,0.992176,217,0,0,,,,1420,481,0.002869,0.0
+owner99,the 96;handwritten;kind:handwritten,gemini-3.7-flash-gw,pp-doclayoutv3,p015,True,0.411241,0.460528,217,123,0,,4,0,5725,1510,0.009956,0.009956
 owner99,the 96;handwritten;kind:handwritten,gemini-3.7-flash-gw,tiles,p015,True,0.933516,0.955183,217,7,7,,3,0,4293,1245,0.007888,0.007888
 owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,whole,p016,True,0.995565,0.988783,171,1,1,,,,1429,255,0.002028,0.0
+owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,pp-doclayoutv3,p016,True,0.996678,0.990797,171,1,1,,9,0,12937,1619,0.015774,0.015774
 owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,tiles,p016,True,0.982514,0.985991,171,1,1,,3,0,4293,1680,0.00952,0.00952
 owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,whole,p017,True,0.991162,0.990499,237,3,2,,,,1420,361,0.002419,0.0
+owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,pp-doclayoutv3,p017,True,0.945615,0.952924,237,16,1,,4,0,5728,977,0.00796,0.00796
 owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,tiles,p017,True,0.991162,0.987301,237,4,3,,3,0,4293,3023,0.014556,0.014556
 owner99,the 96;kind:printed,gemini-3.7-flash-gw,whole,p018,True,0.803615,0.864595,330,17,8,,,,1458,670,0.003606,0.0
+owner99,the 96;kind:printed,gemini-3.7-flash-gw,pp-doclayoutv3,p018,True,0.613218,0.843597,330,26,93,,8,0,11328,3484,0.021561,0.021561
 owner99,the 96;kind:printed,gemini-3.7-flash-gw,tiles,p018,True,0.726074,0.838039,330,20,53,,3,0,4293,3686,0.017042,0.017042
 owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,whole,p019,True,0.991561,0.988813,125,1,0,,,,1448,608,0.003366,0.0
+owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,pp-doclayoutv3,p019,True,0.945355,0.963066,125,2,4,,13,0,18463,1331,0.018839,0.018839
 owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,tiles,p019,True,0.951807,0.985213,125,0,4,,3,0,4293,311,0.004386,0.004386
 owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,whole,p020,True,0.974565,0.982128,266,2,3,,,,1458,367,0.00247,0.0
+owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,pp-doclayoutv3,p020,True,0.985284,0.985571,266,1,2,,6,0,8628,2524,0.015936,0.015936
 owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,tiles,p020,True,0.961056,0.977875,266,0,3,,3,0,4293,2264,0.01171,0.01171
 owner99,the 96;kind:printed,gemini-3.7-flash-gw,whole,p021,True,1.0,1.0,374,0,0,,,,1420,558,0.003158,0.0
+owner99,the 96;kind:printed,gemini-3.7-flash-gw,pp-doclayoutv3,p021,True,1.0,1.0,374,0,0,,12,0,17105,1843,0.01974,0.01974
 owner99,the 96;kind:printed,gemini-3.7-flash-gw,tiles,p021,True,1.0,1.0,374,0,0,,3,0,4293,820,0.006295,0.006295
 owner99,the 96;handwritten;kind:handwritten,gemini-3.7-flash-gw,whole,p022,True,0.996936,0.99276,290,5,3,,,,1420,876,0.00435,0.0
+owner99,the 96;handwritten;kind:handwritten,gemini-3.7-flash-gw,pp-doclayoutv3,p022,True,0.827206,0.902876,290,27,10,,9,0,12958,2715,0.0199,0.0199
 owner99,the 96;handwritten;kind:handwritten,gemini-3.7-flash-gw,tiles,p022,True,0.989672,0.986887,290,1,1,,3,0,4293,1563,0.009081,0.009081
 owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,whole,p023,True,0.99857,0.997063,204,0,0,,,,1458,907,0.004495,0.0
+owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,pp-doclayoutv3,p023,True,1.0,1.0,204,0,0,,8,0,11418,1171,0.012955,0.012955
 owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,tiles,p023,True,0.99857,0.997063,204,0,0,,3,0,4293,2131,0.011211,0.011211
 owner99,the 96;tables;kind:typewritten;owner pilot,gemini-3.7-flash-gw,whole,p024,True,0.934479,0.95769,143,0,7,,,,1420,527,0.003041,0.0
-owner99,owner pilot,gemini-3.7-flash-gw,pp-doclayoutv3,p024,True,0.909192,0.915144,143,14,8,,11,0,15692,3156,0.023604,0.023604
+owner99,the 96;tables;kind:typewritten;owner pilot,gemini-3.7-flash-gw,pp-doclayoutv3,p024,True,0.909192,0.915144,143,14,8,,11,0,15692,3156,0.023604,0.023604
 owner99,the 96;tables;kind:typewritten;owner pilot,gemini-3.7-flash-gw,tiles,p024,True,0.972315,0.971903,143,2,5,,3,0,4293,2384,0.01216,0.01216
 owner99,the 96;tables;kind:typewritten,gemini-3.7-flash-gw,whole,p025,True,0.997512,0.994466,69,1,1,,,,1420,1293,0.005914,0.0
+owner99,the 96;tables;kind:typewritten,gemini-3.7-flash-gw,pp-doclayoutv3,p025,True,0.387892,0.712898,69,9,103,,4,0,5731,1202,0.008806,0.008806
 owner99,the 96;tables;kind:typewritten,gemini-3.7-flash-gw,tiles,p025,True,1.0,1.0,69,0,0,,3,0,4293,2049,0.010903,0.010903
 owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,whole,p026,True,0.988148,0.988351,426,6,7,,,,1420,616,0.003375,0.0
+owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,pp-doclayoutv3,p026,True,0.992609,0.996104,426,0,1,,10,0,14388,2610,0.020578,0.020578
 owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,tiles,p026,True,0.995532,0.996095,426,0,0,,3,0,4293,1630,0.009332,0.009332
 owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,whole,p027,True,0.999148,0.996307,222,1,1,,,,1458,959,0.00469,0.0
+owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,pp-doclayoutv3,p027,True,0.951199,0.972756,222,6,11,,13,0,18504,2310,0.022541,0.022541
 owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,tiles,p027,True,0.999148,0.996307,222,1,1,,3,0,4293,2169,0.011354,0.011354
 owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,whole,p028,True,0.999214,0.996716,202,0,0,,,,1458,279,0.00214,0.0
+owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,pp-doclayoutv3,p028,True,0.989788,0.987961,202,3,3,,6,0,8552,1257,0.011128,0.011128
 owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,tiles,p028,True,0.999214,0.996716,202,0,0,,3,0,4293,493,0.005069,0.005069
 owner99,the 96;kind:printed,gemini-3.7-flash-gw,whole,p029,True,0.997801,0.998074,307,0,0,,,,1420,421,0.002644,0.0
+owner99,the 96;kind:printed,gemini-3.7-flash-gw,pp-doclayoutv3,p029,True,0.974656,0.978455,307,7,0,,7,0,10129,1122,0.011804,0.011804
 owner99,the 96;kind:printed,gemini-3.7-flash-gw,tiles,p029,True,0.880992,0.893755,307,33,0,,3,0,4293,1353,0.008294,0.008294
 owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,whole,p030,True,0.998762,0.997954,275,1,1,,,,1420,385,0.002509,0.0
+owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,pp-doclayoutv3,p030,True,0.988841,0.986624,275,3,1,,8,0,11393,1978,0.015962,0.015962
 owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,tiles,p030,True,0.99256,0.991529,275,1,0,,3,0,4293,2078,0.011012,0.011012
 owner99,the 96;kind:mixed,gemini-3.7-flash-gw,whole,p031,True,0.988806,0.955873,50,0,0,,,,1420,105,0.001459,0.0
+owner99,the 96;kind:mixed,gemini-3.7-flash-gw,pp-doclayoutv3,p031,True,0.817164,0.780228,50,12,1,,9,0,12892,960,0.013269,0.013269
 owner99,the 96;kind:mixed,gemini-3.7-flash-gw,tiles,p031,True,0.854839,0.925394,50,0,5,,3,0,4293,1189,0.007679,0.007679
 owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,whole,p032,True,1.0,1.0,327,0,0,,,,1420,1598,0.007058,0.0
+owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,pp-doclayoutv3,p032,True,0.957664,0.975134,327,7,3,,6,0,8604,1527,0.012179,0.012179
 owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,tiles,p032,True,0.970255,0.990773,327,0,6,,3,0,4293,1665,0.009463,0.009463
 owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,whole,p033,True,0.999122,0.996682,406,1,1,,,,1458,2255,0.00955,0.0
+owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,pp-doclayoutv3,p033,True,0.999123,1.0,406,2,4,,2,0,2904,617,0.004492,0.004492
 owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,tiles,p033,True,0.999122,0.998127,406,2,3,,3,0,4293,1833,0.010094,0.010094
 owner99,the 96;kind:printed,gemini-3.7-flash-gw,whole,p034,True,0.404624,0.416787,28,15,1,,,,1458,338,0.002361,0.0
+owner99,the 96;kind:printed,gemini-3.7-flash-gw,pp-doclayoutv3,p034,True,0.127168,0.146124,28,22,0,,4,0,5775,360,0.005681,0.005681
 owner99,the 96;kind:printed,gemini-3.7-flash-gw,tiles,p034,True,0.317919,0.443454,28,11,3,,3,0,4293,540,0.005245,0.005245
 owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,whole,p035,True,0.999423,0.99809,316,2,1,,,,1458,403,0.002605,0.0
+owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,pp-doclayoutv3,p035,True,0.996538,0.995685,316,4,2,,2,0,2872,807,0.00518,0.00518
 owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,tiles,p035,True,0.999423,0.99809,316,2,1,,3,0,4293,2705,0.013364,0.013364
 owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,whole,p036,True,1.0,1.0,382,0,0,,,,1420,1486,0.006638,0.0
+owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,pp-doclayoutv3,p036,True,0.998692,0.996958,382,0,0,,5,0,7209,2216,0.013717,0.013717
 owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,tiles,p036,True,1.0,1.0,382,0,0,,3,0,4293,1045,0.007138,0.007138
 owner99,the 96;kind:printed,gemini-3.7-flash-gw,whole,p037,True,0.999687,0.998692,508,1,1,,,,1420,709,0.003724,0.0
+owner99,the 96;kind:printed,gemini-3.7-flash-gw,pp-doclayoutv3,p037,True,0.721757,0.926515,508,0,165,,24,0,34012,8194,0.056237,0.056237
 owner99,the 96;kind:printed,gemini-3.7-flash-gw,tiles,p037,True,0.999373,1.0,508,0,0,,3,0,4293,1089,0.007304,0.007304
 owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,whole,p039,True,1.0,1.0,317,0,0,,,,1458,427,0.002695,0.0
+owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,pp-doclayoutv3,p039,True,1.0,1.0,317,0,0,,3,0,4337,890,0.00659,0.00659
 owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,tiles,p039,True,0.992697,0.994463,317,1,1,,3,0,4293,2163,0.011331,0.011331
 owner99,the 96;handwritten;kind:handwritten,gemini-3.7-flash-gw,whole,p040,True,0.994577,0.981913,185,0,0,,,,1458,1376,0.006254,0.0
+owner99,the 96;handwritten;kind:handwritten,gemini-3.7-flash-gw,pp-doclayoutv3,p040,True,0.952332,0.974965,185,0,6,,3,0,4317,2127,0.011214,0.011214
 owner99,the 96;handwritten;kind:handwritten,gemini-3.7-flash-gw,tiles,p040,True,0.960293,0.966135,185,0,2,,3,0,4293,4063,0.018456,0.018456
 owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,whole,p041,True,0.995365,0.993694,385,0,1,,,,1458,1231,0.00571,0.0
+owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,pp-doclayoutv3,p041,True,0.9941,0.993494,385,0,2,,2,0,2889,581,0.004346,0.004346
 owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,tiles,p041,True,0.995365,0.993694,385,0,1,,3,0,4293,811,0.006261,0.006261
 owner99,the 96;kind:printed,gemini-3.7-flash-gw,whole,p042,True,0.999781,1.0,804,1,2,,,,1458,1268,0.005849,0.0
+owner99,the 96;kind:printed,gemini-3.7-flash-gw,pp-doclayoutv3,p042,True,0.953193,0.970952,804,29,5,,27,0,38452,7685,0.057658,0.057658
 owner99,the 96;kind:printed,gemini-3.7-flash-gw,tiles,p042,True,0.675416,0.747616,804,252,11,,3,0,4293,1802,0.009977,0.009977
 owner99,the 96;kind:printed,gemini-3.7-flash-gw,whole,p043,True,0.999788,0.999302,836,0,0,,,,1420,1371,0.006206,0.0
+owner99,the 96;kind:printed,gemini-3.7-flash-gw,pp-doclayoutv3,p043,True,0.919728,0.958558,836,34,0,,32,0,45498,5883,0.056185,0.056185
 owner99,the 96;kind:printed,gemini-3.7-flash-gw,tiles,p043,True,0.751327,0.788019,836,210,0,,3,0,4293,1918,0.010412,0.010412
 owner99,the 96;kind:printed,gemini-3.7-flash-gw,whole,p044,True,1.0,1.0,690,0,0,,,,1458,1125,0.005312,0.0
+owner99,the 96;kind:printed,gemini-3.7-flash-gw,pp-doclayoutv3,p044,True,0.937485,0.98531,690,1,46,,5,0,7185,1742,0.011921,0.011921
 owner99,the 96;kind:printed,gemini-3.7-flash-gw,tiles,p044,True,0.661894,0.711454,690,243,0,,3,0,4293,1640,0.00937,0.00937
 owner99,the 96;handwritten;kind:handwritten,gemini-3.7-flash-gw,whole,p045,True,0.960331,0.944402,113,1,5,,,,1420,951,0.004631,0.0
+owner99,the 96;handwritten;kind:handwritten,gemini-3.7-flash-gw,pp-doclayoutv3,p045,True,0.838124,0.894063,113,3,5,,2,0,2916,235,0.003068,0.003068
 owner99,the 96;handwritten;kind:handwritten,gemini-3.7-flash-gw,tiles,p045,True,0.899213,0.907247,113,2,2,,3,0,4293,1881,0.010273,0.010273
 owner99,the 96;handwritten;kind:handwritten,gemini-3.7-flash-gw,whole,p046,True,0.994094,0.99706,86,2,1,,,,1420,135,0.001571,0.0
+owner99,the 96;handwritten;kind:handwritten,gemini-3.7-flash-gw,pp-doclayoutv3,p046,True,0.775618,0.855891,86,9,4,,8,0,11588,1357,0.01378,0.01378
 owner99,the 96;handwritten;kind:handwritten,gemini-3.7-flash-gw,tiles,p046,True,0.998028,1.0,86,2,1,,3,0,4293,847,0.006396,0.006396
 owner99,the 96;handwritten;kind:handwritten,gemini-3.7-flash-gw,whole,p047,True,0.922835,0.920107,106,7,1,,,,1420,1198,0.005557,0.0
+owner99,the 96;handwritten;kind:handwritten,gemini-3.7-flash-gw,pp-doclayoutv3,p047,False,0.0,0.0,106,106,0,,0,0,0,0,0,0
 owner99,the 96;handwritten;kind:handwritten,gemini-3.7-flash-gw,tiles,p047,True,0.883465,0.882174,106,9,0,,3,0,4293,1700,0.009595,0.009595
 owner99,the 96;handwritten;kind:handwritten,gemini-3.7-flash-gw,whole,p048,True,0.845783,0.789268,67,0,1,,,,1420,522,0.003023,0.0
+owner99,the 96;handwritten;kind:handwritten,gemini-3.7-flash-gw,pp-doclayoutv3,p048,True,0.439642,0.712478,67,4,51,,12,0,17226,3283,0.025231,0.025231
 owner99,the 96;handwritten;kind:handwritten,gemini-3.7-flash-gw,tiles,p048,True,0.528125,0.756288,67,1,44,,3,0,4293,1337,0.008233,0.008233
 owner99,the 96;handwritten;kind:handwritten,gemini-3.7-flash-gw,whole,p049,True,0.968872,0.946208,83,3,3,,,,1420,902,0.004448,0.0
+owner99,the 96;handwritten;kind:handwritten,gemini-3.7-flash-gw,pp-doclayoutv3,p049,True,0.513619,0.540289,83,38,1,,3,0,4306,1443,0.008641,0.008641
 owner99,the 96;handwritten;kind:handwritten,gemini-3.7-flash-gw,tiles,p049,True,0.953307,0.925874,83,4,4,,3,0,4293,1096,0.00733,0.00733
 owner99,the 96;handwritten;kind:handwritten,gemini-3.7-flash-gw,whole,p050,True,0.76746,0.881678,199,17,11,,,,1420,970,0.004703,0.0
+owner99,the 96;handwritten;kind:handwritten,gemini-3.7-flash-gw,pp-doclayoutv3,p050,True,0.713757,0.898886,199,10,20,,4,0,5732,3004,0.015564,0.015564
 owner99,the 96;handwritten;kind:handwritten,gemini-3.7-flash-gw,tiles,p050,True,0.791251,0.895432,199,15,6,,3,0,4293,2520,0.01267,0.01267
 owner99,the 96;handwritten;kind:handwritten,gemini-3.7-flash-gw,whole,p051,True,0.986538,1.0,91,2,9,,,,1420,638,0.003458,0.0
+owner99,the 96;handwritten;kind:handwritten,gemini-3.7-flash-gw,pp-doclayoutv3,p051,True,0.959924,0.963314,91,3,6,,7,0,10072,1070,0.011567,0.011567
 owner99,the 96;handwritten;kind:handwritten,gemini-3.7-flash-gw,tiles,p051,True,0.996117,1.0,91,2,4,,3,0,4293,1240,0.00787,0.00787
 owner99,the 96;handwritten;kind:handwritten,gemini-3.7-flash-gw,whole,p052,True,0.992754,0.979156,154,2,1,,,,1420,511,0.002981,0.0
+owner99,the 96;handwritten;kind:handwritten,gemini-3.7-flash-gw,pp-doclayoutv3,p052,True,0.920415,0.94356,154,8,12,,7,0,10029,3755,0.021603,0.021603
 owner99,the 96;handwritten;kind:handwritten,gemini-3.7-flash-gw,tiles,p052,True,0.995169,0.989578,154,2,1,,3,0,4293,1465,0.008713,0.008713
 owner99,the 96;handwritten;kind:handwritten,gemini-3.7-flash-gw,whole,p053,True,0.981504,0.967316,151,3,3,,,,1420,460,0.00279,0.0
+owner99,the 96;handwritten;kind:handwritten,gemini-3.7-flash-gw,pp-doclayoutv3,p053,True,0.98397,0.976165,151,2,2,,1,0,1420,1045,0.004984,0.004984
 owner99,the 96;handwritten;kind:handwritten,gemini-3.7-flash-gw,tiles,p053,True,0.969174,0.946535,151,4,4,,3,0,4293,705,0.005863,0.005863
 owner99,the 96;handwritten;kind:handwritten,gemini-3.7-flash-gw,whole,p054,True,0.942564,0.912697,145,6,9,,,,1420,977,0.004729,0.0
+owner99,the 96;handwritten;kind:handwritten,gemini-3.7-flash-gw,pp-doclayoutv3,p054,True,0.191667,0.220488,145,116,0,,1,0,1460,545,0.003139,0.003139
 owner99,the 96;handwritten;kind:handwritten,gemini-3.7-flash-gw,tiles,p054,True,0.77349,0.867405,145,5,10,,3,0,4293,1613,0.009268,0.009268
 owner99,the 96;handwritten;kind:handwritten,gemini-3.7-flash-gw,whole,p055,True,0.935238,0.947172,90,8,10,,,,1420,717,0.003754,0.0
+owner99,the 96;handwritten;kind:handwritten,gemini-3.7-flash-gw,pp-doclayoutv3,p055,True,0.825225,0.9128,90,5,8,,8,0,11485,2734,0.018866,0.018866
 owner99,the 96;handwritten;kind:handwritten,gemini-3.7-flash-gw,tiles,p055,True,0.958095,0.953738,90,4,2,,3,0,4293,1709,0.009628,0.009628
 owner99,the 96;handwritten;kind:handwritten,gemini-3.7-flash-gw,whole,p056,True,0.98153,0.967831,132,1,2,,,,1420,803,0.004076,0.0
+owner99,the 96;handwritten;kind:handwritten,gemini-3.7-flash-gw,pp-doclayoutv3,p056,True,0.974934,0.963154,132,3,3,,2,0,2830,506,0.00402,0.00402
 owner99,the 96;handwritten;kind:handwritten,gemini-3.7-flash-gw,tiles,p056,True,0.898533,0.961729,132,0,9,,3,0,4293,1985,0.010663,0.010663
 owner99,the 96;tables;kind:typewritten,gemini-3.7-flash-gw,whole,p057,True,0.975248,0.986419,77,0,0,,,,1420,370,0.002452,0.0
+owner99,the 96;tables;kind:typewritten,gemini-3.7-flash-gw,pp-doclayoutv3,p057,True,0.901015,0.909058,77,7,0,,3,0,4259,460,0.004919,0.004919
 owner99,the 96;tables;kind:typewritten,gemini-3.7-flash-gw,tiles,p057,True,0.975248,0.986419,77,0,0,,2,0,2862,1166,0.006519,0.006519
 owner99,the 96;tables;kind:printed,gemini-3.7-flash-gw,whole,p058,True,0.998601,1.0,315,3,6,,,,1429,523,0.003033,0.0
+owner99,the 96;tables;kind:printed,gemini-3.7-flash-gw,pp-doclayoutv3,p058,True,0.997667,0.998191,315,5,7,,11,0,15779,1218,0.016402,0.016402
 owner99,the 96;tables;kind:printed,gemini-3.7-flash-gw,tiles,p058,True,1.0,1.0,315,0,0,,3,0,4293,812,0.006265,0.006265
 owner99,the 96;tables;kind:typewritten,gemini-3.7-flash-gw,whole,p059,True,0.988275,0.994064,101,1,1,,,,1420,148,0.00162,0.0
+owner99,the 96;tables;kind:typewritten,gemini-3.7-flash-gw,pp-doclayoutv3,p059,True,0.994941,0.996101,101,0,0,,3,0,4351,687,0.00584,0.00584
 owner99,the 96;tables;kind:typewritten,gemini-3.7-flash-gw,tiles,p059,True,0.988275,0.994064,101,1,1,,3,0,4293,287,0.004296,0.004296
 owner99,the 96;tables;kind:typewritten,gemini-3.7-flash-gw,whole,p060,True,1.0,1.0,211,0,0,,,,1458,1180,0.005518,0.0
+owner99,the 96;tables;kind:typewritten,gemini-3.7-flash-gw,pp-doclayoutv3,p060,True,0.933588,0.959791,211,6,7,,21,0,29721,2505,0.031684,0.031684
 owner99,the 96;tables;kind:typewritten,gemini-3.7-flash-gw,tiles,p060,True,1.0,1.0,211,0,0,,3,0,4293,1175,0.007626,0.007626
 owner99,the 96;tables;kind:printed,gemini-3.7-flash-gw,whole,p061,True,0.999578,0.998229,388,0,0,,,,1429,503,0.002958,0.0
+owner99,the 96;tables;kind:printed,gemini-3.7-flash-gw,pp-doclayoutv3,p061,True,0.982708,0.982984,388,6,0,,10,0,14225,1611,0.01671,0.01671
 owner99,the 96;tables;kind:printed,gemini-3.7-flash-gw,tiles,p061,True,0.999157,0.996864,388,0,0,,3,0,4293,1169,0.007604,0.007604
 owner99,the 96;tables;kind:printed,gemini-3.7-flash-gw,whole,p062,True,0.984707,0.988782,535,1,0,,,,1429,793,0.004045,0.0
+owner99,the 96;tables;kind:printed,gemini-3.7-flash-gw,pp-doclayoutv3,p062,True,0.865385,0.955327,535,2,39,,22,0,31465,6313,0.047273,0.047273
 owner99,the 96;tables;kind:printed,gemini-3.7-flash-gw,tiles,p062,True,0.85799,0.898304,535,61,8,,3,0,4293,1128,0.00745,0.00745
 owner99,the 96;tables;kind:printed,gemini-3.7-flash-gw,whole,p063,True,1.0,1.0,589,0,0,,,,1458,824,0.004183,0.0
+owner99,the 96;tables;kind:printed,gemini-3.7-flash-gw,pp-doclayoutv3,p063,True,0.952479,0.984091,589,2,14,,12,0,16975,4158,0.028324,0.028324
 owner99,the 96;tables;kind:printed,gemini-3.7-flash-gw,tiles,p063,True,1.0,1.0,589,0,0,,3,0,4293,1138,0.007487,0.007487
 owner99,the 96;tables;kind:typewritten,gemini-3.7-flash-gw,whole,p064,True,1.0,1.0,129,0,0,,,,1420,249,0.001999,0.0
+owner99,the 96;tables;kind:typewritten,gemini-3.7-flash-gw,pp-doclayoutv3,p064,True,0.480638,0.532117,129,71,2,,3,0,4372,317,0.004468,0.004468
 owner99,the 96;tables;kind:typewritten,gemini-3.7-flash-gw,tiles,p064,True,1.0,1.0,129,0,0,,3,0,4293,1833,0.010094,0.010094
 owner99,the 96;clippings;tables;kind:printed,gemini-3.7-flash-gw,whole,p065,True,1.0,1.0,58,0,0,,,,1420,186,0.001762,0.0
+owner99,the 96;clippings;tables;kind:printed,gemini-3.7-flash-gw,pp-doclayoutv3,p065,True,0.993958,0.987424,58,0,0,,4,0,5817,1017,0.008176,0.008176
 owner99,the 96;clippings;tables;kind:printed,gemini-3.7-flash-gw,tiles,p065,True,0.962209,0.98153,58,0,0,,3,0,4293,474,0.004997,0.004997
 owner99,the 96;tables;kind:typewritten,gemini-3.7-flash-gw,whole,p066,True,1.0,1.0,69,0,0,,,,1420,252,0.00201,0.0
+owner99,the 96;tables;kind:typewritten,gemini-3.7-flash-gw,pp-doclayoutv3,p066,True,0.613365,0.748789,69,15,2,,7,0,10130,1063,0.011584,0.011584
 owner99,the 96;tables;kind:typewritten,gemini-3.7-flash-gw,tiles,p066,True,0.97669,0.994832,69,0,1,,3,0,4293,1130,0.007457,0.007457
 owner99,the 96;kind:printed,gemini-3.7-flash-gw,whole,p067,True,1.0,1.0,79,0,0,,,,1448,158,0.001679,0.0
+owner99,the 96;kind:printed,gemini-3.7-flash-gw,pp-doclayoutv3,p067,True,0.93985,0.945717,79,5,0,,8,0,11457,491,0.010434,0.010434
 owner99,the 96;kind:printed,gemini-3.7-flash-gw,tiles,p067,True,0.955117,0.98987,79,0,2,,3,0,4293,214,0.004022,0.004022
 owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,whole,p068,True,0.996773,0.986602,333,7,0,,,,1420,1159,0.005411,0.0
+owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,pp-doclayoutv3,p068,True,0.952445,0.973247,333,9,10,,11,0,15448,2642,0.021493,0.021493
 owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,tiles,p068,True,0.987552,0.975186,333,10,0,,3,0,4293,1161,0.007574,0.007574
 owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,whole,p069,True,0.993797,0.9741,128,5,0,,,,1420,959,0.004661,0.0
+owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,pp-doclayoutv3,p069,True,0.842553,0.93882,128,6,19,,9,0,12986,2972,0.020885,0.020885
 owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,tiles,p069,True,0.993797,0.9741,128,5,0,,3,0,4293,1369,0.008353,0.008353
 owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,whole,p070,True,0.993056,0.9906,330,2,0,,,,1420,549,0.003124,0.0
+owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,pp-doclayoutv3,p070,True,0.991597,0.990875,330,3,2,,16,0,22875,2638,0.027049,0.027049
 owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,tiles,p070,True,0.991142,0.994186,330,2,1,,3,0,4293,1659,0.009441,0.009441
 owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,whole,p071,True,1.0,1.0,529,0,0,,,,1420,672,0.003585,0.0
+owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,pp-doclayoutv3,p071,True,0.985498,0.994759,529,2,3,,6,0,8622,1629,0.012575,0.012575
 owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,tiles,p071,True,1.0,1.0,529,0,0,,3,0,4293,1439,0.008616,0.008616
 owner99,the 96;clippings;kind:printed,gemini-3.7-flash-gw,whole,p072,True,0.995357,0.993001,1071,1,1,,,,1420,1629,0.007174,0.0
+owner99,the 96;clippings;kind:printed,gemini-3.7-flash-gw,pp-doclayoutv3,p072,True,0.874835,0.962,1071,16,145,,23,0,33084,9866,0.06181,0.06181
 owner99,the 96;clippings;kind:printed,gemini-3.7-flash-gw,tiles,p072,True,0.475836,0.913293,1071,2,488,,3,0,4293,2383,0.012156,0.012156
 owner99,the 96;kind:printed,gemini-3.7-flash-gw,whole,p073,True,1.0,1.0,81,0,0,,,,1463,159,0.001693,0.0
+owner99,the 96;kind:printed,gemini-3.7-flash-gw,pp-doclayoutv3,p073,True,0.528757,0.576946,81,38,0,,8,0,11454,483,0.010402,0.010402
 owner99,the 96;kind:printed,gemini-3.7-flash-gw,tiles,p073,True,1.0,1.0,81,0,0,,3,0,4293,350,0.004532,0.004532
 owner99,the 96;kind:printed,gemini-3.7-flash-gw,whole,p074,True,0.980347,0.972732,448,0,0,,,,1458,1263,0.00583,0.0
+owner99,the 96;kind:printed,gemini-3.7-flash-gw,pp-doclayoutv3,p074,True,0.968786,0.971437,448,0,3,,8,0,11493,1706,0.015017,0.015017
 owner99,the 96;kind:printed,gemini-3.7-flash-gw,tiles,p074,True,0.980347,0.972732,448,0,0,,3,0,4293,1245,0.007888,0.007888
 owner99,the 96;clippings;kind:printed,gemini-3.7-flash-gw,whole,p075,True,0.998149,0.995894,252,0,0,,,,1448,465,0.00283,0.0
+owner99,the 96;clippings;kind:printed,gemini-3.7-flash-gw,pp-doclayoutv3,p075,True,0.971814,0.970493,252,5,2,,7,0,9877,1303,0.012294,0.012294
 owner99,the 96;clippings;kind:printed,gemini-3.7-flash-gw,tiles,p075,True,0.997528,0.993155,252,1,1,,4,0,5724,1358,0.009385,0.009385
 owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,whole,p076,True,0.941744,0.986631,470,1,28,,,,1448,709,0.003745,0.0
+owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,pp-doclayoutv3,p076,True,0.925163,0.979328,470,2,29,,14,0,20035,3312,0.027446,0.027446
 owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,tiles,p076,True,0.93879,0.985469,470,3,31,,3,0,4293,1021,0.007049,0.007049
 owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,whole,p077,True,0.996009,0.990364,321,1,1,,,,1458,456,0.002804,0.0
+owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,pp-doclayoutv3,p077,True,0.996579,0.992826,321,1,1,,2,0,2890,589,0.004376,0.004376
 owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,tiles,p077,True,0.996579,0.992826,321,1,1,,3,0,4293,3050,0.014657,0.014657
 owner99,the 96;clippings;kind:printed,gemini-3.7-flash-gw,whole,p078,True,0.994818,0.991189,922,0,0,,,,1420,1316,0.006,0.0
+owner99,the 96;clippings;kind:printed,gemini-3.7-flash-gw,pp-doclayoutv3,p078,True,0.74761,0.975206,922,0,67,,12,0,17237,3616,0.026488,0.026488
 owner99,the 96;clippings;kind:printed,gemini-3.7-flash-gw,tiles,p078,True,0.517851,0.916139,922,0,384,,3,0,4293,2630,0.013082,0.013082
 owner99,the 96;clippings;kind:typewritten,gemini-3.7-flash-gw,whole,p079,True,0.999471,1.0,274,1,2,,,,1420,475,0.002846,0.0
+owner99,the 96;clippings;kind:typewritten,gemini-3.7-flash-gw,pp-doclayoutv3,p079,True,1.0,1.0,274,0,0,,16,0,22775,2111,0.024997,0.024997
 owner99,the 96;clippings;kind:typewritten,gemini-3.7-flash-gw,tiles,p079,True,1.0,1.0,274,0,0,,3,0,4293,1708,0.009625,0.009625
 owner99,the 96;clippings;kind:printed,gemini-3.7-flash-gw,whole,p080,True,0.941231,0.984477,662,1,35,,,,1420,1089,0.005149,0.0
+owner99,the 96;clippings;kind:printed,gemini-3.7-flash-gw,pp-doclayoutv3,p080,True,0.807374,0.943046,662,19,98,,20,0,28812,9488,0.057189,0.057189
 owner99,the 96;clippings;kind:printed,gemini-3.7-flash-gw,tiles,p080,True,0.452399,0.881547,662,0,429,,3,0,4293,3136,0.01498,0.01498
 owner99,the 96;clippings;kind:printed,gemini-3.7-flash-gw,whole,p081,True,0.934713,0.922584,437,15,18,,,,1427,664,0.00356,0.0
+owner99,the 96;clippings;kind:printed,gemini-3.7-flash-gw,pp-doclayoutv3,p081,True,0.2401,0.281075,437,334,0,,4,0,5711,501,0.006162,0.006162
 owner99,the 96;clippings;kind:printed,gemini-3.7-flash-gw,tiles,p081,True,0.938402,0.95287,437,7,19,,5,0,7155,2979,0.016538,0.016538
 owner99,the 96;clippings;kind:printed,gemini-3.7-flash-gw,whole,p082,True,0.570175,0.837084,54,0,34,,,,1420,163,0.001676,0.0
+owner99,the 96;clippings;kind:printed,gemini-3.7-flash-gw,pp-doclayoutv3,p082,True,0.340047,0.625252,54,13,86,,11,0,15789,1583,0.017778,0.017778
 owner99,the 96;clippings;kind:printed,gemini-3.7-flash-gw,tiles,p082,True,0.570175,0.837084,54,0,34,,3,0,4293,470,0.004982,0.004982
 owner99,the 96;clippings;kind:printed,gemini-3.7-flash-gw,whole,p083,True,1.0,1.0,631,0,0,,,,1448,929,0.00457,0.0
+owner99,the 96;clippings;kind:printed,gemini-3.7-flash-gw,pp-doclayoutv3,p083,True,0.94825,0.974449,631,10,7,,22,0,31477,6024,0.046198,0.046198
 owner99,the 96;clippings;kind:printed,gemini-3.7-flash-gw,tiles,p083,True,0.531777,0.849049,631,0,555,,2,0,2862,1740,0.008671,0.008671
 owner99,the 96;clippings;kind:printed,gemini-3.7-flash-gw,whole,p084,True,1.0,1.0,567,0,0,,,,1466,792,0.00407,0.0
+owner99,the 96;clippings;kind:printed,gemini-3.7-flash-gw,pp-doclayoutv3,p084,True,0.939653,0.973819,567,0,9,,22,0,31601,6688,0.048781,0.048781
 owner99,the 96;clippings;kind:printed,gemini-3.7-flash-gw,tiles,p084,True,0.573338,0.885189,567,0,365,,2,0,2862,2080,0.009947,0.009947
 owner99,the 96;clippings;kind:printed,gemini-3.7-flash-gw,whole,p085,True,0.999515,0.998919,330,0,0,,,,1460,497,0.002959,0.0
+owner99,the 96;clippings;kind:printed,gemini-3.7-flash-gw,pp-doclayoutv3,p085,True,0.817079,0.85583,330,45,4,,4,0,5727,486,0.006118,0.006118
 owner99,the 96;clippings;kind:printed,gemini-3.7-flash-gw,tiles,p085,True,0.993732,0.996204,330,0,0,,4,0,5724,1552,0.010113,0.010113
 owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,whole,p087,True,1.0,1.0,656,0,0,,,,1420,892,0.00441,0.0
+owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,pp-doclayoutv3,p087,True,0.984143,0.986592,656,10,1,,4,0,5721,1562,0.010148,0.010148
 owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,tiles,p087,True,0.999221,0.99956,656,0,0,,3,0,4293,3757,0.017309,0.017309
 owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,whole,p088,True,0.996255,0.995155,452,2,2,,,,1458,678,0.003636,0.0
+owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,pp-doclayoutv3,p088,True,0.768165,0.820539,452,114,7,,9,0,12755,2577,0.01923,0.01923
 owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,tiles,p088,True,0.995131,0.995019,452,2,2,,3,0,4293,2194,0.011447,0.011447
 owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,whole,p089,True,0.993081,0.994618,295,0,0,,,,1420,416,0.002625,0.0
+owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,pp-doclayoutv3,p089,True,0.991485,0.99371,295,0,0,,13,0,18620,1138,0.018232,0.018232
 owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,tiles,p089,True,0.999468,0.997784,295,0,0,,3,0,4293,926,0.006692,0.006692
 owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,whole,p090,True,0.999183,0.996896,528,1,1,,,,1420,808,0.004095,0.0
+owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,pp-doclayoutv3,p090,True,0.997008,0.993974,528,0,0,,9,0,12958,4114,0.025146,0.025146
 owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,tiles,p090,True,0.994301,0.992742,528,4,3,,3,0,4293,3899,0.017841,0.017841
 owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,whole,p091,True,1.0,1.0,664,0,0,,,,1458,892,0.004438,0.0
+owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,pp-doclayoutv3,p091,True,0.979653,0.979323,664,15,1,,10,0,14103,3192,0.022547,0.022547
 owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,tiles,p091,True,1.0,1.0,664,0,0,,3,0,4293,1325,0.008188,0.008188
 owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,whole,p092,True,1.0,1.0,352,0,0,,,,1458,509,0.003002,0.0
+owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,pp-doclayoutv3,p092,True,0.993643,0.994791,352,2,0,,4,0,5765,637,0.006712,0.006712
 owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,tiles,p092,True,1.0,1.0,352,0,0,,3,0,4293,2061,0.010948,0.010948
 owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,whole,p093,True,0.999183,0.998569,419,0,0,,,,1458,659,0.003565,0.0
+owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,pp-doclayoutv3,p093,True,0.646915,0.690569,419,150,1,,9,0,12807,1339,0.014627,0.014627
 owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,tiles,p093,True,1.0,1.0,419,0,0,,3,0,4293,1620,0.009295,0.009295
 owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,whole,p095,True,0.999516,0.997906,391,0,0,,,,1458,522,0.003051,0.0
+owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,pp-doclayoutv3,p095,True,0.999033,0.995813,391,1,1,,3,0,4283,2453,0.012411,0.012411
 owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,tiles,p095,True,0.999516,0.997906,391,0,0,,3,0,4293,1692,0.009565,0.009565
 owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,whole,p097,True,1.0,1.0,320,0,0,,,,1420,935,0.004571,0.0
+owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,pp-doclayoutv3,p097,True,1.0,1.0,320,0,0,,12,0,17041,1242,0.017438,0.017438
 owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,tiles,p097,True,1.0,1.0,320,0,0,,3,0,4293,1634,0.009347,0.009347
 owner99,the 96;clippings;kind:typewritten,gemini-3.7-flash-gw,whole,p098,True,0.998045,1.0,155,0,0,,,,1458,636,0.003478,0.0
+owner99,the 96;clippings;kind:typewritten,gemini-3.7-flash-gw,pp-doclayoutv3,p098,True,0.765916,0.801341,155,35,0,,7,0,9989,1610,0.013529,0.013529
 owner99,the 96;clippings;kind:typewritten,gemini-3.7-flash-gw,tiles,p098,True,1.0,1.0,155,0,0,,3,0,4293,914,0.006647,0.006647
 owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,whole,p099,True,0.998635,0.994849,258,1,1,,,,1420,3506,0.014212,0.0
+owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,pp-doclayoutv3,p099,True,0.875974,0.967204,258,0,36,,2,0,2902,486,0.003999,0.003999
 owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,tiles,p099,True,0.99187,0.996103,258,0,0,,3,0,4293,496,0.00508,0.00508
 owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,whole,p100,True,0.957952,0.992872,165,2,1,,,,1420,1615,0.007121,0.0
+owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,pp-doclayoutv3,p100,True,0.927087,0.948695,165,27,54,,3,0,4379,566,0.005407,0.005407
 owner99,"the 96;typed, no table or clipping;kind:typewritten",gemini-3.7-flash-gw,tiles,p100,True,0.827407,0.995058,165,4,8,,3,0,4293,1890,0.010307,0.010307
 public895,L9,gemini-3.7-flash-gw,whole,newsbench__mss3413200223-28,True,0.980542,0.970714,5265,154,230,0.0,,,1441,7535,0.029337,0.029337
 public895,L9,gemini-3.7-flash-gw,pp-doclayoutv3,newsbench__mss3413200223-28,True,0.87064,0.956957,5265,148,568,0.059701,71,0,101797,24174,0.167,0.167
 public895,L9,gemini-3.7-flash-gw,tiles,newsbench__mss3413200223-28,True,0.449645,0.921344,5265,40,2074,0.666667,2,0,2862,9834,0.039024,0.039024
+public895,L9,gemini-3.7-flash-gw,whole,newsbench__mss3413201573-36,True,0.982147,0.968759,3295,117,206,0.0,,,1441,4942,0.019613,0.019613
+public895,L9,gemini-3.7-flash-gw,pp-doclayoutv3,newsbench__mss3413201573-36,True,0.791583,0.934849,3295,172,640,0.030303,76,0,109240,19583,0.155366,0.155366
+public895,L9,gemini-3.7-flash-gw,tiles,newsbench__mss3413201573-36,True,0.388518,0.870602,3295,59,2431,0.828571,3,0,4293,8369,0.034604,0.034604
+public895,L9,gemini-3.7-flash-gw,whole,newsbench__mss3413201417-29,True,0.972457,0.967501,4871,192,275,0.0,,,1466,7175,0.028006,0.028006
+public895,L9,gemini-3.7-flash-gw,pp-doclayoutv3,newsbench__mss3413201417-29,True,0.809357,0.937886,4871,213,789,0.0,93,0,133595,28760,0.208046,0.208046
+public895,L9,gemini-3.7-flash-gw,tiles,newsbench__mss3413201417-29,True,0.475344,0.887105,4871,94,2941,0.56,2,0,2862,11216,0.044206,0.044206
 public895,L4,gemini-3.7-flash-gw,whole,si__NMAAHC-007630087_00362,True,0.683381,0.716159,127,29,27,0.142857,,,1436,617,0.003391,0.003391
 public895,L4,gemini-3.7-flash-gw,pp-doclayoutv3,si__NMAAHC-007630087_00362,True,0.673352,0.655824,127,43,26,0.0,8,0,11520,2866,0.019387,0.019387
 public895,L4,gemini-3.7-flash-gw,tiles,si__NMAAHC-007630087_00362,True,0.674785,0.689168,127,27,26,0.0,2,0,2862,1952,0.009466,0.009466
+public895,L4,gemini-3.7-flash-gw,whole,si__NMAAHC-007630088_00144,True,0.913738,0.841038,52,5,8,0.0,,,1436,109,0.001486,0.001486
+public895,L4,gemini-3.7-flash-gw,pp-doclayoutv3,si__NMAAHC-007630088_00144,True,0.79288,0.770549,52,12,7,0.0,5,0,7172,1166,0.009751,0.009751
+public895,L4,gemini-3.7-flash-gw,tiles,si__NMAAHC-007630088_00144,True,0.967846,0.938605,52,4,7,0.0,3,0,4293,723,0.005931,0.005931
+public895,L4,gemini-3.7-flash-gw,whole,si__NMAAHC-007630088_00174,True,0.677618,0.780591,66,8,22,0.0,,,1463,190,0.00181,0.00181
+public895,L4,gemini-3.7-flash-gw,pp-doclayoutv3,si__NMAAHC-007630088_00174,True,0.436031,0.371464,66,44,15,0.0,4,0,5704,848,0.007458,0.007458
+public895,L4,gemini-3.7-flash-gw,tiles,si__NMAAHC-007630088_00174,True,0.649505,0.751579,66,7,27,0.0,3,0,4293,1530,0.008957,0.008957
+public895,L3,gemini-3.7-flash-gw,whole,btp__mss4602900305-1058,True,0.990971,0.986721,76,1,1,0.0,,,1429,207,0.001848,0.001848
+public895,L3,gemini-3.7-flash-gw,pp-doclayoutv3,btp__mss4602900305-1058,True,0.892938,0.90701,76,9,0,0.0,5,0,7112,322,0.006541,0.006541
+public895,L3,gemini-3.7-flash-gw,tiles,btp__mss4602900305-1058,True,0.995465,0.994742,76,0,0,0.0,2,0,2862,244,0.003061,0.003061
 public895,L3,gemini-3.7-flash-gw,whole,btp__mss4602900304-120,True,0.986003,0.973887,106,5,6,0.0,,,1436,452,0.002772,0.002772
 public895,L3,gemini-3.7-flash-gw,pp-doclayoutv3,btp__mss4602900304-120,True,0.979751,0.973308,106,5,6,0.0,9,0,12996,2060,0.017472,0.017472
 public895,L3,gemini-3.7-flash-gw,tiles,btp__mss4602900304-120,True,0.947683,0.961453,106,5,7,0.0,2,0,2862,596,0.004381,0.004381
+public895,L3,gemini-3.7-flash-gw,whole,btp__mss4602900306-1126,True,0.967742,0.959335,70,4,2,0.0,,,1429,645,0.003491,0.003491
+public895,L3,gemini-3.7-flash-gw,pp-doclayoutv3,btp__mss4602900306-1126,True,0.889785,0.903885,70,6,0,,6,0,8514,711,0.009052,0.009052
+public895,L3,gemini-3.7-flash-gw,tiles,btp__mss4602900306-1126,True,0.948925,0.945385,70,6,2,0.0,3,0,4293,656,0.00568,0.00568
+public895,L1,gemini-3.7-flash-gw,whole,btp__mss184240074-22,True,0.933929,0.872159,101,13,17,0.0,,,1422,462,0.002799,0.002799
+public895,L1,gemini-3.7-flash-gw,pp-doclayoutv3,btp__mss184240074-22,True,0.845173,0.817206,101,17,13,0.0,4,0,5725,2517,0.013732,0.013732
+public895,L1,gemini-3.7-flash-gw,tiles,btp__mss184240074-22,True,0.831826,0.77348,101,21,20,0.0,2,0,2862,820,0.005222,0.005222
 public895,L1,gemini-3.7-flash-gw,whole,btp__mss1288000002-290,True,0.985542,0.959763,74,3,4,0.0,,,1458,176,0.001754,0.001754
 public895,L1,gemini-3.7-flash-gw,pp-doclayoutv3,btp__mss1288000002-290,True,0.990338,0.970271,74,2,2,0.0,4,0,5726,882,0.007602,0.007602
 public895,L1,gemini-3.7-flash-gw,tiles,btp__mss1288000002-290,True,0.949029,0.928154,74,4,2,0.0,2,0,2862,474,0.003924,0.003924
+public895,L1,gemini-3.7-flash-gw,whole,btp__mss184240329-75,True,0.786458,0.671781,37,11,11,0.0,,,1422,1103,0.005203,0.005203
+public895,L1,gemini-3.7-flash-gw,pp-doclayoutv3,btp__mss184240329-75,True,0.756098,0.677295,37,12,9,0.0,1,0,1445,879,0.00438,0.00438
+public895,L1,gemini-3.7-flash-gw,tiles,btp__mss184240329-75,True,0.638655,0.669669,37,11,14,0.0,3,0,4293,2251,0.011661,0.011661
