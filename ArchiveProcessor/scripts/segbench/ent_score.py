@@ -567,9 +567,12 @@ def cmd_report(a):
                 ET.match(n["name"], e["name"], "overlap", e.get("alternates", ())) for e in truth):
             tab[n["model"]]["judged right, truth disagrees"] += 1
         if c and l:
-            agree["agree" if c == l else "disagree"] += 1
             if c != l:
                 tab[n["model"]]["auditor disagrees"] += 1
+    for n in {(n["id"], n["field"], n["name"]): n for n in names if not n["by_truth"]}.values():
+        c, l = judged("claude", n), judged("luna", n)       # each doubtful name once, whichever models gave it
+        if c and l:
+            agree["agree" if c == l else "disagree"] += 1
     out["nowhere"] = {"by_model": {m: dict(v) for m, v in tab.items()},
                       "totals": {m: sum(1 for n in names if n["model"] == m) for m in REPLIES},
                       "judge_agreement": dict(agree),
@@ -666,7 +669,42 @@ def report(s):
     return "\n".join(L) + "\n"
 
 
-READING = ["## Reading", "", "(to be written once the figures are final)", ""]
+READING = ["## Reading", "", """\
+**The app's fields are worth showing from the API and 27B routes, with an evidence rule; no local tagger replaces
+them.** Gemini 3.8 Flash's text-only tagging reply names the sender at ed2 F1 0.69, the recipient at 0.63 and the
+sending city at 0.90 (0.63 with the state); Qwen3.6 27B 0.60 / 0.59 / 0.70, Qwen3-VL 8B 0.56 / 0.55 / 0.72 and
+Qwen3.5 4B 0.50 / 0.42 / 0.46. The truth readers, with the page images and 8,000 characters, agree with the truth at
+0.89 to 0.96, so the tagging prompt leaves 20 to 30 points on the table: it sees text only, and only the first
+3,000 characters, past which 8 of the 82 documents' named senders sit. Whether a dedicated entity prompt, or the
+whole text, closes that is W46.ent-score-paid's question; the 27B behind Gemini by 10 points on the sender and the
+8B by 13 says the field degrades gracefully down to the Mac-local route and falls off at 4B.
+
+**A wrong name is rarer than a null for the better models.** On the sender Gemini is null on 22 of 77 documents
+and wrong on 9; the 27B null on 29, wrong on 12; the 4B null on 15 and wrong on 30. Showing the field means showing
+Gemini's wrong sender on about one document in nine and its wrong place on one in four, so the field needs its
+evidence beside it.
+
+**The evidence rule.** Of Gemini's 175 names, 56 are not in the text it saw. 38 of those the truth confirms (16
+corrected or completed a garbled name, 22 inferred a name the text does not carry and were right); of the 13 the
+judges saw, 11 were right (garble or knowledge) and 1 was an invention; the three Qwens invented 1, 2 and 0. So an
+unquoted name is right about four times in five and dropping it would lose more than it saves. The rule G §5
+proposed stands: a name whose quote is in the OCR text is shown as read; a name without a quote is shown marked
+inferred; a name found nowhere in the document is never silently shown as read. One leak needs closing in the app
+rather than in the rule: 2 to 10 names a model were lifted from the nearby documents' snippets the tagging prompt
+carries for dating, and the fields should be checked against the document's own text, not the whole prompt.
+
+**No local extractor for profile 1.** The best GLiNER2.5 setting (base, person / place / organisation spans under
+the letter position rule) reaches ed2 F1 0.24 sender / 0.29 recipient / 0.33 city on the 138; the schema and label
+calls, which GLiNER's authors leave unevaluated, do worse; NLTagger reaches 0.14 / 0.17 / 0.20. The ceiling row
+says why: a perfect rule over the spans would still find at most 60 of 138 named senders, 77 of 173 recipients and
+32 of 72 places, because the taggers do not mark most names in OCR letter text. A tenth of a second a document buys
+nothing usable, so the laptop route for these fields is a local LLM through the tagging prompt (Qwen3-VL 8B here),
+and a noise-aware fine-tune (G test 9) would have to close a 30-point gap, which is W46.ent-robust's call.
+
+**Limits.** 82 documents carry replies and 7 of them have two named recipients the single-string field cannot
+both hit. The judges share families with the truth's drafters; their 9 disagreements over 32 doubtful names are
+the ones an owner's eye would settle, and none moves the reading, so no owner sheet was made. Timings come from an
+unattended session at background QoS. Not an OCR or segmentation result, so ArchiveOCRBench is unchanged.""", ""]
 
 
 def main():
