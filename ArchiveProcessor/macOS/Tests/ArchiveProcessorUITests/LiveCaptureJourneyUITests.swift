@@ -11,7 +11,7 @@ import XCTest
 // Every other run skips it, because nothing else starts a phone. Apple Vision OCR, so no key and no money.
 //
 // Three phases, in this order, each a fresh app launch the phone leg pairs to:
-//   live  — 3 photos: card 1 saved with a subject, year and quality; card 2 skipped; card 3 saved with a
+//   live  — in the default No tagging mode, 3 photos: card 1 saved with a subject, year and quality; card 2 skipped; card 3 saved with a
 //           second subject. Finish, name the collection, finalize. Then the PDFs' Finder tags are decoded and
 //           the originals must have left the session folder (moved to the Trash) only with their output there.
 //   fail  — 2 photos, the output folder made read-only before finalize: nothing can be filed, so every
@@ -51,7 +51,9 @@ final class LiveCaptureJourneyUITests: XCTestCase {
     // MARK: Phases
 
     private func livePhase() throws {
-        let (out, backup) = try launchPhase("live", mode: "live")
+        // The default mode: saved Automatic, which Apple Vision without LLM judgement forces to No tagging.
+        // The card's values must still be written (W40.fix-live-vision-drops-card-tags).
+        let (out, backup) = try launchPhase("live", mode: "live", taggingMode: "automatic")
         // Printed first so the host's file record works even when an assertion below stops the test.
         print("[w40d5] live out=\(out.path) backup=\(backup.path)")
         try handCards([
@@ -78,6 +80,8 @@ final class LiveCaptureJourneyUITests: XCTestCase {
             XCTAssertTrue(a.contains("1973"), "card 1's typed year is a Year tag: \(a)")
             XCTAssertTrue(a.contains("q2"), "card 1's quality is the Q2 tag: \(a)")
         }
+        XCTAssertFalse(tagSets.contains { $0.contains("unread") },
+                       "No tagging writes only what a person set, never the generated Unread: \(report)")
         XCTAssertEqual(tagSets.filter { !$0.contains("w40d5 dean alpha") && !$0.contains("w40d5 dean bravo") }.count, 1,
                        "the skipped card's PDF carries neither typed subject: \(report)")
 
@@ -141,7 +145,8 @@ final class LiveCaptureJourneyUITests: XCTestCase {
 
     /// Launch one phase: fresh scratch output + session folder, the LAN receiver started, and the READY line
     /// written where the phone leg waits for it.
-    private func launchPhase(_ name: String, mode: String) throws -> (out: URL, backup: URL) {
+    private func launchPhase(_ name: String, mode: String,
+                             taggingMode: String = "copySource") throws -> (out: URL, backup: URL) {
         let root = scratchRoot.appendingPathComponent(name, isDirectory: true)
         let out = root.appendingPathComponent("out", isDirectory: true)
         let backup = root.appendingPathComponent("backup", isDirectory: true)
@@ -157,9 +162,8 @@ final class LiveCaptureJourneyUITests: XCTestCase {
             "-liveProcessingMode", mode,
             "-useAppleVision", "YES", "-visionUseLLMJudgment", "NO",
             "-useGateway", "NO", "-useLocalAgent", "NO",
-            // Copy source file tags: with Apple Vision and no LLM judgement the only other choice is No tagging,
-            // which writes no Finder tag at all, not even the tag card's (W40.fix-live-vision-drops-card-tags).
-            "-taggingModeRaw", "copySource",
+            // With Apple Vision and no LLM judgement, every saved mode but Copy source runs as No tagging.
+            "-taggingModeRaw", taggingMode,
             "-rotationModeRaw", "off", "-reviewRotation", "NO", "-mergeDocuments", "NO",
             "-tagVocabulary", "", "-outputDirectory", out.path
         ])

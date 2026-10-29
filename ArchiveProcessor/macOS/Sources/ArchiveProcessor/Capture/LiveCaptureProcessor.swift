@@ -1147,7 +1147,15 @@ final class LiveCaptureProcessor: ObservableObject {
         let mac = session.macTags[groupId]
         let segment = DocumentSegment(pdfURLs: group.photos.map { $0.url },
                                       isBox: group.type == .box, isFolder: group.type == .folder, texts: texts)
-        var tags = await computeTags(group: group, segment: segment, mac: mac, config: config)
+        // W40.fix-live-vision-drops-card-tags — No tagging means no GENERATED tags: no LLM subjects, no
+        // app colour, no Unread. What a person set (the card's subjects, and below its or the phone's date
+        // and Quality) is not generated, so it is still written. Apple Vision forces this mode, and the
+        // card it still offers used to be discarded without a word. A box or folder stays untagged: without
+        // its app colour, a phone year or Q would make its label photo read as a rated document.
+        let humanOnly = config.taggingMode == .none
+        var tags = humanOnly
+            ? GeneratedTags(subjectTags: mac?.subjects ?? [])
+            : await computeTags(group: group, segment: segment, mac: mac, config: config)
         // Phone's in-the-room date wins (Mac override beats the phone value).
         if let y = mac?.year ?? group.year { tags.year = String(y); tags.dateUncertain = false }
         if let m = mac?.month ?? group.month, let mt = GeneratedTags.monthTag(m) {
@@ -1156,14 +1164,15 @@ final class LiveCaptureProcessor: ObservableObject {
         // A saved Mac tag card is the operator's explicit Quality decision, including 0/unrated.
         // The phone's Q input is only the default when the card was skipped.
         if let mac { tags.quality = mac.quality }
+        let untaggedContainer = humanOnly && group.type != .document
 
         // Snapshot Sendable per-page work for the off-main file writes.
         let pages: [PageWork] = group.photos.enumerated().map { (i, p) in
-            let quality = mac.flatMap { DocumentTags.qualityTag(for: $0.quality) } ?? p.quality
+            let quality = untaggedContainer ? nil : Self.pageQuality(card: mac?.quality, phone: p.quality)
             return PageWork(sourceURL: p.url, result: results[i], quality: quality)
         }
         let gType = group.type, gOrder = group.order
-        let baseTags = tags.allTags
+        let baseTags = untaggedContainer ? [] : tags.allTags
         let doMerge = config.mergeDocuments && gType == .document && pages.count > 1
         let model = config.model, gatewayName = config.gateway?.displayName
         let localAgentDisplayName = config.localAgent?.provenanceDisplayName
@@ -1417,15 +1426,10 @@ final class LiveCaptureProcessor: ObservableObject {
             // withhold the deletion. Erring here keeps a photo we could have deleted; erring the other way
             // destroys an irreplaceable page.
             if imagePage != .embedded { placeholderSources.append(page.sourceURL) }
-            switch taggingMode {
-            case .none:
-                // No tagging means no Finder metadata write whatsoever, including the phone boundary.
-                break
-            default:
-                let tagList = tagsByApplyingPhoneQuality(baseTags, quality: page.quality)
-                if !tagStagedArtifact(tagList, at: stagedPDF, appColor: appColor, stampUnread: stampUnread) {
-                    untaggedOutputs.append(stagedPDF)
-                }
+            let tagList = tagsByApplyingPhoneQuality(baseTags, quality: page.quality)
+            if writesFinderTags(taggingMode, tagList),
+               !tagStagedArtifact(tagList, at: stagedPDF, appColor: appColor, stampUnread: stampUnread) {
+                untaggedOutputs.append(stagedPDF)
             }
             pdfURLs.append(stagedPDF)
 
@@ -1433,14 +1437,9 @@ final class LiveCaptureProcessor: ObservableObject {
             if outputImageFile {
                 let stagedImg = stagingDir.appendingPathComponent(base + ".jpg")
                 if ImageEncoding.writeSizedJPEG(from: page.sourceURL, to: stagedImg, targetMB: exportedImageMB, rotationDegrees: page.result.rotationDegrees) {
-                    switch taggingMode {
-                    case .none:
-                        break
-                    default:
-                        let tagList = tagsByApplyingPhoneQuality(baseTags, quality: page.quality)
-                        if !tagStagedArtifact(tagList, at: stagedImg, appColor: appColor, stampUnread: stampUnread) {
-                            untaggedOutputs.append(stagedImg)
-                        }
+                    if writesFinderTags(taggingMode, tagList),
+                       !tagStagedArtifact(tagList, at: stagedImg, appColor: appColor, stampUnread: stampUnread) {
+                        untaggedOutputs.append(stagedImg)
                     }
                     imageURLs.append(stagedImg)
                 }
@@ -1470,18 +1469,14 @@ final class LiveCaptureProcessor: ObservableObject {
                 // the merged output so the warning only ever names artifacts that still exist.
                 let constituents = Set(pdfURLs)
                 untaggedOutputs.removeAll { constituents.contains($0) }
-                switch taggingMode {
-                case .none:
-                    break
-                default:
-                    // Q3 is a page-level override, so a later page can outrank the group's first-page
-                    // default on the merged artifact. A saved Mac card has already normalized every page
-                    // to the same Q value, so this also preserves its decision.
-                    let mergedQuality = pages.first(where: { $0.quality == "Q3" })?.quality ?? pages.first?.quality
-                    let tagList = tagsByApplyingPhoneQuality(baseTags, quality: mergedQuality)
-                    if !tagStagedArtifact(tagList, at: mergedURL, appColor: appColor, stampUnread: stampUnread) {
-                        untaggedOutputs.append(mergedURL)
-                    }
+                // Q3 is a page-level override, so a later page can outrank the group's first-page
+                // default on the merged artifact. A saved Mac card has already normalized every page
+                // to the same Q value, so this also preserves its decision.
+                let mergedQuality = pages.first(where: { $0.quality == "Q3" })?.quality ?? pages.first?.quality
+                let tagList = tagsByApplyingPhoneQuality(baseTags, quality: mergedQuality)
+                if writesFinderTags(taggingMode, tagList),
+                   !tagStagedArtifact(tagList, at: mergedURL, appColor: appColor, stampUnread: stampUnread) {
+                    untaggedOutputs.append(mergedURL)
                 }
                 for u in pdfURLs { try? fm.removeItem(at: u) }
                 pdfURLs = [mergedURL]
@@ -1494,10 +1489,25 @@ final class LiveCaptureProcessor: ObservableObject {
                              untaggedOutputs: untaggedOutputs)
     }
 
-    /// Phone quality is a user rating intent, not a source Finder tag. In enabled tagging modes, apply
-    /// its canonical Q token once before every staged-PDF/image/merge write. The Mac-only `Q0` clear
-    /// marker removes a generated/base rating here instead of reaching copy-source output. `TaggingMode.none`
-    /// never calls this helper. Existing non-rating `baseTags` are otherwise untouched.
+    /// A page's Quality input: a saved card's decision, else the phone's. The card's 0 becomes the internal
+    /// `Q0` clear, so the phone's rating cannot come back as the page default after the operator cleared it
+    /// (W40.fix-live-vision-drops-card-tags review; before it, card 0 over a phone Q2 still wrote Q2).
+    nonisolated static func pageQuality(card: Int?, phone: String?) -> String? {
+        guard let card else { return phone }
+        return DocumentTags.qualityTag(for: card) ?? "Q0"
+    }
+
+    /// W40.fix-live-vision-drops-card-tags — whether a staged artifact gets a Finder-tag write. Every
+    /// tagging mode writes; No tagging writes only when a person set something (its `baseTags` hold just
+    /// the card's and phone's values), so an untouched page still gets no Finder metadata write at all.
+    nonisolated private static func writesFinderTags(_ mode: TaggingMode, _ tags: [String]) -> Bool {
+        mode != .none || !tags.isEmpty
+    }
+
+    /// Phone quality is a user rating intent, not a source Finder tag. In every mode, apply its
+    /// canonical Q token once before every staged-PDF/image/merge write. The Mac-only `Q0` clear
+    /// marker removes a generated/base rating here instead of reaching copy-source output. Existing
+    /// non-rating `baseTags` are otherwise untouched.
     nonisolated private static func tagsByApplyingPhoneQuality(_ baseTags: [String], quality raw: String?) -> [String] {
         guard let raw = raw?.trimmingCharacters(in: .whitespaces) else {
             return baseTags

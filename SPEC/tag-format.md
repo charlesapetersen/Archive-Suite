@@ -221,6 +221,11 @@ never crash (Reader `PDFTextExtractor`, `PDFPaneView`).
    `.human`; `autoDateManualSeg` was folded into `autoDate` by W36.seg-opt-review, 2026-10-11), Processor drops any incoming `Unread`, writes all other tags,
    then appends exactly one `Unread` as the final element (`MacOSTagger.applyTags`, lines 42–66).
    "No tagging" and "Copy source tags" modes stamp nothing and pass source tags through verbatim.
+   "No tagging" means no *generated* tag (no LLM subject or date, no app colour, no `Unread`); in
+   Live Capture it still writes what a person set: the tag card's subjects, date and Quality, and the
+   phone's date and Quality (W40.fix-live-vision-drops-card-tags). With nothing set, no write at all.
+   Box and folder photos stay untagged in this mode: without their colour, a year or Q would make a
+   label photo read as a rated document.
 7. **App-authoritative color.** In real-tagging modes Processor assigns exactly one of Red(box)/
    Purple(folder) and writes `.labelNumberKey` accordingly (or `0` to clear a stale swatch). A
    subject string equal to `"Red"`/`"Purple"` is **never** promoted to a color label

@@ -553,16 +553,62 @@ enum LiveCaptureRecoveryTestDriver {
               !tagsOf(clearQualityPDF).contains(where: DocumentTags.isRatingToken)
               && tagsOf(clearQualityPDF).contains("1948"))
 
-        // Unlike copy source, No tagging has no phone-quality boundary at all. The staged artifact is
-        // new, so an empty tag read-back proves Q3 did not create any tag as a side effect.
+        // W40.fix-live-vision-drops-card-tags — No tagging writes no GENERATED tag, but what a person set is
+        // not generated. The phone's Q3 alone reaches the staged PDF, with no Unread.
         let noTagQualityDoc = makeJPEG("no-tag-quality.jpg", in: tagDir)
         let noTagQualitySeg = LiveCaptureProcessor._recoveryTestStageSegment(
             sources: [noTagQualityDoc], stagingDir: tagDir, model: stubModel,
             type: .document, pageQuality: "Q3", jsonTags: GeneratedTags(),
             stampUnread: false, taggingMode: TaggingMode.none)
         let noTagQualityPDF = noTagQualitySeg.pdfURLs.first ?? tagDir
-        check("no-tagging staging leaves phone Q3 entirely out of Finder metadata",
-              tagsOf(noTagQualityPDF).isEmpty)
+        check("no-tagging staging writes the phone's Q3, and nothing else",
+              tagsOf(noTagQualityPDF) == ["Q3"] && noTagQualitySeg.untaggedOutputs.isEmpty)
+
+        // The card's subject, year and Q2 (the values `finalizeSegment` builds for No tagging) reach the
+        // PDF, its image mirror and a merged PDF, with no Unread and no colour label.
+        let noTagCard = GeneratedTags(year: "1973", subjectTags: ["W40d5 Dean Alpha"], quality: 2)
+        let noTagCardA = makeJPEG("no-tag-card-a.jpg", in: tagDir)
+        let noTagCardSeg = LiveCaptureProcessor._recoveryTestStageSegment(
+            sources: [noTagCardA], stagingDir: tagDir, model: stubModel,
+            type: .document, baseTags: noTagCard.allTags, pageQuality: "Q2", jsonTags: noTagCard,
+            stampUnread: false, taggingMode: TaggingMode.none, outputImageFile: true)
+        let noTagCardArtifacts = noTagCardSeg.pdfURLs + noTagCardSeg.imageURLs
+        check("no-tagging staging writes the tag card's subject, year and Q2 to the PDF and image mirror",
+              noTagCardArtifacts.count == 2 && noTagCardArtifacts.allSatisfy {
+                  Set(tagsOf($0)) == ["1973", "W40d5 Dean Alpha", "Q2"] && labelOf($0) == 0
+              })
+        let noTagMergeA = makeJPEG("no-tag-merge-a.jpg", in: tagDir)
+        let noTagMergeB = makeJPEG("no-tag-merge-b.jpg", in: tagDir)
+        let noTagMergeSeg = LiveCaptureProcessor._recoveryTestStageSegment(
+            sources: [noTagMergeA, noTagMergeB], stagingDir: tagDir, model: stubModel,
+            type: .document, baseTags: noTagCard.allTags, jsonTags: noTagCard,
+            stampUnread: false, taggingMode: TaggingMode.none, doMerge: true, pageQualities: ["Q2", "Q2"])
+        check("no-tagging staging writes the card's tags to a merged PDF too",
+              noTagMergeSeg.pdfURLs.count == 1
+              && Set(tagsOf(noTagMergeSeg.pdfURLs[0])) == ["1973", "W40d5 Dean Alpha", "Q2"])
+
+        // A card saved at 0 over a phone Q2 is the operator clearing it: the page input is the Q0 clear,
+        // and through the real writer the PDF carries no rating. A skipped card leaves the phone's value.
+        let clearedQuality = LiveCaptureProcessor.pageQuality(card: 0, phone: "Q2")
+        check("a card saved at Quality 0 overrides the phone's Q2 with the Q0 clear",
+              clearedQuality == "Q0" && LiveCaptureProcessor.pageQuality(card: nil, phone: "Q2") == "Q2"
+              && LiveCaptureProcessor.pageQuality(card: 3, phone: "Q1") == "Q3")
+        let clearedDoc = makeJPEG("no-tag-cleared.jpg", in: tagDir)
+        let clearedSeg = LiveCaptureProcessor._recoveryTestStageSegment(
+            sources: [clearedDoc], stagingDir: tagDir, model: stubModel,
+            type: .document, baseTags: ["1973"], pageQuality: clearedQuality, jsonTags: GeneratedTags(),
+            stampUnread: false, taggingMode: TaggingMode.none)
+        check("...and its PDF is written with the card's other values and no rating",
+              (clearedSeg.pdfURLs.first.map(tagsOf) ?? []) == ["1973"])
+
+        // A skipped card with no phone values: nothing a person set, so no Finder metadata write at all.
+        let noTagBareDoc = makeJPEG("no-tag-bare.jpg", in: tagDir)
+        let noTagBareSeg = LiveCaptureProcessor._recoveryTestStageSegment(
+            sources: [noTagBareDoc], stagingDir: tagDir, model: stubModel,
+            type: .document, jsonTags: GeneratedTags(), stampUnread: false, taggingMode: TaggingMode.none)
+        let noTagBarePDF = noTagBareSeg.pdfURLs.first ?? tagDir
+        check("no-tagging staging with nothing set writes no tag xattr at all",
+              getxattr(noTagBarePDF.path, "com.apple.metadata:_kMDItemUserTags", nil, 0, 0, 0) < 0)
 
         // (b) The app's OWN colour still lands. A box segment carries Red as an actual Finder label, exactly
         // once — proving (a) narrowed the colour source rather than disabling colouring altogether.

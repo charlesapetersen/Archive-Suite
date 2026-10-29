@@ -529,8 +529,9 @@ re-tag used to treat `Q1`–`Q3` as unknown subjects and discard them, and a mer
 with generated `appliedTags` that might not include a user-set Quality. The audited `MacOSTagger` transform
 now applies one explicit Q intent: `Q1`–`Q3` replaces the current rating, the internal-only `Q0` marker
 clears it without becoming a Finder tag, and no rating is invented from OCR. W19.q7 replaced the interim
-interim phone transport with a clean Q-only protocol — no P alias or migration path. No-tagging is a true
-no-op at the phone boundary. Copy-source keeps source names verbatim while applying the explicit phone Q
+interim phone transport with a clean Q-only protocol — no P alias or migration path. No-tagging was a true
+no-op at the phone boundary until W40.fix-live-vision-drops-card-tags (2026-10-29): it now writes the phone's and
+the tag card's human-set values, never a generated tag. Copy-source keeps source names verbatim while applying the explicit phone Q
 decision; the merge preserves its effective Q value and the image mirror carries the PDF's Q unchanged.
 `test-processfiles-tagwarn.sh` and `test-recovery.sh` exercise fresh re-tagging, Q0 clear, merging,
 image mirrors, and the phone Q3 staging path on scratch files. Current retained records require and retain
