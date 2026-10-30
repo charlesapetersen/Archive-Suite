@@ -8,6 +8,10 @@ source "$ROOT/support/sherlock/sh.env"
 export HF_HUB_OFFLINE=1 TOKENIZERS_PARALLELISM=false
 mkdir -p "$ROOT/logs" "$ROOT/runtime"
 "$FS_PY" "$ROOT/support/marks_scan.py" check --root "$ROOT"
+# One reader per pack: a second job on this ROOT would turn the first one's
+# in-flight request into "interrupted" and lose its reply.
+exec 9> "$ROOT/logs/read.lock"
+flock -n 9 || { echo 'another job is reading this pack'; exit 2; }
 CACHE="$HF_HOME/hub/models--Qwen--Qwen3.6-27B-FP8"
 if [ -f "$CACHE/refs/main" ]; then revision=$(cat "$CACHE/refs/main")
 else

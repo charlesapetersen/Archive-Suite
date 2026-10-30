@@ -1,21 +1,21 @@
 {
   "tag": "W46.fix-marks-set-draft",
-  "pack": "marks-preflag-20261025",
-  "mac": "artifacts/marks-preflag-20261025",
-  "submit": "support/marks-pilot-submit.sh",
+  "pack": "marks-scan-20261029",
+  "mac": "artifacts/marks-scan-20261029",
+  "submit": "support/marks-scan-submit.sh",
   "jobs": 2,
-  "gpu_hours": 1,
+  "gpu_hours": 3,
   "review": "execution-plans/items/W46.fix-marks-set-draft.md",
   "imports": [
-    {"dir": "support", "modules": ["marks_pilot"]},
+    {"dir": "support", "modules": ["marks_pilot", "marks_scan"]},
     {"modules": ["vllm"]}
   ],
   "creates": [
-    "$FS_ROOT/marks-preflag-20261025",
-    "$GROUP_HOME/$USER/archive-suite/sherlock-results/marks-preflag-20261025"
+    "$FS_ROOT/marks-scan-20261029",
+    "$GROUP_HOME/$USER/archive-suite/sherlock-results/marks-scan-20261029"
   ],
   "provenance": ["inventory.json"],
-  "results": "$GROUP_HOME/$USER/archive-suite/sherlock-results/marks-preflag-20261025",
-  "collect": ["$FS_ROOT/marks-preflag-20261025/jobs.tsv", "$FS_ROOT/marks-preflag-20261025/logs"],
-  "release": "15-page presence pilot collected into state/artifacts/marks-preflag-20261025; inspect before expansion"
+  "results": "$GROUP_HOME/$USER/archive-suite/sherlock-results/marks-scan-20261029",
+  "collect": ["$FS_ROOT/marks-scan-20261029/jobs.tsv", "$FS_ROOT/marks-scan-20261029/logs"],
+  "release": "marks pre-flag scan collected into state/artifacts/marks-scan-20261029; next session summarises and drafts the 150"
 }

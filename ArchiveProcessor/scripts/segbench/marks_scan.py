@@ -20,6 +20,7 @@ import re
 import shutil
 import statistics
 import time
+import urllib.error
 import urllib.request
 
 import marks_pilot as P
@@ -63,6 +64,29 @@ Report presence, not counts. Do not transcribe any text or produce coordinates. 
 FENCE = re.compile(r'\A\s*```(?:json)?[ \t]*\n(.*)\n[ \t]*```\s*\Z', re.S)
 
 
+def write_new(path, data):
+    """Like the pilot's, but a crash or a full disk never leaves a half-written file in place."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name('.' + path.name + '.' + str(os.getpid()) + '.tmp')
+    with tmp.open('xb') as f:
+        f.write(data)
+        f.flush()
+        os.fsync(f.fileno())
+    try:
+        os.link(tmp, path)  # fails if the receipt or intent already exists
+    finally:
+        tmp.unlink()
+
+
+class ServerGone(RuntimeError):
+    pass
+
+
+def refused(e):
+    reason = getattr(e, 'reason', e)
+    return isinstance(reason, ConnectionRefusedError)
+
+
 def order(rows, c):
     group = [r for r in rows if r['collection'] == c]
     return sorted(group, key=lambda r: P.digest((SEED + ':' + r['id']).encode()))
@@ -85,7 +109,7 @@ def prepare(out, pairs, originals, roots):
         raise ValueError('source and output overlap')
     rows = P.inventory(pairs, originals, roots)
     out.mkdir()  # fail on an existing draft; never overwrite corrected work
-    P.write_new(out / 'inventory.json', P.encoded(dict(seed=SEED, roots=roots, pages=rows,
+    write_new(out / 'inventory.json', P.encoded(dict(seed=SEED, roots=roots, pages=rows,
                                                       originals=str(originals),
                                                       pairs_sha256=P.file_hash(pairs))))
     pages, skipped, seen = [], [], {}
@@ -117,12 +141,12 @@ def prepare(out, pairs, originals, roots):
         dest = out / 'support' / name
         dest.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(HERE / name, dest)
-    P.write_new(out / 'scan.json', P.encoded(dict(pages=pages, skipped=skipped, prompt=PROMPT)))
+    write_new(out / 'scan.json', P.encoded(dict(pages=pages, skipped=skipped, prompt=PROMPT)))
     files = ['inventory.json', 'scan.json'] + [p['image'] for p in pages] + ['support/' + n for n in SUPPORT]
     frozen = dict(protocol=PROTOCOL, model=MODEL, served=SERVED, vllm_args=VLLM_ARGS,
                   max_tokens=MAX_TOKENS, timeout=TIMEOUT,
                   files={name: P.file_hash(out / name) for name in files})
-    P.write_new(out / 'freeze.json', P.encoded(frozen))
+    write_new(out / 'freeze.json', P.encoded(frozen))
     check(out)
     return dict(inventory=len(rows), scan=len(pages), skipped_duplicates=len(skipped),
                 collections=dict(Counter(p['collection'] for p in pages)),
@@ -222,8 +246,11 @@ def receipt_check(root, p, rec):
         raise ValueError('stale/mismatched receipt')
     if rec['status'] not in STATUSES:
         raise ValueError('invalid receipt outcome')
-    if rec['status'] != 'interrupted' and (not isinstance(rec.get('wall_s'), (int, float)) or rec['wall_s'] < 0):
+    wall = rec.get('wall_s')
+    if rec['status'] != 'interrupted' and (type(wall) not in (int, float) or wall < 0):
         raise ValueError('missing receipt timing')
+    if rec['status'] == 'cap' and rec['response']['choices'][0]['finish_reason'] != 'length':
+        raise ValueError('receipt result disagrees with saved response')
     if rec['status'] == 'ok':
         choice = rec['response']['choices'][0]
         obj, fenced, consistent = prediction(choice['message']['content'])
@@ -257,13 +284,13 @@ def read(root, url, runtime, deadline=None):
             old_intent = P.load(intent)
             if old_intent != identity(root, p, old_intent['runtime']):
                 raise ValueError('stale intent')
-            P.write_new(dest, P.encoded(dict(**old_intent, status='interrupted')))
+            write_new(dest, P.encoded(dict(**old_intent, status='interrupted')))
             print(p['id'], 'interrupted', flush=True)
             continue
         if deadline is not None and time.monotonic() - started > deadline:
             print('deadline reached; remaining pages left unread for a later job', flush=True)
             return
-        P.write_new(intent, P.encoded(meta))
+        write_new(intent, P.encoded(meta))
         rec = dict(**meta, status='error')
         start = time.monotonic()
         try:
@@ -285,9 +312,14 @@ def read(root, url, runtime, deadline=None):
                 rec['prediction'], rec['fenced'], rec['consistent'] = prediction(choice['message']['content'])
                 rec['status'] = 'ok'
         except (OSError, ValueError, KeyError, IndexError, TypeError, http.client.HTTPException) as e:
+            if refused(e):
+                # Nothing reached the server, so nothing was read: the intent goes and
+                # the job stops, leaving this and later pages for a later job.
+                intent.unlink()
+                raise ServerGone('loopback server refused the connection; read stopped') from e
             rec['error'] = str(e)[:500]
         rec['wall_s'] = round(time.monotonic() - start, 4)
-        P.write_new(dest, P.encoded(rec))
+        write_new(dest, P.encoded(rec))
         print(p['id'], rec['status'], flush=True)
 
 
@@ -361,7 +393,7 @@ def main():
                        served=SERVED + '-' + os.environ.get('SLURM_JOB_ID', ''),
                        vllm_version=importlib.metadata.version('vllm'),
                        transformers_version=importlib.metadata.version('transformers'))
-        runtime_check(runtime); P.write_new(a.out, P.encoded(runtime))
+        runtime_check(runtime); write_new(a.out, P.encoded(runtime))
 
 
 if __name__ == '__main__':

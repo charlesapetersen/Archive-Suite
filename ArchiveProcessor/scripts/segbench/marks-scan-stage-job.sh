@@ -1,9 +1,9 @@
 #!/bin/bash
-#SBATCH --job-name=w46-marks-stage
+#SBATCH --job-name=w46-marks-scan-stage
 #SBATCH --partition=normal
 #SBATCH --cpus-per-task=2
 #SBATCH --mem=4G
-#SBATCH --time=00:10:00
+#SBATCH --time=00:30:00
 # New Mac pack; CPU-node copies follow sherlock/stage-job.sh's container pattern.
 set -euo pipefail
 SOURCE="$1"; ROOT="$2"; SH_DIR="$3"

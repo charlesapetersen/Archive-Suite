@@ -184,6 +184,25 @@ class Scratch(unittest.TestCase):
         self.assertEqual(len(calls), 19)
         self.assertEqual(S.summary(self.root)['status'], {'ok': 19, 'interrupted': 1})
 
+    def test_dead_server_stops_the_read_without_burning_pages(self):
+        self.prepare()
+        with server() as (url, _):
+            pass  # shut down: the port now refuses connections
+        with self.assertRaises(S.ServerGone):
+            S.read(self.root, url, self.runtime)
+        self.assertEqual(list((self.root / 'intents').glob('*')), [])
+        self.assertEqual(list((self.root / 'out').glob('*')), [])
+        with server() as (url, calls):
+            S.read(self.root, url, self.runtime)
+        self.assertEqual((len(calls), S.summary(self.root)['status']), (20, {'ok': 20}))
+
+    def test_receipts_written_whole_and_never_overwritten(self):
+        path = self.base / 'w' / 'r.json'
+        S.write_new(path, b'{}')
+        with self.assertRaises(FileExistsError):
+            S.write_new(path, b'{"x": 1}')
+        self.assertEqual((path.read_bytes(), sorted(p.name for p in path.parent.iterdir())), (b'{}', ['r.json']))
+
     def test_deadline_leaves_pages_unread_and_summary_says_so(self):
         self.prepare()
         with server() as (url, calls):
