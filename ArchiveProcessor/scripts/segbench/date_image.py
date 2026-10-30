@@ -3,6 +3,7 @@
 
     <lab venv>/bin/python date_image.py pack --out DIR    # the 131 unprinted-year documents' pages, two variants
     run-guarded.sh --label date-image --need-gb 8 -- <lab venv>/bin/python date_image.py collect-mac [--side 1400]
+    python3 date_image.py vision             # Apple Vision text of the targets' pages, for the scorer's check
     python3 date_image.py score              # segbench-results/date-image.md and .json
     <lab venv>/bin/python date_image.py prints   # Vision feature prints of the targets' folder neighbours (JPEGs)
     python3 date_image.py retrieve           # look-alike retrieval, appended to the same results (run after score)
@@ -602,6 +603,40 @@ def cmd_retrieve(a):
     print("\n".join(L))
 
 
+def cmd_vision(a):
+    """Apple Vision text of the targets' first pages, for the scorer's check, into date_traceable's cache (its renderer
+    and reader; the corpus is only read). That cache may have moved to the owner's backup (2026-10-30); this rebuilds
+    only the pages page_sources() reads. Resumable."""
+    import subprocess
+    import corpus_survey as CS
+    import data as D
+    import date_traceable as T
+    import enclosure_split as ES
+    _, found = ES.load()
+    pages = []
+    for d in T.owner_docs("abbyy"):
+        info = found.get(d["id"][2:])
+        pages += info["segs"][info["k"]]["pages"][:PAGES] if info else []
+    tool = D.build_ocr_tool()
+    if tool is None:
+        raise SystemExit("ocr.swift did not compile")
+    for sub in ("img", "txt"):
+        os.makedirs(os.path.join(T.VISION, sub), exist_ok=True)
+    jobs = os.path.join(T.VISION, "jobs-date-image.tsv")
+    with open(jobs, "w", encoding="utf-8") as fh:
+        for p in pages:
+            img, txt = T.vision_page(p)
+            if os.path.exists(txt):
+                continue
+            if not os.path.exists(img):
+                subprocess.run(["/usr/bin/sips", "-Z", str(T.VISION_PX), "-s", "format", "jpeg",
+                                os.path.join(CS.CORPUS, p), "--out", img], capture_output=True, check=False)
+            if os.path.exists(img):
+                fh.write(f"{img}\t{txt}\n")
+    subprocess.run([str(tool), jobs], check=False)
+    print(f"{sum(os.path.exists(T.vision_page(p)[1]) for p in pages)} of {len(pages)} pages have Vision text")
+
+
 RESULTS = str(HERE.parent.parent / "segbench-results" / "date-image.md")
 MAX_TOKENS = 700
 
@@ -616,11 +651,12 @@ def main():
     p.add_argument("--variant", choices=("image", "image+text")); p.add_argument("--limit", type=int)
     p = sub.add_parser("score"); p.add_argument("--cluster", type=Path, default=CLUSTER)
     p.add_argument("--pack", type=Path, default=PACK)
+    sub.add_parser("vision")
     for name in ("prints", "retrieve"):
         p = sub.add_parser(name); p.add_argument("--pack", type=Path, default=PACK)
     a = ap.parse_args()
     {"pack": cmd_pack, "collect-mac": cmd_collect_mac, "score": cmd_score, "prints": cmd_prints,
-     "retrieve": cmd_retrieve}[a.cmd](a)
+     "retrieve": cmd_retrieve, "vision": cmd_vision}[a.cmd](a)
 
 
 if __name__ == "__main__":

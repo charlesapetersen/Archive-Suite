@@ -10,7 +10,8 @@ Measures, per document: **doc year** the document date the model gave equals the
 |---|---|---|---|---|---|---|---|---|
 | Qwen3.6-27B (Sherlock, vLLM, 2,400 px) | image | 122/122 (100%) | 48/122 (39%) | 55/122 (45%) | 52/122 (43%) | 39/52 (75%) | 36/52 (69%) | 17.5 |
 | Qwen3.6-27B (Sherlock, vLLM, 2,400 px) | image+text | 122/122 (100%) | 51/122 (42%) | 58/122 (48%) | 54/122 (44%) | 40/54 (74%) | 36/54 (67%) | 19.1 |
-| Qwen3-VL 8B, 4-bit MLX (this Mac, 1,400 px) | image | 4/4 (100%) | 2/4 (50%) | 2/4 (50%) | 3/4 (75%) | 3/3 (100%) | 3/3 (100%) | 10.79 |
+| Qwen3-VL 8B, 4-bit MLX (this Mac, 1,400 px) | image | 122/122 (100%) | 20/122 (16%) | 22/122 (18%) | 39/122 (32%) | 33/39 (85%) | 27/39 (69%) | 12.05 |
+| Qwen3-VL 8B, 4-bit MLX (this Mac, 1,400 px) | image+text | 28/28 (100%) | 9/28 (32%) | 10/28 (36%) | 12/28 (43%) | 9/12 (75%) | 10/12 (83%) | 18.53 |
 
 ## By class (doc year exact / on the page)
 
@@ -20,18 +21,20 @@ D has no printed carrier anywhere near it; A had a previous document printing th
 |---|---|---|---|---|---|---|
 | Qwen3.6-27B (Sherlock, vLLM, 2,400 px) | image | 10 / 11 of 17 | 10 / 10 of 31 | 15 / 16 of 35 | 11 / 11 of 32 | 2 / 4 of 7 |
 | Qwen3.6-27B (Sherlock, vLLM, 2,400 px) | image+text | 11 / 10 of 17 | 10 / 10 of 31 | 16 / 17 of 35 | 11 / 13 of 32 | 3 / 4 of 7 |
-| Qwen3-VL 8B, 4-bit MLX (this Mac, 1,400 px) | image | 2 / 3 of 4 | 0 / 0 of 0 | 0 / 0 of 0 | 0 / 0 of 0 | 0 / 0 of 0 |
+| Qwen3-VL 8B, 4-bit MLX (this Mac, 1,400 px) | image | 5 / 9 of 17 | 2 / 9 of 31 | 7 / 10 of 35 | 4 / 7 of 32 | 2 / 4 of 7 |
+| Qwen3-VL 8B, 4-bit MLX (this Mac, 1,400 px) | image+text | 6 / 8 of 17 | 1 / 2 of 4 | 1 / 1 of 4 | 1 / 1 of 3 | 0 / 0 of 0 |
 
 ## What the page dates are
 
 Of the documents whose owner year was found written on the page (either variant), the first such date: its kind, where it is, and which page. The handwritten share decides whether the handwritten-date reader (B test 8) is worth filing.
 
 - **Qwen3.6-27B (Sherlock, vLLM, 2,400 px)**, 55 documents. Kind: typed 22, printed 19, handwritten 9, stamped 5. Where: dateline 15, other 10, body 9, letterhead 8, margin 8, stamp 5. Page: 1 50, 2 5.
-- **Qwen3-VL 8B, 4-bit MLX (this Mac, 1,400 px)**, 3 documents. Kind: printed 2, typed 1. Where: letterhead 3. Page: 1 3.
+- **Qwen3-VL 8B, 4-bit MLX (this Mac, 1,400 px)**, 39 documents. Kind: printed 21, typed 9, handwritten 7, stamped 2. Where: letterhead 17, dateline 8, margin 7, body 4, bottom right 2, stamp 1. Page: 1 39.
 
 ## Images alone against images with the text
 
 - **Qwen3.6-27B (Sherlock, vLLM, 2,400 px)**, 122 documents: right in both 48, only with images alone 0, only with the text added 3, neither 71.
+- **Qwen3-VL 8B, 4-bit MLX (this Mac, 1,400 px)**, 28 documents: right in both 7, only with images alone 1, only with the text added 2, neither 18.
 
 ## Against the owner's own reading of the page
 
@@ -39,8 +42,8 @@ Of the documents whose owner year was found written on the page (either variant)
 
 - **Qwen3.6-27B (Sherlock, vLLM, 2,400 px)**: found the owner's year on the page for 20/27 (74%); kind as the owner gave it for 19 of those 20. Missed: d06 (printed or typed, legible), d18 (printed or typed, legible), d20 (printed or typed, legible), a32 (handwritten, legible), a30 (printed or typed, illegible), a16 (printed or typed, legible), a08 (printed or typed, legible).
   Where the owner's tag differs from the year the owner read on the page (d06 tag 1965, read 1967, d18 tag 1935, read 1936, d20 tag 1935, read 1936, a08 tag 1984, read 1985), the model quoted the year the owner read on 4 of 4.
-- **Qwen3-VL 8B, 4-bit MLX (this Mac, 1,400 px)**: found the owner's year on the page for 3/27 (11%); kind as the owner gave it for 3 of those 3. Missed: d13 (printed or typed, legible), d16 (printed or typed, legible), d01 (printed or typed, legible), d05 (printed or typed, legible), d06 (printed or typed, legible), d12 (None, legible), d07 (printed or typed, legible), d18 (printed or typed, legible), d08 (printed or typed, legible), d20 (printed or typed, legible), a04 (printed or typed, legible), a06 (stamped, legible), a18 (printed or typed, legible), a32 (handwritten, legible), a30 (printed or typed, illegible), a02 (handwritten, legible), a14 (printed or typed, legible), a16 (printed or typed, legible), a07 (handwritten, legible), a08 (printed or typed, legible), a09 (printed or typed, legible), a17 (printed or typed, legible), a12 (handwritten, legible), a01 (stamped, legible).
-  Where the owner's tag differs from the year the owner read on the page (d06 tag 1965, read 1967, d18 tag 1935, read 1936, d20 tag 1935, read 1936, a08 tag 1984, read 1985), the model quoted the year the owner read on 0 of 4.
+- **Qwen3-VL 8B, 4-bit MLX (this Mac, 1,400 px)**: found the owner's year on the page for 16/27 (59%); kind as the owner gave it for 14 of those 16. Missed: d13 (printed or typed, legible), d06 (printed or typed, legible), d18 (printed or typed, legible), d20 (printed or typed, legible), a06 (stamped, legible), a32 (handwritten, legible), a30 (printed or typed, illegible), a16 (printed or typed, legible), a07 (handwritten, legible), a08 (printed or typed, legible), a17 (printed or typed, legible).
+  Where the owner's tag differs from the year the owner read on the page (d06 tag 1965, read 1967, d18 tag 1935, read 1936, d20 tag 1935, read 1936, a08 tag 1984, read 1985), the model quoted the year the owner read on 3 of 4.
 
 ## Look-alike retrieval (B test 6)
 
