@@ -83,10 +83,13 @@ def tiers_of(score):
     return {p: TIERS[min(2, 3 * i // n)] for i, p in enumerate(order)}
 
 
-def analyse(prices, names, app_routes):
+def analyse(prices, names, app_routes, fitted=None):
     """prices: route -> standard $ per 1,000 pages (the bench's); names: route -> display name; app_routes: the
-    routes a user of the app could run (hosted, Apple Vision, the Mac), against which cascades are built."""
+    routes a user of the app could run (hosted, Apple Vision, the Mac), against which cascades are built; fitted: the
+    routes the difficulty fit reads (all of ocr-pages.csv's when None)."""
     rows, agree = load()
+    if fitted is not None:
+        rows = [r for r in rows if r["route"] in fitted]
     routes = list(dict.fromkeys(r["route"] for r in rows))
     pages = sorted({r["page"] for r in rows})
     nes, ok, kind, said, cost, words, hyp = (defaultdict(dict) for _ in range(7))

@@ -29,14 +29,17 @@ import ocr_panel_score as S
 CACHES = P.CACHE.parent
 LOCAL, CLOUD = CACHES / 'ocr-panel-local', CACHES / 'ocr-panel-cloud'
 BENCH_INPUTS = P.RESULTS.parents[1] / 'ArchiveOCRBench' / 'data' / 'inputs.json'
-FARMSHARE = {'qwen3.6-27b-farmshare': P.RESULTS / 'farmshare' / 'truth' / 'qwen3.6-27b-1849739' / 'pages.csv'}
+# W46.ocr-rescore-offline: every FarmShare and Sherlock run on the bench's charts (inputs.json's own_hardware routes
+# with a run), from its committed pages.csv, and Gemini 3.7 Flash's gateway reading of the 96 (gateway_gemini.py).
+FARMSHARE_TRUTH = P.RESULTS / 'farmshare' / 'truth'
+GATEWAY_ROUTE, GATEWAY = 'gemini3.7-flash-gw', CACHES / 'gateway-gemini' / 'panel'
 MAC = ('qwen3-vl-8b-mlx4', 'lightonocr-3-4b-mlx8', 'qwen3.5-9b-mlx4')
 # The cheap readers whose texts are compared pairwise: free, or $1 or less per 1,000 pages on the bench.
 CHEAP = ('apple-vision', *MAC, 'qwen3.5-9b', 'mistral-small-24b', 'gemma4-31b', 'gemma4-26b-a4b', 'qwen3.6-35b-a3b',
          'qwen3.8-flash', 'qwen3.5-35b-a3b', 'qwen3-vl-30b-a3b')
 PAGES_CSV = P.RESULTS / 'ocr-pages.csv'
 AGREE_CSV = P.RESULTS / 'ocr-pages-agree.csv'
-FIELDS = ['route', 'page', 'kind', 'said_kind', 'vision_kind', 'ok', 'nes', 'cost', 'words', 'hyp_words',
+FIELDS = ['route', 'page', 'kind', 'said_kind', 'vision_kind', 'ok', 'failure', 'nes', 'cost', 'words', 'hyp_words',
           'completion_tokens', 'finish']
 # W41.bench-vision-kind: vision_kind/run.sh's output for the panel's originals and the bulk pilot's 2,000 pages.
 VISION_KIND = CACHES / 'vision-kind'
@@ -55,12 +58,45 @@ def vision_kinds(*names):
     return out
 
 
+def failure(ok, finish, completion_tokens, meta=None) -> str:
+    """Why a page has no reading (the measurement audit's OCR-2). transport: the provider or the connection lost the
+    request, so the model never finished an answer (a 5xx, an interrupted stream, no finish reason, an error after
+    tokens began). The model's own: cap (it ran to the token cap, nearly always a loop), refusal (a content filter,
+    or an error before any token: Gemini's refusals of reprinted text) and empty (it stopped but left nothing
+    usable)."""
+    if ok:
+        return ''
+    tokens = None if completion_tokens is None or str(completion_tokens).strip() in ('', 'None') else int(completion_tokens)
+    if finish in ('length', 'cap'):
+        return 'cap'
+    if finish == 'content_filter' or (finish == 'error' and tokens == 0):
+        return 'refusal'
+    if finish in ('stop', 'unparsable', 'unparsed'):
+        return 'empty'
+    if finish in ('provider-error', 'interrupted', 'error', '', None, 'None') or (meta or {}).get('error_code'):
+        return 'transport'
+    raise SystemExit(f'unclassified failure: finish {finish!r}, {tokens} tokens')
+
+
+def farmshare_failure(r: dict, summary: dict) -> str:
+    """A cluster run's failed page: its outcome (cap, unparsable) or status (cap, unparsed). A run that recorded
+    neither (CHURRO's first run) counted only caps as failures, as its summary's note says."""
+    why = next((r.get(k) for k in ('outcome', 'status') if r.get(k) not in (None, '', 'ok')), None)
+    if why is None and 'caps count as failures' in summary.get('env', {}).get('note', ''):
+        why = 'cap'
+    return failure(r['ok'] == 'True', why or 'unrecorded', None)
+
+
 def load(f):
     return json.loads(f.read_text()) if f.exists() else {}
 
 
 def reading(route, job):
     """(parsed-or-None, meta) as the route's own report reads it."""
+    if route == GATEWAY_ROUTE:
+        import gateway_gemini as G
+        got = load(GATEWAY / (job + '.json'))
+        return G.parsed(got), got.get('meta') or {}
     if route == 'apple-vision':
         f = LOCAL / 'vision' / (job + '.txt')
         return ({'text': f.read_text(), 'kind': None} if f.exists() else None), {}
@@ -79,6 +115,8 @@ def reading(route, job):
 def main():
     inputs = json.loads(BENCH_INPUTS.read_text())
     routes = [*inputs['routes'], *inputs['own_hardware']['routes']]
+    farmshare = {rid: FARMSHARE_TRUTH / spec['run'] / 'pages.csv' for rid, spec in inputs['own_hardware']['routes'].items()
+                 if spec['where'] == 'farmshare'}
     truth_kind = {r['page']: r['kind'] for r in P.rows()}
     pages = sorted(p for p in truth_kind if p not in P.AGREEMENT)
     truth = {p: (P.TRUTH / 'truth' / (p + '.txt')).read_text() for p in pages}
@@ -91,17 +129,26 @@ def main():
     vk = vision_kinds('panel.tsv')
     rows, texts = [], {}
     for route in routes:
-        if route in FARMSHARE:
-            with FARMSHARE[route].open(newline='') as f:
+        if route in farmshare:
+            with farmshare[route].open(newline='') as f:
                 fs = {r['page']: r for r in csv.DictReader(f)}
+            summary = load(farmshare[route].with_name('summary.json'))
         for p in pages:
             job = p + '-original'
             parsed, meta = reading(route, job)
-            if route in FARMSHARE:
+            if route in farmshare:
                 r = fs[p]
+                # status is the harness's outcome (ok, cap, unparsed); finish the decoder's, where the run kept one
+                status = r.get('status') or r.get('outcome') or ''
                 row = {'ok': r['ok'] == 'True', 'nes': float(r['nes']), 'cost': 0, 'words': r['words'],
-                       'hyp_words': r['hyp_words'], 'completion_tokens': r['completion_tokens'], 'said_kind': '',
-                       'finish': r['status']}
+                       'hyp_words': r.get('hyp_words', ''), 'completion_tokens': r.get('completion_tokens', ''),
+                       'said_kind': '', 'finish': status}
+                row['failure'] = farmshare_failure(r, summary)
+            elif route == GATEWAY_ROUTE:
+                s = S.score(truth[p], parsed['text'] if parsed else '')
+                row = {**s, 'ok': bool(parsed), 'cost': meta.get('cost', 0),
+                       'completion_tokens': (meta.get('usage') or {}).get('completion_tokens'),
+                       'finish': meta.get('finish', '')}
             elif route in MAC:
                 s = S.score(truth[p], parsed['text'] if parsed else '')
                 row = {**s, 'ok': bool(parsed), 'cost': 0, 'completion_tokens': meta.get('completion_tokens'),
@@ -112,7 +159,8 @@ def main():
                 row['finish'] = meta.get('finish_reason') or meta.get('finish') or ''
                 if bool(parsed) != bool(row['ok']):
                     raise SystemExit(f'{route} {p}: scores.json and the reading disagree on whether it answered')
-            if route not in FARMSHARE:
+            if route not in farmshare:
+                row['failure'] = failure(row['ok'], row['finish'], row['completion_tokens'], meta)
                 row['said_kind'] = (parsed or {}).get('kind') or ''
             rows.append({'route': route, 'page': p, 'kind': truth_kind[p],
                          'vision_kind': vk.get(p, {}).get('vision_kind', ''), **row,

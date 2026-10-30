@@ -78,8 +78,14 @@ footer p { font-size: 13px; }
   <header class="part" id="ocr">
     <div class="eyebrow">Part 1 · OCR panel · 96 truth pages</div>
     <h2>OCR price and accuracy</h2>
-    <p>Each point is one route: its NES score against what 1,000 pages cost. NES is character edit similarity to the adjudicated truth, so 96 means about 4% of characters would need fixing. A failed page scores 0. Where a provider sells batch processing, the route appears twice, at its standard and batch price, joined by a dotted line. Some routes ran on our own hardware rather than a paid endpoint. Those on the owner's Mac sit in the free column. Every open-weight model read on these 96 pages on Stanford's FarmShare cluster is here too. FarmShare bills nothing, so a FarmShare run of a model OpenRouter sells (□) is priced at what OpenRouter charges for the same model, from the run's own measured tokens. A run of a model OpenRouter does not sell (✶: GLM-OCR, LightOnOCR-3, PaddleOCR-VL 1.5, PP-OCRv6, CHURRO-3B, Qwen3.5 4B) has no hosted price: it sits in the free column, just right of the Mac routes, as free on a university cluster, and its GPU-hours are in the tables. Native rows use their model card's own prompt, as in part 4. A route on our own hardware that is the same model as a hosted route is listed in the tables under that route.</p>
+    <p>Each point is one route: its NES score against what 1,000 pages cost. NES is character edit similarity to the adjudicated truth, so 96 means about 4% of characters would need fixing. On the charts a failed page scores 0; the ranking table first gives the score on answered pages, the headline, with the failures beside it. Where a provider sells batch processing, the route appears twice, at its standard and batch price, joined by a dotted line. Some routes ran on our own hardware rather than a paid endpoint. Those on the owner's Mac sit in the free column. Every open-weight model read on these 96 pages on Stanford's FarmShare cluster is here too. FarmShare bills nothing, so a FarmShare run of a model OpenRouter sells (□) is priced at what OpenRouter charges for the same model, from the run's own measured tokens. A run of a model OpenRouter does not sell (✶: GLM-OCR, LightOnOCR-3, PaddleOCR-VL 1.5, PP-OCRv6, CHURRO-3B, Qwen3.5 4B) has no hosted price: it sits in the free column, just right of the Mac routes, as free on a university cluster, and its GPU-hours are in the tables. Native rows use their model card's own prompt, as in part 4. A route on our own hardware that is the same model as a hosted route is listed in the tables under that route.</p>
   </header>
+
+  <section class="panel" aria-labelledby="headhead">
+    <div class="head"><h2 id="headhead">The ranking: accuracy on the pages each route answered</h2><span class="meta" id="head-meta"></span></div>
+    <p class="note">The headline score is NES on the pages a route answered, with its failures beside it: a page that fails goes on to another reader, so it is not inaccurate text. The charts below score a failed page 0, which let a route's failures, not its reading, set the top of the ranking (the measurement audit's OCR-2, 2026-10-30). Failures are split: <em>provider</em> is the provider or the connection losing the request (a 5xx, an interrupted or broken stream), so the model never answered; <em>model</em> is the model's own (caps: ran to the token cap, nearly always a loop; refusals: a content filter, or Gemini's refusal of reprinted text; empty: stopped with nothing usable). The paired column is the route less Qwen3.6 27B (the local panel's hosted reading) on the pages both answered, with a 95% bootstrap interval over pages; an interval that crosses 0 is a tie. Page p081 is reported apart, since the owner cannot correct its truth. A route marked "96 only" has not read the 895 public pages itself, so it is missing from the comparison on independent truth (W43.sweep holds most hosted routes). Source: <code>ocr-pages.csv</code>.</p>
+    <div class="tbl"><table><thead><tr><th>#</th><th>Route</th><th>NES, answered</th><th>Answered</th><th>Failed: provider</th><th>Failed: model</th><th>Less Qwen3.6 27B, pages both answered</th><th>Strict NES</th><th>p081</th><th>The 895</th></tr></thead><tbody id="head-rows"></tbody></table></div>
+  </section>
 
   <div class="legend" aria-label="Chart legend">
     <span><i class="sw" style="background:var(--accent)"></i>Best value: nothing cheaper scores higher</span>
@@ -626,6 +632,17 @@ document.getElementById('fs-news-rows').innerHTML = FS.news.map(r => '<tr><td>' 
 // Part 5: difficulty and cascades.
 const DF = DATA.difficulty;
 const f2 = v => v === null || v === undefined ? '—' : v.toFixed(2);
+const HL = DATA.headline;
+document.getElementById('head-meta').textContent = HL.rows[0].pages + ' pages, p081 apart';
+document.getElementById('head-rows').innerHTML = HL.rows.map((h, i) => {
+  const why = ['cap', 'refusal', 'empty'].filter(k => h[k]).map(k => h[k] + ' ' + (k === 'cap' ? 'capped' : k === 'refusal' ? 'refused' : 'empty')).join(', ');
+  const v = h.vs_baseline;
+  return '<tr><td>' + (i + 1) + '</td><td>' + h.name + '</td><td>' + f2(h.nes_answered) + '</td><td>' + h.answered + '/' + h.pages +
+    '</td><td>' + (h.transport || '—') + '</td><td>' + (h.model ? h.model + ' (' + why + ')' : '—') + '</td><td>' +
+    (v ? (v.delta > 0 ? '+' : '') + f2(v.delta) + ' (' + f2(v.lo) + ' to ' + f2(v.hi) + '), ' + v.n + ' pages' : 'the baseline') +
+    '</td><td>' + f2(h.strict) + '</td><td>' + (h.p081[0] ? f2(h.p081[1]) : 'failed') + '</td><td>' +
+    (h.public_pages ? h.public_pages + ' pages' : '96 only') + '</td></tr>';
+}).join('');
 const sgn = v => (v > 0 ? '+' : '') + v.toFixed(2);
 document.getElementById('dif-rank-rows').innerHTML = DF.routes.slice().sort((a, b) => b.adjusted - a.adjusted).map((r, i) =>
   '<tr><td>' + (i + 1) + '</td><td>' + r.name + '</td><td>' + r.answered + '/' + DF.pages + '</td><td>' + f2(r.answered_nes) + '</td><td>' + f2(r.adjusted) +

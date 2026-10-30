@@ -17,8 +17,10 @@ Add --check to fail instead of writing when either output is out of date.
 """
 import csv
 import json
+import random
 import re
 import sys
+from collections import Counter
 from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
 
@@ -64,6 +66,9 @@ LAYOUT_ORDER = RESULTS / "layout-order.json"  # W46.layout-order: layout_order.p
 LOOPS = PUBLIC / "loop-rerun-20261021.json"  # W46.ocr-loops: corpus/loop_rerun.py report, the capped pages read again
 REGIONS = PUBLIC / "regions-20261021.json"  # W46.ocr-regions: whole page, detector regions and overlapping tiles
 REGIONS_GW = PUBLIC / "regions-gateway-20261028.json"  # W46.ocr-regions-paid: corpus/regions_gateway.py score, Gemini 3.7
+REGIONS_ORDERFREE = PUBLIC / "regions-orderfree-20261030.json"  # W46.ocr-rescore-offline: corpus/regions_orderfree.py
+OCR_PAGES = RESULTS / "ocr-pages.csv"  # ocr_pages_export.py: every whole-page route's score on every page of the 96
+OCR_SCORERS_PAGES = RESULTS / "ocr-scorers-pages.csv"  # ocr_rescore.py's per-page rows, both sets
 OPEN_SWEEP = HERE / "data" / "open-sweep-20261019.json"  # the open-model sweep's receipts (hand-entered, sourced)
 OPEN_SWEEP_LATER = ("new-open-sherlock-20261024",)  # W46.ocr-new-open: report in PUBLIC, receipts in data/, same name
 TEMPLATE = HERE / "site" / "template.html"
@@ -437,6 +442,81 @@ def public_segmentation():
                     sys.exit(f"seg-adapt-fewshot.json's zero-shot arm on {b['box']} is not the gateway-gemini row")
                 s["cost_estimate"] = fs["calls_by_box"].get(b["box"], {}).get("cost")
     return boxes
+
+
+# The headline ranking of the 96 (W46.ocr-rescore-offline; the measurement audit's OCR-2, OCR-4 and OCR-9).
+UNCORRECTABLE = "p081"  # the owner cannot correct its truth (ocr-truth-bias.md), so it is reported apart
+BASELINE = "qwen3.6-27b"  # the paired intervals are against Qwen3.6 27B, the local panel's hosted reading
+MODEL_FAILURES = ("cap", "refusal", "empty")
+# A chart route's own reading of the 895 public pages, as ocr-scorers-pages.csv names it (route, family). A route not
+# here has read only the 96; the same model run elsewhere (a hosted route's FarmShare twin) does not count.
+PUBLIC_TWIN = {
+    "apple-vision": ("apple-vision", "Mac"), "gemini3.8-flash": ("gemini3.8-flash", "reference"),
+    "qwen3-vl-235b": ("qwen3-vl-235b", "reference"), "churro-3b-farmshare": ("fs-churro", "FarmShare churro"),
+    "glm-ocr-farmshare": ("glm-ocr", "FarmShare native"), "lightonocr3-4b-farmshare": ("lightonocr3-4b", "FarmShare native"),
+    "lightonocr3-0.8b-farmshare": ("lightonocr3-0.8b", "FarmShare native"),
+    "paddleocr-vl1.5-farmshare": ("paddleocr-vl1.5", "FarmShare native"),
+    "ppocrv6-medium-farmshare": ("ppocrv6-medium", "FarmShare pipeline"),
+    "ling3-flash-vl-farmshare": ("ling3-flash-vl-fp8", "FarmShare panel"),
+    "qwen3-vl-8b-farmshare": ("qwen3-vl-8b", "FarmShare panel"), "qwen3.5-27b-farmshare": ("qwen3.5-27b", "FarmShare panel"),
+    "qwen3.5-4b-farmshare": ("qwen3.5-4b", "FarmShare panel"), "qwen3.6-27b-farmshare": ("qwen3.6-27b", "FarmShare panel"),
+    "qwen3.6-35b-a3b-farmshare": ("qwen3.6-35b-a3b", "FarmShare panel"),
+    "paddleocr-vl1.6-sherlock": ("paddleocr-vl1.6", "Sherlock native"), "qwen3.8-27b-sherlock": ("qwen3.8-27b", "Sherlock panel"),
+    "xiaomi-ocr-0-sherlock": ("xiaomi-ocr-0", "Sherlock native"),
+    "qwen3.5-9b-sherlock": ("qwen3.5-9b", "Sherlock logprob"),  # W46.ocr-logprob's run read both sets
+}
+LOGPROB_PAGES = RESULTS / "ocr-logprob-pages.csv"
+
+
+def bootstrap(d, rounds=10000, seed=0):
+    """Mean of paired per-page differences and its 95% bootstrap interval (ocr_panel_score.paired's interval)."""
+    rng, n = random.Random(seed), len(d)
+    boots = sorted(sum(rng.choices(d, k=n)) / n for _ in range(rounds))
+    return {"n": n, "delta": round(100 * sum(d) / n, 2), "lo": round(100 * boots[int(.025 * rounds)], 2),
+            "hi": round(100 * boots[int(.975 * rounds) - 1], 2)}
+
+
+def headline(routes):
+    """Every whole-page route on the 96: NES on the pages it answered as the headline, its failures beside it, split
+    into the provider's (transport) and the model's own (caps, refusals, empty answers); strict NES with failures as 0;
+    the paired difference from Qwen3.6 27B on pages both answered; p081 apart; and whether it read the 895."""
+    with OCR_PAGES.open(newline="") as f:
+        by = {}
+        for r in csv.DictReader(f):
+            by.setdefault(r["route"], {})[r["page"]] = (r["ok"] == "True", float(r["nes"]), r["failure"])
+    with OCR_SCORERS_PAGES.open(newline="") as f:
+        public = Counter((r["route"], r["family"]) for r in csv.DictReader(f) if r["set"] == "public895")
+    with LOGPROB_PAGES.open(newline="") as f:
+        public.update((r["route"], "Sherlock logprob") for r in csv.DictReader(f) if r["set"] in ("440", "455"))
+    base = by[BASELINE]
+    out = []
+    for r in routes:
+        if r["id"] not in by:
+            continue
+        pp = by[r["id"]]
+        pages = sorted(p for p in pp if p != UNCORRECTABLE)
+        if len(pages) != 95 or UNCORRECTABLE not in pp:
+            sys.exit(f"{r['id']}: ocr-pages.csv holds {len(pp)} of the 96 pages")
+        ans = [p for p in pages if pp[p][0]]
+        fails = Counter(pp[p][2] for p in pages if not pp[p][0])
+        if set(fails) - {"transport", *MODEL_FAILURES}:
+            sys.exit(f"{r['id']}: unclassified failures {dict(fails)}")
+        both = [p for p in ans if base[p][0]]
+        twin = PUBLIC_TWIN.get(r["id"])
+        out.append({"id": r["id"], "name": r["name"], "pages": len(pages), "answered": len(ans),
+                    "nes_answered": round(100 * sum(pp[p][1] for p in ans) / len(ans), 2),
+                    "strict": round(100 * sum(pp[p][1] for p in pages) / len(pages), 2),
+                    "transport": fails["transport"], "model": sum(fails[k] for k in MODEL_FAILURES),
+                    **{k: fails[k] for k in MODEL_FAILURES},
+                    "vs_baseline": None if r["id"] == BASELINE else bootstrap([pp[p][1] - base[p][1] for p in both]),
+                    "p081": [pp[UNCORRECTABLE][0], round(100 * pp[UNCORRECTABLE][1], 2)],
+                    "public_pages": public.get(twin, 0) if twin else 0})
+    out.sort(key=lambda h: -h["nes_answered"])
+    return {"baseline": BASELINE, "uncorrectable": UNCORRECTABLE, "rows": out}
+
+
+def regions_orderfree():
+    return json.loads(REGIONS_ORDERFREE.read_text()) if REGIONS_ORDERFREE.exists() else None
 
 
 def handwriting():
@@ -920,11 +1000,14 @@ def main():
                 or any(e["scores"][c["key"]][2] != c["n"] for e in extra):
             sys.exit(f"a FarmShare run's {c['key']} page count differs from the panel's {c['n']}")
 
-    # The difficulty and cascade analysis reads ocr-pages.csv's per-page rows, which hold the panels' routes but not
-    # the later gateway reading of Gemini 3.7 Flash, so that route is drawn on the charts and left out here.
+    # The difficulty and cascade analysis reads ocr-pages.csv's per-page rows. Its cascades are built from the routes
+    # an app user could run; the later gateway reading of Gemini 3.7 Flash is left out of them.
+    app_routes = [r["id"] for r in routes if r["panel"] != "farmshare" and r["id"] not in GATEWAY_ROUTES
+                  and not r["id"].startswith(("gw-regions-", "dewarp-", "enh-"))]
+    # ocr-pages.csv now holds every whole-page route (W46.ocr-rescore-offline); the difficulty fit keeps the 29 routes
+    # and the FarmShare Qwen run it was built on, so its figures do not move with the headline table's additions.
     diff = difficulty.analyse({r["id"]: r["std"] for r in routes}, {r["id"]: r["name"] for r in routes},
-                              [r["id"] for r in routes if r["panel"] != "farmshare" and r["id"] not in GATEWAY_ROUTES
-                               and not r["id"].startswith(("gw-regions-", "dewarp-", "enh-"))])
+                              app_routes, fitted={*app_routes, "qwen3.6-27b-farmshare"})
     dating = json.loads(DATING.read_text()) if DATING.exists() else None
     if dating:  # FarmShare dating runs too large for the Mac, at OpenRouter's rate for their cached token means
         for k, m in dating.get("open_models", {}).items():
@@ -934,7 +1017,8 @@ def main():
             elif k.removesuffix("-nothink") in op["models"]:
                 sys.exit(f"dating model {k} has an OpenRouter price but no token means in inputs.json")
     built = {"routes": routes, "table_only": extra, "charts": charts, "segmentation": segmentation(op), "handwriting": handwriting(),
-             "farmshare": farmshare(op, own["routes"]), "difficulty": diff, "public_segmentation": public_segmentation(),
+             "farmshare": farmshare(op, own["routes"]), "difficulty": diff, "headline": headline(routes),
+             "regions_orderfree": regions_orderfree(), "public_segmentation": public_segmentation(),
              "kind_classifier": json.loads(KIND_CLASSIFIER.read_text()) if KIND_CLASSIFIER.exists() else None,
              "dating": dating,
              "dating_public": json.loads(DATING_PUBLIC.read_text()) if DATING_PUBLIC.exists() else None,

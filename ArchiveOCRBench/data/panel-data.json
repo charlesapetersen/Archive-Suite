@@ -9211,6 +9211,1136 @@
    }
   }
  },
+ "headline": {
+  "baseline": "qwen3.6-27b",
+  "uncorrectable": "p081",
+  "rows": [
+   {
+    "id": "gemini3.1-pro",
+    "name": "Gemini 3.1 Pro",
+    "pages": 95,
+    "answered": 93,
+    "nes_answered": 96.87,
+    "strict": 94.84,
+    "transport": 0,
+    "model": 2,
+    "cap": 0,
+    "refusal": 2,
+    "empty": 0,
+    "vs_baseline": {
+     "n": 92,
+     "delta": 1.57,
+     "lo": 0.2,
+     "hi": 3.19
+    },
+    "p081": [
+     true,
+     95.75
+    ],
+    "public_pages": 0
+   },
+   {
+    "id": "gemini3.7-flash-gw",
+    "name": "Gemini 3.7 Flash (Stanford gateway, price estimated)",
+    "pages": 95,
+    "answered": 95,
+    "nes_answered": 96.77,
+    "strict": 96.77,
+    "transport": 0,
+    "model": 0,
+    "cap": 0,
+    "refusal": 0,
+    "empty": 0,
+    "vs_baseline": {
+     "n": 94,
+     "delta": 1.5,
+     "lo": -0.44,
+     "hi": 3.32
+    },
+    "p081": [
+     true,
+     93.47
+    ],
+    "public_pages": 0
+   },
+   {
+    "id": "gemini3.8-flash",
+    "name": "Gemini 3.8 Flash",
+    "pages": 95,
+    "answered": 93,
+    "nes_answered": 96.51,
+    "strict": 94.47,
+    "transport": 0,
+    "model": 2,
+    "cap": 0,
+    "refusal": 2,
+    "empty": 0,
+    "vs_baseline": {
+     "n": 92,
+     "delta": 1.11,
+     "lo": -1.15,
+     "hi": 3.07
+    },
+    "p081": [
+     true,
+     93.81
+    ],
+    "public_pages": 440
+   },
+   {
+    "id": "claude-sonnet5.5",
+    "name": "Claude Sonnet 5.5",
+    "pages": 95,
+    "answered": 95,
+    "nes_answered": 96.47,
+    "strict": 96.47,
+    "transport": 0,
+    "model": 0,
+    "cap": 0,
+    "refusal": 0,
+    "empty": 0,
+    "vs_baseline": {
+     "n": 94,
+     "delta": 1.15,
+     "lo": -0.16,
+     "hi": 2.67
+    },
+    "p081": [
+     true,
+     96.08
+    ],
+    "public_pages": 0
+   },
+   {
+    "id": "qwen3.5-27b",
+    "name": "Qwen3.5 27B",
+    "pages": 95,
+    "answered": 81,
+    "nes_answered": 95.82,
+    "strict": 81.7,
+    "transport": 14,
+    "model": 0,
+    "cap": 0,
+    "refusal": 0,
+    "empty": 0,
+    "vs_baseline": {
+     "n": 81,
+     "delta": -0.51,
+     "lo": -0.99,
+     "hi": -0.08
+    },
+    "p081": [
+     true,
+     90.97
+    ],
+    "public_pages": 0
+   },
+   {
+    "id": "gemini3.5-flash",
+    "name": "Gemini 3.5 Flash",
+    "pages": 95,
+    "answered": 93,
+    "nes_answered": 95.51,
+    "strict": 93.5,
+    "transport": 0,
+    "model": 2,
+    "cap": 0,
+    "refusal": 2,
+    "empty": 0,
+    "vs_baseline": {
+     "n": 92,
+     "delta": 0.16,
+     "lo": -1.7,
+     "hi": 1.68
+    },
+    "p081": [
+     true,
+     91.47
+    ],
+    "public_pages": 0
+   },
+   {
+    "id": "qwen3.5-27b-farmshare",
+    "name": "Qwen3.5 27B (FarmShare)",
+    "pages": 95,
+    "answered": 95,
+    "nes_answered": 95.38,
+    "strict": 95.38,
+    "transport": 0,
+    "model": 0,
+    "cap": 0,
+    "refusal": 0,
+    "empty": 0,
+    "vs_baseline": {
+     "n": 94,
+     "delta": 0.06,
+     "lo": -0.6,
+     "hi": 0.8
+    },
+    "p081": [
+     true,
+     90.69
+    ],
+    "public_pages": 895
+   },
+   {
+    "id": "qwen3.6-27b",
+    "name": "Qwen3.6 27B",
+    "pages": 95,
+    "answered": 94,
+    "nes_answered": 95.31,
+    "strict": 94.31,
+    "transport": 1,
+    "model": 0,
+    "cap": 0,
+    "refusal": 0,
+    "empty": 0,
+    "vs_baseline": null,
+    "p081": [
+     true,
+     91.47
+    ],
+    "public_pages": 0
+   },
+   {
+    "id": "qwen3.6-27b-farmshare",
+    "name": "Qwen3.6 27B fp8 (FarmShare)",
+    "pages": 95,
+    "answered": 95,
+    "nes_answered": 95.31,
+    "strict": 95.31,
+    "transport": 0,
+    "model": 0,
+    "cap": 0,
+    "refusal": 0,
+    "empty": 0,
+    "vs_baseline": {
+     "n": 94,
+     "delta": -0.01,
+     "lo": -0.5,
+     "hi": 0.52
+    },
+    "p081": [
+     true,
+     89.48
+    ],
+    "public_pages": 895
+   },
+   {
+    "id": "gemini3.5-flash-lite",
+    "name": "Gemini 3.5 Flash Lite",
+    "pages": 95,
+    "answered": 93,
+    "nes_answered": 95.17,
+    "strict": 93.17,
+    "transport": 0,
+    "model": 2,
+    "cap": 0,
+    "refusal": 2,
+    "empty": 0,
+    "vs_baseline": {
+     "n": 92,
+     "delta": -0.24,
+     "lo": -1.58,
+     "hi": 1.37
+    },
+    "p081": [
+     true,
+     88.87
+    ],
+    "public_pages": 0
+   },
+   {
+    "id": "qwen3.5-9b-sherlock",
+    "name": "Qwen3.5 9B (Sherlock)",
+    "pages": 95,
+    "answered": 93,
+    "nes_answered": 95.13,
+    "strict": 93.13,
+    "transport": 0,
+    "model": 2,
+    "cap": 1,
+    "refusal": 0,
+    "empty": 1,
+    "vs_baseline": {
+     "n": 92,
+     "delta": -0.65,
+     "lo": -1.45,
+     "hi": 0.12
+    },
+    "p081": [
+     true,
+     90.3
+    ],
+    "public_pages": 895
+   },
+   {
+    "id": "qwen3.8-flash",
+    "name": "Qwen3.8 Flash",
+    "pages": 95,
+    "answered": 92,
+    "nes_answered": 95.08,
+    "strict": 92.07,
+    "transport": 3,
+    "model": 0,
+    "cap": 0,
+    "refusal": 0,
+    "empty": 0,
+    "vs_baseline": {
+     "n": 91,
+     "delta": -0.04,
+     "lo": -1.59,
+     "hi": 1.69
+    },
+    "p081": [
+     true,
+     73.2
+    ],
+    "public_pages": 0
+   },
+   {
+    "id": "gpt5.4-mini",
+    "name": "GPT-5.4 Mini",
+    "pages": 95,
+    "answered": 94,
+    "nes_answered": 94.88,
+    "strict": 93.88,
+    "transport": 0,
+    "model": 1,
+    "cap": 0,
+    "refusal": 1,
+    "empty": 0,
+    "vs_baseline": {
+     "n": 93,
+     "delta": -0.35,
+     "lo": -2.24,
+     "hi": 1.28
+    },
+    "p081": [
+     true,
+     62.33
+    ],
+    "public_pages": 0
+   },
+   {
+    "id": "qwen3.5-122b-a10b-farmshare",
+    "name": "Qwen3.5 122B-A10B (FarmShare)",
+    "pages": 95,
+    "answered": 95,
+    "nes_answered": 94.67,
+    "strict": 94.67,
+    "transport": 0,
+    "model": 0,
+    "cap": 0,
+    "refusal": 0,
+    "empty": 0,
+    "vs_baseline": {
+     "n": 94,
+     "delta": -0.63,
+     "lo": -1.74,
+     "hi": 0.44
+    },
+    "p081": [
+     true,
+     91.01
+    ],
+    "public_pages": 0
+   },
+   {
+    "id": "gemini3.1-flash-lite",
+    "name": "Gemini 3.1 Flash Lite",
+    "pages": 95,
+    "answered": 92,
+    "nes_answered": 94.61,
+    "strict": 91.62,
+    "transport": 0,
+    "model": 3,
+    "cap": 1,
+    "refusal": 2,
+    "empty": 0,
+    "vs_baseline": {
+     "n": 91,
+     "delta": -0.81,
+     "lo": -2.32,
+     "hi": 0.54
+    },
+    "p081": [
+     true,
+     90.3
+    ],
+    "public_pages": 0
+   },
+   {
+    "id": "qwen3.6-35b-a3b-farmshare",
+    "name": "Qwen3.6 35B-A3B (FarmShare)",
+    "pages": 95,
+    "answered": 95,
+    "nes_answered": 94.56,
+    "strict": 94.56,
+    "transport": 0,
+    "model": 0,
+    "cap": 0,
+    "refusal": 0,
+    "empty": 0,
+    "vs_baseline": {
+     "n": 94,
+     "delta": -0.74,
+     "lo": -1.91,
+     "hi": 0.24
+    },
+    "p081": [
+     true,
+     90.65
+    ],
+    "public_pages": 895
+   },
+   {
+    "id": "qwen3.5-397b",
+    "name": "Qwen3.5 397B",
+    "pages": 95,
+    "answered": 95,
+    "nes_answered": 94.02,
+    "strict": 94.02,
+    "transport": 0,
+    "model": 0,
+    "cap": 0,
+    "refusal": 0,
+    "empty": 0,
+    "vs_baseline": {
+     "n": 94,
+     "delta": -1.31,
+     "lo": -2.23,
+     "hi": -0.49
+    },
+    "p081": [
+     true,
+     90.47
+    ],
+    "public_pages": 0
+   },
+   {
+    "id": "qwen3-vl-235b",
+    "name": "Qwen3-VL 235B",
+    "pages": 95,
+    "answered": 95,
+    "nes_answered": 93.98,
+    "strict": 93.98,
+    "transport": 0,
+    "model": 0,
+    "cap": 0,
+    "refusal": 0,
+    "empty": 0,
+    "vs_baseline": {
+     "n": 94,
+     "delta": -1.26,
+     "lo": -2.43,
+     "hi": -0.26
+    },
+    "p081": [
+     true,
+     91.19
+    ],
+    "public_pages": 440
+   },
+   {
+    "id": "qwen3-vl-8b",
+    "name": "Qwen3-VL 8B",
+    "pages": 95,
+    "answered": 93,
+    "nes_answered": 93.82,
+    "strict": 91.85,
+    "transport": 0,
+    "model": 2,
+    "cap": 2,
+    "refusal": 0,
+    "empty": 0,
+    "vs_baseline": {
+     "n": 92,
+     "delta": -1.66,
+     "lo": -2.84,
+     "hi": -0.64
+    },
+    "p081": [
+     true,
+     88.37
+    ],
+    "public_pages": 0
+   },
+   {
+    "id": "ling3-flash-vl-farmshare",
+    "name": "Ling 3 Flash VL fp8 (FarmShare)",
+    "pages": 95,
+    "answered": 95,
+    "nes_answered": 93.81,
+    "strict": 93.81,
+    "transport": 0,
+    "model": 0,
+    "cap": 0,
+    "refusal": 0,
+    "empty": 0,
+    "vs_baseline": {
+     "n": 94,
+     "delta": -1.53,
+     "lo": -3.19,
+     "hi": -0.24
+    },
+    "p081": [
+     true,
+     86.26
+    ],
+    "public_pages": 895
+   },
+   {
+    "id": "gemma4-31b",
+    "name": "Gemma 4 31B",
+    "pages": 95,
+    "answered": 92,
+    "nes_answered": 93.73,
+    "strict": 90.77,
+    "transport": 0,
+    "model": 3,
+    "cap": 3,
+    "refusal": 0,
+    "empty": 0,
+    "vs_baseline": {
+     "n": 91,
+     "delta": -2.14,
+     "lo": -4.1,
+     "hi": -0.55
+    },
+    "p081": [
+     true,
+     69.0
+    ],
+    "public_pages": 0
+   },
+   {
+    "id": "qwen3-vl-8b-mlx4",
+    "name": "Qwen3-VL 8B 4-bit (Mac)",
+    "pages": 95,
+    "answered": 91,
+    "nes_answered": 93.61,
+    "strict": 89.66,
+    "transport": 0,
+    "model": 4,
+    "cap": 3,
+    "refusal": 0,
+    "empty": 1,
+    "vs_baseline": {
+     "n": 90,
+     "delta": -1.87,
+     "lo": -2.85,
+     "hi": -0.92
+    },
+    "p081": [
+     true,
+     89.15
+    ],
+    "public_pages": 0
+   },
+   {
+    "id": "gpt5.6-luna",
+    "name": "GPT-5.6 Luna",
+    "pages": 95,
+    "answered": 94,
+    "nes_answered": 93.6,
+    "strict": 92.61,
+    "transport": 0,
+    "model": 1,
+    "cap": 0,
+    "refusal": 1,
+    "empty": 0,
+    "vs_baseline": {
+     "n": 93,
+     "delta": -1.59,
+     "lo": -2.92,
+     "hi": -0.15
+    },
+    "p081": [
+     true,
+     46.31
+    ],
+    "public_pages": 0
+   },
+   {
+    "id": "qwen3-vl-8b-farmshare",
+    "name": "Qwen3-VL 8B (FarmShare)",
+    "pages": 95,
+    "answered": 94,
+    "nes_answered": 93.56,
+    "strict": 92.57,
+    "transport": 0,
+    "model": 1,
+    "cap": 1,
+    "refusal": 0,
+    "empty": 0,
+    "vs_baseline": {
+     "n": 93,
+     "delta": -1.82,
+     "lo": -2.95,
+     "hi": -0.82
+    },
+    "p081": [
+     true,
+     87.69
+    ],
+    "public_pages": 895
+   },
+   {
+    "id": "paddleocr-vl1.5-farmshare",
+    "name": "PaddleOCR-VL 1.5, native (FarmShare)",
+    "pages": 95,
+    "answered": 86,
+    "nes_answered": 93.53,
+    "strict": 84.67,
+    "transport": 0,
+    "model": 9,
+    "cap": 9,
+    "refusal": 0,
+    "empty": 0,
+    "vs_baseline": {
+     "n": 85,
+     "delta": -3.25,
+     "lo": -5.11,
+     "hi": -1.65
+    },
+    "p081": [
+     false,
+     0.0
+    ],
+    "public_pages": 895
+   },
+   {
+    "id": "qwen3.8-27b-sherlock",
+    "name": "Qwen3.8 27B, open sweep settings (Sherlock)",
+    "pages": 95,
+    "answered": 95,
+    "nes_answered": 93.48,
+    "strict": 93.48,
+    "transport": 0,
+    "model": 0,
+    "cap": 0,
+    "refusal": 0,
+    "empty": 0,
+    "vs_baseline": {
+     "n": 94,
+     "delta": -1.82,
+     "lo": -4.26,
+     "hi": -0.06
+    },
+    "p081": [
+     true,
+     89.26
+    ],
+    "public_pages": 895
+   },
+   {
+    "id": "qwen3.5-9b",
+    "name": "Qwen3.5 9B",
+    "pages": 95,
+    "answered": 91,
+    "nes_answered": 93.37,
+    "strict": 89.44,
+    "transport": 0,
+    "model": 4,
+    "cap": 4,
+    "refusal": 0,
+    "empty": 0,
+    "vs_baseline": {
+     "n": 90,
+     "delta": -1.75,
+     "lo": -3.29,
+     "hi": -0.5
+    },
+    "p081": [
+     true,
+     88.83
+    ],
+    "public_pages": 0
+   },
+   {
+    "id": "mistral-large4",
+    "name": "Mistral Large 4",
+    "pages": 95,
+    "answered": 95,
+    "nes_answered": 93.22,
+    "strict": 93.22,
+    "transport": 0,
+    "model": 0,
+    "cap": 0,
+    "refusal": 0,
+    "empty": 0,
+    "vs_baseline": {
+     "n": 94,
+     "delta": -2.09,
+     "lo": -3.97,
+     "hi": -0.54
+    },
+    "p081": [
+     true,
+     86.02
+    ],
+    "public_pages": 0
+   },
+   {
+    "id": "qwen3.8-27b-farmshare",
+    "name": "Qwen3.8 27B (FarmShare)",
+    "pages": 95,
+    "answered": 95,
+    "nes_answered": 93.17,
+    "strict": 93.17,
+    "transport": 0,
+    "model": 0,
+    "cap": 0,
+    "refusal": 0,
+    "empty": 0,
+    "vs_baseline": {
+     "n": 94,
+     "delta": -2.14,
+     "lo": -4.56,
+     "hi": -0.34
+    },
+    "p081": [
+     true,
+     86.25
+    ],
+    "public_pages": 0
+   },
+   {
+    "id": "qwen3.6-35b-a3b",
+    "name": "Qwen3.6 35B-A3B",
+    "pages": 95,
+    "answered": 95,
+    "nes_answered": 93.06,
+    "strict": 93.06,
+    "transport": 0,
+    "model": 0,
+    "cap": 0,
+    "refusal": 0,
+    "empty": 0,
+    "vs_baseline": {
+     "n": 94,
+     "delta": -2.25,
+     "lo": -4.08,
+     "hi": -0.71
+    },
+    "p081": [
+     true,
+     89.98
+    ],
+    "public_pages": 0
+   },
+   {
+    "id": "mistral-ocr-4-1",
+    "name": "Mistral OCR 4.1",
+    "pages": 95,
+    "answered": 95,
+    "nes_answered": 93.0,
+    "strict": 93.0,
+    "transport": 0,
+    "model": 0,
+    "cap": 0,
+    "refusal": 0,
+    "empty": 0,
+    "vs_baseline": {
+     "n": 94,
+     "delta": -2.28,
+     "lo": -4.11,
+     "hi": -0.7
+    },
+    "p081": [
+     true,
+     84.74
+    ],
+    "public_pages": 0
+   },
+   {
+    "id": "qwen3.5-9b-mlx4",
+    "name": "Qwen3.5-9B 4-bit (Mac)",
+    "pages": 95,
+    "answered": 94,
+    "nes_answered": 92.91,
+    "strict": 91.93,
+    "transport": 0,
+    "model": 1,
+    "cap": 0,
+    "refusal": 0,
+    "empty": 1,
+    "vs_baseline": {
+     "n": 93,
+     "delta": -2.36,
+     "lo": -4.29,
+     "hi": -0.84
+    },
+    "p081": [
+     true,
+     90.15
+    ],
+    "public_pages": 0
+   },
+   {
+    "id": "qwen3.5-35b-a3b",
+    "name": "Qwen3.5 35B-A3B",
+    "pages": 95,
+    "answered": 93,
+    "nes_answered": 92.79,
+    "strict": 90.84,
+    "transport": 0,
+    "model": 2,
+    "cap": 2,
+    "refusal": 0,
+    "empty": 0,
+    "vs_baseline": {
+     "n": 92,
+     "delta": -2.52,
+     "lo": -4.85,
+     "hi": -0.77
+    },
+    "p081": [
+     true,
+     89.4
+    ],
+    "public_pages": 0
+   },
+   {
+    "id": "gemma4-26b-a4b",
+    "name": "Gemma 4 26B-A4B",
+    "pages": 95,
+    "answered": 86,
+    "nes_answered": 92.35,
+    "strict": 83.6,
+    "transport": 2,
+    "model": 7,
+    "cap": 7,
+    "refusal": 0,
+    "empty": 0,
+    "vs_baseline": {
+     "n": 85,
+     "delta": -4.1,
+     "lo": -5.62,
+     "hi": -2.77
+    },
+    "p081": [
+     false,
+     0.0
+    ],
+    "public_pages": 0
+   },
+   {
+    "id": "glm-ocr-farmshare",
+    "name": "GLM-OCR, native prompt (FarmShare)",
+    "pages": 95,
+    "answered": 94,
+    "nes_answered": 92.05,
+    "strict": 91.08,
+    "transport": 0,
+    "model": 1,
+    "cap": 1,
+    "refusal": 0,
+    "empty": 0,
+    "vs_baseline": {
+     "n": 93,
+     "delta": -3.2,
+     "lo": -4.8,
+     "hi": -1.76
+    },
+    "p081": [
+     true,
+     73.67
+    ],
+    "public_pages": 895
+   },
+   {
+    "id": "qwen3.5-4b-farmshare",
+    "name": "Qwen3.5 4B (FarmShare)",
+    "pages": 95,
+    "answered": 94,
+    "nes_answered": 91.94,
+    "strict": 90.97,
+    "transport": 0,
+    "model": 1,
+    "cap": 1,
+    "refusal": 0,
+    "empty": 0,
+    "vs_baseline": {
+     "n": 93,
+     "delta": -3.89,
+     "lo": -5.64,
+     "hi": -2.43
+    },
+    "p081": [
+     true,
+     88.73
+    ],
+    "public_pages": 895
+   },
+   {
+    "id": "qwen3-vl-30b-a3b",
+    "name": "Qwen3-VL 30B-A3B",
+    "pages": 95,
+    "answered": 93,
+    "nes_answered": 91.77,
+    "strict": 89.84,
+    "transport": 0,
+    "model": 2,
+    "cap": 2,
+    "refusal": 0,
+    "empty": 0,
+    "vs_baseline": {
+     "n": 92,
+     "delta": -3.52,
+     "lo": -5.07,
+     "hi": -2.09
+    },
+    "p081": [
+     true,
+     87.98
+    ],
+    "public_pages": 0
+   },
+   {
+    "id": "mistral-small-24b",
+    "name": "Mistral Small 24B",
+    "pages": 95,
+    "answered": 93,
+    "nes_answered": 91.44,
+    "strict": 89.51,
+    "transport": 0,
+    "model": 2,
+    "cap": 2,
+    "refusal": 0,
+    "empty": 0,
+    "vs_baseline": {
+     "n": 92,
+     "delta": -3.94,
+     "lo": -6.27,
+     "hi": -2.04
+    },
+    "p081": [
+     true,
+     73.14
+    ],
+    "public_pages": 0
+   },
+   {
+    "id": "churro-3b-farmshare",
+    "name": "CHURRO-3B, its XML prompt (FarmShare)",
+    "pages": 95,
+    "answered": 93,
+    "nes_answered": 91.07,
+    "strict": 89.16,
+    "transport": 0,
+    "model": 2,
+    "cap": 2,
+    "refusal": 0,
+    "empty": 0,
+    "vs_baseline": {
+     "n": 92,
+     "delta": -4.17,
+     "lo": -6.14,
+     "hi": -2.36
+    },
+    "p081": [
+     true,
+     82.84
+    ],
+    "public_pages": 440
+   },
+   {
+    "id": "mistral-medium3.5",
+    "name": "Mistral Medium 3.5",
+    "pages": 95,
+    "answered": 95,
+    "nes_answered": 90.93,
+    "strict": 90.93,
+    "transport": 0,
+    "model": 0,
+    "cap": 0,
+    "refusal": 0,
+    "empty": 0,
+    "vs_baseline": {
+     "n": 94,
+     "delta": -4.3,
+     "lo": -6.51,
+     "hi": -2.44
+    },
+    "p081": [
+     true,
+     64.02
+    ],
+    "public_pages": 0
+   },
+   {
+    "id": "paddleocr-vl1.6-sherlock",
+    "name": "PaddleOCR-VL 1.6, native (Sherlock)",
+    "pages": 95,
+    "answered": 93,
+    "nes_answered": 90.89,
+    "strict": 88.98,
+    "transport": 0,
+    "model": 2,
+    "cap": 2,
+    "refusal": 0,
+    "empty": 0,
+    "vs_baseline": {
+     "n": 93,
+     "delta": -4.52,
+     "lo": -7.13,
+     "hi": -2.36
+    },
+    "p081": [
+     true,
+     78.34
+    ],
+    "public_pages": 895
+   },
+   {
+    "id": "lightonocr3-4b-farmshare",
+    "name": "LightOnOCR-3 4B, native (FarmShare)",
+    "pages": 95,
+    "answered": 95,
+    "nes_answered": 89.38,
+    "strict": 89.38,
+    "transport": 0,
+    "model": 0,
+    "cap": 0,
+    "refusal": 0,
+    "empty": 0,
+    "vs_baseline": {
+     "n": 94,
+     "delta": -5.45,
+     "lo": -8.69,
+     "hi": -2.61
+    },
+    "p081": [
+     true,
+     89.37
+    ],
+    "public_pages": 895
+   },
+   {
+    "id": "lightonocr-3-4b-mlx8",
+    "name": "LightOnOCR-3-4B 8-bit (Mac)",
+    "pages": 95,
+    "answered": 95,
+    "nes_answered": 89.11,
+    "strict": 89.11,
+    "transport": 0,
+    "model": 0,
+    "cap": 0,
+    "refusal": 0,
+    "empty": 0,
+    "vs_baseline": {
+     "n": 94,
+     "delta": -5.72,
+     "lo": -9.07,
+     "hi": -2.76
+    },
+    "p081": [
+     true,
+     90.65
+    ],
+    "public_pages": 0
+   },
+   {
+    "id": "xiaomi-ocr-0-sherlock",
+    "name": "Xiaomi-OCR-0, native Markdown (Sherlock)",
+    "pages": 95,
+    "answered": 95,
+    "nes_answered": 88.78,
+    "strict": 88.78,
+    "transport": 0,
+    "model": 0,
+    "cap": 0,
+    "refusal": 0,
+    "empty": 0,
+    "vs_baseline": {
+     "n": 94,
+     "delta": -6.1,
+     "lo": -8.96,
+     "hi": -3.63
+    },
+    "p081": [
+     true,
+     78.38
+    ],
+    "public_pages": 895
+   },
+   {
+    "id": "lightonocr3-0.8b-farmshare",
+    "name": "LightOnOCR-3 0.8B, native (FarmShare)",
+    "pages": 95,
+    "answered": 95,
+    "nes_answered": 88.04,
+    "strict": 88.04,
+    "transport": 0,
+    "model": 0,
+    "cap": 0,
+    "refusal": 0,
+    "empty": 0,
+    "vs_baseline": {
+     "n": 94,
+     "delta": -6.79,
+     "lo": -10.01,
+     "hi": -3.93
+    },
+    "p081": [
+     true,
+     84.66
+    ],
+    "public_pages": 895
+   },
+   {
+    "id": "apple-vision",
+    "name": "Apple Vision",
+    "pages": 95,
+    "answered": 95,
+    "nes_answered": 81.78,
+    "strict": 81.78,
+    "transport": 0,
+    "model": 0,
+    "cap": 0,
+    "refusal": 0,
+    "empty": 0,
+    "vs_baseline": {
+     "n": 94,
+     "delta": -13.19,
+     "lo": -17.7,
+     "hi": -9.05
+    },
+    "p081": [
+     true,
+     38.96
+    ],
+    "public_pages": 320
+   },
+   {
+    "id": "ppocrv6-medium-farmshare",
+    "name": "PP-OCRv6 medium, not a VLM (FarmShare)",
+    "pages": 95,
+    "answered": 95,
+    "nes_answered": 77.17,
+    "strict": 77.17,
+    "transport": 0,
+    "model": 0,
+    "cap": 0,
+    "refusal": 0,
+    "empty": 0,
+    "vs_baseline": {
+     "n": 94,
+     "delta": -17.92,
+     "lo": -22.8,
+     "hi": -13.29
+    },
+    "p081": [
+     true,
+     46.41
+    ],
+    "public_pages": 895
+   }
+  ]
+ },
+ "regions_orderfree": null,
  "public_segmentation": [
   {
    "box": "CREST",
