@@ -150,13 +150,16 @@ def mark(tag, state, dry):
 
 
 def release(tag, note, dry):
+    """True when the plan line was released (or would be, dry)."""
     cmd = ["/bin/bash", os.path.join(SCRIPTS, "plan-edit.sh"), PLAN, "release", tag, note]
     if dry:
         show(cmd)
-        return
+        return True
     p = subprocess.run(cmd, capture_output=True, text=True, errors="replace")
     if p.returncode != 0:
         print("  release %s failed (%d): %s; release it by hand" % (tag, p.returncode, p.stderr.strip()[-200:]))
+        return False
+    return True
 
 
 # ---- commands ----------------------------------------------------------------------------------------------
@@ -303,8 +306,12 @@ def cmd_fetch(args, dry):
         note = man.get("release", "results collected")
         if status != "collected":
             note += "; some jobs did not complete (%s): inspect the failures before scoring" % detail
+        # Released first: a `finished` ledger under the old HELD note would read as a new pack ready to submit
+        # (cluster-reach.py sherlock_state), so a failed release leaves it `submitted` and the next fetch retries.
+        if not release(tag, "%s (Sherlock batch %s; results in %s)" % (note, stamp, mac), dry):
+            print("%s: left marked submitted; fetch again once the plan can be edited" % tag)
+            continue
         mark(tag, "finished", dry)
-        release(tag, "%s (Sherlock batch %s; results in %s)" % (note, stamp, mac), dry)
         print("%s: collected into %s%s" % (tag, mac, "" if status == "collected" else " (%s)" % detail))
     return 0
 

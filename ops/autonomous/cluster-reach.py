@@ -22,7 +22,8 @@ items submitted or finished to collect. An item still waiting on a prerequisite 
 
 Sherlock is asked in batches instead (owner, 2026-10-28, W46.sherlock-batch), so the owner logs in once per batch
 rather than once per item. A Sherlock pack is ready when its plan line is held `(needs: owner)` with a last note
-`HELD <date>: ready to submit: …` (plan-edit.sh hold) and its ledger is empty. `ask` writes one `[Sherlock batch]`
+`HELD <date>: ready to submit: …` (plan-edit.sh hold) and its ledger is empty or `finished`: `batch_mac.py fetch` marks
+an item `finished` and releases it, so a later HELD note is a new stage's pack. `ask` writes one `[Sherlock batch]`
 entry, emailed, when BATCH_READY packs are ready or the oldest has waited BATCH_WAIT_DAYS, or a submission has
 waited that long to be collected; it names each pack with its jobs and GPU-hour ceiling from its manifest
 (ArchiveProcessor/scripts/segbench/sherlock/packs/<TAG>.json) and the collections waiting. It does not ask again
@@ -259,7 +260,8 @@ def ledger_since(tag):
 
 def sherlock_state(plan_text):
     """(ready, collect): ready = [(tag, held date, manifest or None)] oldest first, for Sherlock items held ready to
-    submit with nothing in the ledger; collect = [(tag, since)] for Sherlock items whose jobs are `submitted`."""
+    submit with nothing in the ledger, or `finished` from an earlier stage; collect = [(tag, since)] for Sherlock items
+    whose jobs are `submitted`."""
     ready, collect = [], []
     for line in plan_text.splitlines():
         m = OPEN_ITEM.match(line)
@@ -268,7 +270,7 @@ def sherlock_state(plan_text):
         tag, state = m.group(1), ledger(m.group(1))
         if state == "submitted":
             collect.append((tag, ledger_since(tag) or "?"))
-        elif state is None:
+        elif state in (None, "finished"):
             since = held_ready(line)
             if since:
                 ready.append((tag, since, manifest(tag)))

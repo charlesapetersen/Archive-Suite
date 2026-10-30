@@ -284,6 +284,28 @@ class TestBatchRoundTrip(BatchFixture):
         self.mac("fetch", stamp)
         self.assertIn("did not complete", self.plan_line("W9.good"))
 
+    def test_failed_release_leaves_it_submitted(self):
+        # A `finished` ledger under the still-HELD line would put the same pack in the next batch.
+        stamp, rb = self.one_pack_batch()
+        self.sherlock("submit", rb)
+        self.mac("mark", stamp)
+        self.sherlock("imports", rb)
+        self.sherlock("copy", rb)
+        edit = os.path.join(self.repo, "ops", "autonomous", "plan-edit.sh")
+        with open(edit) as f:
+            good = f.read()
+        self.write(edit, "#!/bin/bash\necho locked >&2\nexit 1\n", 0o755)
+        fe = self.mac("fetch", stamp)
+        self.assertIn("left marked submitted", fe.stdout)
+        self.assertEqual(self.ledger("W9.good"), "submitted")
+        plan = self.mac("plan").stdout
+        self.assertNotIn("  W9.good  good-1", plan, "not in the batch")
+        self.assertIn("to collect", plan)
+        self.write(edit, good, 0o755)
+        self.mac("fetch", stamp)
+        self.assertEqual(self.ledger("W9.good"), "finished")
+        self.assertNotIn("(needs: owner)", self.plan_line("W9.good"))
+
     def test_dependency_never_satisfied_has_ended(self):
         stamp, rb = self.one_pack_batch()
         self.sherlock("submit", rb)
@@ -393,6 +415,20 @@ class TestBatchAsk(BatchFixture):
             ready, collect = cr.sherlock_state(f.read())
         self.assertNotIn("W9.good", [r[0] for r in ready])
         self.assertEqual([c[0] for c in collect], ["W9.good"])
+
+    def test_finished_earlier_stage_is_ready_when_held_again(self):
+        # W46.fix-marks-set-draft, 2026-10-30: the pilot's fetch left `finished`, and the scan held after it was
+        # missing from the batch until the ledger was cleared by hand.
+        cr = self.cr()
+        os.makedirs(os.path.join(self.state, "cluster-jobs"))
+        for tag in ("W9.good", "W9.released"):
+            with open(os.path.join(self.state, "cluster-jobs", tag), "w") as f:
+                f.write("finished\n")
+        with open(self.plan) as f:
+            ready, collect = cr.sherlock_state(f.read())
+        self.assertIn("W9.good", [r[0] for r in ready])
+        self.assertNotIn("W9.released", [r[0] for r in ready], "released after fetch, not held again")
+        self.assertEqual(collect, [])
 
     def test_daily_ask_skips_sherlock(self):
         cr = self.cr()
