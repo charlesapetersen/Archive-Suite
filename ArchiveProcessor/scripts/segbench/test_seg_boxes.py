@@ -14,15 +14,15 @@ class Ruling(unittest.TestCase):
         self.assertFalse(S.gap_needs_ruling("new", 0.5))
         self.assertTrue(S.gap_needs_ruling("cont", None))  # never judged: the owner rules it
 
-    def test_rawls_gaps_beside_label_photos_are_not_asked(self):
-        self.assertTrue(S.rawls_gap_needs_ruling(None, None))
-        self.assertFalse(S.rawls_gap_needs_ruling("Folder", None))
-        self.assertFalse(S.rawls_gap_needs_ruling(None, "Box"))
+    def test_untagged_gaps_beside_label_photos_are_not_asked(self):
+        self.assertTrue(S.untagged_gap_needs_ruling(None, None))
+        self.assertFalse(S.untagged_gap_needs_ruling("Folder", None))
+        self.assertFalse(S.untagged_gap_needs_ruling(None, "Box"))
 
     def test_label_colours(self):
-        self.assertEqual(S.label_of(["Unread", "John Rawls", "Red"]), "Box")
+        self.assertEqual(S.label_of(["Unread", "Michael Young", "Red"]), "Box")
         self.assertEqual(S.label_of(["Purple"]), "Folder")
-        self.assertIsNone(S.label_of(["Unread", "John Rawls"]))
+        self.assertIsNone(S.label_of(["Unread", "Michael Young"]))
 
 
 class Fold(unittest.TestCase):

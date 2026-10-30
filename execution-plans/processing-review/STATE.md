@@ -98,6 +98,10 @@ The owner's Gemini report is assessed in `screens/gemini-report-2026-10-20.md` (
      Service (200 pages, 1953-1985, 61% clipping-tagged). The owner: Espinosa, the News Service collections and Rogge
      are this type. Chosen as closest to the Deaver problem across four decades. About 1 h.
   Deaver stays a development box.
+  Replaced (owner, 2026-10-29; W46.seg-boxes-hand): Rawls left the segmentation set, its segmentation principles
+  being unclear, and stays for handwriting OCR and W46.date-traceable. The handwritten box is now Cambridge/Young,
+  Sasha photos 00001-00180 (180 JPEGs): her letters to Michael Young, one letter a document, upright, in no
+  label-clean split; every gap is ruled blind by the owner (178 asked), about an hour.
 - Rawls and dating (owner, 2026-10-21): Rawls documents are generally undated and carry no year tags, so the slice
   is for segmentation and handwriting OCR, not dating truth. It serves dating only as a check on invented dates:
   W46.date-traceable runs the tagger over the 196 pages and counts years asserted without cited evidence and not

@@ -1,10 +1,15 @@
 #!/usr/bin/env python3
 """W46.fix-seg-boxes: draft truth for the three new locked segmentation boxes, and the owner's ruling sheets.
 
-The owner named the boxes on 2026-10-21 (execution-plans/processing-review/STATE.md, "Locked boxes named"):
+The owner named the boxes on 2026-10-21 (execution-plans/processing-review/STATE.md, "Locked boxes named"), and
+replaced Rawls with a box of handwritten letters on 2026-10-29 (W46.seg-boxes-hand: Rawls' segmentation principles
+were unclear; it stays for handwriting OCR and W46.date-traceable, and its retired sheet is in the cache as
+rawls-retired-20261029/):
 
-  rawls     Rawls papers, images 00057-00252 (196 photos), handwritten; no document tags, only Red (box) and
-            Purple (folder) label tags, which may be incomplete. The owner rules every gap.
+  sasha     Young, Sasha letters, photos 00001-00180 (180 photos): her handwritten letters to Michael Young, one
+            letter a document, all on one set of collection tags, so no document tags; only Red (box) and Purple
+            (folder) label tags. The owner rules every gap. The corpus holds the JPEGs themselves (no per-photo
+            PDF), so the thumbnails are turned by EXIF alone.
   sir       Stanford Illustrated Review (147 photos), a bound periodical photographed page by page; tagged per
             document. The tags give the draft; the owner rules the gaps where the W41.seg-label-clean teacher
             (Qwen3.5 27B, P(new) averaged over the windows covering the gap) is on the other side of 0.5.
@@ -19,8 +24,8 @@ JPEG and writing an upright thumbnail into the cache. No model calls: the teache
 W41.seg-label-clean run and are read from the corpus-pairs cache. Nothing is written under `Test Files/`; the
 lock item (W46.fix-seg-boxes-lock) folds the owner's rulings in and freezes the boxes there.
 
-    python3 seg_boxes.py draft            # draft.json + draft.csv per box, counts in segbench-results/seg-boxes.md
-    python3 seg_boxes.py sheet            # sheet.html + key.json + thumbnails per box, in the cache
+    python3 seg_boxes.py draft [BOX ...]  # draft.json + draft.csv per box, counts in segbench-results/seg-boxes.md
+    python3 seg_boxes.py sheet [BOX ...]  # sheet.html + key.json + thumbnails per box, in the cache
     python3 seg_boxes.py fold BOX FILE    # the owner's exported answers -> truth.csv beside the draft (cache)
 
 Cache (outside git, private pages): ~/Library/Caches/ArchiveSuiteRehearsal/seg-boxes/<box>/
@@ -47,8 +52,8 @@ ORIENT_MIN = 0.65   # ocr_truth.orient_like_pdf: true pairs measured 0.69-0.98, 
 LEAD = re.compile(r"^\s*(\d{3,})")
 
 BOXES = {
-    "rawls": {"name": "Rawls papers 00057-00252", "folder": "05 Final Tagging/5 Priority 5/Rawls papers",
-              "first": 57, "last": 252, "draft": "label tags only"},
+    "sasha": {"name": "Young, Sasha letters 00001-00180", "folder": "Cambridge/Young, Sasha",
+              "jpegs": "Churchill Archives/Young, Sasha", "first": 1, "last": 180, "draft": "label tags only"},
     "sir": {"name": "Stanford Illustrated Review", "folder": "Stanford University Archives/Stanford Illustrated Review",
             "draft": "tags + teacher"},
     "sc0122": {"name": "SC0122 News Service", "folder": "Stanford University Archives/SC0122 — News Service",
@@ -79,7 +84,7 @@ def gap_needs_ruling(tag, p_new):
     return (p_new >= 0.5) != (tag == "new")
 
 
-def rawls_gap_needs_ruling(left_label, right_label):
+def untagged_gap_needs_ruling(left_label, right_label):
     """Untagged box: every gap between two page photos is ruled; a gap beside a tagged label photo is a start by
     definition (a label photo is never part of a document) and is not asked."""
     return left_label is None and right_label is None
@@ -125,25 +130,24 @@ def jpeg_of_pdfs():
         return {r["pdf"]: r["jpeg"] for r in csv.DictReader(f, delimiter="\t")}
 
 
-def draft_rawls():
-    box = BOXES["rawls"]
-    jpeg = jpeg_of_pdfs()
-    names = {photo_number(n): n for n in os.listdir(os.path.join(CORPUS, box["folder"])) if n.endswith(".pdf")}
+def draft_untagged(key):
+    """A box with no document tags, whose corpus folder holds the photos as JPEGs (no per-photo PDF, so `pdf` is
+    None). Its tags are read from the corpus JPEG; the JPEG originals tree supplies the image."""
+    box = BOXES[key]
+    names = {photo_number(n): n for n in os.listdir(os.path.join(CORPUS, box["folder"])) if n.endswith(".jpeg")}
+    originals = {photo_number(n): n for n in os.listdir(os.path.join(JPEGS, box["jpegs"])) if n.endswith(".jpeg")}
     rows = []
     for i, num in enumerate(range(box["first"], box["last"] + 1), 1):
-        if num not in names:
-            raise SystemExit(f"rawls: no photo {num:05d}")
-        pdf = os.path.join(box["folder"], names[num])
-        if not jpeg.get(pdf):
-            raise SystemExit(f"rawls: no JPEG paired with {pdf}")
-        rows.append({"n": i, "pdf": pdf, "jpeg": jpeg[pdf],
-                     "label": label_of(CS.read_tags(os.path.join(CORPUS, pdf)))})
+        if num not in names or num not in originals:
+            raise SystemExit(f"{key}: no photo {num:05d} in the corpus or the JPEG originals")
+        rows.append({"n": i, "pdf": None, "jpeg": os.path.join(box["jpegs"], originals[num]),
+                     "label": label_of(CS.read_tags(os.path.join(CORPUS, box["folder"], names[num])))})
     for i, r in enumerate(rows):
         # The draft: label photos from the tags, the first page after one a start, every other page undecided
         # (the owner rules it). "Cont" is only a placeholder so the CSV parses; `ask` marks what is undecided.
         prev = rows[i - 1]["label"] if i else "Box"
         r["draft"] = r["label"] or ("New" if prev else "Cont")
-        r["ask"] = bool(i) and rawls_gap_needs_ruling(prev, r["label"])
+        r["ask"] = bool(i) and untagged_gap_needs_ruling(prev, r["label"])
         r["split"] = None
         r["tag_gap"] = None
         r["p_new"] = None
@@ -173,13 +177,19 @@ def summary(key, rows):
 
 
 def cmd_draft(a):
+    """Drafts the named boxes (all by default); the others keep their summary from the last run."""
+    path = os.path.join(CACHE, "summary.json")
     out = {}
-    for key in BOXES:
-        rows = draft_rawls() if key == "rawls" else draft_tagged(key)
+    if os.path.exists(path):
+        with open(path) as f:
+            out = {k: v for k, v in json.load(f).items() if k in BOXES}
+    for key in a.boxes or BOXES:
+        rows = draft_untagged(key) if BOXES[key]["draft"] == "label tags only" else draft_tagged(key)
         write_draft(key, rows)
         out[key] = summary(key, rows)
         print(key, json.dumps(out[key]))
-    with open(os.path.join(CACHE, "summary.json"), "w") as f:
+    out = {k: out[k] for k in BOXES if k in out}
+    with open(path, "w") as f:
         json.dump(out, f, indent=1)
     write_results(out)
 
@@ -187,28 +197,34 @@ def cmd_draft(a):
 def write_results(out):
     lines = ["# W46.fix-seg-boxes — draft truth for three new locked segmentation boxes", "",
              "Written by `seg_boxes.py draft` (numbers only: no names, text or images). The boxes were named by the",
-             "owner on 2026-10-21 (`execution-plans/processing-review/STATE.md`). Drafts, keys and the blind ruling",
+             "owner on 2026-10-21 (`execution-plans/processing-review/STATE.md`); on 2026-10-29 the owner replaced",
+             "Rawls papers 00057-00252 with the Young, Sasha letters (W46.seg-boxes-hand), since Rawls' segmentation",
+             "principles were unclear. Drafts, keys and the blind ruling",
              "sheets are in `~/Library/Caches/ArchiveSuiteRehearsal/seg-boxes/<box>/`, outside git. No model calls:",
              "the teacher's P(new) is the W41.seg-label-clean run's (`label-clean.md`).", "",
              "| box | draft from | photos | gaps | New | Cont | Box | Folder | gaps for the owner | photos in label-clean's train split |",
              "|---|---|---:|---:|---:|---:|---:|---:|---:|---:|"]
     for key, s in out.items():
         lab = s["labels"]
-        if key == "rawls":
+        if BOXES[key]["draft"] == "label tags only":
             new, cont = lab.get("New", 0), "—"
         else:
             new, cont = lab.get("New", 0), lab.get("Cont", 0)
         lines.append(f"| {BOXES[key]['name']} | {BOXES[key]['draft']} | {s['pages']} | {s['gaps']} | {new} | {cont} "
                      f"| {lab.get('Box', 0)} | {lab.get('Folder', 0)} | {s['asked']} | {s['train_split']} |")
-    lines += ["", "Rawls carries no document tags, so its New column counts only the first page after a label photo;",
-              "every gap between two page photos goes to the owner. In the two tagged boxes a gap goes to the owner",
+    lines += ["", "The letters carry no document tags, so their New column counts only the first page after a label",
+              "photo; every gap between two page photos goes to the owner. The box is in no label-clean split (its",
+              "folder is not in the corpus-pairs windows), so every model scored on it is held out. In the two tagged boxes a gap goes to the owner",
               "when the teacher's P(new) is on the other side of 0.5 from the tag (the agree rule's dropped gaps):", ""]
     for key in ("sir", "sc0122"):
+        if key not in out:
+            continue
         lines.append(f"- {BOXES[key]['name']}: " + ", ".join(f"tag {k}: {v}" for k, v in out[key]["asked_by"].items())
                      + f"; gaps the teacher never judged: {out[key]['unjudged']}.")
     lines += ["", "**Both tagged boxes are in label-clean's train split**, so the Mac students trained on its windows",
               "(the W41.seg-finetune 2B and 4B, on the Mac since W41.seg-mac-model) have seen these boxes with the tag or teacher labels; a student's",
-              "score on them is not a held-out figure. The owner's call on it is `W46.seg-boxes-overlap-ok`.", ""]
+              "score on them is not a held-out figure. The owner kept both (`W46.seg-boxes-overlap-ok`, 2026-10-29): a",
+              "student's score on them is reported as trained-on, and both go into corpus_pairs EXCLUDE for any retrain.", ""]
     with open(RESULTS, "w", encoding="utf-8") as f:
         f.write("\n".join(lines))
 
@@ -216,7 +232,8 @@ def write_results(out):
 def thumb_of(key, row, orient):
     """The photo's thumbnail, upright: EXIF orientation applied, then turned to match its corpus PDF, since only the
     PDFs were turned upright (ocr_truth.orient_like_pdf). `orient` collects {n: [turn, correlation]} per box; a
-    correlation under ORIENT_MIN means the pairing itself is doubtful, and cmd_sheet reports it."""
+    correlation under ORIENT_MIN means the pairing itself is doubtful, and cmd_sheet reports it. A photo with no
+    corpus PDF (an untagged JPEG box) is turned by EXIF alone, recorded as [0, None]."""
     import tempfile
     from pathlib import Path
     from PIL import Image, ImageOps
@@ -227,11 +244,12 @@ def thumb_of(key, row, orient):
     if not os.path.exists(dst) or str(row["n"]) not in orient:
         with tempfile.TemporaryDirectory() as tmp, Image.open(os.path.join(JPEGS, row["jpeg"])) as im:
             up = ImageOps.exif_transpose(im).convert("RGB")
-            deg, corr = ocr_truth.orient_like_pdf(up, Path(CORPUS) / row["pdf"], Path(tmp))
+            deg, corr = (ocr_truth.orient_like_pdf(up, Path(CORPUS) / row["pdf"], Path(tmp)) if row["pdf"]
+                         else (0, None))
             up = up.rotate(deg, expand=True)
             up.thumbnail((THUMB_PX, THUMB_PX))
             up.save(dst, "JPEG", quality=88)
-        orient[str(row["n"])] = [deg, round(corr, 3)]
+        orient[str(row["n"])] = [deg, None if corr is None else round(corr, 3)]
     return f"thumbs/{row['n']:04d}.jpg"
 
 
@@ -276,7 +294,7 @@ cnt();
 
 
 def cmd_sheet(a):
-    for key in BOXES:
+    for key in a.boxes or BOXES:
         with open(os.path.join(CACHE, key, "draft.json"), encoding="utf-8") as f:
             rows = json.load(f)["pages"]
         orient_path = os.path.join(CACHE, key, "orient.json")
@@ -302,7 +320,7 @@ def cmd_sheet(a):
         with open(orient_path, "w") as f:
             json.dump(orient, f, indent=0)
         turned = sum(1 for deg, _ in orient.values() if deg)
-        doubtful = sorted((int(n) for n, (_, c) in orient.items() if c < ORIENT_MIN))
+        doubtful = sorted((int(n) for n, (_, c) in orient.items() if c is not None and c < ORIENT_MIN))
         print(f"{key}: {len(cases)} gaps -> {os.path.join(CACHE, key, 'sheet.html')}; {turned} of {len(orient)} "
               f"photos turned upright; pairing doubtful (correlation < {ORIENT_MIN}): {doubtful or 'none'}")
 
@@ -345,13 +363,18 @@ def cmd_fold(a):
 def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = p.add_subparsers(dest="cmd", required=True)
-    sub.add_parser("draft").set_defaults(fn=cmd_draft)
-    sub.add_parser("sheet").set_defaults(fn=cmd_sheet)
+    for name, fn in (("draft", cmd_draft), ("sheet", cmd_sheet)):
+        c = sub.add_parser(name)
+        c.add_argument("boxes", nargs="*", metavar="BOX", help=f"default: every box ({', '.join(BOXES)})")
+        c.set_defaults(fn=fn)
     f = sub.add_parser("fold")
     f.add_argument("box", choices=sorted(BOXES))
     f.add_argument("answers")
     f.set_defaults(fn=cmd_fold)
     a = p.parse_args()
+    unknown = [b for b in getattr(a, "boxes", []) if b not in BOXES]
+    if unknown:
+        p.error(f"unknown box {', '.join(unknown)} (choose from {', '.join(BOXES)})")
     a.fn(a)
 
 
