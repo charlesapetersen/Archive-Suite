@@ -73,7 +73,10 @@ final class AppearanceSettingUITests: NotesFixtureUITestCase {
 
             // Leave the stored value at System for whatever runs next (the next fixture launch clears it anyway).
             relaunch(extra: [])
-            pick("System", in: openSettings())
+            let last = openSettings()
+            pick("System", in: last)
+            last.typeKey("w", modifierFlags: .command)
+            XCTAssertTrue(last.waitForNonExistence(timeout: 5), "Settings should close")
         }
     }
 

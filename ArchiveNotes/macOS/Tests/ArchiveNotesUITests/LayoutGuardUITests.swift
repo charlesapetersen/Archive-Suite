@@ -47,16 +47,20 @@ final class LayoutGuardUITests: NotesFixtureUITestCase {
     private func sweepNarrowAndTall(appearance: String) {
         let window = mainWindow
         app.activate()
-        // To the top of the screen first: a window reaching past the bottom edge has no corner to drag.
-        let title = window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0)).withOffset(CGVector(dx: 0, dy: 12))
-        title.press(forDuration: 0.3, thenDragTo: title.withOffset(CGVector(dx: 0, dy: 40 - window.frame.minY)))
-        LayoutGuard.waitUntilSettled(window)
+        // As tall as the screen allows from where the window opened: down to the top of the Dock. The window is not
+        // moved up first, because a synthesized title-bar drag never moved it in the VM, fast or slow; checking
+        // "100 pt taller" instead made the sweep pass or fail on where an earlier test had left the window
+        // (759 → 918 from y 191, 759 → 845 from y 264; W48.appearance-notes).
         let screen = NSScreen.main?.frame.height ?? 1000
+        let dockTop = screen - (NSScreen.main?.visibleFrame.minY ?? 0)   // top-left coordinates, as XCUITest's
         let before = window.frame
         LayoutGuard.dragCorner(of: window, to: CGPoint(x: before.maxX, y: screen - 8))
         LayoutGuard.waitUntilSettled(window)
-        print("[layout] narrow and tall, \(appearance): window \(before.size) → \(window.frame.size), screen \(screen)")
-        XCTAssertGreaterThan(window.frame.height, before.height + 100, "the window should have been made taller")
+        print("[layout] narrow and tall, \(appearance): window \(before.size) → \(window.frame.size) at y "
+              + "\(window.frame.minY), Dock top \(dockTop), screen \(screen)")
+        // No shorter (a window an earlier test left reaching the Dock already cannot grow), and down to the Dock.
+        XCTAssertGreaterThanOrEqual(window.frame.height, before.height, "the window should not have shrunk")
+        XCTAssertGreaterThanOrEqual(window.frame.maxY, dockTop - 8, "the window should reach down to the Dock")
         // The minimum size was swept above; this is one more size, not a resize check.
         LayoutGuard.sweep(window, screen: "note window, narrow and tall, \(appearance)", in: self, resize: false,
                           ignore: isHarness)

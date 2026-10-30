@@ -1473,7 +1473,10 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
 - **Runtime evidence:** none.
 - **Status:** `unproven`
 - **History:**
-  - 2026-10-30 W48.appearance-notes — row written, `unproven`. The builder's runs:
+  - 2026-10-30 W48.appearance-notes — row written, `unproven`. The builder's runs, in the VM:
+    AppearanceSettingUITests 2/2, the by-setting audits and the four tours (two by setting) pass; the whole suite's
+    other failures are W40.fix-notes-extract-authors-clear (filed) and the stacked narrow-and-tall sweep, which
+    depended on test order and is fixed:
     [`evidence/notes/W48.appearance-notes.md`](evidence/notes/W48.appearance-notes.md).
 
 ---
