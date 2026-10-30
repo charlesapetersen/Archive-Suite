@@ -67,6 +67,9 @@ images use JPEG quality 45, so the window comparison also changes encoding and p
 mean response time and estimated token cost into that table. Gateway costs use checked list rates,
 including reasoning, because the gateway supplies no bill; they are explicitly estimates. The Claude cue
 row combines plan replies and 9 gateway windows on CREST (2 more on Deaver are in the full report).
+The collection-facts panel (W46.seg-context) reads `seg-context.json`: the 27B teacher and trained 2B on
+CREST, Lincoln and the two test boxes, each window with and without a COLLECTION FACTS block, beside the
+gap votes a plain rerun flips (the noise floor).
 
 ## Completeness rule
 

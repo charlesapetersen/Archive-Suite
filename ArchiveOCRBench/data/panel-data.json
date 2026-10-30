@@ -17269,6 +17269,216 @@
    }
   }
  },
+ "seg_context": {
+  "rows": [
+   {
+    "model": "teacher",
+    "box": "CREST",
+    "arm": "base",
+    "pages_exact": 0.953125,
+    "boundary_f1": 0.967741935483871,
+    "false_splits": 2,
+    "false_merges": 0
+   },
+   {
+    "model": "teacher",
+    "box": "CREST",
+    "arm": "block",
+    "pages_exact": 0.953125,
+    "boundary_f1": 0.967741935483871,
+    "false_splits": 2,
+    "false_merges": 0
+   },
+   {
+    "model": "teacher",
+    "box": "Lincoln",
+    "arm": "base",
+    "pages_exact": 0.3486590038314176,
+    "boundary_f1": 0.7920792079207921,
+    "false_splits": 42,
+    "false_merges": 0
+   },
+   {
+    "model": "teacher",
+    "box": "Lincoln",
+    "arm": "block",
+    "pages_exact": 0.3793103448275862,
+    "boundary_f1": 0.7897435897435898,
+    "false_splits": 38,
+    "false_merges": 3
+   },
+   {
+    "model": "teacher",
+    "box": "Stanton",
+    "arm": "base",
+    "pages_exact": 0.8189300411522634,
+    "boundary_f1": 0.9137931034482758,
+    "false_splits": 19,
+    "false_merges": 1
+   },
+   {
+    "model": "teacher",
+    "box": "Stanton",
+    "arm": "block",
+    "pages_exact": 0.7983539094650206,
+    "boundary_f1": 0.9098712446351932,
+    "false_splits": 20,
+    "false_merges": 1
+   },
+   {
+    "model": "teacher",
+    "box": "RG165",
+    "arm": "base",
+    "pages_exact": 0.8620689655172413,
+    "boundary_f1": 0.9166666666666666,
+    "false_splits": 3,
+    "false_merges": 1
+   },
+   {
+    "model": "teacher",
+    "box": "RG165",
+    "arm": "block",
+    "pages_exact": 0.8620689655172413,
+    "boundary_f1": 0.9166666666666666,
+    "false_splits": 3,
+    "false_merges": 1
+   },
+   {
+    "model": "student",
+    "box": "CREST",
+    "arm": "base",
+    "pages_exact": 0.8203125,
+    "boundary_f1": 0.9180327868852459,
+    "false_splits": 3,
+    "false_merges": 2
+   },
+   {
+    "model": "student",
+    "box": "CREST",
+    "arm": "block",
+    "pages_exact": 0.9140625,
+    "boundary_f1": 0.9333333333333333,
+    "false_splits": 2,
+    "false_merges": 2
+   },
+   {
+    "model": "student",
+    "box": "Lincoln",
+    "arm": "base",
+    "pages_exact": 0.3218390804597701,
+    "boundary_f1": 0.7647058823529411,
+    "false_splits": 46,
+    "false_merges": 2
+   },
+   {
+    "model": "student",
+    "box": "Lincoln",
+    "arm": "block",
+    "pages_exact": 0.3563218390804598,
+    "boundary_f1": 0.7722772277227722,
+    "false_splits": 44,
+    "false_merges": 2
+   },
+   {
+    "model": "student",
+    "box": "Stanton",
+    "arm": "base",
+    "pages_exact": 0.7407407407407407,
+    "boundary_f1": 0.8995633187772926,
+    "false_splits": 19,
+    "false_merges": 4
+   },
+   {
+    "model": "student",
+    "box": "Stanton",
+    "arm": "block",
+    "pages_exact": 0.7407407407407407,
+    "boundary_f1": 0.8879310344827587,
+    "false_splits": 22,
+    "false_merges": 4
+   },
+   {
+    "model": "student",
+    "box": "RG165",
+    "arm": "base",
+    "pages_exact": 0.9425287356321839,
+    "boundary_f1": 0.9565217391304348,
+    "false_splits": 1,
+    "false_merges": 1
+   },
+   {
+    "model": "student",
+    "box": "RG165",
+    "arm": "block",
+    "pages_exact": 0.9425287356321839,
+    "boundary_f1": 0.9565217391304348,
+    "false_splits": 1,
+    "false_merges": 1
+   }
+  ],
+  "vote_flips": {
+   "teacher": {
+    "CREST": {
+     "votes": 254,
+     "block_flips": 2,
+     "rerun_votes": 254,
+     "rerun_flips": 0,
+     "unparsed": 0
+    },
+    "Lincoln": {
+     "votes": 520,
+     "block_flips": 22,
+     "rerun_votes": 520,
+     "rerun_flips": 6,
+     "unparsed": 0
+    },
+    "RG165": {
+     "votes": 224,
+     "block_flips": 0,
+     "rerun_votes": 224,
+     "rerun_flips": 1,
+     "unparsed": 0
+    },
+    "Stanton": {
+     "votes": 498,
+     "block_flips": 5,
+     "rerun_votes": 498,
+     "rerun_flips": 2,
+     "unparsed": 0
+    }
+   },
+   "student": {
+    "CREST": {
+     "votes": 254,
+     "block_flips": 1,
+     "rerun_votes": 254,
+     "rerun_flips": 1,
+     "unparsed": 0
+    },
+    "Lincoln": {
+     "votes": 520,
+     "block_flips": 9,
+     "rerun_votes": 520,
+     "rerun_flips": 3,
+     "unparsed": 0
+    },
+    "RG165": {
+     "votes": 224,
+     "block_flips": 0,
+     "rerun_votes": 224,
+     "rerun_flips": 2,
+     "unparsed": 0
+    },
+    "Stanton": {
+     "votes": 498,
+     "block_flips": 3,
+     "rerun_votes": 498,
+     "rerun_flips": 3,
+     "unparsed": 0
+    }
+   }
+  }
+ },
  "public": {
   "rows": [
    {

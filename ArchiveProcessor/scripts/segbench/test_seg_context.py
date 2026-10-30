@@ -136,6 +136,29 @@ class Judge(unittest.TestCase):
                 S.judges(Path(d) / "pack", Path(d) / "runs", "student")
 
 
+class Flips(unittest.TestCase):
+    def test_block_and_rerun_flips_are_counted_against_the_earlier_answer(self):
+        def answer(decision):
+            return json.dumps({"pages": [{"page": 1, "kind": "document"}, {"page": 2, "kind": "document"}],
+                               "boundaries": [{"between": [1, 2], "decision": decision, "cue": "c",
+                                               "confidence": 0.9}]})
+        with tempfile.TemporaryDirectory() as d:
+            toy_pack(Path(d) / "pack")
+            run = Path(d) / "runs" / "teacher"
+            run.mkdir(parents=True)
+            run.joinpath("answers.jsonl").write_text(
+                json.dumps({"cache_key": "teacher-base", "window": [1, 2], "status": "ok",
+                            "result": answer("new")}) + "\n"
+                + json.dumps({"cache_key": "teacher-block", "window": [1, 2], "status": "ok",
+                              "result": answer("continue")}) + "\n")
+            earlier = Path(d) / "public" / "cache" / "responses" / f"window-or-{S.MODELS['teacher'][0]}" / "te"
+            earlier.mkdir(parents=True)
+            (earlier / "teacher-base.json").write_text(json.dumps(answer("new")))
+            got = S.flips(Path(d) / "pack", Path(d) / "runs", "teacher", Path(d) / "public")
+            self.assertEqual(got, {"CREST": {"votes": 1, "block_flips": 1, "rerun_votes": 1, "rerun_flips": 0,
+                                             "unparsed": 0}})
+
+
 class Submit(unittest.TestCase):
     SCRIPT = HERE / "sherlock" / "seg-context" / "submit.sh"
 

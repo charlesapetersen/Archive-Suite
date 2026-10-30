@@ -326,13 +326,60 @@ def judges(pack, results, role):
     return out, failed, len(got)
 
 
+def decisions(answer, nums):
+    """One window answer's gap decisions, {gap: decision}; None for an answer that does not parse."""
+    _, _, _, W, _ = _seg()
+    if isinstance(answer, dict):
+        answer = answer.get("result")
+    if not isinstance(answer, str):
+        return None
+    try:
+        return {g: b["decision"] for g, b in W.parse_answer(answer, nums)["boundaries"].items()}
+    except Exception:
+        return None
+
+
+def flips(pack, results, role, public_root):
+    """Per box, how many gap votes the block changes, beside how many a plain rerun changes: the base arm's
+    answer against the earlier FarmShare answer to the byte-identical request (a different vLLM build, GPU and
+    perhaps weights). The rerun count is the noise floor a block effect has to clear."""
+    data, _, R, _, _ = _seg()
+    key = MODELS[role][0]
+    ws = {w["cache_key"]: w for w in map(json.loads, (Path(pack) / role / "windows.jsonl").read_text().splitlines())}
+    now = {}
+    for r in read_answers(Path(results) / role / "answers.jsonl"):
+        w = ws[r["cache_key"]]
+        now[(w["box"], tuple(w["window"]), w["arm"])] = r
+    earlier_public = data.ResponseCache(f"window-or-{key}")
+    earlier_public.dir = Path(public_root) / "cache" / "responses" / f"window-or-{key}"
+    out = {}
+    for (box, win, arm), r in sorted(now.items()):
+        if arm != "base" or (box, win, "block") not in now:
+            continue
+        nums = list(win)
+        base = decisions(r, nums)
+        block = decisions(now[(box, win, "block")], nums)
+        earlier = decisions((earlier_public if box in PUBLIC else R.cache(key)).get(r["cache_key"]), nums)
+        t = out.setdefault(box, {"votes": 0, "block_flips": 0, "rerun_votes": 0, "rerun_flips": 0, "unparsed": 0})
+        if base is None or block is None:
+            t["unparsed"] += 1
+            continue
+        t["votes"] += len(base)
+        t["block_flips"] += sum(base[g] != block.get(g) for g in base)
+        if earlier is not None:
+            t["rerun_votes"] += len(base)
+            t["rerun_flips"] += sum(base[g] != earlier.get(g) for g in base)
+    return out
+
+
 def cmd_score(a):
     from dataclasses import asdict
     from score import score_labels, derived
     data, L, R, W, P = _seg()
     freeze = check(a.pack)
-    rows, missing = [], []
+    rows, missing, stability = [], [], {}
     for role in MODELS:
+        stability[role] = flips(a.pack, a.results, role, a.public_root)
         js, failed, n = judges(a.pack, a.results, role)
         for box in BOXES:
             col, _ = load(box, a.public_root)
@@ -352,7 +399,7 @@ def cmd_score(a):
         raise SystemExit(f"{len(missing)} model-arm-box cells incomplete (first: {missing[0]}); --partial to score "
                          "what came back")
     out = {"tag": TAG, "boxes": {b: {k: v for k, v in freeze["boxes"][b].items() if k != "block"} for b in BOXES},
-           "rows": rows, "incomplete": missing}
+           "rows": rows, "vote_flips": stability, "incomplete": missing}
     (RESULTS / "seg-context.json").write_text(json.dumps(out, indent=1) + "\n")
     print(json.dumps([r for r in rows if "arm" in r], indent=1))
 

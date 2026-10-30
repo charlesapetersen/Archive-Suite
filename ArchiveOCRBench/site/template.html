@@ -131,6 +131,12 @@ footer p { font-size: 13px; }
     <p class="note" id="public-fewshot-note"></p>
   </section>
 
+  <section class="panel" id="seg-context" hidden>
+    <div class="head"><h2>Collection facts in the window prompt</h2><span class="meta">same windows with and without · Sherlock L40S</span></div>
+    <div class="tbl"><table><thead><tr><th>Model</th><th>Box</th><th>Pages in exact document, without → with</th><th>Boundary F1</th><th>False splits</th><th>False merges</th><th>Votes the block flips</th><th>Votes a rerun flips</th></tr></thead><tbody id="seg-context-rows"></tbody></table></div>
+    <p class="note">Every window sent twice to the same model, once as before and once with a COLLECTION FACTS block above its OCR: the catalogue line and item count (CREST, Lincoln) or the box and folder label photos' OCR (the owner's Stanton and RG 165), the span of years in the box's text, the share of low-text pages and a document-length prior. Nothing in it comes from the box's boundaries. The rerun column is the noise floor: the request without the block is byte-identical to the one FarmShare answered earlier, so its changed gap decisions are what a rerun alone changes. Only Lincoln moves beyond that, for both models, and there the catalogue's item count is close to the answer; on the owner's boxes the block changes nothing beyond rerun noise, so the app's window prompt is unchanged. One run per arm; one vote can move a box several points (the 2B's CREST gain is one vote). Source: <code>seg-context.md</code> and <code>seg-context.json</code>.</p>
+  </section>
+
   <header class="part" id="handwriting">
     <div class="eyebrow">Part 3 · Handwriting on the Mac · Vision OCR lab</div>
     <h2>Handwriting readers that run on the device</h2>
@@ -514,6 +520,27 @@ const fewRows = publicSeg.flatMap(b => (b.fewshot || []).flatMap(s => [['zero_sh
     r.false_merges_held + '</td><td>' + pct1(100 * r.exact) + '</td><td>' + r.pq.toFixed(3) + '</td></tr>'; })));
 document.getElementById('public-fewshot-rows').innerHTML = fewRows.join('');
 document.getElementById('public-fewshot-note').textContent = fewRows.length ? 'Gemini 3.7 Flash windows through the gateway, the row above, sent again with one block added: the k gaps a user has checked in the same box (W46.seg-adapt-curve\'s first random draw), each as 300 characters of OCR text either side and the archivist\'s decision, text only. Both prompts are scored with the checked gaps set to the truth; errors count only the gaps nobody checked. One draw per setting, so a difference of one or two gaps is not a finding. Cost: ' + publicSeg.filter(b => b.fewshot && b.fewshot.length).map(b => b.box + ' ' + money(b.fewshot[0].cost_estimate) + ' (estimate' + (b.fewshot.length > 1 ? ', its ' + b.fewshot.length + ' settings together' : '') + ')').join(', ') + '. Detail: segbench-results/seg-adapt-fewshot.md.' : '';
+
+const segContext = DATA.seg_context;
+if (segContext) {
+  const ctxNames = {teacher: 'Qwen3.5 27B teacher', student: 'Trained Qwen3.5 2B'};
+  const ctxBoxes = ['CREST', 'Lincoln', 'Stanton', 'RG165'];
+  const ctxRows = [];
+  for (const role of ['teacher', 'student']) {
+    for (const box of ctxBoxes) {
+      const arm = a => segContext.rows.find(r => r.model === role && r.box === box && r.arm === a);
+      const base = arm('base'), block = arm('block'), f = segContext.vote_flips[role][box];
+      if (!base || !block) continue;
+      const pair = (k, fmt) => fmt(base[k]) + ' → ' + fmt(block[k]);
+      ctxRows.push('<tr><td>' + ctxNames[role] + '</td><td>' + (box === 'RG165' ? 'RG 165' : box) + '</td><td>' +
+        pair('pages_exact', v => (100 * v).toFixed(1) + '%') + '</td><td>' + pair('boundary_f1', v => (100 * v).toFixed(1)) +
+        '</td><td>' + pair('false_splits', v => v) + '</td><td>' + pair('false_merges', v => v) + '</td><td>' +
+        f.block_flips + ' / ' + f.votes + '</td><td>' + f.rerun_flips + ' / ' + f.rerun_votes + '</td></tr>');
+    }
+  }
+  document.getElementById('seg-context-rows').innerHTML = ctxRows.join('');
+  document.getElementById('seg-context').hidden = !ctxRows.length;
+}
 
 const jointModel = DATA.seg_date;
 if (jointModel) {

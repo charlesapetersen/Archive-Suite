@@ -311,6 +311,19 @@ def segmentation(op):
     return seg
 
 
+def seg_context():
+    """W46.seg-context: each window with and without a COLLECTION FACTS block, beside a rerun's vote flips."""
+    path = RESULTS / "seg-context.json"
+    if not path.exists():
+        return None
+    d = json.loads(path.read_text())
+    if d["incomplete"]:
+        sys.exit(f"seg-context.json has incomplete cells: {d['incomplete'][:1]}")
+    return {"rows": [{k: r[k] for k in ("model", "box", "arm", "pages_exact", "boundary_f1", "false_splits",
+                                        "false_merges")} for r in d["rows"] if "arm" in r],
+            "vote_flips": d["vote_flips"]}
+
+
 def public_segmentation():
     """Separate public/easier boxes; their labels and scores never enter owner-box fitting."""
     root = RESULTS / "public-segmentation"
@@ -869,6 +882,7 @@ def main():
              "dating_enclosure": dating_enclosure(),
              "seg_date": json.loads((RESULTS / "seg-date-model-final.json").read_text())
                          if (RESULTS / "seg-date-model-final.json").exists() else None,
+             "seg_context": seg_context(),
              "public": public(), "ocr_scorers": ocr_scorers(),
              "dewarp": dewarp, "enh_ocr": enh_ocr,
              "loops": json.loads(LOOPS.read_text()) if LOOPS.exists() else None, "regions": regions,
