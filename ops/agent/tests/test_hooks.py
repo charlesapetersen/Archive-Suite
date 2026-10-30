@@ -655,6 +655,38 @@ class Upkeep(Fixture):
         self.assertEqual(r.returncode, 1)
         self.assertIn("ABORTED", r.stdout)
 
+    def test_cache_budget_reports_and_warns_but_never_deletes_or_fails(self):
+        for f in ("check-tracker-sync.sh", "check-todo-stubs.sh", "compact-plan.sh"):
+            self.write("ops/autonomous/" + f, "#!/bin/bash\nexit 0\n", 0o755)
+        shutil.copy2(os.path.join(AUTONOMOUS, "cache-budget.py"), os.path.join(self.repo, "ops", "autonomous"))
+        cache = os.path.join(self.tmp, "bench-cache")
+        venv = os.path.join(cache, "item-a", "venv")
+        os.makedirs(os.path.join(venv, "lib", "python3.12", "site-packages", "torch-2.15.0.dist-info"))
+        open(os.path.join(venv, "pyvenv.cfg"), "w").close()
+        with open(os.path.join(cache, "item-a", "pages.bin"), "wb") as f:
+            f.write(b"x" * 65536)
+        os.makedirs(os.path.join(cache, "item-b"))
+        os.makedirs(os.path.join(self.state, "retired-worktrees", "suite-wt-old"))
+        env = dict(ARCHIVE_BENCH_CACHE=cache, CACHE_BUDGET_FOLDER_GB="0.00001")
+        r = self.hook("upkeep", **env)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("WARN folder item-a", r.stdout)
+        self.assertNotIn("WARN folder item-b", r.stdout)
+        self.assertIn("item-a/venv", r.stdout)
+        self.assertIn("torch 2.15.0", r.stdout)
+        self.assertIn("suite-wt-old", r.stdout)
+        self.assertTrue(os.path.isfile(os.path.join(cache, "item-a", "pages.bin")))
+        self.assertTrue(os.path.isdir(os.path.join(self.state, "retired-worktrees", "suite-wt-old")))
+        with open(os.path.join(self.state, "cache-budget.txt")) as f:
+            self.assertIn("WARN folder item-a", f.read())
+        r = self.hook("upkeep", **env)   # within six hours: the saved report, not a new measurement
+        self.assertIn("last measured", r.stdout)
+        self.assertIn("WARN folder item-a", r.stdout)
+        os.remove(os.path.join(self.state, "cache-budget.txt"))
+        r = self.hook("upkeep", ARCHIVE_BENCH_CACHE=os.path.join(self.tmp, "none"))
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("no bench cache", r.stdout)
+
 
 class NoOtherProject(unittest.TestCase):
     def test_no_hook_names_another_project(self):

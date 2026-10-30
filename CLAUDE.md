@@ -267,6 +267,16 @@ stated as a rule; its full wording, history and the cases behind it are in [`REF
 plans are retained in full** (an explicit exception to "delete a shipped plan"). See `SUITE_TODO.md` §"Archive Notes —
 DEVONthink import". Restructuring Notes is free *now* and stops being free once 7.5 GB lands in it.
 
+**The bench cache** (`~/Library/Caches/ArchiveSuiteRehearsal`; owner, 2026-10-29, after it reached 92 GB and parked
+the engine). An item that completes deletes its own rebuildable scratch there (rendered pages, written PDFs, extracted
+archives, stage copies, a private venv) and records in its DONE entry what it kept and why. It never deletes another
+item's inputs, a retired worktree or an owner session folder. A bench item that needs PyTorch uses the shared
+environment, `ArchiveProcessor/scripts/segbench/torch-env.sh`, not a venv of its own. The upkeep hook reports the size
+against a budget. Sessions cannot read the owner's OneDrive backup: an item that needs a folder moved there (its
+`MOVED.md`) asks the owner to copy it back, rather than failing or downloading it again. Budgets, the shared
+environment and what may move to the backup:
+[`ops/autonomous/README.md`](ops/autonomous/README.md) §"The bench cache".
+
 ## Conventions
 
 - **Build:** XcodeGen. `project.yml` is authoritative; the `.xcodeproj` is generated and **gitignored**

@@ -1403,3 +1403,50 @@ marks it `submitted` (the ask counts it as one to collect, because only a login 
 finish marks `finished`; the Box pickup marks `in-box`; the item's completing session marks `clear`. No file means
 nothing submitted yet. `ops/autonomous/cluster-reach.py check farmshare` runs the cached preflight by hand.
 Tests: `ops/agent/tests/test_hooks.py` class `Cluster`; the batch, `ops/agent/tests/test_sherlock_batch.py`.
+
+## The bench cache — `cache-budget.py`, `segbench/torch-env.sh` (W40.cache-budget, 2026-10-29)
+
+`~/Library/Caches/ArchiveSuiteRehearsal` holds what segbench items download and write: models, Python environments,
+rendered pages, outputs. It grew from 37 GB (21 Oct) to 92 GB (29 Oct) and the engine parked at 10 GB free, because
+nothing ever cleared it; the housekeeping GC covers only build products in worktrees.
+
+**Measured.** The upkeep hook runs `ops/autonomous/cache-budget.py` at most every six hours (`--force` to measure
+now). It writes `$STATE/cache-budget.txt`: total and free disk, each folder over 100 MB, every venv with its PyTorch
+version, and the retired worktrees. `WARN` lines lead it. Budgets, derived in the script's header and overridable by
+environment: the cache 50 GB, one folder 5 GB, the shared model caches (`mlx-hf`, `hf`) 15 GB, free disk 30 GB. It
+never deletes or moves anything. Test: `ops/agent/tests/test_hooks.py` class `Upkeep`.
+
+**Items clear up after themselves.** The rule is in CLAUDE.md ("The bench cache") and the resume prompt's STEP 4: the
+completing session deletes its own rebuildable scratch (rendered pages, written PDFs, extracted archives, stage
+copies, a private venv) and records in the DONE entry what it kept and why. Kept: inputs that are slow or costly to
+get again (downloads behind a login, paid outputs), results not yet committed or scored, and anything an open item
+names. The size of a folder is not a reason to delete an open item's inputs.
+
+**One shared PyTorch.** `ArchiveProcessor/scripts/segbench/torch-env.sh` builds `torch-env/` in the cache once
+(Python 3.12, torch 2.15.0, torchvision, numpy, pillow, safetensors, huggingface-hub; 0.7 GB, 2.5 min) and prints its
+python; `torch-env.sh add PKG…` installs an item's extras pinned to that base, so no item can move torch for the
+next. A package that cannot install against the pins gets a private venv in the item's folder, its reason in the item
+notes, and is removed when the item completes. The seven private environments already there (2.12–2.15, about 7 GB
+on 29 Oct; the report lists them) are left for their items: `place_hands.py` and `ent_score.py` name theirs by path. uv keeps the downloaded wheels in `~/.cache/uv`, which makes a rebuild take seconds; `uv cache prune` or deleting it
+is safe.
+
+**What may move to the owner's OneDrive backup** (`~/Library/CloudStorage/OneDrive-Stanford/Archive Suite backup`)
+when the disk is short. Only the owner's session moves anything; an engine session names it in the Daemon Report (no
+decision). What has moved is listed in the backup's `MOVED.md` (29 Oct: IIT-CDIP imagetars, reader-sample,
+reader-session-1, the 24 retired worktrees, Vision OCR's model-home, ocrlab and September truth runs). Sessions cannot
+read OneDrive (macOS blocks `~/Library/CloudStorage`), so an item that needs a moved folder reports it and asks the
+owner to copy it back to its original path, rather than failing or downloading it again. Sizes 29 Oct; each when nothing open reads it:
+
+| Folder | Size | What it is | Movable when |
+|---|---|---|---|
+| `date-tagging/` (`traceable`, `iitcdip`) | 3.0 GB | public date sets, W46.date-traceable (shipped) | now; a rerun brings it back |
+| `enh-dewarp/` (`uvdoc-bench`, `src`, `hf`) | 4.3 GB | dewarp bench and model sources, W46.enh-dewarp (shipped) | after W46.place-geom, which may straighten with them |
+| `sherlock-results/` | 0.8 GB | downloaded cluster outputs | each batch once its item is scored and shipped |
+| `bench-corpus/raw` | 1.2 GB | public set originals; `pages` are rendered from them | now; keep `pages` (every new model runs the public set) |
+| `mixed-def/pages` | 1.8 GB | mixed-page set renders | after W46.mixed-route-bands |
+| `enh-ocr-input/` (`stage`, `weights`, `src`) | 4.3 GB | enhancement arms | after W46.enh-ocr-input-marks and -ppocr |
+| `ent-robust/g17` | 4.0 GB | the G17 entity set | after W46.ent-robust-paid |
+
+Never moved or deleted here: `mlx-hf/` (shared models, read by five scripts), the retired worktrees in
+`$STATE/retired-worktrees` (the engine's recovery copies, listed in the report for the owner) and owner session
+folders.
