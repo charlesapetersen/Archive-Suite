@@ -1,4 +1,5 @@
 #if DEBUG
+import ArchiveCore
 import AppKit
 import Foundation
 import PDFKit
@@ -100,6 +101,10 @@ enum ProcessorUITestConfiguration {
         defaults.set(LocalAgentTool.claude.rawValue, forKey: DefaultsKeys.localAgentTool)
         defaults.set("", forKey: DefaultsKeys.localAgentBinaryPath)
         defaults.set("", forKey: DefaultsKeys.localAgentModel)
+        // A test that picks Light or Dark must not leave the next test in that mode; the relaunch check keeps it.
+        if !arguments.contains("-APUITestKeepAppearance") {
+            defaults.removeObject(forKey: AppAppearance.defaultsKey)
+        }
     }
 
     private static func urlValue(after flag: String) -> URL? {

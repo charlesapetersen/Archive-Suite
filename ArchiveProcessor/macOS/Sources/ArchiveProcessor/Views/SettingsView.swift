@@ -1,6 +1,7 @@
 import SwiftUI
 import AppKit
 import UniformTypeIdentifiers
+import ArchiveCore
 
 extension Notification.Name {
     /// Posted when the API key changes in Settings, so the main window reloads it from the Keychain.
@@ -90,6 +91,8 @@ struct SettingsView: View {
     @AppStorage(DefaultsKeys.customOCRPrompt) private var customOCRPrompt: String = ""
     @AppStorage(DefaultsKeys.liveProcessingMode) private var liveProcessingMode: String = LiveProcessingMode.stage.rawValue
     @AppStorage(DefaultsKeys.driveClientId) private var driveClientId: String = ""
+    // Applied app-wide by `AppAppearance.follow()`, which watches this key (W48.appearance-processor).
+    @AppStorage(AppAppearance.defaultsKey) private var appearance: AppAppearance = AppAppearance.defaultValue
 
     @ObservedObject private var customModelStore = CustomModelStore.shared
     @ObservedObject private var profileStore = ProcessingProfileStore.shared
@@ -168,6 +171,7 @@ struct SettingsView: View {
     var body: some View {
         HStack(spacing: 0) {
             Form {
+                appearanceSection
                 profilesSection
                 liveCaptureSection
                 providerSection
@@ -1041,6 +1045,15 @@ struct SettingsView: View {
             }
         } header: {
             Text("Tagging & Segmentation")
+        }
+    }
+
+    private var appearanceSection: some View {
+        Section {
+            Picker("Appearance", selection: $appearance) {
+                ForEach(AppAppearance.allCases, id: \.self) { Text($0.title).tag($0) }
+            }
+            .accessibilityIdentifier("settings.appearance")
         }
     }
 

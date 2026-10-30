@@ -15,14 +15,17 @@ import AppKit
 enum UITestAppearance {
     static let argument = "-ArchiveUITestAppearance"
 
-    @MainActor
-    static func applyIfRequested(arguments: [String] = ProcessInfo.processInfo.arguments) {
-        guard let i = arguments.firstIndex(of: argument), i + 1 < arguments.count else { return }
+    /// True when the argument forced an appearance; the app then leaves its stored Appearance setting
+    /// (ArchiveCore `AppAppearance`) unapplied, so the light and dark tours keep their mode (W48.appearance-*).
+    @MainActor @discardableResult
+    static func applyIfRequested(arguments: [String] = ProcessInfo.processInfo.arguments) -> Bool {
+        guard let i = arguments.firstIndex(of: argument), i + 1 < arguments.count else { return false }
         switch arguments[i + 1] {
         case "dark": NSApplication.shared.appearance = NSAppearance(named: .darkAqua)
         case "light": NSApplication.shared.appearance = NSAppearance(named: .aqua)
-        default: break
+        default: return false
         }
+        return true
     }
 }
 #endif
