@@ -116,3 +116,10 @@ The owner's Gemini report is assessed in `screens/gemini-report-2026-10-20.md` (
   marked Date Uncertain. No owner labelling.
 - Box (owner, 2026-10-21): Stanford retired Box in 2023, so W46.box-collect and W46.box-ok are retired; results return
   over SSH at each submit login. Stanford Google Drive via rclone if results ever wait too long.
+
+## Measurement audit, 2026-10-30
+
+- [x] `11-measurement-audit.md`: every W46 and W47 result checked for weak or circular truth, biased selection, noise
+  read as a result, unfair comparisons and weak verdicts; refute-checked by an independent agent. The owner applied the
+  queue rework (13 new items, 4 owner sheets as gates, 23 re-scopes, two moved behind W46.nice-to-have, one retired)
+  and approved the W47 gateway spend. W46.review-phase4 reads the note first and waits on its useful-now items.

@@ -420,6 +420,35 @@ with tempfile.TemporaryDirectory(prefix="worker claims [scratch] ") as scratch:
         text = plan.read_text()
         check("(blocked-on: A-owner-ok)" in text and "- [ ] **A-owner-ok — OWNER GATE" in text,
               "owner-pending dependency and HOLD gate are one locked mutation")
+        queue("- [ ] **A — rests on a weak truth**", "- [ ] **T — rebuild the truth**")
+        gates = plan.read_text().count("OWNER GATE")
+        plan_run("depend", "A", "T", "waits on the rebuilt truth")
+        text = plan.read_text()
+        check("(blocked-on: T) — " in text and text.count("OWNER GATE") == gates,
+              "depend adds a prerequisite without filing a HOLD gate")
+        before = plan.read_text()
+        p = subprocess.run(["bash", str(HERE / "plan-edit.sh"), str(plan), "depend", "A", "Missing", "x"],
+                           env=env, capture_output=True)
+        q = subprocess.run(["bash", str(HERE / "plan-edit.sh"), str(plan), "depend", "A", "T", "again"],
+                           env=env, capture_output=True)
+        check(p.returncode == 2 and q.returncode == 2 and plan.read_text() == before,
+              "depend refuses a missing prerequisite and a repeat, leaving the plan byte-identical")
+        plan_run("block", "A", "A-sheet-ok", "is the sheet answered?")
+        plan_run("depend", "A-sheet-ok", "T", "asked once the sheet exists")
+        gate = next(l for l in plan.read_text().splitlines() if l.startswith("- [ ] **A-sheet-ok"))
+        check(gate.endswith("**") is False and "(blocked-on: T) — " in gate,
+              "depend also makes a HOLD QUEUE gate wait on the item that builds its sheet")
+        queue("- [ ] **A — waits** (blocked-on: T, U) — (blocked-on: V)", "- [ ] **T — t**", "- [ ] **U — u**",
+              "- [ ] **V — v**")
+        plan_run("undepend", "A", "U", "moved behind a gate")
+        plan_run("undepend", "A", "V", "settled")
+        line = next(l for l in plan.read_text().splitlines() if l.startswith("- [ ] **A"))
+        check("(blocked-on: T)" in line and "U," not in line and "(blocked-on: V)" not in line
+              and "no longer waits on U" in line, "undepend drops one prerequisite and keeps the others")
+        before = plan.read_text()
+        p = subprocess.run(["bash", str(HERE / "plan-edit.sh"), str(plan), "undepend", "A", "U", "again"],
+                           env=env, capture_output=True)
+        check(p.returncode == 2 and plan.read_text() == before, "undepend refuses a prerequisite the item lacks")
         plan_run("report", "### new decision\nquestion")
         check(plan.read_text().index("### new decision") < plan.read_text().index("### ✅ settled"),
               "new report lands before the settled walkthrough anchor")
