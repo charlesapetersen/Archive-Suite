@@ -45,6 +45,19 @@ HW = {
         'name': 'Qwen3.5-9B 4-bit', 'hosted': 'qwen3.5-9b', 'reply': 'panel', 'prompt': None, 'max_side': None,
         'max_tokens': None, 'template': {'enable_thinking': False},
         'repo': model_store.snapshot('mlx-community/Qwen3.5-9B-4bit', '8b2b98c00a6b4d291155e4890773ca8f769aee53')},
+    # W46.ocr-new-open's Mac arm: the publisher's bf16 weights at the revision Sherlock read, with the same prompt,
+    # 8,192 tokens, temperature 0 and thinking off, so the gap against the Sherlock truth96 run is the Mac runtime's.
+    'xiaomi-ocr-0-bf16': {
+        'name': 'Xiaomi-OCR-0 bf16', 'hosted': None, 'reply': 'plain', 'max_side': None, 'max_tokens': 8192,
+        'template': {'enable_thinking': False},
+        'prompt': 'Extract all information from the main body of the document image and represent it in markdown format, '
+                  'ignoring headers and footers. Tables should be expressed in OTSL format, formulas in the document should '
+                  'be represented using LATEX format, and the parsing should be organized according to the reading order.',
+        'repo': model_store.snapshot('SeerRay-Lab/Xiaomi-OCR-0', 'ff990be318c4c68f7e621dd690231200f47e48c4')},
+    'paddleocr-vl1.6-bf16': {
+        'name': 'PaddleOCR-VL 1.6 bf16', 'hosted': None, 'reply': 'plain', 'prompt': 'OCR:', 'max_side': None,
+        'max_tokens': 8192, 'template': {'enable_thinking': False},
+        'repo': model_store.snapshot('PaddlePaddle/PaddleOCR-VL-1.6', 'c5630abae1d940eafe0697512a0325494b02ab42')},
 }
 
 
