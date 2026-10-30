@@ -10,9 +10,14 @@ rawls-retired-20261029/):
             letter a document, all on one set of collection tags, so no document tags; only Red (box) and Purple
             (folder) label tags. The owner rules every gap. The corpus holds the JPEGs themselves (no per-photo
             PDF), so the thumbnails are turned by EXIF alone.
-  sir       Stanford Illustrated Review (147 photos), a bound periodical photographed page by page; tagged per
-            document. The tags give the draft; the owner rules the gaps where the W41.seg-label-clean teacher
-            (Qwen3.5 27B, P(new) averaged over the windows covering the gap) is on the other side of 0.5.
+  sir       Stanford Illustrated Review (147 photos), pages of alumni-magazine issues photographed one by one. Ruled on
+            the article-within-issue rule (owner, 2026-10-29; W46.seg-boxes-sir-article): an article inside an issue
+            is its own document and takes the issue's date and journal title from its cover or contents page; the
+            full-magazine rule of 2026-10-05 is only the fallback where splitting an issue by article is too
+            difficult. The tags and the W41.seg-label-clean teacher were both made under the old rule, so neither
+            drafts it: the draft is a page-by-page reading kept in the cache (reading.json), and the owner rules
+            every gap except a byte-identical repeat photo, each case shown with its issue's cover or contents
+            photo. The sheet built on the old rule is kept as sir-fullmag-retired-20261029/.
   sc0122    SC0122 News Service (200 photos), reading-room clippings mixed with other papers; as sir.
 
 Every sheet is blind: it shows the two photos either side of a gap and never the tag, the teacher or any model,
@@ -28,11 +33,16 @@ lock item (W46.fix-seg-boxes-lock) folds the owner's rulings in and freezes the 
     python3 seg_boxes.py sheet [BOX ...]  # sheet.html + key.json + thumbnails per box, in the cache
     python3 seg_boxes.py fold BOX FILE    # the owner's exported answers -> truth.csv beside the draft (cache)
 
+sir's reading.json is {"pages": [{"n", "issue": "YYYY-MM" or null, "kind", "starts"}], "fallback": {"YYYY-MM":
+reason}}: `kind` is a FRONT_KINDS page or another page kind, `starts` whether the photo begins an article (or front
+matter) against the photo before it, and `fallback` the issues whose run stays one document.
+
 Cache (outside git, private pages): ~/Library/Caches/ArchiveSuiteRehearsal/seg-boxes/<box>/
 """
 import argparse
 import collections
 import csv
+import hashlib
 import html
 import json
 import os
@@ -55,11 +65,12 @@ BOXES = {
     "sasha": {"name": "Young, Sasha letters 00001-00180", "folder": "Cambridge/Young, Sasha",
               "jpegs": "Churchill Archives/Young, Sasha", "first": 1, "last": 180, "draft": "label tags only"},
     "sir": {"name": "Stanford Illustrated Review", "folder": "Stanford University Archives/Stanford Illustrated Review",
-            "draft": "tags + teacher"},
+            "draft": "article reading", "prefix": "ar"},
     "sc0122": {"name": "SC0122 News Service", "folder": "Stanford University Archives/SC0122 — News Service",
                "draft": "tags + teacher"},
 }
-ANSWERS = ("new", "same", "label", "unsure")
+ANSWERS = ("new", "same", "label", "fallback", "unsure")
+FRONT_KINDS = ("cover", "masthead_contents")   # the pages an article takes its issue date and journal title from
 
 
 def photo_number(name):
@@ -88,6 +99,50 @@ def untagged_gap_needs_ruling(left_label, right_label):
     """Untagged box: every gap between two page photos is ruled; a gap beside a tagged label photo is a start by
     definition (a label photo is never part of a document) and is not asked."""
     return left_label is None and right_label is None
+
+
+def article_gap_needs_ruling(left_sha, right_sha):
+    """Article-rule box: every gap is ruled except a byte-identical repeat photo, which continues its document by
+    the 2026-10-05 rules (a repeat photo is part of its document)."""
+    return left_sha != right_sha
+
+
+def issue_fronts(reading):
+    """{n: the issue's cover or contents photo for photo n, or None}: the latest front photo at or before n of the
+    same issue. A photo whose issue is unknown, or whose issue has no front photographed before it, gets None."""
+    fronts, last = {}, {}
+    for p in sorted(reading, key=lambda p: p["n"]):
+        if p["issue"] and p["kind"] in FRONT_KINDS:
+            last[p["issue"]] = p["n"]
+        fronts[p["n"]] = last.get(p["issue"]) if p["issue"] else None
+    return fronts
+
+
+def article_draft(reading, fallback):
+    """{n: New | Cont} on the article rule. Inside a fallback issue only a change of issue starts a document (the
+    issue's run is one document); elsewhere a photo starts one where the reading says so."""
+    by = {p["n"]: p for p in reading}
+    out, prev = {}, None
+    for n in sorted(by):
+        p = by[n]
+        if prev is None:
+            out[n] = "New"
+        elif p["issue"] in fallback and p["issue"] == by[prev]["issue"]:
+            out[n] = "Cont"
+        else:
+            out[n] = "New" if p["starts"] else "Cont"
+        prev = n
+    return out
+
+
+def rd_fallback(key):
+    with open(os.path.join(CACHE, key, "reading.json"), encoding="utf-8") as f:
+        return json.load(f).get("fallback", {})
+
+
+def file_sha(path):
+    with open(path, "rb") as f:
+        return hashlib.sha256(f.read()).hexdigest()
 
 
 def read_jsonl(path):
@@ -122,6 +177,27 @@ def draft_tagged(key):
         rows.append({"n": i, "pdf": p["pdf"], "jpeg": p["jpeg"], "draft": p["label"], "split": p["split"],
                      "tag_gap": g["tag"] if g else None, "p_new": g["p_new"] if g else None,
                      "ask": bool(g) and gap_needs_ruling(g["tag"], g["p_new"])})
+    return rows
+
+
+def draft_article(key):
+    """The article-rule draft for a tagged per-document folder: the photos as draft_tagged finds them (keeping the
+    tag and teacher for the key), relabelled from the reading in the cache, and every non-repeat gap asked."""
+    rows = draft_tagged(key)
+    with open(os.path.join(CACHE, key, "reading.json"), encoding="utf-8") as f:
+        rd = json.load(f)
+    reading, fallback = rd["pages"], rd.get("fallback", {})
+    if sorted(p["n"] for p in reading) != [r["n"] for r in rows]:
+        raise SystemExit(f"{key}: reading.json does not cover photos 1..{len(rows)}")
+    draft, fronts = article_draft(reading, fallback), issue_fronts(reading)
+    by = {p["n"]: p for p in reading}
+    shas = [file_sha(os.path.join(JPEGS, r["jpeg"])) for r in rows]
+    for i, r in enumerate(rows):
+        p = by[r["n"]]
+        r["repeat"] = bool(i) and not article_gap_needs_ruling(shas[i - 1], shas[i])
+        r.update({"tag_draft": r["draft"], "draft": "Cont" if r["repeat"] else draft[r["n"]], "issue": p["issue"],
+                  "kind": p["kind"], "front": fronts[r["n"]], "fallback": p["issue"] in fallback,
+                  "ask": bool(i) and not r["repeat"]})
     return rows
 
 
@@ -168,12 +244,26 @@ def write_draft(key, rows):
 def summary(key, rows):
     labels = collections.Counter(r["draft"] for r in rows)
     asked = [r for r in rows if r["ask"]]
+    out = {"pages": len(rows), "gaps": len(rows) - 1, "labels": dict(sorted(labels.items())), "asked": len(asked),
+           "train_split": sum(1 for r in rows if r["split"] == "train")}
+    if BOXES[key]["draft"] == "article reading":
+        issues = sorted({r["issue"] for r in rows if r["issue"]})
+        fronted = {r["issue"] for r in rows if r["issue"] and r["front"]}
+        out.update({
+            "issues": len(issues), "issues_with_front": len(fronted),
+            "photos_issue_unknown": sum(1 for r in rows if not r["issue"]),
+            "photos_without_front": sum(1 for r in rows if not r["front"]),
+            "issues_inferred": sum(1 for k in issues if k.endswith("?")),
+            "fallback_issues": sorted({r["issue"] for r in rows if r["fallback"]}), "fallback_reasons": rd_fallback(key),
+            "fallback_photos": sum(1 for r in rows if r["fallback"]), "repeats": sum(1 for r in rows if r["repeat"]),
+            "tag_new_now_cont": sum(1 for r in rows[1:] if r["tag_draft"] == "New" and r["draft"] == "Cont"),
+            "tag_cont_now_new": sum(1 for r in rows[1:] if r["tag_draft"] == "Cont" and r["draft"] == "New")})
+        return out
     by = collections.Counter((r["tag_gap"], "teacher new" if (r["p_new"] or 0) >= 0.5 else "teacher cont")
                              for r in asked if r["tag_gap"])
-    return {"pages": len(rows), "gaps": len(rows) - 1, "labels": dict(sorted(labels.items())),
-            "asked": len(asked), "asked_by": {f"{a} / {b}": n for (a, b), n in sorted(by.items())},
-            "unjudged": sum(1 for r in rows[1:] if r["tag_gap"] and r["p_new"] is None),
-            "train_split": sum(1 for r in rows if r["split"] == "train")}
+    out.update({"asked_by": {f"{a} / {b}": n for (a, b), n in sorted(by.items())},
+                "unjudged": sum(1 for r in rows[1:] if r["tag_gap"] and r["p_new"] is None)})
+    return out
 
 
 def cmd_draft(a):
@@ -184,7 +274,8 @@ def cmd_draft(a):
         with open(path) as f:
             out = {k: v for k, v in json.load(f).items() if k in BOXES}
     for key in a.boxes or BOXES:
-        rows = draft_untagged(key) if BOXES[key]["draft"] == "label tags only" else draft_tagged(key)
+        rows = {"label tags only": draft_untagged, "article reading": draft_article}.get(
+            BOXES[key]["draft"], draft_tagged)(key)
         write_draft(key, rows)
         out[key] = summary(key, rows)
         print(key, json.dumps(out[key]))
@@ -199,9 +290,11 @@ def write_results(out):
              "Written by `seg_boxes.py draft` (numbers only: no names, text or images). The boxes were named by the",
              "owner on 2026-10-21 (`execution-plans/processing-review/STATE.md`); on 2026-10-29 the owner replaced",
              "Rawls papers 00057-00252 with the Young, Sasha letters (W46.seg-boxes-hand), since Rawls' segmentation",
-             "principles were unclear. Drafts, keys and the blind ruling",
-             "sheets are in `~/Library/Caches/ArchiveSuiteRehearsal/seg-boxes/<box>/`, outside git. No model calls:",
-             "the teacher's P(new) is the W41.seg-label-clean run's (`label-clean.md`).", "",
+             "principles were unclear, and had the Illustrated Review re-ruled on the article-within-issue rule",
+             "(W46.seg-boxes-sir-article). Drafts, keys and the blind ruling",
+             "sheets are in `~/Library/Caches/ArchiveSuiteRehearsal/seg-boxes/<box>/`, outside git. No bench or paid model calls:",
+             "the teacher's P(new) is the W41.seg-label-clean run's (`label-clean.md`); the Illustrated Review's",
+             "draft is a page-by-page reading made in the coding session (below).", "",
              "| box | draft from | photos | gaps | New | Cont | Box | Folder | gaps for the owner | photos in label-clean's train split |",
              "|---|---|---:|---:|---:|---:|---:|---:|---:|---:|"]
     for key, s in out.items():
@@ -214,9 +307,39 @@ def write_results(out):
                      f"| {lab.get('Box', 0)} | {lab.get('Folder', 0)} | {s['asked']} | {s['train_split']} |")
     lines += ["", "The letters carry no document tags, so their New column counts only the first page after a label",
               "photo; every gap between two page photos goes to the owner. The box is in no label-clean split (its",
-              "folder is not in the corpus-pairs windows), so every model scored on it is held out. In the two tagged boxes a gap goes to the owner",
-              "when the teacher's P(new) is on the other side of 0.5 from the tag (the agree rule's dropped gaps):", ""]
-    for key in ("sir", "sc0122"):
+              "folder is not in the corpus-pairs windows), so every model scored on it is held out."]
+    if "sir" in out:
+        s = out["sir"]
+        fb = ", ".join(s["fallback_issues"]) or "none"
+        lines += ["", "## Stanford Illustrated Review on the article-within-issue rule", "",
+                  "Owner, 2026-10-29: an article inside an issue is its own document and inherits the issue's date and",
+                  "journal title from its cover or contents page; the full-magazine rule of 2026-10-05 is only the",
+                  "fallback where splitting an issue by article is too difficult. The box's tags and the label-clean",
+                  "teacher were both made before that rule, so neither drafts it. The draft is a reading of every page",
+                  "(issue, page kind, whether an article or front matter begins), made by four Claude readers in the",
+                  "coding session over the upright thumbnails and merged by hand; it is not a bench arm and decides",
+                  "nothing the owner rules, since every gap except a repeat goes to the owner blind. It is kept in the cache",
+                  "as `seg-boxes/sir/reading.json`.", "",
+                  f"- {s['issues']} issues across the {s['pages']} photos ({s['issues_inferred']} dated only by inference",
+                  f"  from their contents, {s['photos_issue_unknown']} photos of no readable issue);",
+                  f"  {s['issues_with_front']} issues have a cover or contents photo in the box, and",
+                  f"  {s['photos_without_front']} photos have none before them (the sheet says so for those cases).",
+                  f"- {s['repeats']} gaps are a byte-identical repeat photo (the same JPEG twice, and their corpus PDFs",
+                  "  match it equally) and are drafted Cont without asking; the other "
+                  f"{s['asked']} gaps go to the owner.",
+                  f"- Against the old tags: {s['tag_cont_now_new']} photos tagged as continuing are drafted as starts,",
+                  f"  {s['tag_new_now_cont']} tagged as starts are drafted as continuing.",
+                  f"- Fallback needed in the draft: {fb} ({s['fallback_photos']} photos)."]
+        lines += [f"  - {k}: {v}." for k, v in s["fallback_reasons"].items()]
+        lines += ["- The sheet offers a fallback answer on every case, and `fold` lists the issues where it was used.",
+                  "",
+                  "Stale against the new rule, left for `W46.seg-magazine-rule-redo`: the method prompts (`method_gemini.py`",
+                  "and `method_whole.py` rule 10), `make-truth-pack.py`, this script's sheet text for the other boxes",
+                  "(SC0122 already answered on it; the Young, Sasha sheet is out to the owner with it, and holds no",
+                  "magazines), the truth sets with magazine cases (Stanton case 38), and every score built on them."]
+    lines += ["", "In the SC0122 box a gap goes to the owner when the teacher's P(new) is on the other side of 0.5 from",
+              "the tag (the agree rule's dropped gaps):", ""]
+    for key in ("sc0122",):
         if key not in out:
             continue
         lines.append(f"- {BOXES[key]['name']}: " + ", ".join(f"tag {k}: {v}" for k, v in out[key]["asked_by"].items())
@@ -253,37 +376,63 @@ def thumb_of(key, row, orient):
     return f"thumbs/{row['n']:04d}.jpg"
 
 
+RULES_2026_10_05 = """Judge by the document rules approved on 2026-10-05 (a full magazine is one document; each clipping article is its
+own; an enclosure with its own date, author or heading is its own; an envelope, a blank back or a repeat photo is
+part of its document). The small page on the right is the photo after, for context only.
+For each gap: does the RIGHT photo start a new document, continue the left one, or is it a box or folder label card?"""
+
+RULES_ARTICLE = """These are pages of single issues of an alumni magazine. Judge by the article-within-issue rule (owner,
+2026-10-29): <b>an article inside an issue is its own document</b>, and takes the issue's date and journal title from
+its cover or contents page, which is shown first in each case when this box holds one for that issue. The other
+2026-10-05 rules stand (an enclosure with its own date, author or heading is its own; an ad page, a blank back or a
+repeat photo is part of its document; photographs are never reordered). The full-magazine rule is now only the
+fallback: where splitting this issue by article is too difficult (articles interleaved across photos, say), answer
+<b>fallback</b>, and the right photo stays with the left one as part of the whole issue's document.
+A gap where the right photo is a byte-identical repeat of the left is not asked. The small page on the right is the
+photo after, for context only. For each gap: does the RIGHT photo start a new document or continue the left one?"""
+
+
 def sheet_html(key, cases, total_gaps):
-    """cases: [(cid, left n, right n, left img, right img, next img or None)] in box order."""
+    """cases: [(cid, left n, right n, left img, right img, next img or None, front n or None, front img or None)]
+    in box order. A box on the article rule shows each case's issue cover or contents photo first."""
     e = html.escape
     name = BOXES[key]["name"]
+    article = BOXES[key]["draft"] == "article reading"
+    rules = RULES_ARTICLE if article else RULES_2026_10_05
+    store = f"seg-boxes-{key}-article-answers" if article else f"seg-boxes-{key}-answers"
     head = f"""<!doctype html><meta charset="utf-8"><title>{e(name)} — gap rulings</title>
 <style>body{{font:15px -apple-system,sans-serif;margin:24px;max-width:1700px}}
 .case{{border-top:2px solid #ccc;padding:12px 0}}.row{{display:flex;gap:12px;align-items:flex-start}}
-.row figure{{margin:0;flex:1}}.row figure.ctx{{flex:.45;opacity:.75}}.row img{{width:100%;border:1px solid #999}}
+.row figure{{margin:0;flex:1}}.row figure.ctx{{flex:.45;opacity:.75}}.row figure.front{{flex:.6}}
+.row img{{width:100%;border:1px solid #999}}.row figure.front img{{border:2px solid #36c}}.nofront{{flex:.6;font-size:12px;color:#555}}
 figcaption{{font-size:12px;color:#555}}label{{margin-right:18px}}#out{{width:100%;height:160px}}</style>
-<h1>{e(name)} — {len(cases)} gaps to rule (W46.fix-seg-boxes)</h1>
+<h1>{e(name)} — {len(cases)} gaps to rule ({"W46.seg-boxes-sir-article" if article else "W46.fix-seg-boxes"})</h1>
 <p>Each case is one gap between two neighbouring photos of this box, in box order ({len(cases)} of its {total_gaps}
 gaps). The pages are shown on their own: no tag, label or model answer is shown, so the ruling stands on the pages.
-Judge by the document rules approved on 2026-10-05 (a full magazine is one document; each clipping article is its
-own; an enclosure with its own date, author or heading is its own; an envelope, a blank back or a repeat photo is
-part of its document). The small page on the right is the photo after, for context only.
-For each gap: does the RIGHT photo start a new document, continue the left one, or is it a box or folder label card?
+{rules}
 Answers are saved in this browser as you go. When done, press <b>Export</b> and paste the text into a reply.</p>
 """
     parts = [head]
-    for cid, ln, rn, li, ri, ni in cases:
+    for cid, ln, rn, li, ri, ni, fn, fi in cases:
         ctx = f'<figure class="ctx"><img loading="lazy" src="{ni}"><figcaption>photo {rn + 1} (context)</figcaption></figure>' if ni else ""
+        front = ""
+        if article and fi and fn not in (ln, rn):
+            front = (f'<figure class="front"><img loading="lazy" src="{fi}"><figcaption>photo {fn}: this issue\'s cover '
+                     f'or contents page (date and journal title)</figcaption></figure>')
+        elif article and not fn:
+            front = '<div class="nofront">No cover or contents page of this issue is in the box before these photos.</div>'
+        choices = [("new", "right starts a NEW document"), ("same", "right CONTINUES the left")]
+        choices += ([("fallback", "too hard to split by article here: FALLBACK, keep with the whole issue")] if article
+                    else [("label", "right is a box or folder LABEL card")])
+        choices.append(("unsure", "can't tell"))
+        radios = "\n".join(f'<label><input type="radio" name="{cid}" value="{v}"> {t}</label>' for v, t in choices)
         parts.append(f"""<div class="case" id="{cid}"><b>{cid}</b> · photos {ln} | {rn}
-<div class="row"><figure><img loading="lazy" src="{li}"><figcaption>photo {ln} (left)</figcaption></figure>
+<div class="row">{front}<figure><img loading="lazy" src="{li}"><figcaption>photo {ln} (left)</figcaption></figure>
 <figure><img loading="lazy" src="{ri}"><figcaption>photo {rn} (right)</figcaption></figure>{ctx}</div>
-<label><input type="radio" name="{cid}" value="new"> right starts a NEW document</label>
-<label><input type="radio" name="{cid}" value="same"> right CONTINUES the left</label>
-<label><input type="radio" name="{cid}" value="label"> right is a box or folder LABEL card</label>
-<label><input type="radio" name="{cid}" value="unsure"> can't tell</label></div>""")
+{radios}</div>""")
     parts.append(f"""<p><button onclick="exp()">Export</button> <span id="cnt"></span></p><textarea id="out"></textarea>
 <script>
-const K='seg-boxes-{key}-answers';const s=JSON.parse(localStorage.getItem(K)||'{{}}');
+const K='{store}';const s=JSON.parse(localStorage.getItem(K)||'{{}}');
 document.querySelectorAll('input[type=radio]').forEach(r=>{{if(s[r.name]===r.value)r.checked=true;
 r.addEventListener('change',()=>{{s[r.name]=r.value;localStorage.setItem(K,JSON.stringify(s));cnt();}});}});
 function cnt(){{document.getElementById('cnt').textContent=Object.keys(s).length+' of {len(cases)} answered';}}
@@ -309,10 +458,14 @@ def cmd_sheet(a):
                 continue
             left = rows[i - 1]
             nxt = rows[i + 1] if i + 1 < len(rows) else None
-            cid = f"{key[:2]}{len(cases) + 1:03d}"
-            cases.append((cid, left["n"], r["n"], thumb(key, left), thumb(key, r), thumb(key, nxt) if nxt else None))
+            cid = f"{BOXES[key].get('prefix', key[:2])}{len(cases) + 1:03d}"
+            fn = r.get("front")
+            front_row = rows[fn - 1] if fn else None
+            cases.append((cid, left["n"], r["n"], thumb(key, left), thumb(key, r), thumb(key, nxt) if nxt else None,
+                          fn, thumb(key, front_row) if front_row else None))
             keyrows.append({"id": cid, "left": left["n"], "right": r["n"], "draft": r["draft"],
-                            "tag_gap": r["tag_gap"], "p_new": r["p_new"]})
+                            "tag_gap": r["tag_gap"], "p_new": r["p_new"], "front": fn,
+                            "issue": r.get("issue"), "fallback": r.get("fallback", False)})
         with open(os.path.join(CACHE, key, "key.json"), "w") as f:
             json.dump(keyrows, f, indent=0)
         with open(os.path.join(CACHE, key, "sheet.html"), "w", encoding="utf-8") as f:
@@ -327,16 +480,17 @@ def cmd_sheet(a):
 
 def fold(rows, keyrows, answers):
     """The draft with the owner's rulings applied: [(n, label)], plus the ids left unanswered or unsure.
-    'new' -> New, 'same' -> Cont, 'label' -> Folder (a box card is marked Box by hand: the sheet does not tell them
-    apart, and only the label photo itself changes). A page after a label card is a start."""
+    'new' -> New, 'same' -> Cont, 'fallback' -> Cont (the full-magazine fallback: the photo stays with its issue's
+    document; cmd_fold lists where it was used), 'label' -> Folder (a box card is marked Box by hand: the sheet does
+    not tell them apart, and only the label photo itself changes). A page after a label card is a start."""
     labels = {r["n"]: r["draft"] for r in rows}
     open_ids = []
     for k in keyrows:
         ans = answers.get(k["id"])
-        if ans not in ("new", "same", "label"):
+        if ans not in ("new", "same", "label", "fallback"):
             open_ids.append(k["id"])
             continue
-        labels[k["right"]] = {"new": "New", "same": "Cont", "label": "Folder"}[ans]
+        labels[k["right"]] = {"new": "New", "same": "Cont", "fallback": "Cont", "label": "Folder"}[ans]
     ns = sorted(labels)
     for prev, n in zip(ns, ns[1:]):
         if labels[prev] in ("Box", "Folder") and labels[n] == "Cont":
@@ -357,7 +511,9 @@ def cmd_fold(a):
         w = csv.writer(f)
         w.writerow(["File Number", "Status"])
         w.writerows(labs)
-    print(f"{a.box}: {len(keyrows) - len(open_ids)} of {len(keyrows)} rulings applied; open: {open_ids}")
+    used = sorted({k.get("issue") or "issue unknown" for k in keyrows if answers.get(k["id"]) == "fallback"})
+    print(f"{a.box}: {len(keyrows) - len(open_ids)} of {len(keyrows)} rulings applied; open: {open_ids}"
+          + (f"; full-magazine fallback answered in: {used}" if used else ""))
 
 
 def main():

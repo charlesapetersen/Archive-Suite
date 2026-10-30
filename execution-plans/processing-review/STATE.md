@@ -102,6 +102,10 @@ The owner's Gemini report is assessed in `screens/gemini-report-2026-10-20.md` (
   being unclear, and stays for handwriting OCR and W46.date-traceable. The handwritten box is now Cambridge/Young,
   Sasha photos 00001-00180 (180 JPEGs): her letters to Michael Young, one letter a document, upright, in no
   label-clean split; every gap is ruled blind by the owner (178 asked), about an hour.
+  Re-ruled (owner, 2026-10-29; W46.seg-boxes-sir-article): the Illustrated Review is segmented by article within
+  each issue, an article taking the issue's date and journal title from its cover or contents page, the
+  full-magazine rule only a fallback. Redrafted from a page reading; 134 gaps asked blind, each with its issue's
+  cover or contents photo; the fallback was needed for 1926-01 alone (`segbench-results/seg-boxes.md`).
 - Rawls and dating (owner, 2026-10-21): Rawls documents are generally undated and carry no year tags, so the slice
   is for segmentation and handwriting OCR, not dating truth. It serves dating only as a check on invented dates:
   W46.date-traceable runs the tagger over the 196 pages and counts years asserted without cited evidence and not
