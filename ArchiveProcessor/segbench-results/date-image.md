@@ -1,0 +1,47 @@
+# Dating: dates on the page that are not in the text (W46.date-image)
+
+Written by `scripts/segbench/date_image.py score`. B test 2 (`execution-plans/processing-review/B-dating.md`): the owner's unprinted-year documents (the year not in the ABBYY text; classes A to D), 122 of the 131 with a confirmed JPEG original of at least one of their first two pages (the other 9 have none; the corpus PDFs are never sent, owner 2026-10-22). Each model was asked to quote every date on the pages, say where it is and what kind, and give the document's own date; once with the images alone and once with the ABBYY text as well. The owner's year is never in the prompt. $0: open weights only (Gemini is W46.date-image-paid).
+
+Measures, per document: **doc year** the document date the model gave equals the owner's year (exact; within one); **on the page** some quoted date has the owner's year written in it (a year the model supplied, not written in the quote, does not count); **not in ABBYY** of those, the quote is not in the ABBYY text either (spacing and punctuation ignored); **Vision agrees** of those, Apple Vision's reading of the same pages has the year or the quote (Vision text is cached for 122 of the 122), a check that the date is really there rather than invented.
+
+## By arm and variant
+
+| arm | variant | parsed | doc year exact | within one | on the page | not in ABBYY | Vision agrees | median s |
+|---|---|---|---|---|---|---|---|---|
+| Qwen3.6-27B (Sherlock, vLLM, 2,400 px) | image | 122/122 (100%) | 48/122 (39%) | 55/122 (45%) | 52/122 (43%) | 39/52 (75%) | 36/52 (69%) | 17.5 |
+| Qwen3.6-27B (Sherlock, vLLM, 2,400 px) | image+text | 122/122 (100%) | 51/122 (42%) | 58/122 (48%) | 54/122 (44%) | 40/54 (74%) | 36/54 (67%) | 19.1 |
+| Qwen3-VL 8B, 4-bit MLX (this Mac, 1,400 px) | image | 4/4 (100%) | 2/4 (50%) | 2/4 (50%) | 3/4 (75%) | 3/3 (100%) | 3/3 (100%) | 10.79 |
+
+## By class (doc year exact / on the page)
+
+D has no printed carrier anywhere near it; A had a previous document printing the year (the strict class).
+
+| arm | variant | D | C | B | A | A' |
+|---|---|---|---|---|---|---|
+| Qwen3.6-27B (Sherlock, vLLM, 2,400 px) | image | 10 / 11 of 17 | 10 / 10 of 31 | 15 / 16 of 35 | 11 / 11 of 32 | 2 / 4 of 7 |
+| Qwen3.6-27B (Sherlock, vLLM, 2,400 px) | image+text | 11 / 10 of 17 | 10 / 10 of 31 | 16 / 17 of 35 | 11 / 13 of 32 | 3 / 4 of 7 |
+| Qwen3-VL 8B, 4-bit MLX (this Mac, 1,400 px) | image | 2 / 3 of 4 | 0 / 0 of 0 | 0 / 0 of 0 | 0 / 0 of 0 | 0 / 0 of 0 |
+
+## What the page dates are
+
+Of the documents whose owner year was found written on the page (either variant), the first such date: its kind, where it is, and which page. The handwritten share decides whether the handwritten-date reader (B test 8) is worth filing.
+
+- **Qwen3.6-27B (Sherlock, vLLM, 2,400 px)**, 55 documents. Kind: typed 22, printed 19, handwritten 9, stamped 5. Where: dateline 15, other 10, body 9, letterhead 8, margin 8, stamp 5. Page: 1 50, 2 5.
+- **Qwen3-VL 8B, 4-bit MLX (this Mac, 1,400 px)**, 3 documents. Kind: printed 2, typed 1. Where: letterhead 3. Page: 1 3.
+
+## Images alone against images with the text
+
+- **Qwen3.6-27B (Sherlock, vLLM, 2,400 px)**, 122 documents: right in both 48, only with images alone 0, only with the text added 3, neither 71.
+
+## Against the owner's own reading of the page
+
+27 of these documents are among the owner's 54 dating cases answered as a date on the document's own page (`date-truth-sets.md`); the owner said what kind it is and whether it is legible.
+
+- **Qwen3.6-27B (Sherlock, vLLM, 2,400 px)**: found the owner's year on the page for 20/27 (74%); kind as the owner gave it for 19 of those 20. Missed: d06 (printed or typed, legible), d18 (printed or typed, legible), d20 (printed or typed, legible), a32 (handwritten, legible), a30 (printed or typed, illegible), a16 (printed or typed, legible), a08 (printed or typed, legible).
+  Where the owner's tag differs from the year the owner read on the page (d06 tag 1965, read 1967, d18 tag 1935, read 1936, d20 tag 1935, read 1936, a08 tag 1984, read 1985), the model quoted the year the owner read on 4 of 4.
+- **Qwen3-VL 8B, 4-bit MLX (this Mac, 1,400 px)**: found the owner's year on the page for 3/27 (11%); kind as the owner gave it for 3 of those 3. Missed: d13 (printed or typed, legible), d16 (printed or typed, legible), d01 (printed or typed, legible), d05 (printed or typed, legible), d06 (printed or typed, legible), d12 (None, legible), d07 (printed or typed, legible), d18 (printed or typed, legible), d08 (printed or typed, legible), d20 (printed or typed, legible), a04 (printed or typed, legible), a06 (stamped, legible), a18 (printed or typed, legible), a32 (handwritten, legible), a30 (printed or typed, illegible), a02 (handwritten, legible), a14 (printed or typed, legible), a16 (printed or typed, legible), a07 (handwritten, legible), a08 (printed or typed, legible), a09 (printed or typed, legible), a17 (printed or typed, legible), a12 (handwritten, legible), a01 (stamped, legible).
+  Where the owner's tag differs from the year the owner read on the page (d06 tag 1965, read 1967, d18 tag 1935, read 1936, d20 tag 1935, read 1936, a08 tag 1984, read 1985), the model quoted the year the owner read on 0 of 4.
+
+## Reading it
+
+(written by hand; a rerun keeps everything below this heading)

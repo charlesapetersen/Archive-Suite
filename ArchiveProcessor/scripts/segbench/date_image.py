@@ -1,7 +1,12 @@
 #!/usr/bin/env python3
 """W46.date-image, the open cluster arm (B test 2): explicit dates on the page that are not in the text.
 
-    python3 date_image.py pack --out DIR     # on the Mac: the 131 unprinted-year documents' pages, two variants
+    <lab venv>/bin/python date_image.py pack --out DIR    # the 131 unprinted-year documents' pages, two variants
+    run-guarded.sh --label date-image --need-gb 8 -- <lab venv>/bin/python date_image.py collect-mac [--side 1400]
+    python3 date_image.py score              # segbench-results/date-image.md and .json
+
+<lab venv> is ~/.local/share/visionocr-ocrlab/venv (numpy for the pairing test, mlx_vlm for the Mac arm). The pack
+for the Mac arm is rebuilt into PACK with the same command and checked against the cluster's image digests.
 
 The 131 are date_traceable.owner_docs()'s owner documents whose year is not in the text (classes A, A', B, C, D; the
 21 D documents, with no printed carrier, first). Each document's first two pages are sent to Qwen3.6-27B on the cluster
@@ -20,7 +25,9 @@ import collections
 import hashlib
 import json
 import os
+import re
 import sys
+import time
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -29,6 +36,8 @@ sys.path.insert(0, str(HERE))
 # 20 known pairs among the 96's originals measured 0.69-0.98, the 5 non-matching candidates 0.16-0.48 (2026-10-22).
 # corpus_pairs.py's difference hash is not used to confirm: its true pairs spread from 8 to 61 bits.
 MIN_CORR = 0.65
+PACK = Path(os.path.expanduser("~/Library/Caches/ArchiveSuiteRehearsal/date-image"))      # a local copy of the pack
+CLUSTER = Path(os.path.expanduser("~/Library/Caches/ArchiveSuiteRehearsal/sherlock-results/date-image-20261022"))
 LONG_SIDE = 2400
 PAGES = 2
 
@@ -105,13 +114,337 @@ def cmd_pack(a):
     print(dict(why), len(reqs), "requests")
 
 
+def load_requests(pack):
+    return [json.loads(l) for l in open(pack / "requests.jsonl", encoding="utf-8")]
+
+
+def check_pack(pack, cluster):
+    """The local pack must be the one the cluster read: same requests, same image bytes."""
+    mine = {r["id"]: r["image_sha256s"] for r in load_requests(pack)}
+    theirs = {r["id"]: r["image_sha256s"] for r in load_requests(cluster)}
+    same = sum(1 for k, v in theirs.items() if mine.get(k) == v)
+    return same, len(theirs)
+
+
+def cmd_collect_mac(a):
+    """The Mac arm: the cluster's requests through a small MLX model, images shrunk to --side."""
+    import mlx.core as mx
+    from mlx_vlm import load, stream_generate
+    from mlx_vlm.prompt_utils import apply_chat_template
+    from PIL import Image
+    import date_draft as DD
+    os.environ.setdefault("HF_HOME", os.path.expanduser("~/Library/Caches/ArchiveSuiteRehearsal/mlx-hf"))
+    small = a.pack / f"images-{a.side}"; small.mkdir(exist_ok=True)
+    out = a.pack / "mac" / f"{a.model}-{a.side}"; out.mkdir(parents=True, exist_ok=True)
+    reqs = [r for r in load_requests(a.pack) if a.variant in (None, r["variant"])]
+    reqs.sort(key=lambda r: (r["variant"] != "image", r["cls"] != "D", r["doc"]))   # images alone first, D first
+    todo = [r for r in reqs if not (out / (r["id"] + ".json")).exists()][: a.limit or None]
+    print(f"{a.model} at {a.side} px: {len(todo)} requests to send", flush=True)
+    if not todo:
+        return
+    mx.set_cache_limit(256 * 2**20)
+    model, processor = load(DD.MODELS[a.model][0])
+    for k, r in enumerate(todo, 1):
+        paths = []
+        for p in r["images"]:
+            dst = small / os.path.basename(p)
+            if not dst.exists():
+                with Image.open(a.pack / "images" / os.path.basename(p)) as im:
+                    im.thumbnail((a.side, a.side), Image.Resampling.LANCZOS)
+                    im.save(dst, "JPEG", quality=90)
+            paths.append(str(dst))
+        try:
+            chat = apply_chat_template(processor, model.config, r["prompt"], num_images=len(paths), enable_thinking=False)
+        except TypeError:
+            chat = apply_chat_template(processor, model.config, r["prompt"], num_images=len(paths))
+        start, text, last = time.time(), [], None
+        for g in stream_generate(model, processor, chat, image=paths, max_tokens=MAX_TOKENS, temperature=0.0):
+            text.append(g.text)
+            last = g
+        raw = re.sub(r"<think>.*?</think>", "", "".join(text), flags=re.S)
+        gen = getattr(last, "generation_tokens", 0)
+        rec = {"id": r["id"], "text": raw, "finish": "length" if gen >= MAX_TOKENS else "stop",
+               "seconds": round(time.time() - start, 2), "tokens": [getattr(last, "prompt_tokens", 0), gen],
+               "model": a.model, "side": a.side}
+        (out / (r["id"] + ".json")).write_text(json.dumps(rec, ensure_ascii=False))
+        print(f"[{k}/{len(todo)}] {r['id']} {rec['seconds']}s {rec['tokens']}", flush=True)
+
+
+# ---------------------------------------------------------------------------------------------------------- scoring
+
+def reply(raw):
+    """The reply's JSON object, or None."""
+    m = re.search(r"\{.*\}", re.sub(r"```(?:json)?", "", raw or ""), re.S)
+    if not m:
+        return None
+    try:
+        d = json.loads(m.group(0))
+    except ValueError:
+        return None
+    return d if isinstance(d, dict) else None
+
+
+def _year(v):
+    try:
+        y = int(str(v)[:4])
+    except (TypeError, ValueError):
+        return None
+    return y if 1500 <= y <= 2030 else None
+
+
+def year_in_quote(year, quote):
+    """The year is written in the quote, in full or as '58 / 58 (date_draft.year_in_reading's rule)."""
+    y, q = str(year), str(quote or "")
+    return y in q or bool(re.search(r"(?<![0-9])'?" + y[2:] + r"(?![0-9])", q))
+
+
+def quoted_year(quote):
+    """The year written in a quote when the reply left the year field out (the 8B often does): a four-digit year,
+    or the two-digit year closing a numeric date (8/4/68), read as 19xx."""
+    q = str(quote or "")
+    m = re.search(r"(?<![0-9])(1[89][0-9][0-9]|20[0-3][0-9])(?![0-9])", q)
+    if m:
+        return int(m.group(1))
+    m = re.search(r"(?<![0-9])[0-9]{1,2}[/.-][0-9]{1,2}[/.-]([0-9]{2})(?![0-9])", q)
+    return 1900 + int(m.group(1)) if m else None
+
+
+def _norm(s):
+    return re.sub(r"[^0-9a-z]", "", (s or "").lower())
+
+
+def read(rec):
+    """One reply as {ok, doc_year, dates: [{quote, page, where, kind, year, written}]}; written = the year is in the
+    quote (a year the model supplied from elsewhere, as on the owner's d06, is not written)."""
+    d = reply(rec.get("text")) if rec else None
+    if d is None:
+        return {"ok": False, "doc_year": None, "dates": []}
+    dates = []
+    for x in d.get("dates") or []:
+        if not isinstance(x, dict):
+            continue
+        y = _year(x.get("year")) or quoted_year(x.get("quote"))
+        dates.append({"quote": str(x.get("quote") or ""), "page": x.get("page"), "where": str(x.get("where") or "other"),
+                      "kind": str(x.get("kind") or "?"), "year": y, "written": y is not None and year_in_quote(y, x.get("quote"))})
+    dd = d.get("document_date") if isinstance(d.get("document_date"), dict) else {}
+    return {"ok": True, "doc_year": _year(dd.get("year")), "doc_quote": str(dd.get("quote") or ""), "dates": dates}
+
+
+ARMS = (("qwen3.6-27b", "Qwen3.6-27B (Sherlock, vLLM, 2,400 px)"),)
+
+
+def outputs(cluster, mac_dirs):
+    """{(arm, request id): record}; arm labels in arm order."""
+    got, arms = {}, []
+    for label, name in ARMS:
+        arms.append((label, name))
+        for f in (cluster / "out").glob("*.json"):
+            rec = json.loads(f.read_text())
+            got[(label, rec["id"])] = rec
+    for m in mac_dirs:
+        label = "mac:" + m.name
+        recs = [json.loads(f.read_text()) for f in m.glob("*.json")]
+        if not recs:
+            continue
+        import date_draft as DD
+        key, side = m.name.rsplit("-", 1)
+        arms.append((label, f"{DD.MODELS.get(key, (None, key))[1]} (this Mac, {int(side):,} px)"))
+        for rec in recs:
+            got[(label, rec["id"])] = rec
+    return got, arms
+
+
+def page_sources():
+    """{document id: (ABBYY text of the whole document, Apple Vision text of its first pages or None)}."""
+    import date_traceable as T
+    import enclosure_split as ES
+    _, found = ES.load()
+    out = {}
+    for d in T.owner_docs("abbyy"):
+        info = found.get(d["id"][2:])
+        pages = info["segs"][info["k"]]["pages"][:PAGES] if info else []
+        out[d["id"]] = (d["text"], T.vision_text(pages) if pages else None)
+    return out
+
+
+def owner_page_truth():
+    """{document id: page_date} for the owner's dating cases answered from the document's own page."""
+    import date_tagging as DT
+    p = os.path.join(DT.CACHE, "cases", "truth-sets.json")
+    if not os.path.exists(p):
+        return {}
+    return {"o:" + r["doc"]: r for r in json.load(open(p, encoding="utf-8"))["records"] if r.get("page_date")}
+
+
+def score_one(req, rec, texts):
+    """The measures of one reply against the owner's year."""
+    truth = req["truth"].get("year")
+    r = read(rec)
+    hits = [x for x in r["dates"] if x["year"] == truth and x["written"]]
+    abbyy, vision = texts.get(req["doc"], ("", None))
+    na, nv = _norm(abbyy), _norm(vision) if vision is not None else None
+    first = hits[0] if hits else None
+    return {"ok": r["ok"], "doc_year": r["doc_year"], "exact": r["doc_year"] == truth,
+            "within1": r["doc_year"] is not None and truth is not None and abs(r["doc_year"] - truth) <= 1,
+            "answered": r["doc_year"] is not None, "n_dates": len(r["dates"]),
+            "on_page": bool(hits), "hit": first,
+            "hit_in_abbyy": bool(first) and len(_norm(first["quote"])) >= 4 and _norm(first["quote"]) in na,
+            "year_in_abbyy": truth is not None and str(truth) in abbyy,
+            "vision": None if nv is None else (str(truth) in vision or (bool(first) and len(_norm(first["quote"])) >= 4
+                                                                         and _norm(first["quote"]) in nv)),
+            "wrong_written": sorted({x["year"] for x in r["dates"] if x["written"] and x["year"] != truth}),
+            "written": sorted({x["year"] for x in r["dates"] if x["written"]})}
+
+
+CLASSES = ("D", "C", "B", "A", "A'")
+
+
+def pct(n, d):
+    return f"{n}/{d} ({100 * n / d:.0f}%)" if d else "-"
+
+
+def cmd_score(a):
+    reqs = load_requests(a.cluster)
+    mac_dirs = sorted(p for p in (a.pack / "mac").glob("*") if p.is_dir()) if a.pack else []
+    got, arms = outputs(a.cluster, mac_dirs)
+    texts = page_sources()
+    owner = owner_page_truth()
+    rows = []
+    for label, _ in arms:
+        for q in reqs:
+            rec = got.get((label, q["id"]))
+            if rec is None:
+                continue
+            s = score_one(q, rec, texts)
+            s.update(arm=label, id=q["id"], doc=q["doc"], cls=q["cls"], variant=q["variant"], seconds=rec.get("seconds"))
+            rows.append(s)
+    docs = {q["doc"]: q for q in reqs}
+    nvis = sum(1 for d in docs if texts.get(d, ("", None))[1] is not None)
+    L = ["# Dating: dates on the page that are not in the text (W46.date-image)", "",
+         "Written by `scripts/segbench/date_image.py score`. B test 2 (`execution-plans/processing-review/B-dating.md`): "
+         f"the owner's unprinted-year documents (the year not in the ABBYY text; classes A to D), {len(docs)} of the 131 "
+         "with a confirmed JPEG original of at least one of their first two pages (the other 9 have none; the corpus PDFs "
+         "are never sent, owner 2026-10-22). Each model was asked to quote every date on the pages, say where it is and "
+         "what kind, and give the document's own date; once with the images alone and once with the ABBYY text as well. "
+         "The owner's year is never in the prompt. $0: open weights only (Gemini is W46.date-image-paid).", "",
+         "Measures, per document: **doc year** the document date the model gave equals the owner's year (exact; "
+         "within one); **on the page** some quoted date has the owner's year written in it (a year the model "
+         "supplied, not written in the quote, does not count); **not in ABBYY** of those, the quote is not in the "
+         "ABBYY text either (spacing and punctuation ignored); **Vision agrees** of those, Apple Vision's reading of "
+         f"the same pages has the year or the quote (Vision text is cached for {nvis} of the {len(docs)}), a check that "
+         "the date is really there rather than invented.", ""]
+    L += ["## By arm and variant", "",
+          "| arm | variant | parsed | doc year exact | within one | on the page | not in ABBYY | Vision agrees | median s |",
+          "|---|---|---|---|---|---|---|---|---|"]
+    summary = {}
+    for label, name in arms:
+        for v in ("image", "image+text"):
+            R = [r for r in rows if r["arm"] == label and r["variant"] == v]
+            if not R:
+                continue
+            hits = [r for r in R if r["on_page"]]
+            vis = [r for r in hits if r["vision"] is not None]
+            secs = sorted(r["seconds"] for r in R if r["seconds"] is not None)
+            summary[f"{label}|{v}"] = {"n": len(R), "exact": sum(r["exact"] for r in R),
+                                       "within1": sum(r["within1"] for r in R), "on_page": len(hits),
+                                       "not_in_abbyy": sum(not r["hit_in_abbyy"] for r in hits),
+                                       "vision_checked": len(vis), "vision_agrees": sum(r["vision"] for r in vis)}
+            L.append(f"| {name} | {v} | {pct(sum(r['ok'] for r in R), len(R))} | {pct(sum(r['exact'] for r in R), len(R))} "
+                     f"| {pct(sum(r['within1'] for r in R), len(R))} | {pct(len(hits), len(R))} "
+                     f"| {pct(sum(not r['hit_in_abbyy'] for r in hits), len(hits))} "
+                     f"| {pct(sum(r['vision'] for r in vis), len(vis))} | {secs[len(secs) // 2] if secs else '-'} |")
+    L += ["", "## By class (doc year exact / on the page)", "",
+          "D has no printed carrier anywhere near it; A had a previous document printing the year (the strict class).", "",
+          "| arm | variant | " + " | ".join(f"{c}" for c in CLASSES) + " |", "|---|---|" + "---|" * len(CLASSES)]
+    for label, name in arms:
+        for v in ("image", "image+text"):
+            R = [r for r in rows if r["arm"] == label and r["variant"] == v]
+            if not R:
+                continue
+            cells = []
+            for c in CLASSES:
+                C = [r for r in R if r["cls"] == c]
+                cells.append(f"{sum(r['exact'] for r in C)} / {sum(r['on_page'] for r in C)} of {len(C)}")
+            L.append(f"| {name} | {v} | " + " | ".join(cells) + " |")
+    L += ["", "## What the page dates are", "",
+          "Of the documents whose owner year was found written on the page (either variant), the first such date: its "
+          "kind, where it is, and which page. The handwritten share decides whether the handwritten-date reader "
+          "(B test 8) is worth filing.", ""]
+    kinds = {}
+    for label, name in arms:
+        H = {}
+        for r in rows:
+            if r["arm"] == label and r["on_page"] and (r["doc"] not in H or r["variant"] == "image"):
+                H[r["doc"]] = r["hit"]
+        if not H:
+            continue
+        kc = collections.Counter(h["kind"] for h in H.values())
+        wc = collections.Counter(h["where"] for h in H.values())
+        pc = collections.Counter(str(h["page"]) for h in H.values())
+        kinds[label] = {"docs": len(H), "kind": dict(kc), "where": dict(wc), "page": dict(pc)}
+        f = lambda c: ", ".join(f"{k} {n}" for k, n in c.most_common())
+        L += [f"- **{name}**, {len(H)} documents. Kind: {f(kc)}. Where: {f(wc)}. Page: {f(pc)}."]
+    L += ["", "## Images alone against images with the text", ""]
+    for label, name in arms:
+        by = {(r["doc"], r["variant"]): r for r in rows if r["arm"] == label}
+        both = [d for d in docs if (d, "image") in by and (d, "image+text") in by]
+        if not both:
+            continue
+        c = collections.Counter((by[(d, "image")]["exact"], by[(d, "image+text")]["exact"]) for d in both)
+        L.append(f"- **{name}**, {len(both)} documents: right in both {c[(True, True)]}, only with images alone "
+                 f"{c[(True, False)]}, only with the text added {c[(False, True)]}, neither {c[(False, False)]}.")
+    own = [d for d in docs if d in owner and owner[d]["basis"] == "own page"]
+    L += ["", "## Against the owner's own reading of the page", "",
+          f"{len(own)} of these documents are among the owner's 54 dating cases answered as a date on the document's own "
+          "page (`date-truth-sets.md`); the owner said what kind it is and whether it is legible.", ""]
+    for label, name in arms:
+        by = {(r["doc"], r["variant"]): r for r in rows if r["arm"] == label}
+        found = [d for d in own if any(by.get((d, v), {}).get("on_page") for v in ("image", "image+text"))]
+        if not any((d, "image") in by for d in own):
+            continue
+        kind_ok = 0
+        for d in found:
+            h = (by.get((d, "image")) if by.get((d, "image"), {}).get("on_page") else by[(d, "image+text")])["hit"]
+            ok = owner[d]["page_date"].get("kind") or ""
+            kind_ok += (h["kind"] in ("typed", "printed")) if "print" in ok or "typed" in ok else h["kind"] == ok
+        L.append(f"- **{name}**: found the owner's year on the page for {pct(len(found), len(own))}; kind as the owner "
+                 f"gave it for {kind_ok} of those {len(found)}. Missed: "
+                 + (", ".join(f"{owner[d]['id']} ({owner[d]['page_date'].get('kind')}, "
+                              f"{'legible' if owner[d]['page_date'].get('legible') else 'illegible'})"
+                              for d in own if d not in found) or "none") + ".")
+        diff = [d for d in own if owner[d]["page_date"].get("year") not in (None, owner[d]["owner_year"])]
+        same = [d for d in diff if any(owner[d]["page_date"]["year"] in by.get((d, v), {}).get("written", ())
+                                       for v in ("image", "image+text"))]
+        if diff:
+            L.append(f"  Where the owner's tag differs from the year the owner read on the page ("
+                     + ", ".join(f"{owner[d]['id']} tag {owner[d]['owner_year']}, read {owner[d]['page_date']['year']}"
+                                 for d in diff) + f"), the model quoted the year the owner read on {len(same)} of {len(diff)}.")
+    out = Path(RESULTS)
+    kept = out.read_text().split("\n## Reading it\n", 1)[1] if out.exists() and "\n## Reading it\n" in out.read_text() else \
+        "\n(written by hand; a rerun keeps everything below this heading)\n"
+    out.write_text("\n".join(L) + "\n\n## Reading it\n" + kept)
+    Path(RESULTS[:-3] + ".json").write_text(json.dumps({"summary": summary, "kinds": kinds, "documents": len(docs),
+        "rows": [{k: v for k, v in r.items() if k not in ("hit",)} | {"hit_kind": (r["hit"] or {}).get("kind")}
+                 for r in rows]}, indent=1) + "\n")
+    print("\n".join(L[:40]))
+
+
+RESULTS = str(HERE.parent.parent / "segbench-results" / "date-image.md")
+MAX_TOKENS = 700
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
     p = sub.add_parser("pack"); p.add_argument("--out", type=Path, required=True)
     p.add_argument("--remote", default="/scratch/users/cp1/fs-ocr/date-image-20261022")
+    p = sub.add_parser("collect-mac"); p.add_argument("--pack", type=Path, default=PACK)
+    p.add_argument("--model", default="qwen3-vl-8b-mlx4"); p.add_argument("--side", type=int, default=1400)
+    p.add_argument("--variant", choices=("image", "image+text")); p.add_argument("--limit", type=int)
+    p = sub.add_parser("score"); p.add_argument("--cluster", type=Path, default=CLUSTER)
+    p.add_argument("--pack", type=Path, default=PACK)
     a = ap.parse_args()
-    {"pack": cmd_pack}[a.cmd](a)
+    {"pack": cmd_pack, "collect-mac": cmd_collect_mac, "score": cmd_score}[a.cmd](a)
 
 
 if __name__ == "__main__":
