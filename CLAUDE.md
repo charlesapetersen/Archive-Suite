@@ -346,6 +346,14 @@ repository, go in by hand with its file and commit when an item or the owner poi
 interactive session; an unattended one says in its commit body that the published copy is now behind. How to rebuild and read it: [`ArchiveOCRBench/README.md`](ArchiveOCRBench/README.md). Every measured route goes on every chart its data supports (owner, 2026-10-21;
 the README's "Completeness rule"), kept light rather than perfect.
 
+**Every result carries a measurement card (owner, 2026-10-30).** A result report in `segbench-results/` has a
+`## Measurement card`: **Truth** (who made it, its strength against the scored routes, what the owner checked, any
+drafter or relative scored), **Selection** (never by a tested route or ABBYY text), **Comparison** (same inputs and
+settings, both OCR sets), **Noise** (n, paired intervals, the rerun floor; a gap inside it is a tie) and **Scope**
+(what the verdict does not settle). When a truth needs the owner, and how to ask him:
+[`ops/autonomous/README.md`](ops/autonomous/README.md) §"The measurement review". `W46.measure-review` (standing,
+Fable at max effort) reworks the queue on new results; why: `execution-plans/processing-review/11-measurement-audit.md`.
+
 **Both OCR sets, every time (owner, 2026-10-20).** A model tested on the 895-page public set is also run on the
 owner's 96 truth pages, with the same settings, in the same item. The 96 are the owner's own material and are what
 the bench page's first charts show, so a model scored only on the public set is missing from the comparison that

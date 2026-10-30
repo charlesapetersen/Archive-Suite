@@ -449,6 +449,23 @@ with tempfile.TemporaryDirectory(prefix="worker claims [scratch] ") as scratch:
         p = subprocess.run(["bash", str(HERE / "plan-edit.sh"), str(plan), "undepend", "A", "U", "again"],
                            env=env, capture_output=True)
         check(p.returncode == 2 and plan.read_text() == before, "undepend refuses a prerequisite the item lacks")
+        before = plan.read_text()
+        p = subprocess.run(["bash", str(HERE / "plan-edit.sh"), str(plan), "depend", "A", "T", "needs: owner later"],
+                           env=env, capture_output=True)
+        check(p.returncode == 2 and plan.read_text() == before, "depend refuses a note that would read as a hold")
+        queue("- [ ] **A — wrapped**", "  continuation (blocked-on: T)", "- [ ] **T — t**")
+        q = subprocess.run(["bash", str(HERE / "plan-edit.sh"), str(plan), "depend", "A", "T", "again"],
+                           env=env, capture_output=True)
+        check(q.returncode == 2, "depend sees a prerequisite on a continuation line")
+        plan_run("undepend", "A", "T", "settled")
+        text = plan.read_text()
+        check("(blocked-on: T)" not in text and "  continuation" in text and "no longer waits on T" in text,
+              "undepend drops a prerequisite from a continuation line, keeping the line")
+        plan_run("block", "A", "A-gate-ok", "is it answered?")
+        plan_run("depend", "A-gate-ok", "T", "after T")
+        plan_run("undepend", "A-gate-ok", "T", "wrong prerequisite")
+        gate = next(l for l in plan.read_text().splitlines() if l.startswith("- [ ] **A-gate-ok"))
+        check("(blocked-on: T)" not in gate, "undepend also edits a HOLD QUEUE gate")
         plan_run("report", "### new decision\nquestion")
         check(plan.read_text().index("### new decision") < plan.read_text().index("### ✅ settled"),
               "new report lands before the settled walkthrough anchor")

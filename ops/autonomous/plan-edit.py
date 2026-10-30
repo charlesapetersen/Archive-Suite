@@ -199,70 +199,58 @@ def edit(plan, action, values):
             line += " — RELEASED " + time.strftime("%Y-%m-%d") + ": " + note.strip()
             body = body[:lo] + line + "\n" + body[hi:]
             text = text[:start] + body + text[end:]
-        elif action == "depend":
-            # Make an open item wait on work or a gate that already has a checkbox line (a rebuilt truth, an existing
-            # owner gate such as W46.nice-to-have), without filing the new HOLD gate that `block` would. The
-            # prerequisite must exist, so a typo cannot leave an item silently blocked forever.
+        elif action in ("depend", "undepend"):
+            # depend: make an open item wait on work or a gate that already has a checkbox line (a rebuilt truth, an
+            # existing owner gate such as W46.nice-to-have), without filing the new HOLD gate that `block` would; the
+            # prerequisite must exist, so a typo cannot leave an item silently blocked forever. undepend: drop one
+            # prerequisite, e.g. a blocker of W46.review-phase4 moved behind W46.nice-to-have, which itself waits on
+            # W46.review-phase4. Either acts on a WORK QUEUE item or a HOLD QUEUE gate (hooks.py offers a gate only once
+            # its own blocked-on tags are done), and reads the item's whole span, continuation lines included, as
+            # next-queue-item.sh does.
             tag, prereq, note = values
             for value in (tag, prereq):
                 if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", value):
                     raise ValueError("invalid tag")
             if tag == prereq:
                 raise ValueError("an item cannot wait on itself")
-            if "\n" in note or not note.strip() or MARKERS.search(note):
-                raise ValueError("note must be one non-empty line without queue markers")
-            if not any(t == prereq for t, _, _ in entries(text)):
+            if "\n" in note or not note.strip() or MARKERS.search(note) or HOLD.search(note):
+                raise ValueError("note must be one non-empty line without queue or hold markers")
+            if action == "depend" and not any(t == prereq for t, _, _ in entries(text)):
                 raise ValueError("prerequisite has no checkbox line in the plan")
-            # A queue item, or a HOLD QUEUE gate that must not reach the owner before the item building its sheet is
-            # done (hooks.py offers a hold only once its own blocked-on tags are done).
+            matches = []
             for heading in ("## WORK QUEUE", "## HOLD QUEUE"):
                 start, end = section(text, heading)
                 body = text[start:end]
-                matches = [(lo, hi) for t, lo, hi in pending_entries(body) if t == tag]
+                matches = [(lo, hi) for t, lo, hi in entries(body)
+                           if t == tag and re.match(r"^\s*[-*]\s+\[ \]", body[lo:hi])]
                 if matches:
                     break
             if len(matches) != 1:
                 raise ValueError("expected exactly one unchecked queue item or gate")
             lo, hi = matches[0]
-            line = body[lo:hi].rstrip("\n")
-            waits = {t.replace("`", "").strip() for c in re.findall(r"\(blocked-on:([^)]*)\)", line) for t in c.split(",")}
-            if prereq in waits:
-                raise ValueError("item already waits on that prerequisite")
-            line += " (blocked-on: " + prereq + ") — " + time.strftime("%Y-%m-%d") + ": " + note.strip()
-            body = body[:lo] + line + "\n" + body[hi:]
-            text = text[:start] + body + text[end:]
-        elif action == "undepend":
-            # Drop one prerequisite from an open item, e.g. a blocker of W46.review-phase4 moved behind W46.nice-to-have,
-            # which itself waits on W46.review-phase4: leaving it would deadlock both. The other prerequisites stay.
-            tag, prereq, note = values
-            for value in (tag, prereq):
-                if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", value):
-                    raise ValueError("invalid tag")
-            if "\n" in note or not note.strip() or MARKERS.search(note):
-                raise ValueError("note must be one non-empty line without queue markers")
-            start, end = section(text, "## WORK QUEUE")
-            body = text[start:end]
-            matches = [(lo, hi) for t, lo, hi in pending_entries(body) if t == tag]
-            if len(matches) != 1:
-                raise ValueError("expected exactly one unchecked queue item")
-            lo, hi = matches[0]
-            line = body[lo:hi].rstrip("\n")
-            found = False
+            item = body[lo:hi]
+            first_end = item.index("\n") if "\n" in item else len(item)
+            waits = {t.replace("`", "").strip() for c in re.findall(r"\(blocked-on:([^)]*)\)", item) for t in c.split(",")}
+            stamp = " — " + time.strftime("%Y-%m-%d") + ": "
+            if action == "depend":
+                if prereq in waits:
+                    raise ValueError("item already waits on that prerequisite")
+                item = item[:first_end] + " (blocked-on: " + prereq + ")" + stamp + note.strip() + item[first_end:]
+            else:
+                if prereq not in waits:
+                    raise ValueError("item does not wait on that prerequisite")
 
-            def drop(m):
-                nonlocal found
-                kept = [t for t in m.group(1).split(",") if t.replace("`", "").strip() != prereq]
-                if len(kept) == len(m.group(1).split(",")):
-                    return m.group(0)
-                found = True
-                return " (blocked-on:" + ",".join(kept) + ")" if kept else ""
+                def drop(m):
+                    kept = [t for t in m.group(1).split(",") if t.replace("`", "").strip() != prereq]
+                    if len(kept) == len(m.group(1).split(",")):
+                        return m.group(0)
+                    return " (blocked-on:" + ",".join(kept) + ")" if kept else ""
 
-            line = re.sub(r" ?\(blocked-on:([^)]*)\)", drop, line)
-            if not found:
-                raise ValueError("item does not wait on that prerequisite")
-            line = re.sub(r"\(blocked-on:\s+", "(blocked-on: ", line)
-            line += " — " + time.strftime("%Y-%m-%d") + ": no longer waits on " + prereq + ": " + note.strip()
-            body = body[:lo] + line + "\n" + body[hi:]
+                item = re.sub(r" ?\(blocked-on:([^)]*)\)", drop, item)
+                item = re.sub(r"\(blocked-on:\s+", "(blocked-on: ", item)
+                first_end = item.index("\n") if "\n" in item else len(item)
+                item = item[:first_end] + stamp + "no longer waits on " + prereq + ": " + note.strip() + item[first_end:]
+            body = body[:lo] + item + body[hi:]
             text = text[:start] + body + text[end:]
         elif action in ("due", "rearm"):
             # A machine-ticked gate in `## RECURRING` (W40.token-pass): `due` ticks it, so the standing WORK QUEUE

@@ -1463,3 +1463,50 @@ owner to copy it back to its original path, rather than failing or downloading i
 Never moved or deleted here: `mlx-hf/` (the one model cache, above; a local model is a product goal), the retired worktrees in
 `$STATE/retired-worktrees` (the engine's recovery copies, listed in the report for the owner) and owner session
 folders.
+
+## The measurement review — `W46.measure-review`, `ops/agent/measure-review.py` (owner, 2026-10-30)
+
+**Why.** Each result is written by one engine session that judges its own measurement, and nothing looked across
+them. On 2026-10-30 the owner found W47.item-fields-truth scoring the app against a truth two small open models had
+built; the audit that followed (`execution-plans/processing-review/11-measurement-audit.md`) found the same classes of
+flaw across the review. Two fixes: every result report carries a measurement card (root `CLAUDE.md`), and a standing
+review on the strongest model reads what has landed and reworks the queue.
+
+**Cadence.** `measure-review.py upkeep` (the upkeep hook) ticks `W46.measure-review-due` in `## RECURRING` once 8
+commits on origin/main have touched `ArchiveProcessor/segbench-results/` or `ArchiveOCRBench/data/` since the last
+review, or a week has passed with at least one. The standing item `W46.measure-review` carries `(effort: max)`, which
+the Agent Manager's policy runs on Fable at max effort. `status` shows what landed and whether a review is due;
+`cards` lists result reports since the last review with no measurement card; `deps` lists open items waiting on a
+tag that exists nowhere, and dependency cycles (W42.int-s1..s7 and AM-restructure-R3 are expected there: Phase 4
+and the Agent Manager file them).
+
+**The review session, in order.**
+
+1. Read `measure-review.py status` and `cards`; read each listed result report, its item's DONE entry and commit body.
+   Code, aggregates and plans only: no Claude session or subagent reads corpus pages or texts (owner, 2026-10-30).
+2. Judge each result against the six classes: truth weaker than or circular with what it judges; selection by a
+   tested route, by ABBYY text or by convenience; noise read as a result; unequal comparisons or one OCR set only;
+   a verdict that sets a default, a route or closes work on too little; stale or cyclic dependencies (`deps`).
+3. Have one independent subagent try to refute each finding against the cited files before anything changes.
+4. Write `execution-plans/processing-review/measure-reviews/<date>.md` (findings, severity, fix, what stands).
+5. Rework the queue with `plan-edit.sh` only (`add`, `depend`, `undepend`, `block` for an owner sheet) and keep
+   `SUITE_TODO.md` in step: re-measure or rebuild a truth a conclusion depends on, add scoring conditions, re-rank,
+   file owner sheets as gates under the rule below. Never edit a claimed item (`~/.local/state/archive-autonomous/claims`);
+   carry its condition in the item that consumes its result. Ask first, in the Daemon Report as a decision, before
+   retiring an item, moving one behind `W46.nice-to-have`, or any spend past $7 for one piece of work.
+6. `check-tracker-sync.sh`, commit and push, then `measure-review.py done <the commit reviewed up to>` and
+   `plan-edit.sh PLAN rearm W46.measure-review-due '<date>: reviewed up to <sha>'`. The item is never ticked.
+
+**When a truth needs the owner** (the canonical rule; the audit's §2 has the per-set table). His reading is needed
+when only he knows the answer (his collections' conventions, what counts as a document, his own tags, what a page
+hides); or when the drafters are not clearly stronger than every scored route, or a drafter or close relative is
+scored; or when the verdict sets a default or route, or closes a line of work, inside the truth's likely error. A
+strong model through the gateway is enough when two different families draft blind, both stronger than every scored
+route, neither scored (or a drafter scored only on owner-ruled items), and the result is a relative comparison well
+above the truth's error, or a nice-to-have. Never: agreement as truth with a drafter scored; a set chosen by a scored
+route's labels; ABBYY text; a model ruling its own disputes without the count reported. The smallest pass is the
+disputes that can decide a verdict plus about 20 random agreed controls (more where a drafter's family is scored),
+with boxes on the image and an estimate of his minutes. An unattended session builds the sheet, judges the timing
+(root `CLAUDE.md`, owner review sessions), blocks the scoring item on a HOLD gate that names the sheet, its size, its
+minutes and what it decides (`block`, then `depend` the gate on the item that builds the sheet), and adds a Daemon
+Report line (no decision); the gate reaches him at the next walkthrough.

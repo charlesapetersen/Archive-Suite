@@ -58,6 +58,9 @@ and retries handled differently between arms. (5) A verdict written as general (
 
 ## 2. When a truth set needs the owner
 
+The canonical copy of this rule, which outlives this note, is `ops/autonomous/README.md` §"The measurement
+review"; the standing `W46.measure-review` applies it to every new result.
+
 The rule, for every truth set from now on. A session that builds or relies on a truth applies it and says which
 case applies in the item's report.
 
@@ -630,3 +633,24 @@ Several name prerequisites that are done; a done prerequisite is satisfied, so t
 
 Each sheet reaches him as a HOLD QUEUE gate that waits on the item building it; the building session judges the
 timing under the owner-review rule.
+
+## 8. Keeping it from happening again (owner's request, 2026-10-30)
+
+Every flaw above was made by one session judging its own measurement, with nothing looking across results, and most
+would have been visible had the report said where its truth came from and how big a difference must be to count.
+Three changes, filed the same day:
+
+1. **A measurement card on every result report** (root `CLAUDE.md`): Truth, Selection, Comparison, Noise, Scope. A
+   new measurement item states its truth source and noise rule when filed. `measure-review.py cards` lists reports
+   that lack one.
+2. **A standing review on the strongest model.** `W46.measure-review` carries `(effort: max)`, which the Agent
+   Manager's policy runs on Fable at max effort (checked against `policy.decide`: model fable, effort max). The
+   building items stay on the ordinary model: Fable's judgement is spent where one wrong verdict steers many items,
+   not on every build. `ops/agent/measure-review.py`, run by the upkeep hook, opens it after 8 result commits or a
+   week with one; the session follows `ops/autonomous/README.md` §"The measurement review": the six flaw classes, an
+   independent refute-check, a dated note, the queue reworked through `plan-edit.sh`, owner sheets as gates, and
+   retirements, nice-to-have moves and spend past $7 asked first.
+3. **The queue's own health.** `measure-review.py deps` lists prerequisites that exist nowhere and dependency cycles,
+   and `plan-edit.sh` gained `depend` and `undepend`, so a review can reorder dependencies without the duplicate gates
+   `block` would file. The engine's existing Phase 4 (W46.review-phase4) remains the place where review decisions are
+   taken with the owner; the standing review keeps the evidence it will use honest in the meantime.
