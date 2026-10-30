@@ -57,6 +57,8 @@ final class VisualReviewUITests: NotesFixtureUITestCase {
     private var layout = Layout.sideBySide
     override var layoutLaunchArguments: [String] { Self.layoutArguments(layout) }
     private var prefix = ""
+    /// Force the mode through the stored Appearance setting rather than `-ArchiveUITestAppearance` (W48.appearance-notes).
+    private var bySetting = false
 
     // MARK: - The tours
 
@@ -65,6 +67,9 @@ final class VisualReviewUITests: NotesFixtureUITestCase {
     // W48.notes-stacked-layout: every surface again with the list above the note.
     func testTourStackedLight() throws { try optIn(); layout = .stacked; try withFixture { try tour(dark: false) } }
     func testTourStackedDark() throws { try optIn(); layout = .stacked; try withFixture { try tour(dark: true) } }
+    // W48.appearance-notes: the tour with the mode set by the Appearance setting instead of the test argument.
+    func testTourLightBySetting() throws { try optIn(); bySetting = true; try withFixture { try tour(dark: false) } }
+    func testTourDarkBySetting() throws { try optIn(); bySetting = true; try withFixture { try tour(dark: true) } }
     func testVolumeLight() throws { try optIn(); try withFixture { volumeTour(dark: false) } }
     func testVolumeDark() throws { try optIn(); try withFixture { volumeTour(dark: true) } }
     func testEmptyStatesLight() throws { try optIn(); try withFixture { try emptyStates(dark: false) } }
@@ -114,7 +119,8 @@ final class VisualReviewUITests: NotesFixtureUITestCase {
         try seedVolumeNotes()
         for size in WindowSize.allCases {
             relaunch(store: Self.fixturePath, dark: dark, readyRow: Self.idPlain)
-            prefix = "\(dark ? "dark" : "light")\(layout == .stacked ? "-stacked" : "")-\(size.rawValue)"
+            prefix = "\(dark ? "dark" : "light")\(bySetting ? "-setting" : "")\(layout == .stacked ? "-stacked" : "")"
+                + "-\(size.rawValue)"
             resizeMainWindow(to: size.main)
             assertLayout(layout, in: mainWindow)
             noteSurfaces()
@@ -511,6 +517,11 @@ final class VisualReviewUITests: NotesFixtureUITestCase {
 
     // MARK: - Mechanics
 
+    private func appearanceArguments(dark: Bool) -> [String] {
+        bySetting ? (dark ? LayoutGuard.darkSettingArguments : LayoutGuard.lightSettingArguments)
+            : (dark ? LayoutGuard.darkModeArguments : LayoutGuard.lightModeArguments)
+    }
+
     /// Relaunch against `store` in the requested appearance, close the second auto-opening window, and wait for
     /// `readyRow` (or for the main window only). Returns false when the window never came up.
     @discardableResult
@@ -520,7 +531,7 @@ final class VisualReviewUITests: NotesFixtureUITestCase {
         app.launchArguments += ["-ANUITestStorePath", store] + zoteroLaunchArguments + [
             "-an.noteWindow.kindFilter", "notes",
             "-an.extractWindow.kindFilter", "extracts",
-        ] + layoutLaunchArguments + (dark ? LayoutGuard.darkModeArguments : LayoutGuard.lightModeArguments) + extra
+        ] + layoutLaunchArguments + appearanceArguments(dark: dark) + extra
         app.launch()
         app.activate()
         guard mainWindow.waitForExistence(timeout: 20) else { missing.append("main window on \(store)"); return false }

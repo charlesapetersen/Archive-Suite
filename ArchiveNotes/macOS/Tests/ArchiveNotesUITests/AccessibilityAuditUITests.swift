@@ -8,6 +8,8 @@ import XCTest
 final class AccessibilityAuditUITests: NotesFixtureUITestCase {
 
     private var dark = false
+    /// Force the mode through the stored Appearance setting rather than `-ArchiveUITestAppearance` (W48.appearance-notes).
+    private var bySetting = false
     /// W48.notes-stacked-layout: every screen is audited in both layouts.
     private var layout = Layout.sideBySide
     override var layoutLaunchArguments: [String] { Self.layoutArguments(layout) }
@@ -15,7 +17,8 @@ final class AccessibilityAuditUITests: NotesFixtureUITestCase {
         // Without the editor's two 1×1 test probes: with them Xcode's contrast audit never finishes
         // (`EditorTextView.accessibilityChildren`).
         ["-ANUITestNoEditorProbes", "YES"]
-            + (dark ? LayoutGuard.darkModeArguments : LayoutGuard.lightModeArguments)
+            + (bySetting ? (dark ? LayoutGuard.darkSettingArguments : LayoutGuard.lightSettingArguments)
+                : (dark ? LayoutGuard.darkModeArguments : LayoutGuard.lightModeArguments))
     }
 
     func testMainScreensPassAuditInLightMode() throws {
@@ -36,6 +39,19 @@ final class AccessibilityAuditUITests: NotesFixtureUITestCase {
         dark = true
         layout = .stacked
         try withFixture { auditMainScreens(appearance: "dark-stacked") }
+    }
+
+    // The same sweeps with the mode coming from the Appearance setting rather than the test argument
+    // (W48.appearance-notes; plan rule 7: the existing checks run in the new mode as well as the old).
+    func testMainScreensPassAuditInLightModeBySetting() throws {
+        bySetting = true
+        try withFixture { auditMainScreens(appearance: "light") }
+    }
+
+    func testMainScreensPassAuditInDarkModeBySetting() throws {
+        bySetting = true
+        dark = true
+        try withFixture { auditMainScreens(appearance: "dark") }
     }
 
     private func auditMainScreens(appearance: String) {

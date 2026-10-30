@@ -1,6 +1,7 @@
 import SwiftUI
+import ArchiveCore
 
-/// Notes ⌘, Options — Zotero integration (05-zotero §D.8) and the display-calendar switch (W24.cal1-toggle). `@AppStorage` binds directly to the
+/// Notes ⌘, Options — the Appearance choice (W48.appearance-notes), Zotero integration (05-zotero §D.8) and the display-calendar switch (W24.cal1-toggle). `@AppStorage` binds directly to the
 /// `ZoteroSettingsKey` defaults so edits persist immediately; the models resolve/validate those
 /// raw values through `ZoteroSettings(reading:)` at point of use.
 struct NotesSettingsView: View {
@@ -10,9 +11,18 @@ struct NotesSettingsView: View {
     @AppStorage(ZoteroSettingsKey.host) private var host = ZoteroSettings.defaultHost
     @AppStorage(ZoteroSettingsKey.port) private var port = ZoteroSettings.defaultPort
     @AppStorage(DisplayCalendarSettings.enabledKey) private var calendarsEnabled = false
+    // Applied app-wide by `AppAppearance.follow()`, which watches this key (W48.appearance-notes).
+    @AppStorage(AppAppearance.defaultsKey) private var appearance: AppAppearance = AppAppearance.defaultValue
 
     var body: some View {
         Form {
+            Section {
+                Picker("Appearance", selection: $appearance) {
+                    ForEach(AppAppearance.allCases, id: \.self) { Text($0.title).tag($0) }
+                }
+                .accessibilityIdentifier("an.settings.appearance")
+            }
+
             Section {
                 Toggle("Enable Zotero integration", isOn: $enabled)
                 Toggle("Detect Zotero links on the clipboard", isOn: $clipboardDetect)
@@ -51,7 +61,8 @@ struct NotesSettingsView: View {
             }
         }
         .formStyle(.grouped)
-        // Tall enough that the Dates footer, the last section, shows whole (W40.fix-notes-visual-polish).
-        .frame(width: 460, height: 520)
+        // Tall enough that the Dates footer, the last section, shows whole (W40.fix-notes-visual-polish), with
+        // the Appearance row above Zotero (W48.appearance-notes).
+        .frame(width: 460, height: 570)
     }
 }

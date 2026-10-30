@@ -96,10 +96,16 @@ final class InlineImageAttachment: NSTextAttachment {
     private static let missingImage = makePlaceholderImage(labelled: "Missing")
     private static let outOfBoundsImage = makePlaceholderImage(labelled: "Blocked")
 
+    /// Drawn by a handler rather than once into a bitmap, so the tile is redrawn in each appearance it is shown in and
+    /// follows a live switch in Settings ▸ Appearance (W48.appearance-notes).
     private static func makePlaceholderImage(labelled label: String) -> NSImage {
-        let size = NSSize(width: 64, height: 64)
-        let img = NSImage(size: size)
-        img.lockFocus()
+        NSImage(size: NSSize(width: 64, height: 64), flipped: false) { rect in
+            drawPlaceholder(labelled: label, size: rect.size)
+            return true
+        }
+    }
+
+    private static func drawPlaceholder(labelled label: String, size: NSSize) {
         NSColor.quaternaryLabelColor.setFill()
         NSBezierPath(roundedRect: NSRect(origin: .zero, size: size), xRadius: 4, yRadius: 4).fill()
         let attrs: [NSAttributedString.Key: Any] = [
@@ -111,8 +117,6 @@ final class InlineImageAttachment: NSTextAttachment {
         text.draw(at: NSPoint(x: (size.width - textSize.width) / 2,
                               y: (size.height - textSize.height) / 2),
                   withAttributes: attrs)
-        img.unlockFocus()
-        return img
     }
 }
 

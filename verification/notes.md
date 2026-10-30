@@ -13,7 +13,7 @@ Format and statuses: [`README.md`](README.md). Written by `W40.b2`, 2026-10-12.
   `W23.m9`/`-fu3`, `W23.m14`/`-fu`, `W37.dual-date`, `W24.cal1`, `W24.cal1-toggle`, `W24.cal1-validator`,
   and the W0–W8 records under §*Archive Notes — NEW APP*.
 - **Sources and code read at:** `9e8959ef`.
-- **Count:** `unproven 47 · works 2 · broken 2 · unreachable 0` (works: N-34, N-45; broken: N-12, N-44). Updated by `W48.notes-stacked-layout`, 2026-10-29 (N-49–N-51 added).
+- **Count:** `unproven 48 · works 2 · broken 2 · unreachable 0` (works: N-34, N-45; broken: N-12, N-44). Updated by `W48.appearance-notes`, 2026-10-30 (N-52 added).
 
 **Runtime evidence, for every row below: none yet.** The W40.a3 full VM suite
 ([`evidence/notes/W40.a3-full-ui.md`](evidence/notes/W40.a3-full-ui.md)) and the `W9.e2` runtime sweep passed
@@ -1451,6 +1451,30 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
   Enable, clipboard detection and citation style are read when used and apply at once
   (`Zotero/ZoteroStatusModel.swift:36,53,69,77`). W9.e2 had no result for this row. Source conflict: `SMOKE_TEST.md`
   N lists only the Zotero section, but the code has both Zotero and Dates (`Views/NotesSettingsView.swift:40-50`).
+
+### N-52 · The Appearance setting
+
+- **Promise:** Settings offers Appearance: System (the default, following macOS), Light or Dark. A choice changes
+  every open window at once, with a sheet or panel open, and every custom colour follows it; it is back before the
+  first window on the next launch. The UI-test argument `-ArchiveUITestAppearance` still wins over it.
+- **Promised in:** `SUITE_TODO.md` `W48.appearance-notes` (owner, 2026-10-29).
+- **Reached by:** the Picker at the top of `Views/NotesSettingsView.swift`, `@AppStorage(AppAppearance.defaultsKey)`
+  (`archiveAppearance`, the key all three apps share); `AppAppearance.follow()` (`Core/AppAppearance+AppKit.swift`, the
+  AppKit half ArchiveCore may not hold) in `ArchiveNotesApp.init`
+  applies it to `NSApp.appearance` at launch and on every defaults change, unless the UI-test argument forced a mode.
+  Two things Notes drew once now redraw per appearance: the source chip's fill (`Editor/BlockHeaderAttachment.swift`,
+  `BlockHeaderChipView.updateLayer`, a CGColor) and the Missing / Blocked image tiles
+  (`Editor/InlineImageAttachment.swift`, a drawing-handler image); every other colour is a dynamic system colour.
+- **Real-path test:** `ArchiveNotesTests/NotesAppearanceSettingTests` (stored value and default, the UI-test reset,
+  the chip's fill in each appearance) and `ArchiveCoreTests/AppAppearanceTests` (unit).
+  `ArchiveNotesUITests/AppearanceSettingUITests` (VM: Light and Dark live in the note window, a sheet and Settings;
+  System back; restored after a relaunch; the argument wins). `AccessibilityAuditUITests` and `VisualReviewUITests`
+  gain `…BySetting` variants that force the mode through the setting (`LayoutGuard.dark/lightSettingArguments`).
+- **Runtime evidence:** none.
+- **Status:** `unproven`
+- **History:**
+  - 2026-10-30 W48.appearance-notes — row written, `unproven`. The builder's runs:
+    [`evidence/notes/W48.appearance-notes.md`](evidence/notes/W48.appearance-notes.md).
 
 ---
 

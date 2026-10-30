@@ -194,15 +194,29 @@ final class BlockHeaderChipView: NSView {
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("Not supported") }
 
+    private var tint: NSColor {
+        box.anchor.notePassageTarget != nil && sourceMissing ? .secondaryLabelColor : .controlAccentColor
+    }
+
+    // The pill's fill is a CGColor, which does not follow the appearance by itself. `updateLayer` runs with the
+    // view's effective appearance current, at first display and again whenever it changes, so a switch in
+    // Settings ▸ Appearance repaints the chip (W48.appearance-notes).
+    override var wantsUpdateLayer: Bool { true }
+
+    override func updateLayer() {
+        effectiveAppearance.performAsCurrentDrawingAppearance {
+            layer?.backgroundColor = tint.withAlphaComponent(0.12).cgColor
+        }
+    }
+
     private func setupSubviews() {
         // A note-passage chip (extract provenance, W7-S3) offers "Jump to Source" and prefers the
         // source note's live title; a missing source renders greyed.
         let isPassage = box.anchor.notePassageTarget != nil
-        let tint: NSColor = (isPassage && sourceMissing) ? .secondaryLabelColor : .controlAccentColor
+        let tint = self.tint
 
         wantsLayer = true
         layer?.cornerRadius = 6
-        layer?.backgroundColor = tint.withAlphaComponent(0.12).cgColor
         if isPassage && sourceMissing {
             toolTip = "The source note for this passage no longer exists — the extract text is preserved."
         }
