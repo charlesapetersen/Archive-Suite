@@ -1,8 +1,8 @@
 import XCTest
-import AppKit
 import ArchiveCore
 
-/// W48.appearance-* — the stored Appearance value, its default, and what each value sets on an app.
+/// W48.appearance-* — the stored Appearance value and its default. Applying it is AppKit and lives in each app
+/// (Processor: `Models/AppAppearance+AppKit.swift`, proven by `AppearanceSettingUITests`).
 /// Uses a throwaway defaults suite, never the app's real domain.
 final class AppAppearanceTests: XCTestCase {
 
@@ -41,40 +41,7 @@ final class AppAppearanceTests: XCTestCase {
         XCTAssertEqual(AppAppearance.stored(in: defaults), .system)
     }
 
-    func testEachValueNamesItsAppearance() {
-        XCTAssertNil(AppAppearance.system.appearanceName)
-        XCTAssertEqual(AppAppearance.light.appearanceName, .aqua)
-        XCTAssertEqual(AppAppearance.dark.appearanceName, .darkAqua)
+    func testEachValueHasItsPickerTitle() {
         XCTAssertEqual(AppAppearance.allCases.map(\.title), ["System", "Light", "Dark"])
-    }
-
-    @MainActor
-    func testApplySetsAndClearsTheAppAppearance() {
-        let app = NSApplication.shared
-        let before = app.appearance
-        defer { app.appearance = before }
-        AppAppearance.dark.apply(to: app)
-        XCTAssertEqual(app.appearance?.name, .darkAqua)
-        AppAppearance.light.apply(to: app)
-        XCTAssertEqual(app.appearance?.name, .aqua)
-        AppAppearance.system.apply(to: app)
-        XCTAssertNil(app.appearance)
-    }
-
-    /// `follow` applies the stored value at once, then again on each change, without being asked.
-    @MainActor
-    func testFollowAppliesTheStoredValueAndEveryChange() async throws {
-        let app = NSApplication.shared
-        let before = app.appearance
-        defer { app.appearance = before }
-        defaults.set("dark", forKey: AppAppearance.defaultsKey)
-        AppAppearance.follow(defaults)
-        XCTAssertEqual(app.appearance?.name, .darkAqua)
-        for (value, name) in [("light", NSAppearance.Name.aqua), ("system", nil), ("dark", .darkAqua)] {
-            defaults.set(value, forKey: AppAppearance.defaultsKey)
-            let deadline = Date().addingTimeInterval(2)
-            while app.appearance?.name != name, Date() < deadline { try await Task.sleep(nanoseconds: 20_000_000) }
-            XCTAssertEqual(app.appearance?.name, name, "after storing \(value)")
-        }
     }
 }

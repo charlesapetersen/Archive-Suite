@@ -1119,13 +1119,13 @@ cover the Mac: the receiver, the tag card, the drain gate, staging, finalize and
   changes every open window, sheet and panel at once and is restored at the next launch, before the first window.
 - **Promised in:** `README.md` §Settings window; `SUITE_TODO.md` W48.appearance-processor (owner, 2026-10-29).
 - **Reached by:** ⌘, → `Views/SettingsView.swift` `appearanceSection` (`@AppStorage(AppAppearance.defaultsKey)`) →
-  `AppAppearance.follow()` (`packages/ArchiveCore/Sources/ArchiveCore/Appearance/AppAppearance.swift`), called from
+  `AppAppearance.follow()` (`Models/AppAppearance+AppKit.swift`; the value type and key are ArchiveCore's), called from
   `ArchiveProcessorApp.init` unless `-ArchiveUITestAppearance` forced a mode → `NSApplication.shared.appearance`.
 - **Real-path test:** `AppearanceSettingUITests.testPickingLightAndDarkChangesOpenWindowsLiveAndSurvivesARelaunch`
   (picks Dark, Light, Dark with the History sheet and Settings open, checks each window's pixels, relaunches,
   picks System) and `.testTheUITestArgumentStillWinsOverTheStoredChoice`; the `…BySetting` variants of
   `AccessibilityAuditUITests` and `VisualReviewUITests.testTour*`; `ArchiveCoreTests/AppAppearanceTests` (value,
-  default, apply).
+  default, titles).
 - **Runtime evidence:** none (the builder's VM runs are not the independent check; `W48.appearance-verify` is).
 - **Status:** `unproven`
 - **History:**
