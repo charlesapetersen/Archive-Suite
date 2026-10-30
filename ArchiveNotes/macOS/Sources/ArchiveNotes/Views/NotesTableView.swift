@@ -32,7 +32,12 @@ struct NotesTableView: NSViewRepresentable {
         let scrollView = NotesListScrollView()
         scrollView.hasVerticalScroller = true
         scrollView.hasHorizontalScroller = true
-        scrollView.autohidesScrollers = true
+        // Not autohiding: with legacy (always-shown) scrollers the two would decide each other in the short
+        // stacked list — the horizontal one's height pushes the rows past the clip and shows the vertical one,
+        // whose width changes the columns' fit and the horizontal one's need — and SwiftUI's host re-laid the
+        // table between AppKit's tiles until the window's constraint-pass cap threw (W48.notes-stacked-layout,
+        // runs 15–16). Fixed tracks make the clip depend on the frame alone. Overlay scrollers are unaffected.
+        scrollView.autohidesScrollers = false
         scrollView.borderType = .noBorder
 
         let tableView = ContextMenuTableView()
