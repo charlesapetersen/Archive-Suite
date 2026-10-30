@@ -388,6 +388,19 @@ def reading(key, doc_id, stage="drafts"):
     return json.load(open(p, encoding="utf-8"))
 
 
+def local_snapshot(repo):
+    """The cached snapshot's directory when its weights are all there, else the repo id. Loading by id asks the Hub
+    for the revision first, and that request hung for minutes on this Mac with every file already cached, and offline the Hub's check refused a
+    complete snapshot."""
+    import glob
+    hub = os.path.join(os.environ.get("HF_HOME", ""), "hub", "models--" + repo.replace("/", "--"), "snapshots", "*")
+    for d in sorted(glob.glob(hub)):   # mlx_vlm loads every *.safetensors; Gemma's index names stale shards
+        shards = glob.glob(os.path.join(d, "*.safetensors"))
+        if shards and all(os.path.exists(x) for x in shards) and os.path.exists(os.path.join(d, "config.json")):
+            return d
+    return repo
+
+
 class Model:
     def __init__(self, key):
         import mlx.core as mx
@@ -395,7 +408,7 @@ class Model:
         os.environ.setdefault("HF_HOME", os.path.expanduser("~/Library/Caches/ArchiveSuiteRehearsal/mlx-hf"))
         mx.set_cache_limit(256 * 2**20)
         self.key = key
-        self.model, self.processor = load(MODELS[key][0])
+        self.model, self.processor = load(local_snapshot(MODELS[key][0]))
 
     def run(self, prompt, image=None):
         from mlx_vlm import stream_generate
