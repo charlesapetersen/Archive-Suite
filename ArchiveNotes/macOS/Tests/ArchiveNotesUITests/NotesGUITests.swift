@@ -367,6 +367,7 @@ class NotesFixtureUITestCase: XCTestCase {
         app.activate()
         let cell = mainWindow.descendants(matching: .any)["an.cell.title.\(uuid)"]
         XCTAssertTrue(cell.waitForExistence(timeout: timeout), "Title cell for \(uuid) should exist")
+        revealRow(cell)
         _ = pollUntil(timeout: timeout) { app.activate(); return cell.isHittable }
         if cell.isHittable {
             cell.click()
@@ -374,6 +375,35 @@ class NotesFixtureUITestCase: XCTestCase {
             cell.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
         }
         return cell
+    }
+
+    /// Scroll the item table until `cell` is inside its visible rows. XCUITest does not scroll a row into view
+    /// before clicking it: a click on a row past the table's bottom, or under its header, lands on whatever is drawn
+    /// there instead (the column header, which sorts the list; the divider; the editor). Side by side the list is
+    /// tall enough for every fixture row, but the stacked list shows four or five (W48.notes-stacked-layout, tours
+    /// 8: "No note selected" after a select, a sorted Title column, the wrong note's surfaces shot). Row heights are
+    /// about 26 pt; the loop stops as soon as the row is clear of the header and the bottom edge, or after 40 turns.
+    func revealRow(_ cell: XCUIElement) {
+        // The SwiftUI wrapper's frame is the visible list; the NSTableView's own frame is the whole content.
+        let wrapper = mainWindow.descendants(matching: .any)["an.list.table"].firstMatch
+        let list = wrapper.exists ? wrapper : table
+        guard list.exists, cell.exists else { return }
+        let headerHeight: CGFloat = 28
+        func shown() -> Bool {
+            let f = cell.frame, t = list.frame
+            return f.minY >= t.minY + headerHeight && f.maxY <= t.maxY && cell.isHittable
+        }
+        var turns = 0
+        while !shown(), turns < 40 {
+            let f = cell.frame, t = list.frame
+            // Scroll at a point inside the visible rows, not the element's centre (which, for the table's own
+            // frame, can lie below the clip); a negative delta reveals lower content (as `revealInMetadataScroll`).
+            let inRows = list.coordinate(withNormalizedOffset: .zero)
+                .withOffset(CGVector(dx: t.width / 2, dy: headerHeight + 20))
+            inRows.scroll(byDeltaX: 0, deltaY: f.midY > t.midY ? -52 : 52)
+            RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+            turns += 1
+        }
     }
 
     /// The element holding keyboard focus, for a failure message that has to say where typing went.

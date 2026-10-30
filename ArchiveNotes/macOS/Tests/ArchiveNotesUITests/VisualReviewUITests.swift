@@ -191,6 +191,7 @@ final class VisualReviewUITests: NotesFixtureUITestCase {
         select(Self.idPlain)
 
         let row = mainWindow.descendants(matching: .any)["an.cell.title.\(Self.idPlain)"].firstMatch
+        revealRow(row)
         row.rightClick()
         if app.menuItems.firstMatch.waitForExistence(timeout: 3) { shootOnce("row-contextmenu") }
         else { missing.append("note row context menu") }
@@ -228,6 +229,7 @@ final class VisualReviewUITests: NotesFixtureUITestCase {
 
         // Delete… asks first; the dialog is cancelled.
         select(Self.idPlain)
+        revealRow(row)
         row.rightClick()
         if let delete = contextItem("Delete…") {
             delete.click()
@@ -394,6 +396,7 @@ final class VisualReviewUITests: NotesFixtureUITestCase {
         for (id, phrase, name) in [(volumeManyChips.0, volumeManyChips.1, "note-manychips"),
                                    (volumeLongTitle.0, volumeLongTitle.1, "note-longtitle")] {
             if search(phrase), let row = waitRow(id) {
+                revealRow(row)
                 row.click()
                 pause(1)
                 shoot(name)
@@ -401,6 +404,7 @@ final class VisualReviewUITests: NotesFixtureUITestCase {
             clearSearch()
         }
         if let row = waitRow(volumeHuge, timeout: 3) {
+            revealRow(row)
             row.click()
             shoot("note-huge")
         }   // the 1 MB note is off screen unless it sorts near the top; not required
@@ -559,12 +563,14 @@ final class VisualReviewUITests: NotesFixtureUITestCase {
     }
 
     private func select(_ id: String) {
+        // Stacked, the list shows four or five rows: scroll the row into view first (tours 8 selected nothing).
         if let row = waitRow(id, timeout: 5) {
+            revealRow(row)
             row.click()
             pause(1)
         } else {
             allNotes()
-            if let row = waitRow(id, timeout: 5) { row.click(); pause(1) } else { missing.append("row \(id)") }
+            if let row = waitRow(id, timeout: 5) { revealRow(row); row.click(); pause(1) } else { missing.append("row \(id)") }
         }
     }
 

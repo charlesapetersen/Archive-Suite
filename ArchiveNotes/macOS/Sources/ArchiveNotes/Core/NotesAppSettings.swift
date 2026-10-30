@@ -73,8 +73,9 @@ struct NotesLayoutSettings: Equatable, Sendable {
     static let defaultTreeWidth = 220.0,  treeWidthMin = 160.0,  treeWidthMax = 400.0
     static let defaultDetailWidth = 360.0, detailWidthMin = 260.0, detailWidthMax = 700.0
     /// The stacked list keeps its filter bar (three rows when narrow), header and a few rows: at 140 pt the bar
-    /// spilled up under the toolbar in the VM's visual tour.
-    static let defaultListHeight = 240.0, listHeightMin = 220.0, listHeightMax = 440.0
+    /// spilled up under the toolbar in the VM's visual tour. The default shows about seven rows in a 900 pt window
+    /// (at 240 pt it showed four or five, the filter bar taking most of it); the note keeps well over its floor.
+    static let defaultListHeight = 300.0, listHeightMin = 220.0, listHeightMax = 440.0
     /// The note pane's floor in the stacked layout: its header, locations and details inspector, and an editor
     /// still larger than the details (measured in the VM: at 313 pt the editor got 9, and at 440 an extract's got
     /// 103 against 110 for its details). The list gives way first.

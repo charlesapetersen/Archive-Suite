@@ -60,11 +60,18 @@ final class EditorScrollView: NSScrollView {
         }
     }
 
+    /// The first character of the LINE at `y`, not of the paragraph: a TextKit 2 layout fragment is a whole
+    /// paragraph, so anchoring to its start would jump a reader in the middle of a long paragraph back to its first line
+    /// on every resize (Tier-2 review of checkpoint 10).
     private func characterIndex(atY y: CGFloat, in textView: EditorTextView) -> Int? {
         guard let layout = textView.textLayoutManager, let content = layout.textContentManager,
               let fragment = layout.textLayoutFragment(for: CGPoint(x: 0, y: y - textView.textContainerOrigin.y))
         else { return nil }
-        return content.offset(from: content.documentRange.location, to: fragment.rangeInElement.location)
+        let paragraphStart = content.offset(from: content.documentRange.location, to: fragment.rangeInElement.location)
+        let yInFragment = y - textView.textContainerOrigin.y - fragment.layoutFragmentFrame.minY
+        let line = fragment.textLineFragments.last { $0.typographicBounds.minY <= yInFragment }
+            ?? fragment.textLineFragments.first
+        return paragraphStart + (line?.characterRange.location ?? 0)
     }
 
     private func lineTop(ofCharacter index: Int, in textView: EditorTextView) -> CGFloat? {
@@ -72,6 +79,10 @@ final class EditorScrollView: NSScrollView {
               let location = content.location(content.documentRange.location, offsetBy: index) else { return nil }
         layout.ensureLayout(for: NSTextRange(location: location))
         guard let fragment = layout.textLayoutFragment(for: location) else { return nil }
-        return fragment.layoutFragmentFrame.minY + textView.textContainerOrigin.y
+        let paragraphStart = content.offset(from: content.documentRange.location, to: fragment.rangeInElement.location)
+        let offsetInParagraph = index - paragraphStart
+        // After a reflow the character may sit on a different line of the same paragraph; find the line that holds it.
+        let line = fragment.textLineFragments.last { $0.characterRange.location <= offsetInParagraph }
+        return fragment.layoutFragmentFrame.minY + (line?.typographicBounds.minY ?? 0) + textView.textContainerOrigin.y
     }
 }
