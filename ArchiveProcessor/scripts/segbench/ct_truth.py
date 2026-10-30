@@ -219,10 +219,11 @@ def draft_dir(key):
 
 
 def cmd_collect(a):
+    import model_store
+    model_store.use()   # before mlx_vlm imports huggingface_hub, which reads HF_HOME once
     import mlx.core as mx
     from mlx_vlm import load, stream_generate
     from mlx_vlm.prompt_utils import apply_chat_template
-    os.environ.setdefault("HF_HOME", os.path.expanduser("~/Library/Caches/ArchiveSuiteRehearsal/mlx-hf"))
     out = draft_dir(a.model)
     os.makedirs(out, exist_ok=True)
     todo = [r["id"] for r in sample() if os.path.exists(image_of(r["id"]))

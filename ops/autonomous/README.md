@@ -1413,7 +1413,7 @@ nothing ever cleared it; the housekeeping GC covers only build products in workt
 **Measured.** The upkeep hook runs `ops/autonomous/cache-budget.py` at most every six hours (`--force` to measure
 now). It writes `$STATE/cache-budget.txt`: total and free disk, each folder over 100 MB, every venv with its PyTorch
 version, and the retired worktrees. `WARN` lines lead it. Budgets, derived in the script's header and overridable by
-environment: the cache 50 GB, one folder 5 GB, the shared model caches (`mlx-hf`, `hf`) 15 GB, free disk 30 GB. It
+environment: the cache 65 GB, one folder 5 GB, the shared model caches (`mlx-hf`, `hf`) 35 GB, free disk 30 GB. It
 never deletes or moves anything. Test: `ops/agent/tests/test_hooks.py` class `Upkeep`.
 
 **Items clear up after themselves.** The rule is in CLAUDE.md ("The bench cache") and the resume prompt's STEP 4: the
@@ -1421,6 +1421,19 @@ completing session deletes its own rebuildable scratch (rendered pages, written 
 copies, a private venv) and records in the DONE entry what it kept and why. Kept: inputs that are slow or costly to
 get again (downloads behind a login, paid outputs), results not yet committed or scored, and anything an open item
 names. The size of a folder is not a reason to delete an open item's inputs.
+
+**One model cache.** `mlx-hf/` is the Hugging Face cache for every open model the Mac runs (30 Oct 2026). Scripts
+reach it through `ArchiveProcessor/scripts/segbench/model_store.py`: `model_store.use()` sets `HF_HOME` to it unless
+the caller set one, and `model_store.snapshot(repo, revision)` gives a snapshot's folder for a script that loads by
+path. `use()` runs before anything imports `mlx_vlm`, because huggingface_hub reads `HF_HOME` once, at import, and
+it refuses if that already happened. Four scripts had set it after the import, so they read and downloaded into
+`~/.cache/huggingface`. On 30 Oct the same models sat in three caches, 11.9 GB of duplicate blobs. The Vision OCR
+lab's models (13.3 GB) were moved into `mlx-hf`, and `~/.local/share/visionocr-ocrlab/hf/hub` is now a link to
+`mlx-hf/hub`, so the lab's own scripts still find them. The duplicates in the lab and in `~/.cache` went to the Trash,
+12.2 GB. `~/.cache/huggingface/hub` keeps the PyTorch models that scripts load from the default cache (GLiNER, timm,
+CHURRO, vit-historical-page, PP-OCRv6 det; 2.8 GB). Its Qwen3.5-4B, Qwen3-VL-8B and Gemma 3 12B entries are links
+into `mlx-hf`, for scripts on older branches and for `mlx_vlm.server`. A new Mac model downloads into `mlx-hf`
+through `model_store.use()`, never into a second cache.
 
 **One shared PyTorch.** `ArchiveProcessor/scripts/segbench/torch-env.sh` builds `torch-env/` in the cache once
 (Python 3.12, torch 2.15.0, torchvision, numpy, pillow, safetensors, huggingface-hub; 0.7 GB, 2.5 min) and prints its
@@ -1447,6 +1460,6 @@ owner to copy it back to its original path, rather than failing or downloading i
 | `enh-ocr-input/` (`stage`, `weights`, `src`) | 4.3 GB | enhancement arms | after W46.enh-ocr-input-marks and -ppocr |
 | `ent-robust/g17` | 4.0 GB | the G17 entity set | after W46.ent-robust-paid |
 
-Never moved or deleted here: `mlx-hf/` (shared models, read by five scripts), the retired worktrees in
+Never moved or deleted here: `mlx-hf/` (the one model cache, above; a local model is a product goal), the retired worktrees in
 `$STATE/retired-worktrees` (the engine's recovery copies, listed in the report for the owner) and owner session
 folders.

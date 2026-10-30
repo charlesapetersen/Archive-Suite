@@ -28,14 +28,14 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent))
 import common as C          # noqa: E402
+import model_store          # noqa: E402
 import routes as R          # noqa: E402
 
 RUN = C.CACHE / 'specialists'
 KRAKEN = Path(os.environ.get('KRAKEN_BIN', Path.home() / 'Library/Caches/ArchiveSuiteRehearsal/kraken-venv/bin/kraken'))
 MODELS_DIR = Path.home() / 'Library/Application Support/htrmopo'
 RTL = {'Arab', 'Hebr'}
-# The Mac-local cache ocr_mac_local.py uses (the Vision OCR lab's is at its limit).
-os.environ.setdefault('HF_HOME', str(Path.home() / 'Library/Caches/ArchiveSuiteRehearsal/mlx-hf'))
+model_store.use()
 BATCH = 10   # pages per kraken call: one model load per batch, and an interruption loses at most a batch
 WORKERS = int(os.environ.get('SPECIALISTS_WORKERS', '4'))
 

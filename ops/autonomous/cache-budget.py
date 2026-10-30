@@ -13,11 +13,15 @@ The report goes to stdout and to $AGENT_STATE/cache-budget.txt. Lines starting "
 
 The budgets (owner may change them; derivation 2026-10-29, cache 48 GB after the owner cleared 17.6 GB of
 rebuildable PDFs, disk 926 GB with 32 GB free):
-  * TOTAL 50 GB: what the cache held after the cleanup, which carried every open item's inputs. Growth past it is
-    the next item's scratch that nobody cleared.
+  * TOTAL 65 GB: what the cache held after the cleanup, 50 GB with every open item's inputs, plus the 13.3 GB of
+    lab models that moved into mlx-hf on 30 Oct from outside the cache. Growth past it is the next item's scratch
+    that nobody cleared.
   * a folder 5 GB: the largest single item folders left were 7 and 6 GB, both holding rendered stage images and
     a private PyTorch environment that the rules now say to clear or share.
-  * the shared model caches (mlx-hf, hf) 15 GB: models are reused across items, so they are allowed more.
+  * the shared model caches (mlx-hf, hf) 35 GB: models are reused across items, so they are allowed more.
+    Raised from 15 GB on 30 Oct, when mlx-hf became the Mac's one model cache (segbench/model_store.py): the
+    Vision OCR lab's 13.3 GB of models moved in and 12.2 GB of duplicates elsewhere went to the Trash, leaving
+    mlx-hf at 30.6 GB with every model once.
   * free disk 30 GB: the engine parks at 10 GB (MINFREE_MB); 30 leaves room for a model download and a build.
 Environments are listed with their PyTorch version, so a private copy of the shared stack (segbench/torch-env.sh)
 shows up. Retired worktrees are listed for the owner; nothing here removes them.
@@ -34,9 +38,9 @@ GB = 1024 ** 3
 CACHE = Path(os.environ.get('ARCHIVE_BENCH_CACHE', Path.home() / 'Library/Caches/ArchiveSuiteRehearsal'))
 STATE = Path(os.environ.get('AGENT_STATE', Path.home() / '.local/state/archive-autonomous'))
 RETIRED = STATE / 'retired-worktrees'
-TOTAL_GB = float(os.environ.get('CACHE_BUDGET_TOTAL_GB', 50))
+TOTAL_GB = float(os.environ.get('CACHE_BUDGET_TOTAL_GB', 65))
 FOLDER_GB = float(os.environ.get('CACHE_BUDGET_FOLDER_GB', 5))
-MODEL_GB = float(os.environ.get('CACHE_BUDGET_MODEL_GB', 15))
+MODEL_GB = float(os.environ.get('CACHE_BUDGET_MODEL_GB', 35))
 FREE_GB = float(os.environ.get('CACHE_BUDGET_FREE_GB', 30))
 MODEL_CACHES = ('mlx-hf', 'hf')
 # The upkeep hook as a whole has 300 s (Agent Manager CONTRACT.md); measuring took 25 s on 29 Oct. Past this

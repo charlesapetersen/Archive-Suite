@@ -22,18 +22,17 @@ import statistics
 import time
 from pathlib import Path
 
+import model_store
 import ocr_panel as P
 
 KEY = 'qwen3-vl-8b-mlx4'
 HOSTED = 'qwen3-vl-8b'
 REPO = 'mlx-community/Qwen3-VL-8B-Instruct-4bit'
-# Separate from the Vision OCR lab's cache, which is at its own 50 GB limit.
-os.environ.setdefault('HF_HOME', str(Path.home() / 'Library/Caches/ArchiveSuiteRehearsal/mlx-hf'))
+model_store.use()
 OUT = P.CACHE / 'local' / KEY
 REPORT = P.RESULTS / 'ocr-mac-local.md'
 HW_REPORT = P.RESULTS / 'ocr-mac-local-hw.md'
 GROUPS = P.RESULTS / 'ocr-mac-local-groups.csv'  # aggregates by kind, read by ArchiveOCRBench/build.py
-LAB_HUB = Path.home() / '.local/share/visionocr-ocrlab/hf/hub'
 
 # W41.mac-local-hw: the Vision OCR lab's handwriting pick and runner-up, as the lab ran them (its read-mlx.py),
 # except that Qwen3.5-9B's thinking is switched off to match the hosted route's reasoning: off.
@@ -41,11 +40,11 @@ HW = {
     'lightonocr-3-4b-mlx8': {
         'name': 'LightOnOCR-3-4B 8-bit', 'hosted': None, 'reply': 'plain', 'prompt': '', 'max_side': 2048,
         'max_tokens': 4096, 'template': {},
-        'repo': LAB_HUB / 'models--prithivMLmods--LightOnOCR-3-4B-MLX/snapshots/e93084acf44a380776866b23b122f48fe47cab7f/8bit'},
+        'repo': model_store.snapshot('prithivMLmods/LightOnOCR-3-4B-MLX', 'e93084acf44a380776866b23b122f48fe47cab7f') / '8bit'},
     'qwen3.5-9b-mlx4': {
         'name': 'Qwen3.5-9B 4-bit', 'hosted': 'qwen3.5-9b', 'reply': 'panel', 'prompt': None, 'max_side': None,
         'max_tokens': None, 'template': {'enable_thinking': False},
-        'repo': LAB_HUB / 'models--mlx-community--Qwen3.5-9B-4bit/snapshots/8b2b98c00a6b4d291155e4890773ca8f769aee53'},
+        'repo': model_store.snapshot('mlx-community/Qwen3.5-9B-4bit', '8b2b98c00a6b4d291155e4890773ca8f769aee53')},
 }
 
 

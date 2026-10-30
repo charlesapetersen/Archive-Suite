@@ -33,6 +33,7 @@ import time
 from pathlib import Path
 
 import data
+import model_store
 from methods import METHODS  # noqa: F401  (loads method_window and method_gemini in order)
 import method_window as W
 import method_window_cues as C
@@ -41,7 +42,7 @@ from score import derived, score_labels
 MAX_SIDE = 1024
 MAX_TOKENS = 1500
 PROMPT_VERSION = "l1"
-MODELS = {  # key: (repo in the lab's Hugging Face cache, label)
+MODELS = {  # key: (repo in the shared Hugging Face cache, model_store.py; or a build's folder, label)
     "qwen3.5-4b": ("lmstudio-community/Qwen3.5-4B-MLX-4bit", "Qwen3.5-4B, 4-bit"),
     "gemma4-12b": ("mlx-community/gemma-4-12B-it-4bit", "Gemma 4 12B, 4-bit"),
     "qwen3-vl-8b": ("mlx-community/Qwen3-VL-8B-Instruct-4bit", "Qwen3-VL-8B, 4-bit"),
@@ -102,6 +103,7 @@ def strip_thinking(text):
 
 
 def collect(key, names, limit=None):
+    model_store.use()   # before mlx_vlm imports huggingface_hub, which reads HF_HOME once
     import mlx.core as mx
     from mlx_vlm import load, generate
     from mlx_vlm.prompt_utils import apply_chat_template

@@ -26,6 +26,8 @@ import sys
 import time
 from pathlib import Path
 
+import model_store
+
 HERE = Path(__file__).resolve().parent
 RESULTS = HERE.parents[1] / 'segbench-results'
 REHEARSAL = Path.home() / 'Library/Caches/ArchiveSuiteRehearsal'
@@ -197,10 +199,9 @@ def signals():
         subprocess.run(['bash', str(HERE / 'vision_kind/run.sh'), str(rest)], stdout=out, check=True)
 
 
-LAB_HUB = Path.home() / '.local/share/visionocr-ocrlab/hf/hub'
-VLMS = {  # open weights already in the Vision OCR lab's cache, loaded by local path, read only
-    'qwen3.5-2b-mlx4': LAB_HUB / 'models--mlx-community--Qwen3.5-2B-4bit/snapshots/674aaa7240b91e8012fcad5d791b7dfe5ba90207',
-    'qwen3.5-4b-mlx4': LAB_HUB / 'models--lmstudio-community--Qwen3.5-4B-MLX-4bit/snapshots/c43ee1d65576a5d98de1e8405cac93c371a655c1',
+VLMS = {  # open weights already in the shared model cache (model_store.py), loaded by local path, read only
+    'qwen3.5-2b-mlx4': model_store.snapshot('mlx-community/Qwen3.5-2B-4bit', '674aaa7240b91e8012fcad5d791b7dfe5ba90207'),
+    'qwen3.5-4b-mlx4': model_store.snapshot('lmstudio-community/Qwen3.5-4B-MLX-4bit', 'c43ee1d65576a5d98de1e8405cac93c371a655c1'),
 }
 VLM_SIDE = 1024        # the longer side the model sees: kind needs the page's look, not its words
 VLM_PROMPT = (

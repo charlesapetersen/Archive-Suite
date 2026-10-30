@@ -407,9 +407,10 @@ def local_snapshot(repo):
 
 class Model:
     def __init__(self, key):
+        import model_store
+        model_store.use()   # before mlx_vlm imports huggingface_hub, which reads HF_HOME once
         import mlx.core as mx
         from mlx_vlm import load
-        os.environ.setdefault("HF_HOME", os.path.expanduser("~/Library/Caches/ArchiveSuiteRehearsal/mlx-hf"))
         mx.set_cache_limit(256 * 2**20)
         self.key = key
         self.model, self.processor = load(local_snapshot(MODELS[key][0]))

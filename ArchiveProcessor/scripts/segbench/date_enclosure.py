@@ -292,9 +292,10 @@ def answers_dir(label):
 
 
 def _mlx(key):
+    import model_store
+    model_store.use()   # before mlx_vlm imports huggingface_hub, which reads HF_HOME once
     import mlx.core as mx
     from mlx_vlm import load
-    os.environ.setdefault("HF_HOME", os.path.expanduser("~/Library/Caches/ArchiveSuiteRehearsal/mlx-hf"))
     mx.set_cache_limit(256 * 2**20)
     return load(MODELS[key][0])
 
