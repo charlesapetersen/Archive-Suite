@@ -13377,3 +13377,26 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   Recommendations: local route keeps one 7-page image window; no text-only 2B route; no self-voting for the local route or the teacher labeller; W46.seg-window-modality-paid may run K 3/5/10 on the 150-page subset but keeps text-only vs images on all 551 pages (pointer added to its entry).
   Kept: the pack with answers at $AGENT_STATE/artifacts/seg-window-modality-20261029 (293 MB; the answers are the scored inputs). The superseded first pack ($AGENT_STATE/artifacts/seg-window-modality-20261029.superseded-1, 284 MB) is safe to delete; this session's rm was refused. Nothing in ~/Library/Caches/ArchiveSuiteRehearsal. No money, no engine contact with Sherlock. Item notes folded here.
   <!-- /W46.seg-window-modality -->
+- [x] **W46.date-image — dates on the page that are not in the text [M]** · §Document processing review — W46 (owner, 2026-10-20) (lane: segbench) (uses: light,model:10) (cluster: sherlock) (blocked-on: W46.cluster-waves, W46.fix-date-truth-score) — The 131 unprinted-year documents through open VLMs with and without the ABBYY text; look-alike retrieval; the handwritten-date reader only if many dates are handwritten. detail: execution-plans/processing-review/10-gap-audit.md §5 item 16 — SHIPPED 2026-10-30
+  Result (`ArchiveProcessor/segbench-results/date-image.md`, bench page panel "Dates read off the page images"): 122 of
+  the 131 have a JPEG original confirmed by orient_like_pdf (owner, 2026-10-22: never the corpus PDFs). Qwen3.6-27B on
+  Sherlock (2,400 px; the 235B the item named was never packed) finds the owner's year written on the page for 43%
+  with the images alone (44% with the text), 75% of those not in ABBYY's text; document year exact 39% / 42%. Eye check
+  of 24 claimed dates: 23 present, none invented. On the owner's 27 own-page cases 20 found; quotes the owner's reading
+  where tag and reading differ, 4 of 4. Qwen3-VL 8B 4-bit on the Mac (1,400 px, ~12-15 s a request): on the page 32% /
+  27%, document year 16% / 17%, 16 of the 27. Kinds of found dates (27B): typed or printed 41, stamped 5, handwritten 9;
+  page 2 for 5 — so the handwritten-date reader (B test 8) is NOT filed. Look-alike retrieval (Vision feature prints):
+  27 exact against 52 for the nearest dated document before; not a route. The text adds almost nothing (27B: +3, -0).
+  Verdict: an image pass belongs in the dating pipeline for unprinted-year documents, at the 27B tier (32 GB, cluster or
+  gateway); the 8B is a quote source, not a dater. Gemini arm: W46.date-image-paid.
+  Tools: `date_image.py` pack / collect-mac / vision / score / prints / retrieve. `vision` rebuilds Apple Vision text of
+  the targets' pages because date_traceable's cache moved to the owner's OneDrive backup on 2026-10-30 (reproduces
+  the 27B's check exactly). The Mac run needed `mac-heavy-lock.sh run -- bash -c '<wait for pressure 1>;
+  MAC_HEAVY_HELD=1 run-guarded.sh --need-gb 6 …'`: run-guarded's check right after a VM releases the lock refuses.
+  Commits: e90b8b62, 4ec8abe6, 8dd7ffcc (bench panel), 3cad0af8, this one.
+  Bench cache: kept `date-image/` images (180 MB) + requests.jsonl + mac/ replies + prints.json + eyecheck*, which
+  W46.date-image-paid sends and scores against, and `sherlock-results/date-image-20261022` (1.9 MB, the scored
+  replies). The rebuildable `images-1400/` (65 MB) and `thumbs/` (254 MB) are still there: the session's `rm -rf` was
+  refused by the permission layer; any session may delete them. The rebuilt
+  `date-tagging/traceable/vision` (464 pages) is date_traceable's own cache, left for its reruns.
+  <!-- /W46.date-image -->

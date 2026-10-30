@@ -11,7 +11,7 @@ Measures, per document: **doc year** the document date the model gave equals the
 | Qwen3.6-27B (Sherlock, vLLM, 2,400 px) | image | 122/122 (100%) | 48/122 (39%) | 55/122 (45%) | 52/122 (43%) | 39/52 (75%) | 36/52 (69%) | 17.5 |
 | Qwen3.6-27B (Sherlock, vLLM, 2,400 px) | image+text | 122/122 (100%) | 51/122 (42%) | 58/122 (48%) | 54/122 (44%) | 40/54 (74%) | 36/54 (67%) | 19.1 |
 | Qwen3-VL 8B, 4-bit MLX (this Mac, 1,400 px) | image | 122/122 (100%) | 20/122 (16%) | 22/122 (18%) | 39/122 (32%) | 33/39 (85%) | 27/39 (69%) | 12.05 |
-| Qwen3-VL 8B, 4-bit MLX (this Mac, 1,400 px) | image+text | 28/28 (100%) | 9/28 (32%) | 10/28 (36%) | 12/28 (43%) | 9/12 (75%) | 10/12 (83%) | 18.53 |
+| Qwen3-VL 8B, 4-bit MLX (this Mac, 1,400 px) | image+text | 122/122 (100%) | 21/122 (17%) | 25/122 (20%) | 33/122 (27%) | 25/33 (76%) | 24/33 (73%) | 15.28 |
 
 ## By class (doc year exact / on the page)
 
@@ -22,19 +22,19 @@ D has no printed carrier anywhere near it; A had a previous document printing th
 | Qwen3.6-27B (Sherlock, vLLM, 2,400 px) | image | 10 / 11 of 17 | 10 / 10 of 31 | 15 / 16 of 35 | 11 / 11 of 32 | 2 / 4 of 7 |
 | Qwen3.6-27B (Sherlock, vLLM, 2,400 px) | image+text | 11 / 10 of 17 | 10 / 10 of 31 | 16 / 17 of 35 | 11 / 13 of 32 | 3 / 4 of 7 |
 | Qwen3-VL 8B, 4-bit MLX (this Mac, 1,400 px) | image | 5 / 9 of 17 | 2 / 9 of 31 | 7 / 10 of 35 | 4 / 7 of 32 | 2 / 4 of 7 |
-| Qwen3-VL 8B, 4-bit MLX (this Mac, 1,400 px) | image+text | 6 / 8 of 17 | 1 / 2 of 4 | 1 / 1 of 4 | 1 / 1 of 3 | 0 / 0 of 0 |
+| Qwen3-VL 8B, 4-bit MLX (this Mac, 1,400 px) | image+text | 6 / 8 of 17 | 4 / 7 of 31 | 8 / 10 of 35 | 3 / 6 of 32 | 0 / 2 of 7 |
 
 ## What the page dates are
 
 Of the documents whose owner year was found written on the page (either variant), the first such date: its kind, where it is, and which page. The handwritten share decides whether the handwritten-date reader (B test 8) is worth filing.
 
 - **Qwen3.6-27B (Sherlock, vLLM, 2,400 px)**, 55 documents. Kind: typed 22, printed 19, handwritten 9, stamped 5. Where: dateline 15, other 10, body 9, letterhead 8, margin 8, stamp 5. Page: 1 50, 2 5.
-- **Qwen3-VL 8B, 4-bit MLX (this Mac, 1,400 px)**, 39 documents. Kind: printed 21, typed 9, handwritten 7, stamped 2. Where: letterhead 17, dateline 8, margin 7, body 4, bottom right 2, stamp 1. Page: 1 39.
+- **Qwen3-VL 8B, 4-bit MLX (this Mac, 1,400 px)**, 40 documents. Kind: printed 21, typed 10, handwritten 7, stamped 2. Where: letterhead 17, dateline 8, margin 7, body 5, bottom right 2, stamp 1. Page: 1 40.
 
 ## Images alone against images with the text
 
 - **Qwen3.6-27B (Sherlock, vLLM, 2,400 px)**, 122 documents: right in both 48, only with images alone 0, only with the text added 3, neither 71.
-- **Qwen3-VL 8B, 4-bit MLX (this Mac, 1,400 px)**, 28 documents: right in both 7, only with images alone 1, only with the text added 2, neither 18.
+- **Qwen3-VL 8B, 4-bit MLX (this Mac, 1,400 px)**, 122 documents: right in both 15, only with images alone 5, only with the text added 6, neither 96.
 
 ## Against the owner's own reading of the page
 
@@ -63,3 +63,30 @@ Cells are exact / within one year, of n. 122 of 122 targets have a print; the mo
 ## Reading it
 
 (written by hand; a rerun keeps everything below this heading)
+
+**An image pass belongs in the dating pipeline, for the documents whose year is not in the text.** On 52 of the 122
+(43%) Qwen3.6-27B quotes a date carrying the owner's year off the page images alone, and three quarters of those quotes
+are not in ABBYY's text either. A subagent's eye check of 24 claimed page dates found 23 really there and none invented
+(one smeared stamp unsure). On the owner's 27 own-page cases it finds 20, and where the owner's tag and the year the
+owner read on the page differ, it quotes the owner's reading on all four. Its document year is exact on 39%, against
+0% for the text rule on these documents by construction.
+
+**The text adds almost nothing.** With the ABBYY text as well, the 27B is right on 3 more documents and on none fewer;
+the 8B gains 6 and loses 5. The images carry the evidence.
+
+**Few of the dates are handwritten, so the handwritten-date reader (B test 8) is not worth filing.** Of the 27B's 55
+found dates, 41 are typed or printed (a dateline, a letterhead, the body), 5 stamped and 9 handwritten; 5 are on page 2.
+Most of what ABBYY missed is ordinary type in places it does not read well, which a general VLM reads. Nine handwritten
+dates across 131 documents do not pay for annotating 300-500 pages and training a detector and recogniser.
+
+**The Mac's 16 GB model is much weaker.** Qwen3-VL 8B 4-bit at 1,400 px finds the owner's year on the page for 32%
+(16 of the owner's 27 cases) but gives it as the document's year for only 16%: it often quotes the right date and then
+picks another one. Used as a quote source for the chooser, with the year picked by the rule or the 2B date model, it is
+worth more than its document-year figure. The 27B's figures need the 32 GB tier (or the cluster, or the gateway's
+Gemini, W46.date-image-paid). Images at 1,400 px and 4-bit weights are both part of the gap; neither was separated here.
+
+**Look-alike retrieval is worse than position** (27 exact against 52 for the nearest dated document before) and helps
+only class C; it is not a route.
+
+The arm that ran is Qwen3.6-27B, not the Qwen3-VL 235B the item names: the owner's Sherlock session packed the 27B,
+whose server was already up. A 235B run would only say how much of the 27B's 57% miss a bigger reader recovers.

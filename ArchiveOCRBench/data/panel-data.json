@@ -16629,10 +16629,10 @@
     "arm": "mac:qwen3-vl-8b-mlx4-1400",
     "name": "Qwen3-VL 8B, 4-bit MLX (this Mac, 1,400 px)",
     "variant": "image+text",
-    "n": 28,
-    "exact": 9,
-    "within1": 10,
-    "on_page": 12
+    "n": 122,
+    "exact": 21,
+    "within1": 25,
+    "on_page": 33
    }
   ],
   "retrieval": [
