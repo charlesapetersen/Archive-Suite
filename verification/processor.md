@@ -8,7 +8,7 @@ Format and statuses: [`README.md`](README.md). Written by `W40.b3`, 2026-10-21.
   checklist §2.0-2.14, Tier 2D driver list), `ArchiveProcessor/LIVE_CAPTURE_ANDROID_TEST.md` (Runs A-C, Mac side
   only), and `SPEC/tag-format.md` (§Invariants 3, 5, 6, 7 and §2-page PDF structure).
 - **Sources read at:** `8a03097c`; code traced at the same commit.
-- **Count:** `unproven 51 · works 1` (works: P-45, taken in from `W40.d6`).
+- **Count:** `unproven 52 · works 1` (works: P-45, taken in from `W40.d6`).
 
 **Order of work (rule 3).** The *Promise* and *Promised in* of every row were committed first, before any
 implementation file was opened (`d3db14f3`). The rest was traced afterwards by four read-only passes, and every
@@ -1112,6 +1112,24 @@ cover the Mac: the receiver, the tag card, the drain gate, staging, finalize and
   - 2026-10-21 W40.b3 — row written, `unproven`.
 - **Notes:** after a relaunch the mode is undecided (`Capture/CaptureSession.swift:169`); the manifest reloads only on
   the next photo or when the user presses Process N →. README implies it reloads on its own.
+
+### P-53 · An Appearance setting: System, Light or Dark
+
+- **Promise:** Settings offers Appearance with System (the default, following macOS), Light and Dark; a choice
+  changes every open window, sheet and panel at once and is restored at the next launch, before the first window.
+- **Promised in:** `README.md` §Settings window; `SUITE_TODO.md` W48.appearance-processor (owner, 2026-10-29).
+- **Reached by:** ⌘, → `Views/SettingsView.swift` `appearanceSection` (`@AppStorage(AppAppearance.defaultsKey)`) →
+  `AppAppearance.follow()` (`packages/ArchiveCore/Sources/ArchiveCore/Appearance/AppAppearance.swift`), called from
+  `ArchiveProcessorApp.init` unless `-ArchiveUITestAppearance` forced a mode → `NSApplication.shared.appearance`.
+- **Real-path test:** `AppearanceSettingUITests.testPickingLightAndDarkChangesOpenWindowsLiveAndSurvivesARelaunch`
+  (picks Dark, Light, Dark with the History sheet and Settings open, checks each window's pixels, relaunches,
+  picks System) and `.testTheUITestArgumentStillWinsOverTheStoredChoice`; the `…BySetting` variants of
+  `AccessibilityAuditUITests` and `VisualReviewUITests.testTour*`; `ArchiveCoreTests/AppAppearanceTests` (value,
+  default, apply).
+- **Runtime evidence:** none (the builder's VM runs are not the independent check; `W48.appearance-verify` is).
+- **Status:** `unproven`
+- **History:**
+  - 2026-10-29 W48.appearance-processor — row written, `unproven`.
 
 ## Source drift — doc against doc, for `W40.b5`
 

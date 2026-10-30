@@ -118,6 +118,7 @@ struct ContentView: View {
                 }
                 .pickerStyle(.segmented)
                 .frame(width: 320)
+                .accessibilityIdentifier("ap.mode.picker")   // finds the main window in every mode (UI tests)
                 if mode == .live && capture.serverRunning {
                     Label("Live", systemImage: "dot.radiowaves.left.and.right")
                         .font(.caption).foregroundStyle(.green)

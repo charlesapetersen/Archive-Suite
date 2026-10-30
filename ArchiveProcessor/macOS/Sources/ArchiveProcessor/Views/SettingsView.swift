@@ -1053,7 +1053,7 @@ struct SettingsView: View {
             Picker("Appearance", selection: $appearance) {
                 ForEach(AppAppearance.allCases, id: \.self) { Text($0.title).tag($0) }
             }
-            .accessibilityIdentifier("settings.appearance")
+            .accessibilityIdentifier("ap.settings.appearance")
         }
     }
 

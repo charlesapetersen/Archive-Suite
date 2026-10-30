@@ -228,6 +228,8 @@ Diagnostics live in the **Tools** tab (next to Process Files and Live Capture):
 
 All durable settings live in a native macOS Settings window: provider/model/API mode, a **separate API-key field per provider** (Anthropic / Gemini / Mistral / OpenAI / OpenRouter, plus Gateway when the gateway is on, each in the Keychain), Apple Vision's no-key local controls, input & processing (pre-OCR, batch, image resolution), rotation, tagging & segmentation options, custom models, and the Live Capture processing mode. The tagging **mode** dropdown is in Settings and also in the Process Files view for quick access; the output folder is chosen in the Process Files view.
 
+**Appearance** (top of Settings): System (the default, follows macOS), Light or Dark. The choice applies at once to every window, sheet and panel, and is restored at the next launch. The same setting, under the same name, is in the Reader and Notes.
+
 A **pinned pane on the right** recomputes live for 1,000 files (at your standard image size) as you change settings:
 
 - **Cost** — broken out by phase: OCR, **rotation** (LLM rotation calls, which weren't counted before), tagging, collection ID and segmentation, with a standard total and, when batch mode is on, a batch total. Apple Vision, the Local Agent and a gateway with no pricing show a note in place of dollar figures.

@@ -60,4 +60,21 @@ final class AppAppearanceTests: XCTestCase {
         AppAppearance.system.apply(to: app)
         XCTAssertNil(app.appearance)
     }
+
+    /// `follow` applies the stored value at once, then again on each change, without being asked.
+    @MainActor
+    func testFollowAppliesTheStoredValueAndEveryChange() async throws {
+        let app = NSApplication.shared
+        let before = app.appearance
+        defer { app.appearance = before }
+        defaults.set("dark", forKey: AppAppearance.defaultsKey)
+        AppAppearance.follow(defaults)
+        XCTAssertEqual(app.appearance?.name, .darkAqua)
+        for (value, name) in [("light", NSAppearance.Name.aqua), ("system", nil), ("dark", .darkAqua)] {
+            defaults.set(value, forKey: AppAppearance.defaultsKey)
+            let deadline = Date().addingTimeInterval(2)
+            while app.appearance?.name != name, Date() < deadline { try await Task.sleep(nanoseconds: 20_000_000) }
+            XCTAssertEqual(app.appearance?.name, name, "after storing \(value)")
+        }
+    }
 }

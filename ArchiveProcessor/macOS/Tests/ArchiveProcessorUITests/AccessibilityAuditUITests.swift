@@ -33,6 +33,16 @@ final class AccessibilityAuditUITests: XCTestCase {
         try auditMainScreens(appearance: "dark", extra: LayoutGuard.darkModeArguments)
     }
 
+    // The same sweeps with the mode coming from the Appearance setting rather than the test argument
+    // (W48.appearance-processor; plan rule 7: the existing checks run in the new mode as well as the old).
+    func testMainScreensPassAuditInLightModeBySetting() throws {
+        try auditMainScreens(appearance: "light", extra: LayoutGuard.lightSettingArguments)
+    }
+
+    func testMainScreensPassAuditInDarkModeBySetting() throws {
+        try auditMainScreens(appearance: "dark", extra: LayoutGuard.darkSettingArguments)
+    }
+
     private func auditMainScreens(appearance: String, extra: [String]) throws {
         app = .archiveProcessorUITestApp()
         app.launchArguments = UITestLaunch.arguments([

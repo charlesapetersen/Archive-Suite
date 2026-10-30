@@ -48,6 +48,8 @@ final class VisualReviewUITests: XCTestCase {
     private var shotDirectory: URL!
     private var missing: [String] = []
     private var prefix = ""
+    /// Force the mode through the stored Appearance setting rather than `-ArchiveUITestAppearance`.
+    private var bySetting = false
 
     override func setUp() async throws {
         try XCTSkipUnless(FileManager.default.fileExists(atPath: Self.flagPath),
@@ -72,6 +74,9 @@ final class VisualReviewUITests: XCTestCase {
 
     func testTourLight() throws { tour(dark: false) }
     func testTourDark() throws { tour(dark: true) }
+    // The tour with the mode set by the Appearance setting instead of the test argument (W48.appearance-processor).
+    func testTourLightBySetting() throws { bySetting = true; tour(dark: false) }
+    func testTourDarkBySetting() throws { bySetting = true; tour(dark: true) }
     func testStatesLight() throws { states(dark: false) }
     func testStatesDark() throws { states(dark: true) }
     func testVolumeLight() throws { volume(dark: false) }
@@ -87,7 +92,7 @@ final class VisualReviewUITests: XCTestCase {
     private func tour(dark: Bool) {
         for size in WindowSize.allCases {
             relaunch(dark: dark)
-            prefix = "\(dark ? "dark" : "light")-\(size.rawValue)"
+            prefix = "\(dark ? "dark" : "light")\(bySetting ? "-setting" : "")-\(size.rawValue)"
             resizeMainWindow(to: size.main)
 
             selectMode("Process Files")
@@ -317,7 +322,7 @@ final class VisualReviewUITests: XCTestCase {
             "-APUITestMode",
             "-APUITestInputDirectory", scratchRoot.appendingPathComponent("IN").path,
             "-APUITestOutputDirectory", scratchRoot.appendingPathComponent("OUT").path,
-        ] + (dark ? LayoutGuard.darkModeArguments : LayoutGuard.lightModeArguments) + extra)
+        ] + appearanceArguments(dark: dark) + extra)
         app.launchEnvironment["ARCHIVEPROC_HEADLESS"] = "1"
         app.launch()
         app.activate()
@@ -326,6 +331,11 @@ final class VisualReviewUITests: XCTestCase {
             missing.append("main window (\(extra.joined(separator: " ")))")
         }
         pause(1)
+    }
+
+    private func appearanceArguments(dark: Bool) -> [String] {
+        if bySetting { return dark ? LayoutGuard.darkSettingArguments : LayoutGuard.lightSettingArguments }
+        return dark ? LayoutGuard.darkModeArguments : LayoutGuard.lightModeArguments
     }
 
     private func selectMode(_ title: String) {

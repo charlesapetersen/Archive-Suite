@@ -56,10 +56,11 @@ public enum AppAppearance: String, CaseIterable, Sendable {
         stored(in: defaults).apply()
         guard observer == nil else { return }
         followed = defaults
+        // queue nil, then a hop: a `.main` queue would make a background writer of any key wait on the main thread.
         observer = NotificationCenter.default.addObserver(
-            forName: UserDefaults.didChangeNotification, object: defaults, queue: .main
+            forName: UserDefaults.didChangeNotification, object: defaults, queue: nil
         ) { _ in
-            MainActor.assumeIsolated { followed.map { stored(in: $0).apply() } }
+            Task { @MainActor in followed.map { stored(in: $0).apply() } }
         }
     }
 

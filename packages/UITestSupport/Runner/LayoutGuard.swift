@@ -108,6 +108,10 @@ enum LayoutGuard {
     /// dark. (`-AppleInterfaceStyle Dark` was tried first and left the app light.)
     static let darkModeArguments = ["-ArchiveUITestAppearance", "dark"]
     static let lightModeArguments = ["-ArchiveUITestAppearance", "light"]
+    /// The same two modes through each app's stored Appearance setting (ArchiveCore `AppAppearance`, key
+    /// `archiveAppearance`), set in the launch's argument domain so nothing is persisted (W48.appearance-*).
+    static let darkSettingArguments = ["-archiveAppearance", "dark"]
+    static let lightSettingArguments = ["-archiveAppearance", "light"]
 
     static let textTypes: Set<XCUIElement.ElementType> = [.staticText, .textField, .secureTextField, .searchField]
     static let singleLineTextTypes: Set<XCUIElement.ElementType> = [.staticText, .textField, .secureTextField,
