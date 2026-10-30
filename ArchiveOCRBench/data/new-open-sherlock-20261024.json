@@ -1,0 +1,16 @@
+{
+  "_source": "W46.ocr-new-open's Sherlock run of the untested open readers on the 895 frozen public pages, through the open sweep's own harness (scripts/segbench/sherlock/new-open/setup-job.sh: open_sweep_setup.py, the frozen ocr_run.py collector, open_sweep_run.py), submitted 2026-10-22 and collected 2026-10-24 into ~/Library/Caches/ArchiveSuiteRehearsal/sherlock-results/new-open-895 (execution-plans/items/W46.ocr-new-open.md). Scores: segbench-results/bench-corpus/new-open-sherlock-20261024.{json,csv} from corpus/farmshare_expanded_report.py against the open sweep's own manifests. Models, revisions, prompts and weight sizes from each model's prepared.json and status.json; server minutes from the first to the last timestamp of the model's vLLM log, model load included.",
+  "status": "Same settings as the open sweep, on Sherlock rather than FarmShare. Nothing adopted.",
+  "hardware": "One Sherlock GPU with 48 or 80 GB (Slurm constraint GPU_MEM:48GB|GPU_MEM:80GB) per model, vLLM 0.31.0, context 16384, temperature 0, thinking off, 8192 output tokens, 16 sequences and 8 concurrent requests.",
+  "routes": {
+    "xiaomi-ocr-0": {"model": "SeerRay-Lab/Xiaomi-OCR-0", "revision": "ff990be318c4c68f7e621dd690231200f47e48c4", "route": "native", "prompt": "the card's Markdown prompt (main body, OTSL tables, LaTeX formulas, headers and footers ignored)", "dtype": "bf16", "job": 49141939, "server_min": 9.0, "license": "apache-2.0", "weight_gb": 1.75, "gpus": 1, "cluster": "Sherlock"},
+    "qwen3.8-27b": {"model": "Qwen/Qwen3.8-27B-FP8", "revision": "017b9c7af6b5689d5dd426a76e0bc077eb5ca20a", "route": "panel", "prompt": "the panel prompt", "dtype": "fp8", "job": 49143683, "server_min": 171.1, "license": "apache-2.0", "weight_gb": 30.87, "gpus": 1, "cluster": "Sherlock"},
+    "paddleocr-vl1.6": {"model": "PaddlePaddle/PaddleOCR-VL-1.6", "revision": "c5630abae1d940eafe0697512a0325494b02ab42", "route": "native", "prompt": "OCR:", "dtype": "bf16", "job": 49141920, "server_min": 14.5, "license": "apache-2.0", "weight_gb": 1.92, "gpus": 1, "cluster": "Sherlock"}
+  },
+  "not_scored": [
+    {"route": "OvisOCR2", "job": 49141918, "state": "Sherlock 2026-10-22: the three-page pilot capped or came back empty, so open_sweep_run.py stopped before the full run (status needs_inspection). No 96 run."},
+    {"route": "TeleOCR", "job": 49141929, "state": "Sherlock 2026-10-22: vLLM 0.31 does not support its rotary embedding; no reading on either set."},
+    {"route": "MiniCPM-V 4.7 1B and 35B-A3B fp8", "job": 49138954, "state": "Skipped at setup: the installed vLLM does not support the architecture, and the run allows no environment upgrade."},
+    {"route": "Unlimited-OCR, Nemotron-Parse 2.0, granite-docling, dots.ocr, Chandra-2", "job": null, "state": "Not submitted: each needs more than the frozen collector's one image and one prompt (its own vLLM image or logits processor, a vLLM range of 0.20-0.26, DocTags special tokens, or a full prompt and JSON or HTML output not on the card)."}
+  ]
+}

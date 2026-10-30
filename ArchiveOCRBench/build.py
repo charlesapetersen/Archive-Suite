@@ -65,6 +65,7 @@ LOOPS = PUBLIC / "loop-rerun-20261021.json"  # W46.ocr-loops: corpus/loop_rerun.
 REGIONS = PUBLIC / "regions-20261021.json"  # W46.ocr-regions: whole page, detector regions and overlapping tiles
 REGIONS_GW = PUBLIC / "regions-gateway-20261028.json"  # W46.ocr-regions-paid: corpus/regions_gateway.py score, Gemini 3.7
 OPEN_SWEEP = HERE / "data" / "open-sweep-20261019.json"  # the open-model sweep's receipts (hand-entered, sourced)
+OPEN_SWEEP_LATER = ("new-open-sherlock-20261024",)  # W46.ocr-new-open: report in PUBLIC, receipts in data/, same name
 TEMPLATE = HERE / "site" / "template.html"
 OUT_DATA = HERE / "data" / "panel-data.json"
 OUT_PAGE = HERE / "site" / "index.html"
@@ -456,7 +457,11 @@ PRESET_NAMES = {"qwen3.5-27b": "Qwen3.5 27B", "qwen3.6-27b": "Qwen3.6 27B", "qwe
                 "lightonocr3-4b-native": "LightOnOCR-3 4B (native, image only)",
                 "paddleocr-vl1.5-native": "PaddleOCR-VL 1.5 (native prompt)", "qwen3.5-4b": "Qwen3.5 4B",
                 "qwen3-vl-8b": "Qwen3-VL 8B", "ppocrv6-medium-pipeline": "PP-OCRv6 medium (pipeline, not a VLM)",
-                "ling3-flash-vl-fp8": "Ling 3 Flash VL (publisher fp8, 4 GPUs)"}
+                "ling3-flash-vl-fp8": "Ling 3 Flash VL (publisher fp8, 4 GPUs)",
+                # W46.ocr-new-open's Sherlock runs, same harness and settings (farmshare_truth96.py)
+                "paddleocr-vl1.6-native": "PaddleOCR-VL 1.6 (native prompt)",
+                "xiaomi-ocr-0-native": "Xiaomi-OCR-0 (native Markdown prompt)",
+                "qwen3.8-27b-sherlock": "Qwen3.8 27B (Sherlock, open sweep settings)"}
 
 
 def newsbench_table():
@@ -576,9 +581,24 @@ def open_sweep(num):
     receipts = json.loads(OPEN_SWEEP.read_text())
     if set(receipts["routes"]) != {r["route"] for r in rows}:
         sys.exit("open-sweep receipts and scores name different routes")
+    routes, not_scored, later = dict(receipts["routes"]), list(receipts["not_scored"]), []
+    for name in OPEN_SWEEP_LATER:  # later runs of new readers through the same harness, on the same manifests
+        with (PUBLIC / f"{name}.csv").open(newline="") as fh:
+            more = [{k: (v if k in ("route", "mode", "subset", "stratum") else num(v)) for k, v in r.items()}
+                    for r in csv.DictReader(fh)]
+        m = json.loads((PUBLIC / f"{name}.json").read_text())
+        rc = json.loads((HERE / "data" / f"{name}.json").read_text())
+        if m["manifest_sha256"] != meta["manifest_sha256"] or m["base_sha256"] != meta["base_sha256"]:
+            sys.exit(f"{name} was scored on other manifests than the open sweep")
+        if set(rc["routes"]) != {r["route"] for r in more} or set(rc["routes"]) & set(routes):
+            sys.exit(f"{name}: receipts and scores name different routes, or reuse an open-sweep route")
+        rows += more
+        routes.update(rc["routes"])
+        not_scored += rc["not_scored"]
+        later.append(rc["hardware"])
     return {"rows": rows, "coverage": meta["coverage"], "manifest_sha256": meta["manifest_sha256"],
-            "routes": receipts["routes"], "not_scored": receipts["not_scored"], "status": receipts["status"],
-            "hardware": receipts["hardware"]}
+            "routes": routes, "not_scored": not_scored, "status": receipts["status"],
+            "hardware": " ".join([receipts["hardware"], *("Rows marked Sherlock: " + h for h in later)])}
 
 
 SCORER_FIELDS = ("route", "family", "n", "ok", "nes", "nes_answered", "added_rate", "rewritten_rate", "cmer",
