@@ -11,6 +11,8 @@ without the three agreement letters) and the 895 frozen public pages (corpus/rou
            FarmShare truth96 routes and the 2026-10-18 owner99 runs (CHURRO, Qwen3.5-27B), from FARMSHARE.
   the 895  the two reference routes and Apple Vision (bench-corpus/routes), the kraken specialists, the open
            sweep's eleven routes and the 2026-10-18 CHURRO, Qari and Fanar runs, from FARMSHARE.
+  both     W46.ocr-new-open's three Sherlock routes (Xiaomi-OCR-0, PaddleOCR-VL 1.6, Qwen3.8 27B), from
+           CACHE/sherlock-results/new-open-{895,96}.
 
 A reading is what that source's own report scored (the same reading() functions and modes); a failure is an
 empty reading. The invention figures (added, rewritten, suspect) are pooled over answered pages, since an empty
@@ -64,6 +66,12 @@ TRUTH96_ROUTES = [  # label, folder under T96, mode (farmshare_truth96.py's)
     ('qwen3.5-4b', 'qwen35-4b/results/ocr/qwen35-4b', 'panel'),
     ('ling3-flash-vl-fp8', 'ling3-flash-vl-fp8/results/ocr/ling3-flash-vl-fp8', 'panel'),
     ('ppocrv6-medium', 'ppocrv6-medium-native/raw', 'pipeline'),
+]
+SH = CACHE / 'sherlock-results'
+SHERLOCK_ROUTES = [  # W46.ocr-new-open, new-open-sherlock-20261024.md: label, model folder, mode; 895 and 96 alike
+    ('xiaomi-ocr-0', 'xiaomi-ocr-0', 'native'),
+    ('paddleocr-vl1.6', 'paddleocr-vl16', 'native'),
+    ('qwen3.8-27b', 'qwen38-27b-fp8', 'panel'),
 ]
 OS, GS, PS, Q18, Q19 = (FARMSHARE / 'FarmShare-open-sweep-20261019/outputs',
                         FARMSHARE / 'FarmShare-general-sweep-20261019/outputs',
@@ -121,6 +129,11 @@ def owner_sources():
         if (T96 / folder).is_dir():
             recs = F.read_records(T96 / folder)
             out[(label, f'FarmShare {mode}')] = {p: X.reading(recs.get(p), mode) for p in pages}
+    for label, key, mode in SHERLOCK_ROUTES:
+        d = SH / 'new-open-96' / key / 'results/ocr' / key
+        if d.is_dir():
+            recs = F.read_records(d)
+            out[(label, f'Sherlock {mode}')] = {p: X.reading(recs.get(p), mode) for p in pages}
     churro = FARMSHARE / 'FarmShare-20261018/results/ocr/churro-owner99'
     if churro.is_dir():
         recs = F.read_records(churro)
@@ -180,6 +193,11 @@ def public_sources(truth):
             out[(label, f'FarmShare {mode}')] = {j: X.reading(r, mode) for j, r in recs.items()}
         else:
             out[(label, f'FarmShare {mode}')] = {j: X.reading(recs.get(j), mode) for j in want}
+    for label, key, mode in SHERLOCK_ROUTES:
+        d = SH / 'new-open-895' / key / 'results/ocr' / key
+        if d.is_dir():
+            recs = F.read_records(d)
+            out[(label, f'Sherlock {mode}')] = {j: X.reading(recs.get(j), mode) for j in want}
     return out
 
 

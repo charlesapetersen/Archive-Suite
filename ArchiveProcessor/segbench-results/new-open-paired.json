@@ -1,0 +1,281 @@
+{
+ "source": "ocr-scorers-pages.csv",
+ "rows": [
+  {
+   "set": "owner96",
+   "route": "paddleocr-vl1.6",
+   "family": "Sherlock native",
+   "against": "qwen3.6-27b",
+   "pages": 96,
+   "failed": 2,
+   "failed_other": 1,
+   "strict": {
+    "n": 96,
+    "delta": -0.0541,
+    "p": 0.0001,
+    "lo": -0.0856,
+    "hi": -0.0287
+   },
+   "answered": {
+    "n": 94,
+    "delta": -0.0462,
+    "p": 0.0001,
+    "lo": -0.0718,
+    "hi": -0.025
+   }
+  },
+  {
+   "set": "owner96",
+   "route": "paddleocr-vl1.6",
+   "family": "Sherlock native",
+   "against": "lightonocr3-4b",
+   "pages": 96,
+   "failed": 2,
+   "failed_other": 0,
+   "strict": {
+    "n": 96,
+    "delta": -0.005,
+    "p": 0.8021,
+    "lo": -0.0448,
+    "hi": 0.0325
+   },
+   "answered": {
+    "n": 94,
+    "delta": 0.0066,
+    "p": 0.7255,
+    "lo": -0.0293,
+    "hi": 0.0426
+   }
+  },
+  {
+   "set": "owner96",
+   "route": "qwen3.8-27b",
+   "family": "Sherlock panel",
+   "against": "qwen3.6-27b",
+   "pages": 96,
+   "failed": 0,
+   "failed_other": 1,
+   "strict": {
+    "n": 96,
+    "delta": -0.0084,
+    "p": 0.5968,
+    "lo": -0.0368,
+    "hi": 0.0209
+   },
+   "answered": {
+    "n": 95,
+    "delta": -0.0182,
+    "p": 0.0853,
+    "lo": -0.0424,
+    "hi": -0.0006
+   }
+  },
+  {
+   "set": "owner96",
+   "route": "qwen3.8-27b",
+   "family": "Sherlock panel",
+   "against": "lightonocr3-4b",
+   "pages": 96,
+   "failed": 0,
+   "failed_other": 0,
+   "strict": {
+    "n": 96,
+    "delta": 0.0406,
+    "p": 0.0086,
+    "lo": 0.0113,
+    "hi": 0.0725
+   },
+   "answered": {
+    "n": 96,
+    "delta": 0.0406,
+    "p": 0.0086,
+    "lo": 0.0113,
+    "hi": 0.0725
+   }
+  },
+  {
+   "set": "owner96",
+   "route": "xiaomi-ocr-0",
+   "family": "Sherlock native",
+   "against": "qwen3.6-27b",
+   "pages": 96,
+   "failed": 0,
+   "failed_other": 1,
+   "strict": {
+    "n": 96,
+    "delta": -0.0561,
+    "p": 0.0001,
+    "lo": -0.085,
+    "hi": -0.0292
+   },
+   "answered": {
+    "n": 95,
+    "delta": -0.0618,
+    "p": 0.0001,
+    "lo": -0.0904,
+    "hi": -0.0377
+   }
+  },
+  {
+   "set": "owner96",
+   "route": "xiaomi-ocr-0",
+   "family": "Sherlock native",
+   "against": "lightonocr3-4b",
+   "pages": 96,
+   "failed": 0,
+   "failed_other": 0,
+   "strict": {
+    "n": 96,
+    "delta": -0.007,
+    "p": 0.5139,
+    "lo": -0.0279,
+    "hi": 0.013
+   },
+   "answered": {
+    "n": 96,
+    "delta": -0.007,
+    "p": 0.5139,
+    "lo": -0.0279,
+    "hi": 0.013
+   }
+  },
+  {
+   "set": "public895",
+   "route": "paddleocr-vl1.6",
+   "family": "Sherlock native",
+   "against": "qwen3.6-27b",
+   "pages": 895,
+   "failed": 226,
+   "failed_other": 97,
+   "strict": {
+    "n": 895,
+    "delta": -0.1881,
+    "p": 0.0001,
+    "lo": -0.2069,
+    "hi": -0.1693
+   },
+   "answered": {
+    "n": 621,
+    "delta": -0.119,
+    "p": 0.0001,
+    "lo": -0.1317,
+    "hi": -0.107
+   }
+  },
+  {
+   "set": "public895",
+   "route": "paddleocr-vl1.6",
+   "family": "Sherlock native",
+   "against": "lightonocr3-4b",
+   "pages": 895,
+   "failed": 226,
+   "failed_other": 85,
+   "strict": {
+    "n": 895,
+    "delta": -0.1843,
+    "p": 0.0001,
+    "lo": -0.2021,
+    "hi": -0.1668
+   },
+   "answered": {
+    "n": 629,
+    "delta": -0.1041,
+    "p": 0.0001,
+    "lo": -0.1163,
+    "hi": -0.0915
+   }
+  },
+  {
+   "set": "public895",
+   "route": "qwen3.8-27b",
+   "family": "Sherlock panel",
+   "against": "qwen3.6-27b",
+   "pages": 895,
+   "failed": 173,
+   "failed_other": 97,
+   "strict": {
+    "n": 895,
+    "delta": -0.0717,
+    "p": 0.0001,
+    "lo": -0.0876,
+    "hi": -0.0561
+   },
+   "answered": {
+    "n": 671,
+    "delta": -0.0313,
+    "p": 0.0001,
+    "lo": -0.04,
+    "hi": -0.0229
+   }
+  },
+  {
+   "set": "public895",
+   "route": "qwen3.8-27b",
+   "family": "Sherlock panel",
+   "against": "lightonocr3-4b",
+   "pages": 895,
+   "failed": 173,
+   "failed_other": 85,
+   "strict": {
+    "n": 895,
+    "delta": -0.0679,
+    "p": 0.0001,
+    "lo": -0.084,
+    "hi": -0.052
+   },
+   "answered": {
+    "n": 685,
+    "delta": -0.0155,
+    "p": 0.0021,
+    "lo": -0.0251,
+    "hi": -0.006
+   }
+  },
+  {
+   "set": "public895",
+   "route": "xiaomi-ocr-0",
+   "family": "Sherlock native",
+   "against": "qwen3.6-27b",
+   "pages": 895,
+   "failed": 1,
+   "failed_other": 97,
+   "strict": {
+    "n": 895,
+    "delta": -0.0104,
+    "p": 0.1442,
+    "lo": -0.024,
+    "hi": 0.0035
+   },
+   "answered": {
+    "n": 797,
+    "delta": -0.0522,
+    "p": 0.0001,
+    "lo": -0.0641,
+    "hi": -0.0408
+   }
+  },
+  {
+   "set": "public895",
+   "route": "xiaomi-ocr-0",
+   "family": "Sherlock native",
+   "against": "lightonocr3-4b",
+   "pages": 895,
+   "failed": 1,
+   "failed_other": 85,
+   "strict": {
+    "n": 895,
+    "delta": -0.0065,
+    "p": 0.2461,
+    "lo": -0.0175,
+    "hi": 0.0045
+   },
+   "answered": {
+    "n": 810,
+    "delta": -0.0337,
+    "p": 0.0001,
+    "lo": -0.0437,
+    "hi": -0.024
+   }
+  }
+ ]
+}

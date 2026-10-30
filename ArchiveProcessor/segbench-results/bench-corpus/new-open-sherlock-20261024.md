@@ -37,20 +37,48 @@ By stratum on the 895 (NES %, failures as 0):
 
 The full table for every stratum and subset is in `new-open-sherlock-20261024.csv`, and the page rows are in `-pages.csv`.
 
+## Paired against the incumbents, and order-free
+
+The measurement audit asks for these (OCR-2, OCR-6 and OCR-9 in
+`execution-plans/processing-review/11-measurement-audit.md`). `ocr_new_open_paired.py` reads `ocr_rescore.py`'s
+per-page scores and writes `../new-open-paired.json`. Each cell is the new route minus the incumbent, in NES points,
+with its 95% bootstrap interval. Strict pairs every page and counts a failure as 0. Answered pairs only the pages
+both routes answered. Every failure here is the model's: the Sherlock runs logged no request errors, so none is a
+provider's. Each run read once (no rerun-noise figure exists yet, OCR-3), so a difference inside about 1-2 points is
+not a ranking.
+
+| Set | Route | vs Qwen3.6 27B, strict | answered | vs LightOnOCR-3 4B, strict | answered | bowF1 |
+|---|---|---|---|---|---|---|
+| 96 | Xiaomi-OCR-0 | -5.6 (-8.5 to -2.9) | -6.2 (-9.0 to -3.8) | -0.7 (-2.8 to +1.3) | -0.7 (-2.8 to +1.3) | 0.922 |
+| 96 | Qwen3.8 27B | -0.8 (-3.7 to +2.1) | -1.8 (-4.2 to -0.1) | +4.1 (+1.1 to +7.3) | +4.1 (+1.1 to +7.3) | 0.965 |
+| 96 | PaddleOCR-VL 1.6 | -5.4 (-8.6 to -2.9) | -4.6 (-7.2 to -2.5) | -0.5 (-4.5 to +3.3) | +0.7 (-2.9 to +4.3) | 0.903 |
+| 895 | Xiaomi-OCR-0 | -1.0 (-2.4 to +0.4) | -5.2 (-6.4 to -4.1) | -0.7 (-1.8 to +0.5) | -3.4 (-4.4 to -2.4) | 0.583 |
+| 895 | Qwen3.8 27B | -7.2 (-8.8 to -5.6) | -3.1 (-4.0 to -2.3) | -6.8 (-8.4 to -5.2) | -1.6 (-2.5 to -0.6) | 0.578 |
+| 895 | PaddleOCR-VL 1.6 | -18.8 (-20.7 to -16.9) | -11.9 (-13.2 to -10.7) | -18.4 (-20.2 to -16.7) | -10.4 (-11.6 to -9.2) | 0.418 |
+
+For comparison, the order-free bag-of-words F1 (NewsBench's, failures counted) is 0.960 on the 96 and 0.626 on the
+895 for Qwen3.6 27B, and 0.931 and 0.641 for LightOnOCR-3 4B (`../ocr-scorers.md`).
+
 ## What it shows
 
 - **No reader here changes the owner's-material pick.** On the 96, Qwen3.8 27B scores 93.44. That is below Qwen3.6 27B
-  (95.25) and close to the earlier FarmShare run of the same checkpoint with an fp8 KV cache (93.10). Qwen3.8 is also
-  worse than 3.6 on the 895 (56.1 against 63.3). It fails 102 pages there by running to the token cap, against
-  Qwen3.6's 97. Its answered pages score 69.5 against 71.0, so the 3.8 checkpoint is not an upgrade for this panel.
-- **Xiaomi-OCR-0 is the strongest small reader on the public set.** It has 1.75 GB of weights, about 0.9B parameters
-  on the Qwen3.5 architecture. It answered 894 of 895 pages, the lowest failure rate of any VLM in the sweep, where
-  LightOnOCR-3 4B failed 85. Its 62.2 is level with LightOnOCR-3 4B (62.9) at a fifth of the size, and it leads
-  every reader on newspapers (L9 95.2), Cyrillic and Devanagari. On the owner's 96 it scores 88.67, between
-  LightOnOCR-3 0.8B (88.00) and 4B (89.38) and below GLM-OCR (90.90). Its clippings score (83.78) is below every
-  other small VLM except PaddleOCR-VL 1.5. A likely cause, not checked page by page, is the card's prompt, which says
-  to ignore headers and footers. That prompt also asks for OTSL tables, which the scorer reads as written. It is the candidate for the 16 GB laptop tier on mixed public
-  material, and it needs its Mac seconds and memory (the MLX arm of this item).
+  (95.25 by its own run, 94.3 in the rescore's local-panel reading; answered-only -1.8 points, -4.2 to -0.1). It is
+  close to the earlier FarmShare run of the same checkpoint with an fp8 KV cache (93.10). It is the only new route
+  ahead of LightOnOCR-3 4B on the 96, and it has the best bowF1 of the three (0.965, level with Qwen3.6's 0.960).
+  On the 895 it is worse than 3.6 both ways (answered -3.1, -4.0 to -2.3). Its 173 failures there are 102 token caps
+  and 69 replies with `TEXT` written without its colon, mostly Charters, Arabic, Hebrew and Cyrillic, which the
+  panel's parser rejects. So the strict gap overstates the reading gap, but the answered gap stands. The 3.8
+  checkpoint is not an upgrade for this panel.
+- **Xiaomi-OCR-0 is the most reliable small reader on the public set, not the most accurate.** It has 1.75 GB of
+  weights, about 0.9B parameters on the Qwen3.5 architecture. It answered 894 of 895 pages, the lowest failure rate
+  of any VLM in the sweep, where LightOnOCR-3 4B failed 85. That is why its strict 62.2 is level with LightOnOCR-3 4B
+  (62.9; -0.7, -1.8 to +0.5). On the pages both answered it reads 3.4 points lower (-4.4 to -2.4). Its bowF1 is
+  0.583 against 0.641, and it writes Markdown or OTSL markup on 192 pages. It leads every reader on newspapers
+  (L9 95.2), Cyrillic and Devanagari. On the owner's 96 it is level with LightOnOCR-3 4B (-0.7, -2.8 to +1.3) and
+  below GLM-OCR (90.90). Its clippings score (83.78) is below every other small VLM except PaddleOCR-VL 1.5. A likely
+  cause, not checked page by page, is the card's prompt, which says to ignore headers and footers. For the 16 GB
+  laptop tier it is an alternative to LightOnOCR-3 4B at a fifth of the size, not a replacement. That turns on its
+  Mac seconds and memory (the MLX arm of this item).
 - **PaddleOCR-VL 1.6 fixes little of 1.5's whole-page problem.** It answers 669 of 895 against 1.5's 545. It still
   reads nothing on newspapers, where all 15 L9 pages cap, as 1.5's did. On the 96 it improves to 88.87 from 83.78.
   As with 1.5, its place is on regions (W46.ocr-regions), not on the whole page.
