@@ -48,6 +48,13 @@ class Agree(unittest.TestCase):
         self.assertTrue(I.agree("byline", ["John Smith"], ["Smith, John"]))
         self.assertFalse(I.agree("byline", ["John Smith"], ["John Smith", "Ann Lee"]))
 
+    def test_place_by_city_when_loose(self):
+        self.assertTrue(I.field_match("recipient_place", ["Cambridge, Mass."], ["Cambridge, Massachusetts"], "ed2"))
+        self.assertTrue(I.field_match("recipient_place", ["Denver, Colorado"], ["Denver", "Colorado"], "ed2"))
+        self.assertFalse(I.field_match("recipient_place", ["Cambridge, Mass."], ["Cambridge, Massachusetts"],
+                                       "exact"))
+        self.assertFalse(I.field_match("recipient_place", ["Boston, MA"], ["Austin, TX"], "ed2"))
+
     def test_disputes(self):
         a = label(kind="letter", recipient_place=["Boston, Massachusetts"])
         b = label(kind="memo", recipient_place=["Boston, Massachusetts"])

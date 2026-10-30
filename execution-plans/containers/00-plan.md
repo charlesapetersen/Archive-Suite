@@ -184,5 +184,10 @@ document's type as a Zotero item type (`W46.kind-atrium` measures page kind for 
 different thing), and recipient place. `W47.item-fields-truth` measures those on an extension of W46's entity set,
 and `W47.item-fields-build` fills only the fields that clear the bar (owner, 2026-10-21).
 
+Measured 2026-10-30 (`ArchiveProcessor/segbench-results/item-fields.md`): no field clears precision 0.90 from what
+the app gives now (kind closest, Gemini 0.87, inside the truth's own doubt on kind; the tagging prompt asks for no
+title). So `W47.item-fields-build` starts by testing an image-reading item-field prompt against this truth set
+(`scripts/segbench/item_fields.py`), and fills a field only if that prompt clears the bar.
+
 Cost: `W47.ct-read-paid` under $0.50; a full read of the corpus's 4,500 markers about $2–4 on the gateway, priced
 from `W47.ct-read`'s figures before it runs. The $3 rule applies to each item.

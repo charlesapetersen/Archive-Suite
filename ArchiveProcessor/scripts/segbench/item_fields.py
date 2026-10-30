@@ -205,10 +205,19 @@ def text_match(pred, truth, level):
     return ET.lev(p, t) <= 2
 
 
-def list_match(pred, truth, level):
-    """A list field is right on a document when some predicted name matches some truth name."""
-    lvl = "exact" if level == "exact" else "ed2"
-    return any(ET.match(p, t, lvl) for p in pred for t in truth)
+def city(name):
+    return name.split(",")[0].strip()
+
+
+def list_match(pred, truth, level, places=False):
+    """A list field is right on a document when some predicted name matches some truth name. A place counts by its
+    city at the loose level, both sides cut at the comma, as in ent_score: "Cambridge, Mass." is "Cambridge,
+    Massachusetts", and a truth reader that split "Denver, Colorado" into two names still holds "Denver"."""
+    if level == "exact":
+        return any(ET.match(p, t, "exact") for p in pred for t in truth)
+    if places:
+        pred, truth = [city(p) for p in pred], [city(t) for t in truth]
+    return any(ET.match(p, t, "ed2") for p in pred for t in truth)
 
 
 def date_match(pred, truth, level):
@@ -228,7 +237,7 @@ def kind_match(pred, truth, level):
 
 def field_match(field, pred, truth, level):
     if field in LISTS:
-        return list_match(pred, truth, level)
+        return list_match(pred, truth, level, places=field == "recipient_place")
     if field == "publication_date":
         return date_match(pred, truth, level)
     if field == "kind":
@@ -628,6 +637,10 @@ def cmd_build(a):
         "zotero": dict(collections.Counter(r["zotero"] for r in rows).most_common()),
         "filled": {f: sum(filled(f, r[f]) for r in rows) for f in FIELDS},
         "filled_articles": {f: sum(filled(f, r[f]) for r in rows if r["set"] == "articles") for f in FIELDS},
+        "w46_check": dict(collections.Counter(
+            ("w46 correspondence" if r["group"] == "correspondence" else "w46 not") + " / "
+            + ("kind correspondence" if r["kind"] in CORRESP else "kind not")
+            for r in rows if r["set"].startswith("ent-"))),
         "with_reply": len(with_reply), "select": json.load(open(os.path.join(CACHE, "select-summary.json"))),
         "walls": walls}
     out = {"counts": counts, "scores": table, "bar": [BAR, MIN_N]}
@@ -657,7 +670,11 @@ def report(o):
     L += ["", "| Zotero item type | documents |", "|---|---|"] + [f"| {k} | {v} |" for k, v in c["zotero"].items()]
     L += ["", "| field | documents with a value | of them in the 60 articles and reports |", "|---|---|---|"]
     L += [f"| {f} | {c['filled'][f]} | {c['filled_articles'][f]} |" for f in FIELDS]
-    L += ["", "## Drafting and adjudication", "",
+    w = c.get("w46_check", {})
+    L += ["", "Against W46.fix-ent-truth's own ruling on whether each of its documents is correspondence (two "
+          "families plus gateway judges, the stronger truth): " + "; ".join(f"{k} {v}" for k, v in sorted(w.items()))
+          + ". Where they differ this set's kind is the doubtful one, which bounds how far the kind row can be "
+          "trusted.", "", "## Drafting and adjudication", "",
           f"Readers A {MODELS[READERS[0]][1]} and B {MODELS[READERS[1]][1]} read every document blind (OCR text's "
           f"first {TEXT_CAP:,} characters and the first page at {MAX_SIDE} px; this Mac, temperature 0, $0, no plan "
           f"route). {MODELS[JUDGE][1]}, reader B, ruled every document they differed on. Qwen3-VL 8B is also a "
@@ -706,7 +723,17 @@ def report(o):
             s = sc.get(f"{key}|replied|{f}", {})
             cells.append(f"{verdict(s)} ({f3(s.get('precision_ed2'))})")
         L.append(f"| {f} | " + " | ".join(cells) + " |")
-    L += ["", "## Limits", "",
+    g = lambda k, f: f3(sc.get(f"{k}|replied|{f}", {}).get("precision_ed2"))
+    L += ["", f"No route clears the bar on any field, so W47.item-fields-build fills none of them from what the app "
+          f"gives now. Kind comes closest (Gemini {g('app gemini-3.8-flash', 'kind')}), within the truth's own doubt "
+          f"on kind (the W46 check above), so it is too close to call against this truth rather than clearly short. "
+          f"Title is never asked for by the tagging prompt; the dedicated text-only extractor reaches "
+          f"{g(f'extractor {EXTRACTOR}', 'title')}. The app's date is the document's date, filled on every printed "
+          f"piece, so as a printed issue date it is wrong whenever none is printed. The two truth readers, which "
+          f"saw the page image, reach {g('reader qwen3-vl-8b', 'title')} and {g('reader gemma3-12b', 'title')} on "
+          f"title and about 0.9 on kind, byline and recipient place, but the truth is made from their readings, so "
+          f"that says an image-reading prompt is worth testing in W47.item-fields-build, not that it would pass.",
+          "", "## Limits", "",
           "- The 60 articles and reports were drawn by Gemini's own `format`, so Gemini's kind on them is favoured; "
           "the 159 W46 documents were drawn by Gemini's format too (letters, memos, telegrams) or by text cues.",
           "- The 72 W46 additions have no cached app replies; the app is scored on the documents that have them. "
@@ -717,7 +744,10 @@ def report(o):
           "with no printed date it counts as filled where the truth is empty. Recall is the share right where a "
           "date is printed.",
           "- Model-drafted and model-adjudicated by two open 8-12B models (STATE Phase 2 decision 2), no owner pass; "
-          "the session that built it spot-checked rows against the page images (the DONE entry).", ""]
+          "the pages were not read again by the session that built it (corpus pages are read as data by the gateway "
+          "or an open model, never a Claude session; owner, 2026-10-30). It checked the scorer instead, by reading "
+          "the predicted and true values of mismatches: some truth publications are misread (a column name or a "
+          "staff title for the masthead), so the publication row is a floor, not an exact figure.", ""]
     return "\n".join(L)
 
 
