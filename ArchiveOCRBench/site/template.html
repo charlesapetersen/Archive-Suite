@@ -137,6 +137,15 @@ footer p { font-size: 13px; }
     <p class="note">Every window sent twice to the same model, once as before and once with a COLLECTION FACTS block above its OCR: the catalogue line and item count (CREST, Lincoln) or the box and folder label photos' OCR (the owner's Stanton and RG 165), the span of years in the box's text, the share of low-text pages and a document-length prior. Nothing in it comes from the box's boundaries. The rerun column is the noise floor: the request without the block is byte-identical to the one FarmShare answered earlier, so its changed gap decisions are what a rerun alone changes. Only Lincoln moves beyond that, for both models, and there the catalogue's item count is close to the answer; on the owner's boxes the block changes nothing beyond rerun noise, so the app's window prompt is unchanged. One run per arm; one vote can move a box several points (the 2B's CREST gain is one vote). Source: <code>seg-context.md</code> and <code>seg-context.json</code>.</p>
   </section>
 
+  <section class="panel" id="seg-window-modality" hidden>
+    <div class="head"><h2>Window size, text-only windows and self-voting</h2><span class="meta">open models · Sherlock L40S</span></div>
+    <h3>The trained 2B by window size, the owner's development boxes</h3>
+    <div class="tbl"><table><thead><tr><th>Window</th><th>Images and text: pages in exact document</th><th>Boundary F1</th><th>Text only: pages in exact document</th><th>Boundary F1</th></tr></thead><tbody id="swm-sweep-rows"></tbody></table></div>
+    <h3>Six runs voting, against one run</h3>
+    <div class="tbl"><table><thead><tr><th>Model</th><th>Boxes</th><th>Default run</th><th>Mean of six single runs</th><th>Vote of six</th><th>Offsets only</th><th>Prompts only</th></tr></thead><tbody id="swm-vote-rows"></tbody></table></div>
+    <p class="note">Sweep: the trained Qwen3.5 2B on Dean, Deaver and Herrnstein (518 document pages, pooled), a K-page window stepping (K - 1) / 2 pages, sent with its page images or with the OCR text alone. Window size is flat from 3 to 10 pages with images (within the 6 to 9 points a window placement alone moves a test box); the whole folder collapses into merges, and 2 of its 21 folders never came back parseable with images, so that cell is blank. Text only costs 5 to 20 points, so on these photographs the images are not redundant, as A04 found them to be on clean scans; the 2B was trained on image windows, which this also measures. Vote: six runs per model (window offsets 0, 1 and 2 pages by two prompts), each gap decided by majority; the default run is offset 0 with the bench's prompt. On the owner's test boxes (Stanton and RG 165) the vote lands within a point of the default run for all three models; it beats the average single run by 1.5 to 3 points. Lincoln's gain comes from the second prompt, which cuts false splits on its long manuscripts but is no better on the owner's boxes. The local route therefore keeps one 7-page image window. Source: <code>seg-window-modality.md</code> and <code>seg-window-modality.json</code>.</p>
+  </section>
+
   <header class="part" id="handwriting">
     <div class="eyebrow">Part 3 · Handwriting on the Mac · Vision OCR lab</div>
     <h2>Handwriting readers that run on the device</h2>
@@ -540,6 +549,30 @@ if (segContext) {
   }
   document.getElementById('seg-context-rows').innerHTML = ctxRows.join('');
   document.getElementById('seg-context').hidden = !ctxRows.length;
+}
+
+const swm = DATA.seg_window_modality;
+if (swm) {
+  const cell = (model, pool, arm) => swm.pooled.find(r => r.model === model && r.pool === pool && r.arm === arm);
+  const pe = r => r ? (100 * r.pages_exact).toFixed(1) + '%' : '—';
+  const f1 = r => r ? (100 * r.boundary_f1).toFixed(1) : '—';
+  const sweep = [3, 5, 7, 10, 'folder'].map(k => {
+    const name = k === 'folder' ? 'folder' : 'k' + k, it = cell('2b', 'development', name + '-it'), t = cell('2b', 'development', name + '-t');
+    return '<tr><td>' + (k === 'folder' ? 'Whole folder' : k + ' pages') + '</td><td>' + pe(it) + '</td><td>' + f1(it) +
+      '</td><td>' + pe(t) + '</td><td>' + f1(t) + '</td></tr>';
+  });
+  const names = {'2b': 'Trained Qwen3.5 2B', '4b': 'Trained Qwen3.5 4B', teacher: 'Qwen3.5 27B teacher'};
+  const vote = [];
+  for (const [pool, label] of [['test', 'Stanton + RG 165'], ['lincoln', 'Lincoln (public)']]) {
+    for (const m of ['2b', '4b', 'teacher']) {
+      if (!cell(m, pool, 'o0-l1')) continue;
+      vote.push('<tr><td>' + names[m] + '</td><td>' + label + '</td>' + ['o0-l1', 'mean-of-singles', 'vote6', 'vote-offsets-l1', 'vote-prompts-o0']
+        .map(a => '<td>' + pe(cell(m, pool, a)) + '</td>').join('') + '</tr>');
+    }
+  }
+  document.getElementById('swm-sweep-rows').innerHTML = sweep.join('');
+  document.getElementById('swm-vote-rows').innerHTML = vote.join('');
+  document.getElementById('seg-window-modality').hidden = !vote.length;
 }
 
 const jointModel = DATA.seg_date;

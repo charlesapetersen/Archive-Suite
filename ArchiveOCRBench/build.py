@@ -324,6 +324,22 @@ def seg_context():
             "vote_flips": d["vote_flips"]}
 
 
+def seg_window_modality():
+    """W46.seg-window-modality: the 2B's window sizes with and without images, and the three models' six-run vote,
+    pooled over the development and test boxes, with Lincoln on its own."""
+    path = RESULTS / "seg-window-modality.json"
+    if not path.exists():
+        return None
+    d = json.loads(path.read_text())
+    # The one kind of cell allowed to be missing: a whole folder the 2B never answered parseably (the report says so).
+    if any(not x.startswith("2b-folder folder-") for x in d["incomplete"]):
+        sys.exit(f"seg-window-modality.json has incomplete cells: {d['incomplete'][:1]}")
+    keep = ("model", "arm", "pages_exact", "boundary_f1")
+    return {"pooled": [{"pool": r["pool"], **{k: r[k] for k in keep}} for r in d["pooled"]] +
+                      [{"pool": "lincoln", **{k: r[k] for k in keep}} for r in d["rows"] if r["box"] == "Lincoln"],
+            "incomplete": d["incomplete"]}
+
+
 def public_segmentation():
     """Separate public/easier boxes; their labels and scores never enter owner-box fitting."""
     root = RESULTS / "public-segmentation"
@@ -882,7 +898,7 @@ def main():
              "dating_enclosure": dating_enclosure(),
              "seg_date": json.loads((RESULTS / "seg-date-model-final.json").read_text())
                          if (RESULTS / "seg-date-model-final.json").exists() else None,
-             "seg_context": seg_context(),
+             "seg_context": seg_context(), "seg_window_modality": seg_window_modality(),
              "public": public(), "ocr_scorers": ocr_scorers(),
              "dewarp": dewarp, "enh_ocr": enh_ocr,
              "loops": json.loads(LOOPS.read_text()) if LOOPS.exists() else None, "regions": regions,

@@ -17558,6 +17558,496 @@
    }
   }
  },
+ "seg_window_modality": {
+  "pooled": [
+   {
+    "pool": "development",
+    "model": "2b",
+    "arm": "folder-t",
+    "pages_exact": 0.7239382239382239,
+    "boundary_f1": 0.8951048951048951
+   },
+   {
+    "pool": "development",
+    "model": "2b",
+    "arm": "k10-it",
+    "pages_exact": 0.8918918918918919,
+    "boundary_f1": 0.9639794168096055
+   },
+   {
+    "pool": "development",
+    "model": "2b",
+    "arm": "k10-t",
+    "pages_exact": 0.694980694980695,
+    "boundary_f1": 0.9020979020979021
+   },
+   {
+    "pool": "development",
+    "model": "2b",
+    "arm": "k3-it",
+    "pages_exact": 0.8764478764478765,
+    "boundary_f1": 0.9662162162162162
+   },
+   {
+    "pool": "development",
+    "model": "2b",
+    "arm": "k3-t",
+    "pages_exact": 0.777992277992278,
+    "boundary_f1": 0.9383561643835616
+   },
+   {
+    "pool": "development",
+    "model": "2b",
+    "arm": "k5-it",
+    "pages_exact": 0.8841698841698842,
+    "boundary_f1": 0.9661016949152542
+   },
+   {
+    "pool": "development",
+    "model": "2b",
+    "arm": "k5-t",
+    "pages_exact": 0.8378378378378378,
+    "boundary_f1": 0.9409780775716695
+   },
+   {
+    "pool": "development",
+    "model": "2b",
+    "arm": "k7-it",
+    "pages_exact": 0.9092664092664092,
+    "boundary_f1": 0.9726027397260274
+   },
+   {
+    "pool": "development",
+    "model": "2b",
+    "arm": "k7-t",
+    "pages_exact": 0.8262548262548263,
+    "boundary_f1": 0.9417808219178082
+   },
+   {
+    "pool": "test",
+    "model": "2b",
+    "arm": "mean-of-singles",
+    "pages_exact": 0.7767676767676767,
+    "boundary_f1": 0.9014119960370147
+   },
+   {
+    "pool": "test",
+    "model": "2b",
+    "arm": "o0-l1",
+    "pages_exact": 0.8121212121212121,
+    "boundary_f1": 0.9202898550724637
+   },
+   {
+    "pool": "test",
+    "model": "2b",
+    "arm": "o0-w1",
+    "pages_exact": 0.793939393939394,
+    "boundary_f1": 0.9077490774907749
+   },
+   {
+    "pool": "test",
+    "model": "2b",
+    "arm": "o1-l1",
+    "pages_exact": 0.7696969696969697,
+    "boundary_f1": 0.9032258064516129
+   },
+   {
+    "pool": "test",
+    "model": "2b",
+    "arm": "o1-w1",
+    "pages_exact": 0.7757575757575758,
+    "boundary_f1": 0.8945454545454545
+   },
+   {
+    "pool": "test",
+    "model": "2b",
+    "arm": "o2-l1",
+    "pages_exact": 0.7484848484848485,
+    "boundary_f1": 0.8888888888888888
+   },
+   {
+    "pool": "test",
+    "model": "2b",
+    "arm": "o2-w1",
+    "pages_exact": 0.7606060606060606,
+    "boundary_f1": 0.8937728937728938
+   },
+   {
+    "pool": "test",
+    "model": "2b",
+    "arm": "vote-offsets-l1",
+    "pages_exact": 0.7696969696969697,
+    "boundary_f1": 0.9097472924187726
+   },
+   {
+    "pool": "test",
+    "model": "2b",
+    "arm": "vote-prompts-o0",
+    "pages_exact": 0.8,
+    "boundary_f1": 0.9117647058823529
+   },
+   {
+    "pool": "test",
+    "model": "2b",
+    "arm": "vote6",
+    "pages_exact": 0.806060606060606,
+    "boundary_f1": 0.9157509157509157
+   },
+   {
+    "pool": "test",
+    "model": "4b",
+    "arm": "mean-of-singles",
+    "pages_exact": 0.7823232323232324,
+    "boundary_f1": 0.9094141258386265
+   },
+   {
+    "pool": "test",
+    "model": "4b",
+    "arm": "o0-l1",
+    "pages_exact": 0.7909090909090909,
+    "boundary_f1": 0.9169675090252708
+   },
+   {
+    "pool": "test",
+    "model": "4b",
+    "arm": "o0-w1",
+    "pages_exact": 0.796969696969697,
+    "boundary_f1": 0.9130434782608695
+   },
+   {
+    "pool": "test",
+    "model": "4b",
+    "arm": "o1-l1",
+    "pages_exact": 0.7696969696969697,
+    "boundary_f1": 0.9124087591240876
+   },
+   {
+    "pool": "test",
+    "model": "4b",
+    "arm": "o1-w1",
+    "pages_exact": 0.7272727272727273,
+    "boundary_f1": 0.8905109489051095
+   },
+   {
+    "pool": "test",
+    "model": "4b",
+    "arm": "o2-l1",
+    "pages_exact": 0.8181818181818182,
+    "boundary_f1": 0.915129151291513
+   },
+   {
+    "pool": "test",
+    "model": "4b",
+    "arm": "o2-w1",
+    "pages_exact": 0.7909090909090909,
+    "boundary_f1": 0.9084249084249084
+   },
+   {
+    "pool": "test",
+    "model": "4b",
+    "arm": "vote-offsets-l1",
+    "pages_exact": 0.803030303030303,
+    "boundary_f1": 0.9169675090252708
+   },
+   {
+    "pool": "test",
+    "model": "4b",
+    "arm": "vote-prompts-o0",
+    "pages_exact": 0.796969696969697,
+    "boundary_f1": 0.9197080291970803
+   },
+   {
+    "pool": "test",
+    "model": "4b",
+    "arm": "vote6",
+    "pages_exact": 0.796969696969697,
+    "boundary_f1": 0.9117647058823529
+   },
+   {
+    "pool": "test",
+    "model": "teacher",
+    "arm": "mean-of-singles",
+    "pages_exact": 0.8025252525252525,
+    "boundary_f1": 0.9073891287428171
+   },
+   {
+    "pool": "test",
+    "model": "teacher",
+    "arm": "o0-l1",
+    "pages_exact": 0.8303030303030303,
+    "boundary_f1": 0.9142857142857143
+   },
+   {
+    "pool": "test",
+    "model": "teacher",
+    "arm": "o0-w1",
+    "pages_exact": 0.8121212121212121,
+    "boundary_f1": 0.910394265232975
+   },
+   {
+    "pool": "test",
+    "model": "teacher",
+    "arm": "o1-l1",
+    "pages_exact": 0.7636363636363637,
+    "boundary_f1": 0.900709219858156
+   },
+   {
+    "pool": "test",
+    "model": "teacher",
+    "arm": "o1-w1",
+    "pages_exact": 0.8121212121212121,
+    "boundary_f1": 0.910394265232975
+   },
+   {
+    "pool": "test",
+    "model": "teacher",
+    "arm": "o2-l1",
+    "pages_exact": 0.7787878787878788,
+    "boundary_f1": 0.9071428571428571
+   },
+   {
+    "pool": "test",
+    "model": "teacher",
+    "arm": "o2-w1",
+    "pages_exact": 0.8181818181818182,
+    "boundary_f1": 0.9014084507042254
+   },
+   {
+    "pool": "test",
+    "model": "teacher",
+    "arm": "vote-offsets-l1",
+    "pages_exact": 0.8242424242424242,
+    "boundary_f1": 0.9175627240143369
+   },
+   {
+    "pool": "test",
+    "model": "teacher",
+    "arm": "vote-prompts-o0",
+    "pages_exact": 0.8272727272727273,
+    "boundary_f1": 0.9169675090252708
+   },
+   {
+    "pool": "test",
+    "model": "teacher",
+    "arm": "vote6",
+    "pages_exact": 0.8212121212121212,
+    "boundary_f1": 0.9169675090252708
+   },
+   {
+    "pool": "lincoln",
+    "model": "2b",
+    "arm": "o0-l1",
+    "pages_exact": 0.36398467432950193,
+    "boundary_f1": 0.7661691542288558
+   },
+   {
+    "pool": "lincoln",
+    "model": "2b",
+    "arm": "o0-w1",
+    "pages_exact": 0.421455938697318,
+    "boundary_f1": 0.7914438502673796
+   },
+   {
+    "pool": "lincoln",
+    "model": "2b",
+    "arm": "o1-l1",
+    "pages_exact": 0.3103448275862069,
+    "boundary_f1": 0.7596153846153846
+   },
+   {
+    "pool": "lincoln",
+    "model": "2b",
+    "arm": "o1-w1",
+    "pages_exact": 0.48659003831417624,
+    "boundary_f1": 0.8041237113402062
+   },
+   {
+    "pool": "lincoln",
+    "model": "2b",
+    "arm": "o2-l1",
+    "pages_exact": 0.3333333333333333,
+    "boundary_f1": 0.7684729064039408
+   },
+   {
+    "pool": "lincoln",
+    "model": "2b",
+    "arm": "o2-w1",
+    "pages_exact": 0.4904214559386973,
+    "boundary_f1": 0.8020833333333334
+   },
+   {
+    "pool": "lincoln",
+    "model": "2b",
+    "arm": "mean-of-singles",
+    "pages_exact": 0.4010217113665389,
+    "boundary_f1": 0.7819847233648501
+   },
+   {
+    "pool": "lincoln",
+    "model": "2b",
+    "arm": "vote6",
+    "pages_exact": 0.47509578544061304,
+    "boundary_f1": 0.7857142857142857
+   },
+   {
+    "pool": "lincoln",
+    "model": "2b",
+    "arm": "vote-offsets-l1",
+    "pages_exact": 0.3448275862068966,
+    "boundary_f1": 0.7647058823529411
+   },
+   {
+    "pool": "lincoln",
+    "model": "2b",
+    "arm": "vote-prompts-o0",
+    "pages_exact": 0.4521072796934866,
+    "boundary_f1": 0.7812499999999999
+   },
+   {
+    "pool": "lincoln",
+    "model": "4b",
+    "arm": "o0-l1",
+    "pages_exact": 0.4942528735632184,
+    "boundary_f1": 0.8253968253968255
+   },
+   {
+    "pool": "lincoln",
+    "model": "4b",
+    "arm": "o0-w1",
+    "pages_exact": 0.4827586206896552,
+    "boundary_f1": 0.8315789473684211
+   },
+   {
+    "pool": "lincoln",
+    "model": "4b",
+    "arm": "o1-l1",
+    "pages_exact": 0.5134099616858238,
+    "boundary_f1": 0.8272251308900522
+   },
+   {
+    "pool": "lincoln",
+    "model": "4b",
+    "arm": "o1-w1",
+    "pages_exact": 0.4559386973180077,
+    "boundary_f1": 0.8229166666666667
+   },
+   {
+    "pool": "lincoln",
+    "model": "4b",
+    "arm": "o2-l1",
+    "pages_exact": 0.48659003831417624,
+    "boundary_f1": 0.8121827411167513
+   },
+   {
+    "pool": "lincoln",
+    "model": "4b",
+    "arm": "o2-w1",
+    "pages_exact": 0.45977011494252873,
+    "boundary_f1": 0.8205128205128205
+   },
+   {
+    "pool": "lincoln",
+    "model": "4b",
+    "arm": "mean-of-singles",
+    "pages_exact": 0.4821200510855683,
+    "boundary_f1": 0.8233021886585895
+   },
+   {
+    "pool": "lincoln",
+    "model": "4b",
+    "arm": "vote6",
+    "pages_exact": 0.5172413793103449,
+    "boundary_f1": 0.8315789473684211
+   },
+   {
+    "pool": "lincoln",
+    "model": "4b",
+    "arm": "vote-offsets-l1",
+    "pages_exact": 0.5287356321839081,
+    "boundary_f1": 0.8290155440414507
+   },
+   {
+    "pool": "lincoln",
+    "model": "4b",
+    "arm": "vote-prompts-o0",
+    "pages_exact": 0.5823754789272031,
+    "boundary_f1": 0.8449197860962567
+   },
+   {
+    "pool": "lincoln",
+    "model": "teacher",
+    "arm": "o0-l1",
+    "pages_exact": 0.4061302681992337,
+    "boundary_f1": 0.8
+   },
+   {
+    "pool": "lincoln",
+    "model": "teacher",
+    "arm": "o0-w1",
+    "pages_exact": 0.4789272030651341,
+    "boundary_f1": 0.8247422680412371
+   },
+   {
+    "pool": "lincoln",
+    "model": "teacher",
+    "arm": "o1-l1",
+    "pages_exact": 0.38697318007662834,
+    "boundary_f1": 0.7881773399014779
+   },
+   {
+    "pool": "lincoln",
+    "model": "teacher",
+    "arm": "o1-w1",
+    "pages_exact": 0.4521072796934866,
+    "boundary_f1": 0.8163265306122449
+   },
+   {
+    "pool": "lincoln",
+    "model": "teacher",
+    "arm": "o2-l1",
+    "pages_exact": 0.42528735632183906,
+    "boundary_f1": 0.7960199004975125
+   },
+   {
+    "pool": "lincoln",
+    "model": "teacher",
+    "arm": "o2-w1",
+    "pages_exact": 0.4444444444444444,
+    "boundary_f1": 0.8121827411167513
+   },
+   {
+    "pool": "lincoln",
+    "model": "teacher",
+    "arm": "mean-of-singles",
+    "pages_exact": 0.4323116219667944,
+    "boundary_f1": 0.8062414633615372
+   },
+   {
+    "pool": "lincoln",
+    "model": "teacher",
+    "arm": "vote6",
+    "pages_exact": 0.42911877394636017,
+    "boundary_f1": 0.8040201005025126
+   },
+   {
+    "pool": "lincoln",
+    "model": "teacher",
+    "arm": "vote-offsets-l1",
+    "pages_exact": 0.39080459770114945,
+    "boundary_f1": 0.7920792079207921
+   },
+   {
+    "pool": "lincoln",
+    "model": "teacher",
+    "arm": "vote-prompts-o0",
+    "pages_exact": 0.4789272030651341,
+    "boundary_f1": 0.8247422680412371
+   }
+  ],
+  "incomplete": [
+   "2b-folder folder-it Dean: 2 folder units failed"
+  ]
+ },
  "public": {
   "rows": [
    {

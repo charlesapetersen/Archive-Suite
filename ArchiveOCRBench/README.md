@@ -70,6 +70,10 @@ row combines plan replies and 9 gateway windows on CREST (2 more on Deaver are i
 The collection-facts panel (W46.seg-context) reads `seg-context.json`: the 27B teacher and trained 2B on
 CREST, Lincoln and the two test boxes, each window with and without a COLLECTION FACTS block, beside the
 gap votes a plain rerun flips (the noise floor).
+The window panel (W46.seg-window-modality) reads `seg-window-modality.json`'s `pooled` rows: the trained 2B at
+window sizes 3 to 10 and the whole folder, with images and text-only, on the development boxes, and the 2B, 4B
+and teacher voting over six runs on the test boxes and Lincoln. A whole-folder cell the 2B never answered
+parseably stays blank; any other incomplete cell stops the build.
 
 ## Completeness rule
 
