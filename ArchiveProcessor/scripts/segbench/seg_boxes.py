@@ -26,12 +26,15 @@ never reveal the current reading). The key, with the draft and the teacher's P(n
 
 READ ONLY on the corpus and the JPEG tree: getxattr(2) for tags (corpus_survey.read_tags), Pillow reading a
 JPEG and writing an upright thumbnail into the cache. No model calls: the teacher's answers were made by the
-W41.seg-label-clean run and are read from the corpus-pairs cache. Nothing is written under `Test Files/`; the
-lock item (W46.fix-seg-boxes-lock) folds the owner's rulings in and freezes the boxes there.
+W41.seg-label-clean run and are read from the corpus-pairs cache. Only `lock` writes under `Test Files/`: it copies
+each JPEG original byte for byte, renumbered 1..N, beside the folded truth CSV and a lock.json (source photo, sha-256,
+the sheet's turn where known, the gaps the owner left unsure, the trained-on note), then makes the folder read-only.
 
     python3 seg_boxes.py draft [BOX ...]  # draft.json + draft.csv per box, counts in segbench-results/seg-boxes.md
     python3 seg_boxes.py sheet [BOX ...]  # sheet.html + key.json + thumbnails per box, in the cache
     python3 seg_boxes.py fold BOX FILE    # the owner's exported answers -> truth.csv beside the draft (cache)
+    python3 seg_boxes.py lock [BOX ...]   # W46.fix-seg-boxes-lock: freeze a box into Test Files (once; refuses to redo)
+    python3 seg_boxes.py verify [BOX ...] # re-hash a frozen box against its lock.json
 
 sir's reading.json is {"pages": [{"n", "issue": "YYYY-MM" or null, "kind", "starts"}], "fallback": {"YYYY-MM":
 reason}}: `kind` is a FRONT_KINDS page or another page kind, `starts` whether the photo begins an article (or front
@@ -61,13 +64,22 @@ THUMB_PX = 1100
 ORIENT_MIN = 0.65   # ocr_truth.orient_like_pdf: true pairs measured 0.69-0.98, mismatches 0.16-0.48
 LEAD = re.compile(r"^\s*(\d{3,})")
 
+# Owner, 2026-10-29 (W46.seg-boxes-overlap-ok, answer b): both tagged boxes were wholly in W41.seg-label-clean's train
+# split, so the students' scores on them are trained-on, never held-out; corpus_pairs.EXCLUDE keeps them out of any retrain.
+TRAINED_ON = "W41.seg-finetune 2B and 4B students (W41.seg-label-clean train split): report their scores as trained-on"
+# A label card the owner ruled that is a BOX card (the sheet's 'label' folds to Folder): {box: (photo, ...)}. None so far:
+# SC0122 photo 139 is a second card after its box card at photo 1, Sasha photo 164 is a folder card (YONG 2/2, owner).
+BOX_CARDS = {}
+
 BOXES = {
     "sasha": {"name": "Young, Sasha letters 00001-00180", "folder": "Cambridge/Young, Sasha",
-              "jpegs": "Churchill Archives/Young, Sasha", "first": 1, "last": 180, "draft": "label tags only"},
+              "jpegs": "Churchill Archives/Young, Sasha", "first": 1, "last": 180, "draft": "label tags only",
+              "locked": ("Sasha", "Young, Sasha")},
     "sir": {"name": "Stanford Illustrated Review", "folder": "Stanford University Archives/Stanford Illustrated Review",
-            "draft": "article reading", "prefix": "ar"},
+            "draft": "article reading", "prefix": "ar", "locked": ("IllustratedReview", "Stanford Illustrated Review"),
+            "trained_on": TRAINED_ON},
     "sc0122": {"name": "SC0122 News Service", "folder": "Stanford University Archives/SC0122 — News Service",
-               "draft": "tags + teacher"},
+               "draft": "tags + teacher", "locked": ("SC0122", "SC0122 — News Service"), "trained_on": TRAINED_ON},
 }
 ANSWERS = ("new", "same", "label", "fallback", "unsure")
 FRONT_KINDS = ("cover", "masthead_contents")   # the pages an article takes its issue date and journal title from
@@ -504,8 +516,7 @@ def cmd_fold(a):
         rows = json.load(f)["pages"]
     with open(os.path.join(d, "key.json")) as f:
         keyrows = json.load(f)
-    with open(a.answers) as f:
-        answers = {k.strip(): v.strip() for k, v in (l.split(",", 1) for l in f if "," in l)}
+    answers = read_answers(a.answers)
     labs, open_ids = fold(rows, keyrows, answers)
     with open(os.path.join(d, "truth.csv"), "w", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
@@ -516,10 +527,125 @@ def cmd_fold(a):
           + (f"; full-magazine fallback answered in: {used}" if used else ""))
 
 
+def latest_answers(d):
+    names = sorted(n for n in os.listdir(d) if re.fullmatch(r"answers-\d{8}\.txt", n))
+    if not names:
+        raise SystemExit(f"{d}: no answers-YYYYMMDD.txt (fold the owner's export first)")
+    return os.path.join(d, names[-1])
+
+
+def read_answers(path):
+    with open(path) as f:
+        return {k.strip(): v.strip() for k, v in (l.split(",", 1) for l in f if "," in l)}
+
+
+def lock_box(key, data_dir, today):
+    """Freezes one box into data_dir/<folder>/ as data.py loads it; returns the lock record. Refuses an existing folder:
+    a frozen box is never rewritten (a re-rule is a new item, made by hand)."""
+    import shutil
+    d = os.path.join(CACHE, key)
+    coll, folder = BOXES[key]["locked"]
+    dst = os.path.join(data_dir, folder)
+    if os.path.exists(dst):
+        raise SystemExit(f"{key}: {dst} already exists; a locked box is not rewritten")
+    with open(os.path.join(d, "draft.json"), encoding="utf-8") as f:
+        rows = json.load(f)["pages"]
+    with open(os.path.join(d, "key.json")) as f:
+        keyrows = json.load(f)
+    ans_path = latest_answers(d)
+    answers = read_answers(ans_path)
+    labs, open_ids = fold(rows, keyrows, answers)
+    with open(os.path.join(d, "truth.csv"), newline="", encoding="utf-8") as f:
+        cached = [(int(n), lab) for n, lab in list(csv.reader(f))[1:]]
+    if cached != labs:
+        raise SystemExit(f"{key}: truth.csv in the cache differs from a fresh fold of {ans_path}; re-run fold first")
+    labs = [(n, "Box" if n in BOX_CARDS.get(key, ()) else lab) for n, lab in labs]
+    orient_path = os.path.join(d, "orient.json")
+    orient = json.load(open(orient_path)) if os.path.exists(orient_path) else {}
+    by_id = {k["id"]: k for k in keyrows}
+    tmp = dst + ".partial"
+    if os.path.exists(tmp):
+        raise SystemExit(f"{key}: {tmp} is left from an interrupted lock; look at it and move it aside by hand")
+    os.makedirs(tmp)
+    pages = []
+    for r, (n, lab) in zip(rows, labs):
+        assert r["n"] == n
+        src = os.path.join(JPEGS, r["jpeg"])
+        name = f"{n:05d} \u2014\u00a0{coll}{os.path.splitext(src)[1].lower()}"
+        shutil.copyfile(src, os.path.join(tmp, name))
+        sha = file_sha(os.path.join(tmp, name))
+        if sha != file_sha(src):
+            raise SystemExit(f"{key}: copy of {src} does not match it")
+        turn = orient.get(str(n))
+        pages.append({"n": n, "file": name, "source": r["jpeg"], "sha256": sha, "label": lab,
+                      "turn": turn[0] if turn else None})
+    csv_name = f"{coll} Ground Truth.csv"
+    with open(os.path.join(tmp, csv_name), "w", newline="", encoding="utf-8") as f:
+        w = csv.writer(f)
+        w.writerow(["File Number", "Status"])
+        w.writerows(labs)
+    rec = {"item": "W46.fix-seg-boxes-lock", "locked": today, "collection": coll, "box": BOXES[key]["name"],
+           "corpus_folder": BOXES[key]["folder"], "rulings": os.path.basename(ans_path), "rulings_sha256": file_sha(ans_path),
+           "truth_csv": csv_name, "truth_sha256": file_sha(os.path.join(tmp, csv_name)),
+           "rule": "article-within-issue (owner, 2026-10-29); an advertisement between an article's pages goes with it "
+                   "(owner, 2026-10-30)" if BOXES[key]["draft"] == "article reading" else "document rules of 2026-10-05",
+           "unsure": [{"id": i, "left": by_id[i]["left"], "right": by_id[i]["right"], "answer": answers.get(i, "")}
+                      for i in open_ids],
+           "fallback": [{"id": i, "right": by_id[i]["right"], "issue": by_id[i].get("issue")}
+                        for i in sorted(answers) if answers[i] == "fallback" and i in by_id],
+           "label_rulings": [by_id[i]["right"] for i in sorted(answers) if answers[i] == "label" and i in by_id],
+           "box_cards_by_hand": list(BOX_CARDS.get(key, ())),
+           "trained_on": BOXES[key].get("trained_on"),
+           "turn_note": "the JPEG originals are copied unturned; `turn` is the extra rotation (degrees, PIL) the sheet "
+                        "applied after EXIF to match the upright corpus PDF, where it was measured",
+           "pages": pages}
+    with open(os.path.join(tmp, "lock.json"), "w", encoding="utf-8") as f:
+        json.dump(rec, f, indent=1, ensure_ascii=False)
+    for name in os.listdir(tmp):
+        os.chmod(os.path.join(tmp, name), 0o444)
+    os.rename(tmp, dst)
+    os.chmod(dst, 0o500)
+    return rec
+
+
+def verify_box(data_dir, folder):
+    """Problems with a frozen box against its lock.json (an empty list when it is intact)."""
+    dst = os.path.join(data_dir, folder)
+    with open(os.path.join(dst, "lock.json"), encoding="utf-8") as f:
+        rec = json.load(f)
+    bad = []
+    want = {p["file"]: p["sha256"] for p in rec["pages"]} | {rec["truth_csv"]: rec["truth_sha256"]}
+    have = set(os.listdir(dst)) - {"lock.json"}
+    bad += [f"extra file {n}" for n in sorted(have - set(want))]
+    bad += [f"missing {n}" for n in sorted(set(want) - have)]
+    bad += [f"changed {n}" for n in sorted(set(want) & have) if file_sha(os.path.join(dst, n)) != want[n]]
+    bad += [f"writable {n}" for n in sorted(have | {"lock.json"}) if os.stat(os.path.join(dst, n)).st_mode & 0o222]
+    return bad
+
+
+def cmd_lock(a):
+    import datetime
+    import data
+    for key in a.boxes or BOXES:
+        rec = lock_box(key, str(data.DATA_DIR), datetime.date.today().isoformat())
+        print(f"{key}: locked {len(rec['pages'])} photos as {rec['collection']}; unsure gaps "
+              f"{[u['right'] for u in rec['unsure']]}; label cards {rec['label_rulings']}")
+
+
+def cmd_verify(a):
+    import data
+    failed = False
+    for key in a.boxes or BOXES:
+        bad = verify_box(str(data.DATA_DIR), BOXES[key]["locked"][1])
+        failed |= bool(bad)
+        print(f"{key}: " + ("intact" if not bad else "; ".join(bad)))
+    return 1 if failed else 0
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = p.add_subparsers(dest="cmd", required=True)
-    for name, fn in (("draft", cmd_draft), ("sheet", cmd_sheet)):
+    for name, fn in (("draft", cmd_draft), ("sheet", cmd_sheet), ("lock", cmd_lock), ("verify", cmd_verify)):
         c = sub.add_parser(name)
         c.add_argument("boxes", nargs="*", metavar="BOX", help=f"default: every box ({', '.join(BOXES)})")
         c.set_defaults(fn=fn)
@@ -531,7 +657,7 @@ def main():
     unknown = [b for b in getattr(a, "boxes", []) if b not in BOXES]
     if unknown:
         p.error(f"unknown box {', '.join(unknown)} (choose from {', '.join(BOXES)})")
-    a.fn(a)
+    return a.fn(a)
 
 
 if __name__ == "__main__":

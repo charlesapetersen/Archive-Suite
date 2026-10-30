@@ -13400,3 +13400,21 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   refused by the permission layer; any session may delete them. The rebuilt
   `date-tagging/traceable/vision` (464 pages) is date_traceable's own cache, left for its reruns.
   <!-- /W46.date-image -->
+- [x] **W46.fix-seg-boxes-lock — fold in the owner's rulings and freeze the three boxes [S]** · §Document processing review — W46 (owner, 2026-10-20) (lane: segbench) — SHIPPED 2026-10-30
+  `seg_boxes.py lock` refolds each box from its newest answers file, checks it matches the cache truth.csv, copies
+  the JPEG originals byte for byte (renumbered 1..N) beside `<Coll> Ground Truth.csv` and a lock.json into
+  `ArchiveProcessor/Test Files/Ground Truth Segmentation/` (gitignored), then makes the files 0444 and the folder 0500;
+  it refuses a folder that exists. `seg_boxes.py verify` re-hashes against lock.json (missing, extra, changed or
+  writable files). data.py loads them by name from `LOCKED` (`Sasha` 180: 35 New, 143 Cont, Box 1, Folder 164;
+  `IllustratedReview` 147: 86 New, 61 Cont, article-within-issue rule, 4 'fallback' advertisement gaps folded to Cont,
+  matching the 2026-10-30 rule; `SC0122` 200: 95 New, 101 Cont, Box 1, Folders 2, 96, 139), kept out of `COLLECTIONS`
+  so the scripts that loop over the five do not change. `Collection.unsure` gives the gaps the owner left unsure, which
+  hold the draft label and should be left out of a score: Sasha 8 (a placeholder Cont), SC0122 32, 67, 71, 105, 160
+  (tag/teacher draft). `Collection.trained_on` marks IllustratedReview and SC0122 as trained-on for the W41.seg-finetune
+  2B/4B students, and both, with Sasha, are in `corpus_pairs.EXCLUDE` (W46.seg-boxes-overlap-ok, answer b). The two
+  'label' rulings (SC0122 139, Sasha 164) stay Folder: SC0122 already has its box card at photo 1 and the owner named
+  164 a folder card; `BOX_CARDS` is where a box card would be marked by hand. The JPEGs are copied unturned; lock.json
+  carries the sheet's measured extra turn where it has one. The seg-boxes cache (drafts, sheets, thumbnails, answers)
+  is kept (228 MB): it is the record of the rulings that lock.json names by sha-256. Tested on a scratch data
+  folder first (lock, a refused relock, load, a tamper caught by verify).
+  <!-- /W46.fix-seg-boxes-lock -->

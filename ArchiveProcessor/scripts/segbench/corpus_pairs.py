@@ -61,8 +61,10 @@ NEAR = 0.5
 SAMPLE = 100              # pairs a method, checked by image
 SEED = 41
 PDFTOTEXT = os.path.expanduser("~/.local/bin/pdftotext")
-# Locked test boxes and development boxes: their corpus copies never enter training (folder names, any depth).
-EXCLUDE = re.compile(r"stanton|rg ?165|deaver|herrnstein|\bdean\b", re.I)
+# Locked test boxes and development boxes: their corpus copies never enter training (folder names, any depth). The
+# last three are W46.fix-seg-boxes-lock's boxes (owner, 2026-10-29, W46.seg-boxes-overlap-ok: the Illustrated Review and
+# SC0122 were in the W41 students' train split, so their scores there are trained-on, and a retrain leaves them out).
+EXCLUDE = re.compile(r"stanton|rg ?165|deaver|herrnstein|\bdean\b|illustrated review|sc0122|young, sasha", re.I)
 HOLDOUT_SHARE = 0.15      # of collections (first two path levels), by implied boundaries, held out whole
 NO_TEXT_SHARE = 0.3       # of training windows sent with no page text (the app's own OCR is not ABBYY's)
 

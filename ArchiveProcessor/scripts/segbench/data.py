@@ -1,4 +1,4 @@
-"""Load the five ground-truth segmentation collections (W36.seg-bench).
+"""Load the five ground-truth segmentation collections (W36.seg-bench), and the three locked boxes (LOCKED).
 
 The data lives in the gitignored ``Test Files/Ground Truth Segmentation/`` folder of the
 PRIMARY checkout (override with ``SEGBENCH_DATA``). It is read only: nothing here writes
@@ -40,6 +40,16 @@ COLLECTIONS = {
 }
 DEV = ("Dean", "Deaver", "Herrnstein")
 TEST = ("Stanton", "RG165")
+# The three locked boxes frozen by W46.fix-seg-boxes-lock from the owner's rulings (2026-10-29/30), one per kind the
+# five lacked: handwritten letters, an alumni magazine on the article-within-issue rule, reading-room clippings. Kept
+# out of COLLECTIONS so the scripts that loop over the five are unchanged; load() takes them by name. Each folder's
+# lock.json carries the gaps the owner left unsure (Collection.unsure: leave them out of a score) and, for the two
+# tagged boxes, that the W41.seg-finetune students trained on them (Collection.trained_on).
+LOCKED = {
+    "Sasha": "Young, Sasha",
+    "IllustratedReview": "Stanford Illustrated Review",
+    "SC0122": "SC0122 — News Service",
+}
 
 _IMAGE_EXT = {".jpg", ".jpeg"}
 _LEADING_NUM = re.compile(r"^\s*(\d+)")
@@ -59,6 +69,8 @@ class Collection:
     name: str
     directory: Path
     pages: list[Page]
+    unsure: tuple[int, ...] = ()    # file numbers whose gap before them the owner left unsure (locked boxes)
+    trained_on: str | None = None   # which models trained on this box, from lock.json
 
     @property
     def labels(self) -> list[str]:
@@ -137,9 +149,10 @@ def _exif_cache(name: str) -> Path:
 
 
 def load(name: str, with_exif: bool = True) -> Collection:
-    if name not in COLLECTIONS:
-        raise KeyError(f"unknown collection {name!r}; expected one of {list(COLLECTIONS)}")
-    directory = DATA_DIR / COLLECTIONS[name]
+    folders = {**COLLECTIONS, **LOCKED}
+    if name not in folders:
+        raise KeyError(f"unknown collection {name!r}; expected one of {list(folders)}")
+    directory = DATA_DIR / folders[name]
     csvs = [p for p in directory.iterdir() if p.suffix.lower() == ".csv"]
     if len(csvs) != 1:
         raise ValueError(f"{directory}: expected one CSV, found {len(csvs)}")
@@ -162,7 +175,10 @@ def load(name: str, with_exif: bool = True) -> Collection:
         if changed:
             cache.parent.mkdir(parents=True, exist_ok=True)
             cache.write_text(json.dumps(times, indent=0))
-    return Collection(name=name, directory=directory, pages=pages)
+    lock = directory / "lock.json"
+    rec = json.loads(lock.read_text(encoding="utf-8")) if lock.exists() else {}
+    return Collection(name=name, directory=directory, pages=pages,
+                      unsure=tuple(u["right"] for u in rec.get("unsure", ())), trained_on=rec.get("trained_on"))
 
 
 def load_all(names=None, with_exif: bool = True) -> dict[str, Collection]:

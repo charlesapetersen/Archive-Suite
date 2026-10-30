@@ -102,6 +102,10 @@ The owner's Gemini report is assessed in `screens/gemini-report-2026-10-20.md` (
   being unclear, and stays for handwriting OCR and W46.date-traceable. The handwritten box is now Cambridge/Young,
   Sasha photos 00001-00180 (180 JPEGs): her letters to Michael Young, one letter a document, upright, in no
   label-clean split; every gap is ruled blind by the owner (178 asked), about an hour.
+  Frozen (W46.fix-seg-boxes-lock, 2026-10-30): all three in `Test Files/Ground Truth Segmentation/` as data.LOCKED
+  (Sasha 180, IllustratedReview 147, SC0122 200 photos), each with a lock.json (sha-256 per photo, the unsure gaps,
+  trained-on note); `seg_boxes.py verify` re-checks them. Unsure gaps, left out of scores: Sasha 8; SC0122 32, 67, 71,
+  105, 160. The two tagged boxes are trained-on for the W41 students and are in corpus_pairs.EXCLUDE.
   Re-ruled (owner, 2026-10-29; W46.seg-boxes-sir-article): the Illustrated Review is segmented by article within
   each issue, an article taking the issue's date and journal title from its cover or contents page, the
   full-magazine rule only a fallback. Redrafted from a page reading; 134 gaps asked blind, each with its issue's
