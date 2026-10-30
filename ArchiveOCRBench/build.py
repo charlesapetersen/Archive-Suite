@@ -49,6 +49,7 @@ DATING_PUBLIC = RESULTS / "date-tagging-public.json"
 DATING_TRACEABLE = RESULTS / "date-traceable.json"  # W46.date-traceable: date_traceable.py score
 DATING_TRACEABLE_PAID = RESULTS / "date-traceable-paid.json"  # W46.date-traceable-paid: date_traceable_gateway.py score
 DATING_ENCLOSURE = RESULTS / "date-enclosure.json"  # W46.date-enclosure: date_enclosure.py score
+DATING_IMAGE = RESULTS / "date-image.json"  # W46.date-image: date_image.py score
 PUBLIC = RESULTS / "bench-corpus"  # W43.corpus-build: corpus/routes.py report, the public strata
 OCR_SCORERS = RESULTS / "ocr-scorers.json"  # W46.fix-ocr-scorers: ocr_rescore.py, every cached reading re-scored
 TRUTH_BIAS = RESULTS / "ocr-truth-bias.json"  # W46.fix-ocr-truth-bias: ocr_truth_bias.py, agreed v adjudicated words
@@ -166,6 +167,28 @@ def dating_enclosure():
              "auc": a["auc_proxy"], "seconds": a["seconds_mean"], "propagation": a["propagation"]}
             for k, a in d["arms"].items()]
     return {"set": d["set"], "rows": rows}
+
+
+IMAGE_ARMS = {"qwen3.6-27b": "Qwen3.6-27B (Sherlock, 2,400 px)",
+              "mac:qwen3-vl-8b-mlx4-1400": "Qwen3-VL 8B, 4-bit MLX (this Mac, 1,400 px)"}
+
+
+def dating_image():
+    """The date-image panel: dates read off the page images of the unprinted-year documents, per arm and variant, and
+    the look-alike retrieval against the positional baselines. Reads whatever arms the result file holds."""
+    if not DATING_IMAGE.exists():
+        return None
+    d = json.loads(DATING_IMAGE.read_text())
+    rows = []
+    for key, v in d["summary"].items():
+        arm, variant = key.rsplit("|", 1)
+        rows.append({"arm": arm, "name": IMAGE_ARMS.get(arm, arm), "variant": variant, "n": v["n"], "exact": v["exact"],
+                     "within1": v["within1"], "on_page": v["on_page"]})
+    ret = d["retrieval"]["summary"]
+    retrieval = [{"cls": c, **{a: [ret[c][a]["exact"], ret[c][a]["within1"], ret[c][a]["n"]]
+                               for a in ("prev", "near", "nn1", "knn")}}
+                 for c in ("D", "C", "B", "A", "A'", "all") if c in ret]
+    return {"rows": rows, "retrieval": retrieval}
 
 
 def money_cells(cell):
@@ -896,6 +919,7 @@ def main():
              "dating_public": json.loads(DATING_PUBLIC.read_text()) if DATING_PUBLIC.exists() else None,
              "dating_traceable": dating_traceable(),
              "dating_enclosure": dating_enclosure(),
+             "dating_image": dating_image(),
              "seg_date": json.loads((RESULTS / "seg-date-model-final.json").read_text())
                          if (RESULTS / "seg-date-model-final.json").exists() else None,
              "seg_context": seg_context(), "seg_window_modality": seg_window_modality(),

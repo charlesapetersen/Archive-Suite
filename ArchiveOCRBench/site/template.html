@@ -310,6 +310,12 @@ footer p { font-size: 13px; }
     <div class="tbl"><table><thead><tr><th>Arm</th><th>Owner's truth: right yes / wrong yes / missed</th><th>Fires on A</th><th>Fires on A'</th><th>Fires on the matched negatives</th><th>AUC, A and A' against negatives</th><th>Proposals whose propagated year is the owner's</th><th>Seconds a document</th></tr></thead><tbody id="date-enclosure-rows"></tbody></table></div>
     <p class="note">The app proposes an enclosure only from the OCR model's <code>[enclosure]</code> marker; this is its first measurement, beside a relation classifier that reads the letter and the next document's first page, and a cue-word rule. The owner's truth is small: 15 documents whose previous one he judged, 3 of them sent with it. A and A' are documents whose year matches the one before; the owner refuted most of the strict class as covers, so firing there is a structural proxy, not recall. A proposal on a matched negative would write a Sent With the owner did not use. The free arms ran on this Mac and Sherlock; the two Gemini 3.7 Flash arms ran through the Stanford gateway, at about $4.70 (marker) and $3.14 (classifier) per 1,000 documents, and found none of the 3 enclosures. Full tables: <code>ArchiveProcessor/segbench-results/date-enclosure.md</code>.</p>
   </section>
+  <section class="panel" id="date-image" hidden>
+    <div class="head"><h2>Dates read off the page images</h2><span class="meta">122 documents whose year is not in the OCR text</span></div>
+    <div class="tbl"><table><thead><tr><th>Arm</th><th>Input</th><th>Documents</th><th>Document year exact</th><th>Within one year</th><th>Owner's year found written on the page</th></tr></thead><tbody id="date-image-rows"></tbody></table></div>
+    <div class="tbl"><table><thead><tr><th>Class</th><th>Documents</th><th>Nearest dated before (exact / within one)</th><th>Nearest dated either side</th><th>Most similar page</th><th>Majority of 3 most similar</th></tr></thead><tbody id="date-image-retrieval"></tbody></table></div>
+    <p class="note">The 122 are the owner's unprinted-year documents (classes A to D) that have a JPEG original of a first or second page. Each model was asked to quote every date on the pages and give the document's own date, with the images alone or with the OCR text as well; the owner's year is never in the prompt. "Found on the page" means a quoted date has the owner's year written in it. The Mac arm may have read only part of the set; its row shows the count. The second table gives each document the year of the document whose first page looks most like its own (Apple Vision feature prints), against positional baselines; cells are exact / within one year. Open weights only, $0. Full tables: <code>ArchiveProcessor/segbench-results/date-image.md</code>.</p>
+  </section>
 
   <header class="part" id="public">
     <div class="eyebrow">Part 7 · Public truth sets · not the owner's archive</div>
@@ -919,6 +925,18 @@ if (DEN && DEN.rows.length) {
       '</td><td>' + (r.seconds == null ? '–' : r.seconds.toFixed(1)) + '</td></tr>';
   }).join('');
   document.getElementById('date-enclosure').hidden = false;
+}
+
+const DIM = DATA.dating_image;
+if (DIM && DIM.rows.length) {
+  const f = (a, n) => n ? a + ' of ' + n + ' (' + (100 * a / n).toFixed(1) + '%)' : '–';
+  document.getElementById('date-image-rows').innerHTML = DIM.rows.map(r => '<tr><td>' + r.name + '</td><td>' +
+    (r.variant === 'image' ? 'images alone' : 'images and OCR text') + '</td><td>' + r.n + '</td><td>' + f(r.exact, r.n) +
+    '</td><td>' + f(r.within1, r.n) + '</td><td>' + f(r.on_page, r.n) + '</td></tr>').join('');
+  const ew = ([e, w, n]) => n ? e + ' / ' + w : '–';
+  document.getElementById('date-image-retrieval').innerHTML = DIM.retrieval.map(r => '<tr><td>' + (r.cls === 'all' ? 'All' : r.cls) +
+    '</td><td>' + r.prev[2] + '</td><td>' + ew(r.prev) + '</td><td>' + ew(r.near) + '</td><td>' + ew(r.nn1) + '</td><td>' + ew(r.knn) + '</td></tr>').join('');
+  document.getElementById('date-image').hidden = false;
 }
 
 // Part 7: the public strata.
