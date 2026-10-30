@@ -42,6 +42,21 @@ Of the documents whose owner year was found written on the page (either variant)
 - **Qwen3-VL 8B, 4-bit MLX (this Mac, 1,400 px)**: found the owner's year on the page for 3/27 (11%); kind as the owner gave it for 3 of those 3. Missed: d13 (printed or typed, legible), d16 (printed or typed, legible), d01 (printed or typed, legible), d05 (printed or typed, legible), d06 (printed or typed, legible), d12 (None, legible), d07 (printed or typed, legible), d18 (printed or typed, legible), d08 (printed or typed, legible), d20 (printed or typed, legible), a04 (printed or typed, legible), a06 (stamped, legible), a18 (printed or typed, legible), a32 (handwritten, legible), a30 (printed or typed, illegible), a02 (handwritten, legible), a14 (printed or typed, legible), a16 (printed or typed, legible), a07 (handwritten, legible), a08 (printed or typed, legible), a09 (printed or typed, legible), a17 (printed or typed, legible), a12 (handwritten, legible), a01 (stamped, legible).
   Where the owner's tag differs from the year the owner read on the page (d06 tag 1965, read 1967, d18 tag 1935, read 1936, d20 tag 1935, read 1936, a08 tag 1984, read 1985), the model quoted the year the owner read on 0 of 4.
 
+## Look-alike retrieval (B test 6)
+
+Each document takes the year the text rule (`date_traceable.rule_pick`) gives the document whose first page looks most like its own, among the dated documents within 30 either side in the same folder: Apple Vision feature prints of the JPEG originals at 768 px (corpus_pairs's pairing), the print the segmenter features already use, by Euclidean distance. The positional baselines are the same rule's year of the nearest dated document before (what date_traceable propagates) and either side. $0, this Mac.
+
+| class | n | nearest dated before (propagation) | nearest dated either side | most similar page (feature print) | majority of the 3 most similar |
+|---|---|---|---|---|---|
+| D | 17 | 2 / 7 | 2 / 8 | 1 / 4 | 1 / 3 |
+| C | 31 | 3 / 12 | 3 / 12 | 7 / 13 | 7 / 13 |
+| B | 35 | 12 / 19 | 17 / 24 | 6 / 14 | 6 / 15 |
+| A | 32 | 29 / 30 | 29 / 30 | 11 / 16 | 9 / 14 |
+| A' | 7 | 6 / 6 | 3 / 4 | 2 / 4 | 2 / 4 |
+| all | 122 | 52 / 74 | 54 / 78 | 27 / 51 | 25 / 49 |
+
+Cells are exact / within one year, of n. 122 of 122 targets have a print; the most similar page is the nearest dated document before on 12 of 121. Its distance in documents from the target: 1 15, 2 8, 3 7, 4 11, 5 8, 6+ 72. Right by look-alike where both positional baselines are wrong: 10; wrong by look-alike where a baseline is right: 44.
+
 ## Reading it
 
 (written by hand; a rerun keeps everything below this heading)

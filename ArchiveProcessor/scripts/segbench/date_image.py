@@ -4,6 +4,8 @@
     <lab venv>/bin/python date_image.py pack --out DIR    # the 131 unprinted-year documents' pages, two variants
     run-guarded.sh --label date-image --need-gb 8 -- <lab venv>/bin/python date_image.py collect-mac [--side 1400]
     python3 date_image.py score              # segbench-results/date-image.md and .json
+    <lab venv>/bin/python date_image.py prints   # Vision feature prints of the targets' folder neighbours (JPEGs)
+    python3 date_image.py retrieve           # look-alike retrieval, appended to the same results (run after score)
 
 <lab venv> is ~/.local/share/visionocr-ocrlab/venv (numpy for the pairing test, mlx_vlm for the Mac arm). The pack
 for the Mac arm is rebuilt into PACK with the same command and checked against the cluster's image digests.
@@ -420,13 +422,184 @@ def cmd_score(a):
                      + ", ".join(f"{owner[d]['id']} tag {owner[d]['owner_year']}, read {owner[d]['page_date']['year']}"
                                  for d in diff) + f"), the model quoted the year the owner read on {len(same)} of {len(diff)}.")
     out = Path(RESULTS)
-    kept = out.read_text().split("\n## Reading it\n", 1)[1] if out.exists() and "\n## Reading it\n" in out.read_text() else \
-        "\n(written by hand; a rerun keeps everything below this heading)\n"
-    out.write_text("\n".join(L) + "\n\n## Reading it\n" + kept)
-    Path(RESULTS[:-3] + ".json").write_text(json.dumps({"summary": summary, "kinds": kinds, "documents": len(docs),
+    old = out.read_text() if out.exists() else ""
+    kept = next((old[old.index(h):] for h in (RETRIEVAL_HEAD, READING_HEAD) if h in old),
+                READING_HEAD + "\n(written by hand; a rerun keeps everything below this heading)\n")
+    out.write_text("\n".join(L) + "\n" + kept)       # retrieve's section and the reading survive a rescore
+    jf = Path(RESULTS[:-3] + ".json")
+    prev = json.loads(jf.read_text()) if jf.exists() else {}
+    jf.write_text(json.dumps({"summary": summary, "kinds": kinds, "documents": len(docs),
         "rows": [{k: v for k, v in r.items() if k not in ("hit",)} | {"hit_kind": (r["hit"] or {}).get("kind")}
-                 for r in rows]}, indent=1) + "\n")
+                 for r in rows]} | ({"retrieval": prev["retrieval"]} if "retrieval" in prev else {}), indent=1) + "\n")
     print("\n".join(L[:40]))
+
+
+RETRIEVAL_HEAD = "\n## Look-alike retrieval (B test 6)\n"
+READING_HEAD = "\n## Reading it\n"
+
+
+# ------------------------------------------------------------------------------------------ look-alike retrieval
+
+WINDOW = 30          # documents either side in the same folder (a box's run of papers) searched for a look-alike
+THUMB_PX = 768       # features.py's EMBED_IMG_PX: the feature print the segmenter features already use
+TOPK = 3
+
+
+def retrieval_targets():
+    """[(target request, folder info, candidate segment indices)] for the documents the image arms read."""
+    import enclosure_split as ES
+    _, found = ES.load()
+    docs = {}
+    for r in load_requests(CLUSTER):
+        docs.setdefault(r["doc"], r)
+    out = []
+    for d, r in sorted(docs.items()):
+        info = found[d[2:]]
+        k = info["k"]
+        js = [j for j in range(max(0, k - WINDOW), min(len(info["segs"]), k + WINDOW + 1))
+              if j != k and info["segs"][j]["kind"] == "doc"]
+        out.append((r, info, js))
+    return out
+
+
+def jpeg_pairs():
+    import corpus_pairs as CP
+    pairs = {}
+    for line in open(os.path.join(CP.CACHE, "pairs.tsv"), encoding="utf-8").read().splitlines()[1:]:
+        pdf, jpeg, method = line.split("\t")[:3]
+        if jpeg and method != "none":
+            pairs[pdf] = os.path.join(CP.JPEGS, jpeg)
+    return pairs
+
+
+def cmd_prints(a):
+    """Vision feature prints of each target's first page and of every document's first page within WINDOW of it,
+    from the JPEG originals (corpus_pairs's pairing; the target's own page is the pack's confirmed, upright one when
+    it has one). Thumbnails at THUMB_PX into PACK/thumbs, prints cached in PACK/prints.json."""
+    import subprocess
+    from PIL import Image
+    import features as F
+    pairs = jpeg_pairs()
+    thumbs = a.pack / "thumbs"; thumbs.mkdir(exist_ok=True)
+    cache_f = a.pack / "prints.json"
+    cache = json.loads(cache_f.read_text()) if cache_f.exists() else {}
+    want = {}
+    for r, info, js in retrieval_targets():
+        p0 = info["segs"][info["k"]]["pages"][0]
+        own = a.pack / "images" / (hashlib.sha1(p0.encode()).hexdigest() + ".jpg")
+        if own.exists():
+            want[p0] = str(own)
+        elif p0 in pairs:
+            want.setdefault(p0, pairs[p0])
+        for j in js:
+            p = info["segs"][j]["pages"][0]
+            if p in pairs:
+                want.setdefault(p, pairs[p])
+    todo = [(p, src) for p, src in want.items() if p not in cache]
+    print(f"{len(want)} first pages, {len(todo)} to print", flush=True)
+    tool = str(F.build_embed_tool())
+    for i in range(0, len(todo), 200):
+        jobs = []
+        for p, src in todo[i:i + 200]:
+            th = thumbs / (hashlib.sha1(p.encode()).hexdigest() + ".jpg")
+            if not th.exists():
+                try:
+                    with Image.open(src) as im:
+                        im.draft("RGB", (THUMB_PX * 2, THUMB_PX * 2))
+                        im = im.convert("RGB")
+                        im.thumbnail((THUMB_PX, THUMB_PX))
+                        im.save(th, "JPEG", quality=85)
+                except Exception:
+                    cache[p] = None
+                    continue
+            jobs.append((p, th))
+        r = subprocess.run([tool], input="".join(f"image\t{th}\n" for _, th in jobs), capture_output=True, text=True,
+                           check=True)
+        res = [json.loads(l) for l in r.stdout.splitlines() if l.strip()]
+        assert len(res) == len(jobs), (len(res), len(jobs))
+        for (p, _), o in zip(jobs, res):
+            cache[p] = o.get("vec")
+        cache_f.write_text(json.dumps(cache))
+        print(f"{min(i + 200, len(todo))}/{len(todo)}", flush=True)
+
+
+def cmd_retrieve(a):
+    """Look-alike retrieval as dating evidence: each target takes the text-rule year of the most similar dated
+    document's first page within WINDOW (nn1), or the majority of the TOPK nearest (knn), against two positional
+    baselines: the nearest dated document before (date_traceable's propagation) and the nearest either side."""
+    import math
+    import date_traceable as T
+    cache = json.loads((a.pack / "prints.json").read_text())
+    owner = owner_page_truth()
+    rows = []
+    for r, info, js in retrieval_targets():
+        k, truth = info["k"], r["truth"].get("year")
+        v0 = cache.get(info["segs"][k]["pages"][0])
+        dated = []
+        for j in js:
+            y = T.rule_pick(T.candidates(info["texts"][j]))[0]
+            if y is not None:
+                dated.append((j, y, cache.get(info["segs"][j]["pages"][0])))
+        before = [x for x in dated if x[0] < k]
+        prev = max(before, key=lambda x: x[0]) if before else None
+        near = min(dated, key=lambda x: (abs(x[0] - k), x[0] > k)) if dated else None
+        sims = sorted((math.dist(v0, v), j, y) for j, y, v in dated if v) if v0 else []
+        knn = None
+        if sims:
+            c = collections.Counter(y for _, _, y in sims[:TOPK])
+            knn = next(y for _, _, y in sims[:TOPK] if c[y] == max(c.values()))
+        nn1 = sims[0] if sims else None
+        row = {"doc": r["doc"], "cls": r["cls"], "truth": truth, "printed": bool(v0), "dated_near": len(dated),
+               "prev": prev and prev[1], "near": near and near[1], "nn1": nn1 and nn1[2], "knn": knn,
+               "nn1_offset": nn1 and nn1[1] - k, "nn1_dist": nn1 and round(nn1[0], 3),
+               "same_as_prev": bool(nn1 and prev and nn1[1] == prev[0])}
+        o = owner.get(r["doc"])
+        if o:
+            row["owner_case"], row["owner_basis"] = o["id"], o["basis"]
+        rows.append(row)
+    arms = (("prev", "nearest dated before (propagation)"), ("near", "nearest dated either side"),
+            ("nn1", "most similar page (feature print)"), ("knn", f"majority of the {TOPK} most similar"))
+    L = [RETRIEVAL_HEAD.strip("\n"), "",
+         "Each document takes the year the text rule (`date_traceable.rule_pick`) gives the document whose first page "
+         f"looks most like its own, among the dated documents within {WINDOW} either side in the same folder: Apple "
+         f"Vision feature prints of the JPEG originals at {THUMB_PX} px (corpus_pairs's pairing), the print the "
+         "segmenter features already use, by Euclidean distance. The positional baselines are the same rule's year of "
+         "the nearest dated document before (what date_traceable propagates) and either side. $0, this Mac.", "",
+         "| class | n | " + " | ".join(n for _, n in arms) + " |", "|---|---|" + "---|" * len(arms)]
+    summary = {}
+    for c in CLASSES + ("all",):
+        R = [x for x in rows if c in ("all", x["cls"])]
+        cells = []
+        for key, _ in arms:
+            ex = sum(x[key] == x["truth"] for x in R)
+            w1 = sum(x[key] is not None and abs(x[key] - x["truth"]) <= 1 for x in R)
+            cells.append(f"{ex} / {w1}")
+            summary.setdefault(c, {})[key] = {"exact": ex, "within1": w1, "n": len(R)}
+        L.append(f"| {c} | {len(R)} | " + " | ".join(cells) + " |")
+    nn = [x for x in rows if x["nn1"] is not None]
+    offs = collections.Counter(min(abs(x["nn1_offset"]), 6) for x in nn)
+    gain = [x for x in nn if x["nn1"] == x["truth"] and x["prev"] != x["truth"] and x["near"] != x["truth"]]
+    loss = [x for x in nn if x["nn1"] != x["truth"] and (x["prev"] == x["truth"] or x["near"] == x["truth"])]
+    L += ["", f"Cells are exact / within one year, of n. {sum(x['printed'] for x in rows)} of {len(rows)} targets "
+          f"have a print; the most similar page is the nearest dated document before on "
+          f"{sum(x['same_as_prev'] for x in nn)} of {len(nn)}. Its distance in documents from the target: "
+          + ", ".join(f"{'6+' if d == 6 else d} {n}" for d, n in sorted(offs.items())) + ". Right by look-alike where "
+          f"both positional baselines are wrong: {len(gain)}; wrong by look-alike where a baseline is right: {len(loss)}."]
+    covers = [x for x in rows if x.get("owner_basis") == "cover"]
+    if covers:
+        L.append("The owner-confirmed covers (the document came with the one before it, so −1 is the cover): " + ", ".join(
+            f"{x['owner_case']} most similar page {x['nn1_offset']:+d}" if x["nn1_offset"] is not None
+            else f"{x['owner_case']} no print" for x in covers) + ".")
+    res = Path(RESULTS)
+    text = res.read_text()
+    head, _, tail = text.partition(READING_HEAD)
+    head = head.split(RETRIEVAL_HEAD)[0].rstrip("\n")
+    res.write_text(head + "\n\n" + "\n".join(L) + "\n" + READING_HEAD + tail)
+    jf = Path(RESULTS[:-3] + ".json")
+    j = json.loads(jf.read_text())
+    j["retrieval"] = {"window": WINDOW, "thumb_px": THUMB_PX, "topk": TOPK, "summary": summary, "rows": rows}
+    jf.write_text(json.dumps(j, indent=1) + "\n")
+    print("\n".join(L))
 
 
 RESULTS = str(HERE.parent.parent / "segbench-results" / "date-image.md")
@@ -443,8 +616,11 @@ def main():
     p.add_argument("--variant", choices=("image", "image+text")); p.add_argument("--limit", type=int)
     p = sub.add_parser("score"); p.add_argument("--cluster", type=Path, default=CLUSTER)
     p.add_argument("--pack", type=Path, default=PACK)
+    for name in ("prints", "retrieve"):
+        p = sub.add_parser(name); p.add_argument("--pack", type=Path, default=PACK)
     a = ap.parse_args()
-    {"pack": cmd_pack, "collect-mac": cmd_collect_mac, "score": cmd_score}[a.cmd](a)
+    {"pack": cmd_pack, "collect-mac": cmd_collect_mac, "score": cmd_score, "prints": cmd_prints,
+     "retrieve": cmd_retrieve}[a.cmd](a)
 
 
 if __name__ == "__main__":
