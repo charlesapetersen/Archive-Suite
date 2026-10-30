@@ -230,6 +230,10 @@ stated as a rule; its full wording, history and the cases behind it are in [`REF
   `W46.marks-detect`, `W46.ent-robust`, `W46.ent-score` and the `claude -p` voter in `W46.kit-gate` are skipped, and
   the rest of each item goes ahead (the Claude c1
   windows of 14:31 stay as results). Coding sessions (the engine running on the plan) are not arms.
+- ⛔ **A coding session's subagents are not readers either (owner, 2026-10-30).** The plan's usage is for building
+  the app. Reading corpus pages or texts as data (truth drafts, labels, rulings, page-by-page readings) goes to the
+  gateway (Gemini 3.7 Flash first) or an open model, never to Claude subagents in the session; W46.seg-boxes-sir-article
+  had four do it. No Claude arm is added where Gemini already answers the question.
 - ⛔ **Cluster work runs on Sherlock; the engine prepares it, the owner's session submits it (owner, 2026-10-22).**
   Sherlock suits this project better than FarmShare, even when it is slower. FarmShare only with the owner's
   explicit approval for that run; other FarmShare mentions are history, not a route.
