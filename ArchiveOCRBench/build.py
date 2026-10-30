@@ -469,7 +469,8 @@ LOGPROB_PAGES = RESULTS / "ocr-logprob-pages.csv"
 
 
 def bootstrap(d, rounds=10000, seed=0):
-    """Mean of paired per-page differences and its 95% bootstrap interval (ocr_panel_score.paired's interval)."""
+    """Mean of paired per-page differences and its 95% bootstrap interval, the interval ocr_panel_score.paired
+    computes (seeded alike but drawn differently, so an end can differ from its figure in the second decimal)."""
     rng, n = random.Random(seed), len(d)
     boots = sorted(sum(rng.choices(d, k=n)) / n for _ in range(rounds))
     return {"n": n, "delta": round(100 * sum(d) / n, 2), "lo": round(100 * boots[int(.025 * rounds)], 2),
@@ -1004,7 +1005,7 @@ def main():
     # an app user could run; the later gateway reading of Gemini 3.7 Flash is left out of them.
     app_routes = [r["id"] for r in routes if r["panel"] != "farmshare" and r["id"] not in GATEWAY_ROUTES
                   and not r["id"].startswith(("gw-regions-", "dewarp-", "enh-"))]
-    # ocr-pages.csv now holds every whole-page route (W46.ocr-rescore-offline); the difficulty fit keeps the 29 routes
+    # ocr-pages.csv now holds every whole-page route (W46.ocr-rescore-offline); the difficulty fit keeps the 28 routes
     # and the FarmShare Qwen run it was built on, so its figures do not move with the headline table's additions.
     diff = difficulty.analyse({r["id"]: r["std"] for r in routes}, {r["id"]: r["name"] for r in routes},
                               app_routes, fitted={*app_routes, "qwen3.6-27b-farmshare"})

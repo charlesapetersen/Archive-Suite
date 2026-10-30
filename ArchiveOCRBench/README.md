@@ -10,8 +10,12 @@ What the bench has measured, as one page you can read and share. It has seven pa
    FarmShare run of the 96 pages in `farmshare/truth/` is on the same four charts (added 2026-10-21): □ when
    OpenRouter sells the model, priced at its rate for the run's tokens; ✶ when it does not (GLM-OCR, LightOnOCR-3,
    PaddleOCR-VL 1.5, PP-OCRv6, CHURRO-3B, Qwen3.5 4B), drawn in the free column as having no hosted price, free on
-   a university cluster, with its GPU-hours in the tables. Part 5's difficulty fit, rankings and cascades still use
-   only the routes in `ocr-pages.csv`, so these runs are not in part 5.
+   a university cluster, with its GPU-hours in the tables. Part 1 opens with the ranking table (W46.ocr-rescore-
+   offline, 2026-10-30): NES on the pages each route answered, the headline, with its failures beside it (provider
+   or the model's own: caps, refusals, empty answers), strict NES, the paired difference from Qwen3.6 27B on pages
+   both answered, p081 apart (the owner cannot correct its truth) and "96 only" for each route that has not read the
+   895 itself. Part 5's difficulty fit, rankings and cascades keep the 29 routes they were built on (`build.py`
+   passes them to `difficulty.analyse`), so the cluster runs and Gemini 3.7 are not in part 5.
 2. **Segmentation.** How well each approach splits a box of photographs into documents, on the two locked test
    boxes (Stanton and RG 165, 363 pages): pages in the exact document with no checking, against price; and, in a
    table, the checks per 100 pages each needs, the pages right after checking, and the errors left unflagged.
@@ -87,8 +91,10 @@ a model OpenRouter does not sell is drawn in the free column with its own marker
 price (free on a university cluster), with its GPU-hours shown, never as a free equivalent of a hosted route. The
 page says what each marker means. Where a chart cannot take a measured route (it lacks the per-kind scores or the
 per-page answers the chart needs), the route stays off and the page or this README says which and why. New FarmShare
-truth runs are added as `own_hardware.routes` entries in `data/inputs.json`. Known gaps today: part 5 (rankings,
-difficulty curves, cascades) covers only the routes in `ocr-pages.csv`, not the 13 FarmShare runs added to part 1.
+truth runs are added as `own_hardware.routes` entries in `data/inputs.json`; `ocr_pages_export.py` then adds their
+pages to `ocr-pages.csv`, and a new route that has read the 895 gets a `PUBLIC_TWIN` entry in `build.py`. Known gaps
+today: part 5 (rankings, difficulty curves, cascades) covers the 29 routes it was fitted on, not the cluster runs or
+Gemini 3.7 Flash.
 
 ## What is here
 
@@ -125,8 +131,9 @@ record:
   `ocr_panel.py`), and `build.py` stops if that average stops matching `summary.json`. GPU-hours per 100,000
   photos come from its photos an hour. The newspaper results in `farmshare/news/` wait for a newspaper chart
   (`POTENTIAL_FEATURES.md`).
-- `ocr-pages.csv` and `ocr-pages-agree.csv`: every route's score on every one of the 96 pages (kind, the kind the
-  route said, Vision OCR's page kind, answered, NES, measured cost, word counts), and the NES between two cheap
+- `ocr-pages.csv` and `ocr-pages-agree.csv`: every whole-page route's score on every one of the 96 pages (kind, the
+  kind the route said, Vision OCR's page kind, answered, why a failed page failed, NES, measured cost, word counts;
+  the panels, the Mac, Gemini 3.7 through the gateway and every FarmShare and Sherlock run), and the NES between two cheap
   readers' texts on the same page. `scripts/segbench/ocr_pages_export.py` writes them from the panels' private
   caches; rerun it when a route is added or rerun, then `build.py`. Part 5 reads only these, and FarmShare's
   `bulk/summary.json`, `bulk/pages.csv` and `bulk/vision-kind.csv` for the bulk pages' failures and kinds.
@@ -140,8 +147,8 @@ record:
   `ocr-scorers.md` only. `chaos-probe.json` (`chaos_probe.py`) is the altered-word probe on 20 typed owner pages.
 - `gemini37-vs-38.md` and `-groups.csv` (`scripts/segbench/gateway_gemini.py report`, W46.fix-ocr-scorers-paid):
   Gemini 3.7 Flash through the Stanford gateway on the 96, in the cloud panel's two formats, so `build.py` draws it
-  on the 96's charts. Its price is an estimate (the gateway returns no cost), and the route's name says so. It is
-  not in `ocr-pages.csv`, so the difficulty and cascade analysis leaves it out.
+  on the 96's charts. Its price is an estimate (the gateway returns no cost), and the route's name says so. Its
+  pages are in `ocr-pages.csv` for the ranking table; the difficulty and cascade analysis leaves it out.
   `ocr-truth-bias.json` (`ocr_truth_bias.py`, W46.fix-ocr-truth-bias) splits each route's word accuracy on the 96
   into the words both drafters agreed on and the words the owner adjudicated, strict and with line-end hyphen joins
   forgiven; the page shows it under the same section, with the blind owner check it feeds. That check's score is
@@ -182,6 +189,11 @@ record:
   Per-arm speed is unknown: concurrent job summaries combine all arms and both sets. Part 5 excludes them
   because they are absent from `ocr-pages.csv`. The JSON also holds a separate table-markup diagnostic;
   strict NES stays unchanged. `regions-20261021.md` gives provenance, limits and the unmeasured L4 cell arm.
+- `bench-corpus/regions-orderfree-20261030.json` (`corpus/regions_orderfree.py`, W46.ocr-rescore-offline): the same
+  stitched readings of the open readers and of Gemini 3.7 (`regions-gateway-20261028`) rescored with NewsBench's
+  order-free bag-of-words F1, its order gap and the missed and added word rates, each arm paired with its own
+  whole page; the regions table's order-free column. The 96's truth has no reading order, so the order-free loss is
+  the one to quote there.
 - `options.md`: the segmentation approaches on the test boxes (manual, Claude, Gemini, ChatGPT, Claude and
   ChatGPT together), each at the flag level frozen on the development boxes, with their API cost.
 - `cheap-models.md`: the three cheap segmentation finalists (GLM-5.3 Flash, GPT-5.6 Luna, Qwen3.5 Flash) at the

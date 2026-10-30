@@ -293,8 +293,9 @@ best gives the test design.
   staged route costs almost nothing beside the VLM pass.
 
 **Is the 96's truth biased toward Claude and Gemini?** It is biased by construction and the size of the bias is
-unmeasured. The drafters hold the top two or three rows, but Qwen3.6-27B is within 0.6 of Gemini 3.1 Pro on
-completed pages (95.27 against 96.86 [M]), so the bias cannot be large on typed pages. The field builds unbiased
+unmeasured. The drafters hold the top two or three rows, and Qwen3.6-27B is 1.59 behind Gemini 3.1 Pro on
+completed pages (95.27 against 96.86 [M]; corrected 2026-10-30 from "within 0.6", the measurement audit's OCR-5),
+so the bias cannot be large on typed pages; the later blind check (`ocr-truth-bias-score.md`) reached that soundly. The field builds unbiased
 truth with a scaffold that is not under test plus full manual correction plus an audited sample (claim 37), or
 gates the gold (claim 22). The free test is in §7 item 3: score each route separately on the unreviewed agreed words
 and the adjudicated words; a drafter's lead that lives in the agreed words is bias.
