@@ -260,8 +260,8 @@ def app_kind(fmt):
     f = (fmt or "").strip().lower()
     if not f:
         return None
-    table = [("telegram", "telegram"), ("memo", "memo"), ("letter", "letter"), ("newspaper", "newspaper article"),
-             ("magazine", "magazine article"), ("journal", "journal article"), ("newsletter", "newsletter"),
+    table = [("telegram", "telegram"), ("memo", "memo"), ("newsletter", "newsletter"), ("letter", "letter"),
+             ("newspaper", "newspaper article"), ("magazine", "magazine article"), ("journal", "journal article"),
              ("clipping", "clipping"), ("report", "report"), ("speech", "speech"), ("press release", "press release"),
              ("photo", "photograph"), ("article", "clipping")]
     for cue, k in table:
@@ -512,10 +512,11 @@ def score(pairs, field):
             s["ed2"] += field_match(field, pv, tv, "ed2")
         s["wrong_when_filled"] += pf and not (tf and field_match(field, pv, tv, "ed2"))
         s["filled_when_empty"] += pf and not tf
-    s = dict(s)
+    s = {k: s[k] for k in ("docs", "truth_filled", "pred_filled", "null_when_truth", "exact", "ed2",
+                           "wrong_when_filled", "filled_when_empty")}   # a Counter gives 0 for a missing key
     s["fill_rate"] = s["pred_filled"] / s["docs"] if s["docs"] else None
-    s["precision_ed2"] = s.get("ed2", 0) / s["pred_filled"] if s["pred_filled"] else None
-    s["recall_ed2"] = s.get("ed2", 0) / s["truth_filled"] if s["truth_filled"] else None
+    s["precision_ed2"] = s["ed2"] / s["pred_filled"] if s["pred_filled"] else None
+    s["recall_ed2"] = s["ed2"] / s["truth_filled"] if s["truth_filled"] else None
     return s
 
 

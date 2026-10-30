@@ -69,6 +69,7 @@ class Match(unittest.TestCase):
     def test_app_kind(self):
         self.assertEqual(I.app_kind("Newspaper clipping"), "newspaper article")
         self.assertEqual(I.app_kind("memorandum"), "memo")
+        self.assertEqual(I.app_kind("newsletter article"), "newsletter")   # "newsletter" holds "letter"
         self.assertEqual(I.app_kind("article"), "clipping")
         self.assertEqual(I.app_kind("brochure"), "other")
         self.assertIsNone(I.app_kind(None))
