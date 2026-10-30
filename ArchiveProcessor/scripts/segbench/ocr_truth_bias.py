@@ -82,6 +82,20 @@ def labelled_truth(page: dict, answers: dict) -> list[tuple[str, str]]:
     return out
 
 
+def corrected(page: str, truth: list[tuple[str, str]]) -> list[tuple[str, str]]:
+    """The labelled truth carried onto truth/<page>.txt, which also has the corrections made after the adjudication
+    (ocr_truth.CORRECTIONS, W46.truth-edits): words in an aligned equal run keep their label, the rest were set by
+    the owner and are 'adjudicated'."""
+    raw = (T.CACHE / 'truth' / f'{page}.txt').read_text().split()
+    old = [w for w, _ in truth]
+    if old == raw:
+        return truth
+    out = []
+    for op, i1, i2, j1, j2 in difflib.SequenceMatcher(None, old, raw, autojunk=False).get_opcodes():
+        out += truth[i1:i2] if op == 'equal' else [(w, 'adjudicated') for w in raw[j1:j2]]
+    return out
+
+
 def keyed(raw: list[str]) -> list[tuple[int, str]]:
     """[(index of the raw word, scorer word)]: usually one per raw word, none for punctuation or [illegible]."""
     return [(i, k) for i, w in enumerate(raw) for k in keys(w)]
@@ -241,12 +255,12 @@ def build_sheet(pages96, truths, qwen, rng):
     n_items = sum(len(x['items']) for x in data)
     minutes = (len(data) * T.SECONDS_PER_PAGE + n_items * (T.SECONDS_PER_DISPUTE + T.TYPED_SHARE * T.SECONDS_PER_TYPED)) / 60
     BLIND.mkdir(parents=True, exist_ok=True)
-    (BLIND / 'index.html').write_text(SHEET_HTML.replace('__DATA__', json.dumps(data, ensure_ascii=False))
-                                      .replace('__MINUTES__', f'{minutes:.0f}').replace('__N__', str(n_items))
-                                      .replace('__PAGES__', str(len(data))))
-    (BLIND / 'key.json').write_text(json.dumps({'reference': REFERENCE, 'seed': SEED, 'eligible': eligible,
-                                                'pages': key}, indent=1))
-    (BLIND / 'differences.json').write_text(json.dumps(every, ensure_ascii=False, indent=1))
+    if (BLIND / 'answers.json').exists():
+        # the owner has answered this sheet: its key and differences are what the score reads, so a rerun (on a
+        # truth since corrected, ocr_truth.CORRECTIONS) must not replace them
+        print(f'{BLIND} is answered: sheet, key and differences left as they are', file=sys.stderr)
+    else:
+        write_sheet(data, key, every, eligible, n_items, minutes)
     per_page = sorted(len(d) for d in diffs.values())
     return {'joins': sum(x['join'] for d in every.values() for x in d),
             'blocks': sum(x['block'] and not x['join'] for d in every.values() for x in d),
@@ -256,6 +270,15 @@ def build_sheet(pages96, truths, qwen, rng):
             'differences_median_page': per_page[len(per_page) // 2] if per_page else 0,
             'mixed_items': sum(v['mixed'] for k in key.values() for v in k['items'].values()),
             'boxed_items': sum(x['box'] is not None for d in data for x in d['items'])}
+
+
+def write_sheet(data, key, every, eligible, n_items, minutes):
+    (BLIND / 'index.html').write_text(SHEET_HTML.replace('__DATA__', json.dumps(data, ensure_ascii=False))
+                                      .replace('__MINUTES__', f'{minutes:.0f}').replace('__N__', str(n_items))
+                                      .replace('__PAGES__', str(len(data))))
+    (BLIND / 'key.json').write_text(json.dumps({'reference': REFERENCE, 'seed': SEED, 'eligible': eligible,
+                                                'pages': key}, indent=1))
+    (BLIND / 'differences.json').write_text(json.dumps(every, ensure_ascii=False, indent=1))
 
 
 SHEET_HTML = r"""<!doctype html><meta charset="utf-8"><title>W46 blind truth check</title>
@@ -402,7 +425,7 @@ def main():
     answers = json.loads(ANSWERS.read_text())
     compare = {p['page']: p for p in json.loads((T.CACHE / 'compare.json').read_text()) if 'spans' in p}
     pages96 = [r['page'] for r in P.rows() if r['page'] not in P.AGREEMENT]
-    truths = {p: labelled_truth(compare[p], answers.get(p, {})) for p in pages96}
+    truths = {p: corrected(p, labelled_truth(compare[p], answers.get(p, {}))) for p in pages96}
     for p in pages96:   # the labelled words must be exactly the words the panel scores
         whole = S.tokens(ILLEGIBLE.sub('', S.normal((T.CACHE / 'truth' / f'{p}.txt').read_text())))
         if [k for _, k in keyed([w for w, _ in truths[p]])] != whole:
