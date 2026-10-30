@@ -16441,6 +16441,44 @@
     "propagation": {}
    },
    {
+    "arm": "marker:gemini3.7-flash-gw-marker",
+    "name": "[enclosure] marker, app OCR prompt, Gemini 3.7 Flash, the page at 2048 px (gateway)",
+    "owner": {
+     "TN": 11,
+     "FP": 1,
+     "FN": 3
+    },
+    "precision": [
+     0,
+     1
+    ],
+    "recall": [
+     0,
+     3
+    ],
+    "rate": {
+     "A": [
+      1,
+      60
+     ],
+     "A'": [
+      0,
+      45
+     ],
+     "neg": [
+      0,
+      105
+     ]
+    },
+    "auc": 0.505,
+    "seconds": 7.93,
+    "propagation": {
+     "pos_proposed": 2,
+     "pos_cover_dated": 2,
+     "pos_year_right": 2
+    }
+   },
+   {
     "arm": "relate:date-2b-mlx8",
     "name": "relation classifier, the trained 2B date model, 8-bit MLX",
     "owner": {
@@ -16510,6 +16548,47 @@
      "pos_proposed": 5,
      "pos_cover_dated": 4,
      "pos_year_right": 4,
+     "neg_proposed": 1,
+     "neg_cover_dated": 1,
+     "neg_year_right": 0
+    }
+   },
+   {
+    "arm": "relate:gemini3.7-flash-gw-relate",
+    "name": "relation classifier, Gemini 3.7 Flash with both pages' images (gateway)",
+    "owner": {
+     "TN": 11,
+     "FP": 1,
+     "FN": 3
+    },
+    "precision": [
+     0,
+     1
+    ],
+    "recall": [
+     0,
+     3
+    ],
+    "rate": {
+     "A": [
+      0,
+      60
+     ],
+     "A'": [
+      0,
+      45
+     ],
+     "neg": [
+      1,
+      105
+     ]
+    },
+    "auc": 0.674,
+    "seconds": 4.76,
+    "propagation": {
+     "pos_proposed": 1,
+     "pos_cover_dated": 1,
+     "pos_year_right": 1,
      "neg_proposed": 1,
      "neg_cover_dated": 1,
      "neg_year_right": 0

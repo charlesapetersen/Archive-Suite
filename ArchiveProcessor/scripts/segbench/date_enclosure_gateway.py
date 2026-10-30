@@ -28,6 +28,8 @@ import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
 
+import requests
+
 sys.path.insert(0, os.getcwd())
 import corpus_pairs as CP
 import corpus_survey as CS
@@ -111,7 +113,17 @@ def call(arm, d, body):
         raise SystemExit(f"cap: ${spent():.4f} spent of ${CAP}")
     t = time.time()
     for attempt in range(3):
-        r = G.request("/chat/completions", body)
+        try:
+            r = G.request("/chat/completions", body)
+        except requests.exceptions.RequestException as e:
+            # a timed-out call may still be billed; its cost is unknown, so the ledger records it at the worst case
+            with open(os.path.join(CACHE, "calls.jsonl"), "a") as fh:
+                fh.write(json.dumps({"arm": arm, "id": d["id"], "http": None, "t": t, "error": type(e).__name__,
+                                     "cost": round(WORST[arm], 6)}) + "\n")
+            if attempt < 2:
+                time.sleep(10 * (attempt + 1)); continue
+            print(d["id"], type(e).__name__)
+            return {"id": d["id"], "raw": None}
         if r.status_code in (429, 500, 502, 503, 504) and attempt < 2:
             time.sleep(10 * (attempt + 1)); continue
         break

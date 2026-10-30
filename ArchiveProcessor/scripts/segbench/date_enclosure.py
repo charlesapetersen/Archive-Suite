@@ -623,12 +623,30 @@ FINDINGS = [   # written by hand from the scored runs of 2026-10-22 (Mac) and 20
     "print a year and all 4 are the owner's year; its one negative proposal would have written a wrong year. 43 of "
     "its 225 replies quoted two cues unjoined (not valid JSON); all were false verdicts, and `parse_relate` reads "
     "their verdict rather than counting them as no reply.",
+    "Gemini 3.7 Flash through the Stanford gateway (W46.date-enclosure-paid, 2026-10-29; 3.7 because the gateway "
+    "serves no 3.8), on the app's own route: the app's OCR prompt with the page at 2048 px and no previous image, as "
+    "the app sends it. It wrote `[enclosure]` on 2 of 225 pages: 1 of 60 A, and a25, the owner's reply that is not "
+    "an enclosure; none of the 3 enclosures and no negative. Both covers print the owner's year, so the propagated "
+    "year is right, but the a25 Sent With is wrong. It called 12 of the 225 starts continuations, against the 8B's "
+    "53. The marker the app relies on is close to inert on the cloud route too: recall 0 of 3.",
+    "Gemini 3.7 Flash as a relation classifier with both pages' images is the most conservative arm that answers: "
+    "0 of 60 A, 0 of 45 A' and 1 of 105 negatives (an appendix heading quoted as the cue), AUC 0.67 for its "
+    "confidence, the same as the 27B's. On the owner's 15 it found none of the 3 enclosures (confidences 0.05-0.20) "
+    "and called a25 a Sent With at 0.98, quoting a sentence of the cover that the OCR text does not hold verbatim. "
+    "a25 drew a wrong yes from the Gemini marker, Gemini as classifier and the 27B alike: a reply that discusses a "
+    "draft reads as a cover to every model tried. The images did not help: the 27B, text only, found a22, and "
+    "Gemini with both pages did not.",
+    "Cost, from token usage at Gemini 3.8 Flash's list price taken as a ceiling (the gateway returns no cost): the "
+    "marker about $4.70 per 1,000 documents, the classifier about $3.14; the item spent about $1.76 of its $4.00 "
+    "cap, plus at most one call that the first run lost to a read timeout before the ledger recorded it (about "
+    "$0.003; the runner now records timed-out calls at their worst case).",
     "The limit is the truth, not the arms: 3 owner-confirmed enclosures cannot give a precision for any arm that "
-    "fires, and the structural classes are not relation truth. Still to run: the Gemini arm with images "
-    "(W46.date-enclosure-paid). For the app now: on local routes the marker is inert, so `Sent With` is never "
-    "proposed there, and nothing the free arms showed argues for proposing it by rule instead. A 27B relation pass "
-    "is conservative enough not to hurt (one wrong Sent With among the 105 negatives and one among the owner's 12 noes) but finds too little to "
-    "be worth a stage of its own on a laptop route, where it cannot run anyway.",
+    "fires, and the structural classes are not relation truth. For the app now: the marker is inert on local routes "
+    "and nearly so on the cloud route, so `Sent With` is almost never proposed, and nothing any arm showed argues "
+    "for proposing it more often, by rule or by a relation stage. The 27B and Gemini relation passes are each "
+    "conservative enough not to hurt (one wrong Sent With among the 105 negatives and one among the owner's 12 noes) "
+    "but find too little to be worth a stage of their own; Gemini's costs money on every document and found none "
+    "of the 3 enclosures.",
 ]
 
 
@@ -636,9 +654,10 @@ def write_md(out):
     s = out["set"]
     L = ["# Dating: the enclosure marker and a relation classifier (W46.date-enclosure)", "",
          "Written by `scripts/segbench/date_enclosure.py score`. The first measurement of the app's `[enclosure]` "
-         "marker (10-gap-audit.md §5 item 15, B-dating.md §3). All arms $0: local models on this Mac and Qwen3.6-27B "
-         "on Sherlock; no plan route (CLAUDE.md, \"Plan routes wait for the gateway\"); the Gemini arm is "
-         "W46.date-enclosure-paid. The set and the replies stay private in the bench cache "
+         "marker (10-gap-audit.md §5 item 15, B-dating.md §3). The free arms ran on this Mac and Qwen3.6-27B on "
+         "Sherlock, with no plan route (CLAUDE.md, \"Plan routes wait for the gateway\"); the two Gemini 3.7 Flash arms "
+         "ran through the Stanford gateway (W46.date-enclosure-paid, `date_enclosure_gateway.py`), the only paid ones. "
+         "The set and the replies stay private in the bench cache "
          "(`date-tagging/enclosure/`); this page carries counts only.", "",
          "## The set", "",
          f"{sum(s.values())} document starts of the agreed pool whose previous segment is a document (a relation never "

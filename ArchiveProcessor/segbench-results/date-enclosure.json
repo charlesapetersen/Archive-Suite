@@ -261,6 +261,98 @@
     0
    ]
   },
+  "marker:gemini3.7-flash-gw-marker": {
+   "name": "[enclosure] marker, app OCR prompt, Gemini 3.7 Flash, the page at 2048 px (gateway)",
+   "n": 225,
+   "owner": {
+    "confusion": {
+     "TN": 11,
+     "FP": 1,
+     "FN": 3
+    },
+    "precision": [
+     0,
+     1
+    ],
+    "recall": [
+     0,
+     3
+    ]
+   },
+   "owner_no_bound": {
+    "confusion": {
+     "TN": 10,
+     "FP": 1,
+     "FN": 2
+    },
+    "precision": [
+     0,
+     1
+    ],
+    "recall": [
+     0,
+     2
+    ]
+   },
+   "rate": {
+    "A": {
+     "fired": 1,
+     "of": 60,
+     "no_reply": 0,
+     "ci": [
+      0.003,
+      0.089
+     ]
+    },
+    "A'": {
+     "fired": 0,
+     "of": 45,
+     "no_reply": 0,
+     "ci": [
+      0.0,
+      0.079
+     ]
+    },
+    "neg": {
+     "fired": 0,
+     "of": 105,
+     "no_reply": 0,
+     "ci": [
+      0.0,
+      0.035
+     ]
+    },
+    "owner": {
+     "fired": 1,
+     "of": 15,
+     "no_reply": 0,
+     "ci": [
+      0.012,
+      0.298
+     ]
+    }
+   },
+   "auc_proxy": 0.505,
+   "propagation": {
+    "pos_proposed": 2,
+    "pos_cover_dated": 2,
+    "pos_year_right": 2
+   },
+   "seconds_mean": 7.93,
+   "classified": {
+    "document_start": 213,
+    "document_continuation": 12
+   },
+   "neg_fired_cover_cue": [
+    0,
+    0
+   ],
+   "cost": {
+    "calls": 225,
+    "usd": 1.0566,
+    "per_1000": 4.7
+   }
+  },
   "relate:date-2b-mlx8": {
    "name": "relation classifier, the trained 2B date model, 8-bit MLX",
    "n": 225,
@@ -433,6 +525,105 @@
     0,
     1
    ]
+  },
+  "relate:gemini3.7-flash-gw-relate": {
+   "name": "relation classifier, Gemini 3.7 Flash with both pages' images (gateway)",
+   "n": 225,
+   "owner": {
+    "confusion": {
+     "TN": 11,
+     "FP": 1,
+     "FN": 3
+    },
+    "precision": [
+     0,
+     1
+    ],
+    "recall": [
+     0,
+     3
+    ]
+   },
+   "owner_no_bound": {
+    "confusion": {
+     "TN": 10,
+     "FP": 1,
+     "FN": 2
+    },
+    "precision": [
+     0,
+     1
+    ],
+    "recall": [
+     0,
+     2
+    ]
+   },
+   "rate": {
+    "A": {
+     "fired": 0,
+     "of": 60,
+     "no_reply": 0,
+     "ci": [
+      0.0,
+      0.06
+     ]
+    },
+    "A'": {
+     "fired": 0,
+     "of": 45,
+     "no_reply": 0,
+     "ci": [
+      0.0,
+      0.079
+     ]
+    },
+    "neg": {
+     "fired": 1,
+     "of": 105,
+     "no_reply": 0,
+     "ci": [
+      0.002,
+      0.052
+     ]
+    },
+    "owner": {
+     "fired": 1,
+     "of": 15,
+     "no_reply": 0,
+     "ci": [
+      0.012,
+      0.298
+     ]
+    }
+   },
+   "auc_proxy": 0.674,
+   "propagation": {
+    "pos_proposed": 1,
+    "pos_cover_dated": 1,
+    "pos_year_right": 1,
+    "neg_proposed": 1,
+    "neg_cover_dated": 1,
+    "neg_year_right": 0
+   },
+   "cue_quoted": [
+    2,
+    2
+   ],
+   "cue_found": [
+    1,
+    2
+   ],
+   "seconds_mean": 4.76,
+   "neg_fired_cover_cue": [
+    0,
+    1
+   ],
+   "cost": {
+    "calls": 225,
+    "usd": 0.7062,
+    "per_1000": 3.14
+   }
   }
  }
 }
