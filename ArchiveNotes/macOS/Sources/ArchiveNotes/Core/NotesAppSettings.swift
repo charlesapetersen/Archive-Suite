@@ -76,6 +76,9 @@ struct NotesLayoutSettings: Equatable, Sendable {
     /// spilled up under the toolbar in the VM's visual tour. The default shows about seven rows in a 900 pt window
     /// (at 240 pt it showed four or five, the filter bar taking most of it); the note keeps well over its floor.
     static let defaultListHeight = 300.0, listHeightMin = 220.0, listHeightMax = 440.0
+    /// The list pane's floor: its fixed filter controls need 527 pt in the VM; 540 keeps its minimum proposal
+    /// in step with what it draws. The panes' layouts quote it instead of measuring the pane (see `StackedPanesLayout`).
+    static let listMinWidth = 540.0
     /// The note pane's floor in the stacked layout: its header, locations and details inspector, and an editor
     /// still larger than the details (measured in the VM: at 313 pt the editor got 9, and at 440 an extract's got
     /// 103 against 110 for its details). The list gives way first.

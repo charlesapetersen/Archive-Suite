@@ -14,6 +14,12 @@ final class StackedLayoutUITests: NotesFixtureUITestCase {
 
     private var pinned: Layout?
     override var layoutLaunchArguments: [String] { pinned.map(Self.layoutArguments) ?? [] }
+    /// A window wide enough for the list's Quality column, whose cells are SwiftUI hosting views: the crash the
+    /// tree toggle exposed (run 9) needs that column on screen, which only the stacked layout's wide list shows.
+    private var wideWindow = false
+    override var extraLaunchArguments: [String] {
+        wideWindow ? ["-an.windowWidth", "1440", "-an.windowHeight", "900"] : []
+    }
 
     /// N-49 — a switch with a note being edited loses nothing: the selection, the text typed a moment before (still
     /// inside the autosave delay), the scroll position, and the text then reaches disk. Both directions, both windows.
@@ -128,6 +134,7 @@ final class StackedLayoutUITests: NotesFixtureUITestCase {
     /// Tab still reaches the editor from the list in the stacked layout whenever it does side by side.
     func testStackedOrderIsListThenNoteAndFocusCrossesTheDivider() throws {
         pinned = .stacked
+        wideWindow = true
         try withFixture {
             assertLayout(.stacked, in: mainWindow)
             _ = selectItem(uuid: Self.idPlain)
@@ -140,15 +147,22 @@ final class StackedLayoutUITests: NotesFixtureUITestCase {
             XCTAssertLessThanOrEqual(list.frame.maxY, divider.frame.midY, "the list is above the divider")
             XCTAssertGreaterThanOrEqual(editor.frame.minY, divider.frame.midY, "the note is below the divider")
 
-            // The folder tree's animated hide and show, stacked: this crashed AppKit's layout pass once (a feedback
-            // loop through measured state), found by the stacked visual tour.
+            // The folder tree's animated hide and show, stacked: this crashed AppKit's layout pass twice, found by the
+            // stacked visual tour — once a feedback loop through measured state (checkpoint 9), once the Quality
+            // cells' hosting views asking the window for constraints mid-layout (run 9). The second needs the Quality
+            // column on screen, hence the wide window; the pause is shorter than the toggle's animation so the next
+            // click lands while the table is still being relaid.
+            let quality = mainWindow.descendants(matching: .any).matching(NSPredicate(format: "label == 'Quality'"))
+            XCTAssertTrue(quality.firstMatch.waitForExistence(timeout: 5), "the Quality column should be on screen")
             let toggle = mainWindow.buttons["an.toggleTree"].firstMatch
-            for state in ["hidden", "shown", "hidden", "shown"] {
+            for (n, state) in ["hidden", "shown", "hidden", "shown", "hidden", "shown", "hidden", "shown"].enumerated() {
                 toggle.click()
-                RunLoop.current.run(until: Date().addingTimeInterval(1))
+                RunLoop.current.run(until: Date().addingTimeInterval(n % 2 == 0 ? 0.4 : 1))
                 XCTAssertEqual(app.state, .runningForeground, "the app must survive the tree being \(state), stacked")
-                XCTAssertEqual(mainWindow.descendants(matching: .any)["an.sidebar.newFolder"].firstMatch.exists,
-                               state == "shown", "the tree should be \(state)")
+                if n % 2 == 1 {
+                    XCTAssertEqual(mainWindow.descendants(matching: .any)["an.sidebar.newFolder"].firstMatch.exists,
+                                   state == "shown", "the tree should be \(state)")
+                }
             }
             assertLayout(.stacked, in: mainWindow)
 
@@ -161,6 +175,38 @@ final class StackedLayoutUITests: NotesFixtureUITestCase {
             XCTAssertEqual(stackedTabs != nil, sideTabs != nil,
                            "Tab should reach the editor across the divider exactly when it does side by side")
             XCTAssertNotNil(stackedTabs, "Tab should reach the editor from the list")
+        }
+    }
+
+    /// The stacked visual tour's crash (runs 9 and 10): with the window wide, straight after the list reloads from
+    /// Templates to All Notes, the folder tree's animated toggle relaid the table while the stacked layout measured
+    /// it, and AppKit threw after too many constraint passes. Three times, each toggle inside the reload and the
+    /// previous animation.
+    func testStackedTreeToggleSurvivesAListReload() throws {
+        pinned = .stacked
+        wideWindow = true
+        try withFixture {
+            assertLayout(.stacked, in: mainWindow)
+            let templates = mainWindow.descendants(matching: .any)["an.sidebar.templates"].firstMatch
+            let allNotes = mainWindow.descendants(matching: .any)["an.sidebar.allNotes"].firstMatch
+            let toggle = mainWindow.buttons["an.toggleTree"].firstMatch
+            XCTAssertTrue(templates.waitForExistence(timeout: 10), "the Templates row should exist")
+            for round in 1...3 {
+                templates.click()
+                RunLoop.current.run(until: Date().addingTimeInterval(1.2))
+                allNotes.click()
+                RunLoop.current.run(until: Date().addingTimeInterval(0.6))
+                toggle.click()                                             // hide, during the reload
+                RunLoop.current.run(until: Date().addingTimeInterval(0.4))
+                XCTAssertEqual(app.state, .runningForeground, "round \(round): the app must survive hiding the tree")
+                toggle.click()                                             // show, inside the hide animation
+                RunLoop.current.run(until: Date().addingTimeInterval(1.2))
+                XCTAssertEqual(app.state, .runningForeground, "round \(round): the app must survive showing the tree")
+                XCTAssertTrue(mainWindow.descendants(matching: .any)["an.sidebar.newFolder"].firstMatch
+                                .waitForExistence(timeout: 5), "round \(round): the tree should be back")
+            }
+            _ = selectItem(uuid: Self.idPlain)
+            XCTAssertTrue(editor.waitForExistence(timeout: 10), "the note should still open")
         }
     }
 

@@ -24,6 +24,11 @@ struct ArchiveNotesApp: App {
 #if DEBUG
             UITestAppearance.applyIfRequested()   // the layout guard's light/dark passes (W40.e9)
             TransientRecorder.startIfRequested()  // the transient-state check (W40.e13)
+            // The layout-loop probe writes beside the harness store, which the harness restores before every
+            // test and would otherwise wipe the dump of a test that crashed (W48.notes-stacked-layout).
+            if let store = UserDefaults.standard.string(forKey: "ANUITestStorePath"), !store.isEmpty {
+                LayoutLoopProbe.outputDirectory = URL(fileURLWithPath: store, isDirectory: true).deletingLastPathComponent()
+            }
 #endif
         }
     }

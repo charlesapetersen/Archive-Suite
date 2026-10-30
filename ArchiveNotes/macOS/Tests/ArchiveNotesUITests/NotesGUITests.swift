@@ -93,8 +93,29 @@ class NotesFixtureUITestCase: XCTestCase {
     /// weaken its actor checking. `defer` always shuts down the scratch app after the test body returns.
     func withFixture(_ body: () throws -> Void) throws {
         try setUpOnMainActor()
-        defer { tearDownOnMainActor() }
+        defer {
+            collectLayoutLoopDump()
+            tearDownOnMainActor()
+        }
         try body()
+    }
+
+    /// `LayoutLoopProbe` (DEBUG, harness only) writes `uitest-layoutloop.txt` into the store when one run-loop turn
+    /// relaid an AppKit scroll view too many times. Copy it beside the screenshots so the VM runner collects it.
+    /// Also called from `setUp`, before the fixture restore: a test the app's crash interrupted never reaches its
+    /// `defer` (XCTest unwinds the Swift frame with an ObjC exception), so the next test collects for it. The dump
+    /// sits beside the store, not in it, so the restore cannot wipe it; it is moved, not copied, so each is seen once.
+    func collectLayoutLoopDump() {
+        let src = URL(fileURLWithPath: Self.fixturePath).deletingLastPathComponent()
+            .appendingPathComponent("uitest-layoutloop.txt")
+        guard FileManager.default.fileExists(atPath: src.path) else { return }
+        let stamp = Int(Date().timeIntervalSince1970)
+        let dest = FileManager.default.temporaryDirectory.appendingPathComponent("uitest-layoutloop-\(stamp).txt")
+        try? FileManager.default.removeItem(at: dest)
+        if (try? FileManager.default.copyItem(at: src, to: dest)) != nil {
+            print("[shot] layoutloop: wrote \(dest.path)")
+            try? FileManager.default.removeItem(at: src)
+        }
     }
 
     /// Guard a test that invokes a durable store write. The app is deliberately launchable against an
@@ -200,6 +221,7 @@ class NotesFixtureUITestCase: XCTestCase {
             throw FixtureMissing(path: Self.fixturePath, builder: "scripts/make-notes-fixture.sh")
         }
 
+        collectLayoutLoopDump()   // a dump the previous, crash-interrupted test could not collect
         try restoreCanonicalFixtureFromPristine()
 
         app = .archiveUITestApp()   // never a bare XCUIApplication() — see UITestLaunch

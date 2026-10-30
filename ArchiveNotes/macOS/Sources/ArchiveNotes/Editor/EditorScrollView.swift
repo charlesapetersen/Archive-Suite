@@ -28,6 +28,21 @@ final class EditorScrollView: NSScrollView {
 
     private var textView: EditorTextView? { documentView as? EditorTextView }
 
+    // Under the UITest harness, feed `LayoutLoopProbe` (the stacked tree-toggle crash: which scroll view loops).
+    override func tile() {
+        super.tile()
+#if DEBUG
+        LayoutLoopProbe.note(self, "tile")
+#endif
+    }
+
+    override func layout() {
+#if DEBUG
+        LayoutLoopProbe.note(self, "layout")
+#endif
+        super.layout()
+    }
+
     private func currentPlace() -> Place? {
         guard let textView, let storage = textView.textStorage, storage.length > 0 else { return nil }
         let visible = contentView.bounds

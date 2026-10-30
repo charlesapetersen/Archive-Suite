@@ -29,7 +29,7 @@ struct NotesTableView: NSViewRepresentable {
     func makeNSView(context: Context) -> NSScrollView {
         let coordinator = context.coordinator
 
-        let scrollView = NSScrollView()
+        let scrollView = NotesListScrollView()
         scrollView.hasVerticalScroller = true
         scrollView.hasHorizontalScroller = true
         scrollView.autohidesScrollers = true
@@ -130,6 +130,15 @@ struct NotesTableView: NSViewRepresentable {
     }
 
     @MainActor
+    /// The table takes what it is offered. Without this SwiftUI sizes the scroll view from the Auto Layout engine
+    /// over its cells, which changes as columns resize, and a layout that measures it (the stacked panes did) can
+    /// loop until AppKit throws (W48.notes-stacked-layout, VM runs 9 and 10). The fallbacks only answer an
+    /// unspecified probe: the list pane's floor and the stacked list's floor.
+    func sizeThatFits(_ proposal: ProposedViewSize, nsView: NSScrollView, context: Context) -> CGSize? {
+        CGSize(width: proposal.width ?? NotesLayoutSettings.listMinWidth,
+               height: proposal.height ?? NotesLayoutSettings.listHeightMin)
+    }
+
     func updateNSView(_ scrollView: NSScrollView, context: Context) {
         let coordinator = context.coordinator
         guard let tableView = coordinator.tableView else { return }
@@ -355,6 +364,14 @@ struct NotesTableView: NSViewRepresentable {
                 // The cell's group needs its own name: the audit flagged it once the stacked layout's wider
                 // list showed the Quality column on screen (W48.notes-stacked-layout).
                 hosting.setAccessibilityLabel("Quality")
+                // A hosting view inside a table cell must not ask the window for a constraint pass of its own:
+                // the column's width sizes it, and it has no safe area to track. With both on, the folder tree's
+                // animated toggle in the stacked layout (the only layout wide enough to show this column) relaid
+                // the table while the cell's safe-area observer fired `setNeedsUpdateConstraints` on the window
+                // mid-layout, and AppKit threw inside `_postWindowNeedsUpdateConstraints` — the app died in the
+                // stacked visual tour (W48.notes-stacked-layout, run 9; crash report in the VM artifacts).
+                hosting.safeAreaRegions = []
+                hosting.sizingOptions = []
             }
             return hosting
         }
@@ -596,5 +613,23 @@ final class NotesTitleCellView: NSTableCellView {
         styled.addAttribute(.foregroundColor, value: Self.glyphColor(for: backgroundStyle),
                             range: NSRange(location: 0, length: (Self.replicatedGlyph as NSString).length))
         field.attributedStringValue = styled
+    }
+}
+
+/// The list's scroll view. Under the UITest harness its tiling and layout calls feed `LayoutLoopProbe`, which
+/// writes the sequence when one run-loop turn relays the view too many times (the stacked tree-toggle crash).
+final class NotesListScrollView: NSScrollView {
+    override func tile() {
+        super.tile()
+#if DEBUG
+        LayoutLoopProbe.note(self, "tile")
+#endif
+    }
+
+    override func layout() {
+#if DEBUG
+        LayoutLoopProbe.note(self, "layout")
+#endif
+        super.layout()
     }
 }

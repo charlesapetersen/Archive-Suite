@@ -58,7 +58,7 @@ struct NotesBrowserView: View {
                                 : AnyLayout(HStackLayout(spacing: 0))
             panes {
                 ItemListPane(model: model, nav: nav, selectedTemplateID: $selectedTemplateID)
-                    .frame(minWidth: 540, maxWidth: .infinity, maxHeight: .infinity)
+                    .frame(minWidth: NotesLayoutSettings.listMinWidth, maxWidth: .infinity, maxHeight: .infinity)
                     .clipped()   // never drawn outside its share, under the toolbar or the note
                 PanelDivider(size: stacked ? $listHeight : $detailWidth, panelBefore: stacked,
                              axis: stacked ? .vertical : .horizontal,
@@ -262,10 +262,13 @@ struct StackedPanesLayout: Layout {
     var listHeight: Double
 
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        // The widest pane's floor (the list's filter controls) for a minimum probe; otherwise what is offered.
-        let floorWidth = subviews.map { $0.sizeThatFits(ProposedViewSize(width: 0, height: nil)).width }.max() ?? 0
-        let idealWidth = subviews.map { $0.sizeThatFits(.unspecified).width }.max() ?? floorWidth
-        let width = max(floorWidth, proposal.width ?? idealWidth)
+        // The panes are never measured here. The list holds an AppKit table whose fitting size comes from the Auto
+        // Layout engine over its cells, so it changes while the table relays out; measuring it made every constraint
+        // change inside the table invalidate this layout, which measured it again, placed it again, and so on until
+        // AppKit threw "more Update Constraints passes than there are views in the window" (the folder tree's
+        // animated toggle, stacked, at a wide window: VM runs 9 and 10). The width is what is offered, never under
+        // the list's floor (the widest pane's); the height is the stored list height plus the note's floor.
+        let width = max(NotesLayoutSettings.listMinWidth, proposal.width ?? NotesLayoutSettings.listMinWidth)
         let ideal = NotesLayoutSettings.clampedListHeight(listHeight) + NotesLayoutSettings.stackedDividerHeight
             + NotesLayoutSettings.stackedDetailMinHeight
         let height = max(NotesLayoutSettings.stackedMinHeight, proposal.height ?? ideal)
