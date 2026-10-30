@@ -1,0 +1,26 @@
+{
+  "tag": "W46.layout-photo",
+  "pack": "layout-photo-20261030",
+  "mac": "artifacts/layout-photo-20261030",
+  "submit": "support/corpus/layout-photo-submit.sh",
+  "jobs": 4,
+  "gpu_hours": 6.5,
+  "review": "execution-plans/items/W46.layout-photo.md",
+  "imports": [
+    {"dir": "support/corpus", "modules": ["regions_cluster", "layout_photo_cluster"]},
+    {"modules": ["vllm"]}
+  ],
+  "creates": [
+    "$FS_ROOT/layout-photo-20261030",
+    "$GROUP_HOME/$USER/archive-suite/sherlock-results/layout-photo-20261030"
+  ],
+  "provenance": [],
+  "requires": [
+    "$HF_HOME/hub/models--zai-org--GLM-OCR",
+    "$FS_ROOT/open-sweep-20261019/glm-ocr/ocr/panel-prompt.txt",
+    "$FS_ROOT/interactive-20261019/ocr/images"
+  ],
+  "results": "$GROUP_HOME/$USER/archive-suite/sherlock-results/layout-photo-20261030",
+  "collect": ["$FS_ROOT/layout-photo-20261030/jobs.tsv", "$FS_ROOT/layout-photo-20261030/logs"],
+  "release": "GLM-OCR crops collected into the Mac artifact's out/; score with layout_photo.py (the scoring session's step, item notes)"
+}
