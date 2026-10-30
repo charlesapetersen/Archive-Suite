@@ -1,0 +1,17 @@
+# W48.notes-stacked-layout — LayoutLoopProbe, run 16 (checkpoint 13, whole-point placement), the crashing turn: the same step as run 15
+# Widths are whole points now and the ping-pong is unchanged: clip 1218 ↔ 1201 (the vertical scroller's 17 pt), horizontal scroller shown ↔ hidden, last column 551 ↔ 552, document 1201 throughout.
+===== LayoutLoopProbe dump 3: 12 scroll-view layout calls in one run-loop turn =====
+1246.1375 tile EditorScrollView frame=0,0 1218x459 clip=0,0 1201x459 doc=0,0 1201x459 h=none v=shown win=40,258 1442x902
+1246.1376 tile EditorScrollView frame=0,0 1218x459 clip=0,0 1201x459 doc=0,0 1201x459 h=none v=shown win=40,258 1442x902
+1246.1423 tile NotesListScrollView frame=0,0 1218x143 clip=0,0 1218x143 doc=0,0 1201x130 h=shown v=shown cols=[28, 300, 46, 140, 90, 70, 551] win=40,258 1442x902
+1246.1424 layout NotesListScrollView frame=0,0 1218x143 clip=0,0 1218x143 doc=0,0 1201x130 h=shown v=shown cols=[28, 300, 46, 140, 90, 70, 551] win=40,258 1442x902
+1246.1431 tile NotesListScrollView frame=0,0 1218x143 clip=0,0 1201x143 doc=0,0 1201x130 h=hidden v=shown cols=[28, 300, 46, 140, 90, 70, 552] win=40,258 1442x902
+1246.1440 tile NotesListScrollView frame=0,0 1218x143 clip=0,0 1218x143 doc=0,0 1201x130 h=shown v=shown cols=[28, 300, 46, 140, 90, 70, 551] win=40,258 1442x902
+1246.1456 layout EditorScrollView frame=0,0 1218x459 clip=0,0 1201x459 doc=0,0 1201x459 h=none v=shown win=40,258 1442x902
+1246.1456 tile EditorScrollView frame=0,0 1218x459 clip=0,0 1201x459 doc=0,0 1201x459 h=none v=shown win=40,258 1442x902
+1246.1478 layout NotesListScrollView frame=0,0 1218x143 clip=0,0 1218x143 doc=0,0 1201x130 h=shown v=shown cols=[28, 300, 46, 140, 90, 70, 551] win=40,258 1442x902
+1246.1492 tile NotesListScrollView frame=0,0 1218x143 clip=0,0 1201x143 doc=0,0 1201x130 h=hidden v=shown cols=[28, 300, 46, 140, 90, 70, 552] win=40,258 1442x902
+1246.1502 tile NotesListScrollView frame=0,0 1218x143 clip=0,0 1218x143 doc=0,0 1201x130 h=shown v=shown cols=[28, 300, 46, 140, 90, 70, 551] win=40,258 1442x902
+1246.1519 layout NotesListScrollView frame=0,0 1218x143 clip=0,0 1218x143 doc=0,0 1201x130 h=shown v=shown cols=[28, 300, 46, 140, 90, 70, 551] win=40,258 1442x902
+
+window Archive Notes frame=(40.0, 258.0, 1442.0, 902.0) min=(540.0, 759.0) contentMin=(540.0, 759.0)

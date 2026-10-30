@@ -1,0 +1,17 @@
+# W48.notes-stacked-layout — LayoutLoopProbe, run 15, the crashing turn (light stacked tour, 1442×902, the folder tree's toggle after Templates → All Notes)
+# The last dump the app wrote before AppKit threw 'more Update Constraints passes than there are views in the window'. Columns: CACurrentMediaTime, event, scroll view, frame, clip (content view) frame, document frame, horizontal and vertical scroller, column widths, window frame.
+===== LayoutLoopProbe dump 4: 12 scroll-view layout calls in one run-loop turn =====
+1239.8604 tile EditorScrollView frame=0,0 1219x459 clip=0,0 1202x459 doc=0,0 1202x459 h=none v=shown win=40,258 1442x902
+1239.8605 tile EditorScrollView frame=0,0 1219x459 clip=0,0 1202x459 doc=0,0 1202x459 h=none v=shown win=40,258 1442x902
+1239.8631 tile NotesListScrollView frame=0,0 1219x143 clip=0,0 1219x143 doc=0,0 1202x130 h=shown v=shown cols=[28, 300, 46, 140, 90, 70, 550] win=40,258 1442x902
+1239.8632 layout NotesListScrollView frame=0,0 1219x143 clip=0,0 1219x143 doc=0,0 1202x130 h=shown v=shown cols=[28, 300, 46, 140, 90, 70, 550] win=40,258 1442x902
+1239.8637 tile NotesListScrollView frame=0,0 1219x143 clip=0,0 1202x143 doc=0,0 1203x130 h=hidden v=shown cols=[28, 300, 46, 140, 90, 70, 551] win=40,258 1442x902
+1239.8644 tile NotesListScrollView frame=0,0 1219x143 clip=0,0 1219x143 doc=0,0 1202x130 h=shown v=shown cols=[28, 300, 46, 140, 90, 70, 550] win=40,258 1442x902
+1239.8649 layout EditorScrollView frame=0,0 1219x459 clip=0,0 1202x459 doc=0,0 1202x459 h=none v=shown win=40,258 1442x902
+1239.8650 tile EditorScrollView frame=0,0 1219x459 clip=0,0 1202x459 doc=0,0 1202x459 h=none v=shown win=40,258 1442x902
+1239.8661 layout NotesListScrollView frame=0,0 1219x143 clip=0,0 1219x143 doc=0,0 1202x130 h=shown v=shown cols=[28, 300, 46, 140, 90, 70, 550] win=40,258 1442x902
+1239.8669 tile NotesListScrollView frame=0,0 1219x143 clip=0,0 1202x143 doc=0,0 1203x130 h=hidden v=shown cols=[28, 300, 46, 140, 90, 70, 551] win=40,258 1442x902
+1239.8676 tile NotesListScrollView frame=0,0 1219x143 clip=0,0 1219x143 doc=0,0 1202x130 h=shown v=shown cols=[28, 300, 46, 140, 90, 70, 550] win=40,258 1442x902
+1239.8693 layout NotesListScrollView frame=0,0 1219x143 clip=0,0 1219x143 doc=0,0 1202x130 h=shown v=shown cols=[28, 300, 46, 140, 90, 70, 550] win=40,258 1442x902
+
+window Archive Notes frame=(40.0, 258.0, 1442.0, 902.0) min=(767.0, 759.0) contentMin=(767.0, 759.0)

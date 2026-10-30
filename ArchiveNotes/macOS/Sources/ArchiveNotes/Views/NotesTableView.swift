@@ -135,8 +135,14 @@ struct NotesTableView: NSViewRepresentable {
     /// loop until AppKit throws (W48.notes-stacked-layout, VM runs 9 and 10). The fallbacks only answer an
     /// unspecified probe: the list pane's floor and the stacked list's floor.
     func sizeThatFits(_ proposal: ProposedViewSize, nsView: NSScrollView, context: Context) -> CGSize? {
-        CGSize(width: proposal.width ?? NotesLayoutSettings.listMinWidth,
-               height: proposal.height ?? NotesLayoutSettings.listHeightMin)
+        // Whole points, so the columns fitted to the clip never come out a point wider than it (see
+        // `StackedPanesLayout.placeSubviews`); an infinite probe is passed through unchanged.
+        func whole(_ v: CGFloat?, _ fallback: Double) -> CGFloat {
+            guard let v else { return CGFloat(fallback) }
+            return v.isFinite ? v.rounded(.down) : v
+        }
+        return CGSize(width: whole(proposal.width, NotesLayoutSettings.listMinWidth),
+                      height: whole(proposal.height, NotesLayoutSettings.listHeightMin))
     }
 
     func updateNSView(_ scrollView: NSScrollView, context: Context) {

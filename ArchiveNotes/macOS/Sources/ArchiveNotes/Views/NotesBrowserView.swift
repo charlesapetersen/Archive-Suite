@@ -279,12 +279,19 @@ struct StackedPanesLayout: Layout {
         guard subviews.count == 3 else { return }
         let list = CGFloat(NotesLayoutSettings.stackedListHeight(stored: listHeight, paneHeight: Double(bounds.height)))
         let divider = CGFloat(NotesLayoutSettings.stackedDividerHeight)
-        subviews[0].place(at: bounds.origin, proposal: ProposedViewSize(width: bounds.width, height: list))
-        subviews[1].place(at: CGPoint(x: bounds.minX, y: bounds.minY + list),
-                          proposal: ProposedViewSize(width: bounds.width, height: divider))
-        subviews[2].place(at: CGPoint(x: bounds.minX, y: bounds.minY + list + divider),
-                          proposal: ProposedViewSize(width: bounds.width,
-                                                     height: max(0, bounds.height - list - divider)))
+        // Whole points. The folder tree's animated toggle hands this layout fractional widths; the list's AppKit
+        // table then fitted its columns to a fractional clip and came out one point too wide, which showed the
+        // horizontal scroller, which (the stacked table being short, its rows within a scroller's height of its
+        // clip) flipped the vertical one, which changed the clip width back, and so on — AppKit threw after too
+        // many constraint passes in one display cycle (W48.notes-stacked-layout, the stacked tours' crash, caught
+        // by LayoutLoopProbe in run 15: clip 1219 ↔ 1202, document 1202 ↔ 1203, scroller shown ↔ hidden).
+        let width = bounds.width.rounded(.down)
+        let x = bounds.minX.rounded(.down), y = bounds.minY.rounded(.down)
+        subviews[0].place(at: CGPoint(x: x, y: y), proposal: ProposedViewSize(width: width, height: list))
+        subviews[1].place(at: CGPoint(x: x, y: y + list), proposal: ProposedViewSize(width: width, height: divider))
+        subviews[2].place(at: CGPoint(x: x, y: y + list + divider),
+                          proposal: ProposedViewSize(width: width,
+                                                     height: max(0, (bounds.height - list - divider).rounded(.down))))
     }
 }
 
