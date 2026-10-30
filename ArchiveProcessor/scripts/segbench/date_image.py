@@ -254,6 +254,11 @@ def outputs(cluster, mac_dirs):
         arms.append((label, f"{DD.MODELS.get(key, (None, key))[1]} (this Mac, {int(side):,} px)"))
         for rec in recs:
             got[(label, rec["id"])] = rec
+    for g in sorted((PACK / "gateway").glob("gemini*")) if mac_dirs else []:     # date_image_gateway.py run
+        recs = [json.loads(f.read_text()) for f in g.glob("*.json")]
+        if recs:
+            arms.append(("gw:" + g.name, f"Gemini 3.7 Flash (gateway, {int(g.name.rsplit('-', 1)[1]):,} px)"))
+            got.update({("gw:" + g.name, rec["id"]): rec for rec in recs})
     return got, arms
 
 
@@ -329,7 +334,9 @@ def cmd_score(a):
          "with a confirmed JPEG original of at least one of their first two pages (the other 9 have none; the corpus PDFs "
          "are never sent, owner 2026-10-22). Each model was asked to quote every date on the pages, say where it is and "
          "what kind, and give the document's own date; once with the images alone and once with the ABBYY text as well. "
-         "The owner's year is never in the prompt. $0: open weights only (Gemini is W46.date-image-paid).", "",
+         "The owner's year is never in the prompt. The open arms cost $0; Gemini 3.7 Flash (W46.date-image-paid, "
+         "`date_image_gateway.py`) read the images alone through the Stanford gateway, about $0.34 for the 122 at "
+         "3.8's list price taken as a ceiling.", "",
          "Measures, per document: **doc year** the document date the model gave equals the owner's year (exact; "
          "within one); **on the page** some quoted date has the owner's year written in it (a year the model "
          "supplied, not written in the quote, does not count); **not in ABBYY** of those, the quote is not in the "

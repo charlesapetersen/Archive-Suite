@@ -170,7 +170,8 @@ def dating_enclosure():
 
 
 IMAGE_ARMS = {"qwen3.6-27b": "Qwen3.6-27B (Sherlock, 2,400 px)",
-              "mac:qwen3-vl-8b-mlx4-1400": "Qwen3-VL 8B, 4-bit MLX (this Mac, 1,400 px)"}
+              "mac:qwen3-vl-8b-mlx4-1400": "Qwen3-VL 8B, 4-bit MLX (this Mac, 1,400 px)",
+              "gw:gemini3.7-flash-gw-2400": "Gemini 3.7 Flash (Stanford gateway, 2,400 px)"}
 
 
 def dating_image():

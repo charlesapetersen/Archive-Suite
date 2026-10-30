@@ -16633,6 +16633,15 @@
     "exact": 21,
     "within1": 25,
     "on_page": 33
+   },
+   {
+    "arm": "gw:gemini3.7-flash-gw-2400",
+    "name": "Gemini 3.7 Flash (Stanford gateway, 2,400 px)",
+    "variant": "image",
+    "n": 122,
+    "exact": 52,
+    "within1": 58,
+    "on_page": 56
    }
   ],
   "retrieval": [

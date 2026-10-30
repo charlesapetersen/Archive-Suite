@@ -1,0 +1,294 @@
+{
+ "model": "gemini-3.7-flash",
+ "crops": {
+  "letterhead": [
+   0.0,
+   0.22
+  ],
+  "body": [
+   0.35,
+   0.6
+  ]
+ },
+ "pool": 20,
+ "spent_estimate": 0.0265,
+ "rows": [
+  {
+   "doc": "o:eea32dd702cc97cc",
+   "cls": "D",
+   "crop": "letterhead",
+   "truth": 1948,
+   "parsed": true,
+   "content": "printed",
+   "typeface": "Bodoni / Modern display serif",
+   "machine": null,
+   "features": [
+    "extreme stroke contrast between thick stems and razor-thin horizontal strokes",
+    "flat, unbracketed hairline serifs",
+    "vertical axis of stress",
+    "compressed modern serif display style typical of mid-20th century publishing"
+   ],
+   "earliest": 1930,
+   "latest": 1980,
+   "confidence": "high",
+   "named": true,
+   "checkable": true,
+   "consistent": true,
+   "width": 50
+  },
+  {
+   "doc": "o:8497e0c5109707ef",
+   "cls": "D",
+   "crop": "body",
+   "truth": 1957,
+   "parsed": true,
+   "content": "typewritten",
+   "typeface": "Pica",
+   "machine": null,
+   "features": [
+    "standard monospaced serif typewriter font",
+    "double-storey 'a'",
+    "spirit duplicated / ditto purple-blue ink"
+   ],
+   "earliest": 1920,
+   "latest": 1980,
+   "confidence": "medium",
+   "named": true,
+   "checkable": true,
+   "consistent": true,
+   "width": 60
+  },
+  {
+   "doc": "o:d0d7a60ccdd9bb0a",
+   "cls": "C",
+   "crop": "letterhead",
+   "truth": 1976,
+   "parsed": true,
+   "content": "handwritten",
+   "typeface": null,
+   "machine": null,
+   "features": [
+    "Hand-drawn geometric diagram with shaded area",
+    "Handwritten algebraic/coordinate labels (x' y', A1, x2 y2)",
+    "Drawn on green grid engineering calculation paper"
+   ],
+   "earliest": null,
+   "latest": null,
+   "confidence": "high",
+   "named": false,
+   "checkable": false,
+   "consistent": false,
+   "width": null
+  },
+  {
+   "doc": "o:69d338c488d1b113",
+   "cls": "C",
+   "crop": "body",
+   "truth": 1978,
+   "parsed": true,
+   "content": "typewritten",
+   "typeface": "Pica",
+   "machine": null,
+   "features": [
+    "monospaced serif typewriter design",
+    "standard two-story 'a'",
+    "straight-legged capital 'M'",
+    "open curved quotes/apostrophes",
+    "typical manual or early electric typewriter strike impression with ink ribbon halo"
+   ],
+   "earliest": 1930,
+   "latest": 1985,
+   "confidence": "medium",
+   "named": true,
+   "checkable": true,
+   "consistent": true,
+   "width": 55
+  },
+  {
+   "doc": "o:e005e1299b915ef0",
+   "cls": "C",
+   "crop": "letterhead",
+   "truth": 1949,
+   "parsed": true,
+   "content": "typewritten",
+   "typeface": "Pica",
+   "machine": null,
+   "features": [
+    "standard monospaced serif design",
+    "two-story lowercase 'a'",
+    "standard double-storey 'g'",
+    "underlined capital heading with mechanical underscore"
+   ],
+   "earliest": 1920,
+   "latest": 1980,
+   "confidence": "medium",
+   "named": true,
+   "checkable": true,
+   "consistent": true,
+   "width": 60
+  },
+  {
+   "doc": "o:406e716de3d3a441",
+   "cls": "C",
+   "crop": "body",
+   "truth": 1975,
+   "parsed": true,
+   "content": "printed",
+   "typeface": "Times New Roman / Futura",
+   "machine": null,
+   "features": [
+    "Proportionally spaced typeset text in multiple justified columns",
+    "Serif body typeface with bracketed serifs and moderate stroke contrast",
+    "Geometric/Grotesque sans-serif used for headings and left-column feature listings",
+    "Offset lithographic or letterpress commercial printing texture"
+   ],
+   "earliest": 1950,
+   "latest": 1975,
+   "confidence": "high",
+   "named": true,
+   "checkable": true,
+   "consistent": true,
+   "width": 25
+  },
+  {
+   "doc": "o:8012cef582d347fb",
+   "cls": "C",
+   "crop": "letterhead",
+   "truth": 1970,
+   "parsed": true,
+   "content": "printed",
+   "typeface": "Alternate Gothic / Condensed Sans-Serif",
+   "machine": null,
+   "features": [
+    "Bold sans-serif italic header font with humanist/grotesque terminals",
+    "Condensed sans-serif typesetting for corporate entry text and tabular alignment",
+    "Typeset leader dots (periods) aligned for tabular directory layout"
+   ],
+   "earliest": 1950,
+   "latest": 1985,
+   "confidence": "medium",
+   "named": true,
+   "checkable": true,
+   "consistent": true,
+   "width": 35
+  },
+  {
+   "doc": "o:e05d89ab85dfe6ff",
+   "cls": "C",
+   "crop": "body",
+   "truth": 1974,
+   "parsed": true,
+   "content": "printed",
+   "typeface": "Century Expanded / Modern Serif",
+   "machine": null,
+   "features": [
+    "High stroke contrast with vertical axis of stress",
+    "Ball terminals on lowercase 'r', 'f', and 'y'",
+    "Clean, bracketed hairline serifs on uppercase capitals",
+    "Traditional book/commercial typography style"
+   ],
+   "earliest": 1900,
+   "latest": 1990,
+   "confidence": "medium",
+   "named": true,
+   "checkable": true,
+   "consistent": true,
+   "width": 90
+  },
+  {
+   "doc": "o:38ba04140091ed6e",
+   "cls": "B",
+   "crop": "letterhead",
+   "truth": 1959,
+   "parsed": true,
+   "content": "typewritten",
+   "typeface": "Standard Pica",
+   "machine": "Manual Typewriter (Underwood/Royal/Smith-Corona)",
+   "features": [
+    "Monospaced serif typewriter font",
+    "Double-story 'a'",
+    "Curved bottom terminal on lowercase 't'",
+    "Underlined capital title with characteristic uneven manual strike pressure",
+    "Carbon-copy or standard ribbon bleed effect"
+   ],
+   "earliest": 1920,
+   "latest": 1965,
+   "confidence": "medium",
+   "named": true,
+   "checkable": true,
+   "consistent": true,
+   "width": 45
+  },
+  {
+   "doc": "o:27dfa6ca7f27b8cc",
+   "cls": "B",
+   "crop": "body",
+   "truth": 1982,
+   "parsed": true,
+   "content": "typewritten",
+   "typeface": "Courier",
+   "machine": "IBM Selectric",
+   "features": [
+    "monospaced slab serif letterforms",
+    "classic Courier lowercase 'r' with bulbous right terminal",
+    "two-story lowercase 'a'",
+    "open-loop single-story lowercase 'g'",
+    "heavy, even stroke weight typical of electric typewriters/typeballs"
+   ],
+   "earliest": 1961,
+   "latest": 1990,
+   "confidence": "high",
+   "named": true,
+   "checkable": true,
+   "consistent": true,
+   "width": 29
+  },
+  {
+   "doc": "o:cd5e76208b5f3266",
+   "cls": "B",
+   "crop": "letterhead",
+   "truth": 1967,
+   "parsed": true,
+   "content": "printed",
+   "typeface": "Helvetica",
+   "machine": null,
+   "features": [
+    "Neo-grotesque sans-serif typeface in headings and body text",
+    "Horizontal stroke terminal on lowercase 'e'",
+    "Curved tail on lowercase 't' with a flat top cut",
+    "Square title dot on lowercase 'i'"
+   ],
+   "earliest": 1957,
+   "latest": 1985,
+   "confidence": "high",
+   "named": true,
+   "checkable": true,
+   "consistent": true,
+   "width": 28
+  },
+  {
+   "doc": "o:3a60a7e4b3065ce8",
+   "cls": "A",
+   "crop": "body",
+   "truth": 1968,
+   "parsed": true,
+   "content": "typewritten",
+   "typeface": "Pica",
+   "machine": "Standard Manual Typewriter",
+   "features": [
+    "standard monospaced slab-serif/roman typewritten letterforms",
+    "double-storey lowercase 'a'",
+    "ink spread and character degradation typical of carbon ribbon or spirit/mimeograph duplication",
+    "ball terminal on lowercase 'r'",
+    "curved tail on lowercase 't'"
+   ],
+   "earliest": 1920,
+   "latest": 1980,
+   "confidence": "medium",
+   "named": true,
+   "checkable": true,
+   "consistent": true,
+   "width": 60
+  }
+ ]
+}
