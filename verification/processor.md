@@ -1130,6 +1130,7 @@ cover the Mac: the receiver, the tag card, the drain gate, staging, finalize and
 - **Status:** `unproven`
 - **History:**
   - 2026-10-29 W48.appearance-processor — row written, `unproven`.
+  - 2026-10-30 W48.appearance-processor — builder's VM runs green (AppearanceSettingUITests 2/2, whole suite 0 failures, the BySetting audit and tours); still `unproven` until W48.appearance-verify.
 
 ## Source drift — doc against doc, for `W40.b5`
 
