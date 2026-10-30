@@ -125,6 +125,29 @@ class Vote(unittest.TestCase):
         self.assertEqual(M.vote(combs)["gaps"][2]["confidence"], 1.0)
 
 
+class Pooled(unittest.TestCase):
+    def row(self, box, arm, pages, exact, tp, fs, fm, model="2b"):
+        c = {"doc_pages": pages, "pages_exact": exact, "tp": tp, "false_splits": fs, "false_merges": fm}
+        return {"model": model, "box": box, "arm": arm, "failed_units": 0, "counts": c}
+
+    def test_pools_sum_counts_and_skip_a_cell_missing_a_box(self):
+        rows = [self.row(b, "k7-it", 100, 90, 10, 1, 1) for b in M.DEV] + \
+               [self.row(b, "folder-it", 100, 50, 10, 5, 5) for b in M.DEV[1:]]
+        p = M.pooled(rows)
+        self.assertEqual([(r["pool"], r["arm"]) for r in p], [("development", "k7-it")])
+        self.assertEqual(p[0]["pages"], 300)
+        self.assertAlmostEqual(p[0]["pages_exact"], 0.9)
+        self.assertAlmostEqual(p[0]["boundary_f1"], 60 / 66)
+
+    def test_mean_of_singles_needs_all_six_runs(self):
+        rows = [self.row(b, arm, 100, 70 + i, 10, 2, 2) for i, arm in enumerate(M.vote_arms()) for b in ("Stanton", "RG165")]
+        p = M.pooled(rows)
+        mean = [r for r in p if r["arm"] == "mean-of-singles"]
+        self.assertEqual(len(mean), 1)
+        self.assertAlmostEqual(mean[0]["pages_exact"], 0.725)
+        self.assertFalse([r for r in M.pooled(rows[2:]) if r["arm"] == "mean-of-singles"])
+
+
 class Runner(unittest.TestCase):
     def test_cluster_seg_sends_only_the_named_images_at_the_named_limit(self):
         sys.path.insert(0, str(HERE / "institutional-compute"))

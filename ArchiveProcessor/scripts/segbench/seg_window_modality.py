@@ -400,6 +400,40 @@ def score_row(col, comb, truth_photos):
             "false_splits": c.false_splits, "false_merges": c.false_merges}
 
 
+POOLS = {"development": DEV, "test": ("Stanton", "RG165")}
+
+
+def pooled(rows):
+    """Each model and arm over a pool's boxes, from the summed counts; a cell missing any box is left out, and the
+    mean of single runs is the mean of the pooled single runs."""
+    by = defaultdict(dict)
+    for r in rows:
+        if "counts" in r:
+            by[(r["model"], r["arm"])][r["box"]] = r
+    out = []
+    for (model, arm), boxes in by.items():
+        for pool, names in POOLS.items():
+            if not all(b in boxes for b in names):
+                continue
+            c = Counter()
+            for b in names:
+                c.update({k: boxes[b]["counts"][k] for k in ("doc_pages", "pages_exact", "tp", "false_splits",
+                                                            "false_merges")})
+            out.append({"model": model, "pool": pool, "arm": arm, "pages": c["doc_pages"],
+                        "pages_exact": c["pages_exact"] / c["doc_pages"],
+                        "boundary_f1": 2 * c["tp"] / (2 * c["tp"] + c["false_splits"] + c["false_merges"]),
+                        "false_splits": c["false_splits"], "false_merges": c["false_merges"],
+                        "failed_units": sum(boxes[b].get("failed_units", 0) for b in names)})
+    for model in sorted({r["model"] for r in out}):
+        for pool in POOLS:
+            singles = [r for r in out if r["model"] == model and r["pool"] == pool and r["arm"] in vote_arms()]
+            if len(singles) == len(vote_arms()):
+                out.append({"model": model, "pool": pool, "arm": "mean-of-singles", "runs": len(singles),
+                            "pages_exact": sum(r["pages_exact"] for r in singles) / len(singles),
+                            "boundary_f1": sum(r["boundary_f1"] for r in singles) / len(singles)})
+    return sorted(out, key=lambda r: (r["model"], r["pool"], r["arm"]))
+
+
 def cmd_score(a):
     _, _, _, _, _, SC = _seg()
     freeze = check(a.pack)
@@ -439,7 +473,8 @@ def cmd_score(a):
                                  **score_row(col, vote([combs[x] for x in arms]), truth_photos)})
     if missing and not a.partial:
         raise SystemExit(f"{len(missing)} cells incomplete (first: {missing[0]}); --partial to score what came back")
-    out = {"tag": TAG, "boxes": freeze["boxes"], "rows": rows, "runs": runs, "incomplete": missing}
+    out = {"tag": TAG, "boxes": freeze["boxes"], "rows": rows, "pooled": pooled(rows), "runs": runs,
+           "incomplete": missing}
     (RESULTS / "seg-window-modality.json").write_text(json.dumps(out, indent=1) + "\n")
     for r in rows:
         print(f"{r['model']:8} {r['box']:11} {r['arm']:16} pages exact {r['pages_exact']:.3f}  F1 {r['boundary_f1']:.3f}"
