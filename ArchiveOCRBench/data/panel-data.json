@@ -9481,10 +9481,10 @@
     "answered": 92,
     "nes_answered": 95.08,
     "strict": 92.07,
-    "transport": 3,
-    "model": 0,
+    "transport": 0,
+    "model": 3,
     "cap": 0,
-    "refusal": 0,
+    "refusal": 3,
     "empty": 0,
     "vs_baseline": {
      "n": 91,
@@ -10009,9 +10009,9 @@
     "answered": 86,
     "nes_answered": 92.35,
     "strict": 83.6,
-    "transport": 2,
-    "model": 7,
-    "cap": 7,
+    "transport": 1,
+    "model": 8,
+    "cap": 8,
     "refusal": 0,
     "empty": 0,
     "vs_baseline": {
@@ -10387,46 +10387,6 @@
     "source": "gemini",
     "route": "gemini-3.7-flash-gw",
     "arm": "pp-doclayoutv3",
-    "group": "kind:handwritten",
-    "n": 16,
-    "ok": 15,
-    "nes": 0.7029,
-    "nb_overall": 0.7153,
-    "bowf1": 0.7976,
-    "gap": 0.0823,
-    "missed_rate": 0.2099,
-    "added_rate": 0.0619,
-    "latin_pages": 16,
-    "d_nes": {
-     "n": 16,
-     "delta": -0.2478,
-     "p": 0.0001,
-     "lo": -0.3911,
-     "hi": -0.1239
-    },
-    "d_bowf1": {
-     "n": 16,
-     "delta": -0.1758,
-     "p": 0.0006,
-     "lo": -0.3211,
-     "hi": -0.0596
-    },
-    "d_nb_overall": -0.2524,
-    "d_gap": 0.0766,
-    "d_missed_rate": 0.1838,
-    "d_added_rate": 0.0348,
-    "d_bowf1_answered": {
-     "n": 15,
-     "delta": -0.1235,
-     "p": 0.0018,
-     "lo": -0.2242,
-     "hi": -0.042
-    }
-   },
-   {
-    "source": "gemini",
-    "route": "gemini-3.7-flash-gw",
-    "arm": "pp-doclayoutv3",
     "group": "handwritten",
     "n": 16,
     "ok": 15,
@@ -10787,46 +10747,6 @@
     "source": "gemini",
     "route": "gemini-3.7-flash-gw",
     "arm": "tiles",
-    "group": "kind:handwritten",
-    "n": 16,
-    "ok": 16,
-    "nes": 0.9056,
-    "nb_overall": 0.9262,
-    "bowf1": 0.962,
-    "gap": 0.0358,
-    "missed_rate": 0.0266,
-    "added_rate": 0.0445,
-    "latin_pages": 16,
-    "d_nes": {
-     "n": 16,
-     "delta": -0.045,
-     "p": 0.0161,
-     "lo": -0.0912,
-     "hi": -0.0107
-    },
-    "d_bowf1": {
-     "n": 16,
-     "delta": -0.0114,
-     "p": 0.7142,
-     "lo": -0.0451,
-     "hi": 0.0118
-    },
-    "d_nb_overall": -0.0415,
-    "d_gap": 0.0302,
-    "d_missed_rate": 0.0005,
-    "d_added_rate": 0.0174,
-    "d_bowf1_answered": {
-     "n": 16,
-     "delta": -0.0114,
-     "p": 0.7142,
-     "lo": -0.0451,
-     "hi": 0.0118
-    }
-   },
-   {
-    "source": "gemini",
-    "route": "gemini-3.7-flash-gw",
-    "arm": "tiles",
     "group": "handwritten",
     "n": 16,
     "ok": 16,
@@ -11162,21 +11082,6 @@
     "source": "gemini",
     "route": "gemini-3.7-flash-gw",
     "arm": "whole",
-    "group": "kind:handwritten",
-    "n": 16,
-    "ok": 16,
-    "nes": 0.9507,
-    "nb_overall": 0.9677,
-    "bowf1": 0.9734,
-    "gap": 0.0057,
-    "missed_rate": 0.0261,
-    "added_rate": 0.027,
-    "latin_pages": 16
-   },
-   {
-    "source": "gemini",
-    "route": "gemini-3.7-flash-gw",
-    "arm": "whole",
     "group": "handwritten",
     "n": 16,
     "ok": 16,
@@ -11331,46 +11236,6 @@
      "p": 0.0001,
      "lo": -0.1606,
      "hi": -0.054
-    }
-   },
-   {
-    "source": "open readers",
-    "route": "glm-ocr",
-    "arm": "doclayout_yolo",
-    "group": "kind:handwritten",
-    "n": 16,
-    "ok": 11,
-    "nes": 0.1099,
-    "nb_overall": 0.1148,
-    "bowf1": 0.1304,
-    "gap": 0.0156,
-    "missed_rate": 0.8873,
-    "added_rate": 0.027,
-    "latin_pages": 16,
-    "d_nes": {
-     "n": 16,
-     "delta": -0.7462,
-     "p": 0.0002,
-     "lo": -0.8443,
-     "hi": -0.6169
-    },
-    "d_bowf1": {
-     "n": 16,
-     "delta": -0.7354,
-     "p": 0.0001,
-     "lo": -0.8201,
-     "hi": -0.6176
-    },
-    "d_nb_overall": -0.7524,
-    "d_gap": 0.017,
-    "d_missed_rate": 0.7434,
-    "d_added_rate": -0.0839,
-    "d_bowf1_answered": {
-     "n": 11,
-     "delta": -0.7202,
-     "p": 0.0011,
-     "lo": -0.8403,
-     "hi": -0.5577
     }
    },
    {
@@ -11737,46 +11602,6 @@
     "source": "open readers",
     "route": "glm-ocr",
     "arm": "pp-doclayoutv3",
-    "group": "kind:handwritten",
-    "n": 16,
-    "ok": 15,
-    "nes": 0.7015,
-    "nb_overall": 0.697,
-    "bowf1": 0.7352,
-    "gap": 0.0382,
-    "missed_rate": 0.2942,
-    "added_rate": 0.0976,
-    "latin_pages": 16,
-    "d_nes": {
-     "n": 16,
-     "delta": -0.1546,
-     "p": 0.0253,
-     "lo": -0.2843,
-     "hi": -0.0452
-    },
-    "d_bowf1": {
-     "n": 16,
-     "delta": -0.1307,
-     "p": 0.0108,
-     "lo": -0.2477,
-     "hi": -0.0381
-    },
-    "d_nb_overall": -0.1702,
-    "d_gap": 0.0395,
-    "d_missed_rate": 0.1503,
-    "d_added_rate": -0.0133,
-    "d_bowf1_answered": {
-     "n": 15,
-     "delta": -0.0877,
-     "p": 0.0219,
-     "lo": -0.1682,
-     "hi": -0.0232
-    }
-   },
-   {
-    "source": "open readers",
-    "route": "glm-ocr",
-    "arm": "pp-doclayoutv3",
     "group": "handwritten",
     "n": 16,
     "ok": 15,
@@ -12137,46 +11962,6 @@
     "source": "open readers",
     "route": "glm-ocr",
     "arm": "tiles",
-    "group": "kind:handwritten",
-    "n": 16,
-    "ok": 16,
-    "nes": 0.869,
-    "nb_overall": 0.8814,
-    "bowf1": 0.8785,
-    "gap": -0.0028,
-    "missed_rate": 0.1302,
-    "added_rate": 0.1027,
-    "latin_pages": 16,
-    "d_nes": {
-     "n": 16,
-     "delta": 0.0129,
-     "p": 0.1354,
-     "lo": -0.0012,
-     "hi": 0.0297
-    },
-    "d_bowf1": {
-     "n": 16,
-     "delta": 0.0127,
-     "p": 0.0572,
-     "lo": 0.0011,
-     "hi": 0.024
-    },
-    "d_nb_overall": 0.0142,
-    "d_gap": -0.0015,
-    "d_missed_rate": -0.0137,
-    "d_added_rate": -0.0082,
-    "d_bowf1_answered": {
-     "n": 16,
-     "delta": 0.0127,
-     "p": 0.0572,
-     "lo": 0.0011,
-     "hi": 0.024
-    }
-   },
-   {
-    "source": "open readers",
-    "route": "glm-ocr",
-    "arm": "tiles",
     "group": "handwritten",
     "n": 16,
     "ok": 16,
@@ -12512,21 +12297,6 @@
     "source": "open readers",
     "route": "glm-ocr",
     "arm": "whole",
-    "group": "kind:handwritten",
-    "n": 16,
-    "ok": 16,
-    "nes": 0.8561,
-    "nb_overall": 0.8672,
-    "bowf1": 0.8658,
-    "gap": -0.0014,
-    "missed_rate": 0.1439,
-    "added_rate": 0.1109,
-    "latin_pages": 16
-   },
-   {
-    "source": "open readers",
-    "route": "glm-ocr",
-    "arm": "whole",
     "group": "handwritten",
     "n": 16,
     "ok": 16,
@@ -12681,46 +12451,6 @@
      "p": 0.0003,
      "lo": -0.1773,
      "hi": -0.0598
-    }
-   },
-   {
-    "source": "open readers",
-    "route": "lightonocr3-4b",
-    "arm": "doclayout_yolo",
-    "group": "kind:handwritten",
-    "n": 16,
-    "ok": 11,
-    "nes": 0.1125,
-    "nb_overall": 0.12,
-    "bowf1": 0.1325,
-    "gap": 0.0125,
-    "missed_rate": 0.8886,
-    "added_rate": 0.0376,
-    "latin_pages": 16,
-    "d_nes": {
-     "n": 16,
-     "delta": -0.7759,
-     "p": 0.0002,
-     "lo": -0.8751,
-     "hi": -0.6438
-    },
-    "d_bowf1": {
-     "n": 16,
-     "delta": -0.7874,
-     "p": 0.0001,
-     "lo": -0.871,
-     "hi": -0.6648
-    },
-    "d_nb_overall": -0.7937,
-    "d_gap": 0.0063,
-    "d_missed_rate": 0.7869,
-    "d_added_rate": -0.0115,
-    "d_bowf1_answered": {
-     "n": 11,
-     "delta": -0.754,
-     "p": 0.0011,
-     "lo": -0.8721,
-     "hi": -0.589
     }
    },
    {
@@ -13087,46 +12817,6 @@
     "source": "open readers",
     "route": "lightonocr3-4b",
     "arm": "pp-doclayoutv3",
-    "group": "kind:handwritten",
-    "n": 16,
-    "ok": 15,
-    "nes": 0.677,
-    "nb_overall": 0.6015,
-    "bowf1": 0.7424,
-    "gap": 0.1409,
-    "missed_rate": 0.2452,
-    "added_rate": 0.1398,
-    "latin_pages": 16,
-    "d_nes": {
-     "n": 16,
-     "delta": -0.2114,
-     "p": 0.004,
-     "lo": -0.3551,
-     "hi": -0.0867
-    },
-    "d_bowf1": {
-     "n": 16,
-     "delta": -0.1775,
-     "p": 0.0067,
-     "lo": -0.3196,
-     "hi": -0.0612
-    },
-    "d_nb_overall": -0.3122,
-    "d_gap": 0.1347,
-    "d_missed_rate": 0.1434,
-    "d_added_rate": 0.0907,
-    "d_bowf1_answered": {
-     "n": 15,
-     "delta": -0.1272,
-     "p": 0.0155,
-     "lo": -0.2281,
-     "hi": -0.0403
-    }
-   },
-   {
-    "source": "open readers",
-    "route": "lightonocr3-4b",
-    "arm": "pp-doclayoutv3",
     "group": "handwritten",
     "n": 16,
     "ok": 15,
@@ -13487,46 +13177,6 @@
     "source": "open readers",
     "route": "lightonocr3-4b",
     "arm": "tiles",
-    "group": "kind:handwritten",
-    "n": 16,
-    "ok": 16,
-    "nes": 0.8748,
-    "nb_overall": 0.8765,
-    "bowf1": 0.9112,
-    "gap": 0.0347,
-    "missed_rate": 0.0875,
-    "added_rate": 0.0921,
-    "latin_pages": 16,
-    "d_nes": {
-     "n": 16,
-     "delta": -0.0137,
-     "p": 0.5926,
-     "lo": -0.0583,
-     "hi": 0.0213
-    },
-    "d_bowf1": {
-     "n": 16,
-     "delta": -0.0087,
-     "p": 0.519,
-     "lo": -0.033,
-     "hi": 0.0113
-    },
-    "d_nb_overall": -0.0372,
-    "d_gap": 0.0285,
-    "d_missed_rate": -0.0142,
-    "d_added_rate": 0.0431,
-    "d_bowf1_answered": {
-     "n": 16,
-     "delta": -0.0087,
-     "p": 0.519,
-     "lo": -0.033,
-     "hi": 0.0113
-    }
-   },
-   {
-    "source": "open readers",
-    "route": "lightonocr3-4b",
-    "arm": "tiles",
     "group": "handwritten",
     "n": 16,
     "ok": 16,
@@ -13862,21 +13512,6 @@
     "source": "open readers",
     "route": "lightonocr3-4b",
     "arm": "whole",
-    "group": "kind:handwritten",
-    "n": 16,
-    "ok": 16,
-    "nes": 0.8885,
-    "nb_overall": 0.9137,
-    "bowf1": 0.9199,
-    "gap": 0.0062,
-    "missed_rate": 0.1017,
-    "added_rate": 0.049,
-    "latin_pages": 16
-   },
-   {
-    "source": "open readers",
-    "route": "lightonocr3-4b",
-    "arm": "whole",
     "group": "handwritten",
     "n": 16,
     "ok": 16,
@@ -14031,46 +13666,6 @@
      "p": 0.0001,
      "lo": -0.1598,
      "hi": -0.0541
-    }
-   },
-   {
-    "source": "open readers",
-    "route": "paddleocr-vl1.5",
-    "arm": "doclayout_yolo",
-    "group": "kind:handwritten",
-    "n": 16,
-    "ok": 11,
-    "nes": 0.1111,
-    "nb_overall": 0.1112,
-    "bowf1": 0.1276,
-    "gap": 0.0164,
-    "missed_rate": 0.8928,
-    "added_rate": 0.0348,
-    "latin_pages": 16,
-    "d_nes": {
-     "n": 16,
-     "delta": -0.597,
-     "p": 0.0007,
-     "lo": -0.7771,
-     "hi": -0.3932
-    },
-    "d_bowf1": {
-     "n": 16,
-     "delta": -0.5571,
-     "p": 0.0007,
-     "lo": -0.7244,
-     "hi": -0.3737
-    },
-    "d_nb_overall": -0.5969,
-    "d_gap": 0.0397,
-    "d_missed_rate": 0.5875,
-    "d_added_rate": -0.06,
-    "d_bowf1_answered": {
-     "n": 10,
-     "delta": -0.6942,
-     "p": 0.0025,
-     "lo": -0.8112,
-     "hi": -0.5324
     }
    },
    {
@@ -14437,46 +14032,6 @@
     "source": "open readers",
     "route": "paddleocr-vl1.5",
     "arm": "pp-doclayoutv3",
-    "group": "kind:handwritten",
-    "n": 16,
-    "ok": 15,
-    "nes": 0.6637,
-    "nb_overall": 0.6621,
-    "bowf1": 0.677,
-    "gap": 0.0149,
-    "missed_rate": 0.3313,
-    "added_rate": 0.1494,
-    "latin_pages": 16,
-    "d_nes": {
-     "n": 16,
-     "delta": -0.0444,
-     "p": 0.6102,
-     "lo": -0.2118,
-     "hi": 0.1159
-    },
-    "d_bowf1": {
-     "n": 16,
-     "delta": -0.0076,
-     "p": 0.9463,
-     "lo": -0.159,
-     "hi": 0.1451
-    },
-    "d_nb_overall": -0.0459,
-    "d_gap": 0.0383,
-    "d_missed_rate": 0.0261,
-    "d_added_rate": 0.0545,
-    "d_bowf1_answered": {
-     "n": 12,
-     "delta": -0.0734,
-     "p": 0.0158,
-     "lo": -0.1548,
-     "hi": -0.0123
-    }
-   },
-   {
-    "source": "open readers",
-    "route": "paddleocr-vl1.5",
-    "arm": "pp-doclayoutv3",
     "group": "handwritten",
     "n": 16,
     "ok": 15,
@@ -14837,46 +14392,6 @@
     "source": "open readers",
     "route": "paddleocr-vl1.5",
     "arm": "tiles",
-    "group": "kind:handwritten",
-    "n": 16,
-    "ok": 16,
-    "nes": 0.7314,
-    "nb_overall": 0.7811,
-    "bowf1": 0.7741,
-    "gap": -0.007,
-    "missed_rate": 0.2117,
-    "added_rate": 0.1654,
-    "latin_pages": 16,
-    "d_nes": {
-     "n": 16,
-     "delta": 0.0233,
-     "p": 0.8173,
-     "lo": -0.1292,
-     "hi": 0.1821
-    },
-    "d_bowf1": {
-     "n": 16,
-     "delta": 0.0895,
-     "p": 0.2385,
-     "lo": -0.0549,
-     "hi": 0.246
-    },
-    "d_nb_overall": 0.0731,
-    "d_gap": 0.0164,
-    "d_missed_rate": -0.0935,
-    "d_added_rate": 0.0706,
-    "d_bowf1_answered": {
-     "n": 13,
-     "delta": -0.0438,
-     "p": 0.3621,
-     "lo": -0.1321,
-     "hi": 0.012
-    }
-   },
-   {
-    "source": "open readers",
-    "route": "paddleocr-vl1.5",
-    "arm": "tiles",
     "group": "handwritten",
     "n": 16,
     "ok": 16,
@@ -15212,21 +14727,6 @@
     "source": "open readers",
     "route": "paddleocr-vl1.5",
     "arm": "whole",
-    "group": "kind:handwritten",
-    "n": 16,
-    "ok": 13,
-    "nes": 0.7081,
-    "nb_overall": 0.708,
-    "bowf1": 0.6847,
-    "gap": -0.0234,
-    "missed_rate": 0.3052,
-    "added_rate": 0.0949,
-    "latin_pages": 16
-   },
-   {
-    "source": "open readers",
-    "route": "paddleocr-vl1.5",
-    "arm": "whole",
     "group": "handwritten",
     "n": 16,
     "ok": 13,
@@ -15381,46 +14881,6 @@
      "p": 0.0001,
      "lo": -0.1771,
      "hi": -0.0666
-    }
-   },
-   {
-    "source": "open readers",
-    "route": "qwen3.6-27b",
-    "arm": "doclayout_yolo",
-    "group": "kind:handwritten",
-    "n": 16,
-    "ok": 11,
-    "nes": 0.1124,
-    "nb_overall": 0.1161,
-    "bowf1": 0.1334,
-    "gap": 0.0173,
-    "missed_rate": 0.8841,
-    "added_rate": 0.0234,
-    "latin_pages": 16,
-    "d_nes": {
-     "n": 16,
-     "delta": -0.797,
-     "p": 0.0001,
-     "lo": -0.8983,
-     "hi": -0.6616
-    },
-    "d_bowf1": {
-     "n": 16,
-     "delta": -0.7855,
-     "p": 0.0001,
-     "lo": -0.8789,
-     "hi": -0.6606
-    },
-    "d_nb_overall": -0.7918,
-    "d_gap": 0.0063,
-    "d_missed_rate": 0.819,
-    "d_added_rate": -0.0532,
-    "d_bowf1_answered": {
-     "n": 11,
-     "delta": -0.7483,
-     "p": 0.0011,
-     "lo": -0.8798,
-     "hi": -0.5799
     }
    },
    {
@@ -15787,46 +15247,6 @@
     "source": "open readers",
     "route": "qwen3.6-27b",
     "arm": "pp-doclayoutv3",
-    "group": "kind:handwritten",
-    "n": 16,
-    "ok": 15,
-    "nes": 0.7204,
-    "nb_overall": 0.7121,
-    "bowf1": 0.763,
-    "gap": 0.051,
-    "missed_rate": 0.2521,
-    "added_rate": 0.0784,
-    "latin_pages": 16,
-    "d_nes": {
-     "n": 16,
-     "delta": -0.189,
-     "p": 0.0001,
-     "lo": -0.3314,
-     "hi": -0.0713
-    },
-    "d_bowf1": {
-     "n": 16,
-     "delta": -0.1558,
-     "p": 0.0008,
-     "lo": -0.2962,
-     "hi": -0.0473
-    },
-    "d_nb_overall": -0.1958,
-    "d_gap": 0.04,
-    "d_missed_rate": 0.187,
-    "d_added_rate": 0.0018,
-    "d_bowf1_answered": {
-     "n": 15,
-     "delta": -0.1028,
-     "p": 0.0027,
-     "lo": -0.1938,
-     "hi": -0.0323
-    }
-   },
-   {
-    "source": "open readers",
-    "route": "qwen3.6-27b",
-    "arm": "pp-doclayoutv3",
     "group": "handwritten",
     "n": 16,
     "ok": 15,
@@ -16187,46 +15607,6 @@
     "source": "open readers",
     "route": "qwen3.6-27b",
     "arm": "tiles",
-    "group": "kind:handwritten",
-    "n": 16,
-    "ok": 16,
-    "nes": 0.8764,
-    "nb_overall": 0.8564,
-    "bowf1": 0.8971,
-    "gap": 0.0407,
-    "missed_rate": 0.0729,
-    "added_rate": 0.1114,
-    "latin_pages": 16,
-    "d_nes": {
-     "n": 16,
-     "delta": -0.0329,
-     "p": 0.0007,
-     "lo": -0.059,
-     "hi": -0.0126
-    },
-    "d_bowf1": {
-     "n": 16,
-     "delta": -0.0217,
-     "p": 0.022,
-     "lo": -0.0413,
-     "hi": -0.0053
-    },
-    "d_nb_overall": -0.0514,
-    "d_gap": 0.0297,
-    "d_missed_rate": 0.0078,
-    "d_added_rate": 0.0348,
-    "d_bowf1_answered": {
-     "n": 16,
-     "delta": -0.0217,
-     "p": 0.022,
-     "lo": -0.0413,
-     "hi": -0.0053
-    }
-   },
-   {
-    "source": "open readers",
-    "route": "qwen3.6-27b",
-    "arm": "tiles",
     "group": "handwritten",
     "n": 16,
     "ok": 16,
@@ -16557,21 +15937,6 @@
     "missed_rate": 0.0291,
     "added_rate": 0.0304,
     "latin_pages": 96
-   },
-   {
-    "source": "open readers",
-    "route": "qwen3.6-27b",
-    "arm": "whole",
-    "group": "kind:handwritten",
-    "n": 16,
-    "ok": 16,
-    "nes": 0.9094,
-    "nb_overall": 0.9079,
-    "bowf1": 0.9188,
-    "gap": 0.011,
-    "missed_rate": 0.0651,
-    "added_rate": 0.0765,
-    "latin_pages": 16
    },
    {
     "source": "open readers",

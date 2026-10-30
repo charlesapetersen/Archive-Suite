@@ -58,24 +58,38 @@ def vision_kinds(*names):
     return out
 
 
+# What a provider's own error text says, for a page whose finish reason is just "error" (the raw response beside it)
+REFUSED = ('RECITATION', 'DataInspectionFailed', 'inappropriate content')   # Gemini's reprinted text; Alibaba's filter
+LOOPED = ('repeating the same chunk',)                                         # the provider cut a loop off
+
+
 def failure(ok, finish, completion_tokens, meta=None) -> str:
     """Why a page has no reading (the measurement audit's OCR-2). transport: the provider or the connection lost the
-    request, so the model never finished an answer (a 5xx, an interrupted stream, no finish reason, an error after
-    tokens began). The model's own: cap (it ran to the token cap, nearly always a loop), refusal (a content filter,
-    or an error before any token: Gemini's refusals of reprinted text) and empty (it stopped but left nothing
-    usable)."""
+    request, so the model never finished an answer (a 5xx, an interrupted stream, no finish reason, or an error the
+    provider's text does not put on the model). The model's own: cap (it ran to the token cap, or the provider cut
+    off a loop), refusal (a content filter: Gemini's RECITATION on reprinted text, Alibaba's output inspection) and
+    empty (it stopped but left nothing usable). An "error" finish is classified from the provider's error text,
+    which must be on disk."""
     if ok:
         return ''
-    tokens = None if completion_tokens is None or str(completion_tokens).strip() in ('', 'None') else int(completion_tokens)
     if finish in ('length', 'cap'):
         return 'cap'
-    if finish == 'content_filter' or (finish == 'error' and tokens == 0):
+    if finish == 'content_filter':
         return 'refusal'
     if finish in ('stop', 'unparsable', 'unparsed'):
         return 'empty'
-    if finish in ('provider-error', 'interrupted', 'error', '', None, 'None') or (meta or {}).get('error_code'):
+    if finish == 'error':
+        text = (meta or {}).get('error_text')
+        if text is None:
+            raise SystemExit(f'an "error" finish with no provider error text on disk ({completion_tokens} tokens)')
+        if any(k in text for k in REFUSED):
+            return 'refusal'
+        if any(k in text for k in LOOPED):
+            return 'cap'
         return 'transport'
-    raise SystemExit(f'unclassified failure: finish {finish!r}, {tokens} tokens')
+    if finish in ('provider-error', 'interrupted', '', None, 'None') or (meta or {}).get('error_code'):
+        return 'transport'
+    raise SystemExit(f'unclassified failure: finish {finish!r}, {completion_tokens} tokens')
 
 
 def farmshare_failure(r: dict, summary: dict) -> str:
@@ -109,6 +123,10 @@ def reading(route, job):
         got = load(CLOUD / 'sub' / route / (job + '.json'))
     else:
         got = load(LOCAL / 'responses' / route / (job + '.json')) or load(CLOUD / 'responses' / route / (job + '.json'))
+        raw = [d / 'responses' / route / (job + '.raw.json') for d in (LOCAL, CLOUD)]
+        raw = next((f for f in raw if f.exists()), None)
+        if raw is not None and not got.get('parsed'):   # the provider's error text, for failure()
+            return None, {**(got.get('meta') or {}), 'error_text': raw.read_text()}
     return got.get('parsed'), got.get('meta') or {}
 
 
@@ -138,11 +156,10 @@ def main():
             parsed, meta = reading(route, job)
             if route in farmshare:
                 r = fs[p]
-                # status is the harness's outcome (ok, cap, unparsed); finish the decoder's, where the run kept one
-                status = r.get('status') or r.get('outcome') or ''
+                # finish is the decoder's where the run kept one, else the harness's status (ok, cap, unparsed)
                 row = {'ok': r['ok'] == 'True', 'nes': float(r['nes']), 'cost': 0, 'words': r['words'],
                        'hyp_words': r.get('hyp_words', ''), 'completion_tokens': r.get('completion_tokens', ''),
-                       'said_kind': '', 'finish': status}
+                       'said_kind': '', 'finish': r.get('finish') or r.get('status') or ''}
                 row['failure'] = farmshare_failure(r, summary)
             elif route == GATEWAY_ROUTE:
                 s = S.score(truth[p], parsed['text'] if parsed else '')

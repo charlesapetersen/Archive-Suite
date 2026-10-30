@@ -50,7 +50,7 @@ CACHE = Path.home() / 'Library/Caches/ArchiveSuiteRehearsal'
 RUNS = CACHE / 'sherlock-results/regions-20261021'
 OUT = P.RESULTS / 'bench-corpus'
 NAME = 'regions-orderfree-20261030'
-GROUPS = ('the 96', 'kind:handwritten', 'handwritten', 'typed, no table or clipping', 'clippings', 'tables', 'L9', 'L4', 'L3', 'L1')
+GROUPS = ('the 96', 'handwritten', 'typed, no table or clipping', 'clippings', 'tables', 'L9', 'L4', 'L3', 'L1')
 ILLEGIBLE = re.compile(r'\[illegible\]', re.I)
 
 
@@ -184,6 +184,10 @@ def ci(d):
     return '—' if not d or not d['n'] else f"{100 * d['delta']:+.1f} ({100 * d['lo']:+.1f} to {100 * d['hi']:+.1f})"
 
 
+def ci2(d):
+    return f"{100 * d['delta']:+.2f} ({100 * d['lo']:+.2f} to {100 * d['hi']:+.2f})"
+
+
 def report(summary: list[dict], n_rows: int) -> str:
     by = {(r['source'], r['route'], r['arm'], r['group']): r for r in summary}
     gw, q = ('gemini', 'gemini-3.7-flash-gw'), ('open readers', 'qwen3.6-27b')
@@ -206,17 +210,19 @@ def report(summary: list[dict], n_rows: int) -> str:
          '  Every one of these intervals stays below 0, so whole-page reading remains the default. What is left after order',
          '  is roughly 40 to 70 per cent of the in-order loss.',
          '- **What is left after order is content.** Regions miss words: the missed rate rises, most of all on hands.',
-         f"  Gemini on the 16 hand pages: {f(gw, 'pp-doclayoutv3', 'kind:handwritten')}, with the missed rate up",
-         f"  {pt(by[(*gw, 'pp-doclayoutv3', 'kind:handwritten')]['d_missed_rate'], True)} points. Tiles add words: where the",
+         f"  Gemini on the 16 hand pages: {f(gw, 'pp-doclayoutv3', 'handwritten')}, with the missed rate up",
+         f"  {pt(by[(*gw, 'pp-doclayoutv3', 'handwritten')]['d_missed_rate'], True)} points. Tiles add words: where the",
          '  stitch does not find the repeat, the overlap band is read twice. For Gemini on the 96 the added rate is up',
          f"  {pt(by[(*gw, 'tiles', 'the 96')]['d_added_rate'], True)} points, and on clippings it is up 23 to 36 for every reader.",
-         f"  On hand pages, Gemini's tiles are a tie order-free ({ci(by[(*gw, 'tiles', 'kind:handwritten')]['d_bowf1'])}).",
-         '- **Typed pages with no table or clipping:** tiles are a tie order-free for Gemini, Qwen and LightOn. The small',
-         '  readers\' tile gains that regions-20261021.md reported (GLM-OCR, PaddleOCR-VL 1.5) keep their direction',
-         '  order-free, but their intervals reach 0.',
-         '- **Newspapers (L9) and registers (L4) do not change in kind.** On L9, regions lift the two small readers by more',
-         '  than 60 points order-free. Tiles lift them about 11 points and cost LightOn and Qwen most of their L9 score, so the',
-         '  fixed tiler stays ruled out.',
+         f"  On hand pages, Gemini's tiles are a tie order-free ({ci(by[(*gw, 'tiles', 'handwritten')]['d_bowf1'])}).",
+         '- **Typed pages with no table or clipping:** tiles are a tie order-free for Qwen and LightOn; for Gemini they',
+         f"  cost a fifth of a point ({ci2(by[(*gw, 'tiles', 'typed, no table or clipping')]['d_bowf1'])}), small, but its",
+         '  interval stays below 0. The small readers\' tile gains that regions-20261021.md reported (GLM-OCR, PaddleOCR-VL 1.5) keep',
+         '  their direction order-free, but their intervals reach 0.',
+         '- **Newspapers (L9) do not change in kind.** Regions lift the two small readers by more than 60 points order-free.',
+         '  Tiles lift them about 11 points and cost LightOn and Qwen most of their L9 score, so the fixed tiler stays ruled',
+         f"  out. **Registers (L4):** Qwen's tiles, a tie in order ({ci(by[(*q, 'tiles', 'L4')]['d_nes'])}), are a gain",
+         f"  order-free ({ci(by[(*q, 'tiles', 'L4')]['d_bowf1'])}); no other L4 verdict changes (GLM-OCR's tiles stay a tie).",
          '- **The cells arms are not rescored.** They return named table fields, each scored by exact match, so there is no',
          '  reading order to remove. Their receipts are on Sherlock, not on this Mac (regions-cells-20261025.md).', '',
          '## Measurement card', '',

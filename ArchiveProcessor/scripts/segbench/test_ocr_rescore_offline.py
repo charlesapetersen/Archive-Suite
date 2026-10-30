@@ -19,12 +19,17 @@ class FailureClasses(unittest.TestCase):
     def test_model_failures(self):
         self.assertEqual(E.failure(False, 'length', 8192), 'cap')
         self.assertEqual(E.failure(False, 'content_filter', 0), 'refusal')
-        self.assertEqual(E.failure(False, 'error', 0), 'refusal')     # Gemini's 0-token refusal of reprinted text
-        self.assertEqual(E.failure(False, 'error', '0'), 'refusal')   # a zero read from a CSV is still zero
+        self.assertEqual(E.failure(False, 'error', 0, {'error_text': '{"error": "RECITATION"}'}), 'refusal')
+        alibaba = 'InternalError.Algo.DataInspectionFailed: Output data may contain inappropriate content.'
+        self.assertEqual(E.failure(False, 'error', 408, {'error_text': alibaba}), 'refusal')
+        deka = 'litellm.InternalServerError: The model is repeating the same chunk = . . . .'
+        self.assertEqual(E.failure(False, 'error', 330, {'error_text': deka}), 'cap')
         self.assertEqual(E.failure(False, 'stop', 552), 'empty')
 
     def test_transport_failures(self):
-        self.assertEqual(E.failure(False, 'error', 408), 'transport')  # the stream broke after tokens began
+        self.assertEqual(E.failure(False, 'error', 12, {'error_text': 'Upstream 503 Service Unavailable'}), 'transport')
+        with self.assertRaises(SystemExit):   # an "error" finish is never guessed without the provider's text
+            E.failure(False, 'error', 0)
         self.assertEqual(E.failure(False, 'provider-error', None), 'transport')
         self.assertEqual(E.failure(False, 'interrupted', None), 'transport')
         self.assertEqual(E.failure(False, None, None, {'error_code': 502}), 'transport')

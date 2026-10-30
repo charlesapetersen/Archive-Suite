@@ -15,7 +15,7 @@ What the bench has measured, as one page you can read and share. It has seven pa
    or the model's own: caps, refusals, empty answers), strict NES, the paired difference from Qwen3.6 27B on pages
    both answered, p081 apart (the owner cannot correct its truth) and "96 only" for each route that has not read the
    895 itself. Part 5's difficulty fit, rankings and cascades keep the 29 routes they were built on (`build.py`
-   passes them to `difficulty.analyse`), so the cluster runs and Gemini 3.7 are not in part 5.
+   passes them to `difficulty.analyse`), so Gemini 3.7 and the cluster runs other than FarmShare's Qwen3.6 27B are not in part 5.
 2. **Segmentation.** How well each approach splits a box of photographs into documents, on the two locked test
    boxes (Stanton and RG 165, 363 pages): pages in the exact document with no checking, against price; and, in a
    table, the checks per 100 pages each needs, the pages right after checking, and the errors left unflagged.
@@ -93,8 +93,8 @@ page says what each marker means. Where a chart cannot take a measured route (it
 per-page answers the chart needs), the route stays off and the page or this README says which and why. New FarmShare
 truth runs are added as `own_hardware.routes` entries in `data/inputs.json`; `ocr_pages_export.py` then adds their
 pages to `ocr-pages.csv`, and a new route that has read the 895 gets a `PUBLIC_TWIN` entry in `build.py`. Known gaps
-today: part 5 (rankings, difficulty curves, cascades) covers the 29 routes it was fitted on, not the cluster runs or
-Gemini 3.7 Flash.
+today: part 5 (rankings, difficulty curves, cascades) covers the 29 routes it was fitted on, not Gemini 3.7 Flash or the cluster runs
+other than FarmShare's Qwen3.6 27B.
 
 ## What is here
 

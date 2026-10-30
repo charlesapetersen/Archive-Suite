@@ -20,12 +20,14 @@ Script: `scripts/segbench/corpus/regions_orderfree.py`. 5,940 page readings scor
   stitch does not find the repeat, the overlap band is read twice. For Gemini on the 96 the added rate is up
   +8.5 points, and on clippings it is up 23 to 36 for every reader.
   On hand pages, Gemini's tiles are a tie order-free (-1.1 (-4.5 to +1.2)).
-- **Typed pages with no table or clipping:** tiles are a tie order-free for Gemini, Qwen and LightOn. The small
-  readers' tile gains that regions-20261021.md reported (GLM-OCR, PaddleOCR-VL 1.5) keep their direction
-  order-free, but their intervals reach 0.
-- **Newspapers (L9) and registers (L4) do not change in kind.** On L9, regions lift the two small readers by more
-  than 60 points order-free. Tiles lift them about 11 points and cost LightOn and Qwen most of their L9 score, so the
-  fixed tiler stays ruled out.
+- **Typed pages with no table or clipping:** tiles are a tie order-free for Qwen and LightOn; for Gemini they
+  cost a fifth of a point (-0.18 (-0.37 to -0.02)), small, but its
+  interval stays below 0. The small readers' tile gains that regions-20261021.md reported (GLM-OCR, PaddleOCR-VL 1.5) keep
+  their direction order-free, but their intervals reach 0.
+- **Newspapers (L9) do not change in kind.** Regions lift the two small readers by more than 60 points order-free.
+  Tiles lift them about 11 points and cost LightOn and Qwen most of their L9 score, so the fixed tiler stays ruled
+  out. **Registers (L4):** Qwen's tiles, a tie in order (+3.3 (-0.7 to +7.9)), are a gain
+  order-free (+5.9 (+1.3 to +11.1)); no other L4 verdict changes (GLM-OCR's tiles stay a tie).
 - **The cells arms are not rescored.** They return named table fields, each scored by exact match, so there is no
   reading order to remove. Their receipts are on Sherlock, not on this Mac (regions-cells-20261025.md).
 
@@ -62,8 +64,6 @@ pages.
 |---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|
 | the 96 | Gemini 3.7 Flash | PP-DocLayoutV3 | 96 | 96.7 | 84.9 | -11.9 (-15.6 to -8.5) | -7.5 (-10.8 to -4.8) | +5.2 | +5.6 | +3.6 |
 | the 96 | Gemini 3.7 Flash | tiles | 96 | 96.7 | 91.0 | -5.7 (-8.3 to -3.3) | -2.4 (-3.8 to -1.0) | +4.5 | +2.7 | +8.5 |
-| kind:handwritten | Gemini 3.7 Flash | PP-DocLayoutV3 | 16 | 95.1 | 70.3 | -24.8 (-39.1 to -12.4) | -17.6 (-32.1 to -6.0) | +7.7 | +18.4 | +3.5 |
-| kind:handwritten | Gemini 3.7 Flash | tiles | 16 | 95.1 | 90.6 | -4.5 (-9.1 to -1.1) | -1.1 (-4.5 to +1.2) | +3.0 | +0.1 | +1.7 |
 | handwritten | Gemini 3.7 Flash | PP-DocLayoutV3 | 16 | 95.1 | 70.3 | -24.8 (-39.1 to -12.4) | -17.6 (-32.1 to -6.0) | +7.7 | +18.4 | +3.5 |
 | handwritten | Gemini 3.7 Flash | tiles | 16 | 95.1 | 90.6 | -4.5 (-9.1 to -1.1) | -1.1 (-4.5 to +1.2) | +3.0 | +0.1 | +1.7 |
 | typed, no table or clipping | Gemini 3.7 Flash | PP-DocLayoutV3 | 41 | 98.8 | 95.4 | -3.4 (-5.7 to -1.6) | -2.0 (-3.5 to -0.9) | +1.1 | +3.2 | +1.2 |
@@ -97,18 +97,6 @@ pages.
 | the 96 | Qwen3.6-27B | DocLayout-YOLO | 96 | 95.0 | 71.7 | -23.3 (-30.6 to -16.6) | -18.4 (-25.4 to -12.0) | +9.1 | +7.3 | +1.9 |
 | the 96 | Qwen3.6-27B | PP-DocLayoutV3 | 96 | 95.0 | 85.7 | -9.3 (-13.2 to -5.9) | -6.4 (-9.8 to -3.7) | +3.5 | +4.3 | +0.6 |
 | the 96 | Qwen3.6-27B | tiles | 96 | 95.0 | 89.8 | -5.2 (-8.1 to -2.6) | -2.8 (-4.1 to -1.6) | +6.0 | +2.0 | +8.2 |
-| kind:handwritten | GLM-OCR | DocLayout-YOLO | 16 | 85.6 | 11.0 | -74.6 (-84.4 to -61.7) | -73.5 (-82.0 to -61.8) | +1.7 | +74.3 | -8.4 |
-| kind:handwritten | GLM-OCR | PP-DocLayoutV3 | 16 | 85.6 | 70.2 | -15.5 (-28.4 to -4.5) | -13.1 (-24.8 to -3.8) | +4.0 | +15.0 | -1.3 |
-| kind:handwritten | GLM-OCR | tiles | 16 | 85.6 | 86.9 | +1.3 (-0.1 to +3.0) | +1.3 (+0.1 to +2.4) | -0.1 | -1.4 | -0.8 |
-| kind:handwritten | LightOnOCR-3 4B | DocLayout-YOLO | 16 | 88.8 | 11.2 | -77.6 (-87.5 to -64.4) | -78.7 (-87.1 to -66.5) | +0.6 | +78.7 | -1.1 |
-| kind:handwritten | LightOnOCR-3 4B | PP-DocLayoutV3 | 16 | 88.8 | 67.7 | -21.1 (-35.5 to -8.7) | -17.8 (-32.0 to -6.1) | +13.5 | +14.3 | +9.1 |
-| kind:handwritten | LightOnOCR-3 4B | tiles | 16 | 88.8 | 87.5 | -1.4 (-5.8 to +2.1) | -0.9 (-3.3 to +1.1) | +2.9 | -1.4 | +4.3 |
-| kind:handwritten | PaddleOCR-VL 1.5 | DocLayout-YOLO | 16 | 70.8 | 11.1 | -59.7 (-77.7 to -39.3) | -55.7 (-72.4 to -37.4) | +4.0 | +58.8 | -6.0 |
-| kind:handwritten | PaddleOCR-VL 1.5 | PP-DocLayoutV3 | 16 | 70.8 | 66.4 | -4.4 (-21.2 to +11.6) | -0.8 (-15.9 to +14.5) | +3.8 | +2.6 | +5.5 |
-| kind:handwritten | PaddleOCR-VL 1.5 | tiles | 16 | 70.8 | 73.1 | +2.3 (-12.9 to +18.2) | +8.9 (-5.5 to +24.6) | +1.6 | -9.3 | +7.1 |
-| kind:handwritten | Qwen3.6-27B | DocLayout-YOLO | 16 | 90.9 | 11.2 | -79.7 (-89.8 to -66.2) | -78.5 (-87.9 to -66.1) | +0.6 | +81.9 | -5.3 |
-| kind:handwritten | Qwen3.6-27B | PP-DocLayoutV3 | 16 | 90.9 | 72.0 | -18.9 (-33.1 to -7.1) | -15.6 (-29.6 to -4.7) | +4.0 | +18.7 | +0.2 |
-| kind:handwritten | Qwen3.6-27B | tiles | 16 | 90.9 | 87.6 | -3.3 (-5.9 to -1.3) | -2.2 (-4.1 to -0.5) | +3.0 | +0.8 | +3.5 |
 | handwritten | GLM-OCR | DocLayout-YOLO | 16 | 85.6 | 11.0 | -74.6 (-84.4 to -61.7) | -73.5 (-82.0 to -61.8) | +1.7 | +74.3 | -8.4 |
 | handwritten | GLM-OCR | PP-DocLayoutV3 | 16 | 85.6 | 70.2 | -15.5 (-28.4 to -4.5) | -13.1 (-24.8 to -3.8) | +4.0 | +15.0 | -1.3 |
 | handwritten | GLM-OCR | tiles | 16 | 85.6 | 86.9 | +1.3 (-0.1 to +3.0) | +1.3 (+0.1 to +2.4) | -0.1 | -1.4 | -0.8 |
