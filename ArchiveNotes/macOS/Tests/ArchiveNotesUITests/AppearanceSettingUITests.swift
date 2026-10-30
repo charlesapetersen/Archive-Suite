@@ -20,7 +20,6 @@ final class AppearanceSettingUITests: NotesFixtureUITestCase {
     func testPickingLightAndDarkChangesEveryWindowAtOnceWithASheetOpen() throws {
         try withFixture {
             XCTAssertTrue(waitForIndexReady(timeout: 30))
-            let system = luminance(mainWindow, "system-main")
 
             let save = mainWindow.buttons["an.filter.save"]
             XCTAssertTrue(save.waitForExistence(timeout: 5), "the filter bar's Save Search button should exist")
@@ -29,6 +28,9 @@ final class AppearanceSettingUITests: NotesFixtureUITestCase {
             XCTAssertTrue(sheet.waitForExistence(timeout: 5), "the Save Search sheet should open")
 
             let settings = openSettings()
+            // Measured with the sheet and Settings already open: a window's screenshot includes whatever is drawn
+            // over it, so a baseline taken before Settings opened is not comparable with the later ones.
+            let system = luminance(mainWindow, "system-main")
             for choice in ["Dark", "Light", "Dark"] {
                 pick(choice, in: settings)
                 let dark = choice == "Dark"
