@@ -1411,9 +1411,9 @@ rendered pages, outputs. It grew from 37 GB (21 Oct) to 92 GB (29 Oct) and the e
 nothing ever cleared it; the housekeeping GC covers only build products in worktrees.
 
 **Measured.** The upkeep hook runs `ops/autonomous/cache-budget.py` at most every six hours (`--force` to measure
-now). It writes `$STATE/cache-budget.txt`: total and free disk, each folder over 100 MB, every venv with its PyTorch
+now). It writes `$STATE/cache-budget.txt`: total and available disk (free plus purgeable, as Finder counts it), each folder over 100 MB, every venv with its PyTorch
 version, and the retired worktrees. `WARN` lines lead it. Budgets, derived in the script's header and overridable by
-environment: the cache 65 GB, one folder 5 GB, the shared model caches (`mlx-hf`, `hf`) 35 GB, free disk 30 GB. It
+environment: the cache 65 GB, one folder 5 GB, the shared model caches (`mlx-hf`, `hf`) 35 GB, available disk 30 GB. It
 never deletes or moves anything. Test: `ops/agent/tests/test_hooks.py` class `Upkeep`.
 
 **Items clear up after themselves.** The rule is in CLAUDE.md ("The bench cache") and the resume prompt's STEP 4: the

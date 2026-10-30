@@ -354,12 +354,14 @@ fi
 # ---------------------------------------------------------------------------------------------------
 if [ "$DETAILS" = 1 ]; then
   wt="$(num "$(g worktree list 2>/dev/null | grep -c 'wt/')")"
-  disk="$(df -m "$REPO" 2>/dev/null | awk 'NR==2{printf "%.0f", $4/1024}')"
+  # Free plus purgeable, as Finder counts it (owner, 2026-10-30); df's free figure when osascript cannot answer.
+  disk="$(/usr/bin/osascript -l JavaScript -e 'ObjC.import("Foundation"); function run(a) { var k = "NSURLVolumeAvailableCapacityForImportantUsageKey"; var v = $.NSURL.fileURLWithPath(a[0]).resourceValuesForKeysError($([k]), null).objectForKey(k); return v.isNil() ? "" : String(Math.round(v.longLongValue / 1073741824)); }' "$REPO" 2>/dev/null)"
+  case "$disk" in ''|*[!0-9]*) disk="$(df -m "$REPO" 2>/dev/null | awk 'NR==2{printf "%.0f", $4/1024}')" ;; esac
   printf '\n  %s\n' "${B}Details${OFF}"
   printf '  %-18s %s\n' "current code" "$(g log -1 --format='%h %s' | cut -c1-62)"
   printf '  %-18s %s\n' "plan" "$(grep -m1 '^RUN STATUS:' "$PLAN" 2>/dev/null | cut -c1-62 || echo '(no plan file)')"
   printf '  %-18s %s\n' "restart on crash" "$([ "$supervised" = 1 ] && echo 'yes (launchd keeps it alive)' || echo 'no (plain background process)')"
-  printf '  %-18s %s\n' "disk free" "${disk:-?} GB"
+  printf '  %-18s %s\n' "disk available" "${disk:-?} GB (free plus purgeable)"
   printf '  %-18s %s\n' "spare worktrees" "$wt"
   printf '  %-18s %s\n' "keychain" "$([ -f "$STATE/keychain-partition-fixed" ] && cat "$STATE/keychain-partition-fixed" 2>/dev/null || echo 'not set up')"
   printf '  %-18s %s\n' "GUI checks" "run off-screen in the Tart VM (ops/gui/README §3)"

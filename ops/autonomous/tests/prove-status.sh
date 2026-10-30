@@ -250,7 +250,7 @@ for word in WS5 digest backlog SUITE_TODO hold-queue cadence keychain launchd; d
 done
 OUT="$(RUNNING=1 run --details)"
 printf '%s' "$OUT" | grep -qi 'keychain' && ok "--details has the keychain line" || bad "--details missing keychain" "$OUT"
-printf '%s' "$OUT" | grep -qi 'disk free' && ok "--details has disk" || bad "--details missing disk" "$OUT"
+printf '%s' "$OUT" | grep -qi 'disk available' && ok "--details has disk" || bad "--details missing disk" "$OUT"
 printf '%s' "$OUT" | grep -qi 'GUI checks' && ok "--details has the GUI lane" || bad "--details missing GUI" "$OUT"
 
 echo "[11] no colour escapes when the output is a FILE (the daemon writes STATUS.md)"

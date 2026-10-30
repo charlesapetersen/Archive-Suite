@@ -22,7 +22,7 @@ rebuildable PDFs, disk 926 GB with 32 GB free):
     Raised from 15 GB on 30 Oct, when mlx-hf became the Mac's one model cache (segbench/model_store.py): the
     Vision OCR lab's 13.3 GB of models moved in and 12.2 GB of duplicates elsewhere went to the Trash, leaving
     mlx-hf at 30.6 GB with every model once.
-  * free disk 30 GB: the engine parks at 10 GB (MINFREE_MB); 30 leaves room for a model download and a build.
+  * available disk (free plus purgeable) 30 GB: the engine parks at 10 GB (MINFREE_MB); 30 leaves room for a model download and a build.
 Environments are listed with their PyTorch version, so a private copy of the shared stack (segbench/torch-env.sh)
 shows up. Retired worktrees are listed for the owner; nothing here removes them.
 """
@@ -87,6 +87,26 @@ def environments(root, depth=3):
     return found
 
 
+_JXA = ('ObjC.import("Foundation"); function run(argv) {'
+        ' var k = "NSURLVolumeAvailableCapacityForImportantUsageKey";'
+        ' var v = $.NSURL.fileURLWithPath(argv[0]).resourceValuesForKeysError($([k]), null).objectForKey(k);'
+        ' return v.isNil() ? "" : String(v.longLongValue); }')
+
+
+def available_bytes(path):
+    """Free plus purgeable bytes, as Finder's "Available" counts them (owner, 2026-10-30): macOS lets purgeable space
+    (local Time Machine snapshots, evictable caches) fill what is free and gives it back when something writes, so
+    statvfs alone kept this report under its floor. The Agent Manager's diskspace.py reads the same key. Falls back to
+    statvfs, which is never larger, when osascript cannot answer."""
+    plain = shutil.disk_usage(path).free
+    try:
+        out = subprocess.run(['/usr/bin/osascript', '-l', 'JavaScript', '-e', _JXA, str(path)],
+                             stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=15).stdout.strip()
+    except (OSError, subprocess.SubprocessError):
+        return plain
+    return max(plain, int(out)) if out.isdigit() else plain
+
+
 def report():
     lines, warns = [], []
     if not CACHE.is_dir():
@@ -94,13 +114,13 @@ def report():
     folders = sorted(((p.name, du_bytes(p)) for p in CACHE.iterdir() if not p.is_symlink()),
                      key=lambda x: -x[1])
     total = sum(s for _, s in folders)
-    free = shutil.disk_usage(CACHE).free
-    lines.append('bench cache %s: %s (budget %g GB); disk free %s (floor %g GB); measured %s'
+    free = available_bytes(CACHE)
+    lines.append('bench cache %s: %s (budget %g GB); disk available %s, free plus purgeable (floor %g GB); measured %s'
                  % (CACHE, gb(total), TOTAL_GB, gb(free), FREE_GB, time.strftime('%Y-%m-%d %H:%M')))
     if total > TOTAL_GB * GB:
         warns.append('WARN cache %s is over its %g GB budget' % (gb(total), TOTAL_GB))
     if free < FREE_GB * GB:
-        warns.append('WARN disk free %s is under the %g GB floor' % (gb(free), FREE_GB))
+        warns.append('WARN disk available %s is under the %g GB floor' % (gb(free), FREE_GB))
     lines.append('folders (largest first, those over 100 MB):')
     for name, size in folders:
         cap = MODEL_GB if name in MODEL_CACHES else FOLDER_GB
