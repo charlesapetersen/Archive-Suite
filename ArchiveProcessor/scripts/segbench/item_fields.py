@@ -33,11 +33,11 @@ Mac, open weights, temperature 0, $0 and no plan route (root CLAUDE.md). Two fam
 the OCR text's first TEXT_CAP characters and the first page's image: Alibaba's Qwen3-VL 8B (A) and Google's Gemma 3
 12B (B). Gemma 3 12B, shown both readings with the text and the image, rules every document whose readings differ on
 any field, and the report counts how often it sided with each. A document whose readings agree takes A's. Before
-agreement, the label definitions are applied to every reading and ruling (by_definition: no byline or publication
-date on a letter, memo or telegram, no title on a letter or telegram), since Gemma gave most letters their own date
-as a publication date. Two leanings the report states: Qwen3-VL 8B is also a scored local route (from text alone,
-through the app's prompt), and Gemma is a relative of Gemini, the scored cloud route, and judges. A third family was
-not fetched: the Mac had 19 GB of disk free and a second 12B model would have left about 4 GB.
+agreement, the label definitions are applied to every reading and ruling (by_definition: no byline, publication or
+publication date on a letter, memo or telegram, no title on a letter or telegram), since Gemma gave most letters
+their own date as a publication date. Two leanings the report states: Qwen3-VL 8B is also a scored local route (from
+text alone, through the app's prompt), and Gemma is a relative of Gemini, the scored cloud route, and judges. A
+third family was not fetched: the Mac had 19 GB of disk free and a second 12B model would have left about 4 GB.
 
 The scorer, per field and predictor, over the documents with cached replies: fill rate, exact and edit-distance-2
 match (ent_truth's name matcher for names and places; folded text for titles and publications), wrong-when-filled
@@ -81,8 +81,10 @@ READERS = ("qwen3-vl-8b", "gemma3-12b")
 JUDGE = "gemma3-12b"
 EXTRACTOR = "qwen3.5-4b"
 # The app's cached tagging replies (date_tagging.answer_path labels; None is Gemini 3.8 Flash).
-APP = {"gemini-3.8-flash": None, "qwen3.6-27b": "qwen3.6-27b", "qwen3-vl-8b": "qwen3-vl-8b",
-       "qwen3.5-4b": "qwen3.5-4b"}
+# The Qwen3.5 and 3.6 replies with thinking left on ran out of tokens mid-thought on every document here, so the
+# thinking-off replies stand for them, as in ent_score.REPLIES.
+APP = {"gemini-3.8-flash": None, "qwen3.6-27b": "qwen3.6-27b-nothink", "qwen3-vl-8b": "qwen3-vl-8b",
+       "qwen3.5-4b": "qwen3.5-4b-nothink"}
 
 KINDS = ("letter", "memo", "telegram", "newspaper article", "magazine article", "journal article", "newsletter",
          "clipping", "report", "speech", "press release", "photograph", "other")
@@ -471,14 +473,14 @@ PLACEHOLDER = {"city, state", "city, country", "city"}
 
 def by_definition(r):
     """The label definitions applied to a reader's or the judge's reading (never to a scored predictor): a letter,
-    memo or telegram has no byline or publication date, a letter or telegram no title, and a placeholder copied from
-    the prompt is no place. Gemma 3 gave most letters a publication date (their own date) though the prompt says
-    always null; left in, nearly every document went to a judge that is Gemma again."""
+    memo or telegram has no byline, publication or publication date, a letter or telegram no title, and a
+    placeholder copied from the prompt is no place. Gemma 3 gave most letters a publication date (their own date)
+    though the prompt says always null; left in, nearly every document went to a judge that is Gemma again."""
     if r is None:
         return None
     r = dict(r)
     if r.get("kind") in CORRESP:
-        r["byline"], r["publication_date"] = [], None
+        r["byline"], r["publication"], r["publication_date"] = [], None, None
         if r["kind"] != "memo":
             r["title"] = None
     r["recipient_place"] = [x for x in r.get("recipient_place") or [] if x.strip().lower() not in PLACEHOLDER]
@@ -568,6 +570,8 @@ def scoped(pairs, field):
 
 
 def verdict(s):
+    if s and s.get("docs") and not s.get("pred_filled"):
+        return "never filled"
     if not s or s.get("truth_filled", 0) < MIN_N or s.get("precision_ed2") is None:
         return "too few to tell"
     return "fill" if s["precision_ed2"] >= BAR else "leave empty"
@@ -658,8 +662,8 @@ def report(o):
           f"route). {MODELS[JUDGE][1]}, reader B, ruled every document they differed on. Qwen3-VL 8B is also a "
           "scored local route (from text alone, through the app's prompt) and Gemma is a relative of Gemini, so those "
           "two app rows may lean their way on disputed documents. The label definitions were applied to every reading "
-          "and ruling before agreement (no byline or publication date on a letter, memo or telegram, no title on a "
-          "letter or telegram): Gemma gave most letters their own date as a publication date.", "",
+          "and ruling before agreement (no byline, publication or publication date on a letter, memo or telegram, no "
+          "title on a letter or telegram): Gemma gave most letters their own date as a publication date.", "",
           "Disputed fields (documents): " + ", ".join(f"{k} {v}" for k, v in
                                                      sorted(c["disputed_fields"].items(), key=lambda x: -x[1])) + ".",
           "", "Seconds a document on average: " + "; ".join(f"{k} {v[1]} over {v[0]}" for k, v in c["walls"].items())
@@ -689,7 +693,30 @@ def report(o):
         L.append(f"| {f} | {s.get('docs', 0)} | {s.get('truth_filled', 0)} | {s.get('pred_filled', 0)} | "
                  f"{s.get('ed2', 0)} | {s.get('wrong_when_filled', 0)} | {f3(s.get('precision_ed2'))} | "
                  f"{f3(s.get('recall_ed2'))} | {verdict(s)} |")
-    L.append("")
+    L += ["", "## Which fields to fill", "",
+          "The verdict per field for the app's cloud route (Gemini 3.8 Flash), its laptop route (Qwen3.5 4B through "
+          "the app's prompt) and the dedicated extractor (Qwen3.5 4B with this item's prompt), on the documents with "
+          "replies, with the precision in brackets. W47.item-fields-build fills a field only where its route clears "
+          "the bar.", "",
+          "| field | Gemini 3.8 Flash (app) | Qwen3.5 4B (app) | Qwen3.5 4B (extractor) |", "|---|---|---|---|"]
+    for f in FIELDS:
+        cells = []
+        for key in ("app gemini-3.8-flash", "app qwen3.5-4b", f"extractor {EXTRACTOR}"):
+            s = sc.get(f"{key}|replied|{f}", {})
+            cells.append(f"{verdict(s)} ({f3(s.get('precision_ed2'))})")
+        L.append(f"| {f} | " + " | ".join(cells) + " |")
+    L += ["", "## Limits", "",
+          "- The 60 articles and reports were drawn by Gemini's own `format`, so Gemini's kind on them is favoured; "
+          "the 159 W46 documents were drawn by Gemini's format too (letters, memos, telegrams) or by text cues.",
+          "- The 72 W46 additions have no cached app replies; the app is scored on the documents that have them. "
+          "Their fresh Gemini replies are a deferred paid run (execution-plans/paid-runs-deferred.md).",
+          f"- Readers saw the first page and the first {TEXT_CAP:,} characters only: titles, bylines and mastheads "
+          "sit there, but a recipient address or a running head on a later page is missed.",
+          "- The app's date is its estimate of the document's date, not a printed issue date; on a printed piece "
+          "with no printed date it counts as filled where the truth is empty. Recall is the share right where a "
+          "date is printed.",
+          "- Model-drafted and model-adjudicated by two open 8-12B models (STATE Phase 2 decision 2), no owner pass; "
+          "the session that built it spot-checked rows against the page images (the DONE entry).", ""]
     return "\n".join(L)
 
 

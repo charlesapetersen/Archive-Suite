@@ -57,8 +57,9 @@ class Agree(unittest.TestCase):
 class Definitions(unittest.TestCase):
     def test_correspondence_fields_emptied(self):
         r = I.by_definition(label(kind="letter", title="Dear Sir", byline=["A B"], publication_date=(1940, 1, None),
+                                  publication="The Washington Post",
                                   recipient_place=["City, State", "Boston, Massachusetts"]))
-        self.assertEqual((r["title"], r["byline"], r["publication_date"]), (None, [], None))
+        self.assertEqual((r["title"], r["byline"], r["publication"], r["publication_date"]), (None, [], None, None))
         self.assertEqual(r["recipient_place"], ["Boston, Massachusetts"])
         m = I.by_definition(label(kind="memo", title="Budget", publication_date=(1957, 12, None)))
         self.assertEqual((m["title"], m["publication_date"]), ("Budget", None))
