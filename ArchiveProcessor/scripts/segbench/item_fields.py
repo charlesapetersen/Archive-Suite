@@ -32,10 +32,12 @@ Drafting and adjudication (STATE Phase 2 decision 2, model-drafted and model-aud
 Mac, open weights, temperature 0, $0 and no plan route (root CLAUDE.md). Two families read every document blind from
 the OCR text's first TEXT_CAP characters and the first page's image: Alibaba's Qwen3-VL 8B (A) and Google's Gemma 3
 12B (B). Gemma 3 12B, shown both readings with the text and the image, rules every document whose readings differ on
-any field, and the report counts how often it sided with each. A document whose readings agree takes A's. Two
-leanings the report states: Qwen3-VL 8B is also a scored local route (from text alone, through the app's prompt), and
-Gemma is a relative of Gemini, the scored cloud route, and judges. A third family was not fetched: the Mac had 19 GB
-of disk free and a second 12B model would have left about 4 GB.
+any field, and the report counts how often it sided with each. A document whose readings agree takes A's. Before
+agreement, the label definitions are applied to every reading and ruling (by_definition: no byline or publication
+date on a letter, memo or telegram, no title on a letter or telegram), since Gemma gave most letters their own date
+as a publication date. Two leanings the report states: Qwen3-VL 8B is also a scored local route (from text alone,
+through the app's prompt), and Gemma is a relative of Gemini, the scored cloud route, and judges. A third family was
+not fetched: the Mac had 19 GB of disk free and a second 12B model would have left about 4 GB.
 
 The scorer, per field and predictor, over the documents with cached replies: fill rate, exact and edit-distance-2
 match (ent_truth's name matcher for names and places; folded text for titles and publications), wrong-when-filled
@@ -390,8 +392,8 @@ def reading(key, doc_id, stage="drafts"):
 
 def local_snapshot(repo):
     """The cached snapshot's directory when its weights are all there, else the repo id. Loading by id asks the Hub
-    for the revision first, and that request hung for minutes on this Mac with every file already cached, and offline the Hub's check refused a
-    complete snapshot."""
+    for the revision first, and that request hung for minutes on this Mac with every file already cached; offline,
+    the Hub's check refused the complete snapshot."""
     import glob
     hub = os.path.join(os.environ.get("HF_HOME", ""), "hub", "models--" + repo.replace("/", "--"), "snapshots", "*")
     for d in sorted(glob.glob(hub)):   # mlx_vlm loads every *.safetensors; Gemma's index names stale shards
@@ -464,9 +466,28 @@ def show(r):
     return json.dumps(out, ensure_ascii=False)
 
 
+PLACEHOLDER = {"city, state", "city, country", "city"}
+
+
+def by_definition(r):
+    """The label definitions applied to a reader's or the judge's reading (never to a scored predictor): a letter,
+    memo or telegram has no byline or publication date, a letter or telegram no title, and a placeholder copied from
+    the prompt is no place. Gemma 3 gave most letters a publication date (their own date) though the prompt says
+    always null; left in, nearly every document went to a judge that is Gemma again."""
+    if r is None:
+        return None
+    r = dict(r)
+    if r.get("kind") in CORRESP:
+        r["byline"], r["publication_date"] = [], None
+        if r["kind"] != "memo":
+            r["title"] = None
+    r["recipient_place"] = [x for x in r.get("recipient_place") or [] if x.strip().lower() not in PLACEHOLDER]
+    return r
+
+
 def both(d):
     ra, rb = (reading(k, d["id"]) for k in READERS)
-    pa, pb = (parse(r["raw"]) if r else None for r in (ra, rb))
+    pa, pb = (by_definition(parse(r["raw"])) if r else None for r in (ra, rb))
     return pa, pb
 
 
@@ -500,7 +521,7 @@ def truth_of(d):
     if not dis:
         return pa, "agreed"
     r = reading(JUDGE, d["id"], "adjudicated")
-    pr = parse(r["raw"]) if r else None
+    pr = by_definition(parse(r["raw"])) if r else None
     if not pr:
         return None, "unruled"
     sa = all(agree(f, pr.get(f), pa.get(f)) for f in dis)
@@ -636,7 +657,9 @@ def report(o):
           f"first {TEXT_CAP:,} characters and the first page at {MAX_SIDE} px; this Mac, temperature 0, $0, no plan "
           f"route). {MODELS[JUDGE][1]}, reader B, ruled every document they differed on. Qwen3-VL 8B is also a "
           "scored local route (from text alone, through the app's prompt) and Gemma is a relative of Gemini, so those "
-          "two app rows may lean their way on disputed documents.", "",
+          "two app rows may lean their way on disputed documents. The label definitions were applied to every reading "
+          "and ruling before agreement (no byline or publication date on a letter, memo or telegram, no title on a "
+          "letter or telegram): Gemma gave most letters their own date as a publication date.", "",
           "Disputed fields (documents): " + ", ".join(f"{k} {v}" for k, v in
                                                      sorted(c["disputed_fields"].items(), key=lambda x: -x[1])) + ".",
           "", "Seconds a document on average: " + "; ".join(f"{k} {v[1]} over {v[0]}" for k, v in c["walls"].items())

@@ -54,6 +54,19 @@ class Agree(unittest.TestCase):
         self.assertEqual(I.disputes(a, b), ["kind"])
 
 
+class Definitions(unittest.TestCase):
+    def test_correspondence_fields_emptied(self):
+        r = I.by_definition(label(kind="letter", title="Dear Sir", byline=["A B"], publication_date=(1940, 1, None),
+                                  recipient_place=["City, State", "Boston, Massachusetts"]))
+        self.assertEqual((r["title"], r["byline"], r["publication_date"]), (None, [], None))
+        self.assertEqual(r["recipient_place"], ["Boston, Massachusetts"])
+        m = I.by_definition(label(kind="memo", title="Budget", publication_date=(1957, 12, None)))
+        self.assertEqual((m["title"], m["publication_date"]), ("Budget", None))
+        a = I.by_definition(label(kind="report", byline=["A B"], publication_date=(1975, None, None)))
+        self.assertEqual((a["byline"], a["publication_date"]), (["A B"], (1975, None, None)))
+        self.assertIsNone(I.by_definition(None))
+
+
 class Match(unittest.TestCase):
     def test_dates_at_truth_precision(self):
         self.assertTrue(I.date_match((1968, 7, 4), (1968, 7, None), "exact"))
