@@ -1433,16 +1433,16 @@ is safe.
 **What may move to the owner's OneDrive backup** (`~/Library/CloudStorage/OneDrive-Stanford/Archive Suite backup`)
 when the disk is short. Only the owner's session moves anything; an engine session names it in the Daemon Report (no
 decision). What has moved is listed in the backup's `MOVED.md` (29 Oct: IIT-CDIP imagetars, reader-sample,
-reader-session-1, the 24 retired worktrees, Vision OCR's model-home, ocrlab and September truth runs). Sessions cannot
+reader-session-1, the 24 retired worktrees, Vision OCR's model-home, ocrlab and September truth runs; 30 Oct:
+`date-tagging/traceable`, `date-tagging/iitcdip` and `bench-corpus/raw`, 4.2 GB). The walkthrough moves what is
+movable now (`~/Claude/CLAUDE.md`, "The walkthrough", step 7). Sessions cannot
 read OneDrive (macOS blocks `~/Library/CloudStorage`), so an item that needs a moved folder reports it and asks the
 owner to copy it back to its original path, rather than failing or downloading it again. Sizes 29 Oct; each when nothing open reads it:
 
 | Folder | Size | What it is | Movable when |
 |---|---|---|---|
-| `date-tagging/` (`traceable`, `iitcdip`) | 3.0 GB | public date sets, W46.date-traceable (shipped) | now; a rerun brings it back |
 | `enh-dewarp/` (`uvdoc-bench`, `src`, `hf`) | 4.3 GB | dewarp bench and model sources, W46.enh-dewarp (shipped) | after W46.place-geom, which may straighten with them |
 | `sherlock-results/` | 0.8 GB | downloaded cluster outputs | each batch once its item is scored and shipped |
-| `bench-corpus/raw` | 1.2 GB | public set originals; `pages` are rendered from them | now; keep `pages` (every new model runs the public set) |
 | `mixed-def/pages` | 1.8 GB | mixed-page set renders | after W46.mixed-route-bands |
 | `enh-ocr-input/` (`stage`, `weights`, `src`) | 4.3 GB | enhancement arms | after W46.enh-ocr-input-marks and -ppocr |
 | `ent-robust/g17` | 4.0 GB | the G17 entity set | after W46.ent-robust-paid |

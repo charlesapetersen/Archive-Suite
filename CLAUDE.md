@@ -233,7 +233,13 @@ stated as a rule; its full wording, history and the cases behind it are in [`REF
 - ⛔ **A coding session's subagents are not readers either (owner, 2026-10-30).** The plan's usage is for building
   the app. Reading corpus pages or texts as data (truth drafts, labels, rulings, page-by-page readings) goes to the
   gateway (Gemini 3.7 Flash first) or an open model, never to Claude subagents in the session; W46.seg-boxes-sir-article
-  had four do it. No Claude arm is added where Gemini already answers the question.
+  had four do it. No Claude arm is added where Gemini already answers the question, and the skipped Claude arms of
+  `W46.ent-robust` and `W46.ent-score` above are dropped, not moved to the gateway: their `-paid` halves run Gemini.
+- ⛔ **No ABBYY text (owner, 2026-10-30).** The app will not use the corpus PDFs' ABBYY text layer, because LLM OCR
+  is much better. No new arm, prompt, route or training row takes it as input; the remaining arms of
+  `W46.date-image` and `W46.date-image-paid` run on the images alone. Results already scored stay as they are. A set
+  chosen by the ABBYY text (W46.date-image's unprinted-year documents: the year is not in the ABBYY text) says so
+  where it is reported. Images already follow the JPEG-originals rule (2026-10-22).
 - ⛔ **Cluster work runs on Sherlock; the engine prepares it, the owner's session submits it (owner, 2026-10-22).**
   Sherlock suits this project better than FarmShare, even when it is slower. FarmShare only with the owner's
   explicit approval for that run; other FarmShare mentions are history, not a route.

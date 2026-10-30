@@ -695,7 +695,7 @@ def markdown(s):
         L.append("")
     else:
         L += ["## G17 Business Letters", "", "Not yet run: its 27B arm is in the same Sherlock pack; Gemini is "
-              "W46.ent-robust-paid; Claude through the plan waits for W46.gateway-models-ok.", ""]
+              "W46.ent-robust-paid; no Claude arm is run (owner, 2026-10-30).", ""]
     L += READING
     return "\n".join(L) + "\n"
 
@@ -757,8 +757,8 @@ Noise costs a tagger 0.03 to 0.09 on typed pages through the model routes, while
 points short on clean text, because they do not mark most names in letter text at all; a fine-tune against OCR
 degradation cannot close that, and the laptop route for these fields is the local LLM through the prompt.""", "", """\
 **Limits.** The reference is the extractor's own output on the truth text, so a name it misses on both sides is
-invisible here. Gemini on the scans and on G17 is W46.ent-robust-paid; Claude through the plan
-waits for W46.gateway-models-ok (owner, 2026-10-21), so the only G17 row is the 27B's. Readings that failed count as pages with no names, which lowers the 8B's public figure most (77 to 94
+invisible here. Gemini on the scans and on G17 is W46.ent-robust-paid; no Claude arm is run, since Gemini answers
+the same question (owner, 2026-10-30), so the only G17 row is the 27B's. Readings that failed count as pages with no names, which lowers the 8B's public figure most (77 to 94
 of 232 to 302 public pages failed). Two edits are allowed only on names of five letters or more. Post-correction rows
 come from W46.ocr-postcorrect's band sample, so they say what correction buys where it is applied, not on an average
 page. Not an OCR or segmentation result, so ArchiveOCRBench is unchanged.""", ""]
