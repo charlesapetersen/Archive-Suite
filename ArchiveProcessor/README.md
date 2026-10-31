@@ -378,7 +378,8 @@ ArchiveProcessor/macOS/Sources/ArchiveProcessor/
 │   └── LiveCaptureTestDriver.swift    # Test harness driving the live-staging pipeline
 ├── Net/
 │   ├── CaptureServer.swift            # NWListener HTTP receiver (Bearer token)
-│   └── USBBridge.swift                # adb reverse tunnel for USB pairing
+│   ├── USBBridge.swift                # adb reverse tunnel for USB pairing (Android)
+│   └── USBMuxBridge.swift             # usbmux tunnels for USB pairing (iPhone)
 └── Views/
     ├── OCRView.swift                  # Process Files UI — main view (controlPanel + filePanel)
     ├── OCRView+*.swift                # extracted sheets/rows/diff: FileRowView, OCRRetrySheet, Segmentation/DocumentSegment/Collection review sheets, ModelSelection/ModelTestResults/ModelTestTypes, Resolution drop/test sheets, WordDiff

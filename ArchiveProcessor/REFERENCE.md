@@ -389,6 +389,8 @@ Net/                           Phone↔Mac transports + cloud relay (Tier-2; the
   CaptureReceiver.swift        The receiver role: accept phone pages → ingest, ack only on durable.
   CaptureValidation.swift      Shared group-id safety (path-traversal guard) for both receivers.
   USBBridge.swift              Keeps adb reverse asserted so a USB phone reaches 127.0.0.1:<port>.
+  USBMuxBridge.swift           iPhone cable route: usbmux tunnels into the app's 48628, the AC1 HMAC answer,
+                               spliced into CaptureServer's loopback-only cable listener (iphone-usb.md).
   FileRelayReceiver.swift      Watched-directory relay receiver (offline cloud stand-in) + ScanReport.
   RelayObjectFormat.swift      Canonical relay object names/JSON/fingerprint; see SPEC/relay-object-format.md.
   DriveObjectStore.swift       RelayObjectStore over Google Drive (the production cloud relay).

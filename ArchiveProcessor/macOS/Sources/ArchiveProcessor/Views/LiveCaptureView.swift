@@ -239,6 +239,14 @@ struct LiveCaptureView: View {
                                 Image(systemName: "wifi").font(.caption2).foregroundStyle(.secondary)
                                 Text(session.serverRunning ? "Listening (Wi-Fi / USB)" : "LAN off").font(.caption)
                             }
+                            if session.serverRunning, let cable = Self.cableLine(session.cableStatus) {
+                                HStack(spacing: 6) {
+                                    Circle().fill(session.cableStatus == .connected ? .green : .secondary)
+                                        .frame(width: 6, height: 6)
+                                    Image(systemName: "cable.connector").font(.caption2).foregroundStyle(.secondary)
+                                    Text(cable).font(.caption)
+                                }
+                            }
                             HStack(spacing: 6) {
                                 Circle().fill(session.driveWatching ? .green : .secondary).frame(width: 6, height: 6)
                                 Image(systemName: "cloud").font(.caption2).foregroundStyle(.secondary)
@@ -340,6 +348,12 @@ struct LiveCaptureView: View {
                                 Text("\(ip):\(session.listenPort)")
                                     .font(.system(.caption, design: .monospaced))
                                     .textSelection(.enabled)
+                            } else {
+                                Text("No network address: pair over the cable, or Cloud.")
+                                    .font(.caption).foregroundStyle(.primary)
+                            }
+                            if let cable = Self.cableLine(session.cableStatus) {
+                                Text(cable).font(.caption).foregroundStyle(.primary)
                             }
                             // When signed into Drive, the same QR also carries the relay code (additive `relay`
                             // key); a phone that picks Cloud reads it. Shown so it can be typed for manual entry.
@@ -360,7 +374,7 @@ struct LiveCaptureView: View {
                             // The airport-Wi-Fi failure mode we hit: many public/guest networks isolate
                             // clients so the phone can't reach the Mac even on the same Wi-Fi — the scan
                             // just does nothing. Name the fix so the operator isn't stuck.
-                            Text("Phone not connecting? This Wi-Fi may block device-to-device connections (common on public / guest / hotel networks). Fixes: use a **USB cable** (Android), or turn on a **personal hotspot** and join both devices to it.")
+                            Text("Phone not connecting? This Wi-Fi may block device-to-device connections (common on public / guest / hotel networks). Fixes: use a **USB cable**, or turn on a **personal hotspot** and join both devices to it.")
                                 .font(.caption2)
                                 .foregroundStyle(.primary)
                                 .fixedSize(horizontal: false, vertical: true)
@@ -384,10 +398,14 @@ struct LiveCaptureView: View {
     /// (`CaptureServer`), while `relay` stays the SPEC-pinned 6-char Drive-relay code (the value
     /// `DriveObjectStore` stamps as `appProperties.relayToken`). Both are opaque to the companions, so the
     /// only migration cost of the LAN split is one QR re-scan per phone.
+    ///
+    /// S-037 (W40.i-usb-mac): the QR is shown whenever the server listens. Cable pairing needs no Wi-Fi
+    /// address, so with no en0/en1 address `host` falls back to another non-loopback IPv4 (a hotspot or USB
+    /// Ethernet), and with none at all it is empty: valid for the cable and Cloud, refused for Wi-Fi.
     private var pairingPayload: String? {
-        guard session.serverRunning, let ip = Self.primaryIPv4() else { return nil }
+        guard session.serverRunning else { return nil }
         var dict: [String: Any] = [
-            "host": ip,
+            "host": Self.pairingHost(primary: Self.primaryIPv4(), candidates: Self.pairableFallbackIPv4()),
             "port": Int(session.listenPort),
             "token": session.lanToken,
             "name": Host.current().localizedName ?? "Mac"
@@ -813,6 +831,22 @@ struct LiveCaptureView: View {
         return NSImage(cgImage: cg, size: NSSize(width: scaled.extent.width, height: scaled.extent.height))
     }
 
+    /// The QR's `host`: en0/en1 first, else any other non-loopback IPv4, else empty (S-037).
+    static func pairingHost(primary: String?, candidates: [String]) -> String {
+        primary ?? candidates.first ?? ""
+    }
+
+    /// The pane's cable line, or nil when there is nothing to say (no iPhone on the cable).
+    static func cableLine(_ status: USBMuxBridge.Status) -> String? {
+        switch status {
+        case .connected: return "iPhone on the cable: connected"
+        case .awaitingPairing: return "iPhone on the cable: scan the QR in Archive Capture"
+        case .appNotOpen: return "iPhone plugged in: open Archive Capture"
+        case .unavailable: return "Cable route unavailable"
+        case .noDevice: return nil
+        }
+    }
+
     /// Primary LAN IPv4 (prefers en0/en1) for the pairing payload.
     static func primaryIPv4() -> String? {
         var address: String?
@@ -834,6 +868,34 @@ struct LiveCaptureView: View {
             if name == "en0" { break }   // prefer Wi-Fi/primary
         }
         return address
+    }
+
+    /// Whether an address on another interface may stand in for en0/en1 in the QR: not a VPN tunnel, AirDrop
+    /// or low-latency WLAN interface, and not a self-assigned 169.254 address. A hotspot or USB Ethernet is.
+    static func isPairableFallback(interface: String, ip: String) -> Bool {
+        let skipped = ["utun", "ipsec", "awdl", "llw", "lo", "gif", "stf"]
+        return !skipped.contains { interface.hasPrefix($0) } && !ip.hasPrefix("169.254.") && !ip.isEmpty
+    }
+
+    /// The QR's fallback candidates: up, non-loopback IPv4s that pass `isPairableFallback`.
+    static func pairableFallbackIPv4() -> [String] {
+        var result: [String] = []
+        var ifaddr: UnsafeMutablePointer<ifaddrs>?
+        guard getifaddrs(&ifaddr) == 0, let first = ifaddr else { return [] }
+        defer { freeifaddrs(ifaddr) }
+        for ptr in sequence(first: first, next: { $0.pointee.ifa_next }) {
+            let flags = Int32(ptr.pointee.ifa_flags)
+            guard (flags & (IFF_UP | IFF_RUNNING)) == (IFF_UP | IFF_RUNNING),
+                  (flags & IFF_LOOPBACK) == 0,
+                  ptr.pointee.ifa_addr.pointee.sa_family == UInt8(AF_INET) else { continue }
+            var host = [CChar](repeating: 0, count: Int(NI_MAXHOST))
+            getnameinfo(ptr.pointee.ifa_addr, socklen_t(ptr.pointee.ifa_addr.pointee.sa_len),
+                        &host, socklen_t(host.count), nil, 0, NI_NUMERICHOST)
+            let ip = String(decoding: host.prefix(while: { $0 != 0 }).map { UInt8(bitPattern: $0) }, as: UTF8.self)
+            let name = String(cString: ptr.pointee.ifa_name)
+            if isPairableFallback(interface: name, ip: ip), !result.contains(ip) { result.append(ip) }
+        }
+        return result
     }
 
     /// Every non-loopback IPv4 the Mac currently has (any interface), for the "try an alternate"

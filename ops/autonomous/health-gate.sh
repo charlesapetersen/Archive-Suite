@@ -371,6 +371,11 @@ step processor-launch-proof bash "$ROOT/ops/autonomous/tests/prove-processor-lau
 # (its driver stops before any retry if the injected transport is not active). It hung unnoticed on main
 # for weeks because no gate ran it.
 step processor-retry-backend bash -c 'cd ArchiveProcessor && ARCHIVEPROC_TEST_BINARY="$PWD/macOS/build/gate-DD/Build/Products/Debug/ArchiveProcessor.app/Contents/MacOS/ArchiveProcessor" bash scripts/test-retry-backend.sh'
+# W40.i-usb-mac: the iPhone cable route's Mac end against a fake usbmuxd (pool, handshake, splice, expiry,
+# throttle key), on the same gate artifact; loopback only, ~45 s, free. The probe checks the REAL usbmuxd
+# still speaks the private protocol (read-only, no phone, ~50 ms).
+step processor-usbmux-bridge bash -c 'cd ArchiveProcessor && ARCHIVEPROC_TEST_BINARY="$PWD/macOS/build/gate-DD/Build/Products/Debug/ArchiveProcessor.app/Contents/MacOS/ArchiveProcessor" bash scripts/test-usbmux-bridge.sh'
+step usbmux-probe bash "$ROOT/ArchiveProcessor/scripts/usbmux-probe.sh"
 # Opt-in paid OCR smoke. PREREQ before enabling this in an unattended run: the Gemini key must be readable
 # WITHOUT a prompt — test-smoke.sh reads it via `security find-generic-password`, so run the WS12 keychain
 # fix (ops/autonomous/fix-keychain-access.sh) first, else this either prompts (→ the daemon's GATE_MAXRUN

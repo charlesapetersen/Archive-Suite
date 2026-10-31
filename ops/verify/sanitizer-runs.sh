@@ -41,7 +41,8 @@ test-filerelay.sh test-incremental-skip.sh test-local-models.sh test-localagent.
 test-merge-safety.sh test-multipage-reocr.sh test-network-session.sh test-ocr-cascade.sh test-ocr-page-guidance.sh
 test-ocr-page-kind.sh test-ocr-refusal.sh test-processfiles-tagwarn.sh test-processing-history.sh test-recovery.sh
 test-retry-backend.sh test-segment-json.sh test-segmentation-chatgpt.sh test-segmentation-chooser.sh
-test-segmentation-engine.sh test-segmentation-plan.sh test-segmentation-review.sh test-vision-hybrid.sh"
+test-segmentation-engine.sh test-segmentation-plan.sh test-segmentation-review.sh test-vision-hybrid.sh
+test-usbmux-bridge.sh"
 
 worst=0
 verdict() {  # $1 = rc to fold in: 1 beats 2 beats 0

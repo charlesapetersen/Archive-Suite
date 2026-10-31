@@ -11,6 +11,10 @@ final class CaptureSession: ObservableObject {
     @Published private(set) var photos: [CapturedPhoto] = []      // ordered by seq
     @Published private(set) var serverRunning = false
     @Published private(set) var listenPort: UInt16 = 0
+    /// The iPhone cable route (W40.i-usb-mac): what `USBMuxBridge` last reported, for the pane's cable line.
+    @Published private(set) var cableStatus: USBMuxBridge.Status = .noDevice
+    /// The loopback-only port `CaptureServer` splices cable tunnels into (0 while it is not listening).
+    @Published private(set) var cableListenPort: UInt16 = 0
     @Published private(set) var lastActivity: Date?
     @Published var statusMessage = "Idle"
     @Published private(set) var connectedDeviceName: String?
@@ -582,6 +586,40 @@ final class CaptureSession: ObservableObject {
         serverRunning = false
         statusMessage = "Stopped."
         USBBridge.stopReverse()
+    }
+
+    private var cableBridge: USBMuxBridge?
+    /// DEBUG test seam: a test driver that runs its own bridge against a fake usbmuxd turns the session's
+    /// off, so the two do not both answer the fake's devices.
+    var cableBridgeEnabled = true
+
+    /// `CaptureServer`'s cable listener is up: keep idle usbmux tunnels open into any USB-attached iPhone,
+    /// spliced into that port. The iPhone's counterpart of `USBBridge.startReverse`.
+    func cableListenerDidStart(port: UInt16) {
+        cableBridge?.stop()
+        cableBridge = nil
+        cableListenPort = port
+        guard cableBridgeEnabled else { return }
+        let generation = UUID()
+        cableBridgeGeneration = generation
+        let bridge = USBMuxBridge(config: .production, targetPort: port, token: lanToken) { [weak self] status in
+            Task { @MainActor in
+                guard let self, self.cableBridgeGeneration == generation else { return }
+                self.cableStatus = status
+            }
+        }
+        cableBridge = bridge
+        bridge.start()
+    }
+    /// Ignores a status the previous bridge queued before it was stopped.
+    private var cableBridgeGeneration: UUID?
+
+    func cableListenerDidStop() {
+        cableBridge?.stop()
+        cableBridge = nil
+        cableBridgeGeneration = nil
+        cableListenPort = 0
+        cableStatus = .noDevice
     }
 
     func serverDidFail(_ message: String) {

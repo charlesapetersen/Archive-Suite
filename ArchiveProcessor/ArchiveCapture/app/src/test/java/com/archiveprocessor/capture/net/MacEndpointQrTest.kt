@@ -54,6 +54,21 @@ class MacEndpointQrTest {
         assertEquals("REL123", ep.relayToken)   // relay omitted ⇒ falls back to token for a cloud endpoint
     }
 
+    /** S-037: a Mac with no network address still shows a QR, with `host` empty. Wired and Cloud take it. */
+    @Test fun emptyHostQr_parsesForWiredAndCloud() {
+        val ep = MacEndpoint.fromQrPayload("""{"host":"","port":48627,"token":"ABC234","name":"Mac","relay":"REL123"}""")
+        assertNotNull("an empty-host QR must parse: Wired needs only the port and token", ep); ep!!
+        assertEquals("", ep.host)
+        assertEquals(48627, ep.port)
+        assertEquals("ABC234", ep.token)
+        assertTrue("Wi-Fi must refuse it", !ep.hasHost)
+        assertEquals("Cloud still reads the relay code", "REL123", ep.relayToken)
+        val missing = MacEndpoint.fromQrPayload("""{"port":48627,"token":"ABC234","name":"Mac"}""")
+        assertNotNull("an absent host is the same as an empty one", missing)
+        assertTrue(!missing!!.hasHost)
+        assertTrue(MacEndpoint.fromQrPayload("""{"host":"192.168.1.5","port":48627,"token":"T"}""")!!.hasHost)
+    }
+
     @Test fun malformedQr_returnsNull() {
         assertNull(MacEndpoint.fromQrPayload("not json"))
         assertNull(MacEndpoint.fromQrPayload("""{"host":"h","port":0,"token":"t"}"""))   // bad port

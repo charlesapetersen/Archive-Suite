@@ -321,6 +321,10 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
     fun connectFromQr(payload: String, wired: Boolean, onResult: (Boolean) -> Unit) {
         val ep = MacEndpoint.fromQrPayload(payload)
         if (ep == null) { onResult(false); return }
+        if (!wired && !ep.hasHost) {
+            statusMessage = "This Mac has no network address, so Wi-Fi can't reach it. Use Wired (USB cable) or Cloud."
+            onResult(false); return
+        }
         // Wired: reach the Mac at 127.0.0.1 over the adb-reverse tunnel; keep the QR's port + token.
         val host = if (wired) "127.0.0.1" else ep.host
         connect(host, ep.port, ep.token, ep.name, onResult)

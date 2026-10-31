@@ -295,6 +295,14 @@ existing scratch, key-free, no-network execution remains unchanged.
   request leaves the machine. 7 checks as of 2026-07-31. **This is the suite that proves a retry cannot
   double-charge you.**
 - **`test-segment-json.sh`** — byte-identity of the shared `SegmentJSONBuilder` output.
+- **`test-usbmux-bridge.sh`** — the iPhone cable route's Mac end (`USBMuxBridge`) against
+  `scripts/fake-usbmuxd.py`, with the driver playing the phone: the codec (48628 sent as 0xF4BD), the pool of
+  four and its top-up, the `AC1` handshake (right, silent, wrong hello, another Mac's pairing), a reply the
+  server closes at once arriving whole, idle expiry with no EOF, refused `Connect`, detach, and the cable's own
+  failed-auth throttle key on a real `CaptureServer`. Loopback only, no phone, ~45 s. In the health gate.
+- **`usbmux-probe.sh`** — read-only check that the real `/var/run/usbmuxd` still speaks the private protocol
+  the cable route uses (`ListDevices`, `ReadBUID`, `Listen`, `Connect` → BadDevice); no phone, ~50 ms. In the
+  health gate.
 
 **Process Files pipeline**
 - **`test-retry-backend.sh`** — retry backend-lock contract: the real Process Files retry seam runs against

@@ -18,6 +18,11 @@ import Network
 final class CaptureServer: @unchecked Sendable, CaptureReceiver {
     private weak var session: CaptureSession?
     private var listener: NWListener?
+    /// The iPhone cable route's way in (W40.i-usb-mac): a second listener, bound to 127.0.0.1 only and on a
+    /// system port, that `USBMuxBridge` splices its tunnels into. Kept apart from the LAN listener so the
+    /// failed-auth throttle can key its peers `cable:<device>` instead of 127.0.0.1 (shared with
+    /// `adb reverse` and every local process), and so a rogue app on one phone cannot back the others off.
+    private var cableListener: NWListener?
     private let queue = DispatchQueue(label: "capture.server")
     /// The LAN/USB bearer this receiver authenticates: the session's high-entropy `lanToken`, NOT the
     /// SPEC-pinned Drive-relay `token` (W16.lan2 split the two). Constant for the receiver's lifetime.
@@ -56,6 +61,7 @@ final class CaptureServer: @unchecked Sendable, CaptureReceiver {
         queue.async { [self] in
             guard self.listener == nil else { return }   // already listening/starting — don't leak a second NWListener
             self.startListening(on: Self.preferredPort)
+            self.startCableListener()
         }
     }
 
@@ -110,10 +116,46 @@ final class CaptureServer: @unchecked Sendable, CaptureReceiver {
         startListening(on: nil)
     }
 
+    /// Loopback only: `requiredLocalEndpoint` pins the bind to 127.0.0.1, so no LAN peer can reach it.
+    /// No Bonjour service. A failure costs only the cable route; the LAN listener is unaffected.
+    private func startCableListener() {
+        guard cableListener == nil else { return }
+        let params = NWParameters.tcp
+        params.requiredLocalEndpoint = .hostPort(host: .ipv4(.loopback), port: .any)
+        guard let listener = try? NWListener(using: params) else {
+            Task { @MainActor in self.session?.cableListenerDidStop() }
+            return
+        }
+        // Runs on `queue`. Only the current listener reports, so a stopped one's late `.cancelled` cannot
+        // stop the bridge of the listener that replaced it; `stop()` reports its own stop.
+        listener.stateUpdateHandler = { [weak self, weak listener] state in
+            guard let self, let listener, listener === self.cableListener else { return }
+            switch state {
+            case .ready:
+                let boundPort = listener.port?.rawValue ?? 0
+                Task { @MainActor in self.session?.cableListenerDidStart(port: boundPort) }
+            case .failed:
+                self.cableListener = nil
+                listener.cancel()
+                Task { @MainActor in self.session?.cableListenerDidStop() }
+            default:
+                break
+            }
+        }
+        listener.newConnectionHandler = { [weak self] conn in self?.handle(conn, cable: true) }
+        listener.start(queue: queue)
+        cableListener = listener
+    }
+
     func stop() {
         queue.async { [self] in
             self.listener?.cancel()
             self.listener = nil
+            if let cable = self.cableListener {
+                self.cableListener = nil
+                cable.cancel()
+                Task { @MainActor in self.session?.cableListenerDidStop() }
+            }
             let openConnections = self.connections.values.map(\.connection)
             self.connections.removeAll()
             self.aggregateReservedBodyBytes = 0
@@ -137,7 +179,7 @@ final class CaptureServer: @unchecked Sendable, CaptureReceiver {
     static let maxPhotoBodyBytes = 64 * 1024 * 1024
     static let maxControlBodyBytes = 64 * 1024
 
-    private func handle(_ conn: NWConnection) {
+    private func handle(_ conn: NWConnection, cable: Bool = false) {
         conn.start(queue: queue)
 
         guard connections.count < Self.maxConcurrentConnections else {
@@ -155,12 +197,12 @@ final class CaptureServer: @unchecked Sendable, CaptureReceiver {
         queue.asyncAfter(
             deadline: .now() + .seconds(Self.connectionTimeoutSeconds), execute: timeout.workItem)
 
-        readHeaders(conn, buffer: Data(), timeout: timeout)
+        readHeaders(conn, buffer: Data(), timeout: timeout, cable: cable)
     }
 
     /// Read only a small bounded header prefix first. Authentication, route-specific size checks, and an
     /// aggregate reservation all happen before `readBody` is allowed to accumulate the declared payload.
-    private func readHeaders(_ conn: NWConnection, buffer: Data, timeout: TimeoutHandle) {
+    private func readHeaders(_ conn: NWConnection, buffer: Data, timeout: TimeoutHandle, cable: Bool) {
         conn.receive(minimumIncompleteLength: 1, maximumLength: Self.headerReadChunkBytes) { [weak self] data, _, isComplete, error in
             guard let self else { timeout.cancel(); conn.cancel(); return }
             var buffer = buffer
@@ -172,7 +214,7 @@ final class CaptureServer: @unchecked Sendable, CaptureReceiver {
                 // 401s is refused BEFORE admission runs, so a hostile LAN peer can't sweep tokens at
                 // connection speed. Fail-open for an undeterminable source so a real phone is never
                 // collaterally locked out. Belt-and-suspenders atop the ~158-bit `lanToken`.
-                let source = Self.sourceKey(for: conn)
+                let source = cable ? Self.cableSourceKey(for: conn) : Self.sourceKey(for: conn)
                 let now = Self.nowMonotonic()
                 if self.authThrottle.isThrottled(source, now: now) {
                     timeout.cancel()
@@ -232,7 +274,7 @@ final class CaptureServer: @unchecked Sendable, CaptureReceiver {
                     timeout.cancel()
                     self.respond(conn, status: "400 Bad Request", json: ["error": "incomplete request"])
                 } else {
-                    self.readHeaders(conn, buffer: buffer, timeout: timeout)
+                    self.readHeaders(conn, buffer: buffer, timeout: timeout, cable: cable)
                 }
             }
         }
@@ -416,6 +458,22 @@ final class CaptureServer: @unchecked Sendable, CaptureReceiver {
         case .name(let n, _): return "name:\(n)"
         @unknown default: return "unknown"
         }
+    }
+
+    /// Throttle key for a peer of the cable listener: `cable:<device>`, from the port the bridge registered
+    /// when it opened this splice. Never "unknown" (which fails open): an unregistered loopback peer of the
+    /// cable listener shares one `cable:unregistered` bucket, so it cannot dodge the throttle.
+    private static func cableSourceKey(for conn: NWConnection) -> String {
+        guard case let .hostPort(_, port) = (conn.currentPath?.remoteEndpoint ?? conn.endpoint) else {
+            return "cable:unregistered"
+        }
+        return cableSourceKey(remotePort: port.rawValue)
+    }
+
+    static func cableSourceKey(remotePort: UInt16) -> String {
+        let key = CablePeers.deviceID(forLocalPort: remotePort).map { "cable:\($0)" } ?? "cable:unregistered"
+        CablePeers.lastResolvedKey = key
+        return key
     }
 
     /// Per-source failed-auth throttle. Value type; all state is owned by `CaptureServer.queue` (the serial

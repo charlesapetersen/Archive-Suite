@@ -28,6 +28,8 @@ data class MacEndpoint(
 ) {
     val baseUrl: String get() = "http://$host:$port"
     val isCloud: Boolean get() = mode == "cloud"
+    /** False for a QR from a Mac with no network address (S-037): usable over Wired or Cloud, not Wi-Fi. */
+    val hasHost: Boolean get() = host.isNotBlank()
 
     /** The Drive-relay token to use for the Cloud transport: the explicit combined-QR `relay` field, else
      *  the token itself when this endpoint was already built as a cloud endpoint. Null for a plain LAN QR
@@ -45,9 +47,11 @@ data class MacEndpoint(
                 if (o.optString("mode", "lan") == "cloud") {
                     MacEndpoint("", 0, token, name, "cloud", o.optString("account", "").ifBlank { null }, relay)
                 } else {
-                    val host = o.optString("host", "")
+                    // S-037: a Mac with no network address still shows its QR, with `host` empty. That QR is
+                    // valid for Wired (which swaps in 127.0.0.1) and Cloud; Wi-Fi refuses it (`hasHost`).
+                    val host = o.optString("host", "").trim()
                     val port = o.optInt("port", 0)
-                    if (host.isBlank() || port <= 0) null
+                    if (port <= 0) null
                     else MacEndpoint(host, port, token, name, "lan", null, relay)
                 }
             } catch (e: Exception) {
