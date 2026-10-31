@@ -19,6 +19,10 @@ extension NSAttributedString.Key {
     /// serializer reads it to tell a paragraph break from a newline someone typed
     /// (`W3.notes-editor-blankline-collapse`).
     static let noteBlockSeparator = NSAttributedString.Key("an.blockSeparator")
+    /// A CommonMark hard line break read from the file (`a\` or two spaces, then a newline) (Bool). Any
+    /// other newline in plain text is a Return the operator typed, which the serializer writes as a
+    /// paragraph break (`W40.fix-notes-return-paragraph`); this one is written back as a hard break.
+    static let noteHardLineBreak = NSAttributedString.Key("an.hardLineBreak")
 }
 
 // MARK: - BlockKind (paragraph-level semantic)
@@ -163,6 +167,9 @@ enum MarkdownStyler {
                 font = NSFont.monospacedSystemFont(ofSize: fontSize, weight: .regular)
                 attrs[.noteInlineCode] = true
                 attrs[.backgroundColor] = NSColor.quaternaryLabelColor
+            }
+            if inlineIntent.contains(.lineBreak) {
+                attrs[.noteHardLineBreak] = true
             }
         }
 

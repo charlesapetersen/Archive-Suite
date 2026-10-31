@@ -552,6 +552,11 @@ final class EditorTextView: NSTextView {
             var clean = newValue
             clean.removeValue(forKey: .noteBlockSource)
             clean.removeValue(forKey: .noteImageRelPath)
+            // Both mark whitespace read from the file, never typed text. Typed at the start of a paragraph,
+            // text inherited the separator before it, and a Return typed there was then not written as a
+            // paragraph break (W40.fix-notes-return-paragraph).
+            clean.removeValue(forKey: .noteBlockSeparator)
+            clean.removeValue(forKey: .noteHardLineBreak)
             super.typingAttributes = clean
         }
     }

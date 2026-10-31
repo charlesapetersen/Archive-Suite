@@ -60,13 +60,12 @@ class WritingJourneyUITests: NotesFixtureUITestCase {
             XCTAssertTrue(pollUntil(timeout: 10) { self.editorText.contains(second) && self.editorText.contains(first) },
                           "the relaunched editor should show both typed lines")
             log("[d9] step 3 relaunched editor text: \(editorText.debugDescription)")
-            let paragraphs = XCTExpectedFailure.Options(); paragraphs.isStrict = false
-            XCTExpectFailure("W40.fix-notes-return-paragraph (S2): a Return typed in the styled editor is saved as one "
-                             + "newline, so the typed paragraphs merge into one when the note is reopened",
-                             options: paragraphs) {
-                XCTAssertTrue(editorText.contains("no source blocks.\n\(first)\n\(second)"),
-                              "N-12: each Return typed should come back as its own paragraph after relaunch")
-            }
+            // W40.fix-notes-return-paragraph: each typed Return is written as a paragraph break, so the editor
+            // shows the Styler's blank-line separator between the paragraphs it reads back.
+            XCTAssertTrue((noteBody(uuid: id) ?? "").contains("no source blocks.\n\n\(first)\n\n\(second)"),
+                          "N-12: each Return typed should be saved as a paragraph break")
+            XCTAssertTrue(editorText.contains("no source blocks.\n\n\(first)\n\n\(second)"),
+                          "N-12: each Return typed should come back as its own paragraph after relaunch")
             RunLoop.current.run(until: Date().addingTimeInterval(3))   // past both debounces
             let afterRelaunch = try noteFile(id)
             XCTAssertEqual(afterRelaunch.data, afterQuit.data, "N-02: opening a note after relaunch must not rewrite it")

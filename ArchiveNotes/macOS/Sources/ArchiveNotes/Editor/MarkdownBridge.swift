@@ -513,6 +513,10 @@ enum MarkdownBridge {
             separatorSuffix = String((storage.string as NSString).substring(with: separator).dropFirst())
         }
 
+        if case .plain = kind {
+            return serializePlainLines(storage, range: contentRange) + separatorSuffix
+        }
+
         // Get the inline-serialized content for this paragraph
         let inlineContent = serializeInlineRuns(storage, range: contentRange)
         // Strip trailing newline if present
@@ -541,6 +545,34 @@ enum MarkdownBridge {
         case .plain:
             return trimmed + separatorSuffix
         }
+    }
+
+    /// W40.fix-notes-return-paragraph — plain text, with each Return the operator typed written as a
+    /// paragraph break. A typed paragraph inherits `.plain` from the one above it, so `collectParagraphs`
+    /// hands both over as one run, and a bare `\n` between them is a CommonMark soft break: on reopen the
+    /// two read back as one paragraph. So the text is cut at every newline that is neither a Styler
+    /// separator (those serialize verbatim, and already are the blank line) nor a hard break read from the
+    /// file, and the pieces are joined by a blank line. Each piece goes through `serializeInlineRuns` on its
+    /// own, so bold or a link spanning a Return closes before the break instead of enclosing it. Empty
+    /// pieces (Returns in a row, or one ending the run, which the join to the next block already ends) are
+    /// dropped: Markdown has no form for an empty paragraph.
+    private static func serializePlainLines(_ storage: NSAttributedString, range: NSRange) -> String {
+        let text = storage.string as NSString
+        var pieces: [String] = []
+        var start = range.location
+        let end = range.location + range.length
+        var i = start
+        while i < end {
+            if text.character(at: i) == 0x0A,
+               storage.attribute(.noteBlockSeparator, at: i, effectiveRange: nil) as? Bool != true,
+               storage.attribute(.noteHardLineBreak, at: i, effectiveRange: nil) as? Bool != true {
+                pieces.append(serializeInlineRuns(storage, range: NSRange(location: start, length: i - start)))
+                start = i + 1
+            }
+            i += 1
+        }
+        pieces.append(serializeInlineRuns(storage, range: NSRange(location: start, length: end - start)))
+        return pieces.filter { !$0.isEmpty }.joined(separator: "\n\n")
     }
 
     /// The run of block-separator whitespace at the very end of `range`, if the paragraph ends in
@@ -580,6 +612,12 @@ enum MarkdownBridge {
                     alt = ""
                 }
                 result += InlineImageMarkdown.emit(alt: alt, path: relPath)
+                return
+            }
+
+            // A hard break read from the file goes back as one, outside any emphasis around it.
+            if attrs[.noteHardLineBreak] as? Bool == true, !runText.isEmpty, runText.allSatisfy({ $0 == "\n" }) {
+                result += String(repeating: "\\\n", count: runText.count)
                 return
             }
 

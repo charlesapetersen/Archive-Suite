@@ -13,7 +13,7 @@ Format and statuses: [`README.md`](README.md). Written by `W40.b2`, 2026-10-12.
   `W23.m9`/`-fu3`, `W23.m14`/`-fu`, `W37.dual-date`, `W24.cal1`, `W24.cal1-toggle`, `W24.cal1-validator`,
   and the W0–W8 records under §*Archive Notes — NEW APP*.
 - **Sources and code read at:** `9e8959ef`.
-- **Count:** `unproven 45 · works 5 · broken 2 · unreachable 0` (works: N-34, N-45, N-49, N-50, N-51; broken: N-12, N-44). Updated by `W48.notes-stacked-layout-verify`, 2026-10-30 (N-49–N-51 to `works`).
+- **Count:** `unproven 45 · works 5 · broken 1 · unreachable 0 · fixed-pending-recheck 1` (works: N-34, N-45, N-49, N-50, N-51; broken: N-44; fixed-pending-recheck: N-12). Updated by `W40.fix-notes-return-paragraph`, 2026-10-31 (N-12 to `fixed-pending-recheck`).
 
 **Runtime evidence, for every row below: none yet.** The W40.a3 full VM suite
 ([`evidence/notes/W40.a3-full-ui.md`](evidence/notes/W40.a3-full-ui.md)) and the `W9.e2` runtime sweep passed
@@ -497,10 +497,11 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
   and `ArchiveNotesTests/EditorBindingTests.textViewFindBarEnabled`. No test presses Tab, Shift-Tab, Return or
   Backspace in a list.
 - **Runtime evidence:** [`evidence/notes/W40.d9-writing.md`](evidence/notes/W40.d9-writing.md): text typed with `typeText` into the styled editor saves; but each Return typed there is saved as one newline, so typed paragraphs merge into one when the note is reopened.
-- **Status:** `broken`
+- **Status:** `fixed-pending-recheck` (builder is not verifier)
 - **History:**
   - 2026-10-12 W40.b2 — row written, `unproven`.
   - 2026-10-15 W40.d9 — `unproven` → `broken`: typed paragraph breaks are lost on reopen; filed `W40.fix-notes-return-paragraph` (S2).
+  - 2026-10-31 W40.fix-notes-return-paragraph — `broken` → `fixed-pending-recheck`: a Return typed in plain text is saved as a paragraph break (`MarkdownBridge.serializePlainLines`), a hard break read from the file is kept as one, and `WritingJourneyUITests` step 3 now asserts the breaks on disk and after relaunch instead of expecting them to fail.
 - **Notes:** **Drift.**
   - There is no indent or outdent button on the toolbar and no Indent/Outdent item in the Format menu.
     `indentList` and `outdentList` are reached only from Tab and Shift-Tab, and `outdentList` also from Return or

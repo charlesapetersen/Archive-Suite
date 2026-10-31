@@ -508,6 +508,79 @@ struct MarkdownBridgeTests {
         assertNormalized("Line one.\nLine two.", expected: "Line one. Line two.")
     }
 
+    // MARK: - W40.fix-notes-return-paragraph — a typed Return is a paragraph break
+
+    /// Text typed into the styled editor carries the typing attributes of the character before the caret,
+    /// so it is `.plain` like the paragraph it follows. Built that way here, as `W40.d9` typed it in the VM.
+    @MainActor
+    private func typing(_ text: String, after md: String, at location: Int? = nil) -> NSMutableAttributedString {
+        let storage = NSMutableAttributedString(attributedString: MarkdownBridge.parse(markdown: md))
+        let at = location ?? storage.length
+        var attrs = storage.attributes(at: max(at - 1, 0), effectiveRange: nil)
+        attrs.removeValue(forKey: .noteBlockSeparator)
+        storage.insert(NSAttributedString(string: text, attributes: attrs), at: at)
+        return storage
+    }
+
+    /// The defect, measured by `W40.d9`: two Returns typed after a note's last paragraph were written one
+    /// newline apart, which Markdown reads as one paragraph, so the reopened note showed one.
+    @Test @MainActor
+    func typedReturnsAreSavedAsParagraphBreaks() {
+        let saved = MarkdownBridge.serialize(typing("\nTyped by hand.\nQuit straight after.",
+                                                    after: "Has no source blocks."))
+        #expect(saved == "Has no source blocks.\n\nTyped by hand.\n\nQuit straight after.")
+        let reopened = MarkdownBridge.parse(markdown: saved)
+        #expect(reopened.string == "Has no source blocks.\n\nTyped by hand.\n\nQuit straight after.")
+        #expect(MarkdownBridge.serialize(reopened) == saved, "reopening must not rewrite the note")
+    }
+
+    /// Returns in a row are one paragraph break (Markdown has no empty paragraph), and a Return ending the
+    /// text writes nothing after it.
+    @Test @MainActor
+    func repeatedAndTrailingReturnsCollapse() {
+        #expect(MarkdownBridge.serialize(typing("\n\n\nB\n", after: "A")) == "A\n\nB")
+        #expect(MarkdownBridge.serialize(typing("\n", after: "A")) == "A")
+    }
+
+    /// A Return typed inside bold closes the emphasis before the break, rather than enclosing a blank line.
+    @Test @MainActor
+    func returnInsideBoldClosesTheEmphasis() {
+        #expect(MarkdownBridge.serialize(typing("\n", after: "**onetwo**", at: 3)) == "**one**\n\n**two**")
+    }
+
+    /// A paragraph typed between existing blocks leaves the heading and list intact, and the blocks keep
+    /// their separators (`W3.notes-editor-blankline-collapse`).
+    @Test @MainActor
+    func typedReturnBetweenExistingBlocks() {
+        let storage = typing("\nTwo.", after: "# Head\n\nOne.\n\n- a\n- b", at: ("Head\n\nOne." as NSString).length)
+        #expect(MarkdownBridge.serialize(storage) == "# Head\n\nOne.\n\nTwo.\n\n- a\n- b")
+    }
+
+    /// A hard line break read from the file is not a typed Return: it goes back as a hard break, and either
+    /// spelling of one reads back the same.
+    @Test @MainActor
+    func hardLineBreakRoundTrips() {
+        for md in ["Line one\\\nLine two", "Line one  \nLine two"] {
+            let saved = MarkdownBridge.serialize(MarkdownBridge.parse(markdown: md))
+            #expect(saved == "Line one\\\nLine two", "\(md.debugDescription): got \(saved.debugDescription)")
+            #expect(MarkdownBridge.serialize(MarkdownBridge.parse(markdown: saved)) == saved)
+        }
+        #expect(MarkdownBridge.serialize(MarkdownBridge.parse(markdown: "**a**\\\n**b**")) == "**a**\\\n**b**")
+    }
+
+    /// Typed through the real text view: at the start of a paragraph the caret follows the Styler's separator,
+    /// whose flag the typed text used to inherit, so a Return typed there was not written as a break.
+    @Test @MainActor
+    func returnTypedAtTheStartOfAParagraphInTheEditor() throws {
+        let tv = EditorTextView()
+        let storage = try #require(tv.textStorage)
+        storage.setAttributedString(MarkdownBridge.parse(markdown: "A\n\nB"))
+        tv.setSelectedRange(NSRange(location: 3, length: 0))
+        tv.insertText("X\nY", replacementRange: tv.selectedRange())
+        #expect(tv.string == "A\n\nX\nYB")
+        #expect(MarkdownBridge.serialize(storage) == "A\n\nX\n\nYB")
+    }
+
     /// Assert that parse→serialize produces the expected normalized form,
     /// and that a second round-trip is identical (fixed-point after one pass).
     @MainActor
