@@ -25,8 +25,10 @@ neighbour are read: the prompt keeps 3,000 and 300 characters.
 THE CALL. The app's Gemini call sends no generationConfig and its OpenAI-compatible client sends no reasoning_effort
 unless one is set, so the app call here sends neither temperature nor reasoning_effort: Gemini's defaults, as the app
 gets them. max_tokens is set high only so reasoning cannot cut the answer off. `--rerun` sends the undated set a second
-time (a separate cache) for the rerun floor. The image pass is sent as W46.date-image-paid sent it (temperature 0,
-reasoning low), so the two sets' page dates come from one reader.
+time (a separate cache) for the rerun floor, with the gateway's no-cache field (its response cache returned a
+byte-identical copy of the first run otherwise; that copy is kept aside in CACHE/app-rerun-gateway-cached). The image
+pass is sent as W46.date-image-paid sent it (temperature 0, reasoning low), so the two sets' page dates come from one
+reader.
 
 The gateway is real money on a Stanford PTA (root CLAUDE.md): spend is counted at gateway_gemini.PRICE (3.8's list
 price, a ceiling) into CACHE/calls.jsonl before a reply is used, and CAP bounds the item. Replies, images and text stay
@@ -233,6 +235,12 @@ def text_of(pages, n):
     return "\n\n".join(out), missing
 
 
+def readable(d):
+    """The document's first page has a confirmed JPEG original, so Vision read it (the others are left out of the
+    undated set and counted: the app would have its own photo; the bench has no confirmed one)."""
+    return page_files(d["pages"][0])[1].exists()
+
+
 def prompt_of(d):
     text, missing = text_of(d["pages"], DOC_PAGES)
     context = "\n---\n".join(text_of(n, NEAR_PAGES)[0][:300] for n in d["near"])
@@ -250,8 +258,13 @@ def spent():
     return sum(r.get("cost", 0) for r in ledger())
 
 
-def app_body(prompt):
-    return {"model": G.MODEL, "max_tokens": APP_MAX_TOKENS, "messages": [{"role": "user", "content": prompt}]}
+def app_body(prompt, rerun=False):
+    """The app's request. A rerun carries LiteLLM's no-cache field: the gateway answers a byte-identical request from
+    its response cache (W46.ocr-rerun-noise), and the field never reaches the model."""
+    b = {"model": G.MODEL, "max_tokens": APP_MAX_TOKENS, "messages": [{"role": "user", "content": prompt}]}
+    if rerun:
+        b["cache"] = {"no-cache": True}
+    return b
 
 
 def image_body(images):
@@ -308,10 +321,10 @@ def cmd_run(a):
     ts = [d for d in targets() if a.set in (None, d["set"])]
     jobs = []
     for d in ts:
-        if a.rerun and d["set"] != "undated":
+        if (a.rerun and d["set"] != "undated") or (d["set"] == "undated" and not readable(d)):
             continue
         prompt = prompt_of(d)[0]
-        jobs.append((d["id"], app_body(prompt), WORST_APP, app_dest(d, a.rerun)))
+        jobs.append((d["id"], app_body(prompt, a.rerun), WORST_APP, app_dest(d, a.rerun)))
         if not a.rerun and d["set"] == "undated":
             imgs = [page_files(p)[0] for p in d["pages"][:DI.PAGES]]
             imgs = [i.read_bytes() for i in imgs if i.exists()]
@@ -386,7 +399,8 @@ def pool_weighted():
 def cmd_score(a):
     rs = rows()
     smp = json.loads((CACHE / "sample.json").read_text())
-    und = [r for r in rs if r["set"] == "undated" and r["app"]]
+    und = [r for r in rs if r["set"] == "undated" and r["app"] and readable(r)]
+    unread = sum(r["set"] == "undated" and not readable(r) for r in rs)
     dat = [r for r in rs if r["set"] == "dated" and r["app"]]
     usd = spent()
     calls = ledger()
@@ -408,10 +422,14 @@ def cmd_score(a):
     no_own = [r for r in und if r["own"] is None and r["image_ok"]]
     false_year = [r for r in und if not r["app"]["du"] and (r["own"] is None or r["app"]["y"] != r["own"])]
     L += ["## Undated documents", "",
-          f"{smp.get('undated agreed', 0)} agreed documents carry no date tag at all; "
-          f"{smp.get('undated, first page has no JPEG paired', 0)} of them have no JPEG original paired to their first "
-          f"page and were left out. {smp.get('undated sampled', 0)} were drawn round-robin across "
-          f"{smp.get('undated collections', 0)} collections (seed {SEED}); {len(und)} answered.", "",
+          f"{smp.get('undated agreed', 0)} agreed documents carry no date tag at all"
+          + (f"; {smp['undated, first page has no JPEG paired']} of them have no JPEG original paired to their first "
+             "page and were left out" if smp.get("undated, first page has no JPEG paired") else
+             ", every one with a JPEG original paired to its first page")
+          + f". {smp.get('undated sampled', 0)} were drawn round-robin across "
+          f"{smp.get('undated collections', 0)} collections (seed {SEED}). {unread} of those have no JPEG original confirmed "
+          f"as their first page's photo (ocr_truth.orient_like_pdf below {DI.MIN_CORR}), so Vision has nothing to read "
+          f"and they are left out; {len(und)} answered.", "",
           "| measure | documents |", "|---|---:|",
           f"| the reply gives a year | {pct(sum(r['app']['y'] is not None for r in und), len(und))} |",
           f"| the app writes Date Uncertain | {pct(sum(r['app']['du'] for r in und), len(und))} |",
@@ -420,7 +438,7 @@ def cmd_score(a):
           f"| **false year**: a year without Date Uncertain, and no own date on the pages or a different one | "
           f"{pct(len(false_year), len(und))} |", ""]
     if with_own:
-        L += [f"Where the image pass found the document's own date on the page ({len(with_own)}), the owner simply left "
+        L += [f"Where the image pass found the document's own date on the page ({len(with_own)}), the owner left "
               f"it untagged; there the app's year equals the page's for "
               f"{pct(sum(r['app']['y'] == r['own'] for r in with_own), len(with_own))}, and the app writes Date Uncertain "
               f"for {pct(sum(r['app']['du'] for r in with_own), len(with_own))}. The page's year is in Vision's text "
@@ -439,7 +457,7 @@ def cmd_score(a):
     for name, rs_ in (("undated", und), ("dated (unprinted-year)", dat)):
         for has in (True, False):
             s = [r for r in rs_ if (r["own"] is not None) == has and r["image_ok"]]
-            du_json[f"{name}|{has}"] = [sum(r["app"]["du"] for r in s), len(s)]
+            du_json[f"{name.split()[0]}|{'yes' if has else 'no'}"] = [sum(r["app"]["du"] for r in s), len(s)]
             same = pct(sum(r["app"]["y"] == r["own"] for r in s), len(s)) if has else "–"
             L.append(f"| {name} | {'yes' if has else 'no'} | {len(s)} | {pct(sum(r['app']['du'] for r in s), len(s))} | {same} |")
     both = [r for r in und + dat if r["image_ok"]]
@@ -460,7 +478,8 @@ def cmd_score(a):
     # Rerun.
     pairs = [r for r in und if r["rerun"]]
     L += ["", "## Rerun", "",
-          f"The undated set sent a second time ({len(pairs)} answered both times), at the app's default sampling: "
+          f"The undated set sent a second time ({len(pairs)} answered both times), at the app's default sampling, with "
+          "the gateway's no-cache field (without it the gateway returned the first run's replies byte for byte): "
           f"the same year {pct(sum(r['app']['y'] == r['rerun']['y'] for r in pairs), len(pairs))}, the same Date "
           f"Uncertain {pct(sum(r['app']['du'] == r['rerun']['du'] for r in pairs), len(pairs))}; false year in the "
           f"rerun {pct(sum(not r['rerun']['du'] and (r['own'] is None or r['rerun']['y'] != r['own']) for r in pairs), len(pairs))}.", ""]

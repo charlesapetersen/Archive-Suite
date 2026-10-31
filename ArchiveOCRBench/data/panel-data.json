@@ -18613,6 +18613,15 @@
    ]
   },
   "parse_failures": 0,
+  "pool_weighted": {
+   "exact": 89.2,
+   "within1": 98.0,
+   "weights": {
+    "year+month": 3868,
+    "year": 1000,
+    "year+DU": 133
+   }
+  },
   "open_models": {
    "qwen3.6-27b": {
     "model": "qwen3.6-27b",
@@ -24165,6 +24174,74 @@
     ]
    }
   ]
+ },
+ "dating_undated": {
+  "model": "gemini-3.7-flash",
+  "usd": 1.31,
+  "undated": {
+   "n": 90,
+   "du": [
+    44,
+    90
+   ],
+   "certain_year": [
+    46,
+    90
+   ],
+   "false_year": [
+    12,
+    90
+   ],
+   "own_date": [
+    39,
+    90
+   ]
+  },
+  "du_by_own_date": {
+   "undated|yes": [
+    5,
+    39
+   ],
+   "undated|no": [
+    39,
+    51
+   ],
+   "dated|yes": [
+    14,
+    61
+   ],
+   "dated|no": [
+    54,
+    61
+   ]
+  },
+  "du_agrees_own_date": [
+   174,
+   212
+  ],
+  "dated_year_exact": [
+   87,
+   122
+  ],
+  "rerun_same_year": [
+   85,
+   90
+  ],
+  "rerun_same_du": [
+   88,
+   90
+  ],
+  "pool_weighted": {
+   "exact": 89.2,
+   "within1": 98.0,
+   "weights": {
+    "year+month": 3868,
+    "year": 1000,
+    "year+DU": 133
+   },
+   "exact_pooled": 79.6,
+   "within1_pooled": 95.2
+  }
  },
  "seg_date": {
   "locked_gpu": {

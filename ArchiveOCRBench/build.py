@@ -52,6 +52,7 @@ DATING_TRACEABLE = RESULTS / "date-traceable.json"  # W46.date-traceable: date_t
 DATING_TRACEABLE_PAID = RESULTS / "date-traceable-paid.json"  # W46.date-traceable-paid: date_traceable_gateway.py score
 DATING_ENCLOSURE = RESULTS / "date-enclosure.json"  # W46.date-enclosure: date_enclosure.py score
 DATING_IMAGE = RESULTS / "date-image.json"  # W46.date-image: date_image.py score
+DATING_UNDATED = RESULTS / "date-undated.json"  # W46.date-undated: date_undated.py score
 PUBLIC = RESULTS / "bench-corpus"  # W43.corpus-build: corpus/routes.py report, the public strata
 OCR_SCORERS = RESULTS / "ocr-scorers.json"  # W46.fix-ocr-scorers: ocr_rescore.py, every cached reading re-scored
 TRUTH_BIAS = RESULTS / "ocr-truth-bias.json"  # W46.fix-ocr-truth-bias: ocr_truth_bias.py, agreed v adjudicated words
@@ -1037,6 +1038,7 @@ def main():
              "dating_traceable": dating_traceable(),
              "dating_enclosure": dating_enclosure(),
              "dating_image": dating_image(),
+             "dating_undated": json.loads(DATING_UNDATED.read_text()) if DATING_UNDATED.exists() else None,
              "seg_date": json.loads((RESULTS / "seg-date-model-final.json").read_text())
                          if (RESULTS / "seg-date-model-final.json").exists() else None,
              "seg_context": seg_context(), "seg_window_modality": seg_window_modality(),

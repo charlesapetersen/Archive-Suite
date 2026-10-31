@@ -329,6 +329,11 @@ footer p { font-size: 13px; }
     <div class="tbl"><table><thead><tr><th>Class</th><th>Documents</th><th>Nearest dated before (exact / within one)</th><th>Nearest dated either side</th><th>Most similar page</th><th>Majority of 3 most similar</th></tr></thead><tbody id="date-image-retrieval"></tbody></table></div>
     <p class="note">The 122 are the owner's unprinted-year documents (classes A to D) that have a JPEG original of a first or second page. Each model was asked to quote every date on the pages and give the document's own date, with the images alone or with the OCR text as well; the owner's year is never in the prompt. "Found on the page" means a quoted date has the owner's year written in it. Gemini 3.7 Flash read the images alone through the Stanford gateway (about $0.34 for the 122, an estimate at 3.8's list price; the gateway serves no 3.8). The second table gives each document the year of the document whose first page looks most like its own (Apple Vision feature prints), against positional baselines; cells are exact / within one year ($0, this Mac). Full tables, and the typeface probe in <code>date-image-typeface.md</code>: <code>ArchiveProcessor/segbench-results/date-image.md</code>.</p>
   </section>
+  <section class="panel" id="date-undated" hidden>
+    <div class="head"><h2>Documents the owner left undated</h2><span class="meta">the app's call on Apple Vision text · W46.date-undated</span></div>
+    <div class="tbl"><table><thead><tr><th>What is counted</th><th>Documents</th></tr></thead><tbody id="date-undated-rows"></tbody></table></div>
+    <p class="note">The app's tagging call always gives a year. Here it read 100 of the 425 agreed documents with no date tag (drawn across collections) and the 122 unprinted-year documents above, on Apple Vision's reading of the JPEG originals with the app's neighbour context, through the Stanford gateway (Gemini 3.7 Flash, no temperature or reasoning setting, as the app sends it; the gateway serves no 3.8). Date Uncertain is scored against whether the image pass (Gemini 3.7 Flash, images alone) finds the document's own date written on its pages, not against the owner's tag, so it is agreement with a Gemini reader, not with a person. The rerun rows are the same undated set sent twice. Full tables and the measurement card: <code>ArchiveProcessor/segbench-results/date-undated.md</code>.</p>
+  </section>
 
   <header class="part" id="public">
     <div class="eyebrow">Part 7 · Public truth sets · not the owner's archive</div>
@@ -897,6 +902,8 @@ if (DT) {
   document.getElementById('date-rows').innerHTML = [
     row('Year exact, every year-tagged document', Y.all.exact),
     row('Year within one', Y.all.within1),
+    ...(DT.pool_weighted ? ['<tr><td>Year exact, weighted to the pool\'s strata (within one: ' + DT.pool_weighted.within1.toFixed(1) + '%)</td><td>' +
+      Object.values(DT.pool_weighted.weights).reduce((a, b) => a + b, 0).toLocaleString() + ' in the pool</td><td>–</td><td>' + DT.pool_weighted.exact.toFixed(1) + '%</td></tr>'] : []),
     row('Year exact, the year is printed in the text', Y['in text'].exact),
     row('Year exact, the year is not in the text', Y['not in text'].exact),
     row('Year exact, owner tagged a month too', Y['year+month'].exact),
@@ -983,6 +990,24 @@ if (DIM && DIM.rows.length) {
   document.getElementById('date-image-retrieval').innerHTML = DIM.retrieval.map(r => '<tr><td>' + (r.cls === 'all' ? 'All' : r.cls) +
     '</td><td>' + r.prev[2] + '</td><td>' + ew(r.prev) + '</td><td>' + ew(r.near) + '</td><td>' + ew(r.nn1) + '</td><td>' + ew(r.knn) + '</td></tr>').join('');
   document.getElementById('date-image').hidden = false;
+}
+
+const DU = DATA.dating_undated;
+if (DU) {
+  const f = ([a, n]) => n ? a + ' of ' + n + ' (' + (100 * a / n).toFixed(1) + '%)' : '–';
+  const B = DU.du_by_own_date;
+  document.getElementById('date-undated-rows').innerHTML = [
+    ['Undated: the app writes Date Uncertain', DU.undated.du],
+    ['Undated: a year without Date Uncertain', DU.undated.certain_year],
+    ['Undated: a false year (no own date on the pages, or a different one)', DU.undated.false_year],
+    ['Undated: the image pass finds the document\'s own date on its pages', DU.undated.own_date],
+    ['Date Uncertain where the pages carry no own date (undated)', B['undated|no']],
+    ['Date Uncertain where the pages carry one (undated)', B['undated|yes']],
+    ['Date Uncertain where the pages carry no own date (unprinted-year 122)', B['dated|no']],
+    ['Date Uncertain where the pages carry one (unprinted-year 122)', B['dated|yes']],
+    ['Rerun: the same year', DU.rerun_same_year],
+    ['Rerun: the same Date Uncertain', DU.rerun_same_du]].map(([l, x]) => '<tr><td>' + l + '</td><td>' + f(x) + '</td></tr>').join('');
+  document.getElementById('date-undated').hidden = false;
 }
 
 // Part 7: the public strata.
