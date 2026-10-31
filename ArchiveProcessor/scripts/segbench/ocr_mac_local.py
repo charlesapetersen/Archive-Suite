@@ -328,6 +328,36 @@ def hw_groups():
     return sets
 
 
+# The Sherlock truth96 run each Mac bf16 reader repeats, as ocr_rescore.py names the route in ocr-scorers.json.
+SHERLOCK = {'xiaomi-ocr-0-bf16': 'xiaomi-ocr-0', 'paddleocr-vl1.6-bf16': 'paddleocr-vl1.6'}
+
+
+def hw_card():
+    """The report's measurement card (root CLAUDE.md), from the readings and ocr-scorers.json's Sherlock rows."""
+    read = {k: [p for p in hw_pairs(k) if p['local_attempted']] for k in HW}
+    routes = '; '.join(f"{spec['name']} ({len(read[k])} pages, {'the panel prompt' if spec['prompt'] is None else 'its own prompt'})"
+                       for k, spec in HW.items())
+    hosted = [f"{spec['hosted']} for {spec['name']}" for spec in HW.values() if spec['hosted']]
+    gaps = []
+    sc = P.RESULTS / 'ocr-scorers.json'
+    if sc.exists():
+        nes = {r['route']: r['nes'] for r in json.loads(sc.read_text())['summary']
+               if r['set'] == 'owner96' and r['stratum'] == 'all'}
+        gaps = [f"{HW[k]['name']} {100 * abs(nes[k] - nes[s]):.2f} points from its Sherlock run"
+                for k, s in SHERLOCK.items() if k in nes and s in nes]
+    sher = (f"; the bf16 readers land {' and '.join(gaps)} (`ocr-scorers.md`)" if gaps
+            else '; their Sherlock gaps are not scored yet (`ocr_rescore.py`)')
+    return ['## Measurement card', '',
+            '- **Truth.** The OCR panel\'s 96 accuracy pages, the adjudicated truth (`ocr_panel.TRUTH`).',
+            '- **Selection.** All 96 accuracy pages (the three agreement-only letters excluded), one reading each; '
+            'none chosen by a route\'s reading.',
+            f"- **Comparison.** Each Mac route at its own quantisation and prompt: {routes}. The hosted bf16 row is "
+            f"{', '.join(hosted) or 'none'} only. Speed and memory are one Apple M3 Pro with 18 GB, one page at a time.",
+            '- **Noise.** Local greedy routes are deterministic on one machine (`ocr-rerun-noise.md`), so the paired '
+            f'interval alone tests a gap between them{sher}.',
+            '- **Scope.** The 96 only: these routes\' 895 figures are Sherlock\'s, not read from the Mac.', '']
+
+
 def report_hw():
     import ocr_panel_score as S
     L = ['# W41.mac-local-hw — LightOnOCR-3-4B, Qwen3.5-9B and the W46.ocr-new-open readers on our Mac', '',
@@ -408,6 +438,7 @@ def report_hw():
             L += ['The memory guard\'s whole-process view of each collect run (date, exit, seconds, peak RSS MB, '
                   'peak physical footprint MB, swap growth MB, worst pressure level):', '']
             L += [f"- {' · '.join(r[i] for i in (0, 2, 3, 4, 5, 6, 7))}" for r in g] + ['']
+    L += hw_card()
     HW_REPORT.write_text('\n'.join(L).rstrip('\n') + '\n')
     print('report: ' + ', '.join(f"{k} {sum(p['local_attempted'] for p in hw_pairs(k))} pages" for k in HW))
 

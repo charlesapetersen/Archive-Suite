@@ -146,3 +146,11 @@ Total reading time 12 min for 99 pages; 3 failed (3 hit max_tokens).
 The memory guard's whole-process view of each collect run (date, exit, seconds, peak RSS MB, peak physical footprint MB, swap growth MB, worst pressure level):
 
 - 2026-10-31T04:31:50 · 0 · 716 · 2133 · 3460 · -8 · 1
+
+## Measurement card
+
+- **Truth.** The OCR panel's 96 accuracy pages, the adjudicated truth (`ocr_panel.TRUTH`).
+- **Selection.** All 96 accuracy pages (the three agreement-only letters excluded), one reading each; none chosen by a route's reading.
+- **Comparison.** Each Mac route at its own quantisation and prompt: LightOnOCR-3-4B 8-bit (96 pages, its own prompt); Qwen3.5-9B 4-bit (96 pages, the panel prompt); Xiaomi-OCR-0 bf16 (96 pages, its own prompt); PaddleOCR-VL 1.6 bf16 (96 pages, its own prompt). The hosted bf16 row is qwen3.5-9b for Qwen3.5-9B 4-bit only. Speed and memory are one Apple M3 Pro with 18 GB, one page at a time.
+- **Noise.** Local greedy routes are deterministic on one machine (`ocr-rerun-noise.md`), so the paired interval alone tests a gap between them; the bf16 readers land Xiaomi-OCR-0 bf16 0.01 points from its Sherlock run and PaddleOCR-VL 1.6 bf16 0.09 points from its Sherlock run (`ocr-scorers.md`).
+- **Scope.** The 96 only: these routes' 895 figures are Sherlock's, not read from the Mac.
