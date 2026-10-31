@@ -1190,8 +1190,9 @@ autonomous run for a different repo:
   shipped without touching a tracker. The resume prompt tells each session to flip a `SUITE_TODO.md` checkbox
   in the same commit (or `touch .docsync-ok` for infra-only). The root-level acknowledgement is deliberate:
   agents cannot write under `.claude/`, where the hooks and their settings live. `prove-docsync-packages.sh`
-  hermetically confirms the hook also catches a `packages/ArchiveCore` source-only change. Port the equivalent
-  for a new repo.
+  hermetically confirms the hook also catches a `packages/ArchiveCore` source-only change, and that it judges
+  only the commits the session itself created (its checkout's HEAD reflog), never what the engine or another
+  session pushed to main meanwhile. Port the equivalent for a new repo.
 - **One bounded item per fresh session, commit+push each.** A single long session is the *worst* case for
   context and dies whole on a usage cutoff. Fresh resumes off the durable plan are the best case — and they're
   what make a mid-run usage cutoff a no-op (the next cycle just continues).

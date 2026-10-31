@@ -3,8 +3,12 @@
 # origin/main without touching a tracker (SUITE_TODO.md / KNOWN_ISSUES.md) in the same range — i.e. the
 # "docs move with the code, same commit" rule (root CLAUDE.md -> "How we work", step 4).
 #
-# Design: SessionStart records origin/main (docsync-baseline.sh); here we diff baseline..origin/main, so we
-# only see what THIS session landed on main. Fail-OPEN on every error (never deadlock a session). Escapes:
+# Design: SessionStart records origin/main (docsync-baseline.sh); baseline..origin/main is what landed on main
+# during the session. That range also holds what the engine and other sessions pushed meanwhile, so only the
+# commits THIS session created count: those its checkout's HEAD reflog records as made by commit, cherry-pick,
+# revert or a rebase pick (the project dir and the session's current cwd, from the hook's stdin, so a session
+# that cd'd into its own worktree is covered). Others' commits reach a checkout only by fast-forward, reset
+# or checkout, which create nothing. Fail-OPEN on every error (never deadlock a session). Escapes:
 #   - a change that ships no tracked item (refactor / mid-feature / infra):  touch .docsync-ok
 #   - offline / nothing pushed: baseline == origin/main -> passes automatically.
 # Test overrides: DOCSYNC_TEST_BASE / DOCSYNC_TEST_HEAD (commit-ish) bypass the baseline file.
@@ -19,6 +23,8 @@
 # guard fully intact while letting the daemon ack with its already-allowed Bash tool. The BASELINE file stays
 # in .claude/ on purpose: only this hook writes it, and hooks are not subject to tool permissions.
 set -uo pipefail
+input=""; [ -t 0 ] || input="$(cat 2>/dev/null)"
+cwd="$(printf '%s' "$input" | sed -n 's/.*"cwd"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n1)"
 dir="${CLAUDE_PROJECT_DIR:-.}"
 cd "$dir" 2>/dev/null || exit 0
 command -v git >/dev/null 2>&1 || exit 0
@@ -36,13 +42,21 @@ head="${DOCSYNC_TEST_HEAD:-$(git rev-parse --verify -q origin/main 2>/dev/null)}
 [ -n "$head" ] || exit 0
 [ "$base" = "$head" ] && exit 0                                   # nothing landed on main this session
 
-files="$(git diff --name-only "$base..$head" 2>/dev/null)" || exit 0
-[ -z "$files" ] && exit 0
+# Commits this session's checkouts created (see Design above), intersected with what landed on main.
+own="$(for d in "$dir" ${cwd:+"$cwd"}; do
+         git -C "$d" log -g --format='%H %gs' HEAD 2>/dev/null
+       done | grep -E '^[0-9a-f]+ (commit|cherry-pick|revert|.*\((pick|continue|squash|fixup|reword|edit)\):)' \
+            | cut -d' ' -f1 | sort -u)"
+landed="$(git rev-list "$base..$head" 2>/dev/null | sort -u)" || exit 0
+mine="$(comm -12 <(printf '%s\n' "$own") <(printf '%s\n' "$landed") | grep . || true)"
+files=""
+[ -n "$mine" ] && files="$(printf '%s\n' "$mine" | git diff-tree --stdin -r --name-only --no-commit-id 2>/dev/null | sort -u)"
+if [ -z "$files" ]; then printf '%s\n' "$head" > "$base_file" 2>/dev/null; exit 0; fi
 code="$(printf '%s\n' "$files"    | grep -E '\.(swift|kt)$' || true)"
 tracker="$(printf '%s\n' "$files" | grep -E '(^|/)(SUITE_TODO|KNOWN_ISSUES)\.md$|(^|/)execution-plans/items/[^/]+\.md$' || true)"
 
 if [ -n "$code" ] && [ -z "$tracker" ]; then
-  n="$(git rev-list --count "$base..$head" 2>/dev/null || echo '?')"
+  n="$(printf '%s\n' "$mine" | grep -c .)"
   cat >&2 <<EOF
 🚧 doc-sync backstop (root CLAUDE.md -> "How we work", step 4)
 
