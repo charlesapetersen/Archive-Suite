@@ -147,85 +147,77 @@ enum LibrarySort {
     ]
 
     /// Multi-level, deterministic sort. Missing keys (undated, no quality, no read-state) always
-    /// sort LAST regardless of direction; a final filename/path tiebreak makes the order stable.
+    /// sort LAST regardless of direction; a final path tiebreak makes the order stable.
+    ///
+    /// Decorated (W40.fix-reader-list-recompute-at-size): every key is computed once per row, and each
+    /// string key becomes its `localizedStandardCompare` rank from `collation`, so the n·log n
+    /// comparisons compare integers. At 116k rows the comparator form spent 1–5.5 s in
+    /// `localizedStandardCompare`, and in rebuilding `url.path` on every comparison that tied on the
+    /// keys. The ranks persist across calls, so a tag edit or a sort change, which bring no new names,
+    /// compares no strings at all; and paths are ranked only for rows that tie on every key.
     static func sorted(_ files: [ArchiveFile], by descriptors: [ARSortDescriptor]) -> [ArchiveFile] {
-        guard !descriptors.isEmpty else { return files }
+        guard !descriptors.isEmpty, files.count > 1 else { return files }
+        let keyed = descriptors.filter { $0.field != .relevance }   // rank order is injected at recompute()
 
-        // Schwartzian: pre-compute expensive subjects sort keys once, not per-comparison.
-        var subjectsCache = [URL: String]()
-        if descriptors.contains(where: { $0.field == .subjects }) {
-            subjectsCache.reserveCapacity(files.count)
-            for f in files {
-                if let key = subjectsKey(f) { subjectsCache[f.url] = key }
+        // One Int column per descriptor; a missing facet is `Int.max`, which sorts last in either
+        // direction because the direction is applied to present values only.
+        var columns = [[Int]](repeating: [], count: keyed.count)
+        var stringColumns: [(column: Int, values: [String?])] = []
+        for (c, d) in keyed.enumerated() {
+            switch d.field {
+            case .date:      columns[c] = files.map { $0.sortDate ?? Int.max }
+            case .quality:   columns[c] = files.map { $0.quality ?? Int.max }
+            case .name:      stringColumns.append((c, files.map { $0.name }))
+            case .fileType:  stringColumns.append((c, files.map { $0.fileType }))
+            case .readState: stringColumns.append((c, files.map { $0.readState?.rawValue }))
+            case .subjects:  stringColumns.append((c, files.map { subjectsKey($0) }))
+            case .relevance: break
             }
         }
-
-        return files.sorted { a, b in
-            for d in descriptors {
-                let r: ComparisonResult
-                if d.field == .subjects {
-                    r = nilLast(subjectsCache[a.url], subjectsCache[b.url]) {
-                        dir($0.localizedStandardCompare($1), d.ascending)
-                    }
-                } else {
-                    r = rank(a, b, d)
-                }
-                switch r {
-                case .orderedAscending: return true
-                case .orderedDescending: return false
-                case .orderedSame: continue
-                }
-            }
-            return a.url.path.localizedStandardCompare(b.url.path) == .orderedAscending
+        if !stringColumns.isEmpty {
+            let ranks = collation.ranks(for: stringColumns.map(\.values))
+            for (k, sc) in stringColumns.enumerated() { columns[sc.column] = ranks[k] }
         }
+        let ascending = keyed.map(\.ascending)
+        func keyOrder(_ i: Int, _ j: Int) -> Bool? {
+            for c in columns.indices {
+                let x = columns[c][i], y = columns[c][j]
+                if x == y { continue }
+                if x == Int.max { return false }
+                if y == Int.max { return true }
+                return ascending[c] ? x < y : x > y
+            }
+            return nil
+        }
+        var order = Array(files.indices)
+        order.sort { keyOrder($0, $1) ?? false }
+
+        // Rows that tie on every key form contiguous runs; only their paths are ranked and compared.
+        var runs: [Range<Int>] = []
+        var start = 0
+        for k in 1...order.count where k == order.count || keyOrder(order[start], order[k]) != nil {
+            if k - start > 1 { runs.append(start..<k) }
+            start = k
+        }
+        guard !runs.isEmpty else { return order.map { files[$0] } }
+        let tied = runs.flatMap { order[$0] }
+        let pathRanks = collation.ranks(for: [tied.map { Optional(files[$0].url.path) }])[0]
+        var pathRank = [Int](repeating: 0, count: files.count)
+        for (n, i) in tied.enumerated() { pathRank[i] = pathRanks[n] }
+        for run in runs {
+            // The row index breaks a tie between paths that collate equal, so the order stays total.
+            order[run].sort { (pathRank[$0], $0) < (pathRank[$1], $1) }
+        }
+        return order.map { files[$0] }
     }
 
-    static func rank(_ a: ArchiveFile, _ b: ArchiveFile, _ d: ARSortDescriptor) -> ComparisonResult {
-        switch d.field {
-        case .date:
-            return nilLast(a.sortDate, b.sortDate) { dir(cmp($0, $1), d.ascending) }
-        case .quality:
-            return nilLast(a.quality, b.quality) { dir(cmp($0, $1), d.ascending) }
-        case .name:
-            return dir(a.name.localizedStandardCompare(b.name), d.ascending)
-        case .fileType:
-            return dir(a.fileType.localizedStandardCompare(b.fileType), d.ascending)
-        case .readState:
-            return nilLast(a.readState?.rawValue, b.readState?.rawValue) {
-                dir($0.localizedStandardCompare($1), d.ascending)
-            }
-        case .subjects:
-            return nilLast(subjectsKey(a), subjectsKey(b)) {
-                dir($0.localizedStandardCompare($1), d.ascending)
-            }
-        case .relevance:
-            return .orderedSame   // rank ordering is injected at recompute(), not via the comparator
-        }
-    }
+    /// The `localizedStandardCompare` order of every string the list has sorted, kept across sorts.
+    static let collation = CollationRanks()
 
     /// Sort key for the File-tags column: the topical tags joined, or nil when there are none
     /// (so files with no topical tags sort last, like other missing facets).
     private static func subjectsKey(_ f: ArchiveFile) -> String? {
         let s = f.tags.topicalTags.joined(separator: ", ")
         return s.isEmpty ? nil : s
-    }
-
-    // Apply direction only to the *value* comparison; presence (nil-last) is direction-independent.
-    private static func nilLast<T>(_ x: T?, _ y: T?, _ valueCompare: (T, T) -> ComparisonResult) -> ComparisonResult {
-        switch (x, y) {
-        case let (xv?, yv?): return valueCompare(xv, yv)
-        case (nil, nil): return .orderedSame
-        case (nil, _): return .orderedDescending   // x missing → x after y (last)
-        case (_, nil): return .orderedAscending
-        }
-    }
-
-    private static func cmp<T: Comparable>(_ x: T, _ y: T) -> ComparisonResult {
-        x < y ? .orderedAscending : (x > y ? .orderedDescending : .orderedSame)
-    }
-
-    private static func dir(_ r: ComparisonResult, _ ascending: Bool) -> ComparisonResult {
-        if ascending || r == .orderedSame { return r }
-        return r == .orderedAscending ? .orderedDescending : .orderedAscending
     }
 }
