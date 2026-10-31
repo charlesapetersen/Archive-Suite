@@ -83,8 +83,15 @@ footer p { font-size: 13px; }
 
   <section class="panel" aria-labelledby="headhead">
     <div class="head"><h2 id="headhead">The ranking: accuracy on the pages each route answered</h2><span class="meta" id="head-meta"></span></div>
-    <p class="note">The headline score is NES on the pages a route answered, with its failures beside it: a page that fails goes on to another reader, so it is not inaccurate text. The charts below score a failed page 0, which let a route's failures, not its reading, set the top of the ranking (the measurement audit's OCR-2, 2026-10-30). Failures are split: <em>provider</em> is the provider or the connection losing the request (a 5xx, an interrupted or broken stream), so the model never answered; <em>model</em> is the model's own (caps: ran to the token cap, nearly always a loop; refusals: a content filter, or Gemini's refusal of reprinted text; empty: stopped with nothing usable). The paired column is the route less Qwen3.6 27B (the local panel's hosted reading) on the pages both answered, with a 95% bootstrap interval over pages; an interval that crosses 0 is a tie. Page p081 is reported apart, since the owner cannot correct its truth. A route marked "96 only" has not read the 895 public pages itself, so it is missing from the comparison on independent truth (W43.sweep holds most hosted routes). Source: <code>ocr-pages.csv</code>.</p>
+    <p class="note">The headline score is NES on the pages a route answered, with its failures beside it: a page that fails goes on to another reader, so it is not inaccurate text. The charts below score a failed page 0, which let a route's failures, not its reading, set the top of the ranking (the measurement audit's OCR-2, 2026-10-30). Failures are split: <em>provider</em> is the provider or the connection losing the request (a 5xx, an interrupted or broken stream), so the model never answered; <em>model</em> is the model's own (caps: ran to the token cap, nearly always a loop; refusals: a content filter, or Gemini's refusal of reprinted text; empty: stopped with nothing usable). The paired column is the route less Qwen3.6 27B (the local panel's hosted reading) on the pages both answered, with a 95% bootstrap interval over pages; an interval that crosses 0 is a tie, and so is a gap under twice the rerun spread (the next panel). Page p081 is reported apart, since the owner cannot correct its truth. A route marked "96 only" has not read the 895 public pages itself, so it is missing from the comparison on independent truth (W43.sweep holds most hosted routes). Source: <code>ocr-pages.csv</code>.</p>
     <div class="tbl"><table><thead><tr><th>#</th><th>Route</th><th>NES, answered</th><th>Answered</th><th>Failed: provider</th><th>Failed: model</th><th>Less Qwen3.6 27B, pages both answered</th><th>Strict NES</th><th>p081</th><th>The 895</th></tr></thead><tbody id="head-rows"></tbody></table></div>
+  </section>
+
+  <section class="panel" aria-labelledby="rerunhead" id="rerun">
+    <div class="head"><h2 id="rerunhead">Rerun noise: when a gap is a tie</h2><span class="meta" id="rerun-meta"></span></div>
+    <p class="note" id="rerun-note"></p>
+    <div class="tbl"><table><thead><tr><th>Route</th><th>Pages</th><th>Strict NES, each run</th><th>Answered NES, each run</th><th>Spread, strict</th><th>Spread, answered</th></tr></thead><tbody id="rerun-rows"></tbody></table></div>
+    <div class="tbl"><table><thead><tr><th>Route</th><th>Runs</th><th>Identical page texts</th><th>Failure flips</th><th>Page move, mean / max</th><th>Paired difference, strict</th><th>Paired difference, answered</th></tr></thead><tbody id="rerun-pairs"></tbody></table></div>
   </section>
 
   <div class="legend" aria-label="Chart legend">
@@ -643,6 +650,24 @@ document.getElementById('head-rows').innerHTML = HL.rows.map((h, i) => {
     '</td><td>' + f2(h.strict) + '</td><td>' + (h.p081[0] ? f2(h.p081[1]) : 'failed') + '</td><td>' +
     (h.public_pages ? h.public_pages + ' pages' : '96 only') + '</td></tr>';
 }).join('');
+const RN = DATA.rerun_noise;
+if (RN) {
+  const p = v => (100 * v).toFixed(2), sp = v => (v >= 0 ? '+' : '') + (100 * v).toFixed(2);
+  const short = r => r.name.split(' (')[0];
+  const routes = Object.values(RN.routes);
+  document.getElementById('rerun-meta').textContent = routes.map(r => short(r) + ' ' + r.runs_scored.length + ' runs').join(' · ');
+  document.getElementById('rerun-note').textContent = 'Every route above read each page once. Two routes read the 96 again with nothing changed (the same images, prompt, temperature 0 and settings): run 0 is the bench\'s reading, runs 1 and 2 were read on 2026-10-30. Spread is the range of a run\'s mean across the runs (SD in brackets). The rule: a gap between two routes is a tie when it is under twice the larger rerun range of the two, or when its paired 95% interval crosses 0. Twice the range: ' +
+    routes.map(r => short(r) + ' ' + p(r.tie_threshold) + ' points').join(', ') + '. A route not rerun takes the larger figure of its own kind (hosted or local) until it is measured; per kind, the kind\'s own range applies, and a kind of a few pages moves far more than the whole. Temperature 0 is not deterministic on a hosted model: most of its page texts change between runs. The gateway answers a repeated identical request from its own cache, which hides the noise; the reruns bypass it. Source: ocr-rerun-noise.md.';
+  const runs = (s, m) => Object.values(s.runs).map(x => p(x[m])).join(' / ');
+  const spread = (s, m) => p(s.spread[m].range) + ' (' + p(s.spread[m].sd) + ')';
+  document.getElementById('rerun-rows').innerHTML = routes.flatMap(r => [['all 96', r.all], ...Object.entries(r.by_kind)].map(([k, s], i) =>
+    '<tr><td>' + (i ? '&nbsp;&nbsp;' + k : short(r) + ', all') + '</td><td>' + s.pages + '</td><td>' + runs(s, 'strict') + '</td><td>' + runs(s, 'answered') +
+    '</td><td>' + spread(s, 'strict') + '</td><td>' + spread(s, 'answered') + '</td></tr>')).join('');
+  document.getElementById('rerun-pairs').innerHTML = routes.flatMap(r => Object.entries(r.pairs).map(([k, v]) =>
+    '<tr><td>' + short(r) + '</td><td>' + k.replace('-', ' less ') + '</td><td>' + v.identical_text + '/' + r.all.pages + '</td><td>' + v.flipped_failure +
+    '</td><td>' + p(v.mean_abs_page) + ' / ' + p(v.max_abs_page) + '</td><td>' + sp(v.strict.delta) + ' (' + sp(v.strict.lo) + ' to ' + sp(v.strict.hi) +
+    ')</td><td>' + sp(v.answered.delta) + ' (' + sp(v.answered.lo) + ' to ' + sp(v.answered.hi) + '), ' + v.answered.n + ' pages</td></tr>')).join('');
+} else document.getElementById('rerun').hidden = true;
 const sgn = v => (v > 0 ? '+' : '') + v.toFixed(2);
 document.getElementById('dif-rank-rows').innerHTML = DF.routes.slice().sort((a, b) => b.adjusted - a.adjusted).map((r, i) =>
   '<tr><td>' + (i + 1) + '</td><td>' + r.name + '</td><td>' + r.answered + '/' + DF.pages + '</td><td>' + f2(r.answered_nes) + '</td><td>' + f2(r.adjusted) +

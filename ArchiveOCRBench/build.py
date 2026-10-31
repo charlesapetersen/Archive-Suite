@@ -63,6 +63,7 @@ ENH_OCR = RESULTS / "enh-ocr-input.json"  # W46.enh-ocr-input: enh_ocr_input.py 
 POSTCORRECT = RESULTS / "ocr-postcorrect.json"  # W46.ocr-postcorrect: postcorrect.py score --results, the band corrector
 LOGPROB = RESULTS / "ocr-logprob.json"  # W46.ocr-logprob: ocr_logprob.py report, log-probabilities as an error flag
 LAYOUT_ORDER = RESULTS / "layout-order.json"  # W46.layout-order: layout_order.py run, ordering with detection fixed
+RERUN_NOISE = RESULTS / "ocr-rerun-noise.json"  # W46.ocr-rerun-noise: ocr_rerun_noise.py report, the 96 read three times
 LOOPS = PUBLIC / "loop-rerun-20261021.json"  # W46.ocr-loops: corpus/loop_rerun.py report, the capped pages read again
 REGIONS = PUBLIC / "regions-20261021.json"  # W46.ocr-regions: whole page, detector regions and overlapping tiles
 REGIONS_GW = PUBLIC / "regions-gateway-20261028.json"  # W46.ocr-regions-paid: corpus/regions_gateway.py score, Gemini 3.7
@@ -713,6 +714,16 @@ def ocr_scorers():
     return out
 
 
+def rerun_noise():
+    """Each rerun route's three readings of the 96: the run means, their spread, the run-to-run paired differences and
+    the tie threshold. The per-page scores stay in the report. None until ocr_rerun_noise.py report has run."""
+    if not RERUN_NOISE.exists():
+        return None
+    d = json.loads(RERUN_NOISE.read_text())
+    return {"routes": {k: {f: v for f, v in r.items() if f != "pages_detail"} for k, r in d["routes"].items()},
+            "gateway_cost_estimate": d["gateway_cost_estimate"]}
+
+
 def logprob():
     """W46.ocr-logprob: per route and page set, AUC of each signal against an answered page under 90 NES (part 5's
     poor reading), and on the 455 the NES with the riskiest 20% sent to the escalation route. None until it has run."""
@@ -1018,7 +1029,7 @@ def main():
             elif k.removesuffix("-nothink") in op["models"]:
                 sys.exit(f"dating model {k} has an OpenRouter price but no token means in inputs.json")
     built = {"routes": routes, "table_only": extra, "charts": charts, "segmentation": segmentation(op), "handwriting": handwriting(),
-             "farmshare": farmshare(op, own["routes"]), "difficulty": diff, "headline": headline(routes),
+             "farmshare": farmshare(op, own["routes"]), "difficulty": diff, "headline": headline(routes), "rerun_noise": rerun_noise(),
              "regions_orderfree": regions_orderfree(), "public_segmentation": public_segmentation(),
              "kind_classifier": json.loads(KIND_CLASSIFIER.read_text()) if KIND_CLASSIFIER.exists() else None,
              "dating": dating,
