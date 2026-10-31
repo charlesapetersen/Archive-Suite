@@ -58,7 +58,17 @@ HW = {
         'name': 'PaddleOCR-VL 1.6 bf16', 'hosted': None, 'reply': 'plain', 'prompt': 'OCR:', 'max_side': None,
         'max_tokens': 8192, 'template': {'enable_thinking': False},
         'repo': model_store.snapshot('PaddlePaddle/PaddleOCR-VL-1.6', 'c5630abae1d940eafe0697512a0325494b02ab42')},
+    # W46.ocr-new-open-boxes's Mac arm: IBM's own MLX build, the card's prompt, 8,192 tokens, temperature 0. It answers
+    # DocTags; the text scored is docling-core's Markdown export of the (DocTags, page) pair, the card's route and the
+    # one the Sherlock run takes (sherlock/new-open-boxes/boxes_parse.py), and the element boxes are kept beside it.
+    'granite-docling-258m-mlx': {
+        'name': 'granite-docling-258M bf16', 'hosted': None, 'reply': 'doctags', 'prompt': 'Convert this page to docling.',
+        'max_side': None, 'max_tokens': 8192, 'template': {},
+        'repo': model_store.snapshot('ibm-granite/granite-docling-258M-mlx', 'e9939db25d2f296c8678d0491c4609a8c596c50a')},
 }
+# docling-core for the DocTags reply, installed apart from the lab venv (`uv pip install --target DIR
+# docling-core==2.105.0`) and put after its site-packages, so nothing mlx-vlm imported is replaced.
+DOCLING = Path(os.environ.get('DOCLING_CORE_PATH', P.CACHE.parent / 'W46.ocr-new-open-boxes' / 'docling-core-2.105.0'))
 
 
 def out_dir(key):
@@ -69,8 +79,26 @@ def jobs():
     return [j for j in P.manifest()['jobs'] if j['scale'] == 'original']
 
 
-def parse(spec, raw):
-    """The reading's {kind, table, text}: the panel's parser for a panel reply, the whole answer for a plain one."""
+def boxes_parse():
+    import sys
+    here = str(Path(__file__).resolve().parent / 'sherlock' / 'new-open-boxes')
+    if here not in sys.path:
+        sys.path.insert(0, here)
+    if str(DOCLING) not in sys.path:
+        sys.path.append(str(DOCLING))
+    import boxes_parse as B
+    return B
+
+
+def parse(spec, raw, image=None):
+    """The reading's {kind, table, text}: the panel's parser for a panel reply, the whole answer for a plain one,
+    docling-core's Markdown for a DocTags one (with its element boxes under 'boxes')."""
+    if spec['reply'] == 'doctags':
+        from PIL import Image
+        B = boxes_parse()
+        with Image.open(image) as im:
+            text, boxes = B.doctags(raw, to_markdown=lambda r: B.docling_markdown(r, im.convert('RGB')))
+        return {'kind': None, 'table': None, 'text': text, 'boxes': boxes} if text else None
     if spec['reply'] == 'plain':
         return {'kind': None, 'table': None, 'text': raw.strip()} if raw.strip() else None
     return P.T.parse_draft(raw)
@@ -95,6 +123,9 @@ def collect(limit=None, key=KEY):
         os.environ['HF_HUB_OFFLINE'] = '1'  # local path, read only: never download
         if not Path(spec['repo'], 'config.json').exists():
             raise SystemExit('weights not in the lab cache: ' + str(spec['repo']))
+    if spec['reply'] == 'doctags':
+        boxes_parse()
+        import docling_core  # noqa: F401  (fail before the model loads, not after the first page)
     mx.set_cache_limit(256 * 2**20)  # as the lab's read-mlx.py: freed buffers otherwise inflate the footprint
     t0 = time.time()
     model, processor = load(str(spec['repo']), **({'trust_remote_code': True} if key in HW else {}))
@@ -117,10 +148,10 @@ def collect(limit=None, key=KEY):
                 first = time.time()
             text.append(r.text); last = r
         wall = time.time() - start
+        raw = ''.join(text)
+        got = parse(spec, raw, image)
         if spec['max_side']:
             image.unlink()
-        raw = ''.join(text)
-        got = parse(spec, raw)
         finish = 'length' if last is not None and last.generation_tokens >= max_tokens else 'stop'
         meta = {'key': key, 'job': job['id'], 'page': job['page'], 'scale': job['scale'], 'model': str(spec['repo']).replace(str(Path.home()), '~'),
                 'runtime': 'mlx-vlm ' + mlx_vlm.__version__, 'status': 'ok' if got and finish == 'stop' else 'failed',
