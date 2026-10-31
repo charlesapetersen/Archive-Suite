@@ -317,9 +317,10 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
   focus, so that run proves nothing either way.
 - **Would clear it:** the editor keeps focus and the `]` lands in the field. Fixing
   `W40.fix-reader-inline-keys` should clear it at the same time, because it is the same handler path.
-- **Status:** `open`
+- **Status:** `cleared` — `W40.fix-reader-inline-keys`, [`evidence/reader/W40.fix-reader-inline-keys.md`](evidence/reader/W40.fix-reader-inline-keys.md)
 - **History:**
   - 2026-10-14 W40.d8 — raised.
+  - 2026-10-31 W40.fix-reader-inline-keys — cleared: with the fix, `]`, `[` and `\` typed into the focused inline editor of a selected row landed in the field; the selection did not move and nothing was written (VM, `TriageJourneyUITests` step 2a). The run before the fix was not repeated with these keys, so whether they fired there is not known; the guard now covers them.
 
 ### S-016 · Clicking a column header in the Notes list may not sort it
 

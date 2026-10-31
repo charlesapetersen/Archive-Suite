@@ -9,7 +9,7 @@ Format and statuses: [`README.md`](README.md). Written by `W40.b1`, 2026-10-12.
   `W23.m9`, `W24.jpeg1`, `W24.cal1-reader`, `W26.walk2`, `W14.2-fu`). `SPEC/tag-format.md` is the contract
   behind R-05 and R-45.
 - **Sources and code read at:** `caefe33a`.
-- **Count:** `unproven 37 · works 5 · broken 4 · fixed-pending-recheck 1 · dropped 1` (works: R-21, R-25, R-28, R-29, R-47; broken: R-11, R-13, R-23, R-45; fixed-pending-recheck: R-46; dropped: R-26). Updated by `W40.fix-reader-date-ambiguity`, 2026-10-31.
+- **Count:** `unproven 36 · works 5 · broken 2 · fixed-pending-recheck 4 · dropped 1` (works: R-21, R-25, R-28, R-29, R-47; broken: R-11, R-13; fixed-pending-recheck: R-20, R-23, R-45, R-46; dropped: R-26). Updated by `W40.fix-reader-inline-keys`, 2026-10-31.
 
 **Runtime evidence, for every row below: none yet.** The W40.a3 full VM suite
 ([`evidence/reader/W40.a3-full-ui.md`](evidence/reader/W40.a3-full-ui.md), `a5ab9e3c`) passed every UITest
@@ -415,10 +415,11 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
   `.testNextUnreadWrapsAround` and `.testPreviousUnreadSkipsReadRowsAndWraps` test the pure `TriageNavigation`.
   Nothing calls `markReadAndAdvance` or presses a key.
 - **Runtime evidence:** 2026-10-15 · `f5c31a95` · [`evidence/reader/W40.d8-triage.md`](evidence/reader/W40.d8-triage.md): ⌘⇧M marked the file Read and selected the next Unread file in the list.
-- **Status:** `unproven`
+- **Status:** `fixed-pending-recheck` (builder is not verifier)
 - **History:**
   - 2026-10-12 W40.b1 — row written, `unproven`.
   - 2026-10-15 W40.d8 — runtime evidence for ⌘⇧M; stays `unproven`: ⌘]/⌘[ and the bare keys were not pressed. Whether the bare keys fire inside the inline editor is `S-015` (the Space key there does: `W40.fix-reader-inline-keys`).
+  - 2026-10-31 W40.fix-reader-inline-keys — `fixed-pending-recheck`: the bare keys stand down while a field editor has focus; in the VM journey (step 2a) Space, `]`, `[` and `\` typed into the inline editor landed in the field and moved nothing. S-015 cleared. ⌘]/⌘[ and the bare keys on the list itself are still unpressed. [`evidence/reader/W40.fix-reader-inline-keys.md`](evidence/reader/W40.fix-reader-inline-keys.md).
 
 ### R-21 · Undo a tag change
 
@@ -484,10 +485,11 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
 - **Real-path test:** `ArchiveReaderUITests/TriageJourneyUITests.testTriageWritesKeepEveryOtherTagColourAndByte` (steps 2a, 2), through the cell. At the writer level, `ArchiveReaderTests/SubjectTokenEditIntegrationTests.testInlineEditPreservesFacetTokensAndBytes`
   and `.testInlineEditInverseRoundTrips` test `TagEditing.subjectDelta` and `TagWriter` directly.
 - **Runtime evidence:** 2026-10-15 · `f5c31a95` · [`evidence/reader/W40.d8-triage.md`](evidence/reader/W40.d8-triage.md): a Space typed in the focused token field opened the Preview sheet instead (an earlier run's two-word tag was written as its first word), and Return did not commit; the tag was written only on leaving the field. Leaving the field kept every other tag and colour.
-- **Status:** `broken`
+- **Status:** `fixed-pending-recheck` (builder is not verifier)
 - **History:**
   - 2026-10-12 W40.b1 — row written, `unproven`.
   - 2026-10-15 W40.d8 — `broken`: `W40.fix-reader-inline-keys` (S2).
+  - 2026-10-31 W40.fix-reader-inline-keys — `fixed-pending-recheck`: a Space types a space (the two-word tag `W40d8 Inline` was written whole), and Return commits the edit as one delta, with every other file byte-identical. [`evidence/reader/W40.fix-reader-inline-keys.md`](evidence/reader/W40.fix-reader-inline-keys.md).
 - **Notes:** **Drift.** The live editor is the AppKit cell. `Views/SubjectTokenField.swift`, which the guide
   names, is referenced only by the dead `TagsCell` (R-25), so it is dead too. Autocomplete returns at most 20
   and leaves out an exact match. There is no case-duplicate warning here (R-27). 2026-10-16 `W40.e5` deleted
