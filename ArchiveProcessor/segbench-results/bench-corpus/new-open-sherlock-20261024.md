@@ -83,6 +83,25 @@ For comparison, the order-free bag-of-words F1 (NewsBench's, failures counted) i
   reads nothing on newspapers, where all 15 L9 pages cap, as 1.5's did. On the 96 it improves to 88.87 from 83.78.
   As with 1.5, its place is on regions (W46.ocr-regions), not on the whole page.
 
+## Measurement card
+
+- **Truth:** on the 895, each public dataset's own ground-truth transcription, frozen with the set
+  (`bench-corpus/manifest.jsonl` checksums); no scored route drafted it and the owner did not check it. On the 96, the
+  panel's adjudicated truth: 98.0% of its words are where both drafters (Claude Opus 5.5 and Gemini 3.8 Flash) agreed,
+  2.0% come from the 324 spans the owner adjudicated. None of the three new readers is a drafter or a drafter's
+  relative; the drafter family's lead on agreed words (`../ocr-truth-bias.md`) favours neither side of these pairs,
+  whose incumbents are not drafters either.
+- **Selection:** none by a tested route or by ABBYY text: the frozen 895 and all 96 scored pages.
+- **Comparison:** the open sweep's harness unchanged, on the same images, with vLLM 0.31.0, temperature 0, thinking
+  off and 8,192 tokens, as the incumbents read them. Only the prompt differs where a card names its own (Xiaomi-OCR-0's
+  Markdown prompt, PaddleOCR-VL's `OCR:`); Qwen3.8 has the panel prompt, as Qwen3.6 did. Both OCR sets, in this item.
+- **Noise:** n = 895 and 96, paired 95% bootstrap intervals above. Each run read once; these are local greedy routes,
+  so the tie rule (`../ocr-rerun-noise.md`) applies the paired interval alone: a gap whose interval crosses 0 is a tie.
+  Xiaomi-OCR-0 and LightOnOCR-3 4B tie strict on both sets; on the 96 Qwen3.8 27B and Qwen3.6 27B tie strict.
+- **Scope:** whole-page reading with one prompt each. It does not settle region reading (W46.ocr-regions), the box
+  readers (W46.ocr-new-open-boxes), the readers that did not run (below; W46.ocr-new-open-rest), or Mac speed beyond
+  the two MLX runs recorded below.
+
 ## Not scored
 
 - OvisOCR2: the three-page pilot capped or came back empty, so the full run never started.

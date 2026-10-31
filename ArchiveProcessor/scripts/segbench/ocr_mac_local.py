@@ -328,19 +328,23 @@ def hw_groups():
 
 def report_hw():
     import ocr_panel_score as S
-    L = ['# W41.mac-local-hw — LightOnOCR-3-4B and Qwen3.5-9B on our Mac', '',
+    L = ['# W41.mac-local-hw — LightOnOCR-3-4B, Qwen3.5-9B and the W46.ocr-new-open readers on our Mac', '',
          'The Vision OCR lab\'s handwriting pick (LightOnOCR-3-4B, 8-bit) and runner-up (Qwen3.5-9B, 4-bit), read on the '
          'same Apple M3 Pro with 18 GB over the OCR panel\'s 99 frozen originals and scored with the panel\'s own `score()`, '
          'so they sit on the same NES scale as every route in [the panel](ocr-panel-local.md). Reproduce: '
          '`ocr_mac_local.py collect --model KEY` under the Vision OCR lab\'s `run-guarded.sh`, one model at a time, then '
-         '`ocr_mac_local.py report`. Weights from the lab\'s cache by local path (mlx-vlm), nothing downloaded. No money. '
+         '`ocr_mac_local.py report`. Weights from the shared model cache by local path (mlx-vlm). No money. '
          'Raw text stays in the private cache.', '',
          '- **LightOnOCR-3-4B** (`prithivMLmods/LightOnOCR-3-4B-MLX`, 8bit): its card\'s settings, as the lab ran it: an empty '
          'prompt, the 2400 px panel JPEG shrunk to 2048 px on its longest side, 4096 tokens, temperature 0. It answers plain '
          'text with no KIND line, so its whole answer is scored and it has no kind figure. No hosted route serves it.',
          f'- **Qwen3.5-9B** (`mlx-community/Qwen3.5-9B-4bit`): the panel\'s prompt, inputs, max_tokens {P.MAX_TOKENS} and '
          'temperature 0, thinking off (the hosted route\'s reasoning: off), so the gap against the hosted bf16 '
-         '`qwen3.5-9b` row (DeepInfra) is the 4-bit-on-a-Mac penalty.', '']
+         '`qwen3.5-9b` row (DeepInfra) is the 4-bit-on-a-Mac penalty.',
+         '- **Xiaomi-OCR-0** and **PaddleOCR-VL 1.6** (W46.ocr-new-open): the publisher\'s bf16 weights at the revisions '
+         'Sherlock read, downloaded once into the shared model cache (`model_store`), with the Sherlock run\'s prompt '
+         '(the card\'s Markdown prompt; `OCR:`), 8,192 tokens, temperature 0 and thinking off, scored whole. Their '
+         'Sherlock truth96 runs are `farmshare/truth/xiaomi-ocr-0-49202334` and `paddleocr-vl1.6-49202331`.', '']
     for key, spec in HW.items():
         pairs = hw_pairs(key)
         done = [p for p in pairs if p['local_attempted']]
