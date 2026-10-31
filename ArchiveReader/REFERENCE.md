@@ -390,8 +390,11 @@ Core/                         UI-free Reader-local domain (shared tag/PDF facets
                               reconstructs the latest 100 groups for durable inverse-delta undo.
   TagSimilarity.swift         Pure near-duplicate subject clustering (normalize + length-scaled
                               Levenshtein, union-find) behind Find Similar Tags; suggests merges, never writes.
-  LibraryFilter.swift         LibraryFilter (Codable, incl. pathPrefix folder-scope) + LibrarySort.
-  ArchiveFile.swift           A nav-row record (url identity + parsed tags).
+  LibraryFilter.swift         LibraryFilter (Codable, incl. pathPrefix folder-scope) + LibrarySort
+                              (decorated: Int key columns, paths ranked only for full ties).
+  CollationRanks.swift        localizedStandardCompare ranks cached across sorts, + UTF8Key (byte-
+                              keyed hashing; String normalizes non-ASCII on every hash).
+  ArchiveFile.swift           A nav-row record (url identity + native-UTF-8 path/name + parsed tags).
   DuplicateNames.swift        Pure detection of rows sharing a base filename + containing-folder
                               disambiguator (display aid only; never writes).
   LibraryChangeSignature.swift Pure order-independent change-signatures (paths / DISTINCT-subject union /

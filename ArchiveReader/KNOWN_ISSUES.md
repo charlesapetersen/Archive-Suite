@@ -152,9 +152,11 @@ Debug otherwise, and Swift-side sorting is 1.5–3× slower there.
 
 - **Discovery** re-measured against the section above: within ~10% (cold walk 6.98 s, warm start 0.48 s, steady
   revalidation 3.70 s at 150k). The Reader lane's footprint rose to +409 MiB from +277 MiB; not explained.
-- **Open, S2 — `W40.fix-reader-list-recompute-at-size`.** At 115,999 rows every tag edit reassigns
-  `ArchiveLibrary.files` and `libraryDidChange` re-sorts everything on the main thread: **1.56 s per edit**,
-  0.96–5.5 s per sort change (`localizedStandardCompare`, and a path-string tiebreak on every tied comparison).
+- **Fixed 2026-10-31, S2 — `W40.fix-reader-list-recompute-at-size`.** At 115,999 rows every tag edit re-sorted
+  everything on the main thread: 1.56 s per edit, 0.96–5.5 s per sort change. Now **139 ms per edit** and 62–171 ms
+  per sort change at `-O` (decorated sort on cached collation ranks, stored native-UTF-8 paths, byte-keyed hashing,
+  no per-edit table dictionary); `ReaderAtSizeTests` asserts it. Still paid once per session: a sort's first sight
+  of its keys, 0.74 s for 116k names. Evidence: `verification/evidence/reader/W40.fix-reader-list-recompute-at-size.md`.
 - **Open, S2 — `W40.fix-reader-fts-snippet-stall`.** `searchRanked("Bureau of the Budget")` takes **41.7 s** over
   102k rows (the sample's real text, replicated); distinctive single terms take 11–146 ms. It runs on the
   `ContentIndex` actor, so later queries queue behind it.

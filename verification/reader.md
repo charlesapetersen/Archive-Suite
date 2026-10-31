@@ -9,7 +9,7 @@ Format and statuses: [`README.md`](README.md). Written by `W40.b1`, 2026-10-12.
   `W23.m9`, `W24.jpeg1`, `W24.cal1-reader`, `W26.walk2`, `W14.2-fu`). `SPEC/tag-format.md` is the contract
   behind R-05 and R-45.
 - **Sources and code read at:** `caefe33a`.
-- **Count:** `unproven 36 · works 5 · broken 2 · fixed-pending-recheck 4 · dropped 1` (works: R-21, R-25, R-28, R-29, R-47; broken: R-11, R-13; fixed-pending-recheck: R-20, R-23, R-45, R-46; dropped: R-26). Updated by `W40.fix-reader-inline-keys`, 2026-10-31.
+- **Count:** `unproven 36 · works 5 · broken 1 · fixed-pending-recheck 5 · dropped 1` (works: R-21, R-25, R-28, R-29, R-47; broken: R-11; fixed-pending-recheck: R-13, R-20, R-23, R-45, R-46; dropped: R-26). Updated by `W40.fix-reader-list-recompute-at-size`, 2026-10-31.
 
 **Runtime evidence, for every row below: none yet.** The W40.a3 full VM suite
 ([`evidence/reader/W40.a3-full-ui.md`](evidence/reader/W40.a3-full-ui.md), `a5ab9e3c`) passed every UITest
@@ -275,10 +275,11 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
 - **Runtime evidence:** [`evidence/reader/W40.d7-at-size.md`](evidence/reader/W40.d7-at-size.md), 115,999 rows, `-O`, main thread: one tag edit → list 1,561 ms; `recompute()`
   1,021 ms; a sort change 0.96–5.5 s; the table's per-change refresh 107 ms. Scrolling's cell work is 2.7 ms a row
   (no frame rate measured; the unit host draws nothing).
-- **Status:** `broken` — `W40.fix-reader-list-recompute-at-size` (S2)
+- **Status:** `fixed-pending-recheck` (builder is not verifier)
 - **History:**
   - 2026-10-12 W40.b1 — row written, `unproven`.
   - 2026-10-15 W40.d7 — `unproven` → `broken`: every tag edit stalls the main thread ~1.6 s and a sort change 1–5.5 s at 116k rows; filed `W40.fix-reader-list-recompute-at-size` (S2).
+  - 2026-10-31 W40.fix-reader-list-recompute-at-size — `fixed-pending-recheck`: at 115,999 rows, `-O`, one tag edit → list 139 ms, a warm sort change 62–171 ms, the table's per-change refresh 21 ms; `ReaderAtSizeTests` asserts 400 ms budgets. A sort's first sight of its keys still costs up to 2.7 s once per session. Scrolling's frame rate is still unmeasured. [`evidence/reader/W40.fix-reader-list-recompute-at-size.md`](evidence/reader/W40.fix-reader-list-recompute-at-size.md).
 - **Notes:** the headers read "Type" and "Read". There are also flag (⚑) and warning (⚠︎) columns that no
   guide lists.
 
