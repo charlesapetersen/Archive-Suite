@@ -9,7 +9,7 @@ Format and statuses: [`README.md`](README.md). Written by `W40.b1`, 2026-10-12.
   `W23.m9`, `W24.jpeg1`, `W24.cal1-reader`, `W26.walk2`, `W14.2-fu`). `SPEC/tag-format.md` is the contract
   behind R-05 and R-45.
 - **Sources and code read at:** `caefe33a`.
-- **Count:** `unproven 36 · works 5 · broken 1 · fixed-pending-recheck 5 · dropped 1` (works: R-21, R-25, R-28, R-29, R-47; broken: R-11; fixed-pending-recheck: R-13, R-20, R-23, R-45, R-46; dropped: R-26). Updated by `W40.fix-reader-list-recompute-at-size`, 2026-10-31.
+- **Count:** `unproven 36 · works 5 · broken 0 · fixed-pending-recheck 6 · dropped 1` (works: R-21, R-25, R-28, R-29, R-47; fixed-pending-recheck: R-11, R-13, R-20, R-23, R-45, R-46; dropped: R-26). Updated by `W40.fix-reader-fts-snippet-stall`, 2026-10-31.
 
 **Runtime evidence, for every row below: none yet.** The W40.a3 full VM suite
 ([`evidence/reader/W40.a3-full-ui.md`](evidence/reader/W40.a3-full-ui.md), `a5ab9e3c`) passed every UITest
@@ -224,17 +224,18 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
 - **Reached by:** ⌘⌥F, `ArchiveReaderCommands.swift:130`, focuses the `ar.filter.ocr` field
   (`Views/NavigationWindowView.swift:395`). A 150 ms debounce (`Views/NavigationModel.swift:175`) calls
   `runFullTextSearch` (`:656`), which sets the relevance sort (`:661`). The ranking is
-  `ORDER BY bm25(fts,1.0,5.0,10.0)` in `Search/ContentIndex.swift:184`. The re-run after a pass is
+  `ORDER BY bm25(fts,1.0,5.0,10.0)` in `Search/ContentIndex.swift:189`. The re-run after a pass is
   `refreshFullTextSearchIfActive` (`NavigationModel.swift:697`, wired at `:184`).
 - **Real-path test:** `ArchiveReaderUITests/NavigationUITests.testOCRSearchShowsKeywordInContextSnippet`,
   `.testOCRSearchFieldExists`; `ArchiveReaderTests/ContentIndexTests.testBm25RankedSearch`.
 - **Runtime evidence:** [`evidence/reader/W40.d7-at-size.md`](evidence/reader/W40.d7-at-size.md). On the `W40.c2` sample's real OCR text, and on that text replicated to 102,478
   rows: single distinctive terms answer in 11–146 ms at 102k, `the` in 0.7 s, but `Bureau of the Budget` takes
   2.2 s on the sample and **41.7 s** at 102k (`-O`). Index build: 5,268 PDFs in 9.2 s, one pass.
-- **Status:** `broken` — `W40.fix-reader-fts-snippet-stall` (S2)
+- **Status:** `fixed-pending-recheck` (builder is not verifier)
 - **History:**
   - 2026-10-12 W40.b1 — row written, `unproven`.
   - 2026-10-15 W40.d7 — `unproven` → `broken`: a multi-word query with common words takes 42 s at corpus size; filed `W40.fix-reader-fts-snippet-stall` (S2).
+  - 2026-10-31 W40.fix-reader-fts-snippet-stall — `fixed-pending-recheck`: snippets leave out stop words, seek each hit by rowid and stop after 250 ms. On 60 long bodies `Bureau of the Budget` went from 2 of 60 previews in the budget (~135 ms a document) to 60 of 60 in 26 ms. Not yet re-run on the W40.c2 sample, which is in the owner's backup (`W40.fts-snippet-sample-rerun`). [`evidence/reader/W40.fix-reader-fts-snippet-stall.md`](evidence/reader/W40.fix-reader-fts-snippet-stall.md).
 - **Notes:** **Drift.** The search runs as you type, after 150 ms. There is no `.onSubmit` on the field, so
   `SMOKE_TEST.md` step G's "Submit-on-Return" is out of date. The behaviour is arguably better, but the record
   is wrong.
