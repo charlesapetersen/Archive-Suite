@@ -23,6 +23,9 @@ extension NSAttributedString.Key {
     /// other newline in plain text is a Return the operator typed, which the serializer writes as a
     /// paragraph break (`W40.fix-notes-return-paragraph`); this one is written back as a hard break.
     static let noteHardLineBreak = NSAttributedString.Key("an.hardLineBreak")
+    /// Raw HTML read from the file, a headerless chip's unclosed `<!-- block:` opener included (Bool). Its
+    /// newlines are its own, so the serializer writes them as they are rather than as paragraph breaks.
+    static let noteRawHTML = NSAttributedString.Key("an.rawHTML")
 }
 
 // MARK: - BlockKind (paragraph-level semantic)
@@ -64,6 +67,7 @@ enum MarkdownStyler {
             let attrs = buildAttributes(run: run, fontSize: fontSize, bodyFont: bodyFont)
 
             if let previous, previous.intent != run.presentationIntent {
+                dropRawHTMLLineEnd(result)
                 let separator = blockSeparator(from: previous.intent, to: run.presentationIntent)
                 result.append(NSAttributedString(string: separator,
                                                  attributes: separatorAttributes(after: previous.attrs,
@@ -73,8 +77,19 @@ enum MarkdownStyler {
             result.append(NSAttributedString(string: runText, attributes: attrs))
             previous = (run.presentationIntent, attrs)
         }
+        dropRawHTMLLineEnd(result)
 
         return result
+    }
+
+    /// Apple ends an HTML block's run with the newline that closes its last line. Where a separator follows,
+    /// or the text ends, that newline is not the file's text: the serializer keeps raw HTML's newlines as
+    /// they are (`W40.fix-notes-return-paragraph`), so it would come back as one more blank line on each save.
+    private static func dropRawHTMLLineEnd(_ result: NSMutableAttributedString) {
+        let last = result.length - 1
+        guard last >= 0, (result.string as NSString).character(at: last) == 0x0A,
+              result.attribute(.noteRawHTML, at: last, effectiveRange: nil) as? Bool == true else { return }
+        result.deleteCharacters(in: NSRange(location: last, length: 1))
     }
 
     /// The text that separates two adjacent blocks: a blank line, except between list items, which
@@ -170,6 +185,9 @@ enum MarkdownStyler {
             }
             if inlineIntent.contains(.lineBreak) {
                 attrs[.noteHardLineBreak] = true
+            }
+            if inlineIntent.contains(.blockHTML) || inlineIntent.contains(.inlineHTML) {
+                attrs[.noteRawHTML] = true
             }
         }
 

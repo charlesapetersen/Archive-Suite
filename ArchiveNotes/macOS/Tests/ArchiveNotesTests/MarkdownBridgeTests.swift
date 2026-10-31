@@ -517,7 +517,9 @@ struct MarkdownBridgeTests {
         let storage = NSMutableAttributedString(attributedString: MarkdownBridge.parse(markdown: md))
         let at = location ?? storage.length
         var attrs = storage.attributes(at: max(at - 1, 0), effectiveRange: nil)
-        attrs.removeValue(forKey: .noteBlockSeparator)
+        for key in [NSAttributedString.Key.noteBlockSeparator, .noteHardLineBreak, .noteRawHTML] {
+            attrs.removeValue(forKey: key)   // as `EditorTextView.typingAttributes` strips them
+        }
         storage.insert(NSAttributedString(string: text, attributes: attrs), at: at)
         return storage
     }
@@ -566,6 +568,59 @@ struct MarkdownBridgeTests {
             #expect(MarkdownBridge.serialize(MarkdownBridge.parse(markdown: saved)) == saved)
         }
         #expect(MarkdownBridge.serialize(MarkdownBridge.parse(markdown: "**a**\\\n**b**")) == "**a**\\\n**b**")
+    }
+
+    /// Text typed just above a chip follows the single separator `endLine` puts before it; that newline is
+    /// then a paragraph break too, or the typed paragraph would join the one above it.
+    @Test @MainActor
+    func paragraphTypedAboveAChip() {
+        let md = "Intro.\n<!-- block: freeform -->\nBody."
+        let parsed = MarkdownBridge.parse(markdown: md)
+        #expect(parsed.string.hasPrefix("Intro.\n\u{FFFC}"))
+        let saved = MarkdownBridge.serialize(typing("New.\n", after: md, at: 7))
+        #expect(saved == "Intro.\n\nNew.\n<!-- block: freeform -->\nBody.", "got \(saved.debugDescription)")
+        #expect(MarkdownBridge.serialize(MarkdownBridge.parse(markdown: md)) == md)
+    }
+
+    /// A hard break left at the edge of a paragraph, by a Return typed beside it or the text after it deleted,
+    /// writes no backslash: there it would read back as a literal `\`.
+    @Test @MainActor
+    func hardBreakAtAParagraphEdgeWritesNoBackslash() {
+        let md = "Line one\\\nLine two"
+        #expect(MarkdownBridge.serialize(typing("\n", after: md, at: ("Line one\n" as NSString).length))
+                == "Line one\n\nLine two")
+        let storage = NSMutableAttributedString(attributedString: MarkdownBridge.parse(markdown: md))
+        storage.deleteCharacters(in: NSRange(location: 9, length: storage.length - 9))
+        #expect(MarkdownBridge.serialize(storage) == "Line one")
+
+        // The same beside a separator the deleted text leaves behind, after the break or before it.
+        let after = NSMutableAttributedString(attributedString: MarkdownBridge.parse(markdown: "Line one\\\nLine two\n\nNext"))
+        after.deleteCharacters(in: NSRange(location: 9, length: ("Line two" as NSString).length))
+        #expect(!MarkdownBridge.serialize(after).contains("\\"), "got \(MarkdownBridge.serialize(after).debugDescription)")
+        let before = NSMutableAttributedString(attributedString: MarkdownBridge.parse(markdown: "Prev\n\nLine one\\\nLine two"))
+        before.deleteCharacters(in: NSRange(location: 6, length: ("Line one" as NSString).length))
+        #expect(!MarkdownBridge.serialize(before).contains("\\"), "got \(MarkdownBridge.serialize(before).debugDescription)")
+    }
+
+    /// Newlines inside raw HTML are the file's own. A headerless chip's unclosed opener is raw HTML, and a
+    /// blank line inside it, or inside a `<div>`, would end it.
+    @Test @MainActor
+    func rawHTMLNewlinesAreKept() {
+        for md in ["<!-- block: reader-doc\n     link: x", "<div>\nx\n</div>", "a <span\nclass=x>b</span>"] {
+            let saved = MarkdownBridge.serialize(MarkdownBridge.parse(markdown: md))
+            #expect(!saved.contains("\n\n"), "\(md.debugDescription): got \(saved.debugDescription)")
+            #expect(saved.hasPrefix(md.components(separatedBy: "\n")[0] + "\n"))
+        }
+        // Raw HTML's own trailing newline is not written as an extra line.
+        #expect(MarkdownBridge.serialize(MarkdownBridge.parse(markdown: "<!-- block: reader-doc\n     link: x"))
+                == "<!-- block: reader-doc\n     link: x")
+        #expect(MarkdownBridge.serialize(MarkdownBridge.parse(markdown: "<!--\nnote\n-->\n\nafter")) == "<!--\nnote\n-->\n\nafter")
+    }
+
+    /// A lone CR, as pasted text can carry, is a line break like LF; CRLF is one break, not two.
+    @Test @MainActor
+    func carriageReturnsAreLineBreaks() {
+        #expect(MarkdownBridge.serialize(typing("\rB\r\nC", after: "A")) == "A\n\nB\n\nC")
     }
 
     /// Typed through the real text view: at the start of a paragraph the caret follows the Styler's separator,

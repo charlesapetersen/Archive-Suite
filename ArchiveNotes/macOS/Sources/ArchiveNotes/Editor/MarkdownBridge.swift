@@ -556,6 +556,9 @@ enum MarkdownBridge {
     /// own, so bold or a link spanning a Return closes before the break instead of enclosing it. Empty
     /// pieces (Returns in a row, or one ending the run, which the join to the next block already ends) are
     /// dropped: Markdown has no form for an empty paragraph.
+    /// Two newlines read from the file are not typed ones either: those inside raw HTML (a headerless chip's
+    /// unclosed opener is one), which a blank line would end. One separator IS cut: the single newline
+    /// `endLine` puts before a chip, once text typed after it has made it the middle of the run.
     private static func serializePlainLines(_ storage: NSAttributedString, range: NSRange) -> String {
         let text = storage.string as NSString
         var pieces: [String] = []
@@ -563,16 +566,27 @@ enum MarkdownBridge {
         let end = range.location + range.length
         var i = start
         while i < end {
-            if text.character(at: i) == 0x0A,
-               storage.attribute(.noteBlockSeparator, at: i, effectiveRange: nil) as? Bool != true,
-               storage.attribute(.noteHardLineBreak, at: i, effectiveRange: nil) as? Bool != true {
+            let ch = text.character(at: i)
+            guard ch == 0x0A || ch == 0x0D else { i += 1; continue }
+            let width = ch == 0x0D && i + 1 < end && text.character(at: i + 1) == 0x0A ? 2 : 1
+            if isTypedLineBreak(storage, at: i, in: range) {
                 pieces.append(serializeInlineRuns(storage, range: NSRange(location: start, length: i - start)))
-                start = i + 1
+                start = i + width
             }
-            i += 1
+            i += width
         }
         pieces.append(serializeInlineRuns(storage, range: NSRange(location: start, length: end - start)))
         return pieces.filter { !$0.isEmpty }.joined(separator: "\n\n")
+    }
+
+    private static func isTypedLineBreak(_ storage: NSAttributedString, at i: Int, in range: NSRange) -> Bool {
+        if storage.attribute(.noteHardLineBreak, at: i, effectiveRange: nil) as? Bool == true { return false }
+        if storage.attribute(.noteRawHTML, at: i, effectiveRange: nil) as? Bool == true { return false }
+        var separator = NSRange(location: 0, length: 0)
+        if storage.attribute(.noteBlockSeparator, at: i, longestEffectiveRange: &separator, in: range) as? Bool == true {
+            return separator.length == 1
+        }
+        return true
     }
 
     /// The run of block-separator whitespace at the very end of `range`, if the paragraph ends in
@@ -615,9 +629,16 @@ enum MarkdownBridge {
                 return
             }
 
-            // A hard break read from the file goes back as one, outside any emphasis around it.
+            // A hard break read from the file goes back as one, outside any emphasis around it. At the start or
+            // end of a paragraph (a Return typed beside it, or the text after it deleted) a `\` would be read
+            // as a literal backslash, so it writes nothing there.
             if attrs[.noteHardLineBreak] as? Bool == true, !runText.isEmpty, runText.allSatisfy({ $0 == "\n" }) {
-                result += String(repeating: "\\\n", count: runText.count)
+                // Beside another newline (a separator the deleted text left behind) is the same edge.
+                let text = storage.string as NSString
+                let isNewline: (Int) -> Bool = { let c = text.character(at: $0); return c == 0x0A || c == 0x0D }
+                let atEdge = runRange.location == range.location || NSMaxRange(runRange) == NSMaxRange(range)
+                    || isNewline(runRange.location - 1) || isNewline(NSMaxRange(runRange))
+                if !atEdge { result += String(repeating: "\\\n", count: runText.count) }
                 return
             }
 

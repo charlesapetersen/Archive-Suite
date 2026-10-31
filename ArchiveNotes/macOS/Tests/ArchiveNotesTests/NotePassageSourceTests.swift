@@ -184,11 +184,14 @@ final class NotePassageSourceTests: XCTestCase {
 
     /// A range spanning prose + a chip: both bodies survive, on their own lines, with no header
     /// between them. (`passageBlocks` never asks for a multi-segment range — it intersects the
-    /// selection with one block at a time — but the stripper is not allowed to fuse two lines.)
+    /// selection with one block at a time — but the stripper is not allowed to fuse two lines.) With the
+    /// chip gone, the newline before it is the middle of one plain run, so it is written as a paragraph
+    /// break: one newline would be a soft break, and the two bodies would read back as one paragraph
+    /// (W40.fix-notes-return-paragraph).
     func testSnapshotMarkdown_interiorChip_isNotSerializedIntoTheBody() {
         let r = renderedProsePlusChip()
         let (md, _) = source(r, ranges: []).snapshotMarkdown(in: NSRange(location: 0, length: r.length))
-        XCTAssertEqual(md, "Intro prose.\nQuoted body.")
+        XCTAssertEqual(md, "Intro prose.\n\nQuoted body.")
     }
 
     /// End to end through the shipped builder: the passage block a whole-block selection produces
