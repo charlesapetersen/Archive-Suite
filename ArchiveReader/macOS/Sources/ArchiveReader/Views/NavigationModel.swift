@@ -78,7 +78,7 @@ final class NavigationModel: ObservableObject {
     @Published private(set) var displayed: [ArchiveFile] = []
     @Published private(set) var duplicatedNames: Set<String> = []   // base names shared by ≥2 displayed rows
     /// Monotonic counter incremented each time `displayed` is set (in `recompute()`). Lets the
-    /// AppKit table bridge skip its O(N) `displayedByID` dictionary rebuild when `updateNSView`
+    /// AppKit table bridge skip its O(N) snapshot comparison when `updateNSView`
     /// fires for unrelated state changes (selection, scroll, font size).
     private(set) var displayedGeneration: Int = 0
     @Published private(set) var selectedFilesCache: [ArchiveFile] = []
@@ -410,10 +410,10 @@ final class NavigationModel: ObservableObject {
     /// pages — for each currently-selected file, using the content index's classifications. Works
     /// over the whole library in filename order; a no-op with a note when classification is missing.
     func extendSelectionToDocumentRun() {
-        let files = library.files.sorted { $0.url.path.localizedStandardCompare($1.url.path) == .orderedAscending }
-        let paths = files.map(\.url.path)
+        let files = library.files.sorted { $0.path.localizedStandardCompare($1.path) == .orderedAscending }
+        let paths = files.map(\.path)
         let snapshot = selection                              // the selection we're extending
-        let selected = Set(selectedFiles.map(\.url.path))
+        let selected = Set(selectedFiles.map(\.path))
         guard !selected.isEmpty else { return }
         Task { [weak self] in
             guard let self else { return }
@@ -443,7 +443,7 @@ final class NavigationModel: ObservableObject {
 
     // MARK: Notes & flags (app-side, never written to the corpus)
 
-    func toggleFlagSelection() { notes.toggleFlag(selectedFiles.map(\.url.path)) }
+    func toggleFlagSelection() { notes.toggleFlag(selectedFiles.map(\.path)) }
 
     /// Select every currently-displayed file that carries `tag` (from the tag cloud context menu).
     /// Matches on `subjects` — the same facet the tag filter uses — so it agrees with the cloud below.
@@ -494,7 +494,7 @@ final class NavigationModel: ObservableObject {
     private func calendarKey(for file: ArchiveFile) -> (guid: UUID, path: String)? {
         guard let guid = rootStore.preferenceGUID, let root = rootStore.discoveredPathPrefix else { return nil }
         let prefix = root.hasSuffix("/") ? root : root + "/"
-        let path = file.url.path
+        let path = file.path
         guard path.hasPrefix(prefix) else { return nil }
         return (guid, String(path.dropFirst(prefix.count)))
     }
@@ -534,7 +534,7 @@ final class NavigationModel: ObservableObject {
         var base = library.files
         // Exclude user-designated folders before any other filtering.
         if let rootPath = rootStore.discoveredPathPrefix, !excludedFolders.excludedRelativePaths.isEmpty {
-            base = base.filter { !excludedFolders.isExcludedAbsolute($0.url.path, rootPath: rootPath) }
+            base = base.filter { !excludedFolders.isExcludedAbsolute($0.path, rootPath: rootPath) }
         }
         // Counted after the exclusion, so the toggle never offers files no filter can list.
         let ambiguous = base.reduce(0) { $0 + ($1.dateIsAmbiguous ? 1 : 0) }
@@ -542,19 +542,19 @@ final class NavigationModel: ObservableObject {
         // Base scope = the visible universe (smart folder). User filter layers on top.
         if let scope {
             base = base.filter(scope.filter.matches)
-            if let baseFtsPaths { base = base.filter { baseFtsPaths.contains($0.url.path) } }
+            if let baseFtsPaths { base = base.filter { baseFtsPaths.contains($0.path) } }
             if scope.filter.needsAttentionOnly {
-                base = base.filter { formatStatuses[$0.url.path]?.needsAttention == true }
+                base = base.filter { formatStatuses[$0.path]?.needsAttention == true }
             }
         }
         base = base.filter(filter.matches)
-        if let ftsPaths { base = base.filter { ftsPaths.contains($0.url.path) } }
+        if let ftsPaths { base = base.filter { ftsPaths.contains($0.path) } }
         if filter.needsAttentionOnly {
-            base = base.filter { formatStatuses[$0.url.path]?.needsAttention == true }
+            base = base.filter { formatStatuses[$0.path]?.needsAttention == true }
         }
         if let ftsRank, sort.first?.field == .relevance {
             // bm25 relevance ordering: sort by the rank map (0 = best match).
-            displayed = base.sorted { (ftsRank[$0.url.path] ?? Int.max) < (ftsRank[$1.url.path] ?? Int.max) }
+            displayed = base.sorted { (ftsRank[$0.path] ?? Int.max) < (ftsRank[$1.path] ?? Int.max) }
         } else {
             displayed = LibrarySort.sorted(base, by: sort)
         }
@@ -583,7 +583,7 @@ final class NavigationModel: ObservableObject {
     func refreshFormatStatuses() {
         formatGeneration += 1
         let generation = formatGeneration
-        let paths = library.files.map(\.url.path)
+        let paths = library.files.map(\.path)
         Task { [weak self] in
             guard let self else { return }
             let statuses = await self.indexer.formatStatuses(for: paths)
@@ -808,7 +808,7 @@ final class NavigationModel: ObservableObject {
         // Filter excluded folders before indexing so excluded files are never added to the content index.
         let filesToIndex: [ArchiveFile]
         if let rootPath = rootStore.discoveredPathPrefix, !excludedFolders.excludedRelativePaths.isEmpty {
-            filesToIndex = files.filter { !excludedFolders.isExcludedAbsolute($0.url.path, rootPath: rootPath) }
+            filesToIndex = files.filter { !excludedFolders.isExcludedAbsolute($0.path, rootPath: rootPath) }
         } else {
             filesToIndex = files
         }
@@ -825,7 +825,7 @@ final class NavigationModel: ObservableObject {
         // omits files they merely failed to reach — and `pruneIfSettled` treats every omission as a
         // deletion candidate.
         if library.phase.isSettled, !filesToIndex.isEmpty, let rootPath = rootStore.discoveredPathPrefix {
-            indexer.pruneIfSettled(currentPaths: Set(filesToIndex.map(\.url.path)), rootPrefix: rootPath)
+            indexer.pruneIfSettled(currentPaths: filesToIndex.map(\.path), rootPrefix: rootPath)
         }
     }
 
@@ -867,7 +867,7 @@ final class NavigationModel: ObservableObject {
             return
         }
         // Built from the spelling the LIBRARY holds, because that is what `applyPendingRevealIfPossible`
-        // matches `$0.url.path` against. Composed from the root URL, this reported "Document not found
+        // matches `$0.path` against. Composed from the root URL, this reported "Document not found
         // in the current archive" for a file visible on screen under any root whose spelling differs
         // from its resolved one. (`W26.symroot-fu1`.)
         // Joined as STRINGS, not through `URL(fileURLWithPath:)`: that initialiser normalises composed
@@ -891,7 +891,7 @@ final class NavigationModel: ObservableObject {
     func applyPendingRevealIfPossible() {
         guard let targetPath = pendingReveal else { return }
         // Check if the target is in the current library files.
-        if let file = library.files.first(where: { $0.url.path == targetPath }) {
+        if let file = library.files.first(where: { $0.path == targetPath }) {
             selection = [file.id]
             requestScroll(to: file.id)
             statusMessage = ""
@@ -901,7 +901,7 @@ final class NavigationModel: ObservableObject {
             // `execution-plans/archive-notes/00-overview.md` §8.3 requires it be passed on). Ask the
             // window to open the viewer there; a link with no page keeps the plain select-and-scroll.
             if let page = pendingRevealPage {
-                requestOpenViewer(DocumentSelection(filePaths: [file.url.path], initialPage: page,
+                requestOpenViewer(DocumentSelection(filePaths: [file.path], initialPage: page,
                                                      jpegRelativePath: pendingRevealJPEGRelativePath,
                                                      pinsJPEGPartner: true))
             }
@@ -932,7 +932,7 @@ final class NavigationModel: ObservableObject {
     private func refreshSmartFolderCounts() {
         var files = library.files
         if let rootPath = rootStore.discoveredPathPrefix, !excludedFolders.excludedRelativePaths.isEmpty {
-            files = files.filter { !excludedFolders.isExcludedAbsolute($0.url.path, rootPath: rootPath) }
+            files = files.filter { !excludedFolders.isExcludedAbsolute($0.path, rootPath: rootPath) }
         }
         var counts: [UUID: Int] = [:]
         for s in savedSearches.searches { counts[s.id] = files.filter(s.filter.matches).count }
@@ -948,7 +948,7 @@ final class NavigationModel: ObservableObject {
         let top = Mut()
         let hasExclusions = !excludedFolders.excludedRelativePaths.isEmpty
         for f in library.files {
-            let path = f.url.path
+            let path = f.path
             if hasExclusions, excludedFolders.isExcludedAbsolute(path, rootPath: rootPath) { continue }
             top.count += 1                                  // recursive total at the root
             guard path.hasPrefix(root + "/") else { continue }
@@ -1566,7 +1566,7 @@ final class NavigationModel: ObservableObject {
     // MARK: Open / reveal
 
     func documentSelection() -> DocumentSelection {
-        DocumentSelection(filePaths: selectedFiles.map(\.url.path))
+        DocumentSelection(filePaths: selectedFiles.map(\.path))
     }
 
     /// Move the selection one row up/down the *currently displayed* list (single-select), for browsing

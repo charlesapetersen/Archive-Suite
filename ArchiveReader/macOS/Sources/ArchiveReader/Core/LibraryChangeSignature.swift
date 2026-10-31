@@ -27,7 +27,7 @@ enum LibraryChangeSignature {
     /// Signature of the set of file paths (drives the folder tree). One entry per unique path, so no
     /// structural cancellation is possible.
     static func paths(_ files: [ArchiveFile]) -> Int {
-        files.reduce(0) { $0 ^ $1.url.path.hashValue }
+        files.reduce(0) { $0 ^ $1.pathHash }
     }
 
     /// Signature of every facet that affects smart-folder matching (path + read-state + quality +
@@ -36,7 +36,7 @@ enum LibraryChangeSignature {
     static func matchFacets(_ files: [ArchiveFile]) -> Int {
         files.reduce(0) { acc, f in
             var h = Hasher()
-            h.combine(f.url.path)
+            h.combine(f.pathHash)
             h.combine(f.readState)
             h.combine(f.quality)
             for s in f.subjects { h.combine(s) }

@@ -64,6 +64,8 @@ if [ "$ONLY" != sample ]; then
   only_filter="$only_filter -only-testing:ArchiveReaderTests/ReaderAtSizeTests/testListAtOneHundredFiftyThousandFiles"
 fi
 [ -z "$ONLY" ] && only_filter="-only-testing:ArchiveReaderTests/ReaderAtSizeTests"
+# Which build the time budgets in ReaderAtSizeTests apply to (W40.fix-reader-list-recompute-at-size).
+printf 'optimized=%s\n' "$OPTIMIZED" >> "$HANDSHAKE.tmp"
 mv "$HANDSHAKE.tmp" "$HANDSHAKE"
 trap 'rm -f "$HANDSHAKE"' EXIT
 

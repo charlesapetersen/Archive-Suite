@@ -79,6 +79,19 @@ final class LibrarySortDecoratedTests: XCTestCase {
         XCTAssertEqual(ranks.ranks(for: [[nil, "a"]])[0][0], Int.max, "a missing value ranks last")
     }
 
+    func testCanonicallyEqualSpellingsAreTwoKeysRankedAsTheComparatorOrdersThem() {
+        let composed = "Caf\u{E9}.pdf", decomposed = "Cafe\u{301}.pdf"
+        XCTAssertEqual(composed, decomposed, "String equality is canonical")
+        XCTAssertNotEqual(UTF8Key(composed), UTF8Key(decomposed), "the byte key is not")
+        XCTAssertEqual(UTF8Key(composed), UTF8Key(String(decoding: Array(composed.utf8), as: UTF8.self)))
+        let strings = [composed, decomposed, "Cafe.pdf", "Cafz.pdf"]
+        let r = CollationRanks().ranks(for: [strings])[0]
+        for a in strings.indices { for b in strings.indices {
+            let got: ComparisonResult = r[a] < r[b] ? .orderedAscending : (r[a] > r[b] ? .orderedDescending : .orderedSame)
+            XCTAssertEqual(got, strings[a].localizedStandardCompare(strings[b]), "\(a) vs \(b)")
+        } }
+    }
+
     // MARK: - The comparator `sorted` used before the decoration, kept as the reference
 
     private static func reference(_ files: [ArchiveFile], by descriptors: [ARSortDescriptor]) -> [ArchiveFile] {

@@ -62,7 +62,7 @@ struct LibraryFilter: Sendable, Equatable, Codable {
         // Folder scope — match on a path-component boundary so ".../Brown" never matches ".../Brown2".
         if let pathPrefix, !pathPrefix.isEmpty {
             let dir = pathPrefix.hasSuffix("/") ? String(pathPrefix.dropLast()) : pathPrefix
-            if file.url.path != dir, !file.url.path.hasPrefix(dir + "/") { return false }
+            if file.path != dir, !file.path.hasPrefix(dir + "/") { return false }
         }
         // Read state
         switch read {
@@ -201,7 +201,7 @@ enum LibrarySort {
         }
         guard !runs.isEmpty else { return order.map { files[$0] } }
         let tied = runs.flatMap { order[$0] }
-        let pathRanks = collation.ranks(for: [tied.map { Optional(files[$0].url.path) }])[0]
+        let pathRanks = collation.ranks(for: [tied.map { Optional(files[$0].path) }])[0]
         var pathRank = [Int](repeating: 0, count: files.count)
         for (n, i) in tied.enumerated() { pathRank[i] = pathRanks[n] }
         for run in runs {

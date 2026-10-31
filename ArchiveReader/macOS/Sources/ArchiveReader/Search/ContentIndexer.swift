@@ -166,7 +166,7 @@ final class ContentIndexer: ObservableObject {
             }
             // Pull all stored mtimes in one query to partition work without per-file actor round-trips.
             let existing = await idx.existingMTimes()
-            let datalessPaths = files.filter(\.isDataless).map(\.url.path)
+            let datalessPaths = files.filter(\.isDataless).map(\.path)
             var cacheRowsDropped = 0
             if !datalessPaths.isEmpty {
                 // Never let PDFDocument materialise a cloud placeholder. If a previously-local file
@@ -178,7 +178,7 @@ final class ContentIndexer: ObservableObject {
             let work = files.filter { f in
                 guard !f.isDataless else { return false }
                 let mtime = f.contentModified?.timeIntervalSince1970 ?? 0
-                guard let stored = existing[f.url.path] else { return true }
+                guard let stored = existing[f.path] else { return true }
                 return stored != mtime
             }
             let total = files.count
@@ -263,7 +263,7 @@ final class ContentIndexer: ObservableObject {
         extractPDF: @Sendable (URL) -> ExtractedContent?
     ) -> IndexRow {
         CorpusWalker.withDatalessMaterializationDisabled {
-            let path = file.url.path
+            let path = file.path
             let mtime = file.contentModified?.timeIntervalSince1970 ?? 0
             if let content = extractPDF(file.url) {
                 return IndexRow(path: path, mtime: mtime, name: file.name,
@@ -398,10 +398,16 @@ final class ContentIndexer: ObservableObject {
     func commitPruneDecision(gen: Int,
                              indexedUnderRoot: Set<String>,
                              currentPaths: Set<String>) -> Set<String> {
+        commitPruneDecision(gen: gen, absent: Self.absentPaths(indexedUnderRoot: indexedUnderRoot,
+                                                               currentPaths: currentPaths))
+    }
+
+    /// The same, from the absent set `absentPaths` already worked out. `pruneIfSettled` computes it
+    /// off the main actor: at 116k rows the set difference alone held the main thread for hundreds of
+    /// milliseconds after every tag edit (W40.fix-reader-list-recompute-at-size).
+    func commitPruneDecision(gen: Int, absent: Set<String>) -> Set<String> {
         guard gen == pruneGeneration else { return [] }
-        let decision = Self.pruneDecision(indexedUnderRoot: indexedUnderRoot,
-                                          currentPaths: currentPaths,
-                                          previousPending: pendingPrune)
+        let decision = Self.pruneDecision(absent: absent, previousPending: pendingPrune)
         pendingPrune = decision.newPending
         return decision.delete
     }
@@ -421,8 +427,20 @@ final class ContentIndexer: ObservableObject {
         currentPaths: Set<String>,
         previousPending: Set<String>?
     ) -> (delete: Set<String>, newPending: Set<String>?) {
-        guard !currentPaths.isEmpty else { return ([], nil) }
-        let absent = indexedUnderRoot.subtracting(currentPaths)
+        pruneDecision(absent: absentPaths(indexedUnderRoot: indexedUnderRoot, currentPaths: currentPaths),
+                      previousPending: previousPending)
+    }
+
+    /// The indexed paths the snapshot no longer lists; empty for an empty snapshot, which is never a
+    /// reason to prune.
+    nonisolated static func absentPaths(indexedUnderRoot: Set<String>, currentPaths: Set<String>) -> Set<String> {
+        currentPaths.isEmpty ? [] : indexedUnderRoot.subtracting(currentPaths)
+    }
+
+    nonisolated static func pruneDecision(
+        absent: Set<String>,
+        previousPending: Set<String>?
+    ) -> (delete: Set<String>, newPending: Set<String>?) {
         guard !absent.isEmpty else { return ([], nil) }
         guard let prev = previousPending else { return ([], absent) }   // first sighting: stash
         let confirmed = absent.intersection(prev)
@@ -441,7 +459,8 @@ final class ContentIndexer: ObservableObject {
     ///
     /// This is a separate call from `startIndexing` — a destructive delete must never ride the
     /// harmless-on-empty indexing emission.
-    func pruneIfSettled(currentPaths: Set<String>, rootPrefix: String) {
+    /// `currentPaths` is an array so the caller builds no set on the main actor; the task does.
+    func pruneIfSettled(currentPaths: [String], rootPrefix: String) {
         pruneTask?.cancel()
         // Gate 4 (W23.l2): cancellation alone is cooperative and can arrive too late, so stamp this
         // emission. Everything the task writes below is a no-op once the stamp goes stale.
@@ -462,14 +481,14 @@ final class ContentIndexer: ObservableObject {
             let indexedUnderRoot = indexed.filter { path in
                 path == normalizedRoot || path.hasPrefix(normalizedRoot + "/")
             }
+            let absent = Self.absentPaths(indexedUnderRoot: indexedUnderRoot, currentPaths: Set(currentPaths))
+            guard !Task.isCancelled else { return }
 
             // Gates 2+4, atomically: diff against the current library set, confirm across two
             // emissions, and carry the remainder forward — in one main-actor hop, and only if this
             // emission is still the current one.
             let toDelete = await MainActor.run { [weak self] () -> Set<String> in
-                self?.commitPruneDecision(gen: gen,
-                                          indexedUnderRoot: indexedUnderRoot,
-                                          currentPaths: currentPaths) ?? []
+                self?.commitPruneDecision(gen: gen, absent: absent) ?? []
             }
             guard !toDelete.isEmpty else { return }
 

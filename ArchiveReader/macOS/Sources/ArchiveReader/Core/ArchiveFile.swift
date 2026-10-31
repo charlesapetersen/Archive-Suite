@@ -21,6 +21,13 @@ enum ArchiveFileProvenance: Hashable, Sendable {
 /// for opening and for `TagWriter` mutations. UI-free.
 struct ArchiveFile: Identifiable, Sendable {
     let url: URL
+    /// `url.path`, built once. URL rebuilds it on every access, and the list reads it for every row on
+    /// every tag edit (filters, signatures, the prune set, the sort's tiebreak): at 116k rows that was
+    /// most of what remained of a tag edit's cost (W40.fix-reader-list-recompute-at-size).
+    let path: String
+    /// `path`'s UTF-8 hash, for the change signatures (`LibraryChangeSignature`), which hash every row's
+    /// path on every library change.
+    let pathHash: Int
     let name: String
     let fileType: String        // short label, e.g. "PDF"
     let tags: DocumentTags
@@ -35,6 +42,9 @@ struct ArchiveFile: Identifiable, Sendable {
          contentModified: Date?, isDataless: Bool = false,
          provenance: ArchiveFileProvenance = .disk(readAt: Date())) {
         self.url = url
+        let path = url.path
+        self.path = path
+        self.pathHash = UTF8Key(path).hashValue
         self.name = name
         self.fileType = fileType
         self.tags = tags

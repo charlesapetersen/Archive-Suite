@@ -45,14 +45,21 @@ final class ReaderAtSizeTests: XCTestCase {
 
     // MARK: - Roots
 
-    /// `sample=<path>` and `synthetic=<path>` lines, written by the harness and removed after it.
+    /// `sample=<path>`, `synthetic=<path>` and `optimized=0|1` lines, written by the harness and removed
+    /// after it.
     private var handshakeFile: String {
         "/Users/\(NSUserName())/Library/Caches/ArchiveSuiteScale/reader-at-size.txt"
     }
 
+    private var handshakeLines: [String] {
+        (try? String(contentsOfFile: handshakeFile, encoding: .utf8))?.split(separator: "\n").map(String.init) ?? []
+    }
+
+    /// Whether the harness built with `-O`; the time budgets are for that build.
+    private var optimized: Bool { handshakeLines.contains("optimized=1") }
+
     private func root(_ key: String) throws -> URL {
-        let lines = (try? String(contentsOfFile: handshakeFile, encoding: .utf8))?
-            .split(separator: "\n").map(String.init) ?? []
+        let lines = handshakeLines
         guard let line = lines.first(where: { $0.hasPrefix(key + "=") }) else {
             throw XCTSkip("no \(key) root — run ops/scale/run-reader-at-size.sh (handshake: \(handshakeFile))")
         }
@@ -298,12 +305,22 @@ final class ReaderAtSizeTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(walk.filesSeen, 100_000, "the list-length lane needs the 150k tree")
 
         // ── Sort and filter: the pure functions `NavigationModel.recompute()` calls.
+        // W40.fix-reader-list-recompute-at-size: the budgets below are main-thread time at `-O`; a Debug
+        // (-Onone) build, the harness without --optimized, gets three times as long. Before that fix, at
+        // `-O`: 0.96 s for the default sort, 4.0–5.5 s by a field, and 1,561 ms for one tag edit.
+        let budgetScale = optimized ? 1.0 : 3.0
+        let sortBudget = 0.4 * budgetScale
         for field in [SortField.date, .name, .quality, .readState, .fileType, .subjects] {
+            // The first sort to see a key ranks its strings (once per session); later sorts reuse them.
+            let (_, first) = time { _ = LibrarySort.sorted(rows, by: [ARSortDescriptor(field: field)]) }
             let t = repeated(3) { _ = LibrarySort.sorted(rows, by: [ARSortDescriptor(field: field)]) }
-            print("D7 sort \(field.rawValue) rows=\(rows.count) median \(ms(t.median)) max \(ms(t.max))")
+            print("D7 sort \(field.rawValue) rows=\(rows.count) median \(ms(t.median)) max \(ms(t.max)) "
+                  + "(first sight of its keys \(ms(first)))")
+            XCTAssertLessThan(t.median, sortBudget, "re-sorting by \(field.rawValue) at \(rows.count) rows")
         }
         let defaultSort = repeated(3) { _ = LibrarySort.sorted(rows, by: LibrarySort.default) }
         print("D7 sort default median \(ms(defaultSort.median)) max \(ms(defaultSort.max))")
+        XCTAssertLessThan(defaultSort.median, sortBudget, "the default sort at \(rows.count) rows")
         let filters: [(String, LibraryFilter)] = [
             ("unread", LibraryFilter(read: .unread)),
             ("name-text", LibraryFilter(searchText: "box")),
@@ -358,6 +375,21 @@ final class ReaderAtSizeTests: XCTestCase {
         editSamples.sort()
         print("D7 model one tag edit -> list (files reassigned, libraryDidChange) median \(ms(editSamples[1])) "
               + "max \(ms(editSamples[2]))")
+        XCTAssertLessThan(editSamples[1], 0.4 * budgetScale, "one tag edit at \(rows.count) rows")
+        // Where a tag edit's time goes, piece by piece.
+        let current = navigation.library.files
+        for (label, body) in [
+            ("signature paths", { _ = LibraryChangeSignature.paths(current) }),
+            ("signature subjects", { _ = LibraryChangeSignature.subjects(current) }),
+            ("signature match facets", { _ = LibraryChangeSignature.matchFacets(current) }),
+            ("filter all", { _ = current.filter(navigation.filter.matches) }),
+            ("sort default", { _ = LibrarySort.sorted(current, by: navigation.sort) }),
+            ("duplicate names", { _ = DuplicateNames.duplicatedNames(in: current) }),
+            ("prune path set", { _ = Set(current.map(\.path)) }),
+        ] as [(String, () -> Void)] {
+            let t = repeated(3, body)
+            print("D7 model tag-edit part: \(label) median \(ms(t.median))")
+        }
 
         let health = repeated { _ = navigation.dataQuality }
         print("D7 synthetic health total=\(navigation.dataQuality.total) median \(ms(health.median)) max \(ms(health.max))")
@@ -391,16 +423,9 @@ final class ReaderAtSizeTests: XCTestCase {
         // `updateNSView`'s per-generation work: rebuild the id→row map, map the ids, compare with the
         // current snapshot. It runs on every `displayed` change, tag edits included.
         let ids = navigation.displayed.map(\.id)
-        let (_, firstSnapshot) = time {
-            coordinator.displayedByID = Dictionary(uniqueKeysWithValues: navigation.displayed.map { ($0.id, $0) })
-            coordinator.applySnapshot(ids, animated: false)
-        }
+        let (_, firstSnapshot) = time { coordinator.showRows(navigation.displayed) }
         print("D7 table first snapshot rows=\(ids.count) \(ms(firstSnapshot))")
-        let perChange = repeated(3) {
-            coordinator.displayedByID = Dictionary(uniqueKeysWithValues: navigation.displayed.map { ($0.id, $0) })
-            let newIDs = navigation.displayed.map(\.id)
-            _ = newIDs != coordinator.currentSnapshotIDs
-        }
+        let perChange = repeated(3) { XCTAssertFalse(coordinator.showRows(navigation.displayed)) }
         print("D7 table per-change refresh (ids unchanged, e.g. a tag edit) median \(ms(perChange.median)) max \(ms(perChange.max))")
         let reversed = Array(ids.reversed())
         let (_, resort) = time { coordinator.applySnapshot(reversed, animated: false) }
@@ -408,8 +433,8 @@ final class ReaderAtSizeTests: XCTestCase {
         coordinator.applySnapshot(ids, animated: false)
         let lastID = ids.last!
         let selection = repeated { coordinator.syncSelection([lastID]) }
-        print("D7 table syncSelection one row median \(ms(selection.median)) max \(ms(selection.max)) (walks every row)")
-        let scrollLookup = repeated { _ = coordinator.currentSnapshotIDs.firstIndex(of: lastID) }
+        print("D7 table syncSelection one row median \(ms(selection.median)) max \(ms(selection.max)) (looks up the selected ids)")
+        let scrollLookup = repeated { _ = coordinator.rowByID[lastID] }
         print("D7 table scroll-to-row lookup (last row) median \(ms(scrollLookup.median))")
 
         // Scrolling: one screen is ~35 rows. At 200 offsets across the whole list, make every visible

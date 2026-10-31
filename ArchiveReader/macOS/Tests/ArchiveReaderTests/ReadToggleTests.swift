@@ -64,7 +64,7 @@ final class ReadToggleTests: XCTestCase {
 
     /// The Read cell for `url` as the table would make it now, laid out at a row's size.
     private func readCell(_ f: Fixture, for url: URL) throws -> NSView {
-        f.coordinator.displayedByID = Dictionary(uniqueKeysWithValues: f.model.displayed.map { ($0.id, $0) })
+        f.coordinator.showRows(f.model.displayed)
         let file = try XCTUnwrap(f.model.displayed.first { $0.url.path == url.path }, "\(url.lastPathComponent) is listed")
         let cell = f.coordinator.makeCell(tableView: f.table, column: f.column, itemID: file.id)
         cell.frame = NSRect(x: 0, y: 0, width: 84, height: 21)

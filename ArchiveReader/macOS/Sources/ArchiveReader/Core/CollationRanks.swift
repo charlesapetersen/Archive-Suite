@@ -17,7 +17,7 @@ final class CollationRanks: @unchecked Sendable {
     private let lock = NSLock()
     private var ordered: [String] = []        // ascending
     private var tiesPrevious: [Bool] = []     // ordered[i] collates equal to ordered[i - 1]
-    private var rankOf: [String: Int] = [:]
+    private var rankOf: [UTF8Key: Int] = [:]
     private let limit: Int
 
     init(limit: Int = 600_000) { self.limit = limit }
@@ -29,16 +29,18 @@ final class CollationRanks: @unchecked Sendable {
     /// columns of one call.
     func ranks(for columns: [[String?]]) -> [[Int]] {
         lock.withLock {
-            var fresh = Set<String>()
-            for column in columns { for case let s? in column where rankOf[s] == nil { fresh.insert(s) } }
+            var fresh = Set<UTF8Key>()
+            for column in columns {
+                for case let s? in column where rankOf[UTF8Key(s)] == nil { fresh.insert(UTF8Key(s)) }
+            }
             if !fresh.isEmpty {
                 if ordered.count + fresh.count > limit {
                     ordered = []; tiesPrevious = []; rankOf = [:]
-                    fresh = Set(columns.joined().compactMap { $0 })
+                    fresh = Set(columns.joined().compactMap { $0.map(UTF8Key.init) })
                 }
-                insert(fresh)
+                insert(fresh.map(\.string))
             }
-            return columns.map { $0.map { s in s.map { rankOf[$0]! } ?? Int.max } }
+            return columns.map { $0.map { s in s.map { rankOf[UTF8Key($0)]! } ?? Int.max } }
         }
     }
 
@@ -50,7 +52,7 @@ final class CollationRanks: @unchecked Sendable {
         a.localizedStandardCompare(b) == .orderedSame
     }
 
-    private func insert(_ fresh: Set<String>) {
+    private func insert(_ fresh: [String]) {
         let new = fresh.sorted(by: Self.before)
         if new.count <= 64 {
             // A few new strings: binary search each (log n comparisons), then mark its ties with the
@@ -95,7 +97,29 @@ final class CollationRanks: @unchecked Sendable {
         var rank = 0
         for (k, s) in ordered.enumerated() {
             if k > 0, !tiesPrevious[k] { rank += 1 }
-            rankOf[s] = rank
+            rankOf[UTF8Key(s)] = rank
         }
+    }
+}
+
+/// A string compared and hashed by its UTF-8 bytes. `String` hashes and compares by canonical
+/// equivalence, which normalizes any non-ASCII string on every hash: at 116k paths, 42% of them
+/// non-ASCII, a dictionary or set of them cost 15–20 times what it does for ASCII. Byte identity is the
+/// right test where the strings come from the same filesystem walk, and for `CollationRanks` two
+/// canonically equal spellings simply hold two entries that collate equal and so share a rank.
+struct UTF8Key: Hashable, Sendable {
+    let string: String
+    init(_ string: String) { self.string = string }
+
+    static func == (a: UTF8Key, b: UTF8Key) -> Bool {
+        var x = a.string, y = b.string
+        return x.withUTF8 { p in
+            y.withUTF8 { q in p.count == q.count && (p.isEmpty || memcmp(p.baseAddress!, q.baseAddress!, p.count) == 0) }
+        }
+    }
+
+    func hash(into hasher: inout Hasher) {
+        var s = string
+        s.withUTF8 { hasher.combine(bytes: UnsafeRawBufferPointer($0)) }
     }
 }

@@ -131,7 +131,6 @@ struct AppKitTableView: NSViewRepresentable {
         let fitter = Self.fitColumns(of: tableView)
         coordinator.columnFitter = fitter
         headerView.onColumnVisibilityChange = { [weak fitter] in fitter?.fit() }
-        coordinator.displayedByID = Dictionary(uniqueKeysWithValues: model.displayed.map { ($0.id, $0) })
 
         let dataSource = SortableDiffableDataSource(tableView: tableView) { tv, column, row, itemID in
             coordinator.makeCell(tableView: tv, column: column, itemID: itemID)
@@ -147,7 +146,7 @@ struct AppKitTableView: NSViewRepresentable {
         tableView.delegate = coordinator
         tableView.sortDescriptors = sortDescriptorsFromModel()
 
-        coordinator.applySnapshot(model.displayed.map(\.id), animated: false)
+        coordinator.showRows(model.displayed)
         coordinator.syncSelection(selection)
 
         return scrollView
@@ -173,17 +172,12 @@ struct AppKitTableView: NSViewRepresentable {
             }
         }
 
-        // Only rebuild the O(N) lookup dictionary + diff the snapshot when `displayed` actually changed.
+        // Only diff the snapshot when `displayed` actually changed.
         let gen = model.displayedGeneration
         var rowsChanged = false
         if coordinator.lastDisplayedGeneration != gen {
             coordinator.lastDisplayedGeneration = gen
-            coordinator.displayedByID = Dictionary(uniqueKeysWithValues: model.displayed.map { ($0.id, $0) })
-
-            let newIDs = model.displayed.map(\.id)
-            let idsChanged = newIDs != coordinator.currentSnapshotIDs
-            if idsChanged {
-                coordinator.applySnapshot(newIDs, animated: false)
+            if coordinator.showRows(model.displayed) {
                 rowsChanged = true
             } else {
                 // IDs unchanged but values may have changed (tag edit, flag toggle) — reload visible rows.
@@ -192,7 +186,7 @@ struct AppKitTableView: NSViewRepresentable {
                 if visRange.length > 0 {
                     var rowSet = IndexSet(integersIn: visRange.location..<(visRange.location + visRange.length))
                     if let editID = coordinator.editingItemID,
-                       let editIdx = coordinator.currentSnapshotIDs.firstIndex(of: editID) {
+                       let editIdx = coordinator.rowByID[editID] {
                         rowSet.remove(editIdx)
                     }
                     if !rowSet.isEmpty {
@@ -223,7 +217,7 @@ struct AppKitTableView: NSViewRepresentable {
         // Scroll-to-row (keyboard triage)
         if coordinator.lastScrollRequest != scrollRequest, let target = scrollTargetID {
             coordinator.lastScrollRequest = scrollRequest
-            if let idx = coordinator.currentSnapshotIDs.firstIndex(of: target) {
+            if let idx = coordinator.rowByID[target] {
                 tableView.scrollRowToVisible(idx)
             }
         }
@@ -245,9 +239,14 @@ struct AppKitTableView: NSViewRepresentable {
         var isUpdatingSelection = false
         var isSortingFromModel = false
         var lastScrollRequest = 0
-        var displayedByID: [ArchiveFile.ID: ArchiveFile] = [:]
         var lastDisplayedGeneration: Int = -1
-        var currentSnapshotIDs: [ArchiveFile.ID] = []
+        private(set) var currentSnapshotIDs: [ArchiveFile.ID] = []
+        /// Each id's row in `currentSnapshotIDs`, rebuilt only when the snapshot changes.
+        private(set) var rowByID: [ArchiveFile.ID: Int] = [:]
+        /// The displayed generation the table last took. A tag edit keeps every id in place, so it only
+        /// swaps this copy-on-write array and rebuilds nothing; the id→file dictionary it used to
+        /// rebuild cost ~110 ms per edit at 116k rows (W40.fix-reader-list-recompute-at-size).
+        private(set) var rows: [ArchiveFile] = []
         var editingItemID: ArchiveFile.ID?
         var columnFitter: TableColumnFitter?
 
@@ -256,9 +255,27 @@ struct AppKitTableView: NSViewRepresentable {
             self.currentFontSize = parent.fontSize
         }
 
+        /// Take a displayed generation; a new snapshot is applied only when its ids differ from the
+        /// current one. Returns whether they did.
+        @discardableResult
+        func showRows(_ files: [ArchiveFile]) -> Bool {
+            let idsChanged = files.count != currentSnapshotIDs.count
+                || !zip(files, currentSnapshotIDs).allSatisfy { $0.id == $1 }
+            rows = files
+            if idsChanged { applySnapshot(files.map(\.id), animated: false) }
+            return idsChanged
+        }
+
+        /// The file shown under `id`, or nil when `rows` and the snapshot disagree about it.
+        func file(for id: ArchiveFile.ID) -> ArchiveFile? {
+            guard let i = rowByID[id], i < rows.count, rows[i].id == id else { return nil }
+            return rows[i]
+        }
+
         func applySnapshot(_ ids: [ArchiveFile.ID], animated: Bool) {
             guard ids != currentSnapshotIDs else { return }
             currentSnapshotIDs = ids
+            rowByID = Dictionary(ids.enumerated().map { ($1, $0) }, uniquingKeysWith: { first, _ in first })
             var snapshot = NSDiffableDataSourceSnapshot<Int, ArchiveFile.ID>()
             snapshot.appendSections([0])
             snapshot.appendItems(ids, toSection: 0)
@@ -276,9 +293,7 @@ struct AppKitTableView: NSViewRepresentable {
             isUpdatingSelection = true
             defer { isUpdatingSelection = false; lastPushedSelection = sel }
             var indexSet = IndexSet()
-            for (i, id) in currentSnapshotIDs.enumerated() {
-                if sel.contains(id) { indexSet.insert(i) }
-            }
+            for id in sel { if let i = rowByID[id] { indexSet.insert(i) } }
             tableView.selectRowIndexes(indexSet, byExtendingSelection: false)
         }
 
@@ -286,7 +301,7 @@ struct AppKitTableView: NSViewRepresentable {
 
         func makeCell(tableView: NSTableView, column: NSTableColumn, itemID: ArchiveFile.ID) -> NSView {
             let colID = column.identifier.rawValue
-            let file = displayedByID[itemID]
+            let file = self.file(for: itemID)
 
             // Tags column: inline-editable NSTokenField cell
             if colID == "tags" {
@@ -321,13 +336,13 @@ struct AppKitTableView: NSViewRepresentable {
 
             switch colID {
             case "flag":
-                let flagged = parent.model.notes.isFlagged(file.url.path)
+                let flagged = parent.model.notes.isFlagged(file.path)
                 tf.stringValue = flagged ? "⚑" : ""
                 tf.setAccessibilityLabel(flagged ? "Flagged" : "Not flagged")
                 cell.tint = flagged ? ReaderColors.warningCellTint : nil
 
             case "warning":
-                if let status = parent.model.formatStatus(for: file.url.path), status.needsAttention {
+                if let status = parent.model.formatStatus(for: file.path), status.needsAttention {
                     tf.stringValue = "⚠"
                     cell.tint = ReaderColors.warningCellTint
                     tf.toolTip = status.label
@@ -362,7 +377,7 @@ struct AppKitTableView: NSViewRepresentable {
                     ? DuplicateNames.disambiguator(for: file.url) : nil
                 Self.configureNameTextField(tf, name: file.name, dotColor: dotColor,
                                             disambiguator: disambiguator,
-                                            snippet: parent.model.searchSnippet(for: file.url.path),
+                                            snippet: parent.model.searchSnippet(for: file.path),
                                             fontSize: currentFontSize)
 
             case "type":
@@ -371,7 +386,7 @@ struct AppKitTableView: NSViewRepresentable {
 
             case "classification":
                 Self.configureProvenanceTextField(
-                    tf, classification: parent.model.classification(for: file.url.path),
+                    tf, classification: parent.model.classification(for: file.path),
                     fontSize: currentFontSize
                 )
 
@@ -686,7 +701,7 @@ struct AppKitTableView: NSViewRepresentable {
                   let tagCell = tf.superview as? TagTokenCellView,
                   let base = tagCell.editBase,
                   let fileID = tagCell.itemID,
-                  let file = displayedByID[fileID] else {
+                  let file = self.file(for: fileID) else {
                 editingItemID = nil
                 return
             }
