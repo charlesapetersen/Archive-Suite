@@ -16,10 +16,18 @@ struct OptionsView: View {
     @AppStorage(SettingsKey.warnNearDuplicate) private var warnNearDuplicate: Bool = true
     @AppStorage("ar.listFontSize") private var listFontSize: Double = 13
     @AppStorage(DisplayCalendarSettings.enabledKey) private var calendarsEnabled = false
+    // Applied app-wide by `AppAppearance.follow()`, which watches this key (W48.appearance-reader).
+    @AppStorage(AppAppearance.defaultsKey) private var appearance: AppAppearance = AppAppearance.defaultValue
     @ObservedObject private var excludedFolders = ExcludedFoldersStore.shared
 
     var body: some View {
         Form {
+            Section {
+                Picker("Appearance", selection: $appearance) {
+                    ForEach(AppAppearance.allCases, id: \.self) { Text($0.title).tag($0) }
+                }
+                .accessibilityIdentifier("ar.settings.appearance")
+            }
             Section("Copying links") {
                 Picker("Link format", selection: $linkFormat) {
                     ForEach(LinkFormat.allCases, id: \.self) { Text($0.displayName).tag($0) }
@@ -97,7 +105,8 @@ struct OptionsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 500, height: 620)
+        // 40 pt taller for the Appearance row at the top (W48.appearance-reader).
+        .frame(width: 500, height: 660)
     }
 
     private func addExcludedFolder() {

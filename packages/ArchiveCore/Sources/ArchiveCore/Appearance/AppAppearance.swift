@@ -7,7 +7,8 @@
 // Applying it needs AppKit, which ArchiveCore may not import (W9.c3, the write-surface lint's UI-import rule), so
 // `apply` and `follow` live in each app's target, as the app-host window helper does: the Processor's is
 // `ArchiveProcessor/macOS/Sources/ArchiveProcessor/Models/AppAppearance+AppKit.swift`, the Notes's
-// `ArchiveNotes/macOS/Sources/ArchiveNotes/Core/AppAppearance+AppKit.swift`.
+// `ArchiveNotes/macOS/Sources/ArchiveNotes/Core/AppAppearance+AppKit.swift`, the Reader's
+// `ArchiveReader/macOS/Sources/ArchiveReader/Core/AppAppearance+AppKit.swift`.
 
 import Foundation
 

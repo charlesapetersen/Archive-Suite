@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import ArchiveCore
 
 /// Archive Reader — a native macOS app for reading & triaging tagged historical-document PDFs.
 ///
@@ -28,9 +29,14 @@ struct ArchiveReaderApp: App {
         MainActor.assumeIsolated {
             ArchiveTestHost.suppressWindowsIfUnitTestHost()
 #if DEBUG
-            UITestAppearance.applyIfRequested()   // the layout guard's light/dark passes (W40.e9)
+            let appearanceForced = UITestAppearance.applyIfRequested()   // the layout guard's light/dark passes (W40.e9)
             TransientRecorder.startIfRequested()  // the transient-state check (W40.e13)
+            ReaderAppearanceUITestDefaults.clearStoredChoiceIfUITest()
+#else
+            let appearanceForced = false
 #endif
+            // The Appearance setting (W48.appearance-reader), before the first window; a UI test's forced mode wins.
+            if !appearanceForced { AppAppearance.follow() }
         }
     }
 
