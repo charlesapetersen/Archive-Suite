@@ -13487,3 +13487,14 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   S-023 history for the cable. `execution-plans/iphone-usb.md` deleted, its citations repointed to REFERENCE.md. Bench
   cache: nothing written there. Scratch only under `/tmp/ap-e2e-cable*`, `/tmp/ap-e2e-wifi1`.
   <!-- /W40.i-usb-build -->
+- [x] **W40.i5-usb — refresh the iPhone pack for the USB route and the install findings [S]** · §W40 (lane: processor) (uses: light) (blocked-on: W40.i-usb-build) — `verification/sessions/iphone-1.md` with USB pairing first. Fold in the owner's install on 2026-10-29: the bundle id `com.archiveprocessor.capture.ios` is taken by another team (`com.charlespetersen.capture.ios` worked); Xcode did not list the phone until `xcrun devicectl manage pair`; the Developer Mode setting did not appear and trusting the developer was enough on iOS 18.6.2, on a Stanford-managed phone; a command-line build and `devicectl` install avoid the Xcode signing edits. The phone is the owner's own, so the one-sitting limit no longer binds. — SHIPPED 2026-10-31.
+  `verification/sessions/iphone-1.md` rewritten: the install section (devicectl list/pair, `xcodegen generate`, an
+  `xcodebuild` device build with the bundle id, team and signing set on the command line, `devicectl` install and
+  launch; trust under VPN & Device Management, Developer Mode only if asked) replaces the Xcode signing edits; Part A
+  the cable (pair, one document, unplug mid-send, lock while sending, landscape/JPEG, Box/Folder) and Part B Wi-Fi and
+  the Drive relay, on different days if wished; the Drive client uses the new bundle id; S-037 dropped from the known
+  problems (fixed), the cable's unseen-on-device list added; the filing section names C-43 and the KNOWN_ISSUES cable
+  entry. The commands were not run (no phone attached); the team-id extraction was checked against the Mac's
+  certificate. Timing judged: no iPhone or Live Capture fix queued, only open suspects; handed to `W40.i4`.
+  Bench cache: nothing written.
+  <!-- /W40.i5-usb -->
