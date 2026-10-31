@@ -66,21 +66,24 @@ def mlx(n):
 
 
 def readings(route, n):
-    """{job id: text or None} for one run of one route."""
+    """{job id: text or None} for one run of one route, None for a page not yet attempted (no saved reading). Gemini
+    saves only a 200 reply, and every run here answered all 99."""
     import ocr_mac_local as M
     if route == 'gemini':
         d = ROUTES['gemini']['run0'] if n == 0 else ROUTES['gemini']['dir'](n)
         out = {}
         for j in G.panel_manifest()[1]:
             f = d / (j['id'] + '.json')
-            p = G.parsed(json.loads(f.read_text())) if f.exists() else None
-            out[j['id']] = p['text'] if p else None
+            if f.exists():
+                p = G.parsed(json.loads(f.read_text()))
+                out[j['id']] = p['text'] if p else None
         return out
     d = M.OUT if n == 0 else ROUTES['mlx']['dir'](n)
     out = {}
     for j in M.jobs():
-        _, p = M.load_reading(d / (j['id'] + '.json'))
-        out[j['id']] = p['text'] if p else None
+        if (d / (j['id'] + '.json')).exists():
+            _, p = M.load_reading(d / (j['id'] + '.json'))
+            out[j['id']] = p['text'] if p else None
     return out
 
 
@@ -97,11 +100,13 @@ def report():
         runs = {}
         for n in (0, *RUNS):
             texts = readings(route, n)
+            if not set(jobs) <= set(texts):   # a run still being read is not scored
+                continue
             runs[n] = {jobs[i]: {'ok': texts.get(i) is not None,
                                  'text': texts.get(i),
                                  'nes': S.score((P.TRUTH / 'truth' / (jobs[i] + '.txt')).read_text(), texts.get(i) or '')['nes']}
                        for i in jobs}
-        have = [n for n in runs if sum(r['ok'] for r in runs[n].values())]
+        have = list(runs)
         pages = sorted(jobs.values())
 
         def summary(sel):
@@ -112,8 +117,8 @@ def report():
                           'answered': mean([r['nes'] for r in rr if r['ok']])}
             sp = {}
             for m in ('strict', 'answered'):
-                v = [per[n][m] for n in have]
-                sp[m] = {'range': max(v) - min(v), 'sd': statistics.stdev(v) if len(v) > 1 else 0.0}
+                v = [per[n][m] for n in have if per[n][m] == per[n][m]]   # a kind with no answered page is NaN
+                sp[m] = {'range': max(v) - min(v) if v else 0.0, 'sd': statistics.stdev(v) if len(v) > 1 else 0.0}
             return {'pages': len(sel), 'runs': per, 'spread': sp}
 
         res = {'name': spec['name'], 'runs_scored': have, 'all': summary(pages),

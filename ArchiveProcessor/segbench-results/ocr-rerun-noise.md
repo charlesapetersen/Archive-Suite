@@ -47,4 +47,14 @@ Run-to-run spread of the 96-page mean: strict range 0.00 points (SD 0.00), answe
 
 A gap between two routes on the 96 is a **tie** when it is under twice the larger rerun range of the routes compared (strict or answered, whichever is quoted), or when its paired 95% interval crosses 0. Both tests apply: the rerun range catches the route's own instability, the paired interval catches page-sampling noise, which a deterministic route still has. Twice the range measured here: Gemini 3.7 Flash 0.49 points, Qwen3-VL 8B 4-bit 0.00 points. A route with no rerun of its own takes the larger of these (a hosted model is held to Gemini's, a local greedy one to Qwen's) until it is measured. Per kind, the kind's own range applies; a kind of a dozen pages moves far more than the whole.
 
-Gateway spend: 300 calls, about $1.14 at Gemini 3.8 Flash's list rate (an estimate: the gateway returns no cost), Stanford PTA. The MLX runs cost nothing.
+Gateway spend: 300 calls, about $1.14 at Gemini 3.8 Flash's list rate (an estimate; the gateway does report its own figure in an `x-litellm-response-cost` header, which `gateway_gemini.py` does not yet record), Stanford PTA. The MLX runs cost nothing.
+
+**The gateway caches.** It is LiteLLM, and it answers a byte-identical request from a response cache: the first run 2 came back in a median 1.3 s a page (run 1: 8.0 s) with run 1's exact text and tokens on all 99, a copy, not a reading. It is kept aside (`run2-gateway-cached`) and run 2 was read again with the body field `"cache": {"no-cache": true}`, which skips it (median 7.1 s; the request Google sees is unchanged). Run 1 was read before this was known; it was live throughout (no call under 2.7 s, its 22 texts that match run 0 took 3-15 s). Any gateway arm that repeats a request, a retry included, should send that field.
+
+## Measurement card
+
+- **Truth:** the 96's adjudicated truth, the panel's (`ocr_truth`), read today for every run. The figure is the difference between runs of one route against one fixed truth, so a bias in the truth toward a drafter moves every run of that route alike and cancels; it does not cancel in a gap between two routes, which is what `ocr-truth-bias.md` addresses.
+- **Selection:** none: all 96 scored pages, every run.
+- **Comparison:** the same images, prompt, temperature, reasoning and token cap within each route. Only the gateway cache field differs (run 2), and it never reaches the model. Run 0 of Gemini was read on 2026-10-23, runs 1 and 2 on 2026-10-30, so 1-0 and 2-0 can include a provider change in that week; 2-1 is the same-day pair. The public 895 were not reread (the item measures the 96, where routes are chosen).
+- **Noise:** this is the noise figure. Three runs make the range a rough estimate in its own right (a fourth run would likely widen it), and the per-kind ranges rest on 2-50 pages; the 2 mixed pages are anecdote.
+- **Scope:** two routes. Other hosted models, other temperatures and other local runtimes are not measured; the rule above lends them these figures until they are. It says nothing about the 895.
