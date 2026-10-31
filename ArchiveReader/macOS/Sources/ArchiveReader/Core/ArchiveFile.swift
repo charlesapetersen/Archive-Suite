@@ -27,6 +27,9 @@ struct ArchiveFile: Identifiable, Sendable {
     let contentModified: Date?
     let isDataless: Bool
     let provenance: ArchiveFileProvenance
+    /// W40.fix-reader-date-ambiguity: date facets that carried two tags, worked out once per row so the
+    /// filter and the list never re-classify every subject of every file.
+    let dateAmbiguities: [DateAmbiguity]
 
     init(url: URL, name: String, fileType: String, tags: DocumentTags,
          contentModified: Date?, isDataless: Bool = false,
@@ -38,6 +41,7 @@ struct ArchiveFile: Identifiable, Sendable {
         self.contentModified = contentModified
         self.isDataless = isDataless
         self.provenance = provenance
+        self.dateAmbiguities = tags.dateAmbiguities
     }
 
     /// Discovery and index reconstruction build URLs from filesystem representations; URL equality
@@ -45,6 +49,12 @@ struct ArchiveFile: Identifiable, Sendable {
     var id: URL { url }
 
     var sortDate: Int? { tags.sortDate }
+    var dateIsAmbiguous: Bool { !dateAmbiguities.isEmpty }
+
+    /// One line per ambiguous facet, naming the tag the last-wins rule set aside; nil when none.
+    var dateAmbiguityText: String? {
+        dateIsAmbiguous ? dateAmbiguities.map(\.summary).joined(separator: "\n") : nil
+    }
     var dateIsSpeculative: Bool { tags.dateIsSpeculative }
 
     /// W37: the Date column text. The item's own date, plus the covering letter's date when the file

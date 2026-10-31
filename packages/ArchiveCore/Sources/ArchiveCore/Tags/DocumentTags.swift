@@ -35,6 +35,31 @@ public enum ArchiveColor: Sendable, Equatable {
     public var labelNumber: Int { self == .box ? 6 : 3 }
 }
 
+/// A single-valued date facet, for naming what the last-wins rule set aside.
+public enum DateFacet: String, Sendable, CaseIterable {
+    case year = "Year", month = "Month", day = "Day", decade = "Decade", sentWith = "Sent With"
+}
+
+/// A date facet that had more than one token on one file. `kept` is the token the facet reads (nil for
+/// a malformed `Sent With` with no valid one beside it); `setAside` are the others, verbatim, in file order.
+public struct DateAmbiguity: Sendable, Equatable {
+    public let facet: DateFacet
+    public let kept: String?
+    public let setAside: [String]
+    public init(facet: DateFacet, kept: String?, setAside: [String]) {
+        self.facet = facet; self.kept = kept; self.setAside = setAside
+    }
+
+    /// "Two Year tags: 1984 is used, 1980 was set aside."
+    public var summary: String {
+        let others = setAside.map { $0.trimmingCharacters(in: .whitespaces) }.joined(separator: ", ")
+        guard let kept else { return "\(facet.rawValue) tag not read as a date: \(others)." }
+        let count = setAside.count == 1 ? "Two" : String(setAside.count + 1)
+        let verb = setAside.count == 1 ? "was" : "were"
+        return "\(count) \(facet.rawValue) tags: \(kept.trimmingCharacters(in: .whitespaces)) is used, \(others) \(verb) set aside."
+    }
+}
+
 /// A file's tags parsed into facets. `raw` is preserved verbatim and is the source of truth.
 public struct DocumentTags: Sendable, Equatable {
     public struct Month: Sendable, Equatable {
@@ -122,12 +147,50 @@ public struct DocumentTags: Sendable, Equatable {
     /// True when a sent-with date needs review: a second valid token was demoted to a subject, or a
     /// `Sent With <digit…>` token is malformed (e.g. `Sent With 1958-13`). A prose subject such as
     /// `Sent With Love` is not a date and does not count.
-    public var sentWithIsAmbiguous: Bool {
-        subjects.contains { subject in
-            let s = subject.trimmingCharacters(in: .whitespaces)
-            guard s.hasPrefix(SentWithTag.prefix) else { return false }
-            return s.dropFirst(SentWithTag.prefix.count).first.map { ("0"..."9").contains($0) } ?? false
+    public var sentWithIsAmbiguous: Bool { dateAmbiguities.contains { $0.facet == .sentWith } }
+
+    /// Each date facet that had more than one token (W40.fix-reader-date-ambiguity, ledger R-47). The
+    /// last-wins rule still reads the file; this only names what it set aside, so the user can review
+    /// it. Every token that parses as a date facet is consumed by it, so a date-shaped token left among
+    /// `subjects` is exactly one the rule demoted. Facet order is Year, Month, Day, Decade, Sent With.
+    /// A Year beside a Decade is not ambiguous: the SPEC has a Year supersede a Decade.
+    public var dateAmbiguities: [DateAmbiguity] {
+        var setAside: [DateFacet: [String]] = [:]
+        for subject in subjects {
+            if let facet = Self.demotedDateFacet(subject) { setAside[facet, default: []].append(subject) }
         }
+        return DateFacet.allCases.compactMap { facet in
+            setAside[facet].map { DateAmbiguity(facet: facet, kept: winningToken(facet), setAside: $0) }
+        }
+    }
+
+    /// True when any date facet had more than one token; see `dateAmbiguities`.
+    public var dateIsAmbiguous: Bool { subjects.contains { Self.demotedDateFacet($0) != nil } }
+
+    private func winningToken(_ facet: DateFacet) -> String? {
+        switch facet {
+        case .year: return yearToken
+        case .month: return monthToken
+        case .day: return dayToken
+        case .decade: return decadeToken
+        case .sentWith: return sentWithToken
+        }
+    }
+
+    /// The date facet a subject would have filled, or nil. A `Sent With <digit…>` token that is not a
+    /// valid date (`Sent With 1958-13`) counts too: it is a date the rule could not read. A prose subject
+    /// such as `Sent With Love` does not.
+    private static func demotedDateFacet(_ subject: String) -> DateFacet? {
+        let s = subject.trimmingCharacters(in: .whitespaces)
+        if s.hasPrefix(SentWithTag.prefix) {
+            return s.dropFirst(SentWithTag.prefix.count).first.map { ("0"..."9").contains($0) } == true
+                ? .sentWith : nil
+        }
+        if parseYear(s) != nil { return .year }
+        if parseMonth(s) != nil { return .month }
+        if parseDay(s) != nil { return .day }
+        if parseDecade(s) != nil { return .decade }
+        return nil
     }
 
     /// Display form of the sent-with date, e.g. "Mar 12, 1958"; `nil` when absent.

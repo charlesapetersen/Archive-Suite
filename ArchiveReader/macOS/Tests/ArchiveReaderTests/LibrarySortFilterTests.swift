@@ -177,6 +177,23 @@ final class LibrarySortFilterTests: XCTestCase {
         XCTAssertTrue(LibraryFilter.effective(base: base2, user: user2).needsAttentionOnly)
     }
 
+    // W40.fix-reader-date-ambiguity (R-47): failed before it — nothing flagged two Years, and no filter found them.
+    func testTwoYearsAreFlaggedAndTheAmbiguousDatesFilterFindsThem() {
+        let twoYears = file("a", ["Unread", "1980", "Cold War", "1984"])
+        let oneYear = file("b", ["Unread", "1980", "Cold War"])
+        XCTAssertTrue(twoYears.dateIsAmbiguous)
+        XCTAssertEqual(twoYears.dateAmbiguityText, "Two Year tags: 1984 is used, 1980 was set aside.")
+        XCTAssertEqual(twoYears.sortDate, 1984_00_00, "the last-wins rule is unchanged")
+        XCTAssertFalse(oneYear.dateIsAmbiguous)
+        XCTAssertNil(oneYear.dateAmbiguityText)
+
+        let f = LibraryFilter(ambiguousDatesOnly: true)
+        XCTAssertTrue(f.isActive)
+        XCTAssertEqual([twoYears, oneYear].filter(f.matches).map(\.name), ["a"])
+        XCTAssertTrue(LibraryFilter.effective(base: f, user: LibraryFilter()).ambiguousDatesOnly)
+        XCTAssertTrue(LibraryFilter.effective(base: LibraryFilter(), user: f).ambiguousDatesOnly)
+    }
+
     func testEffectiveNeutralBothReturnsNeutral() {
         let eff = LibraryFilter.effective(base: LibraryFilter(), user: LibraryFilter())
         XCTAssertFalse(eff.isActive)

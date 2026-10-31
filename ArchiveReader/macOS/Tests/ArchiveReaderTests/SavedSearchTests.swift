@@ -99,6 +99,7 @@ final class SavedSearchStoreTests: XCTestCase {
         var f = LibraryFilter()
         f.subjects = ["Economics"]; f.subjectCombine = .any; f.qualities = [2, 1]
         f.read = .read; f.searchText = "memo"; f.pathPrefix = "/root/Box 3"; f.needsAttentionOnly = true
+        f.ambiguousDatesOnly = true
         store.add(name: "Round Trip", filter: f, fullTextQuery: "deficit")
         // Reload from a fresh store (persist → reload) and confirm the saved filter is intact so it can
         // be re-applied to the live filter state verbatim.

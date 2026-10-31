@@ -119,6 +119,7 @@ struct TagEditorView: View {
     @ViewBuilder private func dateSection(_ s: GroupTagSummary) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             title("Date")
+            dateAmbiguityNotice()
             HStack {
                 Text("Year").frame(width: 52, alignment: .leading)
                 TextField(yearPlaceholder(s), text: $yearDraft).textFieldStyle(.roundedBorder).frame(width: 90)
@@ -179,6 +180,24 @@ struct TagEditorView: View {
                 Button("Clear Uncertain") { model.applyEdit(.setSentWithUncertain(false)) }
                     .disabled(!model.selectedFiles.contains(where: \.tags.sentWithUncertain))
             }
+        }
+    }
+
+    /// W40.fix-reader-date-ambiguity: a file with two tags for one date facet says which one the date uses and
+    /// which was set aside. The set-aside tag is a subject chip above, so removing it settles the date.
+    @ViewBuilder private func dateAmbiguityNotice() -> some View {
+        let ambiguous = model.selectedFiles.filter(\.dateIsAmbiguous)
+        if ambiguous.count == 1, model.selectedFiles.count == 1, let text = ambiguous[0].dateAmbiguityText {
+            Label("\(text) Remove the wrong one under Subjects.", systemImage: "calendar.badge.exclamationmark")
+                .font(.caption).foregroundStyle(.orange)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("ar.tagEditor.dateAmbiguity")
+        } else if !ambiguous.isEmpty {
+            Label("\(ambiguous.count) of the selected files have two tags for one date. Open one to see which.",
+                  systemImage: "calendar.badge.exclamationmark")
+                .font(.caption).foregroundStyle(.orange)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("ar.tagEditor.dateAmbiguity")
         }
     }
 

@@ -96,6 +96,7 @@ final class NavigationModel: ObservableObject {
     @Published private(set) var classifications: [String: String] = [:]
     @Published private(set) var formatStatuses: [String: PDFFormatStatus] = [:]   // non-standard-PDF detection, per path
     @Published private(set) var needsAttentionCount = 0     // indexed files that need attention
+    @Published private(set) var ambiguousDateCount = 0      // files with two tags for one date facet (R-47)
     @Published private(set) var indexingProgress: (done: Int, total: Int)?
     /// Mirrored from `ContentIndexer.failure` — a degraded content index, so the status bar can say so
     /// instead of going idle over a partial or unopenable one (W23.m9). `nil` = healthy.
@@ -531,6 +532,8 @@ final class NavigationModel: ObservableObject {
 
     func recompute() {
         var base = library.files
+        let ambiguous = base.reduce(0) { $0 + ($1.dateIsAmbiguous ? 1 : 0) }
+        if ambiguous != ambiguousDateCount { ambiguousDateCount = ambiguous }
         // Exclude user-designated folders before any other filtering.
         if let rootPath = rootStore.discoveredPathPrefix, !excludedFolders.excludedRelativePaths.isEmpty {
             base = base.filter { !excludedFolders.isExcludedAbsolute($0.url.path, rootPath: rootPath) }

@@ -339,8 +339,18 @@ struct AppKitTableView: NSViewRepresentable {
 
             case "date":
                 let calendar = parent.model.displayCalendar(for: file)   // W24.cal1-reader; nil = as tagged
-                tf.stringValue = file.dateCellText(in: calendar)
+                let dateText = file.dateCellText(in: calendar)
                 tf.toolTip = file.storedDateTooltip(in: calendar)
+                // W40.fix-reader-date-ambiguity: two tags for one date facet are flagged on the row, and the
+                // tooltip names the one the last-wins rule set aside.
+                if let ambiguity = file.dateAmbiguityText {
+                    tf.stringValue = dateText + " \u{26A0}\u{FE0E}"
+                    tf.toolTip = [ambiguity, tf.toolTip].compactMap { $0 }.joined(separator: "\n")
+                    tf.setAccessibilityLabel("\(dateText), ambiguous date. \(ambiguity)")
+                    cell.tint = ReaderColors.warningCellTint
+                } else {
+                    tf.stringValue = dateText
+                }
                 tf.textColor = file.sortDate == nil ? .secondaryLabelColor : .labelColor
                 if file.dateCellIsSpeculative {
                     tf.font = NSFontManager.shared.convert(regularFont, toHaveTrait: .italicFontMask)

@@ -467,6 +467,19 @@ struct NavigationWindowView: View {
             .help("Show only non-standard PDFs — files that couldn't be opened, or have no selectable text")
             .accessibilityIdentifier("ar.filter.needsAttention")
         }
+
+        // W40.fix-reader-date-ambiguity: stays visible while on, so fixing the last file never strands the filter.
+        if model.ambiguousDateCount > 0 || model.filter.ambiguousDatesOnly {
+            Toggle(isOn: $model.filter.ambiguousDatesOnly) {
+                Label("\(model.ambiguousDateCount) ambiguous date\(model.ambiguousDateCount == 1 ? "" : "s")",
+                      systemImage: "calendar.badge.exclamationmark")
+            }
+            .toggleStyle(.button)
+            .controlSize(.small)
+            .fixedSize()
+            .help("Show only files with two tags for one date (two Years, Months, Days, Decades or Sent With dates)")
+            .accessibilityIdentifier("ar.filter.ambiguousDates")
+        }
     }
 
     @ViewBuilder

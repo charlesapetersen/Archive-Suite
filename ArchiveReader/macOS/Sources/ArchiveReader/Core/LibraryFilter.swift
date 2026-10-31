@@ -36,6 +36,8 @@ struct LibraryFilter: Sendable, Equatable, Codable {
     /// match an active range. Optional so a smart folder saved before this field still decodes.
     var dateFromYear: Int? = nil
     var dateToYear: Int? = nil
+    /// W40.fix-reader-date-ambiguity: only files with two tags for one date facet, to review them.
+    var ambiguousDatesOnly: Bool = false
 
     var dateRange: DateRangeFilter? {
         dateFromYear == nil && dateToYear == nil ? nil : DateRangeFilter(fromYear: dateFromYear, toYear: dateToYear)
@@ -45,7 +47,7 @@ struct LibraryFilter: Sendable, Equatable, Codable {
         !subjects.isEmpty || !qualities.isEmpty || read != .all || dateRange != nil
             || !searchText.trimmingCharacters(in: .whitespaces).isEmpty
             || (pathPrefix?.isEmpty == false)
-            || needsAttentionOnly
+            || needsAttentionOnly || ambiguousDatesOnly
     }
 
     func matches(_ file: ArchiveFile) -> Bool {
@@ -73,6 +75,7 @@ struct LibraryFilter: Sendable, Equatable, Codable {
             case .any: if subjects.isDisjoint(with: fileSubjects) { return false }
             }
         }
+        if ambiguousDatesOnly, !file.dateIsAmbiguous { return false }
         // Date range — either role, the same value meeting both bounds.
         if let dateRange, dateRange.matchingRoles(file.tags.dateKeysByRole).isEmpty { return false }
         // Filename text
@@ -95,7 +98,7 @@ extension LibraryFilter {
 
     /// Fold a user filter onto a base scope for "Save Current Search" / the status summary.
     /// Per-facet: user wins when set, else inherit the base; subjects = union;
-    /// pathPrefix/searchText = user's if non-empty, else base's; needsAttentionOnly = OR.
+    /// pathPrefix/searchText = user's if non-empty, else base's; needsAttentionOnly, ambiguousDatesOnly = OR.
     static func effective(base: LibraryFilter, user: LibraryFilter) -> LibraryFilter {
         var r = LibraryFilter()
         r.read = user.read != .all ? user.read : base.read
@@ -107,6 +110,7 @@ extension LibraryFilter {
         let up = user.pathPrefix
         r.pathPrefix = (up == nil || up?.isEmpty == true) ? base.pathPrefix : up
         r.needsAttentionOnly = base.needsAttentionOnly || user.needsAttentionOnly
+        r.ambiguousDatesOnly = base.ambiguousDatesOnly || user.ambiguousDatesOnly
         if user.dateRange != nil {
             r.dateFromYear = user.dateFromYear; r.dateToYear = user.dateToYear
         } else {
