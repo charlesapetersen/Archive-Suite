@@ -51,7 +51,7 @@ A gap between two routes on the 96 is a **tie** when it is under twice the large
 
 Gateway spend: 300 calls, about $1.14 at Gemini 3.8 Flash's list rate (an estimate; the gateway does report its own figure in an `x-litellm-response-cost` header, which `gateway_gemini.py` does not yet record), Stanford PTA. The MLX runs cost nothing.
 
-**The gateway caches.** It is LiteLLM, and it answers a byte-identical request from a response cache: the first run 2 came back in a median 1.3 s a page (run 1: 8.0 s) with run 1's exact text and tokens on all 99, a copy, not a reading. It is kept aside (`run2-gateway-cached`) and run 2 was read again with the body field `"cache": {"no-cache": true}`, which skips it (median 7.1 s; the request Google sees is unchanged). Run 1 was read before this was known; it was live throughout (no call under 2.7 s, its 22 texts that match run 0 took 3-15 s). Any gateway arm that repeats a request, a retry included, should send that field.
+**The gateway caches.** It is LiteLLM, and it answers a byte-identical request from a response cache: the first run 2 came back in a median 1.3 s a page (run 1: 8.0 s) with run 1's exact text and tokens on all 99, a copy, not a reading. It is kept aside (`run2-gateway-cached`) and run 2 was read again with the body field `"cache": {"no-cache": true}`, which skips it (median 7.1 s; the request Google sees is unchanged). Run 1 was read before this was known; it was live throughout (no call under 2.7 s, its 24 texts that match run 0 took 3-15 s). Any gateway arm that repeats a request, a retry included, should send that field.
 
 ## Measurement card
 

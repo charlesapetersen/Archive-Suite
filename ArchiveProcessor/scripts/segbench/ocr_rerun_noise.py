@@ -204,7 +204,8 @@ def write_md(out):
           'first run 2 came back in a median 1.3 s a page (run 1: 8.0 s) with run 1\'s exact text and tokens on all 99, '
           'a copy, not a reading. It is kept aside (`run2-gateway-cached`) and run 2 was read again with the body field '
           '`"cache": {"no-cache": true}`, which skips it (median 7.1 s; the request Google sees is unchanged). Run 1 was '
-          'read before this was known; it was live throughout (no call under 2.7 s, its 22 texts that match run 0 took '
+          f"read before this was known; it was live throughout (no call under 2.7 s, its "
+          f"{out['routes']['gemini']['pairs']['1-0']['identical_text']} texts that match run 0 took "
           '3-15 s). Any gateway arm that repeats a request, a retry included, should send that field.', '',
           '## Measurement card', '',
           '- **Truth:** the 96\'s adjudicated truth, the panel\'s (`ocr_truth`), read today for every run. The figure is '
