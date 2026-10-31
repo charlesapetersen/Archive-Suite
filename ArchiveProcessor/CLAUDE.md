@@ -113,7 +113,7 @@ and "recoverable" seem to conflict, ship both — err toward keeping data.
   companion changes, no packet-capture harness — **do not re-promote LANSEC-5/6/7 or the crypto redesign.** The acceptance rests on the shipped mitigations:
   high-entropy `lanToken` + failed-auth backoff (W16.lan2), header-first admission, connection/memory caps,
   `constantTimeEquals`, both receivers' `isSafeGroupId` path-traversal guard (`Net/CaptureValidation.swift`). On
-  untrusted venue Wi-Fi use the USB bridge (Android) or Drive relay; LAN only on a trusted network. The Drive-relay
+  untrusted venue Wi-Fi use the USB cable (either phone) or Drive relay; LAN only on a trusted network. The Drive-relay
   code never authenticates the LAN server. Pairing is QR-only (a Bonjour-discovery check is moot). Record:
   `KNOWN_ISSUES.md` §"Live Capture LAN channel".
 - **Backup folder:** legacy staging is read in place, not migrated; launch pruning never removes a folder still holding a photo

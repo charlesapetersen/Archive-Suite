@@ -2,7 +2,7 @@ import Foundation
 import Network
 import CryptoKit
 
-// Host tests for the iPhone's cable relay (W40.i-usb-app; execution-plans/iphone-usb.md §5), compiled with swiftc
+// Host tests for the iPhone's cable relay (W40.i-usb-app; REFERENCE.md §Live Capture, USB local relay), compiled with swiftc
 // against the app's real Net/USBRelay.swift, Net/MacEndpoint.swift and Net/MacClient.swift
 // (scripts/test-ios-usb-relay.sh). A fake Mac connects into the relay's tunnel port and answers the AC1 handshake;
 // a client sends through the relay port. Real sockets on 127.0.0.1, ports chosen by the system.

@@ -1,5 +1,5 @@
 #!/bin/bash
-# test-ios-usb-relay.sh — host tests for the iPhone's cable relay (W40.i-usb-app; execution-plans/iphone-usb.md §5).
+# test-ios-usb-relay.sh — host tests for the iPhone's cable relay (W40.i-usb-app; REFERENCE.md §Live Capture, USB local relay).
 #
 # Net/USBRelay.swift is Network and CryptoKit only, so it compiles standalone with swiftc, with Net/MacEndpoint.swift
 # and Net/MacClient.swift, against ArchiveCaptureiOS/HostTests/USBRelayTests.swift, and runs on the Mac

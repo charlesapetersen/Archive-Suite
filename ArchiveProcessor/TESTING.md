@@ -300,6 +300,9 @@ existing scratch, key-free, no-network execution remains unchanged.
   four and its top-up, the `AC1` handshake (right, silent, wrong hello, another Mac's pairing), a reply the
   server closes at once arriving whole, idle expiry with no EOF, refused `Connect`, detach, and the cable's own
   failed-auth throttle key on a real `CaptureServer`. Loopback only, no phone, ~45 s. In the health gate.
+- **`e2e-phone-mac.sh --ios --cable`** — the whole iPhone cable route: the real app in the headless simulator, its
+  relay and tunnels, the fake usbmuxd, the real bridge and server, OCR and finalize (`scripts/E2E-PHONE-MAC.md`).
+  Not in the health gate (needs a Gemini key and the simulator runtime).
 - **`usbmux-probe.sh`** — read-only check that the real `/var/run/usbmuxd` still speaks the private protocol
   the cable route uses (`ListDevices`, `ReadBUID`, `Listen`, `Connect` → BadDevice); no phone, ~50 ms. In the
   health gate.

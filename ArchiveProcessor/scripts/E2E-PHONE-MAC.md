@@ -78,6 +78,15 @@ the phone side fails (`STALE screencaps`: the app drew no new frame, `W40.i3-fu-
 simulator shows "No camera on this device." where the preview would be. Evidence:
 `verification/evidence/capture/W40.i3-ios-e2e.md`.
 
+## The iPhone over the cable (`--ios --cable`, W40.i-usb-build)
+`e2e-phone-mac.sh --ios --cable` runs the same flow over the iPhone's USB route. `scripts/fake-usbmuxd.py` stands in
+for macOS's usbmuxd, reporting one USB device; the Mac's real `USBMuxBridge` is pointed at it (DEBUG-only
+`ARCHIVE_USBMUX_SOCKET`), and each `Connect(48628)` it forwards lands in the real app's tunnel listener, because the
+simulator shares the Mac's loopback. The app pairs in Cable mode from an empty-host payload (`ARCHIVECAP_E2E_CABLE=1`
+through `connectCableFromQR`), so its only way to the Mac is its relay: 48629 → verified tunnel → bridge → server.
+The script also fails the run if the fake served no `Connect`. Not covered: the real usbmuxd's forwarding and a
+device's network stack. Evidence: `verification/evidence/capture/W40.i-usb-build-cable-e2e.md`.
+
 ## The iPhone app's own buttons (`e2e-ios-ui.sh`, W40.i-sim-ui)
 `caffeinate -di scripts/e2e-ios-ui.sh` covers what `--ios` does not: it runs `ArchiveCaptureiOSUITests` (XCUITest,
 real taps, in the same headless simulator) against the same real headless Mac. Six tests run in order on one install:

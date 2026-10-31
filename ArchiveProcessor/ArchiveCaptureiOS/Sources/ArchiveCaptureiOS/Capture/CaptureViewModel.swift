@@ -151,7 +151,7 @@ final class CaptureViewModel: ObservableObject {
 
     /// Give the relay the token, so it challenges the tunnels it holds, then probe `/ping` through it. The probe
     /// waits longer than Wi-Fi's: a tunnel may need one turn of the Mac's 2 s top-up to arrive and verify. It is
-    /// tried twice, because a tunnel taken just as the Mac expires it fails once (iphone-usb.md §2). A Mac that
+    /// tried twice, because a tunnel taken just as the Mac expires it fails once (REFERENCE.md §Live Capture, USB local relay). A Mac that
     /// answered the challenge wrongly holds another token, so that reads as a stale code, not an absent Mac.
     private func attemptCableConnect(_ ep: MacEndpoint) async {
         if connectPhase == .cableConnecting { return }
@@ -175,7 +175,7 @@ final class CaptureViewModel: ObservableObject {
     }
 
     /// The app is back from the background: a suspended app's sockets are defunct and never say so, so the relay
-    /// tears down and listens again (iphone-usb.md §3). Not on a return from `.inactive`, which suspends nothing and
+    /// tears down and listens again (REFERENCE.md §Live Capture, USB local relay). Not on a return from `.inactive`, which suspends nothing and
     /// would only cut a request in flight.
     func returnedFromBackground() { USBRelay.shared.restart() }
 

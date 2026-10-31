@@ -2,7 +2,7 @@ import Foundation
 import Network
 import CryptoKit
 
-/// The iPhone's cable route, Mac end (W40.i-usb-mac; design: `execution-plans/iphone-usb.md` §2).
+/// The iPhone's cable route, Mac end (W40.i-usb-mac; design: REFERENCE.md §Live Capture, USB local relay §2).
 ///
 /// An iPhone cannot open a connection to the Mac over the cable, but the Mac can open one INTO the phone:
 /// macOS's `usbmuxd` (`/var/run/usbmuxd`, the private service Xcode, Finder and libimobiledevice use)
@@ -19,7 +19,7 @@ import CryptoKit
 final class USBMuxBridge: @unchecked Sendable {
     struct Config: Sendable {
         var socketPath: String
-        /// The phone app's tunnel port (iphone-usb.md §7). Injectable so the test driver's stand-in phone
+        /// The phone app's tunnel port (REFERENCE.md §Live Capture, USB local relay). Injectable so the test driver's stand-in phone
         /// need not take the real port; production always uses 48628.
         var devicePort: UInt16 = 48628
         var poolSize = 4
@@ -39,7 +39,7 @@ final class USBMuxBridge: @unchecked Sendable {
         static var production: Config { Config(socketPath: USBMuxBridge.defaultSocketPath) }
     }
 
-    /// What the Live Capture pane says about the cable (iphone-usb.md §2 "The pane and QR caption").
+    /// What the Live Capture pane says about the cable (REFERENCE.md §Live Capture, USB local relay "The pane and QR caption").
     enum Status: Equatable, Sendable {
         /// usbmuxd could not be reached, or refused `Listen`.
         case unavailable
@@ -563,7 +563,7 @@ enum USBMuxCodec {
     }
 }
 
-/// The tunnel handshake (iphone-usb.md §2, §7): the phone sends `AC1` and a 16-byte random nonce; the Mac
+/// The tunnel handshake (REFERENCE.md §Live Capture, USB local relay): the phone sends `AC1` and a 16-byte random nonce; the Mac
 /// replies HMAC-SHA256(key: lanToken, message: nonce), 32 bytes. It proves to the phone that the far end
 /// of a tunnel is its own Mac before a photo goes in, so another app on the phone cannot pose as one.
 enum CableHandshake {

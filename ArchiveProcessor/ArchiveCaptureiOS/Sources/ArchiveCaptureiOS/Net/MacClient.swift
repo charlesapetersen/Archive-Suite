@@ -15,7 +15,7 @@ struct MacClient {
     var relay: USBRelay = .shared
 
     /// Cable requests go through their own session, at most 4 connections at once to match the Mac's pool of
-    /// four idle tunnels, so the relay's queue stays short (iphone-usb.md §2 "Concurrency"). Ephemeral: nothing
+    /// four idle tunnels, so the relay's queue stays short (REFERENCE.md §Live Capture, USB local relay "Concurrency"). Ephemeral: nothing
     /// about a cable request is worth a cache or a cookie.
     static let cableSession: URLSession = {
         let config = URLSessionConfiguration.ephemeral

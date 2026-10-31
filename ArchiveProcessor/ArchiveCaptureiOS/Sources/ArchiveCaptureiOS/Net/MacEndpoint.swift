@@ -10,7 +10,7 @@ import Foundation
 ///   optional `relay` key, from a `{mode:"cloud", token, account?}` QR, or from a typed relay token.
 ///
 /// - **Cable** (`isCable == true`, W40.i-usb-app): the QR's `token` and `name`, reached through the local relay
-///   (`USBRelay`, `execution-plans/iphone-usb.md` §2). It stores the MODE, not a port: `MacClient` asks the relay
+///   (`USBRelay`, REFERENCE.md §Live Capture, USB local relay §2). It stores the MODE, not a port: `MacClient` asks the relay
 ///   for its bound port each request, so a relay that had to take a system port is followed. `host`/`port` keep
 ///   whatever the QR said and are not dialled.
 ///

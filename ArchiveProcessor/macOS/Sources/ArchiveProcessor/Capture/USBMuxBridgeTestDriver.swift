@@ -2,7 +2,7 @@
 import Foundation
 import Network
 
-/// Headless, $0 test of the iPhone cable route's Mac end (W40.i-usb-mac; `execution-plans/iphone-usb.md`
+/// Headless, $0 test of the iPhone cable route's Mac end (W40.i-usb-mac; REFERENCE.md §Live Capture, USB local relay
 /// §5). Gated by `USBMUX_TEST=1`; `scripts/test-usbmux-bridge.sh` starts `scripts/fake-usbmuxd.py`, points
 /// `ARCHIVE_USBMUX_SOCKET` at it and reads the plain-text report from `USBMUX_TEST_OUT`.
 ///

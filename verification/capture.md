@@ -74,7 +74,7 @@ iOS, so each was checked against the iOS code.
 | Deleting a page | confirms whenever the page is unsent *or* has a pending resend; cancels and waits for its upload; "Save to gallery & delete" or "Delete permanently" (`CaptureViewModel.kt:477-563`) | confirmed only when the page was unsent, so a pending resend was deleted unasked; no cancel; "Delete permanently" only. Now confirms on the heartbeat's own condition, cancels and awaits the upload, and offers "Save to Photos & delete" (kept and re-queued if the copy fails) or "Delete permanently" | **fixed** by `W40.i-fix-ios-delete-confirm` (2026-10-21) |
 | Tests | ten JVM test files over the queue, delete, recovery, orphans, pairing generation, QR parsing, the Drive transport, relay bytes and the session writer | no test target; four `swiftc` scripts cover only the network layer. None of the view model's safety logic is tested, and there is no runtime to host an XCTest bundle | **gap, S3** → `W40.i-fix-ios-testable-core`, which the S1 and S2 fixes wait on so each lands with a failing test first (rule 8) |
 | Small differences | `savedToPhone` badge; "Segment ended · N" and "No pages in this segment yet"; ended segments kept in order; accessibility labels | all of these now: a persisted `savedToPhone` (teal dot + ✓), both status lines, ended segments in insertion order (`EndedSegments`), VoiceOver labels on the strip and Box/shutter/Folder; the QR sheet says why when camera access is off, with Open Settings; the recent-year chips wrap | **fixed** by `W40.i-fix-ios-polish` (2026-10-21) |
-| Wired (USB) transport | `adb reverse` to `127.0.0.1` | absent; the iOS screen says USB is not available | not a gap: the guides promise USB for Android only |
+| Wired (USB) transport | `adb reverse` to `127.0.0.1` | was absent (the iOS screen said USB is not available); now Cable: the Mac opens usbmux tunnels into the app's loopback 48628, the app relays its requests into them from 48629 after an HMAC handshake (`I/Net/USBRelay.swift`; Mac `Net/USBMuxBridge.swift`) | **built** by `W40.i-usb-mac` and `W40.i-usb-app` (2026-10-31; owner, 2026-10-29: most users will want USB); `C-43` |
 | E2E inject seam | DEBUG `files/test_inject.jpg`, used per shutter tap (`A/ui/CaptureScreen.kt:396-411`) | absent | belongs to `W40.i3`, which builds it |
 | Pairing, manual entry, reachability probe | host/port/token, digits-only port; probe reports OK, unauthorised, refused or unreachable | host/port/token with a 1–65535 port check; a refused connection reports as unreachable | same (iOS checks the port better) |
 | Saved endpoint and reconnect at launch | `Prefs` | `UserDefaults`, including the relay token | same |
@@ -121,15 +121,16 @@ Written by `W40.b4`, 2026-10-21.
   §Epoch, §Never-lose invariant, A5). The Mac side of the same features is the Processor ledger's
   ([`processor.md`](processor.md) P-43 to P-52).
 - **Sources read at:** `e14c5adc`; code traced at the same commit.
-- **Count:** `unproven 27 · works 1` (works: C-02, on `W40.a3`'s emulator round trip).
+- **Count:** `unproven 28 · works 1` (works: C-02, on `W40.a3`'s emulator round trip; C-43 added 2026-10-31, `unproven`).
 
 **Order of work (rule 3).** The *Promise* and *Promised in* of every row were committed first (`77bdc91c`), from
 the guides alone. The parity comparison above had already been written from the code by `W40.i2`, so the code was
 not unseen; the trace below re-read each entry point at `e14c5adc`.
 
 **One row per phone.** Each phone is shown working or not on its own, so each feature has an Android row (`C-01` to
-`C-14`) and an iOS row numbered thirty higher (`C-31` to `C-44`). USB is promised for Android only, so there is no
-`C-43`. `C-15` is the wire contract, one promise about both phones' bytes.
+`C-14`) and an iOS row numbered thirty higher (`C-31` to `C-44`). USB was promised for Android only until the
+iPhone cable route (`C-43`, added by `W40.i-usb-build` on 2026-10-31). `C-15` is the wire contract, one promise about
+both phones' bytes.
 
 **Runtime evidence.** One run has driven a phone through a promise: `W40.a3`'s Android emulator round trip
 ([`evidence/capture/W40.a3-phone-e2e.md`](evidence/capture/W40.a3-phone-e2e.md)). It pairs by manual entry, takes
@@ -620,6 +621,30 @@ action or any runtime evidence: there is no test target and no simulator runtime
   unordered `Task`, so the Mac could be told 0 early. Fixed by `W40.i-fix-ios-heartbeat-count` (2026-10-21): every
   unconfirmed page counts, through one ordered writer (host tests in `CaptureQueueTests.swift`). Still `unproven`
   at runtime: no iPhone E2E yet (`W40.i3`).
+
+### C-43 · iOS · USB with no shared Wi-Fi (Cable)
+
+- **Promise:** with the iPhone on a USB cable, trusted by the Mac and the app open, it pairs by the same QR in Cable
+  mode and captures with no shared network; the Mac opens usbmux tunnels into the app and the app relays its uploads
+  into them only after the Mac proves it holds the pairing token. An unplugged cable or a locked phone loses nothing.
+- **Promised in:** `ArchiveProcessor/README.md` §Live Capture (Pairing, Transports); `ArchiveProcessor/REFERENCE.md`
+  §Live Capture, *USB local relay, both phones* (the AC1 handshake).
+- **Reached by:** Connect screen Cable (`I/UI/ConnectScreen.swift:11`, pre-selected when a tunnel is open) → scan →
+  `connectCableFromQR` → `attemptCableConnect` (`I/Capture/CaptureViewModel.swift:156`: token to `USBRelay`, `/ping`
+  through the relay) → a Cable `MacEndpoint` (`asCable`); requests go through `MacClient`'s Cable session to
+  `USBRelay` (`I/Net/USBRelay.swift`), Mac side `Net/USBMuxBridge.swift`.
+- **Real-path test:** `scripts/e2e-phone-mac.sh --ios --cable` (the real app in the simulator, through
+  `scripts/fake-usbmuxd.py` into the real bridge and server); the ends alone: `scripts/test-ios-usb-relay.sh`,
+  `scripts/test-usbmux-bridge.sh`.
+- **Runtime evidence:** 2026-10-31 · `W40.i-usb-build` · [`evidence/capture/W40.i-usb-build-cable-e2e.md`](evidence/capture/W40.i-usb-build-cable-e2e.md)
+  (transport only: no readable OCR key unattended).
+- **Status:** `unproven`
+- **History:**
+  - 2026-10-31 W40.i-usb-build — row written, `unproven`; runtime evidence: three pages over the cable route in the
+    simulator, the phone drained and the Mac filed them. Stays `unproven` for a separate re-check (rule 6) and the
+    real device.
+- **Notes:** the simulator shares the Mac's loopback, so the run skips the real usbmuxd's forwarding and a device's
+  network stack. The trust prompt, recovery after a lock and ATS on a device are the iPhone pack's (`W40.i5-usb`).
 
 ### C-44 · iOS · Google Drive cloud relay, phone side
 

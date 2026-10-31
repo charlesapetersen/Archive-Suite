@@ -10,7 +10,9 @@ import Foundation
 ///   so the page goes through `persistCapturedJPEG` → `addDocumentPhoto` → upload like any other. One file,
 ///   one tap. The simulator has no camera, so without this the shutter delivers nothing.
 /// - **Pair.** `ARCHIVECAP_E2E_PAIR` holds a Wi-Fi QR payload (`{host, port, token, name}`); an unpaired app
-///   pairs from it at launch through `connectFromQR`, the scanner's own path.
+///   pairs from it at launch through `connectFromQR`, the scanner's own path. With `ARCHIVECAP_E2E_CABLE=1`
+///   it pairs through `connectCableFromQR` instead, the Connect screen's Cable path (W40.i-usb-build), and the
+///   payload's empty host leaves the relay as the only way to the Mac.
 /// - **Drive.** `ARCHIVECAP_E2E_DRIVE=1` makes the capture screen run, per JPEG in `Documents/e2e-inbox/`
 ///   in name order, what the Android driver taps: drop the file at the inject seam, press the shutter, End
 ///   segment, then "Skip (tag on Mac)". The simulator has no `adb input`, so the driver presses the buttons'
@@ -25,6 +27,7 @@ enum E2EHarness {
 
     static var pairPayload: String? { env["ARCHIVECAP_E2E_PAIR"].flatMap { $0.isEmpty ? nil : $0 } }
     static var drives: Bool { env["ARCHIVECAP_E2E_DRIVE"] == "1" }
+    static var cable: Bool { env["ARCHIVECAP_E2E_CABLE"] == "1" }
 
     private static var documents: URL {
         FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]

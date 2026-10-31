@@ -1,6 +1,6 @@
 #!/bin/bash
 # usbmux-probe.sh — is macOS's usbmuxd still speaking the protocol the iPhone cable route relies on?
-# (W40.i-usb-mac; execution-plans/iphone-usb.md §4.) Read-only, no phone needed, about 50 ms:
+# (W40.i-usb-mac; REFERENCE.md §Live Capture, USB local relay.) Read-only, no phone needed, about 50 ms:
 #   ListDevices → a DeviceList · ReadBUID → a BUID · Listen → Result 0 · Connect to a device that does not
 #   exist → Result 2 (BadDevice).
 # The protocol is private. If a macOS update changes it, only the cable route breaks (the pane says "Cable

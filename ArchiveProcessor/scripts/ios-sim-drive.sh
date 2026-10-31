@@ -18,7 +18,9 @@
 #   run <port> <fixdir> <gt>   stage fixtures, launch paired to 127.0.0.1:<port>, drive, screenshot;
 #                              the LAN token is read from stdin (never argv)
 #   shutdown                   shut the device down
-# Env: OUT (screenshot dir, default /tmp/ios-e2e-shots), IOS_E2E_DEVICE (device name, default ap-e2e-iphone).
+# Env: OUT (screenshot dir, default /tmp/ios-e2e-shots), IOS_E2E_DEVICE (device name, default ap-e2e-iphone),
+#      IOS_E2E_CABLE=1 (pair in Cable mode with an empty-host payload, so the app reaches the Mac only through
+#      its local relay and the usbmux tunnels; e2e-phone-mac.sh --ios --cable, W40.i-usb-build).
 # ============================================================================
 set -uo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -96,7 +98,9 @@ for d in json.load(open(sys.argv[1])): print(d["file"])' "$gt")
   n=$i; log "staged $n fixture(s) in the app's inbox"
   # The payload rides in the child's environment (SIMCTL_CHILD_ prefix), never in argv.
   # printf into a pipe, not a here-string: bash 3.2 spools a here-string to a temp file.
-  SIMCTL_CHILD_ARCHIVECAP_E2E_PAIR="$(printf '%s' "$token" | python3 -c 'import json,sys;print(json.dumps({"host":"127.0.0.1","port":int(sys.argv[1]),"token":sys.stdin.read().strip(),"name":"E2E Mac"}))' "$port")" \
+  local host=127.0.0.1; [ "${IOS_E2E_CABLE:-}" = 1 ] && host=""
+  SIMCTL_CHILD_ARCHIVECAP_E2E_PAIR="$(printf '%s' "$token" | python3 -c 'import json,sys;print(json.dumps({"host":sys.argv[2],"port":int(sys.argv[1]),"token":sys.stdin.read().strip(),"name":"E2E Mac"}))' "$port" "$host")" \
+  SIMCTL_CHILD_ARCHIVECAP_E2E_CABLE="${IOS_E2E_CABLE:-}" \
   SIMCTL_CHILD_ARCHIVECAP_E2E_DRIVE=1 \
     xcrun simctl launch "$U" "$BUNDLE" >/dev/null || die "simctl launch failed"
   unset token

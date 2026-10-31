@@ -460,6 +460,11 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
     the background (Home), the Mac restarted, and all three reached the Mac while the app was away (Mac count 3 → 6
     before the app was brought back; five runs, `evidence/capture/W40.i-sim-ui.md`). Switching apps does not stall
     uploads there. Left open for a locked real phone, where iOS suspends harder (`sessions/iphone-1.md` task 7).
+  - 2026-10-31 W40.i-usb-build — the iPhone's new cable route (W40.i-usb-*) behaves the same way by design: no
+    background mode, so a suspended app's tunnels and relay go defunct; on return from the background the app
+    re-creates both listeners and the Mac's 2 s top-up and 20 s idle expiry find them, with the 8 s auto-retry
+    re-sending (`ArchiveProcessor/REFERENCE.md` §USB local relay). Same open question, now for both routes; the
+    iPhone pack checks recovery after a lock over the cable too.
 
 ### S-024 · The key wizard reports a key as validated when the Keychain refused to save it
 
@@ -664,9 +669,16 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Would confirm it:** in the VM, with the guest's only interface renamed off en0/en1 (or a stubbed address list),
   open Live Capture and Start.
 - **Would clear it:** a QR or a fallback host is shown.
-- **Status:** `open`
+- **Status:** `superseded` — fixed by `W40.i-usb-mac` (2026-10-31): the QR shows whenever the server listens
 - **History:**
   - 2026-10-21 W40.b3 — raised.
+  - 2026-10-31 W40.i-usb-mac — superseded by the fix it describes: the iPhone cable route needs no Wi-Fi address
+    either, so the QR's `host` is now en0/en1, else another pairable IPv4 (a VPN, AirDrop or self-assigned address
+    never stands in), else empty, valid for Cable, Wired and Cloud and refused for Wi-Fi on both phones
+    (`LiveCaptureView.pairingHost`; Android `MacEndpoint.kt`, `MacEndpointQrTest`). Checked by
+    `scripts/test-usbmux-bridge.sh` (two S-037 checks). `W40.i-usb-build`'s `e2e-phone-mac.sh --ios --cable` pairs
+    the iPhone from an empty-host payload. The case the suspect names was by code reading: USB pairing needed no
+    Wi-Fi address then too, for Android.
 
 ### S-038 · Over the Drive relay, Finish cannot wait for the phone to drain
 

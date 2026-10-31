@@ -22,13 +22,22 @@
 #   caffeinate -di scripts/e2e-phone-mac.sh     # keep the Mac awake for the run
 #   scripts/e2e-phone-mac.sh --ios              # the iPhone companion instead (W40.i3): a headless iOS
 #         simulator via ios-sim-drive.sh, same Mac, fixtures and assertions. Needs an iOS simulator runtime.
+#   scripts/e2e-phone-mac.sh --ios --cable      # the iPhone over the cable route (W40.i-usb-build): a fake
+#         usbmuxd (fake-usbmuxd.py) reports one USB device and connects the Mac's real USBMuxBridge into the
+#         app's 48628 tunnel listener on the shared loopback; the app pairs in Cable mode with an empty host,
+#         so every request goes relay → tunnel → bridge → server. Also asserts the fake carried the tunnels.
+#         Only the real usbmuxd's forwarding and a device's network stack are not exercised (REFERENCE.md §Live Capture, USB local relay).
 # ============================================================================
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/require-unsandboxed.sh"   # no app launch inside the Codex sandbox (2026-10-05)
 set -uo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"                 # …/ArchiveProcessor/scripts
-PHONE=android
-case "${1:-}" in --ios) PHONE=ios ;; --android|"") ;; *) printf '[e2e] usage: %s [--android|--ios]\n' "$0" >&2; exit 2 ;; esac
+PHONE=android; CABLE=0
+for a in "$@"; do
+  case "$a" in --ios) PHONE=ios ;; --android) ;; --cable) CABLE=1 ;;
+    *) printf '[e2e] usage: %s [--android|--ios [--cable]]\n' "$0" >&2; exit 2 ;; esac
+done
+[ "$CABLE" = 1 ] && [ "$PHONE" != ios ] && { printf '[e2e] --cable is the iPhone route; Android uses adb reverse\n' >&2; exit 2; }
 if [ "$PHONE" = ios ]; then DRIVER="$HERE/ios-sim-drive.sh"   # headless simulator + the app's DEBUG E2E harness
 else DRIVER="$HERE/android-ui-drive.sh"; fi                    # proven emulator + UI driver (subcommands)
 FIXTURES="$HERE/e2e-fixtures"                          # doc*.jpg + ground_truth.json
@@ -55,7 +64,7 @@ mkdir "$TESTOUT" "$SHOTS"
 export OUT="$SHOTS"                                    # the phone driver's screenshots land here
 
 log(){ printf '\033[35m[e2e]\033[0m %s\n' "$*" | tee -a "$REPORT"; }
-MAC_PID=""; KEEP_EMU="${KEEP_EMU:-onfail}"
+MAC_PID=""; FAKE_PID=""; MUXSOCK="$RUN/usbmuxd"; KEEP_EMU="${KEEP_EMU:-onfail}"
 phone_down(){ if [ "$PHONE" = ios ]; then bash "$DRIVER" shutdown; else "$ADB" emu kill 2>/dev/null; fi; }
 redact_ready_token(){
   # The READY file briefly carries the LAN bearer needed for emulator pairing. The app has finished its one
@@ -109,8 +118,13 @@ stop_mac_test_child(){
   wait "$MAC_PID" 2>/dev/null || true
   MAC_PID=""
 }
+stop_fake_usbmuxd(){
+  [ -n "$FAKE_PID" ] || return 0
+  kill -TERM "$FAKE_PID" 2>/dev/null || true; wait "$FAKE_PID" 2>/dev/null || true; FAKE_PID=""
+}
 cleanup(){
   stop_mac_test_child || return 1
+  stop_fake_usbmuxd
   redact_ready_token
   redact_closed_maclog
 }
@@ -134,12 +148,14 @@ finish_harness(){
 trap finish_harness EXIT
 
 # --- 0. preflight ------------------------------------------------------------
-KEY="${OCR_KEY:-$(security find-generic-password -s com.archiveprocessor.app -a Gemini -w 2>/dev/null)}"
+# The Keychain fallback can wait forever on a permission prompt when nobody is there (W40.i-usb-build, unattended);
+# 20 s bounds it, so the run fails with the no-key message below instead of hanging.
+KEY="${OCR_KEY:-$(/usr/bin/perl -e 'alarm 20; exec @ARGV' /usr/bin/security find-generic-password -s com.archiveprocessor.app -a Gemini -w 2>/dev/null)}"
 [ -n "$KEY" ] || die "no OCR key (set OCR_KEY=… or store Gemini in the Keychain)"
 [ -f "$GT" ] || die "fixtures missing: $GT"
 [ -f "$DRIVER" ] || die "driver missing: $DRIVER"
 command -v xcodegen >/dev/null || die "xcodegen not on PATH"
-log "run dir: $RUN (phone: $PHONE)"
+log "run dir: $RUN (phone: $PHONE$([ "$CABLE" = 1 ] && printf ', cable'))"
 
 # --- 1. build the Mac app (Debug) --------------------------------------------
 log "building Mac app (Debug)…"
@@ -152,6 +168,17 @@ APP="$APPROOT/build/DD/Build/Products/Debug/ArchiveProcessor.app/Contents/MacOS/
 # --- 2. launch the REAL headless Mac session ---------------------------------
 log "launching headless Mac session (real OCR, auto-skip-tags, auto-finalize, isolated output)…"
 rm -f "$READYFILE" "$TESTOUT/DONE.txt"
+MUXPATH=""   # empty = the bridge's default /var/run/usbmuxd (the override is DEBUG-only and ignores empty)
+if [ "$CABLE" = 1 ]; then
+  # The stand-in usbmuxd: one attached USB device, whose Connect(48628) reaches the simulator app's tunnel
+  # listener, because the simulator shares this Mac's loopback. A DEBUG-only override points the bridge at it.
+  log "starting the fake usbmuxd (one USB device) at ${MUXSOCK}…"
+  /usr/bin/python3 "$HERE/fake-usbmuxd.py" "$MUXSOCK" --attach 1:USB >"$RUN/fake-usbmuxd.log" 2>&1 &
+  FAKE_PID=$!
+  for _ in $(seq 1 50); do [ -S "$MUXSOCK" ] && break; sleep 0.1; done
+  [ -S "$MUXSOCK" ] || die "fake usbmuxd did not start (see $RUN/fake-usbmuxd.log)"
+  MUXPATH="$MUXSOCK"
+fi
 # The engine may mask TERM; unblock it only in this captured child, then exec preserves its PID.
 # NSArgumentDomain overrides are process-local: never rewrite the owner's saved settings.
 # AUTOSTART starts the receiver, but does NOT select live rather than stage-for-later.
@@ -166,6 +193,7 @@ LIVECAPTURE_OCRKEY="$KEY" \
 LIVECAPTURE_AUTOSKIPTAGS=1 \
 LIVECAPTURE_AUTOFINALIZE=1 \
 LIVECAPTURE_TESTOUT="$TESTOUT" \
+ARCHIVE_USBMUX_SOCKET="$MUXPATH" \
 python3 -c 'import os, signal, sys; signal.pthread_sigmask(signal.SIG_UNBLOCK, {signal.SIGTERM}); os.execv(sys.argv[1], sys.argv[1:])' \
   "$APP" -liveProcessingMode live \
   -selectedProvider Gemini -selectedModelId_Gemini gemini-2.5-flash-lite \
@@ -204,7 +232,8 @@ if [ "$PHONE" = ios ]; then
 # fixture, each page entering through the inject seam (ios-sim-drive.sh header).
 bash "$DRIVER" boot            || die "simulator boot failed"
 bash "$DRIVER" install         || die "app install failed"
-printf '%s\n' "$TOKEN" | bash "$DRIVER" run "$PORT" "$FIXTURES" "$GT" || die "iOS pair + inject flow failed"
+# --cable: the driver pairs in Cable mode with an empty host, so the app has no address but its relay.
+printf '%s\n' "$TOKEN" | IOS_E2E_CABLE="$CABLE" bash "$DRIVER" run "$PORT" "$FIXTURES" "$GT" || die "iOS pair + inject flow failed"
 else
 # --- 3. emulator + app + pair over LAN (proven driver subcommands) -----------
 # The emulator is launched (backgrounded) inside `boot` and survives as an
@@ -266,13 +295,39 @@ if [ "$PHONE" = ios ]; then
   [ "$distinct" = "$((ndocs + 1))" ] || { log "  STALE screencaps: $distinct distinct of $((ndocs + 1)) shots — the app drew no new frame"; PHONE_OK=1; }
 fi
 
+# --cable: the photos can only have come through the tunnels, but say so from the fake's own count, so a
+# route that somehow bypassed the bridge fails here rather than passing.
+CABLE_OK=0
+if [ "$CABLE" = 1 ]; then
+  stats="$(/usr/bin/python3 - "$MUXSOCK" <<'PY'
+import plistlib, socket, struct, sys
+s = socket.socket(socket.AF_UNIX); s.connect(sys.argv[1])
+body = plistlib.dumps({"MessageType": "FakeStats"}, fmt=plistlib.FMT_XML)
+s.sendall(struct.pack("<IIII", 16 + len(body), 1, 8, 1) + body)
+def rd(n):
+    b = b""
+    while len(b) < n:
+        c = s.recv(n - len(b))
+        if not c: sys.exit(1)
+        b += c
+    return b
+length = struct.unpack("<IIII", rd(16))[0]
+m = plistlib.loads(rd(length - 16))
+print(m.get("ConnectsByDevice", {}).get("1", 0), m.get("Refused", 0))
+PY
+)" || stats=""
+  read -r connects refused <<< "${stats:-0 0}"
+  log "cable: the fake usbmuxd served $connects Connect(s) to device 1 ($refused refused)"
+  [ "${connects:-0}" -gt 0 ] || { log "  NO TUNNELS: the bridge never connected through the fake usbmuxd"; CABLE_OK=1; }
+fi
+
 # --- 7. verdict --------------------------------------------------------------
 echo | tee -a "$REPORT"
-if [ "$MAC_OK" = 0 ] && [ "$PHONE_OK" = 0 ]; then
+if [ "$MAC_OK" = 0 ] && [ "$PHONE_OK" = 0 ] && [ "$CABLE_OK" = 0 ]; then
   cleanup || die "Mac test-child cleanup failed (output assertions passed; teardown did not)"
   log "RESULT: PASS ✅  (round-trip verified; artifacts in $RUN)"
   [ "$KEEP_EMU" != always ] && phone_down; exit 0
 else
-  log "RESULT: FAIL ❌  (mac=$MAC_OK phone=$PHONE_OK; artifacts + logs in $RUN)"
+  log "RESULT: FAIL ❌  (mac=$MAC_OK phone=$PHONE_OK cable=$CABLE_OK; artifacts + logs in $RUN)"
   cleanup; [ "$KEEP_EMU" = never ] && phone_down; exit 1
 fi

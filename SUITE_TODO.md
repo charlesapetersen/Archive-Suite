@@ -75,8 +75,6 @@ concentrate on:** LAN transport (`Net/CaptureServer.swift`, `CaptureReceiver`, n
 (`Net/USBBridge.swift`), the **Android** app (`ArchiveCapture/`), and the Mac pipeline + Reader.
 
 ## Active execution plans (`execution-plans/`)
-- `iphone-usb.md` — **DESIGNED 2026-10-29 (W40.i-usb-design)**: the iPhone reaches the Mac over the cable through
-  usbmux tunnels into a loopback relay in the app; built by W40.i-usb-mac, W40.i-usb-app, W40.i-usb-build.
 - `items/<TAG>.md` — per-item progress notes (checkpoints, session notes, saved-draft branches), one file per
   open item, deleted when it ships; the item's entry here carries only a `Notes:` pointer (W35.item-notes).
 - `parallel-workers/` — **PLANNED 2026-10-05 (W35, the daemon)**: several sessions at once, sized from the usage
@@ -796,7 +794,6 @@ on `a1` rather than `a3`. The freeze is now per area: only an app's ledger and j
 unfinished features — Processor `b3` and `d1`-`d4` on `W36.seg-decision`, the Reader and Notes ledgers `b1`/`b2` on
 `W24.cal1` (their journeys follow through `b1`/`b2`). Rule 7 of the daemon plan says the same.
 
-- [ ] **`W40.i-usb-build` — the iPhone cable route end to end, and the docs [S]** (lane: processor) (uses: build) (blocked-on: W40.i-usb-mac, W40.i-usb-app) — `e2e-phone-mac.sh --ios --cable` against the fake usbmuxd (the simulator shares the Mac's loopback; `execution-plans/iphone-usb.md` §5), the Wi-Fi simulator E2E re-run unchanged; README.md, `ArchiveProcessor/REFERENCE.md` (the handshake beside the routes), capture.md (a new C-43 row), KNOWN_ISSUES and the S-037/S-023 history where they call USB Android-only. Delete the plan on ship.
 - [ ] **`W40.i5-usb` — refresh the iPhone pack for the USB route and the install findings [S]** (lane: processor) (uses: light) (blocked-on: W40.i-usb-build) — `verification/sessions/iphone-1.md` with USB pairing first. Fold in the owner's install on 2026-10-29: the bundle id `com.archiveprocessor.capture.ios` is taken by another team (`com.charlespetersen.capture.ios` worked); Xcode did not list the phone until `xcrun devicectl manage pair`; the Developer Mode setting did not appear and trusting the developer was enough on iOS 18.6.2, on a Stanford-managed phone; a command-line build and `devicectl` install avoid the Xcode signing edits. The phone is the owner's own, so the one-sitting limit no longer binds.
 - [ ] **`W40.i4` — real-iPhone pass on a borrowed phone — OWNER** (lane: processor) (uses: light) (blocked-on: W40.i5, W40.i5-usb). Owner, 2026-10-29: paused before pairing; it waits for the USB route. Detail: `execution-plans/verification-phase/01-daemon-plan.md` and `00-owner-plan.md` §Decisions.
 - [ ] **`W40.d1` — bulk OCR on a ground-truth collection [M]** (blocked-on: W42.int-done, W46.review-done) (lane: processor) (uses: build,vm,paid) (blocked-on: W40.b3, W40.c1, W36.seg-decision). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §D.

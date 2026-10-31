@@ -2,7 +2,7 @@ import Foundation
 import Network
 import CryptoKit
 
-/// The iPhone end of the cable route (`execution-plans/iphone-usb.md` §2, §7; W40.i-usb-app). An iPhone cannot
+/// The iPhone end of the cable route (REFERENCE.md §Live Capture, USB local relay §2, §7; W40.i-usb-app). An iPhone cannot
 /// open a connection to the Mac over the cable, but the Mac's `USBMuxBridge` can open one into the phone through
 /// usbmuxd. So the app listens on two loopback ports and joins them:
 ///
@@ -445,7 +445,7 @@ final class USBRelay: @unchecked Sendable {
     }
 }
 
-/// The tunnel handshake, the one wire contract the cable adds (iphone-usb.md §2, §7). Must match the Mac's
+/// The tunnel handshake, the one wire contract the cable adds (REFERENCE.md §Live Capture, USB local relay). Must match the Mac's
 /// `CableHandshake` in `USBMuxBridge.swift` byte for byte: `AC1` + 16-byte nonce → HMAC-SHA256(key: lanToken,
 /// message: nonce), 32 bytes.
 enum CableHandshake {

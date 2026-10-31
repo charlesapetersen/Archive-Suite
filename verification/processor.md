@@ -894,7 +894,8 @@ cover the Mac: the receiver, the tag card, the drain gate, staging, finalize and
   - 2026-10-21 W40.b3 — row written, `unproven`.
 - **Notes:** the pinned port 48627 (`Net/CaptureServer.swift:53`) silently falls back to a system port when busy
   (`:106-111`), so "persists" is conditional. Bonjour is still advertised (`:72`) with no browser, as `CLAUDE.md`
-  says. Suspect `S-037` (no QR at all without an en0/en1 IPv4).
+  says. Suspect `S-037` (no QR at all without an en0/en1 IPv4), superseded by `W40.i-usb-mac`'s fix: the QR now
+  shows whenever the server listens, with a fallback or empty host.
 
 ### P-44 · LAN receiver: durable before ack
 

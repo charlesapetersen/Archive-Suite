@@ -2,6 +2,19 @@
 
 Tracked bugs we've chosen to come back to later. Each entry has enough context to resume cold.
 
+## ⚠️ LIMITATION (W40.i-usb-build, 2026-10-31): what the iPhone cable route does not yet cover
+
+The iPhone's USB route (Cable on its Connect screen; `Net/USBMuxBridge.swift` on the Mac, `Net/USBRelay.swift` in the
+app; design in `REFERENCE.md` §Live Capture, *USB local relay, both phones*) is proven only without a phone: the Mac end
+against a fake usbmuxd (`scripts/test-usbmux-bridge.sh`), the app end in host tests (`scripts/test-ios-usb-relay.sh`),
+and the whole route in the simulator (`scripts/e2e-phone-mac.sh --ios --cable`), whose real app reaches the real bridge
+through `scripts/fake-usbmuxd.py`. **Not yet seen on a device:** the real usbmuxd's `Connect` forwarding into a phone,
+the trust prompt, recovery after a lock (expected about 10 s after unlock, an estimate), the cost of a fresh tunnel per
+request (estimated a few milliseconds), and whether `http://127.0.0.1` passes ATS on a device (an IP literal is
+exempt, as the Wi-Fi route already relies on). Those are the iPhone pack's (`W40.i5-usb`, then `W40.i4`). The route
+rests on usbmuxd's private socket protocol: a macOS change would break the cable alone, which `scripts/usbmux-probe.sh`
+in the health gate would catch. Uploads pause while the app is suspended, as on Wi-Fi (S-023); no background mode.
+
 ## FIXED (W46.ocr-regions, 2026-10-25): incomplete crop collections could shrink the scoring denominator
 
 `scripts/segbench/corpus/regions.py::cmd_report` now refuses missing whole-page receipts, incomplete crop
