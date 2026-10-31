@@ -1,0 +1,188 @@
+{
+ "model": "gemini-3.7-flash via the Stanford gateway",
+ "pages": 895,
+ "read": 879,
+ "strict": 0.7717396351891243,
+ "answered": 0.7857872280935907,
+ "by_set": {
+  "440": {
+   "pages": 440,
+   "read": 434,
+   "strict": 0.738826201482555,
+   "answered": 0.7490403885998252
+  },
+  "455": {
+   "pages": 455,
+   "read": 445,
+   "strict": 0.8035680106416309,
+   "answered": 0.8216257187459372
+  }
+ },
+ "vs38_440": {
+  "read38": 419,
+  "both": 417,
+  "nes37_both": 0.7456240226579504,
+  "nes38_both": 0.7443760201988067,
+  "paired_37_minus_38": {
+   "n": 417,
+   "delta": 0.0012480024591436307,
+   "p": 0.7623237676232377,
+   "lo": -0.0066083116672382885,
+   "hi": 0.009302683922839599
+  }
+ },
+ "by_stratum": {
+  "L1": {
+   "pages": 80,
+   "read": 80,
+   "strict": 0.9112589482186619,
+   "answered": 0.9112589482186619,
+   "both38": 0,
+   "nes37_both": NaN,
+   "nes38_both": NaN
+  },
+  "L2": {
+   "pages": 80,
+   "read": 80,
+   "strict": 0.8027129278192934,
+   "answered": 0.8027129278192934,
+   "both38": 0,
+   "nes37_both": NaN,
+   "nes38_both": NaN
+  },
+  "L3": {
+   "pages": 80,
+   "read": 80,
+   "strict": 0.9578787506362557,
+   "answered": 0.9578787506362557,
+   "both38": 0,
+   "nes37_both": NaN,
+   "nes38_both": NaN
+  },
+  "L4": {
+   "pages": 80,
+   "read": 80,
+   "strict": 0.8322060019090698,
+   "answered": 0.8322060019090698,
+   "both38": 0,
+   "nes37_both": NaN,
+   "nes38_both": NaN
+  },
+  "L5": {
+   "pages": 80,
+   "read": 80,
+   "strict": 0.645752550205049,
+   "answered": 0.645752550205049,
+   "both38": 79,
+   "nes37_both": 0.6421480368605287,
+   "nes38_both": 0.6425878769604029
+  },
+  "L6": {
+   "pages": 80,
+   "read": 76,
+   "strict": 0.8258895176237082,
+   "answered": 0.8693573869723245,
+   "both38": 67,
+   "nes37_both": 0.8587507555854698,
+   "nes38_both": 0.8645126463460513
+  },
+  "L7": {
+   "pages": 80,
+   "read": 80,
+   "strict": 0.5849388330331553,
+   "answered": 0.5849388330331553,
+   "both38": 78,
+   "nes37_both": 0.5884753776630276,
+   "nes38_both": 0.5944275634625777
+  },
+  "L8": {
+   "pages": 80,
+   "read": 80,
+   "strict": 0.9243635812130867,
+   "answered": 0.9243635812130867,
+   "both38": 78,
+   "nes37_both": 0.9267840000416402,
+   "nes38_both": 0.9271173784315252
+  },
+  "L9": {
+   "pages": 15,
+   "read": 15,
+   "strict": 0.9680622815026089,
+   "answered": 0.9680622815026089,
+   "both38": 0,
+   "nes37_both": NaN,
+   "nes38_both": NaN
+  },
+  "N1": {
+   "pages": 40,
+   "read": 39,
+   "strict": 0.7824933970365673,
+   "answered": 0.8025573302939152,
+   "both38": 36,
+   "nes37_both": 0.8100210068425397,
+   "nes38_both": 0.8073747110622258
+  },
+  "N2": {
+   "pages": 40,
+   "read": 30,
+   "strict": 0.24009289623382318,
+   "answered": 0.32012386164509754,
+   "both38": 0,
+   "nes37_both": NaN,
+   "nes38_both": NaN
+  },
+  "N3": {
+   "pages": 40,
+   "read": 39,
+   "strict": 0.8962126665066281,
+   "answered": 0.9191924784683365,
+   "both38": 39,
+   "nes37_both": 0.9191924784683365,
+   "nes38_both": 0.9106238988735138
+  },
+  "N4": {
+   "pages": 40,
+   "read": 40,
+   "strict": 0.4864931886149102,
+   "answered": 0.4864931886149102,
+   "both38": 40,
+   "nes37_both": 0.4864931886149102,
+   "nes38_both": 0.46144209289494853
+  },
+  "N5": {
+   "pages": 40,
+   "read": 40,
+   "strict": 0.8400156523500071,
+   "answered": 0.8400156523500071,
+   "both38": 0,
+   "nes37_both": NaN,
+   "nes38_both": NaN
+  },
+  "N6": {
+   "pages": 40,
+   "read": 40,
+   "strict": 0.6893409597346808,
+   "answered": 0.6893409597346808,
+   "both38": 0,
+   "nes37_both": NaN,
+   "nes38_both": NaN
+  }
+ },
+ "calls": 895,
+ "http_errors": {},
+ "finish": {
+  "stop": 878,
+  "content_filter": 16,
+  "length": 1
+ },
+ "usage": {
+  "prompt_tokens": 1289701,
+  "completion_tokens": 865185
+ },
+ "cost_list_estimate": 4.211718,
+ "price_assumed": [
+  0.75,
+  3.75
+ ],
+ "wall_s_median": 8.195
+}

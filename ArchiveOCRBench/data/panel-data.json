@@ -9261,7 +9261,7 @@
      true,
      93.47
     ],
-    "public_pages": 0
+    "public_pages": 895
    },
    {
     "id": "gemini3.8-flash",
@@ -35643,6 +35643,27 @@
  "ocr_scorers": {
   "owner96": [
    {
+    "route": "gemini3.7-flash-gw",
+    "family": "gateway",
+    "n": 96,
+    "ok": 96,
+    "nes": 0.9673782327986609,
+    "nes_answered": 0.9673782327986609,
+    "added_rate": 0.009599680010666311,
+    "rewritten_rate": 0.0020999300023332554,
+    "cmer": 0.02577974640441624,
+    "nb_overall": 0.9697367766037376,
+    "nb_bowF1": 0.9826131840973878,
+    "nb_gap": 0.012876407493650266,
+    "suspect_rate": 0.07637160211092303,
+    "suspect_precision": 0.05780095610604085,
+    "suspect_recall": 0.5659574468085107,
+    "order_edit": null,
+    "order_pages": 0,
+    "markup_pages": 4,
+    "markup_mean_lift": 0.00024176565165583025
+   },
+   {
     "route": "claude-sonnet5.5",
     "family": "plan route",
     "n": 96,
@@ -36547,6 +36568,27 @@
    }
   ],
   "public895": [
+   {
+    "route": "gemini3.7-flash-gw",
+    "family": "gateway",
+    "n": 895,
+    "ok": 879,
+    "nes": 0.7687208271504234,
+    "nes_answered": 0.7827134701929795,
+    "added_rate": 0.10452754843235659,
+    "rewritten_rate": 0.09329711774264146,
+    "cmer": 0.16711517715898874,
+    "nb_overall": 0.7985015977302199,
+    "nb_bowF1": 0.7768012377841673,
+    "nb_gap": -0.021700359946052572,
+    "suspect_rate": 0.7294635970797367,
+    "suspect_precision": 0.4264154222730762,
+    "suspect_recall": 0.8969898238986046,
+    "order_edit": 0.06963089009165957,
+    "order_pages": 619,
+    "markup_pages": 12,
+    "markup_mean_lift": 9.652342256310239e-05
+   },
    {
     "route": "german-handwriting",
     "family": "kraken specialist",

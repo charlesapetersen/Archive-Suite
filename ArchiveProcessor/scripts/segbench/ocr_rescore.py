@@ -11,7 +11,8 @@ without the three agreement letters) and the 895 frozen public pages (corpus/rou
            FarmShare truth96 routes and the 2026-10-18 owner99 runs (CHURRO, Qwen3.5-27B), from FARMSHARE.
   the 895  the two reference routes and Apple Vision (bench-corpus/routes), the kraken specialists, the open
            sweep's eleven routes and the 2026-10-18 CHURRO, Qari and Fanar runs, from FARMSHARE.
-  both     W46.ocr-new-open's three Sherlock routes (Xiaomi-OCR-0, PaddleOCR-VL 1.6, Qwen3.8 27B), from
+  both     Gemini 3.7 Flash through the Stanford gateway (gateway-gemini/panel, gemini37-public/responses), and
+           W46.ocr-new-open's three Sherlock routes (Xiaomi-OCR-0, PaddleOCR-VL 1.6, Qwen3.8 27B), from
            CACHE/sherlock-results/new-open-{895,96}.
 
 A reading is what that source's own report scored (the same reading() functions and modes); a failure is an
@@ -55,6 +56,7 @@ OUT_CACHE = CACHE / 'ocr-scorers'
 PRESERVE = ('L2', 'L5', 'L6', 'L7', 'L8')   # strata whose strict score keeps long s and the ligatures
 SECOND_READER = 'apple-vision'
 SECOND_FOR_VISION = 'gemini3.8-flash'
+GATEWAY_ROUTE = 'gemini3.7-flash-gw'   # Gemini 3.7 Flash through the Stanford gateway, on both sets
 
 T96 = FARMSHARE / 'FarmShare-truth96-20261020/outputs'
 TRUTH96_ROUTES = [  # label, folder under T96, mode (farmshare_truth96.py's)
@@ -100,6 +102,13 @@ SWEEP_ROUTES = [  # open-sweep-20261019.md's command, plus the 2026-10-18 page s
 def _parsed(f: Path) -> str:
     got = json.loads(f.read_text()) if f.exists() else {}
     return ((got.get('parsed') or {}).get('text') or '').strip()
+
+
+def _gateway(f: Path) -> str:
+    """A gateway_gemini.call reply: the raw draft, parsed as the panel parses it; '' for a failure."""
+    got = json.loads(f.read_text()) if f.exists() else {}
+    parsed = P.T.parse_draft(got['raw']) if got.get('raw') else None
+    return parsed['text'].strip() if parsed else ''
 
 
 def owner_sources():
@@ -149,6 +158,9 @@ def owner_sources():
             parsed = P.T.parse_draft(reply.get('raw', '')) if ok else None
             texts[p] = parsed['text'].strip() if parsed else ''
         out[('qwen3.5-27b', 'FarmShare panel')] = texts
+    gw = CACHE / 'gateway-gemini/panel'   # W46.fix-ocr-scorers-paid's reading of the 96 (gateway_gemini.py panel)
+    if gw.is_dir():
+        out[(GATEWAY_ROUTE, 'gateway')] = {p: _gateway(gw / f'{p}-original.json') for p in pages}
     return out
 
 
@@ -198,6 +210,9 @@ def public_sources(truth):
         if d.is_dir():
             recs = F.read_records(d)
             out[(label, f'Sherlock {mode}')] = {j: X.reading(recs.get(j), mode) for j in want}
+    gw = CACHE / 'gemini37-public/responses'   # W46.ocr-gemini37-895-paid (ocr_gemini37_public.py run)
+    if gw.is_dir():
+        out[(GATEWAY_ROUTE, 'gateway')] = {j: _gateway(gw / f'{j}.json') for j in want}
     return out
 
 

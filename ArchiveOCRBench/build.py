@@ -466,6 +466,7 @@ PUBLIC_TWIN = {
     "paddleocr-vl1.6-sherlock": ("paddleocr-vl1.6", "Sherlock native"), "qwen3.8-27b-sherlock": ("qwen3.8-27b", "Sherlock panel"),
     "xiaomi-ocr-0-sherlock": ("xiaomi-ocr-0", "Sherlock native"),
     "qwen3.5-9b-sherlock": ("qwen3.5-9b", "Sherlock logprob"),  # W46.ocr-logprob's run read both sets
+    "gemini3.7-flash-gw": ("gemini3.7-flash-gw", "gateway"),  # W46.ocr-gemini37-895-paid
 }
 LOGPROB_PAGES = RESULTS / "ocr-logprob-pages.csv"
 

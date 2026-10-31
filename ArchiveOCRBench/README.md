@@ -50,7 +50,8 @@ What the bench has measured, as one page you can read and share. It has seven pa
    written by `scripts/segbench/corpus/routes.py report` (W43.corpus-build). The frozen inventory now has
    **895 pages in fifteen strata**, adding English handwriting, typescripts, registers, newspapers, Cyrillic,
    Chinese and Devanagari (W43.corpus-build-more). The **455 added pages have no hosted reference scores**;
-   those readings are deferred to W43.sweep. Part 7 shows the inventory separately from the original results. Below it, the open-weight models read on FarmShare on all 895 pages, native-prompt and panel-prompt routes
+   those readings are deferred to W43.sweep, except Gemini 3.7 Flash through the gateway, which read all 895
+   (W46.ocr-gemini37-895-paid; `gemini37-public.md`, and its rows in the scorer tables). Part 7 shows the inventory separately from the original results. Below it, the open-weight models read on FarmShare on all 895 pages, native-prompt and panel-prompt routes
    labelled apart, a review baseline (`open-sweep-20261019.csv`, written by `corpus/farmshare_expanded_report.py`;
    receipts in `data/open-sweep-20261019.json`), and the open models built for the hardest scripts (`specialists.csv`, written by
    `corpus/specialists.py report`, W43.script-specialists).
@@ -149,6 +150,9 @@ record:
   Gemini 3.7 Flash through the Stanford gateway on the 96, in the cloud panel's two formats, so `build.py` draws it
   on the 96's charts. Its price is an estimate (the gateway returns no cost), and the route's name says so. Its
   pages are in `ocr-pages.csv` for the ranking table; the difficulty and cascade analysis leaves it out.
+  `gemini37-public.md` (`scripts/segbench/ocr_gemini37_public.py report`, W46.ocr-gemini37-895-paid) is the same
+  route on the 895, with the same settings and the reference routes' images; `ocr_rescore.py` scores it on both
+  sets (family `gateway`), and its `PUBLIC_TWIN` entry gives the ranking table its 895 count.
   `ocr-truth-bias.json` (`ocr_truth_bias.py`, W46.fix-ocr-truth-bias) splits each route's word accuracy on the 96
   into the words both drafters agreed on and the words the owner adjudicated, strict and with line-end hyphen joins
   forgiven; the page shows it under the same section, with the blind owner check it feeds. That check's score is
