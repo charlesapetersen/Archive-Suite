@@ -1,7 +1,7 @@
 # W46.ocr-new-open on Sherlock: three new open readers on the 895 and the 96
 
 The untested open readers, run through the open sweep's own harness on Sherlock (submitted 2026-10-22,
-collected 2026-10-24; `execution-plans/items/W46.ocr-new-open.md`). The settings were the same as the open sweep:
+collected 2026-10-24; `SUITE_TODO_DONE.md`, W46.ocr-new-open). The settings were the same as the open sweep:
 vLLM 0.31.0, context 16,384, temperature 0, thinking off, 8,192 output tokens and eight requests at a time. Each run
 used one Sherlock GPU with 48 or 80 GB, so its speed is not comparable with the L40S rows. Three of the seven
 submitted readers came back with readings on both sets. Receipts: `ArchiveOCRBench/data/new-open-sherlock-20261024.json`.
@@ -83,6 +83,27 @@ For comparison, the order-free bag-of-words F1 (NewsBench's, failures counted) i
   reads nothing on newspapers, where all 15 L9 pages cap, as 1.5's did. On the 96 it improves to 88.87 from 83.78.
   As with 1.5, its place is on regions (W46.ocr-regions), not on the whole page.
 
+## On the Mac
+
+The two small readers, read again on the Apple M3 Pro with 18 GB over the 96 (2026-10-31; `../ocr-mac-local-hw.md`):
+the publisher's bf16 weights at the revisions Sherlock read, through mlx-vlm 0.7.4, with the Sherlock run's prompt,
+8,192 tokens, temperature 0 and thinking off, one page at a time under the Vision OCR lab's memory guard.
+
+| Reader | Mac NES, answered | Sherlock NES | seconds a page, median (p90) | MLX peak GB | whole-process peak footprint |
+|---|---|---|---|---|---|
+| Xiaomi-OCR-0 bf16 | 88.66, 96/96 | 88.67, 96/96 | 8.8 (13.8) | 2.92 | 4,456 MB |
+| PaddleOCR-VL 1.6 bf16 | 88.78, 94/96 | 88.87, 94/96 | 4.8 (8.4) | 2.58 | 3,460 MB |
+| *LightOnOCR-3 4B 8-bit (Mac)* | 89.13, 96/96 | | 24 | 6.44 | about 7.9 GB |
+| *Qwen3.5-9B 4-bit (Mac)* | 91.91 | | 38 | 7.48 | about 9.1 GB |
+
+- **The Mac runtime costs these readers nothing.** Both land within 0.1 point of their Sherlock runs on the same
+  pages; PaddleOCR-VL caps the same two pages on both (8,192 tokens), plus one of the three agreement letters on the Mac.
+- **Xiaomi-OCR-0 reads a page in about a third of LightOnOCR-3 4B's time, in under half its memory**, and ties it on
+  the 96 (above). For a 16 GB Mac, or one that is reading while the user works, it is the cheapest reader that
+  keeps LightOnOCR's accuracy on the owner's material; on the public set it reads answered pages 3.4 points lower.
+  Whether the app offers it is a profile decision, not this item's.
+- PaddleOCR-VL 1.6 is faster still, but whole-page it is not a candidate on the public set (above).
+
 ## Measurement card
 
 - **Truth:** on the 895, each public dataset's own ground-truth transcription, frozen with the set
@@ -100,7 +121,7 @@ For comparison, the order-free bag-of-words F1 (NewsBench's, failures counted) i
   Xiaomi-OCR-0 and LightOnOCR-3 4B tie strict on both sets; on the 96 Qwen3.8 27B and Qwen3.6 27B tie strict.
 - **Scope:** whole-page reading with one prompt each. It does not settle region reading (W46.ocr-regions), the box
   readers (W46.ocr-new-open-boxes), the readers that did not run (below; W46.ocr-new-open-rest), or Mac speed beyond
-  the two MLX runs recorded below.
+  the two MLX runs above (one read each, on one Mac).
 
 ## Not scored
 
@@ -109,7 +130,8 @@ For comparison, the order-free bag-of-words F1 (NewsBench's, failures counted) i
 - MiniCPM-V 4.7 1B and 35B-A3B: the architecture is not in the installed vLLM, and the run allows no environment
   upgrade.
 - Unlimited-OCR, Nemotron-Parse 2.0, granite-docling, dots.ocr and Chandra-2 were never submitted. Each needs more
-  than the frozen collector's one image and one prompt (`execution-plans/items/W46.ocr-new-open.md`).
+  than the frozen collector's one image and one prompt; why, per model, is in W46.ocr-new-open-boxes and
+  W46.ocr-new-open-rest (`SUITE_TODO.md`), which run them.
 - Churro-3B was measured earlier on the 96 as `churro-1855420`.
 
 ## Reproduce

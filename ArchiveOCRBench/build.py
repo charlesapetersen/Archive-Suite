@@ -35,6 +35,8 @@ LOCAL_CSV = RESULTS / "ocr-panel-local-groups.csv"
 GATEWAY_MD = RESULTS / "gemini37-vs-38.md"  # W46.fix-ocr-scorers-paid: gateway_gemini.py report, Gemini 3.7 Flash
 GATEWAY_CSV = RESULTS / "gemini37-vs-38-groups.csv"
 GATEWAY_ROUTES = {"gemini3.7-flash-gw"}
+# W46.ocr-new-open's Mac readers, added after the difficulty fit was built: on the headline and speed tables, not in the fit.
+LATE_MAC_ROUTES = {"xiaomi-ocr-0-bf16", "paddleocr-vl1.6-bf16"}
 MAC_MD = RESULTS / "ocr-mac-local.md"
 MAC_CSV = RESULTS / "ocr-mac-local-groups.csv"
 FARMSHARE = RESULTS / "farmshare" / "truth"
@@ -1015,8 +1017,8 @@ def main():
             sys.exit(f"a FarmShare run's {c['key']} page count differs from the panel's {c['n']}")
 
     # The difficulty and cascade analysis reads ocr-pages.csv's per-page rows. Its cascades are built from the routes
-    # an app user could run; the later gateway reading of Gemini 3.7 Flash is left out of them.
-    app_routes = [r["id"] for r in routes if r["panel"] != "farmshare" and r["id"] not in GATEWAY_ROUTES
+    # an app user could run; the later gateway reading of Gemini 3.7 Flash and the late Mac readers are left out of them.
+    app_routes = [r["id"] for r in routes if r["panel"] != "farmshare" and r["id"] not in GATEWAY_ROUTES | LATE_MAC_ROUTES
                   and not r["id"].startswith(("gw-regions-", "dewarp-", "enh-"))]
     # ocr-pages.csv now holds every whole-page route (W46.ocr-rescore-offline); the difficulty fit keeps the 28 routes
     # and the FarmShare Qwen run it was built on, so its figures do not move with the headline table's additions.

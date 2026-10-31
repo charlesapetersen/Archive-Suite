@@ -228,6 +228,36 @@
    }
   },
   {
+   "id": "xiaomi-ocr-0-bf16",
+   "name": "Xiaomi-OCR-0 bf16 (Mac)",
+   "panel": "mac",
+   "pair": null,
+   "std": 0.0,
+   "batch": null,
+   "free_cluster": false,
+   "machine": "Apple M3 Pro, 18 GB",
+   "hw": {
+    "seconds": 8.8,
+    "peak_gb": 2.92,
+    "peak_max_gb": 2.93
+   }
+  },
+  {
+   "id": "paddleocr-vl1.6-bf16",
+   "name": "PaddleOCR-VL 1.6 bf16 (Mac)",
+   "panel": "mac",
+   "pair": null,
+   "std": 0.0,
+   "batch": null,
+   "free_cluster": false,
+   "machine": "Apple M3 Pro, 18 GB",
+   "hw": {
+    "seconds": 4.8,
+    "peak_gb": 2.58,
+    "peak_max_gb": 2.74
+   }
+  },
+  {
    "id": "qwen3.6-27b-farmshare",
    "name": "Qwen3.6 27B fp8 (FarmShare)",
    "panel": "farmshare",
@@ -1461,6 +1491,16 @@
      95,
      96
     ],
+    "xiaomi-ocr-0-bf16": [
+     88.66,
+     96,
+     96
+    ],
+    "paddleocr-vl1.6-bf16": [
+     88.78,
+     94,
+     96
+    ],
     "qwen3.6-27b-farmshare": [
      95.25,
      96,
@@ -2016,6 +2056,16 @@
     ],
     "qwen3.5-9b-mlx4": [
      93.33,
+     49,
+     50
+    ],
+    "xiaomi-ocr-0-bf16": [
+     92.03,
+     50,
+     50
+    ],
+    "paddleocr-vl1.6-bf16": [
+     93.69,
      49,
      50
     ],
@@ -2577,6 +2627,16 @@
      28,
      28
     ],
+    "xiaomi-ocr-0-bf16": [
+     85.97,
+     28,
+     28
+    ],
+    "paddleocr-vl1.6-bf16": [
+     85.89,
+     27,
+     28
+    ],
     "qwen3.6-27b-farmshare": [
      94.93,
      28,
@@ -3132,6 +3192,16 @@
     ],
     "qwen3.5-9b-mlx4": [
      87.92,
+     16,
+     16
+    ],
+    "xiaomi-ocr-0-bf16": [
+     85.85,
+     16,
+     16
+    ],
+    "paddleocr-vl1.6-bf16": [
+     80.18,
      16,
      16
     ],
@@ -10195,6 +10265,30 @@
     "public_pages": 895
    },
    {
+    "id": "paddleocr-vl1.6-bf16",
+    "name": "PaddleOCR-VL 1.6 bf16 (Mac)",
+    "pages": 95,
+    "answered": 93,
+    "nes_answered": 90.81,
+    "strict": 88.9,
+    "transport": 0,
+    "model": 2,
+    "cap": 2,
+    "refusal": 0,
+    "empty": 0,
+    "vs_baseline": {
+     "n": 93,
+     "delta": -4.61,
+     "lo": -7.22,
+     "hi": -2.43
+    },
+    "p081": [
+     true,
+     78.02
+    ],
+    "public_pages": 0
+   },
+   {
     "id": "lightonocr3-4b-farmshare",
     "name": "LightOnOCR-3 4B, native (FarmShare)",
     "pages": 95,
@@ -10239,6 +10333,30 @@
     "p081": [
      true,
      90.65
+    ],
+    "public_pages": 0
+   },
+   {
+    "id": "xiaomi-ocr-0-bf16",
+    "name": "Xiaomi-OCR-0 bf16 (Mac)",
+    "pages": 95,
+    "answered": 95,
+    "nes_answered": 88.79,
+    "strict": 88.79,
+    "transport": 0,
+    "model": 0,
+    "cap": 0,
+    "refusal": 0,
+    "empty": 0,
+    "vs_baseline": {
+     "n": 94,
+     "delta": -6.09,
+     "lo": -8.93,
+     "hi": -3.64
+    },
+    "p081": [
+     true,
+     76.95
     ],
     "public_pages": 0
    },

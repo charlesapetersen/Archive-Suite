@@ -1,7 +1,7 @@
 #!/usr/local/bin/python3
 """W41.mac-local-measure and W41.mac-local-hw. MLX vision models on this Mac, on the OCR panel's frozen truth set.
 
-  run-guarded.sh --label mac-local --need-gb 8 -- <lab venv>/bin/python ocr_mac_local.py collect [--model KEY] [--limit N]
+  run-guarded.sh --label mac-local-KEY --need-gb 8 -- <lab venv>/bin/python ocr_mac_local.py collect [--model KEY] [--limit N]
   uv run --with rapidfuzz --with 'sacrebleu==2.5.1' --with pillow python ocr_mac_local.py report
 
 The panel's 99 frozen originals (ocr_panel.py prepare: JPEG q90, 2400 px ceiling), read by mlx-vlm with each
@@ -270,7 +270,9 @@ def report():
           'for this model only with little else heavy running.',
           f'- The load time ({statistics.median(m["load_s"] for m in metas):.0f} s) is with the weights already in the file cache; '
           'a cold first load reads 5.5 GB from disk.']
-    g = [r for r in guard_rows() if r[1] in ('mac-local', 'mac-local-probe')]
+    # This collector's runs only: other scripts (ocr_rerun_noise.py) and the HW models share the plain label.
+    g = [r for r in guard_rows() if r[1] in ('mac-local', 'mac-local-probe') and ' ocr_mac_local.py collect' in r[-1]
+         and '--model ' not in r[-1]]
     if g:
         L += ['', 'The memory guard\'s whole-process view of each collect run (date, exit, seconds, peak RSS MB, '
               'peak physical footprint MB, swap growth MB, worst pressure level):', '']
@@ -400,7 +402,8 @@ def report_hw():
               f'| MLX peak memory, GB | {statistics.median(peak):.2f} | {pct(peak, .9):.2f} | {max(peak):.2f} |', '',
               f'Total reading time {sum(wall)/60:.0f} min for {len(metas)} pages; '
               f'{sum(m["status"] != "ok" for m in metas)} failed ({sum(m["finish"] == "length" for m in metas)} hit max_tokens).', '']
-        g = [r for r in guard_rows() if r[1] == 'mac-local-' + key]
+        # Labelled per model (`--label mac-local-KEY`), or a plain `mac-local` run whose command names the model.
+        g = [r for r in guard_rows() if r[1] == 'mac-local-' + key or (r[1] == 'mac-local' and r[-1].endswith('ocr_mac_local.py collect --model ' + key))]
         if g:
             L += ['The memory guard\'s whole-process view of each collect run (date, exit, seconds, peak RSS MB, '
                   'peak physical footprint MB, swap growth MB, worst pressure level):', '']
