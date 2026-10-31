@@ -45,12 +45,12 @@ the level fitted on all three, at the 99% and the 98% bars.
 ## Reading
 
 - **On the development boxes it is level with Gemini 3.8 Flash; on the test boxes it is not.** Unchecked, 90.2% of
-  development pages land in the exact document against Gemini's 90.7%, but 83.0% of test pages against 88.8%, with
-  17 unflagged errors to Gemini's 6. Stanton is most of the gap (81.9% against 89.3%, 16 unflagged errors).
+  development pages land in the exact document against Gemini's 90.7%, but 81.5% of test pages against 87.3%, with
+  18 unflagged errors to Gemini's 8. Stanton is most of the gap (79.8% against 87.2%, 17 unflagged errors).
 - **Its confidences do not separate right from wrong.** Every level fitted on the development boxes comes out as
   "flag all": to reach 98% or 99% after checking, the reader would check every gap. Used as an app voter it would
   need a level of its own or a second voter, and it is not offered as one.
 - **As the teacher for W41.seg-label-clean** it is a check on the tags, not a truth: a label is kept where it and
   the tags agree, and its own errors on test-box-like material will leave some noise. The student cannot be expected
-  to beat about 83-90% unchecked on boxes like these, which is the ceiling W41.seg-finetune is chasing.
+  to beat about 81-90% unchecked on boxes like these, which is the ceiling W41.seg-finetune is chasing.
 - Speed: 2,006 pages an hour on one L40S (seven-page windows at stride 3, 9,600 prompt tokens a window).

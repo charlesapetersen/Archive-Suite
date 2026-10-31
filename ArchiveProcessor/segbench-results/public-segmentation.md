@@ -9,7 +9,7 @@ The host-limited fetch helper now covers precisely that grant; nine refusal/redi
 Original source files and page images stay outside git, under
 `Long term storage/FarmShare-20261018/public-segmentation`. Only metadata, labels and scores are tracked.
 
-## CIA CREST: 128 supplied pages, 31 audited documents
+## CIA CREST: 128 supplied pages, 30 documents after the owner's rulings
 
 The [Archive.org box-0017 inventory](https://archive.org/advancedsearch.php?q=identifier%3Acia-readingroom-document-cia-rdp96-00788r0017*&fl%5B%5D=identifier&fl%5B%5D=title&rows=5000&output=json)
 returned all 282 records (SHA-256 `3243cf94977348f783f6bc4022105f1a1c21cf7d0a3393e21964ea10a68accb2`).
@@ -27,7 +27,10 @@ archive labels and an audit note on every page. Poppler rendered all pages at a 
 quality 90. Every page was visually reviewed in sixteen contact sheets; handwritten decision pages 42,
 46, 110 and 111 were also enlarged. No model output informed this truth.
 
-The archive's 22 PDF starts are retained. Nine internal starts were added under the owner-approved
+The agent's audit retained the archive's 22 PDF starts and added nine internal starts (31 documents). The owner's
+2026-10-31 rulings (W46.seg-truth-sheet, folded by W46.seg-truth-rescore; the manifest carries `owner_rulings` and
+`unsure`) join PDF 19 to PDF 18 (gap 74|75, the same document), confirm the start at 95, and leave 45|46, 87|88,
+93|94 and 110|111 unsure: those four gaps are left out of every score. The internal starts were added under the owner-approved
 [document rules](../../execution-plans/segmentation/02-truth-check.md):
 
 | stream page | reason |
@@ -47,7 +50,7 @@ anew, under rule 4. Ambiguous rule interpretations are explicitly listed in the 
 agent audit, not a second owner adjudication. CREST also includes third-party material: no blanket
 US-government public-domain claim is made and no image redistribution is included.
 
-## Lincoln Papers: 261 supplied pages, 81 audited documents
+## Lincoln Papers: 261 supplied pages, 80 documents after the owner's rulings
 
 The [full Library of Congress catalogue](https://www.loc.gov/collections/abraham-lincoln-papers/?sb=shelf-id&c=150)
 was sorted by Shelf Order. The saved first page contains 150 of 20,207 records. Catalogue positions **2–73**
@@ -67,6 +70,9 @@ page-by-page audit before model collection. The 72 catalogue starts are retained
 make **81 documents**: an Evening Edition clipping (76), Martial and Civil Law order/article (102),
 Missionaries resolutions (123), a separate editorial (124), a fresh Milroy-to-Usher letter (139), certified
 Grand State Council resolution (223), Rights of the Press proceedings (230), and isolated wrappers (77/231).
+The owner's 2026-10-31 rulings (W46.seg-truth-sheet, folded by W46.seg-truth-rescore; the manifest carries
+`owner_rulings` and `unsure`) make 230 the same document as its Comstock letter, leaving **80 documents**, confirm
+the clipping at 76, and leave 76|77, 106|107 and 230|231 unsure: left out of every score.
 The two wrappers follow an intervening enclosed publication rather than their covering letter: in a
 contiguous stream they are retained as separate fragments. This is an explicitly ambiguous rule-6
 interpretation, not a second owner adjudication. The manifest records the other retained continuations,
@@ -92,19 +98,23 @@ The fitted rule baseline is fixed from 551 owner-development pages; no public la
 
 | approach | CREST exact document pages (128) | Lincoln exact document pages (261) |
 |---|---:|---:|
-|Every page starts a document|9/128 (7.03%)|19/261 (7.28%)|
+|Every page starts a document|13/128 (10.16%)|18/261 (6.90%)|
 |Whole box is one document|0/128 (0.00%)|0/261 (0.00%)|
-|Rule sketch + Apple Vision|9/128 (7.03%)|19/261 (7.28%)|
-|Rules fitted on owner dev + Apple Vision|15/128 (11.72%)|44/261 (16.86%)|
-|Qwen3.5 27B teacher, FarmShare|122/128 (95.31%)|103/261 (39.46%)|
-|Trained Qwen3.5 2B, FarmShare|117/128 (91.41%)|91/261 (34.87%)|
-|Trained Qwen3.5 4B, FarmShare|126/128 (98.44%)|122/261 (46.74%)|
+|Rule sketch + Apple Vision|13/128 (10.16%)|18/261 (6.90%)|
+|Rules fitted on owner dev + Apple Vision|19/128 (14.84%)|44/261 (16.86%)|
+|Qwen3.5 27B teacher, FarmShare|113/128 (88.28%)|106/261 (40.61%)|
+|Trained Qwen3.5 2B, FarmShare|104/128 (81.25%)|93/261 (35.63%)|
+|Trained Qwen3.5 4B, FarmShare|113/128 (88.28%)|130/261 (49.81%)|
 
-CREST is easier for these models than the owner's locked boxes; **Lincoln is harder**, despite the requested
+Scored on the owner's rulings (rescored 2026-10-31, W46.seg-truth-rescore). CREST is easier for the teacher and the 4B than the owner's locked
+boxes (88.3% each, against 81.5% and 80.0% on the pooled test boxes); for the 2B it is about level (81.2% against
+80.3%), where before the rulings it was 91.4% against 78.8%. **Lincoln is harder**, despite the requested
 public/easier section label. Public provenance does not guarantee ease. Lincoln's long manuscripts and
 separate enclosed items make whole-document accuracy demanding; one wrong split can spoil a long document.
-The frozen primary truth is unchanged, including the explicitly ambiguous isolated wrappers 77/231. These
-are agent-audited references, not a second owner adjudication. No claim of unseen/pretraining-clean data.
+The agent-audited truth was frozen before any model ran; on 2026-10-31 the owner's rulings on a blind sheet of
+its ambiguous gaps were folded in (W46.seg-truth-rescore; the manifests carry `owner_rulings` and `unsure`), and
+every cached answer was rescored, no model rerun. The isolated wrappers 77/231 are now unsure gaps, left out of
+every score. The other gaps remain agent-audited. No claim of unseen/pretraining-clean data.
 Per-model false splits/merges, boundary F1, and all additive counts are in the two `*-scores.json` files.
 
 FarmShare job IDs: teacher 1857094, 2B 1857095, 4B 1857096. Raw answers, summaries, timing and original images

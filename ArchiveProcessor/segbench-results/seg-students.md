@@ -93,7 +93,7 @@ Gemini 3.8 Flash 90.7%, and the untrained 4B at 4-bit on this Mac 57.4% on Deave
   gigabyte, so it is not worth offering.
 - **The 4B buys nothing here.** Twice the time and 3 GB more memory for a lower pooled score; at full precision its
   agreement with the teacher on agreed held-out gaps led the 2B's by 1.6 points (97.6% against 96.0%), and on the
-  test boxes it led by 0.3.
+  test boxes the 2B now leads it by 0.3 (80.3% against 80.0%; rescored 2026-10-31, W46.seg-truth-rescore).
 - An 8 GB Mac running the app beside a 4.4 GB peak is unmeasured; a 16 GB Mac has room.
 
 ## Reading
@@ -102,14 +102,14 @@ Gemini 3.8 Flash 90.7%, and the untrained 4B at 4-bit on this Mac 57.4% on Deave
   everywhere (1,258 false splits on the held-out gaps); fine-tuned, it agrees with the teacher on 97.6% of the
   held-out gaps where tag and teacher agree, and the pilot on a quarter of the windows already reached 97.1%. That
   is agreement, not accuracy (above).
-- **On the test boxes the students land below their teacher.** 79.1% (4B) and 78.8% (2B) of test pages in the exact
-  document unchecked, against the teacher's 83.0% and Gemini's 88.8%. Stanton is the hard box for all three Qwen
+- **On the test boxes the students land below their teacher.** 80.0% (4B) and 80.3% (2B) of test pages in the exact
+  document unchecked, against the teacher's 81.5% and Gemini's 87.3%. Stanton is the hard box for all three Qwen
   models; RG 165 is 113 pages and swings widely (the 2B 94.3%, the 4B 79.3%).
 - **Their confidences are no flag.** As with the teacher, reaching 98% after checking takes about 80 checks per 100
   pages, close to checking every gap.
 - **The training data is one owner's archives.** The held-out collections are other collections from the same
   owner's corpus, so their 97% says the model agrees with its teacher across his collections, not that it is right, nor that it carries to other people's. The test
-  boxes, which no training window saw, are the better guide, and there the students are about ten points behind the
+  boxes, which no training window saw, are the better guide, and there the students are about seven points behind the
   best cloud model.
 
 ## Where the builds are (2026-10-21)

@@ -16,6 +16,8 @@ Re-running fold is a no-op once the truth carries the rulings.
 
     python3 seg_truth_rescore.py fold      # the four truths above + seg-truth-rulings.json
     python3 seg_truth_rescore.py sc0122    # the agreed-stratum error, weighted (N/n) and unweighted, with intervals
+    python3 seg_truth_rescore.py report    # what moved: the results before the fold against the tree's
+    SEGBENCH_CACHE=ROOT/cache <lab venv>/bin/python seg_truth_rescore.py calls ROOT   # each route at the ruled gaps
 """
 from __future__ import annotations
 
@@ -187,11 +189,156 @@ def cmd_sc0122(_a) -> None:
     print(json.dumps(sc0122(load_rulings(), _strata()), indent=1))
 
 
+# --- what moved: the committed results before the fold against the working tree ----------------------------------
+
+def _at(rev: str, rel: str) -> dict:
+    import subprocess
+    out = subprocess.run(["git", "show", f"{rev}:ArchiveProcessor/segbench-results/{rel}"], cwd=RESULTS,
+                         capture_output=True, text=True, check=True).stdout
+    return json.loads(out)
+
+
+def _now(rel: str) -> dict:
+    return json.loads((RESULTS / rel).read_text(encoding="utf-8"))
+
+
+def _pct(x) -> str:
+    return "—" if x is None else f"{100 * x:.1f}%"
+
+
+def moved_public(before: dict, after: dict) -> list[str]:
+    L = ["| route | pages exact | false splits | false merges | PQ |", "|---|---:|---:|---:|---:|"]
+    for k, a in after["models"].items():
+        b = before["models"].get(k)
+        if b is None:
+            continue
+        mb, ma, cb, ca = b["metrics"], a["metrics"], b["counts"], a["counts"]
+        pq = lambda m: "—" if m.get("pq") is None else f"{m['pq']:.3f}"
+        L.append(f"| {k} | {_pct(mb['pages_in_exact_doc'])} → {_pct(ma['pages_in_exact_doc'])} | "
+                 f"{cb['false_splits']} → {ca['false_splits']} | {cb['false_merges']} → {ca['false_merges']} | "
+                 f"{pq(mb)} → {pq(ma)} |")
+    return L
+
+
+def moved_options(before: dict, after: dict) -> list[str]:
+    L = ["| approach | Stanton, no checking | Stanton, after checking | Stanton, unflagged errors | "
+         "test pooled, no checking | test pooled, after checking | test pooled, unflagged errors |",
+         "|---|---:|---:|---:|---:|---:|---:|"]
+    old = {a["id"]: a for a in before["approaches"]}
+    for a in after["approaches"]:
+        b = old.get(a["id"])
+        if not b or not a.get("figures") or not b.get("figures") or "test_by_box" not in a["figures"]:
+            continue
+        cells = []
+        for fb, fa in ((b["figures"]["test_by_box"]["Stanton"], a["figures"]["test_by_box"]["Stanton"]),
+                       (b["figures"]["test"], a["figures"]["test"])):
+            cells += [f"{_pct(fb.get('pages_exact_no_review'))} → {_pct(fa.get('pages_exact_no_review'))}",
+                      f"{_pct(fb['pages_exact_after_review'])} → {_pct(fa['pages_exact_after_review'])}",
+                      f"{fb['unflagged_errors']} → {fa['unflagged_errors']}"]
+        L.append(f"| {a['label']} | " + " | ".join(cells) + " |")
+    return L
+
+
+def moved_sources(before: dict, after: dict, box: str) -> list[str]:
+    L = ["| source | pages exact | false splits | false merges |", "|---|---:|---:|---:|"]
+    sb, sa = before["boxes"][box]["sources"], after["boxes"][box]["sources"]
+    for k, a in sa.items():
+        b = sb.get(k)
+        if b is None:
+            continue
+        cb, ca = b["counts"], a["counts"]
+        e = lambda c: c["pages_exact"] / c["doc_pages"]
+        if (cb["pages_exact"], cb["false_splits"], cb["false_merges"]) == (ca["pages_exact"], ca["false_splits"],
+                                                                          ca["false_merges"]):
+            continue
+        L.append(f"| {k} | {_pct(e(cb))} → {_pct(e(ca))} | {cb['false_splits']} → {ca['false_splits']} | "
+                 f"{cb['false_merges']} → {ca['false_merges']} |")
+    return L
+
+
+def moved_rows(before: dict, after: dict, boxes) -> list[str]:
+    L = ["| model | box | arm | pages exact | boundary F1 |", "|---|---|---|---:|---:|"]
+    key = lambda r: (r["model"], r.get("box"), r.get("arm"))
+    old = {key(r): r for r in before["rows"] if "arm" in r}
+    for r in after["rows"]:
+        b = old.get(key(r))
+        if "arm" not in r or r.get("box") not in boxes or b is None or b == r:
+            continue
+        L.append(f"| {r['model']} | {r['box']} | {r['arm']} | {_pct(b['pages_exact'])} → {_pct(r['pages_exact'])} | "
+                 f"{b['boundary_f1']:.3f} → {r['boundary_f1']:.3f} |")
+    return L
+
+
+def cmd_report(a) -> None:
+    rev = a.before
+    out = ["## Options (options.json): the test-box figures the Stanton gaps moved", ""]
+    out += moved_options(_at(rev, "options.json"), _now("options.json"))
+    out += ["", "## Stanton, every cached source (seg-scorers-owner.json), where a figure moved", ""]
+    out += moved_sources(_at(rev, "seg-scorers-owner.json"), _now("seg-scorers-owner.json"), "Stanton")
+    for box in ("crest", "lincoln"):
+        out += ["", f"## {box.upper() if box == 'crest' else 'Lincoln'} ({box}-scores.json)", ""]
+        out += moved_public(_at(rev, f"public-segmentation/{box}-scores.json"),
+                            _now(f"public-segmentation/{box}-scores.json"))
+    for rel in ("seg-context.json", "seg-window-modality.json"):
+        out += ["", f"## {rel}", ""]
+        out += moved_rows(_at(rev, rel), _now(rel), ("Stanton", "CREST", "Lincoln"))
+    print("\n".join(out))
+
+
+CALL_KEYS = ("fs-qwen3.5-27b", "fs-seg-2b", "fs-seg-4b", "window-cues-claude", "window-cues-claude-cue",
+             "gateway-gemini", "gateway-glm", "gateway-gemini-whole")
+
+
+def cmd_calls(a) -> None:
+    """Each scored route's call (N new, c same) at every ruled CREST and Lincoln gap, and where its errors now are.
+    Cache-only, as public_segmentation.score reads them; needs the lab venv and SEGBENCH_CACHE=ROOT/cache."""
+    import rescore
+    rescore.no_network()
+    import method_openrouter as OR
+    import method_window as W
+    import method_window_cues as WC
+    import public_segmentation as P
+    import seg_lincoln_gateway as GW
+    from score import forgive, segment_ids
+    data.CACHE_DIR = a.root / "cache"
+    rulings = load_rulings()
+    for box in ("crest", "lincoln"):
+        col, _ = P.load(box, a.root)
+        gaps = [r for r in rulings if r["section"] == box]
+        print(f"\n{box}\n\n| route | " + " | ".join(f"{r['left']}\\|{r['right']} ({r['answer']})" for r in gaps)
+              + " | errors now at |\n|---|" + "---|" * (len(gaps) + 1))
+        for k in CALL_KEYS:
+            try:
+                if k.startswith("window-cues-"):
+                    route = k.removeprefix("window-cues-")
+                    pred = W.assemble(col, W.combine(col, GW.claude_cue if route == "claude-cue" else WC.judge(route)),
+                                      False)
+                elif k.startswith("gateway-"):
+                    pred = GW.predictors()[k](col)
+                else:
+                    pred = W.assemble(col, W.combine(col, OR.judge(k)), False)
+            except Exception as e:  # a route with no full-box prediction (Lincoln's failed GLM arm)
+                print(f"| {k} | not scored ({type(e).__name__}) |")
+                continue
+            p = segment_ids(pred.labels)
+            t = segment_ids(forgive(col.labels, pred.labels, col.labels.unsure))
+            calls = ["N" if p[r["right"] - 1] != p[r["right"] - 2] else "c" for r in gaps]
+            errs = [f"{i + 1}\\|{i + 2}" for i in range(len(p) - 1) if (p[i] != p[i + 1]) != (t[i] != t[i + 1])]
+            shown = ", ".join(errs) if len(errs) <= 8 else f"{len(errs)} gaps"
+            print(f"| {k} | " + " | ".join(calls) + f" | {shown} |")
+
+
 def main() -> None:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = p.add_subparsers(dest="cmd", required=True)
     sub.add_parser("fold").set_defaults(fn=cmd_fold)
     sub.add_parser("sc0122").set_defaults(fn=cmd_sc0122)
+    r = sub.add_parser("report")
+    r.add_argument("--before", default="87bcc7b8~1", help="the commit before the fold")
+    r.set_defaults(fn=cmd_report)
+    c = sub.add_parser("calls")
+    c.add_argument("root", type=Path, help="the public-segmentation root")
+    c.set_defaults(fn=cmd_calls)
     a = p.parse_args()
     a.fn(a)
 

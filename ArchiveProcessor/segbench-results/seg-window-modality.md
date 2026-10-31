@@ -15,7 +15,8 @@ itself over several window placements and prompts does better than it does alone
   majority on each gap, a 3-3 tie going to the mean P(new).
 
 Everything was fixed before any answer (`seg_window_modality.py`'s docstring); nothing was chosen on the test boxes.
-Owner boxes are scored with truth photos, Lincoln with the model's own. Run on Sherlock, one L40S per model, vLLM
+Owner boxes are scored with truth photos, Lincoln with the model's own; the test boxes and Lincoln on the owner's
+2026-10-31 rulings (W46.seg-truth-rescore), the gaps he could not rule left out. Run on Sherlock, one L40S per model, vLLM
 0.31.0, batch 20261029-102545: 6,110 requests in six jobs, 2.6 GPU-hours against the 3.5 estimated (teacher 1 h 50,
 2B 25 min, 4B 22 min). Scores: `seg-window-modality.json` (`seg_window_modality.py score`; `pooled` holds the figures
 below). No money was spent.
@@ -54,23 +55,24 @@ Pages in an exact document. "Default" is offset 0 with `l1`, the request the ben
 
 | Model | Pool | Default | Mean of the six single runs | Single runs, lowest – highest | Vote of six | Offsets only (l1) | Prompts only (offset 0) |
 |---|---|---|---|---|---|---|---|
-| 2B | Stanton + RG165 | 81.2% | 77.7% | 74.8 – 81.2% | 80.6% | 77.0% | 80.0% |
-| 4B | Stanton + RG165 | 79.1% | 78.2% | 72.7 – 81.8% | 79.7% | 80.3% | 79.7% |
-| 27B teacher | Stanton + RG165 | 83.0% | 80.3% | 76.4 – 83.0% | 82.1% | 82.4% | 82.7% |
-| 2B | Lincoln | 36.4% | 40.1% | 31.0 – 49.0% | 47.5% | 34.5% | 45.2% |
-| 4B | Lincoln | 49.4% | 48.2% | 45.6 – 51.3% | 51.7% | 52.9% | 58.2% |
-| 27B teacher | Lincoln | 40.6% | 43.2% | 38.7 – 47.9% | 42.9% | 39.1% | 47.9% |
+| 2B | Stanton + RG165 | 82.7% | 79.2% | 76.4 – 82.7% | 82.1% | 78.5% | 81.5% |
+| 4B | Stanton + RG165 | 80.0% | 78.8% | 73.6 – 82.7% | 80.6% | 81.2% | 80.6% |
+| 27B teacher | Stanton + RG165 | 81.5% | 80.6% | 74.8 – 83.3% | 83.0% | 80.9% | 83.6% |
+| 2B | Lincoln | 37.2% | 41.6% | 33.7 – 51.3% | 48.3% | 37.2% | 46.4% |
+| 4B | Lincoln | 52.5% | 49.6% | 46.4 – 52.5% | 54.4% | 54.0% | 60.9% |
+| 27B teacher | Lincoln | 41.8% | 44.1% | 39.8 – 49.0% | 44.1% | 40.2% | 49.0% |
 
-- **On the owner's test boxes the vote does not beat the default run** for any model (2B -0.6, 4B +0.6, teacher -0.9
-  points). It beats the average single run by 1.5 to 2.9 points, which is what it is for: it removes the luck of one
+- **On the owner's test boxes the vote does not beat the default run beyond noise** for any model (2B -0.6, 4B +0.6,
+  teacher +1.5 points; rescored 2026-10-31, W46.seg-truth-rescore: the teacher's was -0.9, so it no longer lands below for every model).
+  It beats the average single run by 1.8 to 2.9 points, which is what it is for: it removes the luck of one
   window placement. Boundary F1 moves by under a point either way.
 - **A single run's placement and prompt alone move a test-box score by 6 to 9 points** (the lowest-to-highest column),
-  and a byte-identical rerun of the default request moved Stanton's 2B from 73.3% (FarmShare, 2026-10-18) and 74.1%
-  (seg-context's Sherlock rerun) to 76.5% here, Deaver's K = 7 from 88.7% to 90.1%, and Lincoln's 2B from 34.9% to
-  36.4%. Differences of about 3 points pooled between arms on these boxes are not findings.
+  and a byte-identical rerun of the default request moved Stanton's 2B from 75.3% (FarmShare, 2026-10-18) and 76.1%
+  (seg-context's Sherlock rerun) to 78.6% here, Deaver's K = 7 from 88.7% to 90.1%, and Lincoln's 2B from 35.6% to
+  37.2%. Differences of about 3 points pooled between arms on these boxes are not findings.
 - **Lincoln gains from the second prompt, not from voting.** `w1` cuts the false splits on Lincoln's long manuscripts
-  (the 2B's three `w1` runs score 42.1, 48.7 and 49.0% against `l1`'s 31.0 to 36.4%; the teacher's 44.4 to 47.9%
-  against 38.7 to 42.5%). On the owner's test boxes `w1` is no better (2B 79.4% against 81.2% at offset 0). It is a
+  (the 2B's three `w1` runs score 43.3, 51.3 and 49.8% against `l1`'s 33.7 to 37.2%; the teacher's 45.6 to 49.0%
+  against 39.8 to 41.8%). On the owner's test boxes `w1` is no better (2B 80.9% against 82.7% at offset 0). It is a
   lead on one public box, not a reason to change the prompt.
 
 ## Recommendations
@@ -80,7 +82,8 @@ Pages in an exact document. "Default" is offset 0 with `l1`, the request the ben
 2. **A text-only 2B window is not a route.** Skipping the vision encoder would save time on the laptop, but it costs
    about 8 points at K = 7 on the development boxes.
 3. **No self-voting for the local route or the teacher labeller.** Six runs cost six times the compute (the 2B takes
-   about 18 s a window on the M3 Pro) and land no higher than the default single run on the test boxes.
+   about 18 s a window on the M3 Pro) and land within noise of the default single run on the test boxes (at most
+   1.5 points above it, the teacher's; rescored 2026-10-31, W46.seg-truth-rescore: before, no higher).
 4. **W46.seg-window-modality-paid keeps its size question open.** The 2B is flat in K, so Gemini's K = 3, 5 and 10 arms
    can run on the 150-page subset; the text-only arm should keep the full 551 development pages, because the 2B is
    not flat in modality and the paid item is what says whether a strong model is. That item's session decides its
