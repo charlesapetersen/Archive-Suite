@@ -1024,14 +1024,50 @@ final class WrappingTokenField: NSTokenField {
         nativeHeight(width: .greatestFiniteMagnitude) ?? TagChips.chipHeight(for: chipFont)
     }
 
+    /// Native heights by width, for the subjects and font they were measured with: the chips ask on every layout
+    /// and draw, and a field's subjects change far less often than it is drawn.
+    private var nativeHeights: (titles: [String], font: NSFont, byWidth: [CGFloat: CGFloat]) = ([], .systemFont(ofSize: 0), [:])
+
     private func nativeHeight(width: CGFloat) -> CGFloat? {
         guard let cell else { return nil }
-        return ceil(cell.cellSize(forBounds: NSRect(x: 0, y: 0, width: width, height: .greatestFiniteMagnitude)).height)
+        let titles = chipTitles, font = chipFont
+        if nativeHeights.titles != titles || nativeHeights.font != font || nativeHeights.byWidth.count > 32 {
+            nativeHeights = (titles, font, [:])   // a window resize passes through many widths
+        }
+        if let known = nativeHeights.byWidth[width] { return known }
+        let height = ceil(cell.cellSize(forBounds: NSRect(x: 0, y: 0, width: width, height: .greatestFiniteMagnitude)).height)
+        nativeHeights.byWidth[width] = height
+        return height
     }
 
-    /// The chips as this field lays them out at `width`.
+    /// The chips as this field lays them out at `width`, on at least as many lines as the native tokens take there.
+    /// The chips are narrower than native tokens, so at some widths they fit one line where the tokens wrap to two;
+    /// the row was then one line tall while accessibility, which reports the native tokens, put the second token
+    /// below it (the layout guard: `1983` 17 pt under its 22-pt row at File tags 193 pt, W40.fix-reader-vm-suite-red).
+    /// So the chips wrap at the widest narrower width that gives them the tokens' line count.
     func chipsLayout(width: CGFloat) -> TagChips.Layout {
-        TagChips.layout(chipTitles, font: chipFont, width: width, lineHeight: nativeLineHeight)
+        let titles = chipTitles, font = chipFont, line = nativeLineHeight
+        let layout = TagChips.layout(titles, font: font, width: width, lineHeight: line)
+        guard titles.count > 1, width < .greatestFiniteMagnitude, let native = nativeHeight(width: width) else {
+            return layout
+        }
+        let nativeLines = Self.lineCount(height: native, lineHeight: line)
+        guard Self.lineCount(of: layout) < nativeLines else { return layout }
+        var fits = TagChips.leadingInset + 1, wraps = width   // the chips' line count is falling in the width
+        while wraps - fits > 0.5 {
+            let mid = ((fits + wraps) / 2).rounded()
+            if mid >= wraps || mid <= fits { break }
+            let lines = Self.lineCount(of: TagChips.layout(titles, font: font, width: mid, lineHeight: line))
+            if lines >= nativeLines { fits = mid } else { wraps = mid }
+        }
+        return TagChips.layout(titles, font: font, width: fits, lineHeight: line)
+    }
+
+    private static func lineCount(of layout: TagChips.Layout) -> Int { Set(layout.chips.map(\.frame.minY)).count }
+
+    /// Native lines in a native height: the first line is `lineHeight`, each further one a line plus a gap under one.
+    private static func lineCount(height: CGFloat, lineHeight: CGFloat) -> Int {
+        Int(((height - lineHeight + 0.5) / lineHeight).rounded(.down)) + 1
     }
 
     override var intrinsicContentSize: NSSize {
@@ -1044,8 +1080,10 @@ final class WrappingTokenField: NSTokenField {
     /// wrap is measured again once the cell is laid out (`TagTokenCellView.layout`).
     func height(editing: Bool, width: CGFloat) -> CGFloat {
         let width = width > 0 ? width : CGFloat.greatestFiniteMagnitude
-        if !editing { return chipsLayout(width: width).height }
-        return nativeHeight(width: width) ?? nativeLineHeight
+        let native = nativeHeight(width: width) ?? nativeLineHeight
+        if editing { return native }
+        // As tall as the native tokens too, which accessibility reports even while the chips are drawn.
+        return chipTitles.isEmpty ? chipsLayout(width: width).height : max(chipsLayout(width: width).height, native)
     }
 
     override func draw(_ dirtyRect: NSRect) {
@@ -1060,34 +1098,6 @@ final class WrappingTokenField: NSTokenField {
         } else {
             TagChips.draw(layout, in: bounds, flipped: isFlipped, font: chipFont, emphasized: isEmphasized)
         }
-    }
-
-    // MARK: Accessibility: the chips as drawn
-
-    /// The chips' accessibility elements, kept while the subjects are the same so an assistive app keeps its place.
-    private var chipElements: [NSAccessibilityElement] = []
-
-    /// While the chips are drawn, the field reports them rather than the cell's native tokens: those are wider than
-    /// the chips, so at some widths they wrapped to a second line the row was never measured for, and accessibility
-    /// placed a subject below its row (the layout guard: `1983` 17 pt under a 22-pt row at File tags 193 pt,
-    /// W40.fix-reader-vm-suite-red). One element per chip, named by its subject, at the frame it is drawn in. The
-    /// native tokens return with the field editor, which draws them.
-    override func accessibilityChildren() -> [Any]? {
-        guard !isBeingEdited else { return super.accessibilityChildren() }
-        let layout = chipsLayout(width: bounds.width)
-        if chipElements.map({ $0.accessibilityLabel() ?? "" }) != layout.chips.map(\.title) {
-            chipElements = layout.chips.map { chip in
-                let element = NSAccessibilityElement()
-                element.setAccessibilityRole(.staticText)
-                element.setAccessibilityLabel(chip.title)
-                element.setAccessibilityParent(self)
-                return element
-            }
-        }
-        for (element, chip) in zip(chipElements, layout.chips) {
-            element.setAccessibilityFrameInParentSpace(TagChips.viewRect(chip.frame, in: bounds, flipped: isFlipped))
-        }
-        return chipElements
     }
 
     override func becomeFirstResponder() -> Bool {

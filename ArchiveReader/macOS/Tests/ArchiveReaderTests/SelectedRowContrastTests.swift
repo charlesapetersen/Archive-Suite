@@ -247,34 +247,37 @@ final class SelectedRowContrastTests: XCTestCase {
                        TagChips.chipHeight(for: font) + 2 * TagChips.verticalInset)
     }
 
-    /// W40.fix-reader-vm-suite-red: accessibility reports the chips the field draws, at the frames it draws them in,
-    /// not the cell's native tokens, which are wider and wrapped `1983` onto a second line below a one-line row.
-    /// The field is as tall as its chips and every element sits inside it; the same element objects come back
-    /// while the subjects are the same.
-    func testAccessibilityReportsTheDrawnChips() throws {
-        let cell = TagTokenCellView(frame: NSRect(x: 0, y: 0, width: 197, height: 22))
-        let field = cell.tokenField
-        field.font = .systemFont(ofSize: NSFont.systemFontSize)
-        field.objectValue = ["Orwell Reference", "1983"]
-        cell.layoutSubtreeIfNeeded()
-        let layout = field.chipsLayout(width: field.bounds.width)
-        XCTAssertEqual(Set(layout.chips.map { $0.frame.minY }).count, 1, "the two chips fit one line at 193 pt")
-
-        let children = try XCTUnwrap(field.accessibilityChildren() as? [NSAccessibilityElement])
-        XCTAssertEqual(children.map { $0.accessibilityLabel() }, ["Orwell Reference", "1983"])
-        for (element, chip) in zip(children, layout.chips) {
-            XCTAssertEqual(element.accessibilityRole(), .staticText)
-            XCTAssertTrue(element.accessibilityParent() as? NSView === field)
-            let frame = element.accessibilityFrameInParentSpace()
-            XCTAssertEqual(frame.size, chip.frame.size, "\(chip.title)")
-            XCTAssertTrue(field.bounds.contains(frame), "\(chip.title) at \(frame) leaves the field \(field.bounds)")
+    /// W40.fix-reader-vm-suite-red: accessibility reports the native tokens even while the chips are drawn, and the
+    /// tokens are wider, so at File tags 193 pt "Orwell Reference" and "1983" fit one line of chips while the tokens
+    /// wrapped to two, and the layout guard found `1983` below its one-line row. At every width the chips now take
+    /// at least the tokens' lines, and the field is at least as tall as the tokens need.
+    func testChipsTakeAtLeastTheNativeTokensLines() {
+        let sets = [["Orwell Reference", "1983"], Self.subjects,
+                    ["Economics", "1983", "Agricultural Labor Relations", "Brown", "Budget", "Legislative Analyst"]]
+        for subjects in sets {
+            let cell = TagTokenCellView(frame: NSRect(x: 0, y: 0, width: 600, height: 22))
+            let field = cell.tokenField
+            field.font = .systemFont(ofSize: NSFont.systemFontSize)
+            field.objectValue = subjects
+            let line = field.height(editing: true, width: .greatestFiniteMagnitude)
+            for width in stride(from: CGFloat(120), through: 600, by: 1) {
+                let native = field.height(editing: true, width: width)
+                let layout = field.chipsLayout(width: width)
+                let chipLines = Set(layout.chips.map { $0.frame.minY }).count
+                let nativeLines = Int(((native - line + 0.5) / line).rounded(.down)) + 1
+                XCTAssertGreaterThanOrEqual(chipLines, nativeLines, "\(subjects.count) tags at \(width) pt")
+                XCTAssertGreaterThanOrEqual(field.height(editing: false, width: width), native,
+                                            "\(subjects.count) tags at \(width) pt: the field is shorter than its tokens")
+                for chip in layout.chips {
+                    XCTAssertLessThanOrEqual(chip.frame.maxX, width, "\(chip.title) runs past \(width) pt")
+                }
+            }
         }
-        let again = try XCTUnwrap(field.accessibilityChildren() as? [NSAccessibilityElement])
-        XCTAssertTrue(zip(children, again).allSatisfy { $0 === $1 }, "unchanged subjects keep their elements")
-
-        field.objectValue = ["Economics"]
-        let changed = try XCTUnwrap(field.accessibilityChildren() as? [NSAccessibilityElement])
-        XCTAssertEqual(changed.map { $0.accessibilityLabel() }, ["Economics"])
+        let pair = TagTokenCellView(frame: NSRect(x: 0, y: 0, width: 197, height: 22)).tokenField
+        pair.font = .systemFont(ofSize: NSFont.systemFontSize)
+        pair.objectValue = ["Orwell Reference", "1983"]
+        XCTAssertEqual(Set(pair.chipsLayout(width: 1000).chips.map { $0.frame.minY }).count, 1,
+                       "with room for both, the pair stays on one line")
     }
 
     // MARK: - Helpers

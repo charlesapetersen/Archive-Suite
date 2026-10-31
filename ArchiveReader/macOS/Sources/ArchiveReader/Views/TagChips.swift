@@ -116,8 +116,7 @@ enum TagChips {
         ])
     }
 
-    /// A chip's top-down frame in the view's own coordinates (also where the field reports the chip to accessibility).
-    static func viewRect(_ topDown: CGRect, in bounds: CGRect, flipped: Bool) -> CGRect {
+    private static func viewRect(_ topDown: CGRect, in bounds: CGRect, flipped: Bool) -> CGRect {
         guard !flipped else { return topDown }
         return CGRect(x: topDown.minX, y: bounds.height - topDown.maxY, width: topDown.width, height: topDown.height)
     }
