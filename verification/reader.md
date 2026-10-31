@@ -440,7 +440,8 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
 - **Notes:**
   - W40.audit-ledger-undo restores history after relaunch (R-46), with a 100-forward-group bound.
   - Partial failures now name the refused files. The group is durably consumed before inverse writes;
-    retry is not offered (the remaining policy question in `W40.fix-reader-undo-partial`).
+    since `W40.fix-reader-undo-partial` a member that failed for any cause but an identity refusal comes
+    back as its own undo step ("Undo again to retry", three attempts at most).
   - `W40.f1` also found that undo re-tagged a file swapped under its path: the §6 identity check compared a
     `URL`'s cached `fileResourceIdentifier` with itself. Fixed 2026-10-17 by `W40.fix-identity-url-cache`
     (S1): `UndoDurabilityTests.testUndoRefusesAFileSwappedUnderItsPath` now passes without its expected
@@ -1007,7 +1008,8 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
     because the owner requested undo to outlive quit. Scratch evidence and limitations:
     [`evidence/reader/W40.audit-ledger-undo.md`](evidence/reader/W40.audit-ledger-undo.md).
 - **Notes:** the on-disk ledger remains unbounded; ordinary forward lines are not fsynced. Interrupted
-  undo attempts consume the group and cannot retry individual files. No schema migration: no production
+  undo attempts consume the group; only members whose failure is known and not an identity refusal are
+  re-recorded for a retry (`W40.fix-reader-undo-partial`). No schema migration: no production
   app output needs migration.
 
 ### R-47 · Two same-facet date tags are flagged as ambiguous

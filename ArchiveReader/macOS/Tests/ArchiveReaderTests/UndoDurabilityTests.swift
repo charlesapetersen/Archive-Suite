@@ -82,11 +82,80 @@ final class UndoDurabilityTests: XCTestCase {
         model.undoLast()
 
         XCTAssertEqual(try tags(fixture.files[0]), ["Unread"], "the file that could be undone was")
-        XCTAssertEqual(model.undoDepth, 0, "the failed entry is dropped, not kept for a retry")
+        XCTAssertEqual(model.undoDepth, 0, "a file that is gone is an identity refusal, never kept for a retry")
         XCTAssertTrue(model.statusMessage.contains("1 could not be undone"))
         XCTAssertTrue(model.statusMessage.contains("b.pdf"))
+        XCTAssertFalse(model.statusMessage.contains("retry"))
         XCTAssertEqual(fixtureNavigationModel(pinnedTo: fixture.root).undoDepth, 0,
                        "partial attempts consume the whole group, including after relaunch")
+    }
+
+    /// Locks a file against tag writes (the user immutable flag), as a cause that may pass.
+    private func setLocked(_ url: URL, _ locked: Bool) throws {
+        try FileManager.default.setAttributes([.immutable: locked], ofItemAtPath: url.path)
+        if locked { addTeardownBlock { try? FileManager.default.setAttributes([.immutable: false], ofItemAtPath: url.path) } }
+    }
+
+    /// W40.fix-reader-undo-partial: a member that failed for a cause that may pass comes back as its own
+    /// undo step, durably, and the retry touches only that file.
+    func testAFailedMemberWhoseCauseMayPassCanBeRetried() throws {
+        let fixture = try makeRoot(files: ["a.pdf", "b.pdf"])
+        let defaults = fixtureDefaults(pinnedTo: fixture.root)
+        let model = NavigationModel(defaults: defaults)
+        try select(fixture.files, in: model)
+        model.mark(.read)
+        XCTAssertEqual(model.undoDepth, 1, "precondition: a bulk mark is one undo step")
+
+        try setLocked(fixture.files[1], true)
+        model.undoLast()
+        XCTAssertEqual(try tags(fixture.files[0]), ["Unread"])
+        XCTAssertEqual(try tags(fixture.files[1]), ["Read"], "precondition: the lock made b's undo fail")
+        XCTAssertEqual(model.statusMessage, "Undid 1 change; 1 could not be undone (b.pdf). Undo again to retry.")
+        XCTAssertEqual(model.undoDepth, 1, "the failed member is offered again")
+
+        // a was reversed: a later edit to it must survive the retry, which names b alone.
+        try (URL(fileURLWithPath: fixture.files[0].path) as NSURL).setResourceValue(["Read"], forKey: .tagNamesKey)
+        try setLocked(fixture.files[1], false)
+        let relaunched = NavigationModel(defaults: defaults)
+        XCTAssertEqual(relaunched.undoDepth, 1, "the retry survives a relaunch")
+        relaunched.undoLast()
+        XCTAssertEqual(try tags(fixture.files[1]), ["Unread"])
+        XCTAssertEqual(try tags(fixture.files[0]), ["Read"], "the retry never re-applies a reversed member")
+        XCTAssertEqual(relaunched.statusMessage, "Undid 1 change.")
+        XCTAssertEqual(NavigationModel(defaults: defaults).undoDepth, 0)
+    }
+
+    /// A cause that never passes is retried a bounded number of times, then dropped, so it cannot block
+    /// the older undo steps behind it forever.
+    func testARetryIsDroppedAfterTheAttemptLimit() throws {
+        let fixture = try makeRoot(files: ["a.pdf", "b.pdf"])
+        let model = fixtureNavigationModel(pinnedTo: fixture.root)
+        try select([fixture.files[0]], in: model)
+        model.mark(.read)
+        try select([fixture.files[1]], in: model)
+        model.mark(.read)
+        XCTAssertEqual(model.undoDepth, 2)
+
+        try setLocked(fixture.files[1], true)
+        for attempt in 1...AuditLedger.undoAttemptLimit {
+            model.undoLast()
+            XCTAssertTrue(model.statusMessage.contains("1 could not be undone (b.pdf)"))
+            let last = attempt == AuditLedger.undoAttemptLimit
+            XCTAssertEqual(model.statusMessage.contains("Undo again to retry"), !last, "attempt \(attempt)")
+            XCTAssertEqual(model.undoDepth, last ? 1 : 2, "attempt \(attempt)")
+        }
+        model.undoLast()
+        XCTAssertEqual(try tags(fixture.files[0]), ["Unread"], "the older step is reachable again")
+        XCTAssertEqual(try tags(fixture.files[1]), ["Read"])
+    }
+
+    func testOnlyAnIdentityRefusalIsNeverRetried() {
+        XCTAssertFalse(AuditLedger.undoMayBeRetried(after: TagWriteError.identityMismatch("x"), attempt: 1))
+        XCTAssertTrue(AuditLedger.undoMayBeRetried(after: TagWriteError.coordinationFailed("x"), attempt: 1))
+        XCTAssertTrue(AuditLedger.undoMayBeRetried(after: TagWriteError.unreadable("x"), attempt: 1))
+        XCTAssertTrue(AuditLedger.undoMayBeRetried(after: TagWriteError.verificationFailed("x"), attempt: 2))
+        XCTAssertFalse(AuditLedger.undoMayBeRetried(after: TagWriteError.coordinationFailed("x"),
+                                                    attempt: AuditLedger.undoAttemptLimit))
     }
 
     /// Found while writing the test above (it first swapped the file rather than deleting it, expecting

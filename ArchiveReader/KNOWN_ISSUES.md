@@ -818,9 +818,11 @@ FileIdentity capture; the writer checks that identity again inside coordination.
 bound to the forward write's object, rather than captured only after the write returned.
 
 A synchronized undoAttempt consumes the group before any inverse, so a crash or failed ledger append
-cannot cause a non-idempotent occurrence inverse to replay. Partial failures name files; whole-group
-consumption means interrupted/failed members are not retried. W40.fix-reader-undo-partial retains the
-retry-policy question. Forward append failure disables older undo and warns; recovery appends a
+cannot cause a non-idempotent occurrence inverse to replay. Partial failures name files. A member
+that failed for any cause but an identity refusal is re-recorded afterwards as its own undo step
+(W40.fix-reader-undo-partial: "Undo again to retry"), up to three attempts so a cause that never
+passes cannot block older undo; a crash between consumption and that record loses the retry, never
+replays. An identity refusal (replaced, gone, outside the archive) is never retried. Forward append failure disables older undo and warns; recovery appends a
 synchronized history barrier. A failure counter keeps the warning even when another member of the
 same batch recovers storage. Process death before recovery can still lose the missing forward record
 and barrier: forward recording remains best-effort, rather than a write-ahead journal. Ledger growth remains unbounded and ordinary forward appends are not fsynced.

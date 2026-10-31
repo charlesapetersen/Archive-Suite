@@ -154,6 +154,25 @@ final class LedgerUndoHistoryTests: XCTestCase {
         XCTAssertEqual(Set(try XCTUnwrap(TagReading.read(url).tagNames)), ["Unread", "X"])
     }
 
+    /// W40.fix-reader-undo-partial: a retried step with two writes to one file is re-recorded in write
+    /// order, so the retry still undoes the newer write first (the reverse order leaves X, Y behind).
+    func testARetriedSameFileStepStillUndoesInReverseOrder() throws {
+        let url = try file(tags: ["Unread", "X"])
+        AuditLedger.withContext(group: UUID()) {
+            _ = try? TagWriter.renameToken(from: "X", to: "Y", on: url)
+            _ = try? TagWriter.renameToken(from: "Y", to: "Z", on: url)
+        }
+        try FileManager.default.setAttributes([.immutable: true], ofItemAtPath: url.path)
+        addTeardownBlock { try? FileManager.default.setAttributes([.immutable: false], ofItemAtPath: url.path) }
+        let model = fixtureNavigationModel(pinnedTo: root)
+        model.undoLast()
+        XCTAssertEqual(model.undoDepth, 1, "both writes are kept for a retry")
+        XCTAssertEqual(ledger.undoGroups(in: root).last?.count, 2)
+        try FileManager.default.setAttributes([.immutable: false], ofItemAtPath: url.path)
+        fixtureNavigationModel(pinnedTo: root).undoLast()
+        XCTAssertEqual(Set(try XCTUnwrap(TagReading.read(url).tagNames)), ["Unread", "X"])
+    }
+
     func testInterruptedUndoIsNeverOfferedAgain() throws {
         let url = try file(tags: ["Unread", "X", "X"])
         _ = try TagWriter.apply(TagDelta(remove: ["X"]), to: url)

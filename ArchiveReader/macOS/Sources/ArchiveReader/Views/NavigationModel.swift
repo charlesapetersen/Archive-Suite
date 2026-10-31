@@ -1149,8 +1149,18 @@ final class NavigationModel: ObservableObject {
         }
         var verified: [TagWriteResult] = []
         var failures: [String] = []
+        var retryable: [AuditLedger.Entry] = []
+        // A batch lists one file's writes newest first. Once one of them fails, its older writes are left
+        // alone too: undoing an older write under a newer one that is still on disk, and then retrying the
+        // newer one, could put back a tag the step removed. They share the first failure's fate.
+        var failedFiles: [AuditLedger.FileNumber: Bool] = [:]
         AuditLedger.withContext(group: UUID(), undoes: group) {
             for entry in batch {
+                if let file = entry.file, let mayRetry = failedFiles[file] {
+                    if mayRetry, (entry.attempt ?? 1) < AuditLedger.undoAttemptLimit { retryable.append(entry) }
+                    failures.append(URL(fileURLWithPath: entry.path).lastPathComponent)
+                    continue
+                }
                 do {
                     let target = try AuditLedger.undoTarget(entry)
                     guard isInsideMainArchive(target.url) else {
@@ -1160,14 +1170,29 @@ final class NavigationModel: ObservableObject {
                         color: entry.inverse.label.map { .restoreLabel($0) })
                     verified.append(try TagWriter.applyOccurrence(inverse, to: target.url, expecting: target.identity,
                         undoing: .init(before: entry.before, afterLabel: entry.afterLabel)))
-                } catch { failures.append(URL(fileURLWithPath: entry.path).lastPathComponent) }
+                } catch {
+                    failures.append(URL(fileURLWithPath: entry.path).lastPathComponent)
+                    let mayRetry = AuditLedger.undoMayBeRetried(after: error, attempt: entry.attempt ?? 1)
+                    if mayRetry { retryable.append(entry) }
+                    if let file = entry.file { failedFiles[file] = mayRetry }
+                }
             }
         }
+        // The batch is already consumed; only the members that failed for a cause that may pass come
+        // back, as their own undo step (W40.fix-reader-undo-partial). Re-recorded oldest first, as they
+        // were written, so the history reads them back newest first again.
+        let kept = AuditLedger.shared.keepForRetry(retryable.reversed(), of: group) ? retryable.count : 0
         library.applyVerifiedWrites(verified)
         refreshUndoHistory()
         let changed = verified.filter { !$0.isNoOp }.count
-        statusMessage = "Undid \(changed) change\(changed == 1 ? "" : "s")"
-            + (failures.isEmpty ? "." : "; \(failures.count) could not be undone (\(failures.prefix(3).joined(separator: ", "))).")
+        var message = "Undid \(changed) change\(changed == 1 ? "" : "s")"
+        if !failures.isEmpty {
+            message += "; \(failures.count) could not be undone (\(failures.prefix(3).joined(separator: ", ")))."
+            if kept > 0 {
+                message += kept == failures.count ? " Undo again to retry." : " Undo again to retry \(kept)."
+            }
+        } else { message += "." }
+        statusMessage = message
         announce(statusMessage)
     }
 

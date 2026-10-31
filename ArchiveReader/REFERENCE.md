@@ -156,7 +156,8 @@ add {"1981"}`. All of the following hold for every delta.
 11. **Batch = independent idempotent units** (bounded concurrency), never all-or-nothing. Surface
     partial failures ("12 of 15 updated; 3 could not — Retry"); a row leaves a filtered view only
     after its write **verified**. *As shipped:* the status line reads "Marked N; M could not update."
-    and no Retry is offered anywhere (ledger R-19; undo's retry question is `W40.fix-reader-undo-partial`).
+    and no Retry is offered for a mark or edit (ledger R-19); a partly failed undo offers "Undo again to
+    retry" (`W40.fix-reader-undo-partial`, item 12).
 12. **Append-only audit ledger** of `{path, bookmark, delta, before[], after[], timestamp}` for
     every change — transparency/history and inverse-delta undo source, *not* blind full-array restore.
     *Mechanism (W40.audit-ledger):* `Core/AuditLedger.swift`, one JSON line per verified `TagWriter`
@@ -168,7 +169,11 @@ add {"1981"}`. All of the following hold for every delta.
     and bookmark identity, then applies the inverse occurrence delta to fresh tags. A synchronized
     `undoAttempt` consumes the whole group BEFORE inverses: interrupted or partly failed attempts are
     not replayed after relaunch, because occurrence additions are not idempotent. Failed files are
-    named in the status; retry is not offered. A failed marker append refuses undo without changing
+    named in the status. Members that failed for any cause but an identity refusal are then re-recorded
+    as one new group (`keepForRetry`, `retryOf`/`attempt` fields; three attempts at most), so the next
+    undo retries exactly those files; a retry is safe because `applyOccurrence(undoing:)` never moves a
+    token past its pre-change count. Once one of a file's writes fails, that file's older writes in the
+    group are skipped and kept with it, re-recorded in write order. A failed marker append refuses undo without changing
     tags. The ledger remains append-only and unbounded on disk; ordinary forward records are not
     fsynced. Unavailable bookmarks fall back to path + device/inode; missing identity or a disagreeing
     bookmark refuses the file. A forward recording failure warns and disables older undo until a

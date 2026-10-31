@@ -47,7 +47,7 @@ final class AuditLedger: @unchecked Sendable {
         var label: Int?
     }
 
-    struct FileNumber: Codable, Equatable, Sendable {
+    struct FileNumber: Codable, Hashable, Sendable {
         var device: Int64
         var inode: UInt64
     }
@@ -70,6 +70,10 @@ final class AuditLedger: @unchecked Sendable {
         /// Set when the write failed its post-write verification: the tags may or may not have changed,
         /// `before`/`after`/`delta`/`inverse` are empty, and the entry is never an undo source.
         var unverified: String?
+        /// Set on a forward entry re-recorded by `keepForRetry`: the group whose undo failed for this
+        /// file, and which attempt the next undo of it will be (the original undo was attempt 1).
+        var retryOf: UUID?
+        var attempt: Int?
     }
 
     private let lock = NSLock()
@@ -229,14 +233,83 @@ final class AuditLedger: @unchecked Sendable {
     }
 
     /// Consume BEFORE applying an occurrence inverse: replay can append duplicate occurrences. If the
-    /// append/sync fails, the caller must refuse to write. A crash or partial failure consumes the entire
-    /// action; retry of individual failures is intentionally not offered by this group-level format.
+    /// append/sync fails, the caller must refuse to write. A crash consumes the entire action; a member
+    /// that failed is offered again only through `keepForRetry`, after its failure is known.
     func beginUndo(_ group: UUID) -> Bool {
         let none = Delta(add: [], remove: [], label: nil)
         return append(Entry(v: 1, timestamp: Date(), op: .undoAttempt, group: UUID(), undoes: group,
                             path: "", bookmark: nil, file: nil, before: [], after: [],
                             beforeLabel: nil, afterLabel: nil, delta: none, inverse: none,
                             unverified: nil), synchronize: true)
+    }
+
+    /// How many times one file's undo is attempted before it is dropped. Each retry sits on top of the
+    /// history, so a cause that never passes would otherwise block every older undo behind it.
+    static let undoAttemptLimit = 3
+
+    /// Whether an undo member that failed with `error` may be offered again. Never an identity refusal:
+    /// the file at the path is not the one recorded (or has gone, or is outside the archive), and a retry
+    /// could tag a replacement (§6). Any other failure may pass (a lock, a coordination timeout, a
+    /// concurrent edit seen at verification), and a retry is safe even if the failed write partly
+    /// landed: `TagWriter.applyOccurrence(undoing:)` never moves a token past its count before the
+    /// change and restores the label only while it still reads as the change left it, so a second
+    /// application of the same inverse writes nothing it has already written (W45.undo-still-applied).
+    static func undoMayBeRetried(after error: Error, attempt: Int) -> Bool {
+        if case TagWriteError.identityMismatch = error { return false }
+        return attempt < undoAttemptLimit
+    }
+
+    /// Per-member durable accounting for a partly failed undo: re-record each retryable failed member as
+    /// a forward entry in ONE new group, so the next undo offers exactly those files and nothing that was
+    /// already reversed. Called only AFTER `beginUndo` consumed `group` and the members were tried, so a
+    /// crash in between loses the retry (the safe direction) and can never replay a reversed member.
+    /// Returns false when the ledger could not record it; the caller reports the files as lost.
+    func keepForRetry(_ failed: [Entry], of group: UUID) -> Bool {
+        guard !failed.isEmpty else { return true }
+        let retryGroup = UUID()
+        var lines = Data()
+        do {
+            for var entry in failed {
+                entry.timestamp = Date()
+                entry.group = retryGroup
+                entry.undoes = nil
+                entry.retryOf = group
+                entry.attempt = (entry.attempt ?? 1) + 1
+                lines.append(try Self.encoder.encode(entry))
+                lines.append(0x0A)
+            }
+        } catch {
+            Self.log.error("audit ledger retry encode failed: \(String(describing: error), privacy: .public)")
+            return false
+        }
+        // One write for the whole group, so a torn append can drop members but never split the group's
+        // decodable lines between two undo steps (a torn last line does not decode and is skipped).
+        return appendLines(lines)
+    }
+
+    /// Append pre-encoded lines in one synchronized write. Like `append`, it never edits an existing line.
+    private func appendLines(_ lines: Data) -> Bool {
+        do {
+            try lock.withLock {
+                let url = _fileURL
+                guard !_hasRecordingGap, FileManager.default.fileExists(atPath: url.path) else {
+                    throw CocoaError(.fileWriteUnknown)
+                }
+                var data = lines
+                if Self.endsMidLine(url) { data.insert(0x0A, at: 0) }
+                let handle = try FileHandle(forWritingTo: url)
+                defer { try? handle.close() }
+                try handle.seekToEnd()
+                try handle.write(contentsOf: data)
+                try handle.synchronize()
+                _lastError = nil
+            }
+            return true
+        } catch {
+            lock.withLock { _lastError = String(describing: error) }
+            Self.log.error("audit ledger append failed: \(String(describing: error), privacy: .public)")
+            return false
+        }
     }
 
     /// A bookmark is a locator, never authority to tag a different object. An existing recorded path
