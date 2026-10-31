@@ -44,8 +44,9 @@ The measurement audit asks for these (OCR-2, OCR-6 and OCR-9 in
 per-page scores and writes `../new-open-paired.json`. Each cell is the new route minus the incumbent, in NES points,
 with its 95% bootstrap interval. Strict pairs every page and counts a failure as 0. Answered pairs only the pages
 both routes answered. Every failure here is the model's: the Sherlock runs logged no request errors, so none is a
-provider's. Each run read once (no rerun-noise figure exists yet, OCR-3), so a difference inside about 1-2 points is
-not a ranking.
+provider's. Each run read once; these are local greedy routes, so the tie rule (`../ocr-rerun-noise.md`, published after
+this section was first written) applies the paired interval alone, as the measurement card below says (measurement
+review 2026-10-31; the sentence had said no rerun-noise figure existed yet).
 
 | Set | Route | vs Qwen3.6 27B, strict | answered | vs LightOnOCR-3 4B, strict | answered | bowF1 |
 |---|---|---|---|---|---|---|

@@ -20,10 +20,11 @@ Script: `scripts/segbench/corpus/regions_orderfree.py`. 5,940 page readings scor
   stitch does not find the repeat, the overlap band is read twice. For Gemini on the 96 the added rate is up
   +8.5 points, and on clippings it is up 23 to 36 for every reader.
   On hand pages, Gemini's tiles are a tie order-free (-1.1 (-4.5 to +1.2)).
-- **Typed pages with no table or clipping:** tiles are a tie order-free for Qwen and LightOn; for Gemini they
-  cost a fifth of a point (-0.18 (-0.37 to -0.02)), small, but its
-  interval stays below 0. The small readers' tile gains that regions-20261021.md reported (GLM-OCR, PaddleOCR-VL 1.5) keep
-  their direction order-free, but their intervals reach 0.
+- **Typed pages with no table or clipping:** tiles are a tie order-free for Qwen and LightOn, and for Gemini too: they
+  cost a fifth of a point (-0.18 (-0.37 to -0.02)), an interval below 0, but a gap under the tie rule's floor (twice
+  Gemini 3.7 Flash's rerun range, 0.49 points; ocr-rerun-noise.md, published 2026-10-31), so it is a tie (measurement
+  review 2026-10-31; the 2026-10-30 report read it as a loss). The small readers' tile gains that regions-20261021.md
+  reported (GLM-OCR, PaddleOCR-VL 1.5) keep their direction order-free, but their intervals reach 0.
 - **Newspapers (L9) do not change in kind.** Regions lift the two small readers by more than 60 points order-free.
   Tiles lift them about 11 points and cost LightOn and Qwen most of their L9 score, so the fixed tiler stays ruled
   out. **Registers (L4):** Qwen's tiles, a tie in order (+3.3 (-0.7 to +7.9)), are a gain
@@ -43,8 +44,11 @@ Script: `scripts/segbench/corpus/regions_orderfree.py`. 5,940 page readings scor
 - **Comparison.** Each arm is compared page for page with the same reader's whole-page reading at the same settings.
   A page an arm returned nothing for scores 0 on both NES and bowF1, as the reports scored it. Both OCR sets: the 96
   and the public strata. Gemini's public rows are 3 pages a stratum, a labelled sample, not a set result.
-- **Noise.** 95% paired bootstrap intervals over pages (ocr_panel_score.paired). No rerun-noise floor exists yet
-  (W46.ocr-rerun-noise), so a difference whose interval crosses 0 is a tie.
+- **Noise.** 95% paired bootstrap intervals over pages (ocr_panel_score.paired). The tie rule (ocr-rerun-noise.md,
+  published 2026-10-31, after this report's first run): a gap is a tie when under twice the larger rerun range of the
+  routes compared (Gemini 3.7 Flash 0.49 points, measured in NES and lent to bowF1 until a bowF1 spread exists; the
+  open readers are local greedy routes with no spread, so the paired interval alone tests them) or when its interval
+  crosses 0.
 - **Scope.** bowF1 credits the right words in any order, but a reader of the page needs the order. The order-free
   figure is therefore the lower bound of the content loss, and it does not make an arm's jumbled text usable. It does
   not re-decide the layout routes for newspapers (W46.layout-photo, W46.layout-order) or the cells arms.
