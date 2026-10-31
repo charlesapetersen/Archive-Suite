@@ -11,11 +11,25 @@ enum ConnectResult { case ok, unauthorized, refused, unreachable }
 /// Mirrors the Android `MacClient` and the Mac's `CaptureServer` routes exactly.
 struct MacClient {
     let endpoint: MacEndpoint
+    /// Cable mode's local relay (W40.i-usb-app); the host tests pass their own.
+    var relay: USBRelay = .shared
+
+    /// Cable requests go through their own session, at most 4 connections at once to match the Mac's pool of
+    /// four idle tunnels, so the relay's queue stays short (iphone-usb.md §2 "Concurrency"). Ephemeral: nothing
+    /// about a cable request is worth a cache or a cookie.
+    static let cableSession: URLSession = {
+        let config = URLSessionConfiguration.ephemeral
+        config.httpMaximumConnectionsPerHost = 4
+        return URLSession(configuration: config)
+    }()
+
+    private var session: URLSession { endpoint.isCable ? Self.cableSession : .shared }
 
     /// `timeout` is parametrized so the pre-pairing reachability probe can fail fast (~3.5s) while photo
     /// uploads keep the full 30s — never shorten the upload timeout to speed up the probe.
     private func makeRequest(_ path: String, method: String, timeout: TimeInterval = 30) -> URLRequest? {
-        guard let url = URL(string: "\(endpoint.baseURL)\(path)") else { return nil }
+        guard let base = endpoint.requestBaseURL(cableRelayPort: endpoint.isCable ? relay.relayPort : nil),
+              let url = URL(string: "\(base)\(path)") else { return nil }
         var req = URLRequest(url: url, timeoutInterval: timeout)
         req.httpMethod = method
         req.setValue("Bearer \(endpoint.token)", forHTTPHeaderField: "Authorization")
@@ -28,7 +42,7 @@ struct MacClient {
 
     func ping() async -> Bool {
         guard let req = makeRequest("/ping", method: "GET") else { return false }
-        do { let (_, resp) = try await URLSession.shared.data(for: req); return Self.isSuccess(resp) }
+        do { let (_, resp) = try await session.data(for: req); return Self.isSuccess(resp) }
         catch { return false }
     }
 
@@ -37,7 +51,7 @@ struct MacClient {
     func reachability(timeout: TimeInterval = 3.5) async -> ConnectResult {
         guard let req = makeRequest("/ping", method: "GET", timeout: timeout) else { return .unreachable }
         do {
-            let (_, resp) = try await URLSession.shared.data(for: req)
+            let (_, resp) = try await session.data(for: req)
             guard let http = resp as? HTTPURLResponse else { return .refused }
             if (200..<300).contains(http.statusCode) { return .ok }
             if http.statusCode == 401 { return .unauthorized }
@@ -70,13 +84,13 @@ struct MacClient {
         }
         if let y = year { req.setValue(String(y), forHTTPHeaderField: "X-Year") }
         if let m = month { req.setValue(String(m), forHTTPHeaderField: "X-Month") }
-        do { let (_, resp) = try await URLSession.shared.upload(for: req, from: jpeg); return Self.isSuccess(resp) }
+        do { let (_, resp) = try await session.upload(for: req, from: jpeg); return Self.isSuccess(resp) }
         catch { return false }
     }
 
     func sessionComplete() async -> Bool {
         guard let req = makeRequest("/session/complete", method: "POST") else { return false }
-        do { let (_, resp) = try await URLSession.shared.upload(for: req, from: Data()); return Self.isSuccess(resp) }
+        do { let (_, resp) = try await session.upload(for: req, from: Data()); return Self.isSuccess(resp) }
         catch { return false }
     }
 
@@ -91,7 +105,7 @@ struct MacClient {
         if let y = year { req.setValue(String(y), forHTTPHeaderField: "X-Year") }
         if let m = month { req.setValue(String(m), forHTTPHeaderField: "X-Month") }
         if let s = seqs, !s.isEmpty { req.setValue(s, forHTTPHeaderField: "X-Seqs") }
-        do { let (_, resp) = try await URLSession.shared.upload(for: req, from: Data()); return Self.isSuccess(resp) }
+        do { let (_, resp) = try await session.upload(for: req, from: Data()); return Self.isSuccess(resp) }
         catch { return false }
     }
 
@@ -99,7 +113,7 @@ struct MacClient {
     /// sitting on a stale "paired" state. Fire-and-forget (may not reach the Mac if the link is already down).
     func sessionDisconnect() async -> Bool {
         guard let req = makeRequest("/session/disconnect", method: "POST") else { return false }
-        do { let (_, resp) = try await URLSession.shared.upload(for: req, from: Data()); return Self.isSuccess(resp) }
+        do { let (_, resp) = try await session.upload(for: req, from: Data()); return Self.isSuccess(resp) }
         catch { return false }
     }
 
@@ -110,7 +124,7 @@ struct MacClient {
     func reportStatus(pending: Int) async -> Bool {
         guard var req = makeRequest("/phone/status", method: "POST", timeout: 5) else { return false }
         req.setValue(String(pending), forHTTPHeaderField: "X-Pending")
-        do { let (_, resp) = try await URLSession.shared.upload(for: req, from: Data()); return Self.isSuccess(resp) }
+        do { let (_, resp) = try await session.upload(for: req, from: Data()); return Self.isSuccess(resp) }
         catch { return false }
     }
 }

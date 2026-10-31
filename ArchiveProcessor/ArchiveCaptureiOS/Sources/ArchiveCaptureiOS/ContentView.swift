@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ContentView: View {
     @StateObject private var vm = CaptureViewModel()
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         Group {
@@ -10,6 +11,9 @@ struct ContentView: View {
             } else {
                 CaptureScreen(vm: vm)
             }
+        }
+        .onChange(of: scenePhase) { old, new in
+            if old == .background && new != .background { vm.returnedFromBackground() }
         }
         #if DEBUG
         .task { await pairForE2E() }

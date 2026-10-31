@@ -418,7 +418,8 @@ Views/                         SwiftUI (+ AppKit where needed):
 - **iPhone** — `ArchiveCaptureiOS/Sources/ArchiveCaptureiOS/`: `App.swift`/`ContentView.swift`;
   `Camera/CameraController.swift`; `Capture/{CaptureModels,CaptureViewModel,SessionStore}.swift` (durable
   capture queue); `Net/{MacEndpoint,MacClient,SegmentTransport,FileRelayTransport,DriveRelayTransport,
-  DriveClient,DriveAuth,DriveTokenStore,DriveOAuthConfig,RelayObjectFormat}.swift`; `UI/{ConnectScreen,CaptureScreen,QRScannerView,CameraPreview,
+  DriveClient,DriveAuth,DriveTokenStore,DriveOAuthConfig,RelayObjectFormat,USBRelay}.swift` (`USBRelay`: the cable
+  route's loopback tunnel port 48628 and local relay 48629, the AC1 challenge; host tests `scripts/test-ios-usb-relay.sh`); `UI/{ConnectScreen,CaptureScreen,QRScannerView,CameraPreview,
   SegmentTagSheet}.swift`. Own `project.yml` (`xcodegen generate` after adding files); camera capture needs
   a physical device (the simulator has none).
 - **Android** — `ArchiveCapture/` (Gradle, Kotlin + Compose + CameraX), the mirror:

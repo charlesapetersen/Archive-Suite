@@ -21,6 +21,14 @@ enum ConnectPhase: Equatable {
     case cloudOnlyQR
     /// Cloud: sign-in failed or this build can't sign in; the message names why.
     case cloudFailed(String)
+    /// Wi-Fi: the QR has no network address (the Mac is on no network, S-037); Cable or Cloud can still use it.
+    case noWiFiHost
+    /// Cable (W40.i-usb-app): the QR decoded and the phone is waiting for its Mac on the cable.
+    case cableConnecting
+    /// Cable: no verified tunnel answered (not plugged in, not trusted, or Live Capture not started).
+    case cableUnreachable
+    /// Cable: the relay's tunnel port is taken on this phone, so the cable route cannot start.
+    case cableUnavailable
 }
 
 /// Owns the capture session: the paired endpoint, the current group, captured items, minimal on-phone
@@ -57,6 +65,8 @@ final class CaptureViewModel: ObservableObject {
     @Published private(set) var sessionNotSaved = false
     @Published var pendingDeleteId: Int64? // set when deleting an un-uploaded item (confirmation dialog)
     @Published private(set) var connectPhase: ConnectPhase = .idle   // drives the pairing screen (P1)
+    /// The cable relay's state (W40.i-usb-app): the Connect screen pre-selects Cable while a tunnel is open.
+    @Published private(set) var cableStatus = USBRelay.Status()
 
     // Document segments the operator has ended whose segment-complete signal the Mac hasn't acked yet live in
     // `queue.endedSegments`, PERSISTED so an app-kill between End segment and the ack can't strand the document
@@ -88,6 +98,11 @@ final class CaptureViewModel: ObservableObject {
             UserDefaults.standard.removeObject(forKey: Self.endpointKey)
         }
         client = endpoint.map { Self.makeTransport(endpoint: $0, driveAuth: driveAuth) }
+        // The cable relay runs whatever the mode, so the Connect screen can see a Mac on the cable; it is given a
+        // token, and so verifies tunnels and carries requests, only for a Cable pairing.
+        USBRelay.shared.onStatus { [weak self] in self?.cableStatus = $0 }
+        USBRelay.shared.setToken(endpoint?.isCable == true ? endpoint?.token : nil)
+        USBRelay.shared.start()
         // W23.m8's port: read this BEFORE anything can save. restore() persists, and the first save that lands
         // clears the flag; read later, recovered pages would be adopted as if their classification were known.
         let manifestWasStale = store.manifestIsStale()
@@ -120,10 +135,55 @@ final class CaptureViewModel: ObservableObject {
         await attemptConnect(ep)
     }
 
+    /// Cable pairing from a scanned QR: its token and name, through the local relay. A no-address QR is fine here.
+    func connectCableFromQR(_ payload: String) async {
+        guard let ep = MacEndpoint.fromQRPayload(payload) else { connectPhase = .badQR; return }
+        if ep.isCloud { connectPhase = .cloudOnlyQR; return }
+        await attemptCableConnect(ep.asCable())
+    }
+
+    /// Cable pairing from a typed pairing code (the QR's token).
+    func connectCable(token: String) async {
+        let t = token.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !t.isEmpty else { return }
+        await attemptCableConnect(MacEndpoint(host: "", port: 0, token: t, name: "Mac", isCable: true))
+    }
+
+    /// Give the relay the token, so it challenges the tunnels it holds, then probe `/ping` through it. The probe
+    /// waits longer than Wi-Fi's: a tunnel may need one turn of the Mac's 2 s top-up to arrive and verify. It is
+    /// tried twice, because a tunnel taken just as the Mac expires it fails once (iphone-usb.md §2). A Mac that
+    /// answered the challenge wrongly holds another token, so that reads as a stale code, not an absent Mac.
+    private func attemptCableConnect(_ ep: MacEndpoint) async {
+        if connectPhase == .cableConnecting { return }
+        guard cableStatus.tunnelListening else { connectPhase = .cableUnavailable; return }
+        connectPhase = .cableConnecting
+        USBRelay.shared.setToken(ep.token)
+        var result = await MacClient(endpoint: ep).reachability(timeout: 8)
+        if result == .unreachable && USBRelay.shared.status.rejectedAnswers == 0 {
+            result = await MacClient(endpoint: ep).reachability(timeout: 8)
+        }
+        if result == .unreachable && USBRelay.shared.status.rejectedAnswers > 0 { result = .unauthorized }
+        switch result {
+        case .ok:
+            pair(ep, status: "Connected over the cable")
+            return
+        case .unauthorized: connectPhase = .unauthorized(host: "", port: 0)
+        case .unreachable, .refused: connectPhase = .cableUnreachable
+        }
+        // Not paired: the relay holds no token, as before the attempt (the Connect screen shows only when unpaired).
+        USBRelay.shared.setToken(endpoint?.isCable == true ? endpoint?.token : nil)
+    }
+
+    /// The app is back from the background: a suspended app's sockets are defunct and never say so, so the relay
+    /// tears down and listens again (iphone-usb.md §3). Not on a return from `.inactive`, which suspends nothing and
+    /// would only cut a request in flight.
+    func returnedFromBackground() { USBRelay.shared.restart() }
+
     /// Wi-Fi only: preflight the endpoint with a short-timeout reachability probe, then pair on success or name
     /// the cause on failure. Sets `.connecting` first so the UI shows "connecting to <ip>:<port>…" immediately.
     /// It never switches to Drive by itself: the operator chooses Cloud on the pairing screen (as on Android).
     private func attemptConnect(_ ep: MacEndpoint) async {
+        guard ep.hasHost else { connectPhase = .noWiFiHost; return }
         connectPhase = .connecting(host: ep.host, port: ep.port)
         switch await MacClient(endpoint: ep).reachability() {
         case .ok:
@@ -168,6 +228,7 @@ final class CaptureViewModel: ObservableObject {
         retirePreviousPairing()
         endpoint = ep
         client = Self.makeTransport(endpoint: ep, driveAuth: driveAuth)
+        USBRelay.shared.setToken(ep.isCable ? ep.token : nil)
         Self.saveEndpoint(ep)
         statusMessage = status
         connectPhase = .idle
@@ -183,6 +244,7 @@ final class CaptureViewModel: ObservableObject {
         UserDefaults.standard.removeObject(forKey: Self.endpointKey)
         endpoint = nil
         client = nil
+        USBRelay.shared.setToken(nil)
         connectPhase = .idle
     }
 

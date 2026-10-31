@@ -198,7 +198,9 @@ written into `ArchiveProcessor/REFERENCE.md` beside the HTTP routes when the bui
    the handshake, the FIFO of local connections with its 10 s limit, the end-of-stream splice, re-create on
    `.active`), the Cable `URLSession` (4 per host), `MacEndpoint` Cable mode storing the mode, not the port, with an
    empty-host QR, the Connect screen's Cable option and copy, host tests. Independent of item 1, but both follow
-   §2's handshake exactly.
+   §2's handshake exactly. **Shipped 2026-10-31** (`Net/USBRelay.swift`, `scripts/test-ios-usb-relay.sh`).
+   Ages count from a tunnel's arrival (12 s), and data is sent as complete messages with the end of stream as an
+   empty final one (an incomplete message followed by a final one carrying data stalls, measured).
 3. **`W40.i-usb-build` [S]** (waits on both): `e2e-phone-mac.sh --ios --cable` against the fake usbmuxd, the
    Wi-Fi E2E re-run unchanged, and the docs: README (USB local relay, both phones), `REFERENCE.md`,
    `capture.md` C-43 row and count, KNOWN_ISSUES transport notes, S-037 and S-023 history in `SUSPECTS.md`.

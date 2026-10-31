@@ -51,7 +51,7 @@ struct CaptureScreen: View {
                 // Connection + Re-pair: once paired the app opens straight to this screen, so this is the
                 // way back to the QR scanner (switch Macs/networks). Captured photos are kept meanwhile.
                 HStack {
-                    Text(vm.endpoint.map { "Connected · \($0.name)" } ?? "Not connected")
+                    Text(vm.endpoint.map { "Connected · \($0.name)\($0.isCable ? " · cable" : "")" } ?? "Not connected")
                         .font(.caption).foregroundStyle(.secondary)
                     Spacer()
                     // Backup safety net: copy what's on the phone to Photos if it won't transfer.
