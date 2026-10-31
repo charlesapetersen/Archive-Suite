@@ -189,7 +189,7 @@ struct TagEditorView: View {
     @ViewBuilder private func dateAmbiguityNotice() -> some View {
         let ambiguous = model.selectedFiles.filter(\.dateIsAmbiguous)
         if ambiguous.count == 1, model.selectedFiles.count == 1, let text = ambiguous[0].dateAmbiguityText {
-            Label("\(text) Remove a set-aside tag under Subjects, or set the right date below.", systemImage: "calendar.badge.exclamationmark")
+            Label("\(text) Remove the wrong tag: a set-aside one under Subjects, or the kept one by setting the date below.", systemImage: "calendar.badge.exclamationmark")
                 .font(.caption).foregroundStyle(.orange)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier("ar.tagEditor.dateAmbiguity")

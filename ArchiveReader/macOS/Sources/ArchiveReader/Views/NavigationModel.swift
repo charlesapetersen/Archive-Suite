@@ -532,12 +532,13 @@ final class NavigationModel: ObservableObject {
 
     func recompute() {
         var base = library.files
-        let ambiguous = base.reduce(0) { $0 + ($1.dateIsAmbiguous ? 1 : 0) }
-        if ambiguous != ambiguousDateCount { ambiguousDateCount = ambiguous }
         // Exclude user-designated folders before any other filtering.
         if let rootPath = rootStore.discoveredPathPrefix, !excludedFolders.excludedRelativePaths.isEmpty {
             base = base.filter { !excludedFolders.isExcludedAbsolute($0.url.path, rootPath: rootPath) }
         }
+        // Counted after the exclusion, so the toggle never offers files no filter can list.
+        let ambiguous = base.reduce(0) { $0 + ($1.dateIsAmbiguous ? 1 : 0) }
+        if ambiguous != ambiguousDateCount { ambiguousDateCount = ambiguous }
         // Base scope = the visible universe (smart folder). User filter layers on top.
         if let scope {
             base = base.filter(scope.filter.matches)

@@ -39,8 +39,9 @@ struct LibraryFilter: Sendable, Equatable, Codable {
     /// W40.fix-reader-date-ambiguity: only files with two tags for one date facet, to review them. Stored
     /// optional so a smart folder or saved view state written before this field still decodes; a non-optional
     /// field makes the synthesized decoder throw, and `SavedSearchStore` would then load nothing and overwrite
-    /// every saved search on its next save.
-    private var ambiguousDates: Bool? = nil
+    /// every saved search on its next save. Not `private`: that would make the memberwise init private too.
+    /// Use `ambiguousDatesOnly`.
+    var ambiguousDates: Bool? = nil
     var ambiguousDatesOnly: Bool {
         get { ambiguousDates ?? false }
         set { ambiguousDates = newValue ? true : nil }
