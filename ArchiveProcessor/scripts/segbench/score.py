@@ -45,11 +45,24 @@ above, do not enter them twice.
 Pooled figures sum the counts over collections (Pk/WindowDiff pool their windows), so a
 pooled percentage is page- or item-weighted, not a mean of per-collection percentages.
 
-UNSURE GAPS (W46.seg-truth-rescore). A document gap the owner could not rule is left out of every
-score by giving the truth the route's own call there (boundary or not) before scoring (``forgive``),
-so it is never an error under any metric. The truth carries them as a ``Truth`` list
+UNSURE GAPS (W46.seg-truth-rescore; masked in W46.seg-unsure-mask). A document gap the owner could
+not rule is an unknown, not an observation. The truth carries them as a ``Truth`` list
 (``Collection.labels``), so every ``score_labels(col.labels, …)`` honours them; a box with none
-scores exactly as before. A copy made with ``list()`` drops them.
+scores exactly as before. A copy made with ``list()`` or a slice drops them.
+* BOUNDARY metrics (gaps, truth boundaries, TP, false splits/merges, precision/recall/F1, kappa) and
+  ``risk_coverage`` are over KNOWN document gaps only: an unsure gap is left out of numerator and
+  denominator alike, and counted in ``unscored_gaps``. It is never an error and never an agreement.
+* SEGMENT metrics cannot drop a gap, because a document is made of its gaps. They are scored on the
+  CONDITIONAL estimand: the truth takes the route's own call at each unsure gap (``forgive``), i.e.
+  "how good is the route if it is right wherever the owner could not tell". This truth differs from
+  route to route, so two routes' conditional figures are not a comparison against one fixed truth.
+  For comparing routes use the bounds or the common support: ``pages_exact_low`` /
+  ``folders_perfect_low`` score the opposite reading (every unsure gap goes against the route),
+  which is the tight minimum over every reading of the unsure gaps, as the conditional figure is the
+  tight maximum; ``resolved_doc_pages`` are the document pages whose truth document touches no
+  unsure gap (the same pages for every route), and ``pages_exact_low`` over them is the headline on
+  that common resolvable support. Docs, document F1, PQ, MNDD, edits and Pk/WindowDiff are
+  conditional figures only.
 """
 from __future__ import annotations
 
@@ -69,15 +82,22 @@ class Truth(list):
             raise ValueError(f"unsure gap index out of range: {self.unsure}")
 
 
-def forgive(truth: list[str], pred: list[str], unsure=()) -> list[str]:
-    """The truth with each unsure document gap set to the prediction's call there, so it scores as right."""
+def doc_unsure(truth: list[str]) -> frozenset:
+    """The truth's unsure gaps that are document gaps (both pages non-photo); a gap beside a photo is fixed."""
+    return frozenset(i for i in getattr(truth, "unsure", ())
+                     if truth[i] not in PHOTO and truth[i - 1] not in PHOTO)
+
+
+def forgive(truth: list[str], pred: list[str], unsure=(), oppose: bool = False) -> list[str]:
+    """The truth with each unsure document gap set to the prediction's call there, so it scores as right
+    (the conditional reading); ``oppose`` sets it against the prediction instead (the lower bound)."""
     out = list(truth)
     if not unsure:
         return out
     p_ids = segment_ids(pred)
     for i in unsure:
         if out[i] not in PHOTO and out[i - 1] not in PHOTO:
-            out[i] = "New" if p_ids[i] != p_ids[i - 1] else "Cont"
+            out[i] = "New" if (p_ids[i] != p_ids[i - 1]) != oppose else "Cont"
     return out
 
 
@@ -148,6 +168,10 @@ class Counts:
     pq_tp: int = 0              # truth documents matched at IoU > 0.5
     pq_iou: float = 0.0         # sum of the matches' IoU
     mndd: int = 0               # minimum single-page drag-and-drops
+    unscored_gaps: int = 0      # unsure document gaps, left out of every boundary count
+    pages_exact_low: int = 0    # pages_exact with every unsure gap read against the route
+    folders_perfect_low: int = 0
+    resolved_doc_pages: int = 0 # document pages whose truth document touches no unsure gap
     collections: list = field(default_factory=list)
 
     def __add__(self, o: "Counts") -> "Counts":
@@ -176,9 +200,14 @@ def derived(c: Counts) -> dict:
         "doc_pages": c.doc_pages,
         "docs": c.docs,
         "pages_in_exact_doc": _ratio(c.pages_exact, c.doc_pages),
+        "pages_in_exact_doc_low": _ratio(c.pages_exact_low, c.doc_pages),
+        "pages_in_exact_doc_resolved": _ratio(c.pages_exact_low, c.resolved_doc_pages),
+        "resolved_doc_pages": c.resolved_doc_pages,
+        "unscored_gaps": c.unscored_gaps,
         "docs_exact": _ratio(c.docs_exact, c.docs),
         "folders": c.folders,
         "folders_perfect": _ratio(c.folders_perfect, c.folders),
+        "folders_perfect_low": _ratio(c.folders_perfect_low, c.folders),
         "false_splits": c.false_splits,
         "false_merges": c.false_merges,
         "boundary_precision": p,
@@ -237,14 +266,16 @@ def _max_matching(pieces: list[tuple[int, int, int]]) -> int:
 def score_labels(truth: list[str], pred: list[str], name: str = "") -> Counts:
     if len(truth) != len(pred):
         raise ValueError(f"{name}: {len(pred)} predicted labels for {len(truth)} pages")
-    truth = forgive(truth, pred, getattr(truth, "unsure", ()))
+    unsure = doc_unsure(truth)
+    raw = truth
+    truth = forgive(raw, pred, unsure)
     n = len(truth)
     t_ids, p_ids = segment_ids(truth), segment_ids(pred)
     t_groups, p_sets = _groups(t_ids), set(_groups(p_ids).values())
     c = Counts(pages=n, collections=[name] if name else [])
     is_doc = [lab not in PHOTO for lab in truth]
 
-    # Documents and the headline.
+    # Documents and the headline (the conditional reading), then its lower bound and common support.
     exact_pages: set[int] = set()
     for s, pages in t_groups.items():
         if truth[min(pages)] in PHOTO:
@@ -255,6 +286,18 @@ def score_labels(truth: list[str], pred: list[str], name: str = "") -> Counts:
             c.docs_exact += 1
             c.pages_exact += len(pages)
             exact_pages |= pages
+    exact_low = exact_pages
+    if unsure:
+        low = segment_ids(forgive(raw, pred, unsure, oppose=True))
+        exact_low = set()
+        for s, pages in _groups(low).items():
+            if is_doc[min(pages)] and not any(min(pages) <= u <= max(pages) + 1 for u in unsure):
+                c.resolved_doc_pages += len(pages)
+                if pages in p_sets:
+                    exact_low |= pages
+    else:
+        c.resolved_doc_pages = c.doc_pages
+    c.pages_exact_low = len(exact_low)
 
     # The field's segment scorers, over the truth's document pages (the module docstring).
     pieces: list[list[int]] = []       # (truth segment, predicted segment, pages), in page order
@@ -289,11 +332,16 @@ def score_labels(truth: list[str], pred: list[str], name: str = "") -> Counts:
         c.folders += 1
         if all(k in exact_pages for k in range(i, j)):
             c.folders_perfect += 1
+        if all(k in exact_low for k in range(i, j)):
+            c.folders_perfect_low += 1
         i = j
 
-    # Boundaries over document gaps.
+    # Boundaries over known document gaps.
     for i in range(n - 1):
         if not (is_doc[i] and is_doc[i + 1]):
+            continue
+        if i + 1 in unsure:
+            c.unscored_gaps += 1
             continue
         c.gaps += 1
         tb = t_ids[i] != t_ids[i + 1]
@@ -348,14 +396,15 @@ def check_prediction(pred) -> None:
 def risk_coverage(truth: list[str], pred) -> list[tuple[float, int, int]] | None:
     """For a method that gives confidences: over document gaps, sorted most-confident first,
     (threshold, accepted, errors among accepted) at each distinct confidence. None if the
-    method gives no confidences. Review load = gaps - accepted."""
+    method gives no confidences. Review load = gaps - accepted. Unsure gaps are left out."""
     confs = [b.get("confidence") for b in pred.boundaries]
     if all(x is None for x in confs):
         return None
     t_ids, p_ids = segment_ids(truth), segment_ids(pred.labels)
+    unsure = doc_unsure(truth)
     rows = []
     for i, b in enumerate(pred.boundaries):
-        if truth[i] in PHOTO or truth[i + 1] in PHOTO:
+        if truth[i] in PHOTO or truth[i + 1] in PHOTO or i + 1 in unsure:
             continue
         wrong = (t_ids[i] != t_ids[i + 1]) != (p_ids[i] != p_ids[i + 1])
         rows.append((b.get("confidence") or 0.0, wrong))

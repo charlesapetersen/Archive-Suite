@@ -398,5 +398,72 @@ class Unsure(unittest.TestCase):
         self.assertEqual(list(col.labels), self.T)
 
 
+class UnsureMask(unittest.TestCase):
+    """W46.seg-unsure-mask: an unsure gap is out of the boundary support, not an artificial agreement."""
+
+    def test_both_predictions_score_one_known_gap(self):
+        t = Truth([N, C, N], [1])                    # two document gaps; only the one before page 2 is known
+        for pred in ([N, N, N], [N, C, N]):
+            c = score_labels(t, pred)
+            self.assertEqual((c.gaps, c.unscored_gaps, c.truth_bounds, c.tp, c.false_splits, c.false_merges),
+                             (1, 1, 1, 1, 0, 0), pred)
+            self.assertEqual(d(t, pred)["kappa"], 1.0)
+        # The segment figures are conditional: the truth's document count follows the route's call ...
+        self.assertEqual((score_labels(t, [N, N, N]).docs, score_labels(t, [N, C, N]).docs), (3, 2))
+        # ... the lower bound does not, and only page 2 is outside the unsure gap's reach.
+        for pred in ([N, N, N], [N, C, N]):
+            r = d(t, pred)
+            self.assertEqual((r["pages_in_exact_doc"], r["pages_in_exact_doc_low"], r["resolved_doc_pages"]),
+                             (1.0, 1 / 3, 1), pred)
+
+    def test_adjacent_unsure_gaps(self):
+        t = Truth([B, N, C, C, N, C], [2, 3])        # gaps 1|2 and 2|3 unsure; 3|4 a known boundary, 4|5 known cont
+        pred = [B, N, N, C, N, N]                    # splits at 2 (unsure), joins at 3 (unsure), false split at 5
+        c = score_labels(t, pred)
+        self.assertEqual((c.gaps, c.unscored_gaps, c.truth_bounds, c.tp, c.false_splits, c.false_merges),
+                         (2, 2, 1, 1, 1, 0))
+        # Pages 1-3 touch the unsure gaps; pages 4-5 are one resolved document, split wrongly.
+        self.assertEqual((c.doc_pages, c.resolved_doc_pages, c.pages_exact, c.pages_exact_low), (5, 2, 3, 0))
+        self.assertEqual((c.folders_perfect, c.folders_perfect_low), (0, 0))
+
+    def test_bounds_are_the_extremes_over_every_reading(self):
+        from itertools import product
+        t = Truth([N, C, C, N, C, F, N, C, N], [1, 2, 4, 7])
+        for pred in ([N, N, C, N, N, F, N, N, N], [N, C, C, C, C, F, N, C, C], [N, N, N, N, N, F, C, C, N]):
+            c = score_labels(t, pred)
+            exact, perfect = [], []
+            for reading in product((N, C), repeat=len(t.unsure)):
+                fixed = list(t)
+                for i, lab in zip(t.unsure, reading):
+                    fixed[i] = lab
+                r = score_labels(fixed, pred)
+                exact.append(r.pages_exact)
+                perfect.append(r.folders_perfect)
+            self.assertEqual((c.pages_exact, c.pages_exact_low), (max(exact), min(exact)), pred)
+            self.assertEqual((c.folders_perfect, c.folders_perfect_low), (max(perfect), min(perfect)), pred)
+
+    def test_no_unsure_box_scores_exactly_as_a_plain_list(self):
+        T = [B, F, N, C, C, N, N, C]
+        for pred in (list(T), [B, F, N, N, C, C, N, C], [N, N, N, N, N, N, N, N]):
+            plain, ruled = d(T, pred), d(Truth(T), pred)
+            self.assertEqual(plain, ruled)
+            self.assertEqual((plain["unscored_gaps"], plain["resolved_doc_pages"]), (0, plain["doc_pages"]))
+            self.assertEqual(plain["pages_in_exact_doc_low"], plain["pages_in_exact_doc"])
+            self.assertEqual(plain["folders_perfect_low"], plain["folders_perfect"])
+
+    def test_photo_gap_marked_unsure_stays_scored(self):
+        c = score_labels(Truth([B, N, C], [1]), [B, N, C])
+        self.assertEqual((c.gaps, c.unscored_gaps), (1, 0))
+
+    def test_risk_coverage_leaves_unsure_gaps_out(self):
+        t = Truth([N, C, N, C], [1])
+        p = Prediction([N, N, N, C], [
+            {"decision": "new", "confidence": 0.2, "cue": ""},   # the unsure gap: neither right nor wrong
+            {"decision": "new", "confidence": 0.9, "cue": ""},
+            {"decision": "continue", "confidence": 0.9, "cue": ""}])
+        self.assertEqual(risk_coverage(t, p), [(0.9, 2, 0)])
+        self.assertEqual(risk_coverage(list(t), p), [(0.9, 2, 0), (0.2, 3, 1)])   # a plain copy loses the mask
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=1)
