@@ -19,8 +19,8 @@ with the same k gaps corrected.
 
 MONEY: real money on the Stanford PTA through the gateway. One ledger (STORE/calls.jsonl), the item cap CAP, and the
 seg_lincoln_gateway machinery unchanged: an fsynced pre-send reservation, settle at Gemini's list rate (.75/3.75 per
-M tokens, an estimate; the gateway returns no cost), stop on any invalid reply, no automatic retry. Scoring makes no
-calls. Lincoln and CREST are public boxes: no owner material is sent.
+M tokens, an estimate; seg_lincoln_gateway records the gateway's own figure beside it), stop on any invalid reply, no
+automatic retry. Scoring makes no calls. Lincoln and CREST are public boxes: no owner material is sent.
 """
 from __future__ import annotations
 

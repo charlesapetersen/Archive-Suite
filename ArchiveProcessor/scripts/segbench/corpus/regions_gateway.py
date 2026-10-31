@@ -35,6 +35,8 @@ PACK = G.REHEARSAL / 'sherlock-results/regions-20261021'
 CAP = 4.30  # owner-approved total for W46.ocr-regions-paid + -pp (2026-10-28 walkthrough); was 3.0
 ARMS = ('whole', 'pp-doclayoutv3', 'tiles')
 PRICE = G.PRICE  # estimate at the prior bench's conservative .75/3.75 USD/M, not a gateway bill
+# A settled line keeps that estimate as `estimate` and the gateway's own figure (x-litellm-response-cost) as
+# `gateway_cost` when sent; its `charge`, what the cap counts, is the larger (W46.gateway-cost-record).
 LOCK = threading.Lock()
 STOP = threading.Event()
 RETRY_UNKNOWN = False  # set only by an explicit --retry-unknown, after the unknown lines were inspected
@@ -66,6 +68,11 @@ def effective():
 
 def spent():
     return sum(r['charge'] for r in effective())
+
+
+def settled():
+    """Settled new calls, each with its token estimate (`charge` on lines written before `estimate` was)."""
+    return [{**r, 'estimate': r.get('estimate', r['charge'])} for r in effective() if r['event'] == 'settle']
 
 
 def append(r):
@@ -294,6 +301,8 @@ def call_once(m, job):
     u = got.get('usage') or {}
     known = all(type(u.get(k)) is int and u[k] >= 0 for k in ('prompt_tokens', 'completion_tokens'))
     cost = G.cost(u) if known else reserve
+    measured = G.gateway_cost(response)
+    charge = max(cost, measured or 0)
     choice = (got.get('choices') or [{}])[0]
     raw = (choice.get('message') or {}).get('content')
     parsed = G.parsed({'raw': raw}) if isinstance(raw, str) else None
@@ -303,9 +312,10 @@ def call_once(m, job):
            'reused': False, 'wall_s': round(time.time() - rec['t'], 3), 'cost_estimate': cost}
     with LOCK:
         save(STORE / 'replies' / (key + '.json'), hit)
-        append({**rec, 'event': 'settle', 'charge': cost, 'usage': u, 'valid': valid,
+        append({**rec, 'event': 'settle', 'charge': charge, 'estimate': cost,
+                **({} if measured is None else {'gateway_cost': measured}), 'usage': u, 'valid': valid,
                 'http': response.status_code, 'finish': choice.get('finish_reason'), 'known': known})
-        if not known or cost > reserve or spent() > CAP:
+        if not known or charge > reserve or spent() > CAP:
             STOP.set()
             raise RuntimeError('unknown usage or allowance overrun; stop and inspect')
     return hit
@@ -396,9 +406,10 @@ def receipt(m, job, ledger):
     parsed = G.parsed({'raw': hit['raw']}) if isinstance(hit['raw'], str) else None
     valid = (led['http'] == 200 and got.get('model') == G.MODEL and choice.get('finish_reason') == 'stop'
              and bool(parsed) and known)
-    if valid != hit['valid'] or not known or abs(led['charge'] - G.cost(u)) > 1e-9:
+    estimate = led.get('estimate', led['charge'])   # lines settled before W46.gateway-cost-record carry only charge
+    if valid != hit['valid'] or not known or abs(estimate - G.cost(u)) > 1e-9:
         raise ValueError(f'receipt does not re-validate: {p["id"]}/{arm}/{i}')
-    return {'text': parsed['text'] if valid else '', 'valid': valid, 'usage': u, 'cost': led['charge'], 'new': led['charge']}
+    return {'text': parsed['text'] if valid else '', 'valid': valid, 'usage': u, 'cost': estimate, 'new': estimate}
 
 
 def present(m, p, arm, ledger):
@@ -485,7 +496,8 @@ def score():
            'public_pages': sorted(p['id'] for p in pages if p['set'] == 'public895'),
            'public_per_stratum': 3 if all_public else 1,
            'price_estimate_usd_per_m': list(PRICE), 'item_spend_estimate': round(item, 4),
-           'calls_new': sum(r['event'] == 'settle' for r in effective())}
+           'calls_new': sum(r['event'] == 'settle' for r in effective()),
+           'billed': G.billed(settled(), 'estimate'), 'billed_note': G.billed_note(settled(), 'estimate')}
     (OUT / f'{NAME}.json').write_text(json.dumps(out, indent=2) + '\n')
     (OUT / f'{NAME}.md').write_text(report_md(out))
     print(report_md(out))
@@ -500,7 +512,8 @@ def report_md(out):
          'a page or crop that returned nothing counts as empty. Whole-page readings of the 96 are the earlier gateway '
          'item\'s, reused after exact request-hash checks. Prices are estimates at '
          f"${out['price_estimate_usd_per_m'][0]}/${out['price_estimate_usd_per_m'][1]} per million tokens; the gateway "
-         f"returns no bill. This item's settled new calls: {out['calls_new']}, about ${out['item_spend_estimate']:.2f}.", '',
+         f"publishes no price. This item's settled new calls: {out['calls_new']}, about ${out['item_spend_estimate']:.2f}; "
+         f"{out.get('billed_note', 'the gateway reported no cost of its own for these calls')}.", '',
          '## The 96 owner pages', '',
          '| group | arm | NES % | answered | Δ whole (points, 95% CI) | failed / crops | cost / 1,000 pages |',
          '|---|---|---:|---:|---:|---:|---:|']

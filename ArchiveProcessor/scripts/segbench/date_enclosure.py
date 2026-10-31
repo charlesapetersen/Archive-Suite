@@ -578,17 +578,24 @@ def cmd_score(a):
 
 def gateway_cost():
     """{arm: {"calls", "usd", "per_1000"}} from the gateway ledger (date_enclosure_gateway.py): token usage at the list
-    price taken as a ceiling, an estimate (the gateway returns no cost); failed calls are counted, retries included."""
+    price taken as a ceiling, an estimate; failed calls are counted, retries included. "gateway_usd" is the gateway's
+    own figure over the calls that carry it (W46.gateway-cost-record), present only when some do."""
     p = os.path.join(OUT, "gateway", "calls.jsonl")
     if not os.path.exists(p):
         return {}
     acc = collections.defaultdict(lambda: [0, 0.0])
+    measured = collections.defaultdict(lambda: [0, 0.0])
     for line in open(p, encoding="utf-8"):
         r = json.loads(line)
         k = next(v[1] + ":" + key for key, v in GATEWAY.items() if v[1] == r["arm"])
         acc[k][0] += 1
         acc[k][1] += r.get("cost", 0)
-    return {k: {"calls": n, "usd": round(c, 4), "per_1000": round(1000 * c / n, 2)} for k, (n, c) in acc.items()}
+        if r.get("gateway_cost") is not None:
+            measured[k][0] += 1
+            measured[k][1] += r["gateway_cost"]
+    return {k: {"calls": n, "usd": round(c, 4), "per_1000": round(1000 * c / n, 2),
+                **({"gateway_usd": round(measured[k][1], 4), "gateway_calls": measured[k][0]} if k in measured else {})}
+            for k, (n, c) in acc.items()}
 
 
 def frac(kn):
@@ -637,7 +644,7 @@ FINDINGS = [   # written by hand from the scored runs of 2026-10-22 (Mac) and 20
     "a25 drew a wrong yes from the Gemini marker, Gemini as classifier and the 27B alike: a reply that discusses a "
     "draft reads as a cover to every model tried. The images did not help: the 27B, text only, found a22, and "
     "Gemini with both pages did not.",
-    "Cost, from token usage at Gemini 3.8 Flash's list price taken as a ceiling (the gateway returns no cost): the "
+    "Cost, from token usage at Gemini 3.8 Flash's list price taken as a ceiling (the gateway publishes no price): the "
     "marker about $4.70 per 1,000 documents, the classifier about $3.14; the item spent about $1.76 of its $4.00 "
     "cap, plus at most one call that the first run lost to a read timeout before the ledger recorded it (about "
     "$0.003; the runner now records timed-out calls at their worst case).",

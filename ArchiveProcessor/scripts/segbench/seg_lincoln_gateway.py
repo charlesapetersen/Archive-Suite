@@ -13,8 +13,10 @@ Scoring cannot make calls.
 
 The gateway publishes no price: costs are estimates at list token rates, reasoning included.
 Gemini .75/3.75, GLM .15/.50, Claude 2/10 USD/M, checked against OpenRouter /models
-2026-10-24 (not the gateway's bill). A single-process lock covers collection; fsynced
-pre-send reservations survive interruption. Unknown usage keeps the reservation and stops.
+2026-10-24 (not the gateway's bill). A settled call also records the gateway's own figure
+(`gateway_cost`, from its x-litellm-response-cost header, when sent) beside the estimate
+(`estimate`); its `charge` is the larger of the two (W46.gateway-cost-record). A single-process lock covers
+collection; fsynced pre-send reservations survive interruption. Unknown usage keeps the reservation and stops.
 """
 from __future__ import annotations
 
@@ -68,6 +70,15 @@ def effective_records():
     for r in records():
         latest[r['id']] = r
     return list(latest.values())
+
+
+def settled():
+    """Settled calls, each with its token estimate (`charge` on lines written before the gateway's figure was)."""
+    return [{**r, 'estimate': r.get('estimate', r['charge'])} for r in effective_records() if r['event'] == 'settle']
+
+
+def settled_billed():
+    return GW.billed(settled(), 'estimate')
 
 
 def append(rec):
@@ -366,7 +377,9 @@ def call(route, col, a, b, whole=False):
     usage = got.get('usage') or {}
     pi, po = PRICES[route]
     known = all(isinstance(usage.get(k), int) and usage[k] >= 0 for k in ('prompt_tokens', 'completion_tokens'))
-    charge = (usage['prompt_tokens'] * pi + usage['completion_tokens'] * po) / 1e6 if known else reserve
+    estimate = (usage['prompt_tokens'] * pi + usage['completion_tokens'] * po) / 1e6 if known else reserve
+    measured = GW.gateway_cost(r)
+    charge = max(estimate, measured or 0)
     choice = (got.get('choices') or [{}])[0]
     raw = (choice.get('message') or {}).get('content') or ''
     valid, error = False, None
@@ -382,7 +395,8 @@ def call(route, col, a, b, whole=False):
     tmp = dest.with_suffix('.tmp')
     tmp.write_text(json.dumps({'valid': valid, 'raw': raw, 'response': got, 'request': rec}, ensure_ascii=False))
     tmp.replace(dest)
-    append({**rec, 'event': 'settle', 'charge': charge, 'usage': usage, 'valid': valid,
+    append({**rec, 'event': 'settle', 'charge': charge, 'estimate': estimate,
+            **({} if measured is None else {'gateway_cost': measured}), 'usage': usage, 'valid': valid,
             'error': error, 'http': r.status_code, 'finish': choice.get('finish_reason'),
             'normalization': normalized(raw, whole)[1] if valid else None,
             'returned_model': got.get('model'), 'wall_s': round(time.time() - rec['t'], 3)})
@@ -470,6 +484,7 @@ def score(root, claude_only=False, record_glm_failure=False):
     rescore.no_network()
     used = used_request_ids(root, claude_only)
     out = {'price_note': __doc__.split('The gateway publishes')[1].strip(), 'cost_estimate': spent(),
+           'billed': settled_billed(),
            'partial': claude_only,
            'calls': [{**r, 'used': r['id'] in used} for r in effective_records()
                      if not claude_only or r['route'] == 'claude-cue'], 'boxes': {}}
@@ -524,7 +539,7 @@ def score(root, claude_only=False, record_glm_failure=False):
              'the saved Lincoln pilot had a 32768 cap.', '',
              'Claude c2 combines earlier plan windows with gateway holes, same Sonnet 5.5 and stated cues, '
              'but inline-image delivery replaces tool reads. It is a mixed-transport result.', '',
-             f'Item cost estimate ${spent():.4f}, at list token prices; gateway billing is unavailable. '
+             f'Item cost estimate ${spent():.4f}, at list token prices; {GW.billed_note(settled(), "estimate")}. '
              'Includes every attempted call and unsettled reservation. Rates: Gemini $0.75/$3.75, '
              'GLM $0.15/$0.50, Claude $2/$10 per million input/output tokens (reasoning included), '
              'OpenRouter model catalog checked 2026-10-24. No batch discount claimed.', '']

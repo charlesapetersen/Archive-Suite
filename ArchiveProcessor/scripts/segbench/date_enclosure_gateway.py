@@ -14,9 +14,10 @@ Two arms, both with images, on the set `date_enclosure.py set` built (owner 15, 
     python3 date_enclosure.py score                       # the gateway arms join the page beside the free ones
 
 The gateway is real money on a Stanford PTA (root CLAUDE.md). Spend is counted from the gateway's token usage at
-Gemini 3.8 Flash's list price taken as a ceiling (gateway_gemini.PRICE; the gateway returns no cost) into the ledger
-CACHE/calls.jsonl, written before a reply is used. The key is read by gateway_gemini.api_key, never printed or written.
-Images and replies stay in the private bench cache. Gemini 3.7, not 3.8: the gateway serves no 3.8. Run from
+Gemini 3.8 Flash's list price taken as a ceiling (gateway_gemini.PRICE; the gateway's own figure per call is recorded
+beside it) into the ledger CACHE/calls.jsonl, written before a reply is used. The key is read by
+gateway_gemini.api_key, never printed or written. Images and replies stay in the private bench cache. Gemini 3.7, not
+3.8: the gateway serves no 3.8. Run from
 scripts/segbench.
 """
 import argparse
@@ -56,7 +57,7 @@ def ledger():
 
 
 def spent():
-    return sum(r.get("cost", 0) for r in ledger())
+    return sum(G.charge(r) for r in ledger())
 
 
 def cover_last_page(d):
@@ -131,6 +132,7 @@ def call(arm, d, body):
     usage = got.get("usage") or {}
     rec = {"arm": arm, "id": d["id"], "http": r.status_code, "t": t, "wall_s": round(time.time() - t, 3),
            "model": got.get("model"), "usage": usage, "cost": round(G.cost(usage), 6)}
+    rec = G.with_gateway_cost(rec, r)
     os.makedirs(CACHE, exist_ok=True)
     with open(os.path.join(CACHE, "calls.jsonl"), "a") as fh:
         fh.write(json.dumps(rec) + "\n")
@@ -157,7 +159,8 @@ def cmd_run(a):
     empty = [r["id"] for r in res if not r.get("raw")]
     calls = [r for r in ledger() if r.get("arm") == a.arm]
     mean = sum(r["cost"] for r in calls) / len(calls) if calls else 0
-    print(f"{len(res) - len(empty)}/{len(res)} answered, ${spent():.4f} spent in all; {a.arm} ${mean:.5f} a call; "
+    print(f"{len(res) - len(empty)}/{len(res)} answered, ${spent():.4f} spent in all ({G.billed_note(ledger())}); "
+          f"{a.arm} ${mean:.5f} a call; "
           f"no text: {empty[:20]}")
 
 

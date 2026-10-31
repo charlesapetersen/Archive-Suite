@@ -54,8 +54,8 @@ and the two are reported with their agreement. The judges share families with th
 scored model.
 
 The gateway is real money on a Stanford PTA: CAP bounds this item's spend, counted from token usage at the PRICE
-table of ent_truth (an estimate; the gateway returns no cost). Texts, images, predictions and judgements stay in
-the bench cache; the committed report has aggregates only.
+table of ent_truth (an estimate; the gateway's own figure per call is recorded beside it). Texts, images, predictions
+and judgements stay in the bench cache; the committed report has aggregates only.
 """
 from __future__ import annotations
 
@@ -347,7 +347,8 @@ def ledger():
 
 
 def spent():
-    return sum(r.get("cost", 0) for r in ledger())
+    import gateway_gemini as G
+    return sum(G.charge(r) for r in ledger())
 
 
 def call(model, key, b, dest):
@@ -367,6 +368,7 @@ def call(model, key, b, dest):
     usage = got.get("usage") or {}
     rec = {"stage": "judge", "key": key, "http": r.status_code, "t": t, "model": got.get("model") or model,
            "usage": usage, "cost": round(ET.cost(model, usage), 6)}
+    rec = G.with_gateway_cost(rec, r)
     with open(os.path.join(CACHE, "calls.jsonl"), "a") as fh:
         fh.write(json.dumps(rec) + "\n")
     choice = (got.get("choices") or [{}])[0]
@@ -581,6 +583,8 @@ def cmd_report(a):
                           {(n["id"], n["field"], n["name"]): n for n in names if not n["by_truth"]}.values()
                           if judged("claude", n) != judged("luna", n)))}
     out["spend_usd"] = round(spent(), 4)
+    import gateway_gemini as G
+    out["billed"], out["billed_note"] = G.billed(ledger()), G.billed_note(ledger())
     out["calls"] = len(ledger())
     json.dump(out, open(RESULTS[:-3] + ".json", "w"), indent=1)
     open(RESULTS, "w").write(report(out))
@@ -664,7 +668,8 @@ def report(s):
                  + " |")
     L += ["", f"Judge agreement over the doubtful names: {s['nowhere']['judge_agreement']}; disagreements (Claude / "
           f"Luna): {s['nowhere']['disagreements']}.", "",
-          f"Spend: ${s['spend_usd']:.2f} estimated over {s['calls']} gateway calls at ceiling prices.", ""]
+          f"Spend: ${s['spend_usd']:.2f} estimated over {s['calls']} gateway calls at ceiling prices"
+          f"{'; ' + s['billed_note'] if s.get('billed_note') else ''}.", ""]
     L += READING
     return "\n".join(L) + "\n"
 

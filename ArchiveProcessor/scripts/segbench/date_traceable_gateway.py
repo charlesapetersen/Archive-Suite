@@ -11,9 +11,10 @@ text (the 131 that the one-shot figures are read on). 161 documents by three var
     python3 date_traceable_gateway.py score                           # segbench-results/date-traceable-paid.md/.json
 
 The gateway is real money on a Stanford PTA (root CLAUDE.md). Spend is counted from the gateway's token usage at
-Gemini 3.8 Flash's list price taken as a ceiling (gateway_gemini.PRICE; the gateway returns no cost) into the ledger
-CACHE/calls.jsonl, written before a reply is used. The key is read by gateway_gemini.api_key, never printed or written.
-Replies stay in the private bench cache (the prompts carry the owner's text). Gemini 3.7, not 3.8: the gateway serves
+Gemini 3.8 Flash's list price taken as a ceiling (gateway_gemini.PRICE; the gateway's own figure per call is recorded
+beside it) into the ledger CACHE/calls.jsonl, written before a reply is used. The key is read by
+gateway_gemini.api_key, never printed or written. Replies stay in the private bench cache (the prompts carry the
+owner's text). Gemini 3.7, not 3.8: the gateway serves
 no 3.8; how far 3.7 sits from 3.8 on OCR is gateway_gemini's report. Run from scripts/segbench.
 """
 import argparse
@@ -45,7 +46,7 @@ def ledger():
 
 
 def spent():
-    return sum(r.get("cost", 0) for r in ledger())
+    return sum(G.charge(r) for r in ledger())
 
 
 def targets(owner):
@@ -75,6 +76,7 @@ def call(key, prompt, path):
     usage = got.get("usage") or {}
     rec = {"id": key, "http": r.status_code, "t": t, "wall_s": round(time.time() - t, 3), "model": got.get("model"),
            "usage": usage, "cost": round(G.cost(usage), 6)}
+    rec = G.with_gateway_cost(rec, r)
     os.makedirs(CACHE, exist_ok=True)
     with open(os.path.join(CACHE, "calls.jsonl"), "a") as fh:
         fh.write(json.dumps(rec) + "\n")
@@ -97,7 +99,8 @@ def cmd_run(a):
     with ThreadPoolExecutor(4) as ex:
         res = list(ex.map(lambda j: call(*j), jobs))
     bad = [r["id"] for r in res if not T.parse_trace(r.get("raw"))["parsed"]]
-    print(f"{len(res) - len(bad)}/{len(res)} parsed, ${spent():.4f} spent in all; unparsed: {bad[:20]}")
+    print(f"{len(res) - len(bad)}/{len(res)} parsed, ${spent():.4f} spent in all ({G.billed_note(ledger())}); "
+          f"unparsed: {bad[:20]}")
 
 
 def answers():
@@ -127,7 +130,8 @@ def cmd_score(a):
             usage[k] += (r.get("usage") or {}).get(k) or 0
     out = {"label": LABEL, "model": G.MODEL, "documents": len(tg), "answers": len(gw), "spent_estimate": round(spent(), 4),
            "price_assumed": G.PRICE, "calls": calls_n, "usage": dict(usage),
-           "usd_per_reply": round(spent() / max(1, calls_n), 5), "one_shot": {}, "pipeline": {}}
+           "usd_per_reply": round(spent() / max(1, calls_n), 5), "billed": G.billed(ledger()),
+           "billed_note": G.billed_note(ledger()), "one_shot": {}, "pipeline": {}}
     g38 = [T.row(d, "one-shot", *got) for d in nit for got in [T.one_shot(d, None)] if got is not None]
     out["one_shot"]["Gemini 3.8 Flash, app prompt (W41, OpenRouter)"] = T.summary(g38, "owner")
     for lab, ans in (("Gemini 3.7 Flash (gateway)", gw), ("Qwen3.6 27B", q)):
@@ -175,7 +179,7 @@ def write_md(out):
          f"Spend: about ${out['spent_estimate']:.2f} for {n} replies ({out['usage'].get('prompt_tokens', 0):,} input, "
          f"{out['usage'].get('completion_tokens', 0):,} output tokens incl. reasoning), an estimate at 3.8's list price "
          f"${out['price_assumed'][0]} / ${out['price_assumed'][1]} per million, so about "
-         f"${1000 * out['usd_per_reply']:.2f} per 1,000 replies. The stated-confidence rerun is dropped (the trace "
+         f"${1000 * out['usd_per_reply']:.2f} per 1,000 replies; {out['billed_note']}. The stated-confidence rerun is dropped (the trace "
          "prompt's 90% interval is what the conformal column reads).", ""]
     L += findings(out)
     L += ["## One shot on the 131 whose year is not in the corpus text", "",

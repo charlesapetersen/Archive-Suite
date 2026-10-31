@@ -11,8 +11,10 @@ The 3.7-against-3.8 check: later gateway arms of the W46 review run Gemini 3.7 F
 serve 3.8, while the bench's cached Gemini figures are 3.8 Flash through OpenRouter (W41.ocr-panel-cloud). This
 reads the same 99 images with the same prompt, temperature 0 and low reasoning, so a later arm can say how far its
 3.7 figure sits from the 3.8 one. The gateway is real money on a Stanford PTA (root CLAUDE.md): CAP bounds this
-item's spend, counted from the gateway's token usage at Google's list price for the model (the gateway does not
-return a cost), and the ledger is CACHE/calls.jsonl.
+item's spend, counted from the gateway's token usage at Google's list price for the model, and the ledger is
+CACHE/calls.jsonl. Each ledger line also carries `gateway_cost`, the gateway's own figure for the call from LiteLLM's
+`x-litellm-response-cost` header (absent when the header is), and a cap counts the larger of the two
+(W46.gateway-cost-record).
 
 The key is the Processor's gateway key (Keychain service com.archiveprocessor.app, account Gateway), read into
 memory once, never printed or written. Images, replies and readings stay in the cache (the owner's material).
@@ -42,9 +44,10 @@ CACHE = REHEARSAL / 'gateway-gemini'
 PANEL = REHEARSAL / 'ocr-panel-cloud'          # the 3.8 run: manifest, images, responses/gemini3.8-flash
 CHAOS = REHEARSAL / 'ocr-scorers/chaos'
 RESULTS = HERE.parents[1] / 'segbench-results'
-# $ per million tokens (input, output incl. reasoning), used only to count spend against CAP and labelled an
-# estimate: the gateway returns no cost and publishes no price. Gemini 3.8 Flash's standard list rate (OpenRouter's
-# catalog, 2026-10-15: $0.75 / $3.75; flex is half), taken as a ceiling for the older 3.7.
+# $ per million tokens (input, output incl. reasoning), used to count spend against CAP and labelled an estimate:
+# the gateway publishes no price. Its per-call figure (gateway_cost below) is recorded beside it. Gemini 3.8
+# Flash's standard list rate (OpenRouter's catalog, 2026-10-15: $0.75 / $3.75; flex is half), taken as a ceiling
+# for the older 3.7.
 PRICE = (0.75, 3.75)
 CAP = 1.00            # the item's total; under the $3 rule with room to spare
 MAX_TOKENS = 8192     # the panel's; 3.7 spends reasoning tokens first, so a small cap returns no text
@@ -77,7 +80,50 @@ def ledger():
 
 
 def spent():
-    return sum(r.get('cost', 0) for r in ledger())
+    return sum(charge(r) for r in ledger())
+
+
+def gateway_cost(response):
+    """The gateway's own figure for one call, from LiteLLM's x-litellm-response-cost header; None when absent or
+    unreadable. A ledger line stores it as `gateway_cost` beside the token estimate, and only when it is there."""
+    v = (getattr(response, 'headers', None) or {}).get('x-litellm-response-cost')
+    try:
+        return round(float(v), 8) if v not in (None, '') else None
+    except (TypeError, ValueError):
+        return None
+
+
+def with_gateway_cost(rec, response):
+    """rec with the gateway's figure added when the response carried one (the line is unchanged otherwise)."""
+    g = gateway_cost(response)
+    return rec if g is None else {**rec, 'gateway_cost': g}
+
+
+def charge(rec, key='cost'):
+    """What one ledger line counts against a cap: the larger of the token estimate and the gateway's figure."""
+    return max(rec.get(key) or 0, rec.get('gateway_cost') or 0)
+
+
+def billed(rows, key='cost'):
+    """Both figures over ledger lines: the estimate, the gateway's own sum over the lines that carry it, and their
+    ratio on those same lines, so a report can quote the measured figure beside the estimate."""
+    rows = list(rows)
+    have = [r for r in rows if r.get('gateway_cost') is not None]
+    est_have = sum(r.get(key) or 0 for r in have)
+    gw = sum(r['gateway_cost'] for r in have)
+    return {'calls': len(rows), 'estimate': round(sum(r.get(key) or 0 for r in rows), 6),
+            'gateway_calls': len(have), 'gateway': round(gw, 6) if have else None,
+            'gateway_over_estimate': round(gw / est_have, 4) if have and est_have else None,
+            'charged': round(sum(charge(r, key) for r in rows), 6)}
+
+
+def billed_note(rows, key='cost'):
+    """One clause for a report: the gateway's own figure and its ratio to the estimate, or that none was recorded."""
+    b = billed(rows, key)
+    if not b['gateway_calls']:
+        return 'the gateway reported no cost of its own for these calls'
+    ratio = '' if b['gateway_over_estimate'] is None else f", {b['gateway_over_estimate']:.2f} times the estimate on them"
+    return f"the gateway's own figure ${b['gateway']:.4f} on {b['gateway_calls']} of {b['calls']} calls{ratio}"
 
 
 def cost(usage):
@@ -122,6 +168,7 @@ def call(set_name, job_id, image: bytes, prompt: str, dest: Path):
     rec = {'set': set_name, 'job': job_id, 'http': r.status_code, 't': t, 'wall_s': round(time.time() - t, 3),
            'model': got.get('model'), 'usage': usage, 'cost': round(cost(usage), 6),
            'request_sha256': hashlib.sha256(json.dumps(b, sort_keys=True).encode()).hexdigest()}
+    rec = with_gateway_cost(rec, r)
     CACHE.mkdir(parents=True, exist_ok=True)
     with (CACHE / 'calls.jsonl').open('a') as f:
         f.write(json.dumps(rec) + '\n')
@@ -233,6 +280,7 @@ def report():
            'kind_correct38': sum(1 for r in scored if r['kind38']), 'kind_correct37': sum(1 for r in scored if r['kind37']),
            'by_kind': by_kind,
            'cost37_list_estimate': sum(c['cost'] for c in calls), 'cost38_openrouter': old_cost,
+           'cost37_billed': billed(calls),
            'usage37': {**usage, 'reasoning_tokens': reasoning},
            'wall37_s_median': sorted(c['wall_s'] for c in calls)[len(calls) // 2] if calls else None,
            'price_assumed': PRICE, 'pages_detail': rows}
@@ -257,7 +305,8 @@ def report():
     for k, v in by_kind.items():
         L.append(f"| {k} | {v['pages']} | {pct(v['nes38'])} | {pct(v['nes37'])} |")
     L += ['', f"3.7 used {usage['prompt_tokens']:,} input and {usage['completion_tokens']:,} output tokens "
-          f"({reasoning:,} of them reasoning) on the 96; median {out['wall37_s_median']} s a page."]
+          f"({reasoning:,} of them reasoning) on the 96; median {out['wall37_s_median']} s a page; "
+          f"{billed_note(calls)}."]
     # The cloud panel's two formats, so ArchiveOCRBench draws 3.7 on the 96's charts beside the panel's routes.
     detail = [d for d in detail if not d['agreement']]
     a = S.aggregate(detail)

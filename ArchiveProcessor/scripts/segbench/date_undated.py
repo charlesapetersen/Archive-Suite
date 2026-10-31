@@ -262,7 +262,7 @@ def ledger():
 
 
 def spent():
-    return sum(r.get("cost", 0) for r in ledger())
+    return sum(G.charge(r) for r in ledger())
 
 
 def app_body(prompt, rerun=False):
@@ -299,6 +299,7 @@ def call(key, b, worst, dest: Path):
     rec = {"id": key, "http": r.status_code, "t": t, "wall_s": round(time.time() - t, 3), "model": got.get("model"),
            "usage": usage, "cost": round(G.cost(usage), 6),
            "request_sha256": hashlib.sha256(json.dumps(b, sort_keys=True).encode()).hexdigest()}
+    rec = G.with_gateway_cost(rec, r)
     with _lock:
         with (CACHE / "calls.jsonl").open("a") as fh:
             fh.write(json.dumps(rec) + "\n")
@@ -516,10 +517,10 @@ def cmd_score(a):
           "## Cost", "",
           f"{len(calls)} gateway calls, {sum((c.get('usage') or {}).get('prompt_tokens', 0) for c in calls):,} input "
           f"and {sum((c.get('usage') or {}).get('completion_tokens', 0) for c in calls):,} output tokens: about "
-          f"${usd:.2f} at 3.8 Flash's list price taken as a ceiling (the gateway returns no price), plus the 122 cached "
-          "image replies of W46.date-image-paid.", ""]
+          f"${usd:.2f} at 3.8 Flash's list price taken as a ceiling (the gateway publishes no price; "
+          f"{G.billed_note(calls)}), plus the 122 cached image replies of W46.date-image-paid.", ""]
     RESULTS.write_text("\n".join(L))
-    out = {"model": G.MODEL, "usd": round(usd, 2), "undated": {
+    out = {"model": G.MODEL, "usd": round(usd, 2), "billed": G.billed(calls), "undated": {
         "n": len(und), "du": [sum(r["app"]["du"] for r in und), len(und)],
         "certain_year": [len(certain), len(und)], "false_year": [len(false_year), len(und)],
         "own_date": [len(with_own), len(und)]}, "du_by_own_date": du_json,

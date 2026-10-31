@@ -13,8 +13,9 @@ output tokens). The raw arm is not read again: its image and prompt are byte for
 read (gateway-gemini/panel/<page>-original.json), which raw_reply() checks against the image hash.
 
 Money: this item's ledger is CACHE/calls.jsonl, apart from gateway_gemini's, and CAP is this item's whole spend,
-counted at the 3.8 list price gateway_gemini takes as a ceiling (the gateway returns no bill). Every call checks the
-cap first. Images and replies stay in CACHE (the owner's material); committed results hold page ids and numbers.
+counted at the 3.8 list price gateway_gemini takes as a ceiling (the gateway's own figure, recorded beside it, counts
+when larger). Every call checks the cap first. Images and replies stay in CACHE (the owner's material); committed
+results hold page ids and numbers.
 """
 from __future__ import annotations
 
@@ -115,7 +116,7 @@ def main():
         run(jobs()[:1])
     elif cmd == 'run':
         run(jobs())
-    print(f'${spent():.4f} of ${CAP} spent on this item')
+    print(f'${spent():.4f} of ${CAP} spent on this item ({G.billed_note(G.ledger())})')
 
 
 if __name__ == '__main__':

@@ -54,7 +54,7 @@ def ledger():
 
 
 def spent():
-    return sum(r.get("cost", 0) for r in ledger())
+    return sum(G.charge(r) for r in ledger())
 
 
 def body(images, prompt):
@@ -82,6 +82,7 @@ def call(key, images, prompt, dest: Path):
     rec = {"id": key, "http": r.status_code, "t": t, "wall_s": round(time.time() - t, 3), "model": got.get("model"),
            "usage": usage, "cost": round(G.cost(usage), 6),
            "request_sha256": hashlib.sha256(json.dumps(b, sort_keys=True).encode()).hexdigest()}
+    rec = G.with_gateway_cost(rec, r)
     OUT.mkdir(parents=True, exist_ok=True)
     with (OUT / "calls.jsonl").open("a") as fh:
         fh.write(json.dumps(rec) + "\n")
@@ -109,7 +110,8 @@ def cmd_run(a):
     with ThreadPoolExecutor(4) as ex:
         res = list(ex.map(lambda j: call(*j), jobs))
     bad = [r["id"] for r in res if DI.reply(r.get("text")) is None]
-    print(f"{len(res) - len(bad)}/{len(res)} parsed, ${spent():.4f} spent in all; unparsed: {bad[:20]}")
+    print(f"{len(res) - len(bad)}/{len(res)} parsed, ${spent():.4f} spent in all ({G.billed_note(ledger())}); "
+          f"unparsed: {bad[:20]}")
 
 
 # ------------------------------------------------------------------------------------------------- typeface probe
@@ -192,7 +194,7 @@ def cmd_typeface(a):
          "position. Each was asked for the typeface or machine, the features it rests on and the years it fits, judging "
          "the letterforms only. **Checkable**: a named typeface or machine, with features and an earliest year. "
          "**Consistent**: the owner's year lies within the years it gave. "
-         f"Spend about ${cost:.3f} for {len(led)} replies (3.8's list price as a ceiling).", "",
+         f"Spend about ${cost:.3f} for {len(led)} replies (3.8's list price as a ceiling); {G.billed_note(led)}.", "",
          f"- Parsed {sum(x['parsed'] for x in rows)}/{n}. What the crops show, by the reply: "
          + ", ".join(f"{k} {v}" for k, v in cont.most_common()) + ".",
          f"- Named a typeface or machine: {sum(x['named'] for x in rows)}/{n}; checkable: {len(ck)}/{n}; consistent "

@@ -16,8 +16,8 @@ bench's scorers (answered-only and strict), beside every other route on the 895.
 
 Real money on the Stanford PTA (root CLAUDE.md), the owner's yes recorded 2026-10-30 at about $3.80. CAP is this
 item's own total, counted from the gateway's token usage at Gemini 3.8 Flash's list price (gateway_gemini.PRICE, an
-estimate: the gateway returns no cost); the ledger is CACHE/calls.jsonl. Images, replies and readings stay in the
-cache.
+estimate; the gateway's own figure per call is recorded beside it); the ledger is CACHE/calls.jsonl. Images, replies
+and readings stay in the cache.
 """
 from __future__ import annotations
 
@@ -184,6 +184,7 @@ def report():
                               'nes38_both': mean([r['nes38'] for r in both if r['stratum'] == s])} for s in strata},
            'calls': len(calls), 'http_errors': collections.Counter(c['http'] for c in calls if c['http'] != 200),
            'finish': finishes, 'usage': usage, 'cost_list_estimate': sum(c['cost'] for c in calls),
+           'cost_billed': G.billed(calls), 'cost_billed_note': G.billed_note(calls),
            'price_assumed': G.PRICE,
            'wall_s_median': sorted(c['wall_s'] for c in ok_calls)[len(ok_calls) // 2] if ok_calls else None}
     (RESULTS / 'gemini37-public.json').write_text(json.dumps(out, indent=1, default=dict))
@@ -213,7 +214,7 @@ def report():
     L += ['', f"Calls {out['calls']} (HTTP errors: {dict(out['http_errors']) or 'none'}); finish reasons "
           f"{dict(finishes)}. Tokens {usage['prompt_tokens']:,} in, {usage['completion_tokens']:,} out; median "
           f"{out['wall_s_median']} s a page. Spend about ${out['cost_list_estimate']:.2f}, an estimate at Gemini 3.8 "
-          f"Flash's list ${G.PRICE[0]}/${G.PRICE[1]} per M tokens (the gateway returns no cost), Stanford PTA.",
+          f"Flash's list ${G.PRICE[0]}/${G.PRICE[1]} per M tokens ({out['cost_billed_note']}), Stanford PTA.",
           '', '## Measurement card', '',
           '- **Truth:** each public dataset\'s own ground-truth transcription, frozen with the 895 (W43.corpus-build; '
           '`bench-corpus/manifest.jsonl` checksums). Not drafted by any scored route; the owner did not check them.',

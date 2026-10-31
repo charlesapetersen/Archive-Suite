@@ -144,6 +144,7 @@ def report():
         if (NOISE / 'gemini/calls.jsonl').exists() else []
     out['gateway_cost_estimate'] = sum(c.get('cost', 0) for c in calls)
     out['gateway_calls'] = len(calls)
+    out['gateway_billed'], out['gateway_billed_note'] = G.billed(calls), G.billed_note(calls)
     (G.RESULTS / 'ocr-rerun-noise.json').write_text(json.dumps(out, indent=1))
     write_md(out)
 
@@ -198,8 +199,8 @@ def write_md(out):
           'local greedy one to Qwen\'s) until it is measured. Per kind, the kind\'s own range applies; a kind of a '
           'dozen pages moves far more than the whole.', '',
           f"Gateway spend: {out['gateway_calls']} calls, about ${out['gateway_cost_estimate']:.2f} at Gemini 3.8 Flash's "
-          'list rate (an estimate; the gateway does report its own figure in an `x-litellm-response-cost` header, '
-          'which `gateway_gemini.py` does not yet record), Stanford PTA. The MLX runs cost nothing.', '',
+          f"list rate (an estimate; {out.get('gateway_billed_note', 'the gateway reported no cost of its own for these calls')}, "
+          "from its `x-litellm-response-cost` header), Stanford PTA. The MLX runs cost nothing.", '',
           '**The gateway caches.** It is LiteLLM, and it answers a byte-identical request from a response cache: the '
           'first run 2 came back in a median 1.3 s a page (run 1: 8.0 s) with run 1\'s exact text and tokens on all 99, '
           'a copy, not a reading. It is kept aside (`run2-gateway-cached`) and run 2 was read again with the body field '

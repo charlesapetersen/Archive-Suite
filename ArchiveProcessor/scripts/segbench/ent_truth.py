@@ -44,8 +44,9 @@ beside the null rate, since a wrong name is worse than a null; evidence validity
 that are substrings of the OCR text, and for replies without quotes the share of predicted names found in it.
 
 The gateway is real money on a Stanford PTA: CAP bounds this item's spend, counted from the returned token usage
-at the PRICE table (an estimate: the gateway returns no cost and publishes no price). The key is read from the
-Keychain into memory once by gateway_gemini.api_key, never printed or written. Texts, images, drafts and the truth
+at the PRICE table (an estimate: the gateway publishes no price; the gateway's own figure per call is recorded beside
+it). The key is read from the Keychain into memory once by gateway_gemini.api_key, never printed or written. Texts,
+images, drafts and the truth
 stay in the bench cache (the owner's material; the repo is public); the committed report has aggregates only.
 """
 from __future__ import annotations
@@ -489,7 +490,8 @@ def ledger():
 
 
 def spent():
-    return sum(r.get("cost", 0) for r in ledger())
+    import gateway_gemini as G
+    return sum(G.charge(r) for r in ledger())
 
 
 def cost(model, usage):
@@ -525,6 +527,7 @@ def call(stage, model, doc_id, b, dest):
     usage = got.get("usage") or {}
     rec = {"stage": stage, "doc": doc_id, "http": r.status_code, "t": t, "wall_s": round(time.time() - t, 3),
            "model": got.get("model") or model, "usage": usage, "cost": round(cost(model, usage), 6)}
+    rec = G.with_gateway_cost(rec, r)
     with open(os.path.join(CACHE, "calls.jsonl"), "a") as fh:
         fh.write(json.dumps(rec) + "\n")
     choice = (got.get("choices") or [{}])[0]
@@ -644,6 +647,7 @@ def cmd_build(a):
 
     def reader_rows(key):
         return [{"truth": r, "pred": r["readers"][key], "text": by_id[r["id"]]["text"]} for r in kept]
+    import gateway_gemini as G
     summary = {
         "documents": len(rows), "correspondence": len(kept), "stats": dict(stats), "sides": dict(sides),
         "disputed": dict(disputed),
@@ -664,6 +668,7 @@ def cmd_build(a):
         "quoted": {f: sum(1 for r in kept for e in r[f] if e["quote"]) for f in FIELDS},
         "readers_vs_truth": {k: score_rows(reader_rows(k)) for k in ("luna", "claude")},
         "spend_usd": round(spent(), 4), "calls": len(ledger()),
+        "billed": G.billed(ledger()), "billed_note": G.billed_note(ledger()),
         "spend_by_stage": {s: round(sum(c["cost"] for c in ledger() if c["stage"] == s), 4)
                            for s in ("draft", "adjudicate")},
     }
@@ -709,7 +714,7 @@ def report(s):
                                                                  sorted(s["disputed"].items(), key=lambda x: -x[1])) + ".",
           "", f"Spend: ${s['spend_usd']:.2f} estimated over {s['calls']} gateway calls (drafts "
           f"${s['spend_by_stage']['draft']:.2f}, adjudication ${s['spend_by_stage']['adjudicate']:.2f}), at "
-          f"ceiling prices (Luna $0.20 / $1.20, Sonnet 5 $3 / $15 a million tokens); the gateway returns no cost.", "",
+          f"ceiling prices (Luna $0.20 / $1.20, Sonnet 5 $3 / $15 a million tokens){'; ' + s['billed_note'] if s.get('billed_note') else ''}.", "",
           "## Each reader against the truth (the scorer's self-check)", "",
           "Named truth entities; a reader's own draft is part of how the truth was made, so these are agreement "
           "figures, an upper bound, not accuracy.", "",
