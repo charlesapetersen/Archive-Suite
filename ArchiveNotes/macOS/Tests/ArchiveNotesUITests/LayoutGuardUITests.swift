@@ -47,6 +47,17 @@ final class LayoutGuardUITests: NotesFixtureUITestCase {
     private func sweepNarrowAndTall(appearance: String) {
         let window = mainWindow
         app.activate()
+        // The Extracts window `sweepMainScreens` opened restores where an earlier test left it, and in a whole-suite
+        // run that was exactly over the note window (both at (393,264) 767×759; runs 18 and 20): the corner drag below
+        // then pressed Extracts, the note window stayed 759 pt tall and the sweep failed, while alone, with Extracts
+        // restored offset, the same drag took. This sweep is of the note window alone, so close Extracts first.
+        let extracts = app.windows["Extracts"]
+        if extracts.exists {
+            let close = extracts.buttons[XCUIIdentifierCloseWindow]
+            if close.waitForExistence(timeout: 5), close.isHittable { close.click() }
+            XCTAssertTrue(extracts.waitForNonExistence(timeout: 8), "the Extracts window should close before the drag")
+            LayoutGuard.waitUntilSettled(window)
+        }
         // As tall as the screen allows from where the window opened: down to the top of the Dock. The window is not
         // moved up first, because a synthesized title-bar drag never moved it in the VM, fast or slow; checking
         // "100 pt taller" instead made the sweep pass or fail on where an earlier test had left the window
