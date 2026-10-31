@@ -177,7 +177,7 @@ The shared contract is the risk (a divergence would corrupt or mis-read irreplac
   copied link groups carry full paths.
 - **Unicode:** normalize (NBSP→space, dash-fold, case/diacritic-fold) for search/type-ahead/sort keys **only**;
   preserve real bytes for display + link encoding.
-- **Multiple same-facet date tags:** deterministic rule + flag ambiguous.
+- **Multiple same-facet date tags:** deterministic rule (last wins) + flag ambiguous — `DocumentTags.dateAmbiguities`, shown in the Date cell (mark + tooltip naming the set-aside tag), the ⌘I sheet, and the filter bar's "ambiguous dates" toggle (W40.fix-reader-date-ambiguity).
 - **Facet-looking subjects** (`1984`, `Q1`, `Read`): heuristics + display-only correction; never affects writes.
 
 ## §Decisions (settled with the owner; the app ships these)

@@ -184,11 +184,12 @@ struct TagEditorView: View {
     }
 
     /// W40.fix-reader-date-ambiguity: a file with two tags for one date facet says which one the date uses and
-    /// which was set aside. The set-aside tag is a subject chip above, so removing it settles the date.
+    /// which was set aside. Either may be the wrong one: a set-aside tag is a subject chip above, and the kept
+    /// one is replaced by setting the date below.
     @ViewBuilder private func dateAmbiguityNotice() -> some View {
         let ambiguous = model.selectedFiles.filter(\.dateIsAmbiguous)
         if ambiguous.count == 1, model.selectedFiles.count == 1, let text = ambiguous[0].dateAmbiguityText {
-            Label("\(text) Remove the wrong one under Subjects.", systemImage: "calendar.badge.exclamationmark")
+            Label("\(text) Remove a set-aside tag under Subjects, or set the right date below.", systemImage: "calendar.badge.exclamationmark")
                 .font(.caption).foregroundStyle(.orange)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier("ar.tagEditor.dateAmbiguity")

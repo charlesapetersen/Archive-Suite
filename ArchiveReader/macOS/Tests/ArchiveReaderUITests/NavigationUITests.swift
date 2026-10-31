@@ -523,6 +523,37 @@ final class NavigationUITests: FixtureUITestCase {
         app.buttons["ar.tagEditor.done"].click()
     }
 
+    /// W40.fix-reader-date-ambiguity (ledger R-47): the fixture's `00006` carries two Years (`1983`, `1984`).
+    /// The filter-bar toggle finds it alone, its Date cell is flagged naming the Year set aside, and the ⌘I
+    /// sheet says the same. Read-only: nothing is written.
+    func testTwoYearTagsAreFlaggedAndTheFilterFindsThem() throws {
+        let toggle = app.descendants(matching: .any)["ar.filter.ambiguousDates"]
+        XCTAssertTrue(toggle.waitForExistence(timeout: 10), "a fixture with two Year tags should offer the filter")
+        toggle.click()
+        XCTAssertTrue(waitForRowCount(1), "the ambiguous-dates filter should list only the two-Year document")
+        let row = table.tableRows.element(boundBy: 0)
+        let dateCell = row.descendants(matching: .any)
+            .matching(NSPredicate(format: "identifier BEGINSWITH %@", "ar.cell.date.")).firstMatch
+        XCTAssertTrue(dateCell.waitForExistence(timeout: 5))
+        XCTAssertTrue(dateCell.identifier.contains("00006"), "the one row should be 00006: \(dateCell.identifier)")
+        XCTAssertTrue(dateCell.label.contains("ambiguous date"), "Date cell label: \(dateCell.label)")
+        XCTAssertTrue(dateCell.label.contains("Two Year tags: 1984 is used, 1983 was set aside."),
+                      "Date cell label: \(dateCell.label)")
+        captureScreenshot("w40-date-ambiguity-filtered-row")
+
+        clickRow(0)
+        toolbarButton("ar.toolbar.editTags").click()
+        let notice = app.descendants(matching: .any)["ar.tagEditor.dateAmbiguity"]
+        XCTAssertTrue(notice.waitForExistence(timeout: 5), "the ⌘I sheet should flag the ambiguous date")
+        XCTAssertTrue(notice.label.contains("1983 was set aside"), "sheet notice: \(notice.label)")
+        captureScreenshot("w40-date-ambiguity-sheet")
+        app.buttons["ar.tagEditor.done"].click()
+
+        toggle.click()
+        waitForRows(minimum: 2, timeout: 10)
+        XCTAssertGreaterThan(rowCount, 1, "turning the filter off should bring the other rows back")
+    }
+
     // MARK: - Phantom selection (W40.fix-reader-phantom-selection)
 
     /// The selection is never wider than the list. Select a row, filter it away: the status bar must

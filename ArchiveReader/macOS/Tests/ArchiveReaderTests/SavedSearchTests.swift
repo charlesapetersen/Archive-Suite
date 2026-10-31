@@ -108,4 +108,14 @@ final class SavedSearchStoreTests: XCTestCase {
         XCTAssertEqual(reloaded.fullTextQuery, "deficit")
         XCTAssertEqual(reloaded.filter, f)   // whole filter round-trips (drives applySaved)
     }
+
+    /// W40.fix-reader-date-ambiguity: a filter saved before `ambiguousDatesOnly` existed still decodes.
+    func testAFilterSavedWithoutTheAmbiguousDatesKeyStillDecodes() throws {
+        var old = LibraryFilter(); old.subjects = ["Cold War"]
+        var json = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(old)) as? [String: Any])
+        json.removeValue(forKey: "ambiguousDates")
+        let decoded = try JSONDecoder().decode(LibraryFilter.self, from: JSONSerialization.data(withJSONObject: json))
+        XCTAssertEqual(decoded.subjects, ["Cold War"])
+        XCTAssertFalse(decoded.ambiguousDatesOnly)
+    }
 }

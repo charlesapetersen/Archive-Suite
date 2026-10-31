@@ -154,10 +154,13 @@ public struct DocumentTags: Sendable, Equatable {
     /// it. Every token that parses as a date facet is consumed by it, so a date-shaped token left among
     /// `subjects` is exactly one the rule demoted. Facet order is Year, Month, Day, Decade, Sent With.
     /// A Year beside a Decade is not ambiguous: the SPEC has a Year supersede a Decade.
+    /// A set-aside token that only repeats the kept one (`" 1980"` beside `"1980"`) is not a second date.
     public var dateAmbiguities: [DateAmbiguity] {
         var setAside: [DateFacet: [String]] = [:]
         for subject in subjects {
-            if let facet = Self.demotedDateFacet(subject) { setAside[facet, default: []].append(subject) }
+            guard let facet = Self.demotedDateFacet(subject) else { continue }
+            let kept = winningToken(facet)?.trimmingCharacters(in: .whitespaces)
+            if subject.trimmingCharacters(in: .whitespaces) != kept { setAside[facet, default: []].append(subject) }
         }
         return DateFacet.allCases.compactMap { facet in
             setAside[facet].map { DateAmbiguity(facet: facet, kept: winningToken(facet), setAside: $0) }
@@ -165,7 +168,7 @@ public struct DocumentTags: Sendable, Equatable {
     }
 
     /// True when any date facet had more than one token; see `dateAmbiguities`.
-    public var dateIsAmbiguous: Bool { subjects.contains { Self.demotedDateFacet($0) != nil } }
+    public var dateIsAmbiguous: Bool { !dateAmbiguities.isEmpty }
 
     private func winningToken(_ facet: DateFacet) -> String? {
         switch facet {

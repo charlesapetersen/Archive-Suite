@@ -51,6 +51,11 @@ final class DateAmbiguityTests: XCTestCase {
         XCTAssertTrue(bad.dateIsAmbiguous)
     }
 
+    func testARepeatOfTheKeptTokenIsNotAmbiguous() {
+        XCTAssertFalse(tags([" 1980", "1980"]).dateIsAmbiguous)
+        XCTAssertEqual(tags([" 1980", "1981", "1980"]).dateAmbiguities.first?.setAside, ["1981"])
+    }
+
     func testDateIsAmbiguousAgreesWithDateAmbiguities() {
         for raw in [["1980"], ["1980", "1981"], ["1970s", "1980s"], ["Sent With 1958-13"], ["Cold War", "Day 3"],
                     ["01 January", "1 January"], ["Sent With Love"]] {

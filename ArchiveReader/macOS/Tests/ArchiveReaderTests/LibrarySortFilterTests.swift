@@ -187,7 +187,7 @@ final class LibrarySortFilterTests: XCTestCase {
         XCTAssertFalse(oneYear.dateIsAmbiguous)
         XCTAssertNil(oneYear.dateAmbiguityText)
 
-        let f = LibraryFilter(ambiguousDatesOnly: true)
+        var f = LibraryFilter(); f.ambiguousDatesOnly = true
         XCTAssertTrue(f.isActive)
         XCTAssertEqual([twoYears, oneYear].filter(f.matches).map(\.name), ["a"])
         XCTAssertTrue(LibraryFilter.effective(base: f, user: LibraryFilter()).ambiguousDatesOnly)

@@ -36,8 +36,15 @@ struct LibraryFilter: Sendable, Equatable, Codable {
     /// match an active range. Optional so a smart folder saved before this field still decodes.
     var dateFromYear: Int? = nil
     var dateToYear: Int? = nil
-    /// W40.fix-reader-date-ambiguity: only files with two tags for one date facet, to review them.
-    var ambiguousDatesOnly: Bool = false
+    /// W40.fix-reader-date-ambiguity: only files with two tags for one date facet, to review them. Stored
+    /// optional so a smart folder or saved view state written before this field still decodes; a non-optional
+    /// field makes the synthesized decoder throw, and `SavedSearchStore` would then load nothing and overwrite
+    /// every saved search on its next save.
+    private var ambiguousDates: Bool? = nil
+    var ambiguousDatesOnly: Bool {
+        get { ambiguousDates ?? false }
+        set { ambiguousDates = newValue ? true : nil }
+    }
 
     var dateRange: DateRangeFilter? {
         dateFromYear == nil && dateToYear == nil ? nil : DateRangeFilter(fromYear: dateFromYear, toYear: dateToYear)
