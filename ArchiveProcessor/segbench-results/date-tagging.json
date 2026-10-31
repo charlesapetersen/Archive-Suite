@@ -111,6 +111,15 @@
   ]
  },
  "parse_failures": 0,
+ "pool_weighted": {
+  "exact": 89.2,
+  "within1": 98.0,
+  "weights": {
+   "year+month": 3868,
+   "year": 1000,
+   "year+DU": 133
+  }
+ },
  "open_models": {
   "qwen3.6-27b": {
    "model": "qwen3.6-27b",

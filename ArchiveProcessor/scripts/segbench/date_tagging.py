@@ -521,6 +521,21 @@ def metrics(rows, usd, model):
     return out
 
 
+def pool_weighted(rows, summary):
+    """The year-tagged strata's exact and within-one rates, weighted by each stratum's agreed count in the pool."""
+    weights = {cls: summary.get("agreed " + cls, 0) for cls in ("year+month", "year", "year+DU")}
+    out = {"weights": weights}
+    for m, hit in (("exact", lambda r: r["y"] == r["truth"]["year"]),
+                   ("within1", lambda r: r["y"] is not None and abs(r["y"] - r["truth"]["year"]) <= 1)):
+        num = den = 0
+        for cls, w in weights.items():
+            rs = [r for r in rows if r["class"] == cls]
+            if rs:
+                num += w * sum(map(hit, rs)) / len(rs); den += w
+        out[m] = 100 * num / den if den else 0.0
+    return out
+
+
 def cmd_score(a):
     docs = [json.loads(l) for l in open(os.path.join(CACHE, "sample.jsonl"), encoding="utf-8")]
     summary = json.load(open(os.path.join(CACHE, "sample-summary.json")))
@@ -577,7 +592,12 @@ def cmd_score(a):
         L.append(f"| {cls} | {pct(sum(r['y'] == r['truth']['year'] for r in rs), len(rs))} | "
                  f"{pct(sum(r['y'] is not None and abs(r['y'] - r['truth']['year']) <= 1 for r in rs), len(rs))} | "
                  f"{pct(sum(r['y'] is None for r in rs), len(rs))} | {pct(sum(r['year_in_text'] for r in rs), len(rs))} |")
-    L += ["", "By whether the owner's year appears as a string in the text the model was sent (first 3,000 "
+    pw = pool_weighted(rows, summary)
+    L.append(f"| all, weighted to the pool | {pw['exact']:.1f}% | {pw['within1']:.1f}% | – | – |")
+    L += ["", "The pooled row is over the 120/80/50 sample, which does not match the pool; the weighted row weights "
+          "each stratum's rate by its agreed count (" + ", ".join(f"{cls} {n:,}" for cls, n in pw["weights"].items())
+          + "; W46.date-undated, measurement audit DAT-6).", "",
+          "By whether the owner's year appears as a string in the text the model was sent (first 3,000 "
           "characters), all classes with a year tag:", "", "| year in text | documents | year exact | within 1 |",
           "|---|---:|---:|---:|"]
     for flag in (True, False):
@@ -652,12 +672,16 @@ def cmd_score(a):
         fh.write("\n".join(L))
 
     out = metrics(rows, usd, MODEL)
+    pw = pool_weighted(rows, summary)
+    out["pool_weighted"] = {"exact": round(pw["exact"], 1), "within1": round(pw["within1"], 1), "weights": pw["weights"]}
     old = json.load(open(RESULTS_JSON)) if os.path.exists(RESULTS_JSON) else {}
     if old.get("open_models"):
         out["open_models"] = old["open_models"]
     with open(RESULTS_JSON, "w", encoding="utf-8") as fh:
         json.dump(out, fh, indent=1)
         fh.write("\n")
+    if out.get("open_models"):
+        write_open_section(out)     # the score above rewrote the file without it
     print("\n".join(L))
 
 

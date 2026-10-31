@@ -29,6 +29,9 @@ Replies the app could not parse (it then writes no year and `Date Uncertain`): 0
 | year | 78.8% (63/80) | 95.0% (76/80) | 0.0% (0/80) | 41.2% (33/80) |
 | year+DU | 48.0% (24/50) | 86.0% (43/50) | 0.0% (0/50) | 10.0% (5/50) |
 | all with a year tag | 79.6% (199/250) | 95.2% (238/250) | 0.0% (0/250) | 47.6% (119/250) |
+| all, weighted to the pool | 89.2% | 98.0% | – | – |
+
+The pooled row is over the 120/80/50 sample, which does not match the pool; the weighted row weights each stratum's rate by its agreed count (year+month 3,868, year 1,000, year+DU 133; W46.date-undated, measurement audit DAT-6).
 
 By whether the owner's year appears as a string in the text the model was sent (first 3,000 characters), all classes with a year tag:
 
