@@ -44,15 +44,27 @@ c=[x for x in json.load(open(sys.argv[1])) if x["key"]==sys.argv[2]][0];print(c[
     run python3 -m venv --system-site-packages "$E"
     # `image` tries the whole image first, then the torch stack alone; the check then refuses the venv if that moved any
     # package vLLM requires (boxes_setup.vllm_drift).
+    # `none` installs the card's full pin list with --no-deps, so pip never resolves the image's torch: its torch
+    # declares nvidia-nccl-cu12==2.29.7 while the image ships 2.30.7, which makes any install that resolves torch
+    # ResolutionImpossible under the torch constraints and installs a second nccl without them (Nemotron-Parse,
+    # job 50536484; dry runs in job 50549022; seg-context merge-job.sh has the same fix). The list names every
+    # dependency the image lacks.
     used=''
-    for c in $([ "$cons" = image ] && echo image torch || echo torch); do
+    if [ "$cons" = none ]; then
+      # shellcheck disable=SC2086  # pins is a word list
+      if run "$E/bin/python" -m pip install -q --disable-pip-version-check --no-deps $pins; then
+        used=none; echo none > "$E/constraints-used"
+      fi
+    fi
+    tries=''; [ "$cons" = image ] && tries='image torch'; [ "$cons" = torch ] && tries=torch
+    for c in $tries; do
       # shellcheck disable=SC2086  # pins is a word list
       if run "$E/bin/python" -m pip install -q --disable-pip-version-check -c "$A/constraints-$c.txt" $pins; then
         used=$c; echo "$c" > "$E/constraints-used"; break
       fi
     done
     if [ -z "$used" ]; then
-      "$FS_PY" - "$A" "$B" "$key" "pip install failed under the image constraints: $pins" <<'PY'
+      "$FS_PY" - "$A" "$B" "$key" "pip install failed under the $cons constraints: $pins" <<'PY'
 import json, pathlib, sys
 for root in sys.argv[1:3]:
     p = pathlib.Path(root) / sys.argv[3] / 'prepared.json'; r = json.loads(p.read_text())

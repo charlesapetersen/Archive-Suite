@@ -24,7 +24,7 @@ import json, sys
 c = json.load(open(sys.argv[1]))
 assert [x['key'] for x in c] == ['unlimited-ocr', 'nemotron-parse-2', 'granite-docling-258m'], c
 for x in c:
-    assert x['adapter'] in ('unlimited', 'nemotron', 'granite') and x['constraints'] in ('torch', 'image') and x['pip'], x
+    assert x['adapter'] in ('unlimited', 'nemotron', 'granite') and x['constraints'] in ('torch', 'image', 'none') and x['pip'], x
     print(x['key'], int(x['hours_895']), int(x['hours_96']))
 PY
 )
