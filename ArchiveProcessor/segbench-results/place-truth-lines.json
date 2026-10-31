@@ -1,0 +1,520 @@
+{
+ "provenance": {
+  "lines": {
+   "drafted": 1028,
+   "drawn": 987,
+   "absent": 7
+  },
+  "words": {
+   "drafted": 8283,
+   "drawn": 5824
+  },
+  "pages": 40
+ },
+ "detectors": {
+  "blla": {
+   "split_lines": 77,
+   "joins": 98,
+   "unassigned_words": 1484,
+   "by_status": {
+    "drawn": {
+     "split": 73,
+     "join": 69
+    },
+    "drafted": {
+     "split": 4,
+     "join": 29
+    }
+   }
+  },
+  "ppocrv6": {
+   "split_lines": 60,
+   "joins": 99,
+   "unassigned_words": 292,
+   "by_status": {
+    "drafted": {
+     "split": 2,
+     "join": 24
+    },
+    "drawn": {
+     "split": 58,
+     "join": 75
+    }
+   }
+  }
+ },
+ "places": 97,
+ "questions": 26,
+ "both": {
+  "drawn": {
+   "split": 29,
+   "join": 47
+  },
+  "drafted": {
+   "split": 0,
+   "join": 21
+  }
+ },
+ "lines_in_places": {
+  "drawn": 138,
+  "drafted": 43
+ },
+ "typed_pages_with_places": 17,
+ "hand_pages": [
+  "p046",
+  "p049",
+  "p052",
+  "p086",
+  "p096"
+ ],
+ "hand_lines": 128,
+ "minutes": 25.9,
+ "pages": [
+  {
+   "page": "p002",
+   "kind": "typewritten",
+   "lines": 24,
+   "main_status": "drafted",
+   "blla_split": 0,
+   "blla_join": 0,
+   "ppocrv6_split": 0,
+   "ppocrv6_join": 1,
+   "places": 0
+  },
+  {
+   "page": "p004",
+   "kind": "typewritten",
+   "lines": 25,
+   "main_status": "drafted",
+   "blla_split": 0,
+   "blla_join": 0,
+   "ppocrv6_split": 1,
+   "ppocrv6_join": 0,
+   "places": 0
+  },
+  {
+   "page": "p005",
+   "kind": "typewritten",
+   "lines": 51,
+   "main_status": "drafted",
+   "blla_split": 0,
+   "blla_join": 0,
+   "ppocrv6_split": 0,
+   "ppocrv6_join": 0,
+   "places": 0
+  },
+  {
+   "page": "p006",
+   "kind": "typewritten",
+   "lines": 8,
+   "main_status": "drawn",
+   "blla_split": 1,
+   "blla_join": 0,
+   "ppocrv6_split": 0,
+   "ppocrv6_join": 0,
+   "places": 0
+  },
+  {
+   "page": "p008",
+   "kind": "typewritten",
+   "lines": 56,
+   "main_status": "drawn",
+   "blla_split": 7,
+   "blla_join": 0,
+   "ppocrv6_split": 0,
+   "ppocrv6_join": 1,
+   "places": 0
+  },
+  {
+   "page": "p014",
+   "kind": "typewritten",
+   "lines": 23,
+   "main_status": "drafted",
+   "blla_split": 0,
+   "blla_join": 0,
+   "ppocrv6_split": 0,
+   "ppocrv6_join": 0,
+   "places": 0
+  },
+  {
+   "page": "p018",
+   "kind": "printed",
+   "lines": 80,
+   "main_status": "drawn",
+   "blla_split": 9,
+   "blla_join": 5,
+   "ppocrv6_split": 0,
+   "ppocrv6_join": 5,
+   "places": 2
+  },
+  {
+   "page": "p019",
+   "kind": "typewritten",
+   "lines": 26,
+   "main_status": "drafted",
+   "blla_split": 0,
+   "blla_join": 1,
+   "ppocrv6_split": 0,
+   "ppocrv6_join": 1,
+   "places": 1
+  },
+  {
+   "page": "p021",
+   "kind": "printed",
+   "lines": 28,
+   "main_status": "drafted",
+   "blla_split": 0,
+   "blla_join": 0,
+   "ppocrv6_split": 0,
+   "ppocrv6_join": 0,
+   "places": 0
+  },
+  {
+   "page": "p023",
+   "kind": "typewritten",
+   "lines": 30,
+   "main_status": "drawn",
+   "blla_split": 3,
+   "blla_join": 1,
+   "ppocrv6_split": 0,
+   "ppocrv6_join": 0,
+   "places": 0
+  },
+  {
+   "page": "p024",
+   "kind": "typewritten",
+   "lines": 39,
+   "main_status": "drawn",
+   "blla_split": 8,
+   "blla_join": 3,
+   "ppocrv6_split": 8,
+   "ppocrv6_join": 4,
+   "places": 9
+  },
+  {
+   "page": "p026",
+   "kind": "typewritten",
+   "lines": 45,
+   "main_status": "drafted",
+   "blla_split": 0,
+   "blla_join": 0,
+   "ppocrv6_split": 0,
+   "ppocrv6_join": 0,
+   "places": 0
+  },
+  {
+   "page": "p030",
+   "kind": "typewritten",
+   "lines": 36,
+   "main_status": "drafted",
+   "blla_split": 0,
+   "blla_join": 0,
+   "ppocrv6_split": 0,
+   "ppocrv6_join": 1,
+   "places": 0
+  },
+  {
+   "page": "p033",
+   "kind": "typewritten",
+   "lines": 31,
+   "main_status": "drafted",
+   "blla_split": 0,
+   "blla_join": 0,
+   "ppocrv6_split": 0,
+   "ppocrv6_join": 0,
+   "places": 0
+  },
+  {
+   "page": "p034",
+   "kind": "printed",
+   "lines": 12,
+   "main_status": "drawn",
+   "blla_split": 3,
+   "blla_join": 0,
+   "ppocrv6_split": 0,
+   "ppocrv6_join": 1,
+   "places": 0
+  },
+  {
+   "page": "p036",
+   "kind": "typewritten",
+   "lines": 29,
+   "main_status": "drafted",
+   "blla_split": 0,
+   "blla_join": 0,
+   "ppocrv6_split": 0,
+   "ppocrv6_join": 0,
+   "places": 0
+  },
+  {
+   "page": "p042",
+   "kind": "printed",
+   "lines": 107,
+   "main_status": "drafted",
+   "blla_split": 0,
+   "blla_join": 1,
+   "ppocrv6_split": 0,
+   "ppocrv6_join": 1,
+   "places": 1
+  },
+  {
+   "page": "p044",
+   "kind": "printed",
+   "lines": 119,
+   "main_status": "drawn",
+   "blla_split": 0,
+   "blla_join": 7,
+   "ppocrv6_split": 0,
+   "ppocrv6_join": 6,
+   "places": 6
+  },
+  {
+   "page": "p057",
+   "kind": "typewritten",
+   "lines": 16,
+   "main_status": "drawn",
+   "blla_split": 6,
+   "blla_join": 0,
+   "ppocrv6_split": 10,
+   "ppocrv6_join": 0,
+   "places": 6
+  },
+  {
+   "page": "p058",
+   "kind": "printed",
+   "lines": 57,
+   "main_status": "drawn",
+   "blla_split": 9,
+   "blla_join": 7,
+   "ppocrv6_split": 0,
+   "ppocrv6_join": 3,
+   "places": 2
+  },
+  {
+   "page": "p060",
+   "kind": "typewritten",
+   "lines": 30,
+   "main_status": "drafted",
+   "blla_split": 0,
+   "blla_join": 0,
+   "ppocrv6_split": 0,
+   "ppocrv6_join": 0,
+   "places": 0
+  },
+  {
+   "page": "p062",
+   "kind": "printed",
+   "lines": 87,
+   "main_status": "drafted",
+   "blla_split": 4,
+   "blla_join": 5,
+   "ppocrv6_split": 0,
+   "ppocrv6_join": 2,
+   "places": 1
+  },
+  {
+   "page": "p064",
+   "kind": "typewritten",
+   "lines": 34,
+   "main_status": "drawn",
+   "blla_split": 0,
+   "blla_join": 0,
+   "ppocrv6_split": 0,
+   "ppocrv6_join": 0,
+   "places": 0
+  },
+  {
+   "page": "p066",
+   "kind": "typewritten",
+   "lines": 23,
+   "main_status": "drawn",
+   "blla_split": 10,
+   "blla_join": 0,
+   "ppocrv6_split": 11,
+   "ppocrv6_join": 0,
+   "places": 10
+  },
+  {
+   "page": "p067",
+   "kind": "printed",
+   "lines": 17,
+   "main_status": "drawn",
+   "blla_split": 1,
+   "blla_join": 0,
+   "ppocrv6_split": 2,
+   "ppocrv6_join": 0,
+   "places": 1
+  },
+  {
+   "page": "p069",
+   "kind": "typewritten",
+   "lines": 26,
+   "main_status": "drawn",
+   "blla_split": 3,
+   "blla_join": 1,
+   "ppocrv6_split": 0,
+   "ppocrv6_join": 2,
+   "places": 0
+  },
+  {
+   "page": "p072",
+   "kind": "printed",
+   "lines": 179,
+   "main_status": "drafted",
+   "blla_split": 0,
+   "blla_join": 9,
+   "ppocrv6_split": 0,
+   "ppocrv6_join": 9,
+   "places": 9
+  },
+  {
+   "page": "p073",
+   "kind": "printed",
+   "lines": 22,
+   "main_status": "drafted",
+   "blla_split": 0,
+   "blla_join": 0,
+   "ppocrv6_split": 1,
+   "ppocrv6_join": 0,
+   "places": 0
+  },
+  {
+   "page": "p074",
+   "kind": "printed",
+   "lines": 41,
+   "main_status": "drafted",
+   "blla_split": 0,
+   "blla_join": 0,
+   "ppocrv6_split": 0,
+   "ppocrv6_join": 0,
+   "places": 0
+  },
+  {
+   "page": "p078",
+   "kind": "printed",
+   "lines": 114,
+   "main_status": "drafted",
+   "blla_split": 0,
+   "blla_join": 2,
+   "ppocrv6_split": 0,
+   "ppocrv6_join": 2,
+   "places": 2
+  },
+  {
+   "page": "p080",
+   "kind": "printed",
+   "lines": 146,
+   "main_status": "drawn",
+   "blla_split": 4,
+   "blla_join": 30,
+   "ppocrv6_split": 4,
+   "ppocrv6_join": 38,
+   "places": 27
+  },
+  {
+   "page": "p081",
+   "kind": "printed",
+   "lines": 81,
+   "main_status": "drawn",
+   "blla_split": 5,
+   "blla_join": 0,
+   "ppocrv6_split": 3,
+   "ppocrv6_join": 0,
+   "places": 1
+  },
+  {
+   "page": "p087",
+   "kind": "typewritten",
+   "lines": 88,
+   "main_status": "drawn",
+   "blla_split": 1,
+   "blla_join": 15,
+   "ppocrv6_split": 3,
+   "ppocrv6_join": 12,
+   "places": 12
+  },
+  {
+   "page": "p088",
+   "kind": "typewritten",
+   "lines": 50,
+   "main_status": "drawn",
+   "blla_split": 2,
+   "blla_join": 0,
+   "ppocrv6_split": 12,
+   "ppocrv6_join": 3,
+   "places": 0
+  },
+  {
+   "page": "p090",
+   "kind": "typewritten",
+   "lines": 68,
+   "main_status": "drafted",
+   "blla_split": 0,
+   "blla_join": 6,
+   "ppocrv6_split": 0,
+   "ppocrv6_join": 6,
+   "places": 6
+  },
+  {
+   "page": "p095",
+   "kind": "typewritten",
+   "lines": 38,
+   "main_status": "drafted",
+   "blla_split": 0,
+   "blla_join": 1,
+   "ppocrv6_split": 0,
+   "ppocrv6_join": 1,
+   "places": 1
+  },
+  {
+   "page": "p097",
+   "kind": "typewritten",
+   "lines": 36,
+   "main_status": "drawn",
+   "blla_split": 0,
+   "blla_join": 0,
+   "ppocrv6_split": 0,
+   "ppocrv6_join": 0,
+   "places": 0
+  },
+  {
+   "page": "p098",
+   "kind": "typewritten",
+   "lines": 24,
+   "main_status": "drafted",
+   "blla_split": 0,
+   "blla_join": 4,
+   "ppocrv6_split": 0,
+   "ppocrv6_join": 0,
+   "places": 0
+  },
+  {
+   "page": "p099",
+   "kind": "typewritten",
+   "lines": 28,
+   "main_status": "drawn",
+   "blla_split": 0,
+   "blla_join": 0,
+   "ppocrv6_split": 0,
+   "ppocrv6_join": 0,
+   "places": 0
+  },
+  {
+   "page": "p100",
+   "kind": "typewritten",
+   "lines": 38,
+   "main_status": "drawn",
+   "blla_split": 1,
+   "blla_join": 0,
+   "ppocrv6_split": 5,
+   "ppocrv6_join": 0,
+   "places": 0
+  }
+ ],
+ "settings": {
+  "join_gap": 0.5,
+  "grab": 0.6,
+  "slack": 1,
+  "seed": 20261030
+ }
+}

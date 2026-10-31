@@ -64,7 +64,8 @@ HAND_PAGES = 5
 JOIN_GAP = 0.5      # PP-OCRv6 pieces on one row join across a gap up to this share of the row's height
 GRAB = 0.6          # a word outside every polygon goes to a baseline within this share of its height
 SLACK = 1           # two detectors' breaks agree within this many words
-SECONDS = {'page': 20, 'place': 10, 'hand_page': 150}   # review-rate estimates for the sheet's minutes
+GROUP_MAX = 6       # one question holds up to this many places of one kind on one page
+SECONDS = {'page': 15, 'item': 10, 'place': 3, 'hand_page': 150}   # review-rate estimates for the sheet's minutes
 
 
 def typed_pages(only=None):
@@ -319,15 +320,22 @@ def build(out_dir: Path, results: Path):
     typed = {t['page']: t for t in typed_pages()}
     data, key = [], {'seed': SEED, 'detectors': DETECTORS, 'join_gap': JOIN_GAP, 'grab': GRAB, 'slack': SLACK,
                      'pages': {}}
-    n = 0
+    n, places = 0, 0
     for p in sorted(cmp):
         items = []
-        for x in typed_places(typed[p], cmp[p]):
-            iid = f't{n:03d}'
-            n += 1
-            items.append({'id': iid, 'box': x['box'], 'marks': x['marks']})
-            # the truth's own answer: a split place is one truth line, a join place two or more
-            key['pages'].setdefault(p, {})[iid] = {**x, 'truth': 'one' if x['kind'] == 'split' else 'breaks'}
+        xs = typed_places(typed[p], cmp[p])
+        for kind in ('split', 'join'):
+            same = [x for x in xs if x['kind'] == kind]
+            for g in range(0, len(same), GROUP_MAX):
+                group = same[g:g + GROUP_MAX]
+                iid = f't{n:03d}'
+                n += 1
+                places += len(group)
+                items.append({'id': iid, 'boxes': [x['box'] for x in group], 'marks': [m for x in group for m in x['marks']]})
+                # the truth's own answer: a split place is one truth line, a join place two or more
+                key['pages'].setdefault(p, {})[iid] = {'kind': kind, 'truth': 'one' if kind == 'split' else 'breaks',
+                                                       'places': group}
+        items.sort(key=lambda it: (round(it['boxes'][0][1], 2), it['boxes'][0][0]))
         if items:
             data.append({'page': p, 'img': img_src(typed[p]), 'type': 'typed', 'items': items})
     hands = hand_pick()
@@ -336,11 +344,12 @@ def build(out_dir: Path, results: Path):
               if ln['status'] == 'drawn' and ln.get('box')]
         data.append({'page': t['page'], 'img': img_src(t), 'type': 'hand', 'lines': ls})
         key['pages'][t['page']] = {'hand': True, 'lines': [ln['id'] for ln in ls]}
-    secs = (sum(1 for d in data if d['type'] == 'typed') * SECONDS['page'] + n * SECONDS['place']
-            + len(hands) * SECONDS['hand_page'])
+    secs = (sum(1 for d in data if d['type'] == 'typed') * SECONDS['page'] + n * SECONDS['item']
+            + places * SECONDS['place'] + len(hands) * SECONDS['hand_page'])
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / 'index.html').write_text(SHEET_HTML.replace('__DATA__', json.dumps(data, ensure_ascii=False))
-                                        .replace('__MINUTES__', f'{secs / 60:.0f}').replace('__N__', str(n))
+                                        .replace('__MINUTES__', f'{secs / 60:.0f}').replace('__N__', str(places))
+                                        .replace('__Q__', str(n))
                                         .replace('__H__', str(len(hands))))
     (out_dir / 'key.json').write_text(json.dumps(key, ensure_ascii=False, indent=1))
     stats = summarise(list(cmp.values()), key, hands, secs)
@@ -378,7 +387,8 @@ def summarise(pages, key, hands, secs) -> dict:
         per_det[k] = {'split_lines': sum(len(p['split'][k]) for p in pages),
                       'joins': sum(len(p['join'][k]) for p in pages),
                       'unassigned_words': sum(p['unassigned'][k] for p in pages), 'by_status': by}
-    places = [v for d in key['pages'].values() if not d.get('hand') for v in d.values()]
+    places = [x for d in key['pages'].values() if not d.get('hand') for v in d.values() for x in v['places']]
+    questions = sum(len(d) for d in key['pages'].values() if not d.get('hand'))
     def status_of(v):
         return v['status'][0] if len(v['status']) == 1 else 'mixed'
     both = {}
@@ -394,8 +404,8 @@ def summarise(pages, key, hands, secs) -> dict:
                           'main_status': max(p['status'], key=p['status'].get),
                           'blla_split': len(p['split']['blla']), 'blla_join': len(p['join']['blla']),
                           'ppocrv6_split': len(p['split']['ppocrv6']), 'ppocrv6_join': len(p['join']['ppocrv6']),
-                          'places': len(d)})
-    return {'provenance': provenance(pages), 'detectors': per_det, 'places': len(places), 'both': both,
+                          'places': sum(len(v['places']) for v in d.values()) if not d.get('hand') else 0})
+    return {'provenance': provenance(pages), 'detectors': per_det, 'places': len(places), 'questions': questions, 'both': both,
             'lines_in_places': lines_in, 'typed_pages_with_places': sum(1 for r in page_rows if r['places']),
             'hand_pages': [t['page'] for t in hands], 'hand_lines': sum(len(key['pages'][t['page']]['lines']) for t in hands),
             'minutes': round(secs / 60, 1), 'pages': page_rows,
@@ -448,17 +458,25 @@ def write_md(path: Path, s: dict):
     d_sp, d_jo = rate('drafted')
     w_sp, w_jo = rate('drawn')
     L += ['', f'**{s["places"]} places where both detectors agree against the truth**, on {s["typed_pages_with_places"]} '
-          f'of the {pv["pages"]} pages: on Vision-derived lines {d_sp + d_jo} '
-          f'({pct(d_sp + d_jo, pv["lines"].get("drafted", 0))} of them, counted per place), on drawn lines {w_sp + w_jo} '
-          f'({pct(w_sp + w_jo, pv["lines"].get("drawn", 0))}). A disagreement is not an error: two detectors can share '
-          'a convention the truth does not (a letterhead\'s two sides, a tabbed date). The owner rules.', '',
+          f'of the {pv["pages"]} pages. On Vision-derived lines: {d_sp + d_jo} places ({d_sp} splits, {d_jo} joins) '
+          f'touching {s["lines_in_places"].get("drafted", 0)} of the {pv["lines"].get("drafted", 0):,} lines '
+          f'({pct(s["lines_in_places"].get("drafted", 0), pv["lines"].get("drafted", 0))}); on drawn lines: '
+          f'{w_sp + w_jo} ({w_sp} splits, {w_jo} joins) touching {s["lines_in_places"].get("drawn", 0)} of '
+          f'{pv["lines"].get("drawn", 0):,} ({pct(s["lines_in_places"].get("drawn", 0), pv["lines"].get("drawn", 0))}). '
+          'The drawn pages are not a like sample: they were redrawn because Vision\'s lines failed there (tables, '
+          'newspaper columns, broken type), so the gap says where the hard pages are as much as who drew the lines. '
+          'A disagreement is not an error: two detectors can share a convention the truth does not (a table row in '
+          'cells, a letterhead\'s two sides), and both detectors join narrow newspaper columns. The owner rules. '
+          'blla left words outside every line on a few pages (most on p008, p088, p058 and p062), which only hides '
+          'places there.', '',
           '| page | kind | lines | mostly | blla split / join | PP-OCRv6 split / join | on the sheet |',
           '|---|---|---:|---|---|---|---:|']
     for r in s['pages']:
         L.append(f'| {r["page"]} | {r["kind"]} | {r["lines"]} | {r["main_status"]} | {r["blla_split"]} / '
                  f'{r["blla_join"]} | {r["ppocrv6_split"]} / {r["ppocrv6_join"]} | {r["places"]} |')
     L += ['', '## The owner sheet', '',
-          f'{s["places"]} typed places, then {len(s["hand_pages"])} hand pages ({", ".join(s["hand_pages"])}: seed '
+          f'{s["places"]} typed places in {s["questions"]} questions (places of one kind on one page share a question, up '
+          f'to {GROUP_MAX} at a time, so a table of like rows is answered once), then {len(s["hand_pages"])} hand pages ({", ".join(s["hand_pages"])}: seed '
           f'{SEED}, among the 20 the audit passed) with their {s["hand_lines"]} drawn lines; about {s["minutes"]:.0f} '
           'minutes at the script\'s review rates (an estimate). Blind: every typed place asks whether the boxed text is '
           'one line or breaks at the dashed marks, and the truth\'s answer is "one line" for a split place and '
@@ -501,9 +519,9 @@ header{position:sticky;top:0;background:#fff;border-bottom:1px solid #ccc;paddin
 .ln.bad{background:#fdd;border-color:#c00;color:#c00;font-weight:bold}
 </style>
 <header><b>Placement lines check</b> — __N__ places on typed pages, then __H__ hand pages; about __MINUTES__ minutes.
-<b>Typed places:</b> the pink box holds some text, the dashed marks are possible line breaks. Is the text in the box
-<b>1</b> one line (ignore the marks) · <b>2</b> separate lines, breaking at every mark · <b>3</b> breaking at some marks
-only · <b>e</b> either will do / can't tell. <b>Hand pages:</b> every line is boxed and numbered, its baseline drawn; click
+<b>Typed questions</b> (__Q__): each pink box holds some text, the dashed marks are possible line breaks. Is the text in each
+box <b>1</b> one line (ignore the marks) · <b>2</b> separate lines, breaking at every mark · <b>3</b> it differs: some marks
+only, or not the same in every box (add a note with <b>t</b>) · <b>e</b> either will do / can't tell. <b>Hand pages:</b> every line is boxed and numbered, its baseline drawn; click
 a line (or its number) that is wrong (box or baseline off its line, two lines in one, one line in two), then
 <b>a</b> when the page is checked. <b>t</b> add a note · <b>n/p</b> next/previous · <b>z</b> zoom.
 Answers stay in this browser; <button onclick="exportAnswers()">Export answers</button><span id="prog"></span></header>
@@ -527,7 +545,7 @@ function rect(b,c,w,extra){return `<rect x="${b[0]*1000}" y="${b[1]*1000}" width
 const root=document.getElementById('root');
 for(const p of DATA){const div=document.createElement('div');div.className='page';
  let h=`<div class="img"><div class="frame"><img src="${p.img}"><svg viewBox="0 0 1000 1000" preserveAspectRatio="none"></svg></div></div><div class="list"><b>${p.page}</b>`;
- if(p.type==='typed'){for(const x of p.items){h+=`<div class="it" data-key="${x.id}"><span class="k">${x.id} · ${x.marks.length} mark${x.marks.length>1?'s':''}</span>`;
+ if(p.type==='typed'){for(const x of p.items){h+=`<div class="it" data-key="${x.id}"><span class="k">${x.id} · ${x.boxes.length} box${x.boxes.length>1?'es':''}</span>`;
    for(const v of ['1','2','3','e'])h+=`<span class="opt" data-v="${v}"><span class="k">${v}:</span> ${LABEL[v]}</span>`;
    h+=`<span class="note"></span></div>`}}
  else{h+=`<div class="it" data-key="lines"><span class="k">hand page: click each wrong line, then a</span><br>`;
@@ -555,8 +573,9 @@ function head(){const h=document.querySelector('header').offsetHeight;document.d
  document.querySelectorAll('.page').forEach(d=>d.style.scrollMarginTop=h+'px')}
 addEventListener('resize',head);head();
 const PAD=.01;
-function show(it){if(!it||it.hand)return;const b=it.x.box;
- it.svg.innerHTML=rect([b[0]-PAD,b[1]-PAD,b[2]+2*PAD,b[3]+2*PAD],'#f0a',3)+it.x.marks.map(m=>
+function show(it){if(!it||it.hand)return;const bs=it.x.boxes;
+ const x0=Math.min(...bs.map(q=>q[0])),y0=Math.min(...bs.map(q=>q[1])),b=[x0,y0,Math.max(...bs.map(q=>q[0]+q[2]))-x0,Math.max(...bs.map(q=>q[1]+q[3]))-y0];
+ it.svg.innerHTML=bs.map(q=>rect([q[0]-PAD/2,q[1]-PAD/2,q[2]+PAD,q[3]+PAD],'#f0a',3)).join('')+it.x.marks.map(m=>
   `<line x1="${m[0]*1000}" y1="${m[1]*1000}" x2="${m[2]*1000}" y2="${m[3]*1000}" stroke="#06f" stroke-width="2.5" stroke-dasharray="6 4" vector-effect="non-scaling-stroke"/>`).join('');
  const f=it.frame,pane=it.pane,centre=()=>{pane.scrollTop=(b[1]+b[3]/2)*f.offsetHeight-pane.clientHeight/2;
   pane.scrollLeft=(b[0]+b[2]/2)*f.offsetWidth-pane.clientWidth/2};
@@ -575,7 +594,7 @@ prog();go(0);
 # ---------------------------------------------------------------- fold
 
 def fold(key: dict, answers: dict) -> dict:
-    """Per typed place: whether the truth's grouping stands ('one' or 'breaks' against the owner's pick); per hand
+    """Per typed question (its ruling holds for each of its places; counts are of places): whether the truth's grouping stands ('one' or 'breaks' against the owner's pick); per hand
     page, the lines the owner marked wrong. Unanswered stays open."""
     pick = {'1': 'one', '2': 'breaks', '3': 'some', 'e': 'either'}
     rulings, n = {}, {'typed': {}, 'hand_pages': {}, 'hand_lines_wrong': 0, 'hand_lines': 0}
@@ -602,7 +621,7 @@ def fold(key: dict, answers: dict) -> dict:
             else:
                 k = 'truth stands' if owner == v['truth'] else 'truth wrong'
             rulings.setdefault(p, {})[iid] = {**v, 'owner': owner, 'ruling': k, 'note': a.get('note')}
-            n['typed'][k] = n['typed'].get(k, 0) + 1
+            n['typed'][k] = n['typed'].get(k, 0) + len(v['places'])
     return {'counts': n, 'rulings': rulings}
 
 

@@ -81,14 +81,14 @@ class RowJoin(unittest.TestCase):
 
 class Fold(unittest.TestCase):
     def test_rulings(self):
-        key = {'pages': {'p1': {'t000': {'kind': 'split', 'truth': 'one'}, 't001': {'kind': 'join', 'truth': 'breaks'},
-                                't002': {'kind': 'join', 'truth': 'breaks'}, 't003': {'kind': 'split', 'truth': 'one'},
-                                't004': {'kind': 'split', 'truth': 'one'}},
+        q = lambda kind, n=1: {'kind': kind, 'truth': 'one' if kind == 'split' else 'breaks', 'places': [{}] * n}
+        key = {'pages': {'p1': {'t000': q('split', 2), 't001': q('join'), 't002': q('join'), 't003': q('split'),
+                                't004': q('split')},
                          'p9': {'hand': True, 'lines': [0, 1, 2]}}}
         ans = {'p1': {'t000': {'pick': '1'}, 't001': {'pick': '1'}, 't002': {'pick': '3'}, 't003': {'pick': 'e'}},
                'p9': {'lines': {'bad': [2], 'checked': True}}}
         r = ptl.fold(key, ans)
-        self.assertEqual(r['counts']['typed'], {'truth stands': 1, 'truth wrong': 1, 'truth partly wrong': 1,
+        self.assertEqual(r['counts']['typed'], {'truth stands': 2, 'truth wrong': 1, 'truth partly wrong': 1,
                                                 'either': 1, 'open': 1})
         self.assertEqual((r['counts']['hand_lines'], r['counts']['hand_lines_wrong']), (3, 1))
         self.assertEqual(r['rulings']['p9']['wrong'], [2])
