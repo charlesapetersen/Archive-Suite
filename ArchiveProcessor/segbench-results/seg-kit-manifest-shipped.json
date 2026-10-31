@@ -1,0 +1,63 @@
+{
+ "kit_version": "seg-kit-1",
+ "prompt_id": "c1",
+ "bench_request": "method_local.request (o1), 1024 px",
+ "model": "shipped",
+ "base_build": "seg-qwen3.5-2b-8bit",
+ "weights_sha256": "e4e00067fe029b179a7d184695b5871a2abbd26e3e879493fc2061b3682b4463",
+ "adapter": null,
+ "training_data": null,
+ "heldout": {
+  "tags": null,
+  "owner_ruled": null
+ },
+ "anchor": {
+  "box": "Lincoln",
+  "truth_sha256": "893d9777a8f0b8d243d39cfbdd36140d97554de2f5f74d7b767786a669d1fe7a",
+  "pages": 261,
+  "documents": 81,
+  "pages_exact": 34.87,
+  "gap_accuracy": 82.31,
+  "review_load_per_100_pages": 96.2,
+  "pages_exact_interval": [
+   23.26,
+   49.28
+  ]
+ },
+ "review_load_at_98": 96.2,
+ "mac": {
+  "build": "8-bit MLX (9.6 bits a weight)",
+  "download_gb": 2.5,
+  "peak_memory_gb": 4.4,
+  "seconds_per_page": 6,
+  "measured_on": "18 GB M3 Pro",
+  "source": "seg-students.md \u00a7On the Mac (W41.seg-mac-model)"
+ },
+ "note": "The shipped build. Anchor scored on FarmShare at full precision (bf16, vLLM 0.31; the 8-bit build here keeps it on the development boxes, 90.3% against 90.5%, seg-students.md). Its held-out run is not on this Mac, so held-out is empty; seg-students.md gives 96.0% agreement with the teacher on agreed held-out gaps, which is not accuracy (label-clean.md).",
+ "gate": {
+  "rule": "an anchor score, a held-out score, and a held-out interval against the shipped model whose low end is above -3 points (proposed, W46.kit-gate)",
+  "passed": false,
+  "reasons": [
+   "no held-out score"
+  ]
+ },
+ "compared": {
+  "shipped": {
+   "failed_windows": 0,
+   "heldout_tags": null,
+   "heldout_ruled": null,
+   "anchor": {
+    "pages": 261,
+    "documents": 81,
+    "pages_exact": 34.87,
+    "gap_accuracy": 82.31,
+    "review_load_per_100_pages": 96.2,
+    "pages_exact_interval": [
+     23.26,
+     49.28
+    ]
+   }
+  }
+ },
+ "made": "2026-10-31T13:25:28"
+}

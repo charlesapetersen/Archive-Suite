@@ -1140,5 +1140,63 @@ class Wave(unittest.TestCase):
         self.assertIn('needs 4 queue places and 3 are free', r.stdout)
 
 
+class Check(unittest.TestCase):
+    """W46.kit-gate: train_seg.py check scores answers on the held-out gaps and the anchor and writes the manifest."""
+
+    @staticmethod
+    def answer(col, nums, new):
+        bounds = [{"between": [a, b], "decision": "new" if (a in new) else "continue", "cue": "x",
+                   "confidence": 0.95 if a % 2 else 0.6} for a, b in zip(nums, nums[1:])]
+        res = {"pages": [{"page": n, "kind": "document"} for n in nums], "boundaries": bounds}
+        return json.dumps({"collection": col, "window": nums, "status": "ok", "result": json.dumps(res)}) + "\n"
+
+    def run_check(self, tmp, cand_new, anchor_new, *extra):
+        truth = {"box": "Anchor", "pages": [{"n": n, "label": "New" if n in (1, 3, 5) else "Cont"} for n in range(1, 7)]}
+        (tmp / "anchor.json").write_text(json.dumps(truth))
+        labels = [{"folder_id": "f1", "n": n, "split": "holdout", "tag": "new" if n == 2 else "cont"} for n in (1, 2, 3)]
+        labels.append({"folder_id": "f2", "n": 1, "split": "train", "tag": "new"})
+        (tmp / "labels.jsonl").write_text("".join(json.dumps(g) + "\n" for g in labels))
+        for name, held, anchor in (("shipped", {2}, {2, 4}), ("cand", cand_new, anchor_new)):
+            d = tmp / name
+            d.mkdir(exist_ok=True)
+            (d / "answers.jsonl").write_text(self.answer("f1", [1, 2, 3, 4], held)
+                                             + (self.answer("Anchor", list(range(1, 7)), anchor) if anchor is not None else ""))
+        return subprocess.run([sys.executable, str(HERE / "train_seg.py"), "check", "--run", f"shipped={tmp / 'shipped'}",
+                               "--run", f"cand={tmp / 'cand'}", "--candidate", "cand", "--anchor-truth",
+                               str(tmp / "anchor.json"), "--labels", str(tmp / "labels.jsonl"),
+                               "--out", str(tmp / "m.json"), *extra], capture_output=True, text=True)
+
+    def test_manifest_scores_and_gate(self):
+        with tempfile.TemporaryDirectory() as t:
+            tmp = Path(t)
+            r = self.run_check(tmp, {2}, {2, 4})
+            self.assertEqual(r.returncode, 0, r.stderr)
+            m = json.loads((tmp / "m.json").read_text())
+            self.assertEqual(m["prompt_id"], "c1")
+            self.assertEqual(m["heldout"]["tags"]["gaps"], 3)          # held-out gaps only, never the train split
+            self.assertEqual(m["heldout"]["tags"]["accuracy"], 100.0)
+            self.assertEqual(m["anchor"]["pages_exact"], 100.0)
+            self.assertEqual(m["anchor"]["documents"], 3)
+            self.assertTrue(m["gate"]["passed"])
+            # Wrong on every held-out gap, and on the anchor's two boundaries: the gate fails, exit 1, with reasons.
+            r = self.run_check(tmp, {1, 3}, set())
+            self.assertEqual(r.returncode, 1)
+            m = json.loads((tmp / "m.json").read_text())
+            self.assertEqual(m["heldout"]["tags"]["accuracy"], 0.0)
+            self.assertEqual(m["heldout"]["tags"]["difference"], -100.0)
+            self.assertEqual(m["anchor"]["pages_exact"], 0.0)
+            self.assertFalse(m["gate"]["passed"])
+            self.assertIn("trail the shipped model", " ".join(m["gate"]["reasons"]))
+
+    def test_no_anchor_answers_no_anchor_score(self):
+        with tempfile.TemporaryDirectory() as t:
+            tmp = Path(t)
+            r = self.run_check(tmp, {2}, None)
+            self.assertEqual(r.returncode, 1)
+            m = json.loads((tmp / "m.json").read_text())
+            self.assertIsNone(m["anchor"])
+            self.assertIn("no anchor score", " ".join(m["gate"]["reasons"]))
+
+
 if __name__ == '__main__':
     unittest.main()
