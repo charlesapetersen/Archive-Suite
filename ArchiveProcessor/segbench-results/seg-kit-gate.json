@@ -1,0 +1,475 @@
+{
+ "teacher_split": {
+  "fs-seg-2b": {
+   "Dean": {
+    "split": "dev",
+    "gaps": 191,
+    "student wrong": 5,
+    "teacher wrong the same way": 2,
+    "teacher right": 3,
+    "teacher wrong, student right": 4
+   },
+   "Deaver": {
+    "split": "dev",
+    "gaps": 136,
+    "student wrong": 7,
+    "teacher wrong the same way": 2,
+    "teacher right": 5,
+    "teacher wrong, student right": 0
+   },
+   "Herrnstein": {
+    "split": "dev",
+    "gaps": 167,
+    "student wrong": 5,
+    "teacher wrong the same way": 2,
+    "teacher right": 3,
+    "teacher wrong, student right": 6
+   },
+   "Stanton": {
+    "split": "test",
+    "gaps": 238,
+    "student wrong": 27,
+    "teacher wrong the same way": 15,
+    "teacher right": 12,
+    "teacher wrong, student right": 5
+   },
+   "RG165": {
+    "split": "test",
+    "gaps": 77,
+    "student wrong": 2,
+    "teacher wrong the same way": 2,
+    "teacher right": 0,
+    "teacher wrong, student right": 1
+   },
+   "Lincoln": {
+    "split": "public",
+    "gaps": 260,
+    "student wrong": 46,
+    "teacher wrong the same way": 35,
+    "teacher right": 11,
+    "teacher wrong, student right": 5
+   },
+   "CREST": {
+    "split": "public",
+    "gaps": 127,
+    "student wrong": 4,
+    "teacher wrong the same way": 1,
+    "teacher right": 3,
+    "teacher wrong, student right": 1
+   }
+  },
+  "fs-seg-4b": {
+   "Dean": {
+    "split": "dev",
+    "gaps": 191,
+    "student wrong": 6,
+    "teacher wrong the same way": 4,
+    "teacher right": 2,
+    "teacher wrong, student right": 2
+   },
+   "Deaver": {
+    "split": "dev",
+    "gaps": 136,
+    "student wrong": 4,
+    "teacher wrong the same way": 2,
+    "teacher right": 2,
+    "teacher wrong, student right": 0
+   },
+   "Herrnstein": {
+    "split": "dev",
+    "gaps": 167,
+    "student wrong": 4,
+    "teacher wrong the same way": 3,
+    "teacher right": 1,
+    "teacher wrong, student right": 5
+   },
+   "Stanton": {
+    "split": "test",
+    "gaps": 238,
+    "student wrong": 19,
+    "teacher wrong the same way": 16,
+    "teacher right": 3,
+    "teacher wrong, student right": 4
+   },
+   "RG165": {
+    "split": "test",
+    "gaps": 77,
+    "student wrong": 4,
+    "teacher wrong the same way": 3,
+    "teacher right": 1,
+    "teacher wrong, student right": 0
+   },
+   "Lincoln": {
+    "split": "public",
+    "gaps": 260,
+    "student wrong": 34,
+    "teacher wrong the same way": 29,
+    "teacher right": 5,
+    "teacher wrong, student right": 11
+   },
+   "CREST": {
+    "split": "public",
+    "gaps": 127,
+    "student wrong": 1,
+    "teacher wrong the same way": 1,
+    "teacher right": 0,
+    "teacher wrong, student right": 1
+   }
+  },
+  "fs-seg-date-2b": {
+   "Lincoln": {
+    "split": "public",
+    "gaps": 260,
+    "student wrong": 46,
+    "teacher wrong the same way": 34,
+    "teacher right": 12,
+    "teacher wrong, student right": 6
+   },
+   "CREST": {
+    "split": "public",
+    "gaps": 127,
+    "student wrong": 3,
+    "teacher wrong the same way": 1,
+    "teacher right": 2,
+    "teacher wrong, student right": 1
+   }
+  }
+ },
+ "bootstrap": {
+  "fs-seg-4b - fs-seg-2b": {
+   "sizes": {
+    "100": {
+     "pages exact": {
+      "lo": -17.65,
+      "hi": 9.01,
+      "half": 13.33
+     },
+     "gap accuracy": {
+      "lo": -2.0,
+      "hi": 5.0,
+      "half": 3.5
+     },
+     "flagged per 100 pages": {
+      "lo": -5.77,
+      "hi": 1.92,
+      "half": 3.85
+     }
+    },
+    "300": {
+     "pages exact": {
+      "lo": -9.97,
+      "hi": 5.77,
+      "half": 7.87
+     },
+     "gap accuracy": {
+      "lo": -1.0,
+      "hi": 3.33,
+      "half": 2.17
+     },
+     "flagged per 100 pages": {
+      "lo": -4.04,
+      "hi": 0.63,
+      "half": 2.33
+     }
+    },
+    "1000": {
+     "pages exact": {
+      "lo": -5.4,
+      "hi": 3.07,
+      "half": 4.23
+     },
+     "gap accuracy": {
+      "lo": -0.1,
+      "hi": 2.3,
+      "half": 1.2
+     },
+     "flagged per 100 pages": {
+      "lo": -2.94,
+      "hi": -0.48,
+      "half": 1.23
+     }
+    }
+   },
+   "needed": {
+    "pages exact": 1988,
+    "gap accuracy": 160,
+    "flagged per 100 pages": 168
+   }
+  },
+  "fs-qwen3.5-27b - fs-seg-2b": {
+   "sizes": {
+    "100": {
+     "pages exact": {
+      "lo": -15.69,
+      "hi": 11.65,
+      "half": 13.67
+     },
+     "gap accuracy": {
+      "lo": -5.0,
+      "hi": 5.0,
+      "half": 5.0
+     },
+     "flagged per 100 pages": {
+      "lo": -5.83,
+      "hi": 2.88,
+      "half": 4.35
+     }
+    },
+    "300": {
+     "pages exact": {
+      "lo": -7.62,
+      "hi": 7.96,
+      "half": 7.79
+     },
+     "gap accuracy": {
+      "lo": -2.33,
+      "hi": 3.65,
+      "half": 2.99
+     },
+     "flagged per 100 pages": {
+      "lo": -3.88,
+      "hi": 1.26,
+      "half": 2.57
+     }
+    },
+    "1000": {
+     "pages exact": {
+      "lo": -3.42,
+      "hi": 5.27,
+      "half": 4.34
+     },
+     "gap accuracy": {
+      "lo": -0.8,
+      "hi": 2.3,
+      "half": 1.55
+     },
+     "flagged per 100 pages": {
+      "lo": -2.76,
+      "hi": 0.09,
+      "half": 1.43
+     }
+    }
+   },
+   "needed": {
+    "pages exact": 2093,
+    "gap accuracy": 267,
+    "flagged per 100 pages": 227
+   }
+  }
+ },
+ "observed": {
+  "fs-qwen3.5-27b": {
+   "Dean": {
+    "pages exact": 84.2,
+    "gap accuracy": 96.9,
+    "gaps": 191,
+    "doc pages": 196
+   },
+   "Deaver": {
+    "pages exact": 96.5,
+    "gap accuracy": 98.5,
+    "gaps": 136,
+    "doc pages": 141
+   },
+   "Herrnstein": {
+    "pages exact": 91.7,
+    "gap accuracy": 95.2,
+    "gaps": 167,
+    "doc pages": 181
+   },
+   "Stanton": {
+    "pages exact": 81.9,
+    "gap accuracy": 91.6,
+    "gaps": 238,
+    "doc pages": 243
+   },
+   "RG165": {
+    "pages exact": 86.2,
+    "gap accuracy": 96.1,
+    "gaps": 77,
+    "doc pages": 87
+   },
+   "Lincoln": {
+    "pages exact": 39.5,
+    "gap accuracy": 84.6,
+    "gaps": 260,
+    "doc pages": 261
+   },
+   "CREST": {
+    "pages exact": 95.3,
+    "gap accuracy": 98.4,
+    "gaps": 127,
+    "doc pages": 128
+   }
+  },
+  "fs-seg-2b": {
+   "Dean": {
+    "pages exact": 93.9,
+    "gap accuracy": 97.4,
+    "gaps": 191,
+    "doc pages": 196
+   },
+   "Deaver": {
+    "pages exact": 88.7,
+    "gap accuracy": 94.9,
+    "gaps": 136,
+    "doc pages": 141
+   },
+   "Herrnstein": {
+    "pages exact": 88.4,
+    "gap accuracy": 97.0,
+    "gaps": 167,
+    "doc pages": 181
+   },
+   "Stanton": {
+    "pages exact": 73.3,
+    "gap accuracy": 88.7,
+    "gaps": 238,
+    "doc pages": 243
+   },
+   "RG165": {
+    "pages exact": 94.3,
+    "gap accuracy": 97.4,
+    "gaps": 77,
+    "doc pages": 87
+   },
+   "Lincoln": {
+    "pages exact": 34.9,
+    "gap accuracy": 82.3,
+    "gaps": 260,
+    "doc pages": 261
+   },
+   "CREST": {
+    "pages exact": 91.4,
+    "gap accuracy": 96.9,
+    "gaps": 127,
+    "doc pages": 128
+   }
+  },
+  "fs-seg-4b": {
+   "Dean": {
+    "pages exact": 85.2,
+    "gap accuracy": 96.9,
+    "gaps": 191,
+    "doc pages": 196
+   },
+   "Deaver": {
+    "pages exact": 92.2,
+    "gap accuracy": 97.1,
+    "gaps": 136,
+    "doc pages": 141
+   },
+   "Herrnstein": {
+    "pages exact": 91.2,
+    "gap accuracy": 97.6,
+    "gaps": 167,
+    "doc pages": 181
+   },
+   "Stanton": {
+    "pages exact": 79.0,
+    "gap accuracy": 92.0,
+    "gaps": 238,
+    "doc pages": 243
+   },
+   "RG165": {
+    "pages exact": 79.3,
+    "gap accuracy": 94.8,
+    "gaps": 77,
+    "doc pages": 87
+   },
+   "Lincoln": {
+    "pages exact": 46.7,
+    "gap accuracy": 86.9,
+    "gaps": 260,
+    "doc pages": 261
+   },
+   "CREST": {
+    "pages exact": 98.4,
+    "gap accuracy": 99.2,
+    "gaps": 127,
+    "doc pages": 128
+   }
+  },
+  "fs-qwen3.5-4b": {
+   "Dean": {
+    "pages exact": 67.9,
+    "gap accuracy": 82.2,
+    "gaps": 191,
+    "doc pages": 196
+   },
+   "Deaver": {
+    "pages exact": 56.0,
+    "gap accuracy": 77.9,
+    "gaps": 136,
+    "doc pages": 141
+   },
+   "Herrnstein": {
+    "pages exact": 76.2,
+    "gap accuracy": 86.2,
+    "gaps": 167,
+    "doc pages": 181
+   }
+  },
+  "fs-seg-date-2b": {
+   "Lincoln": {
+    "pages exact": 34.1,
+    "gap accuracy": 82.3,
+    "gaps": 260,
+    "doc pages": 261
+   },
+   "CREST": {
+    "pages exact": 85.2,
+    "gap accuracy": 97.6,
+    "gaps": 127,
+    "doc pages": 128
+   }
+  }
+ },
+ "dates": {
+  "documents": 131,
+  "gemini right": 83,
+  "students": {
+   "fs-date-2b-nothink": {
+    "answered": 131,
+    "right": 54,
+    "wrong": 77,
+    "gemini wrong too": 40,
+    "gemini the same wrong year": 18,
+    "gemini right": 37,
+    "student right, gemini wrong": 8
+   },
+   "fs-date-4b-nothink": {
+    "answered": 131,
+    "right": 53,
+    "wrong": 78,
+    "gemini wrong too": 41,
+    "gemini the same wrong year": 21,
+    "gemini right": 37,
+    "student right, gemini wrong": 7
+   },
+   "fs-seg-date-2b-nothink": {
+    "answered": 131,
+    "right": 54,
+    "wrong": 77,
+    "gemini wrong too": 41,
+    "gemini the same wrong year": 18,
+    "gemini right": 36,
+    "student right, gemini wrong": 7
+   },
+   "mlx-date-2b-8bit-nothink": {
+    "answered": 131,
+    "right": 51,
+    "wrong": 80,
+    "gemini wrong too": 41,
+    "gemini the same wrong year": 19,
+    "gemini right": 39,
+    "student right, gemini wrong": 7
+   }
+  }
+ },
+ "level": 0.85,
+ "draws": 4000,
+ "seed": 46,
+ "documents_in_pool": 463,
+ "gaps_in_pool": 809
+}
