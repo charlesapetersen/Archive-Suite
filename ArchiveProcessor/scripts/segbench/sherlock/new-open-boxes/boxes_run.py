@@ -111,14 +111,10 @@ class Unlimited(Transformers):
         from transformers import AutoModel, AutoTokenizer
         torch = self.torch
         self.tok = AutoTokenizer.from_pretrained(self.snap, trust_remote_code=True, local_files_only=True)
-        try:
-            import flash_attn  # noqa: F401
-            self.attn = 'flash_attention_2'
-        except ImportError:
-            self.attn = 'eager'
+        # As the card's transformers example loads it (README, read 2026-10-31): bf16, the config's own attention.
         self.model = AutoModel.from_pretrained(self.snap, trust_remote_code=True, use_safetensors=True,
-                                               _attn_implementation=self.attn, local_files_only=True)
-        self.model = self.model.eval().cuda().to(torch.bfloat16)
+                                               torch_dtype=torch.bfloat16, local_files_only=True).eval().cuda()
+        self.attn = getattr(self.model.config, '_attn_implementation', None)
         self.eos = {int(self.tok.eos_token_id)}
         self.captured = {}
         orig = self.model.generate

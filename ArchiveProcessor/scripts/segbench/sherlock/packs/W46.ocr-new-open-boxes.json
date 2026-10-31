@@ -1,0 +1,53 @@
+{
+  "tag": "W46.ocr-new-open-boxes",
+  "pack": "new-open-boxes-20261031",
+  "mac": "artifacts/new-open-boxes-20261031",
+  "submit": "support/sherlock/new-open-boxes/submit.sh",
+  "jobs": 7,
+  "gpu_hours": 52,
+  "review": "execution-plans/items/W46.ocr-new-open-boxes.md",
+  "imports": [
+    {
+      "dir": "support/sherlock/new-open-boxes",
+      "modules": [
+        "boxes_parse",
+        "boxes_setup"
+      ]
+    },
+    {
+      "modules": [
+        "vllm",
+        "huggingface_hub"
+      ]
+    }
+  ],
+  "creates": [
+    "$FS_ROOT/new-open-boxes-20261031",
+    "$FS_ROOT/new-open-boxes-895",
+    "$FS_ROOT/new-open-boxes-96",
+    "$HF_HOME/hub/models--baidu--Unlimited-OCR",
+    "$HF_HOME/hub/models--nvidia--NVIDIA-Nemotron-Parse-2.0",
+    "$HF_HOME/hub/models--ibm-granite--granite-docling-258M",
+    "$GROUP_HOME/$USER/envs/boxes-unlimited-ocr",
+    "$GROUP_HOME/$USER/envs/boxes-nemotron-parse-2",
+    "$GROUP_HOME/$USER/envs/boxes-granite-docling-258m",
+    "$GROUP_HOME/$USER/archive-suite/sherlock-results/new-open-boxes-20261031"
+  ],
+  "provenance": [],
+  "requires": [
+    "$SH_IMG",
+    "$SH_SHIM",
+    "$FS_ROOT/open-sweep-20261019/public895.jsonl",
+    "$FS_ROOT/open-sweep-20261019/pilot3.jsonl",
+    "$FS_ROOT/truth96-20261020/truth99.jsonl",
+    "$FS_ROOT/truth96-20261020/pilot3.jsonl"
+  ],
+  "results": "$GROUP_HOME/$USER/archive-suite/sherlock-results/new-open-boxes-20261031",
+  "collect": [
+    "$FS_ROOT/new-open-boxes-20261031/jobs.tsv",
+    "$FS_ROOT/new-open-boxes-20261031/logs",
+    "$FS_ROOT/new-open-boxes-895",
+    "$FS_ROOT/new-open-boxes-96"
+  ],
+  "release": "Unlimited-OCR, Nemotron-Parse 2.0 and granite-docling readings (895/ and 96/ session folders, with boxes) collected into the Mac artifact; score as W46.ocr-new-open's were (item notes)"
+}
