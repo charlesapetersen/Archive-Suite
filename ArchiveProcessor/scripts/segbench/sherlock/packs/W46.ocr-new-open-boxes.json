@@ -11,6 +11,7 @@
       "dir": "support/sherlock/new-open-boxes",
       "modules": [
         "boxes_parse",
+        "boxes_run",
         "boxes_setup"
       ]
     },

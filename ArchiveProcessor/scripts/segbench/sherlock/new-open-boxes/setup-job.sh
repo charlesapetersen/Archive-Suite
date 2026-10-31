@@ -38,9 +38,12 @@ c=[x for x in json.load(open(sys.argv[1])) if x["key"]==sys.argv[2]][0];print(c[
   state=$("$FS_PY" -c 'import json,sys;print(json.load(open(sys.argv[1]))["state"])' "$A/$key/prepared.json")
   [ "$state" = downloaded ] || { echo "$key: $state, no venv"; continue; }
   E="$ENVS/boxes-$key"
-  if [ ! -x "$E/bin/python" ]; then
+  # Built means its freeze was written (the venv's python links to the image's, so a host-side -x test cannot tell).
+  if [ ! -s "$E/requirements-resolved.txt" ]; then
+    rm -rf "$E"
     run python3 -m venv --system-site-packages "$E"
-    # `image` tries the whole image first, then the torch stack alone; the import check then proves vLLM still loads.
+    # `image` tries the whole image first, then the torch stack alone; the check then refuses the venv if that moved any
+    # package vLLM requires (boxes_setup.vllm_drift).
     used=''
     for c in $([ "$cons" = image ] && echo image torch || echo torch); do
       # shellcheck disable=SC2086  # pins is a word list
@@ -60,7 +63,8 @@ PY
     run "$E/bin/python" -m pip freeze > "$E/requirements-resolved.txt"
   fi
   apptainer -s exec --bind "$SCRATCH,$GROUP_HOME" --env HF_HOME="$HF_HOME" --env HF_HUB_OFFLINE=1 \
-    --env PYTHONPATH="$SH_SHIM" "$SH_IMG" "$E/bin/python" "$HERE/boxes_setup.py" check "$key" "$A" "$B"
+    --env BOXES_IMAGE_FREEZE="$FREEZE" --env PYTHONPATH="$SH_SHIM" "$SH_IMG" \
+    "$E/bin/python" "$HERE/boxes_setup.py" check "$key" "$A" "$B"
 done
 ready=$(cat "$A"/*/prepared.json | "$FS_PY" -c 'import json,sys
 d=json.JSONDecoder();s=sys.stdin.read();i=0;n=[]

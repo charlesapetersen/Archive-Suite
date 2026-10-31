@@ -68,8 +68,10 @@ class Run(unittest.TestCase):
         self.assertEqual(rec['model_raw'][:8], '<|ref|>t')
         self.assertEqual(farmshare_results.reading(rec, 'native'), 'Words p4')
         st = json.loads((self.root / 'status.json').read_text())
-        self.assertEqual((st['state'], st['counts']), ('completed_raw', {'ok': 6, 'cap': 0}))
+        self.assertEqual((st['state'], st['counts']), ('completed_raw', {'ok': 6, 'cap': 0, 'error': 0}))
         self.assertEqual(sorted(Fake.calls), [f'p{i}' for i in range(6)])  # the pilot pages are not read twice
+        self.assertEqual(json.loads((self.root / 'pilot-summary.json').read_text())['expected'], 3)  # truth96 reads it
+        self.assertIn('wall_s', json.loads((self.out / 'summary.json').read_text()))
 
     def test_capped_pilot_stops(self):
         Fake.replies['p1'] = ('Words', 'length')
@@ -86,6 +88,7 @@ class Run(unittest.TestCase):
         del Fake.replies['p4']
         Fake.calls = []
         self.main()
+        self.assertFalse((self.out / 'p4.error.json').exists())  # the scorers would see two records for p4
         self.assertEqual(Fake.calls, ['p4', 'p5'])  # the stopped run never reached p5
 
     def test_contract_binds_96_run(self):

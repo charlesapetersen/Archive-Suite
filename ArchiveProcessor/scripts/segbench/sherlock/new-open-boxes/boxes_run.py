@@ -95,9 +95,11 @@ class Nemotron(Transformers):
         ids = out[0].tolist()
         # An encoder-decoder: generate() returns the decoder sequence, which begins with the task prompt it was seeded
         # with. forced_eos_token_id puts an EOS on a page that reaches the limit too, so the length decides a cap.
-        seed = inputs['input_ids'].shape[1] if 'input_ids' in inputs else 0
+        prompt = inputs['input_ids'][0].tolist() if 'input_ids' in inputs else []
+        seed = len(prompt) if ids[:len(prompt)] == prompt else 0
         n = max(0, len(ids) - seed)
-        finish = 'length' if n >= MAX_NEW - 1 or not ids or ids[-1] not in self.eos else 'stop'
+        # If generate() dropped the seed, a page at the limit is len(prompt) short of it: count that as a cap too.
+        finish = ('length' if n >= MAX_NEW - len(prompt) - 1 or not ids or ids[-1] not in self.eos else 'stop')
         raw = self.processor.batch_decode(out, skip_special_tokens=True)[0]
         text, boxes = B.nemotron(raw, postprocess_text=self.post)
         return raw, text, boxes, image.size, {'prompt_tokens': seed, 'completion_tokens': n}, finish
@@ -112,9 +114,19 @@ class Unlimited(Transformers):
         torch = self.torch
         self.tok = AutoTokenizer.from_pretrained(self.snap, trust_remote_code=True, local_files_only=True)
         # As the card's transformers example loads it (README, read 2026-10-31): bf16, the config's own attention.
+        # If the config asks for flash attention and the image has no flash-attn, eager instead (recorded).
+        from transformers import AutoConfig
+        conf = AutoConfig.from_pretrained(self.snap, trust_remote_code=True, local_files_only=True)
+        asked = getattr(conf, '_attn_implementation', None) or getattr(conf, 'attn_implementation', None)
+        extra = {}
+        if asked == 'flash_attention_2':
+            try:
+                import flash_attn  # noqa: F401
+            except ImportError:
+                extra = {'attn_implementation': 'eager'}
         self.model = AutoModel.from_pretrained(self.snap, trust_remote_code=True, use_safetensors=True,
-                                               torch_dtype=torch.bfloat16, local_files_only=True).eval().cuda()
-        self.attn = getattr(self.model.config, '_attn_implementation', None)
+                                               torch_dtype=torch.bfloat16, local_files_only=True, **extra).eval().cuda()
+        self.attn = {'config': asked, 'used': getattr(self.model.config, '_attn_implementation', None)}
         self.eos = {int(self.tok.eos_token_id)}
         self.captured = {}
         orig = self.model.generate
@@ -124,6 +136,7 @@ class Unlimited(Transformers):
             # max_length, which counts the image and prompt tokens; the harness's limit is 8,192 NEW tokens.
             k.pop('max_length', None)
             k['max_new_tokens'] = MAX_NEW
+            k['streamer'] = None  # its token-by-token print would fill the Slurm log; the output is the same
             out = orig(*a, **k)
             self.captured = {'ids': out, 'input_len': k['input_ids'].shape[1],
                              'kwargs': {x: v for x, v in k.items() if isinstance(v, (int, float, bool, str))}}
@@ -184,10 +197,14 @@ class Granite:
         for im, o in zip(images, outs):
             c = o.outputs[0]
             raw = c.text
-            text, boxes = B.doctags(raw, to_markdown=lambda r: B.docling_markdown(r, im))
+            usage = {'prompt_tokens': len(o.prompt_token_ids or []), 'completion_tokens': len(c.token_ids)}
+            try:
+                text, boxes = B.doctags(raw, to_markdown=lambda r: B.docling_markdown(r, im))
+            except Exception as exc:  # e.g. a capped reply cut mid-tag: the element texts, and the reason kept
+                text, boxes = B.doctags(raw)
+                usage['parse_error'] = f'{type(exc).__name__}: {exc}'[:300]
             finish = 'stop' if c.finish_reason == 'stop' else 'length' if c.finish_reason == 'length' else str(c.finish_reason)
-            yield raw, text, boxes, im.size, {'prompt_tokens': len(o.prompt_token_ids or []),
-                                              'completion_tokens': len(c.token_ids)}, finish
+            yield raw, text, boxes, im.size, usage, finish
 
 
 ADAPTERS = {'nemotron': Nemotron, 'unlimited': Unlimited, 'granite': Granite}
@@ -212,19 +229,20 @@ def run_rows(adapter, rows, root, out, cfg, label):
             error = None
         except Exception as exc:  # one record per page that raised; the run stops after writing it
             results, error = [], f'{type(exc).__name__}: {exc}'[:500]
-        wall = (time.time() - t) / len(part)
+        wall = (time.time() - t) / len(part)  # granite: the chunk's average, read together, not one at a time
         if error:
             for r in part:
                 save(out / (r['id'] + '.error.json'), {**r, 'label': label, 'model': cfg['model'], 'mode': 'native',
                                                      'status': 'error', 'error': error, 'job': os.environ.get('SLURM_JOB_ID')})
             raise RuntimeError(f"{part[0]['id']}: {error}")
         for r, (model_raw, text, boxes, size, usage, finish) in zip(part, results):
-            status = 'ok' if finish == 'stop' else 'cap'
+            status = 'ok' if finish == 'stop' else 'cap' if finish == 'length' else 'error'
             save(out / (r['id'] + '.json'), {**r, 'label': label, 'model': cfg['model'], 'mode': 'native',
                                              'raw': text, 'model_raw': model_raw, 'boxes': boxes,
                                              'image_size': list(size), 'finish': finish, 'status': status,
                                              'error': None, 'usage': usage, 'wall_s': round(wall, 3),
                                              'job': os.environ.get('SLURM_JOB_ID')})
+            (out / (r['id'] + '.error.json')).unlink(missing_ok=True)  # the scorers read every *.json in the folder
             statuses.append(status)
         print(label, i + len(part), '/', len(todo), flush=True)
     return statuses
@@ -262,18 +280,23 @@ def main():
     rows_of = lambda name: [json.loads(x) for x in (parent / name).read_text().splitlines() if x.strip()]
     try:
         pilot = rows_of('pilot3.jsonl')
+        t = time.time()
         run_rows(adapter, pilot, root, out, cfg, label)
+        pilot_wall = round(time.time() - t, 1)
         for row in pilot:
             answer = json.loads((out / (row['id'] + '.json')).read_text())
             if answer['status'] != 'ok' or not answer['raw'].strip():
                 raise ValueError('Pilot failed (capped/empty answer); no full run')
+        if not (root / 'pilot-summary.json').exists():  # farmshare_truth96.py adds its wall_s to the run's
+            save(root / 'pilot-summary.json', {'label': label, 'expected': len(pilot), 'wall_s': pilot_wall,
+                                               'model': cfg['model'], 'job': os.environ.get('SLURM_JOB_ID')})
         status.update(state='full', pilot_passed=len(pilot))
         save(root / 'status.json', status)
         rows = rows_of(manifest)
         assert len({r['id'] for r in rows}) == len(rows)
         t = time.time()
         run_rows(adapter, rows, root, out, cfg, label)
-        counts = {'ok': 0, 'cap': 0}
+        counts = {'ok': 0, 'cap': 0, 'error': 0}
         for row in rows:
             answer = json.loads((out / (row['id'] + '.json')).read_text())
             if any(answer.get(k) != row[k] for k in ('id', 'sha256')) or answer['model'] != cfg['model']:

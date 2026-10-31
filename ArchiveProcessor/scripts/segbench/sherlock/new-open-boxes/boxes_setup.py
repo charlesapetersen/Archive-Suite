@@ -50,11 +50,12 @@ def download(cands, roots):
                                 f"resolved {c['ref']} to {info.sha}; the Mac read {c.get('expected_sha')} on 2026-10-31")
             names = [s.rfilename for s in info.siblings]
             keep = [n for n in names if not any(fnmatch.fnmatch(n, g) for g in c.get('ignore', []))]
-            small = [n for n in keep if not n.endswith('.safetensors')]
+            heavy = ('.safetensors', '.bin', '.pt', '.pth', '.onnx', '.gguf', '.msgpack', '.h5', '.whl')
+            small = [n for n in keep if not n.endswith(heavy)]
             snap = snapshot_download(c['model'], revision=info.sha, allow_patterns=small)
             index = Path(snap) / 'model.safetensors.index.json'
             weights = (sorted(set(json.loads(index.read_text())['weight_map'].values())) if index.exists()
-                       else [n for n in keep if n.endswith('.safetensors')])
+                       else [n for n in keep if n.endswith('.safetensors') and '/' not in n])
             size = sum(s.size or 0 for s in info.siblings if s.rfilename in weights)
             if size > c['weight_limit_bytes']:
                 raise RuntimeError(f'{size} weight bytes over the {c["weight_limit_bytes"]} limit')
@@ -100,12 +101,42 @@ def check(key, roots):
                 from transformers import AutoTokenizer
                 AutoTokenizer.from_pretrained(snap, trust_remote_code=True, local_files_only=True)
         used = Path(sys.prefix, 'constraints-used')
+        if rec['adapter'] == 'granite':
+            drift = vllm_drift()
+            if drift:
+                raise RuntimeError('the overlay moved packages vLLM needs: ' + ', '.join(drift))
         rec.update(state='ready', python=sys.executable, check_versions=versions,
                    constraints_used=used.read_text().strip() if used.exists() else None)
     except Exception:
         rec.update(state='skipped', reason='import check failed: ' + traceback.format_exc()[-1500:])
     write_both(roots, key, rec)
     print(key, rec['state'], rec.get('check_versions', ''), rec.get('reason', '')[-400:])
+
+
+def vllm_drift():
+    """vLLM's own requirements whose installed version in this venv differs from the image's (the venv shadows the
+    image), as `name image->venv`. Empty when docling-core went in under the whole image's constraints."""
+    import importlib.metadata as md
+    import re
+    image = {}
+    freeze = Path(os.environ.get('BOXES_IMAGE_FREEZE', ''))
+    if freeze.is_file():
+        for line in freeze.read_text().splitlines():
+            if '==' in line:
+                k, v = line.split('==', 1)
+                image[re.sub(r'[-_.]+', '-', k).lower()] = v.strip()
+    out = []
+    for req in md.requires('vllm') or []:
+        if 'extra ==' in req:
+            continue
+        name = re.sub(r'[-_.]+', '-', re.match(r'[A-Za-z0-9_.-]+', req).group(0)).lower()
+        try:
+            have = md.version(name)
+        except md.PackageNotFoundError:
+            continue
+        if name in image and image[name] != have:
+            out.append(f'{name} {image[name]}->{have}')
+    return out
 
 
 def main():

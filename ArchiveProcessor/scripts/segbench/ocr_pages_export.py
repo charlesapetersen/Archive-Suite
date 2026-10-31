@@ -33,7 +33,8 @@ BENCH_INPUTS = P.RESULTS.parents[1] / 'ArchiveOCRBench' / 'data' / 'inputs.json'
 # with a run), from its committed pages.csv, and Gemini 3.7 Flash's gateway reading of the 96 (gateway_gemini.py).
 FARMSHARE_TRUTH = P.RESULTS / 'farmshare' / 'truth'
 GATEWAY_ROUTE, GATEWAY = 'gemini3.7-flash-gw', CACHES / 'gateway-gemini' / 'panel'
-MAC = ('qwen3-vl-8b-mlx4', 'lightonocr-3-4b-mlx8', 'qwen3.5-9b-mlx4', 'xiaomi-ocr-0-bf16', 'paddleocr-vl1.6-bf16')
+MAC = ('qwen3-vl-8b-mlx4', 'lightonocr-3-4b-mlx8', 'qwen3.5-9b-mlx4', 'xiaomi-ocr-0-bf16', 'paddleocr-vl1.6-bf16',
+       'granite-docling-258m-mlx')
 # The cheap readers whose texts are compared pairwise: free, or $1 or less per 1,000 pages on the bench.
 CHEAP = ('apple-vision', *MAC, 'qwen3.5-9b', 'mistral-small-24b', 'gemma4-31b', 'gemma4-26b-a4b', 'qwen3.6-35b-a3b',
          'qwen3.8-flash', 'qwen3.5-35b-a3b', 'qwen3-vl-30b-a3b')

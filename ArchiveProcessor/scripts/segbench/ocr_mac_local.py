@@ -96,9 +96,14 @@ def parse(spec, raw, image=None):
     if spec['reply'] == 'doctags':
         from PIL import Image
         B = boxes_parse()
+        extra = {}
         with Image.open(image) as im:
-            text, boxes = B.doctags(raw, to_markdown=lambda r: B.docling_markdown(r, im.convert('RGB')))
-        return {'kind': None, 'table': None, 'text': text, 'boxes': boxes} if text else None
+            try:
+                text, boxes = B.doctags(raw, to_markdown=lambda r: B.docling_markdown(r, im.convert('RGB')))
+            except Exception as exc:  # as the Sherlock runner: the element texts, and the reason kept
+                text, boxes = B.doctags(raw)
+                extra = {'parse_error': f'{type(exc).__name__}: {exc}'[:300]}
+        return {'kind': None, 'table': None, 'text': text, 'boxes': boxes, **extra} if text else None
     if spec['reply'] == 'plain':
         return {'kind': None, 'table': None, 'text': raw.strip()} if raw.strip() else None
     return P.T.parse_draft(raw)

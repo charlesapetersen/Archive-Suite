@@ -35,8 +35,9 @@ LOCAL_CSV = RESULTS / "ocr-panel-local-groups.csv"
 GATEWAY_MD = RESULTS / "gemini37-vs-38.md"  # W46.fix-ocr-scorers-paid: gateway_gemini.py report, Gemini 3.7 Flash
 GATEWAY_CSV = RESULTS / "gemini37-vs-38-groups.csv"
 GATEWAY_ROUTES = {"gemini3.7-flash-gw"}
-# W46.ocr-new-open's Mac readers, added after the difficulty fit was built: on the headline and speed tables, not in the fit.
-LATE_MAC_ROUTES = {"xiaomi-ocr-0-bf16", "paddleocr-vl1.6-bf16"}
+# W46.ocr-new-open's Mac readers and W46.ocr-new-open-boxes's granite-docling, added after the difficulty fit was built:
+# on the headline and speed tables, not in the fit.
+LATE_MAC_ROUTES = {"xiaomi-ocr-0-bf16", "paddleocr-vl1.6-bf16", "granite-docling-258m-mlx"}
 MAC_MD = RESULTS / "ocr-mac-local.md"
 MAC_CSV = RESULTS / "ocr-mac-local-groups.csv"
 FARMSHARE = RESULTS / "farmshare" / "truth"
