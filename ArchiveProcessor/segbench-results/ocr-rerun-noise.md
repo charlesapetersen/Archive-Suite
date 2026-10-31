@@ -30,22 +30,24 @@ Run-to-run spread of the 96-page mean: strict range 0.24 points (SD 0.14), answe
 | run | pages read | NES strict | NES answered |
 |---|---:|---:|---:|
 | 0 | 92/96 | 89.66 | 93.56 |
+| 1 | 92/96 | 89.66 | 93.56 |
 
 Run-to-run spread of the 96-page mean: strict range 0.00 points (SD 0.00), answered range 0.00 points (SD 0.00).
 
 | runs | identical page texts | failure flips | mean / max page move (answered) | paired Δ strict (95% CI) | paired Δ answered (95% CI) |
 |---|---:|---:|---:|---:|---:|
+| 1-0 | 96/96 | 0 | 0.00 / 0.00 | +0.00 (+0.00 to +0.00) | +0.00 (+0.00 to +0.00, n 92) |
 
 | kind | pages | strict mean per run | strict range | answered range |
 |---|---:|---|---:|---:|
-| handwritten | 16 | 89.16 | 0.00 | 0.00 |
-| mixed | 2 | 16.84 | 0.00 | 0.00 |
-| printed | 28 | 91.69 | 0.00 | 0.00 |
-| typewritten | 50 | 91.59 | 0.00 | 0.00 |
+| handwritten | 16 | 89.16 / 89.16 | 0.00 | 0.00 |
+| mixed | 2 | 16.84 / 16.84 | 0.00 | 0.00 |
+| printed | 28 | 91.69 / 91.69 | 0.00 | 0.00 |
+| typewritten | 50 | 91.59 / 91.59 | 0.00 | 0.00 |
 
 ## The tie rule
 
-A gap between two routes on the 96 is a **tie** when it is under twice the larger rerun range of the routes compared (strict or answered, whichever is quoted), or when its paired 95% interval crosses 0. Both tests apply: the rerun range catches the route's own instability, the paired interval catches page-sampling noise, which a deterministic route still has. Twice the range measured here: Gemini 3.7 Flash 0.49 points, Qwen3-VL 8B 4-bit 0.00 points. A route with no rerun of its own takes the larger of these (a hosted model is held to Gemini's, a local greedy one to Qwen's) until it is measured. Per kind, the kind's own range applies; a kind of a dozen pages moves far more than the whole.
+A gap between two routes on the 96 is a **tie** when it is under twice the larger rerun range of the routes compared (strict or answered, whichever is quoted), or when its paired 95% interval crosses 0. Both tests apply: the rerun range catches the route's own instability, the paired interval catches page-sampling noise, which a deterministic route still has. Twice the range measured here: Gemini 3.7 Flash 0.49 points, Qwen3-VL 8B 4-bit 0.00 points. Qwen3-VL 8B 4-bit gave the same text on every page in every run (greedy decoding on one machine is deterministic), so for it, and for a local greedy route like it, only the paired interval applies. A route with no rerun of its own takes the larger of these (a hosted model is held to Gemini's, a local greedy one to Qwen's) until it is measured. Per kind, the kind's own range applies; a kind of a dozen pages moves far more than the whole.
 
 Gateway spend: 300 calls, about $1.14 at Gemini 3.8 Flash's list rate (an estimate; the gateway does report its own figure in an `x-litellm-response-cost` header, which `gateway_gemini.py` does not yet record), Stanford PTA. The MLX runs cost nothing.
 

@@ -185,7 +185,12 @@ def write_md(out):
           'apply: the rerun range catches the route\'s own instability, the paired interval catches page-sampling '
           'noise, which a deterministic route still has. Twice the range measured here: '
           + ', '.join(f"{out['routes'][k]['name'].split(' (')[0]} {2 * 100 * v:.2f} points" for k, v in rng.items())
-          + '. A route with no rerun of its own takes the larger of these (a hosted model is held to Gemini\'s, a '
+          + '. ' + ''.join(f"{out['routes'][k]['name'].split(' (')[0]} gave the same text on every page in every run "
+                           '(greedy decoding on one machine is deterministic), so for it, and for a local greedy route '
+                           'like it, only the paired interval applies. '
+                           for k, r in out['routes'].items()
+                           if all(v['identical_text'] == r['all']['pages'] for v in r['pairs'].values()))
+          + 'A route with no rerun of its own takes the larger of these (a hosted model is held to Gemini\'s, a '
           'local greedy one to Qwen\'s) until it is measured. Per kind, the kind\'s own range applies; a kind of a '
           'dozen pages moves far more than the whole.', '',
           f"Gateway spend: {out['gateway_calls']} calls, about ${out['gateway_cost_estimate']:.2f} at Gemini 3.8 Flash's "
