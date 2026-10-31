@@ -149,4 +149,14 @@ final class AuditLedgerTests: XCTestCase {
                        "the unit-test host never writes the owner's ledger")
         XCTAssertEqual(AuditLedger.defaultFileURL().lastPathComponent, "audit-ledger.jsonl")
     }
+
+    /// W40.fix-reader-vm-nav-red: a test launch whose PID an earlier launch also had must not read that launch's
+    /// ledger. The folder is named for this launch, not the PID alone, and stays the same for the whole process.
+    func testATestLaunchsLedgerIsNotSharedWithAnEarlierLaunchOfTheSamePID() {
+        let folder = AuditLedger.defaultFileURL().deletingLastPathComponent().lastPathComponent
+        XCTAssertNotEqual(folder, "ArchiveReaderTestLedger-\(ProcessInfo.processInfo.processIdentifier)",
+                          "a recycled PID would reopen an older launch's history")
+        XCTAssertEqual(folder, "ArchiveReaderTestLedger-\(AuditLedger.testLaunchID)")
+        XCTAssertEqual(AuditLedger.defaultFileURL(), AuditLedger.defaultFileURL(), "one ledger for the whole process")
+    }
 }

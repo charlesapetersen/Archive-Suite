@@ -99,12 +99,17 @@ final class AuditLedger: @unchecked Sendable {
 
     /// `~/Library/Containers/com.archivereader.app/Data/Library/Application Support/ArchiveReader/
     /// audit-ledger.jsonl` in the sandboxed app. The unit-test host, and a UITest launch (which passes
-    /// `-ARUITestRootPath` on the command line), get a per-process scratch file, so tests never add lines
+    /// `-ARUITestRootPath` on the command line), get a per-launch scratch file, so tests never add lines
     /// to the owner's ledger: both run as `com.archivereader.app` and share its container.
+    /// The process ID alone is not unique: the container's tmp outlives the process, and a VM booted the
+    /// same way each time hands the app the same PID again, so a fresh launch inherited an older run's
+    /// undoable history (W40.fix-reader-vm-nav-red). Fixed for the life of the process.
+    static let testLaunchID = "\(ProcessInfo.processInfo.processIdentifier)-\(UUID().uuidString)"
+
     static func defaultFileURL() -> URL {
         if ArchiveTestHost.isUnitTestHost || ProcessInfo.processInfo.arguments.contains("-ARUITestRootPath") {
             return FileManager.default.temporaryDirectory
-                .appendingPathComponent("ArchiveReaderTestLedger-\(ProcessInfo.processInfo.processIdentifier)", isDirectory: true)
+                .appendingPathComponent("ArchiveReaderTestLedger-\(testLaunchID)", isDirectory: true)
                 .appendingPathComponent("audit-ledger.jsonl")
         }
         let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
