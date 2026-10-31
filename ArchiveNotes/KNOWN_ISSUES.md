@@ -99,7 +99,8 @@ within the debounce, relaunch (bytes, mtime and Finder tags unchanged) and windo
 not; it is carried in that class as a non-strict `XCTExpectFailure` naming its fix item. Evidence:
 `verification/evidence/notes/W40.d9-writing.md` at the suite root. (The outside-edit overwrite is fixed: entry
 above. The typed Return saved as one newline is fixed by `W40.fix-notes-return-paragraph`, 2026-10-31, for plain
-text; a Return in a blockquote or between typed list items is `W40.fix-notes-return-list-quote`, S3.)
+text, and by `W40.fix-notes-return-list-quote`, 2026-10-31, in a blockquote and between typed list items; a typed
+line that begins with list, quote, rule, fence or code syntax is escaped so it reopens as typed.)
 - **A failed inline-image write is only logged** (`W40.fix-notes-asset-write-silent`, S3). This is residual (a) of
   the W7-S5 entry below, now confirmed in the running app.
 

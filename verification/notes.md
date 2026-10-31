@@ -502,6 +502,7 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
   - 2026-10-12 W40.b2 — row written, `unproven`.
   - 2026-10-15 W40.d9 — `unproven` → `broken`: typed paragraph breaks are lost on reopen; filed `W40.fix-notes-return-paragraph` (S2).
   - 2026-10-31 W40.fix-notes-return-paragraph — `broken` → `fixed-pending-recheck`: a Return typed in plain text is saved as a paragraph break (`MarkdownBridge.serializePlainLines`), a hard break read from the file is kept as one, and `WritingJourneyUITests` step 3 now asserts the breaks on disk and after relaunch instead of expecting them to fail.
+  - 2026-10-31 W40.fix-notes-return-list-quote — stays `fixed-pending-recheck`: a Return typed in a blockquote stays in the quote (`> q\n>\n> r`), typed unordered items keep their `- ` markers, and a typed line beginning with four spaces, `2. `, `---`, `- `, `> ` and the like is escaped (`MarkdownBridge.plainPieces`, `escapingBlockStart`); unit tests only, the recheck is the builder-is-not-verifier pass
 - **Notes:** **Drift.**
   - There is no indent or outdent button on the toolbar and no Indent/Outdent item in the Format menu.
     `indentList` and `outdentList` are reached only from Tab and Shift-Tab, and `outdentList` also from Return or

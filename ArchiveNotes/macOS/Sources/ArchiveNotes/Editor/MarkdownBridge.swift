@@ -487,7 +487,33 @@ enum MarkdownBridge {
 
         attributed.enumerateAttribute(.noteBlockKind, in: fullRange) { value, range, _ in
             let kind = (value as? BlockKind) ?? .plain
-            result.append(Para(range: range, kind: kind))
+            guard case .listItem = kind else {
+                result.append(Para(range: range, kind: kind))
+                return
+            }
+            // W40.fix-notes-return-list-quote — `EditorTextView.insertNewline` gives every new unordered item
+            // ordinal 1, so typed items share one kind and arrive here as one run. Each typed line break in a
+            // list item starts the next item, so the run is cut after each one (the newline stays with the
+            // item it ends, which `serializeParagraph` drops). A separator inside one item's run is read from
+            // the file and is the item's second paragraph (the Styler writes one newline between paragraphs
+            // of a list), not a new item, so it is left as it was.
+            let text = attributed.string as NSString
+            var start = range.location
+            var i = range.location
+            while i < NSMaxRange(range) {
+                let ch = text.character(at: i)
+                guard ch == 0x0A || ch == 0x0D else { i += 1; continue }
+                let width = ch == 0x0D && i + 1 < NSMaxRange(range) && text.character(at: i + 1) == 0x0A ? 2 : 1
+                i += width
+                if attributed.attribute(.noteBlockSeparator, at: i - width, effectiveRange: nil) as? Bool != true,
+                   isTypedLineBreak(attributed, at: i - width, in: range) {
+                    if i - width > start { result.append(Para(range: NSRange(location: start, length: i - start), kind: kind)) }
+                    start = i
+                }
+            }
+            if start < NSMaxRange(range) {
+                result.append(Para(range: NSRange(location: start, length: NSMaxRange(range) - start), kind: kind))
+            }
         }
 
         return result
@@ -514,13 +540,24 @@ enum MarkdownBridge {
         }
 
         if case .plain = kind {
-            return serializePlainLines(storage, range: contentRange) + separatorSuffix
+            let (leading, pieces) = plainPieces(storage, range: contentRange)
+            return leading + pieces.joined(separator: "\n\n") + separatorSuffix
+        }
+        // W40.fix-notes-return-list-quote — a quote's paragraphs, typed or read from the file, are cut the
+        // same way and every line is marked: an unmarked line after `> q` is a lazy continuation that reads
+        // back as `q r`, and one after a blank line leaves the quote.
+        if case .blockquote = kind {
+            let (leading, pieces) = plainPieces(storage, range: contentRange)
+            guard !pieces.isEmpty else { return "\(leading)> \(separatorSuffix)" }
+            let quoted = pieces.joined(separator: "\n\n").components(separatedBy: "\n")
+                .map { $0.isEmpty ? ">" : "> \($0)" }
+            return leading + quoted.joined(separator: "\n") + separatorSuffix
         }
 
         // Get the inline-serialized content for this paragraph
         let inlineContent = serializeInlineRuns(storage, range: contentRange)
-        // Strip trailing newline if present
-        let trimmed = inlineContent.hasSuffix("\n")
+        // Strip trailing newline if present (CRLF is one Character)
+        let trimmed = ["\n", "\r\n", "\r"].contains(inlineContent.last)
             ? String(inlineContent.dropLast())
             : inlineContent
 
@@ -530,7 +567,7 @@ enum MarkdownBridge {
             return "\(prefix) \(trimmed)\(separatorSuffix)"
 
         case .blockquote:
-            return "> \(trimmed)\(separatorSuffix)"
+            return "> \(trimmed)\(separatorSuffix)"   // written above
 
         case .codeBlock(let hint):
             let fence = "```"
@@ -540,7 +577,8 @@ enum MarkdownBridge {
         case .listItem(let ordered, let depth, let ordinal):
             let indent = String(repeating: "    ", count: depth)
             let bullet = ordered ? "\(ordinal). " : "- "
-            return "\(indent)\(bullet)\(trimmed)\(separatorSuffix)"
+            let content = startsWithRawHTML(storage, range: contentRange) ? trimmed : escapingBlockStart(trimmed)
+            return "\(indent)\(bullet)\(content)\(separatorSuffix)"
 
         case .plain:
             return trimmed + separatorSuffix
@@ -559,24 +597,99 @@ enum MarkdownBridge {
     /// Two newlines read from the file are not typed ones either: those inside raw HTML (a headerless chip's
     /// unclosed opener is one), which a blank line would end. One separator IS cut: the single newline
     /// `endLine` puts before a chip, once text typed after it has made it the middle of the run.
-    private static func serializePlainLines(_ storage: NSAttributedString, range: NSRange) -> String {
+    /// W40.fix-notes-return-list-quote — a block separator in the middle of the run (two paragraphs of one
+    /// kind) is cut as well, so that every piece is a paragraph start, and each piece's start is escaped: a
+    /// typed line beginning with four spaces, `2. ` or `---` would otherwise open a code block, list or rule.
+    /// A separator BEGINNING the run is the one after a block with no kind (an inline image's line) and comes
+    /// back as `leading`, verbatim: it is that boundary, and cutting it would join the two. (A one-newline
+    /// separator there is `endLine`'s before a chip, cut as before.)
+    private static func plainPieces(_ storage: NSAttributedString,
+                                    range: NSRange) -> (leading: String, pieces: [String]) {
         let text = storage.string as NSString
+        let isNewline: (Int) -> Bool = { let c = text.character(at: $0); return c == 0x0A || c == 0x0D }
+        var leading = ""
         var pieces: [String] = []
         var start = range.location
         let end = range.location + range.length
+        func cut(_ upTo: Int) {
+            let piece = NSRange(location: start, length: upTo - start)
+            let serialized = serializeInlineRuns(storage, range: piece)
+            guard !serialized.isEmpty else { return }
+            pieces.append(startsWithRawHTML(storage, range: piece) ? serialized : escapingBlockStart(serialized))
+        }
         var i = start
         while i < end {
-            let ch = text.character(at: i)
-            guard ch == 0x0A || ch == 0x0D else { i += 1; continue }
-            let width = ch == 0x0D && i + 1 < end && text.character(at: i + 1) == 0x0A ? 2 : 1
+            guard isNewline(i) else { i += 1; continue }
+            let width = text.character(at: i) == 0x0D && i + 1 < end && text.character(at: i + 1) == 0x0A ? 2 : 1
+            if storage.attribute(.noteBlockSeparator, at: i, effectiveRange: nil) as? Bool == true,
+               storage.attribute(.noteRawHTML, at: i, effectiveRange: nil) as? Bool != true {
+                cut(i)
+                var j = i
+                while j < end, isNewline(j),
+                      storage.attribute(.noteBlockSeparator, at: j, effectiveRange: nil) as? Bool == true { j += 1 }
+                if i == range.location, j - i > 1 { leading = text.substring(with: NSRange(location: i, length: j - i)) }
+                start = j
+                i = j
+                continue
+            }
             if isTypedLineBreak(storage, at: i, in: range) {
-                pieces.append(serializeInlineRuns(storage, range: NSRange(location: start, length: i - start)))
+                cut(i)
                 start = i + width
             }
             i += width
         }
-        pieces.append(serializeInlineRuns(storage, range: NSRange(location: start, length: end - start)))
-        return pieces.filter { !$0.isEmpty }.joined(separator: "\n\n")
+        cut(end)
+        return (leading, pieces)
+    }
+
+    /// Whether the first non-blank character of `range` is raw HTML, whose text is the file's own and must not
+    /// be escaped.
+    private static func startsWithRawHTML(_ storage: NSAttributedString, range: NSRange) -> Bool {
+        let text = storage.string as NSString
+        var i = range.location
+        while i < NSMaxRange(range), [0x20, 0x09].contains(text.character(at: i)) { i += 1 }
+        guard i < NSMaxRange(range) else { return false }
+        return storage.attribute(.noteRawHTML, at: i, effectiveRange: nil) as? Bool == true
+    }
+
+    /// W40.fix-notes-return-list-quote — `serialized` begins a Markdown paragraph (or a list item's or quote's
+    /// text). Escape what would open another block there: four columns of leading whitespace (an indented code
+    /// block; its first character is written as an entity, which keeps every space), `>`, a `-` or `+` list
+    /// marker, a `---` rule, a `~~~` fence, `1. ` / `1) `, and a `#` behind leading spaces. `#`, `*`, `_` and
+    /// `` ` `` at the very start are already escaped by `escapeMarkdown`.
+    private static func escapingBlockStart(_ serialized: String) -> String {
+        let chars = Array(serialized)
+        var i = 0
+        var columns = 0
+        while i < chars.count, chars[i] == " " || chars[i] == "\t" {
+            columns = chars[i] == "\t" ? columns + 4 - columns % 4 : columns + 1
+            i += 1
+        }
+        guard i < chars.count else { return serialized }
+        if columns >= 4 {
+            return (chars[0] == "\t" ? "&#9;" : "&#32;") + String(chars.dropFirst())
+        }
+        let line = chars[i...].prefix { $0 != "\n" && $0 != "\r" }
+        let endsMarker: (Int) -> Bool = { $0 >= line.endIndex || line[$0] == " " || line[$0] == "\t" }
+        let escapeAt: Int?
+        switch chars[i] {
+        case ">", "#":
+            escapeAt = i
+        case "-", "+":
+            let isRule = chars[i] == "-" && line.filter { $0 == "-" }.count >= 3
+                && line.allSatisfy { $0 == "-" || $0 == " " || $0 == "\t" }
+            escapeAt = endsMarker(i + 1) || isRule ? i : nil
+        case "~":
+            escapeAt = line.prefix(3).allSatisfy { $0 == "~" } && line.count >= 3 ? i : nil
+        case "0"..."9":
+            var j = i
+            while j < line.endIndex, j - i < 9, line[j].isASCII, line[j].isNumber { j += 1 }
+            escapeAt = j < line.endIndex && (line[j] == "." || line[j] == ")") && endsMarker(j + 1) ? j : nil
+        default:
+            escapeAt = nil
+        }
+        guard let at = escapeAt else { return serialized }
+        return String(chars[..<at]) + "\\" + String(chars[at...])
     }
 
     private static func isTypedLineBreak(_ storage: NSAttributedString, at i: Int, in range: NSRange) -> Bool {

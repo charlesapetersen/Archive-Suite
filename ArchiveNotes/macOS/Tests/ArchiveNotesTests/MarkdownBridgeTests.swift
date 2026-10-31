@@ -156,7 +156,7 @@ struct MarkdownBridgeTests {
         for markdown in ["1. First  \n   continuation\n2. Second", "1. First\n\n   continuation\n2. Second"] {
             let serialized = MarkdownBridge.serialize(MarkdownBridge.parse(markdown: markdown))
             #expect(serialized.contains("continuation"))
-            #expect(serialized.contains("2. Second"))
+            #expect(serialized.contains("2. Second"), "got \(serialized.debugDescription)")
             #expect(!serialized.contains("2. continuation") && !serialized.contains("3. Second"))
         }
     }
@@ -621,6 +621,79 @@ struct MarkdownBridgeTests {
     @Test @MainActor
     func carriageReturnsAreLineBreaks() {
         #expect(MarkdownBridge.serialize(typing("\rB\r\nC", after: "A")) == "A\n\nB\n\nC")
+    }
+
+    // MARK: - W40.fix-notes-return-list-quote — Returns in quotes and lists, and typed block syntax
+
+    /// A Return typed in a quote was written `> q\nr`, a lazy continuation that reopened as `q r`.
+    @Test @MainActor
+    func returnTypedInAQuoteStaysInTheQuote() {
+        let saved = MarkdownBridge.serialize(typing("\nr", after: "> q"))
+        #expect(saved == "> q\n>\n> r", "got \(saved.debugDescription)")
+        let reopened = MarkdownBridge.parse(markdown: saved)
+        #expect(reopened.string == "q\n\nr")
+        #expect(MarkdownBridge.serialize(reopened) == saved, "reopening must not rewrite the note")
+    }
+
+    /// A quote's second paragraph read from the file stayed in the quote neither: it was written after a bare
+    /// blank line, outside it.
+    @Test @MainActor
+    func quoteWithTwoParagraphsRoundTrips() {
+        assertNormalized("> q\n>\n> r\n\nAfter.", expected: "> q\n>\n> r\n\nAfter.")
+        assertNormalized("> Line one\\\n> Line two", expected: "> Line one\\\n> Line two")
+    }
+
+    /// Typed through the real text view: every new unordered item gets ordinal 1, so two typed items share a
+    /// kind, and the second used to be written without its marker, as a continuation of the first.
+    @Test @MainActor
+    func typedUnorderedItemsKeepTheirMarkers() throws {
+        let tv = EditorTextView()
+        let storage = try #require(tv.textStorage)
+        storage.setAttributedString(MarkdownBridge.parse(markdown: "- a"))
+        tv.setSelectedRange(NSRange(location: storage.length, length: 0))
+        tv.insertNewline(nil)
+        tv.insertText("b", replacementRange: tv.selectedRange())
+        tv.insertNewline(nil)
+        tv.insertText("c", replacementRange: tv.selectedRange())
+        let saved = MarkdownBridge.serialize(storage)
+        #expect(saved == "- a\n- b\n- c", "got \(saved.debugDescription)")
+        #expect(MarkdownBridge.serialize(MarkdownBridge.parse(markdown: saved)) == saved)
+    }
+
+    /// The same defect on the serializer alone, for both list kinds: items of one kind in one run are still
+    /// written one per line, numbered in order.
+    @Test @MainActor
+    func listItemsOfOneKindAreWrittenSeparately() {
+        for (md, typed, expected) in [("- a", "\nb\nc", "- a\n- b\n- c"), ("1. a", "\nb", "1. a\n2. b")] {
+            let saved = MarkdownBridge.serialize(typing(typed, after: md))
+            #expect(saved == expected, "\(md.debugDescription): got \(saved.debugDescription)")
+        }
+    }
+
+    /// A typed line is a paragraph now, so what opens a block at a paragraph start is escaped there, and the
+    /// reopened note shows the text as typed.
+    @Test @MainActor
+    func typedBlockSyntaxIsEscaped() {
+        let cases: [(String, String)] = [
+            ("    code", "&#32;   code"), ("\tx", "&#9;x"), ("2. b", "2\\. b"), ("10) b", "10\\) b"),
+            ("---", "\\---"), ("- - -", "\\- - -"), ("- a", "\\- a"), ("+ a", "\\+ a"), ("> q", "\\> q"),
+            ("~~~", "\\~~~"), ("  # h", "  \\# h"), ("-5 degrees", "-5 degrees"), ("2.5 kg", "2.5 kg"),
+            ("1234567890. x", "1234567890. x")
+        ]
+        for (line, written) in cases {
+            let saved = MarkdownBridge.serialize(typing("\n" + line, after: "A"))
+            #expect(saved == "A\n\n" + written, "\(line.debugDescription): got \(saved.debugDescription)")
+            let reopened = MarkdownBridge.parse(markdown: saved)
+            let shown = line.hasPrefix("  #") ? "# h" : line
+            #expect(reopened.string == "A\n\n" + shown, "\(line.debugDescription): reopened \(reopened.string.debugDescription)")
+            #expect(MarkdownBridge.serialize(reopened) == MarkdownBridge.serialize(MarkdownBridge.parse(markdown:
+                MarkdownBridge.serialize(reopened))), "\(line.debugDescription) must settle")
+        }
+        // The same at the start of a quote's or a list item's text.
+        #expect(MarkdownBridge.serialize(typing("\n2. b", after: "> q")) == "> q\n>\n> 2\\. b")
+        #expect(MarkdownBridge.serialize(typing("\n---", after: "- a")) == "- a\n- \\---")
+        // Raw HTML at a piece start is the file's own and stays as it was.
+        #expect(MarkdownBridge.serialize(MarkdownBridge.parse(markdown: "<div>\nx\n</div>")) == "<div>\nx\n</div>")
     }
 
     /// Typed through the real text view: at the start of a paragraph the caret follows the Styler's separator,
