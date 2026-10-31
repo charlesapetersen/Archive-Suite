@@ -230,15 +230,16 @@ final class ReaderAtSizeTests: XCTestCase {
         let queries = ["memorandum", "Kennedy", "budget", "Treasury", "Vietnam", "confidential",
                        "Bureau of the Budget", "the", "a", "president", "zzqxvnotaword"]
         for (i, query) in queries.enumerated() {
-            var hits = 0
+            var hits = 0, previews = 0
             var samples: [Double] = []
             for _ in 0..<(i == 0 ? 1 : 5) {
                 let start = DispatchTime.now().uptimeNanoseconds
-                hits = await indexer.searchRanked(query).paths.count
+                let ranked = await indexer.searchRanked(query)
                 samples.append(Double(DispatchTime.now().uptimeNanoseconds - start) / 1e9)
+                (hits, previews) = (ranked.paths.count, ranked.snippets.count)
             }
             samples.sort()
-            print("D7 search \"\(query)\" hits=\(hits) median \(ms(samples[samples.count / 2])) max \(ms(samples.last!))"
+            print("D7 search \"\(query)\" hits=\(hits) previews=\(previews) median \(ms(samples[samples.count / 2])) max \(ms(samples.last!))"
                   + (i == 0 ? " (first query: opens the index)" : ""))
         }
         await indexer.closeForTesting()
@@ -270,17 +271,19 @@ final class ReaderAtSizeTests: XCTestCase {
         print("D7 fts corpus-size rows=\(corpusRows) (sample text x\(target / extracted.count)+) write+optimize \(s(fillSeconds)) "
               + String(format: "db=%.1f MiB", sqliteMiB(corpusURL)))
         for query in queries {
-            var hits = 0
+            var hits = 0, previews = 0
             var samples: [Double] = []
             for _ in 0..<3 {
                 let start = DispatchTime.now().uptimeNanoseconds
-                hits = await corpusIndex.searchRanked(query).paths.count
+                let ranked = await corpusIndex.searchRanked(query)
                 samples.append(Double(DispatchTime.now().uptimeNanoseconds - start) / 1e9)
+                (hits, previews) = (ranked.paths.count, ranked.snippets.count)
             }
             samples.sort()
-            // The same MATCH without snippets, to say which half of `searchRanked` the time is in.
+            // The same MATCH without snippets, to say which half of `searchRanked` the time is in. `previews`
+            // is how many hits got a snippet: at most 300, fewer when SearchSnippet.timeBudget runs out.
             let pathsOnly = await timeAsync { await corpusIndex.search(query) }.1
-            print("D7 search@102k \"\(query)\" hits=\(hits) median \(ms(samples[1])) max \(ms(samples[2])) "
+            print("D7 search@102k \"\(query)\" hits=\(hits) previews=\(previews) median \(ms(samples[1])) max \(ms(samples[2])) "
                   + "| paths-only search() \(ms(pathsOnly))")
             // W40.fix-reader-fts-snippet-stall: 41.7 s before the fix. SQLite is optimized either way, so
             // one budget serves both builds: the snippet cap plus the 24 ms match, with room.
