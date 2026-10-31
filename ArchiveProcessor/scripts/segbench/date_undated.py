@@ -12,6 +12,13 @@ the document's own pages" from the image pass (date_image.PROMPT, images alone),
     <lab venv>/bin/python date_undated.py vision     # upright JPEG originals -> Apple Vision text (ocr.swift), resumable
     <lab venv>/bin/python date_undated.py run [--set S] [--rerun] [--limit N]   # the app call, the image pass (paid)
     <lab venv>/bin/python date_undated.py score      # segbench-results/date-undated.md and .json
+    <lab venv>/bin/python date_undated.py sheet      # the blind owner sheet of page dates -> CACHE/sheet ($0, no call)
+
+SHEET (W46.date-undated-sheet, measurement review 2026-10-31 R-1). The page-date truth above is the scored model's own
+reading, so the owner rules on the 12 false-year documents and 8 controls where the app's year equals the page's: their
+first DOC_PAGES pages re-rendered upright from the JPEG originals, every date-like string in Vision's text boxed on all
+20 (word boxes from dewarp.swift `lines`; boxing only the controls' quoted dates would tell the groups apart), blind.
+key.json beside index.html holds the groups; W46.date-undated-fold scores the exported answers.
 
 <lab venv> is ~/.local/share/visionocr-ocrlab/venv (numpy and PIL for ocr_truth.orient_like_pdf, requests).
 
@@ -525,6 +532,207 @@ def cmd_score(a):
     print("\n".join(L))
 
 
+# --- the blind owner sheet (W46.date-undated-sheet) -------------------------------------------------------------
+
+SHEET = CACHE / "sheet"
+N_CONTROLS = 8
+SHEET_SEED = 4631
+DEWARP_BIN = Path.home() / "Library/Caches/ArchiveSuiteRehearsal/segbench/bin/segbench-dewarp"
+_MONTH = (r"(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|June?|July?|Aug(?:ust)?|Sept?(?:ember)?|"
+          r"Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)")
+_FULL_MONTH = r"(?:January|February|March|April|June|July|August|September|October|November|December)"
+DATE_LIKE = [
+    r"\b(?:1[89]\d\d|20[0-2]\d)\b",                                            # a year
+    r"\b\d{1,2}\s*[/.-]\s*\d{1,2}\s*[/.-]\s*\d{2,4}\b",                         # 5/12/67, 12.5.1967
+    r"[’'‘]\d\d\b",                                                             # '67
+    _MONTH + r"\.?\s+\d{1,2}(?:st|nd|rd|th)?\b,?(?:\s+[’'‘]?\d{2,4}\b)?",       # May 12, 1967
+    r"\b\d{1,2}(?:st|nd|rd|th)?\s+" + _MONTH + r"\b\.?(?:,?\s+[’'‘]?\d{2,4}\b)?",  # 12 May 1967
+    _MONTH + r"\.?,?\s+[’'‘]?\d{2,4}\b",                                        # Dec. 1967
+    r"\b" + _FULL_MONTH + r"\b",                                                # a month alone, written in full
+]
+
+
+def date_spans(text):
+    """Character spans of every date-like string in one line, overlapping matches merged. Deliberately loose: the
+    sheet boxes what might be a date and the owner judges it; over-boxing is the same on every document."""
+    import re
+    spans = sorted((m.start(), m.end()) for pat in DATE_LIKE for m in re.finditer(pat, text))
+    out = []
+    for s, e in spans:
+        if out and s <= out[-1][1]:
+            out[-1][1] = max(out[-1][1], e)
+        else:
+            out.append([s, e])
+    return [tuple(x) for x in out]
+
+
+def _bbox(quad):
+    xs, ys = [p[0] for p in quad], [p[1] for p in quad]
+    return [min(xs), min(ys), max(xs), max(ys)]
+
+
+def date_boxes(lines_json):
+    """[{text, box: [x, y, w, h]}] in the image's normalised coordinates (top-left origin) for every date-like string
+    in segbench-dewarp's `lines` output: the union of the Vision word boxes the string overlaps, the line's own box
+    when no word box falls on it."""
+    out = []
+    for ln in lines_json.get("lines", []):
+        text = ln["text"]
+        spans = date_spans(text)
+        if not spans:
+            continue
+        placed, cur = [], 0
+        for w in ln.get("words", []):
+            i = text.find(w["text"], cur)
+            if i < 0:
+                continue
+            placed.append((i, i + len(w["text"]), _bbox(w["quad"])))
+            cur = i + len(w["text"])
+        for s, e in spans:
+            hit = [b for ws, we, b in placed if ws < e and we > s]
+            if hit:
+                x0, y0 = min(b[0] for b in hit), min(b[1] for b in hit)
+                x1, y1 = max(b[2] for b in hit), max(b[3] for b in hit)
+            else:
+                x0, y0, x1, y1 = _bbox(ln["quad"])
+            out.append({"text": text[s:e], "box": [round(x0, 4), round(y0, 4), round(x1 - x0, 4), round(y1 - y0, 4)]})
+    return out
+
+
+def sheet_documents(rs):
+    """The false-year documents (as cmd_score counts them) and N_CONTROLS drawn with a fixed seed from those where the
+    app's year equals the page's, shuffled together so the order tells nothing. [(document, group)]."""
+    und = [r for r in rs if r["set"] == "undated" and r["app"] and readable(r)]
+    false_year = [r for r in und if not r["app"]["du"] and (r["own"] is None or r["app"]["y"] != r["own"])]
+    same = sorted((r for r in und if r["own"] is not None and r["app"]["y"] == r["own"]), key=lambda r: r["id"])
+    rng = random.Random(SHEET_SEED)
+    docs = [(r, "false year") for r in false_year] + [(r, "control") for r in rng.sample(same, min(N_CONTROLS, len(same)))]
+    docs.sort(key=lambda x: x[0]["id"])
+    rng.shuffle(docs)
+    return docs, len(false_year), len(same)
+
+
+def build_dewarp_tool():
+    src = HERE / "dewarp.swift"
+    if not (DEWARP_BIN.exists() and DEWARP_BIN.stat().st_mtime >= src.stat().st_mtime):
+        DEWARP_BIN.parent.mkdir(parents=True, exist_ok=True)
+        subprocess.run(["/usr/bin/swiftc", "-O", str(src), "-o", str(DEWARP_BIN)], check=True)
+    return DEWARP_BIN
+
+
+def cmd_sheet(a):
+    """$0, no model call. The 12 false-year documents and 8 controls, each with its first DOC_PAGES pages re-rendered
+    upright from the JPEG originals (orient.json's verdict, as cmd_vision made them), every date-like string in Vision's
+    text boxed from segbench-dewarp's word boxes, blind: no app year, no image-pass reading, no group. The key goes
+    beside the sheet. READ ONLY on the JPEG originals."""
+    from PIL import Image
+    import corpus_pairs as CP
+    pairs = jpeg_pairs()
+    orient = json.loads((CACHE / "orient.json").read_text())
+    docs, n_false, n_same = sheet_documents(rows())
+    for sub in ("img", "lines"):
+        (SHEET / sub).mkdir(parents=True, exist_ok=True)
+    plan, jobs = [], []
+    for k, (d, group) in enumerate(docs, 1):
+        name = f"D{k:02d}"
+        pages = []
+        for n, p in enumerate(d["pages"][:DOC_PAGES], 1):
+            o = orient.get(p, {})
+            img, lj = SHEET / "img" / f"{name}-{n}.jpg", SHEET / "lines" / f"{name}-{n}.json"
+            if "deg" in o and p in pairs:
+                if not img.exists():
+                    with Image.open(os.path.join(CP.JPEGS, pairs[p])) as im:
+                        im = im.convert("RGB").rotate(o["deg"], expand=True)
+                        im.thumbnail((LONG_SIDE, LONG_SIDE), Image.Resampling.LANCZOS)
+                        im.save(img, "JPEG", quality=90)
+                jobs.append(f"{img}\t{lj}\n")
+                pages.append({"page": p, "img": img, "lines": lj})
+            else:
+                pages.append({"page": p, "img": None, "why": o.get("why", "no JPEG paired")})
+        plan.append((name, d, group, pages))
+    (SHEET / "lines-jobs.tsv").write_text("".join(jobs))
+    subprocess.run([str(build_dewarp_tool()), "lines", str(SHEET / "lines-jobs.tsv")], check=True)
+    data, key = [], {}
+    for name, d, group, pages in plan:
+        shown = []
+        for pg in pages:
+            if pg["img"] is None:
+                shown.append({"img": None, "file": os.path.basename(pg["page"]), "why": pg["why"], "boxes": []})
+                continue
+            lj = json.loads(pg["lines"].read_text())
+            shown.append({"img": f"img/{pg['img'].name}", "boxes": [b["box"] for b in date_boxes(lj)],
+                          "aspect": lj["height"] / lj["width"]})
+        data.append({"doc": name, "pages_total": len(d["pages"]), "pages": shown})
+        key[name] = {"id": d["id"], "group": group, "folder": d["folder"], "pages": d["pages"][:DOC_PAGES],
+                     "app_year": d["app"]["y"], "app_date_uncertain": d["app"]["du"], "pass_own_year": d["own"],
+                     "pass_written_years": d["written"]}
+    minutes = max(1, round(0.5 * len(data)))
+    (SHEET / "index.html").write_text(SHEET_HTML.replace("__DATA__", json.dumps(data, ensure_ascii=False))
+                                      .replace("__N__", str(len(data))).replace("__MINUTES__", str(minutes)))
+    (SHEET / "key.json").write_text(json.dumps({
+        "item": "W46.date-undated-sheet", "seed": SHEET_SEED, "false_year": n_false, "control_pool": n_same,
+        "controls": sum(v["group"] == "control" for v in key.values()), "documents": key}, indent=1))
+    boxed = sum(bool(p["boxes"]) for x in data for p in x["pages"])
+    no_box = [x["doc"] for x in data if not any(p["boxes"] for p in x["pages"])]
+    size = sum(f.stat().st_size for f in SHEET.rglob("*") if f.is_file())
+    print(f"{len(data)} documents ({n_false} false year, {len(data) - n_false} controls of {n_same}), "
+          f"{sum(len(x['pages']) for x in data)} pages, {boxed} with a box; no date-like string on {no_box or 'none'}; "
+          f"{size / 1e6:.1f} MB; about {minutes} minutes -> {SHEET / 'index.html'}")
+
+
+SHEET_HTML = r"""<!doctype html><meta charset="utf-8"><title>W46 page dates, blind</title>
+<style>
+body{font:14px -apple-system,sans-serif;margin:0;background:#fff;color:#111;color-scheme:light}
+header{position:sticky;top:0;background:#fff;border-bottom:1px solid #ccc;padding:6px 12px;z-index:2}
+.doc{display:flex;gap:12px;border-bottom:3px solid #999;padding:10px}
+.imgs{flex:1 1 65%}.q{flex:1 1 35%;position:sticky;top:var(--head,60px);align-self:flex-start}
+.frame{position:relative;width:100%;margin-bottom:8px;cursor:zoom-in}.frame.zoom{width:220%;cursor:zoom-out}
+.frame img{width:100%;display:block}.wrap{overflow:auto;max-height:calc(100vh - var(--head,60px) - 20px)}
+.box{position:absolute;border:3px solid #f0a;border-radius:4px;pointer-events:none}
+.none{color:#a40;font-size:13px}.missing{border:1px dashed #a40;padding:20px;color:#a40;margin-bottom:8px}
+.done{background:#e6f6e6}label{display:block;margin:4px 0}input[type=text]{width:8em}textarea{width:95%;height:3em}
+</style>
+<header><b>Page dates, blind</b> — __N__ documents, about __MINUTES__ minutes. For each document: <b>is a date
+written or printed on the document's own pages, and which year?</b> Not when you know the document is from, only what
+the pages carry. Pink boxes mark every date-like string Apple Vision read on the page (a year, a numeric date, a month
+with a number); a box can be a false alarm and Vision can miss a date, so look at the whole page. Click a page to zoom.
+Answers stay in this browser; <button onclick="exportAnswers()">Export answers</button><span id="prog"></span></header>
+<div id="root"></div>
+<script>
+const DATA=__DATA__;const KEY='w46-date-undated-sheet';
+let A=JSON.parse(localStorage.getItem(KEY)||'{}');
+function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+function save(){localStorage.setItem(KEY,JSON.stringify(A));prog()}
+function prog(){const d=DATA.filter(x=>(A[x.doc]||{}).date).length;document.getElementById('prog').textContent=` ${d} / ${DATA.length} answered`;
+ DATA.forEach(x=>document.getElementById(x.doc).classList.toggle('done',!!(A[x.doc]||{}).date))}
+const root=document.getElementById('root');
+for(const x of DATA){const div=document.createElement('div');div.className='doc';div.id=x.doc;
+ let h='<div class="imgs">';
+ x.pages.forEach((p,i)=>{
+  if(!p.img){h+=`<div class="missing">Page ${i+1}: no photograph to show (${esc(p.why)}; file ${esc(p.file)}).</div>`;return}
+  h+=`<div class="wrap"><div class="frame"><img src="${p.img}" alt="${x.doc} page ${i+1}">`+
+   p.boxes.map(b=>`<div class="box" style="left:${100*b[0]-.6}%;top:${100*(b[1]-.006/p.aspect)}%;width:${100*b[2]+1.2}%;height:${100*(b[3]+.012/p.aspect)}%"></div>`).join('')+
+   '</div></div>'});
+ const any=x.pages.some(p=>p.boxes.length);
+ h+='</div><div class="q"><b>'+x.doc+'</b>'+(x.pages_total>x.pages.length?` (pages 1-${x.pages.length} of ${x.pages_total})`:'')+
+  (any?'':'<p class="none">Vision read no date-like string on these pages, so nothing is boxed.</p>')+
+  '<p>Is a date written or printed on the document\'s own pages?</p>'+
+  ['yes','no','cannot tell'].map(v=>`<label><input type="radio" name="${x.doc}" value="${v}"> ${v}</label>`).join('')+
+  '<p>Which year does it give? <input type="text" data-f="year" placeholder="e.g. 1967"></p>'+
+  '<p>Note (optional, e.g. "only the month", "year partly torn off"):<br><textarea data-f="note"></textarea></p></div>';
+ div.innerHTML=h;root.appendChild(div);
+ const a=A[x.doc]||{};
+ div.querySelectorAll('input[type=radio]').forEach(r=>{r.checked=a.date===r.value;r.onchange=()=>{(A[x.doc]=A[x.doc]||{}).date=r.value;save()}});
+ div.querySelectorAll('[data-f]').forEach(f=>{f.value=a[f.dataset.f]||'';f.oninput=()=>{(A[x.doc]=A[x.doc]||{})[f.dataset.f]=f.value;save()}});
+ div.querySelectorAll('.frame').forEach(f=>f.onclick=()=>f.classList.toggle('zoom'))}
+function head(){document.documentElement.style.setProperty('--head',document.querySelector('header').offsetHeight+'px')}
+addEventListener('resize',head);head();
+function exportAnswers(){const b=new Blob([JSON.stringify(A,null,1)],{type:'application/json'});
+ const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='date-undated-sheet-answers.json';a.click()}
+prog();
+</script>"""
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -533,8 +741,9 @@ def main():
     p = sub.add_parser("run"); p.add_argument("--set", choices=("undated", "dated"))
     p.add_argument("--rerun", action="store_true"); p.add_argument("--limit", type=int)
     sub.add_parser("score")
+    sub.add_parser("sheet")
     a = ap.parse_args()
-    {"sample": cmd_sample, "vision": cmd_vision, "run": cmd_run, "score": cmd_score}[a.cmd](a)
+    {"sample": cmd_sample, "vision": cmd_vision, "run": cmd_run, "score": cmd_score, "sheet": cmd_sheet}[a.cmd](a)
 
 
 if __name__ == "__main__":

@@ -75,5 +75,47 @@ class Wilson(unittest.TestCase):
         self.assertEqual(U.wilson(0, 0), (0.0, 0.0))
 
 
+class Sheet(unittest.TestCase):
+    def spans(self, s):
+        return [s[a:b] for a, b in U.date_spans(s)]
+
+    def test_date_like_strings(self):
+        self.assertEqual(self.spans("Received May 12, 1967 at the office"), ["May 12, 1967"])
+        self.assertEqual(self.spans("dated 5/12/67 and 12.5.1967"), ["5/12/67", "12.5.1967"])
+        self.assertEqual(self.spans("Class of '67, 3 Dec 1954"), ["'67", "3 Dec 1954"])
+        self.assertEqual(self.spans("Dec. 1967 report; September"), ["Dec. 1967", "September"])
+
+    def test_not_date_like(self):
+        self.assertEqual(self.spans("May we ask for 250 copies of item 3"), [])
+        self.assertEqual(self.spans("phone 3210 or room 1234"), [])
+
+    def test_box_is_the_union_of_the_words_the_date_overlaps(self):
+        def w(t, x0, x1):
+            return {"text": t, "quad": [[x0, .1], [x1, .1], [x1, .2], [x0, .2]]}
+        ln = {"text": "Sent May 12, 1967 by hand", "quad": [[0, .1], [1, .1], [1, .2], [0, .2]],
+              "words": [w("Sent", 0, .1), w("May", .15, .25), w("12", .3, .35), w("1967", .4, .5), w("by", .55, .6),
+                        w("hand", .65, .8)]}
+        got = U.date_boxes({"lines": [ln]})
+        self.assertEqual([g["text"] for g in got], ["May 12, 1967"])
+        self.assertEqual(got[0]["box"], [.15, .1, .35, .1])
+
+    def test_falls_back_to_the_line_box_without_word_boxes(self):
+        ln = {"text": "1967", "quad": [[.2, .3], [.6, .3], [.6, .4], [.2, .4]], "words": []}
+        self.assertEqual(U.date_boxes({"lines": [ln]})[0]["box"], [.2, .3, .4, .1])
+
+    def test_documents_are_the_false_years_and_seeded_controls(self):
+        def r(i, du, y, own):
+            return {"id": i, "set": "undated", "pages": [i], "app": {"y": y, "du": du}, "own": own}
+        rs = ([r(f"f{i}", False, 1960, None) for i in range(3)] + [r("u", True, 1960, None)]
+              + [r(f"c{i:02d}", False, 1970, 1970) for i in range(20)] + [r("x", False, 1971, 1970)])
+        with mock.patch.object(U, "readable", return_value=True):
+            a, n_false, n_same = U.sheet_documents(rs)
+            b = U.sheet_documents(list(reversed(rs)))[0]
+        self.assertEqual((n_false, n_same), (4, 20))   # "x" has a different own year: a false year
+        self.assertEqual(sum(g == "control" for _, g in a), U.N_CONTROLS)
+        self.assertEqual([d["id"] for d, _ in a], [d["id"] for d, _ in b])   # fixed by the seed, not the input order
+        self.assertNotIn("u", [d["id"] for d, _ in a])
+
+
 if __name__ == "__main__":
     unittest.main()
