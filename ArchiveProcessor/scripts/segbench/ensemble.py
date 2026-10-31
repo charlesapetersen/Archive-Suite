@@ -157,10 +157,11 @@ def evaluate(box: Box, S, v: float) -> dict:
     s_auto = score_labels(box.labels, box.labels_from(auto))
     s_rev = score_labels(box.labels, box.labels_from(rev))
     acc = [i for i, (_, f, _, _) in j.items() if not f]
+    unsure = getattr(box, "unsure", set())
     return {"pages": box.pages, "gaps": len(box.gaps), "flagged": len(box.gaps) - len(acc),
-            "accepted": len(acc), "acc_err": sum(auto[i] != box.truth[i] for i in acc if i not in box.unsure),
+            "accepted": len(acc), "acc_err": sum(auto[i] != box.truth[i] for i in acc if i not in unsure),
             "auto": s_auto, "rev": s_rev,
-            "auto_err": sum(auto[i] != box.truth[i] for i in box.gaps if i not in box.unsure)}
+            "auto_err": sum(auto[i] != box.truth[i] for i in box.gaps if i not in unsure)}
 
 
 def pooled(rows: list[dict]) -> dict:

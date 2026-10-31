@@ -8,29 +8,29 @@ Public window rows use the models' own photo calls, matching the public scorer. 
 
 ## Lincoln and CREST, every source, old and new scorers
 
-### Lincoln: 261 pages, 81 documents
+### Lincoln: 261 pages, 80 documents
 
 | source | pages exact | false splits | false merges | boundaries found | PQ | kappa | MNDD | pages exact, finding-aid count | checks per 100 pages to 98% |
 |---|---|---|---|---|---|---|---|---|---|
-| rule cues (fitted on owner dev boxes) | 16.9% | 85 | 15 | 65/80 | 0.282 | 0.274 | 103 | 4.6% | 85.4 |
-| Qwen3.5 27B teacher, FarmShare | 39.5% | 40 | 0 | 80/80 | 0.579 | 0.683 | 41 | 46.4% | — |
-| trained Qwen3.5 2B, FarmShare | 34.9% | 44 | 2 | 78/80 | 0.517 | 0.638 | 46 | 44.1% | — |
-| trained Qwen3.5 4B, FarmShare | 46.7% | 32 | 2 | 78/80 | 0.643 | 0.722 | 35 | 56.7% | — |
-| Claude Sonnet 5.5, c1, plan | 90.0% | 1 | 2 | 78/80 | 0.956 | 0.973 | 3 | 81.2% | 22.6 |
-| Claude Sonnet 5.5, c2 (stated letter cues), plan + gateway holes | 90.0% | 2 | 0 | 80/80 | 0.984 | 0.982 | 2 | 79.7% | 7.3 |
+| rule cues (fitted on owner dev boxes) | 16.9% | 86 | 14 | 64/78 | 0.276 | 0.275 | 103 | 5.4% | 85.4 |
+| Qwen3.5 27B teacher, FarmShare | 40.6% | 40 | 0 | 80/80 | 0.571 | 0.683 | 41 | 47.5% | — |
+| trained Qwen3.5 2B, FarmShare | 35.6% | 44 | 1 | 78/79 | 0.529 | 0.645 | 45 | 44.1% | — |
+| trained Qwen3.5 4B, FarmShare | 49.8% | 31 | 0 | 79/79 | 0.669 | 0.746 | 32 | 57.9% | — |
+| Claude Sonnet 5.5, c1, plan | 90.4% | 2 | 0 | 77/77 | 0.983 | 0.982 | 2 | 80.8% | 22.6 |
+| Claude Sonnet 5.5, c2 (stated letter cues), plan + gateway holes | 89.3% | 3 | 0 | 79/79 | 0.966 | 0.973 | 3 | 80.1% | 7.3 |
 | ChatGPT gpt-6.1-sol low, c1, plan | not collected | | | | | | | | |
 | ChatGPT gpt-6.1-sol low, c2 (stated letter cues), plan | not collected | | | | | | | | |
 
-### CREST: 128 pages, 31 documents
+### CREST: 128 pages, 30 documents
 
 | source | pages exact | false splits | false merges | boundaries found | PQ | kappa | MNDD | pages exact, finding-aid count | checks per 100 pages to 98% |
 |---|---|---|---|---|---|---|---|---|---|
-| rule cues (fitted on owner dev boxes) | 11.7% | 83 | 0 | 30/30 | 0.162 | 0.074 | 84 | 3.1% | 98.4 |
-| Qwen3.5 27B teacher, FarmShare | 95.3% | 2 | 0 | 30/30 | 0.930 | 0.957 | 2 | 48.4% | 2.3 |
-| trained Qwen3.5 2B, FarmShare | 91.4% | 2 | 2 | 28/30 | 0.860 | 0.913 | 5 | 32.8% | 8.6 |
-| trained Qwen3.5 4B, FarmShare | 98.4% | 1 | 0 | 30/30 | 0.952 | 0.978 | 1 | 54.7% | 0.0 |
-| Claude Sonnet 5.5, c1, plan | 84.4% | 3 | 0 | 30/30 | 0.913 | 0.937 | 3 | 55.5% | 3.9 |
-| Claude Sonnet 5.5, c2 (stated letter cues), plan + gateway holes | 84.4% | 3 | 0 | 30/30 | 0.913 | 0.937 | 3 | 45.3% | 2.3 |
+| rule cues (fitted on owner dev boxes) | 14.8% | 80 | 0 | 33/33 | 0.213 | 0.083 | 81 | 3.1% | 98.4 |
+| Qwen3.5 27B teacher, FarmShare | 88.3% | 1 | 0 | 31/31 | 0.983 | 0.979 | 1 | 37.5% | 45.3 |
+| trained Qwen3.5 2B, FarmShare | 81.2% | 2 | 2 | 28/30 | 0.890 | 0.913 | 5 | 32.0% | 98.4 |
+| trained Qwen3.5 4B, FarmShare | 88.3% | 1 | 0 | 30/30 | 0.982 | 0.978 | 1 | 53.9% | 78.1 |
+| Claude Sonnet 5.5, c1, plan | 89.1% | 1 | 0 | 32/32 | 0.983 | 0.979 | 1 | 54.7% | 31.2 |
+| Claude Sonnet 5.5, c2 (stated letter cues), plan + gateway holes | 89.1% | 1 | 0 | 32/32 | 0.983 | 0.979 | 1 | 44.5% | 32.8 |
 | ChatGPT gpt-6.1-sol low, c1, plan | not collected | | | | | | | | |
 | ChatGPT gpt-6.1-sol low, c2 (stated letter cues), plan | not collected | | | | | | | | |
 
@@ -40,6 +40,6 @@ Public window rows use the models' own photo calls, matching the public scorer. 
 |---|---|---|---|---|---|---|---|---|---|
 | Dean | claude | 85.2% | 85.2% | 2 / 4 | 2 / 4 | 0.942 | 0.942 | 5.9 | 4.0 |
 | Deaver | claude | 97.9% | 97.9% | 0 / 1 | 0 / 1 | 0.991 | 0.991 | 10.7 | 14.8 |
-| Lincoln | claude | 90.0% | 90.0% | 1 / 2 | 2 / 0 | 0.956 | 0.984 | 22.6 | 7.3 |
-| CREST | claude | 84.4% | 84.4% | 3 / 0 | 3 / 0 | 0.913 | 0.913 | 3.9 | 2.3 |
+| Lincoln | claude | 90.4% | 89.3% | 2 / 0 | 3 / 0 | 0.983 | 0.966 | 22.6 | 7.3 |
+| CREST | claude | 89.1% | 89.1% | 1 / 0 | 1 / 0 | 0.983 | 0.983 | 31.2 | 32.8 |
 

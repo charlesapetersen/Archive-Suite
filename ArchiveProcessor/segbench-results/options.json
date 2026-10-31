@@ -61,7 +61,7 @@
      "pages": 363,
      "gaps": 315,
      "flagged": 37,
-     "pages_exact_no_review": 0.8696969696969697,
+     "pages_exact_no_review": 0.8545454545454545,
      "flagged_per_100_pages": 10.192837465564738,
      "pages_exact_after_review": 0.9727272727272728,
      "unflagged_errors": 3,
@@ -72,7 +72,7 @@
       "pages": 250,
       "gaps": 238,
       "flagged": 32,
-      "pages_exact_no_review": 0.8683127572016461,
+      "pages_exact_no_review": 0.8477366255144033,
       "flagged_per_100_pages": 12.8,
       "pages_exact_after_review": 0.9711934156378601,
       "unflagged_errors": 2,
@@ -154,22 +154,22 @@
      "pages": 363,
      "gaps": 315,
      "flagged": 88,
-     "pages_exact_no_review": 0.8878787878787879,
+     "pages_exact_no_review": 0.8727272727272727,
      "flagged_per_100_pages": 24.242424242424242,
-     "pages_exact_after_review": 1.0,
-     "unflagged_errors": 0,
-     "unflagged_errors_per_500_pages": 0.0
+     "pages_exact_after_review": 0.9848484848484849,
+     "unflagged_errors": 2,
+     "unflagged_errors_per_500_pages": 2.7548209366391183
     },
     "test_by_box": {
      "Stanton": {
       "pages": 250,
       "gaps": 238,
       "flagged": 77,
-      "pages_exact_no_review": 0.8930041152263375,
+      "pages_exact_no_review": 0.8724279835390947,
       "flagged_per_100_pages": 30.8,
-      "pages_exact_after_review": 1.0,
-      "unflagged_errors": 0,
-      "unflagged_errors_per_500_pages": 0.0
+      "pages_exact_after_review": 0.9794238683127572,
+      "unflagged_errors": 2,
+      "unflagged_errors_per_500_pages": 4.0
      },
      "RG165": {
       "pages": 113,
@@ -252,7 +252,7 @@
      "pages": 363,
      "gaps": 315,
      "flagged": 287,
-     "pages_exact_no_review": 0.9242424242424242,
+     "pages_exact_no_review": 0.9090909090909091,
      "flagged_per_100_pages": 79.0633608815427,
      "pages_exact_after_review": 1.0,
      "unflagged_errors": 0,
@@ -263,7 +263,7 @@
       "pages": 250,
       "gaps": 238,
       "flagged": 221,
-      "pages_exact_no_review": 0.9176954732510288,
+      "pages_exact_no_review": 0.897119341563786,
       "flagged_per_100_pages": 88.4,
       "pages_exact_after_review": 1.0,
       "unflagged_errors": 0,
@@ -350,7 +350,7 @@
      "pages": 363,
      "gaps": 315,
      "flagged": 37,
-     "pages_exact_no_review": 0.9242424242424242,
+     "pages_exact_no_review": 0.9090909090909091,
      "flagged_per_100_pages": 10.192837465564738,
      "pages_exact_after_review": 0.9727272727272728,
      "unflagged_errors": 3,
@@ -361,7 +361,7 @@
       "pages": 250,
       "gaps": 238,
       "flagged": 32,
-      "pages_exact_no_review": 0.9176954732510288,
+      "pages_exact_no_review": 0.897119341563786,
       "flagged_per_100_pages": 12.8,
       "pages_exact_after_review": 0.9711934156378601,
       "unflagged_errors": 2,
@@ -470,7 +470,7 @@
      "pages": 363,
      "gaps": 315,
      "flagged": 39,
-     "pages_exact_no_review": 0.8939393939393939,
+     "pages_exact_no_review": 0.8787878787878788,
      "flagged_per_100_pages": 10.743801652892563,
      "pages_exact_after_review": 0.9787878787878788,
      "unflagged_errors": 2,
@@ -494,22 +494,22 @@
      "pages": 363,
      "gaps": 315,
      "flagged": 120,
-     "pages_exact_no_review": 0.8212121212121212,
+     "pages_exact_no_review": 0.806060606060606,
      "flagged_per_100_pages": 33.05785123966942,
-     "pages_exact_after_review": 0.9848484848484849,
-     "unflagged_errors": 1,
-     "unflagged_errors_per_500_pages": 1.3774104683195592
+     "pages_exact_after_review": 0.9696969696969697,
+     "unflagged_errors": 3,
+     "unflagged_errors_per_500_pages": 4.132231404958677
     },
     "test_by_box": {
      "Stanton": {
       "pages": 250,
       "gaps": 238,
       "flagged": 93,
-      "pages_exact_no_review": 0.8148148148148148,
+      "pages_exact_no_review": 0.7942386831275721,
       "flagged_per_100_pages": 37.2,
-      "pages_exact_after_review": 0.9794238683127572,
-      "unflagged_errors": 1,
-      "unflagged_errors_per_500_pages": 2.0
+      "pages_exact_after_review": 0.9588477366255144,
+      "unflagged_errors": 3,
+      "unflagged_errors_per_500_pages": 6.0
      },
      "RG165": {
       "pages": 113,
@@ -589,22 +589,22 @@
      "pages": 363,
      "gaps": 315,
      "flagged": 286,
-     "pages_exact_no_review": 0.7878787878787878,
+     "pages_exact_no_review": 0.803030303030303,
      "flagged_per_100_pages": 78.78787878787878,
-     "pages_exact_after_review": 0.9727272727272728,
-     "unflagged_errors": 3,
-     "unflagged_errors_per_500_pages": 4.132231404958677
+     "pages_exact_after_review": 0.9878787878787879,
+     "unflagged_errors": 1,
+     "unflagged_errors_per_500_pages": 1.3774104683195592
     },
     "test_by_box": {
      "Stanton": {
       "pages": 250,
       "gaps": 238,
       "flagged": 213,
-      "pages_exact_no_review": 0.7325102880658436,
+      "pages_exact_no_review": 0.7530864197530864,
       "flagged_per_100_pages": 85.2,
-      "pages_exact_after_review": 0.9629629629629629,
-      "unflagged_errors": 3,
-      "unflagged_errors_per_500_pages": 6.0
+      "pages_exact_after_review": 0.9835390946502057,
+      "unflagged_errors": 1,
+      "unflagged_errors_per_500_pages": 2.0
      },
      "RG165": {
       "pages": 113,
@@ -691,5 +691,10 @@
   "date": "2026-10-17",
   "item": "W41.seg-finetune",
   "added": "W41.app-local-seg"
+ },
+ "rescored": {
+  "date": "2026-10-31",
+  "item": "W46.seg-truth-rescore",
+  "why": "the owner split Stanton 101-105's newsletter issue at 101|102 and 102|103 under the article-within-issue rule (W46.seg-truth-sheet)"
  }
 }

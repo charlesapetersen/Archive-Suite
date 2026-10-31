@@ -224,6 +224,8 @@ def mac_route(spec, kinds):
     the route names its own report and speed heading, as the W41.mac-local-hw models do in ocr-mac-local-hw.md)."""
     with MAC_CSV.open(newline="") as f:
         rows = {(r["attribute"], r["value"]): r for r in csv.DictReader(f) if r["model"] == spec["key"]}
+    if not rows:
+        return None  # registered before its results landed (W46.ocr-new-open-boxes's granite-docling): not drawn yet
     sc = lambda r: [round(100 * float(r["nes"]), 2), int(r["ok"]), int(r["n"])]
     md = RESULTS / spec.get("report", MAC_MD.name)
     speed = {c[0]: c for c in table_after(md.read_text(), spec.get("speed", "## Speed and memory"))}
@@ -968,7 +970,11 @@ def main():
     extra = []
     for rid, spec in own["routes"].items():
         if spec["where"] == "mac":
-            scores, hw = mac_route(spec, inputs["kinds"])
+            got = mac_route(spec, inputs["kinds"])
+            if got is None:
+                print(f"{rid}: no Mac results yet, not drawn")
+                continue
+            scores, hw = got
         else:
             scores, hw = farmshare_run(spec["run"], inputs["kinds"], op, spec.get("price"))
         # Mac routes are free; a FarmShare run of a model OpenRouter sells is priced at OpenRouter's rate; one it

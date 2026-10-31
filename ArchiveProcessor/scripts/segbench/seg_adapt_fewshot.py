@@ -164,7 +164,8 @@ def score_box(col, k):
     base = p_new(col, SL.judge('gemini'))
     with fewshot(col, k) as lab:
         few = p_new(col, SL.judge('gemini'))
-    held = [i for i in gaps if i not in lab]
+    unsure = {u - 1 for u in getattr(col.labels, 'unsure', ())}  # never a held-out error (score.py, UNSURE GAPS)
+    held = [i for i in gaps if i not in lab and i not in unsure]
 
     def row(p):
         new = {i: p[i] >= 0.5 for i in p}

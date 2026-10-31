@@ -2,7 +2,7 @@
 
 W36.seg-opt-measure, run 2026-10-11. Data for the app: `options.json` beside this file. Method: `scripts/segbench/options.py`; the development-set detail is `options-dev.md`.
 
-**Measured on the locked boxes, Stanton and RG 165 (363 pages, 315 gaps between two document pages), scored once**, with each approach's flag level and the mix rule frozen on the development boxes (Dean, Deaver, Herrnstein) before the test boxes' new calls were made (`options-frozen.json`, committed first). Truth photo labels. Claude's test-box answers were collected for W36.seg-ensemble at the same level (0.85), and its row here equals that record; Gemini 3.8 Flash's test-box windows are new. ChatGPT was measured afterwards (2026-10-12, W36.seg-opt-openai) the same way, its level frozen first (`options-frozen-openai.json`).
+**Measured on the locked boxes, Stanton and RG 165 (363 pages, 315 gaps between two document pages), scored once**, with each approach's flag level and the mix rule frozen on the development boxes (Dean, Deaver, Herrnstein) before the test boxes' new calls were made (`options-frozen.json`, committed first). Truth photo labels. Claude's test-box answers were collected for W36.seg-ensemble at the same level (0.85), and its row here equals that record; Gemini 3.8 Flash's test-box windows are new. ChatGPT was measured afterwards (2026-10-12, W36.seg-opt-openai) the same way, its level frozen first (`options-frozen-openai.json`). Rescored 2026-10-31 from the same cached answers on a changed truth (W46.seg-truth-rescore: the owner split Stanton 101-105's newsletter issue at 101|102 and 102|103 under the article-within-issue rule (W46.seg-truth-sheet)); nothing was refit or re-chosen.
 
 Denominators: 'per 100 pages', 'per 500 pages' and 'per 1,000 pages' count every page photographed, box and folder photos included; 'pages in an exact document' counts document pages only.
 
@@ -11,12 +11,12 @@ Denominators: 'per 100 pages', 'per 500 pages' and 'per 1,000 pages' count every
 | approach | pages in an exact document, no checking | boundaries to check per 100 pages | pages right after checking | unflagged errors per 500 pages (count) | API cost per 1,000 pages, list / batch |
 |---|---:|---:|---:|---:|---:|
 | Full manual | — | 86.8 | 100.0% | 0.0 (0) | none |
-| Claude only | 87.0% | 10.2 | 97.3% | 4.1 (3) | $16.93 / $8.47 |
-| Gemini only | 88.8% | 24.2 | 100.0% | 0.0 (0) | $3.61 / $1.81 |
-| ChatGPT only | 92.4% | 79.1 | 100.0% | 0.0 (0) | $14.51 / $7.25 |
-| Claude and ChatGPT together | 92.4% | 10.2 | 97.3% | 4.1 (3) | $31.44 / $15.72 |
-| GLM-5.3 Flash only (budget) | 82.1% | 33.1 | 98.5% | 1.4 (1) | $1.16 / none |
-| Corpus-trained Qwen3.5 2B on this Mac (no key) | 78.8% | 78.8 | 97.3% | 4.1 (3) | $0.000 / none |
+| Claude only | 85.5% | 10.2 | 97.3% | 4.1 (3) | $16.93 / $8.47 |
+| Gemini only | 87.3% | 24.2 | 98.5% | 2.8 (2) | $3.61 / $1.81 |
+| ChatGPT only | 90.9% | 79.1 | 100.0% | 0.0 (0) | $14.51 / $7.25 |
+| Claude and ChatGPT together | 90.9% | 10.2 | 97.3% | 4.1 (3) | $31.44 / $15.72 |
+| GLM-5.3 Flash only (budget) | 80.6% | 33.1 | 97.0% | 4.1 (3) | $1.16 / none |
+| Corpus-trained Qwen3.5 2B on this Mac (no key) | 80.3% | 78.8 | 98.8% | 1.4 (1) | $0.000 / none |
 
 ## Held out on the development boxes (each box at the level fitted on the other two)
 
@@ -33,17 +33,17 @@ Denominators: 'per 100 pages', 'per 500 pages' and 'per 1,000 pages' count every
 
 | approach | box | pages | no checking | flagged | per 100 pages | after checking | unflagged errors |
 |---|---|---:|---:|---:|---:|---:|---:|
-| Claude only | Stanton | 250 | 86.8% | 32 | 12.8 | 97.1% | 2 |
+| Claude only | Stanton | 250 | 84.8% | 32 | 12.8 | 97.1% | 2 |
 | Claude only | RG165 | 113 | 87.4% | 5 | 4.4 | 97.7% | 1 |
-| Gemini only | Stanton | 250 | 89.3% | 77 | 30.8 | 100.0% | 0 |
+| Gemini only | Stanton | 250 | 87.2% | 77 | 30.8 | 97.9% | 2 |
 | Gemini only | RG165 | 113 | 87.4% | 11 | 9.7 | 100.0% | 0 |
-| ChatGPT only | Stanton | 250 | 91.8% | 221 | 88.4 | 100.0% | 0 |
+| ChatGPT only | Stanton | 250 | 89.7% | 221 | 88.4 | 100.0% | 0 |
 | ChatGPT only | RG165 | 113 | 94.3% | 66 | 58.4 | 100.0% | 0 |
-| Claude and ChatGPT together | Stanton | 250 | 91.8% | 32 | 12.8 | 97.1% | 2 |
+| Claude and ChatGPT together | Stanton | 250 | 89.7% | 32 | 12.8 | 97.1% | 2 |
 | Claude and ChatGPT together | RG165 | 113 | 94.3% | 5 | 4.4 | 97.7% | 1 |
-| GLM-5.3 Flash only (budget) | Stanton | 250 | 81.5% | 93 | 37.2 | 97.9% | 1 |
+| GLM-5.3 Flash only (budget) | Stanton | 250 | 79.4% | 93 | 37.2 | 95.9% | 3 |
 | GLM-5.3 Flash only (budget) | RG165 | 113 | 83.9% | 27 | 23.9 | 100.0% | 0 |
-| Corpus-trained Qwen3.5 2B on this Mac (no key) | Stanton | 250 | 73.3% | 213 | 85.2 | 96.3% | 3 |
+| Corpus-trained Qwen3.5 2B on this Mac (no key) | Stanton | 250 | 75.3% | 213 | 85.2 | 98.4% | 1 |
 | Corpus-trained Qwen3.5 2B on this Mac (no key) | RG165 | 113 | 94.3% | 73 | 64.6 | 100.0% | 0 |
 
 ## Tokens and cost per 1,000 pages
@@ -67,7 +67,7 @@ ChatGPT through `codex exec` (the ChatGPT subscription; no money): Codex reporte
 ## Reading
 
 - Manual asks about every gap between two document pages (87 per 100 pages on these boxes) and costs nothing; it is the floor the others are measured against.
-- On the test boxes the fewest checks were Claude only's (10.2 per 100 pages, 3 unflagged errors), and the fewest unflagged errors Gemini only's (0, at 24.2 checks per 100 pages). The trade-off is the level: a higher one flags more and leaves less.
-- Every count here is small (Claude only 3 on the test boxes, 2 held out on the development boxes, Gemini only 0 on the test boxes, 3 held out on the development boxes, ChatGPT only 0 on the test boxes, 0 held out on the development boxes, Claude and ChatGPT together 3 on the test boxes, 2 held out on the development boxes, GLM-5.3 Flash only (budget) 1 on the test boxes, 3 held out on the development boxes, Corpus-trained Qwen3.5 2B on this Mac (no key) 3 on the test boxes, 0 held out on the development boxes), so a difference of one or two errors is within noise, and a zero on 363 pages is not a promise of zero. The figures shown to a user should be the rounded test figures, labelled as measured on two locked boxes (363 pages) of one archive.
+- On the test boxes the fewest checks were Claude only's (10.2 per 100 pages, 3 unflagged errors), and the fewest unflagged errors ChatGPT only's (0, at 79.1 checks per 100 pages). The trade-off is the level: a higher one flags more and leaves less.
+- Every count here is small (Claude only 3 on the test boxes, 2 held out on the development boxes, Gemini only 2 on the test boxes, 3 held out on the development boxes, ChatGPT only 0 on the test boxes, 0 held out on the development boxes, Claude and ChatGPT together 3 on the test boxes, 2 held out on the development boxes, GLM-5.3 Flash only (budget) 3 on the test boxes, 3 held out on the development boxes, Corpus-trained Qwen3.5 2B on this Mac (no key) 1 on the test boxes, 0 held out on the development boxes), so a difference of one or two errors is within noise, and a zero on 363 pages is not a promise of zero. The figures shown to a user should be the rounded test figures, labelled as measured on two locked boxes (363 pages) of one archive.
 - The models make the same mistakes more often than different ones (on Dean, Claude and Gemini took the same decision on every gap), which is why combining them adds little over Claude alone.
 

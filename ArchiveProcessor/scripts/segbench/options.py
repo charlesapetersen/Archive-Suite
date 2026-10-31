@@ -740,7 +740,10 @@ def render(out: dict) -> str:
          "for W36.seg-ensemble at the same level (0.85), and its row here equals that record; Gemini 3.8 Flash's "
          "test-box windows are new."
          + (f" ChatGPT was measured afterwards ({out['openai_measured']['date']}, W36.seg-opt-openai) the same way, "
-            f"its level frozen first (`{out['openai_measured']['freeze']}`)." if out.get("openai_measured") else ""),
+            f"its level frozen first (`{out['openai_measured']['freeze']}`)." if out.get("openai_measured") else "")
+         + (f" Rescored {out['rescored']['date']} from the same cached answers on a changed truth "
+            f"({out['rescored']['item']}: {out['rescored']['why']}); nothing was refit or re-chosen."
+            if out.get("rescored") else ""),
          "",
          "Denominators: 'per 100 pages', 'per 500 pages' and 'per 1,000 pages' count every page photographed, "
          "box and folder photos included; 'pages in an exact document' counts document pages only.", "",

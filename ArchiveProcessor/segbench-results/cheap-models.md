@@ -34,30 +34,30 @@ Development boxes Dean, Deaver, Herrnstein; test boxes Stanton and RG 165, held 
 | Gemini 3.8 Flash (low), the bar | Deaver | 149 | 97.9% | 1 | 0.7 | 97.9% | 1 | |
 | Gemini 3.8 Flash (low), the bar | Herrnstein | 200 | 91.2% | 5 | 2.5 | 91.2% | 4 | |
 | Gemini 3.8 Flash (low), the bar | **dev pooled** | 551 | 90.7% | 8 | 1.5 | 94.2% | 9 | no |
-| Gemini 3.8 Flash (low), the bar | Stanton | 250 | 89.3% | 6 | 2.4 | 92.6% | 3 | |
+| Gemini 3.8 Flash (low), the bar | Stanton | 250 | 87.2% | 6 | 2.4 | 90.5% | 5 | |
 | Gemini 3.8 Flash (low), the bar | RG165 | 113 | 87.4% | 1 | 0.9 | 87.4% | 3 | |
-| Gemini 3.8 Flash (low), the bar | **test pooled** | 363 | 88.8% | 7 | 1.9 | 91.2% | 6 | no |
+| Gemini 3.8 Flash (low), the bar | **test pooled** | 363 | 87.3% | 7 | 1.9 | 89.7% | 8 | no |
 | GLM-5.3 Flash | Dean | 202 | 85.2% | 8 | 4.0 | 96.4% | 3 | |
 | GLM-5.3 Flash | Deaver | 149 | 97.9% | 9 | 6.0 | 97.9% | 1 | |
 | GLM-5.3 Flash | Herrnstein | 200 | 89.5% | 15 | 7.5 | 93.4% | 2 | |
 | GLM-5.3 Flash | **dev pooled** | 551 | 90.2% | 32 | 5.8 | 95.8% | 6 | no |
-| GLM-5.3 Flash | Stanton | 250 | 81.5% | 26 | 10.4 | 91.4% | 3 | |
+| GLM-5.3 Flash | Stanton | 250 | 79.4% | 26 | 10.4 | 89.3% | 5 | |
 | GLM-5.3 Flash | RG165 | 113 | 83.9% | 4 | 3.5 | 89.7% | 2 | |
-| GLM-5.3 Flash | **test pooled** | 363 | 82.1% | 30 | 8.3 | 90.9% | 5 | no |
+| GLM-5.3 Flash | **test pooled** | 363 | 80.6% | 30 | 8.3 | 89.4% | 7 | no |
 | GPT-5.6 Luna | Dean | 202 | 85.2% | 3 | 1.5 | 87.2% | 5 | |
 | GPT-5.6 Luna | Deaver | 149 | 96.5% | 1 | 0.7 | 96.5% | 2 | |
 | GPT-5.6 Luna | Herrnstein | 200 | 90.1% | 2 | 1.0 | 91.7% | 4 | |
 | GPT-5.6 Luna | **dev pooled** | 551 | 90.0% | 6 | 1.1 | 91.3% | 11 | no |
-| GPT-5.6 Luna | Stanton | 250 | 83.5% | 11 | 4.4 | 88.5% | 8 | |
+| GPT-5.6 Luna | Stanton | 250 | 81.5% | 11 | 4.4 | 86.4% | 10 | |
 | GPT-5.6 Luna | RG165 | 113 | 87.4% | 0 | 0.0 | 87.4% | 3 | |
-| GPT-5.6 Luna | **test pooled** | 363 | 84.5% | 11 | 3.0 | 88.2% | 11 | no |
+| GPT-5.6 Luna | **test pooled** | 363 | 83.0% | 11 | 3.0 | 86.7% | 13 | no |
 | Qwen3.5 Flash | Dean | 202 | 83.7% | 14 | 6.9 | 86.7% | 5 | |
 | Qwen3.5 Flash | Deaver | 149 | 95.7% | 25 | 16.8 | 97.9% | 1 | |
 | Qwen3.5 Flash | Herrnstein | 200 | 77.9% | 21 | 10.5 | 94.5% | 3 | |
 | Qwen3.5 Flash | **dev pooled** | 551 | 84.9% | 60 | 10.9 | 92.5% | 9 | no |
-| Qwen3.5 Flash | Stanton | 250 | 76.5% | 28 | 11.2 | 88.9% | 7 | |
+| Qwen3.5 Flash | Stanton | 250 | 74.5% | 28 | 11.2 | 86.8% | 9 | |
 | Qwen3.5 Flash | RG165 | 113 | 80.5% | 5 | 4.4 | 95.4% | 2 | |
-| Qwen3.5 Flash | **test pooled** | 363 | 77.6% | 33 | 9.1 | 90.6% | 9 | no |
+| Qwen3.5 Flash | **test pooled** | 363 | 76.1% | 33 | 9.1 | 89.1% | 11 | no |
 
 ### The level fitted per model, as options.py did
 
@@ -65,14 +65,14 @@ Development boxes Dean, Deaver, Herrnstein; test boxes Stanton and RG 165, held 
 
 | model | bar | dev, held out: after checking | flagged per 100 pages | level for the test boxes | test: no checking | after checking | flagged per 100 pages | unflagged errors |
 |---|---|---:|---:|---|---:|---:|---:|---:|
-| Gemini 3.8 Flash (low), the bar | 99% | 100.0% | 39.4 | <= 0.985 | 88.8% | 100.0% | 51.0 | 0 |
-| Gemini 3.8 Flash (low), the bar | 98% | 98.6% | 10.3 | <= 0.965 | 88.8% | 100.0% | 24.2 | 0 |
-| GLM-5.3 Flash | 99% | 99.4% | 60.1 | <= 0.975 | 82.1% | 100.0% | 81.0 | 0 |
-| GLM-5.3 Flash | 98% | 97.3% | 17.1 | <= 0.925 | 82.1% | 98.5% | 33.1 | 1 |
-| GPT-5.6 Luna | 99% | 100.0% | 86.0 | <= 0.990 | 84.5% | 100.0% | 86.2 | 0 |
-| GPT-5.6 Luna | 98% | 98.8% | 60.8 | <= 0.990 | 84.5% | 100.0% | 86.2 | 0 |
-| Qwen3.5 Flash | 99% | 99.6% | 69.5 | <= 0.975 | 77.6% | 100.0% | 82.4 | 0 |
-| Qwen3.5 Flash | 98% | 99.6% | 55.0 | <= 0.950 | 77.6% | 100.0% | 55.9 | 0 |
+| Gemini 3.8 Flash (low), the bar | 99% | 100.0% | 39.4 | <= 0.985 | 87.3% | 100.0% | 51.0 | 0 |
+| Gemini 3.8 Flash (low), the bar | 98% | 98.6% | 10.3 | <= 0.965 | 87.3% | 98.5% | 24.2 | 2 |
+| GLM-5.3 Flash | 99% | 99.4% | 60.1 | <= 0.975 | 80.6% | 100.0% | 81.0 | 0 |
+| GLM-5.3 Flash | 98% | 97.3% | 17.1 | <= 0.925 | 80.6% | 97.0% | 33.1 | 3 |
+| GPT-5.6 Luna | 99% | 100.0% | 86.0 | <= 0.990 | 83.0% | 100.0% | 86.2 | 0 |
+| GPT-5.6 Luna | 98% | 98.8% | 60.8 | <= 0.990 | 83.0% | 100.0% | 86.2 | 0 |
+| Qwen3.5 Flash | 99% | 99.6% | 69.5 | <= 0.975 | 76.1% | 100.0% | 82.4 | 0 |
+| Qwen3.5 Flash | 98% | 99.6% | 55.0 | <= 0.950 | 76.1% | 100.0% | 55.9 | 0 |
 
 | model | pages | calls | cost paid | per 1,000 pages, standard | per 1,000 pages, batch |
 |---|---:|---:|---:|---:|---:|

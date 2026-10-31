@@ -68,6 +68,8 @@ class Box:
         self.gaps = [i for i in range(self.pages - 1) if self.labels[i] not in PHOTO and self.labels[i + 1] not in PHOTO]
         ids = segment_ids(self.labels)
         self.truth = {i: ids[i] != ids[i + 1] for i in self.gaps}          # True = new document
+        # Gaps the owner left unsure (score.py, UNSURE GAPS): never a held-out or accepted error.
+        self.unsure = {u - 1 for u in getattr(self.labels, "unsure", ())}
         self.src = src
         self.kinds = kinds
 
@@ -295,7 +297,7 @@ def curve(box: Box, bl, ds_base: dict) -> dict:
         rows = {}
         for kind, lab_idx in draws:
             lab = {i: box.truth[i] for i in lab_idx}
-            held = [i for i in box.gaps if i not in lab]
+            held = [i for i in box.gaps if i not in lab and i not in box.unsure]
             ms = {"2B, no refit": box.src["2B"], "2B, threshold-and-prior refit": platt(box.src["2B"], lab)}
             if "teacher" in box.src:
                 ms["teacher, no refit"] = box.src["teacher"]
@@ -371,7 +373,7 @@ def run_box(col, cloud_key: str, cloud_name: str, kinds, ds_base: dict, loco_bas
 def _review(box: Box, p: dict[int, float], v: float):
     new = decide(p)
     flag = [i for i in box.gaps if max(p[i], 1 - p[i]) <= v]
-    acc_err = sum(new[i] != box.truth[i] for i in box.gaps if i not in set(flag))
+    acc_err = sum(new[i] != box.truth[i] for i in box.gaps if i not in set(flag) and i not in box.unsure)
     return (score_labels(box.labels, box.pred_labels(new), box.name),
             score_labels(box.labels, box.pred_labels(corrected(box, new, flag)), box.name), len(flag), acc_err)
 

@@ -8,7 +8,7 @@ GLM uses the documented native minimum, `reasoning_effort=low`, with a final 327
 
 Claude c2 combines earlier plan windows with gateway holes, same Sonnet 5.5 and stated cues, but inline-image delivery replaces tool reads. It is a mixed-transport result.
 
-Item cost estimate $2.8940, at list token prices; gateway billing is unavailable. Includes every attempted call and unsettled reservation. Rates: Gemini $0.75/$3.75, GLM $0.15/$0.50, Claude $2/$10 per million input/output tokens (reasoning included), OpenRouter model catalog checked 2026-10-24. No batch discount claimed.
+Item cost estimate $2.8940, at list token prices; the gateway reported no cost of its own for these calls. Includes every attempted call and unsettled reservation. Rates: Gemini $0.75/$3.75, GLM $0.15/$0.50, Claude $2/$10 per million input/output tokens (reasoning included), OpenRouter model catalog checked 2026-10-24. No batch discount claimed.
 
 The initial uncompressed Lincoln request was rejected before inference (HTTP 413, 32 MB body limit, zero token cost); its reservation was released with an append-only ledger correction. Both whole-stream calls use JPEG quality 45, so their comparison with windows also changes JPEG encoding and photo assumptions, and cannot isolate context length alone. Lincoln's saved whole reply required exactly two opening array brackets restored at gaps 82/83 and 122/123. This repair is restricted to its SHA-256, keeps all 260 stated decisions/confidences unchanged, and passes the complete strict gap validator; it was not a raw-valid JSON reply.
 
@@ -25,9 +25,9 @@ The initial uncompressed Lincoln request was rejected before inference (HTTP 413
 
 ## Findings
 
-On Lincoln, Gemini windows put 87.0% of pages in the exact document and the repaired whole reply 88.1%; GLM windows: failed validation (no score). The existing open models were at 34.9–46.7%, while Claude c1 and c2 were 90.0%. The large open-model drop is not a ceiling imposed by the material. Small differences among cloud results on one agent-audited box do not establish a general ranking.
+On Lincoln, Gemini windows put 86.2% of pages in the exact document and the repaired whole reply 87.7%; GLM windows: failed validation (no score). The existing open models were at 34.9–46.7%, while Claude c1 and c2 were 90.0%. The large open-model drop is not a ceiling imposed by the material. Small differences among cloud results on one agent-audited box do not establish a general ranking.
 
-On CREST, Gemini windows score 84.4% and the whole reply 95.3%; GLM windows: 95.3%. The existing trained 4B is 98.4%, teacher 95.3%, and Claude c1/c2 84.4%. The whole-stream arm scores higher here, but changed JPEG encoding and photo assumptions mean this run does not isolate context length.
+On CREST, Gemini windows score 89.1% and the whole reply 88.3%; GLM windows: 88.3%. The existing trained 4B is 98.4%, teacher 95.3%, and Claude c1/c2 84.4%. The whole-stream arm scores higher here, but changed JPEG encoding and photo assumptions mean this run does not isolate context length.
 
 The table below reports least-confidence-first checking against the truth. High boundary agreement or PQ does not mean those confidence values rank the few errors well; check the review load separately. The finding-aid count is a measured variant, not a setting selected on these public answers.
 
@@ -35,21 +35,21 @@ The final 11 Claude c2 gateway holes leave CREST at 84.4% and Deaver at 97.9%. T
 
 Lincoln GLM FAILED: two stopped, billed replies for pages [163, 169] failed the unchanged strict gap validator: boundaries for [163, 164, 165, 166, 168], wanted [163, 164, 165, 166, 167, 168]. No full-box metric is reported. Further windows in that box were not requested because they cannot repair this failed window; no prompt or score rule was changed.
 
-### Lincoln: 261 pages, 81 documents
+### Lincoln: 261 pages, 80 documents
 
 | source | pages exact | false splits | false merges | boundaries found | PQ | kappa | MNDD | pages exact, finding-aid count | checks per 100 pages to 98% |
 |---|---|---|---|---|---|---|---|---|---|
-| Gemini 3.7 Flash, g1 windows, gateway | 87.0% | 5 | 0 | 80/80 | 0.952 | 0.956 | 5 | 80.8% | 57.1 |
-| Gemini 3.7 Flash, wh1 whole stream, gateway | 88.1% | 3 | 1 | 79/80 | 0.956 | 0.964 | 4 | 82.4% | 92.0 |
-| Claude Sonnet 5.5, c2 (stated letter cues), plan + gateway holes | 90.0% | 2 | 0 | 80/80 | 0.984 | 0.982 | 2 | 79.7% | 7.3 |
+| Gemini 3.7 Flash, g1 windows, gateway | 86.2% | 6 | 0 | 79/79 | 0.933 | 0.947 | 6 | 82.0% | 57.1 |
+| Gemini 3.7 Flash, wh1 whole stream, gateway | 87.7% | 4 | 0 | 78/78 | 0.963 | 0.964 | 4 | 83.5% | 92.0 |
+| Claude Sonnet 5.5, c2 (stated letter cues), plan + gateway holes | 89.3% | 3 | 0 | 79/79 | 0.966 | 0.973 | 3 | 80.1% | 7.3 |
 | GLM 5.3 Flash, g1 windows, gateway | failed validation; no score | | | | | | | | |
 
-### CREST: 128 pages, 31 documents
+### CREST: 128 pages, 30 documents
 
 | source | pages exact | false splits | false merges | boundaries found | PQ | kappa | MNDD | pages exact, finding-aid count | checks per 100 pages to 98% |
 |---|---|---|---|---|---|---|---|---|---|
-| Gemini 3.7 Flash, g1 windows, gateway | 84.4% | 3 | 0 | 30/30 | 0.913 | 0.937 | 3 | 55.5% | 15.6 |
-| GLM 5.3 Flash, g1 windows, gateway | 95.3% | 2 | 0 | 30/30 | 0.930 | 0.957 | 2 | 55.5% | 0.8 |
-| Gemini 3.7 Flash, wh1 whole stream, gateway | 95.3% | 2 | 0 | 30/30 | 0.930 | 0.957 | 2 | 62.5% | 3.9 |
-| Claude Sonnet 5.5, c2 (stated letter cues), plan + gateway holes | 84.4% | 3 | 0 | 30/30 | 0.913 | 0.937 | 3 | 45.3% | 2.3 |
+| Gemini 3.7 Flash, g1 windows, gateway | 89.1% | 1 | 0 | 32/32 | 0.983 | 0.979 | 1 | 54.7% | 75.0 |
+| GLM 5.3 Flash, g1 windows, gateway | 88.3% | 1 | 0 | 31/31 | 0.983 | 0.979 | 1 | 54.7% | 30.5 |
+| Gemini 3.7 Flash, wh1 whole stream, gateway | 88.3% | 1 | 0 | 31/31 | 0.983 | 0.979 | 1 | 62.5% | 17.2 |
+| Claude Sonnet 5.5, c2 (stated letter cues), plan + gateway holes | 89.1% | 1 | 0 | 32/32 | 0.983 | 0.979 | 1 | 44.5% | 32.8 |
 
