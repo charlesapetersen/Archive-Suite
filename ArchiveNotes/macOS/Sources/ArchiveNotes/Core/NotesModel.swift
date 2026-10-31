@@ -1259,7 +1259,21 @@ final class NotesModel: ObservableObject {
     /// to the selected item so pasted/dropped images persist into that item's `assets/`.
     func makeAssetStore() -> ItemAssetStore? {
         guard let noteStore else { return nil }
-        return ItemAssetStore(store: noteStore, root: noteStore.rootURL)
+        let assets = ItemAssetStore(store: noteStore, root: noteStore.rootURL)
+        assets.onWriteFailure = { [weak self] name, itemID, _ in
+            self?.reportAssetWriteFailure(name: name, itemID: itemID)
+        }
+        return assets
+    }
+
+    /// A pasted or dropped image whose bytes could not be written (W40.fix-notes-asset-write-silent).
+    /// The note keeps its `assets/<name>` reference, drawn as the "Missing" placeholder, so the user can
+    /// see which image to paste again. The line names the note, since the write lands after the paste
+    /// and the user may have moved to another one by then.
+    func reportAssetWriteFailure(name: String, itemID: UUID) {
+        let title = allItems.first(where: { $0.id == itemID })?.title ?? ""
+        let inNote = title.isEmpty ? "" : " in “\(title)”"
+        statusMessage = "Couldn't store the pasted image \(name)\(inNote). It shows as Missing; paste it again."
     }
 
     /// Attach a canonical note-level reference without replacing a concurrent body or metadata edit.

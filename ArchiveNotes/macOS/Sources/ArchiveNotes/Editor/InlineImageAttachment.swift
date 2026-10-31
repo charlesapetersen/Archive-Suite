@@ -344,6 +344,10 @@ final class ItemAssetStore: EditorAssetStore {
     /// In-flight byte-write tasks, so `awaitPendingWrites()` can flush them (tests; future quit-flush).
     private var pendingWrites: [Task<Void, Never>] = []
 
+    /// Called on the main actor when a byte write `addAsset` started has failed, with the reserved name
+    /// and the item it was for. `NotesModel.makeAssetStore` points it at the sidebar status line.
+    var onWriteFailure: ((_ name: String, _ itemID: UUID, _ error: Error) -> Void)?
+
     init(store: NoteStore, root: URL, itemID: UUID? = nil) {
         self.store = store
         self.root = root
@@ -363,10 +367,17 @@ final class ItemAssetStore: EditorAssetStore {
         reserved[id, default: []].insert(name)
 
         // Persist the bytes off-main through the audited actor, at exactly the reserved name. A failed
-        // write leaves a dangling reference (missing-asset placeholder) — never corrupt/clobbered bytes.
-        let task = Task.detached(priority: .utility) { [store] in
+        // write leaves a dangling reference (missing-asset placeholder) — never corrupt/clobbered bytes —
+        // and is reported through `onWriteFailure` (W40.fix-notes-asset-write-silent: it used to be only
+        // logged, so the user never learned the image was gone). The name stays reserved on failure: the
+        // note still names it, so handing it to a later paste would make that reference show a different
+        // image.
+        let task = Task.detached(priority: .utility) { [store, weak self] in
             do { try await store.writeReservedAsset(data, name: name, into: id) }
-            catch { NSLog("ItemAssetStore: asset write failed for %@: %@", name, "\(error)") }
+            catch {
+                NSLog("ItemAssetStore: asset write failed for %@: %@", name, "\(error)")
+                await self?.writeFailed(name: name, itemID: id, error: error)
+            }
         }
         pendingWrites.append(task)
         return "assets/\(name)"
@@ -387,6 +398,10 @@ final class ItemAssetStore: EditorAssetStore {
     ///
     /// A task leaves the list only once it has finished, so two callers waiting at once (the editor
     /// refreshing a pasted thumbnail, and a test flushing) both see every write still in flight.
+    private func writeFailed(name: String, itemID: UUID, error: Error) {
+        onWriteFailure?(name, itemID, error)
+    }
+
     func awaitPendingWrites() async {
         let tasks = pendingWrites
         for t in tasks { await t.value }

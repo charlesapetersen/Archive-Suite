@@ -92,17 +92,21 @@ protects cooperating writers; an arbitrary uncoordinated process can still write
 replacement operation.
 
 
-## 🔴 OPEN (W40.d9, 2026-10-15) — writing-session defects, reproduced in the VM
+## ✅ FIXED (W40.d9, 2026-10-15) — writing-session defects, reproduced in the VM
 
 `ArchiveNotesUITests/WritingJourneyUITests` types into the styled editor with real keystrokes. Autosave, ⌘Q
-within the debounce, relaunch (bytes, mtime and Finder tags unchanged) and window close all hold. One thing does
-not; it is carried in that class as a non-strict `XCTExpectFailure` naming its fix item. Evidence:
-`verification/evidence/notes/W40.d9-writing.md` at the suite root. (The outside-edit overwrite is fixed: entry
-above. The typed Return saved as one newline is fixed by `W40.fix-notes-return-paragraph`, 2026-10-31, for plain
-text, and by `W40.fix-notes-return-list-quote`, 2026-10-31, in a blockquote and between typed list items; a typed
-line that begins with list, quote, rule, fence or code syntax is escaped so it reopens as typed.)
-- **A failed inline-image write is only logged** (`W40.fix-notes-asset-write-silent`, S3). This is residual (a) of
-  the W7-S5 entry below, now confirmed in the running app.
+within the debounce, relaunch (bytes, mtime and Finder tags unchanged) and window close all hold, and the class
+carries no expected failure now. Evidence: `verification/evidence/notes/W40.d9-writing.md` at the suite root. (The
+outside-edit overwrite is fixed: entry above. The typed Return saved as one newline is fixed by
+`W40.fix-notes-return-paragraph`, 2026-10-31, for plain text, and by `W40.fix-notes-return-list-quote`,
+2026-10-31, in a blockquote and between typed list items; a typed line that begins with list, quote, rule, fence
+or code syntax is escaped so it reopens as typed.)
+- **A failed inline-image write is reported** (`W40.fix-notes-asset-write-silent`, 2026-10-31). `ItemAssetStore`
+  calls `onWriteFailure` when its background byte write throws, and `NotesModel` puts "Couldn't store the pasted
+  image <name> in “<note>”. It shows as Missing; paste it again." on the sidebar status line. The reference stays
+  in the note, drawn as the Missing placeholder, so the user can see which image to paste again; its name stays
+  reserved, so a later paste cannot land under it and make the old reference show a different image. This closes
+  residual (a) of the W7-S5 entry below.
 
 ## 🔴 OPEN (W40.d10, 2026-10-15) — Auto-fill from Zotero crashes Notes against a real Zotero
 
@@ -1749,7 +1753,8 @@ autosave via `NotesModel.setBody`, flush-on-switch, autosave-race-safe). Two con
   Proven on a scratch store (`ItemAssetStoreTests`, 7 tests: persist/reload, same-name disambiguation,
   skip-preexisting, retarget, no-target-throw, never-overwrite, path-traversal-reject). Residual edges
   (non-blocking, documented for a future touch): (a) an async write *failure* (e.g. disk full) leaves a
-  dangling ref → missing-asset placeholder (no data loss; logged, not surfaced to the user); (b) two
+  dangling ref → missing-asset placeholder (no data loss; reported on the status line since
+  `W40.fix-notes-asset-write-silent`, 2026-10-31); (b) two
   windows editing the **same** note and pasting the same-named image in the same second have independent
   `reserved` sets, so the second write is refused by the no-overwrite guard (safe — no clobber — but that
   paste shows a placeholder); a shared name authority would need a single store, which can't serve two

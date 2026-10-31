@@ -136,6 +136,41 @@ struct ItemAssetStoreTests {
         #expect(asset.resolveAsset("assets/x.png") == nil)
     }
 
+    // MARK: - A failed byte write is reported (W40.fix-notes-asset-write-silent)
+
+    @Test("a byte write that fails calls onWriteFailure with its name, and the name stays reserved")
+    func failedWriteIsReported() async throws {
+        let (store, tmp) = try makeScratchStore()
+        defer { cleanup(tmp) }
+        let item = makeItem()
+        _ = try await store.create(item)
+        // An assets folder the store cannot write into, as in the VM reproduction.
+        let dir = await store.assetsDir(item.id)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        #expect(chmod(dir.path, 0o555) == 0)
+        defer { _ = chmod(dir.path, 0o755) }
+
+        let asset = ItemAssetStore(store: store, root: store.rootURL, itemID: item.id)
+        var failures: [(String, UUID)] = []
+        asset.onWriteFailure = { name, id, _ in failures.append((name, id)) }
+        let ref = try asset.addAsset(Data("PNG".utf8), preferredName: "img.png")
+        await asset.awaitPendingWrites()
+
+        #expect(ref == "assets/img.png")
+        #expect(!FileManager.default.fileExists(atPath: dir.appendingPathComponent("img.png").path))
+        #expect(failures.count == 1)
+        #expect(failures.first?.0 == "img.png")
+        #expect(failures.first?.1 == item.id)
+
+        // The note still names img.png, so a later paste must not take that name: if it landed, the old
+        // reference would show the new image.
+        _ = chmod(dir.path, 0o755)
+        let next = try asset.addAsset(Data("OTHER".utf8), preferredName: "img.png")
+        await asset.awaitPendingWrites()
+        #expect(next == "assets/img-1.png")
+        #expect(failures.count == 1, "a write that succeeds reports nothing")
+    }
+
     // MARK: - NoteStore.writeReservedAsset guarantees (never-overwrite + component boundary)
 
     @Test("writeReservedAsset never overwrites an existing file")

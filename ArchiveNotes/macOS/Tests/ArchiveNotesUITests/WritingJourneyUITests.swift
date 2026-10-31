@@ -291,12 +291,8 @@ class WritingJourneyUITests: NotesFixtureUITestCase {
             let status = statusLine()
             log("[d9] forced asset failure: asset files landed = \(landed.count); status line = \(status ?? "none"); "
                 + "alerts = \(app.alerts.count), sheets = \(app.sheets.count)")
-            let known = XCTExpectedFailure.Options(); known.isStrict = false
-            XCTExpectFailure("W40.fix-notes-asset-write-silent (S3): a failed image write is only logged; the note "
-                             + "keeps a reference to a file that was never written", options: known) {
-                XCTAssertTrue(status != nil || app.alerts.count > 0 || app.sheets.count > 0,
-                              "N-15: a pasted image that could not be stored must be reported to the user")
-            }
+            XCTAssertTrue(status?.contains("Couldn't store the pasted image") == true,
+                          "N-15: a pasted image that could not be stored must be reported to the user — got \(status ?? "none")")
         }
     }
 
