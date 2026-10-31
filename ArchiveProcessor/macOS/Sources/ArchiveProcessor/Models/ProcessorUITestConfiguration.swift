@@ -107,6 +107,19 @@ enum ProcessorUITestConfiguration {
         }
     }
 
+    /// A headless driver launch (`ARCHIVEPROC_HEADLESS=1`, the gate's recovery and retry-backend checks) must not
+    /// restore the window state an earlier run saved. When that state names the main window, SwiftUI's restorer
+    /// returns no window and AppKit then opens no default one, so `ContentView.onAppear` never runs and no driver
+    /// starts: the gate hung on exactly that on 2026-10-30. The flag goes in the argument domain, which is volatile,
+    /// so nothing is written to the app's defaults. Called from `App.init`, before AppKit restores anything.
+    static func ignoreSavedWindowStateIfHeadless() {
+        guard ProcessInfo.processInfo.environment["ARCHIVEPROC_HEADLESS"] != nil else { return }
+        let defaults = UserDefaults.standard
+        var domain = defaults.volatileDomain(forName: UserDefaults.argumentDomain)
+        domain["ApplePersistenceIgnoreState"] = true
+        defaults.setVolatileDomain(domain, forName: UserDefaults.argumentDomain)
+    }
+
     private static func urlValue(after flag: String) -> URL? {
         guard let index = arguments.firstIndex(of: flag), arguments.indices.contains(index + 1) else {
             return nil

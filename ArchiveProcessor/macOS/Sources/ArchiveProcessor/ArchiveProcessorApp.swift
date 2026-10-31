@@ -9,6 +9,7 @@ struct ArchiveProcessorApp: App {
         // This happens before any view reads @AppStorage. The UI suite supplies disposable paths and
         // ARCHIVEPROC_HEADLESS=1, so it never opens a Keychain item or a remembered real folder.
         ProcessorUITestConfiguration.installScratchDefaults()
+        ProcessorUITestConfiguration.ignoreSavedWindowStateIfHeadless()
         MainActor.assumeIsolated {
             appearanceForced = UITestAppearance.applyIfRequested()   // layout guard light/dark (W40.e9)
             TransientRecorder.startIfRequested()  // the transient-state check (W40.e13)
