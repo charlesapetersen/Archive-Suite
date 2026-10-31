@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 
 from score import (Counts, TestSetGuard, boundaries_from_labels, canonical, check_prediction,
-                   derived, guard, risk_coverage, score_labels, segment_ids)
+                   derived, forgive, guard, risk_coverage, score_labels, segment_ids, Truth)
 from methods import AllNew, NoBoundaries, Prediction, RuleCues, RuleCuesSketch, SpringRun, from_labels
 import data
 import rules
@@ -367,6 +367,35 @@ class RuleCuesLOCO(unittest.TestCase):
     def test_marked_tuning_so_the_guard_refuses_the_test_set(self):
         with self.assertRaises(TestSetGuard):
             guard(RuleCues(), ["Stanton"], final=True)
+
+
+class Unsure(unittest.TestCase):
+    """W46.seg-truth-rescore: a gap the owner left unsure is never an error, whatever the route says."""
+    T = [B, F, N, C, C, N, N, C]
+
+    def test_unsure_gap_takes_the_route_call_so_both_answers_score_alike(self):
+        t = Truth(self.T, [3])                       # the gap between pages 2 and 3 (truth: continue)
+        split = [B, F, N, N, C, N, N, C]             # the route splits there
+        self.assertEqual(forgive(t, split, t.unsure), split)
+        for pred in (split, list(self.T)):           # no error either way (the truth's document count follows the call)
+            c = score_labels(t, pred)
+            self.assertEqual((c.false_splits, c.false_merges, c.edits, c.pages_exact), (0, 0, 0, c.doc_pages))
+        self.assertEqual(score_labels(self.T, split).false_splits, 1)   # a plain list keeps the old score
+
+    def test_other_errors_still_count_and_photo_gaps_are_untouched(self):
+        t = Truth(self.T, [3, 2])                    # 2 is the gap after a photo: not a document gap, left alone
+        pred = [B, F, N, N, C, C, N, C]              # split at 3 (unsure) and a merge at 5 (a real error)
+        c = score_labels(t, pred)
+        self.assertEqual((c.false_splits, c.false_merges), (0, 1))
+        self.assertEqual(forgive(t, [B, F, C, C, C, N, N, C], t.unsure)[2], N)
+
+    def test_range_is_checked_and_collection_labels_carry_it(self):
+        with self.assertRaises(ValueError):
+            Truth(self.T, [0])
+        col = data.Collection("toy", Path("."), [data.Page(i + 1, lab, None) for i, lab in enumerate(self.T)],
+                              unsure=(4,))
+        self.assertEqual(col.labels.unsure, (3,))
+        self.assertEqual(list(col.labels), self.T)
 
 
 if __name__ == "__main__":

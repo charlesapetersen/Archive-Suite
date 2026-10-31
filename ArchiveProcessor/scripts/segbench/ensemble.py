@@ -115,6 +115,8 @@ class Box:
         self.gaps = doc_gap_index(col.labels)
         ids = segment_ids(col.labels)
         self.truth = {i: "new" if ids[i] != ids[i + 1] else "continue" for i in self.gaps}
+        # Gaps the owner left unsure (score.py, UNSURE GAPS) are never an error; a flag there still costs a check.
+        self.unsure = {u - 1 for u in getattr(self.labels, "unsure", ())}
         self.v = {c: voter_gaps(c, col) for c in codes}
 
     def labels_from(self, dec: dict[int, str]) -> list[str]:
@@ -156,8 +158,9 @@ def evaluate(box: Box, S, v: float) -> dict:
     s_rev = score_labels(box.labels, box.labels_from(rev))
     acc = [i for i, (_, f, _, _) in j.items() if not f]
     return {"pages": box.pages, "gaps": len(box.gaps), "flagged": len(box.gaps) - len(acc),
-            "accepted": len(acc), "acc_err": sum(auto[i] != box.truth[i] for i in acc),
-            "auto": s_auto, "rev": s_rev, "auto_err": sum(auto[i] != box.truth[i] for i in box.gaps)}
+            "accepted": len(acc), "acc_err": sum(auto[i] != box.truth[i] for i in acc if i not in box.unsure),
+            "auto": s_auto, "rev": s_rev,
+            "auto_err": sum(auto[i] != box.truth[i] for i in box.gaps if i not in box.unsure)}
 
 
 def pooled(rows: list[dict]) -> dict:

@@ -1346,11 +1346,11 @@
       "doc": 19,
       "page": 1,
       "id": "cia-readingroom-document-cia-rdp96-00788r001700270019-6",
-      "label": "New",
+      "label": "Cont",
       "image": "boxes/CREST/0075.jpg",
       "sha256": "9a14a6fb2e887197d6bb63ad844e2a57f5cceec2a806d09fb226e027b20bad4b",
       "archive_label": "New",
-      "audit": "Rule 4: another separately preserved copy of the Secretary of the Army briefing; its cover starts a new document.",
+      "audit": "Owner, 2026-10-31 (W46.seg-truth-sheet cr02): the same document; the agent's New is overruled. Agent's note: Rule 4: another separately preserved copy of the Secretary of the Army briefing; its cover starts a new document.",
       "reviewed": true
     },
     {
@@ -2014,5 +2014,76 @@
       111
     ],
     "notes": "Every page viewed in 16 contact sheets; handwritten decision pages 42,46,110,111 also enlarged. Rule-based interpretation by the interactive agent, no owner adjudication or model outputs used."
+  },
+  "unsure": [
+    {
+      "id": "cr01",
+      "left": 45,
+      "right": 46
+    },
+    {
+      "id": "cr03",
+      "left": 87,
+      "right": 88
+    },
+    {
+      "id": "cr04",
+      "left": 93,
+      "right": 94
+    },
+    {
+      "id": "cr06",
+      "left": 110,
+      "right": 111
+    }
+  ],
+  "owner_rulings": {
+    "item": "W46.seg-truth-sheet, folded by W46.seg-truth-rescore",
+    "date": "2026-10-31",
+    "gaps": [
+      {
+        "id": "cr01",
+        "left": 45,
+        "right": 46,
+        "agent": "Cont",
+        "owner": "unsure"
+      },
+      {
+        "id": "cr02",
+        "left": 74,
+        "right": 75,
+        "agent": "New",
+        "owner": "same"
+      },
+      {
+        "id": "cr03",
+        "left": 87,
+        "right": 88,
+        "agent": "Cont",
+        "owner": "unsure"
+      },
+      {
+        "id": "cr04",
+        "left": 93,
+        "right": 94,
+        "agent": "Cont",
+        "owner": "unsure"
+      },
+      {
+        "id": "cr05",
+        "left": 94,
+        "right": 95,
+        "agent": "New",
+        "owner": "new"
+      },
+      {
+        "id": "cr06",
+        "left": 110,
+        "right": 111,
+        "agent": "Cont",
+        "owner": "unsure"
+      }
+    ],
+    "unsure_rule": "the gaps the owner could not rule are left out of every score (score.py, UNSURE GAPS)"
   }
 }

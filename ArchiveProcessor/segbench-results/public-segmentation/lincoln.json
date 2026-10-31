@@ -3934,10 +3934,10 @@
       "download_url": "https://tile.loc.gov/image-services/iiif/service:mss:mal:239:2398600:002/full/!2000,2000/0/default.jpg",
       "image": "boxes/Lincoln/0230.jpg",
       "sha256": "90a38e54fea7c8fcd8b1b688c0876f986da15c32a0c95833d71a33116a88699a",
-      "label": "New",
+      "label": "Cont",
       "archive_label": "Cont",
       "reviewed": true,
-      "audit": "Rules 1 and 7: separately titled The Rights of the Press printed proceedings/clipping enclosed with Comstock letter."
+      "audit": "Owner, 2026-10-31 (W46.seg-truth-sheet li04): the same document; the agent's New is overruled. Agent's note: Rules 1 and 7: separately titled The Rights of the Press printed proceedings/clipping enclosed with Comstock letter."
     },
     {
       "n": 231,
@@ -4404,5 +4404,64 @@
       "reviewed": true,
       "audit": "Same document body, back, blank, or docket retained after visual review. Albany wrapper and continuous Lincoln-to-Corning letter manuscript, including inserted numbered sheets 17\u00bd and 17\u00be; all same letter through final page 19. No separate enclosure."
     }
-  ]
+  ],
+  "unsure": [
+    {
+      "id": "li02",
+      "left": 76,
+      "right": 77
+    },
+    {
+      "id": "li03",
+      "left": 106,
+      "right": 107
+    },
+    {
+      "id": "li05",
+      "left": 230,
+      "right": 231
+    }
+  ],
+  "owner_rulings": {
+    "item": "W46.seg-truth-sheet, folded by W46.seg-truth-rescore",
+    "date": "2026-10-31",
+    "gaps": [
+      {
+        "id": "li01",
+        "left": 75,
+        "right": 76,
+        "agent": "New",
+        "owner": "new"
+      },
+      {
+        "id": "li02",
+        "left": 76,
+        "right": 77,
+        "agent": "New",
+        "owner": "unsure"
+      },
+      {
+        "id": "li03",
+        "left": 106,
+        "right": 107,
+        "agent": "Cont",
+        "owner": "unsure"
+      },
+      {
+        "id": "li04",
+        "left": 229,
+        "right": 230,
+        "agent": "New",
+        "owner": "same"
+      },
+      {
+        "id": "li05",
+        "left": 230,
+        "right": 231,
+        "agent": "New",
+        "owner": "unsure"
+      }
+    ],
+    "unsure_rule": "the gaps the owner could not rule are left out of every score (score.py, UNSURE GAPS)"
+  }
 }

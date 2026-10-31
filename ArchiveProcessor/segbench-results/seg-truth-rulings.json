@@ -1,0 +1,698 @@
+{
+ "item": "W46.seg-truth-rescore",
+ "answers": "W46.seg-truth-sheet answers-20261031.csv",
+ "rulings": [
+  {
+   "id": "st01",
+   "section": "stanton",
+   "left": 101,
+   "right": 102,
+   "current": "Cont",
+   "stratum": null,
+   "answer": "new"
+  },
+  {
+   "id": "st02",
+   "section": "stanton",
+   "left": 102,
+   "right": 103,
+   "current": "Cont",
+   "stratum": null,
+   "answer": "new"
+  },
+  {
+   "id": "st03",
+   "section": "stanton",
+   "left": 103,
+   "right": 104,
+   "current": "Cont",
+   "stratum": null,
+   "answer": "same"
+  },
+  {
+   "id": "st04",
+   "section": "stanton",
+   "left": 104,
+   "right": 105,
+   "current": "Cont",
+   "stratum": null,
+   "answer": "same"
+  },
+  {
+   "id": "cr01",
+   "section": "crest",
+   "left": 45,
+   "right": 46,
+   "current": "Cont",
+   "stratum": null,
+   "answer": "unsure"
+  },
+  {
+   "id": "cr02",
+   "section": "crest",
+   "left": 74,
+   "right": 75,
+   "current": "New",
+   "stratum": null,
+   "answer": "same"
+  },
+  {
+   "id": "cr03",
+   "section": "crest",
+   "left": 87,
+   "right": 88,
+   "current": "Cont",
+   "stratum": null,
+   "answer": "unsure"
+  },
+  {
+   "id": "cr04",
+   "section": "crest",
+   "left": 93,
+   "right": 94,
+   "current": "Cont",
+   "stratum": null,
+   "answer": "unsure"
+  },
+  {
+   "id": "cr05",
+   "section": "crest",
+   "left": 94,
+   "right": 95,
+   "current": "New",
+   "stratum": null,
+   "answer": "new"
+  },
+  {
+   "id": "cr06",
+   "section": "crest",
+   "left": 110,
+   "right": 111,
+   "current": "Cont",
+   "stratum": null,
+   "answer": "unsure"
+  },
+  {
+   "id": "li01",
+   "section": "lincoln",
+   "left": 75,
+   "right": 76,
+   "current": "New",
+   "stratum": null,
+   "answer": "new"
+  },
+  {
+   "id": "li02",
+   "section": "lincoln",
+   "left": 76,
+   "right": 77,
+   "current": "New",
+   "stratum": null,
+   "answer": "unsure"
+  },
+  {
+   "id": "li03",
+   "section": "lincoln",
+   "left": 106,
+   "right": 107,
+   "current": "Cont",
+   "stratum": null,
+   "answer": "unsure"
+  },
+  {
+   "id": "li04",
+   "section": "lincoln",
+   "left": 229,
+   "right": 230,
+   "current": "New",
+   "stratum": null,
+   "answer": "same"
+  },
+  {
+   "id": "li05",
+   "section": "lincoln",
+   "left": 230,
+   "right": 231,
+   "current": "New",
+   "stratum": null,
+   "answer": "unsure"
+  },
+  {
+   "id": "sc01",
+   "section": "sc0122",
+   "left": 4,
+   "right": 5,
+   "current": "Cont",
+   "stratum": "cont, 0.02 <= P(new) < 0.5",
+   "answer": "same"
+  },
+  {
+   "id": "sc02",
+   "section": "sc0122",
+   "left": 5,
+   "right": 6,
+   "current": "New",
+   "stratum": "new, 0.5 <= P(new) < 0.99",
+   "answer": "new"
+  },
+  {
+   "id": "sc03",
+   "section": "sc0122",
+   "left": 7,
+   "right": 8,
+   "current": "Cont",
+   "stratum": "cont, 0.02 <= P(new) < 0.5",
+   "answer": "same"
+  },
+  {
+   "id": "sc04",
+   "section": "sc0122",
+   "left": 9,
+   "right": 10,
+   "current": "New",
+   "stratum": "new, 0.5 <= P(new) < 0.99",
+   "answer": "new"
+  },
+  {
+   "id": "sc05",
+   "section": "sc0122",
+   "left": 11,
+   "right": 12,
+   "current": "Cont",
+   "stratum": "cont, P(new) < 0.02",
+   "answer": "same"
+  },
+  {
+   "id": "sc06",
+   "section": "sc0122",
+   "left": 12,
+   "right": 13,
+   "current": "Cont",
+   "stratum": "cont, 0.02 <= P(new) < 0.5",
+   "answer": "same"
+  },
+  {
+   "id": "sc07",
+   "section": "sc0122",
+   "left": 16,
+   "right": 17,
+   "current": "Cont",
+   "stratum": "cont, 0.02 <= P(new) < 0.5",
+   "answer": "same"
+  },
+  {
+   "id": "sc08",
+   "section": "sc0122",
+   "left": 18,
+   "right": 19,
+   "current": "Cont",
+   "stratum": "cont, 0.02 <= P(new) < 0.5",
+   "answer": "same"
+  },
+  {
+   "id": "sc09",
+   "section": "sc0122",
+   "left": 23,
+   "right": 24,
+   "current": "Cont",
+   "stratum": "cont, 0.02 <= P(new) < 0.5",
+   "answer": "same"
+  },
+  {
+   "id": "sc10",
+   "section": "sc0122",
+   "left": 25,
+   "right": 26,
+   "current": "New",
+   "stratum": "new, P(new) >= 0.99",
+   "answer": "new"
+  },
+  {
+   "id": "sc11",
+   "section": "sc0122",
+   "left": 34,
+   "right": 35,
+   "current": "New",
+   "stratum": "new, 0.5 <= P(new) < 0.99",
+   "answer": "new"
+  },
+  {
+   "id": "sc12",
+   "section": "sc0122",
+   "left": 36,
+   "right": 37,
+   "current": "New",
+   "stratum": "new, 0.5 <= P(new) < 0.99",
+   "answer": "new"
+  },
+  {
+   "id": "sc13",
+   "section": "sc0122",
+   "left": 38,
+   "right": 39,
+   "current": "Cont",
+   "stratum": "cont, P(new) < 0.02",
+   "answer": "same"
+  },
+  {
+   "id": "sc14",
+   "section": "sc0122",
+   "left": 40,
+   "right": 41,
+   "current": "New",
+   "stratum": "new, P(new) >= 0.99",
+   "answer": "new"
+  },
+  {
+   "id": "sc15",
+   "section": "sc0122",
+   "left": 45,
+   "right": 46,
+   "current": "Cont",
+   "stratum": "cont, P(new) < 0.02",
+   "answer": "same"
+  },
+  {
+   "id": "sc16",
+   "section": "sc0122",
+   "left": 47,
+   "right": 48,
+   "current": "New",
+   "stratum": "new, P(new) >= 0.99",
+   "answer": "new"
+  },
+  {
+   "id": "sc17",
+   "section": "sc0122",
+   "left": 51,
+   "right": 52,
+   "current": "Cont",
+   "stratum": "cont, P(new) < 0.02",
+   "answer": "same"
+  },
+  {
+   "id": "sc18",
+   "section": "sc0122",
+   "left": 55,
+   "right": 56,
+   "current": "New",
+   "stratum": "new, 0.5 <= P(new) < 0.99",
+   "answer": "new"
+  },
+  {
+   "id": "sc19",
+   "section": "sc0122",
+   "left": 56,
+   "right": 57,
+   "current": "New",
+   "stratum": "new, 0.5 <= P(new) < 0.99",
+   "answer": "new"
+  },
+  {
+   "id": "sc20",
+   "section": "sc0122",
+   "left": 57,
+   "right": 58,
+   "current": "New",
+   "stratum": "new, 0.5 <= P(new) < 0.99",
+   "answer": "new"
+  },
+  {
+   "id": "sc21",
+   "section": "sc0122",
+   "left": 58,
+   "right": 59,
+   "current": "Cont",
+   "stratum": "cont, 0.02 <= P(new) < 0.5",
+   "answer": "same"
+  },
+  {
+   "id": "sc22",
+   "section": "sc0122",
+   "left": 60,
+   "right": 61,
+   "current": "Cont",
+   "stratum": "cont, 0.02 <= P(new) < 0.5",
+   "answer": "same"
+  },
+  {
+   "id": "sc23",
+   "section": "sc0122",
+   "left": 62,
+   "right": 63,
+   "current": "New",
+   "stratum": "new, P(new) >= 0.99",
+   "answer": "new"
+  },
+  {
+   "id": "sc24",
+   "section": "sc0122",
+   "left": 63,
+   "right": 64,
+   "current": "New",
+   "stratum": "new, P(new) >= 0.99",
+   "answer": "new"
+  },
+  {
+   "id": "sc25",
+   "section": "sc0122",
+   "left": 67,
+   "right": 68,
+   "current": "Cont",
+   "stratum": "cont, P(new) < 0.02",
+   "answer": "same"
+  },
+  {
+   "id": "sc26",
+   "section": "sc0122",
+   "left": 69,
+   "right": 70,
+   "current": "Cont",
+   "stratum": "cont, P(new) < 0.02",
+   "answer": "same"
+  },
+  {
+   "id": "sc27",
+   "section": "sc0122",
+   "left": 71,
+   "right": 72,
+   "current": "Cont",
+   "stratum": "cont, P(new) < 0.02",
+   "answer": "same"
+  },
+  {
+   "id": "sc28",
+   "section": "sc0122",
+   "left": 73,
+   "right": 74,
+   "current": "Cont",
+   "stratum": "cont, 0.02 <= P(new) < 0.5",
+   "answer": "same"
+  },
+  {
+   "id": "sc29",
+   "section": "sc0122",
+   "left": 74,
+   "right": 75,
+   "current": "Cont",
+   "stratum": "cont, 0.02 <= P(new) < 0.5",
+   "answer": "same"
+  },
+  {
+   "id": "sc30",
+   "section": "sc0122",
+   "left": 76,
+   "right": 77,
+   "current": "New",
+   "stratum": "new, P(new) >= 0.99",
+   "answer": "new"
+  },
+  {
+   "id": "sc31",
+   "section": "sc0122",
+   "left": 79,
+   "right": 80,
+   "current": "Cont",
+   "stratum": "cont, 0.02 <= P(new) < 0.5",
+   "answer": "same"
+  },
+  {
+   "id": "sc32",
+   "section": "sc0122",
+   "left": 80,
+   "right": 81,
+   "current": "Cont",
+   "stratum": "cont, 0.02 <= P(new) < 0.5",
+   "answer": "same"
+  },
+  {
+   "id": "sc33",
+   "section": "sc0122",
+   "left": 83,
+   "right": 84,
+   "current": "Cont",
+   "stratum": "cont, 0.02 <= P(new) < 0.5",
+   "answer": "same"
+  },
+  {
+   "id": "sc34",
+   "section": "sc0122",
+   "left": 85,
+   "right": 86,
+   "current": "Cont",
+   "stratum": "cont, 0.02 <= P(new) < 0.5",
+   "answer": "same"
+  },
+  {
+   "id": "sc35",
+   "section": "sc0122",
+   "left": 86,
+   "right": 87,
+   "current": "Cont",
+   "stratum": "cont, 0.02 <= P(new) < 0.5",
+   "answer": "same"
+  },
+  {
+   "id": "sc36",
+   "section": "sc0122",
+   "left": 89,
+   "right": 90,
+   "current": "Cont",
+   "stratum": "cont, 0.02 <= P(new) < 0.5",
+   "answer": "same"
+  },
+  {
+   "id": "sc37",
+   "section": "sc0122",
+   "left": 101,
+   "right": 102,
+   "current": "Cont",
+   "stratum": "cont, P(new) < 0.02",
+   "answer": "same"
+  },
+  {
+   "id": "sc38",
+   "section": "sc0122",
+   "left": 112,
+   "right": 113,
+   "current": "Cont",
+   "stratum": "cont, P(new) < 0.02",
+   "answer": "same"
+  },
+  {
+   "id": "sc39",
+   "section": "sc0122",
+   "left": 113,
+   "right": 114,
+   "current": "Cont",
+   "stratum": "cont, P(new) < 0.02",
+   "answer": "same"
+  },
+  {
+   "id": "sc40",
+   "section": "sc0122",
+   "left": 116,
+   "right": 117,
+   "current": "Cont",
+   "stratum": "cont, P(new) < 0.02",
+   "answer": "same"
+  },
+  {
+   "id": "sc41",
+   "section": "sc0122",
+   "left": 124,
+   "right": 125,
+   "current": "New",
+   "stratum": "new, P(new) >= 0.99",
+   "answer": "new"
+  },
+  {
+   "id": "sc42",
+   "section": "sc0122",
+   "left": 134,
+   "right": 135,
+   "current": "Cont",
+   "stratum": "cont, 0.02 <= P(new) < 0.5",
+   "answer": "same"
+  },
+  {
+   "id": "sc43",
+   "section": "sc0122",
+   "left": 135,
+   "right": 136,
+   "current": "Cont",
+   "stratum": "cont, 0.02 <= P(new) < 0.5",
+   "answer": "same"
+  },
+  {
+   "id": "sc44",
+   "section": "sc0122",
+   "left": 146,
+   "right": 147,
+   "current": "Cont",
+   "stratum": "cont, 0.02 <= P(new) < 0.5",
+   "answer": "same"
+  },
+  {
+   "id": "sc45",
+   "section": "sc0122",
+   "left": 150,
+   "right": 151,
+   "current": "Cont",
+   "stratum": "cont, 0.02 <= P(new) < 0.5",
+   "answer": "same"
+  },
+  {
+   "id": "sc46",
+   "section": "sc0122",
+   "left": 151,
+   "right": 152,
+   "current": "New",
+   "stratum": "new, 0.5 <= P(new) < 0.99",
+   "answer": "new"
+  },
+  {
+   "id": "sc47",
+   "section": "sc0122",
+   "left": 154,
+   "right": 155,
+   "current": "New",
+   "stratum": "new, P(new) >= 0.99",
+   "answer": "new"
+  },
+  {
+   "id": "sc48",
+   "section": "sc0122",
+   "left": 172,
+   "right": 173,
+   "current": "New",
+   "stratum": "new, P(new) >= 0.99",
+   "answer": "new"
+  },
+  {
+   "id": "sc49",
+   "section": "sc0122",
+   "left": 173,
+   "right": 174,
+   "current": "Cont",
+   "stratum": "cont, P(new) < 0.02",
+   "answer": "same"
+  },
+  {
+   "id": "sc50",
+   "section": "sc0122",
+   "left": 175,
+   "right": 176,
+   "current": "Cont",
+   "stratum": "cont, 0.02 <= P(new) < 0.5",
+   "answer": "same"
+  },
+  {
+   "id": "sc51",
+   "section": "sc0122",
+   "left": 180,
+   "right": 181,
+   "current": "New",
+   "stratum": "new, P(new) >= 0.99",
+   "answer": "new"
+  },
+  {
+   "id": "sc52",
+   "section": "sc0122",
+   "left": 184,
+   "right": 185,
+   "current": "New",
+   "stratum": "new, P(new) >= 0.99",
+   "answer": "new"
+  },
+  {
+   "id": "sc53",
+   "section": "sc0122",
+   "left": 186,
+   "right": 187,
+   "current": "Cont",
+   "stratum": "cont, 0.02 <= P(new) < 0.5",
+   "answer": "same"
+  },
+  {
+   "id": "sc54",
+   "section": "sc0122",
+   "left": 188,
+   "right": 189,
+   "current": "New",
+   "stratum": "new, P(new) >= 0.99",
+   "answer": "new"
+  },
+  {
+   "id": "sc55",
+   "section": "sc0122",
+   "left": 190,
+   "right": 191,
+   "current": "Cont",
+   "stratum": "cont, 0.02 <= P(new) < 0.5",
+   "answer": "same"
+  },
+  {
+   "id": "sc56",
+   "section": "sc0122",
+   "left": 191,
+   "right": 192,
+   "current": "New",
+   "stratum": "new, 0.5 <= P(new) < 0.99",
+   "answer": "new"
+  },
+  {
+   "id": "sc57",
+   "section": "sc0122",
+   "left": 192,
+   "right": 193,
+   "current": "New",
+   "stratum": "new, 0.5 <= P(new) < 0.99",
+   "answer": "new"
+  },
+  {
+   "id": "sc58",
+   "section": "sc0122",
+   "left": 193,
+   "right": 194,
+   "current": "New",
+   "stratum": "new, 0.5 <= P(new) < 0.99",
+   "answer": "new"
+  },
+  {
+   "id": "sc59",
+   "section": "sc0122",
+   "left": 196,
+   "right": 197,
+   "current": "Cont",
+   "stratum": "cont, 0.02 <= P(new) < 0.5",
+   "answer": "same"
+  },
+  {
+   "id": "sc60",
+   "section": "sc0122",
+   "left": 199,
+   "right": 200,
+   "current": "New",
+   "stratum": "new, 0.5 <= P(new) < 0.99",
+   "answer": "new"
+  }
+ ],
+ "sc0122": {
+  "controls": 60,
+  "errors": 0,
+  "unweighted": 0.0,
+  "unweighted_wilson": [
+   0.0,
+   0.06017393047793289
+  ],
+  "agreed_gaps": 162,
+  "weighted": 0.0,
+  "weighted_errors_of_agreed": 0,
+  "kish_n": 50.84404262189216,
+  "weighted_wilson": [
+   0.0,
+   0.07024878589361411
+  ]
+ }
+}

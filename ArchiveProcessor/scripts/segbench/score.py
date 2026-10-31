@@ -44,6 +44,12 @@ above, do not enter them twice.
 
 Pooled figures sum the counts over collections (Pk/WindowDiff pool their windows), so a
 pooled percentage is page- or item-weighted, not a mean of per-collection percentages.
+
+UNSURE GAPS (W46.seg-truth-rescore). A document gap the owner could not rule is left out of every
+score by giving the truth the route's own call there (boundary or not) before scoring (``forgive``),
+so it is never an error under any metric. The truth carries them as a ``Truth`` list
+(``Collection.labels``), so every ``score_labels(col.labels, …)`` honours them; a box with none
+scores exactly as before. A copy made with ``list()`` drops them.
 """
 from __future__ import annotations
 
@@ -51,6 +57,28 @@ from dataclasses import dataclass, field
 
 PHOTO = ("Box", "Folder")
 VALID = ("Box", "Folder", "New", "Cont")
+
+
+class Truth(list):
+    """Truth labels plus ``unsure``: 0-based indices of the right-hand page of each gap the owner left unsure."""
+
+    def __init__(self, labels, unsure=()):
+        super().__init__(labels)
+        self.unsure = tuple(sorted(set(unsure)))
+        if any(not 0 < i < len(self) for i in self.unsure):
+            raise ValueError(f"unsure gap index out of range: {self.unsure}")
+
+
+def forgive(truth: list[str], pred: list[str], unsure=()) -> list[str]:
+    """The truth with each unsure document gap set to the prediction's call there, so it scores as right."""
+    out = list(truth)
+    if not unsure:
+        return out
+    p_ids = segment_ids(pred)
+    for i in unsure:
+        if out[i] not in PHOTO and out[i - 1] not in PHOTO:
+            out[i] = "New" if p_ids[i] != p_ids[i - 1] else "Cont"
+    return out
 
 
 def segment_ids(labels: list[str]) -> list[int]:
@@ -209,6 +237,7 @@ def _max_matching(pieces: list[tuple[int, int, int]]) -> int:
 def score_labels(truth: list[str], pred: list[str], name: str = "") -> Counts:
     if len(truth) != len(pred):
         raise ValueError(f"{name}: {len(pred)} predicted labels for {len(truth)} pages")
+    truth = forgive(truth, pred, getattr(truth, "unsure", ()))
     n = len(truth)
     t_ids, p_ids = segment_ids(truth), segment_ids(pred)
     t_groups, p_sets = _groups(t_ids), set(_groups(p_ids).values())

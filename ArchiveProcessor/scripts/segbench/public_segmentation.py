@@ -51,8 +51,12 @@ def validate(manifest, root):
         seen.add(image)
         if hashlib.sha256(image.read_bytes()).hexdigest() != p["sha256"]:
             raise ValueError(f"image changed: {p['n']}")
+    # W46.seg-truth-rescore: the gaps the owner could not rule, left out of every score (score.py, UNSURE GAPS).
+    unsure = tuple(u["right"] for u in manifest.get("unsure", ()))
+    if any(not 1 < n <= len(pages) for n in unsure):
+        raise ValueError(f"unsure gap outside the stream: {unsure}")
     return data.Collection(manifest["box"], root, [
-        data.Page(p["n"], p["label"], root / p["image"]) for p in pages])
+        data.Page(p["n"], p["label"], root / p["image"]) for p in pages], unsure=unsure)
 
 
 def load(box, root):

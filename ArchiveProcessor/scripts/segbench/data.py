@@ -69,12 +69,15 @@ class Collection:
     name: str
     directory: Path
     pages: list[Page]
-    unsure: tuple[int, ...] = ()    # file numbers whose gap before them the owner left unsure (locked boxes)
+    unsure: tuple[int, ...] = ()    # file numbers whose gap before them the owner left unsure (lock.json, manifest)
     trained_on: str | None = None   # which models trained on this box, from lock.json
 
     @property
     def labels(self) -> list[str]:
-        return [p.label for p in self.pages]
+        """A score.Truth: score_labels leaves the unsure gaps out of every score (score.py, UNSURE GAPS)."""
+        from score import Truth
+        index = {p.n: i for i, p in enumerate(self.pages)}
+        return Truth([p.label for p in self.pages], [index[n] for n in self.unsure])
 
     def text(self, i: int) -> str | None:
         """OCR text of page index i (0-based) from the cache, or None if not yet produced."""
