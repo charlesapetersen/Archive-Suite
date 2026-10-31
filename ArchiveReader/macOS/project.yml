@@ -53,7 +53,9 @@ targets:
         # path is #if DEBUG + launch-arg gated — inactive in normal Debug runs.
         Debug:
           CODE_SIGN_ENTITLEMENTS: Sources/ArchiveReader/ArchiveReader.uitest.entitlements
-        # Release uses the production entitlements (byte-identical to the original).
+        # Release uses the production entitlements: the sandbox, app-scoped bookmarks, user-selected
+        # read-write, and user-selected.executable so a tag write does not stamp com.apple.quarantine
+        # (W40.fix-reader-tag-quarantine).
         Release:
           CODE_SIGN_ENTITLEMENTS: Sources/ArchiveReader/ArchiveReader.entitlements
 

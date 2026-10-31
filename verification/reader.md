@@ -391,7 +391,7 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
 - **Real-path test:** `ArchiveReaderUITests/TriageJourneyUITests.testTriageWritesKeepEveryOtherTagColourAndByte` (step 1); `ArchiveReaderUITests/NavigationUITests.testMatchedIdentityWritesSucceedOnScratchFixture`
   (clicks Mark Read, reads the tags back from disk); `ArchiveReaderTests/TagWriterTests.testMarkReadIsNoOpOnFileWithoutReadState`;
   `ArchiveReaderTests/TriageTests.testMarkReadRemovesOnlyUnreadAndPreservesOtherTags`.
-- **Runtime evidence:** 2026-10-15 · `f5c31a95` · [`evidence/reader/W40.d8-triage.md`](evidence/reader/W40.d8-triage.md): Mark Read on an Unread file removed only `Unread` and added `Read`; every other tag, colour and content byte held. It also stamped the file with `com.apple.quarantine` (R-45).
+- **Runtime evidence:** 2026-10-15 · `f5c31a95` · [`evidence/reader/W40.d8-triage.md`](evidence/reader/W40.d8-triage.md): Mark Read on an Unread file removed only `Unread` and added `Read`; every other tag, colour and content byte held. It also stamped the file with `com.apple.quarantine` (R-45); fixed 2026-10-31 by `W40.fix-reader-tag-quarantine` ([evidence](evidence/reader/W40.fix-reader-tag-quarantine.md)).
 - **Status:** `unproven`
 - **History:**
   - 2026-10-12 W40.b1 — row written, `unproven`.
@@ -933,8 +933,8 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
   `.testApplyWithMismatchedIdentityAbortsAndLeavesReplacementUntouched`;
   `ArchiveReaderTests/TriageTests.testMarkReadRemovesOnlyUnreadAndPreservesOtherTags` (checks the bytes are
   unchanged); `ArchiveCoreTests/TagWriterPrimitiveTests.testReplacedFileAbortsAndLeavesReplacementUntouched`.
-- **Runtime evidence:** 2026-10-15 · `f5c31a95` · [`evidence/reader/W40.d8-triage.md`](evidence/reader/W40.d8-triage.md): no write changed content, location, another file, an unrelated tag or a colour, on the synthetic fixture or on 76 real-corpus sample files. But every write added `com.apple.quarantine` (`0086;…;ArchiveReader;`) or rewrote an existing one (`0082` → `0086`), an xattr outside "only Finder tags".
-- **Status:** `broken`
+- **Runtime evidence:** 2026-10-15 · `f5c31a95` · [`evidence/reader/W40.d8-triage.md`](evidence/reader/W40.d8-triage.md): no write changed content, location, another file, an unrelated tag or a colour, on the synthetic fixture or on 76 real-corpus sample files. But every write added `com.apple.quarantine` (`0086;…;ArchiveReader;`) or rewrote an existing one (`0082` → `0086`), an xattr outside "only Finder tags". 2026-10-31 · [`evidence/reader/W40.fix-reader-tag-quarantine.md`](evidence/reader/W40.fix-reader-tag-quarantine.md): with `user-selected.executable` and a held scope, every journey step on the synthetic fixture left every file's quarantine stamp, or its absence, unchanged.
+- **Status:** `fixed-pending-recheck` (builder is not verifier)
 - **History:**
   - 2026-10-12 W40.b1 — row written, `unproven`.
   - 2026-10-15 W40.d8 — `broken`: `W40.fix-reader-tag-quarantine` (S3).
@@ -953,6 +953,10 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
     `testWriteReadsTheDiskNotTheCallersURLCache`, `testWriteThroughACachedURLKeepsAnExternalHiddenFlag`,
     `testUncachedURLKeepsTheNameBytesAndRefusesAnEmptyPath`), the cache-sensitive five checked to fail on the
     pre-fix code and pass with it. Still `broken` for the quarantine xattr (`W40.fix-reader-tag-quarantine`).
+  - 2026-10-31 W40.fix-reader-tag-quarantine — `fixed-pending-recheck`. The App Sandbox stamps any xattr write
+    by the app and forbids removing the stamp; `com.apple.security.files.user-selected.executable` stops it
+    for writes under a user-selected or bookmark scope, and the Debug fixture root now holds such a scope.
+    `TriageJourneyUITests` fails outright on any quarantine change; half the GUI fixture carries a PDFpen stamp.
 - **Notes:**
   - The writer-level identity tests above passed only because each handed the writer a new `URL`, while the app
     passes the same `ArchiveFile.url` to the capture and the write. Since `W40.fix-identity-url-cache` the

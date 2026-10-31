@@ -252,6 +252,17 @@ mkdir -p "$SUBDIR"
 write_text_pdf "$SUBDIR/00011 IMG — Box Two.pdf" "Reader synthetic fixture page 11"
 set_tags "Box 2/00011 IMG — Box Two.pdf" "1977,Subfolder Fixture,Read"
 
+# --- another app's quarantine stamp on half the files (W40.fix-reader-tag-quarantine) ---
+# The real corpus carries thousands of `com.apple.quarantine` stamps from Preview, Photos and PDFpen. A
+# sandboxed tag write used to add one to an unstamped file and OR its flags into an existing one
+# (0082 → 0086). Stamping the odd-numbered files gives TriageJourneyUITests both cases: whatever group it
+# picks, a write must leave each file's stamp, or its absence, byte-for-byte as it was. Written here, by
+# an unsandboxed shell, because the sandboxed UI-test runner may not set this xattr (measured: EPERM).
+for f in "00001 IMG — Brown.pdf" "00003 IMG — Brown.pdf" "00005 IMG — Brown.pdf" "00007 IMG — Brown.pdf" \
+         "00009 IMG — Brown.pdf" "IMG_NOTEXT — Fixture.pdf"; do
+  xattr -w com.apple.quarantine '0082;56940f8e;PDFpen;' "$DST/$f"
+done
+
 # --- set color labels for Box (Red=6) and Folder (Purple=3) ---
 # The `tag` CLI writes color-name tokens; macOS resolves Red→labelNumber 6,
 # Purple→labelNumber 3 automatically when the color name is in the tag array.

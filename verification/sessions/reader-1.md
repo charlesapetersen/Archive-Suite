@@ -42,8 +42,6 @@ write how much it got in your way**. That tells us which to fix first.
   waits behind it (`W40.fix-reader-fts-snippet-stall`). Single words and rare words are fast.
 - **In the inline tag field in a row, Space opens Preview and Return does not save**. You have to click out of
   the field to save (`W40.fix-reader-inline-keys`).
-- **Each tag write also adds a "downloaded from the internet" quarantine mark to the file**. You won't see it in
-  the Reader (`W40.fix-reader-tag-quarantine`).
 - **At its narrowest the window cuts off the sidebar and the filter bar**, and the Preview sheet is larger than
   the window (`W40.fix-reader-narrow-window`, `W40.fix-reader-preview-sheet-oversize`). Widen the window if that
   happens.

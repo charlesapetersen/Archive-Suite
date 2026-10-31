@@ -230,13 +230,29 @@ final class RootFolderStore: ObservableObject {
     }
 
 #if DEBUG
-    /// Set root for UI testing without persisting a bookmark or starting a security scope.
-    /// The fixture path is accessible via the UITest-only temporary-exception entitlement,
-    /// so no security-scoped resource dance is needed. This method does NOT read or write
+    /// Set root for UI testing without persisting a bookmark. This method does NOT read or write
     /// `archiveRootBookmark` in UserDefaults — the real root bookmark is never touched.
+    ///
+    /// The fixture path is readable through the UITest-only temporary-exception entitlement, but it
+    /// still starts a security scope the way a saved root does: a bookmark minted and resolved in memory,
+    /// then `startAccessingSecurityScopedResource()`. Writes made through the exception alone are
+    /// stamped `com.apple.quarantine` (flags 0086) even with `user-selected.executable`, while writes
+    /// under a held scope are not, so without the scope the UI tests would check a path production
+    /// never takes (measured 2026-10-31, W40.fix-reader-tag-quarantine). The scope covers the path,
+    /// so `url` itself is adopted unchanged. If either step fails the root is adopted anyway, and the
+    /// triage journey's quarantine check then fails.
     private func adoptTestRoot(_ url: URL) {
+        var stale = false
+        if let data = try? url.bookmarkData(options: .withSecurityScope, includingResourceValuesForKeys: nil,
+                                            relativeTo: nil),
+           let scoped = try? URL(resolvingBookmarkData: data, options: .withSecurityScope, relativeTo: nil,
+                                 bookmarkDataIsStale: &stale),
+           scoped.startAccessingSecurityScopedResource() {
+            accessing = scoped
+        } else {
+            NSLog("RootFolderStore: fixture root \(url.path) has no security scope; writes may be quarantined")
+        }
         adopt(url)
-        // `accessing` stays nil — no scope to release. No bookmark persisted.
     }
 #endif
 }

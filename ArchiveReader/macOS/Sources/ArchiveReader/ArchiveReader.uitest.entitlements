@@ -27,6 +27,13 @@
 	<true/>
 	<key>com.apple.security.files.user-selected.read-write</key>
 	<true/>
+	<!-- W40.fix-reader-tag-quarantine: without this, every tag write (any xattr write, even a bare
+	     setxattr) by the sandboxed app stamps the file com.apple.quarantine, or ORs its flags into
+	     another app's existing stamp, and the sandbox forbids removing it again. With it, a write
+	     under a user-selected or bookmark scope leaves quarantine untouched (measured 2026-10-31).
+	     The cost: files this app CREATES in user-selected folders are not quarantined either. -->
+	<key>com.apple.security.files.user-selected.executable</key>
+	<true/>
 	<key>com.apple.security.temporary-exception.files.absolute-path.read-write</key>
 	<array>
 		<string>/Users/</string>

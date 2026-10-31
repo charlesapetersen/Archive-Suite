@@ -593,7 +593,6 @@ final class TriageJourneyUITests: FixtureUITestCase {
             after = (try? snapshot()) ?? [:]
         }
         var problems: [String] = []
-        var quarantine: [String] = []   // the filed W40.fix-reader-tag-quarantine defect, kept apart
         var notes: [String] = []
         if Set(after.keys) != Set(before.keys) { problems.append("the set of files changed") }
         for path in before.keys.sorted() {
@@ -603,10 +602,12 @@ final class TriageJourneyUITests: FixtureUITestCase {
             if a.otherXattrs != b.otherXattrs {
                 let changed = Set(a.otherXattrs.keys).union(b.otherXattrs.keys)
                     .filter { b.otherXattrs[$0] != a.otherXattrs[$0] }.sorted()
-                // Only a quarantine xattr added or rewritten is the filed defect; anything else fails outright.
-                if changed == ["com.apple.quarantine"] && a.quarantine != nil {
-                    quarantine.append("\(id): com.apple.quarantine \(b.quarantine == nil ? "added" : "rewritten") "
-                                      + "(\(b.quarantine ?? "none") → \(a.quarantine ?? "none"))")
+                // A quarantine stamp added or rewritten is named with its text: it is what a sandboxed write
+                // leaves without the user-selected.executable entitlement or a held security scope
+                // (W40.fix-reader-tag-quarantine).
+                if changed == ["com.apple.quarantine"] {
+                    problems.append("\(id): com.apple.quarantine \(b.quarantine == nil ? "added" : "changed") "
+                                    + "(\(b.quarantine ?? "none") → \(a.quarantine ?? "none"))")
                 } else {
                     problems.append("\(id): other xattrs changed: \(changed)")
                 }
@@ -640,22 +641,12 @@ final class TriageJourneyUITests: FixtureUITestCase {
         }
         let untouched = before.count - expect.count
         if app.state != .notRunning { notes.append("\(app.windows.count) window(s) open") }
-        log("[d8] step \(step): \(problems.isEmpty ? "PASS" : "FAIL")\(quarantine.isEmpty ? "" : " (known: quarantine)") — "
+        log("[d8] step \(step): \(problems.isEmpty ? "PASS" : "FAIL") — "
             + "\(expect.count) file(s) changed as expected, \(untouched) untouched file(s) byte-identical in tags, "
             + "other xattrs and content"
             + (problems.isEmpty ? "" : "; problems: \(problems.joined(separator: "; "))")
-            + (quarantine.isEmpty ? "" : "; known defect: \(quarantine.joined(separator: "; "))")
             + (notes.isEmpty ? "" : "; notes: \(notes.joined(separator: "; "))"))
-        // A known, filed defect is recorded as an expected failure naming its fix item, so the journey can
-        // sit in the gate's lane without hiding anything else. Every other problem fails outright.
         for p in problems { XCTFail("[\(step)] \(p)") }
-        if !quarantine.isEmpty {
-            let known = XCTExpectedFailure.Options(); known.isStrict = false
-            XCTExpectFailure("W40.fix-reader-tag-quarantine (S3): a Reader tag write adds com.apple.quarantine",
-                             options: known) {
-                for p in quarantine { XCTFail("[\(step)] \(p)") }
-            }
-        }
         return after
     }
 

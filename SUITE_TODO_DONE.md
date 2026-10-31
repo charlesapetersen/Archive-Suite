@@ -13514,3 +13514,21 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   Tests: `MarkdownBridgeTests` (quote typed Return, quote with two paragraphs and a hard break, typed unordered items through `EditorTextView.insertNewline`, both list kinds on the serializer, 14 typed block-syntax cases with reopen and fixed point). Whole `ArchiveNotesTests` bundle 1029/1029 green, no new warnings. Tier-2 self-review done in-session (the usage window was at 94%, so no review subagent).
   Not covered: a Return typed after a heading still continues the heading's kind and is written as a plain line after it; a hard break followed by a `---` line from the file could read as a setext heading. Neither was filed (text is not lost). No bench cache used.
   <!-- /W40.fix-notes-return-list-quote -->
+- [x] **W40.fix-reader-tag-quarantine — every Reader tag write adds `com.apple.quarantine` to the file [S · S3 · Tier-2]** · §W40 — verification phase (lane: reader) (uses: build,vm) — SHIPPED 2026-10-31.
+  Found by `W40.d8` (every write stamped `0086;…;ArchiveReader;`, or ORed `0082`→`0086` into another app's stamp).
+  Cause, measured with a sandboxed probe: the App Sandbox stamps ANY xattr write by the app (NSURL tag or label
+  setter, raw `setxattr`, `fsetxattr` alike), `removexattr` of the stamp is `EPERM`, and `LSFileQuarantineEnabled`
+  does nothing. `com.apple.security.files.user-selected.executable` stops it for writes under a user-selected or
+  bookmark scope and leaves another app's stamp unchanged; a temporary-exception path alone still stamps `0086`.
+  Fix: the entitlement in both Reader entitlement files; the DEBUG fixture root (`RootFolderStore.adoptTestRoot`)
+  now holds a scope from an in-memory bookmark, never persisted, so UI tests take production's path;
+  `TriageJourneyUITests` fails outright on any quarantine change (its `XCTExpectFailure` removed);
+  `make-gui-fixture.sh` stamps six files `0082;…;PDFpen;` so the journey checks both cases. Processor: not
+  sandboxed, no stamp. Notes: also stamps, but only onto its own `.md` notes, and the entitlement would unquarantine
+  every file a network-facing app creates, so it was deliberately NOT added there (Tier-2 review). Reader cost:
+  its only created file in the root is `.archive-suite-root.json`. Verified: Reader unit bundle 517 tests, 0
+  failures; fixture-scripts 40/40; VM journey all 14 steps PASS; VM whole suite 70 passed, 2 failed
+  (LayoutGuard `1983`, pre-existing, `W40.fix-reader-vm-suite-red`). Rehearsal lane not run (sample gone from the
+  bench cache). R-45 → `fixed-pending-recheck`. Evidence: `verification/evidence/reader/W40.fix-reader-tag-quarantine.md`.
+  Bench cache: nothing written there; probe scratch was in /tmp.
+  <!-- /W40.fix-reader-tag-quarantine -->
