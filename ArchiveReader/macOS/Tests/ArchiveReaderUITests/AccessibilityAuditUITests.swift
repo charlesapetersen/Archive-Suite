@@ -17,6 +17,18 @@ final class AccessibilityAuditUITests: FixtureUITestCase {
         auditMainScreens(appearance: "dark")
     }
 
+    // The same sweeps with the mode coming from the Appearance setting rather than the test argument
+    // (W48.appearance-reader; plan rule 7: the existing checks run in the new mode as well as the old).
+    func testMainScreensPassAuditInLightModeBySetting() throws {
+        relaunch(LayoutGuard.lightSettingArguments)
+        auditMainScreens(appearance: "light")
+    }
+
+    func testMainScreensPassAuditInDarkModeBySetting() throws {
+        relaunch(LayoutGuard.darkSettingArguments)
+        auditMainScreens(appearance: "dark")
+    }
+
     /// `FixtureUITestCase.setUp` has already launched with the fixture; relaunch with the appearance added.
     private func relaunch(_ appearance: [String]) {
         app.terminate()

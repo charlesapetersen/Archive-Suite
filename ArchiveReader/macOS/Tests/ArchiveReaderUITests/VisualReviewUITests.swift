@@ -43,6 +43,8 @@ final class VisualReviewUITests: FixtureUITestCase {
     /// cost every shot after it.
     private var missing: [String] = []
     private var prefix = ""
+    /// Force the mode through the stored Appearance setting rather than `-ArchiveUITestAppearance` (W48.appearance-reader).
+    private var bySetting = false
 
     override func setUp() async throws {
         try XCTSkipUnless(FileManager.default.fileExists(atPath: Self.flagPath),
@@ -55,6 +57,9 @@ final class VisualReviewUITests: FixtureUITestCase {
 
     func testTourLight() throws { try tour(dark: false) }
     func testTourDark() throws { try tour(dark: true) }
+    // W48.appearance-reader: the tour with the mode set by the Appearance setting instead of the test argument.
+    func testTourLightBySetting() throws { bySetting = true; try tour(dark: false) }
+    func testTourDarkBySetting() throws { bySetting = true; try tour(dark: true) }
     func testVolumeLight() throws { try volumeTour(dark: false) }
     func testVolumeDark() throws { try volumeTour(dark: true) }
     func testEmptyStatesLight() throws { try emptyStates(dark: false) }
@@ -104,7 +109,7 @@ final class VisualReviewUITests: FixtureUITestCase {
     private func tour(dark: Bool) throws {
         for size in WindowSize.allCases {
             relaunch(root: Self.fixturePath, dark: dark, size: size)
-            prefix = "\(dark ? "dark" : "light")-\(size.rawValue)"
+            prefix = "\(dark ? "dark" : "light")\(bySetting ? "-setting" : "")-\(size.rawValue)"
             resizeMainWindow(to: size.main)
             mainWindowSurfaces()
             selectionSurfaces()
@@ -463,7 +468,8 @@ final class VisualReviewUITests: FixtureUITestCase {
             args += ["-ARUITestContentIndexPath", Self.canonicalFixturePath + "/content-index-v2.sqlite3"]
         }
         // The app's DEBUG appearance seam (W40.e9); `-AppleInterfaceStyle Dark` leaves a modern AppKit app light.
-        args += dark ? LayoutGuard.darkModeArguments : LayoutGuard.lightModeArguments
+        args += bySetting ? (dark ? LayoutGuard.darkSettingArguments : LayoutGuard.lightSettingArguments)
+            : (dark ? LayoutGuard.darkModeArguments : LayoutGuard.lightModeArguments)
         app.launchArguments = UITestLaunch.arguments(args + extra)
         app.launch()
         app.activate()

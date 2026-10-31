@@ -9,7 +9,7 @@ Format and statuses: [`README.md`](README.md). Written by `W40.b1`, 2026-10-12.
   `W23.m9`, `W24.jpeg1`, `W24.cal1-reader`, `W26.walk2`, `W14.2-fu`). `SPEC/tag-format.md` is the contract
   behind R-05 and R-45.
 - **Sources and code read at:** `caefe33a`.
-- **Count:** `unproven 36 · works 4 · broken 4 · unreachable 1 · fixed-pending-recheck 1 · dropped 1` (works: R-21, R-25, R-28, R-29; broken: R-11, R-13, R-23, R-45; unreachable: R-47; fixed-pending-recheck: R-46; dropped: R-26). Updated by `W40.fix-reader-read-toggle`, 2026-10-29.
+- **Count:** `unproven 37 · works 4 · broken 4 · unreachable 1 · fixed-pending-recheck 1 · dropped 1` (works: R-21, R-25, R-28, R-29; broken: R-11, R-13, R-23, R-45; unreachable: R-47; fixed-pending-recheck: R-46; dropped: R-26). Updated by `W48.appearance-reader`, 2026-10-31.
 
 **Runtime evidence, for every row below: none yet.** The W40.a3 full VM suite
 ([`evidence/reader/W40.a3-full-ui.md`](evidence/reader/W40.a3-full-ui.md), `a5ab9e3c`) passed every UITest
@@ -1023,3 +1023,27 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
   - 2026-10-16 W40.e5 — row written, `unreachable` (found by the dead-code scan).
 - **Notes:** a Daemon Report decision (2026-10-16): show the flag in the Reader, or drop "flag ambiguous" from
   the guide and the SPEC.
+
+### R-48 · The Appearance setting
+
+- **Promise:** Options offers Appearance: System (the default, following macOS), Light or Dark. A choice changes
+  every open window at once, with a sheet or panel open, and every custom colour follows it; it is back before the
+  first window on the next launch. The UI-test argument `-ArchiveUITestAppearance` still wins over it.
+- **Promised in:** `SUITE_TODO.md` `W48.appearance-reader` (owner, 2026-10-29).
+- **Reached by:** the Picker at the top of `Views/OptionsView.swift`, `@AppStorage(AppAppearance.defaultsKey)`
+  (`archiveAppearance`, the key all three apps share); `AppAppearance.follow()` (`Core/AppAppearance+AppKit.swift`,
+  the AppKit half ArchiveCore may not hold) in `ArchiveReaderApp.init` applies it to `NSApp.appearance` at launch and
+  on every defaults change, unless the UI-test argument forced a mode. The Reader's one custom colour,
+  `ReaderColors.warningInk`, is a dynamic `NSColor(name:dynamicProvider:)`, and the PDF pane's background is
+  `windowBackgroundColor`; nothing is resolved once, so nothing needed redrawing per appearance.
+- **Real-path test:** `ArchiveReaderTests/ReaderAppearanceSettingTests` (stored value and default, the UI-test reset,
+  `apply`, the live follow the app's init starts, `warningInk` in each appearance) and
+  `ArchiveCoreTests/AppAppearanceTests` (unit). `ArchiveReaderUITests/AppearanceSettingUITests` (VM: Light and Dark
+  live in the navigation window, the Save Search sheet and Options; System back; restored after a relaunch; the
+  argument wins). `AccessibilityAuditUITests` and `VisualReviewUITests` gain `…BySetting` variants that force the
+  mode through the setting (`LayoutGuard.dark/lightSettingArguments`).
+- **Runtime evidence:** none.
+- **Status:** `unproven`
+- **History:**
+  - 2026-10-31 W48.appearance-reader — row written, `unproven`. The builder's VM runs:
+    [`evidence/reader/W48.appearance-reader.md`](evidence/reader/W48.appearance-reader.md).
