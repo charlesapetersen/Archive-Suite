@@ -1150,8 +1150,9 @@ class Check(unittest.TestCase):
         res = {"pages": [{"page": n, "kind": "document"} for n in nums], "boundaries": bounds}
         return json.dumps({"collection": col, "window": nums, "status": "ok", "result": json.dumps(res)}) + "\n"
 
-    def run_check(self, tmp, cand_new, anchor_new, *extra):
-        truth = {"box": "Anchor", "pages": [{"n": n, "label": "New" if n in (1, 3, 5) else "Cont"} for n in range(1, 7)]}
+    def run_check(self, tmp, cand_new, anchor_new, *extra, unsure=()):
+        truth = {"box": "Anchor", "pages": [{"n": n, "label": "New" if n in (1, 3, 5) else "Cont"} for n in range(1, 7)],
+                 "unsure": [{"id": f"u{n}", "left": n - 1, "right": n} for n in unsure]}
         (tmp / "anchor.json").write_text(json.dumps(truth))
         labels = [{"folder_id": "f1", "n": n, "split": "holdout", "tag": "new" if n == 2 else "cont"} for n in (1, 2, 3)]
         labels.append({"folder_id": "f2", "n": 1, "split": "train", "tag": "new"})
@@ -1187,6 +1188,21 @@ class Check(unittest.TestCase):
             self.assertEqual(m["anchor"]["pages_exact"], 0.0)
             self.assertFalse(m["gate"]["passed"])
             self.assertIn("trail the shipped model", " ".join(m["gate"]["reasons"]))
+
+    def test_anchor_leaves_unsure_gaps_and_their_documents_out(self):
+        # W46.seg-unsure-mask: gap 2|3 is unsure. The candidate calls it "continue", against the stored truth; that
+        # is no error, and the two documents beside it (pages 1-4) are not scored, so only 5-6 remains resolved.
+        with tempfile.TemporaryDirectory() as t:
+            tmp = Path(t)
+            r = self.run_check(tmp, {2}, {4}, unsure=(3,))
+            self.assertEqual(r.returncode, 0, r.stderr)
+            a = json.loads((tmp / "m.json").read_text())["anchor"]
+            self.assertEqual((a["gap_accuracy"], a["unscored_gaps"]), (100.0, 1))
+            self.assertEqual((a["documents"], a["pages"], a["unresolved_pages"], a["pages_exact"]), (1, 2, 4, 100.0))
+            self.assertEqual(a["difference_from_shipped"], 0.0)   # the shipped model is scored on the same documents
+            r = self.run_check(tmp, {2}, {4})                     # unmasked, the same answers are an error
+            a = json.loads((tmp / "m.json").read_text())["anchor"]
+            self.assertEqual((a["gap_accuracy"], a["unscored_gaps"], a["documents"]), (80.0, 0, 3))
 
     def test_data_trains_only_whole_agreed_training_windows(self):
         # The kit's first step: a training window whose every gap the rule keeps, never a held-out one.

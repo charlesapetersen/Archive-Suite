@@ -69,6 +69,18 @@ class ReviewLoad(unittest.TestCase):
         self.assertEqual(S.review_load(truth, Prediction(labels, bounds)), 1)
         self.assertEqual(S.review_load(truth, Prediction(truth, bounds)), 0)
 
+    def test_unsure_gap_is_never_offered_for_checking(self):
+        # W46.seg-unsure-mask: the least confident gap (3|4) is unsure, so checking it would cost a check for nothing.
+        from score import Truth
+        plain = ["New", "Cont", "Cont", "New", "Cont"] * 2
+        truth = Truth(plain, [4])
+        labels = list(plain)
+        labels[1] = "New"
+        bounds = [{"decision": "x", "confidence": 0.9} for _ in range(9)]
+        bounds[3]["confidence"], bounds[0]["confidence"] = 0.5, 0.55
+        self.assertEqual(S.review_load(truth, Prediction(labels, bounds)), 1)
+        self.assertEqual(S.review_load(plain, Prediction(labels, bounds)), 2)
+
 
 if __name__ == "__main__":
     unittest.main()

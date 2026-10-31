@@ -29,7 +29,7 @@ import numpy as np
 import data
 import features as F
 from methods import METHODS, Method, Prediction
-from score import PHOTO, boundaries_from_labels, segment_ids
+from score import PHOTO, boundaries_from_labels, doc_unsure, segment_ids
 
 LAMBDA = 1.0   # L2 penalty on standardised weights (sum, not mean, over the training rows)
 
@@ -88,10 +88,13 @@ def log_loss(y, p) -> float:
 _CACHE: dict[str, tuple] = {}
 
 
-def doc_gaps(labels: list[str]) -> tuple[np.ndarray, np.ndarray]:
-    """(mask over gaps that lie between two document pages, truth boundary at each gap)."""
+def doc_gaps(labels: list[str], known: bool = False) -> tuple[np.ndarray, np.ndarray]:
+    """(mask over gaps that lie between two document pages, truth boundary at each gap). ``known`` also masks out
+    the unsure gaps (score.py, UNSURE GAPS), for any figure scored against the truth; prediction keeps them."""
     ids = segment_ids(labels)
-    mask = np.array([labels[i] not in PHOTO and labels[i + 1] not in PHOTO for i in range(len(labels) - 1)])
+    unsure = doc_unsure(labels) if known else ()
+    mask = np.array([labels[i] not in PHOTO and labels[i + 1] not in PHOTO and i + 1 not in unsure
+                     for i in range(len(labels) - 1)])
     y = np.array([ids[i] != ids[i + 1] for i in range(len(labels) - 1)], dtype=float)
     return mask, y
 

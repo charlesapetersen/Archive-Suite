@@ -148,7 +148,7 @@ def evaluate(cols: dict, preds: dict) -> dict:
     total, loss, n, review, gaps = None, 0.0, 0, 0, 0
     per_box = {}
     for name, p in preds.items():
-        col, (mask, y) = cols[name], MF.doc_gaps(cols[name].labels)
+        col, (mask, y) = cols[name], MF.doc_gaps(cols[name].labels, known=True)
         c = score_labels(col.labels, MF.labels_from_probs(col.labels, p), name)
         total = c if total is None else total + c
         loss += MF.log_loss(y[mask], p[mask]) * mask.sum()

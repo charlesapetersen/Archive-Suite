@@ -70,6 +70,8 @@ class Box:
         self.truth = {i: ids[i] != ids[i + 1] for i in self.gaps}          # True = new document
         # Gaps the owner left unsure (score.py, UNSURE GAPS): never a held-out or accepted error.
         self.unsure = {u - 1 for u in getattr(self.labels, "unsure", ())}
+        # The gaps a refit may be given as labelled: an unsure gap has no truth to give (W46.seg-unsure-mask).
+        self.known = [i for i in self.gaps if i not in self.unsure]
         self.src = src
         self.kinds = kinds
 
@@ -281,19 +283,19 @@ def selection(box: Box, ds_p: dict[int, float]) -> dict:
         if name == "2B vs cloud partner" or name.startswith("2B vs"):
             q = {"2B vs cloud partner": box.src.get("cloud"), "2B vs doc-split-v1": ds_p,
                  "2B vs teacher": box.src.get("teacher")}[name]
-            row["disagreements_per_100p"] = 100 * sum((box.src["2B"][i] >= .5) != (q[i] >= .5) for i in box.gaps) / box.pages
+            row["disagreements_per_100p"] = 100 * sum((box.src["2B"][i] >= .5) != (q[i] >= .5) for i in box.known) / box.pages
         res["rules"][name] = row
     return res
 
 
 def curve(box: Box, bl, ds_base: dict) -> dict:
-    out = {"gaps": len(box.gaps), "ks": {}}
+    out = {"gaps": len(box.gaps), "unscored_gaps": len(box.gaps) - len(box.known), "ks": {}}
     rng = random.Random(11)
     for k in KS:
-        if len(box.gaps) - k < MIN_HELD:
+        if len(box.known) - k < MIN_HELD:
             continue
-        draws = [("random", rng.sample(box.gaps, k)) for _ in range(DRAWS if k else 1)] + \
-                ([("first", box.gaps[:k])] if k else [])
+        draws = [("random", rng.sample(box.known, k)) for _ in range(DRAWS if k else 1)] + \
+                ([("first", box.known[:k])] if k else [])
         rows = {}
         for kind, lab_idx in draws:
             lab = {i: box.truth[i] for i in lab_idx}

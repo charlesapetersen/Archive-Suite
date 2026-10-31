@@ -41,6 +41,27 @@ class FewShot(unittest.TestCase):
             rng.sample(gaps, 25)
         self.assertEqual(M.draw(gaps, 50), sorted(rng.sample(gaps, 50)))
 
+    def test_an_unsure_example_is_scored_as_unknown(self):
+        # W46.seg-unsure-mask: the draw (already in the run prompts) may list an unsure gap; its stored label is no
+        # truth, so it is neither "labelled new" nor "answered against the archivist", and it is reported.
+        from contextlib import contextmanager
+        from score import Truth
+        col = Col()
+        col.labels = Truth(Col.labels, [2])               # gap 1|2 (truth: new) is unsure
+        lab = [1, 4]                                       # both listed; 4|5 is a known new gap
+
+        @contextmanager
+        def fake_fewshot(c, k):
+            yield lab
+        p = {i: 0.0 for i in range(len(col.labels) - 1)}  # always "continue"
+        with patch.object(M, 'gaps_truth', return_value=(list(p), {i: col.labels[i + 1] == 'New' for i in p})), \
+             patch.object(M, 'fewshot', fake_fewshot), patch.object(M, 'p_new', return_value=p), \
+             patch.object(M.SL, 'judge', return_value=None):
+            r = M.score_box(col, 2)
+        self.assertEqual(r['unsure_examples'], [[2, 3]])
+        self.assertEqual(r['labelled_new'], 1)
+        self.assertEqual(r['listed_gaps_answered_against_the_archivist'], [[5, 6]])
+
     def test_block_goes_before_the_schema_and_changes_the_key(self):
         col = Col()
         with patch.object(M, '_BASE_REQUEST', fake_base), M.fewshot(col, 25):

@@ -68,14 +68,18 @@ def no_network() -> None:
 # --- per-gap records --------------------------------------------------------------------------------
 
 def box_record(col) -> dict:
-    """Truth and each model's (decision, confidence) per document gap, and the documents that own them."""
+    """Truth and each model's (decision, confidence) per known document gap, and the documents that own them. The
+    gaps the owner left unsure are not scored (W46.seg-unsure-mask): they are kept in ``unsure`` (right-page index)
+    and left out of ``gaps``."""
     import method_openrouter as R
     import method_window as W
-    from score import PHOTO, segment_ids
+    from score import PHOTO, doc_unsure, segment_ids
     labels = col.labels
     ids = segment_ids(labels)
-    gaps = [i for i in range(len(labels) - 1) if labels[i] not in PHOTO and labels[i + 1] not in PHOTO]
-    rec = {"box": col.name, "pages": len(labels), "labels": labels,
+    unsure = doc_unsure(labels)
+    gaps = [i for i in range(len(labels) - 1)
+            if labels[i] not in PHOTO and labels[i + 1] not in PHOTO and i + 1 not in unsure]
+    rec = {"box": col.name, "pages": len(labels), "labels": list(labels), "unsure": sorted(unsure),
            "gaps": [{"i": i, "truth": "new" if ids[i] != ids[i + 1] else "continue"} for i in gaps], "models": {}}
     for key in KEYS:
         try:
@@ -118,11 +122,13 @@ def cmd_gaps(which: str, root: str | None) -> None:
 # --- documents: what a resample draws ---------------------------------------------------------------
 
 def documents(rec: dict) -> list[dict]:
-    """The truth's documents (photo pages left out, as score.py leaves them), each with the gaps it owns (the gap
-    before each of its pages after the first page of a stream) and, per model, whether it is exact, its wrong gaps
-    and its flagged gaps."""
+    """The truth's documents (photo pages left out, as score.py leaves them), each with the known gaps it owns (the
+    gap before each of its pages after the first page of a stream) and, per model, whether it is exact, its wrong
+    gaps and its flagged gaps. A document that touches an unsure gap has ``exact_pages`` 0 and is never exact: pages
+    exact is over the resolved documents, the same ones for every model (score.py's common resolvable support)."""
     from score import PHOTO, segment_ids
     labels = rec["labels"]
+    unsure = set(rec.get("unsure", ()))
     tid = segment_ids(labels)
     gap_at = {g["i"]: k for k, g in enumerate(rec["gaps"])}
     docs: dict[int, dict] = {}
@@ -135,14 +141,17 @@ def documents(rec: dict) -> list[dict]:
             d["gaps"].append(gap_at[p - 1])
     out = []
     for d in docs.values():
-        row = {"pages": len(d["pages"]), "gaps": len(d["gaps"]), "m": {}}
+        lo, hi = d["pages"][0], d["pages"][-1]
+        resolved = not any(lo <= u <= hi + 1 for u in unsure)
+        row = {"pages": len(d["pages"]), "exact_pages": len(d["pages"]) if resolved else 0, "gaps": len(d["gaps"]),
+               "m": {}}
         for key, m in rec["models"].items():
             pid = segment_ids(m["labels"])
             pset = frozenset(d["pages"])
             seg = frozenset(q for q in range(len(labels)) if pid[q] == pid[d["pages"][0]])
             wrong = sum(m["gaps"][k][0] != rec["gaps"][k]["truth"] for k in d["gaps"])
             flagged = sum(m["gaps"][k][1] <= LEVEL for k in d["gaps"])
-            row["m"][key] = (int(seg == pset), wrong, flagged)
+            row["m"][key] = (int(resolved and seg == pset), wrong, flagged)
         out.append(row)
     return out
 
@@ -158,15 +167,16 @@ def bootstrap(docs: list[dict], a: str, b: str, n_gaps: int, rng: random.Random)
     pool = [d for d in docs if a in d["m"] and b in d["m"]]
     diffs = {"pages exact": [], "gap accuracy": [], "flagged per 100 pages": []}
     for _ in range(DRAWS):
-        g = pages = 0
+        g = pages = rpages = 0
         ex = {a: 0, b: 0}; wr = {a: 0, b: 0}; fl = {a: 0, b: 0}
         while g < n_gaps:
             d = pool[rng.randrange(len(pool))]
-            g += d["gaps"]; pages += d["pages"]
+            g += d["gaps"]; pages += d["pages"]; rpages += d["exact_pages"]
             for k in (a, b):
                 e, w, f = d["m"][k]
                 ex[k] += e * d["pages"]; wr[k] += w; fl[k] += f
-        diffs["pages exact"].append(100 * (ex[b] - ex[a]) / pages)
+        if rpages:
+            diffs["pages exact"].append(100 * (ex[b] - ex[a]) / rpages)
         diffs["gap accuracy"].append(100 * (wr[a] - wr[b]) / g)
         diffs["flagged per 100 pages"].append(100 * (fl[b] - fl[a]) / pages)
     out = {}
@@ -263,6 +273,10 @@ def cmd_report() -> None:
     owner = json.loads((CACHE / "gaps-owner.json").read_text())["boxes"]
     public = json.loads((CACHE / "gaps-public.json").read_text())["boxes"]
     dates = json.loads((CACHE / "dates.json").read_text()) if (CACHE / "dates.json").exists() else None
+    stale = [r["box"] for r in owner + public if "unsure" not in r]
+    if stale:
+        raise SystemExit(f"{', '.join(stale)}: per-gap records predate the unsure mask (W46.seg-unsure-mask); "
+                         "re-run `kit_gate.py gaps` first")
     split = teacher_split(owner + public)
     docs = [d for rec in owner for d in documents(rec)]
     rng = random.Random(SEED)
@@ -275,11 +289,12 @@ def cmd_report() -> None:
     for rec in owner + public:
         for key, m in rec["models"].items():
             ex = sum(d["m"][key][0] * d["pages"] for d in documents(rec) if key in d["m"])
-            dp = sum(d["pages"] for d in documents(rec))
+            dp = sum(d["exact_pages"] for d in documents(rec))
             wrong = sum(m["gaps"][k][0] != g["truth"] for k, g in enumerate(rec["gaps"]))
-            observed.setdefault(key, {})[rec["box"]] = {"pages exact": round(100 * ex / dp, 1),
+            observed.setdefault(key, {})[rec["box"]] = {"pages exact": round(100 * ex / dp, 1) if dp else None,
                                                         "gap accuracy": round(100 * (1 - wrong / len(rec["gaps"])), 1),
-                                                        "gaps": len(rec["gaps"]), "doc pages": dp}
+                                                        "gaps": len(rec["gaps"]), "doc pages": dp,
+                                                        "unscored gaps": len(rec.get("unsure", ()))}
     OUT_JSON.write_text(json.dumps({"teacher_split": split, "bootstrap": boot, "observed": observed,
                                     "dates": dates, "level": LEVEL, "draws": DRAWS, "seed": SEED,
                                     "documents_in_pool": len(docs), "gaps_in_pool": sum(d["gaps"] for d in docs)},

@@ -60,7 +60,9 @@ def gaps_truth(col):
 
 
 def draw(gaps, k):
-    """The first random draw of k gaps in seg_adapt_curve.curve, reproduced by replaying its loop."""
+    """The first random draw of k gaps in seg_adapt_curve.curve as it was before W46.seg-unsure-mask (over every
+    document gap), reproduced by replaying that loop. The prompts already run carry this draw, so it stays; an unsure
+    gap it lists is scored as unknown (score_box) and counted in ``unsure_examples``."""
     rng = random.Random(SEED)
     for kk in CURVE_KS:
         if len(gaps) - kk < MIN_HELD:
@@ -167,9 +169,11 @@ def score_box(col, k):
     unsure = {u - 1 for u in getattr(col.labels, 'unsure', ())}  # never a held-out error (score.py, UNSURE GAPS)
     held = [i for i in gaps if i not in lab and i not in unsure]
 
+    known = [i for i in lab if i not in unsure]
+
     def row(p):
         new = {i: p[i] >= 0.5 for i in p}
-        for i in lab:
+        for i in known:
             new[i] = truth[i]
         pred = []
         for i, t in enumerate(col.labels):
@@ -183,8 +187,9 @@ def score_box(col, k):
                 'exact': m['pages_in_exact_doc'], 'pq': m['pq'], 'false_splits': c.false_splits,
                 'false_merges': c.false_merges}
     flipped = [[col.pages[i].n, col.pages[i + 1].n] for i in held if (base[i] >= 0.5) != (few[i] >= 0.5)]
-    listed_against = [[col.pages[i].n, col.pages[i + 1].n] for i in lab if (few[i] >= 0.5) != truth[i]]
-    return {'box': col.name, 'k': k, 'gaps': len(gaps), 'held': len(held), 'labelled_new': sum(truth[i] for i in lab),
+    listed_against = [[col.pages[i].n, col.pages[i + 1].n] for i in known if (few[i] >= 0.5) != truth[i]]
+    return {'box': col.name, 'k': k, 'gaps': len(gaps), 'held': len(held), 'labelled_new': sum(truth[i] for i in known),
+            'unsure_examples': [[col.pages[i].n, col.pages[i + 1].n] for i in lab if i in unsure],
             'zero_shot': row(base), 'few_shot': row(few), 'held_decisions_changed': flipped,
             'listed_gaps_answered_against_the_archivist': listed_against}
 

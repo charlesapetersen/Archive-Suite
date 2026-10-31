@@ -268,15 +268,18 @@ def heldout_groups(labels, ruled, p_a, p_b):
     return tags, own
 
 
-def anchor_docs(truth_pages, box, p):
+def anchor_docs(truth_pages, box, p, unsure=()):
     """The anchor box's truth documents, each (pages, exact) for the predicted labels, and its gaps (confidence,
-    right), from the per-gap P(new). None when a gap was not answered."""
+    right), from the per-gap P(new). None when a gap was not answered. ``unsure`` holds the manifest's unsure gaps
+    (right-page numbers): those gaps are not scored (W46.seg-unsure-mask, as score.py), and a document that touches
+    one is left out of pages exact and review load, so every model is scored on the same resolvable documents."""
     labels = [q["label"] for q in truth_pages]
     nums = [q["n"] for q in truth_pages]
     pnew = [p.get((box, nums[i])) for i in range(len(nums) - 1)]
     if any(x is None for x in pnew):
         return None
     pred = ["New"] + ["New" if x >= 0.5 else "Cont" for x in pnew]
+    known = [nums[i + 1] not in set(unsure) for i in range(len(pnew))]
 
     def seg_ids(ls):
         out, k = [], -1
@@ -284,28 +287,37 @@ def anchor_docs(truth_pages, box, p):
             k += t == "New"; out.append(k)
         return out
 
-    def exact_docs(pred_labels):
-        tid, pid = seg_ids(labels), seg_ids(pred_labels)
-        tsets, psets = {}, {}
-        for i, (a, b) in enumerate(zip(tid, pid)):
-            tsets.setdefault(a, set()).add(i); psets.setdefault(b, set()).add(i)
-        pfs = {frozenset(s) for s in psets.values()}
-        return [(len(s), frozenset(s) in pfs) for s in tsets.values()]
+    tid = seg_ids(labels)
+    tsets: dict[int, set] = {}
+    for i, a in enumerate(tid):
+        tsets.setdefault(a, set()).add(i)
+    # A truth document is resolved when no unsure gap lies inside it or at either edge.
+    resolved = [s for s in tsets.values() if all(known[i - 1] for i in range(min(s), max(s) + 2)
+                                                 if 0 < i < len(labels))]
 
-    gaps = [(max(x, 1 - x), (x >= 0.5) == (labels[i + 1] == "New")) for i, x in enumerate(pnew)]
+    def exact_docs(pred_labels):
+        psets = {}
+        for i, b in enumerate(seg_ids(pred_labels)):
+            psets.setdefault(b, set()).add(i)
+        pfs = {frozenset(s) for s in psets.values()}
+        return [(len(s), frozenset(s) in pfs) for s in resolved]
+
+    gaps = [(max(x, 1 - x), (x >= 0.5) == (labels[i + 1] == "New")) for i, x in enumerate(pnew) if known[i]]
     docs = exact_docs(pred)
-    # Review load at the bar: check the least confident gaps first (each corrected to the truth) until 98% of pages
-    # sit in the exact document; the number checked per 100 pages.
-    order = sorted(range(len(pnew)), key=lambda i: gaps[i][0])
+    resolved_pages = sum(len(s) for s in resolved)
+    # Review load at the bar: check the least confident known gaps first (each corrected to the truth) until 98% of
+    # the resolved documents' pages sit in the exact document; the number checked per 100 pages.
+    order = sorted((i for i in range(len(pnew)) if known[i]), key=lambda i: max(pnew[i], 1 - pnew[i]))
     fixed, checked = list(pred), None
     for k in range(len(order) + 1):
-        if sum(n for n, e in exact_docs(fixed) if e) >= BAR * len(labels):
+        if sum(n for n, e in exact_docs(fixed) if e) >= BAR * resolved_pages:
             checked = k
             break
         if k < len(order):
             i = order[k]
             fixed[i + 1] = labels[i + 1]
-    return {"docs": docs, "gaps": gaps,
+    return {"docs": docs, "gaps": gaps, "unscored_gaps": known.count(False),
+            "unresolved_pages": len(labels) - resolved_pages,
             "review_load_per_100_pages": None if checked is None else round(100 * checked / len(labels), 1)}
 
 
@@ -316,7 +328,8 @@ def anchor_score(a_docs, b_docs, rng):
     out = {"pages": pages, "documents": len(a_docs["docs"]),
            "pages_exact": round(100 * sum(n for n, e in a_docs["docs"] if e) / pages, 2),
            "gap_accuracy": round(100 * sum(r for _, r in a_docs["gaps"]) / len(a_docs["gaps"]), 2),
-           "review_load_per_100_pages": a_docs["review_load_per_100_pages"]}
+           "review_load_per_100_pages": a_docs["review_load_per_100_pages"],
+           "unscored_gaps": a_docs["unscored_gaps"], "unresolved_pages": a_docs["unresolved_pages"]}
     xs, ds = [], []
     for _ in range(DRAWS):
         idx = [rng.randrange(len(a_docs["docs"])) for _ in a_docs["docs"]]
@@ -373,8 +386,9 @@ def cmd_check(a):
             tags, own = heldout_groups(labels, ruled, p, cmp)
             row["heldout_tags"] = gap_score(tags, rng) if tags else None
             row["heldout_ruled"] = gap_score(own, rng) if own else None
-        ad = anchor_docs(truth["pages"], box, p)
-        sd = anchor_docs(truth["pages"], box, cmp) if cmp else None
+        unsure = [u["right"] for u in truth.get("unsure", ())]
+        ad = anchor_docs(truth["pages"], box, p, unsure)
+        sd = anchor_docs(truth["pages"], box, cmp, unsure) if cmp else None
         row["anchor"] = anchor_score(ad, sd, rng) if ad else None
         report["models"][name] = row
     cand = report["models"][a.candidate]

@@ -51,10 +51,13 @@ BAR = 0.98
 
 
 def review_load(truth: list[str], pred) -> int | None:
-    """Fewest least-confident free gaps checked (each set to the truth) for BAR of pages exact."""
-    from score import derived, score_labels
+    """Fewest least-confident free gaps checked (each set to the truth) for BAR of pages exact. An unsure gap is
+    never offered for checking: the truth has no answer there, and score.py already scores it as the route's call."""
+    from score import derived, doc_unsure, score_labels
     labels = list(pred.labels)
-    free = [i for i, b in enumerate(pred.boundaries) if not b.get("fixed") and b.get("confidence") is not None]
+    unsure = doc_unsure(truth)
+    free = [i for i, b in enumerate(pred.boundaries)
+            if not b.get("fixed") and b.get("confidence") is not None and i + 1 not in unsure]
     if not free:
         return None
     order = sorted(free, key=lambda i: pred.boundaries[i]["confidence"])
