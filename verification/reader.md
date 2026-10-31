@@ -1039,8 +1039,8 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
 - **Real-path test:** `ArchiveReaderTests/ReaderAppearanceSettingTests` (stored value and default, the UI-test reset,
   `apply`, the live follow the app's init starts, `warningInk` in each appearance) and
   `ArchiveCoreTests/AppAppearanceTests` (unit). `ArchiveReaderUITests/AppearanceSettingUITests` (VM: Light and Dark
-  live in the navigation window, the Save Search sheet and Options; System back; restored after a relaunch; the
-  argument wins). `AccessibilityAuditUITests` and `VisualReviewUITests` gain `…BySetting` variants that force the
+  live in the navigation window, the Save Search sheet, Options and an open document viewer; System back; restored
+  after a relaunch; the argument wins). `AccessibilityAuditUITests` and `VisualReviewUITests` gain `…BySetting` variants that force the
   mode through the setting (`LayoutGuard.dark/lightSettingArguments`).
 - **Runtime evidence:** none.
 - **Status:** `unproven`

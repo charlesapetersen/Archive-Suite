@@ -19,6 +19,18 @@ final class AppearanceSettingUITests: FixtureUITestCase {
 
     private var mainWindow: XCUIElement { app.windows["Archive Reader"] }
 
+    /// A test that stops partway (`continueAfterFailure` is off) may leave a choice stored; one more fixture launch,
+    /// without `-ARUITestKeepAppearance`, clears it, so a later suite that launches without `-ARUITestRootPath`
+    /// (`ArchiveReaderUITests`) never inherits it.
+    override func tearDown() async throws {
+        app?.terminate()
+        app = .archiveUITestApp()
+        app.launchArguments += ["-ARUITestRootPath", Self.fixturePath]
+        app.launch()
+        _ = mainWindow.waitForExistence(timeout: 15)
+        try await super.tearDown()
+    }
+
     func testPickingLightAndDarkChangesEveryWindowAtOnceWithASheetOpen() throws {
         let sheet = openSaveSearchSheet()
 
@@ -48,6 +60,39 @@ final class AppearanceSettingUITests: FixtureUITestCase {
         if cancel.exists { cancel.click() } else { app.typeKey(XCUIKeyboardKey.escape.rawValue, modifierFlags: []) }
         XCTAssertTrue(app.textFields["ar.saveSearch.name"].waitForNonExistence(timeout: 5),
                       "the sheet should close unsaved")
+    }
+
+    /// The document viewer is mostly page image, which stays as scanned whatever the appearance, so it is held to a
+    /// change rather than to the thresholds; its shots show whether the PDF pane's background (`PDFPaneView`,
+    /// `windowBackgroundColor`, set once) followed the switch.
+    func testAnOpenDocumentViewerFollowsALiveSwitch() throws {
+        clickRow(0)
+        toolbarButton("ar.toolbar.preview").click()
+        let open = app.buttons["ar.preview.open"]
+        XCTAssertTrue(open.waitForExistence(timeout: 5), "the preview sheet should open")
+        open.click()
+        let opened = app.windows.matching(NSPredicate(format: "title != %@", "Archive Reader")).firstMatch
+        XCTAssertTrue(opened.waitForExistence(timeout: 10), "Open in Viewer should bring up the document window")
+        let viewer = app.windows[opened.title]
+        LayoutGuard.waitUntilSettled(viewer)
+
+        let settings = openSettings()
+        var measured: [String: Double] = [:]
+        for choice in ["Dark", "Light"] {
+            pick(choice, in: settings)
+            let dark = choice == "Dark"
+            _ = pollUntil(timeout: 5) { self.reads(dark: dark, self.luminance(self.mainWindow)) }
+            LayoutGuard.waitUntilSettled(viewer)
+            measured[choice] = luminance(viewer, "\(choice.lowercased())-viewer")
+        }
+        let light = measured["Light"] ?? 0, dark = measured["Dark"] ?? 1
+        XCTAssertGreaterThan(light - dark, 0.1, "the viewer should change with the setting: Light \(light), Dark \(dark)")
+
+        pick("System", in: settings)
+        settings.typeKey("w", modifierFlags: .command)
+        XCTAssertTrue(settings.waitForNonExistence(timeout: 5), "Settings should close")
+        viewer.typeKey("w", modifierFlags: .command)
+        XCTAssertTrue(viewer.waitForNonExistence(timeout: 5), "the viewer should close")
     }
 
     func testTheChoiceIsRestoredAtLaunchAndTheUITestArgumentStillWins() throws {
