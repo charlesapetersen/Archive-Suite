@@ -133,9 +133,11 @@ struct NavigationWindowView: View {
         )
         .overlay { tableOverlay }
         // Focus-scoped Space → preview (fires only when the list has key focus, so Space still types
-        // into the filter text fields).
+        // into the filter text fields). The inline tag editor lives inside the table, so SwiftUI counts
+        // the list as focused while it is edited: every bare-key handler here stands down while the key
+        // window's first responder is a field editor (W40.fix-reader-inline-keys).
         .onKeyPress(.space) {
-            guard !model.selectedFiles.isEmpty else { return .ignored }
+            guard !Self.isEditingText, !model.selectedFiles.isEmpty else { return .ignored }
             model.showingPreview = true
             return .handled
         }
@@ -144,7 +146,7 @@ struct NavigationWindowView: View {
         // menu accelerators). Physical cluster on a US layout: [ = previous unread, ] = next unread,
         // \ = mark read & advance.
         .onKeyPress(characters: CharacterSet(charactersIn: "[]\\"), phases: .down) { press in
-            guard press.modifiers.isEmpty else { return .ignored }
+            guard press.modifiers.isEmpty, !Self.isEditingText else { return .ignored }
             switch press.characters {
             case "]":  model.selectNextUnread();     return .handled
             case "[":  model.selectPreviousUnread(); return .handled
@@ -153,6 +155,9 @@ struct NavigationWindowView: View {
             }
         }
     }
+
+    /// Whether the key window's first responder is a field editor, i.e. text is being typed somewhere inside it.
+    private static var isEditingText: Bool { NSApp.keyWindow?.firstResponder is NSText }
 
     /// Build an NSMenu for the table's right-click context menu (bridges SwiftUI actions to AppKit).
     private func buildNSContextMenu() -> NSMenu {

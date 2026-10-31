@@ -666,6 +666,21 @@ struct AppKitTableView: NSViewRepresentable {
             editingItemID = tagCell.itemID
         }
 
+        /// Return commits the inline edit (R-23), as leaving the field does. The token field handles the key
+        /// first, so pending text becomes a token and an open completion is taken; the list then takes focus
+        /// back on the next turn, which ends the edit and commits it through `controlTextDidEndEditing`
+        /// (W40.fix-reader-inline-keys: before, Return only tokenized and the edit stayed open).
+        func control(_ control: NSControl, textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
+            guard control.superview is TagTokenCellView,
+                  commandSelector == #selector(NSResponder.insertNewline(_:)) else { return false }
+            DispatchQueue.main.async { [weak self, weak control] in
+                guard let control, control.currentEditor() != nil,
+                      let tableView = self?.tableView else { return }
+                tableView.window?.makeFirstResponder(tableView)
+            }
+            return false
+        }
+
         func controlTextDidEndEditing(_ obj: Notification) {
             guard let tf = obj.object as? NSTokenField,
                   let tagCell = tf.superview as? TagTokenCellView,

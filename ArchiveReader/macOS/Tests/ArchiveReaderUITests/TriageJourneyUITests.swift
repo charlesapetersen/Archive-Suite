@@ -30,9 +30,9 @@ import Darwin
 final class TriageJourneyUITests: FixtureUITestCase {
 
     private static let tagXattr = "com.apple.metadata:_kMDItemUserTags"
-    /// One word: a space typed into the inline editor opens the Preview sheet (`W40.fix-reader-inline-keys`,
-    /// reproduced by step 9), so a two-word tag cannot be typed there yet.
-    private let inlineTag = "W40d8-Inline"
+    /// Two words: a space typed into the inline editor must type a space (`W40.fix-reader-inline-keys`; it
+    /// opened the Preview sheet and cut the edit until 2026-10-31).
+    private let inlineTag = "W40d8 Inline"
     private let groupTag = "W40d8 Group"
     private let renamedTag = "W40d8 Renamed"
     private let mergeKeep = "W40d8 Merge"
@@ -102,29 +102,35 @@ final class TriageJourneyUITests: FixtureUITestCase {
         }
         let cell = table.tableRows.element(boundBy: bRow).descendants(matching: .any)["ar.cell.tags.\(b.name)"]
         XCTAssertTrue(cell.waitForExistence(timeout: 5), "row \(bRow) should expose its tag token field")
-        // (2a) First, a Space typed into the editor must type a space, not open the Preview sheet (R-20: the
-        // list's bare keys never fire inside a text field; R-23: subjects are often two words). Reproduced
-        // broken 2026-10-14. If the field kept the space, a Backspace takes it back, so a fixed app ends
-        // this step with the tags unchanged.
+        // (2a) First, the list's bare keys typed into the editor must type themselves (R-20: they never fire
+        // inside a text field; R-23: subjects are often two words). Space opened the Preview sheet until
+        // W40.fix-reader-inline-keys; `]` would move the selection and `\` would run Mark Read & Advance, a
+        // tag write (suspect S-015). Backspaces take the typed text back, so this step ends with the tags
+        // unchanged.
         let focusedA = focusInlineEditor(row: bRow, name: b.name)
         captureScreenshot("w40-d8-step2-focus")
         XCTAssertTrue(focusedA, "a click in the row's Tags cell should start editing it")
         log("[d8]   inline editor took keyboard focus: \(focusedA ? "yes" : "NO")")
         if focusedA {
             app.typeKey(.rightArrow, modifierFlags: .command)
-            app.typeText(" ")
-            RunLoop.current.run(until: Date().addingTimeInterval(1.5))
+            let selectedBefore = selectedNames()
+            let bareKeys = [" ", "]", "[", "\\"]
+            for key in bareKeys {
+                app.typeText(key)
+                RunLoop.current.run(until: Date().addingTimeInterval(0.3))
+            }
+            RunLoop.current.run(until: Date().addingTimeInterval(1.2))
             // The Preview sheet is the only place a "1 of N" page counter appears.
             let previewOpened = app.staticTexts.matching(
                 NSPredicate(format: "label BEGINSWITH %@ OR value BEGINSWITH %@", "1 of ", "1 of ")).count > 0
-            log("[d8] step 2a Space typed in the inline editor opened the Preview sheet: \(previewOpened ? "YES (broken)" : "no")")
+            let selectionMoved = selectedNames() != selectedBefore
+            log("[d8] step 2a bare keys typed in the inline editor: Preview opened \(previewOpened ? "YES (broken)" : "no"), "
+                + "selection moved \(selectionMoved ? "YES (broken)" : "no")")
             captureScreenshot("w40-d8-inline-space")
-            let known = XCTExpectedFailure.Options(); known.isStrict = false
-            XCTExpectFailure("W40.fix-reader-inline-keys (S2): the list's Space handler fires inside the inline tag editor",
-                             options: known) {
-                XCTAssertFalse(previewOpened, "R-20/R-23: Space in the inline tag editor must not open the Preview sheet")
-            }
-            if previewOpened { app.buttons["Done"].firstMatch.click() } else { app.typeKey(.delete, modifierFlags: []) }
+            XCTAssertFalse(previewOpened, "R-20/R-23: Space in the inline tag editor must not open the Preview sheet")
+            XCTAssertFalse(selectionMoved, "R-20: [ and ] in the inline tag editor must not move the selection")
+            if previewOpened { app.buttons["Done"].firstMatch.click() }
+            for _ in bareKeys { app.typeKey(.delete, modifierFlags: []) }
             app.typeKey(.escape, modifierFlags: [])
             RunLoop.current.run(until: Date().addingTimeInterval(1.0))
             before = check("2a Space in the inline editor writes nothing", from: before, expect: [:])
@@ -145,11 +151,7 @@ final class TriageJourneyUITests: FixtureUITestCase {
         app.typeKey(.return, modifierFlags: [])
         let committedOnReturn = waitFor(timeout: 4) { self.tagNames(b.path).contains(self.inlineTag) }
         log("[d8]   inline edit committed on Return: \(committedOnReturn ? "yes" : "NO")")
-        let returnKnown = XCTExpectedFailure.Options(); returnKnown.isStrict = false
-        XCTExpectFailure("W40.fix-reader-inline-keys (S2): Return in the inline tag editor does not commit; "
-                         + "only leaving the field does", options: returnKnown) {
-            XCTAssertTrue(committedOnReturn, "R-23: the inline editor should commit on Return")
-        }
+        XCTAssertTrue(committedOnReturn, "R-23: the inline editor should commit on Return")
         if !committedOnReturn {
             captureScreenshot("w40-d8-inline-after-return")
             // R-23's other half: leaving the field commits. Leave it by selecting another row.
