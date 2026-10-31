@@ -385,7 +385,7 @@ final class ReaderAtSizeTests: XCTestCase {
             ("filter all", { _ = current.filter(navigation.filter.matches) }),
             ("sort default", { _ = LibrarySort.sorted(current, by: navigation.sort) }),
             ("duplicate names", { _ = DuplicateNames.duplicatedNames(in: current) }),
-            ("prune path set", { _ = Set(current.map(\.path)) }),
+            ("prune path set (off the main thread since the fix)", { _ = Set(current.map(\.path)) }),
         ] as [(String, () -> Void)] {
             let t = repeated(3, body)
             print("D7 model tag-edit part: \(label) median \(ms(t.median))")

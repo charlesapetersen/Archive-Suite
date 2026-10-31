@@ -42,7 +42,11 @@ struct ArchiveFile: Identifiable, Sendable {
          contentModified: Date?, isDataless: Bool = false,
          provenance: ArchiveFileProvenance = .disk(readAt: Date())) {
         self.url = url
-        let path = url.path
+        // Native UTF-8, made once here: a bridged string (what the walk and URL hand over) is copied
+        // to UTF-8 on every byte-hash, which made each sort's 116k key lookups slower, not faster.
+        var path = url.path, name = name
+        path.makeContiguousUTF8()
+        name.makeContiguousUTF8()
         self.path = path
         self.pathHash = UTF8Key(path).hashValue
         self.name = name
