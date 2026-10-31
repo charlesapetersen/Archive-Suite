@@ -680,12 +680,13 @@ def cmd_score(a):
     with open(RESULTS_JSON, "w", encoding="utf-8") as fh:
         json.dump(out, fh, indent=1)
         fh.write("\n")
-    if out.get("open_models"):
-        write_open_section(out)     # the score above rewrote the file without it
+    write_open_section(out)     # the score above rewrote the file without the open models and the card
     print("\n".join(L))
 
 
 OPEN_HEAD = "\n## Open-weight models on FarmShare\n"
+CARD_HEAD = "\n## Measurement card\n"
+UNDATED_JSON = os.path.join(os.path.dirname(RESULTS), "date-undated.json")   # W46.date-undated's rerun, the floor
 
 
 def score_open(label, rows):
@@ -700,10 +701,42 @@ def score_open(label, rows):
     print(json.dumps(m, indent=1))
 
 
+def card(j):
+    """The report's measurement card (root CLAUDE.md), from the scored figures and W46.date-undated's rerun."""
+    y = j["year"]
+    strata = ", ".join(f"{c} {y[c]['exact'][1]}" for c in ("year+month", "year", "year+DU")) + f", decade {j['decade'][1]}"
+    floor = "W46.date-undated has not been scored, so there is no rerun floor"
+    if os.path.exists(UNDATED_JSON):
+        und = json.load(open(UNDATED_JSON))
+        same = und.get("rerun_same_year")
+        if same and same[1]:
+            floor = (f"the only measured floor is W46.date-undated's rerun (`date-undated.md`): the same year "
+                     f"{100 * same[0] / same[1]:.0f}% ({same[0]}/{same[1]}) between two identical runs, on Vision text "
+                     f"of undated documents with {und.get('model')}, so it is a guide, not this set's floor")
+    opens = j.get("open_models", {})
+    return [CARD_HEAD.strip(), "",
+            "- **Truth.** The owner's own date tags on each document's first page (year, `MM Month`, decade, "
+            "`Date Uncertain`). The owner knows the box, so a year he tagged may not be on the pages.",
+            f"- **Selection.** Round-robin across collections within each truth class, seed {SEED}, among documents "
+            "where the label-clean teacher and the tags agree on every bounding gap; the development and test boxes "
+            "are left out, and undated and ambiguous documents are not scored. Never by a route's reply.",
+            f"- **Comparison.** Every row is ABBYY's text layer, which is banned as an input since 2026-10-30 (no new "
+            f"run takes it); the rows stay as scored. {j.get('model', MODEL)} direct and the {len(opens)} open-model "
+            f"rows ran on the same {j['documents']} prompts.",
+            f"- **Noise.** n per stratum: {strata} ({y['in text']['exact'][1]} with the owner's year in the text, "
+            f"{y['not in text']['exact'][1]} without). No rerun of this set; {floor}. A gap inside it is a tie.",
+            "- **Scope.** The rows stay as scored: the dated set was not rerun on Vision text, so these figures do not "
+            "say how the app does on its own OCR.", ""]
+
+
 def write_open_section(j):
-    """The open models beside Gemini, rewritten in place at the end of date-tagging.md."""
+    """The open models beside Gemini, then the measurement card, rewritten in place at the end of date-tagging.md."""
     with open(RESULTS, encoding="utf-8") as fh:
-        text = fh.read().split(OPEN_HEAD)[0].rstrip("\n") + "\n"
+        text = fh.read().split(OPEN_HEAD)[0].split(CARD_HEAD)[0].rstrip("\n") + "\n"
+    if not j.get("open_models"):
+        with open(RESULTS, "w", encoding="utf-8") as fh:
+            fh.write(text + "\n" + "\n".join(card(j)))
+        return
 
     def f(x):
         return f"{100 * x[0] / x[1]:.1f}%" if x[1] else "–"
@@ -723,7 +756,7 @@ def write_open_section(j):
                  f"{f(y['not in text']['exact'])} | {f(m['month']['owner'])} | {f(m['month']['none'])} | {f(agree)} | "
                  f"{m['parse_failures']} | {m.get('finish_length', '–')} |")
     with open(RESULTS, "w", encoding="utf-8") as fh:
-        fh.write(text + "\n".join(L) + "\n")
+        fh.write(text + "\n".join(L) + "\n\n" + "\n".join(card(j)))
 
 
 def main():

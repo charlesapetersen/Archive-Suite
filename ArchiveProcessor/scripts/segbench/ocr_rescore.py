@@ -455,7 +455,37 @@ def write_md(path, summary, rest, counts):
     L += ['', 'Not computed here, for want of inputs: the mark-region ink check (needs enhanced images and the marks '
           'set\'s boxes: W46.enh-ocr-input-marks, W46.fix-marks-set-draft) and reseeding instability (needs two seeds '
           'of a diffusion restorer: W46.enh-ocr-input). Both functions are in `ocr_scorers.py` with unit tests.', '']
+    L += card(own, pub)
     path.write_text('\n'.join(L))
+
+
+def card(own, pub):
+    """The report's measurement card (root CLAUDE.md), from the scored rows and W46.ocr-rerun-noise's figures."""
+    both = sorted({r['route'] for r in own} & {r['route'] for r in pub})
+    vis = next((r for r in pub if r['route'] == SECOND_READER), None)
+    vis_txt = (f"NES {pct(vis['nes'])} on the {vis['ok']} pages it read" if vis else 'not scored in this run')
+    floor = 'W46.ocr-rerun-noise has not been run, so no rerun floor is known'
+    nf = RESULTS / 'ocr-rerun-noise.json'
+    if nf.exists():
+        g = json.loads(nf.read_text()).get('routes', {}).get('gemini', {}).get('all', {})
+        rng = ((g.get('spread') or {}).get('strict') or {}).get('range')
+        if rng is not None:
+            floor = (f"the nearest measured floor is W46.ocr-rerun-noise's (`ocr-rerun-noise.md`): Gemini 3.7 Flash's "
+                     f"96-page mean moved {100 * rng:.2f} points across {len(g.get('runs', {}))} identical runs")
+    return ['## Measurement card', '',
+            '- **Truth.** The 96: the adjudicated truth with the 2026-10-29 corrections (`ocr_panel.TRUTH`). The 895: '
+            'the published transcriptions of the frozen public pages (`corpus/routes.frozen()`).',
+            f'- **Selection.** Every cached reading: {len(own)} routes on the 96, {len(pub)} on the 895, each over the '
+            'pages its own run covered; no route or page chosen by its score.',
+            '- **Comparison.** Each route at its own run\'s settings: quantisation, KV-cache dtype, hardware and harness '
+            'differ across the cloud, FarmShare and Sherlock rows, and a FarmShare route\'s 96 and 895 rows are '
+            'different runs (fp8 against BF16 KV cache, 32 against 16 sequences). '
+            f"{len(both)} routes are on both sets: {', '.join(both) or 'none'}.",
+            f'- **Noise.** No rerun floor of its own; {floor}, and the ranking table\'s paired intervals decide a gap '
+            'under the tie rule. The suspect column\'s second reader is Apple Vision, far weaker than most routes on '
+            f'the 895 ({vis_txt}), so its 895 suspect rates measure Vision\'s misses as much as a route\'s inventions.',
+            '- **Scope.** Scorer additions on saved readings, not a ranking: the ranking is the panels\' own reports and '
+            'the bench page.', '']
 
 
 PAGE_FIELDS = ['set', 'route', 'family', 'page', 'stratum', 'ok', 'nes', 'truth_words', 'reading_words', 'inserted',

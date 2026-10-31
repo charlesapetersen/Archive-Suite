@@ -107,3 +107,11 @@ The same 300 prompts, sent as the app's local route sends a text call (`institut
 | qwen3.6-27b-nothink | 68.4% | 83.2% | 97.5% | 42.0% | 72.5% | 23.3% | 72.0% | 0 | 0 |
 | qwen3.6-35b-a3b | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 100.0% | 20.0% | 300 | 300 |
 | qwen3.6-35b-a3b-nothink | 65.2% | 82.0% | 96.6% | 36.6% | 73.3% | 20.8% | 71.6% | 0 | 0 |
+
+## Measurement card
+
+- **Truth.** The owner's own date tags on each document's first page (year, `MM Month`, decade, `Date Uncertain`). The owner knows the box, so a year he tagged may not be on the pages.
+- **Selection.** Round-robin across collections within each truth class, seed 41, among documents where the label-clean teacher and the tags agree on every bounding gap; the development and test boxes are left out, and undated and ambiguous documents are not scored. Never by a route's reply.
+- **Comparison.** Every row is ABBYY's text layer, which is banned as an input since 2026-10-30 (no new run takes it); the rows stay as scored. gemini-3.8-flash direct and the 12 open-model rows ran on the same 300 prompts.
+- **Noise.** n per stratum: year+month 120, year 80, year+DU 50, decade 50 (119 with the owner's year in the text, 131 without). No rerun of this set; the only measured floor is W46.date-undated's rerun (`date-undated.md`): the same year 94% (85/90) between two identical runs, on Vision text of undated documents with gemini-3.7-flash, so it is a guide, not this set's floor. A gap inside it is a tie.
+- **Scope.** The rows stay as scored: the dated set was not rerun on Vision text, so these figures do not say how the app does on its own OCR.
