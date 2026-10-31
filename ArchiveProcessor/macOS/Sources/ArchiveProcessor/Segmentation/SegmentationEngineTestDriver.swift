@@ -444,6 +444,33 @@ enum SegmentationEngineTestDriver {
                 check("local: routed with no key (\(m.description))", false)
             }
 
+            // The model's manifest (W46.kit-gate): the shipped build runs; any other model must be a folder whose
+            // manifest names prompt c1 and carries an anchor score. Read through the seam: no file is touched.
+            func manifest(_ json: String?) -> (URL) -> Data? {
+                { url in url.lastPathComponent == LocalSegmenter.manifestName ? json.map { Data($0.utf8) } : nil }
+            }
+            func refused(_ json: String?, _ modelID: String = "/models/mine") -> String {
+                LocalSegmenter.refusal(modelID: modelID, read: manifest(json)) ?? ""
+            }
+            let good = #"{"kit_version":"seg-kit-1","prompt_id":"c1","anchor":{"box":"Lincoln","pages_exact":34.87}}"#
+            check("manifest: the shipped model needs none",
+                  LocalSegmenter.refusal(modelID: LocalSegmenter.defaultModelID, read: manifest(nil)) == nil)
+            check("manifest: a folder with an anchor score and prompt c1 runs",
+                  LocalSegmenter.refusal(modelID: "/models/mine", read: manifest(good)) == nil)
+            check("manifest: a repository other than the shipped one is refused",
+                  refused(good, "me/seg").contains("not the shipped model"))
+            check("manifest: a folder without one is refused", refused(nil).contains("has no"))
+            check("manifest: no anchor score is refused",
+                  refused(#"{"kit_version":"seg-kit-1","prompt_id":"c1","anchor":null}"#).contains("no anchor score")
+                  && refused(#"{"kit_version":"seg-kit-1","prompt_id":"c1","anchor":{"box":"Lincoln"}}"#)
+                    .contains("no anchor score"))
+            check("manifest: another prompt, another kit version, or unreadable is refused",
+                  refused(#"{"kit_version":"seg-kit-1","prompt_id":"w1","anchor":{"box":"L","pages_exact":50}}"#)
+                    .contains("prompt w1")
+                  && refused(#"{"kit_version":"seg-kit-0","prompt_id":"c1","anchor":{"box":"L","pages_exact":50}}"#)
+                    .contains("another version")
+                  && refused("not json").contains("could not be read"))
+
             // A stopped server: the run stops after the one check, with how to start it; no window is sent.
             final class Counter: @unchecked Sendable { let lock = NSLock(); var n = 0 }
             let sent = Counter(), probed = Counter()

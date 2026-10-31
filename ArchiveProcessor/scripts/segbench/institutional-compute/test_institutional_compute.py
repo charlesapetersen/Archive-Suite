@@ -1188,6 +1188,43 @@ class Check(unittest.TestCase):
             self.assertFalse(m["gate"]["passed"])
             self.assertIn("trail the shipped model", " ".join(m["gate"]["reasons"]))
 
+    def test_data_trains_only_whole_agreed_training_windows(self):
+        # The kit's first step: a training window whose every gap the rule keeps, never a held-out one.
+        with tempfile.TemporaryDirectory() as t:
+            tmp = Path(t)
+            (tmp / "pack").mkdir()
+            wins = [("A", [1, 2, 3], "k1"), ("A", [3, 4, 5], "k2"), ("B", [1, 2, 3], "k3")]
+            (tmp / "pack/windows.jsonl").write_text("".join(json.dumps(
+                {"box": b, "window": w, "cache_key": k, "prompt": "P", "prompt_notext": "N"}) + "\n" for b, w, k in wins))
+            (tmp / "meta.jsonl").write_text("".join(json.dumps(
+                {"folder_id": b, "pages": [{"n": n} for n in w], "split": "holdout" if b == "B" else "train",
+                 "text": "none" if k == "k2" else "abbyy"}) + "\n" for b, w, k in wins))
+            labels = [("A", 1, "new"), ("A", 2, "cont"), ("A", 3, "cont"), ("A", 4, None), ("B", 1, "new"), ("B", 2, "new")]
+            (tmp / "labels.jsonl").write_text("".join(json.dumps(
+                {"folder_id": f, "n": n, "label_agree": lab, "label_start-trust": lab or "cont"}) + "\n" for f, n, lab in labels))
+            (tmp / "answers.jsonl").write_text("".join(json.dumps(
+                {"cache_key": k, "status": "ok", "result": f" R{k} "}) + "\n" for k in ("k1", "k2", "k3")) + "not json\n")
+            args = ["data", "--pack", str(tmp / "pack"), "--answers", str(tmp / "answers.jsonl"), "--labels",
+                    str(tmp / "labels.jsonl"), "--windows", str(tmp / "meta.jsonl")]
+            r = subprocess.run([sys.executable, str(HERE / "train_seg.py"), *args, "--out", str(tmp / "agree")],
+                               capture_output=True, text=True)
+            self.assertEqual(r.returncode, 0, r.stderr)
+            rows = [json.loads(l) for l in (tmp / "agree/train.jsonl").read_text().splitlines()]
+            self.assertEqual([(x["window"], x["prompt"], x["target"]) for x in rows], [([1, 2, 3], "P", "Rk1")])
+            dropped = json.loads((tmp / "agree/data.json").read_text())["dropped"]
+            self.assertEqual((dropped["held out"], dropped["a gap disagrees"]), (1, 1))
+            # Start-trust keeps gap 4, so the no-text window trains too, with the no-text prompt.
+            r = subprocess.run([sys.executable, str(HERE / "train_seg.py"), *args, "--rule", "start-trust",
+                                "--out", str(tmp / "st")], capture_output=True, text=True)
+            rows = sorted((json.loads(l) for l in (tmp / "st/train.jsonl").read_text().splitlines()), key=lambda x: x["window"])
+            self.assertEqual([(x["window"], x["prompt"]) for x in rows], [([1, 2, 3], "P"), ([3, 4, 5], "N")])
+
+    def test_shipped_manifest_meets_the_apps_check(self):
+        # LocalSegmenter.refusal's conditions: this kit version, prompt c1, an anchor with a pages-exact score.
+        m = json.loads((HERE.parent.parent.parent / "segbench-results/seg-kit-manifest-shipped.json").read_text())
+        self.assertEqual((m["kit_version"], m["prompt_id"]), ("seg-kit-1", "c1"))
+        self.assertIsInstance(m["anchor"]["pages_exact"], float)
+
     def test_no_anchor_answers_no_anchor_score(self):
         with tempfile.TemporaryDirectory() as t:
             tmp = Path(t)

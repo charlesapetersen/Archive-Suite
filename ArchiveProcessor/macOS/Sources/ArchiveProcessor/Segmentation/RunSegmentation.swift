@@ -235,6 +235,11 @@ enum WindowStageTransport {
     /// Reads the Keychain (keys and the ChatGPT sign-in) and looks for `claude`. Never call it from a view body.
     static func current(_ spec: ApproachSpec, defaults: UserDefaults = .standard, gate: PlanRunGate? = nil)
         -> Result<any WindowTransport, Missing> {
+        // The model on this Mac must be the shipped one or carry the training kit's manifest (W46.kit-gate).
+        if spec.voters.contains(where: { $0.provider == .local }),
+           let why = LocalSegmenter.refusal(modelID: LocalSegmenter.modelID(defaults)) {
+            return .failure(Missing(description: why))
+        }
         var keys: [WindowProvider: String] = [:]
         for p in Set(spec.voters.map(\.provider)) {
             guard let account = p.keychainAccount else { continue }

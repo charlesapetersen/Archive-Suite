@@ -71,6 +71,59 @@ enum LocalSegmenter {
         return out
     }
 
+    // MARK: The model's manifest (W46.kit-gate)
+
+    /// The file the training kit writes beside a model's weights (`train_seg.py check`, H §6.3): its prompt id, its
+    /// scores on the user's held-out collections and on a locked public anchor box, and the gate's verdict.
+    static let manifestName = "archive-seg-manifest.json"
+    /// The kit's manifest format, and the prompt the app sends this voter (its `WindowVoter.catalog` entry).
+    static let kitVersion = "seg-kit-1"
+    static let promptID = WindowPromptID.c1.rawValue
+
+    struct Manifest: Decodable {
+        struct Anchor: Decodable {
+            let box: String
+            let pagesExact: Double?
+            enum CodingKeys: String, CodingKey { case box, pagesExact = "pages_exact" }
+        }
+        let kitVersion: String?
+        let promptID: String?
+        let anchor: Anchor?
+        enum CodingKeys: String, CodingKey { case kitVersion = "kit_version", promptID = "prompt_id", anchor }
+    }
+
+    /// Why the app will not run the model the Model setting names, or nil. The shipped build is the app's own (its
+    /// manifest is `segbench-results/seg-kit-manifest-shipped.json`). Any other model must be a folder on this Mac
+    /// holding the kit's manifest, for a prompt the app sends and with an anchor score: as the app refuses a voter it
+    /// does not know, it refuses a model nobody has scored on boxes it never saw. `read` is the file read, a seam.
+    static func refusal(modelID: String, read: (URL) -> Data? = { try? Data(contentsOf: $0) }) -> String? {
+        if modelID == defaultModelID { return nil }
+        let path = (modelID as NSString).expandingTildeInPath
+        guard path.hasPrefix("/") else {
+            return "The Model setting names \(modelID), which is not the shipped model. A model you trained must be "
+                + "a folder on this Mac holding the training kit's \(manifestName)."
+        }
+        let url = URL(fileURLWithPath: path).appendingPathComponent(manifestName)
+        guard let data = read(url) else {
+            return "The model folder \(path) has no \(manifestName). The training kit writes it (train_seg.py check) "
+                + "once the model is scored on a public box it never saw; copy it beside the weights."
+        }
+        guard let m = try? JSONDecoder().decode(Manifest.self, from: data) else {
+            return "The model's \(manifestName) could not be read."
+        }
+        guard m.kitVersion == kitVersion else {
+            return "The model's \(manifestName) is from another version of the training kit (\(m.kitVersion ?? "none"))."
+        }
+        guard m.promptID == promptID else {
+            return "The model was trained and scored on prompt \(m.promptID ?? "none"), not the \(promptID) this app sends."
+        }
+        guard let a = m.anchor, a.pagesExact != nil else {
+            return "The model's \(manifestName) has no anchor score: it has not been scored on a public box it never "
+                + "saw, so there is no telling how it does outside its own collections."
+        }
+        return nil
+    }
+
     /// Recommended where it fits with room for the rest of the Mac. An 8 GB Mac beside a 4.4 GB peak is unmeasured.
     static func memoryNote(memoryGB: Double) -> String {
         let gb = Int(memoryGB)
