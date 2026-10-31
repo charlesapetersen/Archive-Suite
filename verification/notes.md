@@ -13,7 +13,7 @@ Format and statuses: [`README.md`](README.md). Written by `W40.b2`, 2026-10-12.
   `W23.m9`/`-fu3`, `W23.m14`/`-fu`, `W37.dual-date`, `W24.cal1`, `W24.cal1-toggle`, `W24.cal1-validator`,
   and the W0–W8 records under §*Archive Notes — NEW APP*.
 - **Sources and code read at:** `9e8959ef`.
-- **Count:** `unproven 48 · works 2 · broken 2 · unreachable 0` (works: N-34, N-45; broken: N-12, N-44). Updated by `W48.appearance-notes`, 2026-10-30 (N-52 added).
+- **Count:** `unproven 45 · works 5 · broken 2 · unreachable 0` (works: N-34, N-45, N-49, N-50, N-51; broken: N-12, N-44). Updated by `W48.notes-stacked-layout-verify`, 2026-10-30 (N-49–N-51 to `works`).
 
 **Runtime evidence, for every row below: none yet.** The W40.a3 full VM suite
 ([`evidence/notes/W40.a3-full-ui.md`](evidence/notes/W40.a3-full-ui.md)) and the `W9.e2` runtime sweep passed
@@ -385,12 +385,14 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
   the Extracts window). `AccessibilityAuditUITests.testMainScreensPassAuditStacked{Light,Dark}Mode`,
   `LayoutGuardUITests.testMainScreensLayOutStacked{Light,Dark}Mode` (typical, minimum, and narrow-and-tall),
   `VisualReviewUITests.testTourStacked{Light,Dark}` (opt-in) and `WritingJourneyStackedUITests` (the whole W40.d9
-  journey stacked).
-- **Runtime evidence:** none (a green suite is not runtime evidence, README §Statuses).
-- **Status:** `unproven`
+  journey stacked). `StackedLayoutVerifyUITests.testExtractBeingEditedSurvivesASwitchFromTheExtractsWindow` (VM, the
+  re-check's own).
+- **Runtime evidence:** VM at `655effca` (W48.notes-stacked-layout-verify): the whole suite 116 tests, 99 passed, 16 skipped, 1 failed (the open W40.fix-notes-extract-authors-clear); the stacked audits, sweeps, switch test and the whole stacked writing journey passed; an extract typed into in the Extracts window survived three switches made from that window and reached disk; the four visual tours, both layouts, light and dark, passed "missing: none" with the shots read. [`evidence/notes/W48.notes-stacked-layout-verify.md`](evidence/notes/W48.notes-stacked-layout-verify.md).
+- **Status:** `works`
 - **History:**
   - 2026-10-29 W48.notes-stacked-layout — row written and the layout built, `unproven`; the re-check is
     `W48.notes-stacked-layout-verify`.
+  - 2026-10-30 W48.notes-stacked-layout-verify — `works`: re-checked at HEAD by a session that did not build it, with its own `StackedLayoutVerifyUITests`; [`evidence/notes/W48.notes-stacked-layout-verify.md`](evidence/notes/W48.notes-stacked-layout-verify.md).
 - **Notes:**
   - One choice for both windows, like the panel widths.
   - The VM runs while it was built found five things, fixed in the same item: the note was squeezed to a 9 pt
@@ -411,11 +413,13 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
   `stackedListRange(paneHeight:)` so the note below keeps 480 pt; the remembered height is kept for a taller window.
 - **Real-path test:** `ArchiveNotesTests/PanelDividerAccessibilityTests.testStackedDividerIsAHorizontalSplitterOverTheListHeight`
   and `NotesAppSettingsTests.listHeightClampsLikeTheWidths` (unit). `ArchiveNotesUITests/StackedLayoutUITests.testStackedDividerDragsClampsAndSurvivesRelaunch`
-  and `.testStackedOrderIsListThenNoteAndFocusCrossesTheDivider` (VM).
-- **Runtime evidence:** none.
-- **Status:** `unproven`
+  and `.testStackedOrderIsListThenNoteAndFocusCrossesTheDivider` (VM); `StackedLayoutVerifyUITests.testDividerGivesWayToAShorterWindowAndComesBack`
+  (VM, the re-check's own).
+- **Runtime evidence:** VM at `655effca`: the list stopped at 220 pt and at 440 pt (990 pt window) and did not move past either; cut to the 759 pt minimum the list gave way to 220 pt with a 146 pt editor, and came back to 440 pt when the window grew again; the Extracts window's divider clamps the same; order table, divider, editor; Tab 18 presses stacked, 22 side by side. [`evidence/notes/W48.notes-stacked-layout-verify.md`](evidence/notes/W48.notes-stacked-layout-verify.md).
+- **Status:** `works`
 - **History:**
   - 2026-10-29 W48.notes-stacked-layout — row written, `unproven`.
+  - 2026-10-30 W48.notes-stacked-layout-verify — `works`. Increment and decrement are proven by the unit test only (XCUITest has no splitter action); [`evidence/notes/W48.notes-stacked-layout-verify.md`](evidence/notes/W48.notes-stacked-layout-verify.md).
 
 ### N-51 · The layout choice is remembered
 
@@ -426,11 +430,13 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
   as side by side (`NotesLayoutSettings`).
 - **Real-path test:** `ArchiveNotesTests/NotesAppSettingsTests.layoutModeDefaultsToSideBySideAndRoundTrips` (unit);
   `StackedLayoutUITests.testStackedDividerDragsClampsAndSurvivesRelaunch` (VM: stacked and its height after a
-  relaunch) and `.testSwitchingLayoutsKeepsSelectionUnsavedTextAndScroll` (both windows switch together).
-- **Runtime evidence:** none.
-- **Status:** `unproven`
+  relaunch) and `.testSwitchingLayoutsKeepsSelectionUnsavedTextAndScroll` (both windows switch together); `StackedLayoutVerifyUITests.testRelaunchRestoresEachLayoutInBothWindows` (VM, the
+  re-check's own: each layout after a relaunch in both windows).
+- **Runtime evidence:** VM at `655effca`: a relaunch restored stacked with the dragged height and side by side, in the note window and the Extracts window, and the height outlived a spell side by side. [`evidence/notes/W48.notes-stacked-layout-verify.md`](evidence/notes/W48.notes-stacked-layout-verify.md).
+- **Status:** `works`
 - **History:**
   - 2026-10-29 W48.notes-stacked-layout — row written, `unproven`.
+  - 2026-10-30 W48.notes-stacked-layout-verify — `works`; [`evidence/notes/W48.notes-stacked-layout-verify.md`](evidence/notes/W48.notes-stacked-layout-verify.md).
 
 ## Writing and editing
 
