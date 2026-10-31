@@ -361,6 +361,48 @@ final class ContentIndexTests: XCTestCase {
         await idx.close()
     }
 
+    /// W40.fix-reader-fts-snippet-stall: the snippet expression drops stop words but keeps the rest of
+    /// the query, wildcard included, and keeps everything when nothing else is left.
+    func testSnippetMatchExpressionDropsStopWordsOnly() {
+        let idx = ContentIndex(url: URL(fileURLWithPath: "/dev/null"))
+        XCTAssertEqual(idx.ftsMatchExpression("Bureau of the Budget"), "\"Bureau\" \"of\" \"the\" \"Budget\"*")
+        XCTAssertEqual(idx.snippetMatchExpression("Bureau of the Budget"), "\"Bureau\" \"Budget\"*")
+        XCTAssertEqual(idx.snippetMatchExpression("Secretary OF THE, Treasury"), "\"Secretary\" \"Treasury\"*")
+        XCTAssertEqual(idx.snippetMatchExpression("budget of the"), "\"budget\"")
+        XCTAssertEqual(idx.snippetMatchExpression("of the"), "\"of\" \"the\"*")
+        XCTAssertEqual(idx.snippetMatchExpression("  "), "")
+    }
+
+    /// The dropped words are not highlighted, the kept ones are, and the hit set is the full query's.
+    func testSearchRankedSnippetHighlightsTheDistinctiveTerms() async throws {
+        let (idx, url) = makeIndex(); defer { try? FileManager.default.removeItem(at: url) }
+        try await idx.open()
+        try await idx.upsert(path: "/a.pdf", mtime: 1, name: "a", classification: nil,
+                             body: "A memorandum from the Bureau of the Budget to the Secretary.")
+        try await idx.upsert(path: "/b.pdf", mtime: 1, name: "b", classification: nil,
+                             body: "The Bureau reviewed a budget.")          // no "of"
+        let ranked = await idx.searchRanked("Bureau of the Budget")
+        XCTAssertEqual(ranked.paths, ["/a.pdf"])
+        let snip = try XCTUnwrap(ranked.snippets["/a.pdf"])
+        let marked = SearchSnippet.segments(from: snip).filter { $0.isMatch }.map { $0.text }
+        XCTAssertEqual(marked, ["Bureau", "Budget"], "got: \(snip.debugDescription)")
+        await idx.close()
+    }
+
+    /// Out of snippet time, every hit is still returned; only the previews are missing.
+    func testSearchRankedSnippetBudgetKeepsEveryPath() async throws {
+        let (idx, url) = makeIndex(); defer { try? FileManager.default.removeItem(at: url) }
+        try await idx.open()
+        for i in 0..<5 {
+            try await idx.upsert(path: "/f\(i).pdf", mtime: 1, name: "f\(i)", classification: nil,
+                                 body: "commonterm in document \(i)")
+        }
+        let ranked = await idx.searchRanked("commonterm", snippetBudget: 0)
+        XCTAssertEqual(ranked.paths.count, 5)
+        XCTAssertTrue(ranked.snippets.isEmpty)
+        await idx.close()
+    }
+
     func testClassificationParsing() {
         let page2 = "Extracted text.\n00023 IMG — Brown.jpg\nGemini · Gemini 2.5 · 19 June 2026\nClassification: Document Start\nINTRODUCTION"
         XCTAssertEqual(PDFHeaderParser.parseClassification(from: page2), "Document Start")

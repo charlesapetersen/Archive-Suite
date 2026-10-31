@@ -19,6 +19,20 @@ enum SearchSnippet {
     /// Fragment width (tokens) requested from `snippet()` — a compact KWIC window. FTS5 clamps to 1…64.
     static let tokenCount = 12
 
+    /// Wall-time cap on building the snippets for one search. Fragments are built best match first, and
+    /// the rows left when it runs out show no preview, as rows past the snippet limit already do.
+    static let timeBudget: TimeInterval = 0.25
+
+    /// Query terms left out of the snippet expression (`ContentIndex.snippetMatchExpression`), never out
+    /// of the MATCH that decides the hits. FTS5's `snippet()` scores every candidate fragment against every
+    /// phrase instance in the document, so its cost grows with the square of the instance count, and
+    /// `of`/`the` occur thousands of times in a long OCR body: `Bureau of the Budget` took about 200 ms a
+    /// hit at corpus size (W40.fix-reader-fts-snippet-stall). Lower-case; compared with the token folded.
+    static let stopWords: Set<String> = [
+        "a", "an", "and", "are", "as", "at", "be", "by", "for", "from", "has", "he", "in", "is", "it",
+        "its", "of", "on", "or", "that", "the", "this", "to", "was", "were", "will", "with",
+    ]
+
     /// One run of a snippet. `isMatch` runs are the query terms FTS5 marked, to be emphasised.
     struct Segment: Equatable, Sendable {
         let text: String

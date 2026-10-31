@@ -175,23 +175,30 @@ actor ContentIndex {
     /// classification hit outranks a body-only hit, and the order is explainable from what the user
     /// can see. `limit` remains available for callers/tests that deliberately want a bounded result.
     func search(_ query: String, limit: Int? = nil) -> [String] {
+        rankedHits(query, limit: limit).map { $0.path }
+    }
+
+    /// `search`'s hits with their FTS rowids, which `snippetMap` seeks by.
+    private func rankedHits(_ query: String, limit: Int? = nil) -> [(rowid: Int64, path: String)] {
         let match = ftsMatchExpression(query)
         guard !match.isEmpty else { return [] }
         // bm25 weights in FTS5 column order (body, classification, name): name hits rank
         // highest (10), then classification (5), then body (1). bm25 returns negative scores
         // (more negative = more relevant); ORDER BY ascending puts the best matches first.
         let sql = limit == nil
-            ? "SELECT path FROM fts WHERE fts MATCH ? ORDER BY bm25(fts, 1.0, 5.0, 10.0);"
-            : "SELECT path FROM fts WHERE fts MATCH ? ORDER BY bm25(fts, 1.0, 5.0, 10.0) LIMIT ?;"
+            ? "SELECT rowid, path FROM fts WHERE fts MATCH ? ORDER BY bm25(fts, 1.0, 5.0, 10.0);"
+            : "SELECT rowid, path FROM fts WHERE fts MATCH ? ORDER BY bm25(fts, 1.0, 5.0, 10.0) LIMIT ?;"
         guard let stmt = prepare(sql) else { return [] }
         defer { sqlite3_finalize(stmt) }
         bindText(stmt, 1, match)
         if let limit { sqlite3_bind_int(stmt, 2, Int32(limit)) }
-        var paths: [String] = []
+        var hits: [(rowid: Int64, path: String)] = []
         while sqlite3_step(stmt) == SQLITE_ROW {
-            if let c = sqlite3_column_text(stmt, 0) { paths.append(String(cString: c)) }
+            if let c = sqlite3_column_text(stmt, 1) {
+                hits.append((sqlite3_column_int64(stmt, 0), String(cString: c)))
+            }
         }
-        return paths
+        return hits
     }
 
     /// A ranked full-text result: **every** matching path (bm25 order, best first) plus keyword-in-context
@@ -208,40 +215,45 @@ actor ContentIndex {
     /// Full-text search returning both the complete ranked path list (as `search`) and bounded
     /// keyword-in-context snippets. Snippet extraction reads each matched document's body, so it is
     /// deliberately capped at the top `snippetLimit` hits: a broad query at 150k scale computes a
-    /// fragment for a few hundred rows, not for every match. (See `snippetMap` — FTS5 evaluates a
-    /// `snippet()` in the SELECT list once per output row, so the `path IN (…)` filter is what actually
-    /// bounds the work; an `ORDER BY bm25 … LIMIT` would still evaluate it for every scanned row.)
-    func searchRanked(_ query: String, snippetLimit: Int = 300) -> RankedSearch {
-        let paths = search(query)
-        guard !paths.isEmpty else { return RankedSearch(paths: [], snippets: [:]) }
-        let top = Array(paths.prefix(max(0, snippetLimit)))
-        return RankedSearch(paths: paths, snippets: snippetMap(query: query, paths: top))
+    /// fragment for a few hundred rows, not for every match, and stops at `snippetBudget` seconds of
+    /// snippet work, so one query cannot hold the actor for long (W40.fix-reader-fts-snippet-stall).
+    func searchRanked(_ query: String, snippetLimit: Int = 300,
+                      snippetBudget: TimeInterval = SearchSnippet.timeBudget) -> RankedSearch {
+        let hits = rankedHits(query)
+        guard !hits.isEmpty else { return RankedSearch(paths: [], snippets: [:]) }
+        let top = Array(hits.prefix(max(0, snippetLimit)))
+        return RankedSearch(paths: hits.map { $0.path },
+                            snippets: snippetMap(query: query, hits: top, budget: snippetBudget))
     }
 
-    /// KWIC `snippet()` of the **body** column (index 0) for each of `paths`, keyed by path. Runs one
-    /// MATCH query filtered by `path IN (…)` so `snippet()` (which reads the stored body) is evaluated
-    /// only for these rows, not for the whole match set. Empty snippets (e.g. an image-only doc with no
+    /// KWIC `snippet()` of the **body** column (index 0) for each of `hits`, keyed by path. One prepared
+    /// statement, MATCH plus `rowid = ?`, which FTS5 answers by seeking the doclists to that row, so
+    /// `snippet()` (which reads the stored body) runs only for these rows. Best match first, checking the
+    /// clock before each row: rows left when `budget` runs out get no snippet. The expression is
+    /// `snippetMatchExpression`, which every hit satisfies. Empty snippets (e.g. an image-only doc with no
     /// body text) are dropped. Terms are wrapped in `SearchSnippet` marks for the UI to emphasise.
-    private func snippetMap(query: String, paths: [String]) -> [String: String] {
-        let match = ftsMatchExpression(query)
-        guard !match.isEmpty, !paths.isEmpty else { return [:] }
-        let placeholders = Array(repeating: "?", count: paths.count).joined(separator: ",")
-        let sql = "SELECT path, snippet(fts, 0, ?, ?, ?, ?) FROM fts WHERE fts MATCH ? AND path IN (\(placeholders));"
+    private func snippetMap(query: String, hits: [(rowid: Int64, path: String)],
+                            budget: TimeInterval) -> [String: String] {
+        let match = snippetMatchExpression(query)
+        guard !match.isEmpty, !hits.isEmpty else { return [:] }
+        let sql = "SELECT snippet(fts, 0, ?, ?, ?, ?) FROM fts WHERE fts MATCH ? AND rowid = ?;"
         guard let stmt = prepare(sql) else { return [:] }
         defer { sqlite3_finalize(stmt) }
-        // Placeholder order: 1–4 = snippet marks/ellipsis/tokens, 5 = MATCH expr, 6… = the paths.
-        bindText(stmt, 1, SearchSnippet.openMark)
-        bindText(stmt, 2, SearchSnippet.closeMark)
-        bindText(stmt, 3, SearchSnippet.ellipsis)
-        sqlite3_bind_int(stmt, 4, Int32(SearchSnippet.tokenCount))
-        bindText(stmt, 5, match)
-        for (i, p) in paths.enumerated() { bindText(stmt, Int32(6 + i), p) }
+        let deadline = DispatchTime.now().uptimeNanoseconds + UInt64(max(0, budget) * 1e9)
         var out: [String: String] = [:]
-        while sqlite3_step(stmt) == SQLITE_ROW {
-            guard let pc = sqlite3_column_text(stmt, 0) else { continue }
-            let path = String(cString: pc)
-            let snip = sqlite3_column_text(stmt, 1).map { String(cString: $0) } ?? ""
-            if !snip.isEmpty { out[path] = snip }
+        for hit in hits {
+            guard DispatchTime.now().uptimeNanoseconds < deadline else { break }
+            sqlite3_reset(stmt); sqlite3_clear_bindings(stmt)
+            // Placeholder order: 1–4 = snippet marks/ellipsis/tokens, 5 = MATCH expr, 6 = the rowid.
+            bindText(stmt, 1, SearchSnippet.openMark)
+            bindText(stmt, 2, SearchSnippet.closeMark)
+            bindText(stmt, 3, SearchSnippet.ellipsis)
+            sqlite3_bind_int(stmt, 4, Int32(SearchSnippet.tokenCount))
+            bindText(stmt, 5, match)
+            sqlite3_bind_int64(stmt, 6, hit.rowid)
+            guard sqlite3_step(stmt) == SQLITE_ROW else { continue }
+            let snip = sqlite3_column_text(stmt, 0).map { String(cString: $0) } ?? ""
+            if !snip.isEmpty { out[hit.path] = snip }
         }
         return out
     }
@@ -384,17 +396,25 @@ actor ContentIndex {
     /// (e.g. "news" → matches "newspaper"). Short tokens (≤2 chars) skip the wildcard because
     /// prefix expansion on 1–2-char terms is too broad (performance + relevance).
     nonisolated func ftsMatchExpression(_ query: String) -> String {
+        matchTerms(query).map { $0.term }.joined(separator: " ")
+    }
+
+    /// The expression `snippet()` is given: `ftsMatchExpression` without its `SearchSnippet.stopWords`
+    /// terms, or all of it when every term is one. Dropping AND-ed terms only widens the match, so every
+    /// hit of the full expression still matches this one; the dropped words are just not highlighted.
+    nonisolated func snippetMatchExpression(_ query: String) -> String {
+        let terms = matchTerms(query)
+        let kept = terms.filter { !SearchSnippet.stopWords.contains($0.token.lowercased().trimmingCharacters(in: .punctuationCharacters)) }
+        return (kept.isEmpty ? terms : kept).map { $0.term }.joined(separator: " ")
+    }
+
+    /// Each whitespace-separated query token with its quoted (and, for the last, wildcarded) FTS5 term.
+    private nonisolated func matchTerms(_ query: String) -> [(token: Substring, term: String)] {
         let tokens = query.split(whereSeparator: { $0.isWhitespace })
-        guard !tokens.isEmpty else { return "" }
-        return tokens.enumerated()
-            .map { (i, tok) in
-                let quoted = "\"" + tok.replacingOccurrences(of: "\"", with: "\"\"") + "\""
-                if i == tokens.count - 1 && tok.count > 2 {
-                    return quoted + "*"
-                }
-                return quoted
-            }
-            .joined(separator: " ")
+        return tokens.enumerated().map { (i, tok) in
+            let quoted = "\"" + tok.replacingOccurrences(of: "\"", with: "\"\"") + "\""
+            return (tok, i == tokens.count - 1 && tok.count > 2 ? quoted + "*" : quoted)
+        }
     }
 
     // MARK: - SQLite helpers

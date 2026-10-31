@@ -282,6 +282,11 @@ final class ReaderAtSizeTests: XCTestCase {
             let pathsOnly = await timeAsync { await corpusIndex.search(query) }.1
             print("D7 search@102k \"\(query)\" hits=\(hits) median \(ms(samples[1])) max \(ms(samples[2])) "
                   + "| paths-only search() \(ms(pathsOnly))")
+            // W40.fix-reader-fts-snippet-stall: 41.7 s before the fix. SQLite is optimized either way, so
+            // one budget serves both builds: the snippet cap plus the 24 ms match, with room.
+            if query == "Bureau of the Budget" {
+                XCTAssertLessThan(samples[1], 1.0, "searchRanked(\"\(query)\") at \(corpusRows) rows")
+            }
         }
         await corpusIndex.close()
 
@@ -292,6 +297,38 @@ final class ReaderAtSizeTests: XCTestCase {
               + "both=\(quality.bothReadUnread) median \(ms(health.median)) max \(ms(health.max))")
         print(String(format: "D7 sample footprint %.0f -> %.0f MiB (peak during index %.0f)",
                      footprintStart, footprintMiB(), peak))
+    }
+
+    // MARK: - Common words in long OCR bodies (runs without the harness)
+
+    /// W40.fix-reader-fts-snippet-stall without the sample: long bodies in which `of` and `the` occur
+    /// thousands of times, as they do in the corpus's long OCR text. FTS5's `snippet()` cost grows with the
+    /// square of a document's matched-term instances, so before the fix this took about 8 s (about 140 ms
+    /// a document, measured on the same shape in SQLite 3.53); the threshold is far below that and every hit
+    /// must still have its preview, so a fix that only ran out the snippet clock would fail too.
+    func testCommonWordPhraseSnippetsStayFastOnLongBodies() async throws {
+        let index = ContentIndex(url: scratch.appendingPathComponent("content-index-long-bodies.sqlite3"))
+        try await index.open()
+        let fillers = ["memorandum", "president", "treasury", "report", "office", "federal", "program"]
+        var rows: [IndexRow] = []
+        for doc in 0..<60 {
+            var words: [String] = []
+            words.reserveCapacity(14_100)
+            for i in 0..<2_000 {
+                words += ["the", fillers[(i + doc) % fillers.count], "of", "the", fillers[i % 5], "and", "a"]
+                if i % 400 == 0 { words += ["Bureau", "of", "the", "Budget"] }
+            }
+            rows.append(IndexRow(path: "/long-\(doc).pdf", mtime: 1, name: "long \(doc)", classification: nil,
+                                 body: words.joined(separator: " "), pageCount: 40, hasText: true, readable: true))
+        }
+        try await index.upsertBatch(rows)
+        _ = await index.searchRanked("Bureau of the Budget")        // warm the page cache
+        let (ranked, seconds) = await timeAsync { await index.searchRanked("Bureau of the Budget") }
+        print("D7 long-body \"Bureau of the Budget\" hits=\(ranked.paths.count) snippets=\(ranked.snippets.count) \(ms(seconds))")
+        XCTAssertEqual(ranked.paths.count, rows.count)
+        XCTAssertEqual(ranked.snippets.count, rows.count, "every hit should keep its preview")
+        XCTAssertLessThan(seconds, 0.5, "searchRanked(\"Bureau of the Budget\") over \(rows.count) long bodies")
+        await index.close()
     }
 
     // MARK: - The 150k synthetic tree: list length
