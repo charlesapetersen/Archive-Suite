@@ -176,6 +176,22 @@ printf '%q ' sbatch --export=ALL "${SBATCH_ARGS[@]}" train.sbatch; printf '\n'
 sbatch --export=ALL "${SBATCH_ARGS[@]}" train.sbatch
 ```
 
+Before a trained student is used, score it with the held-out gate (W46.kit-gate). Serve the merged model with
+`submit.sh seg seg-student` (`IC_STUDENT`, `IC_STUDENT_NAME`) on a held-out pack (`corpus_pairs.py subpack
+--split holdout`) and on a locked public anchor box (`public_segmentation.py pack`), then run
+
+```bash
+python3 train_seg.py check --run shipped=RUNS/shipped-holdout,RUNS/shipped-anchor \
+    --run mine=RUNS/mine-holdout,RUNS/mine-anchor --candidate mine \
+    --anchor-truth segbench-results/public-segmentation/lincoln.json --labels labels.jsonl \
+    --weights /path/to/the/mac/build --data /scratch/$USER/training --out archive-seg-manifest.json
+```
+
+It scores both on the held-out gaps (against your tags, or against your own rulings with `--ruled`) and on the
+anchor, writes the manifest and exits 1 if the gate fails. Put `archive-seg-manifest.json` beside the weights the
+app loads: Archive Processor refuses a model of yours without one, without an anchor score, or for another
+prompt. Separating 3 points of pages-exact needs about 2,000 held-out gaps (`segbench-results/seg-kit-gate.md`).
+
 Confirm that one profile GPU fits the chosen training model and that the wall limit is sufficient; training
 has different memory needs from serving. Queued jobs use the submitted environment snapshot, so later setup
 cannot rename their provenance. Never modify an in-use venv. The old FarmShare hand-run examples in the

@@ -40,6 +40,7 @@ import data
 RESULTS = data.HERE.parent.parent / "segbench-results"
 OUT_MD = RESULTS / "seg-kit-gate.md"
 OUT_JSON = RESULTS / "seg-kit-gate.json"
+MANIFEST = RESULTS / "seg-kit-manifest-shipped.json"
 CACHE = Path(os.environ.get("ARCHIVE_BENCH_CACHE", Path.home() / "Library/Caches/ArchiveSuiteRehearsal")) / "kit-gate"
 
 TEACHER = "fs-qwen3.5-27b"
@@ -382,6 +383,60 @@ def render(split, boot, observed, dates, docs) -> str:
             L.append(f"| {lab.removesuffix('-nothink')} | {r['answered']} | {r['right']} | {r['wrong']} | "
                      f"{r['gemini wrong too']} | {r['gemini the same wrong year']} | {r['gemini right']} | "
                      f"{r['student right, gemini wrong']} |")
+    man = json.loads(MANIFEST.read_text()) if MANIFEST.exists() else None
+    L += ["", "## The gate: `train_seg.py check` and the manifest", "",
+          "`train_seg.py check` (institutional-compute) is the kit's held-out gate. It reads `cluster_seg.py` answers "
+          "only, scores each run's per-gap calls on the held-out collections against their tags (and against the "
+          "owner's rulings when a file of them is given) with a folder bootstrap, and on a locked public anchor box "
+          "(pages exact, gap accuracy, the review load to 98%) with a document bootstrap, each paired against the "
+          "shipped model. It writes H §6.3's manifest: kit version, prompt id, base build, weights, adapter and "
+          "training-data hashes, the scores with intervals, the Mac figures and the gate's verdict, and exits 1 when "
+          "the gate fails. The proposed rule: an anchor score, a held-out score, and a held-out interval against the "
+          "shipped model whose low end is above -3 points. Whether that is the acceptance rule is Phase 4's call "
+          "(gap audit item 20).", "",
+          "The app reads the manifest as `archive-seg-manifest.json` beside the weights. `LocalSegmenter.refusal` runs "
+          "the shipped build as its own, and refuses any other Model setting that is not a folder on the Mac holding a "
+          "manifest of kit `seg-kit-1`, prompt c1, with an anchor pages-exact score: it is returned before a run "
+          "starts (`WindowStageTransport.current`), as an unknown voter is refused today. Six checks in "
+          "`SegmentationEngineTestDriver` cover it."]
+    if man:
+        an = man["anchor"]
+        L += ["", f"The shipped build's own manifest is `seg-kit-manifest-shipped.json`: weights "
+              f"`{man['weights_sha256'][:12]}…` (the 8-bit MLX build), anchor {an['box']} {an['pages_exact']}% of pages "
+              f"exact ({an['pages_exact_interval'][0]} to {an['pages_exact_interval'][1]}), gap accuracy "
+              f"{an['gap_accuracy']}%, review load to 98% {an['review_load_per_100_pages']} gaps per 100 pages. Its "
+              "anchor answers are the full-precision FarmShare run, and its held-out run is not on this Mac, so its "
+              "held-out block is empty and its own gate says so; the app requires only the anchor and the prompt."]
+    L += ["", "## The kit end to end, dry (2026-10-31)", "",
+          "Each step run as far as it can go without a cluster (no engine session contacts Sherlock) and without "
+          "training on this Mac (W46.kit-mac-lora measures that):", "",
+          "| step | how it was run | result |", "|---|---|---|",
+          "| training set | `train_seg.py data`, offline test on a synthetic pack (`test_institutional_compute.Check`) | "
+          "only whole agreed training windows train, held-out never; start-trust keeps more |",
+          "| train and merge | the README's `slurm_args` recipe against the example profile, printed not submitted | "
+          "one sbatch line for `train.sbatch` (train, then merge) |",
+          "| held-out and anchor answers | `submit.sh seg seg-student --pack … --dry-run` (example profile) | one "
+          "sbatch line serving the merged student under its name; the packs come from `corpus_pairs.py subpack "
+          "--split holdout` and `public_segmentation.py pack` |",
+          "| the gate | `train_seg.py check` on the cached FarmShare runs (Lincoln; the joint 2B's held-out run) | "
+          "reproduces the bench's figures (4B 46.7%, 2B 34.9% on Lincoln); joint 2B 80.4% of 7,277 held-out tag gaps |",
+          "| the app | `LocalSegmenter.refusal` on the written manifests | the shipped manifest passes; no manifest, no "
+          "anchor score or another prompt is refused |", "",
+          "What the dry run found missing from the kit:", "",
+          "- **No step builds the Mac model.** The 8-bit MLX build was made by the Vision OCR lab's `convert-mlx.py` by "
+          "hand (`seg-students.md` §On the Mac); the kit stops at a merged model on the cluster. A user needs a "
+          "`train_seg.py` or kit step that converts and quantises it, then hashes what the app will load.",
+          "- **The manifest has to be copied beside the Mac build by hand**, and its weights hash is of whatever folder "
+          "`--weights` named: hashed on the cluster's merged model, it does not match the Mac build.",
+          "- **Mac figures are not measured by the kit.** H §6.3 asks for the kit's own warm-up run; `check` takes them "
+          "from a file (`--mac`), and nothing writes that file yet.",
+          "- **The local copy of the shipped build has no manifest** (`~/.local/share/visionocr-ocrlab/mlx/`): a Model "
+          "setting naming that folder is now refused until `seg-kit-manifest-shipped.json` is copied there as "
+          "`archive-seg-manifest.json`. The default setting (the published repository) is unaffected.",
+          "- The plan-route arm (a `claude -p` voter in the kit) is held for the gateway (CLAUDE.md, \"Plan routes "
+          "wait for the gateway\"), so the coding-agent leg was not run through `claude -p`. The five-hour "
+          "window went from 26% to 39% over this session, which shares it with anything else running; the kit's own "
+          "steps were seconds of CPU."]
     L += ["", "## Measurement card", "",
           "- **Truth.** The owner's ruled boxes (Dean, Deaver, Herrnstein; test boxes Stanton and RG165) and the "
           "audited public truths of Lincoln and CREST; dating: the owner's year tags. Stanton still carries the "
