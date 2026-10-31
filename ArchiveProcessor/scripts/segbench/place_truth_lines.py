@@ -514,17 +514,20 @@ header{position:sticky;top:0;background:#fff;border-bottom:1px solid #ccc;paddin
 .frame svg{position:absolute;left:0;top:0;width:100%;height:100%}
 .list{flex:1 1 38%}.it{scroll-margin:var(--head,44px) 0 10px;border:1px solid #ccc;border-radius:4px;padding:6px;margin:8px 0}
 .it.cur{outline:3px solid #06f}.it.done{background:#e6f6e6;border-color:#4a4}
-.opt{display:block;margin:2px 0}.opt.sel{font-weight:bold;color:#060}.k{color:#888;font-size:12px}.note{color:#a40}
+.opt{display:block;margin:2px 0}.opt.sel{font-weight:bold;color:#060}.k{color:#888;font-size:12px}
+.note{display:block;width:100%;box-sizing:border-box;margin-top:4px;font:inherit;color:#a40;resize:vertical}
+#sheetnote{width:100%;box-sizing:border-box;font:inherit;color:#a40;margin-top:4px}
 .ln{display:inline-block;min-width:2.2em;margin:2px;padding:1px 4px;border:1px solid #aaa;border-radius:3px;cursor:pointer;text-align:center}
 .ln.bad{background:#fdd;border-color:#c00;color:#c00;font-weight:bold}
 </style>
 <header><b>Placement lines check</b> — __N__ places on typed pages, then __H__ hand pages; about __MINUTES__ minutes.
 <b>Typed questions</b> (__Q__): each pink box holds some text, the dashed marks are possible line breaks. Is the text in each
 box <b>1</b> one line (ignore the marks) · <b>2</b> separate lines, breaking at every mark · <b>3</b> it differs: some marks
-only, or not the same in every box (add a note with <b>t</b>) · <b>e</b> either will do / can't tell. <b>Hand pages:</b> every line is boxed and numbered, its baseline drawn; click
+only, or not the same in every box (say which in the notes box) · <b>e</b> either will do / can't tell. <b>Hand pages:</b> every line is boxed and numbered, its baseline drawn; click
 a line (or its number) that is wrong (box or baseline off its line, two lines in one, one line in two), then
-<b>a</b> when the page is checked. <b>t</b> add a note · <b>n/p</b> next/previous · <b>z</b> zoom.
-Answers stay in this browser; <button onclick="exportAnswers()">Export answers</button><span id="prog"></span></header>
+<b>a</b> when the page is checked. Every question has a notes box (<b>t</b> jumps to it, Esc leaves it) · <b>n/p</b> next/previous · <b>z</b> zoom.
+Answers stay in this browser; <button onclick="exportAnswers()">Export answers</button><span id="prog"></span>
+<details><summary>Notes on the whole sheet</summary><textarea id="sheetnote" rows="3" placeholder="Anything that is not about one question"></textarea></details></header>
 <div id="root"></div>
 <script>
 const DATA=__DATA__;const KEY='w46-place-lines';
@@ -540,17 +543,17 @@ function paint(it){const v=get(it);it.el.classList.toggle('done',done(it));
  it.el.querySelectorAll('.opt').forEach(o=>o.classList.toggle('sel',o.dataset.v===v.pick));
  if(it.hand){const bad=new Set(v.bad||[]);it.el.querySelectorAll('.ln').forEach(s=>s.classList.toggle('bad',bad.has(+s.dataset.id)));
   it.svg.querySelectorAll('[data-id]').forEach(r=>r.setAttribute('stroke',bad.has(+r.dataset.id)?'#d00':(r.dataset.c)))}
- it.el.querySelector('.note').textContent=v.note?'note: '+v.note:''}
+ const nb=it.el.querySelector('.note');if(document.activeElement!==nb)nb.value=v.note||''}
 function rect(b,c,w,extra){return `<rect x="${b[0]*1000}" y="${b[1]*1000}" width="${b[2]*1000}" height="${b[3]*1000}" fill="none" stroke="${c}" stroke-width="${w}" vector-effect="non-scaling-stroke" ${extra||''}/>`}
 const root=document.getElementById('root');
 for(const p of DATA){const div=document.createElement('div');div.className='page';
  let h=`<div class="img"><div class="frame"><img src="${p.img}"><svg viewBox="0 0 1000 1000" preserveAspectRatio="none"></svg></div></div><div class="list"><b>${p.page}</b>`;
  if(p.type==='typed'){for(const x of p.items){h+=`<div class="it" data-key="${x.id}"><span class="k">${x.id} · ${x.boxes.length} box${x.boxes.length>1?'es':''}</span>`;
    for(const v of ['1','2','3','e'])h+=`<span class="opt" data-v="${v}"><span class="k">${v}:</span> ${LABEL[v]}</span>`;
-   h+=`<span class="note"></span></div>`}}
+   h+=`<textarea class="note" rows="1" placeholder="Notes (optional)"></textarea></div>`}}
  else{h+=`<div class="it" data-key="lines"><span class="k">hand page: click each wrong line, then a</span><br>`;
   for(const l of p.lines)h+=`<span class="ln" data-id="${l.id}">${l.id}</span>`;
-  h+=`<span class="opt" data-v="a"><span class="k">a:</span> page checked</span><span class="note"></span></div>`}
+  h+=`<span class="opt" data-v="a"><span class="k">a:</span> page checked</span><textarea class="note" rows="1" placeholder="Notes (optional)"></textarea></div>`}
  div.innerHTML=h+'</div>';root.appendChild(div);
  const frame=div.querySelector('.frame'),svg=div.querySelector('svg');
  frame.onclick=()=>{frame.classList.toggle('zoom');if(items[cur])show(items[cur])};
@@ -563,7 +566,11 @@ for(const p of DATA){const div=document.createElement('div');div.className='page
    el.querySelectorAll('.ln').forEach(s=>s.addEventListener('click',e=>{e.stopPropagation();toggle(it,+s.dataset.id)}));
    svg.style.pointerEvents='none'}
   else it.x=p.items.find(x=>x.id===el.dataset.key);
+  const nb=el.querySelector('.note');nb.addEventListener('input',()=>{rec(it).note=nb.value;save()});
+  nb.addEventListener('keydown',e=>{if(e.key==='Escape')nb.blur()});
   items.push(it);paint(it);el.addEventListener('click',()=>go(items.indexOf(it)))})}
+const sn=document.getElementById('sheetnote');sn.value=(A._sheet||{}).note||'';
+sn.addEventListener('input',()=>{A._sheet={note:sn.value};save()});
 function toggle(it,id){const v=rec(it);const s=new Set(v.bad||[]);s.has(id)?s.delete(id):s.add(id);v.bad=[...s].sort((a,b)=>a-b);save();paint(it)}
 let cur=0,first=true;function go(i){if(i<0||i>=items.length)return;const prev=first?null:items[cur];first=false;items[cur].el.classList.remove('cur');cur=i;
  const el=items[cur].el;el.classList.add('cur');
@@ -580,11 +587,11 @@ function show(it){if(!it||it.hand)return;const bs=it.x.boxes;
  const f=it.frame,pane=it.pane,centre=()=>{pane.scrollTop=(b[1]+b[3]/2)*f.offsetHeight-pane.clientHeight/2;
   pane.scrollLeft=(b[0]+b[2]/2)*f.offsetWidth-pane.clientWidth/2};
  const img=f.querySelector('img');if(img.complete)centre();else img.addEventListener('load',centre,{once:true})}
-document.addEventListener('keydown',e=>{const it=items[cur];if(!it)return;
+document.addEventListener('keydown',e=>{const tg=e.target;if(tg&&tg.matches&&tg.matches('textarea,input'))return;const it=items[cur];if(!it)return;
  if(e.key==='n')go(cur+1);else if(e.key==='p')go(cur-1);else if(e.key==='z'){it.frame.classList.toggle('zoom');show(it)}
  else if(!it.hand&&['1','2','3','e'].includes(e.key)){rec(it).pick=e.key;save();paint(it);go(cur+1)}
  else if(it.hand&&e.key==='a'){rec(it).checked=true;save();paint(it);go(cur+1)}
- else if(e.key==='t'){const t=prompt('Note:',get(it).note||'');if(t!==null){rec(it).note=t;save();paint(it)}}});
+ else if(e.key==='t'){e.preventDefault();it.el.querySelector('.note').focus()}});
 function exportAnswers(){const b=new Blob([JSON.stringify(A,null,1)],{type:'application/json'});
  const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='place-lines-answers.json';a.click()}
 prog();go(0);
@@ -622,7 +629,7 @@ def fold(key: dict, answers: dict) -> dict:
                 k = 'truth stands' if owner == v['truth'] else 'truth wrong'
             rulings.setdefault(p, {})[iid] = {**v, 'owner': owner, 'ruling': k, 'note': a.get('note')}
             n['typed'][k] = n['typed'].get(k, 0) + len(v['places'])
-    return {'counts': n, 'rulings': rulings}
+    return {'counts': n, 'rulings': rulings, 'sheet_note': (answers.get('_sheet') or {}).get('note')}
 
 
 def main():
