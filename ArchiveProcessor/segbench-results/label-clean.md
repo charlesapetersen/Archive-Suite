@@ -59,7 +59,8 @@ marked unsure). The tags are right on 61 and wrong on 8.
 
 Agree removes 7 of the 8 wrong tags and loses 5 right ones. This sample is not independent evidence: it is what
 the rules were read against while they were being designed, and it holds only 3 gaps of the kind start-trust
-relabels (2 of them wrong). Measuring the noise that is left takes a fresh sample (below).
+relabels (2 of them wrong). The fresh sample below measured the noise that is left: 5.3% under agree, 9.5% under
+start-trust.
 
 ## A fresh owner check
 
@@ -75,4 +76,37 @@ start-trust kept them, and builds a blind page in the cache (`corpus-pairs/check
 
 (The populations here leave out the old sample's gaps and the few gaps whose photos have no JPEG.)
 `corpus_pairs.py checkscore <answers>` scores the owner's answers: per stratum, then each rule's noise among the
-labels it keeps, weighted by stratum size. Follow-up `W41.seg-label-clean-fu1`.
+labels it keeps, weighted by stratum size.
+
+### The owner's answers (2026-10-20; written up in W46.kit-gate)
+
+The owner judged all 80 (`label-clean-owner-answers.csv`, 6 marked unsure); `corpus_pairs.py checkscore` on that
+file reproduces these figures. Right and wrong for each rule's label, unsure left out:
+
+| stratum | agree: right | wrong | start-trust: right | wrong | unsure |
+|---|---:|---:|---:|---:|---:|
+| A tag start, teacher agrees | 22 | 2 | 22 | 2 | 1 |
+| B tag start, teacher leans continuation | (dropped) | | 1 | 3 | 1 |
+| C tag continuation, teacher sure of a start | (dropped) | | 15 | 6 | 4 |
+| D tag continuation, teacher agrees | 24 | 1 | 24 | 1 | 0 |
+
+| rule | judged | noise among kept labels, weighted by stratum size | 95% interval |
+|---|---:|---:|---|
+| agree | 49 | **5.3%** | 0 to 12.4% |
+| start-trust | 74 | **9.5%** | 3.9 to 16.4% |
+
+The interval is a stratified percentile bootstrap (each stratum's judged cases resampled, 20,000 draws, seed 46);
+with 2 and 1 errors in the two agree strata it is wide, and its lower end of 0 is the bootstrap's floor, not a claim
+that agree is clean.
+
+- **Agree's kept labels are about 5% wrong**, three times the 1.8% the design sample suggested. These are the gaps
+  where tag and teacher agree, so no score against agreed labels can see them: the students' "97.6% of held-out
+  gaps" in `seg-students.md` is agreement with the teacher on agreed gaps, not accuracy, and a score that needs
+  accuracy uses owner-ruled gaps (W46.kit-gate's held-out gate, `seg-kit-gate.md`).
+- **Start-trust's relabelled starts are the weak part.** In stratum C, continuations the teacher was sure were starts,
+  6 of 21 judged were wrong (29%), and in B 3 of 4; A and D are as clean as under agree. Start-trust keeps 94.5% of
+  gaps against agree's 77.7% at nearly twice the noise.
+- **Measurement card.** Truth: the owner, blind to tag, teacher and stratum. Selection: a seeded random draw per
+  stratum from all kept gaps outside the 2026-10-08 sample, by `checkpack`, not by any route's answer. Comparison:
+  the two rules on the same 80 cases. Noise: n above; the intervals are the bootstrap's. Scope: one owner's corpus;
+  the strata sizes are this run's, so a rerun of the teacher changes the weights.

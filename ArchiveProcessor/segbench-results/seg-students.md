@@ -10,7 +10,7 @@ score, beside Gemini 3.8 Flash's cached windows. No money.
 
 ## Before the test boxes: development and held out
 
-| model | Dean | Deaver | Herrnstein | held-out agreed gaps (5,668) | false splits | false merges |
+| model | Dean | Deaver | Herrnstein | agreement with the teacher, agreed held-out gaps (5,668) | false splits | false merges |
 |---|---:|---:|---:|---:|---:|---:|
 | Qwen3.5 4B, untrained | 67.9% | 56.0% | 76.2% | 77.0% | 1,258 | 48 |
 | Qwen3.5 4B, pilot (a quarter of the windows) | 90.3% | 92.2% | 95.0% | 97.1% | 96 | 70 |
@@ -20,8 +20,11 @@ score, beside Gemini 3.8 Flash's cached windows. No money.
 
 The development columns are pages in the exact document with no checking, from runs on those boxes alone; the
 five-box runs below read them again, and vLLM at temperature 0 is not exactly deterministic across batches, so they
-differ by a point or two. The held-out gaps are the corpus's 22 held-out collections, scored against the labels the
-teacher and the tags agree on (`corpus_pairs.py score`).
+differ by a point or two. The held-out column is the corpus's 22 held-out collections, scored against the labels the
+teacher and the tags agree on (`corpus_pairs.py score`). It is agreement with the teacher on gaps the teacher
+already agreed on, not accuracy: the teacher scores 100% on it by construction, and the owner's checkpack found
+5.3% of such agreed labels wrong (`label-clean.md`). Accuracy is measured on owner-ruled gaps in `seg-kit-gate.md`
+(W46.kit-gate; measurement audit SEG-5).
 
 ## Per box, flagged at 0.85
 
@@ -88,22 +91,24 @@ Gemini 3.8 Flash 90.7%, and the untrained 4B at 4-bit on this Mac 57.4% on Deave
   (each page sits in about 2.3 windows): roughly 1.7 hours for 1,000 pages on the M3 Pro.
 - **4-bit costs two to five points** (mostly false merges for the 2B: 25 against 11) for a saving of under a
   gigabyte, so it is not worth offering.
-- **The 4B buys nothing here.** Twice the time and 3 GB more memory for a lower pooled score; at full precision on
-  the held-out collections it led the 2B by 1.6 points (97.6% against 96.0%) and on the test boxes by 0.3.
+- **The 4B buys nothing here.** Twice the time and 3 GB more memory for a lower pooled score; at full precision its
+  agreement with the teacher on agreed held-out gaps led the 2B's by 1.6 points (97.6% against 96.0%), and on the
+  test boxes it led by 0.3.
 - An 8 GB Mac running the app beside a 4.4 GB peak is unmeasured; a 16 GB Mac has room.
 
 ## Reading
 
 - **Training worked, and most of it came from the first quarter of the data.** Untrained, the 4B split documents
-  everywhere (1,258 false splits on the held-out gaps); fine-tuned, it agrees with the cleaned labels on 97.6% of
-  held-out gaps, and the pilot on a quarter of the windows already reached 97.1%.
+  everywhere (1,258 false splits on the held-out gaps); fine-tuned, it agrees with the teacher on 97.6% of the
+  held-out gaps where tag and teacher agree, and the pilot on a quarter of the windows already reached 97.1%. That
+  is agreement, not accuracy (above).
 - **On the test boxes the students land below their teacher.** 79.1% (4B) and 78.8% (2B) of test pages in the exact
   document unchecked, against the teacher's 83.0% and Gemini's 88.8%. Stanton is the hard box for all three Qwen
   models; RG 165 is 113 pages and swings widely (the 2B 94.3%, the 4B 79.3%).
 - **Their confidences are no flag.** As with the teacher, reaching 98% after checking takes about 80 checks per 100
   pages, close to checking every gap.
 - **The training data is one owner's archives.** The held-out collections are other collections from the same
-  owner's corpus, so their 97% says the model carries across his collections, not to other people's. The test
+  owner's corpus, so their 97% says the model agrees with its teacher across his collections, not that it is right, nor that it carries to other people's. The test
   boxes, which no training window saw, are the better guide, and there the students are about ten points behind the
   best cloud model.
 
