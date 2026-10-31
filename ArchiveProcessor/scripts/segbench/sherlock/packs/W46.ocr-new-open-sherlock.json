@@ -1,0 +1,59 @@
+{
+  "tag": "W46.ocr-new-open-sherlock",
+  "pack": "new-open-sherlock-20261031",
+  "mac": "artifacts/new-open-sherlock-20261031",
+  "submit": "support/sherlock/new-open/infinity-submit.sh",
+  "jobs": 3,
+  "gpu_hours": 16,
+  "review": "execution-plans/items/W46.ocr-new-open-sherlock.md",
+  "imports": [
+    {
+      "dir": "support/corpus",
+      "modules": [
+        "open_sweep_setup"
+      ]
+    },
+    {
+      "dir": "support/sherlock/new-open",
+      "modules": [
+        "prompt_source"
+      ]
+    },
+    {
+      "modules": [
+        "vllm",
+        "huggingface_hub"
+      ]
+    }
+  ],
+  "creates": [
+    "$FS_ROOT/new-open-sherlock-20261031",
+    "$FS_ROOT/new-open-895/infinity-parser2-pro",
+    "$FS_ROOT/new-open-96/infinity-parser2-pro",
+    "$HF_HOME/hub/models--infly--Infinity-Parser2-Pro",
+    "$GROUP_HOME/$USER/archive-suite/sherlock-results/new-open-sherlock-20261031"
+  ],
+  "provenance": [],
+  "requires": [
+    "$SH_IMG",
+    "$FS_ROOT/new-open-895",
+    "$FS_ROOT/new-open-96",
+    "$FS_ROOT/new-open-jobs.tsv",
+    "$FS_ROOT/open-sweep-20261019/public895.jsonl",
+    "$FS_ROOT/open-sweep-20261019/pilot3.jsonl",
+    "$FS_ROOT/open-sweep-20261019/recovery/open_sweep_run.py",
+    "$FS_ROOT/open-sweep-20261019/qwen3-vl-8b/ocr/ocr_run.py",
+    "$FS_ROOT/open-sweep-20261019/qwen3-vl-8b/ocr/panel-prompt.txt",
+    "$FS_ROOT/truth96-20261020/truth99.jsonl",
+    "$FS_ROOT/truth96-20261020/pilot3.jsonl",
+    "$FS_ROOT/truth96-20261020/recovery/open_sweep_run.py"
+  ],
+  "results": "$GROUP_HOME/$USER/archive-suite/sherlock-results/new-open-sherlock-20261031",
+  "collect": [
+    "$FS_ROOT/new-open-sherlock-20261031/jobs.tsv",
+    "$FS_ROOT/new-open-sherlock-20261031/logs",
+    "$FS_ROOT/new-open-895/infinity-parser2-pro",
+    "$FS_ROOT/new-open-96/infinity-parser2-pro"
+  ],
+  "release": "Infinity-Parser2-Pro readings (895/ and 96/ session folders) collected into the Mac artifact; score as W46.ocr-new-open's were (item notes)"
+}

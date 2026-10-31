@@ -11,7 +11,8 @@
 # pilot3.jsonl, its runner, which refuses settings that differ from the 895 run's). Then open_sweep_setup.py, unchanged,
 # inside the image: a gated, private, over-size or vLLM-unsupported model is recorded as skipped with its reason,
 # never worked around; a ready one has its pinned snapshot in $FS_ROOT/hf. Each key gets the frozen collector and its
-# prompt. Rerunnable for keys not prepared yet.
+# prompt. Rerunnable for keys not prepared yet. Each candidates file is kept under its own name in the 895 root, so a
+# later file (W46.ocr-new-open-sherlock's) leaves the earlier record in place.
 set -euo pipefail
 SH_DIR="$1"; CANDS="$2"; source "$SH_DIR/sh.env"
 OS="$FS_ROOT/open-sweep-20261019" T96="$FS_ROOT/truth96-20261020" A="$FS_ROOT/new-open-895" B="$FS_ROOT/new-open-96"
@@ -21,15 +22,21 @@ cp "$OS/public895.jsonl" "$OS/pilot3.jsonl" "$A/"; cp "$OS/recovery/open_sweep_r
 # a candidate's weight_limit_bytes (2026-10-22: Qwen3.8-27B and MiniCPM-V 4.7 35B-A3B were skipped by it).
 cp "$SH_DIR/../corpus/open_sweep_setup.py" "$A/recovery/"
 cp "$T96/truth99.jsonl" "$T96/pilot3.jsonl" "$B/"; cp "$T96/recovery/open_sweep_run.py" "$B/recovery/"
-cp "$CANDS" "$A/candidates.json"
+CJ="$A/$(basename "$CANDS")"; [ "$(basename "$CANDS")" != candidates-20261022.json ] || CJ="$A/candidates.json"
+cp "$CANDS" "$CJ"
 PANEL="$OS/qwen3-vl-8b/ocr/panel-prompt.txt" COLLECTOR="$OS/qwen3-vl-8b/ocr/ocr_run.py"
 # open_sweep_setup.py refuses a key that already has prepared.json, so only new keys go to it.
-"$FS_PY" - "$A/candidates.json" "$A/candidates-todo.json" "$A" <<'PY'
+"$FS_PY" - "$CJ" "$A/candidates-todo.json" "$A" <<'PY'
 import json, pathlib, sys
 c = json.load(open(sys.argv[1])); root = pathlib.Path(sys.argv[3])
 json.dump([x for x in c if not (root / x['key'] / 'prepared.json').exists()], open(sys.argv[2], 'w'), indent=1)
 PY
 mkdir -p "$A/todo"; mv "$A/candidates-todo.json" "$A/todo/candidates.json"
+# A candidate with `prompt_source` takes its prompt from the named variable of the model's own package, fetched from
+# PyPI here: the candidates file holds a transcription made on the Mac, and the package wins where the two differ
+# (recorded as prompt_check). If the package cannot be fetched, the transcription stands and the record says so.
+apptainer -s exec --bind "$SCRATCH,$GROUP_HOME" --env PYTHONPATH="$SH_SHIM" "$SH_IMG" \
+  python3 "$SH_DIR/new-open/prompt_source.py" "$A/todo/candidates.json"
 apptainer -s exec --bind "$SCRATCH,$GROUP_HOME" --env HF_HOME="$HF_HOME" --env PYTHONPATH="$SH_SHIM" "$SH_IMG" \
   python3 "$A/recovery/open_sweep_setup.py" "$A/todo" || true
 "$FS_PY" - "$A" "$B" "$PANEL" "$COLLECTOR" <<'PY'
@@ -47,16 +54,35 @@ for prep in sorted((A / 'todo').glob('*/prepared.json')):
             p.write_text(rec.get('prompt') or '')
     print(key, rec['state'], rec.get('reason', '')[:160])
 PY
+# NEW_OPEN_SETUP_ONLY (infinity-submit.sh): the submitting script has chained the GPU pair itself, so the batch holds,
+# releases and collects it; this job stops here, and fails when a key it prepared is not ready, so no two-card job
+# starts only to find the model skipped. (sbatch exports the batch's hold shim into this job: a pair submitted below
+# would be held and never released.)
+if [ -n "${NEW_OPEN_SETUP_ONLY:-}" ]; then
+  notready=$(cat "$A"/todo/*/prepared.json 2>/dev/null | "$FS_PY" -c 'import json,sys
+d=json.JSONDecoder();s=sys.stdin.read();i=0;bad=[]
+while True:
+    while i<len(s) and s[i].isspace(): i+=1
+    if i>=len(s): break
+    r,i=d.raw_decode(s,i)
+    if r["state"]!="ready": bad.append(r["key"])
+print(" ".join(bad))')
+  ls "$A"/todo/*/prepared.json >/dev/null 2>&1 || notready="(nothing prepared)"
+  rm -rf "$A/todo"
+  [ -z "$notready" ] || { echo "not ready: $notready"; exit 3; }
+  exit 0
+fi
 rm -rf "$A/todo"; du -sh "$HF_HOME"
 # Submit each ready model's pair from here, as a workflow step (Sherlock allows jobs that only submit): 895 pages,
-# then the 96 afterok, on the card class the candidate names (`gpu_c`, else sh.env's) for its `hours` (default 4).
+# then the 96 afterok, on the card class the candidate names (`gpu_c`, else sh.env's) for its `hours` (default 4), with
+# `gpus` cards (default 1; job.sh serves with that tensor-parallel size).
 TSV="$FS_ROOT/new-open-jobs.tsv"
 for prep in "$A"/*/prepared.json; do
-  read -r key state c hours < <("$FS_PY" -c 'import json,sys;r=json.load(open(sys.argv[1]));print(r["key"],r["state"],r.get("gpu_c") or "-",r.get("hours",4))' "$prep")
+  read -r key state c hours n < <("$FS_PY" -c 'import json,sys;r=json.load(open(sys.argv[1]));print(r["key"],r["state"],r.get("gpu_c") or "-",r.get("hours",4),r.get("gpus",1))' "$prep")
   [ "$state" = ready ] || continue
   grep -q -P "^$key\t" "$TSV" 2>/dev/null && continue          # submitted by an earlier run of this job
   [ "$c" != - ] || c="$SH_GPU_C"
-  g=(--partition=gpu -G 1 -C "$c" --cpus-per-task=8 --mem=64G --time="$hours:00:00")
+  g=(--partition=gpu -G "$n" -C "$c" --cpus-per-task=$((8 * n)) --mem=$((64 * n))G --time="$hours:00:00")
   a=$(sbatch --parsable "${g[@]}" --job-name="new-open-895-$key" --output="$A/$key/logs/slurm-%j.out" "$SH_DIR/new-open/job.sh" "$SH_DIR" 895 "$key")
   b=$(sbatch --parsable "${g[@]}" --dependency="afterok:$a" --job-name="new-open-96-$key" --output="$B/$key/logs/slurm-%j.out" "$SH_DIR/new-open/job.sh" "$SH_DIR" 96 "$key")
   printf '%s\t%s\t%s\n' "$key" "$a" "$b" | tee -a "$TSV"

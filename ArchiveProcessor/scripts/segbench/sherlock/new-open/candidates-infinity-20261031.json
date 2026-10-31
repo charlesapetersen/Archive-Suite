@@ -1,0 +1,19 @@
+[
+ {
+  "key": "infinity-parser2-pro",
+  "model": "infly/Infinity-Parser2-Pro",
+  "revision": "b27d470100514329fc6439aada8f16ccea5f9e2a",
+  "route": "native-text",
+  "prompt": "\nYou are an AI assistant specialized in converting PDF images to Markdown format. Please follow these instructions for the conversion:\n\n1. Text Processing:\n- Accurately recognize all text content in the PDF image without guessing or inferring.\n- Convert the recognized text into Markdown format.\n- Maintain the original document structure, including headings, paragraphs, lists, etc.\n\n2. Mathematical Formula Processing:\n- Convert all mathematical formulas to LaTeX format.\n- Enclose inline formulas with $ $. For example: This is an inline formula $E = mc^2$\n- Enclose block formulas with $$ $$. For example: $$\\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}$$\n\n3. Table Processing:\n- Convert tables to HTML format.\n\n4. Figure Handling:\n- Ignore figures content in the PDF image. Do not attempt to describe or convert images.\n\n5. Output Format:\n- Ensure the output Markdown document has a clear structure with appropriate line breaks between elements.\n- For complex layouts, try to maintain the original document's structure and format as closely as possible.\n\nPlease strictly follow these guidelines to ensure accuracy and consistency in the conversion. Your task is to accurately convert the content of the PDF image into Markdown format without adding any extra explanations or comments.\n",
+  "prompt_source": {
+   "pypi": "infinity-parser2==0.4.0",
+   "file": "infinity_parser2/prompts.py",
+   "name": "PROMPT_DOC2MD"
+  },
+  "card": "https://huggingface.co/infly/Infinity-Parser2-Pro",
+  "vllm_extra": "--trust-remote-code",
+  "weight_limit_bytes": 75000000000,
+  "gpus": 2,
+  "hours": 6
+ }
+]
