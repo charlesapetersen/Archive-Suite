@@ -151,10 +151,14 @@ def report():
 def write_md(out):
     pt = lambda x: f'{100 * x:.2f}'
     L = ['# OCR rerun noise on the owner\'s 96 (W46.ocr-rerun-noise)', '',
-         'Each route read the same 96 scored pages (the 99 settled jobs less the three agreement-only letters) three '
-         'times with nothing changed: the same images, prompt, temperature 0 and settings. Run 0 is the reading already '
-         'in the bench (Gemini: W46.fix-ocr-scorers-paid on 2026-10-23; Qwen: W41.mac-local-measure), runs 1 and 2 were '
-         'read for this item on 2026-10-30. NES is the panel\'s score (`ocr_panel_score.score`) against today\'s truth. '
+         'Each route read the same 96 scored pages (the 99 settled jobs less the three agreement-only letters) again '
+         'with nothing changed: the same images, prompt, temperature 0 and settings. Run 0 is the reading already in the '
+         'bench (Gemini: W46.fix-ocr-scorers-paid on 2026-10-23; Qwen: W41.mac-local-measure on 2026-10-15); the new '
+         'runs were read for this item on 2026-10-30. Gemini was read three times. Qwen was read twice: its run 1 '
+         'matched run 0, read 15 days earlier, byte for byte on every page, so a third greedy reading could not change '
+         'its spread, and on 2026-10-31 the Mac never had the 8 GB free that the memory guard asks for (run 1 peaked at '
+         '8.5 GB). `ocr_rerun_noise.py mlx --run 2` still reads it, and the report takes it in. '
+         'NES is the panel\'s score (`ocr_panel_score.score`) against today\'s truth. '
          '**Strict** counts a failed page as 0; **answered** averages the pages that run answered. Reproduce: '
          '`ArchiveProcessor/scripts/segbench/ocr_rerun_noise.py`.', '']
     for route, r in out['routes'].items():
@@ -212,8 +216,10 @@ def write_md(out):
           'gateway cache field differs (run 2), and it never reaches the model. Run 0 of Gemini was read on 2026-10-23, '
           'runs 1 and 2 on 2026-10-30, so 1-0 and 2-0 can include a provider change in that week; 2-1 is the same-day '
           'pair. The public 895 were not reread (the item measures the 96, where routes are chosen).',
-          '- **Noise:** this is the noise figure. Three runs make the range a rough estimate in its own right (a fourth '
-          'run would likely widen it), and the per-kind ranges rest on 2-50 pages; the 2 mixed pages are anecdote.',
+          '- **Noise:** this is the noise figure. Gemini\'s three runs make its range a rough estimate in its own right '
+          '(a fourth run would likely widen it), and the per-kind ranges rest on 2-50 pages; the 2 mixed pages are '
+          'anecdote. Qwen\'s zero rests on two runs 15 days apart, identical on every page, which is the evidence for '
+          'determinism, not a sample of a spread.',
           '- **Scope:** two routes. Other hosted models, other temperatures and other local runtimes are not measured; '
           'the rule above lends them these figures until they are. It says nothing about the 895.', '']
     (G.RESULTS / 'ocr-rerun-noise.md').write_text('\n'.join(L))
