@@ -2,6 +2,18 @@
 
 Tracked bugs we've chosen to come back to later. Each entry has enough context to resume cold.
 
+## OPEN (W46.measure-review, 2026-10-31 pass 2): segmentation scoring and kit evidence
+
+At baseline `9d8ab697`, `scripts/segbench/score.py::score_labels` counts unsure gaps as artificial agreements
+after `forgive`, rather than masking them from boundary metrics (`W46.seg-unsure-mask`).
+`scripts/segbench/institutional-compute/train_seg.py::cmd_check` can pass a non-shipped candidate without a
+shipped comparator, a paired interval or complete held-out coverage (`W46.kit-gate-coverage`). Synthetic
+reproductions and an independent refute-check confirmed both. The kit audit/anchor manifest retain pre-fold
+truth, several generated conclusions contradict their rescored tables, and thirteen reports lack the required
+card heading (`W46.seg-report-refresh`; label-clean already has an inline card). These are measurement defects;
+the large Lincoln cloud/open gap stands. Phase 4 waits on all three fixes. Evidence and scope:
+[`2026-10-31-2.md`](../execution-plans/processing-review/measure-reviews/2026-10-31-2.md).
+
 ## ⚠️ LIMITATION (W40.i-usb-build, 2026-10-31): what the iPhone cable route does not yet cover
 
 The iPhone's USB route (Cable on its Connect screen; `Net/USBMuxBridge.swift` on the Mac, `Net/USBRelay.swift` in the
