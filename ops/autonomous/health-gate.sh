@@ -307,6 +307,9 @@ step done-union-proof     bash "$ROOT/ops/autonomous/tests/prove-done-union.sh"
 step agent-hooks-proof    /usr/bin/python3 -m unittest discover -s "$ROOT/ops/agent/tests"
 step housekeeping-proof   bash "$ROOT/ops/autonomous/tests/prove-housekeeping.sh"
 step host-gui-proof       bash "$ROOT/ops/autonomous/tests/prove-no-host-gui.sh"
+# prove-heavy-unlocked.sh (~3 s, 35/0) — the hook that refuses a kraken, ketos, layout-order or mlx_vlm run
+#   outside the heavy lock (the 2026-10-31 panic).
+step heavy-unlocked-proof bash "$ROOT/ops/autonomous/tests/prove-heavy-unlocked.sh"
 step exit-log-proof       bash "$ROOT/ops/autonomous/tests/prove-exit-logging.sh"
 step harness-lifecycle-proof python3 "$ROOT/ops/autonomous/tests/prove-harness-lifecycle.py"
 step review-cadence-proof bash "$ROOT/ops/autonomous/tests/prove-review-cadence.sh"

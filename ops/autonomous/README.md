@@ -60,7 +60,12 @@ The xcodebuild PATH shim intercepts direct builds after unattended and sandbox r
 `-showBuildSettings`, `-version` and `-showsdks` build nothing and pass straight through unlocked. Whole-script
 entries cover suite/app smokes, Processor headless tests, scale/standalone compiler and Android test
 lanes, the health gate, both VM test routes and VM accessibility seeding. Explicit build commands outside the shim should use
-`python3 ops/autonomous/heavy-run.py run -- COMMAND ...`.
+`python3 ops/autonomous/heavy-run.py run -- COMMAND ...`. So does every model or segmenter run, background runs
+included (owner, 2026-10-31, after unlocked Vision and kraken runs beside two other sessions exhausted memory and
+the Mac panicked). Those tools are called by absolute path, which a PATH shim never sees, so
+`.claude/hooks/heavy-unlocked.sh` refuses kraken, ketos, layout-order and mlx_vlm outside `heavy-run.py` or
+run-guarded.sh in unattended sessions (`tests/prove-heavy-unlocked.sh`, a gate step). A script that runs them
+itself is not seen by the hook; the session prompt tells sessions to wrap it.
 
 Nested calls reuse ownership only after checking the token and the published child session/ancestry.
 The lock has no age expiry. Child-session and nested-entry records protect surviving tools even if the supervisor

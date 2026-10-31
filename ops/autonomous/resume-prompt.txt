@@ -144,6 +144,13 @@ STEP 3 — DO IT, honoring the PRIME DIRECTIVES verbatim. The non-negotiables (a
     `build` first and then `test` compiles twice and waits twice for the Mac-wide heavy lock. Use a bare `build`
     only where there is nothing to test (Processor). `-list`, `-showBuildSettings`, `-version`, `-showsdks` take
     no lock.
+  * Every model or segmenter run, and any other job that loads a model or works through a page set, takes the
+    same lock: `python3 ops/autonomous/heavy-run.py run -- <command>` (or Vision OCR's run-guarded.sh). That
+    includes a run you send to the background: wrap the whole pipeline in one call and use the Bash tool's
+    run_in_background, never a bare trailing `&` or nohup. On 2026-10-31 Vision lines and kraken blla started
+    unlocked in the background beside two other sessions, and the Mac panicked out of memory and disk.
+    `.claude/hooks/heavy-unlocked.sh` refuses kraken, ketos, layout-order and mlx_vlm outside the lock; a
+    script that runs them itself is not seen by the hook, so wrap the script.
   * CHECKPOINT as you go — this is what bounds redo if you're interrupted (usage cutoff / watchdog kill), so
     keep the distance between checkpoints SHORT: on a kill you lose only what you wrote since your last push,
     so push OFTEN. Checkpoint at the SMALLEST self-contained build-GREEN unit — a single new file/type that
