@@ -186,20 +186,25 @@ struct TagEditorView: View {
     /// W40.fix-reader-date-ambiguity: a file with two tags for one date facet says which one the date uses and
     /// which was set aside. Either may be the wrong one: a set-aside tag is a subject chip above, and the kept
     /// one is replaced by setting the date below.
+    /// One accessibility element whose label is the whole message (a bare `Label` keeps its text on a child).
     @ViewBuilder private func dateAmbiguityNotice() -> some View {
-        let ambiguous = model.selectedFiles.filter(\.dateIsAmbiguous)
-        if ambiguous.count == 1, model.selectedFiles.count == 1, let text = ambiguous[0].dateAmbiguityText {
-            Label("\(text) Remove the wrong tag: a set-aside one under Subjects, or the kept one by setting the date below.", systemImage: "calendar.badge.exclamationmark")
+        if let message = dateAmbiguityMessage {
+            Label(message, systemImage: "calendar.badge.exclamationmark")
                 .font(.caption).foregroundStyle(.orange)
                 .fixedSize(horizontal: false, vertical: true)
-                .accessibilityIdentifier("ar.tagEditor.dateAmbiguity")
-        } else if !ambiguous.isEmpty {
-            Label("\(ambiguous.count) of the selected files have two tags for one date. Open one to see which.",
-                  systemImage: "calendar.badge.exclamationmark")
-                .font(.caption).foregroundStyle(.orange)
-                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(message)
                 .accessibilityIdentifier("ar.tagEditor.dateAmbiguity")
         }
+    }
+
+    private var dateAmbiguityMessage: String? {
+        let ambiguous = model.selectedFiles.filter(\.dateIsAmbiguous)
+        if ambiguous.count == 1, model.selectedFiles.count == 1, let text = ambiguous[0].dateAmbiguityText {
+            return "\(text) Remove the wrong tag: a set-aside one under Subjects, or the kept one by setting the date below."
+        }
+        return ambiguous.isEmpty ? nil
+            : "\(ambiguous.count) of the selected files have two tags for one date. Open one to see which."
     }
 
     private var parsedSentWith: ArchiveDate? {

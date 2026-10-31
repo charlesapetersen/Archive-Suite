@@ -9,7 +9,7 @@ Format and statuses: [`README.md`](README.md). Written by `W40.b1`, 2026-10-12.
   `W23.m9`, `W24.jpeg1`, `W24.cal1-reader`, `W26.walk2`, `W14.2-fu`). `SPEC/tag-format.md` is the contract
   behind R-05 and R-45.
 - **Sources and code read at:** `caefe33a`.
-- **Count:** `unproven 37 · works 4 · broken 4 · unreachable 1 · fixed-pending-recheck 1 · dropped 1` (works: R-21, R-25, R-28, R-29; broken: R-11, R-13, R-23, R-45; unreachable: R-47; fixed-pending-recheck: R-46; dropped: R-26). Updated by `W48.appearance-reader`, 2026-10-31.
+- **Count:** `unproven 37 · works 5 · broken 4 · fixed-pending-recheck 1 · dropped 1` (works: R-21, R-25, R-28, R-29, R-47; broken: R-11, R-13, R-23, R-45; fixed-pending-recheck: R-46; dropped: R-26). Updated by `W40.fix-reader-date-ambiguity`, 2026-10-31.
 
 **Runtime evidence, for every row below: none yet.** The W40.a3 full VM suite
 ([`evidence/reader/W40.a3-full-ui.md`](evidence/reader/W40.a3-full-ui.md), `a5ab9e3c`) passed every UITest
@@ -1009,20 +1009,27 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
 - **Promise:** a file with two tags of the same date facet (two Years, two Months, two `Sent With` values) is
   read by a deterministic rule and flagged as ambiguous, so the user can see it needs review.
 - **Promised in:** `CLAUDE.md` §Edge cases ("Multiple same-facet date tags … deterministic rule + flag
-  ambiguous"); `SPEC/tag-format.md` facet table, Sent With row ("last wins, the earlier is demoted to a subject
-  (`sentWithIsAmbiguous`)").
-- **Reached by:** **none found.** The deterministic rule exists. For Sent With the flag exists too:
-  `DocumentTags.sentWithIsAmbiguous` (`packages/ArchiveCore/Sources/ArchiveCore/Tags/DocumentTags.swift:125`).
-  No app reads it; Periphery reported it unused across all three apps' index stores (`W40.e5`), and only
-  `ArchiveCoreTests/DualDateTests` touches it. No flag exists for two Years or two Months. Searched:
-  `ambiguous` in `ArchiveReader/macOS/Sources` and `packages/ArchiveCore/Sources`.
-- **Real-path test:** none.
-- **Runtime evidence:** none.
-- **Status:** `unreachable`
+  ambiguous"); `SPEC/tag-format.md` facet table and its paragraph on two tokens for one date facet.
+- **Reached by:** `DocumentTags.dateAmbiguities` / `dateIsAmbiguous` (`packages/ArchiveCore/Sources/ArchiveCore/Tags/DocumentTags.swift`)
+  name each facet (Year, Month, Day, Decade, Sent With) whose last-wins rule set a tag aside. The Reader's Date
+  cell shows a warning mark whose tooltip and accessibility label name the set-aside tag
+  (`Views/AppKitTableView.swift`); the ⌘I sheet says the same above the date editors (`Views/TagEditorView.swift`,
+  `ar.tagEditor.dateAmbiguity`); the filter bar's "N ambiguous date(s)" toggle (`ar.filter.ambiguousDates`,
+  `LibraryFilter.ambiguousDatesOnly`) lists every such file and saves with a smart folder.
+- **Real-path test:** `ArchiveReaderUITests/NavigationUITests.testTwoYearTagsAreFlaggedAndTheFilterFindsThem`
+  (fixture `00006`, tagged `1983` and `1984`); unit: `ArchiveCoreTests/DateAmbiguityTests`,
+  `LibrarySortFilterTests`, `SavedSearchTests` (a filter saved before the field still decodes).
+- **Runtime evidence:** the VM run of 2026-10-31 passed (28 s): the toggle reads "1 ambiguous date", the
+  filter lists only `00006`, its Date cell reads `1984 ⚠` with "Two Year tags: 1984 is used, 1983 was set
+  aside.", and the ⌘I sheet shows that notice. Screenshots:
+  `verification/evidence/reader/W40.fix-reader-date-ambiguity-filtered-row.jpg`, `…-sheet.jpg`.
+- **Status:** `works`
 - **History:**
   - 2026-10-16 W40.e5 — row written, `unreachable` (found by the dead-code scan).
-- **Notes:** a Daemon Report decision (2026-10-16): show the flag in the Reader, or drop "flag ambiguous" from
-  the guide and the SPEC.
+  - 2026-10-16 walkthrough — owner: show the flag; the promise stays.
+  - 2026-10-31 W40.fix-reader-date-ambiguity — `works`, on the VM run above.
+- **Notes:** the last-wins rule is unchanged; the flag only names what it set aside. A Year beside a Decade is
+  not ambiguous (a Year supersedes a Decade), nor is a set-aside token that only repeats the kept one.
 
 ### R-48 · The Appearance setting
 
