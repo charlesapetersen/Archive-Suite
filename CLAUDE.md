@@ -149,7 +149,7 @@ administration and staged changes, and removes its worktree registration. A retr
 its own item. Codex retries start inside the previous checkout or a restored copy, including uncommitted and
 staged changes (`AGENT_RESUME_WORKTREE`); continue there and reconcile newer main changes before shipping.
 Failed restoration stops the launch instead of silently starting over. These recovery copies are ordinary
-directories and must not be edited or deleted by a session. Active or claimed worktrees are left alone.
+directories and must not be edited or deleted by a session; only the walkthrough moves them to the Trash, once their item is finished (owner, 2026-10-31; `ops/autonomous/README.md` §"The bench cache"). Active or claimed worktrees are left alone.
 
 **Subagents that write files** must be isolated the same way — pass `isolation: "worktree"` to the Agent
 tool (or `{isolation: 'worktree'}` on a `Workflow` `agent()` call) so each gets its own scratch worktree

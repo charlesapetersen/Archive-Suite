@@ -24,7 +24,7 @@ rebuildable PDFs, disk 926 GB with 32 GB free):
     mlx-hf at 30.6 GB with every model once.
   * available disk (free plus purgeable) 30 GB: the engine parks at 10 GB (MINFREE_MB); 30 leaves room for a model download and a build.
 Environments are listed with their PyTorch version, so a private copy of the shared stack (segbench/torch-env.sh)
-shows up. Retired worktrees are listed for the owner; nothing here removes them.
+shows up. Retired worktrees are listed; the walkthrough moves them to the Trash, nothing here removes them.
 """
 import argparse
 import os
@@ -138,7 +138,7 @@ def report():
         lines.append('  (%s in private PyTorch environments)' % gb(sum(e[2] for e in torch_envs)))
     if RETIRED.is_dir():
         trees = sorted(p for p in RETIRED.iterdir() if p.is_dir())
-        lines.append('retired worktrees, for the owner (never deleted here): %d in %s, %s'
+        lines.append('retired worktrees (the walkthrough Trashes them; never deleted here): %d in %s, %s'
                      % (len(trees), RETIRED, gb(du_bytes(RETIRED)) if trees else '0 GB'))
         for p in trees:
             try:

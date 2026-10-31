@@ -1466,9 +1466,11 @@ owner to copy it back to its original path, rather than failing or downloading i
 | `enh-ocr-input/` (`stage`, `weights`, `src`) | 4.3 GB | enhancement arms | after W46.enh-ocr-input-marks and -ppocr |
 | `ent-robust/g17` | 4.0 GB | the G17 entity set | after W46.ent-robust-paid |
 
-Never moved or deleted here: `mlx-hf/` (the one model cache, above; a local model is a product goal), the retired worktrees in
-`$STATE/retired-worktrees` (the engine's recovery copies, listed in the report for the owner) and owner session
-folders.
+Never moved or deleted here: `mlx-hf/` (the one model cache, above; a local model is a product goal) and owner session
+folders. The retired worktrees in `$STATE/retired-worktrees` (the engine's recovery copies, listed in the report) are
+not the owner's to clear: the walkthrough moves each to the Trash, unasked, once its item is finished and its
+`refs/agent-manager/recovered` ref exists (owner, 2026-10-31; `~/Claude/CLAUDE.md`, "The walkthrough", step 7).
+Engine sessions leave them alone.
 
 ## The measurement review — `W46.measure-review`, `ops/agent/measure-review.py` (owner, 2026-10-30)
 
