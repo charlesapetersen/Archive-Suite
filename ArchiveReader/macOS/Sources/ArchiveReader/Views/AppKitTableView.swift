@@ -1062,6 +1062,34 @@ final class WrappingTokenField: NSTokenField {
         }
     }
 
+    // MARK: Accessibility: the chips as drawn
+
+    /// The chips' accessibility elements, kept while the subjects are the same so an assistive app keeps its place.
+    private var chipElements: [NSAccessibilityElement] = []
+
+    /// While the chips are drawn, the field reports them rather than the cell's native tokens: those are wider than
+    /// the chips, so at some widths they wrapped to a second line the row was never measured for, and accessibility
+    /// placed a subject below its row (the layout guard: `1983` 17 pt under a 22-pt row at File tags 193 pt,
+    /// W40.fix-reader-vm-suite-red). One element per chip, named by its subject, at the frame it is drawn in. The
+    /// native tokens return with the field editor, which draws them.
+    override func accessibilityChildren() -> [Any]? {
+        guard !isBeingEdited else { return super.accessibilityChildren() }
+        let layout = chipsLayout(width: bounds.width)
+        if chipElements.map({ $0.accessibilityLabel() ?? "" }) != layout.chips.map(\.title) {
+            chipElements = layout.chips.map { chip in
+                let element = NSAccessibilityElement()
+                element.setAccessibilityRole(.staticText)
+                element.setAccessibilityLabel(chip.title)
+                element.setAccessibilityParent(self)
+                return element
+            }
+        }
+        for (element, chip) in zip(chipElements, layout.chips) {
+            element.setAccessibilityFrameInParentSpace(TagChips.viewRect(chip.frame, in: bounds, flipped: isFlipped))
+        }
+        return chipElements
+    }
+
     override func becomeFirstResponder() -> Bool {
         let accepted = super.becomeFirstResponder()
         if accepted { DispatchQueue.main.async { [weak self] in self?.onEditingChange?() } }

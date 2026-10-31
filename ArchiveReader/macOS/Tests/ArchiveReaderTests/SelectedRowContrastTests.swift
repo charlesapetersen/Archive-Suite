@@ -247,6 +247,36 @@ final class SelectedRowContrastTests: XCTestCase {
                        TagChips.chipHeight(for: font) + 2 * TagChips.verticalInset)
     }
 
+    /// W40.fix-reader-vm-suite-red: accessibility reports the chips the field draws, at the frames it draws them in,
+    /// not the cell's native tokens, which are wider and wrapped `1983` onto a second line below a one-line row.
+    /// The field is as tall as its chips and every element sits inside it; the same element objects come back
+    /// while the subjects are the same.
+    func testAccessibilityReportsTheDrawnChips() throws {
+        let cell = TagTokenCellView(frame: NSRect(x: 0, y: 0, width: 197, height: 22))
+        let field = cell.tokenField
+        field.font = .systemFont(ofSize: NSFont.systemFontSize)
+        field.objectValue = ["Orwell Reference", "1983"]
+        cell.layoutSubtreeIfNeeded()
+        let layout = field.chipsLayout(width: field.bounds.width)
+        XCTAssertEqual(Set(layout.chips.map { $0.frame.minY }).count, 1, "the two chips fit one line at 193 pt")
+
+        let children = try XCTUnwrap(field.accessibilityChildren() as? [NSAccessibilityElement])
+        XCTAssertEqual(children.map { $0.accessibilityLabel() }, ["Orwell Reference", "1983"])
+        for (element, chip) in zip(children, layout.chips) {
+            XCTAssertEqual(element.accessibilityRole(), .staticText)
+            XCTAssertTrue(element.accessibilityParent() as? NSView === field)
+            let frame = element.accessibilityFrameInParentSpace()
+            XCTAssertEqual(frame.size, chip.frame.size, "\(chip.title)")
+            XCTAssertTrue(field.bounds.contains(frame), "\(chip.title) at \(frame) leaves the field \(field.bounds)")
+        }
+        let again = try XCTUnwrap(field.accessibilityChildren() as? [NSAccessibilityElement])
+        XCTAssertTrue(zip(children, again).allSatisfy { $0 === $1 }, "unchanged subjects keep their elements")
+
+        field.objectValue = ["Economics"]
+        let changed = try XCTUnwrap(field.accessibilityChildren() as? [NSAccessibilityElement])
+        XCTAssertEqual(changed.map { $0.accessibilityLabel() }, ["Economics"])
+    }
+
     // MARK: - Helpers
 
     private func render(_ scroll: NSScrollView, artifact: String) throws -> (CGImage, CGFloat) {

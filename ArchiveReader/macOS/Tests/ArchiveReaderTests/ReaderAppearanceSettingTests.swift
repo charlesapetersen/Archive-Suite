@@ -33,18 +33,43 @@ final class ReaderAppearanceSettingTests: XCTestCase {
         let key = AppAppearance.defaultsKey
 
         defaults.set("dark", forKey: key)
-        ReaderAppearanceUITestDefaults.clearStoredChoiceIfUITest(arguments: ["ArchiveReader"], defaults: defaults)
+        ReaderUITestDefaults.clearStoredStateIfUITest(arguments: ["ArchiveReader"], defaults: defaults)
         XCTAssertEqual(defaults.string(forKey: key), "dark", "a real launch never loses the owner's choice")
 
-        ReaderAppearanceUITestDefaults.clearStoredChoiceIfUITest(
+        ReaderUITestDefaults.clearStoredStateIfUITest(
             arguments: ["ArchiveReader", "-ARUITestRootPath", "/tmp/x", "-ARUITestKeepAppearance", "YES"],
             defaults: defaults)
         XCTAssertEqual(defaults.string(forKey: key), "dark", "the relaunch check keeps the choice")
 
-        ReaderAppearanceUITestDefaults.clearStoredChoiceIfUITest(
+        ReaderUITestDefaults.clearStoredStateIfUITest(
             arguments: ["ArchiveReader", "-ARUITestRootPath", "/tmp/x"], defaults: defaults)
         XCTAssertNil(defaults.string(forKey: key))
         XCTAssertEqual(AppAppearance.stored(in: defaults), .system)
+    }
+
+    /// W40.fix-reader-vm-suite-red: a test that stopped with the sidebar hidden hid it from every later test.
+    func testAFixtureUITestLaunchShowsTheSidebarAndClosesTheTagCloud() {
+        let (defaults, name) = scratchDefaults()
+        defer { defaults.removePersistentDomain(forName: name) }
+        func store() {
+            defaults.set(false, forKey: "ar.showSidebar")
+            defaults.set(true, forKey: "ar.showTagCloud")
+        }
+
+        store()
+        ReaderUITestDefaults.clearStoredStateIfUITest(arguments: ["ArchiveReader"], defaults: defaults)
+        XCTAssertEqual(defaults.object(forKey: "ar.showSidebar") as? Bool, false, "a real launch keeps the panes")
+        XCTAssertEqual(defaults.object(forKey: "ar.showTagCloud") as? Bool, true)
+
+        for keep in [false, true] {
+            store()
+            ReaderUITestDefaults.clearStoredStateIfUITest(
+                arguments: ["ArchiveReader", "-ARUITestRootPath", "/tmp/x"]
+                    + (keep ? ["-ARUITestKeepAppearance", "YES"] : []),
+                defaults: defaults)
+            XCTAssertNil(defaults.object(forKey: "ar.showSidebar"), "keep appearance \(keep)")
+            XCTAssertNil(defaults.object(forKey: "ar.showTagCloud"), "keep appearance \(keep)")
+        }
     }
 
     func testApplySetsTheApplicationAppearance() {

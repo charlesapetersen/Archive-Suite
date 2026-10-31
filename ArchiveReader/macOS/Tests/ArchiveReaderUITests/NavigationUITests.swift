@@ -76,8 +76,8 @@ final class NavigationUITests: FixtureUITestCase {
         RunLoop.current.run(until: Date().addingTimeInterval(0.5))
 
         if sidebarInitiallyVisible {
-            // After toggle, sidebar should be hidden.
-            XCTAssertFalse(allFiles.exists, "Sidebar should be hidden after toggle")
+            // After toggle, sidebar should be hidden, once its slide-out has finished.
+            XCTAssertTrue(allFiles.waitForNonExistence(timeout: 3), "Sidebar should be hidden after toggle")
         }
 
         // Toggle again — sidebar should return to its original state.

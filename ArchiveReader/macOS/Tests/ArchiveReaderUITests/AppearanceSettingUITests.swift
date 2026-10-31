@@ -8,7 +8,7 @@ import AppKit
 ///
 /// A window's appearance is read off its pixels (its mean luminance), because the accessibility tree does not carry
 /// it. These tests launch without the light/dark argument so the stored setting decides; each fixture launch starts
-/// from System (`ReaderAppearanceUITestDefaults`), and the relaunches pass `-ARUITestKeepAppearance` to keep it.
+/// from System (`ReaderUITestDefaults`), and the relaunches pass `-ARUITestKeepAppearance` to keep it.
 /// Read-only on the fixture: the one sheet used (Save Search) is cancelled. Screenshots: `[shot] appearance-*`.
 /// The Notes twin is `ArchiveNotesUITests/AppearanceSettingUITests`.
 final class AppearanceSettingUITests: FixtureUITestCase {

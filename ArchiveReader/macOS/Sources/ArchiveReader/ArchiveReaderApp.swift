@@ -31,7 +31,7 @@ struct ArchiveReaderApp: App {
 #if DEBUG
             let appearanceForced = UITestAppearance.applyIfRequested()   // the layout guard's light/dark passes (W40.e9)
             TransientRecorder.startIfRequested()  // the transient-state check (W40.e13)
-            ReaderAppearanceUITestDefaults.clearStoredChoiceIfUITest()
+            ReaderUITestDefaults.clearStoredStateIfUITest()
 #else
             let appearanceForced = false
 #endif
