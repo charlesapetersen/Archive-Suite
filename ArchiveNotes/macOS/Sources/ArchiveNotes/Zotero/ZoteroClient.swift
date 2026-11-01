@@ -63,6 +63,38 @@ struct ZoteroCSLItem: Codable, Sendable, Equatable {
             case dateParts = "date-parts"
             case raw
         }
+
+        init(dateParts: [[Int]]? = nil, raw: String? = nil) {
+            self.dateParts = dateParts
+            self.raw = raw
+        }
+
+        /// CSL allows a date part to be a number or a numeric string, and Zotero's local API writes strings
+        /// (`"date-parts": [["1843"]]`). Each row keeps its parts up to the first one that is not a whole
+        /// number, so a year survives an unreadable month rather than the whole item failing to decode.
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            raw = try? container.decodeIfPresent(String.self, forKey: .raw)
+            let rows = try? container.decodeIfPresent([[DatePart]].self, forKey: .dateParts)
+            dateParts = rows.map { rows in
+                rows.map { row in Array(row.prefix { $0.value != nil }.compactMap(\.value)) }
+            }
+        }
+
+        private struct DatePart: Decodable {
+            let value: Int?
+
+            init(from decoder: Decoder) throws {
+                let container = try decoder.singleValueContainer()
+                if let number = try? container.decode(Int.self) {
+                    value = number
+                } else if let text = try? container.decode(String.self) {
+                    value = Int(text.trimmingCharacters(in: .whitespaces))
+                } else {
+                    value = nil
+                }
+            }
+        }
     }
 }
 
@@ -322,12 +354,31 @@ actor ZoteroClient {
         let (data, resp) = try await transport.send(req)
         guard resp.statusCode == 200 else { throw ClientError.itemNotFound }
 
-        // Local API returns a JSON object with a "csljson" key.
-        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let cslJSON = json["csljson"] else {
+        // Local API returns a JSON object with a "csljson" key. Zotero 7+ puts a string there that holds
+        // a CSL array (measured on 10.0.6, W40.d10); an object or an array is accepted too.
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             throw ClientError.unexpectedResponse
         }
-        let cslData = try JSONSerialization.data(withJSONObject: cslJSON)
+        switch json["csljson"] {
+        case let text as String:
+            return try parseCSLArray(text)
+        case let items as [Any]:
+            guard let first = items.first else { throw ClientError.itemNotFound }
+            return try decodeCSLObject(first)
+        case let object as [String: Any]:
+            return try decodeCSLObject(object)
+        default:
+            throw ClientError.unexpectedResponse
+        }
+    }
+
+    /// `data(withJSONObject:)` raises an Objective-C exception (an abort) on a value it cannot encode,
+    /// so only a validated dictionary ever reaches it.
+    private func decodeCSLObject(_ value: Any) throws -> ZoteroCSLItem {
+        guard let object = value as? [String: Any], JSONSerialization.isValidJSONObject(object) else {
+            throw ClientError.unexpectedResponse
+        }
+        let cslData = try JSONSerialization.data(withJSONObject: object)
         return try JSONDecoder().decode(ZoteroCSLItem.self, from: cslData)
     }
 

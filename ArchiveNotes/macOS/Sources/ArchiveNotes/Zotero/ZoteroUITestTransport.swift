@@ -15,11 +15,11 @@ private struct ZoteroUITestTransport: ZoteroTransport {
         if query.contains(where: { $0.name == "limit" }) { return response(url, status: 200, object: [:]) }
         switch include {
         case "csljson":
-            return response(url, status: 200, object: ["csljson": [
-                "title": "Analytical Engine Notes",
-                "author": [["family": "Lovelace", "given": "Ada"]],
-                "issued": ["date-parts": [[1843]]],
-            ]])
+            // Zotero's real shape: a string holding a CSL array, with the date parts as strings (W40.d10).
+            return response(url, status: 200, object: ["csljson": """
+                [{"title": "Analytical Engine Notes", "author": [{"family": "Lovelace", "given": "Ada"}], \
+                "issued": {"date-parts": [["1843"]]}}]
+                """])
         case "bib":
             if url.path.contains("FAIL1234") { throw URLError(.cannotConnectToHost) }
             if url.path.contains("NOTE1234") {

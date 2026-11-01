@@ -110,13 +110,8 @@ final class IntegrationJourneyUITests: NotesFixtureUITestCase {
             let opened = sheet.waitForExistence(timeout: 20)
             let crashed = app.state == .notRunning
             print("[d10] auto-fill sheet opened: \(opened); Notes running: \(!crashed) (state \(app.state.rawValue))")
-            let known = XCTExpectedFailure.Options(); known.isStrict = false
-            XCTExpectFailure("W40.fix-notes-zotero-csljson-crash (S2): Zotero's local API returns `csljson` as a "
-                             + "string holding an array; ZoteroClient hands it to JSONSerialization, which throws "
-                             + "an Objective-C exception, and Notes aborts", options: known) {
-                XCTAssertFalse(crashed, "N-44: Auto-fill from the real Zotero must not crash Notes")
-                XCTAssertTrue(opened, "N-44: Auto-fill should open the confirmation with Zotero's metadata")
-            }
+            XCTAssertFalse(crashed, "N-44: Auto-fill from the real Zotero must not crash Notes")
+            XCTAssertTrue(opened, "N-44: Auto-fill should open the confirmation with Zotero's metadata")
             guard opened, !crashed else { return }
             shot(app.windows["Archive Notes"], "d10-autofill-sheet")
             app.descendants(matching: .any)["an.zotero.autofill.apply"].firstMatch.click()

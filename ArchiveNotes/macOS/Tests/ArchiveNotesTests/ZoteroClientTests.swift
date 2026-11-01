@@ -28,6 +28,16 @@ actor StubZoteroTransport: ZoteroTransport {
         _responses.append((data, resp))
     }
 
+    func enqueue(statusCode: Int, data: Data) {
+        let resp = HTTPURLResponse(
+            url: URL(string: "http://127.0.0.1:23119")!,
+            statusCode: statusCode,
+            httpVersion: nil,
+            headerFields: nil
+        )!
+        _responses.append((data, resp))
+    }
+
     func enqueueError(_ error: Error = URLError(.timedOut)) {
         _pendingErrors.append(error)
     }
@@ -268,6 +278,84 @@ private func makeRef(key: String = "ABCD1234", library: ZoteroLibrary = .user) -
         #expect(csl.title == "Group Item")
         let fetchReq = await stub.invocations.last!.request
         #expect(fetchReq.url?.path.contains("/groups/42/") == true)
+    }
+}
+
+// MARK: - Zotero's real local-API response (W40.fix-notes-zotero-csljson-crash)
+
+/// Zotero 10.0.6's body for `GET /api/users/0/items/5SXHDTMB?include=csljson`, other keys trimmed, as measured
+/// by W40.d10 (`verification/evidence/notes/W40.d10-integrations.md`): `csljson` is a string holding an array,
+/// and the date parts are strings.
+private let realZoteroCSLBody = #"""
+{"key": "5SXHDTMB", "csljson": "[\n\t{\n\t\t\"id\": \"http://zotero.org/users/local/JeE49aLm/items/5SXHDTMB\",\n\t\t\"type\": \"book\",\n\t\t\"publisher\": \"Richard and John E. Taylor\",\n\t\t\"publisher-place\": \"London\",\n\t\t\"title\": \"Notes on the Analytical Engine (W40.d10 seed)\",\n\t\t\"author\": [\n\t\t\t{\n\t\t\t\t\"family\": \"Lovelace\",\n\t\t\t\t\"given\": \"Ada\"\n\t\t\t}\n\t\t],\n\t\t\"issued\": {\n\t\t\t\"date-parts\": [\n\t\t\t\t[\n\t\t\t\t\t\"1843\"\n\t\t\t\t]\n\t\t\t]\n\t\t}\n\t}\n]"}
+"""#
+
+@Suite struct ZoteroLocalAPIShapeTests {
+
+    private func localAPIClient(body: Data) async -> ZoteroClient {
+        let stub = StubZoteroTransport()
+        await stub.enqueueError(URLError(.cannotConnectToHost))
+        await stub.enqueue(statusCode: 200, json: makeLocalAPIProbeResponse())
+        await stub.enqueue(statusCode: 200, data: body)
+        return ZoteroClient(transport: stub)
+    }
+
+    @Test func realZoteroBodyDecodes() async throws {
+        let client = await localAPIClient(body: Data(realZoteroCSLBody.utf8))
+        let csl = try await client.fetchCSL(makeRef(key: "5SXHDTMB"))
+
+        #expect(csl.title == "Notes on the Analytical Engine (W40.d10 seed)")
+        #expect(csl.type == "book")
+        #expect(csl.author?.first?.family == "Lovelace")
+        #expect(csl.author?.first?.given == "Ada")
+        #expect(csl.issued?.dateParts == [[1843]])
+        let (date, precision) = csl.mappedDate()
+        #expect(date == "1843")
+        #expect(precision == .year)
+    }
+
+    @Test func arrayValueDecodes() async throws {
+        let body = #"{"csljson": [{"title": "Array Item", "issued": {"date-parts": [[1936, "11"]]}}]}"#
+        let client = await localAPIClient(body: Data(body.utf8))
+        let csl = try await client.fetchCSL(makeRef())
+
+        #expect(csl.title == "Array Item")
+        #expect(csl.issued?.dateParts == [[1936, 11]])
+    }
+
+    @Test func emptyArrayIsItemNotFound() async {
+        let client = await localAPIClient(body: Data(#"{"csljson": "[]"}"#.utf8))
+        await #expect(throws: ZoteroClient.ClientError.self) { try await client.fetchCSL(makeRef()) }
+    }
+
+    /// Each of these used to reach `data(withJSONObject:)` unchecked; a string raised an Objective-C
+    /// exception and aborted the app. All must come back as a thrown error.
+    @Test(arguments: [
+        #"{"csljson": 42}"#,
+        #"{"csljson": null}"#,
+        #"{"csljson": "not json"}"#,
+        #"{"csljson": "{\"title\": \"an object, not an array\"}"}"#,
+        #"{"csljson": [42]}"#,
+        #"{}"#,
+    ])
+    func unusableValuesThrowInsteadOfCrashing(body: String) async {
+        let client = await localAPIClient(body: Data(body.utf8))
+        await #expect(throws: (any Error).self) { try await client.fetchCSL(makeRef()) }
+    }
+
+    @Test func datePartsKeepTheLeadingWholeNumbers() throws {
+        let json = #"[{"issued": {"date-parts": [["1843", "spring"], [" 1844 ", 2, "3"], [1.5]], "raw": "1843"}}]"#
+        let item = try JSONDecoder().decode([ZoteroCSLItem].self, from: Data(json.utf8))[0]
+        #expect(item.issued?.dateParts == [[1843], [1844, 2, 3], []])
+        #expect(item.issued?.raw == "1843")
+    }
+
+    @Test func malformedDateDoesNotFailTheItem() throws {
+        let json = #"[{"title": "Kept", "issued": {"date-parts": "1843", "raw": 1843}}]"#
+        let item = try JSONDecoder().decode([ZoteroCSLItem].self, from: Data(json.utf8))[0]
+        #expect(item.title == "Kept")
+        #expect(item.issued?.dateParts == nil)
+        #expect(item.issued?.raw == nil)
     }
 }
 
