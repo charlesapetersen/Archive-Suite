@@ -91,6 +91,15 @@ class Compare(unittest.TestCase):
         with self.assertRaises(SystemExit):
             T.correct("p088", "we don t go, don t")  # ambiguous: two matches
 
+    def test_struck_words_stay_in_the_scored_text_and_are_recorded(self):
+        text = T.correct("p077", "which I think believe has")
+        self.assertEqual(text, "which I believe think has")
+        self.assertEqual(T.struck("p077", text), [{"fragment": "which I believe think", "offset": 0,
+                                                    "struck": ["believe"], "owner_read": True}])
+        self.assertEqual(T.struck("p001", "anything"), [])
+        with self.assertRaises(SystemExit):
+            T.struck("p077", "which I think believe has")  # the record follows the corrected text, never the old
+
 
 if __name__ == "__main__":
     unittest.main()

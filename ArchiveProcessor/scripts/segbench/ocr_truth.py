@@ -655,7 +655,34 @@ def spans(a: list[str], b: list[str]) -> list[dict]:
 # 2026-10-29): found by W46.truth-jpeg-upgrade's check against the JPEG originals. Each (old, new) must occur
 # exactly once. Fragments only, because the repo is public. p088: the handwritten "don't" is in the truth twice
 # (the page has it once). p025: the original and the letterhead read "San Francisco 6".
-CORRECTIONS = {"p088": [(" don t", "")], "p025": [("San Francisco 4,", "San Francisco 6,")]}
+#
+# W46.ocr-hands-rescore (owner, the blind handwriting sheet, 2026-10-31; ocr-truth/hands/rulings.json): the hand
+# places where he ruled the truth wrong. p049: the [illegible] word is the one Qwen3.6-27B read ("governed"), the
+# reading he picked. p050: his typed reading of h12; h15's words are not on the page; h14 is struck text he cannot
+# read, so it is scored as [illegible] (STRUCK keeps the drafters' words, unverified). p052 "directed" is
+# tentative (he would need the next page). p077 (control c15): the struck "believe" comes before "think". Not
+# edited: placement-only answers (p048 h01, p052 h00/h01), where the text is already in the truth once.
+CORRECTIONS = {"p088": [(" don t", "")], "p025": [("San Francisco 4,", "San Francisco 6,")],
+               "p045": [("meritocraty,", "meritocracy,")],
+               "p047": [("Ewbank", "Eubank")],
+               "p048": [("6/23 - [illegible]", "6/23 - HWP")],
+               "p049": [('"imperialism" & badly [illegible] by racial', '"insuperable" or heavily governed by social')],
+               "p050": [("expanded. and and [illegible] The cultural and economic", "expanded. The and and economic"),
+                        ("quality popular culture and of", "quality of"),
+                        ("pretty crimes like robery", "[illegible]")],
+               "p052": [("having devoted", "having directed")],
+               "p054": [("class interest", "class culture"), ("our patterns", "our modern experience.")],
+               "p055": [("N.Y. Bell", "N.Y. Bill")],
+               "p077": [("which I think believe", "which I believe think")]}
+
+# Struck (crossed-out) words, owner 2026-10-31: mark and score. The scored truth keeps struck words as plain text,
+# because no reader is yet asked to mark them; `apply` writes this record to truth-struck.json so a scorer that
+# asks for marks can use it. Each entry: (fragment of the corrected text, the struck words in it in order,
+# whether the owner read them). p050 h14's words are the drafters', which he could not read.
+STRUCK = {"p050": [("was had becoming deteriorated", ["was", "becoming"], True),
+                   ("The aged poor", ["aged"], True),
+                   ("increasing [illegible] in", ["pretty", "crimes", "like", "robery"], False)],
+          "p077": [("which I believe think", ["believe"], True)]}
 
 
 def correct(page: str, text: str) -> str:
@@ -664,6 +691,17 @@ def correct(page: str, text: str) -> str:
             raise SystemExit(f"{page}: correction {old!r} does not match the merged text exactly once")
         text = text.replace(old, new)
     return text
+
+
+def struck(page: str, text: str) -> list[dict]:
+    """The page's struck words against its corrected text; a fragment must occur there (the first is taken)."""
+    out = []
+    for frag, words, read in STRUCK.get(page, []):
+        at = text.find(frag)
+        if at < 0:
+            raise SystemExit(f"{page}: struck fragment {frag!r} is not in the corrected text")
+        out.append({"fragment": frag, "offset": at, "struck": words, "owner_read": read})
+    return out
 
 
 def merge(sp: list[dict], answers: dict) -> str | None:
@@ -872,7 +910,7 @@ def cmd_apply(args):
     pages = json.loads((CACHE / "compare.json").read_text())
     ladder = set(json.loads((CACHE / "ladder.json").read_text()))
     (CACHE / "truth").mkdir(exist_ok=True)
-    rows, open_ = [], 0
+    rows, open_, marks = [], 0, {}
     cols = ["page", "collection", "folder", "name", "source", "date_bin", "handwritten", "clippings", "tables",
             "kind", "table_form", "long_side", "sharpness", "year_taken", "camera", "ladder", "status", "tags"]
     for p in pages:
@@ -882,6 +920,8 @@ def cmd_apply(args):
         text = merge(p["spans"], a)
         if text is not None:
             text = correct(p["page"], text)
+            if p["page"] in STRUCK:
+                marks[p["page"]] = struck(p["page"], text)
         kind = a.get("kind") or (p["kind"]["claude"] if p["kind"]["claude"] == p["kind"]["gemini"] else None)
         status = "done" if text is not None and kind else "open"
         if status == "done":
@@ -894,6 +934,7 @@ def cmd_apply(args):
                      "yes" if p["table"]["claude"] and p["table"]["gemini"] else "", p["long_side"], p["sharpness"],
                      p["year_taken"], p.get("camera") or "", "yes" if p["page"] in ladder else "", status,
                      "; ".join(p["tags"])])
+    (CACHE / "truth-struck.json").write_text(json.dumps(marks, ensure_ascii=False, indent=1) + "\n")
     with open(CACHE / "pages.tsv", "w") as fh:
         fh.write("\t".join(cols) + "\n")
         for r in rows:
