@@ -30,8 +30,7 @@ struct OpenAICompatibleClient {
     private var requestTimeout: TimeInterval { localModel ? LocalModelRoute.requestTimeout : 120 }
 
     private var chatEndpoint: URL? {
-        let base = baseURL.hasSuffix("/") ? String(baseURL.dropLast()) : baseURL
-        return URL(string: "\(base)/chat/completions")
+        URL(string: "\(GatewayConfig.normalizedBaseURL(baseURL))/chat/completions")
     }
 
     func ocr(imageURL: URL, previousText: String? = nil, previousImageURL: URL? = nil, customPrompt: String? = nil, imageScale: Double = 1.0) async throws -> OCRResult {

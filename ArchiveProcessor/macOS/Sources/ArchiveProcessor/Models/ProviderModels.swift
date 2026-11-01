@@ -639,6 +639,20 @@ struct GatewayConfig: Codable, Equatable {
 
     var isLocalModel: Bool { localModel == true }
 
+    /// The base URL the field wants (`https://…/v1`), from what the user typed or pasted. A pasted full endpoint
+    /// (`…/v1/chat/completions`) had the path appended a second time and every call answered 404 (owner session
+    /// iphone-1, W40.fix-processor-gateway-url-doubled), so a trailing `/chat/completions`, trailing slashes and
+    /// surrounding whitespace are dropped. Applied when the field is submitted and on every read.
+    static func normalizedBaseURL(_ raw: String) -> String {
+        var s = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        func dropSlashes() { while s.hasSuffix("/") { s.removeLast() } }
+        dropSlashes()
+        let suffix = "/chat/completions"
+        if s.lowercased().hasSuffix(suffix) { s.removeLast(suffix.count) }
+        dropSlashes()
+        return s
+    }
+
     var apiKey: String {
         Self.storedKey(localModel: isLocalModel)
     }
@@ -672,7 +686,7 @@ struct GatewayConfig: Codable, Equatable {
     /// `@AppStorage` keys + defaults match these UserDefaults reads exactly, so the result is unchanged).
     static func fromDefaults(_ d: UserDefaults = .standard) -> GatewayConfig? {
         guard d.bool(forKey: DefaultsKeys.useGateway) else { return nil }
-        let baseURL = d.string(forKey: DefaultsKeys.gatewayBaseURL) ?? ""
+        let baseURL = normalizedBaseURL(d.string(forKey: DefaultsKeys.gatewayBaseURL) ?? "")
         let modelID = d.string(forKey: DefaultsKeys.gatewayModelID) ?? ""
         guard !baseURL.isEmpty, !modelID.isEmpty else { return nil }
         let inCost = d.object(forKey: DefaultsKeys.gatewayInputCost) as? Double ?? -1

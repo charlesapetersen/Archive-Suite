@@ -136,6 +136,13 @@ enum LocalModelsTestDriver {
                   body["max_tokens"] as? Int == 8192 && body["temperature"] == nil && request.timeoutInterval == 120
                   && request.value(forHTTPHeaderField: "Authorization") == "Bearer ")
         } else { check("2 remote request sent", false) }
+        // W40.fix-processor-gateway-url-doubled: a pasted full endpoint is not doubled on the wire.
+        var pasted = remote
+        pasted.baseURL = " https://remote-gateway.invalid/v1/chat/completions/ "
+        wire.reset(["remote-gateway": reply("[document_start]\nHello archive")])
+        _ = try? await OpenAICompatibleClient.gateway(pasted).ocr(imageURL: image)
+        eq("2 a pasted full endpoint is called once, not doubled", wire.requests.first?.url?.absoluteString,
+           "https://remote-gateway.invalid/v1/chat/completions")
         wire.reset(["local-mac": reply("<think>Let me look.</think>\nletter")])
         let text = try? await OpenAICompatibleClient.gateway(local).textCompletion(prompt: "classify", maxTokens: 64)
         eq("2 local text call: reasoning stripped", text, "letter")
@@ -491,6 +498,21 @@ enum LocalModelsTestDriver {
         check("5 allowed, it is frozen into the config", GatewayConfig.fromDefaults(d)?.localEscalates == true)
         d.set(false, forKey: DefaultsKeys.gatewayLocalModel)
         check("5 the leave means nothing for a remote gateway", GatewayConfig.fromDefaults(d)?.localEscalates == nil)
+        // W40.fix-processor-gateway-url-doubled: what the field wants, from what was typed or pasted.
+        for (typed, want) in [("https://aiapi-prod.stanford.edu/v1/chat/completions", "https://aiapi-prod.stanford.edu/v1"),
+                              ("https://aiapi-prod.stanford.edu/v1/chat/completions/", "https://aiapi-prod.stanford.edu/v1"),
+                              ("  https://api.openai.com/v1/Chat/Completions\n", "https://api.openai.com/v1"),
+                              ("https://api.openai.com/v1/", "https://api.openai.com/v1"),
+                              ("https://api.openai.com/v1", "https://api.openai.com/v1"),
+                              ("https://example.invalid/chat/completions/v1", "https://example.invalid/chat/completions/v1"),
+                              ("", "")] {
+            eq("5 normalized base URL of \(typed.debugDescription)", GatewayConfig.normalizedBaseURL(typed), want)
+        }
+        d.set("https://aiapi-prod.stanford.edu/v1/chat/completions", forKey: DefaultsKeys.gatewayBaseURL)
+        eq("5 a saved full endpoint reads as the base", GatewayConfig.fromDefaults(d)?.baseURL,
+           "https://aiapi-prod.stanford.edu/v1")
+        d.set("/chat/completions", forKey: DefaultsKeys.gatewayBaseURL)
+        check("5 a URL that is only the endpoint path counts as not configured", GatewayConfig.fromDefaults(d) == nil)
         let legacy = #"{"baseURL":"u","modelID":"m","displayName":"d"}"#
         let decoded = try? JSONDecoder().decode(GatewayConfig.self, from: Data(legacy.utf8))
         check("5 a saved run without the field decodes as remote", decoded != nil && decoded?.isLocalModel == false)

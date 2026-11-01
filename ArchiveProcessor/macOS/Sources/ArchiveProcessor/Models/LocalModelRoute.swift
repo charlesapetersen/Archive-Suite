@@ -347,8 +347,7 @@ enum LocalModelRoute {
     /// like `KeyValidator`: the OCR session waits for connectivity and retries, so a stopped server would hang the
     /// button.
     static func listModels(baseURL: String) async throws -> [String] {
-        let base = baseURL.hasSuffix("/") ? String(baseURL.dropLast()) : baseURL
-        guard let url = URL(string: "\(base)/models") else { throw OCRError.networkError("Invalid server URL: \(baseURL)") }
+        guard let url = URL(string: "\(GatewayConfig.normalizedBaseURL(baseURL))/models") else { throw OCRError.networkError("Invalid server URL: \(baseURL)") }
         var request = URLRequest(url: url, timeoutInterval: 5)
         request.setValue("Bearer \(placeholderKey)", forHTTPHeaderField: "Authorization")
         let (data, response) = try await URLSession.shared.data(for: request)

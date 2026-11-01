@@ -457,8 +457,12 @@ struct SettingsView: View {
                     }
                     HelpButton(text: "One-click fill for OpenAI's public API: sets the Gateway URL to https://api.openai.com/v1, a cost-effective OpenAI model, a display name, and its pricing. Paste your OpenAI key into the Gateway key field below. The gateway sends standard chat-completions requests, so this fills a non-reasoning model; for GPT-5 reasoning models pick OpenAI under the Direct API mode instead. For Azure OpenAI or another OpenAI-compatible proxy, apply this then edit the Gateway URL to your endpoint.")
                 }
-                settingsField("Gateway URL") {
-                    TextField("Gateway URL", text: $gatewayBaseURL, prompt: Text("https://…/v1"))
+                HStack {
+                    settingsField("Gateway URL") {
+                        TextField("Gateway URL", text: $gatewayBaseURL, prompt: Text("https://…/v1"))
+                            .onSubmit { gatewayBaseURL = GatewayConfig.normalizedBaseURL(gatewayBaseURL) }
+                    }
+                    HelpButton(text: "The gateway's base address, ending at the API version, e.g. https://aiapi-prod.stanford.edu/v1 or https://api.openai.com/v1. The app adds /chat/completions itself; a pasted full endpoint has that ending dropped.")
                 }
                 settingsField("Model ID") {
                     TextField("Model ID", text: $gatewayModelID, prompt: Text("The model name the gateway expects"))
