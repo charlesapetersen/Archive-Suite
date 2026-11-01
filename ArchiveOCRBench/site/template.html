@@ -279,6 +279,7 @@ footer p { font-size: 13px; }
     <div class="tbl"><table><thead><tr><th>Route</th><th>Pages read</th><th>Copied as printed</th><th>Corrected to the expected word</th><th>Other</th><th>NES</th></tr></thead><tbody id="sc-chaos"></tbody></table></div>
     <p class="note" id="sc-bias-note"></p>
     <div class="tbl"><table><thead><tr><th>Route</th><th>Family</th><th>Pages</th><th>Agreed words</th><th>Joins forgiven</th><th>Adjudicated words</th><th>Lead on agreed, joins forgiven</th></tr></thead><tbody id="sc-bias"></tbody></table></div>
+    <p class="note" id="sc-hands-note" hidden></p>
     <p class="note" id="sc-jpeg-note" hidden></p>
     <div class="tbl" id="sc-jpeg-tbl" hidden><table><thead><tr><th>Route</th><th>Pages</th><th>PDF image</th><th>JPEG original</th><th>Change</th><th>Sharper originals</th><th>Upscaled PDFs</th><th>The 96: PDF → JPEG</th></tr></thead><tbody id="sc-jpeg"></tbody></table></div>
   </section>
@@ -759,6 +760,12 @@ if (SC) {
     if (BS) document.getElementById('sc-bias-note').textContent = document.getElementById('sc-bias-note').textContent.replace(/A blind owner check.*$/, 'The owner\'s blind check of ' + BS.places + ' places on ' + BS.pages + ' pages where ' + TB.reference + ' reads the agreed words differently (' + BS.judged + ' judged; one microfilm newspaper page left out as far outside the corpus): the truth was right at ' + BS.classes.truth.places + ', the reader at ' + BS.classes.reader.places + ', either would do at ' + BS.classes.either.places + ', and at ' + BS.classes.frame.places + ' the reader read a folder label or a sheet behind the page. The truth\'s own mistakes cost ' + TB.reference + ' about ' + BS.bias_pts.toFixed(2) + ' points [' + BS.bias_pts_ci[0].toFixed(2) + ', ' + BS.bias_pts_ci[1].toFixed(2) + '] of the ' + BS.drafter_lead_joined_pts.toFixed(2) + '-point drafter lead, so the truth stands; most of the lead is passages read but placed elsewhere on the page (reading order). Detail: segbench-results/ocr-truth-bias-score.md.');
     const pp = v => v === null || v === undefined ? '—' : (100 * v).toFixed(2);
     document.getElementById('sc-bias').innerHTML = TB.routes.map(r => '<tr><td>' + r.route + '</td><td>' + r.family + '</td><td>' + r.pages + '</td><td>' + pp(r.agreed_acc) + '</td><td>' + pp(r.agreed_acc_joined) + '</td><td>' + pp(r.adjudicated_acc) + '</td><td>' + (r.lead_agreed_joined === null ? '—' : (r.lead_agreed_joined >= 0 ? '+' : '−') + Math.abs(100 * r.lead_agreed_joined).toFixed(2)) + '</td></tr>').join('');
+  }
+  const HR = SC.hands_rescore;
+  if (HR) {
+    const h = HR.sheet.hand, c = HR.controls, L = HR.routes.find(r => r.route === HR.lead), S = HR.paired['claude-sonnet5.5'];
+    const e = document.getElementById('sc-hands-note'); e.hidden = false;
+    e.textContent = 'The hand pages, checked (W46.ocr-hands-rescore): Gemini 3.8 Flash drafted the truth and leads on the 16 hand pages, so the owner judged blind every place where Qwen3.6 27B or LightOnOCR-3 4B read them differently. The truth stood at ' + h['truth stands'] + ' of 114 places, either reading was right at ' + h.either + ', the truth was wrong at ' + h['truth wrong'] + ' (corrected on ' + HR.changed + ' pages; struck words stay scored as text). On the corrected truth Gemini 3.8 Flash reads the 16 at ' + L.after.toFixed(2) + ' (' + (L.move >= 0 ? '+' : '−') + Math.abs(L.move).toFixed(2) + ')' + (S ? ', ' + (S.delta >= 0 ? '+' : '−') + Math.abs(S.delta).toFixed(2) + ' over Claude Sonnet 5.5 (' + S.lo.toFixed(1) + ' to ' + S.hi.toFixed(1) + ', 16 pages)' : '') + '. Typed controls, agreed words every reader shares: ' + (c.ruled - c.wrong) + ' of ' + c.ruled + ' confirmed. Gemini is still a drafter, so the hand scores remain partly agreement with it where every reader agrees. Detail: segbench-results/ocr-hands-rescore.md.';
   }
   const TJ = SC.truth_jpeg;
   if (TJ) {

@@ -383,7 +383,10 @@ adjudicated words, `ocr-truth-bias.md`). The blind check drew 20 pages from the 
 [B] Gemini 3.8 minus Sonnet 5.5 on the 16 hand pages is +3.5 (+0.3 to +7.7). **Fix:** a blind owner sheet on the hand
 pages where third-family readers (Qwen3.6-27B, LightOnOCR-3) differ from the truth, about 15 minutes; until then the
 16-page hand chart is labelled "agreement with the drafters"; public L1-L2 and the HHTR gold (W46.ocr-new-open-gold)
-rank hands on independent truth.
+rank hands on independent truth. **Done 2026-10-31 (W46.ocr-hands-rescore, `ocr-hands-rescore.md`):** the owner ruled
+114 hand places (truth stands 87, either 10, wrong 12) and 19 typed controls (all confirm); on the corrected truth
+Gemini 3.8 minus Sonnet 5.5 is +3.31 (+0.21 to +7.24), and Gemini 3.8 still leads all 46 other routes but ties
+Gemini 3.7 Flash.
 
 **OCR-2 · the top of the 96 ranking is set by failures and retries — weakened.** "Highest on the 96: Claude Sonnet 5.5
 (96.47)" counts failures as 0, and Claude's harness retried an empty answer once while the OpenRouter routes had no

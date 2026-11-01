@@ -198,8 +198,10 @@ layout-aware models do not. Our owner corpus has 13 clippings and 12 tables in t
 456 tables among 21,105 documents [M, `ocr-truth.md`]; nothing has been measured region-first on any of them.
 
 **Hands.** On English hands the field's frontier result (Gemini 3.5 Flash 1.52% CER on HHTR, Gemini 3 Pro 0.91%) is
-in line with our 96, where Gemini 3.8 Flash reads the 16 handwritten pages at 95.97 NES against Claude's 92.43 and
-Qwen3.6-27B's 92.15 [M, `difficulty.md` §2 by-kind table]. On the 895's L1-L2 (By the People letters and 1700-1850
+in line with our 96, where Gemini 3.8 Flash reads the 16 handwritten pages at 95.81 NES against Claude's 92.50 and
+Qwen3.6-27B's 92.61 on the truth the owner corrected from his blind hand sheet (2026-10-31; before it, 95.97, 92.43
+and 92.15) [M, `ocr-hands-rescore.md`]. Gemini 3.8 drafted that truth, so where every reader agrees with it the
+score is still partly agreement with itself. On the 895's L1-L2 (By the People letters and 1700-1850
 manuscripts) the best open routes reach 86-88 and 73-77 NES [M, open sweep]; no hosted route has read those strata
 (paid-run hold). The specialist case is strongest exactly where we measured it: kraken script models beat Qwen3-VL
 235B by 11.5-37 points on L5, L6, N3, N4 and tie Gemini on L6 and L5, while no open page model does
@@ -281,9 +283,11 @@ best gives the test design.
   under about 10B or an OCR-specialist model (GLM-OCR, PaddleOCR-VL, LightOnOCR, olmOCR 2); for 27B-class general
   models and the frontier APIs the whole page already works on L9 (93-96) and the gain is unmeasured. Ledgers (L4)
   are the open question: every open route is at 52-70 there and PaddleOCR-VL at 28 [M].
-- English hands (L1, L2, the owner's handwritten pages): one shot with Gemini 3.8 Flash for the API profiles (95.97
-  on our 16; 1.52% CER on HHTR for Gemini 3.5 Flash); for the laptop profile the measured best is LightOnOCR-3 4B
-  8-bit at 89.67 on the 16 [M, `ocr-mac-local-hw.md`], and the untested candidate is the pretrained kraken
+- English hands (L1, L2, the owner's handwritten pages): one shot with Gemini 3.8 Flash for the API profiles (95.81
+  on our 16 on the owner-corrected truth, ahead of every route but Gemini 3.7 Flash, a tie at +0.76, -0.60 to +2.89;
+  +3.31 over Claude Sonnet 5.5, +0.21 to +7.24 [M, `ocr-hands-rescore.md`]; 1.52% CER on HHTR for Gemini 3.5
+  Flash); for the laptop profile the measured best is LightOnOCR-3 4B 8-bit at 89.91 on the 16 [M,
+  `ocr-hands-rescore.md`], and the untested candidate is the pretrained kraken
   PP-OCRv6 medium on Vision or blla lines.
 - Non-Latin scripts and early modern Latin hands (L5-L7, N1-N4): a script specialist on lines for the laptop and
   cluster profiles (kraken models beat the open page models by 11-37 points [M, `specialists.md`]), Gemini for the

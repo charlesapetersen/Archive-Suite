@@ -222,8 +222,8 @@
    "upscaled_n": 5,
    "upscaled_pdf": 0.9609,
    "upscaled_jpeg": 0.8988,
-   "all96_pdf": 0.8134,
-   "all96_jpeg": 0.8068,
+   "all96_pdf": 0.8137,
+   "all96_jpeg": 0.8071,
    "per_page": {
     "p008": [
      0.9257,
@@ -297,8 +297,8 @@
    "upscaled_n": 5,
    "upscaled_pdf": 0.9958,
    "upscaled_jpeg": 0.9814,
-   "all96_pdf": 0.8966,
-   "all96_jpeg": 0.8963,
+   "all96_pdf": 0.8967,
+   "all96_jpeg": 0.8965,
    "per_page": {
     "p008": [
      0.9979,
@@ -372,8 +372,8 @@
    "upscaled_n": 5,
    "upscaled_pdf": 0.9922,
    "upscaled_jpeg": 0.9649,
-   "all96_pdf": 0.8913,
-   "all96_jpeg": 0.8892,
+   "all96_pdf": 0.8917,
+   "all96_jpeg": 0.8896,
    "per_page": {
     "p008": [
      0.9944,
@@ -439,16 +439,16 @@
   },
   "qwen3.5-9b-mlx4": {
    "n": 15,
-   "pdf_mean": 0.8711,
+   "pdf_mean": 0.8707,
    "jpeg_mean": 0.8697,
    "sharper_n": 10,
-   "sharper_pdf": 0.8164,
+   "sharper_pdf": 0.8157,
    "sharper_jpeg": 0.8133,
    "upscaled_n": 5,
    "upscaled_pdf": 0.9805,
    "upscaled_jpeg": 0.9824,
-   "all96_pdf": 0.9191,
-   "all96_jpeg": 0.9189,
+   "all96_pdf": 0.9193,
+   "all96_jpeg": 0.9191,
    "per_page": {
     "p008": [
      0.9251,
@@ -483,7 +483,7 @@
      0.9997
     ],
     "p077": [
-     0.9914,
+     0.9846,
      0.9791
     ],
     "p083": [
@@ -514,16 +514,16 @@
   },
   "gemini3.7-flash-gw": {
    "n": 15,
-   "pdf_mean": 0.9978,
-   "jpeg_mean": 0.9918,
+   "pdf_mean": 0.9973,
+   "jpeg_mean": 0.9913,
    "sharper_n": 10,
-   "sharper_pdf": 0.9971,
-   "sharper_jpeg": 0.9939,
+   "sharper_pdf": 0.9964,
+   "sharper_jpeg": 0.9932,
    "upscaled_n": 5,
    "upscaled_pdf": 0.9993,
    "upscaled_jpeg": 0.9876,
-   "all96_pdf": 0.9674,
-   "all96_jpeg": 0.9664,
+   "all96_pdf": 0.9673,
+   "all96_jpeg": 0.9663,
    "per_page": {
     "p008": [
      0.9994,
@@ -558,8 +558,8 @@
      1.0
     ],
     "p077": [
-     0.996,
-     0.9977
+     0.9892,
+     0.9909
     ],
     "p083": [
      1.0,

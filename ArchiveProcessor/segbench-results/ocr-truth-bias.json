@@ -1,9 +1,9 @@
 {
  "truth": {
-  "words": 30003,
-  "agreed": 29397,
+  "words": 29996,
+  "agreed": 29385,
   "spans": 324,
-  "adjudicated": 606
+  "adjudicated": 611
  },
  "reference": "qwen3.6-27b",
  "split": [
@@ -11,32 +11,32 @@
    "route": "drafter claude-opus5.5",
    "family": "drafter",
    "pages": 96,
-   "agreed_n": 29397,
-   "agreed_read": 29397,
-   "agreed_joined": 29397,
-   "adjudicated_n": 606,
-   "adjudicated_read": 304,
-   "adjudicated_joined": 306,
-   "agreed_acc": 1.0,
-   "adjudicated_acc": 0.5016501650165016,
-   "agreed_acc_joined": 1.0,
-   "adjudicated_acc_joined": 0.504950495049505,
+   "agreed_n": 29385,
+   "agreed_read": 29384,
+   "agreed_joined": 29384,
+   "adjudicated_n": 611,
+   "adjudicated_read": 306,
+   "adjudicated_joined": 308,
+   "agreed_acc": 0.999965969031819,
+   "adjudicated_acc": 0.5008183306055647,
+   "agreed_acc_joined": 0.999965969031819,
+   "adjudicated_acc_joined": 0.5040916530278232,
    "lead": {
     "pages": 95,
-    "lead_agreed": 0.03134185521908539,
+    "lead_agreed": 0.0311153662039253,
     "lead_agreed_ci": [
-     0.020263157894736872,
-     0.043659994122065116
+     0.020307100359827523,
+     0.04342585249801745
     ],
-    "lead_adjudicated": -0.15116279069767447,
+    "lead_adjudicated": -0.1630971993410214,
     "lead_adjudicated_ci": [
-     -0.43377483443708614,
-     0.17664233576642335
+     -0.4442988204456094,
+     0.1731123388581952
     ],
-    "lead_agreed_joined": 0.013637295782350178,
+    "lead_agreed_joined": 0.013403542364767818,
     "lead_agreed_joined_ci": [
-     0.007306699625577062,
-     0.021427263292839283
+     0.007018209408194198,
+     0.021463541160068766
     ]
    }
   },
@@ -44,32 +44,32 @@
    "route": "drafter gemini3.8-flash",
    "family": "drafter",
    "pages": 96,
-   "agreed_n": 29397,
-   "agreed_read": 29397,
-   "agreed_joined": 29397,
-   "adjudicated_n": 606,
-   "adjudicated_read": 415,
-   "adjudicated_joined": 467,
-   "agreed_acc": 1.0,
-   "adjudicated_acc": 0.6848184818481848,
-   "agreed_acc_joined": 1.0,
-   "adjudicated_acc_joined": 0.7706270627062707,
+   "agreed_n": 29385,
+   "agreed_read": 29384,
+   "agreed_joined": 29384,
+   "adjudicated_n": 611,
+   "adjudicated_read": 408,
+   "adjudicated_joined": 460,
+   "agreed_acc": 0.999965969031819,
+   "adjudicated_acc": 0.6677577741407529,
+   "agreed_acc_joined": 0.999965969031819,
+   "adjudicated_acc_joined": 0.7528641571194763,
    "lead": {
     "pages": 95,
-    "lead_agreed": 0.03134185521908539,
+    "lead_agreed": 0.0311153662039253,
     "lead_agreed_ci": [
-     0.020184274225033216,
-     0.04409414271835532
+     0.019673553067339533,
+     0.04282673974519691
     ],
-    "lead_adjudicated": 0.03322259136212624,
+    "lead_adjudicated": 0.0049423393739703725,
     "lead_adjudicated_ci": [
-     -0.02564102564102566,
-     0.09225092250922506
+     -0.05145413870246085,
+     0.057636887608069176
     ],
-    "lead_agreed_joined": 0.013637295782350178,
+    "lead_agreed_joined": 0.013403542364767818,
     "lead_agreed_joined_ci": [
-     0.007178890182382602,
-     0.021622131998866978
+     0.006929889797850031,
+     0.021249148959042508
     ]
    }
   },
@@ -77,32 +77,65 @@
    "route": "gemini3.8-flash",
    "family": "drafter family",
    "pages": 94,
-   "agreed_n": 28673,
-   "agreed_read": 28621,
-   "agreed_joined": 28628,
-   "adjudicated_n": 552,
-   "adjudicated_read": 398,
-   "adjudicated_joined": 419,
-   "agreed_acc": 0.9981864471802742,
-   "adjudicated_acc": 0.7210144927536232,
-   "agreed_acc_joined": 0.9984305792906218,
-   "adjudicated_acc_joined": 0.7590579710144928,
+   "agreed_n": 28661,
+   "agreed_read": 28610,
+   "agreed_joined": 28616,
+   "adjudicated_n": 557,
+   "adjudicated_read": 400,
+   "adjudicated_joined": 421,
+   "agreed_acc": 0.998220578486445,
+   "adjudicated_acc": 0.718132854578097,
+   "agreed_acc_joined": 0.998429922193922,
+   "adjudicated_acc_joined": 0.755834829443447,
    "lead": {
     "pages": 93,
-    "lead_agreed": 0.030104436812223967,
+    "lead_agreed": 0.029941799312811157,
     "lead_agreed_ci": [
-     0.01914335341291251,
-     0.04318793087457884
+     0.018968386023294537,
+     0.04307659254484908
     ],
-    "lead_adjudicated": 0.07299270072992703,
+    "lead_adjudicated": 0.05786618444846292,
     "lead_adjudicated_ci": [
-     -0.01883239171374762,
-     0.18701700154559497
+     -0.03786191536748329,
+     0.17103235747303547
     ],
-    "lead_agreed_joined": 0.012195976729515667,
+    "lead_agreed_joined": 0.011990743987097652,
     "lead_agreed_joined_ci": [
-     0.005520422067712527,
-     0.020073529411764768
+     0.005302818866871339,
+     0.01984351052674027
+    ]
+   }
+  },
+  {
+   "route": "gemini3.7-flash-gw",
+   "family": "drafter family",
+   "pages": 96,
+   "agreed_n": 29385,
+   "agreed_read": 29307,
+   "agreed_joined": 29314,
+   "adjudicated_n": 611,
+   "adjudicated_read": 435,
+   "adjudicated_joined": 456,
+   "agreed_acc": 0.9973455844818785,
+   "adjudicated_acc": 0.7119476268412439,
+   "agreed_acc_joined": 0.9975838012591458,
+   "adjudicated_acc_joined": 0.7463175122749591,
+   "lead": {
+    "pages": 95,
+    "lead_agreed": 0.028482527525131585,
+    "lead_agreed_ci": [
+     0.016313647944632415,
+     0.0409086624564049
+    ],
+    "lead_adjudicated": 0.04612850082372322,
+    "lead_adjudicated_ci": [
+     -0.04366812227074235,
+     0.15295815295815296
+    ],
+    "lead_agreed_joined": 0.011010052656773572,
+    "lead_agreed_joined_ci": [
+     0.004861157354997703,
+     0.018268731935077498
     ]
    }
   },
@@ -110,32 +143,32 @@
    "route": "gemini3.1-pro",
    "family": "drafter family",
    "pages": 94,
-   "agreed_n": 28673,
-   "agreed_read": 28581,
-   "agreed_joined": 28589,
-   "adjudicated_n": 552,
-   "adjudicated_read": 454,
-   "adjudicated_joined": 466,
-   "agreed_acc": 0.9967914065497158,
-   "adjudicated_acc": 0.822463768115942,
-   "agreed_acc_joined": 0.9970704146758275,
-   "adjudicated_acc_joined": 0.8442028985507246,
+   "agreed_n": 28661,
+   "agreed_read": 28570,
+   "agreed_joined": 28577,
+   "adjudicated_n": 557,
+   "adjudicated_read": 456,
+   "adjudicated_joined": 468,
+   "agreed_acc": 0.9968249537699313,
+   "adjudicated_acc": 0.8186714542190305,
+   "agreed_acc_joined": 0.9970691880953212,
+   "adjudicated_acc_joined": 0.8402154398563735,
    "lead": {
     "pages": 93,
-    "lead_agreed": 0.02884278404710172,
+    "lead_agreed": 0.02867961573522193,
     "lead_agreed_ci": [
-     0.017364614867137584,
-     0.041695123616992236
+     0.017247197330433783,
+     0.04147094349751712
     ],
-    "lead_adjudicated": 0.17518248175182483,
+    "lead_adjudicated": 0.15913200723327303,
     "lead_adjudicated_ci": [
-     0.04842105263157892,
-     0.33544303797468356
+     0.026476578411405383,
+     0.31832797427652737
     ],
-    "lead_agreed_joined": 0.010969369874535562,
+    "lead_agreed_joined": 0.010763621064441398,
     "lead_agreed_joined_ci": [
-     0.004897874114214273,
-     0.019042141921467137
+     0.0046805268313921955,
+     0.018907186165823542
     ]
    }
   },
@@ -143,32 +176,32 @@
    "route": "claude-sonnet5.5",
    "family": "drafter family",
    "pages": 96,
-   "agreed_n": 29397,
-   "agreed_read": 29212,
-   "agreed_joined": 29278,
-   "adjudicated_n": 606,
-   "adjudicated_read": 445,
-   "adjudicated_joined": 457,
-   "agreed_acc": 0.9937068408340988,
-   "adjudicated_acc": 0.7343234323432343,
-   "agreed_acc_joined": 0.9959519678878798,
-   "adjudicated_acc_joined": 0.7541254125412541,
+   "agreed_n": 29385,
+   "agreed_read": 29196,
+   "agreed_joined": 29262,
+   "adjudicated_n": 611,
+   "adjudicated_read": 446,
+   "adjudicated_joined": 458,
+   "agreed_acc": 0.9935681470137825,
+   "adjudicated_acc": 0.7299509001636661,
+   "agreed_acc_joined": 0.9958141909137315,
+   "adjudicated_acc_joined": 0.7495908346972177,
    "lead": {
     "pages": 95,
-    "lead_agreed": 0.025018798277394283,
+    "lead_agreed": 0.024687136702455037,
     "lead_agreed_ci": [
-     0.013709260217278807,
-     0.03758770464416972
+     0.013310163788959883,
+     0.037325491209927564
     ],
-    "lead_adjudicated": 0.07973421926910296,
+    "lead_adjudicated": 0.06425041186161451,
     "lead_adjudicated_ci": [
-     0.006741573033707926,
-     0.1796875
+     -0.008695652173913104,
+     0.1606714628297362
     ],
-    "lead_agreed_joined": 0.009570032127965034,
+    "lead_agreed_joined": 0.009232031730834978,
     "lead_agreed_joined_ci": [
-     0.003772161448510003,
-     0.017385705086928605
+     0.0034247671478411235,
+     0.01703282209744883
     ]
    }
   },
@@ -176,32 +209,32 @@
    "route": "gemini3.5-flash",
    "family": "drafter family",
    "pages": 94,
-   "agreed_n": 28673,
-   "agreed_read": 28319,
-   "agreed_joined": 28580,
-   "adjudicated_n": 552,
+   "agreed_n": 28661,
+   "agreed_read": 28304,
+   "agreed_joined": 28564,
+   "adjudicated_n": 557,
    "adjudicated_read": 403,
    "adjudicated_joined": 449,
-   "agreed_acc": 0.9876538904195584,
-   "adjudicated_acc": 0.730072463768116,
-   "agreed_acc_joined": 0.9967565305339519,
-   "adjudicated_acc_joined": 0.8134057971014492,
+   "agreed_acc": 0.987544049405115,
+   "adjudicated_acc": 0.7235188509874326,
+   "agreed_acc_joined": 0.9966156100624542,
+   "adjudicated_acc_joined": 0.8061041292639138,
    "lead": {
     "pages": 93,
-    "lead_agreed": 0.019765893320249472,
+    "lead_agreed": 0.01945866348783387,
     "lead_agreed_ci": [
-     0.009039145907473345,
-     0.03265164644714036
+     0.00861669930567921,
+     0.03235314515569743
     ],
-    "lead_adjudicated": 0.07846715328467158,
+    "lead_adjudicated": 0.05967450271247732,
     "lead_adjudicated_ci": [
-     -0.044742729306487705,
-     0.23460410557184752
+     -0.06537530266343827,
+     0.21167883211678828
     ],
-    "lead_agreed_joined": 0.010689002593397334,
+    "lead_agreed_joined": 0.010342893205245063,
     "lead_agreed_joined_ci": [
-     0.004329998359849041,
-     0.018654063323434666
+     0.003978688070855219,
+     0.01819381271483622
     ]
    }
   },
@@ -209,32 +242,32 @@
    "route": "gemini3.5-flash-lite",
    "family": "drafter family",
    "pages": 94,
-   "agreed_n": 28673,
-   "agreed_read": 28150,
-   "agreed_joined": 28384,
-   "adjudicated_n": 552,
-   "adjudicated_read": 394,
-   "adjudicated_joined": 412,
-   "agreed_acc": 0.9817598437554493,
-   "adjudicated_acc": 0.7137681159420289,
-   "agreed_acc_joined": 0.9899208314442158,
-   "adjudicated_acc_joined": 0.7463768115942029,
+   "agreed_n": 28661,
+   "agreed_read": 28142,
+   "agreed_joined": 28376,
+   "adjudicated_n": 557,
+   "adjudicated_read": 399,
+   "adjudicated_joined": 417,
+   "agreed_acc": 0.9818917693032344,
+   "adjudicated_acc": 0.7163375224416517,
+   "agreed_acc_joined": 0.9900561738948397,
+   "adjudicated_acc_joined": 0.748653500897666,
    "lead": {
     "pages": 93,
-    "lead_agreed": 0.013667904955491639,
+    "lead_agreed": 0.013603534114017157,
     "lead_agreed_ci": [
-     0.0023987526486226596,
-     0.02610966057441244
+     0.002332521524371467,
+     0.025989828710492713
     ],
-    "lead_adjudicated": 0.062043795620437936,
+    "lead_adjudicated": 0.05244122965641951,
     "lead_adjudicated_ci": [
-     -0.010526315789473717,
-     0.16732283464566933
+     -0.019867549668874163,
+     0.1531365313653137
     ],
-    "lead_agreed_joined": 0.0036447746547977333,
+    "lead_agreed_joined": 0.003576186803169401,
     "lead_agreed_joined_ci": [
-     -0.0027412498510189787,
-     0.011703332532518762
+     -0.0027579712094712994,
+     0.011708154506437807
     ]
    }
   },
@@ -242,32 +275,32 @@
    "route": "gemini3.1-flash-lite",
    "family": "drafter family",
    "pages": 93,
-   "agreed_n": 28527,
-   "agreed_read": 27952,
-   "agreed_joined": 28214,
-   "adjudicated_n": 547,
-   "adjudicated_read": 403,
-   "adjudicated_joined": 420,
-   "agreed_acc": 0.9798436568864585,
-   "adjudicated_acc": 0.7367458866544789,
-   "agreed_acc_joined": 0.9890279384442808,
-   "adjudicated_acc_joined": 0.7678244972577697,
+   "agreed_n": 28515,
+   "agreed_read": 27942,
+   "agreed_joined": 28204,
+   "adjudicated_n": 552,
+   "adjudicated_read": 404,
+   "adjudicated_joined": 421,
+   "agreed_acc": 0.9799053129931615,
+   "adjudicated_acc": 0.7318840579710145,
+   "agreed_acc_joined": 0.9890934595826758,
+   "adjudicated_acc_joined": 0.7626811594202898,
    "lead": {
     "pages": 92,
-    "lead_agreed": 0.011624630125405044,
+    "lead_agreed": 0.011488581900197303,
     "lead_agreed_ci": [
-     -0.0035045910142286196,
-     0.02615269359122796
+     -0.003610614505556109,
+     0.026050843191542827
     ],
-    "lead_adjudicated": 0.0847145488029466,
+    "lead_adjudicated": 0.06751824817518248,
     "lead_adjudicated_ci": [
-     0.014678899082568808,
-     0.18905472636815923
+     -0.004444444444444473,
+     0.17404129793510326
     ],
-    "lead_agreed_joined": 0.002571509088347246,
+    "lead_agreed_joined": 0.0024316323653792438,
     "lead_agreed_joined_ci": [
-     -0.009840871021775555,
-     0.013175728920409746
+     -0.009898531185694948,
+     0.012981215014251868
     ]
    }
   },
@@ -275,32 +308,65 @@
    "route": "qwen3.5-9b-mlx4",
    "family": "third family",
    "pages": 95,
-   "agreed_n": 29195,
-   "agreed_read": 28555,
-   "agreed_joined": 28790,
-   "adjudicated_n": 604,
-   "adjudicated_read": 386,
-   "adjudicated_joined": 421,
-   "agreed_acc": 0.9780784380887139,
-   "adjudicated_acc": 0.6390728476821192,
-   "agreed_acc_joined": 0.9861277616030142,
-   "adjudicated_acc_joined": 0.6970198675496688,
+   "agreed_n": 29183,
+   "agreed_read": 28550,
+   "agreed_joined": 28784,
+   "adjudicated_n": 609,
+   "adjudicated_read": 390,
+   "adjudicated_joined": 425,
+   "agreed_acc": 0.9783092896549361,
+   "adjudicated_acc": 0.6403940886699507,
+   "agreed_acc_joined": 0.9863276565123531,
+   "adjudicated_acc_joined": 0.6978653530377669,
    "lead": {
     "pages": 94,
-    "lead_agreed": 0.009774229074889895,
+    "lead_agreed": 0.009812697975485452,
     "lead_agreed_ci": [
-     0.0005452748526053597,
-     0.019940109212612356
+     0.00029977142428905257,
+     0.01991805861960283
     ],
-    "lead_adjudicated": -0.014999999999999902,
+    "lead_adjudicated": -0.024793388429751984,
     "lead_adjudicated_ci": [
-     -0.07377049180327866,
-     0.029484029484029506
+     -0.0843373493975903,
+     0.020454545454545392
     ],
-    "lead_agreed_joined": -3.44162995594699e-05,
+    "lead_agreed_joined": -3.443051921225848e-05,
     "lead_agreed_joined_ci": [
-     -0.0044224933824004165,
-     0.0051120723554857195
+     -0.004407150160420259,
+     0.00497353822610469
+    ]
+   }
+  },
+  {
+   "route": "qwen3.5-9b-mlx4-logprob",
+   "family": "third family",
+   "pages": 95,
+   "agreed_n": 29183,
+   "agreed_read": 28550,
+   "agreed_joined": 28784,
+   "adjudicated_n": 609,
+   "adjudicated_read": 390,
+   "adjudicated_joined": 425,
+   "agreed_acc": 0.9783092896549361,
+   "adjudicated_acc": 0.6403940886699507,
+   "agreed_acc_joined": 0.9863276565123531,
+   "adjudicated_acc_joined": 0.6978653530377669,
+   "lead": {
+    "pages": 94,
+    "lead_agreed": 0.009812697975485452,
+    "lead_agreed_ci": [
+     0.0002293577981651307,
+     0.019690847283689306
+    ],
+    "lead_adjudicated": -0.024793388429751984,
+    "lead_adjudicated_ci": [
+     -0.08644400785854611,
+     0.021008403361344574
+    ],
+    "lead_agreed_joined": -3.443051921225848e-05,
+    "lead_agreed_joined_ci": [
+     -0.00448996252180045,
+     0.004661635060569491
     ]
    }
   },
@@ -308,32 +374,32 @@
    "route": "qwen3.5-397b",
    "family": "third family",
    "pages": 96,
-   "agreed_n": 29397,
-   "agreed_read": 28690,
-   "agreed_joined": 28931,
-   "adjudicated_n": 606,
-   "adjudicated_read": 425,
-   "adjudicated_joined": 445,
-   "agreed_acc": 0.9759499268632854,
-   "adjudicated_acc": 0.7013201320132013,
-   "agreed_acc_joined": 0.9841480423172433,
-   "adjudicated_acc_joined": 0.7343234323432343,
+   "agreed_n": 29385,
+   "agreed_read": 28685,
+   "agreed_joined": 28926,
+   "adjudicated_n": 611,
+   "adjudicated_read": 428,
+   "adjudicated_joined": 448,
+   "agreed_acc": 0.9761783222732687,
+   "adjudicated_acc": 0.7004909983633388,
+   "agreed_acc_joined": 0.9843797856049005,
+   "adjudicated_acc_joined": 0.7332242225859247,
    "lead": {
     "pages": 95,
-    "lead_agreed": 0.007382596213001635,
+    "lead_agreed": 0.0074198180947820935,
     "lead_agreed_ci": [
-     -0.0012891819219861267,
-     0.016192125176349825
+     -0.0012780150244693367,
+     0.01621345589174006
     ],
-    "lead_adjudicated": 0.046511627906976716,
+    "lead_adjudicated": 0.034596375617792496,
     "lead_adjudicated_ci": [
-     -0.008264462809917328,
-     0.12587412587412583
+     -0.021341463414634165,
+     0.11481481481481481
     ],
-    "lead_agreed_joined": -0.002153257228792116,
+    "lead_agreed_joined": -0.002119948027080709,
     "lead_agreed_joined_ci": [
-     -0.006246317030053072,
-     0.0021803257663203235
+     -0.006202729200848411,
+     0.0022153035564602686
     ]
    }
   },
@@ -341,32 +407,32 @@
    "route": "qwen3-vl-8b",
    "family": "third family",
    "pages": 95,
-   "agreed_n": 29113,
-   "agreed_read": 28402,
-   "agreed_joined": 28619,
-   "adjudicated_n": 560,
-   "adjudicated_read": 360,
-   "adjudicated_joined": 398,
-   "agreed_acc": 0.9755779205166077,
-   "adjudicated_acc": 0.6428571428571429,
-   "agreed_acc_joined": 0.9830316353519046,
-   "adjudicated_acc_joined": 0.7107142857142857,
+   "agreed_n": 29101,
+   "agreed_read": 28397,
+   "agreed_joined": 28614,
+   "adjudicated_n": 565,
+   "adjudicated_read": 363,
+   "adjudicated_joined": 401,
+   "agreed_acc": 0.9758083914642108,
+   "adjudicated_acc": 0.6424778761061947,
+   "agreed_acc_joined": 0.9832651798907254,
+   "adjudicated_acc_joined": 0.7097345132743362,
    "lead": {
     "pages": 94,
-    "lead_agreed": 0.0073169048112100565,
+    "lead_agreed": 0.007354464470685662,
     "lead_agreed_ci": [
-     -0.002440002673975483,
-     0.018758716875871717
+     -0.0024070607114202724,
+     0.018805107379358255
     ],
-    "lead_adjudicated": -0.008992805755395739,
+    "lead_adjudicated": -0.021390374331550777,
     "lead_adjudicated_ci": [
-     -0.03508771929824561,
-     0.018567639257294433
+     -0.05330490405117272,
+     0.007772020725388629
     ],
-    "lead_agreed_joined": -0.0031407468765100033,
+    "lead_agreed_joined": -0.003107520198881386,
     "lead_agreed_joined_ci": [
-     -0.00719642196590109,
-     0.001624152097067011
+     -0.007153176644702164,
+     0.0016567896514370073
     ]
    }
   },
@@ -374,32 +440,32 @@
    "route": "ling3-flash-vl-fp8",
    "family": "third family",
    "pages": 96,
-   "agreed_n": 29397,
-   "agreed_read": 28670,
-   "agreed_joined": 28798,
-   "adjudicated_n": 606,
-   "adjudicated_read": 391,
-   "adjudicated_joined": 425,
-   "agreed_acc": 0.9752695853318366,
-   "adjudicated_acc": 0.6452145214521452,
-   "agreed_acc_joined": 0.9796237711331088,
-   "adjudicated_acc_joined": 0.7013201320132013,
+   "agreed_n": 29385,
+   "agreed_read": 28664,
+   "agreed_joined": 28792,
+   "adjudicated_n": 611,
+   "adjudicated_read": 394,
+   "adjudicated_joined": 428,
+   "agreed_acc": 0.9754636719414668,
+   "adjudicated_acc": 0.6448445171849427,
+   "agreed_acc_joined": 0.9798196358686405,
+   "adjudicated_acc_joined": 0.7004909983633388,
    "lead": {
     "pages": 95,
-    "lead_agreed": 0.006596486431061588,
+    "lead_agreed": 0.006599193052041263,
     "lead_agreed_ci": [
-     -0.005517289850998086,
-     0.018164333796345744
+     -0.005767797543825504,
+     0.01832329317269077
     ],
-    "lead_adjudicated": -0.00830564784053156,
+    "lead_adjudicated": -0.01976935749588138,
     "lead_adjudicated_ci": [
-     -0.05427408412483037,
-     0.03435114503816794
+     -0.07042253521126762,
+     0.026315789473684292
     ],
-    "lead_agreed_joined": -0.0068015585480893925,
+    "lead_agreed_joined": -0.006804349312726554,
     "lead_agreed_joined_ci": [
-     -0.016354920575242016,
-     0.0012287395718812988
+     -0.016473818395763895,
+     0.0011498089833462677
     ]
    }
   },
@@ -407,32 +473,32 @@
    "route": "qwen3-vl-8b-mlx4",
    "family": "third family",
    "pages": 92,
-   "agreed_n": 28168,
-   "agreed_read": 27454,
-   "agreed_joined": 27676,
-   "adjudicated_n": 514,
-   "adjudicated_read": 345,
-   "adjudicated_joined": 385,
-   "agreed_acc": 0.9746520874751491,
-   "adjudicated_acc": 0.6712062256809338,
-   "agreed_acc_joined": 0.9825333712013633,
-   "adjudicated_acc_joined": 0.7490272373540856,
+   "agreed_n": 28156,
+   "agreed_read": 27449,
+   "agreed_joined": 27671,
+   "adjudicated_n": 519,
+   "adjudicated_read": 349,
+   "adjudicated_joined": 389,
+   "agreed_acc": 0.9748898991333996,
+   "adjudicated_acc": 0.6724470134874759,
+   "agreed_acc_joined": 0.9827745418383294,
+   "adjudicated_acc_joined": 0.7495183044315993,
    "lead": {
     "pages": 91,
-    "lead_agreed": 0.007349530843055452,
+    "lead_agreed": 0.007388371345968481,
     "lead_agreed_ci": [
-     -0.0027151211361737815,
-     0.018037569375266793
+     -0.002476945354774829,
+     0.017862179185860638
     ],
-    "lead_adjudicated": -0.02941176470588236,
+    "lead_adjudicated": -0.040776699029126284,
     "lead_adjudicated_ci": [
-     -0.09953703703703709,
-     0.024311183144246296
+     -0.11538461538461542,
+     0.015544041450777257
     ],
-    "lead_agreed_joined": -0.0032109600770630076,
+    "lead_agreed_joined": -0.0031766427526145335,
     "lead_agreed_joined_ci": [
-     -0.007065544197233931,
-     0.0013738683200056334
+     -0.006938944827846294,
+     0.001431464283220385
     ]
    }
   },
@@ -440,32 +506,32 @@
    "route": "qwen3.5-27b",
    "family": "third family",
    "pages": 96,
-   "agreed_n": 29397,
-   "agreed_read": 28615,
-   "agreed_joined": 29044,
-   "adjudicated_n": 606,
-   "adjudicated_read": 454,
-   "adjudicated_joined": 479,
-   "agreed_acc": 0.9733986461203524,
-   "adjudicated_acc": 0.7491749174917491,
-   "agreed_acc_joined": 0.9879919719699289,
-   "adjudicated_acc_joined": 0.7904290429042904,
+   "agreed_n": 29385,
+   "agreed_read": 28608,
+   "agreed_joined": 29037,
+   "adjudicated_n": 611,
+   "adjudicated_read": 459,
+   "adjudicated_joined": 484,
+   "agreed_acc": 0.9735579377233282,
+   "adjudicated_acc": 0.7512274959083469,
+   "agreed_acc_joined": 0.9881572230729965,
+   "adjudicated_acc_joined": 0.7921440261865794,
    "lead": {
     "pages": 95,
-    "lead_agreed": 0.004716658691639952,
+    "lead_agreed": 0.004684401285645845,
     "lead_agreed_ci": [
-     -0.000922345595799734,
-     0.01212628057704368
+     -0.0009816983381248923,
+     0.012096071391222485
     ],
-    "lead_adjudicated": 0.09468438538205981,
+    "lead_adjudicated": 0.08566721581548598,
     "lead_adjudicated_ci": [
-     -0.013782542113323193,
-     0.23906249999999996
+     -0.024691358024691357,
+     0.23059866962305986
     ],
-    "lead_agreed_joined": 0.0016063982500512664,
+    "lead_agreed_joined": 0.001572864665253304,
     "lead_agreed_joined_ci": [
-     -0.001456108722784566,
-     0.005842479934201172
+     -0.0015200868621064734,
+     0.005824719706407189
     ]
    }
   },
@@ -473,32 +539,32 @@
    "route": "qwen3-vl-235b",
    "family": "third family",
    "pages": 96,
-   "agreed_n": 29397,
-   "agreed_read": 28606,
-   "agreed_joined": 28941,
-   "adjudicated_n": 606,
-   "adjudicated_read": 396,
-   "adjudicated_joined": 430,
-   "agreed_acc": 0.9730924924312004,
-   "adjudicated_acc": 0.6534653465346535,
-   "agreed_acc_joined": 0.9844882130829676,
-   "adjudicated_acc_joined": 0.7095709570957096,
+   "agreed_n": 29385,
+   "agreed_read": 28600,
+   "agreed_joined": 28935,
+   "adjudicated_n": 611,
+   "adjudicated_read": 400,
+   "adjudicated_joined": 434,
+   "agreed_acc": 0.9732856899778799,
+   "adjudicated_acc": 0.6546644844517185,
+   "agreed_acc_joined": 0.9846860643185299,
+   "adjudicated_acc_joined": 0.7103109656301145,
    "lead": {
     "pages": 95,
-    "lead_agreed": 0.004716658691639952,
+    "lead_agreed": 0.004718593995760023,
     "lead_agreed_ci": [
-     -0.002479152580572408,
-     0.012503161926787909
+     -0.0024875621890547706,
+     0.012568322885464611
     ],
-    "lead_adjudicated": 0.0016611295681062677,
+    "lead_adjudicated": -0.008237232289950547,
     "lead_adjudicated_ci": [
-     -0.03653585926928282,
-     0.04398148148148151
+     -0.04991087344028522,
+     0.03846153846153855
     ],
-    "lead_agreed_joined": -0.0016063982500512664,
+    "lead_agreed_joined": -0.0016070573753675932,
     "lead_agreed_joined_ci": [
-     -0.006737767529004901,
-     0.0033786044022211525
+     -0.006776275901423046,
+     0.0033720228587654777
     ]
    }
   },
@@ -506,32 +572,32 @@
    "route": "gpt5.4-mini",
    "family": "third family",
    "pages": 95,
-   "agreed_n": 29117,
-   "agreed_read": 28333,
-   "agreed_joined": 28457,
-   "adjudicated_n": 604,
+   "agreed_n": 29105,
+   "agreed_read": 28324,
+   "agreed_joined": 28448,
+   "adjudicated_n": 609,
    "adjudicated_read": 385,
    "adjudicated_joined": 405,
-   "agreed_acc": 0.9730741491225058,
-   "adjudicated_acc": 0.6374172185430463,
-   "agreed_acc_joined": 0.9773328296184359,
-   "adjudicated_acc_joined": 0.6705298013245033,
+   "agreed_acc": 0.9731661226593369,
+   "adjudicated_acc": 0.632183908045977,
+   "agreed_acc_joined": 0.9774265590104793,
+   "adjudicated_acc_joined": 0.6650246305418719,
    "lead": {
     "pages": 94,
-    "lead_agreed": 0.004900269169714977,
+    "lead_agreed": 0.004798729544983837,
     "lead_agreed_ci": [
-     -0.0122042808862185,
-     0.01962224554039871
+     -0.012343762130269331,
+     0.019625677803043584
     ],
-    "lead_adjudicated": -0.014999999999999902,
+    "lead_adjudicated": -0.03140495867768589,
     "lead_adjudicated_ci": [
-     -0.09807073954983919,
-     0.08530805687203791
+     -0.11478260869565216,
+     0.0674603174603175
     ],
-    "lead_agreed_joined": -0.008765270204983078,
+    "lead_agreed_joined": -0.008872471173099417,
     "lead_agreed_joined_ci": [
-     -0.022364682742041175,
-     0.00028550582114650336
+     -0.022448165869218495,
+     0.00023492560689108988
     ]
    }
   },
@@ -539,32 +605,32 @@
    "route": "qwen3.5-35b-a3b",
    "family": "third family",
    "pages": 94,
-   "agreed_n": 28941,
-   "agreed_read": 28155,
-   "agreed_joined": 28445,
-   "adjudicated_n": 577,
-   "adjudicated_read": 385,
-   "adjudicated_joined": 397,
-   "agreed_acc": 0.9728412978127915,
-   "adjudicated_acc": 0.6672443674176777,
-   "agreed_acc_joined": 0.9828616841159601,
-   "adjudicated_acc_joined": 0.6880415944540728,
+   "agreed_n": 28929,
+   "agreed_read": 28149,
+   "agreed_joined": 28439,
+   "adjudicated_n": 582,
+   "adjudicated_read": 389,
+   "adjudicated_joined": 401,
+   "agreed_acc": 0.9730374364824225,
+   "adjudicated_acc": 0.6683848797250859,
+   "agreed_acc_joined": 0.9830619793287013,
+   "adjudicated_acc_joined": 0.6890034364261168,
    "lead": {
     "pages": 93,
-    "lead_agreed": 0.004687174501770697,
+    "lead_agreed": 0.004689128169503398,
     "lead_agreed_ci": [
-     -0.00401870242281388,
-     0.01316283034953103
+     -0.004025623971715686,
+     0.013134482870175712
     ],
-    "lead_adjudicated": -0.010471204188481686,
+    "lead_adjudicated": -0.02076124567474047,
     "lead_adjudicated_ci": [
-     -0.07594936708860756,
-     0.04276985743380857
+     -0.08556149732620322,
+     0.030303030303030276
     ],
-    "lead_agreed_joined": -0.0032289424345531836,
+    "lead_agreed_joined": -0.003230288294546746,
     "lead_agreed_joined_ci": [
-     -0.008503401360544172,
-     0.0018879798615482057
+     -0.008510489265576293,
+     0.001942541662406705
     ]
    }
   },
@@ -572,32 +638,32 @@
    "route": "qwen3.6-35b-a3b",
    "family": "third family",
    "pages": 96,
-   "agreed_n": 29397,
-   "agreed_read": 28584,
-   "agreed_joined": 28777,
-   "adjudicated_n": 606,
-   "adjudicated_read": 397,
-   "adjudicated_joined": 437,
-   "agreed_acc": 0.9723441167466068,
-   "adjudicated_acc": 0.6551155115511551,
-   "agreed_acc_joined": 0.9789094125250876,
-   "adjudicated_acc_joined": 0.7211221122112211,
+   "agreed_n": 29385,
+   "agreed_read": 28580,
+   "agreed_joined": 28773,
+   "adjudicated_n": 611,
+   "adjudicated_read": 400,
+   "adjudicated_joined": 440,
+   "agreed_acc": 0.9726050706142589,
+   "adjudicated_acc": 0.6546644844517185,
+   "agreed_acc_joined": 0.9791730474732007,
+   "adjudicated_acc_joined": 0.7201309328968903,
    "lead": {
     "pages": 95,
-    "lead_agreed": 0.0037938341650146645,
+    "lead_agreed": 0.003863776242905015,
     "lead_agreed_ci": [
-     -0.008508914100486265,
-     0.013954671159286725
+     -0.008460481596644698,
+     0.014021118227453666
     ],
-    "lead_adjudicated": 0.0016611295681062677,
+    "lead_adjudicated": -0.009884678747940634,
     "lead_adjudicated_ci": [
-     -0.027027027027027084,
-     0.032745591939546626
+     -0.041554959785522816,
+     0.021543985637342944
     ],
-    "lead_agreed_joined": -0.007382596213001524,
+    "lead_agreed_joined": -0.00731723996443967,
     "lead_agreed_joined_ci": [
-     -0.018697019414820826,
-     0.00048305845007245996
+     -0.018647940326591006,
+     0.00048556381429054607
     ]
    }
   },
@@ -605,32 +671,32 @@
    "route": "qwen3.8-flash",
    "family": "third family",
    "pages": 93,
-   "agreed_n": 28237,
-   "agreed_read": 27395,
-   "agreed_joined": 27850,
-   "adjudicated_n": 555,
-   "adjudicated_read": 389,
-   "adjudicated_joined": 429,
-   "agreed_acc": 0.9701809682331692,
-   "adjudicated_acc": 0.7009009009009008,
-   "agreed_acc_joined": 0.9862945780359104,
-   "adjudicated_acc_joined": 0.772972972972973,
+   "agreed_n": 28225,
+   "agreed_read": 27387,
+   "agreed_joined": 27842,
+   "adjudicated_n": 560,
+   "adjudicated_read": 394,
+   "adjudicated_joined": 434,
+   "agreed_acc": 0.9703100088573959,
+   "adjudicated_acc": 0.7035714285714286,
+   "agreed_acc_joined": 0.9864304694419841,
+   "adjudicated_acc_joined": 0.775,
    "lead": {
     "pages": 92,
-    "lead_agreed": 0.002704818848316637,
+    "lead_agreed": 0.0026347646514277567,
     "lead_agreed_ci": [
-     -0.0036222788078758006,
-     0.009256719692814053
+     -0.0036678019386953142,
+     0.009164342376933421
     ],
-    "lead_adjudicated": 0.07803992740471866,
+    "lead_adjudicated": 0.0683453237410071,
     "lead_adjudicated_ci": [
-     -0.015086206896551713,
-     0.22007722007722008
+     -0.02692307692307694,
+     0.21181262729124234
     ],
-    "lead_agreed_joined": 0.0005694355470139412,
+    "lead_agreed_joined": 0.000498468988108014,
     "lead_agreed_joined_ci": [
-     -0.0026329233308445277,
-     0.004833895665715016
+     -0.0026890280578848458,
+     0.0048026998961577805
     ]
    }
   },
@@ -638,47 +704,47 @@
    "route": "qwen3.6-27b",
    "family": "third family",
    "pages": 95,
-   "agreed_n": 29258,
-   "agreed_read": 28341,
-   "agreed_joined": 28859,
-   "adjudicated_n": 602,
-   "adjudicated_read": 393,
-   "adjudicated_joined": 439,
-   "agreed_acc": 0.9686581447809146,
-   "adjudicated_acc": 0.6528239202657807,
-   "agreed_acc_joined": 0.9863627042176498,
-   "adjudicated_acc_joined": 0.729235880398671
+   "agreed_n": 29246,
+   "agreed_read": 28335,
+   "agreed_joined": 28853,
+   "adjudicated_n": 607,
+   "adjudicated_read": 403,
+   "adjudicated_joined": 449,
+   "agreed_acc": 0.9688504410859605,
+   "adjudicated_acc": 0.6639209225700164,
+   "agreed_acc_joined": 0.986562264925118,
+   "adjudicated_acc_joined": 0.7397034596375618
   },
   {
    "route": "qwen3.5-4b",
    "family": "third family",
    "pages": 95,
-   "agreed_n": 29328,
-   "agreed_read": 28328,
-   "agreed_joined": 28511,
-   "adjudicated_n": 606,
-   "adjudicated_read": 417,
-   "adjudicated_joined": 431,
-   "agreed_acc": 0.9659028914348063,
-   "adjudicated_acc": 0.6881188118811881,
-   "agreed_acc_joined": 0.9721426623022368,
-   "adjudicated_acc_joined": 0.7112211221122112,
+   "agreed_n": 29317,
+   "agreed_read": 28323,
+   "agreed_joined": 28505,
+   "adjudicated_n": 610,
+   "adjudicated_read": 424,
+   "adjudicated_joined": 438,
+   "agreed_acc": 0.9660947573080465,
+   "adjudicated_acc": 0.6950819672131148,
+   "agreed_acc_joined": 0.9723027594910802,
+   "adjudicated_acc_joined": 0.7180327868852459,
    "lead": {
     "pages": 94,
-    "lead_agreed": -0.003014834355407947,
+    "lead_agreed": -0.0029816985399959695,
     "lead_agreed_ci": [
-     -0.01798370887548928,
-     0.00952858575727178
+     -0.017682147422241168,
+     0.009427567933945391
     ],
-    "lead_adjudicated": 0.03488372093023251,
+    "lead_adjudicated": 0.02970297029702973,
     "lead_adjudicated_ci": [
-     -0.018421052631578894,
-     0.11486486486486491
+     -0.02515723270440251,
+     0.1101398601398601
     ],
-    "lead_agreed_joined": -0.014560279557367606,
+    "lead_agreed_joined": -0.014565768729864925,
     "lead_agreed_joined_ci": [
-     -0.027445598902176016,
-     -0.005691155882890042
+     -0.027359097078362704,
+     -0.0058812785388127065
     ]
    }
   },
@@ -686,32 +752,65 @@
    "route": "fs-churro",
    "family": "third family",
    "pages": 94,
-   "agreed_n": 28665,
-   "agreed_read": 27660,
-   "agreed_joined": 27684,
-   "adjudicated_n": 556,
-   "adjudicated_read": 374,
-   "adjudicated_joined": 386,
-   "agreed_acc": 0.9649398220826793,
-   "adjudicated_acc": 0.6726618705035972,
-   "agreed_acc_joined": 0.9657770800627944,
-   "adjudicated_acc_joined": 0.6942446043165468,
+   "agreed_n": 28653,
+   "agreed_read": 27655,
+   "agreed_joined": 27679,
+   "adjudicated_n": 563,
+   "adjudicated_read": 378,
+   "adjudicated_joined": 390,
+   "agreed_acc": 0.9651694412452448,
+   "adjudicated_acc": 0.6714031971580817,
+   "agreed_acc_joined": 0.9660070498726137,
+   "adjudicated_acc_joined": 0.6927175843694494,
    "lead": {
     "pages": 93,
-    "lead_agreed": -0.0035055738624412136,
+    "lead_agreed": -0.0034719786771409966,
     "lead_agreed_ci": [
-     -0.025864553314120964,
-     0.015710233471525115
+     -0.026394857946982042,
+     0.015906643975966306
     ],
-    "lead_adjudicated": 0.019927536231884035,
+    "lead_adjudicated": 0.008944543828264706,
     "lead_adjudicated_ci": [
-     -0.057086614173228356,
-     0.13812154696132595
+     -0.06728971962616825,
+     0.10963455149501666
     ],
-    "lead_agreed_joined": -0.020682885788403604,
+    "lead_agreed_joined": -0.020656519604404844,
     "lead_agreed_joined_ci": [
-     -0.03929078014184395,
-     -0.005504880780924926
+     -0.04030516108277038,
+     -0.00594673476833274
+    ]
+   }
+  },
+  {
+   "route": "qwen3.8-27b",
+   "family": "third family",
+   "pages": 96,
+   "agreed_n": 29385,
+   "agreed_read": 28344,
+   "agreed_joined": 28822,
+   "adjudicated_n": 611,
+   "adjudicated_read": 418,
+   "adjudicated_joined": 440,
+   "agreed_acc": 0.9645737621235324,
+   "adjudicated_acc": 0.6841243862520459,
+   "agreed_acc_joined": 0.9808405649140718,
+   "adjudicated_acc_joined": 0.7201309328968903,
+   "lead": {
+    "pages": 95,
+    "lead_agreed": -0.004239896054161307,
+    "lead_agreed_ci": [
+     -0.022660063419674414,
+     0.008455796594355025
+    ],
+    "lead_adjudicated": 0.01976935749588138,
+    "lead_adjudicated_ci": [
+     -0.05555555555555558,
+     0.10596026490066235
+    ],
+    "lead_agreed_joined": -0.005607604458729432,
+    "lead_agreed_joined_ci": [
+     -0.02461601057878149,
+     0.007411907654921057
     ]
    }
   },
@@ -719,32 +818,32 @@
    "route": "qwen3-vl-30b-a3b",
    "family": "third family",
    "pages": 94,
-   "agreed_n": 28591,
-   "agreed_read": 27462,
-   "agreed_joined": 27873,
-   "adjudicated_n": 599,
-   "adjudicated_read": 407,
-   "adjudicated_joined": 425,
-   "agreed_acc": 0.9605120492462663,
-   "adjudicated_acc": 0.679465776293823,
-   "agreed_acc_joined": 0.9748872022664475,
-   "adjudicated_acc_joined": 0.7095158597662772,
+   "agreed_n": 28579,
+   "agreed_read": 27457,
+   "agreed_joined": 27868,
+   "adjudicated_n": 604,
+   "adjudicated_read": 410,
+   "adjudicated_joined": 428,
+   "agreed_acc": 0.9607404037929949,
+   "adjudicated_acc": 0.6788079470198676,
+   "agreed_acc_joined": 0.9751215927779139,
+   "adjudicated_acc_joined": 0.7086092715231788,
    "lead": {
     "pages": 93,
-    "lead_agreed": -0.00903275692394212,
+    "lead_agreed": -0.009001406469760886,
     "lead_agreed_ci": [
-     -0.01884537912669415,
-     -3.60828462149243e-05
+     -0.018791282540355336,
+     0.0
     ],
-    "lead_adjudicated": 0.025210084033613467,
+    "lead_adjudicated": 0.013333333333333308,
     "lead_adjudicated_ci": [
-     -0.020725388601036232,
-     0.10238095238095246
+     -0.03963414634146345,
+     0.08883248730964477
     ],
-    "lead_agreed_joined": -0.011282159426402427,
+    "lead_agreed_joined": -0.011251758087201136,
     "lead_agreed_joined_ci": [
-     -0.01905328966954445,
-     -0.004006437694757392
+     -0.019042875205946608,
+     -0.0039679848063488565
     ]
    }
   },
@@ -752,32 +851,32 @@
    "route": "mistral-large4",
    "family": "third family",
    "pages": 96,
-   "agreed_n": 29397,
-   "agreed_read": 28228,
-   "agreed_joined": 28827,
-   "adjudicated_n": 606,
-   "adjudicated_read": 400,
-   "adjudicated_joined": 435,
-   "agreed_acc": 0.9602340374868183,
-   "adjudicated_acc": 0.6600660066006601,
-   "agreed_acc_joined": 0.9806102663537095,
-   "adjudicated_acc_joined": 0.7178217821782178,
+   "agreed_n": 29385,
+   "agreed_read": 28222,
+   "agreed_joined": 28821,
+   "adjudicated_n": 611,
+   "adjudicated_read": 403,
+   "adjudicated_joined": 438,
+   "agreed_acc": 0.960421984005445,
+   "adjudicated_acc": 0.6595744680851063,
+   "agreed_acc_joined": 0.9808065339458908,
+   "adjudicated_acc_joined": 0.7168576104746317,
    "lead": {
     "pages": 95,
-    "lead_agreed": -0.008407956798140659,
+    "lead_agreed": -0.008411406688094147,
     "lead_agreed_ci": [
-     -0.023208531532913912,
-     0.001322751322751281
+     -0.023183316611724236,
+     0.0013162657540557454
     ],
-    "lead_adjudicated": 0.00830564784053156,
+    "lead_adjudicated": -0.0032948929159801743,
     "lead_adjudicated_ci": [
-     -0.015360983102918668,
-     0.04130434782608694
+     -0.02918781725888331,
+     0.028523489932885893
     ],
-    "lead_agreed_joined": -0.0057078405906076934,
+    "lead_agreed_joined": -0.005710182589072077,
     "lead_agreed_joined_ci": [
-     -0.021556195965417912,
-     0.004691910120596776
+     -0.021569456726517666,
+     0.004682251552268091
     ]
    }
   },
@@ -785,32 +884,32 @@
    "route": "qwen3.5-9b",
    "family": "third family",
    "pages": 92,
-   "agreed_n": 27446,
-   "agreed_read": 26327,
-   "agreed_joined": 26749,
-   "adjudicated_n": 599,
-   "adjudicated_read": 422,
-   "adjudicated_joined": 446,
-   "agreed_acc": 0.9592290315528674,
-   "adjudicated_acc": 0.7045075125208681,
-   "agreed_acc_joined": 0.9746046782773446,
-   "adjudicated_acc_joined": 0.7445742904841403,
+   "agreed_n": 27434,
+   "agreed_read": 26322,
+   "agreed_joined": 26743,
+   "adjudicated_n": 604,
+   "adjudicated_read": 426,
+   "adjudicated_joined": 450,
+   "agreed_acc": 0.9594663556171175,
+   "adjudicated_acc": 0.7052980132450332,
+   "agreed_acc_joined": 0.9748122767368959,
+   "adjudicated_acc_joined": 0.7450331125827815,
    "lead": {
     "pages": 91,
-    "lead_agreed": -0.011205917896510043,
+    "lead_agreed": -0.011174207730353602,
     "lead_agreed_ci": [
-     -0.027341929470250048,
-     -0.0013792075148172378
+     -0.02723880597014916,
+     -0.0013742896408275307
     ],
-    "lead_adjudicated": 0.04705882352941182,
+    "lead_adjudicated": 0.036666666666666625,
     "lead_adjudicated_ci": [
-     -0.009276437847866359,
-     0.13214285714285712
+     -0.021929824561403577,
+     0.12059369202226344
     ],
-    "lead_agreed_joined": -0.010912952722745062,
+    "lead_agreed_joined": -0.010917750503755319,
     "lead_agreed_joined_ci": [
-     -0.027471361900721303,
-     -0.0013214515637176572
+     -0.02754967829085353,
+     -0.0013579488505933712
     ]
    }
   },
@@ -818,32 +917,32 @@
    "route": "gpt5.6-luna",
    "family": "third family",
    "pages": 95,
-   "agreed_n": 29117,
-   "agreed_read": 27854,
-   "agreed_joined": 28172,
-   "adjudicated_n": 604,
-   "adjudicated_read": 386,
-   "adjudicated_joined": 398,
-   "agreed_acc": 0.9566232784970979,
-   "adjudicated_acc": 0.6390728476821192,
-   "agreed_acc_joined": 0.9675447333173061,
-   "adjudicated_acc_joined": 0.6589403973509934,
+   "agreed_n": 29105,
+   "agreed_read": 27849,
+   "agreed_joined": 28167,
+   "adjudicated_n": 609,
+   "adjudicated_read": 388,
+   "adjudicated_joined": 400,
+   "agreed_acc": 0.9568459027658478,
+   "adjudicated_acc": 0.6371100164203612,
+   "agreed_acc_joined": 0.9677718605050678,
+   "adjudicated_acc_joined": 0.6568144499178982,
    "lead": {
     "pages": 94,
-    "lead_agreed": -0.011284422665470362,
+    "lead_agreed": -0.01125457432852306,
     "lead_agreed_ci": [
-     -0.032558928268611176,
-     0.0038033937975424648
+     -0.03254894916472062,
+     0.0038365687303252294
     ],
-    "lead_adjudicated": -0.009999999999999898,
+    "lead_adjudicated": -0.023140495867768562,
     "lead_adjudicated_ci": [
-     -0.079059829059829,
-     0.0853242320819112
+     -0.09591836734693882,
+     0.07495069033530577
     ],
-    "lead_agreed_joined": -0.01825522810407887,
+    "lead_agreed_joined": -0.018228267624111005,
     "lead_agreed_joined_ci": [
-     -0.0377403356206264,
-     -0.005647664971266231
+     -0.037686478404186596,
+     -0.005647545830869349
     ]
    }
   },
@@ -851,32 +950,32 @@
    "route": "mistral-ocr",
    "family": "third family",
    "pages": 96,
-   "agreed_n": 29397,
-   "agreed_read": 28114,
-   "agreed_joined": 28815,
-   "adjudicated_n": 606,
-   "adjudicated_read": 400,
-   "adjudicated_joined": 437,
-   "agreed_acc": 0.9563560907575603,
-   "adjudicated_acc": 0.6600660066006601,
-   "agreed_acc_joined": 0.9802020614348403,
-   "adjudicated_acc_joined": 0.7211221122112211,
+   "agreed_n": 29385,
+   "agreed_read": 28106,
+   "agreed_joined": 28807,
+   "adjudicated_n": 611,
+   "adjudicated_read": 406,
+   "adjudicated_joined": 443,
+   "agreed_acc": 0.9564743916964438,
+   "adjudicated_acc": 0.6644844517184942,
+   "agreed_acc_joined": 0.9803301003913562,
+   "adjudicated_acc_joined": 0.7250409165302782,
    "lead": {
     "pages": 95,
-    "lead_agreed": -0.012235969649326717,
+    "lead_agreed": -0.01230937564111334,
     "lead_agreed_ci": [
-     -0.029343048350691014,
-     0.0010479983232026813
+     -0.029423003439052353,
+     0.0009608277900960971
     ],
-    "lead_adjudicated": 0.004983388704318914,
+    "lead_adjudicated": -0.0016474464579900872,
     "lead_adjudicated_ci": [
-     -0.033033033033033066,
-     0.05052631578947375
+     -0.0399529964747356,
+     0.044117647058823595
     ],
-    "lead_agreed_joined": -0.006049627452320627,
+    "lead_agreed_joined": -0.006120495110442548,
     "lead_agreed_joined_ci": [
-     -0.023196979722103328,
-     0.006789409706780547
+     -0.023331905114322482,
+     0.006791953262152095
     ]
    }
   },
@@ -884,32 +983,32 @@
    "route": "gemma4-31b",
    "family": "third family",
    "pages": 93,
-   "agreed_n": 28384,
-   "agreed_read": 27038,
-   "agreed_joined": 27128,
-   "adjudicated_n": 558,
-   "adjudicated_read": 330,
-   "adjudicated_joined": 358,
-   "agreed_acc": 0.9525789177001127,
-   "adjudicated_acc": 0.5913978494623656,
-   "agreed_acc_joined": 0.955749718151071,
-   "adjudicated_acc_joined": 0.6415770609318996,
+   "agreed_n": 28373,
+   "agreed_read": 27030,
+   "agreed_joined": 27120,
+   "adjudicated_n": 562,
+   "adjudicated_read": 334,
+   "adjudicated_joined": 362,
+   "agreed_acc": 0.9526662672258838,
+   "adjudicated_acc": 0.594306049822064,
+   "agreed_acc_joined": 0.9558382969724738,
+   "adjudicated_acc_joined": 0.6441281138790036,
    "lead": {
     "pages": 92,
-    "lead_agreed": -0.01695875376172773,
+    "lead_agreed": -0.017036197492385052,
     "lead_agreed_ci": [
-     -0.03414144791840834,
-     -0.0008209899770806883
+     -0.03416416726996929,
+     -0.0009670460462694042
     ],
-    "lead_adjudicated": -0.06137184115523464,
+    "lead_adjudicated": -0.07168458781362008,
     "lead_adjudicated_ci": [
-     -0.14311926605504582,
-     0.015590200445434299
+     -0.15371329879101903,
+     0.006833712984054663
     ],
-    "lead_agreed_joined": -0.03062488936094887,
+    "lead_agreed_joined": -0.03070765743429904,
     "lead_agreed_joined_ci": [
-     -0.05181806248359144,
-     -0.013688553426935757
+     -0.05193903144896783,
+     -0.013724316776381418
     ]
    }
   },
@@ -917,32 +1016,32 @@
    "route": "gemma4-26b-a4b",
    "family": "third family",
    "pages": 86,
-   "agreed_n": 24667,
-   "agreed_read": 23451,
-   "agreed_joined": 23516,
-   "adjudicated_n": 427,
-   "adjudicated_read": 254,
-   "adjudicated_joined": 285,
-   "agreed_acc": 0.9507033688733936,
-   "adjudicated_acc": 0.594847775175644,
-   "agreed_acc_joined": 0.9533384683990757,
-   "adjudicated_acc_joined": 0.667447306791569,
+   "agreed_n": 24656,
+   "agreed_read": 23446,
+   "agreed_joined": 23511,
+   "adjudicated_n": 431,
+   "adjudicated_read": 256,
+   "adjudicated_joined": 287,
+   "agreed_acc": 0.9509247242050617,
+   "adjudicated_acc": 0.5939675174013921,
+   "agreed_acc_joined": 0.9535609993510707,
+   "adjudicated_acc_joined": 0.665893271461717,
    "lead": {
     "pages": 85,
-    "lead_agreed": -0.024991846053489808,
+    "lead_agreed": -0.024962271077211717,
     "lead_agreed_ci": [
-     -0.042679270572466566,
-     -0.010301263362487822
+     -0.04265904519953423,
+     -0.010273418540689194
     ],
-    "lead_adjudicated": -0.009456264775413725,
+    "lead_adjudicated": -0.02810304449648715,
     "lead_adjudicated_ci": [
-     -0.047281323877068515,
-     0.029325513196480912
+     -0.07222222222222219,
+     0.01243781094527363
     ],
-    "lead_agreed_joined": -0.03567351598173518,
+    "lead_agreed_joined": -0.035648733531835064,
     "lead_agreed_joined_ci": [
-     -0.05388652266504412,
-     -0.019636153624025376
+     -0.05395356880376989,
+     -0.019590736040609125
     ]
    }
   },
@@ -950,32 +1049,32 @@
    "route": "lightonocr3-0.8b",
    "family": "third family",
    "pages": 96,
-   "agreed_n": 29397,
-   "agreed_read": 27817,
-   "agreed_joined": 28510,
-   "adjudicated_n": 606,
-   "adjudicated_read": 360,
-   "adjudicated_joined": 399,
-   "agreed_acc": 0.9462530190155458,
-   "adjudicated_acc": 0.594059405940594,
-   "agreed_acc_joined": 0.9698268530802463,
-   "adjudicated_acc_joined": 0.6584158415841584,
+   "agreed_n": 29385,
+   "agreed_read": 27812,
+   "agreed_joined": 28505,
+   "adjudicated_n": 611,
+   "adjudicated_read": 367,
+   "adjudicated_joined": 406,
+   "agreed_acc": 0.9464692870512166,
+   "adjudicated_acc": 0.6006546644844517,
+   "agreed_acc_joined": 0.9700527480006806,
+   "adjudicated_acc_joined": 0.6644844517184942,
    "lead": {
     "pages": 95,
-    "lead_agreed": -0.019857816665527328,
+    "lead_agreed": -0.01983177186623819,
     "lead_agreed_ci": [
-     -0.030831332428576386,
-     -0.010787757150025001
+     -0.030739912171679595,
+     -0.010881325543293352
     ],
-    "lead_adjudicated": -0.05813953488372092,
+    "lead_adjudicated": -0.06260296540362431,
     "lead_adjudicated_ci": [
-     -0.12808988764044948,
-     0.002136752136752129
+     -0.12861736334405138,
+     -0.005347593582887722
     ],
-    "lead_agreed_joined": -0.01394490395789183,
+    "lead_agreed_joined": -0.013916433016480934,
     "lead_agreed_joined_ci": [
-     -0.024408817635270585,
-     -0.005206501090550875
+     -0.024593564935309953,
+     -0.005182443151771521
     ]
    }
   },
@@ -983,32 +1082,32 @@
    "route": "paddleocr-vl1.5",
    "family": "third family",
    "pages": 86,
-   "agreed_n": 27008,
-   "agreed_read": 25505,
-   "agreed_joined": 26128,
-   "adjudicated_n": 411,
-   "adjudicated_read": 266,
-   "adjudicated_joined": 303,
-   "agreed_acc": 0.9443498222748815,
-   "adjudicated_acc": 0.6472019464720195,
-   "agreed_acc_joined": 0.9674170616113744,
-   "adjudicated_acc_joined": 0.7372262773722628,
+   "agreed_n": 27002,
+   "agreed_read": 25503,
+   "agreed_joined": 26126,
+   "adjudicated_n": 419,
+   "adjudicated_read": 269,
+   "adjudicated_joined": 306,
+   "agreed_acc": 0.944485593659729,
+   "adjudicated_acc": 0.6420047732696897,
+   "agreed_acc_joined": 0.9675579586697282,
+   "adjudicated_acc_joined": 0.7303102625298329,
    "lead": {
     "pages": 85,
-    "lead_agreed": -0.025531281402359607,
+    "lead_agreed": -0.025536983955626646,
     "lead_agreed_ci": [
-     -0.04463805941506105,
-     -0.013120326308633579
+     -0.04284907525060011,
+     -0.012141565486954331
     ],
-    "lead_adjudicated": -0.06388206388206386,
+    "lead_adjudicated": -0.07469879518072287,
     "lead_adjudicated_ci": [
-     -0.12693498452012386,
-     -0.01521739130434785
+     -0.1410788381742739,
+     -0.022421524663677084
     ],
-    "lead_agreed_joined": -0.02136290892850501,
+    "lead_agreed_joined": -0.021367680452667237,
     "lead_agreed_joined_ci": [
-     -0.04148401582379979,
-     -0.008388799180812034
+     -0.03995482140336015,
+     -0.007910424946499517
     ]
    }
   },
@@ -1016,32 +1115,32 @@
    "route": "lightonocr3-4b",
    "family": "third family",
    "pages": 96,
-   "agreed_n": 29397,
-   "agreed_read": 27745,
-   "agreed_joined": 28492,
-   "adjudicated_n": 606,
-   "adjudicated_read": 329,
-   "adjudicated_joined": 365,
-   "agreed_acc": 0.9438037895023301,
-   "adjudicated_acc": 0.5429042904290429,
-   "agreed_acc_joined": 0.9692145457019423,
-   "adjudicated_acc_joined": 0.6023102310231023,
+   "agreed_n": 29385,
+   "agreed_read": 27743,
+   "agreed_joined": 28490,
+   "adjudicated_n": 611,
+   "adjudicated_read": 337,
+   "adjudicated_joined": 373,
+   "agreed_acc": 0.9441211502467245,
+   "adjudicated_acc": 0.5515548281505729,
+   "agreed_acc_joined": 0.9695422834779649,
+   "adjudicated_acc_joined": 0.6104746317512275,
    "lead": {
     "pages": 95,
-    "lead_agreed": -0.022284503383689924,
+    "lead_agreed": -0.022156876154003968,
     "lead_agreed_ci": [
-     -0.034293497856656474,
-     -0.01339554963019396
+     -0.03388105826486776,
+     -0.0131664222123683
     ],
-    "lead_adjudicated": -0.10797342192691028,
+    "lead_adjudicated": -0.11037891268533773,
     "lead_adjudicated_ci": [
-     -0.21219822109275732,
-     -0.01388888888888884
+     -0.2116935483870968,
+     -0.012500000000000067
     ],
-    "lead_agreed_joined": -0.014525941622803962,
+    "lead_agreed_joined": -0.01439513095807976,
     "lead_agreed_joined_ci": [
-     -0.025546622586219758,
-     -0.0060094617056641875
+     -0.025650502661147323,
+     -0.005667402550331158
     ]
    }
   },
@@ -1049,32 +1148,65 @@
    "route": "lightonocr-3-4b-mlx8",
    "family": "third family",
    "pages": 96,
-   "agreed_n": 29397,
-   "agreed_read": 27729,
-   "agreed_joined": 28485,
-   "adjudicated_n": 606,
-   "adjudicated_read": 316,
-   "adjudicated_joined": 355,
-   "agreed_acc": 0.9432595162771712,
-   "adjudicated_acc": 0.5214521452145214,
-   "agreed_acc_joined": 0.9689764261659353,
-   "adjudicated_acc_joined": 0.5858085808580858,
+   "agreed_n": 29385,
+   "agreed_read": 27727,
+   "agreed_joined": 28483,
+   "adjudicated_n": 611,
+   "adjudicated_read": 320,
+   "adjudicated_joined": 359,
+   "agreed_acc": 0.9435766547558277,
+   "adjudicated_acc": 0.5237315875613748,
+   "agreed_acc_joined": 0.9693040667006977,
+   "adjudicated_acc_joined": 0.5875613747954174,
    "lead": {
     "pages": 95,
-    "lead_agreed": -0.023002255793287296,
+    "lead_agreed": -0.022874923066402264,
     "lead_agreed_ci": [
-     -0.03448027382453611,
-     -0.013180478642443094
+     -0.03400205215299157,
+     -0.013331105913798935
     ],
-    "lead_adjudicated": -0.1312292358803987,
+    "lead_adjudicated": -0.14003294892915974,
     "lead_adjudicated_ci": [
-     -0.2563482466747279,
-     -0.025522041763341052
+     -0.25391304347826094,
+     -0.03917050691244239
     ],
-    "lead_agreed_joined": -0.014936085856859571,
+    "lead_agreed_joined": -0.014805443479450231,
     "lead_agreed_joined_ci": [
-     -0.025819296526877977,
-     -0.005823868206827787
+     -0.025573192239858877,
+     -0.006114266622118225
+    ]
+   }
+  },
+  {
+   "route": "lightonocr-3-4b-mlx8-logprob",
+   "family": "third family",
+   "pages": 96,
+   "agreed_n": 29385,
+   "agreed_read": 27727,
+   "agreed_joined": 28483,
+   "adjudicated_n": 611,
+   "adjudicated_read": 320,
+   "adjudicated_joined": 359,
+   "agreed_acc": 0.9435766547558277,
+   "adjudicated_acc": 0.5237315875613748,
+   "agreed_acc_joined": 0.9693040667006977,
+   "adjudicated_acc_joined": 0.5875613747954174,
+   "lead": {
+    "pages": 95,
+    "lead_agreed": -0.022874923066402264,
+    "lead_agreed_ci": [
+     -0.0343117881651277,
+     -0.013572309890252598
+    ],
+    "lead_adjudicated": -0.14003294892915974,
+    "lead_adjudicated_ci": [
+     -0.259567387687188,
+     -0.034383954154727836
+    ],
+    "lead_agreed_joined": -0.014805443479450231,
+    "lead_agreed_joined_ci": [
+     -0.025154489276626668,
+     -0.006191950464396245
     ]
    }
   },
@@ -1082,32 +1214,164 @@
    "route": "mistral-medium3.5",
    "family": "third family",
    "pages": 96,
-   "agreed_n": 29397,
-   "agreed_read": 27639,
-   "agreed_joined": 28304,
-   "adjudicated_n": 606,
-   "adjudicated_read": 318,
-   "adjudicated_joined": 355,
-   "agreed_acc": 0.9401979793856516,
-   "adjudicated_acc": 0.5247524752475248,
-   "agreed_acc_joined": 0.9628193353063238,
-   "adjudicated_acc_joined": 0.5858085808580858,
+   "agreed_n": 29385,
+   "agreed_read": 27633,
+   "agreed_joined": 28298,
+   "adjudicated_n": 611,
+   "adjudicated_read": 322,
+   "adjudicated_joined": 359,
+   "agreed_acc": 0.9403777437468096,
+   "adjudicated_acc": 0.5270049099836334,
+   "agreed_acc_joined": 0.9630083375872044,
+   "adjudicated_acc_joined": 0.5875613747954174,
    "lead": {
     "pages": 95,
-    "lead_agreed": -0.02816323740515414,
+    "lead_agreed": -0.02817479313410387,
     "lead_agreed_ci": [
-     -0.04766031195840548,
-     -0.013786792740582587
+     -0.04768018877745783,
+     -0.013770783094301353
     ],
-    "lead_adjudicated": -0.12790697674418605,
+    "lead_adjudicated": -0.13673805601317957,
     "lead_adjudicated_ci": [
-     -0.2468085106382979,
-     -0.03393665158371051
+     -0.25316455696202533,
+     -0.0423728813559322
     ],
-    "lead_agreed_joined": -0.0232073279103151,
+    "lead_agreed_joined": -0.023216850167544267,
     "lead_agreed_joined_ci": [
-     -0.04285352576275481,
-     -0.008734631991825781
+     -0.042831647828673325,
+     -0.00877221910760817
+    ]
+   }
+  },
+  {
+   "route": "xiaomi-ocr-0-bf16",
+   "family": "third family",
+   "pages": 96,
+   "agreed_n": 29385,
+   "agreed_read": 27619,
+   "agreed_joined": 28346,
+   "adjudicated_n": 611,
+   "adjudicated_read": 146,
+   "adjudicated_joined": 161,
+   "agreed_acc": 0.939901310192275,
+   "adjudicated_acc": 0.23895253682487724,
+   "agreed_acc_joined": 0.9646418240598945,
+   "adjudicated_acc_joined": 0.2635024549918167,
+   "lead": {
+    "pages": 95,
+    "lead_agreed": -0.02612323052725163,
+    "lead_agreed_ci": [
+     -0.036679829890644,
+     -0.017117376294591424
+    ],
+    "lead_adjudicated": -0.42668863261943984,
+    "lead_adjudicated_ci": [
+     -0.6131756756756757,
+     -0.20716510903426788
+    ],
+    "lead_agreed_joined": -0.019045339533611427,
+    "lead_agreed_joined_ci": [
+     -0.028434826371414146,
+     -0.010621242484969873
+    ]
+   }
+  },
+  {
+   "route": "xiaomi-ocr-0",
+   "family": "third family",
+   "pages": 96,
+   "agreed_n": 29385,
+   "agreed_read": 27618,
+   "agreed_joined": 28345,
+   "adjudicated_n": 611,
+   "adjudicated_read": 148,
+   "adjudicated_joined": 165,
+   "agreed_acc": 0.939867279224094,
+   "adjudicated_acc": 0.24222585924713586,
+   "agreed_acc_joined": 0.9646077930917134,
+   "adjudicated_acc_joined": 0.2700490998363339,
+   "lead": {
+    "pages": 95,
+    "lead_agreed": -0.026157423237365807,
+    "lead_agreed_ci": [
+     -0.036677454153182354,
+     -0.017363468813657912
+    ],
+    "lead_adjudicated": -0.4233937397034596,
+    "lead_adjudicated_ci": [
+     -0.6082474226804124,
+     -0.19303797468354433
+    ],
+    "lead_agreed_joined": -0.019079532243725716,
+    "lead_agreed_joined_ci": [
+     -0.02909443568917447,
+     -0.010979294082971047
+    ]
+   }
+  },
+  {
+   "route": "paddleocr-vl1.6",
+   "family": "third family",
+   "pages": 94,
+   "agreed_n": 28962,
+   "agreed_read": 27191,
+   "agreed_joined": 27879,
+   "adjudicated_n": 561,
+   "adjudicated_read": 334,
+   "adjudicated_joined": 370,
+   "agreed_acc": 0.9388509080864581,
+   "adjudicated_acc": 0.5953654188948306,
+   "agreed_acc_joined": 0.9626061736067951,
+   "adjudicated_acc_joined": 0.6595365418894831,
+   "lead": {
+    "pages": 94,
+    "lead_agreed": -0.02990124991368004,
+    "lead_agreed_ci": [
+     -0.043267578527733885,
+     -0.01867608883761185
+    ],
+    "lead_adjudicated": -0.071301247771836,
+    "lead_adjudicated_ci": [
+     -0.1159420289855072,
+     -0.031135531135531136
+    ],
+    "lead_agreed_joined": -0.02403148953801537,
+    "lead_agreed_joined_ci": [
+     -0.03702331097357592,
+     -0.012281330423168368
+    ]
+   }
+  },
+  {
+   "route": "paddleocr-vl1.6-bf16",
+   "family": "third family",
+   "pages": 94,
+   "agreed_n": 28962,
+   "agreed_read": 27179,
+   "agreed_joined": 27869,
+   "adjudicated_n": 561,
+   "adjudicated_read": 333,
+   "adjudicated_joined": 371,
+   "agreed_acc": 0.9384365720599406,
+   "adjudicated_acc": 0.5935828877005348,
+   "agreed_acc_joined": 0.9622608935846972,
+   "adjudicated_acc_joined": 0.661319073083779,
+   "lead": {
+    "pages": 94,
+    "lead_agreed": -0.030315585940197565,
+    "lead_agreed_ci": [
+     -0.04435362927414521,
+     -0.019153365718251214
+    ],
+    "lead_adjudicated": -0.07308377896613183,
+    "lead_adjudicated_ci": [
+     -0.12104283054003728,
+     -0.03147699757869249
+    ],
+    "lead_agreed_joined": -0.024376769560113254,
+    "lead_agreed_joined_ci": [
+     -0.03865026551051953,
+     -0.013272253773022546
     ]
    }
   },
@@ -1115,32 +1379,32 @@
    "route": "mistral-small-24b",
    "family": "third family",
    "pages": 94,
-   "agreed_n": 29093,
-   "agreed_read": 27284,
-   "agreed_joined": 27897,
-   "adjudicated_n": 546,
-   "adjudicated_read": 311,
-   "adjudicated_joined": 323,
-   "agreed_acc": 0.9378200941807308,
-   "adjudicated_acc": 0.5695970695970696,
-   "agreed_acc_joined": 0.9588904547485649,
-   "adjudicated_acc_joined": 0.5915750915750916,
+   "agreed_n": 29085,
+   "agreed_read": 27281,
+   "agreed_joined": 27894,
+   "adjudicated_n": 556,
+   "adjudicated_read": 313,
+   "adjudicated_joined": 325,
+   "agreed_acc": 0.9379749011517965,
+   "adjudicated_acc": 0.5629496402877698,
+   "agreed_acc_joined": 0.9590510572460031,
+   "adjudicated_acc_joined": 0.5845323741007195,
    "lead": {
     "pages": 93,
-    "lead_agreed": -0.031152863162257405,
+    "lead_agreed": -0.031161473087818692,
     "lead_agreed_ci": [
-     -0.051625562434453154,
-     -0.01531244764617179
+     -0.05163604371806585,
+     -0.015326330291028034
     ],
-    "lead_adjudicated": -0.12915129151291505,
+    "lead_adjudicated": -0.13949275362318847,
     "lead_adjudicated_ci": [
-     -0.2451923076923077,
-     -0.04092071611253201
+     -0.2546494992846924,
+     -0.05476190476190479
     ],
-    "lead_agreed_joined": -0.02787179664295092,
+    "lead_agreed_joined": -0.02787949975817039,
     "lead_agreed_joined_ci": [
-     -0.04887697387779122,
-     -0.011646859083191852
+     -0.04891052387575334,
+     -0.011688357000802507
     ]
    }
   },
@@ -1148,32 +1412,65 @@
    "route": "glm-ocr",
    "family": "third family",
    "pages": 95,
-   "agreed_n": 29261,
-   "agreed_read": 27410,
-   "agreed_joined": 28100,
-   "adjudicated_n": 577,
-   "adjudicated_read": 160,
-   "adjudicated_joined": 172,
-   "agreed_acc": 0.9367417381497557,
-   "adjudicated_acc": 0.2772963604852686,
-   "agreed_acc_joined": 0.960322613717918,
-   "adjudicated_acc_joined": 0.29809358752166376,
+   "agreed_n": 29249,
+   "agreed_read": 27405,
+   "agreed_joined": 28095,
+   "adjudicated_n": 582,
+   "adjudicated_read": 164,
+   "adjudicated_joined": 176,
+   "agreed_acc": 0.9369551095763958,
+   "adjudicated_acc": 0.281786941580756,
+   "agreed_acc_joined": 0.9605456596806728,
+   "adjudicated_acc_joined": 0.3024054982817869,
    "lead": {
     "pages": 94,
-    "lead_agreed": -0.03135086875901383,
+    "lead_agreed": -0.031329440054963964,
     "lead_agreed_ci": [
-     -0.04386408134908104,
-     -0.01983672846570539
+     -0.0440692405994656,
+     -0.02023074157597149
     ],
-    "lead_adjudicated": -0.4013961605584642,
+    "lead_adjudicated": -0.4083044982698962,
     "lead_adjudicated_ci": [
-     -0.5629139072847682,
-     -0.1869158878504673
+     -0.5647921760391198,
+     -0.22242647058823528
     ],
-    "lead_agreed_joined": -0.02544468099718422,
+    "lead_agreed_joined": -0.02542081758845749,
     "lead_agreed_joined_ci": [
-     -0.03847050594544177,
-     -0.014044106690508151
+     -0.038903712488058795,
+     -0.014566548501450227
+    ]
+   }
+  },
+  {
+   "route": "granite-docling-258m-mlx",
+   "family": "third family",
+   "pages": 37,
+   "agreed_n": 11336,
+   "agreed_read": 10049,
+   "agreed_joined": 10205,
+   "adjudicated_n": 219,
+   "adjudicated_read": 39,
+   "adjudicated_joined": 39,
+   "agreed_acc": 0.8864678899082569,
+   "adjudicated_acc": 0.1780821917808219,
+   "agreed_acc_joined": 0.9002293577981652,
+   "adjudicated_acc_joined": 0.1780821917808219,
+   "lead": {
+    "pages": 36,
+    "lead_agreed": -0.0854693221398588,
+    "lead_agreed_ci": [
+     -0.1545819781901664,
+     -0.039728682170542706
+    ],
+    "lead_adjudicated": -0.37209302325581395,
+    "lead_adjudicated_ci": [
+     -0.5693430656934306,
+     -0.19108280254777069
+    ],
+    "lead_agreed_joined": -0.08832723050817182,
+    "lead_agreed_joined_ci": [
+     -0.15213429256594724,
+     -0.04556830931216016
     ]
    }
   },
@@ -1181,32 +1478,32 @@
    "route": "apple-vision",
    "family": "third family",
    "pages": 96,
-   "agreed_n": 29397,
-   "agreed_read": 24687,
-   "agreed_joined": 24728,
-   "adjudicated_n": 606,
-   "adjudicated_read": 306,
-   "adjudicated_joined": 311,
-   "agreed_acc": 0.8397795693438106,
-   "adjudicated_acc": 0.504950495049505,
-   "agreed_acc_joined": 0.8411742694832806,
-   "adjudicated_acc_joined": 0.5132013201320133,
+   "agreed_n": 29385,
+   "agreed_read": 24686,
+   "agreed_joined": 24727,
+   "adjudicated_n": 611,
+   "adjudicated_read": 307,
+   "adjudicated_joined": 312,
+   "agreed_acc": 0.8400884805172707,
+   "adjudicated_acc": 0.502454991816694,
+   "agreed_acc_joined": 0.8414837502126935,
+   "adjudicated_acc_joined": 0.5106382978723404,
    "lead": {
     "pages": 95,
-    "lead_agreed": -0.12687128306787887,
+    "lead_agreed": -0.12675237639335302,
     "lead_agreed_ci": [
-     -0.178943538517514,
-     -0.0795173800632002
+     -0.18114528167487387,
+     -0.08051939009956133
     ],
-    "lead_adjudicated": -0.14451827242524917,
+    "lead_adjudicated": -0.15815485996705103,
     "lead_adjudicated_ci": [
-     -0.2142857142857143,
-     -0.0839813374805598
+     -0.23162583518930957,
+     -0.09696969696969693
     ],
-    "lead_agreed_joined": -0.14317451637159062,
+    "lead_agreed_joined": -0.14306229911782808,
     "lead_agreed_joined_ci": [
-     -0.19523246650906223,
-     -0.09632522634475416
+     -0.19625018637244662,
+     -0.09676147734853535
     ]
    }
   },
@@ -1214,64 +1511,64 @@
    "route": "ppocrv6-medium",
    "family": "third family",
    "pages": 96,
-   "agreed_n": 29397,
-   "agreed_read": 22720,
-   "agreed_joined": 22818,
-   "adjudicated_n": 606,
-   "adjudicated_read": 295,
-   "adjudicated_joined": 325,
-   "agreed_acc": 0.7728679797258223,
-   "adjudicated_acc": 0.4867986798679868,
-   "agreed_acc_joined": 0.7762016532299214,
-   "adjudicated_acc_joined": 0.5363036303630363,
+   "agreed_n": 29385,
+   "agreed_read": 22719,
+   "agreed_joined": 22817,
+   "adjudicated_n": 611,
+   "adjudicated_read": 296,
+   "adjudicated_joined": 326,
+   "agreed_acc": 0.7731495661051557,
+   "adjudicated_acc": 0.4844517184942717,
+   "agreed_acc_joined": 0.7764846009868981,
+   "adjudicated_acc_joined": 0.5335515548281505,
    "lead": {
     "pages": 95,
-    "lead_agreed": -0.19509194066580082,
+    "lead_agreed": -0.19500102578130352,
     "lead_agreed_ci": [
-     -0.2523315095747327,
-     -0.14026296952115436
+     -0.2525127226463104,
+     -0.14082993584273573
     ],
-    "lead_adjudicated": -0.16279069767441862,
+    "lead_adjudicated": -0.17627677100494232,
     "lead_adjudicated_ci": [
-     -0.24105461393596989,
-     -0.10090556274256146
+     -0.258,
+     -0.11413969335604779
     ],
-    "lead_agreed_joined": -0.20944698885774826,
+    "lead_agreed_joined": -0.209361964029269,
     "lead_agreed_joined_ci": [
-     -0.2740801984291029,
-     -0.14755591170685511
+     -0.27354712681100435,
+     -0.14859250770002153
     ]
    }
   }
  ],
  "by_family": {
   "drafter family": {
-   "routes": 6,
-   "agreed_acc": 0.9896570142709259,
-   "agreed_acc_joined": 0.9945263770461296,
-   "adjudicated_acc": 0.7430646932629039,
-   "lead_agreed_joined": 0.008273444178093095
+   "routes": 7,
+   "agreed_acc": 0.9907571993505069,
+   "agreed_acc_joined": 0.9949517637145843,
+   "adjudicated_acc": 0.7357776096003051,
+   "lead_agreed_joined": 0.00847816597327733
   },
   "third family": {
-   "routes": 28,
-   "agreed_acc": 0.95072205635222,
-   "agreed_acc_joined": 0.963523233170445,
-   "adjudicated_acc": 0.6190350234202607,
-   "lead_agreed_joined": -0.022313443484134183
+   "routes": 35,
+   "agreed_acc": 0.9505591558506615,
+   "agreed_acc_joined": 0.9650033244097797,
+   "adjudicated_acc": 0.596808693020817,
+   "lead_agreed_joined": -0.020897030317025608
   }
  },
  "sheet": {
   "joins": 265,
-  "blocks": 18,
-  "eligible_pages": 50,
+  "blocks": 17,
+  "eligible_pages": 48,
   "answered_pages": 95,
   "chosen": 20,
-  "items": 59,
-  "minutes": 13.658333333333333,
-  "differences_total": 194,
-  "differences_on_chosen": 62,
+  "items": 66,
+  "minutes": 14.883333333333333,
+  "differences_total": 190,
+  "differences_on_chosen": 69,
   "differences_median_page": 1,
   "mixed_items": 2,
-  "boxed_items": 54
+  "boxed_items": 61
  }
 }

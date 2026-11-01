@@ -258,6 +258,21 @@
    }
   },
   {
+   "id": "granite-docling-258m-mlx",
+   "name": "granite-docling-258M bf16 (Mac)",
+   "panel": "mac",
+   "pair": null,
+   "std": 0.0,
+   "batch": null,
+   "free_cluster": false,
+   "machine": "Apple M3 Pro, 18 GB",
+   "hw": {
+    "seconds": 3.8,
+    "peak_gb": 1.44,
+    "peak_max_gb": 1.5
+   }
+  },
+  {
    "id": "qwen3.6-27b-farmshare",
    "name": "Qwen3.6 27B fp8 (FarmShare)",
    "panel": "farmshare",
@@ -1352,62 +1367,62 @@
      96
     ],
     "gemini3.1-pro": [
-     94.84,
+     94.82,
      94,
      96
     ],
     "gemini3.8-flash": [
-     94.47,
+     94.43,
      94,
      96
     ],
     "qwen3.5-397b": [
-     93.98,
+     94.02,
      96,
      96
     ],
     "qwen3-vl-235b": [
-     93.95,
+     93.98,
      96,
      96
     ],
     "gpt5.4-mini": [
-     93.55,
+     93.48,
      95,
      96
     ],
     "gemini3.5-flash": [
-     93.48,
+     93.45,
      94,
      96
     ],
     "mistral-large4": [
-     93.15,
+     93.17,
      96,
      96
     ],
     "gemini3.5-flash-lite": [
-     93.13,
+     93.12,
      94,
      96
     ],
     "mistral-ocr-4-1": [
-     92.91,
+     92.92,
      96,
      96
     ],
     "gpt5.6-luna": [
-     92.13,
+     92.09,
      95,
      96
     ],
     "qwen3.8-flash": [
-     91.88,
+     91.91,
      93,
      96
     ],
     "mistral-medium3.5": [
-     90.65,
+     90.66,
      96,
      96
     ],
@@ -1417,22 +1432,22 @@
      96
     ],
     "qwen3.5-9b": [
-     89.43,
+     89.44,
      92,
      96
     ],
     "qwen3.5-27b": [
-     81.8,
+     81.83,
      82,
      96
     ],
     "qwen3.5-35b-a3b": [
-     90.83,
+     90.85,
      94,
      96
     ],
     "qwen3.6-27b": [
-     94.28,
+     94.35,
      95,
      96
     ],
@@ -1442,64 +1457,69 @@
      96
     ],
     "gemma4-26b-a4b": [
-     82.73,
+     82.75,
      86,
      96
     ],
     "gemma4-31b": [
-     90.55,
+     90.57,
      93,
      96
     ],
     "qwen3-vl-8b": [
-     91.81,
+     91.83,
      94,
      96
     ],
     "qwen3-vl-30b-a3b": [
-     89.82,
+     89.84,
      94,
      96
     ],
     "mistral-small-24b": [
-     89.34,
+     89.36,
      94,
      96
     ],
     "gemini3.1-flash-lite": [
-     91.61,
+     91.59,
      93,
      96
     ],
     "apple-vision": [
-     81.34,
+     81.37,
      96,
      96
     ],
     "qwen3-vl-8b-mlx4": [
-     89.66,
+     89.67,
      92,
      96
     ],
     "lightonocr-3-4b-mlx8": [
-     89.13,
+     89.17,
      96,
      96
     ],
     "qwen3.5-9b-mlx4": [
-     91.91,
+     91.93,
      95,
      96
     ],
     "xiaomi-ocr-0-bf16": [
-     88.66,
+     88.7,
      96,
      96
     ],
     "paddleocr-vl1.6-bf16": [
-     88.78,
+     88.81,
      94,
      96
+    ],
+    "granite-docling-258m-mlx": [
+     60.95,
+     37,
+     46
     ],
     "qwen3.6-27b-farmshare": [
      95.25,
@@ -1897,12 +1917,12 @@
      96
     ],
     "gw-regions-pp-doclayoutv3": [
-     84.85,
+     84.84,
      95,
      96
     ],
     "gw-regions-tiles": [
-     91.05,
+     91.04,
      96,
      96
     ]
@@ -1915,17 +1935,17 @@
    "words": 15040,
    "scores": {
     "claude-sonnet5.5": [
-     98.58,
+     98.57,
      50,
      50
     ],
     "gemini3.1-pro": [
-     98.75,
+     98.74,
      50,
      50
     ],
     "gemini3.8-flash": [
-     98.75,
+     98.73,
      50,
      50
     ],
@@ -1950,12 +1970,12 @@
      50
     ],
     "gpt5.4-mini": [
-     95.51,
+     95.49,
      49,
      50
     ],
     "gemini3.5-flash": [
-     97.33,
+     97.34,
      50,
      50
     ],
@@ -1970,7 +1990,7 @@
      50
     ],
     "mistral-ocr-4-1": [
-     95.7,
+     95.68,
      50,
      50
     ],
@@ -1985,7 +2005,7 @@
      50
     ],
     "qwen3.6-27b": [
-     95.55,
+     95.54,
      49,
      50
     ],
@@ -2000,7 +2020,7 @@
      50
     ],
     "gemini3.1-flash-lite": [
-     96.38,
+     96.36,
      50,
      50
     ],
@@ -2055,7 +2075,7 @@
      50
     ],
     "qwen3.5-9b-mlx4": [
-     93.33,
+     93.32,
      49,
      50
     ],
@@ -2068,6 +2088,11 @@
      93.69,
      49,
      50
+    ],
+    "granite-docling-258m-mlx": [
+     72.13,
+     21,
+     26
     ],
     "qwen3.6-27b-farmshare": [
      97.22,
@@ -2465,12 +2490,12 @@
      50
     ],
     "gw-regions-pp-doclayoutv3": [
-     92.24,
+     92.22,
      50,
      50
     ],
     "gw-regions-tiles": [
-     98.52,
+     98.51,
      50,
      50
     ]
@@ -2636,6 +2661,11 @@
      85.89,
      27,
      28
+    ],
+    "granite-docling-258m-mlx": [
+     67.93,
+     10,
+     11
     ],
     "qwen3.6-27b-farmshare": [
      94.93,
@@ -3048,20 +3078,20 @@
    "key": "handwritten",
    "title": "Handwritten",
    "n": 16,
-   "words": 2182,
+   "words": 2177,
    "scores": {
     "claude-sonnet5.5": [
-     92.43,
+     92.5,
      16,
      16
     ],
     "gemini3.1-pro": [
-     94.06,
+     93.98,
      16,
      16
     ],
     "gemini3.8-flash": [
-     95.97,
+     95.81,
      16,
      16
     ],
@@ -3071,139 +3101,144 @@
      16
     ],
     "qwen3.5-397b": [
-     90.57,
-     16,
-     16
-    ],
-    "qwen3-vl-235b": [
-     91.38,
-     16,
-     16
-    ],
-    "qwen3.8-flash": [
-     91.03,
-     16,
-     16
-    ],
-    "gpt5.4-mini": [
-     89.48,
-     16,
-     16
-    ],
-    "gemini3.5-flash": [
-     92.93,
-     16,
-     16
-    ],
-    "mistral-large4": [
-     92.03,
-     16,
-     16
-    ],
-    "gemini3.5-flash-lite": [
-     91.98,
-     16,
-     16
-    ],
-    "mistral-ocr-4-1": [
-     89.01,
-     16,
-     16
-    ],
-    "gpt5.6-luna": [
-     85.44,
-     16,
-     16
-    ],
-    "mistral-medium3.5": [
-     85.04,
-     16,
-     16
-    ],
-    "qwen3.6-27b": [
-     92.15,
-     16,
-     16
-    ],
-    "qwen3.6-35b-a3b": [
-     88.82,
-     16,
-     16
-    ],
-    "qwen3-vl-8b": [
-     84.83,
-     15,
-     16
-    ],
-    "gemini3.1-flash-lite": [
-     86.64,
-     15,
-     16
-    ],
-    "qwen3.5-35b-a3b": [
-     88.31,
-     16,
-     16
-    ],
-    "gemma4-31b": [
      90.84,
      16,
      16
     ],
+    "qwen3-vl-235b": [
+     91.59,
+     16,
+     16
+    ],
+    "qwen3.8-flash": [
+     91.25,
+     16,
+     16
+    ],
+    "gpt5.4-mini": [
+     89.13,
+     16,
+     16
+    ],
+    "gemini3.5-flash": [
+     92.69,
+     16,
+     16
+    ],
+    "mistral-large4": [
+     92.2,
+     16,
+     16
+    ],
+    "gemini3.5-flash-lite": [
+     91.96,
+     16,
+     16
+    ],
+    "mistral-ocr-4-1": [
+     89.1,
+     16,
+     16
+    ],
+    "gpt5.6-luna": [
+     85.2,
+     16,
+     16
+    ],
+    "mistral-medium3.5": [
+     85.06,
+     16,
+     16
+    ],
+    "qwen3.6-27b": [
+     92.61,
+     16,
+     16
+    ],
+    "qwen3.6-35b-a3b": [
+     88.83,
+     16,
+     16
+    ],
+    "qwen3-vl-8b": [
+     84.98,
+     15,
+     16
+    ],
+    "gemini3.1-flash-lite": [
+     86.55,
+     15,
+     16
+    ],
+    "qwen3.5-35b-a3b": [
+     88.43,
+     16,
+     16
+    ],
+    "gemma4-31b": [
+     90.98,
+     16,
+     16
+    ],
     "qwen3-vl-30b-a3b": [
-     77.58,
+     77.72,
      15,
      16
     ],
     "qwen3.5-9b": [
-     90.92,
+     91.0,
      16,
      16
     ],
     "mistral-small-24b": [
-     79.83,
+     79.9,
      15,
      16
     ],
     "gemma4-26b-a4b": [
-     86.6,
+     86.75,
      16,
      16
     ],
     "qwen3.5-27b": [
-     69.14,
+     69.33,
      12,
      16
     ],
     "apple-vision": [
-     57.87,
+     58.06,
      16,
      16
     ],
     "qwen3-vl-8b-mlx4": [
-     89.16,
+     89.24,
      16,
      16
     ],
     "lightonocr-3-4b-mlx8": [
-     89.67,
+     89.91,
      16,
      16
     ],
     "qwen3.5-9b-mlx4": [
-     87.92,
+     88.06,
      16,
      16
     ],
     "xiaomi-ocr-0-bf16": [
-     85.85,
+     86.04,
      16,
      16
     ],
     "paddleocr-vl1.6-bf16": [
-     80.18,
+     80.37,
      16,
      16
+    ],
+    "granite-docling-258m-mlx": [
+     25.88,
+     6,
+     7
     ],
     "qwen3.6-27b-farmshare": [
      92.8,
@@ -3601,12 +3636,12 @@
      16
     ],
     "gw-regions-pp-doclayoutv3": [
-     70.29,
+     70.28,
      15,
      16
     ],
     "gw-regions-tiles": [
-     90.56,
+     90.53,
      16,
      16
     ]
@@ -4291,21 +4326,21 @@
   "pages": 96,
   "routes_n": 29,
   "wrong_bar": 90.0,
-  "mu": 93.32,
+  "mu": 93.33,
   "routes": [
    {
     "id": "gemini3.1-pro",
     "name": "Gemini 3.1 Pro",
     "price": 21.92,
     "app": true,
-    "strict": 94.84,
+    "strict": 94.82,
     "answered": 94,
     "failed": 2,
-    "answered_nes": 96.86,
-    "adjusted": 96.84,
+    "answered_nes": 96.84,
+    "adjusted": 96.82,
     "page_mix": 0.14,
     "wrong": 10,
-    "fail_pctile": 71,
+    "fail_pctile": 70,
     "fail_hard": 1,
     "fail_kinds": {
      "printed": 2
@@ -4318,13 +4353,13 @@
       "wrong": 0
      },
      "middle": {
-      "answered_nes": 99.31,
+      "answered_nes": 99.28,
       "failed": 1,
       "n": 32,
       "wrong": 0
      },
      "hard": {
-      "answered_nes": 91.4,
+      "answered_nes": 91.37,
       "failed": 1,
       "n": 32,
       "wrong": 10
@@ -4332,7 +4367,7 @@
     },
     "by_kind": {
      "handwritten": {
-      "answered_nes": 94.06,
+      "answered_nes": 93.98,
       "failed": 0,
       "n": 16
      },
@@ -4347,67 +4382,7 @@
       "n": 28
      },
      "typewritten": {
-      "answered_nes": 98.75,
-      "failed": 0,
-      "n": 50
-     }
-    }
-   },
-   {
-    "id": "gemini3.8-flash",
-    "name": "Gemini 3.8 Flash",
-    "price": 3.22,
-    "app": true,
-    "strict": 94.47,
-    "answered": 94,
-    "failed": 2,
-    "answered_nes": 96.48,
-    "adjusted": 96.46,
-    "page_mix": 0.14,
-    "wrong": 6,
-    "fail_pctile": 71,
-    "fail_hard": 1,
-    "fail_kinds": {
-     "printed": 2
-    },
-    "by_tier": {
-     "easy": {
-      "answered_nes": 99.89,
-      "failed": 0,
-      "n": 32,
-      "wrong": 0
-     },
-     "middle": {
-      "answered_nes": 99.41,
-      "failed": 1,
-      "n": 32,
-      "wrong": 0
-     },
-     "hard": {
-      "answered_nes": 90.02,
-      "failed": 1,
-      "n": 32,
-      "wrong": 6
-     }
-    },
-    "by_kind": {
-     "handwritten": {
-      "answered_nes": 95.97,
-      "failed": 0,
-      "n": 16
-     },
-     "mixed": {
-      "answered_nes": 77.06,
-      "failed": 0,
-      "n": 2
-     },
-     "printed": {
-      "answered_nes": 93.92,
-      "failed": 2,
-      "n": 28
-     },
-     "typewritten": {
-      "answered_nes": 98.75,
+      "answered_nes": 98.74,
       "failed": 0,
       "n": 50
      }
@@ -4423,7 +4398,7 @@
     "failed": 0,
     "answered_nes": 96.47,
     "adjusted": 96.59,
-    "page_mix": 0.0,
+    "page_mix": -0.0,
     "wrong": 8,
     "fail_pctile": null,
     "fail_hard": 0,
@@ -4436,13 +4411,13 @@
       "wrong": 0
      },
      "middle": {
-      "answered_nes": 99.11,
+      "answered_nes": 99.07,
       "failed": 0,
       "n": 32,
       "wrong": 0
      },
      "hard": {
-      "answered_nes": 90.45,
+      "answered_nes": 90.5,
       "failed": 0,
       "n": 32,
       "wrong": 8
@@ -4450,7 +4425,7 @@
     },
     "by_kind": {
      "handwritten": {
-      "answered_nes": 92.43,
+      "answered_nes": 92.5,
       "failed": 0,
       "n": 16
      },
@@ -4465,7 +4440,67 @@
       "n": 28
      },
      "typewritten": {
-      "answered_nes": 98.58,
+      "answered_nes": 98.57,
+      "failed": 0,
+      "n": 50
+     }
+    }
+   },
+   {
+    "id": "gemini3.8-flash",
+    "name": "Gemini 3.8 Flash",
+    "price": 3.22,
+    "app": true,
+    "strict": 94.43,
+    "answered": 94,
+    "failed": 2,
+    "answered_nes": 96.44,
+    "adjusted": 96.42,
+    "page_mix": 0.14,
+    "wrong": 6,
+    "fail_pctile": 70,
+    "fail_hard": 1,
+    "fail_kinds": {
+     "printed": 2
+    },
+    "by_tier": {
+     "easy": {
+      "answered_nes": 99.89,
+      "failed": 0,
+      "n": 32,
+      "wrong": 0
+     },
+     "middle": {
+      "answered_nes": 99.38,
+      "failed": 1,
+      "n": 32,
+      "wrong": 0
+     },
+     "hard": {
+      "answered_nes": 89.95,
+      "failed": 1,
+      "n": 32,
+      "wrong": 6
+     }
+    },
+    "by_kind": {
+     "handwritten": {
+      "answered_nes": 95.81,
+      "failed": 0,
+      "n": 16
+     },
+     "mixed": {
+      "answered_nes": 77.06,
+      "failed": 0,
+      "n": 2
+     },
+     "printed": {
+      "answered_nes": 93.92,
+      "failed": 2,
+      "n": 28
+     },
+     "typewritten": {
+      "answered_nes": 98.73,
       "failed": 0,
       "n": 50
      }
@@ -4476,12 +4511,12 @@
     "name": "Qwen3.5 27B",
     "price": 1.8,
     "app": true,
-    "strict": 81.8,
+    "strict": 81.83,
     "answered": 82,
     "failed": 14,
-    "answered_nes": 95.76,
-    "adjusted": 95.07,
-    "page_mix": 0.81,
+    "answered_nes": 95.8,
+    "adjusted": 95.1,
+    "page_mix": 0.82,
     "wrong": 10,
     "fail_pctile": 59,
     "fail_hard": 6,
@@ -4504,7 +4539,7 @@
       "wrong": 0
      },
      "hard": {
-      "answered_nes": 88.27,
+      "answered_nes": 88.38,
       "failed": 6,
       "n": 32,
       "wrong": 10
@@ -4512,7 +4547,7 @@
     },
     "by_kind": {
      "handwritten": {
-      "answered_nes": 92.18,
+      "answered_nes": 92.44,
       "failed": 4,
       "n": 16
      },
@@ -4538,14 +4573,14 @@
     "name": "Gemini 3.5 Flash",
     "price": 6.23,
     "app": true,
-    "strict": 93.48,
+    "strict": 93.45,
     "answered": 94,
     "failed": 2,
-    "answered_nes": 95.47,
-    "adjusted": 95.45,
+    "answered_nes": 95.44,
+    "adjusted": 95.42,
     "page_mix": 0.14,
-    "wrong": 7,
-    "fail_pctile": 71,
+    "wrong": 8,
+    "fail_pctile": 70,
     "fail_hard": 1,
     "fail_kinds": {
      "printed": 2
@@ -4558,21 +4593,21 @@
       "wrong": 0
      },
      "middle": {
-      "answered_nes": 98.57,
+      "answered_nes": 98.58,
       "failed": 1,
       "n": 32,
       "wrong": 1
      },
      "hard": {
-      "answered_nes": 87.85,
+      "answered_nes": 87.73,
       "failed": 1,
       "n": 32,
-      "wrong": 6
+      "wrong": 7
      }
     },
     "by_kind": {
      "handwritten": {
-      "answered_nes": 92.93,
+      "answered_nes": 92.69,
       "failed": 0,
       "n": 16
      },
@@ -4587,7 +4622,7 @@
       "n": 28
      },
      "typewritten": {
-      "answered_nes": 97.33,
+      "answered_nes": 97.34,
       "failed": 0,
       "n": 50
      }
@@ -4598,13 +4633,13 @@
     "name": "Qwen3.6 27B",
     "price": 1.94,
     "app": true,
-    "strict": 94.28,
+    "strict": 94.35,
     "answered": 95,
     "failed": 1,
-    "answered_nes": 95.27,
-    "adjusted": 95.33,
+    "answered_nes": 95.34,
+    "adjusted": 95.4,
     "page_mix": 0.06,
-    "wrong": 13,
+    "wrong": 12,
     "fail_pctile": 82,
     "fail_hard": 1,
     "fail_kinds": {
@@ -4618,21 +4653,21 @@
       "wrong": 0
      },
      "middle": {
-      "answered_nes": 98.12,
+      "answered_nes": 98.1,
       "failed": 0,
       "n": 32,
       "wrong": 1
      },
      "hard": {
-      "answered_nes": 87.63,
+      "answered_nes": 87.87,
       "failed": 1,
       "n": 32,
-      "wrong": 12
+      "wrong": 11
      }
     },
     "by_kind": {
      "handwritten": {
-      "answered_nes": 92.15,
+      "answered_nes": 92.61,
       "failed": 0,
       "n": 16
      },
@@ -4647,7 +4682,7 @@
       "n": 28
      },
      "typewritten": {
-      "answered_nes": 97.5,
+      "answered_nes": 97.49,
       "failed": 1,
       "n": 50
      }
@@ -4663,7 +4698,7 @@
     "failed": 0,
     "answered_nes": 95.25,
     "adjusted": 95.37,
-    "page_mix": 0.0,
+    "page_mix": -0.0,
     "wrong": 14,
     "fail_pctile": null,
     "fail_hard": 0,
@@ -4716,14 +4751,14 @@
     "name": "Gemini 3.5 Flash Lite",
     "price": 1.57,
     "app": true,
-    "strict": 93.13,
+    "strict": 93.12,
     "answered": 94,
     "failed": 2,
-    "answered_nes": 95.11,
+    "answered_nes": 95.1,
     "adjusted": 95.09,
     "page_mix": 0.14,
-    "wrong": 12,
-    "fail_pctile": 71,
+    "wrong": 11,
+    "fail_pctile": 70,
     "fail_hard": 1,
     "fail_kinds": {
      "printed": 2
@@ -4736,21 +4771,21 @@
       "wrong": 0
      },
      "middle": {
-      "answered_nes": 98.0,
+      "answered_nes": 98.01,
       "failed": 1,
       "n": 32,
       "wrong": 0
      },
      "hard": {
-      "answered_nes": 87.64,
+      "answered_nes": 87.62,
       "failed": 1,
       "n": 32,
-      "wrong": 12
+      "wrong": 11
      }
     },
     "by_kind": {
      "handwritten": {
-      "answered_nes": 91.98,
+      "answered_nes": 91.96,
       "failed": 0,
       "n": 16
      },
@@ -4776,11 +4811,11 @@
     "name": "Qwen3.8 Flash",
     "price": 0.6,
     "app": true,
-    "strict": 91.88,
+    "strict": 91.91,
     "answered": 93,
     "failed": 3,
-    "answered_nes": 94.84,
-    "adjusted": 95.12,
+    "answered_nes": 94.88,
+    "adjusted": 95.16,
     "page_mix": -0.16,
     "wrong": 12,
     "fail_pctile": 38,
@@ -4797,13 +4832,13 @@
       "wrong": 0
      },
      "middle": {
-      "answered_nes": 98.24,
+      "answered_nes": 98.23,
       "failed": 2,
       "n": 32,
       "wrong": 0
      },
      "hard": {
-      "answered_nes": 86.98,
+      "answered_nes": 87.1,
       "failed": 0,
       "n": 32,
       "wrong": 12
@@ -4811,7 +4846,7 @@
     },
     "by_kind": {
      "handwritten": {
-      "answered_nes": 91.03,
+      "answered_nes": 91.25,
       "failed": 0,
       "n": 16
      },
@@ -4837,14 +4872,14 @@
     "name": "Gemini 3.1 Flash Lite",
     "price": 1.17,
     "app": true,
-    "strict": 91.61,
+    "strict": 91.59,
     "answered": 93,
     "failed": 3,
-    "answered_nes": 94.56,
-    "adjusted": 94.54,
-    "page_mix": 0.14,
+    "answered_nes": 94.54,
+    "adjusted": 94.52,
+    "page_mix": 0.15,
     "wrong": 12,
-    "fail_pctile": 72,
+    "fail_pctile": 71,
     "fail_hard": 2,
     "fail_kinds": {
      "handwritten": 1,
@@ -4858,13 +4893,13 @@
       "wrong": 0
      },
      "middle": {
-      "answered_nes": 98.71,
+      "answered_nes": 98.68,
       "failed": 1,
       "n": 32,
       "wrong": 0
      },
      "hard": {
-      "answered_nes": 84.84,
+      "answered_nes": 84.81,
       "failed": 2,
       "n": 32,
       "wrong": 12
@@ -4872,7 +4907,7 @@
     },
     "by_kind": {
      "handwritten": {
-      "answered_nes": 92.42,
+      "answered_nes": 92.32,
       "failed": 1,
       "n": 16
      },
@@ -4887,7 +4922,7 @@
       "n": 28
      },
      "typewritten": {
-      "answered_nes": 96.38,
+      "answered_nes": 96.36,
       "failed": 0,
       "n": 50
      }
@@ -4898,11 +4933,11 @@
     "name": "GPT-5.4 Mini",
     "price": 5.55,
     "app": true,
-    "strict": 93.55,
+    "strict": 93.48,
     "answered": 95,
     "failed": 1,
-    "answered_nes": 94.53,
-    "adjusted": 94.72,
+    "answered_nes": 94.47,
+    "adjusted": 94.65,
     "page_mix": -0.07,
     "wrong": 17,
     "fail_pctile": 20,
@@ -4918,13 +4953,13 @@
       "wrong": 0
      },
      "middle": {
-      "answered_nes": 98.71,
+      "answered_nes": 98.68,
       "failed": 0,
       "n": 32,
       "wrong": 0
      },
      "hard": {
-      "answered_nes": 85.33,
+      "answered_nes": 85.16,
       "failed": 0,
       "n": 32,
       "wrong": 17
@@ -4932,7 +4967,7 @@
     },
     "by_kind": {
      "handwritten": {
-      "answered_nes": 89.48,
+      "answered_nes": 89.13,
       "failed": 0,
       "n": 16
      },
@@ -4947,7 +4982,7 @@
       "n": 28
      },
      "typewritten": {
-      "answered_nes": 97.46,
+      "answered_nes": 97.44,
       "failed": 1,
       "n": 50
      }
@@ -4958,12 +4993,12 @@
     "name": "Qwen3.5 397B",
     "price": 2.02,
     "app": true,
-    "strict": 93.98,
+    "strict": 94.02,
     "answered": 96,
     "failed": 0,
-    "answered_nes": 93.98,
-    "adjusted": 94.1,
-    "page_mix": 0.0,
+    "answered_nes": 94.02,
+    "adjusted": 94.14,
+    "page_mix": -0.0,
     "wrong": 16,
     "fail_pctile": null,
     "fail_hard": 0,
@@ -4976,13 +5011,13 @@
       "wrong": 0
      },
      "middle": {
-      "answered_nes": 97.84,
+      "answered_nes": 97.85,
       "failed": 0,
       "n": 32,
       "wrong": 1
      },
      "hard": {
-      "answered_nes": 84.29,
+      "answered_nes": 84.41,
       "failed": 0,
       "n": 32,
       "wrong": 15
@@ -4990,7 +5025,7 @@
     },
     "by_kind": {
      "handwritten": {
-      "answered_nes": 90.57,
+      "answered_nes": 90.84,
       "failed": 0,
       "n": 16
      },
@@ -5016,12 +5051,12 @@
     "name": "Qwen3-VL 235B",
     "price": 1.22,
     "app": true,
-    "strict": 93.95,
+    "strict": 93.98,
     "answered": 96,
     "failed": 0,
-    "answered_nes": 93.95,
-    "adjusted": 94.07,
-    "page_mix": 0.0,
+    "answered_nes": 93.98,
+    "adjusted": 94.1,
+    "page_mix": -0.0,
     "wrong": 16,
     "fail_pctile": null,
     "fail_hard": 0,
@@ -5034,13 +5069,13 @@
       "wrong": 0
      },
      "middle": {
-      "answered_nes": 98.33,
+      "answered_nes": 98.32,
       "failed": 0,
       "n": 32,
       "wrong": 0
      },
      "hard": {
-      "answered_nes": 83.71,
+      "answered_nes": 83.83,
       "failed": 0,
       "n": 32,
       "wrong": 16
@@ -5048,7 +5083,7 @@
     },
     "by_kind": {
      "handwritten": {
-      "answered_nes": 91.38,
+      "answered_nes": 91.59,
       "failed": 0,
       "n": 16
      },
@@ -5074,11 +5109,11 @@
     "name": "Qwen3-VL 8B",
     "price": 1.49,
     "app": true,
-    "strict": 91.81,
+    "strict": 91.83,
     "answered": 94,
     "failed": 2,
-    "answered_nes": 93.76,
-    "adjusted": 93.59,
+    "answered_nes": 93.79,
+    "adjusted": 93.62,
     "page_mix": 0.29,
     "wrong": 20,
     "fail_pctile": 91,
@@ -5101,7 +5136,7 @@
       "wrong": 2
      },
      "hard": {
-      "answered_nes": 84.2,
+      "answered_nes": 84.27,
       "failed": 2,
       "n": 32,
       "wrong": 18
@@ -5109,7 +5144,7 @@
     },
     "by_kind": {
      "handwritten": {
-      "answered_nes": 90.49,
+      "answered_nes": 90.64,
       "failed": 1,
       "n": 16
      },
@@ -5135,11 +5170,11 @@
     "name": "Qwen3-VL 8B 4-bit (Mac)",
     "price": 0.0,
     "app": true,
-    "strict": 89.66,
+    "strict": 89.67,
     "answered": 92,
     "failed": 4,
-    "answered_nes": 93.56,
-    "adjusted": 93.4,
+    "answered_nes": 93.57,
+    "adjusted": 93.41,
     "page_mix": 0.28,
     "wrong": 21,
     "fail_pctile": 74,
@@ -5157,13 +5192,13 @@
       "wrong": 0
      },
      "middle": {
-      "answered_nes": 97.01,
+      "answered_nes": 97.02,
       "failed": 1,
       "n": 32,
       "wrong": 3
      },
      "hard": {
-      "answered_nes": 83.25,
+      "answered_nes": 83.29,
       "failed": 3,
       "n": 32,
       "wrong": 18
@@ -5171,7 +5206,7 @@
     },
     "by_kind": {
      "handwritten": {
-      "answered_nes": 89.16,
+      "answered_nes": 89.24,
       "failed": 0,
       "n": 16
      },
@@ -5197,11 +5232,11 @@
     "name": "Gemma 4 31B",
     "price": 0.38,
     "app": true,
-    "strict": 90.55,
+    "strict": 90.57,
     "answered": 93,
     "failed": 3,
-    "answered_nes": 93.47,
-    "adjusted": 92.86,
+    "answered_nes": 93.49,
+    "adjusted": 92.89,
     "page_mix": 0.72,
     "wrong": 21,
     "fail_pctile": 91,
@@ -5218,13 +5253,13 @@
       "wrong": 1
      },
      "middle": {
-      "answered_nes": 95.79,
+      "answered_nes": 95.78,
       "failed": 0,
       "n": 32,
       "wrong": 5
      },
      "hard": {
-      "answered_nes": 85.07,
+      "answered_nes": 85.16,
       "failed": 3,
       "n": 32,
       "wrong": 15
@@ -5232,7 +5267,7 @@
     },
     "by_kind": {
      "handwritten": {
-      "answered_nes": 90.84,
+      "answered_nes": 90.98,
       "failed": 0,
       "n": 16
      },
@@ -5258,11 +5293,11 @@
     "name": "Qwen3.5 9B",
     "price": 0.25,
     "app": true,
-    "strict": 89.43,
+    "strict": 89.44,
     "answered": 92,
     "failed": 4,
-    "answered_nes": 93.32,
-    "adjusted": 93.61,
+    "answered_nes": 93.33,
+    "adjusted": 93.63,
     "page_mix": -0.18,
     "wrong": 20,
     "fail_pctile": 48,
@@ -5279,13 +5314,13 @@
       "wrong": 0
      },
      "middle": {
-      "answered_nes": 96.15,
+      "answered_nes": 96.16,
       "failed": 2,
       "n": 32,
       "wrong": 2
      },
      "hard": {
-      "answered_nes": 84.56,
+      "answered_nes": 84.59,
       "failed": 1,
       "n": 32,
       "wrong": 18
@@ -5293,7 +5328,7 @@
     },
     "by_kind": {
      "handwritten": {
-      "answered_nes": 90.92,
+      "answered_nes": 91.0,
       "failed": 0,
       "n": 16
      },
@@ -5319,12 +5354,12 @@
     "name": "Mistral Large 4",
     "price": 2.69,
     "app": true,
-    "strict": 93.15,
+    "strict": 93.17,
     "answered": 96,
     "failed": 0,
-    "answered_nes": 93.15,
-    "adjusted": 93.27,
-    "page_mix": 0.0,
+    "answered_nes": 93.17,
+    "adjusted": 93.29,
+    "page_mix": -0.0,
     "wrong": 19,
     "fail_pctile": null,
     "fail_hard": 0,
@@ -5337,13 +5372,13 @@
       "wrong": 0
      },
      "middle": {
-      "answered_nes": 97.01,
+      "answered_nes": 97.02,
       "failed": 0,
       "n": 32,
       "wrong": 1
      },
      "hard": {
-      "answered_nes": 82.73,
+      "answered_nes": 82.81,
       "failed": 0,
       "n": 32,
       "wrong": 18
@@ -5351,7 +5386,7 @@
     },
     "by_kind": {
      "handwritten": {
-      "answered_nes": 92.03,
+      "answered_nes": 92.2,
       "failed": 0,
       "n": 16
      },
@@ -5377,11 +5412,11 @@
     "name": "GPT-5.6 Luna",
     "price": 1.41,
     "app": true,
-    "strict": 92.13,
+    "strict": 92.09,
     "answered": 95,
     "failed": 1,
-    "answered_nes": 93.1,
-    "adjusted": 93.29,
+    "answered_nes": 93.06,
+    "adjusted": 93.24,
     "page_mix": -0.07,
     "wrong": 19,
     "fail_pctile": 20,
@@ -5403,7 +5438,7 @@
       "wrong": 0
      },
      "hard": {
-      "answered_nes": 82.03,
+      "answered_nes": 81.91,
       "failed": 0,
       "n": 32,
       "wrong": 19
@@ -5411,7 +5446,7 @@
     },
     "by_kind": {
      "handwritten": {
-      "answered_nes": 85.44,
+      "answered_nes": 85.2,
       "failed": 0,
       "n": 16
      },
@@ -5442,7 +5477,7 @@
     "failed": 0,
     "answered_nes": 93.02,
     "adjusted": 93.14,
-    "page_mix": 0.0,
+    "page_mix": -0.0,
     "wrong": 17,
     "fail_pctile": null,
     "fail_hard": 0,
@@ -5455,7 +5490,7 @@
       "wrong": 0
      },
      "middle": {
-      "answered_nes": 97.59,
+      "answered_nes": 97.6,
       "failed": 0,
       "n": 32,
       "wrong": 1
@@ -5469,7 +5504,7 @@
     },
     "by_kind": {
      "handwritten": {
-      "answered_nes": 88.82,
+      "answered_nes": 88.83,
       "failed": 0,
       "n": 16
      },
@@ -5495,12 +5530,12 @@
     "name": "Mistral OCR 4.1",
     "price": 4.0,
     "app": true,
-    "strict": 92.91,
+    "strict": 92.92,
     "answered": 96,
     "failed": 0,
-    "answered_nes": 92.91,
-    "adjusted": 93.03,
-    "page_mix": 0.0,
+    "answered_nes": 92.92,
+    "adjusted": 93.04,
+    "page_mix": -0.0,
     "wrong": 17,
     "fail_pctile": null,
     "fail_hard": 0,
@@ -5513,13 +5548,13 @@
       "wrong": 0
      },
      "middle": {
-      "answered_nes": 97.81,
+      "answered_nes": 97.78,
       "failed": 0,
       "n": 32,
       "wrong": 0
      },
      "hard": {
-      "answered_nes": 81.51,
+      "answered_nes": 81.57,
       "failed": 0,
       "n": 32,
       "wrong": 17
@@ -5527,7 +5562,7 @@
     },
     "by_kind": {
      "handwritten": {
-      "answered_nes": 89.01,
+      "answered_nes": 89.1,
       "failed": 0,
       "n": 16
      },
@@ -5542,7 +5577,7 @@
       "n": 28
      },
      "typewritten": {
-      "answered_nes": 95.7,
+      "answered_nes": 95.68,
       "failed": 0,
       "n": 50
      }
@@ -5553,14 +5588,14 @@
     "name": "Qwen3.5-9B 4-bit (Mac)",
     "price": 0.0,
     "app": true,
-    "strict": 91.91,
+    "strict": 91.93,
     "answered": 95,
     "failed": 1,
-    "answered_nes": 92.88,
-    "adjusted": 93.04,
+    "answered_nes": 92.9,
+    "adjusted": 93.06,
     "page_mix": -0.05,
     "wrong": 19,
-    "fail_pctile": 49,
+    "fail_pctile": 48,
     "fail_hard": 0,
     "fail_kinds": {
      "typewritten": 1
@@ -5573,13 +5608,13 @@
       "wrong": 0
      },
      "middle": {
-      "answered_nes": 98.15,
+      "answered_nes": 98.13,
       "failed": 1,
       "n": 32,
       "wrong": 0
      },
      "hard": {
-      "answered_nes": 81.09,
+      "answered_nes": 81.16,
       "failed": 0,
       "n": 32,
       "wrong": 19
@@ -5587,7 +5622,7 @@
     },
     "by_kind": {
      "handwritten": {
-      "answered_nes": 87.92,
+      "answered_nes": 88.06,
       "failed": 0,
       "n": 16
      },
@@ -5602,7 +5637,7 @@
       "n": 28
      },
      "typewritten": {
-      "answered_nes": 95.24,
+      "answered_nes": 95.22,
       "failed": 1,
       "n": 50
      }
@@ -5613,11 +5648,11 @@
     "name": "Qwen3.5 35B-A3B",
     "price": 0.83,
     "app": true,
-    "strict": 90.83,
+    "strict": 90.85,
     "answered": 94,
     "failed": 2,
-    "answered_nes": 92.76,
-    "adjusted": 92.81,
+    "answered_nes": 92.78,
+    "adjusted": 92.83,
     "page_mix": 0.07,
     "wrong": 19,
     "fail_pctile": 65,
@@ -5633,13 +5668,13 @@
       "wrong": 0
      },
      "middle": {
-      "answered_nes": 98.11,
+      "answered_nes": 98.12,
       "failed": 1,
       "n": 32,
       "wrong": 1
      },
      "hard": {
-      "answered_nes": 80.15,
+      "answered_nes": 80.21,
       "failed": 1,
       "n": 32,
       "wrong": 18
@@ -5647,7 +5682,7 @@
     },
     "by_kind": {
      "handwritten": {
-      "answered_nes": 88.31,
+      "answered_nes": 88.43,
       "failed": 0,
       "n": 16
      },
@@ -5673,11 +5708,11 @@
     "name": "Gemma 4 26B-A4B",
     "price": 0.41,
     "app": true,
-    "strict": 82.73,
+    "strict": 82.75,
     "answered": 86,
     "failed": 10,
-    "answered_nes": 92.35,
-    "adjusted": 91.29,
+    "answered_nes": 92.38,
+    "adjusted": 91.31,
     "page_mix": 1.18,
     "wrong": 23,
     "fail_pctile": 70,
@@ -5701,7 +5736,7 @@
       "wrong": 1
      },
      "hard": {
-      "answered_nes": 80.67,
+      "answered_nes": 80.75,
       "failed": 5,
       "n": 32,
       "wrong": 21
@@ -5709,7 +5744,7 @@
     },
     "by_kind": {
      "handwritten": {
-      "answered_nes": 86.6,
+      "answered_nes": 86.75,
       "failed": 0,
       "n": 16
      },
@@ -5735,11 +5770,11 @@
     "name": "Qwen3-VL 30B-A3B",
     "price": 0.98,
     "app": true,
-    "strict": 89.82,
+    "strict": 89.84,
     "answered": 94,
     "failed": 2,
-    "answered_nes": 91.73,
-    "adjusted": 91.8,
+    "answered_nes": 91.75,
+    "adjusted": 91.83,
     "page_mix": 0.05,
     "wrong": 25,
     "fail_pctile": 75,
@@ -5762,7 +5797,7 @@
       "wrong": 2
      },
      "hard": {
-      "answered_nes": 77.53,
+      "answered_nes": 77.6,
       "failed": 2,
       "n": 32,
       "wrong": 23
@@ -5770,7 +5805,7 @@
     },
     "by_kind": {
      "handwritten": {
-      "answered_nes": 82.75,
+      "answered_nes": 82.9,
       "failed": 1,
       "n": 16
      },
@@ -5796,12 +5831,12 @@
     "name": "Mistral Small 24B",
     "price": 0.32,
     "app": true,
-    "strict": 89.34,
+    "strict": 89.36,
     "answered": 94,
     "failed": 2,
-    "answered_nes": 91.24,
-    "adjusted": 91.03,
-    "page_mix": 0.34,
+    "answered_nes": 91.26,
+    "adjusted": 91.05,
+    "page_mix": 0.33,
     "wrong": 24,
     "fail_pctile": 93,
     "fail_hard": 2,
@@ -5817,13 +5852,13 @@
       "wrong": 0
      },
      "middle": {
-      "answered_nes": 96.92,
+      "answered_nes": 96.93,
       "failed": 0,
       "n": 32,
       "wrong": 3
      },
      "hard": {
-      "answered_nes": 76.62,
+      "answered_nes": 76.65,
       "failed": 2,
       "n": 32,
       "wrong": 21
@@ -5831,7 +5866,7 @@
     },
     "by_kind": {
      "handwritten": {
-      "answered_nes": 85.16,
+      "answered_nes": 85.23,
       "failed": 1,
       "n": 16
      },
@@ -5857,12 +5892,12 @@
     "name": "Mistral Medium 3.5",
     "price": 7.29,
     "app": true,
-    "strict": 90.65,
+    "strict": 90.66,
     "answered": 96,
     "failed": 0,
-    "answered_nes": 90.65,
+    "answered_nes": 90.66,
     "adjusted": 90.77,
-    "page_mix": 0.0,
+    "page_mix": -0.0,
     "wrong": 29,
     "fail_pctile": null,
     "fail_hard": 0,
@@ -5875,13 +5910,13 @@
       "wrong": 0
      },
      "middle": {
-      "answered_nes": 96.06,
+      "answered_nes": 96.08,
       "failed": 0,
       "n": 32,
       "wrong": 4
      },
      "hard": {
-      "answered_nes": 77.1,
+      "answered_nes": 77.09,
       "failed": 0,
       "n": 32,
       "wrong": 25
@@ -5889,7 +5924,7 @@
     },
     "by_kind": {
      "handwritten": {
-      "answered_nes": 85.04,
+      "answered_nes": 85.06,
       "failed": 0,
       "n": 16
      },
@@ -5915,12 +5950,12 @@
     "name": "LightOnOCR-3-4B 8-bit (Mac)",
     "price": 0.0,
     "app": true,
-    "strict": 89.13,
+    "strict": 89.17,
     "answered": 96,
     "failed": 0,
-    "answered_nes": 89.13,
-    "adjusted": 89.25,
-    "page_mix": 0.0,
+    "answered_nes": 89.17,
+    "adjusted": 89.29,
+    "page_mix": -0.0,
     "wrong": 27,
     "fail_pctile": null,
     "fail_hard": 0,
@@ -5939,7 +5974,7 @@
       "wrong": 4
      },
      "hard": {
-      "answered_nes": 76.14,
+      "answered_nes": 76.26,
       "failed": 0,
       "n": 32,
       "wrong": 19
@@ -5947,7 +5982,7 @@
     },
     "by_kind": {
      "handwritten": {
-      "answered_nes": 89.67,
+      "answered_nes": 89.91,
       "failed": 0,
       "n": 16
      },
@@ -5973,12 +6008,12 @@
     "name": "Apple Vision",
     "price": 0.0,
     "app": true,
-    "strict": 81.34,
+    "strict": 81.37,
     "answered": 96,
     "failed": 0,
-    "answered_nes": 81.34,
-    "adjusted": 81.46,
-    "page_mix": 0.0,
+    "answered_nes": 81.37,
+    "adjusted": 81.49,
+    "page_mix": -0.0,
     "wrong": 41,
     "fail_pctile": null,
     "fail_hard": 0,
@@ -5997,7 +6032,7 @@
       "wrong": 11
      },
      "hard": {
-      "answered_nes": 62.13,
+      "answered_nes": 62.22,
       "failed": 0,
       "n": 32,
       "wrong": 28
@@ -6005,7 +6040,7 @@
     },
     "by_kind": {
      "handwritten": {
-      "answered_nes": 57.87,
+      "answered_nes": 58.06,
       "failed": 0,
       "n": 16
      },
@@ -6050,8 +6085,8 @@
    },
    "tier_mean": {
     "easy": 99.5,
-    "middle": 97.34,
-    "hard": 82.74
+    "middle": 97.33,
+    "hard": 82.77
    },
    "hardest": [
     {
@@ -6076,7 +6111,7 @@
     },
     {
      "kind": "handwritten",
-     "mean_nes": 73.53,
+     "mean_nes": 74.46,
      "failed_by": 1
     },
     {
@@ -6085,13 +6120,13 @@
      "failed_by": 9
     },
     {
-     "kind": "handwritten",
-     "mean_nes": 75.76,
+     "kind": "printed",
+     "mean_nes": 77.01,
      "failed_by": 0
     },
     {
-     "kind": "printed",
-     "mean_nes": 77.01,
+     "kind": "handwritten",
+     "mean_nes": 77.02,
      "failed_by": 0
     },
     {
@@ -6133,7 +6168,7 @@
     },
     {
      "n": 16,
-     "difficulty": 1.73,
+     "difficulty": 1.75,
      "kinds": {
       "handwritten": 1,
       "mixed": 0,
@@ -6166,7 +6201,7 @@
     },
     {
      "n": 16,
-     "difficulty": 25.48,
+     "difficulty": 25.41,
      "kinds": {
       "handwritten": 5,
       "mixed": 1,
@@ -6187,19 +6222,19 @@
       "failed": 0
      },
      {
-      "nes": 99.6,
+      "nes": 99.52,
       "failed": 0
      },
      {
-      "nes": 98.77,
+      "nes": 98.76,
       "failed": 0
      },
      {
-      "nes": 94.79,
+      "nes": 94.78,
       "failed": 0
      },
      {
-      "nes": 85.96,
+      "nes": 86.08,
       "failed": 0
      }
     ],
@@ -6213,19 +6248,19 @@
       "failed": 0
      },
      {
-      "nes": 99.66,
+      "nes": 99.58,
       "failed": 1
      },
      {
-      "nes": 98.98,
+      "nes": 98.99,
       "failed": 0
      },
      {
-      "nes": 95.45,
+      "nes": 95.44,
       "failed": 0
      },
      {
-      "nes": 87.08,
+      "nes": 87.02,
       "failed": 1
      }
     ],
@@ -6239,19 +6274,19 @@
       "failed": 0
      },
      {
-      "nes": 99.52,
+      "nes": 99.45,
       "failed": 1
      },
      {
-      "nes": 99.3,
+      "nes": 99.31,
       "failed": 0
      },
      {
-      "nes": 97.14,
+      "nes": 97.13,
       "failed": 0
      },
      {
-      "nes": 82.43,
+      "nes": 82.29,
       "failed": 1
      }
     ],
@@ -6265,11 +6300,11 @@
       "failed": 0
      },
      {
-      "nes": 98.64,
+      "nes": 98.65,
       "failed": 0
      },
      {
-      "nes": 97.04,
+      "nes": 97.05,
       "failed": 0
      },
      {
@@ -6277,7 +6312,7 @@
       "failed": 0
      },
      {
-      "nes": 74.42,
+      "nes": 74.66,
       "failed": 0
      }
     ],
@@ -6291,11 +6326,11 @@
       "failed": 0
      },
      {
-      "nes": 98.36,
+      "nes": 98.33,
       "failed": 0
      },
      {
-      "nes": 98.3,
+      "nes": 98.31,
       "failed": 0
      },
      {
@@ -6303,7 +6338,7 @@
       "failed": 0
      },
      {
-      "nes": 73.74,
+      "nes": 73.98,
       "failed": 0
      }
     ],
@@ -6317,11 +6352,11 @@
       "failed": 0
      },
      {
-      "nes": 98.85,
+      "nes": 98.81,
       "failed": 1
      },
      {
-      "nes": 97.64,
+      "nes": 97.65,
       "failed": 1
      },
      {
@@ -6329,7 +6364,7 @@
       "failed": 0
      },
      {
-      "nes": 79.58,
+      "nes": 79.82,
       "failed": 0
      }
     ],
@@ -6343,19 +6378,19 @@
       "failed": 1
      },
      {
-      "nes": 98.99,
+      "nes": 98.91,
       "failed": 0
      },
      {
-      "nes": 98.44,
+      "nes": 98.45,
       "failed": 0
      },
      {
-      "nes": 94.02,
+      "nes": 94.01,
       "failed": 0
      },
      {
-      "nes": 76.63,
+      "nes": 76.31,
       "failed": 0
      }
     ],
@@ -6369,19 +6404,19 @@
       "failed": 0
      },
      {
-      "nes": 99.5,
+      "nes": 99.52,
       "failed": 1
      },
      {
-      "nes": 97.7,
+      "nes": 97.71,
       "failed": 0
      },
      {
-      "nes": 96.37,
+      "nes": 96.36,
       "failed": 0
      },
      {
-      "nes": 78.76,
+      "nes": 78.53,
       "failed": 1
      }
     ],
@@ -6399,15 +6434,15 @@
       "failed": 0
      },
      {
-      "nes": 95.16,
+      "nes": 95.17,
       "failed": 0
      },
      {
-      "nes": 88.67,
+      "nes": 88.68,
       "failed": 0
      },
      {
-      "nes": 76.8,
+      "nes": 76.94,
       "failed": 0
      }
     ],
@@ -6421,11 +6456,11 @@
       "failed": 0
      },
      {
-      "nes": 98.74,
+      "nes": 98.75,
       "failed": 1
      },
      {
-      "nes": 97.62,
+      "nes": 97.63,
       "failed": 0
      },
      {
@@ -6433,7 +6468,7 @@
       "failed": 0
      },
      {
-      "nes": 80.2,
+      "nes": 80.16,
       "failed": 1
      }
     ],
@@ -6447,11 +6482,11 @@
       "failed": 0
      },
      {
-      "nes": 98.17,
+      "nes": 98.1,
       "failed": 0
      },
      {
-      "nes": 97.45,
+      "nes": 97.46,
       "failed": 0
      },
      {
@@ -6459,7 +6494,7 @@
       "failed": 0
      },
      {
-      "nes": 70.22,
+      "nes": 70.33,
       "failed": 0
      }
     ],
@@ -6473,11 +6508,11 @@
       "failed": 1
      },
      {
-      "nes": 98.41,
+      "nes": 98.4,
       "failed": 0
      },
      {
-      "nes": 97.28,
+      "nes": 97.29,
       "failed": 0
      },
      {
@@ -6485,7 +6520,7 @@
       "failed": 0
      },
      {
-      "nes": 72.93,
+      "nes": 72.68,
       "failed": 0
      }
     ],
@@ -6499,11 +6534,11 @@
       "failed": 0
      },
      {
-      "nes": 97.08,
+      "nes": 97.11,
       "failed": 0
      },
      {
-      "nes": 95.84,
+      "nes": 95.85,
       "failed": 0
      },
      {
@@ -6511,7 +6546,7 @@
       "failed": 0
      },
      {
-      "nes": 66.07,
+      "nes": 66.05,
       "failed": 0
      }
     ],
@@ -6525,19 +6560,19 @@
       "failed": 0
      },
      {
-      "nes": 98.94,
+      "nes": 98.9,
       "failed": 0
      },
      {
-      "nes": 97.29,
+      "nes": 97.3,
       "failed": 0
      },
      {
-      "nes": 95.89,
+      "nes": 95.91,
       "failed": 1
      },
      {
-      "nes": 79.89,
+      "nes": 80.33,
       "failed": 0
      }
     ],
@@ -6555,7 +6590,7 @@
       "failed": 0
      },
      {
-      "nes": 98.01,
+      "nes": 98.02,
       "failed": 0
      },
      {
@@ -6563,7 +6598,7 @@
       "failed": 0
      },
      {
-      "nes": 69.98,
+      "nes": 69.97,
       "failed": 0
      }
     ],
@@ -6581,15 +6616,15 @@
       "failed": 0
      },
      {
-      "nes": 97.21,
+      "nes": 97.22,
       "failed": 0
      },
      {
-      "nes": 91.78,
+      "nes": 91.79,
       "failed": 0
      },
      {
-      "nes": 75.33,
+      "nes": 75.46,
       "failed": 2
      }
     ],
@@ -6603,11 +6638,11 @@
       "failed": 0
      },
      {
-      "nes": 99.38,
+      "nes": 99.3,
       "failed": 1
      },
      {
-      "nes": 98.09,
+      "nes": 98.1,
       "failed": 0
      },
      {
@@ -6615,7 +6650,7 @@
       "failed": 1
      },
      {
-      "nes": 75.61,
+      "nes": 75.53,
       "failed": 1
      }
     ],
@@ -6633,7 +6668,7 @@
       "failed": 1
      },
      {
-      "nes": 97.95,
+      "nes": 97.97,
       "failed": 0
      },
      {
@@ -6641,7 +6676,7 @@
       "failed": 0
      },
      {
-      "nes": 66.31,
+      "nes": 66.44,
       "failed": 1
      }
     ],
@@ -6655,19 +6690,19 @@
       "failed": 0
      },
      {
-      "nes": 98.24,
+      "nes": 98.21,
       "failed": 0
      },
      {
-      "nes": 93.72,
+      "nes": 93.73,
       "failed": 0
      },
      {
-      "nes": 91.08,
+      "nes": 91.07,
       "failed": 1
      },
      {
-      "nes": 77.71,
+      "nes": 77.9,
       "failed": 2
      }
     ],
@@ -6685,7 +6720,7 @@
       "failed": 0
      },
      {
-      "nes": 95.98,
+      "nes": 95.99,
       "failed": 0
      },
      {
@@ -6693,7 +6728,7 @@
       "failed": 2
      },
      {
-      "nes": 68.33,
+      "nes": 68.46,
       "failed": 0
      }
     ],
@@ -6707,19 +6742,19 @@
       "failed": 1
      },
      {
-      "nes": 98.53,
+      "nes": 98.54,
       "failed": 1
      },
      {
-      "nes": 93.77,
+      "nes": 93.78,
       "failed": 1
      },
      {
-      "nes": 92.55,
+      "nes": 92.53,
       "failed": 1
      },
      {
-      "nes": 77.07,
+      "nes": 77.15,
       "failed": 0
      }
     ],
@@ -6737,15 +6772,15 @@
       "failed": 0
      },
      {
-      "nes": 96.03,
+      "nes": 96.04,
       "failed": 0
      },
      {
-      "nes": 85.14,
+      "nes": 85.13,
       "failed": 0
      },
      {
-      "nes": 66.88,
+      "nes": 66.95,
       "failed": 2
      }
     ],
@@ -6763,7 +6798,7 @@
       "failed": 1
      },
      {
-      "nes": 96.01,
+      "nes": 96.02,
       "failed": 3
      },
      {
@@ -6771,7 +6806,7 @@
       "failed": 1
      },
      {
-      "nes": 74.15,
+      "nes": 74.34,
       "failed": 4
      }
     ],
@@ -6789,15 +6824,15 @@
       "failed": 0
      },
      {
-      "nes": 97.94,
+      "nes": 97.95,
       "failed": 4
      },
      {
-      "nes": 94.38,
+      "nes": 94.4,
       "failed": 3
      },
      {
-      "nes": 82.16,
+      "nes": 82.37,
       "failed": 3
      }
     ],
@@ -6823,7 +6858,7 @@
       "failed": 0
      },
      {
-      "nes": 54.01,
+      "nes": 54.2,
       "failed": 0
      }
     ],
@@ -6841,7 +6876,7 @@
       "failed": 1
      },
      {
-      "nes": 96.32,
+      "nes": 96.33,
       "failed": 0
      },
      {
@@ -6849,7 +6884,7 @@
       "failed": 1
      },
      {
-      "nes": 74.65,
+      "nes": 74.73,
       "failed": 2
      }
     ],
@@ -6863,11 +6898,11 @@
       "failed": 0
      },
      {
-      "nes": 91.91,
+      "nes": 91.9,
       "failed": 0
      },
      {
-      "nes": 96.75,
+      "nes": 96.76,
       "failed": 0
      },
      {
@@ -6875,7 +6910,7 @@
       "failed": 0
      },
      {
-      "nes": 69.79,
+      "nes": 70.03,
       "failed": 0
      }
     ],
@@ -6889,19 +6924,19 @@
       "failed": 0
      },
      {
-      "nes": 98.53,
+      "nes": 98.48,
       "failed": 1
      },
      {
-      "nes": 97.79,
+      "nes": 97.81,
       "failed": 0
      },
      {
-      "nes": 90.23,
+      "nes": 90.21,
       "failed": 0
      },
      {
-      "nes": 71.95,
+      "nes": 72.1,
       "failed": 0
      }
     ],
@@ -6943,7 +6978,7 @@
       "qwen3.5-9b-mlx4"
      ],
      "trigger": "fail",
-     "nes": 93.42,
+     "nes": 93.43,
      "family": "fail",
      "usd": 0.0,
      "escalated": 4,
@@ -6995,7 +7030,7 @@
       "qwen3.8-flash"
      ],
      "trigger": "disagree@0.85",
-     "nes": 94.68,
+     "nes": 94.71,
      "family": "disagree",
      "usd": 0.11,
      "escalated": 19,
@@ -7008,7 +7043,7 @@
       "qwen3.8-flash"
      ],
      "trigger": "disagree@0.90",
-     "nes": 94.9,
+     "nes": 94.94,
      "family": "disagree",
      "usd": 0.16,
      "escalated": 29,
@@ -7021,7 +7056,7 @@
       "qwen3.8-flash"
      ],
      "trigger": "disagree@0.90",
-     "nes": 94.97,
+     "nes": 95.01,
      "family": "disagree",
      "usd": 0.44,
      "escalated": 32,
@@ -7034,7 +7069,7 @@
       "qwen3.5-9b"
      ],
      "trigger": "fail+vision",
-     "nes": 95.0,
+     "nes": 95.02,
      "family": "fail+vision",
      "usd": 0.55,
      "escalated": 18,
@@ -7047,7 +7082,7 @@
       "qwen3.6-35b-a3b"
      ],
      "trigger": "fail+vision",
-     "nes": 95.11,
+     "nes": 95.12,
      "family": "fail+vision",
      "usd": 0.59,
      "escalated": 18,
@@ -7060,7 +7095,7 @@
       "qwen3.8-flash"
      ],
      "trigger": "disagree@0.80",
-     "nes": 95.42,
+     "nes": 95.45,
      "family": "disagree",
      "usd": 0.67,
      "escalated": 11,
@@ -7073,7 +7108,7 @@
       "qwen3.8-flash"
      ],
      "trigger": "disagree@0.90",
-     "nes": 95.42,
+     "nes": 95.46,
      "family": "disagree",
      "usd": 0.95,
      "escalated": 16,
@@ -7086,7 +7121,7 @@
       "gemini3.8-flash"
      ],
      "trigger": "disagree@0.90",
-     "nes": 95.52,
+     "nes": 95.49,
      "family": "disagree",
      "usd": 1.19,
      "escalated": 21,
@@ -7112,7 +7147,7 @@
       "gemini3.8-flash"
      ],
      "trigger": "fail+vision",
-     "nes": 95.83,
+     "nes": 95.81,
      "family": "fail+vision",
      "usd": 1.25,
      "escalated": 18,
@@ -7125,7 +7160,7 @@
       "gemini3.8-flash"
      ],
      "trigger": "disagree@0.90",
-     "nes": 95.99,
+     "nes": 95.98,
      "family": "disagree",
      "usd": 1.33,
      "escalated": 16,
@@ -7138,7 +7173,7 @@
       "gemini3.8-flash"
      ],
      "trigger": "disagree@0.85",
-     "nes": 96.14,
+     "nes": 96.13,
      "family": "disagree",
      "usd": 1.39,
      "escalated": 16,
@@ -7151,7 +7186,7 @@
       "qwen3.5-9b-mlx4"
      ],
      "trigger": "fail",
-     "nes": 96.38,
+     "nes": 96.35,
      "family": "fail",
      "usd": 3.22,
      "escalated": 2,
@@ -7164,7 +7199,7 @@
       "qwen3.5-35b-a3b"
      ],
      "trigger": "fail",
-     "nes": 96.39,
+     "nes": 96.36,
      "family": "fail",
      "usd": 3.24,
      "escalated": 2,
@@ -7177,7 +7212,7 @@
       "claude-sonnet5.5"
      ],
      "trigger": "disagree@0.90",
-     "nes": 96.41,
+     "nes": 96.44,
      "family": "disagree",
      "usd": 4.48,
      "escalated": 29,
@@ -7190,7 +7225,7 @@
       "claude-sonnet5.5"
      ],
      "trigger": "disagree@0.95",
-     "nes": 96.52,
+     "nes": 96.54,
      "family": "disagree",
      "usd": 5.64,
      "escalated": 37,
@@ -7203,7 +7238,7 @@
       "qwen3.5-9b-mlx4"
      ],
      "trigger": "fail",
-     "nes": 96.76,
+     "nes": 96.74,
      "family": "fail",
      "usd": 21.92,
      "escalated": 2,
@@ -7216,7 +7251,7 @@
       "qwen3.5-35b-a3b"
      ],
      "trigger": "fail",
-     "nes": 96.77,
+     "nes": 96.75,
      "family": "fail",
      "usd": 21.94,
      "escalated": 2,
@@ -7230,7 +7265,7 @@
       "qwen3.5-9b-mlx4"
      ],
      "trigger": "single",
-     "nes": 91.91,
+     "nes": 91.93,
      "family": "single",
      "usd": 0.0,
      "escalated": 0,
@@ -7254,7 +7289,7 @@
       "qwen3-vl-235b"
      ],
      "trigger": "single",
-     "nes": 93.95,
+     "nes": 93.98,
      "family": "single",
      "usd": 1.22,
      "escalated": 0,
@@ -7266,7 +7301,7 @@
       "qwen3.6-27b"
      ],
      "trigger": "single",
-     "nes": 94.28,
+     "nes": 94.35,
      "family": "single",
      "usd": 1.94,
      "escalated": 0,
@@ -7278,7 +7313,7 @@
       "gemini3.8-flash"
      ],
      "trigger": "single",
-     "nes": 94.47,
+     "nes": 94.43,
      "family": "single",
      "usd": 3.22,
      "escalated": 0,
@@ -7308,14 +7343,14 @@
          "qwen3.5-9b-mlx4"
         ],
         "trigger": "single",
-        "nes": 91.91,
+        "nes": 91.93,
         "family": "single",
         "usd": 0.0,
         "escalated": 0,
         "failed": 1
        },
-       "split_in": 91.95,
-       "split_out": 91.88
+       "split_in": 91.96,
+       "split_out": 91.89
       },
       "fail": {
        "best": {
@@ -7325,14 +7360,14 @@
          "qwen3.5-9b-mlx4"
         ],
         "trigger": "fail",
-        "nes": 93.42,
+        "nes": 93.43,
         "family": "fail",
         "usd": 0.0,
         "escalated": 4,
         "failed": 0
        },
-       "split_in": 93.54,
-       "split_out": 92.65
+       "split_in": 93.55,
+       "split_out": 92.67
       },
       "fail+kind": {
        "best": {
@@ -7342,14 +7377,14 @@
          "lightonocr-3-4b-mlx8"
         ],
         "trigger": "fail+kind",
-        "nes": 93.23,
+        "nes": 93.27,
         "family": "fail+kind",
         "usd": 0.0,
         "escalated": 22,
         "failed": 0
        },
-       "split_in": 93.5,
-       "split_out": 92.27
+       "split_in": 93.53,
+       "split_out": 92.33
       },
       "fail+vision": {
        "best": {
@@ -7359,14 +7394,14 @@
          "qwen3.5-9b-mlx4"
         ],
         "trigger": "fail+vision",
-        "nes": 93.41,
+        "nes": 93.43,
         "family": "fail+vision",
         "usd": 0.0,
         "escalated": 18,
         "failed": 0
        },
-       "split_in": 93.63,
-       "split_out": 92.88
+       "split_in": 93.66,
+       "split_out": 92.92
       },
       "disagree": {
        "best": {
@@ -7376,14 +7411,14 @@
          "qwen3.5-9b-mlx4"
         ],
         "trigger": "disagree@0.90",
-        "nes": 93.26,
+        "nes": 93.28,
         "family": "disagree",
         "usd": 0.0,
         "escalated": 44,
         "failed": 0
        },
-       "split_in": 93.6,
-       "split_out": 91.63
+       "split_in": 93.62,
+       "split_out": 91.65
       }
      }
     },
@@ -7397,14 +7432,14 @@
          "qwen3.5-9b-mlx4"
         ],
         "trigger": "single",
-        "nes": 91.91,
+        "nes": 91.93,
         "family": "single",
         "usd": 0.0,
         "escalated": 0,
         "failed": 1
        },
-       "split_in": 92.25,
-       "split_out": 90.84
+       "split_in": 92.26,
+       "split_out": 90.86
       },
       "fail": {
        "best": {
@@ -7414,14 +7449,14 @@
          "gemini3.8-flash"
         ],
         "trigger": "fail",
-        "nes": 93.58,
+        "nes": 93.59,
         "family": "fail",
         "usd": 0.41,
         "escalated": 4,
         "failed": 0
        },
-       "split_in": 94.2,
-       "split_out": 92.12
+       "split_in": 94.22,
+       "split_out": 92.14
       },
       "fail+kind": {
        "best": {
@@ -7431,14 +7466,14 @@
          "qwen3.6-27b"
         ],
         "trigger": "fail+kind",
-        "nes": 94.14,
+        "nes": 94.22,
         "family": "fail+kind",
         "usd": 0.39,
         "escalated": 22,
         "failed": 0
        },
-       "split_in": 94.48,
-       "split_out": 92.57
+       "split_in": 94.51,
+       "split_out": 92.75
       },
       "fail+vision": {
        "best": {
@@ -7448,14 +7483,14 @@
          "qwen3.6-27b"
         ],
         "trigger": "fail+vision",
-        "nes": 93.91,
+        "nes": 93.98,
         "family": "fail+vision",
         "usd": 0.32,
         "escalated": 18,
         "failed": 0
        },
-       "split_in": 94.43,
-       "split_out": 92.57
+       "split_in": 94.46,
+       "split_out": 92.7
       },
       "disagree": {
        "best": {
@@ -7465,14 +7500,14 @@
          "qwen3.8-flash"
         ],
         "trigger": "disagree@0.90",
-        "nes": 94.97,
+        "nes": 95.01,
         "family": "disagree",
         "usd": 0.44,
         "escalated": 32,
         "failed": 0
        },
-       "split_in": 95.58,
-       "split_out": 92.6
+       "split_in": 95.6,
+       "split_out": 92.63
       }
      }
     },
@@ -7492,8 +7527,8 @@
         "escalated": 0,
         "failed": 0
        },
-       "split_in": 93.55,
-       "split_out": 91.25
+       "split_in": 93.56,
+       "split_out": 91.26
       },
       "fail": {
        "best": {
@@ -7503,14 +7538,14 @@
          "gemini3.1-flash-lite"
         ],
         "trigger": "fail",
-        "nes": 95.0,
+        "nes": 95.04,
         "family": "fail",
         "usd": 0.64,
         "escalated": 3,
         "failed": 0
        },
-       "split_in": 95.06,
-       "split_out": 93.98
+       "split_in": 95.09,
+       "split_out": 94.02
       },
       "fail+kind": {
        "best": {
@@ -7526,8 +7561,8 @@
         "escalated": 23,
         "failed": 0
        },
-       "split_in": 95.43,
-       "split_out": 93.46
+       "split_in": 95.42,
+       "split_out": 93.52
       },
       "fail+vision": {
        "best": {
@@ -7537,14 +7572,14 @@
          "qwen3.6-27b"
         ],
         "trigger": "fail+vision",
-        "nes": 95.22,
+        "nes": 95.29,
         "family": "fail+vision",
         "usd": 0.83,
         "escalated": 18,
         "failed": 0
        },
-       "split_in": 95.42,
-       "split_out": 93.87
+       "split_in": 95.44,
+       "split_out": 94.02
       },
       "disagree": {
        "best": {
@@ -7554,14 +7589,14 @@
          "qwen3.8-flash"
         ],
         "trigger": "disagree@0.90",
-        "nes": 95.42,
+        "nes": 95.46,
         "family": "disagree",
         "usd": 0.95,
         "escalated": 16,
         "failed": 0
        },
        "split_in": 96.2,
-       "split_out": 93.41
+       "split_out": 93.46
       }
      }
     },
@@ -7575,14 +7610,14 @@
          "qwen3.6-27b"
         ],
         "trigger": "single",
-        "nes": 94.28,
+        "nes": 94.35,
         "family": "single",
         "usd": 1.94,
         "escalated": 0,
         "failed": 1
        },
-       "split_in": 94.84,
-       "split_out": 92.55
+       "split_in": 94.88,
+       "split_out": 92.61
       },
       "fail": {
        "best": {
@@ -7592,14 +7627,14 @@
          "gemini3.8-flash"
         ],
         "trigger": "fail",
-        "nes": 95.29,
+        "nes": 95.36,
         "family": "fail",
         "usd": 1.97,
         "escalated": 1,
         "failed": 0
        },
-       "split_in": 95.66,
-       "split_out": 93.64
+       "split_in": 95.69,
+       "split_out": 93.69
       },
       "fail+kind": {
        "best": {
@@ -7609,13 +7644,13 @@
          "gemini3.8-flash"
         ],
         "trigger": "fail+kind",
-        "nes": 95.29,
+        "nes": 95.26,
         "family": "fail+kind",
         "usd": 1.44,
         "escalated": 23,
         "failed": 0
        },
-       "split_in": 95.77,
+       "split_in": 95.75,
        "split_out": 93.83
       },
       "fail+vision": {
@@ -7626,14 +7661,14 @@
          "gemini3.8-flash"
         ],
         "trigger": "fail+vision",
-        "nes": 95.83,
+        "nes": 95.81,
         "family": "fail+vision",
         "usd": 1.25,
         "escalated": 18,
         "failed": 0
        },
-       "split_in": 95.88,
-       "split_out": 95.06
+       "split_in": 95.85,
+       "split_out": 95.05
       },
       "disagree": {
        "best": {
@@ -7643,14 +7678,14 @@
          "gemini3.8-flash"
         ],
         "trigger": "disagree@0.85",
-        "nes": 96.14,
+        "nes": 96.13,
         "family": "disagree",
         "usd": 1.39,
         "escalated": 16,
         "failed": 0
        },
-       "split_in": 96.65,
-       "split_out": 94.21
+       "split_in": 96.62,
+       "split_out": 94.11
       }
      }
     },
@@ -7664,14 +7699,14 @@
          "gemini3.8-flash"
         ],
         "trigger": "single",
-        "nes": 94.47,
+        "nes": 94.43,
         "family": "single",
         "usd": 3.22,
         "escalated": 0,
         "failed": 2
        },
-       "split_in": 95.34,
-       "split_out": 92.81
+       "split_in": 95.35,
+       "split_out": 92.82
       },
       "fail": {
        "best": {
@@ -7681,14 +7716,14 @@
          "qwen3.5-35b-a3b"
         ],
         "trigger": "fail",
-        "nes": 96.39,
+        "nes": 96.36,
         "family": "fail",
         "usd": 3.24,
         "escalated": 2,
         "failed": 0
        },
-       "split_in": 96.58,
-       "split_out": 94.87
+       "split_in": 96.56,
+       "split_out": 94.84
       },
       "fail+kind": {
        "best": {
@@ -7698,14 +7733,14 @@
          "claude-sonnet5.5"
         ],
         "trigger": "fail+kind",
-        "nes": 95.49,
+        "nes": 95.5,
         "family": "fail+kind",
         "usd": 3.36,
         "escalated": 23,
         "failed": 0
        },
-       "split_in": 95.92,
-       "split_out": 94.02
+       "split_in": 95.9,
+       "split_out": 94.01
       },
       "fail+vision": {
        "best": {
@@ -7715,14 +7750,14 @@
          "gemini3.8-flash"
         ],
         "trigger": "fail+vision",
-        "nes": 95.83,
+        "nes": 95.81,
         "family": "fail+vision",
         "usd": 1.25,
         "escalated": 18,
         "failed": 0
        },
-       "split_in": 95.88,
-       "split_out": 94.98
+       "split_in": 95.85,
+       "split_out": 94.97
       },
       "disagree": {
        "best": {
@@ -7732,14 +7767,14 @@
          "claude-sonnet5.5"
         ],
         "trigger": "disagree@0.90",
-        "nes": 96.41,
+        "nes": 96.44,
         "family": "disagree",
         "usd": 4.48,
         "escalated": 29,
         "failed": 0
        },
-       "split_in": 96.84,
-       "split_out": 94.47
+       "split_in": 96.83,
+       "split_out": 94.48
       }
      }
     },
@@ -7759,8 +7794,8 @@
         "escalated": 0,
         "failed": 0
        },
-       "split_in": 96.56,
-       "split_out": 95.56
+       "split_in": 96.55,
+       "split_out": 95.55
       },
       "fail": {
        "best": {
@@ -7770,14 +7805,14 @@
          "qwen3.5-35b-a3b"
         ],
         "trigger": "fail",
-        "nes": 96.77,
+        "nes": 96.75,
         "family": "fail",
         "usd": 21.94,
         "escalated": 2,
         "failed": 0
        },
-       "split_in": 96.99,
-       "split_out": 95.3
+       "split_in": 96.96,
+       "split_out": 95.25
       },
       "fail+kind": {
        "best": {
@@ -7787,14 +7822,14 @@
          "gemini3.1-pro"
         ],
         "trigger": "fail+kind",
-        "nes": 95.72,
+        "nes": 95.71,
         "family": "fail+kind",
         "usd": 5.33,
         "escalated": 23,
         "failed": 0
        },
-       "split_in": 95.99,
-       "split_out": 94.28
+       "split_in": 95.97,
+       "split_out": 94.25
       },
       "fail+vision": {
        "best": {
@@ -7804,14 +7839,14 @@
          "gemini3.8-flash"
         ],
         "trigger": "fail+vision",
-        "nes": 95.83,
+        "nes": 95.81,
         "family": "fail+vision",
         "usd": 1.25,
         "escalated": 18,
         "failed": 0
        },
-       "split_in": 95.88,
-       "split_out": 94.98
+       "split_in": 95.85,
+       "split_out": 94.97
       },
       "disagree": {
        "best": {
@@ -7821,14 +7856,14 @@
          "claude-sonnet5.5"
         ],
         "trigger": "disagree@0.95",
-        "nes": 96.52,
+        "nes": 96.54,
         "family": "disagree",
         "usd": 5.64,
         "escalated": 37,
         "failed": 0
        },
-       "split_in": 96.9,
-       "split_out": 94.66
+       "split_in": 96.89,
+       "split_out": 94.67
       }
      }
     }
@@ -7841,7 +7876,7 @@
        "qwen3.5-9b-mlx4"
       ],
       "trigger": "single",
-      "nes": 91.91,
+      "nes": 91.93,
       "family": "single",
       "usd": 0.0,
       "escalated": 0,
@@ -7865,7 +7900,7 @@
        "qwen3-vl-235b"
       ],
       "trigger": "single",
-      "nes": 93.95,
+      "nes": 93.98,
       "family": "single",
       "usd": 1.22,
       "escalated": 0,
@@ -7877,7 +7912,7 @@
        "qwen3.6-27b"
       ],
       "trigger": "single",
-      "nes": 94.28,
+      "nes": 94.35,
       "family": "single",
       "usd": 1.94,
       "escalated": 0,
@@ -7889,7 +7924,7 @@
        "gemini3.8-flash"
       ],
       "trigger": "single",
-      "nes": 94.47,
+      "nes": 94.43,
       "family": "single",
       "usd": 3.22,
       "escalated": 0,
@@ -7916,7 +7951,7 @@
        "qwen3.5-9b-mlx4"
       ],
       "trigger": "fail",
-      "nes": 93.42,
+      "nes": 93.43,
       "family": "fail",
       "usd": 0.0,
       "escalated": 4,
@@ -7929,7 +7964,7 @@
        "qwen3.8-flash"
       ],
       "trigger": "fail",
-      "nes": 93.55,
+      "nes": 93.56,
       "family": "fail",
       "usd": 0.03,
       "escalated": 4,
@@ -7942,7 +7977,7 @@
        "qwen3.5-9b-mlx4"
       ],
       "trigger": "fail",
-      "nes": 93.56,
+      "nes": 93.57,
       "family": "fail",
       "usd": 0.25,
       "escalated": 4,
@@ -7955,7 +7990,7 @@
        "gemini3.8-flash"
       ],
       "trigger": "fail",
-      "nes": 93.58,
+      "nes": 93.59,
       "family": "fail",
       "usd": 0.41,
       "escalated": 4,
@@ -7969,7 +8004,7 @@
        "lightonocr-3-4b-mlx8"
       ],
       "trigger": "fail",
-      "nes": 94.99,
+      "nes": 95.02,
       "family": "fail",
       "usd": 0.6,
       "escalated": 3,
@@ -7983,7 +8018,7 @@
        "gemma4-26b-a4b"
       ],
       "trigger": "fail",
-      "nes": 95.0,
+      "nes": 95.03,
       "family": "fail",
       "usd": 0.6,
       "escalated": 3,
@@ -7997,7 +8032,7 @@
        "qwen3.6-35b-a3b"
       ],
       "trigger": "fail",
-      "nes": 95.0,
+      "nes": 95.03,
       "family": "fail",
       "usd": 0.61,
       "escalated": 3,
@@ -8011,7 +8046,7 @@
        "gemini3.1-flash-lite"
       ],
       "trigger": "fail",
-      "nes": 95.0,
+      "nes": 95.03,
       "family": "fail",
       "usd": 0.61,
       "escalated": 3,
@@ -8024,7 +8059,7 @@
        "gemini3.1-flash-lite"
       ],
       "trigger": "fail",
-      "nes": 95.0,
+      "nes": 95.04,
       "family": "fail",
       "usd": 0.64,
       "escalated": 3,
@@ -8037,23 +8072,10 @@
        "gemini3.1-pro"
       ],
       "trigger": "fail",
-      "nes": 95.0,
+      "nes": 95.04,
       "family": "fail",
       "usd": 1.21,
       "escalated": 3,
-      "failed": 0
-     },
-     {
-      "label": "Gemini 3.5 Flash Lite \u2192 Qwen3.5-9B 4-bit (Mac)",
-      "stages": [
-       "gemini3.5-flash-lite",
-       "qwen3.5-9b-mlx4"
-      ],
-      "trigger": "fail",
-      "nes": 95.04,
-      "family": "fail",
-      "usd": 1.57,
-      "escalated": 2,
       "failed": 0
      },
      {
@@ -8076,7 +8098,7 @@
        "qwen3.5-9b-mlx4"
       ],
       "trigger": "fail",
-      "nes": 95.25,
+      "nes": 95.32,
       "family": "fail",
       "usd": 1.94,
       "escalated": 1,
@@ -8089,7 +8111,7 @@
        "gemini3.1-flash-lite"
       ],
       "trigger": "fail",
-      "nes": 95.29,
+      "nes": 95.36,
       "family": "fail",
       "usd": 1.95,
       "escalated": 1,
@@ -8102,7 +8124,7 @@
        "gemini3.5-flash-lite"
       ],
       "trigger": "fail",
-      "nes": 95.29,
+      "nes": 95.36,
       "family": "fail",
       "usd": 1.96,
       "escalated": 1,
@@ -8115,7 +8137,7 @@
        "gemini3.8-flash"
       ],
       "trigger": "fail",
-      "nes": 95.29,
+      "nes": 95.36,
       "family": "fail",
       "usd": 1.97,
       "escalated": 1,
@@ -8128,7 +8150,7 @@
        "gemini3.5-flash-lite"
       ],
       "trigger": "fail",
-      "nes": 95.41,
+      "nes": 95.43,
       "family": "fail",
       "usd": 2.03,
       "escalated": 14,
@@ -8141,7 +8163,7 @@
        "gemini3.8-flash"
       ],
       "trigger": "fail",
-      "nes": 95.7,
+      "nes": 95.72,
       "family": "fail",
       "usd": 2.28,
       "escalated": 14,
@@ -8154,7 +8176,7 @@
        "qwen3.5-9b-mlx4"
       ],
       "trigger": "fail",
-      "nes": 96.38,
+      "nes": 96.35,
       "family": "fail",
       "usd": 3.22,
       "escalated": 2,
@@ -8167,7 +8189,7 @@
        "qwen3.5-35b-a3b"
       ],
       "trigger": "fail",
-      "nes": 96.39,
+      "nes": 96.36,
       "family": "fail",
       "usd": 3.24,
       "escalated": 2,
@@ -8193,7 +8215,7 @@
        "qwen3.5-9b-mlx4"
       ],
       "trigger": "fail",
-      "nes": 96.76,
+      "nes": 96.74,
       "family": "fail",
       "usd": 21.92,
       "escalated": 2,
@@ -8206,7 +8228,7 @@
        "qwen3.5-35b-a3b"
       ],
       "trigger": "fail",
-      "nes": 96.77,
+      "nes": 96.75,
       "family": "fail",
       "usd": 21.94,
       "escalated": 2,
@@ -8221,7 +8243,7 @@
        "lightonocr-3-4b-mlx8"
       ],
       "trigger": "fail+kind",
-      "nes": 93.23,
+      "nes": 93.27,
       "family": "fail+kind",
       "usd": 0.0,
       "escalated": 22,
@@ -8247,7 +8269,7 @@
        "gemma4-31b"
       ],
       "trigger": "fail+kind",
-      "nes": 93.64,
+      "nes": 93.65,
       "family": "fail+kind",
       "usd": 0.04,
       "escalated": 20,
@@ -8260,7 +8282,7 @@
        "qwen3.5-9b"
       ],
       "trigger": "fail+kind",
-      "nes": 93.74,
+      "nes": 93.75,
       "family": "fail+kind",
       "usd": 0.04,
       "escalated": 22,
@@ -8273,7 +8295,7 @@
        "qwen3.5-397b"
       ],
       "trigger": "fail+kind",
-      "nes": 93.8,
+      "nes": 93.84,
       "family": "fail+kind",
       "usd": 0.33,
       "escalated": 22,
@@ -8286,7 +8308,7 @@
        "qwen3.6-27b"
       ],
       "trigger": "fail+kind",
-      "nes": 94.14,
+      "nes": 94.22,
       "family": "fail+kind",
       "usd": 0.39,
       "escalated": 22,
@@ -8299,7 +8321,7 @@
        "qwen3.5-9b"
       ],
       "trigger": "fail+kind",
-      "nes": 94.23,
+      "nes": 94.25,
       "family": "fail+kind",
       "usd": 0.64,
       "escalated": 23,
@@ -8312,7 +8334,7 @@
        "gemini3.8-flash"
       ],
       "trigger": "fail+kind",
-      "nes": 94.3,
+      "nes": 94.27,
       "family": "fail+kind",
       "usd": 0.76,
       "escalated": 20,
@@ -8338,7 +8360,7 @@
        "gemini3.8-flash"
       ],
       "trigger": "fail+kind",
-      "nes": 95.29,
+      "nes": 95.26,
       "family": "fail+kind",
       "usd": 1.44,
       "escalated": 23,
@@ -8351,7 +8373,7 @@
        "claude-sonnet5.5"
       ],
       "trigger": "fail+kind",
-      "nes": 95.49,
+      "nes": 95.5,
       "family": "fail+kind",
       "usd": 3.36,
       "escalated": 23,
@@ -8364,7 +8386,7 @@
        "gemini3.1-pro"
       ],
       "trigger": "fail+kind",
-      "nes": 95.72,
+      "nes": 95.71,
       "family": "fail+kind",
       "usd": 5.33,
       "escalated": 23,
@@ -8379,7 +8401,7 @@
        "qwen3.5-9b-mlx4"
       ],
       "trigger": "fail+vision",
-      "nes": 93.41,
+      "nes": 93.43,
       "family": "fail+vision",
       "usd": 0.0,
       "escalated": 18,
@@ -8392,7 +8414,7 @@
        "qwen3.5-9b"
       ],
       "trigger": "fail+vision",
-      "nes": 93.59,
+      "nes": 93.6,
       "family": "fail+vision",
       "usd": 0.03,
       "escalated": 18,
@@ -8405,7 +8427,7 @@
        "qwen3.6-35b-a3b"
       ],
       "trigger": "fail+vision",
-      "nes": 93.71,
+      "nes": 93.72,
       "family": "fail+vision",
       "usd": 0.07,
       "escalated": 18,
@@ -8418,7 +8440,7 @@
        "qwen3.8-flash"
       ],
       "trigger": "fail+vision",
-      "nes": 93.83,
+      "nes": 93.86,
       "family": "fail+vision",
       "usd": 0.1,
       "escalated": 18,
@@ -8431,7 +8453,7 @@
        "qwen3.6-27b"
       ],
       "trigger": "fail+vision",
-      "nes": 93.91,
+      "nes": 93.98,
       "family": "fail+vision",
       "usd": 0.32,
       "escalated": 18,
@@ -8444,7 +8466,7 @@
        "lightonocr-3-4b-mlx8"
       ],
       "trigger": "fail+vision",
-      "nes": 94.76,
+      "nes": 94.81,
       "family": "fail+vision",
       "usd": 0.52,
       "escalated": 18,
@@ -8457,7 +8479,7 @@
        "qwen3.5-9b"
       ],
       "trigger": "fail+vision",
-      "nes": 95.0,
+      "nes": 95.02,
       "family": "fail+vision",
       "usd": 0.55,
       "escalated": 18,
@@ -8470,7 +8492,7 @@
        "qwen3.6-35b-a3b"
       ],
       "trigger": "fail+vision",
-      "nes": 95.11,
+      "nes": 95.12,
       "family": "fail+vision",
       "usd": 0.59,
       "escalated": 18,
@@ -8483,7 +8505,7 @@
        "gemini3.5-flash-lite"
       ],
       "trigger": "fail+vision",
-      "nes": 95.2,
+      "nes": 95.22,
       "family": "fail+vision",
       "usd": 0.72,
       "escalated": 18,
@@ -8496,7 +8518,7 @@
        "qwen3.6-27b"
       ],
       "trigger": "fail+vision",
-      "nes": 95.22,
+      "nes": 95.29,
       "family": "fail+vision",
       "usd": 0.83,
       "escalated": 18,
@@ -8509,7 +8531,7 @@
        "gemini3.8-flash"
       ],
       "trigger": "fail+vision",
-      "nes": 95.83,
+      "nes": 95.81,
       "family": "fail+vision",
       "usd": 1.25,
       "escalated": 18,
@@ -8524,7 +8546,7 @@
        "qwen3.5-9b-mlx4"
       ],
       "trigger": "disagree@0.90",
-      "nes": 93.26,
+      "nes": 93.28,
       "family": "disagree",
       "usd": 0.0,
       "escalated": 44,
@@ -8576,7 +8598,7 @@
        "qwen3.8-flash"
       ],
       "trigger": "disagree@0.85",
-      "nes": 94.68,
+      "nes": 94.71,
       "family": "disagree",
       "usd": 0.11,
       "escalated": 19,
@@ -8589,7 +8611,7 @@
        "qwen3.8-flash"
       ],
       "trigger": "disagree@0.90",
-      "nes": 94.9,
+      "nes": 94.94,
       "family": "disagree",
       "usd": 0.16,
       "escalated": 29,
@@ -8602,7 +8624,7 @@
        "qwen3.8-flash"
       ],
       "trigger": "disagree@0.90",
-      "nes": 94.97,
+      "nes": 95.01,
       "family": "disagree",
       "usd": 0.44,
       "escalated": 32,
@@ -8615,7 +8637,7 @@
        "qwen3.8-flash"
       ],
       "trigger": "disagree@0.80",
-      "nes": 95.42,
+      "nes": 95.45,
       "family": "disagree",
       "usd": 0.67,
       "escalated": 11,
@@ -8628,7 +8650,7 @@
        "qwen3.8-flash"
       ],
       "trigger": "disagree@0.90",
-      "nes": 95.42,
+      "nes": 95.46,
       "family": "disagree",
       "usd": 0.95,
       "escalated": 16,
@@ -8641,7 +8663,7 @@
        "gemini3.8-flash"
       ],
       "trigger": "disagree@0.90",
-      "nes": 95.52,
+      "nes": 95.49,
       "family": "disagree",
       "usd": 1.19,
       "escalated": 21,
@@ -8667,7 +8689,7 @@
        "gemini3.8-flash"
       ],
       "trigger": "disagree@0.90",
-      "nes": 95.99,
+      "nes": 95.98,
       "family": "disagree",
       "usd": 1.33,
       "escalated": 16,
@@ -8680,7 +8702,7 @@
        "gemini3.8-flash"
       ],
       "trigger": "disagree@0.85",
-      "nes": 96.14,
+      "nes": 96.13,
       "family": "disagree",
       "usd": 1.39,
       "escalated": 16,
@@ -8693,7 +8715,7 @@
        "claude-sonnet5.5"
       ],
       "trigger": "disagree@0.85",
-      "nes": 96.17,
+      "nes": 96.19,
       "family": "disagree",
       "usd": 3.32,
       "escalated": 20,
@@ -8706,7 +8728,7 @@
        "claude-sonnet5.5"
       ],
       "trigger": "disagree@0.90",
-      "nes": 96.21,
+      "nes": 96.22,
       "family": "disagree",
       "usd": 3.73,
       "escalated": 28,
@@ -8719,7 +8741,7 @@
        "claude-sonnet5.5"
       ],
       "trigger": "disagree@0.90",
-      "nes": 96.33,
+      "nes": 96.35,
       "family": "disagree",
       "usd": 3.91,
       "escalated": 25,
@@ -8732,7 +8754,7 @@
        "claude-sonnet5.5"
       ],
       "trigger": "disagree@0.90",
-      "nes": 96.41,
+      "nes": 96.44,
       "family": "disagree",
       "usd": 4.48,
       "escalated": 29,
@@ -8745,7 +8767,7 @@
        "claude-sonnet5.5"
       ],
       "trigger": "disagree@0.95",
-      "nes": 96.52,
+      "nes": 96.54,
       "family": "disagree",
       "usd": 5.64,
       "escalated": 37,
@@ -9152,7 +9174,7 @@
       "middle": 17,
       "hard": 16
      },
-     "mean_nes": 93.76,
+     "mean_nes": 93.78,
      "route_failures": 46
     },
     "handwriting": {
@@ -9168,7 +9190,7 @@
       "middle": 5,
       "hard": 10
      },
-     "mean_nes": 90.13,
+     "mean_nes": 90.12,
      "route_failures": 8
     },
     "other": {
@@ -9290,8 +9312,8 @@
     "name": "Gemini 3.1 Pro",
     "pages": 95,
     "answered": 93,
-    "nes_answered": 96.87,
-    "strict": 94.84,
+    "nes_answered": 96.85,
+    "strict": 94.81,
     "transport": 0,
     "model": 2,
     "cap": 0,
@@ -9299,9 +9321,9 @@
     "empty": 0,
     "vs_baseline": {
      "n": 92,
-     "delta": 1.57,
-     "lo": 0.2,
-     "hi": 3.19
+     "delta": 1.47,
+     "lo": 0.09,
+     "hi": 3.1
     },
     "p081": [
      true,
@@ -9314,8 +9336,8 @@
     "name": "Gemini 3.7 Flash (Stanford gateway, price estimated)",
     "pages": 95,
     "answered": 95,
-    "nes_answered": 96.77,
-    "strict": 96.77,
+    "nes_answered": 96.76,
+    "strict": 96.76,
     "transport": 0,
     "model": 0,
     "cap": 0,
@@ -9323,9 +9345,9 @@
     "empty": 0,
     "vs_baseline": {
      "n": 94,
-     "delta": 1.5,
-     "lo": -0.44,
-     "hi": 3.32
+     "delta": 1.41,
+     "lo": -0.52,
+     "hi": 3.23
     },
     "p081": [
      true,
@@ -9334,36 +9356,12 @@
     "public_pages": 895
    },
    {
-    "id": "gemini3.8-flash",
-    "name": "Gemini 3.8 Flash",
-    "pages": 95,
-    "answered": 93,
-    "nes_answered": 96.51,
-    "strict": 94.47,
-    "transport": 0,
-    "model": 2,
-    "cap": 0,
-    "refusal": 2,
-    "empty": 0,
-    "vs_baseline": {
-     "n": 92,
-     "delta": 1.11,
-     "lo": -1.15,
-     "hi": 3.07
-    },
-    "p081": [
-     true,
-     93.81
-    ],
-    "public_pages": 440
-   },
-   {
     "id": "claude-sonnet5.5",
     "name": "Claude Sonnet 5.5",
     "pages": 95,
     "answered": 95,
-    "nes_answered": 96.47,
-    "strict": 96.47,
+    "nes_answered": 96.48,
+    "strict": 96.48,
     "transport": 0,
     "model": 0,
     "cap": 0,
@@ -9371,9 +9369,9 @@
     "empty": 0,
     "vs_baseline": {
      "n": 94,
-     "delta": 1.15,
-     "lo": -0.16,
-     "hi": 2.67
+     "delta": 1.08,
+     "lo": -0.22,
+     "hi": 2.59
     },
     "p081": [
      true,
@@ -9382,12 +9380,36 @@
     "public_pages": 0
    },
    {
+    "id": "gemini3.8-flash",
+    "name": "Gemini 3.8 Flash",
+    "pages": 95,
+    "answered": 93,
+    "nes_answered": 96.47,
+    "strict": 94.44,
+    "transport": 0,
+    "model": 2,
+    "cap": 0,
+    "refusal": 2,
+    "empty": 0,
+    "vs_baseline": {
+     "n": 92,
+     "delta": 1.0,
+     "lo": -1.26,
+     "hi": 2.95
+    },
+    "p081": [
+     true,
+     93.81
+    ],
+    "public_pages": 440
+   },
+   {
     "id": "qwen3.5-27b",
     "name": "Qwen3.5 27B",
     "pages": 95,
     "answered": 81,
-    "nes_answered": 95.82,
-    "strict": 81.7,
+    "nes_answered": 95.86,
+    "strict": 81.73,
     "transport": 14,
     "model": 0,
     "cap": 0,
@@ -9395,9 +9417,9 @@
     "empty": 0,
     "vs_baseline": {
      "n": 81,
-     "delta": -0.51,
-     "lo": -0.99,
-     "hi": -0.08
+     "delta": -0.58,
+     "lo": -1.04,
+     "hi": -0.17
     },
     "p081": [
      true,
@@ -9410,8 +9432,8 @@
     "name": "Gemini 3.5 Flash",
     "pages": 95,
     "answered": 93,
-    "nes_answered": 95.51,
-    "strict": 93.5,
+    "nes_answered": 95.48,
+    "strict": 93.47,
     "transport": 0,
     "model": 2,
     "cap": 0,
@@ -9419,10 +9441,29 @@
     "empty": 0,
     "vs_baseline": {
      "n": 92,
-     "delta": 0.16,
-     "lo": -1.7,
-     "hi": 1.68
+     "delta": 0.05,
+     "lo": -1.8,
+     "hi": 1.57
     },
+    "p081": [
+     true,
+     91.47
+    ],
+    "public_pages": 0
+   },
+   {
+    "id": "qwen3.6-27b",
+    "name": "Qwen3.6 27B",
+    "pages": 95,
+    "answered": 94,
+    "nes_answered": 95.38,
+    "strict": 94.38,
+    "transport": 1,
+    "model": 0,
+    "cap": 0,
+    "refusal": 0,
+    "empty": 0,
+    "vs_baseline": null,
     "p081": [
      true,
      91.47
@@ -9443,34 +9484,15 @@
     "empty": 0,
     "vs_baseline": {
      "n": 94,
-     "delta": 0.06,
-     "lo": -0.6,
-     "hi": 0.8
+     "delta": -0.01,
+     "lo": -0.68,
+     "hi": 0.75
     },
     "p081": [
      true,
      90.69
     ],
     "public_pages": 895
-   },
-   {
-    "id": "qwen3.6-27b",
-    "name": "Qwen3.6 27B",
-    "pages": 95,
-    "answered": 94,
-    "nes_answered": 95.31,
-    "strict": 94.31,
-    "transport": 1,
-    "model": 0,
-    "cap": 0,
-    "refusal": 0,
-    "empty": 0,
-    "vs_baseline": null,
-    "p081": [
-     true,
-     91.47
-    ],
-    "public_pages": 0
    },
    {
     "id": "qwen3.6-27b-farmshare",
@@ -9486,9 +9508,9 @@
     "empty": 0,
     "vs_baseline": {
      "n": 94,
-     "delta": -0.01,
-     "lo": -0.5,
-     "hi": 0.52
+     "delta": -0.08,
+     "lo": -0.58,
+     "hi": 0.46
     },
     "p081": [
      true,
@@ -9510,9 +9532,9 @@
     "empty": 0,
     "vs_baseline": {
      "n": 92,
-     "delta": -0.24,
-     "lo": -1.58,
-     "hi": 1.37
+     "delta": -0.31,
+     "lo": -1.66,
+     "hi": 1.3
     },
     "p081": [
      true,
@@ -9534,9 +9556,9 @@
     "empty": 1,
     "vs_baseline": {
      "n": 92,
-     "delta": -0.65,
-     "lo": -1.45,
-     "hi": 0.12
+     "delta": -0.72,
+     "lo": -1.53,
+     "hi": 0.07
     },
     "p081": [
      true,
@@ -9549,8 +9571,8 @@
     "name": "Qwen3.8 Flash",
     "pages": 95,
     "answered": 92,
-    "nes_answered": 95.08,
-    "strict": 92.07,
+    "nes_answered": 95.11,
+    "strict": 92.11,
     "transport": 0,
     "model": 3,
     "cap": 0,
@@ -9558,9 +9580,9 @@
     "empty": 0,
     "vs_baseline": {
      "n": 91,
-     "delta": -0.04,
-     "lo": -1.59,
-     "hi": 1.69
+     "delta": -0.08,
+     "lo": -1.62,
+     "hi": 1.64
     },
     "p081": [
      true,
@@ -9573,8 +9595,8 @@
     "name": "GPT-5.4 Mini",
     "pages": 95,
     "answered": 94,
-    "nes_answered": 94.88,
-    "strict": 93.88,
+    "nes_answered": 94.81,
+    "strict": 93.81,
     "transport": 0,
     "model": 1,
     "cap": 0,
@@ -9582,9 +9604,9 @@
     "empty": 0,
     "vs_baseline": {
      "n": 93,
-     "delta": -0.35,
-     "lo": -2.24,
-     "hi": 1.28
+     "delta": -0.49,
+     "lo": -2.39,
+     "hi": 1.15
     },
     "p081": [
      true,
@@ -9606,9 +9628,9 @@
     "empty": 0,
     "vs_baseline": {
      "n": 94,
-     "delta": -0.63,
-     "lo": -1.74,
-     "hi": 0.44
+     "delta": -0.7,
+     "lo": -1.84,
+     "hi": 0.39
     },
     "p081": [
      true,
@@ -9621,8 +9643,8 @@
     "name": "Gemini 3.1 Flash Lite",
     "pages": 95,
     "answered": 92,
-    "nes_answered": 94.61,
-    "strict": 91.62,
+    "nes_answered": 94.59,
+    "strict": 91.6,
     "transport": 0,
     "model": 3,
     "cap": 1,
@@ -9630,9 +9652,9 @@
     "empty": 0,
     "vs_baseline": {
      "n": 91,
-     "delta": -0.81,
-     "lo": -2.32,
-     "hi": 0.54
+     "delta": -0.9,
+     "lo": -2.41,
+     "hi": 0.42
     },
     "p081": [
      true,
@@ -9654,9 +9676,9 @@
     "empty": 0,
     "vs_baseline": {
      "n": 94,
-     "delta": -0.74,
-     "lo": -1.91,
-     "hi": 0.24
+     "delta": -0.81,
+     "lo": -2.01,
+     "hi": 0.19
     },
     "p081": [
      true,
@@ -9669,8 +9691,8 @@
     "name": "Qwen3.5 397B",
     "pages": 95,
     "answered": 95,
-    "nes_answered": 94.02,
-    "strict": 94.02,
+    "nes_answered": 94.06,
+    "strict": 94.06,
     "transport": 0,
     "model": 0,
     "cap": 0,
@@ -9678,9 +9700,9 @@
     "empty": 0,
     "vs_baseline": {
      "n": 94,
-     "delta": -1.31,
-     "lo": -2.23,
-     "hi": -0.49
+     "delta": -1.34,
+     "lo": -2.26,
+     "hi": -0.5
     },
     "p081": [
      true,
@@ -9693,8 +9715,8 @@
     "name": "Qwen3-VL 235B",
     "pages": 95,
     "answered": 95,
-    "nes_answered": 93.98,
-    "strict": 93.98,
+    "nes_answered": 94.01,
+    "strict": 94.01,
     "transport": 0,
     "model": 0,
     "cap": 0,
@@ -9702,9 +9724,9 @@
     "empty": 0,
     "vs_baseline": {
      "n": 94,
-     "delta": -1.26,
-     "lo": -2.43,
-     "hi": -0.26
+     "delta": -1.3,
+     "lo": -2.46,
+     "hi": -0.29
     },
     "p081": [
      true,
@@ -9717,8 +9739,8 @@
     "name": "Qwen3-VL 8B",
     "pages": 95,
     "answered": 93,
-    "nes_answered": 93.82,
-    "strict": 91.85,
+    "nes_answered": 93.85,
+    "strict": 91.87,
     "transport": 0,
     "model": 2,
     "cap": 2,
@@ -9750,9 +9772,9 @@
     "empty": 0,
     "vs_baseline": {
      "n": 94,
-     "delta": -1.53,
-     "lo": -3.19,
-     "hi": -0.24
+     "delta": -1.6,
+     "lo": -3.27,
+     "hi": -0.31
     },
     "p081": [
      true,
@@ -9765,8 +9787,8 @@
     "name": "Gemma 4 31B",
     "pages": 95,
     "answered": 92,
-    "nes_answered": 93.73,
-    "strict": 90.77,
+    "nes_answered": 93.76,
+    "strict": 90.8,
     "transport": 0,
     "model": 3,
     "cap": 3,
@@ -9774,9 +9796,9 @@
     "empty": 0,
     "vs_baseline": {
      "n": 91,
-     "delta": -2.14,
-     "lo": -4.1,
-     "hi": -0.55
+     "delta": -2.19,
+     "lo": -4.15,
+     "hi": -0.6
     },
     "p081": [
      true,
@@ -9789,8 +9811,8 @@
     "name": "Qwen3-VL 8B 4-bit (Mac)",
     "pages": 95,
     "answered": 91,
-    "nes_answered": 93.61,
-    "strict": 89.66,
+    "nes_answered": 93.62,
+    "strict": 89.68,
     "transport": 0,
     "model": 4,
     "cap": 3,
@@ -9798,9 +9820,9 @@
     "empty": 1,
     "vs_baseline": {
      "n": 90,
-     "delta": -1.87,
-     "lo": -2.85,
-     "hi": -0.92
+     "delta": -1.93,
+     "lo": -2.92,
+     "hi": -0.98
     },
     "p081": [
      true,
@@ -9813,8 +9835,8 @@
     "name": "GPT-5.6 Luna",
     "pages": 95,
     "answered": 94,
-    "nes_answered": 93.6,
-    "strict": 92.61,
+    "nes_answered": 93.56,
+    "strict": 92.57,
     "transport": 0,
     "model": 1,
     "cap": 0,
@@ -9822,9 +9844,9 @@
     "empty": 0,
     "vs_baseline": {
      "n": 93,
-     "delta": -1.59,
-     "lo": -2.92,
-     "hi": -0.15
+     "delta": -1.7,
+     "lo": -3.07,
+     "hi": -0.24
     },
     "p081": [
      true,
@@ -9846,9 +9868,9 @@
     "empty": 0,
     "vs_baseline": {
      "n": 93,
-     "delta": -1.82,
-     "lo": -2.95,
-     "hi": -0.82
+     "delta": -1.9,
+     "lo": -3.04,
+     "hi": -0.86
     },
     "p081": [
      true,
@@ -9870,9 +9892,9 @@
     "empty": 0,
     "vs_baseline": {
      "n": 85,
-     "delta": -3.25,
-     "lo": -5.11,
-     "hi": -1.65
+     "delta": -3.3,
+     "lo": -5.19,
+     "hi": -1.69
     },
     "p081": [
      false,
@@ -9894,9 +9916,9 @@
     "empty": 0,
     "vs_baseline": {
      "n": 94,
-     "delta": -1.82,
-     "lo": -4.26,
-     "hi": -0.06
+     "delta": -1.89,
+     "lo": -4.33,
+     "hi": -0.11
     },
     "p081": [
      true,
@@ -9909,8 +9931,8 @@
     "name": "Qwen3.5 9B",
     "pages": 95,
     "answered": 91,
-    "nes_answered": 93.37,
-    "strict": 89.44,
+    "nes_answered": 93.38,
+    "strict": 89.45,
     "transport": 0,
     "model": 4,
     "cap": 4,
@@ -9918,9 +9940,9 @@
     "empty": 0,
     "vs_baseline": {
      "n": 90,
-     "delta": -1.75,
-     "lo": -3.29,
-     "hi": -0.5
+     "delta": -1.81,
+     "lo": -3.36,
+     "hi": -0.55
     },
     "p081": [
      true,
@@ -9933,8 +9955,8 @@
     "name": "Mistral Large 4",
     "pages": 95,
     "answered": 95,
-    "nes_answered": 93.22,
-    "strict": 93.22,
+    "nes_answered": 93.25,
+    "strict": 93.25,
     "transport": 0,
     "model": 0,
     "cap": 0,
@@ -9942,9 +9964,9 @@
     "empty": 0,
     "vs_baseline": {
      "n": 94,
-     "delta": -2.09,
-     "lo": -3.97,
-     "hi": -0.54
+     "delta": -2.14,
+     "lo": -4.02,
+     "hi": -0.59
     },
     "p081": [
      true,
@@ -9966,9 +9988,9 @@
     "empty": 0,
     "vs_baseline": {
      "n": 94,
-     "delta": -2.14,
-     "lo": -4.56,
-     "hi": -0.34
+     "delta": -2.21,
+     "lo": -4.64,
+     "hi": -0.4
     },
     "p081": [
      true,
@@ -9990,9 +10012,9 @@
     "empty": 0,
     "vs_baseline": {
      "n": 94,
-     "delta": -2.25,
-     "lo": -4.08,
-     "hi": -0.71
+     "delta": -2.32,
+     "lo": -4.15,
+     "hi": -0.77
     },
     "p081": [
      true,
@@ -10005,8 +10027,8 @@
     "name": "Mistral OCR 4.1",
     "pages": 95,
     "answered": 95,
-    "nes_answered": 93.0,
-    "strict": 93.0,
+    "nes_answered": 93.01,
+    "strict": 93.01,
     "transport": 0,
     "model": 0,
     "cap": 0,
@@ -10014,9 +10036,9 @@
     "empty": 0,
     "vs_baseline": {
      "n": 94,
-     "delta": -2.28,
-     "lo": -4.11,
-     "hi": -0.7
+     "delta": -2.34,
+     "lo": -4.19,
+     "hi": -0.76
     },
     "p081": [
      true,
@@ -10029,8 +10051,8 @@
     "name": "Qwen3.5-9B 4-bit (Mac)",
     "pages": 95,
     "answered": 94,
-    "nes_answered": 92.91,
-    "strict": 91.93,
+    "nes_answered": 92.93,
+    "strict": 91.95,
     "transport": 0,
     "model": 1,
     "cap": 0,
@@ -10038,9 +10060,9 @@
     "empty": 1,
     "vs_baseline": {
      "n": 93,
-     "delta": -2.36,
-     "lo": -4.29,
-     "hi": -0.84
+     "delta": -2.42,
+     "lo": -4.34,
+     "hi": -0.9
     },
     "p081": [
      true,
@@ -10053,8 +10075,8 @@
     "name": "Qwen3.5 35B-A3B",
     "pages": 95,
     "answered": 93,
-    "nes_answered": 92.79,
-    "strict": 90.84,
+    "nes_answered": 92.82,
+    "strict": 90.86,
     "transport": 0,
     "model": 2,
     "cap": 2,
@@ -10062,9 +10084,9 @@
     "empty": 0,
     "vs_baseline": {
      "n": 92,
-     "delta": -2.52,
-     "lo": -4.85,
-     "hi": -0.77
+     "delta": -2.57,
+     "lo": -4.92,
+     "hi": -0.8
     },
     "p081": [
      true,
@@ -10077,8 +10099,8 @@
     "name": "Gemma 4 26B-A4B",
     "pages": 95,
     "answered": 86,
-    "nes_answered": 92.35,
-    "strict": 83.6,
+    "nes_answered": 92.38,
+    "strict": 83.62,
     "transport": 1,
     "model": 8,
     "cap": 8,
@@ -10086,9 +10108,9 @@
     "empty": 0,
     "vs_baseline": {
      "n": 85,
-     "delta": -4.1,
-     "lo": -5.62,
-     "hi": -2.77
+     "delta": -4.15,
+     "lo": -5.69,
+     "hi": -2.8
     },
     "p081": [
      false,
@@ -10110,9 +10132,9 @@
     "empty": 0,
     "vs_baseline": {
      "n": 93,
-     "delta": -3.2,
-     "lo": -4.8,
-     "hi": -1.76
+     "delta": -3.28,
+     "lo": -4.88,
+     "hi": -1.82
     },
     "p081": [
      true,
@@ -10134,9 +10156,9 @@
     "empty": 0,
     "vs_baseline": {
      "n": 93,
-     "delta": -3.89,
-     "lo": -5.64,
-     "hi": -2.43
+     "delta": -3.96,
+     "lo": -5.73,
+     "hi": -2.51
     },
     "p081": [
      true,
@@ -10149,8 +10171,8 @@
     "name": "Qwen3-VL 30B-A3B",
     "pages": 95,
     "answered": 93,
-    "nes_answered": 91.77,
-    "strict": 89.84,
+    "nes_answered": 91.79,
+    "strict": 89.86,
     "transport": 0,
     "model": 2,
     "cap": 2,
@@ -10158,9 +10180,9 @@
     "empty": 0,
     "vs_baseline": {
      "n": 92,
-     "delta": -3.52,
-     "lo": -5.07,
-     "hi": -2.09
+     "delta": -3.57,
+     "lo": -5.15,
+     "hi": -2.12
     },
     "p081": [
      true,
@@ -10173,8 +10195,8 @@
     "name": "Mistral Small 24B",
     "pages": 95,
     "answered": 93,
-    "nes_answered": 91.44,
-    "strict": 89.51,
+    "nes_answered": 91.45,
+    "strict": 89.53,
     "transport": 0,
     "model": 2,
     "cap": 2,
@@ -10182,9 +10204,9 @@
     "empty": 0,
     "vs_baseline": {
      "n": 92,
-     "delta": -3.94,
-     "lo": -6.27,
-     "hi": -2.04
+     "delta": -3.99,
+     "lo": -6.32,
+     "hi": -2.09
     },
     "p081": [
      true,
@@ -10206,9 +10228,9 @@
     "empty": 0,
     "vs_baseline": {
      "n": 92,
-     "delta": -4.17,
-     "lo": -6.14,
-     "hi": -2.36
+     "delta": -4.25,
+     "lo": -6.21,
+     "hi": -2.42
     },
     "p081": [
      true,
@@ -10221,8 +10243,8 @@
     "name": "Mistral Medium 3.5",
     "pages": 95,
     "answered": 95,
-    "nes_answered": 90.93,
-    "strict": 90.93,
+    "nes_answered": 90.94,
+    "strict": 90.94,
     "transport": 0,
     "model": 0,
     "cap": 0,
@@ -10230,9 +10252,9 @@
     "empty": 0,
     "vs_baseline": {
      "n": 94,
-     "delta": -4.3,
-     "lo": -6.51,
-     "hi": -2.44
+     "delta": -4.37,
+     "lo": -6.6,
+     "hi": -2.5
     },
     "p081": [
      true,
@@ -10254,9 +10276,9 @@
     "empty": 0,
     "vs_baseline": {
      "n": 93,
-     "delta": -4.52,
-     "lo": -7.13,
-     "hi": -2.36
+     "delta": -4.6,
+     "lo": -7.19,
+     "hi": -2.44
     },
     "p081": [
      true,
@@ -10269,8 +10291,8 @@
     "name": "PaddleOCR-VL 1.6 bf16 (Mac)",
     "pages": 95,
     "answered": 93,
-    "nes_answered": 90.81,
-    "strict": 88.9,
+    "nes_answered": 90.84,
+    "strict": 88.93,
     "transport": 0,
     "model": 2,
     "cap": 2,
@@ -10278,9 +10300,9 @@
     "empty": 0,
     "vs_baseline": {
      "n": 93,
-     "delta": -4.61,
-     "lo": -7.22,
-     "hi": -2.43
+     "delta": -4.65,
+     "lo": -7.26,
+     "hi": -2.47
     },
     "p081": [
      true,
@@ -10302,9 +10324,9 @@
     "empty": 0,
     "vs_baseline": {
      "n": 94,
-     "delta": -5.45,
-     "lo": -8.69,
-     "hi": -2.61
+     "delta": -5.52,
+     "lo": -8.76,
+     "hi": -2.68
     },
     "p081": [
      true,
@@ -10317,8 +10339,8 @@
     "name": "LightOnOCR-3-4B 8-bit (Mac)",
     "pages": 95,
     "answered": 95,
-    "nes_answered": 89.11,
-    "strict": 89.11,
+    "nes_answered": 89.15,
+    "strict": 89.15,
     "transport": 0,
     "model": 0,
     "cap": 0,
@@ -10326,9 +10348,9 @@
     "empty": 0,
     "vs_baseline": {
      "n": 94,
-     "delta": -5.72,
-     "lo": -9.07,
-     "hi": -2.76
+     "delta": -5.75,
+     "lo": -9.12,
+     "hi": -2.8
     },
     "p081": [
      true,
@@ -10341,8 +10363,8 @@
     "name": "Xiaomi-OCR-0 bf16 (Mac)",
     "pages": 95,
     "answered": 95,
-    "nes_answered": 88.79,
-    "strict": 88.79,
+    "nes_answered": 88.82,
+    "strict": 88.82,
     "transport": 0,
     "model": 0,
     "cap": 0,
@@ -10350,9 +10372,9 @@
     "empty": 0,
     "vs_baseline": {
      "n": 94,
-     "delta": -6.09,
-     "lo": -8.93,
-     "hi": -3.64
+     "delta": -6.13,
+     "lo": -8.97,
+     "hi": -3.67
     },
     "p081": [
      true,
@@ -10374,9 +10396,9 @@
     "empty": 0,
     "vs_baseline": {
      "n": 94,
-     "delta": -6.1,
-     "lo": -8.96,
-     "hi": -3.63
+     "delta": -6.17,
+     "lo": -9.03,
+     "hi": -3.69
     },
     "p081": [
      true,
@@ -10398,9 +10420,9 @@
     "empty": 0,
     "vs_baseline": {
      "n": 94,
-     "delta": -6.79,
-     "lo": -10.01,
-     "hi": -3.93
+     "delta": -6.86,
+     "lo": -10.1,
+     "hi": -3.99
     },
     "p081": [
      true,
@@ -10413,8 +10435,8 @@
     "name": "Apple Vision",
     "pages": 95,
     "answered": 95,
-    "nes_answered": 81.78,
-    "strict": 81.78,
+    "nes_answered": 81.82,
+    "strict": 81.82,
     "transport": 0,
     "model": 0,
     "cap": 0,
@@ -10422,9 +10444,9 @@
     "empty": 0,
     "vs_baseline": {
      "n": 94,
-     "delta": -13.19,
-     "lo": -17.7,
-     "hi": -9.05
+     "delta": -13.23,
+     "lo": -17.76,
+     "hi": -9.07
     },
     "p081": [
      true,
@@ -10446,15 +10468,39 @@
     "empty": 0,
     "vs_baseline": {
      "n": 94,
-     "delta": -17.92,
-     "lo": -22.8,
-     "hi": -13.29
+     "delta": -17.99,
+     "lo": -22.88,
+     "hi": -13.35
     },
     "p081": [
      true,
      46.41
     ],
     "public_pages": 895
+   },
+   {
+    "id": "granite-docling-258m-mlx",
+    "name": "granite-docling-258M bf16 (Mac)",
+    "pages": 95,
+    "answered": 37,
+    "nes_answered": 75.78,
+    "strict": 29.51,
+    "transport": 49,
+    "model": 9,
+    "cap": 9,
+    "refusal": 0,
+    "empty": 0,
+    "vs_baseline": {
+     "n": 36,
+     "delta": -18.77,
+     "lo": -28.43,
+     "hi": -10.28
+    },
+    "p081": [
+     false,
+     0.0
+    ],
+    "public_pages": 0
    }
   ]
  },
@@ -36048,17 +36094,17 @@
     "family": "gateway",
     "n": 96,
     "ok": 96,
-    "nes": 0.9673782327986609,
-    "nes_answered": 0.9673782327986609,
-    "added_rate": 0.009599680010666311,
-    "rewritten_rate": 0.0020999300023332554,
-    "cmer": 0.02577974640441624,
-    "nb_overall": 0.9697367766037376,
-    "nb_bowF1": 0.9826131840973878,
-    "nb_gap": 0.012876407493650266,
+    "nes": 0.9672819739931268,
+    "nes_answered": 0.9672819739931268,
+    "added_rate": 0.009634617949059874,
+    "rewritten_rate": 0.002366982264301907,
+    "cmer": 0.0261250077817005,
+    "nb_overall": 0.9692365676458594,
+    "nb_bowF1": 0.981964067561714,
+    "nb_gap": 0.012727499915854534,
     "suspect_rate": 0.07637160211092303,
-    "suspect_precision": 0.05780095610604085,
-    "suspect_recall": 0.5659574468085107,
+    "suspect_precision": 0.06040851803563668,
+    "suspect_recall": 0.5767634854771784,
     "order_edit": null,
     "order_pages": 0,
     "markup_pages": 4,
@@ -36069,17 +36115,17 @@
     "family": "plan route",
     "n": 96,
     "ok": 96,
-    "nes": 0.9646831955042338,
-    "nes_answered": 0.9646831955042338,
-    "added_rate": 0.010766307789740342,
-    "rewritten_rate": 0.00286657111429619,
-    "cmer": 0.027136770591251396,
-    "nb_overall": 0.9680697114771243,
-    "nb_bowF1": 0.9847927849993634,
-    "nb_gap": 0.016723073522239118,
+    "nes": 0.9647236008832136,
+    "nes_answered": 0.9647236008832136,
+    "added_rate": 0.010801440192025603,
+    "rewritten_rate": 0.0030670756100813442,
+    "cmer": 0.027235360897630973,
+    "nb_overall": 0.9678293765786828,
+    "nb_bowF1": 0.9843562599836626,
+    "nb_gap": 0.016526883404979764,
     "suspect_rate": 0.07603097065762802,
-    "suspect_precision": 0.05944055944055944,
-    "suspect_recall": 0.5714285714285714,
+    "suspect_precision": 0.06118881118881119,
+    "suspect_recall": 0.5785123966942148,
     "order_edit": null,
     "order_pages": 0,
     "markup_pages": 4,
@@ -36090,17 +36136,17 @@
     "family": "FarmShare panel",
     "n": 96,
     "ok": 96,
-    "nes": 0.9533249119220031,
-    "nes_answered": 0.9533249119220031,
-    "added_rate": 0.014399520015999466,
-    "rewritten_rate": 0.011032965567814405,
-    "cmer": 0.03695577212340532,
-    "nb_overall": 0.9524635696507123,
-    "nb_bowF1": 0.9712988925923959,
-    "nb_gap": 0.018835322941683552,
+    "nes": 0.9535488385824094,
+    "nes_answered": 0.9535488385824094,
+    "added_rate": 0.014335244699293238,
+    "rewritten_rate": 0.01103480464061875,
+    "cmer": 0.03683271110271945,
+    "nb_overall": 0.9525493209023893,
+    "nb_bowF1": 0.9714522695015885,
+    "nb_gap": 0.018902948599199165,
     "suspect_rate": 0.08026073875981948,
-    "suspect_precision": 0.15201999167013744,
-    "suspect_recall": 0.7620041753653445,
+    "suspect_precision": 0.15160349854227406,
+    "suspect_recall": 0.7615062761506276,
     "order_edit": null,
     "order_pages": 0,
     "markup_pages": 3,
@@ -36111,17 +36157,17 @@
     "family": "cloud panel",
     "n": 96,
     "ok": 94,
-    "nes": 0.9484481381959332,
-    "nes_answered": 0.9686278858171232,
-    "added_rate": 0.008794442733463368,
-    "rewritten_rate": 0.0017452006980802793,
-    "cmer": 0.022881031305895534,
-    "nb_overall": 0.9532092863026752,
-    "nb_bowF1": 0.96672633822797,
-    "nb_gap": 0.013517051925294843,
+    "nes": 0.9482310454118473,
+    "nes_answered": 0.9684061740376313,
+    "added_rate": 0.009001300568142925,
+    "rewritten_rate": 0.00188240125949757,
+    "cmer": 0.023352371768496548,
+    "nb_overall": 0.9525791813571105,
+    "nb_bowF1": 0.966315187515112,
+    "nb_gap": 0.013736006158001524,
     "suspect_rate": 0.07511145900690876,
-    "suspect_precision": 0.054825555052106935,
-    "suspect_recall": 0.510548523206751,
+    "suspect_precision": 0.05663797009515179,
+    "suspect_recall": 0.5186721991701245,
     "order_edit": null,
     "order_pages": 0,
     "markup_pages": 3,
@@ -36132,17 +36178,17 @@
     "family": "cloud panel",
     "n": 96,
     "ok": 94,
-    "nes": 0.9446719002077825,
-    "nes_answered": 0.9647713023398629,
-    "added_rate": 0.011463573212880265,
-    "rewritten_rate": 0.002087396913390138,
-    "cmer": 0.02501836731012102,
-    "nb_overall": 0.9467463006755553,
-    "nb_bowF1": 0.9665748570989104,
-    "nb_gap": 0.019828556423355126,
+    "nes": 0.9443321075975973,
+    "nes_answered": 0.964424280099674,
+    "added_rate": 0.011670887808884934,
+    "rewritten_rate": 0.002156205079060853,
+    "cmer": 0.025654402934828676,
+    "nb_overall": 0.9460093001223823,
+    "nb_bowF1": 0.9660951969850388,
+    "nb_gap": 0.020085896862656494,
     "suspect_rate": 0.07720263569051015,
-    "suspect_precision": 0.06951165860096789,
-    "suspect_recall": 0.632,
+    "suspect_precision": 0.07171139463264409,
+    "suspect_recall": 0.6392156862745098,
     "order_edit": null,
     "order_pages": 0,
     "markup_pages": 3,
@@ -36153,17 +36199,17 @@
     "family": "local panel",
     "n": 96,
     "ok": 95,
-    "nes": 0.942796774399511,
-    "nes_answered": 0.9527209509721374,
-    "added_rate": 0.01872195056601246,
-    "rewritten_rate": 0.014267532989483555,
-    "cmer": 0.038349851211148006,
-    "nb_overall": 0.9416490482702992,
-    "nb_bowF1": 0.9596095362100568,
-    "nb_gap": 0.017960487939757686,
+    "nes": 0.9434944038069274,
+    "nes_answered": 0.9534259238470003,
+    "added_rate": 0.018758583726928617,
+    "rewritten_rate": 0.014169430208019295,
+    "cmer": 0.037739290305304866,
+    "nb_overall": 0.9423251622336262,
+    "nb_bowF1": 0.9603889001636706,
+    "nb_gap": 0.018063737930044454,
     "suspect_rate": 0.08053263567451532,
-    "suspect_precision": 0.17201166180758018,
-    "suspect_recall": 0.7170138888888888,
+    "suspect_precision": 0.16951270304039984,
+    "suspect_recall": 0.7140350877192982,
     "order_edit": null,
     "order_pages": 0,
     "markup_pages": 2,
@@ -36174,14 +36220,14 @@
     "family": "cloud panel",
     "n": 96,
     "ok": 96,
-    "nes": 0.9397979412783992,
-    "nes_answered": 0.9397979412783992,
-    "added_rate": 0.02346588447051765,
-    "rewritten_rate": 0.008499716676110797,
-    "cmer": 0.05020945070833727,
-    "nb_overall": 0.9208087790169253,
-    "nb_bowF1": 0.9647516481129134,
-    "nb_gap": 0.0439428690959881,
+    "nes": 0.9402366739893465,
+    "nes_answered": 0.9402366739893465,
+    "added_rate": 0.023503133751166822,
+    "rewritten_rate": 0.008501133484464594,
+    "cmer": 0.049988161833345555,
+    "nb_overall": 0.9210109299942715,
+    "nb_bowF1": 0.9647936974182012,
+    "nb_gap": 0.043782767423929725,
     "suspect_rate": 0.08151903767770156,
     "suspect_precision": 0.17764227642276423,
     "suspect_recall": 0.7508591065292096,
@@ -36195,14 +36241,14 @@
     "family": "cloud panel",
     "n": 96,
     "ok": 96,
-    "nes": 0.9394802009800616,
-    "nes_answered": 0.9394802009800616,
-    "added_rate": 0.022032598913369554,
-    "rewritten_rate": 0.009666344455184828,
-    "cmer": 0.04819986088179462,
-    "nb_overall": 0.9292073996736736,
-    "nb_bowF1": 0.9693213618407689,
-    "nb_gap": 0.040113962167095285,
+    "nes": 0.939834145985913,
+    "nes_answered": 0.939834145985913,
+    "added_rate": 0.021936258167755702,
+    "rewritten_rate": 0.00986798239765302,
+    "cmer": 0.048024314063740824,
+    "nb_overall": 0.9293087838937312,
+    "nb_bowF1": 0.9693141424127565,
+    "nb_gap": 0.040005358519025314,
     "suspect_rate": 0.07993469278955084,
     "suspect_precision": 0.1567319716548562,
     "suspect_recall": 0.7445544554455445,
@@ -36216,17 +36262,17 @@
     "family": "FarmShare panel",
     "n": 96,
     "ok": 96,
-    "nes": 0.9373379391551242,
-    "nes_answered": 0.9373379391551242,
-    "added_rate": 0.029165694476850773,
-    "rewritten_rate": 0.00826639112029599,
-    "cmer": 0.053805014789915895,
-    "nb_overall": 0.921322176248809,
-    "nb_bowF1": 0.9658451148529038,
-    "nb_gap": 0.04452293860409484,
+    "nes": 0.9375108605709395,
+    "nes_answered": 0.9375108605709395,
+    "added_rate": 0.02907054273903187,
+    "rewritten_rate": 0.008501133484464594,
+    "cmer": 0.05367544536698732,
+    "nb_overall": 0.9213612209665198,
+    "nb_bowF1": 0.9658739480936466,
+    "nb_gap": 0.04451272712712673,
     "suspect_rate": 0.07964222060862103,
-    "suspect_precision": 0.17820140903439702,
-    "suspect_recall": 0.7131011608623549,
+    "suspect_precision": 0.17861583091587235,
+    "suspect_recall": 0.7135761589403974,
     "order_edit": null,
     "order_pages": 0,
     "markup_pages": 3,
@@ -36237,80 +36283,80 @@
     "family": "cloud panel",
     "n": 96,
     "ok": 95,
-    "nes": 0.9354847551150872,
-    "nes_answered": 0.9453319630636671,
-    "added_rate": 0.012281705306369663,
-    "rewritten_rate": 0.010431037383492043,
-    "cmer": 0.044716003568011684,
-    "nb_overall": 0.9405424608074849,
-    "nb_bowF1": 0.9551150351777106,
-    "nb_gap": 0.014572574370225633,
+    "nes": 0.9348176444194843,
+    "nes_answered": 0.9446578301502158,
+    "added_rate": 0.012653967826613717,
+    "rewritten_rate": 0.01026452177424783,
+    "cmer": 0.04525516410124273,
+    "nb_overall": 0.939939732607112,
+    "nb_bowF1": 0.9548600847068571,
+    "nb_gap": 0.014920352099745071,
     "suspect_rate": 0.07386575407447565,
-    "suspect_precision": 0.16788990825688074,
-    "suspect_recall": 0.8394495412844036,
+    "suspect_precision": 0.1688073394495413,
+    "suspect_recall": 0.8401826484018264,
     "order_edit": null,
     "order_pages": 0,
     "markup_pages": 3,
     "markup_mean_lift": -1.240733912065417e-05
    },
    {
-    "route": "gemini3.5-flash",
-    "family": "cloud panel",
-    "n": 96,
-    "ok": 94,
-    "nes": 0.9348209456139865,
-    "nes_answered": 0.9547107529674757,
-    "added_rate": 0.023816856585566162,
-    "rewritten_rate": 0.007733634466002806,
-    "cmer": 0.03876160310098002,
-    "nb_overall": 0.8950490540787138,
-    "nb_bowF1": 0.9496974008989284,
-    "nb_gap": 0.05464834682021458,
-    "suspect_rate": 0.08475147430497051,
-    "suspect_precision": 0.18170974155069583,
-    "suspect_recall": 0.7553719008264462,
-    "order_edit": null,
-    "order_pages": 0,
-    "markup_pages": 5,
-    "markup_mean_lift": 0.000301995036962525
-   },
-   {
     "route": "qwen3.8-27b",
     "family": "Sherlock panel",
     "n": 96,
     "ok": 96,
-    "nes": 0.9343743493503768,
-    "nes_answered": 0.9343743493503768,
-    "added_rate": 0.018466051131628945,
-    "rewritten_rate": 0.014432852238258725,
-    "cmer": 0.04849698619947304,
-    "nb_overall": 0.9419793904446726,
-    "nb_bowF1": 0.9649100175381888,
-    "nb_gap": 0.02293062709351623,
+    "nes": 0.934643132965627,
+    "nes_answered": 0.934643132965627,
+    "added_rate": 0.018469129217228965,
+    "rewritten_rate": 0.014468595812775037,
+    "cmer": 0.04838063364053597,
+    "nb_overall": 0.9420582009235022,
+    "nb_bowF1": 0.9649245236126452,
+    "nb_gap": 0.022866322689143015,
     "suspect_rate": 0.08040133779264214,
-    "suspect_precision": 0.17387687188019968,
-    "suspect_recall": 0.7901701323251418,
+    "suspect_precision": 0.17346089850249585,
+    "suspect_recall": 0.7897727272727273,
     "order_edit": null,
     "order_pages": 0,
     "markup_pages": 2,
     "markup_mean_lift": -5.705608951469867e-05
    },
    {
+    "route": "gemini3.5-flash",
+    "family": "cloud panel",
+    "n": 96,
+    "ok": 94,
+    "nes": 0.9344866007875127,
+    "nes_answered": 0.9543692944212895,
+    "added_rate": 0.023820932302005614,
+    "rewritten_rate": 0.007974536244780615,
+    "cmer": 0.03881695119135569,
+    "nb_overall": 0.8948545125194277,
+    "nb_bowF1": 0.9492128187705378,
+    "nb_gap": 0.054358306251110045,
+    "suspect_rate": 0.08475147430497051,
+    "suspect_precision": 0.18369781312127237,
+    "suspect_recall": 0.7573770491803279,
+    "order_edit": null,
+    "order_pages": 0,
+    "markup_pages": 5,
+    "markup_mean_lift": 0.000301995036962525
+   },
+   {
     "route": "mistral-large4",
     "family": "cloud panel",
     "n": 96,
     "ok": 96,
-    "nes": 0.9314699213586435,
-    "nes_answered": 0.9314699213586435,
-    "added_rate": 0.029432352254924837,
-    "rewritten_rate": 0.022365921135962134,
-    "cmer": 0.05602682189203841,
-    "nb_overall": 0.9213062137655705,
-    "nb_bowF1": 0.9620672285671357,
-    "nb_gap": 0.04076101480156513,
+    "nes": 0.9317495057992518,
+    "nes_answered": 0.9317495057992518,
+    "added_rate": 0.029437258301106814,
+    "rewritten_rate": 0.02250300040005334,
+    "cmer": 0.05592687724399814,
+    "nb_overall": 0.9213933796808365,
+    "nb_bowF1": 0.9621727017625937,
+    "nb_gap": 0.040779322081757274,
     "suspect_rate": 0.0859115655291462,
-    "suspect_precision": 0.21058732612055642,
-    "suspect_recall": 0.7933042212518195,
+    "suspect_precision": 0.2098145285935085,
+    "suspect_recall": 0.7927007299270074,
     "order_edit": null,
     "order_pages": 0,
     "markup_pages": 3,
@@ -36321,14 +36367,14 @@
     "family": "cloud panel",
     "n": 96,
     "ok": 94,
-    "nes": 0.9312540405929609,
-    "nes_answered": 0.9510679563502579,
-    "added_rate": 0.016733394928652088,
-    "rewritten_rate": 0.006946583170790131,
-    "cmer": 0.039299782101416186,
-    "nb_overall": 0.9277020138391937,
-    "nb_bowF1": 0.9513367395521821,
-    "nb_gap": 0.023634725712988414,
+    "nes": 0.9312201500590486,
+    "nes_answered": 0.951033344741156,
+    "added_rate": 0.016838934903141898,
+    "rewritten_rate": 0.006981997398863714,
+    "cmer": 0.03955714676588564,
+    "nb_overall": 0.9274117004669686,
+    "nb_bowF1": 0.9514122073619422,
+    "nb_gap": 0.024000506894973572,
     "suspect_rate": 0.07668429131843767,
     "suspect_precision": 0.12677935943060498,
     "suspect_recall": 0.6551724137931034,
@@ -36342,17 +36388,17 @@
     "family": "local panel",
     "n": 96,
     "ok": 96,
-    "nes": 0.9302353329044187,
-    "nes_answered": 0.9302353329044187,
-    "added_rate": 0.03579880670644312,
-    "rewritten_rate": 0.010532982233925535,
-    "cmer": 0.059793666612255124,
-    "nb_overall": 0.9036166873223175,
-    "nb_bowF1": 0.9581674057840702,
-    "nb_gap": 0.054550718461752745,
+    "nes": 0.9302466063302752,
+    "nes_answered": 0.9302466063302752,
+    "added_rate": 0.0358381117482331,
+    "rewritten_rate": 0.010568075743432458,
+    "cmer": 0.0598612217529031,
+    "nb_overall": 0.9034787308289696,
+    "nb_bowF1": 0.9583762588732453,
+    "nb_gap": 0.05489752804427572,
     "suspect_rate": 0.08356263102725367,
-    "suspect_precision": 0.2163857310858487,
-    "suspect_recall": 0.6943396226415094,
+    "suspect_precision": 0.21560172481379852,
+    "suspect_recall": 0.6935687263556116,
     "order_edit": null,
     "order_pages": 0,
     "markup_pages": 3,
@@ -36363,38 +36409,38 @@
     "family": "cloud native",
     "n": 96,
     "ok": 96,
-    "nes": 0.9291309134230006,
-    "nes_answered": 0.9291309134230006,
-    "added_rate": 0.02599913336222126,
-    "rewritten_rate": 0.018266057798073398,
-    "cmer": 0.05389552448555921,
-    "nb_overall": 0.9255834036311489,
-    "nb_bowF1": 0.9506608986377896,
-    "nb_gap": 0.025077495006640693,
+    "nes": 0.9292169332879784,
+    "nes_answered": 0.9292169332879784,
+    "added_rate": 0.026036804907320975,
+    "rewritten_rate": 0.018369115882117617,
+    "cmer": 0.05391908930337724,
+    "nb_overall": 0.9255882126544224,
+    "nb_bowF1": 0.9508320181561122,
+    "nb_gap": 0.02524380550168981,
     "suspect_rate": 0.08307507747675698,
-    "suspect_precision": 0.23545928600080224,
-    "suspect_recall": 0.6647791619479049,
+    "suspect_precision": 0.2350581628559968,
+    "suspect_recall": 0.6643990929705216,
     "order_edit": null,
     "order_pages": 0,
     "markup_pages": 52,
-    "markup_mean_lift": 0.0032845630695006226
+    "markup_mean_lift": 0.0032851103242954502
    },
    {
     "route": "qwen3-vl-8b",
     "family": "FarmShare panel",
     "n": 96,
     "ok": 95,
-    "nes": 0.9252100781518235,
-    "nes_answered": 0.9349491316060533,
-    "added_rate": 0.02207542718479323,
-    "rewritten_rate": 0.009740150315122511,
-    "cmer": 0.0497751317363811,
-    "nb_overall": 0.9160945747932949,
-    "nb_bowF1": 0.9541601244293946,
-    "nb_gap": 0.03806554963609965,
+    "nes": 0.9254083092553774,
+    "nes_answered": 0.9351494493528025,
+    "added_rate": 0.02211285646868469,
+    "rewritten_rate": 0.009775500573046585,
+    "cmer": 0.04979329590566679,
+    "nb_overall": 0.9160831581518758,
+    "nb_bowF1": 0.9543012013759772,
+    "nb_gap": 0.03821804322410138,
     "suspect_rate": 0.07761714688223258,
-    "suspect_precision": 0.18668971477960242,
-    "suspect_recall": 0.7346938775510204,
+    "suspect_precision": 0.18625756266205704,
+    "suspect_recall": 0.7342419080068143,
     "order_edit": null,
     "order_pages": 0,
     "markup_pages": 4,
@@ -36405,14 +36451,14 @@
     "family": "cloud panel",
     "n": 96,
     "ok": 95,
-    "nes": 0.9213092274756786,
-    "nes_answered": 0.9310072193438436,
-    "added_rate": 0.01887681281335173,
-    "rewritten_rate": 0.014973585921464383,
-    "cmer": 0.056689334230136765,
-    "nb_overall": 0.9256412085900851,
-    "nb_bowF1": 0.9445111490666908,
-    "nb_gap": 0.018869940476605618,
+    "nes": 0.9209071296171795,
+    "nes_answered": 0.9306008888763077,
+    "added_rate": 0.018947297570168945,
+    "rewritten_rate": 0.015043413878979606,
+    "cmer": 0.056919593468453746,
+    "nb_overall": 0.9253502333043699,
+    "nb_bowF1": 0.9445308012372039,
+    "nb_gap": 0.01918056793283396,
     "suspect_rate": 0.07684977196923286,
     "suspect_precision": 0.2382639503985828,
     "suspect_recall": 0.8705501618122977,
@@ -36426,14 +36472,14 @@
     "family": "Mac local",
     "n": 96,
     "ok": 95,
-    "nes": 0.919119476028511,
-    "nes_answered": 0.9287944178814426,
-    "added_rate": 0.025975769372755645,
-    "rewritten_rate": 0.009497600429573446,
-    "cmer": 0.05506829760379797,
-    "nb_overall": 0.9069187976863043,
-    "nb_bowF1": 0.9514480567698973,
-    "nb_gap": 0.044529259083592954,
+    "nes": 0.9192872933223158,
+    "nes_answered": 0.928964001673077,
+    "added_rate": 0.026215091299677765,
+    "rewritten_rate": 0.009062835660580021,
+    "cmer": 0.055066150852881836,
+    "nb_overall": 0.9069077690590891,
+    "nb_bowF1": 0.951358468308909,
+    "nb_gap": 0.044450699249819925,
     "suspect_rate": 0.08283177601170486,
     "suspect_precision": 0.18546768366118024,
     "suspect_recall": 0.7561374795417348,
@@ -36447,14 +36493,14 @@
     "family": "Mac local",
     "n": 96,
     "ok": 95,
-    "nes": 0.919119476028511,
-    "nes_answered": 0.9287944178814426,
-    "added_rate": 0.025975769372755645,
-    "rewritten_rate": 0.009497600429573446,
-    "cmer": 0.05506829760379797,
-    "nb_overall": 0.9069187976863043,
-    "nb_bowF1": 0.9514480567698973,
-    "nb_gap": 0.044529259083592954,
+    "nes": 0.9192872933223158,
+    "nes_answered": 0.928964001673077,
+    "added_rate": 0.026215091299677765,
+    "rewritten_rate": 0.009062835660580021,
+    "cmer": 0.055066150852881836,
+    "nb_overall": 0.9069077690590891,
+    "nb_bowF1": 0.951358468308909,
+    "nb_gap": 0.044450699249819925,
     "suspect_rate": 0.08283177601170486,
     "suspect_precision": 0.18546768366118024,
     "suspect_recall": 0.7561374795417348,
@@ -36468,14 +36514,14 @@
     "family": "cloud panel",
     "n": 96,
     "ok": 93,
-    "nes": 0.9187640821938513,
-    "nes_answered": 0.9484016332323627,
-    "added_rate": 0.015560958666203543,
-    "rewritten_rate": 0.013268496005557484,
-    "cmer": 0.03512585457416233,
-    "nb_overall": 0.929343055168554,
-    "nb_bowF1": 0.9395062162823357,
-    "nb_gap": 0.010163161113781682,
+    "nes": 0.9191303133961308,
+    "nes_answered": 0.9487796783443931,
+    "added_rate": 0.015389960048636443,
+    "rewritten_rate": 0.014000347403161369,
+    "cmer": 0.03493590738177544,
+    "nb_overall": 0.9294597542156318,
+    "nb_bowF1": 0.9395064272158978,
+    "nb_gap": 0.010046673000266071,
     "suspect_rate": 0.07816636477636896,
     "suspect_precision": 0.17335115864527628,
     "suspect_recall": 0.7034358047016275,
@@ -36489,14 +36535,14 @@
     "family": "local panel",
     "n": 96,
     "ok": 94,
-    "nes": 0.9180939607014719,
-    "nes_answered": 0.9376278747589499,
-    "added_rate": 0.020717858591320807,
-    "rewritten_rate": 0.009057726105177775,
-    "cmer": 0.047535079856233196,
-    "nb_overall": 0.9090746289837125,
-    "nb_bowF1": 0.9450801817466741,
-    "nb_gap": 0.03600555276296158,
+    "nes": 0.91833158403541,
+    "nes_answered": 0.9378705539085038,
+    "added_rate": 0.020790372198370575,
+    "rewritten_rate": 0.00909367499408404,
+    "cmer": 0.04749238731819991,
+    "nb_overall": 0.9091086126993215,
+    "nb_bowF1": 0.9452036748680959,
+    "nb_gap": 0.03609506216877434,
     "suspect_rate": 0.07506566983228935,
     "suspect_precision": 0.18663077613279497,
     "suspect_recall": 0.7298245614035088,
@@ -36510,17 +36556,17 @@
     "family": "local panel",
     "n": 96,
     "ok": 93,
-    "nes": 0.9160919865921686,
-    "nes_answered": 0.9456433409983676,
-    "added_rate": 0.02476609796367639,
-    "rewritten_rate": 0.007773802971931755,
-    "cmer": 0.045165280745096965,
-    "nb_overall": 0.8928500769518655,
-    "nb_bowF1": 0.9414134307678356,
-    "nb_gap": 0.0485633538159701,
+    "nes": 0.9158736943213374,
+    "nes_answered": 0.9454180070413806,
+    "added_rate": 0.024873567963670143,
+    "rewritten_rate": 0.007981559844497195,
+    "cmer": 0.045637025221507574,
+    "nb_overall": 0.8923019489172489,
+    "nb_bowF1": 0.9409709650282331,
+    "nb_gap": 0.048669016110984176,
     "suspect_rate": 0.0800258917316799,
-    "suspect_precision": 0.1532567049808429,
-    "suspect_recall": 0.6844106463878327,
+    "suspect_precision": 0.15538527032779906,
+    "suspect_recall": 0.687382297551789,
     "order_edit": null,
     "order_pages": 0,
     "markup_pages": 4,
@@ -36531,17 +36577,17 @@
     "family": "FarmShare panel",
     "n": 96,
     "ok": 95,
-    "nes": 0.9095259922640183,
-    "nes_answered": 0.9190999500773237,
-    "added_rate": 0.028865428304156088,
-    "rewritten_rate": 0.010757717492984098,
-    "cmer": 0.06128802909935766,
-    "nb_overall": 0.9134930855923911,
-    "nb_bowF1": 0.949285112784516,
-    "nb_gap": 0.03579202719212493,
+    "nes": 0.9100685647393912,
+    "nes_answered": 0.9196482338419112,
+    "added_rate": 0.028937080228556154,
+    "rewritten_rate": 0.010625856250208841,
+    "cmer": 0.061017895896093376,
+    "nb_overall": 0.9137417282699946,
+    "nb_bowF1": 0.9495982614034227,
+    "nb_gap": 0.03585653313342818,
     "suspect_rate": 0.08098486108800533,
-    "suspect_precision": 0.19186524239934263,
-    "suspect_recall": 0.731974921630094,
+    "suspect_precision": 0.19022185702547248,
+    "suspect_recall": 0.7302839116719243,
     "order_edit": null,
     "order_pages": 0,
     "markup_pages": 2,
@@ -36552,38 +36598,38 @@
     "family": "FarmShare native",
     "n": 96,
     "ok": 95,
-    "nes": 0.9090344587868464,
-    "nes_answered": 0.9186032425635501,
-    "added_rate": 0.00747419225097198,
-    "rewritten_rate": 0.01920498726370827,
-    "cmer": 0.07005514510780478,
-    "nb_overall": 0.9109843976414516,
-    "nb_bowF1": 0.926649596713288,
-    "nb_gap": 0.01566519907183639,
+    "nes": 0.9093262051242821,
+    "nes_answered": 0.918898059915064,
+    "added_rate": 0.007508967181790754,
+    "rewritten_rate": 0.0192082062284201,
+    "cmer": 0.07008614925649373,
+    "nb_overall": 0.9109156352519612,
+    "nb_bowF1": 0.9265644251339387,
+    "nb_gap": 0.015648789881977487,
     "suspect_rate": 0.0786560292412048,
-    "suspect_precision": 0.22430741733690795,
-    "suspect_recall": 0.8670120898100173,
+    "suspect_precision": 0.22475424486148346,
+    "suspect_recall": 0.8672413793103448,
     "order_edit": null,
     "order_pages": 0,
     "markup_pages": 4,
-    "markup_mean_lift": 0.0001890306308915471
+    "markup_mean_lift": 0.0001871960647297534
    },
    {
     "route": "qwen3.5-35b-a3b",
     "family": "local panel",
     "n": 96,
     "ok": 94,
-    "nes": 0.9082642040840986,
-    "nes_answered": 0.9275889743837603,
-    "added_rate": 0.02910285946605231,
-    "rewritten_rate": 0.010401138365632199,
-    "cmer": 0.06043559411637233,
-    "nb_overall": 0.8848441473885491,
-    "nb_bowF1": 0.9384558271397182,
-    "nb_gap": 0.053611679751169095,
+    "nes": 0.9084750617734682,
+    "nes_answered": 0.9278043184069461,
+    "added_rate": 0.029141675985225848,
+    "rewritten_rate": 0.010402900613330622,
+    "cmer": 0.060316658043692545,
+    "nb_overall": 0.8849591271732192,
+    "nb_bowF1": 0.9386710191331994,
+    "nb_gap": 0.05371189195998016,
     "suspect_rate": 0.08430866226231597,
-    "suspect_precision": 0.21201272871917262,
-    "suspect_recall": 0.7538896746817539,
+    "suspect_precision": 0.21121718377088305,
+    "suspect_recall": 0.7531914893617021,
     "order_edit": null,
     "order_pages": 0,
     "markup_pages": 2,
@@ -36594,17 +36640,17 @@
     "family": "cloud panel",
     "n": 96,
     "ok": 96,
-    "nes": 0.9065267939505001,
-    "nes_answered": 0.9065267939505001,
-    "added_rate": 0.032332255591480286,
-    "rewritten_rate": 0.02479917336088797,
-    "cmer": 0.07772445024313027,
-    "nb_overall": 0.8893578747703771,
-    "nb_bowF1": 0.936859369609631,
-    "nb_gap": 0.04750149483925392,
+    "nes": 0.9065532380338103,
+    "nes_answered": 0.9065532380338103,
+    "added_rate": 0.03260434724629951,
+    "rewritten_rate": 0.024603280437391652,
+    "cmer": 0.07803524643862488,
+    "nb_overall": 0.8890561989783303,
+    "nb_bowF1": 0.9368923337717314,
+    "nb_gap": 0.0478361347934011,
     "suspect_rate": 0.08706717567477061,
-    "suspect_precision": 0.31346153846153846,
-    "suspect_recall": 0.844559585492228,
+    "suspect_precision": 0.3130769230769231,
+    "suspect_recall": 0.8443983402489627,
     "order_edit": null,
     "order_pages": 0,
     "markup_pages": 9,
@@ -36615,17 +36661,17 @@
     "family": "local panel",
     "n": 96,
     "ok": 93,
-    "nes": 0.9054661195081923,
-    "nes_answered": 0.9346747040084566,
-    "added_rate": 0.024326192121630962,
-    "rewritten_rate": 0.02653766413268832,
-    "cmer": 0.055875529920148256,
-    "nb_overall": 0.9086511885380558,
-    "nb_bowF1": 0.9270411314066126,
-    "nb_gap": 0.018389942868556775,
+    "nes": 0.9056946984000432,
+    "nes_answered": 0.9349106564129479,
+    "added_rate": 0.024330395714532573,
+    "rewritten_rate": 0.02671505097632625,
+    "cmer": 0.055838695614484984,
+    "nb_overall": 0.908715227285006,
+    "nb_bowF1": 0.9269487114409118,
+    "nb_gap": 0.018233484155905866,
     "suspect_rate": 0.08802889576883385,
-    "suspect_precision": 0.30246189917936694,
-    "suspect_recall": 0.8431372549019608,
+    "suspect_precision": 0.30324345447440404,
+    "suspect_recall": 0.8434782608695652,
     "order_edit": null,
     "order_pages": 0,
     "markup_pages": 2,
@@ -36636,14 +36682,14 @@
     "family": "local panel",
     "n": 96,
     "ok": 94,
-    "nes": 0.8981875194900936,
-    "nes_answered": 0.9172978922452019,
-    "added_rate": 0.03158832396875428,
-    "rewritten_rate": 0.013464437440043853,
-    "cmer": 0.07013752943498333,
-    "nb_overall": 0.8756032923154927,
-    "nb_bowF1": 0.9318934828598652,
-    "nb_gap": 0.056290190544372454,
+    "nes": 0.8984175443298663,
+    "nes_answered": 0.9175328112305018,
+    "added_rate": 0.031628002604255905,
+    "rewritten_rate": 0.013501010862488436,
+    "cmer": 0.07017839251854072,
+    "nb_overall": 0.8755901093633167,
+    "nb_bowF1": 0.9319146056410847,
+    "nb_gap": 0.05632449627776803,
     "suspect_rate": 0.08418968283773173,
     "suspect_precision": 0.2197891321978913,
     "suspect_recall": 0.7666195190947667,
@@ -36657,17 +36703,17 @@
     "family": "Mac local",
     "n": 96,
     "ok": 92,
-    "nes": 0.8965920855789818,
-    "nes_answered": 0.9355743501693724,
-    "added_rate": 0.023256624825662483,
-    "rewritten_rate": 0.010216178521617852,
-    "cmer": 0.052462977326233805,
-    "nb_overall": 0.883949420624229,
-    "nb_bowF1": 0.9188036850681397,
-    "nb_gap": 0.03485426444391071,
+    "nes": 0.8967281161870281,
+    "nes_answered": 0.9357162951516815,
+    "added_rate": 0.023295553618134263,
+    "rewritten_rate": 0.010252833478639931,
+    "cmer": 0.052498967878558594,
+    "nb_overall": 0.8839118352101442,
+    "nb_bowF1": 0.9189599070265378,
+    "nb_gap": 0.03504807181639369,
     "suspect_rate": 0.0781834557295275,
-    "suspect_precision": 0.19849357554275587,
-    "suspect_recall": 0.7260940032414911,
+    "suspect_precision": 0.19805050952591935,
+    "suspect_recall": 0.7256493506493507,
     "order_edit": null,
     "order_pages": 0,
     "markup_pages": 4,
@@ -36678,17 +36724,17 @@
     "family": "local panel",
     "n": 96,
     "ok": 92,
-    "nes": 0.8943064855405699,
-    "nes_answered": 0.9331893762162469,
-    "added_rate": 0.02963306350961024,
-    "rewritten_rate": 0.020504225653460755,
-    "cmer": 0.052854695775645597,
-    "nb_overall": 0.8817531669184755,
-    "nb_bowF1": 0.9217618825306736,
-    "nb_gap": 0.0400087156121981,
+    "nes": 0.8944410232612677,
+    "nes_answered": 0.9333297634030621,
+    "added_rate": 0.029852343248448533,
+    "rewritten_rate": 0.020329552749839504,
+    "cmer": 0.05302414596384247,
+    "nb_overall": 0.8815427676984228,
+    "nb_bowF1": 0.9218837153985208,
+    "nb_gap": 0.040340947700097995,
     "suspect_rate": 0.0899339347872416,
-    "suspect_precision": 0.2109004739336493,
-    "suspect_recall": 0.8228043143297381,
+    "suspect_precision": 0.21011058451816747,
+    "suspect_recall": 0.8222565687789799,
     "order_edit": null,
     "order_pages": 0,
     "markup_pages": 3,
@@ -36699,35 +36745,35 @@
     "family": "FarmShare native",
     "n": 96,
     "ok": 96,
-    "nes": 0.8937305709655239,
-    "nes_answered": 0.8937305709655239,
-    "added_rate": 0.027399086697110095,
-    "rewritten_rate": 0.027899070030998965,
-    "cmer": 0.07909919519537163,
-    "nb_overall": 0.8850713567923046,
-    "nb_bowF1": 0.9307461767673676,
-    "nb_gap": 0.04567481997506295,
+    "nes": 0.8943395796349791,
+    "nes_answered": 0.8943395796349791,
+    "added_rate": 0.027303640485398052,
+    "rewritten_rate": 0.027837044939325244,
+    "cmer": 0.07853068784238482,
+    "nb_overall": 0.8856797724862732,
+    "nb_bowF1": 0.9313602938360984,
+    "nb_gap": 0.045680521349825254,
     "suspect_rate": 0.09807801965585483,
-    "suspect_precision": 0.36388508891928867,
-    "suspect_recall": 0.907075873827792,
+    "suspect_precision": 0.36183310533515733,
+    "suspect_recall": 0.9065981148243359,
     "order_edit": null,
     "order_pages": 0,
     "markup_pages": 29,
-    "markup_mean_lift": 0.027659656323892737
+    "markup_mean_lift": 0.027658850080342686
    },
    {
     "route": "mistral-small-24b",
     "family": "local panel",
     "n": 96,
     "ok": 94,
-    "nes": 0.8934398468117885,
-    "nes_answered": 0.9124492052545924,
-    "added_rate": 0.030772345379086952,
-    "rewritten_rate": 0.021122245841346966,
-    "cmer": 0.06538638667298022,
-    "nb_overall": 0.8795888525484583,
-    "nb_bowF1": 0.9275737067043903,
-    "nb_gap": 0.04798485415593201,
+    "nes": 0.8935512151050874,
+    "nes_answered": 0.9125629430860467,
+    "added_rate": 0.030734455652643298,
+    "rewritten_rate": 0.021153132485408725,
+    "cmer": 0.06542287190764523,
+    "nb_overall": 0.8795959015362431,
+    "nb_bowF1": 0.9272961362352587,
+    "nb_gap": 0.04770023469901563,
     "suspect_rate": 0.07974791347300289,
     "suspect_precision": 0.2742417770183682,
     "suspect_recall": 0.834850455136541,
@@ -36741,17 +36787,17 @@
     "family": "Mac local",
     "n": 96,
     "ok": 96,
-    "nes": 0.8912934229179478,
-    "nes_answered": 0.8912934229179478,
-    "added_rate": 0.02769907669744342,
-    "rewritten_rate": 0.02733242225259158,
-    "cmer": 0.08101539533180102,
-    "nb_overall": 0.8759980151153812,
-    "nb_bowF1": 0.929119072941647,
-    "nb_gap": 0.05312105782626575,
+    "nes": 0.891689383188356,
+    "nes_answered": 0.891689383188356,
+    "added_rate": 0.02763701826910255,
+    "rewritten_rate": 0.02737031604213895,
+    "cmer": 0.08087492559879994,
+    "nb_overall": 0.8760858769357052,
+    "nb_bowF1": 0.9293378469476083,
+    "nb_gap": 0.05325197001190318,
     "suspect_rate": 0.09686303486263183,
-    "suspect_precision": 0.36095700416088766,
-    "suspect_recall": 0.9091703056768559,
+    "suspect_precision": 0.3602635228848821,
+    "suspect_recall": 0.9090113735783028,
     "order_edit": null,
     "order_pages": 0,
     "markup_pages": 31,
@@ -36762,17 +36808,17 @@
     "family": "Mac local",
     "n": 96,
     "ok": 96,
-    "nes": 0.8912934229179478,
-    "nes_answered": 0.8912934229179478,
-    "added_rate": 0.02769907669744342,
-    "rewritten_rate": 0.02733242225259158,
-    "cmer": 0.08101539533180102,
-    "nb_overall": 0.8759980151153812,
-    "nb_bowF1": 0.929119072941647,
-    "nb_gap": 0.05312105782626575,
+    "nes": 0.891689383188356,
+    "nes_answered": 0.891689383188356,
+    "added_rate": 0.02763701826910255,
+    "rewritten_rate": 0.02737031604213895,
+    "cmer": 0.08087492559879994,
+    "nb_overall": 0.8760858769357052,
+    "nb_bowF1": 0.9293378469476083,
+    "nb_gap": 0.05325197001190318,
     "suspect_rate": 0.09686303486263183,
-    "suspect_precision": 0.36095700416088766,
-    "suspect_recall": 0.9091703056768559,
+    "suspect_precision": 0.3602635228848821,
+    "suspect_recall": 0.9090113735783028,
     "order_edit": null,
     "order_pages": 0,
     "markup_pages": 31,
@@ -36783,14 +36829,14 @@
     "family": "FarmShare churro",
     "n": 96,
     "ok": 94,
-    "nes": 0.8909142877727189,
-    "nes_answered": 0.9098699109168192,
-    "added_rate": 0.02932822285342733,
-    "rewritten_rate": 0.007802607713630608,
-    "cmer": 0.07798595027424784,
-    "nb_overall": 0.8759199750248785,
-    "nb_bowF1": 0.9354167931259928,
-    "nb_gap": 0.05949681810111429,
+    "nes": 0.8911104571071583,
+    "nes_answered": 0.9100702540668851,
+    "added_rate": 0.029264786418400877,
+    "rewritten_rate": 0.007906626506024096,
+    "cmer": 0.0777585828743507,
+    "nb_overall": 0.8761827859775534,
+    "nb_bowF1": 0.9353589316678356,
+    "nb_gap": 0.05917614569028218,
     "suspect_rate": 0.07716481639624252,
     "suspect_precision": 0.1899070385126162,
     "suspect_recall": 0.778584392014519,
@@ -36804,17 +36850,17 @@
     "family": "Sherlock native",
     "n": 96,
     "ok": 94,
-    "nes": 0.8886952162804289,
-    "nes_answered": 0.9076036251374593,
-    "added_rate": 0.028379842861013277,
-    "rewritten_rate": 0.028041181251693307,
-    "cmer": 0.07069507592677901,
-    "nb_overall": 0.8771347628790486,
-    "nb_bowF1": 0.9028839950945944,
-    "nb_gap": 0.025749232215545814,
+    "nes": 0.8889695020374084,
+    "nes_answered": 0.9078837467616087,
+    "added_rate": 0.028384649256511872,
+    "rewritten_rate": 0.028079802188124513,
+    "cmer": 0.07042136857134111,
+    "nb_overall": 0.877333739222617,
+    "nb_bowF1": 0.9030386753011119,
+    "nb_gap": 0.02570493607849489,
     "suspect_rate": 0.08369084099421178,
-    "suspect_precision": 0.36859235150528885,
-    "suspect_recall": 0.8213961922030825,
+    "suspect_precision": 0.3681855166802278,
+    "suspect_recall": 0.8212341197822142,
     "order_edit": null,
     "order_pages": 0,
     "markup_pages": 4,
@@ -36825,17 +36871,17 @@
     "family": "Mac local",
     "n": 96,
     "ok": 94,
-    "nes": 0.8878214712274692,
-    "nes_answered": 0.9067112897642239,
-    "added_rate": 0.02821051205635329,
-    "rewritten_rate": 0.027871850447033324,
-    "cmer": 0.07138423836553325,
-    "nb_overall": 0.8770310854270922,
-    "nb_bowF1": 0.9016325715794888,
-    "nb_gap": 0.024601486152396657,
+    "nes": 0.88813977625194,
+    "nes_answered": 0.9070363672360239,
+    "added_rate": 0.028181417877586965,
+    "rewritten_rate": 0.027910442705687093,
+    "cmer": 0.07107097077269475,
+    "nb_overall": 0.8772548692951316,
+    "nb_bowF1": 0.9017279048394596,
+    "nb_gap": 0.024473035544328003,
     "suspect_rate": 0.08379031983378181,
-    "suspect_precision": 0.3699186991869919,
-    "suspect_recall": 0.8205590622182146,
+    "suspect_precision": 0.3695121951219512,
+    "suspect_recall": 0.8203971119133574,
     "order_edit": null,
     "order_pages": 0,
     "markup_pages": 4,
@@ -36846,17 +36892,17 @@
     "family": "Sherlock native",
     "n": 96,
     "ok": 96,
-    "nes": 0.8867149153627182,
-    "nes_answered": 0.8867149153627182,
-    "added_rate": 0.015132828905703144,
-    "rewritten_rate": 0.020299323355888136,
-    "cmer": 0.09350003157059768,
-    "nb_overall": 0.8692830395132782,
-    "nb_bowF1": 0.922295105532065,
-    "nb_gap": 0.05301206601878672,
+    "nes": 0.8870289867639213,
+    "nes_answered": 0.8870289867639213,
+    "added_rate": 0.015168689158554474,
+    "rewritten_rate": 0.02026936924923323,
+    "cmer": 0.0934011020842729,
+    "nb_overall": 0.8694182732741447,
+    "nb_bowF1": 0.9224065077356186,
+    "nb_gap": 0.05298823446147394,
     "suspect_rate": 0.08366478746584581,
-    "suspect_precision": 0.24844977263331955,
-    "suspect_recall": 0.873546511627907,
+    "suspect_precision": 0.24803637866887143,
+    "suspect_recall": 0.8733624454148472,
     "order_edit": null,
     "order_pages": 0,
     "markup_pages": 45,
@@ -36867,17 +36913,17 @@
     "family": "Mac local",
     "n": 96,
     "ok": 96,
-    "nes": 0.8866463144249108,
-    "nes_answered": 0.8866463144249108,
-    "added_rate": 0.015199493350221659,
-    "rewritten_rate": 0.019999333355554816,
-    "cmer": 0.09347390117709009,
-    "nb_overall": 0.8695151553905115,
-    "nb_bowF1": 0.9226254877041388,
-    "nb_gap": 0.05311033231362727,
+    "nes": 0.8869642253040418,
+    "nes_answered": 0.8869642253040418,
+    "added_rate": 0.015235364715295373,
+    "rewritten_rate": 0.019969329243899187,
+    "cmer": 0.09337165559892342,
+    "nb_overall": 0.8696548695061533,
+    "nb_bowF1": 0.9227375615142278,
+    "nb_gap": 0.05308269200807447,
     "suspect_rate": 0.08330738626535202,
-    "suspect_precision": 0.2462624584717608,
-    "suspect_recall": 0.8695014662756598,
+    "suspect_precision": 0.24584717607973422,
+    "suspect_recall": 0.869309838472834,
     "order_edit": null,
     "order_pages": 0,
     "markup_pages": 45,
@@ -36888,38 +36934,38 @@
     "family": "FarmShare native",
     "n": 96,
     "ok": 96,
-    "nes": 0.8800575540559872,
-    "nes_answered": 0.8800575540559872,
-    "added_rate": 0.0371654278190727,
-    "rewritten_rate": 0.030598980033998868,
-    "cmer": 0.08487721304957614,
-    "nb_overall": 0.8595508716799345,
-    "nb_bowF1": 0.9234835993621044,
-    "nb_gap": 0.06393272768216995,
+    "nes": 0.8803407602331957,
+    "nes_answered": 0.8803407602331957,
+    "added_rate": 0.03727163621816242,
+    "rewritten_rate": 0.030470729430590746,
+    "cmer": 0.0848251309140266,
+    "nb_overall": 0.8595407565805792,
+    "nb_bowF1": 0.9237820945553161,
+    "nb_gap": 0.06424133797473697,
     "suspect_rate": 0.1030982201713909,
-    "suspect_precision": 0.40377237851662406,
-    "suspect_recall": 0.8522267206477733,
+    "suspect_precision": 0.4031329923273657,
+    "suspect_recall": 0.852027027027027,
     "order_edit": null,
     "order_pages": 0,
     "markup_pages": 42,
-    "markup_mean_lift": 0.036249902007158843
+    "markup_mean_lift": 0.03625360088541941
    },
    {
     "route": "paddleocr-vl1.5",
     "family": "FarmShare native",
     "n": 96,
     "ok": 86,
-    "nes": 0.8378339791370518,
-    "nes_answered": 0.9352565348506625,
-    "added_rate": 0.015609613771472337,
-    "rewritten_rate": 0.02213793354972829,
-    "cmer": 0.05235085534319607,
-    "nb_overall": 0.8469741740602634,
-    "nb_bowF1": 0.8523787227676913,
-    "nb_gap": 0.005404548707427903,
+    "nes": 0.8380147683438133,
+    "nes_answered": 0.9354583460582102,
+    "added_rate": 0.015572006856059225,
+    "rewritten_rate": 0.022099850479559462,
+    "cmer": 0.05226620959017686,
+    "nb_overall": 0.847019227743533,
+    "nb_bowF1": 0.8525060684558977,
+    "nb_gap": 0.005486840712364716,
     "suspect_rate": 0.061167747914735865,
-    "suspect_precision": 0.3012121212121212,
-    "suspect_recall": 0.7901430842607313,
+    "suspect_precision": 0.3,
+    "suspect_recall": 0.7894736842105263,
     "order_edit": null,
     "order_pages": 0,
     "markup_pages": 2,
@@ -36930,17 +36976,17 @@
     "family": "local panel",
     "n": 96,
     "ok": 86,
-    "nes": 0.8272775566026578,
-    "nes_answered": 0.9234726213238971,
-    "added_rate": 0.029850151442690896,
-    "rewritten_rate": 0.018970189701897018,
-    "cmer": 0.06264063797190586,
-    "nb_overall": 0.8228391873505809,
-    "nb_bowF1": 0.854762783779535,
-    "nb_gap": 0.03192359642895404,
+    "nes": 0.8275263475168892,
+    "nes_answered": 0.923750341414202,
+    "added_rate": 0.02985610076932276,
+    "rewritten_rate": 0.019053693147845496,
+    "cmer": 0.06250599799000003,
+    "nb_overall": 0.8229210334558933,
+    "nb_bowF1": 0.8547580382453644,
+    "nb_gap": 0.03183700478947116,
     "suspect_rate": 0.07855727308759414,
-    "suspect_precision": 0.30474268415741673,
-    "suspect_recall": 0.7635903919089759,
+    "suspect_precision": 0.30524722502522705,
+    "suspect_recall": 0.7638888888888888,
     "order_edit": null,
     "order_pages": 0,
     "markup_pages": 2,
@@ -36951,17 +36997,17 @@
     "family": "local panel",
     "n": 96,
     "ok": 82,
-    "nes": 0.8179751550202363,
-    "nes_answered": 0.9576294497797888,
-    "added_rate": 0.014024975984630164,
-    "rewritten_rate": 0.010566762728146013,
-    "cmer": 0.031364196429899564,
-    "nb_overall": 0.8256285294656193,
-    "nb_bowF1": 0.83481926640424,
-    "nb_gap": 0.009190736938620714,
+    "nes": 0.818298523273498,
+    "nes_answered": 0.958008027247022,
+    "added_rate": 0.014028210154118145,
+    "rewritten_rate": 0.010646066336138975,
+    "cmer": 0.03111693650057276,
+    "nb_overall": 0.8257828352603759,
+    "nb_bowF1": 0.8350851638492632,
+    "nb_gap": 0.009302328588887354,
     "suspect_rate": 0.07053509381514941,
-    "suspect_precision": 0.15599343185550082,
-    "suspect_recall": 0.7808219178082192,
+    "suspect_precision": 0.15489874110563764,
+    "suspect_recall": 0.7796143250688705,
     "order_edit": null,
     "order_pages": 0,
     "markup_pages": 3,
@@ -36972,14 +37018,14 @@
     "family": "Mac",
     "n": 96,
     "ok": 96,
-    "nes": 0.8133846195252296,
-    "nes_answered": 0.8133846195252296,
-    "added_rate": 0.05219826005799807,
-    "rewritten_rate": 0.0583647211759608,
-    "cmer": 0.16591775657080712,
-    "nb_overall": 0.8080806004000635,
-    "nb_bowF1": 0.8465311540704678,
-    "nb_gap": 0.038450553670404286,
+    "nes": 0.8136946626993543,
+    "nes_answered": 0.8136946626993543,
+    "added_rate": 0.05227363648486465,
+    "rewritten_rate": 0.058307774369915986,
+    "cmer": 0.16582867169523177,
+    "nb_overall": 0.8081853046895956,
+    "nb_bowF1": 0.8465051518307184,
+    "nb_gap": 0.0383198471411228,
     "suspect_rate": 0.07316814534657665,
     "suspect_precision": 0.9903381642512077,
     "suspect_recall": 0.9557109557109557,
@@ -36993,21 +37039,42 @@
     "family": "FarmShare pipeline",
     "n": 96,
     "ok": 96,
-    "nes": 0.7685570484001528,
-    "nes_answered": 0.7685570484001528,
-    "added_rate": 0.10536315456151461,
-    "rewritten_rate": 0.1029965667811073,
-    "cmer": 0.19999584914311305,
-    "nb_overall": 0.7577374599409222,
-    "nb_bowF1": 0.84927738454359,
-    "nb_gap": 0.0915399246026678,
+    "nes": 0.7684717981446701,
+    "nes_answered": 0.7684717981446701,
+    "added_rate": 0.10551406854247233,
+    "rewritten_rate": 0.10304707294305908,
+    "cmer": 0.20012185484643477,
+    "nb_overall": 0.7577224276989851,
+    "nb_bowF1": 0.849159260709908,
+    "nb_gap": 0.09143683301092287,
     "suspect_rate": 0.08580134899168007,
-    "suspect_precision": 0.6300877893056664,
-    "suspect_recall": 0.7759213759213759,
+    "suspect_precision": 0.6304868316041501,
+    "suspect_recall": 0.7760314341846758,
     "order_edit": null,
     "order_pages": 0,
     "markup_pages": 1,
     "markup_mean_lift": 0.0
+   },
+   {
+    "route": "granite-docling-258m-mlx",
+    "family": "Mac local",
+    "n": 96,
+    "ok": 37,
+    "nes": 0.2920659427799807,
+    "nes_answered": 0.7577927164021122,
+    "added_rate": 0.21981826049329295,
+    "rewritten_rate": 0.041886629164863694,
+    "cmer": 0.22676145440978482,
+    "nb_overall": 0.24473552344898097,
+    "nb_bowF1": 0.30075572255107746,
+    "nb_gap": 0.05602019910209649,
+    "suspect_rate": 0.1472341710059618,
+    "suspect_precision": 0.5002562788313686,
+    "suspect_recall": 0.9828801611278952,
+    "order_edit": null,
+    "order_pages": 0,
+    "markup_pages": 12,
+    "markup_mean_lift": 0.00019210939613865594
    }
   ],
   "public895": [
@@ -37730,368 +37797,449 @@
   },
   "truth_bias": {
    "truth": {
-    "words": 30003,
-    "agreed": 29397,
+    "words": 29996,
+    "agreed": 29385,
     "spans": 324,
-    "adjudicated": 606
+    "adjudicated": 611
    },
    "reference": "qwen3.6-27b",
    "sheet": {
     "joins": 265,
-    "blocks": 18,
-    "eligible_pages": 50,
+    "blocks": 17,
+    "eligible_pages": 48,
     "answered_pages": 95,
     "chosen": 20,
-    "items": 59,
-    "minutes": 13.658333333333333,
-    "differences_total": 194,
-    "differences_on_chosen": 62,
+    "items": 66,
+    "minutes": 14.883333333333333,
+    "differences_total": 190,
+    "differences_on_chosen": 69,
     "differences_median_page": 1,
     "mixed_items": 2,
-    "boxed_items": 54
+    "boxed_items": 61
    },
    "routes": [
     {
      "route": "drafter claude-opus5.5",
      "family": "drafter",
      "pages": 96,
-     "agreed_acc": 1.0,
-     "agreed_acc_joined": 1.0,
-     "adjudicated_acc": 0.5016501650165016,
-     "lead_agreed_joined": 0.013637295782350178
+     "agreed_acc": 0.999965969031819,
+     "agreed_acc_joined": 0.999965969031819,
+     "adjudicated_acc": 0.5008183306055647,
+     "lead_agreed_joined": 0.013403542364767818
     },
     {
      "route": "drafter gemini3.8-flash",
      "family": "drafter",
      "pages": 96,
-     "agreed_acc": 1.0,
-     "agreed_acc_joined": 1.0,
-     "adjudicated_acc": 0.6848184818481848,
-     "lead_agreed_joined": 0.013637295782350178
+     "agreed_acc": 0.999965969031819,
+     "agreed_acc_joined": 0.999965969031819,
+     "adjudicated_acc": 0.6677577741407529,
+     "lead_agreed_joined": 0.013403542364767818
     },
     {
      "route": "gemini3.8-flash",
      "family": "drafter family",
      "pages": 94,
-     "agreed_acc": 0.9981864471802742,
-     "agreed_acc_joined": 0.9984305792906218,
-     "adjudicated_acc": 0.7210144927536232,
-     "lead_agreed_joined": 0.012195976729515667
+     "agreed_acc": 0.998220578486445,
+     "agreed_acc_joined": 0.998429922193922,
+     "adjudicated_acc": 0.718132854578097,
+     "lead_agreed_joined": 0.011990743987097652
+    },
+    {
+     "route": "gemini3.7-flash-gw",
+     "family": "drafter family",
+     "pages": 96,
+     "agreed_acc": 0.9973455844818785,
+     "agreed_acc_joined": 0.9975838012591458,
+     "adjudicated_acc": 0.7119476268412439,
+     "lead_agreed_joined": 0.011010052656773572
     },
     {
      "route": "gemini3.1-pro",
      "family": "drafter family",
      "pages": 94,
-     "agreed_acc": 0.9967914065497158,
-     "agreed_acc_joined": 0.9970704146758275,
-     "adjudicated_acc": 0.822463768115942,
-     "lead_agreed_joined": 0.010969369874535562
+     "agreed_acc": 0.9968249537699313,
+     "agreed_acc_joined": 0.9970691880953212,
+     "adjudicated_acc": 0.8186714542190305,
+     "lead_agreed_joined": 0.010763621064441398
     },
     {
      "route": "claude-sonnet5.5",
      "family": "drafter family",
      "pages": 96,
-     "agreed_acc": 0.9937068408340988,
-     "agreed_acc_joined": 0.9959519678878798,
-     "adjudicated_acc": 0.7343234323432343,
-     "lead_agreed_joined": 0.009570032127965034
+     "agreed_acc": 0.9935681470137825,
+     "agreed_acc_joined": 0.9958141909137315,
+     "adjudicated_acc": 0.7299509001636661,
+     "lead_agreed_joined": 0.009232031730834978
     },
     {
      "route": "gemini3.5-flash",
      "family": "drafter family",
      "pages": 94,
-     "agreed_acc": 0.9876538904195584,
-     "agreed_acc_joined": 0.9967565305339519,
-     "adjudicated_acc": 0.730072463768116,
-     "lead_agreed_joined": 0.010689002593397334
+     "agreed_acc": 0.987544049405115,
+     "agreed_acc_joined": 0.9966156100624542,
+     "adjudicated_acc": 0.7235188509874326,
+     "lead_agreed_joined": 0.010342893205245063
     },
     {
      "route": "gemini3.5-flash-lite",
      "family": "drafter family",
      "pages": 94,
-     "agreed_acc": 0.9817598437554493,
-     "agreed_acc_joined": 0.9899208314442158,
-     "adjudicated_acc": 0.7137681159420289,
-     "lead_agreed_joined": 0.0036447746547977333
+     "agreed_acc": 0.9818917693032344,
+     "agreed_acc_joined": 0.9900561738948397,
+     "adjudicated_acc": 0.7163375224416517,
+     "lead_agreed_joined": 0.003576186803169401
     },
     {
      "route": "gemini3.1-flash-lite",
      "family": "drafter family",
      "pages": 93,
-     "agreed_acc": 0.9798436568864585,
-     "agreed_acc_joined": 0.9890279384442808,
-     "adjudicated_acc": 0.7367458866544789,
-     "lead_agreed_joined": 0.002571509088347246
+     "agreed_acc": 0.9799053129931615,
+     "agreed_acc_joined": 0.9890934595826758,
+     "adjudicated_acc": 0.7318840579710145,
+     "lead_agreed_joined": 0.0024316323653792438
     },
     {
      "route": "qwen3.5-9b-mlx4",
      "family": "third family",
      "pages": 95,
-     "agreed_acc": 0.9780784380887139,
-     "agreed_acc_joined": 0.9861277616030142,
-     "adjudicated_acc": 0.6390728476821192,
-     "lead_agreed_joined": -3.44162995594699e-05
+     "agreed_acc": 0.9783092896549361,
+     "agreed_acc_joined": 0.9863276565123531,
+     "adjudicated_acc": 0.6403940886699507,
+     "lead_agreed_joined": -3.443051921225848e-05
+    },
+    {
+     "route": "qwen3.5-9b-mlx4-logprob",
+     "family": "third family",
+     "pages": 95,
+     "agreed_acc": 0.9783092896549361,
+     "agreed_acc_joined": 0.9863276565123531,
+     "adjudicated_acc": 0.6403940886699507,
+     "lead_agreed_joined": -3.443051921225848e-05
     },
     {
      "route": "qwen3.5-397b",
      "family": "third family",
      "pages": 96,
-     "agreed_acc": 0.9759499268632854,
-     "agreed_acc_joined": 0.9841480423172433,
-     "adjudicated_acc": 0.7013201320132013,
-     "lead_agreed_joined": -0.002153257228792116
+     "agreed_acc": 0.9761783222732687,
+     "agreed_acc_joined": 0.9843797856049005,
+     "adjudicated_acc": 0.7004909983633388,
+     "lead_agreed_joined": -0.002119948027080709
     },
     {
      "route": "qwen3-vl-8b",
      "family": "third family",
      "pages": 95,
-     "agreed_acc": 0.9755779205166077,
-     "agreed_acc_joined": 0.9830316353519046,
-     "adjudicated_acc": 0.6428571428571429,
-     "lead_agreed_joined": -0.0031407468765100033
+     "agreed_acc": 0.9758083914642108,
+     "agreed_acc_joined": 0.9832651798907254,
+     "adjudicated_acc": 0.6424778761061947,
+     "lead_agreed_joined": -0.003107520198881386
     },
     {
      "route": "ling3-flash-vl-fp8",
      "family": "third family",
      "pages": 96,
-     "agreed_acc": 0.9752695853318366,
-     "agreed_acc_joined": 0.9796237711331088,
-     "adjudicated_acc": 0.6452145214521452,
-     "lead_agreed_joined": -0.0068015585480893925
+     "agreed_acc": 0.9754636719414668,
+     "agreed_acc_joined": 0.9798196358686405,
+     "adjudicated_acc": 0.6448445171849427,
+     "lead_agreed_joined": -0.006804349312726554
     },
     {
      "route": "qwen3-vl-8b-mlx4",
      "family": "third family",
      "pages": 92,
-     "agreed_acc": 0.9746520874751491,
-     "agreed_acc_joined": 0.9825333712013633,
-     "adjudicated_acc": 0.6712062256809338,
-     "lead_agreed_joined": -0.0032109600770630076
+     "agreed_acc": 0.9748898991333996,
+     "agreed_acc_joined": 0.9827745418383294,
+     "adjudicated_acc": 0.6724470134874759,
+     "lead_agreed_joined": -0.0031766427526145335
     },
     {
      "route": "qwen3.5-27b",
      "family": "third family",
      "pages": 96,
-     "agreed_acc": 0.9733986461203524,
-     "agreed_acc_joined": 0.9879919719699289,
-     "adjudicated_acc": 0.7491749174917491,
-     "lead_agreed_joined": 0.0016063982500512664
+     "agreed_acc": 0.9735579377233282,
+     "agreed_acc_joined": 0.9881572230729965,
+     "adjudicated_acc": 0.7512274959083469,
+     "lead_agreed_joined": 0.001572864665253304
     },
     {
      "route": "qwen3-vl-235b",
      "family": "third family",
      "pages": 96,
-     "agreed_acc": 0.9730924924312004,
-     "agreed_acc_joined": 0.9844882130829676,
-     "adjudicated_acc": 0.6534653465346535,
-     "lead_agreed_joined": -0.0016063982500512664
+     "agreed_acc": 0.9732856899778799,
+     "agreed_acc_joined": 0.9846860643185299,
+     "adjudicated_acc": 0.6546644844517185,
+     "lead_agreed_joined": -0.0016070573753675932
     },
     {
      "route": "gpt5.4-mini",
      "family": "third family",
      "pages": 95,
-     "agreed_acc": 0.9730741491225058,
-     "agreed_acc_joined": 0.9773328296184359,
-     "adjudicated_acc": 0.6374172185430463,
-     "lead_agreed_joined": -0.008765270204983078
+     "agreed_acc": 0.9731661226593369,
+     "agreed_acc_joined": 0.9774265590104793,
+     "adjudicated_acc": 0.632183908045977,
+     "lead_agreed_joined": -0.008872471173099417
     },
     {
      "route": "qwen3.5-35b-a3b",
      "family": "third family",
      "pages": 94,
-     "agreed_acc": 0.9728412978127915,
-     "agreed_acc_joined": 0.9828616841159601,
-     "adjudicated_acc": 0.6672443674176777,
-     "lead_agreed_joined": -0.0032289424345531836
+     "agreed_acc": 0.9730374364824225,
+     "agreed_acc_joined": 0.9830619793287013,
+     "adjudicated_acc": 0.6683848797250859,
+     "lead_agreed_joined": -0.003230288294546746
     },
     {
      "route": "qwen3.6-35b-a3b",
      "family": "third family",
      "pages": 96,
-     "agreed_acc": 0.9723441167466068,
-     "agreed_acc_joined": 0.9789094125250876,
-     "adjudicated_acc": 0.6551155115511551,
-     "lead_agreed_joined": -0.007382596213001524
+     "agreed_acc": 0.9726050706142589,
+     "agreed_acc_joined": 0.9791730474732007,
+     "adjudicated_acc": 0.6546644844517185,
+     "lead_agreed_joined": -0.00731723996443967
     },
     {
      "route": "qwen3.8-flash",
      "family": "third family",
      "pages": 93,
-     "agreed_acc": 0.9701809682331692,
-     "agreed_acc_joined": 0.9862945780359104,
-     "adjudicated_acc": 0.7009009009009008,
-     "lead_agreed_joined": 0.0005694355470139412
+     "agreed_acc": 0.9703100088573959,
+     "agreed_acc_joined": 0.9864304694419841,
+     "adjudicated_acc": 0.7035714285714286,
+     "lead_agreed_joined": 0.000498468988108014
     },
     {
      "route": "qwen3.6-27b",
      "family": "third family",
      "pages": 95,
-     "agreed_acc": 0.9686581447809146,
-     "agreed_acc_joined": 0.9863627042176498,
-     "adjudicated_acc": 0.6528239202657807,
+     "agreed_acc": 0.9688504410859605,
+     "agreed_acc_joined": 0.986562264925118,
+     "adjudicated_acc": 0.6639209225700164,
      "lead_agreed_joined": null
     },
     {
      "route": "qwen3.5-4b",
      "family": "third family",
      "pages": 95,
-     "agreed_acc": 0.9659028914348063,
-     "agreed_acc_joined": 0.9721426623022368,
-     "adjudicated_acc": 0.6881188118811881,
-     "lead_agreed_joined": -0.014560279557367606
+     "agreed_acc": 0.9660947573080465,
+     "agreed_acc_joined": 0.9723027594910802,
+     "adjudicated_acc": 0.6950819672131148,
+     "lead_agreed_joined": -0.014565768729864925
     },
     {
      "route": "fs-churro",
      "family": "third family",
      "pages": 94,
-     "agreed_acc": 0.9649398220826793,
-     "agreed_acc_joined": 0.9657770800627944,
-     "adjudicated_acc": 0.6726618705035972,
-     "lead_agreed_joined": -0.020682885788403604
+     "agreed_acc": 0.9651694412452448,
+     "agreed_acc_joined": 0.9660070498726137,
+     "adjudicated_acc": 0.6714031971580817,
+     "lead_agreed_joined": -0.020656519604404844
+    },
+    {
+     "route": "qwen3.8-27b",
+     "family": "third family",
+     "pages": 96,
+     "agreed_acc": 0.9645737621235324,
+     "agreed_acc_joined": 0.9808405649140718,
+     "adjudicated_acc": 0.6841243862520459,
+     "lead_agreed_joined": -0.005607604458729432
     },
     {
      "route": "qwen3-vl-30b-a3b",
      "family": "third family",
      "pages": 94,
-     "agreed_acc": 0.9605120492462663,
-     "agreed_acc_joined": 0.9748872022664475,
-     "adjudicated_acc": 0.679465776293823,
-     "lead_agreed_joined": -0.011282159426402427
+     "agreed_acc": 0.9607404037929949,
+     "agreed_acc_joined": 0.9751215927779139,
+     "adjudicated_acc": 0.6788079470198676,
+     "lead_agreed_joined": -0.011251758087201136
     },
     {
      "route": "mistral-large4",
      "family": "third family",
      "pages": 96,
-     "agreed_acc": 0.9602340374868183,
-     "agreed_acc_joined": 0.9806102663537095,
-     "adjudicated_acc": 0.6600660066006601,
-     "lead_agreed_joined": -0.0057078405906076934
+     "agreed_acc": 0.960421984005445,
+     "agreed_acc_joined": 0.9808065339458908,
+     "adjudicated_acc": 0.6595744680851063,
+     "lead_agreed_joined": -0.005710182589072077
     },
     {
      "route": "qwen3.5-9b",
      "family": "third family",
      "pages": 92,
-     "agreed_acc": 0.9592290315528674,
-     "agreed_acc_joined": 0.9746046782773446,
-     "adjudicated_acc": 0.7045075125208681,
-     "lead_agreed_joined": -0.010912952722745062
+     "agreed_acc": 0.9594663556171175,
+     "agreed_acc_joined": 0.9748122767368959,
+     "adjudicated_acc": 0.7052980132450332,
+     "lead_agreed_joined": -0.010917750503755319
     },
     {
      "route": "gpt5.6-luna",
      "family": "third family",
      "pages": 95,
-     "agreed_acc": 0.9566232784970979,
-     "agreed_acc_joined": 0.9675447333173061,
-     "adjudicated_acc": 0.6390728476821192,
-     "lead_agreed_joined": -0.01825522810407887
+     "agreed_acc": 0.9568459027658478,
+     "agreed_acc_joined": 0.9677718605050678,
+     "adjudicated_acc": 0.6371100164203612,
+     "lead_agreed_joined": -0.018228267624111005
     },
     {
      "route": "mistral-ocr",
      "family": "third family",
      "pages": 96,
-     "agreed_acc": 0.9563560907575603,
-     "agreed_acc_joined": 0.9802020614348403,
-     "adjudicated_acc": 0.6600660066006601,
-     "lead_agreed_joined": -0.006049627452320627
+     "agreed_acc": 0.9564743916964438,
+     "agreed_acc_joined": 0.9803301003913562,
+     "adjudicated_acc": 0.6644844517184942,
+     "lead_agreed_joined": -0.006120495110442548
     },
     {
      "route": "gemma4-31b",
      "family": "third family",
      "pages": 93,
-     "agreed_acc": 0.9525789177001127,
-     "agreed_acc_joined": 0.955749718151071,
-     "adjudicated_acc": 0.5913978494623656,
-     "lead_agreed_joined": -0.03062488936094887
+     "agreed_acc": 0.9526662672258838,
+     "agreed_acc_joined": 0.9558382969724738,
+     "adjudicated_acc": 0.594306049822064,
+     "lead_agreed_joined": -0.03070765743429904
     },
     {
      "route": "gemma4-26b-a4b",
      "family": "third family",
      "pages": 86,
-     "agreed_acc": 0.9507033688733936,
-     "agreed_acc_joined": 0.9533384683990757,
-     "adjudicated_acc": 0.594847775175644,
-     "lead_agreed_joined": -0.03567351598173518
+     "agreed_acc": 0.9509247242050617,
+     "agreed_acc_joined": 0.9535609993510707,
+     "adjudicated_acc": 0.5939675174013921,
+     "lead_agreed_joined": -0.035648733531835064
     },
     {
      "route": "lightonocr3-0.8b",
      "family": "third family",
      "pages": 96,
-     "agreed_acc": 0.9462530190155458,
-     "agreed_acc_joined": 0.9698268530802463,
-     "adjudicated_acc": 0.594059405940594,
-     "lead_agreed_joined": -0.01394490395789183
+     "agreed_acc": 0.9464692870512166,
+     "agreed_acc_joined": 0.9700527480006806,
+     "adjudicated_acc": 0.6006546644844517,
+     "lead_agreed_joined": -0.013916433016480934
     },
     {
      "route": "paddleocr-vl1.5",
      "family": "third family",
      "pages": 86,
-     "agreed_acc": 0.9443498222748815,
-     "agreed_acc_joined": 0.9674170616113744,
-     "adjudicated_acc": 0.6472019464720195,
-     "lead_agreed_joined": -0.02136290892850501
+     "agreed_acc": 0.944485593659729,
+     "agreed_acc_joined": 0.9675579586697282,
+     "adjudicated_acc": 0.6420047732696897,
+     "lead_agreed_joined": -0.021367680452667237
     },
     {
      "route": "lightonocr3-4b",
      "family": "third family",
      "pages": 96,
-     "agreed_acc": 0.9438037895023301,
-     "agreed_acc_joined": 0.9692145457019423,
-     "adjudicated_acc": 0.5429042904290429,
-     "lead_agreed_joined": -0.014525941622803962
+     "agreed_acc": 0.9441211502467245,
+     "agreed_acc_joined": 0.9695422834779649,
+     "adjudicated_acc": 0.5515548281505729,
+     "lead_agreed_joined": -0.01439513095807976
     },
     {
      "route": "lightonocr-3-4b-mlx8",
      "family": "third family",
      "pages": 96,
-     "agreed_acc": 0.9432595162771712,
-     "agreed_acc_joined": 0.9689764261659353,
-     "adjudicated_acc": 0.5214521452145214,
-     "lead_agreed_joined": -0.014936085856859571
+     "agreed_acc": 0.9435766547558277,
+     "agreed_acc_joined": 0.9693040667006977,
+     "adjudicated_acc": 0.5237315875613748,
+     "lead_agreed_joined": -0.014805443479450231
+    },
+    {
+     "route": "lightonocr-3-4b-mlx8-logprob",
+     "family": "third family",
+     "pages": 96,
+     "agreed_acc": 0.9435766547558277,
+     "agreed_acc_joined": 0.9693040667006977,
+     "adjudicated_acc": 0.5237315875613748,
+     "lead_agreed_joined": -0.014805443479450231
     },
     {
      "route": "mistral-medium3.5",
      "family": "third family",
      "pages": 96,
-     "agreed_acc": 0.9401979793856516,
-     "agreed_acc_joined": 0.9628193353063238,
-     "adjudicated_acc": 0.5247524752475248,
-     "lead_agreed_joined": -0.0232073279103151
+     "agreed_acc": 0.9403777437468096,
+     "agreed_acc_joined": 0.9630083375872044,
+     "adjudicated_acc": 0.5270049099836334,
+     "lead_agreed_joined": -0.023216850167544267
+    },
+    {
+     "route": "xiaomi-ocr-0-bf16",
+     "family": "third family",
+     "pages": 96,
+     "agreed_acc": 0.939901310192275,
+     "agreed_acc_joined": 0.9646418240598945,
+     "adjudicated_acc": 0.23895253682487724,
+     "lead_agreed_joined": -0.019045339533611427
+    },
+    {
+     "route": "xiaomi-ocr-0",
+     "family": "third family",
+     "pages": 96,
+     "agreed_acc": 0.939867279224094,
+     "agreed_acc_joined": 0.9646077930917134,
+     "adjudicated_acc": 0.24222585924713586,
+     "lead_agreed_joined": -0.019079532243725716
+    },
+    {
+     "route": "paddleocr-vl1.6",
+     "family": "third family",
+     "pages": 94,
+     "agreed_acc": 0.9388509080864581,
+     "agreed_acc_joined": 0.9626061736067951,
+     "adjudicated_acc": 0.5953654188948306,
+     "lead_agreed_joined": -0.02403148953801537
+    },
+    {
+     "route": "paddleocr-vl1.6-bf16",
+     "family": "third family",
+     "pages": 94,
+     "agreed_acc": 0.9384365720599406,
+     "agreed_acc_joined": 0.9622608935846972,
+     "adjudicated_acc": 0.5935828877005348,
+     "lead_agreed_joined": -0.024376769560113254
     },
     {
      "route": "mistral-small-24b",
      "family": "third family",
      "pages": 94,
-     "agreed_acc": 0.9378200941807308,
-     "agreed_acc_joined": 0.9588904547485649,
-     "adjudicated_acc": 0.5695970695970696,
-     "lead_agreed_joined": -0.02787179664295092
+     "agreed_acc": 0.9379749011517965,
+     "agreed_acc_joined": 0.9590510572460031,
+     "adjudicated_acc": 0.5629496402877698,
+     "lead_agreed_joined": -0.02787949975817039
     },
     {
      "route": "glm-ocr",
      "family": "third family",
      "pages": 95,
-     "agreed_acc": 0.9367417381497557,
-     "agreed_acc_joined": 0.960322613717918,
-     "adjudicated_acc": 0.2772963604852686,
-     "lead_agreed_joined": -0.02544468099718422
+     "agreed_acc": 0.9369551095763958,
+     "agreed_acc_joined": 0.9605456596806728,
+     "adjudicated_acc": 0.281786941580756,
+     "lead_agreed_joined": -0.02542081758845749
+    },
+    {
+     "route": "granite-docling-258m-mlx",
+     "family": "third family",
+     "pages": 37,
+     "agreed_acc": 0.8864678899082569,
+     "agreed_acc_joined": 0.9002293577981652,
+     "adjudicated_acc": 0.1780821917808219,
+     "lead_agreed_joined": -0.08832723050817182
     },
     {
      "route": "apple-vision",
      "family": "third family",
      "pages": 96,
-     "agreed_acc": 0.8397795693438106,
-     "agreed_acc_joined": 0.8411742694832806,
-     "adjudicated_acc": 0.504950495049505,
-     "lead_agreed_joined": -0.14317451637159062
+     "agreed_acc": 0.8400884805172707,
+     "agreed_acc_joined": 0.8414837502126935,
+     "adjudicated_acc": 0.502454991816694,
+     "lead_agreed_joined": -0.14306229911782808
     },
     {
      "route": "ppocrv6-medium",
      "family": "third family",
      "pages": 96,
-     "agreed_acc": 0.7728679797258223,
-     "agreed_acc_joined": 0.7762016532299214,
-     "adjudicated_acc": 0.4867986798679868,
-     "lead_agreed_joined": -0.20944698885774826
+     "agreed_acc": 0.7731495661051557,
+     "agreed_acc_joined": 0.7764846009868981,
+     "adjudicated_acc": 0.4844517184942717,
+     "lead_agreed_joined": -0.209361964029269
     }
    ],
    "score": {
@@ -38162,6 +38310,687 @@
     "material": false,
     "excluded": {
      "p081": "owner: a badly scanned microfilm of an early-20th-century newspaper, far outside the corpus; not answered beyond the note"
+    }
+   }
+  },
+  "hands_rescore": {
+   "lead": "gemini3.8-flash",
+   "sheet": {
+    "hand": {
+     "truth stands": 87,
+     "either": 10,
+     "truth wrong": 12,
+     "open": 5
+    },
+    "control": {
+     "truth stands": 19,
+     "open": 1
+    }
+   },
+   "controls": {
+    "passages": 20,
+    "ruled": 19,
+    "wrong": 0,
+    "wrong_items": [],
+    "words": 161,
+    "rate_lo": 0.0,
+    "rate_hi": 0.17646691180696533,
+    "per_word_hi": 0.023976820903791662
+   },
+   "changed": 8,
+   "routes": [
+    {
+     "route": "gemini3.8-flash",
+     "after": 95.81102963099426,
+     "before": 95.97214579003568,
+     "move": -0.16111615904142695,
+     "failed": 0
+    },
+    {
+     "route": "gemini3.7-flash-gw",
+     "after": 95.05355630985682,
+     "before": 95.06855218610778,
+     "move": -0.014995876250964102,
+     "failed": 0
+    },
+    {
+     "route": "gemini3.1-pro",
+     "after": 93.97538136517502,
+     "before": 94.06287762855702,
+     "move": -0.08749626338199334,
+     "failed": 0
+    },
+    {
+     "route": "gemini3.5-flash",
+     "after": 92.68903351936957,
+     "before": 92.93239982232353,
+     "move": -0.24336630295395878,
+     "failed": 0
+    },
+    {
+     "route": "qwen3.6-27b",
+     "after": 92.61108074708119,
+     "before": 92.1495969241417,
+     "move": 0.46148382293948487,
+     "failed": 0
+    },
+    {
+     "route": "claude-sonnet5.5",
+     "after": 92.49943655098609,
+     "before": 92.43233618074099,
+     "move": 0.0671003702451003,
+     "failed": 0
+    },
+    {
+     "route": "qwen3.5-27b (FarmShare panel)",
+     "after": 92.2332419470262,
+     "before": 92.09888595078242,
+     "move": 0.1343559962437837,
+     "failed": 0
+    },
+    {
+     "route": "mistral-large4",
+     "after": 92.19542619622187,
+     "before": 92.02767553185693,
+     "move": 0.16775066436494512,
+     "failed": 0
+    },
+    {
+     "route": "gemini3.5-flash-lite",
+     "after": 91.96139224050691,
+     "before": 91.98172656085424,
+     "move": -0.02033432034733096,
+     "failed": 0
+    },
+    {
+     "route": "qwen3-vl-235b",
+     "after": 91.59440632638676,
+     "before": 91.38203932287597,
+     "move": 0.21236700351079207,
+     "failed": 0
+    },
+    {
+     "route": "ling3-flash-vl-fp8",
+     "after": 91.3247036251457,
+     "before": 91.17804459716683,
+     "move": 0.14665902797887043,
+     "failed": 0
+    },
+    {
+     "route": "qwen3.8-flash",
+     "after": 91.2521428689001,
+     "before": 91.03240414753239,
+     "move": 0.21973872136770467,
+     "failed": 0
+    },
+    {
+     "route": "qwen3.5-9b",
+     "after": 91.002885450361,
+     "before": 90.92216281794231,
+     "move": 0.08072263241869848,
+     "failed": 0
+    },
+    {
+     "route": "gemma4-31b",
+     "after": 90.98179247274747,
+     "before": 90.84464513763699,
+     "move": 0.13714733511048394,
+     "failed": 0
+    },
+    {
+     "route": "qwen3.5-397b",
+     "after": 90.83658715925219,
+     "before": 90.57334753268385,
+     "move": 0.26323962656833544,
+     "failed": 0
+    },
+    {
+     "route": "qwen3.8-27b",
+     "after": 90.1371568390568,
+     "before": 89.97588666990667,
+     "move": 0.1612701691501286,
+     "failed": 0
+    },
+    {
+     "route": "lightonocr-3-4b-mlx8",
+     "after": 89.91019653035467,
+     "before": 89.67262036810979,
+     "move": 0.23757616224487776,
+     "failed": 0
+    },
+    {
+     "route": "lightonocr-3-4b-mlx8-logprob",
+     "after": 89.91019653035467,
+     "before": 89.67262036810979,
+     "move": 0.23757616224487776,
+     "failed": 0
+    },
+    {
+     "route": "qwen3-vl-8b (FarmShare panel)",
+     "after": 89.8418301366617,
+     "before": 89.72289147452939,
+     "move": 0.11893866213230808,
+     "failed": 0
+    },
+    {
+     "route": "qwen3-vl-8b-mlx4",
+     "after": 89.24411405673966,
+     "before": 89.16249569191196,
+     "move": 0.08161836482770468,
+     "failed": 0
+    },
+    {
+     "route": "lightonocr3-4b",
+     "after": 89.21090650255938,
+     "before": 88.84550130088621,
+     "move": 0.3654052016731697,
+     "failed": 0
+    },
+    {
+     "route": "gpt5.4-mini",
+     "after": 89.12529760438555,
+     "before": 89.48265784325754,
+     "move": -0.35736023887199053,
+     "failed": 0
+    },
+    {
+     "route": "mistral-ocr",
+     "after": 89.10237931036352,
+     "before": 89.00786121288714,
+     "move": 0.09451809747638151,
+     "failed": 0
+    },
+    {
+     "route": "qwen3.6-35b-a3b",
+     "after": 88.82517366137243,
+     "before": 88.81840960585852,
+     "move": 0.006764055513912126,
+     "failed": 0
+    },
+    {
+     "route": "qwen3.5-35b-a3b",
+     "after": 88.43215348638506,
+     "before": 88.30563887276335,
+     "move": 0.12651461362170835,
+     "failed": 0
+    },
+    {
+     "route": "qwen3.5-9b-mlx4",
+     "after": 88.06149008859128,
+     "before": 87.9178935338186,
+     "move": 0.14359655477268518,
+     "failed": 0
+    },
+    {
+     "route": "qwen3.5-9b-mlx4-logprob",
+     "after": 88.06149008859128,
+     "before": 87.9178935338186,
+     "move": 0.14359655477268518,
+     "failed": 0
+    },
+    {
+     "route": "fs-churro",
+     "after": 87.5964942521885,
+     "before": 87.47879265152481,
+     "move": 0.11770160066369328,
+     "failed": 0
+    },
+    {
+     "route": "gemma4-26b-a4b",
+     "after": 86.74795246868943,
+     "before": 86.59867792015056,
+     "move": 0.14927454853886957,
+     "failed": 0
+    },
+    {
+     "route": "gemini3.1-flash-lite",
+     "after": 86.5519455987983,
+     "before": 86.64016155422746,
+     "move": -0.08821595542916327,
+     "failed": 1
+    },
+    {
+     "route": "xiaomi-ocr-0",
+     "after": 86.17791752578988,
+     "before": 85.989474685068,
+     "move": 0.18844284072187634,
+     "failed": 0
+    },
+    {
+     "route": "xiaomi-ocr-0-bf16",
+     "after": 86.0386744265129,
+     "before": 85.84792789903425,
+     "move": 0.19074652747865173,
+     "failed": 0
+    },
+    {
+     "route": "qwen3.5-4b",
+     "after": 85.85985626774401,
+     "before": 85.5343127825202,
+     "move": 0.32554348522380394,
+     "failed": 0
+    },
+    {
+     "route": "glm-ocr",
+     "after": 85.78487064624143,
+     "before": 85.60982284378,
+     "move": 0.17504780246143525,
+     "failed": 0
+    },
+    {
+     "route": "gpt5.6-luna",
+     "after": 85.2024228542696,
+     "before": 85.44368156936899,
+     "move": -0.24125871509939145,
+     "failed": 0
+    },
+    {
+     "route": "mistral-medium3.5",
+     "after": 85.05533764818067,
+     "before": 85.03947119819455,
+     "move": 0.0158664499861203,
+     "failed": 0
+    },
+    {
+     "route": "qwen3-vl-8b (local panel)",
+     "after": 84.97586449924115,
+     "before": 84.83329049887816,
+     "move": 0.14257400036299828,
+     "failed": 1
+    },
+    {
+     "route": "lightonocr3-0.8b",
+     "after": 84.95112475452605,
+     "before": 84.78120104820091,
+     "move": 0.16992370632513598,
+     "failed": 0
+    },
+    {
+     "route": "paddleocr-vl1.6-bf16",
+     "after": 80.37089949082866,
+     "before": 80.17991647614623,
+     "move": 0.1909830146824305,
+     "failed": 0
+    },
+    {
+     "route": "paddleocr-vl1.6",
+     "after": 80.22445975746339,
+     "before": 80.05988830327566,
+     "move": 0.16457145418773678,
+     "failed": 0
+    },
+    {
+     "route": "mistral-small-24b",
+     "after": 79.90122140620318,
+     "before": 79.83440043022377,
+     "move": 0.06682097597941095,
+     "failed": 1
+    },
+    {
+     "route": "qwen3-vl-30b-a3b",
+     "after": 77.716027002973,
+     "before": 77.57801209910927,
+     "move": 0.13801490386371995,
+     "failed": 1
+    },
+    {
+     "route": "paddleocr-vl1.5",
+     "after": 70.91930616671122,
+     "before": 70.8108326426544,
+     "move": 0.10847352405681931,
+     "failed": 3
+    },
+    {
+     "route": "qwen3.5-27b (local panel)",
+     "after": 69.33200826339922,
+     "before": 69.1379873114422,
+     "move": 0.19402095195701463,
+     "failed": 4
+    },
+    {
+     "route": "ppocrv6-medium",
+     "after": 62.737176491930455,
+     "before": 62.78832664522017,
+     "move": -0.0511501532897114,
+     "failed": 0
+    },
+    {
+     "route": "apple-vision",
+     "after": 58.060943337587254,
+     "before": 57.87491743311246,
+     "move": 0.18602590447479628,
+     "failed": 0
+    },
+    {
+     "route": "granite-docling-258m-mlx",
+     "after": 11.321061272169889,
+     "before": 11.321061272169889,
+     "move": 0.0,
+     "failed": 10
+    }
+   ],
+   "paired": {
+    "apple-vision": {
+     "n": 16,
+     "delta": 37.75008629340701,
+     "p": 9.999000099990002e-05,
+     "lo": 28.48161251484376,
+     "hi": 46.80977267799243
+    },
+    "claude-sonnet5.5": {
+     "n": 16,
+     "delta": 3.3115930800081665,
+     "p": 0.08499150084991501,
+     "lo": 0.20787989631905912,
+     "hi": 7.237783129321271
+    },
+    "fs-churro": {
+     "n": 16,
+     "delta": 8.214535378805754,
+     "p": 9.999000099990002e-05,
+     "lo": 4.945573194688277,
+     "hi": 11.796523253515605
+    },
+    "gemini3.1-flash-lite": {
+     "n": 16,
+     "delta": 9.259084032195966,
+     "p": 0.007899210078992101,
+     "lo": 1.6258365656284264,
+     "hi": 22.170273689724183
+    },
+    "gemini3.1-pro": {
+     "n": 16,
+     "delta": 1.8356482658192288,
+     "p": 0.10598940105989402,
+     "lo": 0.02592044915876457,
+     "hi": 4.267939343437466
+    },
+    "gemini3.5-flash": {
+     "n": 16,
+     "delta": 3.121996111624692,
+     "p": 0.010698930106989302,
+     "lo": 0.9126131503638977,
+     "hi": 5.878283350790312
+    },
+    "gemini3.5-flash-lite": {
+     "n": 16,
+     "delta": 3.849637390487344,
+     "p": 0.0010998900109989002,
+     "lo": 1.614214359896958,
+     "hi": 6.657705508100032
+    },
+    "gemini3.7-flash-gw": {
+     "n": 16,
+     "delta": 0.7574733211374456,
+     "p": 0.7145285471452855,
+     "lo": -0.5954868344856799,
+     "hi": 2.886100686899714
+    },
+    "gemma4-26b-a4b": {
+     "n": 16,
+     "delta": 9.06307716230483,
+     "p": 0.00029997000299970003,
+     "lo": 4.990353957196869,
+     "hi": 14.133855659677813
+    },
+    "gemma4-31b": {
+     "n": 16,
+     "delta": 4.829237158246782,
+     "p": 9.999000099990002e-05,
+     "lo": 2.6741878857685943,
+     "hi": 7.380403876007147
+    },
+    "glm-ocr": {
+     "n": 16,
+     "delta": 10.026158984752833,
+     "p": 0.00019998000199980003,
+     "lo": 6.015113904309638,
+     "hi": 14.430773580199396
+    },
+    "gpt5.4-mini": {
+     "n": 16,
+     "delta": 6.68573202660871,
+     "p": 0.00019998000199980003,
+     "lo": 3.9525340737252153,
+     "hi": 9.522888311705838
+    },
+    "gpt5.6-luna": {
+     "n": 16,
+     "delta": 10.60860677672466,
+     "p": 9.999000099990002e-05,
+     "lo": 6.999033429077219,
+     "hi": 14.294454907391822
+    },
+    "granite-docling-258m-mlx": {
+     "n": 16,
+     "delta": 84.48996835882437,
+     "p": 9.999000099990002e-05,
+     "lo": 73.68619935200432,
+     "hi": 92.87774104702876
+    },
+    "lightonocr-3-4b-mlx8": {
+     "n": 16,
+     "delta": 5.9008331006395895,
+     "p": 0.0007999200079992001,
+     "lo": 3.257504305907113,
+     "hi": 8.60179409506084
+    },
+    "lightonocr-3-4b-mlx8-logprob": {
+     "n": 16,
+     "delta": 5.9008331006395895,
+     "p": 0.0007999200079992001,
+     "lo": 3.257504305907113,
+     "hi": 8.60179409506084
+    },
+    "lightonocr3-0.8b": {
+     "n": 16,
+     "delta": 10.859904876468214,
+     "p": 0.00029997000299970003,
+     "lo": 5.985121686805414,
+     "hi": 16.178130082599317
+    },
+    "lightonocr3-4b": {
+     "n": 16,
+     "delta": 6.600123128434876,
+     "p": 0.0008999100089991,
+     "lo": 3.3772682303750656,
+     "hi": 10.121821946165442
+    },
+    "ling3-flash-vl-fp8": {
+     "n": 16,
+     "delta": 4.486326005848559,
+     "p": 0.0010998900109989002,
+     "lo": 2.217810186758742,
+     "hi": 6.9553620180418365
+    },
+    "mistral-large4": {
+     "n": 16,
+     "delta": 3.615603434772381,
+     "p": 0.0025997400259974,
+     "lo": 1.74849206206816,
+     "hi": 5.453286299387332
+    },
+    "mistral-medium3.5": {
+     "n": 16,
+     "delta": 10.755691982813591,
+     "p": 9.999000099990002e-05,
+     "lo": 6.901736527233724,
+     "hi": 14.99188572791627
+    },
+    "mistral-ocr": {
+     "n": 16,
+     "delta": 6.708650320630742,
+     "p": 9.999000099990002e-05,
+     "lo": 3.3270862900308584,
+     "hi": 10.766739092980426
+    },
+    "mistral-small-24b": {
+     "n": 16,
+     "delta": 15.909808224791089,
+     "p": 0.00039996000399960006,
+     "lo": 5.38321466416131,
+     "hi": 30.075349122966816
+    },
+    "paddleocr-vl1.5": {
+     "n": 16,
+     "delta": 24.891723464283032,
+     "p": 9.999000099990002e-05,
+     "lo": 10.289896327129465,
+     "hi": 41.20944297817917
+    },
+    "paddleocr-vl1.6": {
+     "n": 16,
+     "delta": 15.58656987353087,
+     "p": 9.999000099990002e-05,
+     "lo": 8.616920578363834,
+     "hi": 25.698043424353592
+    },
+    "paddleocr-vl1.6-bf16": {
+     "n": 16,
+     "delta": 15.440130140165593,
+     "p": 9.999000099990002e-05,
+     "lo": 8.498171168462944,
+     "hi": 25.477869734338686
+    },
+    "ppocrv6-medium": {
+     "n": 16,
+     "delta": 33.0738531390638,
+     "p": 9.999000099990002e-05,
+     "lo": 26.53023549689253,
+     "hi": 39.34113544773166
+    },
+    "qwen3-vl-235b": {
+     "n": 16,
+     "delta": 4.216623304607502,
+     "p": 9.999000099990002e-05,
+     "lo": 2.119444330598789,
+     "hi": 7.0083192970529025
+    },
+    "qwen3-vl-30b-a3b": {
+     "n": 16,
+     "delta": 18.09500262802127,
+     "p": 9.999000099990002e-05,
+     "lo": 9.282844899654407,
+     "hi": 30.738872619999523
+    },
+    "qwen3-vl-8b (FarmShare panel)": {
+     "n": 16,
+     "delta": 5.969199494332566,
+     "p": 0.0012998700129987,
+     "lo": 3.1253405566702925,
+     "hi": 9.122782421227033
+    },
+    "qwen3-vl-8b (local panel)": {
+     "n": 16,
+     "delta": 10.835165131753108,
+     "p": 0.0010998900109989002,
+     "lo": 3.318776494537092,
+     "hi": 23.251166654113096
+    },
+    "qwen3-vl-8b-mlx4": {
+     "n": 16,
+     "delta": 6.5669155742545975,
+     "p": 9.999000099990002e-05,
+     "lo": 4.133440556843607,
+     "hi": 9.290067306924376
+    },
+    "qwen3.5-27b (FarmShare panel)": {
+     "n": 16,
+     "delta": 3.57778768396806,
+     "p": 0.0027997200279972004,
+     "lo": 1.461015342895049,
+     "hi": 6.042336175560614
+    },
+    "qwen3.5-27b (local panel)": {
+     "n": 16,
+     "delta": 26.479021367595045,
+     "p": 0.0010998900109989002,
+     "lo": 8.266794244229454,
+     "hi": 48.7296630609585
+    },
+    "qwen3.5-35b-a3b": {
+     "n": 16,
+     "delta": 7.378876144609194,
+     "p": 0.0007999200079992001,
+     "lo": 3.403844660221039,
+     "hi": 12.413779687541425
+    },
+    "qwen3.5-397b": {
+     "n": 16,
+     "delta": 4.9744424717420745,
+     "p": 0.0011998800119988001,
+     "lo": 2.4492291955400383,
+     "hi": 7.967559680684026
+    },
+    "qwen3.5-4b": {
+     "n": 16,
+     "delta": 9.951173363250252,
+     "p": 0.00019998000199980003,
+     "lo": 5.976517212919208,
+     "hi": 14.306469245627452
+    },
+    "qwen3.5-9b": {
+     "n": 16,
+     "delta": 4.808144180633248,
+     "p": 0.00039996000399960006,
+     "lo": 2.5002334278878715,
+     "hi": 7.819820219681235
+    },
+    "qwen3.5-9b-mlx4": {
+     "n": 16,
+     "delta": 7.7495395424029825,
+     "p": 0.0004999500049995,
+     "lo": 4.295121886946726,
+     "hi": 11.528476355316418
+    },
+    "qwen3.5-9b-mlx4-logprob": {
+     "n": 16,
+     "delta": 7.7495395424029825,
+     "p": 0.0004999500049995,
+     "lo": 4.295121886946726,
+     "hi": 11.528476355316418
+    },
+    "qwen3.6-27b": {
+     "n": 16,
+     "delta": 3.199948883913067,
+     "p": 0.006999300069993001,
+     "lo": 1.2746043164187038,
+     "hi": 5.1684240415776825
+    },
+    "qwen3.6-35b-a3b": {
+     "n": 16,
+     "delta": 6.985855969621825,
+     "p": 0.0007999200079992001,
+     "lo": 2.838962439002576,
+     "hi": 12.726629656848775
+    },
+    "qwen3.8-27b": {
+     "n": 16,
+     "delta": 5.673872791937455,
+     "p": 0.0028997100289971,
+     "lo": 2.720712429166106,
+     "hi": 8.781874196474913
+    },
+    "qwen3.8-flash": {
+     "n": 16,
+     "delta": 4.558886762094163,
+     "p": 0.0018998100189981002,
+     "lo": 2.0964658748349336,
+     "hi": 7.517178664803514
+    },
+    "xiaomi-ocr-0": {
+     "n": 16,
+     "delta": 9.633112105204383,
+     "p": 9.999000099990002e-05,
+     "lo": 6.518478076533425,
+     "hi": 12.838223028658053
+    },
+    "xiaomi-ocr-0-bf16": {
+     "n": 16,
+     "delta": 9.772355204481357,
+     "p": 9.999000099990002e-05,
+     "lo": 6.73426624834467,
+     "hi": 12.886208589018775
     }
    }
   },
@@ -38389,8 +39218,8 @@
      "upscaled_n": 5,
      "upscaled_pdf": 0.9609,
      "upscaled_jpeg": 0.8988,
-     "all96_pdf": 0.8134,
-     "all96_jpeg": 0.8068
+     "all96_pdf": 0.8137,
+     "all96_jpeg": 0.8071
     },
     "qwen3-vl-8b-mlx4": {
      "n": 15,
@@ -38402,8 +39231,8 @@
      "upscaled_n": 5,
      "upscaled_pdf": 0.9958,
      "upscaled_jpeg": 0.9814,
-     "all96_pdf": 0.8966,
-     "all96_jpeg": 0.8963
+     "all96_pdf": 0.8967,
+     "all96_jpeg": 0.8965
     },
     "lightonocr-3-4b-mlx8": {
      "n": 15,
@@ -38415,34 +39244,34 @@
      "upscaled_n": 5,
      "upscaled_pdf": 0.9922,
      "upscaled_jpeg": 0.9649,
-     "all96_pdf": 0.8913,
-     "all96_jpeg": 0.8892
+     "all96_pdf": 0.8917,
+     "all96_jpeg": 0.8896
     },
     "qwen3.5-9b-mlx4": {
      "n": 15,
-     "pdf_mean": 0.8711,
+     "pdf_mean": 0.8707,
      "jpeg_mean": 0.8697,
      "sharper_n": 10,
-     "sharper_pdf": 0.8164,
+     "sharper_pdf": 0.8157,
      "sharper_jpeg": 0.8133,
      "upscaled_n": 5,
      "upscaled_pdf": 0.9805,
      "upscaled_jpeg": 0.9824,
-     "all96_pdf": 0.9191,
-     "all96_jpeg": 0.9189
+     "all96_pdf": 0.9193,
+     "all96_jpeg": 0.9191
     },
     "gemini3.7-flash-gw": {
      "n": 15,
-     "pdf_mean": 0.9978,
-     "jpeg_mean": 0.9918,
+     "pdf_mean": 0.9973,
+     "jpeg_mean": 0.9913,
      "sharper_n": 10,
-     "sharper_pdf": 0.9971,
-     "sharper_jpeg": 0.9939,
+     "sharper_pdf": 0.9964,
+     "sharper_jpeg": 0.9932,
      "upscaled_n": 5,
      "upscaled_pdf": 0.9993,
      "upscaled_jpeg": 0.9876,
-     "all96_pdf": 0.9674,
-     "all96_jpeg": 0.9664
+     "all96_pdf": 0.9673,
+     "all96_jpeg": 0.9663
     }
    }
   }
@@ -48549,16 +49378,16 @@
     "arm": "whole",
     "n": 16,
     "ok": 16,
-    "nes": 0.9507,
-    "nes_answered": 0.9507,
-    "chrf": 0.9505,
+    "nes": 0.9505,
+    "nes_answered": 0.9505,
+    "chrf": 0.9487,
     "order_edit": "",
     "order_pages": 0,
     "crops": 0,
     "crops_failed": 0,
     "prompt_tokens": 22796,
     "completion_tokens": 11814,
-    "whole_nes_same": 0.9507,
+    "whole_nes_same": 0.9505,
     "cost": 0.061401
    },
    {
@@ -48567,16 +49396,16 @@
     "arm": "whole",
     "n": 16,
     "ok": 16,
-    "nes": 0.9507,
-    "nes_answered": 0.9507,
-    "chrf": 0.9505,
+    "nes": 0.9505,
+    "nes_answered": 0.9505,
+    "chrf": 0.9487,
     "order_edit": "",
     "order_pages": 0,
     "crops": 0,
     "crops_failed": 0,
     "prompt_tokens": 22796,
     "completion_tokens": 11814,
-    "whole_nes_same": 0.9507,
+    "whole_nes_same": 0.9505,
     "cost": 0.061401
    },
    {
@@ -48621,16 +49450,16 @@
     "arm": "whole",
     "n": 50,
     "ok": 50,
-    "nes": 0.9881,
-    "nes_answered": 0.9881,
-    "chrf": 0.9942,
+    "nes": 0.988,
+    "nes_answered": 0.988,
+    "chrf": 0.9941,
     "order_edit": "",
     "order_pages": 0,
     "crops": 0,
     "crops_failed": 0,
     "prompt_tokens": 71749,
     "completion_tokens": 38807,
-    "whole_nes_same": 0.9881,
+    "whole_nes_same": 0.988,
     "cost": 0.199338
    },
    {
@@ -48675,16 +49504,16 @@
     "arm": "whole",
     "n": 96,
     "ok": 96,
-    "nes": 0.9674,
-    "nes_answered": 0.9674,
-    "chrf": 0.9746,
+    "nes": 0.9673,
+    "nes_answered": 0.9673,
+    "chrf": 0.9743,
     "order_edit": "",
     "order_pages": 0,
     "crops": 0,
     "crops_failed": 0,
     "prompt_tokens": 137639,
     "completion_tokens": 71985,
-    "whole_nes_same": 0.9674,
+    "whole_nes_same": 0.9673,
     "cost": 0.373176
    },
    {
@@ -48693,16 +49522,16 @@
     "arm": "whole",
     "n": 41,
     "ok": 41,
-    "nes": 0.9882,
-    "nes_answered": 0.9882,
-    "chrf": 0.9948,
+    "nes": 0.988,
+    "nes_answered": 0.988,
+    "chrf": 0.9947,
     "order_edit": "",
     "order_pages": 0,
     "crops": 0,
     "crops_failed": 0,
     "prompt_tokens": 58893,
     "completion_tokens": 33677,
-    "whole_nes_same": 0.9882,
+    "whole_nes_same": 0.988,
     "cost": 0.17046
    },
    {
@@ -48836,23 +49665,23 @@
     "arm": "pp-doclayoutv3",
     "n": 16,
     "ok": 15,
-    "nes": 0.7029,
-    "nes_answered": 0.7498,
-    "chrf": 0.7592,
+    "nes": 0.7028,
+    "nes_answered": 0.7496,
+    "chrf": 0.7568,
     "order_edit": "",
     "order_pages": 0,
     "crops": 74,
     "crops_failed": 0,
     "prompt_tokens": 106378,
     "completion_tokens": 25907,
-    "whole_nes_same": 0.9507,
+    "whole_nes_same": 0.9505,
     "cost": 0.176936,
     "paired": {
      "n": 16,
      "delta": -0.2478,
      "p": 0.0001,
-     "lo": -0.3911,
-     "hi": -0.1239
+     "lo": -0.3909,
+     "hi": -0.124
     }
    },
    {
@@ -48861,23 +49690,23 @@
     "arm": "pp-doclayoutv3",
     "n": 16,
     "ok": 15,
-    "nes": 0.7029,
-    "nes_answered": 0.7498,
-    "chrf": 0.7592,
+    "nes": 0.7028,
+    "nes_answered": 0.7496,
+    "chrf": 0.7568,
     "order_edit": "",
     "order_pages": 0,
     "crops": 74,
     "crops_failed": 0,
     "prompt_tokens": 106378,
     "completion_tokens": 25907,
-    "whole_nes_same": 0.9507,
+    "whole_nes_same": 0.9505,
     "cost": 0.176936,
     "paired": {
      "n": 16,
      "delta": -0.2478,
      "p": 0.0001,
-     "lo": -0.3911,
-     "hi": -0.1239
+     "lo": -0.3909,
+     "hi": -0.124
     }
    },
    {
@@ -48936,16 +49765,16 @@
     "arm": "pp-doclayoutv3",
     "n": 50,
     "ok": 50,
-    "nes": 0.9224,
-    "nes_answered": 0.9224,
-    "chrf": 0.9473,
+    "nes": 0.9222,
+    "nes_answered": 0.9222,
+    "chrf": 0.9472,
     "order_edit": "",
     "order_pages": 0,
     "crops": 367,
     "crops_failed": 0,
     "prompt_tokens": 524363,
     "completion_tokens": 83699,
-    "whole_nes_same": 0.9881,
+    "whole_nes_same": 0.988,
     "cost": 0.707141,
     "paired": {
      "n": 50,
@@ -49011,23 +49840,23 @@
     "arm": "pp-doclayoutv3",
     "n": 96,
     "ok": 95,
-    "nes": 0.8485,
-    "nes_answered": 0.8574,
-    "chrf": 0.8895,
+    "nes": 0.8484,
+    "nes_answered": 0.8573,
+    "chrf": 0.889,
     "order_edit": "",
     "order_pages": 0,
     "crops": 826,
     "crops_failed": 0,
     "prompt_tokens": 1181075,
     "completion_tokens": 210186,
-    "whole_nes_same": 0.9674,
+    "whole_nes_same": 0.9673,
     "cost": 1.674003,
     "paired": {
      "n": 96,
      "delta": -0.1189,
      "p": 0.0001,
-     "lo": -0.1562,
-     "hi": -0.085
+     "lo": -0.1563,
+     "hi": -0.0849
     }
    },
    {
@@ -49036,16 +49865,16 @@
     "arm": "pp-doclayoutv3",
     "n": 41,
     "ok": 41,
-    "nes": 0.9544,
-    "nes_answered": 0.9544,
-    "chrf": 0.9707,
+    "nes": 0.9543,
+    "nes_answered": 0.9543,
+    "chrf": 0.9706,
     "order_edit": "",
     "order_pages": 0,
     "crops": 292,
     "crops_failed": 0,
     "prompt_tokens": 417343,
     "completion_tokens": 70588,
-    "whole_nes_same": 0.9882,
+    "whole_nes_same": 0.988,
     "cost": 0.57771,
     "paired": {
      "n": 41,
@@ -49186,23 +50015,23 @@
     "arm": "tiles",
     "n": 16,
     "ok": 16,
-    "nes": 0.9056,
-    "nes_answered": 0.9056,
-    "chrf": 0.9345,
+    "nes": 0.9053,
+    "nes_answered": 0.9053,
+    "chrf": 0.9324,
     "order_edit": "",
     "order_pages": 0,
     "crops": 48,
     "crops_failed": 0,
     "prompt_tokens": 68688,
     "completion_tokens": 25904,
-    "whole_nes_same": 0.9507,
+    "whole_nes_same": 0.9505,
     "cost": 0.148653,
     "paired": {
      "n": 16,
-     "delta": -0.045,
-     "p": 0.0161,
-     "lo": -0.0912,
-     "hi": -0.0107
+     "delta": -0.0452,
+     "p": 0.0168,
+     "lo": -0.0921,
+     "hi": -0.0105
     }
    },
    {
@@ -49211,23 +50040,23 @@
     "arm": "tiles",
     "n": 16,
     "ok": 16,
-    "nes": 0.9056,
-    "nes_answered": 0.9056,
-    "chrf": 0.9345,
+    "nes": 0.9053,
+    "nes_answered": 0.9053,
+    "chrf": 0.9324,
     "order_edit": "",
     "order_pages": 0,
     "crops": 48,
     "crops_failed": 0,
     "prompt_tokens": 68688,
     "completion_tokens": 25904,
-    "whole_nes_same": 0.9507,
+    "whole_nes_same": 0.9505,
     "cost": 0.148653,
     "paired": {
      "n": 16,
-     "delta": -0.045,
-     "p": 0.0161,
-     "lo": -0.0912,
-     "hi": -0.0107
+     "delta": -0.0452,
+     "p": 0.0168,
+     "lo": -0.0921,
+     "hi": -0.0105
     }
    },
    {
@@ -49286,16 +50115,16 @@
     "arm": "tiles",
     "n": 50,
     "ok": 50,
-    "nes": 0.9852,
-    "nes_answered": 0.9852,
-    "chrf": 0.9926,
+    "nes": 0.9851,
+    "nes_answered": 0.9851,
+    "chrf": 0.9925,
     "order_edit": "",
     "order_pages": 0,
     "crops": 149,
     "crops_failed": 0,
     "prompt_tokens": 213219,
     "completion_tokens": 81499,
-    "whole_nes_same": 0.9881,
+    "whole_nes_same": 0.988,
     "cost": 0.465537,
     "paired": {
      "n": 50,
@@ -49361,16 +50190,16 @@
     "arm": "tiles",
     "n": 96,
     "ok": 96,
-    "nes": 0.9105,
-    "nes_answered": 0.9105,
-    "chrf": 0.9553,
+    "nes": 0.9104,
+    "nes_answered": 0.9104,
+    "chrf": 0.9549,
     "order_edit": "",
     "order_pages": 0,
     "crops": 292,
     "crops_failed": 0,
     "prompt_tokens": 417852,
     "completion_tokens": 153823,
-    "whole_nes_same": 0.9674,
+    "whole_nes_same": 0.9673,
     "cost": 0.890224,
     "paired": {
      "n": 96,
@@ -49386,16 +50215,16 @@
     "arm": "tiles",
     "n": 41,
     "ok": 41,
-    "nes": 0.9842,
-    "nes_answered": 0.9842,
-    "chrf": 0.9925,
+    "nes": 0.984,
+    "nes_answered": 0.984,
+    "chrf": 0.9924,
     "order_edit": "",
     "order_pages": 0,
     "crops": 123,
     "crops_failed": 0,
     "prompt_tokens": 176013,
     "completion_tokens": 68853,
-    "whole_nes_same": 0.9882,
+    "whole_nes_same": 0.988,
     "cost": 0.39021,
     "paired": {
      "n": 41,
