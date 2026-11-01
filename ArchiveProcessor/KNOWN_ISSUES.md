@@ -2,6 +2,20 @@
 
 Tracked bugs we've chosen to come back to later. Each entry has enough context to resume cold.
 
+## FIXED (W40.fix-processor-rotation-axis, 2026-10-31): local Vision chose the wrong text axis
+
+`RotationDetector` now takes axis and flip from the first-to-last character direction of one accurate
+Vision pass. The four fast passes could choose the perpendicular axis on short-number tables and dense
+small type, before the accurate recognizer could correct it. Direction votes use pixel coordinates and
+confidence × recognized length; at least 80% must agree. Missing geometry, single characters and mixed
+axes without a dominant direction abstain (`nil`), preserving the OCR model's rotation guess. The dedicated bounded Vision queue remains.
+
+On all 96 frozen upright benchmark pages × four physical turns, exact corrections rose from 342/384
+(89.1%) to 380/384 (99.0%): 29 wrong axes and 13 abstentions became zero wrong axes/flips and four
+abstentions (p034, competing axes, in every turn). This is a development-set orientation check, not an
+OCR transcription score or a guarantee for new pages. The 36 concurrent e2e fixture turns remain exact.
+Reproduce and see limits in [`W40.fix-processor-rotation-axis.md`](../verification/evidence/processor/W40.fix-processor-rotation-axis.md).
+
 ## OPEN (W46.measure-review, 2026-10-31 pass 2): segmentation scoring and kit evidence
 
 At baseline `9d8ab697`, `scripts/segbench/score.py::score_labels` counts unsure gaps as artificial agreements
