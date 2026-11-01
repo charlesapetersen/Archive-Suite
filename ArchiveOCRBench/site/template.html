@@ -368,6 +368,15 @@ footer p { font-size: 13px; }
     <p class="note" id="pub-open-note"></p>
   </section>
 
+  <section class="panel" id="pub-hands" hidden>
+    <div class="head"><h2>kraken PP-OCRv6 on handwriting, and tuned to one hand</h2><span class="meta">NES %, a missing reading as 0 · the Mac's CPU, free (W46.ocr-ppocrv6-hands)</span></div>
+    <p class="note" id="hands-note"></p>
+    <div class="tbl"><table><thead><tr><th>Route</th><th>Public L1-L3 pages</th><th>NES</th><th>L1</th><th>L2</th><th>L3</th><th>Empty</th><th>Owner's hand and mixed pages</th><th>All</th><th>Handwritten</th><th>Mixed</th><th>Empty</th></tr></thead><tbody id="hands-rows"></tbody></table></div>
+    <div class="tbl"><table><thead><tr><th>Pages</th><th>Route</th><th>Minus</th><th>Δ NES points (95% interval)</th><th>p</th></tr></thead><tbody id="hands-pairs"></tbody></table></div>
+    <p class="note" id="hands-tune-note"></p>
+    <div class="tbl"><table><thead><tr><th>Training</th><th>Hand</th><th>Lines</th><th>Device</th><th>Minutes</th><th>Peak GB</th><th>Held-out pages</th><th>Base</th><th>Tuned</th><th>Δ (95% interval)</th></tr></thead><tbody id="hands-tunes"></tbody></table></div>
+  </section>
+
   <section class="panel" id="pub-loops" hidden>
     <div class="head"><h2>Reading the looping pages again</h2><span class="meta">every capped page of the sweep · free (W46.ocr-loops)</span></div>
     <p class="note" id="loops-note"></p>
@@ -870,6 +879,35 @@ if (EO) {
   sel.addEventListener('change', draw);
   draw();
 }
+const PH = DATA.ppocrv6_hands;
+if (PH) {
+  document.getElementById('pub-hands').hidden = false;
+  const f = v => v == null ? '–' : v.toFixed(1);
+  const sg = v => (v >= 0 ? '+' : '−') + Math.abs(v).toFixed(2);
+  const routesH = [...new Set([...PH.public, ...PH.owner].map(r => r.route))];
+  document.getElementById('hands-rows').innerHTML = routesH.map(k => {
+    const p = PH.public.find(r => r.route === k), o = PH.owner.find(r => r.route === k);
+    return '<tr><td>' + k + '</td><td>' + (p ? p.n : '–') + '</td><td>' + f(p && p.nes) + '</td><td>' + f(p && p.strata.L1) + '</td><td>' + f(p && p.strata.L2) +
+      '</td><td>' + f(p && p.strata.L3) + '</td><td>' + (p ? p.empty : '–') + '</td><td>' + (o ? o.n : '–') + '</td><td>' + f(o && o.nes) + '</td><td>' +
+      f(o && o.hand) + '</td><td>' + f(o && o.mixed) + '</td><td>' + (o ? o.empty : '–') + '</td></tr>';
+  }).join('');
+  document.getElementById('hands-pairs').innerHTML = PH.pairs.map(r => '<tr><td>' + (r.set === 'public' ? 'public L1-L3' : 'owner\'s hand and mixed') + ' (' + r.n +
+    ')</td><td>' + r.a + '</td><td>' + r.b + '</td><td>' + sg(r.delta) + ' (' + sg(r.lo) + ' to ' + sg(r.hi) + ')</td><td>' + r.p.toFixed(3) + '</td></tr>').join('');
+  const T = PH.timing, st = (g, k) => T[g] && T[g][k] ? T[g][k].median_s.toFixed(1) + ' s a page, ' + T[g][k].peak_gb.toFixed(1) + ' GB peak' : 'not timed';
+  document.getElementById('hands-note').textContent = 'Kiessling\'s kraken port of PP-OCRv6 medium (kraken 7.1.1, CPU) read on kraken blla baselines (ppocrv6-kraken-blla) and on Apple Vision\'s line boxes as rectangles (ppocrv6-kraken-vision); apple-vision (lines) is Vision\'s own text of those lines. ' +
+    'Public: the ' + PH.sets.public + ' pages of L1-L3, the sources\' own transcriptions, where hands are ranked; the comparators\' figures are those of the stratum table above. ' +
+    'Owner: the ' + PH.sets.owner + ' hand and mixed pages (' + PH.sets.owner_hand + ' handwritten), the agreement-only letters included, on the truth after W46.ocr-hands-rescore: drafted by Claude Opus 5.5 and Gemini 3.8 Flash, only the hand places checked blind by the owner, so the typed and mixed lines there are the drafters\' reading and the table is not a ranking of hands. ' +
+    'That set is not the handwritten chart\'s (16 pages, without the three agreement-only letters, and no mixed pages), and the routes read no typed or printed page, so they are not on the four charts. ' +
+    'Paired differences are over the same pages, route minus comparator; a missing reading scores 0. kraken on CPU is deterministic, so these rows\' rerun floor is 0 and a comparator\'s is the rerun-noise table\'s. ' +
+    'Seconds a page on the M3 Pro, one kraken call each and model load included, so overstated: blla ' + st('blla-public', 'blla') + '; reading on blla lines ' + st('blla-public', 'ocr') + '; reading on Vision lines ' + st('vision', 'ocr') + '.';
+  const lp = Object.entries(PH.line_pairs).map(([h, v]) => h + ': ' + v.kept + ' of ' + v.truth_lines + ' truth lines over ' + v.pages + ' pages').join('; ');
+  document.getElementById('hands-tune-note').textContent = 'Fine-tuned on one hand: the hand\'s own truth lines paired to blla lines on the base model\'s reading (' + lp +
+    '), a few pool lines choosing the epoch, then scored on held-out pages read on blla lines, tuned against the base model on the same lines. Blackwell\'s truth is By the People\'s transcription of the volume. ' +
+    'Rows on the owner\'s hand score agreement with the drafters (the owner checked only the hand places) and rest on one held-out page a fold, so their intervals are wide.';
+  document.getElementById('hands-tunes').innerHTML = PH.tunes.map(t => '<tr><td>' + t.name + '</td><td>' + t.hand + (t.hand === 'owner' ? ' (agreement with the drafters)' : '') +
+    '</td><td>' + t.n + '</td><td>' + t.device + '</td><td>' + f(t.minutes) + '</td><td>' + (t.peak_gb == null ? '–' : t.peak_gb.toFixed(2)) + '</td><td>' + t.pages +
+    '</td><td>' + f(t.base) + '</td><td>' + f(t.tuned) + '</td><td>' + sg(t.delta) + ' (' + sg(t.lo) + ' to ' + sg(t.hi) + ')</td></tr>').join('');
+}
 const LP = DATA.loops;
 if (LP) {
   document.getElementById('pub-loops').hidden = false;
@@ -1119,11 +1157,15 @@ if (PB) {
         (m.server_min == null ? '–' : (m.server_min * (m.gpus || 1)).toFixed(0)) + '</td></tr>';
     }).join('');
     const strata = [...new Set(OS.rows.map(r => r.stratum))].filter(s => s !== 'all').sort();
-    document.getElementById('pub-open-strata-head').innerHTML = '<th>Stratum (NES %, failures as 0)</th>' + order.map(k => '<th>' + k + '</th>').join('');
+    const LR = DATA.ppocrv6_hands ? DATA.ppocrv6_hands.public : [];  // W46.ocr-ppocrv6-hands' line routes, L1-L3 only
+    document.getElementById('pub-open-strata-head').innerHTML = '<th>Stratum (NES %, failures as 0)</th>' + order.map(k => '<th>' + k + '</th>').join('') +
+      LR.map(r => '<th>' + r.route + ' (Mac, L1-L3 only)</th>').join('');
     document.getElementById('pub-open-strata').innerHTML = strata.map(s => '<tr><td>' + s + ' · ' + (STRATUM_NAMES[s] || '') + '</td>' +
-      order.map(k => { const r = OS.rows.find(x => x.route === k && x.subset === 'full895' && x.stratum === s); return '<td>' + p1(r.nes) + '</td>'; }).join('') + '</tr>').join('');
+      order.map(k => { const r = OS.rows.find(x => x.route === k && x.subset === 'full895' && x.stratum === s); return '<td>' + p1(r.nes) + '</td>'; }).join('') +
+      LR.map(r => '<td>' + (r.strata[s] == null ? '–' : r.strata[s].toFixed(1)) + '</td>').join('') + '</tr>').join('');
     document.getElementById('pub-open-note').textContent = OS.status + ' ' + OS.hardware + ' Native routes use the model card\'s own prompt and are scored as written, as Mistral OCR\'s Markdown is; panel rows use the 96\'s prompt. PP-OCRv6 is the stock line detector and recogniser, not a VLM and not a prompt-equivalent row: it reads only Latin and Chinese and interleaves the lines of multi-column pages. A reply that ran to the 8,192-token limit counts as a failure scoring 0; nearly all of them were repetition loops. Word rates pool words, and every Chinese character counts as one, so the Chinese and newspaper pages dominate them. GPU minutes are the server\'s span (vLLM log, or the job for PP-OCRv6), model load included, times the GPUs used; the Qwen comparison rows ran in two jobs and have no single figure. Not scored: ' +
-      OS.not_scored.map(n => n.route + ' (' + n.state + ')').join(' ');
+      OS.not_scored.map(n => n.route + ' (' + n.state + ')').join(' ') +
+      (LR.length ? ' The last columns of the stratum table are line routes read on the Mac on L1-L3 alone (W46.ocr-ppocrv6-hands, below), on the same pages and scorer; they read no other stratum, so they have no row in the 895 table.' : '');
     document.getElementById('pub-open').hidden = false;
   }
   if (PB.specialists && PB.specialists.length) {

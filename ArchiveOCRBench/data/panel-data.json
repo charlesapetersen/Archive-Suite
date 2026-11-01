@@ -40610,6 +40610,428 @@
    }
   }
  },
+ "ppocrv6_hands": {
+  "public": [
+   {
+    "route": "ppocrv6-kraken-blla",
+    "n": 240,
+    "nes": 76.81505950756294,
+    "strata": {
+     "L1": 74.12090625808936,
+     "L2": 67.12196062178754,
+     "L3": 89.20231164281195
+    },
+    "empty": 2
+   },
+   {
+    "route": "ppocrv6-kraken-vision",
+    "n": 240,
+    "nes": 66.35538871821016,
+    "strata": {
+     "L1": 57.64545155032607,
+     "L2": 50.88554778331571,
+     "L3": 90.53516682098872
+    },
+    "empty": 5
+   },
+   {
+    "route": "apple-vision (lines)",
+    "n": 240,
+    "nes": 61.530702283370005,
+    "strata": {
+     "L1": 51.29559002818513,
+     "L2": 43.1024509750906,
+     "L3": 90.19406584683426
+    },
+    "empty": 5
+   }
+  ],
+  "owner": [
+   {
+    "route": "ppocrv6-kraken-blla",
+    "n": 21,
+    "nes": 63.79327386649876,
+    "hand": 64.8445259116707,
+    "mixed": 53.80637943736527,
+    "empty": 0
+   },
+   {
+    "route": "ppocrv6-kraken-vision",
+    "n": 21,
+    "nes": 55.44841501005482,
+    "hand": 54.01028131129232,
+    "mixed": 69.11068514829873,
+    "empty": 0
+   }
+  ],
+  "pairs": [
+   {
+    "set": "public",
+    "a": "ppocrv6-kraken-blla",
+    "b": "lightonocr3-4b",
+    "n": 240,
+    "delta": -9.4,
+    "lo": -11.27,
+    "hi": -7.54,
+    "p": 0.0
+   },
+   {
+    "set": "public",
+    "a": "ppocrv6-kraken-blla",
+    "b": "ppocrv6-medium",
+    "n": 240,
+    "delta": 14.7,
+    "lo": 11.72,
+    "hi": 17.66,
+    "p": 0.0
+   },
+   {
+    "set": "public",
+    "a": "ppocrv6-kraken-blla",
+    "b": "qwen3.6-35b-a3b",
+    "n": 240,
+    "delta": -9.33,
+    "lo": -11.6,
+    "hi": -6.99,
+    "p": 0.0
+   },
+   {
+    "set": "public",
+    "a": "ppocrv6-kraken-blla",
+    "b": "infinity-parser2-pro",
+    "n": 240,
+    "delta": -12.49,
+    "lo": -14.47,
+    "hi": -10.61,
+    "p": 0.0
+   },
+   {
+    "set": "public",
+    "a": "ppocrv6-kraken-blla",
+    "b": "gemini3.7-flash-gw",
+    "n": 240,
+    "delta": -12.31,
+    "lo": -14.28,
+    "hi": -10.41,
+    "p": 0.0
+   },
+   {
+    "set": "public",
+    "a": "ppocrv6-kraken-blla",
+    "b": "ppocrv6-kraken-vision",
+    "n": 240,
+    "delta": 10.46,
+    "lo": 7.86,
+    "hi": 13.05,
+    "p": 0.0
+   },
+   {
+    "set": "public",
+    "a": "ppocrv6-kraken-blla",
+    "b": "apple-vision (lines)",
+    "n": 240,
+    "delta": 15.28,
+    "lo": 12.63,
+    "hi": 17.91,
+    "p": 0.0
+   },
+   {
+    "set": "public",
+    "a": "ppocrv6-kraken-vision",
+    "b": "lightonocr3-4b",
+    "n": 240,
+    "delta": -19.86,
+    "lo": -22.77,
+    "hi": -16.93,
+    "p": 0.0
+   },
+   {
+    "set": "public",
+    "a": "ppocrv6-kraken-vision",
+    "b": "ppocrv6-medium",
+    "n": 240,
+    "delta": 4.24,
+    "lo": 1.62,
+    "hi": 6.95,
+    "p": 0.0
+   },
+   {
+    "set": "public",
+    "a": "ppocrv6-kraken-vision",
+    "b": "qwen3.6-35b-a3b",
+    "n": 240,
+    "delta": -19.79,
+    "lo": -22.95,
+    "hi": -16.59,
+    "p": 0.0
+   },
+   {
+    "set": "public",
+    "a": "ppocrv6-kraken-vision",
+    "b": "infinity-parser2-pro",
+    "n": 240,
+    "delta": -22.95,
+    "lo": -25.94,
+    "hi": -20.07,
+    "p": 0.0
+   },
+   {
+    "set": "public",
+    "a": "ppocrv6-kraken-vision",
+    "b": "gemini3.7-flash-gw",
+    "n": 240,
+    "delta": -22.77,
+    "lo": -25.75,
+    "hi": -19.81,
+    "p": 0.0
+   },
+   {
+    "set": "public",
+    "a": "ppocrv6-kraken-vision",
+    "b": "apple-vision (lines)",
+    "n": 240,
+    "delta": 4.82,
+    "lo": 4.08,
+    "hi": 5.6,
+    "p": 0.0
+   },
+   {
+    "set": "owner",
+    "a": "ppocrv6-kraken-blla",
+    "b": "gemini3.1-pro",
+    "n": 21,
+    "delta": -27.51,
+    "lo": -35.82,
+    "hi": -20.57,
+    "p": 0.0
+   },
+   {
+    "set": "owner",
+    "a": "ppocrv6-kraken-blla",
+    "b": "gemini3.5-flash",
+    "n": 21,
+    "delta": -25.31,
+    "lo": -33.24,
+    "hi": -18.59,
+    "p": 0.0
+   },
+   {
+    "set": "owner",
+    "a": "ppocrv6-kraken-blla",
+    "b": "gemini3.8-flash",
+    "n": 21,
+    "delta": -28.41,
+    "lo": -36.56,
+    "hi": -21.5,
+    "p": 0.0
+   },
+   {
+    "set": "owner",
+    "a": "ppocrv6-kraken-blla",
+    "b": "lightonocr-3-4b-mlx8",
+    "n": 21,
+    "delta": -20.79,
+    "lo": -28.29,
+    "hi": -14.42,
+    "p": 0.0
+   },
+   {
+    "set": "owner",
+    "a": "ppocrv6-kraken-blla",
+    "b": "qwen3.5-9b-mlx4",
+    "n": 21,
+    "delta": -21.13,
+    "lo": -28.69,
+    "hi": -14.83,
+    "p": 0.0
+   },
+   {
+    "set": "owner",
+    "a": "ppocrv6-kraken-blla",
+    "b": "apple-vision",
+    "n": 21,
+    "delta": 7.58,
+    "lo": -1.07,
+    "hi": 16.25,
+    "p": 0.11
+   },
+   {
+    "set": "owner",
+    "a": "ppocrv6-kraken-blla",
+    "b": "ppocrv6-medium",
+    "n": 21,
+    "delta": 4.41,
+    "lo": -1.32,
+    "hi": 9.77,
+    "p": 0.15
+   },
+   {
+    "set": "owner",
+    "a": "ppocrv6-kraken-blla",
+    "b": "gemini3.7-flash-gw",
+    "n": 21,
+    "delta": -28.45,
+    "lo": -36.58,
+    "hi": -21.54,
+    "p": 0.0
+   },
+   {
+    "set": "owner",
+    "a": "ppocrv6-kraken-blla",
+    "b": "ppocrv6-kraken-vision",
+    "n": 21,
+    "delta": 8.34,
+    "lo": 0.71,
+    "hi": 16.68,
+    "p": 0.06
+   },
+   {
+    "set": "owner",
+    "a": "ppocrv6-kraken-vision",
+    "b": "gemini3.1-pro",
+    "n": 21,
+    "delta": -35.85,
+    "lo": -44.19,
+    "hi": -27.91,
+    "p": 0.0
+   },
+   {
+    "set": "owner",
+    "a": "ppocrv6-kraken-vision",
+    "b": "gemini3.5-flash",
+    "n": 21,
+    "delta": -33.66,
+    "lo": -42.27,
+    "hi": -25.19,
+    "p": 0.0
+   },
+   {
+    "set": "owner",
+    "a": "ppocrv6-kraken-vision",
+    "b": "gemini3.8-flash",
+    "n": 21,
+    "delta": -36.75,
+    "lo": -45.33,
+    "hi": -28.21,
+    "p": 0.0
+   },
+   {
+    "set": "owner",
+    "a": "ppocrv6-kraken-vision",
+    "b": "lightonocr-3-4b-mlx8",
+    "n": 21,
+    "delta": -29.13,
+    "lo": -38.15,
+    "hi": -19.98,
+    "p": 0.0
+   },
+   {
+    "set": "owner",
+    "a": "ppocrv6-kraken-vision",
+    "b": "qwen3.5-9b-mlx4",
+    "n": 21,
+    "delta": -29.47,
+    "lo": -37.39,
+    "hi": -21.92,
+    "p": 0.0
+   },
+   {
+    "set": "owner",
+    "a": "ppocrv6-kraken-vision",
+    "b": "apple-vision",
+    "n": 21,
+    "delta": -0.77,
+    "lo": -4.8,
+    "hi": 3.3,
+    "p": 0.72
+   },
+   {
+    "set": "owner",
+    "a": "ppocrv6-kraken-vision",
+    "b": "ppocrv6-medium",
+    "n": 21,
+    "delta": -3.94,
+    "lo": -12.7,
+    "hi": 4.44,
+    "p": 0.4
+   },
+   {
+    "set": "owner",
+    "a": "ppocrv6-kraken-vision",
+    "b": "gemini3.7-flash-gw",
+    "n": 21,
+    "delta": -36.79,
+    "lo": -45.01,
+    "hi": -28.86,
+    "p": 0.0
+   }
+  ],
+  "tunes": [
+   {
+    "name": "blackwell-n20-cpu",
+    "hand": "blackwell",
+    "n": 20,
+    "device": "cpu",
+    "minutes": 6.9,
+    "peak_gb": 3.56,
+    "pages": 16,
+    "tuned": 59.602540152673505,
+    "base": 59.741122972489634,
+    "delta": -0.13858281981613407,
+    "lo": -0.8369481872271689,
+    "hi": 0.5958501904913973
+   }
+  ],
+  "sets": {
+   "public": 240,
+   "owner": 21,
+   "owner_hand": 19
+  },
+  "line_pairs": {
+   "owner": {
+    "pages": 4,
+    "truth_lines": 88,
+    "kept": 77
+   },
+   "blackwell": {
+    "pages": 40,
+    "truth_lines": 1386,
+    "kept": 1004
+   }
+  },
+  "timing": {
+   "blla-public": {
+    "blla": {
+     "calls": 164,
+     "pages": 164,
+     "median_s": 10.4,
+     "peak_gb": 5.86
+    },
+    "ocr": {
+     "calls": 62,
+     "pages": 177,
+     "median_s": 13.6,
+     "peak_gb": 5.87
+    }
+   },
+   "vision": {
+    "ocr": {
+     "calls": 25,
+     "pages": 239,
+     "median_s": 4.2,
+     "peak_gb": 5.78
+    }
+   },
+   "train": {
+    "train": {
+     "calls": 4,
+     "pages": 4,
+     "median_s": 395.3,
+     "peak_gb": 3.56
+    }
+   }
+  }
+ },
  "dewarp": {
   "item": "W46.enh-dewarp",
   "report": "enh-dewarp.md",

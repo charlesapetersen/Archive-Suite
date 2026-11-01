@@ -95,7 +95,11 @@ per-page answers the chart needs), the route stays off and the page or this READ
 truth runs are added as `own_hardware.routes` entries in `data/inputs.json`; `ocr_pages_export.py` then adds their
 pages to `ocr-pages.csv`, and a new route that has read the 895 gets a `PUBLIC_TWIN` entry in `build.py`. Known gaps
 today: part 5 (rankings, difficulty curves, cascades) covers the 29 routes it was fitted on, not Gemini 3.7 Flash or the cluster runs
-other than FarmShare's Qwen3.6 27B.
+other than FarmShare's Qwen3.6 27B. W46.ocr-ppocrv6-hands' line routes (kraken PP-OCRv6 on blla and on Vision lines, and
+Vision's text of its own lines) read only the public L1-L3 and the owner's 21 hand and mixed pages: they join part 7's
+stratum table as L1-L3 columns, but not the 895 table (no other stratum read), not the 96's four charts, the ranking
+table or part 5 (no typed or printed page read, and their 19 handwritten pages include the three agreement-only letters
+the 16-page handwritten chart leaves out), so their owner figures stay in their own panel.
 
 ## What is here
 
@@ -198,6 +202,12 @@ record:
   order-free bag-of-words F1, its order gap and the missed and added word rates, each arm paired with its own
   whole page; the regions table's order-free column. The 96's truth has no reading order, so the order-free loss is
   the one to quote there.
+- `ocr-ppocrv6-hands.json` (`scripts/segbench/ocr_ppocrv6_hands.py report`, W46.ocr-ppocrv6-hands): kraken's port of
+  PP-OCRv6 medium on kraken blla lines and on Apple Vision's line boxes, and Vision's own text of those lines, on the
+  Mac's CPU, on the public L1-L3 (240 pages) and the owner's 21 hand and mixed pages, and fine-tuned on one hand. Part
+  7's panel shows the item's own routes (the comparators in the file are already on the page; `build.py` stops if their
+  L1-L3 figures part from the open sweep's), their paired differences, and every fine-tune row. Owner-hand rows are
+  agreement with the drafters: that truth was drafted by models and only its hand places were owner-checked.
 - `options.md`: the segmentation approaches on the test boxes (manual, Claude, Gemini, ChatGPT, Claude and
   ChatGPT together), each at the flag level frozen on the development boxes, with their API cost.
 - `cheap-models.md`: the three cheap segmentation finalists (GLM-5.3 Flash, GPT-5.6 Luna, Qwen3.5 Flash) at the

@@ -74,6 +74,9 @@ LOOPS = PUBLIC / "loop-rerun-20261021.json"  # W46.ocr-loops: corpus/loop_rerun.
 REGIONS = PUBLIC / "regions-20261021.json"  # W46.ocr-regions: whole page, detector regions and overlapping tiles
 REGIONS_GW = PUBLIC / "regions-gateway-20261028.json"  # W46.ocr-regions-paid: corpus/regions_gateway.py score, Gemini 3.7
 REGIONS_ORDERFREE = PUBLIC / "regions-orderfree-20261030.json"  # W46.ocr-rescore-offline: corpus/regions_orderfree.py
+PPOCRV6_HANDS = RESULTS / "ocr-ppocrv6-hands.json"  # W46.ocr-ppocrv6-hands: ocr_ppocrv6_hands.py report, kraken PP-OCRv6
+# The line routes that item measured; every other row of its tables is a cached comparator already on the page.
+PPOCRV6_HANDS_ROUTES = ("ppocrv6-kraken-blla", "ppocrv6-kraken-vision", "apple-vision (lines)")
 OCR_PAGES = RESULTS / "ocr-pages.csv"  # ocr_pages_export.py: every whole-page route's score on every page of the 96
 OCR_SCORERS_PAGES = RESULTS / "ocr-scorers-pages.csv"  # ocr_rescore.py's per-page rows, both sets
 OPEN_SWEEP = HERE / "data" / "open-sweep-20261019.json"  # the open-model sweep's receipts (hand-entered, sourced)
@@ -788,6 +791,39 @@ def logprob():
     return {"escalation_route": d["escalation_route"], "rows": rows, "budget": budget}
 
 
+def ppocrv6_hands(sweep):
+    """W46.ocr-ppocrv6-hands: kraken's PP-OCRv6 medium on kraken blla lines and on Apple Vision's line boxes (and
+    Vision's own text of those lines), on the public L1-L3 and the owner's hand and mixed pages, and its fine-tunes on
+    one hand. Only the item's own routes are kept; the comparators are on the page already. Their L1-L3 figures in the
+    result must equal the open sweep's, which is what lets the line routes join that table's stratum rows."""
+    if not PPOCRV6_HANDS.exists():
+        return None
+    d = json.loads(PPOCRV6_HANDS.read_text())
+    if sweep:
+        at = {(r["route"], r["stratum"]): r["nes"] for r in sweep["rows"] if r["subset"] == "full895"}
+        for r in d["public"]:
+            for s, v in r["strata"].items():
+                if (r["route"], s) in at and abs(v / 100 - at[(r["route"], s)]) > 1e-6:
+                    sys.exit(f"ocr-ppocrv6-hands.json's {r['route']} {s} ({v:.2f}) is not the open sweep's")
+    ours = lambda rows: [r for r in rows if r["route"] in PPOCRV6_HANDS_ROUTES]
+    public_rows = [{"route": r["route"], "n": r["n"], "nes": r["nes"], "strata": r["strata"], "empty": r["empty"]}
+                   for r in ours(d["public"])]
+    owner_rows = [{"route": r["route"], "n": r["n"], "nes": r["nes"], "hand": d["owner_hand"][r["route"]],
+                   "mixed": d["owner_mixed"][r["route"]], "empty": r["empty"]} for r in ours(d["owner"])]
+    pairs = []
+    for setname, pp in (("public", d["public_pairs"]), ("owner", d["owner_pairs"])):
+        seen = set()
+        for k, v in pp.items():
+            a, b = k.split(" vs ")
+            if (b, a) in seen:  # the same pair the other way round
+                continue
+            seen.add((a, b))
+            pairs.append({"set": setname, "a": a, "b": b, **{f: v[f] for f in ("n", "delta", "lo", "hi", "p")}})
+    return {"public": public_rows, "owner": owner_rows, "pairs": pairs, "tunes": d["tunes"], "sets": d["sets"],
+            "line_pairs": d["pairs"],  # the per-page guard lists stay in the report
+            "timing": {g: {k: v for k, v in t.items() if isinstance(v, dict)} for g, t in d["timing"].items()}}
+
+
 def postcorrect():
     """W46.ocr-postcorrect: Qwen3.6-27B correcting cheap readings in the NES 70-90 band, with the image and text only,
     beside the same model's own reading; the easy pages are the abstention check. None until it has run."""
@@ -1106,6 +1142,7 @@ def main():
                 m["usd_per_1000"] = cents(openrouter_price(op, k.removesuffix("-nothink"), tok["prompt"], tok["completion"]))
             elif k.removesuffix("-nothink") in op["models"]:
                 sys.exit(f"dating model {k} has an OpenRouter price but no token means in inputs.json")
+    pub = public()
     built = {"routes": routes, "table_only": extra, "charts": charts, "segmentation": segmentation(op), "handwriting": handwriting(),
              "farmshare": farmshare(op, own["routes"]), "difficulty": diff, "headline": headline(routes), "rerun_noise": rerun_noise(),
              "regions_orderfree": regions_orderfree(), "public_segmentation": public_segmentation(),
@@ -1120,7 +1157,8 @@ def main():
                          if (RESULTS / "seg-date-model-final.json").exists() else None,
              "seg_context": seg_context(), "seg_window_modality": seg_window_modality(),
              "seg_kit_gate_sherlock": seg_kit_gate_sherlock(),
-             "public": public(), "ocr_scorers": ocr_scorers(),
+             "public": pub, "ocr_scorers": ocr_scorers(),
+             "ppocrv6_hands": ppocrv6_hands(pub and pub["open_sweep"]),
              "dewarp": dewarp, "enh_ocr": enh_ocr,
              "loops": json.loads(LOOPS.read_text()) if LOOPS.exists() else None, "regions": regions,
              "layout_order": layout_order(), "layout_photo": layout_photo(layout_photo_data), "logprob": logprob(), "postcorrect": postcorrect()}

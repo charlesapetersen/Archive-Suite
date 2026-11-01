@@ -1,0 +1,1107 @@
+{
+ "public": [
+  {
+   "route": "infinity-parser2-pro",
+   "n": 240,
+   "nes": 89.30296110393509,
+   "strata": {
+    "L1": 92.14063923429727,
+    "L2": 80.03232463881815,
+    "L3": 95.73591943868983
+   },
+   "empty": 2
+  },
+  {
+   "route": "gemini3.7-flash-gw",
+   "n": 240,
+   "nes": 89.1284992849194,
+   "strata": {
+    "L1": 91.22205942008426,
+    "L2": 80.24230752804378,
+    "L3": 95.92113090663017
+   },
+   "empty": 0
+  },
+  {
+   "route": "lightonocr3-4b",
+   "n": 240,
+   "nes": 86.21484233736673,
+   "strata": {
+    "L1": 87.77127926909169,
+    "L2": 77.38681982493891,
+    "L3": 93.48642791806962
+   },
+   "empty": 5
+  },
+  {
+   "route": "qwen3.6-35b-a3b",
+   "n": 240,
+   "nes": 86.14633939694424,
+   "strata": {
+    "L1": 87.02477880808662,
+    "L2": 76.36967522053389,
+    "L3": 95.0445641622122
+   },
+   "empty": 7
+  },
+  {
+   "route": "qwen3.6-27b",
+   "n": 240,
+   "nes": 85.98730560883256,
+   "strata": {
+    "L1": 88.38796126048548,
+    "L2": 73.54142569882762,
+    "L3": 96.03252986718455
+   },
+   "empty": 7
+  },
+  {
+   "route": "qwen3.5-27b",
+   "n": 240,
+   "nes": 85.00734030704952,
+   "strata": {
+    "L1": 86.24580145402663,
+    "L2": 73.00856834936685,
+    "L3": 95.76765111775504
+   },
+   "empty": 9
+  },
+  {
+   "route": "xiaomi-ocr-0",
+   "n": 240,
+   "nes": 84.845603363767,
+   "strata": {
+    "L1": 85.32718727152475,
+    "L2": 76.10146631429362,
+    "L3": 93.10815650548263
+   },
+   "empty": 0
+  },
+  {
+   "route": "qwen3.8-27b",
+   "n": 240,
+   "nes": 83.67134989073573,
+   "strata": {
+    "L1": 82.68429864564874,
+    "L2": 73.22746325132812,
+    "L3": 95.10228777523034
+   },
+   "empty": 7
+  },
+  {
+   "route": "ling3-flash-vl-fp8",
+   "n": 240,
+   "nes": 82.81688709994391,
+   "strata": {
+    "L1": 83.57152054082313,
+    "L2": 72.47131588274013,
+    "L3": 92.4078248762685
+   },
+   "empty": 6
+  },
+  {
+   "route": "lightonocr3-0.8b",
+   "n": 240,
+   "nes": 82.31011546926386,
+   "strata": {
+    "L1": 83.82562370114397,
+    "L2": 72.41258336003077,
+    "L3": 90.69213934661688
+   },
+   "empty": 5
+  },
+  {
+   "route": "glm-ocr",
+   "n": 240,
+   "nes": 81.08910039573966,
+   "strata": {
+    "L1": 78.58445280607931,
+    "L2": 72.70262714519257,
+    "L3": 91.98022123594713
+   },
+   "empty": 3
+  },
+  {
+   "route": "qwen3.5-4b",
+   "n": 240,
+   "nes": 80.88066144440604,
+   "strata": {
+    "L1": 78.66465078600524,
+    "L2": 70.77055121912413,
+    "L3": 93.20678232808879
+   },
+   "empty": 9
+  },
+  {
+   "route": "qwen3-vl-8b",
+   "n": 240,
+   "nes": 80.58148516271903,
+   "strata": {
+    "L1": 83.07165634381515,
+    "L2": 65.10316678244612,
+    "L3": 93.56963236189583
+   },
+   "empty": 18
+  },
+  {
+   "route": "ppocrv6-kraken-blla",
+   "n": 240,
+   "nes": 76.81505950756294,
+   "strata": {
+    "L1": 74.12090625808936,
+    "L2": 67.12196062178754,
+    "L3": 89.20231164281195
+   },
+   "empty": 2
+  },
+  {
+   "route": "paddleocr-vl1.6",
+   "n": 240,
+   "nes": 75.93780873113168,
+   "strata": {
+    "L1": 73.05973078867945,
+    "L2": 60.90926121764592,
+    "L3": 93.84443418706968
+   },
+   "empty": 13
+  },
+  {
+   "route": "paddleocr-vl1.5",
+   "n": 240,
+   "nes": 70.76615666847223,
+   "strata": {
+    "L1": 69.55351863733992,
+    "L2": 50.362627017760715,
+    "L3": 92.38232435031611
+   },
+   "empty": 30
+  },
+  {
+   "route": "ppocrv6-kraken-vision",
+   "n": 240,
+   "nes": 66.35538871821016,
+   "strata": {
+    "L1": 57.64545155032607,
+    "L2": 50.88554778331571,
+    "L3": 90.53516682098872
+   },
+   "empty": 5
+  },
+  {
+   "route": "ppocrv6-medium",
+   "n": 240,
+   "nes": 62.115831086791374,
+   "strata": {
+    "L1": 46.04386457016435,
+    "L2": 50.5834409834321,
+    "L3": 89.72018770677766
+   },
+   "empty": 2
+  },
+  {
+   "route": "apple-vision (lines)",
+   "n": 240,
+   "nes": 61.530702283370005,
+   "strata": {
+    "L1": 51.29559002818513,
+    "L2": 43.1024509750906,
+    "L3": 90.19406584683426
+   },
+   "empty": 5
+  }
+ ],
+ "public_pairs": {
+  "ppocrv6-kraken-blla vs lightonocr3-4b": {
+   "n": 240,
+   "delta": -9.4,
+   "p": 0.0,
+   "lo": -11.27,
+   "hi": -7.54
+  },
+  "ppocrv6-kraken-blla vs ppocrv6-medium": {
+   "n": 240,
+   "delta": 14.7,
+   "p": 0.0,
+   "lo": 11.72,
+   "hi": 17.66
+  },
+  "ppocrv6-kraken-blla vs qwen3.6-35b-a3b": {
+   "n": 240,
+   "delta": -9.33,
+   "p": 0.0,
+   "lo": -11.6,
+   "hi": -6.99
+  },
+  "ppocrv6-kraken-blla vs infinity-parser2-pro": {
+   "n": 240,
+   "delta": -12.49,
+   "p": 0.0,
+   "lo": -14.47,
+   "hi": -10.61
+  },
+  "ppocrv6-kraken-blla vs gemini3.7-flash-gw": {
+   "n": 240,
+   "delta": -12.31,
+   "p": 0.0,
+   "lo": -14.28,
+   "hi": -10.41
+  },
+  "ppocrv6-kraken-blla vs ppocrv6-kraken-vision": {
+   "n": 240,
+   "delta": 10.46,
+   "p": 0.0,
+   "lo": 7.86,
+   "hi": 13.05
+  },
+  "ppocrv6-kraken-blla vs apple-vision (lines)": {
+   "n": 240,
+   "delta": 15.28,
+   "p": 0.0,
+   "lo": 12.63,
+   "hi": 17.91
+  },
+  "ppocrv6-kraken-vision vs lightonocr3-4b": {
+   "n": 240,
+   "delta": -19.86,
+   "p": 0.0,
+   "lo": -22.77,
+   "hi": -16.93
+  },
+  "ppocrv6-kraken-vision vs ppocrv6-medium": {
+   "n": 240,
+   "delta": 4.24,
+   "p": 0.0,
+   "lo": 1.62,
+   "hi": 6.95
+  },
+  "ppocrv6-kraken-vision vs qwen3.6-35b-a3b": {
+   "n": 240,
+   "delta": -19.79,
+   "p": 0.0,
+   "lo": -22.95,
+   "hi": -16.59
+  },
+  "ppocrv6-kraken-vision vs infinity-parser2-pro": {
+   "n": 240,
+   "delta": -22.95,
+   "p": 0.0,
+   "lo": -25.94,
+   "hi": -20.07
+  },
+  "ppocrv6-kraken-vision vs gemini3.7-flash-gw": {
+   "n": 240,
+   "delta": -22.77,
+   "p": 0.0,
+   "lo": -25.75,
+   "hi": -19.81
+  },
+  "ppocrv6-kraken-vision vs ppocrv6-kraken-blla": {
+   "n": 240,
+   "delta": -10.46,
+   "p": 0.0,
+   "lo": -13.05,
+   "hi": -7.86
+  },
+  "ppocrv6-kraken-vision vs apple-vision (lines)": {
+   "n": 240,
+   "delta": 4.82,
+   "p": 0.0,
+   "lo": 4.08,
+   "hi": 5.6
+  }
+ },
+ "owner": [
+  {
+   "route": "gemini3.7-flash-gw",
+   "n": 21,
+   "nes": 92.2403241937356,
+   "strata": {
+    "S0": 92.2403241937356
+   },
+   "empty": 0
+  },
+  {
+   "route": "gemini3.8-flash",
+   "n": 21,
+   "nes": 92.199861471969,
+   "strata": {
+    "S0": 92.199861471969
+   },
+   "empty": 0
+  },
+  {
+   "route": "gemini3.1-pro",
+   "n": 21,
+   "nes": 91.30072273418692,
+   "strata": {
+    "S0": 91.30072273418692
+   },
+   "empty": 0
+  },
+  {
+   "route": "gemini3.5-flash",
+   "n": 21,
+   "nes": 89.10667487540536,
+   "strata": {
+    "S0": 89.10667487540536
+   },
+   "empty": 0
+  },
+  {
+   "route": "claude-sonnet5.5",
+   "n": 21,
+   "nes": 89.02858930496146,
+   "strata": {
+    "S0": 89.02858930496146
+   },
+   "empty": 0
+  },
+  {
+   "route": "infinity-parser2-pro",
+   "n": 21,
+   "nes": 88.79750535017426,
+   "strata": {
+    "S0": 88.79750535017426
+   },
+   "empty": 0
+  },
+  {
+   "route": "qwen3.6-27b",
+   "n": 21,
+   "nes": 87.60111424294223,
+   "strata": {
+    "S0": 87.60111424294223
+   },
+   "empty": 0
+  },
+  {
+   "route": "qwen3.5-27b (FarmShare panel)",
+   "n": 21,
+   "nes": 87.50181603641103,
+   "strata": {
+    "S0": 87.50181603641103
+   },
+   "empty": 0
+  },
+  {
+   "route": "gemini3.5-flash-lite",
+   "n": 21,
+   "nes": 87.36294157088727,
+   "strata": {
+    "S0": 87.36294157088727
+   },
+   "empty": 0
+  },
+  {
+   "route": "qwen3-vl-235b",
+   "n": 21,
+   "nes": 87.32976503292757,
+   "strata": {
+    "S0": 87.32976503292757
+   },
+   "empty": 0
+  },
+  {
+   "route": "gemma4-31b",
+   "n": 21,
+   "nes": 87.27941599340629,
+   "strata": {
+    "S0": 87.27941599340629
+   },
+   "empty": 0
+  },
+  {
+   "route": "qwen3.8-flash",
+   "n": 21,
+   "nes": 86.89319470411928,
+   "strata": {
+    "S0": 86.89319470411928
+   },
+   "empty": 0
+  },
+  {
+   "route": "qwen3.5-397b",
+   "n": 21,
+   "nes": 86.3901287954209,
+   "strata": {
+    "S0": 86.3901287954209
+   },
+   "empty": 0
+  },
+  {
+   "route": "ling3-flash-vl-fp8",
+   "n": 21,
+   "nes": 86.37626692500946,
+   "strata": {
+    "S0": 86.37626692500946
+   },
+   "empty": 0
+  },
+  {
+   "route": "qwen3.5-9b",
+   "n": 21,
+   "nes": 85.92566880657944,
+   "strata": {
+    "S0": 85.92566880657944
+   },
+   "empty": 0
+  },
+  {
+   "route": "qwen3.8-27b",
+   "n": 21,
+   "nes": 85.74466238468754,
+   "strata": {
+    "S0": 85.74466238468754
+   },
+   "empty": 0
+  },
+  {
+   "route": "mistral-ocr",
+   "n": 21,
+   "nes": 85.3247305661949,
+   "strata": {
+    "S0": 85.3247305661949
+   },
+   "empty": 0
+  },
+  {
+   "route": "qwen3.5-9b-mlx4",
+   "n": 21,
+   "nes": 84.91882598168101,
+   "strata": {
+    "S0": 84.91882598168101
+   },
+   "empty": 0
+  },
+  {
+   "route": "qwen3.5-9b-mlx4-logprob",
+   "n": 21,
+   "nes": 84.91882598168101,
+   "strata": {
+    "S0": 84.91882598168101
+   },
+   "empty": 0
+  },
+  {
+   "route": "qwen3-vl-8b (FarmShare panel)",
+   "n": 21,
+   "nes": 84.89695178854977,
+   "strata": {
+    "S0": 84.89695178854977
+   },
+   "empty": 0
+  },
+  {
+   "route": "gemini3.1-flash-lite",
+   "n": 21,
+   "nes": 84.83326183933795,
+   "strata": {
+    "S0": 84.83326183933795
+   },
+   "empty": 1
+  },
+  {
+   "route": "mistral-large4",
+   "n": 21,
+   "nes": 84.69870239684697,
+   "strata": {
+    "S0": 84.69870239684697
+   },
+   "empty": 0
+  },
+  {
+   "route": "qwen3.6-35b-a3b",
+   "n": 21,
+   "nes": 84.61934972683841,
+   "strata": {
+    "S0": 84.61934972683841
+   },
+   "empty": 0
+  },
+  {
+   "route": "lightonocr-3-4b-mlx8",
+   "n": 21,
+   "nes": 84.58061135937677,
+   "strata": {
+    "S0": 84.58061135937677
+   },
+   "empty": 0
+  },
+  {
+   "route": "lightonocr-3-4b-mlx8-logprob",
+   "n": 21,
+   "nes": 84.58061135937677,
+   "strata": {
+    "S0": 84.58061135937677
+   },
+   "empty": 0
+  },
+  {
+   "route": "lightonocr3-4b",
+   "n": 21,
+   "nes": 84.40739933091096,
+   "strata": {
+    "S0": 84.40739933091096
+   },
+   "empty": 0
+  },
+  {
+   "route": "qwen3.5-35b-a3b",
+   "n": 21,
+   "nes": 84.38898215011835,
+   "strata": {
+    "S0": 84.38898215011835
+   },
+   "empty": 0
+  },
+  {
+   "route": "gpt5.4-mini",
+   "n": 21,
+   "nes": 83.39902651709039,
+   "strata": {
+    "S0": 83.39902651709039
+   },
+   "empty": 0
+  },
+  {
+   "route": "qwen3.5-4b",
+   "n": 21,
+   "nes": 82.0804614103584,
+   "strata": {
+    "S0": 82.0804614103584
+   },
+   "empty": 0
+  },
+  {
+   "route": "glm-ocr",
+   "n": 21,
+   "nes": 81.41976968252436,
+   "strata": {
+    "S0": 81.41976968252436
+   },
+   "empty": 0
+  },
+  {
+   "route": "xiaomi-ocr-0-bf16",
+   "n": 21,
+   "nes": 81.28368653031728,
+   "strata": {
+    "S0": 81.28368653031728
+   },
+   "empty": 0
+  },
+  {
+   "route": "qwen3-vl-8b (local panel)",
+   "n": 21,
+   "nes": 81.18424218318603,
+   "strata": {
+    "S0": 81.18424218318603
+   },
+   "empty": 1
+  },
+  {
+   "route": "xiaomi-ocr-0",
+   "n": 21,
+   "nes": 81.14653761480665,
+   "strata": {
+    "S0": 81.14653761480665
+   },
+   "empty": 0
+  },
+  {
+   "route": "qwen3-vl-8b-mlx4",
+   "n": 21,
+   "nes": 79.80304016420916,
+   "strata": {
+    "S0": 79.80304016420916
+   },
+   "empty": 1
+  },
+  {
+   "route": "fs-churro",
+   "n": 21,
+   "nes": 79.30447013370721,
+   "strata": {
+    "S0": 79.30447013370721
+   },
+   "empty": 1
+  },
+  {
+   "route": "mistral-medium3.5",
+   "n": 21,
+   "nes": 78.35922213971692,
+   "strata": {
+    "S0": 78.35922213971692
+   },
+   "empty": 0
+  },
+  {
+   "route": "lightonocr3-0.8b",
+   "n": 21,
+   "nes": 77.70023257109315,
+   "strata": {
+    "S0": 77.70023257109315
+   },
+   "empty": 1
+  },
+  {
+   "route": "paddleocr-vl1.6",
+   "n": 21,
+   "nes": 76.32347262603339,
+   "strata": {
+    "S0": 76.32347262603339
+   },
+   "empty": 0
+  },
+  {
+   "route": "gpt5.6-luna",
+   "n": 21,
+   "nes": 75.91634322590716,
+   "strata": {
+    "S0": 75.91634322590716
+   },
+   "empty": 1
+  },
+  {
+   "route": "gemma4-26b-a4b",
+   "n": 21,
+   "nes": 75.82705721963123,
+   "strata": {
+    "S0": 75.82705721963123
+   },
+   "empty": 2
+  },
+  {
+   "route": "qwen3-vl-30b-a3b",
+   "n": 21,
+   "nes": 74.38356834354347,
+   "strata": {
+    "S0": 74.38356834354347
+   },
+   "empty": 1
+  },
+  {
+   "route": "paddleocr-vl1.6-bf16",
+   "n": 21,
+   "nes": 74.21880504931525,
+   "strata": {
+    "S0": 74.21880504931525
+   },
+   "empty": 1
+  },
+  {
+   "route": "mistral-small-24b",
+   "n": 21,
+   "nes": 72.66090989036869,
+   "strata": {
+    "S0": 72.66090989036869
+   },
+   "empty": 2
+  },
+  {
+   "route": "qwen3.5-27b (local panel)",
+   "n": 21,
+   "nes": 70.23826693088021,
+   "strata": {
+    "S0": 70.23826693088021
+   },
+   "empty": 4
+  },
+  {
+   "route": "paddleocr-vl1.5",
+   "n": 21,
+   "nes": 66.90905091349916,
+   "strata": {
+    "S0": 66.90905091349916
+   },
+   "empty": 4
+  },
+  {
+   "route": "ppocrv6-kraken-blla",
+   "n": 21,
+   "nes": 63.79327386649876,
+   "strata": {
+    "S0": 63.79327386649876
+   },
+   "empty": 0
+  },
+  {
+   "route": "ppocrv6-medium",
+   "n": 21,
+   "nes": 59.38620678172075,
+   "strata": {
+    "S0": 59.38620678172075
+   },
+   "empty": 0
+  },
+  {
+   "route": "apple-vision",
+   "n": 21,
+   "nes": 56.21826030423418,
+   "strata": {
+    "S0": 56.21826030423418
+   },
+   "empty": 0
+  },
+  {
+   "route": "ppocrv6-kraken-vision",
+   "n": 21,
+   "nes": 55.44841501005482,
+   "strata": {
+    "S0": 55.44841501005482
+   },
+   "empty": 0
+  },
+  {
+   "route": "granite-docling-258m-mlx",
+   "n": 21,
+   "nes": 8.62557049308182,
+   "strata": {
+    "S0": 8.62557049308182
+   },
+   "empty": 15
+  },
+  {
+   "route": "qwen3-vl-8b-mlx4-loops",
+   "n": 21,
+   "nes": 0.0,
+   "strata": {
+    "S0": 0.0
+   },
+   "empty": 21
+  }
+ ],
+ "owner_hand": {
+  "gemini3.1-pro": 92.24802419709813,
+  "gemini3.5-flash": 90.48082602657244,
+  "gemini3.5-flash-lite": 89.78548084082104,
+  "gemini3.8-flash": 93.79327604513118,
+  "gpt5.4-mini": 83.72183541924998,
+  "gpt5.6-luna": 76.77848317275863,
+  "mistral-large4": 87.94510861958838,
+  "mistral-medium3.5": 78.96970661390658,
+  "qwen3-vl-235b": 89.06858912288412,
+  "qwen3.5-397b": 88.11664055555619,
+  "qwen3.8-flash": 88.8322113290039,
+  "claude-sonnet5.5": 90.17872175853037,
+  "mistral-ocr": 86.46360288559609,
+  "gemini3.1-flash-lite": 85.47061451543567,
+  "gemma4-26b-a4b": 80.28171025294594,
+  "gemma4-31b": 87.52675760750174,
+  "mistral-small-24b": 73.90344121074354,
+  "qwen3-vl-30b-a3b": 75.13079457998138,
+  "qwen3-vl-8b (local panel)": 83.19553416419008,
+  "qwen3.5-27b (local panel)": 70.35157438021056,
+  "qwen3.5-35b-a3b": 85.71966197571764,
+  "qwen3.5-9b": 87.66339076953192,
+  "qwen3.6-27b": 89.24302228922939,
+  "qwen3.6-35b-a3b": 86.21051219203513,
+  "granite-docling-258m-mlx": 9.533525281827275,
+  "lightonocr-3-4b-mlx8": 87.30308048888502,
+  "lightonocr-3-4b-mlx8-logprob": 87.30308048888502,
+  "paddleocr-vl1.6-bf16": 74.0847011652401,
+  "qwen3-vl-8b-mlx4": 86.43060368291806,
+  "qwen3-vl-8b-mlx4-loops": 0.0,
+  "qwen3.5-9b-mlx4": 85.83499244103045,
+  "qwen3.5-9b-mlx4-logprob": 85.83499244103045,
+  "xiaomi-ocr-0-bf16": 83.01545153187428,
+  "apple-vision": 54.43069238578699,
+  "glm-ocr": 81.79955498317831,
+  "lightonocr3-4b": 86.95797937368013,
+  "lightonocr3-0.8b": 78.86925738305622,
+  "paddleocr-vl1.5": 65.97629114314354,
+  "qwen3-vl-8b (FarmShare panel)": 87.29905530696053,
+  "qwen3.5-4b": 83.20939098617285,
+  "ling3-flash-vl-fp8": 87.83994958895713,
+  "ppocrv6-medium": 59.05764922028311,
+  "xiaomi-ocr-0": 82.86386588841518,
+  "paddleocr-vl1.6": 76.43977828000594,
+  "qwen3.8-27b": 87.19959152538762,
+  "infinity-parser2-pro": 89.60118858007077,
+  "fs-churro": 80.90203515933509,
+  "qwen3.5-27b (FarmShare panel)": 89.41751146263341,
+  "gemini3.7-flash-gw": 93.12407545389765,
+  "ppocrv6-kraken-blla": 64.8445259116707,
+  "ppocrv6-kraken-vision": 54.01028131129232
+ },
+ "owner_mixed": {
+  "gemini3.1-pro": 82.30135883653033,
+  "gemini3.5-flash": 76.05223893931813,
+  "gemini3.5-flash-lite": 64.34881850651655,
+  "gemini3.8-flash": 77.06242302692834,
+  "gpt5.4-mini": 80.33234194657426,
+  "gpt5.6-luna": 67.7260137308182,
+  "mistral-large4": 53.85784328080355,
+  "mistral-medium3.5": 72.55961963491501,
+  "qwen3-vl-235b": 70.81093617834047,
+  "qwen3.5-397b": 69.98826707413572,
+  "qwen3.8-flash": 68.47253676771535,
+  "claude-sonnet5.5": 78.10233099605668,
+  "mistral-ocr": 74.50544353188354,
+  "gemini3.1-flash-lite": 78.77841141640972,
+  "gemma4-26b-a4b": 33.50785340314136,
+  "gemma4-31b": 84.92967065949958,
+  "mistral-small-24b": 60.856862346807496,
+  "qwen3-vl-30b-a3b": 67.2849190973833,
+  "qwen3-vl-8b (local panel)": 62.07696836364764,
+  "qwen3.5-27b (local panel)": 69.1618461622418,
+  "qwen3.5-35b-a3b": 71.74752380692516,
+  "qwen3.5-9b": 69.41731015853092,
+  "qwen3.6-27b": 72.00298780321427,
+  "qwen3.6-35b-a3b": 69.5033063074696,
+  "granite-docling-258m-mlx": 0.0,
+  "lightonocr-3-4b-mlx8": 58.71715462904854,
+  "lightonocr-3-4b-mlx8-logprob": 58.71715462904854,
+  "paddleocr-vl1.6-bf16": 75.49279194802916,
+  "qwen3-vl-8b-mlx4": 16.841186736474693,
+  "qwen3-vl-8b-mlx4-loops": 0.0,
+  "qwen3.5-9b-mlx4": 76.21524461786134,
+  "qwen3.5-9b-mlx4-logprob": 76.21524461786134,
+  "xiaomi-ocr-0-bf16": 64.83191901552567,
+  "apple-vision": 73.20015552948239,
+  "glm-ocr": 77.81180932631177,
+  "lightonocr3-4b": 60.17688892460373,
+  "lightonocr3-0.8b": 66.59449685744406,
+  "paddleocr-vl1.5": 75.77026873187751,
+  "qwen3-vl-8b (FarmShare panel)": 62.07696836364764,
+  "qwen3.5-4b": 71.35563044012115,
+  "ling3-flash-vl-fp8": 72.47128161750662,
+  "ppocrv6-medium": 62.50750361537832,
+  "xiaomi-ocr-0": 64.83191901552567,
+  "paddleocr-vl1.6": 75.21856891329426,
+  "qwen3.8-27b": 71.92283554803679,
+  "infinity-parser2-pro": 81.16251466615734,
+  "fs-churro": 64.12760239024257,
+  "qwen3.5-27b (FarmShare panel)": 69.30270948729843,
+  "gemini3.7-flash-gw": 83.84468722219623,
+  "ppocrv6-kraken-blla": 53.80637943736527,
+  "ppocrv6-kraken-vision": 69.11068514829873
+ },
+ "owner_pairs": {
+  "ppocrv6-kraken-blla vs gemini3.1-pro": {
+   "n": 21,
+   "delta": -27.51,
+   "p": 0.0,
+   "lo": -35.82,
+   "hi": -20.57
+  },
+  "ppocrv6-kraken-blla vs gemini3.5-flash": {
+   "n": 21,
+   "delta": -25.31,
+   "p": 0.0,
+   "lo": -33.24,
+   "hi": -18.59
+  },
+  "ppocrv6-kraken-blla vs gemini3.8-flash": {
+   "n": 21,
+   "delta": -28.41,
+   "p": 0.0,
+   "lo": -36.56,
+   "hi": -21.5
+  },
+  "ppocrv6-kraken-blla vs lightonocr-3-4b-mlx8": {
+   "n": 21,
+   "delta": -20.79,
+   "p": 0.0,
+   "lo": -28.29,
+   "hi": -14.42
+  },
+  "ppocrv6-kraken-blla vs qwen3.5-9b-mlx4": {
+   "n": 21,
+   "delta": -21.13,
+   "p": 0.0,
+   "lo": -28.69,
+   "hi": -14.83
+  },
+  "ppocrv6-kraken-blla vs apple-vision": {
+   "n": 21,
+   "delta": 7.58,
+   "p": 0.11,
+   "lo": -1.07,
+   "hi": 16.25
+  },
+  "ppocrv6-kraken-blla vs ppocrv6-medium": {
+   "n": 21,
+   "delta": 4.41,
+   "p": 0.15,
+   "lo": -1.32,
+   "hi": 9.77
+  },
+  "ppocrv6-kraken-blla vs gemini3.7-flash-gw": {
+   "n": 21,
+   "delta": -28.45,
+   "p": 0.0,
+   "lo": -36.58,
+   "hi": -21.54
+  },
+  "ppocrv6-kraken-blla vs ppocrv6-kraken-vision": {
+   "n": 21,
+   "delta": 8.34,
+   "p": 0.06,
+   "lo": 0.71,
+   "hi": 16.68
+  },
+  "ppocrv6-kraken-vision vs gemini3.1-pro": {
+   "n": 21,
+   "delta": -35.85,
+   "p": 0.0,
+   "lo": -44.19,
+   "hi": -27.91
+  },
+  "ppocrv6-kraken-vision vs gemini3.5-flash": {
+   "n": 21,
+   "delta": -33.66,
+   "p": 0.0,
+   "lo": -42.27,
+   "hi": -25.19
+  },
+  "ppocrv6-kraken-vision vs gemini3.8-flash": {
+   "n": 21,
+   "delta": -36.75,
+   "p": 0.0,
+   "lo": -45.33,
+   "hi": -28.21
+  },
+  "ppocrv6-kraken-vision vs lightonocr-3-4b-mlx8": {
+   "n": 21,
+   "delta": -29.13,
+   "p": 0.0,
+   "lo": -38.15,
+   "hi": -19.98
+  },
+  "ppocrv6-kraken-vision vs qwen3.5-9b-mlx4": {
+   "n": 21,
+   "delta": -29.47,
+   "p": 0.0,
+   "lo": -37.39,
+   "hi": -21.92
+  },
+  "ppocrv6-kraken-vision vs apple-vision": {
+   "n": 21,
+   "delta": -0.77,
+   "p": 0.72,
+   "lo": -4.8,
+   "hi": 3.3
+  },
+  "ppocrv6-kraken-vision vs ppocrv6-medium": {
+   "n": 21,
+   "delta": -3.94,
+   "p": 0.4,
+   "lo": -12.7,
+   "hi": 4.44
+  },
+  "ppocrv6-kraken-vision vs gemini3.7-flash-gw": {
+   "n": 21,
+   "delta": -36.79,
+   "p": 0.0,
+   "lo": -45.01,
+   "hi": -28.86
+  },
+  "ppocrv6-kraken-vision vs ppocrv6-kraken-blla": {
+   "n": 21,
+   "delta": -8.34,
+   "p": 0.06,
+   "lo": -16.68,
+   "hi": -0.71
+  }
+ },
+ "tunes": [
+  {
+   "name": "blackwell-n20-cpu",
+   "hand": "blackwell",
+   "n": 20,
+   "device": "cpu",
+   "minutes": 6.9,
+   "peak_gb": 3.56,
+   "pages": 16,
+   "tuned": 59.602540152673505,
+   "base": 59.741122972489634,
+   "delta": -0.13858281981613407,
+   "lo": -0.8369481872271689,
+   "hi": 0.5958501904913973
+  }
+ ],
+ "timing": {
+  "blla-public": {
+   "blla": {
+    "calls": 164,
+    "pages": 164,
+    "median_s": 10.4,
+    "peak_gb": 5.86
+   },
+   "ocr": {
+    "calls": 62,
+    "pages": 177,
+    "median_s": 13.6,
+    "peak_gb": 5.87
+   },
+   "killed": [
+    "btp__mgw500029-277",
+    "btp__mgw500029-301",
+    "btp__mgw500029-73",
+    "btp__afc1945001_ms03035-116",
+    "btp__afc1945001_ms04060-21",
+    "btp__afc1945001_ms04074-14",
+    "btp__afc1945001_ms05084-34",
+    "btp__afc1945001_ms06093-87",
+    "btp__mss4602900303-722",
+    "btp__mss4602900304-76",
+    "btp__mss4602900305-1058",
+    "btp__mss4602900305-893",
+    "btp__mss35634010-18",
+    "btp__afc1945001_ms01001-59",
+    "btp__afc1945001_ms02018-27",
+    "btp__afc1945001_ms03040-6"
+   ],
+   "failed": []
+  },
+  "vision": {
+   "ocr": {
+    "calls": 25,
+    "pages": 239,
+    "median_s": 4.2,
+    "peak_gb": 5.78
+   },
+   "killed": [
+    "btp__mss412100072-37",
+    "bentham__096_038_003",
+    "btp__mgw6a00008-9",
+    "btp__afc1945001_ms02017-58",
+    "btp__afc1945001_ms03036-40",
+    "btp__afc1945001_ms04060-21"
+   ],
+   "failed": []
+  },
+  "train": {
+   "train": {
+    "calls": 4,
+    "pages": 4,
+    "median_s": 395.3,
+    "peak_gb": 3.56
+   },
+   "killed": [
+    "blackwell-n20-cpu"
+   ],
+   "failed": [
+    "blackwell-n20-cpu"
+   ]
+  }
+ },
+ "pairs": {
+  "owner": {
+   "pages": 4,
+   "truth_lines": 88,
+   "kept": 77
+  },
+  "blackwell": {
+   "pages": 40,
+   "truth_lines": 1386,
+   "kept": 1004
+  }
+ },
+ "sets": {
+  "public": 240,
+  "owner": 21,
+  "owner_hand": 19
+ }
+}
