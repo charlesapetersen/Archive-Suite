@@ -347,8 +347,11 @@ struct SessionProcessingConfig: Sendable {
         return "\(provider.rawValue) · \(model.displayName)"
     }
 
-    /// A short one-line summary for the control panel.
+    /// A short one-line summary for the control panel: the route this session's pages actually take (the
+    /// same precedence as a retry, so a Local Agent or gateway session never reads as direct provider·model),
+    /// then the tagging mode. W40.fix-processor-live-settings-per-run: it used to name the provider even on
+    /// the gateway route and omit the Local Agent, so a stale snapshot was not visible.
     var summary: String {
-        "\(provider.rawValue) · \(gateway?.displayName ?? model.displayName) · \(taggingMode.displayName)"
+        "\(retryBackendDescription) · \(taggingMode.displayName)"
     }
 }

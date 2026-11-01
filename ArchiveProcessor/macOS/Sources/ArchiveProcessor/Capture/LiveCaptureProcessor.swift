@@ -969,6 +969,7 @@ final class LiveCaptureProcessor: ObservableObject {
             // W3.cap-r5 — the optional gate, captured per page at ingest, lets the driver hold THIS page's
             // result (and therefore its segment's `finalizeSegment`) suspended while it delivers a Box.
             Self._recoveryTestOCRStarts.append(key)
+            Self._recoveryTestOCRRoutes.append(config.retryBackendDescription)
             let gate = Self._recoveryTestOCRGate
             let stubTask = Task<OCRResult, Never> { await gate?(); return stub }
             pageTasks[key] = stubTask
@@ -2248,6 +2249,7 @@ final class LiveCaptureProcessor: ObservableObject {
                 self.finalizeSummary = (self.finalizeSummary ?? outcome.summary)
                     + " ⚠️ The filed group IDs could not be saved, so original photos remain in the Backup Folder. Check disk space or permissions before continuing."
             }
+            self.session.releaseSettingsSnapshotIfEmpty()
         }
     }
 
@@ -2346,6 +2348,15 @@ final class LiveCaptureProcessor: ObservableObject {
         }
         session.finishPreparedClear()
         clearSessionState()
+        session.releaseSettingsSnapshotIfEmpty()
+    }
+
+    /// Nothing of the current session is left here: no staged or in-flight segment, no OCR call, no Finish
+    /// pending or running, no blocked recovery. `CaptureSession.releaseSettingsSnapshotIfEmpty` asks this
+    /// before letting the next capture re-read Settings (W40.fix-processor-live-settings-per-run).
+    var holdsNoSessionWork: Bool {
+        !stagingManifestBlocked && !isFinalizing && !pendingFinish
+            && staged.isEmpty && pageTasks.isEmpty && finalizedGroups.isEmpty && statuses.isEmpty
     }
 
     /// Reconcile the Processing pane with a Captured-pane **Clear** (B1): reset the in-memory/UI state that
@@ -2651,6 +2662,9 @@ final class LiveCaptureProcessor: ObservableObject {
     /// Test-only (W3.cap-r2): every page `photoIngested` started an OCR for while the stub was installed,
     /// in order. One entry per paid call the operator would have been billed for.
     static var _recoveryTestOCRStarts: [PageKey] = []
+    /// Test-only (W40.fix-processor-live-settings-per-run): the route each of those starts would have
+    /// called (`retryBackendDescription` of the config it was started with), in the same order.
+    static var _recoveryTestOCRRoutes: [String] = []
 
     /// Test-only ($0, W3.cap-r5): when set, the stub OCR Task awaits this before returning its result, so a
     /// driver can hold a `finalizeSegment` SUSPENDED at its per-page OCR await and deliver an out-of-order

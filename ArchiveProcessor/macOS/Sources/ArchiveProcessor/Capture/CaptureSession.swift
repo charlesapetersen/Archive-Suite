@@ -233,6 +233,10 @@ final class CaptureSession: ObservableObject {
     /// the config so mid-session Settings changes don't affect the running session.
     func activateProcessingIfNeeded() {
         guard processingMode == .undecided else { return }
+        if let dir = recoveryTestStagingDir, let cfg = recoveryTestSettings {
+            _recoveryTestBeginLive(config: cfg, stagingDir: dir)   // test-armed session only; see below
+            return
+        }
         if liveModeEnabled {
             let cfg = SessionProcessingConfig.fromDefaults()
             config = cfg
@@ -241,6 +245,22 @@ final class CaptureSession: ObservableObject {
         } else {
             processingMode = .stageForLater
         }
+    }
+
+    /// W40.fix-processor-live-settings-per-run — the snapshot belongs to one session, not to the app run.
+    /// Once Finish or Clear has emptied the session (no photo left, and for live nothing staged, in flight or
+    /// blocked), drop it so the next capture's `activateProcessingIfNeeded` reads Settings again. Until this,
+    /// `processingMode` was never reset in a run, so a route changed in Settings (direct Gemini → gateway)
+    /// reached Live Capture only after a relaunch. A session that still holds anything keeps its snapshot:
+    /// a retry or a second Finish must reuse the route its pages began on. Nor does a Clear whose last
+    /// manifest write failed: its marker is still set, and a re-activation would read the committed Clear in
+    /// `loadStagingManifest` and finish it again — Trashing the page that triggered it.
+    func releaseSettingsSnapshotIfEmpty() {
+        guard processingMode != .undecided, photos.isEmpty, clearPhase == nil, clearToken == nil else { return }
+        if processingMode == .live, !liveProcessor.holdsNoSessionWork { return }
+        processingMode = .undecided
+        config = nil
+        settingsLocked = false
     }
 
     func markPaired() { notePhoneContact() }
@@ -282,10 +302,18 @@ final class CaptureSession: ObservableObject {
     /// operator's genuine legacy staging dirs orphaned and delete them. Recovery Core Directive: a test
     /// must not be able to remove real work, so it takes the arming path that touches nothing outside tmp.
     func _recoveryTestBeginLive(config: SessionProcessingConfig, stagingDir: URL) {
+        recoveryTestStagingDir = stagingDir
+        if recoveryTestSettings == nil { recoveryTestSettings = config }
         self.config = config
         processingMode = .live
         liveProcessor._recoveryTestArm(stagingDir: stagingDir, config: config, staged: [])
     }
+    /// Test-only (W40.fix-processor-live-settings-per-run): a session armed by `_recoveryTestBeginLive`
+    /// re-arms the same way once Finish or Clear releases its snapshot, with `recoveryTestSettings` standing
+    /// in for Settings (a driver assigns it to model a Settings change). Never `activate` and never the real
+    /// defaults, for the reason above. Both nil in production.
+    private var recoveryTestStagingDir: URL?
+    var recoveryTestSettings: SessionProcessingConfig?
 
     /// Test-only: when set, the next `ingest` returns nil (simulating a durable-write failure) so the relay
     /// receiver's "no receipt / no delete / no processed-entry on a nil ingest" invariant can be exercised.
@@ -787,6 +815,7 @@ final class CaptureSession: ObservableObject {
             return
         }
         finishPreparedClear()
+        releaseSettingsSnapshotIfEmpty()
     }
 
     /// Finalize cleanup: delete ONLY the source photos that were actually filed into output (their URLs

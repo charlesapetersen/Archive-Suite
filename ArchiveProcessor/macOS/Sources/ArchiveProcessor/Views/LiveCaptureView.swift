@@ -16,6 +16,14 @@ struct LiveCaptureView: View {
 
     /// App-wide choice (Settings ⌘,): live streaming vs. staging for a later batch run.
     @AppStorage(DefaultsKeys.liveProcessingMode) private var liveProcessingMode: String = LiveProcessingMode.stage.rawValue
+    /// Whether THIS session streams live: its own mode once it has one, the Settings choice only while it is
+    /// undecided (W40.fix-processor-live-settings-per-run — a Settings change reaches the next session, not
+    /// the running one, so the pane must not switch under it).
+    private var sessionIsLive: Bool {
+        session.processingMode == .undecided
+            ? liveProcessingMode == LiveProcessingMode.live.rawValue
+            : session.processingMode == .live
+    }
     /// Where finalized live collections are written (shared with Process Files). Empty → Downloads.
     @AppStorage(DefaultsKeys.outputDirectory) private var outputDirPath: String = ""
     // A1 — shared Processing-list state: which segment is expanded.
@@ -280,7 +288,7 @@ struct LiveCaptureView: View {
                 LiveProcessingBox(
                     liveProc: liveProc,
                     session: session,
-                    liveMode: liveProcessingMode == LiveProcessingMode.live.rawValue,
+                    liveMode: sessionIsLive,
                     expandedSegmentID: $expandedSegmentID,
                     onAction: performSegmentAction)
                     .disabled(liveProc.stagingRecoveryBlocked)
@@ -299,7 +307,7 @@ struct LiveCaptureView: View {
                             Spacer()
                             Button("Choose…") { chooseOutputFolder() }.font(.caption)
                         }
-                        if liveProcessingMode != LiveProcessingMode.live.rawValue {
+                        if !sessionIsLive {
                             Text("Set in Process Files for staged captures — they're filed there, not here.")
                                 .font(.caption2).foregroundStyle(.primary)
                                 .fixedSize(horizontal: false, vertical: true)
@@ -307,7 +315,7 @@ struct LiveCaptureView: View {
                     }
                     .frame(maxWidth: .infinity)
                     .padding(6)
-                    .disabled(liveProcessingMode != LiveProcessingMode.live.rawValue)
+                    .disabled(!sessionIsLive)
                 } label: {
                     HStack(spacing: 6) {
                         Text("Output folder")
@@ -623,7 +631,7 @@ struct LiveCaptureView: View {
                 Spacer()
                 if !session.photos.isEmpty {
                     clearButton
-                    if liveProcessingMode != LiveProcessingMode.live.rawValue {
+                    if !sessionIsLive {
                         Button("Process \(session.photos.count) →") { stageForProcessing() }
                             .prominentButtonStyle()
                             .disabled(processor.isProcessing)
@@ -938,7 +946,7 @@ private struct LiveProcessingBox: View {
     /// Segments mapped into the shared read model. Actions + provider·model line only when expanded, so
     /// collapsed rows stay compact in the narrow control panel.
     private var segmentItems: [any ProcessableItem] {
-        let pm = session.config.map { "\($0.provider.rawValue) · \($0.model.displayName)" }
+        let pm = session.config?.retryBackendDescription
         // W3.cap-r3-fu7 — read once for the whole list: `liveProc` is observed, so flipping `isFinalizing`
         // rebuilds these rows and the retry-family actions come and go with the regeneration window.
         let finalizing = liveProc.isFinalizing
@@ -963,8 +971,14 @@ private struct LiveProcessingBox: View {
                     .fixedSize(horizontal: false, vertical: true)
                 Text("Change in Settings (⌘,).").font(.caption2).foregroundStyle(.primary)
 
+                // W40.fix-processor-live-settings-per-run — the route is the session's snapshot, not Settings
+                // as they are now, so say which one this session uses and when a change takes effect.
                 if liveMode, let cfg = session.config {
-                    Text(cfg.summary).font(.caption2).foregroundStyle(.primary)
+                    Text("This session: \(cfg.summary)").font(.caption2).foregroundStyle(.primary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("live.session-route")
+                    Text("A Settings change applies after Finish or Clear.")
+                        .font(.caption2).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 if liveMode, !liveProc.statuses.isEmpty {

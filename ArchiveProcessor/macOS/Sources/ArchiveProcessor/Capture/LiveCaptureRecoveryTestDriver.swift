@@ -4483,6 +4483,122 @@ enum LiveCaptureRecoveryTestDriver {
             LiveCaptureProcessor._recoveryTestOCRTasks = [:]
         }
 
+        // --- Test 32 (W40.fix-processor-live-settings-per-run): a route changed in Settings reaches the NEXT
+        // session of the same app run. The snapshot used to be taken once per run, so with the gateway switched
+        // on, Retry, Clear, Finish and Start all kept using direct Gemini until a relaunch (owner session
+        // iphone-1). `recoveryTestSettings` stands in for Settings; the real ingest → finalize → Clear paths
+        // run, and the OCR stub records the route each page would have called. ---
+        if isolatedBackup {
+            let psOut = tmp.appendingPathComponent("per-session-out", isDirectory: true)
+            let psStaging = tmp.appendingPathComponent(
+                "APStaging-persession-\(String(UUID().uuidString.prefix(8)))", isDirectory: true)
+            try? fm.createDirectory(at: psStaging, withIntermediateDirectories: true)
+            func psConfig(_ gateway: GatewayConfig?) -> SessionProcessingConfig {
+                SessionProcessingConfig(
+                    provider: .gemini, model: stubModel, thinkingLevel: .low, apiKey: "",
+                    taggingMode: .human, rotationMode: .off, mergeDocuments: false, outputDirectory: psOut,
+                    customOCRPrompt: "", imageScale: 1.0, enableSegmentJSON: false, tagVocabulary: [],
+                    gateway: gateway, outputImageFile: false, pdfImageMB: 2.0, exportedImageMB: 3.0, textColumns: 1)
+            }
+            let direct = psConfig(nil)
+            let viaGateway = psConfig(GatewayConfig(
+                baseURL: "https://gateway.invalid/v1", modelID: "test-gateway-model", displayName: "Test Gateway",
+                inputCostPer1M: nil, outputCostPer1M: nil))
+            LiveCaptureProcessor._recoveryTestOCRStub =
+                OCRResult(text: "per-session page", classification: nil, errorMessage: nil, errorCode: nil)
+            LiveCaptureProcessor._recoveryTestOCRStarts = []
+            LiveCaptureProcessor._recoveryTestOCRRoutes = []
+            LiveCaptureProcessor._recoveryTestOCRTasks = [:]
+            let psSession = CaptureSession()
+            psSession._recoveryTestBeginLive(config: direct, stagingDir: psStaging)
+            let psJPEG = bitmap?.representation(using: .jpeg, properties: [:]) ?? Data()
+            let psProc = psSession.liveProcessor
+            func psSettle(_ cond: () -> Bool) async -> Bool {
+                for _ in 0..<400 { if cond() { return true }; try? await Task.sleep(nanoseconds: 25_000_000) }
+                return cond()
+            }
+            func psIngest(_ gid: String, _ seq: Int) {
+                // A real JPEG: a placeholder page keeps its source photo (W23.h5), and a kept photo is a session
+                // that is not empty, so Finish would rightly keep the snapshot.
+                psSession.ingest(jpeg: psJPEG, groupId: gid, seq: seq,
+                                 type: .document, quality: nil, year: nil, month: nil, deviceName: "TestPhone")
+                psProc.segmentResolved(groupId: gid)
+            }
+            func psFinish(_ gid: String) async -> Bool {
+                guard await psSettle({ psProc.staged.first { $0.groupId == gid }?.pdfURLs.isEmpty == false })
+                else { return false }
+                let key = psProc.staged.first { $0.groupId == gid }?.collectionKey ?? "__unfiled__"
+                psProc.finalize([LiveCaptureProcessor.CollectionDraft(
+                    id: key, finalName: psOut.lastPathComponent, existingFolders: [], suggestedFolders: [],
+                    chosenExisting: psOut, segmentCount: 1, photoCount: 1)])
+                return await psSettle { !psProc.isFinalizing && !psProc.staged.contains { $0.groupId == gid } }
+            }
+            let directRoute = direct.retryBackendDescription
+            let gatewayRoute = viaGateway.retryBackendDescription
+
+            // 1. Session one runs on the route it started with, and its Finish releases the snapshot.
+            psIngest("PS1", 1)
+            let ps1Filed = await psFinish("PS1")
+            check("a Finish that empties the session releases its settings snapshot",
+                  ps1Filed && psSession.photos.isEmpty && psSession.processingMode == .undecided
+                      && psSession.config == nil && !psSession.settingsLocked
+                      && LiveCaptureProcessor._recoveryTestOCRRoutes == [directRoute])
+
+            // 2. Settings change between sessions: the next session's first page snapshots it.
+            psSession.recoveryTestSettings = viaGateway
+            psIngest("PS2", 2)
+            check("the next session in the same run uses the route changed in Settings",
+                  psSession.processingMode == .live && psSession.config?.gateway?.modelID == "test-gateway-model"
+                      && LiveCaptureProcessor._recoveryTestOCRRoutes.last == gatewayRoute
+                      && psSession.config?.summary.hasPrefix("Test Gateway · test-gateway-model") == true)
+
+            // 3. A change while that session still holds pages does NOT reach it (the snapshot is deliberate).
+            _ = await psSettle { psProc.staged.contains { $0.groupId == "PS2" } }
+            psSession.recoveryTestSettings = direct
+            psIngest("PS3", 3)
+            _ = await psSettle { psProc.staged.contains { $0.groupId == "PS3" } }
+            check("a Settings change mid-session does not reach the running session",
+                  psSession.config?.gateway != nil
+                      && LiveCaptureProcessor._recoveryTestOCRRoutes.suffix(2) == [gatewayRoute, gatewayRoute])
+
+            // 4. Clear ends the session too: the next page takes the route Settings now hold.
+            psProc.clearSession()
+            let psCleared = psSession.photos.isEmpty && psSession.processingMode == .undecided
+                && psSession.config == nil
+            psIngest("PS4", 4)
+            check("a Clear releases the snapshot and the next session takes the new route",
+                  psCleared && psSession.config?.gateway == nil
+                      && LiveCaptureProcessor._recoveryTestOCRRoutes.last == directRoute)
+
+            // 5. A Clear whose LAST capture-manifest write fails keeps its committed marker, so it must keep
+            //    the snapshot too: re-activating would read that committed Clear back in `loadStagingManifest`
+            //    and finish it again, Trashing the next page (Tier-2 review of this change). The override fails
+            //    only the marker-free write `finishPreparedClear` makes; prepare and commit still land.
+            _ = await psSettle { psProc.staged.contains { $0.groupId == "PS4" } }
+            psSession.manifestWriteOverride = { data, url in
+                guard CaptureSession.decodeManifest(data)?.clearPhase != nil else { return false }
+                do { try data.write(to: url, options: .atomic); return true } catch { return false }
+            }
+            psProc.clearSession()
+            psSession.manifestWriteOverride = nil
+            check("a Clear whose final manifest write failed keeps the session's snapshot",
+                  psSession.photos.isEmpty && psSession.clearPhase == "committed"
+                      && psSession.processingMode == .live && psSession.config != nil)
+
+            psProc.clearSession()   // tidy: a second Clear with the writes working completes the transaction
+            check("...and a Clear that completes then releases it",
+                  psSession.clearPhase == nil && psSession.processingMode == .undecided)
+            let trash = fm.homeDirectoryForCurrentUser.appendingPathComponent(".Trash", isDirectory: true)
+            for item in (try? fm.contentsOfDirectory(atPath: trash.path)) ?? []
+            where item.hasPrefix(psStaging.lastPathComponent) {
+                try? fm.removeItem(at: trash.appendingPathComponent(item))
+            }
+            LiveCaptureProcessor._recoveryTestOCRStub = nil
+            LiveCaptureProcessor._recoveryTestOCRStarts = []
+            LiveCaptureProcessor._recoveryTestOCRRoutes = []
+            LiveCaptureProcessor._recoveryTestOCRTasks = [:]
+        }
+
         // Last by design: this synthetic session may be the newest recoverable one in the shared scratch
         // backup root, so do not let it influence any preceding restart fixture.
         if isolatedBackup {
