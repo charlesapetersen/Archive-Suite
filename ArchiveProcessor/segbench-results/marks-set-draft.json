@@ -1,0 +1,109 @@
+{
+ "protocol": "marks-set-draft-v1",
+ "pages": 150,
+ "core": 40,
+ "routes": {
+  "gemini3.7-flash-gw": {
+   "read": 0,
+   "parsed": 0,
+   "capped": 0,
+   "dropped_marks": {},
+   "marks": 0,
+   "by_class": {},
+   "pages_with_marks": 0,
+   "pages_with_hand": 0,
+   "bands": {},
+   "median_s": null,
+   "cost_estimate": 0,
+   "billed": {
+    "calls": 0,
+    "estimate": 0,
+    "gateway_calls": 0,
+    "gateway": null,
+    "gateway_over_estimate": null,
+    "charged": 0
+   }
+  },
+  "qwen3-vl-8b-mlx4": {
+   "read": 150,
+   "parsed": 146,
+   "capped": 4,
+   "dropped_marks": {
+    "bad json": 4
+   },
+   "marks": 189,
+   "by_class": {
+    "annotation": 119,
+    "signature_initials": 15,
+    "other": 36,
+    "marginal_note": 17,
+    "stamp": 2
+   },
+   "pages_with_marks": 98,
+   "pages_with_hand": 96,
+   "bands": {
+    "under_10_words": 65,
+    "none": 51,
+    "signature_initials_date": 12,
+    "10_29_words": 13,
+    "30_plus_words": 3,
+    "handwritten_page": 2
+   },
+   "median_s": 12.16,
+   "peak_gb": 6.4
+  }
+ },
+ "agreement": {
+  "pages": 0,
+  "hand_page": [
+   0,
+   null
+  ],
+  "band": [
+   0,
+   null
+  ],
+  "gemini_marks": 0,
+  "local_marks": 0,
+  "matched_iou50": 0,
+  "matched_iou50_same_class": 0,
+  "matched_iou30": 0
+ },
+ "preflag_vs_gemini": {
+  "A": {
+   "pages": 0,
+   "gemini_hand": 0,
+   "gemini_hand_preflag_none": 0,
+   "preflag_hand_gemini_none": 0
+  },
+  "B": {
+   "pages": 0,
+   "gemini_hand": 0,
+   "gemini_hand_preflag_none": 0,
+   "preflag_hand_gemini_none": 0
+  }
+ },
+ "band_table": {
+  "none": {
+   "unread": 42
+  },
+  "signature_initials_date": {
+   "unread": 26
+  },
+  "under_10_words": {
+   "unread": 33
+  },
+  "10_29_words": {
+   "unread": 29
+  },
+  "30_plus_words": {
+   "unread": 16
+  },
+  "handwritten_page": {
+   "unread": 4
+  },
+  "unparsed": {}
+ },
+ "disagreement_pages": 0,
+ "disagreement_core": 0
+}
