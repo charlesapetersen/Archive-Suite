@@ -13749,3 +13749,16 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   No model, no network, no money. Bench cache: `place-geom/` deleted except rows.jsonl, rows-m035.jsonl and the
   self-test summaries (a few hundred KB, what `report` rebuilds the page from); the layers and drags are rebuildable.
   <!-- /W46.place-geom -->
+- [x] **W46.kind-atrium — ATRIUM's page classifier against our kind classifier [S]** · §Document processing review — W46 (owner, 2026-10-20) — SHIPPED 2026-11-01.
+  `scripts/segbench/kind_atrium.py` (run / signals / report), `segbench-results/kind-atrium.md` / `.json`, tests
+  `test_kind_atrium.py` 12/12. ATRIUM (`ufal/vit-historical-page` v4.3, 384 px ImageNet) zero-shot, plus an LR head on
+  its 3,024-d embedding, against the shipped classifier. Verdict: keep ours for hand and forms. On the 141 typed /
+  printed / handwritten owner pages (KND-1: partly session-labelled) ours 137, ATRIUM hand-only 121 (McNemar p 0.0009),
+  its head 128 (p 0.035), both feature sets 134; forms ours 13/14 with 2 false, ATRIUM 14/14 with 24 false. Routing the
+  96 by the guide: NES lost ours 1.00, ATRIUM 1.18 (intervals overlap). The 895 (stratum kinds): ours 723, ATRIUM 638.
+  Mixed against the owner's 170 answers under his cut (KND-2): ATRIUM TEXT est. recall 60% (44–82) at 70% precision,
+  Qwen mixed 23% at 99%; ATRIUM calls TEXT on 24 of 46 sheet pages with no handwriting. 0.06 s a page on MPS, 1.5 GB
+  RSS; the 2,895 pages took minutes, so no cluster. Not on ArchiveOCRBench (a kind result, not OCR or segmentation).
+  No money. Bench cache: `kind-atrium/` kept (36 MB: probabilities, embeddings and the 895's Vision signals, what
+  `report` reads); no images were copied.
+  <!-- /W46.kind-atrium -->

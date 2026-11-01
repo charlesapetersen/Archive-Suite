@@ -538,8 +538,64 @@ def report():
         r = run_info[n]
         L.append(f'| {label} | {r["pages"]} | {r["s_page"]:.3f} | {r["model_s_page_median"]:.3f} | {r["decode_s_page"]:.3f} |')
     L.append('\nThe shipped classifier, for comparison: about 0.6 s a page (Vision text lines, document request and '
-             'feature print; `kind-classifier.md` §5), with no download. ATRIUM\'s weights are a 335 MB download '
-             '(CC BY-NC). The 2,895-page pass took minutes on the Mac, so it needs no cluster.\n')
+             'feature print; `kind-classifier.md` §5), with no download. ATRIUM\'s weights are a 323 MB download '
+             f'(CC BY-NC). Vision signals for the shipped classifier on the 895 took {run_info.get("public_signals_s", float("nan")):.0f} s '
+             f'({run_info.get("public_signals_s", float("nan")) / 895:.2f} s a page). The 2,895-page pass took minutes on the Mac, so it needs no cluster.\n')
+    # ---- the verdict, put after the title -------------------------------------------------------------------
+    h = {r['method']: r for r in J['k144_hand']}
+    ph = {r['method']: r for r in J['public_hand']}
+    ours_pub = ph.get('Shipped classifier (bundled weights)')
+    rt = {r['classifier']: r for r in J['routing_96']}
+    bm = {r['label']: r for r in J['bulk_mixed']}
+    at, qw = bm['ATRIUM TEXT (its top class)'], bm['Qwen3.6-27B mixed (saved bulk label)']
+    V = ['## Verdict\n',
+         '**Keep the shipped classifier for the hand and for forms; do not replace it with ATRIUM or combine the two. '
+         'ATRIUM\'s TEXT has the highest mixed-page recall of the three labels on the 2,000 and is worth keeping as a '
+         'candidate signal for the mixed flag (W46.mixed-route), not as the kind router.**\n',
+         f'- On the 141 typed, printed and handwritten owner pages, ours is right on {h[next(k for k in h if k.startswith("Shipped"))]["right"]}, '
+         f'ATRIUM forced to its six text classes on {h["ATRIUM zero-shot, hand-only (top of its six text classes)"]["right"]} '
+         f'(paired p {J["k144_paired"]["hand_only_vs_ours"][2]:.3g}): it finds every handwritten page but calls '
+         'typewriting printed. A head on its embedding does better '
+         f'({h["ATRIUM embedding + LR head (leave-one-folder-out)"]["right"]}) but still below ours '
+         f'(p {J["k144_paired"]["head_vs_ours"][2]:.3g}), and adding it to our features does not help '
+         f'({h["Both feature sets + LR head (leave-one-folder-out)"]["right"]}).',
+         f'- Routed by the guide on the 96, ATRIUM costs {rt["ATRIUM zero-shot hand-only, LINE_* for form"]["lost"]:.2f} NES '
+         f'against ours {rt["Shipped classifier (hand and form LR, leave-one-folder-out)"]["lost"]:.2f}: '
+         'their intervals overlap, because ATRIUM\'s errors are mostly typewritten called printed, which costs '
+         'little on these pages.',
+         f'- On the 895 public pages, which neither was fitted on, ATRIUM hand-only is right on '
+         f'{ph["ATRIUM zero-shot, hand-only"]["right"]}' + (f' and ours on {ours_pub["right"]}' if ours_pub else '') +
+         '. By stratum (§4) both fail L5 and N4; ATRIUM also misses most of L7\'s handwriting and L8\'s and N6\'s print, '
+         'where ours holds better.',
+         f'- Mixed, under the owner\'s cut: ATRIUM\'s TEXT finds an estimated {100 * at["recall"]:.0f}% of mixed pages '
+         f'at {100 * at["precision"]:.0f}% precision; Qwen3.6-27B\'s mixed {100 * qw["recall"]:.0f}% at '
+         f'{100 * qw["precision"]:.0f}%. ATRIUM over-calls mixed on pages with no handwriting '
+         f'({J["bulk_text_by_hand"]["none"][0]} of {J["bulk_text_by_hand"]["none"][1]} on the sheet) and the two '
+         'Qwen\'s few calls are nearly all right but find under a quarter, so neither alone is a mixed filter.',
+         f'- Speed is not the obstacle: {run_info["bulk"]["s_page"]:.2f} s a page on MPS, against about 0.6 s for ours. The '
+         'obstacles are accuracy on the distinction the guide routes by, a 323 MB download and a non-commercial '
+         'licence on the base weights.\n']
+    L[1:1] = V
+    L.append('## Measurement card\n')
+    L.append('- **Truth:** the 144: `kind-classifier.md`\'s labels, the 99 truth pages\' kinds as the drafting models '
+             'and the owner left them and the drawn pages labelled by a session looking at contact sheets, not blind '
+             '(KND-1); the shipped weights were fitted on them, so its rows are leave-one-folder-out. The 895: the '
+             'public set\'s stratum kind, made by its datasets, not by any scored route; not checked page by page, '
+             'and a stratum can hold a page of another kind. The 2,000: the owner\'s own 170 blind sheet answers '
+             '(2026-10-22), read under his cut; no model\'s label is truth.\n'
+             '- **Selection:** the 144 and the 96 as `kind-classifier.md` drew them; the 895 frozen at W43.corpus-'
+             'build by source and script; the 170 drawn by `mixed_def.py` from the four labels\' disagreements, '
+             'ATRIUM\'s among them, which is why the sheet figures are a check and the estimate re-weights them by '
+             'stratum. No page was chosen by ATRIUM\'s output alone or by ABBYY text.\n'
+             '- **Comparison:** every method on the same images; ATRIUM at one preprocessing (chosen on the 144 by '
+             'W46.fix-marks-set, which flatters it there slightly); the heads with the same regression, penalty and '
+             'folders as the shipped classifier\'s.\n'
+             f'- **Noise:** Wilson 95% intervals on rates, exact McNemar on paired right/wrong, paired bootstrap on '
+             f'NES lost, stratified bootstrap on the 2,000\'s estimates. ATRIUM is deterministic here: the rerun gives '
+             f'the same top class as W46.fix-marks-set\'s on {same_label} of {len(bids)} pages.\n'
+             '- **Scope:** page kind for routing only. It does not settle where on a page the handwriting is '
+             '(W46.marks-detect), how mixed pages should be read (W46.mixed-route), or ATRIUM on other corpora; the '
+             '144 has few forms (14) and the 895\'s form truth is the ledger stratum alone.\n')
     REPORT.write_text('\n'.join(L) + '\n')
     REPORT.with_suffix('.json').write_text(json.dumps(J, indent=1, default=float) + '\n')
     print(f'wrote {REPORT}', file=sys.stderr)
