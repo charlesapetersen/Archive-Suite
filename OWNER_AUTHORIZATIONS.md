@@ -445,6 +445,14 @@ This covers the following prepared runs, retaining their existing review, pilot 
 
 The segmentation cap stays $6.80. The handwriting runner must validate the revised $2.50 cap,
 preserve its paid pilot ledger and outcomes without re-calling those pages, and stop on uncertain billing.
-Unknown or incomplete billing is not a free retry; keep projection/cap checks. Never write to the real corpus. The separately raised permission to publish the
-seg-boxes-score checkpoints to main is not answered by this paid-call instruction; preserve that work on
-its item branch until that question is settled.
+Unknown or incomplete billing is not a free retry; keep projection/cap checks. Never write to the real corpus. The later owner answer below also authorizes routine verified publication of these checkpoints.
+
+
+## 2026-11-01 — routine verified pushes are standing authorization
+
+Owner answer in this session: “Yes of course, I don't understand why I'm being asked. This should just
+be done as a matter of course.” Routine verified, non-force pushes to Archive Suite’s main branch,
+including engine checkpoints and completed results, are authorized without a fresh per-item permission
+question. This expressly includes W46.seg-boxes-score’s saved checkpoints and final verified result.
+Keep the normal verification, review, isolated-checkout and reconciliation requirements. This records
+trusted owner consent; automatic approval review remains in place.
