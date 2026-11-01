@@ -337,13 +337,13 @@ def _group_rss_gb(pgid):
     return sum(_footprint(p) for p in pids) / 2**30
 
 
-def guarded(args, log, page, step, cap=None, out=None):
+def guarded(args, log, page, step, cap=None, out=None, env=None):
     """One kraken call for one page, on its own process group, killed past PAGE_CAP_GB (two runs of this item
     took the Mac down on 2026-10-31 with kraken trees of 50 GB). Peak memory and seconds go to `log`."""
     t, peak, cap = time.monotonic(), 0., cap or PAGE_CAP_GB
     sink = out.open('w') if out else None
     p = subprocess.Popen(args, start_new_session=True, stdout=sink or subprocess.DEVNULL,
-                         stderr=sink or subprocess.PIPE, text=True)
+                         stderr=sink or subprocess.PIPE, text=True, env=env)
     killed = False
     while p.poll() is None:
         peak = max(peak, _group_rss_gb(p.pid))
@@ -597,7 +597,8 @@ def cmd_train(a):
                            '-B', str(BATCH_LINES), '-t', str(d / 'train.txt'), '-e', str(d / 'val.txt'), '-q', 'early',
                            '--min-epochs', str(min(MIN_EPOCHS, epochs(pl['n']))), '--lag', str(LAG),
                            '-N', str(epochs(pl['n'])),
-                           '-o', str(d / 'model')], log, name, 'train', cap=TRAIN_CAP_GB, out=d / 'ketos.log')
+                           '-o', str(d / 'model')], log, name, 'train', cap=TRAIN_CAP_GB, out=d / 'ketos.log',
+                          env={**os.environ, 'TORCHDYNAMO_DISABLE': '1'} if pl['device'] == 'mps' else None)
         secs = row['seconds']
         if row['rc']:
             raise SystemExit(f'{name}: ketos exited {row["rc"]} (killed: {row["killed"]}); see {d / "ketos.log"}')
@@ -605,7 +606,8 @@ def cmd_train(a):
         for ck in (d / 'model').glob('*.ckpt'):
             ck.unlink()             # ten 422 MB Lightning checkpoints a training; the best is kept as safetensors
         (d / 'done.json').write_text(json.dumps({'seconds': round(secs, 1), 'best': str(best), 'lines': len(pl['keys']),
-                                                 'device': pl['device'], 'peak_gb': row['peak_gb']}, indent=1))
+                                                 'device': pl['device'], 'peak_gb': row['peak_gb'],
+                                                 'compiled': pl['device'] != 'mps'}, indent=1))
         print(f'{name}: {secs / 60:.1f} min, best {best.name}')
 
 
@@ -625,6 +627,8 @@ def epochs(n):
 # footprint in 17 s, a batch of 1 peaks at 2.7 GB (2026-11-01). ketos's default is one thread; six is the performance cores.
 LRATE, BATCH_LINES, TRAIN_THREADS = 1e-4, int(os.environ.get('PPOCRV6_BATCH', '1')), 6
 TRAIN_PRECISION = os.environ.get('PPOCRV6_PRECISION', '32-true')
+# MPS trains eagerly: kraken wraps PP-OCRv6's forward in torch.compile, and on this Mac Inductor's Metal kernel asks for
+# 32,896 bytes of threadgroup memory, over the GPU's limit ("Failed to created pipeline state object", 2026-11-01).
 # AdamW, not the config's AdamW+Muon: Muon's Newton-Schulz step runs in bfloat16, which has no fast CPU kernel, and
 # took 97% of a CPU training's time on one core (sampled 2026-11-01).
 # --workers 0: ketos's DataLoader worker is a fork of the trainer, and the memory guard charges its shared pages again.
