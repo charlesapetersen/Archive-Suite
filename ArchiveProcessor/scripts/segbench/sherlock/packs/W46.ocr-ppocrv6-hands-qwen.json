@@ -1,0 +1,16 @@
+{
+  "tag": "W46.ocr-ppocrv6-hands-qwen",
+  "pack": "hand-icl-20261101",
+  "mac": "artifacts/hand-icl-20261101",
+  "submit": "support/job/submit.sh",
+  "jobs": 1,
+  "gpu_hours": 1.5,
+  "review": "execution-plans/items/W46.ocr-ppocrv6-hands-qwen.md",
+  "imports": [{"dir": "support", "modules": ["hand_icl"]}, {"modules": ["vllm"]}],
+  "creates": ["$FS_ROOT/hand-icl-20261101", "$GROUP_HOME/$USER/archive-suite/sherlock-results/hand-icl-20261101"],
+  "provenance": [],
+  "requires": ["$HF_HOME/hub/models--Qwen--Qwen3.6-27B-FP8/snapshots/e89b16ebf1988b3d6befa7de50abc2d76f26eb09/config.json", "$SH_IMG"],
+  "results": "$GROUP_HOME/$USER/archive-suite/sherlock-results/hand-icl-20261101",
+  "collect": ["$FS_ROOT/hand-icl-20261101/jobs.tsv", "$FS_ROOT/hand-icl-20261101/logs", "$FS_ROOT/hand-icl-20261101/runtime"],
+  "release": "Qwen 0/8/16-line context experiment returned; inspect pilot/status and all request IDs, score four cohorts separately using the Mac-only target references and preserve OCR-1 masks; no population or full-895/96 claim"
+}
