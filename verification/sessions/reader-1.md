@@ -54,8 +54,6 @@ Every Reader defect the first pack listed has been fixed. What is still known an
   missed it.
 - **A slow several-word search may leave some hits without a snippet line.** Snippets stop after a quarter of a
   second so the search never stalls; every hit is still listed. Task 6.
-- **While the sidebar slides open or shut at the narrowest window, the list's columns can lag by one point for a
-  frame** (`W40.fix-reader-sidebar-slide-1pt`, cosmetic). You are unlikely to see it. No task depends on it.
 
 ## The tasks (45 minutes)
 

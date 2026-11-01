@@ -75,7 +75,7 @@ struct AppKitTableView: NSViewRepresentable {
     func makeNSView(context: Context) -> NSScrollView {
         let coordinator = context.coordinator
 
-        let scrollView = NSScrollView()
+        let scrollView = PixelAlignedScrollView()
         scrollView.hasVerticalScroller = true
         scrollView.hasHorizontalScroller = true
         scrollView.autohidesScrollers = true
