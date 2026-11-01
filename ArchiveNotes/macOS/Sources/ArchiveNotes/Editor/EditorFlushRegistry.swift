@@ -68,8 +68,9 @@ final class EditorFlushRegistry: ObservableObject {
     }
 
     /// Remove a pane's flush closure, so a closed window's now-dead editor isn't flushed on a later quit.
-    /// Used by the template pane, whose refused body is held in `NotesModel` instead (memory only — quit
-    /// does not yet see it: W40.fix-notes-failed-save-close-fu1). A note pane closes through `paneClosed`.
+    /// Used by the template pane, whose buffer holds nothing unique once flushed: a refused body is held
+    /// in `NotesModel` and tracked here under the template's own id (`trackTemplateBody`). A note pane
+    /// closes through `paneClosed`.
     func deregister(_ id: UUID) {
         handles[id] = nil
         retainedPaneIDs.remove(id)
@@ -95,14 +96,19 @@ final class EditorFlushRegistry: ObservableObject {
         }
     }
 
-    /// Await every registered pending flush; true only if every draft is saved afterwards. Snapshotted
-    /// first so a flush that (indirectly) triggers a deregistration can't mutate the dictionary
-    /// mid-iteration. Serial: the underlying `NoteStore` is an actor, so concurrent flushes would
-    /// serialize on it anyway, and there are at most two windows (plus any retained closed panes).
+    /// Await every registered pending flush; true only if every draft is saved afterwards. Each handle is
+    /// looked up afresh, so a flush that (indirectly) deregisters another can't break the iteration, and
+    /// one that registers a new entry gets it flushed in the same pass: a template save refused for the
+    /// first time inside this flush registers its body here, and quit must see that refusal
+    /// (W40.fix-notes-failed-save-close-fu1). Serial: the underlying `NoteStore` is an actor, so
+    /// concurrent flushes would serialize on it anyway, and there are at most two windows (plus any
+    /// retained closed panes and held template bodies).
     @discardableResult
     func flushAll() async -> Bool {
         var allSaved = true
-        for (id, handle) in handles {
+        var visited: Set<UUID> = []
+        while case let (id, handle)? = handles.first(where: { !visited.contains($0.key) }) {
+            visited.insert(id)
             if await handle.flush() {
                 guard handles[id]?.generation == handle.generation else { continue }
                 if retainedPaneIDs.contains(id) { deregister(id) } else { removeCopy(for: id) }
@@ -154,6 +160,33 @@ final class EditorFlushRegistry: ObservableObject {
 
     private func removeCopy(for id: UUID) {
         if let old = copies.removeValue(forKey: id) { vault?.remove(old.url, ifItHolds: old.markdown) }
+    }
+
+    /// W40.fix-notes-failed-save-close-fu1: a template save finished. The template editor marks its buffer
+    /// clean even when the store refuses the body, because `NotesModel` keeps the refused body (so switching
+    /// templates still works and returning reloads it). That body is registered here under the TEMPLATE's
+    /// id, independent of any pane: quit retries it and is refused while it fails, exactly as for a note
+    /// pane, and it is copied to the vault at once so a crash loses nothing. Keyed by template rather than
+    /// pane, so the model's single draft per template is the only body ever retried, and a closed window
+    /// can never write an older buffer over a newer save from another window.
+    func trackTemplateBody(_ id: UUID, in model: NotesModel) {
+        guard model.unsavedTemplateBody(id) != nil else {
+            if model.templateWasDeleted(id) { copies[id] = nil }   // its copy stands (see the flush below)
+            deregister(id)
+            return
+        }
+        if handles[id] == nil {
+            register(id, flush: { [weak self, weak model] in
+                let saved = await model?.retryTemplateBody(id) ?? true
+                // A template trashed with its body still refused: the trash holds only the old body, so
+                // the emergency copy is the refused text's last home and stands, as a trashed note's does.
+                if model?.templateWasDeleted(id) == true { self?.copies[id] = nil }
+                return saved
+            }, draft: { [weak model] in model?.unsavedTemplateBody(id) })
+        }
+        // No live editor stands behind this entry, so it is always dropped once its body saves.
+        retainedPaneIDs.insert(id)
+        copyDraft(for: id)
     }
 }
 

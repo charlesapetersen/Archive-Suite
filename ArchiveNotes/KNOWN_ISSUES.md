@@ -86,8 +86,12 @@ saves (`WritingJourneyUITests` 7/7 in the VM). Residuals, none lossy: a retained
 same note is opened again (switching to Templates and back, or a new window) — the new editor loads the
 on-disk body, and if it is edited and saved first the retained draft lands at quit as a “Recovered draft”
 note; a retained draft for a note trashed meanwhile fails every quit flush until Quit is chosen (its copy
-stands); copies written on the slow-save path stay behind. Templates' own save seam cannot report a refusal,
-so a refused template body is still lost on quit: `W40.fix-notes-failed-save-close-fu1`. File coordination
+stands); copies written on the slow-save path stay behind. A refused template body is covered the same way
+(W40.fix-notes-failed-save-close-fu1, fixed 2026-10-31): the model holds it, the flush registry tracks it
+under the template's id, so it is copied at once, retried and asked about when its window closes, and quit
+is refused until it saves, including a body first refused by quit's own flush; switching templates still
+works and returning reloads the held body; a template deleted with its body still refused stops refusing
+quit and its copy stands. File coordination
 protects cooperating writers; an arbitrary uncoordinated process can still write during another process’s
 replacement operation.
 

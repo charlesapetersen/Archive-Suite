@@ -701,21 +701,61 @@ final class NotesModel: ObservableObject {
     func setTemplateBody(_ markdown: String, for id: UUID) async -> Bool {
         guard let noteStore else { return false }
         let parsed = BlockParser.parse(markdown)
-        do {
-            _ = try await noteStore.withTemplate(id) { item in
-                item.trailingBodyRaw = parsed.leadingText
-                item.blocks = parsed.blocks
-                item.modified = Date()
+        // Saves of one template run one after another, in call order, and each settles the refused-body
+        // state inside its own task: the disk and that state always end at the LAST save, and an older
+        // body never lands after a newer one (W40.fix-notes-failed-save-close-fu1).
+        let previous = templateBodySaveTail[id]
+        let save = Task { @MainActor () -> Bool in
+            _ = await previous?.value
+            do {
+                _ = try await noteStore.withTemplate(id) { item in
+                    item.trailingBodyRaw = parsed.leadingText
+                    item.blocks = parsed.blocks
+                    item.modified = Date()
+                }
+                failedTemplateBodySaves.remove(id)
+                failedTemplateBodyDrafts[id] = nil
+                return true
+            } catch {
+                report(error, "save the template body")
+                // A template trashed meanwhile has nowhere to save to; holding its body would refuse
+                // every quit.
+                guard !deletedTemplateIDs.contains(id) else { return false }
+                failedTemplateBodySaves.insert(id)
+                failedTemplateBodyDrafts[id] = markdown
+                return false
             }
-            failedTemplateBodySaves.remove(id)
-            failedTemplateBodyDrafts[id] = nil
-            return true
-        } catch {
-            failedTemplateBodySaves.insert(id)
-            failedTemplateBodyDrafts[id] = markdown
-            report(error, "save the template body")
-            return false
         }
+        templateBodySaveTail[id] = save
+        let saved = await save.value
+        if templateBodySaveTail[id] == save { templateBodySaveTail[id] = nil }
+        return saved
+    }
+
+    /// The last template-body save started per template, which the next one waits for.
+    private var templateBodySaveTail: [UUID: Task<Bool, Never>] = [:]
+    private var deletedTemplateIDs: Set<UUID> = []
+
+    /// The template was deleted in this session; any refused body it held was dropped with it.
+    func templateWasDeleted(_ id: UUID) -> Bool { deletedTemplateIDs.contains(id) }
+
+    /// A refused template body this model still holds, named for an emergency copy
+    /// (W40.fix-notes-failed-save-close-fu1). Nil once it saves or the template is deleted.
+    func unsavedTemplateBody(_ id: UUID) -> EditorDraft? {
+        guard let markdown = failedTemplateBodyDrafts[id] else { return nil }
+        let title = templates.first { $0.id == id }?.name ?? "Untitled template"
+        return EditorDraft(itemID: id, title: title, markdown: markdown)
+    }
+
+    /// Save a held refused template body again (close Retry, quit). True when none is left unsaved. Saves
+    /// of this template already running finish first, so the body retried is the newest one held.
+    func retryTemplateBody(_ id: UUID) async -> Bool {
+        while let pending = templateBodySaveTail[id] {
+            _ = await pending.value
+            if templateBodySaveTail[id] == pending { break }   // settled; its caller has not cleared it yet
+        }
+        guard let markdown = failedTemplateBodyDrafts[id] else { return true }
+        return await setTemplateBody(markdown, for: id)
     }
 
     /// Duplicate a template (fresh id + " copy" name), preserving kind + front-matter defaults + body.
@@ -771,6 +811,7 @@ final class NotesModel: ObservableObject {
         let referencing = organization.assignments.filter { $0.templateId == id }.map(\.folderId)
         do { try await organization.removeTemplateAssignments(folders: referencing) }
         catch { report(error, "clear the deleted template's folder assignments") }
+        deletedTemplateIDs.insert(id)
         failedTemplateBodySaves.remove(id)
         failedTemplateBodyDrafts[id] = nil
         await reloadTemplates()

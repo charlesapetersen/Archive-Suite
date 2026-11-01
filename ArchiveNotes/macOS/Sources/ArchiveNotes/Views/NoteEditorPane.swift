@@ -663,7 +663,13 @@ struct TemplateBodyEditorPane: View {
         .focusedSceneValue(\.formattingContext, formatting)
         .onAppear {
             bodyEditor.load = { [model] id in await model.loadTemplateBody(for: id) }
-            bodyEditor.save = { [model] id, markdown in await model.setTemplateBody(markdown, for: id) }
+            // A refused body stays in the model; the registry tracks it so quit and a crash cannot lose it
+            // (W40.fix-notes-failed-save-close-fu1).
+            let registry = flushRegistry
+            bodyEditor.save = { [model] id, markdown in
+                await model.setTemplateBody(markdown, for: id)
+                registry.trackTemplateBody(id, in: model)
+            }
             bodyEditor.flushEditor = { [flushBox] in flushBox.flush?() }
             flushRegistry.register(paneID, flush: {
                 await transition?.value
@@ -683,10 +689,17 @@ struct TemplateBodyEditorPane: View {
                 await previousTeardown?.value
                 await previous?.value
                 await bodyEditor.flushPending()
+                let closed = ownedID
                 if let ownedID { model.releaseTemplateEdit(ownedID, pane: paneID) }
                 ownedID = nil
                 if selectionGeneration == closingGeneration {
+                    // The flushed buffer holds nothing unique: a refused body is in the model and tracked
+                    // under the template's id, which closes like a note pane: retry, copy, and ask.
                     flushRegistry.deregister(paneID)
+                    if let closed, model.unsavedTemplateBody(closed) != nil {
+                        let registry = flushRegistry
+                        Task { await registry.paneClosed(closed) }
+                    }
                 }
             }
         }
