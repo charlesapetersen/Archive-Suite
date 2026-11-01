@@ -201,41 +201,42 @@ def cue_table(owner: dict, pub: dict) -> list[str]:
     return L if len(L) > 2 else ["No box has both c1 and c2 on the same route yet."]
 
 
-OPEN_KEYS = ("window-or-fs-qwen3.5-27b", "window-or-fs-seg-2b", "window-or-fs-seg-4b")
-
-
 def findings(pub: dict, owner: dict) -> list[str]:
     """The reading, computed from the tables so a regeneration cannot leave it behind (W46.seg-report-refresh)."""
     L = ["## Findings", ""]
     for box, b in pub["boxes"].items():
         ex = {k: r["metrics"]["pages_in_exact_doc"] for k, r in b["sources"].items()}
         cloud = [ex[k] for k in ex if k.startswith("window-cues-")]
-        opn = [ex[k] for k in OPEN_KEYS if k in ex]
+        opn = [ex[k] for k in OPEN if k in ex]
         if not cloud or not opn:
             continue
-        rng = lambda xs: f"{100 * min(xs):.1f}-{100 * max(xs):.1f}%"  # noqa: E731
+        rng = lambda xs: "-".join(dict.fromkeys(f"{100 * x:.1f}" for x in (min(xs), max(xs)))) + "%"  # noqa: E731
         gap = 100 * (min(cloud) - max(opn))
         L.append(f"- **{box}: the Claude windows put {rng(cloud)} of pages in an exact document, the open models "
                  f"{rng(opn)}.** " + (f"The lowest cloud figure is {gap:.1f} points above the best open one, so the "
                  "drop is the open models', not a ceiling the material imposes." if gap > 5 else
-                 "Within a few points of each other on one agent-audited box: a tie, not a ranking."))
-    L.append("- **The stated letter cue (c2) changes the review load, not the errors, and not in one direction.** "
+                 f"The best open model is {abs(gap):.1f} points from the lowest cloud figure, a gap or so on one "
+                 "agent-audited box: a tie between the best of each, not a ranking."))
+    loads = cue_loads(owner, pub)
+    moved = max((d for *_, d in loads), default=0)
+    L.append("- **The stated letter cue (c2) moves the review load, in no one direction, and the errors little.** "
              "Per box (table below), c1 to c2 checks per 100 pages: " + "; ".join(
-                 f"{box} {c1} to {c2}" for box, c1, c2 in cue_loads(owner, pub)) + ". Pages exact and the error "
-             "counts move by at most one gap a box.")
+                 f"{box} {c1} to {c2}" for box, c1, c2, _ in loads) + f". False splits and merges together move by "
+             f"at most {moved} gap{'s' if moved != 1 else ''} a box.")
     L += ["- **Segment figures on Lincoln and CREST are conditional.** Their unsure gaps take each route's own call "
           "(`score.py`), so two routes' pages exact are not scored against one fixed truth; differences of a gap or "
           "two between cloud arms are inside that and the rerun floor.", ""]
     return L
 
 
-def cue_loads(owner: dict, pub: dict) -> list[tuple[str, str, str]]:
+def cue_loads(owner: dict, pub: dict) -> list[tuple[str, str, str, int]]:
     out = []
     for box, b in {**owner["boxes"], **pub["boxes"]}.items():
         a, c = b["sources"].get("window-cues-claude"), b["sources"].get("window-cues-claude-cue")
         if a and c:
             load = lambda r: "—" if r["review_load"] is None else f"{100 * r['review_load'] / b['pages']:.1f}"  # noqa: E731
-            out.append((box, load(a), load(c)))
+            err = lambda r: r["counts"]["false_splits"] + r["counts"]["false_merges"]  # noqa: E731
+            out.append((box, load(a), load(c), abs(err(a) - err(c))))
     return out
 
 

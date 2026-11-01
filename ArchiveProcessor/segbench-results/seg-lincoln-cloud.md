@@ -6,31 +6,38 @@ Public window rows use the models' own photo calls, matching the public scorer. 
 
 
 
+## Findings
+
+- **Lincoln: the Claude windows put 89.3-90.4% of pages in an exact document, the open models 35.6-49.8%.** The lowest cloud figure is 39.5 points above the best open one, so the drop is the open models', not a ceiling the material imposes.
+- **CREST: the Claude windows put 89.1% of pages in an exact document, the open models 81.2-88.3%.** The best open model is 0.8 points from the lowest cloud figure, a gap or so on one agent-audited box: a tie between the best of each, not a ranking.
+- **The stated letter cue (c2) moves the review load, in no one direction, and the errors little.** Per box (table below), c1 to c2 checks per 100 pages: Dean 5.9 to 4.0; Deaver 10.7 to 14.8; Lincoln 21.5 to 6.5; CREST 28.1 to 29.7. False splits and merges together move by at most 1 gap a box.
+- **Segment figures on Lincoln and CREST are conditional.** Their unsure gaps take each route's own call (`score.py`), so two routes' pages exact are not scored against one fixed truth; differences of a gap or two between cloud arms are inside that and the rerun floor.
+
 ## Lincoln and CREST, every source, old and new scorers
 
-### Lincoln: 261 pages, 80 documents
+### Lincoln: 261 pages, 80 documents as stored, 78-81 with its 3 unsure gaps either way
 
 | source | pages exact | false splits | false merges | boundaries found | PQ | kappa | MNDD | pages exact, finding-aid count | checks per 100 pages to 98% |
 |---|---|---|---|---|---|---|---|---|---|
-| rule cues (fitted on owner dev boxes) | 16.9% | 86 | 14 | 64/78 | 0.276 | 0.275 | 103 | 5.4% | 85.4 |
-| Qwen3.5 27B teacher, FarmShare | 40.6% | 40 | 0 | 80/80 | 0.571 | 0.683 | 41 | 47.5% | — |
-| trained Qwen3.5 2B, FarmShare | 35.6% | 44 | 1 | 78/79 | 0.529 | 0.645 | 45 | 44.1% | — |
-| trained Qwen3.5 4B, FarmShare | 49.8% | 31 | 0 | 79/79 | 0.669 | 0.746 | 32 | 57.9% | — |
-| Claude Sonnet 5.5, c1, plan | 90.4% | 2 | 0 | 77/77 | 0.983 | 0.982 | 2 | 80.8% | 22.6 |
-| Claude Sonnet 5.5, c2 (stated letter cues), plan + gateway holes | 89.3% | 3 | 0 | 79/79 | 0.966 | 0.973 | 3 | 80.1% | 7.3 |
+| rule cues (fitted on owner dev boxes) | 16.9% | 86 | 14 | 63/77 | 0.276 | 0.269 | 103 | 5.4% | 84.7 |
+| Qwen3.5 27B teacher, FarmShare | 40.6% | 40 | 0 | 77/77 | 0.571 | 0.677 | 41 | 47.5% | — |
+| trained Qwen3.5 2B, FarmShare | 35.6% | 44 | 1 | 76/77 | 0.529 | 0.640 | 45 | 44.1% | — |
+| trained Qwen3.5 4B, FarmShare | 49.8% | 31 | 0 | 77/77 | 0.669 | 0.742 | 32 | 57.9% | — |
+| Claude Sonnet 5.5, c1, plan | 90.4% | 2 | 0 | 77/77 | 0.983 | 0.982 | 2 | 80.8% | 21.5 |
+| Claude Sonnet 5.5, c2 (stated letter cues), plan + gateway holes | 89.3% | 3 | 0 | 77/77 | 0.966 | 0.972 | 3 | 80.1% | 6.5 |
 | ChatGPT gpt-6.1-sol low, c1, plan | not collected | | | | | | | | |
 | ChatGPT gpt-6.1-sol low, c2 (stated letter cues), plan | not collected | | | | | | | | |
 
-### CREST: 128 pages, 30 documents
+### CREST: 128 pages, 30 documents as stored, 30-34 with its 4 unsure gaps either way
 
 | source | pages exact | false splits | false merges | boundaries found | PQ | kappa | MNDD | pages exact, finding-aid count | checks per 100 pages to 98% |
 |---|---|---|---|---|---|---|---|---|---|
-| rule cues (fitted on owner dev boxes) | 14.8% | 80 | 0 | 33/33 | 0.213 | 0.083 | 81 | 3.1% | 98.4 |
-| Qwen3.5 27B teacher, FarmShare | 88.3% | 1 | 0 | 31/31 | 0.983 | 0.979 | 1 | 37.5% | 45.3 |
-| trained Qwen3.5 2B, FarmShare | 81.2% | 2 | 2 | 28/30 | 0.890 | 0.913 | 5 | 32.0% | 98.4 |
-| trained Qwen3.5 4B, FarmShare | 88.3% | 1 | 0 | 30/30 | 0.982 | 0.978 | 1 | 53.9% | 78.1 |
-| Claude Sonnet 5.5, c1, plan | 89.1% | 1 | 0 | 32/32 | 0.983 | 0.979 | 1 | 54.7% | 31.2 |
-| Claude Sonnet 5.5, c2 (stated letter cues), plan + gateway holes | 89.1% | 1 | 0 | 32/32 | 0.983 | 0.979 | 1 | 44.5% | 32.8 |
+| rule cues (fitted on owner dev boxes) | 14.8% | 80 | 0 | 29/29 | 0.213 | 0.076 | 81 | 3.1% | 95.3 |
+| Qwen3.5 27B teacher, FarmShare | 88.3% | 1 | 0 | 29/29 | 0.983 | 0.978 | 1 | 37.5% | 42.2 |
+| trained Qwen3.5 2B, FarmShare | 81.2% | 2 | 2 | 27/29 | 0.890 | 0.910 | 5 | 32.0% | 95.3 |
+| trained Qwen3.5 4B, FarmShare | 88.3% | 1 | 0 | 29/29 | 0.982 | 0.978 | 1 | 53.9% | 75.0 |
+| Claude Sonnet 5.5, c1, plan | 89.1% | 1 | 0 | 29/29 | 0.983 | 0.978 | 1 | 54.7% | 28.1 |
+| Claude Sonnet 5.5, c2 (stated letter cues), plan + gateway holes | 89.1% | 1 | 0 | 29/29 | 0.983 | 0.978 | 1 | 44.5% | 29.7 |
 | ChatGPT gpt-6.1-sol low, c1, plan | not collected | | | | | | | | |
 | ChatGPT gpt-6.1-sol low, c2 (stated letter cues), plan | not collected | | | | | | | | |
 
@@ -40,6 +47,14 @@ Public window rows use the models' own photo calls, matching the public scorer. 
 |---|---|---|---|---|---|---|---|---|---|
 | Dean | claude | 85.2% | 85.2% | 2 / 4 | 2 / 4 | 0.942 | 0.942 | 5.9 | 4.0 |
 | Deaver | claude | 97.9% | 97.9% | 0 / 1 | 0 / 1 | 0.991 | 0.991 | 10.7 | 14.8 |
-| Lincoln | claude | 90.4% | 89.3% | 2 / 0 | 3 / 0 | 0.983 | 0.966 | 22.6 | 7.3 |
-| CREST | claude | 89.1% | 89.1% | 1 / 0 | 1 / 0 | 0.983 | 0.983 | 31.2 | 32.8 |
+| Lincoln | claude | 90.4% | 89.3% | 2 / 0 | 3 / 0 | 0.983 | 0.966 | 21.5 | 6.5 |
+| CREST | claude | 89.1% | 89.1% | 1 / 0 | 1 / 0 | 0.983 | 0.983 | 28.1 | 29.7 |
+
+## Measurement card
+
+- **Truth.** The owner's ruled boxes: development Dean, Deaver and Herrnstein, test Stanton and RG165; Stanton carries the owner's 2026-10-31 segmentation-sheet rulings (W46.seg-truth-rescore). The public boxes are agent-audited truths with the owner's rulings on their disputed gaps folded in: Lincoln (`5ba5a0e67380…`: 5 gaps owner-ruled, unsure 76|77, 106|107, 230|231); CREST (`c7a0cfcac896…`: 6 gaps owner-ruled, unsure 45|46, 87|88, 93|94, 110|111). Their other gaps remain agent-audited. Unsure gaps are out of every boundary count; segment figures (pages exact, PQ) are the conditional reading, the route's own call at an unsure gap, so they are not one fixed truth across routes (W46.seg-unsure-mask, `score.py`).
+- **Selection.** Lincoln and CREST were chosen as public boxes unlike the owner's corpus before any route was run on them; the owner boxes are the bench's own. No route, prompt or rule was fitted or chosen on these answers (the c2 wording was written once, before any c2 answer was read).
+- **Comparison.** Same 7-page windows (stride 3), combining and assembly for every window source; the Claude rows are Sonnet 5.5 through `claude -p` (c2's final 11 holes through the gateway, a mixed transport); the FarmShare rows are the committed caches. Public window rows use the models' own photo calls.
+- **Noise.** Single runs, no intervals. The rerun floor (1.4-3.2 points of pages exact a box, SEG-10) applies, and each public box rests on one audit; a difference of a gap or two is a tie.
+- **Scope.** Whether Lincoln's drop belongs to the open models or to the material, and what the stated cue does, on two public boxes and the owner boxes with both prompts. It does not rank cloud routes for the app (options.md) or say how a model trained on Lincoln-like material would do.
 

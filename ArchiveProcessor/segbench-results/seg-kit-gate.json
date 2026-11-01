@@ -28,10 +28,10 @@
    "Stanton": {
     "split": "test",
     "gaps": 238,
-    "student wrong": 27,
+    "student wrong": 25,
     "teacher wrong the same way": 15,
-    "teacher right": 12,
-    "teacher wrong, student right": 5
+    "teacher right": 10,
+    "teacher wrong, student right": 7
    },
    "RG165": {
     "split": "test",
@@ -43,19 +43,19 @@
    },
    "Lincoln": {
     "split": "public",
-    "gaps": 260,
-    "student wrong": 46,
+    "gaps": 257,
+    "student wrong": 45,
     "teacher wrong the same way": 35,
-    "teacher right": 11,
+    "teacher right": 10,
     "teacher wrong, student right": 5
    },
    "CREST": {
     "split": "public",
-    "gaps": 127,
+    "gaps": 123,
     "student wrong": 4,
     "teacher wrong the same way": 1,
     "teacher right": 3,
-    "teacher wrong, student right": 1
+    "teacher wrong, student right": 0
    }
   },
   "fs-seg-4b": {
@@ -87,9 +87,9 @@
     "split": "test",
     "gaps": 238,
     "student wrong": 19,
-    "teacher wrong the same way": 16,
-    "teacher right": 3,
-    "teacher wrong, student right": 4
+    "teacher wrong the same way": 17,
+    "teacher right": 2,
+    "teacher wrong, student right": 5
    },
    "RG165": {
     "split": "test",
@@ -101,37 +101,37 @@
    },
    "Lincoln": {
     "split": "public",
-    "gaps": 260,
-    "student wrong": 34,
-    "teacher wrong the same way": 29,
-    "teacher right": 5,
-    "teacher wrong, student right": 11
+    "gaps": 257,
+    "student wrong": 31,
+    "teacher wrong the same way": 28,
+    "teacher right": 3,
+    "teacher wrong, student right": 12
    },
    "CREST": {
     "split": "public",
-    "gaps": 127,
+    "gaps": 123,
     "student wrong": 1,
     "teacher wrong the same way": 1,
     "teacher right": 0,
-    "teacher wrong, student right": 1
+    "teacher wrong, student right": 0
    }
   },
   "fs-seg-date-2b": {
    "Lincoln": {
     "split": "public",
-    "gaps": 260,
-    "student wrong": 46,
-    "teacher wrong the same way": 34,
+    "gaps": 257,
+    "student wrong": 47,
+    "teacher wrong the same way": 35,
     "teacher right": 12,
-    "teacher wrong, student right": 6
+    "teacher wrong, student right": 5
    },
    "CREST": {
     "split": "public",
-    "gaps": 127,
+    "gaps": 123,
     "student wrong": 3,
     "teacher wrong the same way": 1,
     "teacher right": 2,
-    "teacher wrong, student right": 1
+    "teacher wrong, student right": 0
    }
   }
  },
@@ -141,119 +141,139 @@
     "100": {
      "pages exact": {
       "lo": -17.65,
-      "hi": 9.01,
-      "half": 13.33
+      "hi": 8.57,
+      "half": 13.11
      },
      "gap accuracy": {
-      "lo": -2.0,
-      "hi": 5.0,
-      "half": 3.5
+      "lo": -2.97,
+      "hi": 4.9,
+      "half": 3.94
      },
      "flagged per 100 pages": {
-      "lo": -5.77,
+      "lo": -5.71,
       "hi": 1.92,
-      "half": 3.85
+      "half": 3.82
      }
     },
     "300": {
      "pages exact": {
-      "lo": -9.97,
-      "hi": 5.77,
-      "half": 7.87
+      "lo": -10.06,
+      "hi": 5.57,
+      "half": 7.82
      },
      "gap accuracy": {
-      "lo": -1.0,
-      "hi": 3.33,
-      "half": 2.17
+      "lo": -1.32,
+      "hi": 3.0,
+      "half": 2.16
      },
      "flagged per 100 pages": {
-      "lo": -4.04,
+      "lo": -3.88,
       "hi": 0.63,
-      "half": 2.33
+      "half": 2.26
      }
     },
     "1000": {
      "pages exact": {
-      "lo": -5.4,
-      "hi": 3.07,
-      "half": 4.23
+      "lo": -5.37,
+      "hi": 2.78,
+      "half": 4.08
      },
      "gap accuracy": {
-      "lo": -0.1,
-      "hi": 2.3,
-      "half": 1.2
+      "lo": -0.3,
+      "hi": 2.0,
+      "half": 1.15
      },
      "flagged per 100 pages": {
-      "lo": -2.94,
-      "hi": -0.48,
-      "half": 1.23
+      "lo": -2.9,
+      "hi": -0.47,
+      "half": 1.21
      }
     }
    },
    "needed": {
-    "pages exact": 1988,
-    "gap accuracy": 160,
-    "flagged per 100 pages": 168
+    "pages exact": 1850,
+    "gap accuracy": 147,
+    "flagged per 100 pages": 163
    }
   },
   "fs-qwen3.5-27b - fs-seg-2b": {
    "sizes": {
     "100": {
      "pages exact": {
-      "lo": -15.69,
-      "hi": 11.65,
-      "half": 13.67
+      "lo": -16.82,
+      "hi": 10.09,
+      "half": 13.46
      },
      "gap accuracy": {
-      "lo": -5.0,
-      "hi": 5.0,
-      "half": 5.0
+      "lo": -6.0,
+      "hi": 4.95,
+      "half": 5.48
      },
      "flagged per 100 pages": {
-      "lo": -5.83,
-      "hi": 2.88,
-      "half": 4.35
+      "lo": -5.77,
+      "hi": 2.91,
+      "half": 4.34
      }
     },
     "300": {
      "pages exact": {
-      "lo": -7.62,
-      "hi": 7.96,
-      "half": 7.79
+      "lo": -8.57,
+      "hi": 6.11,
+      "half": 7.34
      },
      "gap accuracy": {
-      "lo": -2.33,
-      "hi": 3.65,
-      "half": 2.99
+      "lo": -2.67,
+      "hi": 2.99,
+      "half": 2.83
      },
      "flagged per 100 pages": {
-      "lo": -3.88,
-      "hi": 1.26,
-      "half": 2.57
+      "lo": -3.82,
+      "hi": 1.27,
+      "half": 2.55
      }
     },
     "1000": {
      "pages exact": {
-      "lo": -3.42,
-      "hi": 5.27,
-      "half": 4.34
+      "lo": -4.3,
+      "hi": 4.02,
+      "half": 4.16
      },
      "gap accuracy": {
-      "lo": -0.8,
-      "hi": 2.3,
+      "lo": -1.3,
+      "hi": 1.8,
       "half": 1.55
      },
      "flagged per 100 pages": {
-      "lo": -2.76,
-      "hi": 0.09,
-      "half": 1.43
+      "lo": -2.75,
+      "hi": 0.1,
+      "half": 1.42
      }
     }
    },
    "needed": {
-    "pages exact": 2093,
+    "pages exact": 1923,
     "gap accuracy": 267,
-    "flagged per 100 pages": 227
+    "flagged per 100 pages": 224
+   }
+  }
+ },
+ "truth_sensitivity": {
+  "fs-seg-4b - fs-seg-2b": {
+   "gaps": 809,
+   "discordant": 31,
+   "difference": 0.87,
+   "shift": {
+    "5.3%": 0.41,
+    "12.4%": 0.95
+   }
+  },
+  "fs-qwen3.5-27b - fs-seg-2b": {
+   "gaps": 809,
+   "discordant": 39,
+   "difference": 0.37,
+   "shift": {
+    "5.3%": 0.51,
+    "12.4%": 1.2
    }
   }
  },
@@ -263,43 +283,50 @@
     "pages exact": 84.2,
     "gap accuracy": 96.9,
     "gaps": 191,
-    "doc pages": 196
+    "doc pages": 196,
+    "unscored gaps": 0
    },
    "Deaver": {
     "pages exact": 96.5,
     "gap accuracy": 98.5,
     "gaps": 136,
-    "doc pages": 141
+    "doc pages": 141,
+    "unscored gaps": 0
    },
    "Herrnstein": {
     "pages exact": 91.7,
     "gap accuracy": 95.2,
     "gaps": 167,
-    "doc pages": 181
+    "doc pages": 181,
+    "unscored gaps": 0
    },
    "Stanton": {
-    "pages exact": 81.9,
-    "gap accuracy": 91.6,
+    "pages exact": 79.8,
+    "gap accuracy": 90.8,
     "gaps": 238,
-    "doc pages": 243
+    "doc pages": 243,
+    "unscored gaps": 0
    },
    "RG165": {
     "pages exact": 86.2,
     "gap accuracy": 96.1,
     "gaps": 77,
-    "doc pages": 87
+    "doc pages": 87,
+    "unscored gaps": 0
    },
    "Lincoln": {
-    "pages exact": 39.5,
-    "gap accuracy": 84.6,
-    "gaps": 260,
-    "doc pages": 261
+    "pages exact": 39.0,
+    "gap accuracy": 84.4,
+    "gaps": 257,
+    "doc pages": 251,
+    "unscored gaps": 3
    },
    "CREST": {
-    "pages exact": 95.3,
-    "gap accuracy": 98.4,
-    "gaps": 127,
-    "doc pages": 128
+    "pages exact": 100.0,
+    "gap accuracy": 99.2,
+    "gaps": 123,
+    "doc pages": 101,
+    "unscored gaps": 4
    }
   },
   "fs-seg-2b": {
@@ -307,43 +334,50 @@
     "pages exact": 93.9,
     "gap accuracy": 97.4,
     "gaps": 191,
-    "doc pages": 196
+    "doc pages": 196,
+    "unscored gaps": 0
    },
    "Deaver": {
     "pages exact": 88.7,
     "gap accuracy": 94.9,
     "gaps": 136,
-    "doc pages": 141
+    "doc pages": 141,
+    "unscored gaps": 0
    },
    "Herrnstein": {
     "pages exact": 88.4,
     "gap accuracy": 97.0,
     "gaps": 167,
-    "doc pages": 181
+    "doc pages": 181,
+    "unscored gaps": 0
    },
    "Stanton": {
-    "pages exact": 73.3,
-    "gap accuracy": 88.7,
+    "pages exact": 75.3,
+    "gap accuracy": 89.5,
     "gaps": 238,
-    "doc pages": 243
+    "doc pages": 243,
+    "unscored gaps": 0
    },
    "RG165": {
     "pages exact": 94.3,
     "gap accuracy": 97.4,
     "gaps": 77,
-    "doc pages": 87
+    "doc pages": 87,
+    "unscored gaps": 0
    },
    "Lincoln": {
-    "pages exact": 34.9,
-    "gap accuracy": 82.3,
-    "gaps": 260,
-    "doc pages": 261
+    "pages exact": 33.1,
+    "gap accuracy": 82.5,
+    "gaps": 257,
+    "doc pages": 251,
+    "unscored gaps": 3
    },
    "CREST": {
-    "pages exact": 91.4,
-    "gap accuracy": 96.9,
-    "gaps": 127,
-    "doc pages": 128
+    "pages exact": 91.1,
+    "gap accuracy": 96.7,
+    "gaps": 123,
+    "doc pages": 101,
+    "unscored gaps": 4
    }
   },
   "fs-seg-4b": {
@@ -351,43 +385,50 @@
     "pages exact": 85.2,
     "gap accuracy": 96.9,
     "gaps": 191,
-    "doc pages": 196
+    "doc pages": 196,
+    "unscored gaps": 0
    },
    "Deaver": {
     "pages exact": 92.2,
     "gap accuracy": 97.1,
     "gaps": 136,
-    "doc pages": 141
+    "doc pages": 141,
+    "unscored gaps": 0
    },
    "Herrnstein": {
     "pages exact": 91.2,
     "gap accuracy": 97.6,
     "gaps": 167,
-    "doc pages": 181
+    "doc pages": 181,
+    "unscored gaps": 0
    },
    "Stanton": {
-    "pages exact": 79.0,
+    "pages exact": 80.2,
     "gap accuracy": 92.0,
     "gaps": 238,
-    "doc pages": 243
+    "doc pages": 243,
+    "unscored gaps": 0
    },
    "RG165": {
     "pages exact": 79.3,
     "gap accuracy": 94.8,
     "gaps": 77,
-    "doc pages": 87
+    "doc pages": 87,
+    "unscored gaps": 0
    },
    "Lincoln": {
-    "pages exact": 46.7,
-    "gap accuracy": 86.9,
-    "gaps": 260,
-    "doc pages": 261
+    "pages exact": 47.8,
+    "gap accuracy": 87.9,
+    "gaps": 257,
+    "doc pages": 251,
+    "unscored gaps": 3
    },
    "CREST": {
-    "pages exact": 98.4,
+    "pages exact": 100.0,
     "gap accuracy": 99.2,
-    "gaps": 127,
-    "doc pages": 128
+    "gaps": 123,
+    "doc pages": 101,
+    "unscored gaps": 4
    }
   },
   "fs-qwen3.5-4b": {
@@ -395,34 +436,56 @@
     "pages exact": 67.9,
     "gap accuracy": 82.2,
     "gaps": 191,
-    "doc pages": 196
+    "doc pages": 196,
+    "unscored gaps": 0
    },
    "Deaver": {
     "pages exact": 56.0,
     "gap accuracy": 77.9,
     "gaps": 136,
-    "doc pages": 141
+    "doc pages": 141,
+    "unscored gaps": 0
    },
    "Herrnstein": {
     "pages exact": 76.2,
     "gap accuracy": 86.2,
     "gaps": 167,
-    "doc pages": 181
+    "doc pages": 181,
+    "unscored gaps": 0
    }
   },
   "fs-seg-date-2b": {
    "Lincoln": {
-    "pages exact": 34.1,
-    "gap accuracy": 82.3,
-    "gaps": 260,
-    "doc pages": 261
+    "pages exact": 31.5,
+    "gap accuracy": 81.7,
+    "gaps": 257,
+    "doc pages": 251,
+    "unscored gaps": 3
    },
    "CREST": {
-    "pages exact": 85.2,
+    "pages exact": 97.0,
     "gap accuracy": 97.6,
-    "gaps": 127,
-    "doc pages": 128
+    "gaps": 123,
+    "doc pages": 101,
+    "unscored gaps": 4
    }
+  }
+ },
+ "label_error": [
+  5.3,
+  0.0,
+  12.4
+ ],
+ "truth": {
+  "lincoln": {
+   "sha256": "5ba5a0e6738003c26e2039fa93166a31494bb709023b8f386e28605632bd6223",
+   "unsure": 3,
+   "owner_rulings": 5
+  },
+  "crest": {
+   "sha256": "c7a0cfcac89642366bf55fff36c423ee90ab063fdde9e54995e49d2855224888",
+   "unsure": 4,
+   "owner_rulings": 6
   }
  },
  "dates": {
@@ -470,6 +533,6 @@
  "level": 0.85,
  "draws": 4000,
  "seed": 46,
- "documents_in_pool": 463,
+ "documents_in_pool": 465,
  "gaps_in_pool": 809
 }

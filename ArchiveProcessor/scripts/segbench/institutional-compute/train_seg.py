@@ -29,7 +29,8 @@ counted wrong; a candidate with no shipped run or no paired gap fails (W46.kit-g
 candidate's manifest (`archive-seg-manifest.json` beside the weights is what the app reads): prompt id, kit version,
 weights and training-data hashes, the scores, and the gate's verdict; it exits 1 when the gate fails. The app refuses a
 model whose manifest lacks the anchor score or names another prompt (`LocalSegmenter.refusal`). Sizes, from
-kit_gate.py: separating 3 points of pages exact takes about 2,000 held-out gaps; gap accuracy about 200.
+kit_gate.py (2026-10-31 truth): separating 3 points of pages exact takes about 1,850 held-out gaps; gap accuracy
+about 150-270 (seg-kit-gate.md is recomputed by `kit_gate.py report`).
 
 The request is the one cluster_seg.py sends (the pack's prompt and 1024 px images), in the base model's chat template
 with thinking off, so a trained model is scored by the same cluster_seg.py run and import as the teacher.

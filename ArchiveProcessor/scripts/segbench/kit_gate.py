@@ -437,8 +437,7 @@ def render(split, boot, observed, dates, docs, sens, records) -> str:
         b, a = pair.split(" - ")
         L.append(f"| {SHORT[b]} minus {SHORT[a]} | {v['gaps']:,} | {v['discordant']} | {v['difference']:+} points | "
                  f"±{v['shift'][f'{LABEL_ERROR[0]}%']} | ±{v['shift'][f'{LABEL_ERROR[2]}%']} |")
-    L += ["",
-          "", "## Observed, from the same records", "",
+    L += ["", "## Observed, from the same records", "",
           "Known gaps only; pages exact over the documents every unsure gap leaves resolved (W46.seg-unsure-mask).", "",
           "| model | box | known gaps | unscored gaps | gap accuracy | pages exact |", "|---|---|---:|---:|---:|---:|"]
     for key, per in observed.items():
@@ -520,7 +519,8 @@ def render(split, boot, observed, dates, docs, sens, records) -> str:
           "- **Truth.** The owner's ruled boxes (Dean, Deaver, Herrnstein; test boxes Stanton and RG165), Stanton "
           "with the owner's 2026-10-31 segmentation-sheet rulings folded (W46.seg-truth-rescore); the agent-audited "
           "public truths of Lincoln and CREST with the owner's rulings folded ("
-          + ", ".join(f"{b} {v['owner_rulings']} ruled, {v['unsure']} unsure, `{v['sha256'][:12]}…`" for b, v in prov.items())
+          + ", ".join(f"{dict(lincoln='Lincoln', crest='CREST')[b]} {v['owner_rulings']} ruled, {v['unsure']} unsure, "
+          f"`{v['sha256'][:12]}…`" for b, v in prov.items())
           + "); their other gaps remain agent-audited. Unsure gaps are out of every count (W46.seg-unsure-mask). "
           "Dating: the owner's year tags.",
           "- **Selection.** Whole boxes, chosen before these models existed; the dating 131 by whether the year is in "

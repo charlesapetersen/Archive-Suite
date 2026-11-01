@@ -166,6 +166,7 @@ def score(col, manifest, key, output_dir=None):
         if previous.get("truth_sha256") != result["truth_sha256"]:
             raise ValueError("previous scores use different truth; preserve and resolve them explicitly")
         previous["models"].update(result["models"])
+        previous["unsure_gaps"] = result["unsure_gaps"]
         result = previous
     path.write_text(json.dumps(result, indent=2) + "\n")
     print(json.dumps(result, indent=2))

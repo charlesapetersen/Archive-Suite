@@ -566,8 +566,8 @@ def score(root, claude_only=False, record_glm_failure=False):
         glm = lambda rows: f"{exact(rows, 'gateway-glm'):.1f}%" if 'gateway-glm' in rows else 'failed validation (no score)'
         allm = {path.name.split('-')[0]: prev['models'] for path, prev in staged}
         pe = lambda box, key: 100 * allm[box][key]['metrics']['pages_in_exact_doc'] if key in allm[box] else None  # noqa: E731
-        rng = lambda box, keys: '–'.join(f'{x:.1f}' for x in (lambda v: (min(v), max(v)))(  # noqa: E731
-            [pe(box, k) for k in keys if pe(box, k) is not None])) + '%'
+        rng = lambda box, keys: '–'.join(dict.fromkeys(f'{x:.1f}' for x in (lambda v: (min(v), max(v)))(  # noqa: E731
+            [pe(box, k) for k in keys if pe(box, k) is not None]))) + '%'
         OPEN = ('fs-qwen3.5-27b', 'fs-seg-2b', 'fs-seg-4b')
         CLAUDE = ('window-cues-claude', 'window-cues-claude-cue')
         cloud_c = [x for x in (pe('crest', k) for k in ('gateway-gemini', 'gateway-gemini-whole', 'gateway-glm', *CLAUDE)) if x is not None]

@@ -9,12 +9,12 @@ Made by `scripts/segbench/rescore.py` (owner, public, report) from the response 
 | whole-gemini | whole folder, Gemini API | 93.1% | 0.941 | 0.026 | 0.026 | 0.963 | 0.969 | 0.994 | 0.950 | 66.7% | 2.7 |
 | window-or-fs-seg-4b-pilot | window, FarmShare | 92.5% | 0.929 | 0.031 | 0.031 | 0.940 | 0.945 | 0.995 | 0.929 | 58.3% | 2.9 |
 | window-cues-codex | window, subscription | 91.3% | 0.958 | 0.018 | 0.018 | 0.970 | 0.978 | 0.992 | 0.956 | 70.8% | 3.1 |
-| window-gemini-3.8-flash-low | window, Gemini API | 90.7% | 0.941 | 0.026 | 0.026 | 0.960 | 0.965 | 0.994 | 0.947 | 70.8% | 3.6 |
 | window-claude | window, subscription | 90.7% | 0.954 | 0.020 | 0.020 | 0.966 | 0.973 | 0.992 | 0.951 | 70.8% | 3.3 |
+| window-gemini-3.8-flash-low | window, Gemini API | 90.7% | 0.941 | 0.026 | 0.026 | 0.960 | 0.965 | 0.994 | 0.947 | 70.8% | 3.6 |
 | window-or-fs-seg-2b | window, FarmShare | 90.5% | 0.929 | 0.031 | 0.031 | 0.938 | 0.945 | 0.993 | 0.923 | 58.3% | 3.4 |
 | window-local-seg-2b-8bit | window, Mac local | 90.3% | 0.929 | 0.031 | 0.031 | 0.940 | 0.948 | 0.992 | 0.922 | 54.2% | 3.4 |
-| window-or-glm5.3-flash | window, OpenRouter | 90.2% | 0.937 | 0.027 | 0.027 | 0.952 | 0.958 | 0.994 | 0.942 | 66.7% | 4.0 |
 | window-or-fs-qwen3.5-27b | window, FarmShare | 90.2% | 0.933 | 0.029 | 0.029 | 0.956 | 0.963 | 0.993 | 0.941 | 66.7% | 3.8 |
+| window-or-glm5.3-flash | window, OpenRouter | 90.2% | 0.937 | 0.027 | 0.027 | 0.952 | 0.958 | 0.994 | 0.942 | 66.7% | 4.0 |
 | window-or-gpt5.6-luna | window, OpenRouter | 90.0% | 0.945 | 0.024 | 0.024 | 0.958 | 0.967 | 0.991 | 0.942 | 66.7% | 3.6 |
 | window-local-seg-date-2b-8bit | window, Mac local | 89.4% | 0.921 | 0.035 | 0.035 | 0.935 | 0.941 | 0.993 | 0.919 | 50.0% | 4.2 |
 | whole-gemini-c10 | whole folder, Gemini API | 89.4% | 0.941 | 0.026 | 0.026 | 0.954 | 0.962 | 0.991 | 0.937 | 62.5% | 3.8 |
@@ -55,33 +55,33 @@ Made by `scripts/segbench/rescore.py` (owner, public, report) from the response 
 | all-new | baseline | 20.9% | 0.000 | 0.507 | 0.507 | 0.289 | 0.289 | 1.000 | 0.289 | 13.3% | 50.4 |
 | no-boundaries | baseline | 8.5% | 0.000 | 0.366 | 0.366 | 0.073 | 0.086 | 0.844 | 0.049 | 26.7% | 68.0 |
 
-## Lincoln (261 pages, 80 documents)
+## Lincoln (261 pages, 80 documents as stored, 78-81 with its 3 unsure gaps either way)
 
 | source | family | pages exact | kappa | Pk | WD | PQ | RQ | SQ | doc F1 | STP | MNDD/100 p |
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | window-cues-claude | window, subscription | 90.4% | 0.982 | 0.008 | 0.015 | 0.983 | 0.987 | 0.995 | 0.962 | 0.0% | 0.8 |
-| window-cues-claude-cue | window, subscription | 89.3% | 0.973 | 0.008 | 0.023 | 0.966 | 0.969 | 0.996 | 0.945 | 0.0% | 1.1 |
-| window-or-fs-seg-4b | window, FarmShare | 49.8% | 0.746 | 0.081 | 0.236 | 0.669 | 0.712 | 0.939 | 0.524 | 0.0% | 12.3 |
-| window-or-fs-qwen3.5-27b | window, FarmShare | 40.6% | 0.683 | 0.089 | 0.301 | 0.571 | 0.614 | 0.930 | 0.426 | 0.0% | 15.7 |
-| window-or-fs-seg-2b | window, FarmShare | 35.6% | 0.645 | 0.100 | 0.324 | 0.529 | 0.571 | 0.927 | 0.384 | 0.0% | 17.2 |
-| window-or-fs-seg-date-2b | window, FarmShare | 33.3% | 0.630 | 0.100 | 0.336 | 0.512 | 0.552 | 0.927 | 0.365 | 0.0% | 18.0 |
-| rule-cues | baseline | 16.9% | 0.275 | 0.274 | 0.537 | 0.276 | 0.313 | 0.881 | 0.191 | 0.0% | 39.5 |
+| window-cues-claude-cue | window, subscription | 89.3% | 0.972 | 0.008 | 0.023 | 0.966 | 0.969 | 0.996 | 0.945 | 0.0% | 1.1 |
+| window-or-fs-seg-4b | window, FarmShare | 49.8% | 0.742 | 0.081 | 0.236 | 0.669 | 0.712 | 0.939 | 0.524 | 0.0% | 12.3 |
+| window-or-fs-qwen3.5-27b | window, FarmShare | 40.6% | 0.677 | 0.089 | 0.301 | 0.571 | 0.614 | 0.930 | 0.426 | 0.0% | 15.7 |
+| window-or-fs-seg-2b | window, FarmShare | 35.6% | 0.640 | 0.100 | 0.324 | 0.529 | 0.571 | 0.927 | 0.384 | 0.0% | 17.2 |
+| window-or-fs-seg-date-2b | window, FarmShare | 33.3% | 0.624 | 0.100 | 0.336 | 0.512 | 0.552 | 0.927 | 0.365 | 0.0% | 18.0 |
+| rule-cues | baseline | 16.9% | 0.269 | 0.274 | 0.537 | 0.276 | 0.313 | 0.881 | 0.191 | 0.0% | 39.5 |
 | all-new | baseline | 6.9% | 0.000 | 0.452 | 0.931 | 0.105 | 0.105 | 1.000 | 0.105 | 0.0% | 69.0 |
 | rule-cues-sketch | baseline | 6.9% | 0.000 | 0.452 | 0.931 | 0.105 | 0.105 | 1.000 | 0.105 | 0.0% | 69.0 |
 | no-boundaries | baseline | 0.0% | 0.000 | 0.541 | 0.541 | 0.000 | 0.000 | 0.000 | — | 0.0% | 91.6 |
 
-## CREST (128 pages, 31 documents)
+## CREST (128 pages, 30 documents as stored, 30-34 with its 4 unsure gaps either way)
 
 | source | family | pages exact | kappa | Pk | WD | PQ | RQ | SQ | doc F1 | STP | MNDD/100 p |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| window-cues-claude | window, subscription | 89.1% | 0.979 | 0.008 | 0.016 | 0.983 | 0.985 | 0.998 | 0.955 | 0.0% | 0.8 |
-| window-or-fs-qwen3.5-27b | window, FarmShare | 88.3% | 0.979 | 0.008 | 0.016 | 0.983 | 0.985 | 0.998 | 0.954 | 0.0% | 0.8 |
+| window-cues-claude | window, subscription | 89.1% | 0.978 | 0.008 | 0.016 | 0.983 | 0.985 | 0.998 | 0.955 | 0.0% | 0.8 |
+| window-or-fs-qwen3.5-27b | window, FarmShare | 88.3% | 0.978 | 0.008 | 0.016 | 0.983 | 0.985 | 0.998 | 0.954 | 0.0% | 0.8 |
 | window-or-fs-seg-4b | window, FarmShare | 88.3% | 0.978 | 0.008 | 0.016 | 0.982 | 0.984 | 0.998 | 0.952 | 0.0% | 0.8 |
-| window-or-fs-seg-date-2b | window, FarmShare | 85.9% | 0.935 | 0.024 | 0.040 | 0.938 | 0.952 | 0.984 | 0.889 | 0.0% | 2.3 |
-| window-or-fs-seg-2b | window, FarmShare | 81.2% | 0.913 | 0.040 | 0.056 | 0.890 | 0.903 | 0.986 | 0.839 | 0.0% | 3.9 |
-| rule-cues | baseline | 14.8% | 0.083 | 0.508 | 0.786 | 0.213 | 0.216 | 0.984 | 0.203 | 0.0% | 63.3 |
+| window-or-fs-seg-date-2b | window, FarmShare | 85.9% | 0.933 | 0.024 | 0.040 | 0.938 | 0.952 | 0.984 | 0.889 | 0.0% | 2.3 |
+| window-or-fs-seg-2b | window, FarmShare | 81.2% | 0.910 | 0.040 | 0.056 | 0.890 | 0.903 | 0.986 | 0.839 | 0.0% | 3.9 |
+| rule-cues | baseline | 14.8% | 0.076 | 0.508 | 0.786 | 0.213 | 0.216 | 0.984 | 0.203 | 0.0% | 63.3 |
 | all-new | baseline | 10.2% | 0.000 | 0.579 | 0.905 | 0.160 | 0.160 | 1.000 | 0.160 | 0.0% | 73.4 |
-| rule-cues-sketch | baseline | 10.2% | 0.046 | 0.540 | 0.857 | 0.169 | 0.169 | 1.000 | 0.169 | 0.0% | 69.5 |
+| rule-cues-sketch | baseline | 10.2% | 0.042 | 0.540 | 0.857 | 0.169 | 0.169 | 1.000 | 0.169 | 0.0% | 69.5 |
 | no-boundaries | baseline | 0.0% | 0.000 | 0.397 | 0.397 | 0.000 | 0.000 | 0.000 | — | 0.0% | 86.7 |
 
 ## What the metric choice changes
@@ -105,18 +105,18 @@ Pages in an exact document gives a page no credit unless its whole document is r
 | RG165 | window-or-fs-seg-4b | 79.3% | 0.885 | +9.2 pts | 0.876 | 4.4 |
 | RG165 | window-or-fs-seg-2b | 94.3% | 0.929 | -1.3 pts | 0.938 | 1.8 |
 | RG165 | window-or-fs-qwen3.5-27b | 86.2% | 0.907 | +4.5 pts | 0.908 | 3.5 |
-| Lincoln | window-or-fs-seg-4b | 49.8% | 0.669 | +17.1 pts | 0.746 | 12.3 |
-| Lincoln | window-or-fs-seg-2b | 35.6% | 0.529 | +17.3 pts | 0.645 | 17.2 |
-| Lincoln | window-or-fs-qwen3.5-27b | 40.6% | 0.571 | +16.5 pts | 0.683 | 15.7 |
+| Lincoln | window-or-fs-seg-4b | 49.8% | 0.669 | +17.1 pts | 0.742 | 12.3 |
+| Lincoln | window-or-fs-seg-2b | 35.6% | 0.529 | +17.3 pts | 0.640 | 17.2 |
+| Lincoln | window-or-fs-qwen3.5-27b | 40.6% | 0.571 | +16.5 pts | 0.677 | 15.7 |
 | CREST | window-or-fs-seg-4b | 88.3% | 0.982 | +9.9 pts | 0.978 | 0.8 |
-| CREST | window-or-fs-seg-2b | 81.2% | 0.890 | +7.8 pts | 0.913 | 3.9 |
-| CREST | window-or-fs-qwen3.5-27b | 88.3% | 0.983 | +10.0 pts | 0.979 | 0.8 |
+| CREST | window-or-fs-seg-2b | 81.2% | 0.890 | +7.8 pts | 0.910 | 3.9 |
+| CREST | window-or-fs-qwen3.5-27b | 88.3% | 0.983 | +10.0 pts | 0.978 | 0.8 |
 
 Rank agreement over the 22 non-baseline sources complete on the development boxes (Spearman, against pages in an exact document): PQ 0.772, kappa 0.714, doc F1 0.823, MNDD (negated) 0.967, WindowDiff (negated) 0.743.
 
 ## The document-count prior (A-segmentation test 9)
 
-Each source's per-gap P(new) ranked, and exactly `count − streams` document gaps kept as boundaries. Lincoln's count is the catalogue's 72 items (truth 81) and CREST's the folder's 22 PDFs (truth 31); the oracle uses the truth's own count, which no user has, and bounds what a count can buy.
+Each source's per-gap P(new) ranked, and exactly `count − streams` document gaps kept as boundaries. Lincoln's count is the catalogue's 72 items (truth: 80 documents as stored, 78-81 with its 3 unsure gaps either way) and CREST's the folder's 22 PDFs (truth: 30 documents as stored, 30-34 with its 4 unsure gaps either way); the oracle uses the stored labels' own count, which no user has, and bounds what a count can buy. Where the box has unsure gaps the oracle count is one point of the range above, not the one true count.
 
 | box | source | count | as answered: pages exact | with the prior | PQ as answered | PQ with the prior |
 |---|---|---|---|---|---|---|
@@ -150,12 +150,12 @@ Development boxes, the oracle count (pooled):
 | whole-gemini | 93.1% | 90.5% | -2.5 pts |
 | window-or-fs-seg-4b-pilot | 92.5% | 92.5% | +0.0 pts |
 | window-cues-codex | 91.3% | 91.5% | +0.2 pts |
-| window-gemini-3.8-flash-low | 90.7% | 90.7% | +0.0 pts |
 | window-claude | 90.7% | 90.5% | -0.2 pts |
+| window-gemini-3.8-flash-low | 90.7% | 90.7% | +0.0 pts |
 | window-or-fs-seg-2b | 90.5% | 88.4% | -2.1 pts |
 | window-local-seg-2b-8bit | 90.3% | 89.8% | -0.6 pts |
-| window-or-glm5.3-flash | 90.2% | 85.5% | -4.6 pts |
 | window-or-fs-qwen3.5-27b | 90.2% | 88.8% | -1.4 pts |
+| window-or-glm5.3-flash | 90.2% | 85.5% | -4.6 pts |
 | window-or-gpt5.6-luna | 90.0% | 89.2% | -0.8 pts |
 | window-local-seg-date-2b-8bit | 89.4% | 85.7% | -3.7 pts |
 | whole-gemini-c10 | 89.4% | 90.3% | +1.0 pts |
@@ -170,4 +170,12 @@ Development boxes, the oracle count (pooled):
 ## Sources with an incomplete cache somewhere
 
 Not collected on every box (each box lists only what it holds): whole-gemini (Lincoln, CREST), whole-gemini-c10 (Stanton, RG165, Lincoln, CREST), window-claude (Lincoln, CREST), window-cues-claude (Herrnstein, Stanton, RG165), window-cues-claude-cue (Deaver, Herrnstein, Stanton, RG165, CREST), window-cues-codex (Lincoln, CREST), window-cues-codex-cue (Dean, Deaver, Herrnstein, Stanton, RG165, Lincoln, CREST), window-cues-opus (Dean, Herrnstein, Stanton, RG165, Lincoln, CREST), window-gemini-3.1-flash-lite-minimal (Stanton, RG165, Lincoln, CREST), window-gemini-3.5-flash-lite-minimal (Dean, Herrnstein, Stanton, RG165, Lincoln, CREST), window-gemini-3.8-flash-high (Dean, Herrnstein, Stanton, RG165, Lincoln, CREST), window-gemini-3.8-flash-low (Lincoln, CREST), window-local-gemma4-12b (Dean, Herrnstein, Stanton, RG165, Lincoln, CREST), window-local-qwen3-vl-8b (Dean, Herrnstein, Stanton, RG165, Lincoln, CREST), window-local-qwen3.5-4b (Dean, Herrnstein, Stanton, RG165, Lincoln, CREST), window-local-seg-2b (Stanton, RG165, Lincoln, CREST), window-local-seg-2b-8bit (Stanton, RG165, Lincoln, CREST), window-local-seg-4b (Stanton, RG165, Lincoln, CREST), window-local-seg-4b-8bit (Stanton, RG165, Lincoln, CREST), window-local-seg-date-2b-8bit (Stanton, RG165, Lincoln, CREST), window-or-fs-qwen3.5-2b (Dean, Deaver, Herrnstein, Stanton, RG165, Lincoln, CREST), window-or-fs-qwen3.5-4b (Stanton, RG165, Lincoln, CREST), window-or-fs-seg-4b-pilot (Stanton, RG165, Lincoln, CREST), window-or-fs-seg-date-2b (Dean, Deaver, Herrnstein, Stanton, RG165), window-or-gemini3.1-flash-lite (Dean, Herrnstein, Stanton, RG165, Lincoln, CREST), window-or-gemini3.5-flash-lite (Dean, Herrnstein, Stanton, RG165, Lincoln, CREST), window-or-gemma4-26b-a4b (Dean, Herrnstein, Stanton, RG165, Lincoln, CREST), window-or-gemma4-31b (Dean, Herrnstein, Stanton, RG165, Lincoln, CREST), window-or-glm5.3-flash (Lincoln, CREST), window-or-gpt5.4-mini (Dean, Deaver, Herrnstein, Stanton, RG165, Lincoln, CREST), window-or-gpt5.4-nano (Dean, Herrnstein, Stanton, RG165, Lincoln, CREST), window-or-gpt5.6-luna (Lincoln, CREST), window-or-llama4-maverick (Dean, Herrnstein, Stanton, RG165, Lincoln, CREST), window-or-mistral-small (Dean, Deaver, Herrnstein, Stanton, RG165, Lincoln, CREST), window-or-qwen3.5-122b-a10b (Dean, Herrnstein, Stanton, RG165, Lincoln, CREST), window-or-qwen3.5-27b (Dean, Herrnstein, Stanton, RG165, Lincoln, CREST), window-or-qwen3.5-flash (Lincoln, CREST), window-or-qwen3.6-35b-a3b (Dean, Herrnstein, Stanton, RG165, Lincoln, CREST), window-or-qwen3.6-35b-a3b-fp4 (Dean, Herrnstein, Stanton, RG165, Lincoln, CREST), window-or-qwen3.6-flash (Dean, Herrnstein, Stanton, RG165, Lincoln, CREST).
+
+## Measurement card
+
+- **Truth.** The owner's ruled boxes: development Dean, Deaver and Herrnstein, test Stanton and RG165; Stanton carries the owner's 2026-10-31 segmentation-sheet rulings (W46.seg-truth-rescore). The public boxes are agent-audited truths with the owner's rulings on their disputed gaps folded in: Lincoln (`5ba5a0e67380…`: 5 gaps owner-ruled, unsure 76|77, 106|107, 230|231); CREST (`c7a0cfcac896…`: 6 gaps owner-ruled, unsure 45|46, 87|88, 93|94, 110|111). Their other gaps remain agent-audited. Unsure gaps are out of every boundary count; segment figures (pages exact, PQ) are the conditional reading, the route's own call at an unsure gap, so they are not one fixed truth across routes (W46.seg-unsure-mask, `score.py`).
+- **Selection.** Whole boxes, chosen before these routes were run; every source whose cache is complete on a table's boxes, none chosen by its score. Nothing is fitted on the test boxes or the public ones here.
+- **Comparison.** Every source on the same pages and the same truth, window and whole-folder sources with the truth's photo labels (so they measure boundaries); each source's own request and settings, as cached. The scorers differ, the answers do not.
+- **Noise.** Single cached runs, no intervals here: the rerun floor (1.4-3.2 points of pages exact a box, SEG-10) and the truth's own label error are not in these figures, so a gap of a few points between sources is a tie.
+- **Scope.** Which scorer agrees with pages exact, and what a document count buys, on these seven boxes. It does not rank routes for the app (options.md does, with its review rule), and the conditional segment figures on Lincoln and CREST are not one fixed truth across routes.
 

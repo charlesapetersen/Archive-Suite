@@ -194,7 +194,7 @@ the paired difference over every gap the shipped run answered, with the candidat
 candidate with no shipped run, or no gap the shipped run answered, fails rather than passing unpaired
 (W46.kit-gate-coverage). Put `archive-seg-manifest.json` beside the weights the
 app loads: Archive Processor refuses a model of yours without one, without an anchor score, or for another
-prompt. Separating 3 points of pages-exact needs about 2,000 held-out gaps (`segbench-results/seg-kit-gate.md`).
+prompt. Separating 3 points of pages-exact needs about 1,850 held-out gaps on the 2026-10-31 truth (`segbench-results/seg-kit-gate.md`, which `kit_gate.py report` recomputes).
 
 Confirm that one profile GPU fits the chosen training model and that the wall limit is sufficient; training
 has different memory needs from serving. Queued jobs use the submitted environment snapshot, so later setup

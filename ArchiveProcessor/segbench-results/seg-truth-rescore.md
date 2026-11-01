@@ -25,6 +25,13 @@ Where the files are: the Stanton truth CSV in `Test Files` (outside git; the pre
 plus their new `unsure` and `owner_rulings` fields, and SC0122's `lock.json` (`owner_ruled_controls`; opened for the
 one write and locked again, `seg_boxes.py verify sc0122`: intact).
 
+**Superseded in part (W46.seg-report-refresh, 2026-10-31).** As written here, an unsure gap took the route's own call and
+so still counted as an agreement in the boundary counts (gaps, true boundaries, boundary F1, kappa); W46.seg-unsure-mask
+then took unsure gaps out of every boundary count and out of the review load. The boundary F1 and kappa figures below
+for CREST and Lincoln therefore read slightly high; pages exact, false splits and merges are unchanged. The current
+figures are in the regenerated reports (`public-segmentation/*-scores.json`, `seg-scorers.md`, `seg-lincoln-cloud.md`,
+`seg-lincoln-gateway.md`, `seg-kit-gate.md`). This record of the fold is kept as written.
+
 **Unsure gaps** (the owner's call: excluded from every score). `score_labels` gives an unsure gap the route's own
 call before scoring (`score.forgive`, carried by `Collection.labels` as a `score.Truth`), so it is never an error
 under any metric, and the flag-and-check scorers (`ensemble`, `seg_adapt_curve`, `seg_adapt_fewshot`) leave it out

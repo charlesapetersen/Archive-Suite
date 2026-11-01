@@ -25,31 +25,39 @@ The initial uncompressed Lincoln request was rejected before inference (HTTP 413
 
 ## Findings
 
-On Lincoln, Gemini windows put 86.2% of pages in the exact document and the repaired whole reply 87.7%; GLM windows: failed validation (no score). The existing open models were at 34.9–46.7%, while Claude c1 and c2 were 90.0%. The large open-model drop is not a ceiling imposed by the material. Small differences among cloud results on one agent-audited box do not establish a general ranking.
+On Lincoln, Gemini windows put 86.2% of pages in the exact document and the repaired whole reply 87.7%; GLM windows: failed validation (no score). The open models (27B teacher, trained 2B and 4B) are at 35.6–49.8% and Claude c1 and c2 at 89.3–90.4%. The large open-model drop is not a ceiling imposed by the material. Small differences among cloud results on one agent-audited box do not establish a general ranking.
 
-On CREST, Gemini windows score 89.1% and the whole reply 88.3%; GLM windows: 88.3%. The existing trained 4B is 98.4%, teacher 95.3%, and Claude c1/c2 84.4%. The whole-stream arm scores higher here, but changed JPEG encoding and photo assumptions mean this run does not isolate context length.
+On CREST, Gemini windows score 89.1% and the whole reply 88.3%; GLM windows: 88.3%. The open models are at 81.2–88.3% and Claude c1 and c2 at 89.1–89.1%. Every cloud arm is within 0.8 points of the others and the best open model within 0.8 of the best cloud arm: a difference of a gap or so, a tie on this box, not a ranking. Neither the whole stream nor the windows is shown better here, and changed JPEG encoding and photo assumptions mean this run does not isolate context length anyway.
 
-The table below reports least-confidence-first checking against the truth. High boundary agreement or PQ does not mean those confidence values rank the few errors well; check the review load separately. The finding-aid count is a measured variant, not a setting selected on these public answers.
+The table below reports least-confidence-first checking against the truth. High boundary agreement or PQ does not mean those confidence values rank the few errors well; check the review load separately. The finding-aid count is a measured variant, not a setting selected on these public answers. Segment figures here are conditional on each route's own call at the owner's unsure gaps (`score.py`), so two routes are not scored against one fixed truth.
 
-The final 11 Claude c2 gateway holes leave CREST at 84.4% and Deaver at 97.9%. The cue cuts CREST checking from 3.9 to 2.3 per 100 pages, but raises Deaver from 10.7 to 14.8, with unchanged error counts. See seg-lincoln-cloud.md for all owner boxes and the original plan comparisons.
+The final 11 Claude c2 holes were collected through the gateway; what the stated cue does to errors and review load, box by box, is in seg-lincoln-cloud.md, with all owner boxes and the original plan comparisons.
 
 Lincoln GLM FAILED: two stopped, billed replies for pages [163, 169] failed the unchanged strict gap validator: boundaries for [163, 164, 165, 166, 168], wanted [163, 164, 165, 166, 167, 168]. No full-box metric is reported. Further windows in that box were not requested because they cannot repair this failed window; no prompt or score rule was changed.
 
-### Lincoln: 261 pages, 80 documents
+### Lincoln: 261 pages, 80 documents as stored, 78-81 with its 3 unsure gaps either way
 
 | source | pages exact | false splits | false merges | boundaries found | PQ | kappa | MNDD | pages exact, finding-aid count | checks per 100 pages to 98% |
 |---|---|---|---|---|---|---|---|---|---|
-| Gemini 3.7 Flash, g1 windows, gateway | 86.2% | 6 | 0 | 79/79 | 0.933 | 0.947 | 6 | 82.0% | 57.1 |
-| Gemini 3.7 Flash, wh1 whole stream, gateway | 87.7% | 4 | 0 | 78/78 | 0.963 | 0.964 | 4 | 83.5% | 92.0 |
-| Claude Sonnet 5.5, c2 (stated letter cues), plan + gateway holes | 89.3% | 3 | 0 | 79/79 | 0.966 | 0.973 | 3 | 80.1% | 7.3 |
+| Gemini 3.7 Flash, g1 windows, gateway | 86.2% | 6 | 0 | 77/77 | 0.933 | 0.946 | 6 | 82.0% | 55.9 |
+| Gemini 3.7 Flash, wh1 whole stream, gateway | 87.7% | 4 | 0 | 77/77 | 0.963 | 0.963 | 4 | 83.5% | 90.8 |
+| Claude Sonnet 5.5, c2 (stated letter cues), plan + gateway holes | 89.3% | 3 | 0 | 77/77 | 0.966 | 0.972 | 3 | 80.1% | 6.5 |
 | GLM 5.3 Flash, g1 windows, gateway | failed validation; no score | | | | | | | | |
 
-### CREST: 128 pages, 30 documents
+### CREST: 128 pages, 30 documents as stored, 30-34 with its 4 unsure gaps either way
 
 | source | pages exact | false splits | false merges | boundaries found | PQ | kappa | MNDD | pages exact, finding-aid count | checks per 100 pages to 98% |
 |---|---|---|---|---|---|---|---|---|---|
-| Gemini 3.7 Flash, g1 windows, gateway | 89.1% | 1 | 0 | 32/32 | 0.983 | 0.979 | 1 | 54.7% | 75.0 |
-| GLM 5.3 Flash, g1 windows, gateway | 88.3% | 1 | 0 | 31/31 | 0.983 | 0.979 | 1 | 54.7% | 30.5 |
-| Gemini 3.7 Flash, wh1 whole stream, gateway | 88.3% | 1 | 0 | 31/31 | 0.983 | 0.979 | 1 | 62.5% | 17.2 |
-| Claude Sonnet 5.5, c2 (stated letter cues), plan + gateway holes | 89.1% | 1 | 0 | 32/32 | 0.983 | 0.979 | 1 | 44.5% | 32.8 |
+| Gemini 3.7 Flash, g1 windows, gateway | 89.1% | 1 | 0 | 29/29 | 0.983 | 0.978 | 1 | 54.7% | 71.9 |
+| GLM 5.3 Flash, g1 windows, gateway | 88.3% | 1 | 0 | 29/29 | 0.983 | 0.978 | 1 | 54.7% | 27.3 |
+| Gemini 3.7 Flash, wh1 whole stream, gateway | 88.3% | 1 | 0 | 29/29 | 0.983 | 0.978 | 1 | 62.5% | 14.8 |
+| Claude Sonnet 5.5, c2 (stated letter cues), plan + gateway holes | 89.1% | 1 | 0 | 29/29 | 0.983 | 0.978 | 1 | 44.5% | 29.7 |
+
+## Measurement card
+
+- **Truth.** The owner's ruled boxes: development Dean, Deaver and Herrnstein, test Stanton and RG165; Stanton carries the owner's 2026-10-31 segmentation-sheet rulings (W46.seg-truth-rescore). The public boxes are agent-audited truths with the owner's rulings on their disputed gaps folded in: Lincoln (`5ba5a0e67380…`: 5 gaps owner-ruled, unsure 76|77, 106|107, 230|231); CREST (`c7a0cfcac896…`: 6 gaps owner-ruled, unsure 45|46, 87|88, 93|94, 110|111). Their other gaps remain agent-audited. Unsure gaps are out of every boundary count; segment figures (pages exact, PQ) are the conditional reading, the route's own call at an unsure gap, so they are not one fixed truth across routes (W46.seg-unsure-mask, `score.py`).
+- **Selection.** Lincoln and CREST, chosen as public boxes before any gateway arm ran; no prompt, setting or score rule fitted on these answers. The arms are the ones the item planned; a GLM box that failed validation is reported without a score, never filled in.
+- **Comparison.** Gemini 3.7 Flash and GLM 5.3 Flash at low reasoning, temperature 0, 1600 px images with cached Vision text, the frozen g1 windows (7 pages, stride 3) and wh1 whole streams; whole streams use JPEG quality 45 and the known absence of label photos, so window against whole also changes encoding and photo assumptions. The open and Claude figures quoted are the committed public-segmentation scores on the same truth.
+- **Noise.** Single runs, no intervals; the rerun floor (1.4-3.2 points of pages exact a box, SEG-10) applies and each box rests on one audit, so a gap or two between arms is a tie.
+- **Scope.** Whether cloud routes keep their level on public material unlike the owner corpus, at what cost. It does not isolate context length, rank the cloud routes generally, or set an app default.
 

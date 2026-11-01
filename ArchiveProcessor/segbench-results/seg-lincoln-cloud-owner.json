@@ -2,7 +2,12 @@
  "boxes": {
   "Dean": {
    "pages": 202,
-   "documents": 121,
+   "documents": {
+    "stored": 121,
+    "low": 121,
+    "high": 121,
+    "unsure_gaps": 0
+   },
    "sources": {
     "window-cues-claude": {
      "counts": {
@@ -31,6 +36,10 @@
       "pq_tp": 114,
       "pq_iou": 113.04166666666666,
       "mndd": 11,
+      "unscored_gaps": 0,
+      "pages_exact_low": 167,
+      "folders_perfect_low": 2,
+      "resolved_doc_pages": 196,
       "collections": [
        "Dean"
       ]
@@ -41,9 +50,14 @@
       "doc_pages": 196,
       "docs": 121,
       "pages_in_exact_doc": 0.8520408163265306,
+      "pages_in_exact_doc_low": 0.8520408163265306,
+      "pages_in_exact_doc_resolved": 0.8520408163265306,
+      "resolved_doc_pages": 196,
+      "unscored_gaps": 0,
       "docs_exact": 0.9173553719008265,
       "folders": 5,
       "folders_perfect": 0.4,
+      "folders_perfect_low": 0.4,
       "false_splits": 2,
       "false_merges": 4,
       "boundary_precision": 0.9824561403508771,
@@ -96,6 +110,10 @@
       "pq_tp": 114,
       "pq_iou": 113.04166666666666,
       "mndd": 11,
+      "unscored_gaps": 0,
+      "pages_exact_low": 167,
+      "folders_perfect_low": 2,
+      "resolved_doc_pages": 196,
       "collections": [
        "Dean"
       ]
@@ -106,9 +124,14 @@
       "doc_pages": 196,
       "docs": 121,
       "pages_in_exact_doc": 0.8520408163265306,
+      "pages_in_exact_doc_low": 0.8520408163265306,
+      "pages_in_exact_doc_resolved": 0.8520408163265306,
+      "resolved_doc_pages": 196,
+      "unscored_gaps": 0,
       "docs_exact": 0.9173553719008265,
       "folders": 5,
       "folders_perfect": 0.4,
+      "folders_perfect_low": 0.4,
       "false_splits": 2,
       "false_merges": 4,
       "boundary_precision": 0.9824561403508771,
@@ -161,6 +184,10 @@
       "pq_tp": 116,
       "pq_iou": 115.04166666666666,
       "mndd": 10,
+      "unscored_gaps": 0,
+      "pages_exact_low": 169,
+      "folders_perfect_low": 2,
+      "resolved_doc_pages": 196,
       "collections": [
        "Dean"
       ]
@@ -171,9 +198,14 @@
       "doc_pages": 196,
       "docs": 121,
       "pages_in_exact_doc": 0.8622448979591837,
+      "pages_in_exact_doc_low": 0.8622448979591837,
+      "pages_in_exact_doc_resolved": 0.8622448979591837,
+      "resolved_doc_pages": 196,
+      "unscored_gaps": 0,
       "docs_exact": 0.9338842975206612,
       "folders": 5,
       "folders_perfect": 0.4,
+      "folders_perfect_low": 0.4,
       "false_splits": 2,
       "false_merges": 3,
       "boundary_precision": 0.9826086956521739,
@@ -207,7 +239,12 @@
   },
   "Deaver": {
    "pages": 149,
-   "documents": 89,
+   "documents": {
+    "stored": 89,
+    "low": 89,
+    "high": 89,
+    "unsure_gaps": 0
+   },
    "sources": {
     "window-cues-claude": {
      "counts": {
@@ -236,6 +273,10 @@
       "pq_tp": 88,
       "pq_iou": 87.66666666666667,
       "mndd": 1,
+      "unscored_gaps": 0,
+      "pages_exact_low": 138,
+      "folders_perfect_low": 4,
+      "resolved_doc_pages": 141,
       "collections": [
        "Deaver"
       ]
@@ -246,9 +287,14 @@
       "doc_pages": 141,
       "docs": 89,
       "pages_in_exact_doc": 0.9787234042553191,
+      "pages_in_exact_doc_low": 0.9787234042553191,
+      "pages_in_exact_doc_resolved": 0.9787234042553191,
+      "resolved_doc_pages": 141,
+      "unscored_gaps": 0,
       "docs_exact": 0.9775280898876404,
       "folders": 5,
       "folders_perfect": 0.8,
+      "folders_perfect_low": 0.8,
       "false_splits": 0,
       "false_merges": 1,
       "boundary_precision": 1.0,
@@ -301,6 +347,10 @@
       "pq_tp": 88,
       "pq_iou": 87.66666666666667,
       "mndd": 1,
+      "unscored_gaps": 0,
+      "pages_exact_low": 138,
+      "folders_perfect_low": 4,
+      "resolved_doc_pages": 141,
       "collections": [
        "Deaver"
       ]
@@ -311,9 +361,14 @@
       "doc_pages": 141,
       "docs": 89,
       "pages_in_exact_doc": 0.9787234042553191,
+      "pages_in_exact_doc_low": 0.9787234042553191,
+      "pages_in_exact_doc_resolved": 0.9787234042553191,
+      "resolved_doc_pages": 141,
+      "unscored_gaps": 0,
       "docs_exact": 0.9775280898876404,
       "folders": 5,
       "folders_perfect": 0.8,
+      "folders_perfect_low": 0.8,
       "false_splits": 0,
       "false_merges": 1,
       "boundary_precision": 1.0,
@@ -366,6 +421,10 @@
       "pq_tp": 88,
       "pq_iou": 87.66666666666667,
       "mndd": 1,
+      "unscored_gaps": 0,
+      "pages_exact_low": 138,
+      "folders_perfect_low": 4,
+      "resolved_doc_pages": 141,
       "collections": [
        "Deaver"
       ]
@@ -376,9 +435,14 @@
       "doc_pages": 141,
       "docs": 89,
       "pages_in_exact_doc": 0.9787234042553191,
+      "pages_in_exact_doc_low": 0.9787234042553191,
+      "pages_in_exact_doc_resolved": 0.9787234042553191,
+      "resolved_doc_pages": 141,
+      "unscored_gaps": 0,
       "docs_exact": 0.9775280898876404,
       "folders": 5,
       "folders_perfect": 0.8,
+      "folders_perfect_low": 0.8,
       "false_splits": 0,
       "false_merges": 1,
       "boundary_precision": 1.0,
@@ -412,7 +476,12 @@
   },
   "Herrnstein": {
    "pages": 200,
-   "documents": 108,
+   "documents": {
+    "stored": 108,
+    "low": 108,
+    "high": 108,
+    "unsure_gaps": 0
+   },
    "sources": {
     "window-cues-codex": {
      "counts": {
@@ -441,6 +510,10 @@
       "pq_tp": 107,
       "pq_iou": 105.88888888888889,
       "mndd": 6,
+      "unscored_gaps": 0,
+      "pages_exact_low": 166,
+      "folders_perfect_low": 11,
+      "resolved_doc_pages": 181,
       "collections": [
        "Herrnstein"
       ]
@@ -451,9 +524,14 @@
       "doc_pages": 181,
       "docs": 108,
       "pages_in_exact_doc": 0.9171270718232044,
+      "pages_in_exact_doc_low": 0.9171270718232044,
+      "pages_in_exact_doc_resolved": 0.9171270718232044,
+      "resolved_doc_pages": 181,
+      "unscored_gaps": 0,
       "docs_exact": 0.9629629629629629,
       "folders": 14,
       "folders_perfect": 0.7857142857142857,
+      "folders_perfect_low": 0.7857142857142857,
       "false_splits": 3,
       "false_merges": 1,
       "boundary_precision": 0.96875,
@@ -489,7 +567,12 @@
   },
   "Stanton": {
    "pages": 250,
-   "documents": 114,
+   "documents": {
+    "stored": 114,
+    "low": 114,
+    "high": 114,
+    "unsure_gaps": 0
+   },
    "sources": {
     "window-cues-codex": {
      "counts": {
@@ -518,6 +601,10 @@
       "pq_tp": 108,
       "pq_iou": 106.53333333333333,
       "mndd": 9,
+      "unscored_gaps": 0,
+      "pages_exact_low": 218,
+      "folders_perfect_low": 1,
+      "resolved_doc_pages": 243,
       "collections": [
        "Stanton"
       ]
@@ -528,9 +615,14 @@
       "doc_pages": 243,
       "docs": 114,
       "pages_in_exact_doc": 0.897119341563786,
+      "pages_in_exact_doc_low": 0.897119341563786,
+      "pages_in_exact_doc_resolved": 0.897119341563786,
+      "resolved_doc_pages": 243,
+      "unscored_gaps": 0,
       "docs_exact": 0.9122807017543859,
       "folders": 5,
       "folders_perfect": 0.2,
+      "folders_perfect_low": 0.2,
       "false_splits": 2,
       "false_merges": 5,
       "boundary_precision": 0.9811320754716981,
@@ -566,7 +658,12 @@
   },
   "RG165": {
    "pages": 113,
-   "documents": 33,
+   "documents": {
+    "stored": 33,
+    "low": 33,
+    "high": 33,
+    "unsure_gaps": 0
+   },
    "sources": {
     "window-cues-codex": {
      "counts": {
@@ -595,6 +692,10 @@
       "pq_tp": 31,
       "pq_iou": 30.666666666666668,
       "mndd": 2,
+      "unscored_gaps": 0,
+      "pages_exact_low": 82,
+      "folders_perfect_low": 8,
+      "resolved_doc_pages": 87,
       "collections": [
        "RG165"
       ]
@@ -605,9 +706,14 @@
       "doc_pages": 87,
       "docs": 33,
       "pages_in_exact_doc": 0.9425287356321839,
+      "pages_in_exact_doc_low": 0.9425287356321839,
+      "pages_in_exact_doc_resolved": 0.9425287356321839,
+      "resolved_doc_pages": 87,
+      "unscored_gaps": 0,
       "docs_exact": 0.9090909090909091,
       "folders": 10,
       "folders_perfect": 0.8,
+      "folders_perfect_low": 0.8,
       "false_splits": 1,
       "false_merges": 1,
       "boundary_precision": 0.9565217391304348,
