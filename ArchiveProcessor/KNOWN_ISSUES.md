@@ -2,6 +2,24 @@
 
 Tracked bugs we've chosen to come back to later. Each entry has enough context to resume cold.
 
+## FIXED (W40.fix-processor-after-finish-not-processed, 2026-11-01): a document ended after a full Finish, in the same run, staged with no output
+
+Found by owner session iphone-1 (`verification/sessions/iphone-1-returned.md`, step 4). A Finish that filed every
+staged segment moved the session's `_processed` staging folder to the Trash (the W3.cap-r6 reclaim) and kept the
+session live with `stagingDir` still set. The next document's `finalizeSegment` wrote its PDFs and manifest into
+the missing folder with `try?`, so it staged as a `.noOutput` record, and the next Finish reported it "could NOT
+be filed" with advice about the output folder's permissions and free space. Nothing was lost: the photos stayed in
+the Backup Folder and a relaunch processed the next document normally.
+
+Now `finalizeSegment` re-creates the staging folder before every write (`ensureStagingDirectory`; `persistManifest`
+backstops it); a full Finish counts a segment still mid-processing as staged, so it keeps the folder and says
+"still processing"; and the partial-Finish summary names a never-processed segment ("processing produced no
+complete output … Retry it in the Processing pane") apart from a failed move, which alone keeps the output-folder
+advice. Regression: `LiveCaptureRecoveryTestDriver` Test 30 (`scripts/test-recovery.sh`, $0, headless) files one
+document, ends a second in the same run and asserts its PDF and manifest are on disk, then holds a third
+mid-processing across the second Finish. Limits: a relaunch restores a failed record and relabels it, it does not
+re-process it (the Retry button does); a Finish with an unplanned collection still gets the output-folder wording.
+
 ## FIXED (W40.fix-processor-rotation-axis, 2026-10-31): local Vision chose the wrong text axis
 
 `RotationDetector` now takes axis and flip from the first-to-last character direction of one accurate

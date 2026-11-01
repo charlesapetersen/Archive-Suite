@@ -1188,6 +1188,13 @@ final class LiveCaptureProcessor: ObservableObject {
         // session's `_processed/`. (The write is the last unavoidable-before-check step; see the guard below.)
         guard clearGeneration == startedGeneration else { return }
 
+        // W40.fix-processor-after-finish-not-processed — a Finish that filed everything moves the spent
+        // staging directory to the Trash and keeps the session live, so the next document of the same run
+        // arrives here with `stagingDir` naming a folder that is gone. `writeSegmentFiles` does not create
+        // it, so every PDF write and the manifest write failed: the segment staged with no output, and the
+        // next Finish blamed the output folder. Re-create it at the one point every segment write passes.
+        ensureStagingDirectory(stagingDir)
+
         // `[texts]`: capture the array by value. `texts` is a `var`, and capturing the variable itself shares its
         // box with this actor; a TSan build rejects that as a data-race risk (W40.e1).
         var outcome = await Task.detached(priority: .userInitiated) { [texts] () -> StagedSegment in
@@ -1643,12 +1650,25 @@ final class LiveCaptureProcessor: ObservableObject {
         let retainedRecords = retainedValues.sorted { $0.groupId < $1.groupId }
         let manifest = StagingManifest(staged: records, retained: retainedRecords, clearToken: clearToken)
         do {
+            // A full Finish trashed the directory and the session went on (W40.fix-processor-after-finish-not-
+            // processed). A backstop: `finalizeSegment` re-creates it before every write that reaches here, and
+            // `finalize` only persists while the folder is still held. Only for a record worth keeping, so an
+            // empty write leaves no folder.
+            if !records.isEmpty || !retainedRecords.isEmpty { ensureStagingDirectory(stagingDir) }
             let data = try JSONEncoder().encode(manifest)
             try data.write(to: url, options: .atomic)
             return true
         } catch {
             return false
         }
+    }
+
+    /// Re-create the staging directory if a completed Finish reclaimed it. Creating a folder destroys
+    /// nothing, and a failure here leaves the write after it to fail and be labelled as before.
+    private func ensureStagingDirectory(_ dir: URL) {
+        let fm = FileManager.default
+        guard !fm.fileExists(atPath: dir.path) else { return }
+        try? fm.createDirectory(at: dir, withIntermediateDirectories: true)
     }
 
     private func upsertStatus(groupId: String, type: CaptureGroupType, pageCount: Int, phase: SegmentStatus.Phase) {
@@ -2111,7 +2131,11 @@ final class LiveCaptureProcessor: ObservableObject {
             // W3.cap-r6 — how many segments are STILL staged, asked after the filed ones were dropped just
             // above. This, not `outcome.allFiled`, is what decides whether the staging directory may be
             // reclaimed; see `stagingSafeToReclaim`.
-            let stillStaged = self.staged.count
+            // W40.fix-processor-after-finish-not-processed — a segment still being written (in
+            // `finalizedGroups`, not yet in `staged`) writes into this directory too, so it counts as staged
+            // here: reclaiming under it sent its first files to the Trash and failed the rest.
+            let staging = Set(self.staged.map(\.groupId))
+            let stillStaged = self.staged.count + self.finalizedGroups.subtracting(staging).count
             if Self.stagingSafeToReclaim(allPlannedFiled: outcome.allFiled, segmentsStillStaged: stillStaged) {
                 // Everything landed and nothing arrived behind it → staging holds nothing recoverable.
                 // Trash it and reset the session.
@@ -2133,16 +2157,33 @@ final class LiveCaptureProcessor: ObservableObject {
                 // do NOT reset the session — it is still live and the straggler still needs filing.
                 self.persistManifest()
                 self.finalizeSummary = outcome.summary
-                    + " ⚠️ \(stillStaged) segment\(stillStaged == 1 ? "" : "s") finished processing while this batch was being filed, so \(stillStaged == 1 ? "it was" : "they were") NOT part of it. Nothing was deleted — \(stillStaged == 1 ? "its" : "their") processed files and original photos are KEPT in the Backup Folder. Click Finish again to file \(stillStaged == 1 ? "it" : "them")."
+                    + " ⚠️ \(stillStaged) segment\(stillStaged == 1 ? "" : "s") finished processing while this batch was being filed, or \(stillStaged == 1 ? "is" : "are") still processing, so \(stillStaged == 1 ? "it was" : "they were") NOT part of it. Nothing was deleted — \(stillStaged == 1 ? "its" : "their") original photos, and any processed files, are KEPT in the Backup Folder. Once processing has finished, click Finish again to file \(stillStaged == 1 ? "it" : "them")."
             } else {
                 // Partial/failed: KEEP the unfiled segments staged (their outputs remain in the backup
                 // folder's `_processed`) and KEEP their source photos, for recovery/retry. Persist the
                 // reduced manifest so a crash right now leaves a consistent state.
                 self.persistManifest()
                 let kept = self.staged.count
+                // W40.fix-processor-after-finish-not-processed — a segment whose processing produced no
+                // complete output was never going to be filed, and the output folder had nothing to do with
+                // it. Name that case on its own instead of sending the operator to check the folder.
+                let unprocessed = Self.keptUnprocessedCount(self.staged)
+                let moveFailed = kept - unprocessed
                 if kept > 0 {
-                    self.finalizeSummary = outcome.summary
-                        + " ⚠️ \(kept) segment\(kept == 1 ? "" : "s") could NOT be filed — their original photos and processed files are KEPT in the Backup Folder (nothing deleted). Check the output folder (permissions / free space / a missing output), then Finish again or recover from the Backup Folder."
+                    var warning = ""
+                    if unprocessed > 0 {
+                        // "Retry", not "relaunch": a relaunch restores the record and relabels it failed, it
+                        // does not re-process it (`loadStagingManifest`).
+                        warning += " ⚠️ \(unprocessed) segment\(unprocessed == 1 ? "" : "s") could NOT be filed because processing produced no complete output — \(unprocessed == 1 ? "its" : "their") original photos are KEPT in the Backup Folder (nothing deleted). Retry \(unprocessed == 1 ? "it" : "them") in the Processing pane, then Finish again."
+                    }
+                    if moveFailed > 0 {
+                        warning += " ⚠️ \(moveFailed) segment\(moveFailed == 1 ? "" : "s") could NOT be filed — their original photos and processed files are KEPT in the Backup Folder (nothing deleted). Check the output folder (permissions / free space / a missing output), then Finish again or recover from the Backup Folder."
+                    } else if outcome.failedMoves > 0 {
+                        // Every kept segment is unprocessed, yet a filed segment's secondary file (an exported
+                        // image or JSON sidecar) failed to move. Say so, or that leftover goes unmentioned.
+                        warning += " ⚠️ A secondary file (an image or JSON sidecar) of a filed document couldn't be moved — check the output folder; the leftover is in the Backup Folder."
+                    }
+                    self.finalizeSummary = outcome.summary + warning
                 } else {
                     // Every document filed, but a secondary file (an exported image or JSON sidecar) couldn't
                     // be moved. No source was deleted for it; the leftover sits in the Backup Folder.
@@ -2463,6 +2504,13 @@ final class LiveCaptureProcessor: ObservableObject {
     /// exist nowhere else. Reclaim only when there are none.
     nonisolated static func stagingSafeToReclaim(allPlannedFiled: Bool, segmentsStillStaged: Int) -> Bool {
         allPlannedFiled && segmentsStillStaged == 0
+    }
+
+    /// How many still-staged segments `executePlans` skipped because their processing never produced a
+    /// complete output (no PDF, or a page without one), as opposed to output that failed to move. The
+    /// first is a processing failure the operator retries; only the second is about the output folder.
+    nonisolated static func keptUnprocessedCount(_ kept: [StagedSegment]) -> Int {
+        kept.filter { $0.pdfURLs.isEmpty || $0.pagesComplete == false }.count
     }
 
     /// Test-only ($0, no OCR/session): stage a real segment from real image files and report which source

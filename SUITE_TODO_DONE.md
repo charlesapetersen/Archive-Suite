@@ -13701,3 +13701,33 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   `layout_photo.py real5-fetch` and `real5-prep`. The pack with its readings stays at
   `$AGENT_STATE/artifacts/layout-photo-20261030` (images 650 MB, out 241 MB).
   <!-- /W46.layout-photo -->
+
+- [x] **W40.fix-processor-after-finish-not-processed — a document ended after Finish session, in the same app run, is never processed [S · S2]** · §W40 — verification phase (lane: processor) (uses: build) — Owner session iphone-1, 2026-10-31 (`verification/sessions/iphone-1-returned.md`). After a Finish that filed two documents, the next document (nine pages, ended and tagged on the phone; the capture manifest's `completedDocGroups` held it) got no `_processed` folder, no OCR request and no status change; the app sat idle for minutes in the same process (a sample showed only the USB bridge). Pressing Finish again then said "Finalized 1 collection · 0 files moved. ⚠️ 1 segment could NOT be filed … Check the output folder (permissions / free space / a missing output)": the photos were kept, correctly, but the advice is wrong (the folder was writable, 50 GB free); the segment had never been processed. A relaunch let the next document process normally. Suspect (from reading, unconfirmed): finalize removes the `_processed` folder or clears state that the next segment's `finalizeSegment` guard (`let stagingDir`, `finalizedGroups`) depends on, so it returns silently. Reproduce in `scripts/e2e-phone-mac.sh --ios` (or the Android E2E): file one document, then send and end a second in the same run, and assert the second is staged. Fix and test; and a segment that was never processed says so at Finish instead of pointing at the output folder. Re-check needs no phone.
+  SHIPPED 2026-11-01. Cause, read and then reproduced: a Finish that files every staged segment moves the
+  session's `_processed` staging folder to the Trash and keeps the session live with `stagingDir` still set
+  (`finalize`, the W3.cap-r6 reclaim). The next document's `finalizeSegment` → `writeSegmentFiles` wrote its
+  PDFs and manifest into the missing folder with `try?`, so it staged as a `.noOutput` record (no `_processed`
+  folder, no output), and the next Finish counted it among the "could NOT be filed" segments and blamed the
+  output folder. The owner's suspected silent `guard let stagingDir` return was not it: Finish said "1 segment
+  could NOT be filed", which needs a staged record. Fix: `ensureStagingDirectory` re-creates the folder in
+  `finalizeSegment` before the write (and as a backstop in `persistManifest`); a full Finish now counts segments
+  mid-processing (`finalizedGroups` not yet in `staged`) as still staged, so it never reclaims the folder under
+  an in-flight write and says "still processing" instead; and the partial-Finish summary names a never-processed
+  segment ("processing produced no complete output … Retry it in the Processing pane") separately from a failed
+  move, which alone keeps the output-folder advice. `keptUnprocessedCount` matches exactly what `executePlans`
+  skips. Tier-2: two adversarial reviews (Fable). The drafting session's gave two message fixes (no "relaunch to
+  resume", since a relaunch relabels but does not re-process; a filed document's failed sidecar move is still
+  reported when every kept segment is unprocessed). The shipping session's traced every exit from
+  `finalizedGroups`, both reclaim directions and every partial-summary case, found no data-safety defect, and gave
+  one wording fix: the "still processing" sentence no longer promises processed files for a segment that has none
+  yet. It left as pre-existing, not regressions: a kept segment whose listed PDFs are absent on disk, or that the
+  Finish sheet never planned, still gets the output-folder sentence. Test: `LiveCaptureRecoveryTestDriver`
+  Test 30 (`scripts/test-recovery.sh`, $0, headless) drives the real ingest → finalizeSegment → finalize path
+  twice, with a third document held mid-processing across the second Finish, and arms the unprocessed-record
+  Finish directly. Measured 2026-11-01: `test-recovery.sh` 277/277 (8 new); with `ensureStagingDirectory` removed
+  (mutant M1) exactly the five Test 30 checks that need the folder go red and the other 272 stay green, so the test
+  reproduces the defect; `test-manifest-persistence.sh` 113/113 and `test-merge-safety.sh` 15/15 on the fixed
+  build; clean build, no new warnings. Reproduced here rather than in `e2e-phone-mac.sh`: the phone transport is
+  not part of the defect, and the driver reaches the same Mac-side path for $0. Re-check needs no phone; W40.i4's
+  Part B (file a document, then shoot another) now unblocks on this item. No bench cache used.
+  <!-- /W40.fix-processor-after-finish-not-processed -->
