@@ -15,6 +15,8 @@ final class CameraController: NSObject, ObservableObject {
     private var completions: [Int64: (Data?) -> Void] = [:]
     /// Whether the controller has been asked to run (tracks start/stop intent across background cycles).
     private var shouldBeRunning = false
+    /// Tracks how the phone is physically held; the portrait-only UI cannot (W40.fix-ios-landscape-orientation).
+    private var rotationCoordinator: AVCaptureDevice.RotationCoordinator?
 
     @Published var authorized = false
     /// True when access is .denied/.restricted — the UI offers a route to Settings (a previously-denied
@@ -74,6 +76,7 @@ final class CameraController: NSObject, ObservableObject {
            let input = try? AVCaptureDeviceInput(device: device), session.canAddInput(input) {
             session.addInput(input)
             hasVideoInput = true
+            rotationCoordinator = AVCaptureDevice.RotationCoordinator(device: device, previewLayer: nil)
         }
         if session.canAddOutput(photoOutput) { session.addOutput(photoOutput) }
         session.commitConfiguration()
@@ -94,8 +97,15 @@ final class CameraController: NSObject, ObservableObject {
             // Require a live video connection: capturing without one throws NSInvalidArgumentException
             // (a hard crash) rather than failing gracefully, so convert that to completion(nil).
             guard self.configured, self.hasVideoInput,
-                  self.photoOutput.connection(with: .video)?.isActive == true else {
+                  let connection = self.photoOutput.connection(with: .video), connection.isActive else {
                 DispatchQueue.main.async { completion(nil) }; return
+            }
+            // Without an angle the JPEG carries no orientation, so a sideways shot reached the Mac as the sensor's
+            // raw landscape, upside down one way round (owner session iphone-1, task 6). Set per shot: the phone
+            // may have turned since the last one.
+            if let raw = self.rotationCoordinator?.videoRotationAngleForHorizonLevelCapture {
+                let angle = CaptureRotation.snapped(raw)
+                if connection.isVideoRotationAngleSupported(angle) { connection.videoRotationAngle = angle }
             }
             let settings = AVCapturePhotoSettings()
             self.completions[settings.uniqueID] = completion

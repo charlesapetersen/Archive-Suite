@@ -351,6 +351,8 @@ step relay-fuzz bash "$ROOT/ArchiveProcessor/scripts/test-relay-fuzz.sh"
 step ios-capture-queue bash "$ROOT/ArchiveProcessor/scripts/test-ios-capture-queue.sh"
 # W40.i-usb-app: the iPhone's cable relay (AC1 handshake, FIFO, splice) over real loopback sockets; ~15 s, free.
 step ios-usb-relay bash "$ROOT/ArchiveProcessor/scripts/test-ios-usb-relay.sh"
+# W40.fix-ios-landscape-orientation: the shot's rotation angle and the EXIF orientation it yields; seconds, free.
+step ios-capture-rotation bash "$ROOT/ArchiveProcessor/scripts/test-ios-capture-rotation.sh"
 # W40.e8: the Android app's whole JVM suite, its Robolectric screen tests and their screenshot goldens; ~1 min, free.
 step android-unit bash "$ROOT/ArchiveProcessor/scripts/test-android-unit.sh"
 # W40.fix-drive-script-path: the Mac cloud relay's DriveObjectStore against a mock Drive; offline, no OAuth, free.

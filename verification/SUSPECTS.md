@@ -445,6 +445,8 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
   - 2026-10-31 owner session iphone-1, task 6 (`sessions/iphone-1-returned.md`) — format cleared: both files `ffd8ff`.
     Orientation confirmed: both 4032×3024 with no EXIF orientation; the sideways shot filed upside down (rotation
     correction off). Filed as `W40.fix-ios-landscape-orientation`.
+  - 2026-11-01 `W40.fix-ios-landscape-orientation` — fixed in code: each shot sets the device's rotation angle on the
+    photo connection, so the JPEG carries its EXIF orientation. Re-check on the phone: task 6 of the iPhone pack.
 
 ### S-023 · iOS uploads may be cut off whenever the phone leaves the app
 

@@ -421,7 +421,8 @@ Views/                         SwiftUI (+ AppKit where needed):
 
 **Companions** (separate build; the phone↔Mac protocol + relay object format are the only shared surface):
 - **iPhone** — `ArchiveCaptureiOS/Sources/ArchiveCaptureiOS/`: `App.swift`/`ContentView.swift`;
-  `Camera/CameraController.swift`; `Capture/{CaptureModels,CaptureViewModel,SessionStore}.swift` (durable
+  `Camera/{CameraController,CaptureRotation}.swift` (each shot carries the EXIF orientation of how the phone was held;
+  host tests `scripts/test-ios-capture-rotation.sh`); `Capture/{CaptureModels,CaptureViewModel,SessionStore}.swift` (durable
   capture queue); `Net/{MacEndpoint,MacClient,SegmentTransport,FileRelayTransport,DriveRelayTransport,
   DriveClient,DriveAuth,DriveTokenStore,DriveOAuthConfig,RelayObjectFormat,USBRelay}.swift` (`USBRelay`: the cable
   route's loopback tunnel port 48628 and local relay 48629, the AC1 challenge; host tests `scripts/test-ios-usb-relay.sh`); `UI/{ConnectScreen,CaptureScreen,QRScannerView,CameraPreview,
