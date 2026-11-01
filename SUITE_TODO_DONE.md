@@ -13762,3 +13762,27 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   No money. Bench cache: `kind-atrium/` kept (36 MB: probabilities, embeddings and the 895's Vision signals, what
   `report` reads); no images were copied.
   <!-- /W46.kind-atrium -->
+- [x] **W40.fix-processor-failed-ocr-filed-image-only — a document whose every page failed OCR is labelled image-only and filed with no text [S · S3]** · §W40 — verification phase (lane: processor) (uses: build) — Owner session iphone-1, 2026-10-31 (`verification/sessions/iphone-1-returned.md`). Three pages that all failed with Gemini's 402 were labelled `succeededNoText` (amber, "Filed as image-only — no OCR text") and dropped from `failedGroupIds`, so the bulk "Retry N failed" vanished, and Finish then filed them as three PDFs with no text (`output/Temp` in the session's scratch folder). `labelStagedRecord` (`Capture/LiveCaptureProcessor.swift`, the `type == .document && !anyText` branch) reads "every page has a PDF and none has text" as image-only even when every page's result carries an error code. Fix: a page whose result has an error is a failure, so the document stays `.failed` (retryable, not filed); image-only stays for pages that answered with no text. Unit tests on both shapes.
+  SHIPPED 2026-11-01. A document page whose OCR request got no reading now produces no output and fails the
+  document: `LiveCaptureProcessor.ocrFailed` is true for an error with no text whose code is an HTTP status (the
+  session's 402, 429, 5xx, a bad key), absent (a thrown transport error, "OCR not started") or a Local Agent
+  `cli_*` code other than `cli_bad_response`, or Anthropic's body type standing in for the status
+  (`rate_limit_error`, `overloaded_error`, `authentication_error`, `api_error`; not `invalid_request_error`). `writeSegmentFiles` skips such a page's PDF, so the segment is
+  incomplete and `executePlans` files none of it and keeps every source photo; `labelStagedRecord` ranks it first
+  as `.failed(.provider)` with the provider's message and code, in `failedGroupIds`, so bulk "Retry N failed" is
+  back. The writer and the labeller share the one predicate, so rotation regeneration and manifest resume agree.
+  A page the reader DID answer with no text stays image-only, as before: Apple Vision's `vision_no_text` on a
+  blank verso, Gemini blocks and refusals (`SAFETY`, `Recitation`, `GeminiRefused`), `CascadeExhausted`, a cut-off
+  or unparsable reply. Those come back the same on every retry, and Live Capture has no "file as image-only"
+  action, so failing them would hold a document back for good. The adversarial review (Opus) found exactly that
+  regression in the first draft, which failed every error, and on the second pass the Anthropic types. Left open
+  as `W40.fix-processor-failed-ocr-wrapped`: `GeminiRefused` and `CascadeExhausted` can wrap a transient first
+  failure (a Gemini 500 counted as a refusal, then no second reader) and still file image-only. Behaviour change: a mixed document (pages read, one
+  402) is now held back as failed rather than filed with an image-only page. Box and folder groups are
+  unchanged. No migration: a staging manifest written by the earlier build could show such a record as failed
+  until Finish files it (no production data). Test 31 in `LiveCaptureRecoveryTestDriver` drives both shapes through
+  ingest, finalizeSegment and finalize: three 402 pages stay failed, unfiled, with sources kept; three
+  `vision_no_text` pages are filed image-only; plus the predicate on 15 codes. Mutant (drop the writer skip)
+  turns three checks red. `test-recovery.sh` ALL PASS (twice) and `test-manifest-persistence.sh` ALL PASS;
+  clean build, no new warnings. No bench cache used.
+  <!-- /W40.fix-processor-failed-ocr-filed-image-only -->

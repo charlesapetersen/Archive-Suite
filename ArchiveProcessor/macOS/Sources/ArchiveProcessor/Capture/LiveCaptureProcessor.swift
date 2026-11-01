@@ -1274,7 +1274,12 @@ final class LiveCaptureProcessor: ObservableObject {
         let pagesComplete = outcome.pagesComplete ?? true
         let anyText = results.contains { $0.text != nil }
         let firstError = results.first(where: { $0.errorMessage != nil })
-        if !producedOutput {
+        if type == .document, let failedPage = results.first(where: Self.ocrFailed) {
+            // W40.fix-processor-failed-ocr-filed-image-only — a page's OCR failed, so `writeSegmentFiles` wrote
+            // no PDF for it and finalize will not file the document. Ranked first so the row names the
+            // provider's error rather than the missing output it caused. Retryable; sources kept.
+            markFailed(groupId, .provider, failedPage)
+        } else if !producedOutput {
             // No PDF at all (incl. a true document OCR-empty with no usable PDF). Retryable; sources kept.
             markFailed(groupId, .noOutput, firstError)
         } else if !pagesComplete {
@@ -1302,6 +1307,23 @@ final class LiveCaptureProcessor: ObservableObject {
             setStatusDetail(groupId, kind: nil, error: nil)
             setPhase(groupId, .staged)
         }
+    }
+
+    /// A page whose OCR request got no reading at all: an HTTP status (the session's 402, a 429, a 5xx, a
+    /// bad key), a thrown transport error or a page never started (no code), or a Local Agent CLI that did not
+    /// answer. That is a failure, not an image-only page. An error that is the reader's verdict on the page
+    /// (Vision's `vision_no_text` on a blank verso, a Gemini block or refusal, a cut-off or unreadable reply)
+    /// comes back the same on every retry, so it still files image-only with its reason shown: failing it
+    /// would hold the document back for good, since Live Capture has no "file as image-only" action.
+    nonisolated static func ocrFailed(_ result: OCRResult) -> Bool {
+        guard result.errorMessage != nil, result.text?.isEmpty ?? true else { return false }
+        guard let code = result.errorCode, !code.isEmpty else { return true }
+        if code.allSatisfy(\.isNumber) { return true }
+        // Anthropic reports its error body's type in place of the status (`rate_limit_error`,
+        // `overloaded_error`, `authentication_error`, `api_error`); `invalid_request_error` is about the request
+        // itself and repeats on every retry, so it stays a verdict.
+        if code.hasSuffix("_error") { return code != "invalid_request_error" }
+        return code.hasPrefix("cli_") && code != "cli_bad_response"
     }
 
     /// Compute the segment's subject/color tags (may hit the LLM). Date/quality are layered on later.
@@ -1411,6 +1433,14 @@ final class LiveCaptureProcessor: ObservableObject {
             ? EnclosureDates.pdfSourceDates(for: jsonTags) : nil
 
         for page in pages {
+            // W40.fix-processor-failed-ocr-filed-image-only — a document page whose OCR FAILED (`ocrFailed`:
+            // the request got no reading) produces no output, exactly like a page whose PDF did not write. Its
+            // PDF would hold the scan and no text, and a document of such pages was filed as "image-only" with
+            // nothing to say the text was never read (owner session iphone-1: three pages that each failed with
+            // a 402). Skipping it leaves the segment incomplete, so `executePlans` does not file it, its sources
+            // stay, and `labelStagedRecord` marks it failed and retryable. A page that was READ and has no text
+            // still writes its image-only PDF.
+            if type == .document, ocrFailed(page.result) { continue }
             let base = page.sourceURL.deletingPathExtension().lastPathComponent
             let stagedPDF = stagingDir.appendingPathComponent(base + ".pdf")
             let imagePage = try? pdfGen.generate(imageURL: page.sourceURL, result: page.result, model: model,
@@ -2115,8 +2145,9 @@ final class LiveCaptureProcessor: ObservableObject {
             // ⚠️ `W3.cap-r3-fu6` then closed the one chain that reached this. Regeneration now re-derives the
             // label from the record it just wrote, so a group cannot be filable and failed at the same time,
             // and no OTHER path inserts into `failedGroupIds` over a record `executePlans` will file:
-            // `markFailed` is the only writer that inserts, it only fires for `.noOutput` (no PDFs) or
-            // `.incompleteOutput` (`pagesComplete == false`), and `executePlans` skips both. So this pairing
+            // `markFailed` is the only writer that inserts, it only fires for `.noOutput` (no PDFs),
+            // `.incompleteOutput` (`pagesComplete == false`) or `.provider` (a failed page wrote no PDF, so
+            // one of the other two holds as well), and `executePlans` skips both. So this pairing
             // is now belt-and-braces at THIS call site rather than the fix for a live defect — kept because
             // it is right on its own merits (a group whose every PDF reached its collection is not a failed
             // one) and because the invariant it maintains, `failedGroupIds ⊆ finalizedGroups`, is load-bearing

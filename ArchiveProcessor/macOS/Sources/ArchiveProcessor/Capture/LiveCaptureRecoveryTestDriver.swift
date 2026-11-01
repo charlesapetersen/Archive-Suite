@@ -4339,6 +4339,122 @@ enum LiveCaptureRecoveryTestDriver {
             LiveCaptureProcessor._recoveryTestOCRTasks = [:]
         }
 
+        // --- Test 31 (W40.fix-processor-failed-ocr-filed-image-only): a document whose every page FAILED OCR
+        // was labelled image-only, left the retry set and was filed with no text (owner session iphone-1, three
+        // pages that each failed with Gemini's 402). A failed page is a failure: the document stays failed,
+        // retryable and unfiled. A page that was read and has no text is still filed image-only. Both shapes run
+        // through the real ingest → finalizeSegment → finalize path. ---
+        if isolatedBackup {
+            if let testRoot = ProcessInfo.processInfo.environment["ARCHIVEPROC_TEST_BACKUP_ROOT"],
+               !testRoot.isEmpty {
+                let entries = (try? fm.contentsOfDirectory(at: URL(fileURLWithPath: testRoot),
+                                                           includingPropertiesForKeys: nil)) ?? []
+                for e in entries where CaptureSession.isSessionIdName(e.lastPathComponent) {
+                    try? fm.removeItem(at: e)
+                }
+            }
+            // A real, decodable JPEG: an undecodable one would be labelled placeholder-image first.
+            let foBitmap = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: 64, pixelsHigh: 64,
+                                            bitsPerSample: 8, samplesPerPixel: 3, hasAlpha: false,
+                                            isPlanar: false, colorSpaceName: .deviceRGB,
+                                            bytesPerRow: 0, bitsPerPixel: 0)
+            let foJPEG = foBitmap?.representation(using: .jpeg, properties: [:]) ?? Data()
+            func foSettle(_ cond: () -> Bool) async -> Bool {
+                for _ in 0..<400 { if cond() { return true }; try? await Task.sleep(nanoseconds: 25_000_000) }
+                return cond()
+            }
+            // One three-page document through a fresh live session with `stub` as every page's OCR, then
+            // Finish. Returns the processor, the group's source photos and the output folder.
+            func foRun(_ name: String, stub: OCRResult) async
+                -> (proc: LiveCaptureProcessor, sources: [URL], out: URL, staged: Bool, finished: Bool) {
+                let out = tmp.appendingPathComponent("failed-ocr-\(name)-out", isDirectory: true)
+                let staging = tmp.appendingPathComponent(
+                    "APStaging-failedocr-\(name)-\(String(UUID().uuidString.prefix(8)))", isDirectory: true)
+                try? fm.createDirectory(at: staging, withIntermediateDirectories: true)
+                let session = CaptureSession()
+                LiveCaptureProcessor._recoveryTestOCRStub = stub
+                LiveCaptureProcessor._recoveryTestOCRStarts = []
+                LiveCaptureProcessor._recoveryTestOCRTasks = [:]
+                session._recoveryTestBeginLive(config: SessionProcessingConfig(
+                    provider: .gemini, model: stubModel, thinkingLevel: .low, apiKey: "",
+                    taggingMode: .human, rotationMode: .off, mergeDocuments: false, outputDirectory: out,
+                    customOCRPrompt: "", imageScale: 1.0, enableSegmentJSON: false, tagVocabulary: [],
+                    gateway: nil, outputImageFile: false, pdfImageMB: 2.0, exportedImageMB: 3.0, textColumns: 1),
+                    stagingDir: staging)
+                let proc = session.liveProcessor
+                for seq in [1, 2, 3] {
+                    session.ingest(jpeg: foJPEG, groupId: "FO", seq: seq,
+                                   type: .document, quality: nil, year: nil, month: nil, deviceName: "TestPhone")
+                }
+                proc.segmentResolved(groupId: "FO")
+                let staged = await foSettle { proc.staged.contains { $0.groupId == "FO" } }
+                let sources = session.photos.filter { $0.groupId == "FO" }.map(\.url)
+                let key = proc.staged.first { $0.groupId == "FO" }?.collectionKey ?? "__unfiled__"
+                proc.finalize([LiveCaptureProcessor.CollectionDraft(
+                    id: key, finalName: out.lastPathComponent, existingFolders: [], suggestedFolders: [],
+                    chosenExisting: out, segmentCount: 1, photoCount: 3)])
+                let finished = await foSettle { !proc.isFinalizing && proc.finalizeSummary != nil }
+                // A Finish that files everything reclaims staging to the real Trash; take this test's copy out.
+                let trash = fm.homeDirectoryForCurrentUser.appendingPathComponent(".Trash", isDirectory: true)
+                for item in (try? fm.contentsOfDirectory(atPath: trash.path)) ?? []
+                where item.hasPrefix(staging.lastPathComponent) {
+                    try? fm.removeItem(at: trash.appendingPathComponent(item))
+                }
+                return (proc, sources, out, staged, finished)
+            }
+            func foOutPDFs(_ out: URL) -> Int {
+                ((try? fm.contentsOfDirectory(at: out, includingPropertiesForKeys: nil)) ?? [])
+                    .filter { $0.pathExtension == "pdf" }.count
+            }
+
+            // 1. THE FIX: every page failed (the session's 402). Failed with the provider's error, offered for
+            //    retry, nothing written for it, nothing filed, every source kept.
+            let failed = await foRun("402", stub: OCRResult(
+                text: nil, classification: nil, errorMessage: "Gemini API error (402): payment required",
+                errorCode: "402"))
+            let failedStatus = failed.proc.statuses.first { $0.id == "FO" }
+            let failedRecord = failed.proc.staged.first { $0.groupId == "FO" }
+            check("a document whose every page failed OCR is FAILED with the provider error, in the retry set",
+                  failed.staged && failedStatus?.phase == .failed && failedStatus?.failureKind == .provider
+                      && failedStatus?.errorCode == "402" && failed.proc.failedGroupIds == ["FO"])
+            check("...and Finish files none of it and keeps every source photo",
+                  failed.finished && failedRecord?.pdfURLs.isEmpty == true
+                      && foOutPDFs(failed.out) == 0 && failed.sources.count == 3
+                      && failed.sources.allSatisfy { fm.fileExists(atPath: $0.path) })
+
+            // 2. UNCHANGED: every page was read and has no text — Apple Vision's answer for a blank verso, which
+            //    carries an error code and comes back the same on every retry. Image-only, not failed, filed.
+            let empty = await foRun("notext", stub: OCRResult(
+                text: nil, classification: nil,
+                errorMessage: "Apple Vision found no text meeting the confidence threshold.",
+                errorCode: "vision_no_text"))
+            check("a document whose pages were read with no text is still filed image-only, not failed",
+                  empty.staged && empty.finished && foOutPDFs(empty.out) == 3
+                      && empty.proc.failedGroupIds.isEmpty
+                      && !empty.proc.statuses.contains { $0.id == "FO" && $0.phase == .failed })
+
+            // 3. The predicate both halves share: a request that got no reading fails; a reader's verdict on
+            //    the page, any text, or no error at all does not.
+            func foFails(_ text: String?, _ message: String?, _ code: String?) -> Bool {
+                LiveCaptureProcessor.ocrFailed(OCRResult(text: text, classification: nil,
+                                                         errorMessage: message, errorCode: code))
+            }
+            check("a page fails OCR when the request got no reading: an HTTP status, no code, or a silent CLI",
+                  foFails(nil, "x", "402") && foFails("", "x", "503") && foFails(nil, "x", nil)
+                      && foFails(nil, "x", "cli_timeout") && foFails(nil, "x", "rate_limit_error")
+                      && foFails(nil, "x", "authentication_error"))
+            check("...and not when the reader answered: a verdict on the page, any text, or no error",
+                  !foFails(nil, "x", "vision_no_text") && !foFails(nil, "x", "SAFETY")
+                      && !foFails(nil, "x", "Recitation") && !foFails(nil, "x", "GeminiRefused")
+                      && !foFails(nil, "x", "unparsable") && !foFails(nil, "x", "cli_bad_response")
+                      && !foFails(nil, "x", "invalid_request_error")
+                      && !foFails("read", "x", "402") && !foFails(nil, nil, nil))
+
+            LiveCaptureProcessor._recoveryTestOCRStub = nil
+            LiveCaptureProcessor._recoveryTestOCRStarts = []
+            LiveCaptureProcessor._recoveryTestOCRTasks = [:]
+        }
+
         // Last by design: this synthetic session may be the newest recoverable one in the shared scratch
         // backup root, so do not let it influence any preceding restart fixture.
         if isolatedBackup {
