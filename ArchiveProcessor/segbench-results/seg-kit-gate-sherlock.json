@@ -1,0 +1,1242 @@
+{
+ "tag": "W46.kit-gate-sherlock",
+ "pack": "kit-gate-sherlock-20261031",
+ "sets": {
+  "checkpack": {
+   "windows": 160,
+   "boxes": 32
+  },
+  "boxes": {
+   "windows": 179,
+   "boxes": 3
+  }
+ },
+ "runs": {
+  "teacher": {
+   "answers": 339,
+   "failed": 0,
+   "missing": 0
+  },
+  "2b": {
+   "answers": 339,
+   "failed": 0,
+   "missing": 0
+  },
+  "4b": {
+   "answers": 339,
+   "failed": 1,
+   "missing": 0
+  }
+ },
+ "checkpack": {
+  "rows": [
+   {
+    "model": "teacher",
+    "split": "holdout",
+    "gaps": 9,
+    "answered": 9,
+    "right": 7,
+    "accuracy": 0.7777777777777778,
+    "false_splits": 1,
+    "false_merges": 1,
+    "tag_right": 6
+   },
+   {
+    "model": "teacher",
+    "split": "train",
+    "gaps": 65,
+    "answered": 65,
+    "right": 55,
+    "accuracy": 0.8461538461538461,
+    "false_splits": 10,
+    "false_merges": 0,
+    "tag_right": 47
+   },
+   {
+    "model": "teacher",
+    "split": "all",
+    "gaps": 74,
+    "answered": 74,
+    "right": 62,
+    "accuracy": 0.8378378378378378,
+    "false_splits": 11,
+    "false_merges": 1,
+    "tag_right": 53
+   },
+   {
+    "model": "2b",
+    "split": "holdout",
+    "gaps": 9,
+    "answered": 9,
+    "right": 8,
+    "accuracy": 0.8888888888888888,
+    "false_splits": 0,
+    "false_merges": 1,
+    "tag_right": 6
+   },
+   {
+    "model": "2b",
+    "split": "train",
+    "gaps": 65,
+    "answered": 65,
+    "right": 59,
+    "accuracy": 0.9076923076923077,
+    "false_splits": 6,
+    "false_merges": 0,
+    "tag_right": 47
+   },
+   {
+    "model": "2b",
+    "split": "all",
+    "gaps": 74,
+    "answered": 74,
+    "right": 67,
+    "accuracy": 0.9054054054054054,
+    "false_splits": 6,
+    "false_merges": 1,
+    "tag_right": 53
+   },
+   {
+    "model": "4b",
+    "split": "holdout",
+    "gaps": 9,
+    "answered": 9,
+    "right": 8,
+    "accuracy": 0.8888888888888888,
+    "false_splits": 0,
+    "false_merges": 1,
+    "tag_right": 6
+   },
+   {
+    "model": "4b",
+    "split": "train",
+    "gaps": 65,
+    "answered": 65,
+    "right": 56,
+    "accuracy": 0.8615384615384616,
+    "false_splits": 9,
+    "false_merges": 0,
+    "tag_right": 47
+   },
+   {
+    "model": "4b",
+    "split": "all",
+    "gaps": 74,
+    "answered": 74,
+    "right": 64,
+    "accuracy": 0.8648648648648649,
+    "false_splits": 9,
+    "false_merges": 1,
+    "tag_right": 53
+   }
+  ],
+  "strata": [
+   {
+    "stratum": "A",
+    "gaps": 24,
+    "tag_right": 22,
+    "teacher": 22,
+    "2b": 23,
+    "4b": 22
+   },
+   {
+    "stratum": "B",
+    "gaps": 4,
+    "tag_right": 1,
+    "teacher": 2,
+    "2b": 1,
+    "4b": 2
+   },
+   {
+    "stratum": "C",
+    "gaps": 21,
+    "tag_right": 6,
+    "teacher": 15,
+    "2b": 19,
+    "4b": 16
+   },
+   {
+    "stratum": "D",
+    "gaps": 25,
+    "tag_right": 24,
+    "teacher": 23,
+    "2b": 24,
+    "4b": 24
+   }
+  ],
+  "teacher_split": [
+   {
+    "student": "2b",
+    "split": "holdout",
+    "gaps": 9,
+    "student wrong": 1,
+    "teacher wrong the same way": 1,
+    "teacher right": 0,
+    "teacher wrong, student right": 1
+   },
+   {
+    "student": "2b",
+    "split": "train",
+    "gaps": 65,
+    "student wrong": 6,
+    "teacher wrong the same way": 5,
+    "teacher right": 1,
+    "teacher wrong, student right": 5
+   },
+   {
+    "student": "2b",
+    "split": "all",
+    "gaps": 74,
+    "student wrong": 7,
+    "teacher wrong the same way": 6,
+    "teacher right": 1,
+    "teacher wrong, student right": 6
+   },
+   {
+    "student": "4b",
+    "split": "holdout",
+    "gaps": 9,
+    "student wrong": 1,
+    "teacher wrong the same way": 1,
+    "teacher right": 0,
+    "teacher wrong, student right": 1
+   },
+   {
+    "student": "4b",
+    "split": "train",
+    "gaps": 65,
+    "student wrong": 9,
+    "teacher wrong the same way": 9,
+    "teacher right": 0,
+    "teacher wrong, student right": 1
+   },
+   {
+    "student": "4b",
+    "split": "all",
+    "gaps": 74,
+    "student wrong": 10,
+    "teacher wrong the same way": 10,
+    "teacher right": 0,
+    "teacher wrong, student right": 2
+   }
+  ],
+  "paired": [
+   {
+    "pair": "2b vs teacher",
+    "scope": "holdout",
+    "gaps": 9,
+    "only first right": 1,
+    "only second right": 0,
+    "difference points": 11.11111111111111,
+    "sign test p": 1.0
+   },
+   {
+    "pair": "2b vs teacher",
+    "scope": "all",
+    "gaps": 74,
+    "only first right": 6,
+    "only second right": 1,
+    "difference points": 6.756756756756757,
+    "sign test p": 0.125
+   },
+   {
+    "pair": "4b vs teacher",
+    "scope": "holdout",
+    "gaps": 9,
+    "only first right": 1,
+    "only second right": 0,
+    "difference points": 11.11111111111111,
+    "sign test p": 1.0
+   },
+   {
+    "pair": "4b vs teacher",
+    "scope": "all",
+    "gaps": 74,
+    "only first right": 2,
+    "only second right": 0,
+    "difference points": 2.7027027027027026,
+    "sign test p": 0.5
+   },
+   {
+    "pair": "2b vs 4b",
+    "scope": "holdout",
+    "gaps": 9,
+    "only first right": 0,
+    "only second right": 0,
+    "difference points": 0.0,
+    "sign test p": 1.0
+   },
+   {
+    "pair": "2b vs 4b",
+    "scope": "all",
+    "gaps": 74,
+    "only first right": 4,
+    "only second right": 1,
+    "difference points": 4.054054054054054,
+    "sign test p": 0.375
+   }
+  ],
+  "cases": [
+   {
+    "id": "k01",
+    "split": "train",
+    "stratum": "A",
+    "owner": "new",
+    "teacher": "new",
+    "2b": "new",
+    "4b": "new"
+   },
+   {
+    "id": "k02",
+    "split": "holdout",
+    "stratum": "A",
+    "owner": "new",
+    "teacher": "new",
+    "2b": "new",
+    "4b": "new"
+   },
+   {
+    "id": "k03",
+    "split": "train",
+    "stratum": "A",
+    "owner": "new",
+    "teacher": "new",
+    "2b": "new",
+    "4b": "new"
+   },
+   {
+    "id": "k04",
+    "split": "train",
+    "stratum": "D",
+    "owner": "cont",
+    "teacher": "cont",
+    "2b": "cont",
+    "4b": "cont"
+   },
+   {
+    "id": "k05",
+    "split": "train",
+    "stratum": "C",
+    "owner": "unsure",
+    "teacher": "new",
+    "2b": "new",
+    "4b": "new"
+   },
+   {
+    "id": "k06",
+    "split": "train",
+    "stratum": "A",
+    "owner": "new",
+    "teacher": "new",
+    "2b": "new",
+    "4b": "new"
+   },
+   {
+    "id": "k07",
+    "split": "train",
+    "stratum": "A",
+    "owner": "new",
+    "teacher": "new",
+    "2b": "new",
+    "4b": "new"
+   },
+   {
+    "id": "k08",
+    "split": "train",
+    "stratum": "C",
+    "owner": "new",
+    "teacher": "new",
+    "2b": "new",
+    "4b": "new"
+   },
+   {
+    "id": "k09",
+    "split": "train",
+    "stratum": "A",
+    "owner": "new",
+    "teacher": "new",
+    "2b": "new",
+    "4b": "new"
+   },
+   {
+    "id": "k10",
+    "split": "train",
+    "stratum": "A",
+    "owner": "new",
+    "teacher": "new",
+    "2b": "new",
+    "4b": "new"
+   },
+   {
+    "id": "k11",
+    "split": "train",
+    "stratum": "D",
+    "owner": "cont",
+    "teacher": "cont",
+    "2b": "cont",
+    "4b": "cont"
+   },
+   {
+    "id": "k12",
+    "split": "train",
+    "stratum": "D",
+    "owner": "cont",
+    "teacher": "cont",
+    "2b": "cont",
+    "4b": "cont"
+   },
+   {
+    "id": "k13",
+    "split": "train",
+    "stratum": "C",
+    "owner": "unsure",
+    "teacher": "new",
+    "2b": "cont",
+    "4b": "new"
+   },
+   {
+    "id": "k14",
+    "split": "holdout",
+    "stratum": "C",
+    "owner": "new",
+    "teacher": "new",
+    "2b": "new",
+    "4b": "new"
+   },
+   {
+    "id": "k15",
+    "split": "train",
+    "stratum": "C",
+    "owner": "new",
+    "teacher": "new",
+    "2b": "new",
+    "4b": "new"
+   },
+   {
+    "id": "k16",
+    "split": "train",
+    "stratum": "C",
+    "owner": "cont",
+    "teacher": "new",
+    "2b": "cont",
+    "4b": "cont"
+   },
+   {
+    "id": "k17",
+    "split": "train",
+    "stratum": "A",
+    "owner": "new",
+    "teacher": "new",
+    "2b": "new",
+    "4b": "new"
+   },
+   {
+    "id": "k18",
+    "split": "holdout",
+    "stratum": "C",
+    "owner": "new",
+    "teacher": "new",
+    "2b": "new",
+    "4b": "new"
+   },
+   {
+    "id": "k19",
+    "split": "train",
+    "stratum": "C",
+    "owner": "cont",
+    "teacher": "new",
+    "2b": "cont",
+    "4b": "new"
+   },
+   {
+    "id": "k20",
+    "split": "train",
+    "stratum": "A",
+    "owner": "new",
+    "teacher": "new",
+    "2b": "new",
+    "4b": "new"
+   },
+   {
+    "id": "k21",
+    "split": "train",
+    "stratum": "D",
+    "owner": "cont",
+    "teacher": "cont",
+    "2b": "cont",
+    "4b": "cont"
+   },
+   {
+    "id": "k22",
+    "split": "holdout",
+    "stratum": "D",
+    "owner": "cont",
+    "teacher": "new",
+    "2b": "cont",
+    "4b": "cont"
+   },
+   {
+    "id": "k23",
+    "split": "train",
+    "stratum": "D",
+    "owner": "cont",
+    "teacher": "cont",
+    "2b": "cont",
+    "4b": "cont"
+   },
+   {
+    "id": "k24",
+    "split": "train",
+    "stratum": "A",
+    "owner": "new",
+    "teacher": "new",
+    "2b": "new",
+    "4b": "new"
+   },
+   {
+    "id": "k25",
+    "split": "train",
+    "stratum": "A",
+    "owner": "new",
+    "teacher": "new",
+    "2b": "new",
+    "4b": "new"
+   },
+   {
+    "id": "k26",
+    "split": "train",
+    "stratum": "C",
+    "owner": "new",
+    "teacher": "new",
+    "2b": "new",
+    "4b": "new"
+   },
+   {
+    "id": "k27",
+    "split": "holdout",
+    "stratum": "D",
+    "owner": "cont",
+    "teacher": "cont",
+    "2b": "cont",
+    "4b": "cont"
+   },
+   {
+    "id": "k28",
+    "split": "train",
+    "stratum": "C",
+    "owner": "unsure",
+    "teacher": "new",
+    "2b": "cont",
+    "4b": "cont"
+   },
+   {
+    "id": "k29",
+    "split": "train",
+    "stratum": "D",
+    "owner": "cont",
+    "teacher": "cont",
+    "2b": "cont",
+    "4b": "cont"
+   },
+   {
+    "id": "k30",
+    "split": "train",
+    "stratum": "A",
+    "owner": "new",
+    "teacher": "new",
+    "2b": "new",
+    "4b": "new"
+   },
+   {
+    "id": "k31",
+    "split": "train",
+    "stratum": "A",
+    "owner": "cont",
+    "teacher": "new",
+    "2b": "cont",
+    "4b": "new"
+   },
+   {
+    "id": "k32",
+    "split": "train",
+    "stratum": "D",
+    "owner": "cont",
+    "teacher": "cont",
+    "2b": "cont",
+    "4b": "cont"
+   },
+   {
+    "id": "k33",
+    "split": "train",
+    "stratum": "B",
+    "owner": "cont",
+    "teacher": "new",
+    "2b": "new",
+    "4b": "new"
+   },
+   {
+    "id": "k34",
+    "split": "train",
+    "stratum": "C",
+    "owner": "cont",
+    "teacher": "new",
+    "2b": "cont",
+    "4b": "new"
+   },
+   {
+    "id": "k35",
+    "split": "train",
+    "stratum": "D",
+    "owner": "cont",
+    "teacher": "cont",
+    "2b": "cont",
+    "4b": "cont"
+   },
+   {
+    "id": "k36",
+    "split": "train",
+    "stratum": "D",
+    "owner": "cont",
+    "teacher": "cont",
+    "2b": "cont",
+    "4b": "cont"
+   },
+   {
+    "id": "k37",
+    "split": "train",
+    "stratum": "A",
+    "owner": "new",
+    "teacher": "new",
+    "2b": "new",
+    "4b": "new"
+   },
+   {
+    "id": "k38",
+    "split": "holdout",
+    "stratum": "A",
+    "owner": "new",
+    "teacher": "new",
+    "2b": "new",
+    "4b": "new"
+   },
+   {
+    "id": "k39",
+    "split": "train",
+    "stratum": "A",
+    "owner": "unsure",
+    "teacher": "new",
+    "2b": "new",
+    "4b": "new"
+   },
+   {
+    "id": "k40",
+    "split": "train",
+    "stratum": "D",
+    "owner": "cont",
+    "teacher": "cont",
+    "2b": "cont",
+    "4b": "cont"
+   },
+   {
+    "id": "k41",
+    "split": "train",
+    "stratum": "B",
+    "owner": "new",
+    "teacher": "new",
+    "2b": "new",
+    "4b": "new"
+   },
+   {
+    "id": "k42",
+    "split": "train",
+    "stratum": "D",
+    "owner": "cont",
+    "teacher": "cont",
+    "2b": "cont",
+    "4b": "cont"
+   },
+   {
+    "id": "k43",
+    "split": "train",
+    "stratum": "D",
+    "owner": "cont",
+    "teacher": "cont",
+    "2b": "cont",
+    "4b": "cont"
+   },
+   {
+    "id": "k44",
+    "split": "train",
+    "stratum": "C",
+    "owner": "new",
+    "teacher": "new",
+    "2b": "new",
+    "4b": "new"
+   },
+   {
+    "id": "k45",
+    "split": "train",
+    "stratum": "D",
+    "owner": "cont",
+    "teacher": "cont",
+    "2b": "cont",
+    "4b": "cont"
+   },
+   {
+    "id": "k46",
+    "split": "train",
+    "stratum": "D",
+    "owner": "cont",
+    "teacher": "cont",
+    "2b": "cont",
+    "4b": "cont"
+   },
+   {
+    "id": "k47",
+    "split": "holdout",
+    "stratum": "D",
+    "owner": "new",
+    "teacher": "cont",
+    "2b": "cont",
+    "4b": "cont"
+   },
+   {
+    "id": "k48",
+    "split": "train",
+    "stratum": "C",
+    "owner": "cont",
+    "teacher": "new",
+    "2b": "new",
+    "4b": "new"
+   },
+   {
+    "id": "k49",
+    "split": "holdout",
+    "stratum": "A",
+    "owner": "new",
+    "teacher": "new",
+    "2b": "new",
+    "4b": "new"
+   },
+   {
+    "id": "k50",
+    "split": "train",
+    "stratum": "A",
+    "owner": "new",
+    "teacher": "new",
+    "2b": "new",
+    "4b": "new"
+   },
+   {
+    "id": "k51",
+    "split": "train",
+    "stratum": "A",
+    "owner": "new",
+    "teacher": "new",
+    "2b": "new",
+    "4b": "new"
+   },
+   {
+    "id": "k52",
+    "split": "train",
+    "stratum": "B",
+    "owner": "cont",
+    "teacher": "new",
+    "2b": "new",
+    "4b": "new"
+   },
+   {
+    "id": "k53",
+    "split": "train",
+    "stratum": "D",
+    "owner": "cont",
+    "teacher": "cont",
+    "2b": "cont",
+    "4b": "cont"
+   },
+   {
+    "id": "k54",
+    "split": "train",
+    "stratum": "C",
+    "owner": "cont",
+    "teacher": "new",
+    "2b": "cont",
+    "4b": "new"
+   },
+   {
+    "id": "k55",
+    "split": "train",
+    "stratum": "A",
+    "owner": "new",
+    "teacher": "new",
+    "2b": "new",
+    "4b": "new"
+   },
+   {
+    "id": "k56",
+    "split": "train",
+    "stratum": "C",
+    "owner": "new",
+    "teacher": "new",
+    "2b": "new",
+    "4b": "new"
+   },
+   {
+    "id": "k57",
+    "split": "train",
+    "stratum": "A",
+    "owner": "new",
+    "teacher": "new",
+    "2b": "new",
+    "4b": "new"
+   },
+   {
+    "id": "k58",
+    "split": "holdout",
+    "stratum": "A",
+    "owner": "new",
+    "teacher": "new",
+    "2b": "new",
+    "4b": "new"
+   },
+   {
+    "id": "k59",
+    "split": "train",
+    "stratum": "D",
+    "owner": "cont",
+    "teacher": "cont",
+    "2b": "cont",
+    "4b": "cont"
+   },
+   {
+    "id": "k60",
+    "split": "train",
+    "stratum": "C",
+    "owner": "new",
+    "teacher": "new",
+    "2b": "new",
+    "4b": "new"
+   },
+   {
+    "id": "k61",
+    "split": "train",
+    "stratum": "C",
+    "owner": "new",
+    "teacher": "new",
+    "2b": "new",
+    "4b": "new"
+   },
+   {
+    "id": "k62",
+    "split": "train",
+    "stratum": "D",
+    "owner": "cont",
+    "teacher": "cont",
+    "2b": "cont",
+    "4b": "cont"
+   },
+   {
+    "id": "k63",
+    "split": "train",
+    "stratum": "C",
+    "owner": "new",
+    "teacher": "new",
+    "2b": "new",
+    "4b": "new"
+   },
+   {
+    "id": "k64",
+    "split": "train",
+    "stratum": "B",
+    "owner": "unsure",
+    "teacher": "new",
+    "2b": "cont",
+    "4b": "cont"
+   },
+   {
+    "id": "k65",
+    "split": "train",
+    "stratum": "D",
+    "owner": "cont",
+    "teacher": "cont",
+    "2b": "cont",
+    "4b": "cont"
+   },
+   {
+    "id": "k66",
+    "split": "train",
+    "stratum": "C",
+    "owner": "new",
+    "teacher": "new",
+    "2b": "new",
+    "4b": "new"
+   },
+   {
+    "id": "k67",
+    "split": "train",
+    "stratum": "D",
+    "owner": "cont",
+    "teacher": "cont",
+    "2b": "cont",
+    "4b": "cont"
+   },
+   {
+    "id": "k68",
+    "split": "train",
+    "stratum": "D",
+    "owner": "cont",
+    "teacher": "cont",
+    "2b": "cont",
+    "4b": "cont"
+   },
+   {
+    "id": "k69",
+    "split": "train",
+    "stratum": "C",
+    "owner": "cont",
+    "teacher": "new",
+    "2b": "new",
+    "4b": "new"
+   },
+   {
+    "id": "k70",
+    "split": "train",
+    "stratum": "D",
+    "owner": "cont",
+    "teacher": "cont",
+    "2b": "cont",
+    "4b": "cont"
+   },
+   {
+    "id": "k71",
+    "split": "train",
+    "stratum": "A",
+    "owner": "new",
+    "teacher": "new",
+    "2b": "new",
+    "4b": "new"
+   },
+   {
+    "id": "k72",
+    "split": "train",
+    "stratum": "A",
+    "owner": "cont",
+    "teacher": "new",
+    "2b": "new",
+    "4b": "new"
+   },
+   {
+    "id": "k73",
+    "split": "train",
+    "stratum": "C",
+    "owner": "new",
+    "teacher": "new",
+    "2b": "new",
+    "4b": "new"
+   },
+   {
+    "id": "k74",
+    "split": "train",
+    "stratum": "B",
+    "owner": "cont",
+    "teacher": "cont",
+    "2b": "new",
+    "4b": "cont"
+   },
+   {
+    "id": "k75",
+    "split": "train",
+    "stratum": "C",
+    "owner": "new",
+    "teacher": "new",
+    "2b": "new",
+    "4b": "new"
+   },
+   {
+    "id": "k76",
+    "split": "train",
+    "stratum": "C",
+    "owner": "new",
+    "teacher": "new",
+    "2b": "new",
+    "4b": "new"
+   },
+   {
+    "id": "k77",
+    "split": "train",
+    "stratum": "A",
+    "owner": "new",
+    "teacher": "new",
+    "2b": "new",
+    "4b": "new"
+   },
+   {
+    "id": "k78",
+    "split": "train",
+    "stratum": "C",
+    "owner": "new",
+    "teacher": "new",
+    "2b": "new",
+    "4b": "new"
+   },
+   {
+    "id": "k79",
+    "split": "train",
+    "stratum": "D",
+    "owner": "cont",
+    "teacher": "cont",
+    "2b": "cont",
+    "4b": "cont"
+   },
+   {
+    "id": "k80",
+    "split": "train",
+    "stratum": "C",
+    "owner": "unsure",
+    "teacher": "new",
+    "2b": "new",
+    "4b": "new"
+   }
+  ]
+ },
+ "boxes": {
+  "observed": [
+   {
+    "model": "fs-qwen3.5-27b",
+    "box": "Sasha",
+    "split": "held-out",
+    "known gaps": 175,
+    "unsure": 1,
+    "gap accuracy": 0.6742857142857143,
+    "pages exact": 0.15517241379310345,
+    "false splits": 57,
+    "false merges": 0
+   },
+   {
+    "model": "fs-seg-2b",
+    "box": "Sasha",
+    "split": "held-out",
+    "known gaps": 175,
+    "unsure": 1,
+    "gap accuracy": 0.8914285714285715,
+    "pages exact": 0.46551724137931033,
+    "false splits": 14,
+    "false merges": 5
+   },
+   {
+    "model": "fs-seg-4b",
+    "box": "Sasha",
+    "split": "held-out",
+    "known gaps": 175,
+    "unsure": 1,
+    "gap accuracy": 0.8,
+    "pages exact": 0.21839080459770116,
+    "false splits": 33,
+    "false merges": 2
+   },
+   {
+    "model": "fs-qwen3.5-27b",
+    "box": "IllustratedReview",
+    "split": "trained-on",
+    "known gaps": 146,
+    "unsure": 0,
+    "gap accuracy": 0.7808219178082192,
+    "pages exact": 0.5306122448979592,
+    "false splits": 11,
+    "false merges": 21
+   },
+   {
+    "model": "fs-seg-2b",
+    "box": "IllustratedReview",
+    "split": "trained-on",
+    "known gaps": 146,
+    "unsure": 0,
+    "gap accuracy": 0.7328767123287672,
+    "pages exact": 0.3945578231292517,
+    "false splits": 9,
+    "false merges": 30
+   },
+   {
+    "model": "fs-seg-4b",
+    "box": "IllustratedReview",
+    "split": "trained-on",
+    "known gaps": 146,
+    "unsure": 0,
+    "gap accuracy": 0.7191780821917808,
+    "pages exact": 0.36054421768707484,
+    "false splits": 12,
+    "false merges": 29
+   },
+   {
+    "model": "fs-qwen3.5-27b",
+    "box": "SC0122",
+    "split": "trained-on",
+    "known gaps": 188,
+    "unsure": 5,
+    "gap accuracy": 0.9946808510638298,
+    "pages exact": 0.9217877094972067,
+    "false splits": 1,
+    "false merges": 0
+   },
+   {
+    "model": "fs-seg-2b",
+    "box": "SC0122",
+    "split": "trained-on",
+    "known gaps": 188,
+    "unsure": 5,
+    "gap accuracy": 0.9893617021276596,
+    "pages exact": 0.9776536312849162,
+    "false splits": 1,
+    "false merges": 1
+   },
+   {
+    "model": "fs-seg-4b",
+    "box": "SC0122",
+    "split": "trained-on",
+    "known gaps": 188,
+    "unsure": 5,
+    "gap accuracy": 0.9946808510638298,
+    "pages exact": 0.9217877094972067,
+    "false splits": 1,
+    "false merges": 0
+   }
+  ],
+  "teacher_split": {
+   "fs-seg-2b": {
+    "Sasha": {
+     "split": "held-out",
+     "gaps": 175,
+     "student wrong": 19,
+     "teacher wrong the same way": 13,
+     "teacher right": 6,
+     "teacher wrong, student right": 44
+    },
+    "IllustratedReview": {
+     "split": "trained-on",
+     "gaps": 146,
+     "student wrong": 39,
+     "teacher wrong the same way": 23,
+     "teacher right": 16,
+     "teacher wrong, student right": 9
+    },
+    "SC0122": {
+     "split": "trained-on",
+     "gaps": 188,
+     "student wrong": 2,
+     "teacher wrong the same way": 0,
+     "teacher right": 2,
+     "teacher wrong, student right": 1
+    }
+   },
+   "fs-seg-4b": {
+    "Sasha": {
+     "split": "held-out",
+     "gaps": 175,
+     "student wrong": 35,
+     "teacher wrong the same way": 30,
+     "teacher right": 5,
+     "teacher wrong, student right": 27
+    },
+    "IllustratedReview": {
+     "split": "trained-on",
+     "gaps": 146,
+     "student wrong": 41,
+     "teacher wrong the same way": 29,
+     "teacher right": 12,
+     "teacher wrong, student right": 3
+    },
+    "SC0122": {
+     "split": "trained-on",
+     "gaps": 188,
+     "student wrong": 1,
+     "teacher wrong the same way": 1,
+     "teacher right": 0,
+     "teacher wrong, student right": 0
+    }
+   }
+  },
+  "paired": [
+   {
+    "pair": "2b vs teacher",
+    "scope": "Sasha",
+    "gaps": 175,
+    "only first right": 44,
+    "only second right": 6,
+    "difference points": 21.714285714285715,
+    "sign test p": 3.243740565039843e-08
+   },
+   {
+    "pair": "4b vs teacher",
+    "scope": "Sasha",
+    "gaps": 175,
+    "only first right": 27,
+    "only second right": 5,
+    "difference points": 12.571428571428571,
+    "sign test p": 0.00011307420209050179
+   },
+   {
+    "pair": "2b vs 4b",
+    "scope": "Sasha",
+    "gaps": 175,
+    "only first right": 24,
+    "only second right": 8,
+    "difference points": 9.142857142857142,
+    "sign test p": 0.0070003666914999485
+   },
+   {
+    "pair": "2b vs teacher",
+    "scope": "IllustratedReview",
+    "gaps": 146,
+    "only first right": 9,
+    "only second right": 16,
+    "difference points": -4.794520547945205,
+    "sign test p": 0.2295229434967041
+   },
+   {
+    "pair": "4b vs teacher",
+    "scope": "IllustratedReview",
+    "gaps": 146,
+    "only first right": 3,
+    "only second right": 12,
+    "difference points": -6.164383561643835,
+    "sign test p": 0.03515625
+   },
+   {
+    "pair": "2b vs 4b",
+    "scope": "IllustratedReview",
+    "gaps": 146,
+    "only first right": 9,
+    "only second right": 7,
+    "difference points": 1.36986301369863,
+    "sign test p": 0.803619384765625
+   },
+   {
+    "pair": "2b vs teacher",
+    "scope": "SC0122",
+    "gaps": 188,
+    "only first right": 1,
+    "only second right": 2,
+    "difference points": -0.5319148936170213,
+    "sign test p": 1.0
+   },
+   {
+    "pair": "4b vs teacher",
+    "scope": "SC0122",
+    "gaps": 188,
+    "only first right": 0,
+    "only second right": 0,
+    "difference points": 0.0,
+    "sign test p": 1.0
+   },
+   {
+    "pair": "2b vs 4b",
+    "scope": "SC0122",
+    "gaps": 188,
+    "only first right": 1,
+    "only second right": 2,
+    "difference points": -0.5319148936170213,
+    "sign test p": 1.0
+   }
+  ]
+ }
+}

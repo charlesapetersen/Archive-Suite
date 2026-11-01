@@ -350,6 +350,19 @@ def score_checkpack():
                          "false_splits": sum(calls[role][c["id"]]["call"] == "new" and c["owner"] == "cont" for c in got),
                          "false_merges": sum(calls[role][c["id"]]["call"] == "cont" and c["owner"] == "new" for c in got),
                          "tag_right": sum(c["tag"] == c["owner"] for c in cs)})
+    # The checkpack was drawn by stratum (corpus_pairs.check_stratum: the tag against the teacher's ABBYY-run label),
+    # not in proportion to the population, so the strata are reported apart as well as pooled.
+    strata = []
+    for st in sorted({c["stratum"] for c in cases}):
+        cs = [c for c in cases if c["owner"] != "unsure" and c["stratum"] == st]
+        strata.append({"stratum": st, "gaps": len(cs), "tag_right": sum(c["tag"] == c["owner"] for c in cs),
+                       **{role: sum(calls[role].get(c["id"], {}).get("call") == c["owner"] for c in cs)
+                          for role in MODELS}})
+    paired = [paired_row(f"{a} vs {b}", sp, [(calls[a][c["id"]]["call"] == c["owner"],
+                                               calls[b][c["id"]]["call"] == c["owner"])
+                                              for c in cases if c["owner"] != "unsure" and sp in ("all", c["split"])
+                                              and c["id"] in calls[a] and c["id"] in calls[b]])
+              for a, b in (("2b", "teacher"), ("4b", "teacher"), ("2b", "4b")) for sp in ("holdout", "all")]
     split = []
     for role in ("2b", "4b"):
         for sp in ("holdout", "train", "all"):
@@ -361,7 +374,7 @@ def score_checkpack():
                           "teacher right": sum(calls["teacher"][c["id"]]["call"] == c["owner"] for c in sw),
                           "teacher wrong, student right": sum(calls["teacher"][c["id"]]["call"] != c["owner"] and
                                                               calls[role][c["id"]]["call"] == c["owner"] for c in cs)})
-    return {"rows": rows, "teacher_split": split,
+    return {"rows": rows, "strata": strata, "teacher_split": split, "paired": paired,
             "cases": [{**{k: c[k] for k in ("id", "split", "stratum", "owner")},
                        **{r: calls[r].get(c["id"], {}).get("call") for r in MODELS}} for c in cases]}
 
@@ -385,10 +398,148 @@ def score_boxes():
             docs = K.documents(r)   # pages exact over the documents no unsure gap touches, as seg-kit-gate.md
             pages = sum(d["exact_pages"] for d in docs)
             exact = sum(d["exact_pages"] for d in docs if d["m"][key][0])
+            calls = [(m["gaps"][k][0], g["truth"]) for k, g in enumerate(r["gaps"])]
             observed.append({"model": key, "box": r["box"], "split": r["split"], "known gaps": len(r["gaps"]),
                              "unsure": len(r["unsure"]), "gap accuracy": right / len(r["gaps"]),
-                             "pages exact": exact / pages if pages else None})
-    return {"observed": observed, "teacher_split": K.teacher_split(recs)}
+                             "pages exact": exact / pages if pages else None,
+                             "false splits": sum(c == "new" and t == "continue" for c, t in calls),
+                             "false merges": sum(c == "continue" and t == "new" for c, t in calls)})
+    names = {k: role for role, (k, _) in MODELS.items()}
+    paired = [paired_row(f"{names[a]} vs {names[b]}", r["box"],
+                         [(r["models"][a]["gaps"][k][0] == g["truth"], r["models"][b]["gaps"][k][0] == g["truth"])
+                          for k, g in enumerate(r["gaps"])])
+              for r in recs for a, b in (("fs-seg-2b", "fs-qwen3.5-27b"), ("fs-seg-4b", "fs-qwen3.5-27b"),
+                                         ("fs-seg-2b", "fs-seg-4b"))]
+    return {"observed": observed, "teacher_split": K.teacher_split(recs), "paired": paired}
+
+
+def paired_row(pair, scope, rights):
+    """Gap-accuracy difference of a over b on the same gaps, with the discordant gaps and an exact two-sided sign
+    test on them (McNemar's exact form): [(a right, b right)]."""
+    from math import comb
+    only_a = sum(x and not y for x, y in rights)
+    only_b = sum(y and not x for x, y in rights)
+    n = only_a + only_b
+    p = min(1.0, 2 * sum(comb(n, i) for i in range(min(only_a, only_b) + 1)) / 2 ** n) if n else 1.0
+    return {"pair": pair, "scope": scope, "gaps": len(rights), "only first right": only_a, "only second right": only_b,
+            "difference points": 100 * (only_a - only_b) / len(rights) if rights else None, "sign test p": p}
+
+
+LABEL = {"teacher": "Qwen3.5 27B teacher", "2b": "fine-tuned Qwen3.5 2B (the shipped build's source)",
+         "4b": "fine-tuned Qwen3.5 4B", "fs-qwen3.5-27b": "Qwen3.5 27B teacher",
+         "fs-seg-2b": "fine-tuned Qwen3.5 2B (the shipped build's source)", "fs-seg-4b": "fine-tuned Qwen3.5 4B"}
+SPLIT = {"holdout": "held out (9)", "train": "training collections (65)", "all": "all (74)"}
+STRATUM = {"A": "A: tag start the teacher agreed with", "B": "B: tag start the teacher leaned against",
+           "C": "C: tag continuation start-trust made a start", "D": "D: agreed continuation"}
+
+
+def render(out):
+    """seg-kit-gate-sherlock.md, from the scored record alone."""
+    cp, bx, runs = out["checkpack"], out["boxes"], out["runs"]
+    pct = lambda v: "-" if v is None else f"{100 * v:.1f}%"
+    L = ["# W46.kit-gate-sherlock — the students and the teacher on owner-ruled gaps they have no answers for", "",
+         "Generated by `ArchiveProcessor/scripts/segbench/kit_gate_sherlock.py score` from one Sherlock submission "
+         f"(pack `{out['pack']}`, batch 20261031-210431): the Qwen3.5 27B teacher and the fine-tuned 2B and 4B on the "
+         f"same {out['sets']['checkpack']['windows'] + out['sets']['boxes']['windows']} windows each, the bench's "
+         "request (7-page windows at stride 3, images at 1,024 px, temperature 0, thinking off), vLLM 0.31 on one "
+         "GPU. Apple Vision text on every window, not ABBYY (owner, 2026-10-30). No money.", "",
+         "Answers: " + ", ".join(f"{LABEL[k]} {v['answers']} ({v['failed']} failed, {v['missing']} missing)"
+                                 for k, v in runs.items()) +
+         ". A failed window counts as the bench's neutral answer, as everywhere in the bench.", "",
+         "## The owner's checkpack (80 gaps, 6 unsure out)", "",
+         "A gap's call is the mean P(new) over every window that holds both its pages. Nine gaps sit in collections "
+         "no student trained on; 65 in collections they did, where their training target was the teacher's reply on "
+         "ABBYY text, so these windows (Vision text) are not their training input either. The tag column is the "
+         "corpus's own label, the one label cleaning started from.", "",
+         "| model | gaps | right | accuracy | false splits | false merges | tag right |", "|---|---|---:|---:|---:|---:|---:|"]
+    for r in cp["rows"]:
+        L.append(f"| {LABEL[r['model']]} | {SPLIT[r['split']]} | {r['right']}/{r['answered']} | {pct(r['accuracy'])} "
+                 f"| {r['false_splits']} | {r['false_merges']} | {r['tag_right']} |")
+    L += ["", "By the stratum the gap was drawn from (the checkpack drew about equal numbers from each, so the pooled "
+          "rows are not a population rate):", "",
+          "| stratum | gaps | tag right | teacher | 2B | 4B |", "|---|---:|---:|---:|---:|---:|"]
+    for s in cp["strata"]:
+        L.append(f"| {STRATUM.get(s['stratum'], s['stratum'])} | {s['gaps']} | {s['tag_right']} | {s['teacher']} "
+                 f"| {s['2b']} | {s['4b']} |")
+    L += ["", "## The three locked boxes", "",
+          "Known gaps only (unsure out); pages exact over the documents no unsure gap touches, as `seg-kit-gate.md`. "
+          "Sasha is the one owner box no student trained on; the Illustrated Review and SC0122 are wholly in their "
+          "training split (owner, 2026-10-29). SC0122 here is every known gap, not W46.seg-boxes-score's 97 "
+          "owner-ruled ones.", "",
+          "| model | box | split | known gaps | gap accuracy | false splits | false merges | pages exact |",
+          "|---|---|---|---:|---:|---:|---:|---:|"]
+    for r in bx["observed"]:
+        L.append(f"| {LABEL[r['model']]} | {r['box']} | {r['split']} | {r['known gaps']} | {pct(r['gap accuracy'])} "
+                 f"| {r['false splits']} | {r['false merges']} | {pct(r['pages exact'])} |")
+    L += ["", "## Paired differences", "",
+          "Same gaps, same windows. Discordant gaps are those only one model of the pair gets right; p is the exact "
+          "two-sided sign test on them. Sampling only: the rerun floor (1.4-3.2 points a box, `seg-kit-gate.md`) is "
+          "not in it, and gaps within one box are not independent, so a small p on one box is one box's finding.", "",
+          "| pair | scope | gaps | only first right | only second right | difference | p |",
+          "|---|---|---:|---:|---:|---:|---:|"]
+    for r in cp["paired"] + bx["paired"]:
+        scope = SPLIT.get(r["scope"], r["scope"])
+        if r["scope"] in SPLIT:
+            scope = "checkpack, " + scope
+        L.append(f"| {r['pair']} | {scope} | {r['gaps']} | {r['only first right']} | {r['only second right']} "
+                 f"| {r['difference points']:+.1f} points | {r['sign test p']:.3g} |")
+    L += ["", "## The teacher split", "",
+          "Each student's wrong gaps by what the teacher did on the same gap; descriptive co-occurrence in single "
+          "runs, as in `seg-kit-gate.md`.", "",
+          "| student | set | gaps | student wrong | teacher wrong the same way | teacher right | teacher wrong, student right |",
+          "|---|---|---:|---:|---:|---:|---:|"]
+    for r in cp["teacher_split"]:
+        L.append(f"| {LABEL[r['student']]} | checkpack, {SPLIT[r['split']]} | {r['gaps']} | {r['student wrong']} | "
+                 f"{r['teacher wrong the same way']} | {r['teacher right']} | {r['teacher wrong, student right']} |")
+    for key, per in bx["teacher_split"].items():
+        for box, r in per.items():
+            L.append(f"| {LABEL[key]} | {box} ({r['split']}) | {r['gaps']} | {r['student wrong']} | "
+                     f"{r['teacher wrong the same way']} | {r['teacher right']} | {r['teacher wrong, student right']} |")
+    L += ["", READING, "", CARD, ""]
+    return "\n".join(L)
+
+
+# Written after reading the scored record (2026-11-01); a rescore that moves a figure must revisit these.
+READING = """## Reading
+
+- **On Sasha, the one owner box no model trained on, the shipped 2B beats its teacher by a wide margin: 89.1% of
+  175 known gaps against 67.4%** (44 gaps only the 2B gets right, 6 only the teacher; p far below 0.001), and the 4B
+  sits between (80.0%; 27 to 5 against the teacher, 8 to 24 against the 2B). All 57 of the teacher's errors there
+  are false splits (pages exact 15.5%, against the 2B's 46.6%). So on this box the students are not bounded by the
+  teacher's errors, though most of their own errors (13 of the 2B's 19, 30 of the 4B's 35) are gaps the teacher also
+  gets wrong. One box: it shows the teacher can be beaten on held-out owner material, not by how much on another.
+- **On the Illustrated Review, trained-on, the teacher leads (78.1% against 73.3% and 71.9%; 4B against teacher 3
+  to 12, p 0.035)**, every model is weak, and the students' errors are mostly false merges (30 and 29); on SC0122,
+  trained-on, all three are at 98.9-99.5% and tie.
+- **On the owner's checkpack the 2B is right on 67 of 74 gaps, the 4B 64, the teacher 62.** On the 9 held-out gaps
+  the students get 8 and the teacher 7. Paired, 2B against teacher is 6 gaps to 1 (p 0.125): a lead, not a
+  finding at n 74, and the 9 held-out gaps settle nothing on their own. Eleven of the teacher's 12 errors are false
+  splits, 6 of the 12 in stratum C, drawn where the teacher's label overturned the tag (Selection). Against the corpus tag
+  (53 of 74 right) the gain is all in stratum C: the 2B 19 of 21 where the tag has 6.
+- **The 4B is not better than the 2B on held-out owner material**: worse on Sasha (80.0% against 89.1%) and level
+  or worse on the checkpack. The development and test boxes' +0.87-point 4B lead (`seg-kit-gate.md`) does not carry
+  to Sasha.
+- **Input shift.** The students were trained on windows carrying ABBYY's text and are measured here on Apple
+  Vision's, the app's input. These are the first student figures on the app's input on owner-ruled gaps."""
+
+CARD = """## Measurement card
+
+- **Truth.** The owner's answers on the 80-gap checkpack (`label-clean-owner-answers.csv`; his 6 unsure out), and the
+  three locked boxes' truths (Sasha owner-ruled from label tags, locked 2026-10-30; the Illustrated Review and SC0122
+  locked 2026-10-29/30), unsure gaps out of every count. No drafter or relative of a scored route made them, except
+  that the checkpack's candidate gaps came from the teacher's label-clean run (Selection).
+- **Selection.** The three boxes whole. The checkpack was drawn by stratum from the corpus label set, and the strata
+  are defined by the teacher's own ABBYY-run label against the tag (`corpus_pairs.check_stratum`): selected partly by
+  a tested route and by ABBYY text. That over-represents gaps the teacher disagreed with (strata B, C), which biases
+  the teacher's checkpack accuracy down against the students'; the strata are reported apart for that reason, and the
+  boxes carry the comparison.
+- **Comparison.** One pack: the three models on the same windows, prompt, images and Vision text, under the same
+  server settings. Both OCR sets do not apply: this is segmentation, scored on gaps.
+- **Noise.** Single runs at temperature 0. Paired sign tests above are sampling only; the rerun floor (1.4-3.2
+  points a box) is not in them, so a gap inside it is a tie (SC0122, the checkpack's held-out 9). Sasha's 21.7-point
+  lead is far outside both.
+- **Scope.** Owner material only, one held-out owner box. It does not say how the students do on other kinds of
+  material, what owner-ruled training labels would gain, or how a second-family teacher compares."""
 
 
 def cmd_score(a):
@@ -397,6 +548,7 @@ def cmd_score(a):
     out = {"tag": TAG, "pack": PACK_NAME, "sets": freeze["sets"], "runs": runs,
            "checkpack": score_checkpack(), "boxes": score_boxes()}
     (RESULTS / "seg-kit-gate-sherlock.json").write_text(json.dumps(out, indent=1) + "\n")
+    (RESULTS / "seg-kit-gate-sherlock.md").write_text(render(out))
     for r in out["checkpack"]["rows"]:
         acc = "-" if r["accuracy"] is None else f"{r['accuracy']:.3f}"
         print(f"checkpack {r['model']:8} {r['split']:8} {r['right']}/{r['answered']} of {r['gaps']}  {acc}")
