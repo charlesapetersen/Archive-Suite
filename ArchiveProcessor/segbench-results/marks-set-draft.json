@@ -2,6 +2,18 @@
  "protocol": "marks-set-draft-v1",
  "pages": 150,
  "core": 40,
+ "weighting": {
+  "final_core_inclusion_probability": null,
+  "validated": false,
+  "use": "descriptive",
+  "support": {
+   "A-core": 16,
+   "B-core": 24
+  },
+  "phase_a_pages": 50,
+  "phase_a_owner_truth": 16,
+  "restriction": "The phase and core fractions are not validated final owner-core inclusion probabilities (P3-3, W46.marks-sampling-support): report core results descriptively, A-core and B-core apart, as an enriched set; no population recall, mixed share or corpus-weighted routing benefit is weighted from them. The independent mixed share and interval are mixed-def-score's; within-core paired route comparisons stand."
+ },
  "routes": {
   "gemini3.7-flash-gw": {
    "read": 0,

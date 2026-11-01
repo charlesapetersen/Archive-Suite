@@ -11,10 +11,18 @@ The draw answers the measurement audit (execution-plans/processing-review/11-mea
 pre-flagger is Qwen3.6-27B, which W46.marks-detect will rank, so the set must not be chosen only from its flags.
 Phase A draws 50 pages of the 1,014 uniformly within each collection, whatever the flag said. Phase B draws 100
 more from the rest, enriched by the pre-flag's handwriting band so the owner's four bands can each be scored
-(W46.mixed-route-bands). Every page carries its stratum and the probability it was drawn; for phase B that is
-conditional on phase A's draw (the stratum's remaining count), and the unconditional figure is given as
-pA + (1 - pA) * pB, which is exact for phase A and close for phase B. The owner core of 40 is drawn from both
-phases in fixed numbers, its probabilities recorded the same way.
+(W46.mixed-route-bands). Every page carries its stratum and its phase fraction (quota over the stratum's count,
+for phase B the count left after phase A), plus an approximate phase-membership figure, pA for phase A and
+pA + (1 - pA) * pB for phase B. The owner core of 40 is drawn from both phases in fixed numbers (A-core 16, B-core 24),
+taking the lowest seed ranks again, and each core page records its conditional fraction within its phase or band.
+
+None of these fractions is a validated final owner-core inclusion probability (measurement review 2026-10-31 pass
+3, P3-3; W46.marks-sampling-support): the same hash ranks pick both stages, and the core pools collection strata
+with different frame sizes and quotas, so multiplying the stage fractions is not a demonstrated marginal weight.
+Results on the core are therefore descriptive of an enriched set, reported A-core and B-core apart (core_groups),
+never weighted to the corpus: no population recall, mixed share or corpus-weighted routing benefit comes from them.
+The independent mixed share and its interval stay mixed-def-score's. Only the 16 A-core pages of phase A's 50 get
+owner truth; the other 34 are drafts, not recall observations.
 
 Drafting uses two families, neither the pre-flagger (MRK-1): Gemini 3.7 Flash through the gateway, and Qwen3-VL 8B
 locally. Both get the same instruction, each in its own native box form, normalised here to [x0, y0, x1, y1]
@@ -124,7 +132,8 @@ def select(rows):
     for c in COLLECTIONS:
         n = PHASE_A[c]
         for r in take(by_c[c], n):
-            chosen[r['id']] = dict(r, phase='A', stratum='A:' + c, p_phase=n / len(by_c[c]), p_a=n / len(by_c[c]))
+            chosen[r['id']] = dict(r, phase='A', stratum='A:' + c, phase_fraction=n / len(by_c[c]),
+                                   p_a=n / len(by_c[c]))
     left = [r for r in rows if r['id'] not in chosen]
 
     def add(group, n, stratum, p_a):
@@ -133,7 +142,7 @@ def select(rows):
         got = take(group, n)
         for r in got:
             pb = len(got) / len(group)
-            chosen[r['id']] = dict(r, phase='B', stratum=stratum, p_phase=pb, p_a=p_a(r))
+            chosen[r['id']] = dict(r, phase='B', stratum=stratum, phase_fraction=pb, p_a=p_a(r))
     p_a_of = {c: PHASE_A[c] / len(by_c[c]) for c in COLLECTIONS}
     pa = lambda r: p_a_of[r['collection']]  # noqa: E731
     for band, q in PHASE_B.items():
@@ -151,19 +160,45 @@ def select(rows):
     if len(chosen) != SET_SIZE:
         raise SystemExit(f'drew {len(chosen)} pages, not {SET_SIZE}')
     for r in chosen.values():
-        r['p_overall'] = r['p_a'] if r['phase'] == 'A' else r['p_a'] + (1 - r['p_a']) * r['p_phase']
+        r['phase_membership_approx'] = (r['p_a'] if r['phase'] == 'A'
+                                        else r['p_a'] + (1 - r['p_a']) * r['phase_fraction'])
         r['core'] = False
     # The owner core: CORE_A of phase A in seed order, and CORE_B by band from phase B.
     a = [r for r in chosen.values() if r['phase'] == 'A']
     for r in take(a, CORE_A):
-        r['core'], r['p_core'] = True, CORE_A / len(a)
+        r['core'], r['core_support'], r['core_fraction_conditional'] = True, 'A-core', CORE_A / len(a)
     b = [r for r in chosen.values() if r['phase'] == 'B']
     for band, n in CORE_B.items():
         group = [r for r in b if r['amount'] == band]
         got = take(group, n)
         for r in got:
-            r['core'], r['p_core'] = True, len(got) / len(group)
+            r['core'], r['core_support'], r['core_fraction_conditional'] = True, 'B-core', len(got) / len(group)
     return sorted(chosen.values(), key=lambda r: (r['phase'], r['stratum'], rank(r['id'])))
+
+
+CORE_RESTRICTION = (
+    'The phase and core fractions are not validated final owner-core inclusion probabilities (P3-3, '
+    'W46.marks-sampling-support): report core results descriptively, A-core and B-core apart, as an enriched set; '
+    'no population recall, mixed share or corpus-weighted routing benefit is weighted from them. The independent '
+    "mixed share and interval are mixed-def-score's; within-core paired route comparisons stand.")
+
+
+def weighting(rows):
+    """The selection's weighting block: no validated weights, and the support each descriptive group has."""
+    a = [r for r in rows if r['phase'] == 'A']
+    return dict(final_core_inclusion_probability=None, validated=False, use='descriptive',
+                support=dict(Counter(r['core_support'] for r in rows if r['core'])),
+                phase_a_pages=len(a), phase_a_owner_truth=sum(r['core'] for r in a), restriction=CORE_RESTRICTION)
+
+
+def core_groups(rows):
+    """The owner core split into its two descriptive groups. Scorers report each apart and never pool them with
+    weights: see CORE_RESTRICTION."""
+    groups = {'A-core': [], 'B-core': []}
+    for r in rows:
+        if r['core']:
+            groups[r['core_support']].append(r)
+    return groups
 
 
 def cmd_select(_):
@@ -176,14 +211,19 @@ def cmd_select(_):
                pages=len(pages), core=len(core),
                frame=dict(Counter(r['collection'] for r in rows)),
                frame_bands=dict(Counter(r['amount'] or 'unparsed' for r in rows)),
-               note='Phase B and core probabilities are conditional on the earlier draw; p_overall approximates '
-                    'the unconditional inclusion probability (exact for phase A).',
-               rows=[{k: p[k] for k in ('id', 'collection', 'phase', 'stratum', 'amount', 'flagged', 'p_phase',
-                                        'p_overall', 'core') if k in p} | ({'p_core': round(p['p_core'], 6)}
-                                                                          if p['core'] else {})
+               note='phase_fraction is the quota over the stratum count within its phase (phase B: after phase A); '
+                    'phase_membership_approx is pA, or pA + (1 - pA) * pB for phase B, an approximation; '
+                    'core_fraction_conditional is the core quota within its phase or band. None is a final '
+                    'inclusion weight: see weighting.',
+               weighting=weighting(pages),
+               rows=[{k: p[k] for k in ('id', 'collection', 'phase', 'stratum', 'amount', 'flagged',
+                                        'phase_fraction', 'phase_membership_approx', 'core') if k in p}
+                     | ({'core_support': p['core_support'],
+                         'core_fraction_conditional': round(p['core_fraction_conditional'], 6)} if p['core'] else {})
                      for p in pages])
     for r in out['rows']:
-        r['p_phase'], r['p_overall'] = round(r['p_phase'], 6), round(r['p_overall'], 6)
+        r['phase_fraction'] = round(r['phase_fraction'], 6)
+        r['phase_membership_approx'] = round(r['phase_membership_approx'], 6)
     CACHE.mkdir(parents=True, exist_ok=True)
     text = json.dumps(out, indent=1) + '\n'
     (CACHE / 'selection.json').write_text(text)
@@ -400,7 +440,8 @@ def cmd_report(_):
     rows = sel['rows']
     routes = {'gemini3.7-flash-gw': gemini_draft, LOCAL_KEY: local_draft}
     per = {name: {r['id']: f(r['id']) for r in rows} for name, f in routes.items()}
-    out = dict(protocol='marks-set-draft-v1', pages=len(rows), core=sum(r['core'] for r in rows), routes={})
+    out = dict(protocol='marks-set-draft-v1', pages=len(rows), core=sum(r['core'] for r in rows),
+               weighting=sel['weighting'], routes={})
     for name, got in per.items():
         have = [g for g in got.values() if g]
         ok = [g for g in have if g['draft']]
@@ -501,7 +542,8 @@ def markdown(o):
           '- **Comparison.** One instruction, each route in its own box form; Gemini at 2,400 px, the 8B at 1,400 px.',
           '- **Noise.** One pass each at temperature 0; no rerun floor.',
           '- **Scope.** Agreement is not accuracy: two drafts can agree and both be wrong. Neither drafter may be '
-          'ranked on these pages (MRK-1).', '']
+          'ranked on these pages (MRK-1). Counts are of the drawn, enriched set, not the corpus. ' + CORE_RESTRICTION,
+          '']
     return '\n'.join(L)
 
 

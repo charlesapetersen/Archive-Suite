@@ -29,4 +29,4 @@ No page has both drafts yet.
 - **Selection.** `marks-set-selection.json`: phase A independent of every route, phase B by the Qwen3.6-27B pre-flag's band (neither drafter).
 - **Comparison.** One instruction, each route in its own box form; Gemini at 2,400 px, the 8B at 1,400 px.
 - **Noise.** One pass each at temperature 0; no rerun floor.
-- **Scope.** Agreement is not accuracy: two drafts can agree and both be wrong. Neither drafter may be ranked on these pages (MRK-1).
+- **Scope.** Agreement is not accuracy: two drafts can agree and both be wrong. Neither drafter may be ranked on these pages (MRK-1). Counts are of the drawn, enriched set, not the corpus. The phase and core fractions are not validated final owner-core inclusion probabilities (P3-3, W46.marks-sampling-support): report core results descriptively, A-core and B-core apart, as an enriched set; no population recall, mixed share or corpus-weighted routing benefit is weighted from them. The independent mixed share and interval are mixed-def-score's; within-core paired route comparisons stand.

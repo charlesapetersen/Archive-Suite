@@ -56,7 +56,19 @@
   "handwritten_page": 19,
   "unparsed": 1
  },
- "note": "Phase B and core probabilities are conditional on the earlier draw; p_overall approximates the unconditional inclusion probability (exact for phase A).",
+ "note": "phase_fraction is the quota over the stratum count within its phase (phase B: after phase A); phase_membership_approx is pA, or pA + (1 - pA) * pB for phase B, an approximation; core_fraction_conditional is the core quota within its phase or band. None is a final inclusion weight: see weighting.",
+ "weighting": {
+  "final_core_inclusion_probability": null,
+  "validated": false,
+  "use": "descriptive",
+  "support": {
+   "A-core": 16,
+   "B-core": 24
+  },
+  "phase_a_pages": 50,
+  "phase_a_owner_truth": 16,
+  "restriction": "The phase and core fractions are not validated final owner-core inclusion probabilities (P3-3, W46.marks-sampling-support): report core results descriptively, A-core and B-core apart, as an enriched set; no population recall, mixed share or corpus-weighted routing benefit is weighted from them. The independent mixed share and interval are mixed-def-score's; within-core paired route comparisons stand."
+ },
  "rows": [
   {
    "id": "Dean-24a6d76b84c2729b",
@@ -65,10 +77,11 @@
    "stratum": "A:Dean",
    "amount": "under_10_words",
    "flagged": true,
-   "p_phase": 0.048889,
-   "p_overall": 0.048889,
+   "phase_fraction": 0.048889,
+   "phase_membership_approx": 0.048889,
    "core": true,
-   "p_core": 0.32
+   "core_support": "A-core",
+   "core_fraction_conditional": 0.32
   },
   {
    "id": "Dean-e2e08ce8aad21ad6",
@@ -77,10 +90,11 @@
    "stratum": "A:Dean",
    "amount": "under_10_words",
    "flagged": true,
-   "p_phase": 0.048889,
-   "p_overall": 0.048889,
+   "phase_fraction": 0.048889,
+   "phase_membership_approx": 0.048889,
    "core": true,
-   "p_core": 0.32
+   "core_support": "A-core",
+   "core_fraction_conditional": 0.32
   },
   {
    "id": "Dean-e387811188d0b447",
@@ -89,8 +103,8 @@
    "stratum": "A:Dean",
    "amount": "under_10_words",
    "flagged": true,
-   "p_phase": 0.048889,
-   "p_overall": 0.048889,
+   "phase_fraction": 0.048889,
+   "phase_membership_approx": 0.048889,
    "core": false
   },
   {
@@ -100,8 +114,8 @@
    "stratum": "A:Dean",
    "amount": "under_10_words",
    "flagged": true,
-   "p_phase": 0.048889,
-   "p_overall": 0.048889,
+   "phase_fraction": 0.048889,
+   "phase_membership_approx": 0.048889,
    "core": false
   },
   {
@@ -111,8 +125,8 @@
    "stratum": "A:Dean",
    "amount": "under_10_words",
    "flagged": true,
-   "p_phase": 0.048889,
-   "p_overall": 0.048889,
+   "phase_fraction": 0.048889,
+   "phase_membership_approx": 0.048889,
    "core": false
   },
   {
@@ -122,8 +136,8 @@
    "stratum": "A:Dean",
    "amount": "none",
    "flagged": false,
-   "p_phase": 0.048889,
-   "p_overall": 0.048889,
+   "phase_fraction": 0.048889,
+   "phase_membership_approx": 0.048889,
    "core": false
   },
   {
@@ -133,8 +147,8 @@
    "stratum": "A:Dean",
    "amount": "none",
    "flagged": true,
-   "p_phase": 0.048889,
-   "p_overall": 0.048889,
+   "phase_fraction": 0.048889,
+   "phase_membership_approx": 0.048889,
    "core": false
   },
   {
@@ -144,8 +158,8 @@
    "stratum": "A:Dean",
    "amount": "signature_initials_date",
    "flagged": true,
-   "p_phase": 0.048889,
-   "p_overall": 0.048889,
+   "phase_fraction": 0.048889,
+   "phase_membership_approx": 0.048889,
    "core": false
   },
   {
@@ -155,8 +169,8 @@
    "stratum": "A:Dean",
    "amount": "under_10_words",
    "flagged": true,
-   "p_phase": 0.048889,
-   "p_overall": 0.048889,
+   "phase_fraction": 0.048889,
+   "phase_membership_approx": 0.048889,
    "core": false
   },
   {
@@ -166,8 +180,8 @@
    "stratum": "A:Dean",
    "amount": "none",
    "flagged": false,
-   "p_phase": 0.048889,
-   "p_overall": 0.048889,
+   "phase_fraction": 0.048889,
+   "phase_membership_approx": 0.048889,
    "core": false
   },
   {
@@ -177,8 +191,8 @@
    "stratum": "A:Dean",
    "amount": "under_10_words",
    "flagged": true,
-   "p_phase": 0.048889,
-   "p_overall": 0.048889,
+   "phase_fraction": 0.048889,
+   "phase_membership_approx": 0.048889,
    "core": false
   },
   {
@@ -188,10 +202,11 @@
    "stratum": "A:Deaver",
    "amount": "none",
    "flagged": false,
-   "p_phase": 0.048889,
-   "p_overall": 0.048889,
+   "phase_fraction": 0.048889,
+   "phase_membership_approx": 0.048889,
    "core": true,
-   "p_core": 0.32
+   "core_support": "A-core",
+   "core_fraction_conditional": 0.32
   },
   {
    "id": "Deaver-121ef0a90a8b6e50",
@@ -200,10 +215,11 @@
    "stratum": "A:Deaver",
    "amount": "none",
    "flagged": false,
-   "p_phase": 0.048889,
-   "p_overall": 0.048889,
+   "phase_fraction": 0.048889,
+   "phase_membership_approx": 0.048889,
    "core": true,
-   "p_core": 0.32
+   "core_support": "A-core",
+   "core_fraction_conditional": 0.32
   },
   {
    "id": "Deaver-8ae6fd1b533022f9",
@@ -212,10 +228,11 @@
    "stratum": "A:Deaver",
    "amount": "signature_initials_date",
    "flagged": true,
-   "p_phase": 0.048889,
-   "p_overall": 0.048889,
+   "phase_fraction": 0.048889,
+   "phase_membership_approx": 0.048889,
    "core": true,
-   "p_core": 0.32
+   "core_support": "A-core",
+   "core_fraction_conditional": 0.32
   },
   {
    "id": "Deaver-25d964981d232154",
@@ -224,10 +241,11 @@
    "stratum": "A:Deaver",
    "amount": "none",
    "flagged": false,
-   "p_phase": 0.048889,
-   "p_overall": 0.048889,
+   "phase_fraction": 0.048889,
+   "phase_membership_approx": 0.048889,
    "core": true,
-   "p_core": 0.32
+   "core_support": "A-core",
+   "core_fraction_conditional": 0.32
   },
   {
    "id": "Deaver-55b8ed799142eb7d",
@@ -236,8 +254,8 @@
    "stratum": "A:Deaver",
    "amount": "none",
    "flagged": false,
-   "p_phase": 0.048889,
-   "p_overall": 0.048889,
+   "phase_fraction": 0.048889,
+   "phase_membership_approx": 0.048889,
    "core": false
   },
   {
@@ -247,8 +265,8 @@
    "stratum": "A:Deaver",
    "amount": "under_10_words",
    "flagged": true,
-   "p_phase": 0.048889,
-   "p_overall": 0.048889,
+   "phase_fraction": 0.048889,
+   "phase_membership_approx": 0.048889,
    "core": false
   },
   {
@@ -258,8 +276,8 @@
    "stratum": "A:Deaver",
    "amount": "none",
    "flagged": false,
-   "p_phase": 0.048889,
-   "p_overall": 0.048889,
+   "phase_fraction": 0.048889,
+   "phase_membership_approx": 0.048889,
    "core": false
   },
   {
@@ -269,8 +287,8 @@
    "stratum": "A:Deaver",
    "amount": "none",
    "flagged": false,
-   "p_phase": 0.048889,
-   "p_overall": 0.048889,
+   "phase_fraction": 0.048889,
+   "phase_membership_approx": 0.048889,
    "core": false
   },
   {
@@ -280,8 +298,8 @@
    "stratum": "A:Deaver",
    "amount": "under_10_words",
    "flagged": true,
-   "p_phase": 0.048889,
-   "p_overall": 0.048889,
+   "phase_fraction": 0.048889,
+   "phase_membership_approx": 0.048889,
    "core": false
   },
   {
@@ -291,8 +309,8 @@
    "stratum": "A:Deaver",
    "amount": "under_10_words",
    "flagged": true,
-   "p_phase": 0.048889,
-   "p_overall": 0.048889,
+   "phase_fraction": 0.048889,
+   "phase_membership_approx": 0.048889,
    "core": false
   },
   {
@@ -302,8 +320,8 @@
    "stratum": "A:Deaver",
    "amount": "none",
    "flagged": false,
-   "p_phase": 0.048889,
-   "p_overall": 0.048889,
+   "phase_fraction": 0.048889,
+   "phase_membership_approx": 0.048889,
    "core": false
   },
   {
@@ -313,10 +331,11 @@
    "stratum": "A:Herrnstein",
    "amount": "under_10_words",
    "flagged": true,
-   "p_phase": 0.048889,
-   "p_overall": 0.048889,
+   "phase_fraction": 0.048889,
+   "phase_membership_approx": 0.048889,
    "core": true,
-   "p_core": 0.32
+   "core_support": "A-core",
+   "core_fraction_conditional": 0.32
   },
   {
    "id": "Herrnstein-cd90d77ed844dfe8",
@@ -325,10 +344,11 @@
    "stratum": "A:Herrnstein",
    "amount": "none",
    "flagged": true,
-   "p_phase": 0.048889,
-   "p_overall": 0.048889,
+   "phase_fraction": 0.048889,
+   "phase_membership_approx": 0.048889,
    "core": true,
-   "p_core": 0.32
+   "core_support": "A-core",
+   "core_fraction_conditional": 0.32
   },
   {
    "id": "Herrnstein-6cd0a8613c23703f",
@@ -337,10 +357,11 @@
    "stratum": "A:Herrnstein",
    "amount": "none",
    "flagged": false,
-   "p_phase": 0.048889,
-   "p_overall": 0.048889,
+   "phase_fraction": 0.048889,
+   "phase_membership_approx": 0.048889,
    "core": true,
-   "p_core": 0.32
+   "core_support": "A-core",
+   "core_fraction_conditional": 0.32
   },
   {
    "id": "Herrnstein-493cc4688af77647",
@@ -349,10 +370,11 @@
    "stratum": "A:Herrnstein",
    "amount": "none",
    "flagged": false,
-   "p_phase": 0.048889,
-   "p_overall": 0.048889,
+   "phase_fraction": 0.048889,
+   "phase_membership_approx": 0.048889,
    "core": true,
-   "p_core": 0.32
+   "core_support": "A-core",
+   "core_fraction_conditional": 0.32
   },
   {
    "id": "Herrnstein-a1e1c9ba8987ba55",
@@ -361,8 +383,8 @@
    "stratum": "A:Herrnstein",
    "amount": "30_plus_words",
    "flagged": true,
-   "p_phase": 0.048889,
-   "p_overall": 0.048889,
+   "phase_fraction": 0.048889,
+   "phase_membership_approx": 0.048889,
    "core": false
   },
   {
@@ -372,8 +394,8 @@
    "stratum": "A:Herrnstein",
    "amount": "none",
    "flagged": false,
-   "p_phase": 0.048889,
-   "p_overall": 0.048889,
+   "phase_fraction": 0.048889,
+   "phase_membership_approx": 0.048889,
    "core": false
   },
   {
@@ -383,8 +405,8 @@
    "stratum": "A:Herrnstein",
    "amount": "signature_initials_date",
    "flagged": true,
-   "p_phase": 0.048889,
-   "p_overall": 0.048889,
+   "phase_fraction": 0.048889,
+   "phase_membership_approx": 0.048889,
    "core": false
   },
   {
@@ -394,8 +416,8 @@
    "stratum": "A:Herrnstein",
    "amount": "none",
    "flagged": false,
-   "p_phase": 0.048889,
-   "p_overall": 0.048889,
+   "phase_fraction": 0.048889,
+   "phase_membership_approx": 0.048889,
    "core": false
   },
   {
@@ -405,8 +427,8 @@
    "stratum": "A:Herrnstein",
    "amount": "10_29_words",
    "flagged": true,
-   "p_phase": 0.048889,
-   "p_overall": 0.048889,
+   "phase_fraction": 0.048889,
+   "phase_membership_approx": 0.048889,
    "core": false
   },
   {
@@ -416,8 +438,8 @@
    "stratum": "A:Herrnstein",
    "amount": "none",
    "flagged": false,
-   "p_phase": 0.048889,
-   "p_overall": 0.048889,
+   "phase_fraction": 0.048889,
+   "phase_membership_approx": 0.048889,
    "core": false
   },
   {
@@ -427,8 +449,8 @@
    "stratum": "A:Herrnstein",
    "amount": "none",
    "flagged": false,
-   "p_phase": 0.048889,
-   "p_overall": 0.048889,
+   "phase_fraction": 0.048889,
+   "phase_membership_approx": 0.048889,
    "core": false
   },
   {
@@ -438,10 +460,11 @@
    "stratum": "A:RG165",
    "amount": "none",
    "flagged": false,
-   "p_phase": 0.052632,
-   "p_overall": 0.052632,
+   "phase_fraction": 0.052632,
+   "phase_membership_approx": 0.052632,
    "core": true,
-   "p_core": 0.32
+   "core_support": "A-core",
+   "core_fraction_conditional": 0.32
   },
   {
    "id": "RG165-6e6265610c4d6c57",
@@ -450,8 +473,8 @@
    "stratum": "A:RG165",
    "amount": "none",
    "flagged": false,
-   "p_phase": 0.052632,
-   "p_overall": 0.052632,
+   "phase_fraction": 0.052632,
+   "phase_membership_approx": 0.052632,
    "core": false
   },
   {
@@ -461,8 +484,8 @@
    "stratum": "A:RG165",
    "amount": "none",
    "flagged": false,
-   "p_phase": 0.052632,
-   "p_overall": 0.052632,
+   "phase_fraction": 0.052632,
+   "phase_membership_approx": 0.052632,
    "core": false
   },
   {
@@ -472,8 +495,8 @@
    "stratum": "A:RG165",
    "amount": "under_10_words",
    "flagged": true,
-   "p_phase": 0.052632,
-   "p_overall": 0.052632,
+   "phase_fraction": 0.052632,
+   "phase_membership_approx": 0.052632,
    "core": false
   },
   {
@@ -483,8 +506,8 @@
    "stratum": "A:RG165",
    "amount": "10_29_words",
    "flagged": true,
-   "p_phase": 0.052632,
-   "p_overall": 0.052632,
+   "phase_fraction": 0.052632,
+   "phase_membership_approx": 0.052632,
    "core": false
   },
   {
@@ -494,8 +517,8 @@
    "stratum": "A:RG165",
    "amount": "none",
    "flagged": false,
-   "p_phase": 0.052632,
-   "p_overall": 0.052632,
+   "phase_fraction": 0.052632,
+   "phase_membership_approx": 0.052632,
    "core": false
   },
   {
@@ -505,10 +528,11 @@
    "stratum": "A:Stanton",
    "amount": "none",
    "flagged": false,
-   "p_phase": 0.048889,
-   "p_overall": 0.048889,
+   "phase_fraction": 0.048889,
+   "phase_membership_approx": 0.048889,
    "core": true,
-   "p_core": 0.32
+   "core_support": "A-core",
+   "core_fraction_conditional": 0.32
   },
   {
    "id": "Stanton-861964e4c404fa9d",
@@ -517,10 +541,11 @@
    "stratum": "A:Stanton",
    "amount": "none",
    "flagged": false,
-   "p_phase": 0.048889,
-   "p_overall": 0.048889,
+   "phase_fraction": 0.048889,
+   "phase_membership_approx": 0.048889,
    "core": true,
-   "p_core": 0.32
+   "core_support": "A-core",
+   "core_fraction_conditional": 0.32
   },
   {
    "id": "Stanton-b25eca07791ab8bd",
@@ -529,10 +554,11 @@
    "stratum": "A:Stanton",
    "amount": "signature_initials_date",
    "flagged": true,
-   "p_phase": 0.048889,
-   "p_overall": 0.048889,
+   "phase_fraction": 0.048889,
+   "phase_membership_approx": 0.048889,
    "core": true,
-   "p_core": 0.32
+   "core_support": "A-core",
+   "core_fraction_conditional": 0.32
   },
   {
    "id": "Stanton-355ed7385ef1e51d",
@@ -541,10 +567,11 @@
    "stratum": "A:Stanton",
    "amount": "none",
    "flagged": false,
-   "p_phase": 0.048889,
-   "p_overall": 0.048889,
+   "phase_fraction": 0.048889,
+   "phase_membership_approx": 0.048889,
    "core": true,
-   "p_core": 0.32
+   "core_support": "A-core",
+   "core_fraction_conditional": 0.32
   },
   {
    "id": "Stanton-05ba2c5c14daa5ba",
@@ -553,10 +580,11 @@
    "stratum": "A:Stanton",
    "amount": "none",
    "flagged": false,
-   "p_phase": 0.048889,
-   "p_overall": 0.048889,
+   "phase_fraction": 0.048889,
+   "phase_membership_approx": 0.048889,
    "core": true,
-   "p_core": 0.32
+   "core_support": "A-core",
+   "core_fraction_conditional": 0.32
   },
   {
    "id": "Stanton-0f329a928ed3504c",
@@ -565,8 +593,8 @@
    "stratum": "A:Stanton",
    "amount": "none",
    "flagged": false,
-   "p_phase": 0.048889,
-   "p_overall": 0.048889,
+   "phase_fraction": 0.048889,
+   "phase_membership_approx": 0.048889,
    "core": false
   },
   {
@@ -576,8 +604,8 @@
    "stratum": "A:Stanton",
    "amount": "none",
    "flagged": false,
-   "p_phase": 0.048889,
-   "p_overall": 0.048889,
+   "phase_fraction": 0.048889,
+   "phase_membership_approx": 0.048889,
    "core": false
   },
   {
@@ -587,8 +615,8 @@
    "stratum": "A:Stanton",
    "amount": "signature_initials_date",
    "flagged": true,
-   "p_phase": 0.048889,
-   "p_overall": 0.048889,
+   "phase_fraction": 0.048889,
+   "phase_membership_approx": 0.048889,
    "core": false
   },
   {
@@ -598,8 +626,8 @@
    "stratum": "A:Stanton",
    "amount": "under_10_words",
    "flagged": true,
-   "p_phase": 0.048889,
-   "p_overall": 0.048889,
+   "phase_fraction": 0.048889,
+   "phase_membership_approx": 0.048889,
    "core": false
   },
   {
@@ -609,8 +637,8 @@
    "stratum": "A:Stanton",
    "amount": "signature_initials_date",
    "flagged": true,
-   "p_phase": 0.048889,
-   "p_overall": 0.048889,
+   "phase_fraction": 0.048889,
+   "phase_membership_approx": 0.048889,
    "core": false
   },
   {
@@ -620,8 +648,8 @@
    "stratum": "A:Stanton",
    "amount": "none",
    "flagged": false,
-   "p_phase": 0.048889,
-   "p_overall": 0.048889,
+   "phase_fraction": 0.048889,
+   "phase_membership_approx": 0.048889,
    "core": false
   },
   {
@@ -631,10 +659,11 @@
    "stratum": "B:10_29_words",
    "amount": "10_29_words",
    "flagged": true,
-   "p_phase": 1.0,
-   "p_overall": 1.0,
+   "phase_fraction": 1.0,
+   "phase_membership_approx": 1.0,
    "core": true,
-   "p_core": 0.222222
+   "core_support": "B-core",
+   "core_fraction_conditional": 0.222222
   },
   {
    "id": "Dean-e6ecf7a0b3ed6e6b",
@@ -643,10 +672,11 @@
    "stratum": "B:10_29_words",
    "amount": "10_29_words",
    "flagged": true,
-   "p_phase": 1.0,
-   "p_overall": 1.0,
+   "phase_fraction": 1.0,
+   "phase_membership_approx": 1.0,
    "core": true,
-   "p_core": 0.222222
+   "core_support": "B-core",
+   "core_fraction_conditional": 0.222222
   },
   {
    "id": "Herrnstein-8c937397cea57ec2",
@@ -655,10 +685,11 @@
    "stratum": "B:10_29_words",
    "amount": "10_29_words",
    "flagged": true,
-   "p_phase": 1.0,
-   "p_overall": 1.0,
+   "phase_fraction": 1.0,
+   "phase_membership_approx": 1.0,
    "core": true,
-   "p_core": 0.222222
+   "core_support": "B-core",
+   "core_fraction_conditional": 0.222222
   },
   {
    "id": "Dean-7d1bce1dde28dfee",
@@ -667,10 +698,11 @@
    "stratum": "B:10_29_words",
    "amount": "10_29_words",
    "flagged": true,
-   "p_phase": 1.0,
-   "p_overall": 1.0,
+   "phase_fraction": 1.0,
+   "phase_membership_approx": 1.0,
    "core": true,
-   "p_core": 0.222222
+   "core_support": "B-core",
+   "core_fraction_conditional": 0.222222
   },
   {
    "id": "RG165-00ddd16c4738ada2",
@@ -679,10 +711,11 @@
    "stratum": "B:10_29_words",
    "amount": "10_29_words",
    "flagged": true,
-   "p_phase": 1.0,
-   "p_overall": 1.0,
+   "phase_fraction": 1.0,
+   "phase_membership_approx": 1.0,
    "core": true,
-   "p_core": 0.222222
+   "core_support": "B-core",
+   "core_fraction_conditional": 0.222222
   },
   {
    "id": "Dean-23edf5f15485b7ff",
@@ -691,10 +724,11 @@
    "stratum": "B:10_29_words",
    "amount": "10_29_words",
    "flagged": true,
-   "p_phase": 1.0,
-   "p_overall": 1.0,
+   "phase_fraction": 1.0,
+   "phase_membership_approx": 1.0,
    "core": true,
-   "p_core": 0.222222
+   "core_support": "B-core",
+   "core_fraction_conditional": 0.222222
   },
   {
    "id": "Dean-6ec1a6921c79ac98",
@@ -703,8 +737,8 @@
    "stratum": "B:10_29_words",
    "amount": "10_29_words",
    "flagged": true,
-   "p_phase": 1.0,
-   "p_overall": 1.0,
+   "phase_fraction": 1.0,
+   "phase_membership_approx": 1.0,
    "core": false
   },
   {
@@ -714,8 +748,8 @@
    "stratum": "B:10_29_words",
    "amount": "10_29_words",
    "flagged": true,
-   "p_phase": 1.0,
-   "p_overall": 1.0,
+   "phase_fraction": 1.0,
+   "phase_membership_approx": 1.0,
    "core": false
   },
   {
@@ -725,8 +759,8 @@
    "stratum": "B:10_29_words",
    "amount": "10_29_words",
    "flagged": true,
-   "p_phase": 1.0,
-   "p_overall": 1.0,
+   "phase_fraction": 1.0,
+   "phase_membership_approx": 1.0,
    "core": false
   },
   {
@@ -736,8 +770,8 @@
    "stratum": "B:10_29_words",
    "amount": "10_29_words",
    "flagged": true,
-   "p_phase": 1.0,
-   "p_overall": 1.0,
+   "phase_fraction": 1.0,
+   "phase_membership_approx": 1.0,
    "core": false
   },
   {
@@ -747,8 +781,8 @@
    "stratum": "B:10_29_words",
    "amount": "10_29_words",
    "flagged": true,
-   "p_phase": 1.0,
-   "p_overall": 1.0,
+   "phase_fraction": 1.0,
+   "phase_membership_approx": 1.0,
    "core": false
   },
   {
@@ -758,8 +792,8 @@
    "stratum": "B:10_29_words",
    "amount": "10_29_words",
    "flagged": true,
-   "p_phase": 1.0,
-   "p_overall": 1.0,
+   "phase_fraction": 1.0,
+   "phase_membership_approx": 1.0,
    "core": false
   },
   {
@@ -769,8 +803,8 @@
    "stratum": "B:10_29_words",
    "amount": "10_29_words",
    "flagged": true,
-   "p_phase": 1.0,
-   "p_overall": 1.0,
+   "phase_fraction": 1.0,
+   "phase_membership_approx": 1.0,
    "core": false
   },
   {
@@ -780,8 +814,8 @@
    "stratum": "B:10_29_words",
    "amount": "10_29_words",
    "flagged": true,
-   "p_phase": 1.0,
-   "p_overall": 1.0,
+   "phase_fraction": 1.0,
+   "phase_membership_approx": 1.0,
    "core": false
   },
   {
@@ -791,8 +825,8 @@
    "stratum": "B:10_29_words",
    "amount": "10_29_words",
    "flagged": true,
-   "p_phase": 1.0,
-   "p_overall": 1.0,
+   "phase_fraction": 1.0,
+   "phase_membership_approx": 1.0,
    "core": false
   },
   {
@@ -802,8 +836,8 @@
    "stratum": "B:10_29_words",
    "amount": "10_29_words",
    "flagged": true,
-   "p_phase": 1.0,
-   "p_overall": 1.0,
+   "phase_fraction": 1.0,
+   "phase_membership_approx": 1.0,
    "core": false
   },
   {
@@ -813,8 +847,8 @@
    "stratum": "B:10_29_words",
    "amount": "10_29_words",
    "flagged": true,
-   "p_phase": 1.0,
-   "p_overall": 1.0,
+   "phase_fraction": 1.0,
+   "phase_membership_approx": 1.0,
    "core": false
   },
   {
@@ -824,8 +858,8 @@
    "stratum": "B:10_29_words",
    "amount": "10_29_words",
    "flagged": true,
-   "p_phase": 1.0,
-   "p_overall": 1.0,
+   "phase_fraction": 1.0,
+   "phase_membership_approx": 1.0,
    "core": false
   },
   {
@@ -835,8 +869,8 @@
    "stratum": "B:10_29_words",
    "amount": "10_29_words",
    "flagged": true,
-   "p_phase": 1.0,
-   "p_overall": 1.0,
+   "phase_fraction": 1.0,
+   "phase_membership_approx": 1.0,
    "core": false
   },
   {
@@ -846,8 +880,8 @@
    "stratum": "B:10_29_words",
    "amount": "10_29_words",
    "flagged": true,
-   "p_phase": 1.0,
-   "p_overall": 1.0,
+   "phase_fraction": 1.0,
+   "phase_membership_approx": 1.0,
    "core": false
   },
   {
@@ -857,8 +891,8 @@
    "stratum": "B:10_29_words",
    "amount": "10_29_words",
    "flagged": true,
-   "p_phase": 1.0,
-   "p_overall": 1.0,
+   "phase_fraction": 1.0,
+   "phase_membership_approx": 1.0,
    "core": false
   },
   {
@@ -868,8 +902,8 @@
    "stratum": "B:10_29_words",
    "amount": "10_29_words",
    "flagged": true,
-   "p_phase": 1.0,
-   "p_overall": 1.0,
+   "phase_fraction": 1.0,
+   "phase_membership_approx": 1.0,
    "core": false
   },
   {
@@ -879,8 +913,8 @@
    "stratum": "B:10_29_words",
    "amount": "10_29_words",
    "flagged": true,
-   "p_phase": 1.0,
-   "p_overall": 1.0,
+   "phase_fraction": 1.0,
+   "phase_membership_approx": 1.0,
    "core": false
   },
   {
@@ -890,8 +924,8 @@
    "stratum": "B:10_29_words",
    "amount": "10_29_words",
    "flagged": true,
-   "p_phase": 1.0,
-   "p_overall": 1.0,
+   "phase_fraction": 1.0,
+   "phase_membership_approx": 1.0,
    "core": false
   },
   {
@@ -901,8 +935,8 @@
    "stratum": "B:10_29_words",
    "amount": "10_29_words",
    "flagged": true,
-   "p_phase": 1.0,
-   "p_overall": 1.0,
+   "phase_fraction": 1.0,
+   "phase_membership_approx": 1.0,
    "core": false
   },
   {
@@ -912,8 +946,8 @@
    "stratum": "B:10_29_words",
    "amount": "10_29_words",
    "flagged": true,
-   "p_phase": 1.0,
-   "p_overall": 1.0,
+   "phase_fraction": 1.0,
+   "phase_membership_approx": 1.0,
    "core": false
   },
   {
@@ -923,8 +957,8 @@
    "stratum": "B:10_29_words",
    "amount": "10_29_words",
    "flagged": true,
-   "p_phase": 1.0,
-   "p_overall": 1.0,
+   "phase_fraction": 1.0,
+   "phase_membership_approx": 1.0,
    "core": false
   },
   {
@@ -934,10 +968,11 @@
    "stratum": "B:30_plus_words",
    "amount": "30_plus_words",
    "flagged": true,
-   "p_phase": 1.0,
-   "p_overall": 1.0,
+   "phase_fraction": 1.0,
+   "phase_membership_approx": 1.0,
    "core": true,
-   "p_core": 0.4
+   "core_support": "B-core",
+   "core_fraction_conditional": 0.4
   },
   {
    "id": "Herrnstein-04d25d2e123a33d0",
@@ -946,10 +981,11 @@
    "stratum": "B:30_plus_words",
    "amount": "30_plus_words",
    "flagged": true,
-   "p_phase": 1.0,
-   "p_overall": 1.0,
+   "phase_fraction": 1.0,
+   "phase_membership_approx": 1.0,
    "core": true,
-   "p_core": 0.4
+   "core_support": "B-core",
+   "core_fraction_conditional": 0.4
   },
   {
    "id": "Dean-b31c4f7387db3844",
@@ -958,10 +994,11 @@
    "stratum": "B:30_plus_words",
    "amount": "30_plus_words",
    "flagged": true,
-   "p_phase": 1.0,
-   "p_overall": 1.0,
+   "phase_fraction": 1.0,
+   "phase_membership_approx": 1.0,
    "core": true,
-   "p_core": 0.4
+   "core_support": "B-core",
+   "core_fraction_conditional": 0.4
   },
   {
    "id": "Herrnstein-5d66cd10e6af25f0",
@@ -970,10 +1007,11 @@
    "stratum": "B:30_plus_words",
    "amount": "30_plus_words",
    "flagged": true,
-   "p_phase": 1.0,
-   "p_overall": 1.0,
+   "phase_fraction": 1.0,
+   "phase_membership_approx": 1.0,
    "core": true,
-   "p_core": 0.4
+   "core_support": "B-core",
+   "core_fraction_conditional": 0.4
   },
   {
    "id": "Dean-d3a52a7e272b066a",
@@ -982,10 +1020,11 @@
    "stratum": "B:30_plus_words",
    "amount": "30_plus_words",
    "flagged": true,
-   "p_phase": 1.0,
-   "p_overall": 1.0,
+   "phase_fraction": 1.0,
+   "phase_membership_approx": 1.0,
    "core": true,
-   "p_core": 0.4
+   "core_support": "B-core",
+   "core_fraction_conditional": 0.4
   },
   {
    "id": "Herrnstein-ffa375644a778474",
@@ -994,10 +1033,11 @@
    "stratum": "B:30_plus_words",
    "amount": "30_plus_words",
    "flagged": true,
-   "p_phase": 1.0,
-   "p_overall": 1.0,
+   "phase_fraction": 1.0,
+   "phase_membership_approx": 1.0,
    "core": true,
-   "p_core": 0.4
+   "core_support": "B-core",
+   "core_fraction_conditional": 0.4
   },
   {
    "id": "Dean-3a1bdda6efdb2a60",
@@ -1006,8 +1046,8 @@
    "stratum": "B:30_plus_words",
    "amount": "30_plus_words",
    "flagged": true,
-   "p_phase": 1.0,
-   "p_overall": 1.0,
+   "phase_fraction": 1.0,
+   "phase_membership_approx": 1.0,
    "core": false
   },
   {
@@ -1017,8 +1057,8 @@
    "stratum": "B:30_plus_words",
    "amount": "30_plus_words",
    "flagged": true,
-   "p_phase": 1.0,
-   "p_overall": 1.0,
+   "phase_fraction": 1.0,
+   "phase_membership_approx": 1.0,
    "core": false
   },
   {
@@ -1028,8 +1068,8 @@
    "stratum": "B:30_plus_words",
    "amount": "30_plus_words",
    "flagged": true,
-   "p_phase": 1.0,
-   "p_overall": 1.0,
+   "phase_fraction": 1.0,
+   "phase_membership_approx": 1.0,
    "core": false
   },
   {
@@ -1039,8 +1079,8 @@
    "stratum": "B:30_plus_words",
    "amount": "30_plus_words",
    "flagged": true,
-   "p_phase": 1.0,
-   "p_overall": 1.0,
+   "phase_fraction": 1.0,
+   "phase_membership_approx": 1.0,
    "core": false
   },
   {
@@ -1050,8 +1090,8 @@
    "stratum": "B:30_plus_words",
    "amount": "30_plus_words",
    "flagged": true,
-   "p_phase": 1.0,
-   "p_overall": 1.0,
+   "phase_fraction": 1.0,
+   "phase_membership_approx": 1.0,
    "core": false
   },
   {
@@ -1061,8 +1101,8 @@
    "stratum": "B:30_plus_words",
    "amount": "30_plus_words",
    "flagged": true,
-   "p_phase": 1.0,
-   "p_overall": 1.0,
+   "phase_fraction": 1.0,
+   "phase_membership_approx": 1.0,
    "core": false
   },
   {
@@ -1072,8 +1112,8 @@
    "stratum": "B:30_plus_words",
    "amount": "30_plus_words",
    "flagged": true,
-   "p_phase": 1.0,
-   "p_overall": 1.0,
+   "phase_fraction": 1.0,
+   "phase_membership_approx": 1.0,
    "core": false
   },
   {
@@ -1083,8 +1123,8 @@
    "stratum": "B:30_plus_words",
    "amount": "30_plus_words",
    "flagged": true,
-   "p_phase": 1.0,
-   "p_overall": 1.0,
+   "phase_fraction": 1.0,
+   "phase_membership_approx": 1.0,
    "core": false
   },
   {
@@ -1094,8 +1134,8 @@
    "stratum": "B:30_plus_words",
    "amount": "30_plus_words",
    "flagged": true,
-   "p_phase": 1.0,
-   "p_overall": 1.0,
+   "phase_fraction": 1.0,
+   "phase_membership_approx": 1.0,
    "core": false
   },
   {
@@ -1105,10 +1145,11 @@
    "stratum": "B:handwritten_page",
    "amount": "handwritten_page",
    "flagged": false,
-   "p_phase": 0.210526,
-   "p_overall": 0.252078,
+   "phase_fraction": 0.210526,
+   "phase_membership_approx": 0.252078,
    "core": true,
-   "p_core": 0.25
+   "core_support": "B-core",
+   "core_fraction_conditional": 0.25
   },
   {
    "id": "Herrnstein-53a2d2ecacfaf95c",
@@ -1117,8 +1158,8 @@
    "stratum": "B:handwritten_page",
    "amount": "handwritten_page",
    "flagged": false,
-   "p_phase": 0.210526,
-   "p_overall": 0.249123,
+   "phase_fraction": 0.210526,
+   "phase_membership_approx": 0.249123,
    "core": false
   },
   {
@@ -1128,8 +1169,8 @@
    "stratum": "B:handwritten_page",
    "amount": "handwritten_page",
    "flagged": false,
-   "p_phase": 0.210526,
-   "p_overall": 0.249123,
+   "phase_fraction": 0.210526,
+   "phase_membership_approx": 0.249123,
    "core": false
   },
   {
@@ -1139,8 +1180,8 @@
    "stratum": "B:handwritten_page",
    "amount": "handwritten_page",
    "flagged": false,
-   "p_phase": 0.210526,
-   "p_overall": 0.249123,
+   "phase_fraction": 0.210526,
+   "phase_membership_approx": 0.249123,
    "core": false
   },
   {
@@ -1150,10 +1191,11 @@
    "stratum": "B:none:Dean",
    "amount": "none",
    "flagged": false,
-   "p_phase": 0.029126,
-   "p_overall": 0.076591,
+   "phase_fraction": 0.029126,
+   "phase_membership_approx": 0.076591,
    "core": true,
-   "p_core": 0.214286
+   "core_support": "B-core",
+   "core_fraction_conditional": 0.214286
   },
   {
    "id": "Dean-d2a3f1fd638201ae",
@@ -1162,8 +1204,8 @@
    "stratum": "B:none:Dean",
    "amount": "none",
    "flagged": false,
-   "p_phase": 0.029126,
-   "p_overall": 0.076591,
+   "phase_fraction": 0.029126,
+   "phase_membership_approx": 0.076591,
    "core": false
   },
   {
@@ -1173,8 +1215,8 @@
    "stratum": "B:none:Dean",
    "amount": "none",
    "flagged": false,
-   "p_phase": 0.029126,
-   "p_overall": 0.076591,
+   "phase_fraction": 0.029126,
+   "phase_membership_approx": 0.076591,
    "core": false
   },
   {
@@ -1184,8 +1226,8 @@
    "stratum": "B:none:Deaver",
    "amount": "none",
    "flagged": false,
-   "p_phase": 0.026786,
-   "p_overall": 0.074365,
+   "phase_fraction": 0.026786,
+   "phase_membership_approx": 0.074365,
    "core": false
   },
   {
@@ -1195,8 +1237,8 @@
    "stratum": "B:none:Deaver",
    "amount": "none",
    "flagged": false,
-   "p_phase": 0.026786,
-   "p_overall": 0.074365,
+   "phase_fraction": 0.026786,
+   "phase_membership_approx": 0.074365,
    "core": false
   },
   {
@@ -1206,8 +1248,8 @@
    "stratum": "B:none:Deaver",
    "amount": "none",
    "flagged": false,
-   "p_phase": 0.026786,
-   "p_overall": 0.074365,
+   "phase_fraction": 0.026786,
+   "phase_membership_approx": 0.074365,
    "core": false
   },
   {
@@ -1217,8 +1259,8 @@
    "stratum": "B:none:Herrnstein",
    "amount": "none",
    "flagged": false,
-   "p_phase": 0.029126,
-   "p_overall": 0.076591,
+   "phase_fraction": 0.029126,
+   "phase_membership_approx": 0.076591,
    "core": false
   },
   {
@@ -1228,8 +1270,8 @@
    "stratum": "B:none:Herrnstein",
    "amount": "none",
    "flagged": false,
-   "p_phase": 0.029126,
-   "p_overall": 0.076591,
+   "phase_fraction": 0.029126,
+   "phase_membership_approx": 0.076591,
    "core": false
   },
   {
@@ -1239,8 +1281,8 @@
    "stratum": "B:none:Herrnstein",
    "amount": "none",
    "flagged": false,
-   "p_phase": 0.029126,
-   "p_overall": 0.076591,
+   "phase_fraction": 0.029126,
+   "phase_membership_approx": 0.076591,
    "core": false
   },
   {
@@ -1250,8 +1292,8 @@
    "stratum": "B:none:RG165",
    "amount": "none",
    "flagged": false,
-   "p_phase": 0.027027,
-   "p_overall": 0.078236,
+   "phase_fraction": 0.027027,
+   "phase_membership_approx": 0.078236,
    "core": false
   },
   {
@@ -1261,8 +1303,8 @@
    "stratum": "B:none:RG165",
    "amount": "none",
    "flagged": false,
-   "p_phase": 0.027027,
-   "p_overall": 0.078236,
+   "phase_fraction": 0.027027,
+   "phase_membership_approx": 0.078236,
    "core": false
   },
   {
@@ -1272,10 +1314,11 @@
    "stratum": "B:none:Stanton",
    "amount": "none",
    "flagged": false,
-   "p_phase": 0.021277,
-   "p_overall": 0.069125,
+   "phase_fraction": 0.021277,
+   "phase_membership_approx": 0.069125,
    "core": true,
-   "p_core": 0.214286
+   "core_support": "B-core",
+   "core_fraction_conditional": 0.214286
   },
   {
    "id": "Stanton-9340dbe7c2fe5002",
@@ -1284,10 +1327,11 @@
    "stratum": "B:none:Stanton",
    "amount": "none",
    "flagged": false,
-   "p_phase": 0.021277,
-   "p_overall": 0.069125,
+   "phase_fraction": 0.021277,
+   "phase_membership_approx": 0.069125,
    "core": true,
-   "p_core": 0.214286
+   "core_support": "B-core",
+   "core_fraction_conditional": 0.214286
   },
   {
    "id": "Stanton-ca07ceec5e27ba8a",
@@ -1296,8 +1340,8 @@
    "stratum": "B:none:Stanton",
    "amount": "none",
    "flagged": false,
-   "p_phase": 0.021277,
-   "p_overall": 0.069125,
+   "phase_fraction": 0.021277,
+   "phase_membership_approx": 0.069125,
    "core": false
   },
   {
@@ -1307,10 +1351,11 @@
    "stratum": "B:signature_initials_date:Dean",
    "amount": "signature_initials_date",
    "flagged": true,
-   "p_phase": 0.210526,
-   "p_overall": 0.249123,
+   "phase_fraction": 0.210526,
+   "phase_membership_approx": 0.249123,
    "core": true,
-   "p_core": 0.2
+   "core_support": "B-core",
+   "core_fraction_conditional": 0.2
   },
   {
    "id": "Dean-502d90119e5ec56d",
@@ -1319,8 +1364,8 @@
    "stratum": "B:signature_initials_date:Dean",
    "amount": "signature_initials_date",
    "flagged": true,
-   "p_phase": 0.210526,
-   "p_overall": 0.249123,
+   "phase_fraction": 0.210526,
+   "phase_membership_approx": 0.249123,
    "core": false
   },
   {
@@ -1330,8 +1375,8 @@
    "stratum": "B:signature_initials_date:Dean",
    "amount": "signature_initials_date",
    "flagged": true,
-   "p_phase": 0.210526,
-   "p_overall": 0.249123,
+   "phase_fraction": 0.210526,
+   "phase_membership_approx": 0.249123,
    "core": false
   },
   {
@@ -1341,8 +1386,8 @@
    "stratum": "B:signature_initials_date:Dean",
    "amount": "signature_initials_date",
    "flagged": true,
-   "p_phase": 0.210526,
-   "p_overall": 0.249123,
+   "phase_fraction": 0.210526,
+   "phase_membership_approx": 0.249123,
    "core": false
   },
   {
@@ -1352,8 +1397,8 @@
    "stratum": "B:signature_initials_date:Deaver",
    "amount": "signature_initials_date",
    "flagged": true,
-   "p_phase": 0.173913,
-   "p_overall": 0.2143,
+   "phase_fraction": 0.173913,
+   "phase_membership_approx": 0.2143,
    "core": false
   },
   {
@@ -1363,8 +1408,8 @@
    "stratum": "B:signature_initials_date:Deaver",
    "amount": "signature_initials_date",
    "flagged": true,
-   "p_phase": 0.173913,
-   "p_overall": 0.2143,
+   "phase_fraction": 0.173913,
+   "phase_membership_approx": 0.2143,
    "core": false
   },
   {
@@ -1374,8 +1419,8 @@
    "stratum": "B:signature_initials_date:Deaver",
    "amount": "signature_initials_date",
    "flagged": true,
-   "p_phase": 0.173913,
-   "p_overall": 0.2143,
+   "phase_fraction": 0.173913,
+   "phase_membership_approx": 0.2143,
    "core": false
   },
   {
@@ -1385,8 +1430,8 @@
    "stratum": "B:signature_initials_date:Deaver",
    "amount": "signature_initials_date",
    "flagged": true,
-   "p_phase": 0.173913,
-   "p_overall": 0.2143,
+   "phase_fraction": 0.173913,
+   "phase_membership_approx": 0.2143,
    "core": false
   },
   {
@@ -1396,10 +1441,11 @@
    "stratum": "B:signature_initials_date:Herrnstein",
    "amount": "signature_initials_date",
    "flagged": true,
-   "p_phase": 0.093023,
-   "p_overall": 0.137364,
+   "phase_fraction": 0.093023,
+   "phase_membership_approx": 0.137364,
    "core": true,
-   "p_core": 0.2
+   "core_support": "B-core",
+   "core_fraction_conditional": 0.2
   },
   {
    "id": "Herrnstein-31cba1ac423e8ed7",
@@ -1408,8 +1454,8 @@
    "stratum": "B:signature_initials_date:Herrnstein",
    "amount": "signature_initials_date",
    "flagged": true,
-   "p_phase": 0.093023,
-   "p_overall": 0.137364,
+   "phase_fraction": 0.093023,
+   "phase_membership_approx": 0.137364,
    "core": false
   },
   {
@@ -1419,8 +1465,8 @@
    "stratum": "B:signature_initials_date:Herrnstein",
    "amount": "signature_initials_date",
    "flagged": true,
-   "p_phase": 0.093023,
-   "p_overall": 0.137364,
+   "phase_fraction": 0.093023,
+   "phase_membership_approx": 0.137364,
    "core": false
   },
   {
@@ -1430,8 +1476,8 @@
    "stratum": "B:signature_initials_date:Herrnstein",
    "amount": "signature_initials_date",
    "flagged": true,
-   "p_phase": 0.093023,
-   "p_overall": 0.137364,
+   "phase_fraction": 0.093023,
+   "phase_membership_approx": 0.137364,
    "core": false
   },
   {
@@ -1441,8 +1487,8 @@
    "stratum": "B:signature_initials_date:RG165",
    "amount": "signature_initials_date",
    "flagged": true,
-   "p_phase": 1.0,
-   "p_overall": 1.0,
+   "phase_fraction": 1.0,
+   "phase_membership_approx": 1.0,
    "core": false
   },
   {
@@ -1452,8 +1498,8 @@
    "stratum": "B:signature_initials_date:RG165",
    "amount": "signature_initials_date",
    "flagged": true,
-   "p_phase": 1.0,
-   "p_overall": 1.0,
+   "phase_fraction": 1.0,
+   "phase_membership_approx": 1.0,
    "core": false
   },
   {
@@ -1463,8 +1509,8 @@
    "stratum": "B:signature_initials_date:RG165",
    "amount": "signature_initials_date",
    "flagged": true,
-   "p_phase": 1.0,
-   "p_overall": 1.0,
+   "phase_fraction": 1.0,
+   "phase_membership_approx": 1.0,
    "core": false
   },
   {
@@ -1474,8 +1520,8 @@
    "stratum": "B:signature_initials_date:RG165",
    "amount": "signature_initials_date",
    "flagged": true,
-   "p_phase": 1.0,
-   "p_overall": 1.0,
+   "phase_fraction": 1.0,
+   "phase_membership_approx": 1.0,
    "core": false
   },
   {
@@ -1485,10 +1531,11 @@
    "stratum": "B:signature_initials_date:Stanton",
    "amount": "signature_initials_date",
    "flagged": true,
-   "p_phase": 0.075472,
-   "p_overall": 0.120671,
+   "phase_fraction": 0.075472,
+   "phase_membership_approx": 0.120671,
    "core": true,
-   "p_core": 0.2
+   "core_support": "B-core",
+   "core_fraction_conditional": 0.2
   },
   {
    "id": "Stanton-00948e05eccffc0d",
@@ -1497,10 +1544,11 @@
    "stratum": "B:signature_initials_date:Stanton",
    "amount": "signature_initials_date",
    "flagged": true,
-   "p_phase": 0.075472,
-   "p_overall": 0.120671,
+   "phase_fraction": 0.075472,
+   "phase_membership_approx": 0.120671,
    "core": true,
-   "p_core": 0.2
+   "core_support": "B-core",
+   "core_fraction_conditional": 0.2
   },
   {
    "id": "Stanton-041642f375e49c33",
@@ -1509,8 +1557,8 @@
    "stratum": "B:signature_initials_date:Stanton",
    "amount": "signature_initials_date",
    "flagged": true,
-   "p_phase": 0.075472,
-   "p_overall": 0.120671,
+   "phase_fraction": 0.075472,
+   "phase_membership_approx": 0.120671,
    "core": false
   },
   {
@@ -1520,8 +1568,8 @@
    "stratum": "B:signature_initials_date:Stanton",
    "amount": "signature_initials_date",
    "flagged": true,
-   "p_phase": 0.075472,
-   "p_overall": 0.120671,
+   "phase_fraction": 0.075472,
+   "phase_membership_approx": 0.120671,
    "core": false
   },
   {
@@ -1531,10 +1579,11 @@
    "stratum": "B:under_10_words:Dean",
    "amount": "under_10_words",
    "flagged": true,
-   "p_phase": 0.059701,
-   "p_overall": 0.105672,
+   "phase_fraction": 0.059701,
+   "phase_membership_approx": 0.105672,
    "core": true,
-   "p_core": 0.2
+   "core_support": "B-core",
+   "core_fraction_conditional": 0.2
   },
   {
    "id": "Dean-2c66ccc93aae172e",
@@ -1543,8 +1592,8 @@
    "stratum": "B:under_10_words:Dean",
    "amount": "under_10_words",
    "flagged": true,
-   "p_phase": 0.059701,
-   "p_overall": 0.105672,
+   "phase_fraction": 0.059701,
+   "phase_membership_approx": 0.105672,
    "core": false
   },
   {
@@ -1554,8 +1603,8 @@
    "stratum": "B:under_10_words:Dean",
    "amount": "under_10_words",
    "flagged": true,
-   "p_phase": 0.059701,
-   "p_overall": 0.105672,
+   "phase_fraction": 0.059701,
+   "phase_membership_approx": 0.105672,
    "core": false
   },
   {
@@ -1565,8 +1614,8 @@
    "stratum": "B:under_10_words:Dean",
    "amount": "under_10_words",
    "flagged": true,
-   "p_phase": 0.059701,
-   "p_overall": 0.105672,
+   "phase_fraction": 0.059701,
+   "phase_membership_approx": 0.105672,
    "core": false
   },
   {
@@ -1576,8 +1625,8 @@
    "stratum": "B:under_10_words:Deaver",
    "amount": "under_10_words",
    "flagged": true,
-   "p_phase": 0.050633,
-   "p_overall": 0.097046,
+   "phase_fraction": 0.050633,
+   "phase_membership_approx": 0.097046,
    "core": false
   },
   {
@@ -1587,8 +1636,8 @@
    "stratum": "B:under_10_words:Deaver",
    "amount": "under_10_words",
    "flagged": true,
-   "p_phase": 0.050633,
-   "p_overall": 0.097046,
+   "phase_fraction": 0.050633,
+   "phase_membership_approx": 0.097046,
    "core": false
   },
   {
@@ -1598,8 +1647,8 @@
    "stratum": "B:under_10_words:Deaver",
    "amount": "under_10_words",
    "flagged": true,
-   "p_phase": 0.050633,
-   "p_overall": 0.097046,
+   "phase_fraction": 0.050633,
+   "phase_membership_approx": 0.097046,
    "core": false
   },
   {
@@ -1609,8 +1658,8 @@
    "stratum": "B:under_10_words:Deaver",
    "amount": "under_10_words",
    "flagged": true,
-   "p_phase": 0.050633,
-   "p_overall": 0.097046,
+   "phase_fraction": 0.050633,
+   "phase_membership_approx": 0.097046,
    "core": false
   },
   {
@@ -1620,10 +1669,11 @@
    "stratum": "B:under_10_words:Herrnstein",
    "amount": "under_10_words",
    "flagged": true,
-   "p_phase": 0.081633,
-   "p_overall": 0.126531,
+   "phase_fraction": 0.081633,
+   "phase_membership_approx": 0.126531,
    "core": true,
-   "p_core": 0.2
+   "core_support": "B-core",
+   "core_fraction_conditional": 0.2
   },
   {
    "id": "Herrnstein-34f34eaffee4491f",
@@ -1632,8 +1682,8 @@
    "stratum": "B:under_10_words:Herrnstein",
    "amount": "under_10_words",
    "flagged": true,
-   "p_phase": 0.081633,
-   "p_overall": 0.126531,
+   "phase_fraction": 0.081633,
+   "phase_membership_approx": 0.126531,
    "core": false
   },
   {
@@ -1643,8 +1693,8 @@
    "stratum": "B:under_10_words:Herrnstein",
    "amount": "under_10_words",
    "flagged": true,
-   "p_phase": 0.081633,
-   "p_overall": 0.126531,
+   "phase_fraction": 0.081633,
+   "phase_membership_approx": 0.126531,
    "core": false
   },
   {
@@ -1654,8 +1704,8 @@
    "stratum": "B:under_10_words:Herrnstein",
    "amount": "under_10_words",
    "flagged": true,
-   "p_phase": 0.081633,
-   "p_overall": 0.126531,
+   "phase_fraction": 0.081633,
+   "phase_membership_approx": 0.126531,
    "core": false
   },
   {
@@ -1665,10 +1715,11 @@
    "stratum": "B:under_10_words:RG165",
    "amount": "under_10_words",
    "flagged": true,
-   "p_phase": 0.222222,
-   "p_overall": 0.263158,
+   "phase_fraction": 0.222222,
+   "phase_membership_approx": 0.263158,
    "core": true,
-   "p_core": 0.2
+   "core_support": "B-core",
+   "core_fraction_conditional": 0.2
   },
   {
    "id": "RG165-6b3a4787f64a7589",
@@ -1677,8 +1728,8 @@
    "stratum": "B:under_10_words:RG165",
    "amount": "under_10_words",
    "flagged": true,
-   "p_phase": 0.222222,
-   "p_overall": 0.263158,
+   "phase_fraction": 0.222222,
+   "phase_membership_approx": 0.263158,
    "core": false
   },
   {
@@ -1688,8 +1739,8 @@
    "stratum": "B:under_10_words:RG165",
    "amount": "under_10_words",
    "flagged": true,
-   "p_phase": 0.222222,
-   "p_overall": 0.263158,
+   "phase_fraction": 0.222222,
+   "phase_membership_approx": 0.263158,
    "core": false
   },
   {
@@ -1699,8 +1750,8 @@
    "stratum": "B:under_10_words:RG165",
    "amount": "under_10_words",
    "flagged": true,
-   "p_phase": 0.222222,
-   "p_overall": 0.263158,
+   "phase_fraction": 0.222222,
+   "phase_membership_approx": 0.263158,
    "core": false
   },
   {
@@ -1710,10 +1761,11 @@
    "stratum": "B:under_10_words:Stanton",
    "amount": "under_10_words",
    "flagged": true,
-   "p_phase": 0.285714,
-   "p_overall": 0.320635,
+   "phase_fraction": 0.285714,
+   "phase_membership_approx": 0.320635,
    "core": true,
-   "p_core": 0.2
+   "core_support": "B-core",
+   "core_fraction_conditional": 0.2
   },
   {
    "id": "Stanton-372ffa5bc56646f2",
@@ -1722,8 +1774,8 @@
    "stratum": "B:under_10_words:Stanton",
    "amount": "under_10_words",
    "flagged": true,
-   "p_phase": 0.285714,
-   "p_overall": 0.320635,
+   "phase_fraction": 0.285714,
+   "phase_membership_approx": 0.320635,
    "core": false
   },
   {
@@ -1733,8 +1785,8 @@
    "stratum": "B:under_10_words:Stanton",
    "amount": "under_10_words",
    "flagged": true,
-   "p_phase": 0.285714,
-   "p_overall": 0.320635,
+   "phase_fraction": 0.285714,
+   "phase_membership_approx": 0.320635,
    "core": false
   },
   {
@@ -1744,8 +1796,8 @@
    "stratum": "B:under_10_words:Stanton",
    "amount": "under_10_words",
    "flagged": true,
-   "p_phase": 0.285714,
-   "p_overall": 0.320635,
+   "phase_fraction": 0.285714,
+   "phase_membership_approx": 0.320635,
    "core": false
   }
  ]

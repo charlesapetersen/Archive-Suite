@@ -43,14 +43,18 @@ Drawn so the set is not chosen only by the pre-flagger, which W46.marks-detect w
 
 - **Phase A, 50 pages, flag-independent.** Uniform within each collection in a fixed seed order: 11 each from Dean,
   Deaver, Herrnstein and Stanton, 6 from RG165 (about 50 × N/1,014). 24 of the 50 happen to be pre-flagged. Each
-  page's inclusion probability is exact (11/225, 6/114), so detector recall on the set can be estimated by inverse
-  weighting from this phase alone.
+  page's phase-A fraction is exact (11/225, 6/114), but only the 16 of them in the owner core get owner truth; the
+  other 34 are drafts, not recall observations (measurement review 2026-10-31 pass 3, P3-3).
 - **Phase B, 100 pages, enriched.** From the remaining 964: every remaining 30+ (15) and 10-29 (27) page; 4
   handwritten pages; 4 a collection from the signature band (20) and from the under-10 band (20); the 14 left over
   from the no-mark band, spread across the collections. Its probabilities are conditional on phase A (the stratum's
-  remaining count); `p_overall` = pA + (1 − pA) · pB approximates the unconditional figure.
+  remaining count); `phase_membership_approx` = pA + (1 − pA) · pB approximates phase membership only.
 - **The owner core, 40 pages**: 16 of phase A's 50 in seed order (10 unflagged, 6 flagged) and 24 from phase B by
-  band (6 of 30+, 6 of 10-29, 4 signature, 4 under-10, 1 handwritten page, 3 no-mark). Probabilities recorded per page.
+  band (6 of 30+, 6 of 10-29, 4 signature, 4 under-10, 1 handwritten page, 3 no-mark), taking the lowest seed ranks
+  again and pooling collections. Each core page records its conditional fraction; none of these fractions is a
+  validated final core inclusion weight (W46.marks-sampling-support), so core results are descriptive of an enriched
+  set, A-core 16 and B-core 24 reported apart, and never weighted to population recall, a mixed share or a
+  corpus-weighted routing benefit (the selection JSON's `weighting` block).
 - By collection: Dean 44, Herrnstein 33, RG165 28, Stanton 23, Deaver 22.
 
 ## Measurement card
@@ -58,7 +62,9 @@ Drawn so the set is not chosen only by the pre-flagger, which W46.marks-detect w
 - **Truth.** None here. The pre-flag is one model's reading; nothing in this report is a mark label. The owner's
   core check (W46.marks-core-owner-ok) is the first truth the set gets.
 - **Selection.** Phase A is independent of every tested route. Phase B is chosen by the pre-flagger's band, so its
-  pages may not be used to estimate the pre-flagger's recall or the mixed share; only phase A may.
+  pages may not be used to estimate the pre-flagger's recall or the mixed share. Phase A is flag-independent, but its
+  owner-checked part (A-core 16) has no validated weight either; the mixed share and its interval stay
+  mixed-def-score's independent measurement.
 - **Comparison.** Not applicable: one reader, one prompt, one pass.
 - **Noise.** One pass at temperature 0; no rerun floor was measured. The band counts are single-reading counts.
 - **Scope.** Does not say how often the pre-flag is right, how many marks a page carries, or where they are. Does not

@@ -43,17 +43,37 @@ class Select(unittest.TestCase):
         ids = {p['id'] for p in a}
         self.assertEqual(ids, {p['id'] for p in M.select(rotated) if p['phase'] == 'A'})
         for p in a:
-            self.assertAlmostEqual(p['p_overall'], M.PHASE_A[p['collection']] /
+            self.assertAlmostEqual(p['phase_membership_approx'], M.PHASE_A[p['collection']] /
                                    sum(r['collection'] == p['collection'] for r in self.rows))
 
-    def test_probabilities(self):
+    def test_fractions(self):
         for p in self.pages:
-            self.assertTrue(0 < p['p_phase'] <= 1 and 0 < p['p_overall'] <= 1, p)
+            self.assertTrue(0 < p['phase_fraction'] <= 1 and 0 < p['phase_membership_approx'] <= 1, p)
             if p['core']:
-                self.assertTrue(0 < p['p_core'] <= 1)
-        # an all-taken stratum has probability one in its phase
+                self.assertTrue(0 < p['core_fraction_conditional'] <= 1)
+        # an all-taken stratum has fraction one in its phase
         b30 = [p for p in self.pages if p['stratum'] == 'B:30_plus_words']
-        self.assertTrue(b30 and all(p['p_phase'] == 1 for p in b30))
+        self.assertTrue(b30 and all(p['phase_fraction'] == 1 for p in b30))
+
+    def test_no_field_reads_as_a_weight(self):
+        # P3-3: nothing named like an inclusion probability or weight on any page
+        for p in self.pages:
+            self.assertFalse({'p_core', 'p_overall', 'p_phase', 'weight'} & set(p), p)
+
+    def test_core_groups_and_weighting(self):
+        g = M.core_groups(self.pages)
+        self.assertEqual({k: len(v) for k, v in g.items()}, {'A-core': M.CORE_A, 'B-core': sum(M.CORE_B.values())})
+        self.assertTrue(all(p['phase'] == 'A' for p in g['A-core']) and all(p['phase'] == 'B' for p in g['B-core']))
+        w = M.weighting(self.pages)
+        self.assertIsNone(w['final_core_inclusion_probability'])
+        self.assertFalse(w['validated'])
+        self.assertEqual(w['use'], 'descriptive')
+        self.assertEqual((w['phase_a_pages'], w['phase_a_owner_truth']), (50, M.CORE_A))
+        self.assertEqual(w['support'], {'A-core': M.CORE_A, 'B-core': sum(M.CORE_B.values())})
+
+    def test_report_card_carries_the_restriction(self):
+        o = dict(pages=150, core=40, routes={}, agreement=dict(pages=0), weighting=M.weighting(self.pages))
+        self.assertIn(M.CORE_RESTRICTION, M.markdown(o))
 
     def test_the_parse_failure_can_only_enter_by_phase_a(self):
         for p in self.pages:
