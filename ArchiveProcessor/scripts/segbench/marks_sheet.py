@@ -302,6 +302,12 @@ def export_yolo(answers, key, out_dir):
     """YOLO files for the core pages the owner finished: kept candidates (the draft's box, the owner's class) and
     the boxes he added. An unfinished page writes no file and is listed, so a missing answer never reads as 'no
     marks'. marks.json keeps the owner's band (as a marks_set.AMOUNTS value or 'nontext'), texts and overlaps."""
+    from marks_core import COMMENT
+    for page in answers.values():
+        entries = list((page.get('candidates') or {}).values()) + (page.get('added') or [])
+        if page.get('note', '').strip() or any(COMMENT.search(m.get('text') or '') for m in entries):
+            raise ValueError('Owner question feedback must be retained with marks_core.py freeze; '
+                             'the plain YOLO export cannot treat it as transcription or detector truth')
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     write_classes(out_dir)

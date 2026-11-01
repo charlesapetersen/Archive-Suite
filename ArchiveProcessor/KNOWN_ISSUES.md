@@ -2,6 +2,10 @@
 
 Tracked bugs we've chosen to come back to later. Each entry has enough context to resume cold.
 
+## Marks review: question comments and obscured draft boxes (W46.fix-marks-sheet-feedback)
+
+Owner export 2026-11-01, baseline 2b1dd66b: 18 comments on 12 core pages are in transcription fields. They describe duplicate/connected boxes, grouped annotations, bounding boxes obscuring text, a sideways incomplete reading and low legibility. marks_sheet.py::build copies marks_scan.py::prepare’s EXIF-upright, at-most-2400-pixel JPEGs (quality 95), not original JPEG bytes. The frozen record preserves the export and notes; marks_core.py excludes these pages from detector labels and comment-bearing fields from transcription. Plain export_yolo refuses feedback instead of mis-scoring it. The queued repair must reconcile feedback and provide clear original-resolution review before offering only the unresolved places again. No model ranking or full-core truth claim is valid yet.
+
 ## OPEN (W46.seg-kit-truth-provenance, 2026-11-01): measurement support and report provenance
 
 W46.measure-review pass 4, baseline `7092c5fd`; independent refute-check confirmed these offline corrections.

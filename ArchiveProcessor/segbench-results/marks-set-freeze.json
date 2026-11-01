@@ -1,0 +1,73 @@
+{
+ "protocol": "marks-set-freeze-v1",
+ "frozen_root": "/Users/cp1/Library/Application Support/ArchiveSuiteRehearsal/marks-set-frozen-da388b05c388",
+ "receipts": {
+  "answers": "da388b05c3885d6fc1f20986ddea02ba7cbed7274de5c33a4d3b1b5b98554b38",
+  "sheet_key": "7a0868fcfeb1aab1ba99b0188a7ccd48627aea6c8264e0cff5d3295af65f8648",
+  "selection": "401f65349ffb5772b5f7761c12f40a78787a3005eeb9af0a32a457052aa5d590"
+ },
+ "owner_pages": 40,
+ "groups": {
+  "A-core": {
+   "pages": 16,
+   "detector_evaluable": 14,
+   "bands": {
+    "under_10_words": 3,
+    "none": 11,
+    "signature_initials_date": 2
+   },
+   "accepted_boxes": 7
+  },
+  "B-core": {
+   "pages": 24,
+   "detector_evaluable": 14,
+   "bands": {
+    "signature_initials_date": 4,
+    "10_29_words": 8,
+    "under_10_words": 6,
+    "none": 4,
+    "handwritten_page": 2
+   },
+   "accepted_boxes": 78
+  }
+ },
+ "accepted_boxes": 85,
+ "rejected_candidates": 23,
+ "added_boxes": 1,
+ "feedback_pages": [
+  "Dean-0a07517aa636ba99",
+  "Dean-23edf5f15485b7ff",
+  "Dean-24a6d76b84c2729b",
+  "Dean-7d1bce1dde28dfee",
+  "Dean-b31c4f7387db3844",
+  "Dean-d3a52a7e272b066a",
+  "Dean-e6ecf7a0b3ed6e6b",
+  "Herrnstein-04d25d2e123a33d0",
+  "Herrnstein-39bea9fb30cda479",
+  "Herrnstein-3f753f88969588ac",
+  "Herrnstein-5d66cd10e6af25f0",
+  "RG165-15a0647456422fb9"
+ ],
+ "feedback_entries": 18,
+ "transcription_excluded_feedback": 16,
+ "weighting": {
+  "final_core_inclusion_probability": null,
+  "validated": false,
+  "use": "descriptive",
+  "support": {
+   "A-core": 16,
+   "B-core": 24
+  },
+  "phase_a_pages": 50,
+  "phase_a_owner_truth": 16,
+  "restriction": "The phase and core fractions are not validated final owner-core inclusion probabilities (P3-3, W46.marks-sampling-support): report core results descriptively, A-core and B-core apart, as an enriched set; no population recall, mixed share or corpus-weighted routing benefit is weighted from them. The independent mixed share and interval are mixed-def-score's; within-core paired route comparisons stand."
+ },
+ "scope": "Descriptive enriched core, A-core/B-core apart. No population weights or prevalence. Feedback pages are not detector training/evaluation truth; rough draft boxes are not independently measured geometry. Non-core agreement remains model drafts, never truth.",
+ "image_provenance": "Sheet images are EXIF-upright copies downscaled to at most 2400 pixels and saved at JPEG quality 95, not original JPEG bytes. Source inventory and original hashes are retained in scan-provenance; feedback about legibility is unresolved.",
+ "model_drafts": {
+  "pages": 107,
+  "agreed": 32,
+  "single": 256,
+  "skipped": 3
+ }
+}
