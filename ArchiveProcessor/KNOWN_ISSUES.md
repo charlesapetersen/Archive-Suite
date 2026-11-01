@@ -6,6 +6,16 @@ Tracked bugs we've chosen to come back to later. Each entry has enough context t
 
 Owner export 2026-11-01, baseline 2b1dd66b: 18 comments on 12 core pages are in transcription fields. They describe duplicate/connected boxes, grouped annotations, bounding boxes obscuring text, a sideways incomplete reading and low legibility. marks_sheet.py::build copies marks_scan.py::prepare’s EXIF-upright, at-most-2400-pixel JPEGs (quality 95), not original JPEG bytes. The frozen record preserves the export and notes; marks_core.py excludes these pages from detector labels and comment-bearing fields from transcription. Plain export_yolo refuses feedback instead of mis-scoring it. The queued repair must reconcile feedback and provide clear original-resolution review before offering only the unresolved places again. No model ranking or full-core truth claim is valid yet.
 
+## FIXED (W46.seg-boxes-score checkpoint, 2026-11-01): scorer cap and support safeguards
+
+`seg_boxes_score.py::cmd_collect` now permits one worker only, keeping the gateway reservation/check/send
+serial under the collector lock; the recovered three-worker check could race before reservations were
+recorded. Cap, provider and unknown-usage failures stop with an error instead of becoming neutral model
+votes. Only billed, completed but unparseable model replies may vote neutral. SC0122's owner estimator
+refuses an uncovered control stratum rather than shrinking its denominator; training status belongs to
+each route, so Gemini and the teacher are not labelled trained-on. Synthetic cap/failure/weight tests pass.
+The full experiment remains open pending the gateway arm and final report.
+
 ## OPEN (W46.seg-kit-truth-provenance, 2026-11-01): measurement support and report provenance
 
 W46.measure-review pass 4, baseline `7092c5fd`; independent refute-check confirmed these offline corrections.
