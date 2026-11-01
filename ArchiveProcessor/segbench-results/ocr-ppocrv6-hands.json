@@ -1035,24 +1035,8 @@
     "median_s": 13.6,
     "peak_gb": 5.87
    },
-   "killed": [
-    "btp__mgw500029-277",
-    "btp__mgw500029-301",
-    "btp__mgw500029-73",
-    "btp__afc1945001_ms03035-116",
-    "btp__afc1945001_ms04060-21",
-    "btp__afc1945001_ms04074-14",
-    "btp__afc1945001_ms05084-34",
-    "btp__afc1945001_ms06093-87",
-    "btp__mss4602900303-722",
-    "btp__mss4602900304-76",
-    "btp__mss4602900305-1058",
-    "btp__mss4602900305-893",
-    "btp__mss35634010-18",
-    "btp__afc1945001_ms01001-59",
-    "btp__afc1945001_ms02018-27",
-    "btp__afc1945001_ms03040-6"
-   ],
+   "killed": [],
+   "killed_batches": 4,
    "failed": []
   },
   "vision": {
@@ -1062,28 +1046,22 @@
     "median_s": 4.2,
     "peak_gb": 5.78
    },
-   "killed": [
-    "btp__mss412100072-37",
-    "bentham__096_038_003",
-    "btp__mgw6a00008-9",
-    "btp__afc1945001_ms02017-58",
-    "btp__afc1945001_ms03036-40",
-    "btp__afc1945001_ms04060-21"
-   ],
+   "killed": [],
+   "killed_batches": 6,
    "failed": []
   },
   "train": {
    "train": {
-    "calls": 4,
-    "pages": 4,
+    "calls": 5,
+    "pages": 5,
     "median_s": 395.3,
     "peak_gb": 3.56
    },
-   "killed": [
-    "blackwell-n20-cpu"
-   ],
+   "killed": [],
+   "killed_batches": 0,
    "failed": [
-    "blackwell-n20-cpu"
+    "blackwell-n20-cpu",
+    "blackwell-n80-mps"
    ]
   }
  },

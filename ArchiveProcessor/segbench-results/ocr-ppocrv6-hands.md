@@ -132,6 +132,11 @@ Training lines are the hand's own truth lines, paired to blla lines by a monoton
 |---|---:|---|---:|---:|---:|---:|---:|---:|---|
 | blackwell-n20-cpu | 20 | cpu | 6.9 | 3.56 | 16 | 59.7 | 59.6 | -0.14 | -0.84 to +0.60 |
 
+Training: ketos (kraken 7.1.1), batch 1, AdamW at 0.0001 constant, 6 threads, fp32, at most 1500 line-steps or 25 epochs, early stopping after 5 epochs with a lag of 3 (blackwell-n20 ran at 10 and 5 before that change; its best epoch, 2, is the same under either). The PP-OCRv6 config's own optimizer, AdamW+Muon, runs Muon's Newton-Schulz step in bfloat16, which has no fast CPU kernel (97% of a step, on one core); a batch of 8 passed 8.8 GB within 17 s (a first attempt at blackwell-n20, the one stopped in the guard figures below). The owner's rows leave one of the four Shils pages out and train on the other three pages' lines; their truth is the drafted owner truth (hand places owner-checked), so a gain there is agreement with the drafters, not a ranking (OCR-1).
+
+The CPU trainings use kraken's torch.compile of the forward pass; the MPS one runs eagerly (TORCHDYNAMO_DISABLE=1), because Inductor's Metal kernel for this model asks for 32,896 bytes of threadgroup memory, more than the GPU allows, and `ketos train -d mps` fails at its first step. 
+Blackwell n240 did not train this session: CPU trainings run one at a time (two side by side each ran about 4x slower) and the longer ones did not fit the session.
+
 ## Seconds and memory (M3 Pro, 18 GB, CPU, one page a kraken call)
 
 | step | calls | pages | median seconds a page | peak GB a call |
@@ -139,9 +144,8 @@ Training lines are the hand's own truth lines, paired to blla lines by a monoton
 | blla-public blla | 164 | 164 | 10.4 | 5.86 |
 | blla-public ocr | 62 | 177 | 13.6 | 5.87 |
 | vision ocr | 25 | 239 | 4.2 | 5.78 |
-| train train | 4 | 4 | 395.3 | 3.56 |
 
-Pages stopped by the 9 GB per-call guard: bentham__096_038_003, blackwell-n20-cpu, btp__afc1945001_ms01001-59, btp__afc1945001_ms02017-58, btp__afc1945001_ms02018-27, btp__afc1945001_ms03035-116, btp__afc1945001_ms03036-40, btp__afc1945001_ms03040-6, btp__afc1945001_ms04060-21, btp__afc1945001_ms04074-14, btp__afc1945001_ms05084-34, btp__afc1945001_ms06093-87, btp__mgw500029-277, btp__mgw500029-301, btp__mgw500029-73, btp__mgw6a00008-9, btp__mss35634010-18, btp__mss412100072-37, btp__mss4602900303-722, btp__mss4602900304-76, btp__mss4602900305-1058, btp__mss4602900305-893. A call includes loading the model, so one-page calls overstate seconds a page; blla is one page a call because two batched four-worker runs took the Mac down on 2026-10-31; reading is batched ten pages a call.
+Calls stopped by the guard (9 GB a page call; 5 GB a training, 8 GB for the first attempt): none; 10 batched reading calls stopped at the earlier 5 GB cap, their pages read again. A call includes loading the model, so one-page calls overstate seconds a page; blla is one page a call because two batched four-worker runs took the Mac down on 2026-10-31; reading is batched ten pages a call.
 
 ## Measurement card
 

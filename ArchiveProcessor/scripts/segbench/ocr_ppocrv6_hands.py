@@ -717,7 +717,12 @@ def guard_stats(*paths):
             secs = sorted(r['seconds'] / size(r) for r in rr)
             out[step] = {'calls': len(rr), 'pages': sum(size(r) for r in rr), 'median_s': round(secs[len(secs) // 2], 1),
                          'peak_gb': max(r['peak_gb'] for r in rr)}
-    out['killed'] = [r['page'] for r in rows if r['killed']]
+    last = {}
+    for r in rows:                  # a page stopped once and finished at a higher cap later is not a stopped page
+        if not r['step'].startswith('ocr-batch'):   # a batch row is named by its first page only
+            last[(r['page'], kind(r))] = r
+    out['killed'] = sorted({pg for (pg, _), r in last.items() if r['killed']})
+    out['killed_batches'] = sum(r['killed'] for r in rows if r['step'].startswith('ocr-batch'))
     out['failed'] = sorted({r['page'] for r in rows if r['rc'] and not r['killed']})
     return out
 
@@ -788,6 +793,9 @@ def cmd_report(_):
     timing = {'blla-public': guard_stats(RUN / 'zero' / 'blla-public-guard.jsonl'),
               'vision': guard_stats(RUN / 'zero' / 'vision-guard.jsonl'),
               'train': guard_stats(*sorted((RUN / 'train').glob('guard*.jsonl')))}
+    # The pages the 5 GB pass stopped were segmented again alone at 9 GB (chain.log, not this log): they have readings.
+    timing['blla-public']['killed'] = [p for p in timing['blla-public'].get('killed', [])
+                                       if not (RUN / 'zero' / 'blla-public' / f'{p}.txt').exists()]
     pairs_stats = {h: json.loads((hand_dir(h) / 'pairs.json').read_text()) for h in ('owner', 'blackwell')
                    if (hand_dir(h) / 'pairs.json').exists()}
     out = {'public': pub, 'public_pairs': pub_pairs, 'owner': own, 'owner_hand': own_hand, 'owner_mixed': own_mixed,
@@ -847,15 +855,37 @@ def write_md(o):
     for t in o['tunes']:
         L.append(f'| {t["name"]} | {t["n"]} | {t["device"]} | {t["minutes"]} | {t["peak_gb"]} | {t["pages"]} | '
                  f'{f1(t["base"])} | {f1(t["tuned"])} | {t["delta"]:+.2f} | {t["lo"]:+.2f} to {t["hi"]:+.2f} |')
+    by = {(t['hand'], t['n'], t['device']): t for t in o['tunes']}
+    mps = [(c, m) for (h, n, dev), m in by.items() if dev == 'mps' and (c := by.get((h, n, 'cpu')))]
+    L += ['', f'Training: ketos (kraken 7.1.1), batch 1, AdamW at {LRATE:g} constant, {TRAIN_THREADS} threads, fp32, '
+          f'at most {LINE_STEPS} line-steps or {MAX_EPOCHS} epochs, early stopping after {MIN_EPOCHS} epochs with a lag '
+          f'of {LAG} (blackwell-n20 ran at 10 and 5 before that change; its best epoch, 2, is the same under either). '
+          'The PP-OCRv6 config\'s own optimizer, AdamW+Muon, runs Muon\'s Newton-Schulz step in bfloat16, which has no '
+          'fast CPU kernel (97% of a step, on one core); a batch of 8 passed 8.8 GB within 17 s (a first attempt at '
+          'blackwell-n20, the one stopped in the guard figures below). The owner\'s rows leave one of the four Shils '
+          'pages out and train on the other three pages\' lines; their truth is the drafted owner truth (hand places '
+          'owner-checked), so a gain there is agreement with the drafters, not a ranking (OCR-1).', '',
+          'The CPU trainings use kraken\'s torch.compile of the forward pass; the MPS one runs eagerly '
+          '(TORCHDYNAMO_DISABLE=1), because Inductor\'s Metal kernel for this model asks for 32,896 bytes of '
+          'threadgroup memory, more than the GPU allows, and `ketos train -d mps` fails at its first step. '
+          + ' '.join(f'{m["name"]}: {m["minutes"]} min against {c["minutes"]} on the CPU (the CPU one beside no other '
+                     f'training), tuned {f1(m["tuned"])} against {f1(c["tuned"])}, '
+                     f'{"identical" if abs(m["tuned"] - c["tuned"]) < 1e-9 else "not identical"}.' for c, m in mps)]
+    if not any(t['n'] == max(CURVE['blackwell']) for t in o['tunes'] if t['hand'] == 'blackwell'):
+        L.append(f'Blackwell n{max(CURVE["blackwell"])} did not train this session: CPU trainings run one at a time '
+                 '(two side by side each ran about 4x slower) and the longer ones did not fit the session.')
     tm = o['timing']
     L += ['', '## Seconds and memory (M3 Pro, 18 GB, CPU, one page a kraken call)', '',
           '| step | calls | pages | median seconds a page | peak GB a call |', '|---|---:|---:|---:|---:|']
     for k, v in tm.items():
         for step, s in v.items():
-            if isinstance(s, dict):
+            if isinstance(s, dict) and k != 'train':    # a training's minutes and peak are in the table above
                 L.append(f'| {k} {step} | {s["calls"]} | {s["pages"]} | {s["median_s"]} | {s["peak_gb"]} |')
     killed = sorted({p for v in tm.values() for p in v.get('killed', [])})
-    L += ['', f'Pages stopped by the {PAGE_CAP_GB:g} GB per-call guard: {", ".join(killed) or "none"}. A call includes '
+    batches = sum(v.get('killed_batches', 0) for v in tm.values())
+    L += ['', f'Calls stopped by the guard ({PAGE_CAP_GB:g} GB a page call; {TRAIN_CAP_GB:g} GB a training, 8 GB for the '
+          f'first attempt): {", ".join(killed) or "none"}; {batches} batched reading calls stopped at the earlier 5 GB '
+          'cap, their pages read again. A call includes '
           'loading the model, so one-page calls overstate seconds a page; blla is one page a call because two batched '
           'four-worker runs took the Mac down on 2026-10-31; reading is batched ten pages a call.']
     L += ['', '## Measurement card', '',
