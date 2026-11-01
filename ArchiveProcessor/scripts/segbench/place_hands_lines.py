@@ -24,8 +24,8 @@ Readings: truth, Gemini 3.8 Flash (a drafter of the owner-hand truth; owner page
 Qwen3.6-27B (the non-drafter reading: neither drafted nor checked the hand truth; both groups).
 
 Usage (the drags take no model; run under the heavy lock all the same, as they work through a page set):
-  uv run --offline --with rapidfuzz --with numpy python place_hands_lines.py run      # CACHE/lines-rows.jsonl
-  uv run --offline --with rapidfuzz --with numpy python place_hands_lines.py report   # segbench-results/place-hands-lines.{json,md}
+  uv run --with rapidfuzz --with numpy python place_hands_lines.py run      # CACHE/lines-rows.jsonl
+  uv run --with rapidfuzz --with numpy python place_hands_lines.py report   # segbench-results/place-hands-lines.{json,md}
 """
 from __future__ import annotations
 
@@ -344,7 +344,82 @@ def cmd_report(a):
                 res['writer_paired'][f'{g}|{rd}'] = boot([(pg[(p, 'word')]['passed'], pg[(p, 'lab')]['passed'],
                                                            pg[(p, 'lab')]['lines']) for p in pages])
     (RESULTS / 'place-hands-lines.json').write_text(json.dumps(res, indent=1) + '\n')
+    md = RESULTS / 'place-hands-lines.md'
+    head = md.read_text().split(MARK)[0] if md.exists() else '# W46.place-hands-lines\n\n'
+    md.write_text(head + MARK + '\n' + tables_md(res) + MARK + '\n' + (md.read_text().split(MARK)[2] if md.exists() and md.read_text().count(MARK) >= 2 else ''))
     return res
+
+
+MARK = '<!-- tables -->'
+SHOW = 8   # routes per table; the json has every one
+NAMES = {'truth': 'truth text', 'gemini3.8-flash': 'Gemini 3.8 Flash (a drafter)',
+         'lightonocr3-4b': 'LightOnOCR-3', 'qwen3.6-27b': 'Qwen3.6-27B (non-drafter)'}
+
+
+def pct(a, n):
+    return f'{100 * a / n:.1f} ({a}/{n})' if n else '—'
+
+
+def ci(d):
+    return '—' if d is None else f'{d[0]:+.1f} ({d[1]:+.1f} to {d[2]:+.1f})'
+
+
+def tables_md(res):
+    out = []
+    for w, wname in (('lab', "the app's line writer (lab)"), ('word', "place_hands's per-word layer")):
+        out.append(f'## Line pass rate, {wname}\n')
+        out.append('Δ is against the shipped placer (`' + DEFAULT + '`) on the same pages, paired over pages '
+                   f'(bootstrap, {DRAWS} draws). Unread: scored lines the reading has no word for (they fail on every '
+                   f'placer). The best {SHOW} routes and the shipped one; every route is in the json.\n')
+        for g in P.GROUPS:
+            for rd in READINGS:
+                tb = res['tables'].get(f'{w}|{g}|{rd}')
+                if not tb:
+                    continue
+                n = next(x for x in tb if x['route'] == DEFAULT)
+                out.append(f"### {g}, {NAMES[rd]} ({n['pages']} pages, {n['lines']} lines, {n['unread']} unread)\n")
+                out.append('| rank | detector.placer | line pass % | Δ vs shipped (95% CI) | broken drags |')
+                out.append('|---:|---|---:|---|---:|')
+                for i, x in enumerate(tb):
+                    if i < SHOW or x['route'] == DEFAULT:
+                        nm = f"**{x['route']}** (shipped)" if x['route'] == DEFAULT else x['route']
+                        out.append(f"| {i + 1} | {nm} | {pct(x['passed'], x['lines'])} | {ci(x['delta'])} | {x['broken']} |")
+                out.append(f'\n{len(tb)} routes.\n')
+    out.append('## The 0.67 gate on the line pass rate\n')
+    out.append('The shipped placer with and without its gate: a page whose CTC confidence is under 0.67 goes to the '
+               'text page, so its lines are not selectable on the image (counted as not passing) and its failing '
+               'drags are spared the user. Δ is gated minus ungated line pass, paired over pages.\n')
+    out.append('| writer | group | reading | pages to the text page | passing lines given up | failing lines spared | Δ line pass (95% CI) |')
+    out.append('|---|---|---|---:|---:|---:|---|')
+    for k, v in res['gate_paired'].items():
+        w, g, rd = k.split('|')
+        out.append(f"| {w} | {g} | {NAMES[rd]} | {len(v['sent_to_text'])} of {v['pages']} | {v['passing_lines_lost']} | "
+                   f"{v['failing_lines_avoided']} | {ci(v['delta'])} |")
+    out.append('\n### The gate swept, lab writer\n')
+    out.append('Per threshold: pages kept, lines passing on them (of all scored lines), and the pass rate on the kept '
+               'pages. Thresholds are the pages\' own confidences.\n')
+    for k, sw in res['gate_sweeps'].items():
+        w, g, rd = k.split('|')
+        if w != 'lab':
+            continue
+        out.append(f'#### {g}, {NAMES[rd]}\n')
+        out.append('| threshold | pages kept | lines passing (of all) | pass % on kept pages |')
+        out.append('|---:|---:|---:|---:|')
+        for x in sw:
+            mark = ' (shipped)' if abs(x['threshold'] - GATE) < 1e-9 else (' (no gate)' if x['threshold'] == 0 else '')
+            out.append(f"| {x['threshold']:.3f}{mark} | {x['pages_kept']}/{x['pages']} | {pct(x['passed'], x['lines'])} | "
+                       f"{pct(x['passed'], x['kept_lines'])} |")
+        out.append('')
+    out.append('## Writers, the shipped placer\n')
+    out.append('| group | reading | lab minus per-word, line pass points (95% CI) |')
+    out.append('|---|---|---|')
+    for k, d in res['writer_paired'].items():
+        g, rd = k.split('|')
+        out.append(f'| {g} | {NAMES[rd]} | {ci(d)} |')
+    cov = res['coverage']
+    out.append('\nReading coverage (scored lines with at least one reading word, every placer alike): ' +
+               '; '.join(f'{NAMES[r]} {pct(*v)}' for r, v in cov.items()) + '.\n')
+    return '\n'.join(out) + '\n'
 
 
 def main():

@@ -13786,3 +13786,21 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   turns three checks red. `test-recovery.sh` ALL PASS (twice) and `test-manifest-persistence.sh` ALL PASS;
   clean build, no new warnings. No bench cache used.
   <!-- /W40.fix-processor-failed-ocr-filed-image-only -->
+- [x] **W46.place-hands-lines — rescore the shipped hand placer and its gate on the line pass rate [S]** · §Document processing review — W46 (lane: segbench) (uses: light) (blocked-on: W46.place-geom) — Owner, 2026-10-30 (measurement audit, execution-plans/processing-review/11-measurement-audit.md), OCR-11. The hand placer (blla + McCATMuS forced alignment, the conf pick, the 0.67 CTC gate) was chosen on per-word Find, which the owner ruled no evidence of selection hours later (c096de18). Rescore it and the gate with the line-drag scorer W46.place-geom builds, on the 16 hand pages and Bentham, with a non-drafter reading (Qwen3.6-27B) as input beside Gemini's; keep the shipped default only if it still wins on the line pass rate.
+  SHIPPED 2026-11-01. `scripts/segbench/place_hands_lines.py`; `segbench-results/place-hands-lines.md` and `.json`.
+  All 52 placement routes (4 detectors, 13 placers and matcher picks) were dragged line by line in PDFKit, with
+  W46.place-geom's scorer and two writers. The material: the 20 audited owner hand pages (475 lines) and 14 Bentham
+  pages (314), with four readings: truth, Gemini 3.8 Flash (a drafter), LightOnOCR-3 and the non-drafter Qwen3.6-27B
+  (newly aligned by every detector and recogniser). With the app's line writer, the shipped blla + McCATMuS + conf
+  placer is first or tied on the owner pages for every reading: Qwen3.6-27B 42.9%, `cer` pick +0.4 (a tie), Orli
+  -4.6, PP-OCRv6 -17.9, flow -40.2. Kept for the owner's material. On Bentham, PP-OCRv6 lines pass +17.5 points
+  (+6.6 to +27.8) with Qwen and +16.2 with the truth, because blla's lines are the loss there. So for Phase 4, the
+  detector should be a setting of the hand route, not hard-coded. PP-OCRv6 is not a Mac route at its pinned
+  settings. The 0.67 gate only lowers line pass: with Qwen, 2 pages go to the text page, giving up 4 passing lines
+  and sparing 39 failing drags. It stays at 0.67 as its starting value, and the line score sets no bar to refit it
+  by. Writers: the line writer beats one run per word on owner hands (+8.4) and loses on Bentham (-10.2). Scorer
+  ceiling: the truth's own lines pass 85% of owner drags. `place_functional.swift oracle` gains `--no-image`, and
+  `place_hands.py` READINGS gains qwen3.6-27b. No money, no network reads of pages. Not on ArchiveOCRBench, since
+  this is placement. Bench cache: kept the Qwen hypotheses and readings under `place-hands/` (inputs to any rescore)
+  and `lines-rows.jsonl` (what `report` reads); the drag PDFs were deleted as each was scored.
+  <!-- /W46.place-hands-lines -->

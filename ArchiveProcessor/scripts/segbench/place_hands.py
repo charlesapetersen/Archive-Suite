@@ -42,7 +42,9 @@ reading), `ctc_conf` and `match_cer`; `score` sweeps each as the per-page gate t
 
 Readings: `truth` (the line-broken truth text itself: what the geometry and the aligner lose with a perfect
 reader), `lightonocr3-4b` (FarmShare's saved readings, both groups) and `gemini3.8-flash` (the cloud panel's,
-owner pages only: no Gemini reading of the Bentham pages exists and this item has no paid arm). Scores: place_score's
+owner pages only: no Gemini reading of the Bentham pages exists and this item has no paid arm). `qwen3.6-27b`
+(the saved Qwen3.6-27B readings, both groups) is the non-drafter reading W46.place-hands-lines added; its line pass
+score is `place_hands_lines.py`. Scores: place_score's
 word F1 (at centre, ranked; 0.5 and 0.7 beside), line-level alignment accuracy, and place_functional's Find and
 placed-hit on a PDF written with the hypothesis's words.
 
