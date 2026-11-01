@@ -84,20 +84,20 @@ class Contracts(unittest.TestCase):
 
     def test_cap_blocks_before_request(self):
         self.out.mkdir()
-        for i in range(12):
+        for i in range(31):
             r = dict(id=str(i), request_sha256=str(i))
             H.append(self.out, dict(r, event='reserve', reservation=H.RESERVE))
             H.append(self.out, dict(r, event='settle', cost=.08))
         with self.assertRaisesRegex(ValueError, 'item cap'):
             self.call()
-        self.assertEqual(len(H.journal(self.out)), 24)
+        self.assertEqual(len(H.journal(self.out)), 62)
 
     def test_custom_output_still_counts_original_pilot(self):
         H.LEGACY_OUT.mkdir()
         H.append(H.LEGACY_OUT, dict(id='old', event='reserve', request_sha256='old', reservation=.08))
         with self.assertRaisesRegex(ValueError, 'outstanding'):
             self.call()
-        H.append(H.LEGACY_OUT, dict(id='old', event='settle', request_sha256='old', cost=.96))
+        H.append(H.LEGACY_OUT, dict(id='old', event='settle', request_sha256='old', cost=2.46))
         with self.assertRaisesRegex(ValueError, 'item cap'):
             self.call()
         self.assertEqual(H.journal(self.out), [])
@@ -158,24 +158,13 @@ class Contracts(unittest.TestCase):
         self.assertEqual(list(pack.iterdir()), [])
         self.assertEqual(list(truth.iterdir()), [])
 
-    def test_sheet_preserves_each_crop_pixel_and_order(self):
-        from PIL import Image
-        import io
-        examples = []
-        for i, size in enumerate([(30, 10), (20, 25)]):
-            name = f'e{i}.png'
-            Image.new('RGB', size, (i * 100, 20, 50)).save(self.root / name)
-            examples.append(dict(id=str(i), image=name, text='corrected line'))
-        raw, meta = H.example_sheet(self.root, examples)
-        with Image.open(io.BytesIO(raw)) as sheet:
-            for e, placement in zip(examples, meta['placements'], strict=True):
-                with Image.open(self.root / e['image']) as original:
-                    self.assertEqual(sheet.crop(tuple(placement['rect'])).tobytes(), original.tobytes())
-            self.assertEqual([p['id'] for p in meta['placements']], ['0', '1'])
+    def test_examples_stay_separate_and_ordered(self):
+        examples = [dict(id=str(i), image='target.jpg', text=f'corrected line {i}') for i in range(2)]
         self.job.update(examples=examples, examples_n=2)
         content = H.body(self.root, self.freeze, self.job)['messages'][0]['content']
-        self.assertEqual(sum(x['type'] == 'image_url' for x in content), 2)
-        self.assertTrue(content[2]['image_url']['url'].startswith('data:image/png;base64,'))
+        self.assertEqual(sum(x['type'] == 'image_url' for x in content), 3)
+        self.assertEqual(content[3]['text'], 'Corrected reading: corrected line 0')
+        self.assertEqual(content[6]['text'], 'Corrected reading: corrected line 1')
 
     def test_cluster_bootstrap_counts_collections(self):
         v = H.interval([1, 1, -3, -3], ['a', 'a', 'b', 'b'], rounds=1000)

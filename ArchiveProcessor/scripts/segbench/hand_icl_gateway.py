@@ -13,7 +13,6 @@ import argparse
 import base64
 from collections import Counter, defaultdict
 import hashlib
-import io
 import json
 import math
 import random
@@ -30,14 +29,14 @@ import gateway_gemini as G
 
 TAG = 'W46.ocr-ppocrv6-hands-paid'
 COUNTS = (0, 8, 16)
-CAP = 1.00
+CAP = 2.50     # OWNER_AUTHORIZATIONS.md, 2026-11-01, commit 1565f7d9
 RESERVE = .08    # 8,192 output + up to 60k input at the conservative list rates
 DEFAULT_STATE = Path.home() / '.local/state/archive-autonomous/artifacts'
 DEFAULT_PACK = DEFAULT_STATE / 'hand-icl-20261101'
 DEFAULT_TRUTH = DEFAULT_STATE / 'hand-icl-truth-20261101'
-LEGACY_OUT = DEFAULT_STATE / 'hand-icl-gateway-20261101'
-DEFAULT_OUT = DEFAULT_STATE / 'hand-icl-gateway-sheet-20261101'
-ENCODING = 'numbered-native-pixel-png-sheet-v1'
+LEGACY_OUT = DEFAULT_STATE / 'hand-icl-gateway-sheet-20261101'  # never sent; any later spend still counts
+DEFAULT_OUT = DEFAULT_STATE / 'hand-icl-gateway-20261101'
+ENCODING = 'separate-line-images-v1'
 RESULTS = HERE.parents[1] / 'segbench-results'
 COHORTS = {'blackwell-held-out': 12, 'owner-Shils-folder-proxy': 4,
            'owner-transfer': 15, 'public-L1-transfer': 40}
@@ -126,48 +125,13 @@ def body(pack, freeze, j):
         return {'type': 'image_url', 'image_url': {'url': 'data:image/jpeg;base64,' +
                 base64.b64encode(inside(pack, name).read_bytes()).decode()}}
     content = [{'type': 'text', 'text': freeze['prompt']}]
-    if j['examples']:
-        sheet, _ = example_sheet(pack, j['examples'])
-        content += [{'type': 'text', 'text': 'Example lines from other pages, numbered in the left gutter:'},
-                    {'type': 'image_url', 'image_url': {'url': 'data:image/png;base64,' +
-                                                       base64.b64encode(sheet).decode()}},
-                    {'type': 'text', 'text': '\n'.join(f'{i+1}. Corrected reading: ' + e['text']
-                                                     for i, e in enumerate(j['examples']))}]
+    for e in j['examples']:
+        content += [{'type': 'text', 'text': 'Example line:'}, image(e['image']),
+                    {'type': 'text', 'text': 'Corrected reading: ' + e['text']}]
     content += [{'type': 'text', 'text': 'TARGET PAGE — transcribe this only:'}, image(j['image'])]
     return {'model': G.MODEL, 'temperature': 0, 'max_tokens': freeze['max_tokens'],
             'reasoning_effort': 'low', 'cache': {'no-cache': True},
             'messages': [{'role': 'user', 'content': content}]}
-
-
-def example_sheet(pack, examples):
-    """One PNG: exact decoded source pixels, numbered gutters, no scaling.
-
-    The gateway may resize it internally. Placement/pixel assertions establish
-    our encoding only, not model-side inference resolution.
-    """
-    from PIL import Image, ImageDraw, ImageFont
-    images = []
-    for e in examples:
-        with Image.open(inside(pack, e['image'])) as im:
-            images.append(im.convert('RGB'))
-    gutter, gap = 56, 12
-    sheet = Image.new('RGB', (gutter + max(im.width for im in images),
-                              sum(im.height + gap for im in images) + gap), 'white')
-    draw, y, placements = ImageDraw.Draw(sheet), gap, []
-    font = ImageFont.load_default(size=18)
-    for i, (im, e) in enumerate(zip(images, examples, strict=True)):
-        rect = [gutter, y, gutter + im.width, y + im.height]
-        sheet.paste(im, (gutter, y))
-        draw.text((8, y), str(i + 1), fill='black', font=font)
-        if sheet.crop(tuple(rect)).tobytes() != im.tobytes():
-            raise ValueError('example pixels changed in sheet')
-        placements.append({'id': e['id'], 'image': e['image'], 'sha256': sha(inside(pack, e['image'])),
-                           'rect': rect})
-        y += im.height + gap
-    b = io.BytesIO(); sheet.save(b, 'PNG')
-    raw = b.getvalue()
-    return raw, {'encoding': ENCODING, 'sha256': hashlib.sha256(raw).hexdigest(),
-                 'size': list(sheet.size), 'placements': placements}
 
 
 def request_hash(b):
@@ -197,9 +161,11 @@ def validate_receipt(out, pack, truth, freeze):
     expected = {'pack_freeze_sha256': sha(Path(pack) / 'freeze.json'),
                 'truth_index_sha256': sha(Path(truth) / 'index.json'), 'model': G.MODEL,
                 'max_tokens': freeze['max_tokens'], 'temperature': 0, 'reasoning_effort': 'low',
-                'no_cache': True, 'cap': CAP, 'reservation': RESERVE, 'encoding': ENCODING}
+                'no_cache': True, 'reservation': RESERVE}
     if any(rec.get(k) != v for k, v in expected.items()):
         raise ValueError('run receipt differs from frozen experiment')
+    if rec.get('cap') not in (1.00, CAP) or rec.get('encoding', ENCODING) != ENCODING:
+        raise ValueError('unrecognized original receipt cap/encoding')
     return rec
 
 
@@ -214,12 +180,12 @@ def journal(out):
 
 
 def prior_spend(out):
-    """The abandoned separate-image pilot is part of this item's $1, forever."""
+    """Count any alternate-encoding ledger, including custom output resumes."""
     if Path(out).resolve() == LEGACY_OUT.resolve():
         return 0., []
     pending, settled, spent = state(journal(LEGACY_OUT))
     if pending:
-        raise ValueError('the separate-image pilot still has an outstanding request')
+        raise ValueError('the alternate-encoding pilot still has an outstanding request')
     return spent, list(settled.values())
 
 
@@ -270,8 +236,6 @@ def call(pack, freeze, j, out, request=G.request):
     out.mkdir(parents=True, exist_ok=True)
     rec = {'id': j['id'], 'page': j['page'], 'cohort': j['cohort'], 'examples_n': j['examples_n'],
            'request_sha256': digest, 'time': time.time(), 'encoding': ENCODING}
-    if j['examples']:
-        _, rec['sheet'] = example_sheet(pack, j['examples'])
     append(out, {**rec, 'event': 'reserve', 'reservation': RESERVE})
     start = time.monotonic()
     try:
@@ -325,6 +289,12 @@ def run(a):
         validate_receipt(a.out, a.pack, a.truth, f)
     else:
         dump(a.out / 'receipt.json', receipt)
+    authority = HERE.parents[2] / 'OWNER_AUTHORIZATIONS.md'
+    grant = authority.read_text().split('## 2026-11-01 — ready paid processing-review runs (owner session)', 1)[1]
+    if '**W46.ocr-ppocrv6-hands-paid:**' not in grant or '**$2.50 working item cap**' not in grant:
+        raise ValueError('the revised owner working cap is not recorded')
+    dump(a.out / 'working-cap.json', {'cap': CAP, 'authorization_commit': '1565f7d9',
+         'authorization_sha256': sha(authority), 'original_receipt_sha256': sha(a.out / 'receipt.json')})
     # A key failure happens before any reservation; no key is printed or persisted.
     load_key()
     pilot = pilot_jobs(jobs)
@@ -474,7 +444,7 @@ def write_report(r):
         return '—' if not v['n'] else f"{v['delta']:+.2f} ({v['lo']:+.2f} to {v['hi']:+.2f}; n={v['n']})"
     L = ['# Gemini given corrected handwriting lines (W46.ocr-ppocrv6-hands-paid)', '',
          'Gemini 3.7 Flash through the Stanford gateway, using the Qwen arm’s frozen 0/8/16 image/text '
-         'example selection, composed into numbered PNG sheets. Scores are NES points. Only the Blackwell holdout tests a documented same hand; '
+         'example pack, with each crop a separate image. Scores are NES points. Only the Blackwell holdout tests a documented same hand; '
          'the Shils folder is a hand proxy, and the other cohorts test transfer with unverified hand identity. '
          'The 40 L1 pages include three Blackwell diary pages (other volumes) and two Blackwell '
          'correspondence pages; they are not all known different hands.', '',
@@ -492,12 +462,10 @@ def write_report(r):
          'which remain unvalidated. L2 is not an adaptation cohort because no verified same-hand example pool was prepared.',
          '- **Comparison:** identical 2400 px/quality-90 target JPEGs across 0/8/16 examples; quality-95 '
          'line crops, eight examples the prefix of sixteen; same target prompt as the Qwen pack. '
-         'Each example sheet pastes the decoded crops at native size into one column, with numbered gutters; '
-         'pixel-equality assertions check every placed rectangle. No target or example crop is scaled locally. '
-         'The gateway may downsample sheets internally; this run cannot establish benefits of separate-image examples. Temperature 0, '
+         'Each example is a separate crop paired with its corrected line text; no target or example crop is scaled locally. Temperature 0, '
          'low reasoning, 8192-token output cap, gateway cache disabled. Single attempts; capped, empty '
-         'or transport failures are separate and score zero only in strict sensitivity. Qwen uses separate '
-         'example images and no thinking; this is not a controlled model-only comparison. These subsets enter their own panel, '
+         'or transport failures are separate and score zero only in strict sensitivity. Qwen uses the same '
+         'example images with no thinking; this is not a controlled model-only comparison. These subsets enter their own panel, '
          'not whole-96 or whole-895 charts.',
          '- **Noise:** 10,000-round paired page bootstrap, both-answered headline and failure=0 sensitivity. '
          'Public transfer additionally bootstraps collection clusters. A single diary and four Shils pages '
@@ -531,18 +499,18 @@ def write_report(r):
         for c in r['owner_clear']['comparisons']:
             L.append(f"| {c['cohort']} | {c['examples_n']} | {ci(c['both_answered'])} |")
     L += ['', '## Cost and provenance', '',
-          f"Charged against the $1 item cap: ${r['charged']:.5f}. List-rate estimate ${r['cost']['estimate']:.5f} "
+          f"Charged against the owner-revised $2.50 working item cap: ${r['charged']:.5f}. List-rate estimate ${r['cost']['estimate']:.5f} "
           f"at ${G.PRICE[0]}/${G.PRICE[1]} per million input/output tokens (including reasoning); gateway’s own "
           f"figure ${r['cost']['gateway'] or 0:.5f} on {r['cost']['gateway_calls']} of {r['cost']['calls']} attempts. "
           'The cap counts the larger for each request; any unknown request keeps its full reservation. '
-          f"No retries. The abandoned 24-request separate-image pilot is included (${r['prior_pilot']['charged']:.5f}); "
-          'it projected over $1 because each small crop incurred a separate image allocation. All final '
-          'conditions were run again with the sheet encoding, including zero examples; no pilot answer '
-          'was selected for its score. Stanford PTA, not subscription usage.', '',
+          'No retries. The initial 24-request pilot cost $0.1950195 and projected $1.7958 for 221 calls. '
+          'The owner revised the working cap from the initial agent-set $1 estimate to $2.50 '
+          '(OWNER_AUTHORIZATIONS.md, 1565f7d9); all pilot answers were preserved, not re-called. '
+          'A sheet alternative was prepared but made no paid call and is not an accuracy arm. '
+          'Stanford PTA, not subscription usage.', '',
           f"Frozen pack SHA-256 `{r['pack_freeze_sha256']}`; truth-index SHA-256 `{r['truth_index_sha256']}`. "
           'Private input pack `~/.local/state/archive-autonomous/artifacts/hand-icl-20261101`, target truth '
-          '`hand-icl-truth-20261101`, responses/ledger/receipt `hand-icl-gateway-sheet-20261101`; '
-          'the original pilot remains in `hand-icl-gateway-20261101`. '
+          '`hand-icl-truth-20261101`, responses/ledger/receipt `hand-icl-gateway-20261101`. '
           'The receipt records the runner hash and code commit; each ledger outcome pins request and response '
           'hashes, usage, finish reason, returned model and time. Shared inputs are read-only. '
           'No rendered or model scratch created; only paid replies and audit receipts retained.', '',
