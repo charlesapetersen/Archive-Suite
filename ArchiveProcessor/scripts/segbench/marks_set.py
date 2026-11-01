@@ -464,7 +464,45 @@ def cmd_report(_):
     RESULTS.mkdir(exist_ok=True)
     (RESULTS / 'marks-set-draft.json').write_text(json.dumps(out, indent=1) + '\n')
     (CACHE / 'disagreements.json').write_text(json.dumps(dis, indent=1) + '\n')
+    (RESULTS / 'marks-set-draft.md').write_text(markdown(out))
     print(json.dumps(out, indent=1))
+
+
+def markdown(o):
+    """The committed report: counts and agreement only, never page text."""
+    names = list(o['routes'])
+    L = ['# Marks set: the two drafts of the 150 pages', '',
+         f"W46.fix-marks-set-draft. `marks_set.py report` over the {o['pages']} pages of `marks-set-selection.json` "
+         f"({o['core']} in the owner core). Draft figures, not truth; the JSON beside this file has every count.", '',
+         '| | ' + ' | '.join(names) + ' |', '|---|' + '---|' * len(names)]
+    rows = [('Pages read', 'read'), ('Parsed', 'parsed'), ('Hit the output cap', 'capped'), ('Marks', 'marks'),
+            ('Pages with a mark', 'pages_with_marks'), ('Pages with handwriting', 'pages_with_hand'),
+            ('Median seconds a page', 'median_s')]
+    for label, k in rows:
+        L.append(f'| {label} | ' + ' | '.join(str(o['routes'][n].get(k)) for n in names) + ' |')
+    for c in CLASSES:
+        L.append(f'| {c} | ' + ' | '.join(str(o['routes'][n]['by_class'].get(c, 0)) for n in names) + ' |')
+    L.append('| Marks dropped (bad class or box) | ' + ' | '.join(
+        str(sum(o['routes'][n]['dropped_marks'].values())) for n in names) + ' |')
+    a = o['agreement']
+    L += ['', '## Agreement between the drafts', '']
+    if a['pages']:
+        L += [f"On the {a['pages']} pages both parsed: handwriting present or not agreed on {a['hand_page'][0]} "
+              f"(95% {a['hand_page'][1]}); the band on {a['band'][0]} ({a['band'][1]}). Of "
+              f"{a['gemini_marks']} and {a['local_marks']} marks, {a['matched_iou50']} pair at IoU 0.5 "
+              f"({a['matched_iou50_same_class']} with the same class) and {a['matched_iou30']} at IoU 0.3. "
+              f"{o['disagreement_pages']} pages disagree somewhere, {o['disagreement_core']} of them in the core."]
+    else:
+        L += ['No page has both drafts yet.']
+    L += ['', '## Measurement card', '',
+          '- **Truth.** None. Both columns are drafts; the owner core (W46.marks-core-owner-ok) is the first truth.',
+          '- **Selection.** `marks-set-selection.json`: phase A independent of every route, phase B by the '
+          "Qwen3.6-27B pre-flag's band (neither drafter).",
+          '- **Comparison.** One instruction, each route in its own box form; Gemini at 2,400 px, the 8B at 1,400 px.',
+          '- **Noise.** One pass each at temperature 0; no rerun floor.',
+          '- **Scope.** Agreement is not accuracy: two drafts can agree and both be wrong. Neither drafter may be '
+          'ranked on these pages (MRK-1).', '']
+    return '\n'.join(L)
 
 
 def main():
