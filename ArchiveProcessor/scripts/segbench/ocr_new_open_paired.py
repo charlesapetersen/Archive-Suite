@@ -7,7 +7,7 @@ The measurement audit's OCR-2 (execution-plans/processing-review/11-measurement-
 Qwen3.6 27B and LightOnOCR-3 4B, on the owner's 96 and the 895, two ways. Strict pairs every page and scores a
 failure as 0. Answered pairs only the pages both routes answered. Each comparison has its mean NES difference, a
 95% bootstrap interval and a paired permutation p (ocr_panel_score.paired), with each route's failure count beside
-it. Every failure here is the model's (a reply that ran to the token cap or came back empty). The Sherlock runs
+it. Every failure here is the model's (a reply that ran to the token cap or came back empty). The completed Sherlock runs
 logged no request errors, so no failure is a provider's. Reads ocr_rescore.py's per-page scores; no text, no model.
 Writes segbench-results/new-open-paired.json.
 """
@@ -23,7 +23,7 @@ import ocr_panel_score as S
 HERE = Path(__file__).resolve().parent
 RESULTS = HERE.parent.parent / 'segbench-results'
 NEW = ['xiaomi-ocr-0', 'paddleocr-vl1.6', 'qwen3.8-27b', 'xiaomi-ocr-0-bf16', 'paddleocr-vl1.6-bf16',
-       'infinity-parser2-pro']
+       'infinity-parser2-pro', 'unlimited-ocr', 'nemotron-parse-2', 'granite-docling-258m-mlx']
 # The incumbent per set: the reading the bench shows for that route on that set.
 INCUMBENTS = {'owner96': {'qwen3.6-27b': 'local panel', 'lightonocr3-4b': 'FarmShare native'},
               'public895': {'qwen3.6-27b': 'FarmShare panel', 'lightonocr3-4b': 'FarmShare native'}}

@@ -77,7 +77,7 @@ def failure(ok, finish, completion_tokens, meta=None) -> str:
         return 'cap'
     if finish == 'content_filter':
         return 'refusal'
-    if finish in ('stop', 'unparsable', 'unparsed'):
+    if finish in ('stop', 'unparsable', 'unparsed', 'blank'):
         return 'empty'
     if finish == 'error':
         text = (meta or {}).get('error_text')

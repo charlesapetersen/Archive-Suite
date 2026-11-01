@@ -76,6 +76,8 @@ SHERLOCK_ROUTES = [  # W46.ocr-new-open, new-open-sherlock-20261024.md: label, m
     ('paddleocr-vl1.6', 'paddleocr-vl16', 'native'),
     ('qwen3.8-27b', 'qwen38-27b-fp8', 'panel'),
     ('infinity-parser2-pro', 'infinity-parser2-pro', 'native'),  # W46.ocr-new-open-sherlock, two cards
+    ('unlimited-ocr', 'unlimited-ocr', 'native'),  # W46.ocr-new-open-boxes, in-process card routes
+    ('nemotron-parse-2', 'nemotron-parse-2', 'native'),
 ]
 OS, GS, PS, Q18, Q19 = (FARMSHARE / 'FarmShare-open-sweep-20261019/outputs',
                         FARMSHARE / 'FarmShare-general-sweep-20261019/outputs',

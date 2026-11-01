@@ -90,7 +90,12 @@ def settings(root, mode):
         return {'model': f"{m['det']['model']} + {m['rec']['model']} (stock pipeline)",
                 'revision': f"det {m['det']['revision']}, rec {m['rec']['revision']}",
                 'route': 'pipeline', 'versions': c['prepared']['versions']}
-    return json.loads((root / 'status.json').read_text())['settings']
+    st = json.loads((root / 'status.json').read_text())['settings']
+    if 'adapter' in st:  # W46.ocr-new-open-boxes: an in-process card route, not a vLLM server
+        return {**st, 'route': st['adapter'], 'max_tokens': st['max_new_tokens'],
+                'temperature': 0 if st['greedy'] else None, 'concurrency': 1,
+                'vllm': None}  # an installed vLLM version does not mean it served this reading
+    return st
 
 
 def collector_wall(root, mode, records):
@@ -170,6 +175,8 @@ def score_route(label, root, mode, jobs, truth_dir, rows, agreement, sacct, gpus
                 'vllm': st.get('vllm'), 'max_tokens': st.get('max_tokens'), 'temperature': st.get('temperature'),
                 'concurrency': st.get('concurrency'), 'prompt_sha256': st.get('prompt_sha256'),
                 'versions': st.get('versions'),
+                **({'native_settings': st['settings'], 'runner_sha256': st['runner_sha256'],
+                    'parser_sha256': st['parser_sha256']} if 'adapter' in st else {}),
                 'note': {'panel': 'panel prompt (KIND/TABLE/TEXT), parsed as the panel parses it',
                          'native': "the model card's own prompt, reply scored as written",
                          'pipeline': 'line detection then recognition, lines joined in the pipeline order; no prompt, '

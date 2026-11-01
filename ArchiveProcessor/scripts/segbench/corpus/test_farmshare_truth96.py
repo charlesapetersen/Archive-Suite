@@ -57,6 +57,21 @@ class Precision(unittest.TestCase):
         self.assertEqual(T.precision('PP-OCRv6 medium', 'pipeline'), 'pipeline default')
 
 
+class Settings(unittest.TestCase):
+    def test_in_process_route_preserves_its_card_settings_without_claiming_a_vllm_server(self):
+        contract = {'model': 'test/reader', 'revision': 'frozen', 'adapter': 'nemotron',
+                    'greedy': True, 'max_new_tokens': 8192, 'settings': {'repetition_penalty': 1.1},
+                    'versions': {'transformers': '5.6.1', 'vllm': 'installed-but-unused'}}
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            (root / 'status.json').write_text(json.dumps({'settings': contract}))
+            st = T.settings(root, 'native')
+        self.assertEqual(st['route'], 'nemotron')
+        self.assertEqual((st['temperature'], st['max_tokens'], st['concurrency']), (0, 8192, 1))
+        self.assertEqual(st['settings'], {'repetition_penalty': 1.1})
+        self.assertIsNone(st['vllm'])
+
+
 class Wall(unittest.TestCase):
     def test_vllm_wall_adds_pilot_and_full_pass_and_pipeline_sums_pages(self):
         with tempfile.TemporaryDirectory() as d:

@@ -43,6 +43,7 @@ class FailureClasses(unittest.TestCase):
         self.assertEqual(E.farmshare_failure({'ok': 'False', 'outcome': 'cap', 'status': 'cap'}, {}), 'cap')
         self.assertEqual(E.farmshare_failure({'ok': 'False', 'outcome': 'unparsable', 'status': 'ok'}, {}), 'empty')
         self.assertEqual(E.farmshare_failure({'ok': 'False', 'status': 'unparsed'}, {}), 'empty')
+        self.assertEqual(E.farmshare_failure({'ok': 'False', 'outcome': 'blank', 'finish': 'stop'}, {}), 'empty')
         note = {'env': {'note': 'official XML prompt, 8192 token cap; caps count as failures'}}
         self.assertEqual(E.farmshare_failure({'ok': 'False'}, note), 'cap')
         with self.assertRaises(SystemExit):
