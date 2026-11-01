@@ -25,8 +25,8 @@ owner's placement truth lines are carried the same way and dragged in PDFKit, on
   is worse still (−15.8), so the lab writer's advantage is its own fitting, not only its levelness.
 - **Recommendation:** a reading copy turned level after OCR, triggered by the page's measured median line angle of
   1° or more (not by a capture tag), on an enlarged canvas, with the lab writer's layer. An app change, so it is
-  for the processing review's Phase 4 (W46.review-phase4), which files the implementation queue. Find is unchanged by every arm (86.2% everywhere, ±0.8), as expected: Find matches words,
-  not lines.
+  for the processing review's Phase 4 (W46.review-phase4), which files the implementation queue. Find varies little across arms overall (roughly 86.1–87.0%); this is a descriptive range,
+  not exact equality or evidence of a significant Find effect. Find matches words, not lines.
 
 The scorer is the line-drag pass on `place_functional.swift` (`layer`, `drag`), which W46.place-print and
 W46.place-hands-lines reuse. Its own oracle passes 98.5% of 1,772 level lines in place and 11.4% with the layer

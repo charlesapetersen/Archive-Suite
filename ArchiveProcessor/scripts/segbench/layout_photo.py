@@ -643,6 +643,40 @@ def summarise_scores(rows: list[dict]) -> dict:
     return out
 
 
+# Keep the tables self-contained when cmd_score regenerates them.
+SCORE_CARD = """## Measurement card
+
+- **Truth.**
+  - Real5: OmniDocBench v1.5's human-annotated text for each page, the same truth in every folder (Real5
+    photographs the same pages again). No scored route drafted it.
+  - The 96: the owner's truth (`ocr-truth.md`), drafted by Claude Opus 5.5 and Gemini 3.8 Flash and
+    adjudicated by the owner where they differed, corrected on 2026-10-29. Neither drafter is scored here.
+  - L9 and L4: the public sets' published transcriptions.
+  - The owner checked nothing specific to this item.
+- **Selection.** Real5 pages were chosen by src_omnidoc's plain-text rule over all English pages, not by any
+  route's reading. The bench pages are the 96, L9 and L4 that W46.ocr-regions read. No ABBYY text was used.
+- **Comparison.**
+  - Inputs: one reader and one request in every arm, on the same 2,400 px copies; the detectors see the frozen
+    copies at their own input sizes.
+  - The bench's whole-page readings come from the open sweep and the truth-96 run (the same model and prompt
+    W46.ocr-regions compared against). Real5's whole-page readings come from this pack.
+  - Both OCR sets: the owner's 96, and L9 and L4 of the 895.
+- **Noise.**
+  - n: 155 a Real5 cell; 96, 16 handwritten, 15 L9 and 80 L4 on the bench.
+  - One reading at temperature 0. The 95 crops that hit the token cap count as failed.
+  - The rerun floor on the 96 is `ocr-rerun-noise.md`'s 0.49 NES points; none was measured on Real5.
+  - A paired interval that crosses 0 is a tie. Per-kind groups under 20 pages are descriptive.
+- **Scope.**
+  - One reader. W46.ocr-regions found that the region gain depends on the reader and matters most for small
+    readers, so a larger reader may need regions less.
+  - Real5 is modern print photographed in a lab, not archival pages. Our own photographs of skewed or warped
+    pages are not here.
+  - The detectors' thresholds are the shipped or maker defaults, not tuned.
+  - Heron and Vision were not tried after the pre-step.
+  - The figures do not say which ordering suits each detector; that is W46.layout-order.
+"""
+
+
 def score_md(s: dict, meta: dict) -> str:
     pct = lambda v: f'{100 * v:.1f}'
     iv = lambda d: f'{100 * d["delta"]:+.1f} [{100 * d["lo"]:+.1f}, {100 * d["hi"]:+.1f}]'
@@ -667,7 +701,7 @@ def score_md(s: dict, meta: dict) -> str:
         for arm, e in arms.items():
             out.append(f'| {cond} | {arm} | {pct(e["nes"])} ({pct(e["nes_stripped"])}) | {e["ok"]}/{e["n"]} | '
                        f'{iv(e["vs_raw"])} |')
-    return '\n'.join(out) + '\n'
+    return '\n'.join(out) + '\n\n' + SCORE_CARD
 
 
 def cmd_score(a):

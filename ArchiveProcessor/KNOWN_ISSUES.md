@@ -2,7 +2,7 @@
 
 Tracked bugs we've chosen to come back to later. Each entry has enough context to resume cold.
 
-## OPEN (W46.seg-kit-truth-provenance, W46.measure-report-consistency, 2026-11-01): measurement support and report provenance
+## OPEN (W46.seg-kit-truth-provenance, 2026-11-01): measurement support and report provenance
 
 W46.measure-review pass 4, baseline `7092c5fd`; independent refute-check confirmed these offline corrections.
 Details: [`2026-11-01.md`](../execution-plans/processing-review/measure-reviews/2026-11-01.md).
@@ -11,10 +11,13 @@ Details: [`2026-11-01.md`](../execution-plans/processing-review/measure-reviews/
   claiming no scored drafter made it; that truth still includes tag/teacher agreement beyond the owner's
   checked subset. W46.seg-kit-truth-provenance reuses W46.seg-boxes-score's owner-supported scoring and fixes
   report/panel provenance. Sasha's held-out lead stands; no duplicate experiment is needed.
-- `scripts/segbench/layout_photo.py::{score_md,cmd_score}` overwrites `layout-photo-tables.md` without its
-  required card; the parent report has one. `segbench-results/place-geom.md` says Find is exactly unchanged
-  although its table spans about 86.1–87.0%. W46.measure-report-consistency fixes these minor report defects;
-  neither changes the layout or line-selection verdict.
+
+## FIXED (W46.measure-report-consistency, 2026-11-01): persistent layout card and qualified Find prose
+
+`layout_photo.py::score_md` now writes the parent report's five-field measurement card into
+`layout-photo-tables.md` on every generation. `place-geom.md` describes Find's roughly 86.1–87.0%
+overall range without claiming exact equality or a significant effect. Repeated offline generation
+retains the card; numeric tables and the layout/line-selection verdicts are unchanged.
 
 ## FIXED (W46.kind-mixed-support, 2026-11-01): mixed-filter support and uncertainty
 
