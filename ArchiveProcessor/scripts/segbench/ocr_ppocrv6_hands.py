@@ -13,7 +13,7 @@ first as it comes and then fine-tuned on a few hundred lines of one hand.
                                             (By the People, CC0), none of them in the 895
   python3 ocr_ppocrv6_hands.py hand-seg     blla and the base model's line readings on every hand page
   python3 ocr_ppocrv6_hands.py pairs        each truth line matched to a blla line (below)
-  python3 ocr_ppocrv6_hands.py train [--device cpu|mps] [--only NAME]   the fine-tune curve, resumable
+  python3 ocr_ppocrv6_hands.py train [--device cpu|mps] [--only NAME] [--hand H]   the fine-tune curve, resumable
   python3 ocr_ppocrv6_hands.py eval         every trained model on its hand's held-out pages
   uv run --with rapidfuzz --with 'sacrebleu==2.5.1' --with regex python ocr_ppocrv6_hands.py report
 
@@ -79,7 +79,7 @@ HAND_PAGES, TRAIN_PAGES, SEED = 36, 24, 46
 MIN_LINES = 8                 # a diary page with fewer truth lines is skipped (a blank or a cover)
 MAX_CER, LEN_RATIO, SKIP = 0.6, 2.0, 0.7
 VAL_LINES = 10
-CURVE = {'blackwell': (20, 40, 80, 160, 240), 'owner': (20, 40, 80)}
+CURVE = {'blackwell': (20, 40, 80, 160, 240), 'owner': (20, 80)}   # owner: 20 lines and all of the other three pages'
 MPS_N = 80
 
 
@@ -577,7 +577,7 @@ def write_lines(hand, keys, d):
 
 def cmd_train(a):
     todo = {k: v for k, v in plans().items() if (not a.only or re.fullmatch(a.only, k))
-            and (not a.device or v['device'] == a.device)}
+            and (not a.device or v['device'] == a.device) and (not a.hand or v['hand'] == a.hand)}
     base = LK.model()
     for name, pl in todo.items():
         d = RUN / 'train' / name
@@ -589,9 +589,11 @@ def cmd_train(a):
         va = write_lines(pl['hand'], pl['val'], d / 'val')
         (d / 'train.txt').write_text(''.join(f'{f}\n' for f in tr))
         (d / 'val.txt').write_text(''.join(f'{f}\n' for f in va))
-        with (RUN / 'train' / 'guard.jsonl').open('a') as log:
-            row = guarded([str(KETOS), '-d', pl['device'], '--workers', '0', '-s', str(SEED), 'train', '-f', 'page', '-i', str(base),
-                           '--resize', 'union', '--schedule', 'constant', '--warmup', '0', '-r', str(LRATE),
+        with (RUN / 'train' / f'guard-{pl["hand"]}.jsonl').open('a') as log:
+            row = guarded([str(KETOS), '-d', pl['device'], '--workers', '0', '--threads', str(TRAIN_THREADS), '--precision', TRAIN_PRECISION,
+                           '-s', str(SEED),
+                           'train', '-f', 'page', '-i', str(base),
+                           '--resize', 'union', '--optimizer', 'AdamW', '--schedule', 'constant', '--warmup', '0', '-r', str(LRATE),
                            '-B', str(BATCH_LINES), '-t', str(d / 'train.txt'), '-e', str(d / 'val.txt'), '-q', 'early',
                            '--min-epochs', str(MIN_EPOCHS), '--lag', str(LAG), '-N', str(MAX_EPOCHS),
                            '-o', str(d / 'model')], log, name, 'train', cap=TRAIN_CAP_GB, out=d / 'ketos.log')
@@ -599,17 +601,24 @@ def cmd_train(a):
         if row['rc']:
             raise SystemExit(f'{name}: ketos exited {row["rc"]} (killed: {row["killed"]}); see {d / "ketos.log"}')
         best = best_model(d)
+        for ck in (d / 'model').glob('*.ckpt'):
+            ck.unlink()             # ten 422 MB Lightning checkpoints a training; the best is kept as safetensors
         (d / 'done.json').write_text(json.dumps({'seconds': round(secs, 1), 'best': str(best), 'lines': len(pl['keys']),
                                                  'device': pl['device'], 'peak_gb': row['peak_gb']}, indent=1))
         print(f'{name}: {secs / 60:.1f} min, best {best.name}')
 
 
-MIN_EPOCHS, LAG, MAX_EPOCHS = 10, 5, 60
+MIN_EPOCHS, LAG, MAX_EPOCHS = 10, 5, 25
 # Fine-tuning a few dozen lines: the PP-OCRv6 config's defaults (cosine over 100 epochs, 1,000 warmup steps,
 # batch 64) are for training from scratch, and its cosine schedule cannot run under early stopping.
-LRATE, BATCH_LINES = 1e-4, 8
+# Batch 1: PP-OCRv6 lines are 128 px high and it has an NRTR head; a batch of 8 Blackwell lines passed 8.8 GB of
+# footprint in 17 s, a batch of 1 peaks at 2.7 GB (2026-11-01). ketos's default is one thread; six is the performance cores.
+LRATE, BATCH_LINES, TRAIN_THREADS = 1e-4, int(os.environ.get('PPOCRV6_BATCH', '1')), 6
+TRAIN_PRECISION = os.environ.get('PPOCRV6_PRECISION', '32-true')
+# AdamW, not the config's AdamW+Muon: Muon's Newton-Schulz step runs in bfloat16, which has no fast CPU kernel, and
+# took 97% of a CPU training's time on one core (sampled 2026-11-01).
 # --workers 0: ketos's DataLoader worker is a fork of the trainer, and the memory guard charges its shared pages again.
-TRAIN_CAP_GB = 8.
+TRAIN_CAP_GB = 5.   # a batch-1 training peaks at 2.9 GB; two run side by side (train --hand)
 
 
 def best_model(d):
@@ -682,8 +691,8 @@ def pairs_against(per, ours, ids):
     return out
 
 
-def guard_stats(path):
-    rows = [json.loads(ln) for ln in path.open()] if path.exists() else []
+def guard_stats(*paths):
+    rows = [json.loads(ln) for path in paths if path.exists() for ln in path.open()]
     out = {}
     size = lambda r: int(r['step'][9:]) if r['step'].startswith('ocr-batch') else 1   # noqa: E731
     kind = lambda r: 'ocr' if r['step'].startswith('ocr') else r['step']               # noqa: E731
@@ -763,7 +772,7 @@ def cmd_report(_):
                           'delta': pd['delta'], 'lo': pd['lo'], 'hi': pd['hi']})
     timing = {'blla-public': guard_stats(RUN / 'zero' / 'blla-public-guard.jsonl'),
               'vision': guard_stats(RUN / 'zero' / 'vision-guard.jsonl'),
-              'train': guard_stats(RUN / 'train' / 'guard.jsonl')}
+              'train': guard_stats(*sorted((RUN / 'train').glob('guard*.jsonl')))}
     pairs_stats = {h: json.loads((hand_dir(h) / 'pairs.json').read_text()) for h in ('owner', 'blackwell')
                    if (hand_dir(h) / 'pairs.json').exists()}
     out = {'public': pub, 'public_pairs': pub_pairs, 'owner': own, 'owner_hand': own_hand, 'owner_mixed': own_mixed,
@@ -861,6 +870,7 @@ def main():
                                         'report'])
     ap.add_argument('--device', choices=['cpu', 'mps'])
     ap.add_argument('--only', help='train: a regular expression over the training names')
+    ap.add_argument('--hand', choices=['blackwell', 'owner'], help='train: one hand (the two run side by side)')
     a = ap.parse_args()
     globals()['cmd_' + a.command.replace('-', '_')](a)
 
