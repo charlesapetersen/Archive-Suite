@@ -16,7 +16,10 @@ abstentions (p034, competing axes, in every turn). This is a development-set ori
 OCR transcription score or a guarantee for new pages. The 36 concurrent e2e fixture turns remain exact.
 Reproduce and see limits in [`W40.fix-processor-rotation-axis.md`](../verification/evidence/processor/W40.fix-processor-rotation-axis.md).
 
-## OPEN (W46.measure-review, 2026-10-31 pass 2): segmentation scoring and kit evidence
+## ✅ FIXED (W46.seg-unsure-mask, W46.kit-gate-coverage, W46.seg-report-refresh, 2026-10-31): segmentation scoring and kit evidence
+
+Found by W46.measure-review's second pass. All three fixes shipped on 2026-10-31 (`4912d9a6`, `b4be290a`, `849310e1`;
+entries in `SUITE_TODO_DONE.md`). What was found:
 
 At baseline `9d8ab697`, `scripts/segbench/score.py::score_labels` counts unsure gaps as artificial agreements
 after `forgive`, rather than masking them from boundary metrics (`W46.seg-unsure-mask`).
@@ -73,7 +76,10 @@ three duplicate-bearing records, all in the unscored Lincoln GLM arm; no publish
 All three now fail; caches and the paid ledger remain intact. No model call or paid rerun was made.
 Audit scope, failed-record exclusions and exact cache keys: `segbench-results/window-duplicates-audit.md`.
 
-## OPEN (W46.fix-postcorrect-pack, 2026-10-24): post-correction pack repeats route/page requests
+## ✅ FIXED (W46.fix-postcorrect-pack, 2026-10-29): post-correction pack repeated route/page requests
+
+Fixed by `078615d2`: one request per id, sources pinned by family, baseline recomputed (entry in `SUITE_TODO_DONE.md`).
+What was found:
 
 At baseline `076b3d84`, `scripts/segbench/postcorrect.py::cmd_pack` selects `ocr-scorers-pages.csv` by route alone
 and `owner_src` discards the source family. The collected Sherlock pack has 464 rows but 434 unique IDs; 30 rows

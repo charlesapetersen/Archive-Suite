@@ -144,7 +144,7 @@ the plan is being deleted. Synthetic **scratch** corpus, 150,000 files / 124,647
   the background clamp alone that costs ~6×, so a shipping change that moved discovery to `.utility` from a
   higher band would cost nothing, and one that let it fall to `.background` would cost everything.
 
-## 📏 MEASURED (`W40.d7`, 2026-10-15) — the Reader at corpus size: two open S2 stalls
+## 📏 MEASURED (`W40.d7`, 2026-10-15) — the Reader at corpus size: two S2 stalls, both fixed 2026-10-31
 
 Full numbers, method and caveats: `verification/evidence/reader/W40.d7-at-size.md`. Harness:
 `ops/scale/run-reader-at-size.sh [--optimized]`. Quote its `-O` run as the shipped cost; the unit bundle is
@@ -157,7 +157,10 @@ Debug otherwise, and Swift-side sorting is 1.5–3× slower there.
   per sort change at `-O` (decorated sort on cached collation ranks, stored native-UTF-8 paths, byte-keyed hashing,
   no per-edit table dictionary); `ReaderAtSizeTests` asserts it. Still paid once per session: a sort's first sight
   of its keys, 0.74 s for 116k names. Evidence: `verification/evidence/reader/W40.fix-reader-list-recompute-at-size.md`.
-- **Open, S2 — `W40.fix-reader-fts-snippet-stall`.** `searchRanked("Bureau of the Budget")` takes **41.7 s** over
+- **Fixed 2026-10-31, S2 — `W40.fix-reader-fts-snippet-stall`** (`87201576`): snippets leave out stop words, seek each
+  hit by rowid and stop after 250 ms; the long-body reproduction went from 2/60 to 60/60 previews in budget. Not yet
+  re-run on the sample lane (`W40.fts-snippet-sample-rerun`, waiting on the sample's copy back). What was measured:
+  `searchRanked("Bureau of the Budget")` took **41.7 s** over
   102k rows (the sample's real text, replicated); distinctive single terms take 11–146 ms. It runs on the
   `ContentIndex` actor, so later queries queue behind it.
 - **Fine at size:** filters 7–33 ms, the health popover's `dataQuality` 30 ms, scrolling's cell work 2.7 ms a

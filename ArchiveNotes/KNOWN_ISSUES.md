@@ -1743,7 +1743,7 @@ one real bug plus two benign edge-normalizations:
   byte-idempotent. Real editors emit `\n` or clean `\r\n` (both handled correctly), so this is a
   fuzz-only artifact; the fuzz body generator excludes lone CR and the observation is logged, not fixed.
 
-## Editor↔item body wiring — follow-ups (W7-S1a, 2026-07-13, open)
+## Editor↔item body wiring — follow-ups (W7-S1a, 2026-07-13): the code items are fixed; the live GUI checks below were never run
 
 W7-S1a bound `NoteEditorPane` to the selected item's body (`NoteBodyEditorModel`: load-on-select,
 autosave via `NotesModel.setBody`, flush-on-switch, autosave-race-safe). Two conscious deferrals:
@@ -1780,7 +1780,7 @@ autosave via `NotesModel.setBody`, flush-on-switch, autosave-race-safe). Two con
   edit present) is still deferred with the rest of Notes' GUI drive until the scratch-store launch
   override lands (W8-S7) — driving the live app would write the owner's real store.
 
-## Extracts create/copy-paste — follow-ups (W7-S2, 2026-07-13, open)
+## Extracts create/copy-paste — follow-ups (W7-S2, 2026-07-13): image bytes fixed; the paste edges are queued as `W40.fix-notes-extract-paste-edges`; the live GUI checks were never run
 
 W7-S2 shipped the live Create-Extract (⌘⌥E) / Append-to-Extract… commands and the copy-in-Notes →
 paste-into-Extract round-trip (`Extract` menu; `com.archivenotes.passage` on ⌘C in a note editor;
@@ -1817,7 +1817,7 @@ paste in an extract editor → note-passage blocks). Model + codec paths are uni
   Append picker. Logic is proven at the model/codec layer (`ExtractCommandTests`, `PasteboardPassageTests`,
   `BlockParserTests`).
 
-## Extracts jump-to-source + provenance chips — follow-ups (W7-S3, 2026-07-13, open)
+## Extracts jump-to-source + provenance chips — follow-ups (W7-S3, 2026-07-13): the template-pane and folder-scope edges are queued as `W40.fix-notes-jump-pending-template`; the same-window edge stays a limitation; the live GUI checks were never run
 
 W7-S3 shipped the note-passage provenance chip's **Jump to Source** button + live-title label + the
 in-app navigation channel (`NotesModel.openItem`/`pendingOpen`) and the Note-window consume side
@@ -1863,7 +1863,7 @@ is unit-tested (`NotePassageResolveTests`, 20 tests incl. `openAction`); conscio
   '[NSValue]' to '[NSValue]' always succeeds" — `textView.selectedRanges` is already `[NSValue]`, so the
   `as?` cast is redundant; bound directly (behavior-identical). Warning gone on a clean compile.
 
-## Extract-viewer featuring — follow-ups (W7-S4, 2026-07-14, open)
+## Extract-viewer featuring — follow-ups (W7-S4, 2026-07-14): the Sources column is fixed (W14.4d); the back-fill note stays; the live GUI checks were never run, although W8-S7, which they waited on, has shipped
 
 W7-S4 gave each window its kind featuring (Note→notes, Extract→extracts, remembered per window) via the
 already-shipped segmented control, and added the extract-only **Sources** column (distinct source notes,
