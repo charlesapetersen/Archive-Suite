@@ -27,7 +27,8 @@ it; `score` then adds the owner-ruled section. A ruling of "yes" with a year (or
 document's own date; "no" is none; "yes" with no year is none too, because the owner answered so only where the dates
 on the page are citations, table headings or references (his notes, 2026-10-31); "cannot tell" is left out. The
 false-year rate is restated as the false-year documents the owner confirms, plus the confident years that match the
-pass weighted by the pass's invention rate on the controls, with a seeded simulation for its interval.
+pass: the controls among them keep their rulings, the unjudged rest is imputed at those controls' error rate. It is a
+share of the 90 sampled, with finite bounds and a model-based interval (owner_fold).
 
 <lab venv> is ~/.local/share/visionocr-ocrlab/venv (numpy and PIL for ocr_truth.orient_like_pdf, requests).
 
@@ -137,6 +138,8 @@ def cmd_sample(a):
                 continue
             undated.append(record(segs, k, f))
     # Round-robin across collections, as date_tagging's sample: no document is chosen by its text or a route's reply.
+    # Collection-balanced, so not an iid sample of the undated documents: figures on it are shares of this sample
+    # (measurement review 2026-10-31 pass 3, P3-1), not weighted estimates for the population.
     rng = random.Random(SEED)
     by_col = collections.defaultdict(list)
     for d in undated:
@@ -450,24 +453,55 @@ def _in(d, y):
     return y is not None and o["own"] is True and o["lo"] <= y <= o["hi"]
 
 
-def owner_fold(docs, n_und, n_certain_match, seed=FOLD_SEED, draws=FOLD_DRAWS):
+def _draw_count(rng, k, p):
+    return sum(rng.random() < p for _ in range(k))
+
+
+def _predictive(rng, fixed, unknown, errs, m, draws):
+    """Counts of the fixed false years plus those drawn among `unknown` documents at a rate drawn from its Jeffreys
+    posterior on `errs` of `m` checked; the tuple (lo, hi) is the 2.5th and 97.5th percentile."""
+    sims = sorted(fixed + _draw_count(rng, unknown, rng.betavariate(errs + 0.5, m - errs + 0.5)) for _ in range(draws))
+    return sims[int(0.025 * draws)], sims[int(0.975 * draws) - 1]
+
+
+def owner_fold(docs, n_und, target_ids, seed=FOLD_SEED, draws=FOLD_DRAWS):
     """The rulings (rulings.json's documents) -> the owner-ruled counts and the restated false-year rate. n_und is the
-    undated set answered, n_certain_match the years without Date Uncertain that equal the pass's own year."""
+    undated set answered; target_ids the ids of its confident matches (a year without Date Uncertain that equals the
+    pass's own year), the documents whose false years the false-year sheet group could not see.
+
+    Measurement review 2026-10-31 pass 3, P3-1. The controls were drawn from every match, confident or Date Uncertain,
+    so they are two strata: a control in the target keeps its ruling (it is checked, not imputed), and only the target's
+    unjudged documents are imputed, at the error rate of the target's own controls. A Date Uncertain control cannot be a
+    false year; it enters only the pooled sensitivity. The count is a finite one over the 90: its bounds take every
+    unjudged document as right or as wrong, and the interval is model-based (Jeffreys posterior on the target controls,
+    which assumes they are exchangeable with the unjudged), for the share of these 90, not of the 425 or the corpus."""
+    target_ids = set(target_ids)
     ruled = [d for d in docs.values() if d["owner"]["own"] is not None]
     fy = [d for d in ruled if d["group"] == "false year"]
+    fy_unruled = sum(d["group"] == "false year" and d["owner"]["own"] is None for d in docs.values())
     ctl = [d for d in ruled if d["group"] == "control"]
+    t_ctl = [d for d in ctl if d["id"] in target_ids]
+    wrong = lambda d: not _in(d, d["app_year"])                                    # the app's year is not the page's
     missed = sum(d["owner"]["own"] and not _in(d, d["pass_own_year"]) for d in fy)
-    confirmed = sum(not _in(d, d["app_year"]) for d in fy)
+    confirmed = sum(wrong(d) for d in fy)
     invented = sum(d["pass_own_year"] is not None and not _in(d, d["pass_own_year"]) for d in ctl)
+    t_wrong = sum(wrong(d) for d in t_ctl)
+    unjudged = len(target_ids) - len(t_ctl)
+    fixed = confirmed + t_wrong
+    rate_t = t_wrong / len(t_ctl) if t_ctl else 0.0
+    est = fixed + unjudged * rate_t
     rng = random.Random(seed)
-    sims = []
-    for _ in range(draws):
-        p = rng.betavariate(invented + 0.5, len(ctl) - invented + 0.5)       # Jeffreys, the controls' invention rate
-        f = confirmed + sum(rng.random() < p for _ in range(n_certain_match))
-        sims.append(rng.betavariate(f + 0.5, n_und - f + 0.5))               # the 90 as a sample of the 425
-    sims.sort()
-    est = confirmed + n_certain_match * (invented / len(ctl) if ctl else 0)
-    return {"ruled": len(ruled), "false_year_docs": len(fy), "controls": len(ctl),
+    if fy_unruled:     # a false-year document the owner could not rule: drawn at the ruled ones' confirm rate
+        sims = sorted(fixed + _draw_count(rng, unjudged, rng.betavariate(t_wrong + 0.5, len(t_ctl) - t_wrong + 0.5))
+                      + _draw_count(rng, fy_unruled, rng.betavariate(confirmed + 0.5, len(fy) - confirmed + 0.5))
+                      for _ in range(draws))
+        lo_c, hi_c = sims[int(0.025 * draws)], sims[int(0.975 * draws) - 1]
+    else:
+        lo_c, hi_c = _predictive(rng, fixed, unjudged, t_wrong, len(t_ctl), draws)
+    p_wrong = sum(wrong(d) for d in ctl)
+    p_lo, p_hi = _predictive(random.Random(seed + 1), fixed, unjudged, p_wrong, len(ctl), draws)
+    r = lambda c: round(c / n_und, 4) if n_und else 0.0
+    return {"ruled": len(ruled), "false_year_docs": len(fy), "false_year_unruled": fy_unruled, "controls": len(ctl),
             "owner_own_date": [sum(d["owner"]["own"] for d in fy), len(fy)],
             "pass_missed": [missed, len(fy)], "confirmed_false": [confirmed, len(fy)],
             "pass_invented": [invented, len(ctl)],
@@ -476,9 +510,15 @@ def owner_fold(docs, n_und, n_certain_match, seed=FOLD_SEED, draws=FOLD_DRAWS):
             "app_matches_owner_controls": [sum(_in(d, d["app_year"]) for d in ctl), len(ctl)],
             "du_agrees_owner": [sum(d["app_date_uncertain"] == (not d["owner"]["own"]) for d in ruled), len(ruled)],
             "pass_agrees_owner": [sum((d["pass_own_year"] is None) == (not d["owner"]["own"]) for d in ruled), len(ruled)],
-            "n_certain_match": n_certain_match, "n": n_und, "estimate": round(est, 2),
-            "rate": round(est / n_und, 4) if n_und else 0.0,
-            "interval": [round(sims[int(0.025 * draws)], 4), round(sims[int(0.975 * draws) - 1], 4)]}
+            "n_certain_match": len(target_ids), "target_controls": [t_wrong, len(t_ctl)],
+            "other_controls": len(ctl) - len(t_ctl), "target_unjudged": unjudged,
+            "n": n_und, "estimate": round(est, 2), "rate": r(est),
+            "bounds": [fixed, fixed + unjudged + fy_unruled], "bounds_rate": [r(fixed), r(fixed + unjudged + fy_unruled)],
+            "interval_count": [lo_c, hi_c], "interval": [r(lo_c), r(hi_c)],
+            "interval_kind": "model-based: Jeffreys posterior predictive on the target controls, for these 90",
+            "pooled_controls_interval": [r(p_lo), r(p_hi)],
+            "scope": "the accepted, collection-balanced sample of 90 (round-robin over collections, readable only); "
+                     "not a weighted estimate for the 425 or the corpus"}
 
 
 def cmd_score(a):
@@ -537,8 +577,8 @@ def cmd_score(a):
     rulings = SHEET / RULINGS_NAME
     if rulings.exists():
         docs = json.loads(rulings.read_text())["documents"]
-        n_cm = sum(not r["app"]["du"] and r["own"] is not None and r["app"]["y"] == r["own"] for r in und)
-        fold = owner_fold(docs, len(und), n_cm)
+        target = [r["id"] for r in und if not r["app"]["du"] and r["own"] is not None and r["app"]["y"] == r["own"]]
+        fold = owner_fold(docs, len(und), target)
         fy_ids = sorted(n for n, d in docs.items() if d["group"] == "false year" and d["owner"]["own"] is not None
                         and not _in(d, d["app_year"]))
         lo, hi = fold["interval"]
@@ -560,17 +600,36 @@ def cmd_score(a):
               f"| Date Uncertain agrees with \"no own date\", all {fold['ruled']} | {pct(*fold['du_agrees_owner'])} |",
               f"| the image pass agrees with \"no own date\", all {fold['ruled']} (for comparison) | "
               f"{pct(*fold['pass_agrees_owner'])} |", "",
-              f"**False year on owner-ruled truth: {100 * fold['rate']:.1f}% ({fold['estimate']:g} of {fold['n']}; "
-              f"{100 * lo:.0f}-{100 * hi:.0f})**, against 13% on the Gemini reading. It is the "
-              f"{fold['confirmed_false'][0]} false-year documents the owner confirms ({', '.join(fy_ids)} on the "
-              f"sheet), plus the {fold['n_certain_match']} confident years that match the pass weighted by the pass's "
-              f"invention rate on the controls ({fold['pass_invented'][0]} of {fold['pass_invented'][1]}). The interval "
-              f"is a seeded simulation ({FOLD_DRAWS:,} draws, seed {FOLD_SEED}): the invention rate drawn from its "
-              f"Jeffreys posterior on the {fold['controls']} controls, the {fold['n_certain_match']} drawn at it, and "
-              f"the total drawn as a share of {fold['n']} sampled documents; most of its width above the point is the "
-              "controls' small n. Where the owner found an own date the pass missed "
-              f"({fold['pass_missed'][0]}), the app's year is his on {fold['app_matches_owner_missed'][0]}: those were "
-              "the reader's misses, not the app's false years.", "",
+              f"**False year on owner-ruled truth: {100 * fold['rate']:.1f}% ({fold['estimate']:g} of {fold['n']})**, "
+              f"against 13% on the Gemini reading; finite bounds {fold['bounds'][0]}-{fold['bounds'][1]} of "
+              f"{fold['n']} ({100 * fold['bounds_rate'][0]:.1f}-{100 * fold['bounds_rate'][1]:.1f}%); model-based 95% "
+              f"interval {fold['interval_count'][0]}-{fold['interval_count'][1]} of {fold['n']} "
+              f"({100 * lo:.1f}-{100 * hi:.1f}%). The count is the {fold['confirmed_false'][0]} false-year documents "
+              f"the owner confirms ({', '.join(fy_ids)} on the sheet), the {fold['target_controls'][0]} of the "
+              f"{fold['target_controls'][1]} controls among the {fold['n_certain_match']} confident years that match "
+              f"the pass which he rules wrong, and the other {fold['target_unjudged']} of those matches, which nobody "
+              f"checked, at the target controls' error rate ({fold['target_controls'][0]} of "
+              f"{fold['target_controls'][1]}). The checked controls keep their rulings and only the "
+              f"{fold['target_unjudged']} are imputed; {fold['other_controls']} control"
+              f"{'s were' if fold['other_controls'] != 1 else ' was'} a Date Uncertain match, which cannot be a false "
+              "year and is left out of that rate (measurement review 2026-10-31 pass 3, P3-1)."
+              + (f" {fold['false_year_unruled']} false-year documents the owner could not rule are drawn at the "
+                 "ruled ones' confirm rate and counted as wrong in the upper bound." if fold['false_year_unruled'] else ""),
+              "",
+              f"The bounds take every unjudged document as right (lower) or as wrong (upper) and assume nothing. The "
+              f"interval is model-based, not a design-based confidence interval: a seeded simulation ({FOLD_DRAWS:,} "
+              f"draws, seed {FOLD_SEED}) draws the error rate from its Jeffreys posterior on the "
+              f"{fold['target_controls'][1]} target controls and the {fold['target_unjudged']} at it, which assumes "
+              "the controls (drawn with a fixed seed among the matches) are exchangeable with the unjudged; its width "
+              "above the point is the controls' small n. With the Date Uncertain control pooled in, it is "
+              f"{100 * fold['pooled_controls_interval'][0]:.1f}-{100 * fold['pooled_controls_interval'][1]:.1f}%. "
+              f"**Scope:** the share is of these {fold['n']} documents, the accepted collection-balanced sample "
+              f"(round-robin over {smp.get('undated collections', 0)} collections, then the unreadable left out); it is "
+              f"not an estimate for the {smp.get('undated agreed', 0)} undated documents or the corpus, which would "
+              "need population weights and a treatment of the unreadable ones. The 6 observed false years and the "
+              "point are not evidence that every unjudged match is right, and no direction of bias is inferred. "
+              f"Where the owner found an own date the pass missed ({fold['pass_missed'][0]}), the app's year is his "
+              f"on {fold['app_matches_owner_missed'][0]}: those were the reader's misses, not the app's false years.", "",
               "Owner rule from the sheet's notes (W47.ct-folder-date): a dated folder photo dates the otherwise "
               "undated documents inside it.", ""]
     # Dated set: Date Uncertain against a date on the page.
@@ -623,8 +682,9 @@ def cmd_score(a):
           "route scored, so the Date Uncertain agreement is relative to a Gemini reader, not to a human. "
           + (f"The owner ruled blind on {fold['ruled']} of the 90 (the false-year documents and {fold['controls']} "
              f"controls; the section above), so the false-year rate is restated on his reading, the "
-             f"{fold['n_certain_match']} confident years that match the pass through the controls only; the rest of the undated figures stay on the Gemini "
-             "reading. " if fold else "The owner checked none of these. ")
+             f"{fold['n_certain_match']} confident years that match the pass through the {fold['target_controls'][1]} "
+             f"controls among them (their rulings kept, the other {fold['target_unjudged']} imputed); the rest of the "
+             "undated figures stay on the Gemini reading. " if fold else "The owner checked none of these. ")
           + "Dated set: the owner's year tag.",
           f"- **Selection.** Undated: round-robin across collections, seed {SEED}, among those whose first page has a "
           "paired JPEG; never by a route's reply or the ABBYY text. Dated: W46.date-image's 122, chosen as owner years "
@@ -634,7 +694,8 @@ def cmd_score(a):
           "(different model version and text).",
           f"- **Noise.** n as given, Wilson 95% intervals in brackets; the rerun section is the floor between two "
           "identical runs. A gap inside it is a tie.",
-          "- **Scope.** It does not say how often a date is truly on an undated document's pages (a Gemini reading), "
+          "- **Scope.** The undated figures are shares of the accepted, collection-balanced sample, not weighted "
+          "estimates for all undated documents. It does not say how often a date is truly on an undated document's pages (a Gemini reading), "
           "nor how the app would do with 3.8 or its own OCR's settings beyond Vision's defaults.", "",
           "## Cost", "",
           f"{len(calls)} gateway calls, {sum((c.get('usage') or {}).get('prompt_tokens', 0) for c in calls):,} input "
@@ -724,7 +785,9 @@ def date_boxes(lines_json):
 
 def sheet_documents(rs):
     """The false-year documents (as cmd_score counts them) and N_CONTROLS drawn with a fixed seed from those where the
-    app's year equals the page's, shuffled together so the order tells nothing. [(document, group)]."""
+    app's year equals the page's, shuffled together so the order tells nothing. [(document, group)]. The controls come
+    from every match, Date Uncertain or not, so owner_fold splits them by stratum (key.json keeps each one's
+    app_date_uncertain)."""
     und = [r for r in rs if r["set"] == "undated" and r["app"] and readable(r)]
     false_year = [r for r in und if not r["app"]["du"] and (r["own"] is None or r["app"]["y"] != r["own"])]
     same = sorted((r for r in und if r["own"] is not None and r["app"]["y"] == r["own"]), key=lambda r: r["id"])

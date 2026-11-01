@@ -126,8 +126,8 @@ class Fold(unittest.TestCase):
         self.assertIsNone(U.owner_ruling({"date": "cannot tell", "year": "1970"})["own"])
         self.assertIsNone(U.owner_ruling(None)["own"])
 
-    def doc(self, group, app, pass_own, ans):
-        return {"group": group, "app_year": app, "app_date_uncertain": False, "pass_own_year": pass_own,
+    def doc(self, group, app, pass_own, ans, i="x", du=False):
+        return {"id": i, "group": group, "app_year": app, "app_date_uncertain": du, "pass_own_year": pass_own,
                 "owner": U.owner_ruling(ans)}
 
     def test_counts_and_restated_rate(self):
@@ -136,19 +136,68 @@ class Fold(unittest.TestCase):
                 "c": self.doc("false year", 1967, None, {"date": "yes", "year": "1968"}),        # missed, app wrong
                 "d": self.doc("false year", 1947, None, {"date": "yes"}),                        # citations only
                 "e": self.doc("false year", 1963, None, {"date": "cannot tell"}),                # left out
-                "f": self.doc("control", 1970, 1970, {"date": "yes", "year": "1970"}),
-                "g": self.doc("control", 1971, 1971, {"date": "no"})}                            # pass invented
-        f = U.owner_fold(docs, 90, 30, draws=2000)
+                "f": self.doc("control", 1970, 1970, {"date": "yes", "year": "1970"}, "t1"),
+                "g": self.doc("control", 1971, 1971, {"date": "no"}, "t2")}                      # pass invented
+        target = ["t1", "t2"] + [f"u{i}" for i in range(28)]
+        f = U.owner_fold(docs, 90, target, draws=2000)
         self.assertEqual(f["ruled"], 6)
         self.assertEqual(f["pass_missed"], [3, 4])
         self.assertEqual(f["app_matches_owner_missed"], [2, 3])
         self.assertEqual(f["confirmed_false"], [2, 4])
         self.assertEqual(f["pass_invented"], [1, 2])
-        self.assertEqual(f["estimate"], 2 + 30 * 0.5)
+        self.assertEqual(f["target_controls"], [1, 2])
+        self.assertEqual(f["target_unjudged"], 28)
+        self.assertEqual(f["false_year_unruled"], 1)
+        self.assertEqual(f["estimate"], 2 + 1 + 28 * 0.5)               # g's ruling kept, only the 28 imputed
+        self.assertEqual(f["bounds"], [3, 3 + 28 + 1])                   # the unruled false year can go either way
         lo, hi = f["interval"]
         self.assertLess(lo, f["rate"])
         self.assertGreater(hi, f["rate"])
-        self.assertEqual(f, U.owner_fold(docs, 90, 30, draws=2000))   # seeded
+        self.assertEqual(f, U.owner_fold(docs, 90, target, draws=2000))   # seeded
+
+    def p3_1(self):
+        """Measurement review pass 3's synthetic case: 12 flagged, six stay false; seven confident and one Date
+        Uncertain control, all right; n=90, 34 confident matches."""
+        docs = {}
+        for k in range(12):
+            ans = {"date": "no"} if k < 6 else {"date": "yes", "year": str(1900 + k)}
+            docs[f"F{k}"] = self.doc("false year", 1900 + k, None, ans, f"f{k}")
+        for k in range(7):
+            docs[f"C{k}"] = self.doc("control", 1950 + k, 1950 + k, {"date": "yes", "year": str(1950 + k)}, f"t{k}")
+        docs["CU"] = self.doc("control", 1990, 1990, {"date": "yes", "year": "1990"}, "du", du=True)
+        return docs, [f"t{k}" for k in range(7)] + [f"u{k}" for k in range(27)]
+
+    def test_target_controls_are_kept_and_the_date_uncertain_one_is_not_target(self):
+        docs, target = self.p3_1()
+        f = U.owner_fold(docs, 90, target, draws=4000)
+        self.assertEqual((f["confirmed_false"], f["target_controls"], f["other_controls"]), ([6, 12], [0, 7], 1))
+        self.assertEqual(f["target_unjudged"], 27)                       # not 34: seven are checked and right
+        self.assertEqual((f["estimate"], f["bounds"]), (6, [6, 33]))
+        lo_c, hi_c = f["interval_count"]
+        self.assertEqual(lo_c, 6)                                        # never below the fixed rulings
+        self.assertLessEqual(hi_c, 33)                                   # never above every unjudged one wrong
+        self.assertLess(f["interval"][1], 0.1974)                        # narrower than re-imputing all 34
+        self.assertIn("model-based", f["interval_kind"])
+        self.assertIn("not a weighted estimate", f["scope"])
+
+    def test_a_wrong_target_control_is_fixed_and_a_wrong_non_target_one_only_pools(self):
+        docs, target = self.p3_1()
+        docs["C0"] = self.doc("control", 1950, 1950, {"date": "no"}, "t0")
+        f = U.owner_fold(docs, 90, target, draws=2000)
+        self.assertEqual(f["target_controls"], [1, 7])
+        self.assertEqual(f["bounds"][0], 7)
+        self.assertAlmostEqual(f["estimate"], 6 + 1 + 27 / 7, places=2)
+        docs, target = self.p3_1()
+        docs["CU"] = self.doc("control", 1990, 1990, {"date": "no"}, "du", du=True)
+        g = U.owner_fold(docs, 90, target, draws=2000)
+        self.assertEqual((g["target_controls"], g["estimate"], g["bounds"]), ([0, 7], 6, [6, 33]))
+        self.assertGreater(g["pooled_controls_interval"][1], g["interval"][1])
+
+    def test_a_control_the_owner_could_not_rule_stays_unjudged(self):
+        docs, target = self.p3_1()
+        docs["C3"] = self.doc("control", 1953, 1953, {"date": "cannot tell"}, "t3")
+        f = U.owner_fold(docs, 90, target, draws=2000)
+        self.assertEqual((f["target_controls"], f["target_unjudged"], f["bounds"]), ([0, 6], 28, [6, 34]))
 
 
 if __name__ == "__main__":

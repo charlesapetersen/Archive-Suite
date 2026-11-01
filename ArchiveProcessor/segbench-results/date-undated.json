@@ -76,6 +76,7 @@
  "owner_ruled": {
   "ruled": 20,
   "false_year_docs": 12,
+  "false_year_unruled": 0,
   "controls": 8,
   "owner_own_date": [
    7,
@@ -110,12 +111,36 @@
    20
   ],
   "n_certain_match": 34,
+  "target_controls": [
+   0,
+   7
+  ],
+  "other_controls": 1,
+  "target_unjudged": 27,
   "n": 90,
   "estimate": 6.0,
   "rate": 0.0667,
+  "bounds": [
+   6,
+   33
+  ],
+  "bounds_rate": [
+   0.0667,
+   0.3667
+  ],
+  "interval_count": [
+   6,
+   15
+  ],
   "interval": [
-   0.0325,
-   0.1974
-  ]
+   0.0667,
+   0.1667
+  ],
+  "interval_kind": "model-based: Jeffreys posterior predictive on the target controls, for these 90",
+  "pooled_controls_interval": [
+   0.0667,
+   0.1556
+  ],
+  "scope": "the accepted, collection-balanced sample of 90 (round-robin over collections, readable only); not a weighted estimate for the 425 or the corpus"
  }
 }

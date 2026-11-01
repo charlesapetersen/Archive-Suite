@@ -333,7 +333,7 @@ footer p { font-size: 13px; }
   <section class="panel" id="date-undated" hidden>
     <div class="head"><h2>Documents the owner left undated</h2><span class="meta">the app's call on Apple Vision text · W46.date-undated</span></div>
     <div class="tbl"><table><thead><tr><th>What is counted</th><th>Documents</th></tr></thead><tbody id="date-undated-rows"></tbody></table></div>
-    <p class="note">The app's tagging call always gives a year. Here it read 100 of the 425 agreed documents with no date tag (drawn across collections) and the 122 unprinted-year documents above, on Apple Vision's reading of the JPEG originals with the app's neighbour context, through the Stanford gateway (Gemini 3.7 Flash, no temperature or reasoning setting, as the app sends it; the gateway serves no 3.8). Date Uncertain is scored against whether the image pass (Gemini 3.7 Flash, images alone) finds the document's own date written on its pages, not against the owner's tag, so it is agreement with a Gemini reader, not with a person. The owner then ruled blind on the 12 false-year documents and 8 controls: the restated row counts the false years he confirms, plus the confident years matching the image pass at its invention rate on the controls, and the owner-ruled rows give the image pass's misses and inventions there. The rerun rows are the same undated set sent twice. Full tables and the measurement card: <code>ArchiveProcessor/segbench-results/date-undated.md</code>.</p>
+    <p class="note">The app's tagging call always gives a year. Here it read 100 of the 425 agreed documents with no date tag (drawn across collections) and the 122 unprinted-year documents above, on Apple Vision's reading of the JPEG originals with the app's neighbour context, through the Stanford gateway (Gemini 3.7 Flash, no temperature or reasoning setting, as the app sends it; the gateway serves no 3.8). Date Uncertain is scored against whether the image pass (Gemini 3.7 Flash, images alone) finds the document's own date written on its pages, not against the owner's tag, so it is agreement with a Gemini reader, not with a person. The owner then ruled blind on the 12 false-year documents and 8 controls: the restated row counts the false years he confirms, keeps his rulings on the controls among the confident years matching the image pass, and imputes only the unjudged rest at those controls' error rate; its bounds take every unjudged one as right or wrong, its interval is model-based, and it is a share of this collection-balanced sample of 90, not an estimate for all undated documents; and the owner-ruled rows give the image pass's misses and inventions there. The rerun rows are the same undated set sent twice. Full tables and the measurement card: <code>ArchiveProcessor/segbench-results/date-undated.md</code>.</p>
   </section>
 
   <header class="part" id="public">
@@ -1006,9 +1006,11 @@ if (DU) {
   const O = DU.owner_ruled;
   // W46.date-undated-fold: the false-year rate restated on the owner's blind rulings, beside the Gemini-scored one.
   const owner = O ? [
-    ['Undated: a false year, restated on the owner\'s rulings (' + O.ruled + ' ruled blind)',
-     (100 * O.rate).toFixed(1) + '% (' + O.estimate + ' of ' + O.n + '; 95% ' + (100 * O.interval[0]).toFixed(0) + '-' +
-     (100 * O.interval[1]).toFixed(0) + '%)'],
+    // Pass 3 P3-1: the checked controls keep their rulings, only the unjudged matches are imputed; a share of the 90.
+    ['Undated: a false year, restated on the owner\'s rulings (' + O.ruled + ' ruled blind; ' + O.target_unjudged +
+     ' confident matches unjudged)',
+     (100 * O.rate).toFixed(1) + '% (' + O.estimate + ' of ' + O.n + '; bounds ' + O.bounds[0] + '-' + O.bounds[1] +
+     ' of ' + O.n + '; model-based 95% ' + (100 * O.interval[0]).toFixed(1) + '-' + (100 * O.interval[1]).toFixed(1) + '%)'],
     ['Owner-ruled: the image pass missed the page\'s own date (false-year documents)', f(O.pass_missed)],
     ['Owner-ruled: the image pass quoted a date the owner does not find (controls)', f(O.pass_invented)],
     ['Owner-ruled: Date Uncertain agrees with "no own date"', f(O.du_agrees_owner)]] : [];
