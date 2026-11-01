@@ -198,6 +198,8 @@ struct OCRCascade: Codable, Equatable, Sendable {
         let firstLabel = firstReaderLabel ?? "\(model.provider.rawValue) · \(model.displayName)"
         let targetLabel = "\(target.provider.rawValue) · \(target.displayName)"
         var why: String
+        // The escalation's code for `OCRResult.readingCodes`: "" when it threw, had no key or was stopped.
+        var whyCode = ""
         if Task.isCancelled {
             why = "stopped before \(targetLabel)"
         } else if let key = key(for: target.provider), !key.isEmpty {
@@ -217,6 +219,7 @@ struct OCRCascade: Codable, Equatable, Sendable {
                                      enclosure: read.enclosure, secondReader: reader)
                 }
                 why = "\(targetLabel): \(read.errorMessage ?? "no text")"
+                whyCode = read.errorCode ?? ""
             } catch {
                 why = "\(targetLabel): \(error.localizedDescription)"
             }
@@ -230,12 +233,13 @@ struct OCRCascade: Codable, Equatable, Sendable {
         if refused, !Task.isCancelled {
             return await OCRRefusalFallback.readRefusedPage(
                 first, imageURL: imageURL, previousText: previousText, previousImageURL: previousImageURL,
-                customPrompt: customPrompt, imageScale: imageScale, excluding: target, failedBefore: why)
+                customPrompt: customPrompt, imageScale: imageScale, excluding: target, failedBefore: why,
+                failedBeforeCode: whyCode)
         }
         let firstWhy = first.errorMessage ?? "\(firstLabel) returned no text (\(firstCode))."
         return OCRResult(text: nil, classification: nil,
                          errorMessage: "\(firstWhy) Escalated to \(targetLabel), which failed too — \(why)",
-                         errorCode: exhaustedCode)
+                         errorCode: exhaustedCode, readingCodes: [first.errorCode ?? "", whyCode])
     }
 
     private static func key(for provider: LLMProvider) -> String? {
@@ -258,4 +262,17 @@ enum OCRFailureCode {
     static let cutOff = "length"
     /// The reply came back but held no answer the client could read.
     static let unparsable = "unparsable"
+
+    /// W40.fix-processor-failed-ocr-filed-image-only / -wrapped — whether a reading's code says the request got
+    /// no reading at all: an HTTP status (a 402, a 429, a 5xx, a bad key), no code (a thrown transport error, no
+    /// key, a stop, a page never started), an Anthropic error body's type other than `invalid_request_error`
+    /// (`rate_limit_error`, `overloaded_error`, `authentication_error`, `api_error`), or a Local Agent CLI that
+    /// did not answer (`cli_*` but `cli_bad_response`). Anything else is the reader's verdict on the page (a
+    /// Gemini finish or block reason, `vision_no_text`, a cut-off or unparsable reply) and repeats on a retry.
+    static func requestFailed(_ code: String?) -> Bool {
+        guard let code, !code.isEmpty else { return true }
+        if code.allSatisfy(\.isNumber) { return true }
+        if code.hasSuffix("_error") { return code != "invalid_request_error" }
+        return code.hasPrefix("cli_") && code != "cli_bad_response"
+    }
 }

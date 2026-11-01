@@ -2,6 +2,19 @@
 
 Tracked bugs we've chosen to come back to later. Each entry has enough context to resume cold.
 
+## FIXED (W40.fix-processor-failed-ocr-wrapped, 2026-11-01): a never-read page wrapped as GeminiRefused or CascadeExhausted was filed image-only
+
+`GeminiRefused` and `CascadeExhausted` now carry every reading's code (`OCRResult.readingCodes`), and Live Capture
+fails such a page for Retry when none of those readings was a verdict (`LiveCaptureProcessor.ocrFailed`): a Gemini
+500 with no second reader, or one whose readers answered 402, no key or a thrown error. A real refusal (`SAFETY`,
+`Recitation`) or a cut-off first reading still files image-only. Anthropic's low-credit reply (a 400
+`invalid_request_error`) is now recorded as a 402. Two edges remain:
+- A page AI Studio refuses with a bare 500 on every try, for a user with no second reader set up, now holds its
+  document back until a second reader is added (the failure message says how); before, it filed image-only.
+- Bare HTTP statuses from OpenAI, Mistral and OpenRouter (a 400, a 413) count as request failures, while
+  Anthropic's `invalid_request_error` and `request_too_large` count as verdicts, so the same faulty request is
+  failed on one route and filed image-only on another.
+
 ## FIXED (W40.fix-processor-after-finish-not-processed, 2026-11-01): a document ended after a full Finish, in the same run, staged with no output
 
 Found by owner session iphone-1 (`verification/sessions/iphone-1-returned.md`, step 4). A Finish that filed every

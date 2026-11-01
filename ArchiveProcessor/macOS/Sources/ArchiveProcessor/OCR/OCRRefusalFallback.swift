@@ -106,9 +106,13 @@ enum OCRRefusalFallback {
     /// marked with `secondReader`. Otherwise a failure (`exhaustedCode`) naming Gemini's reason and every route's.
     static func readRefusedPage(
         _ refused: OCRResult, imageURL: URL, previousText: String?, previousImageURL: URL?,
-        customPrompt: String?, imageScale: Double, excluding: LLMModel? = nil, failedBefore: String? = nil
+        customPrompt: String?, imageScale: Double, excluding: LLMModel? = nil, failedBefore: String? = nil,
+        failedBeforeCode: String = ""
     ) async -> OCRResult {
         let why = refused.errorMessage ?? "Gemini returned no text (\(refused.errorCode ?? "?"))."
+        // W40.fix-processor-failed-ocr-wrapped: every reading's code, so Live Capture can tell a page never read
+        // (Gemini's 500, then a 402 on each second reader) from a refusal (`OCRResult.readingCodes`).
+        var codes = [refused.errorCode ?? ""] + (failedBefore == nil ? [] : [failedBeforeCode])
         // `excluding`: the cascade's route, which has already failed this page (W41.app-ocr-cascade).
         let routes = availableRoutes().filter { route in
             guard let excluding, route.localAgent == nil else { return true }
@@ -117,19 +121,20 @@ enum OCRRefusalFallback {
         if routes.isEmpty, let failedBefore {
             // The cascade's route was the only one, and it failed: say so, not "no second reader is set up".
             return OCRResult(text: nil, classification: nil,
-                             errorMessage: "\(why) Second readers failed too — \(failedBefore)", errorCode: exhaustedCode)
+                             errorMessage: "\(why) Second readers failed too — \(failedBefore)", errorCode: exhaustedCode,
+                             readingCodes: codes)
         }
         guard !routes.isEmpty else {
             NSLog("[OCR] Gemini refused \(imageURL.lastPathComponent) (\(refused.errorCode ?? "?")); no second reader")
             return OCRResult(text: nil, classification: nil,
                              errorMessage: "\(why) No second reader is set up: add an Anthropic, OpenRouter, "
                                  + "OpenAI or Mistral key, or install claude, to read pages Gemini refuses.",
-                             errorCode: exhaustedCode)
+                             errorCode: exhaustedCode, readingCodes: codes)
         }
         var reasons: [String] = failedBefore.map { [$0] } ?? []
         for route in routes {
             // Stopped: spend nothing more. The caller sees the exhausted code and, in a batch, does not persist it.
-            if Task.isCancelled { reasons.append("stopped before \(route.label)"); break }
+            if Task.isCancelled { reasons.append("stopped before \(route.label)"); codes.append(""); break }
             let result: OCRResult
             do {
                 result = try await read(route, imageURL: imageURL, previousText: previousText,
@@ -137,6 +142,7 @@ enum OCRRefusalFallback {
                                         imageScale: imageScale)
             } catch {
                 reasons.append("\(route.label): \(error.localizedDescription)")
+                codes.append("")
                 continue
             }
             if result.text != nil {
@@ -150,11 +156,12 @@ enum OCRRefusalFallback {
                                  enclosure: result.enclosure, secondReader: reader)
             }
             reasons.append("\(route.label): \(result.errorMessage ?? "no text")")
+            codes.append(result.errorCode ?? "")
         }
         NSLog("[OCR] Gemini refused \(imageURL.lastPathComponent); every second reader failed")
         return OCRResult(text: nil, classification: nil,
                          errorMessage: "\(why) Second readers failed too — " + reasons.joined(separator: "; "),
-                         errorCode: exhaustedCode)
+                         errorCode: exhaustedCode, readingCodes: codes)
     }
 
     /// One route's reading of the page. Also the cascade's escalation read (`OCRCascade`), which may be Gemini.

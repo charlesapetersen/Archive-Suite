@@ -1133,7 +1133,8 @@ final class LiveCaptureProcessor: ObservableObject {
                               rotationDegrees: ((rot % 360) + 360) % 360,
                               errorMessage: r.errorMessage, errorCode: r.errorCode,
                               enclosure: r.enclosure, ocrClassification: .some(r.ocrClassification), ocrEnclosure: .some(r.ocrEnclosure),
-                              secondReader: r.secondReader, pageReader: r.pageReader, imported: r.imported)
+                              secondReader: r.secondReader, pageReader: r.pageReader, imported: r.imported,
+                              readingCodes: r.readingCodes)
             }
             results.append(r)
             texts.append(r.text ?? "")
@@ -1315,15 +1316,18 @@ final class LiveCaptureProcessor: ObservableObject {
     /// (Vision's `vision_no_text` on a blank verso, a Gemini block or refusal, a cut-off or unreadable reply)
     /// comes back the same on every retry, so it still files image-only with its reason shown: failing it
     /// would hold the document back for good, since Live Capture has no "file as image-only" action.
+    ///
+    /// W40.fix-processor-failed-ocr-wrapped — a page no reader could read (`GeminiRefused`, `CascadeExhausted`)
+    /// is judged by every reading it folds in (`OCRResult.readingCodes`): it failed when none of them was a
+    /// verdict, e.g. Gemini's 500 with no second reader set up, or a 500 whose escalation answered 402. One real
+    /// refusal or verdict among them, and it still files image-only. Without the codes it stays a verdict.
     nonisolated static func ocrFailed(_ result: OCRResult) -> Bool {
         guard result.errorMessage != nil, result.text?.isEmpty ?? true else { return false }
-        guard let code = result.errorCode, !code.isEmpty else { return true }
-        if code.allSatisfy(\.isNumber) { return true }
-        // Anthropic reports its error body's type in place of the status (`rate_limit_error`,
-        // `overloaded_error`, `authentication_error`, `api_error`); `invalid_request_error` is about the request
-        // itself and repeats on every retry, so it stays a verdict.
-        if code.hasSuffix("_error") { return code != "invalid_request_error" }
-        return code.hasPrefix("cli_") && code != "cli_bad_response"
+        if result.errorCode == OCRRefusalFallback.exhaustedCode || result.errorCode == OCRCascade.exhaustedCode {
+            guard let codes = result.readingCodes, !codes.isEmpty else { return false }
+            return codes.allSatisfy(OCRFailureCode.requestFailed)
+        }
+        return OCRFailureCode.requestFailed(result.errorCode)
     }
 
     /// Compute the segment's subject/color tags (may hit the LLM). Date/quality are layered on later.

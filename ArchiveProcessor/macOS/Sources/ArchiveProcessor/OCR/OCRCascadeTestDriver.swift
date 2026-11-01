@@ -156,6 +156,25 @@ enum OCRCascadeTestDriver {
         check("a success is kept and the escalation route is never called",
               r.text?.contains("QWEN-TEXT") == true && r.secondReader == nil && calls.count == 1)
 
+        // W40.fix-processor-failed-ocr-wrapped — an exhausted cascade carries both readings' codes, so Live Capture
+        // fails a page neither read (a 500, then a 402 or no key) and files one the first reader judged (`length`).
+        // Fresh cascades, so `toClaude`'s breaker count is untouched for the checks below.
+        let wrapCascade = OCRCascade(routeID: OCRCascade.routeID(for: claude))
+        await script.set(["openrouter": (500, #"{"error":{"message":"internal"}}"#), "anthropic": (402, badKey)])
+        r = await ocr(cascade: wrapCascade)
+        check("a 500 whose escalation answers 402 is CascadeExhausted with both codes, and Live Capture fails it",
+              r.errorCode == OCRCascade.exhaustedCode && r.readingCodes?.first == "500"
+              && r.readingCodes?.count == 2 && LiveCaptureProcessor.ocrFailed(r))
+        await script.set(["openrouter": (500, #"{"error":{"message":"internal"}}"#)])
+        r = await ocr(cascade: OCRCascade(routeID: OCRCascade.routeID(for: LLMModel.mistralModels[0])))
+        check("a 500 whose escalation route has no key carries [500, \"\"], and Live Capture fails it",
+              r.errorCode == OCRCascade.exhaustedCode && r.readingCodes == ["500", ""] && LiveCaptureProcessor.ocrFailed(r))
+        await script.set(["openrouter": (200, qwenCut), "anthropic": (402, badKey)])
+        r = await ocr(cascade: wrapCascade)
+        check("a cut-off reply whose escalation answers 402 still files image-only (the first reader's verdict)",
+              r.errorCode == OCRCascade.exhaustedCode && r.readingCodes?.first == OCRFailureCode.cutOff
+              && !LiveCaptureProcessor.ocrFailed(r))
+
         // 4. Never a silent failure.
         await script.set(["openrouter": (200, qwenCut), "anthropic": (401, badKey)])
         r = await ocr(cascade: toClaude)

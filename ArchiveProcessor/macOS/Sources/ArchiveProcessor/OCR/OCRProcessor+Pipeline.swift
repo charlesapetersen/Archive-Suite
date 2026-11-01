@@ -3406,7 +3406,8 @@ extension OCRProcessor {
                                rotationDegrees: ((rotation % 360) + 360) % 360,
                                errorMessage: result.errorMessage, errorCode: result.errorCode,
                                enclosure: result.enclosure, ocrClassification: .some(result.ocrClassification), ocrEnclosure: .some(result.ocrEnclosure),
-                               secondReader: result.secondReader, pageReader: result.pageReader, imported: result.imported)
+                               secondReader: result.secondReader, pageReader: result.pageReader, imported: result.imported,
+                               readingCodes: result.readingCodes)
         }
         result = await Self.applyingVisionTextClassification(
             to: result, previousText: nil, customPrompt: effectiveRunConfig.customOCRPrompt,

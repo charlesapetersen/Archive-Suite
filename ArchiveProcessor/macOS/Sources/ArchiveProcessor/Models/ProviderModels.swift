@@ -525,10 +525,18 @@ struct OCRResult: Codable {
     /// W41.app-institutional-compute — set when the text came in from an institutional-computing bulk run instead of the run's model
     /// (`InstitutionalComputeImport`). `nil` = read in this run.
     let imported: ImportedReading?
+    /// W40.fix-processor-failed-ocr-wrapped — on a page no reader could read (`OCRRefusalFallback.exhaustedCode`,
+    /// `OCRCascade.exhaustedCode`), the code of every reading the failure folds in: the first reader's, then each
+    /// second reader's or the escalation's, "" for one that threw, had no key or was stopped. It is what tells a
+    /// page that was never read (a Gemini 500 then a 402 on the only second reader) from a real refusal
+    /// (`OCRFailureCode.requestFailed`). `nil` on every other result.
+    let readingCodes: [String]?
 
     init(text: String?, classification: DocumentClassification?, rotationDegrees: Int = 0, errorMessage: String?, errorCode: String?,
          enclosure: Bool? = nil, ocrClassification: DocumentClassification?? = nil, ocrEnclosure: Bool?? = nil,
-         secondReader: SecondReader? = nil, pageReader: PageReaderRecord? = nil, imported: ImportedReading? = nil) {
+         secondReader: SecondReader? = nil, pageReader: PageReaderRecord? = nil, imported: ImportedReading? = nil,
+         readingCodes: [String]? = nil) {
+        self.readingCodes = readingCodes
         self.secondReader = secondReader
         self.pageReader = pageReader
         self.imported = imported
@@ -563,7 +571,7 @@ struct OCRResult: Codable {
                   errorMessage: errorMessage, errorCode: errorCode,
                   enclosure: classification == self.classification ? enclosure : nil,
                   ocrClassification: .some(ocrClassification), ocrEnclosure: .some(ocrEnclosure),
-                  secondReader: secondReader, pageReader: pageReader, imported: imported)
+                  secondReader: secondReader, pageReader: pageReader, imported: imported, readingCodes: readingCodes)
     }
 }
 

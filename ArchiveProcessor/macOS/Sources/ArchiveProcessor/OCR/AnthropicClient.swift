@@ -99,6 +99,12 @@ struct AnthropicClient {
             let errorType = error["type"] as? String ?? ""
             apiType = errorType
             let message = error["message"] as? String
+            // W40.fix-processor-failed-ocr-wrapped — Anthropic sends "Your credit balance is too low" as a 400
+            // `invalid_request_error`. It is a billing failure the user fixes, not a fault in the request, so it
+            // carries a 402's code: Live Capture then fails the page for Retry instead of filing it image-only.
+            if statusCode == 400, message?.localizedCaseInsensitiveContains("credit balance") == true {
+                return (billingStatusMessage(402, provider: .anthropic, detail: message) ?? message ?? "", "402")
+            }
             let code = errorType.isEmpty ? "\(statusCode)" : errorType
             if statusCode == 529 || errorType == "overloaded_error" {
                 return ("Model in high use. Try again later.", code)

@@ -13804,3 +13804,20 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   this is placement. Bench cache: kept the Qwen hypotheses and readings under `place-hands/` (inputs to any rescore)
   and `lines-rows.jsonl` (what `report` reads); the drag PDFs were deleted as each was scored.
   <!-- /W46.place-hands-lines -->
+- [x] **W40.fix-processor-failed-ocr-wrapped — a transient OCR failure wrapped as `GeminiRefused` or `CascadeExhausted` is still filed image-only [S · S3]** · §W40 — verification phase (lane: processor) (uses: build) — Follow-up of W40.fix-processor-failed-ocr-filed-image-only (2026-11-01, its adversarial review). `LiveCaptureProcessor.ocrFailed` fails a page whose request got no reading (HTTP status, no code, a silent CLI, Anthropic's `*_error` types) and files a reader's verdict image-only. But `OCRRefusalFallback.isRefusal` counts a Gemini 500 as a refusal, and with no second reader (or one that also fails, e.g. a 402 on its key) the page returns `GeminiRefused`; a cascade whose first reading was a 500 and whose escalation fails returns `CascadeExhausted`. Both read as verdicts, so a never-read page files image-only. Fix: carry the first reader's code on those results (or decide from it) so a transient cause fails the page and a real refusal still files. Test in `LiveCaptureRecoveryTestDriver` Test 31's predicate checks.
+  SHIPPED 2026-11-01. `OCRResult.readingCodes` records the code of every reading an exhausted result folds in
+  (the first reader's, then each second reader's or the escalation's; "" for a throw, a missing key or a stop),
+  filled at all four construction sites in `OCRRefusalFallback.readRefusedPage` and `OCRCascade.resolve` and
+  carried through `with` and the two rotation rebuilds. The code test moved to `OCRFailureCode.requestFailed`;
+  `LiveCaptureProcessor.ocrFailed` fails a `GeminiRefused`/`CascadeExhausted` page only when every reading was a
+  request failure, so one real refusal or verdict still files image-only (no codes: verdict, as before).
+  Adversarial review (Opus) found no blocking defect; its point that Anthropic sends low credit as a 400
+  `invalid_request_error` is fixed in `AnthropicClient.parseErrorResponse` (recorded as "402"); its other two
+  points are in `ArchiveProcessor/KNOWN_ISSUES.md` (a page AI Studio always 500s now waits for a second reader;
+  bare-status vs Anthropic-type inconsistency). Tests: Test 31 (predicate cases plus a wrapped document through
+  ingest → Finish: failed, nothing filed, sources kept; placed before the filing run, after which this driver's
+  later runs do not stage), `test-ocr-refusal.sh` (500 alone, 500 then 402, 500 then low-credit 400, RECITATION
+  then 402, Codable and `with`), `test-ocr-cascade.sh` (500 then 402, 500 then no key, cut-off then 402); all
+  four drivers ALL PASS with `test-manifest-persistence.sh`; clean build, no new warnings. No migration (no
+  production data). No bench cache used.
+  <!-- /W40.fix-processor-failed-ocr-wrapped -->

@@ -240,6 +240,43 @@ enum OCRRefusalFallbackTestDriver {
         calls = await script.calls()
         check("a key error (403) is the user's to fix: no second route is called",
               r.text == nil && r.errorCode == "403" && !calls.contains { $0.contains("anthropic") })
+        // W40.fix-processor-failed-ocr-wrapped — a refused page that no reader read carries every reading's code,
+        // so Live Capture fails a page that was never read (a 500, then a 402) and still files a real refusal.
+        let gemini500 = #"{"error":{"code":500,"message":"Internal error encountered."}}"#
+        let anthropic402 = #"{"type":"error","error":{"type":"billing_error","message":"credit balance too low"}}"#
+        useRoutes([])
+        await script.set(gemini: (500, gemini500))
+        r = await ocr()
+        check("a Gemini 500 with no second reader is GeminiRefused carrying the 500, and Live Capture fails it",
+              r.errorCode == OCRRefusalFallback.exhaustedCode && r.readingCodes == ["500"]
+              && LiveCaptureProcessor.ocrFailed(r))
+        useRoutes([claude])
+        await script.set(gemini: (500, gemini500), anthropic: (402, anthropic402))
+        r = await ocr()
+        let wrapped500 = r
+        check("a Gemini 500 whose second reader answers 402 carries both codes, and Live Capture fails it",
+              r.errorCode == OCRRefusalFallback.exhaustedCode && r.readingCodes?.first == "500"
+              && r.readingCodes?.count == 2 && LiveCaptureProcessor.ocrFailed(r))
+        let lowCredit = #"{"type":"error","error":{"type":"invalid_request_error","message":"Your credit balance is too low to access the Anthropic API."}}"#
+        await script.set(gemini: (500, gemini500), anthropic: (400, lowCredit))
+        r = await ocr()
+        check("Anthropic's low-credit 400 is recorded as a 402, so a Gemini 500 then no credit fails the page",
+              r.readingCodes == ["500", "402"] && LiveCaptureProcessor.ocrFailed(r))
+        await script.set(gemini: (200, recitation), anthropic: (402, anthropic402))
+        r = await ocr()
+        check("a real refusal (RECITATION) whose second reader answers 402 still files image-only",
+              r.errorCode == OCRRefusalFallback.exhaustedCode && r.readingCodes?.first == "Recitation"
+              && !LiveCaptureProcessor.ocrFailed(r))
+        if let data = try? JSONEncoder().encode(wrapped500),
+           let back = try? JSONDecoder().decode(OCRResult.self, from: data) {
+            check("readingCodes round-trips through Codable and survives `with`",
+                  back.readingCodes == wrapped500.readingCodes
+                  && wrapped500.with(classification: .documentStart, rotationDegrees: 90).readingCodes
+                      == wrapped500.readingCodes)
+        } else {
+            check("readingCodes round-trips through Codable and survives `with`", false)
+        }
+
         check("isRefusal: a transport failure (no code) and a timeout are not refusals",
               !OCRRefusalFallback.isRefusal(OCRResult(text: nil, classification: nil, errorMessage: "offline", errorCode: nil))
               && !OCRRefusalFallback.isRefusal(OCRResult(text: nil, classification: nil, errorMessage: "x", errorCode: "504")))

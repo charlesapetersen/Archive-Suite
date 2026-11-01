@@ -4422,6 +4422,19 @@ enum LiveCaptureRecoveryTestDriver {
                       && foOutPDFs(failed.out) == 0 && failed.sources.count == 3
                       && failed.sources.allSatisfy { fm.fileExists(atPath: $0.path) })
 
+            // 1b. W40.fix-processor-failed-ocr-wrapped, end to end (before any run that files, which the
+            //     following runs do not stage in this driver): every page a Gemini 500 whose only second reader
+            //     answered 402 → failed, nothing filed, every source kept.
+            let wrapped = await foRun("wrapped", stub: OCRResult(
+                text: nil, classification: nil,
+                errorMessage: "Gemini API error (500). Second readers failed too — Anthropic: (402)",
+                errorCode: OCRRefusalFallback.exhaustedCode, readingCodes: ["500", "402"]))
+            let wrappedStatus = wrapped.proc.statuses.first { $0.id == "FO" }
+            check("a document whose pages Gemini 500'd and no second reader read is FAILED and files nothing",
+                  wrapped.staged && wrappedStatus?.phase == .failed && wrappedStatus?.failureKind == .provider
+                      && wrapped.proc.failedGroupIds == ["FO"] && wrapped.finished && foOutPDFs(wrapped.out) == 0
+                      && wrapped.sources.allSatisfy { fm.fileExists(atPath: $0.path) })
+
             // 2. UNCHANGED: every page was read and has no text — Apple Vision's answer for a blank verso, which
             //    carries an error code and comes back the same on every retry. Image-only, not failed, filed.
             let empty = await foRun("notext", stub: OCRResult(
@@ -4449,6 +4462,21 @@ enum LiveCaptureRecoveryTestDriver {
                       && !foFails(nil, "x", "unparsable") && !foFails(nil, "x", "cli_bad_response")
                       && !foFails(nil, "x", "invalid_request_error")
                       && !foFails("read", "x", "402") && !foFails(nil, nil, nil))
+
+            // 4. W40.fix-processor-failed-ocr-wrapped — a page no reader read is judged by every reading's code.
+            func foWrapped(_ code: String, _ codes: [String]?) -> Bool {
+                LiveCaptureProcessor.ocrFailed(OCRResult(text: nil, classification: nil, errorMessage: "x",
+                                                         errorCode: code, readingCodes: codes))
+            }
+            check("a GeminiRefused or CascadeExhausted page that no reader read fails OCR",
+                  foWrapped("GeminiRefused", ["500"]) && foWrapped("GeminiRefused", ["500", "402"])
+                      && foWrapped("GeminiRefused", ["500", "", "billing_error"])
+                      && foWrapped("CascadeExhausted", ["500", "402"]) && foWrapped("CascadeExhausted", ["api_error", ""]))
+            check("...and one with a real refusal or verdict among its readings still files image-only",
+                  !foWrapped("GeminiRefused", ["SAFETY", "402"]) && !foWrapped("GeminiRefused", ["Recitation"])
+                      && !foWrapped("GeminiRefused", ["500", "invalid_request_error"])
+                      && !foWrapped("CascadeExhausted", ["length", "402"]) && !foWrapped("CascadeExhausted", ["500", "length"])
+                      && !foWrapped("GeminiRefused", nil) && !foWrapped("CascadeExhausted", []))
 
             LiveCaptureProcessor._recoveryTestOCRStub = nil
             LiveCaptureProcessor._recoveryTestOCRStarts = []
