@@ -45,7 +45,6 @@ from __future__ import annotations
 
 import argparse
 import collections
-import concurrent.futures
 import json
 import os
 import random
@@ -271,20 +270,24 @@ def _group_rss_gb(pgid):
     return sum(int(r) for g, r in (ln.split() for ln in out.splitlines() if ln.strip()) if int(g) == pgid) / 2**20
 
 
-def guarded(args, log, page, step):
+def guarded(args, log, page, step, cap=None, out=None):
     """One kraken call for one page, on its own process group, killed past PAGE_CAP_GB (two runs of this item
     took the Mac down on 2026-10-31 with kraken trees of 50 GB). Peak memory and seconds go to `log`."""
-    t, peak = time.monotonic(), 0.
-    p = subprocess.Popen(args, start_new_session=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
+    t, peak, cap = time.monotonic(), 0., cap or PAGE_CAP_GB
+    sink = out.open('w') if out else None
+    p = subprocess.Popen(args, start_new_session=True, stdout=sink or subprocess.DEVNULL,
+                         stderr=sink or subprocess.PIPE, text=True)
     killed = False
     while p.poll() is None:
         peak = max(peak, _group_rss_gb(p.pid))
-        if peak > PAGE_CAP_GB:
+        if peak > cap:
             os.killpg(p.pid, 9)
             killed = True
             break
         time.sleep(0.5)
-    err = p.communicate()[1]
+    err = p.communicate()[1] or (out.read_text() if out else '')
+    if sink:
+        sink.close()
     row = {'page': page, 'step': step, 'rc': p.returncode, 'peak_gb': round(peak, 2),
            'seconds': round(time.monotonic() - t, 1), 'killed': killed}
     log.write(json.dumps(row) + '\n')
@@ -317,29 +320,18 @@ def cmd_public(_):
                 shutil.copyfile(txt, out / f'{i}.txt')
 
 
-def timed_kraken(log, step, pairs, *cmd, device='cpu'):
-    t = time.monotonic()
-    SP.kraken(['-d', device, '-f', 'page'], pairs, *cmd)
-    log.append({'step': step, 'pages': len(pairs), 'seconds': round(time.monotonic() - t, 1)})
-
-
 def cmd_zero(_):
+    """PP-OCRv6 on the Vision lines, one page a guarded call (the readings' seconds and memory are the timing)."""
     m = LK.model()
     jobs = [(i, RUN / 'vision-xml' / f'{i}.xml', RUN / 'zero' / ('vision-hands' if i.startswith('p') and '__' not in i
                                                                else 'vision-public') / f'{i}.txt')
             for i in [*owner_pages(), *(R.job_id(r) for r in public_rows())]]
-    todo = [j for j in jobs if not j[2].exists()]
-    for j in todo:
-        j[2].parent.mkdir(parents=True, exist_ok=True)
-    log = []
-    with concurrent.futures.ThreadPoolExecutor(SP.WORKERS) as ex:
-        for f in [ex.submit(timed_kraken, log, 'ocr', [(j[1], j[2]) for j in b], 'ocr', '-m', str(m))
-                  for b in SP.batches(todo)]:
-            f.result()
-    t = RUN / 'zero' / 'vision-timing.json'
-    prev = json.loads(t.read_text())['calls'] if t.exists() else []
-    t.write_text(json.dumps({'workers': SP.WORKERS, 'batch': SP.BATCH, 'calls': prev + log}, indent=1))
-    print(f'{len(todo)} pages read on Vision lines')
+    with (RUN / 'zero' / 'vision-guard.jsonl').open('a') as log:
+        for i, xml, txt in jobs:
+            if not txt.exists():
+                txt.parent.mkdir(parents=True, exist_ok=True)
+                guarded([str(SP.KRAKEN), '-d', 'cpu', '-f', 'page', '-i', str(xml), str(txt), 'ocr', '-m', str(m)],
+                        log, i, 'ocr')
 
 
 # ---- the hands ----------------------------------------------------------------------------------------------------
@@ -408,18 +400,16 @@ def cmd_hand_seg(_):
         pp = hand_pages(hand)
         (hand_dir(hand) / 'seg').mkdir(parents=True, exist_ok=True)
         (hand_dir(hand) / 'base').mkdir(parents=True, exist_ok=True)
-        todo = [p for p in pp if not seg_xml(hand, p).exists()]
-        with concurrent.futures.ThreadPoolExecutor(SP.WORKERS) as ex:
-            for f in [ex.submit(SP.kraken, ['-x'], [(p['image'], seg_xml(hand, p)) for p in b], 'segment', '-bl',
-                                '--text-direction', 'horizontal-lr') for b in SP.batches(todo)]:
-                f.result()
-        read = [p for p in pp if not (hand_dir(hand) / 'base' / f'{p["page"]}.xml').exists()]
-        with concurrent.futures.ThreadPoolExecutor(SP.WORKERS) as ex:
-            for f in [ex.submit(SP.kraken, ['-f', 'page', '-x'],
-                                [(seg_xml(hand, p), hand_dir(hand) / 'base' / f'{p["page"]}.xml') for p in b],
-                                'ocr', '-m', str(m)) for b in SP.batches(read)]:
-                f.result()
-        print(f'{hand}: {len(todo)} segmented, {len(read)} read')
+        with (hand_dir(hand) / 'guard.jsonl').open('a') as log:
+            for p in pp:
+                seg, base = seg_xml(hand, p), hand_dir(hand) / 'base' / f'{p["page"]}.xml'
+                if not seg.exists():
+                    guarded([str(SP.KRAKEN), '-d', 'cpu', '-x', '-i', p['image'], str(seg), 'segment', '-bl',
+                             '--text-direction', 'horizontal-lr'], log, p['page'], 'blla')
+                if seg.exists() and not base.exists():
+                    guarded([str(SP.KRAKEN), '-d', 'cpu', '-f', 'page', '-x', '-i', str(seg), str(base), 'ocr', '-m',
+                             str(m)], log, p['page'], 'ocr')
+        print(f'{hand}: {sum(seg_xml(hand, p).exists() for p in pp)} of {len(pp)} segmented')
 
 
 def cmd_pairs(_):
@@ -499,22 +489,22 @@ def cmd_train(a):
         va = write_lines(pl['hand'], pl['val'], d / 'val')
         (d / 'train.txt').write_text(''.join(f'{f}\n' for f in tr))
         (d / 'val.txt').write_text(''.join(f'{f}\n' for f in va))
-        t = time.monotonic()
-        p = subprocess.run([str(KETOS), '-d', pl['device'], '-s', str(SEED), 'train', '-f', 'page', '-i', str(base), '--resize', 'union',
-                            '-t', str(d / 'train.txt'), '-e', str(d / 'val.txt'), '-q', 'early', '--min-epochs',
-                            str(MIN_EPOCHS), '--lag', str(LAG), '-N', str(MAX_EPOCHS), '-o', str(d / 'model')],
-                           capture_output=True, text=True)
-        secs = time.monotonic() - t
-        (d / 'ketos.log').write_text(p.stdout + p.stderr)
-        if p.returncode:
-            raise SystemExit(f'{name}: ketos exited {p.returncode}; see {d / "ketos.log"}')
+        with (RUN / 'train' / 'guard.jsonl').open('a') as log:
+            row = guarded([str(KETOS), '-d', pl['device'], '-s', str(SEED), 'train', '-f', 'page', '-i', str(base),
+                           '--resize', 'union', '-t', str(d / 'train.txt'), '-e', str(d / 'val.txt'), '-q', 'early',
+                           '--min-epochs', str(MIN_EPOCHS), '--lag', str(LAG), '-N', str(MAX_EPOCHS),
+                           '-o', str(d / 'model')], log, name, 'train', cap=TRAIN_CAP_GB, out=d / 'ketos.log')
+        secs = row['seconds']
+        if row['rc']:
+            raise SystemExit(f'{name}: ketos exited {row["rc"]} (killed: {row["killed"]}); see {d / "ketos.log"}')
         best = best_model(d)
         (d / 'done.json').write_text(json.dumps({'seconds': round(secs, 1), 'best': str(best), 'lines': len(pl['keys']),
-                                                 'device': pl['device']}, indent=1))
+                                                 'device': pl['device'], 'peak_gb': row['peak_gb']}, indent=1))
         print(f'{name}: {secs / 60:.1f} min, best {best.name}')
 
 
 MIN_EPOCHS, LAG, MAX_EPOCHS = 10, 5, 60
+TRAIN_CAP_GB = 8.
 
 
 def best_model(d):
@@ -534,17 +524,216 @@ def cmd_eval(_):
         pages = {p['page']: p for p in hand_pages(pl['hand'])}
         todo = [pg for pg in pl['test'] if not (d / 'read' / f'{pg}.txt').exists()]
         (d / 'read').mkdir(parents=True, exist_ok=True)
-        if todo:
-            SP.kraken(['-d', 'cpu', '-f', 'page'], [(seg_xml(pl['hand'], pages[pg]), d / 'read' / f'{pg}.txt')
-                                                    for pg in todo], 'ocr', '-m', m)
+        with (d / 'eval-guard.jsonl').open('a') as log:
+            for pg in todo:
+                guarded([str(SP.KRAKEN), '-d', 'cpu', '-f', 'page', '-i', str(seg_xml(pl['hand'], pages[pg])),
+                         str(d / 'read' / f'{pg}.txt'), 'ocr', '-m', m], log, pg, 'ocr')
         print(f'{name}: {len(todo)} read')
 
 
 # ---- report -------------------------------------------------------------------------------------------------------
 
-def cmd_report(_):
+def _texts(d, ids):
+    return {i: (d / f'{i}.txt').read_text().strip() for i in ids if (d / f'{i}.txt').exists()}
+
+
+def page_text(xml):
+    """A kraken PAGE XML reading -> its lines' text, one a line."""
+    return '\n'.join(ln['text'] for ln in read_page(xml)[3] if ln['text'].strip())
+
+
+def table(sources, ids, truth, stratum, ours, lead_n=6):
+    """Per route: mean NES (points) over `ids` (a missing or empty reading scores 0) by stratum; a route enters only
+    when it read every page. -> (rows sorted by NES, per-page scores by route)."""
     import ocr_panel_score as S
-    raise SystemExit('report: not written yet')
+    per = {}
+    for name, texts in sources.items():
+        if not all(i in texts for i in ids) and name not in ours:
+            continue
+        per[name] = {i: 100 * S.score(truth(i), texts.get(i) or '', stratum(i))['nes'] for i in ids}
+    rows = []
+    for name, sc in per.items():
+        by = collections.defaultdict(list)
+        for i, v in sc.items():
+            by[stratum(i)].append(v)
+        rows.append({'route': name, 'n': len(sc), 'nes': sum(sc.values()) / len(sc),
+                     'strata': {k: sum(v) / len(v) for k, v in sorted(by.items())},
+                     'empty': sum(not (sources[name].get(i) or '').strip() for i in ids)})
+    return sorted(rows, key=lambda r: -r['nes']), per
+
+
+def pairs_against(per, ours, ids):
+    import ocr_panel_score as S
+    out = {}
+    for o in ours:
+        for other in per:
+            if other != o:
+                d = S.paired([per[o][i] for i in ids], [per[other][i] for i in ids])
+                out[f'{o} vs {other}'] = {k: round(v, 2) if isinstance(v, float) else v for k, v in d.items()}
+    return out
+
+
+def guard_stats(path):
+    rows = [json.loads(ln) for ln in path.open()] if path.exists() else []
+    out = {}
+    for step in sorted({r['step'] for r in rows}):
+        rr = [r for r in rows if r['step'] == step and not r['killed'] and r['rc'] == 0]
+        if rr:
+            secs = sorted(r['seconds'] for r in rr)
+            out[step] = {'calls': len(rr), 'median_s': secs[len(secs) // 2], 'peak_gb': max(r['peak_gb'] for r in rr)}
+    out['killed'] = [r['page'] for r in rows if r['killed']]
+    out['failed'] = sorted({r['page'] for r in rows if r['rc'] and not r['killed']})
+    return out
+
+
+def named(sources):
+    """{(route, family): texts} -> {name: texts}, the family added only where a route name repeats."""
+    names = [r for r, _ in sources]
+    return {(r if names.count(r) == 1 else f'{r} ({fam})'): t for (r, fam), t in sources.items()}
+
+
+def cmd_report(_):
+    import ocr_panel as P
+    import ocr_rescore as RS
+    ours = ('ppocrv6-kraken-blla', 'ppocrv6-kraken-vision')
+    # The public L1-L3, ranked (OCR-1: hands are ranked here, where the truth is the source's own).
+    R.MANIFEST = RESULTS / 'bench-corpus' / 'manifest.jsonl'
+    rows = [r for r in R.frozen() if r['stratum'] in STRATA]
+    by = {R.job_id(r): r for r in rows}
+    ids = sorted(by)
+    src = {k: {i: t for i, t in v.items() if i in by} for k, v in named(RS.public_sources(R.frozen())).items()}
+    src[ours[0]] = _texts(RUN / 'zero' / 'blla-public', ids)
+    src[ours[1]] = _texts(RUN / 'zero' / 'vision-public', ids)
+    pub, pub_per = table(src, ids, lambda i: Path(by[i]['truth']).read_text(), lambda i: by[i]['stratum'], ours)
+    pub_pairs = pairs_against({k: v for k, v in pub_per.items() if k in ours or k in [r['route'] for r in pub[:6]]
+                               or k == 'ppocrv6-medium'}, ours, ids)
+    # The owner's 21 hand and mixed pages (truth after W46.ocr-hands-rescore's corrections).
+    kinds = owner_kinds()
+    own_ids = owner_pages()
+    osrc = named(RS.owner_sources())
+    osrc[ours[0]] = _texts(RUN / 'zero' / 'blla-hands', own_ids)
+    osrc[ours[1]] = _texts(RUN / 'zero' / 'vision-hands', own_ids)
+    own, own_per = table(osrc, own_ids, owner_truth, lambda p: 'S0', ours)
+    hand_ids = [p for p in own_ids if kinds[p] == 'handwritten']
+    own_hand = {r: sum(v[p] for p in hand_ids) / len(hand_ids) for r, v in own_per.items()}
+    own_mixed = {r: sum(v[p] for p in own_ids if p not in hand_ids) / max(1, len(own_ids) - len(hand_ids))
+                 for r, v in own_per.items()}
+    own_pairs = pairs_against({k: v for k, v in own_per.items() if k in ours or k in [r['route'] for r in own[:4]]
+                               or k in ('ppocrv6-medium', 'apple-vision', 'lightonocr-3-4b-mlx8', 'qwen3.5-9b-mlx4')},
+                              ours, own_ids)
+    # The fine-tunes: held-out pages, tuned against base (both on blla lines).
+    import ocr_panel_score as S
+    tunes = []
+    for name, pl in plans().items():
+        d = RUN / 'train' / name
+        if not (d / 'done.json').exists():
+            continue
+        done = json.loads((d / 'done.json').read_text())
+        pages = {p['page']: p for p in hand_pages(pl['hand'])}
+        tuned, base = [], []
+        for pg in pl['test']:
+            f = d / 'read' / f'{pg}.txt'
+            if not f.exists():
+                continue
+            t = page_truth(pages[pg])
+            tuned.append(100 * S.score(t, f.read_text())['nes'])
+            base.append(100 * S.score(t, page_text(hand_dir(pl['hand']) / 'base' / f'{pg}.xml'))['nes'])
+        if tuned:
+            pd = S.paired(tuned, base)
+            tunes.append({'name': name, 'hand': pl['hand'], 'n': pl['n'], 'device': pl['device'],
+                          'minutes': round(done['seconds'] / 60, 1), 'peak_gb': done.get('peak_gb'),
+                          'pages': len(tuned), 'tuned': sum(tuned) / len(tuned), 'base': sum(base) / len(base),
+                          'delta': pd['delta'], 'lo': pd['lo'], 'hi': pd['hi']})
+    timing = {'blla-public': guard_stats(RUN / 'zero' / 'blla-public-guard.jsonl'),
+              'vision': guard_stats(RUN / 'zero' / 'vision-guard.jsonl'),
+              'train': guard_stats(RUN / 'train' / 'guard.jsonl')}
+    pairs_stats = {h: json.loads((hand_dir(h) / 'pairs.json').read_text()) for h in ('owner', 'blackwell')
+                   if (hand_dir(h) / 'pairs.json').exists()}
+    out = {'public': pub, 'public_pairs': pub_pairs, 'owner': own, 'owner_hand': own_hand, 'owner_mixed': own_mixed,
+           'owner_pairs': own_pairs, 'tunes': tunes, 'timing': timing,
+           'pairs': {h: {'pages': len(v), 'truth_lines': sum(s['truth_lines'] for s in v),
+                         'kept': sum(s['kept'] for s in v)} for h, v in pairs_stats.items()},
+           'sets': {'public': len(ids), 'owner': len(own_ids), 'owner_hand': len(hand_ids)}}
+    (RESULTS / 'ocr-ppocrv6-hands.json').write_text(json.dumps(out, indent=1))
+    write_md(out)
+    print(f'{RESULTS / "ocr-ppocrv6-hands.md"}: {len(pub)} public routes, {len(own)} owner routes, {len(tunes)} tunes')
+
+
+def f1(x):
+    return '' if x is None else f'{x:.1f}'
+
+
+def write_md(o):
+    L = ['# kraken PP-OCRv6 as the laptop handwriting route (W46.ocr-ppocrv6-hands)', '',
+         'Generated by `scripts/segbench/ocr_ppocrv6_hands.py report` from saved readings. Kiessling\'s kraken port of '
+         'PP-OCRv6 medium (Zenodo 10.5281/zenodo.21788410, kraken 7.1.1, CPU) read on two line sources: kraken blla '
+         'baselines (`ppocrv6-kraken-blla`) and Apple Vision\'s line boxes as rectangles (`ppocrv6-kraken-vision`); '
+         'then fine-tuned on corrected lines of one hand. `ppocrv6-medium` is the native PaddleOCR pipeline (its own '
+         'detector) from FarmShare. Mean NES in points; a missing or empty reading scores 0. No money; no text in the '
+         'repo.', '']
+    L += [f'## The public L1-L3 ({o["sets"]["public"]} pages), where hands are ranked', '',
+          '| route | NES | L1 | L2 | L3 | empty |', '|---|---:|---:|---:|---:|---:|']
+    for r in o['public']:
+        st = r['strata']
+        L.append(f'| {r["route"]} | {f1(r["nes"])} | {f1(st.get("L1"))} | {f1(st.get("L2"))} | {f1(st.get("L3"))} '
+                 f'| {r["empty"]} |')
+    L += ['', 'Paired differences (ours minus the other route, 95% bootstrap interval over the pages):', '',
+          '| pair | delta | interval | p |', '|---|---:|---|---:|']
+    L += [f'| {k} | {v["delta"]:+.2f} | {v["lo"]:+.2f} to {v["hi"]:+.2f} | {v["p"]:.4f} |'
+          for k, v in o['public_pairs'].items()]
+    L += ['', f'## The owner\'s {o["sets"]["owner"]} hand and mixed pages of the 96', '',
+          'Truth after W46.ocr-hands-rescore\'s corrections (the owner\'s blind sheet of 2026-10-31 on the hand '
+          'places; ten places stay unresolved, scored on the truth\'s reading). Not a ranking of hands (OCR-1); '
+          f'the {o["sets"]["owner_hand"]} handwritten pages and the mixed pages apart.', '',
+          '| route | all | handwritten | mixed | empty |', '|---|---:|---:|---:|---:|']
+    for r in o['owner']:
+        L.append(f'| {r["route"]} | {f1(r["nes"])} | {f1(o["owner_hand"][r["route"]])} | '
+                 f'{f1(o["owner_mixed"][r["route"]])} | {r["empty"]} |')
+    L += ['', '| pair | delta | interval | p |', '|---|---:|---|---:|']
+    L += [f'| {k} | {v["delta"]:+.2f} | {v["lo"]:+.2f} to {v["hi"]:+.2f} | {v["p"]:.4f} |'
+          for k, v in o['owner_pairs'].items()]
+    L += ['', '## Fine-tuned on one hand', '',
+          'Training lines are the hand\'s own truth lines, paired to blla lines by a monotone alignment on the base '
+          f'model\'s reading (character error at most {MAX_CER}, lengths within {LEN_RATIO}x); {VAL_LINES} pool lines '
+          'pick the epoch (early stopping); scored on held-out pages read on blla lines, tuned against the base model '
+          'on the same lines. '
+          + '; '.join(f'{h}: {v["kept"]} of {v["truth_lines"]} truth lines paired over {v["pages"]} pages'
+                      for h, v in o['pairs'].items()) + '.', '',
+          '| training | lines | device | minutes | peak GB | held-out pages | base | tuned | delta | interval |',
+          '|---|---:|---|---:|---:|---:|---:|---:|---:|---|']
+    for t in o['tunes']:
+        L.append(f'| {t["name"]} | {t["n"]} | {t["device"]} | {t["minutes"]} | {t["peak_gb"]} | {t["pages"]} | '
+                 f'{f1(t["base"])} | {f1(t["tuned"])} | {t["delta"]:+.2f} | {t["lo"]:+.2f} to {t["hi"]:+.2f} |')
+    tm = o['timing']
+    L += ['', '## Seconds and memory (M3 Pro, 18 GB, CPU, one page a kraken call)', '',
+          '| step | calls | median seconds | peak GB |', '|---|---:|---:|---:|']
+    for k, v in tm.items():
+        for step, s in v.items():
+            if isinstance(s, dict):
+                L.append(f'| {k} {step} | {s["calls"]} | {s["median_s"]} | {s["peak_gb"]} |')
+    killed = sorted({p for v in tm.values() for p in v.get('killed', [])})
+    L += ['', f'Pages stopped by the {PAGE_CAP_GB:g} GB per-call guard: {", ".join(killed) or "none"}. A call includes '
+          'loading the model (a few seconds), so a batched run is faster per page; the guard is why it is one page a '
+          'call (two batched four-worker runs took the Mac down on 2026-10-31).']
+    L += ['', '## Measurement card', '',
+          '- **Truth.** Public L1-L3: the sources\' own transcriptions (By the People crowd text, Bentham '
+          'Transcribe), not drafted by any scored route. Owner pages: drafted by Claude Opus 5.5 and Gemini 3.8 '
+          'Flash, the hand places checked blind by the owner (W46.ocr-hands-rescore); typed and mixed lines not '
+          're-checked, so Gemini 3.8 Flash\'s rows there are agreement with its own draft. Blackwell fine-tune truth: '
+          'By the People\'s transcriptions of the volume. No line was drawn or corrected by a Claude subagent.',
+          '- **Selection.** The 895\'s frozen L1-L3 strata; the owner\'s pages by the panel\'s kind label; the '
+          'Blackwell volume pages by a seeded shuffle of the volume\'s pages with at least '
+          f'{MIN_LINES} truth lines, none in the 895; the owner\'s fine-tune hand is the folder with most hand pages. '
+          'None chosen by a tested route.',
+          '- **Comparison.** Every row reads the same pages; comparator readings are the cached ones '
+          '(`ocr_rescore.py` sources), scored by `ocr_panel_score.score` with the stratum\'s settings. A route that '
+          'did not read every page is left out of a table rather than scored on fewer.',
+          '- **Noise.** kraken on CPU is deterministic, so the rerun floor of our rows is 0; the comparators\' rerun '
+          'floor is ocr-rerun-noise.md\'s 0.49 points. A paired interval across 0 is a tie. Fine-tune rows rest on '
+          'few held-out pages (one per fold for the owner\'s hand), so their intervals are wide.',
+          '- **Scope.** Line recognition only: placement of these lines is W46.place-hands. The Qwen few-line '
+          'prompting arm (cluster) and the Gemini arm (W46.ocr-ppocrv6-hands-paid) are not here.', '']
+    (RESULTS / 'ocr-ppocrv6-hands.md').write_text('\n'.join(L))
 
 
 def main():
