@@ -298,6 +298,26 @@ def guarded(args, log, page, step, cap=None, out=None):
     return row
 
 
+OCR_BATCH = 10   # reading peaks under 2 GB a call (blla is what ran away), so it is batched to load the model once
+
+
+def ocr_batches(pairs, m, log, opts):
+    """kraken ocr over (input, output) pairs, OCR_BATCH a guarded call; the log row names the batch's first page and
+    its size, so seconds a page are seconds / pages."""
+    for k in range(0, len(pairs), OCR_BATCH):
+        b = pairs[k:k + OCR_BATCH]
+        args = [str(SP.KRAKEN), '-d', 'cpu', *opts]
+        for a, o in b:
+            args += ['-i', str(a), str(o)]
+        row = guarded(args + ['ocr', '-m', str(m)], log, Path(b[0][0]).stem, f'ocr-batch{len(b)}')
+        if row['rc'] and not row['killed'] and len(b) > 1:
+            # One bad page fails the call: read the batch's pages one at a time so the rest are not lost.
+            for a, o in b:
+                if not Path(o).exists():
+                    guarded([str(SP.KRAKEN), '-d', 'cpu', *opts, '-i', str(a), str(o), 'ocr', '-m', str(m)], log,
+                            Path(a).stem, 'ocr')
+
+
 def cmd_public(_):
     """The blla arm on L1-L3, one page per kraken call on the CPU, each guarded (loop_kraken.py's batches of ten
     under four workers are what ran away). Segmentations go where loop_kraken.py's would (SP.seg_path), readings
@@ -321,17 +341,16 @@ def cmd_public(_):
 
 
 def cmd_zero(_):
-    """PP-OCRv6 on the Vision lines, one page a guarded call (the readings' seconds and memory are the timing)."""
+    """PP-OCRv6 on the Vision lines, OCR_BATCH pages a guarded call."""
     m = LK.model()
     jobs = [(i, RUN / 'vision-xml' / f'{i}.xml', RUN / 'zero' / ('vision-hands' if i.startswith('p') and '__' not in i
                                                                else 'vision-public') / f'{i}.txt')
             for i in [*owner_pages(), *(R.job_id(r) for r in public_rows())]]
+    todo = [(xml, txt) for _, xml, txt in jobs if not txt.exists()]
+    for _, txt in todo:
+        txt.parent.mkdir(parents=True, exist_ok=True)
     with (RUN / 'zero' / 'vision-guard.jsonl').open('a') as log:
-        for i, xml, txt in jobs:
-            if not txt.exists():
-                txt.parent.mkdir(parents=True, exist_ok=True)
-                guarded([str(SP.KRAKEN), '-d', 'cpu', '-f', 'page', '-i', str(xml), str(txt), 'ocr', '-m', str(m)],
-                        log, i, 'ocr')
+        ocr_batches(todo, m, log, ['-f', 'page'])
 
 
 # ---- the hands ----------------------------------------------------------------------------------------------------
@@ -402,13 +421,12 @@ def cmd_hand_seg(_):
         (hand_dir(hand) / 'base').mkdir(parents=True, exist_ok=True)
         with (hand_dir(hand) / 'guard.jsonl').open('a') as log:
             for p in pp:
-                seg, base = seg_xml(hand, p), hand_dir(hand) / 'base' / f'{p["page"]}.xml'
-                if not seg.exists():
-                    guarded([str(SP.KRAKEN), '-d', 'cpu', '-x', '-i', p['image'], str(seg), 'segment', '-bl',
-                             '--text-direction', 'horizontal-lr'], log, p['page'], 'blla')
-                if seg.exists() and not base.exists():
-                    guarded([str(SP.KRAKEN), '-d', 'cpu', '-f', 'page', '-x', '-i', str(seg), str(base), 'ocr', '-m',
-                             str(m)], log, p['page'], 'ocr')
+                if not seg_xml(hand, p).exists():
+                    guarded([str(SP.KRAKEN), '-d', 'cpu', '-x', '-i', p['image'], str(seg_xml(hand, p)), 'segment',
+                             '-bl', '--text-direction', 'horizontal-lr'], log, p['page'], 'blla')
+            ocr_batches([(seg_xml(hand, p), hand_dir(hand) / 'base' / f'{p["page"]}.xml') for p in pp
+                         if seg_xml(hand, p).exists() and not (hand_dir(hand) / 'base' / f'{p["page"]}.xml').exists()],
+                        m, log, ['-f', 'page', '-x'])
         print(f'{hand}: {sum(seg_xml(hand, p).exists() for p in pp)} of {len(pp)} segmented')
 
 
@@ -525,9 +543,8 @@ def cmd_eval(_):
         todo = [pg for pg in pl['test'] if not (d / 'read' / f'{pg}.txt').exists()]
         (d / 'read').mkdir(parents=True, exist_ok=True)
         with (d / 'eval-guard.jsonl').open('a') as log:
-            for pg in todo:
-                guarded([str(SP.KRAKEN), '-d', 'cpu', '-f', 'page', '-i', str(seg_xml(pl['hand'], pages[pg])),
-                         str(d / 'read' / f'{pg}.txt'), 'ocr', '-m', m], log, pg, 'ocr')
+            ocr_batches([(seg_xml(pl['hand'], pages[pg]), d / 'read' / f'{pg}.txt') for pg in todo], m, log,
+                        ['-f', 'page'])
         print(f'{name}: {len(todo)} read')
 
 
@@ -535,6 +552,11 @@ def cmd_eval(_):
 
 def _texts(d, ids):
     return {i: (d / f'{i}.txt').read_text().strip() for i in ids if (d / f'{i}.txt').exists()}
+
+
+def vision_text(i):
+    """Apple Vision's own reading of the lines PP-OCRv6 read in the vision arm (layout_order.swift `lines`)."""
+    return '\n'.join(ln.get('text', '') for ln in json.loads((RUN / 'vision' / f'{i}.json').read_text())['lines'])
 
 
 def page_text(xml):
@@ -576,11 +598,14 @@ def pairs_against(per, ours, ids):
 def guard_stats(path):
     rows = [json.loads(ln) for ln in path.open()] if path.exists() else []
     out = {}
-    for step in sorted({r['step'] for r in rows}):
-        rr = [r for r in rows if r['step'] == step and not r['killed'] and r['rc'] == 0]
+    size = lambda r: int(r['step'][9:]) if r['step'].startswith('ocr-batch') else 1   # noqa: E731
+    kind = lambda r: 'ocr' if r['step'].startswith('ocr') else r['step']               # noqa: E731
+    for step in sorted({kind(r) for r in rows}):
+        rr = [r for r in rows if kind(r) == step and not r['killed'] and r['rc'] == 0]
         if rr:
-            secs = sorted(r['seconds'] for r in rr)
-            out[step] = {'calls': len(rr), 'median_s': secs[len(secs) // 2], 'peak_gb': max(r['peak_gb'] for r in rr)}
+            secs = sorted(r['seconds'] / size(r) for r in rr)
+            out[step] = {'calls': len(rr), 'pages': sum(size(r) for r in rr), 'median_s': round(secs[len(secs) // 2], 1),
+                         'peak_gb': max(r['peak_gb'] for r in rr)}
     out['killed'] = [r['page'] for r in rows if r['killed']]
     out['failed'] = sorted({r['page'] for r in rows if r['rc'] and not r['killed']})
     return out
@@ -604,9 +629,10 @@ def cmd_report(_):
     src = {k: {i: t for i, t in v.items() if i in by} for k, v in named(RS.public_sources(R.frozen())).items()}
     src[ours[0]] = _texts(RUN / 'zero' / 'blla-public', ids)
     src[ours[1]] = _texts(RUN / 'zero' / 'vision-public', ids)
+    src['apple-vision (lines)'] = {i: vision_text(i) for i in ids if (RUN / 'vision' / f'{i}.json').exists()}
     pub, pub_per = table(src, ids, lambda i: Path(by[i]['truth']).read_text(), lambda i: by[i]['stratum'], ours)
-    pub_pairs = pairs_against({k: v for k, v in pub_per.items() if k in ours or k in [r['route'] for r in pub[:6]]
-                               or k == 'ppocrv6-medium'}, ours, ids)
+    pub_pairs = pairs_against({k: v for k, v in pub_per.items() if k in ours or k in [r['route'] for r in pub[:4]]
+                               or k in ('ppocrv6-medium', 'apple-vision (lines)', 'lightonocr3-4b')}, ours, ids)
     # The owner's 21 hand and mixed pages (truth after W46.ocr-hands-rescore's corrections).
     kinds = owner_kinds()
     own_ids = owner_pages()
@@ -624,7 +650,11 @@ def cmd_report(_):
     # The fine-tunes: held-out pages, tuned against base (both on blla lines).
     import ocr_panel_score as S
     tunes = []
-    for name, pl in plans().items():
+    try:
+        trained = plans()
+    except FileNotFoundError:      # no pairs yet: the zero-shot tables alone
+        trained = {}
+    for name, pl in trained.items():
         d = RUN / 'train' / name
         if not (d / 'done.json').exists():
             continue
@@ -668,6 +698,8 @@ def write_md(o):
          'Generated by `scripts/segbench/ocr_ppocrv6_hands.py report` from saved readings. Kiessling\'s kraken port of '
          'PP-OCRv6 medium (Zenodo 10.5281/zenodo.21788410, kraken 7.1.1, CPU) read on two line sources: kraken blla '
          'baselines (`ppocrv6-kraken-blla`) and Apple Vision\'s line boxes as rectangles (`ppocrv6-kraken-vision`); '
+         '`apple-vision (lines)` is Vision\'s own text of those lines (the cached Vision page readings do not cover '
+         'L1-L3); '
          'then fine-tuned on corrected lines of one hand. `ppocrv6-medium` is the native PaddleOCR pipeline (its own '
          'detector) from FarmShare. Mean NES in points; a missing or empty reading scores 0. No money; no text in the '
          'repo.', '']
@@ -706,15 +738,15 @@ def write_md(o):
                  f'{f1(t["base"])} | {f1(t["tuned"])} | {t["delta"]:+.2f} | {t["lo"]:+.2f} to {t["hi"]:+.2f} |')
     tm = o['timing']
     L += ['', '## Seconds and memory (M3 Pro, 18 GB, CPU, one page a kraken call)', '',
-          '| step | calls | median seconds | peak GB |', '|---|---:|---:|---:|']
+          '| step | calls | pages | median seconds a page | peak GB a call |', '|---|---:|---:|---:|---:|']
     for k, v in tm.items():
         for step, s in v.items():
             if isinstance(s, dict):
-                L.append(f'| {k} {step} | {s["calls"]} | {s["median_s"]} | {s["peak_gb"]} |')
+                L.append(f'| {k} {step} | {s["calls"]} | {s["pages"]} | {s["median_s"]} | {s["peak_gb"]} |')
     killed = sorted({p for v in tm.values() for p in v.get('killed', [])})
     L += ['', f'Pages stopped by the {PAGE_CAP_GB:g} GB per-call guard: {", ".join(killed) or "none"}. A call includes '
-          'loading the model (a few seconds), so a batched run is faster per page; the guard is why it is one page a '
-          'call (two batched four-worker runs took the Mac down on 2026-10-31).']
+          'loading the model, so one-page calls overstate seconds a page; blla is one page a call because two batched '
+          'four-worker runs took the Mac down on 2026-10-31; reading is batched ten pages a call.']
     L += ['', '## Measurement card', '',
           '- **Truth.** Public L1-L3: the sources\' own transcriptions (By the People crowd text, Bentham '
           'Transcribe), not drafted by any scored route. Owner pages: drafted by Claude Opus 5.5 and Gemini 3.8 '
