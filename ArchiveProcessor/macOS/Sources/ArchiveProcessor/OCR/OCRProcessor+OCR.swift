@@ -1862,6 +1862,8 @@ extension OCRProcessor {
               result.errorCode != OCRRefusalFallback.exhaustedCode,
               result.errorCode != OCRCascade.exhaustedCode else { return false }
         let code = result.errorCode ?? ""
+        // No credit or billing: every retry would fail the same way (W40.fix-processor-gemini-402-message).
+        if code == "402" { return false }
         let msg = (result.errorMessage ?? "").lowercased()
         return code == "503" || code == "429" || code == "529"
             || msg.contains("high use") || msg.contains("high demand")

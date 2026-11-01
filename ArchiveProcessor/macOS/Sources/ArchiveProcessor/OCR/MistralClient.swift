@@ -125,17 +125,16 @@ struct MistralClient {
         return .documentStart
     }
 
-    private static func parseErrorResponse(data: Data, statusCode: Int) -> String {
+    static func parseErrorResponse(data: Data, statusCode: Int) -> String {
         // Status-based classification first, independent of body shape (empty/non-JSON 5xx/429).
         if let msg = transientStatusMessage(statusCode) { return msg }
+        var message: String?
         if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
             // Mistral errors can be {"message": "..."} or {"error": {"message": "..."}}
-            let message = (json["message"] as? String)
+            message = (json["message"] as? String)
                 ?? (json["error"] as? [String: Any])?["message"] as? String
-            if let message = message {
-                return message
-            }
         }
-        return "API error (\(statusCode))"
+        if let billing = billingStatusMessage(statusCode, provider: .mistral, detail: message) { return billing }
+        return message ?? "API error (\(statusCode))"
     }
 }

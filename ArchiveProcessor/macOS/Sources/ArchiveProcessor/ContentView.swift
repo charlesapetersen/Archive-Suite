@@ -81,6 +81,7 @@ struct ContentView: View {
             OCRCascadeTestDriver.runIfRequested()            // $0 W41 cheap-first OCR cascade, no wire
             InstitutionalComputeImportTestDriver.runIfRequested()       // $0 W41 an institutional-computing bulk run's text, no wire
             OpenRouterTestDriver.runIfRequested()             // $0 W41 OpenRouter request pinning, no wire
+            ProviderErrorTestDriver.runIfRequested()         // $0 W40 a 402 reads as credit/billing, not a rate limit
             LocalModelsTestDriver.runIfRequested()           // $0 W41 local open-weight model route, no wire
             OCRPageGuidanceTestDriver.runIfRequested()       // $0 W41 picker note: which model reads which pages
             OCRPageKindTestDriver.runIfRequested()           // $0 W41 page kind → its reader, no wire

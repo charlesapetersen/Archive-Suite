@@ -153,6 +153,12 @@ struct APIWindowTransport: WindowTransport {
                 message += ": " + String(raw.prefix(300))
             }
             let kind = ((err?["type"] as? String) ?? (err?["status"] as? String) ?? (err?["code"] as? String) ?? "")
+            // No credit or billing fails every window alike, though Gemini sends it as RESOURCE_EXHAUSTED: it is not
+            // the usage limit below (W40.fix-processor-gemini-402-message).
+            if status == 402 {
+                let billing = billingStatusMessage(402, provider: provider.keychainAccount, detail: message) ?? message
+                throw WindowTransportError.fatal("\(provider.rawValue) 402: \(billing)")
+            }
             // NetworkSession has already retried a 429 with back-off; one still standing is the account's
             // quota or rate limit, so the run stops rather than burning through every window.
             if status == 429 || kind == "rate_limit_error" || kind == "RESOURCE_EXHAUSTED" || kind == "insufficient_quota" {

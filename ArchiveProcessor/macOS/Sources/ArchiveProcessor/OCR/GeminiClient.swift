@@ -102,6 +102,11 @@ struct GeminiClient {
             let status = error["status"] as? String ?? ""
             let message = error["message"] as? String
             // Handle common error statuses with friendly messages
+            // Before RESOURCE_EXHAUSTED: Google sends that status with a 402 when the prepaid credits are gone,
+            // which is a billing stop, not a rate limit (W40.fix-processor-gemini-402-message).
+            if let billing = billingStatusMessage(statusCode, provider: .gemini, detail: message) {
+                return billing
+            }
             if statusCode == 503 || status == "UNAVAILABLE" {
                 return "Model in high use. Try again later."
             }
@@ -116,6 +121,7 @@ struct GeminiClient {
             }
         }
         // Status-based classification even when the body is empty/non-JSON (gateway/CDN 5xx often are).
+        if let msg = billingStatusMessage(statusCode, provider: .gemini, detail: nil) { return msg }
         if let msg = transientStatusMessage(statusCode) { return msg }
         return "API error (\(statusCode))"
     }

@@ -75,7 +75,7 @@ struct OpenAICompatibleClient {
         guard let http = response as? HTTPURLResponse else { throw OCRError.networkError("No HTTP response") }
 
         if http.statusCode != 200 {
-            let errorMessage = Self.parseErrorResponse(data: data, statusCode: http.statusCode)
+            let errorMessage = Self.parseErrorResponse(data: data, statusCode: http.statusCode, provider: billingProvider)
             return OCRResult(text: nil, classification: nil, errorMessage: errorMessage, errorCode: "\(http.statusCode)")
         }
         return parseCompletion(data)
@@ -91,8 +91,10 @@ struct OpenAICompatibleClient {
             if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                let error = json["error"] as? [String: Any] {
                 let code = (error["code"] as? Int).map(String.init) ?? (error["code"] as? String)
+                let message = error["message"] as? String
                 return OCRResult(text: nil, classification: nil,
-                                 errorMessage: (error["message"] as? String) ?? "Provider error",
+                                 errorMessage: billingStatusMessage(Int(code ?? "") ?? 0, provider: billingProvider,
+                                                                    detail: message) ?? message ?? "Provider error",
                                  errorCode: Self.openRouterRetryCode(code))
             }
             // A reply cut at the token limit before any content (`content: null`) is a cut-off, not unparsable.
@@ -163,7 +165,7 @@ struct OpenAICompatibleClient {
         guard let http = response as? HTTPURLResponse else { throw OCRError.networkError("No HTTP response") }
         if http.statusCode != 200 {
             return OCRResult(text: nil, classification: nil,
-                             errorMessage: Self.parseErrorResponse(data: reply.rawBody, statusCode: http.statusCode),
+                             errorMessage: Self.parseErrorResponse(data: reply.rawBody, statusCode: http.statusCode, provider: billingProvider),
                              errorCode: "\(http.statusCode)")
         }
         // `take` stops the stream only when the reply loops.
@@ -196,7 +198,7 @@ struct OpenAICompatibleClient {
         // failure, never tags or a classification read from its thinking (W41.app-local-models-fu2). A refusal says
         // why (a server that rejected a request field, say), as the OCR stream does.
         if localModel, let status = (response as? HTTPURLResponse)?.statusCode, status != 200 {
-            throw OCRError.networkError(Self.parseErrorResponse(data: data, statusCode: status))
+            throw OCRError.networkError(Self.parseErrorResponse(data: data, statusCode: status, provider: billingProvider))
         }
         if localModel, let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
            let choice = (json["choices"] as? [[String: Any]])?.first {
@@ -214,7 +216,7 @@ struct OpenAICompatibleClient {
               let content = message["content"] as? String else {
             if openRouterRoute != nil {
                 let status = (response as? HTTPURLResponse)?.statusCode ?? 200
-                throw OCRError.networkError(Self.parseErrorResponse(data: data, statusCode: status))
+                throw OCRError.networkError(Self.parseErrorResponse(data: data, statusCode: status, provider: billingProvider))
             }
             throw OCRError.networkError("bad response")
         }
@@ -245,20 +247,24 @@ struct OpenAICompatibleClient {
         return request
     }
 
-    static func parseErrorResponse(data: Data, statusCode: Int) -> String {
+    /// The provider a 402 names, by endpoint: OpenAI or OpenRouter; nil for a gateway or a server on this Mac.
+    var billingProvider: LLMProvider? {
+        if openRouterRoute != nil || baseURL == Self.openRouterBaseURL { return .openrouter }
+        return baseURL == Self.openAIBaseURL ? .openai : nil
+    }
+
+    static func parseErrorResponse(data: Data, statusCode: Int, provider: LLMProvider? = nil) -> String {
         // Status-based classification first, independent of body shape — gateways (vLLM/LiteLLM/Ollama
         // shims, CDNs) often return an empty or non-JSON 5xx/429 body.
         if let msg = transientStatusMessage(statusCode) { return msg }
+        var message: String?
         if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
             // Handle the several error shapes arbitrary OpenAI-compatible gateways use.
-            if let error = json["error"] as? [String: Any], let message = error["message"] as? String {
-                return message
-            }
-            if let error = json["error"] as? String { return error }
-            if let detail = json["detail"] as? String { return detail }
-            if let message = json["message"] as? String { return message }
+            message = (json["error"] as? [String: Any])?["message"] as? String
+                ?? json["error"] as? String ?? json["detail"] as? String ?? json["message"] as? String
         }
-        return "API error (\(statusCode))"
+        if let billing = billingStatusMessage(statusCode, provider: provider, detail: message) { return billing }
+        return message ?? "API error (\(statusCode))"
     }
 }
 

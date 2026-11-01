@@ -87,8 +87,13 @@ struct AnthropicClient {
     /// Returns a friendly message plus the provider's semantic error code (Anthropic `error.type`,
     /// e.g. `invalid_request_error`, `request_too_large`), falling back to the HTTP status. Status-code
     /// classification also runs when the body is empty/non-JSON (some gateway 5xx have no JSON body).
-    private static func parseErrorResponse(data: Data, statusCode: Int) -> (message: String, code: String) {
+    static func parseErrorResponse(data: Data, statusCode: Int) -> (message: String, code: String) {
         var apiType = ""
+        // A 402 keeps "402" as its code whatever the body's type, so it is never retried as a transient failure.
+        if statusCode == 402 {
+            let error = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["error"] as? [String: Any]
+            return (billingStatusMessage(402, provider: .anthropic, detail: error?["message"] as? String) ?? "", "402")
+        }
         if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
            let error = json["error"] as? [String: Any] {
             let errorType = error["type"] as? String ?? ""
