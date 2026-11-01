@@ -262,7 +262,9 @@ def cmd_vision_xml(_):
     print(f'{len(jobs)} pages, {len(missing)} read by Vision now')
 
 
-PAGE_CAP_GB = float(os.environ.get('PPOCRV6_PAGE_CAP_GB', '5'))
+# A kraken call's process tree is stopped past this. Ordinary pages peak at 2.4-5.7 GB on CPU (landscape and
+# large scans highest); 9 GB stays under the Agent Manager's 10.8 GB guard, and one call runs at a time.
+PAGE_CAP_GB = float(os.environ.get('PPOCRV6_PAGE_CAP_GB', '9'))
 
 
 def _group_rss_gb(pgid):
@@ -310,8 +312,9 @@ def ocr_batches(pairs, m, log, opts):
         for a, o in b:
             args += ['-i', str(a), str(o)]
         row = guarded(args + ['ocr', '-m', str(m)], log, Path(b[0][0]).stem, f'ocr-batch{len(b)}')
-        if row['rc'] and not row['killed'] and len(b) > 1:
-            # One bad page fails the call: read the batch's pages one at a time so the rest are not lost.
+        if row['rc'] and len(b) > 1:
+            # One bad or heavy page fails or stops the call: read the batch's pages one at a time so the rest are
+            # not lost, and a page that is stopped alone is the one named in the log.
             for a, o in b:
                 if not Path(o).exists():
                     guarded([str(SP.KRAKEN), '-d', 'cpu', *opts, '-i', str(a), str(o), 'ocr', '-m', str(m)], log,
@@ -434,6 +437,9 @@ def cmd_pairs(_):
     for hand in ('owner', 'blackwell'):
         stats = []
         for p in hand_pages(hand):
+            if not (hand_dir(hand) / 'base' / f'{p["page"]}.xml').exists():
+                print(f'{hand}: {p["page"]} has no base reading (stopped by the guard); left out', file=sys.stderr)
+                continue
             image, w, h, lines = read_page(hand_dir(hand) / 'base' / f'{p["page"]}.xml')
             truth = truth_lines(page_truth(p))
             kept = [(i, j, c) for i, j, c in match(truth, [ln['text'] for ln in lines])
@@ -457,7 +463,8 @@ def pair_lines(hand, page):
 def plans():
     """Every training: name -> {hand, n, train pages, test pages, device}. Owner: leave one page out."""
     out = {}
-    bw = hand_pages('blackwell')
+    paired = lambda hand, p: (hand_dir(hand) / 'pairs' / f'{p["page"]}.json').exists()   # noqa: E731
+    bw = [p for p in hand_pages('blackwell') if paired('blackwell', p)]   # a page the guard stopped is left out
     tr = [p['page'] for p in bw if p['role'] == 'train']
     te = [p['page'] for p in bw if p['role'] in ('test', 'other')]
     pool = [f'{pg}|{k}' for pg in tr for k in range(len(pair_lines('blackwell', pg)['lines']))]
