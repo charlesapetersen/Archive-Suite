@@ -13,7 +13,7 @@ Format and statuses: [`README.md`](README.md). Written by `W40.b2`, 2026-10-12.
   `W23.m9`/`-fu3`, `W23.m14`/`-fu`, `W37.dual-date`, `W24.cal1`, `W24.cal1-toggle`, `W24.cal1-validator`,
   and the W0–W8 records under §*Archive Notes — NEW APP*.
 - **Sources and code read at:** `9e8959ef`.
-- **Count:** `unproven 45 · works 5 · broken 1 · unreachable 0 · fixed-pending-recheck 1` (works: N-34, N-45, N-49, N-50, N-51; broken: N-44; fixed-pending-recheck: N-12). Updated by `W40.fix-notes-return-paragraph`, 2026-10-31 (N-12 to `fixed-pending-recheck`).
+- **Count:** `unproven 45 · works 5 · broken 0 · unreachable 0 · fixed-pending-recheck 2` (works: N-34, N-45, N-49, N-50, N-51; fixed-pending-recheck: N-12, N-44). Updated by `W40.fix-notes-zotero-csljson-crash`, 2026-10-31 (N-44 to `fixed-pending-recheck`).
 
 **Runtime evidence, for every row below: none yet.** The W40.a3 full VM suite
 ([`evidence/notes/W40.a3-full-ui.md`](evidence/notes/W40.a3-full-ui.md)) and the `W9.e2` runtime sweep passed
@@ -1372,10 +1372,11 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
   `ArchiveNotesTests/ZoteroAutoFillTests.modelCancelWritesNothing`, `.planFillEmpty` and
   `.attachedReferenceResolverRejectsAmbiguousNote`.
 - **Runtime evidence:** [`evidence/notes/W40.d10-integrations.md`](evidence/notes/W40.d10-integrations.md): against the real Zotero, Note ▸ Auto-fill from Zotero… crashes Notes (SIGABRT in `ZoteroClient.fetchCSLviaLocalAPI`; Zotero returns `csljson` as a string holding an array). 2 of 2 VM runs, plus the crash report.
-- **Status:** `broken` — `W40.fix-notes-zotero-csljson-crash` (S2)
+- **Status:** `fixed-pending-recheck` (builder is not verifier)
 - **History:**
   - 2026-10-12 W40.b2 — row written, `unproven`.
   - 2026-10-15 W40.d10 — reproduced against the real Zotero; `broken`, filed `W40.fix-notes-zotero-csljson-crash` (S2).
+  - 2026-10-31 W40.fix-notes-zotero-csljson-crash — `broken` → `fixed-pending-recheck`: `ZoteroClient.fetchCSLviaLocalAPI` reads the string holding a CSL array (and an object or array), never hands an unvalidated value to `data(withJSONObject:)`, and `CSLDate` decodes numeric-string date parts; `ZoteroLocalAPIShapeTests` carries Zotero's measured body, the DEBUG UI-test transport answers in that shape, and `testD10_2_AutoFillFromRealZotero` no longer expects the failure. VM: the real-Zotero journey step passed (sheet opened; Apply wrote `date: 1843` and the APA citation).
 - **Notes:** `W9.e2-zotero` ran `testG15_AutoFill…` (attach → Cancel writes nothing → Apply writes only the
   accepted date plus the configured-style citation) through the DEBUG in-process transport. There are two
   `testG15_…` tests; this row means the AutoFill one. A citation fetch that fails does not block Auto-fill

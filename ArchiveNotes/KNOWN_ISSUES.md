@@ -112,15 +112,16 @@ or code syntax is escaped so it reopens as typed.)
   reserved, so a later paste cannot land under it and make the old reference show a different image. This closes
   residual (a) of the W7-S5 entry below.
 
-## 🔴 OPEN (W40.d10, 2026-10-15) — Auto-fill from Zotero crashes Notes against a real Zotero
+## ✅ FIXED (W40.fix-notes-zotero-csljson-crash, 2026-10-31) — Auto-fill from Zotero crashed against a real Zotero
 
-With a real Zotero (10.0.6, local API on, no Better BibTeX), Note ▸ Auto-fill from Zotero… aborts the app: Zotero
-returns `csljson` as a string holding an array, and `ZoteroClient.fetchCSLviaLocalAPI` passes it to
-`JSONSerialization.data(withJSONObject:)`, which raises (`W40.fix-notes-zotero-csljson-crash`, S2). Until it is
-fixed, do not use Auto-fill. Attaching a reference, its citation and Open in Zotero all work against the real
-Zotero. Reproduced by `ArchiveNotesUITests/IntegrationJourneyUITests.testD10_2_AutoFillFromRealZotero` in
-`NOTES_JOURNEY=integrations ops/gui/vm-gui-runner.sh notes xcuitest`, carried there as a non-strict
-`XCTExpectFailure`. Evidence: `verification/evidence/notes/W40.d10-integrations.md` at the suite root.
+Found by W40.d10 (2026-10-15): with a real Zotero (10.0.6, local API on, no Better BibTeX), Note ▸ Auto-fill from
+Zotero… aborted the app, because Zotero returns `csljson` as a string holding an array and
+`ZoteroClient.fetchCSLviaLocalAPI` passed it to `JSONSerialization.data(withJSONObject:)`, which raises. The client
+now reads that string (and an array or object), never hands an unvalidated value to `data(withJSONObject:)`, and
+decodes Zotero's string date parts (`[["1843"]]`). `ZoteroLocalAPIShapeTests` carries Zotero's measured body;
+`IntegrationJourneyUITests.testD10_2_AutoFillFromRealZotero` (`NOTES_JOURNEY=integrations ops/gui/vm-gui-runner.sh
+notes xcuitest`) passes against the real Zotero without its expected failure. Evidence:
+`verification/evidence/notes/W40.d10-integrations.md` at the suite root.
 
 ## GUI fixture order — regression coverage (W40.a3, 2026-10-11)
 
