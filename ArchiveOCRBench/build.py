@@ -413,7 +413,7 @@ def seg_boxes_score():
               "teacher": "Qwen3.5 27B teacher", "fs-2b": "Trained 2B, bf16", "fs-4b": "Trained 4B, bf16"}
     return {"labels": labels, "status": d["status"], "source": path.with_suffix(".md").name,
             "boxes": [{k: r[k] for k in ("route", "box", "split", "known gaps", "gap accuracy", "false splits",
-                                          "false merges", "pages exact")} for r in d["observed"]],
+                                          "false merges", "pages exact", "resolved pages", "unsure")} for r in d["observed"]],
             "sc0122": d["sc0122_owner"], "offsets": d["offsets"], "note": d["note"]}
 
 

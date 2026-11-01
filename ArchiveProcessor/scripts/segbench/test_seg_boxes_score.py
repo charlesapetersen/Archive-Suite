@@ -104,7 +104,8 @@ class PartialReport(unittest.TestCase):
         out = {"status": "offline arms only; gateway and offsets pending", "offsets": None, "paired": [],
                "observed": [{"route": k, "box": b, "split": B.route_split(k, b), "known gaps": 10,
                              "gap accuracy": .8, "right": 8, "false splits": 1, "false merges": 1,
-                             "pages exact": .6, "failed windows": 0} for b in B.BOXES for k in routes],
+                             "pages exact": .6, "failed windows": 0, "unsure": 2, "resolved pages": 20}
+                            for b in B.BOXES for k in routes],
                "gateway": {"calls": 0, "input_tokens": 0, "output_tokens": 0, "invalid": 0, "spent": .0291,
                            "billed": "unknown", "mean_seconds": 0},
                "sc0122_owner": {"asked_known": 2, "controls": 2, "agreed_doc_gaps": 3,
@@ -120,6 +121,7 @@ class PartialReport(unittest.TestCase):
         self.assertNotIn("| 3.7 o0", report)
         self.assertNotIn("READING", report)
         self.assertIn("document-exact scores there remain conditional", out["note"])
+        self.assertIn("2 unsure gaps excluded, 20 resolved document pages", report)
 
 
 if __name__ == "__main__":

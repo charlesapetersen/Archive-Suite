@@ -423,6 +423,10 @@ def render(out) -> str:
          "boxes. SC0122's all-known scores below are diagnostics against its locked draft, which includes "
          "tag/teacher agreement beyond the owner's controls; its document-exact scores are conditional on that "
          "draft. Use the separate owner-supported weighted gap comparison for accuracy conclusions there.", "",
+         "Common support: " + "; ".join(
+             f"{b}: {obs[(routes[0], b)]['known gaps']} known gaps, "
+             f"{obs[(routes[0], b)]['unsure']} unsure gaps excluded, "
+             f"{obs[(routes[0], b)]['resolved pages']} resolved document pages" for b in BOXES) + ".", "",
          "| route | box | split | known gaps | gap accuracy | false splits | false merges | pages exact | "
          "failed windows |", "|---|---|---|---:|---:|---:|---:|---:|---:|"]
     for b in BOXES:
