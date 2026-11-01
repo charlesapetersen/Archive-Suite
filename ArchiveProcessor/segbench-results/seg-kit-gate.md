@@ -62,7 +62,6 @@ Paired document bootstrap over the five owner boxes (465 documents, 809 gaps): d
 | 4B minus 2B | 809 | 31 | +0.87 points | ±0.41 | ±0.95 |
 | 27B teacher minus 2B | 809 | 39 | +0.37 points | ±0.51 | ±1.2 |
 
-
 ## Observed, from the same records
 
 Known gaps only; pages exact over the documents every unsure gap leaves resolved (W46.seg-unsure-mask).
@@ -137,7 +136,7 @@ What the dry run found missing from the kit:
 
 ## Measurement card
 
-- **Truth.** The owner's ruled boxes (Dean, Deaver, Herrnstein; test boxes Stanton and RG165), Stanton with the owner's 2026-10-31 segmentation-sheet rulings folded (W46.seg-truth-rescore); the agent-audited public truths of Lincoln and CREST with the owner's rulings folded (lincoln 5 ruled, 3 unsure, `5ba5a0e67380…`, crest 6 ruled, 4 unsure, `c7a0cfcac896…`); their other gaps remain agent-audited. Unsure gaps are out of every count (W46.seg-unsure-mask). Dating: the owner's year tags.
+- **Truth.** The owner's ruled boxes (Dean, Deaver, Herrnstein; test boxes Stanton and RG165), Stanton with the owner's 2026-10-31 segmentation-sheet rulings folded (W46.seg-truth-rescore); the agent-audited public truths of Lincoln and CREST with the owner's rulings folded (Lincoln 5 ruled, 3 unsure, `5ba5a0e67380…`, CREST 6 ruled, 4 unsure, `c7a0cfcac896…`); their other gaps remain agent-audited. Unsure gaps are out of every count (W46.seg-unsure-mask). Dating: the owner's year tags.
 - **Selection.** Whole boxes, chosen before these models existed; the dating 131 by whether the year is in the ABBYY text, which is how they were chosen in W41.date-model (ABBYY is not an input here).
 - **Comparison.** Every model on the same windows and the same request (`method_local.request`, the images at 1,024 px, temperature 0, thinking off), each on one L40S under vLLM 0.31, read from `method_openrouter.py`'s caches; the untrained 4B was run on the development boxes only.
 - **Noise.** The bootstrap's intervals above are sampling only; the rerun floor (1.4-3.2 points a box) is not in them, and truth noise enters only as the discordant-gap sensitivity. Shared-error counts are single runs, and descriptive.

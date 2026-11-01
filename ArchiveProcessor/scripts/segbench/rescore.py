@@ -244,7 +244,7 @@ def pooled_rows(boxes: dict, names: list[str], prior: str | None = None) -> dict
 def table(rows: dict[str, dict], family: dict[str, str]) -> list[str]:
     head = "| source | family | " + " | ".join(c[1] for c in COLS) + " |"
     lines = [head, "|" + "---|" * (len(COLS) + 2)]
-    for s, m in sorted(rows.items(), key=lambda kv: -(kv[1]["pages_in_exact_doc"] or 0)):
+    for s, m in sorted(rows.items(), key=lambda kv: (-(kv[1]["pages_in_exact_doc"] or 0), kv[0])):
         lines.append(f"| {s} | {family.get(s, '')} | " + " | ".join(_fmt(m[k], f) for k, _, f in COLS) + " |")
     return lines
 
@@ -323,7 +323,7 @@ def render(owner_res: dict, public_res: dict) -> str:
                            f"{_fmt(m['mndd_per_100_pages'], 'f1')} |")
     out.append("")
     devrows = pooled_rows(boxes, dev)
-    keep = [s for s in devrows if family.get(s) != "baseline"]
+    keep = sorted(s for s in devrows if family.get(s) != "baseline")
     pe = [devrows[s]["pages_in_exact_doc"] for s in keep]
     out += [f"Rank agreement over the {len(keep)} non-baseline sources complete on the development boxes "
             "(Spearman, against pages in an exact document): "
@@ -356,7 +356,7 @@ def render(owner_res: dict, public_res: dict) -> str:
     oracle_dev = pooled_rows(boxes, dev, prior="oracle")
     out += ["", "Development boxes, the oracle count (pooled):", "",
             "| source | pages exact as answered | with the oracle count | change |", "|---|---|---|---|"]
-    for s in sorted(oracle_dev, key=lambda s: -(devrows[s]["pages_in_exact_doc"] or 0)):
+    for s in sorted(oracle_dev, key=lambda s: (-(devrows[s]["pages_in_exact_doc"] or 0), s)):
         if family.get(s) == "baseline" or s not in devrows:
             continue
         a, b = devrows[s]["pages_in_exact_doc"], oracle_dev[s]["pages_in_exact_doc"]

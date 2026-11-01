@@ -71,3 +71,11 @@ ChatGPT through `codex exec` (the ChatGPT subscription; no money): Codex reporte
 - Every count here is small (Claude only 3 on the test boxes, 2 held out on the development boxes, Gemini only 2 on the test boxes, 3 held out on the development boxes, ChatGPT only 0 on the test boxes, 0 held out on the development boxes, Claude and ChatGPT together 3 on the test boxes, 2 held out on the development boxes, GLM-5.3 Flash only (budget) 3 on the test boxes, 3 held out on the development boxes, Corpus-trained Qwen3.5 2B on this Mac (no key) 1 on the test boxes, 0 held out on the development boxes), so a difference of one or two errors is within noise, and a zero on 363 pages is not a promise of zero. The figures shown to a user should be the rounded test figures, labelled as measured on two locked boxes (363 pages) of one archive.
 - The models make the same mistakes more often than different ones (on Dean, Claude and Gemini took the same decision on every gap), which is why combining them adds little over Claude alone.
 
+## Measurement card
+
+- **Truth.** The owner's ruled test boxes, Stanton (with the owner's 2026-10-31 segmentation-sheet rulings, W46.seg-truth-rescore) and RG 165, with the truth's photo labels; neither carries an unsure gap, so every figure here is on a fixed truth. Levels and the mix rule were frozen on the owner's development boxes (Dean, Deaver, Herrnstein).
+- **Selection.** Whole boxes chosen before these routes existed; the approaches are the ones the app offers, not picked by their test score. Nothing was fitted, chosen or re-chosen on the test boxes.
+- **Comparison.** Every approach on the same 363 pages and gaps, with its own flag level frozen first (`options-frozen.json`) and its own route's request and settings as cached; costs at list token prices.
+- **Noise.** Single runs with no intervals. The error counts are a few gaps each, so a difference of one or two is within noise; the rerun floor (1.4-3.2 points of pages exact a box, SEG-10) applies to the no-review column.
+- **Scope.** The figures the Processor shows for one archive's two locked boxes (363 pages). Not other material (Lincoln, CREST and the locked new boxes wait for W46.seg-boxes-score), and not a forecast for a user's own corpus.
+

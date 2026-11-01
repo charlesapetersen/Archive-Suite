@@ -800,6 +800,7 @@
    },
    "curve": {
     "gaps": 191,
+    "unscored_gaps": 0,
     "ks": {
      "0": {
       "random": {
@@ -1604,6 +1605,7 @@
    },
    "curve": {
     "gaps": 136,
+    "unscored_gaps": 0,
     "ks": {
      "0": {
       "random": {
@@ -2501,6 +2503,7 @@
    },
    "curve": {
     "gaps": 167,
+    "unscored_gaps": 0,
     "ks": {
      "0": {
       "random": {
@@ -3611,6 +3614,7 @@
    },
    "curve": {
     "gaps": 238,
+    "unscored_gaps": 0,
     "ks": {
      "0": {
       "random": {
@@ -4316,6 +4320,7 @@
    },
    "curve": {
     "gaps": 77,
+    "unscored_gaps": 0,
     "ks": {
      "0": {
       "random": {

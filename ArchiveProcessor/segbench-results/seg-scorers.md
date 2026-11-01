@@ -16,8 +16,8 @@ Made by `scripts/segbench/rescore.py` (owner, public, report) from the response 
 | window-or-fs-qwen3.5-27b | window, FarmShare | 90.2% | 0.933 | 0.029 | 0.029 | 0.956 | 0.963 | 0.993 | 0.941 | 66.7% | 3.8 |
 | window-or-glm5.3-flash | window, OpenRouter | 90.2% | 0.937 | 0.027 | 0.027 | 0.952 | 0.958 | 0.994 | 0.942 | 66.7% | 4.0 |
 | window-or-gpt5.6-luna | window, OpenRouter | 90.0% | 0.945 | 0.024 | 0.024 | 0.958 | 0.967 | 0.991 | 0.942 | 66.7% | 3.6 |
-| window-local-seg-date-2b-8bit | window, Mac local | 89.4% | 0.921 | 0.035 | 0.035 | 0.935 | 0.941 | 0.993 | 0.919 | 50.0% | 4.2 |
 | whole-gemini-c10 | whole folder, Gemini API | 89.4% | 0.941 | 0.026 | 0.026 | 0.954 | 0.962 | 0.991 | 0.937 | 62.5% | 3.8 |
+| window-local-seg-date-2b-8bit | window, Mac local | 89.4% | 0.921 | 0.035 | 0.035 | 0.935 | 0.941 | 0.993 | 0.919 | 50.0% | 4.2 |
 | window-or-fs-seg-4b | window, FarmShare | 89.2% | 0.941 | 0.026 | 0.026 | 0.956 | 0.965 | 0.990 | 0.937 | 58.3% | 3.8 |
 | window-local-seg-4b-8bit | window, Mac local | 87.8% | 0.929 | 0.031 | 0.031 | 0.946 | 0.954 | 0.992 | 0.929 | 58.3% | 4.5 |
 | spring-v1 | spring 2026 Gemini (own photo labels) | 86.9% | 0.890 | 0.053 | 0.053 | 0.921 | 0.926 | 0.994 | 0.901 | 45.8% | 5.1 |
@@ -157,8 +157,8 @@ Development boxes, the oracle count (pooled):
 | window-or-fs-qwen3.5-27b | 90.2% | 88.8% | -1.4 pts |
 | window-or-glm5.3-flash | 90.2% | 85.5% | -4.6 pts |
 | window-or-gpt5.6-luna | 90.0% | 89.2% | -0.8 pts |
-| window-local-seg-date-2b-8bit | 89.4% | 85.7% | -3.7 pts |
 | whole-gemini-c10 | 89.4% | 90.3% | +1.0 pts |
+| window-local-seg-date-2b-8bit | 89.4% | 85.7% | -3.7 pts |
 | window-or-fs-seg-4b | 89.2% | 87.1% | -2.1 pts |
 | window-local-seg-4b-8bit | 87.8% | 87.6% | -0.2 pts |
 | window-local-seg-4b | 86.5% | 85.1% | -1.4 pts |
