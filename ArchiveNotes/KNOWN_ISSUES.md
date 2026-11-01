@@ -82,11 +82,14 @@ recovered-draft conflict in the VM (5/5). A save the store refuses no longer los
 quit (W40.fix-notes-failed-save-close, fixed 2026-10-15): the first refused autosave copies the draft to
 `Application Support/ArchiveNotes/Unsaved Drafts` (inside the sandbox container), a closed editor's draft is
 kept in memory and offered a Retry, and quit is refused behind a Retry / Don't Quit / Quit alert until it
-saves (`WritingJourneyUITests` 7/7 in the VM). Residuals, none lossy: a retained draft is not shown when the
-same note is opened again (switching to Templates and back, or a new window) — the new editor loads the
-on-disk body, and if it is edited and saved first the retained draft lands at quit as a “Recovered draft”
-note; a retained draft for a note trashed meanwhile fails every quit flush until Quit is chosen (its copy
-stands); copies written on the slow-save path stay behind. A refused template body is covered the same way
+saves (`WritingJourneyUITests` 7/7 in the VM). Its residuals are fixed (W40.fix-notes-held-draft-reopen,
+2026-11-01): a note opened again while a closed editor holds its draft (Templates and back, a new window)
+shows that draft, not the saved body, behind a Keep Changes / Use Saved Version bar, and its copy moves with
+it; a held draft whose note was trashed in the app no longer refuses quit (its copy stands as its home); and
+at launch a copy left behind once its slow save landed after Quit is deleted only when a receipt proves
+its full note ID and unchanged original bytes, and that note holds exactly its text. Older copies without
+receipts, edited copies and templates' copies stand. A note removed outside the app still refuses quit until
+Quit is chosen (its copy stands). A refused template body is covered the same way
 (W40.fix-notes-failed-save-close-fu1, fixed 2026-10-31): the model holds it, the flush registry tracks it
 under the template's id, so it is copied at once, retried and asked about when its window closes, and quit
 is refused until it saves, including a body first refused by quit's own flush; switching templates still

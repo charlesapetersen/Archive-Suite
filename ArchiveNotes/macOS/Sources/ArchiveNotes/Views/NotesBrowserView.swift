@@ -87,6 +87,12 @@ struct NotesBrowserView: View {
         .background(indexReadyProbe)                               // hidden XCUITest index-ready signal (§3.4)
         .background(NotesWindowAccessor { configureWindow($0) })   // restore/remember window size (DV-1)
         .task { await model.bootstrap() }   // open the store + load organization + items (idempotent)
+        .task(id: model.isIndexReady) {
+            // A second window can finish bootstrap() while the first is still loading. Sweep only
+            // after a settled snapshot, never permanently consume the sweep on that empty list.
+            guard model.isIndexReady else { return }
+            await flushRegistry.sweepSavedCopies(noteIDs: model.allItems.map(\.id)) { await model.loadBody(for: $0) }
+        }
         .toolbar { toolbar }
         .onDisappear {
             if let w = window {

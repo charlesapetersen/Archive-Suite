@@ -73,7 +73,8 @@ struct FailedSaveCloseTests {
     }
 
     private func vaultFiles(_ env: Env) -> [URL] {
-        (try? FileManager.default.contentsOfDirectory(at: env.vault.directory, includingPropertiesForKeys: nil)) ?? []
+        ((try? FileManager.default.contentsOfDirectory(at: env.vault.directory, includingPropertiesForKeys: nil)) ?? [])
+            .filter { $0.pathExtension == "md" }
     }
 
     @Test("CLOSE, normal save: a refused write keeps every keystroke, copies it, and saves on retry at quit")

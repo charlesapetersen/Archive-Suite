@@ -236,11 +236,56 @@ class WritingJourneyUITests: NotesFixtureUITestCase {
         }
     }
 
+    /// W40.fix-notes-held-draft-reopen — the store refuses the write, the note's editor goes away (Templates),
+    /// and the note is opened again: it shows the held draft, not the saved body, with a choice; once writes
+    /// work again Keep Changes saves it and its copy goes.
+    func testHeldDraftIsShownWhenTheNoteOpensAgain() throws {
+        try withFixture {
+            try requireCanonicalScratchFixtureForStoreWrites()
+            let id = Self.idPlain
+            try loadNote(id)
+            let dir = itemsDir + "/" + id
+            XCTAssertEqual(chmod(dir, 0o555), 0, "should make the scratch note folder read-only")
+            defer { _ = chmod(dir, 0o755) }
+            let line = "Helddraftreopenline"
+            try typeIntoEditor("\n" + line)
+            RunLoop.current.run(until: Date().addingTimeInterval(2))   // the autosave is refused
+
+            let templates = mainWindow.descendants(matching: .any)["an.sidebar.templates"].firstMatch
+            XCTAssertTrue(templates.waitForExistence(timeout: 10), "the Templates row should exist")
+            templates.click()
+            let ok = app.buttons["OK"].firstMatch
+            XCTAssertTrue(ok.waitForExistence(timeout: 10), "the closed editor's refused save is reported")
+            ok.click()
+            XCTAssertTrue(pollUntil(timeout: 5) { self.unsavedDraftCopies().contains { $0.contains(line) } },
+                          "the held draft is copied outside the store")
+
+            mainWindow.descendants(matching: .any)["an.sidebar.allNotes"].firstMatch.click()
+            selectItem(uuid: id)
+            XCTAssertTrue(editor.waitForExistence(timeout: 10), "the editor should exist")
+            let bar = mainWindow.descendants(matching: .any)["an.editor.heldDraft"].firstMatch
+            XCTAssertTrue(bar.waitForExistence(timeout: 10), "reopening the note says it shows held changes")
+            XCTAssertTrue(pollUntil(timeout: 5) { self.editorText.contains(line) },
+                          "the reopened editor shows the held draft, not the saved body")
+            try saveOutsideEditShot("W40-held-draft-reopen", screenshot: mainWindow.screenshot())
+
+            XCTAssertEqual(chmod(dir, 0o755), 0)
+            mainWindow.buttons["an.editor.heldDraft.keep"].firstMatch.click()
+            XCTAssertTrue(pollUntil(timeout: 10) { self.bodyLines(id).contains(line) },
+                          "Keep Changes saves the held draft once writes work again")
+            XCTAssertTrue(pollUntil(timeout: 5) { !bar.exists }, "the choice is gone once made")
+            XCTAssertTrue(pollUntil(timeout: 5) { !self.unsavedDraftCopies().contains { $0.contains(line) } },
+                          "the copy is removed once the draft is saved")
+            XCTAssertTrue(recoveredDraftFiles().isEmpty, "keeping the draft makes no recovered-draft note")
+            log("[W40-held-reopen] saved after keep = \(bodyLines(id).contains(line))")
+        }
+    }
+
     /// The text of every emergency copy the app wrote beside the scratch store.
     private func unsavedDraftCopies() -> [String] {
         let dir = URL(fileURLWithPath: Self.fixturePath + " Unsaved Drafts")
         let files = (try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)) ?? []
-        return files.compactMap { try? String(contentsOf: $0, encoding: .utf8) }
+        return files.filter { $0.pathExtension == "md" }.compactMap { try? String(contentsOf: $0, encoding: .utf8) }
     }
 
     private func saveOutsideEditShot(_ name: String, screenshot: XCUIScreenshot) throws {

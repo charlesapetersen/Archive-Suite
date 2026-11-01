@@ -61,7 +61,7 @@ struct TemplateFailedSaveTests {
 
     private func vaultTexts(_ env: Env) throws -> [String] {
         let files = (try? FileManager.default.contentsOfDirectory(at: env.vault.directory, includingPropertiesForKeys: nil)) ?? []
-        return try files.map { try String(contentsOf: $0, encoding: .utf8) }
+        return try files.filter { $0.pathExtension == "md" }.map { try String(contentsOf: $0, encoding: .utf8) }
     }
 
     @Test("QUIT: a refused body is copied at once, refuses quit, is recoverable from the copy, and saves on retry")

@@ -97,6 +97,7 @@ struct NoteEditorPane: View {
                     .padding(8)
                     .accessibilityIdentifier("an.editor.externalChange")
             }
+            if bodyEditor.showsHeldDraft { heldDraftBar }
             bodyEditorView
                 .id(bodyEditor.reloadGeneration)
                 .id(bodyEditor.loadedID)
@@ -145,13 +146,17 @@ struct NoteEditorPane: View {
                 guard let draft = bodyEditor.unsavedDraft else { return nil }
                 let title = model.allItems.first { $0.id == draft.id }?.title ?? "Untitled"
                 return EditorDraft(itemID: draft.id, title: title, markdown: draft.markdown)
-            })
+            }, editor: bodyEditor, noteWasTrashed: { model.noteWasTrashed($0) })
             // A refused autosave copies the draft at once (a crash before close/quit must not lose it);
             // the copy goes once a save lands. The registry weak-captured: it outlives every pane anyway.
             let registry = flushRegistry
             bodyEditor.onSaveResult = { [weak registry, paneID] saved in
                 if saved { registry?.discardCopy(for: paneID) } else { registry?.copyDraft(for: paneID) }
             }
+            // W40.fix-notes-held-draft-reopen: a note a closed editor still holds a draft of opens with it.
+            bodyEditor.takeHeldDraft = { [weak registry, paneID] id in registry?.takeHeldDraft(for: id, into: paneID) }
+            bodyEditor.heldDraftSource = { [weak registry] id in registry?.heldDraftSource(for: id) }
+            bodyEditor.onHeldDraftDiscarded = { [weak registry, paneID] in registry?.discardCopy(for: paneID) }
             // W9.b5-fu1: a window opened FOR an open request (`.openFeaturingWindow`) can get that request
             // as `onReceive`'s initial value, before this `onAppear` has wired the body seams above.
             // Selecting then would load through the default `load` (returns nil): the item would be marked
@@ -569,6 +574,25 @@ struct NoteEditorPane: View {
         }
         .frame(height: 28)
         .background(.bar)
+    }
+
+    /// W40.fix-notes-held-draft-reopen: the editor shows text a closed editor could not save, not the
+    /// saved body. Either one can be kept.
+    private var heldDraftBar: some View {
+        HStack(spacing: 8) {
+            Label("This note has unsaved changes from an editor that closed. They are shown here, not the saved version.",
+                  systemImage: "exclamationmark.triangle")
+                .font(.caption)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Button("Keep Changes") { bodyEditor.keepHeldDraft() }
+                .accessibilityIdentifier("an.editor.heldDraft.keep")
+            Button("Use Saved Version") { Task { await bodyEditor.useSavedVersion() } }
+                .accessibilityIdentifier("an.editor.heldDraft.useSaved")
+        }
+        .controlSize(.small)
+        .padding(8)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("an.editor.heldDraft")
     }
 }
 

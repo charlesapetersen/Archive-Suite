@@ -1,4 +1,5 @@
 import Foundation
+import CryptoKit
 
 /// An editor's unsaved body, named for an emergency copy.
 struct EditorDraft: Equatable, Sendable {
@@ -29,6 +30,10 @@ final class EditorFlushRegistry: ObservableObject {
     private struct Handle {
         let flush: () async -> Bool
         let draft: () -> EditorDraft?
+        /// A note pane's editor (nil for a template body): a closed pane's draft can be handed to a pane
+        /// that opens the same note, and dropped once its note is trashed.
+        let editor: NoteBodyEditorModel?
+        let noteWasTrashed: (UUID) -> Bool
         /// Bumped on every register, so a slow close cannot remove a pane that has since reappeared.
         let generation: Int
     }
@@ -60,11 +65,47 @@ final class EditorFlushRegistry: ObservableObject {
     /// Register (or re-register — `onAppear` may fire more than once) a pane's flush closure. Idempotent
     /// for a given `id`: the same key is overwritten, never duplicated. `flush` returns false while the
     /// pane's draft is still unsaved; `draft` names that unsaved body for an emergency copy.
+    /// A note pane also passes its `editor` and how to tell its note was trashed in the app.
     func register(_ id: UUID, flush: @escaping () async -> Bool,
-                  draft: @escaping () -> EditorDraft? = { nil }) {
+                  draft: @escaping () -> EditorDraft? = { nil },
+                  editor: NoteBodyEditorModel? = nil,
+                  noteWasTrashed: @escaping (UUID) -> Bool = { _ in false }) {
         generation &+= 1
-        handles[id] = Handle(flush: flush, draft: draft, generation: generation)
+        handles[id] = Handle(flush: flush, draft: draft, editor: editor, noteWasTrashed: noteWasTrashed,
+                             generation: generation)
         retainedPaneIDs.remove(id)
+    }
+
+    func heldDraftSource(for itemID: UUID) -> NoteBodyEditorModel? {
+        retainedPaneIDs.lazy.compactMap { self.handles[$0]?.editor }
+            .first { $0.unsavedDraft?.id == itemID }
+    }
+
+    /// W40.fix-notes-held-draft-reopen: `pane` is opening note `itemID`. A closed pane still holding an
+    /// unsaved draft of it hands that draft over: the closed pane is dropped and its emergency copy moves
+    /// with the draft, so the note's editor shows the text the user last typed rather than the saved body.
+    func takeHeldDraft(for itemID: UUID, into pane: UUID) -> NoteBodyEditorModel.HeldDraft? {
+        guard handles[pane] != nil,
+              let closed = retainedPaneIDs.first(where: { handles[$0]?.editor?.unsavedDraft?.id == itemID }),
+              let editor = handles[closed]?.editor, let held = editor.heldDraft else { return nil }
+        editor.retire()
+        handles[closed] = nil
+        retainedPaneIDs.remove(closed)
+        if let copy = copies.removeValue(forKey: closed) {
+            if let old = copies.updateValue(copy, forKey: pane) { vault?.remove(old.url, ifItHolds: old.markdown) }
+        }
+        return held
+    }
+
+    /// A failed flush whose note was trashed in the app meanwhile: the store can never take the draft, so
+    /// once its emergency copy is on disk that copy is its home (it stands, as a deleted template's
+    /// does) and the draft is dropped, rather than failing every quit until Quit is chosen.
+    private func releaseTrashedDraft(_ id: UUID) -> Bool {
+        guard let handle = handles[id], let editor = handle.editor, let draft = editor.unsavedDraft,
+              handle.noteWasTrashed(draft.id), writeCopy(for: id) != nil else { return false }
+        copies[id] = nil
+        editor.retire()
+        return true
     }
 
     /// Remove a pane's flush closure, so a closed window's now-dead editor isn't flushed on a later quit.
@@ -81,8 +122,13 @@ final class EditorFlushRegistry: ObservableObject {
     /// write an emergency copy, and offer a retry until it saves or the user defers to quit.
     func paneClosed(_ id: UUID) async {
         guard let handle = handles[id] else { return }
+        // Make the closing editor discoverable before its first save suspends, not only after a
+        // refusal. A new pane opening meanwhile must wait for this save's outcome too.
+        retainedPaneIDs.insert(id)
         while true {
-            if await handle.flush() {
+            let saved = await handle.flush()
+            guard handles[id]?.generation == handle.generation else { return }
+            if saved || releaseTrashedDraft(id) {
                 // A pane that reappeared during the flush registered anew; leave that live entry alone.
                 if handles[id]?.generation == handle.generation { deregister(id) }
                 return
@@ -109,7 +155,8 @@ final class EditorFlushRegistry: ObservableObject {
         var visited: Set<UUID> = []
         while case let (id, handle)? = handles.first(where: { !visited.contains($0.key) }) {
             visited.insert(id)
-            if await handle.flush() {
+            let saved = await handle.flush()
+            if saved || (handles[id]?.generation == handle.generation && releaseTrashedDraft(id)) {
                 guard handles[id]?.generation == handle.generation else { continue }
                 if retainedPaneIDs.contains(id) { deregister(id) } else { removeCopy(for: id) }
             } else {
@@ -157,6 +204,25 @@ final class EditorFlushRegistry: ObservableObject {
         copies[id] = (url, draft.markdown)
         return url
     }
+
+    /// Once per launch, after the notes are loaded: delete each emergency copy a past session left whose
+    /// note's saved body now holds exactly its text. That is the slow-save path — quit chosen while a save
+    /// was still with the store, which then landed after the app stopped waiting — or a crash after a late
+    /// save. Every other copy stands (templates', trashed notes', unsaved text), and so does one written
+    /// this session.
+    func sweepSavedCopies(noteIDs: [UUID], loadBody: (UUID) async -> String?) async {
+        guard !didSweep, let vault else { return }
+        didSweep = true
+        let notes = Set(noteIDs)
+        for copy in vault.copies() where notes.contains(copy.itemID) {
+            guard !copies.values.contains(where: { $0.url == copy.url }),
+                  let body = await loadBody(copy.itemID), body == copy.markdown,
+                  !copies.values.contains(where: { $0.url == copy.url }) else { continue }
+            vault.remove(copy.url, ifItHolds: copy.markdown)
+        }
+    }
+
+    private var didSweep = false
 
     private func removeCopy(for id: UUID) {
         if let old = copies.removeValue(forKey: id) { vault?.remove(old.url, ifItHolds: old.markdown) }
@@ -222,7 +288,37 @@ struct UnsavedDraftVault: Sendable {
             url = directory.appendingPathComponent("\(base) \(n).md"); n += 1
         }
         try Data(draft.markdown.utf8).write(to: url, options: [.atomic])
+        // A receipt proves full item identity and the original bytes after relaunch. Without it the
+        // plain copy remains recoverable, but is never swept just because its filename looks like ours.
+        let receipt = Receipt(itemID: draft.itemID, digest: Self.digest(draft.markdown))
+        if let data = try? JSONEncoder().encode(receipt) {
+            try? data.write(to: receiptURL(url), options: [.atomic])
+        }
         return url
+    }
+
+    private struct Receipt: Codable {
+        let itemID: UUID
+        let digest: String
+    }
+
+    private func receiptURL(_ url: URL) -> URL { url.appendingPathExtension("receipt.json") }
+    private static func digest(_ text: String) -> String {
+        SHA256.hash(data: Data(text.utf8)).map { String(format: "%02x", $0) }.joined()
+    }
+
+    /// Only copies whose receipt still proves their full item ID and original contents. A user edit,
+    /// an old copy without a receipt, or a filename that only looks like a copy is never swept.
+    func copies() -> [(url: URL, itemID: UUID, markdown: String)] {
+        let files = (try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)) ?? []
+        return files.compactMap { url in
+            guard url.pathExtension == "md",
+                  let data = try? Data(contentsOf: receiptURL(url)),
+                  let receipt = try? JSONDecoder().decode(Receipt.self, from: data),
+                  let text = try? String(contentsOf: url, encoding: .utf8),
+                  receipt.digest == Self.digest(text) else { return nil }
+            return (url, receipt.itemID, text)
+        }
     }
 
     func holds(_ markdown: String, at url: URL) -> Bool {
@@ -235,6 +331,12 @@ struct UnsavedDraftVault: Sendable {
         guard url.deletingLastPathComponent().standardizedFileURL.path == directory.standardizedFileURL.path,
               holds(markdown, at: url) else { return }
         try? FileManager.default.removeItem(at: url)
+        if !FileManager.default.fileExists(atPath: url.path),
+           let data = try? Data(contentsOf: receiptURL(url)),
+           let receipt = try? JSONDecoder().decode(Receipt.self, from: data),
+           receipt.digest == Self.digest(markdown) {
+            try? FileManager.default.removeItem(at: receiptURL(url))
+        }
     }
 
     /// Filenames are limited in BYTES (255), so a long CJK or emoji title is cut by its UTF-8 length,

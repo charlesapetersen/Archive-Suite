@@ -30,6 +30,9 @@ final class NoteBodyEditorModel: ObservableObject {
         didSet {
             guard !suppressAutosave, markdown != oldValue, loadedID != nil else { return }
             dirty = true
+            // Typing accepts the shown draft. The next save compares against the saved version the
+            // user saw on reopen, and the saved-version button cannot race that autosave.
+            if showsHeldDraft { acceptHeldDraft() }
             scheduleSave()
         }
     }
@@ -72,6 +75,23 @@ final class NoteBodyEditorModel: ObservableObject {
     /// flush-on-switch captures the last keystrokes (→ the editor coordinator's `flushWriteBack`). A
     /// no-op in tests (which set `markdown` directly to simulate the editor having pushed).
     var flushEditor: () -> Void = {}
+    /// W40.fix-notes-held-draft-reopen: a closed editor's held draft for this note, taken over when the note
+    /// opens here (→ `EditorFlushRegistry.takeHeldDraft`). Nil = none held.
+    var takeHeldDraft: (UUID) -> HeldDraft? = { _ in nil }
+    /// A retained editor may be retrying its save. Await that existing work before loading disk or
+    /// taking ownership, so a refusal during reopen cannot leave the draft hidden again.
+    var heldDraftSource: (UUID) -> NoteBodyEditorModel? = { _ in nil }
+    /// The held draft shown here was set aside for the saved version (or already matched it): its
+    /// emergency copy can go.
+    var onHeldDraftDiscarded: () -> Void = {}
+    /// True while the editor shows a held draft the user has not yet kept or set aside.
+    @Published private(set) var showsHeldDraft = false
+
+    /// An unsaved body and the saved body it was edited from.
+    struct HeldDraft: Equatable, Sendable {
+        let markdown: String
+        let baseline: String
+    }
 
     /// Debounce before an idle autosave. The live editor already debounces its serialize (~400 ms); this
     /// coalesces the resulting body writes so rapid typing is one save, not one per keystroke.
@@ -85,6 +105,10 @@ final class NoteBodyEditorModel: ObservableObject {
     private var saveTask: Task<Void, Never>?
     private var saveGeneration = 0
     private var loadGeneration = 0
+    /// Checked saves still waiting on the store. A draft is not handed to another editor meanwhile.
+    private var persisting = 0
+    /// The saved body the held draft was shown over; keeping the draft makes it the save's baseline.
+    private var heldDraftShownOver: String?
 
     init() {}
 
@@ -115,10 +139,85 @@ final class NoteBodyEditorModel: ObservableObject {
         guard !dirty else { settledSelection = SettledSelection(id: id); return }
         guard let id else { setLoaded(nil, body: ""); settledSelection = SettledSelection(id: nil); return }
 
-        let body = await load(id)
-        guard generation == loadGeneration else { return }   // a newer select() superseded this load; it settles
-        if let body { setLoaded(id, body: body) }
-        settledSelection = SettledSelection(id: id)
+        while true {
+            await heldDraftSource(id)?.waitForPendingSave()
+            guard generation == loadGeneration else { return }
+            let body = await load(id)
+            guard generation == loadGeneration else { return }
+            // A retry can begin during the disk read. Read again after it settles; the loaded body
+            // and ownership transfer must agree about whether the draft saved or is still held.
+            guard heldDraftSource(id)?.isSavingDraft != true else { continue }
+            if let body {
+                setLoaded(id, body: body)
+                showHeldDraft(for: id, over: body)
+            }
+            settledSelection = SettledSelection(id: id)
+            return
+        }
+    }
+
+    // MARK: Held draft (W40.fix-notes-held-draft-reopen)
+
+    /// A closed editor still holds an unsaved draft of the note just loaded: show that draft instead of
+    /// the saved body, dirty and on its own baseline, so a save that finds the note changed meanwhile
+    /// still keeps both versions. Not saved until the user edits it, keeps it, switches away or quits.
+    private func showHeldDraft(for id: UUID, over body: String) {
+        guard let held = takeHeldDraft(id) else { return }
+        guard held.markdown != body else { onHeldDraftDiscarded(); return }
+        suppressAutosave = true
+        markdown = held.markdown
+        suppressAutosave = false
+        baseline = held.baseline
+        dirty = true
+        heldDraftShownOver = body
+        showsHeldDraft = true
+    }
+
+    /// Keep the held draft over the saved version shown when it opened, and save it.
+    func keepHeldDraft() {
+        guard showsHeldDraft else { return }
+        acceptHeldDraft()
+        if dirty { scheduleSave() }
+    }
+
+    private func acceptHeldDraft() {
+        showsHeldDraft = false
+        if let over = heldDraftShownOver { baseline = over }
+        heldDraftShownOver = nil
+    }
+
+    /// Set the held draft aside and show the saved version (its emergency copy goes).
+    func useSavedVersion() async {
+        guard showsHeldDraft, let id = loadedID, let body = heldDraftShownOver else { return }
+        // No suspension: a newer edit/selection must never be replaced by a delayed reload. Disk
+        // polling will refresh this clean buffer if the saved body has changed again meanwhile.
+        setLoaded(id, body: body)
+        reloadGeneration &+= 1
+        onHeldDraftDiscarded()
+    }
+
+    var isSavingDraft: Bool { persisting != 0 }
+
+    /// Wait only for existing work; reopening must not initiate another write of the held draft.
+    private func waitForPendingSave() async {
+        while let pending = saveTask {
+            let generation = saveGeneration
+            await pending.value
+            if generation == saveGeneration { return }
+        }
+    }
+
+    /// This editor's draft, for another editor opening the same note. Nil while clean or while a save of
+    /// it is still with the store (its outcome is not known yet).
+    var heldDraft: HeldDraft? {
+        guard dirty, loadedID != nil, persisting == 0 else { return nil }
+        return HeldDraft(markdown: markdown, baseline: baseline)
+    }
+
+    /// The draft now lives elsewhere (another editor took it, or its note was trashed and the emergency
+    /// copy is its home): drop it and any pending save, so this editor never writes it again.
+    func retire() {
+        setLoaded(nil, body: "")
     }
 
     /// Persist any pending edit for the currently-loaded item **now** (cancel the debounce and await the
@@ -196,11 +295,15 @@ final class NoteBodyEditorModel: ObservableObject {
 
     @discardableResult
     private func persist(_ body: String, for id: UUID) async -> Bool {
+        persisting += 1
+        defer { persisting -= 1 }
         let expected = baseline
         await prepareSave()
+        guard loadedID == id else { return true }
         let saved: String
         if let checkedSave {
-            guard let actual = await checkedSave(id, body, expected) else {
+            let result = await checkedSave(id, body, expected)
+            guard let actual = result else {
                 if loadedID == id { onSaveResult(false) }
                 return false
             }
@@ -219,6 +322,8 @@ final class NoteBodyEditorModel: ObservableObject {
         if markdown == body {
             baseline = saved
             dirty = false
+            showsHeldDraft = false
+            heldDraftShownOver = nil
             if saved != body {
                 suppressAutosave = true
                 markdown = saved
@@ -246,6 +351,8 @@ final class NoteBodyEditorModel: ObservableObject {
         baseline = body
         dirty = false
         externalChangeMessage = nil
+        showsHeldDraft = false
+        heldDraftShownOver = nil
     }
 
     /// (Re)schedule the debounced idle save, capturing the target id at schedule time so a later

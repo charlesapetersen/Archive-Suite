@@ -739,6 +739,11 @@ final class NotesModel: ObservableObject {
     /// The template was deleted in this session; any refused body it held was dropped with it.
     func templateWasDeleted(_ id: UUID) -> Bool { deletedTemplateIDs.contains(id) }
 
+    /// Notes this session moved to the Trash (or found already gone while trashing). A refused draft
+    /// of one can never be saved, so its emergency copy becomes its home (W40.fix-notes-held-draft-reopen).
+    private var trashedNoteIDs: Set<UUID> = []
+    func noteWasTrashed(_ id: UUID) -> Bool { trashedNoteIDs.contains(id) }
+
     /// A refused template body this model still holds, named for an emergency copy
     /// (W40.fix-notes-failed-save-close-fu1). Nil once it saves or the template is deleted.
     func unsavedTemplateBody(_ id: UUID) -> EditorDraft? {
@@ -1791,6 +1796,7 @@ final class NotesModel: ObservableObject {
         } else {
             removed = ids                 // injected test store with no `noteStore`: bookkeeping only
         }
+        trashedNoteIDs.formUnion(removed)
         var indexWriteFailed = false
         if let index, !removed.isEmpty {
             do { try await index.deleteItems(removed) }
