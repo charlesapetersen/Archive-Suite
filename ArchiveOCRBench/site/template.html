@@ -168,6 +168,16 @@ footer p { font-size: 13px; }
     <p class="note" id="skg-note"></p>
   </section>
 
+  <section class="panel" id="seg-boxes-score" hidden>
+    <div class="head"><h2>Every segmentation route on the three locked boxes</h2><span class="meta">Gemini 3.7 · the shipped 2B · Sherlock · Vision text</span></div>
+    <div class="tbl"><table><thead><tr><th>Route</th><th>Box</th><th>Students trained on it?</th><th>Known gaps</th><th>Gap accuracy</th><th>False splits</th><th>False merges</th><th>Pages in exact document</th></tr></thead><tbody id="sbs-box-rows"></tbody></table></div>
+    <h3>SC0122 on its owner-ruled gaps</h3>
+    <div class="tbl"><table><thead><tr><th>Route</th><th>Tag and teacher disagreed: right</th><th>Controls right</th><th>Owner-ruled, weighted</th></tr></thead><tbody id="sbs-sc-rows"></tbody></table></div>
+    <h3>The shipped cloud route at three window offsets (Stanton and RG 165)</h3>
+    <div class="tbl"><table><thead><tr><th>Figure</th><th>3.7, offset 0</th><th>3.7, offset 1</th><th>3.7, offset 2</th><th>3.8, offset 0 (the app's figures)</th></tr></thead><tbody id="sbs-off-rows"></tbody></table></div>
+    <p class="note" id="sbs-note"></p>
+  </section>
+
   <header class="part" id="handwriting">
     <div class="eyebrow">Part 3 · Handwriting on the Mac · Vision OCR lab</div>
     <h2>Handwriting readers that run on the device</h2>
@@ -640,6 +650,29 @@ if (skg) {
     r.false_merges + '</td><td>' + r.tag_right + '</td></tr>').join('');
   document.getElementById('skg-note').textContent = 'One Sherlock job: the teacher whose replies trained the students, and the trained 2B (the shipped build\'s source) and 4B, on the same 7-page windows with Apple Vision\'s text, the app\'s input (they trained on ABBYY text). Sasha is the one owner box no student trained on, and there the 2B beats its teacher by 21.7 points (44 gaps to 6): every teacher error there is a false split. On the two boxes they trained on the teacher leads on the Illustrated Review and all three tie on SC0122. The checkpack is the owner\'s 80 ruled gaps (6 unsure out), drawn by stratum where the teacher and the tag disagreed, so its pooled rate is not a population rate and the teacher is drawn against; the 2B\'s lead there (6 gaps to 1) is inside the noise. Failed windows, scored neutral: ' + Object.entries(skg.failed).map(([k, v]) => nm[k] + ' ' + v).join(', ') + '. Unsure gaps out of every count. Source: <code>seg-kit-gate-sherlock.md</code>.'.replace(/<\/?code>/g, '');
   document.getElementById('seg-kit-gate-sherlock').hidden = false;
+}
+
+const sbs = DATA.seg_boxes_score;
+if (sbs) {
+  const p1 = v => v === null ? '—' : (100 * v).toFixed(1) + '%';
+  const boxName = {IllustratedReview: 'Illustrated Review'};
+  document.getElementById('sbs-box-rows').innerHTML = sbs.boxes.map(r => '<tr><td>' + sbs.labels[r.route] + '</td><td>' +
+    (boxName[r.box] || r.box) + '</td><td>' + (r.split === 'held-out' ? 'no' : 'yes') + '</td><td>' + r['known gaps'] +
+    '</td><td>' + p1(r['gap accuracy']) + '</td><td>' + r['false splits'] + '</td><td>' + r['false merges'] + '</td><td>' +
+    p1(r['pages exact']) + '</td></tr>').join('');
+  const sc = sbs.sc0122;
+  document.getElementById('sbs-sc-rows').innerHTML = Object.entries(sc.models).map(([k, m]) => '<tr><td>' + sbs.labels[k] +
+    '</td><td>' + m.asked_right + ' of ' + sc.asked_known + '</td><td>' + m.controls_right + ' of ' + sc.controls + '</td><td>' +
+    p1(m.owner_weighted_accuracy) + '</td></tr>').join('');
+  const figs = [['pages_exact_no_review', 'Pages in an exact document, no checking', p1],
+                ['flagged_per_100_pages', 'Boundaries to check per 100 pages', v => v.toFixed(1)],
+                ['pages_exact_after_review', 'Pages right after checking', p1],
+                ['unflagged_errors_per_500_pages', 'Unflagged errors per 500 pages', v => v.toFixed(1)]];
+  document.getElementById('sbs-off-rows').innerHTML = figs.map(([k, name, f]) => '<tr><td>' + name + '</td>' +
+    ['o0', 'o1', 'o2'].map(o => '<td>' + f(sbs.offsets.rows[o].figures[k]) + '</td>').join('') + '<td>' +
+    f(sbs.offsets.gemini38_o0[k]) + '</td></tr>').join('');
+  document.getElementById('sbs-note').textContent = sbs.note;
+  document.getElementById('seg-boxes-score').hidden = false;
 }
 
 const jointModel = DATA.seg_date;

@@ -128,9 +128,37 @@ def cmd_plan(_a):
     print(f"pages without Vision text: {missing_text[:10]}{' ...' if len(missing_text) > 10 else ''}")
 
 
+def gateway_key():
+    """Read the gateway key with a deadline. A locked login keychain (the Mac asleep and locked, 2026-11-01 04:14)
+    makes `security` wait on an unlock dialog on the owner's screen instead of failing; stop instead."""
+    import subprocess
+    import gateway_gemini as GW
+    try:
+        r = subprocess.run(["/usr/bin/security", "find-generic-password", "-s", "com.archiveprocessor.app",
+                            "-a", "Gateway", "-w"], capture_output=True, text=True, timeout=20)
+    except subprocess.TimeoutExpired:
+        sys.exit("the Keychain did not answer in 20 s (locked?): no gateway call made")
+    if r.returncode != 0 or not r.stdout.strip():
+        sys.exit("no gateway key in the Keychain (com.archiveprocessor.app / Gateway)")
+    GW._key = r.stdout.strip()
+
+
+def release_unsent(S):
+    """A reservation whose process was killed before its request left (the Keychain hang): approve its one retry
+    through seg_lincoln_gateway's own rule, its allowance still counted."""
+    if any(r["event"] in ("reserve", "unknown") and S.cached(r["request_sha256"]) is None
+           for r in S.effective_records()):
+        S.retry_unsettled_once()
+
+
 def cmd_collect(a):
     L, W, S, _ = _mods()
-    todo = [j for j in jobs() if gemini_answer(*j[1:]) is None][: a.limit or None]
+    gateway_key()
+    STORE.mkdir(parents=True, exist_ok=True)
+    with (STORE / "collect.lock").open("a") as fh:
+        fcntl.flock(fh, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        release_unsent(S)
+    todo =[j for j in jobs() if gemini_answer(*j[1:]) is None][: a.limit or None]
     print(f"{len(todo)} windows to send, item spent ${S.spent():.4f} of ${CAP:.2f}", flush=True)
     STORE.mkdir(parents=True, exist_ok=True)
     lock, stop, invalid = threading.Lock(), threading.Event(), []
@@ -141,7 +169,6 @@ def cmd_collect(a):
         _, col, lo, hi = j
         with lock:   # the cap check reads the ledger; one reservation at a time keeps it exact
             body, key, nums = S.request("gemini", col, lo, hi)
-            pi, po = S.PRICES["gemini"]
             if S.spent() + S.reservation("gemini", body) > CAP:
                 stop.set()
                 print(f"cap: ${S.spent():.4f} spent; stopping before {col.name} {nums[0]}-{nums[-1]}", flush=True)

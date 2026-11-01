@@ -398,6 +398,21 @@ def seg_kit_gate_sherlock():
             "failed": {k: r["failed"] for k, r in d["runs"].items()}}
 
 
+def seg_boxes_score():
+    """W46.seg-boxes-score: every segmentation route on the three locked boxes, SC0122 on its owner-ruled gaps, and
+    the shipped cloud route at three window offsets."""
+    path = RESULTS / "seg-boxes-score.json"
+    if not path.exists():
+        return None
+    d = json.loads(path.read_text())
+    labels = {"gemini": "Gemini 3.7 Flash (gateway)", "mac-2b": "Shipped 2B, 8-bit, on the Mac",
+              "teacher": "Qwen3.5 27B teacher", "fs-2b": "Trained 2B, bf16", "fs-4b": "Trained 4B, bf16"}
+    return {"labels": labels,
+            "boxes": [{k: r[k] for k in ("route", "box", "split", "known gaps", "gap accuracy", "false splits",
+                                          "false merges", "pages exact")} for r in d["observed"]],
+            "sc0122": d["sc0122_owner"], "offsets": d["offsets"], "note": d["note"]}
+
+
 def public_segmentation():
     """Separate public/easier boxes; their labels and scores never enter owner-box fitting."""
     root = RESULTS / "public-segmentation"
@@ -1156,7 +1171,7 @@ def main():
              "seg_date": json.loads((RESULTS / "seg-date-model-final.json").read_text())
                          if (RESULTS / "seg-date-model-final.json").exists() else None,
              "seg_context": seg_context(), "seg_window_modality": seg_window_modality(),
-             "seg_kit_gate_sherlock": seg_kit_gate_sherlock(),
+             "seg_kit_gate_sherlock": seg_kit_gate_sherlock(), "seg_boxes_score": seg_boxes_score(),
              "public": pub, "ocr_scorers": ocr_scorers(),
              "ppocrv6_hands": ppocrv6_hands(pub and pub["open_sweep"]),
              "dewarp": dewarp, "enh_ocr": enh_ocr,
