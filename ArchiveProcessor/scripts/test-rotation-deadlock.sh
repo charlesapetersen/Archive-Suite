@@ -3,7 +3,7 @@
 # RotationDetector with a tiny command-line host and queues 36 pages (the three e2e fixture pages, each rotated
 # 0/90/180/270 and copied three times) through local Vision rotation detection at once. Every page must finish
 # inside the time limit (after a one-page warm-up that absorbs the Neural Engine's first-run model compile),
-# and each must come back on the right text axis. Everything is in one temporary directory.
+# and each must come back with the exact correction: right text axis, right way up. Everything is in one temporary directory.
 # ROTATION_LIMIT overrides the 120 s limit. ROTATION_DETECTOR_SRC compiles another RotationDetector.swift instead,
 # for the mutation check: the pre-fix source (`git show 92ec5626:ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/
 # RotationDetector.swift`) must FAIL on the time limit.

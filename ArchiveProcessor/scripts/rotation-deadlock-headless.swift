@@ -73,19 +73,19 @@ struct RotationDeadlockHeadlessDriver {
               found.count == pages.count)
 
         // Fixture pages are named <doc>-c<copy>-r<deg>.jpg, rotated <deg> clockwise, so the correction is
-        // (360 - deg) % 360. Every page must come back on the right text axis; telling upright from upside-down
-        // is the scorer's own accuracy (W40.fix-processor-rotation-flip), so it is reported, not required.
+        // (360 - deg) % 360. Every page must come back on the right text axis and the right way up
+        // (W40.fix-processor-rotation-flip: the accurate pass used to tie on the flip and return 21 of 36).
         var axisRight = 0, exact = 0, total = 0
         for (name, c) in found.sorted(by: { $0.key < $1.key }) {
             guard let r = name.split(separator: "-").last?.dropFirst().split(separator: ".").first,
                   let deg = Int(r) else { continue }
             total += 1
             let want = (360 - deg) % 360
-            if let c, c % 180 == want % 180 { axisRight += 1 } else { results.append("NOTE: \(name) → \(c.map(String.init) ?? "nil")") }
-            if c == want { exact += 1 }
+            if let c, c % 180 == want % 180 { axisRight += 1 }
+            if c == want { exact += 1 } else { results.append("NOTE: \(name) → \(c.map(String.init) ?? "nil"), want \(want)") }
         }
         check("text axis right on \(axisRight) of \(total) rotated fixture pages", total > 0 && axisRight == total)
-        results.append("NOTE: exact correction (flip resolved) on \(exact) of \(total)")
+        check("exact correction (flip resolved) on \(exact) of \(total)", total > 0 && exact == total)
 
         let passed = !results.contains { $0.hasPrefix("FAIL") }
         print((passed ? "ALL PASS\n" : "SOME FAILED\n") + results.joined(separator: "\n"))

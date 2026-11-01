@@ -12,7 +12,11 @@ import CoreGraphics
 ///     text *axis* (horizontal {0°,180°} vs vertical {90°,270°}) with large margins, but a
 ///     fast pass cannot tell upright from upside-down.
 ///   • Stage 2 — an `.accurate` + language-corrected pass on just the 2 orientations of the
-///     chosen axis resolves the flip (upright reads as real words, inverted does not).
+///     chosen axis resolves the flip. The accurate recognizer orients text on its own, so both
+///     passes read the same words with the same confidence (measured on the e2e fixtures,
+///     W40.fix-processor-rotation-flip); what differs is the geometry. A line counts only when
+///     its first character's box lies left of its last one in the orientation handed to Vision,
+///     which holds for upright text and is reversed for text read upside-down.
 ///
 /// Everything runs on a single downscaled (~1000px) CGImage; passes run in parallel on `visionQueue`.
 /// Returns the best correction in {0, 90, 180, 270}, or `nil` when no orientation yields
@@ -84,8 +88,8 @@ enum RotationDetector {
     }
 
     /// One Vision text-recognition pass at the given orientation. For the fast pass the score
-    /// is Σ(confidence); for the accurate pass it is Σ(confidence × recognized-length), which
-    /// rewards the orientation that reads real words.
+    /// is Σ(confidence); for the accurate pass it is Σ(confidence × recognized-length) over the
+    /// lines that read left to right in this orientation (`readsForward`).
     private static func score(
         cgImage: CGImage,
         orientation: CGImagePropertyOrientation,
@@ -110,6 +114,7 @@ enum RotationDetector {
         for obs in observations {
             guard let candidate = obs.topCandidates(1).first else { continue }
             if level == .accurate {
+                guard readsForward(candidate) else { continue }
                 total += candidate.confidence * Float(candidate.string.count)
             } else {
                 total += candidate.confidence
@@ -117,6 +122,21 @@ enum RotationDetector {
         }
         // Small per-observation nudge (fast pass only) breaks ties toward more text lines.
         return level == .fast ? total + Float(observations.count) * 0.001 : total
+    }
+
+    /// Whether the line's first character sits left of its last in the oriented image. Vision's
+    /// boxes are in the coordinates of the orientation it was given, so a line Vision turned over
+    /// to read comes back with its characters running right to left. Assumes left-to-right scripts,
+    /// which is the whole archive. Lines too short to tell count.
+    private static func readsForward(_ candidate: VNRecognizedText) -> Bool {
+        let text = candidate.string
+        guard let first = text.firstIndex(where: { !$0.isWhitespace }),
+              let last = text.lastIndex(where: { !$0.isWhitespace }),
+              first < last,
+              let a = try? candidate.boundingBox(for: first..<text.index(after: first)),
+              let b = try? candidate.boundingBox(for: last..<text.index(after: last))
+        else { return true }
+        return a.boundingBox.midX < b.boundingBox.midX
     }
 
     // MARK: - Decoding
