@@ -93,7 +93,9 @@ struct VisionClient {
         request.recognitionLanguages = settings.languages
         request.customWords = settings.customWords
 
-        let handler = VNImageRequestHandler(cgImage: image, options: [:])
+        // The decoded image is the pixels as stored; a phone shot says in EXIF how to turn them upright
+        // (W40.fix-processor-vision-ignores-exif). Fast recognition reads a turned page as garbage without it.
+        let handler = VNImageRequestHandler(cgImage: image, orientation: storedOrientation(of: source), options: [:])
         do {
             try handler.perform([request])
         } catch {
@@ -117,5 +119,12 @@ struct VisionClient {
         // selected local rotation correction and replaces this neutral orientation before output is written.
         return OCRResult(text: lines.joined(separator: "\n"), classification: nil,
                          rotationDegrees: 0, errorMessage: nil, errorCode: nil)
+    }
+
+    /// The first image's EXIF/TIFF orientation, `.up` when it is absent or out of range.
+    private static func storedOrientation(of source: CGImageSource) -> CGImagePropertyOrientation {
+        let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any]
+        let raw = (properties?[kCGImagePropertyOrientation] as? NSNumber)?.uint32Value ?? 1
+        return CGImagePropertyOrientation(rawValue: raw) ?? .up
     }
 }
