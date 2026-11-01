@@ -274,8 +274,8 @@ def report():
     ptok = [m['prompt_tokens'] for m in metas]; ctok = [m['completion_tokens'] for m in metas]
     hosted_ptok = [hm.get('prompt_tokens') for p in done if (hm := p['hosted_meta']).get('prompt_tokens')]
     L += ['', '## Speed and memory on the 18 GB M3 Pro', '',
-          f'{len(metas)} of the 99 originals read, one at a time, model loaded once '
-          f'({statistics.median(m["load_s"] for m in metas):.0f} s to load).', '',
+          f'{len(metas)} of the 99 originals read, one at a time, one model load per collect invocation '
+          f'({statistics.median(m["load_s"] for m in metas):.1f} s median recorded load time).', '',
           '| measure | median | 90th percentile | max |', '|---|---:|---:|---:|',
           f'| seconds a page (prompt + generation) | {statistics.median(wall):.1f} | {pct(wall, .9):.1f} | {max(wall):.1f} |',
           f'| seconds to first token (image encoding + prefill) | {statistics.median(m["first_token_s"] for m in metas):.1f} | '
@@ -310,7 +310,7 @@ def report():
     g = [r for r in guard_rows() if r[1] in ('mac-local', 'mac-local-probe') and ' ocr_mac_local.py collect' in r[-1]
          and '--model ' not in r[-1]]
     if g:
-        L += ['', 'The memory guard\'s whole-process view of each collect run (date, exit, seconds, peak RSS MB, '
+        L += ['', 'Available memory guard whole-process rows (resumed collects may lack a row) (date, exit, seconds, peak RSS MB, '
               'peak physical footprint MB, swap growth MB, worst pressure level):', '']
         L += [f"- {' · '.join(r[i] for i in (0, 2, 3, 4, 5, 6, 7))}" for r in g]
     from ocr_card import card, TRUTH_96, NOISE_96
@@ -469,8 +469,8 @@ def report_hw():
         wall = [m['wall_s'] for m in metas]; peak = [m['mlx_peak_gb'] for m in metas]
         ptok = [m['prompt_tokens'] for m in metas]; ctok = [m['completion_tokens'] for m in metas]
         L += ['', f'## Speed and memory: {key}', '',
-              f'{len(metas)} of the 99 originals read, one at a time, model loaded once '
-              f'({statistics.median(m["load_s"] for m in metas):.0f} s to load).', '',
+              f'{len(metas)} of the 99 originals read, one at a time, one model load per collect invocation '
+              f'({statistics.median(m["load_s"] for m in metas):.1f} s median recorded load time).', '',
               '| measure | median | 90th percentile | max |', '|---|---:|---:|---:|',
               f'| seconds a page (prompt + generation) | {statistics.median(wall):.1f} | {pct(wall, .9):.1f} | {max(wall):.1f} |',
               f'| seconds to first token (image encoding + prefill) | {statistics.median(m["first_token_s"] for m in metas):.1f} | '
@@ -484,7 +484,7 @@ def report_hw():
         # Labelled per model (`--label mac-local-KEY`), or a plain `mac-local` run whose command names the model.
         g = [r for r in guard_rows() if r[1] == 'mac-local-' + key or (r[1] == 'mac-local' and r[-1].endswith('ocr_mac_local.py collect --model ' + key))]
         if g:
-            L += ['The memory guard\'s whole-process view of each collect run (date, exit, seconds, peak RSS MB, '
+            L += ['Available memory guard whole-process rows (resumed collects may lack a row) (date, exit, seconds, peak RSS MB, '
                   'peak physical footprint MB, swap growth MB, worst pressure level):', '']
             L += [f"- {' · '.join(r[i] for i in (0, 2, 3, 4, 5, 6, 7))}" for r in g] + ['']
     L += hw_card()

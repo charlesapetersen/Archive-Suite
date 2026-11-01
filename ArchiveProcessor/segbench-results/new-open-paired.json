@@ -3,6 +3,52 @@
  "rows": [
   {
    "set": "owner96",
+   "route": "granite-docling-258m-mlx",
+   "family": "Mac local",
+   "against": "qwen3.6-27b",
+   "pages": 96,
+   "failed": 19,
+   "failed_other": 1,
+   "strict": {
+    "n": 96,
+    "delta": -0.3228,
+    "p": 0.0001,
+    "lo": -0.3963,
+    "hi": -0.2489
+   },
+   "answered": {
+    "n": 76,
+    "delta": -0.1871,
+    "p": 0.0001,
+    "lo": -0.2514,
+    "hi": -0.1289
+   }
+  },
+  {
+   "set": "owner96",
+   "route": "granite-docling-258m-mlx",
+   "family": "Mac local",
+   "against": "lightonocr3-4b",
+   "pages": 96,
+   "failed": 19,
+   "failed_other": 0,
+   "strict": {
+    "n": 96,
+    "delta": -0.2736,
+    "p": 0.0001,
+    "lo": -0.3505,
+    "hi": -0.1986
+   },
+   "answered": {
+    "n": 77,
+    "delta": -0.1278,
+    "p": 0.0001,
+    "lo": -0.1865,
+    "hi": -0.0727
+   }
+  },
+  {
+   "set": "owner96",
    "route": "infinity-parser2-pro",
    "family": "Sherlock native",
    "against": "qwen3.6-27b",
@@ -45,6 +91,52 @@
     "p": 0.0081,
     "lo": 0.0107,
     "hi": 0.0664
+   }
+  },
+  {
+   "set": "owner96",
+   "route": "nemotron-parse-2",
+   "family": "Sherlock native",
+   "against": "qwen3.6-27b",
+   "pages": 96,
+   "failed": 4,
+   "failed_other": 1,
+   "strict": {
+    "n": 96,
+    "delta": -0.1111,
+    "p": 0.0001,
+    "lo": -0.1602,
+    "hi": -0.0636
+   },
+   "answered": {
+    "n": 91,
+    "delta": -0.0917,
+    "p": 0.0001,
+    "lo": -0.1286,
+    "hi": -0.0578
+   }
+  },
+  {
+   "set": "owner96",
+   "route": "nemotron-parse-2",
+   "family": "Sherlock native",
+   "against": "lightonocr3-4b",
+   "pages": 96,
+   "failed": 4,
+   "failed_other": 0,
+   "strict": {
+    "n": 96,
+    "delta": -0.0619,
+    "p": 0.006,
+    "lo": -0.1058,
+    "hi": -0.0192
+   },
+   "answered": {
+    "n": 92,
+    "delta": -0.0327,
+    "p": 0.0668,
+    "lo": -0.0672,
+    "hi": 0.0019
    }
   },
   {
@@ -187,6 +279,52 @@
   },
   {
    "set": "owner96",
+   "route": "unlimited-ocr",
+   "family": "Sherlock native",
+   "against": "qwen3.6-27b",
+   "pages": 96,
+   "failed": 2,
+   "failed_other": 1,
+   "strict": {
+    "n": 96,
+    "delta": -0.1067,
+    "p": 0.0001,
+    "lo": -0.1553,
+    "hi": -0.0636
+   },
+   "answered": {
+    "n": 93,
+    "delta": -0.0942,
+    "p": 0.0001,
+    "lo": -0.1351,
+    "hi": -0.0582
+   }
+  },
+  {
+   "set": "owner96",
+   "route": "unlimited-ocr",
+   "family": "Sherlock native",
+   "against": "lightonocr3-4b",
+   "pages": 96,
+   "failed": 2,
+   "failed_other": 0,
+   "strict": {
+    "n": 96,
+    "delta": -0.0575,
+    "p": 0.0048,
+    "lo": -0.1009,
+    "hi": -0.0194
+   },
+   "answered": {
+    "n": 94,
+    "delta": -0.0386,
+    "p": 0.016,
+    "lo": -0.0712,
+    "hi": -0.0082
+   }
+  },
+  {
+   "set": "owner96",
    "route": "xiaomi-ocr-0",
    "family": "Sherlock native",
    "against": "qwen3.6-27b",
@@ -325,6 +463,52 @@
   },
   {
    "set": "public895",
+   "route": "nemotron-parse-2",
+   "family": "Sherlock native",
+   "against": "qwen3.6-27b",
+   "pages": 895,
+   "failed": 290,
+   "failed_other": 97,
+   "strict": {
+    "n": 895,
+    "delta": -0.3018,
+    "p": 0.0001,
+    "lo": -0.3218,
+    "hi": -0.2822
+   },
+   "answered": {
+    "n": 573,
+    "delta": -0.2395,
+    "p": 0.0001,
+    "lo": -0.2586,
+    "hi": -0.2203
+   }
+  },
+  {
+   "set": "public895",
+   "route": "nemotron-parse-2",
+   "family": "Sherlock native",
+   "against": "lightonocr3-4b",
+   "pages": 895,
+   "failed": 290,
+   "failed_other": 85,
+   "strict": {
+    "n": 895,
+    "delta": -0.298,
+    "p": 0.0001,
+    "lo": -0.3184,
+    "hi": -0.2777
+   },
+   "answered": {
+    "n": 577,
+    "delta": -0.2247,
+    "p": 0.0001,
+    "lo": -0.2451,
+    "hi": -0.2051
+   }
+  },
+  {
+   "set": "public895",
    "route": "paddleocr-vl1.6",
    "family": "Sherlock native",
    "against": "qwen3.6-27b",
@@ -413,6 +597,52 @@
     "p": 0.0021,
     "lo": -0.0251,
     "hi": -0.006
+   }
+  },
+  {
+   "set": "public895",
+   "route": "unlimited-ocr",
+   "family": "Sherlock native",
+   "against": "qwen3.6-27b",
+   "pages": 895,
+   "failed": 105,
+   "failed_other": 97,
+   "strict": {
+    "n": 895,
+    "delta": -0.2172,
+    "p": 0.0001,
+    "lo": -0.2345,
+    "hi": -0.2
+   },
+   "answered": {
+    "n": 715,
+    "delta": -0.2268,
+    "p": 0.0001,
+    "lo": -0.2432,
+    "hi": -0.2103
+   }
+  },
+  {
+   "set": "public895",
+   "route": "unlimited-ocr",
+   "family": "Sherlock native",
+   "against": "lightonocr3-4b",
+   "pages": 895,
+   "failed": 105,
+   "failed_other": 85,
+   "strict": {
+    "n": 895,
+    "delta": -0.2134,
+    "p": 0.0001,
+    "lo": -0.2298,
+    "hi": -0.197
+   },
+   "answered": {
+    "n": 726,
+    "delta": -0.2133,
+    "p": 0.0001,
+    "lo": -0.2289,
+    "hi": -0.1975
    }
   },
   {

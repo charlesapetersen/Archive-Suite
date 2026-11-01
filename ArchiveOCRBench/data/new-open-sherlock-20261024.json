@@ -11,6 +11,6 @@
     {"route": "OvisOCR2", "job": 49141918, "state": "Sherlock 2026-10-22: the three-page pilot capped or came back empty, so open_sweep_run.py stopped before the full run (status needs_inspection). No 96 run."},
     {"route": "TeleOCR", "job": 49141929, "state": "Sherlock 2026-10-22: vLLM 0.31 does not support its rotary embedding; no reading on either set."},
     {"route": "MiniCPM-V 4.7 1B and 35B-A3B fp8", "job": 49138954, "state": "Skipped at setup: the installed vLLM does not support the architecture, and the run allows no environment upgrade."},
-    {"route": "Unlimited-OCR, Nemotron-Parse 2.0, granite-docling, dots.ocr, Chandra-2", "job": null, "state": "Not submitted: each needs more than the frozen collector's one image and one prompt (its own vLLM image or logits processor, a vLLM range of 0.20-0.26, DocTags special tokens, or a full prompt and JSON or HTML output not on the card)."}
+    {"route": "dots.ocr, Chandra-2", "job": null, "state": "Not submitted in this frozen collector: a full prompt and JSON or HTML output not on the card. Unlimited-OCR and Nemotron-Parse 2.0 were later measured in W46.ocr-new-open-boxes; granite-docling failed that arm’s cluster pilot and has a separate Mac measurement."}
   ]
 }

@@ -1,0 +1,67 @@
+{
+  "_source": "W46.ocr-new-open-boxes, batch 20261031-131437, completed card-route sessions collected 2026-11-01. Aggregated by ocr_boxes_audit.py from new-open-{895,96} in the shared Sherlock results cache. Full settings and box geometry audit in ArchiveProcessor/segbench-results/bench-corpus/new-open-boxes-audit.json. server_min is Slurm elapsed (sacct.tsv); this is an in-process transformers runtime, not server uptime.",
+  "status": "Native card routes, same frozen images and 8192 output tokens; caps and blanks score zero. Nothing adopted.",
+  "hardware": "One Sherlock GPU with 48 or 80 GB, type not recorded. In-process transformers, one page at a time, bf16, greedy, 8192 new tokens; torch 2.13.0+cu129. Unlimited-OCR transformers 4.57.1, Nemotron-Parse 2.0 transformers 5.6.1. Not vLLM served.",
+  "routes": {
+    "unlimited-ocr": {
+      "model": "baidu/Unlimited-OCR",
+      "revision": "8249d20b2822a7d8a4c22c8d8c9069b5ac36bda3",
+      "route": "native",
+      "prompt": "<image>document parsing.",
+      "dtype": "bf16",
+      "job": 50550127,
+      "server_min": 532.817,
+      "license": "MIT",
+      "weight_gb": 6.673,
+      "gpus": 1,
+      "cluster": "Sherlock",
+      "runtime": "4.57.1",
+      "generation": {
+        "infer": {
+          "base_size": 1024,
+          "crop_mode": true,
+          "image_size": 640,
+          "ngram_window": 128,
+          "no_repeat_ngram_size": 35
+        },
+        "attn_implementation": {
+          "config": null,
+          "used": "eager"
+        },
+        "generate": "max_length replaced by max_new_tokens 8192; eos [1]"
+      }
+    },
+    "nemotron-parse-2": {
+      "model": "nvidia/NVIDIA-Nemotron-Parse-2.0",
+      "revision": "4e021c03edc92e715d5d788921a927d0cbb4b4d1",
+      "route": "native",
+      "prompt": "</s><s><predict_bbox><predict_classes><output_markdown><predict_no_text_in_pic>",
+      "dtype": "bf16",
+      "job": 50569392,
+      "server_min": 140.767,
+      "license": "OpenMDW-1.1",
+      "weight_gb": 3.612,
+      "gpus": 1,
+      "cluster": "Sherlock",
+      "runtime": "5.6.1",
+      "generation": {
+        "generation": {
+          "max_new_tokens": 8192,
+          "do_sample": false,
+          "num_beams": 1,
+          "repetition_penalty": 1.1,
+          "eos_token_id": 2,
+          "forced_eos_token_id": 2
+        },
+        "decode": "batch_decode skip_special_tokens=True (run_transformers_inference.py)"
+      }
+    }
+  },
+  "not_scored": [
+    {
+      "route": "granite-docling-258M (Sherlock)",
+      "job": 50536486,
+      "state": "Initial vLLM fork deadlock: 895 timed out before loading, 96 cancelled. A later spawned-engine pilot (50573600) read three pages and failed on two handwriting caps (owner session 56916c54); no full-set reading, no numerical score. Mac MLX arm measured separately on the 96."
+    }
+  ]
+}

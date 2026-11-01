@@ -23,7 +23,7 @@ The Vision OCR lab's handwriting pick (LightOnOCR-3-4B, 8-bit) and runner-up (Qw
 
 ## Speed and memory: lightonocr-3-4b-mlx8
 
-99 of the 99 originals read, one at a time, model loaded once (2 s to load).
+99 of the 99 originals read, one at a time, one model load per collect invocation (2.2 s median recorded load time).
 
 | measure | median | 90th percentile | max |
 |---|---:|---:|---:|
@@ -36,7 +36,7 @@ The Vision OCR lab's handwriting pick (LightOnOCR-3-4B, 8-bit) and runner-up (Qw
 
 Total reading time 42 min for 99 pages; 0 failed (0 hit max_tokens).
 
-The memory guard's whole-process view of each collect run (date, exit, seconds, peak RSS MB, peak physical footprint MB, swap growth MB, worst pressure level):
+Available memory guard whole-process rows (resumed collects may lack a row) (date, exit, seconds, peak RSS MB, peak physical footprint MB, swap growth MB, worst pressure level):
 
 - 2026-10-15T18:58:20 · 0 · 2491 · 1763 · 7889 · -24 · 1
 
@@ -62,7 +62,7 @@ The memory guard's whole-process view of each collect run (date, exit, seconds, 
 
 ## Speed and memory: qwen3.5-9b-mlx4
 
-99 of the 99 originals read, one at a time, model loaded once (2 s to load).
+99 of the 99 originals read, one at a time, one model load per collect invocation (2.4 s median recorded load time).
 
 | measure | median | 90th percentile | max |
 |---|---:|---:|---:|
@@ -75,7 +75,7 @@ The memory guard's whole-process view of each collect run (date, exit, seconds, 
 
 Total reading time 64 min for 99 pages; 1 failed (0 hit max_tokens).
 
-The memory guard's whole-process view of each collect run (date, exit, seconds, peak RSS MB, peak physical footprint MB, swap growth MB, worst pressure level):
+Available memory guard whole-process rows (resumed collects may lack a row) (date, exit, seconds, peak RSS MB, peak physical footprint MB, swap growth MB, worst pressure level):
 
 - 2026-10-15T20:03:12 · 0 · 3867 · 3304 · 9096 · -24 · 2
 
@@ -96,7 +96,7 @@ The memory guard's whole-process view of each collect run (date, exit, seconds, 
 
 ## Speed and memory: xiaomi-ocr-0-bf16
 
-99 of the 99 originals read, one at a time, model loaded once (1 s to load).
+99 of the 99 originals read, one at a time, one model load per collect invocation (1.2 s median recorded load time).
 
 | measure | median | 90th percentile | max |
 |---|---:|---:|---:|
@@ -109,7 +109,7 @@ The memory guard's whole-process view of each collect run (date, exit, seconds, 
 
 Total reading time 15 min for 99 pages; 0 failed (0 hit max_tokens).
 
-The memory guard's whole-process view of each collect run (date, exit, seconds, peak RSS MB, peak physical footprint MB, swap growth MB, worst pressure level):
+Available memory guard whole-process rows (resumed collects may lack a row) (date, exit, seconds, peak RSS MB, peak physical footprint MB, swap growth MB, worst pressure level):
 
 - 2026-10-31T04:19:54 · 0 · 917 · 3073 · 4456 · -8 · 1
 
@@ -130,7 +130,7 @@ The memory guard's whole-process view of each collect run (date, exit, seconds, 
 
 ## Speed and memory: paddleocr-vl1.6-bf16
 
-99 of the 99 originals read, one at a time, model loaded once (1 s to load).
+99 of the 99 originals read, one at a time, one model load per collect invocation (0.8 s median recorded load time).
 
 | measure | median | 90th percentile | max |
 |---|---:|---:|---:|
@@ -143,43 +143,41 @@ The memory guard's whole-process view of each collect run (date, exit, seconds, 
 
 Total reading time 12 min for 99 pages; 3 failed (3 hit max_tokens).
 
-The memory guard's whole-process view of each collect run (date, exit, seconds, peak RSS MB, peak physical footprint MB, swap growth MB, worst pressure level):
+Available memory guard whole-process rows (resumed collects may lack a row) (date, exit, seconds, peak RSS MB, peak physical footprint MB, swap growth MB, worst pressure level):
 
 - 2026-10-31T04:31:50 · 0 · 716 · 2133 · 3460 · -8 · 1
 
 ## granite-docling-258M bf16 (`granite-docling-258m-mlx`)
 
-**Incomplete: 46 of 96 accuracy pages read.**
-
-46 of the panel's 96 accuracy pages (the three agreement-only letters excluded, as there). Failed or cut-off readings score as empty, as in the panel.
+96 of the panel's 96 accuracy pages (the three agreement-only letters excluded, as there). Failed or cut-off readings score as empty, as in the panel.
 
 | route | completed / n | NES % | chrF2 % | words missed % | words added % | kind correct |
 |---|---:|---:|---:|---:|---:|---:|
-| Mac MLX (granite-docling-258m-mlx) | 37/46 | 60.95 | 61.97 | 26.22 | 21.93 | – |
+| Mac MLX (granite-docling-258m-mlx) | 77/96 | 62.07 | 63.70 | 26.11 | 16.87 | – |
 
 | kind | n | Mac MLX NES % |
 |---|---:|---:|
-| handwritten | 7 | 25.88 |
+| handwritten | 16 | 17.26 |
 | mixed | 2 | 0.00 |
-| printed | 11 | 67.93 |
-| typewritten | 26 | 72.13 |
+| printed | 28 | 67.15 |
+| typewritten | 50 | 76.05 |
 
 ## Speed and memory: granite-docling-258m-mlx
 
-46 of the 99 originals read, one at a time, model loaded once (0 s to load).
+99 of the 99 originals read, one at a time, one model load per collect invocation (0.4 s median recorded load time).
 
 | measure | median | 90th percentile | max |
 |---|---:|---:|---:|
-| seconds a page (prompt + generation) | 3.8 | 39.9 | 40.4 |
+| seconds a page (prompt + generation) | 3.9 | 39.9 | 40.4 |
 | seconds to first token (image encoding + prefill) | 0.8 | 1.0 | 1.3 |
-| generation tokens/s | 246.6 | – | – |
+| generation tokens/s | 247.7 | – | – |
 | input tokens (image + prompt) | 878 | 1142 | 1142 |
-| output tokens | 690 | 8192 | 8192 |
+| output tokens | 755 | 8192 | 8192 |
 | MLX peak memory, GB | 1.44 | 1.50 | 1.50 |
 
-Total reading time 11 min for 46 pages; 9 failed (9 hit max_tokens).
+Total reading time 22 min for 99 pages; 21 failed (20 hit max_tokens).
 
-The memory guard's whole-process view of each collect run (date, exit, seconds, peak RSS MB, peak physical footprint MB, swap growth MB, worst pressure level):
+Available memory guard whole-process rows (resumed collects may lack a row) (date, exit, seconds, peak RSS MB, peak physical footprint MB, swap growth MB, worst pressure level):
 
 - 2026-10-31T12:08:00 · 0 · 11 · 1239 · 1313 · 0 · 1
 
@@ -187,6 +185,6 @@ The memory guard's whole-process view of each collect run (date, exit, seconds, 
 
 - **Truth.** The OCR panel's 96 accuracy pages, the adjudicated truth (`ocr_panel.TRUTH`).
 - **Selection.** All 96 accuracy pages (the three agreement-only letters excluded), one reading each; none chosen by a route's reading.
-- **Comparison.** Each Mac route at its own quantisation and prompt: LightOnOCR-3-4B 8-bit (96 pages, its own prompt); Qwen3.5-9B 4-bit (96 pages, the panel prompt); Xiaomi-OCR-0 bf16 (96 pages, its own prompt); PaddleOCR-VL 1.6 bf16 (96 pages, its own prompt); granite-docling-258M bf16 (46 pages, its own prompt). The hosted bf16 row is qwen3.5-9b for Qwen3.5-9B 4-bit only. Speed and memory are one Apple M3 Pro with 18 GB, one page at a time.
+- **Comparison.** Each Mac route at its own quantisation and prompt: LightOnOCR-3-4B 8-bit (96 pages, its own prompt); Qwen3.5-9B 4-bit (96 pages, the panel prompt); Xiaomi-OCR-0 bf16 (96 pages, its own prompt); PaddleOCR-VL 1.6 bf16 (96 pages, its own prompt); granite-docling-258M bf16 (96 pages, its own prompt). The hosted bf16 row is qwen3.5-9b for Qwen3.5-9B 4-bit only. Speed and memory are one Apple M3 Pro with 18 GB, one page at a time.
 - **Noise.** Local greedy routes are deterministic on one machine (`ocr-rerun-noise.md`), so the paired interval alone tests a gap between them; the bf16 readers land Xiaomi-OCR-0 bf16 0.01 points from its Sherlock run and PaddleOCR-VL 1.6 bf16 0.08 points from its Sherlock run (`ocr-scorers.md`).
 - **Scope.** The 96 only: these routes' 895 figures are Sherlock's, not read from the Mac.

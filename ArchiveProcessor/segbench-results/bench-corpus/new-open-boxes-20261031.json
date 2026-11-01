@@ -1,0 +1,141 @@
+{
+  "models": [
+    {
+      "route": "nemotron-parse-2",
+      "mode": "native",
+      "subset": "added455",
+      "stratum": "all",
+      "n": 455,
+      "ok": 330,
+      "failed": 0.27472527472527475,
+      "nes_answered": 0.5651828095609631,
+      "nes": 0.4099128069343249,
+      "chrf": 0.37153852841205776,
+      "miss": 0.8260515409472149,
+      "add": 0.08033244716560595,
+      "cost": 0,
+      "words": 223434,
+      "nes_mapped": null,
+      "nes_no_marks": null,
+      "nes_no_space": null
+    },
+    {
+      "route": "nemotron-parse-2",
+      "mode": "native",
+      "subset": "full895",
+      "stratum": "all",
+      "n": 895,
+      "ok": 605,
+      "failed": 0.3240223463687151,
+      "nes_answered": 0.489381012117326,
+      "nes": 0.33081062830277347,
+      "chrf": 0.2829648213773862,
+      "miss": 0.8334032681897585,
+      "add": 0.17895585771381467,
+      "cost": 0,
+      "words": 336027,
+      "nes_mapped": null,
+      "nes_no_marks": null,
+      "nes_no_space": null
+    },
+    {
+      "route": "nemotron-parse-2",
+      "mode": "native",
+      "subset": "original440",
+      "stratum": "all",
+      "n": 440,
+      "ok": 275,
+      "failed": 0.375,
+      "nes_answered": 0.39841885518496145,
+      "nes": 0.2490117844906009,
+      "chrf": 0.19137155614835086,
+      "miss": 0.847992326343556,
+      "add": 0.37466805218796906,
+      "cost": 0,
+      "words": 112593,
+      "nes_mapped": null,
+      "nes_no_marks": null,
+      "nes_no_space": null
+    },
+    {
+      "route": "unlimited-ocr",
+      "mode": "native",
+      "subset": "added455",
+      "stratum": "all",
+      "n": 455,
+      "ok": 417,
+      "failed": 0.08351648351648355,
+      "nes_answered": 0.5721739050074285,
+      "nes": 0.5243879525013135,
+      "chrf": 0.482533905938154,
+      "miss": 0.37750297627039753,
+      "add": 0.16812571050064,
+      "cost": 0,
+      "words": 223434,
+      "nes_mapped": null,
+      "nes_no_marks": null,
+      "nes_no_space": null
+    },
+    {
+      "route": "unlimited-ocr",
+      "mode": "native",
+      "subset": "full895",
+      "stratum": "all",
+      "n": 895,
+      "ok": 790,
+      "failed": 0.11731843575418999,
+      "nes_answered": 0.47061659584171406,
+      "nes": 0.41540459297760235,
+      "chrf": 0.3507873050704624,
+      "miss": 0.5294544783603699,
+      "add": 0.4065804235969133,
+      "cost": 0,
+      "words": 336027,
+      "nes_mapped": null,
+      "nes_no_marks": null,
+      "nes_no_space": null
+    },
+    {
+      "route": "unlimited-ocr",
+      "mode": "native",
+      "subset": "original440",
+      "stratum": "all",
+      "n": 440,
+      "ok": 373,
+      "failed": 0.15227272727272723,
+      "nes_answered": 0.35707933599693414,
+      "nes": 0.30270589165194645,
+      "chrf": 0.21454934280955412,
+      "miss": 0.8309930457488476,
+      "add": 0.8797793823772349,
+      "cost": 0,
+      "words": 112593,
+      "nes_mapped": null,
+      "nes_no_marks": null,
+      "nes_no_space": null
+    }
+  ],
+  "coverage": {
+    "unlimited-ocr": {
+      "mode": "native",
+      "records": 895,
+      "missing": 0,
+      "status": {
+        "cap": 60,
+        "ok": 835
+      }
+    },
+    "nemotron-parse-2": {
+      "mode": "native",
+      "records": 895,
+      "missing": 0,
+      "status": {
+        "cap": 283,
+        "ok": 612
+      }
+    }
+  },
+  "manifest_sha256": "27673d67e648a1864f16515ed6d73bf9a0b35a4895e8821455ea36c17f4236eb",
+  "base_sha256": "2ac7d7c97c10019a0a169dd48df32b0b5b100de452c35a2f9c7a46a7e47d0c20",
+  "note": "Different page mix: the expanded total is not directly comparable to hosted references on the original pages only. No original report overwritten; no new inference."
+}

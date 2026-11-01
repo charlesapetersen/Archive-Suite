@@ -1,0 +1,291 @@
+{
+ "public895": {
+  "unlimited-ocr": {
+   "job": "50550127",
+   "contract": {
+    "model": "baidu/Unlimited-OCR",
+    "revision": "8249d20b2822a7d8a4c22c8d8c9069b5ac36bda3",
+    "adapter": "unlimited",
+    "prompt_sha256": "a210f5b991d35d2a9a7d6c6160f54165c0ae96e02fbfdd1bc38400232021c303",
+    "runner_sha256": "76940f6150d1039f522d531667363b95f8fed67f8e2084a29eada87991defee6",
+    "parser_sha256": "030010a2d0ff649a9cfb50ef0a4733a538e9ed8e54227a013a8f9532b604b783",
+    "max_new_tokens": 8192,
+    "greedy": true,
+    "settings": {
+     "infer": {
+      "base_size": 1024,
+      "crop_mode": true,
+      "image_size": 640,
+      "ngram_window": 128,
+      "no_repeat_ngram_size": 35
+     },
+     "attn_implementation": {
+      "config": null,
+      "used": "eager"
+     },
+     "generate": "max_length replaced by max_new_tokens 8192; eos [1]"
+    },
+    "versions": {
+     "torch": "2.13.0+cu129",
+     "transformers": "4.57.1",
+     "vllm": "0.31.0+cu129",
+     "docling-core": null
+    }
+   },
+   "records": 895,
+   "outcomes": {
+    "ok": 790,
+    "cap": 60,
+    "blank": 45
+   },
+   "scored_outcomes": {
+    "ok": 790,
+    "cap": 60,
+    "blank": 45
+   },
+   "load_s": 22.1,
+   "collector_s": 31930.3,
+   "median_page_s": 11.978,
+   "max_page_s": 313.136,
+   "pages_per_hour": 100.9,
+   "all_boxes": 14071,
+   "answered_pages_with_boxes": 790,
+   "answered_boxes": 11396,
+   "invalid_geometry": {
+    "zero_area": 295,
+    "reversed": 34,
+    "out_of_range": 13
+   },
+   "invalid_boxes": 334,
+   "classes": {
+    "aside_text": 104,
+    "equation": 1,
+    "footer": 388,
+    "header": 343,
+    "image": 269,
+    "image_caption": 22,
+    "image_footnote": 1,
+    "page_footnote": 4,
+    "page_number": 385,
+    "ref_text": 10,
+    "table": 104,
+    "text": 9166,
+    "text_block": 10,
+    "title": 589
+   },
+   "units": [
+    "unlimited-999"
+   ]
+  },
+  "nemotron-parse-2": {
+   "job": "50569392",
+   "contract": {
+    "model": "nvidia/NVIDIA-Nemotron-Parse-2.0",
+    "revision": "4e021c03edc92e715d5d788921a927d0cbb4b4d1",
+    "adapter": "nemotron",
+    "prompt_sha256": "5d8023c6c6767d98ac4d58669ffd99981ca4872dd816eed973e3efd72055fc44",
+    "runner_sha256": "76940f6150d1039f522d531667363b95f8fed67f8e2084a29eada87991defee6",
+    "parser_sha256": "030010a2d0ff649a9cfb50ef0a4733a538e9ed8e54227a013a8f9532b604b783",
+    "max_new_tokens": 8192,
+    "greedy": true,
+    "settings": {
+     "generation": {
+      "max_new_tokens": 8192,
+      "do_sample": false,
+      "num_beams": 1,
+      "repetition_penalty": 1.1,
+      "eos_token_id": 2,
+      "forced_eos_token_id": 2
+     },
+     "decode": "batch_decode skip_special_tokens=True (run_transformers_inference.py)"
+    },
+    "versions": {
+     "torch": "2.13.0+cu129",
+     "transformers": "5.6.1",
+     "vllm": "0.31.0+cu129",
+     "docling-core": null
+    }
+   },
+   "records": 895,
+   "outcomes": {
+    "ok": 605,
+    "cap": 283,
+    "blank": 7
+   },
+   "scored_outcomes": {
+    "ok": 605,
+    "cap": 283,
+    "blank": 7
+   },
+   "load_s": 41.8,
+   "collector_s": 8386.4,
+   "median_page_s": 2.514,
+   "max_page_s": 25.371,
+   "pages_per_hour": 384.2,
+   "all_boxes": 3140,
+   "answered_pages_with_boxes": 605,
+   "answered_boxes": 2384,
+   "invalid_geometry": {
+    "reversed": 4
+   },
+   "invalid_boxes": 4,
+   "classes": {
+    "Bibliography": 10,
+    "Caption": 120,
+    "Chart": 100,
+    "Footnote": 2,
+    "Formula": 1,
+    "List-item": 129,
+    "Page-footer": 114,
+    "Page-header": 125,
+    "Picture": 114,
+    "Section-header": 123,
+    "Table": 223,
+    "Text": 1283,
+    "Title": 40
+   },
+   "units": [
+    "nemotron-canvas-1"
+   ]
+  }
+ },
+ "owner99": {
+  "unlimited-ocr": {
+   "job": "50550130",
+   "contract": {
+    "model": "baidu/Unlimited-OCR",
+    "revision": "8249d20b2822a7d8a4c22c8d8c9069b5ac36bda3",
+    "adapter": "unlimited",
+    "prompt_sha256": "a210f5b991d35d2a9a7d6c6160f54165c0ae96e02fbfdd1bc38400232021c303",
+    "runner_sha256": "76940f6150d1039f522d531667363b95f8fed67f8e2084a29eada87991defee6",
+    "parser_sha256": "030010a2d0ff649a9cfb50ef0a4733a538e9ed8e54227a013a8f9532b604b783",
+    "max_new_tokens": 8192,
+    "greedy": true,
+    "settings": {
+     "infer": {
+      "base_size": 1024,
+      "crop_mode": true,
+      "image_size": 640,
+      "ngram_window": 128,
+      "no_repeat_ngram_size": 35
+     },
+     "attn_implementation": {
+      "config": null,
+      "used": "eager"
+     },
+     "generate": "max_length replaced by max_new_tokens 8192; eos [1]"
+    },
+    "versions": {
+     "torch": "2.13.0+cu129",
+     "transformers": "4.57.1",
+     "vllm": "0.31.0+cu129",
+     "docling-core": null
+    }
+   },
+   "records": 99,
+   "outcomes": {
+    "ok": 97,
+    "cap": 2
+   },
+   "scored_outcomes": {
+    "ok": 94,
+    "cap": 2
+   },
+   "load_s": 27.8,
+   "collector_s": 1757.0,
+   "median_page_s": 10.596,
+   "max_page_s": 259.475,
+   "pages_per_hour": 202.8,
+   "all_boxes": 1449,
+   "answered_pages_with_boxes": 97,
+   "answered_boxes": 1428,
+   "invalid_geometry": {
+    "out_of_range": 1
+   },
+   "invalid_boxes": 1,
+   "classes": {
+    "aside_text": 36,
+    "chart": 1,
+    "footer": 21,
+    "header": 71,
+    "image": 13,
+    "image_caption": 5,
+    "image_footnote": 1,
+    "page_footnote": 1,
+    "page_number": 37,
+    "table": 13,
+    "text": 1140,
+    "title": 89
+   },
+   "units": [
+    "unlimited-999"
+   ]
+  },
+  "nemotron-parse-2": {
+   "job": "50569394",
+   "contract": {
+    "model": "nvidia/NVIDIA-Nemotron-Parse-2.0",
+    "revision": "4e021c03edc92e715d5d788921a927d0cbb4b4d1",
+    "adapter": "nemotron",
+    "prompt_sha256": "5d8023c6c6767d98ac4d58669ffd99981ca4872dd816eed973e3efd72055fc44",
+    "runner_sha256": "76940f6150d1039f522d531667363b95f8fed67f8e2084a29eada87991defee6",
+    "parser_sha256": "030010a2d0ff649a9cfb50ef0a4733a538e9ed8e54227a013a8f9532b604b783",
+    "max_new_tokens": 8192,
+    "greedy": true,
+    "settings": {
+     "generation": {
+      "max_new_tokens": 8192,
+      "do_sample": false,
+      "num_beams": 1,
+      "repetition_penalty": 1.1,
+      "eos_token_id": 2,
+      "forced_eos_token_id": 2
+     },
+     "decode": "batch_decode skip_special_tokens=True (run_transformers_inference.py)"
+    },
+    "versions": {
+     "torch": "2.13.0+cu129",
+     "transformers": "5.6.1",
+     "vllm": "0.31.0+cu129",
+     "docling-core": null
+    }
+   },
+   "records": 99,
+   "outcomes": {
+    "ok": 94,
+    "cap": 5
+   },
+   "scored_outcomes": {
+    "ok": 92,
+    "cap": 4
+   },
+   "load_s": 46.1,
+   "collector_s": 335.8,
+   "median_page_s": 1.933,
+   "max_page_s": 25.888,
+   "pages_per_hour": 1061.3,
+   "all_boxes": 989,
+   "answered_pages_with_boxes": 94,
+   "answered_boxes": 972,
+   "invalid_geometry": {},
+   "invalid_boxes": 0,
+   "classes": {
+    "Bibliography": 13,
+    "Caption": 55,
+    "Chart": 2,
+    "Footnote": 7,
+    "List-item": 89,
+    "Page-footer": 26,
+    "Page-header": 40,
+    "Picture": 20,
+    "Section-header": 65,
+    "Table": 12,
+    "Text": 611,
+    "Title": 32
+   },
+   "units": [
+    "nemotron-canvas-1"
+   ]
+  }
+ }
+}

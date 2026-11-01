@@ -101,6 +101,14 @@ stratum table as L1-L3 columns, but not the 895 table (no other stratum read), n
 table or part 5 (no typed or printed page read, and their 19 handwritten pages include the three agreement-only letters
 the 16-page handwritten chart leaves out), so their owner figures stay in their own panel.
 
+W46.ocr-new-open-boxes adds Unlimited-OCR and Nemotron-Parse 2.0 on both sets (one Sherlock card,
+their in-process transformers routes) and the complete granite-docling-258M Mac arm on the 96. They join all
+four OCR charts, the headline, speed tables and applicable scorer tables; the two cluster readers also join
+part 7's 895/440/455 and stratum tables. They stay outside part 5's frozen fit. Granite's cluster pilot failed,
+so it has no numerical public-set row. Its saved element boxes and the other readers' semantic block boxes
+are inputs for W46.place-print, not measured line-selection results. Full report and provenance:
+`ArchiveProcessor/segbench-results/bench-corpus/new-open-boxes-20261031.md`.
+
 ## What is here
 
 | Path | What it is |

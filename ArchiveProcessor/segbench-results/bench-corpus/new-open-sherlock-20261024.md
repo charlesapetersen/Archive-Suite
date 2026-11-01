@@ -153,3 +153,5 @@ uv run --with rapidfuzz --with 'sacrebleu==2.5.1' --with regex --with numpy pyth
   --route "paddleocr-vl1.6=$S/new-open-96/paddleocr-vl16:native" --route "xiaomi-ocr-0=$S/new-open-96/xiaomi-ocr-0:native" \
   --route "qwen3.8-27b-sherlock=$S/new-open-96/qwen38-27b-fp8:panel"
 ```
+
+The box readers were subsequently measured by W46.ocr-new-open-boxes: see [new-open-boxes-20261031.md](new-open-boxes-20261031.md) for Unlimited-OCR and Nemotron-Parse 2.0 on both sets, granite's failed cluster pilot and complete Mac arm, and the saved block-box handoff.

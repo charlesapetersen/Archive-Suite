@@ -89,7 +89,7 @@ def main():
         raise ValueError('expected the frozen 895 and 99 manifests')
     out = {}
     for label, st, jobs in [('public895', '895', public), ('owner99', '96', owner)]:
-        expected = {r['id']: r['sha256'] for r in jobs}
+        expected = {r['page'] if st == '96' else r['id']: r['sha256'] for r in jobs}
         out[label] = {key: audit(a.cache / ('new-open-' + st) / key, expected,
                                 P.AGREEMENT if st == '96' else frozenset()) for key in KEYS}
     for key in KEYS:

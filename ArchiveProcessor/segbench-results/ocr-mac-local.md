@@ -32,7 +32,7 @@ Largest drops (NES points; page ids are private-cache keys, not corpus names):
 
 ## Speed and memory on the 18 GB M3 Pro
 
-99 of the 99 originals read, one at a time, model loaded once (2 s to load).
+99 of the 99 originals read, one at a time, one model load per collect invocation (2.1 s median recorded load time).
 
 | measure | median | 90th percentile | max |
 |---|---:|---:|---:|
@@ -54,7 +54,7 @@ Total reading time 88 min for 99 pages; 4 failed (3 hit max_tokens). The hosted 
 - Memory: 7.6 GB at MLX's peak, about 8.4 GB of whole-process footprint, on an 18 GB Mac with the owner's usual apps open. It ran without the memory guard tripping, but with memory pressure at "warn"; 18 GB is enough for this model only with little else heavy running.
 - The load time (2 s) is with the weights already in the file cache; a cold first load reads 5.5 GB from disk.
 
-The memory guard's whole-process view of each collect run (date, exit, seconds, peak RSS MB, peak physical footprint MB, swap growth MB, worst pressure level):
+Available memory guard whole-process rows (resumed collects may lack a row) (date, exit, seconds, peak RSS MB, peak physical footprint MB, swap growth MB, worst pressure level):
 
 - 2026-10-15T15:11:47 · 0 · 80 · 1252 · 7665 · 661 · 2
 - 2026-10-15T16:53:17 · 0 · 5209 · 1000 · 8367 · -517 · 2
