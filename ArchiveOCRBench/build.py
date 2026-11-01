@@ -379,6 +379,22 @@ def seg_window_modality():
             "incomplete": d["incomplete"]}
 
 
+def seg_kit_gate_sherlock():
+    """W46.kit-gate-sherlock: the teacher and the two students on owner-ruled gaps, the checkpack and the three locked
+    boxes, from one Sherlock job."""
+    path = RESULTS / "seg-kit-gate-sherlock.json"
+    if not path.exists():
+        return None
+    d = json.loads(path.read_text())
+    if any(r["missing"] for r in d["runs"].values()):
+        sys.exit(f"seg-kit-gate-sherlock.json has unanswered windows: {d['runs']}")
+    return {"checkpack": [{k: r[k] for k in ("model", "split", "gaps", "right", "false_splits", "false_merges",
+                                              "tag_right")} for r in d["checkpack"]["rows"]],
+            "boxes": [{k: r[k] for k in ("model", "box", "split", "known gaps", "gap accuracy", "false splits",
+                                          "false merges", "pages exact")} for r in d["boxes"]["observed"]],
+            "failed": {k: r["failed"] for k, r in d["runs"].items()}}
+
+
 def public_segmentation():
     """Separate public/easier boxes; their labels and scores never enter owner-box fitting."""
     root = RESULTS / "public-segmentation"
@@ -1103,6 +1119,7 @@ def main():
              "seg_date": json.loads((RESULTS / "seg-date-model-final.json").read_text())
                          if (RESULTS / "seg-date-model-final.json").exists() else None,
              "seg_context": seg_context(), "seg_window_modality": seg_window_modality(),
+             "seg_kit_gate_sherlock": seg_kit_gate_sherlock(),
              "public": public(), "ocr_scorers": ocr_scorers(),
              "dewarp": dewarp, "enh_ocr": enh_ocr,
              "loops": json.loads(LOOPS.read_text()) if LOOPS.exists() else None, "regions": regions,

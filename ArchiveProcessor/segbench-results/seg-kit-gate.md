@@ -36,7 +36,7 @@ Each student's wrong gaps, split by what the teacher (Qwen3.5 27B, whose replies
 
 - **On the test boxes, 63.0% of the 2B's errors and 87.0% of the 4B's are the teacher's.** The 2B shares 17 of its 27 wrong gaps with the teacher, the 4B 20 of 23. That is co-occurrence in single runs, not a ceiling: it does not show that training on this teacher could not remove them, nor what a better teacher or owner-ruled labels would gain. Only a training run scored on held-out gaps measures that.
 - **On the public boxes, material none of them trained on, the split is 36 of 49 (2B) and 29 of 32 (4B).** Lincoln and CREST differ from the owner's corpus in kind. The overlap there is descriptive too: it does not forecast how much a second-family teacher would help a user whose material is unlike the owner's.
-- **Not yet on the owner's 80-gap checkpack or Sasha.** No route has answers on the windows those gaps sit in (the checkpack's gaps are 71 in training collections and 9 held out; Sasha was locked on 2026-10-30), so the students' accuracy on owner-ruled held-out gaps, and the split there, wait for the teacher-and-students Sherlock job W46.kit-gate-sherlock prepares (W46.seg-boxes-score shares its teacher arm, as the audit asks).
+- **On the owner's 80-gap checkpack and Sasha: `seg-kit-gate-sherlock.md`** (W46.kit-gate-sherlock, one Sherlock job, Vision text). On Sasha, the one owner box no student trained on, the 2B is right on 89.1% of 175 known gaps against the teacher's 67.4% (44 gaps to 6) and the 4B on 80.0%; on the checkpack the 2B 67 of 74, the 4B 64, the teacher 62, a lead inside the noise there.
 
 ## The held-out set size
 
@@ -140,4 +140,4 @@ What the dry run found missing from the kit:
 - **Selection.** Whole boxes, chosen before these models existed; the dating 131 by whether the year is in the ABBYY text, which is how they were chosen in W41.date-model (ABBYY is not an input here).
 - **Comparison.** Every model on the same windows and the same request (`method_local.request`, the images at 1,024 px, temperature 0, thinking off), each on one L40S under vLLM 0.31, read from `method_openrouter.py`'s caches; the untrained 4B was run on the development boxes only.
 - **Noise.** The bootstrap's intervals above are sampling only; the rerun floor (1.4-3.2 points a box) is not in them, and truth noise enters only as the discordant-gap sensitivity. Shared-error counts are single runs, and descriptive.
-- **Scope.** The owner's material and two public boxes. Overlap is not a training ceiling and forecasts no other teacher. The checkpack and Sasha arms, which measure accuracy on owner-ruled held-out gaps, wait for the Sherlock job (above).
+- **Scope.** The owner's material and two public boxes. Overlap is not a training ceiling and forecasts no other teacher. Accuracy on owner-ruled held-out gaps (the checkpack and Sasha) is in `seg-kit-gate-sherlock.md`.

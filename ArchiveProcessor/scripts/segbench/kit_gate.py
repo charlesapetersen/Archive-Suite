@@ -395,10 +395,10 @@ def render(split, boot, observed, dates, docs, sens, records) -> str:
                  f"of {p4['student wrong']} (4B).** Lincoln and CREST differ from the owner's corpus in kind. The overlap "
                  "there is descriptive too: it does not forecast how much a second-family teacher would help a user "
                  "whose material is unlike the owner's.")
-    L += ["- **Not yet on the owner's 80-gap checkpack or Sasha.** No route has answers on the windows those gaps sit "
-          "in (the checkpack's gaps are 71 in training collections and 9 held out; Sasha was locked on 2026-10-30), so "
-          "the students' accuracy on owner-ruled held-out gaps, and the split there, wait for the teacher-and-students "
-          "Sherlock job W46.kit-gate-sherlock prepares (W46.seg-boxes-score shares its teacher arm, as the audit asks).",
+    L += ["- **On the owner's 80-gap checkpack and Sasha: `seg-kit-gate-sherlock.md`** (W46.kit-gate-sherlock, one "
+          "Sherlock job, Vision text). On Sasha, the one owner box no student trained on, the 2B is right on 89.1% of "
+          "175 known gaps against the teacher's 67.4% (44 gaps to 6) and the 4B on 80.0%; on the checkpack the 2B 67 "
+          "of 74, the 4B 64, the teacher 62, a lead inside the noise there.",
           "", "## The held-out set size", "",
           f"Paired document bootstrap over the five owner boxes ({len(docs)} documents, "
           f"{sum(d['gaps'] for d in docs)} gaps): documents drawn with replacement until the draw holds N gaps, "
@@ -532,8 +532,8 @@ def render(split, boot, observed, dates, docs, sens, records) -> str:
           "is not in them, and truth noise enters only as the discordant-gap sensitivity. Shared-error counts are "
           "single runs, and descriptive.",
           "- **Scope.** The owner's material and two public boxes. Overlap is not a training ceiling and forecasts "
-          "no other teacher. The checkpack and Sasha arms, which measure accuracy on owner-ruled held-out gaps, wait "
-          "for the Sherlock job (above).", ""]
+          "no other teacher. Accuracy on owner-ruled held-out gaps (the checkpack and Sasha) is in "
+          "`seg-kit-gate-sherlock.md`.", ""]
     return "\n".join(L)
 
 

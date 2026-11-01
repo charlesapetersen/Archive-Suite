@@ -26371,6 +26371,188 @@
    "2b-folder folder-it Dean: 2 folder units failed"
   ]
  },
+ "seg_kit_gate_sherlock": {
+  "checkpack": [
+   {
+    "model": "teacher",
+    "split": "holdout",
+    "gaps": 9,
+    "right": 7,
+    "false_splits": 1,
+    "false_merges": 1,
+    "tag_right": 6
+   },
+   {
+    "model": "teacher",
+    "split": "train",
+    "gaps": 65,
+    "right": 55,
+    "false_splits": 10,
+    "false_merges": 0,
+    "tag_right": 47
+   },
+   {
+    "model": "teacher",
+    "split": "all",
+    "gaps": 74,
+    "right": 62,
+    "false_splits": 11,
+    "false_merges": 1,
+    "tag_right": 53
+   },
+   {
+    "model": "2b",
+    "split": "holdout",
+    "gaps": 9,
+    "right": 8,
+    "false_splits": 0,
+    "false_merges": 1,
+    "tag_right": 6
+   },
+   {
+    "model": "2b",
+    "split": "train",
+    "gaps": 65,
+    "right": 59,
+    "false_splits": 6,
+    "false_merges": 0,
+    "tag_right": 47
+   },
+   {
+    "model": "2b",
+    "split": "all",
+    "gaps": 74,
+    "right": 67,
+    "false_splits": 6,
+    "false_merges": 1,
+    "tag_right": 53
+   },
+   {
+    "model": "4b",
+    "split": "holdout",
+    "gaps": 9,
+    "right": 8,
+    "false_splits": 0,
+    "false_merges": 1,
+    "tag_right": 6
+   },
+   {
+    "model": "4b",
+    "split": "train",
+    "gaps": 65,
+    "right": 56,
+    "false_splits": 9,
+    "false_merges": 0,
+    "tag_right": 47
+   },
+   {
+    "model": "4b",
+    "split": "all",
+    "gaps": 74,
+    "right": 64,
+    "false_splits": 9,
+    "false_merges": 1,
+    "tag_right": 53
+   }
+  ],
+  "boxes": [
+   {
+    "model": "fs-qwen3.5-27b",
+    "box": "Sasha",
+    "split": "held-out",
+    "known gaps": 175,
+    "gap accuracy": 0.6742857142857143,
+    "false splits": 57,
+    "false merges": 0,
+    "pages exact": 0.15517241379310345
+   },
+   {
+    "model": "fs-seg-2b",
+    "box": "Sasha",
+    "split": "held-out",
+    "known gaps": 175,
+    "gap accuracy": 0.8914285714285715,
+    "false splits": 14,
+    "false merges": 5,
+    "pages exact": 0.46551724137931033
+   },
+   {
+    "model": "fs-seg-4b",
+    "box": "Sasha",
+    "split": "held-out",
+    "known gaps": 175,
+    "gap accuracy": 0.8,
+    "false splits": 33,
+    "false merges": 2,
+    "pages exact": 0.21839080459770116
+   },
+   {
+    "model": "fs-qwen3.5-27b",
+    "box": "IllustratedReview",
+    "split": "trained-on",
+    "known gaps": 146,
+    "gap accuracy": 0.7808219178082192,
+    "false splits": 11,
+    "false merges": 21,
+    "pages exact": 0.5306122448979592
+   },
+   {
+    "model": "fs-seg-2b",
+    "box": "IllustratedReview",
+    "split": "trained-on",
+    "known gaps": 146,
+    "gap accuracy": 0.7328767123287672,
+    "false splits": 9,
+    "false merges": 30,
+    "pages exact": 0.3945578231292517
+   },
+   {
+    "model": "fs-seg-4b",
+    "box": "IllustratedReview",
+    "split": "trained-on",
+    "known gaps": 146,
+    "gap accuracy": 0.7191780821917808,
+    "false splits": 12,
+    "false merges": 29,
+    "pages exact": 0.36054421768707484
+   },
+   {
+    "model": "fs-qwen3.5-27b",
+    "box": "SC0122",
+    "split": "trained-on",
+    "known gaps": 188,
+    "gap accuracy": 0.9946808510638298,
+    "false splits": 1,
+    "false merges": 0,
+    "pages exact": 0.9217877094972067
+   },
+   {
+    "model": "fs-seg-2b",
+    "box": "SC0122",
+    "split": "trained-on",
+    "known gaps": 188,
+    "gap accuracy": 0.9893617021276596,
+    "false splits": 1,
+    "false merges": 1,
+    "pages exact": 0.9776536312849162
+   },
+   {
+    "model": "fs-seg-4b",
+    "box": "SC0122",
+    "split": "trained-on",
+    "known gaps": 188,
+    "gap accuracy": 0.9946808510638298,
+    "false splits": 1,
+    "false merges": 0,
+    "pages exact": 0.9217877094972067
+   }
+  ],
+  "failed": {
+   "teacher": 0,
+   "2b": 0,
+   "4b": 1
+  }
+ },
  "public": {
   "rows": [
    {

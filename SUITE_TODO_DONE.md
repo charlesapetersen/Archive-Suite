@@ -13821,3 +13821,22 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   four drivers ALL PASS with `test-manifest-persistence.sh`; clean build, no new warnings. No migration (no
   production data). No bench cache used.
   <!-- /W40.fix-processor-failed-ocr-wrapped -->
+- [x] **W46.kit-gate-sherlock — the students and the teacher on owner-ruled held-out gaps: the checkpack's windows and Sasha [S]** · §Document processing review — W46 (owner, 2026-10-20) (lane: segbench) (uses: light) (cluster: sherlock) (blocked-on: W46.cluster-waves) — The arm of W46.kit-gate that needs answers no cache holds (measurement audit SEG-5). Pack the windows covering the owner's 80 checkpack gaps (`corpus_pairs.py checkpack` key; 71 in training collections, 9 held out) and Sasha (180 pages, the one locked box no student trained on), and prepare one Sherlock job serving the 27B teacher (`qwen3.5-27b`) and the fine-tuned 2B and 4B (`seg-student`) on them, temperature 0, the bench's request. Then score: each student's accuracy on the 9 held-out checkpack gaps and on Sasha (the checkpack's 71 reported as trained-on), and the teacher split there (`kit_gate.py`). This is the teacher arm W46.seg-boxes-score shares (its 27B and 4B on the three locked boxes go in the same job, so it is not run twice); the size-and-necessity review goes in execution-plans/items/W46.kit-gate-sherlock.md before the hand-over. detail: ArchiveProcessor/segbench-results/seg-kit-gate.md (blocked-on: W46.seg-report-refresh) **Measurement review, pass 2 (2026-10-31):** use the refreshed teacher audit and masked known-gap support; co-errors are descriptive overlap, not a causal training ceiling. — Mac side done 2026-10-31: pack frozen, ready for the owner's Sherlock batch; scoring remains (execution-plans/items/W46.kit-gate-sherlock.md).
+  SHIPPED 2026-11-01. Pack and hand-over c5dbdd93 (2026-10-31); the owner's session submitted it in batch 20261031-210431
+  (six jobs, all COMPLETED: teacher 35 min, 2B 3.5, 4B 4.4, merges about 3 each, about 0.7 GPU-hours against the 0.9
+  estimate) and collected it 2026-11-01; scored in checkpoint 2 and this commit. All 1,017 answers home, one 4B window
+  failed (scored neutral, as the bench does). Results: `segbench-results/seg-kit-gate-sherlock.md` and `.json`, written by
+  `kit_gate_sherlock.py score`, with a measurement card. On Sasha, the one owner box no student trained on, the shipped
+  2B is right on 89.1% of 175 known gaps against the 27B teacher's 67.4% (44 gaps to 6, sign test p 3e-8; every teacher
+  error a false split), the 4B 80.0% (worse than the 2B, 8 to 24). On the trained-on boxes the teacher leads on the
+  Illustrated Review (78.1% against 73.3% and 71.9%) and all tie on SC0122 (98.9-99.5%). On the owner's checkpack (74
+  ruled gaps): 2B 67, 4B 64, teacher 62; 9 held-out gaps 8, 8, 7; the 2B's lead over the teacher is 6 gaps to 1 (p 0.125),
+  inside the noise, and the checkpack's strata were drawn by the teacher's ABBYY-run label, which draws against the
+  teacher (said in the card). All on Apple Vision text, not the students' ABBYY training input. `seg-kit-gate.md`'s
+  "not yet" line and Scope now point here (kit_gate.py render edited to match); ArchiveOCRBench gains the panel "The
+  teacher and its students on owner-ruled gaps" (published copy now behind). W46.seg-boxes-score's teacher, 2B and 4B
+  rows on the three locked boxes are in the response caches (imported by `score`; SC0122 here is every known gap, that
+  item scores its 97 owner-ruled ones). Kept: the pack and results at `$AGENT_STATE/artifacts/kit-gate-sherlock-20261031`
+  (outside the bench cache; `score` needs both to rerun) and the checkpack pages' Vision text in the segbench cache
+  (seg-boxes-score reads it). No money.
+  <!-- /W46.kit-gate-sherlock -->

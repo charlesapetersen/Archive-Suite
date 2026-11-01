@@ -159,6 +159,15 @@ footer p { font-size: 13px; }
     <p class="note">Sweep: the trained Qwen3.5 2B on Dean, Deaver and Herrnstein (518 document pages, pooled), a K-page window stepping (K - 1) / 2 pages, sent with its page images or with the OCR text alone. Window size is flat from 3 to 10 pages with images (within the 6 to 9 points a window placement alone moves a test box); the whole folder collapses into merges, and 2 of its 21 folders never came back parseable with images, so that cell is blank. Text only costs 5 to 20 points, so on these photographs the images are not redundant, as A04 found them to be on clean scans; the 2B was trained on image windows, which this also measures. Vote: six runs per model (window offsets 0, 1 and 2 pages by two prompts), each gap decided by majority; the default run is offset 0 with the bench's prompt. On the owner's test boxes (Stanton and RG 165) the vote lands within a point of the default run for all three models; it beats the average single run by 1.5 to 3 points. Lincoln's gain comes from the second prompt, which cuts false splits on its long manuscripts but is no better on the owner's boxes. The local route therefore keeps one 7-page image window. Source: <code>seg-window-modality.md</code> and <code>seg-window-modality.json</code>.</p>
   </section>
 
+  <section class="panel" id="seg-kit-gate-sherlock" hidden>
+    <div class="head"><h2>The teacher and its students on owner-ruled gaps</h2><span class="meta">open models · Sherlock · Vision text</span></div>
+    <h3>The three locked boxes</h3>
+    <div class="tbl"><table><thead><tr><th>Model</th><th>Box</th><th>Trained on it?</th><th>Known gaps</th><th>Gap accuracy</th><th>False splits</th><th>False merges</th><th>Pages in exact document</th></tr></thead><tbody id="skg-box-rows"></tbody></table></div>
+    <h3>The owner's checkpack</h3>
+    <div class="tbl"><table><thead><tr><th>Model</th><th>Gaps</th><th>Right</th><th>False splits</th><th>False merges</th><th>The corpus tag right</th></tr></thead><tbody id="skg-cp-rows"></tbody></table></div>
+    <p class="note" id="skg-note"></p>
+  </section>
+
   <header class="part" id="handwriting">
     <div class="eyebrow">Part 3 · Handwriting on the Mac · Vision OCR lab</div>
     <h2>Handwriting readers that run on the device</h2>
@@ -604,6 +613,24 @@ if (swm) {
   document.getElementById('swm-sweep-rows').innerHTML = sweep.join('');
   document.getElementById('swm-vote-rows').innerHTML = vote.join('');
   document.getElementById('seg-window-modality').hidden = !vote.length;
+}
+
+const skg = DATA.seg_kit_gate_sherlock;
+if (skg) {
+  const nm = {teacher: 'Qwen3.5 27B teacher', '2b': 'Trained Qwen3.5 2B', '4b': 'Trained Qwen3.5 4B',
+              'fs-qwen3.5-27b': 'Qwen3.5 27B teacher', 'fs-seg-2b': 'Trained Qwen3.5 2B', 'fs-seg-4b': 'Trained Qwen3.5 4B'};
+  const boxName = {IllustratedReview: 'Illustrated Review'};
+  const p1 = v => v === null ? '—' : (100 * v).toFixed(1) + '%';
+  document.getElementById('skg-box-rows').innerHTML = skg.boxes.map(r => '<tr><td>' + nm[r.model] + '</td><td>' +
+    (boxName[r.box] || r.box) + '</td><td>' + (r.split === 'held-out' ? 'no' : 'yes') + '</td><td>' + r['known gaps'] +
+    '</td><td>' + p1(r['gap accuracy']) + '</td><td>' + r['false splits'] + '</td><td>' + r['false merges'] + '</td><td>' +
+    p1(r['pages exact']) + '</td></tr>').join('');
+  const sp = {holdout: 'held out', train: 'in training collections', all: 'all'};
+  document.getElementById('skg-cp-rows').innerHTML = skg.checkpack.map(r => '<tr><td>' + nm[r.model] + '</td><td>' + r.gaps +
+    ' ' + sp[r.split] + '</td><td>' + r.right + ' (' + p1(r.right / r.gaps) + ')</td><td>' + r.false_splits + '</td><td>' +
+    r.false_merges + '</td><td>' + r.tag_right + '</td></tr>').join('');
+  document.getElementById('skg-note').textContent = 'One Sherlock job: the teacher whose replies trained the students, and the trained 2B (the shipped build\'s source) and 4B, on the same 7-page windows with Apple Vision\'s text, the app\'s input (they trained on ABBYY text). Sasha is the one owner box no student trained on, and there the 2B beats its teacher by 21.7 points (44 gaps to 6): every teacher error there is a false split. On the two boxes they trained on the teacher leads on the Illustrated Review and all three tie on SC0122. The checkpack is the owner\'s 80 ruled gaps (6 unsure out), drawn by stratum where the teacher and the tag disagreed, so its pooled rate is not a population rate and the teacher is drawn against; the 2B\'s lead there (6 gaps to 1) is inside the noise. Failed windows, scored neutral: ' + Object.entries(skg.failed).map(([k, v]) => nm[k] + ' ' + v).join(', ') + '. Unsure gaps out of every count. Source: <code>seg-kit-gate-sherlock.md</code>.'.replace(/<\/?code>/g, '');
+  document.getElementById('seg-kit-gate-sherlock').hidden = false;
 }
 
 const jointModel = DATA.seg_date;
