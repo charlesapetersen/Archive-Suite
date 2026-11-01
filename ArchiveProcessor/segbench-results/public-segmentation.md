@@ -1,8 +1,9 @@
 # Public segmentation boxes — W43.seg-corpus-build
 
-CIA input frozen on 2026-10-18; Lincoln inventory in progress. No model scores yet. These public boxes
-are reported separately from the owner's locked boxes and are expected to be easier. Paid hosted runs
-remain deferred to W43.sweep, under the owner's 2026-10-17 instruction.
+CIA input frozen on 2026-10-18, Lincoln since; both are scored below. These public boxes are reported
+separately from the owner's locked boxes. They were expected to be easier; Lincoln turned out harder (below).
+Hosted routes on them are in `seg-lincoln-cloud.md` and `seg-lincoln-gateway.md` (W46's paid arms were released
+on 2026-10-21).
 
 The 2026-10-18 walkthrough approved `www.cia.gov` and checked Archive.org file-delivery subdomains.
 The host-limited fetch helper now covers precisely that grant; nine refusal/redirect tests pass.
@@ -30,7 +31,8 @@ quality 90. Every page was visually reviewed in sixteen contact sheets; handwrit
 The agent's audit retained the archive's 22 PDF starts and added nine internal starts (31 documents). The owner's
 2026-10-31 rulings (W46.seg-truth-sheet, folded by W46.seg-truth-rescore; the manifest carries `owner_rulings` and
 `unsure`) join PDF 19 to PDF 18 (gap 74|75, the same document), confirm the start at 95, and leave 45|46, 87|88,
-93|94 and 110|111 unsure: those four gaps are left out of every score. The internal starts were added under the owner-approved
+93|94 and 110|111 unsure: those four gaps are out of every boundary count, and segment figures take each
+route's own call there (W46.seg-unsure-mask). The internal starts were added under the owner-approved
 [document rules](../../execution-plans/segmentation/02-truth-check.md):
 
 | stream page | reason |
@@ -72,7 +74,8 @@ Missionaries resolutions (123), a separate editorial (124), a fresh Milroy-to-Us
 Grand State Council resolution (223), Rights of the Press proceedings (230), and isolated wrappers (77/231).
 The owner's 2026-10-31 rulings (W46.seg-truth-sheet, folded by W46.seg-truth-rescore; the manifest carries
 `owner_rulings` and `unsure`) make 230 the same document as its Comstock letter, leaving **80 documents**, confirm
-the clipping at 76, and leave 76|77, 106|107 and 230|231 unsure: left out of every score.
+the clipping at 76, and leave 76|77, 106|107 and 230|231 unsure: out of every boundary count, segment figures conditional on each
+route's call there.
 The two wrappers follow an intervening enclosed publication rather than their covering letter: in a
 contiguous stream they are retained as separate fragments. This is an explicitly ambiguous rule-6
 interpretation, not a second owner adjudication. The manifest records the other retained continuations,
@@ -113,11 +116,20 @@ public/easier section label. Public provenance does not guarantee ease. Lincoln'
 separate enclosed items make whole-document accuracy demanding; one wrong split can spoil a long document.
 The agent-audited truth was frozen before any model ran; on 2026-10-31 the owner's rulings on a blind sheet of
 its ambiguous gaps were folded in (W46.seg-truth-rescore; the manifests carry `owner_rulings` and `unsure`), and
-every cached answer was rescored, no model rerun. The isolated wrappers 77/231 are now unsure gaps, left out of
-every score. The other gaps remain agent-audited. No claim of unseen/pretraining-clean data.
-Per-model false splits/merges, boundary F1, and all additive counts are in the two `*-scores.json` files.
+every cached answer was rescored, no model rerun. The isolated wrappers 77/231 are now unsure gaps, out of every
+boundary count (segment figures conditional). The other gaps remain agent-audited. No claim of unseen/pretraining-clean data.
+Per-model false splits/merges, boundary F1, and all additive counts are in the two `*-scores.json` files,
+rescored with the unsure mask on 2026-10-31 (W46.seg-report-refresh; each file records `unsure_gaps`).
 
 FarmShare job IDs: teacher 1857094, 2B 1857095, 4B 1857096. Raw answers, summaries, timing and original images
-remain outside git. Only metadata/truth/numeric scores are published. Hosted reference routes remain in
-W43.sweep's deferred-run register; no paid call or subscription-agent call was made. Source construction
+remain outside git. Only metadata/truth/numeric scores are published. Hosted reference routes were run later and are reported
+in `seg-lincoln-cloud.md` and `seg-lincoln-gateway.md`; this report's own runs made no paid or subscription-agent call. Source construction
 and the available free CPU/FarmShare comparisons are finished; no more corpus work is needed for these boxes.
+
+## Measurement card
+
+- **Truth.** Agent-audited truths, frozen before any model ran (contact-sheet review of every page; no model output informed them), with the owner's 2026-10-31 rulings on their ambiguous gaps folded in (W46.seg-truth-sheet, W46.seg-truth-rescore). CREST: 74|75 joined; unsure 45|46, 87|88, 93|94, 110|111. Lincoln: 229|230 joined; unsure 76|77, 106|107, 230|231. Their other gaps remain agent-audited, which is weaker than the owner-ruled boxes they are set against. Unsure gaps are out of every boundary count; segment figures (pages exact) take each route's own call there, the conditional reading (W46.seg-unsure-mask, `score.py`). Photo kinds come from each model, not from truth photos.
+- **Selection.** CREST is folder 00170027, the one complete PDF folder (documents 1-22, checksum- and page-count-checked; 00170021 was rejected for missing numbers). Lincoln is catalogue positions 2-73 in shelf order, stopped near 250 pages at a whole-item boundary. Neither box was chosen by a model, by ABBYY text or by the By the People transcriptions. CREST has a known hole: the two exempt pages after stream page 94 are absent.
+- **Comparison.** Every route got the same seven-page image and Apple Vision prompt, window combiner and document scorer, on FarmShare; the rule baseline was fitted on the 551 owner-development pages only. The comparison with the owner's locked boxes sets an agent-audited truth with model photo labels against owner truth with truth photos.
+- **Noise.** 128 pages and 261 pages, one run per route, no intervals. Against the rerun floor of 1.4-3.2 points a box (SEG-10) the teacher and the 4B on CREST (88.3% each) are a tie; a byte-identical rerun moved Lincoln's 2B by 1.6 points (`seg-window-modality.md`).
+- **Scope.** Two public boxes, not the owner's material. Nothing here makes a claim about unseen or pretraining-clean data, and a public box is not shown to be easier: Lincoln is harder.

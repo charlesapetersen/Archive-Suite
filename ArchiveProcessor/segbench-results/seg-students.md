@@ -118,3 +118,11 @@ The shipped build, `seg-qwen3.5-2b-8bit`, stays in `~/.local/share/visionocr-ocr
 builds (`seg-qwen3.5-4b-8bit`, `seg-qwen3.5-4b-4bit`, `seg-qwen3.5-2b-4bit`, 9.3 GB) were moved off this Mac to free
 disk, into the owner's OneDrive-Stanford folder as `Offload to OneDrive/visionocr-seg-builds`, with a README. Copy
 them back to that path to rerun `method_local.py`'s seg-4b, seg-2b or seg-4b-8bit.
+
+## Measurement card
+
+- **Truth.** Development Dean, Deaver and Herrnstein and test Stanton and RG165 are owner-ruled, with truth photo labels and no unsure gaps; Stanton carries the owner's 2026-10-31 rulings. The held-out column is not truth: it is agreement with the teacher on gaps where the teacher and the tags agree, and the owner's checkpack found 5.3% of such labels wrong (0-12.4%, `label-clean.md`). The students were trained on the teacher's replies, so the teacher scored beside them is a relative, not an independent route.
+- **Selection.** Every page of each box. The students were frozen in `seg-students.json` on the development boxes and the held-out collections, and the test boxes, which no training window saw, were called once. The Mac build (2B, 8-bit) was chosen on the development boxes alone.
+- **Comparison.** FarmShare ran the students in bf16 under vLLM 0.31.0, the teacher at fp8 (`seg-teacher.md`); Gemini 3.8 Flash is cached windows; all are scored the same way. The Mac builds ran MLX at 8 and 4 bits with 1024 px pages.
+- **Noise.** 551 development and 363 test pages, one run, no intervals. A byte-identical rerun moved the 2B's Stanton by about 3 points (`seg-window-modality.md`) and the floor is 1.4-3.2 points a box (SEG-10), so the 2B against the 4B on test (80.3 against 80.0%), the students against the teacher (about 80 against 81.5%) and the 8-bit Mac builds against each other and against full precision are ties. Gemini's lead of about 7 points is not.
+- **Scope.** One owner's corpus. Agreement figures are not accuracy (`seg-kit-gate.md`). The Mac builds were not run on the test boxes, and an 8 GB Mac is unmeasured.

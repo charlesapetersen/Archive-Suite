@@ -16,7 +16,8 @@ itself over several window placements and prompts does better than it does alone
 
 Everything was fixed before any answer (`seg_window_modality.py`'s docstring); nothing was chosen on the test boxes.
 Owner boxes are scored with truth photos, Lincoln with the model's own; the test boxes and Lincoln on the owner's
-2026-10-31 rulings (W46.seg-truth-rescore), the gaps he could not rule left out. Run on Sherlock, one L40S per model, vLLM
+2026-10-31 rulings (W46.seg-truth-rescore); the test boxes have no unsure gap, and at Lincoln's three each arm's own
+call is taken. Run on Sherlock, one L40S per model, vLLM
 0.31.0, batch 20261029-102545: 6,110 requests in six jobs, 2.6 GPU-hours against the 3.5 estimated (teacher 1 h 50,
 2B 25 min, 4B 22 min). Scores: `seg-window-modality.json` (`seg_window_modality.py score`; `pooled` holds the figures
 below). No money was spent.
@@ -94,3 +95,11 @@ Pages in an exact document. "Default" is offset 0 with `l1`, the request the ben
 Teacher 1,260 vote windows in 6,350 s (5.0 s a window); 4B 1,260 in 1,161 s (0.9 s); 2B 1,260 in 583 s (0.5 s); the
 2B's sweep 2,288 requests in 642 s; its 42 whole-folder requests in 91 s (mean prompt 21,670 tokens, the longest about
 64,000). These are cluster throughput figures, not the laptop route's.
+
+## Measurement card
+
+- **Truth.** The sweep is on the owner-ruled development boxes Dean, Deaver and Herrnstein, with truth photos; the vote on owner-ruled Stanton and RG165, with truth photos and no unsure gaps (Stanton carries the owner's 2026-10-31 rulings). Lincoln is agent-audited with the owner's rulings folded in (229|230 joined; unsure 76|77, 106|107, 230|231), its other gaps agent-audited, scored with the model's own photos.
+- **Selection.** Every page of each box. The arms, sizes and vote rule were fixed in `seg_window_modality.py`'s docstring before any answer; nothing was chosen on the test boxes.
+- **Comparison.** Within the sweep, one model (the 2B) and one batch. A K-page window steps (K-1)//2, so every gap is judged about twice at every K. Text-only puts the 2B off its image training shape. The whole-folder image cell drops Dean (2 of 21 units unparseable), so it covers two boxes where text covers three. The vote arms are six runs per model in one Sherlock batch (20261029-102545).
+- **Noise.** One run per arm. A byte-identical rerun moved the 2B's Stanton by about 3 points, and the floor is 1.4-3.2 points a box (SEG-10), so the K spread (3.3 points pooled) and every vote-against-default gap (at most 1.5 points) are ties; the text-only costs of 4.6-19.7 points are not. `seg-window-modality.json`'s Lincoln boundary columns (gaps, true boundaries, boundary F1, kappa) were scored before W46.seg-unsure-mask and still count the unsure gaps as agreements; false splits and merges and pages exact are unchanged by the mask (an unsure gap already took the route's own call). The Sherlock answers needed to rescore those columns are not on this Mac, so the boundary F1 figures for those boxes here are slightly high.
+- **Scope.** The sweep covers the 2B only; whether a strong model is insensitive to window size and images is `W46.seg-window-modality-paid`'s question. Lincoln's `w1` lead is on one public box, and the speeds are cluster throughput, not the laptop.

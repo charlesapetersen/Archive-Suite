@@ -51,6 +51,16 @@ the level fitted on all three, at the 99% and the 98% bars.
   "flag all": to reach 98% or 99% after checking, the reader would check every gap. Used as an app voter it would
   need a level of its own or a second voter, and it is not offered as one.
 - **As the teacher for W41.seg-label-clean** it is a check on the tags, not a truth: a label is kept where it and
-  the tags agree, and its own errors on test-box-like material will leave some noise. The student cannot be expected
-  to beat about 81-90% unchecked on boxes like these, which is the ceiling W41.seg-finetune is chasing.
+  the tags agree, and its own errors on test-box-like material will leave some noise (since measured: 5.3% wrong among agreed
+  labels, `label-clean.md`). Its 81-90% unchecked on boxes like these is the level W41.seg-finetune aimed the
+  students at; it is not a proven ceiling, since a student can get gaps right that its teacher gets wrong
+  (`seg-kit-gate.md`, W46.seg-report-refresh).
 - Speed: 2,006 pages an hour on one L40S (seven-page windows at stride 3, 9,600 prompt tokens a window).
+
+## Measurement card
+
+- **Truth.** The owner's boxes, all owner-ruled, with truth photo labels: development Dean, Deaver and Herrnstein; test Stanton and RG165. Stanton carries the owner's 2026-10-31 rulings; the owner boxes have no unsure gaps. The teacher drafted none of this truth; the training labels it later helped make (`label-clean.md`) are a separate thing.
+- **Selection.** Every page of each box. The teacher was chosen on Deaver and frozen in `seg-teacher.json` before the run, and the test boxes were called once.
+- **Comparison.** FarmShare job 1850707 ran fp8 vLLM 0.31.0 on an L40S; Deaver's 51 windows come from the earlier W41.farmshare-seg-run. The bar, Gemini 3.8 Flash, is cached windows; both are scored as `cheap-models.md` scores them.
+- **Noise.** 551 development and 363 test pages, one run, no intervals. Against the floor of 1.4-3.2 points a box (SEG-10) the development result (90.2 against 90.7%) is a tie; the test gap (81.5 against 87.3%) is beyond it, most of it on Stanton.
+- **Scope.** One owner's corpus. Nothing here bounds what a student can reach; shared teacher and student errors are overlap (`seg-kit-gate.md`), not a ceiling.

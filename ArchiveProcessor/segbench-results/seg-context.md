@@ -9,8 +9,8 @@ Models: the Qwen3.5 27B teacher (FP8) and the trained Qwen3.5 2B student (`fs-se
 both on vLLM 0.31.0 on one Sherlock L40S, the card FarmShare used. 255 windows x 2 arms x 2 models = 1,020 requests,
 all answered, none failed. Teacher 44 minutes, student 4. Scores: `seg-context.json`
 (`seg_context.py score`). Owner boxes use truth photos, public boxes the model's own, as `public_segmentation.py`
-does. Scored on the owner's 2026-10-31 rulings (W46.seg-truth-rescore): the gaps he could not rule are left out, so a
-box's truth document count can differ by one between arms.
+does. Scored on the owner's 2026-10-31 rulings (W46.seg-truth-rescore): at the gaps he could not rule each arm's own
+call is taken, so a box's truth document count can differ by one between arms. `seg-context.json`'s Lincoln and CREST boundary columns (gaps, true boundaries, boundary F1, kappa) were scored before W46.seg-unsure-mask and still count the unsure gaps as agreements; false splits and merges and pages exact are unchanged by the mask (an unsure gap already took the route's own call). The Sherlock answers needed to rescore those columns are not on this Mac, so the boundary F1 figures for those boxes here are slightly high.
 
 ## Results
 
@@ -35,7 +35,7 @@ student's CREST gain of 9.4 points is one vote, the same as its rerun noise.
 
 - **Only Lincoln moves beyond noise**, for both models: 22 flipped votes against 6 for the teacher, 9 against 3 for
   the student. The flips are the intended ones (fewer false splits on long manuscripts, 42 → 37 and 46 → 44). The
-  teacher pays for them with one merge (0 → 1), so its boundary F1 gains 1.2 points and pages exact 5.0; the
+  teacher pays for them with one merge (0 → 1), so its boundary F1 gains 1.2 points (pre-mask, see above) and pages exact 5.0; the
   student gains 0.8 and 3.4 (rescored 2026-10-31, W46.seg-truth-rescore; before, the teacher paid three merges and
   its F1 was flat). The block
   does not cure Lincoln's over-splitting: both models still predict about 120 documents where the truth has 80 or 81,
@@ -70,3 +70,11 @@ student's CREST gain of 9.4 points is one vote, the same as its rerun noise.
   `merge-job.sh` differing from its frozen hash; the owner's session resubmitted it as 50149167, which passed the
   check, after the merge (50137555) had succeeded. The scorer matches every answer to the pack's requests by cache
   key and the Mac copy's check passes (855 files), so the requests, images and blocks scored are the frozen ones.
+
+## Measurement card
+
+- **Truth.** Stanton and RG165 are owner-ruled boxes with truth photos and no unsure gaps; Stanton carries the owner's 2026-10-31 rulings. CREST and Lincoln are agent-audited with the owner's rulings folded in (CREST 74|75 joined, unsure 45|46, 87|88, 93|94, 110|111; Lincoln 229|230 joined, unsure 76|77, 106|107, 230|231), their other gaps agent-audited, scored with the model's own photos. Lincoln's block quotes the catalogue item count the truth was built from.
+- **Selection.** All 255 windows of the four boxes; nothing chosen by results. Each block was built from the catalogue, or from label-photo OCR and the box's OCR, never from the box's own boundaries.
+- **Comparison.** Each model sees the same windows in both arms, which differ only by the block. The base request is byte-identical to FarmShare's 2026-10-18 request (asserted at pack time), and both arms ran in one Sherlock vLLM 0.31.0 run on an L40S. The block's facts differ by box type: a catalogue count for the public boxes, label OCR for the owner's.
+- **Noise.** One run per arm. The rerun floor, measured here as votes flipped between this run's base arm and FarmShare's, is 0 to 6 votes a box, and one vote can move pages exact by several points (the 2B's CREST +9.4 is one vote); SEG-10 puts it at 1.4-3.2 points a box. Only Lincoln's flips (22 against 6, 9 against 3) clear it. `seg-context.json`'s Lincoln and CREST boundary columns (gaps, true boundaries, boundary F1, kappa) were scored before W46.seg-unsure-mask and still count the unsure gaps as agreements; false splits and merges and pages exact are unchanged by the mask (an unsure gap already took the route's own call). The Sherlock answers needed to rescore those columns are not on this Mac, so the boundary F1 figures for those boxes here are slightly high.
+- **Scope.** Two open models, one block design, one count per box. Gemini (`W46.seg-context-paid`, behind nice-to-have) and a per-folder catalogue count are untested.

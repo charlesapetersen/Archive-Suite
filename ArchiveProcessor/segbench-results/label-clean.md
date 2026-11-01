@@ -41,10 +41,12 @@ A window can train whole only when all six of its gaps keep a label:
 | holdout | 2,459 | 934 (38.0%) | 1,821 (74.1%) |
 
 The teacher calls 27.6% of tag continuations starts, three and a half times the 7.9% of continuations the owner found wrong
-in the 2026-10-08 sample (`corpus-survey.md`). So most of what agree drops on that side are probably right labels
-lost to the teacher's false splits, which is also the error the untrained 4B makes most. Start-trust does the
+in the 2026-10-08 sample (`corpus-survey.md`). So most of what agree drops on that side were expected to be right labels
+lost to the teacher's false splits, which is also the error the untrained 4B makes most. [The owner's check below
+found the opposite in stratum C: 15 of 21 judged cases there are starts, so most of those tag continuations were
+wrong and the teacher right (W46.seg-report-refresh, 2026-10-31).] Start-trust does the
 opposite with the confident ones and turns 8,015 continuations into starts. Whether those flips are mostly
-right is the open question, and the next section cannot answer it.
+right was the open question here; the owner's check below answers it for the sampled strata.
 
 ## Against the owner's 2026-10-08 sample
 
@@ -106,7 +108,11 @@ that agree is clean.
 - **Start-trust's relabelled starts are the weak part.** In stratum C, continuations the teacher was sure were starts,
   6 of 21 judged were wrong (29%), and in B 3 of 4; A and D are as clean as under agree. Start-trust keeps 94.5% of
   gaps against agree's 77.7% at nearly twice the noise.
-- **Measurement card.** Truth: the owner, blind to tag, teacher and stratum. Selection: a seeded random draw per
-  stratum from all kept gaps outside the 2026-10-08 sample, by `checkpack`, not by any route's answer. Comparison:
-  the two rules on the same 80 cases. Noise: n above; the intervals are the bootstrap's. Scope: one owner's corpus;
-  the strata sizes are this run's, so a rerun of the teacher changes the weights.
+
+## Measurement card
+
+- **Truth.** The owner judged all 80 checkpack gaps (`label-clean-owner-answers.csv`, 2026-10-20), blind to tag, teacher and stratum; the 6 he marked unsure are left out. The labels being judged come from the Qwen3.5 27B teacher together with the tags; neither had any part in the owner's answers.
+- **Selection.** `checkpack` made a seeded random draw within each of four strata (A 25, B 5, C 25, D 25) from all kept gaps outside the 2026-10-08 sample; no route's answer chose a case. The strata are defined by how tag and teacher agree, so noise is weighted back by stratum size. The 2026-10-08 sample (69 clear gaps) is not independent: the rules were designed against it.
+- **Comparison.** Both rules are scored on the same 80 cases: agree on 49 (strata A and D; it drops B and C), start-trust on 74.
+- **Noise.** Agree 5.3% wrong among kept labels (95% interval 0-12.4%), start-trust 9.5% (3.9-16.4%), from a stratified percentile bootstrap (20,000 draws, seed 46). Agree's lower end of 0 is the bootstrap's floor, not a claim that agree is clean, and the two rules' intervals overlap.
+- **Scope.** One owner's corpus. The stratum sizes are this run's, so a rerun of the teacher changes the weights. Nothing here measures the gaps either rule drops, or whether a student trained on these labels is accurate (`seg-kit-gate.md`).
