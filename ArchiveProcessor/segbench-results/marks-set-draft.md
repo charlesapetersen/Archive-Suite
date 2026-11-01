@@ -4,24 +4,24 @@ W46.fix-marks-set-draft. `marks_set.py report` over the 150 pages of `marks-set-
 
 | | gemini3.7-flash-gw | qwen3-vl-8b-mlx4 |
 |---|---|---|
-| Pages read | 0 | 150 |
-| Parsed | 0 | 146 |
+| Pages read | 150 | 150 |
+| Parsed | 149 | 146 |
 | Hit the output cap | 0 | 4 |
-| Marks | 0 | 189 |
-| Pages with a mark | 0 | 98 |
-| Pages with handwriting | 0 | 96 |
-| Median seconds a page | None | 12.16 |
-| annotation | 0 | 119 |
-| marginal_note | 0 | 17 |
-| stamp | 0 | 2 |
-| signature_initials | 0 | 15 |
-| redaction | 0 | 0 |
-| other | 0 | 36 |
-| Marks dropped (bad class or box) | 0 | 4 |
+| Marks | 327 | 189 |
+| Pages with a mark | 109 | 98 |
+| Pages with handwriting | 98 | 96 |
+| Median seconds a page | 5.243 | 12.16 |
+| annotation | 76 | 119 |
+| marginal_note | 109 | 17 |
+| stamp | 16 | 2 |
+| signature_initials | 29 | 15 |
+| redaction | 1 | 0 |
+| other | 96 | 36 |
+| Marks dropped (bad class or box) | 1 | 4 |
 
 ## Agreement between the drafts
 
-No page has both drafts yet.
+On the 146 pages both parsed: handwriting present or not agreed on 125 (95% [0.7901, 0.904]); the band on 95 ([0.5704, 0.7233]). Of 309 and 189 marks, 110 pair at IoU 0.5 (47 with the same class) and 131 at IoU 0.3. 92 pages disagree somewhere, 24 of them in the core.
 
 ## Measurement card
 

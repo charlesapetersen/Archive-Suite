@@ -16,24 +16,40 @@
  },
  "routes": {
   "gemini3.7-flash-gw": {
-   "read": 0,
-   "parsed": 0,
+   "read": 150,
+   "parsed": 149,
    "capped": 0,
-   "dropped_marks": {},
-   "marks": 0,
-   "by_class": {},
-   "pages_with_marks": 0,
-   "pages_with_hand": 0,
-   "bands": {},
-   "median_s": null,
-   "cost_estimate": 0,
+   "dropped_marks": {
+    "bad json": 1
+   },
+   "marks": 327,
+   "by_class": {
+    "other": 96,
+    "marginal_note": 109,
+    "signature_initials": 29,
+    "annotation": 76,
+    "stamp": 16,
+    "redaction": 1
+   },
+   "pages_with_marks": 109,
+   "pages_with_hand": 98,
+   "bands": {
+    "none": 48,
+    "under_10_words": 58,
+    "signature_initials_date": 10,
+    "10_29_words": 20,
+    "30_plus_words": 9,
+    "handwritten_page": 4
+   },
+   "median_s": 5.243,
+   "cost_estimate": 0.3366,
    "billed": {
-    "calls": 0,
-    "estimate": 0,
-    "gateway_calls": 0,
-    "gateway": null,
-    "gateway_over_estimate": null,
-    "charged": 0
+    "calls": 150,
+    "estimate": 0.336611,
+    "gateway_calls": 150,
+    "gateway": 0.336614,
+    "gateway_over_estimate": 1.0,
+    "charged": 0.33663
    }
   },
   "qwen3-vl-8b-mlx4": {
@@ -66,56 +82,74 @@
   }
  },
  "agreement": {
-  "pages": 0,
+  "pages": 146,
   "hand_page": [
-   0,
-   null
+   125,
+   [
+    0.7901,
+    0.904
+   ]
   ],
   "band": [
-   0,
-   null
+   95,
+   [
+    0.5704,
+    0.7233
+   ]
   ],
-  "gemini_marks": 0,
-  "local_marks": 0,
-  "matched_iou50": 0,
-  "matched_iou50_same_class": 0,
-  "matched_iou30": 0
+  "gemini_marks": 309,
+  "local_marks": 189,
+  "matched_iou50": 110,
+  "matched_iou50_same_class": 47,
+  "matched_iou30": 131
  },
  "preflag_vs_gemini": {
   "A": {
-   "pages": 0,
-   "gemini_hand": 0,
-   "gemini_hand_preflag_none": 0,
-   "preflag_hand_gemini_none": 0
+   "pages": 50,
+   "gemini_hand": 22,
+   "gemini_hand_preflag_none": 3,
+   "preflag_hand_gemini_none": 3
   },
   "B": {
-   "pages": 0,
-   "gemini_hand": 0,
-   "gemini_hand_preflag_none": 0,
-   "preflag_hand_gemini_none": 0
+   "pages": 99,
+   "gemini_hand": 76,
+   "gemini_hand_preflag_none": 1,
+   "preflag_hand_gemini_none": 10
   }
  },
  "band_table": {
   "none": {
-   "unread": 42
+   "under_10_words": 4,
+   "none": 38
   },
   "signature_initials_date": {
-   "unread": 26
+   "signature_initials_date": 10,
+   "under_10_words": 15,
+   "none": 1
   },
   "under_10_words": {
-   "unread": 33
+   "none": 4,
+   "under_10_words": 29
   },
   "10_29_words": {
-   "unread": 29
+   "under_10_words": 7,
+   "10_29_words": 17,
+   "none": 5
   },
   "30_plus_words": {
-   "unread": 16
+   "under_10_words": 2,
+   "30_plus_words": 9,
+   "10_29_words": 2,
+   "handwritten_page": 2,
+   "unread": 1
   },
   "handwritten_page": {
-   "unread": 4
+   "10_29_words": 1,
+   "handwritten_page": 2,
+   "under_10_words": 1
   },
   "unparsed": {}
  },
- "disagreement_pages": 0,
- "disagreement_core": 0
+ "disagreement_pages": 92,
+ "disagreement_core": 24
 }
