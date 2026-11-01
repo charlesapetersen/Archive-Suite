@@ -91,7 +91,9 @@ def settings(root, mode):
                 'revision': f"det {m['det']['revision']}, rec {m['rec']['revision']}",
                 'route': 'pipeline', 'versions': c['prepared']['versions']}
     st = json.loads((root / 'status.json').read_text())['settings']
-    if 'adapter' in st:  # W46.ocr-new-open-boxes: an in-process card route, not a vLLM server
+    if 'adapter' in st:  # W46.ocr-new-open-boxes: the two completed transformers routes
+        if st['adapter'] not in ('unlimited', 'nemotron'):
+            raise ValueError('unscored adapter needs explicit runtime settings: ' + st['adapter'])
         return {**st, 'route': st['adapter'], 'max_tokens': st['max_new_tokens'],
                 'temperature': 0 if st['greedy'] else None, 'concurrency': 1,
                 'vllm': None}  # an installed vLLM version does not mean it served this reading
@@ -135,8 +137,8 @@ def score_route(label, root, mode, jobs, truth_dir, rows, agreement, sacct, gpus
     want = {j['page'] for j in jobs}
     if not set(records) <= want:
         raise ValueError(f'{label}: readings for pages outside the manifest: {sorted(set(records) - want)}')
-    job_ids = {str(r.get('job')) for r in records.values()}
-    if len(job_ids) != 1:
+    job_ids = {str(r.get('job') or '') for r in records.values()}
+    if len(job_ids) != 1 or '' in job_ids:
         raise ValueError(f'{label}: readings from more than one job: {sorted(job_ids)}')
     job = job_ids.pop()
     rr, caps_repetitive, cap_pages = [], 0, []

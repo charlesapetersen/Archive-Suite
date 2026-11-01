@@ -70,6 +70,12 @@ class Settings(unittest.TestCase):
         self.assertEqual((st['temperature'], st['max_tokens'], st['concurrency']), (0, 8192, 1))
         self.assertEqual(st['settings'], {'repetition_penalty': 1.1})
         self.assertIsNone(st['vllm'])
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            contract['adapter'] = 'doctags'
+            (root / 'status.json').write_text(json.dumps({'settings': contract}))
+            with self.assertRaises(ValueError):
+                T.settings(root, 'native')
 
 
 class Wall(unittest.TestCase):
