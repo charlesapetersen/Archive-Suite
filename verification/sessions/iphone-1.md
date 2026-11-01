@@ -9,6 +9,9 @@ route in `../evidence/capture/W40.i-usb-build-cable-e2e.md`). Whenever something
 something wrong, write one line on the form at the end. The next daemon session turns each note into a reproduced
 bug, a design question for you, or a suspect (`../SUSPECTS.md`).
 
+Part A was run on 2026-10-31; the returned form is [`iphone-1-returned.md`](iphone-1-returned.md). Part B waits on
+`W40.fix-processor-after-finish-not-processed`.
+
 Prepared by `W40.i5` on 2026-10-22. Rewritten by `W40.i5-usb` on 2026-10-31 for the iPhone cable route
 (`W40.i-usb-mac`, `W40.i-usb-app`, `W40.i-usb-build`), which is now the first way to connect, and for what your
 install on 2026-10-29 found. The capture apps' state is in [`../capture.md`](../capture.md) (the feature ledger;
@@ -61,19 +64,21 @@ it. If one fails, note the exact message on the form; that is a finding too.
    ```bash
    cd ~/Claude/"Archive Suite"/ArchiveProcessor/ArchiveCaptureiOS && xcodegen generate
    ```
-3. Build for the phone, signed with your personal team, under your bundle id. The team id is read from your
-   Apple Development certificate:
+3. Build for the phone, signed with your personal team, under your bundle id. The team id is the one Xcode's
+   account holds (not a certificate's: on 2026-10-31 this Mac had two Apple Development certificates, and the first
+   carried another team):
    ```bash
-   TEAM=$(security find-certificate -c "Apple Development" -p | openssl x509 -noout -subject \
-     | sed -n 's/.*OU *= *\([A-Z0-9]*\).*/\1/p')
+   TEAM=$(defaults read com.apple.dt.Xcode IDEProvisioningTeamByIdentifier \
+     | sed -n 's/.*teamID = \([A-Z0-9]*\);/\1/p' | head -1)
    echo "team: $TEAM"
    xcodebuild -project ArchiveCaptureiOS.xcodeproj -scheme ArchiveCaptureiOS -configuration Debug \
      -destination 'generic/platform=iOS' -derivedDataPath build/device -allowProvisioningUpdates \
      PRODUCT_BUNDLE_IDENTIFIER=com.charlespetersen.capture.ios DEVELOPMENT_TEAM="$TEAM" \
      CODE_SIGN_STYLE=Automatic CODE_SIGN_IDENTITY="Apple Development" CODE_SIGNING_REQUIRED=YES build
    ```
-   It should end `** BUILD SUCCEEDED **`. If it says no account or no profile, open Xcode ▸ Settings ▸ Accounts,
-   check your Apple ID is there, and run it again.
+   It should end `** BUILD SUCCEEDED **`. If it says no account or no profile, or `team:` printed nothing, open
+   Xcode ▸ Settings ▸ Accounts, check your Apple ID is there (an Xcode update removed it on 2026-10-31), and run it
+   again.
 4. Install it and open it:
    ```bash
    xcrun devicectl device install app --device "<the phone's name>" build/device/Build/Products/Debug-iphoneos/ArchiveCaptureiOS.app
@@ -99,8 +104,10 @@ If you rebuild after pulling new code, run `xcodegen generate` first; it no long
    panel, so press ⇧⌘G and paste the path. **Check the path before you shoot anything.** The photos as received
    are kept in the fixed Backup Folder, `~/Pictures/Archive Processor Live Capture/` (the pane's **Backup Folder**
    button opens it). That is the app's own folder, not your collection.
-7. Leave the OCR provider and tagging as they are in Settings. A session of about 50 pages costs a few cents of
-   OCR.
+7. Check the OCR route in Settings before Start: a session keeps the route it started with until the Processor
+   is relaunched (`W40.fix-processor-live-settings-per-run`). On 2026-10-31 the direct Gemini key had no prepaid
+   credit left, and the Stanford gateway worked once its base URL was `https://aiapi-prod.stanford.edu/v1`, with
+   nothing after `/v1`. A session of about 50 pages costs a few cents of OCR.
 8. In the Live Capture pane, press **Start** under Connection. A "Pair the phone" box appears with a QR code. The
    one code works for the cable, Wi-Fi and the Drive relay.
 

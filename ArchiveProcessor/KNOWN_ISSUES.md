@@ -41,6 +41,11 @@ exempt, as the Wi-Fi route already relies on). Those are the iPhone pack's (`W40
 rests on usbmuxd's private socket protocol: a macOS change would break the cable alone, which `scripts/usbmux-probe.sh`
 in the health gate would catch. Uploads pause while the app is suspended, as on Wi-Fi (S-023); no background mode.
 
+**Seen on a device, 2026-10-31** (owner session iphone-1, `verification/sessions/iphone-1-returned.md`): the real
+usbmuxd forwards into the phone, `http://127.0.0.1` passed ATS, and the phone was already trusted. Pages arrived about
+1 s apart. After an unplug the queued pages went across within about 30 s of replugging; with the phone locked,
+sending stopped and resumed on return (34 s gap in that run; the time from unlock was not measured).
+
 ## FIXED (W46.ocr-regions, 2026-10-25): incomplete crop collections could shrink the scoring denominator
 
 `scripts/segbench/corpus/regions.py::cmd_report` now refuses missing whole-page receipts, incomplete crop

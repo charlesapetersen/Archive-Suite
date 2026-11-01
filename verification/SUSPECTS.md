@@ -439,9 +439,12 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Would confirm it:** on a simulator with a camera stand-in, or the borrowed phone (`W40.i4`), capture one portrait
   and one landscape page and check the first bytes (`FF D8 FF`) and the EXIF orientation of what reaches the Mac.
 - **Would clear it:** both files are JPEG and both read upright on the Mac.
-- **Status:** `open`
+- **Status:** `confirmed` (orientation) · format cleared
 - **History:**
   - 2026-10-21 W40.i2 — raised.
+  - 2026-10-31 owner session iphone-1, task 6 (`sessions/iphone-1-returned.md`) — format cleared: both files `ffd8ff`.
+    Orientation confirmed: both 4032×3024 with no EXIF orientation; the sideways shot filed upside down (rotation
+    correction off). Filed as `W40.fix-ios-landscape-orientation`.
 
 ### S-023 · iOS uploads may be cut off whenever the phone leaves the app
 
@@ -454,7 +457,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Would confirm it:** in the `W40.i3` simulator E2E, background the app during a multi-page upload and record
   whether in-flight requests fail.
 - **Would clear it:** the uploads finish while the app is in the background.
-- **Status:** `open` (narrowed)
+- **Status:** `confirmed` (expected behaviour; no fix filed)
 - **History:**
   - 2026-10-21 W40.i2 — raised.
   - 2026-10-23 W40.i-sim-ui — narrowed in the simulator: with three unsent pages and the Mac down, the app was sent to
@@ -466,6 +469,9 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
     re-creates both listeners and the Mac's 2 s top-up and 20 s idle expiry find them, with the 8 s auto-retry
     re-sending (`ArchiveProcessor/REFERENCE.md` §USB local relay). Same open question, now for both routes; the
     iPhone pack checks recovery after a lock over the cable too.
+  - 2026-10-31 owner session iphone-1, task 5 (`sessions/iphone-1-returned.md`) — confirmed on the owner's iPhone over the
+    cable: with the phone locked, sending stopped (34 s with no page) and resumed by itself on return; nothing lost.
+    The limitation entry in `ArchiveProcessor/KNOWN_ISSUES.md` (cable route) records it.
 
 ### S-024 · The key wizard reports a key as validated when the Keychain refused to save it
 

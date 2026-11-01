@@ -121,7 +121,7 @@ Written by `W40.b4`, 2026-10-21.
   §Epoch, §Never-lose invariant, A5). The Mac side of the same features is the Processor ledger's
   ([`processor.md`](processor.md) P-43 to P-52).
 - **Sources read at:** `e14c5adc`; code traced at the same commit.
-- **Count:** `unproven 28 · works 1` (works: C-02, on `W40.a3`'s emulator round trip; C-43 added 2026-10-31, `unproven`).
+- **Count:** `unproven 27 · works 2` (works: C-02, on `W40.a3`'s emulator round trip; C-43, the cable, on the owner's iPhone in session iphone-1, 2026-10-31).
 
 **Order of work (rule 3).** The *Promise* and *Promised in* of every row were committed first (`77bdc91c`), from
 the guides alone. The parity comparison above had already been written from the code by `W40.i2`, so the code was
@@ -638,11 +638,15 @@ action or any runtime evidence: there is no test target and no simulator runtime
   `scripts/test-usbmux-bridge.sh`.
 - **Runtime evidence:** 2026-10-31 · `W40.i-usb-build` · [`evidence/capture/W40.i-usb-build-cable-e2e.md`](evidence/capture/W40.i-usb-build-cable-e2e.md)
   (transport only: no readable OCR key unattended).
-- **Status:** `unproven`
+- **Status:** `works`
 - **History:**
   - 2026-10-31 W40.i-usb-build — row written, `unproven`; runtime evidence: three pages over the cable route in the
     simulator, the phone drained and the Mac filed them. Stays `unproven` for a separate re-check (rule 6) and the
     real device.
+  - 2026-10-31 owner session iphone-1 (Part A, tasks 2-5, [`sessions/iphone-1-returned.md`](sessions/iphone-1-returned.md))
+    — `works` on the owner's iPhone 14: paired by QR in Cable mode, pages about 1 s apart through the real usbmuxd;
+    an unplugged cable lost nothing (nine pages, the last three about 32 s after replugging) and a locked phone lost
+    nothing (eleven pages, sending paused while locked and resumed on return). The owner is not the builder (rule 6).
 - **Notes:** the simulator shares the Mac's loopback, so the run skips the real usbmuxd's forwarding and a device's
   network stack. The trust prompt, recovery after a lock and ATS on a device are the iPhone pack's (`W40.i5-usb`).
 
