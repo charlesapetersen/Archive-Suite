@@ -550,7 +550,7 @@ def cmd_run(a):
              and (DEWARP / 'lines/raw' / f'{t["page"]}.json').exists()]
     if a.pages:
         pages = [t for t in pages if t['page'] in a.pages.split(',')]
-    out = CACHE / 'rows.jsonl'
+    out = CACHE / os.environ.get('PLACE_GEOM_ROWS', 'rows.jsonl')   # a second drag margin writes its own rows
     done = {}
     if a.fresh and out.exists():
         out.write_text('')

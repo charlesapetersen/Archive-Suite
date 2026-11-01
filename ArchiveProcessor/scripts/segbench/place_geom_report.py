@@ -136,6 +136,10 @@ def write(rows_path: Path, results: Path, prose: str = ''):
     st = {k: json.loads((cache / f'selftest-{k}.json').read_text()) for k in ('level', 'sloped')
           if (cache / f'selftest-{k}.json').exists()}
     s['selftest'] = st
+    over = cache / 'rows-m035.jsonl'
+    if over.exists():
+        s2 = summarise(load(over))
+        s['overshoot_035'] = s2['strata']
     (results / 'place-geom.json').write_text(json.dumps({'item': 'W46.place-geom', **s}, indent=1) + '\n')
     L = []
     for name, rows in s['strata'].items():
@@ -145,6 +149,19 @@ def write(rows_path: Path, results: Path, prose: str = ''):
         for r in rows:
             L.append(f'| {LABEL[(r["arm"], r["writer"])]} | {pct(r["rate"])} ({r["passed"]}/{r["lines"]}) | '
                      f'{dpct(r)} | {r["cut_lines"]} | {pct(r["find"])} | {pct(r["placed"])} |')
+    if 'overshoot_035' in s:
+        L.append('\n## The same drags overshooting the ink by 0.35 of its height\n')
+        L.append('A user drags a little past the first and last letters. Same pages and lines; only the drag points '
+                 'move out. The scorer\'s level oracle passes 92.8% this way, against 98.5% on the ink\'s edges.\n')
+        keys = [k for k in s['overshoot_035'] if k.split(' (')[0] in ('every page', 'skewed', 'perspective', 'curled', 'hand')]
+        L.append('| arm | ' + ' | '.join(k.split(' (')[0] for k in keys) + ' |')
+        L.append('|---|' + '---|' * len(keys))
+        for j, v in enumerate(VARIANTS):
+            cells = []
+            for k in keys:
+                r = s['overshoot_035'][k][j]
+                cells.append(f'{pct(r["rate"])}' + ('' if r['delta'] is None else f' ({dpct(r)})'))
+            L.append(f'| {LABEL[v]} | ' + ' | '.join(cells) + ' |')
     every = s['strata']['every page']
     E = ['\n| arm | pages cut | truth words lost, own sheet | lost, neighbour text | words partly cut |',
          '|---|---:|---:|---:|---:|']

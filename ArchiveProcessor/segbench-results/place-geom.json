@@ -1,0 +1,6323 @@
+{
+ "item": "W46.place-geom",
+ "strata": {
+  "every page": [
+   {
+    "arm": "raw",
+    "writer": "lab",
+    "pages": 58,
+    "lines": 1682,
+    "passed": 1238,
+    "rate": 0.7360285374554102,
+    "delta": null,
+    "ci": null,
+    "cut_lines": 0,
+    "broken": 50,
+    "find": 0.8615256182823751,
+    "placed": 0.8296984242930189,
+    "find_words": 9583,
+    "lost_own": 0,
+    "lost_neighbour": 0,
+    "cut_words": 0,
+    "pages_cut": 0
+   },
+   {
+    "arm": "deskew",
+    "writer": "lab",
+    "pages": 58,
+    "lines": 1682,
+    "passed": 1275,
+    "rate": 0.7580261593341261,
+    "delta": 0.0219976218787159,
+    "ci": [
+     0.010823812387251941,
+     0.03642172523961662
+    ],
+    "cut_lines": 0,
+    "broken": 39,
+    "find": 0.8615256182823751,
+    "placed": 0.8314723990399666,
+    "find_words": 9583,
+    "lost_own": 0,
+    "lost_neighbour": 0,
+    "cut_words": 0,
+    "pages_cut": 0
+   },
+   {
+    "arm": "quad",
+    "writer": "lab",
+    "pages": 58,
+    "lines": 1682,
+    "passed": 1142,
+    "rate": 0.6789536266349584,
+    "delta": -0.057074910820451796,
+    "ci": [
+     -0.09791216702663796,
+     -0.018303843807199516
+    ],
+    "cut_lines": 39,
+    "broken": 107,
+    "find": 0.8624104509060261,
+    "placed": 0.8277496839443742,
+    "find_words": 9492,
+    "lost_own": 14,
+    "lost_neighbour": 24,
+    "cut_words": 109,
+    "pages_cut": 12
+   },
+   {
+    "arm": "uvdoc",
+    "writer": "lab",
+    "pages": 58,
+    "lines": 1682,
+    "passed": 1094,
+    "rate": 0.6504161712247325,
+    "delta": -0.0856123662306777,
+    "ci": [
+     -0.12427325581395343,
+     -0.04964028776978413
+    ],
+    "cut_lines": 199,
+    "broken": 39,
+    "find": 0.8703400021865092,
+    "placed": 0.8423526839400897,
+    "find_words": 9147,
+    "lost_own": 289,
+    "lost_neighbour": 27,
+    "cut_words": 361,
+    "pages_cut": 38
+   },
+   {
+    "arm": "raw",
+    "writer": "level",
+    "pages": 58,
+    "lines": 1682,
+    "passed": 972,
+    "rate": 0.5778834720570749,
+    "delta": -0.15814506539833528,
+    "ci": [
+     -0.2212310437109723,
+     -0.09817671809256656
+    ],
+    "cut_lines": 0,
+    "broken": 73,
+    "find": 0.8615256182823751,
+    "placed": 0.8341855368882396,
+    "find_words": 9583,
+    "lost_own": 0,
+    "lost_neighbour": 0,
+    "cut_words": 0,
+    "pages_cut": 0
+   },
+   {
+    "arm": "raw",
+    "writer": "slope",
+    "pages": 58,
+    "lines": 1682,
+    "passed": 1114,
+    "rate": 0.6623067776456599,
+    "delta": -0.07372175980975026,
+    "ci": [
+     -0.10666666666666669,
+     -0.041881812966150234
+    ],
+    "cut_lines": 0,
+    "broken": 92,
+    "find": 0.8606908066367526,
+    "placed": 0.8295940728373161,
+    "find_words": 9583,
+    "lost_own": 0,
+    "lost_neighbour": 0,
+    "cut_words": 0,
+    "pages_cut": 0
+   },
+   {
+    "arm": "deskew",
+    "writer": "slope",
+    "pages": 58,
+    "lines": 1682,
+    "passed": 1185,
+    "rate": 0.7045184304399524,
+    "delta": -0.031510107015457756,
+    "ci": [
+     -0.06053459119496862,
+     -0.005503144654088077
+    ],
+    "cut_lines": 0,
+    "broken": 68,
+    "find": 0.8606908066367526,
+    "placed": 0.8313680475842637,
+    "find_words": 9583,
+    "lost_own": 0,
+    "lost_neighbour": 0,
+    "cut_words": 0,
+    "pages_cut": 0
+   },
+   {
+    "arm": "quad",
+    "writer": "slope",
+    "pages": 58,
+    "lines": 1682,
+    "passed": 1046,
+    "rate": 0.6218787158145065,
+    "delta": -0.1141498216409037,
+    "ci": [
+     -0.16666666666666663,
+     -0.05905511811023623
+    ],
+    "cut_lines": 39,
+    "broken": 176,
+    "find": 0.8617783396544458,
+    "placed": 0.834070796460177,
+    "find_words": 9492,
+    "lost_own": 14,
+    "lost_neighbour": 24,
+    "cut_words": 109,
+    "pages_cut": 12
+   },
+   {
+    "arm": "uvdoc",
+    "writer": "slope",
+    "pages": 58,
+    "lines": 1682,
+    "passed": 1020,
+    "rate": 0.6064209274673008,
+    "delta": -0.12960760998810938,
+    "ci": [
+     -0.17241379310344818,
+     -0.0893812070282658
+    ],
+    "cut_lines": 199,
+    "broken": 78,
+    "find": 0.8697933748770088,
+    "placed": 0.8433366130971903,
+    "find_words": 9147,
+    "lost_own": 289,
+    "lost_neighbour": 27,
+    "cut_words": 361,
+    "pages_cut": 38
+   }
+  ],
+  "typed": [
+   {
+    "arm": "raw",
+    "writer": "lab",
+    "pages": 40,
+    "lines": 1456,
+    "passed": 1100,
+    "rate": 0.7554945054945055,
+    "delta": null,
+    "ci": null,
+    "cut_lines": 0,
+    "broken": 41,
+    "find": 0.9277049975739932,
+    "placed": 0.9016254245511888,
+    "find_words": 8244,
+    "lost_own": 0,
+    "lost_neighbour": 0,
+    "cut_words": 0,
+    "pages_cut": 0
+   },
+   {
+    "arm": "deskew",
+    "writer": "lab",
+    "pages": 40,
+    "lines": 1456,
+    "passed": 1128,
+    "rate": 0.7747252747252747,
+    "delta": 0.019230769230769273,
+    "ci": [
+     0.008116883116883189,
+     0.0339366515837104
+    ],
+    "cut_lines": 0,
+    "broken": 29,
+    "find": 0.9277049975739932,
+    "placed": 0.9029597282872392,
+    "find_words": 8244,
+    "lost_own": 0,
+    "lost_neighbour": 0,
+    "cut_words": 0,
+    "pages_cut": 0
+   },
+   {
+    "arm": "quad",
+    "writer": "lab",
+    "pages": 40,
+    "lines": 1456,
+    "passed": 1013,
+    "rate": 0.6957417582417582,
+    "delta": -0.05975274725274726,
+    "ci": [
+     -0.10852090032154338,
+     -0.014814814814814836
+    ],
+    "cut_lines": 34,
+    "broken": 93,
+    "find": 0.9294275929549902,
+    "placed": 0.8994618395303327,
+    "find_words": 8176,
+    "lost_own": 11,
+    "lost_neighbour": 18,
+    "cut_words": 89,
+    "pages_cut": 7
+   },
+   {
+    "arm": "uvdoc",
+    "writer": "lab",
+    "pages": 40,
+    "lines": 1456,
+    "passed": 980,
+    "rate": 0.6730769230769231,
+    "delta": -0.08241758241758235,
+    "ci": [
+     -0.12660028449502136,
+     -0.03918128654970765
+    ],
+    "cut_lines": 159,
+    "broken": 31,
+    "find": 0.9337781694573839,
+    "placed": 0.9104872214528515,
+    "find_words": 7943,
+    "lost_own": 223,
+    "lost_neighbour": 19,
+    "cut_words": 225,
+    "pages_cut": 22
+   },
+   {
+    "arm": "raw",
+    "writer": "level",
+    "pages": 40,
+    "lines": 1456,
+    "passed": 865,
+    "rate": 0.5940934065934066,
+    "delta": -0.16140109890109888,
+    "ci": [
+     -0.23350846468184472,
+     -0.0886178861788618
+    ],
+    "cut_lines": 0,
+    "broken": 64,
+    "find": 0.9277049975739932,
+    "placed": 0.9055070354196991,
+    "find_words": 8244,
+    "lost_own": 0,
+    "lost_neighbour": 0,
+    "cut_words": 0,
+    "pages_cut": 0
+   },
+   {
+    "arm": "raw",
+    "writer": "slope",
+    "pages": 40,
+    "lines": 1456,
+    "passed": 991,
+    "rate": 0.6806318681318682,
+    "delta": -0.07486263736263732,
+    "ci": [
+     -0.11253561253561262,
+     -0.0376007162041182
+    ],
+    "cut_lines": 0,
+    "broken": 80,
+    "find": 0.9267345948568656,
+    "placed": 0.9007763221737021,
+    "find_words": 8244,
+    "lost_own": 0,
+    "lost_neighbour": 0,
+    "cut_words": 0,
+    "pages_cut": 0
+   },
+   {
+    "arm": "deskew",
+    "writer": "slope",
+    "pages": 40,
+    "lines": 1456,
+    "passed": 1047,
+    "rate": 0.7190934065934066,
+    "delta": -0.03640109890109888,
+    "ci": [
+     -0.06928213689482476,
+     -0.008928571428571508
+    ],
+    "cut_lines": 0,
+    "broken": 57,
+    "find": 0.9267345948568656,
+    "placed": 0.9028384279475983,
+    "find_words": 8244,
+    "lost_own": 0,
+    "lost_neighbour": 0,
+    "cut_words": 0,
+    "pages_cut": 0
+   },
+   {
+    "arm": "quad",
+    "writer": "slope",
+    "pages": 40,
+    "lines": 1456,
+    "passed": 926,
+    "rate": 0.635989010989011,
+    "delta": -0.11950549450549453,
+    "ci": [
+     -0.18372379778051795,
+     -0.05653266331658291
+    ],
+    "cut_lines": 34,
+    "broken": 154,
+    "find": 0.9286937377690803,
+    "placed": 0.9059442270058709,
+    "find_words": 8176,
+    "lost_own": 11,
+    "lost_neighbour": 18,
+    "cut_words": 89,
+    "pages_cut": 7
+   },
+   {
+    "arm": "uvdoc",
+    "writer": "slope",
+    "pages": 40,
+    "lines": 1456,
+    "passed": 921,
+    "rate": 0.632554945054945,
+    "delta": -0.12293956043956045,
+    "ci": [
+     -0.17295980511571252,
+     -0.07621736062103035
+    ],
+    "cut_lines": 159,
+    "broken": 64,
+    "find": 0.9331486843761803,
+    "placed": 0.9113685005665366,
+    "find_words": 7943,
+    "lost_own": 223,
+    "lost_neighbour": 19,
+    "cut_words": 225,
+    "pages_cut": 22
+   }
+  ],
+  "hand": [
+   {
+    "arm": "raw",
+    "writer": "lab",
+    "pages": 18,
+    "lines": 226,
+    "passed": 138,
+    "rate": 0.6106194690265486,
+    "delta": null,
+    "ci": null,
+    "cut_lines": 0,
+    "broken": 9,
+    "find": 0.4540702016430172,
+    "placed": 0.38685586258401794,
+    "find_words": 1339,
+    "lost_own": 0,
+    "lost_neighbour": 0,
+    "cut_words": 0,
+    "pages_cut": 0
+   },
+   {
+    "arm": "deskew",
+    "writer": "lab",
+    "pages": 18,
+    "lines": 226,
+    "passed": 147,
+    "rate": 0.6504424778761062,
+    "delta": 0.039823008849557584,
+    "ci": [
+     0.0,
+     0.09565217391304348
+    ],
+    "cut_lines": 0,
+    "broken": 10,
+    "find": 0.4540702016430172,
+    "placed": 0.39133681852128455,
+    "find_words": 1339,
+    "lost_own": 0,
+    "lost_neighbour": 0,
+    "cut_words": 0,
+    "pages_cut": 0
+   },
+   {
+    "arm": "quad",
+    "writer": "lab",
+    "pages": 18,
+    "lines": 226,
+    "passed": 129,
+    "rate": 0.5707964601769911,
+    "delta": -0.03982300884955747,
+    "ci": [
+     -0.109375,
+     0.00877192982456143
+    ],
+    "cut_lines": 5,
+    "broken": 14,
+    "find": 0.446048632218845,
+    "placed": 0.3822188449848024,
+    "find_words": 1316,
+    "lost_own": 3,
+    "lost_neighbour": 6,
+    "cut_words": 20,
+    "pages_cut": 5
+   },
+   {
+    "arm": "uvdoc",
+    "writer": "lab",
+    "pages": 18,
+    "lines": 226,
+    "passed": 114,
+    "rate": 0.504424778761062,
+    "delta": -0.10619469026548667,
+    "ci": [
+     -0.2202380952380953,
+     -0.016949152542372836
+    ],
+    "cut_lines": 40,
+    "broken": 8,
+    "find": 0.45182724252491696,
+    "placed": 0.39285714285714285,
+    "find_words": 1204,
+    "lost_own": 66,
+    "lost_neighbour": 8,
+    "cut_words": 136,
+    "pages_cut": 16
+   },
+   {
+    "arm": "raw",
+    "writer": "level",
+    "pages": 18,
+    "lines": 226,
+    "passed": 107,
+    "rate": 0.47345132743362833,
+    "delta": -0.1371681415929203,
+    "ci": [
+     -0.2281553398058252,
+     -0.05681818181818182
+    ],
+    "cut_lines": 0,
+    "broken": 9,
+    "find": 0.4540702016430172,
+    "placed": 0.3950709484690067,
+    "find_words": 1339,
+    "lost_own": 0,
+    "lost_neighbour": 0,
+    "cut_words": 0,
+    "pages_cut": 0
+   },
+   {
+    "arm": "raw",
+    "writer": "slope",
+    "pages": 18,
+    "lines": 226,
+    "passed": 123,
+    "rate": 0.5442477876106194,
+    "delta": -0.0663716814159292,
+    "ci": [
+     -0.12621359223300976,
+     -0.026431718061673992
+    ],
+    "cut_lines": 0,
+    "broken": 12,
+    "find": 0.4540702016430172,
+    "placed": 0.39133681852128455,
+    "find_words": 1339,
+    "lost_own": 0,
+    "lost_neighbour": 0,
+    "cut_words": 0,
+    "pages_cut": 0
+   },
+   {
+    "arm": "deskew",
+    "writer": "slope",
+    "pages": 18,
+    "lines": 226,
+    "passed": 138,
+    "rate": 0.6106194690265486,
+    "delta": 0.0,
+    "ci": [
+     -0.05803571428571419,
+     0.06956521739130428
+    ],
+    "cut_lines": 0,
+    "broken": 11,
+    "find": 0.4540702016430172,
+    "placed": 0.39133681852128455,
+    "find_words": 1339,
+    "lost_own": 0,
+    "lost_neighbour": 0,
+    "cut_words": 0,
+    "pages_cut": 0
+   },
+   {
+    "arm": "quad",
+    "writer": "slope",
+    "pages": 18,
+    "lines": 226,
+    "passed": 120,
+    "rate": 0.5309734513274337,
+    "delta": -0.07964601769911495,
+    "ci": [
+     -0.14883720930232558,
+     -0.022727272727272707
+    ],
+    "cut_lines": 5,
+    "broken": 22,
+    "find": 0.446048632218845,
+    "placed": 0.38753799392097266,
+    "find_words": 1316,
+    "lost_own": 3,
+    "lost_neighbour": 6,
+    "cut_words": 20,
+    "pages_cut": 5
+   },
+   {
+    "arm": "uvdoc",
+    "writer": "slope",
+    "pages": 18,
+    "lines": 226,
+    "passed": 99,
+    "rate": 0.43805309734513276,
+    "delta": -0.17256637168141586,
+    "ci": [
+     -0.2670807453416149,
+     -0.09440559440559437
+    ],
+    "cut_lines": 40,
+    "broken": 14,
+    "find": 0.45182724252491696,
+    "placed": 0.3945182724252492,
+    "find_words": 1204,
+    "lost_own": 66,
+    "lost_neighbour": 8,
+    "cut_words": 136,
+    "pages_cut": 16
+   }
+  ],
+  "skewed (|angle| \u2265 1\u00b0)": [
+   {
+    "arm": "raw",
+    "writer": "lab",
+    "pages": 17,
+    "lines": 441,
+    "passed": 285,
+    "rate": 0.6462585034013606,
+    "delta": null,
+    "ci": null,
+    "cut_lines": 0,
+    "broken": 12,
+    "find": 0.8363566190659977,
+    "placed": 0.7993052875337707,
+    "find_words": 2591,
+    "lost_own": 0,
+    "lost_neighbour": 0,
+    "cut_words": 0,
+    "pages_cut": 0
+   },
+   {
+    "arm": "deskew",
+    "writer": "lab",
+    "pages": 17,
+    "lines": 441,
+    "passed": 315,
+    "rate": 0.7142857142857143,
+    "delta": 0.0680272108843537,
+    "ci": [
+     0.03413654618473905,
+     0.14215686274509798
+    ],
+    "cut_lines": 0,
+    "broken": 4,
+    "find": 0.8363566190659977,
+    "placed": 0.8039367039752991,
+    "find_words": 2591,
+    "lost_own": 0,
+    "lost_neighbour": 0,
+    "cut_words": 0,
+    "pages_cut": 0
+   },
+   {
+    "arm": "quad",
+    "writer": "lab",
+    "pages": 17,
+    "lines": 441,
+    "passed": 263,
+    "rate": 0.5963718820861678,
+    "delta": -0.049886621315192836,
+    "ci": [
+     -0.10072992700729921,
+     0.04123711340206193
+    ],
+    "cut_lines": 4,
+    "broken": 38,
+    "find": 0.8359314107560405,
+    "placed": 0.803975058456742,
+    "find_words": 2566,
+    "lost_own": 4,
+    "lost_neighbour": 21,
+    "cut_words": 11,
+    "pages_cut": 5
+   },
+   {
+    "arm": "uvdoc",
+    "writer": "lab",
+    "pages": 17,
+    "lines": 441,
+    "passed": 253,
+    "rate": 0.5736961451247166,
+    "delta": -0.07256235827664403,
+    "ci": [
+     -0.16774193548387095,
+     0.03952569169960474
+    ],
+    "cut_lines": 71,
+    "broken": 8,
+    "find": 0.8428338762214984,
+    "placed": 0.8151465798045603,
+    "find_words": 2456,
+    "lost_own": 49,
+    "lost_neighbour": 24,
+    "cut_words": 133,
+    "pages_cut": 14
+   },
+   {
+    "arm": "raw",
+    "writer": "level",
+    "pages": 17,
+    "lines": 441,
+    "passed": 135,
+    "rate": 0.30612244897959184,
+    "delta": -0.34013605442176875,
+    "ci": [
+     -0.41871345029239765,
+     -0.17465753424657532
+    ],
+    "cut_lines": 0,
+    "broken": 38,
+    "find": 0.8363566190659977,
+    "placed": 0.807024314936318,
+    "find_words": 2591,
+    "lost_own": 0,
+    "lost_neighbour": 0,
+    "cut_words": 0,
+    "pages_cut": 0
+   },
+   {
+    "arm": "raw",
+    "writer": "slope",
+    "pages": 17,
+    "lines": 441,
+    "passed": 242,
+    "rate": 0.5487528344671202,
+    "delta": -0.0975056689342404,
+    "ci": [
+     -0.19108280254777066,
+     -0.01953125
+    ],
+    "cut_lines": 0,
+    "broken": 36,
+    "find": 0.8355847163257429,
+    "placed": 0.7977614820532613,
+    "find_words": 2591,
+    "lost_own": 0,
+    "lost_neighbour": 0,
+    "cut_words": 0,
+    "pages_cut": 0
+   },
+   {
+    "arm": "deskew",
+    "writer": "slope",
+    "pages": 17,
+    "lines": 441,
+    "passed": 302,
+    "rate": 0.6848072562358276,
+    "delta": 0.038548752834467015,
+    "ci": [
+     0.01773049645390079,
+     0.07729468599033806
+    ],
+    "cut_lines": 0,
+    "broken": 12,
+    "find": 0.8355847163257429,
+    "placed": 0.8043226553454265,
+    "find_words": 2591,
+    "lost_own": 0,
+    "lost_neighbour": 0,
+    "cut_words": 0,
+    "pages_cut": 0
+   },
+   {
+    "arm": "quad",
+    "writer": "slope",
+    "pages": 17,
+    "lines": 441,
+    "passed": 220,
+    "rate": 0.4988662131519274,
+    "delta": -0.14739229024943318,
+    "ci": [
+     -0.19885277246653915,
+     -0.02816901408450706
+    ],
+    "cut_lines": 4,
+    "broken": 85,
+    "find": 0.8359314107560405,
+    "placed": 0.8043647700701481,
+    "find_words": 2566,
+    "lost_own": 4,
+    "lost_neighbour": 21,
+    "cut_words": 11,
+    "pages_cut": 5
+   },
+   {
+    "arm": "uvdoc",
+    "writer": "slope",
+    "pages": 17,
+    "lines": 441,
+    "passed": 238,
+    "rate": 0.5396825396825397,
+    "delta": -0.10657596371882094,
+    "ci": [
+     -0.2098445595854922,
+     -0.022624434389140302
+    ],
+    "cut_lines": 71,
+    "broken": 11,
+    "find": 0.8432410423452769,
+    "placed": 0.8131107491856677,
+    "find_words": 2456,
+    "lost_own": 49,
+    "lost_neighbour": 24,
+    "cut_words": 133,
+    "pages_cut": 14
+   }
+  ],
+  "level (|angle| < 1\u00b0)": [
+   {
+    "arm": "raw",
+    "writer": "lab",
+    "pages": 41,
+    "lines": 1241,
+    "passed": 953,
+    "rate": 0.7679290894439967,
+    "delta": null,
+    "ci": null,
+    "cut_lines": 0,
+    "broken": 38,
+    "find": 0.8708524027459954,
+    "placed": 0.8409610983981693,
+    "find_words": 6992,
+    "lost_own": 0,
+    "lost_neighbour": 0,
+    "cut_words": 0,
+    "pages_cut": 0
+   },
+   {
+    "arm": "deskew",
+    "writer": "lab",
+    "pages": 41,
+    "lines": 1241,
+    "passed": 960,
+    "rate": 0.7735697018533441,
+    "delta": 0.005640612409347323,
+    "ci": [
+     0.0007923930269414514,
+     0.011502029769959399
+    ],
+    "cut_lines": 0,
+    "broken": 35,
+    "find": 0.8708524027459954,
+    "placed": 0.8416762013729977,
+    "find_words": 6992,
+    "lost_own": 0,
+    "lost_neighbour": 0,
+    "cut_words": 0,
+    "pages_cut": 0
+   },
+   {
+    "arm": "quad",
+    "writer": "lab",
+    "pages": 41,
+    "lines": 1241,
+    "passed": 879,
+    "rate": 0.7082997582594682,
+    "delta": -0.05962933118452851,
+    "ci": [
+     -0.11624326404926866,
+     -0.010046367851622828
+    ],
+    "cut_lines": 35,
+    "broken": 69,
+    "find": 0.8722206179613052,
+    "placed": 0.8365578977764944,
+    "find_words": 6926,
+    "lost_own": 10,
+    "lost_neighbour": 3,
+    "cut_words": 98,
+    "pages_cut": 7
+   },
+   {
+    "arm": "uvdoc",
+    "writer": "lab",
+    "pages": 41,
+    "lines": 1241,
+    "passed": 841,
+    "rate": 0.67767929089444,
+    "delta": -0.09024979854955673,
+    "ci": [
+     -0.13965087281795519,
+     -0.052180128663330994
+    ],
+    "cut_lines": 128,
+    "broken": 31,
+    "find": 0.8804364071140338,
+    "placed": 0.8523389627858318,
+    "find_words": 6691,
+    "lost_own": 240,
+    "lost_neighbour": 3,
+    "cut_words": 228,
+    "pages_cut": 24
+   },
+   {
+    "arm": "raw",
+    "writer": "level",
+    "pages": 41,
+    "lines": 1241,
+    "passed": 837,
+    "rate": 0.6744560838033844,
+    "delta": -0.09347300564061234,
+    "ci": [
+     -0.12824675324675328,
+     -0.05852601156069359
+    ],
+    "cut_lines": 0,
+    "broken": 35,
+    "find": 0.8708524027459954,
+    "placed": 0.8442505720823799,
+    "find_words": 6992,
+    "lost_own": 0,
+    "lost_neighbour": 0,
+    "cut_words": 0,
+    "pages_cut": 0
+   },
+   {
+    "arm": "raw",
+    "writer": "slope",
+    "pages": 41,
+    "lines": 1241,
+    "passed": 872,
+    "rate": 0.7026591458501209,
+    "delta": -0.06526994359387583,
+    "ci": [
+     -0.09508408796895207,
+     -0.037238873751135326
+    ],
+    "cut_lines": 0,
+    "broken": 56,
+    "find": 0.8699942791762014,
+    "placed": 0.8413901601830663,
+    "find_words": 6992,
+    "lost_own": 0,
+    "lost_neighbour": 0,
+    "cut_words": 0,
+    "pages_cut": 0
+   },
+   {
+    "arm": "deskew",
+    "writer": "slope",
+    "pages": 41,
+    "lines": 1241,
+    "passed": 883,
+    "rate": 0.7115229653505237,
+    "delta": -0.05640612409347301,
+    "ci": [
+     -0.08491343775762572,
+     -0.027896995708154515
+    ],
+    "cut_lines": 0,
+    "broken": 56,
+    "find": 0.8699942791762014,
+    "placed": 0.8413901601830663,
+    "find_words": 6992,
+    "lost_own": 0,
+    "lost_neighbour": 0,
+    "cut_words": 0,
+    "pages_cut": 0
+   },
+   {
+    "arm": "quad",
+    "writer": "slope",
+    "pages": 41,
+    "lines": 1241,
+    "passed": 826,
+    "rate": 0.6655922643029815,
+    "delta": -0.10233682514101528,
+    "ci": [
+     -0.17536704730831976,
+     -0.03936269915651358
+    ],
+    "cut_lines": 35,
+    "broken": 91,
+    "find": 0.8713543170661276,
+    "placed": 0.8450765232457407,
+    "find_words": 6926,
+    "lost_own": 10,
+    "lost_neighbour": 3,
+    "cut_words": 98,
+    "pages_cut": 7
+   },
+   {
+    "arm": "uvdoc",
+    "writer": "slope",
+    "pages": 41,
+    "lines": 1241,
+    "passed": 782,
+    "rate": 0.6301369863013698,
+    "delta": -0.1377921031426269,
+    "ci": [
+     -0.1912919343326196,
+     -0.09128630705394192
+    ],
+    "cut_lines": 128,
+    "broken": 67,
+    "find": 0.879539680167389,
+    "placed": 0.8544313256613362,
+    "find_words": 6691,
+    "lost_own": 240,
+    "lost_neighbour": 3,
+    "cut_words": 228,
+    "pages_cut": 24
+   }
+  ],
+  "perspective (angle range \u2265 1\u00b0)": [
+   {
+    "arm": "raw",
+    "writer": "lab",
+    "pages": 29,
+    "lines": 534,
+    "passed": 354,
+    "rate": 0.6629213483146067,
+    "delta": null,
+    "ci": null,
+    "cut_lines": 0,
+    "broken": 38,
+    "find": 0.7637540453074434,
+    "placed": 0.7199176228302442,
+    "find_words": 3399,
+    "lost_own": 0,
+    "lost_neighbour": 0,
+    "cut_words": 0,
+    "pages_cut": 0
+   },
+   {
+    "arm": "deskew",
+    "writer": "lab",
+    "pages": 29,
+    "lines": 534,
+    "passed": 383,
+    "rate": 0.7172284644194756,
+    "delta": 0.054307116104868935,
+    "ci": [
+     0.02226345083487935,
+     0.09558823529411764
+    ],
+    "cut_lines": 0,
+    "broken": 27,
+    "find": 0.7637540453074434,
+    "placed": 0.7249190938511327,
+    "find_words": 3399,
+    "lost_own": 0,
+    "lost_neighbour": 0,
+    "cut_words": 0,
+    "pages_cut": 0
+   },
+   {
+    "arm": "quad",
+    "writer": "lab",
+    "pages": 29,
+    "lines": 534,
+    "passed": 328,
+    "rate": 0.6142322097378277,
+    "delta": -0.048689138576779034,
+    "ci": [
+     -0.12908496732026142,
+     0.032258064516129004
+    ],
+    "cut_lines": 26,
+    "broken": 62,
+    "find": 0.761989871909443,
+    "placed": 0.709562109025916,
+    "find_words": 3357,
+    "lost_own": 9,
+    "lost_neighbour": 7,
+    "cut_words": 56,
+    "pages_cut": 7
+   },
+   {
+    "arm": "uvdoc",
+    "writer": "lab",
+    "pages": 29,
+    "lines": 534,
+    "passed": 314,
+    "rate": 0.5880149812734082,
+    "delta": -0.07490636704119846,
+    "ci": [
+     -0.15165876777251186,
+     0.011737089201877882
+    ],
+    "cut_lines": 95,
+    "broken": 11,
+    "find": 0.7691582914572864,
+    "placed": 0.7320979899497487,
+    "find_words": 3184,
+    "lost_own": 129,
+    "lost_neighbour": 10,
+    "cut_words": 201,
+    "pages_cut": 21
+   },
+   {
+    "arm": "raw",
+    "writer": "level",
+    "pages": 29,
+    "lines": 534,
+    "passed": 267,
+    "rate": 0.5,
+    "delta": -0.1629213483146067,
+    "ci": [
+     -0.21078431372549017,
+     -0.11575562700964631
+    ],
+    "cut_lines": 0,
+    "broken": 24,
+    "find": 0.7637540453074434,
+    "placed": 0.7319799941159164,
+    "find_words": 3399,
+    "lost_own": 0,
+    "lost_neighbour": 0,
+    "cut_words": 0,
+    "pages_cut": 0
+   },
+   {
+    "arm": "raw",
+    "writer": "slope",
+    "pages": 29,
+    "lines": 534,
+    "passed": 312,
+    "rate": 0.5842696629213483,
+    "delta": -0.0786516853932584,
+    "ci": [
+     -0.12408759124087598,
+     -0.02676399026763987
+    ],
+    "cut_lines": 0,
+    "broken": 51,
+    "find": 0.7637540453074434,
+    "placed": 0.725213298028832,
+    "find_words": 3399,
+    "lost_own": 0,
+    "lost_neighbour": 0,
+    "cut_words": 0,
+    "pages_cut": 0
+   },
+   {
+    "arm": "deskew",
+    "writer": "slope",
+    "pages": 29,
+    "lines": 534,
+    "passed": 336,
+    "rate": 0.6292134831460674,
+    "delta": -0.0337078651685393,
+    "ci": [
+     -0.08823529411764708,
+     0.024390243902439046
+    ],
+    "cut_lines": 0,
+    "broken": 43,
+    "find": 0.7637540453074434,
+    "placed": 0.7258017063842307,
+    "find_words": 3399,
+    "lost_own": 0,
+    "lost_neighbour": 0,
+    "cut_words": 0,
+    "pages_cut": 0
+   },
+   {
+    "arm": "quad",
+    "writer": "slope",
+    "pages": 29,
+    "lines": 534,
+    "passed": 290,
+    "rate": 0.5430711610486891,
+    "delta": -0.11985018726591756,
+    "ci": [
+     -0.2139800285306705,
+     -0.03160270880361171
+    ],
+    "cut_lines": 26,
+    "broken": 85,
+    "find": 0.761989871909443,
+    "placed": 0.7265415549597856,
+    "find_words": 3357,
+    "lost_own": 9,
+    "lost_neighbour": 7,
+    "cut_words": 56,
+    "pages_cut": 7
+   },
+   {
+    "arm": "uvdoc",
+    "writer": "slope",
+    "pages": 29,
+    "lines": 534,
+    "passed": 286,
+    "rate": 0.5355805243445693,
+    "delta": -0.12734082397003743,
+    "ci": [
+     -0.21000000000000008,
+     -0.04056795131845847
+    ],
+    "cut_lines": 95,
+    "broken": 32,
+    "find": 0.7694723618090452,
+    "placed": 0.7346105527638191,
+    "find_words": 3184,
+    "lost_own": 129,
+    "lost_neighbour": 10,
+    "cut_words": 201,
+    "pages_cut": 21
+   }
+  ],
+  "curled (UVDoc bend \u2265 median 7.9 px)": [
+   {
+    "arm": "raw",
+    "writer": "lab",
+    "pages": 29,
+    "lines": 449,
+    "passed": 281,
+    "rate": 0.6258351893095768,
+    "delta": null,
+    "ci": null,
+    "cut_lines": 0,
+    "broken": 41,
+    "find": 0.7051005747126436,
+    "placed": 0.6548132183908046,
+    "find_words": 2784,
+    "lost_own": 0,
+    "lost_neighbour": 0,
+    "cut_words": 0,
+    "pages_cut": 0
+   },
+   {
+    "arm": "deskew",
+    "writer": "lab",
+    "pages": 29,
+    "lines": 449,
+    "passed": 304,
+    "rate": 0.6770601336302895,
+    "delta": 0.05122494432071267,
+    "ci": [
+     0.01758241758241752,
+     0.09999999999999998
+    ],
+    "cut_lines": 0,
+    "broken": 31,
+    "find": 0.7051005747126436,
+    "placed": 0.6591235632183908,
+    "find_words": 2784,
+    "lost_own": 0,
+    "lost_neighbour": 0,
+    "cut_words": 0,
+    "pages_cut": 0
+   },
+   {
+    "arm": "quad",
+    "writer": "lab",
+    "pages": 29,
+    "lines": 449,
+    "passed": 250,
+    "rate": 0.5567928730512249,
+    "delta": -0.06904231625835189,
+    "ci": [
+     -0.1594427244582044,
+     0.032418952618453956
+    ],
+    "cut_lines": 33,
+    "broken": 67,
+    "find": 0.7011704462326261,
+    "placed": 0.6404535479151426,
+    "find_words": 2734,
+    "lost_own": 13,
+    "lost_neighbour": 20,
+    "cut_words": 57,
+    "pages_cut": 8
+   },
+   {
+    "arm": "uvdoc",
+    "writer": "lab",
+    "pages": 29,
+    "lines": 449,
+    "passed": 232,
+    "rate": 0.5167037861915368,
+    "delta": -0.10913140311804004,
+    "ci": [
+     -0.22052401746724892,
+     0.002624671916010457
+    ],
+    "cut_lines": 104,
+    "broken": 18,
+    "find": 0.7090483619344774,
+    "placed": 0.6669266770670826,
+    "find_words": 2564,
+    "lost_own": 142,
+    "lost_neighbour": 22,
+    "cut_words": 201,
+    "pages_cut": 22
+   },
+   {
+    "arm": "raw",
+    "writer": "level",
+    "pages": 29,
+    "lines": 449,
+    "passed": 217,
+    "rate": 0.48329621380846327,
+    "delta": -0.14253897550111355,
+    "ci": [
+     -0.20164609053497945,
+     -0.08495145631067968
+    ],
+    "cut_lines": 0,
+    "broken": 27,
+    "find": 0.7051005747126436,
+    "placed": 0.6670258620689655,
+    "find_words": 2784,
+    "lost_own": 0,
+    "lost_neighbour": 0,
+    "cut_words": 0,
+    "pages_cut": 0
+   },
+   {
+    "arm": "raw",
+    "writer": "slope",
+    "pages": 29,
+    "lines": 449,
+    "passed": 244,
+    "rate": 0.5434298440979956,
+    "delta": -0.08240534521158127,
+    "ci": [
+     -0.13659359190556492,
+     -0.01990049751243772
+    ],
+    "cut_lines": 0,
+    "broken": 52,
+    "find": 0.704382183908046,
+    "placed": 0.6605603448275862,
+    "find_words": 2784,
+    "lost_own": 0,
+    "lost_neighbour": 0,
+    "cut_words": 0,
+    "pages_cut": 0
+   },
+   {
+    "arm": "deskew",
+    "writer": "slope",
+    "pages": 29,
+    "lines": 449,
+    "passed": 266,
+    "rate": 0.5924276169265034,
+    "delta": -0.03340757238307346,
+    "ci": [
+     -0.09207708779443258,
+     0.04022988505747127
+    ],
+    "cut_lines": 0,
+    "broken": 46,
+    "find": 0.704382183908046,
+    "placed": 0.6605603448275862,
+    "find_words": 2784,
+    "lost_own": 0,
+    "lost_neighbour": 0,
+    "cut_words": 0,
+    "pages_cut": 0
+   },
+   {
+    "arm": "quad",
+    "writer": "slope",
+    "pages": 29,
+    "lines": 449,
+    "passed": 224,
+    "rate": 0.49888641425389757,
+    "delta": -0.12694877505567925,
+    "ci": [
+     -0.22807017543859642,
+     -0.025445292620865145
+    ],
+    "cut_lines": 33,
+    "broken": 84,
+    "find": 0.7011704462326261,
+    "placed": 0.660936356986101,
+    "find_words": 2734,
+    "lost_own": 13,
+    "lost_neighbour": 20,
+    "cut_words": 57,
+    "pages_cut": 8
+   },
+   {
+    "arm": "uvdoc",
+    "writer": "slope",
+    "pages": 29,
+    "lines": 449,
+    "passed": 214,
+    "rate": 0.4766146993318486,
+    "delta": -0.14922048997772824,
+    "ci": [
+     -0.26153846153846155,
+     -0.03389830508474578
+    ],
+    "cut_lines": 104,
+    "broken": 36,
+    "find": 0.7090483619344774,
+    "placed": 0.672386895475819,
+    "find_words": 2564,
+    "lost_own": 142,
+    "lost_neighbour": 22,
+    "cut_words": 201,
+    "pages_cut": 22
+   }
+  ],
+  "originals": [
+   {
+    "arm": "raw",
+    "writer": "lab",
+    "pages": 42,
+    "lines": 995,
+    "passed": 692,
+    "rate": 0.6954773869346733,
+    "delta": null,
+    "ci": null,
+    "cut_lines": 0,
+    "broken": 46,
+    "find": 0.832886805090422,
+    "placed": 0.7972203616878768,
+    "find_words": 5972,
+    "lost_own": 0,
+    "lost_neighbour": 0,
+    "cut_words": 0,
+    "pages_cut": 0
+   },
+   {
+    "arm": "deskew",
+    "writer": "lab",
+    "pages": 42,
+    "lines": 995,
+    "passed": 729,
+    "rate": 0.7326633165829146,
+    "delta": 0.0371859296482413,
+    "ci": [
+     0.019711902956785377,
+     0.061617458279845994
+    ],
+    "cut_lines": 0,
+    "broken": 35,
+    "find": 0.832886805090422,
+    "placed": 0.8000669792364367,
+    "find_words": 5972,
+    "lost_own": 0,
+    "lost_neighbour": 0,
+    "cut_words": 0,
+    "pages_cut": 0
+   },
+   {
+    "arm": "quad",
+    "writer": "lab",
+    "pages": 42,
+    "lines": 995,
+    "passed": 640,
+    "rate": 0.6432160804020101,
+    "delta": -0.052261306532663254,
+    "ci": [
+     -0.10165975103734437,
+     -0.001094091903719896
+    ],
+    "cut_lines": 36,
+    "broken": 97,
+    "find": 0.8327124957670166,
+    "placed": 0.793599729089062,
+    "find_words": 5906,
+    "lost_own": 14,
+    "lost_neighbour": 24,
+    "cut_words": 72,
+    "pages_cut": 11
+   },
+   {
+    "arm": "uvdoc",
+    "writer": "lab",
+    "pages": 42,
+    "lines": 995,
+    "passed": 594,
+    "rate": 0.5969849246231156,
+    "delta": -0.09849246231155773,
+    "ci": [
+     -0.1618037135278514,
+     -0.03969957081545061
+    ],
+    "cut_lines": 163,
+    "broken": 31,
+    "find": 0.8395976707252515,
+    "placed": 0.8094229751191107,
+    "find_words": 5667,
+    "lost_own": 164,
+    "lost_neighbour": 27,
+    "cut_words": 276,
+    "pages_cut": 29
+   },
+   {
+    "arm": "raw",
+    "writer": "level",
+    "pages": 42,
+    "lines": 995,
+    "passed": 465,
+    "rate": 0.46733668341708545,
+    "delta": -0.22814070351758786,
+    "ci": [
+     -0.3025347506132461,
+     -0.14263322884012541
+    ],
+    "cut_lines": 0,
+    "broken": 68,
+    "find": 0.832886805090422,
+    "placed": 0.8044206296048225,
+    "find_words": 5972,
+    "lost_own": 0,
+    "lost_neighbour": 0,
+    "cut_words": 0,
+    "pages_cut": 0
+   },
+   {
+    "arm": "raw",
+    "writer": "slope",
+    "pages": 42,
+    "lines": 995,
+    "passed": 603,
+    "rate": 0.6060301507537689,
+    "delta": -0.08944723618090444,
+    "ci": [
+     -0.13734290843806107,
+     -0.042630937880633324
+    ],
+    "cut_lines": 0,
+    "broken": 84,
+    "find": 0.8325519089082385,
+    "placed": 0.7982250502344274,
+    "find_words": 5972,
+    "lost_own": 0,
+    "lost_neighbour": 0,
+    "cut_words": 0,
+    "pages_cut": 0
+   },
+   {
+    "arm": "deskew",
+    "writer": "slope",
+    "pages": 42,
+    "lines": 995,
+    "passed": 674,
+    "rate": 0.6773869346733669,
+    "delta": -0.018090452261306456,
+    "ci": [
+     -0.06060606060606055,
+     0.018047579983593076
+    ],
+    "cut_lines": 0,
+    "broken": 60,
+    "find": 0.8325519089082385,
+    "placed": 0.8010716677829873,
+    "find_words": 5972,
+    "lost_own": 0,
+    "lost_neighbour": 0,
+    "cut_words": 0,
+    "pages_cut": 0
+   },
+   {
+    "arm": "quad",
+    "writer": "slope",
+    "pages": 42,
+    "lines": 995,
+    "passed": 563,
+    "rate": 0.5658291457286432,
+    "delta": -0.12964824120603013,
+    "ci": [
+     -0.18560915780866716,
+     -0.061484918793503485
+    ],
+    "cut_lines": 36,
+    "broken": 161,
+    "find": 0.8327124957670166,
+    "placed": 0.8025736539112767,
+    "find_words": 5906,
+    "lost_own": 14,
+    "lost_neighbour": 24,
+    "cut_words": 72,
+    "pages_cut": 11
+   },
+   {
+    "arm": "uvdoc",
+    "writer": "slope",
+    "pages": 42,
+    "lines": 995,
+    "passed": 550,
+    "rate": 0.5527638190954773,
+    "delta": -0.14271356783919598,
+    "ci": [
+     -0.21128021486123544,
+     -0.08431703204047214
+    ],
+    "cut_lines": 163,
+    "broken": 57,
+    "find": 0.8397741309334745,
+    "placed": 0.8113640374095642,
+    "find_words": 5667,
+    "lost_own": 164,
+    "lost_neighbour": 27,
+    "cut_words": 276,
+    "pages_cut": 29
+   }
+  ],
+  "PDF images": [
+   {
+    "arm": "raw",
+    "writer": "lab",
+    "pages": 16,
+    "lines": 687,
+    "passed": 546,
+    "rate": 0.7947598253275109,
+    "delta": null,
+    "ci": null,
+    "cut_lines": 0,
+    "broken": 4,
+    "find": 0.9088895042924398,
+    "placed": 0.8834117972860703,
+    "find_words": 3611,
+    "lost_own": 0,
+    "lost_neighbour": 0,
+    "cut_words": 0,
+    "pages_cut": 0
+   },
+   {
+    "arm": "deskew",
+    "writer": "lab",
+    "pages": 16,
+    "lines": 687,
+    "passed": 546,
+    "rate": 0.7947598253275109,
+    "delta": 0.0,
+    "ci": [
+     0.0,
+     0.0
+    ],
+    "cut_lines": 0,
+    "broken": 4,
+    "find": 0.9088895042924398,
+    "placed": 0.8834117972860703,
+    "find_words": 3611,
+    "lost_own": 0,
+    "lost_neighbour": 0,
+    "cut_words": 0,
+    "pages_cut": 0
+   },
+   {
+    "arm": "quad",
+    "writer": "lab",
+    "pages": 16,
+    "lines": 687,
+    "passed": 502,
+    "rate": 0.7307132459970888,
+    "delta": -0.06404657933042213,
+    "ci": [
+     -0.1451851851851852,
+     -0.006741573033707926
+    ],
+    "cut_lines": 3,
+    "broken": 10,
+    "find": 0.9113218070273285,
+    "placed": 0.8839933073061907,
+    "find_words": 3586,
+    "lost_own": 0,
+    "lost_neighbour": 0,
+    "cut_words": 37,
+    "pages_cut": 1
+   },
+   {
+    "arm": "uvdoc",
+    "writer": "lab",
+    "pages": 16,
+    "lines": 687,
+    "passed": 500,
+    "rate": 0.727802037845706,
+    "delta": -0.06695778748180492,
+    "ci": [
+     -0.11641791044776117,
+     -0.03658536585365857
+    ],
+    "cut_lines": 36,
+    "broken": 8,
+    "find": 0.9204022988505747,
+    "placed": 0.8959770114942529,
+    "find_words": 3480,
+    "lost_own": 125,
+    "lost_neighbour": 0,
+    "cut_words": 85,
+    "pages_cut": 9
+   },
+   {
+    "arm": "raw",
+    "writer": "level",
+    "pages": 16,
+    "lines": 687,
+    "passed": 507,
+    "rate": 0.7379912663755459,
+    "delta": -0.056768558951964976,
+    "ci": [
+     -0.09891435464414966,
+     -0.02376910016977929
+    ],
+    "cut_lines": 0,
+    "broken": 5,
+    "find": 0.9088895042924398,
+    "placed": 0.8834117972860703,
+    "find_words": 3611,
+    "lost_own": 0,
+    "lost_neighbour": 0,
+    "cut_words": 0,
+    "pages_cut": 0
+   },
+   {
+    "arm": "raw",
+    "writer": "slope",
+    "pages": 16,
+    "lines": 687,
+    "passed": 511,
+    "rate": 0.7438136826783115,
+    "delta": -0.05094614264919939,
+    "ci": [
+     -0.08611111111111114,
+     -0.019230769230769273
+    ],
+    "cut_lines": 0,
+    "broken": 8,
+    "find": 0.9072279147050678,
+    "placed": 0.8814732761008031,
+    "find_words": 3611,
+    "lost_own": 0,
+    "lost_neighbour": 0,
+    "cut_words": 0,
+    "pages_cut": 0
+   },
+   {
+    "arm": "deskew",
+    "writer": "slope",
+    "pages": 16,
+    "lines": 687,
+    "passed": 511,
+    "rate": 0.7438136826783115,
+    "delta": -0.05094614264919939,
+    "ci": [
+     -0.08743169398907102,
+     -0.018092105263157965
+    ],
+    "cut_lines": 0,
+    "broken": 8,
+    "find": 0.9072279147050678,
+    "placed": 0.8814732761008031,
+    "find_words": 3611,
+    "lost_own": 0,
+    "lost_neighbour": 0,
+    "cut_words": 0,
+    "pages_cut": 0
+   },
+   {
+    "arm": "quad",
+    "writer": "slope",
+    "pages": 16,
+    "lines": 687,
+    "passed": 483,
+    "rate": 0.7030567685589519,
+    "delta": -0.09170305676855894,
+    "ci": [
+     -0.1973293768545994,
+     -0.014450867052023142
+    ],
+    "cut_lines": 3,
+    "broken": 15,
+    "find": 0.9096486335750139,
+    "placed": 0.8859453430005577,
+    "find_words": 3586,
+    "lost_own": 0,
+    "lost_neighbour": 0,
+    "cut_words": 37,
+    "pages_cut": 1
+   },
+   {
+    "arm": "uvdoc",
+    "writer": "slope",
+    "pages": 16,
+    "lines": 687,
+    "passed": 470,
+    "rate": 0.6841339155749636,
+    "delta": -0.11062590975254727,
+    "ci": [
+     -0.1724137931034483,
+     -0.06309148264984221
+    ],
+    "cut_lines": 36,
+    "broken": 21,
+    "find": 0.9186781609195402,
+    "placed": 0.8954022988505748,
+    "find_words": 3480,
+    "lost_own": 125,
+    "lost_neighbour": 0,
+    "cut_words": 85,
+    "pages_cut": 9
+   }
+  ]
+ },
+ "bend_median": 7.907855,
+ "fold": {
+  "merged": 50,
+  "split": 0,
+  "left_out": 24
+ },
+ "skipped": {
+  "unread": 309,
+  "shared": 208,
+  "short": 242,
+  "sideways": 4
+ },
+ "truth_lines": 2445,
+ "scored_lines": 1682,
+ "pages": [
+  {
+   "page": "p002",
+   "group": "owner-typed",
+   "kind": "typewritten",
+   "angle": -0.936129354570247,
+   "spread": 2.414516584185412,
+   "bend": 17.150173,
+   "source": "original",
+   "scored_lines": 20
+  },
+  {
+   "page": "p004",
+   "group": "owner-typed",
+   "kind": "typewritten",
+   "angle": 1.0658680616953704,
+   "spread": 1.4245000424213325,
+   "bend": 6.858605,
+   "source": "original",
+   "scored_lines": 25
+  },
+  {
+   "page": "p005",
+   "group": "owner-typed",
+   "kind": "typewritten",
+   "angle": 0.0,
+   "spread": 0.7777768115684498,
+   "bend": 7.62135,
+   "source": "original",
+   "scored_lines": 46
+  },
+  {
+   "page": "p006",
+   "group": "owner-typed",
+   "kind": "typewritten",
+   "angle": 0.0,
+   "spread": 0.9007437623558282,
+   "bend": 4.872534,
+   "source": "original",
+   "scored_lines": 7
+  },
+  {
+   "page": "p007",
+   "group": "owner-hand",
+   "kind": "handwritten",
+   "angle": -1.2022867651691902,
+   "spread": 5.1949859775160725,
+   "bend": 16.79855,
+   "source": "original",
+   "scored_lines": 5
+  },
+  {
+   "page": "p008",
+   "group": "owner-typed",
+   "kind": "typewritten",
+   "angle": 0.0,
+   "spread": 0.11504285746756003,
+   "bend": 2.531581,
+   "source": "pdf image",
+   "scored_lines": 47
+  },
+  {
+   "page": "p009",
+   "group": "owner-hand",
+   "kind": "mixed",
+   "angle": 0.0,
+   "spread": 4.404009197889469,
+   "bend": 4.973101,
+   "source": "original",
+   "scored_lines": 36
+  },
+  {
+   "page": "p014",
+   "group": "owner-typed",
+   "kind": "typewritten",
+   "angle": 0.0,
+   "spread": 0.3066104830789299,
+   "bend": 3.233719,
+   "source": "pdf image",
+   "scored_lines": 21
+  },
+  {
+   "page": "p015",
+   "group": "owner-hand",
+   "kind": "handwritten",
+   "angle": 0.0,
+   "spread": 0.8574436774636464,
+   "bend": 7.673478,
+   "source": "original",
+   "scored_lines": 32
+  },
+  {
+   "page": "p018",
+   "group": "owner-typed",
+   "kind": "printed",
+   "angle": 1.2946017742486975,
+   "spread": 3.9484296534626244,
+   "bend": 6.94776,
+   "source": "original",
+   "scored_lines": 31
+  },
+  {
+   "page": "p019",
+   "group": "owner-typed",
+   "kind": "typewritten",
+   "angle": 0.0,
+   "spread": 0.0672343222249862,
+   "bend": 8.413673,
+   "source": "pdf image",
+   "scored_lines": 22
+  },
+  {
+   "page": "p021",
+   "group": "owner-typed",
+   "kind": "printed",
+   "angle": 0.6835513999163342,
+   "spread": 1.6362211430801241,
+   "bend": 12.616423,
+   "source": "original",
+   "scored_lines": 27
+  },
+  {
+   "page": "p022",
+   "group": "owner-hand",
+   "kind": "handwritten",
+   "angle": 0.0,
+   "spread": 1.4147022416332242,
+   "bend": 13.845265,
+   "source": "original",
+   "scored_lines": 7
+  },
+  {
+   "page": "p023",
+   "group": "owner-typed",
+   "kind": "typewritten",
+   "angle": 0.0,
+   "spread": 0.5287409531276152,
+   "bend": 13.516488,
+   "source": "pdf image",
+   "scored_lines": 29
+  },
+  {
+   "page": "p024",
+   "group": "owner-typed",
+   "kind": "typewritten",
+   "angle": 0.0,
+   "spread": null,
+   "bend": 30.006596,
+   "source": "original",
+   "scored_lines": 9
+  },
+  {
+   "page": "p026",
+   "group": "owner-typed",
+   "kind": "typewritten",
+   "angle": 0.0,
+   "spread": 0.50029033449917,
+   "bend": 7.083138,
+   "source": "original",
+   "scored_lines": 43
+  },
+  {
+   "page": "p030",
+   "group": "owner-typed",
+   "kind": "typewritten",
+   "angle": -0.5183534494144593,
+   "spread": 0.731307192716263,
+   "bend": 7.661553,
+   "source": "original",
+   "scored_lines": 26
+  },
+  {
+   "page": "p031",
+   "group": "owner-hand",
+   "kind": "mixed",
+   "angle": 3.0206654003203264,
+   "spread": 5.6162346193465895,
+   "bend": 10.007645,
+   "source": "original",
+   "scored_lines": 9
+  },
+  {
+   "page": "p033",
+   "group": "owner-typed",
+   "kind": "typewritten",
+   "angle": 0.6245935017756157,
+   "spread": 2.0673780046751173,
+   "bend": 4.512954,
+   "source": "original",
+   "scored_lines": 28
+  },
+  {
+   "page": "p034",
+   "group": "owner-typed",
+   "kind": "printed",
+   "angle": 1.6103016828060324,
+   "spread": null,
+   "bend": 8.158974,
+   "source": "original",
+   "scored_lines": 2
+  },
+  {
+   "page": "p036",
+   "group": "owner-typed",
+   "kind": "typewritten",
+   "angle": -0.1750619607512616,
+   "spread": 0.9005860962983003,
+   "bend": 7.907855,
+   "source": "original",
+   "scored_lines": 28
+  },
+  {
+   "page": "p040",
+   "group": "owner-hand",
+   "kind": "handwritten",
+   "angle": -3.386989775323095,
+   "spread": 2.4901064695760793,
+   "bend": 13.912886,
+   "source": "original",
+   "scored_lines": 7
+  },
+  {
+   "page": "p042",
+   "group": "owner-typed",
+   "kind": "printed",
+   "angle": 0.0,
+   "spread": 0.89118608160709,
+   "bend": 4.893157,
+   "source": "pdf image",
+   "scored_lines": 99
+  },
+  {
+   "page": "p044",
+   "group": "owner-typed",
+   "kind": "printed",
+   "angle": 0.0,
+   "spread": 0.1671420333981769,
+   "bend": 5.083501,
+   "source": "pdf image",
+   "scored_lines": 96
+  },
+  {
+   "page": "p045",
+   "group": "owner-hand",
+   "kind": "handwritten",
+   "angle": 0.0,
+   "spread": 3.819270045394106,
+   "bend": 13.945094,
+   "source": "original",
+   "scored_lines": 13
+  },
+  {
+   "page": "p046",
+   "group": "owner-hand",
+   "kind": "handwritten",
+   "angle": -2.0340252738532585,
+   "spread": 2.0081816667817884,
+   "bend": 13.291232,
+   "source": "original",
+   "scored_lines": 7
+  },
+  {
+   "page": "p047",
+   "group": "owner-hand",
+   "kind": "handwritten",
+   "angle": -1.839418776335267,
+   "spread": 4.711880014880908,
+   "bend": 11.496286,
+   "source": "original",
+   "scored_lines": 4
+  },
+  {
+   "page": "p048",
+   "group": "owner-hand",
+   "kind": "handwritten",
+   "angle": 0.0,
+   "spread": 5.395103956967138,
+   "bend": 11.24297,
+   "source": "original",
+   "scored_lines": 15
+  },
+  {
+   "page": "p049",
+   "group": "owner-hand",
+   "kind": "handwritten",
+   "angle": 0.0,
+   "spread": 0.8371655546411746,
+   "bend": 15.52826,
+   "source": "original",
+   "scored_lines": 7
+  },
+  {
+   "page": "p050",
+   "group": "owner-hand",
+   "kind": "handwritten",
+   "angle": 0.0,
+   "spread": 1.3424970058185002,
+   "bend": 9.721499,
+   "source": "original",
+   "scored_lines": 14
+  },
+  {
+   "page": "p051",
+   "group": "owner-hand",
+   "kind": "handwritten",
+   "angle": 0.0,
+   "spread": 1.7389288527166387,
+   "bend": 9.682092,
+   "source": "original",
+   "scored_lines": 8
+  },
+  {
+   "page": "p052",
+   "group": "owner-hand",
+   "kind": "handwritten",
+   "angle": -2.207408817881669,
+   "spread": 2.645416253287692,
+   "bend": 10.04535,
+   "source": "original",
+   "scored_lines": 23
+  },
+  {
+   "page": "p053",
+   "group": "owner-hand",
+   "kind": "handwritten",
+   "angle": -2.50242720254514,
+   "spread": 3.83409475615881,
+   "bend": 14.105001,
+   "source": "original",
+   "scored_lines": 7
+  },
+  {
+   "page": "p054",
+   "group": "owner-hand",
+   "kind": "handwritten",
+   "angle": -3.6699195377716873,
+   "spread": 4.098483393134126,
+   "bend": 24.876105,
+   "source": "original",
+   "scored_lines": 8
+  },
+  {
+   "page": "p055",
+   "group": "owner-hand",
+   "kind": "handwritten",
+   "angle": -1.907727865190462,
+   "spread": 3.5592409984361204,
+   "bend": 10.636195,
+   "source": "original",
+   "scored_lines": 12
+  },
+  {
+   "page": "p056",
+   "group": "owner-hand",
+   "kind": "handwritten",
+   "angle": 0.0,
+   "spread": 2.3306106867912852,
+   "bend": 9.851132,
+   "source": "original",
+   "scored_lines": 12
+  },
+  {
+   "page": "p057",
+   "group": "owner-typed",
+   "kind": "typewritten",
+   "angle": 0.0,
+   "spread": null,
+   "bend": 18.286708,
+   "source": "original",
+   "scored_lines": 6
+  },
+  {
+   "page": "p058",
+   "group": "owner-typed",
+   "kind": "printed",
+   "angle": 0.0,
+   "spread": 0.017297980648292157,
+   "bend": 3.557506,
+   "source": "pdf image",
+   "scored_lines": 38
+  },
+  {
+   "page": "p060",
+   "group": "owner-typed",
+   "kind": "typewritten",
+   "angle": 1.347790447372898,
+   "spread": 1.9653175209511144,
+   "bend": 7.128949,
+   "source": "original",
+   "scored_lines": 23
+  },
+  {
+   "page": "p062",
+   "group": "owner-typed",
+   "kind": "printed",
+   "angle": 0.0,
+   "spread": 0.1457174829546048,
+   "bend": 6.61808,
+   "source": "pdf image",
+   "scored_lines": 79
+  },
+  {
+   "page": "p064",
+   "group": "owner-typed",
+   "kind": "typewritten",
+   "angle": 0.0,
+   "spread": 1.8695001125041895,
+   "bend": 7.458605,
+   "source": "original",
+   "scored_lines": 4
+  },
+  {
+   "page": "p066",
+   "group": "owner-typed",
+   "kind": "typewritten",
+   "angle": 0.0,
+   "spread": null,
+   "bend": 7.169837,
+   "source": "original",
+   "scored_lines": 7
+  },
+  {
+   "page": "p067",
+   "group": "owner-typed",
+   "kind": "printed",
+   "angle": 0.0,
+   "spread": 0.7941899109021322,
+   "bend": 5.709814,
+   "source": "pdf image",
+   "scored_lines": 14
+  },
+  {
+   "page": "p069",
+   "group": "owner-typed",
+   "kind": "typewritten",
+   "angle": 1.0504515215491375,
+   "spread": 2.6020830070612373,
+   "bend": 11.66577,
+   "source": "original",
+   "scored_lines": 8
+  },
+  {
+   "page": "p072",
+   "group": "owner-typed",
+   "kind": "printed",
+   "angle": 1.2283854497693474,
+   "spread": 0.46310837553601436,
+   "bend": 5.388637,
+   "source": "original",
+   "scored_lines": 150
+  },
+  {
+   "page": "p073",
+   "group": "owner-typed",
+   "kind": "printed",
+   "angle": 0.0,
+   "spread": 0.34373196783643856,
+   "bend": 7.017444,
+   "source": "pdf image",
+   "scored_lines": 21
+  },
+  {
+   "page": "p074",
+   "group": "owner-typed",
+   "kind": "printed",
+   "angle": 0.0,
+   "spread": 3.20145079485903,
+   "bend": 4.84677,
+   "source": "original",
+   "scored_lines": 41
+  },
+  {
+   "page": "p078",
+   "group": "owner-typed",
+   "kind": "printed",
+   "angle": -1.3047980392074172,
+   "spread": 0.7241933375288239,
+   "bend": 6.65119,
+   "source": "original",
+   "scored_lines": 98
+  },
+  {
+   "page": "p080",
+   "group": "owner-typed",
+   "kind": "printed",
+   "angle": 0.51729275905891,
+   "spread": 5.353543148575728,
+   "bend": 9.512173,
+   "source": "original",
+   "scored_lines": 87
+  },
+  {
+   "page": "p081",
+   "group": "owner-typed",
+   "kind": "printed",
+   "angle": 0.0,
+   "spread": 0.06986087034505518,
+   "bend": 6.963866,
+   "source": "pdf image",
+   "scored_lines": 25
+  },
+  {
+   "page": "p087",
+   "group": "owner-typed",
+   "kind": "typewritten",
+   "angle": 0.0,
+   "spread": 0.1598230184324722,
+   "bend": 5.065299,
+   "source": "pdf image",
+   "scored_lines": 47
+  },
+  {
+   "page": "p088",
+   "group": "owner-typed",
+   "kind": "typewritten",
+   "angle": 0.0,
+   "spread": 0.4598371237991258,
+   "bend": 2.828331,
+   "source": "pdf image",
+   "scored_lines": 38
+  },
+  {
+   "page": "p090",
+   "group": "owner-typed",
+   "kind": "typewritten",
+   "angle": 0.0,
+   "spread": 0.10546327698025176,
+   "bend": 6.43936,
+   "source": "pdf image",
+   "scored_lines": 53
+  },
+  {
+   "page": "p095",
+   "group": "owner-typed",
+   "kind": "typewritten",
+   "angle": 0.0,
+   "spread": 0.11454568201238102,
+   "bend": 4.647044,
+   "source": "pdf image",
+   "scored_lines": 37
+  },
+  {
+   "page": "p097",
+   "group": "owner-typed",
+   "kind": "typewritten",
+   "angle": 1.3156632172630265,
+   "spread": 2.20563569237238,
+   "bend": 9.939149,
+   "source": "original",
+   "scored_lines": 22
+  },
+  {
+   "page": "p098",
+   "group": "owner-typed",
+   "kind": "typewritten",
+   "angle": 0.0,
+   "spread": 0.48872197770583226,
+   "bend": 5.444054,
+   "source": "pdf image",
+   "scored_lines": 21
+  },
+  {
+   "page": "p099",
+   "group": "owner-typed",
+   "kind": "typewritten",
+   "angle": -0.20289782054908537,
+   "spread": 5.111130669964725,
+   "bend": 26.438184,
+   "source": "original",
+   "scored_lines": 26
+  },
+  {
+   "page": "p100",
+   "group": "owner-typed",
+   "kind": "typewritten",
+   "angle": 0.5442589128947372,
+   "spread": 1.3226931799307016,
+   "bend": 9.890563,
+   "source": "original",
+   "scored_lines": 5
+  }
+ ],
+ "per_page": {
+  "raw-lab": {
+   "p002": [
+    16,
+    20
+   ],
+   "p004": [
+    18,
+    25
+   ],
+   "p005": [
+    43,
+    46
+   ],
+   "p006": [
+    4,
+    7
+   ],
+   "p007": [
+    2,
+    5
+   ],
+   "p008": [
+    35,
+    47
+   ],
+   "p009": [
+    22,
+    36
+   ],
+   "p014": [
+    20,
+    21
+   ],
+   "p015": [
+    27,
+    32
+   ],
+   "p018": [
+    26,
+    31
+   ],
+   "p019": [
+    17,
+    22
+   ],
+   "p021": [
+    19,
+    27
+   ],
+   "p022": [
+    3,
+    7
+   ],
+   "p023": [
+    22,
+    29
+   ],
+   "p024": [
+    8,
+    9
+   ],
+   "p026": [
+    35,
+    43
+   ],
+   "p030": [
+    24,
+    26
+   ],
+   "p031": [
+    3,
+    9
+   ],
+   "p033": [
+    25,
+    28
+   ],
+   "p034": [
+    2,
+    2
+   ],
+   "p036": [
+    23,
+    28
+   ],
+   "p040": [
+    5,
+    7
+   ],
+   "p042": [
+    80,
+    99
+   ],
+   "p044": [
+    78,
+    96
+   ],
+   "p045": [
+    11,
+    13
+   ],
+   "p046": [
+    4,
+    7
+   ],
+   "p047": [
+    3,
+    4
+   ],
+   "p048": [
+    14,
+    15
+   ],
+   "p049": [
+    3,
+    7
+   ],
+   "p050": [
+    7,
+    14
+   ],
+   "p051": [
+    5,
+    8
+   ],
+   "p052": [
+    8,
+    23
+   ],
+   "p053": [
+    3,
+    7
+   ],
+   "p054": [
+    5,
+    8
+   ],
+   "p055": [
+    7,
+    12
+   ],
+   "p056": [
+    6,
+    12
+   ],
+   "p057": [
+    1,
+    6
+   ],
+   "p058": [
+    27,
+    38
+   ],
+   "p060": [
+    18,
+    23
+   ],
+   "p062": [
+    60,
+    79
+   ],
+   "p064": [
+    3,
+    4
+   ],
+   "p066": [
+    5,
+    7
+   ],
+   "p067": [
+    13,
+    14
+   ],
+   "p069": [
+    6,
+    8
+   ],
+   "p072": [
+    98,
+    150
+   ],
+   "p073": [
+    20,
+    21
+   ],
+   "p074": [
+    37,
+    41
+   ],
+   "p078": [
+    65,
+    98
+   ],
+   "p080": [
+    40,
+    87
+   ],
+   "p081": [
+    13,
+    25
+   ],
+   "p087": [
+    43,
+    47
+   ],
+   "p088": [
+    24,
+    38
+   ],
+   "p090": [
+    44,
+    53
+   ],
+   "p095": [
+    32,
+    37
+   ],
+   "p097": [
+    12,
+    22
+   ],
+   "p098": [
+    18,
+    21
+   ],
+   "p099": [
+    25,
+    26
+   ],
+   "p100": [
+    1,
+    5
+   ]
+  },
+  "deskew-lab": {
+   "p002": [
+    18,
+    20
+   ],
+   "p004": [
+    19,
+    25
+   ],
+   "p005": [
+    43,
+    46
+   ],
+   "p006": [
+    4,
+    7
+   ],
+   "p007": [
+    3,
+    5
+   ],
+   "p008": [
+    35,
+    47
+   ],
+   "p009": [
+    22,
+    36
+   ],
+   "p014": [
+    20,
+    21
+   ],
+   "p015": [
+    27,
+    32
+   ],
+   "p018": [
+    28,
+    31
+   ],
+   "p019": [
+    17,
+    22
+   ],
+   "p021": [
+    21,
+    27
+   ],
+   "p022": [
+    3,
+    7
+   ],
+   "p023": [
+    22,
+    29
+   ],
+   "p024": [
+    8,
+    9
+   ],
+   "p026": [
+    35,
+    43
+   ],
+   "p030": [
+    25,
+    26
+   ],
+   "p031": [
+    3,
+    9
+   ],
+   "p033": [
+    25,
+    28
+   ],
+   "p034": [
+    2,
+    2
+   ],
+   "p036": [
+    23,
+    28
+   ],
+   "p040": [
+    7,
+    7
+   ],
+   "p042": [
+    80,
+    99
+   ],
+   "p044": [
+    78,
+    96
+   ],
+   "p045": [
+    11,
+    13
+   ],
+   "p046": [
+    5,
+    7
+   ],
+   "p047": [
+    3,
+    4
+   ],
+   "p048": [
+    14,
+    15
+   ],
+   "p049": [
+    3,
+    7
+   ],
+   "p050": [
+    7,
+    14
+   ],
+   "p051": [
+    5,
+    8
+   ],
+   "p052": [
+    13,
+    23
+   ],
+   "p053": [
+    4,
+    7
+   ],
+   "p054": [
+    4,
+    8
+   ],
+   "p055": [
+    7,
+    12
+   ],
+   "p056": [
+    6,
+    12
+   ],
+   "p057": [
+    1,
+    6
+   ],
+   "p058": [
+    27,
+    38
+   ],
+   "p060": [
+    21,
+    23
+   ],
+   "p062": [
+    60,
+    79
+   ],
+   "p064": [
+    3,
+    4
+   ],
+   "p066": [
+    5,
+    7
+   ],
+   "p067": [
+    13,
+    14
+   ],
+   "p069": [
+    6,
+    8
+   ],
+   "p072": [
+    101,
+    150
+   ],
+   "p073": [
+    20,
+    21
+   ],
+   "p074": [
+    37,
+    41
+   ],
+   "p078": [
+    69,
+    98
+   ],
+   "p080": [
+    42,
+    87
+   ],
+   "p081": [
+    13,
+    25
+   ],
+   "p087": [
+    43,
+    47
+   ],
+   "p088": [
+    24,
+    38
+   ],
+   "p090": [
+    44,
+    53
+   ],
+   "p095": [
+    32,
+    37
+   ],
+   "p097": [
+    20,
+    22
+   ],
+   "p098": [
+    18,
+    21
+   ],
+   "p099": [
+    25,
+    26
+   ],
+   "p100": [
+    1,
+    5
+   ]
+  },
+  "quad-lab": {
+   "p002": [
+    17,
+    20
+   ],
+   "p004": [
+    19,
+    25
+   ],
+   "p005": [
+    43,
+    46
+   ],
+   "p006": [
+    5,
+    7
+   ],
+   "p007": [
+    3,
+    5
+   ],
+   "p008": [
+    35,
+    47
+   ],
+   "p009": [
+    22,
+    36
+   ],
+   "p014": [
+    20,
+    21
+   ],
+   "p015": [
+    27,
+    32
+   ],
+   "p018": [
+    24,
+    31
+   ],
+   "p019": [
+    17,
+    22
+   ],
+   "p021": [
+    21,
+    27
+   ],
+   "p022": [
+    3,
+    7
+   ],
+   "p023": [
+    22,
+    29
+   ],
+   "p024": [
+    8,
+    9
+   ],
+   "p026": [
+    35,
+    43
+   ],
+   "p030": [
+    25,
+    26
+   ],
+   "p031": [
+    4,
+    9
+   ],
+   "p033": [
+    25,
+    28
+   ],
+   "p034": [
+    2,
+    2
+   ],
+   "p036": [
+    14,
+    28
+   ],
+   "p040": [
+    3,
+    7
+   ],
+   "p042": [
+    81,
+    99
+   ],
+   "p044": [
+    74,
+    96
+   ],
+   "p045": [
+    10,
+    13
+   ],
+   "p046": [
+    3,
+    7
+   ],
+   "p047": [
+    3,
+    4
+   ],
+   "p048": [
+    14,
+    15
+   ],
+   "p049": [
+    3,
+    7
+   ],
+   "p050": [
+    6,
+    14
+   ],
+   "p051": [
+    5,
+    8
+   ],
+   "p052": [
+    8,
+    23
+   ],
+   "p053": [
+    3,
+    7
+   ],
+   "p054": [
+    4,
+    8
+   ],
+   "p055": [
+    1,
+    12
+   ],
+   "p056": [
+    7,
+    12
+   ],
+   "p057": [
+    1,
+    6
+   ],
+   "p058": [
+    25,
+    38
+   ],
+   "p060": [
+    16,
+    23
+   ],
+   "p062": [
+    60,
+    79
+   ],
+   "p064": [
+    3,
+    4
+   ],
+   "p066": [
+    5,
+    7
+   ],
+   "p067": [
+    13,
+    14
+   ],
+   "p069": [
+    6,
+    8
+   ],
+   "p072": [
+    83,
+    150
+   ],
+   "p073": [
+    20,
+    21
+   ],
+   "p074": [
+    36,
+    41
+   ],
+   "p078": [
+    61,
+    98
+   ],
+   "p080": [
+    16,
+    87
+   ],
+   "p081": [
+    12,
+    25
+   ],
+   "p087": [
+    28,
+    47
+   ],
+   "p088": [
+    24,
+    38
+   ],
+   "p090": [
+    22,
+    53
+   ],
+   "p095": [
+    31,
+    37
+   ],
+   "p097": [
+    20,
+    22
+   ],
+   "p098": [
+    18,
+    21
+   ],
+   "p099": [
+    25,
+    26
+   ],
+   "p100": [
+    1,
+    5
+   ]
+  },
+  "uvdoc-lab": {
+   "p002": [
+    18,
+    20
+   ],
+   "p004": [
+    17,
+    25
+   ],
+   "p005": [
+    43,
+    46
+   ],
+   "p006": [
+    5,
+    7
+   ],
+   "p007": [
+    1,
+    5
+   ],
+   "p008": [
+    32,
+    47
+   ],
+   "p009": [
+    21,
+    36
+   ],
+   "p014": [
+    21,
+    21
+   ],
+   "p015": [
+    23,
+    32
+   ],
+   "p018": [
+    12,
+    31
+   ],
+   "p019": [
+    16,
+    22
+   ],
+   "p021": [
+    20,
+    27
+   ],
+   "p022": [
+    3,
+    7
+   ],
+   "p023": [
+    22,
+    29
+   ],
+   "p024": [
+    7,
+    9
+   ],
+   "p026": [
+    28,
+    43
+   ],
+   "p030": [
+    23,
+    26
+   ],
+   "p031": [
+    4,
+    9
+   ],
+   "p033": [
+    24,
+    28
+   ],
+   "p034": [
+    2,
+    2
+   ],
+   "p036": [
+    2,
+    28
+   ],
+   "p040": [
+    1,
+    7
+   ],
+   "p042": [
+    78,
+    99
+   ],
+   "p044": [
+    76,
+    96
+   ],
+   "p045": [
+    5,
+    13
+   ],
+   "p046": [
+    4,
+    7
+   ],
+   "p047": [
+    1,
+    4
+   ],
+   "p048": [
+    14,
+    15
+   ],
+   "p049": [
+    0,
+    7
+   ],
+   "p050": [
+    5,
+    14
+   ],
+   "p051": [
+    3,
+    8
+   ],
+   "p052": [
+    13,
+    23
+   ],
+   "p053": [
+    2,
+    7
+   ],
+   "p054": [
+    4,
+    8
+   ],
+   "p055": [
+    4,
+    12
+   ],
+   "p056": [
+    6,
+    12
+   ],
+   "p057": [
+    1,
+    6
+   ],
+   "p058": [
+    25,
+    38
+   ],
+   "p060": [
+    20,
+    23
+   ],
+   "p062": [
+    54,
+    79
+   ],
+   "p064": [
+    3,
+    4
+   ],
+   "p066": [
+    5,
+    7
+   ],
+   "p067": [
+    10,
+    14
+   ],
+   "p069": [
+    6,
+    8
+   ],
+   "p072": [
+    84,
+    150
+   ],
+   "p073": [
+    20,
+    21
+   ],
+   "p074": [
+    35,
+    41
+   ],
+   "p078": [
+    57,
+    98
+   ],
+   "p080": [
+    23,
+    87
+   ],
+   "p081": [
+    1,
+    25
+   ],
+   "p087": [
+    38,
+    47
+   ],
+   "p088": [
+    20,
+    38
+   ],
+   "p090": [
+    40,
+    53
+   ],
+   "p095": [
+    30,
+    37
+   ],
+   "p097": [
+    21,
+    22
+   ],
+   "p098": [
+    17,
+    21
+   ],
+   "p099": [
+    24,
+    26
+   ],
+   "p100": [
+    0,
+    5
+   ]
+  },
+  "raw-level": {
+   "p002": [
+    14,
+    20
+   ],
+   "p004": [
+    18,
+    25
+   ],
+   "p005": [
+    34,
+    46
+   ],
+   "p006": [
+    3,
+    7
+   ],
+   "p007": [
+    2,
+    5
+   ],
+   "p008": [
+    34,
+    47
+   ],
+   "p009": [
+    14,
+    36
+   ],
+   "p014": [
+    19,
+    21
+   ],
+   "p015": [
+    27,
+    32
+   ],
+   "p018": [
+    22,
+    31
+   ],
+   "p019": [
+    17,
+    22
+   ],
+   "p021": [
+    11,
+    27
+   ],
+   "p022": [
+    3,
+    7
+   ],
+   "p023": [
+    20,
+    29
+   ],
+   "p024": [
+    7,
+    9
+   ],
+   "p026": [
+    26,
+    43
+   ],
+   "p030": [
+    12,
+    26
+   ],
+   "p031": [
+    2,
+    9
+   ],
+   "p033": [
+    24,
+    28
+   ],
+   "p034": [
+    2,
+    2
+   ],
+   "p036": [
+    23,
+    28
+   ],
+   "p040": [
+    0,
+    7
+   ],
+   "p042": [
+    77,
+    99
+   ],
+   "p044": [
+    73,
+    96
+   ],
+   "p045": [
+    9,
+    13
+   ],
+   "p046": [
+    2,
+    7
+   ],
+   "p047": [
+    1,
+    4
+   ],
+   "p048": [
+    13,
+    15
+   ],
+   "p049": [
+    3,
+    7
+   ],
+   "p050": [
+    7,
+    14
+   ],
+   "p051": [
+    5,
+    8
+   ],
+   "p052": [
+    7,
+    23
+   ],
+   "p053": [
+    0,
+    7
+   ],
+   "p054": [
+    1,
+    8
+   ],
+   "p055": [
+    3,
+    12
+   ],
+   "p056": [
+    8,
+    12
+   ],
+   "p057": [
+    1,
+    6
+   ],
+   "p058": [
+    27,
+    38
+   ],
+   "p060": [
+    12,
+    23
+   ],
+   "p062": [
+    58,
+    79
+   ],
+   "p064": [
+    3,
+    4
+   ],
+   "p066": [
+    5,
+    7
+   ],
+   "p067": [
+    13,
+    14
+   ],
+   "p069": [
+    5,
+    8
+   ],
+   "p072": [
+    39,
+    150
+   ],
+   "p073": [
+    20,
+    21
+   ],
+   "p074": [
+    30,
+    41
+   ],
+   "p078": [
+    16,
+    98
+   ],
+   "p080": [
+    27,
+    87
+   ],
+   "p081": [
+    14,
+    25
+   ],
+   "p087": [
+    31,
+    47
+   ],
+   "p088": [
+    19,
+    38
+   ],
+   "p090": [
+    35,
+    53
+   ],
+   "p095": [
+    32,
+    37
+   ],
+   "p097": [
+    3,
+    22
+   ],
+   "p098": [
+    18,
+    21
+   ],
+   "p099": [
+    20,
+    26
+   ],
+   "p100": [
+    1,
+    5
+   ]
+  },
+  "raw-slope": {
+   "p002": [
+    15,
+    20
+   ],
+   "p004": [
+    20,
+    25
+   ],
+   "p005": [
+    40,
+    46
+   ],
+   "p006": [
+    5,
+    7
+   ],
+   "p007": [
+    2,
+    5
+   ],
+   "p008": [
+    35,
+    47
+   ],
+   "p009": [
+    20,
+    36
+   ],
+   "p014": [
+    19,
+    21
+   ],
+   "p015": [
+    27,
+    32
+   ],
+   "p018": [
+    24,
+    31
+   ],
+   "p019": [
+    17,
+    22
+   ],
+   "p021": [
+    21,
+    27
+   ],
+   "p022": [
+    3,
+    7
+   ],
+   "p023": [
+    20,
+    29
+   ],
+   "p024": [
+    8,
+    9
+   ],
+   "p026": [
+    29,
+    43
+   ],
+   "p030": [
+    21,
+    26
+   ],
+   "p031": [
+    3,
+    9
+   ],
+   "p033": [
+    24,
+    28
+   ],
+   "p034": [
+    2,
+    2
+   ],
+   "p036": [
+    23,
+    28
+   ],
+   "p040": [
+    2,
+    7
+   ],
+   "p042": [
+    76,
+    99
+   ],
+   "p044": [
+    72,
+    96
+   ],
+   "p045": [
+    11,
+    13
+   ],
+   "p046": [
+    3,
+    7
+   ],
+   "p047": [
+    3,
+    4
+   ],
+   "p048": [
+    10,
+    15
+   ],
+   "p049": [
+    3,
+    7
+   ],
+   "p050": [
+    7,
+    14
+   ],
+   "p051": [
+    5,
+    8
+   ],
+   "p052": [
+    8,
+    23
+   ],
+   "p053": [
+    1,
+    7
+   ],
+   "p054": [
+    5,
+    8
+   ],
+   "p055": [
+    6,
+    12
+   ],
+   "p056": [
+    4,
+    12
+   ],
+   "p057": [
+    1,
+    6
+   ],
+   "p058": [
+    27,
+    38
+   ],
+   "p060": [
+    17,
+    23
+   ],
+   "p062": [
+    57,
+    79
+   ],
+   "p064": [
+    3,
+    4
+   ],
+   "p066": [
+    5,
+    7
+   ],
+   "p067": [
+    13,
+    14
+   ],
+   "p069": [
+    6,
+    8
+   ],
+   "p072": [
+    90,
+    150
+   ],
+   "p073": [
+    20,
+    21
+   ],
+   "p074": [
+    34,
+    41
+   ],
+   "p078": [
+    37,
+    98
+   ],
+   "p080": [
+    23,
+    87
+   ],
+   "p081": [
+    14,
+    25
+   ],
+   "p087": [
+    32,
+    47
+   ],
+   "p088": [
+    23,
+    38
+   ],
+   "p090": [
+    36,
+    53
+   ],
+   "p095": [
+    32,
+    37
+   ],
+   "p097": [
+    13,
+    22
+   ],
+   "p098": [
+    18,
+    21
+   ],
+   "p099": [
+    18,
+    26
+   ],
+   "p100": [
+    1,
+    5
+   ]
+  },
+  "deskew-slope": {
+   "p002": [
+    18,
+    20
+   ],
+   "p004": [
+    20,
+    25
+   ],
+   "p005": [
+    40,
+    46
+   ],
+   "p006": [
+    5,
+    7
+   ],
+   "p007": [
+    2,
+    5
+   ],
+   "p008": [
+    35,
+    47
+   ],
+   "p009": [
+    20,
+    36
+   ],
+   "p014": [
+    19,
+    21
+   ],
+   "p015": [
+    27,
+    32
+   ],
+   "p018": [
+    26,
+    31
+   ],
+   "p019": [
+    17,
+    22
+   ],
+   "p021": [
+    21,
+    27
+   ],
+   "p022": [
+    3,
+    7
+   ],
+   "p023": [
+    20,
+    29
+   ],
+   "p024": [
+    8,
+    9
+   ],
+   "p026": [
+    29,
+    43
+   ],
+   "p030": [
+    25,
+    26
+   ],
+   "p031": [
+    3,
+    9
+   ],
+   "p033": [
+    24,
+    28
+   ],
+   "p034": [
+    2,
+    2
+   ],
+   "p036": [
+    23,
+    28
+   ],
+   "p040": [
+    7,
+    7
+   ],
+   "p042": [
+    76,
+    99
+   ],
+   "p044": [
+    72,
+    96
+   ],
+   "p045": [
+    11,
+    13
+   ],
+   "p046": [
+    4,
+    7
+   ],
+   "p047": [
+    3,
+    4
+   ],
+   "p048": [
+    10,
+    15
+   ],
+   "p049": [
+    3,
+    7
+   ],
+   "p050": [
+    7,
+    14
+   ],
+   "p051": [
+    5,
+    8
+   ],
+   "p052": [
+    13,
+    23
+   ],
+   "p053": [
+    4,
+    7
+   ],
+   "p054": [
+    5,
+    8
+   ],
+   "p055": [
+    7,
+    12
+   ],
+   "p056": [
+    4,
+    12
+   ],
+   "p057": [
+    1,
+    6
+   ],
+   "p058": [
+    27,
+    38
+   ],
+   "p060": [
+    17,
+    23
+   ],
+   "p062": [
+    57,
+    79
+   ],
+   "p064": [
+    3,
+    4
+   ],
+   "p066": [
+    5,
+    7
+   ],
+   "p067": [
+    13,
+    14
+   ],
+   "p069": [
+    6,
+    8
+   ],
+   "p072": [
+    102,
+    150
+   ],
+   "p073": [
+    20,
+    21
+   ],
+   "p074": [
+    34,
+    41
+   ],
+   "p078": [
+    68,
+    98
+   ],
+   "p080": [
+    24,
+    87
+   ],
+   "p081": [
+    14,
+    25
+   ],
+   "p087": [
+    32,
+    47
+   ],
+   "p088": [
+    23,
+    38
+   ],
+   "p090": [
+    36,
+    53
+   ],
+   "p095": [
+    32,
+    37
+   ],
+   "p097": [
+    13,
+    22
+   ],
+   "p098": [
+    18,
+    21
+   ],
+   "p099": [
+    21,
+    26
+   ],
+   "p100": [
+    1,
+    5
+   ]
+  },
+  "quad-slope": {
+   "p002": [
+    16,
+    20
+   ],
+   "p004": [
+    20,
+    25
+   ],
+   "p005": [
+    40,
+    46
+   ],
+   "p006": [
+    5,
+    7
+   ],
+   "p007": [
+    2,
+    5
+   ],
+   "p008": [
+    35,
+    47
+   ],
+   "p009": [
+    20,
+    36
+   ],
+   "p014": [
+    19,
+    21
+   ],
+   "p015": [
+    28,
+    32
+   ],
+   "p018": [
+    26,
+    31
+   ],
+   "p019": [
+    17,
+    22
+   ],
+   "p021": [
+    22,
+    27
+   ],
+   "p022": [
+    3,
+    7
+   ],
+   "p023": [
+    22,
+    29
+   ],
+   "p024": [
+    8,
+    9
+   ],
+   "p026": [
+    29,
+    43
+   ],
+   "p030": [
+    24,
+    26
+   ],
+   "p031": [
+    5,
+    9
+   ],
+   "p033": [
+    23,
+    28
+   ],
+   "p034": [
+    2,
+    2
+   ],
+   "p036": [
+    18,
+    28
+   ],
+   "p040": [
+    3,
+    7
+   ],
+   "p042": [
+    79,
+    99
+   ],
+   "p044": [
+    73,
+    96
+   ],
+   "p045": [
+    10,
+    13
+   ],
+   "p046": [
+    2,
+    7
+   ],
+   "p047": [
+    3,
+    4
+   ],
+   "p048": [
+    10,
+    15
+   ],
+   "p049": [
+    3,
+    7
+   ],
+   "p050": [
+    6,
+    14
+   ],
+   "p051": [
+    5,
+    8
+   ],
+   "p052": [
+    8,
+    23
+   ],
+   "p053": [
+    1,
+    7
+   ],
+   "p054": [
+    4,
+    8
+   ],
+   "p055": [
+    3,
+    12
+   ],
+   "p056": [
+    4,
+    12
+   ],
+   "p057": [
+    1,
+    6
+   ],
+   "p058": [
+    24,
+    38
+   ],
+   "p060": [
+    13,
+    23
+   ],
+   "p062": [
+    58,
+    79
+   ],
+   "p064": [
+    3,
+    4
+   ],
+   "p066": [
+    5,
+    7
+   ],
+   "p067": [
+    13,
+    14
+   ],
+   "p069": [
+    6,
+    8
+   ],
+   "p072": [
+    69,
+    150
+   ],
+   "p073": [
+    20,
+    21
+   ],
+   "p074": [
+    32,
+    41
+   ],
+   "p078": [
+    41,
+    98
+   ],
+   "p080": [
+    5,
+    87
+   ],
+   "p081": [
+    14,
+    25
+   ],
+   "p087": [
+    17,
+    47
+   ],
+   "p088": [
+    23,
+    38
+   ],
+   "p090": [
+    19,
+    53
+   ],
+   "p095": [
+    32,
+    37
+   ],
+   "p097": [
+    12,
+    22
+   ],
+   "p098": [
+    18,
+    21
+   ],
+   "p099": [
+    22,
+    26
+   ],
+   "p100": [
+    1,
+    5
+   ]
+  },
+  "uvdoc-slope": {
+   "p002": [
+    18,
+    20
+   ],
+   "p004": [
+    18,
+    25
+   ],
+   "p005": [
+    41,
+    46
+   ],
+   "p006": [
+    5,
+    7
+   ],
+   "p007": [
+    1,
+    5
+   ],
+   "p008": [
+    32,
+    47
+   ],
+   "p009": [
+    19,
+    36
+   ],
+   "p014": [
+    20,
+    21
+   ],
+   "p015": [
+    22,
+    32
+   ],
+   "p018": [
+    11,
+    31
+   ],
+   "p019": [
+    16,
+    22
+   ],
+   "p021": [
+    22,
+    27
+   ],
+   "p022": [
+    3,
+    7
+   ],
+   "p023": [
+    22,
+    29
+   ],
+   "p024": [
+    7,
+    9
+   ],
+   "p026": [
+    22,
+    43
+   ],
+   "p030": [
+    18,
+    26
+   ],
+   "p031": [
+    3,
+    9
+   ],
+   "p033": [
+    24,
+    28
+   ],
+   "p034": [
+    2,
+    2
+   ],
+   "p036": [
+    3,
+    28
+   ],
+   "p040": [
+    1,
+    7
+   ],
+   "p042": [
+    75,
+    99
+   ],
+   "p044": [
+    72,
+    96
+   ],
+   "p045": [
+    4,
+    13
+   ],
+   "p046": [
+    4,
+    7
+   ],
+   "p047": [
+    1,
+    4
+   ],
+   "p048": [
+    12,
+    15
+   ],
+   "p049": [
+    0,
+    7
+   ],
+   "p050": [
+    5,
+    14
+   ],
+   "p051": [
+    3,
+    8
+   ],
+   "p052": [
+    10,
+    23
+   ],
+   "p053": [
+    0,
+    7
+   ],
+   "p054": [
+    4,
+    8
+   ],
+   "p055": [
+    4,
+    12
+   ],
+   "p056": [
+    3,
+    12
+   ],
+   "p057": [
+    1,
+    6
+   ],
+   "p058": [
+    23,
+    38
+   ],
+   "p060": [
+    17,
+    23
+   ],
+   "p062": [
+    51,
+    79
+   ],
+   "p064": [
+    3,
+    4
+   ],
+   "p066": [
+    5,
+    7
+   ],
+   "p067": [
+    10,
+    14
+   ],
+   "p069": [
+    5,
+    8
+   ],
+   "p072": [
+    82,
+    150
+   ],
+   "p073": [
+    19,
+    21
+   ],
+   "p074": [
+    31,
+    41
+   ],
+   "p078": [
+    56,
+    98
+   ],
+   "p080": [
+    16,
+    87
+   ],
+   "p081": [
+    2,
+    25
+   ],
+   "p087": [
+    26,
+    47
+   ],
+   "p088": [
+    20,
+    38
+   ],
+   "p090": [
+    32,
+    53
+   ],
+   "p095": [
+    33,
+    37
+   ],
+   "p097": [
+    19,
+    22
+   ],
+   "p098": [
+    17,
+    21
+   ],
+   "p099": [
+    25,
+    26
+   ],
+   "p100": [
+    0,
+    5
+   ]
+  }
+ },
+ "selftest": {
+  "level": {
+   "0.0 all": {
+    "passed": 1745,
+    "n": 1772,
+    "rate": 0.9847629796839729
+   },
+   "0.0 slope>=0.5": {
+    "passed": 808,
+    "n": 824,
+    "rate": 0.9805825242718447
+   },
+   "0.0 slope<0.5": {
+    "passed": 937,
+    "n": 948,
+    "rate": 0.9883966244725738
+   },
+   "0.02 all": {
+    "passed": 202,
+    "n": 1772,
+    "rate": 0.11399548532731377
+   },
+   "0.02 slope>=0.5": {
+    "passed": 89,
+    "n": 824,
+    "rate": 0.10800970873786407
+   },
+   "0.02 slope<0.5": {
+    "passed": 113,
+    "n": 948,
+    "rate": 0.11919831223628692
+   }
+  },
+  "sloped": {
+   "0.0 all": {
+    "passed": 1593,
+    "n": 1772,
+    "rate": 0.8989841986455982
+   },
+   "0.0 slope>=0.5": {
+    "passed": 704,
+    "n": 824,
+    "rate": 0.8543689320388349
+   },
+   "0.0 slope<0.5": {
+    "passed": 889,
+    "n": 948,
+    "rate": 0.9377637130801688
+   },
+   "0.02 all": {
+    "passed": 207,
+    "n": 1772,
+    "rate": 0.11681715575620767
+   },
+   "0.02 slope>=0.5": {
+    "passed": 101,
+    "n": 824,
+    "rate": 0.12257281553398058
+   },
+   "0.02 slope<0.5": {
+    "passed": 106,
+    "n": 948,
+    "rate": 0.11181434599156118
+   }
+  }
+ },
+ "overshoot_035": {
+  "every page": [
+   {
+    "arm": "raw",
+    "writer": "lab",
+    "pages": 58,
+    "lines": 1682,
+    "passed": 1397,
+    "rate": 0.8305588585017836,
+    "delta": null,
+    "ci": null,
+    "cut_lines": 0,
+    "broken": 59,
+    "find": 0.8615256182823751,
+    "placed": 0.8296984242930189,
+    "find_words": 9583,
+    "lost_own": 0,
+    "lost_neighbour": 0,
+    "cut_words": 0,
+    "pages_cut": 0
+   },
+   {
+    "arm": "deskew",
+    "writer": "lab",
+    "pages": 58,
+    "lines": 1682,
+    "passed": 1425,
+    "rate": 0.847205707491082,
+    "delta": 0.01664684898929847,
+    "ci": [
+     0.0056022408963585235,
+     0.03257497414684585
+    ],
+    "cut_lines": 0,
+    "broken": 49,
+    "find": 0.8615256182823751,
+    "placed": 0.8314723990399666,
+    "find_words": 9583,
+    "lost_own": 0,
+    "lost_neighbour": 0,
+    "cut_words": 0,
+    "pages_cut": 0
+   },
+   {
+    "arm": "quad",
+    "writer": "lab",
+    "pages": 58,
+    "lines": 1682,
+    "passed": 1295,
+    "rate": 0.7699167657550535,
+    "delta": -0.06064209274673005,
+    "ci": [
+     -0.10513296227581947,
+     -0.018170019467877996
+    ],
+    "cut_lines": 39,
+    "broken": 120,
+    "find": 0.8624104509060261,
+    "placed": 0.8277496839443742,
+    "find_words": 9492,
+    "lost_own": 14,
+    "lost_neighbour": 24,
+    "cut_words": 109,
+    "pages_cut": 12
+   },
+   {
+    "arm": "uvdoc",
+    "writer": "lab",
+    "pages": 58,
+    "lines": 1682,
+    "passed": 1242,
+    "rate": 0.7384066587395958,
+    "delta": -0.0921521997621878,
+    "ci": [
+     -0.136986301369863,
+     -0.04783342712436689
+    ],
+    "cut_lines": 199,
+    "broken": 55,
+    "find": 0.8703400021865092,
+    "placed": 0.8423526839400897,
+    "find_words": 9147,
+    "lost_own": 289,
+    "lost_neighbour": 27,
+    "cut_words": 361,
+    "pages_cut": 38
+   },
+   {
+    "arm": "raw",
+    "writer": "level",
+    "pages": 58,
+    "lines": 1682,
+    "passed": 1075,
+    "rate": 0.6391200951248514,
+    "delta": -0.19143876337693222,
+    "ci": [
+     -0.2940824865511058,
+     -0.09819121447028423
+    ],
+    "cut_lines": 0,
+    "broken": 120,
+    "find": 0.8615256182823751,
+    "placed": 0.8341855368882396,
+    "find_words": 9583,
+    "lost_own": 0,
+    "lost_neighbour": 0,
+    "cut_words": 0,
+    "pages_cut": 0
+   },
+   {
+    "arm": "raw",
+    "writer": "slope",
+    "pages": 58,
+    "lines": 1682,
+    "passed": 1242,
+    "rate": 0.7384066587395958,
+    "delta": -0.0921521997621878,
+    "ci": [
+     -0.13541042540443382,
+     -0.05360824742268033
+    ],
+    "cut_lines": 0,
+    "broken": 110,
+    "find": 0.8606908066367526,
+    "placed": 0.8295940728373161,
+    "find_words": 9583,
+    "lost_own": 0,
+    "lost_neighbour": 0,
+    "cut_words": 0,
+    "pages_cut": 0
+   },
+   {
+    "arm": "deskew",
+    "writer": "slope",
+    "pages": 58,
+    "lines": 1682,
+    "passed": 1323,
+    "rate": 0.786563614744352,
+    "delta": -0.04399524375743158,
+    "ci": [
+     -0.0661896243291592,
+     -0.02190847127555995
+    ],
+    "cut_lines": 0,
+    "broken": 79,
+    "find": 0.8606908066367526,
+    "placed": 0.8313680475842637,
+    "find_words": 9583,
+    "lost_own": 0,
+    "lost_neighbour": 0,
+    "cut_words": 0,
+    "pages_cut": 0
+   },
+   {
+    "arm": "quad",
+    "writer": "slope",
+    "pages": 58,
+    "lines": 1682,
+    "passed": 1150,
+    "rate": 0.6837098692033293,
+    "delta": -0.14684898929845425,
+    "ci": [
+     -0.21467798302546182,
+     -0.07440476190476197
+    ],
+    "cut_lines": 39,
+    "broken": 186,
+    "find": 0.8617783396544458,
+    "placed": 0.834070796460177,
+    "find_words": 9492,
+    "lost_own": 14,
+    "lost_neighbour": 24,
+    "cut_words": 109,
+    "pages_cut": 12
+   },
+   {
+    "arm": "uvdoc",
+    "writer": "slope",
+    "pages": 58,
+    "lines": 1682,
+    "passed": 1139,
+    "rate": 0.6771700356718192,
+    "delta": -0.15338882282996436,
+    "ci": [
+     -0.2036124794745484,
+     -0.10012594458438295
+    ],
+    "cut_lines": 199,
+    "broken": 94,
+    "find": 0.8697933748770088,
+    "placed": 0.8433366130971903,
+    "find_words": 9147,
+    "lost_own": 289,
+    "lost_neighbour": 27,
+    "cut_words": 361,
+    "pages_cut": 38
+   }
+  ],
+  "typed": [
+   {
+    "arm": "raw",
+    "writer": "lab",
+    "pages": 40,
+    "lines": 1456,
+    "passed": 1239,
+    "rate": 0.8509615384615384,
+    "delta": null,
+    "ci": null,
+    "cut_lines": 0,
+    "broken": 43,
+    "find": 0.9277049975739932,
+    "placed": 0.9016254245511888,
+    "find_words": 8244,
+    "lost_own": 0,
+    "lost_neighbour": 0,
+    "cut_words": 0,
+    "pages_cut": 0
+   },
+   {
+    "arm": "deskew",
+    "writer": "lab",
+    "pages": 40,
+    "lines": 1456,
+    "passed": 1256,
+    "rate": 0.8626373626373627,
+    "delta": 0.011675824175824245,
+    "ci": [
+     0.001749271137026276,
+     0.026964560862865916
+    ],
+    "cut_lines": 0,
+    "broken": 35,
+    "find": 0.9277049975739932,
+    "placed": 0.9029597282872392,
+    "find_words": 8244,
+    "lost_own": 0,
+    "lost_neighbour": 0,
+    "cut_words": 0,
+    "pages_cut": 0
+   },
+   {
+    "arm": "quad",
+    "writer": "lab",
+    "pages": 40,
+    "lines": 1456,
+    "passed": 1146,
+    "rate": 0.7870879120879121,
+    "delta": -0.06387362637362637,
+    "ci": [
+     -0.11339600470035249,
+     -0.014899211218229569
+    ],
+    "cut_lines": 34,
+    "broken": 102,
+    "find": 0.9294275929549902,
+    "placed": 0.8994618395303327,
+    "find_words": 8176,
+    "lost_own": 11,
+    "lost_neighbour": 18,
+    "cut_words": 89,
+    "pages_cut": 7
+   },
+   {
+    "arm": "uvdoc",
+    "writer": "lab",
+    "pages": 40,
+    "lines": 1456,
+    "passed": 1110,
+    "rate": 0.7623626373626373,
+    "delta": -0.08859890109890112,
+    "ci": [
+     -0.14161073825503356,
+     -0.03373015873015883
+    ],
+    "cut_lines": 159,
+    "broken": 42,
+    "find": 0.9337781694573839,
+    "placed": 0.9104872214528515,
+    "find_words": 7943,
+    "lost_own": 223,
+    "lost_neighbour": 19,
+    "cut_words": 225,
+    "pages_cut": 22
+   },
+   {
+    "arm": "raw",
+    "writer": "level",
+    "pages": 40,
+    "lines": 1456,
+    "passed": 950,
+    "rate": 0.6524725274725275,
+    "delta": -0.19848901098901095,
+    "ci": [
+     -0.3140551445864156,
+     -0.08636363636363642
+    ],
+    "cut_lines": 0,
+    "broken": 107,
+    "find": 0.9277049975739932,
+    "placed": 0.9055070354196991,
+    "find_words": 8244,
+    "lost_own": 0,
+    "lost_neighbour": 0,
+    "cut_words": 0,
+    "pages_cut": 0
+   },
+   {
+    "arm": "raw",
+    "writer": "slope",
+    "pages": 40,
+    "lines": 1456,
+    "passed": 1097,
+    "rate": 0.7534340659340659,
+    "delta": -0.09752747252747251,
+    "ci": [
+     -0.14785276073619624,
+     -0.05134099616858245
+    ],
+    "cut_lines": 0,
+    "broken": 92,
+    "find": 0.9267345948568656,
+    "placed": 0.9007763221737021,
+    "find_words": 8244,
+    "lost_own": 0,
+    "lost_neighbour": 0,
+    "cut_words": 0,
+    "pages_cut": 0
+   },
+   {
+    "arm": "deskew",
+    "writer": "slope",
+    "pages": 40,
+    "lines": 1456,
+    "passed": 1167,
+    "rate": 0.801510989010989,
+    "delta": -0.049450549450549386,
+    "ci": [
+     -0.073139974779319,
+     -0.02735156771180791
+    ],
+    "cut_lines": 0,
+    "broken": 59,
+    "find": 0.9267345948568656,
+    "placed": 0.9028384279475983,
+    "find_words": 8244,
+    "lost_own": 0,
+    "lost_neighbour": 0,
+    "cut_words": 0,
+    "pages_cut": 0
+   },
+   {
+    "arm": "quad",
+    "writer": "slope",
+    "pages": 40,
+    "lines": 1456,
+    "passed": 1010,
+    "rate": 0.6936813186813187,
+    "delta": -0.15728021978021978,
+    "ci": [
+     -0.2296730930427494,
+     -0.07374100719424459
+    ],
+    "cut_lines": 34,
+    "broken": 161,
+    "find": 0.9286937377690803,
+    "placed": 0.9059442270058709,
+    "find_words": 8176,
+    "lost_own": 11,
+    "lost_neighbour": 18,
+    "cut_words": 89,
+    "pages_cut": 7
+   },
+   {
+    "arm": "uvdoc",
+    "writer": "slope",
+    "pages": 40,
+    "lines": 1456,
+    "passed": 1019,
+    "rate": 0.6998626373626373,
+    "delta": -0.15109890109890112,
+    "ci": [
+     -0.2086614173228346,
+     -0.09256661991584858
+    ],
+    "cut_lines": 159,
+    "broken": 77,
+    "find": 0.9331486843761803,
+    "placed": 0.9113685005665366,
+    "find_words": 7943,
+    "lost_own": 223,
+    "lost_neighbour": 19,
+    "cut_words": 225,
+    "pages_cut": 22
+   }
+  ],
+  "hand": [
+   {
+    "arm": "raw",
+    "writer": "lab",
+    "pages": 18,
+    "lines": 226,
+    "passed": 158,
+    "rate": 0.6991150442477876,
+    "delta": null,
+    "ci": null,
+    "cut_lines": 0,
+    "broken": 16,
+    "find": 0.4540702016430172,
+    "placed": 0.38685586258401794,
+    "find_words": 1339,
+    "lost_own": 0,
+    "lost_neighbour": 0,
+    "cut_words": 0,
+    "pages_cut": 0
+   },
+   {
+    "arm": "deskew",
+    "writer": "lab",
+    "pages": 18,
+    "lines": 226,
+    "passed": 169,
+    "rate": 0.7477876106194691,
+    "delta": 0.04867256637168149,
+    "ci": [
+     0.007246376811594235,
+     0.10843373493975894
+    ],
+    "cut_lines": 0,
+    "broken": 14,
+    "find": 0.4540702016430172,
+    "placed": 0.39133681852128455,
+    "find_words": 1339,
+    "lost_own": 0,
+    "lost_neighbour": 0,
+    "cut_words": 0,
+    "pages_cut": 0
+   },
+   {
+    "arm": "quad",
+    "writer": "lab",
+    "pages": 18,
+    "lines": 226,
+    "passed": 149,
+    "rate": 0.6592920353982301,
+    "delta": -0.03982300884955747,
+    "ci": [
+     -0.1116751269035533,
+     0.004065040650406471
+    ],
+    "cut_lines": 5,
+    "broken": 18,
+    "find": 0.446048632218845,
+    "placed": 0.3822188449848024,
+    "find_words": 1316,
+    "lost_own": 3,
+    "lost_neighbour": 6,
+    "cut_words": 20,
+    "pages_cut": 5
+   },
+   {
+    "arm": "uvdoc",
+    "writer": "lab",
+    "pages": 18,
+    "lines": 226,
+    "passed": 132,
+    "rate": 0.584070796460177,
+    "delta": -0.11504424778761058,
+    "ci": [
+     -0.226027397260274,
+     -0.030888030888030826
+    ],
+    "cut_lines": 40,
+    "broken": 13,
+    "find": 0.45182724252491696,
+    "placed": 0.39285714285714285,
+    "find_words": 1204,
+    "lost_own": 66,
+    "lost_neighbour": 8,
+    "cut_words": 136,
+    "pages_cut": 16
+   },
+   {
+    "arm": "raw",
+    "writer": "level",
+    "pages": 18,
+    "lines": 226,
+    "passed": 125,
+    "rate": 0.5530973451327433,
+    "delta": -0.14601769911504425,
+    "ci": [
+     -0.24358974358974356,
+     -0.05945945945945941
+    ],
+    "cut_lines": 0,
+    "broken": 13,
+    "find": 0.4540702016430172,
+    "placed": 0.3950709484690067,
+    "find_words": 1339,
+    "lost_own": 0,
+    "lost_neighbour": 0,
+    "cut_words": 0,
+    "pages_cut": 0
+   },
+   {
+    "arm": "raw",
+    "writer": "slope",
+    "pages": 18,
+    "lines": 226,
+    "passed": 145,
+    "rate": 0.6415929203539823,
+    "delta": -0.05752212389380529,
+    "ci": [
+     -0.10344827586206895,
+     -0.028455284552845517
+    ],
+    "cut_lines": 0,
+    "broken": 18,
+    "find": 0.4540702016430172,
+    "placed": 0.39133681852128455,
+    "find_words": 1339,
+    "lost_own": 0,
+    "lost_neighbour": 0,
+    "cut_words": 0,
+    "pages_cut": 0
+   },
+   {
+    "arm": "deskew",
+    "writer": "slope",
+    "pages": 18,
+    "lines": 226,
+    "passed": 156,
+    "rate": 0.6902654867256637,
+    "delta": -0.008849557522123908,
+    "ci": [
+     -0.07291666666666663,
+     0.055118110236220486
+    ],
+    "cut_lines": 0,
+    "broken": 20,
+    "find": 0.4540702016430172,
+    "placed": 0.39133681852128455,
+    "find_words": 1339,
+    "lost_own": 0,
+    "lost_neighbour": 0,
+    "cut_words": 0,
+    "pages_cut": 0
+   },
+   {
+    "arm": "quad",
+    "writer": "slope",
+    "pages": 18,
+    "lines": 226,
+    "passed": 140,
+    "rate": 0.6194690265486725,
+    "delta": -0.07964601769911506,
+    "ci": [
+     -0.14204545454545459,
+     -0.03448275862068961
+    ],
+    "cut_lines": 5,
+    "broken": 25,
+    "find": 0.446048632218845,
+    "placed": 0.38753799392097266,
+    "find_words": 1316,
+    "lost_own": 3,
+    "lost_neighbour": 6,
+    "cut_words": 20,
+    "pages_cut": 5
+   },
+   {
+    "arm": "uvdoc",
+    "writer": "slope",
+    "pages": 18,
+    "lines": 226,
+    "passed": 120,
+    "rate": 0.5309734513274337,
+    "delta": -0.1681415929203539,
+    "ci": [
+     -0.27748691099476436,
+     -0.08058608058608063
+    ],
+    "cut_lines": 40,
+    "broken": 17,
+    "find": 0.45182724252491696,
+    "placed": 0.3945182724252492,
+    "find_words": 1204,
+    "lost_own": 66,
+    "lost_neighbour": 8,
+    "cut_words": 136,
+    "pages_cut": 16
+   }
+  ],
+  "skewed (|angle| \u2265 1\u00b0)": [
+   {
+    "arm": "raw",
+    "writer": "lab",
+    "pages": 17,
+    "lines": 441,
+    "passed": 359,
+    "rate": 0.8140589569160998,
+    "delta": null,
+    "ci": null,
+    "cut_lines": 0,
+    "broken": 15,
+    "find": 0.8363566190659977,
+    "placed": 0.7993052875337707,
+    "find_words": 2591,
+    "lost_own": 0,
+    "lost_neighbour": 0,
+    "cut_words": 0,
+    "pages_cut": 0
+   },
+   {
+    "arm": "deskew",
+    "writer": "lab",
+    "pages": 17,
+    "lines": 441,
+    "passed": 383,
+    "rate": 0.8684807256235828,
+    "delta": 0.054421768707483054,
+    "ci": [
+     0.013182674199623379,
+     0.15384615384615385
+    ],
+    "cut_lines": 0,
+    "broken": 8,
+    "find": 0.8363566190659977,
+    "placed": 0.8039367039752991,
+    "find_words": 2591,
+    "lost_own": 0,
+    "lost_neighbour": 0,
+    "cut_words": 0,
+    "pages_cut": 0
+   },
+   {
+    "arm": "quad",
+    "writer": "lab",
+    "pages": 17,
+    "lines": 441,
+    "passed": 327,
+    "rate": 0.7414965986394558,
+    "delta": -0.07256235827664392,
+    "ci": [
+     -0.15051546391752568,
+     0.02405498281786944
+    ],
+    "cut_lines": 4,
+    "broken": 40,
+    "find": 0.8359314107560405,
+    "placed": 0.803975058456742,
+    "find_words": 2566,
+    "lost_own": 4,
+    "lost_neighbour": 21,
+    "cut_words": 11,
+    "pages_cut": 5
+   },
+   {
+    "arm": "uvdoc",
+    "writer": "lab",
+    "pages": 17,
+    "lines": 441,
+    "passed": 307,
+    "rate": 0.6961451247165533,
+    "delta": -0.11791383219954643,
+    "ci": [
+     -0.19437939110070257,
+     0.0182648401826484
+    ],
+    "cut_lines": 71,
+    "broken": 12,
+    "find": 0.8428338762214984,
+    "placed": 0.8151465798045603,
+    "find_words": 2456,
+    "lost_own": 49,
+    "lost_neighbour": 24,
+    "cut_words": 133,
+    "pages_cut": 14
+   },
+   {
+    "arm": "raw",
+    "writer": "level",
+    "pages": 17,
+    "lines": 441,
+    "passed": 156,
+    "rate": 0.35374149659863946,
+    "delta": -0.4603174603174603,
+    "ci": [
+     -0.583941605839416,
+     -0.1578947368421053
+    ],
+    "cut_lines": 0,
+    "broken": 78,
+    "find": 0.8363566190659977,
+    "placed": 0.807024314936318,
+    "find_words": 2591,
+    "lost_own": 0,
+    "lost_neighbour": 0,
+    "cut_words": 0,
+    "pages_cut": 0
+   },
+   {
+    "arm": "raw",
+    "writer": "slope",
+    "pages": 17,
+    "lines": 441,
+    "passed": 289,
+    "rate": 0.655328798185941,
+    "delta": -0.15873015873015872,
+    "ci": [
+     -0.27290836653386463,
+     -0.025380710659898442
+    ],
+    "cut_lines": 0,
+    "broken": 42,
+    "find": 0.8355847163257429,
+    "placed": 0.7977614820532613,
+    "find_words": 2591,
+    "lost_own": 0,
+    "lost_neighbour": 0,
+    "cut_words": 0,
+    "pages_cut": 0
+   },
+   {
+    "arm": "deskew",
+    "writer": "slope",
+    "pages": 17,
+    "lines": 441,
+    "passed": 357,
+    "rate": 0.8095238095238095,
+    "delta": -0.0045351473922902175,
+    "ci": [
+     -0.03714285714285703,
+     0.06132075471698106
+    ],
+    "cut_lines": 0,
+    "broken": 18,
+    "find": 0.8355847163257429,
+    "placed": 0.8043226553454265,
+    "find_words": 2591,
+    "lost_own": 0,
+    "lost_neighbour": 0,
+    "cut_words": 0,
+    "pages_cut": 0
+   },
+   {
+    "arm": "quad",
+    "writer": "slope",
+    "pages": 17,
+    "lines": 441,
+    "passed": 249,
+    "rate": 0.564625850340136,
+    "delta": -0.24943310657596374,
+    "ci": [
+     -0.3387888707037643,
+     -0.026615969581749055
+    ],
+    "cut_lines": 4,
+    "broken": 92,
+    "find": 0.8359314107560405,
+    "placed": 0.8043647700701481,
+    "find_words": 2566,
+    "lost_own": 4,
+    "lost_neighbour": 21,
+    "cut_words": 11,
+    "pages_cut": 5
+   },
+   {
+    "arm": "uvdoc",
+    "writer": "slope",
+    "pages": 17,
+    "lines": 441,
+    "passed": 276,
+    "rate": 0.6258503401360545,
+    "delta": -0.1882086167800453,
+    "ci": [
+     -0.2592592592592592,
+     -0.06713780918727918
+    ],
+    "cut_lines": 71,
+    "broken": 15,
+    "find": 0.8432410423452769,
+    "placed": 0.8131107491856677,
+    "find_words": 2456,
+    "lost_own": 49,
+    "lost_neighbour": 24,
+    "cut_words": 133,
+    "pages_cut": 14
+   }
+  ],
+  "level (|angle| < 1\u00b0)": [
+   {
+    "arm": "raw",
+    "writer": "lab",
+    "pages": 41,
+    "lines": 1241,
+    "passed": 1038,
+    "rate": 0.8364222401289283,
+    "delta": null,
+    "ci": null,
+    "cut_lines": 0,
+    "broken": 44,
+    "find": 0.8708524027459954,
+    "placed": 0.8409610983981693,
+    "find_words": 6992,
+    "lost_own": 0,
+    "lost_neighbour": 0,
+    "cut_words": 0,
+    "pages_cut": 0
+   },
+   {
+    "arm": "deskew",
+    "writer": "lab",
+    "pages": 41,
+    "lines": 1241,
+    "passed": 1042,
+    "rate": 0.8396454472199839,
+    "delta": 0.003223207091055613,
+    "ci": [
+     0.0,
+     0.007366482504604144
+    ],
+    "cut_lines": 0,
+    "broken": 41,
+    "find": 0.8708524027459954,
+    "placed": 0.8416762013729977,
+    "find_words": 6992,
+    "lost_own": 0,
+    "lost_neighbour": 0,
+    "cut_words": 0,
+    "pages_cut": 0
+   },
+   {
+    "arm": "quad",
+    "writer": "lab",
+    "pages": 41,
+    "lines": 1241,
+    "passed": 968,
+    "rate": 0.7800161160354553,
+    "delta": -0.05640612409347301,
+    "ci": [
+     -0.11187019641332197,
+     -0.0075125208681134925
+    ],
+    "cut_lines": 35,
+    "broken": 80,
+    "find": 0.8722206179613052,
+    "placed": 0.8365578977764944,
+    "find_words": 6926,
+    "lost_own": 10,
+    "lost_neighbour": 3,
+    "cut_words": 98,
+    "pages_cut": 7
+   },
+   {
+    "arm": "uvdoc",
+    "writer": "lab",
+    "pages": 41,
+    "lines": 1241,
+    "passed": 935,
+    "rate": 0.7534246575342466,
+    "delta": -0.08299758259468171,
+    "ci": [
+     -0.14106844741235391,
+     -0.040030211480362565
+    ],
+    "cut_lines": 128,
+    "broken": 43,
+    "find": 0.8804364071140338,
+    "placed": 0.8523389627858318,
+    "find_words": 6691,
+    "lost_own": 240,
+    "lost_neighbour": 3,
+    "cut_words": 228,
+    "pages_cut": 24
+   },
+   {
+    "arm": "raw",
+    "writer": "level",
+    "pages": 41,
+    "lines": 1241,
+    "passed": 919,
+    "rate": 0.7405318291700241,
+    "delta": -0.09589041095890416,
+    "ci": [
+     -0.1329225352112675,
+     -0.05933682373472948
+    ],
+    "cut_lines": 0,
+    "broken": 42,
+    "find": 0.8708524027459954,
+    "placed": 0.8442505720823799,
+    "find_words": 6992,
+    "lost_own": 0,
+    "lost_neighbour": 0,
+    "cut_words": 0,
+    "pages_cut": 0
+   },
+   {
+    "arm": "raw",
+    "writer": "slope",
+    "pages": 41,
+    "lines": 1241,
+    "passed": 953,
+    "rate": 0.7679290894439967,
+    "delta": -0.06849315068493156,
+    "ci": [
+     -0.09375,
+     -0.04370629370629375
+    ],
+    "cut_lines": 0,
+    "broken": 68,
+    "find": 0.8699942791762014,
+    "placed": 0.8413901601830663,
+    "find_words": 6992,
+    "lost_own": 0,
+    "lost_neighbour": 0,
+    "cut_words": 0,
+    "pages_cut": 0
+   },
+   {
+    "arm": "deskew",
+    "writer": "slope",
+    "pages": 41,
+    "lines": 1241,
+    "passed": 966,
+    "rate": 0.7784045124899275,
+    "delta": -0.058017727639000816,
+    "ci": [
+     -0.08437935843793587,
+     -0.033302497687326515
+    ],
+    "cut_lines": 0,
+    "broken": 61,
+    "find": 0.8699942791762014,
+    "placed": 0.8413901601830663,
+    "find_words": 6992,
+    "lost_own": 0,
+    "lost_neighbour": 0,
+    "cut_words": 0,
+    "pages_cut": 0
+   },
+   {
+    "arm": "quad",
+    "writer": "slope",
+    "pages": 41,
+    "lines": 1241,
+    "passed": 901,
+    "rate": 0.726027397260274,
+    "delta": -0.11039484286865431,
+    "ci": [
+     -0.17775831873905434,
+     -0.051444043321299704
+    ],
+    "cut_lines": 35,
+    "broken": 94,
+    "find": 0.8713543170661276,
+    "placed": 0.8450765232457407,
+    "find_words": 6926,
+    "lost_own": 10,
+    "lost_neighbour": 3,
+    "cut_words": 98,
+    "pages_cut": 7
+   },
+   {
+    "arm": "uvdoc",
+    "writer": "slope",
+    "pages": 41,
+    "lines": 1241,
+    "passed": 863,
+    "rate": 0.6954069298952458,
+    "delta": -0.14101531023368252,
+    "ci": [
+     -0.20617620345140775,
+     -0.08784258608573436
+    ],
+    "cut_lines": 128,
+    "broken": 79,
+    "find": 0.879539680167389,
+    "placed": 0.8544313256613362,
+    "find_words": 6691,
+    "lost_own": 240,
+    "lost_neighbour": 3,
+    "cut_words": 228,
+    "pages_cut": 24
+   }
+  ],
+  "perspective (angle range \u2265 1\u00b0)": [
+   {
+    "arm": "raw",
+    "writer": "lab",
+    "pages": 29,
+    "lines": 534,
+    "passed": 380,
+    "rate": 0.7116104868913857,
+    "delta": null,
+    "ci": null,
+    "cut_lines": 0,
+    "broken": 45,
+    "find": 0.7637540453074434,
+    "placed": 0.7199176228302442,
+    "find_words": 3399,
+    "lost_own": 0,
+    "lost_neighbour": 0,
+    "cut_words": 0,
+    "pages_cut": 0
+   },
+   {
+    "arm": "deskew",
+    "writer": "lab",
+    "pages": 29,
+    "lines": 534,
+    "passed": 409,
+    "rate": 0.7659176029962547,
+    "delta": 0.054307116104868935,
+    "ci": [
+     0.019607843137254943,
+     0.09956709956709953
+    ],
+    "cut_lines": 0,
+    "broken": 32,
+    "find": 0.7637540453074434,
+    "placed": 0.7249190938511327,
+    "find_words": 3399,
+    "lost_own": 0,
+    "lost_neighbour": 0,
+    "cut_words": 0,
+    "pages_cut": 0
+   },
+   {
+    "arm": "quad",
+    "writer": "lab",
+    "pages": 29,
+    "lines": 534,
+    "passed": 353,
+    "rate": 0.6610486891385767,
+    "delta": -0.050561797752809,
+    "ci": [
+     -0.13314447592067985,
+     0.025862068965517238
+    ],
+    "cut_lines": 26,
+    "broken": 70,
+    "find": 0.761989871909443,
+    "placed": 0.709562109025916,
+    "find_words": 3357,
+    "lost_own": 9,
+    "lost_neighbour": 7,
+    "cut_words": 56,
+    "pages_cut": 7
+   },
+   {
+    "arm": "uvdoc",
+    "writer": "lab",
+    "pages": 29,
+    "lines": 534,
+    "passed": 351,
+    "rate": 0.6573033707865169,
+    "delta": -0.054307116104868824,
+    "ci": [
+     -0.12631578947368416,
+     0.022831050228310446
+    ],
+    "cut_lines": 95,
+    "broken": 21,
+    "find": 0.7691582914572864,
+    "placed": 0.7320979899497487,
+    "find_words": 3184,
+    "lost_own": 129,
+    "lost_neighbour": 10,
+    "cut_words": 201,
+    "pages_cut": 21
+   },
+   {
+    "arm": "raw",
+    "writer": "level",
+    "pages": 29,
+    "lines": 534,
+    "passed": 292,
+    "rate": 0.5468164794007491,
+    "delta": -0.16479400749063666,
+    "ci": [
+     -0.21850393700787396,
+     -0.11631419939577037
+    ],
+    "cut_lines": 0,
+    "broken": 31,
+    "find": 0.7637540453074434,
+    "placed": 0.7319799941159164,
+    "find_words": 3399,
+    "lost_own": 0,
+    "lost_neighbour": 0,
+    "cut_words": 0,
+    "pages_cut": 0
+   },
+   {
+    "arm": "raw",
+    "writer": "slope",
+    "pages": 29,
+    "lines": 534,
+    "passed": 337,
+    "rate": 0.6310861423220974,
+    "delta": -0.08052434456928836,
+    "ci": [
+     -0.11415525114155256,
+     -0.041269841269841234
+    ],
+    "cut_lines": 0,
+    "broken": 60,
+    "find": 0.7637540453074434,
+    "placed": 0.725213298028832,
+    "find_words": 3399,
+    "lost_own": 0,
+    "lost_neighbour": 0,
+    "cut_words": 0,
+    "pages_cut": 0
+   },
+   {
+    "arm": "deskew",
+    "writer": "slope",
+    "pages": 29,
+    "lines": 534,
+    "passed": 360,
+    "rate": 0.6741573033707865,
+    "delta": -0.03745318352059923,
+    "ci": [
+     -0.08718861209964412,
+     0.017817371937639215
+    ],
+    "cut_lines": 0,
+    "broken": 49,
+    "find": 0.7637540453074434,
+    "placed": 0.7258017063842307,
+    "find_words": 3399,
+    "lost_own": 0,
+    "lost_neighbour": 0,
+    "cut_words": 0,
+    "pages_cut": 0
+   },
+   {
+    "arm": "quad",
+    "writer": "slope",
+    "pages": 29,
+    "lines": 534,
+    "passed": 322,
+    "rate": 0.602996254681648,
+    "delta": -0.10861423220973776,
+    "ci": [
+     -0.1966386554621849,
+     -0.0311284046692607
+    ],
+    "cut_lines": 26,
+    "broken": 85,
+    "find": 0.761989871909443,
+    "placed": 0.7265415549597856,
+    "find_words": 3357,
+    "lost_own": 9,
+    "lost_neighbour": 7,
+    "cut_words": 56,
+    "pages_cut": 7
+   },
+   {
+    "arm": "uvdoc",
+    "writer": "slope",
+    "pages": 29,
+    "lines": 534,
+    "passed": 317,
+    "rate": 0.5936329588014981,
+    "delta": -0.1179775280898876,
+    "ci": [
+     -0.1976351351351351,
+     -0.037280701754386025
+    ],
+    "cut_lines": 95,
+    "broken": 36,
+    "find": 0.7694723618090452,
+    "placed": 0.7346105527638191,
+    "find_words": 3184,
+    "lost_own": 129,
+    "lost_neighbour": 10,
+    "cut_words": 201,
+    "pages_cut": 21
+   }
+  ],
+  "curled (UVDoc bend \u2265 median 7.9 px)": [
+   {
+    "arm": "raw",
+    "writer": "lab",
+    "pages": 29,
+    "lines": 449,
+    "passed": 310,
+    "rate": 0.6904231625835189,
+    "delta": null,
+    "ci": null,
+    "cut_lines": 0,
+    "broken": 47,
+    "find": 0.7051005747126436,
+    "placed": 0.6548132183908046,
+    "find_words": 2784,
+    "lost_own": 0,
+    "lost_neighbour": 0,
+    "cut_words": 0,
+    "pages_cut": 0
+   },
+   {
+    "arm": "deskew",
+    "writer": "lab",
+    "pages": 29,
+    "lines": 449,
+    "passed": 333,
+    "rate": 0.7416481069042317,
+    "delta": 0.051224944320712784,
+    "ci": [
+     0.01630434782608703,
+     0.10158730158730156
+    ],
+    "cut_lines": 0,
+    "broken": 35,
+    "find": 0.7051005747126436,
+    "placed": 0.6591235632183908,
+    "find_words": 2784,
+    "lost_own": 0,
+    "lost_neighbour": 0,
+    "cut_words": 0,
+    "pages_cut": 0
+   },
+   {
+    "arm": "quad",
+    "writer": "lab",
+    "pages": 29,
+    "lines": 449,
+    "passed": 275,
+    "rate": 0.6124721603563474,
+    "delta": -0.07795100222717144,
+    "ci": [
+     -0.16707021791767557,
+     0.019607843137254943
+    ],
+    "cut_lines": 33,
+    "broken": 74,
+    "find": 0.7011704462326261,
+    "placed": 0.6404535479151426,
+    "find_words": 2734,
+    "lost_own": 13,
+    "lost_neighbour": 20,
+    "cut_words": 57,
+    "pages_cut": 8
+   },
+   {
+    "arm": "uvdoc",
+    "writer": "lab",
+    "pages": 29,
+    "lines": 449,
+    "passed": 258,
+    "rate": 0.5746102449888641,
+    "delta": -0.11581291759465473,
+    "ci": [
+     -0.24292452830188682,
+     -0.0078125
+    ],
+    "cut_lines": 104,
+    "broken": 26,
+    "find": 0.7090483619344774,
+    "placed": 0.6669266770670826,
+    "find_words": 2564,
+    "lost_own": 142,
+    "lost_neighbour": 22,
+    "cut_words": 201,
+    "pages_cut": 22
+   },
+   {
+    "arm": "raw",
+    "writer": "level",
+    "pages": 29,
+    "lines": 449,
+    "passed": 247,
+    "rate": 0.5501113585746102,
+    "delta": -0.14031180400890864,
+    "ci": [
+     -0.20050125313283207,
+     -0.08446866485013627
+    ],
+    "cut_lines": 0,
+    "broken": 34,
+    "find": 0.7051005747126436,
+    "placed": 0.6670258620689655,
+    "find_words": 2784,
+    "lost_own": 0,
+    "lost_neighbour": 0,
+    "cut_words": 0,
+    "pages_cut": 0
+   },
+   {
+    "arm": "raw",
+    "writer": "slope",
+    "pages": 29,
+    "lines": 449,
+    "passed": 273,
+    "rate": 0.6080178173719376,
+    "delta": -0.08240534521158127,
+    "ci": [
+     -0.1214392803598201,
+     -0.03550295857988173
+    ],
+    "cut_lines": 0,
+    "broken": 60,
+    "find": 0.704382183908046,
+    "placed": 0.6605603448275862,
+    "find_words": 2784,
+    "lost_own": 0,
+    "lost_neighbour": 0,
+    "cut_words": 0,
+    "pages_cut": 0
+   },
+   {
+    "arm": "deskew",
+    "writer": "slope",
+    "pages": 29,
+    "lines": 449,
+    "passed": 294,
+    "rate": 0.6547884187082406,
+    "delta": -0.03563474387527832,
+    "ci": [
+     -0.09272727272727271,
+     0.02977667493796532
+    ],
+    "cut_lines": 0,
+    "broken": 51,
+    "find": 0.704382183908046,
+    "placed": 0.6605603448275862,
+    "find_words": 2784,
+    "lost_own": 0,
+    "lost_neighbour": 0,
+    "cut_words": 0,
+    "pages_cut": 0
+   },
+   {
+    "arm": "quad",
+    "writer": "slope",
+    "pages": 29,
+    "lines": 449,
+    "passed": 247,
+    "rate": 0.5501113585746102,
+    "delta": -0.14031180400890864,
+    "ci": [
+     -0.22474747474747475,
+     -0.046798029556650245
+    ],
+    "cut_lines": 33,
+    "broken": 83,
+    "find": 0.7011704462326261,
+    "placed": 0.660936356986101,
+    "find_words": 2734,
+    "lost_own": 13,
+    "lost_neighbour": 20,
+    "cut_words": 57,
+    "pages_cut": 8
+   },
+   {
+    "arm": "uvdoc",
+    "writer": "slope",
+    "pages": 29,
+    "lines": 449,
+    "passed": 235,
+    "rate": 0.5233853006681515,
+    "delta": -0.1670378619153674,
+    "ci": [
+     -0.2946428571428571,
+     -0.052757793764988015
+    ],
+    "cut_lines": 104,
+    "broken": 40,
+    "find": 0.7090483619344774,
+    "placed": 0.672386895475819,
+    "find_words": 2564,
+    "lost_own": 142,
+    "lost_neighbour": 22,
+    "cut_words": 201,
+    "pages_cut": 22
+   }
+  ],
+  "originals": [
+   {
+    "arm": "raw",
+    "writer": "lab",
+    "pages": 42,
+    "lines": 995,
+    "passed": 795,
+    "rate": 0.7989949748743719,
+    "delta": null,
+    "ci": null,
+    "cut_lines": 0,
+    "broken": 53,
+    "find": 0.832886805090422,
+    "placed": 0.7972203616878768,
+    "find_words": 5972,
+    "lost_own": 0,
+    "lost_neighbour": 0,
+    "cut_words": 0,
+    "pages_cut": 0
+   },
+   {
+    "arm": "deskew",
+    "writer": "lab",
+    "pages": 42,
+    "lines": 995,
+    "passed": 823,
+    "rate": 0.8271356783919598,
+    "delta": 0.028140703517587906,
+    "ci": [
+     0.008998875140607487,
+     0.0567200986436498
+    ],
+    "cut_lines": 0,
+    "broken": 43,
+    "find": 0.832886805090422,
+    "placed": 0.8000669792364367,
+    "find_words": 5972,
+    "lost_own": 0,
+    "lost_neighbour": 0,
+    "cut_words": 0,
+    "pages_cut": 0
+   },
+   {
+    "arm": "quad",
+    "writer": "lab",
+    "pages": 42,
+    "lines": 995,
+    "passed": 733,
+    "rate": 0.7366834170854272,
+    "delta": -0.062311557788944705,
+    "ci": [
+     -0.11869918699186988,
+     -0.00216216216216214
+    ],
+    "cut_lines": 36,
+    "broken": 106,
+    "find": 0.8327124957670166,
+    "placed": 0.793599729089062,
+    "find_words": 5906,
+    "lost_own": 14,
+    "lost_neighbour": 24,
+    "cut_words": 72,
+    "pages_cut": 11
+   },
+   {
+    "arm": "uvdoc",
+    "writer": "lab",
+    "pages": 42,
+    "lines": 995,
+    "passed": 683,
+    "rate": 0.6864321608040201,
+    "delta": -0.11256281407035174,
+    "ci": [
+     -0.1827133479212254,
+     -0.0423634336677815
+    ],
+    "cut_lines": 163,
+    "broken": 44,
+    "find": 0.8395976707252515,
+    "placed": 0.8094229751191107,
+    "find_words": 5667,
+    "lost_own": 164,
+    "lost_neighbour": 27,
+    "cut_words": 276,
+    "pages_cut": 29
+   },
+   {
+    "arm": "raw",
+    "writer": "level",
+    "pages": 42,
+    "lines": 995,
+    "passed": 509,
+    "rate": 0.5115577889447236,
+    "delta": -0.2874371859296483,
+    "ci": [
+     -0.4175715695952616,
+     -0.14713896457765663
+    ],
+    "cut_lines": 0,
+    "broken": 114,
+    "find": 0.832886805090422,
+    "placed": 0.8044206296048225,
+    "find_words": 5972,
+    "lost_own": 0,
+    "lost_neighbour": 0,
+    "cut_words": 0,
+    "pages_cut": 0
+   },
+   {
+    "arm": "raw",
+    "writer": "slope",
+    "pages": 42,
+    "lines": 995,
+    "passed": 676,
+    "rate": 0.6793969849246231,
+    "delta": -0.1195979899497488,
+    "ci": [
+     -0.1830726770929163,
+     -0.059435364041604766
+    ],
+    "cut_lines": 0,
+    "broken": 98,
+    "find": 0.8325519089082385,
+    "placed": 0.7982250502344274,
+    "find_words": 5972,
+    "lost_own": 0,
+    "lost_neighbour": 0,
+    "cut_words": 0,
+    "pages_cut": 0
+   },
+   {
+    "arm": "deskew",
+    "writer": "slope",
+    "pages": 42,
+    "lines": 995,
+    "passed": 757,
+    "rate": 0.7608040201005025,
+    "delta": -0.03819095477386936,
+    "ci": [
+     -0.07010710808179166,
+     -0.0032679738562091387
+    ],
+    "cut_lines": 0,
+    "broken": 67,
+    "find": 0.8325519089082385,
+    "placed": 0.8010716677829873,
+    "find_words": 5972,
+    "lost_own": 0,
+    "lost_neighbour": 0,
+    "cut_words": 0,
+    "pages_cut": 0
+   },
+   {
+    "arm": "quad",
+    "writer": "slope",
+    "pages": 42,
+    "lines": 995,
+    "passed": 619,
+    "rate": 0.6221105527638191,
+    "delta": -0.17688442211055277,
+    "ci": [
+     -0.2547906316536551,
+     -0.06896551724137934
+    ],
+    "cut_lines": 36,
+    "broken": 170,
+    "find": 0.8327124957670166,
+    "placed": 0.8025736539112767,
+    "find_words": 5906,
+    "lost_own": 14,
+    "lost_neighbour": 24,
+    "cut_words": 72,
+    "pages_cut": 11
+   },
+   {
+    "arm": "uvdoc",
+    "writer": "slope",
+    "pages": 42,
+    "lines": 995,
+    "passed": 617,
+    "rate": 0.6201005025125628,
+    "delta": -0.1788944723618091,
+    "ci": [
+     -0.2462908011869437,
+     -0.10943775100401598
+    ],
+    "cut_lines": 163,
+    "broken": 67,
+    "find": 0.8397741309334745,
+    "placed": 0.8113640374095642,
+    "find_words": 5667,
+    "lost_own": 164,
+    "lost_neighbour": 27,
+    "cut_words": 276,
+    "pages_cut": 29
+   }
+  ],
+  "PDF images": [
+   {
+    "arm": "raw",
+    "writer": "lab",
+    "pages": 16,
+    "lines": 687,
+    "passed": 602,
+    "rate": 0.87627365356623,
+    "delta": null,
+    "ci": null,
+    "cut_lines": 0,
+    "broken": 6,
+    "find": 0.9088895042924398,
+    "placed": 0.8834117972860703,
+    "find_words": 3611,
+    "lost_own": 0,
+    "lost_neighbour": 0,
+    "cut_words": 0,
+    "pages_cut": 0
+   },
+   {
+    "arm": "deskew",
+    "writer": "lab",
+    "pages": 16,
+    "lines": 687,
+    "passed": 602,
+    "rate": 0.87627365356623,
+    "delta": 0.0,
+    "ci": [
+     0.0,
+     0.0
+    ],
+    "cut_lines": 0,
+    "broken": 6,
+    "find": 0.9088895042924398,
+    "placed": 0.8834117972860703,
+    "find_words": 3611,
+    "lost_own": 0,
+    "lost_neighbour": 0,
+    "cut_words": 0,
+    "pages_cut": 0
+   },
+   {
+    "arm": "quad",
+    "writer": "lab",
+    "pages": 16,
+    "lines": 687,
+    "passed": 562,
+    "rate": 0.8180494905385735,
+    "delta": -0.05822416302765654,
+    "ci": [
+     -0.13607594936708867,
+     -0.004411764705882337
+    ],
+    "cut_lines": 3,
+    "broken": 14,
+    "find": 0.9113218070273285,
+    "placed": 0.8839933073061907,
+    "find_words": 3586,
+    "lost_own": 0,
+    "lost_neighbour": 0,
+    "cut_words": 37,
+    "pages_cut": 1
+   },
+   {
+    "arm": "uvdoc",
+    "writer": "lab",
+    "pages": 16,
+    "lines": 687,
+    "passed": 559,
+    "rate": 0.8136826783114993,
+    "delta": -0.06259097525473067,
+    "ci": [
+     -0.1254416961130742,
+     -0.023376623376623384
+    ],
+    "cut_lines": 36,
+    "broken": 11,
+    "find": 0.9204022988505747,
+    "placed": 0.8959770114942529,
+    "find_words": 3480,
+    "lost_own": 125,
+    "lost_neighbour": 0,
+    "cut_words": 85,
+    "pages_cut": 9
+   },
+   {
+    "arm": "raw",
+    "writer": "level",
+    "pages": 16,
+    "lines": 687,
+    "passed": 566,
+    "rate": 0.8238719068413392,
+    "delta": -0.05240174672489084,
+    "ci": [
+     -0.09576427255985265,
+     -0.02110817941952503
+    ],
+    "cut_lines": 0,
+    "broken": 6,
+    "find": 0.9088895042924398,
+    "placed": 0.8834117972860703,
+    "find_words": 3611,
+    "lost_own": 0,
+    "lost_neighbour": 0,
+    "cut_words": 0,
+    "pages_cut": 0
+   },
+   {
+    "arm": "raw",
+    "writer": "slope",
+    "pages": 16,
+    "lines": 687,
+    "passed": 566,
+    "rate": 0.8238719068413392,
+    "delta": -0.05240174672489084,
+    "ci": [
+     -0.08407871198568873,
+     -0.024390243902439046
+    ],
+    "cut_lines": 0,
+    "broken": 12,
+    "find": 0.9072279147050678,
+    "placed": 0.8814732761008031,
+    "find_words": 3611,
+    "lost_own": 0,
+    "lost_neighbour": 0,
+    "cut_words": 0,
+    "pages_cut": 0
+   },
+   {
+    "arm": "deskew",
+    "writer": "slope",
+    "pages": 16,
+    "lines": 687,
+    "passed": 566,
+    "rate": 0.8238719068413392,
+    "delta": -0.05240174672489084,
+    "ci": [
+     -0.08460634547591073,
+     -0.024163568773234223
+    ],
+    "cut_lines": 0,
+    "broken": 12,
+    "find": 0.9072279147050678,
+    "placed": 0.8814732761008031,
+    "find_words": 3611,
+    "lost_own": 0,
+    "lost_neighbour": 0,
+    "cut_words": 0,
+    "pages_cut": 0
+   },
+   {
+    "arm": "quad",
+    "writer": "slope",
+    "pages": 16,
+    "lines": 687,
+    "passed": 531,
+    "rate": 0.7729257641921398,
+    "delta": -0.10334788937409023,
+    "ci": [
+     -0.20930232558139528,
+     -0.027072758037224975
+    ],
+    "cut_lines": 3,
+    "broken": 16,
+    "find": 0.9096486335750139,
+    "placed": 0.8859453430005577,
+    "find_words": 3586,
+    "lost_own": 0,
+    "lost_neighbour": 0,
+    "cut_words": 37,
+    "pages_cut": 1
+   },
+   {
+    "arm": "uvdoc",
+    "writer": "slope",
+    "pages": 16,
+    "lines": 687,
+    "passed": 522,
+    "rate": 0.759825327510917,
+    "delta": -0.11644832605531297,
+    "ci": [
+     -0.1962962962962963,
+     -0.054012345679012363
+    ],
+    "cut_lines": 36,
+    "broken": 27,
+    "find": 0.9186781609195402,
+    "placed": 0.8954022988505748,
+    "find_words": 3480,
+    "lost_own": 125,
+    "lost_neighbour": 0,
+    "cut_words": 85,
+    "pages_cut": 9
+   }
+  ]
+ }
+}
