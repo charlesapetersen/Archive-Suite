@@ -1466,8 +1466,20 @@ owner to copy it back to its original path, rather than failing or downloading i
 | `enh-ocr-input/` (`stage`, `weights`, `src`) | 4.3 GB | enhancement arms | after W46.enh-ocr-input-marks and -ppocr |
 | `ent-robust/g17` | 4.0 GB | the G17 entity set | after W46.ent-robust-paid |
 
-Never moved or deleted here: `mlx-hf/` (the one model cache, above; a local model is a product goal) and owner session
-folders. The retired worktrees in `$STATE/retired-worktrees` (the engine's recovery copies, listed in the report) are
+Never moved here: `mlx-hf/` (the one model cache, above) and owner session folders. Owner session folders are never
+deleted either.
+
+**A model with no current plans is deleted** (owner, 2026-10-31). The walkthrough moves a model in `mlx-hf/` to the
+Trash, unasked, when no open item and no app source names it and it can be downloaded again by its repo id (a public
+Hugging Face repo, not one behind a login or a gate). A script that loads a model by default counts as naming it when
+an open item runs that script. A model that is hard to get again stays. Its files in the shared `hub/blobs/` store go
+too, unless a kept model's snapshot also resolves to them, and so do links into it from `~/.cache/huggingface/hub`.
+An item that later needs it downloads it again through `model_store.use()`. The first pass, 2026-10-31, removed
+Qwen3.5 9B, LightOnOCR 3 4B (prithivMLmods MLX), TrOCR Kurrent and three empty stubs (pixtral 12B, nara-lightonocr,
+lightonai LightOnOCR), 13.8 GB. Qwen3.5 4B stayed: the item-field, date and kind scripts of the open W47 items load it
+by default.
+
+The retired worktrees in `$STATE/retired-worktrees` (the engine's recovery copies, listed in the report) are
 not the owner's to clear: the walkthrough moves each to the Trash, unasked, once its item is finished and its
 `refs/agent-manager/recovered` ref exists (owner, 2026-10-31; `~/Claude/CLAUDE.md`, "The walkthrough", step 7).
 Engine sessions leave them alone.
