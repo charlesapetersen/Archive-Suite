@@ -325,6 +325,8 @@ def anchor_score(a_docs, b_docs, rng):
     """The model's (a) anchor figures with a document-bootstrap interval, and with a reference (b, the shipped model)
     the paired difference a - b in pages exact."""
     pages = sum(n for n, _ in a_docs["docs"])
+    if not pages or not a_docs["gaps"]:
+        raise SystemExit("the anchor box has no resolved document or no known gap left to score (every gap unsure?)")
     out = {"pages": pages, "documents": len(a_docs["docs"]),
            "pages_exact": round(100 * sum(n for n, e in a_docs["docs"] if e) / pages, 2),
            "gap_accuracy": round(100 * sum(r for _, r in a_docs["gaps"]) / len(a_docs["gaps"]), 2),
