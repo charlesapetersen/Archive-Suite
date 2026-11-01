@@ -87,6 +87,25 @@ enum LocalAgentTestDriver {
                 check("ocr(garbage): errorCode = cli_bad_response", r.errorCode == "cli_bad_response")
             } catch { check("ocr(garbage) returns a result", false) }
 
+            // 5b. An API key in the app's own environment never reaches `claude` (W40.fix-processor-localagent-api-key):
+            // OCR, text completion and the probe all spawn through the same path.
+            setenv("ANTHROPIC_API_KEY", "sk-test-not-a-key", 1)
+            setenv("ANTHROPIC_AUTH_TOKEN", "test-not-a-token", 1)
+            do {
+                let t = try await client(mode: "envkeys").textCompletion(prompt: "hello")
+                check("textCompletion: no inherited API credential reaches claude", t == "ENV_KEYS=NONE")
+                if t != "ENV_KEYS=NONE" { note("claude saw \(t)") }
+            } catch { check("textCompletion(envkeys) did not throw", false); note("threw \(error)") }
+            do {
+                let r = try await client(mode: "envkeys").ocr(imageURL: imageURL)
+                check("ocr: no inherited API credential reaches claude", r.text?.contains("ENV_KEYS=NONE") == true)
+            } catch { check("ocr(envkeys) did not throw", false); note("threw \(error)") }
+            let codexKeys = try? await LocalAgentClient(config: LocalAgentConfig(tool: .codex, binaryPath: fakeCLI))
+                .textCompletion(prompt: "hello")
+            check("the fake CLI sees the variables when nothing strips them", codexKeys?.hasPrefix("ENV_KEYS=ANTHROPIC_API_KEY") == true)
+            unsetenv("ANTHROPIC_API_KEY")
+            unsetenv("ANTHROPIC_AUTH_TOKEN")
+
             unsetenv("LOCALAGENT_FAKE_MODE")
 
             // 6. Missing binary → not-found (no spawn, no crash).

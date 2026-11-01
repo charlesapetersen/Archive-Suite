@@ -8,6 +8,7 @@
 # by $LOCALAGENT_FAKE_MODE:
 #   ok         (default) success JSON; .result is a valid OCRPrompt-format transcription        exit 0
 #   echostdin  success JSON whose .result reports how many stdin bytes it received               exit 0
+#   envkeys    success JSON whose .result names the API-credential variables it inherited, or NONE    exit 0
 #   garbage    non-JSON stdout (tests the client's bad-response handling)                        exit 0
 #   fail       generic error on stderr                                                          exit 3
 #   notlogged  a "not logged in" error on stderr (client → cli_not_logged_in)                   exit 1
@@ -34,6 +35,13 @@ case "$mode" in
     exit 0 ;;
   echostdin)
     printf '{"result":"STDIN_BYTES=%s"}\n' "$stdin_bytes"
+    exit 0 ;;
+  envkeys)
+    keys=""
+    for v in ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN; do
+        if [ -n "${!v+set}" ]; then keys="$keys${keys:+,}$v"; fi
+    done
+    printf '{"result":"ENV_KEYS=%s"}\n' "${keys:-NONE}"
     exit 0 ;;
   garbage)
     printf 'this is not json at all\n'

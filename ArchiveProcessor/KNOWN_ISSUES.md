@@ -305,12 +305,11 @@ Runtime evidence and the final unattended rerun are under `verification/evidence
 
 ## ⚠️ LIMITATION (W36.seg-opt-subscription, 2026-10-11): the Claude plan route, as built
 
-- **The OCR Local CLI Agent still passes on an inherited `ANTHROPIC_API_KEY`.** The segmentation windows' plan
-  route strips `ANTHROPIC_API_KEY` and `ANTHROPIC_AUTH_TOKEN` from the `claude` child
-  (`LocalAgentWindowTransport.apiCredentialVariables`), so a shell-launched app cannot bill an API key the user did
-  not choose. The OCR path (`LocalAgentClient.ocr/textCompletion/probe`) was left as it was: it is outside this item,
-  and stripping there would change what a user who signs `claude` in by key gets. If a shell exports the key, OCR
-  through the Local CLI Agent bills it, while its cost pane says the subscription covers it.
+- **A `claude` signed in by API key still bills that key.** Every `claude` child the app spawns (OCR, text
+  completion, the probe and the segmentation windows) has `ANTHROPIC_API_KEY` and `ANTHROPIC_AUTH_TOKEN` removed
+  (`LocalAgentClient.claudeAPICredentialVariables`; W40.fix-processor-localagent-api-key, 2026-11-01), so a key
+  exported by the shell that launched the app is never used. A key the CLI stored at its own login is outside the
+  environment and the app cannot see it: the cost pane's "the plan covers it" is then wrong.
 - **The meter is account-wide and whole-percent.** Other use of the account during a run inflates the measured
   share; rule 7 discards a run only when a step jumps by more than the calls explain, or when a window resets.
 - **The ratio is stored unkeyed.** A change of plan shows as a ratio that moves; the median of the last five runs

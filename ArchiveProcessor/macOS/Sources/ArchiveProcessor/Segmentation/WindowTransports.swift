@@ -236,8 +236,8 @@ struct LocalAgentWindowTransport: WindowTransport {
     var gate: PlanRunGate? = nil
 
     /// Inherited from a shell that launched the app, these would make `claude -p` bill an API key, not the plan the
-    /// user chose this route for (and the meter would then read as unreadable).
-    static let apiCredentialVariables = ["ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN"]
+    /// user chose this route for (and the meter would then read as unreadable). The same list the OCR path strips.
+    static let apiCredentialVariables = LocalAgentClient.claudeAPICredentialVariables
 
     static func arguments(model: String) -> [String] {
         ["-p", "--model", model, "--output-format", "stream-json", "--verbose", "--allowedTools", "Read",

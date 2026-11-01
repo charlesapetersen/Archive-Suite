@@ -220,7 +220,8 @@ struct LocalAgentClient: Sendable {
     private static func spawnAndClassify(binary: String, tool: LocalAgentTool, modelOverride: String?,
                                          prompt: String, timeout: TimeInterval) async -> InvokeOutcome {
         let args = cliArguments(tool: tool, modelOverride: modelOverride)
-        let cli = await runAsync(binaryPath: binary, args: args, stdinText: prompt, timeout: timeout)
+        let cli = await runAsync(binaryPath: binary, args: args, stdinText: prompt, timeout: timeout,
+                                 unsetEnvironment: credentialVariables(for: tool))
 
         if cli.cancelled {
             return .failure(code: "cli_cancelled", message: "The \(tool.displayName) CLI request was cancelled.")
@@ -246,6 +247,16 @@ struct LocalAgentClient: Sendable {
                             message: "The \(tool.displayName) CLI returned an unreadable response.")
         }
         return .success(text)
+    }
+
+    /// Inherited from a shell that launched the app, these make `claude -p` bill an API key instead of the
+    /// subscription this backend exists to use, while the cost pane says the plan covers it. Stripped from every
+    /// `claude` child: OCR, text completion, the probe and the segmentation windows (`LocalAgentWindowTransport`).
+    static let claudeAPICredentialVariables = ["ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN"]
+
+    /// The variables removed from `tool`'s environment. `gemini`/`codex` are unverified adapters, left as they were.
+    static func credentialVariables(for tool: LocalAgentTool) -> [String] {
+        tool == .claude ? claudeAPICredentialVariables : []
     }
 
     /// Fixed headless args per tool. Prompt rides on stdin, so it is NOT here.
