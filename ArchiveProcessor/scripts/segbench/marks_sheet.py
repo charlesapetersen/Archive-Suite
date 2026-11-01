@@ -118,17 +118,24 @@ def esc(s):
 
 
 def build(out_dir, routes=None, partial=False):
-    """The core pages' sheet in out_dir. Refuses (SystemExit) when a core page lacks a draft from any route (both
-    families must have drafted it, MRK-1; partial=True only refuses a page with no draft at all, for a trial build
-    that is never offered) or has no image. Images are copied byte for byte (the scan artifact is read-only); nothing on the sheet names a route."""
+    """The core pages' sheet in out_dir. Refuses (SystemExit) when a core page has no usable draft, or when any route
+    has not read it (both families must have tried every page, MRK-1). A route that read a page and failed (output cap,
+    bad JSON) is a measured failure, not a missing draft: the page goes on with the other family's boxes and key.json
+    lists the route under 'failed'. partial=True only refuses a page with no draft at all, for a trial build that is
+    never offered. Also refuses a page with no image. Images are copied byte for byte (the scan artifact is read-only);
+    nothing on the sheet names a route."""
     routes = routes or default_routes()
     out_dir = Path(out_dir)
     rows = [r for r in M.selection()['rows'] if r.get('core')]
-    pages, missing = {}, []
+    pages, missing, failed = {}, [], {}
     for r in rows:
-        got = [(name, inner(f(r['id']))) for name, f in routes.items()]
-        if not (any if partial else all)(d for _, d in got):
+        recs = [(name, f(r['id'])) for name, f in routes.items()]
+        got = [(name, inner(rec)) for name, rec in recs]
+        if not any(d for _, d in got) or (not partial and not all(rec for _, rec in recs)):
             missing.append(r['id'])
+        bad = [name for name, rec in recs if rec and not inner(rec)]
+        if bad:
+            failed[r['id']] = bad
         pages[r['id']] = (r, got)
     if missing:
         raise SystemExit(f'{len(missing)} core pages lack a draft: {missing[:5]}')
@@ -148,7 +155,7 @@ def build(out_dir, routes=None, partial=False):
                          cands=[dict(box=c['box'], cls=c['cls'], texts=c['texts'], overlaps=c['overlaps_print'])
                                 for c in cs]))
         key['pages'][pid] = dict(stratum=r['stratum'], phase=r['phase'], preflag=r.get('amount'),
-                                 drafted=[n for n, d in got if d], candidates=cs)
+                                 drafted=[n for n, d in got if d], failed=failed.get(pid, []), candidates=cs)
     n_c = sum(len(d['cands']) for d in data)
     minutes = len(data) * MINUTES_PER_PAGE
     defs, nots = class_notes()
@@ -160,7 +167,7 @@ def build(out_dir, routes=None, partial=False):
             .replace('__NOTX__', blob(list(NOT_TRANSCRIBED))).replace('__DATA__', blob(data)))
     (out_dir / 'index.html').write_text(html)
     (out_dir / 'key.json').write_text(json.dumps(key, indent=1, ensure_ascii=False) + '\n')
-    return dict(pages=len(data), candidates=n_c, minutes=minutes, out=str(out_dir))
+    return dict(pages=len(data), candidates=n_c, minutes=minutes, failed=failed, out=str(out_dir))
 
 
 SHEET_HTML = r"""<!doctype html><meta charset="utf-8"><title>W46 marks: the core</title>

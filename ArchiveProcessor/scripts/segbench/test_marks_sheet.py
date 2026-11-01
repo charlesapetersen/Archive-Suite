@@ -164,6 +164,15 @@ class Build(unittest.TestCase):
             S.build(self.root / 'sheet')
         self.assertEqual(S.build(self.root / 'sheet', partial=True)['pages'], 4)
 
+    def test_read_but_failed_route_goes_on_recorded(self):
+        # the route read the page and hit its cap: a measured failure, built with the other family's boxes
+        self.drafts['qwen3-vl-8b-mlx4']['Dean-0002'] = {'draft': None, 'problems': ['bad json'], 'finish': 'length'}
+        got = S.build(self.root / 'sheet')
+        self.assertEqual((got['pages'], got['failed']), (4, {'Dean-0002': ['qwen3-vl-8b-mlx4']}))
+        p = json.loads((self.root / 'sheet' / 'key.json').read_text())['pages']['Dean-0002']
+        self.assertEqual((p['drafted'], p['failed']), (['gemini3.7-flash-gw'], ['qwen3-vl-8b-mlx4']))
+        self.assertEqual(json.loads((self.root / 'sheet' / 'key.json').read_text())['pages']['Dean-0001']['failed'], [])
+
     def test_drafts_export(self):
         self.drafts['qwen3-vl-8b-mlx4']['Dean-0005'] = None
         out = self.root / 'drafts'
