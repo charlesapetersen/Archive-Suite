@@ -1453,7 +1453,9 @@ is safe.
 when the disk is short. Only the owner's session moves anything; an engine session names it in the Daemon Report (no
 decision). What has moved is listed in the backup's `MOVED.md` (29 Oct: IIT-CDIP imagetars, reader-sample,
 reader-session-1, the 24 retired worktrees, Vision OCR's model-home, ocrlab and September truth runs; 30 Oct:
-`date-tagging/traceable`, `date-tagging/iitcdip` and `bench-corpus/raw`, 4.2 GB). The walkthrough moves what is
+`date-tagging/traceable`, `date-tagging/iitcdip` and `bench-corpus/raw`, 4.2 GB; 31 Oct: `reader-sample` again, 9.0 GB,
+after W40.fts-snippet-sample-rerun shipped, and from Vision OCR `testdocs` and the engine's `model-files`, 1.8 GB,
+in a `vision-ocr` folder with its own `MOVED-2026-10-31-vision-ocr.md`). The walkthrough moves what is
 movable now (`~/Claude/CLAUDE.md`, "The walkthrough", step 7). Sessions cannot
 read OneDrive (macOS blocks `~/Library/CloudStorage`), so an item that needs a moved folder reports it and asks the
 owner to copy it back to its original path, rather than failing or downloading it again. Sizes 29 Oct; each when nothing open reads it:
