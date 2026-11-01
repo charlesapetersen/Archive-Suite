@@ -25576,7 +25576,7 @@
     "box": "CREST",
     "arm": "base",
     "pages_exact": 0.8828125,
-    "boundary_f1": 0.9841269841269841,
+    "boundary_f1": 0.983050847457627,
     "false_splits": 1,
     "false_merges": 0
    },
@@ -25585,7 +25585,7 @@
     "box": "CREST",
     "arm": "block",
     "pages_exact": 0.8828125,
-    "boundary_f1": 0.9841269841269841,
+    "boundary_f1": 0.983050847457627,
     "false_splits": 1,
     "false_merges": 0
    },
@@ -25594,7 +25594,7 @@
     "box": "Lincoln",
     "arm": "base",
     "pages_exact": 0.36015325670498083,
-    "boundary_f1": 0.7920792079207921,
+    "boundary_f1": 0.7857142857142858,
     "false_splits": 42,
     "false_merges": 0
    },
@@ -25603,7 +25603,7 @@
     "box": "Lincoln",
     "arm": "block",
     "pages_exact": 0.4099616858237548,
-    "boundary_f1": 0.8041237113402062,
+    "boundary_f1": 0.8,
     "false_splits": 37,
     "false_merges": 1
    },
@@ -25648,7 +25648,7 @@
     "box": "CREST",
     "arm": "base",
     "pages_exact": 0.71875,
-    "boundary_f1": 0.9180327868852459,
+    "boundary_f1": 0.9152542372881356,
     "false_splits": 3,
     "false_merges": 2
    },
@@ -25657,7 +25657,7 @@
     "box": "CREST",
     "arm": "block",
     "pages_exact": 0.8125,
-    "boundary_f1": 0.9333333333333333,
+    "boundary_f1": 0.9310344827586207,
     "false_splits": 2,
     "false_merges": 2
    },
@@ -25666,7 +25666,7 @@
     "box": "Lincoln",
     "arm": "base",
     "pages_exact": 0.32950191570881227,
-    "boundary_f1": 0.7684729064039408,
+    "boundary_f1": 0.7638190954773869,
     "false_splits": 46,
     "false_merges": 1
    },
@@ -25675,7 +25675,7 @@
     "box": "Lincoln",
     "arm": "block",
     "pages_exact": 0.36398467432950193,
-    "boundary_f1": 0.7761194029850748,
+    "boundary_f1": 0.7715736040609137,
     "false_splits": 44,
     "false_merges": 1
    },
@@ -26059,210 +26059,210 @@
     "model": "2b",
     "arm": "o0-l1",
     "pages_exact": 0.3716475095785441,
-    "boundary_f1": 0.77
+    "boundary_f1": 0.7653061224489796
    },
    {
     "pool": "lincoln",
     "model": "2b",
     "arm": "o0-w1",
     "pages_exact": 0.4329501915708812,
-    "boundary_f1": 0.7999999999999999
+    "boundary_f1": 0.7978142076502732
    },
    {
     "pool": "lincoln",
     "model": "2b",
     "arm": "o1-l1",
     "pages_exact": 0.3371647509578544,
-    "boundary_f1": 0.7692307692307693
+    "boundary_f1": 0.7623762376237623
    },
    {
     "pool": "lincoln",
     "model": "2b",
     "arm": "o1-w1",
     "pages_exact": 0.5134099616858238,
-    "boundary_f1": 0.8144329896907218
+    "boundary_f1": 0.8085106382978723
    },
    {
     "pool": "lincoln",
     "model": "2b",
     "arm": "o2-l1",
     "pages_exact": 0.3448275862068966,
-    "boundary_f1": 0.7783251231527093
+    "boundary_f1": 0.7715736040609137
    },
    {
     "pool": "lincoln",
     "model": "2b",
     "arm": "o2-w1",
     "pages_exact": 0.49808429118773945,
-    "boundary_f1": 0.8062827225130891
+    "boundary_f1": 0.802139037433155
    },
    {
     "pool": "lincoln",
     "model": "2b",
     "arm": "mean-of-singles",
     "pages_exact": 0.4163473818646233,
-    "boundary_f1": 0.7897119340978817
+    "boundary_f1": 0.784619974585826
    },
    {
     "pool": "lincoln",
     "model": "2b",
     "arm": "vote6",
     "pages_exact": 0.4827586206896552,
-    "boundary_f1": 0.7897435897435898
+    "boundary_f1": 0.7853403141361257
    },
    {
     "pool": "lincoln",
     "model": "2b",
     "arm": "vote-offsets-l1",
     "pages_exact": 0.3716475095785441,
-    "boundary_f1": 0.7745098039215687
+    "boundary_f1": 0.7676767676767676
    },
    {
     "pool": "lincoln",
     "model": "2b",
     "arm": "vote-prompts-o0",
     "pages_exact": 0.46360153256704983,
-    "boundary_f1": 0.7894736842105262
+    "boundary_f1": 0.7872340425531914
    },
    {
     "pool": "lincoln",
     "model": "4b",
     "arm": "o0-l1",
     "pages_exact": 0.524904214559387,
-    "boundary_f1": 0.8404255319148937
+    "boundary_f1": 0.8369565217391304
    },
    {
     "pool": "lincoln",
     "model": "4b",
     "arm": "o0-w1",
     "pages_exact": 0.5095785440613027,
-    "boundary_f1": 0.8421052631578948
+    "boundary_f1": 0.8369565217391304
    },
    {
     "pool": "lincoln",
     "model": "4b",
     "arm": "o1-l1",
     "pages_exact": 0.5057471264367817,
-    "boundary_f1": 0.8210526315789474
+    "boundary_f1": 0.8172043010752688
    },
    {
     "pool": "lincoln",
     "model": "4b",
     "arm": "o1-w1",
     "pages_exact": 0.46360153256704983,
-    "boundary_f1": 0.8272251308900525
+    "boundary_f1": 0.8235294117647058
    },
    {
     "pool": "lincoln",
     "model": "4b",
     "arm": "o2-l1",
     "pages_exact": 0.49808429118773945,
-    "boundary_f1": 0.8121827411167513
+    "boundary_f1": 0.806282722513089
    },
    {
     "pool": "lincoln",
     "model": "4b",
     "arm": "o2-w1",
     "pages_exact": 0.47126436781609193,
-    "boundary_f1": 0.8205128205128205
+    "boundary_f1": 0.8148148148148148
    },
    {
     "pool": "lincoln",
     "model": "4b",
     "arm": "mean-of-singles",
     "pages_exact": 0.49553001277139214,
-    "boundary_f1": 0.82725068652856
+    "boundary_f1": 0.8226240489410231
    },
    {
     "pool": "lincoln",
     "model": "4b",
     "arm": "vote6",
     "pages_exact": 0.5440613026819924,
-    "boundary_f1": 0.8421052631578948
+    "boundary_f1": 0.8369565217391304
    },
    {
     "pool": "lincoln",
     "model": "4b",
     "arm": "vote-offsets-l1",
     "pages_exact": 0.5402298850574713,
-    "boundary_f1": 0.8290155440414507
+    "boundary_f1": 0.8235294117647058
    },
    {
     "pool": "lincoln",
     "model": "4b",
     "arm": "vote-prompts-o0",
     "pages_exact": 0.6091954022988506,
-    "boundary_f1": 0.8556149732620321
+    "boundary_f1": 0.850828729281768
    },
    {
     "pool": "lincoln",
     "model": "teacher",
     "arm": "o0-l1",
     "pages_exact": 0.41762452107279696,
-    "boundary_f1": 0.8
+    "boundary_f1": 0.7938144329896908
    },
    {
     "pool": "lincoln",
     "model": "teacher",
     "arm": "o0-w1",
     "pages_exact": 0.4904214559386973,
-    "boundary_f1": 0.8247422680412371
+    "boundary_f1": 0.8191489361702128
    },
    {
     "pool": "lincoln",
     "model": "teacher",
     "arm": "o1-l1",
     "pages_exact": 0.39846743295019155,
-    "boundary_f1": 0.7881773399014779
+    "boundary_f1": 0.7817258883248732
    },
    {
     "pool": "lincoln",
     "model": "teacher",
     "arm": "o1-w1",
     "pages_exact": 0.46360153256704983,
-    "boundary_f1": 0.8163265306122449
+    "boundary_f1": 0.8105263157894737
    },
    {
     "pool": "lincoln",
     "model": "teacher",
     "arm": "o2-l1",
     "pages_exact": 0.41762452107279696,
-    "boundary_f1": 0.79
+    "boundary_f1": 0.7857142857142858
    },
    {
     "pool": "lincoln",
     "model": "teacher",
     "arm": "o2-w1",
     "pages_exact": 0.4559386973180077,
-    "boundary_f1": 0.8121827411167513
+    "boundary_f1": 0.806282722513089
    },
    {
     "pool": "lincoln",
     "model": "teacher",
     "arm": "mean-of-singles",
     "pages_exact": 0.44061302681992337,
-    "boundary_f1": 0.8052381466119519
+    "boundary_f1": 0.799535430250271
    },
    {
     "pool": "lincoln",
     "model": "teacher",
     "arm": "vote6",
     "pages_exact": 0.44061302681992337,
-    "boundary_f1": 0.8040201005025126
+    "boundary_f1": 0.7979274611398964
    },
    {
     "pool": "lincoln",
     "model": "teacher",
     "arm": "vote-offsets-l1",
     "pages_exact": 0.40229885057471265,
-    "boundary_f1": 0.7920792079207921
+    "boundary_f1": 0.7857142857142858
    },
    {
     "pool": "lincoln",
     "model": "teacher",
     "arm": "vote-prompts-o0",
     "pages_exact": 0.4904214559386973,
-    "boundary_f1": 0.8247422680412371
+    "boundary_f1": 0.8191489361702128
    }
   ],
   "incomplete": [
