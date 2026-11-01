@@ -595,7 +595,8 @@ def cmd_train(a):
                            'train', '-f', 'page', '-i', str(base),
                            '--resize', 'union', '--optimizer', 'AdamW', '--schedule', 'constant', '--warmup', '0', '-r', str(LRATE),
                            '-B', str(BATCH_LINES), '-t', str(d / 'train.txt'), '-e', str(d / 'val.txt'), '-q', 'early',
-                           '--min-epochs', str(MIN_EPOCHS), '--lag', str(LAG), '-N', str(MAX_EPOCHS),
+                           '--min-epochs', str(min(MIN_EPOCHS, epochs(pl['n']))), '--lag', str(LAG),
+                           '-N', str(epochs(pl['n'])),
                            '-o', str(d / 'model')], log, name, 'train', cap=TRAIN_CAP_GB, out=d / 'ketos.log')
         secs = row['seconds']
         if row['rc']:
@@ -609,6 +610,13 @@ def cmd_train(a):
 
 
 MIN_EPOCHS, LAG, MAX_EPOCHS = 10, 5, 25
+LINE_STEPS = 1500   # at batch 1 an epoch is one step a line: a larger set gets fewer epochs (80: 18, 160: 9, 240: 6)
+
+
+def epochs(n):
+    """The most epochs a training of n lines runs (CPU time is the limit: about 2.4 s a line-step beside a second
+    training on 2026-11-01, so 240 lines at 25 epochs would take four hours)."""
+    return max(6, min(MAX_EPOCHS, LINE_STEPS // n))
 # Fine-tuning a few dozen lines: the PP-OCRv6 config's defaults (cosine over 100 epochs, 1,000 warmup steps,
 # batch 64) are for training from scratch, and its cosine schedule cannot run under early stopping.
 # Batch 1: PP-OCRv6 lines are 128 px high and it has an NRTR head; a batch of 8 Blackwell lines passed 8.8 GB of
