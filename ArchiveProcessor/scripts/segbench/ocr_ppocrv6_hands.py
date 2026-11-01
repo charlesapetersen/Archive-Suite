@@ -597,7 +597,7 @@ def cmd_train(a):
                            '-B', str(BATCH_LINES), '-t', str(d / 'train.txt'), '-e', str(d / 'val.txt'), '-q', 'early',
                            '--min-epochs', str(min(MIN_EPOCHS, epochs(pl['n']))), '--lag', str(LAG),
                            '-N', str(epochs(pl['n'])),
-                           '-o', str(d / 'model')], log, name, 'train', cap=TRAIN_CAP_GB, out=d / 'ketos.log',
+                           '-o', str(d / 'model')], log, name, 'train', cap=TRAIN_CAP_GB if pl['device'] == 'cpu' else MPS_CAP_GB, out=d / 'ketos.log',
                           env={**os.environ, 'TORCHDYNAMO_DISABLE': '1'} if pl['device'] == 'mps' else None)
         secs = row['seconds']
         if row['rc']:
@@ -632,6 +632,7 @@ TRAIN_PRECISION = os.environ.get('PPOCRV6_PRECISION', '32-true')
 # AdamW, not the config's AdamW+Muon: Muon's Newton-Schulz step runs in bfloat16, which has no fast CPU kernel, and
 # took 97% of a CPU training's time on one core (sampled 2026-11-01).
 # --workers 0: ketos's DataLoader worker is a fork of the trainer, and the memory guard charges its shared pages again.
+MPS_CAP_GB = 8.     # Metal buffers count in the footprint: the MPS training passed 5 GB in its third epoch; it runs alone
 TRAIN_CAP_GB = 5.   # a batch-1 training peaks at 2.9-3.6 GB. Two CPU trainings side by side each ran
                     # about 4x slower (2026-11-01), so CPU trainings run one at a time; the MPS one beside them
 
@@ -786,7 +787,9 @@ def cmd_report(_):
             base.append(100 * S.score(t, page_text(hand_dir(pl['hand']) / 'base' / f'{pg}.xml'))['nes'])
         if tuned:
             pd = S.paired(tuned, base)
+            stages = re.findall(r'stage (\d+)/', (d / 'ketos.log').read_text(errors='replace'))
             tunes.append({'name': name, 'hand': pl['hand'], 'n': pl['n'], 'device': pl['device'],
+                          'epochs': max(map(int, stages)) + 1 if stages else None,
                           'minutes': round(done['seconds'] / 60, 1), 'peak_gb': done.get('peak_gb'),
                           'pages': len(tuned), 'tuned': sum(tuned) / len(tuned), 'base': sum(base) / len(base),
                           'delta': pd['delta'], 'lo': pd['lo'], 'hi': pd['hi']})
@@ -808,8 +811,53 @@ def cmd_report(_):
     print(f'{RESULTS / "ocr-ppocrv6-hands.md"}: {len(pub)} public routes, {len(own)} owner routes, {len(tunes)} tunes')
 
 
+def per_epoch(t):
+    return round(t['minutes'] * 60 / t['epochs']) if t.get('epochs') else '?'
+
+
 def f1(x):
     return '' if x is None else f'{x:.1f}'
+
+
+def verdict(o):
+    """The answer in a few lines, its figures read from `o`."""
+    pub = {r['route']: r for r in o['public']}
+    own = o['owner_hand']
+    pp = o['public_pairs']
+    b, v, lo = pub.get('ppocrv6-kraken-blla'), pub.get('ppocrv6-kraken-vision'), pub.get('lightonocr3-4b')
+    if not (b and v and lo):
+        return []
+    d = lambda k: pp.get(k, {})   # noqa: E731
+    iv = lambda x: f'{x["delta"]:+.1f} ({x["lo"]:+.1f} to {x["hi"]:+.1f})' if x else '?'   # noqa: E731
+    bw = sorted((t for t in o['tunes'] if t['hand'] == 'blackwell'), key=lambda t: (t['n'], t['device']))
+    ow = [t for t in o['tunes'] if t['hand'] == 'owner']
+    L = ['## Verdict', '',
+         f'- **On blla lines kraken PP-OCRv6 is the best line recogniser measured here, and not the laptop handwriting pick.** '
+         f'{b["nes"]:.1f} on the public L1-L3 against {pub.get("ppocrv6-medium", {}).get("nes", 0):.1f} for the '
+         f'native PaddleOCR PP-OCRv6 pipeline ({iv(d("ppocrv6-kraken-blla vs ppocrv6-medium"))}) and '
+         f'{pub.get("apple-vision (lines)", {}).get("nes", 0):.1f} for Apple Vision\'s own text of its lines, but '
+         f'{iv(d("ppocrv6-kraken-blla vs lightonocr3-4b"))} behind LightOnOCR-3 4B ({lo["nes"]:.1f}). On the owner\'s '
+         f'{o["sets"]["owner_hand"]} handwritten pages {own.get("ppocrv6-kraken-blla", 0):.1f} against '
+         f'{own.get("lightonocr-3-4b-mlx8", 0):.1f} for LightOnOCR-3 4B 8-bit on the Mac (agreement with the drafters, '
+         'OCR-1). It needs 2-6 GB a page call on the CPU, so it is the low-memory fallback, not the default.',
+         f'- **The line source matters more than the reader:** on Vision\'s line boxes the same model scores '
+         f'{v["nes"]:.1f} ({iv(d("ppocrv6-kraken-vision vs ppocrv6-kraken-blla"))} against blla), losing most on '
+         f'the hands (L1 {v["strata"]["L1"]:.1f} against {b["strata"]["L1"]:.1f}); typed L3 is level.']
+    if bw:
+        L.append('- **Fine-tuning on one public hand gains little before 80 lines:** '
+                 + '; '.join(f'{t["n"]} lines {t["device"]} {t["delta"]:+.1f} ({t["lo"]:+.1f} to {t["hi"]:+.1f})'
+                             for t in bw)
+                 + f' on {bw[0]["pages"]} held-out pages of the Blackwell diary, base {bw[0]["base"]:.1f}.')
+    if ow:
+        worse = sum(t['delta'] < 0 for t in ow)
+        L.append(f'- **On the owner\'s Shils pages it made {worse} of {len(ow)} held-out pages worse** '
+                 f'({", ".join(f"{t["delta"]:+.1f}" for t in ow)}). Their truth is one paragraph a page, so the '
+                 'training lines are word runs matched to blla lines by the base model\'s reading (mean character '
+                 'error 0.18-0.33 on the kept lines), and three pages are too few; this does not show the owner\'s hand '
+                 'cannot be learnt, only that paragraph truth paired this way does not train it. A kit fine-tune needs line-broken, '
+                 'corrected lines.')
+    L.append('')
+    return L
 
 
 def write_md(o):
@@ -822,6 +870,7 @@ def write_md(o):
          'then fine-tuned on corrected lines of one hand. `ppocrv6-medium` is the native PaddleOCR pipeline (its own '
          'detector) from FarmShare. Mean NES in points; a missing or empty reading scores 0. No money; no text in the '
          'repo.', '']
+    L += verdict(o)
     L += [f'## The public L1-L3 ({o["sets"]["public"]} pages), where hands are ranked', '',
           '| route | NES | L1 | L2 | L3 | empty |', '|---|---:|---:|---:|---:|---:|']
     for r in o['public']:
@@ -850,10 +899,11 @@ def write_md(o):
           'on the same lines. '
           + '; '.join(f'{h}: {v["kept"]} of {v["truth_lines"]} truth lines paired over {v["pages"]} pages'
                       for h, v in o['pairs'].items()) + '.', '',
-          '| training | lines | device | minutes | peak GB | held-out pages | base | tuned | delta | interval |',
-          '|---|---:|---|---:|---:|---:|---:|---:|---:|---|']
+          '| training | lines | device | epochs | minutes | peak GB | held-out pages | base | tuned | delta | interval |',
+          '|---|---:|---|---:|---:|---:|---:|---:|---:|---:|---|']
     for t in o['tunes']:
-        L.append(f'| {t["name"]} | {t["n"]} | {t["device"]} | {t["minutes"]} | {t["peak_gb"]} | {t["pages"]} | '
+        L.append(f'| {t["name"]} | {t["n"]} | {t["device"]} | {t.get("epochs") or ""} | {t["minutes"]} | '
+                 f'{t["peak_gb"]} | {t["pages"]} | '
                  f'{f1(t["base"])} | {f1(t["tuned"])} | {t["delta"]:+.2f} | {t["lo"]:+.2f} to {t["hi"]:+.2f} |')
     by = {(t['hand'], t['n'], t['device']): t for t in o['tunes']}
     mps = [(c, m) for (h, n, dev), m in by.items() if dev == 'mps' and (c := by.get((h, n, 'cpu')))]
@@ -862,18 +912,21 @@ def write_md(o):
           f'of {LAG} (blackwell-n20 ran at 10 and 5 before that change; its best epoch, 2, is the same under either). '
           'The PP-OCRv6 config\'s own optimizer, AdamW+Muon, runs Muon\'s Newton-Schulz step in bfloat16, which has no '
           'fast CPU kernel (97% of a step, on one core); a batch of 8 passed 8.8 GB within 17 s (a first attempt at '
-          'blackwell-n20, the one stopped in the guard figures below). The owner\'s rows leave one of the four Shils '
+          'blackwell-n20, stopped by the guard). The owner\'s rows leave one of the four Shils '
           'pages out and train on the other three pages\' lines; their truth is the drafted owner truth (hand places '
           'owner-checked), so a gain there is agreement with the drafters, not a ranking (OCR-1).', '',
           'The CPU trainings use kraken\'s torch.compile of the forward pass; the MPS one runs eagerly '
           '(TORCHDYNAMO_DISABLE=1), because Inductor\'s Metal kernel for this model asks for 32,896 bytes of '
           'threadgroup memory, more than the GPU allows, and `ketos train -d mps` fails at its first step. '
-          + ' '.join(f'{m["name"]}: {m["minutes"]} min against {c["minutes"]} on the CPU (the CPU one beside no other '
-                     f'training), tuned {f1(m["tuned"])} against {f1(c["tuned"])}, '
+          + ' '.join(f'{m["name"]}: {per_epoch(m)} s an epoch against {per_epoch(c)} on the CPU (each beside no other '
+                     f'training; {m["epochs"]} and {c["epochs"]} epochs before early stopping, so {m["minutes"]} and '
+                     f'{c["minutes"]} minutes), tuned {f1(m["tuned"])} against {f1(c["tuned"])}, '
                      f'{"identical" if abs(m["tuned"] - c["tuned"]) < 1e-9 else "not identical"}.' for c, m in mps)]
-    if not any(t['n'] == max(CURVE['blackwell']) for t in o['tunes'] if t['hand'] == 'blackwell'):
-        L.append(f'Blackwell n{max(CURVE["blackwell"])} did not train this session: CPU trainings run one at a time '
-                 '(two side by side each ran about 4x slower) and the longer ones did not fit the session.')
+    missing = [n for n in CURVE['blackwell'] if not any(t['n'] == n and t['hand'] == 'blackwell' for t in o['tunes'])]
+    if missing:
+        L += ['', f'Not trained: Blackwell {", ".join(f"n{n}" for n in missing)} (W46.ocr-ppocrv6-hands-curve). CPU '
+              'trainings run one at a time, since two side by side each ran about 4x slower, and at about 1.8 s a '
+              'line-step these did not fit the session.']
     tm = o['timing']
     L += ['', '## Seconds and memory (M3 Pro, 18 GB, CPU, one page a kraken call)', '',
           '| step | calls | pages | median seconds a page | peak GB a call |', '|---|---:|---:|---:|---:|']
@@ -905,7 +958,10 @@ def write_md(o):
           'floor is ocr-rerun-noise.md\'s 0.49 points. A paired interval across 0 is a tie. Fine-tune rows rest on '
           'few held-out pages (one per fold for the owner\'s hand), so their intervals are wide.',
           '- **Scope.** Line recognition only: placement of these lines is W46.place-hands. The Qwen few-line '
-          'prompting arm (cluster) and the Gemini arm (W46.ocr-ppocrv6-hands-paid) are not here.', '']
+          'prompting arm (W46.ocr-ppocrv6-hands-qwen, cluster), the Gemini arm (W46.ocr-ppocrv6-hands-paid) and the '
+          'curve past 80 lines (W46.ocr-ppocrv6-hands-curve) are not here. One public hand and one owner folder: '
+          'whether other hands gain alike is not settled. MPS against CPU is one training each, eager against '
+          'compiled, so it gives speed, not equivalence.', '']
     (RESULTS / 'ocr-ppocrv6-hands.md').write_text('\n'.join(L))
 
 
