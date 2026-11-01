@@ -4,11 +4,12 @@
 # The one-time partition-list repair and daemon's stale-marker warning must agree on this exact provider
 # account list. Keeping it here avoids the W21.seed-fu failure mode: add a provider to the repair script,
 # then silently lose the warning that its old marker does not cover it. DriveClientSecret is deliberately
-# absent — it is an app-owned OAuth secret, never read by the command-line smoke tools. Gateway is excluded
-# for the same reason: only the app reads it.
+# absent — it is an app-owned OAuth secret, never read by the command-line smoke tools. Gateway (the Stanford AI
+# API gateway key) is listed since 2026-10-31: bench items read it through /usr/bin/security (marks_set.py gemini,
+# W46.fix-marks-set-draft), and the owner chose unattended access for it at that day's walkthrough.
 
 KEYCHAIN_PROVIDER_SERVICE="com.archiveprocessor.app"
-KEYCHAIN_PROVIDER_ACCOUNTS=(Gemini Anthropic Mistral OpenAI)
+KEYCHAIN_PROVIDER_ACCOUNTS=(Gemini Anthropic Mistral OpenAI Gateway)
 
 # Convert a local marker timestamp (the format written by date '+%F %T') to epoch seconds.
 keychain_local_timestamp_epoch() {

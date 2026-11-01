@@ -77,7 +77,7 @@ run_fix() {
 
 echo "[0] repair and warning share the complete provider account list"
 ACCOUNTS="$(bash -c '. "$1"; printf "%s " "${KEYCHAIN_PROVIDER_ACCOUNTS[@]}"' _ "$LIB")"
-[ "$ACCOUNTS" = 'Gemini Anthropic Mistral OpenAI ' ] \
+[ "$ACCOUNTS" = 'Gemini Anthropic Mistral OpenAI Gateway ' ] \
   && ok "shared list names every CLI-read provider, never DriveClientSecret" || bad "shared provider list drifted: $ACCOUNTS"
 
 echo "[1] repair records only the present provider accounts"

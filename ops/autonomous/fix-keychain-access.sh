@@ -24,8 +24,10 @@ SVC="$KEYCHAIN_PROVIDER_SERVICE"
 LOGIN_KC="$HOME/Library/Keychains/login.keychain-db"
 # All LLM-provider key accounts the app stores under $SVC (the ones a smoke/E2E run reads via /usr/bin/
 # security). MUST include Mistral — scripts/test-smoke.sh reads it via the CLI, so omitting it would leave a
-# live prompt while this script reports success. App-owned items (Drive secrets and Gateway) are left alone:
-# the CLI never reads them, so touching their partition lists would risk an app re-prompt for no gain.
+# live prompt while this script reports success. Gateway is included since 2026-10-31 (the bench reads it through
+# the CLI; owner's call). The Drive secrets are left alone: the CLI never reads them, so touching their partition
+# lists would risk an app re-prompt for no gain. After this script the Processor may ask once for the Gateway key;
+# Always Allow there restores its own access.
 CANDIDATES=("${KEYCHAIN_PROVIDER_ACCOUNTS[@]}")
 
 echo "== fix-keychain-access =="
