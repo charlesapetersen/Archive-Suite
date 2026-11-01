@@ -12,7 +12,10 @@
 //                                                                            --words, at a hypothesis's word boxes
 //                                                                            instead (W46.place-hands); --fit
 //                                                                            sizes each word's font to its box
-//                                                                            rather than stretching it
+//                                                                            rather than stretching it;
+//                                                                            --no-image leaves the image out (the
+//                                                                            same page size and text, for drags
+//                                                                            only: W46.place-hands-lines)
 //
 //     place_functional layer  <lines.json> <out.pdf>                     -> W46.place-geom's own writer: one run per
 //                                                                            line along its baseline, sloped or level
@@ -134,14 +137,15 @@ func words(_ doc: PDFDocument, _ pageIndex: Int, baselineFrac: Double) -> [Strin
     return ["words": outWords, "lines": outLines]
 }
 
-func oracle(_ truth: [String: Any], _ out: String, dx: Double, dy: Double, hypWords: [[String: Any]]? = nil, fit: Bool = false) {
+func oracle(_ truth: [String: Any], _ out: String, dx: Double, dy: Double, hypWords: [[String: Any]]? = nil, fit: Bool = false,
+            image: Bool = true) {
     guard let path = truth["image"] as? String,
           let src = CGImageSourceCreateWithURL(URL(fileURLWithPath: path) as CFURL, nil),
           let img = CGImageSourceCreateImageAtIndex(src, 0, nil) else { fail("cannot read the page image") }
     var media = CGRect(x: 0, y: 0, width: img.width, height: img.height)
     guard let ctx = CGContext(URL(fileURLWithPath: out) as CFURL, mediaBox: &media, nil) else { fail("cannot write \(out)") }
     ctx.beginPDFPage(nil)
-    ctx.draw(img, in: media)
+    if image { ctx.draw(img, in: media) }
     ctx.setTextDrawingMode(.invisible)
     for w in hypWords ?? truth["words"] as? [[String: Any]] ?? [] {
         guard var b = box(w["box"]), let text = w["text"] as? String, b.w > 0, b.h > 0 else { continue }
@@ -265,7 +269,7 @@ case "drag":
 case "oracle":
     let hypWords = option(args, "--words").map { loadJSON($0)["words"] as? [[String: Any]] ?? [] }
     oracle(truth, args[3], dx: Double(option(args, "--dx") ?? "0") ?? 0, dy: Double(option(args, "--dy") ?? "0") ?? 0,
-           hypWords: hypWords, fit: args.contains("--fit"))
+           hypWords: hypWords, fit: args.contains("--fit"), image: !args.contains("--no-image"))
     result = ["wrote": args[3]]
 default:
     fail("unknown mode \(args[1])")

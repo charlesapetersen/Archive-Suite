@@ -93,7 +93,7 @@ PPOCR = [LTS / 'FarmShare-ppocrv6-20261019/outputs/ppocrv6-medium-native/raw',
          LTS / 'FarmShare-truth96-20261020/outputs/ppocrv6-medium-native/raw']
 PPOCR_IMAGES = lambda name: [Path.home() / f'Library/Caches/ArchiveSuiteRehearsal/ocr-panel-local/images/{name}-original.jpg',
                               LTS / f'FarmShare-20261019/ocr/images/{name}.jpg']
-READINGS = ('truth', 'lightonocr3-4b', 'gemini3.8-flash')
+READINGS = ('truth', 'lightonocr3-4b', 'gemini3.8-flash', 'qwen3.6-27b')  # qwen3.6-27b: the non-drafter reading (W46.place-hands-lines)
 FRAC = place_truth.BASELINE_FRAC
 ROW_OVERLAP = 0.5   # two pieces are one line when their vertical overlap is this share of the shorter's height
 SKIP = {'length': 1.5, 'text': 0.6}   # DP cost of leaving a reading line or a detected line unmatched
