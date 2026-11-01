@@ -404,11 +404,13 @@ def seg_boxes_score():
     the shipped cloud route at three window offsets."""
     path = RESULTS / "seg-boxes-score.json"
     if not path.exists():
-        return None
+        path = RESULTS / "seg-boxes-score-local.json"
+        if not path.exists():
+            return None
     d = json.loads(path.read_text())
     labels = {"gemini": "Gemini 3.7 Flash (gateway)", "mac-2b": "Shipped 2B, 8-bit, on the Mac",
               "teacher": "Qwen3.5 27B teacher", "fs-2b": "Trained 2B, bf16", "fs-4b": "Trained 4B, bf16"}
-    return {"labels": labels,
+    return {"labels": labels, "status": d["status"], "source": path.with_suffix(".md").name,
             "boxes": [{k: r[k] for k in ("route", "box", "split", "known gaps", "gap accuracy", "false splits",
                                           "false merges", "pages exact")} for r in d["observed"]],
             "sc0122": d["sc0122_owner"], "offsets": d["offsets"], "note": d["note"]}

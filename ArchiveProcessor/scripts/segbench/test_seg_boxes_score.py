@@ -98,5 +98,29 @@ class OwnerSupport(unittest.TestCase):
                 self.assertEqual(B.route_split(route, box), "held-out" if box == "Sasha" else "trained-on")
 
 
+class PartialReport(unittest.TestCase):
+    def test_missing_gateway_and_offsets_are_explicitly_unmeasured(self):
+        routes = [k for k in B.ROUTES if k != "gemini"]
+        out = {"status": "offline arms only; gateway and offsets pending", "offsets": None, "paired": [],
+               "observed": [{"route": k, "box": b, "split": B.route_split(k, b), "known gaps": 10,
+                             "gap accuracy": .8, "right": 8, "false splits": 1, "false merges": 1,
+                             "pages exact": .6, "failed windows": 0} for b in B.BOXES for k in routes],
+               "gateway": {"calls": 0, "input_tokens": 0, "output_tokens": 0, "invalid": 0, "spent": .0291,
+                           "billed": "unknown", "mean_seconds": 0},
+               "sc0122_owner": {"asked_known": 2, "controls": 2, "agreed_doc_gaps": 3,
+                                "strata": {"low": [2, 1], "high": [1, 1]}, "models": {
+                                    k: {"asked_right": 1, "controls_right": 1,
+                                        "agreed_weighted_accuracy": 2 / 3, "owner_weighted_accuracy": 3 / 5}
+                                    for k in routes}}}
+        out["note"] = B.reading(out)
+        report = B.render(out)
+        self.assertIn("offline arms only; gateway and offsets pending", report)
+        self.assertIn("unmeasured", report)
+        self.assertNotIn("| Gemini 3.7", report)
+        self.assertNotIn("| 3.7 o0", report)
+        self.assertNotIn("READING", report)
+        self.assertIn("document-exact scores there remain conditional", out["note"])
+
+
 if __name__ == "__main__":
     unittest.main()

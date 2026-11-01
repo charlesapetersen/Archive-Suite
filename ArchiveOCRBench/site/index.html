@@ -169,12 +169,15 @@ footer p { font-size: 13px; }
   </section>
 
   <section class="panel" id="seg-boxes-score" hidden>
-    <div class="head"><h2>Every segmentation route on the three locked boxes</h2><span class="meta">Gemini 3.7 · the shipped 2B · Sherlock · Vision text</span></div>
+    <div class="head"><h2>Segmentation routes on the three locked boxes</h2><span class="meta" id="sbs-status"></span></div>
+    <p class="note">SC0122's all-known figures are diagnostics against tag/teacher-drafted truth. Its document-exact scores are conditional on that draft; use the owner-supported weighted gap comparison below for accuracy conclusions.</p>
     <div class="tbl"><table><thead><tr><th>Route</th><th>Box</th><th>Fine-tuned on it?</th><th>Known gaps</th><th>Gap accuracy</th><th>False splits</th><th>False merges</th><th>Pages in exact document</th></tr></thead><tbody id="sbs-box-rows"></tbody></table></div>
     <h3>SC0122 on its owner-ruled gaps</h3>
     <div class="tbl"><table><thead><tr><th>Route</th><th>Tag and teacher disagreed: right</th><th>Controls right</th><th>Owner-ruled, weighted</th></tr></thead><tbody id="sbs-sc-rows"></tbody></table></div>
-    <h3>The shipped cloud route at three window offsets (Stanton and RG 165)</h3>
-    <div class="tbl"><table><thead><tr><th>Figure</th><th>3.7, offset 0</th><th>3.7, offset 1</th><th>3.7, offset 2</th><th>3.8, offset 0 (the app's figures)</th></tr></thead><tbody id="sbs-off-rows"></tbody></table></div>
+    <div id="sbs-offsets" hidden>
+      <h3>The shipped cloud route at three window offsets (Stanton and RG 165)</h3>
+      <div class="tbl"><table><thead><tr><th>Figure</th><th>3.7, offset 0</th><th>3.7, offset 1</th><th>3.7, offset 2</th><th>3.7 range</th><th>3.8, offset 0 (the app's figures)</th></tr></thead><tbody id="sbs-off-rows"></tbody></table></div>
+    </div>
     <p class="note" id="sbs-note"></p>
   </section>
 
@@ -667,6 +670,7 @@ if (skg) {
 
 const sbs = DATA.seg_boxes_score;
 if (sbs) {
+  document.getElementById('sbs-status').textContent = sbs.status;
   const p1 = v => v === null ? '—' : (100 * v).toFixed(1) + '%';
   const boxName = {IllustratedReview: 'Illustrated Review'};
   document.getElementById('sbs-box-rows').innerHTML = sbs.boxes.map(r => '<tr><td>' + sbs.labels[r.route] + '</td><td>' +
@@ -681,10 +685,15 @@ if (sbs) {
                 ['flagged_per_100_pages', 'Boundaries to check per 100 pages', v => v.toFixed(1)],
                 ['pages_exact_after_review', 'Pages right after checking', p1],
                 ['unflagged_errors_per_500_pages', 'Unflagged errors per 500 pages', v => v.toFixed(1)]];
-  document.getElementById('sbs-off-rows').innerHTML = figs.map(([k, name, f]) => '<tr><td>' + name + '</td>' +
-    ['o0', 'o1', 'o2'].map(o => '<td>' + f(sbs.offsets.rows[o].figures[k]) + '</td>').join('') + '<td>' +
-    f(sbs.offsets.gemini38_o0[k]) + '</td></tr>').join('');
-  document.getElementById('sbs-note').textContent = sbs.note;
+  if (sbs.offsets) {
+    document.getElementById('sbs-off-rows').innerHTML = figs.map(([k, name, f]) => {
+      const values = ['o0', 'o1', 'o2'].map(o => sbs.offsets.rows[o].figures[k]);
+      return '<tr><td>' + name + '</td>' + values.map(v => '<td>' + f(v) + '</td>').join('') + '<td>' +
+        f(Math.min(...values)) + '–' + f(Math.max(...values)) + '</td><td>' + f(sbs.offsets.gemini38_o0[k]) + '</td></tr>';
+    }).join('');
+    document.getElementById('sbs-offsets').hidden = false;
+  }
+  document.getElementById('sbs-note').textContent = sbs.note + ' Source: ' + sbs.source + '.';
   document.getElementById('seg-boxes-score').hidden = false;
 }
 

@@ -4,10 +4,11 @@ shipped cloud route at three window offsets on the test boxes.
 
   python3 seg_boxes_score.py plan        # windows, cached answers and the gateway estimate (no calls)
   python3 seg_boxes_score.py collect     # Gemini 3.7 Flash g1 windows through the gateway (paid, capped)
-  <lab venv>/bin/python seg_boxes_score.py mac   # the shipped 8-bit 2B on this Mac (run-guarded.sh, below)
+  <lab venv>/bin/python seg_boxes_score.py mac   # the shipped 8-bit 2B on this Mac (heavy lock, below)
   python3 seg_boxes_score.py score       # -> segbench-results/seg-boxes-score.{json,md} (no calls)
+  python3 seg_boxes_score.py score --local-only  # explicit partial report while gateway arms are blocked
 
-  ~/Claude/vision-ocr/ops/ocrlab/run-guarded.sh --label seg-boxes-2b --need-gb 8 -- \\
+  HF_HUB_OFFLINE=1 python3 ops/autonomous/heavy-run.py run -- \\
       ~/.local/share/visionocr-ocrlab/venv/bin/python seg_boxes_score.py mac
 
 THE ARMS, fixed before any answer:
@@ -318,13 +319,15 @@ def offsets(js_gem):
             "gemini38_o0_by_box": ref["figures"]["test_by_box"]}
 
 
-def cmd_score(_a):
+def cmd_score(a):
     import rescore
     rescore.no_network()
     import kit_gate as K
     import kit_gate_sherlock as KS
     _, _, S, _ = _mods()
     js = judges()
+    if a.local_only:
+        js.pop("gemini")
     boxes, observed, paired, sc = [], [], [], None
     for b in BOXES:
         col = data.load(b, with_exif=False)
@@ -343,26 +346,29 @@ def cmd_score(_a):
                              "pages exact": sum(d["exact_pages"] for d in docs if d["m"][key][0]) / pages,
                              "resolved pages": pages, "failed windows": rec["failed_windows"][key]})
         for x, y in (("mac-2b", "gemini"), ("mac-2b", "fs-2b"), ("gemini", "teacher"), ("mac-2b", "teacher")):
+            if x not in js or y not in js:
+                continue
             paired.append(KS.paired_row(f"{x} vs {y}", b, [
                 (rec["models"][x]["gaps"][k][0] == g["truth"], rec["models"][y]["gaps"][k][0] == g["truth"])
                 for k, g in enumerate(rec["gaps"])]))
         if b == "SC0122":
             sc = sc0122_owner(col, rec)
-    off = offsets(js["gemini"])
+    off = None if a.local_only else offsets(js["gemini"])
     calls = S.settled()
     usage = {"calls": len(calls), "spent": S.spent(), "billed": S.settled_billed(),
              "input_tokens": sum(r["usage"].get("prompt_tokens", 0) for r in calls),
              "output_tokens": sum(r["usage"].get("completion_tokens", 0) for r in calls),
              "invalid": sum(not r.get("valid") for r in calls),
              "mean_seconds": sum(r.get("wall_s", 0) for r in calls) / max(1, len(calls))}
-    pages = sum(len(data.load(b, with_exif=False).pages) for b in BOXES + OFFSET_BOXES)
     out = {"tag": TAG, "observed": observed, "paired": paired, "sc0122_owner": sc, "offsets": off,
-           "gateway": usage, "pages_sent": pages}
-    (RESULTS / "seg-boxes-score.json").write_text(json.dumps(out, indent=1) + "\n")
-    (RESULTS / "seg-boxes-score.md").write_text(render(out))
+           "gateway": usage, "status": "offline arms only; gateway and offsets pending" if a.local_only else "complete"}
+    out["note"] = reading(out)
+    stem = "seg-boxes-score-local" if a.local_only else "seg-boxes-score"
+    (RESULTS / f"{stem}.json").write_text(json.dumps(out, indent=1) + "\n")
+    (RESULTS / f"{stem}.md").write_text(render(out))
     for r in observed:
         print(f"{r['box']:18} {r['route']:8} {r['right']}/{r['known gaps']}  pages exact {r['pages exact']:.3f}")
-    for k, r in off["rows"].items():
+    for k, r in (off["rows"] if off else {}).items():
         f = r["figures"]
         print(k, {x: round(f[x], 4) for x in ("pages_exact_no_review", "flagged_per_100_pages",
                                                "pages_exact_after_review", "unflagged_errors_per_500_pages")})
@@ -374,9 +380,28 @@ def _p(x, d=1):
     return "—" if x is None else f"{100 * x:.{d}f}%"
 
 
+def reading(out):
+    obs = {(r["route"], r["box"]): r for r in out["observed"]}
+    mac, teacher, source = [obs[(k, "Sasha")] for k in ("mac-2b", "teacher", "fs-2b")]
+    text = (f"On held-out Sasha the shipped Mac 2B scores {_p(mac['gap accuracy'])} on {mac['known gaps']} known gaps "
+            f"(pages exact {_p(mac['pages exact'])}), against the teacher's {_p(teacher['gap accuracy'])} and its "
+            f"bf16 source's {_p(source['gap accuracy'])}. The Illustrated Review and SC0122 are trained-on "
+            "diagnostics for the students, not evidence of generalization. SC0122's supported comparison is its "
+            "owner-ruled disagreement gaps plus controls weighted to the agreed strata; document-exact scores "
+            "there remain conditional on tag/teacher-drafted truth. ")
+    if out["offsets"] is None:
+        return text + "Partial report: Gemini and all three cloud window offsets remain unmeasured; no cloud-versus-Mac recommendation follows."
+    figures = [r["figures"] for r in out["offsets"]["rows"].values()]
+    exact = [r["pages_exact_no_review"] for r in figures]
+    flags = [r["flagged_per_100_pages"] for r in figures]
+    return text + (f"Across three cloud offsets, no-check exact pages range {_p(min(exact))}–{_p(max(exact))} "
+                   f"and checks per 100 pages {min(flags):.1f}–{max(flags):.1f}; the 3.8-fitted flag level is unchanged.")
+
+
 def render(out) -> str:
     import seg_card
     obs = {(r["route"], r["box"]): r for r in out["observed"]}
+    routes = [k for k in ROUTES if (k, "Sasha") in obs]
     g = out["gateway"]
     L = ["# W46.seg-boxes-score — the segmentation routes on the three locked boxes, and the shipped cloud route's "
          "window offsets", "",
@@ -386,8 +411,10 @@ def render(out) -> str:
          "MLX 2B on this Mac (prompt l1, 1,024 px); the 27B teacher and the bf16 2B and 4B from "
          "W46.kit-gate-sherlock's Sherlock run on the same windows. Seven-page windows at stride 3, combined and "
          "assembled with the truth's photo labels. No ABBYY text.", "",
+         f"Status: **{out['status']}**. Missing routes have no score, not a neutral or zero score.", "",
          f"Gateway: {g['calls']} calls, {g['input_tokens']:,} input and {g['output_tokens']:,} output tokens, "
-         f"{g['invalid']} invalid, ${g['spent']:.2f} at list token prices (Gemini $0.75/$3.75 per million; "
+         f"{g['invalid']} invalid, ${g['spent']:.2f} counted including unsettled reservations and the larger of "
+         "returned gateway cost or list-token estimate (Gemini $0.75/$3.75 per million; "
          f"{g['billed']}), {g['mean_seconds']:.1f} s a call. Item total under the $7 rule.", "",
          "## The three locked boxes", "",
          "Known gaps only (the owner's unsure gaps out); pages exact over the documents no unsure gap touches, the "
@@ -399,13 +426,13 @@ def render(out) -> str:
          "| route | box | split | known gaps | gap accuracy | false splits | false merges | pages exact | "
          "failed windows |", "|---|---|---|---:|---:|---:|---:|---:|---:|"]
     for b in BOXES:
-        for k in ROUTES:
+        for k in routes:
             r = obs[(k, b)]
             L.append(f"| {LABEL[k]} | {b} | {r['split']} | {r['known gaps']} | {_p(r['gap accuracy'])} | "
                      f"{r['false splits']} | {r['false merges']} | {_p(r['pages exact'])} | {r['failed windows']} |")
     L += ["", "Pooled over the three boxes (sums of gaps; the boxes differ in kind, so a pool is not a population "
           "rate):", "", "| route | known gaps | gap accuracy | false splits | false merges |", "|---|---:|---:|---:|---:|"]
-    for k in ROUTES:
+    for k in routes:
         rs = [obs[(k, b)] for b in BOXES]
         n = sum(r["known gaps"] for r in rs)
         L.append(f"| {LABEL[k]} | {n} | {_p(sum(r['right'] for r in rs) / n)} | "
@@ -421,7 +448,7 @@ def render(out) -> str:
           "teacher's label for them.", "",
           "| route | disagreement gaps right | controls right | agreed stratum, weighted | owner-ruled, weighted |",
           "|---|---:|---:|---:|---:|"]
-    for k in ROUTES:
+    for k in routes:
         m = sc["models"][k]
         L.append(f"| {LABEL[k]} | {m['asked_right']}/{sc['asked_known']} | {m['controls_right']}/{sc['controls']} | "
                  f"{_p(m['agreed_weighted_accuracy'])} | {_p(m['owner_weighted_accuracy'])} |")
@@ -434,33 +461,34 @@ def render(out) -> str:
         L.append(f"| {r['pair']} | {r['scope']} | {r['gaps']} | {r['only first right']} | {r['only second right']} | "
                  f"{r['difference points']:+.1f} points | {r['sign test p']:.3g} |")
     off = out["offsets"]
-    F = (("pages_exact_no_review", "pages in an exact document, no checking", lambda x: _p(x)),
-         ("flagged_per_100_pages", "boundaries to check per 100 pages", lambda x: f"{x:.1f}"),
-         ("pages_exact_after_review", "pages right after checking", lambda x: _p(x)),
-         ("unflagged_errors_per_500_pages", "unflagged errors per 500 pages", lambda x: f"{x:.1f}"))
-    rows = off["rows"]
-    L += ["", "## The shipped cloud route at three window offsets (Stanton and RG165, 363 pages)", "",
-          f"options.py's frozen Gemini approach (rule {off['rule']}, flag at or below {off['level']}), applied to "
-          "Gemini 3.7 windows starting 0, 1 and 2 pages later; nothing refit. The level was fitted for 3.8 on the "
-          "development boxes, so 3.7's flag load at it is not 3.7's own best level. The fifth figure, cost per 1,000 "
-          "pages, remains options.md's 3.8 reference estimate, not a measured 3.7 offset cost: edge windows and "
-          "output lengths can change tokens and spend.", "",
-          "| figure | 3.7, offset 0 | 3.7, offset 1 | 3.7, offset 2 | 3.7 range | 3.8, offset 0 (options.md) |",
-          "|---|---:|---:|---:|---:|---:|"]
-    for k, name, fmt in F:
-        v = [rows[f"o{o}"]["figures"][k] for o in (0, 1, 2)]
-        L.append(f"| {name} | {' | '.join(fmt(x) for x in v)} | {fmt(min(v))}–{fmt(max(v))} | "
-                 f"{fmt(off['gemini38_o0'][k])} |")
-    L += ["", "By box:", "", "| offset | box | no checking | to check per 100 pages | after checking | "
-          "unflagged errors |", "|---|---|---:|---:|---:|---:|"]
-    for o in (0, 1, 2):
-        for b, f in rows[f"o{o}"]["by_box"].items():
-            L.append(f"| 3.7 o{o} | {b} | {_p(f['pages_exact_no_review'])} | {f['flagged_per_100_pages']:.1f} | "
+    if off is not None:
+        F = (("pages_exact_no_review", "pages in an exact document, no checking", lambda x: _p(x)),
+             ("flagged_per_100_pages", "boundaries to check per 100 pages", lambda x: f"{x:.1f}"),
+             ("pages_exact_after_review", "pages right after checking", lambda x: _p(x)),
+             ("unflagged_errors_per_500_pages", "unflagged errors per 500 pages", lambda x: f"{x:.1f}"))
+        rows = off["rows"]
+        L += ["", "## The shipped cloud route at three window offsets (Stanton and RG165, 363 pages)", "",
+              f"options.py's frozen Gemini approach (rule {off['rule']}, flag at or below {off['level']}), applied to "
+              "Gemini 3.7 windows starting 0, 1 and 2 pages later; nothing refit. The level was fitted for 3.8 on the "
+              "development boxes, so 3.7's flag load at it is not 3.7's own best level. The fifth figure, cost per 1,000 "
+              "pages, remains options.md's 3.8 reference estimate, not a measured 3.7 offset cost: edge windows and "
+              "output lengths can change tokens and spend.", "",
+              "| figure | 3.7, offset 0 | 3.7, offset 1 | 3.7, offset 2 | 3.7 range | 3.8, offset 0 (options.md) |",
+              "|---|---:|---:|---:|---:|---:|"]
+        for k, name, fmt in F:
+            v = [rows[f"o{o}"]["figures"][k] for o in (0, 1, 2)]
+            L.append(f"| {name} | {' | '.join(fmt(x) for x in v)} | {fmt(min(v))}–{fmt(max(v))} | "
+                     f"{fmt(off['gemini38_o0'][k])} |")
+        L += ["", "By box:", "", "| offset | box | no checking | to check per 100 pages | after checking | "
+              "unflagged errors |", "|---|---|---:|---:|---:|---:|"]
+        for o in (0, 1, 2):
+            for b, f in rows[f"o{o}"]["by_box"].items():
+                L.append(f"| 3.7 o{o} | {b} | {_p(f['pages_exact_no_review'])} | {f['flagged_per_100_pages']:.1f} | "
+                         f"{_p(f['pages_exact_after_review'])} | {f['unflagged_errors']} |")
+        for b, f in off["gemini38_o0_by_box"].items():
+            L.append(f"| 3.8 o0 | {b} | {_p(f['pages_exact_no_review'])} | {f['flagged_per_100_pages']:.1f} | "
                      f"{_p(f['pages_exact_after_review'])} | {f['unflagged_errors']} |")
-    for b, f in off["gemini38_o0_by_box"].items():
-        L.append(f"| 3.8 o0 | {b} | {_p(f['pages_exact_no_review'])} | {f['flagged_per_100_pages']:.1f} | "
-                 f"{_p(f['pages_exact_after_review'])} | {f['unflagged_errors']} |")
-    L += ["", "## Reading", "", "READING", ""]
+    L += ["", "## Reading", "", out["note"], ""]
     L += seg_card.card(
         truth="The three locked boxes' truths (Sasha owner-ruled from label tags, locked 2026-10-30; the Illustrated "
               "Review owner-ruled on the article-within-issue rule; SC0122 tags and teacher where they agreed, the "
@@ -474,7 +502,7 @@ def render(out) -> str:
                    "documents. The Mac 2B and the Sherlock models see 1,024 px images and prompt l1; Gemini sees "
                    "1,600 px and g1, as each is run in the bench and the app. Both OCR sets do not apply: this is "
                    "segmentation.",
-        noise="Single runs at temperature 0. The offsets are the rerun floor this item measures for the cloud route; "
+        noise="Single runs at temperature 0. The cloud offset spread is unavailable in an offline-only report; "
               "a difference between routes smaller than the offset spread, or than 1.4-3.2 points a box, is a tie. "
               "Sign tests are sampling only.",
         scope="Three owner boxes and two test boxes. It does not settle a prompt change for the article-within-issue "
@@ -487,6 +515,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("command", choices=("plan", "collect", "mac", "score"))
     ap.add_argument("--limit", type=int)
+    ap.add_argument("--local-only", action="store_true", help="score only completed Mac/Sherlock arms, explicitly partial")
     ap.add_argument("--workers", type=int, choices=(1,), default=1,
                     help="collection is serial so reservation checks cannot race")
     a = ap.parse_args()
