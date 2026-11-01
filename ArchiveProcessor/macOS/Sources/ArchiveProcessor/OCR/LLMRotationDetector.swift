@@ -33,6 +33,13 @@ enum LLMRotationDetector {
         [180, 0, 270, 90]
     ]
 
+    /// Whether an LLM rotation mode has a comparative call on this backend. The gateway, the Local Agent CLI,
+    /// Apple Vision, Mistral and OpenRouter have no multi-image vision chat path here, so their LLM modes fall
+    /// back to local Vision (`OCRProcessor.detectRotation`); Settings says so (W40.fix-processor-rotation-deadlock).
+    static func hasRoute(provider: LLMProvider, usesGateway: Bool, usesLocalAgent: Bool) -> Bool {
+        !usesGateway && !usesLocalAgent && (provider == .gemini || provider == .anthropic || provider == .openai)
+    }
+
     static func detectCorrection(
         imageURL: URL,
         provider: LLMProvider,
@@ -40,9 +47,7 @@ enum LLMRotationDetector {
         orderings: Int,
         gatewayConfig: GatewayConfig?
     ) async -> Int? {
-        // Gateway / Mistral don't have a supported multi-image vision chat path here.
-        if gatewayConfig != nil { return nil }
-        guard provider == .gemini || provider == .anthropic || provider == .openai else { return nil }
+        guard hasRoute(provider: provider, usesGateway: gatewayConfig != nil, usesLocalAgent: false) else { return nil }
 
         guard let candidates = renderCandidates(imageURL: imageURL) else { return nil }
 

@@ -14,7 +14,7 @@ import CoreGraphics
 ///   • Stage 2 — an `.accurate` + language-corrected pass on just the 2 orientations of the
 ///     chosen axis resolves the flip (upright reads as real words, inverted does not).
 ///
-/// Everything runs on a single downscaled (~1000px) CGImage; passes run in parallel.
+/// Everything runs on a single downscaled (~1000px) CGImage; passes run in parallel on `visionQueue`.
 /// Returns the best correction in {0, 90, 180, 270}, or `nil` when no orientation yields
 /// confident text (caller falls back to the LLM's rotation guess).
 enum RotationDetector {
@@ -32,13 +32,18 @@ enum RotationDetector {
     private static let orientationFor: [Int: CGImagePropertyOrientation] =
         [0: .up, 90: .right, 180: .down, 270: .left]
 
+    /// Every pass runs here, off the cooperative pool (W40.fix-processor-rotation-deadlock): run in a task group,
+    /// four blocking passes per page and a segment's pages at once took every pool thread and hung. Four passes in
+    /// flight keep a page's Stage 1 together without crowding the OCR work beside it.
+    private static let visionQueue = VisionQueue(name: "ArchiveProcessor.RotationDetector.vision", width: 4)
+
     static func detectCorrection(imageURL: URL) async -> Int? {
         guard let cgImage = downscaledCGImage(from: imageURL) else { return nil }
 
         // Stage 1: fast pass in all four orientations (parallel) → choose the text axis.
         let fast: [Int: Float] = await withTaskGroup(of: (Int, Float).self) { group in
             for corr in [0, 90, 180, 270] {
-                group.addTask { (corr, score(cgImage: cgImage, orientation: orientationFor[corr]!, level: .fast, languageCorrection: false)) }
+                group.addTask { (corr, await queuedScore(cgImage: cgImage, orientation: orientationFor[corr]!, level: .fast, languageCorrection: false)) }
             }
             var out: [Int: Float] = [:]
             for await (corr, s) in group { out[corr] = s }
@@ -54,7 +59,7 @@ enum RotationDetector {
         // Stage 2: accurate + language-corrected pass on the 2 axis orientations → resolve flip.
         let accurate: [Int: Float] = await withTaskGroup(of: (Int, Float).self) { group in
             for corr in axis {
-                group.addTask { (corr, score(cgImage: cgImage, orientation: orientationFor[corr]!, level: .accurate, languageCorrection: true)) }
+                group.addTask { (corr, await queuedScore(cgImage: cgImage, orientation: orientationFor[corr]!, level: .accurate, languageCorrection: true)) }
             }
             var out: [Int: Float] = [:]
             for await (corr, s) in group { out[corr] = s }
@@ -65,6 +70,18 @@ enum RotationDetector {
     }
 
     // MARK: - Scoring
+
+    /// `score` on `visionQueue`, awaited without holding a cooperative-pool thread.
+    private static func queuedScore(
+        cgImage: CGImage,
+        orientation: CGImagePropertyOrientation,
+        level: VNRequestTextRecognitionLevel,
+        languageCorrection: Bool
+    ) async -> Float {
+        await visionQueue.run {
+            score(cgImage: cgImage, orientation: orientation, level: level, languageCorrection: languageCorrection)
+        }
+    }
 
     /// One Vision text-recognition pass at the given orientation. For the fast pass the score
     /// is Σ(confidence); for the accurate pass it is Σ(confidence × recognized-length), which

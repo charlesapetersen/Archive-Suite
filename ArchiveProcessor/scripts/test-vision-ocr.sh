@@ -14,6 +14,7 @@ trap cleanup EXIT
 
 swiftc -parse-as-library \
     "$PWD/macOS/Sources/ArchiveProcessor/Models/DefaultsKeys.swift" \
+    "$PWD/macOS/Sources/ArchiveProcessor/OCR/VisionQueue.swift" \
     "$PWD/macOS/Sources/ArchiveProcessor/OCR/VisionClient.swift" \
     "$PWD/scripts/vision-ocr-headless.swift" \
     -o "$work/vision-ocr-headless"

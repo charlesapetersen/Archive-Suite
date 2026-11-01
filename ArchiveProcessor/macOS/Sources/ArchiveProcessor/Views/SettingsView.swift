@@ -951,6 +951,13 @@ struct SettingsView: View {
                 }
             }
             .disabled(preOCRedInput)
+            if rotationMode.orderings > 0, !preOCRedInput, !LLMRotationDetector.hasRoute(
+                provider: useAppleVision ? .appleVision : selectedProvider,
+                usesGateway: useGateway && GatewayConfig.fromDefaults() != nil, usesLocalAgent: useLocalAgent) {
+                Text("This OCR backend has no LLM rotation check, so pages are checked with Local Vision instead.")
+                    .font(.caption).foregroundStyle(.secondary)
+                    .accessibilityIdentifier("ap.settings.rotationFallback")
+            }
             Toggle(isOn: $reviewRotation) {
                 HStack {
                     Text("Review rotation")

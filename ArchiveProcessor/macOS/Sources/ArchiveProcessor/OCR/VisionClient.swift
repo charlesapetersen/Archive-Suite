@@ -68,10 +68,14 @@ struct VisionClient {
         // has no prompt or multi-image context channel and reads the original image to retain small text.
         _ = (previousText, previousImageURL, customPrompt, imageScale)
         let settings = settings
-        return try await Task.detached(priority: .userInitiated) {
+        return try await Self.visionQueue.run {
             try Self.transcribe(imageURL: imageURL, settings: settings)
-        }.value
+        }
     }
+
+    /// The blocking Vision pass runs off the cooperative pool (W40.fix-processor-rotation-deadlock): a detached task
+    /// still runs there, and the cascade's second reader calls this inside page task groups sized by the worker count.
+    private static let visionQueue = VisionQueue(name: "ArchiveProcessor.VisionClient.vision", width: recommendedConcurrency)
 
     private static func transcribe(imageURL: URL, settings: VisionOCRSettings) throws -> OCRResult {
         guard settings.isValid else {

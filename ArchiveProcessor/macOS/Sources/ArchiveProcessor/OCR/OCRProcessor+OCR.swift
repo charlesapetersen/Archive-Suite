@@ -1838,9 +1838,9 @@ extension OCRProcessor {
         case .localVision:
             return await RotationDetector.detectCorrection(imageURL: imageURL)
         case .llmSingle, .llmMajority:
-            // The Local Agent CLI backend has no multi-image comparative-rotation path (same as the
-            // gateway, which LLMRotationDetector already gates out), so skip straight to local Vision.
-            if localAgent == nil, provider != .appleVision,
+            // Backends with no multi-image comparative-rotation path skip straight to local Vision.
+            if LLMRotationDetector.hasRoute(
+                   provider: provider, usesGateway: gatewayConfig != nil, usesLocalAgent: localAgent != nil),
                let c = await LLMRotationDetector.detectCorrection(
                    imageURL: imageURL, provider: provider, apiKey: apiKey,
                    orderings: mode.orderings, gatewayConfig: gatewayConfig
