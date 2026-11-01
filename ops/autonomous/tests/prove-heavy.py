@@ -491,6 +491,24 @@ echo "gate-rc=$GATE_RC"
             check(p.returncode == 0 and jobs.read_text() == before
                   and not (home / ".local/state/agent-manager/heavy-jobs.log").exists(),
                   "a scratch Mac lock without a scratch manager state never samples into a manager log")
+            # The manager's memory guard (2026-10-31): a job past its limit is stopped and the note reaches stderr.
+            hog = ("/usr/bin/python3 -c 'import time; b = b\"x\" * (300 << 20); time.sleep(30)'")
+            warning = root / "sysctl-warning"   # the guard also needs memory pressure at warning or worse
+            warning.write_text('#!/bin/sh\ncase "$2" in kern.memorystatus_vm_pressure_level) echo 2 ;; '
+                               '*) exec /usr/sbin/sysctl "$@" ;; esac\n')
+            warning.chmod(0o755)
+            t0 = time.monotonic()
+            p = subprocess.Popen([sys.executable, str(HELPER), "--state", str(hold_state), "run", "--", "/bin/sh", "-c",
+                                  hog], env=dict(env, AGENT_MANAGER_HEAVY_LOCK=str(manager),
+                                                 AGENT_MANAGER_STATE=str(mstate), HEAVY_LOCK_SAMPLE_EVERY="0.2",
+                                                 HEAVY_LOCK_MEM_LIMIT_MB="150", HEAVY_LOCK_SYSCTL=str(warning)),
+                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            _, err = p.communicate(timeout=60)
+            if "take_killed_note" in manager.read_text():
+                check(p.returncode != 0 and time.monotonic() - t0 < 20 and "heavy-lock: stopped" in err,
+                      "the manager's memory guard stops a held job past its limit and says why on stderr")
+            else:
+                print("SKIP memory guard: the Agent Manager heavy-lock at " + str(source) + " has none", flush=True)
         else:
             print("SKIP manager load record: no Agent Manager heavy-lock at " + str(source), flush=True)
     finally:

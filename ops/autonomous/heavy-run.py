@@ -337,6 +337,16 @@ def start_load_sampler(pid, label, command):
         return None
 
 
+def guard_note(pid):
+    """Why the manager's memory guard stopped this job (its sampler leaves a note), or None. The session reads it
+    on the job's stderr, so it does not rerun a job that would take the Mac down."""
+    module = manager_lock()
+    try:
+        return module.take_killed_note(pid) if module else None
+    except Exception:
+        return None
+
+
 def stop_load_sampler(sampler, rc):
     if sampler is None:
         return
@@ -487,6 +497,7 @@ def run(state, command, ready):
                         ready.write_text("ready\n")
                     os.write(wr, b"1")
                     held_from = time.time()
+                    guard_note(child.pid)   # clears a note left for an earlier job with this pid
                     sampler = start_load_sampler(child.pid, label, command)
             finally:
                 os.close(wr)
@@ -512,6 +523,9 @@ def run(state, command, ready):
             if held_from is not None:
                 stop_load_sampler(sampler, 128 - rc if rc < 0 else rc)
                 log_hold(state, held_from, time.time(), command)
+                note = guard_note(child.pid)
+                if note:
+                    print(note, file=sys.stderr, flush=True)
             retire_members(state, token)
             owner_path.unlink()
             return 128 + interrupted if interrupted else (128 - rc if rc < 0 else rc)
