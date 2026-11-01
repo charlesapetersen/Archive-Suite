@@ -13,18 +13,20 @@
  },
  "anchor": {
   "box": "Lincoln",
-  "truth_sha256": "893d9777a8f0b8d243d39cfbdd36140d97554de2f5f74d7b767786a669d1fe7a",
-  "pages": 261,
-  "documents": 81,
-  "pages_exact": 34.87,
-  "gap_accuracy": 82.31,
-  "review_load_per_100_pages": 96.2,
+  "truth_sha256": "5ba5a0e6738003c26e2039fa93166a31494bb709023b8f386e28605632bd6223",
+  "pages": 251,
+  "documents": 75,
+  "pages_exact": 33.07,
+  "gap_accuracy": 82.49,
+  "review_load_per_100_pages": 95.4,
+  "unscored_gaps": 3,
+  "unresolved_pages": 10,
   "pages_exact_interval": [
-   23.26,
-   49.28
+   20.96,
+   47.83
   ]
  },
- "review_load_at_98": 96.2,
+ "review_load_at_98": 95.4,
  "mac": {
   "build": "8-bit MLX (9.6 bits a weight)",
   "download_gb": 2.5,
@@ -35,29 +37,29 @@
  },
  "note": "The shipped build. Anchor scored on FarmShare at full precision (bf16, vLLM 0.31; the 8-bit build here keeps it on the development boxes, 90.3% against 90.5%, seg-students.md). Its held-out run is not on this Mac, so held-out is empty; seg-students.md gives 96.0% agreement with the teacher on agreed held-out gaps, which is not accuracy (label-clean.md).",
  "gate": {
-  "rule": "an anchor score, a held-out score, and a held-out interval against the shipped model whose low end is above -3 points (proposed, W46.kit-gate)",
+  "rule": "an anchor score, a held-out score, and for a candidate other than the shipped model a paired held-out interval against the shipped run, over every gap that run answered with the candidate's missing answers counted wrong, whose low end is above -3 points (proposed, W46.kit-gate; coverage, W46.kit-gate-coverage)",
   "passed": false,
   "reasons": [
-   "no held-out score"
+   "no held-out score: no expected held-out gap (no --labels, or no held-out split)"
   ]
  },
  "compared": {
   "shipped": {
    "failed_windows": 0,
-   "heldout_tags": null,
-   "heldout_ruled": null,
    "anchor": {
-    "pages": 261,
-    "documents": 81,
-    "pages_exact": 34.87,
-    "gap_accuracy": 82.31,
-    "review_load_per_100_pages": 96.2,
+    "pages": 251,
+    "documents": 75,
+    "pages_exact": 33.07,
+    "gap_accuracy": 82.49,
+    "review_load_per_100_pages": 95.4,
+    "unscored_gaps": 3,
+    "unresolved_pages": 10,
     "pages_exact_interval": [
-     23.26,
-     49.28
+     20.96,
+     47.83
     ]
    }
   }
  },
- "made": "2026-10-31T13:25:28"
+ "made": "2026-10-31T17:22:45"
 }

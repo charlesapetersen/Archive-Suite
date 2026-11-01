@@ -564,26 +564,40 @@ def score(root, claude_only=False, record_glm_failure=False):
         L, C = (out['boxes'][b]['sources'] for b in ('Lincoln', 'CREST'))
         exact = lambda rows, key: 100 * rows[key]['metrics']['pages_in_exact_doc']
         glm = lambda rows: f"{exact(rows, 'gateway-glm'):.1f}%" if 'gateway-glm' in rows else 'failed validation (no score)'
+        allm = {path.name.split('-')[0]: prev['models'] for path, prev in staged}
+        pe = lambda box, key: 100 * allm[box][key]['metrics']['pages_in_exact_doc'] if key in allm[box] else None  # noqa: E731
+        rng = lambda box, keys: '–'.join(f'{x:.1f}' for x in (lambda v: (min(v), max(v)))(  # noqa: E731
+            [pe(box, k) for k in keys if pe(box, k) is not None])) + '%'
+        OPEN = ('fs-qwen3.5-27b', 'fs-seg-2b', 'fs-seg-4b')
+        CLAUDE = ('window-cues-claude', 'window-cues-claude-cue')
+        cloud_c = [x for x in (pe('crest', k) for k in ('gateway-gemini', 'gateway-gemini-whole', 'gateway-glm', *CLAUDE)) if x is not None]
+        open_c = [x for x in (pe('crest', k) for k in OPEN) if x is not None]
         lines += ['## Findings', '',
                   f"On Lincoln, Gemini windows put {exact(L, 'gateway-gemini'):.1f}% of pages in the exact "
                   f"document and the repaired whole reply {exact(L, 'gateway-gemini-whole'):.1f}%; "
-                  f"GLM windows: {glm(L)}. The existing open models were at "
-                  '34.9–46.7%, while Claude c1 and c2 were 90.0%. The large open-model drop is not '
-                  'a ceiling imposed by the material. Small differences among cloud results on one '
+                  f"GLM windows: {glm(L)}. The open models (27B teacher, trained 2B and 4B) are at "
+                  f"{rng('lincoln', OPEN)} and Claude c1 and c2 at {rng('lincoln', CLAUDE)}. The large open-model "
+                  'drop is not a ceiling imposed by the material. Small differences among cloud results on one '
                   'agent-audited box do not establish a general ranking.', '',
                   f"On CREST, Gemini windows score {exact(C, 'gateway-gemini'):.1f}% and the whole reply "
-                  f"{exact(C, 'gateway-gemini-whole'):.1f}%; GLM windows: {glm(C)}. "
-                  'The existing trained 4B is 98.4%, teacher 95.3%, and Claude c1/c2 84.4%. '
-                  'The whole-stream arm scores higher here, but changed JPEG encoding and photo assumptions '
-                  'mean this run does not isolate context length.', '',
+                  f"{exact(C, 'gateway-gemini-whole'):.1f}%; GLM windows: {glm(C)}. The open models are at "
+                  f"{rng('crest', OPEN)} and Claude c1 and c2 at {rng('crest', CLAUDE)}. "
+                  + (f"Every cloud arm is within {max(cloud_c) - min(cloud_c):.1f} points of the others and the best "
+                     f"open model within {abs(max(cloud_c) - max(open_c)):.1f} of the best cloud arm: a difference of "
+                     "a gap or so, a tie on this box, not a ranking. Neither the whole stream nor the windows is "
+                     "shown better here, and changed JPEG encoding and photo assumptions mean this run does not "
+                     "isolate context length anyway." if max(cloud_c) - min(cloud_c) <= 2 else
+                     'The arms differ by more than two points here, but changed JPEG encoding and photo assumptions '
+                     'mean this run does not isolate context length.'), '',
                   'The table below reports least-confidence-first checking against the truth. '
                   'High boundary agreement or PQ does not mean those confidence values rank the few '
                   'errors well; check the review load separately. The finding-aid count is a measured '
-                  'variant, not a setting selected on these public answers.', '',
-                  'The final 11 Claude c2 gateway holes leave CREST at 84.4% and Deaver at 97.9%. '
-                  'The cue cuts CREST checking from 3.9 to 2.3 per 100 pages, but raises Deaver from '
-                  '10.7 to 14.8, with unchanged error counts. See seg-lincoln-cloud.md for all owner '
-                  'boxes and the original plan comparisons.', '']
+                  'variant, not a setting selected on these public answers. Segment figures here are '
+                  "conditional on each route's own call at the owner's unsure gaps (`score.py`), so two routes "
+                  'are not scored against one fixed truth.', '',
+                  'The final 11 Claude c2 holes were collected through the gateway; what the stated cue does to '
+                  'errors and review load, box by box, is in seg-lincoln-cloud.md, with all owner boxes and the '
+                  'original plan comparisons.', '']
     for box, rows in out['boxes'].items():
         for name, failure in rows.get('failed', {}).items():
             lines += [f"{box} GLM FAILED: two stopped, billed replies for pages {failure['span']} "
@@ -591,6 +605,21 @@ def score(root, claude_only=False, record_glm_failure=False):
                       'No full-box metric is reported. Further windows in that box were not requested '
                       'because they cannot repair this failed window; no prompt or score rule was changed.', '']
         lines += S.public_table(box, rows)
+    import seg_card
+    lines += seg_card.card(
+        truth=seg_card.TRUTH,
+        selection='Lincoln and CREST, chosen as public boxes before any gateway arm ran; no prompt, setting or '
+                  'score rule fitted on these answers. The arms are the ones the item planned; a GLM box that '
+                  'failed validation is reported without a score, never filled in.',
+        comparison='Gemini 3.7 Flash and GLM 5.3 Flash at low reasoning, temperature 0, 1600 px images with cached '
+                   'Vision text, the frozen g1 windows (7 pages, stride 3) and wh1 whole streams; whole streams use '
+                   'JPEG quality 45 and the known absence of label photos, so window against whole also changes '
+                   'encoding and photo assumptions. The open and Claude figures quoted are the committed '
+                   'public-segmentation scores on the same truth.',
+        noise='Single runs, no intervals; the rerun floor (1.4-3.2 points of pages exact a box, SEG-10) applies and '
+              'each box rests on one audit, so a gap or two between arms is a tie.',
+        scope='Whether cloud routes keep their level on public material unlike the owner corpus, at what cost. It '
+              'does not isolate context length, rank the cloud routes generally, or set an app default.')
     (RESULTS / 'seg-lincoln-gateway.md').write_text('\n'.join(lines) + '\n')
 
 

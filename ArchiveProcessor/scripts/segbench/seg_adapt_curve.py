@@ -3,7 +3,11 @@
     <lab venv>/bin/python doc_split.py embed owner; doc_split.py embed public ROOT     # once, CPU, ~30 min
     <lab venv>/bin/python seg_adapt_curve.py owner                                     # -> seg-adapt-curve-owner.json
     SEGBENCH_CACHE=ROOT/cache <lab venv>/bin/python seg_adapt_curve.py public ROOT     # -> seg-adapt-curve-public.json
-    <lab venv>/bin/python seg_adapt_curve.py report                                    # -> seg-adapt-curve.md
+    <lab venv>/bin/python seg_adapt_curve.py report [NOTES]                            # -> seg-adapt-curve.md
+
+The report's Findings are hand-written and committed, `report-notes/seg-adapt-curve.md` (the default NOTES), so a
+regeneration keeps them; `report` refuses to run without them (W46.seg-report-refresh: a run with no notes file
+dropped the whole Findings section once). Update the notes when the figures they quote move.
 
 NO CALLS, NO MONEY. Every model answer is read from its committed cache (``rescore.no_network``); doc-split-v1 runs
 from its cached page embeddings (doc_split.py). Owner and public boxes run in separate processes because the response
@@ -459,6 +463,7 @@ def _lvl(v):
     return "none" if v < 0 else f"<= {v:.3f}"
 
 
+NOTES = Path(__file__).resolve().parent / "report-notes" / "seg-adapt-curve.md"
 ZNAMES = {"2B": "trained Qwen3.5 2B (FarmShare)", "teacher": "Qwen3.5 27B teacher", "cloud": "cloud partner"}
 
 
@@ -525,6 +530,21 @@ def render(boxes: dict, dev_fit: dict, frozen: dict, notes: str) -> str:
                 continue
             L.append(f"| {bx} | {_p(s['base'])} | {name} | {_p(r['10'])} | {_p(r['25'])} | {_p(r['50'])} | "
                      f"{_n(r['to98'])} | {_n(r.get('disagreements_per_100p'))} |")
+    import seg_card
+    L += ["", *seg_card.card(
+        truth=seg_card.TRUTH,
+        selection="Every box is run; the k labelled gaps are drawn at random (30 draws) or as the box's first k, from "
+                  "known gaps only. LAMBDA was set before any curve was read, and nothing is fitted on a test box "
+                  "except the learning curve's refit on its own labelled gaps.",
+        comparison="Every method on the same gaps and draws, the same cached window answers (2B, teacher, cloud "
+                   "partner) and doc-split-v1's cached embeddings; the cloud partner is Gemini 3.8 Flash low on the "
+                   "owner boxes and Claude Sonnet 5.5 c1 on Lincoln and CREST, so it is not one model across boxes.",
+        noise="The learning curve's 10th-90th percentiles are draw-to-draw spread only. No rerun floor is in them "
+              "(1.4-3.2 points of pages exact a box, SEG-10), and the selection rules are single orderings of one "
+              "run's answers.",
+        scope="What corrections buy and which review rule to use on these seven boxes. It does not measure the LoRA "
+              "continuation (W46.seg-adapt-lora) or few-shot prompts (seg-adapt-fewshot.md), and Lincoln's and "
+              "CREST's segment figures are conditional on each route's call at their unsure gaps.")]
     return "\n".join(L) + "\n"
 
 
@@ -535,7 +555,10 @@ def main(argv) -> int:
         public(Path(argv[1]))
     elif argv[:1] == ["report"]:
         o, p = json.loads(OWNER_JSON.read_text()), json.loads(PUBLIC_JSON.read_text())
-        notes = Path(argv[1]).read_text() if len(argv) > 1 else ""
+        notes_path = Path(argv[1]) if len(argv) > 1 else NOTES
+        if not notes_path.exists():
+            raise SystemExit(f"{notes_path}: the report's Findings are missing; the report is not written without them")
+        notes = notes_path.read_text()
         REPORT.write_text(render({**o["boxes"], **p["boxes"]}, o["dev_fit"], o["frozen"], notes))
         print(f"wrote {REPORT}")
     else:

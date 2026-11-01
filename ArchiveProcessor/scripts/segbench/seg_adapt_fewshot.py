@@ -224,27 +224,66 @@ def score(root):
     print(render(out))
 
 
-FINDINGS = """## Findings (2026-10-29)
-
-1. **The examples change almost nothing, because zero-shot Gemini already makes very few errors here.** Gemini 3.7
-   Flash windows get 2-5 of the held-out gaps wrong on these boxes (about 2 per 100). With the examples:
-   - Lincoln, k=25: 5 errors become 4. The examples fixed two over-splits and made one new false merge (pages 76/77).
-   - CREST, k=25: no held-out decision changed.
-   - CREST, k=50: one over-split went (pages 87/88). That single gap rejoins a long document, so pages exact rises
-     from 85.9% to 96.9%.
-   Each difference is one or two gaps on one draw, which is within what a different draw would move. This run is
-   no evidence that few-shot examples help, and none that they hurt.
-2. **The examples did not override the archivist.** Where a listed gap fell inside a window, the model gave the
-   archivist's decision every time, as asked. So the examples need no separate guard.
-3. **What follows for the kit.** A user's corrections set the gaps they correct; feeding them back into the cloud
+def findings(out):
+    """The reading, computed from the settings so a regeneration cannot leave it behind (W46.seg-report-refresh:
+    the 2026-10-29 text named a merge at 76|77 and a CREST gain at 87|88, both gaps the owner later left unsure)."""
+    pct = lambda x: f'{100 * x:.1f}%'  # noqa: E731
+    gap = lambda g: f'{g[0]}|{g[1]}'  # noqa: E731
+    L = ['## Findings (rescored on the owner-ruled truth, unsure gaps unscored)', '']
+    errs = [s[a]['held_errors'] for s in out['settings'] for a in ('zero_shot', 'few_shot')]
+    L.append(f'1. **The examples change almost nothing, because zero-shot Gemini already makes very few errors here.** '
+             f'Gemini 3.7 Flash windows get {min(errs)}-{max(errs)} of the held-out known gaps wrong on these boxes. '
+             'With the examples:')
+    for s in out['settings']:
+        z, f = s['zero_shot'], s['few_shot']
+        fixed = [g for g in z['wrong_gaps'] if g not in f['wrong_gaps']]
+        made = [g for g in f['wrong_gaps'] if g not in z['wrong_gaps']]
+        what = (f"{z['held_errors']} errors become {f['held_errors']}"
+                + (f"; fixed {', '.join(map(gap, fixed))}" if fixed else '')
+                + (f"; new {', '.join(map(gap, made))}" if made else '')
+                + (f"; no new false merge" if not f['false_merges_held'] else '')
+                if z['wrong_gaps'] != f['wrong_gaps'] else
+                f"no held-out error changed ({z['held_errors']} known-gap error{'s' if z['held_errors'] != 1 else ''} "
+                f"either way)")
+        ex = '' if z['exact'] == f['exact'] else (
+            f"; pages exact {pct(z['exact'])} to {pct(f['exact'])}, a move outside the held-out known gaps (each arm's own "
+            "call at an unsure gap counts as right in the conditional reading), so no few-shot gain or loss" if z['wrong_gaps'] == f['wrong_gaps'] else
+            f"; pages exact {pct(z['exact'])} to {pct(f['exact'])}")
+        L.append(f"   - {s['box']}, k={s['k']}: {what}{ex}.")
+    L += ['   Each difference is one or two gaps on one draw, which is within what a different draw would move. This run '
+          'is no evidence that few-shot examples help, and none that they hurt.']
+    against = [s for s in out['settings'] if s['listed_gaps_answered_against_the_archivist']]
+    L += ['2. **The examples did not override the archivist.** ' + (
+          'Where a listed gap fell inside a window, the model gave the archivist\'s decision every time, as asked. So '
+          'the examples need no separate guard.' if not against else
+          'Some listed gaps were answered against the archivist: ' + '; '.join(
+              f"{s['box']} k={s['k']} {s['listed_gaps_answered_against_the_archivist']}" for s in against) + '.')]
+    L += ["""3. **What follows for the kit.** A user's corrections set the gaps they correct; feeding them back into the cloud
    prompt buys no measurable accuracy here, and it costs input tokens on every window: 1.43x the zero-shot arm's
-   input on Lincoln at k=25 ($1.18 for the box), 1.51x on CREST at k=25 ($0.68) and 2.01x at k=50 ($0.88). The review screen's disagreement rule
-   (W46.seg-adapt-curve) remains the way corrections pay off. Where few-shot might still matter is a box on which
-   the cloud model errs often, as the local models do on Lincoln. No such box is in hand for Gemini.
-4. **Limits.** One random draw per setting; two public boxes; text-only examples (300 characters of OCR either
+   input on Lincoln at k=25 ($1.18 for the box), 1.51x on CREST at k=25 ($0.68) and 2.01x at k=50 ($0.88). The review
+   screen's disagreement rule (W46.seg-adapt-curve) remains the way corrections pay off. Where few-shot might still
+   matter is a box on which the cloud model errs often, as the local models do on Lincoln. No such box is in hand
+   for Gemini.""",
+          """4. **Limits.** One random draw per setting; two public boxes; text-only examples (300 characters of OCR either
    side), with no example images; Gemini 3.7, not 3.8. Lincoln k=50 (about $1.40) was not run, to keep the item
-   under its $3 cap.
-"""
+   under its $3 cap. Pages exact and PQ are conditional on each arm's own call at the owner's unsure gaps
+   (`score.py`), so the two arms' segment figures are not against one fixed truth; held-out errors are known gaps
+   only.""", '']
+    return '\n'.join(L)
+
+
+def card():
+    import seg_card
+    return '\n'.join(seg_card.card(
+        truth=seg_card.TRUTH,
+        selection="The k checked gaps are W46.seg-adapt-curve's first random draw, made before any few-shot answer; "
+                  "an unsure gap drawn as an example is listed but counted neither as labelled nor as an error.",
+        comparison="The same Gemini 3.7 Flash requests (gateway, low reasoning, temperature 0, g1 windows), with and "
+                   "without the k examples; both columns count the k gaps as corrected.",
+        noise="One draw per setting and single runs: no interval, and the rerun floor (1.4-3.2 points of pages exact "
+              "a box, SEG-10) is larger than every difference here.",
+        scope="Whether a user's corrections, fed back as text examples, help a cloud model on two public boxes. Not "
+              "image examples, not Gemini 3.8, not a box where the cloud model errs often."))
 
 
 def render(out):
@@ -255,7 +294,7 @@ def render(out):
          "W46.seg-lincoln-cloud-paid's cached arm; the few-shot column is the same requests with the box's k checked "
          'gaps added as text examples (OCR either side of the gap and the archivist\'s decision). The k gaps are '
          "W46.seg-adapt-curve's first random draw, and both columns count them as corrected.", '',
-         FINDINGS,
+         findings(out),
          '| box | k checked | held-out gaps | arm | held-out errors | per 100 held-out | false splits | false merges | pages exact | PQ |',
          '|---|---:|---:|---|---:|---:|---:|---:|---:|---:|']
     for s in out['settings']:
@@ -279,7 +318,8 @@ def render(out):
           'and then failed before sending (no requests module in that Python); its allowance stays charged. A box\'s cost '
           'covers all its settings.']
     L += ['', f"Item cost estimate ${out['item_cost_estimate']:.4f} of the ${out['cap']:.2f} cap, at Gemini's list rate "
-          '($0.75 / $3.75 per million input / output tokens, reasoning included); the gateway returns no cost.', '']
+          '($0.75 / $3.75 per million input / output tokens, reasoning included); the gateway returns no cost.', '',
+          card()]
     return '\n'.join(L)
 
 

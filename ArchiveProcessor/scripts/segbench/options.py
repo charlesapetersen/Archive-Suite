@@ -830,6 +830,23 @@ def render(out: dict) -> str:
     L.append("- The models make the same mistakes more often than different ones (on Dean, Claude and Gemini took "
              "the same decision on every gap), which is why combining them adds little over Claude alone.")
     L.append("")
+    import seg_card
+    L += seg_card.card(
+        truth="The owner's ruled test boxes, Stanton (with the owner's 2026-10-31 segmentation-sheet rulings, "
+              "W46.seg-truth-rescore) and RG 165, with the truth's photo labels; neither carries an unsure gap, so "
+              "every figure here is on a fixed truth. Levels and the mix rule were frozen on the owner's development "
+              "boxes (Dean, Deaver, Herrnstein).",
+        selection="Whole boxes chosen before these routes existed; the approaches are the ones the app offers, not "
+                  "picked by their test score. Nothing was fitted, chosen or re-chosen on the test boxes.",
+        comparison="Every approach on the same 363 pages and gaps, with its own flag level frozen first "
+                   "(`options-frozen.json`) and its own route's request and settings as cached; costs at list "
+                   "token prices.",
+        noise="Single runs with no intervals. The error counts are a few gaps each, so a difference of one or two is "
+              "within noise; the rerun floor (1.4-3.2 points of pages exact a box, SEG-10) applies to the "
+              "no-review column.",
+        scope="The figures the Processor shows for one archive's two locked boxes (363 pages). Not other material "
+              "(Lincoln, CREST and the locked new boxes wait for W46.seg-boxes-score), and not a forecast for a "
+              "user's own corpus.")
     text = "\n".join(L) + "\n"
     OUT_MD.write_text(text)
     return text

@@ -20,11 +20,13 @@ a finalist was collected under ``--final``. Nothing is fitted or chosen on them 
 with more scorers does not spend the held-out set; the figures are reported apart from the development boxes.
 
 THE DOCUMENT-COUNT PRIOR (A-segmentation test 9). A finding aid gives a document count without labels: Lincoln's
-catalogue lists 72 items for the 261 canvases (the audited truth has 81 documents) and the CREST folder 22 PDFs
-(truth 31). For a source with per-gap confidences, the prior keeps exactly the count's boundaries: the
+catalogue lists 72 items for the 261 canvases and the CREST folder 22 PDFs; the truth's own counts are in the
+report (since W46.seg-truth-rescore each box has unsure gaps, so its count is a range: every unsure gap joined to
+every one split, with the stored labels' count between). For a source with per-gap confidences, the prior keeps exactly the count's boundaries: the
 ``count - streams`` document gaps with the highest P(new) become boundaries and every other gap a continuation.
 On the owner boxes there is no finding aid, so the prior is run with the truth's own count as an oracle, which
-bounds what any count could buy.
+bounds what any count could buy. The oracle takes the stored labels' count; where a box has unsure gaps the report
+gives the range beside it (W46.seg-report-refresh).
 """
 from __future__ import annotations
 
@@ -35,6 +37,7 @@ from dataclasses import asdict
 from pathlib import Path
 
 import data
+import seg_card
 
 RESULTS = data.HERE.parent.parent / "segbench-results"
 OWNER_JSON = RESULTS / "seg-scorers-owner.json"
@@ -130,13 +133,23 @@ def count_prior(truth: list[str], pred, count: int) -> list[str] | None:
 # --- scoring --------------------------------------------------------------------------------------
 
 def truth_docs(labels: list[str]) -> int:
+    """The stored labels' document count (an unsure gap counts as stored; truth_doc_range gives the range)."""
     return sum(1 for i, t in enumerate(labels)
                if t == "New" or (t == "Cont" and (i == 0 or labels[i - 1] in ("Box", "Folder"))))
 
 
+def truth_doc_range(labels) -> dict:
+    """The truth's document count: as stored, and from every unsure document gap joined to every one split."""
+    from score import doc_unsure
+    unsure = doc_unsure(labels)
+    stored = truth_docs(list(labels))
+    split = sum(1 for i in unsure if labels[i] == "New")
+    return {"stored": stored, "low": stored - split, "high": stored + len(unsure) - split, "unsure_gaps": len(unsure)}
+
+
 def score_box(col, srcs: dict, priors: list[tuple[str, int]]) -> dict:
     from score import check_prediction, derived, score_labels
-    out = {"pages": len(col.pages), "documents": None, "sources": {}, "incomplete": {}}
+    out = {"pages": len(col.pages), "documents": truth_doc_range(col.labels), "sources": {}, "incomplete": {}}
     for name, (predict, family) in srcs.items():
         try:
             pred = predict(col)
@@ -148,7 +161,6 @@ def score_box(col, srcs: dict, priors: list[tuple[str, int]]) -> dict:
         check_prediction(pred)
         c = score_labels(col.labels, pred.labels, col.name)
         row = {"family": family, "counts": asdict(c), "metrics": derived(c)}
-        out["documents"] = c.docs
         for kind, count in priors:
             labels = count_prior(col.labels, pred, count)
             if labels is not None:
@@ -262,6 +274,16 @@ def spearman(a: list[float], b: list[float]) -> float | None:
     return cov / (va * vb) if va and vb else None
 
 
+def docs_text(d) -> str:
+    """A box's truth document count for a heading: one number, or the stored count with its unsure range."""
+    if not isinstance(d, dict):
+        return f"{d} documents"
+    if not d["unsure_gaps"]:
+        return f"{d['stored']} documents"
+    return (f"{d['stored']} documents as stored, {d['low']}-{d['high']} with its {d['unsure_gaps']} unsure "
+            f"gap{'s' if d['unsure_gaps'] > 1 else ''} either way")
+
+
 def render(owner_res: dict, public_res: dict) -> str:
     boxes = {**owner_res["boxes"], **public_res["boxes"]}
     family = {s: r["family"] for b in boxes.values() for s, r in b["sources"].items()}
@@ -282,7 +304,7 @@ def render(owner_res: dict, public_res: dict) -> str:
         out += [f"## {title}", ""] + table(pooled_rows(boxes, names), family) + [""]
     for name in ("Lincoln", "CREST"):
         b = boxes[name]
-        out += [f"## {name} ({b['pages']} pages, {b['documents']} documents)", ""]
+        out += [f"## {name} ({b['pages']} pages, {docs_text(b['documents'])})", ""]
         out += table({s: r["metrics"] for s, r in b["sources"].items()}, family) + [""]
 
     # How much of Lincoln is the metric's severity on long documents.
@@ -314,8 +336,11 @@ def render(owner_res: dict, public_res: dict) -> str:
     # The document-count prior.
     out += ["## The document-count prior (A-segmentation test 9)", "",
             "Each source's per-gap P(new) ranked, and exactly `count − streams` document gaps kept as boundaries. "
-            "Lincoln's count is the catalogue's 72 items (truth 81) and CREST's the folder's 22 PDFs (truth 31); "
-            "the oracle uses the truth's own count, which no user has, and bounds what a count can buy.", "",
+            f"Lincoln's count is the catalogue's {CATALOGUE_COUNT['Lincoln']} items (truth: "
+            f"{docs_text(boxes['Lincoln']['documents'])}) and CREST's the folder's {CATALOGUE_COUNT['CREST']} PDFs "
+            f"(truth: {docs_text(boxes['CREST']['documents'])}); the oracle uses the stored labels' own count, which "
+            "no user has, and bounds what a count can buy. Where the box has unsure gaps the oracle count is one point "
+            "of the range above, not the one true count.", "",
             "| box | source | count | as answered: pages exact | with the prior | PQ as answered | PQ with the prior |",
             "|---|---|---|---|---|---|---|"]
     prior_sets = [(n, "finding aid") for n in ("Lincoln", "CREST")] + \
@@ -342,6 +367,19 @@ def render(owner_res: dict, public_res: dict) -> str:
     out += ["## Sources with an incomplete cache somewhere", "",
             "Not collected on every box (each box lists only what it holds): " + ", ".join(
                 f"{s} ({', '.join(n for n, b in boxes.items() if s in b['incomplete'])})" for s in incomplete) + ".", ""]
+    out += seg_card.card(
+        truth=seg_card.TRUTH,
+        selection="Whole boxes, chosen before these routes were run; every source whose cache is complete on a table's "
+                  "boxes, none chosen by its score. Nothing is fitted on the test boxes or the public ones here.",
+        comparison="Every source on the same pages and the same truth, window and whole-folder sources with the "
+                   "truth's photo labels (so they measure boundaries); each source's own request and settings, as "
+                   "cached. The scorers differ, the answers do not.",
+        noise="Single cached runs, no intervals here: the rerun floor (1.4-3.2 points of pages exact a box, SEG-10) "
+              "and the truth's own label error are not in these figures, so a gap of a few points between sources is "
+              "a tie.",
+        scope="Which scorer agrees with pages exact, and what a document count buys, on these seven boxes. It does "
+              "not rank routes for the app (options.md does, with its review rule), and the conditional segment "
+              "figures on Lincoln and CREST are not one fixed truth across routes.")
     return "\n".join(out) + "\n"
 
 

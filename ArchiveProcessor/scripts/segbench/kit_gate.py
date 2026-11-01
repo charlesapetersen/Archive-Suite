@@ -11,15 +11,18 @@ NO CALLS, NO MONEY. Every answer is read from its response cache with ``allow_ca
 them, and the process refuses the network. Numbers only reach the committed files.
 
 THE TEACHER SPLIT (gap audit item 20). Each student's wrong gaps, split into the gaps where the teacher (Qwen3.5 27B,
-`seg-teacher.json`) made the same wrong call and the gaps where it was right. A student error the teacher shares is
-one the training could not have removed (the teacher's reply was the target); one it does not share is the student's
-own. Document gaps only, with the truth's photo labels, as `ensemble.py` scores them.
+`seg-teacher.json`) made the same wrong call and the gaps where it was right. It describes where the errors of frozen runs overlap; it
+is not a measured effect of training, sets no ceiling on what training could reach, and forecasts no other teacher's
+gain (measurement review 2026-10-31 pass 2, P2-4). Known document gaps only, with the truth's photo labels, as
+`ensemble.py` scores them; the owner's unsure gaps are left out (W46.seg-unsure-mask).
 
 THE HELD-OUT SET SIZE (H test 6). How many held-out gaps a gate needs before its interval separates a 3-point
 difference between two models. Documents of the five owner boxes are resampled with replacement (a document carries
 its own gaps, its pages, and whether each model put it exactly), paired, until the draw holds N gaps; 4,000 draws a
 size. The figure is the 95% interval's half-width of the paired difference in pages exact and in review load (gaps
-flagged at confidence 0.85, per 100 pages). The rerun noise the audit measured (1.4-3.2 points a box, SEG-10) is a
+flagged at confidence 0.85, per 100 pages). Truth noise is not in it: a wrong tag cancels in a paired difference only where
+the two models agree, and reverses the difference at a discordant gap, so the report gives the shift if the measured
+label-error rate fell on the discordant gaps (a sensitivity, not a measured rate). The rerun noise the audit measured (1.4-3.2 points a box, SEG-10) is a
 separate floor: a held-out set this size bounds the sampling error, not the model's own run-to-run wobble.
 
 THE DATING SPLIT. The dating students (W41.date-model) were trained on the owner's tags and dated public
@@ -285,6 +288,7 @@ def cmd_report() -> None:
         per = {n: bootstrap(docs, a, b, n, rng) for n in SIZES}
         boot[f"{b} - {a}"] = {"sizes": {str(n): v for n, v in per.items()},
                               "needed": {k: needed({n: per[n][k]["half"] for n in SIZES}) for k in per[SIZES[0]]}}
+    sens = {f"{b} - {a}": discordant(owner, a, b) for a, b in PAIRS}
     observed = {}
     for rec in owner + public:
         for key, m in rec["models"].items():
@@ -295,23 +299,64 @@ def cmd_report() -> None:
                                                         "gap accuracy": round(100 * (1 - wrong / len(rec["gaps"])), 1),
                                                         "gaps": len(rec["gaps"]), "doc pages": dp,
                                                         "unscored gaps": len(rec.get("unsure", ()))}
-    OUT_JSON.write_text(json.dumps({"teacher_split": split, "bootstrap": boot, "observed": observed,
+    OUT_JSON.write_text(json.dumps({"teacher_split": split, "bootstrap": boot, "truth_sensitivity": sens,
+                                    "observed": observed, "label_error": LABEL_ERROR, "truth": truth_provenance(),
                                     "dates": dates, "level": LEVEL, "draws": DRAWS, "seed": SEED,
                                     "documents_in_pool": len(docs), "gaps_in_pool": sum(d["gaps"] for d in docs)},
                                    indent=1) + "\n")
-    OUT_MD.write_text(render(split, boot, observed, dates, docs))
+    OUT_MD.write_text(render(split, boot, observed, dates, docs, sens, owner + public))
     print("wrote", OUT_MD, OUT_JSON)
 
 
-def render(split, boot, observed, dates, docs) -> str:
+LABEL_ERROR = (5.3, 0.0, 12.4)   # % wrong among agreed kept labels, with its interval (label-clean.md)
+
+
+def discordant(owner: list[dict], a: str, b: str) -> dict:
+    """Over the owner boxes' known gaps both models answered: how many are discordant (one right, one wrong), the
+    observed difference b - a in gap accuracy, and how far it could move if the measured label-error rate fell on the
+    discordant gaps, every wrong tag against the observed winner. A wrong tag at an agreed gap moves both models
+    alike; at a discordant gap it reverses which one is right, moving the difference by two gaps. A sensitivity
+    (P2-4): the 5.3% was measured on agreed labels and is not located on these gaps."""
+    n = d = diff = 0
+    for rec in owner:
+        if a not in rec["models"] or b not in rec["models"]:
+            continue
+        for k, g in enumerate(rec["gaps"]):
+            ra = rec["models"][a]["gaps"][k][0] == g["truth"]
+            rb = rec["models"][b]["gaps"][k][0] == g["truth"]
+            n += 1
+            d += ra != rb
+            diff += rb - ra
+    shift = {f"{r}%": round(100 * 2 * (r / 100) * d / n, 2) if n else None for r in LABEL_ERROR[::2]}
+    return {"gaps": n, "discordant": d, "difference": round(100 * diff / n, 2) if n else None, "shift": shift}
+
+
+def truth_provenance() -> dict:
+    """Which truth the records were scored on: the committed public manifests' hashes and their owner rulings."""
+    import hashlib
+    out = {}
+    for b in ("lincoln", "crest"):
+        path = RESULTS / "public-segmentation" / f"{b}.json"
+        m = json.loads(path.read_text())
+        out[b] = {"sha256": hashlib.sha256(path.read_bytes()).hexdigest(), "unsure": len(m.get("unsure", ())),
+                  "owner_rulings": len((m.get("owner_rulings") or {}).get("gaps", ()))}
+    return out
+
+
+def render(split, boot, observed, dates, docs, sens, records) -> str:
+    unsure = {r["box"]: len(r.get("unsure", ())) for r in records}
+    prov = truth_provenance()
     L = ["# W46.kit-gate — the kit's held-out gate and the teacher audit", "",
          "Generated by `ArchiveProcessor/scripts/segbench/kit_gate.py` from the bench's cached window answers (FarmShare "
          "runs of the teacher and students, `seg-teacher.md`, `seg-students.md`). No calls, no money. Document gaps "
          "only, with the truth's photo labels, as `ensemble.py` scores them.", "",
          "## The teacher split", "",
          "Each student's wrong gaps, split by what the teacher (Qwen3.5 27B, whose replies were the training target) "
-         "did on the same gap. A shared error is one training on the teacher could not remove; the rest are the "
-         "student's own.", "",
+         "did on the same gap. This describes where the errors of frozen runs overlap. It is not a measured effect "
+         "of training: a student also gets some of the teacher's wrong gaps right (the last column), and shared "
+         "conventions in the material, what the training data covered, or how each model generalises can each "
+         "produce overlap without the student having inherited it. Known gaps only: the owner's unsure gaps are "
+         "out of every count (" + ", ".join(f"{b} {n}" for b, n in unsure.items() if n) + ").", "",
          "| student | box | split | gaps | student wrong | teacher wrong the same way | teacher right | teacher wrong, student right |",
          "|---|---|---|---:|---:|---:|---:|---:|"]
     for s, per in split.items():
@@ -340,20 +385,20 @@ def render(split, boot, observed, dates, docs) -> str:
         L.append(f"- **On the test boxes, {pct(s2['teacher wrong the same way'], s2['student wrong'])} of the 2B's errors "
                  f"and {pct(s4['teacher wrong the same way'], s4['student wrong'])} of the 4B's are the teacher's.** The 2B shares "
                  f"{s2['teacher wrong the same way']} of its {s2['student wrong']} wrong gaps with the teacher, the 4B "
-                 f"{s4['teacher wrong the same way']} of {s4['student wrong']}. Those cannot be trained away with this "
-                 "teacher: a better teacher, or owner-ruled labels, is what would move them. The rest are errors the "
-                 "students add on top, which more or better-matched training could reach.")
+                 f"{s4['teacher wrong the same way']} of {s4['student wrong']}. That is co-occurrence in single runs, not a "
+                 "ceiling: it does not show that training on this teacher could not remove them, nor what a better "
+                 "teacher or owner-ruled labels would gain. Only a training run scored on held-out gaps measures that.")
     p2, p4 = pub.get("fs-seg-2b"), pub.get("fs-seg-4b")
     if p2 and p4:
         L.append(f"- **On the public boxes, material none of them trained on, the split is "
                  f"{p2['teacher wrong the same way']} of {p2['student wrong']} (2B) and {p4['teacher wrong the same way']} "
-                 f"of {p4['student wrong']} (4B).** Lincoln and CREST differ from the owner's corpus in kind, so how "
-                 "much of the students' loss there comes from the teacher says how far a second-family teacher could "
-                 "help a user whose material is unlike the owner's.")
+                 f"of {p4['student wrong']} (4B).** Lincoln and CREST differ from the owner's corpus in kind. The overlap "
+                 "there is descriptive too: it does not forecast how much a second-family teacher would help a user "
+                 "whose material is unlike the owner's.")
     L += ["- **Not yet on the owner's 80-gap checkpack or Sasha.** No route has answers on the windows those gaps sit "
           "in (the checkpack's gaps are 71 in training collections and 9 held out; Sasha was locked on 2026-10-30), so "
           "the students' accuracy on owner-ruled held-out gaps, and the split there, wait for the teacher-and-students "
-          "job W46.seg-boxes-score prepares for Sherlock (this item's teacher arm is shared with it, as the audit asks).",
+          "Sherlock job W46.kit-gate-sherlock prepares (W46.seg-boxes-score shares its teacher arm, as the audit asks).",
           "", "## The held-out set size", "",
           f"Paired document bootstrap over the five owner boxes ({len(docs)} documents, "
           f"{sum(d['gaps'] for d in docs)} gaps): documents drawn with replacement until the draw holds N gaps, "
@@ -379,13 +424,27 @@ def render(split, boot, observed, dates, docs) -> str:
           "vLLM is a second error of about the same size, so a 3-point difference is only separated when both are "
           "inside it: the gate should score two runs, or demand the difference clear the larger floor.",
           "- **These are owner gaps, and the kit's user has tags.** The interval is sampling only; a gate scored "
-          "against a user's tags inherits their noise (5.3% among agreed labels, `label-clean.md`), which shifts "
-          "both models' scores alike in a paired difference but caps any absolute claim.",
+          f"against a user's tags inherits their noise ({LABEL_ERROR[0]}% wrong among agreed labels, interval "
+          f"{LABEL_ERROR[1]:g}-{LABEL_ERROR[2]}%, `label-clean.md`). A wrong tag cancels in a paired difference only "
+          "where the two models agree; at a gap where one is right and the other wrong it reverses which one "
+          "scores, moving the difference by two gaps. That rate was measured on agreed labels and is not located "
+          "on the discordant gaps, so the table below is a sensitivity, not a measured noise term: the shift in the "
+          "gap-accuracy difference if that share of the discordant gaps' tags were wrong, every one against the "
+          "observed winner.", "",
+          "| difference | known gaps | discordant | observed gap-accuracy difference | shift at "
+          f"{LABEL_ERROR[0]}% | shift at {LABEL_ERROR[2]}% |", "|---|---:|---:|---:|---:|---:|"]
+    for pair, v in sens.items():
+        b, a = pair.split(" - ")
+        L.append(f"| {SHORT[b]} minus {SHORT[a]} | {v['gaps']:,} | {v['discordant']} | {v['difference']:+} points | "
+                 f"±{v['shift'][f'{LABEL_ERROR[0]}%']} | ±{v['shift'][f'{LABEL_ERROR[2]}%']} |")
+    L += ["",
           "", "## Observed, from the same records", "",
-          "| model | box | gaps | gap accuracy | pages exact |", "|---|---|---:|---:|---:|"]
+          "Known gaps only; pages exact over the documents every unsure gap leaves resolved (W46.seg-unsure-mask).", "",
+          "| model | box | known gaps | unscored gaps | gap accuracy | pages exact |", "|---|---|---:|---:|---:|---:|"]
     for key, per in observed.items():
         for box, r in per.items():
-            L.append(f"| {NAMES[key]} | {box} | {r['gaps']} | {r['gap accuracy']}% | {r['pages exact']}% |")
+            L.append(f"| {NAMES[key]} | {box} | {r['gaps']} | {r['unscored gaps']} | {r['gap accuracy']}% | "
+                     f"{r['pages exact']}% |")
     if dates:
         L += ["", "## The dating split (the 131 documents whose year is not in the text)", "",
               "The dating students were trained on the owner's tags and dated public documents, not on a teacher's "
@@ -421,7 +480,9 @@ def render(split, boot, observed, dates, docs) -> str:
         L += ["", f"The shipped build's own manifest is `seg-kit-manifest-shipped.json`: weights "
               f"`{man['weights_sha256'][:12]}…` (the 8-bit MLX build), anchor {an['box']} {an['pages_exact']}% of pages "
               f"exact ({an['pages_exact_interval'][0]} to {an['pages_exact_interval'][1]}), gap accuracy "
-              f"{an['gap_accuracy']}%, review load to 98% {an['review_load_per_100_pages']} gaps per 100 pages. Its "
+              f"{an['gap_accuracy']}%, review load to 98% {an['review_load_per_100_pages']} gaps per 100 pages, on "
+              f"{an['documents']} resolved documents ({an['pages']} pages) with {an.get('unscored_gaps', 0)} unsure "
+              f"gaps unscored, against truth `{an['truth_sha256'][:12]}…`. Its "
               "anchor answers are the full-precision FarmShare run, and its held-out run is not on this Mac, so its "
               "held-out block is empty and its own gate says so; the app requires only the anchor and the prompt."]
     L += ["", "## The kit end to end, dry (2026-10-31)", "",
@@ -436,7 +497,8 @@ def render(split, boot, observed, dates, docs) -> str:
           "sbatch line serving the merged student under its name; the packs come from `corpus_pairs.py subpack "
           "--split holdout` and `public_segmentation.py pack` |",
           "| the gate | `train_seg.py check` on the cached FarmShare runs (Lincoln; the joint 2B's held-out run) | "
-          "reproduces the bench's figures (4B 46.7%, 2B 34.9% on Lincoln); joint 2B 80.4% of 7,277 held-out tag gaps |",
+          "reproduced the bench's figures at the time (4B 46.7%, 2B 34.9% on Lincoln, before the owner's rulings were "
+          "folded; the manifest above is on the current truth); joint 2B 80.4% of 7,277 held-out tag gaps |",
           "| the app | `LocalSegmenter.refusal` on the written manifests | the shipped manifest passes; no manifest, no "
           "anchor score or another prompt is refused |", "",
           "What the dry run found missing from the kit:", "",
@@ -455,18 +517,23 @@ def render(split, boot, observed, dates, docs) -> str:
           "window went from 26% to 39% over this session, which shares it with anything else running; the kit's own "
           "steps were seconds of CPU."]
     L += ["", "## Measurement card", "",
-          "- **Truth.** The owner's ruled boxes (Dean, Deaver, Herrnstein; test boxes Stanton and RG165) and the "
-          "audited public truths of Lincoln and CREST; dating: the owner's year tags. Stanton still carries the "
-          "full-magazine rule the owner re-ruled on 2026-10-29 (SEG-7), so its figures will move when it is re-ruled.",
+          "- **Truth.** The owner's ruled boxes (Dean, Deaver, Herrnstein; test boxes Stanton and RG165), Stanton "
+          "with the owner's 2026-10-31 segmentation-sheet rulings folded (W46.seg-truth-rescore); the agent-audited "
+          "public truths of Lincoln and CREST with the owner's rulings folded ("
+          + ", ".join(f"{b} {v['owner_rulings']} ruled, {v['unsure']} unsure, `{v['sha256'][:12]}…`" for b, v in prov.items())
+          + "); their other gaps remain agent-audited. Unsure gaps are out of every count (W46.seg-unsure-mask). "
+          "Dating: the owner's year tags.",
           "- **Selection.** Whole boxes, chosen before these models existed; the dating 131 by whether the year is in "
           "the ABBYY text, which is how they were chosen in W41.date-model (ABBYY is not an input here).",
           "- **Comparison.** Every model on the same windows and the same request (`method_local.request`, the "
           "images at 1,024 px, temperature 0, thinking off), each on one L40S under vLLM 0.31, read from "
           "`method_openrouter.py`'s caches; the untrained 4B was run on the development boxes only.",
-          f"- **Noise.** The bootstrap's intervals above; the rerun floor (1.4-3.2 points a box) is not in them. "
-          "Shared-error counts are single runs.",
-          "- **Scope.** The owner's material and two public boxes. The checkpack and Sasha arms, which measure "
-          "accuracy on owner-ruled held-out gaps, wait for the Sherlock job (above).", ""]
+          f"- **Noise.** The bootstrap's intervals above are sampling only; the rerun floor (1.4-3.2 points a box) "
+          "is not in them, and truth noise enters only as the discordant-gap sensitivity. Shared-error counts are "
+          "single runs, and descriptive.",
+          "- **Scope.** The owner's material and two public boxes. Overlap is not a training ceiling and forecasts "
+          "no other teacher. The checkpack and Sasha arms, which measure accuracy on owner-ruled held-out gaps, wait "
+          "for the Sherlock job (above).", ""]
     return "\n".join(L)
 
 

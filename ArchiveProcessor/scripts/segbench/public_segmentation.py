@@ -114,7 +114,7 @@ def pack(col, manifest, key, out):
 def score(col, manifest, key, output_dir=None):
     from dataclasses import asdict
     from methods import AllNew, NoBoundaries, RuleCuesSketch
-    from score import score_labels, derived, check_prediction
+    from score import score_labels, derived, check_prediction, doc_unsure
     methods = [AllNew(), NoBoundaries()]
     if all(data.ocr_cache_path(col.name, p.n).exists() for p in col.pages):
         methods.append(RuleCuesSketch())
@@ -152,7 +152,7 @@ def score(col, manifest, key, output_dir=None):
             import method_openrouter as R
             predictions[key] = W.assemble(col, W.combine(col, R.judge(key)), False)
     result = {"box": col.name, "public": True, "pages": len(col.pages),
-              "documents": Counter(col.labels)["New"], "models": {},
+              "documents": Counter(col.labels)["New"], "unsure_gaps": len(doc_unsure(col.labels)), "models": {},
               "truth_sha256": hashlib.sha256(json.dumps(manifest, sort_keys=True).encode()).hexdigest()}
     for name, pred in predictions.items():
         check_prediction(pred)
