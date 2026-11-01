@@ -79,7 +79,7 @@ HAND_PAGES, TRAIN_PAGES, SEED = 36, 24, 46
 MIN_LINES = 8                 # a diary page with fewer truth lines is skipped (a blank or a cover)
 MAX_CER, LEN_RATIO, SKIP = 0.6, 2.0, 0.7
 VAL_LINES = 10
-CURVE = {'blackwell': (20, 40, 80, 160, 240), 'owner': (20, 80)}   # owner: 20 lines and all of the other three pages'
+CURVE = {'blackwell': (20, 40, 80, 160, 240), 'owner': (80,)}   # owner: all of the other three pages' lines (39-57)
 MPS_N = 80
 
 
@@ -609,7 +609,9 @@ def cmd_train(a):
         print(f'{name}: {secs / 60:.1f} min, best {best.name}')
 
 
-MIN_EPOCHS, LAG, MAX_EPOCHS = 10, 5, 25
+# Early stopping: at least 5 epochs, stop 3 without a better validation score (blackwell-n20 ran at 10 and 5 and
+# its best was epoch 2, the same best either way).
+MIN_EPOCHS, LAG, MAX_EPOCHS = 5, 3, 25
 LINE_STEPS = 1500   # at batch 1 an epoch is one step a line: a larger set gets fewer epochs (80: 18, 160: 9, 240: 6)
 
 
@@ -626,7 +628,8 @@ TRAIN_PRECISION = os.environ.get('PPOCRV6_PRECISION', '32-true')
 # AdamW, not the config's AdamW+Muon: Muon's Newton-Schulz step runs in bfloat16, which has no fast CPU kernel, and
 # took 97% of a CPU training's time on one core (sampled 2026-11-01).
 # --workers 0: ketos's DataLoader worker is a fork of the trainer, and the memory guard charges its shared pages again.
-TRAIN_CAP_GB = 5.   # a batch-1 training peaks at 2.9 GB; two run side by side (train --hand)
+TRAIN_CAP_GB = 5.   # a batch-1 training peaks at 2.9-3.6 GB. Two CPU trainings side by side each ran
+                    # about 4x slower (2026-11-01), so CPU trainings run one at a time; the MPS one beside them
 
 
 def best_model(d):
@@ -878,7 +881,7 @@ def main():
                                         'report'])
     ap.add_argument('--device', choices=['cpu', 'mps'])
     ap.add_argument('--only', help='train: a regular expression over the training names')
-    ap.add_argument('--hand', choices=['blackwell', 'owner'], help='train: one hand (the two run side by side)')
+    ap.add_argument('--hand', choices=['blackwell', 'owner'], help='train: one hand')
     a = ap.parse_args()
     globals()['cmd_' + a.command.replace('-', '_')](a)
 
