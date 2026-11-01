@@ -422,3 +422,25 @@ its own date. Verbatim as recorded when granted.)*
     adjacent one in the batch code.
   - **Not data loss — money.** Results already written stay written; the cost is paying twice. Frame the fix
     and its proof around re-spend, and do not over-correct into withholding or deleting anything.
+
+
+## 2026-11-01 — ready paid processing-review runs (owner session)
+
+The owner instructed: “Do the paid calls if they’re ready to be done, or set up so the engine can do them.”
+This covers the following prepared runs, retaining their existing review, pilot and accounting checks:
+
+- **W46.seg-boxes-score:** cached archival images and Apple Vision text (not adjudicated target truth) from
+  Sasha, the Illustrated Review, SC0122 and Stanton/RG165 offset windows may go to
+  `https://aiapi-prod.stanford.edu/v1/chat/completions`, through the existing Processor Gateway credential,
+  Gemini 3.7 Flash. **$6.80 total item cap**, including every attempt and the retained $0.0291 reservation;
+  estimate about $5.30 for the remaining 546 windows. This answers W46.seg-boxes-score-owner-ok.
+  Resume the saved item-branch checkpoints through d36e03ff, not the older main scorer.
+- **W46.ocr-ppocrv6-hands-paid:** the frozen 71-page / 213-condition hand-icl-20261101 image pack and
+  corrected example-line images/text may go to the same Stanford gateway with Gemini 3.7 Flash.
+  **$1 total item cap**, including every attempt and pilot/repeats. Target-page reference answers stay
+  on the Mac. Keep the 0/8/16 conditions and same-volume/folder-proxy/transfer cohorts separate.
+
+Neither cap is increased. Unknown or incomplete billing is not a free retry; stop at the existing
+projection/cap checks. Never write to the real corpus. The separately raised permission to publish the
+seg-boxes-score checkpoints to main is not answered by this paid-call instruction; preserve that work on
+its item branch until that question is settled.
