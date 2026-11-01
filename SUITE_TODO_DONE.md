@@ -13680,3 +13680,24 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   `marks-set/` (selection, both drafts, Gemini ledger, sheet, 48 MB) for the owner's sitting and the score item;
   the rebuildable `marks-set/local-images/` (49 MB) went to the Trash.
   <!-- /W46.fix-marks-set-draft -->
+- [x] **W46.layout-photo — whether DocLayout-YOLO collapses on our photographs [M]** · §Document processing review — W46 (owner, 2026-10-20) (lane: segbench) (uses: build) (cluster: sherlock) — SHIPPED 2026-10-31.
+  Four detectors (DocLayout-YOLO in the app's setup, PP-DocLayoutV3, docling-layout-heron, Apple Vision's document
+  request) feeding GLM-OCR on the 96, L9, L4 and 155 Real5-OmniDocBench pages in Scanning, Illumination, Warping and
+  Skew, plus the quad and UVDoc copies of Warping and Skew. Mac half (detectors, Real5 fetch and pre-step, the
+  handwriting arm `segbench-results/layout-photo-hands.md`) in checkpoints 1-4; Sherlock pack layout-photo-20261030
+  (batch 20261031-131437, 4/4 jobs, 60,880 crops, 95 capped, 0.9 GPU-hours, no money); scored by
+  `layout_photo.py score` into `segbench-results/layout-photo.md` (measurement card), `-tables.md`, `.json`,
+  `-pages.csv`. Shared arms reproduce regions-20261021 exactly.
+  Result: yes. YOLO drops 81.2 to 41.1 NES on Skew (−40.1 [−47.2, −33.1]; nothing kept on 58 of 155 pages;
+  RT-DocLayout's Table 2 has 48.74 against 91.66), and reads 14.2 against the whole page's 85.8 on the 96's
+  hands and 1.6 against 59.7 on L4. PP-DocLayoutV3 is the robust detector (ties the whole page on Scanning,
+  −10.0 on Skew); Vision's regions score 16.8 on L9. The whole page beats every detector except on newspapers.
+  A quad first lifts YOLO +37.1 on Skew and PP +7.4; on the whole page the pre-step is inside the noise
+  (W46.enh-dewarp again). The decisions (shipped detector, kind gate, quad before layout) go to W46.review-phase4.
+  ArchiveOCRBench: three GLM-OCR region routes on the 96's charts and a "Layout detectors on photographed pages"
+  table; the published copy is now behind (an unattended session does not republish).
+  Bench cache: kept `layout-photo/` regions, pages.jsonl, Real5 truth and quad records (12 MB) for rescoring; the
+  Real5 frozen images (650 MB) and the OmniDocBench json (63 MB) went to the Trash, rebuildable by
+  `layout_photo.py real5-fetch` and `real5-prep`. The pack with its readings stays at
+  `$AGENT_STATE/artifacts/layout-photo-20261030` (images 650 MB, out 241 MB).
+  <!-- /W46.layout-photo -->

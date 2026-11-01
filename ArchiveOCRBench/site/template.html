@@ -372,6 +372,12 @@ footer p { font-size: 13px; }
     <div class="tbl"><table><thead><tr><th>Ordering stage</th><th>Benchmark lines, multi-column</th><th>Single-column</th><th>Word error from order, multi-column</th><th>DocLayout-YOLO regions, multi-column</th><th>Single-column</th><th>Lines inside a region</th><th>L9 newspapers</th><th>L9 order gap</th></tr></thead><tbody id="order-rows"></tbody></table></div>
   </section>
 
+  <section class="panel" id="pub-layout-photo" hidden>
+    <div class="head"><h2>Layout detectors on photographed pages</h2><span class="meta">GLM-OCR NES %, failures as 0 (answered / pages); Δ in NES points, 95% interval · Sherlock, free (W46.layout-photo)</span></div>
+    <p class="note" id="lp-note"></p>
+    <div class="tbl"><table><thead><tr><th>Pages</th><th>Whole page</th><th>DocLayout-YOLO, app sort</th><th>PP-DocLayoutV3</th><th>docling-layout-heron</th><th>Apple Vision document</th><th>DocLayout-YOLO, newspaper-ocr</th></tr></thead><tbody id="lp-rows"></tbody></table></div>
+  </section>
+
   <section class="panel" id="pub-spec" hidden>
     <div class="head"><h2>Models built for the script</h2><span class="meta">NES %, failures as 0; paired differences in NES points</span></div>
     <div class="tbl"><table><thead><tr><th>Stratum</th><th>Model</th><th>Trained on a test source</th><th>Answered</th><th>NES</th><th>Second score</th><th>chrF</th><th>Minus Gemini (95%)</th><th>Minus Qwen (95%)</th></tr></thead><tbody id="pub-spec-rows"></tbody></table></div>
@@ -864,6 +870,19 @@ if (LO) {
     const own = l9 && l9.all.covered != null ? ' (own lines ' + p(l9.all.covered) + ', tau ' + l9.all.tau_own.toFixed(3) + ')' : '';
     return '<tr><td>' + (NAMES[a] || a) + '</td><td>' + t(bl && bl.multi) + '</td><td>' + t(bl && bl.single) + '</td><td>' + p(bl && bl.multi.oiwer) + '</td><td>' + t(br && br.multi) + '</td><td>' + t(br && br.single) + '</td><td>' + p(br && br.all.coverage) + '</td><td>' + t(l9 && l9.all) + own + '</td><td>' + (l9 ? (100 * l9.all.gap).toFixed(1) : '–') + '</td></tr>'; }).join('');
   document.getElementById('order-note').textContent = 'Each ordering stage orders the same boxes. Benchmark lines: the 40 scored pages of the historical reading-order benchmark (Jha, MIT) on its own YOLOv8m line boxes; this reproduces its published 0.50 and 0.99. DocLayout-YOLO regions: the same pages, each ground-truth body line read in its region\'s place, top to bottom inside it; the detector finds no body region on the Swedish court hand and the Middle-French manuscripts, so most multi-column pages fail the guard (' + (100 * LO.guard.min_frac) + '% of the lines and at least ' + LO.guard.min_n + '). The benchmark\'s XY-cut never cuts a gutter (its threshold is 1.2 median box widths), so it equals top to bottom; the rows-first XY-cut is the method itself. L9: NewsBench\'s 15 Library of Congress pages, Vision\'s lines inside DocLayout-YOLO\'s body regions, tau over the lines found in the volunteer transcription; the order gap is the order-free bag-of-words F1 less word accuracy, in points, with recognition the same in every row. Word error from order assumes perfect recognition. Detail: segbench-results/layout-order.md.';
+}
+const LPH = DATA.layout_photo;
+if (LPH) {
+  document.getElementById('pub-layout-photo').hidden = false;
+  const ARMS = ['whole', 'yolo_appsort', 'pp-doclayoutv3', 'heron', 'vision_doc', 'yolo_newsocr'];
+  const NAME = {scan: 'Real5 Scanning', illum: 'Real5 Illumination', warp: 'Real5 Warping', skew: 'Real5 Skew',
+    'warp-quad': 'Warping, after the quad', 'warp-uvdoc': 'Warping, after UVDoc', 'skew-quad': 'Skew, after the quad', 'skew-uvdoc': 'Skew, after UVDoc',
+    L9: 'L9 newspapers', L4: 'L4 registers', 'the 96': 'The 96', handwritten: "The 96's handwritten pages"};
+  const d = x => x ? ' Δ ' + (100 * x[0] >= 0 ? '+' : '') + (100 * x[0]).toFixed(1) + ' [' + (100 * x[1]).toFixed(1) + ', ' + (100 * x[2]).toFixed(1) + ']' : '';
+  const c = e => e ? (100 * e.nes).toFixed(1) + ' (' + e.ok + '/' + e.n + ')' + d(e.d) : '–';
+  const row = (k, arms) => '<tr><td>' + NAME[k] + '</td>' + ARMS.map(a => '<td>' + c(arms[a]) + '</td>').join('') + '</tr>';
+  document.getElementById('lp-rows').innerHTML = [...Object.entries(LPH.real5), ...Object.entries(LPH.staged), ...Object.entries(LPH.bench)].map(([k, a]) => row(k, a)).join('');
+  document.getElementById('lp-note').textContent = 'Four layout detectors, each at its shipped or maker setting, cut regions that GLM-OCR reads with W46.ocr-regions\' request; a page with no region read scores 0. Real5-OmniDocBench: the 155 English OmniDocBench v1.5 pages whose truth is plain text, photographed again in each condition; Δ is against the same arm on Scanning (Real5), against the raw photograph (after the quad or UVDoc), or against the whole page (bench pages). On Skew, DocLayout-YOLO keeps no region on 58 of 155 pages; a quad correction first restores most of it. The whole page is best everywhere except on newspapers. Reading took ' + LPH.gpu_hours + ' GPU-hours; ' + LPH.caps + ' crops hit the token cap. Detail: segbench-results/layout-photo.md.';
 }
 const curveCanvas = document.querySelector('#dif-curves canvas'), frontCanvas = document.querySelector('#dif-frontier canvas');
 let curveChart, frontChart;

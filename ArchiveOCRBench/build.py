@@ -68,6 +68,7 @@ ENH_OCR = RESULTS / "enh-ocr-input.json"  # W46.enh-ocr-input: enh_ocr_input.py 
 POSTCORRECT = RESULTS / "ocr-postcorrect.json"  # W46.ocr-postcorrect: postcorrect.py score --results, the band corrector
 LOGPROB = RESULTS / "ocr-logprob.json"  # W46.ocr-logprob: ocr_logprob.py report, log-probabilities as an error flag
 LAYOUT_ORDER = RESULTS / "layout-order.json"  # W46.layout-order: layout_order.py run, ordering with detection fixed
+LAYOUT_PHOTO = RESULTS / "layout-photo.json"  # W46.layout-photo: layout_photo.py score, four detectors feeding GLM-OCR
 RERUN_NOISE = RESULTS / "ocr-rerun-noise.json"  # W46.ocr-rerun-noise: ocr_rerun_noise.py report, the 96 read three times
 LOOPS = PUBLIC / "loop-rerun-20261021.json"  # W46.ocr-loops: corpus/loop_rerun.py report, the capped pages read again
 REGIONS = PUBLIC / "regions-20261021.json"  # W46.ocr-regions: whole page, detector regions and overlapping tiles
@@ -804,6 +805,42 @@ def layout_order():
             **{k: d[k]["summary"] for k in ("bench_lines", "bench_regions", "l9")}}
 
 
+LAYOUT_PHOTO_ARMS = {"yolo_appsort": "DocLayout-YOLO regions, the app's sort", "heron": "docling-layout-heron regions",
+                     "vision_doc": "Apple Vision document regions"}  # the rest of its bench arms are W46.ocr-regions' rows
+
+
+def layout_photo_chart_routes(data, kinds, op):
+    """W46.layout-photo's new GLM-OCR crop arms on the 96, priced as region_chart_routes prices GLM-OCR's."""
+    if data is None:
+        return []
+    out = []
+    for arm, label in LAYOUT_PHOTO_ARMS.items():
+        groups = [("overall", "the 96"), *((k, "kind:" + k) for k in kinds)]
+        overall = data["bench"]["the 96"][arm]
+        price = openrouter_price(op, "glm-ocr", overall["prompt_tokens"] / overall["n"],
+                                 overall["completion_tokens"] / overall["n"])
+        out.append({"id": f"layout-photo-glm-ocr-{arm}", "name": "GLM-OCR · " + label, "panel": "farmshare",
+                    "cluster": "Sherlock", "std": cents(price) if price is not None else 0.0, "batch": None,
+                    "free_cluster": price is None, "machine": "one NVIDIA L40S per job",
+                    "hw": {"photos_per_hour": None, "gpu_hours_per_100k": None},
+                    "scores": {key: [round(100 * data["bench"][g][arm]["nes"], 2), data["bench"][g][arm]["ok"],
+                                     data["bench"][g][arm]["n"]] for key, g in groups}})
+    return out
+
+
+def layout_photo(data):
+    """W46.layout-photo's table: each detector's GLM-OCR NES by photographed condition and on the bench groups."""
+    if data is None:
+        return None
+    cell = lambda e, k=None: {"nes": e["nes"], "ok": e["ok"], "n": e["n"],
+                              **({"d": [e[k]["delta"], e[k]["lo"], e[k]["hi"]]} if k and k in e else {})}
+    return {"real5": {c: {a: cell(e, "vs_scan") for a, e in arms.items()} for c, arms in data["real5"].items()},
+            "staged": {c: {a: cell(e, "vs_raw") for a, e in arms.items()} for c, arms in data["staged"].items()},
+            "bench": {g: {a: cell(e, "vs_whole") for a, e in data["bench"][g].items()}
+                      for g in ("L9", "L4", "the 96", "handwritten")},
+            "gpu_hours": data["meta"]["gpu_hours_reading"], "caps": data["meta"]["caps"]}
+
+
 def region_chart_routes(data, kinds, op):
     """Crop routes on the exact panel-kind subsets, priced from all attempted crops of the 96 accuracy pages.
     Concurrent job spans combine all arms and sets, so no per-arm throughput is inferred from them.
@@ -1001,7 +1038,9 @@ def main():
         scores, hw = farmshare_run(spec["run"], inputs["kinds"], op)
         extra.append({"name": spec["name"], "panel": "farmshare", "under": spec["under"], "std": cents(hw["usd_per_1000"]), "machine": spec["machine"],
                       "hw": hw, "scores": scores})
-    for route in region_chart_routes(regions, inputs["kinds"], op):
+    layout_photo_data = json.loads(LAYOUT_PHOTO.read_text()) if LAYOUT_PHOTO.exists() else None
+    for route in [*region_chart_routes(regions, inputs["kinds"], op),
+                  *layout_photo_chart_routes(layout_photo_data, inputs["kinds"], op)]:
         scores = route.pop("scores")
         routes.append(route)
         for c in charts:
@@ -1067,7 +1106,7 @@ def main():
              "public": public(), "ocr_scorers": ocr_scorers(),
              "dewarp": dewarp, "enh_ocr": enh_ocr,
              "loops": json.loads(LOOPS.read_text()) if LOOPS.exists() else None, "regions": regions,
-             "layout_order": layout_order(), "logprob": logprob(), "postcorrect": postcorrect()}
+             "layout_order": layout_order(), "layout_photo": layout_photo(layout_photo_data), "logprob": logprob(), "postcorrect": postcorrect()}
     page = TEMPLATE.read_text().replace("__DATA__", json.dumps(built, separators=(",", ":")))
     outputs = {OUT_DATA: json.dumps(built, indent=1) + "\n", OUT_PAGE: page, OUT_DIFFICULTY: difficulty.report(diff)}
 
