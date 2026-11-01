@@ -400,6 +400,12 @@ footer p { font-size: 13px; }
     <div class="tbl"><table><thead><tr><th>Training</th><th>Hand</th><th>Lines</th><th>Device</th><th>Minutes</th><th>Peak GB</th><th>Held-out pages</th><th>Base</th><th>Tuned</th><th>Δ (95% interval)</th></tr></thead><tbody id="hands-tunes"></tbody></table></div>
   </section>
 
+  <section class="panel" id="hands-icl" hidden>
+    <div class="head"><h2>Gemini given corrected handwriting lines</h2><span class="meta">0, 8 or 16 examples · Stanford gateway · NES points</span></div>
+    <p class="note" id="hands-icl-note"></p>
+    <div class="tbl"><table><thead><tr><th>Pages</th><th>Example lines</th><th>Answered / attempted / fixed n</th><th>NES answered</th><th>NES strict</th><th>Δ vs zero, both answered (95% interval)</th><th>Collection-clustered interval</th></tr></thead><tbody id="hands-icl-rows"></tbody></table></div>
+  </section>
+
   <section class="panel" id="pub-loops" hidden>
     <div class="head"><h2>Reading the looping pages again</h2><span class="meta">every capped page of the sweep · free (W46.ocr-loops)</span></div>
     <p class="note" id="loops-note"></p>
@@ -968,6 +974,18 @@ if (PH) {
   document.getElementById('hands-tunes').innerHTML = PH.tunes.map(t => '<tr><td>' + t.name + '</td><td>' + t.hand + (t.hand === 'owner' ? ' (agreement with the drafters)' : '') +
     '</td><td>' + t.n + '</td><td>' + t.device + '</td><td>' + f(t.minutes) + '</td><td>' + (t.peak_gb == null ? '–' : t.peak_gb.toFixed(2)) + '</td><td>' + t.pages +
     '</td><td>' + f(t.base) + '</td><td>' + f(t.tuned) + '</td><td>' + sg(t.delta) + ' (' + sg(t.lo) + ' to ' + sg(t.hi) + ')</td></tr>').join('');
+}
+const HI = DATA.hands_icl;
+if (HI && HI.complete) {
+  document.getElementById('hands-icl').hidden = false;
+  const names = {'blackwell-held-out': 'Blackwell same-volume holdout', 'owner-Shils-folder-proxy': 'Shils folder (hand assumed)', 'owner-transfer': 'Owner, other hands unverified', 'public-L1-transfer': 'Public L1, mixed/unverified hands'};
+  const num = x => x == null ? '–' : x.toFixed(2);
+  const iv = x => x && x.n ? num(x.delta) + ' (' + num(x.lo) + ' to ' + num(x.hi) + '; n=' + x.n + ')' : '–';
+  document.getElementById('hands-icl-rows').innerHTML = HI.groups.map(g => {
+    const c = HI.comparisons.find(c => c.cohort === g.cohort && c.examples_n === g.examples_n);
+    return '<tr><td>' + names[g.cohort] + '</td><td>' + g.examples_n + '</td><td>' + g.answered + ' / ' + g.attempted + ' / ' + g.n + '</td><td>' + num(g.nes_answered) + '</td><td>' + num(g.nes_strict) + '</td><td>' + (c ? iv(c.both_answered) : 'baseline') + '</td><td>' + (c && g.cohort === 'public-L1-transfer' ? iv(c.collection_clustered) : 'not estimated across hands') + '</td></tr>';
+  }).join('');
+  document.getElementById('hands-icl-note').textContent = (HI.verdict || '') + ' Same target pages and nested line examples as the Qwen experiment, encoded here as native-pixel numbered PNG sheets; model-side downsampling is unknown. Only one documented diary hand and a four-page folder proxy: page intervals do not establish generalisation across hands. Owner truth was drafted by model relatives, with the original 16 hand pages checked at disputed places; three extra owner letters remain agreement-only. L1 includes five Blackwell pages, so it is not purely cross-hand transfer. The report also gives clear-owner-page sensitivity and strict failure=0 differences. Borrowed hand-kind noise floor 0.60 points; public/prompt-specific noise unmeasured. These subsets support this panel, not whole-96 or whole-895 rankings. Total $' + HI.charged.toFixed(3) + ', including the abandoned separate-image pilot. Source: segbench-results/ocr-ppocrv6-hands-paid.md.';
 }
 const LP = DATA.loops;
 if (LP) {

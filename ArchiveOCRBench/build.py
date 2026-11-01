@@ -1181,6 +1181,9 @@ def main():
              "seg_kit_gate_sherlock": seg_kit_gate_sherlock(), "seg_boxes_score": seg_boxes_score(),
              "public": pub, "ocr_scorers": ocr_scorers(),
              "ppocrv6_hands": ppocrv6_hands(pub and pub["open_sweep"]),
+             "hands_icl": {k: v for k, v in json.loads((RESULTS / "ocr-ppocrv6-hands-paid.json").read_text()).items()
+                           if k in ("model", "groups", "comparisons", "cohorts", "charged", "complete", "verdict")}
+                          if (RESULTS / "ocr-ppocrv6-hands-paid.json").exists() else None,
              "dewarp": dewarp, "enh_ocr": enh_ocr,
              "loops": json.loads(LOOPS.read_text()) if LOOPS.exists() else None, "regions": regions,
              "layout_order": layout_order(), "layout_photo": layout_photo(layout_photo_data), "logprob": logprob(), "postcorrect": postcorrect()}

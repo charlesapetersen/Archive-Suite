@@ -30,8 +30,11 @@ class Contracts(unittest.TestCase):
                         image='target.jpg', examples=[])
         self.freeze = dict(prompt='Read the target', max_tokens=8192)
         self.out = self.root / 'out'
+        self.legacy_patch = patch.object(H, 'LEGACY_OUT', self.root / 'legacy')
+        self.legacy_patch.start()
 
     def tearDown(self):
+        self.legacy_patch.stop()
         self.temp.cleanup()
 
     def call(self, reply=None):
@@ -89,6 +92,16 @@ class Contracts(unittest.TestCase):
             self.call()
         self.assertEqual(len(H.journal(self.out)), 24)
 
+    def test_custom_output_still_counts_original_pilot(self):
+        H.LEGACY_OUT.mkdir()
+        H.append(H.LEGACY_OUT, dict(id='old', event='reserve', request_sha256='old', reservation=.08))
+        with self.assertRaisesRegex(ValueError, 'outstanding'):
+            self.call()
+        H.append(H.LEGACY_OUT, dict(id='old', event='settle', request_sha256='old', cost=.96))
+        with self.assertRaisesRegex(ValueError, 'item cap'):
+            self.call()
+        self.assertEqual(H.journal(self.out), [])
+
     def test_length_and_empty_are_failed_without_retry(self):
         for finish, text in [('length', 'cut off'), ('stop', ''), ('stop', None)]:
             with self.subTest(finish=finish, text=text):
@@ -104,6 +117,13 @@ class Contracts(unittest.TestCase):
                       {'prompt_tokens': float('nan'), 'completion_tokens': 1}]:
             self.assertFalse(H.known_usage(usage))
         self.assertTrue(H.known_usage({'prompt_tokens': 12, 'completion_tokens': 20}))
+
+    def test_keychain_timeout_precedes_spend(self):
+        import subprocess
+        with patch.object(H.subprocess, 'run', side_effect=subprocess.TimeoutExpired('security', 20)):
+            with self.assertRaisesRegex(ValueError, 'no paid call made'):
+                H.load_key()
+        self.assertFalse(H.journal(self.out))
 
     def test_partial_usage_charges_full_reservation(self):
         class Partial(Reply):
@@ -137,6 +157,25 @@ class Contracts(unittest.TestCase):
                 H.run(a)
         self.assertEqual(list(pack.iterdir()), [])
         self.assertEqual(list(truth.iterdir()), [])
+
+    def test_sheet_preserves_each_crop_pixel_and_order(self):
+        from PIL import Image
+        import io
+        examples = []
+        for i, size in enumerate([(30, 10), (20, 25)]):
+            name = f'e{i}.png'
+            Image.new('RGB', size, (i * 100, 20, 50)).save(self.root / name)
+            examples.append(dict(id=str(i), image=name, text='corrected line'))
+        raw, meta = H.example_sheet(self.root, examples)
+        with Image.open(io.BytesIO(raw)) as sheet:
+            for e, placement in zip(examples, meta['placements'], strict=True):
+                with Image.open(self.root / e['image']) as original:
+                    self.assertEqual(sheet.crop(tuple(placement['rect'])).tobytes(), original.tobytes())
+            self.assertEqual([p['id'] for p in meta['placements']], ['0', '1'])
+        self.job.update(examples=examples, examples_n=2)
+        content = H.body(self.root, self.freeze, self.job)['messages'][0]['content']
+        self.assertEqual(sum(x['type'] == 'image_url' for x in content), 2)
+        self.assertTrue(content[2]['image_url']['url'].startswith('data:image/png;base64,'))
 
     def test_cluster_bootstrap_counts_collections(self):
         v = H.interval([1, 1, -3, -3], ['a', 'a', 'b', 'b'], rounds=1000)
