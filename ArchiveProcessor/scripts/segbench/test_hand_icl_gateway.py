@@ -99,6 +99,25 @@ class Contracts(unittest.TestCase):
         self.call(Reply(usage=False))
         self.assertEqual(H.state(H.journal(self.out))[2], H.RESERVE)
 
+    def test_partial_invalid_usage_is_unknown(self):
+        for usage in [{}, {'prompt_tokens': 12}, {'prompt_tokens': 0, 'completion_tokens': -1},
+                      {'prompt_tokens': float('nan'), 'completion_tokens': 1}]:
+            self.assertFalse(H.known_usage(usage))
+        self.assertTrue(H.known_usage({'prompt_tokens': 12, 'completion_tokens': 20}))
+
+    def test_partial_usage_charges_full_reservation(self):
+        class Partial(Reply):
+            def json(self):
+                return dict(super().json(), usage={'prompt_tokens': 100})
+        self.call(Partial())
+        self.assertEqual(H.state(H.journal(self.out))[2], H.RESERVE)
+
+    def test_wrong_model_is_not_accepted(self):
+        class Wrong(Reply):
+            def json(self):
+                return dict(super().json(), model='different-reader')
+        self.assertFalse(self.call(Wrong())['ok'])
+
     def test_outcome_without_reservation_rejected(self):
         with self.assertRaisesRegex(ValueError, 'matching reservation'):
             H.state([dict(event='settle', id='p', request_sha256='x')])
@@ -107,6 +126,17 @@ class Contracts(unittest.TestCase):
         for name in ['../secret', '/etc/passwd']:
             with self.assertRaises(ValueError):
                 H.inside(self.root, name)
+
+    def test_output_rejection_writes_nothing(self):
+        from types import SimpleNamespace
+        pack, truth = self.root / 'pack', self.root / 'truth'
+        pack.mkdir(); truth.mkdir()
+        for out in [pack, truth / 'new']:
+            a = SimpleNamespace(out=out, pack=pack, truth=truth)
+            with self.assertRaisesRegex(ValueError, 'separate'):
+                H.run(a)
+        self.assertEqual(list(pack.iterdir()), [])
+        self.assertEqual(list(truth.iterdir()), [])
 
     def test_cluster_bootstrap_counts_collections(self):
         v = H.interval([1, 1, -3, -3], ['a', 'a', 'b', 'b'], rounds=1000)

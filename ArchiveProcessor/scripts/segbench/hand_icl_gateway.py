@@ -68,7 +68,8 @@ def check(pack, truth_root):
     """
     pack, truth_root = Path(pack), Path(truth_root)
     freeze = json.loads((pack / 'freeze.json').read_text())
-    if freeze['protocol'] != 'hand-icl-v1' or freeze['counts'] != list(COUNTS):
+    if (freeze['protocol'] != 'hand-icl-v1' or freeze['counts'] != list(COUNTS)
+            or freeze['max_tokens'] != 8192 or 'jobs.json' not in freeze['files']):
         raise ValueError('unsupported experiment protocol')
     for name, digest in freeze['files'].items():
         if sha(inside(pack, name)) != digest:
@@ -131,6 +132,31 @@ def body(pack, freeze, j):
             'messages': [{'role': 'user', 'content': content}]}
 
 
+def request_hash(b):
+    return hashlib.sha256(json.dumps(b, sort_keys=True).encode()).hexdigest()
+
+
+def known_usage(usage):
+    return all(type(usage.get(k)) is int and usage[k] >= 0
+               for k in ('prompt_tokens', 'completion_tokens'))
+
+
+def validate_receipt(out, pack, truth, freeze):
+    rec = json.loads((Path(out) / 'receipt.json').read_text())
+    expected = {'pack_freeze_sha256': sha(Path(pack) / 'freeze.json'),
+                'truth_index_sha256': sha(Path(truth) / 'index.json'), 'model': G.MODEL,
+                'max_tokens': freeze['max_tokens'], 'temperature': 0, 'reasoning_effort': 'low',
+                'no_cache': True, 'cap': CAP, 'reservation': RESERVE}
+    if any(rec.get(k) != v for k, v in expected.items()):
+        raise ValueError('run receipt differs from frozen experiment')
+    return rec
+
+
+def validate_output(out, pack, truth):
+    if any(Path(out).resolve().is_relative_to(Path(p).resolve()) for p in (pack, truth)):
+        raise ValueError('output must be separate from frozen inputs')
+
+
 def journal(out):
     f = Path(out) / 'calls.jsonl'
     return [json.loads(l) for l in f.read_text().splitlines()] if f.exists() else []
@@ -168,7 +194,7 @@ def append(out, rec):
 
 def call(pack, freeze, j, out, request=G.request):
     b = body(pack, freeze, j)
-    digest = hashlib.sha256(json.dumps(b, sort_keys=True).encode()).hexdigest()
+    digest = request_hash(b)
     pending, done, spent = state(journal(out))
     if pending:
         raise ValueError('uncertain paid attempt; reconcile before any further calls')
@@ -197,10 +223,11 @@ def call(pack, freeze, j, out, request=G.request):
         choice = (reply.get('choices') or [{}])[0]
         text = (choice.get('message') or {}).get('content')
         ok = (r.status_code == 200 and choice.get('finish_reason') == 'stop'
-              and isinstance(text, str) and bool(text.strip()) and not reply.get('error'))
+              and isinstance(text, str) and bool(text.strip()) and not reply.get('error')
+              and reply.get('model') == G.MODEL)
         rec.update(event='settle', http=r.status_code, usage=usage, model=reply.get('model'),
                    finish=choice.get('finish_reason'), ok=ok,
-                   cost=G.cost(usage) if usage else RESERVE,
+                   cost=G.cost(usage) if known_usage(usage) else RESERVE,
                    wall_s=round(time.monotonic() - start, 3),
                    response_sha256=sha(out / 'responses' / (j['id'] + '.json')))
         rec = G.with_gateway_cost(rec, r)
@@ -221,10 +248,9 @@ def pilot_jobs(jobs):
 
 
 def run(a):
+    validate_output(a.out, a.pack, a.truth)
     f, jobs, _ = check(a.pack, a.truth)
     a.out.mkdir(parents=True, exist_ok=True)
-    if any(a.out.resolve().is_relative_to(p.resolve()) for p in (a.pack, a.truth)):
-        raise ValueError('output must be separate from frozen inputs')
     receipt = {'item': TAG, 'pack_freeze_sha256': sha(a.pack / 'freeze.json'),
                'truth_index_sha256': sha(a.truth / 'index.json'), 'model': G.MODEL,
                'max_tokens': f['max_tokens'], 'temperature': 0, 'reasoning_effort': 'low',
@@ -232,12 +258,7 @@ def run(a):
                'runner_sha256': sha(__file__), 'code_commit': subprocess.check_output(
                    ['git', '-C', str(HERE), 'rev-parse', 'HEAD'], text=True).strip()}
     if (a.out / 'receipt.json').exists():
-        old = json.loads((a.out / 'receipt.json').read_text())
-        # Code edits for reporting do not alter frozen requests; keep the initial receipt.
-        for k in ('pack_freeze_sha256', 'truth_index_sha256', 'model', 'max_tokens', 'temperature',
-                  'reasoning_effort', 'no_cache', 'cap', 'reservation'):
-            if old[k] != receipt[k]:
-                raise ValueError('run receipt differs: ' + k)
+        validate_receipt(a.out, a.pack, a.truth, f)
     else:
         dump(a.out / 'receipt.json', receipt)
     # A key failure happens before any reservation; no key is printed or persisted.
@@ -247,6 +268,12 @@ def run(a):
     if a.cmd == 'repeat':
         tasks = [{**j, 'id': j['id'] + '-repeat'} for j in pilot if j['examples_n'] == 0]
     for j in tasks:
+        if a.cmd == 'run' and j not in pilot:
+            pending, done, spent = state(journal(a.out))
+            pilots = [done[k['id']] for k in pilot]
+            projection = sum(G.charge(r) for r in pilots) / len(pilots) * (len(jobs) + 8)
+            if pending or any(not r['ok'] for r in pilots) or projection > CAP:
+                raise ValueError('pilot failed or projects beyond the item cap; inspect before proceeding')
         call(a.pack, f, j, a.out)
     pending, done, spent = state(journal(a.out))
     pilots = [done[j['id']] for j in pilot if j['id'] in done]
@@ -323,9 +350,15 @@ def analyze(jobs, rows, truths, outputs, score):
 def report(a):
     import ocr_panel_score as S
     freeze, jobs, refs = check(a.pack, a.truth)
+    receipt = validate_receipt(a.out, a.pack, a.truth, freeze)
     pending, rows, spent = state(journal(a.out))
+    expected = {j['id']: j for j in jobs}
+    expected.update({j['id'] + '-repeat': {**j, 'id': j['id'] + '-repeat'}
+                     for j in pilot_jobs(jobs) if j['examples_n'] == 0})
     texts = {}
     for key, r in rows.items():
+        if key not in expected or r['request_sha256'] != request_hash(body(a.pack, freeze, expected[key])):
+            raise ValueError('recorded request does not match the frozen experiment')
         path = a.out / 'responses' / (key + '.json')
         if sha(path) != r['response_sha256']:
             raise ValueError('response checksum changed')
@@ -346,7 +379,8 @@ def report(a):
     result.update(item=TAG, model=G.MODEL, settings={'temperature': 0, 'reasoning_effort': 'low',
                   'max_tokens': freeze['max_tokens'], 'cache': {'no-cache': True}},
                   cohorts=freeze['cohorts'], cost=G.billed(rows.values()), charged=spent,
-                  pending=len(pending), complete=all(j['id'] in rows for j in jobs), repeats=noise,
+                  pending=len(pending), complete=not pending and all(j['id'] in rows for j in jobs), repeats=noise,
+                  returned_models=dict(Counter(r['model'] for r in rows.values())), receipt=receipt,
                   pack_freeze_sha256=sha(a.pack / 'freeze.json'),
                   truth_index_sha256=sha(a.truth / 'index.json'))
     # Owner sensitivity: the nine of the original 16 hand pages with no unresolved
@@ -372,7 +406,9 @@ def write_report(r):
     L = ['# Gemini given corrected handwriting lines (W46.ocr-ppocrv6-hands-paid)', '',
          'Gemini 3.7 Flash through the Stanford gateway, using the Qwen arm’s frozen 0/8/16 image/text '
          'example pack. Scores are NES points. Only the Blackwell holdout tests a documented same hand; '
-         'the Shils folder is a hand proxy, and the other two cohorts test transfer across hands.', '',
+         'the Shils folder is a hand proxy, and the other cohorts test transfer with unverified hand identity. '
+         'The 40 L1 pages include three Blackwell diary pages (other volumes) and two Blackwell '
+         'correspondence pages; they are not all known different hands.', '',
          '## Measurement card', '',
          '- **Truth:** public By the People transcriptions (CC0). Owner targets use the post-sheet truth '
          '(W46.ocr-hands-rescore); Gemini 3.8/Claude drafted it and 114 hand places were checked, '
@@ -383,7 +419,8 @@ def write_report(r):
          '- **Selection:** fixed Qwen pack: 40 seeded L1 pages, all 19 owner hand pages, 12 held-out '
          'Blackwell diary pages. Blackwell examples come only from its 24 training pages. Shils leaves '
          'the target page out; source-image hashes reject aliases. No target truth enters the prompt. '
-         'L2 is not an adaptation cohort because no verified same-hand example pool was prepared.',
+         'Owner targets include the 16 scored hand pages and three agreement-only letters (p086, p094, p096), '
+         'which remain unvalidated. L2 is not an adaptation cohort because no verified same-hand example pool was prepared.',
          '- **Comparison:** identical 2400 px/quality-90 target JPEGs across 0/8/16 examples; quality-95 '
          'line crops, eight examples the prefix of sixteen; same prompt as the Qwen pack. Temperature 0, '
          'low reasoning, 8192-token output cap, gateway cache disabled. Single attempts; capped, empty '
@@ -408,7 +445,7 @@ def write_report(r):
     L += ['', '| cohort | examples | Δ vs zero, both answered (95% CI) | Δ strict (95% CI) | collection-clustered (95% CI) |',
           '|---|---:|---|---|---|']
     for c in r['comparisons']:
-        cluster = ci(c['collection_clustered']) if c['cohort'] == 'public-L1-transfer' else 'one hand/folder; no across-hand interval'
+        cluster = ci(c['collection_clustered']) if c['cohort'] == 'public-L1-transfer' else 'across-hand interval not estimated'
         L.append(f"| {c['cohort']} | {c['examples_n']} | {ci(c['both_answered'])} | {ci(c['strict'])} | {cluster} |")
     L += ['', '## Stability and owner sensitivity', '',
           f"Zero-example repeats: {len(r['repeats'])}; " + '; '.join(
@@ -451,7 +488,12 @@ def main():
     elif a.cmd == 'report':
         report(a)
     else:
-        run(a)
+        import fcntl
+        validate_output(a.out, a.pack, a.truth)
+        a.out.mkdir(parents=True, exist_ok=True)
+        with (a.out / '.run.lock').open('a') as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            run(a)
 
 
 if __name__ == '__main__':
