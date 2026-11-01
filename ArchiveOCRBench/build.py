@@ -76,7 +76,7 @@ REGIONS_ORDERFREE = PUBLIC / "regions-orderfree-20261030.json"  # W46.ocr-rescor
 OCR_PAGES = RESULTS / "ocr-pages.csv"  # ocr_pages_export.py: every whole-page route's score on every page of the 96
 OCR_SCORERS_PAGES = RESULTS / "ocr-scorers-pages.csv"  # ocr_rescore.py's per-page rows, both sets
 OPEN_SWEEP = HERE / "data" / "open-sweep-20261019.json"  # the open-model sweep's receipts (hand-entered, sourced)
-OPEN_SWEEP_LATER = ("new-open-sherlock-20261024",)  # W46.ocr-new-open: report in PUBLIC, receipts in data/, same name
+OPEN_SWEEP_LATER = ("new-open-sherlock-20261024", "new-open-sherlock-20261031")  # W46.ocr-new-open(-sherlock): report in PUBLIC, receipts in data/, same name
 TEMPLATE = HERE / "site" / "template.html"
 OUT_DATA = HERE / "data" / "panel-data.json"
 OUT_PAGE = HERE / "site" / "index.html"
@@ -471,6 +471,7 @@ PUBLIC_TWIN = {
     "qwen3.6-35b-a3b-farmshare": ("qwen3.6-35b-a3b", "FarmShare panel"),
     "paddleocr-vl1.6-sherlock": ("paddleocr-vl1.6", "Sherlock native"), "qwen3.8-27b-sherlock": ("qwen3.8-27b", "Sherlock panel"),
     "xiaomi-ocr-0-sherlock": ("xiaomi-ocr-0", "Sherlock native"),
+    "infinity-parser2-pro-sherlock": ("infinity-parser2-pro", "Sherlock native"),  # W46.ocr-new-open-sherlock
     "qwen3.5-9b-sherlock": ("qwen3.5-9b", "Sherlock logprob"),  # W46.ocr-logprob's run read both sets
     "gemini3.7-flash-gw": ("gemini3.7-flash-gw", "gateway"),  # W46.ocr-gemini37-895-paid
 }
@@ -551,7 +552,8 @@ PRESET_NAMES = {"qwen3.5-27b": "Qwen3.5 27B", "qwen3.6-27b": "Qwen3.6 27B", "qwe
                 # W46.ocr-new-open's Sherlock runs, same harness and settings (farmshare_truth96.py)
                 "paddleocr-vl1.6-native": "PaddleOCR-VL 1.6 (native prompt)",
                 "xiaomi-ocr-0-native": "Xiaomi-OCR-0 (native Markdown prompt)",
-                "qwen3.8-27b-sherlock": "Qwen3.8 27B (Sherlock, open sweep settings)"}
+                "qwen3.8-27b-sherlock": "Qwen3.8 27B (Sherlock, open sweep settings)",
+                "infinity-parser2-pro-native": "Infinity-Parser2-Pro (doc2md prompt, two cards)"}
 
 
 def newsbench_table():

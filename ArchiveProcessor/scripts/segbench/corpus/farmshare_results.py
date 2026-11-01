@@ -58,7 +58,14 @@ def reading(record, mode):
     if mode == 'panel':
         parsed = R.P.T.parse_draft(raw)
         return parsed['text'].strip() if parsed else ''
-    return raw.strip()
+    # A native reply wrapped whole in one code fence (Infinity-Parser2-Pro's ```markdown, every page) is read
+    # inside it, so the fence is not scored as a word. No earlier native route's reply starts with a fence
+    # (checked 2026-10-31 over every saved native reading), so this changes none of their scores.
+    m = FENCE.match(raw)
+    return (m.group(1) if m else raw).strip()
+
+
+FENCE = re.compile(r'\A\s*```[A-Za-z]*[ \t]*\n(.*?)\n?[ \t]*```\s*\Z', re.S)
 
 
 def read_records(folder):

@@ -1,0 +1,9 @@
+{
+  "_source": "W46.ocr-new-open-sherlock's Sherlock run of Infinity-Parser2-Pro on the 895 frozen public pages, through W46.ocr-new-open's harness unchanged except tensor-parallel 2 (scripts/segbench/sherlock/new-open/infinity-submit.sh), Sherlock batch 20261031-131437, collected 2026-10-31 into ~/Library/Caches/ArchiveSuiteRehearsal/sherlock-results/new-open-895/infinity-parser2-pro (execution-plans/items/W46.ocr-new-open-sherlock.md, now in SUITE_TODO_DONE.md). Scores: segbench-results/bench-corpus/new-open-sherlock-20261031.{json,csv} from corpus/farmshare_expanded_report.py against the open sweep's own manifests. Model, revision, prompt and weight size from prepared.json and status.json. server_min is the Slurm job's elapsed time (sacct, job 50536489), model load included: this run's vLLM log stops at server start, so the first-to-last timestamp rule of the 20261024 receipts cannot be applied.",
+  "status": "Same settings as the open sweep, on Sherlock and on two cards. Nothing adopted.",
+  "hardware": "Infinity-Parser2-Pro: two Sherlock GPUs with 48 or 80 GB (Slurm constraint GPU_MEM:48GB|GPU_MEM:80GB; tensor-parallel 2), vLLM 0.31.0, context 16384, temperature 0, thinking off, 8192 output tokens, 16 sequences and 8 concurrent requests.",
+  "routes": {
+    "infinity-parser2-pro": {"model": "infly/Infinity-Parser2-Pro", "revision": "b27d470100514329fc6439aada8f16ccea5f9e2a", "route": "native", "prompt": "the package's doc2md prompt (infinity-parser2 0.4.0, PROMPT_DOC2MD); the reply's whole-page ```markdown fence is read inside it", "dtype": "bf16", "job": 50536489, "server_min": 32.4, "license": "apache-2.0", "weight_gb": 70.21, "gpus": 2, "cluster": "Sherlock"}
+  },
+  "not_scored": []
+}

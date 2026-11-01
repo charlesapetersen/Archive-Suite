@@ -1,0 +1,75 @@
+{
+  "models": [
+    {
+      "route": "infinity-parser2-pro",
+      "mode": "native",
+      "subset": "added455",
+      "stratum": "all",
+      "n": 455,
+      "ok": 445,
+      "failed": 0.02197802197802201,
+      "nes_answered": 0.783815093336932,
+      "nes": 0.7665883879888676,
+      "chrf": 0.7576659147167962,
+      "miss": 0.20816437963783488,
+      "add": 0.0398193650026406,
+      "cost": 0,
+      "words": 223434,
+      "nes_mapped": null,
+      "nes_no_marks": null,
+      "nes_no_space": null
+    },
+    {
+      "route": "infinity-parser2-pro",
+      "mode": "native",
+      "subset": "full895",
+      "stratum": "all",
+      "n": 895,
+      "ok": 874,
+      "failed": 0.02346368715083802,
+      "nes_answered": 0.6578639382048331,
+      "nes": 0.6424280245709767,
+      "chrf": 0.59672211795217,
+      "miss": 0.343683692084267,
+      "add": 0.18331562642287674,
+      "cost": 0,
+      "words": 336027,
+      "nes_mapped": null,
+      "nes_no_marks": null,
+      "nes_no_space": null
+    },
+    {
+      "route": "infinity-parser2-pro",
+      "mode": "native",
+      "subset": "original440",
+      "stratum": "all",
+      "n": 440,
+      "ok": 429,
+      "failed": 0.025000000000000022,
+      "nes_answered": 0.5272153040934485,
+      "nes": 0.5140349214911123,
+      "chrf": 0.43029160084329504,
+      "miss": 0.6126135727798353,
+      "add": 0.4680752799907632,
+      "cost": 0,
+      "words": 112593,
+      "nes_mapped": null,
+      "nes_no_marks": null,
+      "nes_no_space": null
+    }
+  ],
+  "coverage": {
+    "infinity-parser2-pro": {
+      "mode": "native",
+      "records": 895,
+      "missing": 0,
+      "status": {
+        "cap": 21,
+        "ok": 874
+      }
+    }
+  },
+  "manifest_sha256": "27673d67e648a1864f16515ed6d73bf9a0b35a4895e8821455ea36c17f4236eb",
+  "base_sha256": "2ac7d7c97c10019a0a169dd48df32b0b5b100de452c35a2f9c7a46a7e47d0c20",
+  "note": "Different page mix: the expanded total is not directly comparable to hosted references on the original pages only. No original report overwritten; no new inference."
+}

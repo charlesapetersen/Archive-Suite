@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""W46.ocr-new-open: paired intervals for the new open readers against the incumbents, on both sets.
+"""W46.ocr-new-open and W46.ocr-new-open-sherlock: paired intervals for the new open readers against the incumbents, on both sets.
 
   python3 ocr_new_open_paired.py [--pages ../../segbench-results/ocr-scorers-pages.csv]
 
@@ -22,7 +22,8 @@ import ocr_panel_score as S
 
 HERE = Path(__file__).resolve().parent
 RESULTS = HERE.parent.parent / 'segbench-results'
-NEW = ['xiaomi-ocr-0', 'paddleocr-vl1.6', 'qwen3.8-27b', 'xiaomi-ocr-0-bf16', 'paddleocr-vl1.6-bf16']
+NEW = ['xiaomi-ocr-0', 'paddleocr-vl1.6', 'qwen3.8-27b', 'xiaomi-ocr-0-bf16', 'paddleocr-vl1.6-bf16',
+       'infinity-parser2-pro']
 # The incumbent per set: the reading the bench shows for that route on that set.
 INCUMBENTS = {'owner96': {'qwen3.6-27b': 'local panel', 'lightonocr3-4b': 'FarmShare native'},
               'public895': {'qwen3.6-27b': 'FarmShare panel', 'lightonocr3-4b': 'FarmShare native'}}

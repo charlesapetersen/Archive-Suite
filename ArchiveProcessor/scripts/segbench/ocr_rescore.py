@@ -12,7 +12,8 @@ without the three agreement letters) and the 895 frozen public pages (corpus/rou
   the 895  the two reference routes and Apple Vision (bench-corpus/routes), the kraken specialists, the open
            sweep's eleven routes and the 2026-10-18 CHURRO, Qari and Fanar runs, from FARMSHARE.
   both     Gemini 3.7 Flash through the Stanford gateway (gateway-gemini/panel, gemini37-public/responses), and
-           W46.ocr-new-open's three Sherlock routes (Xiaomi-OCR-0, PaddleOCR-VL 1.6, Qwen3.8 27B), from
+           W46.ocr-new-open's three Sherlock routes (Xiaomi-OCR-0, PaddleOCR-VL 1.6, Qwen3.8 27B) and
+           W46.ocr-new-open-sherlock's Infinity-Parser2-Pro, from
            CACHE/sherlock-results/new-open-{895,96}.
 
 A reading is what that source's own report scored (the same reading() functions and modes); a failure is an
@@ -74,6 +75,7 @@ SHERLOCK_ROUTES = [  # W46.ocr-new-open, new-open-sherlock-20261024.md: label, m
     ('xiaomi-ocr-0', 'xiaomi-ocr-0', 'native'),
     ('paddleocr-vl1.6', 'paddleocr-vl16', 'native'),
     ('qwen3.8-27b', 'qwen38-27b-fp8', 'panel'),
+    ('infinity-parser2-pro', 'infinity-parser2-pro', 'native'),  # W46.ocr-new-open-sherlock, two cards
 ]
 OS, GS, PS, Q18, Q19 = (FARMSHARE / 'FarmShare-open-sweep-20261019/outputs',
                         FARMSHARE / 'FarmShare-general-sweep-20261019/outputs',

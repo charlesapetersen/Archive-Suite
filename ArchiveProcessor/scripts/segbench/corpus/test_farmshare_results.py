@@ -15,6 +15,13 @@ class Extraction(unittest.TestCase):
         self.assertEqual(churro_text('<HistoricalDocument><Page>broken'), '')
         self.assertEqual(reading({'status': 'cap', 'finish': 'length', 'raw': 'partial'}, 'qari'), '')
 
+    def test_a_whole_reply_fence_is_read_inside_and_any_other_reply_as_written(self):
+        ok = lambda raw: {'status': 'ok', 'finish': 'stop', 'raw': raw}
+        self.assertEqual(reading(ok('```markdown\n# Title\nbody\n```'), 'native'), '# Title\nbody')
+        self.assertEqual(reading(ok('```\nbody\n```\n'), 'native'), 'body')
+        self.assertEqual(reading(ok('intro\n```\ncode\n```'), 'native'), 'intro\n```\ncode\n```')
+        self.assertEqual(reading(ok('```markdown\nunclosed'), 'native'), '```markdown\nunclosed')
+
     def test_line_order_is_numeric_and_one_missing_line_fails_page(self):
         records = {str(i): {'page': 'p', 'line': i, 'raw': str(i), 'status': 'ok', 'finish': 'stop'}
                    for i in [3, 1, 2]}
