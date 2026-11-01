@@ -27,6 +27,7 @@
   "pip": ["transformers==5.6.1", "accelerate==1.12.0", "timm==1.0.22", "open_clip_torch==3.2.0", "einops==0.8.1",
           "beautifulsoup4==4.15.0", "soupsieve==3.0.4", "ftfy==6.3.1", "wcwidth==0.9.4", "tokenizers==0.22.2"],
   "constraints": "none",
+  "code_repos": ["nvidia/C-RADIOv2-H"],
   "ignore": ["Dockerfile", "docker-compose.yaml", "uv.lock"],
   "weight_limit_bytes": 5000000000,
   "hours_895": 16,

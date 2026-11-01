@@ -7,7 +7,8 @@
 download resolves each candidate's ref (`main`, granite's `untied`) to a commit, records it beside the sha the Mac read
 on 2026-10-31 (`expected_sha`; a mismatch is recorded, not fatal, since the snapshot is pinned from here on), fetches
 the small files, then only the weight files the index names (Unlimited-OCR's repo carries the same weights twice),
-refusing a model over `weight_limit_bytes`. It writes prepared.json (state `downloaded`) into ROOT/<key> for both
+refusing a model over `weight_limit_bytes`, and the code and config of any `code_repos` its remote code loads by
+name. It writes prepared.json (state `downloaded`) into ROOT/<key> for both
 sets. check imports the model's remote code (transformers' dynamic modules; granite: vLLM and docling-core) without
 loading a weight and sets state `ready`, or `skipped` with the reason, in both. A key already `ready` is left alone.
 """
@@ -60,7 +61,16 @@ def download(cands, roots):
             if size > c['weight_limit_bytes']:
                 raise RuntimeError(f'{size} weight bytes over the {c["weight_limit_bytes"]} limit')
             snap = snapshot_download(c['model'], revision=info.sha, allow_patterns=small + weights)
-            rec.update(state='downloaded', snapshot=snap, weights=weights, weight_bytes=size)
+            # Code another repo holds, which the model's remote code fetches by name when it is built (Nemotron-Parse
+            # builds its encoder from nvidia/C-RADIOv2-H's hf_model.py; job 50550135 failed offline without it).
+            # Code and config only: the model's own weights cover the encoder. Cached under its name, so the
+            # offline GPU job finds it.
+            code = {}
+            for repo in c.get('code_repos', []):
+                # At `main`, not the sha: the model code asks for the repo with no revision, and offline that
+                # resolves through refs/main, which only a download at `main` writes.
+                code[repo] = Path(snapshot_download(repo, allow_patterns=['*.py', '*.json', '*.txt'])).name
+            rec.update(state='downloaded', snapshot=snap, weights=weights, weight_bytes=size, code_repos=code)
         except Exception as exc:
             rec['reason'] = f'{type(exc).__name__}: {exc}'[:500]
         write_both(roots, key, rec)
@@ -91,8 +101,12 @@ def check(key, roots):
             from transformers.dynamic_module_utils import get_class_from_dynamic_module
             cfg = AutoConfig.from_pretrained(snap, trust_remote_code=True, local_files_only=True)
             ref = cfg.auto_map.get('AutoModel') or cfg.auto_map.get('AutoModelForCausalLM')
-            get_class_from_dynamic_module(ref, snap, local_files_only=True)
+            model_cls = get_class_from_dynamic_module(ref, snap, local_files_only=True)
             if rec['adapter'] == 'nemotron':
+                # Build the model on the meta device: its constructor fetches the encoder's code from another repo
+                # (code_repos), which importing the model's own code never reaches (job 50550135). No weights load.
+                with torch.device('meta'):
+                    model_cls(cfg)
                 sys.path.insert(0, snap)
                 from postprocessing import postprocess_text  # noqa: F401
                 from transformers import AutoProcessor

@@ -171,6 +171,11 @@ class Granite:
     kind = 'granite'
 
     def __init__(self, cfg):
+        # Spawn vLLM's engine process, not fork it: forked from this process, which already runs a thread pool, the
+        # engine deadlocked at its first allocations and never loaded a weight (job 50536486 ran out its 4 h; stacks in
+        # diagnosis jobs 50569457 and 50572028, under both model runners). Spawned, it loads in 0.4 s (job 50573600).
+        # Set before vllm is imported, which reads it once.
+        os.environ.setdefault('VLLM_WORKER_MULTIPROC_METHOD', 'spawn')
         from transformers import AutoProcessor
         from vllm import LLM, SamplingParams
         self.cfg = cfg
@@ -187,7 +192,8 @@ class Granite:
     def settings(self):
         return {'sampling': 'temperature 0, max_tokens None (context 8192 less the prompt), skip_special_tokens False',
                 'chat_prompt_sha256': hashlib.sha256(self.prompt.encode()).hexdigest(),
-                'max_model_len': self.llm.llm_engine.model_config.max_model_len, 'docling_core': version('docling-core')}
+                'max_model_len': self.llm.llm_engine.model_config.max_model_len, 'docling_core': version('docling-core'),
+                'vllm_worker_multiproc_method': os.environ['VLLM_WORKER_MULTIPROC_METHOD']}
 
     def read_many(self, paths):
         from PIL import Image
@@ -313,4 +319,14 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    # Exit outright, success or failure: granite's spawned vLLM engine kept the process alive after a failed pilot,
+    # which would hold the GPU until the job's time limit (job 50573600). The records and status are saved by then.
+    try:
+        main()
+    except BaseException:
+        import traceback
+        traceback.print_exc()
+        sys.stdout.flush(); sys.stderr.flush()
+        os._exit(1)
+    sys.stdout.flush(); sys.stderr.flush()
+    os._exit(0)
