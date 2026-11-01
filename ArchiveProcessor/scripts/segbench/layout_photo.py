@@ -7,6 +7,7 @@
     <lab venv>/bin/python layout_photo.py detect --detector vision    # the Swift helper (layout_photo_vision.swift)
     <lab venv>/bin/python layout_photo.py hands                       # segbench-results/layout-photo-hands.{json,md}
     <lab venv>/bin/python layout_photo.py pack --out DIR              # the Sherlock pack (GLM-OCR on the new arms)
+    <lab venv>/bin/python layout_photo.py score --runs DIR            # segbench-results/layout-photo{.json,-tables.md,-pages.csv}
 
 Four detectors, each as the app or its maker would run it:
   yolo    DocLayout-YOLO DocStructBench (the ONNX export of the weights the app ships as Core ML), imgsz 1024,
@@ -515,6 +516,180 @@ def cmd_pack(a):
     print(json.dumps({'pages': freeze['pages'], 'crops': crops, 'total': freeze['crops_total']}))
 
 
+# ---------------------------------------------------------------- scoring the pack's readings
+# W46.ocr-regions' stitching and scorer (regions.page_reading, ocr_panel_score.score strict NES; a page with no
+# region read scores 0). Bench pages: the three new arms beside W46.ocr-regions' whole-page, PP-DocLayoutV3 and
+# YOLO-through-newspaper-ocr readings of the same pages, rescored here. Real5: each arm in each condition, and
+# its drop from Scanning on the same page. Markup-stripped NES is reported beside strict, since a region crop
+# rarely carries a heading's '#' and a whole page does.
+
+OLD_RUNS = CACHE / 'sherlock-results/regions-20261021'
+OLD_ARMS = {'yolo_newsocr': 'doclayout_yolo', 'pp-doclayoutv3': 'pp-doclayoutv3'}   # our name -> its arm there
+BENCH_ARMS = ('whole', 'pp-doclayoutv3', 'yolo_newsocr', 'yolo_appsort', 'heron', 'vision_doc')
+REAL5_ARMS = ('whole', 'yolo_appsort', 'pp-doclayoutv3', 'heron', 'vision_doc')
+BENCH_GROUPS = ('L9', 'L4', 'the 96', 'handwritten', 'typed, no table or clipping', 'clippings', 'tables')
+PANEL_KINDS = ('kind:typewritten', 'kind:printed', 'kind:handwritten')   # the bench page's per-kind charts
+TABLE2 = 'RT-DocLayout Table 2: DocLayout-YOLO 48.74 on Skew against 91.66 (their recogniser, XY-cut order)'
+
+
+def _reading(runs: Path, arm: str, pid: str, regions: dict, G, X) -> dict:
+    recs = G.crop_records(runs, 'glm-ocr', arm, pid)
+    expected = G.validate_crops('glm-ocr', arm, pid, recs, regions)
+    return G.page_reading(arm, recs, expected, 'native', X.reading)
+
+
+def _page_row(ref: str, got: dict, S, O, **kw) -> dict:
+    sc = S.score(ref, got['text'])
+    return {**kw, 'ok': bool(got['text']), 'nes': sc['nes'], 'chrf': sc['chrf'], 'words': sc['words'],
+            'missed': sc['missed'], 'added': sc['added'],
+            'nes_stripped': S.score(ref, O.strip_markup(got['text']))['nes'] if got['text'] else 0.0,
+            'crops': got.get('crops', ''), 'crops_failed': got.get('crops_failed', ''),
+            'prompt_tokens': got.get('prompt_tokens', ''), 'completion_tokens': got.get('completion_tokens', '')}
+
+
+def score_pages(runs: Path) -> list[dict]:
+    import regions as G
+    import routes as R
+    import loop_rerun as L
+    import ocr_panel as P
+    import ocr_scorers as O
+    import ocr_panel_score as S
+    X, F = L.X, L.F
+    pages = C.load_pages(runs)
+    regions = {arm: json.loads((runs / 'regions' / f'{arm}.json').read_text())['pages']
+               for arm in ('whole', 'yolo_appsort', 'pp-doclayoutv3', 'heron', 'vision_doc')}
+    old = {arm: json.loads((OLD_RUNS / 'regions' / f'{arm}.json').read_text())['pages'] for arm in OLD_ARMS.values()}
+    R.MANIFEST = G.MANIFEST
+    truth = {R.job_id(r): r for r in R.frozen()}
+    panel = {r['page']: r for r in P.rows()}
+    whole = {'public895': F.read_records(L.ROUTES['glm-ocr']['dir']), 'owner99': G.whole96('glm-ocr', L, F)}
+    rows = []
+    for p in pages:
+        pid = p['id']
+        if p.get('source') == 'real5':
+            ref = (REAL5 / 'truth' / f'{p["stem"]}.txt').read_text()
+            for arm in REAL5_ARMS:
+                if pid in regions[arm]:
+                    rows.append(_page_row(ref, _reading(runs, arm, pid, regions, G, X), S, O, set='real5',
+                                          cond=p['cond'], stem=p['stem'], groups=p['cond'], arm=arm, page=pid))
+            continue
+        if p['set'] == 'public895':
+            ref, groups = Path(truth[pid]['truth']).read_text(), [truth[pid]['stratum']]
+        elif pid in P.AGREEMENT:
+            continue
+        else:
+            ref = (P.TRUTH / 'truth' / (pid + '.txt')).read_text()
+            groups = ['the 96', *G.kinds_of(panel[pid]), 'kind:' + panel[pid]['kind']]
+        if pid not in whole[p['set']]:
+            raise ValueError(f'glm-ocr/whole/{pid}: missing whole-page receipt')
+        rec = whole[p['set']][pid]
+        got = {'whole': {'text': X.reading(rec, 'native'), **{k: (rec.get('usage') or {}).get(k, '')
+                                                             for k in ('prompt_tokens', 'completion_tokens')}}}
+        for ours, theirs in OLD_ARMS.items():
+            got[ours] = _reading(OLD_RUNS, theirs, pid, old, G, X)
+        for arm in ('yolo_appsort', 'heron', 'vision_doc'):
+            got[arm] = _reading(runs, arm, pid, regions, G, X)
+        for arm in BENCH_ARMS:
+            rows.append(_page_row(ref, got[arm], S, O, set=p['set'], cond='', stem='', groups=';'.join(groups),
+                                  arm=arm, page=pid))
+    return rows
+
+
+def _paired(rows: list[dict], key_a, key_b, field='nes') -> dict:
+    """Mean of a - b over the pages both have (keys pick a row's pairing id), with S.paired's interval."""
+    import ocr_panel_score as S
+    a, b = dict(key_a), dict(key_b)
+    common = sorted(set(a) & set(b))
+    d = S.paired([a[k][field] for k in common], [b[k][field] for k in common])
+    return {k: round(v, 4) if isinstance(v, float) else v for k, v in d.items()}
+
+
+def summarise_scores(rows: list[dict]) -> dict:
+    import statistics as st
+
+    def agg(rr):
+        return {'n': len(rr), 'ok': sum(r['ok'] for r in rr), 'nes': round(st.mean(r['nes'] for r in rr), 4),
+                'nes_stripped': round(st.mean(r['nes_stripped'] for r in rr), 4),
+                'crops_failed': sum(r['crops_failed'] or 0 for r in rr if r['crops_failed'] != ''),
+                **{k: sum(r[k] or 0 for r in rr if r[k] != '') for k in ('prompt_tokens', 'completion_tokens')}}
+    out = {'bench': {}, 'real5': {}, 'staged': {}}
+    bench = [r for r in rows if r['set'] != 'real5']
+    for g in BENCH_GROUPS + PANEL_KINDS:
+        gr = [r for r in bench if g in r['groups'].split(';')]
+        by = {arm: [r for r in gr if r['arm'] == arm] for arm in BENCH_ARMS}
+        out['bench'][g] = {arm: {**agg(rr), 'vs_whole': _paired(rows, ((r['page'], r) for r in rr),
+                                                                  ((r['page'], r) for r in by['whole']))}
+                           for arm, rr in by.items() if rr}
+    r5 = [r for r in rows if r['set'] == 'real5']
+    cell = lambda cond, arm: [r for r in r5 if r['cond'] == cond and r['arm'] == arm]
+    for cond in REAL5_COND:
+        out['real5'][cond] = {}
+        for arm in REAL5_ARMS:
+            rr = cell(cond, arm)
+            if not rr:
+                continue
+            e = {**agg(rr), 'vs_whole': _paired(rows, ((r['stem'], r) for r in rr),
+                                                 ((r['stem'], r) for r in cell(cond, 'whole')))}
+            if cond != 'scan':
+                e['vs_scan'] = _paired(rows, ((r['stem'], r) for r in rr), ((r['stem'], r) for r in cell('scan', arm)))
+            out['real5'][cond][arm] = e
+    for base in ('warp', 'skew'):
+        for prep in ('quad', 'uvdoc'):
+            cond = f'{base}-{prep}'
+            out['staged'][cond] = {arm: {**agg(cell(cond, arm)),
+                                         'vs_raw': _paired(rows, ((r['stem'], r) for r in cell(cond, arm)),
+                                                           ((r['stem'], r) for r in cell(base, arm)))}
+                                   for arm in ('whole', 'yolo_appsort', 'pp-doclayoutv3')}
+    return out
+
+
+def score_md(s: dict, meta: dict) -> str:
+    pct = lambda v: f'{100 * v:.1f}'
+    iv = lambda d: f'{100 * d["delta"]:+.1f} [{100 * d["lo"]:+.1f}, {100 * d["hi"]:+.1f}]'
+    out = ['NES % strict (markup-stripped in brackets), pages answered / pages; a page with no region read scores 0. '
+           'Δ is a paired mean difference in NES points with its 95% bootstrap interval.', '', '## Bench pages', '']
+    for g, arms in ((g, a) for g, a in s['bench'].items() if g in BENCH_GROUPS):
+        out += [f'### {g}', '', '| arm | NES (stripped) | answered | Δ whole |', '|---|---:|---:|---:|']
+        for arm, e in arms.items():
+            out.append(f'| {arm} | {pct(e["nes"])} ({pct(e["nes_stripped"])}) | {e["ok"]}/{e["n"]} | '
+                       f'{"–" if arm == "whole" else iv(e["vs_whole"])} |')
+        out.append('')
+    out += ['## Real5-OmniDocBench (155 English plain-text pages a condition)', '',
+            '| condition | arm | NES (stripped) | answered | Δ whole | Δ Scanning |', '|---|---|---:|---:|---:|---:|']
+    for cond, arms in s['real5'].items():
+        for arm, e in arms.items():
+            out.append(f'| {cond} | {arm} | {pct(e["nes"])} ({pct(e["nes_stripped"])}) | {e["ok"]}/{e["n"]} | '
+                       f'{"–" if arm == "whole" else iv(e["vs_whole"])} | {iv(e["vs_scan"]) if "vs_scan" in e else "–"} |')
+    out += ['', '## The staged pre-step on Warping and Skew', '',
+            f'Quad found on {meta["quad_found"]}. Δ raw is against the same arm on the raw photograph.', '',
+            '| copy | arm | NES (stripped) | answered | Δ raw |', '|---|---|---:|---:|---:|']
+    for cond, arms in s['staged'].items():
+        for arm, e in arms.items():
+            out.append(f'| {cond} | {arm} | {pct(e["nes"])} ({pct(e["nes_stripped"])}) | {e["ok"]}/{e["n"]} | '
+                       f'{iv(e["vs_raw"])} |')
+    return '\n'.join(out) + '\n'
+
+
+def cmd_score(a):
+    import ocr_panel_score as S
+    rows = score_pages(a.runs)
+    summ = summarise_scores(rows)
+    gpu = sum(json.loads(f.read_text())['wall_s'] for f in (a.runs / 'out/glm-ocr').glob('summary-*.json')) / 3600
+    caps = sum(json.loads(f.read_text())['caps'] for f in (a.runs / 'out/glm-ocr').glob('summary-*.json'))
+    prepped = [p for p in real5_pages() if p['cond'] in REAL5_PREPPED and p['cond'].endswith('-quad')]
+    meta = {'reader': 'zai-org/GLM-OCR', 'pack': a.runs.name, 'gpu_hours_reading': round(gpu, 2), 'caps': caps,
+            'quad_found': f'{sum(p["quad_found"] for p in prepped)} of {len(prepped)} Warping and Skew photographs',
+            'table2': TABLE2, 'detectors': DETECTORS}
+    RESULTS.mkdir(exist_ok=True)
+    S.write_csv(RESULTS / 'layout-photo-pages.csv',
+                [{k: round(v, 6) if isinstance(v, float) else v for k, v in r.items()} for r in rows],
+                ['set', 'cond', 'stem', 'groups', 'arm', 'page', 'ok', 'nes', 'nes_stripped', 'chrf', 'words',
+                 'missed', 'added', 'crops', 'crops_failed', 'prompt_tokens', 'completion_tokens'])
+    (RESULTS / 'layout-photo.json').write_text(json.dumps({'meta': meta, **summ}, indent=1) + '\n')
+    (RESULTS / 'layout-photo-tables.md').write_text(score_md(summ, meta))
+    print(len(rows), 'page rows ->', RESULTS / 'layout-photo.json', json.dumps(meta))
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest='cmd', required=True)
@@ -525,8 +700,9 @@ def main():
     sub.add_parser('real5-fetch')
     sub.add_parser('real5-prep')
     p = sub.add_parser('pack'); p.add_argument('--out', type=Path, required=True)
+    s = sub.add_parser('score'); s.add_argument('--runs', type=Path, required=True, help='the pack with out/ brought back')
     a = ap.parse_args()
-    {'pages': cmd_pages, 'detect': cmd_detect, 'hands': cmd_hands, 'pack': cmd_pack,
+    {'pages': cmd_pages, 'detect': cmd_detect, 'hands': cmd_hands, 'pack': cmd_pack, 'score': cmd_score,
      'real5-fetch': cmd_real5_fetch, 'real5-prep': cmd_real5_prep}[a.cmd](a)
 
 

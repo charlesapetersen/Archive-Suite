@@ -1,0 +1,1635 @@
+{
+ "meta": {
+  "reader": "zai-org/GLM-OCR",
+  "pack": "layout-photo-20261030",
+  "gpu_hours_reading": 0.9,
+  "caps": 95,
+  "quad_found": "310 of 310 Warping and Skew photographs",
+  "table2": "RT-DocLayout Table 2: DocLayout-YOLO 48.74 on Skew against 91.66 (their recogniser, XY-cut order)",
+  "detectors": {
+   "yolo": "DocLayout-YOLO DocStructBench ONNX, imgsz 1024, conf 0.25, app region sort",
+   "pp": "PP-DocLayoutV3 (mlx-vlm port), conf 0.5, 1024 px, model reading order",
+   "heron": "docling-layout-heron (RT-DETRv2), 640 x 640, conf 0.3, app region sort",
+   "vision": "Apple Vision RecognizeDocumentsRequest (macOS 26): title, paragraphs, tables, lists; its order"
+  }
+ },
+ "bench": {
+  "L9": {
+   "whole": {
+    "n": 15,
+    "ok": 6,
+    "nes": 0.2919,
+    "nes_stripped": 0.2919,
+    "crops_failed": 0,
+    "prompt_tokens": 85704,
+    "completion_tokens": 89730,
+    "vs_whole": {
+     "n": 15,
+     "delta": 0.0,
+     "p": 1.0,
+     "lo": 0.0,
+     "hi": 0.0
+    }
+   },
+   "pp-doclayoutv3": {
+    "n": 15,
+    "ok": 15,
+    "nes": 0.8623,
+    "nes_stripped": 0.8623,
+    "crops_failed": 6,
+    "prompt_tokens": 78596,
+    "completion_tokens": 93592,
+    "vs_whole": {
+     "n": 15,
+     "delta": 0.5705,
+     "p": 0.0002,
+     "lo": 0.3754,
+     "hi": 0.7477
+    }
+   },
+   "yolo_newsocr": {
+    "n": 15,
+    "ok": 15,
+    "nes": 0.9113,
+    "nes_stripped": 0.9113,
+    "crops_failed": 5,
+    "prompt_tokens": 71461,
+    "completion_tokens": 77645,
+    "vs_whole": {
+     "n": 15,
+     "delta": 0.6194,
+     "p": 0.0001,
+     "lo": 0.4176,
+     "hi": 0.8048
+    }
+   },
+   "yolo_appsort": {
+    "n": 15,
+    "ok": 15,
+    "nes": 0.7349,
+    "nes_stripped": 0.7349,
+    "crops_failed": 8,
+    "prompt_tokens": 79030,
+    "completion_tokens": 90832,
+    "vs_whole": {
+     "n": 15,
+     "delta": 0.4431,
+     "p": 0.0063,
+     "lo": 0.1903,
+     "hi": 0.6764
+    }
+   },
+   "heron": {
+    "n": 15,
+    "ok": 15,
+    "nes": 0.6498,
+    "nes_stripped": 0.6499,
+    "crops_failed": 10,
+    "prompt_tokens": 84747,
+    "completion_tokens": 90050,
+    "vs_whole": {
+     "n": 15,
+     "delta": 0.358,
+     "p": 0.0165,
+     "lo": 0.1127,
+     "hi": 0.5873
+    }
+   },
+   "vision_doc": {
+    "n": 15,
+    "ok": 14,
+    "nes": 0.168,
+    "nes_stripped": 0.168,
+    "crops_failed": 7,
+    "prompt_tokens": 48687,
+    "completion_tokens": 52719,
+    "vs_whole": {
+     "n": 15,
+     "delta": -0.1239,
+     "p": 0.2074,
+     "lo": -0.3054,
+     "hi": 0.0245
+    }
+   }
+  },
+  "L4": {
+   "whole": {
+    "n": 80,
+    "ok": 79,
+    "nes": 0.5969,
+    "nes_stripped": 0.5969,
+    "crops_failed": 0,
+    "prompt_tokens": 443475,
+    "completion_tokens": 21897,
+    "vs_whole": {
+     "n": 80,
+     "delta": 0.0,
+     "p": 1.0,
+     "lo": 0.0,
+     "hi": 0.0
+    }
+   },
+   "pp-doclayoutv3": {
+    "n": 80,
+    "ok": 79,
+    "nes": 0.489,
+    "nes_stripped": 0.489,
+    "crops_failed": 4,
+    "prompt_tokens": 169382,
+    "completion_tokens": 17126,
+    "vs_whole": {
+     "n": 80,
+     "delta": -0.1079,
+     "p": 0.0001,
+     "lo": -0.1481,
+     "hi": -0.0676
+    }
+   },
+   "yolo_newsocr": {
+    "n": 80,
+    "ok": 44,
+    "nes": 0.0111,
+    "nes_stripped": 0.0111,
+    "crops_failed": 7,
+    "prompt_tokens": 5001,
+    "completion_tokens": 449,
+    "vs_whole": {
+     "n": 80,
+     "delta": -0.5858,
+     "p": 0.0001,
+     "lo": -0.6201,
+     "hi": -0.5513
+    }
+   },
+   "yolo_appsort": {
+    "n": 80,
+    "ok": 30,
+    "nes": 0.0158,
+    "nes_stripped": 0.0158,
+    "crops_failed": 1,
+    "prompt_tokens": 13907,
+    "completion_tokens": 4836,
+    "vs_whole": {
+     "n": 80,
+     "delta": -0.5811,
+     "p": 0.0001,
+     "lo": -0.619,
+     "hi": -0.5413
+    }
+   },
+   "heron": {
+    "n": 80,
+    "ok": 80,
+    "nes": 0.5153,
+    "nes_stripped": 0.5153,
+    "crops_failed": 28,
+    "prompt_tokens": 203614,
+    "completion_tokens": 23099,
+    "vs_whole": {
+     "n": 80,
+     "delta": -0.0817,
+     "p": 0.0001,
+     "lo": -0.1194,
+     "hi": -0.0441
+    }
+   },
+   "vision_doc": {
+    "n": 80,
+    "ok": 79,
+    "nes": 0.409,
+    "nes_stripped": 0.409,
+    "crops_failed": 109,
+    "prompt_tokens": 141516,
+    "completion_tokens": 28966,
+    "vs_whole": {
+     "n": 80,
+     "delta": -0.1879,
+     "p": 0.0001,
+     "lo": -0.226,
+     "hi": -0.15
+    }
+   }
+  },
+  "the 96": {
+   "whole": {
+    "n": 96,
+    "ok": 95,
+    "nes": 0.9093,
+    "nes_stripped": 0.9095,
+    "crops_failed": 0,
+    "prompt_tokens": 470585,
+    "completion_tokens": 49356,
+    "vs_whole": {
+     "n": 96,
+     "delta": 0.0,
+     "p": 1.0,
+     "lo": 0.0,
+     "hi": 0.0
+    }
+   },
+   "pp-doclayoutv3": {
+    "n": 96,
+    "ok": 95,
+    "nes": 0.8493,
+    "nes_stripped": 0.8503,
+    "crops_failed": 5,
+    "prompt_tokens": 245382,
+    "completion_tokens": 41388,
+    "vs_whole": {
+     "n": 96,
+     "delta": -0.06,
+     "p": 0.001,
+     "lo": -0.0965,
+     "hi": -0.0261
+    }
+   },
+   "yolo_newsocr": {
+    "n": 96,
+    "ok": 88,
+    "nes": 0.7093,
+    "nes_stripped": 0.7094,
+    "crops_failed": 23,
+    "prompt_tokens": 204795,
+    "completion_tokens": 40893,
+    "vs_whole": {
+     "n": 96,
+     "delta": -0.2001,
+     "p": 0.0001,
+     "lo": -0.2729,
+     "hi": -0.1326
+    }
+   },
+   "yolo_appsort": {
+    "n": 96,
+    "ok": 84,
+    "nes": 0.7414,
+    "nes_stripped": 0.7424,
+    "crops_failed": 12,
+    "prompt_tokens": 195492,
+    "completion_tokens": 39364,
+    "vs_whole": {
+     "n": 96,
+     "delta": -0.1679,
+     "p": 0.0001,
+     "lo": -0.2364,
+     "hi": -0.103
+    }
+   },
+   "heron": {
+    "n": 96,
+    "ok": 96,
+    "nes": 0.8707,
+    "nes_stripped": 0.8719,
+    "crops_failed": 15,
+    "prompt_tokens": 250135,
+    "completion_tokens": 44142,
+    "vs_whole": {
+     "n": 96,
+     "delta": -0.0386,
+     "p": 0.0426,
+     "lo": -0.0772,
+     "hi": -0.0031
+    }
+   },
+   "vision_doc": {
+    "n": 96,
+    "ok": 96,
+    "nes": 0.798,
+    "nes_stripped": 0.7992,
+    "crops_failed": 25,
+    "prompt_tokens": 279700,
+    "completion_tokens": 49855,
+    "vs_whole": {
+     "n": 96,
+     "delta": -0.1114,
+     "p": 0.0001,
+     "lo": -0.1486,
+     "hi": -0.0755
+    }
+   }
+  },
+  "handwritten": {
+   "whole": {
+    "n": 16,
+    "ok": 16,
+    "nes": 0.8578,
+    "nes_stripped": 0.8586,
+    "crops_failed": 0,
+    "prompt_tokens": 88492,
+    "completion_tokens": 3573,
+    "vs_whole": {
+     "n": 16,
+     "delta": 0.0,
+     "p": 1.0,
+     "lo": 0.0,
+     "hi": 0.0
+    }
+   },
+   "pp-doclayoutv3": {
+    "n": 16,
+    "ok": 15,
+    "nes": 0.7048,
+    "nes_stripped": 0.7043,
+    "crops_failed": 0,
+    "prompt_tokens": 45929,
+    "completion_tokens": 2742,
+    "vs_whole": {
+     "n": 16,
+     "delta": -0.1531,
+     "p": 0.027,
+     "lo": -0.2823,
+     "hi": -0.0438
+    }
+   },
+   "yolo_newsocr": {
+    "n": 16,
+    "ok": 11,
+    "nes": 0.1097,
+    "nes_stripped": 0.1097,
+    "crops_failed": 1,
+    "prompt_tokens": 5876,
+    "completion_tokens": 581,
+    "vs_whole": {
+     "n": 16,
+     "delta": -0.7481,
+     "p": 0.0002,
+     "lo": -0.8448,
+     "hi": -0.6195
+    }
+   },
+   "yolo_appsort": {
+    "n": 16,
+    "ok": 6,
+    "nes": 0.1424,
+    "nes_stripped": 0.1424,
+    "crops_failed": 0,
+    "prompt_tokens": 8309,
+    "completion_tokens": 489,
+    "vs_whole": {
+     "n": 16,
+     "delta": -0.7154,
+     "p": 0.0002,
+     "lo": -0.8419,
+     "hi": -0.5583
+    }
+   },
+   "heron": {
+    "n": 16,
+    "ok": 16,
+    "nes": 0.7263,
+    "nes_stripped": 0.7274,
+    "crops_failed": 6,
+    "prompt_tokens": 49814,
+    "completion_tokens": 3401,
+    "vs_whole": {
+     "n": 16,
+     "delta": -0.1315,
+     "p": 0.0621,
+     "lo": -0.2858,
+     "hi": -0.0119
+    }
+   },
+   "vision_doc": {
+    "n": 16,
+    "ok": 16,
+    "nes": 0.6353,
+    "nes_stripped": 0.6358,
+    "crops_failed": 7,
+    "prompt_tokens": 48897,
+    "completion_tokens": 2938,
+    "vs_whole": {
+     "n": 16,
+     "delta": -0.2226,
+     "p": 0.0004,
+     "lo": -0.3247,
+     "hi": -0.1292
+    }
+   }
+  },
+  "typed, no table or clipping": {
+   "whole": {
+    "n": 41,
+    "ok": 40,
+    "nes": 0.9404,
+    "nes_stripped": 0.9404,
+    "crops_failed": 0,
+    "prompt_tokens": 203389,
+    "completion_tokens": 25799,
+    "vs_whole": {
+     "n": 41,
+     "delta": 0.0,
+     "p": 1.0,
+     "lo": 0.0,
+     "hi": 0.0
+    }
+   },
+   "pp-doclayoutv3": {
+    "n": 41,
+    "ok": 41,
+    "nes": 0.9465,
+    "nes_stripped": 0.9465,
+    "crops_failed": 0,
+    "prompt_tokens": 112072,
+    "completion_tokens": 18393,
+    "vs_whole": {
+     "n": 41,
+     "delta": 0.0061,
+     "p": 0.7672,
+     "lo": -0.0274,
+     "hi": 0.0441
+    }
+   },
+   "yolo_newsocr": {
+    "n": 41,
+    "ok": 41,
+    "nes": 0.9289,
+    "nes_stripped": 0.9289,
+    "crops_failed": 15,
+    "prompt_tokens": 114891,
+    "completion_tokens": 19218,
+    "vs_whole": {
+     "n": 41,
+     "delta": -0.0116,
+     "p": 0.5767,
+     "lo": -0.0448,
+     "hi": 0.0261
+    }
+   },
+   "yolo_appsort": {
+    "n": 41,
+    "ok": 41,
+    "nes": 0.9576,
+    "nes_stripped": 0.9576,
+    "crops_failed": 8,
+    "prompt_tokens": 108729,
+    "completion_tokens": 18726,
+    "vs_whole": {
+     "n": 41,
+     "delta": 0.0172,
+     "p": 0.3627,
+     "lo": -0.0087,
+     "hi": 0.0515
+    }
+   },
+   "heron": {
+    "n": 41,
+    "ok": 41,
+    "nes": 0.9628,
+    "nes_stripped": 0.9628,
+    "crops_failed": 6,
+    "prompt_tokens": 111132,
+    "completion_tokens": 19182,
+    "vs_whole": {
+     "n": 41,
+     "delta": 0.0223,
+     "p": 0.1737,
+     "lo": -0.0022,
+     "hi": 0.055
+    }
+   },
+   "vision_doc": {
+    "n": 41,
+    "ok": 41,
+    "nes": 0.8647,
+    "nes_stripped": 0.8647,
+    "crops_failed": 7,
+    "prompt_tokens": 127994,
+    "completion_tokens": 21737,
+    "vs_whole": {
+     "n": 41,
+     "delta": -0.0758,
+     "p": 0.0034,
+     "lo": -0.1233,
+     "hi": -0.027
+    }
+   }
+  },
+  "clippings": {
+   "whole": {
+    "n": 13,
+    "ok": 13,
+    "nes": 0.869,
+    "nes_stripped": 0.8687,
+    "crops_failed": 0,
+    "prompt_tokens": 48660,
+    "completion_tokens": 7473,
+    "vs_whole": {
+     "n": 13,
+     "delta": 0.0,
+     "p": 1.0,
+     "lo": 0.0,
+     "hi": 0.0
+    }
+   },
+   "pp-doclayoutv3": {
+    "n": 13,
+    "ok": 13,
+    "nes": 0.8184,
+    "nes_stripped": 0.8184,
+    "crops_failed": 2,
+    "prompt_tokens": 25358,
+    "completion_tokens": 7803,
+    "vs_whole": {
+     "n": 13,
+     "delta": -0.0505,
+     "p": 0.3322,
+     "lo": -0.15,
+     "hi": 0.0306
+    }
+   },
+   "yolo_newsocr": {
+    "n": 13,
+    "ok": 13,
+    "nes": 0.8656,
+    "nes_stripped": 0.8653,
+    "crops_failed": 0,
+    "prompt_tokens": 28654,
+    "completion_tokens": 8653,
+    "vs_whole": {
+     "n": 13,
+     "delta": -0.0033,
+     "p": 0.9565,
+     "lo": -0.1105,
+     "hi": 0.088
+    }
+   },
+   "yolo_appsort": {
+    "n": 13,
+    "ok": 13,
+    "nes": 0.7714,
+    "nes_stripped": 0.7714,
+    "crops_failed": 1,
+    "prompt_tokens": 26103,
+    "completion_tokens": 8086,
+    "vs_whole": {
+     "n": 13,
+     "delta": -0.0975,
+     "p": 0.1987,
+     "lo": -0.2374,
+     "hi": 0.0282
+    }
+   },
+   "heron": {
+    "n": 13,
+    "ok": 13,
+    "nes": 0.8186,
+    "nes_stripped": 0.8187,
+    "crops_failed": 3,
+    "prompt_tokens": 27417,
+    "completion_tokens": 8648,
+    "vs_whole": {
+     "n": 13,
+     "delta": -0.0503,
+     "p": 0.4119,
+     "lo": -0.1678,
+     "hi": 0.0506
+    }
+   },
+   "vision_doc": {
+    "n": 13,
+    "ok": 13,
+    "nes": 0.7103,
+    "nes_stripped": 0.7104,
+    "crops_failed": 9,
+    "prompt_tokens": 36566,
+    "completion_tokens": 11093,
+    "vs_whole": {
+     "n": 13,
+     "delta": -0.1586,
+     "p": 0.0436,
+     "lo": -0.2978,
+     "hi": -0.0371
+    }
+   }
+  },
+  "tables": {
+   "whole": {
+    "n": 12,
+    "ok": 12,
+    "nes": 0.9191,
+    "nes_stripped": 0.92,
+    "crops_failed": 0,
+    "prompt_tokens": 54384,
+    "completion_tokens": 4518,
+    "vs_whole": {
+     "n": 12,
+     "delta": 0.0,
+     "p": 1.0,
+     "lo": 0.0,
+     "hi": 0.0
+    }
+   },
+   "pp-doclayoutv3": {
+    "n": 12,
+    "ok": 12,
+    "nes": 0.8278,
+    "nes_stripped": 0.8364,
+    "crops_failed": 2,
+    "prompt_tokens": 19153,
+    "completion_tokens": 4516,
+    "vs_whole": {
+     "n": 12,
+     "delta": -0.0913,
+     "p": 0.0043,
+     "lo": -0.1833,
+     "hi": -0.0231
+    }
+   },
+   "yolo_newsocr": {
+    "n": 12,
+    "ok": 12,
+    "nes": 0.7642,
+    "nes_stripped": 0.7652,
+    "crops_failed": 5,
+    "prompt_tokens": 22697,
+    "completion_tokens": 5166,
+    "vs_whole": {
+     "n": 12,
+     "delta": -0.1549,
+     "p": 0.0262,
+     "lo": -0.2879,
+     "hi": -0.0449
+    }
+   },
+   "yolo_appsort": {
+    "n": 12,
+    "ok": 12,
+    "nes": 0.8349,
+    "nes_stripped": 0.8426,
+    "crops_failed": 2,
+    "prompt_tokens": 20464,
+    "completion_tokens": 4892,
+    "vs_whole": {
+     "n": 12,
+     "delta": -0.0841,
+     "p": 0.0535,
+     "lo": -0.1746,
+     "hi": -0.014
+    }
+   },
+   "heron": {
+    "n": 12,
+    "ok": 12,
+    "nes": 0.8775,
+    "nes_stripped": 0.8852,
+    "crops_failed": 0,
+    "prompt_tokens": 19805,
+    "completion_tokens": 4712,
+    "vs_whole": {
+     "n": 12,
+     "delta": -0.0415,
+     "p": 0.4898,
+     "lo": -0.1439,
+     "hi": 0.0456
+    }
+   },
+   "vision_doc": {
+    "n": 12,
+    "ok": 12,
+    "nes": 0.8862,
+    "nes_stripped": 0.8946,
+    "crops_failed": 1,
+    "prompt_tokens": 21197,
+    "completion_tokens": 4852,
+    "vs_whole": {
+     "n": 12,
+     "delta": -0.0329,
+     "p": 0.5062,
+     "lo": -0.1022,
+     "hi": 0.0566
+    }
+   }
+  },
+  "kind:typewritten": {
+   "whole": {
+    "n": 50,
+    "ok": 49,
+    "nes": 0.9349,
+    "nes_stripped": 0.9348,
+    "crops_failed": 0,
+    "prompt_tokens": 244649,
+    "completion_tokens": 28341,
+    "vs_whole": {
+     "n": 50,
+     "delta": 0.0,
+     "p": 1.0,
+     "lo": 0.0,
+     "hi": 0.0
+    }
+   },
+   "pp-doclayoutv3": {
+    "n": 50,
+    "ok": 50,
+    "nes": 0.9158,
+    "nes_stripped": 0.9158,
+    "crops_failed": 3,
+    "prompt_tokens": 124570,
+    "completion_tokens": 20749,
+    "vs_whole": {
+     "n": 50,
+     "delta": -0.0192,
+     "p": 0.3449,
+     "lo": -0.0575,
+     "hi": 0.0193
+    }
+   },
+   "yolo_newsocr": {
+    "n": 50,
+    "ok": 50,
+    "nes": 0.8987,
+    "nes_stripped": 0.8986,
+    "crops_failed": 20,
+    "prompt_tokens": 131147,
+    "completion_tokens": 22371,
+    "vs_whole": {
+     "n": 50,
+     "delta": -0.0363,
+     "p": 0.095,
+     "lo": -0.0781,
+     "hi": 0.0048
+    }
+   },
+   "yolo_appsort": {
+    "n": 50,
+    "ok": 50,
+    "nes": 0.9396,
+    "nes_stripped": 0.9396,
+    "crops_failed": 10,
+    "prompt_tokens": 123412,
+    "completion_tokens": 21489,
+    "vs_whole": {
+     "n": 50,
+     "delta": 0.0047,
+     "p": 0.7718,
+     "lo": -0.0205,
+     "hi": 0.0354
+    }
+   },
+   "heron": {
+    "n": 50,
+    "ok": 50,
+    "nes": 0.9567,
+    "nes_stripped": 0.9567,
+    "crops_failed": 6,
+    "prompt_tokens": 124498,
+    "completion_tokens": 21779,
+    "vs_whole": {
+     "n": 50,
+     "delta": 0.0218,
+     "p": 0.1388,
+     "lo": -0.0019,
+     "hi": 0.051
+    }
+   },
+   "vision_doc": {
+    "n": 50,
+    "ok": 50,
+    "nes": 0.8664,
+    "nes_stripped": 0.8664,
+    "crops_failed": 8,
+    "prompt_tokens": 143402,
+    "completion_tokens": 24548,
+    "vs_whole": {
+     "n": 50,
+     "delta": -0.0685,
+     "p": 0.0044,
+     "lo": -0.111,
+     "hi": -0.0246
+    }
+   }
+  },
+  "kind:printed": {
+   "whole": {
+    "n": 28,
+    "ok": 28,
+    "nes": 0.9024,
+    "nes_stripped": 0.9028,
+    "crops_failed": 0,
+    "prompt_tokens": 126404,
+    "completion_tokens": 17066,
+    "vs_whole": {
+     "n": 28,
+     "delta": 0.0,
+     "p": 1.0,
+     "lo": 0.0,
+     "hi": 0.0
+    }
+   },
+   "pp-doclayoutv3": {
+    "n": 28,
+    "ok": 28,
+    "nes": 0.8277,
+    "nes_stripped": 0.8314,
+    "crops_failed": 2,
+    "prompt_tokens": 71335,
+    "completion_tokens": 17542,
+    "vs_whole": {
+     "n": 28,
+     "delta": -0.0746,
+     "p": 0.024,
+     "lo": -0.1402,
+     "hi": -0.0174
+    }
+   },
+   "yolo_newsocr": {
+    "n": 28,
+    "ok": 26,
+    "nes": 0.7491,
+    "nes_stripped": 0.7496,
+    "crops_failed": 2,
+    "prompt_tokens": 67109,
+    "completion_tokens": 17770,
+    "vs_whole": {
+     "n": 28,
+     "delta": -0.1532,
+     "p": 0.0199,
+     "lo": -0.2749,
+     "hi": -0.0396
+    }
+   },
+   "yolo_appsort": {
+    "n": 28,
+    "ok": 27,
+    "nes": 0.782,
+    "nes_stripped": 0.7853,
+    "crops_failed": 2,
+    "prompt_tokens": 63737,
+    "completion_tokens": 17373,
+    "vs_whole": {
+     "n": 28,
+     "delta": -0.1203,
+     "p": 0.0232,
+     "lo": -0.228,
+     "hi": -0.0263
+    }
+   },
+   "heron": {
+    "n": 28,
+    "ok": 28,
+    "nes": 0.8326,
+    "nes_stripped": 0.8359,
+    "crops_failed": 3,
+    "prompt_tokens": 72332,
+    "completion_tokens": 18578,
+    "vs_whole": {
+     "n": 28,
+     "delta": -0.0697,
+     "p": 0.0636,
+     "lo": -0.1427,
+     "hi": -0.0037
+    }
+   },
+   "vision_doc": {
+    "n": 28,
+    "ok": 28,
+    "nes": 0.7805,
+    "nes_stripped": 0.7841,
+    "crops_failed": 10,
+    "prompt_tokens": 83155,
+    "completion_tokens": 21889,
+    "vs_whole": {
+     "n": 28,
+     "delta": -0.1219,
+     "p": 0.0009,
+     "lo": -0.195,
+     "hi": -0.0546
+    }
+   }
+  },
+  "kind:handwritten": {
+   "whole": {
+    "n": 16,
+    "ok": 16,
+    "nes": 0.8578,
+    "nes_stripped": 0.8586,
+    "crops_failed": 0,
+    "prompt_tokens": 88492,
+    "completion_tokens": 3573,
+    "vs_whole": {
+     "n": 16,
+     "delta": 0.0,
+     "p": 1.0,
+     "lo": 0.0,
+     "hi": 0.0
+    }
+   },
+   "pp-doclayoutv3": {
+    "n": 16,
+    "ok": 15,
+    "nes": 0.7048,
+    "nes_stripped": 0.7043,
+    "crops_failed": 0,
+    "prompt_tokens": 45929,
+    "completion_tokens": 2742,
+    "vs_whole": {
+     "n": 16,
+     "delta": -0.1531,
+     "p": 0.027,
+     "lo": -0.2823,
+     "hi": -0.0438
+    }
+   },
+   "yolo_newsocr": {
+    "n": 16,
+    "ok": 11,
+    "nes": 0.1097,
+    "nes_stripped": 0.1097,
+    "crops_failed": 1,
+    "prompt_tokens": 5876,
+    "completion_tokens": 581,
+    "vs_whole": {
+     "n": 16,
+     "delta": -0.7481,
+     "p": 0.0002,
+     "lo": -0.8448,
+     "hi": -0.6195
+    }
+   },
+   "yolo_appsort": {
+    "n": 16,
+    "ok": 6,
+    "nes": 0.1424,
+    "nes_stripped": 0.1424,
+    "crops_failed": 0,
+    "prompt_tokens": 8309,
+    "completion_tokens": 489,
+    "vs_whole": {
+     "n": 16,
+     "delta": -0.7154,
+     "p": 0.0002,
+     "lo": -0.8419,
+     "hi": -0.5583
+    }
+   },
+   "heron": {
+    "n": 16,
+    "ok": 16,
+    "nes": 0.7263,
+    "nes_stripped": 0.7274,
+    "crops_failed": 6,
+    "prompt_tokens": 49814,
+    "completion_tokens": 3401,
+    "vs_whole": {
+     "n": 16,
+     "delta": -0.1315,
+     "p": 0.0621,
+     "lo": -0.2858,
+     "hi": -0.0119
+    }
+   },
+   "vision_doc": {
+    "n": 16,
+    "ok": 16,
+    "nes": 0.6353,
+    "nes_stripped": 0.6358,
+    "crops_failed": 7,
+    "prompt_tokens": 48897,
+    "completion_tokens": 2938,
+    "vs_whole": {
+     "n": 16,
+     "delta": -0.2226,
+     "p": 0.0004,
+     "lo": -0.3247,
+     "hi": -0.1292
+    }
+   }
+  }
+ },
+ "real5": {
+  "scan": {
+   "whole": {
+    "n": 155,
+    "ok": 154,
+    "nes": 0.9206,
+    "nes_stripped": 0.9205,
+    "crops_failed": 1,
+    "prompt_tokens": 479266,
+    "completion_tokens": 108704,
+    "vs_whole": {
+     "n": 155,
+     "delta": 0.0,
+     "p": 1.0,
+     "lo": 0.0,
+     "hi": 0.0
+    }
+   },
+   "yolo_appsort": {
+    "n": 155,
+    "ok": 153,
+    "nes": 0.8125,
+    "nes_stripped": 0.8123,
+    "crops_failed": 26,
+    "prompt_tokens": 244410,
+    "completion_tokens": 123170,
+    "vs_whole": {
+     "n": 155,
+     "delta": -0.1081,
+     "p": 0.0001,
+     "lo": -0.1472,
+     "hi": -0.0695
+    }
+   },
+   "pp-doclayoutv3": {
+    "n": 155,
+    "ok": 154,
+    "nes": 0.9171,
+    "nes_stripped": 0.9168,
+    "crops_failed": 5,
+    "prompt_tokens": 250180,
+    "completion_tokens": 118618,
+    "vs_whole": {
+     "n": 155,
+     "delta": -0.0036,
+     "p": 0.8097,
+     "lo": -0.0335,
+     "hi": 0.0254
+    }
+   },
+   "heron": {
+    "n": 155,
+    "ok": 155,
+    "nes": 0.8225,
+    "nes_stripped": 0.8223,
+    "crops_failed": 4,
+    "prompt_tokens": 253393,
+    "completion_tokens": 118416,
+    "vs_whole": {
+     "n": 155,
+     "delta": -0.0981,
+     "p": 0.0001,
+     "lo": -0.1346,
+     "hi": -0.0622
+    }
+   },
+   "vision_doc": {
+    "n": 155,
+    "ok": 154,
+    "nes": 0.8365,
+    "nes_stripped": 0.8365,
+    "crops_failed": 9,
+    "prompt_tokens": 281969,
+    "completion_tokens": 141432,
+    "vs_whole": {
+     "n": 155,
+     "delta": -0.0841,
+     "p": 0.0001,
+     "lo": -0.1181,
+     "hi": -0.053
+    }
+   }
+  },
+  "illum": {
+   "whole": {
+    "n": 155,
+    "ok": 153,
+    "nes": 0.9301,
+    "nes_stripped": 0.9304,
+    "crops_failed": 2,
+    "prompt_tokens": 645072,
+    "completion_tokens": 111793,
+    "vs_whole": {
+     "n": 155,
+     "delta": 0.0,
+     "p": 1.0,
+     "lo": 0.0,
+     "hi": 0.0
+    },
+    "vs_scan": {
+     "n": 155,
+     "delta": 0.0094,
+     "p": 0.2312,
+     "lo": -0.0062,
+     "hi": 0.0245
+    }
+   },
+   "yolo_appsort": {
+    "n": 155,
+    "ok": 152,
+    "nes": 0.7964,
+    "nes_stripped": 0.7961,
+    "crops_failed": 6,
+    "prompt_tokens": 241354,
+    "completion_tokens": 119050,
+    "vs_whole": {
+     "n": 155,
+     "delta": -0.1337,
+     "p": 0.0001,
+     "lo": -0.1762,
+     "hi": -0.091
+    },
+    "vs_scan": {
+     "n": 155,
+     "delta": -0.0161,
+     "p": 0.1286,
+     "lo": -0.0373,
+     "hi": 0.0035
+    }
+   },
+   "pp-doclayoutv3": {
+    "n": 155,
+    "ok": 155,
+    "nes": 0.8991,
+    "nes_stripped": 0.8988,
+    "crops_failed": 5,
+    "prompt_tokens": 255642,
+    "completion_tokens": 124841,
+    "vs_whole": {
+     "n": 155,
+     "delta": -0.031,
+     "p": 0.0303,
+     "lo": -0.0593,
+     "hi": -0.0034
+    },
+    "vs_scan": {
+     "n": 155,
+     "delta": -0.018,
+     "p": 0.1366,
+     "lo": -0.0409,
+     "hi": 0.0064
+    }
+   },
+   "heron": {
+    "n": 155,
+    "ok": 155,
+    "nes": 0.7926,
+    "nes_stripped": 0.7925,
+    "crops_failed": 4,
+    "prompt_tokens": 259071,
+    "completion_tokens": 121898,
+    "vs_whole": {
+     "n": 155,
+     "delta": -0.1375,
+     "p": 0.0001,
+     "lo": -0.1782,
+     "hi": -0.0956
+    },
+    "vs_scan": {
+     "n": 155,
+     "delta": -0.03,
+     "p": 0.0134,
+     "lo": -0.0538,
+     "hi": -0.007
+    }
+   },
+   "vision_doc": {
+    "n": 155,
+    "ok": 154,
+    "nes": 0.7022,
+    "nes_stripped": 0.7022,
+    "crops_failed": 5,
+    "prompt_tokens": 257266,
+    "completion_tokens": 111010,
+    "vs_whole": {
+     "n": 155,
+     "delta": -0.2279,
+     "p": 0.0001,
+     "lo": -0.2746,
+     "hi": -0.1825
+    },
+    "vs_scan": {
+     "n": 155,
+     "delta": -0.1343,
+     "p": 0.0001,
+     "lo": -0.171,
+     "hi": -0.0987
+    }
+   }
+  },
+  "warp": {
+   "whole": {
+    "n": 155,
+    "ok": 147,
+    "nes": 0.8799,
+    "nes_stripped": 0.8805,
+    "crops_failed": 8,
+    "prompt_tokens": 642320,
+    "completion_tokens": 123775,
+    "vs_whole": {
+     "n": 155,
+     "delta": 0.0,
+     "p": 1.0,
+     "lo": 0.0,
+     "hi": 0.0
+    },
+    "vs_scan": {
+     "n": 155,
+     "delta": -0.0407,
+     "p": 0.0209,
+     "lo": -0.0768,
+     "hi": -0.0092
+    }
+   },
+   "yolo_appsort": {
+    "n": 155,
+    "ok": 141,
+    "nes": 0.696,
+    "nes_stripped": 0.6958,
+    "crops_failed": 5,
+    "prompt_tokens": 174637,
+    "completion_tokens": 94024,
+    "vs_whole": {
+     "n": 155,
+     "delta": -0.1839,
+     "p": 0.0001,
+     "lo": -0.2421,
+     "hi": -0.1265
+    },
+    "vs_scan": {
+     "n": 155,
+     "delta": -0.1165,
+     "p": 0.0001,
+     "lo": -0.1703,
+     "hi": -0.0666
+    }
+   },
+   "pp-doclayoutv3": {
+    "n": 155,
+    "ok": 154,
+    "nes": 0.8508,
+    "nes_stripped": 0.8506,
+    "crops_failed": 6,
+    "prompt_tokens": 234974,
+    "completion_tokens": 127284,
+    "vs_whole": {
+     "n": 155,
+     "delta": -0.0291,
+     "p": 0.1721,
+     "lo": -0.0701,
+     "hi": 0.0131
+    },
+    "vs_scan": {
+     "n": 155,
+     "delta": -0.0663,
+     "p": 0.0002,
+     "lo": -0.0975,
+     "hi": -0.0348
+    }
+   },
+   "heron": {
+    "n": 155,
+    "ok": 155,
+    "nes": 0.7581,
+    "nes_stripped": 0.7578,
+    "crops_failed": 15,
+    "prompt_tokens": 230926,
+    "completion_tokens": 142052,
+    "vs_whole": {
+     "n": 155,
+     "delta": -0.1218,
+     "p": 0.0001,
+     "lo": -0.1648,
+     "hi": -0.079
+    },
+    "vs_scan": {
+     "n": 155,
+     "delta": -0.0644,
+     "p": 0.0001,
+     "lo": -0.092,
+     "hi": -0.0386
+    }
+   },
+   "vision_doc": {
+    "n": 155,
+    "ok": 152,
+    "nes": 0.6134,
+    "nes_stripped": 0.6133,
+    "crops_failed": 8,
+    "prompt_tokens": 189589,
+    "completion_tokens": 71245,
+    "vs_whole": {
+     "n": 155,
+     "delta": -0.2665,
+     "p": 0.0001,
+     "lo": -0.3165,
+     "hi": -0.2178
+    },
+    "vs_scan": {
+     "n": 155,
+     "delta": -0.2231,
+     "p": 0.0001,
+     "lo": -0.2644,
+     "hi": -0.183
+    }
+   }
+  },
+  "skew": {
+   "whole": {
+    "n": 155,
+    "ok": 152,
+    "nes": 0.9128,
+    "nes_stripped": 0.9126,
+    "crops_failed": 3,
+    "prompt_tokens": 759280,
+    "completion_tokens": 112772,
+    "vs_whole": {
+     "n": 155,
+     "delta": 0.0,
+     "p": 1.0,
+     "lo": 0.0,
+     "hi": 0.0
+    },
+    "vs_scan": {
+     "n": 155,
+     "delta": -0.0079,
+     "p": 0.5458,
+     "lo": -0.0333,
+     "hi": 0.0148
+    }
+   },
+   "yolo_appsort": {
+    "n": 155,
+    "ok": 97,
+    "nes": 0.4111,
+    "nes_stripped": 0.411,
+    "crops_failed": 2,
+    "prompt_tokens": 157104,
+    "completion_tokens": 63887,
+    "vs_whole": {
+     "n": 155,
+     "delta": -0.5017,
+     "p": 0.0001,
+     "lo": -0.5723,
+     "hi": -0.4296
+    },
+    "vs_scan": {
+     "n": 155,
+     "delta": -0.4014,
+     "p": 0.0001,
+     "lo": -0.4722,
+     "hi": -0.3311
+    }
+   },
+   "pp-doclayoutv3": {
+    "n": 155,
+    "ok": 154,
+    "nes": 0.8175,
+    "nes_stripped": 0.8174,
+    "crops_failed": 4,
+    "prompt_tokens": 408435,
+    "completion_tokens": 138023,
+    "vs_whole": {
+     "n": 155,
+     "delta": -0.0953,
+     "p": 0.0001,
+     "lo": -0.133,
+     "hi": -0.0581
+    },
+    "vs_scan": {
+     "n": 155,
+     "delta": -0.0996,
+     "p": 0.0001,
+     "lo": -0.1297,
+     "hi": -0.0678
+    }
+   },
+   "heron": {
+    "n": 155,
+    "ok": 154,
+    "nes": 0.7035,
+    "nes_stripped": 0.7033,
+    "crops_failed": 5,
+    "prompt_tokens": 350631,
+    "completion_tokens": 128415,
+    "vs_whole": {
+     "n": 155,
+     "delta": -0.2092,
+     "p": 0.0001,
+     "lo": -0.2552,
+     "hi": -0.1636
+    },
+    "vs_scan": {
+     "n": 155,
+     "delta": -0.119,
+     "p": 0.0001,
+     "lo": -0.1572,
+     "hi": -0.082
+    }
+   },
+   "vision_doc": {
+    "n": 155,
+    "ok": 154,
+    "nes": 0.6755,
+    "nes_stripped": 0.6755,
+    "crops_failed": 9,
+    "prompt_tokens": 430413,
+    "completion_tokens": 159840,
+    "vs_whole": {
+     "n": 155,
+     "delta": -0.2373,
+     "p": 0.0001,
+     "lo": -0.2803,
+     "hi": -0.1951
+    },
+    "vs_scan": {
+     "n": 155,
+     "delta": -0.161,
+     "p": 0.0001,
+     "lo": -0.197,
+     "hi": -0.1262
+    }
+   }
+  }
+ },
+ "staged": {
+  "warp-quad": {
+   "whole": {
+    "n": 155,
+    "ok": 144,
+    "nes": 0.8679,
+    "nes_stripped": 0.868,
+    "crops_failed": 11,
+    "prompt_tokens": 388247,
+    "completion_tokens": 131409,
+    "vs_raw": {
+     "n": 155,
+     "delta": -0.012,
+     "p": 0.4155,
+     "lo": -0.0409,
+     "hi": 0.015
+    }
+   },
+   "yolo_appsort": {
+    "n": 155,
+    "ok": 152,
+    "nes": 0.7869,
+    "nes_stripped": 0.7867,
+    "crops_failed": 13,
+    "prompt_tokens": 186419,
+    "completion_tokens": 124867,
+    "vs_raw": {
+     "n": 155,
+     "delta": 0.0909,
+     "p": 0.0012,
+     "lo": 0.0385,
+     "hi": 0.1441
+    }
+   },
+   "pp-doclayoutv3": {
+    "n": 155,
+    "ok": 153,
+    "nes": 0.8591,
+    "nes_stripped": 0.8588,
+    "crops_failed": 7,
+    "prompt_tokens": 221858,
+    "completion_tokens": 130170,
+    "vs_raw": {
+     "n": 155,
+     "delta": 0.0083,
+     "p": 0.4564,
+     "lo": -0.0133,
+     "hi": 0.0295
+    }
+   }
+  },
+  "warp-uvdoc": {
+   "whole": {
+    "n": 155,
+    "ok": 153,
+    "nes": 0.9115,
+    "nes_stripped": 0.912,
+    "crops_failed": 2,
+    "prompt_tokens": 388247,
+    "completion_tokens": 111651,
+    "vs_raw": {
+     "n": 155,
+     "delta": 0.0316,
+     "p": 0.0988,
+     "lo": -0.0043,
+     "hi": 0.0697
+    }
+   },
+   "yolo_appsort": {
+    "n": 155,
+    "ok": 152,
+    "nes": 0.829,
+    "nes_stripped": 0.8287,
+    "crops_failed": 8,
+    "prompt_tokens": 224057,
+    "completion_tokens": 118325,
+    "vs_raw": {
+     "n": 155,
+     "delta": 0.1329,
+     "p": 0.0001,
+     "lo": 0.0795,
+     "hi": 0.1889
+    }
+   },
+   "pp-doclayoutv3": {
+    "n": 155,
+    "ok": 154,
+    "nes": 0.8831,
+    "nes_stripped": 0.8829,
+    "crops_failed": 3,
+    "prompt_tokens": 234588,
+    "completion_tokens": 120626,
+    "vs_raw": {
+     "n": 155,
+     "delta": 0.0323,
+     "p": 0.0366,
+     "lo": 0.002,
+     "hi": 0.0627
+    }
+   }
+  },
+  "skew-quad": {
+   "whole": {
+    "n": 155,
+    "ok": 154,
+    "nes": 0.9302,
+    "nes_stripped": 0.9305,
+    "crops_failed": 1,
+    "prompt_tokens": 527588,
+    "completion_tokens": 111072,
+    "vs_raw": {
+     "n": 155,
+     "delta": 0.0174,
+     "p": 0.1466,
+     "lo": -0.0032,
+     "hi": 0.0418
+    }
+   },
+   "yolo_appsort": {
+    "n": 155,
+    "ok": 152,
+    "nes": 0.7823,
+    "nes_stripped": 0.782,
+    "crops_failed": 6,
+    "prompt_tokens": 270586,
+    "completion_tokens": 116384,
+    "vs_raw": {
+     "n": 155,
+     "delta": 0.3712,
+     "p": 0.0001,
+     "lo": 0.3037,
+     "hi": 0.4397
+    }
+   },
+   "pp-doclayoutv3": {
+    "n": 155,
+    "ok": 154,
+    "nes": 0.8915,
+    "nes_stripped": 0.8912,
+    "crops_failed": 4,
+    "prompt_tokens": 304975,
+    "completion_tokens": 121627,
+    "vs_raw": {
+     "n": 155,
+     "delta": 0.074,
+     "p": 0.0001,
+     "lo": 0.0485,
+     "hi": 0.1004
+    }
+   }
+  },
+  "skew-uvdoc": {
+   "whole": {
+    "n": 155,
+    "ok": 154,
+    "nes": 0.9161,
+    "nes_stripped": 0.9168,
+    "crops_failed": 1,
+    "prompt_tokens": 527588,
+    "completion_tokens": 110132,
+    "vs_raw": {
+     "n": 155,
+     "delta": 0.0033,
+     "p": 0.8094,
+     "lo": -0.0213,
+     "hi": 0.03
+    }
+   },
+   "yolo_appsort": {
+    "n": 155,
+    "ok": 150,
+    "nes": 0.7796,
+    "nes_stripped": 0.7793,
+    "crops_failed": 5,
+    "prompt_tokens": 313942,
+    "completion_tokens": 113404,
+    "vs_raw": {
+     "n": 155,
+     "delta": 0.3685,
+     "p": 0.0001,
+     "lo": 0.2974,
+     "hi": 0.4402
+    }
+   },
+   "pp-doclayoutv3": {
+    "n": 155,
+    "ok": 154,
+    "nes": 0.8881,
+    "nes_stripped": 0.8878,
+    "crops_failed": 3,
+    "prompt_tokens": 324222,
+    "completion_tokens": 115394,
+    "vs_raw": {
+     "n": 155,
+     "delta": 0.0706,
+     "p": 0.0001,
+     "lo": 0.0408,
+     "hi": 0.1002
+    }
+   }
+  }
+ }
+}
