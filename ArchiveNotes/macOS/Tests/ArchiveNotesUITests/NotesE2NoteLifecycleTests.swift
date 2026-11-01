@@ -42,7 +42,9 @@ final class NotesE2NoteLifecycleTests: NotesFixtureUITestCase {
             }, "Set should write the extract's authors to front matter")
 
             // Put both back so the later checks see the fixture as generated.
-            win.buttons["an.detail.authors.clear"].click()
+            let extractClear = win.buttons["an.detail.authors.clear"]
+            revealInMetadataScroll(extractClear, in: win)
+            extractClear.click()
             XCTAssertTrue(pollUntil(timeout: 10) {
                 !(self.rawMarkdown(inItemDir: Self.idExtract) ?? "").contains("Ignatius Fenwick")
             }, "Clear should remove the extract's authors")
@@ -50,6 +52,7 @@ final class NotesE2NoteLifecycleTests: NotesFixtureUITestCase {
             selectItem(uuid: Self.idPlain)
             let clear = mainWindow.buttons["an.detail.authors.clear"]
             XCTAssertTrue(clear.waitForExistence(timeout: 10))
+            revealInMetadataScroll(clear)
             clear.click()
             XCTAssertTrue(pollUntil(timeout: 10) {
                 !(self.rawMarkdown(inItemDir: Self.idPlain) ?? "").contains("authors:")
@@ -92,10 +95,14 @@ final class NotesE2NoteLifecycleTests: NotesFixtureUITestCase {
     private func setAuthors(_ name: String, in window: XCUIElement) {
         let field = window.descendants(matching: .any)["an.detail.authors"].firstMatch
         XCTAssertTrue(field.waitForExistence(timeout: 10), "the authors field should be in the inspector")
+        revealInMetadataScroll(field, in: window)
         field.click()
         app.typeKey("a", modifierFlags: .command)
         app.typeText(name)
-        window.buttons["an.detail.authors.set"].click()
+        // In the Extracts window the Sources section pushes this row to the pane's fold.
+        let set = window.buttons["an.detail.authors.set"]
+        revealInMetadataScroll(set, in: window)
+        set.click()
     }
 
     private func openExtractsWindow() -> XCUIElement {

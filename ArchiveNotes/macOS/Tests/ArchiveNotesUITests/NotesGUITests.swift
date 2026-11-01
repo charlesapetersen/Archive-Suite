@@ -368,6 +368,24 @@ class NotesFixtureUITestCase: XCTestCase {
         return condition()
     }
 
+    /// Scroll `an.detail.metadataScroll` until `element` lies wholly inside its visible area (W35.vm-mem-fu1).
+    /// In the VM's window the day row sits below the pane's fold, so a click there landed outside the
+    /// field and the year field kept keyboard focus ("Neither element nor any descendant has keyboard focus").
+    /// An element half under the fold still reports hittable, but its centre, where `click()` lands, is
+    /// on the editor toolbar below: the Extracts window's authors Clear did nothing that way
+    /// (W40.fix-notes-extract-authors-clear). Pass `window` for a window other than the note window.
+    func revealInMetadataScroll(_ element: XCUIElement, in window: XCUIElement? = nil,
+                                file: StaticString = #filePath, line: UInt = #line) {
+        let scroll = (window ?? mainWindow).scrollViews["an.detail.metadataScroll"]
+        guard scroll.exists else { return }
+        for _ in 0..<10 {
+            let clip = scroll.frame, frame = element.frame
+            if frame.minY >= clip.minY && frame.maxY <= clip.maxY { return }
+            scroll.scroll(byDeltaX: 0, deltaY: frame.maxY > clip.maxY ? -60 : 60)   // negative reveals lower content
+        }
+        XCTFail("could not scroll \(element.identifier) into the metadata pane \(scroll.frame)", file: file, line: line)
+    }
+
     /// Wait until the index-ready probe publishes the settled completion token. The probe carries the
     /// bare generation token in its `accessibilityValue` (empty before settle) and mirrors it in the
     /// label (`building` → `ready:<gen>`); some SwiftUI static-text elements surface their string via
@@ -901,20 +919,6 @@ final class NotesGUITests: NotesFixtureUITestCase {
             XCTAssertTrue(pollUntil(timeout: 10) { cell.exists || cellLower.exists },
                           "the created note should appear in the note list: \(mainWindow.debugDescription)")
         }
-    }
-
-    /// Scroll `an.detail.metadataScroll` until `element` lies wholly inside its visible area (W35.vm-mem-fu1).
-    /// In the VM's window the day row sits below the pane's fold, so a click there landed outside the
-    /// field and the year field kept keyboard focus ("Neither element nor any descendant has keyboard focus").
-    private func revealInMetadataScroll(_ element: XCUIElement, file: StaticString = #filePath, line: UInt = #line) {
-        let scroll = mainWindow.scrollViews["an.detail.metadataScroll"]
-        guard scroll.exists else { return }
-        for _ in 0..<10 {
-            let clip = scroll.frame, frame = element.frame
-            if frame.minY >= clip.minY && frame.maxY <= clip.maxY { return }
-            scroll.scroll(byDeltaX: 0, deltaY: frame.maxY > clip.maxY ? -60 : 60)   // negative reveals lower content
-        }
-        XCTFail("could not scroll \(element.identifier) into the metadata pane \(scroll.frame)", file: file, line: line)
     }
 
     /// W23.l4-fu — the metadata date row renders the impossible-day warning and persists the
