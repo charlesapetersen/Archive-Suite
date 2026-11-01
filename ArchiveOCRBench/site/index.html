@@ -170,7 +170,7 @@ footer p { font-size: 13px; }
 
   <section class="panel" id="seg-boxes-score" hidden>
     <div class="head"><h2>Every segmentation route on the three locked boxes</h2><span class="meta">Gemini 3.7 · the shipped 2B · Sherlock · Vision text</span></div>
-    <div class="tbl"><table><thead><tr><th>Route</th><th>Box</th><th>Students trained on it?</th><th>Known gaps</th><th>Gap accuracy</th><th>False splits</th><th>False merges</th><th>Pages in exact document</th></tr></thead><tbody id="sbs-box-rows"></tbody></table></div>
+    <div class="tbl"><table><thead><tr><th>Route</th><th>Box</th><th>Fine-tuned on it?</th><th>Known gaps</th><th>Gap accuracy</th><th>False splits</th><th>False merges</th><th>Pages in exact document</th></tr></thead><tbody id="sbs-box-rows"></tbody></table></div>
     <h3>SC0122 on its owner-ruled gaps</h3>
     <div class="tbl"><table><thead><tr><th>Route</th><th>Tag and teacher disagreed: right</th><th>Controls right</th><th>Owner-ruled, weighted</th></tr></thead><tbody id="sbs-sc-rows"></tbody></table></div>
     <h3>The shipped cloud route at three window offsets (Stanton and RG 165)</h3>
@@ -670,7 +670,7 @@ if (sbs) {
   const p1 = v => v === null ? '—' : (100 * v).toFixed(1) + '%';
   const boxName = {IllustratedReview: 'Illustrated Review'};
   document.getElementById('sbs-box-rows').innerHTML = sbs.boxes.map(r => '<tr><td>' + sbs.labels[r.route] + '</td><td>' +
-    (boxName[r.box] || r.box) + '</td><td>' + (r.split === 'held-out' ? 'no' : 'yes') + '</td><td>' + r['known gaps'] +
+    (boxName[r.box] || r.box) + '</td><td>' + (r.split === 'trained-on' ? 'yes' : r.split === 'held-out' ? 'no' : 'not fine-tuned') + '</td><td>' + r['known gaps'] +
     '</td><td>' + p1(r['gap accuracy']) + '</td><td>' + r['false splits'] + '</td><td>' + r['false merges'] + '</td><td>' +
     p1(r['pages exact']) + '</td></tr>').join('');
   const sc = sbs.sc0122;

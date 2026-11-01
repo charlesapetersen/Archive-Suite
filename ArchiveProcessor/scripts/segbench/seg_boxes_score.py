@@ -37,13 +37,11 @@ only to the gateway and the caches, never into git (the repo is public).
 from __future__ import annotations
 
 import argparse
-import concurrent.futures as cf
 import fcntl
 import json
 import os
 from pathlib import Path
 import sys
-import threading
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
@@ -106,7 +104,12 @@ def gemini_answer(col, a, b):
     hit = S.cache_hit(body, key)
     if hit is None:
         return None
-    return S.parse(hit["raw"], nums, False) if hit.get("valid") else L.neutral(nums)
+    if hit.get("valid"):
+        return S.parse(hit["raw"], nums, False)
+    rec = next((r for r in S.effective_records() if r["id"] == hit["request"]["id"]), {})
+    if not invalid_model_reply(hit, rec):
+        raise RuntimeError(f"{col.name} {nums[0]}-{nums[-1]}: provider/usage failure, not a model vote")
+    return L.neutral(nums)
 
 
 def cmd_plan(_a):
@@ -152,47 +155,50 @@ def release_unsent(S):
 
 
 def cmd_collect(a):
-    L, W, S, _ = _mods()
-    gateway_key()
+    _, _, S, _ = _mods()
+    # S.call reserves and fsyncs before HTTP, but its check + append are not thread-safe.
+    # Keep the entire collector serial and locked, including recovery of unsettled calls.
+    if a.workers != 1:
+        raise SystemExit("collect requires --workers 1 to keep the item spending cap exact")
     STORE.mkdir(parents=True, exist_ok=True)
     with (STORE / "collect.lock").open("a") as fh:
         fcntl.flock(fh, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        gateway_key()
         release_unsent(S)
-    todo =[j for j in jobs() if gemini_answer(*j[1:]) is None][: a.limit or None]
-    print(f"{len(todo)} windows to send, item spent ${S.spent():.4f} of ${CAP:.2f}", flush=True)
-    STORE.mkdir(parents=True, exist_ok=True)
-    lock, stop, invalid = threading.Lock(), threading.Event(), []
-
-    def one(j):
-        if stop.is_set():
-            return
-        _, col, lo, hi = j
-        with lock:   # the cap check reads the ledger; one reservation at a time keeps it exact
-            body, key, nums = S.request("gemini", col, lo, hi)
-            if S.spent() + S.reservation("gemini", body) > CAP:
-                stop.set()
-                print(f"cap: ${S.spent():.4f} spent; stopping before {col.name} {nums[0]}-{nums[-1]}", flush=True)
-                return
-        try:
-            S.call("gemini", col, lo, hi)
-        except RuntimeError as e:
-            body, key, nums = S.request("gemini", col, lo, hi)
-            hit = S.cache_hit(body, key)
-            if hit is not None and not hit.get("valid"):
+        todo = [j for j in jobs() if gemini_answer(*j[1:]) is None][: a.limit or None]
+        print(f"{len(todo)} windows to send, item spent ${S.spent():.4f} of ${CAP:.2f}", flush=True)
+        invalid = []
+        for _, col, lo, hi in todo:
+            try:
+                S.call("gemini", col, lo, hi)
+            except RuntimeError as e:
+                body, key, nums = S.request("gemini", col, lo, hi)
+                hit = S.cache_hit(body, key)
+                rec = next((r for r in S.effective_records()
+                            if hit is not None and r["id"] == hit["request"]["id"]), {})
+                # Only a completed, billed model answer that fails parsing is neutral.
+                # A transport/provider/cap failure stops collection with a failing exit.
+                if not invalid_model_reply(hit, rec):
+                    raise
                 invalid.append(f"{col.name} {nums[0]}-{nums[-1]}: {e}")
                 if len(invalid) > 5:
-                    stop.set()
-                return
-            stop.set()
-            print(f"stopped: {col.name} {nums[0]}-{nums[-1]}: {e}", flush=True)
-
-    with (STORE / "collect.lock").open("a") as fh:
-        fcntl.flock(fh, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        with cf.ThreadPoolExecutor(a.workers) as ex:
-            list(ex.map(one, todo))
+                    raise RuntimeError("more than five invalid model replies; inspect before continuing") from e
     print(f"done; item spent ${S.spent():.4f}; invalid replies {len(invalid)}", flush=True)
     for x in invalid:
         print("  invalid", x)
+
+
+def invalid_model_reply(hit, rec):
+    if hit is None or hit.get("valid"):
+        return False
+    response = hit.get("response", {})
+    usage = response.get("usage") or {}
+    choices = response.get("choices") or [{}]
+    return (rec.get("http") == 200 and rec.get("event") == "settle"
+            and rec.get("charge", float("inf")) <= hit["request"]["charge"]
+            and choices[0].get("finish_reason") == "stop"
+            and all(type(usage.get(k)) is int and usage[k] >= 0
+                    for k in ("prompt_tokens", "completion_tokens")))
 
 
 def cmd_mac(a):
@@ -210,6 +216,12 @@ def judges():
     def gem(col, a, b, allow_call=False):
         return gemini_answer(col, a, b)
     return {"gemini": gem, "mac-2b": L.judge(LOCAL), **{k: R.judge(v) for k, v in SHERLOCK.items()}}
+
+
+def route_split(route, box):
+    if route not in ("mac-2b", "fs-2b", "fs-4b"):
+        return "not fine-tuned"
+    return "held-out" if box in HELD_OUT else "trained-on"
 
 
 def box_record(col, js):
@@ -261,6 +273,8 @@ def sc0122_owner(col, rec):
     n_ctl = {s: sum(x == s for _, x in controls) for s in agreed}
     weight = {s: len(agreed[s]) / n_ctl[s] for s in agreed if n_ctl[s]}
     uncovered = [s for s in agreed if not n_ctl[s]]
+    if uncovered:
+        raise ValueError(f"SC0122 owner controls do not cover agreed strata: {uncovered}")
     N = sum(len(v) for s, v in agreed.items() if s in weight)
     out = {"asked_known": len(asked), "controls": len(controls), "agreed_doc_gaps": sum(map(len, agreed.values())),
            "strata": {s: [len(agreed[s]), n_ctl[s]] for s in agreed}, "uncovered_strata": uncovered, "models": {}}
@@ -321,7 +335,7 @@ def cmd_score(_a):
         pages = sum(d["exact_pages"] for d in docs)
         for key, m in rec["models"].items():
             calls = [(m["gaps"][k][0], g["truth"]) for k, g in enumerate(rec["gaps"])]
-            observed.append({"route": key, "box": b, "split": rec["split"], "known gaps": len(calls),
+            observed.append({"route": key, "box": b, "split": route_split(key, b), "known gaps": len(calls),
                              "unsure": len(rec["unsure"]), "right": sum(c == t for c, t in calls),
                              "gap accuracy": sum(c == t for c, t in calls) / len(calls),
                              "false splits": sum(c == "new" and t == "continue" for c, t in calls),
@@ -378,7 +392,10 @@ def render(out) -> str:
          "## The three locked boxes", "",
          "Known gaps only (the owner's unsure gaps out); pages exact over the documents no unsure gap touches, the "
          "same pages for every route. Sasha is the one box no student trained on; the Illustrated Review and SC0122 "
-         "are in the students' training split (trained-on). Gemini and the teacher trained on none of them.", "",
+         "are in the students' training split (trained-on). Gemini and the teacher were not fine-tuned on these "
+         "boxes. SC0122's all-known scores below are diagnostics against its locked draft, which includes "
+         "tag/teacher agreement beyond the owner's controls; its document-exact scores are conditional on that "
+         "draft. Use the separate owner-supported weighted gap comparison for accuracy conclusions there.", "",
          "| route | box | split | known gaps | gap accuracy | false splits | false merges | pages exact | "
          "failed windows |", "|---|---|---|---:|---:|---:|---:|---:|---:|"]
     for b in BOXES:
@@ -425,8 +442,9 @@ def render(out) -> str:
     L += ["", "## The shipped cloud route at three window offsets (Stanton and RG165, 363 pages)", "",
           f"options.py's frozen Gemini approach (rule {off['rule']}, flag at or below {off['level']}), applied to "
           "Gemini 3.7 windows starting 0, 1 and 2 pages later; nothing refit. The level was fitted for 3.8 on the "
-          "development boxes, so 3.7's flag load at it is not 3.7's own best level. Cost per 1,000 pages is not an "
-          "offset effect and stays options.md's.", "",
+          "development boxes, so 3.7's flag load at it is not 3.7's own best level. The fifth figure, cost per 1,000 "
+          "pages, remains options.md's 3.8 reference estimate, not a measured 3.7 offset cost: edge windows and "
+          "output lengths can change tokens and spend.", "",
           "| figure | 3.7, offset 0 | 3.7, offset 1 | 3.7, offset 2 | 3.7 range | 3.8, offset 0 (options.md) |",
           "|---|---:|---:|---:|---:|---:|"]
     for k, name, fmt in F:
@@ -469,7 +487,8 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("command", choices=("plan", "collect", "mac", "score"))
     ap.add_argument("--limit", type=int)
-    ap.add_argument("--workers", type=int, default=3)
+    ap.add_argument("--workers", type=int, choices=(1,), default=1,
+                    help="collection is serial so reservation checks cannot race")
     a = ap.parse_args()
     {"plan": cmd_plan, "collect": cmd_collect, "mac": cmd_mac, "score": cmd_score}[a.command](a)
 
