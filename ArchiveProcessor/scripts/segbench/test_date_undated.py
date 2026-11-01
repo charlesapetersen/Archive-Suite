@@ -117,5 +117,39 @@ class Sheet(unittest.TestCase):
         self.assertNotIn("u", [d["id"] for d, _ in a])
 
 
+class Fold(unittest.TestCase):
+    def test_rulings(self):
+        self.assertEqual(U.owner_ruling({"date": "yes", "year": "1962"}), {"own": True, "lo": 1962, "hi": 1962})
+        self.assertEqual(U.owner_ruling({"date": "yes", "year": "1965-1967"}), {"own": True, "lo": 1965, "hi": 1967})
+        self.assertFalse(U.owner_ruling({"date": "yes", "note": "citations only"})["own"])   # yes with no year
+        self.assertFalse(U.owner_ruling({"date": "no"})["own"])
+        self.assertIsNone(U.owner_ruling({"date": "cannot tell", "year": "1970"})["own"])
+        self.assertIsNone(U.owner_ruling(None)["own"])
+
+    def doc(self, group, app, pass_own, ans):
+        return {"group": group, "app_year": app, "app_date_uncertain": False, "pass_own_year": pass_own,
+                "owner": U.owner_ruling(ans)}
+
+    def test_counts_and_restated_rate(self):
+        docs = {"a": self.doc("false year", 1962, None, {"date": "yes", "year": "1962"}),        # pass missed, app right
+                "b": self.doc("false year", 1965, None, {"date": "yes", "year": "1965-1967"}),   # inside the range
+                "c": self.doc("false year", 1967, None, {"date": "yes", "year": "1968"}),        # missed, app wrong
+                "d": self.doc("false year", 1947, None, {"date": "yes"}),                        # citations only
+                "e": self.doc("false year", 1963, None, {"date": "cannot tell"}),                # left out
+                "f": self.doc("control", 1970, 1970, {"date": "yes", "year": "1970"}),
+                "g": self.doc("control", 1971, 1971, {"date": "no"})}                            # pass invented
+        f = U.owner_fold(docs, 90, 30, draws=2000)
+        self.assertEqual(f["ruled"], 6)
+        self.assertEqual(f["pass_missed"], [3, 4])
+        self.assertEqual(f["app_matches_owner_missed"], [2, 3])
+        self.assertEqual(f["confirmed_false"], [2, 4])
+        self.assertEqual(f["pass_invented"], [1, 2])
+        self.assertEqual(f["estimate"], 2 + 30 * 0.5)
+        lo, hi = f["interval"]
+        self.assertLess(lo, f["rate"])
+        self.assertGreater(hi, f["rate"])
+        self.assertEqual(f, U.owner_fold(docs, 90, 30, draws=2000))   # seeded
+
+
 if __name__ == "__main__":
     unittest.main()

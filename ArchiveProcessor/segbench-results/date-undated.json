@@ -1,6 +1,14 @@
 {
  "model": "gemini-3.7-flash",
  "usd": 1.31,
+ "billed": {
+  "calls": 482,
+  "estimate": 1.308506,
+  "gateway_calls": 0,
+  "gateway": null,
+  "gateway_over_estimate": null,
+  "charged": 1.308506
+ },
  "undated": {
   "n": 90,
   "du": [
@@ -64,5 +72,50 @@
   },
   "exact_pooled": 79.6,
   "within1_pooled": 95.2
+ },
+ "owner_ruled": {
+  "ruled": 20,
+  "false_year_docs": 12,
+  "controls": 8,
+  "owner_own_date": [
+   7,
+   12
+  ],
+  "pass_missed": [
+   7,
+   12
+  ],
+  "confirmed_false": [
+   6,
+   12
+  ],
+  "pass_invented": [
+   0,
+   8
+  ],
+  "app_matches_owner_missed": [
+   6,
+   7
+  ],
+  "app_matches_owner_controls": [
+   8,
+   8
+  ],
+  "du_agrees_owner": [
+   14,
+   20
+  ],
+  "pass_agrees_owner": [
+   13,
+   20
+  ],
+  "n_certain_match": 34,
+  "n": 90,
+  "estimate": 6.0,
+  "rate": 0.0667,
+  "interval": [
+   0.0325,
+   0.1974
+  ]
  }
 }

@@ -20,6 +20,15 @@ first DOC_PAGES pages re-rendered upright from the JPEG originals, every date-li
 20 (word boxes from dewarp.swift `lines`; boxing only the controls' quoted dates would tell the groups apart), blind.
 key.json beside index.html holds the groups; W46.date-undated-fold scores the exported answers.
 
+    <lab venv>/bin/python date_undated.py fold ANSWERS.json   # the owner's rulings -> CACHE/sheet/rulings.json ($0)
+
+FOLD (W46.date-undated-fold). `fold` reads the sheet's exported answers against key.json and writes rulings.json beside
+it; `score` then adds the owner-ruled section. A ruling of "yes" with a year (or a range, "1965-1967") is the
+document's own date; "no" is none; "yes" with no year is none too, because the owner answered so only where the dates
+on the page are citations, table headings or references (his notes, 2026-10-31); "cannot tell" is left out. The
+false-year rate is restated as the false-year documents the owner confirms, plus the confident years that match the
+pass weighted by the pass's invention rate on the controls, with a seeded simulation for its interval.
+
 <lab venv> is ~/.local/share/visionocr-ocrlab/venv (numpy and PIL for ocr_truth.orient_like_pdf, requests).
 
 TEXT. As the app builds it from its own OCR: the document's page texts joined by a blank line (DocumentSegment
@@ -404,6 +413,74 @@ def pool_weighted():
     return pw
 
 
+RULINGS_NAME = "rulings.json"
+FOLD_SEED, FOLD_DRAWS = 4632, 20000
+
+
+def owner_ruling(ans):
+    """One sheet answer -> {"own": True/False/None, "lo", "hi"}: None when the owner could not tell or left it blank."""
+    date = (ans or {}).get("date")
+    year = str((ans or {}).get("year") or "").strip()
+    if date == "no":
+        return {"own": False, "lo": None, "hi": None}
+    if date != "yes":
+        return {"own": None, "lo": None, "hi": None}
+    ys = [int(y) for y in year.replace("–", "-").split("-") if y.strip().isdigit() and len(y.strip()) == 4]
+    if not ys:           # "yes" with no year: a citation, table heading or reference, not the document's own date
+        return {"own": False, "lo": None, "hi": None}
+    return {"own": True, "lo": min(ys), "hi": max(ys)}
+
+
+def cmd_fold(a):
+    """$0. The owner's exported sheet answers, read against key.json, -> SHEET/rulings.json beside the cached replies."""
+    answers = json.loads(Path(a.answers).read_text())
+    key = json.loads((SHEET / "key.json").read_text())
+    docs = {}
+    for name, k in sorted(key["documents"].items()):
+        docs[name] = {**k, "answer": answers.get(name), "owner": owner_ruling(answers.get(name))}
+    missing = [n for n, d in docs.items() if d["answer"] is None]
+    (SHEET / RULINGS_NAME).write_text(json.dumps({"item": "W46.date-undated-fold", "answers": str(a.answers),
+                                                  "documents": docs}, indent=1, ensure_ascii=False) + "\n")
+    print(f"{len(docs)} documents, {len(docs) - len(missing)} answered"
+          + (f", unanswered {missing}" if missing else "") + f" -> {SHEET / RULINGS_NAME}")
+
+
+def _in(d, y):
+    o = d["owner"]
+    return y is not None and o["own"] is True and o["lo"] <= y <= o["hi"]
+
+
+def owner_fold(docs, n_und, n_certain_match, seed=FOLD_SEED, draws=FOLD_DRAWS):
+    """The rulings (rulings.json's documents) -> the owner-ruled counts and the restated false-year rate. n_und is the
+    undated set answered, n_certain_match the years without Date Uncertain that equal the pass's own year."""
+    ruled = [d for d in docs.values() if d["owner"]["own"] is not None]
+    fy = [d for d in ruled if d["group"] == "false year"]
+    ctl = [d for d in ruled if d["group"] == "control"]
+    missed = sum(d["owner"]["own"] and not _in(d, d["pass_own_year"]) for d in fy)
+    confirmed = sum(not _in(d, d["app_year"]) for d in fy)
+    invented = sum(d["pass_own_year"] is not None and not _in(d, d["pass_own_year"]) for d in ctl)
+    rng = random.Random(seed)
+    sims = []
+    for _ in range(draws):
+        p = rng.betavariate(invented + 0.5, len(ctl) - invented + 0.5)       # Jeffreys, the controls' invention rate
+        f = confirmed + sum(rng.random() < p for _ in range(n_certain_match))
+        sims.append(rng.betavariate(f + 0.5, n_und - f + 0.5))               # the 90 as a sample of the 425
+    sims.sort()
+    est = confirmed + n_certain_match * (invented / len(ctl) if ctl else 0)
+    return {"ruled": len(ruled), "false_year_docs": len(fy), "controls": len(ctl),
+            "owner_own_date": [sum(d["owner"]["own"] for d in fy), len(fy)],
+            "pass_missed": [missed, len(fy)], "confirmed_false": [confirmed, len(fy)],
+            "pass_invented": [invented, len(ctl)],
+            "app_matches_owner_missed": [sum(d["owner"]["own"] and not _in(d, d["pass_own_year"]) and _in(d, d["app_year"])
+                                             for d in fy), missed],
+            "app_matches_owner_controls": [sum(_in(d, d["app_year"]) for d in ctl), len(ctl)],
+            "du_agrees_owner": [sum(d["app_date_uncertain"] == (not d["owner"]["own"]) for d in ruled), len(ruled)],
+            "pass_agrees_owner": [sum((d["pass_own_year"] is None) == (not d["owner"]["own"]) for d in ruled), len(ruled)],
+            "n_certain_match": n_certain_match, "n": n_und, "estimate": round(est, 2),
+            "rate": round(est / n_und, 4) if n_und else 0.0,
+            "interval": [round(sims[int(0.025 * draws)], 4), round(sims[int(0.975 * draws) - 1], 4)]}
+
+
 def cmd_score(a):
     rs = rows()
     smp = json.loads((CACHE / "sample.json").read_text())
@@ -455,6 +532,47 @@ def cmd_score(a):
         L += [f"Where it found none ({len(no_own)}), the app writes Date Uncertain for "
               f"{pct(sum(r['app']['du'] for r in no_own), len(no_own))}; the rest is a confident year the pages do not "
               "carry.", ""]
+    # The owner's rulings (W46.date-undated-fold).
+    fold = None
+    rulings = SHEET / RULINGS_NAME
+    if rulings.exists():
+        docs = json.loads(rulings.read_text())["documents"]
+        n_cm = sum(not r["app"]["du"] and r["own"] is not None and r["app"]["y"] == r["own"] for r in und)
+        fold = owner_fold(docs, len(und), n_cm)
+        fy_ids = sorted(n for n, d in docs.items() if d["group"] == "false year" and d["owner"]["own"] is not None
+                        and not _in(d, d["app_year"]))
+        lo, hi = fold["interval"]
+        L += ["## On the owner's reading (W46.date-undated-fold)", "",
+              f"The 13% above counts a page date only where the image pass, the same Gemini model as the route scored, "
+              f"found one (measurement review 2026-10-31, R-1). The owner ruled blind on {fold['ruled']} documents "
+              f"(the blind sheet of W46.date-undated-sheet, every date-like string boxed): the "
+              f"{fold['false_year_docs']} counted as false years and {fold['controls']} controls drawn where the app's "
+              "year equals the page's. \"Yes\" with no year is read as no own date: the owner answered so only where "
+              "the page's dates are citations, table headings or references.", "",
+              "| on the owner's reading | documents |", "|---|---:|",
+              f"| false-year documents whose pages do carry their own date | {pct(*fold['owner_own_date'])} |",
+              f"| … the image pass missed it (its miss count) | {pct(*fold['pass_missed'])} |",
+              f"| false-year documents that stay false years (the app's year is not the page's) | "
+              f"{pct(*fold['confirmed_false'])} |",
+              f"| controls where the image pass quoted a date the owner does not find (its invention count) | "
+              f"{pct(*fold['pass_invented'])} |",
+              f"| controls where the app's year equals the owner's | {pct(*fold['app_matches_owner_controls'])} |",
+              f"| Date Uncertain agrees with \"no own date\", all {fold['ruled']} | {pct(*fold['du_agrees_owner'])} |",
+              f"| the image pass agrees with \"no own date\", all {fold['ruled']} (for comparison) | "
+              f"{pct(*fold['pass_agrees_owner'])} |", "",
+              f"**False year on owner-ruled truth: {100 * fold['rate']:.1f}% ({fold['estimate']:g} of {fold['n']}; "
+              f"{100 * lo:.0f}-{100 * hi:.0f})**, against 13% on the Gemini reading. It is the "
+              f"{fold['confirmed_false'][0]} false-year documents the owner confirms ({', '.join(fy_ids)} on the "
+              f"sheet), plus the {fold['n_certain_match']} confident years that match the pass weighted by the pass's "
+              f"invention rate on the controls ({fold['pass_invented'][0]} of {fold['pass_invented'][1]}). The interval "
+              f"is a seeded simulation ({FOLD_DRAWS:,} draws, seed {FOLD_SEED}): the invention rate drawn from its "
+              f"Jeffreys posterior on the {fold['controls']} controls, the {fold['n_certain_match']} drawn at it, and "
+              f"the total drawn as a share of {fold['n']} sampled documents; most of its width above the point is the "
+              "controls' small n. Where the owner found an own date the pass missed "
+              f"({fold['pass_missed'][0]}), the app's year is his on {fold['app_matches_owner_missed'][0]}: those were "
+              "the reader's misses, not the app's false years.", "",
+              "Owner rule from the sheet's notes (W47.ct-folder-date): a dated folder photo dates the otherwise "
+              "undated documents inside it.", ""]
     # Dated set: Date Uncertain against a date on the page.
     L += ["## Date Uncertain against a date on the document's own pages", "",
           "The prompt's test for `date_uncertain` is whether the year can be determined from the document itself. "
@@ -502,8 +620,12 @@ def cmd_score(a):
     L += ["## Measurement card", "",
           "- **Truth.** Undated: the owner's tags carry no date (truth that the owner could not or did not date it, not "
           "that no date exists). \"Own date on the pages\": Gemini 3.7 Flash's image pass, the same model family as the "
-          "route scored, so the Date Uncertain agreement is relative to a Gemini reader, not to a human; the owner "
-          "checked none of these. Dated set: the owner's year tag.",
+          "route scored, so the Date Uncertain agreement is relative to a Gemini reader, not to a human. "
+          + (f"The owner ruled blind on {fold['ruled']} of the 90 (the false-year documents and {fold['controls']} "
+             f"controls; the section above), so the false-year rate is restated on his reading, the "
+             f"{fold['n_certain_match']} confident years that match the pass through the controls only; the rest of the undated figures stay on the Gemini "
+             "reading. " if fold else "The owner checked none of these. ")
+          + "Dated set: the owner's year tag.",
           f"- **Selection.** Undated: round-robin across collections, seed {SEED}, among those whose first page has a "
           "paired JPEG; never by a route's reply or the ABBYY text. Dated: W46.date-image's 122, chosen as owner years "
           "not in the ABBYY text.",
@@ -528,7 +650,7 @@ def cmd_score(a):
         "dated_year_exact": [sum(r["app"]["y"] == r["truth"]["year"] for r in dat), len(dat)],
         "rerun_same_year": [sum(r["app"]["y"] == r["rerun"]["y"] for r in pairs), len(pairs)],
         "rerun_same_du": [sum(r["app"]["du"] == r["rerun"]["du"] for r in pairs), len(pairs)],
-        "pool_weighted": pw}
+        "pool_weighted": pw, "owner_ruled": fold}
     RESULTS_JSON.write_text(json.dumps(out, indent=1) + "\n")
     print("\n".join(L))
 
@@ -743,8 +865,10 @@ def main():
     p.add_argument("--rerun", action="store_true"); p.add_argument("--limit", type=int)
     sub.add_parser("score")
     sub.add_parser("sheet")
+    p = sub.add_parser("fold"); p.add_argument("answers")
     a = ap.parse_args()
-    {"sample": cmd_sample, "vision": cmd_vision, "run": cmd_run, "score": cmd_score, "sheet": cmd_sheet}[a.cmd](a)
+    {"sample": cmd_sample, "vision": cmd_vision, "run": cmd_run, "score": cmd_score, "sheet": cmd_sheet,
+     "fold": cmd_fold}[a.cmd](a)
 
 
 if __name__ == "__main__":

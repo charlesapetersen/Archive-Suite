@@ -20,6 +20,24 @@ Where the image pass found the document's own date on the page (39), the owner l
 
 Where it found none (51), the app writes Date Uncertain for 76% (39/51; 63-86); the rest is a confident year the pages do not carry.
 
+## On the owner's reading (W46.date-undated-fold)
+
+The 13% above counts a page date only where the image pass, the same Gemini model as the route scored, found one (measurement review 2026-10-31, R-1). The owner ruled blind on 20 documents (the blind sheet of W46.date-undated-sheet, every date-like string boxed): the 12 counted as false years and 8 controls drawn where the app's year equals the page's. "Yes" with no year is read as no own date: the owner answered so only where the page's dates are citations, table headings or references.
+
+| on the owner's reading | documents |
+|---|---:|
+| false-year documents whose pages do carry their own date | 58% (7/12; 32-81) |
+| … the image pass missed it (its miss count) | 58% (7/12; 32-81) |
+| false-year documents that stay false years (the app's year is not the page's) | 50% (6/12; 25-75) |
+| controls where the image pass quoted a date the owner does not find (its invention count) | 0% (0/8; 0-32) |
+| controls where the app's year equals the owner's | 100% (8/8; 68-100) |
+| Date Uncertain agrees with "no own date", all 20 | 70% (14/20; 48-85) |
+| the image pass agrees with "no own date", all 20 (for comparison) | 65% (13/20; 43-82) |
+
+**False year on owner-ruled truth: 6.7% (6 of 90; 3-20)**, against 13% on the Gemini reading. It is the 6 false-year documents the owner confirms (D10, D13, D16, D17, D19, D20 on the sheet), plus the 34 confident years that match the pass weighted by the pass's invention rate on the controls (0 of 8). The interval is a seeded simulation (20,000 draws, seed 4632): the invention rate drawn from its Jeffreys posterior on the 8 controls, the 34 drawn at it, and the total drawn as a share of 90 sampled documents; most of its width above the point is the controls' small n. Where the owner found an own date the pass missed (7), the app's year is his on 6: those were the reader's misses, not the app's false years.
+
+Owner rule from the sheet's notes (W47.ct-folder-date): a dated folder photo dates the otherwise undated documents inside it.
+
 ## Date Uncertain against a date on the document's own pages
 
 The prompt's test for `date_uncertain` is whether the year can be determined from the document itself. Scored here against the image pass, not the owner's tag (the owner knows the box; DAT-7).
@@ -56,7 +74,7 @@ Its year figures were pooled over a 120/80/50 sample; weighted to the pool's agr
 
 ## Measurement card
 
-- **Truth.** Undated: the owner's tags carry no date (truth that the owner could not or did not date it, not that no date exists). "Own date on the pages": Gemini 3.7 Flash's image pass, the same model family as the route scored, so the Date Uncertain agreement is relative to a Gemini reader, not to a human; the owner checked none of these. Dated set: the owner's year tag.
+- **Truth.** Undated: the owner's tags carry no date (truth that the owner could not or did not date it, not that no date exists). "Own date on the pages": Gemini 3.7 Flash's image pass, the same model family as the route scored, so the Date Uncertain agreement is relative to a Gemini reader, not to a human. The owner ruled blind on 20 of the 90 (the false-year documents and 8 controls; the section above), so the false-year rate is restated on his reading, the 34 confident years that match the pass through the controls only; the rest of the undated figures stay on the Gemini reading. Dated set: the owner's year tag.
 - **Selection.** Undated: round-robin across collections, seed 46, among those whose first page has a paired JPEG; never by a route's reply or the ABBYY text. Dated: W46.date-image's 122, chosen as owner years not in the ABBYY text.
 - **Comparison.** One route, one prompt, one text source (Vision on the JPEG originals at 2,400 px). 19 documents had a page without a confirmed JPEG, read as empty. Not compared with ABBYY-text runs (different model version and text).
 - **Noise.** n as given, Wilson 95% intervals in brackets; the rerun section is the floor between two identical runs. A gap inside it is a tie.
@@ -64,4 +82,4 @@ Its year figures were pooled over a 120/80/50 sample; weighted to the pool's agr
 
 ## Cost
 
-482 gateway calls, 615,652 input and 225,805 output tokens: about $1.31 at 3.8 Flash's list price taken as a ceiling (the gateway returns no price), plus the 122 cached image replies of W46.date-image-paid.
+482 gateway calls, 615,652 input and 225,805 output tokens: about $1.31 at 3.8 Flash's list price taken as a ceiling (the gateway publishes no price; the gateway reported no cost of its own for these calls), plus the 122 cached image replies of W46.date-image-paid.

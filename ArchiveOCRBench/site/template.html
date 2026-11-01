@@ -333,7 +333,7 @@ footer p { font-size: 13px; }
   <section class="panel" id="date-undated" hidden>
     <div class="head"><h2>Documents the owner left undated</h2><span class="meta">the app's call on Apple Vision text · W46.date-undated</span></div>
     <div class="tbl"><table><thead><tr><th>What is counted</th><th>Documents</th></tr></thead><tbody id="date-undated-rows"></tbody></table></div>
-    <p class="note">The app's tagging call always gives a year. Here it read 100 of the 425 agreed documents with no date tag (drawn across collections) and the 122 unprinted-year documents above, on Apple Vision's reading of the JPEG originals with the app's neighbour context, through the Stanford gateway (Gemini 3.7 Flash, no temperature or reasoning setting, as the app sends it; the gateway serves no 3.8). Date Uncertain is scored against whether the image pass (Gemini 3.7 Flash, images alone) finds the document's own date written on its pages, not against the owner's tag, so it is agreement with a Gemini reader, not with a person. The rerun rows are the same undated set sent twice. Full tables and the measurement card: <code>ArchiveProcessor/segbench-results/date-undated.md</code>.</p>
+    <p class="note">The app's tagging call always gives a year. Here it read 100 of the 425 agreed documents with no date tag (drawn across collections) and the 122 unprinted-year documents above, on Apple Vision's reading of the JPEG originals with the app's neighbour context, through the Stanford gateway (Gemini 3.7 Flash, no temperature or reasoning setting, as the app sends it; the gateway serves no 3.8). Date Uncertain is scored against whether the image pass (Gemini 3.7 Flash, images alone) finds the document's own date written on its pages, not against the owner's tag, so it is agreement with a Gemini reader, not with a person. The owner then ruled blind on the 12 false-year documents and 8 controls: the restated row counts the false years he confirms, plus the confident years matching the image pass at its invention rate on the controls, and the owner-ruled rows give the image pass's misses and inventions there. The rerun rows are the same undated set sent twice. Full tables and the measurement card: <code>ArchiveProcessor/segbench-results/date-undated.md</code>.</p>
   </section>
 
   <header class="part" id="public">
@@ -1003,17 +1003,27 @@ const DU = DATA.dating_undated;
 if (DU) {
   const f = ([a, n]) => n ? a + ' of ' + n + ' (' + (100 * a / n).toFixed(1) + '%)' : '–';
   const B = DU.du_by_own_date;
+  const O = DU.owner_ruled;
+  // W46.date-undated-fold: the false-year rate restated on the owner's blind rulings, beside the Gemini-scored one.
+  const owner = O ? [
+    ['Undated: a false year, restated on the owner\'s rulings (' + O.ruled + ' ruled blind)',
+     (100 * O.rate).toFixed(1) + '% (' + O.estimate + ' of ' + O.n + '; 95% ' + (100 * O.interval[0]).toFixed(0) + '-' +
+     (100 * O.interval[1]).toFixed(0) + '%)'],
+    ['Owner-ruled: the image pass missed the page\'s own date (false-year documents)', f(O.pass_missed)],
+    ['Owner-ruled: the image pass quoted a date the owner does not find (controls)', f(O.pass_invented)],
+    ['Owner-ruled: Date Uncertain agrees with "no own date"', f(O.du_agrees_owner)]] : [];
   document.getElementById('date-undated-rows').innerHTML = [
     ['Undated: the app writes Date Uncertain', DU.undated.du],
     ['Undated: a year without Date Uncertain', DU.undated.certain_year],
-    ['Undated: a false year (no own date on the pages, or a different one)', DU.undated.false_year],
+    ['Undated: a false year (no own date on the pages, or a different one), against the Gemini image reading', DU.undated.false_year],
+    ...owner,
     ['Undated: the image pass finds the document\'s own date on its pages', DU.undated.own_date],
     ['Date Uncertain where the pages carry no own date (undated)', B['undated|no']],
     ['Date Uncertain where the pages carry one (undated)', B['undated|yes']],
     ['Date Uncertain where the pages carry no own date (unprinted-year 122)', B['dated|no']],
     ['Date Uncertain where the pages carry one (unprinted-year 122)', B['dated|yes']],
     ['Rerun: the same year', DU.rerun_same_year],
-    ['Rerun: the same Date Uncertain', DU.rerun_same_du]].map(([l, x]) => '<tr><td>' + l + '</td><td>' + f(x) + '</td></tr>').join('');
+    ['Rerun: the same Date Uncertain', DU.rerun_same_du]].map(([l, x]) => '<tr><td>' + l + '</td><td>' + (typeof x === 'string' ? x : f(x)) + '</td></tr>').join('');
   document.getElementById('date-undated').hidden = false;
 }
 
