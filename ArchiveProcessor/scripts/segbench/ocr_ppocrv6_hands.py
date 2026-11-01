@@ -319,7 +319,7 @@ def ocr_batches(pairs, m, log, opts):
 
 
 def cmd_public(_):
-    """The blla arm on L1-L3, one page per kraken call on the CPU, each guarded (loop_kraken.py's batches of ten
+    """The blla arm on L1-L3, blla one page per kraken call on the CPU (reading batched), each guarded (loop_kraken.py's batches of ten
     under four workers are what ran away). Segmentations go where loop_kraken.py's would (SP.seg_path), readings
     to SP.text_path(LK.KEY) and RUN/zero/blla-public; a killed page is recorded and skipped."""
     rows, m = public_rows(), LK.model()
@@ -327,17 +327,17 @@ def cmd_public(_):
     out.mkdir(parents=True, exist_ok=True)
     with (RUN / 'zero' / 'blla-public-guard.jsonl').open('a') as log:
         for r in rows:
-            i, seg, txt = R.job_id(r), SP.seg_path(r), SP.text_path(LK.KEY, r)
+            seg = SP.seg_path(r)
             seg.parent.mkdir(parents=True, exist_ok=True)
-            txt.parent.mkdir(parents=True, exist_ok=True)
+            SP.text_path(LK.KEY, r).parent.mkdir(parents=True, exist_ok=True)
             if not seg.exists():
                 guarded([str(SP.KRAKEN), '-d', 'cpu', '-x', '-i', str(r['image']), str(seg), 'segment', '-bl',
-                         '--text-direction', 'horizontal-lr'], log, i, 'blla')
-            if seg.exists() and not txt.exists():
-                guarded([str(SP.KRAKEN), '-d', 'cpu', '-f', 'page', '-i', str(seg), str(txt), 'ocr', '-m', str(m)],
-                        log, i, 'ocr')
-            if txt.exists():
-                shutil.copyfile(txt, out / f'{i}.txt')
+                         '--text-direction', 'horizontal-lr'], log, R.job_id(r), 'blla')
+        ocr_batches([(SP.seg_path(r), SP.text_path(LK.KEY, r)) for r in rows
+                     if SP.seg_path(r).exists() and not SP.text_path(LK.KEY, r).exists()], m, log, ['-f', 'page'])
+    for r in rows:
+        if SP.text_path(LK.KEY, r).exists():
+            shutil.copyfile(SP.text_path(LK.KEY, r), out / f'{R.job_id(r)}.txt')
 
 
 def cmd_zero(_):
