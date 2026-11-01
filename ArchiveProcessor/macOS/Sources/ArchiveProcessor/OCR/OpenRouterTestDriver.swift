@@ -157,7 +157,7 @@ enum OpenRouterTestDriver {
         eq("6 glm test figures (cheap-models.md's 98% row)", [test?.pagesExactNoReview.map { ($0 * 1000).rounded() / 10 },
                                                              test.map { ($0.flaggedPer100Pages * 10).rounded() / 10 },
                                                              test.map { ($0.pagesExactAfterReview * 1000).rounded() / 10 }],
-           [82.1, 33.1, 98.5])
+           [80.6, 33.1, 97.0])  // rescored on the owner's rulings, W46.seg-truth-rescore
         let cost = options.approach(.glm)?.cost?.total
         check("6 glm costs $1.16 per 1,000 pages, no batch", cost.map { abs($0.listUSDPer1000Pages - 1.16) < 0.005 } == true
               && cost?.batchUSDPer1000Pages == nil, String(describing: cost))
