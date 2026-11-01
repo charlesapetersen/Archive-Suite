@@ -107,7 +107,8 @@ class PartialReport(unittest.TestCase):
                              "pages exact": .6, "failed windows": 0, "unsure": 2, "resolved pages": 20}
                             for b in B.BOXES for k in routes],
                "gateway": {"calls": 0, "input_tokens": 0, "output_tokens": 0, "invalid": 0, "spent": .0291,
-                           "billed": "unknown", "mean_seconds": 0},
+                           "billed": {"gateway": None, "estimate": 0, "gateway_calls": 0, "calls": 0},
+                           "mean_seconds": 0},
                "sc0122_owner": {"asked_known": 2, "controls": 2, "agreed_doc_gaps": 3,
                                 "strata": {"low": [2, 1], "high": [1, 1]}, "models": {
                                     k: {"asked_right": 1, "controls_right": 1,
@@ -116,6 +117,8 @@ class PartialReport(unittest.TestCase):
         out["note"] = B.reading(out)
         report = B.render(out)
         self.assertIn("offline arms only; gateway and offsets pending", report)
+        self.assertIn("seg_boxes_score.py score --local-only`", report)
+        self.assertIn("Only the three owner boxes scored", report)
         self.assertIn("unmeasured", report)
         self.assertNotIn("| Gemini 3.7", report)
         self.assertNotIn("| 3.7 o0", report)

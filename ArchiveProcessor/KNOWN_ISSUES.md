@@ -14,7 +14,11 @@ recorded. Cap, provider and unknown-usage failures stop with an error instead of
 votes. Only billed, completed but unparseable model replies may vote neutral. SC0122's owner estimator
 refuses an uncovered control stratum rather than shrinking its denominator; training status belongs to
 each route, so Gemini and the teacher are not labelled trained-on. Synthetic cap/failure/weight tests pass.
-The full experiment remains open pending the gateway arm and final report.
+The offline comparison is now in `segbench-results/seg-boxes-score-local.md` and the bench panel, explicitly
+partial: all 179 Mac windows valid, Sasha gap accuracy 89.7% against the teacher's 67.4%; pages exact only
+37.4% against 15.5%. The full experiment remains open pending the gateway arm and offsets. Automatic approval
+review rejected archival gateway egress and direct main pushes; checkpoints/results are on the item's wt/
+branch pending scoped approval. No app behavior changed.
 
 ## OPEN (W46.seg-kit-truth-provenance, 2026-11-01): measurement support and report provenance
 

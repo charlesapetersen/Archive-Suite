@@ -225,6 +225,12 @@ record:
   candidate signal; the shipped hand/form classifier stays preferred.
 - `options.md`: the segmentation approaches on the test boxes (manual, Claude, Gemini, ChatGPT, Claude and
   ChatGPT together), each at the flag level frozen on the development boxes, with their API cost.
+- `seg-boxes-score-local.json` (`seg_boxes_score.py score --local-only`, W46.seg-boxes-score): the shipped
+  8-bit Mac 2B, its bf16 source, the 4B and the 27B teacher on Sasha, Illustrated Review and SC0122. The panel
+  explicitly shows partial status while Gemini and the cloud offsets are pending; it prefers
+  `seg-boxes-score.json` once the full scorer runs. SC0122's draft diagnostics and owner-supported weighted
+  gap estimates stay separate, with common mask/support counts and student training status. These are three
+  different boxes from the 363-page segmentation test chart, so the figures stay in their own panel.
 - `cheap-models.md`: the three cheap segmentation finalists (GLM-5.3 Flash, GPT-5.6 Luna, Qwen3.5 Flash) at the
   98% bar's frozen level, and their cost over five boxes. `build.py` stops if its Gemini row stops matching
   `options.md`, which the report says it reproduces.

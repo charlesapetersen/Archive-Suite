@@ -27603,7 +27603,215 @@
    "4b": 1
   }
  },
- "seg_boxes_score": null,
+ "seg_boxes_score": {
+  "labels": {
+   "gemini": "Gemini 3.7 Flash (gateway)",
+   "mac-2b": "Shipped 2B, 8-bit, on the Mac",
+   "teacher": "Qwen3.5 27B teacher",
+   "fs-2b": "Trained 2B, bf16",
+   "fs-4b": "Trained 4B, bf16"
+  },
+  "status": "offline arms only; gateway and offsets pending",
+  "source": "seg-boxes-score-local.md",
+  "boxes": [
+   {
+    "route": "mac-2b",
+    "box": "Sasha",
+    "split": "held-out",
+    "known gaps": 175,
+    "gap accuracy": 0.8971428571428571,
+    "false splits": 13,
+    "false merges": 5,
+    "pages exact": 0.3735632183908046,
+    "resolved pages": 174,
+    "unsure": 1
+   },
+   {
+    "route": "teacher",
+    "box": "Sasha",
+    "split": "not fine-tuned",
+    "known gaps": 175,
+    "gap accuracy": 0.6742857142857143,
+    "false splits": 57,
+    "false merges": 0,
+    "pages exact": 0.15517241379310345,
+    "resolved pages": 174,
+    "unsure": 1
+   },
+   {
+    "route": "fs-2b",
+    "box": "Sasha",
+    "split": "held-out",
+    "known gaps": 175,
+    "gap accuracy": 0.8914285714285715,
+    "false splits": 14,
+    "false merges": 5,
+    "pages exact": 0.46551724137931033,
+    "resolved pages": 174,
+    "unsure": 1
+   },
+   {
+    "route": "fs-4b",
+    "box": "Sasha",
+    "split": "held-out",
+    "known gaps": 175,
+    "gap accuracy": 0.8,
+    "false splits": 33,
+    "false merges": 2,
+    "pages exact": 0.21839080459770116,
+    "resolved pages": 174,
+    "unsure": 1
+   },
+   {
+    "route": "mac-2b",
+    "box": "IllustratedReview",
+    "split": "trained-on",
+    "known gaps": 146,
+    "gap accuracy": 0.726027397260274,
+    "false splits": 9,
+    "false merges": 31,
+    "pages exact": 0.42857142857142855,
+    "resolved pages": 147,
+    "unsure": 0
+   },
+   {
+    "route": "teacher",
+    "box": "IllustratedReview",
+    "split": "not fine-tuned",
+    "known gaps": 146,
+    "gap accuracy": 0.7808219178082192,
+    "false splits": 11,
+    "false merges": 21,
+    "pages exact": 0.5306122448979592,
+    "resolved pages": 147,
+    "unsure": 0
+   },
+   {
+    "route": "fs-2b",
+    "box": "IllustratedReview",
+    "split": "trained-on",
+    "known gaps": 146,
+    "gap accuracy": 0.7328767123287672,
+    "false splits": 9,
+    "false merges": 30,
+    "pages exact": 0.3945578231292517,
+    "resolved pages": 147,
+    "unsure": 0
+   },
+   {
+    "route": "fs-4b",
+    "box": "IllustratedReview",
+    "split": "trained-on",
+    "known gaps": 146,
+    "gap accuracy": 0.7191780821917808,
+    "false splits": 12,
+    "false merges": 29,
+    "pages exact": 0.36054421768707484,
+    "resolved pages": 147,
+    "unsure": 0
+   },
+   {
+    "route": "mac-2b",
+    "box": "SC0122",
+    "split": "trained-on",
+    "known gaps": 188,
+    "gap accuracy": 0.9840425531914894,
+    "false splits": 2,
+    "false merges": 1,
+    "pages exact": 0.9664804469273743,
+    "resolved pages": 179,
+    "unsure": 5
+   },
+   {
+    "route": "teacher",
+    "box": "SC0122",
+    "split": "not fine-tuned",
+    "known gaps": 188,
+    "gap accuracy": 0.9946808510638298,
+    "false splits": 1,
+    "false merges": 0,
+    "pages exact": 0.9217877094972067,
+    "resolved pages": 179,
+    "unsure": 5
+   },
+   {
+    "route": "fs-2b",
+    "box": "SC0122",
+    "split": "trained-on",
+    "known gaps": 188,
+    "gap accuracy": 0.9893617021276596,
+    "false splits": 1,
+    "false merges": 1,
+    "pages exact": 0.9776536312849162,
+    "resolved pages": 179,
+    "unsure": 5
+   },
+   {
+    "route": "fs-4b",
+    "box": "SC0122",
+    "split": "trained-on",
+    "known gaps": 188,
+    "gap accuracy": 0.9946808510638298,
+    "false splits": 1,
+    "false merges": 0,
+    "pages exact": 0.9217877094972067,
+    "resolved pages": 179,
+    "unsure": 5
+   }
+  ],
+  "sc0122": {
+   "asked_known": 30,
+   "controls": 60,
+   "agreed_doc_gaps": 158,
+   "strata": {
+    "cont, 0.02 <= P(new) < 0.5": [
+     60,
+     24
+    ],
+    "new, 0.5 <= P(new) < 0.99": [
+     12,
+     12
+    ],
+    "cont, P(new) < 0.02": [
+     35,
+     12
+    ],
+    "new, P(new) >= 0.99": [
+     51,
+     12
+    ]
+   },
+   "uncovered_strata": [],
+   "models": {
+    "mac-2b": {
+     "asked_right": 29,
+     "controls_right": 59,
+     "agreed_weighted_accuracy": 0.9841772151898734,
+     "owner_weighted_accuracy": 0.9813829787234043
+    },
+    "teacher": {
+     "asked_right": 29,
+     "controls_right": 60,
+     "agreed_weighted_accuracy": 1.0,
+     "owner_weighted_accuracy": 0.9946808510638298
+    },
+    "fs-2b": {
+     "asked_right": 29,
+     "controls_right": 59,
+     "agreed_weighted_accuracy": 0.9841772151898734,
+     "owner_weighted_accuracy": 0.9813829787234043
+    },
+    "fs-4b": {
+     "asked_right": 29,
+     "controls_right": 60,
+     "agreed_weighted_accuracy": 1.0,
+     "owner_weighted_accuracy": 0.9946808510638298
+    }
+   }
+  },
+  "offsets": null,
+  "note": "On held-out Sasha the shipped Mac 2B scores 89.7% on 175 known gaps (pages exact 37.4%), against the teacher's 67.4% and its bf16 source's 89.1%. The source's pages exact is 46.6%: similar gap accuracy can leave different long documents wrong, and these single runs do not rank quantizations. The Illustrated Review and SC0122 are trained-on diagnostics for the students, not evidence of generalization. SC0122's supported comparison is its owner-ruled disagreement gaps plus controls weighted to the agreed strata; document-exact scores there remain conditional on tag/teacher-drafted truth. Partial report: Gemini and all three cloud window offsets remain unmeasured; no cloud-versus-Mac recommendation follows."
+ },
  "public": {
   "rows": [
    {
