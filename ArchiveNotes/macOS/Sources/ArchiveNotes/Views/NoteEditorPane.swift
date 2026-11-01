@@ -580,7 +580,7 @@ struct NoteEditorPane: View {
     /// saved body. Either one can be kept.
     private var heldDraftBar: some View {
         HStack(spacing: 8) {
-            Label("This note has unsaved changes from an editor that closed. They are shown here, not the saved version.",
+            Label("Unsaved changes from a closed editor.",
                   systemImage: "exclamationmark.triangle")
                 .font(.caption)
                 .frame(maxWidth: .infinity, alignment: .leading)

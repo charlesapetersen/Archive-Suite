@@ -89,7 +89,9 @@ it; a held draft whose note was trashed in the app no longer refuses quit (its c
 at launch a copy left behind once its slow save landed after Quit is deleted only when a receipt proves
 its full note ID and unchanged original bytes, and that note holds exactly its text. Older copies without
 receipts, edited copies and templates' copies stand. A note removed outside the app still refuses quit until
-Quit is chosen (its copy stands). A refused template body is covered the same way
+Quit is chosen (its copy stands). Verified by scratch-store HeldDraftReopenTests and WritingJourneyUITests
+in the VM (8/8); [evidence and screenshot](../verification/evidence/notes/W40.fix-notes-held-draft-reopen.md).
+A refused template body is covered the same way
 (W40.fix-notes-failed-save-close-fu1, fixed 2026-10-31): the model holds it, the flush registry tracks it
 under the template's id, so it is copied at once, retried and asked about when its window closes, and quit
 is refused until it saves, including a body first refused by quit's own flush; switching templates still
