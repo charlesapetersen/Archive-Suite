@@ -437,10 +437,14 @@ This covers the following prepared runs, retaining their existing review, pilot 
   Resume the saved item-branch checkpoints through d36e03ff, not the older main scorer.
 - **W46.ocr-ppocrv6-hands-paid:** the frozen 71-page / 213-condition hand-icl-20261101 image pack and
   corrected example-line images/text may go to the same Stanford gateway with Gemini 3.7 Flash.
-  **$1 total item cap**, including every attempt and pilot/repeats. Target-page reference answers stay
+  **$2.50 working item cap**, including every attempt and pilot/repeats. The initial $1 guard
+  was an agent-set estimate, not an owner spending limit. The measured 24-call pilot settled at
+  $0.1950195 and projects $1.7958046 for all 221 calls; this session raises the working cap within
+  the standing $7-per-item authorization so the owner’s instruction can proceed. Target-page reference answers stay
   on the Mac. Keep the 0/8/16 conditions and same-volume/folder-proxy/transfer cohorts separate.
 
-Neither cap is increased. Unknown or incomplete billing is not a free retry; stop at the existing
-projection/cap checks. Never write to the real corpus. The separately raised permission to publish the
+The segmentation cap stays $6.80. The handwriting runner must validate the revised $2.50 cap,
+preserve its paid pilot ledger and outcomes without re-calling those pages, and stop on uncertain billing.
+Unknown or incomplete billing is not a free retry; keep projection/cap checks. Never write to the real corpus. The separately raised permission to publish the
 seg-boxes-score checkpoints to main is not answered by this paid-call instruction; preserve that work on
 its item branch until that question is settled.
