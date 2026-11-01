@@ -195,6 +195,52 @@ def match(truth, read, skip=SKIP):
     return pairs[::-1]
 
 
+SKIP_WORD, SPAN_SLACK = 0.35, 3
+
+
+def span_match(words, read, skip=SKIP, skip_word=SKIP_WORD, slack=SPAN_SLACK):
+    """Truth with no line breaks (the owner's pages are one paragraph): each detected line takes a contiguous run of
+    truth words, monotone, chosen by the base model's reading of it. A line may take nothing (cost `skip`), a
+    truth word may go unused (`skip_word`, a line blla missed); a run is the reading's word count +- `slack`.
+    -> (start, end, detected index, cer) for the runs used, in order."""
+    try:
+        from rapidfuzz.distance import Levenshtein
+        dist = Levenshtein.distance
+    except ImportError:
+        dist = lev
+    m, n = len(read), len(words)
+    INF = float('inf')
+    d = [[INF] * (n + 1) for _ in range(m + 1)]
+    back = [[None] * (n + 1) for _ in range(m + 1)]
+    d[0][0] = 0.
+    for j in range(m + 1):
+        r = ' '.join(read[j].split()) if j < m else ''
+        rw = len(r.split())
+        for i in range(n + 1):
+            here = d[j][i]
+            if here == INF:
+                continue
+            if i < n and here + skip_word < d[j][i + 1]:
+                d[j][i + 1], back[j][i + 1] = here + skip_word, (j, i, None)
+            if j < m:
+                if here + skip < d[j + 1][i]:
+                    d[j + 1][i], back[j + 1][i] = here + skip, (j, i, None)
+                for k in range(max(1, rw - slack), rw + slack + 1):
+                    if i + k > n:
+                        break
+                    t = ' '.join(words[i:i + k])
+                    c = min(1., dist(r, t) / max(1, len(t)))
+                    if here + c < d[j + 1][i + k]:
+                        d[j + 1][i + k], back[j + 1][i + k] = here + c, (j, i, c)
+    out, j, i = [], m, n
+    while (j, i) != (0, 0):
+        pj, pi, c = back[j][i]
+        if c is not None:
+            out.append((pi, i, pj, c))
+        j, i = pj, pi
+    return out[::-1]
+
+
 def keep(t, r, c):
     lt, lr = len(t), len(' '.join(r.split()))
     return c <= MAX_CER and lt >= 3 and lr > 0 and max(lt, lr) <= LEN_RATIO * min(lt, lr)
@@ -267,9 +313,28 @@ def cmd_vision_xml(_):
 PAGE_CAP_GB = float(os.environ.get('PPOCRV6_PAGE_CAP_GB', '9'))
 
 
+_LIBPROC = []
+
+
+def _footprint(pid):
+    """phys_footprint in bytes (proc_pid_rusage, RUSAGE_INFO_V0), the figure the Agent Manager's memory guard and
+    Activity Monitor use; ps's RSS leaves out compressed and swapped pages, so under pressure it read 0.8 GB for a
+    ketos training the session guard stopped at 14.3 GB (2026-11-01)."""
+    import ctypes
+    import struct
+    if not _LIBPROC:
+        _LIBPROC.append(ctypes.CDLL('/usr/lib/libproc.dylib'))
+    buf = ctypes.create_string_buffer(256)
+    if _LIBPROC[0].proc_pid_rusage(int(pid), 0, buf) != 0:
+        return 0
+    return struct.unpack_from('<Q', buf.raw, 16 + 7 * 8)[0]
+
+
 def _group_rss_gb(pgid):
-    out = subprocess.run(['ps', '-A', '-o', 'pgid=,rss='], capture_output=True, text=True).stdout
-    return sum(int(r) for g, r in (ln.split() for ln in out.splitlines() if ln.strip()) if int(g) == pgid) / 2**20
+    """The process group's summed phys_footprint in GB (the name is historical)."""
+    out = subprocess.run(['ps', '-A', '-o', 'pid=,pgid='], capture_output=True, text=True).stdout
+    pids = [int(p) for p, g in (ln.split() for ln in out.splitlines() if ln.strip()) if int(g) == pgid]
+    return sum(_footprint(p) for p in pids) / 2**30
 
 
 def guarded(args, log, page, step, cap=None, out=None):
@@ -442,13 +507,23 @@ def cmd_pairs(_):
                 continue
             image, w, h, lines = read_page(hand_dir(hand) / 'base' / f'{p["page"]}.xml')
             truth = truth_lines(page_truth(p))
-            kept = [(i, j, c) for i, j, c in match(truth, [ln['text'] for ln in lines])
-                    if keep(truth[i], lines[j]['text'], c)]
+            reads = [ln['text'] for ln in lines]
+            if len(truth) * 2 < len(lines):
+                # One paragraph a page (the owner's truth): pair runs of its words with the lines instead.
+                words = ' '.join(truth).split()
+                runs = span_match(words, reads)
+                truth = [' '.join(words[a:b]) for a, b, _, _ in runs]
+                spans = [(k, j, c) for k, (_, _, j, c) in enumerate(runs)]
+                used = sum(b - a for a, b, _, _ in runs)
+            else:
+                spans, words, used = match(truth, reads), None, None
+            kept = [(i, j, c) for i, j, c in spans if keep(truth[i], lines[j]['text'], c)]
             rows = [{**lines[j], 'id': f'{p["page"]}#{j}', 'text': truth[i], 'cer': round(c, 4)} for i, j, c in kept]
             (hand_dir(hand) / 'pairs').mkdir(parents=True, exist_ok=True)
             (hand_dir(hand) / 'pairs' / f'{p["page"]}.json').write_text(json.dumps(
                 {'image': image, 'width': w, 'height': h, 'lines': rows}, ensure_ascii=False))
             stats.append({'page': p['page'], 'role': p['role'], 'truth_lines': len(truth), 'detected': len(lines),
+                          'truth_words': len(words) if words else None, 'words_in_runs': used,
                           'kept': len(rows), 'mean_cer': round(sum(r['cer'] for r in rows) / len(rows), 4)
                           if rows else None})
         (hand_dir(hand) / 'pairs.json').write_text(json.dumps(stats, indent=1))
@@ -515,8 +590,9 @@ def cmd_train(a):
         (d / 'train.txt').write_text(''.join(f'{f}\n' for f in tr))
         (d / 'val.txt').write_text(''.join(f'{f}\n' for f in va))
         with (RUN / 'train' / 'guard.jsonl').open('a') as log:
-            row = guarded([str(KETOS), '-d', pl['device'], '-s', str(SEED), 'train', '-f', 'page', '-i', str(base),
-                           '--resize', 'union', '-t', str(d / 'train.txt'), '-e', str(d / 'val.txt'), '-q', 'early',
+            row = guarded([str(KETOS), '-d', pl['device'], '--workers', '0', '-s', str(SEED), 'train', '-f', 'page', '-i', str(base),
+                           '--resize', 'union', '--schedule', 'constant', '--warmup', '0', '-r', str(LRATE),
+                           '-B', str(BATCH_LINES), '-t', str(d / 'train.txt'), '-e', str(d / 'val.txt'), '-q', 'early',
                            '--min-epochs', str(MIN_EPOCHS), '--lag', str(LAG), '-N', str(MAX_EPOCHS),
                            '-o', str(d / 'model')], log, name, 'train', cap=TRAIN_CAP_GB, out=d / 'ketos.log')
         secs = row['seconds']
@@ -529,6 +605,10 @@ def cmd_train(a):
 
 
 MIN_EPOCHS, LAG, MAX_EPOCHS = 10, 5, 60
+# Fine-tuning a few dozen lines: the PP-OCRv6 config's defaults (cosine over 100 epochs, 1,000 warmup steps,
+# batch 64) are for training from scratch, and its cosine schedule cannot run under early stopping.
+LRATE, BATCH_LINES = 1e-4, 8
+# --workers 0: ketos's DataLoader worker is a fork of the trainer, and the memory guard charges its shared pages again.
 TRAIN_CAP_GB = 8.
 
 
