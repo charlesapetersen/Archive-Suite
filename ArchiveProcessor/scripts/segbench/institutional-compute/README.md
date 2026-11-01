@@ -188,7 +188,11 @@ python3 train_seg.py check --run shipped=RUNS/shipped-holdout,RUNS/shipped-ancho
 ```
 
 It scores both on the held-out gaps (against your tags, or against your own rulings with `--ruled`) and on the
-anchor, writes the manifest and exits 1 if the gate fails. Put `archive-seg-manifest.json` beside the weights the
+anchor, writes the manifest and exits 1 if the gate fails. Every expected held-out gap counts: the manifest gives
+expected, answered and missing gaps, the strict accuracy (an unanswered gap is wrong) beside the answered-only one, and
+the paired difference over every gap the shipped run answered, with the candidate's unanswered gaps counted wrong. A
+candidate with no shipped run, or no gap the shipped run answered, fails rather than passing unpaired
+(W46.kit-gate-coverage). Put `archive-seg-manifest.json` beside the weights the
 app loads: Archive Processor refuses a model of yours without one, without an anchor score, or for another
 prompt. Separating 3 points of pages-exact needs about 2,000 held-out gaps (`segbench-results/seg-kit-gate.md`).
 

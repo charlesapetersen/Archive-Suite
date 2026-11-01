@@ -1174,7 +1174,7 @@ class Check(unittest.TestCase):
             self.assertEqual(r.returncode, 0, r.stderr)
             m = json.loads((tmp / "m.json").read_text())
             self.assertEqual(m["prompt_id"], "c1")
-            self.assertEqual(m["heldout"]["tags"]["gaps"], 3)          # held-out gaps only, never the train split
+            self.assertEqual(m["heldout"]["tags"]["expected_gaps"], 3)  # held-out gaps only, never the train split
             self.assertEqual(m["heldout"]["tags"]["accuracy"], 100.0)
             self.assertEqual(m["anchor"]["pages_exact"], 100.0)
             self.assertEqual(m["anchor"]["documents"], 3)
@@ -1203,6 +1203,80 @@ class Check(unittest.TestCase):
             r = self.run_check(tmp, {2}, {4})                     # unmasked, the same answers are an error
             a = json.loads((tmp / "m.json").read_text())["anchor"]
             self.assertEqual((a["gap_accuracy"], a["unscored_gaps"], a["documents"]), (80.0, 0, 3))
+
+    def coverage_check(self, tmp, cand, shipped):
+        """W46.kit-gate-coverage's synthetic set: a complete three-page anchor (New, Cont, New) that both runs get
+        right, and two expected held-out gaps, H1|2 (new) and H2|3 (cont), in folders H1 and H2. ``cand`` and
+        ``shipped`` give each run's held-out calls as {folder: "new"|"continue"}; a folder left out is unanswered,
+        and ``shipped`` None means no shipped run at all."""
+        truth = {"box": "Anchor", "pages": [{"n": n, "label": l} for n, l in ((1, "New"), (2, "Cont"), (3, "New"))]}
+        (tmp / "anchor.json").write_text(json.dumps(truth))
+        labels = [{"folder_id": "H1", "n": 1, "split": "holdout", "tag": "new"},
+                  {"folder_id": "H2", "n": 2, "split": "holdout", "tag": "cont"}]
+        (tmp / "labels.jsonl").write_text("".join(json.dumps(g) + "\n" for g in labels))
+        runs = [("cand", cand)] + ([("shipped", shipped)] if shipped is not None else [])
+        for name, calls in runs:
+            d = tmp / name
+            d.mkdir(exist_ok=True)
+            text = self.answer("Anchor", [1, 2, 3], {2})
+            for col, n in (("H1", 1), ("H2", 2)):
+                if col in calls:
+                    text += self.answer(col, [n, n + 1], {n} if calls[col] == "new" else set())
+            (d / "answers.jsonl").write_text(text)
+        r = subprocess.run([sys.executable, str(HERE / "train_seg.py"), "check",
+                            *[x for name, _ in runs for x in ("--run", f"{name}={tmp / name}")], "--candidate", "cand",
+                            "--anchor-truth", str(tmp / "anchor.json"), "--labels", str(tmp / "labels.jsonl"),
+                            "--out", str(tmp / "m.json")], capture_output=True, text=True)
+        return r, json.loads((tmp / "m.json").read_text())
+
+    def test_missing_reference_or_heldout_answers_fail_the_gate(self):
+        # The three cases measure-reviews/2026-10-31-2.md P2-1 saw pass: the candidate answers H1 only (rightly).
+        right = {"H1": "new", "H2": "continue"}
+        with tempfile.TemporaryDirectory() as t:
+            tmp = Path(t)
+            r, m = self.coverage_check(tmp, {"H1": "new"}, None)            # no shipped run
+            self.assertEqual(r.returncode, 1, r.stdout)
+            self.assertFalse(m["gate"]["passed"])
+            self.assertIn("no shipped reference", " ".join(m["gate"]["reasons"]))
+            h = m["heldout"]["tags"]
+            self.assertEqual((h["expected_gaps"], h["answered_gaps"], h["missing_gaps"]), (2, 1, 1))
+            self.assertEqual((h["accuracy"], h["accuracy_answered"]), (50.0, 100.0))   # strict beside answered-only
+        with tempfile.TemporaryDirectory() as t:
+            r, m = self.coverage_check(Path(t), {"H1": "new"}, {"H2": "continue"})   # no shared held-out gap
+            self.assertEqual(r.returncode, 1, r.stdout)
+            h = m["heldout"]["tags"]
+            # The shipped model answered H2 only; the candidate's missing H2 is paired, counted wrong, and it trails.
+            self.assertEqual((h["paired_gaps"], h["paired_missing_gaps"], h["reference_missing_gaps"]), (1, 1, 1))
+            self.assertIsNone(h["difference_answered"])
+            self.assertEqual(h["difference"], -100.0)
+            self.assertIn("trail the shipped model", " ".join(m["gate"]["reasons"]))
+        with tempfile.TemporaryDirectory() as t:
+            r, m = self.coverage_check(Path(t), {"H1": "new"}, right)              # candidate 1/2, shipped 2/2
+            self.assertEqual(r.returncode, 1, r.stdout)
+            h = m["heldout"]["tags"]
+            self.assertEqual((h["paired_gaps"], h["difference"], h["difference_answered"]), (2, -50.0, 0.0))
+            self.assertLessEqual(h["difference_interval"][0], -3)
+            self.assertFalse(m["gate"]["passed"])
+        with tempfile.TemporaryDirectory() as t:
+            r, m = self.coverage_check(Path(t), {}, {"H1": "new"})                 # the candidate answered nothing
+            self.assertEqual(r.returncode, 1, r.stdout)
+            self.assertIn("answered none of the 2", " ".join(m["gate"]["reasons"]))
+        with tempfile.TemporaryDirectory() as t:
+            r, m = self.coverage_check(Path(t), {"H1": "new"}, {})                 # the shipped run answered none
+            self.assertEqual(r.returncode, 1, r.stdout)
+            self.assertIn("no paired held-out comparison", " ".join(m["gate"]["reasons"]))
+
+    def test_complete_paired_comparison_passes(self):
+        right = {"H1": "new", "H2": "continue"}
+        with tempfile.TemporaryDirectory() as t:
+            r, m = self.coverage_check(Path(t), right, right)
+            self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+            h = m["heldout"]["tags"]
+            self.assertEqual((h["expected_gaps"], h["answered_gaps"], h["missing_gaps"], h["paired_gaps"]), (2, 2, 0, 2))
+            self.assertEqual((h["accuracy"], h["difference"], h["difference_interval"]), (100.0, 0.0, [0.0, 0.0]))
+            self.assertEqual(m["anchor"]["difference_from_shipped"], 0.0)
+            self.assertTrue(m["gate"]["passed"])
+            self.assertEqual(m["gate"]["reasons"], [])
 
     def test_data_trains_only_whole_agreed_training_windows(self):
         # The kit's first step: a training window whose every gap the rule keeps, never a held-out one.

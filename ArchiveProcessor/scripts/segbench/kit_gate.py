@@ -407,7 +407,9 @@ def render(split, boot, observed, dates, docs) -> str:
           "shipped model. It writes H §6.3's manifest: kit version, prompt id, base build, weights, adapter and "
           "training-data hashes, the scores with intervals, the Mac figures and the gate's verdict, and exits 1 when "
           "the gate fails. The proposed rule: an anchor score, a held-out score, and a held-out interval against the "
-          "shipped model whose low end is above -3 points. Whether that is the acceptance rule is Phase 4's call "
+          "shipped model whose low end is above -3 points, paired over every gap the shipped run answered with the "
+          "candidate's unanswered gaps counted wrong; a candidate with no shipped run or no paired gap fails "
+          "(W46.kit-gate-coverage). Whether that is the acceptance rule is Phase 4's call "
           "(gap audit item 20).", "",
           "The app reads the manifest as `archive-seg-manifest.json` beside the weights. `LocalSegmenter.refusal` runs "
           "the shipped build as its own, and refuses any other Model setting that is not a folder on the Mac holding a "

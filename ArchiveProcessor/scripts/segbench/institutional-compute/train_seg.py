@@ -22,7 +22,10 @@ never trained on.
 CHECK (W46.kit-gate). Reads cluster_seg.py answers only: each run's per-gap P(new), averaged over the windows that
 cover a gap, scored on the held-out collections' gaps against their tags (and against the owner's rulings where a
 file of them is given), and on a locked public anchor box (pages in the exact document, gap accuracy, the review load
-to 98%), with bootstrap intervals by folder and by document, paired against the shipped model. It writes the
+to 98%), with bootstrap intervals by folder and by document, paired against the shipped model. Held-out figures
+count every expected gap: expected, answered and missing, the strict accuracy (a missing answer is wrong) beside the
+answered-only one, and the paired difference over every gap the shipped run answered, the candidate's missing answers
+counted wrong; a candidate with no shipped run or no paired gap fails (W46.kit-gate-coverage). It writes the
 candidate's manifest (`archive-seg-manifest.json` beside the weights is what the app reads): prompt id, kit version,
 weights and training-data hashes, the scores, and the gate's verdict; it exits 1 when the gate fails. The app refuses a
 model whose manifest lacks the anchor score or names another prompt (`LocalSegmenter.refusal`). Sizes, from
@@ -223,48 +226,63 @@ def pct_interval(xs):
     return [round(100 * xs[int(0.025 * len(xs))], 2), round(100 * xs[int(0.975 * len(xs)) - 1], 2)]
 
 
-def gap_score(groups, rng):
-    """groups: {group: [(model right, reference right or None), ...]}. The model's accuracy, its interval and, with
-    a reference, the paired difference model - reference, all by resampling groups (folders) with replacement."""
+def gap_score(groups, rng, reference=False):
+    """groups: {group: [(model right, reference right), ...]} over every expected held-out gap, each True, False or
+    None when that run has no answer for it (W46.kit-gate-coverage). Strict figures count a missing answer as wrong,
+    so a run cannot raise its score by leaving hard gaps unanswered; answered-only figures sit beside them as
+    diagnostics. With a reference (the shipped model), the paired difference model - reference is taken over every
+    gap the reference answered, the model's missing answers counted wrong. Intervals resample groups (folders)."""
     keys = sorted(groups)
     flat = [x for k in keys for x in groups[k]]
-    out = {"gaps": len(flat), "accuracy": round(100 * sum(a for a, _ in flat) / max(1, len(flat)), 2)}
+    answered = [a for a, _ in flat if a is not None]
+    out = {"expected_gaps": len(flat), "answered_gaps": len(answered), "missing_gaps": len(flat) - len(answered),
+           "accuracy": round(100 * sum(a is True for a, _ in flat) / max(1, len(flat)), 2),
+           "accuracy_answered": round(100 * sum(answered) / len(answered), 2) if answered else None}
     if not flat:
         return out
-    paired = [(a, b) for a, b in flat if b is not None]
-    acc, diff = [], []
+    acc = []
     for _ in range(DRAWS):
-        n = ra = m = d = 0
-        for _ in keys:
-            for a, b in groups[keys[rng.randrange(len(keys))]]:
-                n += 1; ra += a
-                if b is not None:
-                    m += 1; d += a - b
-        acc.append(ra / max(1, n)); diff.append(d / max(1, m))
+        draw = [x for _ in keys for x in groups[keys[rng.randrange(len(keys))]]]
+        acc.append(sum(a is True for a, _ in draw) / len(draw))
     out["interval"] = pct_interval(acc)
-    if paired:   # over the gaps both answered
-        out["paired_gaps"] = len(paired)
-        out["difference"] = round(100 * sum(a - b for a, b in paired) / len(paired), 2)
-        out["difference_interval"] = pct_interval(diff)
+    if not reference:
+        return out
+    paired = {k: [(a is True, b) for a, b in groups[k] if b is not None] for k in keys}
+    paired = {k: v for k, v in paired.items() if v}
+    both = [(a, b) for a, b in flat if a is not None and b is not None]
+    out["paired_gaps"] = sum(len(v) for v in paired.values())
+    out["paired_missing_gaps"] = sum(1 for k in keys for a, b in groups[k] if b is not None and a is None)
+    out["reference_missing_gaps"] = sum(1 for _, b in flat if b is None)
+    out["difference_answered"] = round(100 * sum(a - b for a, b in both) / len(both), 2) if both else None
+    if not paired:
+        return out
+    pk = sorted(paired)
+    pflat = [x for k in pk for x in paired[k]]
+    out["difference"] = round(100 * sum(a - b for a, b in pflat) / len(pflat), 2)
+    diff = []
+    for _ in range(DRAWS):
+        draw = [x for _ in pk for x in paired[pk[rng.randrange(len(pk))]]]
+        diff.append(sum(a - b for a, b in draw) / len(draw))
+    out["difference_interval"] = pct_interval(diff)
     return out
 
 
 def heldout_groups(labels, ruled, p_a, p_b):
-    """Per folder, (model right, reference right) on every held-out gap both answered: against the tags, and against
-    the owner's rulings where given. p_b (the reference) None when there is none."""
+    """Per folder, (model right, reference right) on every expected held-out gap: against the tags, and against the
+    owner's rulings where given. Each is None when that run has no answer for the gap, and the reference's is None
+    throughout when p_b (the reference) is None. No gap is dropped for want of an answer (W46.kit-gate-coverage)."""
     tags, own = {}, {}
+
+    def right(p, k, truth):
+        return None if p is None or k not in p else (p[k] >= 0.5) == (truth == "new")
     for g in labels:
         if g["split"] != "holdout":
             continue
         k = (g["folder_id"], g["n"])
-        if k not in p_a:
-            continue
         for truth, dst in ((g["tag"], tags), (ruled.get(k), own)):
             if truth is None:
                 continue
-            ra = (p_a[k] >= 0.5) == (truth == "new")
-            rb = None if p_b is None or k not in p_b else (p_b[k] >= 0.5) == (truth == "new")
-            dst.setdefault(g["folder_id"], []).append((ra, rb))
+            dst.setdefault(g["folder_id"], []).append((right(p_a, k, truth), right(p_b, k, truth)))
     return tags, own
 
 
@@ -386,8 +404,8 @@ def cmd_check(a):
         cmp = shipped[0] if shipped and name != a.shipped else None
         if labels:
             tags, own = heldout_groups(labels, ruled, p, cmp)
-            row["heldout_tags"] = gap_score(tags, rng) if tags else None
-            row["heldout_ruled"] = gap_score(own, rng) if own else None
+            row["heldout_tags"] = gap_score(tags, rng, cmp is not None) if tags else None
+            row["heldout_ruled"] = gap_score(own, rng, cmp is not None) if own else None
         unsure = [u["right"] for u in truth.get("unsure", ())]
         ad = anchor_docs(truth["pages"], box, p, unsure)
         sd = anchor_docs(truth["pages"], box, cmp, unsure) if cmp else None
@@ -398,11 +416,23 @@ def cmd_check(a):
     if not cand["anchor"]:
         reasons.append(f"no anchor score: the run has no answer for every gap of {box}")
     held = cand.get("heldout_ruled") or cand.get("heldout_tags")
-    if a.candidate != a.shipped and held and "difference_interval" in held and held["difference_interval"][0] <= -GATE_POINTS:
-        reasons.append(f"on held-out gaps it may trail the shipped model by {GATE_POINTS:g} points or more "
-                       f"(difference {held['difference']}, interval {held['difference_interval']})")
+    # W46.kit-gate-coverage: fail closed. Missing evidence is a reason, never a pass: a candidate other than the
+    # shipped model needs the shipped run and a paired interval over the gaps that run answered.
     if held is None:
-        reasons.append("no held-out score")
+        reasons.append("no held-out score: no expected held-out gap (no --labels, or no held-out split)")
+    elif not held["answered_gaps"]:
+        reasons.append(f"no held-out score: the run answered none of the {held['expected_gaps']} expected held-out gaps")
+    if a.candidate != a.shipped:
+        if shipped is None:
+            reasons.append(f"no shipped reference: there is no --run {a.shipped} to pair the candidate against")
+        elif held is not None and "difference_interval" not in held:
+            reasons.append(f"no paired held-out comparison: the shipped run answered none of the "
+                           f"{held['expected_gaps']} expected held-out gaps")
+        elif held is not None and held["difference_interval"][0] <= -GATE_POINTS:
+            reasons.append(f"on held-out gaps it may trail the shipped model by {GATE_POINTS:g} points or more "
+                           f"(difference {held['difference']}, interval {held['difference_interval']}, over "
+                           f"{held['paired_gaps']} gaps the shipped model answered, {held['paired_missing_gaps']} "
+                           f"of them unanswered by the candidate and counted wrong)")
     manifest = {
         "kit_version": KIT_VERSION, "prompt_id": PROMPT_ID, "bench_request": "method_local.request (o1), 1024 px",
         "model": a.candidate, "base_build": a.base_build,
@@ -416,8 +446,10 @@ def cmd_check(a):
         "anchor": None if not cand["anchor"] else {"box": box, "truth_sha256": sha256_of(a.anchor_truth), **cand["anchor"]},
         "review_load_at_98": None if not cand["anchor"] else cand["anchor"]["review_load_per_100_pages"],
         "mac": json.loads(Path(a.mac).read_text()) if a.mac else None, "note": a.note,
-        "gate": {"rule": f"an anchor score, a held-out score, and a held-out interval against the shipped model "
-                         f"whose low end is above -{GATE_POINTS:g} points (proposed, W46.kit-gate)",
+        "gate": {"rule": f"an anchor score, a held-out score, and for a candidate other than the shipped model a "
+                         f"paired held-out interval against the shipped run, over every gap that run answered with "
+                         f"the candidate's missing answers counted wrong, whose low end is above -{GATE_POINTS:g} "
+                         f"points (proposed, W46.kit-gate; coverage, W46.kit-gate-coverage)",
                  "passed": not reasons, "reasons": reasons},
         "compared": report["models"], "made": time.strftime("%Y-%m-%dT%H:%M:%S")}
     out = Path(a.out)
