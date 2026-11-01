@@ -25,7 +25,7 @@ rather than once per item. A Sherlock pack is ready when its plan line is held `
 `HELD <date>: ready to submit: …` (plan-edit.sh hold) and its ledger is empty or `finished`: `batch_mac.py fetch` marks
 an item `finished` and releases it, so a later HELD note is a new stage's pack. `ask` writes one `[Sherlock batch]`
 entry, emailed, when BATCH_READY packs are ready or the oldest has waited BATCH_WAIT_DAYS, or a submission has
-waited that long to be collected; it names each pack with its jobs and GPU-hour ceiling from its manifest
+waited BATCH_COLLECT_DAYS to be collected (while it waits, its hold is not counted as the owner's question); it names each pack with its jobs and GPU-hour ceiling from its manifest
 (ArchiveProcessor/scripts/segbench/sherlock/packs/<TAG>.json) and the collections waiting. It does not ask again
 for the same packs until BATCH_WAIT_DAYS more have passed. The batch itself is
 ArchiveProcessor/scripts/segbench/sherlock/batch_mac.py; execution-plans/sherlock-access.md §"Batches".
@@ -57,6 +57,9 @@ BOX_ITEM = "W46.box-collect"
 PACKS = os.path.join(REPO, "ArchiveProcessor", "scripts", "segbench", "sherlock", "packs")
 BATCH_READY = 3
 BATCH_WAIT_DAYS = 5
+# A submission is asked to be collected after one day (owner, 2026-10-31): while its jobs run, its hold counts as
+# waiting on the cluster, not on the owner (ops/agent/hooks.py cluster_submitted), so this ask is what brings it back.
+BATCH_COLLECT_DAYS = 1
 
 # name -> (display name, control socket, login). Sherlock's entry names it for messages only: it is PREP_ONLY.
 CLUSTERS = {
@@ -292,8 +295,9 @@ def batch_due(ready, collect, today):
         return "%d packs are ready" % len(ready)
     if ready and _days(ready[0][1], today) >= BATCH_WAIT_DAYS:
         return "the oldest ready pack has waited %d days" % _days(ready[0][1], today)
-    if collect and _days(collect[0][1], today) >= BATCH_WAIT_DAYS:
-        return "a submission has waited %d days to be collected" % _days(collect[0][1], today)
+    if collect and _days(collect[0][1], today) >= BATCH_COLLECT_DAYS:
+        n = _days(collect[0][1], today)
+        return "a submission has waited %d day%s to be collected" % (n, "" if n == 1 else "s")
     return None
 
 

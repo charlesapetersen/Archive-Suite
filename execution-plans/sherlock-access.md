@@ -61,8 +61,10 @@ once per batch rather than once per item.
   `ArchiveProcessor/scripts/segbench/sherlock/packs/<TAG>.json` (fields in that folder's README). Without one, the
   batch leaves the pack out. Its own Daemon Report line stays a mention (no decision).
 - **The request.** `cluster-reach.py ask` (the upkeep hook) writes one `[Sherlock batch]` entry, emailed, when 3 packs
-  are ready, the oldest has waited 5 days, or a submission has waited 5 days to be collected. It names each pack with
-  its jobs and GPU-hour ceiling, and the collections waiting; the same packs are not asked about again for 5 days.
+  are ready, the oldest has waited 5 days, or a submission has waited a day to be collected (owner, 2026-10-31;
+  until then a submitted pack's hold counts as waiting on Sherlock, not as a question for the owner). It names each
+  pack with its jobs and GPU-hour ceiling, and the collections waiting; the same packs are not asked about again for
+  5 days.
   `cluster-reach.py ready` lists them at any time.
 - **The session**, owner-started, after the shared login is open (`batch_mac.py` refuses under
   `ARCHIVE_UNATTENDED=1`):

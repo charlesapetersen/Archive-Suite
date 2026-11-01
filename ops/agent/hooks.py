@@ -107,13 +107,25 @@ def cluster_offer(tag, text):
     W46.box-collect are loaded on the first marked item, so an unmarked queue costs nothing and touches no network."""
     if "(cluster:" not in text:
         return True, None
+    cluster_module()
+    return _cluster["mod"].offer(tag, text, _cluster["box"])
+
+
+def cluster_module():
     if not _cluster:
         spec = importlib.util.spec_from_file_location("cluster_reach", os.path.join(SCRIPTS, "cluster-reach.py"))
         mod = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(mod)
         done, pend = tag_states()
         _cluster.update(mod=mod, box=mod.BOX_ITEM in done and mod.BOX_ITEM not in pend)
-    return _cluster["mod"].offer(tag, text, _cluster["box"])
+    return _cluster["mod"]
+
+
+def cluster_submitted(tag, text):
+    """True for a cluster item whose jobs are marked `submitted` (cluster-reach.py mark): it waits on the cluster, not
+    on the owner, so its hold is not a question until the batch request asks for the collect session (owner,
+    2026-10-31: two running Sherlock packs showed as needing him)."""
+    return "(cluster:" in text and cluster_module().ledger(tag) == "submitted"
 
 
 def queue():
@@ -291,7 +303,7 @@ def holds():
         if not tag or tag in seen:
             continue
         seen.add(tag)
-        ready = tag in pending and own_prerequisites_met(line, states)
+        ready = tag in pending and own_prerequisites_met(line, states) and not cluster_submitted(tag, line)
         text = clean(line[m.end():])
         half = half_recorded(tag, rows)
         if half:
@@ -303,7 +315,7 @@ def holds():
     for status, tag, text in rows:
         if HOLD_MARK.search(text) and tag not in seen:
             seen.add(tag)
-            ready = tag in pending and not status.startswith("blocked:")
+            ready = tag in pending and not status.startswith("blocked:") and not cluster_submitted(tag, text)
             out.append({"key": tag, "text": clean(text), "permanent": not ready, "source": "WORK QUEUE",
                         "detail": clean(text, DETAIL_MAX)})
     # The Daemon Report is ONE pending item, keyed by its newest unwalked entry that asks for a decision: a new

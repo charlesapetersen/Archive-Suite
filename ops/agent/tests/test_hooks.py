@@ -313,6 +313,21 @@ class Cluster(Fixture):
         self.assertEqual(self.ssh_calls(), 0)
         self.assertIn("nothing to ask", self.upkeep())
 
+    def test_a_submitted_sherlock_hold_waits_on_the_cluster_not_the_owner(self):
+        # Owner, 2026-10-31: two running Sherlock packs showed as needing him. Once its jobs are marked submitted, a
+        # held cluster item is not a question; the batch request asks for the collect session a day later.
+        items = ("- [ ] **S.held — ready** (lane: segbench) (uses: light) (cluster: sherlock) (needs: owner)\n"
+                 "- [ ] **S.next — scores it** (lane: segbench) (blocked-on: S.held)\n")
+        self.write(".maintenance/AUTONOMOUS_PLAN.md", PLAN.replace("- [ ] **A.four", items + "- [ ] **A.four"))
+        by = {d["key"]: d for d in self.jsonl(self.hook("holds").stdout)}
+        self.assertFalse(by["S.held"]["permanent"], by["S.held"])
+        self.mark("S.held", "submitted")
+        by = {d["key"]: d for d in self.jsonl(self.hook("holds").stdout)}
+        self.assertTrue(by["S.held"]["permanent"], by["S.held"])
+        self.mark("S.held", "finished")
+        by = {d["key"]: d for d in self.jsonl(self.hook("holds").stdout)}
+        self.assertFalse(by["S.held"]["permanent"], by["S.held"])
+
     def test_hold_hands_an_item_to_the_owner(self):
         items = "- [ ] **S.prep — to prepare** (lane: segbench) (uses: light) (cluster: sherlock)\n"
         self.write(".maintenance/AUTONOMOUS_PLAN.md", PLAN.replace("- [ ] **A.four", items + "- [ ] **A.four"))

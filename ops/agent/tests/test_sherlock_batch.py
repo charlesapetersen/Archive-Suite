@@ -395,6 +395,9 @@ class TestBatchAsk(BatchFixture):
         self.assertIsNone(cr.batch_ask_text(ready[:2], [], "2026-10-24"))           # 2 ready, oldest 4 days
         self.assertIn("waited 5 days", cr.batch_ask_text(ready[:2], [], "2026-10-25"))
         self.assertIn("to be collected", cr.batch_ask_text([], [("W9.x", "2026-10-01")], "2026-10-06"))
+        # owner, 2026-10-31: a submission is asked to be collected after one day, not five
+        self.assertIsNone(cr.batch_ask_text([], [("W9.x", "2026-10-31")], "2026-10-31"))
+        self.assertIn("waited 1 day to be collected", cr.batch_ask_text([], [("W9.x", "2026-10-31")], "2026-11-01"))
 
     def test_asks_once_per_batch(self):
         cr = self.cr()
