@@ -285,7 +285,10 @@ best gives the test design.
   are the open question: every open route is at 52-70 there and PaddleOCR-VL at 28 [M].
 - English hands (L1, L2, the owner's handwritten pages): one shot with Gemini 3.8 Flash for the API profiles (95.81
   on our 16 on the owner-corrected truth, ahead of every route but Gemini 3.7 Flash, a tie at +0.76, -0.60 to +2.89;
-  +3.31 over Claude Sonnet 5.5, +0.21 to +7.24 [M, `ocr-hands-rescore.md`]; 1.52% CER on HHTR for Gemini 3.5
+  +3.31 over Claude Sonnet 5.5, +0.21 to +7.24 [M, `ocr-hands-rescore.md`]; those are fixed-reference figures,
+  and the owner answered 10 hand places "either will do / can't tell": with their 7 pages left out the lead over
+  Sonnet holds (+3.61, +0.61 to +7.85) but on the adverse bound it is a tie (+2.81, -0.33 to +6.72), and over
+  Gemini 3.1 Pro a tie in both, so the preference over those two is conditional (W46.ocr-audit-report-fix); 1.52% CER on HHTR for Gemini 3.5
   Flash); for the laptop profile the measured best is LightOnOCR-3 4B 8-bit at 89.91 on the 16 [M,
   `ocr-hands-rescore.md`], and the untested candidate is the pretrained kraken
   PP-OCRv6 medium on Vision or blla lines.

@@ -386,7 +386,11 @@ pages where third-family readers (Qwen3.6-27B, LightOnOCR-3) differ from the tru
 rank hands on independent truth. **Done 2026-10-31 (W46.ocr-hands-rescore, `ocr-hands-rescore.md`):** the owner ruled
 114 hand places (truth stands 87, either 10, wrong 12) and 19 typed controls (all confirm); on the corrected truth
 Gemini 3.8 minus Sonnet 5.5 is +3.31 (+0.21 to +7.24), and Gemini 3.8 still leads all 46 other routes but ties
-Gemini 3.7 Flash.
+Gemini 3.7 Flash. **Pass 3 (2026-10-31, W46.ocr-audit-report-fix):** the "either 10" are "either will do / can't
+tell", unresolved; on the pages without them and on an adverse bound Gemini 3.8 still leads 44 of those routes, and
+the leads over Sonnet 5.5 and Gemini 3.1 Pro are conditional on the truth's readings there
+(`ocr-hands-rescore.md` §"The unresolved places"). The typed controls bound the error per passage (under 17.6%); the
+earlier per-word 2.4% assumed independent words.
 
 **OCR-2 · the top of the 96 ranking is set by failures and retries — weakened.** "Highest on the 96: Claude Sonnet 5.5
 (96.47)" counts failures as 0, and Claude's harness retried an empty answer once while the OpenRouter routes had no

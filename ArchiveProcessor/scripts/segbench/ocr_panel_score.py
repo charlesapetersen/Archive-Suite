@@ -15,6 +15,7 @@ import regex
 from rapidfuzz.distance import Levenshtein
 from sacrebleu.metrics import CHRF
 import ocr_panel as P
+from ocr_card import card, TRUTH_96, NOISE_96
 
 CHRF2 = CHRF(char_order=6, word_order=0, beta=2, lowercase=False, whitespace=False, eps_smoothing=False)
 PARAMETERS = {
@@ -272,7 +273,7 @@ def report():
          '99 settled originals, 96 in the accuracy table below. p038 excluded by the owner. '
          'The three Michael Young letters p086/p094/p096 are shown separately as **agreement with Claude/Gemini**, '
          'not measured accuracy. The truth was drafted by Claude Opus 5.5 and Gemini 3.8 Flash, then adjudicated; '
-         'unreviewed agreements can still favor those models.', '',
+         'agreements the owner\'s later blind checks did not reach can still favor those models (measurement card).', '',
          'NES is 1 − character Levenshtein/max(lengths), as [socOCRbench](https://noahdasanaike.github.io/posts/sococrbench.html) '
          'defines it. chrF uses [SacreBLEU 2.5.1](https://github.com/mjpost/sacrebleu/tree/v2.5.1), '
          'character orders 1–6, beta 2, no word n-grams or whitespace, case preserved, effective orders. '
@@ -380,6 +381,18 @@ def report():
           'so they provide no matched hosted-vs-Q4 comparison and cannot quantify a quantization penalty. '
           'Source: read-only `vision-ocr/OCR-BAKEOFF-2026-10-07.tsv` and `ops/ocrlab/score-bakeoff.py`.', '']
     L += cloud_estimate(calls)
+    L += ['', *card(TRUTH_96 + ' The figures here are rescored on that truth as it now stands.',
+                    'All 99 settled originals for every route (96 in the accuracy table, the three agreement-only '
+                    'letters apart, p038 excluded by the owner), and 20 matched pages for the ladder; none chosen by '
+                    'a tested route or by ABBYY text. The routes are the local-sized models planned in W41, read '
+                    'hosted through OpenRouter, not on a Mac.',
+                    'The same JPEG images (quality 90, 2,400 px cap), prompt, temperature 0 and reasoning setting '
+                    'for every route, one pinned endpoint and precision each, Apple Vision included. One scorer; a '
+                    'failed reading scores empty.',
+                    'n = 96 pages, one reading per route. ' + NOISE_96 + ' The tables carry no paired intervals, so '
+                    'close rows are not an order; the 20-page ladder and the attribute groups are descriptive.',
+                    'Hosted precision, not Mac quantization or speed (`ocr-mac-local.md` measures that); the owner\'s '
+                    '96, not the public 895. Memory figures are estimates, not tested fits.')]
     (P.RESULTS / 'ocr-panel-local.md').write_text('\n'.join(L))
     print(f'report: {len(ss)} scored model-input pairs, ${P.spent():.6f} accounted')
 

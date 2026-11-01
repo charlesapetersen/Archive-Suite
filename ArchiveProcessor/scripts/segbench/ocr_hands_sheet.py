@@ -397,7 +397,11 @@ prog();go(0);
 
 def fold(key: dict, answers: dict) -> dict:
     """Per item: which sources the owner's pick matches ('truth' among them when the truth stands), or the typed
-    text, or 'either'. Plus the counts W46.ocr-hands-rescore starts from."""
+    text, or 'either'. Plus the counts W46.ocr-hands-rescore starts from.
+
+    'either' is the sheet's one key for "either will do / can't tell", so it is folded as unresolved
+    (`unresolved: True`, `truth_stands: None`): neither "both readings are right" nor "the truth stands" can be read
+    from it, and a scorer must not credit its alternatives as right (measurement review 2026-10-31 pass 3, P3-2)."""
     rulings, n = {}, {'hand': {}, 'control': {}}
     for p, d in key['pages'].items():
         for iid, v in d['items'].items():
@@ -405,7 +409,7 @@ def fold(key: dict, answers: dict) -> dict:
             if a is None:
                 r = {'ruling': 'open'}
             elif a == 'either':
-                r = {'ruling': 'either'}
+                r = {'ruling': 'either', 'unresolved': True}
             elif a.startswith('='):
                 text = a[1:]
                 same = [s for s in v['readings'] if B.keys(text.replace(' ', '')) == B.keys(v['readings'][s].replace(' ', ''))]

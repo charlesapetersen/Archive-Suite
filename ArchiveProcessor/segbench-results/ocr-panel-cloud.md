@@ -6,7 +6,7 @@ Question 2 of the W41 bake-off: how the paid and subscription leaders read the 9
 
 ## Findings
 
-- Highest on the 96 accuracy pages: **claude-sonnet5.5** (96.47 NES, subscription route).
+- Highest of this panel's routes on the 96 accuracy pages: **claude-sonnet5.5** (96.47 NES, subscription route). The panel is the routes run in October 2026; routes measured since are on the bench page, so this is not a ranking of every current route.
 - Best paid route: **gemini3.1-pro**, 94.82 NES at $0.02192 a page. Cheapest paid route within 1.5 points of it: **qwen3-vl-235b**, 93.98 at $0.00122.
 - Best open-weight route (the FarmShare-scale ceiling): **qwen3.5-397b**, 94.02 NES at $0.00202 a page, against the local panel’s best, qwen3.6-27b, at 94.28.
 - The spread among the paid leaders is about two points on one corpus of 96 pages; the truth leans toward Gemini 3.8 Flash and Claude (its drafters), so read the order of close rows as provisional.
@@ -100,3 +100,11 @@ Per-attribute scores (collection, period, kind, table/form, camera, tertiles, ev
 ## Reproduction
 
 `ocr_cloud_full.py prepare`, `ocr_cloud_mistral.py --full <driver>`, `ocr_cloud_full.py paid`, `ocr_cloud_full.py sub <route>`, `ocr_cloud_full.py report`. Private cache `~/Library/Caches/ArchiveSuiteRehearsal/ocr-panel-cloud/` (images, ledger, replies, page scores). The pilot’s spending controls hold: write-ahead reservations, pinned providers, no paid retries, the OCR reserve held apart, an uncertain outcome blocks continuation.
+
+## Measurement card
+
+- **Truth.** The owner's 96 pages (99 less the three agreement-only letters), truth drafted by Claude Opus 5.5 and Gemini 3.8 Flash and adjudicated by the owner where they differed (`ocr-truth.md`), corrected on 2026-10-29 (W46.truth-edits). Words the two drafters wrote alike were not adjudicated; since then the owner has checked samples of them blind: 59 places on 20 pages where Qwen3.6-27B differs (answered 2026-10-21, `ocr-truth-bias-score.md`: 4 truth errors, the bias not material) and every place where Qwen3.6-27B or LightOnOCR-3 4B differs on the 16 hand pages, with 19 typed controls (answered 2026-10-31, `ocr-hands-rescore.md`: 12 corrections, 10 places unresolved). Agreed words that no third-family reader disputes stay unchecked, so a drafter-family route can still gain where the truth shares its mistake. The figures here are rescored on that truth as it now stands.
+- **Selection.** All 96 accuracy pages for every route, none chosen by a tested route or by ABBYY text; the routes are the panel planned in W41 (the subscription and paid hosted routes of October 2026), not a sample of current models.
+- **Comparison.** Every route reads the same JPEG images (2,400 px cap) with the panel prompt, except Mistral OCR, which takes the app's own 2,048 px encoding and no prompt, and Claude Sonnet 5.5 through `claude -p`, whose harness may resize the image and retried an empty answer once (the OpenRouter routes had no retry). One scorer; a failed reading scores empty, so a route's failures lower its mean.
+- **Noise.** n = 96 pages, one reading per route. The rerun floor on the 96 is `ocr-rerun-noise.md`'s: a gap under 0.49 NES points, or a paired interval across 0, is a tie. The rows above carry no paired intervals, so gaps of a point or two are not an order; per-attribute groups are descriptive.
+- **Scope.** The owner's 96, not the public 895, and only this panel's routes. Prices are the full run's measured OpenRouter charges of October 2026. The truth leans toward its drafters' families.

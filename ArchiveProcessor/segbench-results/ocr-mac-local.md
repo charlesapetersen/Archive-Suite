@@ -58,3 +58,12 @@ The memory guard's whole-process view of each collect run (date, exit, seconds, 
 
 - 2026-10-15T15:11:47 · 0 · 80 · 1252 · 7665 · 661 · 2
 - 2026-10-15T16:53:17 · 0 · 5209 · 1000 · 8367 · -517 · 2
+
+## Measurement card
+
+- **Truth.** The owner's 96 pages (99 less the three agreement-only letters), truth drafted by Claude Opus 5.5 and Gemini 3.8 Flash and adjudicated by the owner where they differed (`ocr-truth.md`), corrected on 2026-10-29 (W46.truth-edits). Words the two drafters wrote alike were not adjudicated; since then the owner has checked samples of them blind: 59 places on 20 pages where Qwen3.6-27B differs (answered 2026-10-21, `ocr-truth-bias-score.md`: 4 truth errors, the bias not material) and every place where Qwen3.6-27B or LightOnOCR-3 4B differs on the 16 hand pages, with 19 typed controls (answered 2026-10-31, `ocr-hands-rescore.md`: 12 corrections, 10 places unresolved). Agreed words that no third-family reader disputes stay unchecked, so a drafter-family route can still gain where the truth shares its mistake. The figures here are rescored on that truth as it now stands.
+- **Selection.** All 96 accuracy pages (the three agreement-only letters excluded, as on the panel), one reading each; none chosen by a route's reading or by ABBYY text.
+- **Comparison.** The 4-bit MLX model on the Mac against the hosted panel's bf16 `qwen3-vl-8b` row: the same 2,400 px JPEG inputs, prompt, 8,192-token cap and temperature 0, one scorer, failed or cut-off readings empty on both sides. Speed and memory are one Apple M3 Pro with 18 GB, one page at a time, with the owner's usual apps open.
+- **Noise.** n = 96 pages, paired on the same pages. Greedy local decoding is deterministic on one machine (`ocr-rerun-noise.md`); the hosted side is one reading. The rerun floor on the 96 is `ocr-rerun-noise.md`'s: a gap under 0.49 NES points, or a paired interval across 0, is a tie. Speed and memory are one run of each page, so they are typical figures, not a distribution.
+- **Scope.** One model at one quantisation, on this Mac only; the owner's 96, not the public 895. The 102k-page day count is an extrapolation at one photograph a PDF.
+

@@ -38591,7 +38591,11 @@
     "differences_on_chosen": 69,
     "differences_median_page": 1,
     "mixed_items": 2,
-    "boxed_items": 61
+    "boxed_items": 61,
+    "answered": {
+     "pages": 20,
+     "items": 59
+    }
    },
    "routes": [
     {
@@ -38836,6 +38840,15 @@
      "agreed_acc_joined": 0.9808065339458908,
      "adjudicated_acc": 0.6595744680851063,
      "lead_agreed_joined": -0.005710182589072077
+    },
+    {
+     "route": "infinity-parser2-pro",
+     "family": "third family",
+     "pages": 96,
+     "agreed_acc": 0.9602518291645398,
+     "agreed_acc_joined": 0.9847200952867109,
+     "adjudicated_acc": 0.33878887070376434,
+     "lead_agreed_joined": -0.001812213636052884
     },
     {
      "route": "qwen3.5-9b",
@@ -39111,7 +39124,8 @@
     "words": 161,
     "rate_lo": 0.0,
     "rate_hi": 0.17646691180696533,
-    "per_word_hi": 0.023976820903791662
+    "per_word_hi": 0.17646691180696533,
+    "per_word_hi_if_iid": 0.023976820903791662
    },
    "changed": 8,
    "routes": [
@@ -39120,329 +39134,480 @@
      "after": 95.81102963099426,
      "before": 95.97214579003568,
      "move": -0.16111615904142695,
-     "failed": 0
+     "failed": 0,
+     "lo": 95.46747525220268,
+     "hi": 95.83289898728941,
+     "clear": 95.96051949377484
     },
     {
      "route": "gemini3.7-flash-gw",
      "after": 95.05355630985682,
      "before": 95.06855218610778,
      "move": -0.014995876250964102,
-     "failed": 0
+     "failed": 0,
+     "lo": 94.6612917881109,
+     "hi": 95.05355630985682,
+     "clear": 94.29923543941851
     },
     {
      "route": "gemini3.1-pro",
      "after": 93.97538136517502,
      "before": 94.06287762855702,
      "move": -0.08749626338199334,
-     "failed": 0
+     "failed": 0,
+     "lo": 93.68227496364764,
+     "hi": 94.01489513457061,
+     "clear": 93.84998475967177
     },
     {
      "route": "gemini3.5-flash",
      "after": 92.68903351936957,
      "before": 92.93239982232353,
      "move": -0.24336630295395878,
-     "failed": 0
+     "failed": 0,
+     "lo": 92.31378783012934,
+     "hi": 92.6933055631153,
+     "clear": 91.28910854743185
     },
     {
      "route": "qwen3.6-27b",
      "after": 92.61108074708119,
      "before": 92.1495969241417,
      "move": 0.46148382293948487,
-     "failed": 0
+     "failed": 0,
+     "lo": 92.364842281203,
+     "hi": 92.77975068787678,
+     "clear": 93.6037062657152
     },
     {
      "route": "claude-sonnet5.5",
      "after": 92.49943655098609,
      "before": 92.43233618074099,
      "move": 0.0671003702451003,
-     "failed": 0
+     "failed": 0,
+     "lo": 92.25487246863293,
+     "hi": 92.65422381521665,
+     "clear": 92.34936789594039
     },
     {
      "route": "qwen3.5-27b (FarmShare panel)",
      "after": 92.2332419470262,
      "before": 92.09888595078242,
      "move": 0.1343559962437837,
-     "failed": 0
+     "failed": 0,
+     "lo": 91.89185864162076,
+     "hi": 92.26150295701879,
+     "clear": 92.68101198417054
     },
     {
      "route": "mistral-large4",
      "after": 92.19542619622187,
      "before": 92.02767553185693,
      "move": 0.16775066436494512,
-     "failed": 0
+     "failed": 0,
+     "lo": 91.93675690473198,
+     "hi": 92.32349983918472,
+     "clear": 93.31806623179618
     },
     {
      "route": "gemini3.5-flash-lite",
      "after": 91.96139224050691,
      "before": 91.98172656085424,
      "move": -0.02033432034733096,
-     "failed": 0
+     "failed": 0,
+     "lo": 91.62458931384785,
+     "hi": 91.98631096712165,
+     "clear": 90.73517165571485
+    },
+    {
+     "route": "infinity-parser2-pro",
+     "after": 91.76415902321719,
+     "before": 91.7712249145479,
+     "move": -0.007065891330711338,
+     "failed": 0,
+     "lo": 91.50532873665985,
+     "hi": 91.81830761966998,
+     "clear": 91.68743143844341
     },
     {
      "route": "qwen3-vl-235b",
      "after": 91.59440632638676,
      "before": 91.38203932287597,
      "move": 0.21236700351079207,
-     "failed": 0
+     "failed": 0,
+     "lo": 91.2553940555974,
+     "hi": 91.6745495464155,
+     "clear": 91.8740429423708
     },
     {
      "route": "ling3-flash-vl-fp8",
      "after": 91.3247036251457,
      "before": 91.17804459716683,
      "move": 0.14665902797887043,
-     "failed": 0
+     "failed": 0,
+     "lo": 91.10790137006485,
+     "hi": 91.4029236395876,
+     "clear": 91.95426937823335
     },
     {
      "route": "qwen3.8-flash",
      "after": 91.2521428689001,
      "before": 91.03240414753239,
      "move": 0.21973872136770467,
-     "failed": 0
+     "failed": 0,
+     "lo": 91.02936910244276,
+     "hi": 91.27613116976468,
+     "clear": 90.81261747521711
     },
     {
      "route": "qwen3.5-9b",
      "after": 91.002885450361,
      "before": 90.92216281794231,
      "move": 0.08072263241869848,
-     "failed": 0
+     "failed": 0,
+     "lo": 90.74724881228606,
+     "hi": 91.03192954546564,
+     "clear": 90.36069141392102
     },
     {
      "route": "gemma4-31b",
      "after": 90.98179247274747,
      "before": 90.84464513763699,
      "move": 0.13714733511048394,
-     "failed": 0
+     "failed": 0,
+     "lo": 90.82497067393781,
+     "hi": 91.12145474833268,
+     "clear": 92.12101411420063
     },
     {
      "route": "qwen3.5-397b",
      "after": 90.83658715925219,
      "before": 90.57334753268385,
      "move": 0.26323962656833544,
-     "failed": 0
+     "failed": 0,
+     "lo": 90.58903424440092,
+     "hi": 90.89529556640072,
+     "clear": 91.433602976259
     },
     {
      "route": "qwen3.8-27b",
      "after": 90.1371568390568,
      "before": 89.97588666990667,
      "move": 0.1612701691501286,
-     "failed": 0
+     "failed": 0,
+     "lo": 89.94799336204429,
+     "hi": 90.22198241306181,
+     "clear": 91.2053771192758
     },
     {
      "route": "lightonocr-3-4b-mlx8",
      "after": 89.91019653035467,
      "before": 89.67262036810979,
      "move": 0.23757616224487776,
-     "failed": 0
+     "failed": 0,
+     "lo": 89.7569330148009,
+     "hi": 90.13661283987943,
+     "clear": 90.20897148618027
     },
     {
      "route": "lightonocr-3-4b-mlx8-logprob",
      "after": 89.91019653035467,
      "before": 89.67262036810979,
      "move": 0.23757616224487776,
-     "failed": 0
+     "failed": 0,
+     "lo": 89.7569330148009,
+     "hi": 90.13661283987943,
+     "clear": 90.20897148618027
     },
     {
      "route": "qwen3-vl-8b (FarmShare panel)",
      "after": 89.8418301366617,
      "before": 89.72289147452939,
      "move": 0.11893866213230808,
-     "failed": 0
+     "failed": 0,
+     "lo": 89.62727861516407,
+     "hi": 89.92483599471245,
+     "clear": 92.31884293511146
     },
     {
      "route": "qwen3-vl-8b-mlx4",
      "after": 89.24411405673966,
      "before": 89.16249569191196,
      "move": 0.08161836482770468,
-     "failed": 0
+     "failed": 0,
+     "lo": 89.12380988239332,
+     "hi": 89.37941369429001,
+     "clear": 91.39668821538251
     },
     {
      "route": "lightonocr3-4b",
      "after": 89.21090650255938,
      "before": 88.84550130088621,
      "move": 0.3654052016731697,
-     "failed": 0
+     "failed": 0,
+     "lo": 89.09526811006825,
+     "hi": 89.52435452873937,
+     "clear": 90.03087364093192
     },
     {
      "route": "gpt5.4-mini",
      "after": 89.12529760438555,
      "before": 89.48265784325754,
      "move": -0.35736023887199053,
-     "failed": 0
+     "failed": 0,
+     "lo": 88.93101941043099,
+     "hi": 89.21564030580994,
+     "clear": 91.57549721367178
     },
     {
      "route": "mistral-ocr",
      "after": 89.10237931036352,
      "before": 89.00786121288714,
      "move": 0.09451809747638151,
-     "failed": 0
+     "failed": 0,
+     "lo": 88.85214449012227,
+     "hi": 89.1591648384134,
+     "clear": 87.49868958550792
     },
     {
      "route": "qwen3.6-35b-a3b",
      "after": 88.82517366137243,
      "before": 88.81840960585852,
      "move": 0.006764055513912126,
-     "failed": 0
+     "failed": 0,
+     "lo": 88.60600434319626,
+     "hi": 88.93056221858333,
+     "clear": 86.98617898693178
     },
     {
      "route": "qwen3.5-35b-a3b",
      "after": 88.43215348638506,
      "before": 88.30563887276335,
      "move": 0.12651461362170835,
-     "failed": 0
+     "failed": 0,
+     "lo": 88.2161309170745,
+     "hi": 88.48295249751764,
+     "clear": 87.24728555559626
     },
     {
      "route": "qwen3.5-9b-mlx4",
      "after": 88.06149008859128,
      "before": 87.9178935338186,
      "move": 0.14359655477268518,
-     "failed": 0
+     "failed": 0,
+     "lo": 87.81183903836369,
+     "hi": 88.15488345823265,
+     "clear": 87.56697820088755
     },
     {
      "route": "qwen3.5-9b-mlx4-logprob",
      "after": 88.06149008859128,
      "before": 87.9178935338186,
      "move": 0.14359655477268518,
-     "failed": 0
+     "failed": 0,
+     "lo": 87.81183903836369,
+     "hi": 88.15488345823265,
+     "clear": 87.56697820088755
     },
     {
      "route": "fs-churro",
      "after": 87.5964942521885,
      "before": 87.47879265152481,
      "move": 0.11770160066369328,
-     "failed": 0
+     "failed": 0,
+     "lo": 87.47075013502895,
+     "hi": 87.70533310157698,
+     "clear": 90.43928005511185
     },
     {
      "route": "gemma4-26b-a4b",
      "after": 86.74795246868943,
      "before": 86.59867792015056,
      "move": 0.14927454853886957,
-     "failed": 0
+     "failed": 0,
+     "lo": 86.6130584501194,
+     "hi": 86.85027296190742,
+     "clear": 87.23263531170797
     },
     {
      "route": "gemini3.1-flash-lite",
      "after": 86.5519455987983,
      "before": 86.64016155422746,
      "move": -0.08821595542916327,
-     "failed": 1
+     "failed": 1,
+     "lo": 86.37222107120375,
+     "hi": 86.65078218316587,
+     "clear": 93.34161387026518
     },
     {
      "route": "xiaomi-ocr-0",
      "after": 86.17791752578988,
      "before": 85.989474685068,
      "move": 0.18844284072187634,
-     "failed": 0
+     "failed": 0,
+     "lo": 85.9927594433465,
+     "hi": 86.27871393176568,
+     "clear": 88.03057771451705
     },
     {
      "route": "xiaomi-ocr-0-bf16",
      "after": 86.0386744265129,
      "before": 85.84792789903425,
      "move": 0.19074652747865173,
-     "failed": 0
+     "failed": 0,
+     "lo": 85.8537812290141,
+     "hi": 86.13887835288615,
+     "clear": 87.78681627880471
     },
     {
      "route": "qwen3.5-4b",
      "after": 85.85985626774401,
      "before": 85.5343127825202,
      "move": 0.32554348522380394,
-     "failed": 0
+     "failed": 0,
+     "lo": 85.68265465794234,
+     "hi": 85.97385517325881,
+     "clear": 87.28188323963043
     },
     {
      "route": "glm-ocr",
      "after": 85.78487064624143,
      "before": 85.60982284378,
      "move": 0.17504780246143525,
-     "failed": 0
+     "failed": 0,
+     "lo": 85.62203669887586,
+     "hi": 85.92626202234418,
+     "clear": 87.10576618148698
     },
     {
      "route": "gpt5.6-luna",
      "after": 85.2024228542696,
      "before": 85.44368156936899,
      "move": -0.24125871509939145,
-     "failed": 0
+     "failed": 0,
+     "lo": 85.00669549975606,
+     "hi": 85.30525832446003,
+     "clear": 86.24783876702
     },
     {
      "route": "mistral-medium3.5",
      "after": 85.05533764818067,
      "before": 85.03947119819455,
      "move": 0.0158664499861203,
-     "failed": 0
+     "failed": 0,
+     "lo": 84.89393069506937,
+     "hi": 85.15605430686485,
+     "clear": 89.42270232064787
     },
     {
      "route": "qwen3-vl-8b (local panel)",
      "after": 84.97586449924115,
      "before": 84.83329049887816,
      "move": 0.14257400036299828,
-     "failed": 1
+     "failed": 1,
+     "lo": 84.81635269762619,
+     "hi": 85.0594145716882,
+     "clear": 92.21350727293564
     },
     {
      "route": "lightonocr3-0.8b",
      "after": 84.95112475452605,
      "before": 84.78120104820091,
      "move": 0.16992370632513598,
-     "failed": 0
+     "failed": 0,
+     "lo": 84.80860850129432,
+     "hi": 85.0873875538449,
+     "clear": 83.22652900870354
     },
     {
      "route": "paddleocr-vl1.6-bf16",
      "after": 80.37089949082866,
      "before": 80.17991647614623,
      "move": 0.1909830146824305,
-     "failed": 0
+     "failed": 0,
+     "lo": 80.23953581685144,
+     "hi": 80.47865422559526,
+     "clear": 79.03230348062432
     },
     {
      "route": "paddleocr-vl1.6",
      "after": 80.22445975746339,
      "before": 80.05988830327566,
      "move": 0.16457145418773678,
-     "failed": 0
+     "failed": 0,
+     "lo": 80.10646527394215,
+     "hi": 80.3430128285305,
+     "clear": 78.90572624694657
     },
     {
      "route": "mistral-small-24b",
      "after": 79.90122140620318,
      "before": 79.83440043022377,
      "move": 0.06682097597941095,
-     "failed": 1
+     "failed": 1,
+     "lo": 79.66665109422637,
+     "hi": 79.97915267210587,
+     "clear": 81.7551464797212
     },
     {
      "route": "qwen3-vl-30b-a3b",
      "after": 77.716027002973,
      "before": 77.57801209910927,
      "move": 0.13801490386371995,
-     "failed": 1
+     "failed": 1,
+     "lo": 77.62772486041402,
+     "hi": 77.88584997797551,
+     "clear": 84.51497011666729
     },
     {
      "route": "paddleocr-vl1.5",
      "after": 70.91930616671122,
      "before": 70.8108326426544,
      "move": 0.10847352405681931,
-     "failed": 3
+     "failed": 3,
+     "lo": 70.84499135649126,
+     "hi": 70.96854216158773,
+     "clear": 69.83917776418201
     },
     {
      "route": "qwen3.5-27b (local panel)",
      "after": 69.33200826339922,
      "before": 69.1379873114422,
      "move": 0.19402095195701463,
-     "failed": 4
+     "failed": 4,
+     "lo": 69.2047209478879,
+     "hi": 69.3602914814009,
+     "clear": 71.72005250445
     },
     {
      "route": "ppocrv6-medium",
      "after": 62.737176491930455,
      "before": 62.78832664522017,
      "move": -0.0511501532897114,
-     "failed": 0
+     "failed": 0,
+     "lo": 62.63705539851564,
+     "hi": 62.798238788777795,
+     "clear": 64.75444249652587
     },
     {
      "route": "apple-vision",
      "after": 58.060943337587254,
      "before": 57.87491743311246,
      "move": 0.18602590447479628,
-     "failed": 0
+     "failed": 0,
+     "lo": 57.967929951674876,
+     "hi": 58.11771951775357,
+     "clear": 55.146610150572116
     },
     {
      "route": "granite-docling-258m-mlx",
      "after": 11.321061272169889,
      "before": 11.321061272169889,
      "move": 0.0,
-     "failed": 10
+     "failed": 10,
+     "lo": 11.321061272169889,
+     "hi": 11.321061272169889,
+     "clear": 18.212378597247206
     }
    ],
    "paired": {
@@ -39543,6 +39708,13 @@
      "p": 9.999000099990002e-05,
      "lo": 73.68619935200432,
      "hi": 92.87774104702876
+    },
+    "infinity-parser2-pro": {
+     "n": 16,
+     "delta": 4.046870607777076,
+     "p": 0.0029997000299970002,
+     "lo": 1.7257543637648913,
+     "hi": 6.787529559276577
     },
     "lightonocr-3-4b-mlx8": {
      "n": 16,
@@ -39768,6 +39940,108 @@
      "lo": 6.73426624834467,
      "hi": 12.886208589018775
     }
+   },
+   "unresolved": {
+    "places": 10,
+    "pages": 7,
+    "fixed_leads": [
+     "apple-vision",
+     "claude-sonnet5.5",
+     "fs-churro",
+     "gemini3.1-flash-lite",
+     "gemini3.1-pro",
+     "gemini3.5-flash",
+     "gemini3.5-flash-lite",
+     "gemma4-26b-a4b",
+     "gemma4-31b",
+     "glm-ocr",
+     "gpt5.4-mini",
+     "gpt5.6-luna",
+     "granite-docling-258m-mlx",
+     "infinity-parser2-pro",
+     "lightonocr-3-4b-mlx8",
+     "lightonocr-3-4b-mlx8-logprob",
+     "lightonocr3-0.8b",
+     "lightonocr3-4b",
+     "ling3-flash-vl-fp8",
+     "mistral-large4",
+     "mistral-medium3.5",
+     "mistral-ocr",
+     "mistral-small-24b",
+     "paddleocr-vl1.5",
+     "paddleocr-vl1.6",
+     "paddleocr-vl1.6-bf16",
+     "ppocrv6-medium",
+     "qwen3-vl-235b",
+     "qwen3-vl-30b-a3b",
+     "qwen3-vl-8b (FarmShare panel)",
+     "qwen3-vl-8b (local panel)",
+     "qwen3-vl-8b-mlx4",
+     "qwen3.5-27b (FarmShare panel)",
+     "qwen3.5-27b (local panel)",
+     "qwen3.5-35b-a3b",
+     "qwen3.5-397b",
+     "qwen3.5-4b",
+     "qwen3.5-9b",
+     "qwen3.5-9b-mlx4",
+     "qwen3.5-9b-mlx4-logprob",
+     "qwen3.6-27b",
+     "qwen3.6-35b-a3b",
+     "qwen3.8-27b",
+     "qwen3.8-flash",
+     "xiaomi-ocr-0",
+     "xiaomi-ocr-0-bf16"
+    ],
+    "robust": [
+     "apple-vision",
+     "fs-churro",
+     "gemini3.1-flash-lite",
+     "gemini3.5-flash",
+     "gemini3.5-flash-lite",
+     "gemma4-26b-a4b",
+     "gemma4-31b",
+     "glm-ocr",
+     "gpt5.4-mini",
+     "gpt5.6-luna",
+     "granite-docling-258m-mlx",
+     "infinity-parser2-pro",
+     "lightonocr-3-4b-mlx8",
+     "lightonocr-3-4b-mlx8-logprob",
+     "lightonocr3-0.8b",
+     "lightonocr3-4b",
+     "ling3-flash-vl-fp8",
+     "mistral-large4",
+     "mistral-medium3.5",
+     "mistral-ocr",
+     "mistral-small-24b",
+     "paddleocr-vl1.5",
+     "paddleocr-vl1.6",
+     "paddleocr-vl1.6-bf16",
+     "ppocrv6-medium",
+     "qwen3-vl-235b",
+     "qwen3-vl-30b-a3b",
+     "qwen3-vl-8b (FarmShare panel)",
+     "qwen3-vl-8b (local panel)",
+     "qwen3-vl-8b-mlx4",
+     "qwen3.5-27b (FarmShare panel)",
+     "qwen3.5-27b (local panel)",
+     "qwen3.5-35b-a3b",
+     "qwen3.5-397b",
+     "qwen3.5-4b",
+     "qwen3.5-9b",
+     "qwen3.5-9b-mlx4",
+     "qwen3.5-9b-mlx4-logprob",
+     "qwen3.6-27b",
+     "qwen3.6-35b-a3b",
+     "qwen3.8-27b",
+     "qwen3.8-flash",
+     "xiaomi-ocr-0",
+     "xiaomi-ocr-0-bf16"
+    ],
+    "conditional": [
+     "claude-sonnet5.5",
+     "gemini3.1-pro"
+    ]
    }
   },
   "truth_jpeg": {

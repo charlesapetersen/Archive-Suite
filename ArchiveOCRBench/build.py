@@ -721,7 +721,11 @@ def ocr_scorers():
         hr = json.loads(HANDS_RESCORE.read_text())
         out["hands_rescore"] = {"lead": hr["lead"], "sheet": hr["sheet"], "controls": hr["controls"],
                                 "changed": len(hr["changed_pages"]), "routes": hr["routes"],
-                                "paired": {k: v["after"] for k, v in hr["paired"].items()}}
+                                "paired": {k: v["after"] for k, v in hr["paired"].items()},
+                                # W46.ocr-audit-report-fix: the "either / can't tell" places and the leads they hold
+                                "unresolved": {"places": sum(len(v) for v in hr["unresolved"]["places"].values()),
+                                               "pages": len(hr["unresolved"]["pages"]),
+                                               **hr["unresolved"]["summary"]}}
     if TRUTH_JPEG.exists():
         tj = json.loads(TRUTH_JPEG.read_text())
         out["truth_jpeg"] = {"pages": tj["pages"], "routes": {k: {f: v for f, v in r.items() if f != "per_page"}

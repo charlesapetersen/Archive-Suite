@@ -6,7 +6,7 @@ Conservative OpenRouter budget accounting, every attempt: **$1.533384 / $2.00 ca
 
 ## Scoring and limits
 
-99 settled originals, 96 in the accuracy table below. p038 excluded by the owner. The three Michael Young letters p086/p094/p096 are shown separately as **agreement with Claude/Gemini**, not measured accuracy. The truth was drafted by Claude Opus 5.5 and Gemini 3.8 Flash, then adjudicated; unreviewed agreements can still favor those models.
+99 settled originals, 96 in the accuracy table below. p038 excluded by the owner. The three Michael Young letters p086/p094/p096 are shown separately as **agreement with Claude/Gemini**, not measured accuracy. The truth was drafted by Claude Opus 5.5 and Gemini 3.8 Flash, then adjudicated; agreements the owner's later blind checks did not reach can still favor those models (measurement card).
 
 NES is 1 − character Levenshtein/max(lengths), as [socOCRbench](https://noahdasanaike.github.io/posts/sococrbench.html) defines it. chrF uses [SacreBLEU 2.5.1](https://github.com/mjpost/sacrebleu/tree/v2.5.1), character orders 1–6, beta 2, no word n-grams or whitespace, case preserved, effective orders. The benchmark does not publish its exact chrF/normalization settings; these explicit settings are our reproduction choice. NES/chrF are per-page means; word rates pool counts, as Vision OCR does.
 
@@ -183,3 +183,12 @@ Completed original-page routes average 636–4104 input and 443–485 output tok
 | qwen/qwen3-vl-235b-a22b-instruct | 0.21/1.9 | $0.10 | $0.26 |
 
 **Total chat-panel proxy: $4.33–$14.39.** Mistral’s dedicated OCR endpoint is additional and needs its own key and current per-page price check. Its 99 pages and any ladder extension must be added before approval. The existing `W41.ocr-panel-cloud-owner-ok` gate remains open; this is an estimate, not authorization to spend. Prices: [OpenRouter model catalog](https://openrouter.ai/api/v1/models), snapshot 2026-10-14. The snapshot is committed beside this scorer; listed minimum prices may differ from the pinned provider.
+
+
+## Measurement card
+
+- **Truth.** The owner's 96 pages (99 less the three agreement-only letters), truth drafted by Claude Opus 5.5 and Gemini 3.8 Flash and adjudicated by the owner where they differed (`ocr-truth.md`), corrected on 2026-10-29 (W46.truth-edits). Words the two drafters wrote alike were not adjudicated; since then the owner has checked samples of them blind: 59 places on 20 pages where Qwen3.6-27B differs (answered 2026-10-21, `ocr-truth-bias-score.md`: 4 truth errors, the bias not material) and every place where Qwen3.6-27B or LightOnOCR-3 4B differs on the 16 hand pages, with 19 typed controls (answered 2026-10-31, `ocr-hands-rescore.md`: 12 corrections, 10 places unresolved). Agreed words that no third-family reader disputes stay unchecked, so a drafter-family route can still gain where the truth shares its mistake. The figures here are rescored on that truth as it now stands.
+- **Selection.** All 99 settled originals for every route (96 in the accuracy table, the three agreement-only letters apart, p038 excluded by the owner), and 20 matched pages for the ladder; none chosen by a tested route or by ABBYY text. The routes are the local-sized models planned in W41, read hosted through OpenRouter, not on a Mac.
+- **Comparison.** The same JPEG images (quality 90, 2,400 px cap), prompt, temperature 0 and reasoning setting for every route, one pinned endpoint and precision each, Apple Vision included. One scorer; a failed reading scores empty.
+- **Noise.** n = 96 pages, one reading per route. The rerun floor on the 96 is `ocr-rerun-noise.md`'s: a gap under 0.49 NES points, or a paired interval across 0, is a tie. The tables carry no paired intervals, so close rows are not an order; the 20-page ladder and the attribute groups are descriptive.
+- **Scope.** Hosted precision, not Mac quantization or speed (`ocr-mac-local.md` measures that); the owner's 96, not the public 895. Memory figures are estimates, not tested fits.

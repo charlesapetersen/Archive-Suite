@@ -313,6 +313,19 @@ def report():
         L += ['', 'The memory guard\'s whole-process view of each collect run (date, exit, seconds, peak RSS MB, '
               'peak physical footprint MB, swap growth MB, worst pressure level):', '']
         L += [f"- {' · '.join(r[i] for i in (0, 2, 3, 4, 5, 6, 7))}" for r in g]
+    from ocr_card import card, TRUTH_96, NOISE_96
+    L += ['', *card(TRUTH_96 + ' The figures here are rescored on that truth as it now stands.',
+                    'All 96 accuracy pages (the three agreement-only letters excluded, as on the panel), one reading '
+                    'each; none chosen by a route\'s reading or by ABBYY text.',
+                    'The 4-bit MLX model on the Mac against the hosted panel\'s bf16 `qwen3-vl-8b` row: the same 2,400 px '
+                    'JPEG inputs, prompt, 8,192-token cap and temperature 0, one scorer, failed or cut-off readings '
+                    'empty on both sides. Speed and memory are one Apple M3 Pro with 18 GB, one page at a time, with '
+                    'the owner\'s usual apps open.',
+                    'n = 96 pages, paired on the same pages. Greedy local decoding is deterministic on one machine '
+                    '(`ocr-rerun-noise.md`); the hosted side is one reading. ' + NOISE_96 + ' Speed and memory are '
+                    'one run of each page, so they are typical figures, not a distribution.',
+                    'One model at one quantisation, on this Mac only; the owner\'s 96, not the public 895. The 102k-page '
+                    'day count is an extrapolation at one photograph a PDF.')]
     REPORT.write_text('\n'.join(L) + '\n')
     print(f'report: {len(done)} paired pages, penalty {100*mean:+.2f} NES points')
     report_hw()

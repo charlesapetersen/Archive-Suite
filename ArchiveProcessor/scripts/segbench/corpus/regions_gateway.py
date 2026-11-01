@@ -557,6 +557,21 @@ def report_md(out):
               '| arm | pages | strict | markup stripped | pages with markup |', '|---|---:|---:|---:|---:|']
         L += [f"| {arm[a]} | {r['n']} | {100 * r['strict']:.1f} | {100 * r['markup_stripped']:.1f} | {r['markup_pages']} |"
               for a, r in t.items()]
+    from ocr_card import card, TRUTH_96, NOISE_96
+    L += ['', *card(TRUTH_96 + ' The figures here are rescored on that truth as it now stands. The public pages are '
+                    'scored on their own published transcriptions as the bench corpus normalises them '
+                    '(`bench-corpus/README.md`), a truth no route drafted.',
+                    'All 96 owner accuracy pages for every arm; on the public set three pages a stratum in four '
+                    'strata, drawn by stable id hash. None is chosen by a route\'s reading or by ABBYY text.',
+                    'One model and setting (Gemini 3.7 Flash through the gateway, temperature 0, low reasoning, '
+                    '8,192 tokens, the panel prompt) on the same frozen 2,400 px images; the arms differ only in what '
+                    'is sent: the whole page, PP-DocLayoutV3 regions or overlapping tiles, each arm\'s crop '
+                    'readings joined into one page reading for the one scorer. A failed page or crop is empty.',
+                    'n = 96 pages; the Δ intervals are 95% paired page bootstraps against the whole page. '
+                    + NOISE_96 + ' That floor is Gemini 3.7 Flash\'s whole-page rerun spread; the crop arms were read '
+                    'once. The public rows are 3 pages a stratum, anecdote, not a set result.',
+                    'One model, one layout detector and one tile geometry; it does not rank region-first reading for '
+                    'other models. Prices are estimates at the stated rates, the gateway publishing none.')]
     return '\n'.join(L) + '\n'
 
 

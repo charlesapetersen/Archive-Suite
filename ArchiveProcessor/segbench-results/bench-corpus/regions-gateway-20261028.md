@@ -57,3 +57,12 @@ Three pages a stratum drawn by stable id hash (W46.ocr-regions-paid-pp read the 
 | whole page | 12 | 99.0 | 99.1 | 1 |
 | PP-DocLayoutV3 regions | 12 | 83.4 | 83.5 | 3 |
 | overlapping tiles | 12 | 97.7 | 97.9 | 1 |
+
+## Measurement card
+
+- **Truth.** The owner's 96 pages (99 less the three agreement-only letters), truth drafted by Claude Opus 5.5 and Gemini 3.8 Flash and adjudicated by the owner where they differed (`ocr-truth.md`), corrected on 2026-10-29 (W46.truth-edits). Words the two drafters wrote alike were not adjudicated; since then the owner has checked samples of them blind: 59 places on 20 pages where Qwen3.6-27B differs (answered 2026-10-21, `ocr-truth-bias-score.md`: 4 truth errors, the bias not material) and every place where Qwen3.6-27B or LightOnOCR-3 4B differs on the 16 hand pages, with 19 typed controls (answered 2026-10-31, `ocr-hands-rescore.md`: 12 corrections, 10 places unresolved). Agreed words that no third-family reader disputes stay unchecked, so a drafter-family route can still gain where the truth shares its mistake. The figures here are rescored on that truth as it now stands. The public pages are scored on their own published transcriptions as the bench corpus normalises them (`bench-corpus/README.md`), a truth no route drafted.
+- **Selection.** All 96 owner accuracy pages for every arm; on the public set three pages a stratum in four strata, drawn by stable id hash. None is chosen by a route's reading or by ABBYY text.
+- **Comparison.** One model and setting (Gemini 3.7 Flash through the gateway, temperature 0, low reasoning, 8,192 tokens, the panel prompt) on the same frozen 2,400 px images; the arms differ only in what is sent: the whole page, PP-DocLayoutV3 regions or overlapping tiles, each arm's crop readings joined into one page reading for the one scorer. A failed page or crop is empty.
+- **Noise.** n = 96 pages; the Δ intervals are 95% paired page bootstraps against the whole page. The rerun floor on the 96 is `ocr-rerun-noise.md`'s: a gap under 0.49 NES points, or a paired interval across 0, is a tie. That floor is Gemini 3.7 Flash's whole-page rerun spread; the crop arms were read once. The public rows are 3 pages a stratum, anecdote, not a set result.
+- **Scope.** One model, one layout detector and one tile geometry; it does not rank region-first reading for other models. Prices are estimates at the stated rates, the gateway publishing none.
+

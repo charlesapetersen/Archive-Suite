@@ -79,6 +79,14 @@ class Fold(unittest.TestCase):
         self.assertTrue(rr['c00']['truth_stands'])
         self.assertEqual(r['counts'], {'hand': {'truth wrong': 2, 'open': 1}, 'control': {'truth stands': 1}})
 
+    def test_either_is_unresolved_not_a_ruling_for_either_side(self):
+        key = {'pages': {'p1': {'items': {
+            'h00': {'kind': 'hand', 'options': [['truth'], ['q']], 'readings': {'truth': 'cat', 'q': 'cot'}}}}}}
+        r = H.fold(key, {'p1': {'h00': 'either'}})
+        x = r['rulings']['p1']['h00']
+        self.assertEqual((x['ruling'], x['unresolved'], x['truth_stands']), ('either', True, None))
+        self.assertEqual(r['counts']['hand'], {'either': 1})
+
 
 if __name__ == '__main__':
     unittest.main()

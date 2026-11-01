@@ -5,6 +5,7 @@ from pathlib import Path
 import ocr_cloud_full as F
 import ocr_panel as P
 from ocr_panel_score import score, aggregate, group_values, write_csv
+from ocr_card import card, TRUTH_96, NOISE_96
 
 MISTRAL = 'mistral-ocr-4-1'
 LOCAL_SCORES = F.C.LOCAL / 'scores.json'
@@ -121,8 +122,10 @@ def report():
     near = min((k for k in per if nes[k] >= nes[best_paid] - 1.5), key=per.get)
     open_w = max((k for k in per if k.startswith('qwen')), key=nes.get)
     findings = ['## Findings', '',
-                f'- Highest on the 96 accuracy pages: **{order[0]}** ({nes[order[0]]:.2f} NES'
-                + (', subscription route' if is_sub(order[0]) else '') + ').',
+                f'- Highest of this panel\'s routes on the 96 accuracy pages: **{order[0]}** ({nes[order[0]]:.2f} NES'
+                + (', subscription route' if is_sub(order[0]) else '') + '). The panel is the routes run in '
+                'October 2026; routes measured since are on the bench page, so this is not a ranking of every '
+                'current route.',
                 f'- Best paid route: **{best_paid}**, {nes[best_paid]:.2f} NES at ${per[best_paid]:.5f} a page. '
                 f'Cheapest paid route within 1.5 points of it: **{near}**, {nes[near]:.2f} at ${per[near]:.5f}.',
                 f'- Best open-weight route (the FarmShare-scale ceiling): **{open_w}**, {nes[open_w]:.2f} NES at '
@@ -185,5 +188,17 @@ def report():
           '`~/Library/Caches/ArchiveSuiteRehearsal/ocr-panel-cloud/` (images, ledger, replies, page scores). '
           'The pilot’s spending controls hold: write-ahead reservations, pinned providers, no paid retries, the '
           'OCR reserve held apart, an uncertain outcome blocks continuation.', '']
+    L += card(TRUTH_96 + ' The figures here are rescored on that truth as it now stands.',
+              'All 96 accuracy pages for every route, none chosen by a tested route or by ABBYY text; the routes are '
+              'the panel planned in W41 (the subscription and paid hosted routes of October 2026), not a sample of '
+              'current models.',
+              'Every route reads the same JPEG images (2,400 px cap) with the panel prompt, except Mistral OCR, which '
+              'takes the app\'s own 2,048 px encoding and no prompt, and Claude Sonnet 5.5 through `claude -p`, whose '
+              'harness may resize the image and retried an empty answer once (the OpenRouter routes had no retry). '
+              'One scorer; a failed reading scores empty, so a route\'s failures lower its mean.',
+              'n = 96 pages, one reading per route. ' + NOISE_96 + ' The rows above carry no paired intervals, so '
+              'gaps of a point or two are not an order; per-attribute groups are descriptive.',
+              'The owner\'s 96, not the public 895, and only this panel\'s routes. Prices are the full run\'s '
+              'measured OpenRouter charges of October 2026. The truth leans toward its drafters\' families.')
     (P.RESULTS / 'ocr-panel-cloud.md').write_text('\n'.join(L))
     print(f'report: {len(ss)} route-page pairs; item ${P.spent() + ocr_cost:.6f}')
