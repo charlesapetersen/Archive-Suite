@@ -208,6 +208,13 @@ record:
   7's panel shows the item's own routes (the comparators in the file are already on the page; `build.py` stops if their
   L1-L3 figures part from the open sweep's), their paired differences, and every fine-tune row. Owner-hand rows are
   agreement with the drafters: that truth was drafted by models and only its hand places were owner-checked.
+- `kind-atrium.json` / `.md` (`scripts/segbench/kind_atrium.py report`, W46.kind-mixed-support): part 5's
+  mixed-signal panel. Point recall/precision cover 1,881 of the 2,000 bulk pages; the full-call sensitivity
+  includes all calls in the 105 agreed-handwritten and 14 unsettled pages, with assumptions explicit. Finite
+  completion bounds keep all 170 owner answers, fixed pattern quotas and the 39-page census intact; these are
+  partial-identification bounds, not confidence intervals. The 25 singleton patterns include six one-page
+  censuses and 19 with unjudged pages. The separate mixed-share estimate remains unchanged. ATRIUM TEXT is a
+  candidate signal; the shipped hand/form classifier stays preferred.
 - `options.md`: the segmentation approaches on the test boxes (manual, Claude, Gemini, ChatGPT, Claude and
   ChatGPT together), each at the flag level frozen on the development boxes, with their API cost.
 - `cheap-models.md`: the three cheap segmentation finalists (GLM-5.3 Flash, GPT-5.6 Luna, Qwen3.5 Flash) at the

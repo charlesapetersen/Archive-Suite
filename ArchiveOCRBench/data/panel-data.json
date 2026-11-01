@@ -19098,6 +19098,886 @@
   ],
   "oracle_nes": 97.26
  },
+ "kind_atrium": {
+  "run": {
+   "device": "mps",
+   "prep": "imagenet-384",
+   "revision": "543216d6b7e12552b164372e9124ceb168b06b98",
+   "load_s": 1.8,
+   "torch": "2.15.0",
+   "k144": {
+    "pages": 144,
+    "seconds": 10.9,
+    "s_page": 0.0758,
+    "model_s_page_median": 0.0318,
+    "decode_s_page": 0.03
+   },
+   "peak_rss_gb": 1.48,
+   "mps_driver_gb": 4.8,
+   "public": {
+    "pages": 895,
+    "seconds": 98.8,
+    "s_page": 0.1103,
+    "model_s_page_median": 0.0318,
+    "decode_s_page": 0.077
+   },
+   "bulk": {
+    "pages": 2000,
+    "seconds": 126.4,
+    "s_page": 0.0632,
+    "model_s_page_median": 0.0317,
+    "decode_s_page": 0.0315
+   },
+   "public_signals_s": 538.3
+  },
+  "k144_hand": [
+   {
+    "method": "ATRIUM zero-shot, its top class",
+    "right": 89,
+    "n": 141,
+    "mixed": 29,
+    "none": 11,
+    "handwritten": "28/34",
+    "typewritten": "41/72",
+    "printed": "20/35"
+   },
+   {
+    "method": "ATRIUM zero-shot, hand-only (top of its six text classes)",
+    "right": 121,
+    "n": 141,
+    "mixed": 0,
+    "none": 0,
+    "handwritten": "34/34",
+    "typewritten": "56/72",
+    "printed": "31/35"
+   },
+   {
+    "method": "Shipped classifier: Vision signals + feature print, LR (leave-one-folder-out)",
+    "right": 137,
+    "n": 141,
+    "mixed": 0,
+    "none": 0,
+    "handwritten": "33/34",
+    "typewritten": "70/72",
+    "printed": "34/35"
+   },
+   {
+    "method": "ATRIUM embedding + LR head (leave-one-folder-out)",
+    "right": 128,
+    "n": 141,
+    "mixed": 0,
+    "none": 0,
+    "handwritten": "34/34",
+    "typewritten": "66/72",
+    "printed": "28/35"
+   },
+   {
+    "method": "Both feature sets + LR head (leave-one-folder-out)",
+    "right": 134,
+    "n": 141,
+    "mixed": 0,
+    "none": 0,
+    "handwritten": "34/34",
+    "typewritten": "68/72",
+    "printed": "32/35"
+   }
+  ],
+  "k144_paired": {
+   "hand_only_vs_ours": [
+    3,
+    19,
+    0.0009
+   ],
+   "head_vs_ours": [
+    3,
+    12,
+    0.0352
+   ]
+  },
+  "k144_forms": [
+   {
+    "method": "ATRIUM zero-shot, top class LINE_*",
+    "right": 129,
+    "found": 13,
+    "forms": 14,
+    "false": 14
+   },
+   {
+    "method": "ATRIUM zero-shot, hand-only top class LINE_*",
+    "right": 120,
+    "found": 14,
+    "forms": 14,
+    "false": 24
+   },
+   {
+    "method": "Shipped classifier, LR (leave-one-folder-out)",
+    "right": 141,
+    "found": 13,
+    "forms": 14,
+    "false": 2
+   },
+   {
+    "method": "ATRIUM embedding + LR head (leave-one-folder-out)",
+    "right": 136,
+    "found": 10,
+    "forms": 14,
+    "false": 4
+   }
+  ],
+  "routing_96": [
+   {
+    "classifier": "Labels for hand and form",
+    "hand_right": 96,
+    "as_labelled": 96,
+    "n": 96,
+    "mean_nes": 97.23,
+    "lost": 0.0,
+    "lost_ci": [
+     0.0,
+     0.0
+    ]
+   },
+   {
+    "classifier": "Shipped classifier (hand and form LR, leave-one-folder-out)",
+    "hand_right": 91,
+    "as_labelled": 92,
+    "n": 96,
+    "mean_nes": 96.23,
+    "lost": 1.0,
+    "lost_ci": [
+     -0.02,
+     3.04
+    ]
+   },
+   {
+    "classifier": "ATRIUM zero-shot hand-only, LINE_* for form",
+    "hand_right": 79,
+    "as_labelled": 77,
+    "n": 96,
+    "mean_nes": 96.05,
+    "lost": 1.18,
+    "lost_ci": [
+     0.03,
+     3.32
+    ]
+   },
+   {
+    "classifier": "ATRIUM zero-shot top class (mixed or no hand to the handwritten pick)",
+    "hand_right": 55,
+    "as_labelled": 75,
+    "n": 96,
+    "mean_nes": 94.28,
+    "lost": 2.95,
+    "lost_ci": [
+     0.13,
+     6.61
+    ]
+   },
+   {
+    "classifier": "ATRIUM embedding heads (leave-one-folder-out)",
+    "hand_right": 85,
+    "as_labelled": 86,
+    "n": 96,
+    "mean_nes": 96.15,
+    "lost": 1.08,
+    "lost_ci": [
+     0.01,
+     3.17
+    ]
+   }
+  ],
+  "public_hand": [
+   {
+    "method": "ATRIUM zero-shot, its top class",
+    "right": 494,
+    "n": 895,
+    "handwritten": 447,
+    "typewritten": 34,
+    "printed": 13,
+    "mixed": 201,
+    "none": 130
+   },
+   {
+    "method": "ATRIUM zero-shot, hand-only",
+    "right": 638,
+    "n": 895,
+    "handwritten": 509,
+    "typewritten": 72,
+    "printed": 57,
+    "mixed": 0,
+    "none": 0
+   },
+   {
+    "method": "ATRIUM embedding + LR head fitted on the 141",
+    "right": 625,
+    "n": 895,
+    "handwritten": 478,
+    "typewritten": 77,
+    "printed": 70,
+    "mixed": 0,
+    "none": 0
+   },
+   {
+    "method": "Shipped classifier (bundled weights)",
+    "right": 723,
+    "n": 895,
+    "handwritten": 530,
+    "typewritten": 68,
+    "printed": 125,
+    "mixed": 0,
+    "none": 0
+   }
+  ],
+  "public_strata": {
+   "L1": {
+    "ATRIUM zero-shot, its top class": 75,
+    "ATRIUM zero-shot, hand-only": 78,
+    "ATRIUM embedding + LR head fitted on the 141": 78,
+    "Shipped classifier (bundled weights)": 79,
+    "n": 80
+   },
+   "L2": {
+    "ATRIUM zero-shot, its top class": 77,
+    "ATRIUM zero-shot, hand-only": 80,
+    "ATRIUM embedding + LR head fitted on the 141": 80,
+    "Shipped classifier (bundled weights)": 80,
+    "n": 80
+   },
+   "L3": {
+    "ATRIUM zero-shot, its top class": 34,
+    "ATRIUM zero-shot, hand-only": 72,
+    "ATRIUM embedding + LR head fitted on the 141": 77,
+    "Shipped classifier (bundled weights)": 68,
+    "n": 80
+   },
+   "L4": {
+    "ATRIUM zero-shot, its top class": 80,
+    "ATRIUM zero-shot, hand-only": 80,
+    "ATRIUM embedding + LR head fitted on the 141": 80,
+    "Shipped classifier (bundled weights)": 80,
+    "n": 80
+   },
+   "L5": {
+    "ATRIUM zero-shot, its top class": 13,
+    "ATRIUM zero-shot, hand-only": 24,
+    "ATRIUM embedding + LR head fitted on the 141": 22,
+    "Shipped classifier (bundled weights)": 21,
+    "n": 80
+   },
+   "L6": {
+    "ATRIUM zero-shot, its top class": 80,
+    "ATRIUM zero-shot, hand-only": 80,
+    "ATRIUM embedding + LR head fitted on the 141": 80,
+    "Shipped classifier (bundled weights)": 80,
+    "n": 80
+   },
+   "L7": {
+    "ATRIUM zero-shot, its top class": 0,
+    "ATRIUM zero-shot, hand-only": 35,
+    "ATRIUM embedding + LR head fitted on the 141": 7,
+    "Shipped classifier (bundled weights)": 63,
+    "n": 80
+   },
+   "L8": {
+    "ATRIUM zero-shot, its top class": 3,
+    "ATRIUM zero-shot, hand-only": 22,
+    "ATRIUM embedding + LR head fitted on the 141": 21,
+    "Shipped classifier (bundled weights)": 59,
+    "n": 80
+   },
+   "L9": {
+    "ATRIUM zero-shot, its top class": 5,
+    "ATRIUM zero-shot, hand-only": 14,
+    "ATRIUM embedding + LR head fitted on the 141": 15,
+    "Shipped classifier (bundled weights)": 15,
+    "n": 15
+   },
+   "N1": {
+    "ATRIUM zero-shot, its top class": 35,
+    "ATRIUM zero-shot, hand-only": 40,
+    "ATRIUM embedding + LR head fitted on the 141": 39,
+    "Shipped classifier (bundled weights)": 40,
+    "n": 40
+   },
+   "N2": {
+    "ATRIUM zero-shot, its top class": 40,
+    "ATRIUM zero-shot, hand-only": 40,
+    "ATRIUM embedding + LR head fitted on the 141": 40,
+    "Shipped classifier (bundled weights)": 40,
+    "n": 40
+   },
+   "N3": {
+    "ATRIUM zero-shot, its top class": 40,
+    "ATRIUM zero-shot, hand-only": 40,
+    "ATRIUM embedding + LR head fitted on the 141": 40,
+    "Shipped classifier (bundled weights)": 40,
+    "n": 40
+   },
+   "N4": {
+    "ATRIUM zero-shot, its top class": 7,
+    "ATRIUM zero-shot, hand-only": 12,
+    "ATRIUM embedding + LR head fitted on the 141": 12,
+    "Shipped classifier (bundled weights)": 7,
+    "n": 40
+   },
+   "N5": {
+    "ATRIUM zero-shot, its top class": 5,
+    "ATRIUM zero-shot, hand-only": 21,
+    "ATRIUM embedding + LR head fitted on the 141": 33,
+    "Shipped classifier (bundled weights)": 37,
+    "n": 40
+   },
+   "N6": {
+    "ATRIUM zero-shot, its top class": 0,
+    "ATRIUM zero-shot, hand-only": 0,
+    "ATRIUM embedding + LR head fitted on the 141": 1,
+    "Shipped classifier (bundled weights)": 14,
+    "n": 40
+   }
+  },
+  "public_forms": {
+   "found": 80,
+   "ledgers": 80,
+   "false": 126
+  },
+  "bulk_rerun_same_label": [
+   2000,
+   2000
+  ],
+  "bulk_mixed_design": {
+   "population": 2000,
+   "covered_pages": 1881,
+   "covered_by_stratum": {
+    "clean": 1212,
+    "disagree": 630,
+    "mixed": 39
+   },
+   "unsampled_by_stratum": {
+    "hand": 105,
+    "open": 14
+   },
+   "weighted_answers": 159,
+   "observed_answers": 170,
+   "top_up_answers": 11,
+   "groups": [
+    {
+     "stratum": "clean",
+     "pattern": "",
+     "population": 1212,
+     "checked": 20,
+     "census": false
+    },
+    {
+     "stratum": "disagree",
+     "pattern": "regression:C sorter:CM atrium:M qwen:C",
+     "population": 418,
+     "checked": 61,
+     "census": false
+    },
+    {
+     "stratum": "disagree",
+     "pattern": "regression:C sorter:HM qwen:H",
+     "population": 1,
+     "checked": 1,
+     "census": true
+    },
+    {
+     "stratum": "disagree",
+     "pattern": "regression:C sorter:CM atrium:M qwen:M",
+     "population": 74,
+     "checked": 10,
+     "census": false
+    },
+    {
+     "stratum": "disagree",
+     "pattern": "regression:C sorter:CM qwen:H",
+     "population": 4,
+     "checked": 1,
+     "census": false
+    },
+    {
+     "stratum": "mixed",
+     "pattern": "",
+     "population": 39,
+     "checked": 39,
+     "census": true
+    },
+    {
+     "stratum": "disagree",
+     "pattern": "regression:HM sorter:CM qwen:H",
+     "population": 6,
+     "checked": 1,
+     "census": false
+    },
+    {
+     "stratum": "disagree",
+     "pattern": "regression:C sorter:CM atrium:C qwen:M",
+     "population": 8,
+     "checked": 1,
+     "census": false
+    },
+    {
+     "stratum": "disagree",
+     "pattern": "regression:C sorter:HM atrium:H qwen:H",
+     "population": 3,
+     "checked": 1,
+     "census": false
+    },
+    {
+     "stratum": "disagree",
+     "pattern": "regression:C sorter:HM atrium:M qwen:C",
+     "population": 7,
+     "checked": 1,
+     "census": false
+    },
+    {
+     "stratum": "disagree",
+     "pattern": "regression:HM sorter:CM qwen:C",
+     "population": 5,
+     "checked": 1,
+     "census": false
+    },
+    {
+     "stratum": "disagree",
+     "pattern": "regression:HM sorter:CM atrium:C qwen:M",
+     "population": 3,
+     "checked": 1,
+     "census": false
+    },
+    {
+     "stratum": "disagree",
+     "pattern": "regression:HM sorter:CM atrium:H qwen:M",
+     "population": 11,
+     "checked": 1,
+     "census": false
+    },
+    {
+     "stratum": "disagree",
+     "pattern": "regression:HM sorter:CM atrium:H qwen:H",
+     "population": 15,
+     "checked": 2,
+     "census": false
+    },
+    {
+     "stratum": "disagree",
+     "pattern": "regression:C sorter:C atrium:M qwen:C",
+     "population": 5,
+     "checked": 1,
+     "census": false
+    },
+    {
+     "stratum": "disagree",
+     "pattern": "regression:HM sorter:CM atrium:M qwen:C",
+     "population": 12,
+     "checked": 1,
+     "census": false
+    },
+    {
+     "stratum": "disagree",
+     "pattern": "regression:C sorter:CM qwen:M",
+     "population": 9,
+     "checked": 1,
+     "census": false
+    },
+    {
+     "stratum": "disagree",
+     "pattern": "regression:C sorter:CM atrium:H qwen:H",
+     "population": 5,
+     "checked": 1,
+     "census": false
+    },
+    {
+     "stratum": "disagree",
+     "pattern": "regression:C sorter:HM qwen:C",
+     "population": 8,
+     "checked": 1,
+     "census": false
+    },
+    {
+     "stratum": "disagree",
+     "pattern": "regression:C sorter:HM atrium:C qwen:C",
+     "population": 15,
+     "checked": 2,
+     "census": false
+    },
+    {
+     "stratum": "disagree",
+     "pattern": "regression:HM sorter:CM atrium:M qwen:H",
+     "population": 2,
+     "checked": 1,
+     "census": false
+    },
+    {
+     "stratum": "disagree",
+     "pattern": "regression:HM sorter:HM atrium:H qwen:M",
+     "population": 3,
+     "checked": 1,
+     "census": false
+    },
+    {
+     "stratum": "disagree",
+     "pattern": "regression:C sorter:CM atrium:H qwen:C",
+     "population": 2,
+     "checked": 1,
+     "census": false
+    },
+    {
+     "stratum": "disagree",
+     "pattern": "regression:C sorter:HM atrium:M qwen:M",
+     "population": 1,
+     "checked": 1,
+     "census": true
+    },
+    {
+     "stratum": "disagree",
+     "pattern": "regression:HM sorter:HM atrium:M qwen:H",
+     "population": 1,
+     "checked": 1,
+     "census": true
+    },
+    {
+     "stratum": "disagree",
+     "pattern": "regression:HM sorter:C qwen:H",
+     "population": 1,
+     "checked": 1,
+     "census": true
+    },
+    {
+     "stratum": "disagree",
+     "pattern": "regression:C sorter:CM atrium:M",
+     "population": 3,
+     "checked": 1,
+     "census": false
+    },
+    {
+     "stratum": "disagree",
+     "pattern": "regression:HM sorter:HM qwen:C",
+     "population": 1,
+     "checked": 1,
+     "census": true
+    },
+    {
+     "stratum": "disagree",
+     "pattern": "regression:C sorter:HM atrium:M qwen:H",
+     "population": 1,
+     "checked": 1,
+     "census": true
+    },
+    {
+     "stratum": "disagree",
+     "pattern": "regression:HM sorter:CM atrium:C qwen:C",
+     "population": 3,
+     "checked": 1,
+     "census": false
+    },
+    {
+     "stratum": "disagree",
+     "pattern": "regression:C sorter:CM atrium:H qwen:M",
+     "population": 3,
+     "checked": 1,
+     "census": false
+    }
+   ],
+   "singleton_patterns_total": 25,
+   "singleton_patterns": 19,
+   "uncertainty": "finite-population completion bounds, not confidence intervals; no design-based variance estimate from noncensus singleton patterns"
+  },
+  "bulk_mixed": [
+   {
+    "label": "ATRIUM TEXT (its top class)",
+    "sheet": {
+     "found": 103,
+     "false": 26,
+     "mixed": 121,
+     "n": 170
+    },
+    "covered": {
+     "pages": 1881,
+     "calls": 563,
+     "tp": 393.09836065573774,
+     "fp": 169.9016393442623,
+     "fn": 257.8,
+     "tn": 1060.2,
+     "recall": 0.6039320182950172,
+     "precision": 0.6982208892641878
+    },
+    "full": {
+     "calls": 563,
+     "unsampled_calls": {
+      "hand": 0,
+      "open": 0
+     },
+     "point_completion": {
+      "hand_not_mixed": {
+       "precision": [
+        0.6982208892641878,
+        0.6982208892641878
+       ],
+       "recall": [
+        0.5912157164413149,
+        0.6039320182950172
+       ],
+       "recall_undefined_possible": false
+      },
+      "unrestricted": {
+       "precision": [
+        0.6982208892641878,
+        0.6982208892641878
+       ],
+       "recall": [
+        0.5105847482529097,
+        0.6039320182950172
+       ],
+       "recall_undefined_possible": false
+      }
+     },
+     "finite_completion": {
+      "hand_not_mixed": {
+       "precision": [
+        0.18294849023090587,
+        0.9538188277087034
+       ],
+       "recall": [
+        0.07294617563739376,
+        0.9675675675675676
+       ],
+       "recall_undefined_possible": false
+      },
+      "unrestricted": {
+       "precision": [
+        0.18294849023090587,
+        0.9538188277087034
+       ],
+       "recall": [
+        0.06789716545814106,
+        0.9675675675675676
+       ],
+       "recall_undefined_possible": false
+      }
+     }
+    },
+    "auc": 0.742
+   },
+   {
+    "label": "Qwen3.6-27B mixed (saved bulk label)",
+    "sheet": {
+     "found": 66,
+     "false": 1,
+     "mixed": 121,
+     "n": 170
+    },
+    "covered": {
+     "pages": 1881,
+     "calls": 151,
+     "tp": 150.0,
+     "fp": 1.0,
+     "fn": 500.8983606557377,
+     "tn": 1229.1016393442624,
+     "recall": 0.23045072636054081,
+     "precision": 0.9933774834437086
+    },
+    "full": {
+     "calls": 165,
+     "unsampled_calls": {
+      "hand": 0,
+      "open": 14
+     },
+     "point_completion": {
+      "hand_not_mixed": {
+       "precision": [
+        0.9090909090909091,
+        0.9939393939393939
+       ],
+       "recall": [
+        0.23045072636054081,
+        0.24665424026351868
+       ],
+       "recall_undefined_possible": false
+      },
+      "unrestricted": {
+       "precision": [
+        0.9090909090909091,
+        0.9939393939393939
+       ],
+       "recall": [
+        0.19843937731241518,
+        0.24665424026351868
+       ],
+       "recall_undefined_possible": false
+      }
+     },
+     "finite_completion": {
+      "hand_not_mixed": {
+       "precision": [
+        0.4,
+        0.9939393939393939
+       ],
+       "recall": [
+        0.03775743707093822,
+        0.7488584474885844
+       ],
+       "recall_undefined_possible": false
+      },
+      "unrestricted": {
+       "precision": [
+        0.4,
+        0.9939393939393939
+       ],
+       "recall": [
+        0.035617916891527254,
+        0.7488584474885844
+       ],
+       "recall_undefined_possible": false
+      }
+     }
+    },
+    "auc": null
+   },
+   {
+    "label": "Shipped classifier handwritten",
+    "sheet": {
+     "found": 46,
+     "false": 6,
+     "mixed": 121,
+     "n": 170
+    },
+    "covered": {
+     "pages": 1881,
+     "calls": 102,
+     "tp": 81.0,
+     "fp": 21.0,
+     "fn": 569.8983606557377,
+     "tn": 1209.1016393442624,
+     "recall": 0.12444339223469202,
+     "precision": 0.7941176470588235
+    },
+    "full": {
+     "calls": 221,
+     "unsampled_calls": {
+      "hand": 105,
+      "open": 14
+     },
+     "point_completion": {
+      "hand_not_mixed": {
+       "precision": [
+        0.3665158371040724,
+        0.4298642533936652
+       ],
+       "recall": [
+        0.12444339223469202,
+        0.14287898064045287
+       ],
+       "recall_undefined_possible": false
+      },
+      "unrestricted": {
+       "precision": [
+        0.3665158371040724,
+        0.9049773755656109
+       ],
+       "recall": [
+        0.12444339223469202,
+        0.25977454975960207
+       ],
+       "recall_undefined_possible": false
+      }
+     },
+     "finite_completion": {
+      "hand_not_mixed": {
+       "precision": [
+        0.2081447963800905,
+        0.497737556561086
+       ],
+       "recall": [
+        0.025813692480359147,
+        0.5945945945945946
+       ],
+       "recall_undefined_possible": false
+      },
+      "unrestricted": {
+       "precision": [
+        0.2081447963800905,
+        0.9728506787330317
+       ],
+       "recall": [
+        0.025813692480359147,
+        0.7413793103448276
+       ],
+       "recall_undefined_possible": false
+      }
+     }
+    },
+    "auc": null
+   }
+  ],
+  "bulk_text_by_hand": {
+   "none": [
+    24,
+    46
+   ],
+   "signature": [
+    20,
+    22
+   ],
+   "few": [
+    62,
+    73
+   ],
+   "passage": [
+    13,
+    15
+   ],
+   "long": [
+    8,
+    11
+   ],
+   "handpage": [
+    2,
+    3
+   ]
+  },
+  "bulk_agreement": {
+   "typewritten|typewritten": 714,
+   "mixed|typewritten": 363,
+   "none|printed": 218,
+   "printed|printed": 148,
+   "handwritten|handwritten": 126,
+   "mixed|printed": 146,
+   "mixed|handwritten": 54,
+   "printed|typewritten": 125,
+   "none|handwritten": 35,
+   "handwritten|printed": 11,
+   "typewritten|handwritten": 6,
+   "none|typewritten": 25,
+   "typewritten|printed": 27,
+   "handwritten|typewritten": 2
+  },
+  "confidence": [
+   {
+    "from": 0,
+    "to": 0.5,
+    "n": 56,
+    "right": 21
+   },
+   {
+    "from": 0.5,
+    "to": 0.8,
+    "n": 155,
+    "right": 74
+   },
+   {
+    "from": 0.8,
+    "to": 0.95,
+    "n": 130,
+    "right": 72
+   },
+   {
+    "from": 0.95,
+    "to": 1,
+    "n": 695,
+    "right": 592
+   }
+  ]
+ },
  "dating": {
   "model": "gemini-3.8-flash",
   "documents": 300,

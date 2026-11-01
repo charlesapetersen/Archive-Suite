@@ -266,6 +266,19 @@ footer p { font-size: 13px; }
     <div class="tbl"><table><thead><tr><th>Step</th><th>Seconds a page</th><th>Peak memory</th></tr></thead><tbody id="kind-clf-speed"></tbody></table></div>
   </section>
 
+  <section class="panel" id="kind-mixed" hidden>
+    <div class="head"><h2>Mixed-page signals: what the checked frame supports</h2><span class="meta">W46.kind-atrium · W46.kind-mixed-support · offline</span></div>
+    <p class="note" id="kind-mixed-note"></p>
+    <div class="tbl"><table><thead><tr><th>Label</th><th>Covered recall</th><th>Covered precision</th><th>All calls</th><th>Omitted calls, hand / unsettled</th></tr></thead><tbody id="kind-mixed-covered"></tbody></table></div>
+    <p class="note">Full-call point-completion sensitivity below holds covered weighted estimates fixed. “Hand not mixed” assumes agreed-handwritten pages are not mixed and allows any unsettled truth; “unrestricted” allows both unchecked strata any truth. These ranges exclude sampling uncertainty. The independent 33.02% mixed-share estimate stays in its own report and is not a filter denominator.</p>
+    <div class="tbl"><table><thead><tr><th>Label</th><th>Precision, hand not mixed</th><th>Recall, hand not mixed</th><th>Precision, unrestricted</th><th>Recall, unrestricted</th></tr></thead><tbody id="kind-mixed-point"></tbody></table></div>
+    <details><summary>Uncertainty over every unjudged page: finite-population completion bounds</summary>
+      <p class="note">These bounds allow every unjudged truth to vary, keeping all owner answers, the 39-page census and the top-ups fixed. They include singleton-pattern uncertainty and are partial-identification bounds, not 95% confidence intervals. Recall ranges over completions with mixed pages; zero calls or no possible mixed pages is undefined.</p>
+      <div class="tbl"><table><thead><tr><th>Label</th><th>Precision, hand not mixed</th><th>Recall, hand not mixed</th><th>Precision, unrestricted</th><th>Recall, unrestricted</th></tr></thead><tbody id="kind-mixed-finite"></tbody></table></div>
+    </details>
+    <p class="note">Keep the shipped kind classifier for hand and forms. ATRIUM TEXT remains a candidate mixed signal; covered point estimates do not establish full-frame accuracy or a statistical recall lead. Truth is the owner's blind sheet under his any-handwriting-on-print cut; selection used four classifiers' disagreements, including ATRIUM's. Same saved inputs, no new truth or inference. Full measurement card: ArchiveProcessor/segbench-results/kind-atrium.md.</p>
+  </section>
+
   <section class="panel" id="ocr-regions" hidden>
     <div class="head"><h2>Read the page whole, in regions or in tiles</h2><span class="meta">255 public pages + the 96 · W46.ocr-regions</span></div>
     <p class="note">Regions rescue GLM-OCR and PaddleOCR on newspaper scans; they usually lose on the other material. DocLayout-YOLO drops many hands and forms as figures. Whole-page reading remains the general choice. These are the same frozen images: 4,096 tokens per crop versus 8,192 per whole page. A capped crop gives no text; other crops may still give a partial page. Empty detection scores zero. Annotation groups overlap; the charts above use the exact panel kinds.</p>
@@ -815,6 +828,21 @@ if (KC) {
   document.getElementById('kind-clf-route').innerHTML = '<tr><td>True kinds</td><td>—</td><td>' + f2(KC.oracle_nes) + '</td><td>—</td></tr>' + KC.routing.map(r => '<tr><td>' + r.classifier + '</td><td>' + r.as_labelled + ' of ' + r.n + '</td><td>' + f2(r.mean_nes) + '</td><td>' + (r.lost >= 0 ? '−' : '+') + Math.abs(r.lost).toFixed(2) + '</td></tr>').join('');
   document.getElementById('kind-clf-speed').innerHTML = KC.speed.map(s => '<tr><td>' + s.step + '</td><td>' + s.s_page.toFixed(2) + '</td><td>' + (s.peak_gb ? s.peak_gb.toFixed(1) + ' GB' : 'OS model') + '</td></tr>').join('');
 } else document.getElementById('kind-clf').hidden = true;
+const KA = DATA.kind_atrium;
+if (KA && KA.bulk_mixed_design) {
+  document.getElementById('kind-mixed').hidden = false;
+  const d = KA.bulk_mixed_design;
+  const pct = x => x === null ? 'undefined' : (100*x).toFixed(2) + '%';
+  const range = b => b.map(pct).join('–');
+  document.getElementById('kind-mixed-note').textContent = 'Owner truth on ' + d.observed_answers + ' enriched sheet pages. Point estimates cover ' + d.covered_pages + ' of ' + d.population + ' pages, weighted within fixed disagreement patterns and clean controls; all-mixed is a census. The ' + d.top_up_answers + ' top-ups have no design weight. No mixed-filter confidence interval: ' + d.singleton_patterns + ' noncensus patterns have one checked page, so within-pattern variance is unavailable.';
+  document.getElementById('kind-mixed-covered').innerHTML = KA.bulk_mixed.map(r => '<tr><td>' + r.label + '</td><td>' + pct(r.covered.recall) + '</td><td>' + pct(r.covered.precision) + '</td><td>' + r.full.calls + '</td><td>' + (r.full.unsampled_calls.hand || 0) + ' / ' + (r.full.unsampled_calls.open || 0) + '</td></tr>').join('');
+  for (const [id, field] of [['kind-mixed-point', 'point_completion'], ['kind-mixed-finite', 'finite_completion']]) {
+    document.getElementById(id).innerHTML = KA.bulk_mixed.map(r => '<tr><td>' + r.label + '</td>' + ['hand_not_mixed', 'unrestricted'].map(a => {
+      const b = r.full[field][a];
+      return '<td>' + range(b.precision) + '</td><td>' + range(b.recall) + (b.recall_undefined_possible ? ' (zero-mixed completion also possible)' : '') + '</td>';
+    }).join('') + '</tr>').join('');
+  }
+}
 const SC = DATA.ocr_scorers;
 if (SC) {
   document.getElementById('ocr-scorers').hidden = false;

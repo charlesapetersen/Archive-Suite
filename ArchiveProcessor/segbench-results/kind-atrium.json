@@ -344,60 +344,469 @@
   2000,
   2000
  ],
+ "bulk_mixed_design": {
+  "population": 2000,
+  "covered_pages": 1881,
+  "covered_by_stratum": {
+   "clean": 1212,
+   "disagree": 630,
+   "mixed": 39
+  },
+  "unsampled_by_stratum": {
+   "hand": 105,
+   "open": 14
+  },
+  "weighted_answers": 159,
+  "observed_answers": 170,
+  "top_up_answers": 11,
+  "groups": [
+   {
+    "stratum": "clean",
+    "pattern": "",
+    "population": 1212,
+    "checked": 20,
+    "census": false
+   },
+   {
+    "stratum": "disagree",
+    "pattern": "regression:C sorter:CM atrium:M qwen:C",
+    "population": 418,
+    "checked": 61,
+    "census": false
+   },
+   {
+    "stratum": "disagree",
+    "pattern": "regression:C sorter:HM qwen:H",
+    "population": 1,
+    "checked": 1,
+    "census": true
+   },
+   {
+    "stratum": "disagree",
+    "pattern": "regression:C sorter:CM atrium:M qwen:M",
+    "population": 74,
+    "checked": 10,
+    "census": false
+   },
+   {
+    "stratum": "disagree",
+    "pattern": "regression:C sorter:CM qwen:H",
+    "population": 4,
+    "checked": 1,
+    "census": false
+   },
+   {
+    "stratum": "mixed",
+    "pattern": "",
+    "population": 39,
+    "checked": 39,
+    "census": true
+   },
+   {
+    "stratum": "disagree",
+    "pattern": "regression:HM sorter:CM qwen:H",
+    "population": 6,
+    "checked": 1,
+    "census": false
+   },
+   {
+    "stratum": "disagree",
+    "pattern": "regression:C sorter:CM atrium:C qwen:M",
+    "population": 8,
+    "checked": 1,
+    "census": false
+   },
+   {
+    "stratum": "disagree",
+    "pattern": "regression:C sorter:HM atrium:H qwen:H",
+    "population": 3,
+    "checked": 1,
+    "census": false
+   },
+   {
+    "stratum": "disagree",
+    "pattern": "regression:C sorter:HM atrium:M qwen:C",
+    "population": 7,
+    "checked": 1,
+    "census": false
+   },
+   {
+    "stratum": "disagree",
+    "pattern": "regression:HM sorter:CM qwen:C",
+    "population": 5,
+    "checked": 1,
+    "census": false
+   },
+   {
+    "stratum": "disagree",
+    "pattern": "regression:HM sorter:CM atrium:C qwen:M",
+    "population": 3,
+    "checked": 1,
+    "census": false
+   },
+   {
+    "stratum": "disagree",
+    "pattern": "regression:HM sorter:CM atrium:H qwen:M",
+    "population": 11,
+    "checked": 1,
+    "census": false
+   },
+   {
+    "stratum": "disagree",
+    "pattern": "regression:HM sorter:CM atrium:H qwen:H",
+    "population": 15,
+    "checked": 2,
+    "census": false
+   },
+   {
+    "stratum": "disagree",
+    "pattern": "regression:C sorter:C atrium:M qwen:C",
+    "population": 5,
+    "checked": 1,
+    "census": false
+   },
+   {
+    "stratum": "disagree",
+    "pattern": "regression:HM sorter:CM atrium:M qwen:C",
+    "population": 12,
+    "checked": 1,
+    "census": false
+   },
+   {
+    "stratum": "disagree",
+    "pattern": "regression:C sorter:CM qwen:M",
+    "population": 9,
+    "checked": 1,
+    "census": false
+   },
+   {
+    "stratum": "disagree",
+    "pattern": "regression:C sorter:CM atrium:H qwen:H",
+    "population": 5,
+    "checked": 1,
+    "census": false
+   },
+   {
+    "stratum": "disagree",
+    "pattern": "regression:C sorter:HM qwen:C",
+    "population": 8,
+    "checked": 1,
+    "census": false
+   },
+   {
+    "stratum": "disagree",
+    "pattern": "regression:C sorter:HM atrium:C qwen:C",
+    "population": 15,
+    "checked": 2,
+    "census": false
+   },
+   {
+    "stratum": "disagree",
+    "pattern": "regression:HM sorter:CM atrium:M qwen:H",
+    "population": 2,
+    "checked": 1,
+    "census": false
+   },
+   {
+    "stratum": "disagree",
+    "pattern": "regression:HM sorter:HM atrium:H qwen:M",
+    "population": 3,
+    "checked": 1,
+    "census": false
+   },
+   {
+    "stratum": "disagree",
+    "pattern": "regression:C sorter:CM atrium:H qwen:C",
+    "population": 2,
+    "checked": 1,
+    "census": false
+   },
+   {
+    "stratum": "disagree",
+    "pattern": "regression:C sorter:HM atrium:M qwen:M",
+    "population": 1,
+    "checked": 1,
+    "census": true
+   },
+   {
+    "stratum": "disagree",
+    "pattern": "regression:HM sorter:HM atrium:M qwen:H",
+    "population": 1,
+    "checked": 1,
+    "census": true
+   },
+   {
+    "stratum": "disagree",
+    "pattern": "regression:HM sorter:C qwen:H",
+    "population": 1,
+    "checked": 1,
+    "census": true
+   },
+   {
+    "stratum": "disagree",
+    "pattern": "regression:C sorter:CM atrium:M",
+    "population": 3,
+    "checked": 1,
+    "census": false
+   },
+   {
+    "stratum": "disagree",
+    "pattern": "regression:HM sorter:HM qwen:C",
+    "population": 1,
+    "checked": 1,
+    "census": true
+   },
+   {
+    "stratum": "disagree",
+    "pattern": "regression:C sorter:HM atrium:M qwen:H",
+    "population": 1,
+    "checked": 1,
+    "census": true
+   },
+   {
+    "stratum": "disagree",
+    "pattern": "regression:HM sorter:CM atrium:C qwen:C",
+    "population": 3,
+    "checked": 1,
+    "census": false
+   },
+   {
+    "stratum": "disagree",
+    "pattern": "regression:C sorter:CM atrium:H qwen:M",
+    "population": 3,
+    "checked": 1,
+    "census": false
+   }
+  ],
+  "singleton_patterns_total": 25,
+  "singleton_patterns": 19,
+  "uncertainty": "finite-population completion bounds, not confidence intervals; no design-based variance estimate from noncensus singleton patterns"
+ },
  "bulk_mixed": [
   {
    "label": "ATRIUM TEXT (its top class)",
-   "found": 103,
-   "false": 26,
-   "mixed": 121,
-   "n": 170,
-   "auc": 0.742,
-   "recall": 0.604,
-   "recall_ci": [
-    0.438,
-    0.82
-   ],
-   "precision": 0.698,
-   "precision_ci": [
-    0.597,
-    0.79
-   ]
+   "sheet": {
+    "found": 103,
+    "false": 26,
+    "mixed": 121,
+    "n": 170
+   },
+   "covered": {
+    "pages": 1881,
+    "calls": 563,
+    "tp": 393.09836065573774,
+    "fp": 169.9016393442623,
+    "fn": 257.8,
+    "tn": 1060.2,
+    "recall": 0.6039320182950172,
+    "precision": 0.6982208892641878
+   },
+   "full": {
+    "calls": 563,
+    "unsampled_calls": {
+     "hand": 0,
+     "open": 0
+    },
+    "point_completion": {
+     "hand_not_mixed": {
+      "precision": [
+       0.6982208892641878,
+       0.6982208892641878
+      ],
+      "recall": [
+       0.5912157164413149,
+       0.6039320182950172
+      ],
+      "recall_undefined_possible": false
+     },
+     "unrestricted": {
+      "precision": [
+       0.6982208892641878,
+       0.6982208892641878
+      ],
+      "recall": [
+       0.5105847482529097,
+       0.6039320182950172
+      ],
+      "recall_undefined_possible": false
+     }
+    },
+    "finite_completion": {
+     "hand_not_mixed": {
+      "precision": [
+       0.18294849023090587,
+       0.9538188277087034
+      ],
+      "recall": [
+       0.07294617563739376,
+       0.9675675675675676
+      ],
+      "recall_undefined_possible": false
+     },
+     "unrestricted": {
+      "precision": [
+       0.18294849023090587,
+       0.9538188277087034
+      ],
+      "recall": [
+       0.06789716545814106,
+       0.9675675675675676
+      ],
+      "recall_undefined_possible": false
+     }
+    }
+   },
+   "auc": 0.742
   },
   {
    "label": "Qwen3.6-27B mixed (saved bulk label)",
-   "found": 66,
-   "false": 1,
-   "mixed": 121,
-   "n": 170,
-   "auc": null,
-   "recall": 0.23,
-   "recall_ci": [
-    0.147,
-    0.351
-   ],
-   "precision": 0.993,
-   "precision_ci": [
-    0.978,
-    1.0
-   ]
+   "sheet": {
+    "found": 66,
+    "false": 1,
+    "mixed": 121,
+    "n": 170
+   },
+   "covered": {
+    "pages": 1881,
+    "calls": 151,
+    "tp": 150.0,
+    "fp": 1.0,
+    "fn": 500.8983606557377,
+    "tn": 1229.1016393442624,
+    "recall": 0.23045072636054081,
+    "precision": 0.9933774834437086
+   },
+   "full": {
+    "calls": 165,
+    "unsampled_calls": {
+     "hand": 0,
+     "open": 14
+    },
+    "point_completion": {
+     "hand_not_mixed": {
+      "precision": [
+       0.9090909090909091,
+       0.9939393939393939
+      ],
+      "recall": [
+       0.23045072636054081,
+       0.24665424026351868
+      ],
+      "recall_undefined_possible": false
+     },
+     "unrestricted": {
+      "precision": [
+       0.9090909090909091,
+       0.9939393939393939
+      ],
+      "recall": [
+       0.19843937731241518,
+       0.24665424026351868
+      ],
+      "recall_undefined_possible": false
+     }
+    },
+    "finite_completion": {
+     "hand_not_mixed": {
+      "precision": [
+       0.4,
+       0.9939393939393939
+      ],
+      "recall": [
+       0.03775743707093822,
+       0.7488584474885844
+      ],
+      "recall_undefined_possible": false
+     },
+     "unrestricted": {
+      "precision": [
+       0.4,
+       0.9939393939393939
+      ],
+      "recall": [
+       0.035617916891527254,
+       0.7488584474885844
+      ],
+      "recall_undefined_possible": false
+     }
+    }
+   },
+   "auc": null
   },
   {
    "label": "Shipped classifier handwritten",
-   "found": 46,
-   "false": 6,
-   "mixed": 121,
-   "n": 170,
-   "auc": null,
-   "recall": 0.124,
-   "recall_ci": [
-    0.075,
-    0.2
-   ],
-   "precision": 0.794,
-   "precision_ci": [
-    0.587,
-    0.974
-   ]
+   "sheet": {
+    "found": 46,
+    "false": 6,
+    "mixed": 121,
+    "n": 170
+   },
+   "covered": {
+    "pages": 1881,
+    "calls": 102,
+    "tp": 81.0,
+    "fp": 21.0,
+    "fn": 569.8983606557377,
+    "tn": 1209.1016393442624,
+    "recall": 0.12444339223469202,
+    "precision": 0.7941176470588235
+   },
+   "full": {
+    "calls": 221,
+    "unsampled_calls": {
+     "hand": 105,
+     "open": 14
+    },
+    "point_completion": {
+     "hand_not_mixed": {
+      "precision": [
+       0.3665158371040724,
+       0.4298642533936652
+      ],
+      "recall": [
+       0.12444339223469202,
+       0.14287898064045287
+      ],
+      "recall_undefined_possible": false
+     },
+     "unrestricted": {
+      "precision": [
+       0.3665158371040724,
+       0.9049773755656109
+      ],
+      "recall": [
+       0.12444339223469202,
+       0.25977454975960207
+      ],
+      "recall_undefined_possible": false
+     }
+    },
+    "finite_completion": {
+     "hand_not_mixed": {
+      "precision": [
+       0.2081447963800905,
+       0.497737556561086
+      ],
+      "recall": [
+       0.025813692480359147,
+       0.5945945945945946
+      ],
+      "recall_undefined_possible": false
+     },
+     "unrestricted": {
+      "precision": [
+       0.2081447963800905,
+       0.9728506787330317
+      ],
+      "recall": [
+       0.025813692480359147,
+       0.7413793103448276
+      ],
+      "recall_undefined_possible": false
+     }
+    }
+   },
+   "auc": null
   }
  ],
  "bulk_text_by_hand": {

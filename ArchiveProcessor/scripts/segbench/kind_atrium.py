@@ -231,6 +231,174 @@ def fit_all(X, y, k, lam=0.05):
 
 # ---- report ---------------------------------------------------------------------------------------------------------
 
+def completion_bounds(tp, mixed, calls, unknown_called, unknown_not_called):
+    """All completions of unknown binary truths, NOT a confidence interval.
+
+    Also used with weighted covered-frame totals held fixed, for point sensitivity only.
+    If no completion has mixed pages, recall is undefined (None); otherwise extrema
+    range over completions with a defined recall, flagging when undefined is also possible.
+    """
+    precision = [tp / calls, (tp + unknown_called) / calls] if calls else [None, None]
+    low_den, high_den = mixed + unknown_not_called, mixed + unknown_called
+    recall = [tp / low_den if low_den else (1.0 if unknown_called else None),
+              (tp + unknown_called) / high_den if high_den else (0.0 if unknown_not_called else None)]
+    return {'precision': precision, 'recall': recall, 'recall_undefined_possible': mixed == 0}
+
+
+def mixed_support(labels, key, truth, calls):
+    """Fixed-pattern N_h/n_h point estimates plus finite-frame identification bounds.
+
+    `truth` is the owner's threshold truth, never a classifier label. Top-ups have no
+    design weight but remain observed constraints on finite completions. Fail on lost
+    sheet answers, missing patterns/census members, or a changed saved sampling frame.
+    """
+    if not set(key['pages']) <= truth.keys() or not truth.keys() <= labels.keys():
+        raise ValueError('mixed support requires every sheet answer and only frame IDs')
+    for name, c in calls.items():
+        if set(c) != set(labels):
+            raise ValueError(f'{name}: calls must cover every frame ID')
+    groups = defaultdict(list)
+    sampled = defaultdict(list)
+    for p, row in labels.items():
+        if row['kind'] in ('clean', 'mixed', 'disagree'):
+            groups[(row['kind'], row['pattern'] if row['kind'] == 'disagree' else '')].append(p)
+    for p, row in key['pages'].items():
+        s = {'control': 'clean', 'mixed': 'mixed', 'disagree': 'disagree'}.get(row['stratum'])
+        if s:
+            g = (s, row['pattern'] if s == 'disagree' else '')
+            if p not in groups[g]:
+                raise ValueError('sheet stratum/pattern differs from saved frame')
+            sampled[g].append(p)
+    pattern_sizes = {pat: len(ps) for (s, pat), ps in groups.items() if s == 'disagree'}
+    if pattern_sizes != key['pattern_sizes']:
+        raise ValueError('disagreement pattern sizes differ from sheet frame')
+    w, design_groups = {}, []
+    for g, ps in groups.items():
+        checked = sampled[g]
+        if not checked or (g[0] == 'mixed' and set(checked) != set(ps)):
+            raise ValueError('missing sampled pattern/control or incomplete mixed census')
+        w.update({p: len(ps) / len(checked) for p in checked})
+        design_groups.append({'stratum': g[0], 'pattern': g[1], 'population': len(ps),
+                              'checked': len(checked), 'census': len(checked) == len(ps)})
+    covered = {p for ps in groups.values() for p in ps}
+    omitted = set(labels) - covered
+    design = {'population': len(labels), 'covered_pages': len(covered),
+              'covered_by_stratum': dict(sorted(Counter(labels[p]['kind'] for p in covered).items())),
+              'unsampled_by_stratum': dict(sorted(Counter(labels[p]['kind'] for p in omitted).items())),
+              'weighted_answers': len(w), 'observed_answers': len(truth),
+              'top_up_answers': sum(r['stratum'] == 'mixed-both' for r in key['pages'].values()),
+              'groups': design_groups,
+              'singleton_patterns_total': sum(g['stratum'] == 'disagree' and g['checked'] == 1
+                                              for g in design_groups),
+              'singleton_patterns': sum(g['stratum'] == 'disagree' and g['checked'] == 1 and not g['census']
+                                        for g in design_groups),
+              'uncertainty': 'finite-population completion bounds, not confidence intervals; '
+                             'no design-based variance estimate from noncensus singleton patterns'}
+    out = []
+    for name, call in calls.items():
+        # These saved label calls are constant within the design groups. Check this:
+        # a new call varying within a group needs a different estimator/calibration.
+        if any(len({call[p] for p in ps}) != 1 for ps in groups.values()):
+            raise ValueError(f'{name}: call varies within a fixed design group')
+        tp = sum(v for p, v in w.items() if call[p] and truth[p])
+        fp = sum(v for p, v in w.items() if call[p] and not truth[p])
+        fn = sum(v for p, v in w.items() if not call[p] and truth[p])
+        tn = sum(v for p, v in w.items() if not call[p] and not truth[p])
+        all_calls = sum(call.values())
+        covered_calls = sum(call[p] for p in covered)
+        if not math.isclose(tp + fp, covered_calls):
+            raise ValueError('weighted calls do not match covered-frame calls')
+        known_tp = sum(call[p] and truth[p] for p in truth)
+        known_mixed = sum(truth.values())
+        point, finite = {}, {}
+        for assumption in ('hand_not_mixed', 'unrestricted'):
+            # Assumptions constrain only unobserved truths; an owner answer always wins.
+            def possible(p):
+                return assumption == 'unrestricted' or labels[p]['kind'] != 'hand'
+            point_unknown = [p for p in omitted if p not in truth and possible(p)]
+            finite_unknown = [p for p in labels if p not in truth and possible(p)]
+            point[assumption] = completion_bounds(tp + sum(call[p] and truth[p] for p in omitted if p in truth),
+                tp + fn + sum(truth[p] for p in omitted if p in truth), all_calls,
+                sum(call[p] for p in point_unknown), sum(not call[p] for p in point_unknown))
+            finite[assumption] = completion_bounds(known_tp, known_mixed, all_calls,
+                sum(call[p] for p in finite_unknown), sum(not call[p] for p in finite_unknown))
+        out.append({'label': name,
+                    'sheet': {'found': known_tp, 'false': sum(call[p] and not truth[p] for p in truth),
+                              'mixed': known_mixed, 'n': len(truth)},
+                    'covered': {'pages': len(covered), 'calls': covered_calls, 'tp': tp, 'fp': fp, 'fn': fn, 'tn': tn,
+                                'recall': tp / (tp + fn) if tp + fn else None,
+                                'precision': tp / covered_calls if covered_calls else None},
+                    'full': {'calls': all_calls,
+                             'unsampled_calls': {s: sum(call[p] for p in omitted if labels[p]['kind'] == s)
+                                                 for s in design['unsampled_by_stratum']},
+                             'point_completion': point, 'finite_completion': finite}})
+    return design, out
+
+
+def mixed_support_md(design, rows):
+    def rate(x):
+        return 'undefined' if x is None else f'{100 * x:.2f}%'
+    def interval(v):
+        return '–'.join(rate(x) for x in v)
+    sizes = design['covered_by_stratum']
+    checked = Counter()
+    for g in design['groups']:
+        checked[g['stratum']] += g['checked']
+    L = ['## 5. Mixed pages: covered-frame estimates and full-call uncertainty\n',
+         f'The owner\'s cut (`mixed-def-score.md`) is any handwriting on a typed or printed page, a signature '
+         f'included. All {design["observed_answers"]} owner answers remain fixed. The on-sheet counts are '
+         'descriptive checks on an enriched draw, not population accuracy.\n',
+         f'The point estimates cover **{design["covered_pages"]} of {design["population"]} pages**: '
+         f'{sizes.get("clean", 0)} clean-stratum pages represented by {checked["clean"]} checked controls, '
+         f'{sizes.get("disagree", 0)} disagreements represented by {checked["disagree"]} checks across '
+         f'{sum(g["stratum"] == "disagree" for g in design["groups"])} fixed patterns, and '
+         f'{sizes.get("mixed", 0)} all-mixed pages. Each checked page gets N_h/n_h within its fixed '
+         'disagreement pattern or control stratum; the all-mixed stratum is a census (weight 1). '
+         f'The {design["top_up_answers"]} mixed-both top-ups have no population weight. '
+         f'Unsampled strata: {design["unsampled_by_stratum"]}. Covered recall divides weighted TP by '
+         'weighted mixed pages in this frame; covered precision divides weighted TP by covered calls.\n',
+         '| label | sheet found / mixed | sheet false / nonmixed | sheet AUC p(TEXT) | covered TP / FP | covered recall | covered precision |',
+         '|---|---:|---:|---:|---:|---:|---:|']
+    for r in rows:
+        s, c = r['sheet'], r['covered']
+        a = r.get('auc')
+        L.append(f'| {r["label"]} | {s["found"]}/{s["mixed"]} | {s["false"]}/{s["n"] - s["mixed"]} | '
+                 f'{"–" if a is None else f"{a:.2f}"} | {c["tp"]:.2f} / {c["fp"]:.2f} | '
+                 f'{rate(c["recall"])} | {rate(c["precision"])} |')
+    L += ['\n**Full-call point-completion sensitivity, not confidence intervals.** Hold the covered-frame '
+          'weighted TP (a) and mixed total (t) fixed. All calls D include unsampled calls. If u of the '
+          'remaining possible mixed pages are called and v are not, precision spans a/D to (a+u)/D and '
+          'recall a/(t+v) to (a+u)/(t+u). First assume agreed-handwritten pages are not mixed, as in the '
+          'independent share estimate, with unsettled truths arbitrary; then allow both unsampled strata '
+          'arbitrary truth. Neither range includes sampling uncertainty in the covered estimates.\n',
+          '| label | all calls | omitted calls: hand / open | full precision, hand not mixed | full recall, hand not mixed | full precision, unrestricted | full recall, unrestricted |',
+          '|---|---:|---:|---:|---:|---:|---:|']
+    for r in rows:
+        f = r['full']; h, u = (f['point_completion'][k] for k in ('hand_not_mixed', 'unrestricted'))
+        L.append(f'| {r["label"]} | {f["calls"]} | {f["unsampled_calls"].get("hand", 0)} / '
+                 f'{f["unsampled_calls"].get("open", 0)} | {interval(h["precision"])} | {interval(h["recall"])} | '
+                 f'{interval(u["precision"])} | {interval(u["recall"])} |')
+    L += ['\n**Finite-population completion bounds, including all unjudged pages.** These allow every '
+          'unjudged binary truth to vary, keep all observed answers (including the top-ups and census) fixed, '
+          'and use the same formulas with observed TP/mixed totals instead of weighted estimates. '
+          'They are exact partial-identification bounds conditional on the owner threshold truths, not '
+          '95% intervals or probability statements. They include uncertainty hidden by singleton patterns.\n',
+          '| label | precision, hand not mixed | recall, hand not mixed | precision, unrestricted | recall, unrestricted |',
+          '|---|---:|---:|---:|---:|']
+    for r in rows:
+        h, u = (r['full']['finite_completion'][k] for k in ('hand_not_mixed', 'unrestricted'))
+        L.append(f'| {r["label"]} | {interval(h["precision"])} | {interval(h["recall"])} | '
+                 f'{interval(u["precision"])} | {interval(u["recall"])} |')
+    L.append(f'\nNo mixed-filter confidence interval is reported: {design["singleton_patterns_total"]} disagreement '
+             f'patterns have one checked page; {design["singleton_patterns"]} of those are noncensus and cannot '
+             'supply within-pattern variance (the others contain just one population page). '
+             'Pooling patterns or resampling the census would misrepresent this draw. The broad finite bounds '
+             'are the available uncertainty statement without new truth or an imputation model. '
+             'Recall bounds range over completions with at least one mixed page; JSON flags when zero mixed '
+             'pages is also possible (undefined recall). Zero calls give undefined precision.\n')
+    return L
+
+
 def report():
     import numpy as np
     run_info = json.loads((CACHE / 'run.json').read_text())
@@ -267,7 +435,7 @@ def report():
             'Both feature sets + LR head (leave-one-folder-out)': heads['both']}
     J['k144_hand'] = []
     L.append('# ATRIUM\'s page classifier against our kind classifier (W46.kind-atrium)\n')
-    L.append(f'Measured {time.strftime("%Y-%m-%d")} with `scripts/segbench/kind_atrium.py` (header: how to rerun). '
+    L.append(f'Report regenerated from cached results {time.strftime("%Y-%m-%d")} with `scripts/segbench/kind_atrium.py` (header: how to rerun). '
              'ATRIUM is `ufal/vit-historical-page` main (v4.3, RegNetY-16GF, eleven classes, revision '
              f'`{MD.ATRIUM_REV[:12]}`), zero-shot, the whole page squeezed to 384 px with ImageNet normalisation '
              '(the reading W46.fix-marks-set chose on the 144). "Ours" is the Processor\'s page-kind classifier '
@@ -438,62 +606,14 @@ def report():
     calls = {'ATRIUM TEXT (its top class)': lambda p: CLASSES[int(BP[bix[p]].argmax())] == 'TEXT',
              'Qwen3.6-27B mixed (saved bulk label)': lambda p: blab[p]['qwen'] == 'mixed',
              'Shipped classifier handwritten': lambda p: blab[p]['regression'] == 'handwritten'}
-    # population weights: each sampled stratum's pages stand for its size in the 2,000; the disagreements by pattern
-    size = Counter(r['kind'] for r in blab.values())
-    psize = key['pattern_sizes']
-    w = {}
-    for s, k in (('disagree', 'disagree'), ('mixed', 'mixed'), ('control', 'clean')):
-        ps = [p for p in got if kp[p]['stratum'] == s]
-        if s == 'disagree':
-            per = Counter(kp[p]['pattern'] for p in ps)
-            raw = {p: psize.get(kp[p]['pattern'], 0) / per[kp[p]['pattern']] for p in ps}
-            tot = sum(raw.values())
-            w.update({p: v * size[k] / tot for p, v in raw.items()})
-        else:
-            w.update({p: size[k] / len(ps) for p in ps})
-    strat = defaultdict(list)
-    for p in w:
-        strat[kp[p]['stratum']].append(p)
-
-    def est(fn, pages):
-        tp = sum(w[p] for p in pages if fn(p) and truth_m[p])
-        fp_ = sum(w[p] for p in pages if fn(p) and not truth_m[p])
-        fn_ = sum(w[p] for p in pages if not fn(p) and truth_m[p])
-        return tp / (tp + fn_) if tp + fn_ else float('nan'), tp / (tp + fp_) if tp + fp_ else float('nan')
-    L.append('## 5. Mixed pages on the 2,000, against the owner\'s 170 answers\n')
-    L.append(f'The owner\'s cut (mixed-def-score.md): any handwriting on a typed or printed page, a signature '
-             f'included. Of the sheet\'s 170 pages, {len(got)} carry text and have an answer ({sum(truth_m.values())} '
-             'mixed under the cut). "On the sheet" counts those pages as drawn, which is not a random draw. '
-             '"Estimated in the 2,000" weights each answered page by the stratum it stands for (the disagreements '
-             'by pattern; the top-up of pages both mixed classes call mixed is left out, as in the share estimate; '
-             f'the {size["open"]} unsettled and {size["hand"]} agreed-handwritten pages are not sampled and add '
-             'nothing), with a stratified bootstrap interval (2,000 draws). Recall is of the owner\'s mixed pages, '
-             'precision of the label\'s mixed calls.\n')
-    L.append('| label | on the sheet: found | false | AUC of p(TEXT) | est. recall | est. precision |\n'
-             '|---|---:|---:|---:|---:|---:|')
-    J['bulk_mixed'] = []
-    rng = random.Random(SEED)
-    for name, fn in calls.items():
-        found = sum(fn(p) and truth_m[p] for p in got)
-        false = sum(fn(p) and not truth_m[p] for p in got)
-        rec, prec = est(fn, list(w))
-        bs = []
-        for _ in range(2000):
-            sample = [q for s, ps in strat.items() for q in (ps[rng.randrange(len(ps))] for _ in ps)]
-            bs.append(est(fn, sample))
-        def ci(j):
-            v = sorted(x[j] for x in bs if x[j] == x[j])
-            return v[int(.025 * len(v))], v[int(.975 * len(v)) - 1]
-        (rl, rh), (pl, ph) = ci(0), ci(1)
+    design, mixed_rows = mixed_support(blab, key, truth_m,
+        {name: {p: fn(p) for p in bids} for name, fn in calls.items()})
+    for r in mixed_rows:
         a = auc([float(BP[bix[p]][CLASSES.index('TEXT')]) for p in got], [truth_m[p] for p in got]) \
-            if name.startswith('ATRIUM') else float('nan')
-        L.append(f'| {name} | {found}/{sum(truth_m.values())} | {false}/{len(got) - sum(truth_m.values())} | '
-                 f'{"–" if a != a else f"{a:.2f}"} | {100 * rec:.0f}% ({100 * rl:.0f}–{100 * rh:.0f}) | '
-                 f'{100 * prec:.0f}% ({100 * pl:.0f}–{100 * ph:.0f}) |')
-        J['bulk_mixed'].append({'label': name, 'found': found, 'false': false, 'mixed': sum(truth_m.values()),
-                                'n': len(got), 'auc': None if a != a else round(a, 3), 'recall': round(rec, 3),
-                                'recall_ci': [round(rl, 3), round(rh, 3)], 'precision': round(prec, 3),
-                                'precision_ci': [round(pl, 3), round(ph, 3)]})
+            if r['label'].startswith('ATRIUM') else float('nan')
+        r['auc'] = None if a != a else round(a, 3)
+    J['bulk_mixed_design'], J['bulk_mixed'] = design, mixed_rows
+    L.extend(mixed_support_md(design, mixed_rows))
     hand_of_owner = Counter((a['hand'], CLASSES[int(BP[bix[p]].argmax())] == 'TEXT') for p, a in got.items())
     L.append('\nATRIUM\'s TEXT calls by how much handwriting the owner saw (called / pages): ' + ', '.join(
         f'{h} {hand_of_owner[(h, True)]}/{hand_of_owner[(h, True)] + hand_of_owner[(h, False)]}'
@@ -502,7 +622,9 @@ def report():
                               for h in ('none', *MD.ORDER, 'handpage')}
     share = sum(CLASSES[int(q.argmax())] == 'TEXT' for q in BP)
     L.append(f'ATRIUM says TEXT on {share} of the 2,000 ({100 * share / len(BP):.1f}%); the owner\'s cut puts the '
-             f'share near 33% (about 27–46%, KND-3). This rerun gives the same top class as W46.fix-marks-set\'s on '
+             'independent share estimate at 33.02% (`mixed-def-score.md`), assuming agreed-handwritten pages are not '
+             'mixed and unsettled pages take the disagreement rate. That estimate is unchanged; it is not a filter '
+             'denominator or confidence interval. This rerun gives the same top class as W46.fix-marks-set\'s on '
              f'{same_label} of {len(bids)} pages.\n')
     agree = Counter((hand_argmax(CLASSES[int(BP[i].argmax())]), blab[p]['regression']) for i, p in enumerate(bids))
     L.append('ATRIUM\'s hand against the shipped classifier\'s on the 2,000 (no truth; rows ATRIUM, columns ours):\n')
@@ -550,7 +672,7 @@ def report():
     at, qw = bm['ATRIUM TEXT (its top class)'], bm['Qwen3.6-27B mixed (saved bulk label)']
     V = ['## Verdict\n',
          '**Keep the shipped classifier for the hand and for forms; do not replace it with ATRIUM or combine the two. '
-         'ATRIUM\'s TEXT has the highest mixed-page recall of the three labels on the 2,000 and is worth keeping as a '
+         'ATRIUM\'s TEXT has the highest covered-frame mixed-recall point estimate of the three labels and is worth keeping as a '
          'candidate signal for the mixed flag (W46.mixed-route), not as the kind router.**\n',
          f'- On the 141 typed, printed and handwritten owner pages, ours is right on {h[next(k for k in h if k.startswith("Shipped"))]["right"]}, '
          f'ATRIUM forced to its six text classes on {h["ATRIUM zero-shot, hand-only (top of its six text classes)"]["right"]} '
@@ -567,11 +689,16 @@ def report():
          f'{ph["ATRIUM zero-shot, hand-only"]["right"]}' + (f' and ours on {ours_pub["right"]}' if ours_pub else '') +
          '. By stratum (§4) both fail L5 and N4; ATRIUM also misses most of L7\'s handwriting and L8\'s and N6\'s print, '
          'where ours holds better.',
-         f'- Mixed, under the owner\'s cut: ATRIUM\'s TEXT finds an estimated {100 * at["recall"]:.0f}% of mixed pages '
-         f'at {100 * at["precision"]:.0f}% precision; Qwen3.6-27B\'s mixed {100 * qw["recall"]:.0f}% at '
-         f'{100 * qw["precision"]:.0f}%. ATRIUM over-calls mixed on pages with no handwriting '
-         f'({J["bulk_text_by_hand"]["none"][0]} of {J["bulk_text_by_hand"]["none"][1]} on the sheet) and the two '
-         'Qwen\'s few calls are nearly all right but find under a quarter, so neither alone is a mixed filter.',
+         f'- Mixed, under the owner\'s cut: on the {design["covered_pages"]}-page covered frame, ATRIUM TEXT has '
+         f'{100 * at["covered"]["recall"]:.0f}% recall and {100 * at["covered"]["precision"]:.0f}% precision; '
+         f'Qwen has {100 * qw["covered"]["recall"]:.0f}% and {100 * qw["covered"]["precision"]:.0f}%. '
+         f'Qwen makes {qw["full"]["calls"]} full-frame calls, including '
+         f'{qw["full"]["unsampled_calls"].get("open", 0)} unjudged unsettled calls: '
+         f'its full-call precision point-completion range is '
+         f'{100 * qw["full"]["point_completion"]["hand_not_mixed"]["precision"][0]:.2f}–'
+         f'{100 * qw["full"]["point_completion"]["hand_not_mixed"]["precision"][1]:.2f}%, before sampling uncertainty. '
+         'The full-call sensitivities and finite bounds in §5 do not establish population accuracy or a statistical '
+         'recall lead. ATRIUM remains a candidate signal; neither label is established as a complete mixed filter.',
          f'- Speed is not the obstacle: {run_info["bulk"]["s_page"]:.2f} s a page on MPS, against about 0.6 s for ours. The '
          'obstacles are accuracy on the distinction the guide routes by, a 323 MB download and a non-commercial '
          'licence on the base weights.\n']
@@ -591,7 +718,9 @@ def report():
              'W46.fix-marks-set, which flatters it there slightly); the heads with the same regression, penalty and '
              'folders as the shipped classifier\'s.\n'
              f'- **Noise:** Wilson 95% intervals on rates, exact McNemar on paired right/wrong, paired bootstrap on '
-             f'NES lost, stratified bootstrap on the 2,000\'s estimates. ATRIUM is deterministic here: the rerun gives '
+             'NES lost; for mixed filters, fixed-pattern covered estimates, full-call sensitivity and finite-population '
+             'completion bounds (§5), not a confidence interval. Noncensus singleton patterns lack measured variance; '
+             'the 39-page census stays fixed. ATRIUM is deterministic here: the rerun gives '
              f'the same top class as W46.fix-marks-set\'s on {same_label} of {len(bids)} pages.\n'
              '- **Scope:** page kind for routing only. It does not settle where on a page the handwriting is '
              '(W46.marks-detect), how mixed pages should be read (W46.mixed-route), or ATRIUM on other corpora; the '

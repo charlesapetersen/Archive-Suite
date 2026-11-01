@@ -2,15 +2,11 @@
 
 Tracked bugs we've chosen to come back to later. Each entry has enough context to resume cold.
 
-## OPEN (W46.kind-mixed-support, W46.seg-kit-truth-provenance, W46.measure-report-consistency, 2026-11-01): measurement support and report provenance
+## OPEN (W46.seg-kit-truth-provenance, W46.measure-report-consistency, 2026-11-01): measurement support and report provenance
 
 W46.measure-review pass 4, baseline `7092c5fd`; independent refute-check confirmed these offline corrections.
 Details: [`2026-11-01.md`](../execution-plans/processing-review/measure-reviews/2026-11-01.md).
 
-- `scripts/segbench/kind_atrium.py::report` calls its mixed precision/recall estimates results in the 2,000,
-  but weights only 1,881 pages, omitting positive calls in 105 agreed-handwritten and 14 unsettled pages.
-  Its bootstrap also differs from the fixed-pattern/census draw. W46.kind-mixed-support corrects support,
-  uncertainty and conclusions without new labels; the hand/form results stand.
 - `scripts/segbench/kit_gate_sherlock.py::{score_boxes,render,CARD}` scores SC0122's all-known truth while
   claiming no scored drafter made it; that truth still includes tag/teacher agreement beyond the owner's
   checked subset. W46.seg-kit-truth-provenance reuses W46.seg-boxes-score's owner-supported scoring and fixes
@@ -19,6 +15,18 @@ Details: [`2026-11-01.md`](../execution-plans/processing-review/measure-reviews/
   required card; the parent report has one. `segbench-results/place-geom.md` says Find is exactly unchanged
   although its table spans about 86.1–87.0%. W46.measure-report-consistency fixes these minor report defects;
   neither changes the layout or line-selection verdict.
+
+## FIXED (W46.kind-mixed-support, 2026-11-01): mixed-filter support and uncertainty
+
+`kind_atrium.py::{mixed_support,mixed_support_md,report}` now separates the 1,881-page covered-frame
+point estimates from all 2,000 pages' call denominators. Under agreed-handwritten=nonmixed, Qwen's 165 calls
+have a 90.91–99.39% precision point-completion range; regression's 221 calls have 36.65–42.99%, before
+covered-frame sampling uncertainty. Unrestricted unsampled-stratum sensitivity is separate. The invalid
+bootstrap is replaced by finite-population completion bounds conditional on every owner threshold answer,
+including the eleven top-ups, with the 39-page census fixed and the 19 noncensus singleton patterns allowed
+unjudged outcomes. These are partial-identification bounds, not confidence intervals. Missing support fails
+rather than being renormalized away. Report, JSON and bench panel agree; ATRIUM remains only a mixed-signal
+candidate. The independent 33.02% mixed-share estimate, owner answers and hand/form results are unchanged.
 
 ## FIXED (W40.fix-processor-failed-ocr-wrapped, 2026-11-01): a never-read page wrapped as GeminiRefused or CascadeExhausted was filed image-only
 

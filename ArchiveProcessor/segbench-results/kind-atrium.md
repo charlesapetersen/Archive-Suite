@@ -2,15 +2,15 @@
 
 ## Verdict
 
-**Keep the shipped classifier for the hand and for forms; do not replace it with ATRIUM or combine the two. ATRIUM's TEXT has the highest mixed-page recall of the three labels on the 2,000 and is worth keeping as a candidate signal for the mixed flag (W46.mixed-route), not as the kind router.**
+**Keep the shipped classifier for the hand and for forms; do not replace it with ATRIUM or combine the two. ATRIUM's TEXT has the highest covered-frame mixed-recall point estimate of the three labels and is worth keeping as a candidate signal for the mixed flag (W46.mixed-route), not as the kind router.**
 
 - On the 141 typed, printed and handwritten owner pages, ours is right on 137, ATRIUM forced to its six text classes on 121 (paired p 0.0009): it finds every handwritten page but calls typewriting printed. A head on its embedding does better (128) but still below ours (p 0.0352), and adding it to our features does not help (134).
 - Routed by the guide on the 96, ATRIUM costs 1.18 NES against ours 1.00: their intervals overlap, because ATRIUM's errors are mostly typewritten called printed, which costs little on these pages.
 - On the 895 public pages, which neither was fitted on, ATRIUM hand-only is right on 638 and ours on 723. By stratum (§4) both fail L5 and N4; ATRIUM also misses most of L7's handwriting and L8's and N6's print, where ours holds better.
-- Mixed, under the owner's cut: ATRIUM's TEXT finds an estimated 60% of mixed pages at 70% precision; Qwen3.6-27B's mixed 23% at 99%. ATRIUM over-calls mixed on pages with no handwriting (24 of 46 on the sheet) and the two Qwen's few calls are nearly all right but find under a quarter, so neither alone is a mixed filter.
+- Mixed, under the owner's cut: on the 1881-page covered frame, ATRIUM TEXT has 60% recall and 70% precision; Qwen has 23% and 99%. Qwen makes 165 full-frame calls, including 14 unjudged unsettled calls: its full-call precision point-completion range is 90.91–99.39%, before sampling uncertainty. The full-call sensitivities and finite bounds in §5 do not establish population accuracy or a statistical recall lead. ATRIUM remains a candidate signal; neither label is established as a complete mixed filter.
 - Speed is not the obstacle: 0.06 s a page on MPS, against about 0.6 s for ours. The obstacles are accuracy on the distinction the guide routes by, a 323 MB download and a non-commercial licence on the base weights.
 
-Measured 2026-11-01 with `scripts/segbench/kind_atrium.py` (header: how to rerun). ATRIUM is `ufal/vit-historical-page` main (v4.3, RegNetY-16GF, eleven classes, revision `543216d6b7e1`), zero-shot, the whole page squeezed to 384 px with ImageNet normalisation (the reading W46.fix-marks-set chose on the 144). "Ours" is the Processor's page-kind classifier (`kind-classifier.md`): Vision signals and the Vision feature print with a logistic regression. Page images and per-page labels stay in the private cache. No money.
+Report regenerated from cached results 2026-11-01 with `scripts/segbench/kind_atrium.py` (header: how to rerun). ATRIUM is `ufal/vit-historical-page` main (v4.3, RegNetY-16GF, eleven classes, revision `543216d6b7e1`), zero-shot, the whole page squeezed to 384 px with ImageNet normalisation (the reading W46.fix-marks-set chose on the 144). "Ours" is the Processor's page-kind classifier (`kind-classifier.md`): Vision signals and the Vision feature print with a logistic regression. Page images and per-page labels stay in the private cache. No money.
 
 ## 1. The hand on the 144 owner-set pages
 
@@ -90,19 +90,40 @@ By stratum, right of pages:
 
 Forms: hand-only ATRIUM calls LINE_* on 80 of the 80 L4 ledger pages and on 126 other pages (some of which may really hold a table: the strata carry no form label).
 
-## 5. Mixed pages on the 2,000, against the owner's 170 answers
+## 5. Mixed pages: covered-frame estimates and full-call uncertainty
 
-The owner's cut (mixed-def-score.md): any handwriting on a typed or printed page, a signature included. Of the sheet's 170 pages, 170 carry text and have an answer (121 mixed under the cut). "On the sheet" counts those pages as drawn, which is not a random draw. "Estimated in the 2,000" weights each answered page by the stratum it stands for (the disagreements by pattern; the top-up of pages both mixed classes call mixed is left out, as in the share estimate; the 14 unsettled and 105 agreed-handwritten pages are not sampled and add nothing), with a stratified bootstrap interval (2,000 draws). Recall is of the owner's mixed pages, precision of the label's mixed calls.
+The owner's cut (`mixed-def-score.md`) is any handwriting on a typed or printed page, a signature included. All 170 owner answers remain fixed. The on-sheet counts are descriptive checks on an enriched draw, not population accuracy.
 
-| label | on the sheet: found | false | AUC of p(TEXT) | est. recall | est. precision |
-|---|---:|---:|---:|---:|---:|
-| ATRIUM TEXT (its top class) | 103/121 | 26/49 | 0.74 | 60% (44–82) | 70% (60–79) |
-| Qwen3.6-27B mixed (saved bulk label) | 66/121 | 1/49 | – | 23% (15–35) | 99% (98–100) |
-| Shipped classifier handwritten | 46/121 | 6/49 | – | 12% (8–20) | 79% (59–97) |
+The point estimates cover **1881 of 2000 pages**: 1212 clean-stratum pages represented by 20 checked controls, 630 disagreements represented by 100 checks across 29 fixed patterns, and 39 all-mixed pages. Each checked page gets N_h/n_h within its fixed disagreement pattern or control stratum; the all-mixed stratum is a census (weight 1). The 11 mixed-both top-ups have no population weight. Unsampled strata: {'hand': 105, 'open': 14}. Covered recall divides weighted TP by weighted mixed pages in this frame; covered precision divides weighted TP by covered calls.
+
+| label | sheet found / mixed | sheet false / nonmixed | sheet AUC p(TEXT) | covered TP / FP | covered recall | covered precision |
+|---|---:|---:|---:|---:|---:|---:|
+| ATRIUM TEXT (its top class) | 103/121 | 26/49 | 0.74 | 393.10 / 169.90 | 60.39% | 69.82% |
+| Qwen3.6-27B mixed (saved bulk label) | 66/121 | 1/49 | – | 150.00 / 1.00 | 23.05% | 99.34% |
+| Shipped classifier handwritten | 46/121 | 6/49 | – | 81.00 / 21.00 | 12.44% | 79.41% |
+
+**Full-call point-completion sensitivity, not confidence intervals.** Hold the covered-frame weighted TP (a) and mixed total (t) fixed. All calls D include unsampled calls. If u of the remaining possible mixed pages are called and v are not, precision spans a/D to (a+u)/D and recall a/(t+v) to (a+u)/(t+u). First assume agreed-handwritten pages are not mixed, as in the independent share estimate, with unsettled truths arbitrary; then allow both unsampled strata arbitrary truth. Neither range includes sampling uncertainty in the covered estimates.
+
+| label | all calls | omitted calls: hand / open | full precision, hand not mixed | full recall, hand not mixed | full precision, unrestricted | full recall, unrestricted |
+|---|---:|---:|---:|---:|---:|---:|
+| ATRIUM TEXT (its top class) | 563 | 0 / 0 | 69.82%–69.82% | 59.12%–60.39% | 69.82%–69.82% | 51.06%–60.39% |
+| Qwen3.6-27B mixed (saved bulk label) | 165 | 0 / 14 | 90.91%–99.39% | 23.05%–24.67% | 90.91%–99.39% | 19.84%–24.67% |
+| Shipped classifier handwritten | 221 | 105 / 14 | 36.65%–42.99% | 12.44%–14.29% | 36.65%–90.50% | 12.44%–25.98% |
+
+**Finite-population completion bounds, including all unjudged pages.** These allow every unjudged binary truth to vary, keep all observed answers (including the top-ups and census) fixed, and use the same formulas with observed TP/mixed totals instead of weighted estimates. They are exact partial-identification bounds conditional on the owner threshold truths, not 95% intervals or probability statements. They include uncertainty hidden by singleton patterns.
+
+| label | precision, hand not mixed | recall, hand not mixed | precision, unrestricted | recall, unrestricted |
+|---|---:|---:|---:|---:|
+| ATRIUM TEXT (its top class) | 18.29%–95.38% | 7.29%–96.76% | 18.29%–95.38% | 6.79%–96.76% |
+| Qwen3.6-27B mixed (saved bulk label) | 40.00%–99.39% | 3.78%–74.89% | 40.00%–99.39% | 3.56%–74.89% |
+| Shipped classifier handwritten | 20.81%–49.77% | 2.58%–59.46% | 20.81%–97.29% | 2.58%–74.14% |
+
+No mixed-filter confidence interval is reported: 25 disagreement patterns have one checked page; 19 of those are noncensus and cannot supply within-pattern variance (the others contain just one population page). Pooling patterns or resampling the census would misrepresent this draw. The broad finite bounds are the available uncertainty statement without new truth or an imputation model. Recall bounds range over completions with at least one mixed page; JSON flags when zero mixed pages is also possible (undefined recall). Zero calls give undefined precision.
+
 
 ATRIUM's TEXT calls by how much handwriting the owner saw (called / pages): none 24/46, signature 20/22, few 62/73, passage 13/15, long 8/11, handpage 2/3.
 
-ATRIUM says TEXT on 563 of the 2,000 (28.1%); the owner's cut puts the share near 33% (about 27–46%, KND-3). This rerun gives the same top class as W46.fix-marks-set's on 2000 of 2000 pages.
+ATRIUM says TEXT on 563 of the 2,000 (28.1%); the owner's cut puts the independent share estimate at 33.02% (`mixed-def-score.md`), assuming agreed-handwritten pages are not mixed and unsettled pages take the disagreement rate. That estimate is unchanged; it is not a filter denominator or confidence interval. This rerun gives the same top class as W46.fix-marks-set's on 2000 of 2000 pages.
 
 ATRIUM's hand against the shipped classifier's on the 2,000 (no truth; rows ATRIUM, columns ours):
 
@@ -142,6 +163,6 @@ The shipped classifier, for comparison: about 0.6 s a page (Vision text lines, d
 - **Truth:** the 144: `kind-classifier.md`'s labels, the 99 truth pages' kinds as the drafting models and the owner left them and the drawn pages labelled by a session looking at contact sheets, not blind (KND-1); the shipped weights were fitted on them, so its rows are leave-one-folder-out. The 895: the public set's stratum kind, made by its datasets, not by any scored route; not checked page by page, and a stratum can hold a page of another kind. The 2,000: the owner's own 170 blind sheet answers (2026-10-22), read under his cut; no model's label is truth.
 - **Selection:** the 144 and the 96 as `kind-classifier.md` drew them; the 895 frozen at W43.corpus-build by source and script; the 170 drawn by `mixed_def.py` from the four labels' disagreements, ATRIUM's among them, which is why the sheet figures are a check and the estimate re-weights them by stratum. No page was chosen by ATRIUM's output alone or by ABBYY text.
 - **Comparison:** every method on the same images; ATRIUM at one preprocessing (chosen on the 144 by W46.fix-marks-set, which flatters it there slightly); the heads with the same regression, penalty and folders as the shipped classifier's.
-- **Noise:** Wilson 95% intervals on rates, exact McNemar on paired right/wrong, paired bootstrap on NES lost, stratified bootstrap on the 2,000's estimates. ATRIUM is deterministic here: the rerun gives the same top class as W46.fix-marks-set's on 2000 of 2000 pages.
+- **Noise:** Wilson 95% intervals on rates, exact McNemar on paired right/wrong, paired bootstrap on NES lost; for mixed filters, fixed-pattern covered estimates, full-call sensitivity and finite-population completion bounds (§5), not a confidence interval. Noncensus singleton patterns lack measured variance; the 39-page census stays fixed. ATRIUM is deterministic here: the rerun gives the same top class as W46.fix-marks-set's on 2000 of 2000 pages.
 - **Scope:** page kind for routing only. It does not settle where on a page the handwriting is (W46.marks-detect), how mixed pages should be read (W46.mixed-route), or ATRIUM on other corpora; the 144 has few forms (14) and the 895's form truth is the ledger stratum alone.
 
