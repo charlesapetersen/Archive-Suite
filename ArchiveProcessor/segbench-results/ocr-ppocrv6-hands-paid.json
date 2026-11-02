@@ -1,0 +1,55 @@
+{
+ "item": "W46.ocr-ppocrv6-hands-paid",
+ "model": "gemini-3.7-flash",
+ "complete": false,
+ "state": "blocked",
+ "reason": "Gateway returned HTTP 502 without usage, then ConnectionError; billing reconciliation required.",
+ "cohorts": {
+  "public-L1-transfer": 40,
+  "owner-transfer": 15,
+  "owner-Shils-folder-proxy": 4,
+  "blackwell-held-out": 12
+ },
+ "planned_conditions": 213,
+ "attempted": 78,
+ "settled": 77,
+ "successful": 68,
+ "http_counts": {
+  "200": 68,
+  "502": 9
+ },
+ "known_billing": {
+  "calls": 68,
+  "estimate": 0.545493,
+  "gateway_calls": 68,
+  "gateway": 0.537235,
+  "gateway_over_estimate": 0.9849,
+  "charged": 0.545493
+ },
+ "unknown_response_count": 9,
+ "pending": [
+  "public-btp-mss184240101-32-n16"
+ ],
+ "unknown_allowance": 0.7999999999999999,
+ "charged": 1.345493,
+ "cap": 2.5,
+ "groups": [],
+ "comparisons": [],
+ "receipt": {
+  "item": "W46.ocr-ppocrv6-hands-paid",
+  "pack_freeze_sha256": "6f644e4d11b075429095642fa5b71e254bed99604726d5d951dfa0736c7a7b07",
+  "truth_index_sha256": "051664c1e67ec8b713181f198f21af20bef43aa5ff18c42b8afdc7d4f89c3210",
+  "model": "gemini-3.7-flash",
+  "max_tokens": 8192,
+  "temperature": 0,
+  "reasoning_effort": "low",
+  "no_cache": true,
+  "cap": 1.0,
+  "reservation": 0.08,
+  "runner_sha256": "6d04a7e94cfd1c2f1b97f9c4421fefd7b5c2c9c525f8d8771d31756ab5170b67",
+  "code_commit": "6b5c58c4ad0150c2dc6f4b33b75bd8488f108d8f"
+ },
+ "ledger_sha256": "ee687a7774b76c9117c65d4007c966f78a2293051199c7db33849cb89544d065",
+ "pack_freeze_sha256": "6f644e4d11b075429095642fa5b71e254bed99604726d5d951dfa0736c7a7b07",
+ "truth_index_sha256": "051664c1e67ec8b713181f198f21af20bef43aa5ff18c42b8afdc7d4f89c3210"
+}

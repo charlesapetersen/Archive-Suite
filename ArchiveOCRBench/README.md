@@ -101,6 +101,11 @@ stratum table as L1-L3 columns, but not the 895 table (no other stratum read), n
 table or part 5 (no typed or printed page read, and their 19 handwritten pages include the three agreement-only letters
 the 16-page handwritten chart leaves out), so their owner figures stay in their own panel.
 
+W46.ocr-ppocrv6-hands-paid's 0/8/16-line prompting panel is scaffolded but hidden while its run is
+incomplete. The gateway stopped after 68 successful conditions, nine 502s without usage and a lost
+connection. Its support/cost record is `segbench-results/ocr-ppocrv6-hands-paid.{md,json}`; it has no
+accuracy verdict. Once complete, its 71-page subsets support only that panel, not whole-96/895 rankings.
+
 W46.ocr-new-open-boxes adds Unlimited-OCR and Nemotron-Parse 2.0 on both sets (one Sherlock card,
 their in-process transformers routes) and the complete granite-docling-258M Mac arm on the 96. They join all
 four OCR charts, the headline, speed tables and applicable scorer tables; the two cluster readers also join

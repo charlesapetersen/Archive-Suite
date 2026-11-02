@@ -180,13 +180,15 @@ def journal(out):
 
 
 def prior_spend(out):
-    """Count any alternate-encoding ledger, including custom output resumes."""
-    if Path(out).resolve() == LEGACY_OUT.resolve():
-        return 0., []
-    pending, settled, spent = state(journal(LEGACY_OUT))
-    if pending:
-        raise ValueError('the alternate-encoding pilot still has an outstanding request')
-    return spent, list(settled.values())
+    """Changing --out cannot escape the original or alternate item ledgers."""
+    total, rows = 0., []
+    for path in {DEFAULT_OUT.resolve(), LEGACY_OUT.resolve()} - {Path(out).resolve()}:
+        pending, settled, spent = state(journal(path))
+        if pending or any(not known_usage(r.get('usage') or {}) for r in settled.values()):
+            raise ValueError('uncertain billing in another item ledger; outstanding/missing-usage request')
+        total += spent
+        rows += list(settled.values())
+    return total, rows
 
 
 def state(rows):
@@ -219,13 +221,19 @@ def append(out, rec):
         os.fsync(f.fileno())
 
 
+def require_clear_billing(out):
+    pending, done, _ = state(journal(out))
+    if pending or any(not known_usage(r.get('usage') or {}) for r in done.values()):
+        raise ValueError('uncertain billing: reconcile missing-usage/outstanding attempts before any paid call')
+    prior_spend(out)
+
+
 def call(pack, freeze, j, out, request=G.request):
     b = body(pack, freeze, j)
     digest = request_hash(b)
     pending, done, spent = state(journal(out))
     spent += prior_spend(out)[0]
-    if pending:
-        raise ValueError('uncertain paid attempt; reconcile before any further calls')
+    require_clear_billing(out)
     if j['id'] in done:
         if done[j['id']]['request_sha256'] != digest:
             raise ValueError('cached request differs from frozen request')
@@ -265,6 +273,8 @@ def call(pack, freeze, j, out, request=G.request):
         raise RuntimeError('uncertain paid attempt: ' + j['id'] + ' (' + type(e).__name__ + ')') from None
     append(out, rec)
     print(j['id'], 'ok' if ok else 'failed', rec['wall_s'], f'${G.charge(rec):.5f}', flush=True)
+    if not known_usage(usage):
+        raise ValueError('gateway supplied no complete billing usage; allowance retained, stopping before another request')
     return rec
 
 
@@ -279,6 +289,7 @@ def run(a):
     validate_output(a.out, a.pack, a.truth)
     f, jobs, _ = check(a.pack, a.truth)
     a.out.mkdir(parents=True, exist_ok=True)
+    require_clear_billing(a.out)
     receipt = {'item': TAG, 'pack_freeze_sha256': sha(a.pack / 'freeze.json'),
                'truth_index_sha256': sha(a.truth / 'index.json'), 'model': G.MODEL,
                'max_tokens': f['max_tokens'], 'temperature': 0, 'reasoning_effort': 'low',
@@ -389,6 +400,8 @@ def report(a):
     freeze, jobs, refs = check(a.pack, a.truth)
     receipt = validate_receipt(a.out, a.pack, a.truth, freeze)
     pending, rows, spent = state(journal(a.out))
+    if pending or any(not known_usage(r.get('usage') or {}) for r in rows.values()) or any(j['id'] not in rows for j in jobs):
+        raise ValueError('incomplete or uncertain run: use status; no accuracy report may be published')
     expected = {j['id']: j for j in jobs}
     expected.update({j['id'] + '-repeat': {**j, 'id': j['id'] + '-repeat'}
                      for j in pilot_jobs(jobs) if j['examples_n'] == 0})
@@ -519,9 +532,77 @@ def write_report(r):
     (RESULTS / 'ocr-ppocrv6-hands-paid.md').write_text('\n'.join(L) + '\n')
 
 
+def blocked_status(a):
+    """Publish only support/cost status for an interrupted run, never a ranking."""
+    freeze, jobs, _ = check(a.pack, a.truth)
+    receipt = validate_receipt(a.out, a.pack, a.truth, freeze)
+    pending, done, charged = state(journal(a.out))
+    known = [r for r in done.values() if known_usage(r.get('usage') or {})]
+    unknown = [r for r in done.values() if not known_usage(r.get('usage') or {})]
+    r = {'item': TAG, 'model': G.MODEL, 'complete': False, 'state': 'blocked',
+         'reason': 'Gateway returned HTTP 502 without usage, then ConnectionError; billing reconciliation required.',
+         'cohorts': freeze['cohorts'], 'planned_conditions': len(jobs),
+         'attempted': len(done) + len(pending), 'settled': len(done),
+         'successful': sum(r['ok'] for r in done.values()),
+         'http_counts': dict(Counter(str(r['http']) for r in done.values())),
+         'known_billing': G.billed(known), 'unknown_response_count': len(unknown),
+         'pending': list(pending), 'unknown_allowance': sum(G.charge(r) for r in unknown)
+                    + sum(r['reservation'] for r in pending.values()),
+         'charged': charged, 'cap': CAP, 'groups': [], 'comparisons': [],
+         'receipt': receipt, 'ledger_sha256': sha(a.out / 'calls.jsonl'),
+         'pack_freeze_sha256': sha(a.pack / 'freeze.json'),
+         'truth_index_sha256': sha(a.truth / 'index.json')}
+    dump(RESULTS / 'ocr-ppocrv6-hands-paid.json', r)
+    L = ['# Gemini given corrected handwriting lines — interrupted (W46.ocr-ppocrv6-hands-paid)', '',
+         '**Blocked; no accuracy verdict.** The original 71-page / 213-condition experiment stopped '
+         'when the gateway returned 502 without usage, then a connection failed before a reply. '
+         'The frozen 0/8/16-line requests and every paid outcome are retained. No pilot answer was repeated.', '',
+         f"{r['successful']} successful replies; {r['unknown_response_count']} HTTP 502 replies without usage; "
+         f"{len(pending)} outstanding connection-error request; {len(jobs)-r['attempted']} conditions never attempted. "
+         'No zero-example repeats run. Counts describe conditions, not independently sampled pages.', '',
+         '## Cost and resume boundary', '',
+         f"Known usage/header charges: **${r['known_billing']['charged']:.6f}**. "
+         f"Unknown allowances retained: **${r['unknown_allowance']:.2f}**, "
+         f"so **${r['charged']:.6f}** counts against the owner-revised $2.50 working cap "
+         '(OWNER_AUTHORIZATIONS.md, 1565f7d9). The allowances are not asserted to be actual bills. '
+         'The initial 24-request pilot ($0.1950195, projected $1.7958 for 221 requests) is included, not added twice.', '',
+         'The runner initially continued across nine HTTP 502 replies because their full allowances '
+         'were retained as settled records. That violated the stricter stop-on-uncertain-billing instruction; '
+         '`call` now stops at the first missing-usage response, and `run` refuses any unresolved or '
+         'missing-usage history before reading credentials. Offline regression tests cover both. '
+         'There is no retry or automatic re-spend.', '',
+         'Outstanding request: `' + ', '.join(pending) + '`. Reconcile all ten unknown outcomes before '
+         'any further paid call; preserve the nine failed replies and do not repeat them. '
+         'After resolution, resume the never-attempted conditions with `hand_icl_gateway.py run`, '
+         'then the eight preselected zero-example repeats, final scoring, verdict and bench panel. '
+         'The unused sheet alternative sent no request.', '',
+         '## Measurement card', '',
+         '- **Truth:** public By the People transcriptions; owner target truth after W46.ocr-hands-rescore, '
+         'partly Gemini/Claude drafted, with ten unresolved hand places. Owner references cannot independently rank models. '
+         'Existing corrected-line pairs are filtered by the base recognizer; owner pairs precede the sheet corrections.',
+         '- **Selection:** frozen Qwen pack, 40 seeded public L1 pages, 19 owner hand pages and 12 held-out '
+         'Blackwell diary pages. The latter use only 24 training pages as examples; Shils leaves its target out. '
+         'Other cohorts have unverified hand identities. Source hashes reject target/exemplar aliases.',
+         '- **Comparison:** same target JPEGs and nested 0/8/16 example-image/text contexts. Gemini 3.7 Flash '
+         'on the Stanford gateway, temperature 0, low reasoning, 8192-token cap, cache disabled, single attempts. '
+         'Only 78 of 213 conditions attempted: no paired accuracy comparison is published.',
+         '- **Noise:** final paired page/collection intervals and the nine clear-owner-page sensitivity remain unrun; '
+         'no new rerun floor measured. One diary and a four-page folder proxy cannot estimate across-hand variability.',
+         '- **Scope:** this is a spending/support checkpoint, not evidence for or against corrected-line prompting. '
+         'Incomplete results are hidden on the bench page; whole-96 and whole-895 charts cannot take these subsets.', '',
+         '## Provenance', '',
+         f"Pack freeze SHA-256 `{r['pack_freeze_sha256']}`; truth index `{r['truth_index_sha256']}`; "
+         f"ledger `{r['ledger_sha256']}`. Private inputs: "
+         '`~/.local/state/archive-autonomous/artifacts/hand-icl-20261101` and `hand-icl-truth-20261101`; '
+         'paid replies, write-ahead ledger, original receipt and working-cap sidecar: `hand-icl-gateway-20261101`. '
+         'No new model/download/page cache created; paid replies and audit receipts retained, shared inputs untouched.']
+    (RESULTS / 'ocr-ppocrv6-hands-paid.md').write_text('\n'.join(L) + '\n')
+    print(json.dumps({k: r[k] for k in ('state', 'successful', 'attempted', 'charged', 'unknown_allowance')}))
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument('cmd', choices=['check', 'pilot', 'run', 'repeat', 'report'])
+    p.add_argument('cmd', choices=['check', 'pilot', 'run', 'repeat', 'report', 'status'])
     p.add_argument('--pack', type=Path, default=DEFAULT_PACK)
     p.add_argument('--truth', type=Path, default=DEFAULT_TRUTH)
     p.add_argument('--out', type=Path, default=DEFAULT_OUT)
@@ -531,6 +612,8 @@ def main():
         print(json.dumps({'jobs': len(j), 'cohorts': f['cohorts'], 'pack_sha256': sha(a.pack / 'freeze.json')}))
     elif a.cmd == 'report':
         report(a)
+    elif a.cmd == 'status':
+        blocked_status(a)
     else:
         import fcntl
         validate_output(a.out, a.pack, a.truth)

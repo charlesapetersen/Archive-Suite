@@ -32,11 +32,13 @@ class Reporting(unittest.TestCase):
                 rec = dict(id=j['id'], request_sha256=H.request_hash(H.body(pack, f, j)))
                 H.append(out, dict(rec, event='reserve', reservation=.08))
                 H.append(out, dict(rec, event='settle', cost=.001, ok=True, model=H.G.MODEL,
-                                   response_sha256=H.sha(response)))
+                                   response_sha256=H.sha(response),
+                                   usage={'prompt_tokens': 10, 'completion_tokens': 10}))
             a = SimpleNamespace(pack=pack, truth=truth, out=out)
             with (patch.object(H, 'check', return_value=(f, jobs, {'owner-p001': {'path': 'p.txt'}})),
                   patch.object(H, 'validate_receipt', return_value={}),
                   patch.object(H, 'RESULTS', results), patch.object(HS, 'HANDS', hands),
+                  patch.object(H, 'DEFAULT_OUT', out),
                   patch.object(H, 'LEGACY_OUT', root / 'unused')):
                 H.report(a)
                 r = json.loads((results / 'ocr-ppocrv6-hands-paid.json').read_text())
@@ -46,6 +48,10 @@ class Reporting(unittest.TestCase):
                 # A changed prompt must never be relabelled as this frozen run.
                 f['prompt'] += ' changed'
                 with self.assertRaisesRegex(ValueError, 'request does not match'):
+                    H.report(a)
+                f['prompt'] = 'Read the target only'
+                H.append(out, dict(id='lost-repeat', event='reserve', request_sha256='lost', reservation=.08))
+                with self.assertRaisesRegex(ValueError, 'no accuracy report'):
                     H.report(a)
 
 

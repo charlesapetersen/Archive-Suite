@@ -2,6 +2,17 @@
 
 Tracked bugs we've chosen to come back to later. Each entry has enough context to resume cold.
 
+## FIXED / experiment blocked (W46.ocr-ppocrv6-hands-paid, 2026-11-01): missing-usage gateway errors must stop the run
+
+`scripts/segbench/hand_icl_gateway.py::call` retained a full allowance for HTTP 502 replies without usage but
+continued to other requests, contrary to the owner grant's stop-on-uncertain-billing rule. It now stops at the
+first such reply; `require_clear_billing` checks the original, alternate and selected output ledgers before
+credentials or another request. Changing `--out` cannot bypass uncertainty or prior spending. `report` refuses
+partial accuracy tables; `status` publishes only the blocked support/cost record. Regression tests cover these
+boundaries. The preserved run has 68 successful readings ($0.545493 known charges), nine 502s without usage and
+one outstanding connection-error request ($0.80 allowances, $1.345493 counted against the $2.50 cap). No retry.
+The item's owner billing gate must clear before resuming; details in `segbench-results/ocr-ppocrv6-hands-paid.md`.
+
 ## Marks review: question comments and obscured draft boxes (W46.fix-marks-sheet-feedback)
 
 Owner export 2026-11-01, baseline 2b1dd66b: 18 comments on 12 core pages were in transcription fields. The view repair is prepared (checkpoint, 2026-11-01): `marks_sheet.py` copies hash-verified original JPEG bytes instead of the scan's 2400px model derivatives, with native-pixel crops/full-page views, rotation, hideable boxes/numbers, and separate mark notes. The EXIF-upright coordinate frame is preserved. `marks_feedback.py` verifies the untouched da388b05c388 freeze and records six explicit duplicate/connected/part relationships (seven entries), without choosing new classes, merging boxes or inventing text; two comments retain existing rejections.

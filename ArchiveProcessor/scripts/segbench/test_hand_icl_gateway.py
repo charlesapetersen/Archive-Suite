@@ -32,8 +32,11 @@ class Contracts(unittest.TestCase):
         self.out = self.root / 'out'
         self.legacy_patch = patch.object(H, 'LEGACY_OUT', self.root / 'legacy')
         self.legacy_patch.start()
+        self.default_patch = patch.object(H, 'DEFAULT_OUT', self.out)
+        self.default_patch.start()
 
     def tearDown(self):
+        self.default_patch.stop()
         self.legacy_patch.stop()
         self.temp.cleanup()
 
@@ -79,7 +82,7 @@ class Contracts(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, 'uncertain paid attempt'):
             H.call(self.root, self.freeze, self.job, self.out, request=lost)
         self.assertEqual(H.state(H.journal(self.out))[2], H.RESERVE)
-        with self.assertRaisesRegex(ValueError, 'uncertain paid attempt'):
+        with self.assertRaisesRegex(ValueError, 'uncertain billing'):
             self.call()
 
     def test_cap_blocks_before_request(self):
@@ -87,7 +90,8 @@ class Contracts(unittest.TestCase):
         for i in range(31):
             r = dict(id=str(i), request_sha256=str(i))
             H.append(self.out, dict(r, event='reserve', reservation=H.RESERVE))
-            H.append(self.out, dict(r, event='settle', cost=.08))
+            H.append(self.out, dict(r, event='settle', cost=.08,
+                                   usage={'prompt_tokens': 0, 'completion_tokens': 0}))
         with self.assertRaisesRegex(ValueError, 'item cap'):
             self.call()
         self.assertEqual(len(H.journal(self.out)), 62)
@@ -97,10 +101,17 @@ class Contracts(unittest.TestCase):
         H.append(H.LEGACY_OUT, dict(id='old', event='reserve', request_sha256='old', reservation=.08))
         with self.assertRaisesRegex(ValueError, 'outstanding'):
             self.call()
-        H.append(H.LEGACY_OUT, dict(id='old', event='settle', request_sha256='old', cost=2.46))
+        H.append(H.LEGACY_OUT, dict(id='old', event='settle', request_sha256='old', cost=2.46,
+                                  usage={'prompt_tokens': 0, 'completion_tokens': 0}))
         with self.assertRaisesRegex(ValueError, 'item cap'):
             self.call()
         self.assertEqual(H.journal(self.out), [])
+
+    def test_new_output_cannot_escape_original_unknown(self):
+        self.out.mkdir()
+        H.append(self.out, dict(id='unknown', event='reserve', request_sha256='lost', reservation=.08))
+        with self.assertRaisesRegex(ValueError, 'uncertain billing in another'):
+            H.call(self.root, self.freeze, self.job, self.root / 'new-out', request=lambda *a, **k: self.fail('must not send'))
 
     def test_length_and_empty_are_failed_without_retry(self):
         for finish, text in [('length', 'cut off'), ('stop', ''), ('stop', None)]:
@@ -109,8 +120,11 @@ class Contracts(unittest.TestCase):
                 self.assertFalse(self.call(Reply(finish, text))['ok'])
 
     def test_missing_usage_reserves_full_cost(self):
-        self.call(Reply(usage=False))
+        with self.assertRaisesRegex(ValueError, 'no complete billing usage'):
+            self.call(Reply(usage=False))
         self.assertEqual(H.state(H.journal(self.out))[2], H.RESERVE)
+        with self.assertRaisesRegex(ValueError, 'uncertain billing'):
+            self.call()
 
     def test_partial_invalid_usage_is_unknown(self):
         for usage in [{}, {'prompt_tokens': 12}, {'prompt_tokens': 0, 'completion_tokens': -1},
@@ -129,7 +143,8 @@ class Contracts(unittest.TestCase):
         class Partial(Reply):
             def json(self):
                 return dict(super().json(), usage={'prompt_tokens': 100})
-        self.call(Partial())
+        with self.assertRaisesRegex(ValueError, 'no complete billing usage'):
+            self.call(Partial())
         self.assertEqual(H.state(H.journal(self.out))[2], H.RESERVE)
 
     def test_wrong_model_is_not_accepted(self):
