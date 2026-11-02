@@ -1184,7 +1184,7 @@ def main():
              "public": pub, "ocr_scorers": ocr_scorers(),
              "ppocrv6_hands": ppocrv6_hands(pub and pub["open_sweep"]),
              "hands_icl": {k: v for k, v in json.loads((RESULTS / "ocr-ppocrv6-hands-paid.json").read_text()).items()
-                           if k in ("model", "groups", "comparisons", "cohorts", "charged", "complete", "verdict")}
+                           if k in ("model", "groups", "comparisons", "cohorts", "charged", "complete", "verdict", "retained_allowance", "acknowledged_failures", "failure_reasons")}
                           if (RESULTS / "ocr-ppocrv6-hands-paid.json").exists() else None,
              "dewarp": dewarp, "enh_ocr": enh_ocr,
              "loops": json.loads(LOOPS.read_text()) if LOOPS.exists() else None, "regions": regions,
