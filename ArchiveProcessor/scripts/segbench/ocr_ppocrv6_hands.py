@@ -35,7 +35,7 @@ are the validation lines (early stopping picks the epoch); the curve's N lines a
 seeded order, so each set contains the smaller ones. Scored on the held-out pages' whole text (blla lines, read by
 the tuned model), as the zero-shot pages are.
 
-MPS against CPU: the same training (the public hand, N = MPS_N) on each device, minutes and the held-out score.
+MPS against CPU: the same training (the public hand, N in MPS_NS) on each device, minutes and the held-out score.
 
 Writes RUN/ (rebuildable: Vision lines, PAGE XML, readings, models) and segbench-results/ocr-ppocrv6-hands.md and
 .json (aggregates only; the owner's text never enters the repo). No network but hand-fetch's public download; no
@@ -80,7 +80,7 @@ MIN_LINES = 8                 # a diary page with fewer truth lines is skipped (
 MAX_CER, LEN_RATIO, SKIP = 0.6, 2.0, 0.7
 VAL_LINES = 10
 CURVE = {'blackwell': (20, 40, 80, 160, 240), 'owner': (80,)}   # owner: all of the other three pages' lines (39-57)
-MPS_N = 80
+MPS_NS = (80, 160, 240)
 
 
 # ---- PAGE XML ----------------------------------------------------------------------------------------------------
@@ -547,8 +547,9 @@ def plans():
     for n, keys in sets.items():
         out[f'blackwell-n{n}-cpu'] = {'hand': 'blackwell', 'n': n, 'keys': keys, 'val': vals, 'test': te,
                                       'device': 'cpu'}
-    if MPS_N in sets:
-        out[f'blackwell-n{MPS_N}-mps'] = {**out[f'blackwell-n{MPS_N}-cpu'], 'device': 'mps'}
+    for n in MPS_NS:
+        if n in sets:
+            out[f'blackwell-n{n}-mps'] = {**out[f'blackwell-n{n}-cpu'], 'device': 'mps'}
     for held in OWNER_HAND:
         pool = [f'{pg}|{k}' for pg in OWNER_HAND if pg != held
                 for k in range(len(pair_lines('owner', pg)['lines']))]
@@ -645,8 +646,10 @@ def best_model(d):
     return found[0]
 
 
-def cmd_eval(_):
+def cmd_eval(a):
     for name, pl in plans().items():
+        if (a.only and not re.fullmatch(a.only, name)) or (a.device and pl['device'] != a.device) or (a.hand and pl['hand'] != a.hand):
+            continue
         d = RUN / 'train' / name
         if not (d / 'done.json').exists():
             continue
@@ -970,8 +973,8 @@ def main():
     ap.add_argument('command', choices=['vision-xml', 'public', 'zero','hand-fetch', 'hand-seg', 'pairs', 'train', 'eval',
                                         'report'])
     ap.add_argument('--device', choices=['cpu', 'mps'])
-    ap.add_argument('--only', help='train: a regular expression over the training names')
-    ap.add_argument('--hand', choices=['blackwell', 'owner'], help='train: one hand')
+    ap.add_argument('--only', help='train/eval: a regular expression over the training names')
+    ap.add_argument('--hand', choices=['blackwell', 'owner'], help='train/eval: one hand')
     a = ap.parse_args()
     globals()['cmd_' + a.command.replace('-', '_')](a)
 
