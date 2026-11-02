@@ -28,7 +28,7 @@ L1-L3.
 Fine-tune hands. The owner's: the four handwritten pages of the Shils papers folder (p050, p051, p055, p056; the
 folder is the only writer record, so one hand is assumed, not checked), leave one page out. The public: one
 Blackwell diary volume (VOLUME), seeded pages, TRAIN_PAGES to draw lines from and the rest held out, plus the
-26 L1 pages of the 895 from her other volumes. Training lines are the truth's own lines, never drawn by anyone: the base
+four L1 pages of the 895 from her other volumes in the frozen set. Training lines are the truth's own lines, never drawn by anyone: the base
 model reads each blla line, and a monotone alignment (`match`) pairs truth lines with blla lines by character
 error; a pair is kept when its error is at most MAX_CER and its lengths are within LEN_RATIO. VAL_LINES of the pool
 are the validation lines (early stopping picks the epoch); the curve's N lines are the first N of the rest in a
@@ -737,6 +737,36 @@ def named(sources):
     return {(r if names.count(r) == 1 else f'{r} ({fam})'): t for (r, fam), t in sources.items()}
 
 
+def tune_scores(pl, d, pages):
+    """Score every planned held-out page; an absent file is unfinished evaluation, never a smaller sample."""
+    import ocr_panel_score as S
+    missing = [pg for pg in pl['test'] if not (d / 'read' / f'{pg}.txt').exists()]
+    if missing:
+        raise ValueError(f'{d.name}: incomplete evaluation ({len(missing)} held-out readings missing)')
+    tuned, base = {}, {}
+    for pg in pl['test']:
+        truth = page_truth(pages[pg])
+        tuned[pg] = 100 * S.score(truth, (d / 'read' / f'{pg}.txt').read_text())['nes']
+        base[pg] = 100 * S.score(truth, page_text(hand_dir(pl['hand']) / 'base' / f'{pg}.xml'))['nes']
+    return tuned, base
+
+
+def tune_pairs(tunes, per):
+    """Paired same-device curve increments and same-N device contrasts on exactly the same held-out pages."""
+    import ocr_panel_score as S
+    by = {(t['n'], t['device']): t['name'] for t in tunes if t['hand'] == 'blackwell'}
+    pairs = [(by[n, dev], by[ref, dev]) for dev in ('cpu', 'mps')
+             for n, ref in ((160, 80), (240, 80), (240, 160)) if (n, dev) in by and (ref, dev) in by]
+    pairs += [(by[n, 'mps'], by[n, 'cpu']) for n in MPS_NS if (n, 'mps') in by and (n, 'cpu') in by]
+    out = []
+    for a, b in pairs:
+        if not per[a] or per[a].keys() != per[b].keys():
+            raise ValueError(f'{a} vs {b}: different held-out pages')
+        ids = sorted(per[a])
+        out.append({'a': a, 'b': b, **S.paired([per[a][pg] for pg in ids], [per[b][pg] for pg in ids])})
+    return out
+
+
 def cmd_report(_):
     import ocr_panel as P
     import ocr_rescore as RS
@@ -769,7 +799,7 @@ def cmd_report(_):
                               ours, own_ids)
     # The fine-tunes: held-out pages, tuned against base (both on blla lines).
     import ocr_panel_score as S
-    tunes = []
+    tunes, tune_per = [], {}
     try:
         trained = plans()
     except FileNotFoundError:      # no pairs yet: the zero-shot tables alone
@@ -780,21 +810,15 @@ def cmd_report(_):
             continue
         done = json.loads((d / 'done.json').read_text())
         pages = {p['page']: p for p in hand_pages(pl['hand'])}
-        tuned, base = [], []
-        for pg in pl['test']:
-            f = d / 'read' / f'{pg}.txt'
-            if not f.exists():
-                continue
-            t = page_truth(pages[pg])
-            tuned.append(100 * S.score(t, f.read_text())['nes'])
-            base.append(100 * S.score(t, page_text(hand_dir(pl['hand']) / 'base' / f'{pg}.xml'))['nes'])
+        tuned, base = tune_scores(pl, d, pages)
         if tuned:
-            pd = S.paired(tuned, base)
+            tune_per[name] = tuned
+            pd = S.paired(list(tuned.values()), list(base.values()))
             stages = re.findall(r'stage (\d+)/', (d / 'ketos.log').read_text(errors='replace'))
             tunes.append({'name': name, 'hand': pl['hand'], 'n': pl['n'], 'device': pl['device'],
                           'epochs': max(map(int, stages)) + 1 if stages else None,
                           'minutes': round(done['seconds'] / 60, 1), 'peak_gb': done.get('peak_gb'),
-                          'pages': len(tuned), 'tuned': sum(tuned) / len(tuned), 'base': sum(base) / len(base),
+                          'pages': len(tuned), 'tuned': sum(tuned.values()) / len(tuned), 'base': sum(base.values()) / len(base),
                           'delta': pd['delta'], 'lo': pd['lo'], 'hi': pd['hi']})
     timing = {'blla-public': guard_stats(RUN / 'zero' / 'blla-public-guard.jsonl'),
               'vision': guard_stats(RUN / 'zero' / 'vision-guard.jsonl'),
@@ -805,7 +829,7 @@ def cmd_report(_):
     pairs_stats = {h: json.loads((hand_dir(h) / 'pairs.json').read_text()) for h in ('owner', 'blackwell')
                    if (hand_dir(h) / 'pairs.json').exists()}
     out = {'public': pub, 'public_pairs': pub_pairs, 'owner': own, 'owner_hand': own_hand, 'owner_mixed': own_mixed,
-           'owner_pairs': own_pairs, 'tunes': tunes, 'timing': timing,
+           'owner_pairs': own_pairs, 'tunes': tunes, 'tune_pairs': tune_pairs(tunes, tune_per), 'timing': timing,
            'pairs': {h: {'pages': len(v), 'truth_lines': sum(s['truth_lines'] for s in v),
                          'kept': sum(s['kept'] for s in v)} for h, v in pairs_stats.items()},
            'sets': {'public': len(ids), 'owner': len(own_ids), 'owner_hand': len(hand_ids)}}
@@ -851,6 +875,13 @@ def verdict(o):
                  + '; '.join(f'{t["n"]} lines {t["device"]} {t["delta"]:+.1f} ({t["lo"]:+.1f} to {t["hi"]:+.1f})'
                              for t in bw)
                  + f' on {bw[0]["pages"]} held-out pages of the Blackwell diary, base {bw[0]["base"]:.1f}.')
+    increments = [p for p in o.get('tune_pairs', []) if re.fullmatch(r'blackwell-n240-(cpu|mps)', p['a'])
+                  and '-n80-' in p['b']]
+    if increments:
+        L.append('- **The curve past 80 lines, paired on the same held-out pages:** '
+                 + '; '.join(f'240 minus 80 lines ({p["a"].rsplit("-", 1)[1]}) {iv(p)}' for p in increments)
+                 + '. These intervals describe 16 held-out Blackwell pages: 12 same-volume and four other-volume '
+                 'pages; training-seed variability is unmeasured.')
     if ow:
         worse = sum(t['delta'] < 0 for t in ow)
         L.append(f'- **On the owner\'s Shils pages it made {worse} of {len(ow)} held-out pages worse** '
@@ -908,6 +939,18 @@ def write_md(o):
         L.append(f'| {t["name"]} | {t["n"]} | {t["device"]} | {t.get("epochs") or ""} | {t["minutes"]} | '
                  f'{t["peak_gb"]} | {t["pages"]} | '
                  f'{f1(t["base"])} | {f1(t["tuned"])} | {t["delta"]:+.2f} | {t["lo"]:+.2f} to {t["hi"]:+.2f} |')
+    if o.get('tune_pairs'):
+        L += ['', 'Paired curve increments and device contrasts (first training minus second, same held-out pages):', '',
+              '| training | minus | pages | delta | 95% interval |', '|---|---|---:|---:|---|']
+        L += [f'| {p["a"]} | {p["b"]} | {p["n"]} | {p["delta"]:+.2f} | {p["lo"]:+.2f} to {p["hi"]:+.2f} |'
+              for p in o['tune_pairs']]
+        L += ['', 'The line sets are nested prefixes of one seeded order, with the same ten validation lines and '
+              '16 held-out Blackwell pages (12 same-volume and four other-volume pages), disjoint from the training '
+              'and validation pages. n160 allows nine epochs and '
+              'n240 six (1,440 line-steps each at most), so this is a fixed maximum compute-budget curve, '
+              'not a curve trained to convergence at every size. Early stopping may use fewer steps. '
+              'Only this same-hand Blackwell holdout is scored for the larger tunes: the previous public L1-L3 '
+              'and owner zero-shot panels remain above; the new tunes make no full-895, full-96 or cross-hand claim.']
     by = {(t['hand'], t['n'], t['device']): t for t in o['tunes']}
     mps = [(c, m) for (h, n, dev), m in by.items() if dev == 'mps' and (c := by.get((h, n, 'cpu')))]
     L += ['', f'Training: ketos (kraken 7.1.1), batch 1, AdamW at {LRATE:g} constant, {TRAIN_THREADS} threads, fp32, '
@@ -918,7 +961,7 @@ def write_md(o):
           'blackwell-n20, stopped by the guard). The owner\'s rows leave one of the four Shils '
           'pages out and train on the other three pages\' lines; their truth is the drafted owner truth (hand places '
           'owner-checked), so a gain there is agreement with the drafters, not a ranking (OCR-1).', '',
-          'The CPU trainings use kraken\'s torch.compile of the forward pass; the MPS one runs eagerly '
+          'The CPU trainings use kraken\'s torch.compile of the forward pass; the MPS trainings run eagerly '
           '(TORCHDYNAMO_DISABLE=1), because Inductor\'s Metal kernel for this model asks for 32,896 bytes of '
           'threadgroup memory, more than the GPU allows, and `ketos train -d mps` fails at its first step. '
           + ' '.join(f'{m["name"]}: {per_epoch(m)} s an epoch against {per_epoch(c)} on the CPU (each beside no other '
@@ -953,17 +996,19 @@ def write_md(o):
           '- **Selection.** The 895\'s frozen L1-L3 strata; the owner\'s pages by the panel\'s kind label; the '
           'Blackwell volume pages by a seeded shuffle of the volume\'s pages with at least '
           f'{MIN_LINES} truth lines, none in the 895; the owner\'s fine-tune hand is the folder with most hand pages. '
-          'None chosen by a tested route.',
+          'Page selection is not by a tested route. Training-line pairing and filtering do use the base reader\'s '
+          'text, so harder unpaired lines are underrepresented; every held-out page is still scored in full.',
           '- **Comparison.** Every row reads the same pages; comparator readings are the cached ones '
           '(`ocr_rescore.py` sources), scored by `ocr_panel_score.score` with the stratum\'s settings. A route that '
           'did not read every page is left out of a table rather than scored on fewer.',
-          '- **Noise.** kraken on CPU is deterministic, so the rerun floor of our rows is 0; the comparators\' rerun '
-          'floor is ocr-rerun-noise.md\'s 0.49 points. A paired interval across 0 is a tie. Fine-tune rows rest on '
-          'few held-out pages (one per fold for the owner\'s hand), so their intervals are wide.',
+          '- **Noise.** Fixed-weight kraken CPU inference is deterministic (rerun floor 0); the comparators\' rerun '
+          'floor is ocr-rerun-noise.md\'s 0.49 points. A paired interval across 0 is a tie. Fine-tune intervals '
+          'bootstrap the held-out pages, not training seeds or hands: seed/device training variability is unmeasured '
+          '(one seed, one training per condition). One held-out owner page per fold cannot estimate population uncertainty.',
           '- **Scope.** Line recognition only: placement of these lines is W46.place-hands. The Qwen few-line '
-          'prompting arm (W46.ocr-ppocrv6-hands-qwen, cluster), the Gemini arm (W46.ocr-ppocrv6-hands-paid) and the '
-          'curve past 80 lines (W46.ocr-ppocrv6-hands-curve) are not here. One public hand and one owner folder: '
-          'whether other hands gain alike is not settled. MPS against CPU is one training each, eager against '
+          'prompting arm (W46.ocr-ppocrv6-hands-qwen, cluster) and the Gemini arm (W46.ocr-ppocrv6-hands-paid) '
+          'are separate reports. The 160/240-line extension is W46.ocr-ppocrv6-hands-curve. One public hand and one owner folder: '
+          'whether other hands gain alike is not settled. MPS against CPU is one training per size/device, eager against '
           'compiled, so it gives speed, not equivalence.', '']
     (RESULTS / 'ocr-ppocrv6-hands.md').write_text('\n'.join(L))
 
