@@ -52,6 +52,15 @@ class CurveReportTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'different held-out pages'):
             H.tune_pairs(tunes, {'blackwell-n80-cpu': {'a': 10}, 'blackwell-n160-cpu': {'b': 20}})
 
+    def test_kit_recommendation_requires_both_backends_and_no_resolved_240_gain(self):
+        pairs = [{'a': f'blackwell-n{n}-{dev}', 'b': f'blackwell-n{ref}-{dev}',
+                  'lo': .2 if n == 160 else -.2, 'hi': .8}
+                 for dev in ('cpu', 'mps') for n, ref in ((160, 80), (240, 160))]
+        self.assertIn('160 corrected lines', H.kit_recommendation({'tune_pairs': pairs}))
+        self.assertEqual(H.kit_recommendation({'tune_pairs': pairs[:-1]}), '')
+        pairs[-1] = {**pairs[-1], 'lo': .1}
+        self.assertEqual(H.kit_recommendation({'tune_pairs': pairs}), '')
+
 
 if __name__ == '__main__':
     unittest.main()

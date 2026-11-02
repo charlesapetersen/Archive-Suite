@@ -43669,6 +43669,36 @@
     "hi": 1.909685910678669
    },
    {
+    "name": "blackwell-n160-cpu",
+    "hand": "blackwell",
+    "n": 160,
+    "device": "cpu",
+    "epochs": 5,
+    "minutes": 18.1,
+    "peak_gb": 3.54,
+    "pages": 16,
+    "tuned": 62.2441715671806,
+    "base": 59.741122972489634,
+    "delta": 2.5030485946909615,
+    "lo": 1.6994557499894878,
+    "hi": 3.2383820272207586
+   },
+   {
+    "name": "blackwell-n240-cpu",
+    "hand": "blackwell",
+    "n": 240,
+    "device": "cpu",
+    "epochs": 5,
+    "minutes": 26.4,
+    "peak_gb": 3.52,
+    "pages": 16,
+    "tuned": 61.97262894473216,
+    "base": 59.741122972489634,
+    "delta": 2.2315059722425223,
+    "lo": 1.3995137666944348,
+    "hi": 3.148611200939039
+   },
+   {
     "name": "blackwell-n80-mps",
     "hand": "blackwell",
     "n": 80,
@@ -43682,6 +43712,36 @@
     "delta": 1.530278560664898,
     "lo": 0.6823920870130724,
     "hi": 2.3392693144245627
+   },
+   {
+    "name": "blackwell-n160-mps",
+    "hand": "blackwell",
+    "n": 160,
+    "device": "mps",
+    "epochs": 5,
+    "minutes": 6.3,
+    "peak_gb": 5.88,
+    "pages": 16,
+    "tuned": 62.34159722671467,
+    "base": 59.741122972489634,
+    "delta": 2.6004742542250296,
+    "lo": 1.7430666842062648,
+    "hi": 3.428907834177186
+   },
+   {
+    "name": "blackwell-n240-mps",
+    "hand": "blackwell",
+    "n": 240,
+    "device": "mps",
+    "epochs": 5,
+    "minutes": 9.3,
+    "peak_gb": 5.9,
+    "pages": 16,
+    "tuned": 62.59297978125656,
+    "base": 59.741122972489634,
+    "delta": 2.851856808766921,
+    "lo": 2.0362653335273846,
+    "hi": 3.688808275946679
    },
    {
     "name": "owner-p050-n39-cpu",
@@ -43744,7 +43804,90 @@
     "hi": -17.282321899736147
    }
   ],
-  "tune_pairs": [],
+  "tune_pairs": [
+   {
+    "a": "blackwell-n160-cpu",
+    "b": "blackwell-n80-cpu",
+    "n": 16,
+    "delta": 1.381232375500578,
+    "p": 9.999000099990002e-05,
+    "lo": 1.0200521620424676,
+    "hi": 1.7633305076517445
+   },
+   {
+    "a": "blackwell-n240-cpu",
+    "b": "blackwell-n80-cpu",
+    "n": 16,
+    "delta": 1.1096897530521388,
+    "p": 0.0168983101689831,
+    "lo": 0.27433103342820386,
+    "hi": 1.8268818059638954
+   },
+   {
+    "a": "blackwell-n240-cpu",
+    "b": "blackwell-n160-cpu",
+    "n": 16,
+    "delta": -0.2715426224484392,
+    "p": 0.535946405359464,
+    "lo": -1.1313916390601375,
+    "hi": 0.5117430192625867
+   },
+   {
+    "a": "blackwell-n160-mps",
+    "b": "blackwell-n80-mps",
+    "n": 16,
+    "delta": 1.0701956935601316,
+    "p": 0.00029997000299970003,
+    "lo": 0.6933747552609733,
+    "hi": 1.5149118390882395
+   },
+   {
+    "a": "blackwell-n240-mps",
+    "b": "blackwell-n80-mps",
+    "n": 16,
+    "delta": 1.321578248102023,
+    "p": 9.999000099990002e-05,
+    "lo": 0.9175892672311501,
+    "hi": 1.723094932250608
+   },
+   {
+    "a": "blackwell-n240-mps",
+    "b": "blackwell-n160-mps",
+    "n": 16,
+    "delta": 0.2513825545418915,
+    "p": 0.4343565643435656,
+    "lo": -0.38883820206278896,
+    "hi": 0.7381885131054329
+   },
+   {
+    "a": "blackwell-n80-mps",
+    "b": "blackwell-n80-cpu",
+    "n": 16,
+    "delta": 0.40846234147451455,
+    "p": 0.16848315168483152,
+    "lo": -0.1292072958252879,
+    "hi": 0.9231955213856087
+   },
+   {
+    "a": "blackwell-n160-mps",
+    "b": "blackwell-n160-cpu",
+    "n": 16,
+    "delta": 0.09742565953406812,
+    "p": 0.5998400159984002,
+    "lo": -0.2499997211949827,
+    "hi": 0.46108801495266283
+   },
+   {
+    "a": "blackwell-n240-mps",
+    "b": "blackwell-n240-cpu",
+    "n": 16,
+    "delta": 0.6203508365243988,
+    "p": 0.025297470252974703,
+    "lo": 0.14902601139409644,
+    "hi": 1.0675108439320566
+   }
+  ],
+  "kit_recommendation": "Target about 160 corrected lines for an optional same-hand fine-tune, using eager MPS when available. Both backends gain over 80 lines on this holdout; 240 adds no resolved gain over 160. Require line-broken corrected truth and a separate held-out acceptance check for each hand. One hand and one seed do not justify making fine-tuning the default handwriting route.",
   "sets": {
    "public": 240,
    "owner": 21,
@@ -43787,9 +43930,9 @@
    },
    "train": {
     "train": {
-     "calls": 12,
-     "pages": 12,
-     "median_s": 415.1,
+     "calls": 16,
+     "pages": 16,
+     "median_s": 426.2,
      "peak_gb": 6.25
     }
    }

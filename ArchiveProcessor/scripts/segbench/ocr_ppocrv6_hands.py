@@ -635,7 +635,7 @@ TRAIN_PRECISION = os.environ.get('PPOCRV6_PRECISION', '32-true')
 # --workers 0: ketos's DataLoader worker is a fork of the trainer, and the memory guard charges its shared pages again.
 MPS_CAP_GB = 8.     # Metal buffers count in the footprint: the MPS training passed 5 GB in its third epoch; it runs alone
 TRAIN_CAP_GB = 5.   # a batch-1 training peaks at 2.9-3.6 GB. Two CPU trainings side by side each ran
-                    # about 4x slower (2026-11-01), so CPU trainings run one at a time; the MPS one beside them
+                    # about 4x slower (2026-11-01); all CPU/MPS trainings run serially under the shared heavy lock.
 
 
 def best_model(d):
@@ -833,6 +833,7 @@ def cmd_report(_):
            'pairs': {h: {'pages': len(v), 'truth_lines': sum(s['truth_lines'] for s in v),
                          'kept': sum(s['kept'] for s in v)} for h, v in pairs_stats.items()},
            'sets': {'public': len(ids), 'owner': len(own_ids), 'owner_hand': len(hand_ids)}}
+    out['kit_recommendation'] = kit_recommendation(out)
     (RESULTS / 'ocr-ppocrv6-hands.json').write_text(json.dumps(out, indent=1))
     write_md(out)
     print(f'{RESULTS / "ocr-ppocrv6-hands.md"}: {len(pub)} public routes, {len(own)} owner routes, {len(tunes)} tunes')
@@ -844,6 +845,17 @@ def per_epoch(t):
 
 def f1(x):
     return '' if x is None else f'{x:.1f}'
+
+
+def kit_recommendation(o):
+    n160 = [p for p in o.get('tune_pairs', []) if '-n160-' in p['a'] and '-n80-' in p['b']]
+    n240 = [p for p in o.get('tune_pairs', []) if '-n240-' in p['a'] and '-n160-' in p['b']]
+    if len(n160) == len(n240) == 2 and all(p['lo'] > 0 for p in n160) and all(p['lo'] <= 0 <= p['hi'] for p in n240):
+        return ('Target about 160 corrected lines for an optional same-hand fine-tune, using eager MPS when available. '
+                'Both backends gain over 80 lines on this holdout; 240 adds no resolved gain over 160. Require '
+                'line-broken corrected truth and a separate held-out acceptance check for each hand. One hand and '
+                'one seed do not justify making fine-tuning the default handwriting route.')
+    return ''
 
 
 def verdict(o):
@@ -874,14 +886,17 @@ def verdict(o):
         L.append('- **Fine-tuning on one public hand gains little before 80 lines:** '
                  + '; '.join(f'{t["n"]} lines {t["device"]} {t["delta"]:+.1f} ({t["lo"]:+.1f} to {t["hi"]:+.1f})'
                              for t in bw)
-                 + f' on {bw[0]["pages"]} held-out pages of the Blackwell diary, base {bw[0]["base"]:.1f}.')
-    increments = [p for p in o.get('tune_pairs', []) if re.fullmatch(r'blackwell-n240-(cpu|mps)', p['a'])
+                 + f' on {bw[0]["pages"]} held-out Blackwell pages, base {bw[0]["base"]:.1f}.')
+    increments = [p for p in o.get('tune_pairs', []) if re.fullmatch(r'blackwell-n(160|240)-(cpu|mps)', p['a'])
                   and '-n80-' in p['b']]
     if increments:
         L.append('- **The curve past 80 lines, paired on the same held-out pages:** '
-                 + '; '.join(f'240 minus 80 lines ({p["a"].rsplit("-", 1)[1]}) {iv(p)}' for p in increments)
+                 + '; '.join(f'{p["a"].split("-n")[1].split("-")[0]} minus 80 lines '
+                             f'({p["a"].rsplit("-", 1)[1]}) {iv(p)}' for p in increments)
                  + '. These intervals describe 16 held-out Blackwell pages: 12 same-volume and four other-volume '
                  'pages; training-seed variability is unmeasured.')
+    if recommendation := kit_recommendation(o):
+        L.append('- **Kit recommendation.** ' + recommendation)
     if ow:
         worse = sum(t['delta'] < 0 for t in ow)
         L.append(f'- **On the owner\'s Shils pages it made {worse} of {len(ow)} held-out pages worse** '
@@ -930,7 +945,9 @@ def write_md(o):
           'Training lines are the hand\'s own truth lines, paired to blla lines by a monotone alignment on the base '
           f'model\'s reading (character error at most {MAX_CER}, lengths within {LEN_RATIO}x); {VAL_LINES} pool lines '
           'pick the epoch (early stopping); scored on held-out pages read on blla lines, tuned against the base model '
-          'on the same lines. '
+          'on the same lines. All held-out readings use CPU inference, including the MPS-trained weights. '
+          'Fine-tune rows keep the earlier curve\'s S0 normalization for both models '
+          '(not the public panel\'s L1 hyphen joining). '
           + '; '.join(f'{h}: {v["kept"]} of {v["truth_lines"]} truth lines paired over {v["pages"]} pages'
                       for h, v in o['pairs'].items()) + '.', '',
           '| training | lines | device | epochs | minutes | peak GB | held-out pages | base | tuned | delta | interval |',
@@ -947,8 +964,8 @@ def write_md(o):
         L += ['', 'The line sets are nested prefixes of one seeded order, with the same ten validation lines and '
               '16 held-out Blackwell pages (12 same-volume and four other-volume pages), disjoint from the training '
               'and validation pages. n160 allows nine epochs and '
-              'n240 six (1,440 line-steps each at most), so this is a fixed maximum compute-budget curve, '
-              'not a curve trained to convergence at every size. Early stopping may use fewer steps. '
+              'n240 six (1,440 line-steps each at most), so this curve measures gains under a fixed maximum step '
+              'budget. Convergence at each size is unmeasured. Early stopping may use fewer steps. '
               'Only this same-hand Blackwell holdout is scored for the larger tunes: the previous public L1-L3 '
               'and owner zero-shot panels remain above; the new tunes make no full-895, full-96 or cross-hand claim.']
     by = {(t['hand'], t['n'], t['device']): t for t in o['tunes']}
@@ -982,8 +999,9 @@ def write_md(o):
                 L.append(f'| {k} {step} | {s["calls"]} | {s["pages"]} | {s["median_s"]} | {s["peak_gb"]} |')
     killed = sorted({p for v in tm.values() for p in v.get('killed', [])})
     batches = sum(v.get('killed_batches', 0) for v in tm.values())
-    L += ['', f'Calls stopped by the guard ({PAGE_CAP_GB:g} GB a page call; {TRAIN_CAP_GB:g} GB a training, 8 GB for the '
-          f'first attempt): {", ".join(killed) or "none"}; {batches} batched reading calls stopped at the earlier 5 GB '
+    L += ['', f'Calls stopped by the guard ({PAGE_CAP_GB:g} GB a page call; {TRAIN_CAP_GB:g} GB a CPU training, '
+          f'{MPS_CAP_GB:g} GB an MPS training and 8 GB for the original batch-8 '
+          f'attempt): {", ".join(killed) or "none"}; {batches} batched reading calls stopped at the earlier 5 GB '
           'cap, their pages read again. A call includes '
           'loading the model, so one-page calls overstate seconds a page; blla is one page a call because two batched '
           'four-worker runs took the Mac down on 2026-10-31; reading is batched ten pages a call.']
@@ -1000,10 +1018,14 @@ def write_md(o):
           'text, so harder unpaired lines are underrepresented; every held-out page is still scored in full.',
           '- **Comparison.** Every row reads the same pages; comparator readings are the cached ones '
           '(`ocr_rescore.py` sources), scored by `ocr_panel_score.score` with the stratum\'s settings. A route that '
-          'did not read every page is left out of a table rather than scored on fewer.',
-          '- **Noise.** Fixed-weight kraken CPU inference is deterministic (rerun floor 0); the comparators\' rerun '
+          'did not read every page is left out of a table rather than scored on fewer. This regeneration includes '
+          'the already-shipped Nemotron-Parse 2.0 and Unlimited-OCR caches (W46.ocr-new-open-boxes), and refreshed '
+          'Granite owner-subset readings from the saved Mac run; no comparator model was rerun for the curve extension.',
+          '- **Noise.** Fixed-weight kraken CPU inference has an expected rerun floor of 0 (deterministic inference; '
+          'not remeasured in this extension); the comparators\' rerun '
           'floor is ocr-rerun-noise.md\'s 0.49 points. A paired interval across 0 is a tie. Fine-tune intervals '
-          'bootstrap the held-out pages, not training seeds or hands: seed/device training variability is unmeasured '
+          'are exploratory and unadjusted across contrasts; they bootstrap the held-out pages, not training seeds '
+          'or hands: seed/device training variability is unmeasured '
           '(one seed, one training per condition). One held-out owner page per fold cannot estimate population uncertainty.',
           '- **Scope.** Line recognition only: placement of these lines is W46.place-hands. The Qwen few-line '
           'prompting arm (W46.ocr-ppocrv6-hands-qwen, cluster) and the Gemini arm (W46.ocr-ppocrv6-hands-paid) '

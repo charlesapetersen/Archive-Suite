@@ -850,7 +850,7 @@ def ppocrv6_hands(sweep):
             seen.add((a, b))
             pairs.append({"set": setname, "a": a, "b": b, **{f: v[f] for f in ("n", "delta", "lo", "hi", "p")}})
     return {"public": public_rows, "owner": owner_rows, "pairs": pairs, "tunes": d["tunes"],
-            "tune_pairs": d.get("tune_pairs", []), "sets": d["sets"],
+            "tune_pairs": d.get("tune_pairs", []), "kit_recommendation": d.get("kit_recommendation", ""), "sets": d["sets"],
             "line_pairs": d["pairs"],  # the per-page guard lists stay in the report
             "timing": {g: {k: v for k, v in t.items() if isinstance(v, dict)} for g, t in d["timing"].items()}}
 

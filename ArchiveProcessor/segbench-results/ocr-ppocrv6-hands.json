@@ -188,6 +188,17 @@
    "empty": 5
   },
   {
+   "route": "unlimited-ocr",
+   "n": 240,
+   "nes": 65.39666958037927,
+   "strata": {
+    "L1": 62.585021183159014,
+    "L2": 40.11925758041806,
+    "L3": 93.48572997756074
+   },
+   "empty": 18
+  },
+  {
    "route": "ppocrv6-medium",
    "n": 240,
    "nes": 62.115831086791374,
@@ -208,6 +219,17 @@
     "L3": 90.19406584683426
    },
    "empty": 5
+  },
+  {
+   "route": "nemotron-parse-2",
+   "n": 240,
+   "nes": 55.72690206163485,
+   "strata": {
+    "L1": 47.46632405379858,
+    "L2": 33.07012041289079,
+    "L3": 86.64426171821519
+   },
+   "empty": 39
   }
  ],
  "public_pairs": {
@@ -726,6 +748,15 @@
    "empty": 0
   },
   {
+   "route": "unlimited-ocr",
+   "n": 21,
+   "nes": 62.077558910355556,
+   "strata": {
+    "S0": 62.077558910355556
+   },
+   "empty": 0
+  },
+  {
    "route": "ppocrv6-medium",
    "n": 21,
    "nes": 59.38620678172075,
@@ -753,13 +784,22 @@
    "empty": 0
   },
   {
+   "route": "nemotron-parse-2",
+   "n": 21,
+   "nes": 48.71963073609828,
+   "strata": {
+    "S0": 48.71963073609828
+   },
+   "empty": 5
+  },
+  {
    "route": "granite-docling-258m-mlx",
    "n": 21,
-   "nes": 8.62557049308182,
+   "nes": 13.286080133786816,
    "strata": {
-    "S0": 8.62557049308182
+    "S0": 13.286080133786816
    },
-   "empty": 15
+   "empty": 9
   },
   {
    "route": "qwen3-vl-8b-mlx4-loops",
@@ -796,7 +836,7 @@
   "qwen3.5-9b": 87.66339076953192,
   "qwen3.6-27b": 89.24302228922939,
   "qwen3.6-35b-a3b": 86.21051219203513,
-  "granite-docling-258m-mlx": 9.533525281827275,
+  "granite-docling-258m-mlx": 14.684614884711744,
   "lightonocr-3-4b-mlx8": 87.30308048888502,
   "lightonocr-3-4b-mlx8-logprob": 87.30308048888502,
   "paddleocr-vl1.6-bf16": 74.0847011652401,
@@ -818,6 +858,8 @@
   "paddleocr-vl1.6": 76.43977828000594,
   "qwen3.8-27b": 87.19959152538762,
   "infinity-parser2-pro": 89.60118858007077,
+  "unlimited-ocr": 62.541104171707715,
+  "nemotron-parse-2": 49.17401448993738,
   "fs-churro": 80.90203515933509,
   "qwen3.5-27b (FarmShare panel)": 89.41751146263341,
   "gemini3.7-flash-gw": 93.12407545389765,
@@ -871,6 +913,8 @@
   "paddleocr-vl1.6": 75.21856891329426,
   "qwen3.8-27b": 71.92283554803679,
   "infinity-parser2-pro": 81.16251466615734,
+  "unlimited-ocr": 57.6738789275101,
+  "nemotron-parse-2": 44.40298507462687,
   "fs-churro": 64.12760239024257,
   "qwen3.5-27b (FarmShare panel)": 69.30270948729843,
   "gemini3.7-flash-gw": 83.84468722219623,
@@ -1052,6 +1096,36 @@
    "hi": 1.909685910678669
   },
   {
+   "name": "blackwell-n160-cpu",
+   "hand": "blackwell",
+   "n": 160,
+   "device": "cpu",
+   "epochs": 5,
+   "minutes": 18.1,
+   "peak_gb": 3.54,
+   "pages": 16,
+   "tuned": 62.2441715671806,
+   "base": 59.741122972489634,
+   "delta": 2.5030485946909615,
+   "lo": 1.6994557499894878,
+   "hi": 3.2383820272207586
+  },
+  {
+   "name": "blackwell-n240-cpu",
+   "hand": "blackwell",
+   "n": 240,
+   "device": "cpu",
+   "epochs": 5,
+   "minutes": 26.4,
+   "peak_gb": 3.52,
+   "pages": 16,
+   "tuned": 61.97262894473216,
+   "base": 59.741122972489634,
+   "delta": 2.2315059722425223,
+   "lo": 1.3995137666944348,
+   "hi": 3.148611200939039
+  },
+  {
    "name": "blackwell-n80-mps",
    "hand": "blackwell",
    "n": 80,
@@ -1065,6 +1139,36 @@
    "delta": 1.530278560664898,
    "lo": 0.6823920870130724,
    "hi": 2.3392693144245627
+  },
+  {
+   "name": "blackwell-n160-mps",
+   "hand": "blackwell",
+   "n": 160,
+   "device": "mps",
+   "epochs": 5,
+   "minutes": 6.3,
+   "peak_gb": 5.88,
+   "pages": 16,
+   "tuned": 62.34159722671467,
+   "base": 59.741122972489634,
+   "delta": 2.6004742542250296,
+   "lo": 1.7430666842062648,
+   "hi": 3.428907834177186
+  },
+  {
+   "name": "blackwell-n240-mps",
+   "hand": "blackwell",
+   "n": 240,
+   "device": "mps",
+   "epochs": 5,
+   "minutes": 9.3,
+   "peak_gb": 5.9,
+   "pages": 16,
+   "tuned": 62.59297978125656,
+   "base": 59.741122972489634,
+   "delta": 2.851856808766921,
+   "lo": 2.0362653335273846,
+   "hi": 3.688808275946679
   },
   {
    "name": "owner-p050-n39-cpu",
@@ -1127,6 +1231,89 @@
    "hi": -17.282321899736147
   }
  ],
+ "tune_pairs": [
+  {
+   "a": "blackwell-n160-cpu",
+   "b": "blackwell-n80-cpu",
+   "n": 16,
+   "delta": 1.381232375500578,
+   "p": 9.999000099990002e-05,
+   "lo": 1.0200521620424676,
+   "hi": 1.7633305076517445
+  },
+  {
+   "a": "blackwell-n240-cpu",
+   "b": "blackwell-n80-cpu",
+   "n": 16,
+   "delta": 1.1096897530521388,
+   "p": 0.0168983101689831,
+   "lo": 0.27433103342820386,
+   "hi": 1.8268818059638954
+  },
+  {
+   "a": "blackwell-n240-cpu",
+   "b": "blackwell-n160-cpu",
+   "n": 16,
+   "delta": -0.2715426224484392,
+   "p": 0.535946405359464,
+   "lo": -1.1313916390601375,
+   "hi": 0.5117430192625867
+  },
+  {
+   "a": "blackwell-n160-mps",
+   "b": "blackwell-n80-mps",
+   "n": 16,
+   "delta": 1.0701956935601316,
+   "p": 0.00029997000299970003,
+   "lo": 0.6933747552609733,
+   "hi": 1.5149118390882395
+  },
+  {
+   "a": "blackwell-n240-mps",
+   "b": "blackwell-n80-mps",
+   "n": 16,
+   "delta": 1.321578248102023,
+   "p": 9.999000099990002e-05,
+   "lo": 0.9175892672311501,
+   "hi": 1.723094932250608
+  },
+  {
+   "a": "blackwell-n240-mps",
+   "b": "blackwell-n160-mps",
+   "n": 16,
+   "delta": 0.2513825545418915,
+   "p": 0.4343565643435656,
+   "lo": -0.38883820206278896,
+   "hi": 0.7381885131054329
+  },
+  {
+   "a": "blackwell-n80-mps",
+   "b": "blackwell-n80-cpu",
+   "n": 16,
+   "delta": 0.40846234147451455,
+   "p": 0.16848315168483152,
+   "lo": -0.1292072958252879,
+   "hi": 0.9231955213856087
+  },
+  {
+   "a": "blackwell-n160-mps",
+   "b": "blackwell-n160-cpu",
+   "n": 16,
+   "delta": 0.09742565953406812,
+   "p": 0.5998400159984002,
+   "lo": -0.2499997211949827,
+   "hi": 0.46108801495266283
+  },
+  {
+   "a": "blackwell-n240-mps",
+   "b": "blackwell-n240-cpu",
+   "n": 16,
+   "delta": 0.6203508365243988,
+   "p": 0.025297470252974703,
+   "lo": 0.14902601139409644,
+   "hi": 1.0675108439320566
+  }
+ ],
  "timing": {
   "blla-public": {
    "blla": {
@@ -1158,9 +1345,9 @@
   },
   "train": {
    "train": {
-    "calls": 12,
-    "pages": 12,
-    "median_s": 415.1,
+    "calls": 16,
+    "pages": 16,
+    "median_s": 426.2,
     "peak_gb": 6.25
    },
    "killed": [],
@@ -1187,5 +1374,6 @@
   "public": 240,
   "owner": 21,
   "owner_hand": 19
- }
+ },
+ "kit_recommendation": "Target about 160 corrected lines for an optional same-hand fine-tune, using eager MPS when available. Both backends gain over 80 lines on this holdout; 240 adds no resolved gain over 160. Require line-broken corrected truth and a separate held-out acceptance check for each hand. One hand and one seed do not justify making fine-tuning the default handwriting route."
 }

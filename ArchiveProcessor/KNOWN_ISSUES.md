@@ -2,6 +2,15 @@
 
 Tracked bugs we've chosen to come back to later. Each entry has enough context to resume cold.
 
+## FIXED (W46.ocr-ppocrv6-hands-curve, 2026-11-02): incomplete fine-tune evaluation could shrink its sample
+
+`scripts/segbench/ocr_ppocrv6_hands.py::cmd_report` previously skipped missing held-out readings, so an
+interrupted evaluation could appear as a smaller completed comparison. `tune_scores` now requires every
+planned reading; an existing empty reading remains a zero. `tune_pairs` aligns curve and device contrasts
+by page identity and rejects different holdouts even when their counts match. Five synthetic contracts
+cover missing/empty readings, page alignment, all nine 80/160/240 CPU/MPS contrasts and the conditional kit recommendation. The report and bench
+panel distinguish page intervals from unmeasured training-seed and cross-hand variation.
+
 ## FIXED / experiment awaits cap headroom (W46.ocr-ppocrv6-hands-paid, 2026-11-02): stop on missing billing; never repeat retained attempts
 
 `scripts/segbench/hand_icl_gateway.py::call` initially continued across nine HTTP 502 replies without usage.
