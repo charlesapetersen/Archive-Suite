@@ -2,11 +2,13 @@
 and the submit guard, on toy data.
 Run: $(torch-env.sh) test_kit_gate_sherlock.py   (no bench data, no model call, no cluster)."""
 import json
+from copy import deepcopy
 import os
 from pathlib import Path
 import subprocess
 import tempfile
 import unittest
+from unittest.mock import patch
 
 import kit_gate_sherlock as K
 
@@ -93,6 +95,74 @@ class Frozen(unittest.TestCase):
                                env={**os.environ, "ARCHIVE_UNATTENDED": "1"}, capture_output=True, text=True)
             self.assertEqual(r.returncode, 2)
             self.assertIn("owner-attended", r.stdout)
+
+
+class TruthProvenance(unittest.TestCase):
+    """Real committed scores exercise the consuming refresh; no corpus, pack, models or money."""
+    def setUp(self):
+        self.source = K.RESULTS / K.OWNER_SOURCE
+        self.local = json.loads(self.source.read_text())
+        self.kit = json.loads((K.RESULTS / "seg-kit-gate-sherlock.json").read_text())
+
+    def test_reuses_exact_owner_scores_and_keeps_original_diagnostics(self):
+        before = deepcopy(self.kit)
+        boxes = K.qualify_boxes(self.kit["boxes"])
+        self.assertEqual(before["boxes"]["observed"], boxes["observed"])
+        self.assertEqual(before["checkpack"], self.kit["checkpack"])
+        sc = boxes["sc0122_owner"]
+        self.assertEqual(sc["source_sha256"], K.sha(self.source))
+        self.assertEqual((sc["asked_known"], sc["controls"], sc["agreed_doc_gaps"]), (30, 60, 158))
+        for key, route in K.OWNER_ROUTES.items():
+            self.assertEqual(sc["models"][key], self.local["sc0122_owner"]["models"][route])
+        scrows = [r for r in boxes["observed"] if r["box"] == "SC0122"]
+        self.assertTrue(all("teacher-drafted" in r["truth"] and "conditional" in r["interpretation"] for r in scrows))
+
+    def reject_source(self, change, error=ValueError):
+        change(self.local)
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / K.OWNER_SOURCE
+            path.write_text(json.dumps(self.local))
+            with self.assertRaises(error):
+                K.qualify_boxes(self.kit["boxes"], path)
+
+    def test_missing_route_refused(self):
+        self.reject_source(lambda d: d["sc0122_owner"]["models"].pop("fs-4b"), KeyError)
+
+    def test_changed_support_refused(self):
+        self.reject_source(lambda d: d["sc0122_owner"].update(asked_known=37))
+
+    def test_uncovered_stratum_refused(self):
+        self.reject_source(lambda d: d["sc0122_owner"]["uncovered_strata"].append("missing"))
+
+    def test_inconsistent_stratum_denominator_refused(self):
+        self.reject_source(lambda d: next(iter(d["sc0122_owner"]["strata"].values())).__setitem__(1, 0))
+
+    def test_unrelated_run_refused(self):
+        def change(d):
+            next(r for r in d["observed"] if r["box"] == "SC0122" and r["route"] == "fs-2b")["false merges"] += 1
+        self.reject_source(change)
+
+    def test_wrong_weighted_estimate_refused(self):
+        self.reject_source(lambda d: d["sc0122_owner"]["models"]["fs-2b"].update(owner_weighted_accuracy=.99))
+
+    def test_refresh_is_offline_and_idempotent(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            (root / K.OWNER_SOURCE).write_bytes(self.source.read_bytes())
+            target = root / "seg-kit-gate-sherlock.json"
+            target.write_text(json.dumps(self.kit))
+            with patch.object(K, "RESULTS", root), patch.object(K, "_seg", side_effect=AssertionError("no model/data")), \
+                    patch.object(K, "import_answers", side_effect=AssertionError("no pack import")):
+                K.cmd_refresh(None)
+                first = [target.read_bytes(), target.with_suffix(".md").read_bytes()]
+                K.cmd_refresh(None)
+                self.assertEqual(first, [target.read_bytes(), target.with_suffix(".md").read_bytes()])
+            report = first[1].decode()
+            for text in ("tag/teacher-drafted", "30 disputes", "158 known agreed", "90 known owner rulings",
+                         "not 188 independent", "not independent accuracy", "98.1%", "document-exact"):
+                self.assertIn(text, report)
+            self.assertNotIn("No drafter or relative", report)
+            self.assertIn("89.1%", report)   # held-out Sasha unchanged
 
 
 if __name__ == "__main__":

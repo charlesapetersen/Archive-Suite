@@ -393,10 +393,17 @@ def seg_kit_gate_sherlock():
     d = json.loads(path.read_text())
     if any(r["missing"] for r in d["runs"].values()):
         sys.exit(f"seg-kit-gate-sherlock.json has unanswered windows: {d['runs']}")
-    return {"checkpack": [{k: r[k] for k in ("model", "split", "gaps", "right", "false_splits", "false_merges",
+    # Enforce the writer's provenance/source contract on every build, including after a local rescore.
+    sys.path.insert(0, str(HERE.parent / "ArchiveProcessor/scripts/segbench"))
+    from kit_gate_sherlock import qualify_boxes
+    from copy import deepcopy
+    qualified = qualify_boxes(deepcopy(d["boxes"]), RESULTS / "seg-boxes-score-local.json")
+    if qualified != d["boxes"]:
+        sys.exit("seg-kit-gate-sherlock.json has stale provenance; run kit_gate_sherlock.py refresh")
+    return {"sc0122_owner": qualified["sc0122_owner"], "checkpack": [{k: r[k] for k in ("model", "split", "gaps", "right", "false_splits", "false_merges",
                                               "tag_right")} for r in d["checkpack"]["rows"]],
             "boxes": [{k: r[k] for k in ("model", "box", "split", "known gaps", "gap accuracy", "false splits",
-                                          "false merges", "pages exact")} for r in d["boxes"]["observed"]],
+                                          "false merges", "pages exact", "truth", "interpretation")} for r in d["boxes"]["observed"]],
             "failed": {k: r["failed"] for k, r in d["runs"].items()}}
 
 

@@ -9,6 +9,7 @@ in one Sherlock submission:
              and SC0122 (both wholly in the students' training split: trained-on). The last two are W46.seg-boxes-score's
              teacher-and-4B arm, so that item shares this job rather than running the teacher twice.
 
+  kit_gate_sherlock.py refresh               # offline provenance/owner-score refresh of saved scores
   kit_gate_sherlock.py plan                  # request counts and the pages still without Vision text (no writes)
   kit_gate_sherlock.py ocr                   # Vision text for those pages into the segbench cache (heavy-run.py)
   kit_gate_sherlock.py pack  --out DIR       # the frozen pack for Sherlock (Mac only)
@@ -35,6 +36,7 @@ from collections import Counter, defaultdict
 import csv
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
 import shutil
@@ -410,7 +412,73 @@ def score_boxes():
                           for k, g in enumerate(r["gaps"])])
               for r in recs for a, b in (("fs-seg-2b", "fs-qwen3.5-27b"), ("fs-seg-4b", "fs-qwen3.5-27b"),
                                          ("fs-seg-2b", "fs-seg-4b"))]
-    return {"observed": observed, "teacher_split": K.teacher_split(recs), "paired": paired}
+    return qualify_boxes({"observed": observed, "teacher_split": K.teacher_split(recs), "paired": paired})
+
+
+# This is the completed local arm, not the unfinished gateway/offset experiment.
+OWNER_SOURCE = "seg-boxes-score-local.json"
+OWNER_ROUTES = {"fs-qwen3.5-27b": "teacher", "fs-seg-2b": "fs-2b", "fs-seg-4b": "fs-4b"}
+SC_TRUTH = "tag/teacher-drafted; owner ruled disputes and sampled agreed controls"
+SC_LIMIT = "diagnostic against drafted truth; document exactness is conditional on that draft"
+
+
+def qualify_boxes(boxes, source=None):
+    """Reuse and validate the committed owner estimator; never read images or run a model.
+
+    Match the source's all-known route rows to this kit run before carrying over its owner-supported
+    estimates. Keep every original numeric diagnostic, with explicit truth/scope metadata.
+    """
+    source = RESULTS / OWNER_SOURCE if source is None else Path(source)
+    raw = source.read_bytes()
+    local = json.loads(raw)
+    if local["tag"] != "W46.seg-boxes-score":
+        raise ValueError("SC0122 owner source has the wrong tag")
+    owner = local["sc0122_owner"]
+    if (owner["asked_known"], owner["controls"], owner["agreed_doc_gaps"]) != (30, 60, 158):
+        raise ValueError("SC0122 owner source has changed support; review before reuse")
+    strata = list(owner["strata"].values())
+    if (owner["uncovered_strata"] or len(strata) != 4 or any(not 0 < n <= N for N, n in strata)
+            or sum(N for N, n in strata) != 158 or sum(n for N, n in strata) != 60):
+        raise ValueError("SC0122 owner source has missing or inconsistent strata")
+    models = {}
+    for kit, route in OWNER_ROUTES.items():
+        row = next(r for r in boxes["observed"] if r["box"] == "SC0122" and r["model"] == kit)
+        original = next(r for r in local["observed"] if r["box"] == "SC0122" and r["route"] == route)
+        for field in ("known gaps", "unsure", "gap accuracy", "pages exact", "false splits", "false merges"):
+            if row[field] != original[field]:
+                raise ValueError(f"SC0122 {kit}: owner source mismatches kit {field}")
+        m = owner["models"][route]
+        if not (0 <= m["asked_right"] <= 30 and 0 <= m["controls_right"] <= 60
+                and 0 <= m["agreed_weighted_accuracy"] <= 1
+                and math.isclose(m["owner_weighted_accuracy"],
+                                 (m["asked_right"] + 158 * m["agreed_weighted_accuracy"]) / 188,
+                                 rel_tol=0, abs_tol=1e-12)):
+            raise ValueError(f"SC0122 {kit}: inconsistent owner estimate")
+        models[kit] = dict(m)
+    for r in boxes["observed"]:
+        r["truth"] = SC_TRUTH if r["box"] == "SC0122" else "locked owner truth"
+        r["interpretation"] = SC_LIMIT if r["box"] == "SC0122" else "known gaps; unsure-touching documents excluded"
+    for r in boxes["paired"]:
+        r["interpretation"] = SC_LIMIT if r["scope"] == "SC0122" else "paired known-gap comparison"
+    for per in boxes["teacher_split"].values():
+        for box, r in per.items():
+            r["interpretation"] = SC_LIMIT if box == "SC0122" else "descriptive co-occurrence"
+    boxes["sc0122_owner"] = {**{k: v for k, v in owner.items() if k != "models"}, "models": models,
+                              "source": source.name, "source_sha256": hashlib.sha256(raw).hexdigest(),
+                              "estimator": "seg_boxes_score.py::sc0122_owner",
+                              "truth": "owner-ruled disputes and agreed controls; agreed strata weighted N/n",
+                              "scope": "trained-on; 90 known owner-ruled gaps support an estimate over 188 document gaps; "
+                                       "no owner-supported document-exact estimate or independent held-out accuracy"}
+    return boxes
+
+
+def cmd_refresh(_a):
+    """Offline consuming refresh of saved scores, without pack import or duplicate inference."""
+    path = RESULTS / "seg-kit-gate-sherlock.json"
+    out = json.loads(path.read_text())
+    out["boxes"] = qualify_boxes(out["boxes"])
+    path.write_text(json.dumps(out, indent=1) + "\n")
+    (RESULTS / "seg-kit-gate-sherlock.md").write_text(render(out))
 
 
 def paired_row(pair, scope, rights):
@@ -437,7 +505,7 @@ def render(out):
     """seg-kit-gate-sherlock.md, from the scored record alone."""
     cp, bx, runs = out["checkpack"], out["boxes"], out["runs"]
     pct = lambda v: "-" if v is None else f"{100 * v:.1f}%"
-    L = ["# W46.kit-gate-sherlock — the students and the teacher on owner-ruled gaps they have no answers for", "",
+    L = ["# W46.kit-gate-sherlock — the students and the teacher on locked boxes and owner checks", "",
          "Generated by `ArchiveProcessor/scripts/segbench/kit_gate_sherlock.py score` from one Sherlock submission "
          f"(pack `{out['pack']}`, batch 20261031-210431): the Qwen3.5 27B teacher and the fine-tuned 2B and 4B on the "
          f"same {out['sets']['checkpack']['windows'] + out['sets']['boxes']['windows']} windows each, the bench's "
@@ -464,28 +532,46 @@ def render(out):
     L += ["", "## The three locked boxes", "",
           "Known gaps only (unsure out); pages exact over the documents no unsure gap touches, as `seg-kit-gate.md`. "
           "Sasha is the one owner box no student trained on; the Illustrated Review and SC0122 are wholly in their "
-          "training split (owner, 2026-10-29). SC0122 here is every known gap, not W46.seg-boxes-score's 97 "
-          "owner-ruled ones.", "",
+          "training split (owner, 2026-10-29). SC0122's all-known rows are diagnostics against tag/teacher-drafted truth, "
+          "including unchecked agreement. Their document-exact figures are conditional on that draft, not "
+          "owner-supported document accuracy. Use the owner-supported gap estimator below.", "",
           "| model | box | split | known gaps | gap accuracy | false splits | false merges | pages exact |",
           "|---|---|---|---:|---:|---:|---:|---:|"]
     for r in bx["observed"]:
-        L.append(f"| {LABEL[r['model']]} | {r['box']} | {r['split']} | {r['known gaps']} | {pct(r['gap accuracy'])} "
+        L.append(f"| {LABEL[r['model']]} | {r['box']} | {r['split']}{' (draft diagnostic)' if r['box'] == 'SC0122' else ''} | {r['known gaps']} | {pct(r['gap accuracy'])} "
                  f"| {r['false splits']} | {r['false merges']} | {pct(r['pages exact'])} |")
-    L += ["", "## Paired differences", "",
+    sc = bx["sc0122_owner"]
+    L += ["", "## SC0122: owner-supported weighted gap estimate (trained-on)", "",
+          f"Reused without inference from `{sc['source']}` (`{sc['estimator']}`; SHA-256 `{sc['source_sha256']}`). "
+          "The owner ruled 37 disputed gaps and 60 agreed controls; 30 disputes remain known document-to-document "
+          "gaps after excluding unsure and non-document support. The 60 controls represent 158 known agreed document gaps, weighted N/n "
+          "within each of four covered strata. Thus 90 known owner rulings support the estimate over 188 gaps; "
+          "this is not 188 independent owner rulings. No owner-supported document-exact estimate follows from "
+          "these sampled gap controls. These are stratified-sample point estimates; the paired tests below do not "
+          "include control-subsampling uncertainty. Students trained on this box; this is not held-out accuracy.", "",
+          "| model | known disputes right / 30 | controls right / 60 | agreed weighted | owner-supported weighted |",
+          "|---|---:|---:|---:|---:|"]
+    for key, m in sc["models"].items():
+        L.append(f"| {LABEL[key]} | {m['asked_right']} | {m['controls_right']} | "
+                 f"{pct(m['agreed_weighted_accuracy'])} | {pct(m['owner_weighted_accuracy'])} |")
+    L += ["", "Stratum support (population N / owner controls n): " +
+          "; ".join(f"{s}: {N}/{n}" for s, (N, n) in sc["strata"].items()) + ".", "",
+          "## Paired differences", "",
           "Same gaps, same windows. Discordant gaps are those only one model of the pair gets right; p is the exact "
           "two-sided sign test on them. Sampling only: the rerun floor (1.4-3.2 points a box, `seg-kit-gate.md`) is "
-          "not in it, and gaps within one box are not independent, so a small p on one box is one box's finding.", "",
+          "not in it, and gaps within one box are not independent, so a small p on one box is one box's finding. "
+          "SC0122 paired rows are draft-agreement diagnostics, not independent accuracy tests.", "",
           "| pair | scope | gaps | only first right | only second right | difference | p |",
           "|---|---|---:|---:|---:|---:|---:|"]
     for r in cp["paired"] + bx["paired"]:
-        scope = SPLIT.get(r["scope"], r["scope"])
+        scope = SPLIT.get(r["scope"], r["scope"]) + (" (draft diagnostic)" if r["scope"] == "SC0122" else "")
         if r["scope"] in SPLIT:
             scope = "checkpack, " + scope
         L.append(f"| {r['pair']} | {scope} | {r['gaps']} | {r['only first right']} | {r['only second right']} "
                  f"| {r['difference points']:+.1f} points | {r['sign test p']:.3g} |")
     L += ["", "## The teacher split", "",
           "Each student's wrong gaps by what the teacher did on the same gap; descriptive co-occurrence in single "
-          "runs, as in `seg-kit-gate.md`.", "",
+          "runs, as in `seg-kit-gate.md`. SC0122 is descriptive agreement with drafted truth only.", "",
           "| student | set | gaps | student wrong | teacher wrong the same way | teacher right | teacher wrong, student right |",
           "|---|---|---:|---:|---:|---:|---:|"]
     for r in cp["teacher_split"]:
@@ -510,7 +596,9 @@ READING = """## Reading
   gets wrong. One box: it shows the teacher can be beaten on held-out owner material, not by how much on another.
 - **On the Illustrated Review, trained-on, the teacher leads (78.1% against 73.3% and 71.9%; 4B against teacher 3
   to 12, p 0.035)**, every model is weak, and the students' errors are mostly false merges (30 and 29); on SC0122,
-  trained-on, all three are at 98.9-99.5% and tie.
+  trained-on, 98.9-99.5% is agreement with partly teacher-drafted truth, not independent accuracy. The reused
+  owner-supported weighted gap estimates are 98.1% (2B) and 99.5% (teacher and 4B), within the rerun floor;
+  sampled gap controls do not justify an owner-supported document-exact claim.
 - **On the owner's checkpack the 2B is right on 67 of 74 gaps, the 4B 64, the teacher 62.** On the 9 held-out gaps
   the students get 8 and the teacher 7. Paired, 2B against teacher is 6 gaps to 1 (p 0.125): a lead, not a
   finding at n 74, and the 9 held-out gaps settle nothing on their own. Eleven of the teacher's 12 errors are false
@@ -526,8 +614,12 @@ CARD = """## Measurement card
 
 - **Truth.** The owner's answers on the 80-gap checkpack (`label-clean-owner-answers.csv`; his 6 unsure out), and the
   three locked boxes' truths (Sasha owner-ruled from label tags, locked 2026-10-30; the Illustrated Review and SC0122
-  locked 2026-10-29/30), unsure gaps out of every count. No drafter or relative of a scored route made them, except
-  that the checkpack's candidate gaps came from the teacher's label-clean run (Selection).
+  locked 2026-10-29/30), unsure gaps out of every count. SC0122 was drafted from tags plus the scored Qwen3.5 27B
+  teacher: the owner ruled 37 disputes and 60 agreed controls, not the remaining agreed gaps. Its 188-gap rows,
+  paired tests, teacher split and document-exact figures are draft diagnostics. The separate owner-supported
+  estimator uses 30 known disputes and 60 controls weighted to 158 agreed document gaps, with all four strata
+  covered. It estimates gap accuracy only, on trained-on material. Checkpack truth is owner-ruled, but its
+  candidate gaps came from the teacher's label-clean run (Selection).
 - **Selection.** The three boxes whole. The checkpack was drawn by stratum from the corpus label set, and the strata
   are defined by the teacher's own ABBYY-run label against the tag (`corpus_pairs.check_stratum`): selected partly by
   a tested route and by ABBYY text. That over-represents gaps the teacher disagreed with (strata B, C), which biases
@@ -561,6 +653,7 @@ def main():
     sub = ap.add_subparsers(dest="cmd", required=True)
     sub.add_parser("plan")
     sub.add_parser("ocr")
+    sub.add_parser("refresh", help="reuse committed local owner scores; no inference or pack import")
     p = sub.add_parser("pack"); p.add_argument("--out", required=True)
     p = sub.add_parser("check"); p.add_argument("--root", required=True)
     p = sub.add_parser("score"); p.add_argument("--pack", required=True); p.add_argument("--results", required=True)
@@ -568,7 +661,7 @@ def main():
     if a.cmd == "check":
         check(a.root)
     else:
-        {"plan": cmd_plan, "ocr": cmd_ocr, "pack": cmd_pack, "score": cmd_score}[a.cmd](a)
+        {"plan": cmd_plan, "ocr": cmd_ocr, "pack": cmd_pack, "score": cmd_score, "refresh": cmd_refresh}[a.cmd](a)
 
 
 if __name__ == "__main__":

@@ -13898,3 +13898,13 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   No item scratch created in the bench cache; existing responses/truth/shared weights retained as inputs
   owned by prior work. Temporary verification script removed. Published private bench copy is now behind.
   <!-- /W46.mac-card-provenance -->
+
+- [x] **W46.seg-kit-truth-provenance — qualify SC0122's kit truth and reuse its owner-supported score [S · S2]** · §Processing review — W46 · SHIPPED 2026-11-02 (this commit) (lane: segbench) (uses: light) — Measurement review 2026-11-01 pass 4, P4-2 (`execution-plans/processing-review/measure-reviews/2026-11-01.md`), baseline 7092c5fd, `ArchiveProcessor/scripts/segbench/kit_gate_sherlock.py::{score_boxes,render,CARD}`, `ArchiveOCRBench/build.py::seg_kit_gate_sherlock` and the kit panel in `ArchiveOCRBench/site/template.html`. Offline/$0 consuming refresh: the 188-known-gap SC0122 scores include tag/teacher-drafted truth, contrary to the card's no-scored-drafter claim and audit SEG-1. Reuse W46.seg-boxes-score's cached owner-supported weighted comparison (`seg_boxes_score.py::sc0122_owner`); no duplicate inference or truth work. Correct writer/report/JSON and bench headings/provenance/conclusions together; retain all-known trained-on rows only as qualified diagnostics and restrict document-exact conclusions to justified truth support. Add a provenance regression check. Sasha's owner-ruled held-out lead stands. Phase 4 waits. **Pass 5 (2026-11-02), P5-2:** the committed `seg-boxes-score-local.json::sc0122_owner` (4383ab97) already has all three kit routes and 30 known disputes/60 controls/158 agreed document gaps. Reuse and validate that artifact now; no dependency on the unfinished gateway/offset experiment or a future full result file.
+  Result: source-validated offline refresh reuses the committed three-route SC0122 owner estimator;
+  report/JSON/bench distinguish drafted diagnostics from 30/60/158 owner support. Weighted 2B 98.1%,
+  teacher/4B 99.5%; no owner-supported document-exact claim. Sasha/checkpack/all original numeric
+  diagnostics unchanged. Verified 14 kit and 2 bench provenance contracts, repeat refresh/build freshness,
+  original-score equality and actual headless desktop/mobile panel renders; separate adversarial pass clear.
+  No inference, spend or owner work. No item scratch created in the bench cache; existing shared source
+  scores/caches retained for W46.seg-boxes-score, whose paid recovery/offset gates are unchanged.
+  <!-- /W46.seg-kit-truth-provenance -->

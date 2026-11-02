@@ -27422,6 +27422,55 @@
   ]
  },
  "seg_kit_gate_sherlock": {
+  "sc0122_owner": {
+   "asked_known": 30,
+   "controls": 60,
+   "agreed_doc_gaps": 158,
+   "strata": {
+    "cont, 0.02 <= P(new) < 0.5": [
+     60,
+     24
+    ],
+    "new, 0.5 <= P(new) < 0.99": [
+     12,
+     12
+    ],
+    "cont, P(new) < 0.02": [
+     35,
+     12
+    ],
+    "new, P(new) >= 0.99": [
+     51,
+     12
+    ]
+   },
+   "uncovered_strata": [],
+   "models": {
+    "fs-qwen3.5-27b": {
+     "asked_right": 29,
+     "controls_right": 60,
+     "agreed_weighted_accuracy": 1.0,
+     "owner_weighted_accuracy": 0.9946808510638298
+    },
+    "fs-seg-2b": {
+     "asked_right": 29,
+     "controls_right": 59,
+     "agreed_weighted_accuracy": 0.9841772151898734,
+     "owner_weighted_accuracy": 0.9813829787234043
+    },
+    "fs-seg-4b": {
+     "asked_right": 29,
+     "controls_right": 60,
+     "agreed_weighted_accuracy": 1.0,
+     "owner_weighted_accuracy": 0.9946808510638298
+    }
+   },
+   "source": "seg-boxes-score-local.json",
+   "source_sha256": "5672c967494303d6c23472c883a224df2fd2d760a5281439f36898e0c8e24404",
+   "estimator": "seg_boxes_score.py::sc0122_owner",
+   "truth": "owner-ruled disputes and agreed controls; agreed strata weighted N/n",
+   "scope": "trained-on; 90 known owner-ruled gaps support an estimate over 188 document gaps; no owner-supported document-exact estimate or independent held-out accuracy"
+  },
   "checkpack": [
    {
     "model": "teacher",
@@ -27514,7 +27563,9 @@
     "gap accuracy": 0.6742857142857143,
     "false splits": 57,
     "false merges": 0,
-    "pages exact": 0.15517241379310345
+    "pages exact": 0.15517241379310345,
+    "truth": "locked owner truth",
+    "interpretation": "known gaps; unsure-touching documents excluded"
    },
    {
     "model": "fs-seg-2b",
@@ -27524,7 +27575,9 @@
     "gap accuracy": 0.8914285714285715,
     "false splits": 14,
     "false merges": 5,
-    "pages exact": 0.46551724137931033
+    "pages exact": 0.46551724137931033,
+    "truth": "locked owner truth",
+    "interpretation": "known gaps; unsure-touching documents excluded"
    },
    {
     "model": "fs-seg-4b",
@@ -27534,7 +27587,9 @@
     "gap accuracy": 0.8,
     "false splits": 33,
     "false merges": 2,
-    "pages exact": 0.21839080459770116
+    "pages exact": 0.21839080459770116,
+    "truth": "locked owner truth",
+    "interpretation": "known gaps; unsure-touching documents excluded"
    },
    {
     "model": "fs-qwen3.5-27b",
@@ -27544,7 +27599,9 @@
     "gap accuracy": 0.7808219178082192,
     "false splits": 11,
     "false merges": 21,
-    "pages exact": 0.5306122448979592
+    "pages exact": 0.5306122448979592,
+    "truth": "locked owner truth",
+    "interpretation": "known gaps; unsure-touching documents excluded"
    },
    {
     "model": "fs-seg-2b",
@@ -27554,7 +27611,9 @@
     "gap accuracy": 0.7328767123287672,
     "false splits": 9,
     "false merges": 30,
-    "pages exact": 0.3945578231292517
+    "pages exact": 0.3945578231292517,
+    "truth": "locked owner truth",
+    "interpretation": "known gaps; unsure-touching documents excluded"
    },
    {
     "model": "fs-seg-4b",
@@ -27564,7 +27623,9 @@
     "gap accuracy": 0.7191780821917808,
     "false splits": 12,
     "false merges": 29,
-    "pages exact": 0.36054421768707484
+    "pages exact": 0.36054421768707484,
+    "truth": "locked owner truth",
+    "interpretation": "known gaps; unsure-touching documents excluded"
    },
    {
     "model": "fs-qwen3.5-27b",
@@ -27574,7 +27635,9 @@
     "gap accuracy": 0.9946808510638298,
     "false splits": 1,
     "false merges": 0,
-    "pages exact": 0.9217877094972067
+    "pages exact": 0.9217877094972067,
+    "truth": "tag/teacher-drafted; owner ruled disputes and sampled agreed controls",
+    "interpretation": "diagnostic against drafted truth; document exactness is conditional on that draft"
    },
    {
     "model": "fs-seg-2b",
@@ -27584,7 +27647,9 @@
     "gap accuracy": 0.9893617021276596,
     "false splits": 1,
     "false merges": 1,
-    "pages exact": 0.9776536312849162
+    "pages exact": 0.9776536312849162,
+    "truth": "tag/teacher-drafted; owner ruled disputes and sampled agreed controls",
+    "interpretation": "diagnostic against drafted truth; document exactness is conditional on that draft"
    },
    {
     "model": "fs-seg-4b",
@@ -27594,7 +27659,9 @@
     "gap accuracy": 0.9946808510638298,
     "false splits": 1,
     "false merges": 0,
-    "pages exact": 0.9217877094972067
+    "pages exact": 0.9217877094972067,
+    "truth": "tag/teacher-drafted; owner ruled disputes and sampled agreed controls",
+    "interpretation": "diagnostic against drafted truth; document exactness is conditional on that draft"
    }
   ],
   "failed": {

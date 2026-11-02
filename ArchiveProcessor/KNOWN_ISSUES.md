@@ -61,17 +61,17 @@ The bench's truth-limit summaries are qualified too. Six synthetic tests and two
 generations pass: the entire pre-card numeric/settings/runtime body is byte-identical. No inference,
 truth edit, spend or default change; the parent box-reader verdict and Phase-4 gates stand.
 
-## OPEN (W46.seg-kit-truth-provenance, 2026-11-01): measurement support and report provenance
+## FIXED (W46.seg-kit-truth-provenance, 2026-11-02): SC0122 kit truth provenance
 
-W46.measure-review pass 4, baseline `7092c5fd`; independent refute-check confirmed these offline corrections.
-Details: [`2026-11-01.md`](../execution-plans/processing-review/measure-reviews/2026-11-01.md).
-
-- `scripts/segbench/kit_gate_sherlock.py::{score_boxes,render,CARD}` scores SC0122's all-known truth while
-  claiming no scored drafter made it; that truth still includes tag/teacher agreement beyond the owner's
-  checked subset. W46.seg-kit-truth-provenance reuses W46.seg-boxes-score's owner-supported scoring and fixes
-  report/panel provenance. Sasha's held-out lead stands; no duplicate experiment is needed. The committed
-  `seg-boxes-score-local.json::sc0122_owner` now supplies every kit route and the supported
-  30/60/158 document-gap comparison; pass 5 removes the wait for unfinished paid offsets.
+`kit_gate_sherlock.py::{score_boxes,refresh,render,CARD}` now labels SC0122's 188-gap,
+paired and document-exact rows as diagnostics against tag/teacher-drafted truth. Its offline refresh
+reuses `seg-boxes-score-local.json::sc0122_owner` (introduced in `4383ab97`), validates route/support
+and estimator arithmetic, and records the source hash. The 30 known disputes plus 60 controls weighted
+to 158 agreed document gaps give 98.1% (2B), 99.5% (teacher/4B): sampled gap estimates, no owner-supported
+document-exact claim or held-out generalization. Bench builds reject stale provenance and expose the
+same support/limits. Original numeric diagnostics, checkpack and Sasha's held-out lead are unchanged.
+Offline contracts, repeat generation and actual headless desktop/mobile rendering pass. No model run,
+truth edit, owner work or spending; unfinished box gateway/offset gates remain intact.
 
 ## FIXED (W46.measure-report-consistency, 2026-11-01): persistent layout card and qualified Find prose
 

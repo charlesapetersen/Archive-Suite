@@ -115,6 +115,15 @@ so it has no numerical public-set row. Its saved element boxes and the other rea
 are inputs for W46.place-print, not measured line-selection results. Full report and provenance:
 `ArchiveProcessor/segbench-results/bench-corpus/new-open-boxes-20261031.md`.
 
+W46.seg-kit-truth-provenance qualifies the kit's SC0122 all-known rows as diagnostics against
+partly teacher-drafted truth. Its separate owner-supported gap table reuses the committed local box
+rescore: 30 known disputed gaps and 60 owner controls weighted to 158 agreed document gaps. These
+are stratified-sample point estimates on a box the students trained on; the controls do not establish
+owner-supported document-exact accuracy. Refresh without inference or pack access with
+`python3 ArchiveProcessor/scripts/segbench/kit_gate_sherlock.py refresh`, then rebuild this page.
+The writer validates route rows, support and estimator arithmetic and records the source SHA-256;
+the builder rejects stale provenance. Sasha's held-out comparison is unchanged.
+
 ## What is here
 
 | Path | What it is |

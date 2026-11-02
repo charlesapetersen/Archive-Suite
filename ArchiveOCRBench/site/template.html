@@ -161,9 +161,13 @@ footer p { font-size: 13px; }
   </section>
 
   <section class="panel" id="seg-kit-gate-sherlock" hidden>
-    <div class="head"><h2>The teacher and its students on owner-ruled gaps</h2><span class="meta">open models · Sherlock · Vision text</span></div>
-    <h3>The three locked boxes</h3>
+    <div class="head"><h2>The teacher and its students: locked boxes and owner checks</h2><span class="meta">open models · Sherlock · Vision text</span></div>
+    <h3>The three locked boxes (SC0122: draft diagnostics)</h3>
+    <p class="note">SC0122 includes truth drafted from tags and the scored teacher. Its all-known gap and document-exact rows below are conditional diagnostics against that draft. Only Sasha is held out for the students. Use SC0122’s owner-supported gap estimate for accuracy conclusions.</p>
     <div class="tbl"><table><thead><tr><th>Model</th><th>Box</th><th>Trained on it?</th><th>Known gaps</th><th>Gap accuracy</th><th>False splits</th><th>False merges</th><th>Pages in exact document</th></tr></thead><tbody id="skg-box-rows"></tbody></table></div>
+    <h3>SC0122: owner-supported weighted gaps (students trained on this box)</h3>
+    <p class="note" id="skg-sc-support"></p>
+    <div class="tbl"><table><thead><tr><th>Model</th><th>Known disputes right</th><th>Controls right</th><th>Owner-supported weighted</th></tr></thead><tbody id="skg-sc-rows"></tbody></table></div>
     <h3>The owner's checkpack</h3>
     <div class="tbl"><table><thead><tr><th>Model</th><th>Gaps</th><th>Right</th><th>False splits</th><th>False merges</th><th>The corpus tag right</th></tr></thead><tbody id="skg-cp-rows"></tbody></table></div>
     <p class="note" id="skg-note"></p>
@@ -666,14 +670,21 @@ if (skg) {
   const boxName = {IllustratedReview: 'Illustrated Review'};
   const p1 = v => v === null ? '—' : (100 * v).toFixed(1) + '%';
   document.getElementById('skg-box-rows').innerHTML = skg.boxes.map(r => '<tr><td>' + nm[r.model] + '</td><td>' +
-    (boxName[r.box] || r.box) + '</td><td>' + (r.split === 'held-out' ? 'no' : 'yes') + '</td><td>' + r['known gaps'] +
+    (boxName[r.box] || r.box) + (r.box === 'SC0122' ? ' (draft diagnostic)' : '') + '</td><td>' + (r.model === 'fs-qwen3.5-27b' ? 'not fine-tuned' : r.split === 'held-out' ? 'no' : 'yes') + '</td><td>' + r['known gaps'] +
     '</td><td>' + p1(r['gap accuracy']) + '</td><td>' + r['false splits'] + '</td><td>' + r['false merges'] + '</td><td>' +
-    p1(r['pages exact']) + '</td></tr>').join('');
+    p1(r['pages exact']) + (r.box === 'SC0122' ? ' (draft conditional)' : '') + '</td></tr>').join('');
+  const sc = skg.sc0122_owner;
+  document.getElementById('skg-sc-rows').innerHTML = Object.entries(sc.models).map(([k, m]) => '<tr><td>' + nm[k] +
+    '</td><td>' + m.asked_right + ' of ' + sc.asked_known + '</td><td>' + m.controls_right + ' of ' + sc.controls +
+    '</td><td>' + p1(m.owner_weighted_accuracy) + '</td></tr>').join('');
+  document.getElementById('skg-sc-support').textContent = sc.asked_known + ' known owner-ruled disputes; ' + sc.controls +
+    ' owner-ruled controls weighted N/n to ' + sc.agreed_doc_gaps + ' agreed document gaps, all four strata covered. ' +
+    '90 known owner rulings support an estimate over 188 gaps, not a census of owner rulings. Stratified-sample point estimates; paired tests exclude control-subsampling uncertainty. No owner-supported document-exact estimate. Reused from ' + sc.source + '.';
   const sp = {holdout: 'held out', train: 'in training collections', all: 'all'};
   document.getElementById('skg-cp-rows').innerHTML = skg.checkpack.map(r => '<tr><td>' + nm[r.model] + '</td><td>' + r.gaps +
     ' ' + sp[r.split] + '</td><td>' + r.right + ' (' + p1(r.right / r.gaps) + ')</td><td>' + r.false_splits + '</td><td>' +
     r.false_merges + '</td><td>' + r.tag_right + '</td></tr>').join('');
-  document.getElementById('skg-note').textContent = 'One Sherlock job: the teacher whose replies trained the students, and the trained 2B (the shipped build\'s source) and 4B, on the same 7-page windows with Apple Vision\'s text, the app\'s input (they trained on ABBYY text). Sasha is the one owner box no student trained on, and there the 2B beats its teacher by 21.7 points (44 gaps to 6): every teacher error there is a false split. On the two boxes they trained on the teacher leads on the Illustrated Review and all three tie on SC0122. The checkpack is the owner\'s 80 ruled gaps (6 unsure out), drawn by stratum where the teacher and the tag disagreed, so its pooled rate is not a population rate and the teacher is drawn against; the 2B\'s lead there (6 gaps to 1) is inside the noise. Failed windows, scored neutral: ' + Object.entries(skg.failed).map(([k, v]) => nm[k] + ' ' + v).join(', ') + '. Unsure gaps out of every count. Source: <code>seg-kit-gate-sherlock.md</code>.'.replace(/<\/?code>/g, '');
+  document.getElementById('skg-note').textContent = 'One Sherlock job: the teacher whose replies trained the students, and the trained 2B (the shipped build\'s source) and 4B, on the same 7-page windows with Apple Vision\'s text, the app\'s input (they trained on ABBYY text). Sasha is the one owner box no student trained on, and there the 2B beats its teacher by 21.7 points (44 gaps to 6): every teacher error there is a false split. On the two boxes they trained on the teacher leads on the Illustrated Review and SC0122’s owner-supported weighted gap estimates are 98.1% (2B) and 99.5% (teacher and 4B), within the rerun floor; its all-known rows measure agreement with partly teacher-drafted truth. The checkpack is the owner\'s 80 ruled gaps (6 unsure out), drawn by stratum where the teacher and the tag disagreed, so its pooled rate is not a population rate and the teacher is drawn against; the 2B\'s lead there (6 gaps to 1) is inside the noise. Failed windows, scored neutral: ' + Object.entries(skg.failed).map(([k, v]) => nm[k] + ' ' + v).join(', ') + '. Unsure gaps out of every count. Source: <code>seg-kit-gate-sherlock.md</code>.'.replace(/<\/?code>/g, '');
   document.getElementById('seg-kit-gate-sherlock').hidden = false;
 }
 
