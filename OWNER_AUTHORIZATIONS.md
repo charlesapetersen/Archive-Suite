@@ -456,3 +456,22 @@ including engine checkpoints and completed results, are authorized without a fre
 question. This expressly includes W46.seg-boxes-score’s saved checkpoints and final verified result.
 Keep the normal verification, review, isolated-checkout and reconciliation requirements. This records
 trusted owner consent; automatic approval review remains in place.
+
+## 2026-11-01 evening — walkthrough answers recorded at owner request
+
+- **W46.ocr-ppocrv6-hands-paid:** retain the full $0.80 allowance for the ten uncertain outcomes
+  (nine HTTP 502 replies without usage and one lost connection); never retry those requests.
+  Resume only the 135 never-attempted conditions after service recovery, within the existing
+  $2.50 total item cap. Known charges are $0.545493, so known charges plus retained allowances
+  start at $1.345493. This expressly permits those existing uncertain outcomes to remain
+  conservatively accounted rather than requiring exact billing reconciliation first. Any new
+  uncertain outcome still stops the run under the existing accounting checks.
+- **W46.seg-boxes-score:** the owner directly authorized in this chat sending cached images and
+  Apple Vision text, with no adjudicated target truth, from Sasha, Illustrated Review, SC0122
+  and Stanton/RG165 offset windows to `https://aiapi-prod.stanford.edu/v1/chat/completions`,
+  using the existing Processor Gateway credential and Gemini 3.7 Flash, and finishing the
+  comparison within the existing $6.80 total item cap including every attempt and reservation.
+  This renews the exact scope after automatic approval review rejected the earlier recorded grant;
+  it does not bypass automatic approval review.
+- **W46.fix-marks-sheet-feedback-owner-ok:** stays open. The owner will review the corrected
+  nine-place/seven-page sheet and supply `marks-feedback-answers.json`; no labels are inferred.
