@@ -102,9 +102,10 @@ table or part 5 (no typed or printed page read, and their 19 handwritten pages i
 the 16-page handwritten chart leaves out), so their owner figures stay in their own panel.
 
 W46.ocr-ppocrv6-hands-paid's 0/8/16-line prompting panel is scaffolded but hidden while its run is
-incomplete. The gateway stopped after 68 successful conditions, nine 502s without usage and a lost
-connection. Its support/cost record is `segbench-results/ocr-ppocrv6-hands-paid.{md,json}`; it has no
-accuracy verdict. Once complete, its 71-page subsets support only that panel, not whole-96/895 rankings.
+incomplete. The reservation guard stopped at $2.427833 against the $2.50 cap after 207 conditions
+(195 successes, two content-filter refusals, ten retained old gateway failures); six Blackwell conditions
+remain untouched. `segbench-results/ocr-ppocrv6-hands-paid.{md,json}` records cost/support and the cap
+question, with no accuracy verdict. Its 71-page subsets support only this panel, not whole-96/895 rankings.
 
 W46.ocr-new-open-boxes adds Unlimited-OCR and Nemotron-Parse 2.0 on both sets (one Sherlock card,
 their in-process transformers routes) and the complete granite-docling-258M Mac arm on the 96. They join all

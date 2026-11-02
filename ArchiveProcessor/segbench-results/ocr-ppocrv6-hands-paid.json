@@ -2,8 +2,8 @@
  "item": "W46.ocr-ppocrv6-hands-paid",
  "model": "gemini-3.7-flash",
  "complete": false,
- "state": "blocked",
- "reason": "Gateway returned HTTP 502 without usage, then ConnectionError; billing reconciliation required.",
+ "state": "reservation-cap-blocked",
+ "reason": "Next $0.08 reservation would exceed the owner-recorded $2.50 working cap; no further call made.",
  "cohorts": {
   "public-L1-transfer": 40,
   "owner-transfer": 15,
@@ -11,30 +11,52 @@
   "blackwell-held-out": 12
  },
  "planned_conditions": 213,
- "attempted": 78,
- "settled": 77,
- "successful": 68,
- "http_counts": {
-  "200": 68,
-  "502": 9
- },
- "known_billing": {
-  "calls": 68,
-  "estimate": 0.545493,
-  "gateway_calls": 68,
-  "gateway": 0.537235,
-  "gateway_over_estimate": 0.9849,
-  "charged": 0.545493
- },
- "unknown_response_count": 9,
- "pending": [
+ "attempted": 207,
+ "successful": 195,
+ "pending": [],
+ "unattempted": [
+  "blackwell-mss1288000967-42-n0",
+  "blackwell-mss1288000967-42-n8",
+  "blackwell-mss1288000967-42-n16",
+  "blackwell-mss1288000967-44-n0",
+  "blackwell-mss1288000967-44-n8",
+  "blackwell-mss1288000967-44-n16"
+ ],
+ "charged": 2.427833,
+ "cap": 2.5,
+ "reservation": 0.08,
+ "retained_allowance": 0.8,
+ "acknowledged_failures": [
+  "public-btp-mss184240037-80-n16",
+  "public-btp-mss1288000848-35-n0",
+  "public-btp-mss1288000848-35-n8",
+  "public-btp-mss1288000848-35-n16",
+  "public-btp-mss184240200-11-n0",
+  "public-btp-mss184240200-11-n8",
+  "public-btp-mss184240200-11-n16",
+  "public-btp-mss184240101-32-n0",
+  "public-btp-mss184240101-32-n8",
   "public-btp-mss184240101-32-n16"
  ],
- "unknown_allowance": 0.7999999999999999,
- "charged": 1.345493,
- "cap": 2.5,
+ "known_billing": {
+  "calls": 197,
+  "estimate": 1.627833,
+  "gateway_calls": 197,
+  "gateway": 1.608562,
+  "gateway_over_estimate": 0.9882,
+  "charged": 1.627833
+ },
+ "failure_reasons": {
+  "retained HTTP 502": 9,
+  "retained lost connection": 1,
+  "content_filter": 2
+ },
+ "estimated_final_charge": 2.48021,
  "groups": [],
  "comparisons": [],
+ "ledger_sha256": "c703f953c9cce0d767895c222927add69f911148ff5359d31540a6165e11e5a2",
+ "pack_freeze_sha256": "6f644e4d11b075429095642fa5b71e254bed99604726d5d951dfa0736c7a7b07",
+ "truth_index_sha256": "051664c1e67ec8b713181f198f21af20bef43aa5ff18c42b8afdc7d4f89c3210",
  "receipt": {
   "item": "W46.ocr-ppocrv6-hands-paid",
   "pack_freeze_sha256": "6f644e4d11b075429095642fa5b71e254bed99604726d5d951dfa0736c7a7b07",
@@ -48,8 +70,5 @@
   "reservation": 0.08,
   "runner_sha256": "6d04a7e94cfd1c2f1b97f9c4421fefd7b5c2c9c525f8d8771d31756ab5170b67",
   "code_commit": "6b5c58c4ad0150c2dc6f4b33b75bd8488f108d8f"
- },
- "ledger_sha256": "ee687a7774b76c9117c65d4007c966f78a2293051199c7db33849cb89544d065",
- "pack_freeze_sha256": "6f644e4d11b075429095642fa5b71e254bed99604726d5d951dfa0736c7a7b07",
- "truth_index_sha256": "051664c1e67ec8b713181f198f21af20bef43aa5ff18c42b8afdc7d4f89c3210"
+ }
 }

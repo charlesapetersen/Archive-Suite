@@ -2,18 +2,24 @@
 
 Tracked bugs we've chosen to come back to later. Each entry has enough context to resume cold.
 
-## FIXED / experiment blocked (W46.ocr-ppocrv6-hands-paid, 2026-11-01): missing-usage gateway errors must stop the run
+## FIXED / experiment awaits cap headroom (W46.ocr-ppocrv6-hands-paid, 2026-11-02): stop on missing billing; never repeat retained attempts
 
-`scripts/segbench/hand_icl_gateway.py::call` retained a full allowance for HTTP 502 replies without usage but
-continued to other requests, contrary to the owner grant's stop-on-uncertain-billing rule. It now stops at the
-first such reply; `require_clear_billing` checks the original, alternate and selected output ledgers before
-credentials or another request. Changing `--out` cannot bypass uncertainty or prior spending. `report` refuses
-partial accuracy tables; `status` publishes only the blocked support/cost record. Regression tests cover these
-boundaries. The preserved run has 68 successful readings ($0.545493 known charges), nine 502s without usage and
-one outstanding connection-error request ($0.80 allowances, $1.345493 counted against the $2.50 cap). No retry.
-The owner's 2026-11-01 evening answer retains those ten allowances and permits only untouched conditions.
-An exact-prefix acknowledgment preserves the original journal, counts all $.80 and never retries those IDs.
-New uncertainty still stops; details in `execution-plans/items/W46.ocr-ppocrv6-hands-paid.md`.
+`scripts/segbench/hand_icl_gateway.py::call` initially continued across nine HTTP 502 replies without usage.
+It now stops at the first new missing-usage outcome; `require_clear_billing` checks all item ledgers before
+credentials or another request. Paid runs require the original frozen pack/truth/output; cached request
+hashes are validated before credentials. A validated append-only acknowledgment pins the exact ten old
+ID/request hashes and original 155-row ledger prefix, retains the owner-approved $.80 and never retries
+those IDs. Raw acknowledgment markers, altered prefixes and subsequent acknowledgments are rejected.
+`report` refuses incomplete accuracy; `status` is read-only accounting. Offline and actual-run proofs pass.
+The final headless check also found `section.panel { display: grid; }` overriding this panel's `hidden` flag;
+a scoped `#hands-icl[hidden] { display: none; }` now hides the incomplete panel while complete data still render.
+
+The authorized resume ended at the existing reservation guard: 207 conditions, 195 successes, two known-billing
+content-filter refusals and ten retained old failures. $1.627833 known conservative charges + $.80 retained =
+$2.427833 counted; the next $.08 reservation exceeds $2.50. No call is outstanding, no new uncertainty arose,
+and six Blackwell conditions remain untouched. W46.ocr-ppocrv6-hands-paid-cap-ok asks for $2.60 working headroom
+(projected final counted cost $2.480210); no further call until answered. Details and measurement limits:
+`segbench-results/ocr-ppocrv6-hands-paid.md`. No accuracy verdict; bench panel hidden.
 
 ## Marks review: question comments and obscured draft boxes (W46.fix-marks-sheet-feedback)
 

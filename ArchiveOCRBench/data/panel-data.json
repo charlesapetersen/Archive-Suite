@@ -43736,7 +43736,25 @@
    "owner-Shils-folder-proxy": 4,
    "blackwell-held-out": 12
   },
-  "charged": 1.345493,
+  "charged": 2.427833,
+  "retained_allowance": 0.8,
+  "acknowledged_failures": [
+   "public-btp-mss184240037-80-n16",
+   "public-btp-mss1288000848-35-n0",
+   "public-btp-mss1288000848-35-n8",
+   "public-btp-mss1288000848-35-n16",
+   "public-btp-mss184240200-11-n0",
+   "public-btp-mss184240200-11-n8",
+   "public-btp-mss184240200-11-n16",
+   "public-btp-mss184240101-32-n0",
+   "public-btp-mss184240101-32-n8",
+   "public-btp-mss184240101-32-n16"
+  ],
+  "failure_reasons": {
+   "retained HTTP 502": 9,
+   "retained lost connection": 1,
+   "content_filter": 2
+  },
   "groups": [],
   "comparisons": []
  },
