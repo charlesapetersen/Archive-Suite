@@ -148,12 +148,19 @@ def gateway_key():
     GW._key = r.stdout.strip()
 
 
-def release_unsent(S):
-    """A reservation whose process was killed before its request left (the Keychain hang): approve its one retry
-    through seg_lincoln_gateway's own rule, its allowance still counted."""
-    if any(r["event"] in ("reserve", "unknown") and S.cached(r["request_sha256"]) is None
-           for r in S.effective_records()):
-        S.retry_unsettled_once()
+def check_prior_failures(S):
+    """A new uncertain outcome remains a stop on resume, before credentials or another send.
+
+    The original pre-HTTP Keychain reservation already has its explicit retry-approved ledger
+    entry, with its full allowance retained. Collection never approves another uncertain retry.
+    """
+    for r in S.effective_records():
+        if r["event"] in ("reserve", "unknown"):
+            raise RuntimeError("unsettled request: full allowance retained; inspect before continuing")
+        if r["event"] == "settle" and not r.get("valid"):
+            hit = S.cached(r["request_sha256"])
+            if not invalid_model_reply(hit, r):
+                raise RuntimeError("saved provider/usage failure: inspect before continuing")
 
 
 def check_reservations(S):
@@ -176,8 +183,8 @@ def cmd_collect(a):
     with (STORE / "collect.lock").open("a") as fh:
         fcntl.flock(fh, fcntl.LOCK_EX | fcntl.LOCK_NB)
         check_reservations(S)
+        check_prior_failures(S)
         gateway_key()
-        release_unsent(S)
         todo = [j for j in jobs() if gemini_answer(*j[1:]) is None][: a.limit or None]
         print(f"{len(todo)} windows to send, item spent ${S.spent():.4f} of ${CAP:.2f}", flush=True)
         invalid = []
@@ -463,7 +470,7 @@ def render(out) -> str:
          "returned gateway cost or list-token estimate (Gemini $0.75/$3.75 per million; "
          f"settled token estimate ${bill['estimate']:.4f}, returned gateway total {gateway_total} from "
          f"{bill['gateway_calls']}/{bill['calls']} settled calls), {g['mean_seconds']:.1f} s a call. "
-         "Item total under the $7 rule.", "",
+         f"Authorized item cap ${CAP:.2f}, including every attempt and retained reservation.", "",
          "## The three locked boxes", "",
          "Known gaps only (the owner's unsure gaps out); pages exact over the documents no unsure gap touches, the "
          "same pages for every route. Sasha is the one box no student trained on; the Illustrated Review and SC0122 "

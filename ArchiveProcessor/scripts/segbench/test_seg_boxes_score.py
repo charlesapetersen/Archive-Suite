@@ -15,6 +15,44 @@ import seg_truth_sheet as TS
 
 
 class Collection(unittest.TestCase):
+    def test_new_uncertain_outcomes_stop_on_resume_before_key_or_send(self):
+        for event in ("reserve", "unknown"):
+            with self.subTest(event=event), tempfile.TemporaryDirectory() as folder, \
+                    patch.object(B, "STORE", Path(folder)), patch.object(S, "STORE", Path(folder)), \
+                    patch.object(B, "_mods", return_value=(None, None, S, None)), \
+                    patch.object(B, "gateway_key") as key, patch.object(S, "call") as send:
+                S.append({"id": "a", "event": "reserve", "charge": .03, "request_sha256": "hash"})
+                if event == "unknown":
+                    S.append({**S.records()[0], "event": "unknown"})
+                before = S.records()
+                with self.assertRaisesRegex(RuntimeError, "unsettled request"):
+                    B.cmd_collect(argparse.Namespace(workers=1, limit=None))
+                key.assert_not_called()
+                send.assert_not_called()
+                self.assertEqual(S.records(), before)
+                self.assertAlmostEqual(S.spent(), .03)
+
+    def test_saved_provider_failure_stops_before_any_other_window(self):
+        with tempfile.TemporaryDirectory() as folder, \
+                patch.object(B, "STORE", Path(folder)), patch.object(S, "STORE", Path(folder)), \
+                patch.object(B, "_mods", return_value=(None, None, S, None)), \
+                patch.object(B, "gateway_key") as key, patch.object(S, "call") as send:
+            S.append({"id": "a", "event": "reserve", "charge": .03, "request_sha256": "hash"})
+            S.append({**S.records()[0], "event": "settle", "http": 502, "valid": False})
+            with self.assertRaisesRegex(RuntimeError, "saved provider/usage failure"):
+                B.cmd_collect(argparse.Namespace(workers=1, limit=None))
+            key.assert_not_called()
+            send.assert_not_called()
+            self.assertAlmostEqual(S.spent(), .03)
+
+    def test_existing_explicit_unsent_approval_keeps_allowance_without_new_approval(self):
+        with tempfile.TemporaryDirectory() as folder, patch.object(S, "STORE", Path(folder)):
+            S.append({"id": "a", "event": "reserve", "charge": .03, "request_sha256": "hash"})
+            S.append({**S.records()[0], "event": "retry-approved"})
+            B.check_prior_failures(S)
+            self.assertEqual(len(S.records()), 2)
+            self.assertAlmostEqual(S.spent(), .03)
+
     def test_saved_success_cannot_bypass_a_prior_reservation_overrun(self):
         with tempfile.TemporaryDirectory() as folder, \
                 patch.object(B, "STORE", Path(folder)), patch.object(S, "STORE", Path(folder)), \
@@ -47,7 +85,7 @@ class Collection(unittest.TestCase):
                 patch.object(B, "STORE", Path(folder)), patch.object(S, "STORE", Path(folder)), \
                 patch.object(S, "CAP", .002), \
                 patch.object(B, "_mods", return_value=(None, None, S, None)), \
-                patch.object(B, "gateway_key"), patch.object(B, "release_unsent"), \
+                patch.object(B, "gateway_key"), \
                 patch.object(B, "jobs", return_value=[("boxes", c, 0, 2) for c in cols]), \
                 patch.object(B, "gemini_answer", return_value=None), \
                 patch.object(S, "request", side_effect=lambda route, col, *args: (body, col.name, [1, 2])), \
