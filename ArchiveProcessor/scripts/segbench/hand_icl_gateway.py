@@ -40,6 +40,36 @@ ENCODING = 'separate-line-images-v1'
 RESULTS = HERE.parents[1] / 'segbench-results'
 COHORTS = {'blackwell-held-out': 12, 'owner-Shils-folder-proxy': 4,
            'owner-transfer': 15, 'public-L1-transfer': 40}
+ACK_PREFIX = 'ee687a7774b76c9117c65d4007c966f78a2293051199c7db33849cb89544d065'
+ACK_ROWS = 155
+ACK_AUTHORITY = '2026-11-01 evening — walkthrough answers recorded at owner request'
+ACK_ATTEMPTS = {
+    'public-btp-mss184240037-80-n16': '7b8a9b26bffeb937f1c602f454c2652f0f081a1e4f69707e795b9b243147e5f6',
+    'public-btp-mss1288000848-35-n0': '6e540d0fcaa22bb021cb53fad2a9c65610abae8f5719379607f20c96524a3200',
+    'public-btp-mss1288000848-35-n8': '19ddf3760b74d732c7aee9d899bf821b8d6a55bf2b5117f97fcf21f2eea138c1',
+    'public-btp-mss1288000848-35-n16': 'd34da45e8bd65856edd27d485335e27d8817f079884b12bbcb579f10700870bd',
+    'public-btp-mss184240200-11-n0': '12e560c1ee47ccd98a7e9afd2edc22799da642e8520b6bee7da46c254c266997',
+    'public-btp-mss184240200-11-n8': '9658972a244f1b6751fa66b3e5f2b8f2b3fff5892cae8f09b7511f6c07e8583f',
+    'public-btp-mss184240200-11-n16': '579c88aef9d6114dcb0144a46d4f5a15472f6993a7ce8fb532968fb4a7ab685c',
+    'public-btp-mss184240101-32-n0': '5c0d042f883cd50aa2e500407aeca6f8e9a0671e0d784d045e40d997e75db0b8',
+    'public-btp-mss184240101-32-n8': '6dd3e3595d33f9137ec94240595a65b01720760fb0f89a235dbe221df6dddbf7',
+    'public-btp-mss184240101-32-n16': '44f4ef5dafb6a0db94603268cdc3b222f3852d1cc99c273040c0366aa0345c77',
+}
+
+
+def prefix_hash(rows):
+    return hashlib.sha256(''.join(json.dumps(r, ensure_ascii=False, allow_nan=False) + '\n'
+                                  for r in rows).encode()).hexdigest()
+
+
+def ack_event():
+    return dict(event='acknowledge-uncertain', id='owner-20261101-evening',
+                authority=ACK_AUTHORITY, prefix_sha256=ACK_PREFIX, attempts=ACK_ATTEMPTS,
+                retained_per_attempt=RESERVE)
+
+
+def uncertainty(r):
+    return not r.get('acknowledged_uncertain') and not known_usage(r.get('usage') or {})
 
 
 def sha(path):
@@ -184,7 +214,7 @@ def prior_spend(out):
     total, rows = 0., []
     for path in {DEFAULT_OUT.resolve(), LEGACY_OUT.resolve()} - {Path(out).resolve()}:
         pending, settled, spent = state(journal(path))
-        if pending or any(not known_usage(r.get('usage') or {}) for r in settled.values()):
+        if pending or any(uncertainty(r) for r in settled.values()):
             raise ValueError('uncertain billing in another item ledger; outstanding/missing-usage request')
         total += spent
         rows += list(settled.values())
@@ -193,9 +223,24 @@ def prior_spend(out):
 
 def state(rows):
     pending, settled = {}, {}
-    for r in rows:
+    for i, r in enumerate(rows):
         key = r['id']
-        if r['event'] == 'reserve':
+        if 'acknowledged_uncertain' in r:
+            raise ValueError('only the pinned acknowledgment may create retained outcomes')
+        if r['event'] == 'acknowledge-uncertain':
+            if i != ACK_ROWS or prefix_hash(rows[:i]) != ACK_PREFIX or r != ack_event():
+                raise ValueError('acknowledgment does not match the exact authorized ledger prefix')
+            unknown = set(pending) | {k for k, v in settled.items() if uncertainty(v)}
+            if unknown != set(ACK_ATTEMPTS):
+                raise ValueError('acknowledgment does not match the ten authorized outcomes')
+            for k, digest in ACK_ATTEMPTS.items():
+                old = pending.get(k) or settled[k]
+                if old['request_sha256'] != digest or (k in pending and old['reservation'] != RESERVE):
+                    raise ValueError('authorized request hash/allowance differs')
+                settled[k] = dict(old, event='acknowledged-outcome', ok=False,
+                                  cost=max(RESERVE, G.charge(old)), acknowledged_uncertain=True)
+                pending.pop(k, None)
+        elif r['event'] == 'reserve':
             if key in pending or key in settled:
                 raise ValueError('request attempted twice: ' + key)
             pending[key] = r
@@ -223,7 +268,7 @@ def append(out, rec):
 
 def require_clear_billing(out):
     pending, done, _ = state(journal(out))
-    if pending or any(not known_usage(r.get('usage') or {}) for r in done.values()):
+    if pending or any(uncertainty(r) for r in done.values()):
         raise ValueError('uncertain billing: reconcile missing-usage/outstanding attempts before any paid call')
     prior_spend(out)
 
@@ -238,6 +283,11 @@ def call(pack, freeze, j, out, request=G.request):
         if done[j['id']]['request_sha256'] != digest:
             raise ValueError('cached request differs from frozen request')
         return done[j['id']]
+    for r in prior_spend(out)[1]:
+        if r['id'] == j['id']:
+            if r['request_sha256'] != digest:
+                raise ValueError('cached request differs in another item ledger')
+            raise ValueError('request already attempted in another item ledger; use original output')
     if spent + RESERVE > CAP:
         raise ValueError(f'item cap: ${spent:.4f} charged; next reservation ${RESERVE:.2f}, cap ${CAP:.2f}')
     out = Path(out)
@@ -285,8 +335,43 @@ def pilot_jobs(jobs):
     return [j for j in jobs if j['page'] in pages]
 
 
-def run(a):
+def original_paths(a):
     validate_output(a.out, a.pack, a.truth)
+    if any(Path(got).resolve() != expected.resolve() for got, expected in
+           ((a.out, DEFAULT_OUT), (a.pack, DEFAULT_PACK), (a.truth, DEFAULT_TRUTH))):
+        raise ValueError('paid resume requires the original frozen pack, truth and output')
+
+
+def acknowledge(a):
+    """One append-only, idempotent event for the owner's exact ten old outcomes."""
+    original_paths(a)
+    f, jobs, _ = check(a.pack, a.truth)
+    validate_receipt(a.out, a.pack, a.truth, f)
+    authority = HERE.parents[2] / 'OWNER_AUTHORIZATIONS.md'
+    grant = authority.read_text().split('## ' + ACK_AUTHORITY, 1)[1].split('- **W46.seg-boxes-score:**', 1)[0]
+    if not all(s in grant for s in ('**W46.ocr-ppocrv6-hands-paid:**', 'full $0.80 allowance',
+                                  'never retry those requests', '135 never-attempted conditions',
+                                  '$2.50 total item cap', 'Any new')):
+        raise ValueError('exact owner retained-allowance answer is not recorded')
+    rows = journal(a.out)
+    state(rows)
+    if len(rows) > ACK_ROWS and rows[ACK_ROWS] == ack_event():
+        return  # An interruption after the append cannot acknowledge/spend twice.
+    if len(rows) != ACK_ROWS or sha(a.out / 'calls.jsonl') != ACK_PREFIX:
+        raise ValueError('original interrupted ledger prefix differs; no acknowledgment written')
+    by_id = {j['id']: j for j in jobs}
+    for r in rows:
+        if r['id'] not in by_id or r['request_sha256'] != request_hash(body(a.pack, f, by_id[r['id']])):
+            raise ValueError('original paid request differs from the frozen pack')
+    state([*rows, ack_event()])  # Validate the complete next state before writing.
+    append(a.out, ack_event())
+    print('Acknowledged exactly ten old outcomes; $0.80 retained; no paid call made.')
+
+
+def run(a):
+    original_paths(a)
+    if a.cmd == 'repeat':
+        raise ValueError('owner resume scope is only the 135 untouched conditions; no new repeats')
     f, jobs, _ = check(a.pack, a.truth)
     a.out.mkdir(parents=True, exist_ok=True)
     require_clear_billing(a.out)
@@ -306,6 +391,11 @@ def run(a):
         raise ValueError('the revised owner working cap is not recorded')
     dump(a.out / 'working-cap.json', {'cap': CAP, 'authorization_commit': '1565f7d9',
          'authorization_sha256': sha(authority), 'original_receipt_sha256': sha(a.out / 'receipt.json')})
+    by_id = {j['id']: j for j in jobs}
+    _, done, _ = state(journal(a.out))
+    for key, r in done.items():
+        if key not in by_id or r['request_sha256'] != request_hash(body(a.pack, f, by_id[key])):
+            raise ValueError('cached request differs from frozen request; no paid call made')
     # A key failure happens before any reservation; no key is printed or persisted.
     load_key()
     pilot = pilot_jobs(jobs)
@@ -316,19 +406,20 @@ def run(a):
         if a.cmd == 'run' and j not in pilot:
             pending, done, spent = state(journal(a.out))
             pilots = [done[k['id']] for k in pilot]
-            projection = (sum(G.charge(r) for r in pilots) / len(pilots) * (len(jobs) + 8)
-                          + prior_spend(a.out)[0] + RESERVE)
+            remaining = sum(k['id'] not in done for k in jobs)
+            projection = (spent + prior_spend(a.out)[0]
+                          + sum(G.charge(r) for r in pilots) / len(pilots) * remaining)
             if pending or any(not r['ok'] for r in pilots) or projection > CAP:
                 raise ValueError('pilot failed or projects beyond the item cap; inspect before proceeding')
         call(a.pack, f, j, a.out)
     pending, done, spent = state(journal(a.out))
     pilots = [done[j['id']] for j in pilot if j['id'] in done]
-    projection = (sum(G.charge(r) for r in pilots) / len(pilots) * (len(jobs) + 8)
-                  + prior_spend(a.out)[0] + RESERVE) if pilots else None
+    projection = (spent + prior_spend(a.out)[0] + sum(G.charge(r) for r in pilots) / len(pilots)
+                  * sum(j['id'] not in done for j in jobs)) if pilots else None
     spent += prior_spend(a.out)[0]
     summary = {'settled': len(done), 'pending': len(pending), 'charged': spent,
                'failed': sum(not r['ok'] for r in done.values()),
-               'pilot_requests': len(pilots), 'projected_221_calls_usd': projection}
+               'pilot_requests': len(pilots), 'projected_total_usd': projection}
     dump(a.out / 'status.json', summary)
     print(json.dumps(summary))
 
@@ -400,7 +491,7 @@ def report(a):
     freeze, jobs, refs = check(a.pack, a.truth)
     receipt = validate_receipt(a.out, a.pack, a.truth, freeze)
     pending, rows, spent = state(journal(a.out))
-    if pending or any(not known_usage(r.get('usage') or {}) for r in rows.values()) or any(j['id'] not in rows for j in jobs):
+    if pending or any(uncertainty(r) for r in rows.values()) or any(j['id'] not in rows for j in jobs):
         raise ValueError('incomplete or uncertain run: use status; no accuracy report may be published')
     expected = {j['id']: j for j in jobs}
     expected.update({j['id'] + '-repeat': {**j, 'id': j['id'] + '-repeat'}
@@ -410,6 +501,10 @@ def report(a):
         if key not in expected or r['request_sha256'] != request_hash(body(a.pack, freeze, expected[key])):
             raise ValueError('recorded request does not match the frozen experiment')
         path = a.out / 'responses' / (key + '.json')
+        if r.get('acknowledged_uncertain') and not r.get('response_sha256'):
+            if path.exists() or r['ok']:
+                raise ValueError('acknowledged lost reply must remain missing and failed')
+            continue
         if sha(path) != r['response_sha256']:
             raise ValueError('response checksum changed')
         reply = json.loads(path.read_text())
@@ -428,11 +523,15 @@ def report(a):
             noise.append({'cohort': j['cohort'], 'delta': delta})
     result.update(item=TAG, model=G.MODEL, settings={'temperature': 0, 'reasoning_effort': 'low',
                   'max_tokens': freeze['max_tokens'], 'cache': {'no-cache': True}},
-                  cohorts=freeze['cohorts'], cost=G.billed([*rows.values(), *prior_spend(a.out)[1]]),
+                  cohorts=freeze['cohorts'], cost=G.billed([r for r in [*rows.values(), *prior_spend(a.out)[1]]
+                                                          if not r.get('acknowledged_uncertain')]),
                   charged=spent + prior_spend(a.out)[0], prior_pilot=G.billed(prior_spend(a.out)[1]),
+                  retained_allowance=sum(G.charge(r) for r in rows.values() if r.get('acknowledged_uncertain')),
+                  acknowledged_failures=[k for k, r in rows.items() if r.get('acknowledged_uncertain')],
                   encoding=ENCODING,
                   pending=len(pending), complete=not pending and all(j['id'] in rows for j in jobs), repeats=noise,
-                  returned_models=dict(Counter(r['model'] for r in rows.values())), receipt=receipt,
+                  returned_models=dict(Counter(r.get('model') for r in rows.values())), receipt=receipt,
+                  ledger_sha256=sha(a.out / 'calls.jsonl'),
                   pack_freeze_sha256=sha(a.pack / 'freeze.json'),
                   truth_index_sha256=sha(a.truth / 'index.json'))
     # Owner sensitivity: the nine of the original 16 hand pages with no unresolved
@@ -504,7 +603,8 @@ def write_report(r):
           f"Zero-example repeats: {len(r['repeats'])}; " + '; '.join(
               f"{cohort}: mean move {statistics.mean(x['delta'] for x in r['repeats'] if x['cohort'] == cohort):+.2f}"
               for cohort in sorted({x['cohort'] for x in r['repeats']})) + '.',
-          'These are two pages per cohort, too few to estimate a reliable rerun floor.']
+          'No new repeats were run: the owner resume scope was only 135 untouched conditions. '
+          'The eight repeats in the initial design were omitted; no prompt-specific rerun floor is established.']
     if r.get('owner_clear'):
         L += ['', 'Owner pages without unresolved sheet places (the nine clear pages of the original 16), '
               'kept apart by cohort; the four-page Shils inference remains descriptive:', '',
@@ -512,7 +612,9 @@ def write_report(r):
         for c in r['owner_clear']['comparisons']:
             L.append(f"| {c['cohort']} | {c['examples_n']} | {ci(c['both_answered'])} |")
     L += ['', '## Cost and provenance', '',
-          f"Charged against the owner-revised $2.50 working item cap: ${r['charged']:.5f}. List-rate estimate ${r['cost']['estimate']:.5f} "
+          f"Charged against the owner-revised $2.50 working item cap: ${r['charged']:.5f}, including "
+          f"${r['retained_allowance']:.2f} retained for {len(r['acknowledged_failures'])} uncertain outcomes. "
+          f"Known-usage list-rate estimate ${r['cost']['estimate']:.5f} "
           f"at ${G.PRICE[0]}/${G.PRICE[1]} per million input/output tokens (including reasoning); gateway’s own "
           f"figure ${r['cost']['gateway'] or 0:.5f} on {r['cost']['gateway_calls']} of {r['cost']['calls']} attempts. "
           'The cap counts the larger for each request; any unknown request keeps its full reservation. '
@@ -520,6 +622,10 @@ def write_report(r):
           'The owner revised the working cap from the initial agent-set $1 estimate to $2.50 '
           '(OWNER_AUTHORIZATIONS.md, 1565f7d9); all pilot answers were preserved, not re-called. '
           'A sheet alternative was prepared but made no paid call and is not an accuracy arm. '
+          'The owner’s 2026-11-01 evening answer retained the ten old allowances without exact billing '
+          'reconciliation; nine 502 replies and one lost connection remain failed, never repeated. '
+          'Both-answered comparisons omit these pairs; strict sensitivity counts them as zero. '
+          'These missing responses limit the transfer comparison and are not recognizer failures. '
           'Stanford PTA, not subscription usage.', '',
           f"Frozen pack SHA-256 `{r['pack_freeze_sha256']}`; truth-index SHA-256 `{r['truth_index_sha256']}`. "
           'Private input pack `~/.local/state/archive-autonomous/artifacts/hand-icl-20261101`, target truth '
@@ -533,76 +639,18 @@ def write_report(r):
 
 
 def blocked_status(a):
-    """Publish only support/cost status for an interrupted run, never a ranking."""
-    freeze, jobs, _ = check(a.pack, a.truth)
-    receipt = validate_receipt(a.out, a.pack, a.truth, freeze)
+    """Read-only accounting/support status; never replace a scored report."""
     pending, done, charged = state(journal(a.out))
-    known = [r for r in done.values() if known_usage(r.get('usage') or {})]
-    unknown = [r for r in done.values() if not known_usage(r.get('usage') or {})]
-    r = {'item': TAG, 'model': G.MODEL, 'complete': False, 'state': 'blocked',
-         'reason': 'Gateway returned HTTP 502 without usage, then ConnectionError; billing reconciliation required.',
-         'cohorts': freeze['cohorts'], 'planned_conditions': len(jobs),
-         'attempted': len(done) + len(pending), 'settled': len(done),
-         'successful': sum(r['ok'] for r in done.values()),
-         'http_counts': dict(Counter(str(r['http']) for r in done.values())),
-         'known_billing': G.billed(known), 'unknown_response_count': len(unknown),
-         'pending': list(pending), 'unknown_allowance': sum(G.charge(r) for r in unknown)
-                    + sum(r['reservation'] for r in pending.values()),
-         'charged': charged, 'cap': CAP, 'groups': [], 'comparisons': [],
-         'receipt': receipt, 'ledger_sha256': sha(a.out / 'calls.jsonl'),
-         'pack_freeze_sha256': sha(a.pack / 'freeze.json'),
-         'truth_index_sha256': sha(a.truth / 'index.json')}
-    dump(RESULTS / 'ocr-ppocrv6-hands-paid.json', r)
-    L = ['# Gemini given corrected handwriting lines — interrupted (W46.ocr-ppocrv6-hands-paid)', '',
-         '**Blocked; no accuracy verdict.** The original 71-page / 213-condition experiment stopped '
-         'when the gateway returned 502 without usage, then a connection failed before a reply. '
-         'The frozen 0/8/16-line requests and every paid outcome are retained. No pilot answer was repeated.', '',
-         f"{r['successful']} successful replies; {r['unknown_response_count']} HTTP 502 replies without usage; "
-         f"{len(pending)} outstanding connection-error request; {len(jobs)-r['attempted']} conditions never attempted. "
-         'No zero-example repeats run. Counts describe conditions, not independently sampled pages.', '',
-         '## Cost and resume boundary', '',
-         f"Known usage/header charges: **${r['known_billing']['charged']:.6f}**. "
-         f"Unknown allowances retained: **${r['unknown_allowance']:.2f}**, "
-         f"so **${r['charged']:.6f}** counts against the owner-revised $2.50 working cap "
-         '(OWNER_AUTHORIZATIONS.md, 1565f7d9). The allowances are not asserted to be actual bills. '
-         'The initial 24-request pilot ($0.1950195, projected $1.7958 for 221 requests) is included, not added twice.', '',
-         'The runner initially continued across nine HTTP 502 replies because their full allowances '
-         'were retained as settled records. That violated the stricter stop-on-uncertain-billing instruction; '
-         '`call` now stops at the first missing-usage response, and `run` refuses any unresolved or '
-         'missing-usage history before reading credentials. Offline regression tests cover both. '
-         'There is no retry or automatic re-spend.', '',
-         'Outstanding request: `' + ', '.join(pending) + '`. Reconcile all ten unknown outcomes before '
-         'any further paid call; preserve the nine failed replies and do not repeat them. '
-         'After resolution, resume the never-attempted conditions with `hand_icl_gateway.py run`, '
-         'then the eight preselected zero-example repeats, final scoring, verdict and bench panel. '
-         'The unused sheet alternative sent no request.', '',
-         '## Measurement card', '',
-         '- **Truth:** public By the People transcriptions; owner target truth after W46.ocr-hands-rescore, '
-         'partly Gemini/Claude drafted, with ten unresolved hand places. Owner references cannot independently rank models. '
-         'Existing corrected-line pairs are filtered by the base recognizer; owner pairs precede the sheet corrections.',
-         '- **Selection:** frozen Qwen pack, 40 seeded public L1 pages, 19 owner hand pages and 12 held-out '
-         'Blackwell diary pages. The latter use only 24 training pages as examples; Shils leaves its target out. '
-         'Other cohorts have unverified hand identities. Source hashes reject target/exemplar aliases.',
-         '- **Comparison:** same target JPEGs and nested 0/8/16 example-image/text contexts. Gemini 3.7 Flash '
-         'on the Stanford gateway, temperature 0, low reasoning, 8192-token cap, cache disabled, single attempts. '
-         'Only 78 of 213 conditions attempted: no paired accuracy comparison is published.',
-         '- **Noise:** final paired page/collection intervals and the nine clear-owner-page sensitivity remain unrun; '
-         'no new rerun floor measured. One diary and a four-page folder proxy cannot estimate across-hand variability.',
-         '- **Scope:** this is a spending/support checkpoint, not evidence for or against corrected-line prompting. '
-         'Incomplete results are hidden on the bench page; whole-96 and whole-895 charts cannot take these subsets.', '',
-         '## Provenance', '',
-         f"Pack freeze SHA-256 `{r['pack_freeze_sha256']}`; truth index `{r['truth_index_sha256']}`; "
-         f"ledger `{r['ledger_sha256']}`. Private inputs: "
-         '`~/.local/state/archive-autonomous/artifacts/hand-icl-20261101` and `hand-icl-truth-20261101`; '
-         'paid replies, write-ahead ledger, original receipt and working-cap sidecar: `hand-icl-gateway-20261101`. '
-         'No new model/download/page cache created; paid replies and audit receipts retained, shared inputs untouched.']
-    (RESULTS / 'ocr-ppocrv6-hands-paid.md').write_text('\n'.join(L) + '\n')
-    print(json.dumps({k: r[k] for k in ('state', 'successful', 'attempted', 'charged', 'unknown_allowance')}))
+    print(json.dumps(dict(settled=len(done), pending=list(pending), charged=charged,
+                          successful=sum(r['ok'] for r in done.values()),
+                          acknowledged_failures=[k for k, r in done.items()
+                                                 if r.get('acknowledged_uncertain')],
+                          unresolved=[k for k, r in done.items() if uncertainty(r)], cap=CAP)))
 
 
 def main():
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument('cmd', choices=['check', 'pilot', 'run', 'repeat', 'report', 'status'])
+    p.add_argument('cmd', choices=['check', 'pilot', 'run', 'repeat', 'report', 'status', 'acknowledge'])
     p.add_argument('--pack', type=Path, default=DEFAULT_PACK)
     p.add_argument('--truth', type=Path, default=DEFAULT_TRUTH)
     p.add_argument('--out', type=Path, default=DEFAULT_OUT)
@@ -620,7 +668,7 @@ def main():
         a.out.mkdir(parents=True, exist_ok=True)
         with (a.out / '.run.lock').open('a') as lock:
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            run(a)
+            acknowledge(a) if a.cmd == 'acknowledge' else run(a)
 
 
 if __name__ == '__main__':

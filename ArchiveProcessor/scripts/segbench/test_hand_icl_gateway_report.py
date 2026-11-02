@@ -12,6 +12,12 @@ import ocr_hands_rescore as HS
 
 class Reporting(unittest.TestCase):
     def test_report_reads_wrapped_owner_rulings_and_pins_requests(self):
+        self.report_fixture()
+
+    def test_report_acknowledged_lost_reply_is_failed_without_fabricated_response(self):
+        self.report_fixture(missing=True)
+
+    def report_fixture(self, missing=False):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             pack, truth, out, results, hands = [root / d for d in ('pack', 'truth', 'out', 'results', 'hands')]
@@ -28,23 +34,40 @@ class Reporting(unittest.TestCase):
                          collection='owner', image='target.jpg', examples_n=n, examples=[]) for n in H.COUNTS]
             for j in jobs:
                 response = out / 'responses' / (j['id'] + '.json')
-                H.dump(response, dict(choices=[dict(message=dict(content='a quiet morning'))]))
+                if not (missing and j['examples_n'] == 8):
+                    H.dump(response, dict(choices=[dict(message=dict(content='a quiet morning'))]))
                 rec = dict(id=j['id'], request_sha256=H.request_hash(H.body(pack, f, j)))
                 H.append(out, dict(rec, event='reserve', reservation=.08))
+                if missing and j['examples_n'] == 8:
+                    continue
                 H.append(out, dict(rec, event='settle', cost=.001, ok=True, model=H.G.MODEL,
                                    response_sha256=H.sha(response),
                                    usage={'prompt_tokens': 10, 'completion_tokens': 10}))
             a = SimpleNamespace(pack=pack, truth=truth, out=out)
+            rows = H.journal(out)
+            attempts = {j['id']: H.request_hash(H.body(pack, f, j)) for j in jobs if j['examples_n'] == 8}
             with (patch.object(H, 'check', return_value=(f, jobs, {'owner-p001': {'path': 'p.txt'}})),
                   patch.object(H, 'validate_receipt', return_value={}),
                   patch.object(H, 'RESULTS', results), patch.object(HS, 'HANDS', hands),
                   patch.object(H, 'DEFAULT_OUT', out),
-                  patch.object(H, 'LEGACY_OUT', root / 'unused')):
+                  patch.object(H, 'LEGACY_OUT', root / 'unused'),
+                  patch.object(H, 'ACK_ROWS', len(rows)),
+                  patch.object(H, 'ACK_PREFIX', H.prefix_hash(rows)),
+                  patch.object(H, 'ACK_ATTEMPTS', attempts)):
+                if missing:
+                    H.append(out, H.ack_event())
                 H.report(a)
                 r = json.loads((results / 'ocr-ppocrv6-hands-paid.json').read_text())
                 self.assertTrue(r['complete'])
                 self.assertEqual(r['owner_clear']['groups'][0]['nes_answered'], 100.)
-                self.assertEqual(r['comparisons'][0]['both_answered']['delta'], 0.)
+                if missing:
+                    self.assertEqual(r['comparisons'][0]['both_answered']['n'], 0)
+                    self.assertEqual(r['comparisons'][0]['strict']['delta'], -100.)
+                    self.assertAlmostEqual(r['retained_allowance'], .08)
+                    self.assertAlmostEqual(r['charged'], .082)
+                    self.assertEqual(r['cost']['calls'], 2)
+                else:
+                    self.assertEqual(r['comparisons'][0]['both_answered']['delta'], 0.)
                 # A changed prompt must never be relabelled as this frozen run.
                 f['prompt'] += ' changed'
                 with self.assertRaisesRegex(ValueError, 'request does not match'):

@@ -4,6 +4,8 @@ from pathlib import Path
 import tempfile
 import unittest
 from unittest.mock import patch
+from contextlib import ExitStack
+from types import SimpleNamespace
 
 import hand_icl_gateway as H
 
@@ -180,6 +182,61 @@ class Contracts(unittest.TestCase):
         self.assertEqual(sum(x['type'] == 'image_url' for x in content), 3)
         self.assertEqual(content[3]['text'], 'Corrected reading: corrected line 0')
         self.assertEqual(content[6]['text'], 'Corrected reading: corrected line 1')
+
+    def test_exact_acknowledgment_preserves_ledger_and_never_resends(self):
+        self.out.mkdir()
+        pack = self.root / 'pack'
+        pack.mkdir()
+        (pack / 'target.jpg').write_bytes(b'fake JPEG')
+        ids = ['lost', 'bad-gateway']
+        jobs = [dict(self.job, id=k) for k in ids]
+        attempts = {j['id']: H.request_hash(H.body(self.root, self.freeze, j)) for j in jobs}
+        for k in ids:
+            H.append(self.out, dict(id=k, event='reserve', request_sha256=attempts[k], reservation=.08))
+        H.append(self.out, dict(id=ids[1], event='settle', request_sha256=attempts[ids[1]],
+                               cost=.08, usage={}, ok=False))
+        prefix = (self.out / 'calls.jsonl').read_bytes()
+        with ExitStack() as stack:
+            for key, value in dict(ACK_ROWS=3, ACK_PREFIX=H.sha(self.out / 'calls.jsonl'),
+                                   ACK_ATTEMPTS=attempts, DEFAULT_PACK=pack,
+                                   DEFAULT_TRUTH=self.root / 'truth').items():
+                stack.enter_context(patch.object(H, key, value))
+            stack.enter_context(patch.object(H, 'check', return_value=(self.freeze, jobs, {})))
+            stack.enter_context(patch.object(H, 'validate_receipt', return_value={}))
+            a = SimpleNamespace(out=self.out, pack=pack, truth=self.root / 'truth')
+            H.acknowledge(a)
+            H.acknowledge(a)  # Recover an interruption after the single append.
+            self.assertTrue((self.out / 'calls.jsonl').read_bytes().startswith(prefix))
+            self.assertEqual(len(H.journal(self.out)), 4)
+            pending, done, spent = H.state(H.journal(self.out))
+            self.assertFalse(pending)
+            self.assertAlmostEqual(spent, .16)
+            self.assertTrue(all(not r['ok'] and r['acknowledged_uncertain'] for r in done.values()))
+            H.require_clear_billing(self.out)
+            for j in jobs:
+                H.call(self.root, self.freeze, j, self.out,
+                       request=lambda *a, **k: self.fail('acknowledged request repeated'))
+            # No foreign ID, mutated prefix, duplicate acknowledgment or later
+            # reservation can turn an authorized failure into a retry.
+            rows = H.journal(self.out)
+            for changed in [rows + [H.ack_event()],
+                            [dict(rows[0], reservation=.01), *rows[1:]],
+                            [*rows[:2], dict(rows[2], acknowledged_uncertain=True), rows[3]],
+                            rows + [dict(rows[0])],
+                            [*rows[:3], dict(rows[3], retained_per_attempt=.01)]]:
+                with self.assertRaises(ValueError):
+                    H.state(changed)
+            H.append(self.out, dict(id='new-lost', event='reserve', request_sha256='new', reservation=.08))
+            with self.assertRaisesRegex(ValueError, 'uncertain billing'):
+                H.require_clear_billing(self.out)
+            with self.assertRaisesRegex(ValueError, 'exact authorized ledger prefix'):
+                H.state(H.journal(self.out) + [H.ack_event()])
+
+    def test_paid_resume_rejects_other_output_before_credentials(self):
+        a = SimpleNamespace(out=self.root / 'new-out', pack=self.root / 'pack', truth=self.root / 'truth', cmd='run')
+        with patch.object(H, 'load_key', side_effect=AssertionError('must not read key')):
+            with self.assertRaisesRegex(ValueError, 'original frozen'):
+                H.run(a)
 
     def test_cluster_bootstrap_counts_collections(self):
         v = H.interval([1, 1, -3, -3], ['a', 'a', 'b', 'b'], rounds=1000)

@@ -11,7 +11,9 @@ credentials or another request. Changing `--out` cannot bypass uncertainty or pr
 partial accuracy tables; `status` publishes only the blocked support/cost record. Regression tests cover these
 boundaries. The preserved run has 68 successful readings ($0.545493 known charges), nine 502s without usage and
 one outstanding connection-error request ($0.80 allowances, $1.345493 counted against the $2.50 cap). No retry.
-The item's owner billing gate must clear before resuming; details in `segbench-results/ocr-ppocrv6-hands-paid.md`.
+The owner's 2026-11-01 evening answer retains those ten allowances and permits only untouched conditions.
+An exact-prefix acknowledgment preserves the original journal, counts all $.80 and never retries those IDs.
+New uncertainty still stops; details in `execution-plans/items/W46.ocr-ppocrv6-hands-paid.md`.
 
 ## Marks review: question comments and obscured draft boxes (W46.fix-marks-sheet-feedback)
 
