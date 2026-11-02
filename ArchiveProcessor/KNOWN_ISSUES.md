@@ -51,15 +51,15 @@ keeps every new reserve/unknown and saved provider/usage failure stopped before 
 another send, without changing any charge or granting retries. The historical explicit unsent approval
 remains recorded. All 41 offline scorer/gateway/kit tests pass. No app behavior changed.
 
-## OPEN (W46.mac-card-provenance, 2026-11-02): Mac OCR card omits truth limits and overstates 895 coverage
+## FIXED (W46.mac-card-provenance, 2026-11-02): Mac OCR card truth and public coverage
 
-Measurement review pass 5, baseline `9e9d9f1d`, `scripts/segbench/ocr_mac_local.py::hw_card`:
-the generated `ocr-mac-local-hw.md` calls truth merely adjudicated, omitting model drafters,
-unchecked agreement and ten unresolved hand places. Its blanket Sherlock-895 scope includes
-Granite, whose cluster pilot was refused and has no 895 score. The parent box-reader and main
-scorer reports are qualified; no numeric verdict changes. Offline writer/report correction is
-queued as W46.mac-card-provenance, with repeat-generation and unchanged-table checks.
-Details: [`2026-11-02.md`](../execution-plans/processing-review/measure-reviews/2026-11-02.md).
+`scripts/segbench/ocr_mac_local.py::hw_card` now reuses `ocr_card.TRUTH_96`, including both model
+drafters, unchecked agreement, blind owner checks and ten unresolved hand places. Its scope distinguishes
+the Mac-only 96 from LightOn's FarmShare/Sherlock, Qwen3.5's Sherlock and Xiaomi/Paddle's Sherlock public
+counterparts; Granite's refused cluster pilot has no 895 score or Mac-versus-cluster penalty estimate.
+The bench's truth-limit summaries are qualified too. Six synthetic tests and two actual offline report
+generations pass: the entire pre-card numeric/settings/runtime body is byte-identical. No inference,
+truth edit, spend or default change; the parent box-reader verdict and Phase-4 gates stand.
 
 ## OPEN (W46.seg-kit-truth-provenance, 2026-11-01): measurement support and report provenance
 

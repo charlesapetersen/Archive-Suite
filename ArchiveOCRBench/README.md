@@ -297,7 +297,9 @@ Python standard library.
 ## Limits
 
 For the OCR panel, from its reports. One corpus of about 100 pages. Claude Opus 5.5 and Gemini 3.8
-Flash drafted the truth before it was adjudicated, so it may lean toward those families. The "local panel"
+Flash drafted the truth; the owner adjudicated their disagreements. Blind checks of agreed words found
+corrections, but agreement unchallenged by a third-family reader remains unchecked, and ten hand places
+remain unresolved (`ocr-hands-rescore.md`). Scores can still favour a drafter family. The "local panel"
 chose models small enough to run on a Mac, and ran hosted on OpenRouter; of those, Qwen3-VL 8B and Qwen3.5-9B have
 been measured on the Mac itself (Qwen3-VL 8B −2.15 NES strict, −0.17 on the pages both finished; Qwen3.5-9B +2.48,
 because the hosted route failed four pages, and −3.00 on handwritten pages). A difference of a point or two is not a ranking, and the handwritten chart rests on about 2,200 words.

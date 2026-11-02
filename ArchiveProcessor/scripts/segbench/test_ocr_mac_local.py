@@ -101,6 +101,39 @@ class MacLocal(unittest.TestCase):
         self.assertIn('qwen3.5-9b-mlx4,kind,typewritten,1,1,', groups)
         self.assertIn('qwen3-vl-8b-mlx4,all,accuracy-96,1,1,1.0,', groups)
 
+    def test_hw_card_provenance_and_coverage_survive_regeneration(self):
+        from ocr_card import TRUTH_96
+
+        for page in ('p001', 'p002', 'p086'):
+            self.reading('local', page, 'the quick brown fox')
+            self.reading('hosted', page, 'the quick brown fox')
+            source = M.OUT / (page + '-original.json')
+            for key, spec in M.HW.items():
+                P.save(M.out_dir(key) / source.name, json.loads(source.read_text()))
+                if spec['hosted']:
+                    P.save(P.CACHE / 'responses' / spec['hosted'] / source.name,
+                           json.loads(source.read_text()))
+        # Exercise the normal report writer twice, including every model's accuracy/runtime tables.
+        reports = []
+        for _ in range(2):
+            M.report_hw()
+            reports.append(M.HW_REPORT.read_text())
+            self.assertIn('- **Truth.** ' + TRUTH_96, reports[-1])
+            self.assertIn('10 places unresolved', reports[-1])
+            self.assertIn('none read the public 895 on the Mac', reports[-1])
+            self.assertIn('LightOnOCR-3-4B bf16 on FarmShare', reports[-1])
+            self.assertIn('Qwen3.5-9B bf16 on Sherlock vLLM', reports[-1])
+            self.assertIn('Xiaomi-OCR-0 and PaddleOCR-VL 1.6 bf16 on Sherlock', reports[-1])
+            self.assertIn('Granite has no 895 score: its cluster pilot was refused', reports[-1])
+            self.assertIn('not a runtime penalty estimate', reports[-1])
+            self.assertNotIn("these routes' 895 figures are Sherlock's", reports[-1])
+            for key in M.HW:
+                self.assertIn(f'| Mac MLX ({key}) | 2/2 | 100.00 |', reports[-1])
+                self.assertIn(f'## Speed and memory: {key}', reports[-1])
+            self.assertEqual(reports[-1].count('## Measurement card'), 1)
+            self.assertNotIn('quick brown', reports[-1])
+        self.assertEqual(*reports)
+
     def test_plain_reply_is_scored_whole(self):
         spec = M.HW['lightonocr-3-4b-mlx8']
         self.assertEqual(M.parse(spec, '  KIND: x\nsome text\n')['text'], 'KIND: x\nsome text')

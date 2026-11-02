@@ -383,6 +383,8 @@ SHERLOCK = {'xiaomi-ocr-0-bf16': 'xiaomi-ocr-0', 'paddleocr-vl1.6-bf16': 'paddle
 
 def hw_card():
     """The report's measurement card (root CLAUDE.md), from the readings and ocr-scorers.json's Sherlock rows."""
+    from ocr_card import card, TRUTH_96
+
     read = {k: [p for p in hw_pairs(k) if p['local_attempted']] for k in HW}
     routes = '; '.join(f"{spec['name']} ({len(read[k])} pages, {'the panel prompt' if spec['prompt'] is None else 'its own prompt'})"
                        for k, spec in HW.items())
@@ -396,15 +398,21 @@ def hw_card():
                 for k, s in SHERLOCK.items() if k in nes and s in nes]
     sher = (f"; the bf16 readers land {' and '.join(gaps)} (`ocr-scorers.md`)" if gaps
             else '; their Sherlock gaps are not scored yet (`ocr_rescore.py`)')
-    return ['## Measurement card', '',
-            '- **Truth.** The OCR panel\'s 96 accuracy pages, the adjudicated truth (`ocr_panel.TRUTH`).',
-            '- **Selection.** All 96 accuracy pages (the three agreement-only letters excluded), one reading each; '
-            'none chosen by a route\'s reading.',
-            f"- **Comparison.** Each Mac route at its own quantisation and prompt: {routes}. The hosted bf16 row is "
-            f"{', '.join(hosted) or 'none'} only. Speed and memory are one Apple M3 Pro with 18 GB, one page at a time.",
-            '- **Noise.** Local greedy routes are deterministic on one machine (`ocr-rerun-noise.md`), so the paired '
-            f'interval alone tests a gap between them{sher}.',
-            '- **Scope.** The 96 only: these routes\' 895 figures are Sherlock\'s, not read from the Mac.', '']
+    return card(
+        TRUTH_96,
+        "All 96 accuracy pages (the three agreement-only letters excluded), one reading each; "
+        "none chosen by a route's reading.",
+        f"Each Mac route at its own quantisation and prompt: {routes}. The hosted bf16 row is "
+        f"{', '.join(hosted) or 'none'} only. Speed and memory are one Apple M3 Pro with 18 GB, one page at a time.",
+        'Local greedy routes are deterministic on one machine (`ocr-rerun-noise.md`), so the paired '
+        f'interval alone tests a gap between them{sher}.',
+        'These Mac runs cover the 96 only; none read the public 895 on the Mac. Separate public counterparts: '
+        'LightOnOCR-3-4B bf16 on FarmShare (`ocr-scorers.md`), also rerun on Sherlock; Qwen3.5-9B bf16 on '
+        'Sherlock vLLM (`ocr-logprob.md`, 440 + 455 pages); Xiaomi-OCR-0 and PaddleOCR-VL 1.6 bf16 on Sherlock '
+        '(`bench-corpus/new-open-sherlock-20261024.md`, 895 each). These are separate runtime/precision routes, '
+        'not public-set scores of the Mac builds. Granite has no 895 score: its cluster pilot was refused '
+        'after two of three diagnostic pages looped (`bench-corpus/new-open-boxes-20261031.md`); the cluster '
+        'weights/runtime and context limit differ from the Mac build, so this is not a runtime penalty estimate.')
 
 
 def report_hw():
