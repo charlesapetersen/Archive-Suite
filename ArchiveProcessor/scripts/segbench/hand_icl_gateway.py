@@ -534,6 +534,11 @@ def report(a):
                   ledger_sha256=sha(a.out / 'calls.jsonl'),
                   pack_freeze_sha256=sha(a.pack / 'freeze.json'),
                   truth_index_sha256=sha(a.truth / 'index.json'))
+    result['failure_reasons'] = dict(Counter(
+        ('retained HTTP ' + str(r['http']) if r.get('http') else 'retained lost connection')
+        if r.get('acknowledged_uncertain') else (r.get('finish') or 'HTTP ' + str(r.get('http')))
+        for r in rows.values() if not r['ok']))
+    result['scoring_runner_sha256'] = sha(__file__)
     # Owner sensitivity: the nine of the original 16 hand pages with no unresolved
     # place. This doesn't turn the remaining model-drafted reference into gold.
     import ocr_hands_rescore as HS
@@ -544,6 +549,15 @@ def report(a):
              and j['page'].removeprefix('owner-') in hand16 - set(unresolved)]
     if clear:
         result['owner_clear'] = analyze(clear, rows, truths, texts, S.score)
+    primary = [c for c in result['comparisons'] if c['cohort'] == 'blackwell-held-out']
+    effects = '; '.join(f"{c['examples_n']} lines {c['both_answered']['delta']:+.2f} NES "
+                        f"(95% page interval {c['both_answered']['lo']:+.2f} to "
+                        f"{c['both_answered']['hi']:+.2f}, n={c['both_answered']['n']})"
+                        for c in primary if c['both_answered']['n'])
+    result['verdict'] = ('On the one documented Blackwell diary hand: ' + effects +
+                         '. These page-conditional results do not establish an OCR default for a new hand. '
+                         'The intervals are pointwise, without adjustment across the example conditions.'
+                         if effects else 'No documented same-hand paired result is available.')
     dump(RESULTS / 'ocr-ppocrv6-hands-paid.json', result)
     write_report(result)
     print(json.dumps({k: result[k] for k in ('complete', 'charged', 'cost', 'cohorts')}))
@@ -560,6 +574,13 @@ def write_report(r):
          'the Shils folder is a hand proxy, and the other cohorts test transfer with unverified hand identity. '
          'The 40 L1 pages include three Blackwell diary pages (other volumes) and two Blackwell '
          'correspondence pages; they are not all known different hands.', '',
+         r['verdict'], '',
+         f"**Support:** {sum(g['answered'] for g in r['groups'])} successful replies / "
+         f"{sum(g['attempted'] for g in r['groups'])} attempted conditions; "
+         f"{len(r['acknowledged_failures'])} gateway failures retained without retry. "
+         'Failure reasons: ' + ', '.join(f'{k}: {v}' for k, v in r['failure_reasons'].items()) + '. '
+         'Both-answered differences use matched successful pairs; strict scores count failures as zero. '
+         'All fixed conditions are accounted for; complete does not mean every request succeeded.', '',
          '## Measurement card', '',
          '- **Truth:** public By the People transcriptions (CC0). Owner targets use the post-sheet truth '
          '(W46.ocr-hands-rescore); Gemini 3.8/Claude drafted it and 114 hand places were checked, '
@@ -583,8 +604,8 @@ def write_report(r):
          'Public transfer additionally bootstraps collection clusters. A single diary and four Shils pages '
          'cannot estimate variation across hands. The inherited hosted floor is 0.60 points '
          '(twice the measured handwritten-kind rerun range; the 96-wide floor is 0.49); public and prompt-specific '
-         'noise is not established. Eight preselected zero-example repeats check stability only. '
-         'An interval spanning zero or a gap inside the floor is a tie.',
+         'noise is not established. Eight zero-example repeats were initially preselected but omitted under the narrower resume scope. '
+         'An interval spanning zero or a gap inside the inherited floor does not establish a gain.',
          '- **Scope:** zero-training adaptation on these pages and examples only; no app default, fine-tune '
          'or new-hand population claim. Cross-hand transfer cannot answer same-hand adaptation. '
          'No corpus modified; no target transcription supplied to a model.', '',
