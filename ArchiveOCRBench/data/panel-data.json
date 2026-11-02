@@ -43727,7 +43727,19 @@
    }
   }
  },
- "hands_icl": null,
+ "hands_icl": {
+  "model": "gemini-3.7-flash",
+  "complete": false,
+  "cohorts": {
+   "public-L1-transfer": 40,
+   "owner-transfer": 15,
+   "owner-Shils-folder-proxy": 4,
+   "blackwell-held-out": 12
+  },
+  "charged": 1.345493,
+  "groups": [],
+  "comparisons": []
+ },
  "dewarp": {
   "item": "W46.enh-dewarp",
   "report": "enh-dewarp.md",
