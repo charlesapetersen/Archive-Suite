@@ -11,7 +11,7 @@ class when they agree and None ("choose") when they do not; its texts are the di
 Unpaired marks are candidates too. Which route proposed a box goes into key.json only: the sheet shows no route
 name, no stratum, no pre-flag and no source of a box, so a box never says which reading is the current truth
 (owner check-sheet rule, 2026-10-21). Pages appear in a seeded shuffle. No Claude session reads the pages (owner,
-2026-10-30): this script copies the images byte for byte and never opens them.
+2026-10-30): this script copies verified original JPEG bytes and never interprets them.
 
 The owner's answers are the core's truth; the other 110 pages export only the marks both drafts found with the same
 class, in a folder whose manifest says they are model drafts, not truth.
@@ -117,12 +117,43 @@ def esc(s):
     return str(s).replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
 
 
+def original_path(pid):
+    """Verified original bytes for review, independent of the downscaled model input."""
+    from marks_scan import original_source
+    return original_source(M.SCAN, pid)
+
+
+def write_sheet(out_dir, data, key, initial=None, storage_key='w46-marks-core', recheck=False):
+    """Write the shared view; a recheck preserves candidate IDs and locks prior labels/bands."""
+    defs, nots = class_notes()
+    blob = lambda o: json.dumps(o, ensure_ascii=False).replace('</', r'<\/')
+    html = (SHEET_HTML.replace('__CLASSDEFS__', ''.join(f'<li><b>{esc(c)}</b>: {esc(t)}</li>' for c, t in defs))
+            .replace('__NOTMARKS__', esc(nots)).replace('__N__', str(len(data)))
+            .replace('__NC__', str(sum(len(d['cands']) for d in data)))
+            .replace('__MINUTES__', str(len(data) * MINUTES_PER_PAGE))
+            .replace('__BANDS__', blob(BANDS)).replace('__BANDTEXT__', blob(BAND_TEXT))
+            .replace('__CLASSES__', blob(list(M.CLASSES))).replace('__NOTX__', blob(list(NOT_TRANSCRIBED)))
+            .replace('__DATA__', blob(data)).replace('__INITIAL__', blob(initial or {}))
+            .replace('__STORAGEKEY__', blob(storage_key)).replace('__RECHECK__', blob(recheck))
+            .replace('__SOURCE__', blob(key.get('answers_sha256'))))
+    if recheck:
+        start, end = html.index('<header>'), html.index('<b>j/k</b>')
+        html = html[:start] + ('<header><b>Marks: nine places on seven pages, about 30–45 minutes.</b> '
+            'Earlier keep/reject, class, touches-print and page bands are retained and locked. '
+            'Recheck only the flagged places below. The original comment is shown beside a blank text field. '
+            'Use notes for uncertainty; leave text blank if the reading remains incomplete. '
+            'For grouped subannotations, shift-drag the missing separate boxes on the page '
+            '(or <button id="addbtn" onclick="toggleAdd()">add box (a)</button> and drag). ') + html[end:]
+    (out_dir / 'index.html').write_text(html)
+    (out_dir / 'key.json').write_text(json.dumps(key, indent=1, ensure_ascii=False) + '\n')
+
+
 def build(out_dir, routes=None, partial=False):
     """The core pages' sheet in out_dir. Refuses (SystemExit) when a core page has no usable draft, or when any route
     has not read it (both families must have tried every page, MRK-1). A route that read a page and failed (output cap,
     bad JSON) is a measured failure, not a missing draft: the page goes on with the other family's boxes and key.json
     lists the route under 'failed'. partial=True only refuses a page with no draft at all, for a trial build that is
-    never offered. Also refuses a page with no image. Images are copied byte for byte (the scan artifact is read-only);
+    never offered. Also refuses a page with no image. Verified original JPEGs are copied byte for byte (the scan artifact is read-only);
     nothing on the sheet names a route."""
     routes = routes or default_routes()
     out_dir = Path(out_dir)
@@ -139,7 +170,7 @@ def build(out_dir, routes=None, partial=False):
         pages[r['id']] = (r, got)
     if missing:
         raise SystemExit(f'{len(missing)} core pages lack a draft: {missing[:5]}')
-    noimg = [pid for pid in pages if not Path(M.image_path(pid)).exists()]
+    noimg = [pid for pid in pages if not Path(original_path(pid)).exists()]
     if noimg:
         raise SystemExit(f'no image for {noimg[:5]}')
     order = sorted(pages)
@@ -149,7 +180,13 @@ def build(out_dir, routes=None, partial=False):
                          order=order, pages={})
     for pid in order:
         r, got = pages[pid]
-        shutil.copyfile(M.image_path(pid), out_dir / 'pages' / (pid + '.jpg'))
+        src = original_path(pid)
+        from marks_core import sha
+        digest = sha(src)
+        dest = out_dir / 'pages' / (pid + '.jpg')
+        shutil.copyfile(src, dest)
+        if sha(src) != digest or sha(dest) != digest:
+            raise ValueError('original changed during copying: ' + pid)
         cs = candidates(got)
         data.append(dict(page=pid, img=f'pages/{pid}.jpg',
                          cands=[dict(box=c['box'], cls=c['cls'], texts=c['texts'], overlaps=c['overlaps_print'])
@@ -158,15 +195,7 @@ def build(out_dir, routes=None, partial=False):
                                  drafted=[n for n, d in got if d], failed=failed.get(pid, []), candidates=cs)
     n_c = sum(len(d['cands']) for d in data)
     minutes = len(data) * MINUTES_PER_PAGE
-    defs, nots = class_notes()
-    blob = lambda o: json.dumps(o, ensure_ascii=False).replace('</', '<\\/')  # noqa: E731 - no </script> in data
-    html = (SHEET_HTML.replace('__CLASSDEFS__', ''.join(f'<li><b>{esc(c)}</b>: {esc(t)}</li>' for c, t in defs))
-            .replace('__NOTMARKS__', esc(nots)).replace('__N__', str(len(data))).replace('__NC__', str(n_c))
-            .replace('__MINUTES__', str(minutes)).replace('__BANDS__', blob(BANDS))
-            .replace('__BANDTEXT__', blob(BAND_TEXT)).replace('__CLASSES__', blob(list(M.CLASSES)))
-            .replace('__NOTX__', blob(list(NOT_TRANSCRIBED))).replace('__DATA__', blob(data)))
-    (out_dir / 'index.html').write_text(html)
-    (out_dir / 'key.json').write_text(json.dumps(key, indent=1, ensure_ascii=False) + '\n')
+    write_sheet(out_dir, data, key)
     return dict(pages=len(data), candidates=n_c, minutes=minutes, failed=failed, out=str(out_dir))
 
 
@@ -177,18 +206,22 @@ header{position:sticky;top:0;background:#fff;border-bottom:1px solid #ccc;paddin
 header details{font-size:13px}header ul{margin:2px 0 4px;padding-left:20px}
 .page{display:flex;gap:12px;border-bottom:3px solid #999;padding:10px;min-height:90vh;scroll-margin-top:var(--head,60px)}
 .img{flex:1 1 62%;position:sticky;top:var(--head,60px);height:calc(100vh - var(--head,60px) - 20px);overflow:auto}
-.frame{position:relative;width:100%;cursor:zoom-in;user-select:none}.frame.zoom{width:250%;cursor:zoom-out}
+.frame{position:relative;width:100%;cursor:zoom-in;user-select:none}.frame.zoom{cursor:zoom-out}
 .frame img{width:100%;display:block;pointer-events:none}.adding .frame{cursor:crosshair}
 .q{flex:1 1 38%;overflow:auto}.page.cur .q{outline:3px solid #06f;outline-offset:4px}.page.done .q{background:#e6f6e6}
 .opt{display:block;margin:3px 0;padding:2px 4px;border-radius:3px;cursor:pointer}.opt.sel{font-weight:bold;color:#060;background:#d8f0d8}
 .k{color:#888;font-size:12px;display:inline-block;width:1.4em}
 .bx{position:absolute;border:2px solid #d00;box-sizing:border-box;pointer-events:none}
-.bx span{position:absolute;top:-16px;left:-2px;background:#d00;color:#fff;font:bold 11px sans-serif;padding:0 3px}
+.bx span{display:none;position:absolute;top:-16px;left:-2px;background:#d00;color:#fff;font:bold 11px sans-serif;padding:0 3px}
 .bx.no{border:2px dashed #999}.bx.no span{background:#999}.bx.add{border-color:#06c}.bx.add span{background:#06c}
-.bx.hi{border-width:4px}.drag{position:absolute;border:2px dashed #06c;pointer-events:none}
+.show-numbers .bx span{display:block}.hide-boxes .bx{display:none}.bx.hi{border-width:4px}.drag{position:absolute;border:2px dashed #06c;pointer-events:none}
 .mk{border-top:1px solid #ccc;padding:5px 0}.mk.ok{background:#eef8ee}.mk label{margin-right:8px;white-space:nowrap}
 .mk input[type=text]{width:95%}.alt{color:#06c;cursor:pointer;text-decoration:underline;margin-right:8px}
 .hint{color:#777;font-size:12px}textarea{width:95%}#addbtn.on{background:#06c;color:#fff}
+.viewtools{position:sticky;top:0;background:white;padding:5px;z-index:2}
+.frame.zoom{cursor:zoom-out}dialog{max-width:95vw;max-height:94vh;padding:8px}dialog::backdrop{background:#0009}
+.detail-scroll{overflow:auto;max-width:90vw;max-height:78vh;background:#eee}#detail canvas{display:block}
+.locked{color:#555}.feedback{white-space:pre-wrap;border-left:3px solid #d80;padding-left:6px}
 </style>
 <header><b>Marks on the core pages</b>: __N__ pages, __NC__ draft boxes, about __MINUTES__ minutes.
 The numbered boxes are <b>rough drafts</b>: for each say <b>keep</b> or <b>not a mark</b>, then its class, whether it
@@ -196,17 +229,28 @@ touches print, and its text. Signatures, initials and redactions are labelled, n
 <b>shift-drag</b> a rectangle on the image (or turn on <button id="addbtn" onclick="toggleAdd()">add box (a)</button>
 and drag). Then the page's <b>handwriting band</b> (<b>0</b> none · <b>1</b> signature/initials/date only · <b>2</b>
 under ~10 words · <b>3</b> ~10-29 · <b>4</b> 30+ on a typed or printed page · <b>5</b> a handwritten page · <b>x</b>
-not a text page). <b>j/k</b> next/previous · <b>z</b> zoom (or click the image). Answers stay in this browser;
+not a text page). <b>j/k</b> next/previous · <b>z</b> native pixels · <b>b</b> hide/show boxes.
+Images are the verified original JPEG bytes, displayed EXIF-upright. Use a mark's <b>clean crop</b> for native
+pixels with no boxes or labels, and rotate that view as needed. Numbers are hidden on the image by default;
+the form identifies each mark. Notes are separate from transcription.
+<label><input id="boxes" type="checkbox" checked onchange="document.body.classList.toggle('hide-boxes',!this.checked)">boxes</label>
+<label><input id="numbers" type="checkbox" onchange="document.body.classList.toggle('show-numbers',this.checked)">numbers</label>
+<span id="recheck-help"></span> Answers stay in this browser;
 <button onclick="exportAnswers()">Export answers</button><span id="prog"></span>
 <details><summary>The classes</summary><ul>__CLASSDEFS__</ul>__NOTMARKS__</details></header><div id="root"></div>
+<dialog id="detail"><div class="viewtools"><b id="detail-title"></b>
+<button onclick="rotateDetail(-1)">rotate left</button><button onclick="rotateDetail(1)">rotate right</button>
+<button onclick="document.getElementById('detail').close()">close</button></div>
+<div class="detail-scroll"><canvas id="detail-canvas"></canvas></div></dialog>
 <script>
-const DATA=__DATA__,BANDS=__BANDS__,BANDTEXT=__BANDTEXT__,CLASSES=__CLASSES__,NOTX=__NOTX__;const KEY='w46-marks-core';
-let A=JSON.parse(localStorage.getItem(KEY)||'{}');const P=[];let cur=0,adding=false,drag=null,swallow=false;
+const INITIAL=__INITIAL__,RECHECK=__RECHECK__,SOURCE=__SOURCE__;
+const DATA=__DATA__,BANDS=__BANDS__,BANDTEXT=__BANDTEXT__,CLASSES=__CLASSES__,NOTX=__NOTX__;const KEY=__STORAGEKEY__;
+let A=JSON.parse(localStorage.getItem(KEY)||JSON.stringify(INITIAL));const P=[];let cur=0,adding=false,drag=null,swallow=false;
 function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function st(d){const a=A[d.page]=A[d.page]||{band:null,note:'',candidates:{},added:[]};a.candidates=a.candidates||{};a.added=a.added||[];
  d.cands.forEach((c,i)=>{const n=String(i+1);if(!a.candidates[n])a.candidates[n]={keep:null,cls:c.cls,overlaps:c.overlaps,text:c.texts[0]||''}});return a}
 function okMark(m){return !!m&&(m.keep===false||(m.keep===true&&!!m.cls))}
-function done(d){const a=A[d.page];return !!(a&&a.band&&d.cands.every((c,i)=>okMark(a.candidates[String(i+1)]))&&a.added.every(m=>!!m.cls))}
+function done(d){const a=A[d.page];if(RECHECK)return d.pending.every(n=>a.candidates[n].reviewed===true)&&a.added.every(m=>!!m.cls&&typeof m.overlaps==='boolean');return !!(a&&a.band&&d.cands.every((c,i)=>okMark(a.candidates[String(i+1)]))&&a.added.every(m=>!!m.cls))}
 function save(){localStorage.setItem(KEY,JSON.stringify(A));prog()}
 function prog(){document.getElementById('prog').textContent=` ${P.filter(p=>done(p.d)).length} / ${P.length} pages done`}
 function radios(name,f,vals,cur,labels){return vals.map((v,i)=>`<label><input type="radio" name="${name}" data-f="${f}" value="${esc(v)}"${cur===v?' checked':''}>${esc(labels?labels[i]:v)}</label>`).join('')}
@@ -215,9 +259,18 @@ function form(pi,kind,n,m,c){const id=`${pi}-${kind}${n}`,yn=m.overlaps===true?'
  h+=kind==='c'?radios(id+'-k','keep',['keep','drop'],m.keep===true?'keep':m.keep===false?'drop':null,['keep','not a mark'])
   :`<button data-f="remove">remove</button>`;
  h+=`<div>${radios(id+'-c','cls',CLASSES,m.cls)}</div><div>touches print: ${radios(id+'-o','overlaps',['yes','no'],yn)}</div>`;
- h+=`<input type="text" data-f="text" value="${esc(m.text||'')}" placeholder="what it says">`;
+ h+=`<button data-f="crop">clean crop</button> <input type="text" data-f="text" value="${esc(m.text||'')}" placeholder="what it says">`;
  if(c&&c.texts.length>1)h+=`<div class="hint">other readings: ${c.texts.slice(1).map((t,j)=>`<span class="alt" data-alt="${j+1}">${esc(t)}</span>`).join('')}</div>`;
- h+=`<div class="hint">signatures, initials and redactions: label only, no text</div></div>`;return h}
+ h+=`<div class="hint">signatures, initials and redactions: label only, no text</div>`;
+ h+=`<textarea data-f="mark_note" rows="2" placeholder="note about this mark (not transcription)">${esc(m.note||'')}</textarea>`;
+ if(RECHECK&&kind==='c'){
+  const pending=DATA[pi].pending.includes(String(n));
+  h+=m.feedback?`<div class="feedback">Original feedback: ${esc(m.feedback)}</div>`:'';
+  h+=pending?`<label><input type="checkbox" data-f="reviewed"${m.reviewed?' checked':''}>reviewed this place</label>
+   <div class="hint">Leave unread text blank; describe uncertainty in the note. Keep incomplete readings out of text.</div>`
+   :'<div class="locked">Prior answer retained; no recheck requested.</div>';
+ }
+ h+='</div>';return h}
 function render(p){const d=p.d,a=st(d),pi=p.i;
  let o=`<img loading="lazy" src="${esc(d.img)}">`;
  d.cands.forEach((c,i)=>o+=`<div class="bx" data-kind="c" data-n="${i+1}" style="${pos(c.box)}"><span>${i+1}</span></div>`);
@@ -229,7 +282,19 @@ function render(p){const d=p.d,a=st(d),pi=p.i;
  h+=`<div style="margin-top:10px"><b>Handwriting band</b>`;
  for(const [k,v] of Object.entries(BANDS))h+=`<span class="opt" data-band="${v}"><span class="k">${k}</span>${esc(BANDTEXT[v])}</span>`;
  h+=`</div><textarea rows="2" data-f="note" placeholder="note (optional)">${esc(a.note||'')}</textarea>`;
- p.q.innerHTML=h;paint(p)}
+ p.q.innerHTML=h;
+ if(RECHECK){
+  p.q.querySelectorAll('.mk').forEach(e=>{const fixedAdded=e.dataset.kind==='a'&&+e.dataset.n<=(INITIAL[d.page].added||[]).length;
+   const pending=!fixedAdded&&(e.dataset.kind==='a'||d.pending.includes(e.dataset.n));
+   e.querySelectorAll('input[type=radio]').forEach(t=>t.disabled=e.dataset.kind==='c'||fixedAdded);
+   const remove=e.querySelector('[data-f=remove]');if(remove)remove.disabled=fixedAdded;
+   e.querySelectorAll('[data-f=text],[data-f=mark_note]').forEach(t=>t.disabled=!pending);
+  });
+  p.q.querySelectorAll('.opt').forEach(e=>{e.style.pointerEvents='none';e.classList.add('locked')});
+  p.q.querySelector('[data-f=note]').disabled=true;
+  p.q.querySelectorAll('.alt').forEach(e=>e.remove());
+ }
+ paint(p)}
 function pos(b){return `left:${b[0]*100}%;top:${b[1]*100}%;width:${(b[2]-b[0])*100}%;height:${(b[3]-b[1])*100}%`}
 function markOf(p,kind,n){const a=st(p.d);return kind==='c'?a.candidates[n]:a.added[n-1]}
 function paint(p){const a=st(p.d);p.el.classList.toggle('done',done(p.d));
@@ -239,14 +304,15 @@ function paint(p){const a=st(p.d);p.el.classList.toggle('done',done(p.d));
 function edit(p,e){const t=e.target,mk=t.closest('.mk');if(!mk){if(t.dataset.f==='note'){st(p.d).note=t.value;save()}return}
  const m=markOf(p,mk.dataset.kind,+mk.dataset.n),f=t.dataset.f;
  if(f==='keep')m.keep=t.value==='keep';else if(f==='cls')m.cls=t.value;else if(f==='overlaps')m.overlaps=t.value==='yes';
- else if(f==='text')m.text=t.value;else return;save();paint(p)}
+ else if(f==='text')m.text=t.value;else if(f==='mark_note')m.note=t.value;else if(f==='reviewed')m.reviewed=t.checked;else return;if(RECHECK&&f!=='reviewed'){m.reviewed=false;const box=mk.querySelector('[data-f=reviewed]');if(box)box.checked=false}save();paint(p)}
 const root=document.getElementById('root');
 DATA.forEach((d,i)=>{const el=document.createElement('div');el.className='page';
- el.innerHTML='<div class="img"><div class="frame"></div></div><div class="q"></div>';root.appendChild(el);
- const p={d,i,el,frame:el.querySelector('.frame'),q:el.querySelector('.q')};P.push(p);render(p);
+ el.innerHTML='<div class="img"><div class="viewtools"><button class="full">clean full page</button> <button class="native">fit / native pixels</button></div><div class="frame"></div></div><div class="q"></div>';root.appendChild(el);
+ const p={d,i,el,frame:el.querySelector('.frame'),q:el.querySelector('.q')};P.push(p);render(p);el.querySelector('.full').onclick=()=>openDetail(p,null,'full page');el.querySelector('.native').onclick=()=>zoom(p);
  p.q.addEventListener('change',e=>edit(p,e));p.q.addEventListener('input',e=>{if(e.target.type==='text'||e.target.tagName==='TEXTAREA')edit(p,e)});
  p.q.addEventListener('click',e=>{if(cur!==i)go(i,false);const t=e.target;
-  if(t.dataset.band!==undefined||t.closest('.opt')){st(d).band=t.closest('.opt').dataset.band;save();paint(p);return}
+  if(t.dataset.f==='crop'){const mk=t.closest('.mk'),n=+mk.dataset.n;openDetail(p,mk.dataset.kind==='c'?d.cands[n-1].box:st(d).added[n-1].box,`mark ${mk.dataset.kind==='a'?'+':''}${n}`);return}
+  if(t.dataset.band!==undefined||t.closest('.opt')){if(RECHECK)return;st(d).band=t.closest('.opt').dataset.band;save();paint(p);return}
   if(t.dataset.alt){const mk=t.closest('.mk'),m=markOf(p,'c',+mk.dataset.n);m.text=d.cands[+mk.dataset.n-1].texts[+t.dataset.alt];
    mk.querySelector('input[type=text]').value=m.text;save();return}
   if(t.dataset.f==='remove'){st(d).added.splice(+t.closest('.mk').dataset.n-1,1);save();render(p)}});
@@ -254,7 +320,7 @@ DATA.forEach((d,i)=>{const el=document.createElement('div');el.className='page';
  p.frame.addEventListener('mousedown',e=>{if(e.button!==0||!(e.shiftKey||adding))return;e.preventDefault();go(i,false);
   const r=p.frame.getBoundingClientRect(),dv=document.createElement('div');dv.className='drag';p.frame.appendChild(dv);
   drag={p,r,dv,x0:fx(e,r),y0:fy(e,r),x1:fx(e,r),y1:fy(e,r)}});
- p.frame.addEventListener('click',()=>{if(swallow||adding)return;p.frame.classList.toggle('zoom')})});
+ p.frame.addEventListener('click',()=>{if(swallow||adding)return;zoom(p)})});
 function hi(p,mk){p.frame.querySelectorAll('.bx').forEach(b=>b.classList.toggle('hi',!!mk&&b.dataset.kind===mk.dataset.kind&&b.dataset.n===mk.dataset.n))}
 function cl(v){return Math.min(1,Math.max(0,v))}function fx(e,r){return cl((e.clientX-r.left)/r.width)}function fy(e,r){return cl((e.clientY-r.top)/r.height)}
 document.addEventListener('mousemove',e=>{if(!drag)return;drag.x1=fx(e,drag.r);drag.y1=fy(e,drag.r);
@@ -269,11 +335,26 @@ function head(){document.documentElement.style.setProperty('--head',document.que
 addEventListener('resize',head);document.querySelector('details').addEventListener('toggle',head);head();
 document.addEventListener('keydown',e=>{const p=P[cur];if(!p||e.metaKey||e.ctrlKey||e.altKey)return;
  if(['INPUT','TEXTAREA'].includes(e.target.tagName)&&e.target.type!=='radio')return;
- if(e.key==='j')go(cur+1);else if(e.key==='k')go(cur-1);else if(e.key==='z')p.frame.classList.toggle('zoom');
- else if(e.key==='a')toggleAdd();else if(BANDS[e.key]){st(p.d).band=BANDS[e.key];save();paint(p)}});
+ if(e.key==='j')go(cur+1);else if(e.key==='k')go(cur-1);else if(e.key==='z')zoom(p);
+ else if(e.key==='a')toggleAdd();else if(e.key==='b'){document.getElementById('boxes').click()}else if(!RECHECK&&BANDS[e.key]){st(p.d).band=BANDS[e.key];save();paint(p)}});
 function exportAnswers(){const out={};P.forEach(p=>{const a=st(p.d);out[p.d.page]={band:a.band,note:a.note||'',candidates:a.candidates,added:a.added}});
- const b=new Blob([JSON.stringify(out,null,1)],{type:'application/json'});
- const l=document.createElement('a');l.href=URL.createObjectURL(b);l.download='marks-core-answers.json';l.click()}
+ const payload=RECHECK?{protocol:'marks-feedback-answers-v1',answers_sha256:SOURCE,pages:out}:out;
+ const b=new Blob([JSON.stringify(payload,null,1)],{type:'application/json'});
+ const l=document.createElement('a');l.href=URL.createObjectURL(b);l.download=RECHECK?'marks-feedback-answers.json':'marks-core-answers.json';l.click()}
+function zoom(p){const img=p.frame.querySelector('img');p.frame.classList.toggle('zoom');
+ p.frame.style.width=p.frame.classList.contains('zoom')?img.naturalWidth+'px':'100%'}
+let detailImage=null,detailBox=null,detailTurns=0;
+async function openDetail(p,box,label){const img=p.frame.querySelector('img');await img.decode();
+ detailImage=img;detailBox=box;detailTurns=0;document.getElementById('detail-title').textContent=p.d.page+' — '+label+' (native pixels, no overlay)';
+ drawDetail();document.getElementById('detail').showModal()}
+function rotateDetail(n){detailTurns=(detailTurns+n+4)%4;drawDetail()}
+function drawDetail(){const img=detailImage,w=img.naturalWidth,h=img.naturalHeight,b=detailBox;
+ const x=b?Math.max(0,Math.floor((b[0]-.025)*w)):0,y=b?Math.max(0,Math.floor((b[1]-.025)*h)):0;
+ const cw=(b?Math.min(w,Math.ceil((b[2]+.025)*w)):w)-x,ch=(b?Math.min(h,Math.ceil((b[3]+.025)*h)):h)-y;
+ const c=document.getElementById('detail-canvas');c.width=detailTurns%2?ch:cw;c.height=detailTurns%2?cw:ch;
+ const ctx=c.getContext('2d');ctx.translate(c.width/2,c.height/2);ctx.rotate(detailTurns*Math.PI/2);
+ ctx.drawImage(img,x,y,cw,ch,-cw/2,-ch/2,cw,ch)}
+if(RECHECK)document.getElementById('recheck-help').textContent='Targeted recheck: only the flagged places need answers. Earlier labels and page bands are locked. Shift-drag separate subannotations if needed; keep added text and notes separate.';
 save();go(0,false);
 </script>"""
 
@@ -302,10 +383,12 @@ def export_yolo(answers, key, out_dir):
     """YOLO files for the core pages the owner finished: kept candidates (the draft's box, the owner's class) and
     the boxes he added. An unfinished page writes no file and is listed, so a missing answer never reads as 'no
     marks'. marks.json keeps the owner's band (as a marks_set.AMOUNTS value or 'nontext'), texts and overlaps."""
+    if answers.get('protocol') == 'marks-feedback-answers-v1' or key.get('protocol') == 'marks-feedback-sheet-v1':
+        raise ValueError('A feedback recheck must be validated and folded against the frozen full core')
     from marks_core import COMMENT
     for page in answers.values():
         entries = list((page.get('candidates') or {}).values()) + (page.get('added') or [])
-        if page.get('note', '').strip() or any(COMMENT.search(m.get('text') or '') for m in entries):
+        if page.get('note', '').strip() or any('feedback' in m or 'reviewed' in m or (m.get('note') or '').strip() or COMMENT.search(m.get('text') or '') for m in entries):
             raise ValueError('Owner question feedback must be retained with marks_core.py freeze; '
                              'the plain YOLO export cannot treat it as transcription or detector truth')
     out_dir = Path(out_dir)

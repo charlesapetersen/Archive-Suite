@@ -101,7 +101,32 @@ def choose(rows, skipped=()):
     return out
 
 
+def original_source(root, pid):
+    """Read-only native-resolution review source, checked against the frozen scan.
+
+    prepare's 2400px JPEG is a model input, never the owner's review original.
+    Keep source bytes and EXIF: modern browsers display the same upright axes as
+    prepare's exif_transpose without a lossy recompression or inferred rotation.
+    Works with existing scan receipts; does not rerun or rewrite the scan.
+    """
+    root = Path(root)
+    frozen = P.load(root / 'freeze.json')
+    for name in ('inventory.json', 'scan.json'):
+        if P.file_hash(root / name) != frozen['files'][name]:
+            raise ValueError('changed scan provenance: ' + name)
+    inventory, scan = P.load(root / 'inventory.json'), P.load(root / 'scan.json')
+    rows = [r for r in inventory['pages'] if r['id'] == pid]
+    pages = [r for r in scan['pages'] if r['id'] == pid]
+    if len(rows) != 1 or len(pages) != 1:
+        raise ValueError('missing/duplicate original source: ' + pid)
+    src = P.relative(Path(inventory['originals']), rows[0]['source_rel'])
+    if P.file_hash(src) != pages[0]['source_sha256']:
+        raise ValueError('original source differs from scan: ' + pid)
+    return src
+
+
 def prepare(out, pairs, originals, roots):
+    # Model inputs are bounded to 2400px; review uses original_source(), never these derivatives.
     from PIL import Image, ImageOps
     out = P.safe_output(out)
     originals = originals.resolve()

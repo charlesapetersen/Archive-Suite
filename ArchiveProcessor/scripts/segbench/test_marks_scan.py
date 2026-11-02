@@ -96,6 +96,25 @@ class Scratch(unittest.TestCase):
         self.assertEqual(P.file_hash(self.root / 'freeze.json'), P.file_hash(self.base / 'second/freeze.json'))
         self.assertEqual(hashes, {p: P.file_hash(p) for p in hashes})
 
+    def test_review_uses_verified_native_original_not_model_derivative(self):
+        src = self.originals / self.roots['Dean'] / '00000.jpg'
+        exif = Image.Exif(); exif[274] = 6
+        Image.new('RGB', (2600, 40), 'white').save(src, exif=exif)
+        before = P.file_hash(src)
+        self.prepare()
+        p = next(p for p in self.pages() if p['source_sha256'] == before)
+        self.assertEqual(p['original_size'], [40, 2600])
+        self.assertEqual(p['sent_size'][1], 2400)
+        original = S.original_source(self.root, p['id'])
+        self.assertEqual(original.resolve(), src.resolve())
+        self.assertEqual(P.file_hash(original), before)
+        with Image.open(original) as im:
+            self.assertEqual(im.size, (2600, 40))
+            self.assertEqual(im.getexif()[274], 6)
+        src.write_bytes(b'changed original')
+        with self.assertRaisesRegex(ValueError, 'differs from scan'):
+            S.original_source(self.root, p['id'])
+
     def test_cap_per_collection(self):
         with mock.patch.object(S, 'PER_COLLECTION', 2):
             out = self.prepare()

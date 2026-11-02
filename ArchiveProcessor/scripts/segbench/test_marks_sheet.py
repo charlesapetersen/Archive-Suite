@@ -111,7 +111,8 @@ class Build(unittest.TestCase):
                                               for r in rows},
                        'qwen3-vl-8b-mlx4': {r['id']: draft(mk('annotation', [0.11, 0.1, 0.3, 0.2], '</script>x'),
                                                            mk('other', [0.7, 0.7, 0.8, 0.8])) for r in rows}}
-        self.patches = [mock.patch.object(M, 'selection', lambda: {'rows': self.rows}),
+        self.patches = [mock.patch.object(S, 'original_path', lambda pid: root / 'img' / (pid + '.jpg')),
+                        mock.patch.object(M, 'selection', lambda: {'rows': self.rows}),
                         mock.patch.object(M, 'image_path', lambda pid: root / 'img' / (pid + '.jpg')),
                         mock.patch.object(M, 'gemini_draft', lambda pid: self.drafts['gemini3.7-flash-gw'].get(pid)),
                         mock.patch.object(M, 'local_draft', lambda pid: self.drafts['qwen3-vl-8b-mlx4'].get(pid))]

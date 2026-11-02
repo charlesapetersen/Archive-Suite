@@ -55,6 +55,20 @@ class Fold(unittest.TestCase):
         self.assertEqual(out['pages']['b']['marks'], [])
         self.assertFalse(out['pages']['b']['detector_evaluable'])
 
+    def test_per_mark_notes_are_feedback_separate_from_text(self):
+        self.a['a']['candidates']['1']['note'] = 'uncertain geometry'
+        out = C.fold(self.a, self.k, self.s)
+        page = out['pages']['a']
+        self.assertFalse(page['detector_evaluable'])
+        self.assertIsNone(page['marks'][0]['text'])
+        self.assertFalse(page['marks'][0]['transcription_evaluable'])
+        self.assertEqual(page['marks'][0]['owner_entry'], 'invented fixture')
+        self.assertEqual(page['marks'][0]['note'], 'uncertain geometry')
+        self.assertEqual(out['question_feedback'][0]['entries'][0]['field'], 'mark_note')
+        with tempfile.TemporaryDirectory() as d:
+            with self.assertRaises(ValueError): S.export_yolo(self.a, self.k, Path(d) / 'labels')
+            self.assertFalse((Path(d) / 'labels').exists())
+
     def test_signatures_never_become_transcription(self):
         self.a['a']['candidates']['1']['cls'] = 'signature_initials'
         m = C.fold(self.a, self.k, self.s)['pages']['a']['marks'][0]
@@ -78,6 +92,18 @@ class Fold(unittest.TestCase):
         for box in ([0, 0, float('nan'), 1], [0, 0, 2, 1], [.8, 0, .2, 1], [True, 0, 1, 1]):
             self.k['pages']['a']['candidates'][0]['box'] = box
             with self.assertRaises(ValueError): C.fold(self.a, self.k, self.s)
+
+    def test_recheck_export_cannot_bypass_masks_with_original_key(self):
+        for field, value in [('feedback', 'old question'), ('reviewed', False), ('reviewed', True)]:
+            a = copy.deepcopy(self.a)
+            a['a']['candidates']['1'][field] = value
+            with tempfile.TemporaryDirectory() as d:
+                with self.assertRaises(ValueError): S.export_yolo(a, self.k, Path(d) / 'labels')
+                self.assertFalse((Path(d) / 'labels').exists())
+        envelope = dict(protocol='marks-feedback-answers-v1', answers_sha256='test', pages=self.a)
+        with tempfile.TemporaryDirectory() as d:
+            with self.assertRaises(ValueError): S.export_yolo(envelope, self.k, Path(d) / 'labels')
+            self.assertFalse((Path(d) / 'labels').exists())
 
     def test_plain_export_cannot_bypass_feedback_masks(self):
         self.a['a']['candidates']['1']['text'] = 'NB: not legible'

@@ -61,12 +61,15 @@ def fold(answers, key, selection):
                    for i, c in enumerate(k['candidates'], 1)]
         entries += [(f'+{i}', m, m['box'], 'owner') for i, m in enumerate(a['added'], 1)]
         for cid, m, box, origin in entries:
-            if not box_ok(box) or not isinstance(m.get('text', ''), str):
+            if not box_ok(box) or not isinstance(m.get('text', ''), str) or not isinstance(m.get('note', ''), str):
                 raise ValueError(f'{pid}/{cid}: invalid box or text')
             if origin == 'draft' and type(m.get('keep')) is not bool:
                 raise ValueError(f'{pid}/{cid}: keep must be boolean')
-            comment = bool(COMMENT.search(m.get('text', '')))
-            if comment:
+            if m.get('note', '').strip():
+                feedback.append(dict(field='mark_note', candidate=cid, text=m['note']))
+            inline_comment = bool(COMMENT.search(m.get('text', '')))
+            comment = inline_comment or bool(m.get('note', '').strip())
+            if inline_comment:
                 feedback.append(dict(field='text', candidate=cid, text=m['text']))
             if origin == 'draft' and not m['keep']:
                 rejected.append(cid)
@@ -78,7 +81,7 @@ def fold(answers, key, selection):
             # label-only class to a transcription scorer as if it were text.
             text = None if comment or label_only else m.get('text', '')
             marks.append(dict(candidate=cid, box=box, cls=m['cls'], overlaps=m['overlaps'],
-                              text=text, owner_entry=m.get('text', ''), origin=origin,
+                              text=text, owner_entry=m.get('text', ''), note=m.get('note', ''), origin=origin,
                               transcription_evaluable=bool(text),
                               transcription_status=('question_feedback' if comment else
                                   'label_only' if label_only else 'owner_reviewed' if text else 'unread'),

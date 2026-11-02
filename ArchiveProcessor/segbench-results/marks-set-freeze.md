@@ -23,3 +23,32 @@ Feedback pages: Dean-0a07517aa636ba99, Dean-23edf5f15485b7ff, Dean-24a6d76b84c27
 
 Frozen record: `/Users/cp1/Library/Application Support/ArchiveSuiteRehearsal/marks-set-frozen-da388b05c388`.
 Input SHA-256 receipts are in the adjacent JSON. Images and all owner text stay outside Git.
+
+## Feedback view repair prepared — 2026-11-01 (item remains open)
+
+`marks_feedback.py` accounts for all 18 comments: seven entries record six explicit
+relationships; two retain rejected candidates; nine places on seven pages need a
+bounded owner recheck. Relationship metadata preserves every class, band and rough
+box. In particular, duplicated text does not establish identical geometry, and
+connected boxes with different owner classes are not silently merged.
+
+The corrected sheet uses hash-verified original JPEG bytes (9,420,729 bytes across
+seven pages), with EXIF-upright coordinates, native-pixel clean crops/full-page
+views, rotation, hideable boxes/numbers and separate mark notes. It is ready now:
+the known view defects are fixed and the remaining pending experiments consume
+this truth, rather than changing these nine questions. Allow about 30–45 minutes,
+with sittings supported by isolated browser storage.
+
+Open `~/.local/state/archive-autonomous/artifacts/marks-feedback-da388b05c388/index.html`
+and export `marks-feedback-answers.json`. Labels/bands remain locked. An unread or
+incomplete reading may stay blank with an uncertainty note. A source-bound envelope
+prevents the seven-page export being mistaken for a new core. Gate
+`W46.fix-marks-sheet-feedback-owner-ok` waits for the owner's export; a later pass
+validates and folds it against the full baseline, settles grouped subannotations
+and publishes a new derived truth without replacing the original freeze.
+
+The da388b05c388 freeze, 40 labels/bands and all exclusion masks are unchanged.
+All 12 feedback pages remain outside detector training/evaluation; missing label
+files are never no-mark negatives. No transcription is inferred from comments,
+no model run or paid call was made. Kept the review artifact and its original-byte
+receipts as pending owner work; no disposable benchmark cache was created.
