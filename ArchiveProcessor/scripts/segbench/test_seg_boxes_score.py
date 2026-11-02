@@ -15,6 +15,19 @@ import seg_truth_sheet as TS
 
 
 class Collection(unittest.TestCase):
+    def test_saved_success_cannot_bypass_a_prior_reservation_overrun(self):
+        with tempfile.TemporaryDirectory() as folder, \
+                patch.object(B, "STORE", Path(folder)), patch.object(S, "STORE", Path(folder)), \
+                patch.object(B, "_mods", return_value=(None, None, S, None)), \
+                patch.object(B, "gateway_key") as key, patch.object(S, "call") as send:
+            S.append({"id": "a", "event": "reserve", "charge": .01})
+            S.append({"id": "a", "event": "settle", "charge": .02, "valid": True})
+            with self.assertRaisesRegex(RuntimeError, "reservation"):
+                B.cmd_collect(argparse.Namespace(workers=1, limit=None))
+            key.assert_not_called()
+            send.assert_not_called()
+            self.assertEqual(len(S.records()), 2)
+
     def test_multiple_workers_refused_before_credentials_or_calls(self):
         with patch.object(B, "_mods", return_value=(None, None, S, None)), \
                 patch.object(B, "gateway_key") as key:
@@ -98,6 +111,35 @@ class OwnerSupport(unittest.TestCase):
                 self.assertEqual(B.route_split(route, box), "held-out" if box == "Sasha" else "trained-on")
 
 
+class OffsetCost(unittest.TestCase):
+    def cost(self, rows, missing=False):
+        col = SimpleNamespace(pages=list(range(10)))
+        def hit(body, key):
+            return None if missing else {"request": {"id": key, "request_sha256": key}}
+        with patch.object(S, "effective_records", return_value=rows), \
+                patch.object(S, "request", side_effect=lambda route, col, a, b: ({}, str(a), [])), \
+                patch.object(S, "cache_hit", side_effect=hit):
+            return B.offset_cost(S, col, [(0, 7), (3, 10)])
+
+    def test_standalone_offset_counts_retained_attempts_and_excludes_other_windows(self):
+        rows = [{"id": "0", "request_sha256": "0", "event": "settle", "charge": .01},
+                {"id": "prior", "request_sha256": "3", "event": "retry-approved", "charge": .03},
+                {"id": "3", "request_sha256": "3", "event": "settle", "charge": .02},
+                {"id": "other", "request_sha256": "9", "event": "settle", "charge": 1}]
+        r = self.cost(rows)
+        self.assertEqual((r["windows"], r["attempts"]), (2, 3))
+        self.assertAlmostEqual(r["charged_usd"], .06)
+        self.assertAlmostEqual(r["usd_per_1000_pages"], 6)
+        # Another offset using the same windows has the same standalone cost, not zero from cache reuse.
+        self.assertEqual(self.cost(rows), r)
+
+    def test_missing_reply_or_billing_cannot_be_a_free_offset(self):
+        with self.assertRaisesRegex(RuntimeError, "cached window"):
+            self.cost([], missing=True)
+        with self.assertRaisesRegex(RuntimeError, "settled billing"):
+            self.cost([])
+
+
 class PartialReport(unittest.TestCase):
     def test_missing_gateway_and_offsets_are_explicitly_unmeasured(self):
         routes = [k for k in B.ROUTES if k != "gemini"]
@@ -125,6 +167,15 @@ class PartialReport(unittest.TestCase):
         self.assertNotIn("READING", report)
         self.assertIn("document-exact scores there remain conditional", out["note"])
         self.assertIn("2 unsure gaps excluded, 20 resolved document pages", report)
+        f = {"pages_exact_no_review": .8, "flagged_per_100_pages": 10,
+             "pages_exact_after_review": .9, "unflagged_errors_per_500_pages": 2,
+             "usd_per_1000_pages": 4, "unflagged_errors": 1}
+        out["offsets"] = {"rule": "frozen", "level": .9, "rows": {
+            f"o{o}": {"figures": {**f, "usd_per_1000_pages": 4 + o}, "by_box": {"Stanton": f}}
+            for o in (0, 1, 2)}, "gemini38_o0": f, "gemini38_o0_by_box": {"Stanton": f}}
+        full = B.render(out)
+        self.assertIn("$4.00 | $5.00 | $6.00 | $4.00–$6.00 | $4.00", full)
+        self.assertIn("total experiment spend counts it once", full)
 
 
 if __name__ == "__main__":

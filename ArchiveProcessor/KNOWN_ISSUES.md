@@ -16,9 +16,14 @@ refuses an uncovered control stratum rather than shrinking its denominator; trai
 each route, so Gemini and the teacher are not labelled trained-on. Synthetic cap/failure/weight tests pass.
 The offline comparison is now in `segbench-results/seg-boxes-score-local.md` and the bench panel, explicitly
 partial: all 179 Mac windows valid, Sasha gap accuracy 89.7% against the teacher's 67.4%; pages exact only
-37.4% against 15.5%. The full experiment remains open pending the gateway arm and offsets. Automatic approval
-review rejected archival gateway egress and direct main pushes; checkpoints/results are on the item's wt/
-branch pending scoped approval. No app behavior changed.
+37.4% against 15.5%. The full experiment remains open pending the gateway arm and offsets. The owner's
+2026-11-01 grants authorize the scoped $6.80 gateway run and routine verified main pushes; checkpoints are
+integrated on main. Automatic approval review nevertheless rejected the resumed two-window pilot before
+execution, calling the recorded archival-egress approval untrusted; no new paid calls ran. The collector
+now also refuses a prior reservation overrun on resume, even if that saved answer parsed successfully.
+The full scorer and bench can show the fifth offset range (cost per 1,000 input pages): each standalone
+offset's window charges and retained attempts, with shared experiment spend counted separately. Synthetic
+accounting, resume-refusal, missing-billing and report tests pass. No app behavior changed.
 
 ## OPEN (W46.seg-kit-truth-provenance, 2026-11-01): measurement support and report provenance
 

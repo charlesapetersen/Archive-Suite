@@ -178,6 +178,7 @@ footer p { font-size: 13px; }
     <div id="sbs-offsets" hidden>
       <h3>The shipped cloud route at three window offsets (Stanton and RG 165)</h3>
       <div class="tbl"><table><thead><tr><th>Figure</th><th>3.7, offset 0</th><th>3.7, offset 1</th><th>3.7, offset 2</th><th>3.7 range</th><th>3.8, offset 0 (the app's figures)</th></tr></thead><tbody id="sbs-off-rows"></tbody></table></div>
+      <p class="note">Cost per 1,000 input pages counts each offset's windows and all attempts, including retained allowances, at the larger of returned gateway cost or list-token estimate. Shared windows count in each standalone offset; total experiment spend counts them once. The 3.8 cost is the older reference list estimate.</p>
     </div>
     <p class="note" id="sbs-note"></p>
   </section>
@@ -695,7 +696,8 @@ if (sbs) {
   const figs = [['pages_exact_no_review', 'Pages in an exact document, no checking', p1],
                 ['flagged_per_100_pages', 'Boundaries to check per 100 pages', v => v.toFixed(1)],
                 ['pages_exact_after_review', 'Pages right after checking', p1],
-                ['unflagged_errors_per_500_pages', 'Unflagged errors per 500 pages', v => v.toFixed(1)]];
+                ['unflagged_errors_per_500_pages', 'Unflagged errors per 500 pages', v => v.toFixed(1)],
+                ['usd_per_1000_pages', 'Charged $ per 1,000 pages (3.8: reference estimate)', v => '$' + v.toFixed(2)]];
   if (sbs.offsets) {
     document.getElementById('sbs-off-rows').innerHTML = figs.map(([k, name, f]) => {
       const values = ['o0', 'o1', 'o2'].map(o => sbs.offsets.rows[o].figures[k]);

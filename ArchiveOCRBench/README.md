@@ -231,6 +231,9 @@ record:
   `seg-boxes-score.json` once the full scorer runs. SC0122's draft diagnostics and owner-supported weighted
   gap estimates stay separate, with common mask/support counts and student training status. These are three
   different boxes from the 363-page segmentation test chart, so the figures stay in their own panel.
+  Once collected, the full report shows all five offset ranges, including charged dollars per 1,000 input
+  pages. Each standalone offset counts its window attempts and retained allowances; shared windows count
+  in each offset but only once in total experiment spend. The 3.8 cost alongside is a reference list estimate.
 - `cheap-models.md`: the three cheap segmentation finalists (GLM-5.3 Flash, GPT-5.6 Luna, Qwen3.5 Flash) at the
   98% bar's frozen level, and their cost over five boxes. `build.py` stops if its Gemini row stops matching
   `options.md`, which the report says it reproduces.

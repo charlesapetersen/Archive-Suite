@@ -40,6 +40,7 @@ from __future__ import annotations
 import argparse
 import fcntl
 import json
+import math
 import os
 from pathlib import Path
 import sys
@@ -155,6 +156,16 @@ def release_unsent(S):
         S.retry_unsettled_once()
 
 
+def check_reservations(S):
+    """An overrun remains a stop on resume, even when the saved answer parsed successfully."""
+    reserved = {r["id"]: r["charge"] for r in S.records() if r["event"] == "reserve"}
+    for r in S.effective_records():
+        charge, allowance = r["charge"], reserved.get(r["id"])
+        if (allowance is None or not math.isfinite(charge) or charge < 0
+                or not math.isfinite(allowance) or charge > allowance):
+            raise RuntimeError("ledger charge exceeded its reservation or is invalid; inspect before continuing")
+
+
 def cmd_collect(a):
     _, _, S, _ = _mods()
     # S.call reserves and fsyncs before HTTP, but its check + append are not thread-safe.
@@ -164,6 +175,7 @@ def cmd_collect(a):
     STORE.mkdir(parents=True, exist_ok=True)
     with (STORE / "collect.lock").open("a") as fh:
         fcntl.flock(fh, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        check_reservations(S)
         gateway_key()
         release_unsent(S)
         todo = [j for j in jobs() if gemini_answer(*j[1:]) is None][: a.limit or None]
@@ -290,18 +302,43 @@ def sc0122_owner(col, rec):
     return out
 
 
+def offset_cost(S, col, spans):
+    """Standalone run cost: every window once, every attempt charged, including retained allowances.
+
+    A window shared by offsets belongs to each standalone route's cost; experiment spend deduplicates it.
+    Missing billing is an error, never a free window. No paid request is made here.
+    """
+    keys = set()
+    rows = S.effective_records()
+    for a, b in spans:
+        body, key, _ = S.request("gemini", col, a, b)
+        hit = S.cache_hit(body, key)
+        if hit is None:
+            raise RuntimeError("offset cost requires every cached window")
+        req = hit["request"]
+        if not any(r["id"] == req["id"] and r["event"] == "settle" for r in rows):
+            raise RuntimeError("offset cost requires settled billing for every cached window")
+        keys.add(req["request_sha256"])
+    charged = [r for r in rows if r["request_sha256"] in keys]
+    total = sum(r["charge"] for r in charged)
+    return {"windows": len(keys), "attempts": len(charged), "charged_usd": total,
+            "usd_per_1000_pages": 1000 * total / len(col.pages)}
+
+
 def offsets(js_gem):
     """Each offset's five figures on Stanton + RG165, at options.py's frozen Gemini rule and level."""
-    _, W, _, M = _mods()
+    _, W, S, M = _mods()
+    check_reservations(S)
     import ensemble as E
     import options as O
     fz = json.loads((RESULTS / "options-frozen.json").read_text())["approaches"]["gemini"]
     rows = {}
     for o in sorted(OFFSETS):
-        per, failed = [], 0
+        per, costs, failed = [], {}, 0
         for b in OFFSET_BOXES:
             col = data.load(b, with_exif=False)
             spans = M.spans(len(col.pages), 7, o)
+            costs[b] = offset_cost(S, col, spans)
             for a, z in spans:
                 j = js_gem(col, a, z)
                 failed += j is not None and bool(j["boundaries"]) and all(
@@ -312,10 +349,14 @@ def offsets(js_gem):
             with O.rule(fz["rule"]):
                 per.append(E.evaluate(box, tuple(fz["voters"]), fz["level"]) | {"name": b})
         p = E.pooled(per)
-        rows[f"o{o}"] = {"figures": O.figures(p), "by_box": {r["name"]: O.figures(r) for r in per},
+        fig = O.figures(p)
+        fig["usd_per_1000_pages"] = 1000 * sum(c["charged_usd"] for c in costs.values()) / p["pages"]
+        rows[f"o{o}"] = {"figures": fig, "by_box": {r["name"]: O.figures(r) for r in per}, "cost_by_box": costs,
                          "failed_windows": failed}
     ref = next(x for x in json.loads((RESULTS / "options.json").read_text())["approaches"] if x["id"] == "gemini")
-    return {"rule": fz["rule"], "level": fz["level"], "rows": rows, "gemini38_o0": ref["figures"]["test"],
+    ref_fig = {**ref["figures"]["test"],
+               "usd_per_1000_pages": ref["cost"]["total"]["list_usd_per_1000_pages"]}
+    return {"rule": fz["rule"], "level": fz["level"], "rows": rows, "gemini38_o0": ref_fig,
             "gemini38_o0_by_box": ref["figures"]["test_by_box"]}
 
 
@@ -477,14 +518,17 @@ def render(out) -> str:
         F = (("pages_exact_no_review", "pages in an exact document, no checking", lambda x: _p(x)),
              ("flagged_per_100_pages", "boundaries to check per 100 pages", lambda x: f"{x:.1f}"),
              ("pages_exact_after_review", "pages right after checking", lambda x: _p(x)),
-             ("unflagged_errors_per_500_pages", "unflagged errors per 500 pages", lambda x: f"{x:.1f}"))
+             ("unflagged_errors_per_500_pages", "unflagged errors per 500 pages", lambda x: f"{x:.1f}"),
+             ("usd_per_1000_pages", "charged $ per 1,000 pages (3.8: reference list estimate)", lambda x: f"${x:.2f}"))
         rows = off["rows"]
         L += ["", "## The shipped cloud route at three window offsets (Stanton and RG165, 363 pages)", "",
               f"options.py's frozen Gemini approach (rule {off['rule']}, flag at or below {off['level']}), applied to "
               "Gemini 3.7 windows starting 0, 1 and 2 pages later; nothing refit. The level was fitted for 3.8 on the "
-              "development boxes, so 3.7's flag load at it is not 3.7's own best level. The fifth figure, cost per 1,000 "
-              "pages, remains options.md's 3.8 reference estimate, not a measured 3.7 offset cost: edge windows and "
-              "output lengths can change tokens and spend.", "",
+              "development boxes, so 3.7's flag load at it is not 3.7's own best level. Cost counts each offset's "
+              "windows once and all their attempts, including retained allowances, divided by all 363 input pages "
+              "and scaled to 1,000. Each charge is the larger of returned gateway cost or list-token estimate. "
+              "A window shared by offsets counts in each standalone route's cost; total experiment spend counts it "
+              "once. The 3.8 cost is options.md's reference list estimate, with a different measurement basis.", "",
               "| figure | 3.7, offset 0 | 3.7, offset 1 | 3.7, offset 2 | 3.7 range | 3.8, offset 0 (options.md) |",
               "|---|---:|---:|---:|---:|---:|"]
         for k, name, fmt in F:
