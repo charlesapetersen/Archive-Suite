@@ -25,7 +25,7 @@ and six Blackwell conditions remain untouched. W46.ocr-ppocrv6-hands-paid-cap-ok
 
 Owner export 2026-11-01, baseline 2b1dd66b: 18 comments on 12 core pages were in transcription fields. The view repair is prepared (checkpoint, 2026-11-01): `marks_sheet.py` copies hash-verified original JPEG bytes instead of the scan's 2400px model derivatives, with native-pixel crops/full-page views, rotation, hideable boxes/numbers, and separate mark notes. The EXIF-upright coordinate frame is preserved. `marks_feedback.py` verifies the untouched da388b05c388 freeze and records six explicit duplicate/connected/part relationships (seven entries), without choosing new classes, merging boxes or inventing text; two comments retain existing rejections.
 
-Nine marks on seven pages still need the owner's reading/grouping check. The bounded sheet is at `~/.local/state/archive-autonomous/artifacts/marks-feedback-da388b05c388/index.html`; prior labels and bands are locked, uncertainty belongs in notes, and the export is `marks-feedback-answers.json`. Gate `W46.fix-marks-sheet-feedback-owner-ok` keeps the item and dependent experiments waiting for this export and a validated fold. All 12 feedback pages remain excluded; they are never no-mark negatives. Recheck envelopes/markers cannot pass plain YOLO export; unresolved mark notes also mask transcription. Synthetic tests and a headless EXIF-JPEG interaction/pixel proof cover the repair; no owner document was interpreted, no model call or corpus write made.
+Nine marks on seven pages still need the owner's reading/grouping check. The bounded sheet is at `~/.local/state/archive-autonomous/artifacts/marks-feedback-da388b05c388/index.html`; prior labels and bands are locked, uncertainty belongs in notes, and the export is `marks-feedback-answers.json`. Gate `W46.fix-marks-sheet-feedback-owner-ok` keeps the item and dependent experiments waiting for this export and a validated fold. All 12 feedback pages remain excluded; they are never no-mark negatives. Pass 5 also requires current feedback status or its durable pointer to survive `marks_core.py::report` replay; the manually appended status section is currently lost on regeneration, without changing the immutable truth or masks. Recheck envelopes/markers cannot pass plain YOLO export; unresolved mark notes also mask transcription. Synthetic tests and a headless EXIF-JPEG interaction/pixel proof cover the repair; no owner document was interpreted, no model call or corpus write made.
 
 ## FIXED (W46.seg-boxes-score checkpoint, 2026-11-01): scorer cap and support safeguards
 
@@ -51,6 +51,16 @@ keeps every new reserve/unknown and saved provider/usage failure stopped before 
 another send, without changing any charge or granting retries. The historical explicit unsent approval
 remains recorded. All 41 offline scorer/gateway/kit tests pass. No app behavior changed.
 
+## OPEN (W46.mac-card-provenance, 2026-11-02): Mac OCR card omits truth limits and overstates 895 coverage
+
+Measurement review pass 5, baseline `9e9d9f1d`, `scripts/segbench/ocr_mac_local.py::hw_card`:
+the generated `ocr-mac-local-hw.md` calls truth merely adjudicated, omitting model drafters,
+unchecked agreement and ten unresolved hand places. Its blanket Sherlock-895 scope includes
+Granite, whose cluster pilot was refused and has no 895 score. The parent box-reader and main
+scorer reports are qualified; no numeric verdict changes. Offline writer/report correction is
+queued as W46.mac-card-provenance, with repeat-generation and unchanged-table checks.
+Details: [`2026-11-02.md`](../execution-plans/processing-review/measure-reviews/2026-11-02.md).
+
 ## OPEN (W46.seg-kit-truth-provenance, 2026-11-01): measurement support and report provenance
 
 W46.measure-review pass 4, baseline `7092c5fd`; independent refute-check confirmed these offline corrections.
@@ -59,7 +69,9 @@ Details: [`2026-11-01.md`](../execution-plans/processing-review/measure-reviews/
 - `scripts/segbench/kit_gate_sherlock.py::{score_boxes,render,CARD}` scores SC0122's all-known truth while
   claiming no scored drafter made it; that truth still includes tag/teacher agreement beyond the owner's
   checked subset. W46.seg-kit-truth-provenance reuses W46.seg-boxes-score's owner-supported scoring and fixes
-  report/panel provenance. Sasha's held-out lead stands; no duplicate experiment is needed.
+  report/panel provenance. Sasha's held-out lead stands; no duplicate experiment is needed. The committed
+  `seg-boxes-score-local.json::sc0122_owner` now supplies every kit route and the supported
+  30/60/158 document-gap comparison; pass 5 removes the wait for unfinished paid offsets.
 
 ## FIXED (W46.measure-report-consistency, 2026-11-01): persistent layout card and qualified Find prose
 
