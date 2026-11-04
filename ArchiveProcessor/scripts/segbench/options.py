@@ -835,7 +835,12 @@ def render(out: dict) -> str:
         truth="The owner's ruled test boxes, Stanton (with the owner's 2026-10-31 segmentation-sheet rulings, "
               "W46.seg-truth-rescore) and RG 165, with the truth's photo labels; neither carries an unsure gap, so "
               "every figure here is on a fixed truth. Levels and the mix rule were frozen on the owner's development "
-              "boxes (Dean, Deaver, Herrnstein).",
+              "boxes (Dean, Deaver, Herrnstein). Gemini only's 2 unflagged errors (2.8 per 500 pages) are Stanton "
+              "101|102 and 102|103, the newsletter gaps the owner re-ruled on 2026-10-31 under the "
+              "article-within-issue rule, which g1's rule 10 still tells the model to merge: a rule mismatch pending "
+              "W46.seg-magazine-rule-redo, not reading error. GLM-5.3 Flash's 3 are that pair and 144|145; Claude's "
+              "3 (Stanton 124|125 and 144|145, RG 165 99|100) and the Mac 2B's 1 (a false split at Stanton 108|109) "
+              "do not include it (W46.seg-offsets-label, from the cached answers).",
         selection="Whole boxes chosen before these routes existed; the approaches are the ones the app offers, not "
                   "picked by their test score. Nothing was fitted, chosen or re-chosen on the test boxes.",
         comparison="Every approach on the same 363 pages and gaps, with its own flag level frozen first "
@@ -843,7 +848,8 @@ def render(out: dict) -> str:
                    "token prices.",
         noise="Single runs with no intervals. The error counts are a few gaps each, so a difference of one or two is "
               "within noise; the rerun floor (1.4-3.2 points of pages exact a box, SEG-10) applies to the "
-              "no-review column.",
+              "no-review column. Gemini 3.8's five figures have no measured window-offset range: the gateway serves "
+              "only 3.7, whose range at this 3.8-fitted level is in seg-boxes-score.md (83.0%-85.2% no checking).",
         scope="The figures the Processor shows for one archive's two locked boxes (363 pages). Not other material "
               "(Lincoln, CREST and the locked new boxes wait for W46.seg-boxes-score), and not a forecast for a "
               "user's own corpus.")

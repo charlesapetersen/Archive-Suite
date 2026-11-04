@@ -208,12 +208,31 @@ class PartialReport(unittest.TestCase):
         f = {"pages_exact_no_review": .8, "flagged_per_100_pages": 10,
              "pages_exact_after_review": .9, "unflagged_errors_per_500_pages": 2,
              "usd_per_1000_pages": 4, "unflagged_errors": 1}
+        pair = [{"gap": g, "said": "continue", "truth": "new", "confidence": .98} for g in ("101|102", "102|103")]
         out["offsets"] = {"rule": "frozen", "level": .9, "rows": {
-            f"o{o}": {"figures": {**f, "usd_per_1000_pages": 4 + o}, "by_box": {"Stanton": f}}
-            for o in (0, 1, 2)}, "gemini38_o0": f, "gemini38_o0_by_box": {"Stanton": f}}
+            f"o{o}": {"figures": {**f, "usd_per_1000_pages": 4 + o, "usd_settled_per_1000_pages": 3 + o},
+                      "by_box": {"Stanton": f}, "unflagged_gaps": {"Stanton": pair, "RG165": []}}
+            for o in (0, 1, 2)}, "gemini38_o0": f, "gemini38_o0_by_box": {"Stanton": f},
+            "gemini38_o0_unflagged_gaps": {"Stanton": pair, "RG165": []}}
         full = B.render(out)
         self.assertIn("$4.00 | $5.00 | $6.00 | $4.00–$6.00 | $4.00", full)
+        self.assertIn("$3.00 | $4.00 | $5.00 | $3.00–$5.00 | — |", full)
         self.assertIn("total experiment spend counts it once", full)
+        self.assertIn("## Gemini 3.7 (gateway) at the shipped route's rule and level, three window offsets", full)
+        self.assertIn("the shipped 3.8 route's own offset range is unmeasured", full)
+        self.assertIn("rule mismatch pending W46.seg-magazine-rule-redo", full)
+        self.assertIn("same two confident Stanton gaps", full)
+
+    def test_unflagged_note_only_names_the_newsletter_pair_when_every_run_has_exactly_it(self):
+        pair = [{"gap": g} for g in ("101|102", "102|103")]
+        off = {"rows": {f"o{o}": {"unflagged_gaps": {"Stanton": pair, "RG165": []}} for o in (0, 1, 2)},
+               "gemini38_o0_unflagged_gaps": {"Stanton": pair, "RG165": []}}
+        self.assertTrue(B.newsletter_only(off))
+        self.assertIn("rule mismatch", B.unflagged_note(off))
+        off["rows"]["o1"]["unflagged_gaps"]["RG165"] = [{"gap": "9|10"}]
+        self.assertFalse(B.newsletter_only(off))
+        self.assertNotIn("rule mismatch", B.unflagged_note(off))
+        self.assertIn("3.7 o1: RG165 9|10, Stanton 101|102", B.unflagged_note(off))
 
 
 if __name__ == "__main__":

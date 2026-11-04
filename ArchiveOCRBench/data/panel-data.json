@@ -28443,7 +28443,8 @@
       "pages_exact_after_review": 0.9848484848484849,
       "unflagged_errors": 2,
       "unflagged_errors_per_500_pages": 2.7548209366391183,
-      "usd_per_1000_pages": 3.5857727272727273
+      "usd_per_1000_pages": 3.5857727272727273,
+      "usd_settled_per_1000_pages": 3.5857727272727273
      },
      "by_box": {
       "Stanton": {
@@ -28472,16 +28473,35 @@
        "windows": 84,
        "attempts": 84,
        "charged_usd": 0.9031455,
+       "settled_usd": 0.9031455,
        "usd_per_1000_pages": 3.612582
       },
       "RG165": {
        "windows": 39,
        "attempts": 39,
        "charged_usd": 0.39849,
+       "settled_usd": 0.39849,
        "usd_per_1000_pages": 3.5264601769911503
       }
      },
-     "failed_windows": 0
+     "failed_windows": 0,
+     "unflagged_gaps": {
+      "Stanton": [
+       {
+        "gap": "101|102",
+        "said": "continue",
+        "truth": "new",
+        "confidence": 0.98
+       },
+       {
+        "gap": "102|103",
+        "said": "continue",
+        "truth": "new",
+        "confidence": 0.98
+       }
+      ],
+      "RG165": []
+     }
     },
     "o1": {
      "figures": {
@@ -28493,7 +28513,8 @@
       "pages_exact_after_review": 0.9848484848484849,
       "unflagged_errors": 2,
       "unflagged_errors_per_500_pages": 2.7548209366391183,
-      "usd_per_1000_pages": 3.820853305785124
+      "usd_per_1000_pages": 3.820853305785124,
+      "usd_settled_per_1000_pages": 3.5712417355371904
      },
      "by_box": {
       "Stanton": {
@@ -28522,16 +28543,35 @@
        "windows": 84,
        "attempts": 86,
        "charged_usd": 0.990351,
+       "settled_usd": 0.899742,
        "usd_per_1000_pages": 3.961404
       },
       "RG165": {
        "windows": 38,
        "attempts": 38,
        "charged_usd": 0.39661875,
+       "settled_usd": 0.39661875,
        "usd_per_1000_pages": 3.5099004424778766
       }
      },
-     "failed_windows": 0
+     "failed_windows": 0,
+     "unflagged_gaps": {
+      "Stanton": [
+       {
+        "gap": "101|102",
+        "said": "continue",
+        "truth": "new",
+        "confidence": 0.985
+       },
+       {
+        "gap": "102|103",
+        "said": "continue",
+        "truth": "new",
+        "confidence": 0.985
+       }
+      ],
+      "RG165": []
+     }
     },
     "o2": {
      "figures": {
@@ -28543,7 +28583,8 @@
       "pages_exact_after_review": 0.9848484848484849,
       "unflagged_errors": 2,
       "unflagged_errors_per_500_pages": 2.7548209366391183,
-      "usd_per_1000_pages": 3.56175
+      "usd_per_1000_pages": 3.56175,
+      "usd_settled_per_1000_pages": 3.56175
      },
      "by_box": {
       "Stanton": {
@@ -28572,16 +28613,35 @@
        "windows": 84,
        "attempts": 84,
        "charged_usd": 0.898914,
+       "settled_usd": 0.898914,
        "usd_per_1000_pages": 3.595656
       },
       "RG165": {
        "windows": 38,
        "attempts": 38,
        "charged_usd": 0.39400125,
+       "settled_usd": 0.39400125,
        "usd_per_1000_pages": 3.486736725663717
       }
      },
-     "failed_windows": 0
+     "failed_windows": 0,
+     "unflagged_gaps": {
+      "Stanton": [
+       {
+        "gap": "101|102",
+        "said": "continue",
+        "truth": "new",
+        "confidence": 0.99
+       },
+       {
+        "gap": "102|103",
+        "said": "continue",
+        "truth": "new",
+        "confidence": 0.985
+       }
+      ],
+      "RG165": []
+     }
     }
    },
    "gemini38_o0": {
@@ -28616,9 +28676,26 @@
      "unflagged_errors": 0,
      "unflagged_errors_per_500_pages": 0.0
     }
+   },
+   "gemini38_o0_unflagged_gaps": {
+    "Stanton": [
+     {
+      "gap": "101|102",
+      "said": "continue",
+      "truth": "new",
+      "confidence": 0.985
+     },
+     {
+      "gap": "102|103",
+      "said": "continue",
+      "truth": "new",
+      "confidence": 0.985
+     }
+    ],
+    "RG165": []
    }
   },
-  "note": "On held-out Sasha the shipped Mac 2B scores 89.7% on 175 known gaps (pages exact 37.4%), against the teacher's 67.4% and its bf16 source's 89.1%. The source's pages exact is 46.6%: similar gap accuracy can leave different long documents wrong, and these single runs do not rank quantizations. The Illustrated Review and SC0122 are trained-on diagnostics for the students, not evidence of generalization. SC0122's supported comparison is its owner-ruled disagreement gaps plus controls weighted to the agreed strata; document-exact scores there remain conditional on tag/teacher-drafted truth. Gemini 3.7 Flash scores 96.0% on held-out Sasha (pages exact 82.2%); paired against the Mac 2B it is 6.3 points ahead on gap accuracy (sign test p 0.019), and far ahead on whole documents. On the Illustrated Review it merges 40 article gaps, because g1 still asks for the full magazine issue (W46.seg-magazine-rule-redo), so its pages exact there is no test of reading ability. Across three cloud offsets, no-check exact pages range 83.0%\u201385.2% and checks per 100 pages 25.9\u201327.3; the 3.8-fitted flag level is unchanged."
+  "note": "On held-out Sasha the shipped Mac 2B scores 89.7% on 175 known gaps (pages exact 37.4%), against the teacher's 67.4% and its bf16 source's 89.1%. The source's pages exact is 46.6%: similar gap accuracy can leave different long documents wrong, and these single runs do not rank quantizations. The Illustrated Review and SC0122 are trained-on diagnostics for the students, not evidence of generalization. SC0122's supported comparison is its owner-ruled disagreement gaps plus controls weighted to the agreed strata; document-exact scores there remain conditional on tag/teacher-drafted truth. Gemini 3.7 Flash scores 96.0% on held-out Sasha (pages exact 82.2%); paired against the Mac 2B it is 6.3 points ahead on gap accuracy (sign test p 0.019), and far ahead on whole documents. On the Illustrated Review it merges 40 article gaps, against the teacher's 21 and the students' 29-31; that g1 still asks for the full magazine issue (W46.seg-magazine-rule-redo) explains at most the excess over those, and its pages exact there is no test of reading ability. Across three offsets of Gemini 3.7 at the shipped route's 3.8-fitted rule and level, no-check exact pages range 83.0%\u201385.2% and checks per 100 pages 25.9\u201327.3; the shipped 3.8 route's own offset range is unmeasured. Its two unflagged errors are the re-ruled Stanton newsletter gaps 101|102 and 102|103, at every offset and for 3.8: a rule mismatch pending W46.seg-magazine-rule-redo, not reading error."
  },
  "public": {
   "rows": [

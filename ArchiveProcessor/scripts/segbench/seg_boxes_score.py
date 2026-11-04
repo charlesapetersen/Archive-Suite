@@ -62,6 +62,7 @@ OFFSETS = (1, 2, 0)          # collection order: the two new offsets first, then
 LOCAL = "seg-2b-8bit"
 SHERLOCK = {"teacher": "fs-qwen3.5-27b", "fs-2b": "fs-seg-2b", "fs-4b": "fs-seg-4b"}
 ROUTES = ("gemini", "mac-2b", "teacher", "fs-2b", "fs-4b")
+STUDENTS = ("mac-2b", "fs-2b", "fs-4b")
 LABEL = {"gemini": "Gemini 3.7 Flash, g1 (gateway)", "mac-2b": "shipped 2B, 8-bit MLX on this Mac",
          "teacher": "Qwen3.5 27B teacher", "fs-2b": "fine-tuned 2B, bf16 (the shipped build's source)",
          "fs-4b": "fine-tuned 4B, bf16"}
@@ -328,8 +329,17 @@ def offset_cost(S, col, spans):
         keys.add(req["request_sha256"])
     charged = [r for r in rows if r["request_sha256"] in keys]
     total = sum(r["charge"] for r in charged)
-    return {"windows": len(keys), "attempts": len(charged), "charged_usd": total,
+    settled = sum(r["charge"] for r in charged if r["event"] == "settle")
+    return {"windows": len(keys), "attempts": len(charged), "charged_usd": total, "settled_usd": settled,
             "usd_per_1000_pages": 1000 * total / len(col.pages)}
+
+
+def unflagged_gaps(box, S, level):
+    """The accepted (unflagged) gaps the route gets wrong, as 1-based page pairs 'a|b' with the call made."""
+    import ensemble as E
+    j = E.judge(box, S, level)
+    return [{"gap": f"{i + 1}|{i + 2}", "said": j[i][0], "truth": box.truth[i], "confidence": round(j[i][2], 6)}
+            for i in box.gaps if not j[i][1] and j[i][0] != box.truth[i] and i not in box.unsure]
 
 
 def offsets(js_gem):
@@ -341,7 +351,7 @@ def offsets(js_gem):
     fz = json.loads((RESULTS / "options-frozen.json").read_text())["approaches"]["gemini"]
     rows = {}
     for o in sorted(OFFSETS):
-        per, costs, failed = [], {}, 0
+        per, costs, failed, wrong = [], {}, 0, {}
         for b in OFFSET_BOXES:
             col = data.load(b, with_exif=False)
             spans = M.spans(len(col.pages), 7, o)
@@ -355,16 +365,22 @@ def offsets(js_gem):
             box.v = {"G": E._from_bounds(col, W.assemble(col, comb, True))}
             with O.rule(fz["rule"]):
                 per.append(E.evaluate(box, tuple(fz["voters"]), fz["level"]) | {"name": b})
+                wrong[b] = unflagged_gaps(box, tuple(fz["voters"]), fz["level"])
         p = E.pooled(per)
         fig = O.figures(p)
         fig["usd_per_1000_pages"] = 1000 * sum(c["charged_usd"] for c in costs.values()) / p["pages"]
+        fig["usd_settled_per_1000_pages"] = 1000 * sum(c["settled_usd"] for c in costs.values()) / p["pages"]
         rows[f"o{o}"] = {"figures": fig, "by_box": {r["name"]: O.figures(r) for r in per}, "cost_by_box": costs,
-                         "failed_windows": failed}
+                         "failed_windows": failed, "unflagged_gaps": wrong}
+    wrong38 = {}
+    for b in OFFSET_BOXES:  # the cached 3.8 test-box answers options.py scored (no call)
+        with O.rule(fz["rule"]):
+            wrong38[b] = unflagged_gaps(E.Box(data.load(b), tuple(fz["voters"])), tuple(fz["voters"]), fz["level"])
     ref = next(x for x in json.loads((RESULTS / "options.json").read_text())["approaches"] if x["id"] == "gemini")
     ref_fig = {**ref["figures"]["test"],
                "usd_per_1000_pages": ref["cost"]["total"]["list_usd_per_1000_pages"]}
     return {"rule": fz["rule"], "level": fz["level"], "rows": rows, "gemini38_o0": ref_fig,
-            "gemini38_o0_by_box": ref["figures"]["test_by_box"]}
+            "gemini38_o0_by_box": ref["figures"]["test_by_box"], "gemini38_o0_unflagged_gaps": wrong38}
 
 
 def cmd_score(a):
@@ -446,13 +462,55 @@ def reading(out):
     text += (f"Gemini 3.7 Flash scores {_p(gem['gap accuracy'])} on held-out Sasha (pages exact {_p(gem['pages exact'])}); "
              f"paired against the Mac 2B it is {-pair['difference points']:.1f} points ahead on gap accuracy "
              f"(sign test p {pair['sign test p']:.2g}), and far ahead on whole documents. On the Illustrated Review it "
-             f"merges {gir['false merges']} article gaps, because g1 still asks for the full magazine issue "
-             "(W46.seg-magazine-rule-redo), so its pages exact there is no test of reading ability. ")
+             f"merges {gir['false merges']} article gaps, against the teacher's "
+             f"{obs[('teacher', 'IllustratedReview')]['false merges']} and the students' "
+             f"{min(obs[(k, 'IllustratedReview')]['false merges'] for k in STUDENTS)}-"
+             f"{max(obs[(k, 'IllustratedReview')]['false merges'] for k in STUDENTS)}; that g1 still asks for the "
+             "full magazine issue (W46.seg-magazine-rule-redo) explains at most the excess over those, and its pages "
+             "exact there is no test of reading ability. ")
     figures = [r["figures"] for r in out["offsets"]["rows"].values()]
     exact = [r["pages_exact_no_review"] for r in figures]
     flags = [r["flagged_per_100_pages"] for r in figures]
-    return text + (f"Across three cloud offsets, no-check exact pages range {_p(min(exact))}–{_p(max(exact))} "
-                   f"and checks per 100 pages {min(flags):.1f}–{max(flags):.1f}; the 3.8-fitted flag level is unchanged.")
+    return text + (f"Across three offsets of Gemini 3.7 at the shipped route's 3.8-fitted rule and level, no-check "
+                   f"exact pages range {_p(min(exact))}–{_p(max(exact))} and checks per 100 pages "
+                   f"{min(flags):.1f}–{max(flags):.1f}; the shipped 3.8 route's own offset range is unmeasured." +
+                   (" Its two unflagged errors are the re-ruled Stanton newsletter gaps 101|102 and 102|103, at every "
+                    "offset and for 3.8: a rule mismatch pending W46.seg-magazine-rule-redo, not reading error."
+                    if newsletter_only(out["offsets"]) else ""))
+
+
+# The Stanton gaps the owner re-ruled on 2026-10-31 under the article-within-issue rule (W46.seg-truth-sheet): the
+# newsletter issue 101-105 split at 101|102 and 102|103, which g1's rule 10 still tells the model to merge.
+NEWSLETTER_GAPS = {("Stanton", "101|102"), ("Stanton", "102|103")}
+
+
+def wrong_sets(off):
+    """Each cloud run's unflagged errors as a set of (box, gap): the three 3.7 offsets, then the cached 3.8."""
+    runs = {f"3.7 {k}": r["unflagged_gaps"] for k, r in off["rows"].items()}
+    runs["3.8 o0"] = off["gemini38_o0_unflagged_gaps"]
+    return {k: {(b, g["gap"]) for b, gs in v.items() for g in gs} for k, v in runs.items()}
+
+
+def unflagged_note(off):
+    sets = wrong_sets(off)
+    same = len({frozenset(v) for v in sets.values()}) == 1
+    listed = "; ".join(f"{k}: {', '.join(f'{b} {g}' for b, g in sorted(v)) or 'none'}" for k, v in sets.items())
+    text = f"Unflagged errors, by gap: {listed}. "
+    if same and next(iter(sets.values())) == NEWSLETTER_GAPS:
+        text += ("Every run's are the same pair, both a confident continue (0.98-0.99): the newsletter gaps the owner "
+                 "re-ruled on 2026-10-31 under the article-within-issue rule, which g1's rule 10 still tells the model "
+                 "to merge. So the route's 2.8 unflagged errors per 500 pages, here and in options.md, is that rule "
+                 "mismatch pending W46.seg-magazine-rule-redo, not reading error, and \"after checking 98.5%\" is the "
+                 "same at every offset because the same confident pair is wrong every time. ")
+    return text + ("The other approaches' unflagged errors in options.md, from its cached test-box answers at their "
+                   "frozen levels (W46.seg-offsets-label): GLM-5.3 Flash's 3 are the same pair and Stanton 144|145; "
+                   "Claude's 3 (Stanton 124|125 and 144|145, RG165 99|100) and the Mac 2B's 1 (a false split at "
+                   "Stanton 108|109) do not include it.")
+
+
+def newsletter_only(off):
+    """True when every cloud run's unflagged errors are exactly the two re-ruled newsletter gaps."""
+    return all(v == NEWSLETTER_GAPS for v in wrong_sets(off).values())
 
 
 def offset_spread(out):
@@ -471,8 +529,7 @@ def render(out) -> str:
     bill = g["billed"]
     gateway_total = "unavailable" if bill["gateway"] is None else f"${bill['gateway']:.4f}"
     command = "score --local-only" if out["offsets"] is None else "score"
-    L = ["# W46.seg-boxes-score — the segmentation routes on the three locked boxes, and the shipped cloud route's "
-         "window offsets", "",
+    L = ["# W46.seg-boxes-score — the segmentation routes on the three locked boxes, and Gemini 3.7 (gateway) at the shipped route's rule and level, three window offsets", "",
          f"Generated by `ArchiveProcessor/scripts/segbench/seg_boxes_score.py {command}` from cached answers (no calls). "
          "Gemini 3.7 Flash through the Stanford AI API gateway (prompt g1, 1600 px images with Apple Vision text, "
          "temperature 0, reasoning low; the gateway does not serve the 3.8 Flash of options.md); the shipped 8-bit "
@@ -504,8 +561,9 @@ def render(out) -> str:
             r = obs[(k, b)]
             L.append(f"| {LABEL[k]} | {b} | {r['split']} | {r['known gaps']} | {_p(r['gap accuracy'])} | "
                      f"{r['false splits']} | {r['false merges']} | {_p(r['pages exact'])} | {r['failed windows']} |")
-    L += ["", "Pooled over the three boxes (sums of gaps; the boxes differ in kind, so a pool is not a population "
-          "rate):", "", "| route | known gaps | gap accuracy | false splits | false merges |", "|---|---:|---:|---:|---:|"]
+    L += ["", "Pooled over the three boxes, a diagnostic and not a ranking: sums of gaps over boxes that differ in kind, "
+          "two of which the students trained on, with Gemini's Illustrated Review row scored against the "
+          "article-within-issue truth while g1 still asks for the full issue. A pool is not a population rate.", "", "| route | known gaps | gap accuracy | false splits | false merges |", "|---|---:|---:|---:|---:|"]
     for k in routes:
         rs = [obs[(k, b)] for b in BOXES]
         n = sum(r["known gaps"] for r in rs)
@@ -529,7 +587,8 @@ def render(out) -> str:
                  f"{_p(m['agreed_weighted_accuracy'])} | {_p(m['owner_weighted_accuracy'])} |")
     L += ["", "## Paired differences", "",
           "Same gaps, same windows; discordant gaps and the exact two-sided sign test on them. Sampling only: the "
-          "rerun floor (1.4-3.2 points a box) is not in it, and gaps in one box are not independent.", "",
+          "rerun floor (1.4-3.2 points a box, measured in pages exact, not in gap accuracy) is not in it, and gaps in one "
+          "box are not independent.", "",
           "| pair | box | gaps | only first right | only second right | difference | p |",
           "|---|---|---:|---:|---:|---:|---:|"]
     for r in out["paired"]:
@@ -541,22 +600,28 @@ def render(out) -> str:
              ("flagged_per_100_pages", "boundaries to check per 100 pages", lambda x: f"{x:.1f}"),
              ("pages_exact_after_review", "pages right after checking", lambda x: _p(x)),
              ("unflagged_errors_per_500_pages", "unflagged errors per 500 pages", lambda x: f"{x:.1f}"),
-             ("usd_per_1000_pages", "charged $ per 1,000 pages (3.8: reference list estimate)", lambda x: f"${x:.2f}"))
+             ("usd_per_1000_pages", "charged $ per 1,000 pages, all attempts (3.8: reference list estimate)",
+              lambda x: f"${x:.2f}"),
+             ("usd_settled_per_1000_pages", "settled $ per 1,000 pages, retained allowances out", lambda x: f"${x:.2f}"))
         rows = off["rows"]
-        L += ["", "## The shipped cloud route at three window offsets (Stanton and RG165, 363 pages)", "",
+        L += ["", "## Gemini 3.7 (gateway) at the shipped route's rule and level, three window offsets (Stanton and RG165, 363 pages)", "",
               f"options.py's frozen Gemini approach (rule {off['rule']}, flag at or below {off['level']}), applied to "
-              "Gemini 3.7 windows starting 0, 1 and 2 pages later; nothing refit. The level was fitted for 3.8 on the "
-              "development boxes, so 3.7's flag load at it is not 3.7's own best level. Cost counts each offset's "
+              "Gemini 3.7 windows starting 0, 1 and 2 pages later; nothing refit. The app's cloud voter is Gemini 3.8 "
+              "Flash on the user's own key, and the level was fitted for 3.8 on the development boxes; the gateway "
+              "serves only 3.7. So this is 3.7's offset range at another model's level, not the shipped route's own, "
+              "and 3.7's flag load at it is not 3.7's own best level. Cost counts each offset's "
               "windows once and all their attempts, including retained allowances, divided by all 363 input pages "
               "and scaled to 1,000. Each charge is the larger of returned gateway cost or list-token estimate. "
               "A window shared by offsets counts in each standalone route's cost; total experiment spend counts it "
-              "once. The 3.8 cost is options.md's reference list estimate, with a different measurement basis.", "",
+              "once; the settled row leaves out allowances retained for calls the gateway never billed. The 3.8 cost is "
+              "options.md's reference list estimate, with a different measurement basis.", "",
               "| figure | 3.7, offset 0 | 3.7, offset 1 | 3.7, offset 2 | 3.7 range | 3.8, offset 0 (options.md) |",
               "|---|---:|---:|---:|---:|---:|"]
         for k, name, fmt in F:
             v = [rows[f"o{o}"]["figures"][k] for o in (0, 1, 2)]
+            ref = off["gemini38_o0"].get(k)
             L.append(f"| {name} | {' | '.join(fmt(x) for x in v)} | {fmt(min(v))}–{fmt(max(v))} | "
-                     f"{fmt(off['gemini38_o0'][k])} |")
+                     f"{'—' if ref is None else fmt(ref)} |")
         L += ["", "By box:", "", "| offset | box | no checking | to check per 100 pages | after checking | "
               "unflagged errors |", "|---|---|---:|---:|---:|---:|"]
         for o in (0, 1, 2):
@@ -566,6 +631,7 @@ def render(out) -> str:
         for b, f in off["gemini38_o0_by_box"].items():
             L.append(f"| 3.8 o0 | {b} | {_p(f['pages_exact_no_review'])} | {f['flagged_per_100_pages']:.1f} | "
                      f"{_p(f['pages_exact_after_review'])} | {f['unflagged_errors']} |")
+        L += ["", unflagged_note(off)]
     L += ["", "## Reading", "", out["note"], ""]
     L += seg_card.card(
         truth="The three locked boxes' truths (Sasha owner-ruled from label tags, locked 2026-10-30; the Illustrated "
@@ -583,14 +649,18 @@ def render(out) -> str:
         noise="Single runs at temperature 0. " +
               ("The cloud offset spread is unavailable in an offline-only report; "
                if offset_spread(out) is None else
-               f"The cloud route's window offsets move no-check exact pages by {offset_spread(out):.1f} points; ") +
-              "a difference between routes smaller than the offset spread, or than 1.4-3.2 points a box, is a tie. "
+               f"Gemini 3.7's window offsets, at the 3.8-fitted level, move no-check exact pages by "
+               f"{offset_spread(out):.1f} points; the shipped 3.8 route's own offset range is unmeasured. ") +
+              "A difference between routes smaller than the offset spread, or than the 1.4-3.2-point rerun floor a "
+              "box (measured in pages exact; applied to gap accuracy it is a guide, not a measured floor), is a tie. " +
+              ("The unflagged-error figures do not move across offsets because the same two confident Stanton gaps "
+               "are wrong every time. " if out["offsets"] is not None and newsletter_only(out["offsets"]) else "") +
               "Sign tests are sampling only.",
         scope=("Only the three owner boxes scored; the two test boxes' cloud offsets remain pending. "
                if out["offsets"] is None else "Three owner boxes and two test boxes. ") +
               "It does not settle a prompt change for the article-within-issue "
-              "rule (g1 still says full magazine: W46.seg-magazine-rule-redo), 3.8 against 3.7 on these boxes, or a "
-              "level fitted for 3.7.")
+              "rule (g1 still says full magazine: W46.seg-magazine-rule-redo), 3.8 against 3.7 on these boxes, the "
+              "shipped 3.8 route's own offset range (the gateway serves only 3.7), or a level fitted for 3.7.")
     return "\n".join(L) + "\n"
 
 

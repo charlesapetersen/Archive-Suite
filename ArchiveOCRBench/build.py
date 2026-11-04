@@ -422,7 +422,7 @@ def seg_kit_gate_sherlock():
 
 def seg_boxes_score():
     """W46.seg-boxes-score: every segmentation route on the three locked boxes, SC0122 on its owner-ruled gaps, and
-    the shipped cloud route at three window offsets."""
+    Gemini 3.7 at the shipped cloud route's rule and level, three window offsets."""
     path = RESULTS / "seg-boxes-score.json"
     if not path.exists():
         path = RESULTS / "seg-boxes-score-local.json"
