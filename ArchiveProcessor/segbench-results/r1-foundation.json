@@ -163,30 +163,30 @@
   },
   "100": {
    "n": 100,
-   "attempted": 16,
-   "ok": 3,
+   "attempted": 100,
+   "ok": 45,
    "failures": {
-    "length": 13
+    "length": 55
    },
-   "fm_nes": 0.008943179379770454,
-   "fm_nes_answered": 0.047696956692109084,
-   "vision_nes": 0.5242820173181336,
-   "fm_nes_loops_cut": 0.03587310147205634,
-   "vision_ok": 16,
+   "fm_nes": 0.10622557102942709,
+   "fm_nes_answered": 0.23605682450983798,
+   "vision_nes": 0.4086840834481059,
+   "fm_nes_loops_cut": 0.1487529447304067,
+   "vision_ok": 100,
    "diff": {
-    "mean": -0.5153388379383631,
-    "lo": -0.6181643871185964,
-    "hi": -0.40172813394359924
+    "mean": -0.30245851241867877,
+    "lo": -0.3566409566048121,
+    "hi": -0.24879010580543742
    },
-   "diff_answered": -0.6092334652986721,
-   "fm_better": 0,
-   "fm_worse": 16,
+   "diff_answered": -0.14880677613604434,
+   "fm_better": 8,
+   "fm_worse": 90,
    "seconds": {
-    "median": 90.26518851518631,
-    "mean": 333.8309295028448,
-    "p90": 110.89391505718231,
+    "median": 76.6538850069046,
+    "mean": 92.7312004852295,
+    "p90": 94.63329911231995,
     "max": 4240.2363929748535,
-    "total": 5341.294872045517
+    "total": 9273.12004852295
    },
    "input_tokens": {
     "median": 244.0,
@@ -196,11 +196,11 @@
    "image_tokens": [
     [
      131,
-     11
+     67
     ],
     [
      147,
-     5
+     33
     ]
    ],
    "output_tokens": {
@@ -217,50 +217,85 @@
      3
     ],
     [
-     "1936x2400",
-     2
+     "2400x1602",
+     10
     ]
    ],
    "groups": {
     "L5": {
-     "n": 16,
-     "ok": 3,
-     "fm_nes": 0.008943179379770454,
-     "fm_nes_answered": 0.047696956692109084,
-     "vision_nes": 0.5242820173181336,
-     "vision_nes_answered": 0.6569304219907811,
+     "n": 25,
+     "ok": 4,
+     "fm_nes": 0.008576618791408258,
+     "fm_nes_answered": 0.053603867446301606,
+     "vision_nes": 0.4745986307224638,
+     "vision_nes_answered": 0.5456240251444854,
      "diff_answered": null
+    },
+    "L6": {
+     "n": 25,
+     "ok": 7,
+     "fm_nes": 0.03727926243947007,
+     "fm_nes_answered": 0.1331402229981074,
+     "vision_nes": 0.27007381948512316,
+     "vision_nes_answered": 0.27829008193792004,
+     "diff_answered": null
+    },
+    "L7": {
+     "n": 25,
+     "ok": 20,
+     "fm_nes": 0.0772825415721915,
+     "fm_nes_answered": 0.09660317696523937,
+     "vision_nes": 0.1393120967816229,
+     "vision_nes_answered": 0.1387337220516629,
+     "diff_answered": [
+      -0.04213054508642354,
+      -0.08760998368468073,
+      0.004147139306890512
+     ]
+    },
+    "L8": {
+     "n": 25,
+     "ok": 14,
+     "fm_nes": 0.30176386131463856,
+     "fm_nes_answered": 0.5388640380618546,
+     "vision_nes": 0.7507517868032135,
+     "vision_nes_answered": 0.7438329224205761,
+     "diff_answered": [
+      -0.20496888435872154,
+      -0.284682685715738,
+      -0.13371756811564395
+     ]
     }
    },
    "auc": {
     "this model NES < 70": {
-     "positives": 16,
-     "auc": null
+     "positives": 96,
+     "auc": 1.0
     },
     "this model NES < 90": {
-     "positives": 16,
+     "positives": 100,
      "auc": null
     },
     "this model failed": {
-     "positives": 13,
-     "auc": 1.0
+     "positives": 55,
+     "auc": 0.9444444444444444
     },
     "Apple Vision NES < 70": {
-     "positives": 13,
-     "auc": 0.38461538461538464
+     "positives": 75,
+     "auc": 0.6069333333333333
     },
     "Apple Vision NES < 90": {
-     "positives": 16,
-     "auc": null
+     "positives": 99,
+     "auc": 0.29797979797979796
     }
    },
    "auc_answered": {
     "this model NES < 70": {
-     "positives": 3,
-     "auc": null
+     "positives": 41,
+     "auc": 1.0
     },
     "this model NES < 90": {
-     "positives": 3,
+     "positives": 45,
      "auc": null
     },
     "this model failed": {
@@ -268,11 +303,11 @@
      "auc": null
     },
     "Apple Vision NES < 70": {
-     "positives": 3,
-     "auc": null
+     "positives": 34,
+     "auc": 0.9759358288770054
     },
     "Apple Vision NES < 90": {
-     "positives": 3,
+     "positives": 45,
      "auc": null
     }
    }
@@ -424,6 +459,108 @@
     "side": 4000,
     "tokenCount": 131,
     "w": 1793
+   }
+  ],
+  "p057": [
+   {
+    "h": 191,
+    "input": 125,
+    "side": 256,
+    "tokenCount": 67,
+    "w": 256
+   },
+   {
+    "h": 382,
+    "input": 253,
+    "side": 512,
+    "tokenCount": 195,
+    "w": 512
+   },
+   {
+    "h": 573,
+    "input": 189,
+    "side": 768,
+    "tokenCount": 131,
+    "w": 768
+   },
+   {
+    "h": 765,
+    "input": 189,
+    "side": 1024,
+    "tokenCount": 131,
+    "w": 1024
+   },
+   {
+    "h": 1148,
+    "input": 189,
+    "side": 1536,
+    "tokenCount": 131,
+    "w": 1536
+   },
+   {
+    "h": 1793,
+    "input": 189,
+    "side": 2400,
+    "tokenCount": 131,
+    "w": 2400
+   },
+   {
+    "h": 1793,
+    "input": 189,
+    "side": 4000,
+    "tokenCount": 131,
+    "w": 2400
+   }
+  ],
+  "p010": [
+   {
+    "h": 256,
+    "input": 93,
+    "side": 256,
+    "tokenCount": 35,
+    "w": 85
+   },
+   {
+    "h": 512,
+    "input": 189,
+    "side": 512,
+    "tokenCount": 131,
+    "w": 172
+   },
+   {
+    "h": 768,
+    "input": 221,
+    "side": 768,
+    "tokenCount": 163,
+    "w": 257
+   },
+   {
+    "h": 1024,
+    "input": 221,
+    "side": 1024,
+    "tokenCount": 163,
+    "w": 343
+   },
+   {
+    "h": 1536,
+    "input": 221,
+    "side": 1536,
+    "tokenCount": 163,
+    "w": 515
+   },
+   {
+    "h": 2400,
+    "input": 221,
+    "side": 2400,
+    "tokenCount": 163,
+    "w": 804
+   },
+   {
+    "h": 2400,
+    "input": 221,
+    "side": 4000,
+    "tokenCount": 163,
+    "w": 804
    }
   ]
  }

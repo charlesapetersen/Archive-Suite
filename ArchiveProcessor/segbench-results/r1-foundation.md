@@ -4,20 +4,20 @@ Reproduce: `ArchiveProcessor/scripts/segbench/fm_foundation.py` (its header has 
 
 ## Findings
 
-- **Not a first reader.** On the owner's 96 it scores 42.4 NES against Apple Vision's 81.4 on the same images (-39.0 points, interval -47.0 to -31.0). A third of the pages (33 of 96) run into a repetition loop and reach the 4,096-token cap; cutting each loop where it starts recovers only 4 points (46.4). Where it finishes a page it still trails Vision on typed (-19.8) and printed (-28.1) pages.
-- **Handwriting is the one lead, and it is a tie.** On the 13 handwritten pages it finished it reads 67.5 against Vision's 59.4 (+8.1, interval -1.1 to +17.7). Those 13 are chosen by the model itself finishing, so this is a lead for a test with a loop stop, not a result.
-- **The image is seen at a fixed small size.** 131 image tokens for any page from 768 px to 2,400 px on the long side (147-163 for other aspect ratios); sending more pixels buys nothing, and the resolution arm is moot. A page takes 9.5 s at the median, 80 s when it loops.
-- **Disagreement flags its own bad pages, not Vision's.** Its disagreement with Vision picks out its own pages under 70 NES at AUC 0.92 (answered pages); Vision's own pages under 70 only at 0.84 and under 90 at 0.77 on the pages it answered, and at 0.63 and 0.55 over all 96, because its loops (zero agreement) fall mostly on pages Vision reads well. As a free routing voter beside Vision it is weak, and its loops make it noisy.
+- **Not a first reader.** On the owner's 96 it scores 42.4 NES against Apple Vision's 83.1 on the same images, both read on macOS 27.2 (-40.7 points, interval -49.0 to -32.5). A third of the pages (33 of 96) run into a repetition loop and reach the 4,096-token cap; cutting each of those loops where it starts (post hoc) recovers 4.4 points (46.8). Where it finishes a page it still trails Vision on typed (-20.4, -27.9 to -13.5) and printed (-25.4, -40.6 to -11.4) pages.
+- **Handwriting is the one lead, and it is a tie.** On the 13 handwritten pages it finished it reads 67.5 against Vision's 61.5 (+5.9, interval -3.8 to +15.8). Those 13 are chosen by the model itself finishing, and the answered-page comparison was added after the 96 were read, so this is a lead for a test with a loop stop, not a result.
+- **Worse on the 100 Latin pages (the 440 reference set's L5-L8, medieval and early-modern hands).** 10.6 NES against Vision's 40.9 (-30.2, -35.7 to -24.9); 55 of 100 loop to the cap. Where it finished, it trails on L8 (53.9 against 74.4, -20.5, -28.5 to -13.4) and ties on L7, where both readers fail (9.7 against 13.9, -4.2, -8.8 to +0.4); L5 and L6 have too few finished pages (4 and 7) for an interval.
+- **The image is seen at a fixed small size.** On three page shapes, the token count stops growing at 768 px on the long side: 131 tokens for a 3:4 portrait and a 4:3 landscape page, 163 for a tall 1:3 page, the same at 2,400 px (512 px gives 195 and 131, 256 px 67 and 35). Sending more than 768 px buys nothing, so a resolution arm above that is moot. A page takes 9.5 s at the median on the 96 (mean 32 s) and about 80 s when it loops; on the 100, 77 s at the median (one page, read in session 1, took 4,240 s, cause not recorded; it is why the mean there is 93 s).
+- **Disagreement flags its own bad pages, and Vision's only weakly.** On the 96 its disagreement with Vision picks out its own pages under 70 NES at AUC 0.93 (answered pages, post hoc); Vision's own pages under 70 at 0.82 and under 90 at 0.75 on those answered pages, and at 0.59 and 0.51 over all 96, because its loops (zero agreement) fall mostly on pages Vision reads well. As a free routing voter beside Vision it is weak, and its loops make it noisy.
 - **No text-only segmentation voter.** On Deaver, Gemini 3.7's k3-t prompt word for word gives replies that copy the pasted schema's wrapper (139 of 149 unparsable); with guided generation into the same fields, 132 parse but score 33.3% of pages in an exact document against Gemini 3.7's 93.6% (-60.3 points), 49 false splits: no better than the failed windows' 0.5 votes.
 - **Guardrails.** The stock guardrail refused an owner page on the pilot; permissiveContentTransformations was used throughout, and still refused 3 of 149 segmentation windows.
-- **The 100 of the 895 are PENDING** (the run was still reading when this was written; the table shows what is in).
 
 ## OCR
 
 | set | read / n | NES % (failures empty) | NES % answered | NES %, loops cut (post hoc) | Apple Vision NES % (27.2) | difference from Vision, points (95% interval) | failures |
 |---|---:|---:|---:|---:|---:|---:|---|
 | The owner's 96 | 63/96 of 96 | 42.4 | 64.5 | 46.8 | 83.1 | -40.7 (-49.0 to -32.5) | length 33 |
-| 100 Latin pages of the 440 reference set (25 from each of L5-L8) | 3/16 of 100 | 0.9 | 4.8 | 3.6 | 52.4 | -51.5 (-61.8 to -40.2) | length 13 |
+| 100 Latin pages of the 440 reference set (25 from each of L5-L8) | 45/100 of 100 | 10.6 | 23.6 | 14.9 | 40.9 | -30.2 (-35.7 to -24.9) | length 55 |
 
 ### The owner's 96: by group
 
@@ -36,14 +36,17 @@ The columns on the pages it read, and their intervals, were added after the 96 w
 
 | group | n | read | on-device NES % | Vision NES % | on-device NES %, pages it read | Vision NES %, the same pages | difference on those pages (95% interval) |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| L5 | 16 | 3 | 0.9 | 52.4 | 4.8 | 65.7 | – |
+| L5 | 25 | 4 | 0.9 | 47.5 | 5.4 | 54.6 | – |
+| L6 | 25 | 7 | 3.7 | 27.0 | 13.3 | 27.8 | – |
+| L7 | 25 | 20 | 7.7 | 13.9 | 9.7 | 13.9 | -4.2 (-8.8 to +0.4) |
+| L8 | 25 | 14 | 30.2 | 75.1 | 53.9 | 74.4 | -20.5 (-28.5 to -13.4) |
 
 ## Speed and tokens
 
 | set | seconds a page, median / mean / 90th / max | total minutes | input tokens (image + prompt), median (min-max) | image tokens (tokenCount) | output tokens, median / max |
 |---|---:|---:|---:|---:|---:|
 | The owner's 96 | 9.5 / 32.1 / 80.5 / 90.8 | 51 | 244 (244-276) | 131 on 53, 147 on 41, 163 on 2 | 369 / 4102 |
-| 100 Latin pages of the 440 reference set (25 from each of L5-L8) | 90.3 / 333.8 / 110.9 / 4240.2 | 89 | 244 (244-260) | 131 on 11, 147 on 5 | 4102 / 4102 |
+| 100 Latin pages of the 440 reference set (25 from each of L5-L8) | 76.7 / 92.7 / 94.6 / 4240.2 | 155 | 244 (244-260) | 131 on 67, 147 on 33 | 4102 / 4102 |
 
 Image tokens against the size sent (owner pages of three shapes, `tokenCount(for: Attachment)` and the session's own input count for a five-token reply; the long side is downsampled to at most the size named, never enlarged):
 
@@ -56,6 +59,20 @@ Image tokens against the size sent (owner pages of three shapes, `tokenCount(for
 | p002 | 1536 | 1148x1536 | 131 | 189 |
 | p002 | 2400 | 1793x2400 | 131 | 189 |
 | p002 | 4000 | 1793x2400 | 131 | 189 |
+| p057 | 256 | 256x191 | 67 | 125 |
+| p057 | 512 | 512x382 | 195 | 253 |
+| p057 | 768 | 768x573 | 131 | 189 |
+| p057 | 1024 | 1024x765 | 131 | 189 |
+| p057 | 1536 | 1536x1148 | 131 | 189 |
+| p057 | 2400 | 2400x1793 | 131 | 189 |
+| p057 | 4000 | 2400x1793 | 131 | 189 |
+| p010 | 256 | 85x256 | 35 | 93 |
+| p010 | 512 | 172x512 | 131 | 189 |
+| p010 | 768 | 257x768 | 163 | 221 |
+| p010 | 1024 | 343x1024 | 163 | 221 |
+| p010 | 1536 | 515x1536 | 163 | 221 |
+| p010 | 2400 | 804x2400 | 163 | 221 |
+| p010 | 4000 | 804x2400 | 163 | 221 |
 
 ## Disagreement with Apple Vision as a routing signal
 
@@ -68,11 +85,11 @@ Risk = 1 − NES(on-device text, Vision text), 0 agreement when either failed. A
 | 96 | this model failed | 33 | 1.00 | 0 | – |
 | 96 | Apple Vision NES < 70 | 21 | 0.59 | 16 | 0.82 |
 | 96 | Apple Vision NES < 90 | 37 | 0.51 | 29 | 0.75 |
-| 100 | this model NES < 70 | 16 | – | 3 | – |
-| 100 | this model NES < 90 | 16 | – | 3 | – |
-| 100 | this model failed | 13 | 1.00 | 0 | – |
-| 100 | Apple Vision NES < 70 | 13 | 0.38 | 3 | – |
-| 100 | Apple Vision NES < 90 | 16 | – | 3 | – |
+| 100 | this model NES < 70 | 96 | 1.00 | 41 | 1.00 |
+| 100 | this model NES < 90 | 100 | – | 45 | – |
+| 100 | this model failed | 55 | 0.94 | 0 | – |
+| 100 | Apple Vision NES < 70 | 75 | 0.61 | 34 | 0.98 |
+| 100 | Apple Vision NES < 90 | 99 | 0.30 | 45 | – |
 
 ## Text-only segmentation on Deaver
 

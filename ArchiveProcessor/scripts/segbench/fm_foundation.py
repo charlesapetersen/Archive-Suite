@@ -446,27 +446,35 @@ def write_md(o):
 
 FINDINGS = [   # written from the measured results; the figures are in the tables below
     '## Findings', '',
-    '- **Not a first reader.** On the owner\'s 96 it scores 42.4 NES against Apple Vision\'s 81.4 on the same images '
-    '(-39.0 points, interval -47.0 to -31.0). A third of the pages (33 of 96) run into a repetition loop and reach the '
-    '4,096-token cap; cutting each loop where it starts recovers only 4 points (46.4). Where it finishes a page it '
-    'still trails Vision on typed (-19.8) and printed (-28.1) pages.',
+    '- **Not a first reader.** On the owner\'s 96 it scores 42.4 NES against Apple Vision\'s 83.1 on the same images, '
+    'both read on macOS 27.2 (-40.7 points, interval -49.0 to -32.5). A third of the pages (33 of 96) run into a '
+    'repetition loop and reach the 4,096-token cap; cutting each of those loops where it starts (post hoc) recovers '
+    '4.4 points (46.8). Where it finishes a page it still trails Vision on typed (-20.4, -27.9 to -13.5) and printed '
+    '(-25.4, -40.6 to -11.4) pages.',
     '- **Handwriting is the one lead, and it is a tie.** On the 13 handwritten pages it finished it reads 67.5 against '
-    'Vision\'s 59.4 (+8.1, interval -1.1 to +17.7). Those 13 are chosen by the model itself finishing, so this is a lead '
-    'for a test with a loop stop, not a result.',
-    '- **The image is seen at a fixed small size.** 131 image tokens for any page from 768 px to 2,400 px on the long '
-    'side (147-163 for other aspect ratios); sending more pixels buys nothing, and the resolution arm is moot. A page '
-    'takes 9.5 s at the median, 80 s when it loops.',
-    '- **Disagreement flags its own bad pages, not Vision\'s.** Its disagreement with Vision picks out its own pages '
-    'under 70 NES at AUC 0.92 (answered pages); Vision\'s own pages under 70 only at 0.84 and under 90 at 0.77 on the '
-    'pages it answered, and at 0.63 and 0.55 over all 96, because its loops (zero agreement) fall mostly on pages Vision '
-    'reads well. As a free routing voter beside Vision it is weak, and its loops make it noisy.',
+    'Vision\'s 61.5 (+5.9, interval -3.8 to +15.8). Those 13 are chosen by the model itself finishing, and the '
+    'answered-page comparison was added after the 96 were read, so this is a lead for a test with a loop stop, not a '
+    'result.',
+    '- **Worse on the 100 Latin pages (the 440 reference set\'s L5-L8, medieval and early-modern hands).** 10.6 NES '
+    'against Vision\'s 40.9 (-30.2, -35.7 to -24.9); 55 of 100 loop to the cap. Where it finished, it trails on L8 '
+    '(53.9 against 74.4, -20.5, -28.5 to -13.4) and ties on L7, where both readers fail (9.7 against 13.9, -4.2, -8.8 '
+    'to +0.4); L5 and L6 have too few finished pages (4 and 7) for an interval.',
+    '- **The image is seen at a fixed small size.** On three page shapes, the token count stops growing at 768 px on '
+    'the long side: 131 tokens for a 3:4 portrait and a 4:3 landscape page, 163 for a tall 1:3 page, the same at '
+    '2,400 px (512 px gives 195 and 131, 256 px 67 and 35). Sending more than 768 px buys nothing, so a resolution arm '
+    'above that is moot. A page takes 9.5 s at the median on the 96 (mean 32 s) and about 80 s when it loops; on the '
+    '100, 77 s at the median (one page, read in session 1, took 4,240 s, cause not recorded; it is why the mean there is 93 s).',
+    '- **Disagreement flags its own bad pages, and Vision\'s only weakly.** On the 96 its disagreement with Vision '
+    'picks out its own pages under 70 NES at AUC 0.93 (answered pages, post hoc); Vision\'s own pages under 70 at 0.82 '
+    'and under 90 at 0.75 on those answered pages, and at 0.59 and 0.51 over all 96, because its loops (zero agreement) '
+    'fall mostly on pages Vision reads well. As a free routing voter beside Vision it is weak, and its loops make it '
+    'noisy.',
     '- **No text-only segmentation voter.** On Deaver, Gemini 3.7\'s k3-t prompt word for word gives replies that copy '
     'the pasted schema\'s wrapper (139 of 149 unparsable); with guided generation into the same fields, 132 parse but '
     'score 33.3% of pages in an exact document against Gemini 3.7\'s 93.6% (-60.3 points), 49 false splits: no better '
     'than the failed windows\' 0.5 votes.',
     '- **Guardrails.** The stock guardrail refused an owner page on the pilot; permissiveContentTransformations was used '
     'throughout, and still refused 3 of 149 segmentation windows.',
-    '- **The 100 of the 895 are PENDING** (the run was still reading when this was written; the table shows what is in).',
 ]
 
 
