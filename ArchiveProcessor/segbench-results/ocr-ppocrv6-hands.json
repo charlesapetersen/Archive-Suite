@@ -1381,5 +1381,5 @@
    "p096"
   ]
  },
- "kit_recommendation": "Target about 160 corrected lines for an optional same-hand fine-tune, using eager MPS when available. Under the 1,440 line-step ceiling, 80 to 160 lines pays on this hand on both backends; 240 adds no resolved gain over 160, but n240 trained six epochs to n160's nine, so past 160 lines is unmeasured, not shown to be useless. Require line-broken corrected truth and a separate held-out acceptance check for each hand. One hand and one seed do not justify making fine-tuning the default handwriting route."
+ "kit_recommendation": "Target about 160 corrected lines for an optional same-hand fine-tune, using eager MPS when available. 80 to 160 lines pays on this hand on both backends; 240 against 160 is a measured tie (-0.27 (-1.13 to +0.51) CPU; +0.25 (-0.39 to +0.74) MPS): every n160 and n240 training stopped early at 5 epochs, under its step ceiling, so both sizes trained to the same early stop. Require line-broken corrected truth and a separate held-out acceptance check for each hand. One hand and one seed do not justify making fine-tuning the default handwriting route."
 }

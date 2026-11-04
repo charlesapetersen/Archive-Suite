@@ -59,13 +59,15 @@ Mean NES in points; a failed page scores 0, as on the panels. "Before" is the tr
 | qwen3-vl-30b-a3b | 77.72 | 77.58 | +0.14 | 1 | 77.63 to 77.89 | 84.51 |
 | paddleocr-vl1.5 | 70.92 | 70.81 | +0.11 | 3 | 70.84 to 70.97 | 69.84 |
 | qwen3.5-27b (local panel) | 69.33 | 69.14 | +0.19 | 4 | 69.20 to 69.36 | 71.72 |
+| unlimited-ocr | 66.84 | 66.81 | +0.04 | 0 | 66.74 to 66.95 | 61.95 |
 | ppocrv6-medium | 62.74 | 62.79 | -0.05 | 0 | 62.64 to 62.80 | 64.75 |
 | apple-vision | 58.06 | 57.87 | +0.19 | 0 | 57.97 to 58.12 | 55.15 |
-| granite-docling-258m-mlx | 11.32 | 11.32 | +0.00 | 10 | 11.32 to 11.32 | 18.21 |
+| nemotron-parse-2 | 52.43 | 52.38 | +0.05 | 3 | 52.40 to 52.47 | 58.07 |
+| granite-docling-258m-mlx | 17.26 | 17.26 | +0.00 | 5 | 17.26 to 17.27 | 25.16 |
 
 ## The API hand route: gemini3.8-flash
 
-On the corrected truth gemini3.8-flash reads the 16 at 95.81 (-0.16 from 95.97), rank 1 of 48. Paired differences, gemini3.8-flash minus each route, 95% bootstrap interval over the 16 pages:
+On the corrected truth gemini3.8-flash reads the 16 at 95.81 (-0.16 from 95.97), rank 1 of 50. Paired differences, gemini3.8-flash minus each route, 95% bootstrap interval over the 16 pages:
 
 | against | after | interval | tie | before | interval |
 |---|---:|---|---|---:|---|
@@ -113,11 +115,13 @@ On the corrected truth gemini3.8-flash reads the 16 at 95.81 (-0.16 from 95.97),
 | qwen3-vl-30b-a3b | +18.10 | +9.28 to +30.74 |  | +18.39 | +9.54 to +31.04 |
 | paddleocr-vl1.5 | +24.89 | +10.29 to +41.21 |  | +25.16 | +10.70 to +41.60 |
 | qwen3.5-27b (local panel) | +26.48 | +8.27 to +48.73 |  | +26.83 | +8.56 to +49.05 |
+| unlimited-ocr | +28.97 | +18.30 to +40.55 |  | +29.16 | +18.50 to +40.72 |
 | ppocrv6-medium | +33.07 | +26.53 to +39.34 |  | +33.18 | +26.65 to +39.52 |
 | apple-vision | +37.75 | +28.48 to +46.81 |  | +38.10 | +28.68 to +47.29 |
-| granite-docling-258m-mlx | +84.49 | +73.69 to +92.88 |  | +84.65 | +73.75 to +93.17 |
+| nemotron-parse-2 | +43.38 | +28.57 to +59.28 |  | +43.59 | +28.63 to +59.60 |
+| granite-docling-258m-mlx | +78.55 | +67.02 to +88.22 |  | +78.71 | +67.07 to +88.50 |
 
-On the corrected truth, by the rerun-noise rule (0.49 points, or an interval across 0), gemini3.8-flash ties 1 route (gemini3.7-flash-gw) and leads the other 46. The correction moves its lead over each route by -0.62 to +0.20 points. These are fixed-reference figures: each unresolved place is scored on the truth's reading, so they are conditional on it (next section).
+On the corrected truth, by the rerun-noise rule (0.49 points, or an interval across 0), gemini3.8-flash ties 1 route (gemini3.7-flash-gw) and leads the other 48. The correction moves its lead over each route by -0.62 to +0.20 points. These are fixed-reference figures: each unresolved place is scored on the truth's reading, so they are conditional on it (next section).
 
 ## The unresolved places
 
@@ -174,11 +178,13 @@ gemini3.8-flash minus each route, 95% paired bootstrap; "tie" by the rerun-noise
 | qwen3-vl-30b-a3b | +18.10 leads | +11.45 leads | +4.86 to +18.92 | +17.58 leads | +8.79 to +30.29 |
 | paddleocr-vl1.5 | +24.89 leads | +26.12 leads | +6.59 to +52.15 | +24.50 leads | +9.99 to +40.60 |
 | qwen3.5-27b (local panel) | +26.48 leads | +24.24 leads | +2.10 to +55.64 | +26.11 leads | +8.03 to +48.09 |
+| unlimited-ocr | +28.97 leads | +34.02 leads | +17.25 to +52.67 | +28.52 leads | +17.95 to +40.13 |
 | ppocrv6-medium | +33.07 leads | +31.21 leads | +23.02 to +39.69 | +32.67 leads | +26.24 to +38.75 |
 | apple-vision | +37.75 leads | +40.81 leads | +27.97 to +53.00 | +37.35 leads | +28.21 to +46.31 |
-| granite-docling-258m-mlx | +84.49 leads | +77.75 leads | +60.60 to +91.46 | +84.15 leads | +73.38 to +92.46 |
+| nemotron-parse-2 | +43.38 leads | +37.89 leads | +18.61 to +59.97 | +43.00 leads | +28.25 to +58.85 |
+| granite-docling-258m-mlx | +78.55 leads | +70.80 leads | +53.38 to +86.08 | +78.20 leads | +66.75 to +87.81 |
 
-Of the 46 routes gemini3.8-flash leads on the fixed reference, it still leads 44 both without the unresolved pages and on the adverse bound; against 2 (claude-sonnet5.5, gemini3.1-pro) it fails at least one of the two, so the API hand-route preference over them stays conditional on the truth's readings at those places.
+Of the 48 routes gemini3.8-flash leads on the fixed reference, it still leads 46 both without the unresolved pages and on the adverse bound; against 2 (claude-sonnet5.5, gemini3.1-pro) it fails at least one of the two, so the API hand-route preference over them stays conditional on the truth's readings at those places.
 
 ## The typed controls
 

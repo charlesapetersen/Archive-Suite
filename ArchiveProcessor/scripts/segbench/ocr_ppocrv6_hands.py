@@ -858,14 +858,30 @@ def f1(x):
     return '' if x is None else f'{x:.1f}'
 
 
+def granite_empty(o):
+    return next((r['empty'] for r in o['owner'] if r['route'].startswith('granite-docling')), '?')
+
+
+def edge_pairs(o):
+    """The owner pairs whose interval clears 0 while the permutation p is 0.05 or more."""
+    e = [f'{k} {p["delta"]:+.1f} ({p["lo"]:+.1f} to {p["hi"]:+.1f}, p {p["p"]:.2f})'
+         for k, p in o['owner_pairs'].items() if (p['lo'] > 0 or p['hi'] < 0) and p['p'] >= .05
+         and not k.startswith('ppocrv6-kraken-vision vs')]   # the reverse of a blla pair already listed
+    return f' ({"; ".join(e)})' if e else ''
+
+
 def kit_recommendation(o):
     n160 = [p for p in o.get('tune_pairs', []) if '-n160-' in p['a'] and '-n80-' in p['b']]
     n240 = [p for p in o.get('tune_pairs', []) if '-n240-' in p['a'] and '-n160-' in p['b']]
+    ran = sorted({t['epochs'] for t in o.get('tunes', []) if t['hand'] == 'blackwell' and t['n'] in (160, 240)
+                  and t['epochs']})
     if len(n160) == len(n240) == 2 and all(p['lo'] > 0 for p in n160) and all(p['lo'] <= 0 <= p['hi'] for p in n240):
+        tie = '; '.join(f'{p["delta"]:+.2f} ({p["lo"]:+.2f} to {p["hi"]:+.2f}) {p["a"].rsplit("-", 1)[1].upper()}'
+                        for p in n240)
         return ('Target about 160 corrected lines for an optional same-hand fine-tune, using eager MPS when available. '
-                'Under the 1,440 line-step ceiling, 80 to 160 lines pays on this hand on both backends; 240 adds no '
-                'resolved gain over 160, but n240 trained six epochs to n160\'s nine, so past 160 lines is unmeasured, '
-                'not shown to be useless. Require '
+                '80 to 160 lines pays on this hand on both backends; 240 against 160 is a measured tie '
+                f'({tie}): every n160 and n240 training stopped early at {" or ".join(map(str, ran))} epochs, '
+                'under its step ceiling, so both sizes trained to the same early stop. Require '
                 'line-broken corrected truth and a separate held-out acceptance check for each hand. One hand and '
                 'one seed do not justify making fine-tuning the default handwriting route.')
     return ''
@@ -979,11 +995,14 @@ def write_md(o):
               '| training | minus | pages | delta | 95% interval |', '|---|---|---:|---:|---|']
         L += [f'| {p["a"]} | {p["b"]} | {p["n"]} | {p["delta"]:+.2f} | {p["lo"]:+.2f} to {p["hi"]:+.2f} |'
               for p in o['tune_pairs']]
+        big = [t for t in o['tunes'] if t['hand'] == 'blackwell' and t['n'] >= 160]
+        ran = sorted({t['epochs'] for t in big if t['epochs']})
         L += ['', 'The line sets are nested prefixes of one seeded order, with the same ten validation lines and '
               '16 held-out Blackwell pages (12 same-volume and four other-volume pages), disjoint from the training '
-              'and validation pages. n160 allows nine epochs and '
-              'n240 six (1,440 line-steps each at most), so this curve measures gains under a fixed maximum step '
-              'budget. Convergence at each size is unmeasured. Early stopping may use fewer steps. '
+              f'and validation pages. The step ceiling allows n160 {epochs(160)} epochs and n240 {epochs(240)} '
+              f'({LINE_STEPS} line-steps at most), but all {len(big)} n160 and n240 trainings stopped early at '
+              f'{" or ".join(map(str, ran))} epochs (`tunes[].epochs`), so the ceiling never bound: both sizes '
+              'trained to the same early stop, and 240 against 160 lines is measured, not cut short. '
               'Only this same-hand Blackwell holdout is scored for the larger tunes: the previous public L1-L3 '
               'and owner zero-shot panels remain above; the new tunes make no full-895, full-96 or cross-hand claim.']
     by = {(t['hand'], t['n'], t['device']): t for t in o['tunes']}
@@ -1040,11 +1059,18 @@ def write_md(o):
           '- **Comparison.** Every row reads the same pages; comparator readings are the cached ones '
           '(`ocr_rescore.py` sources), scored by `ocr_panel_score.score` with the stratum\'s settings. A route that '
           'did not read every page is left out of a table rather than scored on fewer. This regeneration includes '
-          'the already-shipped Nemotron-Parse 2.0 and Unlimited-OCR caches (W46.ocr-new-open-boxes), and refreshed '
-          'Granite owner-subset readings from the saved Mac run; no comparator model was rerun for the curve extension.',
+          'the already-shipped Nemotron-Parse 2.0 and Unlimited-OCR caches (W46.ocr-new-open-boxes), and '
+          'Granite\'s completed Mac run (W46.ocr-new-open-boxes, 2026-11-01), which leaves '
+          f'{granite_empty(o)} of the {o["sets"]["owner"]} scored owner pages empty; ocr-hands-rescore.md scores the '
+          'same readings since W46.hands-kit-epochs (before it, a set from before the Mac run completed, with 10 of '
+          'the 16 hand pages failed). No comparator '
+          'model was rerun for the curve extension.',
           '- **Noise.** Fixed-weight kraken CPU inference has an expected rerun floor of 0 (deterministic inference; '
           'not remeasured in this extension); the comparators\' rerun '
-          'floor is ocr-rerun-noise.md\'s 0.49 points. A paired interval across 0 is a tie. Fine-tune intervals '
+          'floor is ocr-rerun-noise.md\'s 0.49 points. The interval decides: a paired difference is a tie when its '
+          '95% bootstrap interval reaches 0 or the difference is inside the rerun floor, whatever the p. The '
+          f'sign-flip p is shown beside it; at n = {o["sets"]["owner"]} the two can disagree near the edge'
+          f'{edge_pairs(o)}, and such a pair is a resolved but marginal lead. Fine-tune intervals '
           'are exploratory and unadjusted across contrasts; they bootstrap the held-out pages, not training seeds '
           'or hands: seed/device training variability is unmeasured '
           '(one seed, one training per condition). One held-out owner page per fold cannot estimate population uncertainty.',

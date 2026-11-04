@@ -43338,6 +43338,16 @@
      "clear": 71.72005250445
     },
     {
+     "route": "unlimited-ocr",
+     "after": 66.84391046046679,
+     "before": 66.80855398445124,
+     "move": 0.0353564760155507,
+     "failed": 0,
+     "lo": 66.73648373768332,
+     "hi": 66.95136681718283,
+     "clear": 61.94548603871769
+    },
+    {
      "route": "ppocrv6-medium",
      "after": 62.737176491930455,
      "before": 62.78832664522017,
@@ -43358,14 +43368,24 @@
      "clear": 55.146610150572116
     },
     {
+     "route": "nemotron-parse-2",
+     "after": 52.42801579639712,
+     "before": 52.377718793503746,
+     "move": 0.05029700289337313,
+     "failed": 3,
+     "lo": 52.395486329330886,
+     "hi": 52.46933626027608,
+     "clear": 58.065962185734776
+    },
+    {
      "route": "granite-docling-258m-mlx",
-     "after": 11.321061272169889,
-     "before": 11.321061272169889,
-     "move": 0.0,
-     "failed": 10,
-     "lo": 11.321061272169889,
-     "hi": 11.321061272169889,
-     "clear": 18.212378597247206
+     "after": 17.264369064484086,
+     "before": 17.264260254879936,
+     "move": 0.00010880960414993979,
+     "failed": 5,
+     "lo": 17.260851291313838,
+     "hi": 17.265405903788537,
+     "clear": 25.15684042325714
     }
    ],
    "paired": {
@@ -43462,10 +43482,10 @@
     },
     "granite-docling-258m-mlx": {
      "n": 16,
-     "delta": 84.48996835882437,
+     "delta": 78.54666056651017,
      "p": 9.999000099990002e-05,
-     "lo": 73.68619935200432,
-     "hi": 92.87774104702876
+     "lo": 67.0177478142772,
+     "hi": 88.216104219484
     },
     "infinity-parser2-pro": {
      "n": 16,
@@ -43536,6 +43556,13 @@
      "p": 0.00039996000399960006,
      "lo": 5.38321466416131,
      "hi": 30.075349122966816
+    },
+    "nemotron-parse-2": {
+     "n": 16,
+     "delta": 43.38301383459714,
+     "p": 9.999000099990002e-05,
+     "lo": 28.574856096424654,
+     "hi": 59.28248279994061
     },
     "paddleocr-vl1.5": {
      "n": 16,
@@ -43684,6 +43711,13 @@
      "lo": 2.0964658748349336,
      "hi": 7.517178664803514
     },
+    "unlimited-ocr": {
+     "n": 16,
+     "delta": 28.96711917052747,
+     "p": 9.999000099990002e-05,
+     "lo": 18.29584909969383,
+     "hi": 40.55459047365907
+    },
     "xiaomi-ocr-0": {
      "n": 16,
      "delta": 9.633112105204383,
@@ -43726,6 +43760,7 @@
      "mistral-medium3.5",
      "mistral-ocr",
      "mistral-small-24b",
+     "nemotron-parse-2",
      "paddleocr-vl1.5",
      "paddleocr-vl1.6",
      "paddleocr-vl1.6-bf16",
@@ -43747,6 +43782,7 @@
      "qwen3.6-35b-a3b",
      "qwen3.8-27b",
      "qwen3.8-flash",
+     "unlimited-ocr",
      "xiaomi-ocr-0",
      "xiaomi-ocr-0-bf16"
     ],
@@ -43772,6 +43808,7 @@
      "mistral-medium3.5",
      "mistral-ocr",
      "mistral-small-24b",
+     "nemotron-parse-2",
      "paddleocr-vl1.5",
      "paddleocr-vl1.6",
      "paddleocr-vl1.6-bf16",
@@ -43793,6 +43830,7 @@
      "qwen3.6-35b-a3b",
      "qwen3.8-27b",
      "qwen3.8-flash",
+     "unlimited-ocr",
      "xiaomi-ocr-0",
      "xiaomi-ocr-0-bf16"
     ],
@@ -44705,7 +44743,7 @@
     "hi": 1.0675108439320566
    }
   ],
-  "kit_recommendation": "Target about 160 corrected lines for an optional same-hand fine-tune, using eager MPS when available. Under the 1,440 line-step ceiling, 80 to 160 lines pays on this hand on both backends; 240 adds no resolved gain over 160, but n240 trained six epochs to n160's nine, so past 160 lines is unmeasured, not shown to be useless. Require line-broken corrected truth and a separate held-out acceptance check for each hand. One hand and one seed do not justify making fine-tuning the default handwriting route.",
+  "kit_recommendation": "Target about 160 corrected lines for an optional same-hand fine-tune, using eager MPS when available. 80 to 160 lines pays on this hand on both backends; 240 against 160 is a measured tie (-0.27 (-1.13 to +0.51) CPU; +0.25 (-0.39 to +0.74) MPS): every n160 and n240 training stopped early at 5 epochs, under its step ceiling, so both sizes trained to the same early stop. Require line-broken corrected truth and a separate held-out acceptance check for each hand. One hand and one seed do not justify making fine-tuning the default handwriting route.",
   "sets": {
    "public": 240,
    "owner": 18,
