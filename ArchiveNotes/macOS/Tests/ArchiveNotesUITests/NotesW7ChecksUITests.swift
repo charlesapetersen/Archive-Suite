@@ -71,6 +71,37 @@ final class NotesW7ChecksUITests: NotesFixtureUITestCase {
         }
     }
 
+    /// S1a: type into note A and select note B at once. A's edit is in A's file, B loads its own text, and
+    /// nothing typed reaches B. (`WritingJourneyUITests` drives typing then ⌘Q; this is the switch.)
+    func testS1a_TypeThenSelectAnotherNoteSavesTheEditAndLoadsTheOtherFresh() throws {
+        try withFixture {
+            try requireCanonicalScratchFixtureForStoreWrites()
+            let marker = "SwitchedAwayEdit"
+            let zoteroBefore = try XCTUnwrap(noteBody(uuid: Self.idZotero))
+
+            selectItem(uuid: Self.idPlain)
+            XCTAssertTrue(pollUntil(timeout: 10) { self.editorText(in: self.mainWindow).contains("A plain note") },
+                          "the plain note should load")
+            ensureStyled()
+            XCTAssertTrue(setEditorSelection(location: 0, length: 0), "the selection seam must place the caret")
+            app.typeText(marker)
+            XCTAssertTrue(pollUntil(timeout: 5) { self.editorText(in: self.mainWindow).contains(marker) },
+                          "the typed text should reach the editor — focus: \(keyboardFocusDescription())")
+
+            selectItem(uuid: Self.idZotero)   // straight away, inside the 600 ms autosave delay
+            XCTAssertTrue(pollUntil(timeout: 10) {
+                self.editorText(in: self.mainWindow).contains("Notes on the Lovelace")
+            }, "the other note should load")
+            XCTAssertFalse(editorText(in: mainWindow).contains(marker), "the other note must not show A's edit")
+            XCTAssertTrue(pollUntil(timeout: 10) { (self.noteBody(uuid: Self.idPlain) ?? "").contains(marker) },
+                          "A's edit should be in A's file after the switch")
+            RunLoop.current.run(until: Date().addingTimeInterval(2))   // past any late autosave
+            XCTAssertEqual(noteBody(uuid: Self.idZotero), zoteroBefore, "the other note's file must be unchanged")
+            XCTAssertEqual(occurrences(of: marker, in: noteBody(uuid: Self.idPlain) ?? ""), 1,
+                           "A's edit should be saved exactly once")
+        }
+    }
+
     // MARK: - S2: Create Extract on a two-block selection; plain paste; the Append picker
 
     /// ⌘⌥E over a selection spanning two source blocks makes an extract with two note-passage blocks, one per
@@ -299,6 +330,60 @@ final class NotesW7ChecksUITests: NotesFixtureUITestCase {
         }
     }
 
+    /// A jump from the Extracts window to a block far down its source scrolls the Note window to it. The
+    /// source gets a long body and a second source block at the end, and the extract cites that block.
+    func testS3_JumpFromTheExtractsWindowScrollsToALowerBlock() throws {
+        try withFixture {
+            try requireCanonicalScratchFixtureForStoreWrites()
+
+            // Edit the scratch files with the app closed.
+            app.terminate()
+            XCTAssertTrue(app.wait(for: .notRunning, timeout: 15), "the app should quit before the files are edited")
+            let sourceURL = URL(fileURLWithPath: itemsDir + "/" + Self.idReader + "/"
+                                + (try XCTUnwrap(mdFiles(inItemDir: Self.idReader).first)))
+            let filler = (1...200).map { "Filler paragraph \($0) of the source note." }.joined(separator: "\n\n")
+            let lowerBlock = """
+                <!-- block: reader-page
+                     link: archivereader://reveal?root=\(Self.corpusRootGUID)&rel=sample.pdf&jpeg=&page=2
+                     display: "sample.pdf — p. 2"
+                     page: 2 -->
+
+                The lower block's own text.
+                """
+            let source = try String(contentsOf: sourceURL, encoding: .utf8)
+            try (source + "\n" + filler + "\n\n" + lowerBlock + "\n").write(to: sourceURL, atomically: true, encoding: .utf8)
+            let extractURL = URL(fileURLWithPath: itemsDir + "/" + Self.idExtract + "/"
+                                 + (try XCTUnwrap(mdFiles(inItemDir: Self.idExtract).first)))
+            let extract = try String(contentsOf: extractURL, encoding: .utf8)
+            XCTAssertTrue(extract.contains("id=\(Self.idReader)#block-0"), "the fixture extract should cite block 0")
+            try extract.replacingOccurrences(of: "id=\(Self.idReader)#block-0", with: "id=\(Self.idReader)#block-1")
+                .write(to: extractURL, atomically: true, encoding: .utf8)
+            relaunchWithOneWindow()
+
+            let extractWin = try openExtractsWindow()
+            let cell = extractWin.descendants(matching: .any)["an.cell.title.\(Self.idExtract)"]
+            XCTAssertTrue(cell.waitForExistence(timeout: 15), "the Extracts window should list the extract")
+            cell.click()
+            XCTAssertTrue(pollUntil(timeout: 12) { self.editorText(in: extractWin).contains("Moore says") },
+                          "the extract should load in the Extracts window")
+            XCTAssertTrue(clickStripButton("an.editor.test.jump", timeout: 10, in: extractWin),
+                          "the jump seam must be drivable in the Extracts window")
+
+            XCTAssertTrue(pollUntil(timeout: 15) {
+                self.editorText(in: self.mainWindow).contains("The lower block's own text.")
+            }, "Jump to Source should load the source note in the Note window")
+            var scroll: Double?
+            XCTAssertTrue(pollUntil(timeout: 10) {
+                scroll = self.editorScroll(in: self.mainWindow)
+                return (scroll ?? 0) > 0.8
+            }, "the Note window should scroll down to the cited block — scroll position \(String(describing: scroll))")
+            XCTAssertFalse((statusText(in: mainWindow) ?? "").contains("has changed"),
+                           "block 1 exists, so the jump is exact — status: \(statusText(in: mainWindow) ?? "none")")
+            shot("W7-S3 jump scrolled to block 1")
+            closeWindow(extractWin)
+        }
+    }
+
     /// Show both kinds in the Note window, select the fixture extract and jump to its source: the Note window
     /// then holds the source note.
     private func jumpFromTheFixtureExtract() throws {
@@ -353,6 +438,14 @@ final class NotesW7ChecksUITests: NotesFixtureUITestCase {
     private func attachmentCount(_ text: String) -> Int { text.unicodeScalars.filter { $0 == "\u{FFFC}" }.count }
 
     private func occurrences(of needle: String, in text: String) -> Int { text.components(separatedBy: needle).count - 1 }
+
+    /// The editor's vertical scroll position, 0 at the top and 1 at the end (as `StackedLayoutUITests`).
+    private func editorScroll(in win: XCUIElement) -> Double? {
+        let bar = win.scrollViews.containing(.textView, identifier: "an.editor.text").firstMatch.scrollBars.firstMatch
+        guard bar.exists else { return nil }
+        if let n = bar.value as? NSNumber { return n.doubleValue }
+        return (bar.value as? String).flatMap(Double.init)
+    }
 
     private func statusText(in win: XCUIElement) -> String? {
         let texts = win.staticTexts.matching(identifier: "an.sidebar.status")
