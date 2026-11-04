@@ -44,7 +44,25 @@ final class EditorTextView: NSTextView {
         states += uiTestHeaderSlots()
         states.append(["inlineImages": uiTestInlineImages()])
         // The editor's visible rect, to check a header slot's `slotY` against (W40.notes-w7-gui-checks).
-        states.append(["editorVisibleY": Double(visibleRect.minY), "editorVisibleH": Double(visibleRect.height)])
+        var visibleEntry: [String: Any] = ["editorVisibleY": Double(visibleRect.minY),
+                                           "editorVisibleH": Double(visibleRect.height)]
+        // What TextKit draws there: the paragraph at the top of the visible rect and the viewport's character
+        // range (W40.fix-notes-jump-scroll-short, where the header slots' y disagreed with the screenshots).
+        if let layout = textLayoutManager, let content = layout.textContentManager {
+            let origin = content.documentRange.location
+            if let top = layout.textLayoutFragment(for: CGPoint(x: 0, y: visibleRect.minY - textContainerOrigin.y)) {
+                visibleEntry["editorTopChar"] = content.offset(from: origin, to: top.rangeInElement.location)
+                visibleEntry["editorTopFragY"] = Double(top.layoutFragmentFrame.minY + textContainerOrigin.y)
+            }
+            if let bottom = layout.textLayoutFragment(for: CGPoint(x: 0, y: visibleRect.maxY - 1 - textContainerOrigin.y)) {
+                visibleEntry["editorBottomChar"] = content.offset(from: origin, to: bottom.rangeInElement.location)
+            }
+            if let viewport = layout.textViewportLayoutController.viewportRange {
+                visibleEntry["viewportStart"] = content.offset(from: origin, to: viewport.location)
+                visibleEntry["viewportEnd"] = content.offset(from: origin, to: viewport.endLocation)
+            }
+        }
+        states.append(visibleEntry)
         states.append(["relayout": relayoutLastPass, "rebuilds": relayoutRebuilds, "strandedFixes": strandedChipFixes,
                        "layoutPasses": layoutStrandedPasses])
         guard let data = try? JSONSerialization.data(withJSONObject: states, options: [.sortedKeys]) else { return nil }
@@ -157,6 +175,45 @@ final class EditorTextView: NSTextView {
         needsLayout = true
         needsDisplay = true
         installChipViewsAtNextLayout = true
+    }
+
+    /// Scroll so the start of `range` (a source block's header) sits at the top of the view, and say whether it
+    /// could be placed (W40.fix-notes-jump-scroll-short). `scrollRangeToVisible` alone landed short: a load
+    /// invalidates the whole document's layout, and TextKit 2 puts the fragments not yet laid out at estimated
+    /// heights, so it scrolled to where the block was estimated to be, several paragraphs above it. Laying out
+    /// everything above the block first did not help either: the viewport pass anchors its fragments on the
+    /// scroll offset, so the VM's probe showed paragraph 87 drawn at the y the header's own fragment claimed
+    /// (`relocateViewport(to:)` overshot to the end). So this measures from what the viewport draws: the
+    /// fragment at the top of the view, then the fragments laid out one after another from it to the header,
+    /// which puts the header in the same coordinates as what is drawn.
+    @discardableResult
+    func scrollBlockToTop(_ range: NSRange) -> Bool {
+        guard let storage = textStorage, NSMaxRange(range) <= storage.length,
+              let layout = textLayoutManager, let content = layout.textContentManager,
+              let start = content.location(content.documentRange.location, offsetBy: range.location),
+              let clip = enclosingScrollView?.contentView
+        else { return false }
+        let viewport = layout.textViewportLayoutController
+        scrollRangeToVisible(range)   // near it, by the estimated heights
+        viewport.layoutViewport()
+        guard let anchor = layout.textLayoutFragment(for: CGPoint(x: 0, y: clip.bounds.minY - textContainerOrigin.y))
+        else { return false }
+        var options: NSTextLayoutFragment.EnumerationOptions = [.ensuresLayout]
+        if start.compare(anchor.rangeInElement.location) == .orderedAscending { options.insert(.reverse) }
+        var header: NSTextLayoutFragment?
+        layout.enumerateTextLayoutFragments(from: anchor.rangeInElement.location, options: options) { fragment in
+            guard fragment.rangeInElement.contains(start) || fragment.rangeInElement.location.isEqual(start)
+            else { return true }
+            header = fragment
+            return false
+        }
+        guard let header else { return false }
+        let y = header.layoutFragmentFrame.minY + textContainerOrigin.y
+        let maxY = max(0, frame.height - clip.bounds.height)
+        clip.scroll(to: NSPoint(x: clip.bounds.minX, y: min(max(0, y - 6), maxY)))
+        enclosingScrollView?.reflectScrolledClipView(clip)
+        viewport.layoutViewport()
+        return true
     }
 
     func performContentEditingTransaction(_ edit: () -> Void) {

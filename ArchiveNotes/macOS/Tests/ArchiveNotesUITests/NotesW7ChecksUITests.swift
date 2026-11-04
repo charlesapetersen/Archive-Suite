@@ -417,11 +417,11 @@ final class NotesW7ChecksUITests: NotesFixtureUITestCase {
             }
             XCTContext.runActivity(named: "W7-S3 scroll: cited header visible = \(headerShown) — \(shown.1)") { _ in }
             shot("W7-S3 jump scrolled to block 1")
-            // Known defect, W40.fix-notes-jump-scroll-short: the jump lands short of the block (the header just
-            // above the view, or the view several paragraphs above it). Remove this wrapper with the fix.
-            XCTExpectFailure("W40.fix-notes-jump-scroll-short", options: .nonStrict()) {
-                XCTAssertTrue(headerShown, "the cited block's header should be visible in the Note window after the jump — \(shown.1)")
-            }
+            RunLoop.current.run(until: Date().addingTimeInterval(2))
+            XCTContext.runActivity(named: "W7-S3 scroll, 2 s later: \(self.showsBlockHeader(1, in: self.mainWindow).1)") { _ in }
+            shot("W7-S3 jump scrolled to block 1, 2 s later")
+            // W40.fix-notes-jump-scroll-short: the jump used to land several paragraphs short of the block.
+            XCTAssertTrue(headerShown, "the cited block's header should be visible in the Note window after the jump — \(shown.1)")
             XCTAssertFalse((statusText(in: mainWindow) ?? "").contains("has changed"),
                            "block 1 exists, so the jump is exact — status: \(statusText(in: mainWindow) ?? "none")")
             closeWindow(extractWin)
@@ -529,7 +529,19 @@ final class NotesW7ChecksUITests: NotesFixtureUITestCase {
         guard index < slots.count, let y = slots[index]["slotY"] as? Double,
               let top = rect?["editorVisibleY"] as? Double, let height = rect?["editorVisibleH"] as? Double
         else { return (false, "slots \(slots), visible rect \(String(describing: rect))") }
-        return (y >= top && y < top + height, "header y \(y), visible \(top)…\(top + height)")
+        // What is drawn at the top of the view, by character offset: the slots' y alone once disagreed with the
+        // screenshot (W40.fix-notes-jump-scroll-short).
+        let loc = slots[index]["loc"] as? Int ?? -1
+        let topChar = rect?["editorTopChar"] as? Int
+        let text = editorText(in: win) as NSString
+        let bottomChar = rect?["editorBottomChar"] as? Int
+        let topLine = topChar.flatMap { $0 < text.length ? text.substring(from: $0).components(separatedBy: "\n").first : nil }
+        // Drawn: the paragraphs at the top and bottom of the view bracket the header's character.
+        let drawn = topChar.map { $0 <= loc } == true && bottomChar.map { loc <= $0 } == true
+        return (y >= top && y < top + height && drawn,
+                "header y \(y) at char \(loc), visible \(top)…\(top + height); paragraphs drawn from char "
+                + "\(topChar.map(String.init) ?? "?") (y \(rect?["editorTopFragY"] ?? "?"), \"\(topLine ?? "?")\") to char "
+                + "\(bottomChar.map(String.init) ?? "?"); viewport chars \(rect?["viewportStart"] ?? "?")…\(rect?["viewportEnd"] ?? "?")")
     }
 
     /// The editor draws `assets/<name>` from its own bytes: present, and not the Missing or Blocked placeholder.
