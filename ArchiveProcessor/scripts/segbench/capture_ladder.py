@@ -499,6 +499,12 @@ plain image from the dewarp run (W46.enh-dewarp), same settings. A loop is a rea
 limit; a blank is a reply with no text. Both score 0 (strict NES); NES answered leaves them out. bowF1 is the
 bag-of-words F1 from the panel's word counts, so it ignores reading order. Δ is paired by page: mean, 95% bootstrap.
 
+Gemini 3.7 Flash (W46.capture-ladder-paid, `capture_ladder_gateway.py`) read 48 of the 96 (every other page of the 96
+ordered by source, kind and a seeded key; no reader's result used) at the worst setting of each defect plus motion
+17 px and defocus sigma 3, through the Stanford gateway with the cloud panel's prompt and settings (temperature 0,
+low reasoning, 8,192 tokens); its baseline is the cloud panel's reading of the same plain image, checked by hash.
+Separately it judged the capture of those 528 images (the verdict section, at the end).
+
 """
 CARD = """
 ## Measurement card
