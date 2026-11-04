@@ -61,6 +61,15 @@ MODELS = {  # key: (repo in the shared Hugging Face cache, model_store.py; or a 
     "seg-date-2b-8bit": ("/Users/cp1/Claude/Long term storage/FarmShare-20261018/seg-date-2b-8bit",
                          "Qwen3.5-2B segmentation + dating, 8-bit (experimental)"),
 }
+# W46.kit-mac-lora: a LoRA adapter trained on this Mac with mlx_vlm.lora, loaded on the shipped 8-bit build by
+# `load(..., adapter_path=)` rather than merged. key: (base key in MODELS, adapter folder, label).
+_KIT = Path("~/Library/Caches/ArchiveSuiteRehearsal/kit-mac-lora").expanduser()
+ADAPTERS = {
+    "seg-2b-8bit-mac-r8": ("seg-2b-8bit", str(_KIT / "adapters/seg-200-r8"),
+                           "Qwen3.5-2B 8-bit + a rank-8 LoRA trained on this Mac (200 windows)"),
+}
+for _k, (_base, _ad, _label) in ADAPTERS.items():
+    MODELS[_k] = (MODELS[_base][0], _label)
 FAILED = "failed"
 
 
@@ -119,7 +128,7 @@ def collect(key, names, limit=None):
         return
     mx.set_cache_limit(256 * 2**20)   # as read-mlx.py: freed buffers otherwise count against the guard
     t0 = time.time()
-    model, processor = load(repo)
+    model, processor = load(repo, adapter_path=ADAPTERS[key][1] if key in ADAPTERS else None)
     print(f"{key}: loaded in {time.time() - t0:.0f}s", flush=True)
     tmp = Path(tempfile.mkdtemp(prefix="seg-local-"))
     for k, (col, a, b) in enumerate(todo, 1):
