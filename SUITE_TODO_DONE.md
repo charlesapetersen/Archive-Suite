@@ -13954,3 +13954,21 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   frontend peaks at 1.5 GB (measured, 1 s samples). Reviewer's other notes: the test seams are not `#if DEBUG` but inert in
   Release, like `_recoveryTestBeginLive`; `activate`'s stale "chooseLive" doc fixed. No bench cache used.
   <!-- /W40.fix-processor-pending-invisible-after-relaunch -->
+- [x] **W46.ocr-ppocrv6-hands-paid — Gemini prompted with a hand's corrected lines [S]** · §Document processing review — W46 (owner, 2026-10-20) — SHIPPED 2026-11-03
+  Gemini 3.7 Flash through the Stanford gateway on the Qwen arm's frozen pack (`hand-icl-20261101`, freeze SHA 6f644e4d…):
+  71 target pages × 0/8/16 corrected example lines (separate line crops, eight the prefix of sixteen), 213 conditions;
+  cohorts kept apart (12 held-out Blackwell diary pages, 4 Shils folder-proxy, 15 owner transfer, 40 public L1 transfer).
+  **Result: corrected lines in the prompt do not help.** On the one documented same hand (Blackwell holdout, n=12):
+  8 lines +0.25 NES (−0.62 to +1.11), 16 lines −0.46 (−1.40 to +0.45); every cohort's interval spans zero, the Shils
+  proxy leans negative (−4.1, n=4) and owner transfer 16 lines +1.09 (−0.11 to +2.59). Agrees with the Qwen arm
+  (W46.ocr-ppocrv6-hands-qwen). No app default or new-hand claim; owner figures are agreement with model-drafted truth
+  (OCR-1). Report `ArchiveProcessor/segbench-results/ocr-ppocrv6-hands-paid.md` (measurement card), bench panel now shown.
+  Support: 201/213 answered; 9 HTTP 502 + 1 lost connection retained at $0.08 each, never retried (owner, 2026-11-01),
+  2 content-filter refusals. **Real money: $2.476781 counted** ($1.676781 known list-rate charges, gateway's own figure
+  $1.65751, plus $0.80 retained allowances) against the owner's working cap, raised $2.50 → $2.60 on 2026-11-03 (44860fc8)
+  only to finish the six untouched Blackwell conditions (pages 42/44, ~$0.049); runner checkpoints 1–12 under this tag.
+  Bench cache: no rendered/model scratch was created. Kept for audit in `~/.local/state/archive-autonomous/artifacts/`:
+  the shared read-only pack and `hand-icl-truth-20261101`, and `hand-icl-gateway-20261101` (replies, ledger, receipts,
+  working-cap record with the superseded $2.50 grant, verification-20261102 screenshots). Published bench copy is behind
+  (unattended session; an interactive one republishes).
+  <!-- /W46.ocr-ppocrv6-hands-paid -->

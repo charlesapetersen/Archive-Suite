@@ -1,36 +1,65 @@
-# Gemini given corrected handwriting lines — reservation cap reached (W46.ocr-ppocrv6-hands-paid)
+# Gemini given corrected handwriting lines (W46.ocr-ppocrv6-hands-paid)
 
-**Paused; no accuracy verdict.** 207 of 213 fixed conditions were attempted on 69 of the 71 pages: 195 successful replies, two provider content-filter refusals, nine earlier HTTP 502 replies and one earlier lost connection. The original 24-call pilot and all other attempted requests were never repeated. No new uncertain billing arose in this resume.
+Gemini 3.7 Flash through the Stanford gateway, using the Qwen arm’s frozen 0/8/16 image/text example pack, with each crop a separate image. Scores are NES points. Only the Blackwell holdout tests a documented same hand; the Shils folder is a hand proxy, and the other cohorts test transfer with unverified hand identity. The 40 L1 pages include three Blackwell diary pages (other volumes) and two Blackwell correspondence pages; they are not all known different hands.
 
-## Cost and exact resume boundary
+On the one documented Blackwell diary hand: 8 lines +0.25 NES (95% page interval -0.62 to +1.11, n=12); 16 lines -0.46 NES (95% page interval -1.40 to +0.45, n=12). These page-conditional results do not establish an OCR default for a new hand. The intervals are pointwise, without adjustment across the example conditions.
 
-**$2.427833 counts against the $2.50 working cap:** $1.627833 known conservative charges plus the owner's retained $0.80 for ten uncertain outcomes. The gateway headers total $1.608562 on all 197 known-usage requests; each request counts the larger of its estimate and header charge. The retained $0.80 is an allowance, not an asserted actual bill.
-
-The next $0.08 write-ahead reservation would count $2.507833, above the cap. The runner stopped before reserving or sending it. **No request is outstanding.** Six conditions on two Blackwell holdout pages remain untouched. Their cost, projected from the observed Blackwell per-condition means, is $0.052377, for about $2.480210 final counted charges; this is an estimate, not a guarantee or permission to lower the reservation.
-
-The owner-cap question is queued as `W46.ocr-ppocrv6-hands-paid-cap-ok`: may the working cap rise to $2.60 so the existing $0.08 guard can finish only these six conditions? The owner-recorded $2.50 cap and the assignment's requirement to keep its cap checks bind until answered. No further paid request is authorized by this record.
-
-Untouched request IDs:
-
-- `blackwell-mss1288000967-42-n0`
-- `blackwell-mss1288000967-42-n8`
-- `blackwell-mss1288000967-42-n16`
-- `blackwell-mss1288000967-44-n0`
-- `blackwell-mss1288000967-44-n8`
-- `blackwell-mss1288000967-44-n16`
-
-After an affirmative recorded answer: validate the revised cap, keep the exact ten-ID acknowledgment, original receipts and all spending, and run only these untouched conditions. New uncertainty must still stop. The original eight repeat-zero requests are omitted under the owner's narrower resume scope. Then score paired and strict outcomes, nine-clear-owner-page sensitivity and conditional uncertainty; write the verdict; rebuild and render the bench panel; move the final tracker entry and complete the plan.
+**Support:** 201 successful replies / 213 attempted conditions; 10 gateway failures retained without retry. Failure reasons: retained HTTP 502: 9, retained lost connection: 1, content_filter: 2. Both-answered differences use matched successful pairs; strict scores count failures as zero. All fixed conditions are accounted for; complete does not mean every request succeeded.
 
 ## Measurement card
 
-- **Truth:** public By the People transcriptions; owner targets use W46.ocr-hands-rescore's post-sheet truth, partly Gemini/Claude drafted, with ten unresolved hand places. Owner results are reference agreement, not independent model rankings. Exemplar pairs were filtered by the base recognizer; owner examples predate sheet corrections.
-- **Selection:** frozen Qwen pack: 40 L1 pages, 19 owner pages and 12 independent Blackwell holdouts, with nested 0/8/16 corrected line image/text examples. Blackwell draws examples only from 24 training pages; Shils excludes the target. Source hashes reject target aliases. Only one documented same hand and a four-page folder proxy; other hand identities are unverified.
-- **Support:** all 120 public, 45 owner-transfer and 12 Shils conditions accounted for; 30/36 Blackwell conditions accounted for (10/12 complete target pages). No incomplete accuracy tables are published; the bench panel remains hidden.
-- **Noise:** paired page/collection intervals and clear-owner sensitivity await completion. No new repeats or prompt-specific rerun floor. No claim about new-hand variability, app defaults or whole-96/895 rankings.
-- **Safety:** the exact original 155-row prefix remains unchanged. One validated append-only acknowledgment retains the ten old allowances and makes those IDs permanently non-retryable. New missing usage/outstanding reservations still fail closed; alternate paid output paths are refused.
+- **Truth:** public By the People transcriptions (CC0). Owner targets use the post-sheet truth (W46.ocr-hands-rescore); Gemini 3.8/Claude drafted it and 114 hand places were checked, with 10 unresolved. Owner figures are reference agreement, not independent model rankings. The 19 typed controls found no error, with an exact 95% passage-error upper bound of 17.6%. Examples are the existing PP-OCRv6-aligned corrected lines: model-filtered, not a random line draw. Owner exemplar lines predate the sheet corrections and may retain reference errors.
+- **Selection:** fixed Qwen pack: 40 seeded L1 pages, all 19 owner hand pages, 12 held-out Blackwell diary pages. Blackwell examples come only from its 24 training pages. Shils leaves the target page out; source-image hashes reject aliases. No target truth enters the prompt. Owner targets include the 16 scored hand pages and three agreement-only letters (p086, p094, p096), which remain unvalidated. L2 is not an adaptation cohort because no verified same-hand example pool was prepared.
+- **Comparison:** identical 2400 px/quality-90 target JPEGs across 0/8/16 examples; quality-95 line crops, eight examples the prefix of sixteen; same target prompt as the Qwen pack. Each example is a separate crop paired with its corrected line text; no target or example crop is scaled locally. Temperature 0, low reasoning, 8192-token output cap, gateway cache disabled. Single attempts; capped, empty or transport failures are separate and score zero only in strict sensitivity. Qwen uses the same example images with no thinking; this is not a controlled model-only comparison. These subsets enter their own panel, not whole-96 or whole-895 charts.
+- **Noise:** 10,000-round paired page bootstrap, both-answered headline and failure=0 sensitivity. Public transfer additionally bootstraps collection clusters. A single diary and four Shils pages cannot estimate variation across hands. The inherited hosted floor is 0.60 points (twice the measured handwritten-kind rerun range; the 96-wide floor is 0.49); public and prompt-specific noise is not established. Eight zero-example repeats were initially preselected but omitted under the narrower resume scope. An interval spanning zero or a gap inside the inherited floor does not establish a gain.
+- **Scope:** zero-training adaptation on these pages and examples only; no app default, fine-tune or new-hand population claim. Cross-hand transfer cannot answer same-hand adaptation. No corpus modified; no target transcription supplied to a model.
 
-## Verification and retained artifacts
+## Paired conditions
 
-24 offline contracts passed; independent adversarial money-safety and measurement reviews completed. Actual frozen pack validation, original-prefix preservation, exact allowance accounting, cap stop and refusal to publish partial accuracy passed. Synthetic bench panel: 12 rows, no JS errors; desktop/mobile screenshots inspected. Bench build freshness passes. The actual headless proof found and fixed the grid CSS overriding this panel's hidden flag: incomplete data are now display:none; complete synthetic data still render, including horizontal scrolling. Both have zero JS errors. No native app source changed or host GUI launched.
+| cohort | examples | answered / attempted / fixed n | NES answered | NES strict | missed words % | added words % |
+|---|---:|---:|---:|---:|---:|---:|
+| blackwell-held-out | 0 | 12 / 12 / 12 | 83.67 | 83.67 | 13.85 | 16.99 |
+| blackwell-held-out | 8 | 12 / 12 / 12 | 83.92 | 83.92 | 13.57 | 17.69 |
+| blackwell-held-out | 16 | 12 / 12 / 12 | 83.20 | 83.20 | 14.97 | 17.62 |
+| owner-Shils-folder-proxy | 0 | 4 / 4 / 4 | 95.72 | 95.72 | 4.17 | 6.56 |
+| owner-Shils-folder-proxy | 8 | 4 / 4 / 4 | 91.63 | 91.63 | 3.98 | 5.57 |
+| owner-Shils-folder-proxy | 16 | 4 / 4 / 4 | 91.68 | 91.68 | 2.78 | 5.57 |
+| owner-transfer | 0 | 15 / 15 / 15 | 91.64 | 91.64 | 2.63 | 5.22 |
+| owner-transfer | 8 | 15 / 15 / 15 | 90.76 | 90.76 | 2.72 | 5.27 |
+| owner-transfer | 16 | 15 / 15 / 15 | 92.73 | 92.73 | 2.42 | 5.18 |
+| public-L1-transfer | 0 | 36 / 40 / 40 | 91.52 | 82.36 | 12.94 | 5.32 |
+| public-L1-transfer | 8 | 37 / 40 / 40 | 91.43 | 84.57 | 11.19 | 5.95 |
+| public-L1-transfer | 16 | 35 / 40 / 40 | 91.39 | 79.96 | 17.75 | 5.20 |
 
-Pack SHA-256 `6f644e4d11b075429095642fa5b71e254bed99604726d5d951dfa0736c7a7b07`; truth index `051664c1e67ec8b713181f198f21af20bef43aa5ff18c42b8afdc7d4f89c3210`; final ledger `c703f953c9cce0d767895c222927add69f911148ff5359d31540a6165e11e5a2`. Private artifacts under `~/.local/state/archive-autonomous/artifacts/`: shared read-only `hand-icl-20261101` and `hand-icl-truth-20261101`; paid replies, append-only ledger, original receipt and working-cap sidecar in `hand-icl-gateway-20261101`. Keep these for audit and six-condition resume. No new model/page cache was created; item-owned temporary scorer/fixture files were removed after checks, shared inputs/environments untouched. Audit screenshots (synthetic), check summary and support generator remain under `hand-icl-gateway-20261101/verification-20261102/`.
+| cohort | examples | Δ vs zero, both answered (95% CI) | Δ strict (95% CI) | collection-clustered (95% CI) |
+|---|---:|---|---|---|
+| blackwell-held-out | 8 | +0.25 (-0.62 to +1.11; n=12) | +0.25 (-0.62 to +1.11; n=12) | across-hand interval not estimated |
+| blackwell-held-out | 16 | -0.46 (-1.40 to +0.45; n=12) | -0.46 (-1.40 to +0.45; n=12) | across-hand interval not estimated |
+| owner-Shils-folder-proxy | 8 | -4.09 (-12.47 to +0.16; n=4) | -4.09 (-12.47 to +0.16; n=4) | across-hand interval not estimated |
+| owner-Shils-folder-proxy | 16 | -4.04 (-12.75 to +0.39; n=4) | -4.04 (-12.75 to +0.39; n=4) | across-hand interval not estimated |
+| owner-transfer | 8 | -0.88 (-2.54 to +0.44; n=15) | -0.88 (-2.54 to +0.44; n=15) | across-hand interval not estimated |
+| owner-transfer | 16 | +1.09 (-0.11 to +2.59; n=15) | +1.09 (-0.11 to +2.59; n=15) | across-hand interval not estimated |
+| public-L1-transfer | 8 | -0.28 (-1.27 to +0.50; n=36) | +2.21 (-0.91 to +7.58; n=40) | -0.28 (-0.92 to +0.50; n=36) |
+| public-L1-transfer | 16 | -0.02 (-1.52 to +1.36; n=35) | -2.40 (-7.84 to +0.89; n=40) | -0.02 (-1.82 to +1.27; n=35) |
+
+## Stability and owner sensitivity
+
+Zero-example repeats: 0.
+No new repeats were run: the owner resume scope was only the 135 untouched conditions, then the six finished under the $2.60 cap. The eight repeats in the initial design were omitted; no prompt-specific rerun floor is established.
+
+Owner pages without unresolved sheet places (the nine clear pages of the original 16), kept apart by cohort; the four-page Shils inference remains descriptive:
+
+| cohort | examples | Δ vs zero, both answered (95% CI) |
+|---|---:|---|
+| owner-Shils-folder-proxy | 8 | -8.34 (-16.68 to -0.01; n=2) |
+| owner-Shils-folder-proxy | 16 | -8.37 (-17.12 to +0.38; n=2) |
+| owner-transfer | 8 | -1.88 (-4.84 to +0.43; n=7) |
+| owner-transfer | 16 | +0.14 (-0.39 to +0.58; n=7) |
+
+## Cost and provenance
+
+Charged against the owner-revised $2.60 working item cap: $2.47678, including $0.80 retained for 10 uncertain outcomes. Known-usage list-rate estimate $1.67678 at $0.75/$3.75 per million input/output tokens (including reasoning); gateway’s own figure $1.65751 on 203 of 203 attempts. The cap counts the larger for each request; any unknown request keeps its full reservation. No retries. The initial 24-request pilot cost $0.1950195 and projected $1.7958 for 221 calls. The owner revised the working cap from the initial agent-set $1 estimate to $2.50 (OWNER_AUTHORIZATIONS.md, 1565f7d9), then to $2.60 (44860fc8, 2026-11-03) only so the $0.08 reservation guard could finish the six untouched Blackwell conditions; all pilot answers were preserved, not re-called. A sheet alternative was prepared but made no paid call and is not an accuracy arm. The owner’s 2026-11-01 evening answer retained the ten old allowances without exact billing reconciliation; nine 502 replies and one lost connection remain failed, never repeated. Both-answered comparisons omit these pairs; strict sensitivity counts them as zero. These missing responses limit the transfer comparison and are not recognizer failures. Stanford PTA, not subscription usage.
+
+Frozen pack SHA-256 `6f644e4d11b075429095642fa5b71e254bed99604726d5d951dfa0736c7a7b07`; truth-index SHA-256 `051664c1e67ec8b713181f198f21af20bef43aa5ff18c42b8afdc7d4f89c3210`. Private input pack `~/.local/state/archive-autonomous/artifacts/hand-icl-20261101`, target truth `hand-icl-truth-20261101`, responses/ledger/receipt `hand-icl-gateway-20261101`. The receipt records the runner hash and code commit; each ledger outcome pins request and response hashes, usage, finish reason, returned model and time. Shared inputs are read-only. No rendered or model scratch created; only paid replies and audit receipts retained.
+
+Reproduce: `python3 ops/autonomous/heavy-run.py run -- uv run --offline --with rapidfuzz --with 'sacrebleu==2.5.1' --with regex python ArchiveProcessor/scripts/segbench/hand_icl_gateway.py report`.

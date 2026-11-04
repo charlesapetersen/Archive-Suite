@@ -636,10 +636,10 @@ def write_report(r):
         cluster = ci(c['collection_clustered']) if c['cohort'] == 'public-L1-transfer' else 'across-hand interval not estimated'
         L.append(f"| {c['cohort']} | {c['examples_n']} | {ci(c['both_answered'])} | {ci(c['strict'])} | {cluster} |")
     L += ['', '## Stability and owner sensitivity', '',
-          f"Zero-example repeats: {len(r['repeats'])}; " + '; '.join(
+          f"Zero-example repeats: {len(r['repeats'])}" + ''.join('; ' + '; '.join(
               f"{cohort}: mean move {statistics.mean(x['delta'] for x in r['repeats'] if x['cohort'] == cohort):+.2f}"
-              for cohort in sorted({x['cohort'] for x in r['repeats']})) + '.',
-          'No new repeats were run: the owner resume scope was only 135 untouched conditions. '
+              for cohort in sorted({x['cohort'] for x in r['repeats']})) for _ in r['repeats'][:1]) + '.',
+          'No new repeats were run: the owner resume scope was only the 135 untouched conditions, then the six finished under the $2.60 cap. '
           'The eight repeats in the initial design were omitted; no prompt-specific rerun floor is established.']
     if r.get('owner_clear'):
         L += ['', 'Owner pages without unresolved sheet places (the nine clear pages of the original 16), '

@@ -43939,15 +43939,350 @@
   }
  },
  "hands_icl": {
+  "groups": [
+   {
+    "cohort": "blackwell-held-out",
+    "examples_n": 0,
+    "n": 12,
+    "answered": 12,
+    "attempted": 12,
+    "nes_strict": 83.66767954374195,
+    "nes_answered": 83.66767954374195,
+    "words_missed_pct": 13.846153846153847,
+    "words_added_pct": 16.993006993006993
+   },
+   {
+    "cohort": "blackwell-held-out",
+    "examples_n": 8,
+    "n": 12,
+    "answered": 12,
+    "attempted": 12,
+    "nes_strict": 83.92119574455076,
+    "nes_answered": 83.92119574455076,
+    "words_missed_pct": 13.566433566433567,
+    "words_added_pct": 17.692307692307693
+   },
+   {
+    "cohort": "blackwell-held-out",
+    "examples_n": 16,
+    "n": 12,
+    "answered": 12,
+    "attempted": 12,
+    "nes_strict": 83.20292058826311,
+    "nes_answered": 83.20292058826311,
+    "words_missed_pct": 14.965034965034965,
+    "words_added_pct": 17.622377622377623
+   },
+   {
+    "cohort": "owner-Shils-folder-proxy",
+    "examples_n": 0,
+    "n": 4,
+    "answered": 4,
+    "attempted": 4,
+    "nes_strict": 95.71934210375188,
+    "nes_answered": 95.71934210375188,
+    "words_missed_pct": 4.174950298210735,
+    "words_added_pct": 6.560636182902584
+   },
+   {
+    "cohort": "owner-Shils-folder-proxy",
+    "examples_n": 8,
+    "n": 4,
+    "answered": 4,
+    "attempted": 4,
+    "nes_strict": 91.6286578257004,
+    "nes_answered": 91.6286578257004,
+    "words_missed_pct": 3.9761431411530817,
+    "words_added_pct": 5.566600397614314
+   },
+   {
+    "cohort": "owner-Shils-folder-proxy",
+    "examples_n": 16,
+    "n": 4,
+    "answered": 4,
+    "attempted": 4,
+    "nes_strict": 91.67824126799599,
+    "nes_answered": 91.67824126799599,
+    "words_missed_pct": 2.783300198807157,
+    "words_added_pct": 5.566600397614314
+   },
+   {
+    "cohort": "owner-transfer",
+    "examples_n": 0,
+    "n": 15,
+    "answered": 15,
+    "attempted": 15,
+    "nes_strict": 91.64160608993129,
+    "nes_answered": 91.64160608993129,
+    "words_missed_pct": 2.6327147173068624,
+    "words_added_pct": 5.222270176952956
+   },
+   {
+    "cohort": "owner-transfer",
+    "examples_n": 8,
+    "n": 15,
+    "answered": 15,
+    "attempted": 15,
+    "nes_strict": 90.76053229837625,
+    "nes_answered": 90.76053229837625,
+    "words_missed_pct": 2.719033232628399,
+    "words_added_pct": 5.265429434613725
+   },
+   {
+    "cohort": "owner-transfer",
+    "examples_n": 16,
+    "n": 15,
+    "answered": 15,
+    "attempted": 15,
+    "nes_strict": 92.72879572271992,
+    "nes_answered": 92.72879572271992,
+    "words_missed_pct": 2.416918429003021,
+    "words_added_pct": 5.179110919292188
+   },
+   {
+    "cohort": "public-L1-transfer",
+    "examples_n": 0,
+    "n": 40,
+    "answered": 36,
+    "attempted": 40,
+    "nes_strict": 82.36478803574505,
+    "nes_answered": 91.51643115082783,
+    "words_missed_pct": 12.939264676010563,
+    "words_added_pct": 5.321958155596181
+   },
+   {
+    "cohort": "public-L1-transfer",
+    "examples_n": 8,
+    "n": 40,
+    "answered": 37,
+    "attempted": 40,
+    "nes_strict": 84.57028354809603,
+    "nes_answered": 91.42733356550922,
+    "words_missed_pct": 11.192362380662198,
+    "words_added_pct": 5.951655494617103
+   },
+   {
+    "cohort": "public-L1-transfer",
+    "examples_n": 16,
+    "n": 40,
+    "answered": 35,
+    "attempted": 40,
+    "nes_strict": 79.96324607642643,
+    "nes_answered": 91.38656694448734,
+    "words_missed_pct": 17.753402396912453,
+    "words_added_pct": 5.200081251269551
+   }
+  ],
+  "comparisons": [
+   {
+    "cohort": "blackwell-held-out",
+    "examples_n": 8,
+    "both_answered": {
+     "n": 12,
+     "clusters": 12,
+     "delta": 0.2535162008088025,
+     "lo": -0.6174367509196573,
+     "hi": 1.1071461469258967
+    },
+    "strict": {
+     "n": 12,
+     "clusters": 12,
+     "delta": 0.2535162008088025,
+     "lo": -0.6174367509196573,
+     "hi": 1.1071461469258967
+    },
+    "collection_clustered": {
+     "n": 12,
+     "clusters": 1,
+     "delta": 0.2535162008088025,
+     "lo": 0.2535162008088025,
+     "hi": 0.2535162008088025
+    }
+   },
+   {
+    "cohort": "blackwell-held-out",
+    "examples_n": 16,
+    "both_answered": {
+     "n": 12,
+     "clusters": 12,
+     "delta": -0.4647589554788425,
+     "lo": -1.4019195862179217,
+     "hi": 0.45474225614205227
+    },
+    "strict": {
+     "n": 12,
+     "clusters": 12,
+     "delta": -0.4647589554788425,
+     "lo": -1.4019195862179217,
+     "hi": 0.45474225614205227
+    },
+    "collection_clustered": {
+     "n": 12,
+     "clusters": 1,
+     "delta": -0.4647589554788425,
+     "lo": -0.4647589554788425,
+     "hi": -0.4647589554788425
+    }
+   },
+   {
+    "cohort": "owner-Shils-folder-proxy",
+    "examples_n": 8,
+    "both_answered": {
+     "n": 4,
+     "clusters": 4,
+     "delta": -4.09068427805148,
+     "lo": -12.473696123669267,
+     "hi": 0.16029585083629883
+    },
+    "strict": {
+     "n": 4,
+     "clusters": 4,
+     "delta": -4.09068427805148,
+     "lo": -12.473696123669267,
+     "hi": 0.16029585083629883
+    },
+    "collection_clustered": {
+     "n": 4,
+     "clusters": 1,
+     "delta": -4.09068427805148,
+     "lo": -4.09068427805148,
+     "hi": -4.09068427805148
+    }
+   },
+   {
+    "cohort": "owner-Shils-folder-proxy",
+    "examples_n": 16,
+    "both_answered": {
+     "n": 4,
+     "clusters": 4,
+     "delta": -4.041100835755902,
+     "lo": -12.749252726368198,
+     "hi": 0.38550644284604374
+    },
+    "strict": {
+     "n": 4,
+     "clusters": 4,
+     "delta": -4.041100835755902,
+     "lo": -12.749252726368198,
+     "hi": 0.38550644284604374
+    },
+    "collection_clustered": {
+     "n": 4,
+     "clusters": 1,
+     "delta": -4.041100835755902,
+     "lo": -4.041100835755902,
+     "hi": -4.041100835755902
+    }
+   },
+   {
+    "cohort": "owner-transfer",
+    "examples_n": 8,
+    "both_answered": {
+     "n": 15,
+     "clusters": 15,
+     "delta": -0.8810737915550286,
+     "lo": -2.5401045040627404,
+     "hi": 0.4396841628941085
+    },
+    "strict": {
+     "n": 15,
+     "clusters": 15,
+     "delta": -0.8810737915550286,
+     "lo": -2.5401045040627404,
+     "hi": 0.4396841628941085
+    },
+    "collection_clustered": {
+     "n": 15,
+     "clusters": 1,
+     "delta": -0.8810737915550286,
+     "lo": -0.8810737915550286,
+     "hi": -0.8810737915550286
+    }
+   },
+   {
+    "cohort": "owner-transfer",
+    "examples_n": 16,
+    "both_answered": {
+     "n": 15,
+     "clusters": 15,
+     "delta": 1.0871896327886408,
+     "lo": -0.10923343661655356,
+     "hi": 2.590978283090076
+    },
+    "strict": {
+     "n": 15,
+     "clusters": 15,
+     "delta": 1.0871896327886408,
+     "lo": -0.10923343661655356,
+     "hi": 2.590978283090076
+    },
+    "collection_clustered": {
+     "n": 15,
+     "clusters": 1,
+     "delta": 1.0871896327886408,
+     "lo": 1.0871896327886408,
+     "hi": 1.0871896327886408
+    }
+   },
+   {
+    "cohort": "public-L1-transfer",
+    "examples_n": 8,
+    "both_answered": {
+     "n": 36,
+     "clusters": 36,
+     "delta": -0.27818137293622,
+     "lo": -1.2677066386075475,
+     "hi": 0.5037440509187024
+    },
+    "strict": {
+     "n": 40,
+     "clusters": 40,
+     "delta": 2.2054955123509816,
+     "lo": -0.9130175989531653,
+     "hi": 7.576487680545013
+    },
+    "collection_clustered": {
+     "n": 36,
+     "clusters": 15,
+     "delta": -0.27818137293622,
+     "lo": -0.9236749030392037,
+     "hi": 0.5025592033993291
+    }
+   },
+   {
+    "cohort": "public-L1-transfer",
+    "examples_n": 16,
+    "both_answered": {
+     "n": 35,
+     "clusters": 35,
+     "delta": -0.02193030644816868,
+     "lo": -1.5205058114155912,
+     "hi": 1.3573492742048305
+    },
+    "strict": {
+     "n": 40,
+     "clusters": 40,
+     "delta": -2.401541959318618,
+     "lo": -7.841817315998577,
+     "hi": 0.893601423013024
+    },
+    "collection_clustered": {
+     "n": 35,
+     "clusters": 15,
+     "delta": -0.02193030644816868,
+     "lo": -1.8201080450516585,
+     "hi": 1.2651041471693025
+    }
+   }
+  ],
   "model": "gemini-3.7-flash",
-  "complete": false,
   "cohorts": {
    "public-L1-transfer": 40,
    "owner-transfer": 15,
    "owner-Shils-folder-proxy": 4,
    "blackwell-held-out": 12
   },
-  "charged": 2.427833,
+  "charged": 2.476781,
   "retained_allowance": 0.8,
   "acknowledged_failures": [
    "public-btp-mss184240037-80-n16",
@@ -43961,13 +44296,13 @@
    "public-btp-mss184240101-32-n8",
    "public-btp-mss184240101-32-n16"
   ],
+  "complete": true,
   "failure_reasons": {
    "retained HTTP 502": 9,
    "retained lost connection": 1,
    "content_filter": 2
   },
-  "groups": [],
-  "comparisons": []
+  "verdict": "On the one documented Blackwell diary hand: 8 lines +0.25 NES (95% page interval -0.62 to +1.11, n=12); 16 lines -0.46 NES (95% page interval -1.40 to +0.45, n=12). These page-conditional results do not establish an OCR default for a new hand. The intervals are pointwise, without adjustment across the example conditions."
  },
  "hands_icl_qwen": {
   "groups": [
