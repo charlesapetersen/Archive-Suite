@@ -197,6 +197,11 @@ record:
   hardest pages. The page shows its summary rows as a table with a page-group picker; every arm read on all 96
   enters the four OCR charts (`enh-` ids, kept out of the difficulty analysis). Tag, repair-by-tag and gate tables
   are in `enh-ocr-input.md`.
+- `capture-ladder.json` (`scripts/segbench/capture_ladder.py report`, W46.capture-ladder): the 96 under 16
+  synthetic capture defects (Augraphy, motion, defocus, tilt, JPEG), read by Qwen3.6-27B and LightOnOCR-3 4B on
+  Sherlock and Apple Vision on the Mac, each paired against its own plain image, and the capture-time signals' AUC
+  against a 5-point loss. A section of its own with a reader picker; the defect images are degraded inputs, not
+  routes, so none enters the OCR charts. Group tables are in `capture-ladder.md`.
 - `ocr-logprob.json` (`scripts/segbench/ocr_logprob.py report`, W46.ocr-logprob): LightOnOCR-3 4B and Qwen3.5-9B
   read again with token log-probabilities (mlx-vlm on the Mac for the 96, vLLM on Sherlock for the 96 and the 895).
   Part 5 shows each signal's AUC against an answered page under 90 NES and the 455's 20%-budget cascade into

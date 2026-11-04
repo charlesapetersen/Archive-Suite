@@ -65,6 +65,7 @@ TRUTH_JPEG = RESULTS / "truth-jpeg-upgrade.json"  # W46.truth-jpeg-upgrade: trut
 TRUTH_BIAS_SCORE = RESULTS / "ocr-truth-bias-score.json"  # W46.fix-ocr-truth-bias-score: the owner's blind check
 CHAOS = RESULTS / "chaos-probe.json"  # W46.fix-ocr-scorers: chaos_probe.py score, the altered-word probe
 DEWARP = RESULTS / "enh-dewarp.json"  # W46.enh-dewarp: enh_dewarp.py report, crop or dewarp against raw, by reader
+CAPTURE = RESULTS / "capture-ladder.json"  # W46.capture-ladder: capture_ladder.py report, capture defects by reader
 ENH_OCR = RESULTS / "enh-ocr-input.json"  # W46.enh-ocr-input: enh_ocr_input.py report, content-removing enhancement
 POSTCORRECT = RESULTS / "ocr-postcorrect.json"  # W46.ocr-postcorrect: postcorrect.py score --results, the band corrector
 LOGPROB = RESULTS / "ocr-logprob.json"  # W46.ocr-logprob: ocr_logprob.py report, log-probabilities as an error flag
@@ -1199,6 +1200,7 @@ def main():
                                 if k in ("model", "groups", "comparisons", "cohorts", "verdict", "completion_tokens_max")}
                                if (RESULTS / "ocr-ppocrv6-hands-qwen.json").exists() else None,
              "dewarp": dewarp, "enh_ocr": enh_ocr,
+             "capture_ladder": json.loads(CAPTURE.read_text()) if CAPTURE.exists() else None,
              "loops": json.loads(LOOPS.read_text()) if LOOPS.exists() else None, "regions": regions,
              "layout_order": layout_order(), "layout_photo": layout_photo(layout_photo_data), "logprob": logprob(), "postcorrect": postcorrect()}
     page = TEMPLATE.read_text().replace("__DATA__", json.dumps(built, separators=(",", ":")))
