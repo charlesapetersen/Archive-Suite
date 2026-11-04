@@ -77,5 +77,44 @@ class Pack(unittest.TestCase):
             self.assertEqual(call.call_count,6)
             with self.assertRaises(ValueError):H.run(self.root,'http://127.0.0.1:12345')
 
+    def collect_fixture(self):
+        freeze=dict(json.loads((self.root/'freeze.json').read_text()),revision=H.REVISION)
+        (self.root/'results').mkdir(exist_ok=True);(self.root/'runtime').mkdir(exist_ok=True)
+        H.dump(self.root/'runtime/1.json',dict(revision=H.REVISION))
+        H.dump(self.root/'results/status.json',dict(state='completed',completed=len(self.jobs)))
+        rows=[dict(id=j['id'],page=j['page'],cohort=j['cohort'],examples_n=j['examples_n'],status='ok',finish='stop',
+                   text='fixture',request_sha256=H.hashlib.sha256(H.request_body(self.root,freeze,j)).hexdigest())
+              for j in self.jobs]
+        return freeze,rows
+
+    def write_rows(self,rows):
+        (self.root/'results/answers.jsonl').write_text(''.join(json.dumps(r)+'\n' for r in rows))
+
+    def test_collected_accepts_exact_run_and_refuses_tampering(self):
+        freeze,rows=self.collect_fixture()
+        self.write_rows(rows)
+        by,_,_=H.collected(self.root,self.jobs,freeze)
+        self.assertTrue(all(r['ok'] for r in by.values()))
+        for mode in ('hash','missing','repeat','stopped'):
+            bad=copy.deepcopy(rows)
+            if mode=='hash':bad[1]['request_sha256']='0'*64
+            elif mode=='missing':bad.pop()
+            elif mode=='repeat':bad.append(bad[0])
+            self.write_rows(bad)
+            if mode=='stopped':H.dump(self.root/'results/status.json',dict(state='pilot_stopped',completed=1))
+            with self.assertRaises(ValueError):H.collected(self.root,self.jobs,freeze)
+
+    def test_capped_reply_is_a_failure_not_a_reading(self):
+        freeze,rows=self.collect_fixture()
+        rows[2].update(status='cap_or_empty',finish='length')
+        self.write_rows(rows)
+        by,_,_=H.collected(self.root,self.jobs,freeze)
+        self.assertFalse(by[rows[2]['id']]['ok'])
+
+    def test_copied_examples_counts_verbatim_lines_only(self):
+        job=dict(examples=[dict(text='a long example reading'),dict(text='short')])
+        self.assertEqual(H.copied_examples(job,'x a long example reading y'),(1,1))
+        self.assertEqual(H.copied_examples(job,'nothing here'),(0,1))
+
 
 if __name__=='__main__':unittest.main()

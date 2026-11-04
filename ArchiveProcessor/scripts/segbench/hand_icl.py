@@ -242,6 +242,199 @@ def run(root, url, budget_seconds=3600):
     return 0
 
 
+RESULTS = Path(__file__).resolve().parents[2] / 'segbench-results'
+REVISION = 'e89b16ebf1988b3d6befa7de50abc2d76f26eb09'
+
+
+def request_body(root, freeze, job):
+    """Byte-identical to run()'s request, so a recorded hash pins the frozen inputs."""
+    return json.dumps(dict(model='hand-icl-qwen', messages=messages(root, job), max_tokens=freeze['max_tokens'],
+                           temperature=0, stream=False,
+                           chat_template_kwargs=dict(enable_thinking=False))).encode()
+
+
+def collected(root, jobs, freeze):
+    """Validate the returned run before any score: every frozen request exactly once, its recorded
+    request hash equal to the frozen request, the pinned model/runtime, a completed status. -> rows."""
+    root = Path(root)
+    status = json.loads((root/'results/status.json').read_text())
+    if status.get('state') != 'completed' or status.get('completed') != len(jobs):
+        raise ValueError('run did not complete; a stopped pilot is a feasibility result, not a score')
+    receipts = sorted((root/'runtime').glob('*.json'))
+    if len(receipts) != 1:
+        raise ValueError('expected exactly one runtime receipt (the completed allocation)')
+    runtime = json.loads(receipts[0].read_text())
+    if runtime.get('revision') != freeze['revision'] or freeze['revision'] != REVISION:
+        raise ValueError('model snapshot differs from the freeze')
+    rows = [json.loads(l) for l in (root/'results/answers.jsonl').read_text().splitlines() if l.strip()]
+    by = {}
+    for r in rows:
+        if r['id'] in by:
+            raise ValueError('repeated request in the ledger: ' + r['id'])
+        by[r['id']] = r
+    expected = {j['id']: j for j in jobs}
+    if by.keys() != expected.keys():
+        raise ValueError('ledger and frozen request IDs differ')
+    for k, r in by.items():
+        j = expected[k]
+        if (r['page'], r['cohort'], r['examples_n']) != (j['page'], j['cohort'], j['examples_n']):
+            raise ValueError('ledger row does not match its frozen job: ' + k)
+        if r['request_sha256'] != hashlib.sha256(request_body(root, freeze, j)).hexdigest():
+            raise ValueError('recorded request differs from the frozen request: ' + k)
+        r['ok'] = r['status'] == 'ok' and r.get('finish') == 'stop' and bool((r.get('text') or '').strip())
+    return by, runtime, status
+
+
+def copied_examples(job, text, min_chars=12):
+    """Example readings reproduced verbatim in the target answer (the prompt forbids it). Mechanical."""
+    lines = [e['text'].strip() for e in job['examples'] if len(e['text'].strip()) >= min_chars]
+    return sum(line in text for line in lines), len(lines)
+
+
+def report(root, truth_root):
+    """Score the collected Qwen run with the Gemini arm's pinned check and paired analysis.
+    Reads truth and replies programmatically only; prints no page text."""
+    import statistics
+    import sys
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    import hand_icl_gateway as GW
+    import ocr_panel_score as S
+    root, truth_root = Path(root), Path(truth_root)
+    freeze, jobs, refs = GW.check(root, truth_root)
+    rows, runtime, status = collected(root, jobs, freeze)
+    texts = {k: r.get('text') or '' for k, r in rows.items()}
+    truths = {p: GW.inside(truth_root, r['path']).read_text() for p, r in refs.items()}
+    result = GW.analyze(jobs, rows, truths, texts, S.score)
+    import ocr_hands_rescore as HS
+    rulings = json.loads((HS.HANDS / 'rulings.json').read_text())
+    unresolved = set(HS.unresolved(rulings['rulings']))
+    hand16 = set(json.loads((RESULTS / 'ocr-hands-rescore.json').read_text())['pages'])
+    clear = [j for j in jobs if j['page'].startswith('owner-')
+             and j['page'].removeprefix('owner-') in hand16 - unresolved]
+    if clear:
+        result['owner_clear'] = GW.analyze(clear, rows, truths, texts, S.score)
+        result['owner_clear_pages'] = len({j['page'] for j in clear})
+    copies = Counter()
+    for j in jobs:
+        if j['examples_n']:
+            hit, of = copied_examples(j, texts[j['id']])
+            copies[j['examples_n'], 'hit'] += hit; copies[j['examples_n'], 'of'] += of
+            copies[j['examples_n'], 'pages'] += bool(hit)
+    usage = [r['usage'] for r in rows.values()]
+    walls = [r['wall_s'] for r in rows.values()]
+    result.update(item='W46.ocr-ppocrv6-hands-qwen', model=MODEL, revision=freeze['revision'], runtime=runtime,
+                  settings=dict(temperature=0, thinking=False, max_tokens=freeze['max_tokens']),
+                  cohorts=freeze['cohorts'], status=status,
+                  failed=sorted(k for k, r in rows.items() if not r['ok']),
+                  finish=dict(Counter(r.get('finish') for r in rows.values())),
+                  completion_tokens_max=max(u['completion_tokens'] for u in usage),
+                  prompt_tokens_max=max(u['prompt_tokens'] for u in usage),
+                  wall_s=dict(median=statistics.median(walls), max=max(walls), total=sum(walls)),
+                  wall_by_n={n: statistics.median(r['wall_s'] for r in rows.values() if r['examples_n'] == n)
+                             for n in COUNTS},
+                  prompt_by_n={n: statistics.median(r['usage']['prompt_tokens'] for r in rows.values()
+                                                    if r['examples_n'] == n) for n in COUNTS},
+                  identical_to_zero={n: sum(texts[j['id']] == texts[j['page'] + '-n0'] for j in jobs
+                                            if j['examples_n'] == n) for n in (8, 16)},
+                  copied={n: dict(lines=copies[n, 'hit'], of=copies[n, 'of'], pages=copies[n, 'pages'])
+                          for n in (8, 16)},
+                  pilot=json.loads((root/'results/pilot.json').read_text()),
+                  ledger_sha256=sha(root/'results/answers.jsonl'),
+                  pack_freeze_sha256=sha(root/'freeze.json'), truth_index_sha256=sha(truth_root/'index.json'),
+                  scoring_runner_sha256=sha(__file__))
+    primary = [c for c in result['comparisons'] if c['cohort'] == 'blackwell-held-out']
+    result['verdict'] = ('On the one documented Blackwell diary hand (12 held-out pages): ' + '; '.join(
+        f"{c['examples_n']} lines {c['both_answered']['delta']:+.2f} NES (95% page interval "
+        f"{c['both_answered']['lo']:+.2f} to {c['both_answered']['hi']:+.2f})" for c in primary) +
+        '. Page-conditional on this hand; not an OCR default for a new hand. Intervals are pointwise, '
+        'unadjusted across the two example counts.')
+    dump(RESULTS / 'ocr-ppocrv6-hands-qwen.json', result)
+    write_report(result)
+    return result
+
+
+def write_report(r):
+    def num(v):
+        return '—' if v is None else f'{v:.2f}'
+    def ci(v):
+        return '—' if not v['n'] else f"{v['delta']:+.2f} ({v['lo']:+.2f} to {v['hi']:+.2f}; n={v['n']})"
+    rt = r['runtime']
+    L = ['# Qwen3.6-27B given corrected handwriting lines (W46.ocr-ppocrv6-hands-qwen)', '',
+         'Qwen3.6-27B (FP8) on vLLM on one Sherlock H100, given 0, 8 or 16 corrected line images of a hand, each '
+         'crop a separate image followed by its corrected reading, then the target page. Scores are NES points. '
+         'Only the Blackwell holdout tests a documented same hand; the Shils folder is a hand proxy; the owner-'
+         'transfer and public L1 cohorts get Blackwell examples and test transfer across hands, not adaptation.', '',
+         '**Verdict.** ' + r['verdict'], '',
+         '**For the training kit:** putting a hand\'s corrected lines in Qwen3.6-27B\'s prompt is not an adaptation '
+         'route on this evidence. No cohort at 8 or 16 lines moved by more than its interval allows, the documented '
+         'hand\'s point estimates are below zero, and most answers changed only slightly. A kit user who wants a '
+         'reader adapted to a hand needs training (W46.ocr-ppocrv6-hands) or another model; this run says nothing '
+         'about Gemini, whose arm (W46.ocr-ppocrv6-hands-paid) is still open.', '',
+         f"**Support:** {sum(g['answered'] for g in r['groups'])} of {sum(g['n'] for g in r['groups'])} fixed "
+         f"conditions answered; every reply ended normally (finish {r['finish']}); the longest reply was "
+         f"{r['completion_tokens_max']} tokens against the 8,192 cap, so no reply was cut off. "
+         f"Failed conditions: {len(r['failed'])}.", '',
+         '## Measurement card', '',
+         '- **Truth:** public By the People transcriptions (CC0) for the Blackwell holdout and L1 pages. Owner targets '
+         'use the post-sheet truth (W46.ocr-hands-rescore): model-drafted, 114 hand places owner-checked, 10 unresolved, '
+         'so owner figures are agreement with that reference (OCR-1), not rankings. Example lines are the existing '
+         'PP-OCRv6-aligned corrected lines, filtered by alignment error against the base recognizer (not a random line '
+         'draw); the owner example lines predate the sheet corrections. No Claude subagent drew or read any line or page.',
+         '- **Selection:** the frozen pack (`hand_icl.py prepare`, seed `W46.ocr-ppocrv6-hands-qwen-20261101`): 40 seeded L1 '
+         'pages, all 19 owner handwritten pages, the 12 test-role Blackwell pages of the training volume. Blackwell '
+         'examples come only from its 24 training pages; Shils examples from the other three Shils pages; source-image '
+         'hashes reject aliases. No page was chosen by a tested route or by ABBYY text.',
+         '- **Comparison:** identical 2400 px / quality-90 target JPEGs across conditions, eight examples the prefix of '
+         'sixteen, one prompt, temperature 0, no thinking, 8,192-token cap, 32,768-token context, at most 17 images, '
+         f"one sequence, fp8 KV cache, eager. Snapshot `{r['revision']}`, vLLM {rt['vllm']}, transformers "
+         f"{rt['transformers']}. Every recorded request hash was recomputed from the frozen pack and matched. "
+         'The Gemini arm (W46.ocr-ppocrv6-hands-paid) uses the same pack but is paused six conditions short, so no '
+         'model comparison is drawn here.',
+         '- **Noise:** 10,000-round paired page bootstrap within each cohort; public L1 also bootstraps by collection. '
+         'One diary and four Shils pages cannot estimate variation across hands. No repeat run was made, so no '
+         'prompt-specific rerun floor exists; the inherited hosted handwritten floor (0.60 points) is a reference, not '
+         'this route\'s floor. A gap whose interval spans zero is a tie.',
+         '- **Scope:** zero-training prompting on these pages and examples only. Not an app default, not a fine-tune '
+         'comparison on the same pages, no claim about a new hand, another collection, the 96 or the 895. These '
+         'subsets do not enter the whole-96 or whole-895 charts.', '',
+         '## Paired conditions', '',
+         '| cohort | examples | answered / n | NES | missed words % | added words % |', '|---|---:|---:|---:|---:|---:|']
+    for g in r['groups']:
+        L.append(f"| {g['cohort']} | {g['examples_n']} | {g['answered']} / {g['n']} | {num(g['nes_strict'])} | "
+                 f"{num(g['words_missed_pct'])} | {num(g['words_added_pct'])} |")
+    L += ['', '| cohort | examples | Δ vs zero (95% page CI) | collection-clustered (95% CI) |', '|---|---:|---|---|']
+    for c in r['comparisons']:
+        cl = ci(c['collection_clustered']) if c['cohort'] == 'public-L1-transfer' else 'one hand/folder: not estimated'
+        L.append(f"| {c['cohort']} | {c['examples_n']} | {ci(c['both_answered'])} | {cl} |")
+    if r.get('owner_clear'):
+        L += ['', f"Owner sensitivity, the {r['owner_clear_pages']} pages of the original 16 with no unresolved sheet "
+              'place (descriptive; still a model-drafted reference):', '',
+              '| cohort | examples | Δ vs zero (95% page CI) |', '|---|---:|---|']
+        L += [f"| {c['cohort']} | {c['examples_n']} | {ci(c['both_answered'])} |" for c in r['owner_clear']['comparisons']]
+    cp = r['copied']
+    L += ['', '## Copying, speed and cost', '',
+          f"Example readings (12+ characters) found verbatim in the target answer: {cp[8]['lines']} of {cp[8]['of']} "
+          f"at 8 lines ({cp[8]['pages']} answers), {cp[16]['lines']} of {cp[16]['of']} at 16 ({cp[16]['pages']} answers). "
+          'The prompt forbids copying; a verbatim hit can also be a phrase genuinely repeated on the target page. '
+          'The examples reached the model: median prompt ' +
+          ' / '.join(f"{r['prompt_by_n'][n]:.0f}" for n in COUNTS) + ' tokens at 0/8/16 examples. The answer was '
+          f"character-identical to the zero-example answer on {r['identical_to_zero'][8]} of 71 pages at 8 lines and "
+          f"{r['identical_to_zero'][16]} at 16.", '',
+          f"Median request {r['wall_s']['median']:.1f} s (0/8/16 examples: " +
+          ' / '.join(f"{r['wall_by_n'][n]:.1f}" for n in COUNTS) + f" s), longest {r['wall_s']['max']:.1f} s, "
+          f"{r['wall_s']['total'] / 60:.0f} min of requests in total on one {rt['gpu']}; largest prompt "
+          f"{r['prompt_tokens_max']} tokens. The 24-request pilot projected {r['pilot']['projected_seconds'] / 60:.0f} "
+          'min; the allocation ran 46 min including startup (Slurm 50741268). The first attempt (50696432) failed '
+          'in 10 s before the model started (node-local scratch not bound into the container); no request was '
+          'repeated. Sherlock allocation only; no money spent.', '',
+          f"Frozen pack SHA-256 `{r['pack_freeze_sha256']}`; truth index `{r['truth_index_sha256']}`; ledger "
+          f"`{r['ledger_sha256']}`. Private pack and results `~/.local/state/archive-autonomous/artifacts/"
+          'hand-icl-20261101`, target truth `hand-icl-truth-20261101`.', '',
+          'Reproduce: `python3 ops/autonomous/heavy-run.py run -- uv run --with rapidfuzz '
+          "--with 'sacrebleu==2.5.1' --with regex python ArchiveProcessor/scripts/segbench/hand_icl.py report`."]
+    (RESULTS / 'ocr-ppocrv6-hands-qwen.md').write_text('\n'.join(L) + '\n')
+
+
 def main():
     p=argparse.ArgumentParser(description=__doc__)
     sub=p.add_subparsers(dest='cmd', required=True)
@@ -250,7 +443,12 @@ def main():
     a=sub.add_parser('check'); a.add_argument('--root',type=Path,required=True)
     a=sub.add_parser('run'); a.add_argument('--root',type=Path,required=True); a.add_argument('--url',required=True)
     a.add_argument('--budget-seconds',type=int,default=3600)
+    state = Path.home()/'.local/state/archive-autonomous/artifacts'
+    a=sub.add_parser('report'); a.add_argument('--root',type=Path,default=state/'hand-icl-20261101')
+    a.add_argument('--truth-root',type=Path,default=state/'hand-icl-truth-20261101')
     a=p.parse_args()
+    if a.cmd=='report':
+        r=report(a.root,a.truth_root); print(r['verdict']); return
     if a.cmd=='prepare':
         f=prepare(a.root,a.truth_root,a.revision); print(json.dumps({k:f[k] for k in ('jobs','cohorts','revision')},indent=1))
     elif a.cmd=='check':

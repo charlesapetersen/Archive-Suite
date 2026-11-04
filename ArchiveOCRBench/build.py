@@ -1194,6 +1194,10 @@ def main():
              "hands_icl": {k: v for k, v in json.loads((RESULTS / "ocr-ppocrv6-hands-paid.json").read_text()).items()
                            if k in ("model", "groups", "comparisons", "cohorts", "charged", "complete", "verdict", "retained_allowance", "acknowledged_failures", "failure_reasons")}
                           if (RESULTS / "ocr-ppocrv6-hands-paid.json").exists() else None,
+             # W46.ocr-ppocrv6-hands-qwen: hand_icl.py report, the same frozen pack on Qwen3.6-27B (Sherlock)
+             "hands_icl_qwen": {k: v for k, v in json.loads((RESULTS / "ocr-ppocrv6-hands-qwen.json").read_text()).items()
+                                if k in ("model", "groups", "comparisons", "cohorts", "verdict", "completion_tokens_max")}
+                               if (RESULTS / "ocr-ppocrv6-hands-qwen.json").exists() else None,
              "dewarp": dewarp, "enh_ocr": enh_ocr,
              "loops": json.loads(LOOPS.read_text()) if LOOPS.exists() else None, "regions": regions,
              "layout_order": layout_order(), "layout_photo": layout_photo(layout_photo_data), "logprob": logprob(), "postcorrect": postcorrect()}

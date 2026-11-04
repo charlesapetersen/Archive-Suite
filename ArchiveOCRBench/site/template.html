@@ -418,6 +418,12 @@ footer p { font-size: 13px; }
     <div class="tbl"><table><thead><tr><th>Pages</th><th>Example lines</th><th>Answered / attempted / fixed n</th><th>NES answered</th><th>NES strict</th><th>Δ vs zero, both answered (95% interval)</th><th>Collection-clustered interval</th></tr></thead><tbody id="hands-icl-rows"></tbody></table></div>
   </section>
 
+  <section class="panel" id="hands-icl-qwen" hidden>
+    <div class="head"><h2>Qwen3.6-27B given corrected handwriting lines</h2><span class="meta">0, 8 or 16 examples · one Sherlock H100 · NES points</span></div>
+    <p class="note" id="hands-icl-qwen-note"></p>
+    <div class="tbl"><table><thead><tr><th>Pages</th><th>Example lines</th><th>Answered / n</th><th>NES</th><th>Δ vs zero (95% page interval)</th><th>Collection-clustered interval</th></tr></thead><tbody id="hands-icl-qwen-rows"></tbody></table></div>
+  </section>
+
   <section class="panel" id="pub-loops" hidden>
     <div class="head"><h2>Reading the looping pages again</h2><span class="meta">every capped page of the sweep · free (W46.ocr-loops)</span></div>
     <p class="note" id="loops-note"></p>
@@ -1021,6 +1027,18 @@ if (HI && HI.complete) {
     return '<tr><td>' + names[g.cohort] + '</td><td>' + g.examples_n + '</td><td>' + g.answered + ' / ' + g.attempted + ' / ' + g.n + '</td><td>' + num(g.nes_answered) + '</td><td>' + num(g.nes_strict) + '</td><td>' + (c ? iv(c.both_answered) : 'baseline') + '</td><td>' + (c && g.cohort === 'public-L1-transfer' ? iv(c.collection_clustered) : 'not estimated across hands') + '</td></tr>';
   }).join('');
   document.getElementById('hands-icl-note').textContent = (HI.verdict || '') + ' Same target pages and nested line-image/text examples as the Qwen experiment. Only one documented diary hand and a four-page folder proxy: page intervals do not establish generalisation across hands. Owner truth was drafted by model relatives, with the original 16 hand pages checked at disputed places; three extra owner letters remain agreement-only. L1 includes five Blackwell pages, so it is not purely cross-hand transfer. The report also gives clear-owner-page sensitivity and strict failure=0 differences. Borrowed hand-kind noise floor 0.60 points; public/prompt-specific noise unmeasured. These subsets support this panel, not whole-96 or whole-895 rankings. Total $' + HI.charged.toFixed(3) + ', including the original pilot and $' + HI.retained_allowance.toFixed(2) + ' retained for ' + HI.acknowledged_failures.length + ' gateway failures that were never retried. All failure reasons: ' + Object.entries(HI.failure_reasons).map(([k,v]) => k + ': ' + v).join('; ') + '. No new repeats: resume scope was only untouched conditions; owner working cap $2.50. Source: segbench-results/ocr-ppocrv6-hands-paid.md.';
+}
+const HQ = DATA.hands_icl_qwen;
+if (HQ) {
+  document.getElementById('hands-icl-qwen').hidden = false;
+  const names = {'blackwell-held-out': 'Blackwell same-volume holdout', 'owner-Shils-folder-proxy': 'Shils folder (hand assumed)', 'owner-transfer': 'Owner, other hands unverified', 'public-L1-transfer': 'Public L1, mixed/unverified hands'};
+  const num = x => x == null ? '–' : x.toFixed(2);
+  const iv = x => x && x.n ? num(x.delta) + ' (' + num(x.lo) + ' to ' + num(x.hi) + '; n=' + x.n + ')' : '–';
+  document.getElementById('hands-icl-qwen-rows').innerHTML = HQ.groups.map(g => {
+    const c = HQ.comparisons.find(c => c.cohort === g.cohort && c.examples_n === g.examples_n);
+    return '<tr><td>' + names[g.cohort] + '</td><td>' + g.examples_n + '</td><td>' + g.answered + ' / ' + g.n + '</td><td>' + num(g.nes_strict) + '</td><td>' + (c ? iv(c.both_answered) : 'baseline') + '</td><td>' + (c && g.cohort === 'public-L1-transfer' ? iv(c.collection_clustered) : 'not estimated across hands') + '</td></tr>';
+  }).join('');
+  document.getElementById('hands-icl-qwen-note').textContent = HQ.verdict + ' Same frozen pack as the Gemini panel above (temperature 0, no thinking); every reply ended normally, the longest ' + HQ.completion_tokens_max + ' tokens of 8,192. Only one documented diary hand and a four-page folder proxy; the owner and L1 cohorts get Blackwell examples and test transfer, not adaptation. Owner truth is model-drafted and owner-checked at disputed places (agreement, OCR-1). No repeat run, so no prompt-specific noise floor. These subsets support this panel, not whole-96 or whole-895 rankings. Free (Sherlock allocation). Source: segbench-results/ocr-ppocrv6-hands-qwen.md.';
 }
 const LP = DATA.loops;
 if (LP) {
