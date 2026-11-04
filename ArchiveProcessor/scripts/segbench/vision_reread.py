@@ -260,6 +260,18 @@ def cmd_report(_):
         for k in ('reported (resave 27.2 - raw 26.6)', 'update alone (raw 27.2 - raw 26.6)',
                   're-encode alone (resave 27.2 - raw 27.2)'):
             M.append(f"| {k} | {s} | {c['n']} | {ci(c[k]['bowf1'])} | {ci(c[k]['nes'])} |")
+    M += ['', '## Which reports carry a macOS 26.6 Vision figure', '',
+          "Every script that reads one of the three dated caches (`ocr-panel-local/vision`, `bench-corpus/routes/vision`, "
+          "`enh-dewarp/lines/raw`) reports 26.6 Vision text, as committed on 2026-11-04. Vision's own score: "
+          "`ocr-panel-local.md` (ocr_panel_score.py), `ocr-scorers.md` and `ocr-pages.csv` (ocr_rescore.py, "
+          "ocr_pages_export.py; the bench page's Vision rows and its cascade and agreement tables), "
+          "`bench-corpus/routes.csv` (corpus/routes.py), `enh-dewarp.md`'s raw row, `capture-ladder.md`'s raw row "
+          "and its re-save sentence (above: the update, not the re-save), `truth-jpeg-upgrade.md`, "
+          "`ocr-ppocrv6-hands.md`'s Vision rows, and the Vision column of `r1-foundation.md` (in flight). Vision text "
+          "as an input to another route: `layout-order.md` and `place-geom.md`. The capture ladder's defect and "
+          "re-save rows, and `capture-ladder-paid`, were read on 27.2. The bench page says so in its footer; "
+          "the charts keep the 26.6 readings until the dated caches are swapped for these and the reports above "
+          "regenerated together (W46.vision-27-swap), so that no table pairs a 27.2 Vision with a 26.6 one.", '']
     M += ['', '## Measurement card', '',
           "- **Truth.** Unchanged and the same files the dated scores used: the owner panel's adjudicated truth "
           "(`ocr_truth` cache, owner-checked pages as recorded there) and the 440's frozen public truths. No model "

@@ -53599,6 +53599,28 @@
    }
   ]
  },
+ "vision_reread": {
+  "os": "27.2",
+  "build": "26B123",
+  "panel": {
+   "n": 96,
+   "changed": 95,
+   "old": 81.4,
+   "new": 83.1,
+   "delta": 1.7,
+   "lo": -0.3,
+   "hi": 4.0
+  },
+  "public": {
+   "n": 320,
+   "changed": 320,
+   "old": 37.5,
+   "new": 39.3,
+   "delta": 1.8,
+   "lo": 0.6,
+   "hi": 3.1
+  }
+ },
  "loops": {
   "report": "bench-corpus/loop-rerun-20261021.md",
   "retry_first": [

@@ -66,6 +66,7 @@ TRUTH_JPEG = RESULTS / "truth-jpeg-upgrade.json"  # W46.truth-jpeg-upgrade: trut
 TRUTH_BIAS_SCORE = RESULTS / "ocr-truth-bias-score.json"  # W46.fix-ocr-truth-bias-score: the owner's blind check
 CHAOS = RESULTS / "chaos-probe.json"  # W46.fix-ocr-scorers: chaos_probe.py score, the altered-word probe
 DEWARP = RESULTS / "enh-dewarp.json"  # W46.enh-dewarp: enh_dewarp.py report, crop or dewarp against raw, by reader
+VISION_REREAD = RESULTS / "vision-27-reread.json"  # W46.vision-27-reread: Apple Vision on macOS 27.2 against 26.6
 CAPTURE = RESULTS / "capture-ladder.json"  # W46.capture-ladder: capture_ladder.py report, capture defects by reader
 ENH_OCR = RESULTS / "enh-ocr-input.json"  # W46.enh-ocr-input: enh_ocr_input.py report, content-removing enhancement
 POSTCORRECT = RESULTS / "ocr-postcorrect.json"  # W46.ocr-postcorrect: postcorrect.py score --results, the band corrector
@@ -1054,6 +1055,18 @@ def enh_ocr_chart_routes(data, kinds, op):
     return out
 
 
+def vision_reread():
+    """W46.vision-27-reread: every Apple Vision figure on the page is its macOS 26.6 reading; the re-read on 27.2 of
+    the same images, paired by page, says how far the update moved it (the 96's scored originals, the 440's Latin pages)."""
+    if not VISION_REREAD.exists():
+        return None
+    d = json.loads(VISION_REREAD.read_text())
+    cell = lambda c: {"n": c["n"], "changed": c["n"] - c["identical"], "old": round(c["old_nes"], 1),
+                      "new": round(c["new_nes"], 1), **{k: round(c["d_nes"][k], 1) for k in ("delta", "lo", "hi")}}
+    return {"os": d["os_now"].get("ProductVersion"), "build": d["os_now"].get("BuildVersion"),
+            "panel": cell(d["panel"]["original · scored"]), "public": cell(d["bench"]["all"])}
+
+
 def main():
     check = "--check" in sys.argv[1:]
     inputs = json.loads(INPUTS.read_text())
@@ -1226,6 +1239,7 @@ def main():
                                if (RESULTS / "ocr-ppocrv6-hands-qwen.json").exists() else None,
              "dewarp": dewarp, "enh_ocr": enh_ocr,
              "capture_ladder": json.loads(CAPTURE.read_text()) if CAPTURE.exists() else None,
+             "vision_reread": vision_reread(),
              "loops": json.loads(LOOPS.read_text()) if LOOPS.exists() else None, "regions": regions,
              "layout_order": layout_order(), "layout_photo": layout_photo(layout_photo_data), "logprob": logprob(), "postcorrect": postcorrect()}
     page = TEMPLATE.read_text().replace("__DATA__", json.dumps(built, separators=(",", ":")))
