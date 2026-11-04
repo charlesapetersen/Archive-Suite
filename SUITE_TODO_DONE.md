@@ -13914,3 +13914,17 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   Report/bench: ocr-ppocrv6-hands.md/.json and rebuilt ArchiveOCRBench, all 12 tunes and nine paired size/device contrasts; prior eight tunes and focal zero-shot pairs unchanged. Normal report regeneration also incorporates already-shipped Nemotron/Unlimited caches and refreshed Granite owner-subset readings; no comparator model rerun. Both earlier OCR sets remain reported; new tunes claim only the same-hand holdout. Missing evaluations now fail instead of shrinking the sample (KNOWN_ISSUES.md). Five synthetic scoring contracts, five bench tests, 64 successful/nonempty held-out readings, separate reviews, exact report/bench transfer, freshness and actual headless desktop/mobile/scroll checks pass. No app code changed. The published bench copy is behind the rebuilt local page. No spend or uploads.
   Cache: deleted the four new best-weight files (255 MB; Lightning checkpoints already pruned) and own temporary scorer/renderer cache (505 MB). Kept 56 MB of shared hand inputs, pairs, base/tuned readings, training metadata/logs and weight checksums so the report can be rebuilt; earlier inputs and the pre-existing kraken stack/base model remain dependencies.
   <!-- /W46.ocr-ppocrv6-hands-curve -->
+- [x] **W48.reader-copy-shortcut — a reliable keyboard shortcut for copying text in Archive Reader [S]** · §Owner-requested batch (2026-07-09) — Processor output + Reader UX/viewer (lane: reader) (uses: build,vm) — Owner, 2026-11-01: Archive Reader should have a keyboard shortcut for copying text. Existing `ArchiveReaderCommands` declares Copy (⌘C) and Copy Cleaned for Prose (⌥⌘C); reproduce their actual routing before adding another binding. Make the ordinary Copy shortcut discoverable and reliable for selected text in either document pane and the preview, respecting focused text fields and avoiding the Copy Link(s) binding. Verify clipboard contents and disabled/no-selection behavior on scratch documents in the VM; update the keyboard documentation. Read-only copying must never change archive contents or tags.
+  SHIPPED 2026-11-03. Routing reproduced first, in the VM, with a probe UITest: ⌘C was bound twice (Edit ▸ Copy and
+  Document ▸ Copy) and AppKit matched the Document item first, so panes, cross-pane focus and the preview already
+  copied the plain selection, but with the caret in the find field ⌘C copied the PDF selection instead of the field's
+  text; Copy stayed enabled with nothing selected. Fix: ⌘C is the standard Edit ▸ Copy alone. `ReaderPDFView` answers
+  `copy:` with the viewer's verbatim copy from whichever pane holds the selection (plain text, as before) and validates
+  it off when neither pane has selected text; the Document menu's duplicate "Copy" and the preview header button's ⌘C
+  binding are gone, so focused fields and the preview's selectable embedded text get their own copy. ⌥⌘C Copy Cleaned
+  for Prose and ⇧⌘C Copy Link(s) unchanged. Proof: `CopyShortcutUITests` (document window: disabled + clipboard
+  untouched with no selection, ⌘C/⌥⌘C contents, plain-only types, image-pane focus, find field copies "Calif";
+  preview: no-selection, ⌘C, ⌥⌘C; both assert no archive file's mtime or Finder tags changed) 3/3 iterations green in
+  the VM; ViewerUITests 13/13; Reader unit bundle 535 green. Docs: REFERENCE.md §Keyboard map, SMOKE_TEST.md K. No
+  bench cache used.
+  <!-- /W48.reader-copy-shortcut -->

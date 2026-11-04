@@ -37,8 +37,9 @@ never the real `Test files/` corpus. Mark-Read / tag edits therefore never touch
       per-pane zoom clusters + cycle/copy/find/split toolbar, ~66/33 splitter.
 - [~] **J. Viewer: ↑/↓ cycle / splitter / per-pane zoom / top-anchored zoom** — top-anchored zoom +
       cycle verified pre-compaction; controls present in I. Not re-driven exhaustively this pass.
-- [~] **K. Viewer: ⌘C intelligent copy / ⌘F find** — `CopyTextCleaner` (collapse/paragraph/de-hyphenate)
-      is unit-tested (10 tests); find UI present. Not driven live this pass.
+- [~] **K. Viewer: ⌘C / ⌥⌘C copy / ⌘F find** — `CopyTextCleaner` (collapse/paragraph/de-hyphenate)
+      is unit-tested (10 tests); ⌘C/⌥⌘C clipboard contents, no-selection and find-field focus are driven in
+      the VM by `CopyShortcutUITests` (W48.reader-copy-shortcut); find UI present.
 - [x] **L. Preview (Space)** — **PASS**. 2-up preview sheet (image | OCR text), header shows 1 of 1 with
       ‹ › cycle, copy, Open, Done. (Esc dismissal was flaky once under scripted focus — Done works.)
 - [x] **M. Copy links (⌘⇧C)** — **PASS**. Clipboard = `file:///Users/archivist/Desktop/AR-Smoke/00015%20IMG%20%E2%80%94%20Brown.pdf`

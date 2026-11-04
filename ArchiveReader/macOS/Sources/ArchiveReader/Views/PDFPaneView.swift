@@ -18,6 +18,11 @@ final class PDFPaneController {
     private var isApplying = false     // true while WE set the scale, so we don't re-record it
     private var findQuery = ""         // active find query to highlight on this pane ("" = none)
     private var findCurrentIndex: Int? // which match on THIS pane is the current selection; nil = highlight-only
+    /// Edit ▸ Copy (⌘C) as this pane's `copy:` answers it — the viewer's verbatim copy from whichever pane
+    /// holds the selection, and whether there is one to copy. Set by `DocumentViewerModel`; nil leaves
+    /// PDFKit's own `copy:` in place. See `ReaderPDFView.copy(_:)`.
+    var copySelection: (() -> Void)?
+    var canCopySelection: (() -> Bool)?
 
     init(key: String, persists: Bool = true) {
         self.key = key
@@ -158,6 +163,7 @@ struct PDFPaneView: NSViewRepresentable {
 
     func makeNSView(context: Context) -> PDFView {
         let view = ReaderPDFView()
+        view.paneController = controller
         view.pageAccessibilityTitle = controller.key == "left" ? "Original image page" : "OCR text page"
         view.setAccessibilityLabel(view.pageAccessibilityTitle)
         view.displayMode = .singlePage
@@ -206,6 +212,7 @@ struct PDFPaneView: NSViewRepresentable {
 /// setter works: name only AXPage nodes and leave PDFKit's content, actions and parentage intact.
 final class ReaderPDFView: PDFView {
     var pageAccessibilityTitle = "PDF page"
+    weak var paneController: PDFPaneController?
 
     override func accessibilityChildren() -> [Any]? {
         let children = super.accessibilityChildren()
@@ -221,5 +228,29 @@ final class ReaderPDFView: PDFView {
                 namePages(in: descendants)
             }
         }
+    }
+
+    /// W48.reader-copy-shortcut: ⌘C is the standard Edit ▸ Copy, sent down the responder chain, so a
+    /// focused text field (the find bar) copies its own text. It used to be a second ⌘C on Document ▸
+    /// Copy, which AppKit matched first and which copied the PDF selection even with the caret in the
+    /// find field (measured in the VM). Reaching a pane, it copies the viewer's selection from EITHER
+    /// pane, plain text only, so focus on the image pane still copies text selected on the text page.
+    override func copy(_ sender: Any?) {
+        if let copy = paneController?.copySelection { copy() } else { super.copy(sender) }
+    }
+}
+
+extension ReaderPDFView: NSMenuItemValidation {
+    /// Copy is enabled only when one of the viewer's panes has selected text. PDFKit's own validation
+    /// is not public API, so every other item is forwarded to it by selector.
+    func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
+        if menuItem.action == #selector(copy(_:)), let canCopy = paneController?.canCopySelection {
+            return canCopy()
+        }
+        let selector = #selector(NSMenuItemValidation.validateMenuItem(_:))
+        guard PDFView.instancesRespond(to: selector) else { return true }
+        typealias Validate = @convention(c) (AnyObject, Selector, NSMenuItem) -> Bool
+        let validate = unsafeBitCast(PDFView.instanceMethod(for: selector), to: Validate.self)
+        return validate(self, selector, menuItem)
     }
 }

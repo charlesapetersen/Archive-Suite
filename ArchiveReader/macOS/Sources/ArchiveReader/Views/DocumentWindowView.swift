@@ -5,7 +5,7 @@ import Combine
 
 /// The document-view window: a two-up viewer — image page (left) / OCR text page (right) — with an
 /// independent zoom per pane, a draggable splitter defaulting to ⅔ : ⅓ (reset per document), page
-/// cycling with ↑/↓, intelligent copy (⌘C), and in-document find (⌘F).
+/// cycling with ↑/↓, verbatim copy (⌘C, Edit ▸ Copy) and intelligent copy (⌥⌘C), and in-document find (⌘F).
 struct DocumentWindowView: View {
     let selection: DocumentSelection?
     @StateObject private var model = DocumentViewerModel()

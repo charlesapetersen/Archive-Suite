@@ -155,8 +155,9 @@ struct ArchiveReaderCommands: Commands {
                 if let doc, let linkContext { doc.copyArchivePageLink(context: linkContext) }
             }
             .disabled(doc == nil || linkContext?.target == nil)
-            Button("Copy") { doc?.copyPlainSelection() }
-                .keyboardShortcut("c", modifiers: .command).disabled(doc == nil)
+            // No "Copy" here: ⌘C is the standard Edit ▸ Copy, which reaches the viewer through the
+            // responder chain (`ReaderPDFView.copy(_:)`). A second ⌘C on this menu matched first and copied
+            // the PDF selection with the caret in the find field (W48.reader-copy-shortcut).
             // ⌥⌘C, not ⇧⌘C: ⇧⌘C is Selection ▸ Copy Link(s), and with the preview sheet up both items are
             // enabled in the nav window at once (W40.fix-reader-visual-polish).
             Button("Copy Cleaned for Prose") { doc?.copySelection() }

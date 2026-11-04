@@ -278,13 +278,17 @@ writes against the real corpus — always a copy.
 - `⌘⌥←`/`⌘⌥→` focus image pane / focus text pane
 - `⌘↑`/`⌘↓` zoom in/out the focused pane · `⌘0` fit the focused page · `⌥⌘0` reset the split to the saved
   default (not necessarily ⅔) and fit both panes
-- `⌘C` copy verbatim · `⌥⌘C` copy cleaned-for-prose (intelligent; not `⌘⇧C`, which is Copy Link(s))
+- `⌘C` copy verbatim — the standard **Edit ▸ Copy**, from whichever pane holds the selection (plain text;
+  disabled with nothing selected; a focused text field such as the find bar copies its own text) · `⌥⌘C`
+  Document ▸ Copy Cleaned for Prose (intelligent; not `⌘⇧C`, which is Copy Link(s)). Since
+  `W48.reader-copy-shortcut` there is no second `⌘C` on the Document menu: it matched before Edit ▸ Copy
+  and copied the PDF selection with the caret in the find field
 - `⌘F` find in the open document(s) · `⌘G`/`⇧⌘G` next/previous match (highlight-all, wraps, "N of M" across open docs)
 - `⌘,` Options (both windows)
 
 *Preview sheet* (opened by `Space`/`⌘Y`)
 - `↑/↓` previous/next file in the list (nav selection follows) · `←/→` cycle within a multi-file selection ·
-  `⌘C`/`⌥⌘C` copy verbatim/cleaned · `⌘O` open the full viewer · `Space`/`Esc` close
+  `⌘C` (Edit ▸ Copy)/`⌥⌘C` copy verbatim/cleaned · `⌘O` open the full viewer · `Space`/`Esc` close
 - `⌘↑`/`⌘↓`/`⌘0` zoom in/out/fit the focused pane — the image pane on open (since `W26.previewzoom`: the
   sheet's viewer model is published by `NavigationWindowView`, so the Document menu acts on it)
 - **No find bar here:** `⌘F`/`⌘G`/`⌘⇧G` are *disabled* in the preview (`DocumentViewerModel.supportsFind`,

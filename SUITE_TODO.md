@@ -834,7 +834,6 @@ at implementation). Not yet scoped into execution plans — the **decades** item
 ### Archive Reader — search
 ### Archive Reader — sort & smart folders
 ### Archive Reader — viewer & preview
-- [ ] **W48.reader-copy-shortcut — a reliable keyboard shortcut for copying text in Archive Reader [S]** (lane: reader) (uses: build,vm) — Owner, 2026-11-01: Archive Reader should have a keyboard shortcut for copying text. Existing `ArchiveReaderCommands` declares Copy (⌘C) and Copy Cleaned for Prose (⌥⌘C); reproduce their actual routing before adding another binding. Make the ordinary Copy shortcut discoverable and reliable for selected text in either document pane and the preview, respecting focused text fields and avoiding the Copy Link(s) binding. Verify clipboard contents and disabled/no-selection behavior on scratch documents in the VM; update the keyboard documentation. Read-only copying must never change archive contents or tags.
 ## Deferred from the 2026-07-09/10 autonomous run → queued for next autonomous run
 Correctness bugs from that run's review shipped (`848c9d2`, `f866a0f`, `14118c0`); the items below were
 consciously deferred (perf-only / LOW / GUI infra / new idea). All armed in `.maintenance/AUTONOMOUS_PLAN.md`

@@ -71,6 +71,11 @@ final class DocumentViewerModel: ObservableObject {
         self.imageSourcePreferences = imageSourcePreferences
         self.persistsImageSource = persists
         self.thumbnailer = thumbnailer
+        // Edit ▸ Copy (⌘C) reaching either pane copies the viewer's selection (`ReaderPDFView.copy(_:)`).
+        for controller in [leftController, rightController] {
+            controller.copySelection = { [weak self] in self?.copyPlainSelection() }
+            controller.canCopySelection = { [weak self] in self?.hasTextSelection ?? false }
+        }
     }
 
     /// Which pane keyboard focus / zoom acts on. ⌘↑/⌘↓ zoom this pane; ⌘⌥←/→ switch it.
@@ -216,11 +221,15 @@ final class DocumentViewerModel: ObservableObject {
         copyToPasteboard(text)
     }
 
-    /// Plain/direct copy — the raw selected text, exactly as PDFKit reports it (no cleaning) — ⌘C.
+    /// Plain/direct copy — the raw selected text, exactly as PDFKit reports it (no cleaning) — ⌘C, which
+    /// is Edit ▸ Copy reaching a pane's `copy:` (W48.reader-copy-shortcut).
     func copyPlainSelection() {
         let text = rightController.plainSelection() ?? leftController.plainSelection()
         copyToPasteboard(text)
     }
+
+    /// Either pane has selected text — what enables Edit ▸ Copy over the viewer.
+    var hasTextSelection: Bool { rightController.plainSelection() != nil || leftController.plainSelection() != nil }
 
     private func copyToPasteboard(_ text: String?) {
         guard let text, !text.isEmpty else { return }

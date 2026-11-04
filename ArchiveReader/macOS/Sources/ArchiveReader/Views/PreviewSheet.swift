@@ -82,8 +82,9 @@ struct PreviewSheet: View {
                 .keyboardShortcut(.rightArrow, modifiers: [])
                 .disabled(!model.canGoNext)
                 .help("Next page in the selection (→)")
+            // No ⌘C binding on this button: ⌘C is Edit ▸ Copy, which reaches the sheet's panes through the
+            // responder chain and leaves selectable embedded text its own copy (W48.reader-copy-shortcut).
             Button { model.copyPlainSelection() } label: { Image(systemName: "doc.on.doc") }
-                .keyboardShortcut("c", modifiers: .command)
                 .help("Copy selected text exactly (⌘C)")
             Button { model.copySelection() } label: { Image(systemName: "doc.on.doc.fill") }
                 .keyboardShortcut("c", modifiers: [.command, .option])
