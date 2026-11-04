@@ -36,29 +36,17 @@ Owner export 2026-11-01, baseline 2b1dd66b: 18 comments on 12 core pages were in
 
 Nine marks on seven pages still need the owner's reading/grouping check. The bounded sheet is at `~/.local/state/archive-autonomous/artifacts/marks-feedback-da388b05c388/index.html`; prior labels and bands are locked, uncertainty belongs in notes, and the export is `marks-feedback-answers.json`. Gate `W46.fix-marks-sheet-feedback-owner-ok` keeps the item and dependent experiments waiting for this export and a validated fold. All 12 feedback pages remain excluded; they are never no-mark negatives. Pass 5 also requires current feedback status or its durable pointer to survive `marks_core.py::report` replay; the manually appended status section is currently lost on regeneration, without changing the immutable truth or masks. Recheck envelopes/markers cannot pass plain YOLO export; unresolved mark notes also mask transcription. Synthetic tests and a headless EXIF-JPEG interaction/pixel proof cover the repair; no owner document was interpreted, no model call or corpus write made.
 
-## FIXED (W46.seg-boxes-score checkpoint, 2026-11-01): scorer cap and support safeguards
+## RESOLVED (W46.seg-boxes-score, 2026-11-04): scorer cap and support safeguards; experiment complete
 
-`seg_boxes_score.py::cmd_collect` now permits one worker only, keeping the gateway reservation/check/send
-serial under the collector lock; the recovered three-worker check could race before reservations were
-recorded. Cap, provider and unknown-usage failures stop with an error instead of becoming neutral model
-votes. Only billed, completed but unparseable model replies may vote neutral. SC0122's owner estimator
-refuses an uncovered control stratum rather than shrinking its denominator; training status belongs to
-each route, so Gemini and the teacher are not labelled trained-on. Synthetic cap/failure/weight tests pass.
-The offline comparison is now in `segbench-results/seg-boxes-score-local.md` and the bench panel, explicitly
-partial: all 179 Mac windows valid, Sasha gap accuracy 89.7% against the teacher's 67.4%; pages exact only
-37.4% against 15.5%. The full experiment remains open pending the gateway arm and offsets. The owner's
-2026-11-01 grants authorize the scoped $6.80 gateway run and routine verified main pushes; checkpoints are
-integrated on main. The engine's scoped gateway authorization cleared review on the 2026-11-01 evening
-resume: the two-window pilot returned valid answers, $0.0441 total counted including the old reservation.
-The remaining serial collection is running within the same cap. The collector
-now also refuses a prior reservation overrun on resume, even if that saved answer parsed successfully.
-The full scorer and bench can show the fifth offset range (cost per 1,000 input pages): each standalone
-offset's window charges and retained attempts, with shared experiment spend counted separately. Synthetic
-accounting, resume-refusal, missing-billing and report tests pass. A separate adversarial review found that
-`release_unsent` could approve any new uncertain send on a later invocation; `check_prior_failures` now
-keeps every new reserve/unknown and saved provider/usage failure stopped before credential access or
-another send, without changing any charge or granting retries. The historical explicit unsent approval
-remains recorded. All 41 offline scorer/gateway/kit tests pass. No app behavior changed.
+`seg_boxes_score.py::cmd_collect` is serial under the collector lock (one worker), so the gateway
+reservation/check/send cannot race the cap. Cap, provider and unknown-usage failures stop instead of
+becoming neutral votes; only billed, completed, unparseable replies vote neutral. Every new uncertain
+reservation stops before credential access, and a retry needs an explicit owner-approved
+`retry_unsettled_once` (two interrupted requests were each retried once, on 3 and 4 Nov, their full
+allowances retained). SC0122's owner estimator refuses an uncovered control stratum; training status is
+per route. The full report is `segbench-results/seg-boxes-score.md`: 546 valid gateway calls, $5.9198 counted
+of the $6.80 cap. `seg-boxes-score-local.json` stays as the SHA-pinned owner-estimator source of
+`seg-kit-gate-sherlock.json`; its SC0122 owner block is identical to the full report's. No app behavior changed.
 
 ## FIXED (W46.mac-card-provenance, 2026-11-02): Mac OCR card truth and public coverage
 

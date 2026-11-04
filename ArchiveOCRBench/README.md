@@ -251,15 +251,16 @@ record:
   candidate signal; the shipped hand/form classifier stays preferred.
 - `options.md`: the segmentation approaches on the test boxes (manual, Claude, Gemini, ChatGPT, Claude and
   ChatGPT together), each at the flag level frozen on the development boxes, with their API cost.
-- `seg-boxes-score-local.json` (`seg_boxes_score.py score --local-only`, W46.seg-boxes-score): the shipped
-  8-bit Mac 2B, its bf16 source, the 4B and the 27B teacher on Sasha, Illustrated Review and SC0122. The panel
-  explicitly shows partial status while Gemini and the cloud offsets are pending; it prefers
-  `seg-boxes-score.json` once the full scorer runs. SC0122's draft diagnostics and owner-supported weighted
-  gap estimates stay separate, with common mask/support counts and student training status. These are three
-  different boxes from the 363-page segmentation test chart, so the figures stay in their own panel.
-  Once collected, the full report shows all five offset ranges, including charged dollars per 1,000 input
-  pages. Each standalone offset counts its window attempts and retained allowances; shared windows count
-  in each offset but only once in total experiment spend. The 3.8 cost alongside is a reference list estimate.
+- `seg-boxes-score.json` (`seg_boxes_score.py score`, W46.seg-boxes-score): Gemini 3.7 Flash through the
+  gateway, the shipped 8-bit Mac 2B, its bf16 source, the 4B and the 27B teacher on Sasha, Illustrated Review
+  and SC0122, and the cloud route at three window offsets on Stanton and RG165. SC0122's draft diagnostics and
+  owner-supported weighted gap estimates stay separate, with common mask/support counts and student training
+  status. These are three different boxes from the 363-page segmentation test chart, so the figures stay in
+  their own panel. The offset table gives all five ranges, including charged dollars per 1,000 input pages:
+  each standalone offset counts its window attempts and retained allowances; shared windows count in each
+  offset but only once in total experiment spend. The 3.8 cost alongside is a reference list estimate.
+  `seg-boxes-score-local.json` (`score --local-only`) is kept as the SHA-pinned SC0122 owner-estimator source
+  for `seg-kit-gate-sherlock.json`; the panel reads it only when the full file is absent.
 - `cheap-models.md`: the three cheap segmentation finalists (GLM-5.3 Flash, GPT-5.6 Luna, Qwen3.5 Flash) at the
   98% bar's frozen level, and their cost over five boxes. `build.py` stops if its Gemini row stops matching
   `options.md`, which the report says it reproduces.

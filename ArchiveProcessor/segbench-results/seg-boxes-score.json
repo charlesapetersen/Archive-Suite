@@ -1,0 +1,588 @@
+{
+ "tag": "W46.seg-boxes-score",
+ "observed": [
+  {
+   "route": "gemini",
+   "box": "Sasha",
+   "split": "not fine-tuned",
+   "known gaps": 175,
+   "unsure": 1,
+   "right": 168,
+   "gap accuracy": 0.96,
+   "false splits": 6,
+   "false merges": 1,
+   "pages exact": 0.8218390804597702,
+   "resolved pages": 174,
+   "failed windows": 0
+  },
+  {
+   "route": "mac-2b",
+   "box": "Sasha",
+   "split": "held-out",
+   "known gaps": 175,
+   "unsure": 1,
+   "right": 157,
+   "gap accuracy": 0.8971428571428571,
+   "false splits": 13,
+   "false merges": 5,
+   "pages exact": 0.3735632183908046,
+   "resolved pages": 174,
+   "failed windows": 0
+  },
+  {
+   "route": "teacher",
+   "box": "Sasha",
+   "split": "not fine-tuned",
+   "known gaps": 175,
+   "unsure": 1,
+   "right": 118,
+   "gap accuracy": 0.6742857142857143,
+   "false splits": 57,
+   "false merges": 0,
+   "pages exact": 0.15517241379310345,
+   "resolved pages": 174,
+   "failed windows": 0
+  },
+  {
+   "route": "fs-2b",
+   "box": "Sasha",
+   "split": "held-out",
+   "known gaps": 175,
+   "unsure": 1,
+   "right": 156,
+   "gap accuracy": 0.8914285714285715,
+   "false splits": 14,
+   "false merges": 5,
+   "pages exact": 0.46551724137931033,
+   "resolved pages": 174,
+   "failed windows": 0
+  },
+  {
+   "route": "fs-4b",
+   "box": "Sasha",
+   "split": "held-out",
+   "known gaps": 175,
+   "unsure": 1,
+   "right": 140,
+   "gap accuracy": 0.8,
+   "false splits": 33,
+   "false merges": 2,
+   "pages exact": 0.21839080459770116,
+   "resolved pages": 174,
+   "failed windows": 0
+  },
+  {
+   "route": "gemini",
+   "box": "IllustratedReview",
+   "split": "not fine-tuned",
+   "known gaps": 146,
+   "unsure": 0,
+   "right": 104,
+   "gap accuracy": 0.7123287671232876,
+   "false splits": 2,
+   "false merges": 40,
+   "pages exact": 0.25170068027210885,
+   "resolved pages": 147,
+   "failed windows": 0
+  },
+  {
+   "route": "mac-2b",
+   "box": "IllustratedReview",
+   "split": "trained-on",
+   "known gaps": 146,
+   "unsure": 0,
+   "right": 106,
+   "gap accuracy": 0.726027397260274,
+   "false splits": 9,
+   "false merges": 31,
+   "pages exact": 0.42857142857142855,
+   "resolved pages": 147,
+   "failed windows": 0
+  },
+  {
+   "route": "teacher",
+   "box": "IllustratedReview",
+   "split": "not fine-tuned",
+   "known gaps": 146,
+   "unsure": 0,
+   "right": 114,
+   "gap accuracy": 0.7808219178082192,
+   "false splits": 11,
+   "false merges": 21,
+   "pages exact": 0.5306122448979592,
+   "resolved pages": 147,
+   "failed windows": 0
+  },
+  {
+   "route": "fs-2b",
+   "box": "IllustratedReview",
+   "split": "trained-on",
+   "known gaps": 146,
+   "unsure": 0,
+   "right": 107,
+   "gap accuracy": 0.7328767123287672,
+   "false splits": 9,
+   "false merges": 30,
+   "pages exact": 0.3945578231292517,
+   "resolved pages": 147,
+   "failed windows": 0
+  },
+  {
+   "route": "fs-4b",
+   "box": "IllustratedReview",
+   "split": "trained-on",
+   "known gaps": 146,
+   "unsure": 0,
+   "right": 105,
+   "gap accuracy": 0.7191780821917808,
+   "false splits": 12,
+   "false merges": 29,
+   "pages exact": 0.36054421768707484,
+   "resolved pages": 147,
+   "failed windows": 0
+  },
+  {
+   "route": "gemini",
+   "box": "SC0122",
+   "split": "not fine-tuned",
+   "known gaps": 188,
+   "unsure": 5,
+   "right": 186,
+   "gap accuracy": 0.9893617021276596,
+   "false splits": 1,
+   "false merges": 1,
+   "pages exact": 0.9553072625698324,
+   "resolved pages": 179,
+   "failed windows": 0
+  },
+  {
+   "route": "mac-2b",
+   "box": "SC0122",
+   "split": "trained-on",
+   "known gaps": 188,
+   "unsure": 5,
+   "right": 185,
+   "gap accuracy": 0.9840425531914894,
+   "false splits": 2,
+   "false merges": 1,
+   "pages exact": 0.9664804469273743,
+   "resolved pages": 179,
+   "failed windows": 0
+  },
+  {
+   "route": "teacher",
+   "box": "SC0122",
+   "split": "not fine-tuned",
+   "known gaps": 188,
+   "unsure": 5,
+   "right": 187,
+   "gap accuracy": 0.9946808510638298,
+   "false splits": 1,
+   "false merges": 0,
+   "pages exact": 0.9217877094972067,
+   "resolved pages": 179,
+   "failed windows": 0
+  },
+  {
+   "route": "fs-2b",
+   "box": "SC0122",
+   "split": "trained-on",
+   "known gaps": 188,
+   "unsure": 5,
+   "right": 186,
+   "gap accuracy": 0.9893617021276596,
+   "false splits": 1,
+   "false merges": 1,
+   "pages exact": 0.9776536312849162,
+   "resolved pages": 179,
+   "failed windows": 0
+  },
+  {
+   "route": "fs-4b",
+   "box": "SC0122",
+   "split": "trained-on",
+   "known gaps": 188,
+   "unsure": 5,
+   "right": 187,
+   "gap accuracy": 0.9946808510638298,
+   "false splits": 1,
+   "false merges": 0,
+   "pages exact": 0.9217877094972067,
+   "resolved pages": 179,
+   "failed windows": 0
+  }
+ ],
+ "paired": [
+  {
+   "pair": "mac-2b vs gemini",
+   "scope": "Sasha",
+   "gaps": 175,
+   "only first right": 4,
+   "only second right": 15,
+   "difference points": -6.285714285714286,
+   "sign test p": 0.0192108154296875
+  },
+  {
+   "pair": "mac-2b vs fs-2b",
+   "scope": "Sasha",
+   "gaps": 175,
+   "only first right": 2,
+   "only second right": 1,
+   "difference points": 0.5714285714285714,
+   "sign test p": 1.0
+  },
+  {
+   "pair": "gemini vs teacher",
+   "scope": "Sasha",
+   "gaps": 175,
+   "only first right": 51,
+   "only second right": 1,
+   "difference points": 28.571428571428573,
+   "sign test p": 2.353672812205332e-14
+  },
+  {
+   "pair": "mac-2b vs teacher",
+   "scope": "Sasha",
+   "gaps": 175,
+   "only first right": 44,
+   "only second right": 5,
+   "difference points": 22.285714285714285,
+   "sign test p": 7.59715845788378e-09
+  },
+  {
+   "pair": "mac-2b vs gemini",
+   "scope": "IllustratedReview",
+   "gaps": 146,
+   "only first right": 14,
+   "only second right": 12,
+   "difference points": 1.36986301369863,
+   "sign test p": 0.8450189828872681
+  },
+  {
+   "pair": "mac-2b vs fs-2b",
+   "scope": "IllustratedReview",
+   "gaps": 146,
+   "only first right": 3,
+   "only second right": 4,
+   "difference points": -0.684931506849315,
+   "sign test p": 1.0
+  },
+  {
+   "pair": "gemini vs teacher",
+   "scope": "IllustratedReview",
+   "gaps": 146,
+   "only first right": 11,
+   "only second right": 21,
+   "difference points": -6.8493150684931505,
+   "sign test p": 0.11018416518345475
+  },
+  {
+   "pair": "mac-2b vs teacher",
+   "scope": "IllustratedReview",
+   "gaps": 146,
+   "only first right": 7,
+   "only second right": 15,
+   "difference points": -5.47945205479452,
+   "sign test p": 0.13380050659179688
+  },
+  {
+   "pair": "mac-2b vs gemini",
+   "scope": "SC0122",
+   "gaps": 188,
+   "only first right": 2,
+   "only second right": 3,
+   "difference points": -0.5319148936170213,
+   "sign test p": 1.0
+  },
+  {
+   "pair": "mac-2b vs fs-2b",
+   "scope": "SC0122",
+   "gaps": 188,
+   "only first right": 0,
+   "only second right": 1,
+   "difference points": -0.5319148936170213,
+   "sign test p": 1.0
+  },
+  {
+   "pair": "gemini vs teacher",
+   "scope": "SC0122",
+   "gaps": 188,
+   "only first right": 1,
+   "only second right": 2,
+   "difference points": -0.5319148936170213,
+   "sign test p": 1.0
+  },
+  {
+   "pair": "mac-2b vs teacher",
+   "scope": "SC0122",
+   "gaps": 188,
+   "only first right": 1,
+   "only second right": 3,
+   "difference points": -1.0638297872340425,
+   "sign test p": 0.625
+  }
+ ],
+ "sc0122_owner": {
+  "asked_known": 30,
+  "controls": 60,
+  "agreed_doc_gaps": 158,
+  "strata": {
+   "cont, 0.02 <= P(new) < 0.5": [
+    60,
+    24
+   ],
+   "new, 0.5 <= P(new) < 0.99": [
+    12,
+    12
+   ],
+   "cont, P(new) < 0.02": [
+    35,
+    12
+   ],
+   "new, P(new) >= 0.99": [
+    51,
+    12
+   ]
+  },
+  "uncovered_strata": [],
+  "models": {
+   "gemini": {
+    "asked_right": 29,
+    "controls_right": 60,
+    "agreed_weighted_accuracy": 1.0,
+    "owner_weighted_accuracy": 0.9946808510638298
+   },
+   "mac-2b": {
+    "asked_right": 29,
+    "controls_right": 59,
+    "agreed_weighted_accuracy": 0.9841772151898734,
+    "owner_weighted_accuracy": 0.9813829787234043
+   },
+   "teacher": {
+    "asked_right": 29,
+    "controls_right": 60,
+    "agreed_weighted_accuracy": 1.0,
+    "owner_weighted_accuracy": 0.9946808510638298
+   },
+   "fs-2b": {
+    "asked_right": 29,
+    "controls_right": 59,
+    "agreed_weighted_accuracy": 0.9841772151898734,
+    "owner_weighted_accuracy": 0.9813829787234043
+   },
+   "fs-4b": {
+    "asked_right": 29,
+    "controls_right": 60,
+    "agreed_weighted_accuracy": 1.0,
+    "owner_weighted_accuracy": 0.9946808510638298
+   }
+  }
+ },
+ "offsets": {
+  "rule": "min",
+  "level": 0.965,
+  "rows": {
+   "o0": {
+    "figures": {
+     "pages": 363,
+     "gaps": 315,
+     "flagged": 94,
+     "pages_exact_no_review": 0.8515151515151516,
+     "flagged_per_100_pages": 25.895316804407713,
+     "pages_exact_after_review": 0.9848484848484849,
+     "unflagged_errors": 2,
+     "unflagged_errors_per_500_pages": 2.7548209366391183,
+     "usd_per_1000_pages": 3.5857727272727273
+    },
+    "by_box": {
+     "Stanton": {
+      "pages": 250,
+      "gaps": 238,
+      "flagged": 85,
+      "pages_exact_no_review": 0.8436213991769548,
+      "flagged_per_100_pages": 34.0,
+      "pages_exact_after_review": 0.9794238683127572,
+      "unflagged_errors": 2,
+      "unflagged_errors_per_500_pages": 4.0
+     },
+     "RG165": {
+      "pages": 113,
+      "gaps": 77,
+      "flagged": 9,
+      "pages_exact_no_review": 0.8735632183908046,
+      "flagged_per_100_pages": 7.964601769911504,
+      "pages_exact_after_review": 1.0,
+      "unflagged_errors": 0,
+      "unflagged_errors_per_500_pages": 0.0
+     }
+    },
+    "cost_by_box": {
+     "Stanton": {
+      "windows": 84,
+      "attempts": 84,
+      "charged_usd": 0.9031455,
+      "usd_per_1000_pages": 3.612582
+     },
+     "RG165": {
+      "windows": 39,
+      "attempts": 39,
+      "charged_usd": 0.39849,
+      "usd_per_1000_pages": 3.5264601769911503
+     }
+    },
+    "failed_windows": 0
+   },
+   "o1": {
+    "figures": {
+     "pages": 363,
+     "gaps": 315,
+     "flagged": 96,
+     "pages_exact_no_review": 0.8303030303030303,
+     "flagged_per_100_pages": 26.446280991735538,
+     "pages_exact_after_review": 0.9848484848484849,
+     "unflagged_errors": 2,
+     "unflagged_errors_per_500_pages": 2.7548209366391183,
+     "usd_per_1000_pages": 3.820853305785124
+    },
+    "by_box": {
+     "Stanton": {
+      "pages": 250,
+      "gaps": 238,
+      "flagged": 86,
+      "pages_exact_no_review": 0.8148148148148148,
+      "flagged_per_100_pages": 34.4,
+      "pages_exact_after_review": 0.9794238683127572,
+      "unflagged_errors": 2,
+      "unflagged_errors_per_500_pages": 4.0
+     },
+     "RG165": {
+      "pages": 113,
+      "gaps": 77,
+      "flagged": 10,
+      "pages_exact_no_review": 0.8735632183908046,
+      "flagged_per_100_pages": 8.849557522123893,
+      "pages_exact_after_review": 1.0,
+      "unflagged_errors": 0,
+      "unflagged_errors_per_500_pages": 0.0
+     }
+    },
+    "cost_by_box": {
+     "Stanton": {
+      "windows": 84,
+      "attempts": 86,
+      "charged_usd": 0.990351,
+      "usd_per_1000_pages": 3.961404
+     },
+     "RG165": {
+      "windows": 38,
+      "attempts": 38,
+      "charged_usd": 0.39661875,
+      "usd_per_1000_pages": 3.5099004424778766
+     }
+    },
+    "failed_windows": 0
+   },
+   "o2": {
+    "figures": {
+     "pages": 363,
+     "gaps": 315,
+     "flagged": 99,
+     "pages_exact_no_review": 0.8424242424242424,
+     "flagged_per_100_pages": 27.272727272727273,
+     "pages_exact_after_review": 0.9848484848484849,
+     "unflagged_errors": 2,
+     "unflagged_errors_per_500_pages": 2.7548209366391183,
+     "usd_per_1000_pages": 3.56175
+    },
+    "by_box": {
+     "Stanton": {
+      "pages": 250,
+      "gaps": 238,
+      "flagged": 91,
+      "pages_exact_no_review": 0.831275720164609,
+      "flagged_per_100_pages": 36.4,
+      "pages_exact_after_review": 0.9794238683127572,
+      "unflagged_errors": 2,
+      "unflagged_errors_per_500_pages": 4.0
+     },
+     "RG165": {
+      "pages": 113,
+      "gaps": 77,
+      "flagged": 8,
+      "pages_exact_no_review": 0.8735632183908046,
+      "flagged_per_100_pages": 7.079646017699115,
+      "pages_exact_after_review": 1.0,
+      "unflagged_errors": 0,
+      "unflagged_errors_per_500_pages": 0.0
+     }
+    },
+    "cost_by_box": {
+     "Stanton": {
+      "windows": 84,
+      "attempts": 84,
+      "charged_usd": 0.898914,
+      "usd_per_1000_pages": 3.595656
+     },
+     "RG165": {
+      "windows": 38,
+      "attempts": 38,
+      "charged_usd": 0.39400125,
+      "usd_per_1000_pages": 3.486736725663717
+     }
+    },
+    "failed_windows": 0
+   }
+  },
+  "gemini38_o0": {
+   "pages": 363,
+   "gaps": 315,
+   "flagged": 88,
+   "pages_exact_no_review": 0.8727272727272727,
+   "flagged_per_100_pages": 24.242424242424242,
+   "pages_exact_after_review": 0.9848484848484849,
+   "unflagged_errors": 2,
+   "unflagged_errors_per_500_pages": 2.7548209366391183,
+   "usd_per_1000_pages": 3.6108848468271337
+  },
+  "gemini38_o0_by_box": {
+   "Stanton": {
+    "pages": 250,
+    "gaps": 238,
+    "flagged": 77,
+    "pages_exact_no_review": 0.8724279835390947,
+    "flagged_per_100_pages": 30.8,
+    "pages_exact_after_review": 0.9794238683127572,
+    "unflagged_errors": 2,
+    "unflagged_errors_per_500_pages": 4.0
+   },
+   "RG165": {
+    "pages": 113,
+    "gaps": 77,
+    "flagged": 11,
+    "pages_exact_no_review": 0.8735632183908046,
+    "flagged_per_100_pages": 9.734513274336283,
+    "pages_exact_after_review": 1.0,
+    "unflagged_errors": 0,
+    "unflagged_errors_per_500_pages": 0.0
+   }
+  }
+ },
+ "gateway": {
+  "calls": 546,
+  "spent": 5.91978825,
+  "billed": {
+   "calls": 546,
+   "estimate": 5.800076,
+   "gateway_calls": 546,
+   "gateway": 5.800076,
+   "gateway_over_estimate": 1.0,
+   "charged": 5.800076
+  },
+  "input_tokens": 6631030,
+  "output_tokens": 220481,
+  "invalid": 0,
+  "mean_seconds": 16.028489010989013
+ },
+ "status": "complete",
+ "note": "On held-out Sasha the shipped Mac 2B scores 89.7% on 175 known gaps (pages exact 37.4%), against the teacher's 67.4% and its bf16 source's 89.1%. The source's pages exact is 46.6%: similar gap accuracy can leave different long documents wrong, and these single runs do not rank quantizations. The Illustrated Review and SC0122 are trained-on diagnostics for the students, not evidence of generalization. SC0122's supported comparison is its owner-ruled disagreement gaps plus controls weighted to the agreed strata; document-exact scores there remain conditional on tag/teacher-drafted truth. Gemini 3.7 Flash scores 96.0% on held-out Sasha (pages exact 82.2%); paired against the Mac 2B it is 6.3 points ahead on gap accuracy (sign test p 0.019), and far ahead on whole documents. On the Illustrated Review it merges 40 article gaps, because g1 still asks for the full magazine issue (W46.seg-magazine-rule-redo), so its pages exact there is no test of reading ability. Across three cloud offsets, no-check exact pages range 83.0%\u201385.2% and checks per 100 pages 25.9\u201327.3; the 3.8-fitted flag level is unchanged."
+}

@@ -441,11 +441,26 @@ def reading(out):
             "there remain conditional on tag/teacher-drafted truth. ")
     if out["offsets"] is None:
         return text + "Partial report: Gemini and all three cloud window offsets remain unmeasured; no cloud-versus-Mac recommendation follows."
+    gem, gir = obs[("gemini", "Sasha")], obs[("gemini", "IllustratedReview")]
+    pair = next(r for r in out["paired"] if r["pair"] == "mac-2b vs gemini" and r["scope"] == "Sasha")
+    text += (f"Gemini 3.7 Flash scores {_p(gem['gap accuracy'])} on held-out Sasha (pages exact {_p(gem['pages exact'])}); "
+             f"paired against the Mac 2B it is {-pair['difference points']:.1f} points ahead on gap accuracy "
+             f"(sign test p {pair['sign test p']:.2g}), and far ahead on whole documents. On the Illustrated Review it "
+             f"merges {gir['false merges']} article gaps, because g1 still asks for the full magazine issue "
+             "(W46.seg-magazine-rule-redo), so its pages exact there is no test of reading ability. ")
     figures = [r["figures"] for r in out["offsets"]["rows"].values()]
     exact = [r["pages_exact_no_review"] for r in figures]
     flags = [r["flagged_per_100_pages"] for r in figures]
     return text + (f"Across three cloud offsets, no-check exact pages range {_p(min(exact))}–{_p(max(exact))} "
                    f"and checks per 100 pages {min(flags):.1f}–{max(flags):.1f}; the 3.8-fitted flag level is unchanged.")
+
+
+def offset_spread(out):
+    """Points of no-check exact pages between the best and worst cloud offset, or None offline."""
+    if out["offsets"] is None:
+        return None
+    exact = [r["figures"]["pages_exact_no_review"] for r in out["offsets"]["rows"].values()]
+    return 100 * (max(exact) - min(exact))
 
 
 def render(out) -> str:
@@ -565,7 +580,10 @@ def render(out) -> str:
                    "documents. The Mac 2B and the Sherlock models see 1,024 px images and prompt l1; Gemini sees "
                    "1,600 px and g1, as each is run in the bench and the app. Both OCR sets do not apply: this is "
                    "segmentation.",
-        noise="Single runs at temperature 0. The cloud offset spread is unavailable in an offline-only report; "
+        noise="Single runs at temperature 0. " +
+              ("The cloud offset spread is unavailable in an offline-only report; "
+               if offset_spread(out) is None else
+               f"The cloud route's window offsets move no-check exact pages by {offset_spread(out):.1f} points; ") +
               "a difference between routes smaller than the offset spread, or than 1.4-3.2 points a box, is a tie. "
               "Sign tests are sampling only.",
         scope=("Only the three owner boxes scored; the two test boxes' cloud offsets remain pending. "
