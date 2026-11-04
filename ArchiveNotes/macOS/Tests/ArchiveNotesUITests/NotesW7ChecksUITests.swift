@@ -43,6 +43,10 @@ final class NotesW7ChecksUITests: NotesFixtureUITestCase {
             let assetURL = URL(fileURLWithPath: itemsDir + "/" + id + "/assets/" + name)
             XCTAssertEqual(try Data(contentsOf: assetURL), png, "the stored asset should be the pasted bytes")
             XCTAssertEqual(attachmentCount(editorText(in: mainWindow)), 1, "the pasted image should be in the editor")
+            // An attachment could also be the Missing placeholder (a write still in flight, or a reference the
+            // read seam could not resolve); the probe says whether the editor drew the asset's own bytes.
+            XCTAssertTrue(pollUntil(timeout: 10) { self.showsLoadedImage(named: name) },
+                          "the just-pasted image should draw its own bytes once written — \(inlineImages())")
             RunLoop.current.run(until: Date().addingTimeInterval(2))   // past the autosave debounce
             let savedMarkdown = try XCTUnwrap(rawMarkdown(inItemDir: id))
 
@@ -55,6 +59,8 @@ final class NotesW7ChecksUITests: NotesFixtureUITestCase {
                 self.editorText(in: self.mainWindow).contains("A plain note")
                     && self.attachmentCount(self.editorText(in: self.mainWindow)) == 1
             }, "returning to the note should show the image again — editor: \(editorText(in: mainWindow).debugDescription)")
+            XCTAssertTrue(pollUntil(timeout: 10) { self.showsLoadedImage(named: name) },
+                          "returning to the note should draw the pasted bytes, not a placeholder — \(inlineImages())")
             shot("W7-S1a image after reselect")
 
             // Relaunch: the same file, the same bytes, the image shown.
@@ -64,6 +70,8 @@ final class NotesW7ChecksUITests: NotesFixtureUITestCase {
                 self.editorText(in: self.mainWindow).contains("A plain note")
                     && self.attachmentCount(self.editorText(in: self.mainWindow)) == 1
             }, "after relaunch the note should show the image — editor: \(editorText(in: mainWindow).debugDescription)")
+            XCTAssertTrue(pollUntil(timeout: 10) { self.showsLoadedImage(named: name) },
+                          "after relaunch the note should draw the pasted bytes, not a placeholder — \(inlineImages())")
             XCTAssertEqual(try Data(contentsOf: assetURL), png, "the asset should be unchanged after relaunch")
             RunLoop.current.run(until: Date().addingTimeInterval(2))
             XCTAssertEqual(rawMarkdown(inItemDir: id), savedMarkdown, "opening the note after relaunch must not rewrite it")
@@ -85,16 +93,17 @@ final class NotesW7ChecksUITests: NotesFixtureUITestCase {
             ensureStyled()
             XCTAssertTrue(setEditorSelection(location: 0, length: 0), "the selection seam must place the caret")
             app.typeText(marker)
-            XCTAssertTrue(pollUntil(timeout: 5) { self.editorText(in: self.mainWindow).contains(marker) },
-                          "the typed text should reach the editor — focus: \(keyboardFocusDescription())")
-
-            selectItem(uuid: Self.idZotero)   // straight away, inside the 600 ms autosave delay
+            // Switch at once. Whether the idle autosave (600 ms after the last keystroke) had already written
+            // the file is recorded in the log, not assumed: when it had not, the switch itself saved the edit.
+            let savedBeforeSwitch = (noteBody(uuid: Self.idPlain) ?? "").contains(marker)
+            selectItem(uuid: Self.idZotero)
+            XCTContext.runActivity(named: "W7-S1a switch: A's file already held the edit before the switch = \(savedBeforeSwitch)") { _ in }
             XCTAssertTrue(pollUntil(timeout: 10) {
                 self.editorText(in: self.mainWindow).contains("Notes on the Lovelace")
             }, "the other note should load")
             XCTAssertFalse(editorText(in: mainWindow).contains(marker), "the other note must not show A's edit")
             XCTAssertTrue(pollUntil(timeout: 10) { (self.noteBody(uuid: Self.idPlain) ?? "").contains(marker) },
-                          "A's edit should be in A's file after the switch")
+                          "A's edit should be in A's file after the switch — focus now: \(keyboardFocusDescription())")
             RunLoop.current.run(until: Date().addingTimeInterval(2))   // past any late autosave
             XCTAssertEqual(noteBody(uuid: Self.idZotero), zoteroBefore, "the other note's file must be unchanged")
             XCTAssertEqual(occurrences(of: marker, in: noteBody(uuid: Self.idPlain) ?? ""), 1,
@@ -131,6 +140,8 @@ final class NotesW7ChecksUITests: NotesFixtureUITestCase {
             }, "the note should now hold two source blocks")
             XCTAssertTrue(pollUntil(timeout: 10) { self.attachmentCount(self.editorText(in: self.mainWindow)) >= 2 },
                           "the editor should show both block chips")
+            RunLoop.current.run(until: Date().addingTimeInterval(2))   // past the autosave of the paste
+            let sourceBefore = try XCTUnwrap(rawMarkdown(inItemDir: id))
 
             let before = itemDirs()
             XCTAssertTrue(setEditorSelection(location: 0, length: 100_000), "the selection seam must select both blocks")
@@ -139,7 +150,7 @@ final class NotesW7ChecksUITests: NotesFixtureUITestCase {
             @MainActor func newExtracts() -> [String] {
                 itemDirs().subtracting(before).filter { (rawMarkdown(inItemDir: $0) ?? "").contains("kind: extract") }
             }
-            if !pollUntil(timeout: 8, { !newExtracts().isEmpty }) {
+            if !pollUntil(timeout: 12, { !newExtracts().isEmpty }) {
                 clickMenu("Extract", "Create Extract")
                 _ = pollUntil(timeout: 10) { !newExtracts().isEmpty }
             }
@@ -151,6 +162,11 @@ final class NotesW7ChecksUITests: NotesFixtureUITestCase {
             XCTAssertTrue(md.contains("archivenotes://open?id=\(id)#block-0"), "the first block should cite block 0:\n\(md)")
             XCTAssertTrue(md.contains("archivenotes://open?id=\(id)#block-1"), "the second block should cite block 1:\n\(md)")
             XCTAssertTrue(md.contains("Notes on the Lovelace paper."), "the Zotero block's text should be in the extract")
+            let first = try XCTUnwrap(md.range(of: "archivenotes://open?id=\(id)#block-0")).lowerBound
+            let second = try XCTUnwrap(md.range(of: "archivenotes://open?id=\(id)#block-1")).lowerBound
+            XCTAssertLessThan(first, second, "the extract's blocks should keep the source's order:\n\(md)")
+            RunLoop.current.run(until: Date().addingTimeInterval(2))   // past any save the command could trigger
+            XCTAssertEqual(rawMarkdown(inItemDir: id), sourceBefore, "Create Extract must leave the source note as it was")
             closeWindow(app.windows["Extracts"])
         }
     }
@@ -206,6 +222,7 @@ final class NotesW7ChecksUITests: NotesFixtureUITestCase {
             selectItem(uuid: Self.idPlain)
             XCTAssertTrue(pollUntil(timeout: 10) { self.editorText(in: self.mainWindow).contains("A plain note") },
                           "the plain note should load")
+            let plainBefore = try XCTUnwrap(rawMarkdown(inItemDir: Self.idPlain))
             XCTAssertTrue(setEditorSelection(location: 0, length: 8), "the selection seam must select text")
             clickMenu("Extract", "Append to Extract\u{2026}")
 
@@ -228,6 +245,7 @@ final class NotesW7ChecksUITests: NotesFixtureUITestCase {
 
             XCTAssertTrue(pollUntil(timeout: 12) { (sources.value as? String) == "2" },
                           "the Sources column should count both distinct sources — shows \(sources.value ?? "nil")")
+            XCTAssertEqual(rawMarkdown(inItemDir: Self.idPlain), plainBefore, "Append must leave the source note as it was")
             shot("W7-S4 sources column after append")
             closeWindow(extractWin)
         }
@@ -311,27 +329,38 @@ final class NotesW7ChecksUITests: NotesFixtureUITestCase {
             XCTAssertFalse((statusText(in: mainWindow) ?? "").contains("has changed"),
                            "an exact jump should not say the source changed — status: \(statusText(in: mainWindow) ?? "none")")
 
-            // The source has one block, so #block-7 is out of range. Edit the scratch file with the app closed.
+            // The source has one block, so #block-7 is out of range. Edit the scratch files with the app closed:
+            // the extract cites #block-7, and the source gets 200 paragraphs so that a scroll position exists.
             app.terminate()
-            XCTAssertTrue(app.wait(for: .notRunning, timeout: 15), "the app should quit before the file is edited")
+            XCTAssertTrue(app.wait(for: .notRunning, timeout: 15), "the app should quit before the files are edited")
             let dir = itemsDir + "/" + Self.idExtract
             let md = try XCTUnwrap(mdFiles(inItemDir: Self.idExtract).first)
             let url = URL(fileURLWithPath: dir + "/" + md)
             let original = try String(contentsOf: url, encoding: .utf8)
             XCTAssertTrue(original.contains("#block-0"), "the fixture extract should cite block 0")
             try original.replacingOccurrences(of: "#block-0", with: "#block-7").write(to: url, atomically: true, encoding: .utf8)
+            let sourceURL = URL(fileURLWithPath: itemsDir + "/" + Self.idReader + "/"
+                                + (try XCTUnwrap(mdFiles(inItemDir: Self.idReader).first)))
+            let filler = (1...200).map { "Filler paragraph \($0) of the source note." }.joined(separator: "\n\n")
+            try (try String(contentsOf: sourceURL, encoding: .utf8) + "\n" + filler + "\n")
+                .write(to: sourceURL, atomically: true, encoding: .utf8)
             relaunchWithOneWindow()
 
             try jumpFromTheFixtureExtract()
             XCTAssertTrue(pollUntil(timeout: 10) {
                 (self.statusText(in: self.mainWindow) ?? "").contains("The source note has changed since this extract was made.")
             }, "a stale ordinal should say the source changed — status: \(statusText(in: mainWindow) ?? "none")")
+            RunLoop.current.run(until: Date().addingTimeInterval(1))
+            let scroll = editorScroll(in: mainWindow)
+            XCTAssertLessThanOrEqual(scroll ?? 0, 0.05,
+                                     "a stale ordinal should leave the source at its top — scroll position \(String(describing: scroll))")
             shot("W7-S3 stale ordinal")
         }
     }
 
-    /// A jump from the Extracts window to a block far down its source scrolls the Note window to it. The
-    /// source gets a long body and a second source block at the end, and the extract cites that block.
+    /// A jump from the Extracts window to a block half-way down its source scrolls the Note window to it, not to
+    /// the top and not to the end. The source gets 100 paragraphs, a second source block, and 100 more, and the
+    /// extract cites that block.
     func testS3_JumpFromTheExtractsWindowScrollsToALowerBlock() throws {
         try withFixture {
             try requireCanonicalScratchFixtureForStoreWrites()
@@ -341,7 +370,8 @@ final class NotesW7ChecksUITests: NotesFixtureUITestCase {
             XCTAssertTrue(app.wait(for: .notRunning, timeout: 15), "the app should quit before the files are edited")
             let sourceURL = URL(fileURLWithPath: itemsDir + "/" + Self.idReader + "/"
                                 + (try XCTUnwrap(mdFiles(inItemDir: Self.idReader).first)))
-            let filler = (1...200).map { "Filler paragraph \($0) of the source note." }.joined(separator: "\n\n")
+            let fillerAbove = (1...100).map { "Filler paragraph \($0) of the source note." }.joined(separator: "\n\n")
+            let fillerBelow = (101...200).map { "Filler paragraph \($0) of the source note." }.joined(separator: "\n\n")
             let lowerBlock = """
                 <!-- block: reader-page
                      link: archivereader://reveal?root=\(Self.corpusRootGUID)&rel=sample.pdf&jpeg=&page=2
@@ -351,7 +381,8 @@ final class NotesW7ChecksUITests: NotesFixtureUITestCase {
                 The lower block's own text.
                 """
             let source = try String(contentsOf: sourceURL, encoding: .utf8)
-            try (source + "\n" + filler + "\n\n" + lowerBlock + "\n").write(to: sourceURL, atomically: true, encoding: .utf8)
+            try (source + "\n" + fillerAbove + "\n\n" + lowerBlock + "\n\n" + fillerBelow + "\n")
+                .write(to: sourceURL, atomically: true, encoding: .utf8)
             let extractURL = URL(fileURLWithPath: itemsDir + "/" + Self.idExtract + "/"
                                  + (try XCTUnwrap(mdFiles(inItemDir: Self.idExtract).first)))
             let extract = try String(contentsOf: extractURL, encoding: .utf8)
@@ -375,11 +406,24 @@ final class NotesW7ChecksUITests: NotesFixtureUITestCase {
             var scroll: Double?
             XCTAssertTrue(pollUntil(timeout: 10) {
                 scroll = self.editorScroll(in: self.mainWindow)
-                return (scroll ?? 0) > 0.8
-            }, "the Note window should scroll down to the cited block — scroll position \(String(describing: scroll))")
+                return (0.3...0.7).contains(scroll ?? -1)
+            }, "the Note window should scroll to the cited block half-way down, not to the top or the end — scroll position \(String(describing: scroll))")
+            // The scroll position alone cannot tell the block from the paragraphs beside it: its header must be
+            // on screen. Polled, so a scroll that lands late is not counted as a miss.
+            var shown = (false, "")
+            let headerShown = pollUntil(timeout: 5) {
+                shown = self.showsBlockHeader(1, in: self.mainWindow)
+                return shown.0
+            }
+            XCTContext.runActivity(named: "W7-S3 scroll: cited header visible = \(headerShown) — \(shown.1)") { _ in }
+            shot("W7-S3 jump scrolled to block 1")
+            // Known defect, W40.fix-notes-jump-scroll-short: the jump lands short of the block (the header just
+            // above the view, or the view several paragraphs above it). Remove this wrapper with the fix.
+            XCTExpectFailure("W40.fix-notes-jump-scroll-short", options: .nonStrict()) {
+                XCTAssertTrue(headerShown, "the cited block's header should be visible in the Note window after the jump — \(shown.1)")
+            }
             XCTAssertFalse((statusText(in: mainWindow) ?? "").contains("has changed"),
                            "block 1 exists, so the jump is exact — status: \(statusText(in: mainWindow) ?? "none")")
-            shot("W7-S3 jump scrolled to block 1")
             closeWindow(extractWin)
         }
     }
@@ -423,10 +467,25 @@ final class NotesW7ChecksUITests: NotesFixtureUITestCase {
             XCTAssertTrue(pollUntil(timeout: 15) {
                 (notes + [Self.idExtract]).allSatisfy { listed($0, in: self.mainWindow) }
             }, "Both should list the notes and the extract together")
+            RunLoop.current.run(until: Date().addingTimeInterval(2))   // a late propagation would show by now
             XCTAssertFalse(notes.contains { listed($0, in: extractWin) },
                            "the Note window's choice must not change the Extracts window's list")
             shot("W7-S4 both kinds")
             closeWindow(extractWin)
+
+            // The choice is remembered per window: relaunched without the harness's kind pins, the Note window
+            // comes back on Both and the Extracts window on its untouched default.
+            relaunchWithOneWindow(keepingKindPins: false)
+            XCTAssertTrue(pollUntil(timeout: 15) {
+                (notes + [Self.idExtract]).allSatisfy { listed($0, in: self.mainWindow) }
+            }, "the Note window should remember Both across a relaunch")
+            let extractWinAgain = try openExtractsWindow()
+            XCTAssertTrue(pollUntil(timeout: 15) { listed(Self.idExtract, in: extractWinAgain) },
+                          "the Extracts window should still list the extract")
+            XCTAssertFalse(notes.contains { listed($0, in: extractWinAgain) },
+                           "the Extracts window should keep its own remembered kind")
+            shot("W7-S4 both remembered after relaunch")
+            closeWindow(extractWinAgain)
         }
     }
 
@@ -445,6 +504,37 @@ final class NotesW7ChecksUITests: NotesFixtureUITestCase {
         guard bar.exists else { return nil }
         if let n = bar.value as? NSNumber { return n.doubleValue }
         return (bar.value as? String).flatMap(Double.init)
+    }
+
+    /// The `inlineImages` entry of the chip-geometry probe (`EditorTextView.uiTestInlineImages`), as
+    /// `NotesE2PasteTests` reads it: one entry per inline image, with its `ref` and whether a placeholder is shown.
+    private func inlineImages() -> [[String: Any]] {
+        chipProbe(in: mainWindow).compactMap { $0["inlineImages"] as? [[String: Any]] }.first ?? []
+    }
+
+    private func chipProbe(in win: XCUIElement) -> [[String: Any]] {
+        let probe = win.descendants(matching: .any)["an.editor.test.chipGeometry"]
+        guard probe.exists, let raw = probe.value as? String, let data = raw.data(using: .utf8),
+              let entries = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] else { return [] }
+        return entries
+    }
+
+    /// Whether the editor shows the header of its `index`-th source block (0-based, in text order): the header's
+    /// laid-out y, from the probe's header slots, lies inside the editor's visible rect. Also returns the figures.
+    private func showsBlockHeader(_ index: Int, in win: XCUIElement) -> (Bool, String) {
+        let entries = chipProbe(in: win)
+        let slots = entries.filter { $0["loc"] != nil && $0["sourceID"] != nil }
+            .sorted { ($0["loc"] as? Int ?? 0) < ($1["loc"] as? Int ?? 0) }
+        let rect = entries.first { $0["editorVisibleY"] != nil }
+        guard index < slots.count, let y = slots[index]["slotY"] as? Double,
+              let top = rect?["editorVisibleY"] as? Double, let height = rect?["editorVisibleH"] as? Double
+        else { return (false, "slots \(slots), visible rect \(String(describing: rect))") }
+        return (y >= top && y < top + height, "header y \(y), visible \(top)…\(top + height)")
+    }
+
+    /// The editor draws `assets/<name>` from its own bytes: present, and not the Missing or Blocked placeholder.
+    private func showsLoadedImage(named name: String) -> Bool {
+        inlineImages().contains { ($0["ref"] as? String) == "assets/\(name)" && ($0["placeholder"] as? Bool) == false }
     }
 
     private func statusText(in win: XCUIElement) -> String? {
@@ -506,9 +596,18 @@ final class NotesW7ChecksUITests: NotesFixtureUITestCase {
     }
 
     /// Quit and relaunch with the same arguments (the fixture is NOT restored), then close the Extracts window
-    /// if the relaunch reopened it, as `setUp` does, so the Note window's controls are not covered.
-    private func relaunchWithOneWindow() {
+    /// if the relaunch reopened it, as `setUp` does, so the Note window's controls are not covered. With
+    /// `keepingKindPins: false` the harness's per-window kind-filter pins are dropped, so the app reads the
+    /// choices it remembered in its own defaults.
+    private func relaunchWithOneWindow(keepingKindPins: Bool = true) {
         if app.state != .notRunning { app.terminate() }
+        if !keepingKindPins {
+            for key in ["-an.noteWindow.kindFilter", "-an.extractWindow.kindFilter"] {
+                if let i = app.launchArguments.firstIndex(of: key) {
+                    app.launchArguments.removeSubrange(i...min(i + 1, app.launchArguments.count - 1))
+                }
+            }
+        }
         app.launch()
         app.activate()
         XCTAssertTrue(mainWindow.waitForExistence(timeout: 15), "the window should come back after relaunch")

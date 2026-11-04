@@ -13,7 +13,7 @@ Format and statuses: [`README.md`](README.md). Written by `W40.b2`, 2026-10-12.
   `W23.m9`/`-fu3`, `W23.m14`/`-fu`, `W37.dual-date`, `W24.cal1`, `W24.cal1-toggle`, `W24.cal1-validator`,
   and the W0–W8 records under §*Archive Notes — NEW APP*.
 - **Sources and code read at:** `9e8959ef`.
-- **Count:** `unproven 45 · works 5 · broken 0 · unreachable 0 · fixed-pending-recheck 2` (works: N-34, N-45, N-49, N-50, N-51; fixed-pending-recheck: N-12, N-44). Updated by `W40.fix-notes-zotero-csljson-crash`, 2026-10-31 (N-44 to `fixed-pending-recheck`).
+- **Count:** `unproven 42 · works 7 · broken 1 · unreachable 0 · fixed-pending-recheck 2` (works: N-07, N-14, N-34, N-45, N-49, N-50, N-51; broken: N-41; fixed-pending-recheck: N-12, N-44). Updated by `W40.notes-w7-gui-checks`, 2026-11-04 (N-07 and N-14 to `works`, N-41 to `broken`).
 
 **Runtime evidence, for every row below: none yet.** The W40.a3 full VM suite
 ([`evidence/notes/W40.a3-full-ui.md`](evidence/notes/W40.a3-full-ui.md)) and the `W9.e2` runtime sweep passed
@@ -282,11 +282,16 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
 - **Real-path test:** `ArchiveNotesUITests/NotesGUITests.testG12_SourcesColumnIsHiddenInTheNoteWindowAndShownInTheExtractsWindow`
   (opens both windows, drives the kind control); `ArchiveNotesTests/NotesNavigationModelTests.kindFilterScopesDisplayed`.
   `ArchiveNotesTests/NotesAppSettingsTests.windowKindRoundTripsPerWindowIndependently` tests the settings helper
-  only. No test passes `persistingKindTo:`, so "the choice persists" has no real-path test.
-- **Runtime evidence:** none.
-- **Status:** `unproven`
+  only. `ArchiveNotesUITests/NotesW7ChecksUITests.testS4_EachWindowFeaturesItsKindAndBothUnionsThem` drives the
+  real kind control in the running app and relaunches it without the harness's kind pins, so the real
+  `persistingKindTo: .standard` path restores the remembered choice.
+- **Runtime evidence:** 2026-11-04 · the completing commit of `W40.notes-w7-gui-checks` · [`evidence/notes/W40.notes-w7-gui-checks.md`](evidence/notes/W40.notes-w7-gui-checks.md): at launch the Note window lists the three notes and not the extract, the Extracts window the extract and no note; Both in the Note window lists all four and the Extracts window's list stays as it was; relaunched without the pins, the Note window comes back on Both and the Extracts window on Extracts. VM runs 3, 5 and 7 (twice).
+- **Status:** `works`
 - **History:**
   - 2026-10-12 W40.b2 — row written, `unproven`.
+  - 2026-11-04 W40.notes-w7-gui-checks — runtime evidence for each window's kind, Both and the remembered choice across a relaunch; `works`. Not
+    driven: the built-in defaults on a store that never chose (`NotesNavigationModelTests` only), since the
+    harness pins the kinds at every first launch.
 - **Notes:** the folder scope (`NotesModel.selectedFolderId`) lives on the shared model, not per window. See the
   N-11 note. The promise draft records no W9.e2 result.
 
@@ -557,14 +562,19 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
 - **Real-path test:** `ArchiveNotesTests/EditorTerminateFlushTests.editWithinDebounceFlushedToDisk` (a real
   `NoteBodyEditorModel` → `NotesModel.setBody` → a scratch `NoteStore`, flushed through `EditorFlushRegistry`; it
   calls `flushAll` itself, not the app delegate); `ArchiveNotesTests/NoteBodyEditorModelTests.editThenSwitchSavesOutgoingOnly`
-  (the real switch logic, with closure stubs for load/save); `ArchiveNotesTests/TerminateFlushCoordinatorTests.boundedReplyOnTimeout`.
-- **Runtime evidence:** [`evidence/notes/W40.d9-writing.md`](evidence/notes/W40.d9-writing.md): typing autosaves with no other action (on disk after 1.3 s); ⌘Q pressed straight after typing, inside both debounces, saved the edit; closing the window straight after typing saved it. Held in every VM run.
-- **Status:** `unproven`
+  (the real switch logic, with closure stubs for load/save); `ArchiveNotesTests/TerminateFlushCoordinatorTests.boundedReplyOnTimeout`;
+  `ArchiveNotesUITests/NotesW7ChecksUITests.testS1a_TypeThenSelectAnotherNoteSavesTheEditAndLoadsTheOtherFresh`
+  (real keystrokes, then a real list selection, in the running app).
+- **Runtime evidence:** 2026-11-04 · [`evidence/notes/W40.notes-w7-gui-checks.md`](evidence/notes/W40.notes-w7-gui-checks.md): typed into one note and selected another at once: the edit is in the first note's file exactly once, the second loads its own text and its file is byte-identical; the run logged that the idle autosave had not yet written the file, so the switch saved it. VM runs 3, 5 and 7 (twice).
+  Earlier: [`evidence/notes/W40.d9-writing.md`](evidence/notes/W40.d9-writing.md): typing autosaves with no other action (on disk after 1.3 s); ⌘Q pressed straight after typing, inside both debounces, saved the edit; closing the window straight after typing saved it. Held in every VM run.
+- **Status:** `works`
 - **History:**
   - 2026-10-12 W40.b2 — row written, `unproven`.
   - 2026-10-15 W40.d9 — runtime evidence for idle autosave, quit and window close; stays `unproven`: switching notes with an unsaved edit was not driven.
+  - 2026-11-04 W40.notes-w7-gui-checks — runtime evidence for switching notes with an unsaved edit; `works`.
 - **Notes:**
-  - No test quits the real app within the debounce.
+  - `WritingJourneyUITests.testTypingAutosavesAndSurvivesQuitWithinDebounceAndRelaunch` quits the real app within
+    the debounce (W40.d9; run again in this item's run 4).
   - On quit, a store write that takes longer than 2 s is abandoned, by design.
   - The promise draft records no W9.e2 result.
 
@@ -589,11 +599,14 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
   the DEBUG seam `an.editor.test.pasteImage`, which calls the real `tryPasteImage` but bypasses the ⌘V gesture);
   `ArchiveNotesTests/InlineImageReadSeamTests.rendererRefusesEscapingReference` and `.rendererKeepsMissingDistinctFromBlocked`;
   `ArchiveNotesTests/ItemAssetStoreTests.addPersistsAndSurvivesReload`. No test drags an image.
-- **Runtime evidence:** [`evidence/notes/W40.d9-writing.md`](evidence/notes/W40.d9-writing.md): with the note's `assets/` read-only, a pasted PNG reports `ok`, the note gains the `![](assets/pasted-…)` reference, no file lands, and nothing tells the user.
+- **Runtime evidence:** 2026-11-04 · [`evidence/notes/W40.notes-w7-gui-checks.md`](evidence/notes/W40.notes-w7-gui-checks.md): a PNG pasted into a note (through `an.editor.test.pasteImage`, which calls the real `tryPasteImage`) lands in its `assets/` with the pasted bytes, the body cites it, and the editor draws those bytes, not a placeholder, after the paste, after selecting another note and back, and after a relaunch; the saved Markdown is not rewritten by opening it. VM runs 3, 5 and 7 (twice).
+  Earlier: [`evidence/notes/W40.d9-writing.md`](evidence/notes/W40.d9-writing.md): with the note's `assets/` read-only, a pasted PNG reports `ok`, the note gains the `![](assets/pasted-…)` reference, no file lands, and nothing tells the user.
 - **Status:** `unproven`
 - **History:**
   - 2026-10-12 W40.b2 — row written, `unproven`.
   - 2026-10-15 W40.d9 — runtime evidence for the failed-write path; stays `unproven` (a successful paste and a drag were not driven here). The silent failure is filed `W40.fix-notes-asset-write-silent` (S3).
+  - 2026-11-04 W40.notes-w7-gui-checks — runtime evidence for a successful paste and its reload; stays `unproven`: no test sends ⌘V with an
+    image or drags one.
 - **Notes:**
   - Every image is stored as PNG named `pasted-<yyyyMMdd-HHmmss>.png` (TIFF, JPEG and HEIC are converted,
     `Editor/EditorTextView.swift:712-735`).
@@ -1230,13 +1243,17 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
   (`:107`), and `NoteEditorPane.handleOpen` (`Views/NoteEditorPane.swift:340`) selects the extract and opens or
   raises the Extracts window.
 - **Real-path test:** `ArchiveNotesUITests/NotesGUITests.testG9_CreateExtractFromSelectionWritesExtractItem`;
+  `ArchiveNotesUITests/NotesW7ChecksUITests.testS2_CreateExtractFromATwoBlockSelectionMakesTwoBlocks` and
+  `.testS2S4_AppendPickerAppendsAndTheSourcesColumnCountsBothSources`;
   `ArchiveNotesUITests/NotesGUITests.testG15_OpenRequestOpensTheClosedFeaturingWindow` (⌘⌥E with Extracts
   closed); `ArchiveNotesUITests/NotesE2PasteTests.testE2_MenuCreatedExtractEmbedsTheImageBytes`. Unit:
   `ArchiveNotesTests/ExtractCommandTests.createExtractMenuActionKeepsTheSourceItemAssetBoundary`.
-- **Runtime evidence:** none
+- **Runtime evidence:** 2026-11-04 · [`evidence/notes/W40.notes-w7-gui-checks.md`](evidence/notes/W40.notes-w7-gui-checks.md): the real ⌘⌥E on a two-block selection made one extract with two note-passage blocks in the source's order, citing `#block-0` and `#block-1`, the source note byte-identical; Extract ▸ Append to Extract…'s picker appended a block citing the second source, the extract's first passage and both sources unchanged; `testE2_MenuCreatedExtractEmbedsTheImageBytes` passed again (its own copy of the images). VM runs 3, 5 and 7 (twice).
 - **Status:** `unproven`
 - **History:**
   - 2026-10-12 W40.b2 — row written, `unproven`.
+  - 2026-11-04 W40.notes-w7-gui-checks — runtime evidence for Create on two blocks, Append through the picker and the untouched source;
+    stays `unproven`: the title taken from the passage's first line was not checked.
 - **Notes:** W9.e1 rated D5 PARTIAL (nothing was raised when the Extracts window was closed). That led to
   `W9.b5-fu1` and `testG15_OpenRequestOpensTheClosedFeaturingWindow`. In `W9.e2-paste`,
   `testE2_MenuCreatedExtractEmbedsTheImageBytes` showed byte-identical image bytes and an unchanged source note.
@@ -1285,11 +1302,15 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
 - **Real-path test:** `ArchiveNotesUITests/NotesGUITests.testG10_JumpToSourceSelectsSourceNoteInNoteWindow`;
   `ArchiveNotesUITests/NotesGUITests.testG15_OpenRequestOpensTheClosedFeaturingWindow` (jump through the
   `an.editor.test.jump` seam with the Notes window closed);
-  `ArchiveNotesUITests/NotesGUITests.testW21_CrossWindowPassageChipReStylesAfterSourceTrash`.
-- **Runtime evidence:** none
-- **Status:** `unproven`
+  `ArchiveNotesUITests/NotesGUITests.testW21_CrossWindowPassageChipReStylesAfterSourceTrash`;
+  `ArchiveNotesUITests/NotesW7ChecksUITests.testS3_JumpFromTheExtractsWindowScrollsToALowerBlock` (the failing
+  check, an expected failure until the fix), `.testS3_RenamedThenDeletedSourceUpdatesTheChipAndTheJump`,
+  `.testS3_StaleOrdinalJumpOpensTheSourceAndSaysItHasChanged`.
+- **Runtime evidence:** 2026-11-04 · [`evidence/notes/W40.notes-w7-gui-checks.md`](evidence/notes/W40.notes-w7-gui-checks.md): **the scroll fails.** A jump from the Extracts window to a block half-way down a 200-paragraph source selects the note in the Note window and moves the view down, but the block's header is not on screen afterwards (the screenshots show paragraphs 93 to 98, the block after paragraph 100), 3 runs of 3. Held in the same runs: a renamed source's chip shows the new title, a deleted source greys the chip and the jump says "no longer exists — the extract text is preserved", a stale ordinal opens the source at its top with "The source note has changed since this extract was made."
+- **Status:** `broken` — `W40.fix-notes-jump-scroll-short` (S3)
 - **History:**
   - 2026-10-12 W40.b2 — row written, `unproven`.
+  - 2026-11-04 W40.notes-w7-gui-checks — the scroll to the block reproduced failing; `broken`, `W40.fix-notes-jump-scroll-short` (S3).
 - **Notes:** W9.e1 rated this PARTIAL (a jump with the Notes window closed did nothing). `W9.b5-fu1` fixed it, and
   VM `testG15_OpenRequestOpensTheClosedFeaturingWindow` covers both directions. That test drives Jump through a
   DEBUG seam, not the chip button. If the source's block ordinal no longer matches, the jump selects the note
@@ -1310,11 +1331,14 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
   (`Core/ItemSummaryDisplay.swift:96`), indexed from `distinctSourceNoteCount` (`Index/NoteIndexRow.swift:64`).
 - **Real-path test:** `ArchiveNotesUITests/NotesGUITests.testW9_ExtractInspectorShowsSourceSummary`;
   `ArchiveNotesUITests/NotesGUITests.testG12_SourcesColumnIsHiddenInTheNoteWindowAndShownInTheExtractsWindow`;
+  `ArchiveNotesUITests/NotesW7ChecksUITests.testS2S4_AppendPickerAppendsAndTheSourcesColumnCountsBothSources`;
   `ArchiveNotesTests/KindFilterQueryTests.sourceUsage`; `ArchiveNotesTests/NotesIndexTests.sourceCountRoundTrip`.
-- **Runtime evidence:** none
+- **Runtime evidence:** 2026-11-04 · [`evidence/notes/W40.notes-w7-gui-checks.md`](evidence/notes/W40.notes-w7-gui-checks.md): the Extracts window's Sources cell read 1 for the fixture extract and 2 after a passage from a second note was appended; the inspector then read "2 notes", one passage each (run 3's screenshot); with the source deleted the inspector showed "Source note missing" under the saved label (run 3's screenshot). VM runs 3, 5 and 7 (twice) for the cell.
 - **Status:** `unproven`
 - **History:**
   - 2026-10-12 W40.b2 — row written, `unproven`.
+  - 2026-11-04 W40.notes-w7-gui-checks — runtime evidence for the Sources count and the missing label; stays `unproven`: the inspector's
+    live title after a rename was not checked, and the inspector figures are read from screenshots, not asserted.
 - **Notes:** W9.e2 had no result for this row. The inspector reloads when the extract's mtime changes. Live titles
   follow `allItems`, so they update without a reload.
 

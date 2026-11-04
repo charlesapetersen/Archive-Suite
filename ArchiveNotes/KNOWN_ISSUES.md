@@ -1748,7 +1748,7 @@ one real bug plus two benign edge-normalizations:
   byte-idempotent. Real editors emit `\n` or clean `\r\n` (both handled correctly), so this is a
   fuzz-only artifact; the fuzz body generator excludes lone CR and the observation is logged, not fixed.
 
-## Editor↔item body wiring — follow-ups (W7-S1a, 2026-07-13): the code items are fixed; the live GUI checks below were never run
+## Editor↔item body wiring — follow-ups (W7-S1a, 2026-07-13): the code items are fixed; the live GUI checks ran and held (W40.notes-w7-gui-checks, 2026-11-04)
 
 W7-S1a bound `NoteEditorPane` to the selected item's body (`NoteBodyEditorModel`: load-on-select,
 autosave via `NotesModel.setBody`, flush-on-switch, autosave-race-safe). Two conscious deferrals:
@@ -1768,10 +1768,18 @@ autosave via `NotesModel.setBody`, flush-on-switch, autosave-race-safe). Two con
   windows editing the **same** note and pasting the same-named image in the same second have independent
   `reserved` sets, so the second write is refused by the no-overwrite guard (safe — no clobber — but that
   paste shows a placeholder); a shared name authority would need a single store, which can't serve two
-  windows' differing selections. GUI drive of a live paste is deferred to **W8-S8** (the scratch-store launch
-  override now exists and is proven — **W8-S7** validated it: `SmokeUITest` LAUNCHES the app under XCUITest
-  against the `-ANUITestStorePath` scratch fixture, in-memory-only, without touching the owner's real store).
-- **GUI drive of load/autosave deferred (GUI paused).** The load-on-select + autosave-on-switch behavior
+  windows' differing selections. **Driven live (W40.notes-w7-gui-checks, 2026-11-04):** a pasted PNG lands in
+  the note's `assets/` with the pasted bytes and draws them (no placeholder) after the paste, after selecting
+  another note and back, and after a relaunch, with the Markdown unrewritten
+  (`NotesW7ChecksUITests.testS1a_PastedImageReloadsAfterReselectAndRelaunch`, VM, through the
+  `an.editor.test.pasteImage` seam that calls the real `tryPasteImage`; ⌘V of an image and a drag are not sent).
+  Record: `verification/evidence/notes/W40.notes-w7-gui-checks.md`.
+- **Load/autosave, driven live (W40.notes-w7-gui-checks, 2026-11-04).** Select A, type, select B at once: A's
+  edit is in A's file exactly once, B loads its own text and its file is untouched; the run recorded that the
+  idle autosave had not yet written the file, so the switch saved it
+  (`NotesW7ChecksUITests.testS1a_TypeThenSelectAnotherNoteSavesTheEditAndLoadsTheOtherFresh`). Type then ⌘Q at
+  once, reopen: the edit is there (`WritingJourneyUITests.testTypingAutosavesAndSurvivesQuitWithinDebounceAndRelaunch`,
+  run again for this record). The history: the load-on-select + autosave-on-switch behavior
   is proven at the model layer (`NoteBodyEditorModelTests` incl. the cross-item race + generation guard;
   `NotesModelBodyTests` round-trip/reindex/front-matter-preservation), but not yet driven in a live window.
   When GUI resumes: select note A, type, select B → A's edit persists (assert the on-disk `.md`) and B
@@ -1785,7 +1793,7 @@ autosave via `NotesModel.setBody`, flush-on-switch, autosave-race-safe). Two con
   edit present) is still deferred with the rest of Notes' GUI drive until the scratch-store launch
   override lands (W8-S7) — driving the live app would write the owner's real store.
 
-## Extracts create/copy-paste — follow-ups (W7-S2, 2026-07-13): image bytes fixed; the paste edges fixed (W40.fix-notes-extract-paste-edges, 2026-11-03); the live GUI checks were never run
+## Extracts create/copy-paste — follow-ups (W7-S2, 2026-07-13): image bytes fixed; the paste edges fixed (W40.fix-notes-extract-paste-edges, 2026-11-03); the live GUI checks ran and held (W40.notes-w7-gui-checks, 2026-11-04)
 
 W7-S2 shipped the live Create-Extract (⌘⌥E) / Append-to-Extract… commands and the copy-in-Notes →
 paste-into-Extract round-trip (`Extract` menu; `com.archivenotes.passage` on ⌘C in a note editor;
@@ -1820,23 +1828,32 @@ paste in an extract editor → note-passage blocks). Model + codec paths are uni
   auto-opened on create (deliberate — avoids an intrusive pop-up); the extract is still selected the next
   time that window opens. +2 model tests assert the open-request is published. **Live GUI drive → Morning
   Review.**
-- **GUI drive deferred (GUI paused).** Not yet driven live: ⌘⌥E on a two-block selection → a two-block
-  extract; copy-note → paste-into-extract → provenanced blocks; plain external paste → freeform; the
-  Append picker. Logic is proven at the model/codec layer (`ExtractCommandTests`, `PasteboardPassageTests`,
-  `BlockParserTests`).
+- **Driven live (W40.notes-w7-gui-checks, 2026-11-04), all held.** The real ⌘⌥E on a two-block selection makes
+  one extract with two note-passage blocks in the source's order, the source untouched
+  (`NotesW7ChecksUITests.testS2_CreateExtractFromATwoBlockSelectionMakesTwoBlocks`); a plain external ⌘V into an
+  extract is freeform, no block and no chip (`testS2_PlainExternalPasteIntoAnExtractIsFreeform`); Extract ▸
+  Append to Extract…'s picker appends a block citing the new source, the source untouched
+  (`testS2S4_AppendPickerAppendsAndTheSourcesColumnCountsBothSources`); copy in a note → paste into an extract
+  gives provenanced blocks with the image bytes (`NotesGUITests.testG13_…`, through the copy/paste seams, not the
+  ⌘C/⌘V keystrokes); Create/Append raise the Extracts window (`testG14_…`, `testG15_…`). Record: `verification/evidence/notes/W40.notes-w7-gui-checks.md`.
 
-## Extracts jump-to-source + provenance chips — follow-ups (W7-S3, 2026-07-13): the template-pane and folder-scope edges are fixed (W40.fix-notes-jump-pending-template, 2026-11-03); the same-window edge stays a limitation; the live GUI checks were never run
+## Extracts jump-to-source + provenance chips — follow-ups (W7-S3, 2026-07-13): the template-pane and folder-scope edges are fixed (W40.fix-notes-jump-pending-template, 2026-11-03); the same-window edge stays a limitation; the live GUI checks ran (W40.notes-w7-gui-checks, 2026-11-04): the jump lands short of the block (W40.fix-notes-jump-scroll-short), the rest held
 
 W7-S3 shipped the note-passage provenance chip's **Jump to Source** button + live-title label + the
 in-app navigation channel (`NotesModel.openItem`/`pendingOpen`) and the Note-window consume side
 (observe → `NotePassageResolve.openAction` → select + scroll-to-block, gated on `loadedID`). Pure logic
 is unit-tested (`NotePassageResolveTests`, 20 tests incl. `openAction`); conscious gaps / edges:
 
-- **GUI drive deferred (GUI paused).** Not yet driven live: click Jump in an extract block → the Note
-  window selects the source note and scrolls to the right block; a deleted source → greyed chip +
-  "source no longer exists — extract text preserved" status; a stale ordinal → scroll-to-top +
-  "source has changed" status; a renamed source → chip shows the current title. Verify with
-  `cliclick` on `an.chip.jump` + a screenshot when GUI resumes.
+- **Driven live (W40.notes-w7-gui-checks, 2026-11-04), through the `an.editor.test.jump` seam (the chip's own
+  button cannot be hit-tested).** Held: a renamed source shows its current title on the chip; a deleted source
+  greys it and the jump says "no longer exists — the extract text is preserved"
+  (`NotesW7ChecksUITests.testS3_RenamedThenDeletedSourceUpdatesTheChipAndTheJump`); a stale ordinal opens the
+  source at its top with "The source note has changed since this extract was made."
+  (`testS3_StaleOrdinalJumpOpensTheSourceAndSaysItHasChanged`); the jump raises the Note window
+  (`NotesGUITests.testG14_…`, `testG15_…`). **Failed: the scroll to the block.** A jump from the Extracts
+  window to a block half-way down a 200-paragraph source selects the note and scrolls the view down, but stops
+  short: the cited block is below the view, 3 runs of 3 (`testS3_JumpFromTheExtractsWindowScrollsToALowerBlock`,
+  an expected failure until **`W40.fix-notes-jump-scroll-short`**). Record: `verification/evidence/notes/W40.notes-w7-gui-checks.md`.
 - ✅ **FIXED (W14.4b, 2026-07-17):** window is now programmatically RAISED. `NoteEditorPane.handleOpen`'s
   `.selectAndScroll` branch — which runs only in the window featuring the target's kind — calls
   `openWindow(id:)` (fronts the singleton Notes/Extracts `Window` scene, never duplicates) + `NSApp.activate`,
@@ -1879,7 +1896,7 @@ is unit-tested (`NotePassageResolveTests`, 20 tests incl. `openAction`); conscio
   '[NSValue]' to '[NSValue]' always succeeds" — `textView.selectedRanges` is already `[NSValue]`, so the
   `as?` cast is redundant; bound directly (behavior-identical). Warning gone on a clean compile.
 
-## Extract-viewer featuring — follow-ups (W7-S4, 2026-07-14): the Sources column is fixed (W14.4d); the back-fill note stays; the live GUI checks were never run, although W8-S7, which they waited on, has shipped
+## Extract-viewer featuring — follow-ups (W7-S4, 2026-07-14): the Sources column is fixed (W14.4d); the back-fill note stays; the live GUI checks ran and held (W40.notes-w7-gui-checks, 2026-11-04)
 
 W7-S4 gave each window its kind featuring (Note→notes, Extract→extracts, remembered per window) via the
 already-shipped segmented control, and added the extract-only **Sources** column (distinct source notes,
@@ -1894,6 +1911,12 @@ per-window kind round-trip; `NotesNavigationModelTests` window defaults). Consci
   Extract window opens featuring extracts / Note window features notes / toggling to `both` unions /
   the Sources column shows the right count for a segmented extract — are deferred to Daemon Report and
   are the natural payload for the **W8-S7** fixture-rooted XCUITest (which builds the scratch store).
+  **Driven live (W40.notes-w7-gui-checks, 2026-11-04), all held:** each window lists its own kind, Both unions
+  them in the Note window without changing the Extracts window, and after a relaunch without the harness's kind
+  pins each window comes back on its remembered choice
+  (`NotesW7ChecksUITests.testS4_EachWindowFeaturesItsKindAndBothUnionsThem`); the Sources column reads 1, then 2
+  after an append from a second source (`testS2S4_…`); it is hidden in the Note window and shown in the Extracts
+  window (`NotesGUITests.testG12_…`). Record: `verification/evidence/notes/W40.notes-w7-gui-checks.md`.
 - ✅ **FIXED (W14.4d, 2026-07-17 `7ef833d`):** the "Sources" column is now per-window. `NotesAppSettings`
   gained `windowHiddenColumns(for:)`/`setWindowHiddenColumns(_:for:)` (keyed per window like
   `windowKindFilter`), defaulting the Note window to hide the always-blank Sources column while the Extracts

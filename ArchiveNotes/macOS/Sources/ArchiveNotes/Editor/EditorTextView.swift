@@ -43,6 +43,8 @@ final class EditorTextView: NSTextView {
         if let root = window?.contentView { visit(root) }
         states += uiTestHeaderSlots()
         states.append(["inlineImages": uiTestInlineImages()])
+        // The editor's visible rect, to check a header slot's `slotY` against (W40.notes-w7-gui-checks).
+        states.append(["editorVisibleY": Double(visibleRect.minY), "editorVisibleH": Double(visibleRect.height)])
         states.append(["relayout": relayoutLastPass, "rebuilds": relayoutRebuilds, "strandedFixes": strandedChipFixes,
                        "layoutPasses": layoutStrandedPasses])
         guard let data = try? JSONSerialization.data(withJSONObject: states, options: [.sortedKeys]) else { return nil }
