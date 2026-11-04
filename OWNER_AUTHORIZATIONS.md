@@ -515,3 +515,10 @@ trusted owner consent; automatic approval review remains in place.
   exported `marks-feedback-answers.json` (SHA-256 `dac79c80c2f6…a210e`), now beside the sheet in
   `$AGENT_STATE/artifacts/marks-feedback-da388b05c388/`. Owner text stays outside Git. The next session
   validates and folds it against the full baseline; the da388b05c388 freeze is never replaced.
+
+## 2026-11-04 afternoon — Acrobat Reader check dropped
+
+- **W46.place-print-acrobat-owner-ok:** answered by dropping the check. Owner: very few people use Acrobat
+  as their reader, so it is not a viewer the app targets. W46.place-print closes on the four measured
+  viewers (PDFKit, poppler, mupdf, pdf.js) and its report says Acrobat Reader was not checked, by owner
+  decision. The blind Acrobat sheet is scratch.
