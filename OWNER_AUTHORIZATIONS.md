@@ -487,3 +487,12 @@ trusted owner consent; automatic approval review remains in place.
   the 329 untouched offset windows, within the unchanged $6.80 total cap including every attempt and
   reservation. Any new uncertain outcome still stops the run. The 2026-11-01 upload scope is unchanged.
 - **W46.fix-marks-sheet-feedback-owner-ok:** stays open; the owner will do the nine-place recheck later.
+
+## 2026-11-04 — walkthrough answers recorded at owner request
+
+- **W46.seg-boxes-score:** retain the full $0.045477 allowance for the interrupted Stanton 116–122
+  request `57ad654187be4c64b21d66b58d9faeb2` as counted, retry that exact request once, then collect
+  the other 327 untouched windows, within the unchanged $6.80 total cap including every attempt and
+  reservation. Any new uncertain outcome still stops the run.
+- **W46.place-print-acrobat-owner-ok** and **W46.fix-marks-sheet-feedback-owner-ok:** stay open; the owner
+  will do both checks later.
