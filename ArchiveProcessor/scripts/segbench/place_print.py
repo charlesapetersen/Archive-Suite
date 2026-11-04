@@ -10,7 +10,8 @@
   $U place_print.py report     segbench-results/place-print.md and .json from the rows
 
   ($U is `uv run -q --with numpy --with rapidfuzz --with regex --with sacrebleu --with jiwer --with pikepdf
-  --with ocrmypdf python`; run every step under ops/autonomous/heavy-run.py, as they work through a page set.)
+  --with ocrmypdf --with fonttools --with reportlab python`; run every step under ops/autonomous/heavy-run.py, as
+  they work through a page set.)
 
 Inputs, all saved before this item: the placement truth (place_truth.py STORE) with the owner's line rulings
 folded (place_geom.fold_lines, W46.place-lines-owner-ok); Vision's words and lines read by place_print_vision.swift
@@ -543,24 +544,103 @@ def as_pdfa(src, dst, conformance):
         doc.save(dst, fix_metadata_version=False)
 
 
-def to_unicode_cmap(pairs):
+def to_unicode_cmap(pairs, width=1):
+    """A ToUnicode CMap for `pairs` {code: text}, codes `width` bytes wide (1 for simple fonts, 2 for Identity-H)."""
+    h = 2 * width
     lines = ['/CIDInit /ProcSet findresource begin', '12 dict begin', 'begincmap',
              '/CIDSystemInfo << /Registry (Adobe) /Ordering (UCS) /Supplement 0 >> def',
-             '/CMapName /Adobe-Identity-UCS def', '/CMapType 2 def', '1 begincodespacerange', '<00> <FF>',
-             'endcodespacerange']
+             '/CMapName /Adobe-Identity-UCS def', '/CMapType 2 def', '1 begincodespacerange',
+             f'<{0:0{h}X}> <{256 ** width - 1:0{h}X}>', 'endcodespacerange']
     pairs = sorted(pairs.items())
     for i in range(0, len(pairs), 100):
         chunk = pairs[i:i + 100]
         lines.append(f'{len(chunk)} beginbfchar')
-        lines += [f'<{c:02X}> <{"".join(f"{ord(u):04X}" for u in s)}>' for c, s in chunk]
+        lines += [f'<{c:0{h}X}> <{s.encode("utf-16-be").hex().upper()}>' for c, s in chunk]
         lines.append('endbfchar')
     lines += ['endcmap', 'CMapName currentdict /CMap defineresource pop', 'end', 'end']
     return '\n'.join(lines).encode()
 
 
+def system_glyph_unicode(base):
+    """{glyph name: text} for the installed font whose PostScript name is `base` (a subset prefix stripped), from its
+    cmap, the lowest code point winning; {} when no installed font has that name."""
+    import glob
+    from fontTools.ttLib import TTCollection, TTFont
+    base = base.split('+', 1)[-1]
+    if base in _GLYPH_UNICODE:
+        return _GLYPH_UNICODE[base]
+    out = {}
+    for path in glob.glob('/System/Library/Fonts/*.tt[cf]') + glob.glob('/Library/Fonts/*.tt[cf]'):
+        try:
+            fonts = TTCollection(path).fonts if path.endswith('.ttc') else [TTFont(path)]
+        except Exception:
+            continue
+        ft = next((x for x in fonts if 'name' in x and x['name'].getDebugName(6) == base), None)
+        if ft is not None:
+            for u, g in sorted(ft.getBestCmap().items(), reverse=True):
+                out[g] = chr(u)
+            break
+    _GLYPH_UNICODE[base] = out
+    return out
+
+
+_GLYPH_UNICODE = {}
+
+
+def truetype_to_unicode(doc, f):
+    """A complete ToUnicode stream for a simple TrueType font with no /Encoding (Core Text's subsets): its embedded
+    (1,0) cmap names each code's glyph, and the installed full font, else the Adobe Glyph List, gives the glyph's
+    text. Core Text writes a ToUnicode for these that can miss a glyph (₴ "Hryvnia" on p024). None when a used code
+    cannot be named."""
+    import io
+    import pikepdf
+    from fontTools.agl import toUnicode
+    from fontTools.ttLib import TTFont
+    ff = f.get('/FontDescriptor', {}).get('/FontFile2')
+    if ff is None or '/Encoding' in f:
+        return None
+    ft = TTFont(io.BytesIO(ff.read_bytes()))
+    sub = next((t for t in ft['cmap'].tables if (t.platformID, t.platEncID) in ((1, 0), (3, 0))), None)
+    if sub is None:
+        return None
+    names = system_glyph_unicode(str(f.BaseFont)[1:])
+    pairs = {}
+    for code, g in sub.cmap.items():
+        text = names.get(g) or toUnicode(g)
+        if not text:
+            return None
+        pairs[code & 0xFF] = text
+    return pikepdf.Stream(doc, to_unicode_cmap(pairs))
+
+
+def type0_to_unicode(doc, f):
+    """A ToUnicode stream for an Identity-H Type0 font over an embedded CID-keyed CFF (what Core Text embeds when it
+    falls back to a CJK font for a symbol Helvetica lacks): the subset's charset names each glyph's CID, and the
+    installed full font maps CIDs to Unicode. None when that cannot be rebuilt."""
+    import io
+    import pikepdf
+    from fontTools.cffLib import CFFFontSet
+    if str(f.get('/Encoding', '')) != '/Identity-H':
+        return None
+    desc = f.DescendantFonts[0]
+    ff = desc.get('/FontDescriptor', {}).get('/FontFile3')
+    if ff is None:
+        return None
+    cff = CFFFontSet()
+    cff.decompile(io.BytesIO(ff.read_bytes()), None)
+    top = cff[cff.fontNames[0]]
+    uni = system_glyph_unicode(str(f.BaseFont)[1:])
+    pairs = {}
+    for name in top.charset:
+        if name.startswith('cid') and name[3:].isdigit() and name in uni:
+            pairs[int(name[3:])] = uni[name]   # Identity-H with no CIDToGIDMap: the code is the CID
+    return pikepdf.Stream(doc, to_unicode_cmap(pairs, 2)) if pairs else None
+
+
 def add_to_unicode(src, dst):
-    """Give every simple font without a ToUnicode map one built from its encoding (the base encoding named, or
-    WinAnsi, with its Differences applied by glyph name). Returns how many fonts were given one."""
+    """Give every font without a ToUnicode map one: a simple font's from its encoding (the base encoding named, or
+    WinAnsi, with its Differences applied by glyph name), an Identity-H CID font's from type0_to_unicode; and replace
+    an unencoded TrueType subset's (Core Text's) with truetype_to_unicode's. Returns how many fonts were given one."""
     import pikepdf
     from fontTools.agl import toUnicode
     n = 0
@@ -568,10 +648,26 @@ def add_to_unicode(src, dst):
         for pg in doc.pages:
             fonts = pg.obj.get('/Resources', {}).get('/Font', {})
             for _, f in fonts.items():
-                if '/ToUnicode' in f or f.get('/Subtype') == '/Type0':
+                if f.get('/Subtype') == '/TrueType' and '/Encoding' not in f:
+                    tu = truetype_to_unicode(doc, f)       # replaces Core Text's own map, which can miss a glyph
+                    if tu is not None:
+                        f.ToUnicode = tu
+                        n += 1
+                    continue
+                if '/ToUnicode' in f:
+                    continue
+                if f.get('/Subtype') == '/Type0':
+                    tu = type0_to_unicode(doc, f)
+                    if tu is not None:
+                        f.ToUnicode = tu
+                        n += 1
                     continue
                 enc = f.get('/Encoding')
                 base, diffs = 'cp1252', {}
+                if str(f.get('/BaseFont', '')) in ('/ZapfDingbats', '/Symbol'):   # their built-in encodings
+                    import reportlab.pdfbase.rl_codecs as rlc
+                    rlc.RL_Codecs.register()
+                    base = str(f.BaseFont)[1:].lower()
                 if isinstance(enc, pikepdf.Name) and str(enc) == '/MacRomanEncoding':
                     base = 'mac_roman'
                 if isinstance(enc, pikepdf.Dictionary):
@@ -787,8 +883,8 @@ ACROBAT_PAGES = ('p002', 'p024', 'p087', 'p078', 'p081')   # three typewritten w
 
 def cmd_acrobat(a):
     """The owner's sheet: five writer pages, each in all three designs under blind names (A, B, C, shuffled per
-    page; the key is a separate file), ten words to Find and two lines to drag-select on each, about 20 minutes in
-    Acrobat Reader. Writes CACHE/acrobat/ (PDF copies, index.html, key.json)."""
+    page; the key is CACHE/acrobat-key.json, outside the folder he opens), ten words to Find and two lines to
+    drag-select on each, about 20 minutes in Acrobat Reader. Writes CACHE/acrobat/ (PDF copies, index.html) and CACHE/acrobat-key.json."""
     import html
     import shutil
     R = rulings()
@@ -812,7 +908,7 @@ def cmd_acrobat(a):
             shutil.copyfile(src / f'{key(t)}-{d}.pdf', out / f'{p}-{name}.pdf')
             key_[f'{p}-{name}'] = d
         items.append((p, sorted(names), finds, [' '.join(L['tokens']) for L in lines]))
-    (out / 'key.json').write_text(json.dumps(key_, indent=1) + '\n')
+    (CACHE / 'acrobat-key.json').write_text(json.dumps(key_, indent=1) + '\n')
     rows = []
     for p, names, finds, lines in items:
         for n in names:

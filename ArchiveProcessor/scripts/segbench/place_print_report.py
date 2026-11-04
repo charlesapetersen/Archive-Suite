@@ -164,8 +164,9 @@ def arms_tables(pages):
     md.append('### When does aligning stop paying? Aligned against Vision\'s own layer, by anchor share\n')
     md.append('Per page and reading (the three saved readings): the share of Vision\'s words the reading pairs with '
               'an equal word (an approximation of the lab\'s anchors, which it does not report), and the change in '
-              'Find-placed words and in strictly passing lines against Vision\'s own layer. Below half, the lab '
-              'keeps Vision\'s words, so there is nothing to change. A text page leaves Vision\'s layer as it is and '
+              'Find-placed words and in strictly passing lines against Vision\'s own layer. The lab keeps Vision\'s '
+              'words when under half of them are its anchors; its anchors match loosely (wordLikeness), so this '
+              'exact-equality share is lower than the lab\'s and pages under 0.50 here were still rewritten. A text page leaves Vision\'s layer as it is and '
               'adds the reading on a page of its own: it never costs placement, and it adds Find for the reading\'s '
               'words that the layer lacks.\n')
     md.append('| anchor share | page readings | lines rewritten | Δ placed words (sum) | pages placed worse | '
@@ -245,7 +246,12 @@ def writer_tables(rows, vrows):
               'sRGB output intent; nothing else changed), so what it finds is the file\'s own content: its fonts, '
               'their embedding and their Unicode mapping. Twenty `lab` PDFs (the fifteen writer pages and five more '
               'typewritten ones) and the fifteen of each other design. The same files without the declarations fail '
-              '(6.6.2.1 metadata, 6.2.4.3 DeviceRGB without an output intent), so the validator is reading them.\n')
+              '(6.6.2.1 metadata, 6.2.4.3 DeviceRGB without an output intent), so the validator is reading them. Where 2u '
+              'fails, every font is given a full ToUnicode map (`add_to_unicode`): a simple font\'s from its encoding '
+              '(ZapfDingbats and Symbol by their built-in ones), a Core Text TrueType subset\'s rebuilt from its '
+              'embedded cmap\'s glyph names through the installed font (Core Text\'s own map can miss a glyph), and '
+              'an Identity-H CID fallback font\'s from its CFF charset through the installed font; the extracted text '
+              'is unchanged by it.\n')
     md.append('| design | PDFs | PDF/A-2b compliant | PDF/A-2u compliant | 2u after adding ToUnicode maps | rules failed |')
     md.append('|---|---:|---:|---:|---:|---|')
     for d in ('lab', 'ocrmypdf', 'words'):
@@ -263,6 +269,42 @@ def writer_tables(rows, vrows):
     return md, js
 
 
+def acrobat_tables(cache: Path):
+    """The owner's Acrobat Reader check (place_print.py acrobat): his answers.json against the blind key."""
+    md, js = ['## Acrobat Reader, the owner\'s check (test 5, fifth viewer)\n'], {}
+    ans, key = cache / 'acrobat' / 'answers.json', cache / 'acrobat-key.json'
+    if not ans.exists():
+        md.append('Not answered yet: the sheet is `acrobat/index.html` in the bench cache, gate '
+                  '`W46.place-print-acrobat-owner-ok`.\n')
+        return md, js
+    a, k = json.loads(ans.read_text()), json.loads(key.read_text())
+    md.append('Five writer pages (p002, p024, p087 typewritten; p078, p081 clippings), each design under a blind name; '
+              'ten Find words and two whole-line drags a PDF, ticked by the owner in Adobe Acrobat Reader.\n')
+    md.append('| design | Find, on the word | lines whole, in order | notes |')
+    md.append('|---|---:|---:|---|')
+    for d in ('lab', 'ocrmypdf', 'words'):
+        files = [f for f, v in k.items() if v == d]
+        c = {x: [0, 0] for x in ('find', 'line')}
+        notes = []
+        for f in files:
+            for name, v in a.items():
+                parts = name.split('|')
+                if parts[0] != f:
+                    continue
+                if parts[1] in c:
+                    c[parts[1]][0] += bool(v)
+                    c[parts[1]][1] += 1
+                elif parts[1] == 'note' and v.strip():
+                    notes.append(f'{f[:4]}: {v.strip()}')
+        js[d] = {x: c[x] for x in c} | {'notes': notes}
+        md.append(f'| {d} | {c["find"][0]} of {c["find"][1]} | {c["line"][0]} of {c["line"][1]} | '
+                  f'{"; ".join(notes).replace("|", "/") or "—"} |')
+    if str(a.get('overall', '')).strip():
+        md.append(f'\nOverall (owner): {a["overall"].strip()}')
+    md.append('')
+    return md, js
+
+
 # ---------------------------------------------------------------- test 7
 def box_tables(d):
     rows = d['rows']
@@ -276,7 +318,7 @@ def box_tables(d):
               'left out, not repaired. For the blocks, `in block text` is the share of the truth words inside a '
               'block that the block\'s own text holds (what a block-level `replace` would put there). Nemotron\'s '
               f'canvas transform is rebuilt (centred padding), checked against Unlimited\'s blocks of like text: '
-              f'{d["nemotron_check"]["pairs"]} pairs, median offset {d["nemotron_check"]["median_dx_dy"]}, '
+              f'{d["nemotron_check"]["pairs"]} pairs, median offset ({", ".join(f"{v:+.4f}" for v in d["nemotron_check"]["median_dx_dy"])}) of the page, '
               f'{d["nemotron_check"]["within_0.02"]} within 0.02 of the page on both axes.\n')
     md.append('| source | pages | regions | truth lines | whole % | whole and alone % | truth words outside % | '
               'baseline F | in block text % |')
@@ -307,7 +349,7 @@ def write(cache: Path, results: Path):
     brows = json.loads((cache / 'boxes-rows.json').read_text())
     out, js = [], {}
     for fn, args in ((vision_tables, (vrows,)), (arms_tables, (pages,)), (writer_tables, (wrows, prow)),
-                     (box_tables, (brows,))):
+                     (acrobat_tables, (cache,)), (box_tables, (brows,))):
         md, j = fn(*args)
         out += md
         js[fn.__name__.replace('_tables', '')] = j
