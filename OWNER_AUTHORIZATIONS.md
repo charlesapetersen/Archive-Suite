@@ -508,3 +508,10 @@ trusted owner consent; automatic approval review remains in place.
   Transkribus arm is included on the same 25 pages, spending credits only, no real money and no credit
   purchase. The owner adds a Keychain item `Transkribus` (login or API token). The gate is ticked once
   all three items (`Azure DI`, `AWS Textract`, `Transkribus`) exist.
+
+## 2026-11-04 afternoon — marks recheck answered
+
+- **W46.fix-marks-sheet-feedback-owner-ok:** answered. The owner rechecked the nine places on seven pages and
+  exported `marks-feedback-answers.json` (SHA-256 `dac79c80c2f6…a210e`), now beside the sheet in
+  `$AGENT_STATE/artifacts/marks-feedback-da388b05c388/`. Owner text stays outside Git. The next session
+  validates and folds it against the full baseline; the da388b05c388 freeze is never replaced.
