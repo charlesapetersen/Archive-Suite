@@ -18,7 +18,8 @@ first as it comes and then fine-tuned on a few hundred lines of one hand.
   uv run --with rapidfuzz --with 'sacrebleu==2.5.1' --with regex python ocr_ppocrv6_hands.py report
 
 Sets. Zero-shot: the 895's L1-L3 (240 pages; By the People and Bentham, none in the model's listed training data)
-and the owner's 21 hand and mixed pages of the 96 (the panel's 2400 px JPEGs, as loop_kraken.py reads them).
+and the owner's 21 hand and mixed pages (the panel's 2400 px JPEGs, as loop_kraken.py reads them), scored on the 18 of
+the 96: the three agreement-only letters (ocr_panel.AGREEMENT) are read but, as in every other table, not scored.
 Comparators on the same pages: LightOnOCR-3 4B and Qwen3.5-9B 4-bit on this Mac for the owner's pages
 (ocr_mac_local.py's saved readings), LightOnOCR-3 4B bf16 on FarmShare for L1-L3 (no Mac reading of the public
 pages exists). The owner's truth was drafted by Claude Opus and Gemini 3.8 Flash, so on the owner's pages every
@@ -268,8 +269,15 @@ def public_rows():
 
 
 def owner_pages():
+    """Every hand and mixed page read, the three agreement-only letters included (the reading jobs)."""
     import ocr_panel as P
     return sorted(r['page'] for r in P.rows() if r['kind'] in ('handwritten', 'mixed'))
+
+
+def scored_owner_pages():
+    """The pages scored: the hand and mixed pages of the 96, without the agreement-only letters (W46.hands-owner-pages)."""
+    import ocr_panel as P
+    return [p for p in owner_pages() if p not in P.AGREEMENT]
 
 
 def owner_kinds():
@@ -783,9 +791,11 @@ def cmd_report(_):
     pub, pub_per = table(src, ids, lambda i: Path(by[i]['truth']).read_text(), lambda i: by[i]['stratum'], ours)
     pub_pairs = pairs_against({k: v for k, v in pub_per.items() if k in ours or k in [r['route'] for r in pub[:4]]
                                or k in ('ppocrv6-medium', 'apple-vision (lines)', 'lightonocr3-4b')}, ours, ids)
-    # The owner's 21 hand and mixed pages (truth after W46.ocr-hands-rescore's corrections).
+    # The owner's hand and mixed pages of the 96 (truth after W46.ocr-hands-rescore's corrections); the three
+    # agreement-only letters were read but are not scored, as in every other table (W46.hands-owner-pages).
     kinds = owner_kinds()
-    own_ids = owner_pages()
+    own_ids = scored_owner_pages()
+    left_out = sorted(set(owner_pages()) - set(own_ids))
     osrc = named(RS.owner_sources())
     osrc[ours[0]] = _texts(RUN / 'zero' / 'blla-hands', own_ids)
     osrc[ours[1]] = _texts(RUN / 'zero' / 'vision-hands', own_ids)
@@ -832,7 +842,8 @@ def cmd_report(_):
            'owner_pairs': own_pairs, 'tunes': tunes, 'tune_pairs': tune_pairs(tunes, tune_per), 'timing': timing,
            'pairs': {h: {'pages': len(v), 'truth_lines': sum(s['truth_lines'] for s in v),
                          'kept': sum(s['kept'] for s in v)} for h, v in pairs_stats.items()},
-           'sets': {'public': len(ids), 'owner': len(own_ids), 'owner_hand': len(hand_ids)}}
+           'sets': {'public': len(ids), 'owner': len(own_ids), 'owner_hand': len(hand_ids),
+                    'owner_mixed': len(own_ids) - len(hand_ids), 'owner_left_out': left_out}}
     out['kit_recommendation'] = kit_recommendation(out)
     (RESULTS / 'ocr-ppocrv6-hands.json').write_text(json.dumps(out, indent=1))
     write_md(out)
@@ -852,7 +863,9 @@ def kit_recommendation(o):
     n240 = [p for p in o.get('tune_pairs', []) if '-n240-' in p['a'] and '-n160-' in p['b']]
     if len(n160) == len(n240) == 2 and all(p['lo'] > 0 for p in n160) and all(p['lo'] <= 0 <= p['hi'] for p in n240):
         return ('Target about 160 corrected lines for an optional same-hand fine-tune, using eager MPS when available. '
-                'Both backends gain over 80 lines on this holdout; 240 adds no resolved gain over 160. Require '
+                'Under the 1,440 line-step ceiling, 80 to 160 lines pays on this hand on both backends; 240 adds no '
+                'resolved gain over 160, but n240 trained six epochs to n160\'s nine, so past 160 lines is unmeasured, '
+                'not shown to be useless. Require '
                 'line-broken corrected truth and a separate held-out acceptance check for each hand. One hand and '
                 'one seed do not justify making fine-tuning the default handwriting route.')
     return ''
@@ -930,10 +943,15 @@ def write_md(o):
           '| pair | delta | interval | p |', '|---|---:|---|---:|']
     L += [f'| {k} | {v["delta"]:+.2f} | {v["lo"]:+.2f} to {v["hi"]:+.2f} | {v["p"]:.4f} |'
           for k, v in o['public_pairs'].items()]
+    left = o['sets'].get('owner_left_out', [])
     L += ['', f'## The owner\'s {o["sets"]["owner"]} hand and mixed pages of the 96', '',
           'Truth after W46.ocr-hands-rescore\'s corrections (the owner\'s blind sheet of 2026-10-31 on the hand '
-          'places; ten places stay unresolved, scored on the truth\'s reading). Not a ranking of hands (OCR-1); '
-          f'the {o["sets"]["owner_hand"]} handwritten pages and the mixed pages apart.', '',
+          f'places of the {o["sets"]["owner_hand"]} handwritten pages, 114 places; ten stay unresolved, scored on the '
+          'truth\'s reading; the mixed pages\' lines were not re-checked). Not a ranking of hands (OCR-1); '
+          f'the {o["sets"]["owner_hand"]} handwritten pages and the {o["sets"].get("owner_mixed", "")} mixed pages apart. '
+          + (f'The three agreement-only letters ({", ".join(left)}) were read but are not scored: their truth is '
+             'the drafters\' agreement, never adjudicated and not on the hand sheet, and every other table of the '
+             '96 leaves them out.' if left else ''), '',
           '| route | all | handwritten | mixed | empty |', '|---|---:|---:|---:|---:|']
     for r in o['owner']:
         L.append(f'| {r["route"]} | {f1(r["nes"])} | {f1(o["owner_hand"][r["route"]])} | '
@@ -1008,10 +1026,13 @@ def write_md(o):
     L += ['', '## Measurement card', '',
           '- **Truth.** Public L1-L3: the sources\' own transcriptions (By the People crowd text, Bentham '
           'Transcribe), not drafted by any scored route. Owner pages: drafted by Claude Opus 5.5 and Gemini 3.8 '
-          'Flash, the hand places checked blind by the owner (W46.ocr-hands-rescore); typed and mixed lines not '
-          're-checked, so Gemini 3.8 Flash\'s rows there are agreement with its own draft. Blackwell fine-tune truth: '
+          'Flash; on the 16 handwritten pages the hand places were checked blind by the owner (114 places, '
+          'W46.ocr-hands-rescore); the mixed pages\' lines and any typed lines were not re-checked, so Gemini 3.8 '
+          'Flash\'s rows there are agreement with its own draft. The three agreement-only letters (p086, p094, p096) '
+          'have truth no one adjudicated and are not scored. Blackwell fine-tune truth: '
           'By the People\'s transcriptions of the volume. No line was drawn or corrected by a Claude subagent.',
-          '- **Selection.** The 895\'s frozen L1-L3 strata; the owner\'s pages by the panel\'s kind label; the '
+          '- **Selection.** The 895\'s frozen L1-L3 strata; the owner\'s pages by the panel\'s kind label, less the '
+          'three agreement-only letters; the '
           'Blackwell volume pages by a seeded shuffle of the volume\'s pages with at least '
           f'{MIN_LINES} truth lines, none in the 895; the owner\'s fine-tune hand is the folder with most hand pages. '
           'Page selection is not by a tested route. Training-line pairing and filtering do use the base reader\'s '

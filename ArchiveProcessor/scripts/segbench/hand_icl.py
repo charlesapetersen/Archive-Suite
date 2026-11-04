@@ -369,7 +369,7 @@ def write_report(r):
          'route on this evidence. No cohort at 8 or 16 lines moved by more than its interval allows, the documented '
          'hand\'s point estimates are below zero, and most answers changed only slightly. A kit user who wants a '
          'reader adapted to a hand needs training (W46.ocr-ppocrv6-hands) or another model; this run says nothing '
-         'about Gemini, whose arm (W46.ocr-ppocrv6-hands-paid) is still open.', '',
+         'about Gemini, whose arm (W46.ocr-ppocrv6-hands-paid) is its own report, `ocr-ppocrv6-hands-paid.md`.', '',
          f"**Support:** {sum(g['answered'] for g in r['groups'])} of {sum(g['n'] for g in r['groups'])} fixed "
          f"conditions answered; every reply ended normally (finish {r['finish']}); the longest reply was "
          f"{r['completion_tokens_max']} tokens against the 8,192 cap, so no reply was cut off. "
@@ -381,15 +381,17 @@ def write_report(r):
          'PP-OCRv6-aligned corrected lines, filtered by alignment error against the base recognizer (not a random line '
          'draw); the owner example lines predate the sheet corrections. No Claude subagent drew or read any line or page.',
          '- **Selection:** the frozen pack (`hand_icl.py prepare`, seed `W46.ocr-ppocrv6-hands-qwen-20261101`): 40 seeded L1 '
-         'pages, all 19 owner handwritten pages, the 12 test-role Blackwell pages of the training volume. Blackwell '
+         'pages, all 19 owner handwritten pages, the 12 test-role Blackwell pages of the training volume. The owner '
+         'cohorts hold the 16 scored hand pages and the three agreement-only letters (p086, p094, p096, in '
+         'owner-transfer), whose truth is the drafters\' agreement, never adjudicated and not on the hand sheet. Blackwell '
          'examples come only from its 24 training pages; Shils examples from the other three Shils pages; source-image '
          'hashes reject aliases. No page was chosen by a tested route or by ABBYY text.',
          '- **Comparison:** identical 2400 px / quality-90 target JPEGs across conditions, eight examples the prefix of '
          'sixteen, one prompt, temperature 0, no thinking, 8,192-token cap, 32,768-token context, at most 17 images, '
          f"one sequence, fp8 KV cache, eager. Snapshot `{r['revision']}`, vLLM {rt['vllm']}, transformers "
          f"{rt['transformers']}. Every recorded request hash was recomputed from the frozen pack and matched. "
-         'The Gemini arm (W46.ocr-ppocrv6-hands-paid) uses the same pack but is paused six conditions short, so no '
-         'model comparison is drawn here.',
+         'The Gemini arm (W46.ocr-ppocrv6-hands-paid) uses the same pack and is reported apart '
+         '(`ocr-ppocrv6-hands-paid.md`); no model comparison is drawn here.',
          '- **Noise:** 10,000-round paired page bootstrap within each cohort; public L1 also bootstraps by collection. '
          'One diary and four Shils pages cannot estimate variation across hands. No repeat run was made, so no '
          'prompt-specific rerun floor exists; the inherited hosted handwritten floor (0.60 points) is a reference, not '

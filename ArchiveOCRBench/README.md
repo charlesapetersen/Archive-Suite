@@ -96,10 +96,10 @@ truth runs are added as `own_hardware.routes` entries in `data/inputs.json`; `oc
 pages to `ocr-pages.csv`, and a new route that has read the 895 gets a `PUBLIC_TWIN` entry in `build.py`. Known gaps
 today: part 5 (rankings, difficulty curves, cascades) covers the 29 routes it was fitted on, not Gemini 3.7 Flash or the cluster runs
 other than FarmShare's Qwen3.6 27B. W46.ocr-ppocrv6-hands' line routes (kraken PP-OCRv6 on blla and on Vision lines, and
-Vision's text of its own lines) read only the public L1-L3 and the owner's 21 hand and mixed pages: they join part 7's
-stratum table as L1-L3 columns, but not the 895 table (no other stratum read), not the 96's four charts, the ranking
-table or part 5 (no typed or printed page read, and their 19 handwritten pages include the three agreement-only letters
-the 16-page handwritten chart leaves out), so their owner figures stay in their own panel.
+Vision's text of its own lines) read only the public L1-L3 and the owner's 21 hand and mixed pages, scored on the 18 of
+the 96 (16 handwritten, 2 mixed; the three agreement-only letters are left out, as everywhere else, W46.hands-owner-pages):
+they join part 7's stratum table as L1-L3 columns, but not the 895 table (no other stratum read), not the 96's four
+charts, the ranking table or part 5 (no typed or printed page read), so their owner figures stay in their own panel.
 
 W46.ocr-ppocrv6-hands-paid's 0/8/16-line prompting panel is scaffolded but hidden while its run is
 incomplete. The reservation guard stopped at $2.427833 against the $2.50 cap after 207 conditions
@@ -232,7 +232,8 @@ record:
   the one to quote there.
 - `ocr-ppocrv6-hands.json` (`scripts/segbench/ocr_ppocrv6_hands.py report`, W46.ocr-ppocrv6-hands): kraken's port of
   PP-OCRv6 medium on kraken blla lines and on Apple Vision's line boxes, and Vision's own text of those lines, on the
-  Mac's CPU, on the public L1-L3 (240 pages) and the owner's 21 hand and mixed pages, and fine-tuned on one hand. Part
+  Mac's CPU, on the public L1-L3 (240 pages) and the owner's 18 hand and mixed pages of the 96 (`sets.owner_left_out`
+  names the three agreement-only letters read but not scored), and fine-tuned on one hand. Part
   7's panel shows the item's own routes (the comparators in the file are already on the page; `build.py` stops if their
   L1-L3 figures part from the open sweep's), their paired differences, and every fine-tune row. Owner-hand rows are
   agreement with the drafters: that truth was drafted by models and only its hand places were owner-checked.

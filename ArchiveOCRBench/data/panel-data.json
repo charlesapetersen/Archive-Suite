@@ -43305,17 +43305,17 @@
   "owner": [
    {
     "route": "ppocrv6-kraken-blla",
-    "n": 21,
-    "nes": 63.79327386649876,
-    "hand": 64.8445259116707,
+    "n": 18,
+    "nes": 69.62935100671199,
+    "hand": 71.60722245288032,
     "mixed": 53.80637943736527,
     "empty": 0
    },
    {
     "route": "ppocrv6-kraken-vision",
-    "n": 21,
-    "nes": 55.44841501005482,
-    "hand": 54.01028131129232,
+    "n": 18,
+    "nes": 60.55070042908366,
+    "hand": 59.48070233918178,
     "mixed": 69.11068514829873,
     "empty": 0
    }
@@ -43455,170 +43455,170 @@
     "set": "owner",
     "a": "ppocrv6-kraken-blla",
     "b": "gemini3.1-pro",
-    "n": 21,
-    "delta": -27.51,
-    "lo": -35.82,
-    "hi": -20.57,
-    "p": 0.0
-   },
-   {
-    "set": "owner",
-    "a": "ppocrv6-kraken-blla",
-    "b": "gemini3.5-flash",
-    "n": 21,
-    "delta": -25.31,
-    "lo": -33.24,
-    "hi": -18.59,
+    "n": 18,
+    "delta": -23.05,
+    "lo": -28.3,
+    "hi": -17.65,
     "p": 0.0
    },
    {
     "set": "owner",
     "a": "ppocrv6-kraken-blla",
     "b": "gemini3.8-flash",
-    "n": 21,
-    "delta": -28.41,
-    "lo": -36.56,
-    "hi": -21.5,
+    "n": 18,
+    "delta": -24.1,
+    "lo": -29.34,
+    "hi": -18.69,
+    "p": 0.0
+   },
+   {
+    "set": "owner",
+    "a": "ppocrv6-kraken-blla",
+    "b": "claude-sonnet5.5",
+    "n": 18,
+    "delta": -21.27,
+    "lo": -27.34,
+    "hi": -14.98,
     "p": 0.0
    },
    {
     "set": "owner",
     "a": "ppocrv6-kraken-blla",
     "b": "lightonocr-3-4b-mlx8",
-    "n": 21,
-    "delta": -20.79,
-    "lo": -28.29,
-    "hi": -14.42,
+    "n": 18,
+    "delta": -16.81,
+    "lo": -22.15,
+    "hi": -11.54,
     "p": 0.0
    },
    {
     "set": "owner",
     "a": "ppocrv6-kraken-blla",
     "b": "qwen3.5-9b-mlx4",
-    "n": 21,
-    "delta": -21.13,
-    "lo": -28.69,
-    "hi": -14.83,
+    "n": 18,
+    "delta": -17.12,
+    "lo": -22.32,
+    "hi": -11.99,
     "p": 0.0
    },
    {
     "set": "owner",
     "a": "ppocrv6-kraken-blla",
     "b": "apple-vision",
-    "n": 21,
-    "delta": 7.58,
-    "lo": -1.07,
-    "hi": 16.25,
-    "p": 0.11
+    "n": 18,
+    "delta": 9.89,
+    "lo": 0.86,
+    "hi": 19.2,
+    "p": 0.06
    },
    {
     "set": "owner",
     "a": "ppocrv6-kraken-blla",
     "b": "ppocrv6-medium",
-    "n": 21,
-    "delta": 4.41,
-    "lo": -1.32,
-    "hi": 9.77,
-    "p": 0.15
+    "n": 18,
+    "delta": 6.92,
+    "lo": 1.97,
+    "hi": 12.02,
+    "p": 0.02
    },
    {
     "set": "owner",
     "a": "ppocrv6-kraken-blla",
     "b": "gemini3.7-flash-gw",
-    "n": 21,
-    "delta": -28.45,
-    "lo": -36.58,
-    "hi": -21.54,
+    "n": 18,
+    "delta": -24.18,
+    "lo": -29.48,
+    "hi": -18.63,
     "p": 0.0
    },
    {
     "set": "owner",
     "a": "ppocrv6-kraken-blla",
     "b": "ppocrv6-kraken-vision",
-    "n": 21,
-    "delta": 8.34,
-    "lo": 0.71,
-    "hi": 16.68,
+    "n": 18,
+    "delta": 9.08,
+    "lo": 0.8,
+    "hi": 18.34,
     "p": 0.06
    },
    {
     "set": "owner",
     "a": "ppocrv6-kraken-vision",
     "b": "gemini3.1-pro",
-    "n": 21,
-    "delta": -35.85,
-    "lo": -44.19,
-    "hi": -27.91,
-    "p": 0.0
-   },
-   {
-    "set": "owner",
-    "a": "ppocrv6-kraken-vision",
-    "b": "gemini3.5-flash",
-    "n": 21,
-    "delta": -33.66,
-    "lo": -42.27,
-    "hi": -25.19,
+    "n": 18,
+    "delta": -32.13,
+    "lo": -40.46,
+    "hi": -24.05,
     "p": 0.0
    },
    {
     "set": "owner",
     "a": "ppocrv6-kraken-vision",
     "b": "gemini3.8-flash",
-    "n": 21,
-    "delta": -36.75,
-    "lo": -45.33,
-    "hi": -28.21,
+    "n": 18,
+    "delta": -33.18,
+    "lo": -41.91,
+    "hi": -24.35,
+    "p": 0.0
+   },
+   {
+    "set": "owner",
+    "a": "ppocrv6-kraken-vision",
+    "b": "claude-sonnet5.5",
+    "n": 18,
+    "delta": -30.35,
+    "lo": -39.45,
+    "hi": -21.34,
     "p": 0.0
    },
    {
     "set": "owner",
     "a": "ppocrv6-kraken-vision",
     "b": "lightonocr-3-4b-mlx8",
-    "n": 21,
-    "delta": -29.13,
-    "lo": -38.15,
-    "hi": -19.98,
+    "n": 18,
+    "delta": -25.89,
+    "lo": -35.8,
+    "hi": -15.98,
     "p": 0.0
    },
    {
     "set": "owner",
     "a": "ppocrv6-kraken-vision",
     "b": "qwen3.5-9b-mlx4",
-    "n": 21,
-    "delta": -29.47,
-    "lo": -37.39,
-    "hi": -21.92,
+    "n": 18,
+    "delta": -26.19,
+    "lo": -34.56,
+    "hi": -18.42,
     "p": 0.0
    },
    {
     "set": "owner",
     "a": "ppocrv6-kraken-vision",
     "b": "apple-vision",
-    "n": 21,
-    "delta": -0.77,
-    "lo": -4.8,
-    "hi": 3.3,
-    "p": 0.72
+    "n": 18,
+    "delta": 0.81,
+    "lo": -3.67,
+    "hi": 5.04,
+    "p": 0.73
    },
    {
     "set": "owner",
     "a": "ppocrv6-kraken-vision",
     "b": "ppocrv6-medium",
-    "n": 21,
-    "delta": -3.94,
-    "lo": -12.7,
-    "hi": 4.44,
-    "p": 0.4
+    "n": 18,
+    "delta": -2.16,
+    "lo": -12.18,
+    "hi": 7.2,
+    "p": 0.68
    },
    {
     "set": "owner",
     "a": "ppocrv6-kraken-vision",
     "b": "gemini3.7-flash-gw",
-    "n": 21,
-    "delta": -36.79,
-    "lo": -45.01,
-    "hi": -28.86,
+    "n": 18,
+    "delta": -33.26,
+    "lo": -41.61,
+    "hi": -25.09,
     "p": 0.0
    }
   ],
@@ -43887,11 +43887,17 @@
     "hi": 1.0675108439320566
    }
   ],
-  "kit_recommendation": "Target about 160 corrected lines for an optional same-hand fine-tune, using eager MPS when available. Both backends gain over 80 lines on this holdout; 240 adds no resolved gain over 160. Require line-broken corrected truth and a separate held-out acceptance check for each hand. One hand and one seed do not justify making fine-tuning the default handwriting route.",
+  "kit_recommendation": "Target about 160 corrected lines for an optional same-hand fine-tune, using eager MPS when available. Under the 1,440 line-step ceiling, 80 to 160 lines pays on this hand on both backends; 240 adds no resolved gain over 160, but n240 trained six epochs to n160's nine, so past 160 lines is unmeasured, not shown to be useless. Require line-broken corrected truth and a separate held-out acceptance check for each hand. One hand and one seed do not justify making fine-tuning the default handwriting route.",
   "sets": {
    "public": 240,
-   "owner": 21,
-   "owner_hand": 19
+   "owner": 18,
+   "owner_hand": 16,
+   "owner_mixed": 2,
+   "owner_left_out": [
+    "p086",
+    "p094",
+    "p096"
+   ]
   },
   "line_pairs": {
    "owner": {
