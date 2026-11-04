@@ -541,7 +541,8 @@ final class NotesW7ChecksUITests: NotesFixtureUITestCase {
         return (y >= top && y < top + height && drawn,
                 "header y \(y) at char \(loc), visible \(top)…\(top + height); paragraphs drawn from char "
                 + "\(topChar.map(String.init) ?? "?") (y \(rect?["editorTopFragY"] ?? "?"), \"\(topLine ?? "?")\") to char "
-                + "\(bottomChar.map(String.init) ?? "?"); viewport chars \(rect?["viewportStart"] ?? "?")…\(rect?["viewportEnd"] ?? "?")")
+                + "\(bottomChar.map(String.init) ?? "?"); viewport chars \(rect?["viewportStart"] ?? "?")…\(rect?["viewportEnd"] ?? "?"); "
+                + "scrolls \(rect?["blockScroll"] ?? "?")")
     }
 
     /// The editor draws `assets/<name>` from its own bytes: present, and not the Missing or Blocked placeholder.

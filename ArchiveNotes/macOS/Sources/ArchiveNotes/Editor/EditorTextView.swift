@@ -62,6 +62,7 @@ final class EditorTextView: NSTextView {
                 visibleEntry["viewportEnd"] = content.offset(from: origin, to: viewport.endLocation)
             }
         }
+        visibleEntry["blockScroll"] = blockScrollTrace
         states.append(visibleEntry)
         states.append(["relayout": relayoutLastPass, "rebuilds": relayoutRebuilds, "strandedFixes": strandedChipFixes,
                        "layoutPasses": layoutStrandedPasses])
@@ -180,12 +181,13 @@ final class EditorTextView: NSTextView {
     /// Scroll so the start of `range` (a source block's header) sits at the top of the view, and say whether it
     /// could be placed (W40.fix-notes-jump-scroll-short). `scrollRangeToVisible` alone landed short: a load
     /// invalidates the whole document's layout, and TextKit 2 puts the fragments not yet laid out at estimated
-    /// heights, so it scrolled to where the block was estimated to be, several paragraphs above it. Laying out
-    /// everything above the block first did not help either: the viewport pass anchors its fragments on the
-    /// scroll offset, so the VM's probe showed paragraph 87 drawn at the y the header's own fragment claimed
-    /// (`relocateViewport(to:)` overshot to the end). So this measures from what the viewport draws: the
-    /// fragment at the top of the view, then the fragments laid out one after another from it to the header,
-    /// which puts the header in the same coordinates as what is drawn.
+    /// heights, so it scrolled to where the block was estimated to be, several paragraphs above it. A y measured
+    /// from the top of the document is not enough either: after a long scroll the viewport pass re-anchors on
+    /// the new offset by estimate, and the VM's probe showed paragraph 87 drawn at the y the header had been laid
+    /// out at. So each pass measures from what the viewport has just laid out (its first fragment, then the
+    /// fragments after it, laid out one below another, to the header) and scrolls by that, until a pass finds the
+    /// view already there. A relayout pass after it undoes it all the same, so the caller runs it again once they
+    /// are done (`whenLayoutSettles`).
     @discardableResult
     func scrollBlockToTop(_ range: NSRange) -> Bool {
         guard let storage = textStorage, NSMaxRange(range) <= storage.length,
@@ -194,27 +196,61 @@ final class EditorTextView: NSTextView {
               let clip = enclosingScrollView?.contentView
         else { return false }
         let viewport = layout.textViewportLayoutController
-        scrollRangeToVisible(range)   // near it, by the estimated heights
-        viewport.layoutViewport()
-        guard let anchor = layout.textLayoutFragment(for: CGPoint(x: 0, y: clip.bounds.minY - textContainerOrigin.y))
-        else { return false }
-        var options: NSTextLayoutFragment.EnumerationOptions = [.ensuresLayout]
-        if start.compare(anchor.rangeInElement.location) == .orderedAscending { options.insert(.reverse) }
-        var header: NSTextLayoutFragment?
-        layout.enumerateTextLayoutFragments(from: anchor.rangeInElement.location, options: options) { fragment in
-            guard fragment.rangeInElement.contains(start) || fragment.rangeInElement.location.isEqual(start)
-            else { return true }
-            header = fragment
-            return false
+        var passes: [String] = []
+        defer { noteBlockScroll(passes.joined(separator: "; ")) }
+        for _ in 0..<4 {
+            viewport.layoutViewport()
+            guard let first = viewport.viewportRange?.location, let anchor = layout.textLayoutFragment(for: first) else {
+                passes.append("no viewport fragment")
+                return false
+            }
+            // Fragments between the anchor and the header can keep frames from an earlier pass, laid out before
+            // the viewport re-anchored (measured: the second pass read the first pass's y back). Re-lay them so
+            // they follow on from the anchor.
+            var options: NSTextLayoutFragment.EnumerationOptions = [.ensuresLayout]
+            let between: NSTextRange?
+            if start.compare(anchor.rangeInElement.location) == .orderedAscending {
+                options.insert(.reverse)
+                between = NSTextRange(location: start, end: anchor.rangeInElement.location)
+            } else {
+                let blockEnd = content.location(content.documentRange.location, offsetBy: NSMaxRange(range))
+                between = blockEnd.flatMap { NSTextRange(location: anchor.rangeInElement.endLocation, end: $0) }
+            }
+            if let between, !between.isEmpty { layout.invalidateLayout(for: between) }
+            var header: NSTextLayoutFragment?
+            layout.enumerateTextLayoutFragments(from: anchor.rangeInElement.location, options: options) { fragment in
+                guard fragment.rangeInElement.contains(start) || fragment.rangeInElement.location.isEqual(start)
+                else { return true }
+                header = fragment
+                return false
+            }
+            guard let header else {
+                passes.append("header fragment not reached")
+                return false
+            }
+            let y = header.layoutFragmentFrame.minY + textContainerOrigin.y
+            let target = min(max(0, y - 6), max(0, frame.height - clip.bounds.height))
+            if abs(clip.bounds.minY - target) < 1 {
+                passes.append("there, header y \(y)")
+                return true
+            }
+            passes.append("header y \(y), \(clip.bounds.minY) → \(target)")
+            clip.scroll(to: NSPoint(x: clip.bounds.minX, y: target))
+            enclosingScrollView?.reflectScrolledClipView(clip)
         }
-        guard let header else { return false }
-        let y = header.layoutFragmentFrame.minY + textContainerOrigin.y
-        let maxY = max(0, frame.height - clip.bounds.height)
-        clip.scroll(to: NSPoint(x: clip.bounds.minX, y: min(max(0, y - 6), maxY)))
-        enclosingScrollView?.reflectScrolledClipView(clip)
         viewport.layoutViewport()
         return true
     }
+
+    private func noteBlockScroll(_ outcome: String) {
+#if DEBUG
+        blockScrollTrace = Array((blockScrollTrace + [outcome]).suffix(4))
+#endif
+    }
+#if DEBUG
+    /// The last few `scrollBlockToTop` outcomes, for the chip-geometry probe.
+    private var blockScrollTrace: [String] = []
+#endif
 
     func performContentEditingTransaction(_ edit: () -> Void) {
         if let manager = textLayoutManager?.textContentManager {
@@ -298,8 +334,17 @@ final class EditorTextView: NSTextView {
     /// counts the chips in each viewport fragment against its installed views and, while any is short,
     /// re-lays (at most five more times), rebuilding the short paragraphs from the second pass on.
     private func relayoutViewportSoon(attempt: Int = 0, then: (@MainActor () -> Void)? = nil) {
+        if attempt == 0 { relayoutChains += 1 }
         DispatchQueue.main.async { [weak self] in
-            guard let self, self.window != nil, let layout = self.textLayoutManager,
+            guard let self else { return }
+            var continues = false
+            defer {
+                if !continues {
+                    self.relayoutChains -= 1
+                    self.runSettleWaitersIfIdle()
+                }
+            }
+            guard self.window != nil, let layout = self.textLayoutManager,
                   let content = layout.textContentManager else { return }
             layout.invalidateLayout(for: content.documentRange)
             layout.textViewportLayoutController.layoutViewport()
@@ -310,6 +355,7 @@ final class EditorTextView: NSTextView {
 #endif
             if attempt < 5, !short.isEmpty {
                 if attempt >= 1 { self.rebuildFragments(in: short) }
+                continues = true
                 self.relayoutViewportSoon(attempt: attempt + 1, then: then)
                 return
             }
@@ -317,6 +363,26 @@ final class EditorTextView: NSTextView {
             self.installStrandedChipViews()
             then?()
         }
+    }
+
+    /// Relayout chains still to finish. Each pass invalidates the whole document, and the viewport then places
+    /// its fragments by estimate around the scroll offset, so a scroll measured before the chain ends is lost.
+    private var relayoutChains = 0
+    private var settleWaiters: [@MainActor () -> Void] = []
+
+    /// Run `body` once no relayout chain is pending: at the end of the last one, or on the next turn.
+    func whenLayoutSettles(_ body: @escaping @MainActor () -> Void) {
+        settleWaiters.append(body)
+        if relayoutChains == 0 {
+            DispatchQueue.main.async { [weak self] in self?.runSettleWaitersIfIdle() }
+        }
+    }
+
+    private func runSettleWaitersIfIdle() {
+        guard relayoutChains == 0, !settleWaiters.isEmpty else { return }
+        let waiters = settleWaiters
+        settleWaiters = []
+        waiters.forEach { $0() }
     }
 
     /// Marks `ranges` attribute-edited so the content storage rebuilds their elements, and layout their

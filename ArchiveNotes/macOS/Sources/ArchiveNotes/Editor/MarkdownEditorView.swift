@@ -363,14 +363,21 @@ struct MarkdownEditorView: NSViewRepresentable {
             let range = NotePassageResolve.scrollRange(forBlock: req.block, in: rendered)
             let hitExact = (req.block == nil) || (range != nil)
             if let range {
-                // Placed now, and again a turn later: the text view's frame follows the new layout only then,
-                // so a block near the end can be clamped short on the first pass (W40.fix-notes-jump-scroll-short).
+                // Placed now, then again once the new editor's relayout passes are done (each re-lays the whole
+                // document, and the viewport comes back at estimated positions), and once more a turn after that,
+                // past a resize's place restore (W40.fix-notes-jump-scroll-short).
                 if !textView.scrollBlockToTop(range) { textView.scrollRangeToVisible(range) }
-                DispatchQueue.main.async { [weak textView, weak coordinator] in
-                    guard let textView, let coordinator, coordinator.lastScrollToken == req.token,
-                          coordinator.lastContentID == contentID,
-                          coordinator.lastAppliedMarkdown == markdown else { return }
+                @MainActor func isCurrent() -> Bool {
+                    coordinator.lastScrollToken == req.token && coordinator.lastContentID == contentID
+                        && coordinator.lastAppliedMarkdown == markdown
+                }
+                textView.whenLayoutSettles { [weak textView] in
+                    guard let textView, isCurrent() else { return }
                     textView.scrollBlockToTop(range)
+                    DispatchQueue.main.async { [weak textView] in
+                        guard let textView, isCurrent() else { return }
+                        textView.scrollBlockToTop(range)
+                    }
                 }
             } else {
                 textView.scrollRangeToVisible(NSRange(location: 0, length: 0))

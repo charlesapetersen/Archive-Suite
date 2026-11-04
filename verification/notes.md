@@ -13,7 +13,7 @@ Format and statuses: [`README.md`](README.md). Written by `W40.b2`, 2026-10-12.
   `W23.m9`/`-fu3`, `W23.m14`/`-fu`, `W37.dual-date`, `W24.cal1`, `W24.cal1-toggle`, `W24.cal1-validator`,
   and the W0–W8 records under §*Archive Notes — NEW APP*.
 - **Sources and code read at:** `9e8959ef`.
-- **Count:** `unproven 42 · works 7 · broken 1 · unreachable 0 · fixed-pending-recheck 2` (works: N-07, N-14, N-34, N-45, N-49, N-50, N-51; broken: N-41; fixed-pending-recheck: N-12, N-44). Updated by `W40.notes-w7-gui-checks`, 2026-11-04 (N-07 and N-14 to `works`, N-41 to `broken`).
+- **Count:** `unproven 42 · works 7 · broken 0 · unreachable 0 · fixed-pending-recheck 3` (works: N-07, N-14, N-34, N-45, N-49, N-50, N-51; fixed-pending-recheck: N-12, N-41, N-44). Updated by `W40.fix-notes-jump-scroll-short`, 2026-11-04 (N-41 to `fixed-pending-recheck`).
 
 **Runtime evidence, for every row below: none yet.** The W40.a3 full VM suite
 ([`evidence/notes/W40.a3-full-ui.md`](evidence/notes/W40.a3-full-ui.md)) and the `W9.e2` runtime sweep passed
@@ -565,7 +565,7 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
   (the real switch logic, with closure stubs for load/save); `ArchiveNotesTests/TerminateFlushCoordinatorTests.boundedReplyOnTimeout`;
   `ArchiveNotesUITests/NotesW7ChecksUITests.testS1a_TypeThenSelectAnotherNoteSavesTheEditAndLoadsTheOtherFresh`
   (real keystrokes, then a real list selection, in the running app).
-- **Runtime evidence:** 2026-11-04 · [`evidence/notes/W40.notes-w7-gui-checks.md`](evidence/notes/W40.notes-w7-gui-checks.md): typed into one note and selected another at once: the edit is in the first note's file exactly once, the second loads its own text and its file is byte-identical; the run logged that the idle autosave had not yet written the file, so the switch saved it. VM runs 3, 5 and 7 (twice).
+- **Runtime evidence:** 2026-11-04 · [`evidence/notes/W40.fix-notes-jump-scroll-short.md`](evidence/notes/W40.fix-notes-jump-scroll-short.md): after the fix the cited block's header is drawn in the view after the jump, 9 runs of 9 in the VM (at the top of the view in 5, about 70 pt below it in 4). Before it, 2026-11-04 · [`evidence/notes/W40.notes-w7-gui-checks.md`](evidence/notes/W40.notes-w7-gui-checks.md): typed into one note and selected another at once: the edit is in the first note's file exactly once, the second loads its own text and its file is byte-identical; the run logged that the idle autosave had not yet written the file, so the switch saved it. VM runs 3, 5 and 7 (twice).
   Earlier: [`evidence/notes/W40.d9-writing.md`](evidence/notes/W40.d9-writing.md): typing autosaves with no other action (on disk after 1.3 s); ⌘Q pressed straight after typing, inside both debounces, saved the edit; closing the window straight after typing saved it. Held in every VM run.
 - **Status:** `works`
 - **History:**
@@ -1303,14 +1303,15 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
   `ArchiveNotesUITests/NotesGUITests.testG15_OpenRequestOpensTheClosedFeaturingWindow` (jump through the
   `an.editor.test.jump` seam with the Notes window closed);
   `ArchiveNotesUITests/NotesGUITests.testW21_CrossWindowPassageChipReStylesAfterSourceTrash`;
-  `ArchiveNotesUITests/NotesW7ChecksUITests.testS3_JumpFromTheExtractsWindowScrollsToALowerBlock` (the failing
-  check, an expected failure until the fix), `.testS3_RenamedThenDeletedSourceUpdatesTheChipAndTheJump`,
+  `ArchiveNotesUITests/NotesW7ChecksUITests.testS3_JumpFromTheExtractsWindowScrollsToALowerBlock` (the header
+  drawn in the view after the jump, live since the fix), `.testS3_RenamedThenDeletedSourceUpdatesTheChipAndTheJump`,
   `.testS3_StaleOrdinalJumpOpensTheSourceAndSaysItHasChanged`.
 - **Runtime evidence:** 2026-11-04 · [`evidence/notes/W40.notes-w7-gui-checks.md`](evidence/notes/W40.notes-w7-gui-checks.md): **the scroll fails.** A jump from the Extracts window to a block half-way down a 200-paragraph source selects the note in the Note window and moves the view down, but the block's header is not on screen afterwards (the screenshots show paragraphs 93 to 98, the block after paragraph 100), 3 runs of 3. Held in the same runs: a renamed source's chip shows the new title, a deleted source greys the chip and the jump says "no longer exists — the extract text is preserved", a stale ordinal opens the source at its top with "The source note has changed since this extract was made."
-- **Status:** `broken` — `W40.fix-notes-jump-scroll-short` (S3)
+- **Status:** `fixed-pending-recheck` (builder is not verifier)
 - **History:**
   - 2026-10-12 W40.b2 — row written, `unproven`.
   - 2026-11-04 W40.notes-w7-gui-checks — the scroll to the block reproduced failing; `broken`, `W40.fix-notes-jump-scroll-short` (S3).
+  - 2026-11-04 W40.fix-notes-jump-scroll-short — `broken` → `fixed-pending-recheck`: the jump measures the header's position from the fragments the viewport has drawn (`EditorTextView.scrollBlockToTop`) and is placed again once the new editor's relayout passes finish (`whenLayoutSettles`); the S3 test now asserts the header is drawn in the view, by the paragraphs drawn at its top and bottom, 6 runs of 6 in the VM, and the W7 class with G10 3 runs of 3. [`evidence/notes/W40.fix-notes-jump-scroll-short.md`](evidence/notes/W40.fix-notes-jump-scroll-short.md).
 - **Notes:** W9.e1 rated this PARTIAL (a jump with the Notes window closed did nothing). `W9.b5-fu1` fixed it, and
   VM `testG15_OpenRequestOpensTheClosedFeaturingWindow` covers both directions. That test drives Jump through a
   DEBUG seam, not the chip button. If the source's block ordinal no longer matches, the jump selects the note
