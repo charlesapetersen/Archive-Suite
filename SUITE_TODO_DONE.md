@@ -13988,3 +13988,21 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   noted that a folder swapped for another bulk run still loads and pays without asking, which is recorded in KNOWN_ISSUES.
   The previous session's uncommitted draft (retired 2026-11-01) was the starting point. No bench cache was used.
   <!-- /W40.fix-processor-instcompute-resume-silent -->
+- [x] **W46.capture-ladder — which capture defects cost which reader how much, reduced to FarmShare scale [M]** (lane: segbench) (uses: build) (cluster: sherlock) (blocked-on: W46.cluster-waves, W46.fix-ocr-scorers, W46.fix-capture-tags) · §Document processing review — W46 (owner, 2026-10-20) · SHIPPED 2026-11-03 — Augraphy and OpenCV defects on the 96 at every setting and a two-severity subset of the 895 for the cheap readers, a 100-page 27B sample, capture-time signals, SmartDoc-QA letters; two sessions; the full 895 ladder is W46.capture-ladder-sherlock. detail: execution-plans/processing-review/10-gap-audit.md §5 item 27 **Measurement audit (2026-10-30, `execution-plans/processing-review/11-measurement-audit.md`):** ENH-1/CAP-1/OCR-6: no slicing by the optical capture tags (kappa 0.14-0.33); add the dewarp arms on the tilt-12 and tilt-20 images; bowF1 beside NES.
+  Result (`ArchiveProcessor/segbench-results/capture-ladder.md`, the bench page's capture section): the 96 under 16
+  synthetic defects (Augraphy ShadowCast, LightingGradient, ReflectedLight, LowLightNoise at defaults; motion 9/17/31 px;
+  defocus sigma 1.5/3/5; tilt 5/12/20 degrees; JPEG 60/75/85; seed 46), read by Qwen3.6-27B and LightOnOCR-3 4B on Sherlock
+  (2026-10-22, jobs 49142361-49142370, owner-collected) and Apple Vision on the Mac. Glare costs 10.3 / 9.3 / 8.7 NES
+  (27B / LightOn / Vision); motion 17 px 7.9 / 12.2 / 38.3; defocus 5 15.1 / 15.3 / 53.8; tilt, JPEG >= 60 and the faint
+  default shadow and gradient cost none more than about 2. Vision breaks first under blur; LightOn answers heavy blur
+  with empty replies (66), the 27B with 600 s timeouts (29). Apple's quad on the tilted images recovers nothing for
+  Vision; the open readers lose at most 0.6 on tilt, so no cluster dewarp arm was run (audit ENH-1). Vision moves 1.6
+  NES on a defect-free re-save, so its rows pair against that re-save. Signals (AUC against a 5-point loss): sharpness
+  in word boxes 0.70-0.75, word-box coverage 0.70-0.78, clipped highlights 0.50-0.53 (misses the glare); cuts in-sample.
+  bowF1 beside NES; no optical-tag slicing (CAP-1). Left for W46.capture-ladder-rest (behind W46.nice-to-have): GLM-OCR
+  regions, the 895 subset and 27B sample, the 2B windows, the 27B's quality verdict, SmartDoc-QA. No money spent.
+  Bench cache: moved the regenerated images (825 MB), arms and the private Augraphy venv to the Trash; kept capture-ladder/{lines,quad,
+  signals.json} (118 MB, Vision output the report reads) and sherlock-results/capture-ladder-20261022 (15 MB, the owner-collected readings). A rerun of
+  `report` needs `make --out ~/Library/Caches/ArchiveSuiteRehearsal/capture-ladder/pack` first (deterministic,
+  about 25 minutes, needs augraphy) and `vision` for the re-save and tilt arms.
+  <!-- /W46.capture-ladder -->
