@@ -121,7 +121,7 @@ RESAVE = 'resave-q92'   # the raw image through make's save with no defect: Visi
 # Apple Vision moves on a re-encode alone (its JPEG 85 row was +1.6 NES against the raw file, +4.7 on the PDF
 # images), so its defect rows are paired against the raw image re-saved exactly as every defect image was; the
 # Sherlock readers' JPEG 85 rows are within 0.3 points of raw, so raw stays theirs (re-saving needs no new reading).
-BASE = {'qwen3.6-27b': 'raw', 'lightonocr3-4b': 'raw', 'vision': RESAVE}
+BASE = {'qwen3.6-27b': 'raw', 'lightonocr3-4b': 'raw', 'vision': RESAVE, 'gemini3.7-flash-gw': 'raw'}
 LOSS = 0.05                                               # a "loss": the page's NES falls 5 points or more
 
 
@@ -266,6 +266,89 @@ def cluster_readings(root, routes, expected, check_images):
 
 
 READERS = {'qwen3.6-27b': 'Qwen3.6-27B', 'lightonocr3-4b': 'LightOnOCR-3 4B', 'vision': 'Apple Vision'}
+SIGNAL_READERS = dict(READERS)   # the readers of all 96 at every setting; Gemini (below) read half of them
+GEMINI = 'gemini3.7-flash-gw'    # W46.capture-ladder-paid: capture_ladder_gateway.py, 48 pages, ten settings
+
+
+def gemini():
+    """(readings, verdicts) from capture_ladder_gateway.py, each None until that arm is complete."""
+    import capture_ladder_gateway as W
+    return W.readings(), W.verdicts()
+
+
+GEMINI_LABEL = 'Gemini 3.7 Flash (gateway, 48 pages)'
+
+
+def verdict_tables(by, sig, ver, pages):
+    """Gemini's verdict on each image against the applied defect and against every reader's loss on that image:
+    (report lines, json). AUC of 5 - quality against a loss of LOSS or more, beside the capture-time signals' AUC on
+    the same images; an unparsed verdict is left out and counted."""
+    from collections import Counter
+    import capture_ladder_gateway as GW
+    if not ver:
+        return [], None
+    gp = GW.pages()
+    conds = ('raw', *GW.VARIANTS)
+    mean = lambda xs: sum(xs) / len(xs) if xs else None
+    pc = lambda x: '—' if x is None else f'{100 * x:.0f}'
+    L = ["## Gemini 3.7 Flash's own verdict on the capture", '', VERDICT_NOTE, '',
+         '| image | n | parsed | mean quality (1-5) | retake % | flags the applied defect % | flags a blur % | '
+         'flags any defect % | most flagged |', '|---|---:|---:|---:|---:|---:|---:|---:|---|']
+    cond_rows = []
+    for c in conds:
+        vv = [ver[c, p] for p in gp if ver[c, p]]
+        tag = GW.TAG.get(c)
+        row = {'variant': c, 'n': len(gp), 'parsed': len(vv), 'tag': tag,
+               'quality': mean([v['quality'] for v in vv]), 'retake': mean([v['retake'] for v in vv]),
+               'flag_tag': mean([tag in v['defects'] for v in vv]) if tag else None,
+               'flag_blur': mean([bool(v['defects'] & GW.BLUR) for v in vv]),
+               'flag_any': mean([bool(v['defects']) for v in vv]),
+               'top': Counter(d for v in vv for d in v['defects']).most_common(3)}
+        cond_rows.append(row)
+        q = '—' if row['quality'] is None else f"{row['quality']:.2f}"
+        L.append(f"| {c} | {row['n']} | {row['parsed']} | {q} | {pc(row['retake'])} | "
+                 f"{pc(row['flag_tag'])} | {pc(row['flag_blur'])} | {pc(row['flag_any'])} | "
+                 + ', '.join(f'{d} {k}' for d, k in row['top']) + ' |')
+    readers = [r for r in (*SIGNAL_READERS, GEMINI) if (r, BASE[r], gp[0]) in by]
+    labels = {**SIGNAL_READERS, GEMINI: GEMINI_LABEL}
+    L += ['', f'Against each reader\'s loss of {round(100 * LOSS)} NES points or more on the same '
+          f'{len(GW.VARIANTS)} x {len(gp)} defect images (AUC 0.5 is no information; the signals\' AUC is over these '
+          'images only, so it differs from the table above):', '',
+          '| reader | losses / images | verdict: 5 - quality AUC | retake: hit / false alarm | '
+          'Laplacian variance AUC | word-box share AUC |', '|---|---:|---:|---|---:|---:|']
+    auc_rows = []
+    f2 = lambda x: '—' if x is None else f'{x:.2f}'
+    for r in readers:
+        pos, neg, rp, rn, lp, ln, tp, tn = [], [], [], [], [], [], [], []
+        for c in GW.VARIANTS:
+            for p in gp:
+                v = ver[c, p]
+                if not v:
+                    continue
+                loss = by[r, BASE[r], p]['nes'] - by[r, c, p]['nes'] >= LOSS
+                (pos if loss else neg).append(5 - v['quality'])
+                (rp if loss else rn).append(v['retake'])
+                (lp if loss else ln).append(-sig[c, p]['laplacian_var'])
+                (tp if loss else tn).append(-sig[c, p]['text_px'])
+        row = {'reader': r, 'losses': len(pos), 'images': len(pos) + len(neg), 'auc_quality': auc(pos, neg),
+               'retake_hit': mean(rp), 'retake_false_alarm': mean(rn),
+               'auc_laplacian': auc(lp, ln), 'auc_text_px': auc(tp, tn)}
+        auc_rows.append(row)
+        L.append(f"| {labels[r]} | {row['losses']} / {row['images']} | {f2(row['auc_quality'])} | "
+                 f"{pc(row['retake_hit'])}% / {pc(row['retake_false_alarm'])}% | {f2(row['auc_laplacian'])} | "
+                 f"{f2(row['auc_text_px'])} |")
+    L.append('')
+    return L, {'pages': len(gp), 'conditions': cond_rows, 'auc': auc_rows, 'note': VERDICT_NOTE,
+               'labels': labels, 'billed': GW.billed(), 'prompt': GW.VERDICT_PROMPT}
+
+
+VERDICT_NOTE = ('Gemini 3.7 Flash was asked, apart from any reading, to judge each image\'s capture: a quality '
+                'score 1-5, whether to retake it, and a defect list from a fixed vocabulary (capture_ladder_gateway.py '
+                'VERDICT_PROMPT), temperature 0, low reasoning. The images are the 48 pages\' plain photographs and '
+                'their ten defect images that Gemini also read. "Flags the applied defect" is the share whose list '
+                'names the defect the image was given (Augraphy shadow as shadow, lighting gradient as '
+                'uneven_lighting, reflected light as glare, low light as dark_or_noisy, motion as motion_blur, '
+                'defocus as out_of_focus, tilt as tilted, JPEG as compression_artifacts).')
 
 
 def score_all():
@@ -277,6 +360,8 @@ def score_all():
     pages = [r['page'] for r in rows]
     routes = ('qwen3.6-27b', 'lightonocr3-4b')
     lad = cluster_readings(CLUSTER, routes, {f'{v}/{p}' for v in names for p in pages}, check_images=True)
+    import capture_ladder_gateway as GW
+    gem = gemini()[0]
     base = cluster_readings(DEWARP_CLUSTER, routes, {f'raw/{p}' for p in pages}, check_images=False)
     out = []
     for r in rows:
@@ -290,6 +375,8 @@ def score_all():
         for v in ['raw', RESAVE, *names, *TILT_ARMS]:
             text = '\n'.join(l['text'] for l in json.loads(lines_path(v, p).read_text())['lines'])
             cells.append(('vision', v, text, 'ok' if text else 'blank'))
+        if gem and (('raw', p) in gem):
+            cells += [(GEMINI, v, *gem[v, p]) for v in ('raw', *GW.VARIANTS)]
         for route, v, text, status in cells:
             s = S.score(truth, text)
             n = s['words'] + s['hyp_words']
@@ -442,10 +529,14 @@ def cmd_report(a):
               ('handwritten', lambda r: r['kind'] == 'handwritten')]
     pct = lambda x: f'{100 * x:.1f}'
     ci = lambda d: f"{100 * d['delta']:+.1f} ({100 * d['lo']:+.1f} to {100 * d['hi']:+.1f})"
+    import capture_ladder_gateway as GW
+    all_pages = pages
+    readers = {**READERS, **({GEMINI: GEMINI_LABEL} if any(r['reader'] == GEMINI for r in rows) else {})}
     summary, L = [], []
-    for reader, label in READERS.items():
-        vs = names + (list(TILT_ARMS) if reader == 'vision' else [])
+    for reader, label in readers.items():
+        vs = list(GW.VARIANTS) if reader == GEMINI else names + (list(TILT_ARMS) if reader == 'vision' else [])
         b0 = BASE[reader]
+        pages = [r for r in all_pages if (reader, b0, r['page']) in by]
         heads = ['raw'] + ([RESAVE] if b0 == RESAVE else [])
         L += [f'## {label}', '',
               '| defect | n | loops (cap / timeout) | blank | NES strict % | Δ NES strict (95% CI) | NES answered % | bowF1 % | '
@@ -482,15 +573,16 @@ def cmd_report(a):
                 cells.append(f"{ci(d)} [{d['n']}]")
             L.append(f'| {v} | ' + ' | '.join(cells) + ' |')
         L.append('')
+    pages = all_pages
     sig = {(s['variant'], s['page']): s for s in json.loads((WORK / 'signals.json').read_text())}
     L += ['## Capture-time signals against a loss of 5 NES points or more', '',
-          '| signal | ' + ' | '.join(f'{lab} AUC' for lab in READERS.values()) + ' | ' +
-          ' | '.join(f'{lab}: cut (hit / false alarm)' for lab in READERS.values()) + ' |',
-          '|---|' + '---:|' * len(READERS) + '---|' * len(READERS)]
+          '| signal | ' + ' | '.join(f'{lab} AUC' for lab in SIGNAL_READERS.values()) + ' | ' +
+          ' | '.join(f'{lab}: cut (hit / false alarm)' for lab in SIGNAL_READERS.values()) + ' |',
+          '|---|' + '---:|' * len(SIGNAL_READERS) + '---|' * len(SIGNAL_READERS)]
     sig_rows = []
     for name, (label, sign) in SIGNALS.items():
         aucs, cuts = [], []
-        for reader in READERS:
+        for reader in SIGNAL_READERS:
             pos, neg = [], []
             for v in names:
                 for r in pages:
@@ -504,7 +596,7 @@ def cmd_report(a):
                              'hit': tpr, 'false_alarm': fpr, 'losses': len(pos), 'cases': len(pos) + len(neg)})
         L.append(f'| {label} | ' + ' | '.join(aucs) + ' | ' + ' | '.join(cuts) + ' |')
     L += ['', 'Losses (of {} defect images): '.format(len(names) * len(pages)) + ', '.join(
-        f"{lab} {next(s['losses'] for s in sig_rows if s['reader'] == rd)}" for rd, lab in READERS.items()) + '.', '']
+        f"{lab} {next(s['losses'] for s in sig_rows if s['reader'] == rd)}" for rd, lab in SIGNAL_READERS.items()) + '.', '']
     res = P.RESULTS
     fields = ['reader', 'variant', 'page', 'source', 'kind', 'status', 'ok', 'nes', 'chrf', 'bowf1', 'words',
               'hyp_words', 'missed', 'added']
@@ -517,7 +609,9 @@ def cmd_report(a):
         w = csv.DictWriter(f, keys, extrasaction='ignore', lineterminator='\n'); w.writeheader()
         for s in sig.values():
             w.writerow({k: round(v, 6) if isinstance(v, float) else v for k, v in s.items()})
-    page = {'report': 'capture-ladder.md', 'loss': LOSS, 'readers': READERS, 'variants': VARIANT_NAMES,
+    vt, vj = verdict_tables(by, sig, gemini()[1], pages)
+    L += vt
+    page = {'report': 'capture-ladder.md', 'loss': LOSS, 'readers': readers, 'verdict': vj, 'variants': VARIANT_NAMES,
             'signal_names': {k: v[0] for k, v in SIGNALS.items()}, 'note': PAGE_NOTE, 'signals_note': SIGNALS_NOTE,
             'summary': summary, 'signals': sig_rows}
     (res / 'capture-ladder.json').write_text(json.dumps(page, indent=1) + '\n')

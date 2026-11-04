@@ -305,12 +305,17 @@ footer p { font-size: 13px; }
   </section>
 
   <section class="panel" id="capture" hidden>
-    <div class="head"><h2>What a bad photograph costs each reader</h2><span class="meta">the 96 at 16 defect settings · Sherlock readers and Apple Vision, free (W46.capture-ladder)</span></div>
+    <div class="head"><h2>What a bad photograph costs each reader</h2><span class="meta">the 96 at 16 defect settings · Sherlock readers and Apple Vision, free (W46.capture-ladder); Gemini 3.7 Flash on 48 at ten, gateway (W46.capture-ladder-paid)</span></div>
     <p class="note" id="cl-note"></p>
     <label for="cl-reader">Reader </label><select id="cl-reader"></select>
     <div class="tbl"><table><thead><tr><th>Defect</th><th>NES</th><th>Change against the plain image (95% CI)</th><th>Order-free change (bowF1, 95% CI)</th><th>Loops</th><th>Blank</th><th>Pages losing ≥5 points</th></tr></thead><tbody id="cl-rows"></tbody></table></div>
     <p class="note" id="cl-sig-note"></p>
     <div class="tbl"><table><thead><tr><th>Signal, measured at capture</th><th>Reader</th><th>AUC</th><th>Best cut</th><th>Losses caught</th><th>False alarms</th></tr></thead><tbody id="cl-sig"></tbody></table></div>
+    <div id="cl-verdict" hidden>
+    <p class="note" id="cl-v-note"></p>
+    <div class="tbl"><table><thead><tr><th>Image</th><th>Verdicts</th><th>Mean quality (1-5)</th><th>Retake</th><th>Names the applied defect</th><th>Names a blur</th><th>Names any defect</th></tr></thead><tbody id="cl-v-rows"></tbody></table></div>
+    <div class="tbl"><table><thead><tr><th>Reader</th><th>Losses / images</th><th>Verdict AUC</th><th>Retake: losses caught</th><th>Retake: false alarms</th><th>Laplacian AUC, same images</th><th>Word-box share AUC, same images</th></tr></thead><tbody id="cl-v-auc"></tbody></table></div>
+    </div>
   </section>
 
   <section class="panel" id="enh-ocr" hidden>
@@ -986,6 +991,15 @@ if (CL) {
   const draw = () => { document.getElementById('cl-rows').innerHTML = CL.summary.filter(r => r.reader === sel.value).map(r => '<tr><td>' + (CL.variants[r.variant] || r.variant) + '</td><td>' + q1(r.nes) + '</td><td>' + (r.baseline ? '—' : ci(r.d_nes)) + '</td><td>' + (r.baseline ? '—' : ci(r.d_bowf1)) + '</td><td>' + r.loops + '</td><td>' + r.blank + '</td><td>' + (r.baseline ? '—' : r.lost5) + '</td></tr>').join(''); };
   sel.addEventListener('change', draw);
   draw();
+  const CV = CL.verdict;
+  if (CV) {
+    document.getElementById('cl-verdict').hidden = false;
+    const pc = v => v == null ? '—' : Math.round(100 * v) + '%';
+    const f2 = v => v == null ? '—' : v.toFixed(2);
+    document.getElementById('cl-v-note').textContent = CV.note + (CV.finding ? ' ' + CV.finding : '');
+    document.getElementById('cl-v-rows').innerHTML = CV.conditions.map(r => '<tr><td>' + (CL.variants[r.variant] || r.variant) + '</td><td>' + r.parsed + ' of ' + r.n + '</td><td>' + f2(r.quality) + '</td><td>' + pc(r.retake) + '</td><td>' + pc(r.flag_tag) + '</td><td>' + pc(r.flag_blur) + '</td><td>' + pc(r.flag_any) + '</td></tr>').join('');
+    document.getElementById('cl-v-auc').innerHTML = CV.auc.map(r => '<tr><td>' + CV.labels[r.reader] + '</td><td>' + r.losses + ' / ' + r.images + '</td><td>' + f2(r.auc_quality) + '</td><td>' + pc(r.retake_hit) + '</td><td>' + pc(r.retake_false_alarm) + '</td><td>' + f2(r.auc_laplacian) + '</td><td>' + f2(r.auc_text_px) + '</td></tr>').join('');
+  }
   document.getElementById('cl-sig').innerHTML = CL.signals.map(r => '<tr><td>' + CL.signal_names[r.signal] + '</td><td>' + CL.readers[r.reader] + '</td><td>' + (r.auc == null ? '—' : r.auc.toFixed(2)) + '</td><td>' + (r.cut == null ? '—' : r.cut.toPrecision(3)) + '</td><td>' + Math.round(100 * r.hit) + '% of ' + r.losses + '</td><td>' + Math.round(100 * r.false_alarm) + '%</td></tr>').join('');
 }
 const EO = DATA.enh_ocr;
