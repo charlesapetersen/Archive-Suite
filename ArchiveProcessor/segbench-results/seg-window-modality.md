@@ -88,7 +88,9 @@ Pages in an exact document. "Default" is offset 0 with `l1`, the request the ben
 4. **W46.seg-window-modality-paid keeps its size question open.** The 2B is flat in K, so Gemini's K = 3, 5 and 10 arms
    can run on the 150-page subset; the text-only arm should keep the full 551 development pages, because the 2B is
    not flat in modality and the paid item is what says whether a strong model is. That item's session decides its
-   own arms within its $8 cap.
+   own arms within its $8 cap. **Answered 2026-11-04 (`seg-window-gateway.md`):** Gemini 3.7 Flash is flat in K on
+   Deaver too, and text alone costs it 2.7 points over the 551 pages (a tie; interval -9.5 to +1.6), against the
+   2B's 8.3; $6.08 spent.
 
 ## Speed on one L40S (concurrency 16)
 

@@ -380,9 +380,19 @@ def seg_window_modality():
     if any(not x.startswith("2b-folder folder-") for x in d["incomplete"]):
         sys.exit(f"seg-window-modality.json has incomplete cells: {d['incomplete'][:1]}")
     keep = ("model", "arm", "pages_exact", "boundary_f1")
-    return {"pooled": [{"pool": r["pool"], **{k: r[k] for k in keep}} for r in d["pooled"]] +
-                      [{"pool": "lincoln", **{k: r[k] for k in keep}} for r in d["rows"] if r["box"] == "Lincoln"],
-            "incomplete": d["incomplete"]}
+    out = {"pooled": [{"pool": r["pool"], **{k: r[k] for k in keep}} for r in d["pooled"]] +
+                     [{"pool": "lincoln", **{k: r[k] for k in keep}} for r in d["rows"] if r["box"] == "Lincoln"],
+           "incomplete": d["incomplete"]}
+    # W46.seg-window-modality-paid: Gemini 3.7 Flash through the gateway, K = 7 on the three boxes, sizes on Deaver.
+    gw = RESULTS / "seg-window-gateway.json"
+    if gw.exists():
+        g = json.loads(gw.read_text())
+        if g["incomplete"]:
+            sys.exit(f"seg-window-gateway.json has incomplete cells: {g['incomplete'][:1]}")
+        out["gateway"] = {"pooled": [{k: r[k] for k in ("arm", "boxes", "pages", "pages_exact", "boundary_f1",
+                                                        "false_splits", "false_merges")} for r in g["pooled"]],
+                          "paired": g["paired"], "spent": g["spent"]}
+    return out
 
 
 def seg_kit_gate_sherlock():

@@ -27419,7 +27419,397 @@
   ],
   "incomplete": [
    "2b-folder folder-it Dean: 2 folder units failed"
-  ]
+  ],
+  "gateway": {
+   "pooled": [
+    {
+     "arm": "k7-it",
+     "boxes": [
+      "Dean",
+      "Deaver",
+      "Herrnstein"
+     ],
+     "pages": 518,
+     "pages_exact": 0.9227799227799228,
+     "boundary_f1": 0.9728813559322034,
+     "false_splits": 9,
+     "false_merges": 7
+    },
+    {
+     "arm": "k7-it",
+     "boxes": [
+      "Deaver"
+     ],
+     "pages": 141,
+     "pages_exact": 0.9219858156028369,
+     "boundary_f1": 0.9707602339181286,
+     "false_splits": 4,
+     "false_merges": 1
+    },
+    {
+     "arm": "k7-t",
+     "boxes": [
+      "Dean",
+      "Deaver",
+      "Herrnstein"
+     ],
+     "pages": 518,
+     "pages_exact": 0.8957528957528957,
+     "boundary_f1": 0.9761092150170648,
+     "false_splits": 6,
+     "false_merges": 8
+    },
+    {
+     "arm": "k7-t",
+     "boxes": [
+      "Deaver"
+     ],
+     "pages": 141,
+     "pages_exact": 0.9361702127659575,
+     "boundary_f1": 0.9761904761904762,
+     "false_splits": 2,
+     "false_merges": 2
+    },
+    {
+     "arm": "k3-it",
+     "boxes": [
+      "Deaver"
+     ],
+     "pages": 141,
+     "pages_exact": 0.9219858156028369,
+     "boundary_f1": 0.9822485207100592,
+     "false_splits": 2,
+     "false_merges": 1
+    },
+    {
+     "arm": "k5-it",
+     "boxes": [
+      "Deaver"
+     ],
+     "pages": 141,
+     "pages_exact": 0.9361702127659575,
+     "boundary_f1": 0.9764705882352941,
+     "false_splits": 3,
+     "false_merges": 1
+    },
+    {
+     "arm": "k10-it",
+     "boxes": [
+      "Deaver"
+     ],
+     "pages": 141,
+     "pages_exact": 0.9219858156028369,
+     "boundary_f1": 0.9707602339181286,
+     "false_splits": 4,
+     "false_merges": 1
+    },
+    {
+     "arm": "folder-it",
+     "boxes": [
+      "Deaver"
+     ],
+     "pages": 141,
+     "pages_exact": 0.8865248226950354,
+     "boundary_f1": 0.9545454545454546,
+     "false_splits": 8,
+     "false_merges": 0
+    },
+    {
+     "arm": "k3-t",
+     "boxes": [
+      "Deaver"
+     ],
+     "pages": 141,
+     "pages_exact": 0.9361702127659575,
+     "boundary_f1": 0.9761904761904762,
+     "false_splits": 2,
+     "false_merges": 2
+    },
+    {
+     "arm": "k5-t",
+     "boxes": [
+      "Deaver"
+     ],
+     "pages": 141,
+     "pages_exact": 0.950354609929078,
+     "boundary_f1": 0.9820359281437125,
+     "false_splits": 1,
+     "false_merges": 2
+    },
+    {
+     "arm": "k10-t",
+     "boxes": [
+      "Deaver"
+     ],
+     "pages": 141,
+     "pages_exact": 0.9361702127659575,
+     "boundary_f1": 0.9761904761904762,
+     "false_splits": 2,
+     "false_merges": 2
+    },
+    {
+     "arm": "3.8-k7-it",
+     "boxes": [
+      "Dean",
+      "Deaver",
+      "Herrnstein"
+     ],
+     "pages": 518,
+     "pages_exact": 0.9073359073359073,
+     "boundary_f1": 0.9761904761904762,
+     "false_splits": 7,
+     "false_merges": 7
+    },
+    {
+     "arm": "3.8-k7-it",
+     "boxes": [
+      "Deaver"
+     ],
+     "pages": 141,
+     "pages_exact": 0.9787234042553191,
+     "boundary_f1": 0.9940119760479041,
+     "false_splits": 0,
+     "false_merges": 1
+    },
+    {
+     "arm": "3.8-folder-it",
+     "boxes": [
+      "Dean",
+      "Deaver",
+      "Herrnstein"
+     ],
+     "pages": 518,
+     "pages_exact": 0.9305019305019305,
+     "boundary_f1": 0.9761904761904762,
+     "false_splits": 7,
+     "false_merges": 7
+    },
+    {
+     "arm": "3.8-folder-it",
+     "boxes": [
+      "Deaver"
+     ],
+     "pages": 141,
+     "pages_exact": 0.9361702127659575,
+     "boundary_f1": 0.9880952380952381,
+     "false_splits": 1,
+     "false_merges": 1
+    }
+   ],
+   "paired": [
+    {
+     "a": "k7-t",
+     "b": "k7-it",
+     "boxes": [
+      "Dean",
+      "Deaver",
+      "Herrnstein"
+     ],
+     "delta": -0.02702702702702703,
+     "lo": -0.09514563106796116,
+     "hi": 0.016293279022403257,
+     "pages": 518,
+     "runs": 318,
+     "by_folder_run": {
+      "lo": -0.09330628803245436,
+      "hi": 0.016597510373443983,
+      "runs": 24
+     }
+    },
+    {
+     "a": "3.8-k7-it",
+     "b": "k7-it",
+     "boxes": [
+      "Dean",
+      "Deaver",
+      "Herrnstein"
+     ],
+     "delta": -0.015444015444015444,
+     "lo": -0.08333333333333333,
+     "hi": 0.028282828282828285,
+     "pages": 518,
+     "runs": 318,
+     "by_folder_run": {
+      "lo": -0.08461538461538462,
+      "hi": 0.03319502074688797,
+      "runs": 24
+     }
+    },
+    {
+     "a": "3.8-k7-it",
+     "b": "k7-it",
+     "boxes": [
+      "Deaver"
+     ],
+     "delta": 0.05673758865248227,
+     "lo": 0.013422818791946308,
+     "hi": 0.11764705882352941,
+     "pages": 141,
+     "runs": 89,
+     "by_folder_run": {
+      "lo": 0.0,
+      "hi": 0.09230769230769231,
+      "runs": 5
+     }
+    },
+    {
+     "a": "k3-it",
+     "b": "k7-it",
+     "boxes": [
+      "Deaver"
+     ],
+     "delta": 0.0,
+     "lo": -0.1038961038961039,
+     "hi": 0.08571428571428572,
+     "pages": 141,
+     "runs": 89,
+     "by_folder_run": {
+      "lo": -0.19047619047619047,
+      "hi": 0.075,
+      "runs": 5
+     }
+    },
+    {
+     "a": "k5-it",
+     "b": "k7-it",
+     "boxes": [
+      "Deaver"
+     ],
+     "delta": 0.014184397163120567,
+     "lo": -0.058394160583941604,
+     "hi": 0.08955223880597014,
+     "pages": 141,
+     "runs": 89,
+     "by_folder_run": {
+      "lo": -0.09302325581395349,
+      "hi": 0.06779661016949153,
+      "runs": 5
+     }
+    },
+    {
+     "a": "k10-it",
+     "b": "k7-it",
+     "boxes": [
+      "Deaver"
+     ],
+     "delta": 0.0,
+     "lo": -0.06993006993006994,
+     "hi": 0.06944444444444445,
+     "pages": 141,
+     "runs": 89,
+     "by_folder_run": {
+      "lo": 0.0,
+      "hi": 0.0,
+      "runs": 5
+     }
+    },
+    {
+     "a": "folder-it",
+     "b": "k7-it",
+     "boxes": [
+      "Deaver"
+     ],
+     "delta": -0.03546099290780142,
+     "lo": -0.11347517730496454,
+     "hi": 0.0364963503649635,
+     "pages": 141,
+     "runs": 89,
+     "by_folder_run": {
+      "lo": -0.07971014492753623,
+      "hi": 0.0,
+      "runs": 5
+     }
+    },
+    {
+     "a": "k3-t",
+     "b": "k3-it",
+     "boxes": [
+      "Deaver"
+     ],
+     "delta": 0.014184397163120567,
+     "lo": -0.07377049180327869,
+     "hi": 0.11724137931034483,
+     "pages": 141,
+     "runs": 89,
+     "by_folder_run": {
+      "lo": -0.11428571428571428,
+      "hi": 0.1797752808988764,
+      "runs": 5
+     }
+    },
+    {
+     "a": "k5-t",
+     "b": "k5-it",
+     "boxes": [
+      "Deaver"
+     ],
+     "delta": 0.014184397163120567,
+     "lo": -0.043478260869565216,
+     "hi": 0.07534246575342465,
+     "pages": 141,
+     "runs": 89,
+     "by_folder_run": {
+      "lo": 0.0,
+      "hi": 0.06741573033707865,
+      "runs": 5
+     }
+    },
+    {
+     "a": "k10-t",
+     "b": "k10-it",
+     "boxes": [
+      "Deaver"
+     ],
+     "delta": 0.014184397163120567,
+     "lo": -0.027586206896551724,
+     "hi": 0.06201550387596899,
+     "pages": 141,
+     "runs": 89,
+     "by_folder_run": {
+      "lo": -0.07228915662650602,
+      "hi": 0.043795620437956206,
+      "runs": 5
+     }
+    },
+    {
+     "a": "k7-t",
+     "b": "k7-it",
+     "boxes": [
+      "Deaver"
+     ],
+     "delta": 0.014184397163120567,
+     "lo": -0.043478260869565216,
+     "hi": 0.0736196319018405,
+     "pages": 141,
+     "runs": 89,
+     "by_folder_run": {
+      "lo": -0.07228915662650602,
+      "hi": 0.043795620437956206,
+      "runs": 5
+     }
+    },
+    {
+     "a": "3.8-folder-it",
+     "b": "3.8-k7-it",
+     "boxes": [
+      "Dean",
+      "Deaver",
+      "Herrnstein"
+     ],
+     "delta": 0.023166023166023165,
+     "lo": -0.027722772277227723,
+     "hi": 0.09358752166377816,
+     "pages": 518,
+     "runs": 318,
+     "by_folder_run": {
+      "lo": -0.03501945525291829,
+      "hi": 0.0972972972972973,
+      "runs": 24
+     }
+    }
+   ],
+   "spent": 6.076503
+  }
  },
  "seg_kit_gate_sherlock": {
   "sc0122_owner": {

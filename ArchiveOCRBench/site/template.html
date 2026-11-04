@@ -155,6 +155,11 @@ footer p { font-size: 13px; }
     <div class="head"><h2>Window size, text-only windows and self-voting</h2><span class="meta">open models · Sherlock L40S</span></div>
     <h3>The trained 2B by window size, the owner's development boxes</h3>
     <div class="tbl"><table><thead><tr><th>Window</th><th>Images and text: pages in exact document</th><th>Boundary F1</th><th>Text only: pages in exact document</th><th>Boundary F1</th></tr></thead><tbody id="swm-sweep-rows"></tbody></table></div>
+    <div id="swm-gw" hidden>
+      <h3>Gemini 3.7 Flash through the gateway: images against text alone, and window size</h3>
+      <div class="tbl"><table><thead><tr><th>Arm</th><th>Boxes</th><th>Pages in exact document</th><th>Boundary F1</th><th>Less its control, points (95% interval)</th></tr></thead><tbody id="swm-gw-rows"></tbody></table></div>
+      <p class="note" id="swm-gw-note">Gemini 3.7 Flash, low reasoning, the bench's g1 request, truth photos. Each arm is read against the Gemini 3.7 control on the same pages (K = 7 with images; a text-only row against the same size with images); the 3.8 row is a different model and route, for reference only. Intervals are a paired bootstrap over folder runs and do not include rerun noise (1.4 to 3.2 points a box). Source: <code>seg-window-gateway.md</code>.</p>
+    </div>
     <h3>Six runs voting, against one run</h3>
     <div class="tbl"><table><thead><tr><th>Model</th><th>Boxes</th><th>Default run</th><th>Mean of six single runs</th><th>Vote of six</th><th>Offsets only</th><th>Prompts only</th></tr></thead><tbody id="swm-vote-rows"></tbody></table></div>
     <p class="note">Sweep: the trained Qwen3.5 2B on Dean, Deaver and Herrnstein (518 document pages, pooled), a K-page window stepping (K - 1) / 2 pages, sent with its page images or with the OCR text alone. Window size is flat from 3 to 10 pages with images (within the 6 to 9 points a window placement alone moves a test box); the whole folder collapses into merges, and 2 of its 21 folders never came back parseable with images, so that cell is blank. Text only costs 5 to 20 points, so on these photographs the images are not redundant, as A04 found them to be on clean scans; the 2B was trained on image windows, which this also measures. Vote: six runs per model (window offsets 0, 1 and 2 pages by two prompts), each gap decided by majority; the default run is offset 0 with the bench's prompt. On the owner's test boxes (Stanton and RG 165) the vote lands within a point of the default run for all three models; it beats the average single run by 1.5 to 3 points. Lincoln's gain comes from the second prompt, which cuts false splits on its long manuscripts but is no better on the owner's boxes. The local route therefore keeps one 7-page image window. Source: <code>seg-window-modality.md</code> and <code>seg-window-modality.json</code>.</p>
@@ -679,6 +684,24 @@ if (swm) {
       vote.push('<tr><td>' + names[m] + '</td><td>' + label + '</td>' + ['o0-l1', 'mean-of-singles', 'vote6', 'vote-offsets-l1', 'vote-prompts-o0']
         .map(a => '<td>' + pe(cell(m, pool, a)) + '</td>').join('') + '</tr>');
     }
+  }
+  const gw = swm.gateway;
+  if (gw) {
+    const g = (arm, boxes) => gw.pooled.find(r => r.arm === arm && r.boxes.join('+') === boxes);
+    const d = (a, b, boxes) => {
+      const c = gw.paired.find(x => x.a === a && x.b === b && x.boxes.join('+') === boxes);
+      return c ? (100 * c.delta >= 0 ? '+' : '') + (100 * c.delta).toFixed(1) + ' (' + (100 * c.lo).toFixed(1) + ' to ' + (100 * c.hi).toFixed(1) + ')' : '—';
+    };
+    const dev = 'Dean+Deaver+Herrnstein', dv = 'Deaver';
+    const rows = [['K = 7, images and text (control)', 'k7-it', dev, null], ['K = 7, text only', 'k7-t', dev, 'k7-it'],
+      ['K = 7, Gemini 3.8 (cached, reference)', '3.8-k7-it', dev, 'k7-it'],
+      ...[3, 5, 7, 10].flatMap(k => [['K = ' + k + ', images and text', 'k' + k + '-it', dv, k === 7 ? null : 'k7-it'],
+                                     ['K = ' + k + ', text only', 'k' + k + '-t', dv, 'k' + k + '-it']]),
+      ['Whole folder, images and text', 'folder-it', dv, 'k7-it']];
+    document.getElementById('swm-gw-rows').innerHTML = rows.filter(([, a, b]) => g(a, b)).map(([label, a, b, base]) =>
+      '<tr><td>' + label + '</td><td>' + (b === dev ? 'Dean, Deaver, Herrnstein' : 'Deaver') + '</td><td>' + pe(g(a, b)) +
+      '</td><td>' + f1(g(a, b)) + '</td><td>' + (base ? d(a, base, b) : '—') + '</td></tr>').join('');
+    document.getElementById('swm-gw').hidden = false;
   }
   document.getElementById('swm-sweep-rows').innerHTML = sweep.join('');
   document.getElementById('swm-vote-rows').innerHTML = vote.join('');
