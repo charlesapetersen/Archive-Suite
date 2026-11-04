@@ -16,20 +16,28 @@ Gap audit §5 item 21 (`execution-plans/processing-review/10-gap-audit.md`), F-p
   Vision box at all, which is W46.place-hands' ground, not this item's.
 - **Aligning a better reading onto Vision's lines costs selection nothing and adds a little Find.** The lab's
   `alignedReading` of LightOnOCR-3 4B, Qwen3.6-27B and Gemini 3.8 Flash readings, and of the truth text itself (the
-  aligner's ceiling), all tie Vision on whole-line selection (every Δ within ±0.8 points) and place +0.8 to +1.4
-  points more of the Find words (the ceiling +1.4, +0.5 to +2.7; the non-drafters' intervals touch 0 on all pages,
-  and clear it on the typewritten ones: Qwen +1.4, LightOnOCR +1.6). The selection ceiling is the layer's line
-  geometry, not its words: the truth text aligned does no better than Vision's own words.
+  aligner's ceiling), move whole-line selection by at most 0.8 points: the truth text and the two non-drafters tie
+  Vision, and Gemini, which drafted the truth text, is 0.6 points below it on all pages (−1.0 to −0.2), a small
+  resolved loss rather than a tie. They place +0.8 to +1.4 points more of the Find words (the ceiling +1.4, +0.5 to
+  +2.7; the non-drafters' intervals touch 0 on all pages, and clear it on the typewritten ones: Qwen +1.4,
+  LightOnOCR +1.6). The selection ceiling is the layer's line geometry, not its words: the truth text aligned does no
+  better than Vision's own words.
 - **No anchor-share threshold at which a text page wins on placement was found.** By the share of Vision's words a
   reading repeats exactly, the aligned layer places more Find words in every band (sum +243 over 117 page readings)
   and moves whole lines by −9 to +7 a band out of 1,770 a reading. The pages that lose lines are the high-agreement
   ones (0.85-1.00), where the reading changes a word or two on a line; the gain is largest where Vision and the reading
-  disagree most. So aligning is the default for print; a text page is kept for what the aligner cannot place
-  (hands, W46.place-hands), not chosen by a share threshold on print.
+  disagree most. So aligning is the default for print because it costs nothing: the non-drafters tie Vision on
+  selection, and their Find gain is resolved only on the typewritten pages (on all pages their intervals touch 0).
+  It confirms the lab's existing behaviour rather than setting a new default on a measured gain. A text page is kept
+  for what the aligner cannot place (hands, W46.place-hands), not chosen by a share threshold on print.
 - **The box readers.** PP-OCRv6 det's lines hold 88.2% of the typed truth lines whole and alone, against Vision's
-  66.0% and kraken blla's 77.5%, with 2.1% of truth words outside any line (Vision 6.7%). This is the measured case
-  for PP-OCRv6 det as the line geometry under a reader on print (gap audit R2), and the reason the paid Gemini
-  line-box arm is not run: the open models did not fail. Unlimited-OCR and Nemotron-Parse 2.0 emit blocks
+  66.0% and kraken blla's 77.5%, with 2.1% of truth words outside any line (Vision 6.7%). The owner's line rulings
+  were asked only where both detectors disagreed with the truth, so their fold favours the two; on the unfolded truth
+  PP-OCRv6 det leads Vision by +20.9 points (+12.6 to +30.0) and on the lines the fold left alone by +21.4 (+12.9 to
+  +30.9), against +22.2 folded: the fold made about 1 point of the gap. PP-OCRv6 det's pieces are also joined across
+  gaps up to half a row's height (card). blla's +11.5 over Vision (−2.2 to +23.7) is a tie on every truth (+10.4
+  unfolded, +10.5 untouched). This is the measured case for PP-OCRv6 det as the line geometry under a reader on print
+  (gap audit R2), and the reason the paid Gemini line-box arm is not run: the open models did not fail. Unlimited-OCR and Nemotron-Parse 2.0 emit blocks
   (paragraphs): 98-99% of truth lines fall whole inside one, but only 9-14% alone, so they serve a block-level
   `replace`, not a line layer; their block text holds 94-95% of the truth words inside the block. GutenOCR-3B
   (cc-by-nc) and Surya-2 (OpenRAIL-M, test only) have no saved readings from any item, and their licences keep them
@@ -176,6 +184,19 @@ The 40 owner-typed pages, the same folded truth lines. A truth line is `whole` w
 | unlimited-ocr | 39 | 553 | 1690 | 99.0 | 13.5 | 0.2 | — | 93.6 |
 | nemotron-parse-2 | 40 | 501 | 1770 | 98.4 | 9.4 | 0.6 | — | 94.5 |
 
+### The same grouping on the unfolded truth, and on the lines the fold left alone
+
+The owner's line rulings (W46.place-lines-owner-ok) were asked only where blla and PP-OCRv6 det both grouped a place differently from the truth, so folding them can only move the truth toward those two detectors: 50 merges and 24 truth lines left out, 0 splits, on 11 pages. `folded` is the table above; `unfolded` the truth lines as typed, before any ruling; `untouched` the unfolded lines no ruling merged, split or left out, on which the two truths agree. Δ is against Vision's `accurate` lines on the same truth, paired over the 40 pages.
+
+| source | folded: lines | whole and alone % | Δ vs Vision (95% CI) | unfolded: lines | whole and alone % | Δ vs Vision (95% CI) | untouched: lines | whole and alone % | Δ vs Vision (95% CI) |
+|---|---:|---:|---|---:|---:|---|---:|---:|---|
+| vision-accurate | 1770 | 66.0 | — | 1814 | 64.1 | — | 1732 | 66.6 | — |
+| vision-documents | 1770 | 57.7 | -8.4 (-13.0 to -3.8) | 1814 | 56.0 | -8.0 (-12.5 to -3.7) | 1732 | 58.3 | -8.3 (-13.1 to -3.8) |
+| blla | 1770 | 77.5 | +11.5 (-2.2 to +23.7) | 1814 | 74.5 | +10.4 (-2.6 to +22.1) | 1732 | 77.1 | +10.5 (-2.9 to +22.6) |
+| ppocrv6 | 1770 | 88.2 | +22.2 (+13.4 to +31.6) | 1814 | 85.0 | +20.9 (+12.6 to +30.0) | 1732 | 88.0 | +21.4 (+12.9 to +30.9) |
+| unlimited-ocr | 1690 | 13.5 | -54.4 (-66.7 to -41.4) | 1734 | 13.0 | -52.8 (-64.6 to -40.3) | 1652 | 13.8 | -54.7 (-66.9 to -41.5) |
+| nemotron-parse-2 | 1770 | 9.4 | -56.6 (-66.8 to -46.3) | 1814 | 9.2 | -54.9 (-64.6 to -45.0) | 1732 | 9.8 | -56.8 (-67.0 to -46.4) |
+
 <!-- /tables -->
 
 ## Measurement card
@@ -191,6 +212,15 @@ The 40 owner-typed pages, the same folded truth lines. A truth line is `whole` w
     Vision row is reported apart on Vision-derived and on drawn lines (OCR-10), and the drawn lines, the harder
     pages, are about 30 points lower for every arm alike. The aligned arms sit on Vision's lines, so the favour is
     shared, and the comparison between them is not affected.
+  - The fold favours the open detectors (test 7). W46.place-lines-owner-ok asked the owner only about places where
+    blla and PP-OCRv6 det both grouped differently from the truth (`place-truth-lines.md`: their agreement is the
+    filter), and his rulings were folded as 50 merges and 24 truth lines left out, no splits, on 11 pages; each can
+    only move the truth toward the two detectors, and at the Vision-derived join places away from Vision. Test 7 is
+    therefore also reported on the unfolded truth and on the lines the fold left alone (its second table); every
+    verdict holds on both, and the fold accounts for about 1 point of PP-OCRv6 det's lead. PP-OCRv6 det's lines are
+    its pieces joined across gaps up to half a row's height (`place_truth_lines.py` JOIN_GAP 0.5), a rule set for the
+    rulings sheet on these same 40 pages and not fitted to test 7; Vision's and blla's lines are used as they come.
+    The fold is applied in every test, but test 3's arms all sit on Vision's lines, so it does not move them apart.
   - Bentham (14) and N6 (28) public pages have line geometry only: Vision's baseline F is reported there, no word
     or selection score.
 - **Selection.** Every audited-ok placement-truth page; no route chose a page. The writer pages: every second

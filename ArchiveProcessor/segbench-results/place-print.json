@@ -707,6 +707,11 @@
    "whole": 1468,
    "words": 13785
   },
+  "fold_counts": {
+   "left_out": 24,
+   "merged": 50,
+   "split": 0
+  },
   "nemotron-parse-2": {
    "alone": 167,
    "baseline_F": null,
@@ -730,6 +735,165 @@
    "regions": 2080,
    "whole": 1668,
    "words": 13785
+  },
+  "truths/blla": {
+   "folded": {
+    "alone": 1372,
+    "delta_vs_vision": [
+     11.46892655367232,
+     -2.157829839704073,
+     23.72781065088757
+    ],
+    "lines": 1770
+   },
+   "unfolded": {
+    "alone": 1351,
+    "delta_vs_vision": [
+     10.418963616317523,
+     -2.5547445255474477,
+     22.12543554006968
+    ],
+    "lines": 1814
+   },
+   "untouched": {
+    "alone": 1335,
+    "delta_vs_vision": [
+     10.5080831408776,
+     -2.8554070473876036,
+     22.582253240279172
+    ],
+    "lines": 1732
+   }
+  },
+  "truths/nemotron-parse-2": {
+   "folded": {
+    "alone": 167,
+    "delta_vs_vision": [
+     -56.61016949152542,
+     -66.79738562091504,
+     -46.29981024667932
+    ],
+    "lines": 1770
+   },
+   "unfolded": {
+    "alone": 166,
+    "delta_vs_vision": [
+     -54.90628445424477,
+     -64.61538461538461,
+     -44.9763991908294
+    ],
+    "lines": 1814
+   },
+   "untouched": {
+    "alone": 169,
+    "delta_vs_vision": [
+     -56.812933025404156,
+     -66.97009102730819,
+     -46.36642784032754
+    ],
+    "lines": 1732
+   }
+  },
+  "truths/ppocrv6": {
+   "folded": {
+    "alone": 1562,
+    "delta_vs_vision": [
+     22.20338983050848,
+     13.358572201189833,
+     31.603459747172323
+    ],
+    "lines": 1770
+   },
+   "unfolded": {
+    "alone": 1541,
+    "delta_vs_vision": [
+     20.893054024255786,
+     12.598081952920658,
+     30.01605136436597
+    ],
+    "lines": 1814
+   },
+   "untouched": {
+    "alone": 1524,
+    "delta_vs_vision": [
+     21.420323325635103,
+     12.923864363403714,
+     30.85163363685056
+    ],
+    "lines": 1732
+   }
+  },
+  "truths/unlimited-ocr": {
+   "folded": {
+    "alone": 228,
+    "delta_vs_vision": [
+     -54.37869822485206,
+     -66.66666666666667,
+     -41.40087554721701
+    ],
+    "lines": 1690
+   },
+   "unfolded": {
+    "alone": 225,
+    "delta_vs_vision": [
+     -52.7681660899654,
+     -64.61456102783725,
+     -40.26737967914439
+    ],
+    "lines": 1734
+   },
+   "untouched": {
+    "alone": 228,
+    "delta_vs_vision": [
+     -54.66101694915254,
+     -66.87898089171973,
+     -41.52585765488991
+    ],
+    "lines": 1652
+   }
+  },
+  "truths/vision-accurate": {
+   "folded": {
+    "alone": 1169,
+    "lines": 1770
+   },
+   "unfolded": {
+    "alone": 1162,
+    "lines": 1814
+   },
+   "untouched": {
+    "alone": 1153,
+    "lines": 1732
+   }
+  },
+  "truths/vision-documents": {
+   "folded": {
+    "alone": 1021,
+    "delta_vs_vision": [
+     -8.361581920903948,
+     -13.0301167793485,
+     -3.7888198757764058
+    ],
+    "lines": 1770
+   },
+   "unfolded": {
+    "alone": 1016,
+    "delta_vs_vision": [
+     -8.04851157662625,
+     -12.527114967462039,
+     -3.6592026215182982
+    ],
+    "lines": 1814
+   },
+   "untouched": {
+    "alone": 1009,
+    "delta_vs_vision": [
+     -8.314087759815248,
+     -13.056379821958453,
+     -3.8105606967882455
+    ],
+    "lines": 1732
+   }
   },
   "unlimited-ocr": {
    "alone": 228,

@@ -844,15 +844,24 @@ def nemotron_check(page):
     return out
 
 
+def scored_line_words(t, folded):
+    return {L['id']: [i for i in folded[L['id']] if t['words'][i]['status'] not in UNSCORED]
+            for L in truth_lines(t, folded) if L['scored']}
+
+
 def cmd_boxes(a):
+    """Grouping is scored on three truths (P6-1, W46.place-print-fold-split): the folded one (the owner's rulings,
+    asked only where blla and PP-OCRv6 det both grouped differently from the truth, so the fold can only move the
+    truth toward them); the unfolded one (no rulings); and the unfolded lines the fold left alone (not merged,
+    split or left out), on which the two truths agree."""
     R = rulings()
     rows, offs = [], []
     for t in typed_pages():
         folded, _ = G.fold_lines(t, R)
-        tlw = {}
-        for L in truth_lines(t, folded):
-            if L['scored']:
-                tlw[L['id']] = [i for i in folded[L['id']] if t['words'][i]['status'] not in UNSCORED]
+        tlw = scored_line_words(t, folded)
+        unfolded, _ = G.fold_lines(t, {})
+        tlw_un = scored_line_words(t, unfolded)
+        tlw_alone = {L: ws for L, ws in tlw_un.items() if folded.get(L) == unfolded[L]}
         offs += nemotron_check(t['page'])
         sources = {f'vision-{api}': [{'box': l['box'], 'baseline': l['baseline']} for l in hyp(api, t)['lines']]
                    for api in ('accurate', 'documents')}
@@ -864,7 +873,8 @@ def cmd_boxes(a):
             if regs is None:
                 continue
             row = {'page': t['page'], 'kind': t['kind'], 'source': name, 'regions': len(regs),
-                   **grouping(t, tlw, regs)}
+                   **grouping(t, tlw, regs), 'unfolded': grouping(t, tlw_un, regs),
+                   'untouched': grouping(t, tlw_alone, regs)}
             if name.startswith(('vision', 'blla', 'ppocr')):
                 row['baseline'] = S.baseline_scores(t, {'lines': [r for r in regs if r.get('baseline')]})
             else:

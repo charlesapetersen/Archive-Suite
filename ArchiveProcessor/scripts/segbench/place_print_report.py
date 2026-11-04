@@ -338,6 +338,48 @@ def box_tables(d):
                   f'{f"{sum(bf) / len(bf):.3f}" if bf else "—"} | '
                   f'{pct(c["in_block_text"], c["block_words"]) if c["block_words"] else "—"} |')
     md.append('')
+    # P6-1 (W46.place-print-fold-split): the owner's line rulings were asked only where blla and PP-OCRv6 det both
+    # grouped differently from the truth, so folding them can only move the truth toward those two.
+    fold = d.get('fold') or {}
+    fs = collections.Counter()
+    for v in fold.values():
+        fs.update(v)
+    md.append('### The same grouping on the unfolded truth, and on the lines the fold left alone\n')
+    md.append('The owner\'s line rulings (W46.place-lines-owner-ok) were asked only where blla and PP-OCRv6 det both '
+              'grouped a place differently from the truth, so folding them can only move the truth toward those two '
+              f'detectors: {fs["merged"]} merges and {fs["left_out"]} truth lines left out, {fs["split"]} splits, on '
+              f'{sum(1 for v in fold.values() if any(v.values()))} pages. `folded` is the table above; `unfolded` the '
+              'truth lines as typed, before any ruling; `untouched` the unfolded lines no ruling merged, split or left '
+              'out, on which the two truths agree. Δ is against Vision\'s `accurate` lines on the same truth, paired '
+              'over the 40 pages.\n')
+    md.append('| source | folded: lines | whole and alone % | Δ vs Vision (95% CI) | unfolded: lines | '
+              'whole and alone % | Δ vs Vision (95% CI) | untouched: lines | whole and alone % | Δ vs Vision (95% CI) |')
+    md.append('|---|---:|---:|---|---:|---:|---|---:|---:|---|')
+    base = {r['page']: r for r in rows if r['source'] == 'vision-accurate'}
+    for src in ('vision-accurate', 'vision-documents', 'blla', 'ppocrv6', 'unlimited-ocr', 'nemotron-parse-2'):
+        rs = [r for r in rows if r['source'] == src and r['page'] in base and 'unfolded' in r]
+        if not rs:
+            continue
+        cells, jv = [], {}
+        for truth in ('folded', 'unfolded', 'untouched'):
+            g = (lambda r: r) if truth == 'folded' else (lambda r, k=truth: r[k])
+            n = sum(g(r)['lines'] for r in rs)
+            a = sum(g(r)['alone'] for r in rs)
+            bn = sum(g(base[r['page']])['lines'] for r in rs)
+            ba = sum(g(base[r['page']])['alone'] for r in rs)
+            jv[truth] = {'lines': n, 'alone': a}
+            if src == 'vision-accurate':
+                cells.append(f'{n} | {pct(a, n)} | —')
+                continue
+            dd = 100 * (a / n - ba / bn)
+            ci = boot([(g(r)['alone'], g(r)['lines'], g(base[r['page']])['alone'], g(base[r['page']])['lines'])
+                       for r in rs], 'alone', 'lines')
+            jv[truth]['delta_vs_vision'] = [dd, *ci]
+            cells.append(f'{n} | {pct(a, n)} | {fmt_ci(dd, *ci)}')
+        js[f'truths/{src}'] = jv
+        md.append(f'| {src} | ' + ' | '.join(cells) + ' |')
+    js['fold_counts'] = dict(fs)
+    md.append('')
     return md, js
 
 
@@ -347,6 +389,7 @@ def write(cache: Path, results: Path):
     wrows = json.loads((cache / 'writers-rows.json').read_text())
     prow = json.loads((cache / 'verapdf-rows.json').read_text())
     brows = json.loads((cache / 'boxes-rows.json').read_text())
+    brows['fold'] = {p['meta']['page']: p['meta']['fold'] for p in pages}
     out, js = [], {}
     for fn, args in ((vision_tables, (vrows,)), (arms_tables, (pages,)), (writer_tables, (wrows, prow)),
                      (acrobat_tables, (cache,)), (box_tables, (brows,))):
