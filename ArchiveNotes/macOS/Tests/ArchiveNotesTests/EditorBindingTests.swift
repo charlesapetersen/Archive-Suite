@@ -255,6 +255,72 @@ struct EditorBindingTests {
         #expect((try? Data(contentsOf: thumbnailURL)) == thumbnailData)
     }
 
+    /// W40.fix-notes-extract-paste-edges: the extract paste had the same write-behind as W9.e2-paste —
+    /// its imported images drew "Missing" until the extract was reloaded. Pasted on a private pasteboard,
+    /// through the production store, the image must end up shown.
+    @Test @MainActor
+    func extractPasteShowsItsImagesOnceTheirWritesLand() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("EditorBindingTests-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let noteStore = NoteStore(root: root)
+        let item = Item(
+            id: UUID(), kind: .extract, title: "Extract host", authors: [], date: "1980", datePrecision: .year,
+            dateUncertain: false, quality: nil, tags: [], zotero: [], roundup: false, created: Date(),
+            modified: Date(), schema: 1, blocks: [], unknownFrontMatter: [], trailingBodyRaw: nil
+        )
+        _ = try await noteStore.create(item)
+        let store = ItemAssetStore(store: noteStore, root: root, itemID: item.id)
+
+        let rep = try #require(NSBitmapImageRep(
+            bitmapDataPlanes: nil, pixelsWide: 32, pixelsHigh: 32, bitsPerSample: 8, samplesPerPixel: 4,
+            hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0
+        ))
+        let png = try #require(rep.representation(using: .png, properties: [:]))
+        let payload = NotesPassagePayload(
+            sourceNoteId: UUID(), sourceTitle: "Src", sourceDateDisplay: "1970",
+            segments: [.init(sourceBlockIndex: 0, markdown: "![q](assets/q.png) one\n", assetPNGs: ["q.png": png])])
+        let pasteboard = NSPasteboard(name: .init("extract-paste-\(UUID().uuidString)"))
+        defer { pasteboard.releaseGlobally() }
+        #expect(PassagePasteboard.write(payload, to: pasteboard))
+
+        let holder = BindingHolder("")
+        let formatting = FormattingContext()
+        formatting.currentItemID = item.id
+        formatting.currentItemKind = .extract
+        let view = MarkdownEditorView(
+            markdown: Binding(get: { holder.markdown }, set: { holder.markdown = $0 }),
+            isRaw: Binding(get: { holder.isRaw }, set: { holder.isRaw = $0 }),
+            formatting: formatting,
+            assetStore: store
+        )
+        let coordinator = view.makeCoordinator()
+        let textView = EditorTextView()
+        coordinator.textView = textView
+        coordinator.parent = view
+        coordinator.formattingContext = formatting
+        coordinator.assetStore = store
+
+        #expect(coordinator.handlePassagePaste(from: pasteboard))
+
+        func image() -> InlineImageAttachment? {
+            guard let storage = textView.textStorage else { return nil }
+            var found: InlineImageAttachment?
+            storage.enumerateAttribute(.attachment, in: NSRange(location: 0, length: storage.length)) { value, _, _ in
+                if let image = value as? InlineImageAttachment, image.relativePath == "assets/q.png" { found = image }
+            }
+            return found
+        }
+        for _ in 0..<300 where image()?.placeholder != nil || image() == nil {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        await store.awaitPendingWrites()
+        #expect(store.resolveAsset("assets/q.png") != nil, "the pasted image's bytes should be on disk")
+        let shown = try #require(image(), "the pasted block should carry its inline image")
+        #expect(shown.placeholder == nil, "the editor should show the written image, not the Missing placeholder")
+    }
+
     /// W9.e2-paste: `ItemAssetStore` writes a pasted thumbnail's bytes after it returns the reference, so
     /// the chip built at once showed the "Missing" placeholder until the note was reloaded — caught in the
     /// VM by `NotesE2PasteTests`. Both paste paths (a rendered thumbnail and a Reader payload's own) must

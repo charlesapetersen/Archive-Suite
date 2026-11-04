@@ -802,14 +802,17 @@ struct MarkdownEditorView: NSViewRepresentable {
         /// (07-extracts §5). Declines (→ falls through to plain paste) unless an extract is loaded and a
         /// passage payload is present; the markdown is coerced to notes-only + rendered exactly as a
         /// saved-then-reloaded extract would render (chip + body).
-        func handlePassagePaste() -> Bool {
+        func handlePassagePaste(from pasteboard: NSPasteboard = .general) -> Bool {
             guard let textView, textView.isEditable, !currentIsRaw, formattingContext?.currentItemKind == .extract,
-                  let payload = PassagePasteboard.read() else { return false }
+                  let payload = PassagePasteboard.read(from: pasteboard) else { return false }
             // Copy the payload's inline-image BYTES into THIS extract's own assets/ (reserve→write,
             // no-overwrite guard) and rewrite refs on collision, so pasted images persist instead of
             // dangling as missing-asset placeholders. Writes go only through the audited ItemAssetStore.
+            var importedRefs: Set<String> = []
             let markdown = ExtractBuilder.pastedExtractMarkdown(from: payload) { data, bare in
-                try? assetStore?.addAsset(data, preferredName: bare)
+                guard let ref = try? assetStore?.addAsset(data, preferredName: bare) else { return nil }
+                importedRefs.insert(ref)
+                return ref
             }
             guard !markdown.isEmpty else { return false }
             let attributed = MarkdownBridge.parse(markdown: markdown, fontSize: currentFontSize,
@@ -826,6 +829,16 @@ struct MarkdownEditorView: NSViewRepresentable {
             textView.refreshUITestPassageChipStateSnapshot()
 #endif
             scheduleWriteBack()
+            // The copies' bytes land on a background task, so the images just inserted drew "Missing";
+            // swap them in once written, as the source-block paste does (W40.fix-notes-extract-paste-edges).
+            if let store = assetStore, !importedRefs.isEmpty {
+                let itemID = formattingContext?.currentItemID
+                Task { [weak self, weak textView] in
+                    guard let self, let textView else { return }
+                    await self.showInlineImagesOnceWritten(importedRefs, itemID: itemID,
+                                                           assetStore: store, in: textView)
+                }
+            }
             return true
         }
 

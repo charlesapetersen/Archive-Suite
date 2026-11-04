@@ -607,6 +607,23 @@ struct ExtractBuilderTests {
         #expect(FrontMatterCodec.encode(reloaded) == FrontMatterCodec.encode(created))
     }
 
+    @Test("createExtract: two passages citing the same image share one copy (W40.fix-notes-extract-paste-edges)")
+    func createSharesOneCopyAcrossPassages() async throws {
+        let (store, tmp) = try scratch(); defer { cleanup(tmp) }
+        let bytes = Data("SAME".utf8)
+        let payload = NotesPassagePayload(
+            sourceNoteId: UUID(), sourceTitle: "Src", sourceDateDisplay: "1970",
+            segments: [.init(sourceBlockIndex: 0, markdown: "![q](assets/q.png) one\n", assetPNGs: ["q.png": bytes]),
+                       .init(sourceBlockIndex: 1, markdown: "![q](assets/q.png) two\n", assetPNGs: ["q.png": bytes])])
+        let created = try await ExtractBuilder(store: store)
+            .createExtract(from: ExtractBuilder.passageBlocks(from: payload))
+
+        let dir = await store.assetsDir(created.id)
+        #expect(try FileManager.default.contentsOfDirectory(atPath: dir.path) == ["q.png"])
+        #expect(try Data(contentsOf: dir.appendingPathComponent("q.png")) == bytes)
+        #expect(created.blocks.allSatisfy { $0.markdown.contains("](assets/q.png)") })
+    }
+
     @Test("createExtract copies inline-image bytes into the new extract's assets/ (independent copy)")
     func createCopiesAssets() async throws {
         let (store, tmp) = try scratch(); defer { cleanup(tmp) }
@@ -718,6 +735,46 @@ struct ExtractBuilderTests {
         #expect(markdown.contains("](assets/a-1.png)"))  // collided ref rewritten
         #expect(!markdown.contains("](assets/a.png)"))
         #expect(markdown.contains("](assets/b.png)"))    // failed import → original ref left dangling, not dropped
+    }
+
+    /// W40.fix-notes-extract-paste-edges — two selected blocks citing one image used to import it
+    /// twice (`q.png` + `q-1.png`). One paste now makes one copy, and both blocks point at it.
+    @Test("extract-paste: two blocks citing the same image share one copy")
+    func pasteSharesOneCopyAcrossBlocks() async throws {
+        let f = try await pasteFixture(); defer { cleanup(f.tmp) }
+        let bytes = Data("SAME".utf8)
+        let payload = NotesPassagePayload(
+            sourceNoteId: UUID(), sourceTitle: "Src", sourceDateDisplay: "1970",
+            segments: [.init(sourceBlockIndex: 0, markdown: "![q](assets/q.png) one\n", assetPNGs: ["q.png": bytes]),
+                       .init(sourceBlockIndex: 1, markdown: "![q](assets/q.png) two\n", assetPNGs: ["q.png": bytes])])
+        var imports = 0
+        let markdown = ExtractBuilder.pastedExtractMarkdown(from: payload) { data, bare in
+            imports += 1
+            return try? f.assets.addAsset(data, preferredName: bare)
+        }
+        await f.assets.awaitPendingWrites()
+
+        #expect(imports == 1)
+        #expect(!markdown.contains("q-1.png"))
+        #expect(markdown.components(separatedBy: "](assets/q.png)").count == 3)  // both blocks keep the ref
+        let dir = await f.store.assetsDir(f.extractID)
+        #expect(try FileManager.default.contentsOfDirectory(atPath: dir.path) == ["q.png"])
+    }
+
+    @Test("extract-paste: two DIFFERENT images under one name still land as two files")
+    func pasteKeepsDifferentBytesApart() {
+        let payload = NotesPassagePayload(
+            sourceNoteId: UUID(), sourceTitle: "Src", sourceDateDisplay: "1970",
+            segments: [.init(sourceBlockIndex: 0, markdown: "![q](assets/q.png) one\n", assetPNGs: ["q.png": Data([1])]),
+                       .init(sourceBlockIndex: 1, markdown: "![q](assets/q.png) two\n", assetPNGs: ["q.png": Data([2])])])
+        var stored: [Data] = []
+        let markdown = ExtractBuilder.pastedExtractMarkdown(from: payload) { data, _ in
+            stored.append(data)
+            return stored.count == 1 ? "assets/q.png" : "assets/q-1.png"
+        }
+        #expect(stored == [Data([1]), Data([2])])
+        #expect(markdown.contains("](assets/q.png) one"))
+        #expect(markdown.contains("](assets/q-1.png) two"))
     }
 
     /// W3.notes-image-dest-paren — the coupled consumer. This re-key is a plain string match, so it

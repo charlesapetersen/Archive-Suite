@@ -1785,7 +1785,7 @@ autosave via `NotesModel.setBody`, flush-on-switch, autosave-race-safe). Two con
   edit present) is still deferred with the rest of Notes' GUI drive until the scratch-store launch
   override lands (W8-S7) — driving the live app would write the owner's real store.
 
-## Extracts create/copy-paste — follow-ups (W7-S2, 2026-07-13): image bytes fixed; the paste edges are queued as `W40.fix-notes-extract-paste-edges`; the live GUI checks were never run
+## Extracts create/copy-paste — follow-ups (W7-S2, 2026-07-13): image bytes fixed; the paste edges fixed (W40.fix-notes-extract-paste-edges, 2026-11-03); the live GUI checks were never run
 
 W7-S2 shipped the live Create-Extract (⌘⌥E) / Append-to-Extract… commands and the copy-in-Notes →
 paste-into-Extract round-trip (`Extract` menu; `com.archivenotes.passage` on ⌘C in a note editor;
@@ -1804,11 +1804,14 @@ paste in an extract editor → note-passage blocks). Model + codec paths are uni
   too: a new `ExtractBuilder.pastedExtractMarkdown(from:importingAssetsVia:)` overload imports each segment's
   bytes via `ItemAssetStore.addAsset` (reserve→write, no-overwrite guard) and rewrites the `](assets/…)` refs
   when a name collision disambiguates, so a copy→paste into an extract is self-contained. Verified on scratch
-  stores (`ExtractBuilderTests`: byte-on-disk, no-clobber disambiguation, nil-import resilience). **Residual
-  (→ Daemon Report, minor, not data loss):** (1) because `ItemAssetStore` writes bytes on a background task,
-  the just-pasted images can render as missing-asset placeholders until the extract is reloaded (identical to
-  the single-image paste path); (2) two selected blocks referencing the *same* source image import as two
-  copies (consistent with the audited Create/Append `persist`); (3) the end-to-end **GUI copy→paste drive**
+  stores (`ExtractBuilderTests`: byte-on-disk, no-clobber disambiguation, nil-import resilience). **Residuals:**
+  (1) ✅ FIXED (W40.fix-notes-extract-paste-edges, 2026-11-03) — reproduced: because `ItemAssetStore` writes
+  bytes on a background task, the just-pasted images drew "Missing" until the extract was reloaded. The paste
+  now swaps them in once written, through the same `showInlineImagesOnceWritten` the source-block paste got in
+  W9.e2-paste (`EditorBindingTests.extractPasteShowsItsImagesOnceTheirWritesLand`, failing without the fix);
+  (2) ✅ FIXED (same item) — two blocks citing the *same* image imported two copies, in the paste and in
+  Create/Append's `persist` alike; one write now makes one copy per name+bytes (`ExtractAssetImports`), and
+  two different images under one name still land as two files; (3) the end-to-end **GUI copy→paste drive**
   still wants a live confirm.
 - ✅ **FIXED (W14.4b, 2026-07-17):** Create-Extract (and Append-to-Extract) now auto-select + raise the
   extract in the Extracts window. `NotesModel.createExtract`/`appendToExtract` route the new/updated extract

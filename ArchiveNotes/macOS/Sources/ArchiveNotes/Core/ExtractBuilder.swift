@@ -18,6 +18,23 @@ struct ExtractPassageBlock: Sendable, Equatable {
     }
 }
 
+/// The copies one extract write has already made, so blocks that cite the same source image share one
+/// copy instead of importing it once per block (W40.fix-notes-extract-paste-edges). Keyed by the bare
+/// name AND the bytes: a passage's segments all come from one note, so a shared name normally means a
+/// shared file, but two different images under one name must still land as two files.
+struct ExtractAssetImports {
+    private var copies: [String: [(bytes: Data, stored: String)]] = [:]
+
+    /// The `assets/<name>` ref this write already stored for these bytes, if any.
+    func stored(bare: String, bytes: Data) -> String? {
+        copies[bare]?.first(where: { $0.bytes == bytes })?.stored
+    }
+
+    mutating func record(bare: String, bytes: Data, stored: String) {
+        copies[bare, default: []].append((bytes, stored))
+    }
+}
+
 /// The read-only seam over a live note-editor selection.
 ///
 /// W7-S1 is UI-free (plan §S1: "an injectable block-range map so it tests without a live
@@ -139,16 +156,25 @@ struct ExtractBuilder {
     /// (`stored != assets/<bare>`) the block markdown ref is rewritten to the stored name so the inserted
     /// text points at the file that actually landed. A nil return (import failed / no target item) leaves
     /// that one ref at the original name — a missing-asset placeholder, never a crash — without aborting
-    /// the rest of the paste. `@MainActor` because the production importer (`ItemAssetStore.addAsset`) is
+    /// the rest of the paste. Blocks citing the same image share one copy (`ExtractAssetImports`).
+    /// `@MainActor` because the production importer (`ItemAssetStore.addAsset`) is
     /// main-actor-isolated.
     @MainActor
     static func pastedExtractMarkdown(from payload: NotesPassagePayload,
                                       importingAssetsVia importAsset: (Data, String) -> String?) -> String {
+        var imports = ExtractAssetImports()
         let imported: [Block] = passageBlocks(from: payload).map { passage in
             var block = passage.block
             for (name, bytes) in passage.pendingAssets {
                 let bare = (name as NSString).lastPathComponent
-                guard let stored = importAsset(bytes, bare) else { continue }
+                let stored: String
+                if let earlier = imports.stored(bare: bare, bytes: bytes) {
+                    stored = earlier
+                } else {
+                    guard let fresh = importAsset(bytes, bare) else { continue }
+                    imports.record(bare: bare, bytes: bytes, stored: fresh)
+                    stored = fresh
+                }
                 let originalRef = "assets/\(bare)"
                 if stored != originalRef {
                     // Spelled by the grammar owner, not interpolated: a name needing the
@@ -333,11 +359,18 @@ struct ExtractBuilder {
     private func persist(_ passages: [ExtractPassageBlock], into id: UUID) async throws -> [Block] {
         var result: [Block] = []
         result.reserveCapacity(passages.count)
+        var imports = ExtractAssetImports()
         for passage in passages {
             var block = passage.block
             for (name, bytes) in passage.pendingAssets {
                 let bare = (name as NSString).lastPathComponent
-                let stored = try await store.importAsset(bytes, preferredName: bare, into: id)
+                let stored: String
+                if let earlier = imports.stored(bare: bare, bytes: bytes) {
+                    stored = earlier
+                } else {
+                    stored = try await store.importAsset(bytes, preferredName: bare, into: id)
+                    imports.record(bare: bare, bytes: bytes, stored: stored)
+                }
                 let originalRef = "assets/\(bare)"
                 if stored != originalRef {
                     // Same re-key, same reason as `pastedExtractMarkdown` — through the grammar owner
