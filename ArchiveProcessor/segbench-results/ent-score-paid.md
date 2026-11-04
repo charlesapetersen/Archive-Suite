@@ -108,14 +108,16 @@ Spend: $1.19 estimated over 454 gateway calls (454 answered). the gateway's own 
   on more documents (27-28 against 16): 15 of entity8k's 27 wrong senders are the organisation fallback its rule asks for
   (an office or institution where the truth has the signer), the rest a surname or first name alone where the truth has the full name, or a garbled
   signature. Length helps the dedicated prompt's sender (+0.09, interval +0.02 to +0.17; 12 more named senders sit
-  past 3,000 in the Vision text), but the rerun floor for senders is +0.04 on 40 documents, so read it as a likely
-  small gain, not a measured size.
+  past 3,000 in the Vision text), but the sender rerun of the same calls moved +0.04 on 40 documents, all one way
+  (interval 0.000 to +0.115: a drift between identical calls, not noise around zero), so read it as a likely small
+  gain, not a measured size.
 - **Vision text against ABBYY: no loss.** The tagging prompt on Vision text with Gemini 3.7 is level with
   W46.ent-score's Gemini 3.8 reply on ABBYY on the 82 (sender +0.03, recipient +0.01, city +0.00, all ties), and Vision
   text holds more of the truth's names (sender 78 against 64 of 138 in the first 3,000, recipient 146 against 112).
-- **The evidence rule is satisfiable.** Every one of the dedicated prompt's 364 quoted names was found verbatim in
-  the text it read (whitespace folded); 2 came without a quote. A quote check in the app would therefore pass the
-  model's own reads and catch only inferred names, which this prompt almost never offers.
+- **The evidence rule is satisfiable.** Every quoted name the dedicated prompt gave was found verbatim in the text
+  it read (whitespace folded): 364 at 8,000 characters and 347 at 3,000, 711 in both arms; 2 in each arm came without
+  a quote. A quote check in the app would therefore pass the model's own reads and catch only inferred names, which
+  this prompt almost never offers.
 
 What it means for the app: the tagging prompt's recipient field should ask for every addressee, as a list, and its
 place for "City, State"; the sender should stay a person, null rather than the letterhead's organisation. Filed as
@@ -136,8 +138,9 @@ the sending place, and the 8,000-character window is not worth its tokens for th
   3,000 characters. The 3.8 reply on ABBYY differs in text source and model version together, and is reported only
   as that pair.
 - **Noise:** n 138 (82, 40 for the floor); paired document bootstrap, 2,000 draws, 95% intervals. Rerun floor
-  (entity8k repeated, one changed newline to pass the gateway's cache): sender +0.04, recipient 0.00, city -0.03,
-  full-string place -0.16. A gap inside its interval or the floor is a tie.
+  (entity8k repeated, one changed newline to pass the gateway's cache): sender +0.04 (0.000 to +0.115, one-signed: a
+  drift between identical calls, not a floor around zero), recipient 0.00, city -0.03, full-string place -0.16. A gap
+  inside its interval or the floor is a tie.
 - **Scope:** text-only, one model (Gemini 3.7 Flash), one prompt wording per arm; it does not settle a multimodal
   read, a local model on the dedicated prompt, or how the dates move if the tagging prompt changes (W46.ent-prompt-app).
   The plan-route Claude arm planned for this item is dropped, not moved (owner, 2026-10-30).

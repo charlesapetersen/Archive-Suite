@@ -5,6 +5,7 @@
     heavy-run.py run -- python3 ent_score_paid.py vision   # Apple Vision text per page (ocr.swift, the app's settings)
     python3 ent_score_paid.py run --arm tagging|entity3k|entity8k [--limit N] [--rerun]
     python3 ent_score_paid.py report                  # segbench-results/ent-score-paid.md and .json
+    python3 ent_score_paid.py stamp                   # rebuild the prompt hash of replies cached without one
 
 TORCH_PY is the shared environment's python (torch-env.sh; it holds numpy and Pillow, which extract needs).
 
@@ -230,13 +231,18 @@ TAGGING_RULES_BEFORE = {
 }
 
 
-def tagging_prompt_before(text, context):
-    import date_tagging as DT
-    lines = DT.build_prompt(text, context).split("\n")
-    for k, v in TAGGING_RULES_BEFORE.items():
+def with_rules(prompt, rules):
+    """The prompt with each named rule line replaced ({field: the whole line})."""
+    lines = prompt.split("\n")
+    for k, v in rules.items():
         i = next(j for j, x in enumerate(lines) if x.startswith(f'- "{k}":'))
         lines[i] = v
     return "\n".join(lines)
+
+
+def tagging_prompt_before(text, context):
+    import date_tagging as DT
+    return with_rules(DT.build_prompt(text, context), TAGGING_RULES_BEFORE)
 
 
 def prompt_for(arm, d):
@@ -246,16 +252,100 @@ def prompt_for(arm, d):
     return ENTITY_PROMPT.format(text=t[:ARMS[arm]])
 
 
+def label_prompt(label, d):
+    """The prompt a reply under label was sent: its arm's, and for the rerun one extra newline (cmd_run)."""
+    if label == "entity8k-rerun":
+        return prompt_for("entity8k", d) + "\n"
+    return prompt_for(label, d)
+
+
 def reply_path(arm, doc_id, cache=CACHE):
     return os.path.join(cache, "replies", arm, doc_id + ".json")
 
 
+# The reply cache is keyed by label and document, so each reply records the SHA-256 of the prompt it answered, and a
+# cached reply is returned only for that prompt: otherwise a prompt edit and a rerun would score the old replies
+# (measurement review 2026-11-03, P6-5). Replies made before the hash was recorded carry one rebuilt from the known
+# prompts by `stamp` ("prompt_hash": "reconstructed"); one whose prompt cannot be rebuilt is labelled "unknown" with
+# no hash, and is refused, never re-called.
+def prompt_sha(prompt):
+    return hashlib.sha256(prompt.encode("utf-8")).hexdigest()
+
+
+def cached(dest, prompt):
+    """The cached reply at dest if it answered this prompt; None if there is none; refuses any other."""
+    if not os.path.exists(dest):
+        return None
+    with open(dest, encoding="utf-8") as fh:
+        out = json.load(fh)
+    m = out.get("meta", {})
+    if not m.get("prompt_sha256"):
+        raise SystemExit(f"{dest}: cached reply with no prompt hash ({m.get('prompt_hash', 'not stamped')}); "
+                         "run `stamp`, or move it aside to call again")
+    if m["prompt_sha256"] != prompt_sha(prompt):
+        raise SystemExit(f"{dest}: cached reply answered a different prompt; move it aside to call again")
+    return out
+
+
+def check_replies(label, cache, prompt_of):
+    """Refuses unless every reply under label answered prompt_of(doc) as it now stands (a report scores no other)."""
+    for _r, d in rows():
+        cached(reply_path(label, d["id"], cache), prompt_of(d))
+
+
+def write_reply(dest, out):
+    os.makedirs(os.path.dirname(dest), exist_ok=True)
+    with open(dest + ".tmp", "w", encoding="utf-8") as fh:
+        json.dump(out, fh, ensure_ascii=False, indent=1)
+    os.replace(dest + ".tmp", dest)
+
+
+def stamp(labels, cache=CACHE):
+    """Writes the rebuilt prompt hash into each reply under labels ({label: prompt_of(doc), or None where the prompt
+    is not known}) that has none, or labels it "unknown". A reply that has a hash is compared, never changed.
+    Returns {label: Counter of outcomes}."""
+    got = {}
+    for label, prompt_of in labels.items():
+        c = got[label] = collections.Counter()
+        d_ = os.path.join(cache, "replies", label)
+        docs = {d["id"]: d for _r, d in rows()}
+        for f in sorted(os.listdir(d_)) if os.path.isdir(d_) else []:
+            if not f.endswith(".json"):
+                continue
+            dest = os.path.join(d_, f)
+            with open(dest, encoding="utf-8") as fh:
+                out = json.load(fh)
+            m = out.setdefault("meta", {})
+            try:
+                h = prompt_sha(prompt_of(docs[f[:-5]])) if prompt_of else None
+            except (OSError, KeyError, ValueError, StopIteration):
+                h = None
+            if m.get("prompt_sha256"):
+                c["had a hash, " + ("same" if m["prompt_sha256"] == h else "DIFFERENT")] += 1
+                continue
+            m["prompt_sha256"], m["prompt_hash"] = h, "reconstructed" if h else "unknown"
+            write_reply(dest, out)
+            c[m["prompt_hash"]] += 1
+    return got
+
+
+def cmd_stamp(a):
+    print(json.dumps(stamp({label: (lambda d, L=label: label_prompt(L, d)) for label in replies_labels(CACHE)}),
+                     indent=1))
+
+
+def replies_labels(cache):
+    d = os.path.join(cache, "replies")
+    return sorted(os.listdir(d)) if os.path.isdir(d) else []
+
+
 def call(arm, doc_id, prompt, cache=CACHE, cap=CAP):
-    """One call, cached by destination; the ledger line is written before the reply is used."""
+    """One call, cached by destination and prompt hash; the ledger line is written before the reply is used."""
     import gateway_gemini as G
     dest = reply_path(arm, doc_id, cache)
-    if os.path.exists(dest):
-        return json.load(open(dest))
+    hit = cached(dest, prompt)
+    if hit is not None:
+        return hit
     worst = G.cost({"prompt_tokens": 6000, "completion_tokens": G.MAX_TOKENS})
     if spent(cache) + worst > cap:
         raise SystemExit(f"cap: ${spent(cache):.4f} spent of ${cap}")
@@ -270,7 +360,8 @@ def call(arm, doc_id, prompt, cache=CACHE, cap=CAP):
     got = r.json() if r.headers.get("content-type", "").startswith("application/json") else {"raw": r.text[:2000]}
     usage = got.get("usage") or {}
     rec = {"arm": arm, "doc": doc_id, "http": r.status_code, "t": t, "wall_s": round(time.time() - t, 3),
-           "model": got.get("model") or G.MODEL, "usage": usage, "cost": round(G.cost(usage), 6)}
+           "model": got.get("model") or G.MODEL, "usage": usage, "cost": round(G.cost(usage), 6),
+           "prompt_sha256": prompt_sha(prompt), "prompt_hash": "sent"}
     rec = G.with_gateway_cost(rec, r)
     with open(os.path.join(cache, "calls.jsonl"), "a") as fh:
         fh.write(json.dumps(rec) + "\n")
@@ -278,8 +369,7 @@ def call(arm, doc_id, prompt, cache=CACHE, cap=CAP):
     out = {"meta": {**rec, "finish": choice.get("finish_reason")},
            "raw": (choice.get("message") or {}).get("content") if r.status_code == 200 else None}
     if r.status_code == 200:
-        os.makedirs(os.path.dirname(dest), exist_ok=True)
-        json.dump(out, open(dest, "w"), ensure_ascii=False, indent=1)
+        write_reply(dest, out)
     else:
         print(doc_id, r.status_code, json.dumps(got)[:300])
     return out
@@ -408,6 +498,7 @@ def cmd_report(a):
     sample = {r["id"] for r, _d in rs if r["set"] == "sample88"}
     P, bad = {}, {}
     for arm in list(ARMS) + ["entity8k-rerun"]:
+        check_replies(arm, CACHE, lambda d, L=arm: label_prompt(L, d))
         P[arm], bad[arm] = preds(arm)
     s = {"docs": len(rs), "sample_docs": len(sample), "unparsed": bad,
          "answered": {k: len(v) for k, v in P.items()}, "scores": {}, "scores_82": {}, "paired": {}, "evidence": {}}
@@ -545,14 +636,16 @@ READING = """## Reading
   on more documents (27-28 against 16): 15 of entity8k's 27 wrong senders are the organisation fallback its rule asks for
   (an office or institution where the truth has the signer), the rest a surname or first name alone where the truth has the full name, or a garbled
   signature. Length helps the dedicated prompt's sender (+0.09, interval +0.02 to +0.17; 12 more named senders sit
-  past 3,000 in the Vision text), but the rerun floor for senders is +0.04 on 40 documents, so read it as a likely
-  small gain, not a measured size.
+  past 3,000 in the Vision text), but the sender rerun of the same calls moved +0.04 on 40 documents, all one way
+  (interval 0.000 to +0.115: a drift between identical calls, not noise around zero), so read it as a likely small
+  gain, not a measured size.
 - **Vision text against ABBYY: no loss.** The tagging prompt on Vision text with Gemini 3.7 is level with
   W46.ent-score's Gemini 3.8 reply on ABBYY on the 82 (sender +0.03, recipient +0.01, city +0.00, all ties), and Vision
   text holds more of the truth's names (sender 78 against 64 of 138 in the first 3,000, recipient 146 against 112).
-- **The evidence rule is satisfiable.** Every one of the dedicated prompt's 364 quoted names was found verbatim in
-  the text it read (whitespace folded); 2 came without a quote. A quote check in the app would therefore pass the
-  model's own reads and catch only inferred names, which this prompt almost never offers.
+- **The evidence rule is satisfiable.** Every quoted name the dedicated prompt gave was found verbatim in the text
+  it read (whitespace folded): 364 at 8,000 characters and 347 at 3,000, 711 in both arms; 2 in each arm came without
+  a quote. A quote check in the app would therefore pass the model's own reads and catch only inferred names, which
+  this prompt almost never offers.
 
 What it means for the app: the tagging prompt's recipient field should ask for every addressee, as a list, and its
 place for "City, State"; the sender should stay a person, null rather than the letterhead's organisation. Filed as
@@ -573,8 +666,9 @@ the sending place, and the 8,000-character window is not worth its tokens for th
   3,000 characters. The 3.8 reply on ABBYY differs in text source and model version together, and is reported only
   as that pair.
 - **Noise:** n 138 (82, 40 for the floor); paired document bootstrap, 2,000 draws, 95% intervals. Rerun floor
-  (entity8k repeated, one changed newline to pass the gateway's cache): sender +0.04, recipient 0.00, city -0.03,
-  full-string place -0.16. A gap inside its interval or the floor is a tie.
+  (entity8k repeated, one changed newline to pass the gateway's cache): sender +0.04 (0.000 to +0.115, one-signed: a
+  drift between identical calls, not a floor around zero), recipient 0.00, city -0.03, full-string place -0.16. A gap
+  inside its interval or the floor is a tie.
 - **Scope:** text-only, one model (Gemini 3.7 Flash), one prompt wording per arm; it does not settle a multimodal
   read, a local model on the dedicated prompt, or how the dates move if the tagging prompt changes (W46.ent-prompt-app).
   The plan-route Claude arm planned for this item is dropped, not moved (owner, 2026-10-30).
@@ -591,8 +685,9 @@ def main():
     r.add_argument("--limit", type=int)
     r.add_argument("--rerun", action="store_true")
     sub.add_parser("report")
+    sub.add_parser("stamp")
     a = ap.parse_args()
-    {"pages": cmd_pages, "vision": cmd_vision, "run": cmd_run, "report": cmd_report}[a.cmd](a)
+    {"pages": cmd_pages, "vision": cmd_vision, "run": cmd_run, "report": cmd_report, "stamp": cmd_stamp}[a.cmd](a)
 
 
 if __name__ == "__main__":

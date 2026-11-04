@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Unit tests for ent_score_paid.py's pure helpers (no cache, no gateway): python3 test_ent_score_paid.py"""
+import json
 import os
 import sys
 import unittest
@@ -90,6 +91,60 @@ class TaggingPreds(unittest.TestCase):
     def test_array_joined_as_the_app_joins_it(self):
         import ent_score as ES
         self.assertEqual(ES.split_names("; ".join(["Jane Doe", "John Smith"])), ["Jane Doe", "John Smith"])
+
+
+class ReplyCache(unittest.TestCase):
+    """A cached reply is returned only for the prompt it answered (measurement review 2026-11-03, P6-5)."""
+    def setUp(self):
+        import tempfile
+        self.dir = tempfile.mkdtemp()
+        self.rows, P.rows = P.rows, lambda: [({}, {"id": "a"}), ({}, {"id": "b"})]
+
+    def tearDown(self):
+        import shutil
+        P.rows = self.rows
+        shutil.rmtree(self.dir)
+
+    def put(self, label, doc, meta):
+        P.write_reply(P.reply_path(label, doc, self.dir), {"meta": meta, "raw": "{}"})
+
+    def test_same_prompt_hit_other_refused(self):
+        dest = P.reply_path("x", "a", self.dir)
+        self.assertIsNone(P.cached(dest, "p"))
+        self.put("x", "a", {"prompt_sha256": P.prompt_sha("p")})
+        self.assertEqual(P.cached(dest, "p")["raw"], "{}")
+        with self.assertRaises(SystemExit):
+            P.cached(dest, "p\n")
+
+    def test_unstamped_and_unknown_refused(self):
+        self.put("x", "a", {})
+        with self.assertRaises(SystemExit):
+            P.cached(P.reply_path("x", "a", self.dir), "p")
+        self.put("x", "b", {"prompt_sha256": None, "prompt_hash": "unknown"})
+        with self.assertRaises(SystemExit):
+            P.cached(P.reply_path("x", "b", self.dir), "p")
+
+    def test_call_refuses_before_the_gateway(self):
+        import types
+        sys.modules.setdefault("gateway_gemini", types.ModuleType("gateway_gemini"))
+        self.put("x", "a", {"prompt_sha256": P.prompt_sha("old")})
+        with self.assertRaises(SystemExit):
+            P.call("x", "a", "new", cache=self.dir)
+
+    def test_stamp(self):
+        self.put("x", "a", {})
+        self.put("x", "b", {"prompt_sha256": P.prompt_sha("other")})
+        self.put("y", "a", {})
+        got = P.stamp({"x": lambda d: "prompt " + d["id"], "y": None}, self.dir)
+        self.assertEqual(got["x"], {"reconstructed": 1, "had a hash, DIFFERENT": 1})
+        self.assertEqual(got["y"], {"unknown": 1})
+        self.assertEqual(P.cached(P.reply_path("x", "a", self.dir), "prompt a")["meta"]["prompt_hash"], "reconstructed")
+        b = json.load(open(P.reply_path("x", "b", self.dir)))["meta"]
+        self.assertEqual(b["prompt_sha256"], P.prompt_sha("other"))   # a recorded hash is never changed
+        with self.assertRaises(SystemExit):
+            P.check_replies("y", self.dir, lambda d: "p")         # unknown and missing-hash replies stop a report
+
+
 
 if __name__ == "__main__":
     unittest.main()

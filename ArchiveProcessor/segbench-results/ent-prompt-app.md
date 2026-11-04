@@ -84,7 +84,12 @@ Spend: $1.12 estimated over 356 gateway calls (356 answered). the gateway's own 
   identical.
 
 What it means for the app: the change ships in TagGenerator.generateTags. The sidecar's field shapes are unchanged
-(recipient_name stays one string, several names joined by "; "; a JSON array is joined the same way).
+(recipient_name stays one string, several names joined by "; "; a JSON array is joined the same way). The shipped
+rules are provisional: the processing review's Phase 4 decides the sender and place rules with the entity feature.
+The sender rule (always a person, never the letterhead's organisation) is stricter than the truth it is scored
+against, which takes an organisation where no person is named (`ent_truth.py`), and than the entity feature's design
+(G-entities: a person or an organisation), so some of the new empty senders are senders the truth counts right; the
+sender F1 is a tie.
 
 ## Measurement card
 
@@ -92,9 +97,10 @@ What it means for the app: the change ships in TagGenerator.generateTags. The si
   Sonnet rulings; the owner has not checked it). Dates on the 82 against the owner's own Finder tags. No Gemini
   drafted or ruled.
 - **Selection:** as W46.ent-score-paid (82 of the date-tagging sample's correspondence documents plus 56 chosen by
-  ABBYY text cues, not by any route tested here). The prompt's second wording was chosen after reading the first
-  wording's misses on these same 138, so the second wording's figures are not held out: the gain over the first is
-  partly fitted to this set.
+  ABBYY text cues, not by any route tested here). The three rules were written after reading W46.ent-score-paid's
+  misses on these same 138, and the second wording after reading the first wording's misses on them, so no new-prompt
+  figure is held out: every gain against the old prompt, not only the second wording's over the first, is in-sample
+  and partly fitted to this set.
 - **Comparison:** the same Vision text, first 3,000 characters, context block, model, temperature 0 and gateway in
   every arm; old and new tagging prompts differ in three rules only.
 - **Noise:** n 138 (82 for the owner's dates, 40 for the rerun floor); paired document bootstrap, 2,000 draws, 95%
