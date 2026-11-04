@@ -29,7 +29,7 @@ import gateway_gemini as G
 
 TAG = 'W46.ocr-ppocrv6-hands-paid'
 COUNTS = (0, 8, 16)
-CAP = 2.50     # OWNER_AUTHORIZATIONS.md, 2026-11-01, commit 1565f7d9
+CAP = 2.60     # OWNER_AUTHORIZATIONS.md, 2026-11-03, commit 44860fc8 (was 2.50, 1565f7d9)
 RESERVE = .08    # 8,192 output + up to 60k input at the conservative list rates
 DEFAULT_STATE = Path.home() / '.local/state/archive-autonomous/artifacts'
 DEFAULT_PACK = DEFAULT_STATE / 'hand-icl-20261101'
@@ -55,6 +55,9 @@ ACK_ATTEMPTS = {
     'public-btp-mss184240101-32-n8': '6dd3e3595d33f9137ec94240595a65b01720760fb0f89a235dbe221df6dddbf7',
     'public-btp-mss184240101-32-n16': '44f4ef5dafb6a0db94603268cdc3b222f3852d1cc99c273040c0366aa0345c77',
 }
+# The $2.60 cap (owner, 2026-11-03) covers only these six untouched conditions.
+CAP_AUTHORITY = '2026-11-03 evening — walkthrough answers recorded at owner request'
+CAP_FINISH = frozenset(f'blackwell-mss1288000967-{p}-n{n}' for p in (42, 44) for n in COUNTS)
 
 
 def prefix_hash(rows):
@@ -389,13 +392,25 @@ def run(a):
     grant = authority.read_text().split('## 2026-11-01 — ready paid processing-review runs (owner session)', 1)[1]
     if '**W46.ocr-ppocrv6-hands-paid:**' not in grant or '**$2.50 working item cap**' not in grant:
         raise ValueError('the revised owner working cap is not recorded')
-    dump(a.out / 'working-cap.json', {'cap': CAP, 'authorization_commit': '1565f7d9',
-         'authorization_sha256': sha(authority), 'original_receipt_sha256': sha(a.out / 'receipt.json')})
+    raised = (authority.read_text().split('## ' + CAP_AUTHORITY, 1) + [''])[1].split('- **W46.seg-boxes-score:**', 1)[0]
+    if not all(s in raised for s in ('**W46.ocr-ppocrv6-hands-paid:**', 'from $2.50 to $2.60',
+                                     'six untouched Blackwell', '`blackwell-mss1288000967-{42,44}-n{0,8,16}`',
+                                     'every accounting stop stays in force')):
+        raise ValueError('the owner-raised $2.60 working cap is not recorded')
     by_id = {j['id']: j for j in jobs}
     _, done, _ = state(journal(a.out))
     for key, r in done.items():
         if key not in by_id or r['request_sha256'] != request_hash(body(a.pack, f, by_id[key])):
             raise ValueError('cached request differs from frozen request; no paid call made')
+    if not {j['id'] for j in jobs if j['id'] not in done} <= CAP_FINISH:
+        raise ValueError('the $2.60 cap covers only the six untouched Blackwell conditions; no paid call made')
+    cap_file = a.out / 'working-cap.json'
+    prior = json.loads(cap_file.read_text()) if cap_file.exists() else None
+    if prior and prior.get('cap') != CAP:  # keep the superseded grant's record, never rewrite it
+        prior = {'superseded': prior}
+    dump(cap_file, {'cap': CAP, 'authorization_commit': '44860fc8', 'authorization_sha256': sha(authority),
+                    'original_receipt_sha256': sha(a.out / 'receipt.json'),
+                    'covers_only': sorted(CAP_FINISH), **(prior if prior and 'superseded' in prior else {})})
     # A key failure happens before any reservation; no key is printed or persisted.
     load_key()
     pilot = pilot_jobs(jobs)
@@ -633,7 +648,7 @@ def write_report(r):
         for c in r['owner_clear']['comparisons']:
             L.append(f"| {c['cohort']} | {c['examples_n']} | {ci(c['both_answered'])} |")
     L += ['', '## Cost and provenance', '',
-          f"Charged against the owner-revised $2.50 working item cap: ${r['charged']:.5f}, including "
+          f"Charged against the owner-revised $2.60 working item cap: ${r['charged']:.5f}, including "
           f"${r['retained_allowance']:.2f} retained for {len(r['acknowledged_failures'])} uncertain outcomes. "
           f"Known-usage list-rate estimate ${r['cost']['estimate']:.5f} "
           f"at ${G.PRICE[0]}/${G.PRICE[1]} per million input/output tokens (including reasoning); gateway’s own "
@@ -641,7 +656,8 @@ def write_report(r):
           'The cap counts the larger for each request; any unknown request keeps its full reservation. '
           'No retries. The initial 24-request pilot cost $0.1950195 and projected $1.7958 for 221 calls. '
           'The owner revised the working cap from the initial agent-set $1 estimate to $2.50 '
-          '(OWNER_AUTHORIZATIONS.md, 1565f7d9); all pilot answers were preserved, not re-called. '
+          '(OWNER_AUTHORIZATIONS.md, 1565f7d9), then to $2.60 (44860fc8, 2026-11-03) only so the $0.08 '
+          'reservation guard could finish the six untouched Blackwell conditions; all pilot answers were preserved, not re-called. '
           'A sheet alternative was prepared but made no paid call and is not an accuracy arm. '
           'The owner’s 2026-11-01 evening answer retained the ten old allowances without exact billing '
           'reconciliation; nine 502 replies and one lost connection remain failed, never repeated. '

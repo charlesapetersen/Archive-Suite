@@ -89,21 +89,22 @@ class Contracts(unittest.TestCase):
 
     def test_cap_blocks_before_request(self):
         self.out.mkdir()
-        for i in range(31):
+        n = int(H.CAP / H.RESERVE)  # the most whole reservations under the cap
+        for i in range(n):
             r = dict(id=str(i), request_sha256=str(i))
             H.append(self.out, dict(r, event='reserve', reservation=H.RESERVE))
             H.append(self.out, dict(r, event='settle', cost=.08,
                                    usage={'prompt_tokens': 0, 'completion_tokens': 0}))
         with self.assertRaisesRegex(ValueError, 'item cap'):
             self.call()
-        self.assertEqual(len(H.journal(self.out)), 62)
+        self.assertEqual(len(H.journal(self.out)), 2 * n)
 
     def test_custom_output_still_counts_original_pilot(self):
         H.LEGACY_OUT.mkdir()
         H.append(H.LEGACY_OUT, dict(id='old', event='reserve', request_sha256='old', reservation=.08))
         with self.assertRaisesRegex(ValueError, 'outstanding'):
             self.call()
-        H.append(H.LEGACY_OUT, dict(id='old', event='settle', request_sha256='old', cost=2.46,
+        H.append(H.LEGACY_OUT, dict(id='old', event='settle', request_sha256='old', cost=round(H.CAP - .04, 2),
                                   usage={'prompt_tokens': 0, 'completion_tokens': 0}))
         with self.assertRaisesRegex(ValueError, 'item cap'):
             self.call()
