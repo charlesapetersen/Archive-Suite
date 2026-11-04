@@ -1,0 +1,726 @@
+{
+ "docs": 138,
+ "answered": {
+  "tagging": 138,
+  "entity3k": 138,
+  "tagging-v1": 138,
+  "tagging-new": 138,
+  "tagging-new-rerun": 40
+ },
+ "unparsed": {
+  "tagging": 0,
+  "entity3k": 0,
+  "tagging-v1": 0,
+  "tagging-new": 0,
+  "tagging-new-rerun": 0
+ },
+ "scores": {
+  "tagging": {
+   "sender": {
+    "docs": 138,
+    "exact": {
+     "tp": 77,
+     "fp": 23,
+     "fn": 61,
+     "precision": 0.77,
+     "recall": 0.5579710144927537,
+     "f1": 0.6470588235294118,
+     "inferred_matched": 2,
+     "wrong_when_filled_docs": 23
+    },
+    "overlap": {
+     "tp": 88,
+     "fp": 12,
+     "fn": 50,
+     "precision": 0.88,
+     "recall": 0.6376811594202898,
+     "f1": 0.7394957983193275,
+     "inferred_matched": 2,
+     "wrong_when_filled_docs": 12
+    },
+    "ed2": {
+     "tp": 84,
+     "fp": 16,
+     "fn": 54,
+     "precision": 0.84,
+     "recall": 0.6086956521739131,
+     "f1": 0.7058823529411766,
+     "inferred_matched": 2,
+     "wrong_when_filled_docs": 16
+    },
+    "truth_nonempty": 129,
+    "null_when_truth": 31,
+    "filled_when_empty": 4,
+    "quotes": 0,
+    "quotes_valid": 0,
+    "names": 102,
+    "names_in_text": 74
+   },
+   "recipient": {
+    "docs": 138,
+    "exact": {
+     "tp": 100,
+     "fp": 20,
+     "fn": 73,
+     "precision": 0.8333333333333334,
+     "recall": 0.5780346820809249,
+     "f1": 0.6825938566552902,
+     "inferred_matched": 4,
+     "wrong_when_filled_docs": 20
+    },
+    "overlap": {
+     "tp": 109,
+     "fp": 10,
+     "fn": 64,
+     "precision": 0.9159663865546218,
+     "recall": 0.630057803468208,
+     "f1": 0.7465753424657533,
+     "inferred_matched": 5,
+     "wrong_when_filled_docs": 10
+    },
+    "ed2": {
+     "tp": 105,
+     "fp": 15,
+     "fn": 68,
+     "precision": 0.875,
+     "recall": 0.6069364161849711,
+     "f1": 0.7167235494880546,
+     "inferred_matched": 4,
+     "wrong_when_filled_docs": 15
+    },
+    "truth_nonempty": 132,
+    "null_when_truth": 14,
+    "filled_when_empty": 1,
+    "quotes": 0,
+    "quotes_valid": 0,
+    "names": 124,
+    "names_in_text": 103
+   },
+   "sending_place": {
+    "docs": 138,
+    "exact": {
+     "tp": 45,
+     "fp": 32,
+     "fn": 27,
+     "precision": 0.5844155844155844,
+     "recall": 0.625,
+     "f1": 0.6040268456375839,
+     "inferred_matched": 4,
+     "wrong_when_filled_docs": 32
+    },
+    "overlap": {
+     "tp": 69,
+     "fp": 1,
+     "fn": 3,
+     "precision": 0.9857142857142858,
+     "recall": 0.9583333333333334,
+     "f1": 0.971830985915493,
+     "inferred_matched": 11,
+     "wrong_when_filled_docs": 1
+    },
+    "ed2": {
+     "tp": 46,
+     "fp": 31,
+     "fn": 26,
+     "precision": 0.5974025974025974,
+     "recall": 0.6388888888888888,
+     "f1": 0.6174496644295301,
+     "inferred_matched": 4,
+     "wrong_when_filled_docs": 31
+    },
+    "truth_nonempty": 104,
+    "null_when_truth": 24,
+    "filled_when_empty": 1,
+    "quotes": 0,
+    "quotes_valid": 0,
+    "names": 81,
+    "names_in_text": 68
+   }
+  },
+  "tagging-v1": {
+   "sender": {
+    "docs": 138,
+    "exact": {
+     "tp": 76,
+     "fp": 14,
+     "fn": 62,
+     "precision": 0.8444444444444444,
+     "recall": 0.5507246376811594,
+     "f1": 0.6666666666666667,
+     "inferred_matched": 1,
+     "wrong_when_filled_docs": 14
+    },
+    "overlap": {
+     "tp": 85,
+     "fp": 5,
+     "fn": 53,
+     "precision": 0.9444444444444444,
+     "recall": 0.6159420289855072,
+     "f1": 0.7456140350877193,
+     "inferred_matched": 1,
+     "wrong_when_filled_docs": 5
+    },
+    "ed2": {
+     "tp": 84,
+     "fp": 6,
+     "fn": 54,
+     "precision": 0.9333333333333333,
+     "recall": 0.6086956521739131,
+     "f1": 0.7368421052631579,
+     "inferred_matched": 1,
+     "wrong_when_filled_docs": 6
+    },
+    "truth_nonempty": 129,
+    "null_when_truth": 40,
+    "filled_when_empty": 1,
+    "quotes": 0,
+    "quotes_valid": 0,
+    "names": 91,
+    "names_in_text": 74
+   },
+   "recipient": {
+    "docs": 138,
+    "exact": {
+     "tp": 119,
+     "fp": 17,
+     "fn": 54,
+     "precision": 0.875,
+     "recall": 0.6878612716763006,
+     "f1": 0.7702265372168284,
+     "inferred_matched": 0,
+     "wrong_when_filled_docs": 17
+    },
+    "overlap": {
+     "tp": 130,
+     "fp": 5,
+     "fn": 43,
+     "precision": 0.9629629629629629,
+     "recall": 0.7514450867052023,
+     "f1": 0.8441558441558441,
+     "inferred_matched": 1,
+     "wrong_when_filled_docs": 5
+    },
+    "ed2": {
+     "tp": 123,
+     "fp": 13,
+     "fn": 50,
+     "precision": 0.9044117647058824,
+     "recall": 0.7109826589595376,
+     "f1": 0.796116504854369,
+     "inferred_matched": 0,
+     "wrong_when_filled_docs": 13
+    },
+    "truth_nonempty": 132,
+    "null_when_truth": 26,
+    "filled_when_empty": 0,
+    "quotes": 0,
+    "quotes_valid": 0,
+    "names": 136,
+    "names_in_text": 125
+   },
+   "sending_place": {
+    "docs": 138,
+    "exact": {
+     "tp": 45,
+     "fp": 36,
+     "fn": 27,
+     "precision": 0.5555555555555556,
+     "recall": 0.625,
+     "f1": 0.5882352941176471,
+     "inferred_matched": 0,
+     "wrong_when_filled_docs": 36
+    },
+    "overlap": {
+     "tp": 68,
+     "fp": 1,
+     "fn": 4,
+     "precision": 0.9855072463768116,
+     "recall": 0.9444444444444444,
+     "f1": 0.9645390070921985,
+     "inferred_matched": 12,
+     "wrong_when_filled_docs": 1
+    },
+    "ed2": {
+     "tp": 45,
+     "fp": 36,
+     "fn": 27,
+     "precision": 0.5555555555555556,
+     "recall": 0.625,
+     "f1": 0.5882352941176471,
+     "inferred_matched": 0,
+     "wrong_when_filled_docs": 36
+    },
+    "truth_nonempty": 104,
+    "null_when_truth": 24,
+    "filled_when_empty": 1,
+    "quotes": 0,
+    "quotes_valid": 0,
+    "names": 81,
+    "names_in_text": 72
+   }
+  },
+  "tagging-new": {
+   "sender": {
+    "docs": 138,
+    "exact": {
+     "tp": 76,
+     "fp": 13,
+     "fn": 62,
+     "precision": 0.8539325842696629,
+     "recall": 0.5507246376811594,
+     "f1": 0.6696035242290748,
+     "inferred_matched": 1,
+     "wrong_when_filled_docs": 13
+    },
+    "overlap": {
+     "tp": 85,
+     "fp": 4,
+     "fn": 53,
+     "precision": 0.9550561797752809,
+     "recall": 0.6159420289855072,
+     "f1": 0.748898678414097,
+     "inferred_matched": 1,
+     "wrong_when_filled_docs": 4
+    },
+    "ed2": {
+     "tp": 83,
+     "fp": 6,
+     "fn": 55,
+     "precision": 0.9325842696629213,
+     "recall": 0.6014492753623188,
+     "f1": 0.7312775330396476,
+     "inferred_matched": 1,
+     "wrong_when_filled_docs": 6
+    },
+    "truth_nonempty": 129,
+    "null_when_truth": 41,
+    "filled_when_empty": 1,
+    "quotes": 0,
+    "quotes_valid": 0,
+    "names": 90,
+    "names_in_text": 74
+   },
+   "recipient": {
+    "docs": 138,
+    "exact": {
+     "tp": 131,
+     "fp": 25,
+     "fn": 42,
+     "precision": 0.8397435897435898,
+     "recall": 0.7572254335260116,
+     "f1": 0.7963525835866261,
+     "inferred_matched": 4,
+     "wrong_when_filled_docs": 25
+    },
+    "overlap": {
+     "tp": 146,
+     "fp": 9,
+     "fn": 27,
+     "precision": 0.9419354838709677,
+     "recall": 0.8439306358381503,
+     "f1": 0.8902439024390243,
+     "inferred_matched": 5,
+     "wrong_when_filled_docs": 9
+    },
+    "ed2": {
+     "tp": 135,
+     "fp": 21,
+     "fn": 38,
+     "precision": 0.8653846153846154,
+     "recall": 0.7803468208092486,
+     "f1": 0.8206686930091186,
+     "inferred_matched": 4,
+     "wrong_when_filled_docs": 21
+    },
+    "truth_nonempty": 132,
+    "null_when_truth": 4,
+    "filled_when_empty": 1,
+    "quotes": 0,
+    "quotes_valid": 0,
+    "names": 160,
+    "names_in_text": 143
+   },
+   "sending_place": {
+    "docs": 138,
+    "exact": {
+     "tp": 54,
+     "fp": 15,
+     "fn": 18,
+     "precision": 0.782608695652174,
+     "recall": 0.75,
+     "f1": 0.7659574468085107,
+     "inferred_matched": 15,
+     "wrong_when_filled_docs": 15
+    },
+    "overlap": {
+     "tp": 68,
+     "fp": 1,
+     "fn": 4,
+     "precision": 0.9855072463768116,
+     "recall": 0.9444444444444444,
+     "f1": 0.9645390070921985,
+     "inferred_matched": 15,
+     "wrong_when_filled_docs": 1
+    },
+    "ed2": {
+     "tp": 54,
+     "fp": 15,
+     "fn": 18,
+     "precision": 0.782608695652174,
+     "recall": 0.75,
+     "f1": 0.7659574468085107,
+     "inferred_matched": 15,
+     "wrong_when_filled_docs": 15
+    },
+    "truth_nonempty": 104,
+    "null_when_truth": 21,
+    "filled_when_empty": 1,
+    "quotes": 0,
+    "quotes_valid": 0,
+    "names": 84,
+    "names_in_text": 47
+   }
+  },
+  "entity3k": {
+   "sender": {
+    "docs": 138,
+    "exact": {
+     "tp": 75,
+     "fp": 37,
+     "fn": 63,
+     "precision": 0.6696428571428571,
+     "recall": 0.5434782608695652,
+     "f1": 0.6,
+     "inferred_matched": 0,
+     "wrong_when_filled_docs": 37
+    },
+    "overlap": {
+     "tp": 87,
+     "fp": 24,
+     "fn": 51,
+     "precision": 0.7837837837837838,
+     "recall": 0.6304347826086957,
+     "f1": 0.6987951807228915,
+     "inferred_matched": 1,
+     "wrong_when_filled_docs": 24
+    },
+    "ed2": {
+     "tp": 84,
+     "fp": 28,
+     "fn": 54,
+     "precision": 0.75,
+     "recall": 0.6086956521739131,
+     "f1": 0.672,
+     "inferred_matched": 0,
+     "wrong_when_filled_docs": 28
+    },
+    "truth_nonempty": 129,
+    "null_when_truth": 19,
+    "filled_when_empty": 1,
+    "quotes": 111,
+    "quotes_valid": 111,
+    "names": 112,
+    "names_in_text": 98
+   },
+   "recipient": {
+    "docs": 138,
+    "exact": {
+     "tp": 143,
+     "fp": 22,
+     "fn": 30,
+     "precision": 0.8666666666666667,
+     "recall": 0.8265895953757225,
+     "f1": 0.8461538461538461,
+     "inferred_matched": 3,
+     "wrong_when_filled_docs": 21
+    },
+    "overlap": {
+     "tp": 155,
+     "fp": 9,
+     "fn": 18,
+     "precision": 0.9451219512195121,
+     "recall": 0.8959537572254336,
+     "f1": 0.9198813056379822,
+     "inferred_matched": 4,
+     "wrong_when_filled_docs": 9
+    },
+    "ed2": {
+     "tp": 147,
+     "fp": 18,
+     "fn": 26,
+     "precision": 0.8909090909090909,
+     "recall": 0.8497109826589595,
+     "f1": 0.8698224852071005,
+     "inferred_matched": 3,
+     "wrong_when_filled_docs": 17
+    },
+    "truth_nonempty": 132,
+    "null_when_truth": 9,
+    "filled_when_empty": 1,
+    "quotes": 167,
+    "quotes_valid": 167,
+    "names": 168,
+    "names_in_text": 156
+   },
+   "sending_place": {
+    "docs": 138,
+    "exact": {
+     "tp": 59,
+     "fp": 9,
+     "fn": 13,
+     "precision": 0.8676470588235294,
+     "recall": 0.8194444444444444,
+     "f1": 0.8428571428571429,
+     "inferred_matched": 1,
+     "wrong_when_filled_docs": 9
+    },
+    "overlap": {
+     "tp": 67,
+     "fp": 0,
+     "fn": 5,
+     "precision": 1.0,
+     "recall": 0.9305555555555556,
+     "f1": 0.9640287769784173,
+     "inferred_matched": 2,
+     "wrong_when_filled_docs": 0
+    },
+    "ed2": {
+     "tp": 59,
+     "fp": 9,
+     "fn": 13,
+     "precision": 0.8676470588235294,
+     "recall": 0.8194444444444444,
+     "f1": 0.8428571428571429,
+     "inferred_matched": 1,
+     "wrong_when_filled_docs": 9
+    },
+    "truth_nonempty": 104,
+    "null_when_truth": 35,
+    "filled_when_empty": 0,
+    "quotes": 69,
+    "quotes_valid": 69,
+    "names": 69,
+    "names_in_text": 53
+   }
+  }
+ },
+ "paired": {
+  "tagging-new vs tagging": {
+   "what": "the three rules",
+   "sender": {
+    "n": 138,
+    "diff": 0.025395180098471082,
+    "lo": -0.016299947192395692,
+    "hi": 0.07036665998797842
+   },
+   "recipient": {
+    "n": 138,
+    "diff": 0.10394514352106388,
+    "lo": -0.02121744220076094,
+    "hi": 0.2616541353383458
+   },
+   "sending_place": {
+    "n": 138,
+    "diff": 0.14850778237898044,
+    "lo": 0.013378273269380347,
+    "hi": 0.28451759140632693
+   }
+  },
+  "tagging-new vs tagging-v1": {
+   "what": "the second wording",
+   "sender": {
+    "n": 138,
+    "diff": -0.005564572223510256,
+    "lo": -0.02631578947368418,
+    "hi": 0.00921137685843565
+   },
+   "recipient": {
+    "n": 138,
+    "diff": 0.024552188154749577,
+    "lo": -0.009037700120502645,
+    "hi": 0.06509197324414717
+   },
+   "sending_place": {
+    "n": 138,
+    "diff": 0.17772215269086356,
+    "lo": 0.03994591462236807,
+    "hi": 0.3140036156306494
+   }
+  },
+  "tagging-new vs entity3k": {
+   "what": "new tagging against dedicated",
+   "sender": {
+    "n": 138,
+    "diff": 0.059277533039647556,
+    "lo": 0.022298362973840247,
+    "hi": 0.09666592078764824
+   },
+   "recipient": {
+    "n": 138,
+    "diff": -0.049153792197982105,
+    "lo": -0.13083647456442715,
+    "hi": 0.016892478721556303
+   },
+   "sending_place": {
+    "n": 138,
+    "diff": -0.07689969604863223,
+    "lo": -0.16889880952380953,
+    "hi": 0.011835364776541235
+   }
+  },
+  "tagging-new-rerun vs tagging-new": {
+   "what": "the same calls repeated",
+   "sender": {
+    "n": 40,
+    "diff": 0.0,
+    "lo": 0.0,
+    "hi": 0.0
+   },
+   "recipient": {
+    "n": 40,
+    "diff": 0.0,
+    "lo": 0.0,
+    "hi": 0.0
+   },
+   "sending_place": {
+    "n": 40,
+    "diff": -0.07731092436974796,
+    "lo": -0.2881720430107527,
+    "hi": 0.11764705882352944
+   }
+  }
+ },
+ "place_city": {
+  "tagging": 0.8951048951048951,
+  "tagging-v1": 0.9014084507042254,
+  "tagging-new": 0.9219858156028369,
+  "entity3k": 0.9064748201438849
+ },
+ "paired_city": {
+  "tagging-new vs tagging": {
+   "n": 138,
+   "diff": 0.026880920497941774,
+   "lo": -0.008354702622218602,
+   "hi": 0.06721132897603488
+  },
+  "tagging-new vs tagging-v1": {
+   "n": 138,
+   "diff": 0.020577364898611505,
+   "lo": -0.011035378123985695,
+   "hi": 0.06017540490365525
+  },
+  "tagging-new vs entity3k": {
+   "n": 138,
+   "diff": 0.01551099545895196,
+   "lo": -0.022313564298297228,
+   "hi": 0.058730158730158744
+  },
+  "tagging-new-rerun vs tagging-new": {
+   "n": 40,
+   "diff": -0.02857142857142858,
+   "lo": -0.09999999999999998,
+   "hi": 0.0
+  }
+ },
+ "multi_recipient": {
+  "tagging": 1,
+  "tagging-v1": 4,
+  "tagging-new": 5,
+  "entity3k": 12
+ },
+ "recipients_named": {
+  "tagging": 124,
+  "tagging-v1": 136,
+  "tagging-new": 160,
+  "entity3k": 168
+ },
+ "dates_changed": {
+  "old vs new prompt": {
+   "n": 138,
+   "any": 2,
+   "year": 1,
+   "month": 0,
+   "day": 1,
+   "uncertain": 0
+  },
+  "old vs the first wording": {
+   "n": 138,
+   "any": 3,
+   "year": 1,
+   "month": 1,
+   "day": 2,
+   "uncertain": 0
+  },
+  "old vs new, the rerun's 40": {
+   "n": 40,
+   "any": 1,
+   "year": 1,
+   "month": 0,
+   "day": 0,
+   "uncertain": 0
+  },
+  "new vs its rerun": {
+   "n": 40,
+   "any": 1,
+   "year": 1,
+   "month": 0,
+   "day": 0,
+   "uncertain": 0
+  }
+ },
+ "dates_owner": {
+  "tagging": {
+   "n": 82,
+   "year_right": 75,
+   "month_truth": 57,
+   "month_right": 55,
+   "month_untagged": 25,
+   "month_given_untagged": 21,
+   "du_agree": 76
+  },
+  "tagging-v1": {
+   "n": 82,
+   "year_right": 75,
+   "month_truth": 57,
+   "month_right": 55,
+   "month_untagged": 25,
+   "month_given_untagged": 21,
+   "du_agree": 76
+  },
+  "tagging-new": {
+   "n": 82,
+   "year_right": 74,
+   "month_truth": 57,
+   "month_right": 55,
+   "month_untagged": 25,
+   "month_given_untagged": 21,
+   "du_agree": 76
+  }
+ },
+ "dates_paired": {
+  "year right": {
+   "n": 82,
+   "diff": -0.012195121951219513,
+   "lo": -0.036585365853658534,
+   "hi": 0.0
+  },
+  "month right or rightly absent": {
+   "n": 82,
+   "diff": 0.0,
+   "lo": 0.0,
+   "hi": 0.0
+  },
+  "date uncertain agrees": {
+   "n": 82,
+   "diff": 0.0,
+   "lo": 0.0,
+   "hi": 0.0
+  }
+ },
+ "calls": {
+  "n": 356,
+  "ok": 356,
+  "spent": 1.1171,
+  "note": "the gateway's own figure $1.1171 on 356 of 356 calls, 1.00 times the estimate on them"
+ }
+}

@@ -63,9 +63,9 @@ class TagGenerator: ObservableObject {
         - "date_uncertain": true if year cannot be determined from the document itself (even if estimated from context)
         - "subject_tags": \(vocabulary.isEmpty ? "2–6 general-but-specific subject tags (e.g. \"Democratic Party\", \"taxes\", \"education\", \"transportation\", \"business\", \"literature\", \"economics\", \"foreign policy\", \"civil rights\", \"military\", \"journalism\", \"science\", \"health care\", \"labor unions\"). Do NOT use overly broad terms like \"politics\" or \"history\"." : "2–6 tags chosen ONLY from this controlled vocabulary: [\(vocabulary.map { "\"\($0)\"" }.joined(separator: ", "))]. Use only tags from this list that are relevant to the document. Do not invent new tags.")
         - "format": document type, e.g. "letter", "memo", "newspaper article", "magazine article", "report", "draft", "speech", "press release", "telegram", "photograph", or null if unclear
-        - "author_name": author, sender, or writer name if identifiable, or null
-        - "recipient_name": recipient or addressee name if identifiable, or null
-        - "author_location": author's or sender's location if identifiable, or null
+        - "author_name": the person who wrote, signed or sent the document (a signature, a typed name under the closing, a "From:" line, a byline), or null. Always a person: if no person is named as its writer, null, never the organisation on the letterhead
+        - "recipient_name": everyone it is addressed to, a person or a body such as a committee or "All Employees" (the inside address, a "To:" line, the salutation), names separated by "; " (e.g. "Jane Doe; John Smith"), or null. Copies ("cc") are not recipients
+        - "author_location": where it was written or sent from (the letterhead's or the dateline's city), as "City, State" with the state written out (e.g. "Chicago, Illinois") or "City, Country", or null
         - "recipient_location": recipient's location if identifiable, or null
         - "publication_name": newspaper, magazine, or publication name if applicable, or null
         - Respond with ONLY the JSON object. No commentary.
@@ -189,11 +189,21 @@ class TagGenerator: ObservableObject {
         tags.subjectTags = ControlledVocabulary.enforce(
             json["subject_tags"] as? [String] ?? [], vocabulary: vocabulary)
         tags.format = json["format"] as? String
-        tags.authorName = json["author_name"] as? String
-        tags.recipientName = json["recipient_name"] as? String
+        tags.authorName = Self.names(json["author_name"])
+        tags.recipientName = Self.names(json["recipient_name"])
         tags.authorLocation = json["author_location"] as? String
         tags.recipientLocation = json["recipient_location"] as? String
         tags.publicationName = json["publication_name"] as? String
         return tags
+    }
+
+    /// A name field as the one string the sidecar keeps. The prompt asks for several addressees joined by "; ",
+    /// but a model may answer with a JSON array instead; join that the same way rather than drop it.
+    private static func names(_ value: Any?) -> String? {
+        if let s = value as? String { return s }
+        guard let list = value as? [Any] else { return nil }
+        let parts = list.compactMap { ($0 as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        return parts.isEmpty ? nil : parts.joined(separator: "; ")
     }
 }

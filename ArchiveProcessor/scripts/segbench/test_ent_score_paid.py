@@ -74,5 +74,22 @@ class City(unittest.TestCase):
         self.assertEqual(P.by_city({"d": {"sending_place": None}}, tr)[0]["d"]["sending_place"], [])
 
 
+
+class TaggingBefore(unittest.TestCase):
+    """The tagging arm keeps the prompt its cached replies answered: the app's prompt with its three entity rules put
+    back, every other line as the app sends it (W46.ent-prompt-app changed those three)."""
+    def test_three_rules_put_back(self):
+        new = DT.build_prompt("body", "ctx").split("\n")
+        old = P.tagging_prompt_before("body", "ctx").split("\n")
+        self.assertEqual(len(new), len(old))
+        diff = [o for n, o in zip(new, old) if n != o]
+        self.assertEqual(diff, list(P.TAGGING_RULES_BEFORE.values()))
+
+
+class TaggingPreds(unittest.TestCase):
+    def test_array_joined_as_the_app_joins_it(self):
+        import ent_score as ES
+        self.assertEqual(ES.split_names("; ".join(["Jane Doe", "John Smith"])), ["Jane Doe", "John Smith"])
+
 if __name__ == "__main__":
     unittest.main()

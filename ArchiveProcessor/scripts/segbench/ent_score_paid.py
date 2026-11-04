@@ -204,14 +204,14 @@ def cmd_vision(a):
 
 # --- the gateway ------------------------------------------------------------------------------------
 
-def ledger():
-    f = os.path.join(CACHE, "calls.jsonl")
+def ledger(cache=CACHE):
+    f = os.path.join(cache, "calls.jsonl")
     return [json.loads(x) for x in open(f)] if os.path.exists(f) else []
 
 
-def spent():
+def spent(cache=CACHE):
     import gateway_gemini as G
-    return sum(G.charge(r) for r in ledger())
+    return sum(G.charge(r) for r in ledger(cache))
 
 
 def context_of(prompt):
@@ -221,27 +221,44 @@ def context_of(prompt):
     return None if c == "(none)" else c
 
 
-def prompt_for(arm, d):
+# The three rules of the tagging prompt as this item sent them; W46.ent-prompt-app replaced them in TagGenerator, so
+# the tagging arm puts them back to stay the prompt its cached replies answered.
+TAGGING_RULES_BEFORE = {
+    "author_name": '- "author_name": author, sender, or writer name if identifiable, or null',
+    "recipient_name": '- "recipient_name": recipient or addressee name if identifiable, or null',
+    "author_location": '- "author_location": author\'s or sender\'s location if identifiable, or null',
+}
+
+
+def tagging_prompt_before(text, context):
     import date_tagging as DT
+    lines = DT.build_prompt(text, context).split("\n")
+    for k, v in TAGGING_RULES_BEFORE.items():
+        i = next(j for j, x in enumerate(lines) if x.startswith(f'- "{k}":'))
+        lines[i] = v
+    return "\n".join(lines)
+
+
+def prompt_for(arm, d):
     t = vision_text(d)
     if arm == "tagging":
-        return DT.build_prompt(t, context_of(d["prompt"]))
+        return tagging_prompt_before(t, context_of(d["prompt"]))
     return ENTITY_PROMPT.format(text=t[:ARMS[arm]])
 
 
-def reply_path(arm, doc_id):
-    return os.path.join(CACHE, "replies", arm, doc_id + ".json")
+def reply_path(arm, doc_id, cache=CACHE):
+    return os.path.join(cache, "replies", arm, doc_id + ".json")
 
 
-def call(arm, doc_id, prompt):
+def call(arm, doc_id, prompt, cache=CACHE, cap=CAP):
     """One call, cached by destination; the ledger line is written before the reply is used."""
     import gateway_gemini as G
-    dest = reply_path(arm, doc_id)
+    dest = reply_path(arm, doc_id, cache)
     if os.path.exists(dest):
         return json.load(open(dest))
     worst = G.cost({"prompt_tokens": 6000, "completion_tokens": G.MAX_TOKENS})
-    if spent() + worst > CAP:
-        raise SystemExit(f"cap: ${spent():.4f} spent of ${CAP}")
+    if spent(cache) + worst > cap:
+        raise SystemExit(f"cap: ${spent(cache):.4f} spent of ${cap}")
     b = {"model": G.MODEL, "temperature": 0, "max_tokens": G.MAX_TOKENS,
          "messages": [{"role": "user", "content": prompt}]}
     t = time.time()
@@ -255,7 +272,7 @@ def call(arm, doc_id, prompt):
     rec = {"arm": arm, "doc": doc_id, "http": r.status_code, "t": t, "wall_s": round(time.time() - t, 3),
            "model": got.get("model") or G.MODEL, "usage": usage, "cost": round(G.cost(usage), 6)}
     rec = G.with_gateway_cost(rec, r)
-    with open(os.path.join(CACHE, "calls.jsonl"), "a") as fh:
+    with open(os.path.join(cache, "calls.jsonl"), "a") as fh:
         fh.write(json.dumps(rec) + "\n")
     choice = (got.get("choices") or [{}])[0]
     out = {"meta": {**rec, "finish": choice.get("finish_reason")},
@@ -300,19 +317,21 @@ def parse(raw):
     return js if isinstance(js, dict) else None
 
 
-def preds(label):
-    """{doc_id: pred} for the answered and parsed documents; unparsed ones counted apart."""
+def preds(label, cache=CACHE):
+    """{doc_id: pred} for the answered and parsed documents; unparsed ones counted apart. A tagging reply's name list
+    (an array where the prompt asks for one string) is joined with "; ", as TagGenerator.names joins it."""
     import ent_score as ES
     out, bad = {}, 0
+    joined = lambda v: "; ".join(x for x in v if isinstance(x, str) and x.strip()) or None if isinstance(v, list) else v  # noqa: E731
     for r, d in rows():
-        p = reply_path(label, d["id"])
+        p = reply_path(label, d["id"], cache)
         if not os.path.exists(p):
             continue
         js = parse(json.load(open(p)).get("raw"))
         if js is None:
             bad += 1; continue
-        if label == "tagging":
-            out[r["id"]] = {f: ES.split_names(js.get(k)) if f != "sending_place" else js.get(k)
+        if label.startswith("tagging"):
+            out[r["id"]] = {f: ES.split_names(joined(js.get(k))) if f != "sending_place" else joined(js.get(k))
                             for f, k in ES.REPLY_FIELD.items()}
         else:
             out[r["id"]] = {f: js.get(f) for f in ET.FIELDS}
