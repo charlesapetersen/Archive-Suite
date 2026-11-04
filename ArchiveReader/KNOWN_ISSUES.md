@@ -829,9 +829,32 @@ that failed for any cause but an identity refusal is re-recorded afterwards as i
 passes cannot block older undo; a crash between consumption and that record loses the retry, never
 replays. An identity refusal (replaced, gone, outside the archive) is never retried. Forward append failure disables older undo and warns; recovery appends a
 synchronized history barrier. A failure counter keeps the warning even when another member of the
-same batch recovers storage. Process death before recovery can still lose the missing forward record
-and barrier: forward recording remains best-effort, rather than a write-ahead journal. Ledger growth remains unbounded and ordinary forward appends are not fsynced.
-Scratch regressions: UndoDurabilityTests, LedgerUndoHistoryTests; evidence in
+same batch recovers storage.
+
+**Durability (W40.fix-reader-ledger-durability, 2026-11-03).** Each forward action is write-ahead
+journalled: an `actionIntent` line is flushed (`F_FULLFSYNC`) inside coordination before its first
+tag write, and an `actionDone` is flushed once every record of the action has been appended. An intent
+with no `actionDone` (the process or the Mac died mid-action, a record failed, or a write failed its
+verification so its change is uncertain) is a permanent
+barrier: neither that action nor anything older is offered, so the gap no longer depends on the
+in-memory flag surviving. The live file is cut into numbered segments at 4 MiB
+(`audit-ledger.000001.jsonl`, …) that are kept, not pruned (§12 is append-only); undo reads them newest
+first and stops at a barrier or a full window. A file that exists but cannot be read, or a segment cut
+by another running copy during the read, offers nothing rather than older history. Appends use
+`O_APPEND`, so two running copies never write over each other's lines. What is still not covered:
+- **A double fault.** If the intent itself cannot be written (storage failing) and the process dies
+  before storage recovers, the change is on disk with no line at all, and the older history is offered
+  after relaunch. The in-process warning and barrier still cover the case while the app runs.
+- **The disk keeps everything:** about 1 KB per changed file (mostly the bookmark). Deleting old segments
+  would lose audit history, which §12 keeps; ask before adding a retention.
+- **An action that crashes hides the history before it for good**, even when every write in it was
+  recorded and only the `actionDone` was lost. That is the safe direction; later actions are offered.
+- **Reading is bounded only once the window fills.** An archive with fewer than 100 actions since the
+  last barrier still decodes every segment on each undo refresh (on the main actor), as it did before.
+- Two running copies cutting a segment at the same moment: the second rename fails, is logged, and the
+  append goes on into the live file.
+
+Scratch regressions: UndoDurabilityTests, LedgerUndoHistoryTests, LedgerJournalTests; evidence in
 verification/evidence/reader/W40.audit-ledger-undo.md. R-46 stays fixed-pending-recheck.
 
 ### W45.undo-still-applied — undo never takes a token past its count before the change (fixed 2026-10-20)

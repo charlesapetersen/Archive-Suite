@@ -17,6 +17,16 @@ import os
 //  time, before/after tags and labels, the forward occurrence delta, its inverse, and a `group` so a
 //  bulk action stays one undo step. An undo is itself a change and gets its own line, naming the
 //  group it undoes in `undoes`.
+//
+//  Durability (W40.fix-reader-ledger-durability). A forward action is write-ahead journalled: before
+//  its first tag write, a synchronized `actionIntent` line names the group; once every record of the
+//  action has been appended, a synchronized `actionDone` closes it. The records between them are not
+//  synchronized one by one: the closing `fsync` makes them durable together. An intent with no
+//  `actionDone` after it (the process or the machine died mid-action, or a record could not be
+//  appended) is a history barrier: neither that action nor anything older is offered as undo, since a
+//  change may be on disk with no record. The live file is closed off as a numbered segment beside it
+//  once it passes `segmentByteLimit`; segments are kept (the record stays append-only) and undo reads
+//  them newest first only as far as its 100-group window needs.
 // ============================================================================================
 
 final class AuditLedger: @unchecked Sendable {
@@ -28,16 +38,62 @@ final class AuditLedger: @unchecked Sendable {
     struct Context: Sendable {
         var group: UUID
         var undoes: UUID?
+        var journal: ActionJournal? = nil
     }
     @TaskLocal static var context: Context?
 
-    /// Run `body` with every ledger entry it produces tagged with `group` (and `undoes`).
+    /// Run `body` with every ledger entry it produces tagged with `group` (and `undoes`). A forward
+    /// action is journalled (`writeAhead`); an undo is not, because `beginUndo` consumed its group
+    /// durably first and an undo write is never itself an undo source.
     static func withContext<T>(group: UUID, undoes: UUID? = nil, _ body: () throws -> T) rethrows -> T {
-        try $context.withValue(Context(group: group, undoes: undoes), operation: body)
+        // Nested inside the same action: keep its journal, so one `actionDone` cannot close the other's intent.
+        if let outer = context, outer.group == group, outer.undoes == undoes { return try body() }
+        let journal = undoes == nil ? ActionJournal(group: group) : nil
+        defer { journal?.close() }
+        return try $context.withValue(Context(group: group, undoes: undoes, journal: journal), operation: body)
+    }
+
+    /// The write-ahead state of one forward action: whether its intent is durable, and whether any of
+    /// its records failed (then the action is never closed, and its intent stays a barrier).
+    final class ActionJournal: @unchecked Sendable {
+        let group: UUID
+        private let openLock = NSLock()
+        private let stateLock = NSLock()
+        private var ledger: AuditLedger?
+        private var incomplete = false
+
+        init(group: UUID) { self.group = group }
+
+        /// Held across the append, so a second write of the same action cannot start before the intent
+        /// is synchronized.
+        func open(on ledger: AuditLedger) {
+            openLock.withLock {
+                guard stateLock.withLock({ self.ledger == nil && !incomplete }) else { return }
+                if ledger.append(AuditLedger.marker(.actionIntent, group: group), synchronize: true,
+                                 recordsChange: true) {
+                    stateLock.withLock { self.ledger = ledger }
+                } else {
+                    markIncomplete()
+                }
+            }
+        }
+
+        func markIncomplete() { stateLock.withLock { incomplete = true } }
+
+        /// A failed close leaves the intent open, which is the safe direction: it reads as a barrier.
+        /// A write after close (a task that outlived the action) writes a new intent that is never
+        /// closed: a barrier, never a record outside any journalled action.
+        func close() {
+            let ledger: AuditLedger? = stateLock.withLock {
+                defer { self.ledger = nil }
+                return incomplete ? nil : self.ledger
+            }
+            ledger?.append(AuditLedger.marker(.actionDone, group: group), synchronize: true)
+        }
     }
 
     enum Operation: String, Codable, Sendable {
-        case apply, readState, rename, undo, undoAttempt, historyBarrier
+        case apply, readState, rename, undo, undoAttempt, historyBarrier, actionIntent, actionDone
     }
 
     struct Delta: Codable, Equatable, Sendable {
@@ -81,6 +137,7 @@ final class AuditLedger: @unchecked Sendable {
     private var _lastError: String?
     private var _hasRecordingGap = false
     private var _recordingFailureCount: UInt64 = 0
+    private var _segmentByteLimit: UInt64 = 4 << 20
     private static let log = Logger(subsystem: "com.archivereader.app", category: "AuditLedger")
 
     init(fileURL: URL) { _fileURL = fileURL }
@@ -96,6 +153,13 @@ final class AuditLedger: @unchecked Sendable {
     /// A successful change missing from the ledger makes older inverses unsafe to offer as “last”.
     var hasRecordingGap: Bool { lock.withLock { _hasRecordingGap } }
     var recordingFailureCount: UInt64 { lock.withLock { _recordingFailureCount } }
+
+    /// Size past which the live file becomes a numbered segment before the next append. About 4,000
+    /// changes; it bounds what one undo refresh decodes, not what the disk keeps.
+    var segmentByteLimit: UInt64 {
+        get { lock.withLock { _segmentByteLimit } }
+        set { lock.withLock { _segmentByteLimit = newValue } }
+    }
 
     /// `~/Library/Containers/com.archivereader.app/Data/Library/Application Support/ArchiveReader/
     /// audit-ledger.jsonl` in the sandboxed app. The unit-test host, and a UITest launch (which passes
@@ -120,6 +184,20 @@ final class AuditLedger: @unchecked Sendable {
 
     // MARK: Recording
 
+    /// Called by `TagWriter` before each write of a forward action: the first one of the action
+    /// synchronizes the action's intent. A failure to write it warns and disables older undo like a
+    /// failed record, and the write still goes ahead.
+    func writeAhead() {
+        Self.context?.journal?.open(on: self)
+    }
+
+    static func marker(_ op: Operation, group: UUID) -> Entry {
+        let none = Delta(add: [], remove: [], label: nil)
+        return Entry(v: 1, timestamp: Date(), op: op, group: group, undoes: nil, path: "", bookmark: nil,
+                     file: nil, before: [], after: [], beforeLabel: nil, afterLabel: nil, delta: none,
+                     inverse: none, unverified: nil)
+    }
+
     /// Append one line for a verified write. A no-op result records nothing.
     func record(_ op: Operation, _ r: TagWriteResult, file: FileNumber?) {
         guard !r.isNoOp else { return }
@@ -138,7 +216,10 @@ final class AuditLedger: @unchecked Sendable {
     }
 
     /// Append one line for a write that failed its post-write re-read (`.verificationFailed`).
+    /// The change may or may not be on disk, so the action is never closed: its intent stays a barrier
+    /// and no older inverse is offered across it.
     func recordUnverified(_ op: Operation, _ url: URL, _ why: String) {
+        Self.context?.journal?.markIncomplete()
         let ctx = Self.context ?? Context(group: UUID(), undoes: nil)
         let none = Delta(add: [], remove: [], label: nil)
         append(Entry(
@@ -157,6 +238,7 @@ final class AuditLedger: @unchecked Sendable {
                 let url = _fileURL
                 let fm = FileManager.default
                 try fm.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+                closeSegmentIfFull(url)
                 if !fm.fileExists(atPath: url.path) {
                     // A new, empty ledger file in the app's own support directory — never a corpus path.
                     _ = fm.createFile(atPath: url.path, contents: nil, attributes: [.posixPermissions: 0o600])
@@ -165,11 +247,7 @@ final class AuditLedger: @unchecked Sendable {
                 // expose an older inverse across a successful but unrecorded (or uncertain) change.
                 let hadGap = _hasRecordingGap
                 if hadGap {
-                    let none = Delta(add: [], remove: [], label: nil)
-                    let barrier = Entry(v: 1, timestamp: Date(), op: .historyBarrier, group: UUID(),
-                        undoes: nil, path: "", bookmark: nil, file: nil, before: [], after: [],
-                        beforeLabel: nil, afterLabel: nil, delta: none, inverse: none, unverified: nil)
-                    var prefix = try Self.encoder.encode(barrier)
+                    var prefix = try Self.encoder.encode(Self.marker(.historyBarrier, group: UUID()))
                     prefix.append(0x0A)
                     line.insert(contentsOf: prefix, at: 0)
                 }
@@ -177,11 +255,10 @@ final class AuditLedger: @unchecked Sendable {
                 // crash mid-append can leave a last line with no newline; start a fresh line after it, so
                 // the torn fragment costs only itself and not the entry written next.
                 if Self.endsMidLine(url) { line.insert(0x0A, at: 0) }
-                let handle = try FileHandle(forWritingTo: url)
+                let handle = try Self.appendHandle(url)
                 defer { try? handle.close() }
-                try handle.seekToEnd()
                 try handle.write(contentsOf: line)
-                if synchronize || hadGap { try handle.synchronize() }
+                if synchronize || hadGap { try Self.flushToStorage(handle) }
                 _hasRecordingGap = false
                 _lastError = nil
             }
@@ -194,6 +271,7 @@ final class AuditLedger: @unchecked Sendable {
                     _recordingFailureCount &+= 1
                 }
             }
+            if recordsChange { Self.context?.journal?.markIncomplete() }
             Self.log.error("audit ledger append failed: \(String(describing: error), privacy: .public)")
             return false
         }
@@ -201,39 +279,75 @@ final class AuditLedger: @unchecked Sendable {
 
     // MARK: Reading
 
-    /// Every entry in file order. A line that does not decode (a torn last line after a crash) is
-    /// skipped, never fatal: the rest of the history stays readable.
+    /// Every entry in file order, segments included, without the write-ahead journal's markers. A line
+    /// that does not decode (a torn last line after a crash) is skipped, never fatal: the rest of the
+    /// history stays readable.
     func entries() -> [Entry] {
-        guard let data = lock.withLock({ try? Data(contentsOf: _fileURL) }) else { return [] }
-        return data.split(separator: 0x0A).compactMap { try? Self.decoder.decode(Entry.self, from: Data($0)) }
+        allEntries().filter { $0.op != .actionIntent && $0.op != .actionDone }
+    }
+
+    /// `entries()` with the journal's `actionIntent` / `actionDone` markers.
+    func allEntries() -> [Entry] {
+        historyFilesNewestFirst().reversed().flatMap { Self.decodeEntries($0) ?? [] }
+    }
+
+    /// The live file first, then its segments from the newest.
+    private func historyFilesNewestFirst() -> [URL] {
+        let url = fileURL
+        return [url] + Self.segments(of: url).reversed().map(\.url)
+    }
+
+    /// nil when a file that exists cannot be read: skipping it would expose older history across it.
+    private static func decodeEntries(_ url: URL) -> [Entry]? {
+        guard let data = try? Data(contentsOf: url) else {
+            return FileManager.default.fileExists(atPath: url.path) ? nil : []
+        }
+        return data.split(separator: 0x0A).compactMap { try? decoder.decode(Entry.self, from: Data($0)) }
     }
 
     /// Latest 100 forward actions in this archive, including consumed actions in the bound. Counting
     /// only pending actions would resurrect older history each time the most recent action was undone.
-    /// Undo writes are never redo candidates. The ledger itself remains append-only and is not pruned.
+    /// Undo writes are never redo candidates. The ledger itself remains append-only and is not pruned:
+    /// a full file is closed off as a segment and kept, and undo stops reading once the window is full.
     static let undoGroupLimit = 100
 
     func undoGroups(in root: URL) -> [[Entry]] {
         guard !hasRecordingGap else { return [] }
-        let history = entries()
         var consumed = Set<UUID>()
+        var closed = Set<UUID>()
         var order: [UUID] = []
         var groups: [UUID: [Entry]] = [:]
-        for entry in history.reversed() where entry.v == 1 && entry.unverified == nil {
-            if entry.op == .historyBarrier { break }
+        let files = historyFilesNewestFirst()
+        history: for file in files {
+          guard let lines = Self.decodeEntries(file) else { return [] }
+          for entry in lines.reversed() where entry.v == 1 && entry.unverified == nil {
+            if entry.op == .historyBarrier { break history }
+            if entry.op == .actionDone { closed.insert(entry.group); continue }
+            if entry.op == .actionIntent {
+                if closed.contains(entry.group) { continue }
+                // Unclosed: some change of this action may be on disk unrecorded. Offer neither this
+                // action (it may be incomplete) nor anything older.
+                groups[entry.group] = nil
+                order.removeAll { $0 == entry.group }
+                break history
+            }
             if let undone = entry.undoes { consumed.insert(undone); continue }
             guard entry.op != .undo && entry.op != .undoAttempt,
                   (ReaderArchiveLayout.isContained(URL(fileURLWithPath: entry.path), inRootPath: root.path)
                     || Self.bookmarkURL(entry).map { ReaderArchiveLayout.isContained($0, inRootPath: root.path) } == true)
             else { continue }
             if groups[entry.group] == nil {
-                guard order.count < Self.undoGroupLimit else { break }
+                guard order.count < Self.undoGroupLimit else { break history }
                 order.append(entry.group)
                 groups[entry.group] = []
             }
             // Already reversed: undo multiple writes to the same file in reverse write order.
             groups[entry.group, default: []].append(entry)
+          }
         }
+        // Another running copy cut a segment while this one read: the files read may have skipped its
+        // newest lines. Offer nothing; the next refresh reads the settled files.
+        guard historyFilesNewestFirst() == files else { return [] }
         return order.reversed().filter { !consumed.contains($0) }.compactMap { groups[$0] }
     }
 
@@ -241,11 +355,9 @@ final class AuditLedger: @unchecked Sendable {
     /// append/sync fails, the caller must refuse to write. A crash consumes the entire action; a member
     /// that failed is offered again only through `keepForRetry`, after its failure is known.
     func beginUndo(_ group: UUID) -> Bool {
-        let none = Delta(add: [], remove: [], label: nil)
-        return append(Entry(v: 1, timestamp: Date(), op: .undoAttempt, group: UUID(), undoes: group,
-                            path: "", bookmark: nil, file: nil, before: [], after: [],
-                            beforeLabel: nil, afterLabel: nil, delta: none, inverse: none,
-                            unverified: nil), synchronize: true)
+        var attempt = Self.marker(.undoAttempt, group: UUID())
+        attempt.undoes = group
+        return append(attempt, synchronize: true)
     }
 
     /// How many times one file's undo is attempted before it is dropped. Each retry sits on top of the
@@ -297,16 +409,20 @@ final class AuditLedger: @unchecked Sendable {
         do {
             try lock.withLock {
                 let url = _fileURL
-                guard !_hasRecordingGap, FileManager.default.fileExists(atPath: url.path) else {
+                let fm = FileManager.default
+                guard !_hasRecordingGap, fm.fileExists(atPath: url.path) else {
                     throw CocoaError(.fileWriteUnknown)
+                }
+                closeSegmentIfFull(url)
+                if !fm.fileExists(atPath: url.path) {
+                    _ = fm.createFile(atPath: url.path, contents: nil, attributes: [.posixPermissions: 0o600])
                 }
                 var data = lines
                 if Self.endsMidLine(url) { data.insert(0x0A, at: 0) }
-                let handle = try FileHandle(forWritingTo: url)
+                let handle = try Self.appendHandle(url)
                 defer { try? handle.close() }
-                try handle.seekToEnd()
                 try handle.write(contentsOf: data)
-                try handle.synchronize()
+                try Self.flushToStorage(handle)
                 _lastError = nil
             }
             return true
@@ -364,6 +480,61 @@ final class AuditLedger: @unchecked Sendable {
         d.dateDecodingStrategy = .iso8601
         return d
     }()
+
+    /// Caller holds `lock`. Renames the full live file to the next numbered segment beside it
+    /// (`audit-ledger.000001.jsonl`, …), so the next append starts a fresh live file. Nothing is
+    /// rewritten or deleted. A group may span the cut; undo reads across it.
+    /// A cut that fails (another running copy took the name first) is only logged: appending to the
+    /// live file goes on, and the next append tries again.
+    private func closeSegmentIfFull(_ url: URL) {
+        var st = stat()
+        guard stat(url.path, &st) == 0, UInt64(st.st_size) >= _segmentByteLimit else { return }
+        let next = (Self.segments(of: url).last?.number ?? 0) + 1
+        let segment = Self.segmentURL(of: url, number: next)
+        do {
+            try FileManager.default.moveItem(at: url, to: segment)
+        } catch {
+            Self.log.error("audit ledger segment cut failed: \(String(describing: error), privacy: .public)")
+        }
+    }
+
+    /// `O_APPEND`: every write lands at the end of the file as it is at that moment, so two running
+    /// copies sharing the container's ledger never write over each other's lines.
+    private static func appendHandle(_ url: URL) throws -> FileHandle {
+        let fd = open(url.path, O_WRONLY | O_APPEND | O_CLOEXEC)
+        guard fd >= 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
+        return FileHandle(fileDescriptor: fd, closeOnDealloc: true)
+    }
+
+    static func segmentURL(of url: URL, number: Int) -> URL {
+        let stem = url.deletingPathExtension().lastPathComponent
+        let name = "\(stem).\(String(format: "%06d", number)).\(url.pathExtension)"
+        return url.deletingLastPathComponent().appendingPathComponent(name)
+    }
+
+    /// The live file's closed segments, oldest first.
+    static func segments(of url: URL) -> [(number: Int, url: URL)] {
+        let stem = url.deletingPathExtension().lastPathComponent + "."
+        let ext = "." + url.pathExtension
+        let dir = url.deletingLastPathComponent()
+        let names = (try? FileManager.default.contentsOfDirectory(atPath: dir.path)) ?? []
+        return names.compactMap { name -> (number: Int, url: URL)? in
+            guard name.hasPrefix(stem), name.hasSuffix(ext), name.count > stem.count + ext.count else { return nil }
+            let middle = name.dropFirst(stem.count).dropLast(ext.count)
+            guard middle.allSatisfy(\.isASCII), middle.allSatisfy(\.isNumber), let n = Int(middle) else { return nil }
+            return (n, dir.appendingPathComponent(name))
+        }.sorted { $0.number < $1.number }
+    }
+
+    /// `F_FULLFSYNC`, so a synchronized line survives power loss and not only process death: plain
+    /// `fsync(2)` on macOS leaves it in the drive's cache. Falls back to `fsync` where the file system
+    /// does not support it.
+    private static func flushToStorage(_ handle: FileHandle) throws {
+        guard fcntl(handle.fileDescriptor, F_FULLFSYNC) == -1 else { return }
+        let code = errno
+        guard code == ENOTSUP || code == EINVAL else { throw POSIXError(POSIXErrorCode(rawValue: code) ?? .EIO) }
+        try handle.synchronize()
+    }
 
     private static func endsMidLine(_ url: URL) -> Bool {
         guard let h = try? FileHandle(forReadingFrom: url) else { return false }

@@ -113,7 +113,8 @@ lint scope history): REFERENCE.md §Safety Protocol.
     refuses the file), consumes the whole group **before** applying inverses (never replayed after relaunch — occurrence additions
     are not idempotent), and
     a failed marker append refuses undo without changing tags. A forward recording failure warns and disables
-    older undo until a synchronized history barrier persists. The 100-group undo window counts consumed groups,
+    older undo until a synchronized history barrier persists; each forward action is write-ahead journalled, and
+    an action a crash left unclosed is a barrier after relaunch. The 100-group undo window counts consumed groups,
     so older changes never resurface, and undo skips unsupported, undecodable and unverified ledger lines.
 13. **PDF panes are provably non-writing:** PDFViews non-editable, annotations disabled, no `PDFDocument.write`
     path. The write-surface lint covers *all* write spellings (`setResourceValue(s)`, `setxattr`, `FileManager`

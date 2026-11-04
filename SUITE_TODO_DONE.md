@@ -14021,3 +14021,23 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   KNOWN_ISSUES. Adversarial review (opus): no blocking defect; its comment, `billing_error` and test-strength notes
   were folded in. The Processor build needs `-jobs 3` under the heavy lock's memory limit. No bench cache used; no paid call.
   <!-- /W40.fix-processor-cascade-edges -->
+- [x] **W40.fix-reader-ledger-durability — the undo ledger's forward records are best-effort, unbounded and not fsynced [S · S3 · Tier-2]** · §W40 — verification phase · SHIPPED 2026-11-03
+  Original scope: (lane: reader) (uses: build). Owner, 2026-10-31, from `ArchiveReader/KNOWN_ISSUES.md` §"W40.audit-ledger-undo":
+  process death could lose a missing forward record and its barrier; ledger growth unbounded; forward appends not fsynced.
+  Built: each forward action is write-ahead journalled in `Core/AuditLedger.swift`. `TagWriter.journalledWrite` flushes an
+  `actionIntent` (`F_FULLFSYNC`, fallback `fsync` only on ENOTSUP/EINVAL) inside coordination once the transform decides to
+  write, so a no-op or refused write journals nothing; `withContext` closes the action with a flushed `actionDone` unless a
+  record failed or a write failed verification. An unclosed intent is a permanent barrier in `undoGroups` (that action and
+  everything older). Records between are not flushed one by one; the done's flush covers them (two flushes per action,
+  however many files). Appends use `open(2)` `O_APPEND`. The live file is cut into numbered 4 MiB segments that are kept
+  (§12 is append-only; no pruning, so the disk still keeps ~1 KB per changed file; ask the owner before any retention);
+  undo reads newest first and stops at a barrier or a full 100-group window. An unreadable existing file, or a segment cut
+  by another copy during the read, offers nothing. Residual, stated in KNOWN_ISSUES: an intent that cannot be written at
+  all followed by process death before storage recovers. Tests: `LedgerJournalTests` (11, crash cases simulated by
+  dropping a scratch ledger's last lines); whole Reader unit bundle 546 green, no new warnings; write-surface lint
+  allowance swapped (the `FileHandle(forWritingTo:)` line is gone, the segment `moveItem` added; `open(2)` is not a
+  spelling the lint matches). Adversarial review (opus): no HIGH; its MEDIUM findings (read failure skipping the live
+  file, two-copy overwrites, a failed rename disabling the ledger) and LOW ones (fsync fallback, same-group nesting,
+  post-close writes, unverified write closing normally) were all fixed. R-46 stays fixed-pending-recheck. No migration
+  written: there is no production ledger to migrate. Bench cache: not used.
+  <!-- /W40.fix-reader-ledger-durability -->

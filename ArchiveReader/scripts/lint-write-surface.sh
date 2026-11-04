@@ -134,7 +134,12 @@ ALLOW=(
   # `FileManager.urls(for: .applicationSupportDirectory…)` and nothing else, so no scanned corpus URL
   # can reach it. It creates that one empty file and appends to it; it never truncates or rewrites.
   "destructive${SEP}ArchiveReader/macOS/Sources/ArchiveReader/Core/AuditLedger.swift${SEP}_ = fm.createFile(atPath: url.path, contents: nil, attributes: [.posixPermissions: 0o600])"
-  "destructive${SEP}ArchiveReader/macOS/Sources/ArchiveReader/Core/AuditLedger.swift${SEP}let handle = try FileHandle(forWritingTo: url)"
+  # Appends go through `open(2)` with O_APPEND (W40.fix-reader-ledger-durability), which no rule here
+  # matches; the URL is the same ledger URL.
+  # W40.fix-reader-ledger-durability: a full live ledger is renamed to the next numbered segment
+  # beside it (`audit-ledger.000001.jsonl`), so undo decodes only what its window needs. Both URLs are
+  # derived from the ledger's own URL; the segment is kept, never rewritten or deleted.
+  "destructive${SEP}ArchiveReader/macOS/Sources/ArchiveReader/Core/AuditLedger.swift${SEP}try FileManager.default.moveItem(at: url, to: segment)"
 
   # ── rule 3 (errorHandler:-less enumerator) ──────────────────────────────────────────────────
   # `ArchiveLibrary.swift`'s Spotlight-era fixture loader used to be allowed here. `W26.walk2`

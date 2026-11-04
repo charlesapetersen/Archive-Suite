@@ -21,7 +21,7 @@ enum TagWriter {
     /// write target's identity re-verified inside coordination (Safety §6); a file moved/replaced
     /// under the same path aborts with `.identityMismatch`. `nil` (default) skips the check.
     static func apply(_ delta: TagDelta, to url: URL, expecting identity: FileIdentity? = nil) throws -> TagWriteResult {
-        try recorded(.apply, url) { try CoordinatedTagWriter.write(url, expectedIdentity: identity) { current, label in
+        try recorded(.apply, url) { try journalledWrite(url, expectedIdentity: identity) { current, label in
             var removals = delta.remove
             var additions = delta.add
             var targetLabel = label
@@ -86,7 +86,7 @@ enum TagWriter {
     static func applyOccurrence(_ delta: TagOccurrenceDelta, to url: URL,
                                 expecting identity: FileIdentity? = nil,
                                 undoing change: UndoneChange) throws -> TagWriteResult {
-        try recorded(.undo, url) { try CoordinatedTagWriter.write(url, expectedIdentity: identity) { current, label in
+        try recorded(.undo, url) { try journalledWrite(url, expectedIdentity: identity) { current, label in
             var targetLabel = label
             switch delta.color {
             case .restoreLabel(let lbl): targetLabel = lbl
@@ -164,7 +164,7 @@ enum TagWriter {
     /// markers, Safety §10); pass `addIfMissing: true` for an explicit "mark Read" on such files.
     static func setReadState(_ target: ReadState, on url: URL, addIfMissing: Bool = false,
                              expecting identity: FileIdentity? = nil) throws -> TagWriteResult {
-        try recorded(.readState, url) { try CoordinatedTagWriter.write(url, expectedIdentity: identity) { current, label in
+        try recorded(.readState, url) { try journalledWrite(url, expectedIdentity: identity) { current, label in
             let hasReadState = current.contains { isReadStateWord($0) }
             guard hasReadState || addIfMissing else { return nil }
             let alreadyTarget = current.contains { isSameTag($0, target.rawValue) }
@@ -183,13 +183,25 @@ enum TagWriter {
     /// verified no-op instead of unconditionally adding `new` to the wrong selection set.
     static func renameToken(from old: String, to new: String, on url: URL,
                             expecting identity: FileIdentity? = nil) throws -> TagWriteResult {
-        try recorded(.rename, url) { try CoordinatedTagWriter.write(url, expectedIdentity: identity) { current, label in
+        try recorded(.rename, url) { try journalledWrite(url, expectedIdentity: identity) { current, label in
             guard current.contains(where: { shouldRemoveTag($0, matching: old) }) else { return nil }
             var renamed = current.filter { !shouldRemoveTag($0, matching: old) }
             if !renamed.contains(where: { isSameTag($0, new) }) { renamed.append(new) }
             if renamed == current { return nil }
             return (renamed, label)
         } }
+    }
+
+    /// The shared writer, with the action's write-ahead intent made durable once the transform has
+    /// decided to write, inside coordination and before any tag reaches the disk
+    /// (W40.fix-reader-ledger-durability). A no-op or a refused write journals nothing.
+    private static func journalledWrite(_ url: URL, expectedIdentity identity: FileIdentity?,
+                                        transform: ([String], Int?) -> ([String], Int?)?) throws -> TagWriteResult {
+        try CoordinatedTagWriter.write(url, expectedIdentity: identity) { current, label in
+            let change = transform(current, label)
+            if change != nil { AuditLedger.shared.writeAhead() }
+            return change
+        }
     }
 
     /// Safety §12: every verified write that changed something gets one audit-ledger line. A write that
@@ -199,6 +211,10 @@ enum TagWriter {
     /// and leave nothing to record.
     private static func recorded(_ op: AuditLedger.Operation, _ url: URL,
                                  _ write: () throws -> TagWriteResult) throws -> TagWriteResult {
+        // An unbound write is its own action, journalled like any other: intent before, done after.
+        guard AuditLedger.context != nil else {
+            return try AuditLedger.withContext(group: UUID()) { try recorded(op, url, write) }
+        }
         // Bind the persisted inode to the object present before the write. Capturing only after
         // coordination could record a replacement's identity against the original file's inverse.
         let number = AuditLedger.fileNumber(url)
