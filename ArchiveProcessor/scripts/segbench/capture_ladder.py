@@ -127,8 +127,9 @@ DEWARP_CLUSTER = CACHE / 'sherlock-results/dewarp-20261022'
 BIN = CACHE / 'segbench/bin/segbench-dewarp'
 TILT_ARMS = ('quad-tilt-12', 'quad-tilt-20')
 RESAVE = 'resave-q92'   # the raw image through make's save with no defect: Vision's baseline (see BASE)
-# Apple Vision moves on a re-encode alone (its JPEG 85 row was +1.6 NES against the raw file, +4.7 on the PDF
-# images), so its defect rows are paired against the raw image re-saved exactly as every defect image was; the
+# Apple Vision moves on a re-encode alone (the quality-92 re-save against the raw file: bowF1 +1.5, +0.6 to +2.4;
+# NES +1.6, -0.4 to +3.9; +4.6 NES on the PDF images), so its defect rows are paired against the raw image re-saved
+# exactly as every defect image was; the
 # Sherlock readers' JPEG 85 rows are within 0.3 points of raw, so raw stays theirs (re-saving needs no new reading).
 BASE = {'qwen3.6-27b': 'raw', 'lightonocr3-4b': 'raw', 'vision': RESAVE, 'gemini3.7-flash-gw': 'raw'}
 LOSS = 0.05                                               # a "loss": the page's NES falls 5 points or more
@@ -312,7 +313,7 @@ def verdict_tables(by, sig, ver, pages):
                'flag_tag': mean([tag in v['defects'] for v in vv]) if tag else None,
                'flag_blur': mean([bool(v['defects'] & GW.BLUR) for v in vv]),
                'flag_any': mean([bool(v['defects']) for v in vv]),
-               'top': Counter(d for v in vv for d in v['defects']).most_common(3)}
+               'top': sorted(Counter(d for v in vv for d in v['defects']).items(), key=lambda t: (-t[1], t[0]))[:3]}
         cond_rows.append(row)
         q = '—' if row['quality'] is None else f"{row['quality']:.2f}"
         L.append(f"| {c} | {row['n']} | {row['parsed']} | {q} | {pc(row['retake'])} | "
@@ -439,7 +440,7 @@ VARIANT_NAMES = {
 # The measured findings, written once the results were read (2026-11-03); a rerun that moves them must rewrite them.
 PAGE_NOTE = ('Each of the 96 pages degraded by one synthetic defect at one setting and read again by the same reader, '
              'paired by page against that reader\'s plain image (Apple Vision against the plain image re-saved as '
-             'every defect image was, because a re-save alone moves Vision 1.6 points). Glare, motion blur and heavy '
+             'every defect image was, because a re-save alone moves Vision\'s bag-of-words F1 by 1.5 points). Glare, motion blur and heavy '
              'defocus cost every reader; tilt up to 20 degrees, JPEG down to quality 60 and Augraphy\'s shadow and '
              'lighting gradient at their defaults cost none of them more than about 2 points. Apple Vision breaks '
              'first: 9 px of motion costs it 6.6 points and 17 px 38, where Qwen3.6-27B loses 1.0 and 7.9. '
@@ -474,9 +475,10 @@ FINDINGS = """## Findings
   only 0.2 to 0.5, so most of that is line order. Apple's quad correction of the tilted image recovers nothing
   measurable (tilt 12: -0.7 against -1.2; tilt 20: -1.7 against -1.4; both intervals overlap). The open readers lose
   at most 0.6 on any tilt, so there is nothing for a dewarp arm to recover for them, and none was run.
-- **Re-saving alone moves Vision.** The raw file read against the same image re-saved at JPEG 92 differs by 1.6 NES
-  (bowF1 1.5, 0.6 to 2.4), 4.7 on the PDF images; Vision is deterministic, so this is its sensitivity to small pixel
-  changes, and its defect rows are paired against the re-saved image for that reason. The Sherlock readers' JPEG 85
+- **Re-saving alone moves Vision.** Vision's reading of the raw file scores 1.5 bowF1 points below its reading of the
+  same image re-saved at JPEG 92 (-2.4 to -0.6); its NES is 1.6 lower (-3.9 to +0.4, so NES alone does not clear 0), 4.6 on
+  the 33 PDF images (-10.6 to -0.1). Vision is deterministic, so this is its sensitivity to small pixel changes, and
+  its defect rows are paired against the re-saved image for that reason. The Sherlock readers' JPEG 85
   rows are 0.3 and 0.1 from raw.
 - **Capture-time signals are weak on their own.** Sharpness inside Vision's word boxes (Laplacian variance, Tenengrad)
   and the share of the image inside word boxes reach AUC 0.70 to 0.78 against a 5-point loss; the clipped-highlight
@@ -499,8 +501,9 @@ FINDINGS = """## Findings
   plain photographs. The verdicts cost $0.80 for 528 images, about $0.0015 each.
 
 What this means for the companion's guidance: hold the phone still and avoid reflections; tilt and compression need
-no warning for any reader, and the gateway or open readers forgive blur that Vision does not, so a blur warning
-matters most where Vision reads on the device.
+no warning for any reader. Every measured reader loses far less to blur than Vision (on the 48 pages: defocus
+sigma 5 costs Vision 58.3 NES points, Gemini 3.7 Flash 6.2 and the open readers 14 to 17; motion 17 px costs Vision
+37.5 and the others 10 to 16), so a blur warning matters most where Vision reads on the device.
 """
 REPORT_HEAD = """# W46.capture-ladder: what a capture defect costs each reader, on the owner's 96
 

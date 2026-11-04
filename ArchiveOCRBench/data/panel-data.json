@@ -50350,11 +50350,11 @@
        6
       ],
       [
-       "out_of_focus",
+       "compression_artifacts",
        3
       ],
       [
-       "compression_artifacts",
+       "cut_off",
        3
       ]
      ]
@@ -50429,7 +50429,7 @@
        34
       ],
       [
-       "cut_off",
+       "compression_artifacts",
        2
       ]
      ]
@@ -50709,7 +50709,7 @@
    "quad_margin": "quad-to-frame margin (low = cut or tight)",
    "text_px": "image share in Vision word boxes (low = text missed)"
   },
-  "note": "Each of the 96 pages degraded by one synthetic defect at one setting and read again by the same reader, paired by page against that reader's plain image (Apple Vision against the plain image re-saved as every defect image was, because a re-save alone moves Vision 1.6 points). Glare, motion blur and heavy defocus cost every reader; tilt up to 20 degrees, JPEG down to quality 60 and Augraphy's shadow and lighting gradient at their defaults cost none of them more than about 2 points. Apple Vision breaks first: 9 px of motion costs it 6.6 points and 17 px 38, where Qwen3.6-27B loses 1.0 and 7.9. LightOnOCR-3 4B answers heavy blur with an empty reply (43 of 96 at 31 px). Correcting the tilt with Apple's quad recovers nothing for Vision, because tilt cost it little. Gemini 3.7 Flash through the gateway, on 48 of the pages at ten settings, loses 6.2 points to sigma-5 defocus and 16.2 to 17 px of motion. A loop is a reading cut at the token cap or the 600 s limit; loops and blanks score 0. Synthetic defects, one at a time: real phone captures are not in this table. Detail: segbench-results/capture-ladder.md.",
+  "note": "Each of the 96 pages degraded by one synthetic defect at one setting and read again by the same reader, paired by page against that reader's plain image (Apple Vision against the plain image re-saved as every defect image was, because a re-save alone moves Vision's bag-of-words F1 by 1.5 points). Glare, motion blur and heavy defocus cost every reader; tilt up to 20 degrees, JPEG down to quality 60 and Augraphy's shadow and lighting gradient at their defaults cost none of them more than about 2 points. Apple Vision breaks first: 9 px of motion costs it 6.6 points and 17 px 38, where Qwen3.6-27B loses 1.0 and 7.9. LightOnOCR-3 4B answers heavy blur with an empty reply (43 of 96 at 31 px). Correcting the tilt with Apple's quad recovers nothing for Vision, because tilt cost it little. Gemini 3.7 Flash through the gateway, on 48 of the pages at ten settings, loses 6.2 points to sigma-5 defocus and 16.2 to 17 px of motion. A loop is a reading cut at the token cap or the 600 s limit; loops and blanks score 0. Synthetic defects, one at a time: real phone captures are not in this table. Detail: segbench-results/capture-ladder.md.",
   "signals_note": "Signals a phone can measure at capture, from the image alone, against a loss of 5 NES points or more on each of the 1,536 defect images (0.5 is no information). Sharpness inside the word boxes and the share of the image the word boxes cover separate losses only moderately (AUC 0.70 to 0.78), and their best cuts differ threefold between readers; the clipped-highlight share does not see the glare that costs 9 points (0.50 to 0.53), and lower luminance goes with fewer losses, not more. The cuts are in-sample on synthetic images; none is ready to be a live warning without a check on real captures.",
   "summary": [
    {
