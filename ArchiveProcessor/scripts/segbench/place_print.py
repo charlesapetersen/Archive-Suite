@@ -522,6 +522,324 @@ def cmd_writers(a):
     (CACHE / 'writers-rows.json').write_text(json.dumps(rows) + '\n')
 
 
+# ---------------------------------------------------------------- test 6: PDF/A
+SRGB = Path('/System/Library/ColorSync/Profiles/sRGB Profile.icc')
+VERAPDF = '/opt/homebrew/bin/verapdf'
+
+
+def as_pdfa(src, dst, conformance):
+    """A copy of `src` declared PDF/A-2 (XMP pdfaid part 2 and `conformance`) with an sRGB output intent: the
+    declarations every PDF/A file carries, so what veraPDF still finds is the file's own content (its fonts and
+    text layer), not the absence of a claim."""
+    import pikepdf
+    with pikepdf.open(src) as doc:
+        with doc.open_metadata(set_pikepdf_as_editor=False) as m:
+            m['pdfaid:part'] = '2'
+            m['pdfaid:conformance'] = conformance
+        icc = pikepdf.Stream(doc, SRGB.read_bytes(), N=3)
+        doc.Root.OutputIntents = pikepdf.Array([pikepdf.Dictionary(
+            Type=pikepdf.Name.OutputIntent, S=pikepdf.Name.GTS_PDFA1, OutputConditionIdentifier='sRGB',
+            DestOutputProfile=icc)])
+        doc.save(dst, fix_metadata_version=False)
+
+
+def to_unicode_cmap(pairs):
+    lines = ['/CIDInit /ProcSet findresource begin', '12 dict begin', 'begincmap',
+             '/CIDSystemInfo << /Registry (Adobe) /Ordering (UCS) /Supplement 0 >> def',
+             '/CMapName /Adobe-Identity-UCS def', '/CMapType 2 def', '1 begincodespacerange', '<00> <FF>',
+             'endcodespacerange']
+    pairs = sorted(pairs.items())
+    for i in range(0, len(pairs), 100):
+        chunk = pairs[i:i + 100]
+        lines.append(f'{len(chunk)} beginbfchar')
+        lines += [f'<{c:02X}> <{"".join(f"{ord(u):04X}" for u in s)}>' for c, s in chunk]
+        lines.append('endbfchar')
+    lines += ['endcmap', 'CMapName currentdict /CMap defineresource pop', 'end', 'end']
+    return '\n'.join(lines).encode()
+
+
+def add_to_unicode(src, dst):
+    """Give every simple font without a ToUnicode map one built from its encoding (the base encoding named, or
+    WinAnsi, with its Differences applied by glyph name). Returns how many fonts were given one."""
+    import pikepdf
+    from fontTools.agl import toUnicode
+    n = 0
+    with pikepdf.open(src) as doc:
+        for pg in doc.pages:
+            fonts = pg.obj.get('/Resources', {}).get('/Font', {})
+            for _, f in fonts.items():
+                if '/ToUnicode' in f or f.get('/Subtype') == '/Type0':
+                    continue
+                enc = f.get('/Encoding')
+                base, diffs = 'cp1252', {}
+                if isinstance(enc, pikepdf.Name) and str(enc) == '/MacRomanEncoding':
+                    base = 'mac_roman'
+                if isinstance(enc, pikepdf.Dictionary):
+                    if str(enc.get('/BaseEncoding', '')) == '/MacRomanEncoding':
+                        base = 'mac_roman'
+                    code = 0
+                    for d in enc.get('/Differences', []):
+                        if isinstance(d, int):
+                            code = int(d)
+                        else:
+                            diffs[code] = toUnicode(str(d)[1:])
+                            code += 1
+                pairs = {}
+                for c in range(32, 256):
+                    s = diffs.get(c)
+                    if s is None:
+                        try:
+                            s = bytes([c]).decode(base)
+                        except UnicodeDecodeError:
+                            continue
+                    if s:
+                        pairs[c] = s
+                f.ToUnicode = pikepdf.Stream(doc, to_unicode_cmap(pairs))
+                n += 1
+        doc.save(dst, fix_metadata_version=False)
+    return n
+
+
+def verapdf(pdf, flavour):
+    out = run_tool([VERAPDF, '--flavour', flavour, '--format', 'json', pdf], check=False)
+    d = json.loads(out)
+    job = d['report']['jobs'][0]
+    vr = job['validationResult']
+    vr = vr[0] if isinstance(vr, list) else vr
+    fails = []
+    for r in vr.get('details', {}).get('ruleSummaries', []):
+        if r.get('ruleStatus') == 'FAILED':
+            fails.append({'rule': f'{r["clause"]}-{r["testNumber"]}', 'checks': r.get('failedChecks'),
+                          'description': r.get('description', '')[:200]})
+    return {'compliant': bool(vr.get('compliant')), 'fails': fails}
+
+
+def cmd_verapdf(a):
+    """veraPDF 2b and 2u over the lab writer's PDFs of the fifteen writer pages and five more typewritten pages
+    (twenty of ours), and over the other two designs' fifteen; then 2u again with ToUnicode maps added."""
+    work = CACHE / 'writers'
+    va = CACHE / 'verapdf'
+    va.mkdir(parents=True, exist_ok=True)
+    ts = {t['page']: t for t in typed_pages()}
+    plain = sorted(p for p, t in ts.items() if t['kind'] == 'typewritten' and p not in CLIPPINGS)
+    extra = [p for p in plain[1::2]][:5]
+    for p in extra:
+        pdf = work / f'{p}-lab.pdf'
+        if not pdf.exists():
+            write_design(ts[p], hyp('accurate', ts[p]), 'lab', pdf, work)
+    rows = []
+    for pdf in sorted(work.glob('*.pdf')):
+        page, design = pdf.stem.rsplit('-', 1)
+        row = {'page': page, 'design': design}
+        for flav, conf in (('2b', 'B'), ('2u', 'U')):
+            cand = va / f'{pdf.stem}-{flav}.pdf'
+            as_pdfa(pdf, cand, conf)
+            row[flav] = verapdf(cand, flav)
+            if flav == '2u' and not row[flav]['compliant']:
+                fixed = va / f'{pdf.stem}-2u-tounicode.pdf'
+                row['tounicode_added'] = add_to_unicode(cand, fixed)
+                row['2u+tounicode'] = verapdf(fixed, '2u')
+                fixed.unlink()
+            cand.unlink()
+        rows.append(row)
+        print(page, design, {k: (v['compliant'], [f['rule'] for f in v['fails']]) for k, v in row.items()
+                             if isinstance(v, dict)}, flush=True)
+    (CACHE / 'verapdf-rows.json').write_text(json.dumps(rows) + '\n')
+
+
+# ---------------------------------------------------------------- test 7: box-emitting readers and detectors
+BOXREAD = REH / 'sherlock-results/new-open-96'
+DETECT = REH / 'place-truth-lines/lines'
+NEMO_W, NEMO_H = 1664, 2048
+
+
+def nemotron_to_image(b, iw, ih):
+    """Nemotron-Parse 2.0's box (0-1 of its 1664x2048 canvas) -> 0-1 of the image. Rebuilt from the card's
+    statement of the canvas (the image fitted inside it, aspect kept, padded to it) with the padding centred: the
+    publisher's postprocessing.py could not be read in this session, and centred padding is the one that puts its
+    blocks on Unlimited-OCR's (checked in `boxes`, `nemotron_check`)."""
+    s = min(NEMO_W / iw, NEMO_H / ih, 1.0)
+    rw, rh = iw * s, ih * s
+    px, py = (NEMO_W - rw) / 2, (NEMO_H - rh) / 2
+    x0, y0, x1, y1 = b
+    return [(x0 * NEMO_W - px) / rw, (y0 * NEMO_H - py) / rh, (x1 * NEMO_W - px) / rw, (y1 * NEMO_H - py) / rh]
+
+
+def reader_blocks(reader, page):
+    f = BOXREAD / reader / 'results/ocr' / reader / f'{page}.json'
+    if not f.exists():
+        return None
+    d = json.loads(f.read_text())
+    if d.get('status') != 'ok':
+        return None
+    iw, ih = d['image_size']
+    out = []
+    for b in d.get('boxes') or []:
+        x0, y0, x1, y1 = b['box']
+        if b['units'] == 'unlimited-999':
+            q = [x0 / 999, y0 / 999, x1 / 999, y1 / 999]
+        else:
+            q = nemotron_to_image(b['box'], iw, ih)
+        if q[2] > q[0] and q[3] > q[1]:    # an invalid box (reversed, zero area) is not repaired; it holds nothing
+            out.append({'cls': b['cls'], 'box': [q[0], q[1], q[2] - q[0], q[3] - q[1]], 'text': b.get('text', '')})
+    return out
+
+
+def detector_lines(det, page):
+    f = DETECT / det / f'{page}.json'
+    if not f.exists():
+        return None
+    return [{'box': l['box'], 'baseline': l['baseline'], 'poly': l.get('boundary')} for l in json.loads(f.read_text())['lines']]
+
+
+def holds(region, c):
+    if region.get('poly'):
+        return G.inside(region['poly'], c)
+    return S.inside(c, region['box'])
+
+
+def grouping(t, tl_words, regions):
+    """Per scored truth line: `whole` when one region holds the centres of all its scored words, `alone` when that
+    region also holds no scored word of another truth line; and the truth words in no region at all."""
+    centre = {}
+    for L, ws in tl_words.items():
+        for i in ws:
+            b = t['words'][i]['box']
+            centre[i] = (b[0] + b[2] / 2, b[1] + b[3] / 2)
+    home = {i: [k for k, r in enumerate(regions) if holds(r, c)] for i, c in centre.items()}
+    owners = collections.defaultdict(set)
+    for L, ws in tl_words.items():
+        for i in ws:
+            for k in home[i]:
+                owners[k].add(L)
+    whole = alone = 0
+    for L, ws in tl_words.items():
+        common = set(home[ws[0]]).intersection(*(set(home[i]) for i in ws[1:]))
+        whole += bool(common)
+        alone += any(owners[k] == {L} for k in common)
+    return {'lines': len(tl_words), 'whole': whole, 'alone': alone,
+            'words': len(centre), 'outside': sum(1 for i in home if not home[i])}
+
+
+def block_text(t, blocks):
+    """For `replace` (a block's text placed in its block): the share of the truth words inside some block that the
+    block's own text holds (multiset, case and punctuation aside)."""
+    hit = n = 0
+    for blk in blocks:
+        inside = [w['text'] for w in S.scoreable(t)
+                  if S.inside((w['box'][0] + w['box'][2] / 2, w['box'][1] + w['box'][3] / 2), blk['box'])]
+        if inside:
+            n += len(inside)
+            hit += round(multiset_share(inside, blk['text'].split()) * len(inside))
+    return {'block_words': n, 'in_block_text': hit}
+
+
+def nemotron_check(page):
+    """Median offset, in page widths and heights, between each Nemotron block's left-top corner and that of the
+    Unlimited-OCR block whose text is most alike (when the two texts share at least half their words)."""
+    a, b = reader_blocks('nemotron-parse-2', page), reader_blocks('unlimited-ocr', page)
+    if not a or not b:
+        return []
+    out = []
+    for x in a:
+        best = max(b, key=lambda y: multiset_share(x['text'].split(), y['text'].split()), default=None)
+        if best and len(x['text'].split()) >= 5 and multiset_share(x['text'].split(), best['text'].split()) >= 0.5:
+            out.append((x['box'][0] - best['box'][0], x['box'][1] - best['box'][1]))
+    return out
+
+
+def cmd_boxes(a):
+    R = rulings()
+    rows, offs = [], []
+    for t in typed_pages():
+        folded, _ = G.fold_lines(t, R)
+        tlw = {}
+        for L in truth_lines(t, folded):
+            if L['scored']:
+                tlw[L['id']] = [i for i in folded[L['id']] if t['words'][i]['status'] not in UNSCORED]
+        offs += nemotron_check(t['page'])
+        sources = {f'vision-{api}': [{'box': l['box'], 'baseline': l['baseline']} for l in hyp(api, t)['lines']]
+                   for api in ('accurate', 'documents')}
+        for det in ('blla', 'ppocrv6'):
+            sources[det] = detector_lines(det, t['page'])
+        for rd in ('unlimited-ocr', 'nemotron-parse-2'):
+            sources[rd] = reader_blocks(rd, t['page'])
+        for name, regs in sources.items():
+            if regs is None:
+                continue
+            row = {'page': t['page'], 'kind': t['kind'], 'source': name, 'regions': len(regs),
+                   **grouping(t, tlw, regs)}
+            if name.startswith(('vision', 'blla', 'ppocr')):
+                row['baseline'] = S.baseline_scores(t, {'lines': [r for r in regs if r.get('baseline')]})
+            else:
+                row.update(block_text(t, regs))
+            rows.append(row)
+    med = ([statistics.median(o[0] for o in offs), statistics.median(o[1] for o in offs)] if offs else None)
+    (CACHE / 'boxes-rows.json').write_text(json.dumps({'rows': rows, 'nemotron_check': {
+        'pairs': len(offs), 'median_dx_dy': med,
+        'within_0.02': sum(1 for o in offs if abs(o[0]) <= 0.02 and abs(o[1]) <= 0.02)}}) + '\n')
+    print(len(rows), 'rows; nemotron vs unlimited', len(offs), med)
+
+
+# ---------------------------------------------------------------- the owner's Acrobat check (test 5, by hand)
+ACROBAT_PAGES = ('p002', 'p024', 'p087', 'p078', 'p081')   # three typewritten writer pages, two clippings
+
+
+def cmd_acrobat(a):
+    """The owner's sheet: five writer pages, each in all three designs under blind names (A, B, C, shuffled per
+    page; the key is a separate file), ten words to Find and two lines to drag-select on each, about 20 minutes in
+    Acrobat Reader. Writes CACHE/acrobat/ (PDF copies, index.html, key.json)."""
+    import html
+    import shutil
+    R = rulings()
+    src, out = CACHE / 'writers', CACHE / 'acrobat'
+    out.mkdir(parents=True, exist_ok=True)
+    rnd = random.Random(SEED)
+    ts = {t['page']: t for t in typed_pages()}
+    key_, items = {}, []
+    for p in ACROBAT_PAGES:
+        t = ts[p]
+        folded, _ = G.fold_lines(t, R)
+        tl = [L for L in truth_lines(t, folded) if L['scored'] and len(L['tokens']) >= 4]
+        words = [w['text'].strip('.,;:()"\'') for w in S.scoreable(t)]
+        words = [w for w in words if sum(ch.isalpha() for ch in w) >= 5]
+        step = max(1, len(words) // 10)
+        finds = words[::step][:10]
+        lines = [tl[len(tl) // 4], tl[(3 * len(tl)) // 4]] if len(tl) >= 2 else tl
+        names = ['A', 'B', 'C']
+        rnd.shuffle(names)
+        for name, d in zip(names, DESIGNS):
+            shutil.copyfile(src / f'{key(t)}-{d}.pdf', out / f'{p}-{name}.pdf')
+            key_[f'{p}-{name}'] = d
+        items.append((p, sorted(names), finds, [' '.join(L['tokens']) for L in lines]))
+    (out / 'key.json').write_text(json.dumps(key_, indent=1) + '\n')
+    rows = []
+    for p, names, finds, lines in items:
+        for n in names:
+            f = f'{p}-{n}'
+            rows.append(f'<h2>{f}.pdf</h2><p>Find (Ctrl/Cmd-F): for each word, tick if Acrobat finds it <i>and</i> '
+                        'the highlight sits on the word in the image.</p><table>' +
+                        ''.join(f'<tr><td>{html.escape(w)}</td><td><label><input type=checkbox name="{f}|find|{k}">'
+                                f' found, on the word</label></td></tr>' for k, w in enumerate(finds)) +
+                        '</table><p>Drag-select each line from its first word to its last and copy (Cmd-C). Tick if '
+                        'the copy is that line\'s words, in order, on one line, nothing extra.</p><table>' +
+                        ''.join(f'<tr><td>{html.escape(l)}</td><td><label><input type=checkbox name="{f}|line|{k}">'
+                                f' whole line, in order</label></td></tr>' for k, l in enumerate(lines)) +
+                        f'</table><p><textarea name="{f}|note" rows=2 cols=80 placeholder="anything odd"></textarea></p>')
+    page = ('<!doctype html><meta charset=utf-8><title>W46.place-print — Acrobat check</title><style>body{font:15px '
+            'system-ui;max-width:52em;margin:2em auto}td{padding:2px 10px}h2{margin-top:2em}</style>'
+            '<h1>Acrobat Reader check: three text layers (about 20 minutes)</h1><p>Fifteen PDFs in this folder: five '
+            'pages, each written three ways, named A, B and C in a different order on each page. Open each in '
+            'Adobe Acrobat Reader (not Preview). Untick means it failed. When done, press Export and save the file '
+            'next to this page as <code>answers.json</code>.</p>' + ''.join(rows) +
+            '<p><textarea id=overall rows=3 cols=80 placeholder="overall notes"></textarea></p>'
+            '<button onclick="const o={};document.querySelectorAll(\'input,textarea\').forEach(e=>o[e.name||e.id]='
+            'e.type===\'checkbox\'?e.checked:e.value);const a=document.createElement(\'a\');a.href=URL.createObject'
+            'URL(new Blob([JSON.stringify(o,null,1)]));a.download=\'answers.json\';a.click()">Export</button>')
+    (out / 'index.html').write_text(page)
+    print('sheet', out / 'index.html', len(key_), 'PDFs')
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest='cmd', required=True)
@@ -529,9 +847,15 @@ def main():
     r = sub.add_parser('arms')
     r.add_argument('--pages')
     r.add_argument('--fresh', action='store_true')
-    sub.add_parser('writers')
+    for c in ('writers', 'verapdf', 'boxes', 'acrobat', 'report'):
+        sub.add_parser(c)
     a = ap.parse_args()
-    {'vision': cmd_vision, 'arms': cmd_arms, 'writers': cmd_writers}[a.cmd](a)
+    if a.cmd == 'report':
+        import place_print_report
+        place_print_report.write(CACHE, RESULTS)
+        return
+    {'vision': cmd_vision, 'arms': cmd_arms, 'writers': cmd_writers, 'verapdf': cmd_verapdf,
+     'boxes': cmd_boxes, 'acrobat': cmd_acrobat}[a.cmd](a)
 
 
 if __name__ == '__main__':
