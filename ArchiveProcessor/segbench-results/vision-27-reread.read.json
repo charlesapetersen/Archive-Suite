@@ -1,0 +1,19 @@
+{
+ "os": {
+  "ProductName": "macOS",
+  "ProductVersion": "27.2",
+  "BuildVersion": "26B123"
+ },
+ "machine": "arm64",
+ "segbench-ocr": {
+  "sha256_16": "0bbde609a30d3f23",
+  "source": "ocr.swift"
+ },
+ "segbench-dewarp": {
+  "sha256_16": "b4ca2de5d19c98aa"
+ },
+ "repeat": {
+  "n": 30,
+  "identical": 30
+ }
+}
