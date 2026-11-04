@@ -504,3 +504,7 @@ trusted owner consent; automatic approval review remains in place.
   `AWS Textract`. Transkribus stays out (its smallest credit purchase is over the $7 rule). Gate
   `W46.r6-spot-owner-ok` is ticked only once the owner says both keys are in Keychain, so no session
   starts the item before its credentials exist.
+- **W46.r6-spot, Transkribus (added the same morning):** the owner has free Transkribus credits, so the
+  Transkribus arm is included on the same 25 pages, spending credits only, no real money and no credit
+  purchase. The owner adds a Keychain item `Transkribus` (login or API token). The gate is ticked once
+  all three items (`Azure DI`, `AWS Textract`, `Transkribus`) exist.
