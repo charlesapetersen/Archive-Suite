@@ -496,3 +496,11 @@ trusted owner consent; automatic approval review remains in place.
   reservation. Any new uncertain outcome still stops the run.
 - **W46.place-print-acrobat-owner-ok** and **W46.fix-marks-sheet-feedback-owner-ok:** stay open; the owner
   will do both checks later.
+
+## 2026-11-04 morning — walkthrough answer recorded at owner request
+
+- **W46.r6-spot:** run the Azure Document Intelligence and AWS Textract arms, about $1.50 in all, on
+  accounts the owner will create, with keys in Keychain as `Azure DI` (with its endpoint) and
+  `AWS Textract`. Transkribus stays out (its smallest credit purchase is over the $7 rule). Gate
+  `W46.r6-spot-owner-ok` is ticked only once the owner says both keys are in Keychain, so no session
+  starts the item before its credentials exist.
