@@ -1,0 +1,364 @@
+#!/usr/bin/env python3
+"""W46.r1-foundation. The macOS 27 on-device Foundation Model as a free first reader (processing review, H test 9).
+
+  python3 fm_foundation.py build                      # compile fm_ocr.swift and fm_text.swift into BIN
+  python3 fm_foundation.py jobs                       # job lists: the 99 panel originals, 100 of the 895, Deaver
+  python3 ops/autonomous/heavy-run.py run -- BIN/segbench-fm-ocr STORE/ocr96.tsv     # then ocr100.tsv
+  python3 ops/autonomous/heavy-run.py run -- BIN/segbench-fm-text STORE/seg-deaver.tsv
+  uv run --offline --with rapidfuzz --with 'sacrebleu==2.5.1' --with regex --with numpy \
+      python fm_foundation.py report                  # -> segbench-results/r1-foundation.{json,md}
+
+FIXED BEFORE ANY ANSWER:
+- Model: SystemLanguageModel on this Mac (M3 Pro, 18 GB, macOS 27.2, Apple Intelligence on), on-device only;
+  Private Cloud Compute is never called. Greedy sampling, a fresh session per page or window, guardrails
+  permissiveContentTransformations (Apple's setting for transforming the user's own content; the stock guardrail
+  refused the first pilot page). OCR output is capped at 4,096 tokens, so a page reaching it is a loop ("length").
+- OCR prompt: plain transcription instructions (fm_ocr.swift), answer scored whole, as LightOnOCR is on the panel;
+  the panel's KIND/TEXT reply format is not asked of a 3B model.
+- The 96: the panel's 99 frozen originals (2,400 px JPEG q90), scored on the 96 accuracy pages with the panel's
+  score(); failed or cut-off readings score empty, as on the panel.
+- 100 of the 895: 25 a stratum from the four Latin-script strata (L5-L8) of the 440 reference pages, drawn with
+  random.Random(SEED) from the ids sorted; the reference images (corpus/routes.py prepare). Latin only because
+  Apple Vision, the disagreement partner, reads only Latin script on the 895 (routes.VISION_SCRIPTS). Scored with
+  the panel's score() at each page's stratum.
+- Disagreement: NES between this model's text and Apple Vision's on the same page (0 when either failed), as
+  ocr_logprob.add_agreement; AUC (Mann-Whitney) for picking out this model's NES < 70, < 90 and failures, and
+  Vision's own NES < 70 and < 90 (the routing question: does disagreement flag the page Vision got wrong?).
+- Segmentation: Deaver (149 pages, one development box), K = 3 text-only windows, the exact prompt
+  seg_window_gateway's k3-t arm sent Gemini 3.7 Flash (JSON schema in the prompt, no JSON mode on-device), its
+  parser and combiner; a failed window votes 0.5. Compared paired with Gemini 3.7's k3-t and k3-it on Deaver,
+  bootstrap over truth documents (seg_window_gateway.bootstrap).
+No money, no network. Page images, text and replies stay in STORE and the panel cache, outside git.
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import random
+import statistics
+import subprocess
+import sys
+from collections import Counter
+from pathlib import Path
+
+HERE = Path(__file__).resolve().parent
+sys.path[:0] = [str(HERE), str(HERE / 'corpus')]
+
+TAG = 'W46.r1-foundation'
+STORE = Path.home() / 'Library/Caches/ArchiveSuiteRehearsal' / TAG
+BIN = STORE / 'bin'
+RESULTS = HERE.parents[1] / 'segbench-results'
+SEED = 'W46.r1-foundation/100-of-895'
+LATIN = ('L5', 'L6', 'L7', 'L8')
+PER_STRATUM = 25
+BOX = 'Deaver'
+ARM = 'k3-t'
+
+
+def ocr_dir(name):
+    return STORE / name
+
+
+# --- build and jobs -------------------------------------------------------------------------------
+
+def cmd_build(_):
+    BIN.mkdir(parents=True, exist_ok=True)
+    for src, out in (('fm_ocr.swift', 'segbench-fm-ocr'), ('fm_text.swift', 'segbench-fm-text')):
+        subprocess.run(['swiftc', '-parse-as-library', '-O', str(HERE / src), '-o', str(BIN / out)], check=True)
+    print('built', BIN)
+
+
+def panel_jobs():
+    import ocr_panel as P
+    return [j for j in P.manifest()['jobs'] if j['scale'] == 'original']
+
+
+def draw_100():
+    import routes as R
+    jobs = sorted((j for j in R.manifest()['jobs'] if j['stratum'] in LATIN), key=lambda j: j['id'])
+    rng = random.Random(SEED)
+    out = []
+    for s in LATIN:
+        pool = [j for j in jobs if j['stratum'] == s]
+        out += sorted(rng.sample(pool, PER_STRATUM), key=lambda j: j['id'])
+    return out
+
+
+def seg_units():
+    import seg_window_gateway as SG
+    col = SG.load(BOX)
+    return col, SG.units(col, ARM)
+
+
+def cmd_jobs(_):
+    import ocr_panel as P
+    import routes as R
+    import seg_window_gateway as SG
+    STORE.mkdir(parents=True, exist_ok=True)
+    (STORE / 'ocr96.tsv').write_text(''.join(
+        f"{P.CACHE / 'images' / (j['id'] + '.jpg')}\t{ocr_dir('ocr96') / (j['id'] + '.txt')}\n" for j in panel_jobs()))
+    (STORE / 'ocr100.tsv').write_text(''.join(
+        f"{R.RUN / 'images' / (j['id'] + '.jpg')}\t{ocr_dir('ocr100') / (j['id'] + '.txt')}\n" for j in draw_100()))
+    col, us = seg_units()
+    pdir = STORE / 'seg-prompts'
+    pdir.mkdir(exist_ok=True)
+    lines = []
+    for a, b in us:
+        body, key, nums = SG.request(col, a, b, ARM)
+        (pdir / f'{key}.txt').write_text(body['messages'][0]['content'][0]['text'])
+        lines.append(f"{pdir / (key + '.txt')}\t{STORE / 'seg-replies' / (key + '.txt')}\n")
+    (STORE / 'seg-deaver.tsv').write_text(''.join(lines))
+    print(f'jobs: {len(panel_jobs())} panel originals, {len(draw_100())} of the 895, {len(lines)} {BOX} windows')
+
+
+# --- report ---------------------------------------------------------------------------------------
+
+def reading(d, jid):
+    """(sidecar, text or None). A page with no sidecar was not attempted; a failed or capped one reads None."""
+    side = d / (jid + '.txt.json')
+    if not side.exists():
+        return None, None
+    meta = json.loads(side.read_text())
+    txt = d / (jid + '.txt')
+    return meta, (txt.read_text() if meta.get('ok') and txt.exists() else None)
+
+
+def pct(xs, q):
+    xs = sorted(xs)
+    return xs[min(len(xs) - 1, int(round(q * (len(xs) - 1))))] if xs else 0
+
+
+def boot_mean(d, rounds=10000, seed=0):
+    rng = random.Random(seed)
+    ms = sorted(statistics.fmean(rng.choice(d) for _ in d) for _ in range(rounds))
+    return statistics.fmean(d), ms[int(.025 * rounds)], ms[int(.975 * rounds) - 1]
+
+
+def ocr_rows():
+    import ocr_panel as P
+    import ocr_panel_score as S
+    import routes as R
+    kinds = {r['page']: r['kind'] for r in P.rows()}
+    rows = []
+    for j in panel_jobs():
+        if j['page'] in P.AGREEMENT:
+            continue
+        truth = (P.TRUTH / 'truth' / (j['page'] + '.txt')).read_text()
+        meta, text = reading(ocr_dir('ocr96'), j['id'])
+        vf = P.CACHE / 'vision' / (j['id'] + '.txt')
+        vis = vf.read_text() if vf.exists() else None
+        rows.append({'set': '96', 'page': j['id'], 'group': kinds[j['page']], 'meta': meta, 'text': text, 'vision': vis,
+                     'fm': S.score(truth, text or ''), 'vs': S.score(truth, vis or '')})
+    truth = {R.job_id(r): r for r in R.frozen()}
+    for j in draw_100():
+        t = Path(truth[j['id']]['truth']).read_text()
+        meta, text = reading(ocr_dir('ocr100'), j['id'])
+        vf = R.RUN / 'vision' / (j['id'] + '.txt')
+        vis = vf.read_text() if vf.exists() else None
+        rows.append({'set': '100', 'page': j['id'], 'group': j['stratum'], 'meta': meta, 'text': text, 'vision': vis,
+                     'fm': S.score(t, text or '', j['stratum']), 'vs': S.score(t, vis or '', j['stratum'])})
+    for r in rows:
+        r['ok'] = r['text'] is not None
+        r['vok'] = r['vision'] is not None
+        r['agree'] = S.score(r['vision'], r['text'])['nes'] if r['ok'] and r['vok'] else 0.0
+    return rows
+
+
+def auc_table(rr):
+    from ocr_logprob import auc
+    risk = [1 - r['agree'] for r in rr]
+    labels = {'this model NES < 70': [not r['ok'] or r['fm']['nes'] < .70 for r in rr],
+              'this model NES < 90': [not r['ok'] or r['fm']['nes'] < .90 for r in rr],
+              'this model failed': [not r['ok'] for r in rr],
+              'Apple Vision NES < 70': [r['vs']['nes'] < .70 for r in rr],
+              'Apple Vision NES < 90': [r['vs']['nes'] < .90 for r in rr]}
+    return {k: {'positives': sum(v), 'auc': auc(risk, v)} for k, v in labels.items()}
+
+
+def ocr_summary(rows):
+    out = {}
+    for s in ('96', '100'):
+        rr = [r for r in rows if r['set'] == s]
+        done = [r for r in rr if r['meta']]
+        if not done:
+            continue
+        metas = [r['meta'] for r in done]
+        d = [r['fm']['nes'] - r['vs']['nes'] for r in done]
+        both = [r['fm']['nes'] - r['vs']['nes'] for r in done if r['ok']]
+        m, lo, hi = boot_mean(d)
+        groups = {}
+        for g in sorted({r['group'] for r in done}):
+            gg = [r for r in done if r['group'] == g]
+            groups[g] = {'n': len(gg), 'ok': sum(r['ok'] for r in gg), 'fm_nes': statistics.fmean(r['fm']['nes'] for r in gg),
+                         'vision_nes': statistics.fmean(r['vs']['nes'] for r in gg)}
+        out[s] = {'n': len(rr), 'attempted': len(done), 'ok': sum(r['ok'] for r in done),
+                  'failures': dict(Counter(r['meta'].get('failure') for r in done if not r['ok'])),
+                  'fm_nes': statistics.fmean(r['fm']['nes'] for r in done),
+                  'fm_nes_answered': statistics.fmean(r['fm']['nes'] for r in done if r['ok']) if any(r['ok'] for r in done) else 0,
+                  'vision_nes': statistics.fmean(r['vs']['nes'] for r in done),
+                  'vision_ok': sum(r['vok'] for r in done),
+                  'diff': {'mean': m, 'lo': lo, 'hi': hi},
+                  'diff_answered': statistics.fmean(both) if both else None,
+                  'fm_better': sum(x > .005 for x in d), 'fm_worse': sum(x < -.005 for x in d),
+                  'seconds': {'median': statistics.median(x['seconds'] for x in metas), 'p90': pct([x['seconds'] for x in metas], .9),
+                              'max': max(x['seconds'] for x in metas), 'total': sum(x['seconds'] for x in metas)},
+                  'input_tokens': {'median': statistics.median(x.get('input_tokens', 0) for x in metas),
+                                   'min': min(x.get('input_tokens', 0) for x in metas), 'max': max(x.get('input_tokens', 0) for x in metas)},
+                  'image_tokens': sorted(Counter(x.get('image_tokens') for x in metas).items()),
+                  'output_tokens': {'median': statistics.median(x.get('output_tokens', 0) for x in metas),
+                                    'max': max(x.get('output_tokens', 0) for x in metas)},
+                  'sent_px': sorted(Counter(f"{x.get('sent_w')}x{x.get('sent_h')}" for x in metas).most_common(3)),
+                  'groups': groups, 'auc': auc_table(done)}
+    return out
+
+
+def seg_summary():
+    import seg_window_gateway as SG
+    import seg_window_modality as SM
+    import method_window as W
+    from score import score_labels, derived
+    col, us = seg_units()
+    failed = Counter()
+    metas = []
+
+    def judge_fm(c, a, b):
+        body, key, nums = SG.request(c, a, b, ARM)
+        side = STORE / 'seg-replies' / (key + '.txt.json')
+        if not side.exists():
+            raise RuntimeError(f'{BOX} window {nums[0]}-{nums[-1]} not read yet')
+        meta = json.loads(side.read_text())
+        metas.append(meta)
+        if meta.get('ok'):
+            try:
+                return SG.parse((STORE / 'seg-replies' / (key + '.txt')).read_text(), nums, False)
+            except Exception:
+                meta['failure'] = 'unparsed'
+        failed['fm'] += 1
+        return SM._seg()[1].neutral(nums)
+
+    preds = {}
+    try:
+        preds['on-device k3-t'] = W.assemble(col, SM.combine_units(col, us, judge_fm), True).labels
+    except RuntimeError as e:
+        return {'incomplete': str(e)}
+    for arm in ('k3-t', 'k3-it'):
+        preds[f'Gemini 3.7 {arm}'] = W.assemble(col, SM.combine_units(col, SG.units(col, arm), SG.judge_for(arm, failed)),
+                                                True).labels
+    rows, per_page = {}, {}
+    for name, labels in preds.items():
+        c = score_labels(col.labels, labels, BOX)
+        m = derived(c)
+        per_page[name] = [bool(v) for v in SG.exact_pages(col.labels, labels)]
+        rows[name] = {'pages': c.doc_pages, 'pages_exact': m['pages_in_exact_doc'], 'boundary_f1': m['boundary_f1'],
+                      'false_splits': c.false_splits, 'false_merges': c.false_merges}
+    docs = SG.documents(col)
+    paired = {f'on-device k3-t − {g}': SG.bootstrap(per_page['on-device k3-t'], per_page[g], docs)
+              for g in ('Gemini 3.7 k3-t', 'Gemini 3.7 k3-it')}
+    return {'box': BOX, 'windows': len(us), 'failed_windows': failed['fm'],
+            'failures': dict(Counter(m.get('failure') for m in metas if not m.get('ok') or m.get('failure'))),
+            'seconds': {'median': statistics.median(m['seconds'] for m in metas), 'total': sum(m['seconds'] for m in metas)},
+            'input_tokens': {'median': statistics.median(m.get('input_tokens', 0) for m in metas),
+                             'max': max(m.get('input_tokens', 0) for m in metas)},
+            'rows': rows, 'paired': paired}
+
+
+def cmd_report(_):
+    rows = ocr_rows()
+    o = {'tag': TAG, 'model': 'SystemLanguageModel (on-device), macOS 27.2 (26B123), Apple M3 Pro 18 GB',
+         'ocr': ocr_summary(rows), 'segmentation': seg_summary()}
+    tok = STORE / 'image-tokens.json'
+    if tok.exists():
+        o['image_tokens_by_size'] = json.loads(tok.read_text())
+    (RESULTS / 'r1-foundation.json').write_text(json.dumps(o, indent=1, default=str) + '\n')
+    write_md(o)
+    print(json.dumps({s: {k: v for k, v in x.items() if k in ('attempted', 'ok', 'fm_nes', 'vision_nes')}
+                      for s, x in o['ocr'].items()}, indent=1))
+
+
+def p(x):
+    return f'{100 * x:.1f}'
+
+
+def write_md(o):
+    from ocr_card import card, TRUTH_96, NOISE_96
+    L = [f'# {TAG} — the macOS 27 on-device model as a free first reader', '',
+         'Reproduce: `ArchiveProcessor/scripts/segbench/fm_foundation.py` (its header has every step and every setting '
+         'fixed before the first answer). Model: Apple\'s on-device `SystemLanguageModel` on macOS 27.2, on the '
+         'M3 Pro with 18 GB; Private Cloud Compute never called. No money, no network. Page text stays in the cache.', '']
+    L += FINDINGS + ['']
+    names = {'96': 'The owner\'s 96', '100': '100 of the 895 (25 from each Latin stratum, L5-L8)'}
+    L += ['## OCR', '', '| set | read / n | NES % (failures empty) | NES % answered | Apple Vision NES % | '
+          'difference, points (95% interval) | failures |', '|---|---:|---:|---:|---:|---:|---|']
+    for s, x in o['ocr'].items():
+        d = x['diff']
+        L.append(f"| {names[s]} | {x['ok']}/{x['attempted']} of {x['n']} | {p(x['fm_nes'])} | {p(x['fm_nes_answered'])} | "
+                 f"{p(x['vision_nes'])} | {100*d['mean']:+.1f} ({100*d['lo']:+.1f} to {100*d['hi']:+.1f}) | "
+                 f"{', '.join(f'{k} {v}' for k, v in x['failures'].items()) or 'none'} |")
+    for s, x in o['ocr'].items():
+        L += ['', f'### {names[s]}: by group', '', '| group | n | read | on-device NES % | Vision NES % |', '|---|---:|---:|---:|---:|']
+        L += [f"| {g} | {v['n']} | {v['ok']} | {p(v['fm_nes'])} | {p(v['vision_nes'])} |" for g, v in x['groups'].items()]
+    L += ['', '## Speed and tokens', '', '| set | seconds a page, median / 90th / max | total minutes | input tokens '
+          '(image + prompt), median (min-max) | image tokens (tokenCount) | output tokens, median / max |',
+          '|---|---:|---:|---:|---:|---:|']
+    for s, x in o['ocr'].items():
+        sc, it = x['seconds'], x['input_tokens']
+        L.append(f"| {names[s]} | {sc['median']:.1f} / {sc['p90']:.1f} / {sc['max']:.1f} | {sc['total']/60:.0f} | "
+                 f"{it['median']:.0f} ({it['min']}-{it['max']}) | {', '.join(f'{k} on {v}' for k, v in x['image_tokens'])} | "
+                 f"{x['output_tokens']['median']:.0f} / {x['output_tokens']['max']} |")
+    if 'image_tokens_by_size' in o:
+        L += ['', 'Image tokens against the size sent (one owner page, `tokenCount(for: Attachment)` and the session\'s '
+              'own input count for a five-token reply):', '', '| long side px | sent | tokenCount | session input tokens |',
+              '|---:|---|---:|---:|']
+        L += [f"| {r['side']} | {r['w']}x{r['h']} | {r['tokenCount']} | {r['input']} |" for r in o['image_tokens_by_size']]
+    L += ['', '## Disagreement with Apple Vision as a routing signal', '',
+          'Risk = 1 − NES(on-device text, Vision text), 0 agreement when either failed. AUC 0.5 is chance.', '',
+          '| set | label | positives | AUC |', '|---|---|---:|---:|']
+    for s, x in o['ocr'].items():
+        L += [f"| {s} | {k} | {v['positives']} | {'–' if v['auc'] is None else format(v['auc'], '.2f')} |"
+              for k, v in x['auc'].items()]
+    sg = o['segmentation']
+    L += ['', f'## Text-only segmentation on {BOX}', '']
+    if 'incomplete' in sg:
+        L += [f"Incomplete: {sg['incomplete']}"]
+    else:
+        L += [f"{sg['windows']} K = 3 text-only windows, Gemini 3.7's k3-t prompt word for word; {sg['failed_windows']} "
+              f"failed ({', '.join(f'{k} {v}' for k, v in sg['failures'].items()) or 'none'}), each voting 0.5. "
+              f"{sg['seconds']['median']:.1f} s a window (median), {sg['seconds']['total']/60:.0f} min in all; "
+              f"input {sg['input_tokens']['median']:.0f} tokens a window (max {sg['input_tokens']['max']}).", '',
+              '| route | pages in an exact document % | boundary F1 % | false splits | false merges |', '|---|---:|---:|---:|---:|']
+        L += [f"| {k} | {p(v['pages_exact'])} | {p(v['boundary_f1'])} | {v['false_splits']} | {v['false_merges']} |"
+              for k, v in sg['rows'].items()]
+        L += ['', 'Paired, pages in an exact document, bootstrap over truth documents:', '']
+        L += [f"- {k}: {100*v['delta']:+.1f} points ({100*v['lo']:+.1f} to {100*v['hi']:+.1f}), {v['pages']} pages"
+              for k, v in sg['paired'].items()]
+    L += ['', *card(
+        TRUTH_96 + ' The 100 of the 895 carry their public sets\' own transcriptions (corpus/README), scored at each '
+        'page\'s stratum. Deaver\'s segmentation truth is the bench\'s development-box truth (data.py). No drafter is '
+        'scored here.',
+        'The 96 are every accuracy page; the 100 are a seeded draw, 25 from each Latin stratum, made before any reading '
+        '(SEED in the script); Deaver is the development box seg_window_gateway already read at K = 3. None chosen by a '
+        'route\'s reading or by ABBYY text.',
+        'Apple Vision on the same images (the shipped free reader); for segmentation, Gemini 3.7 Flash\'s k3-t and '
+        'k3-it on the same windows and prompt. The on-device model gets a plain transcription prompt where the panel\'s '
+        'routes get the KIND/TEXT prompt; that difference is the route as an app would call it, and is named here.',
+        f'n = 96 and 100 pages, paired bootstrap intervals on the page differences. {NOISE_96} Greedy decoding on one '
+        'Mac; one reading of each page. Segmentation n = one box (149 pages), intervals over its truth documents.',
+        'One Mac, one OS build, one prompt; the 100 are Latin script only; text-only segmentation on one box, not the '
+        'three. Apple may change the model with an OS update, so these figures are for 26B123.')]
+    (RESULTS / 'r1-foundation.md').write_text('\n'.join(L) + '\n')
+
+
+FINDINGS = []   # filled from the measured results when the report is written up
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    sub = ap.add_subparsers(dest='cmd', required=True)
+    for name, fn in (('build', cmd_build), ('jobs', cmd_jobs), ('report', cmd_report)):
+        sub.add_parser(name).set_defaults(fn=fn)
+    a = ap.parse_args()
+    a.fn(a)
+
+
+if __name__ == '__main__':
+    main()
