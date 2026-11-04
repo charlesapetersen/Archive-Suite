@@ -213,6 +213,48 @@ struct NotesNavigationModelTests {
         #expect(nav.displayed.count == 3)
     }
 
+    /// W40.fix-notes-jump-pending-template: a jump to a note the shared folder scope excludes widens the
+    /// scope to All Notes and says so, so the row is listed (and highlighted) as well as loaded.
+    @Test func revealForOpenWidensAFolderScopeThatHidesTheTarget() async throws {
+        let (model, index, root) = try await makeModel()
+        defer { Task { await cleanup(root, index) } }
+        let member = sum("member", kind: .note), outside = sum("outside", kind: .note)
+        model.replaceItems([member, outside])
+        let folder = try await model.organization.createFolder(name: "F", parent: nil, kind: .normal)
+        try await model.organization.addMembership(item: member.id, folder: folder.id)
+        let nav = NotesNavigationModel(model: model, defaultKind: .note)
+        model.setFolderScope(folder.id)
+        #expect(nav.displayed.map(\.id) == [member.id])
+
+        #expect(nav.revealForOpen(member.id) == false)             // in scope: the scope stays
+        #expect(model.selectedFolderId == folder.id)
+        #expect(model.statusMessage == nil)
+
+        #expect(nav.revealForOpen(outside.id) == true)
+        #expect(model.scope == nil && model.selectedFolderId == nil)
+        #expect(nav.displayed.contains { $0.id == outside.id })
+        #expect(model.statusMessage == NotePassageResolve.scopeWidenedStatus)
+    }
+
+    /// A user filter alone hiding the target is cleared as before, and leaves the shared scope alone.
+    @Test func revealForOpenClearsUserFiltersWithoutTouchingAScopeThatShowsTheTarget() async throws {
+        let (model, index, root) = try await makeModel()
+        defer { Task { await cleanup(root, index) } }
+        let a = sum("alpha", kind: .note), b = sum("beta", kind: .note)
+        model.replaceItems([a, b])
+        let folder = try await model.organization.createFolder(name: "F", parent: nil, kind: .normal)
+        try await model.organization.addMembership(item: a.id, folder: folder.id)
+        try await model.organization.addMembership(item: b.id, folder: folder.id)
+        let nav = NotesNavigationModel(model: model, defaultKind: .note)
+        model.setFolderScope(folder.id)
+        nav.filter = NotesFilter(searchText: "alpha", kind: nav.filter.kind)
+        #expect(nav.displayed.map(\.id) == [a.id])
+
+        #expect(nav.revealForOpen(b.id) == false)
+        #expect(model.selectedFolderId == folder.id)
+        #expect(Set(nav.displayed.map(\.id)) == [a.id, b.id])
+    }
+
     @Test func smartFolderBadgeCountsSavedQueryAndRefreshesOnItemsAndMembership() async throws {
         let (model, index, root) = try await makeModel()
         defer { Task { await cleanup(root, index) } }

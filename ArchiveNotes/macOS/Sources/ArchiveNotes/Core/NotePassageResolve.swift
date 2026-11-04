@@ -97,6 +97,31 @@ enum NotePassageResolve {
         return summary.kind == windowKind ? .selectAndScroll(id: id, block: block)
                                           : .openFeaturingWindow(summary.kind)
     }
+
+    /// The status a deleted jump target reports (Note window only, see `openAction`).
+    static let sourceMissingStatus = "The source note for this passage no longer exists — the extract text is preserved."
+
+    /// The status a jump reports when it had to widen the shared folder scope to show its target.
+    static let scopeWidenedStatus = "Showing All Notes — the selected folder doesn't contain the note you opened."
+
+    /// Whether a window whose item pane shows the templates manager must leave it for `action`
+    /// (W40.fix-notes-jump-pending-template). In templates mode the detail shows a template, so no
+    /// `NoteEditorPane` is mounted and a request this window must select stayed pending until one was.
+    /// Only a select needs the pane: a missing-source report is a status, and opening the other window
+    /// does not need this one's pane, so the template being edited stays on screen for those.
+    static func leavesTemplatesMode(for action: PassageOpenAction) -> Bool {
+        if case .selectAndScroll = action { return true }
+        return false
+    }
+
+    /// Whether the shared folder/smart-folder `scope` keeps `target` out of every window's list, so a
+    /// jump that only clears the window's user filters would load the note without highlighting its
+    /// row (W40.fix-notes-jump-pending-template). `scopeItemIDs` is the scope folder's subtree
+    /// membership, as `NotesNavigationModel.recompute` passes it; `nil` scope is All Notes.
+    static func scopeHides(_ target: ItemSummary, scope: NotesFilter?, scopeItemIDs: Set<UUID>?) -> Bool {
+        guard let scope else { return false }
+        return !scope.matches(target, folderItemIDs: scopeItemIDs)
+    }
 }
 
 /// The action the observing window takes for an in-app open request (W7-S3). Pure/`Equatable` so the

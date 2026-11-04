@@ -1822,7 +1822,7 @@ paste in an extract editor → note-passage blocks). Model + codec paths are uni
   Append picker. Logic is proven at the model/codec layer (`ExtractCommandTests`, `PasteboardPassageTests`,
   `BlockParserTests`).
 
-## Extracts jump-to-source + provenance chips — follow-ups (W7-S3, 2026-07-13): the template-pane and folder-scope edges are queued as `W40.fix-notes-jump-pending-template`; the same-window edge stays a limitation; the live GUI checks were never run
+## Extracts jump-to-source + provenance chips — follow-ups (W7-S3, 2026-07-13): the template-pane and folder-scope edges are fixed (W40.fix-notes-jump-pending-template, 2026-11-03); the same-window edge stays a limitation; the live GUI checks were never run
 
 W7-S3 shipped the note-passage provenance chip's **Jump to Source** button + live-title label + the
 in-app navigation channel (`NotesModel.openItem`/`pendingOpen`) and the Note-window consume side
@@ -1847,9 +1847,15 @@ is unit-tested (`NotePassageResolveTests`, 20 tests incl. `openAction`); conscio
   measured in the VM: `@Published` emits in `willSet` and `openWindow` builds a closed window synchronously,
   so the open is deferred one main-loop turn (else the new pane reads `pendingOpen` as nil and never acts);
   and a pane ignores the publish until it has appeared, because before `onAppear` wires the body seams a
-  select would mark the item loaded with an EMPTY body (the default `load` returns nil). Residual
-  edge: if the Note window's detail is showing a template, its `NoteEditorPane` is not mounted and a note
-  request stays pending until it is. VM-checked by `testG15_OpenRequestOpensTheClosedFeaturingWindow`.
+  select would mark the item loaded with an EMPTY body (the default `load` returns nil).
+  VM-checked by `testG15_OpenRequestOpensTheClosedFeaturingWindow`.
+- ✅ **FIXED (W40.fix-notes-jump-pending-template, 2026-11-03):** a request reaching a window in templates
+  mode no longer waits. Templates mode mounts no `NoteEditorPane`, so `NotesBrowserView` observes
+  `pendingOpen` itself while `showingTemplates`: a target this window selects leaves templates mode (one
+  main-loop turn later; the mounted pane's `onAppear` then handles and consumes it,
+  `NotePassageResolve.leavesTemplatesMode`), a deleted target is reported from there, and a target of the
+  other kind opens that window, so the template being edited stays on screen for those two. VM test
+  `testG16_JumpToSourceLeavesTemplatesMode`.
 - ✅ **FIXED (W14.4c, 2026-07-17 `d615589`):** the chip live title now refreshes reactively. `NotesModel`
   gained an `itemsGeneration` counter (bumped on every `replaceItems`); `MarkdownEditorView.updateNSView`
   re-styles a chip-bearing extract when that generation changes even if THIS note's markdown didn't, so a
@@ -1861,9 +1867,11 @@ is unit-tested (`NotePassageResolveTests`, 20 tests incl. `openAction`); conscio
   scroll maps against possibly-stale content (falls back to top if out of range — non-crashing). The
   realistic jump is cross-window (Extract → Note window), where the target window isn't first responder,
   so content re-applies and the scroll is exact.
-- **Folder-scope-hidden target.** A jump clears the window's *user* filters so the row is reachable, but
-  a shared *folder scope* that excludes the note is left intact; the editor still loads + scrolls the
-  note (detail reads `allItems`, not the filtered list), but the list-row highlight may be absent.
+- ✅ **FIXED (W40.fix-notes-jump-pending-template, 2026-11-03): folder-scope-hidden target.** A jump
+  cleared the window's *user* filters but left a shared *folder scope* that excludes the note, so the
+  editor loaded it with no list row highlighted. `NotesNavigationModel.revealForOpen` now also widens such
+  a scope (folder or smart folder, `NotePassageResolve.scopeHides`) to All Notes and says so in the status
+  line. The scope is shared, so the other window's list widens with it, as its sidebar shows.
 - ✅ **FIXED (W14.4a, 2026-07-17 `592049a`):** `Core/NotePassageSource.swift:118` "conditional cast from
   '[NSValue]' to '[NSValue]' always succeeds" — `textView.selectedRanges` is already `[NSValue]`, so the
   `as?` cast is redundant; bound directly (behavior-identical). Warning gone on a clean compile.

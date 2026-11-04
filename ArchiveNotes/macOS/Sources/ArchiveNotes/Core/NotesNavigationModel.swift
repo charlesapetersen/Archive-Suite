@@ -291,6 +291,23 @@ final class NotesNavigationModel: ObservableObject {
         recompute()                                // ensure a recompute even when filter was already neutral
     }
 
+    /// Make `id` reachable in this window's list before an open request selects it (W7-S3). Clears the
+    /// window's user filters when the row is not displayed; when the SHARED folder/smart-folder scope
+    /// also excludes it, widens that scope to All Notes and says so, since otherwise the editor loads
+    /// the note (it reads `allItems`) with no list row highlighted (W40.fix-notes-jump-pending-template).
+    /// The scope is shared, so the other window's list widens too; it shows the same sidebar selection.
+    /// Returns whether the scope was widened.
+    @discardableResult
+    func revealForOpen(_ id: UUID) -> Bool {
+        if !displayed.contains(where: { $0.id == id }) { clearUserFilters() }
+        guard let scope = model.scope, let target = model.allItems.first(where: { $0.id == id }) else { return false }
+        let scopeItemIDs = scope.folderId.map { model.organization.subtreeItemIDs(of: $0) }
+        guard NotePassageResolve.scopeHides(target, scope: scope, scopeItemIDs: scopeItemIDs) else { return false }
+        model.setAllNotesScope()
+        model.statusMessage = NotePassageResolve.scopeWidenedStatus
+        return true
+    }
+
     /// The current user filter with the live keyword folded into `searchText` (the durable title
     /// predicate) — the basis for "Save as Smart Folder".
     var currentUserFilter: NotesFilter {

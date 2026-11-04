@@ -2713,6 +2713,60 @@ final class NotesGUITests: NotesFixtureUITestCase {
         closeExtractsWindow(extractWin)
     }
 
+    /// G16 — Jump to Source while the Note window shows the templates manager (W40.fix-notes-jump-pending-
+    /// template). Templates mode mounts no note editor pane, so the request used to stay pending until one
+    /// was; the Note window must now leave templates mode and load the source note.
+    func testG16_JumpToSourceLeavesTemplatesMode() throws {
+        try withFixture { try runG16_JumpToSourceLeavesTemplatesMode() }
+    }
+
+    private func runG16_JumpToSourceLeavesTemplatesMode() throws {
+        try requireCanonicalScratchFixtureForStoreWrites()   // Create Extract writes a new extract
+        let noteWin = app.windows["Archive Notes"]
+        XCTAssertTrue(noteWin.waitForExistence(timeout: 10), "the Note window should exist")
+        let extractWin = app.windows["Extracts"]
+
+        // An extract of idPlain, loaded in the Extracts window, whose chip jumps back to idPlain.
+        frontWindow(named: "Archive Notes")
+        selectItem(uuid: Self.idPlain)
+        XCTAssertTrue(pollUntil(timeout: 10) { isKey(noteWin) }, "the Note window should be key before the trigger")
+        let noteEditor = noteWin.textViews["an.editor.text"]
+        XCTAssertTrue(noteEditor.waitForExistence(timeout: 10), "the Note window's editor should exist")
+        XCTAssertTrue(pollUntil(timeout: 10) { !((noteEditor.value as? String) ?? "").isEmpty },
+                      "the note body should load before selecting text")
+        XCTAssertTrue(setEditorSelection(location: 0, length: 8, in: noteWin),
+                      "the DEBUG selection seam must be drivable")
+        app.activate()
+        app.typeKey("e", modifierFlags: [.command, .option])
+        XCTAssertTrue(extractWin.waitForExistence(timeout: 15), "Create Extract should open the Extracts window")
+        let extractEditor = extractWin.textViews["an.editor.text"]
+        XCTAssertTrue(pollUntil(timeout: 15) { !((extractEditor.value as? String) ?? "").isEmpty },
+                      "the Extracts window should have loaded the new extract")
+
+        // Put the Note window into templates mode: its detail shows a template, not a note.
+        frontWindow(named: "Archive Notes")
+        XCTAssertTrue(pollUntil(timeout: 10) { isKey(noteWin) }, "the Note window should be fronted")
+        let templatesRow = noteWin.staticTexts.matching(identifier: "an.sidebar.templates").firstMatch
+        XCTAssertTrue(templatesRow.waitForExistence(timeout: 10), "the sidebar Templates row should exist")
+        templatesRow.click()
+        XCTAssertTrue(noteWin.descendants(matching: .any)["an.template.new"].waitForExistence(timeout: 10),
+                      "the Note window should show the templates manager")
+        XCTAssertTrue(pollUntil(timeout: 10) { !noteWin.descendants(matching: .any)["an.detail.header"].exists },
+                      "templates mode should have unmounted the note detail")
+
+        XCTAssertTrue(clickStripButton("an.editor.test.jump", timeout: 10, in: extractWin),
+                      "the jump seam must be drivable in the Extracts window")
+        XCTAssertTrue(noteWin.descendants(matching: .any)["an.detail.header"].waitForExistence(timeout: 15),
+                      "Jump to Source should take the Note window out of templates mode")
+        XCTAssertTrue(pollUntil(timeout: 10) { !noteWin.descendants(matching: .any)["an.template.new"].exists },
+                      "the templates manager should be gone")
+        XCTAssertTrue(pollUntil(timeout: 15) { isKey(noteWin) }, "the Note window should be key after the jump")
+        XCTAssertTrue(pollUntil(timeout: 15) { !((noteWin.textViews["an.editor.text"].value as? String) ?? "").isEmpty },
+                      "the Note window should have loaded the source note")
+
+        closeExtractsWindow(extractWin)
+    }
+
     // MARK: - G12/G13/G14 helpers
 
     /// Is `win` the key window, per its own `an.status.keyWindow` probe? The probe publishes `key`/`notkey`

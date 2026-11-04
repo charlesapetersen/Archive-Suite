@@ -35,6 +35,7 @@ struct NotesBrowserView: View {
     @State private var didConfigureWindow = false
     @State private var selectedTemplateID: UUID?
     @EnvironmentObject private var flushRegistry: EditorFlushRegistry
+    @Environment(\.openWindow) private var openWindow
 
     init(kind: ItemKindShell, model: NotesModel) {
         self._model = ObservedObject(wrappedValue: model)
@@ -94,6 +95,10 @@ struct NotesBrowserView: View {
             await flushRegistry.sweepSavedCopies(noteIDs: model.allItems.map(\.id)) { await model.loadBody(for: $0) }
         }
         .toolbar { toolbar }
+        // Templates mode mounts no `NoteEditorPane`, so nothing in this window would act on an open
+        // request; handle it here instead (W40.fix-notes-jump-pending-template). The delivered value,
+        // since `@Published` emits in `willSet`; an initial pending value covers a window just opened.
+        .onReceive(model.$pendingOpen) { handleOpenWhileShowingTemplates($0) }
         .onDisappear {
             if let w = window {
                 NotesAppSettings.persistWindowSizeOnDisappear(
@@ -217,6 +222,31 @@ struct NotesBrowserView: View {
     private var kindLabel: String { nav.windowKind == .extract ? "Extract" : "Note" }
 
     /// Create a new item in the current folder scope (system default when unscoped, §16.6), from
+    /// An open request while this window's panes show the templates manager. A target this window
+    /// selects leaves templates mode, one main-loop turn later so the request is stored by then: the
+    /// note editor pane mounts and its `onAppear` handles and consumes it. A deleted target is
+    /// reported here and the other kind's window is opened from here, so neither leaves the template
+    /// being edited. Outside templates mode the mounted `NoteEditorPane` handles every request.
+    private func handleOpenWhileShowingTemplates(_ req: NotesModel.OpenRequest?) {
+        guard nav.showingTemplates, let req else { return }
+        let action = NotePassageResolve.openAction(forItemID: req.id, block: req.block,
+                                                   among: model.allItems, windowKind: nav.windowKind)
+        if NotePassageResolve.leavesTemplatesMode(for: action) {
+            DispatchQueue.main.async { nav.showingTemplates = false }
+            return
+        }
+        switch action {
+        case .reportSourceMissing:
+            model.statusMessage = NotePassageResolve.sourceMissingStatus
+            DispatchQueue.main.async { model.consumeOpen() }
+        case let .openFeaturingWindow(kind):
+            let windowID = kind == .extract ? NotesWindowID.extracts : NotesWindowID.notes
+            DispatchQueue.main.async { openWindow(id: windowID) }
+        case .selectAndScroll, .ignore:
+            break
+        }
+    }
+
     /// `templateId` when given, then select it (leaving templates mode if active).
     private func newItem(from templateId: UUID?) {
         Task {

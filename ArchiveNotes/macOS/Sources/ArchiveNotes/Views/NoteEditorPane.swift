@@ -406,8 +406,9 @@ struct NoteEditorPane: View {
         switch NotePassageResolve.openAction(forItemID: req.id, block: req.block,
                                              among: nav.model.allItems, windowKind: nav.windowKind) {
         case let .selectAndScroll(id, _):
-            // Make sure the note is reachable in this window's list before selecting it.
-            if !nav.displayed.contains(where: { $0.id == id }) { nav.clearUserFilters() }
+            // Make sure the note is reachable in this window's list (user filters, then the shared
+            // folder scope) before selecting it.
+            nav.revealForOpen(id)
             nav.select(id)          // triggers the body load via the selectedItemID onChange
             jumpTarget = req        // arm the scroll; fires when loadedID reaches the target
             // W14.4(b): bring THIS window (the one featuring the target's kind) to the front + focus it,
@@ -418,7 +419,7 @@ struct NoteEditorPane: View {
             NSApp.activate(ignoringOtherApps: true)
             DispatchQueue.main.async { nav.model.consumeOpen() }
         case .reportSourceMissing:
-            nav.model.statusMessage = "The source note for this passage no longer exists — the extract text is preserved."
+            nav.model.statusMessage = NotePassageResolve.sourceMissingStatus
             DispatchQueue.main.async { nav.model.consumeOpen() }
         case let .openFeaturingWindow(kind):
             // W9.b5-fu1: the featuring window may be closed, leaving no pane to act. Opening it mounts

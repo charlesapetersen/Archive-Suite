@@ -211,4 +211,42 @@ struct NotePassageResolveTests {
         #expect(NotePassageResolve.openAction(forItemID: sourceID, block: 0, among: [], windowKind: .extract)
                 == .ignore)
     }
+
+    // MARK: Templates mode + folder scope (W40.fix-notes-jump-pending-template)
+
+    @Test func onlyASelectLeavesTemplatesMode() {
+        // A window showing a template has no note pane mounted: a target it must select leaves templates
+        // mode so the pane mounts and handles the request; nothing else takes the template off screen.
+        #expect(NotePassageResolve.leavesTemplatesMode(for: .selectAndScroll(id: sourceID, block: 2)))
+        #expect(!NotePassageResolve.leavesTemplatesMode(for: .reportSourceMissing))
+        #expect(!NotePassageResolve.leavesTemplatesMode(for: .openFeaturingWindow(.extract)))
+        #expect(!NotePassageResolve.leavesTemplatesMode(for: .ignore))
+    }
+
+    @Test func noteTargetInTheNoteWindowShowingATemplateLeavesTemplatesMode() {
+        // The jump-to-source case end to end through the decision: Note window, note target.
+        let items = [summary(sourceID, title: "The source note", kind: .note)]
+        let action = NotePassageResolve.openAction(forItemID: sourceID, block: 1, among: items, windowKind: .note)
+        #expect(NotePassageResolve.leavesTemplatesMode(for: action))
+        let fromExtracts = NotePassageResolve.openAction(forItemID: sourceID, block: 1, among: items,
+                                                         windowKind: .extract)
+        #expect(!NotePassageResolve.leavesTemplatesMode(for: fromExtracts))
+    }
+
+    @Test func scopeHidesATargetOutsideTheFolderSubtree() {
+        let target = summary(sourceID, title: "The source note")
+        let folder = UUID()
+        #expect(!NotePassageResolve.scopeHides(target, scope: nil, scopeItemIDs: nil))       // All Notes
+        #expect(!NotePassageResolve.scopeHides(target, scope: NotesFilter(folderId: folder),
+                                               scopeItemIDs: [sourceID]))
+        #expect(NotePassageResolve.scopeHides(target, scope: NotesFilter(folderId: folder), scopeItemIDs: []))
+        #expect(NotePassageResolve.scopeHides(target, scope: NotesFilter(folderId: folder), scopeItemIDs: nil))
+    }
+
+    @Test func scopeHidesATargetASmartFolderQueryExcludes() {
+        let target = summary(sourceID, title: "The source note", kind: .note)
+        #expect(NotePassageResolve.scopeHides(target, scope: NotesFilter(kind: .extracts), scopeItemIDs: nil))
+        #expect(!NotePassageResolve.scopeHides(target, scope: NotesFilter(searchText: "source"), scopeItemIDs: nil))
+        #expect(NotePassageResolve.scopeHides(target, scope: NotesFilter(searchText: "unrelated"), scopeItemIDs: nil))
+    }
 }
