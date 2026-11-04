@@ -45,7 +45,9 @@ import gateway_gemini as G  # noqa: E402
 
 ROUTE = G.LABEL
 CACHE = G.REHEARSAL / 'capture-ladder-gateway'
-CAP = 3.50  # the item's whole spend; filed at about $2.00, the two middle blur rungs and the verdicts on all 528 added
+# The item's whole spend, under the $7 rule: filed at about $2.00; the two middle blur rungs and the verdicts on
+# all 528 were added, and the probe put the whole at about $3 (a reading cut at 8,192 tokens costs about $0.03).
+CAP = 4.50
 SET = 'capture-ladder'
 WORST = ('aug-ShadowCast', 'aug-LightingGradient', 'aug-ReflectedLight', 'aug-LowLightNoise', 'motion-31',
          'defocus-5', 'tilt-20', 'jpeg-60')
