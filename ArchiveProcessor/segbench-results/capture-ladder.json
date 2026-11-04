@@ -292,6 +292,59 @@
     "losses": 124,
     "images": 480,
     "auc_quality": 0.8477709314969192,
+    "auc_page_blind": 0.8642624139180862,
+    "auc_within_defect": {
+     "aug-ShadowCast": {
+      "auc": 0.5638297872340425,
+      "losses": 1,
+      "images": 48
+     },
+     "aug-LightingGradient": {
+      "auc": 0.483695652173913,
+      "losses": 2,
+      "images": 48
+     },
+     "aug-ReflectedLight": {
+      "auc": 0.7151675485008818,
+      "losses": 27,
+      "images": 48
+     },
+     "aug-LowLightNoise": {
+      "auc": null,
+      "losses": 0,
+      "images": 48
+     },
+     "motion-31": {
+      "auc": 0.5,
+      "losses": 42,
+      "images": 48
+     },
+     "defocus-5": {
+      "auc": 0.66,
+      "losses": 25,
+      "images": 48
+     },
+     "tilt-20": {
+      "auc": 0.5957446808510638,
+      "losses": 1,
+      "images": 48
+     },
+     "jpeg-60": {
+      "auc": null,
+      "losses": 0,
+      "images": 48
+     },
+     "motion-17": {
+      "auc": 0.5149911816578483,
+      "losses": 21,
+      "images": 48
+     },
+     "defocus-3": {
+      "auc": 0.5976744186046512,
+      "losses": 5,
+      "images": 48
+     }
+    },
     "retake_hit": 0.9354838709677419,
     "retake_false_alarm": 0.42134831460674155,
     "auc_laplacian": 0.6782008880028996,
@@ -302,6 +355,59 @@
     "losses": 111,
     "images": 480,
     "auc_quality": 0.8777924265729143,
+    "auc_page_blind": 0.8990331795209844,
+    "auc_within_defect": {
+     "aug-ShadowCast": {
+      "auc": null,
+      "losses": 0,
+      "images": 48
+     },
+     "aug-LightingGradient": {
+      "auc": null,
+      "losses": 0,
+      "images": 48
+     },
+     "aug-ReflectedLight": {
+      "auc": 0.6426086956521739,
+      "losses": 23,
+      "images": 48
+     },
+     "aug-LowLightNoise": {
+      "auc": null,
+      "losses": 0,
+      "images": 48
+     },
+     "motion-31": {
+      "auc": 0.5,
+      "losses": 45,
+      "images": 48
+     },
+     "defocus-5": {
+      "auc": 0.7321428571428571,
+      "losses": 20,
+      "images": 48
+     },
+     "tilt-20": {
+      "auc": null,
+      "losses": 0,
+      "images": 48
+     },
+     "jpeg-60": {
+      "auc": null,
+      "losses": 0,
+      "images": 48
+     },
+     "motion-17": {
+      "auc": 0.5149911816578483,
+      "losses": 21,
+      "images": 48
+     },
+     "defocus-3": {
+      "auc": 0.9239130434782609,
+      "losses": 2,
+      "images": 48
+     }
+    },
     "retake_hit": 0.963963963963964,
     "retake_false_alarm": 0.43089430894308944,
     "auc_laplacian": 0.6809248272662907,
@@ -312,6 +418,59 @@
     "losses": 204,
     "images": 480,
     "auc_quality": 0.9038078999715828,
+    "auc_page_blind": 0.9092071611253197,
+    "auc_within_defect": {
+     "aug-ShadowCast": {
+      "auc": 0.5652173913043478,
+      "losses": 2,
+      "images": 48
+     },
+     "aug-LightingGradient": {
+      "auc": 0.7127659574468085,
+      "losses": 1,
+      "images": 48
+     },
+     "aug-ReflectedLight": {
+      "auc": 0.6302083333333334,
+      "losses": 24,
+      "images": 48
+     },
+     "aug-LowLightNoise": {
+      "auc": 0.5390625,
+      "losses": 8,
+      "images": 48
+     },
+     "motion-31": {
+      "auc": null,
+      "losses": 48,
+      "images": 48
+     },
+     "defocus-5": {
+      "auc": 0.5777777777777777,
+      "losses": 45,
+      "images": 48
+     },
+     "tilt-20": {
+      "auc": 0.5978260869565217,
+      "losses": 2,
+      "images": 48
+     },
+     "jpeg-60": {
+      "auc": 0.5749128919860628,
+      "losses": 7,
+      "images": 48
+     },
+     "motion-17": {
+      "auc": 0.7976744186046512,
+      "losses": 43,
+      "images": 48
+     },
+     "defocus-3": {
+      "auc": 0.7743055555555556,
+      "losses": 24,
+      "images": 48
+     }
+    },
     "retake_hit": 0.9019607843137255,
     "retake_false_alarm": 0.2971014492753623,
     "auc_laplacian": 0.7659136118215402,
@@ -322,6 +481,59 @@
     "losses": 99,
     "images": 480,
     "auc_quality": 0.8101354754898062,
+    "auc_page_blind": 0.8276863119382805,
+    "auc_within_defect": {
+     "aug-ShadowCast": {
+      "auc": null,
+      "losses": 0,
+      "images": 48
+     },
+     "aug-LightingGradient": {
+      "auc": 0.2553191489361702,
+      "losses": 1,
+      "images": 48
+     },
+     "aug-ReflectedLight": {
+      "auc": 0.7716049382716049,
+      "losses": 27,
+      "images": 48
+     },
+     "aug-LowLightNoise": {
+      "auc": 0.06382978723404255,
+      "losses": 1,
+      "images": 48
+     },
+     "motion-31": {
+      "auc": 0.5,
+      "losses": 38,
+      "images": 48
+     },
+     "defocus-5": {
+      "auc": 0.5824175824175825,
+      "losses": 13,
+      "images": 48
+     },
+     "tilt-20": {
+      "auc": null,
+      "losses": 0,
+      "images": 48
+     },
+     "jpeg-60": {
+      "auc": 0.29347826086956524,
+      "losses": 2,
+      "images": 48
+     },
+     "motion-17": {
+      "auc": 0.6271008403361344,
+      "losses": 14,
+      "images": 48
+     },
+     "defocus-3": {
+      "auc": 0.5814814814814815,
+      "losses": 3,
+      "images": 48
+     }
+    },
     "retake_hit": 0.9292929292929293,
     "retake_false_alarm": 0.4566929133858268,
     "auc_laplacian": 0.6141069487526181,
@@ -385,7 +597,7 @@
   "quad_margin": "quad-to-frame margin (low = cut or tight)",
   "text_px": "image share in Vision word boxes (low = text missed)"
  },
- "note": "Each of the 96 pages degraded by one synthetic defect at one setting and read again by the same reader, paired by page against that reader's plain image (Apple Vision against the plain image re-saved as every defect image was, because a re-save alone moves Vision's bag-of-words F1 by 1.5 points). Glare, motion blur and heavy defocus cost every reader; tilt up to 20 degrees, JPEG down to quality 60 and Augraphy's shadow and lighting gradient at their defaults cost none of them more than about 2 points. Apple Vision breaks first: 9 px of motion costs it 6.6 points and 17 px 38, where Qwen3.6-27B loses 1.0 and 7.9. LightOnOCR-3 4B answers heavy blur with an empty reply (43 of 96 at 31 px). Correcting the tilt with Apple's quad recovers nothing for Vision, because tilt cost it little. Gemini 3.7 Flash through the gateway, on 48 of the pages at ten settings, loses 6.2 points to sigma-5 defocus and 16.2 to 17 px of motion. A loop is a reading cut at the token cap or the 600 s limit; loops and blanks score 0. Synthetic defects, one at a time: real phone captures are not in this table. Detail: segbench-results/capture-ladder.md.",
+ "note": "Each of the 96 pages degraded by one synthetic defect at one setting and read again by the same reader, paired by page against that reader's plain image (Apple Vision against the plain image re-saved as every defect image was and read in the same run on macOS 27.2; its raw row is a 26.6 reading). Glare, motion blur and heavy defocus cost every reader; tilt up to 20 degrees, JPEG down to quality 60 and Augraphy's shadow and lighting gradient at their defaults cost none of them more than about 2 points. Apple Vision breaks first: 9 px of motion costs it 6.6 points and 17 px 38, where Qwen3.6-27B loses 1.0 and 7.9. LightOnOCR-3 4B answers heavy blur with an empty reply (43 of 96 at 31 px). Correcting the tilt with Apple's quad recovers nothing for Vision, because tilt cost it little. Gemini 3.7 Flash through the gateway, on 48 of the pages at ten settings, loses 6.2 points to sigma-5 defocus, less than the open readers (14 to 17), and 16.2 to 17 px of motion, a tie with them (10 to 12) when paired by page. A loop is a reading cut at the token cap or the 600 s limit; loops and blanks score 0. Synthetic defects, one at a time: real phone captures are not in this table. Detail: segbench-results/capture-ladder.md.",
  "signals_note": "Signals a phone can measure at capture, from the image alone, against a loss of 5 NES points or more on each of the 1,536 defect images (0.5 is no information). Sharpness inside the word boxes and the share of the image the word boxes cover separate losses only moderately (AUC 0.70 to 0.78), and their best cuts differ threefold between readers; the clipped-highlight share does not see the glare that costs 9 points (0.50 to 0.53), and lower luminance goes with fewer losses, not more. The cuts are in-sample on synthetic images; none is ready to be a live warning without a check on real captures.",
  "summary": [
   {
@@ -2272,6 +2484,878 @@
    "added": 0.01844546919273293,
    "lost5": 3,
    "baseline": false
+  }
+ ],
+ "summary_gemini_pages": [
+  {
+   "reader": "qwen3.6-27b",
+   "variant": "aug-ShadowCast",
+   "n": 48,
+   "baseline": "raw",
+   "nes": 0.955130962859116,
+   "nes_baseline": 0.9564817656248964,
+   "d_nes": {
+    "n": 48,
+    "delta": -0.001350802765780361,
+    "p": 0.34926507349265073,
+    "lo": -0.0040160926351016394,
+    "hi": 0.0002452453786467278
+   },
+   "d_bowf1": {
+    "n": 48,
+    "delta": 0.00010296887567080859,
+    "p": 0.8605139486051395,
+    "lo": -0.0009484102553790966,
+    "hi": 0.001049661726468749
+   },
+   "gemini_minus_reader": {
+    "n": 48,
+    "delta": -0.000915681660605056,
+    "p": 0.6618338166183382,
+    "lo": -0.004841282229376798,
+    "hi": 0.0030346319801224744
+   }
+  },
+  {
+   "reader": "lightonocr3-4b",
+   "variant": "aug-ShadowCast",
+   "n": 48,
+   "baseline": "raw",
+   "nes": 0.8994198673123975,
+   "nes_baseline": 0.8963126898444632,
+   "d_nes": {
+    "n": 48,
+    "delta": 0.003107177467934423,
+    "p": 0.40405959404059594,
+    "lo": -0.001058898574483727,
+    "hi": 0.009102822970763431
+   },
+   "d_bowf1": {
+    "n": 48,
+    "delta": 0.0010834616399003582,
+    "p": 0.5123487651234877,
+    "lo": -0.0005600456326019845,
+    "hi": 0.0037522375011459844
+   },
+   "gemini_minus_reader": {
+    "n": 48,
+    "delta": -0.00537366189431984,
+    "p": 0.12348765123487651,
+    "lo": -0.012428043439553551,
+    "hi": 0.0006231580185026333
+   }
+  },
+  {
+   "reader": "vision",
+   "variant": "aug-ShadowCast",
+   "n": 48,
+   "baseline": "resave-q92",
+   "nes": 0.8047629451271168,
+   "nes_baseline": 0.8046493763163941,
+   "d_nes": {
+    "n": 48,
+    "delta": 0.00011356881072251367,
+    "p": 0.9776022397760225,
+    "lo": -0.008138752082059253,
+    "hi": 0.008174889037523858
+   },
+   "d_bowf1": {
+    "n": 48,
+    "delta": -0.0052080510992385054,
+    "p": 0.0720927907209279,
+    "lo": -0.011010204695019022,
+    "hi": -0.0001468379430018552
+   },
+   "gemini_minus_reader": {
+    "n": 48,
+    "delta": -0.0023800532371079305,
+    "p": 0.6764323567643236,
+    "lo": -0.012928862121977504,
+    "hi": 0.008068218840860848
+   }
+  },
+  {
+   "reader": "qwen3.6-27b",
+   "variant": "aug-LightingGradient",
+   "n": 48,
+   "baseline": "raw",
+   "nes": 0.9526132980961465,
+   "nes_baseline": 0.9564817656248964,
+   "d_nes": {
+    "n": 48,
+    "delta": -0.003868467528749841,
+    "p": 0.40815918408159185,
+    "lo": -0.0135363579141692,
+    "hi": 0.004740415725750837
+   },
+   "d_bowf1": {
+    "n": 48,
+    "delta": 0.0033559697559949497,
+    "p": 0.4002599740025997,
+    "lo": -0.0007159634084721705,
+    "hi": 0.009524517321197806
+   },
+   "gemini_minus_reader": {
+    "n": 48,
+    "delta": -0.002299121259426079,
+    "p": 0.5521447855214479,
+    "lo": -0.00939709666373831,
+    "hi": 0.003587416615479328
+   }
+  },
+  {
+   "reader": "lightonocr3-4b",
+   "variant": "aug-LightingGradient",
+   "n": 48,
+   "baseline": "raw",
+   "nes": 0.8992656981218281,
+   "nes_baseline": 0.8963126898444632,
+   "d_nes": {
+    "n": 48,
+    "delta": 0.002953008277364821,
+    "p": 0.28057194280571945,
+    "lo": -0.0008341537796933834,
+    "hi": 0.00801629474861093
+   },
+   "d_bowf1": {
+    "n": 48,
+    "delta": 0.0011857806411616535,
+    "p": 0.30916908309169083,
+    "lo": -0.0007790621202112454,
+    "hi": 0.0034837049223843306
+   },
+   "gemini_minus_reader": {
+    "n": 48,
+    "delta": -0.00912059706554074,
+    "p": 0.030296970302969704,
+    "lo": -0.020363907897370706,
+    "hi": -0.0013389945272071861
+   }
+  },
+  {
+   "reader": "vision",
+   "variant": "aug-LightingGradient",
+   "n": 48,
+   "baseline": "resave-q92",
+   "nes": 0.81092196220667,
+   "nes_baseline": 0.8046493763163941,
+   "d_nes": {
+    "n": 48,
+    "delta": 0.0062725858902757834,
+    "p": 0.26847315268473154,
+    "lo": -0.003653923320171016,
+    "hi": 0.017670850322609316
+   },
+   "d_bowf1": {
+    "n": 48,
+    "delta": -0.002025324468140497,
+    "p": 0.6853314668533147,
+    "lo": -0.010939491164654003,
+    "hi": 0.007787013872049826
+   },
+   "gemini_minus_reader": {
+    "n": 48,
+    "delta": -0.012440174678451703,
+    "p": 0.0800919908009199,
+    "lo": -0.026907633306339464,
+    "hi": -9.987901349315284e-06
+   }
+  },
+  {
+   "reader": "qwen3.6-27b",
+   "variant": "aug-ReflectedLight",
+   "n": 48,
+   "baseline": "raw",
+   "nes": 0.856387177484145,
+   "nes_baseline": 0.9564817656248964,
+   "d_nes": {
+    "n": 48,
+    "delta": -0.10009458814075138,
+    "p": 9.999000099990002e-05,
+    "lo": -0.14768336227385379,
+    "hi": -0.06377937740729141
+   },
+   "d_bowf1": {
+    "n": 48,
+    "delta": -0.07387644170532483,
+    "p": 9.999000099990002e-05,
+    "lo": -0.11860919475260001,
+    "hi": -0.04329629250134798
+   },
+   "gemini_minus_reader": {
+    "n": 48,
+    "delta": 0.010732256175070455,
+    "p": 0.833916608339166,
+    "lo": -0.016690964908041034,
+    "hi": 0.05232883393647838
+   }
+  },
+  {
+   "reader": "lightonocr3-4b",
+   "variant": "aug-ReflectedLight",
+   "n": 48,
+   "baseline": "raw",
+   "nes": 0.7951586098435265,
+   "nes_baseline": 0.8963126898444632,
+   "d_nes": {
+    "n": 48,
+    "delta": -0.10115408000093673,
+    "p": 9.999000099990002e-05,
+    "lo": -0.15253833354303045,
+    "hi": -0.06202371085290662
+   },
+   "d_bowf1": {
+    "n": 48,
+    "delta": -0.0754242999917359,
+    "p": 9.999000099990002e-05,
+    "lo": -0.12122335634875565,
+    "hi": -0.042098456541044486
+   },
+   "gemini_minus_reader": {
+    "n": 48,
+    "delta": 0.011791748035255822,
+    "p": 0.7045295470452955,
+    "lo": -0.020613744562967214,
+    "hi": 0.05622874564727986
+   }
+  },
+  {
+   "reader": "vision",
+   "variant": "aug-ReflectedLight",
+   "n": 48,
+   "baseline": "resave-q92",
+   "nes": 0.7291620120146112,
+   "nes_baseline": 0.8046493763163941,
+   "d_nes": {
+    "n": 48,
+    "delta": -0.07548736430178307,
+    "p": 9.999000099990002e-05,
+    "lo": -0.10400697120637814,
+    "hi": -0.04842640678976368
+   },
+   "d_bowf1": {
+    "n": 48,
+    "delta": -0.06722797609125779,
+    "p": 9.999000099990002e-05,
+    "lo": -0.08739856166051936,
+    "hi": -0.048872705830605705
+   },
+   "gemini_minus_reader": {
+    "n": 48,
+    "delta": -0.01387496766389784,
+    "p": 0.23007699230076992,
+    "lo": -0.03583700098254753,
+    "hi": 0.007593167724884167
+   }
+  },
+  {
+   "reader": "qwen3.6-27b",
+   "variant": "aug-LowLightNoise",
+   "n": 48,
+   "baseline": "raw",
+   "nes": 0.9591699117613718,
+   "nes_baseline": 0.9564817656248964,
+   "d_nes": {
+    "n": 48,
+    "delta": 0.0026881461364753867,
+    "p": 0.65003499650035,
+    "lo": -0.0055583973832313656,
+    "hi": 0.01413945557579721
+   },
+   "d_bowf1": {
+    "n": 48,
+    "delta": 0.0008067240863470262,
+    "p": 0.8947105289471053,
+    "lo": -0.002990294142510649,
+    "hi": 0.006428477508277741
+   },
+   "gemini_minus_reader": {
+    "n": 48,
+    "delta": -0.004318161079740483,
+    "p": 0.48025197480251974,
+    "lo": -0.015995635947659386,
+    "hi": 0.004661949334755622
+   }
+  },
+  {
+   "reader": "lightonocr3-4b",
+   "variant": "aug-LowLightNoise",
+   "n": 48,
+   "baseline": "raw",
+   "nes": 0.9083260029646691,
+   "nes_baseline": 0.8963126898444632,
+   "d_nes": {
+    "n": 48,
+    "delta": 0.012013313120205928,
+    "p": 0.49605039496050396,
+    "lo": -0.0024910461802130288,
+    "hi": 0.03780929644198962
+   },
+   "d_bowf1": {
+    "n": 48,
+    "delta": 0.008757989879379735,
+    "p": 0.48465153484651535,
+    "lo": -0.002294756036031296,
+    "hi": 0.027780607683523972
+   },
+   "gemini_minus_reader": {
+    "n": 48,
+    "delta": -0.013643328063471025,
+    "p": 0.3144685531446855,
+    "lo": -0.0409395962024222,
+    "hi": 0.0029123021581382905
+   }
+  },
+  {
+   "reader": "vision",
+   "variant": "aug-LowLightNoise",
+   "n": 48,
+   "baseline": "resave-q92",
+   "nes": 0.7778446339932977,
+   "nes_baseline": 0.8046493763163941,
+   "d_nes": {
+    "n": 48,
+    "delta": -0.02680474232309646,
+    "p": 0.06679332066793321,
+    "lo": -0.05633731042193794,
+    "hi": -0.0004992523771668057
+   },
+   "d_bowf1": {
+    "n": 48,
+    "delta": -0.040376564922244854,
+    "p": 9.999000099990002e-05,
+    "lo": -0.061751497262848405,
+    "hi": -0.022157064482550604
+   },
+   "gemini_minus_reader": {
+    "n": 48,
+    "delta": 0.025174727379831358,
+    "p": 0.0984901509849015,
+    "lo": -0.0025129413096428833,
+    "hi": 0.055705757416846656
+   }
+  },
+  {
+   "reader": "qwen3.6-27b",
+   "variant": "motion-31",
+   "n": 48,
+   "baseline": "raw",
+   "nes": 0.5142645007929373,
+   "nes_baseline": 0.9564817656248964,
+   "d_nes": {
+    "n": 48,
+    "delta": -0.44221726483195906,
+    "p": 9.999000099990002e-05,
+    "lo": -0.5444643707978766,
+    "hi": -0.34388819152271277
+   },
+   "d_bowf1": {
+    "n": 48,
+    "delta": -0.4749624831166995,
+    "p": 9.999000099990002e-05,
+    "lo": -0.5731421143765656,
+    "hi": -0.3800086505570865
+   },
+   "gemini_minus_reader": {
+    "n": 48,
+    "delta": -0.08924486914282664,
+    "p": 0.1146885311468853,
+    "lo": -0.19737844118196268,
+    "hi": 0.015202183800123649
+   }
+  },
+  {
+   "reader": "lightonocr3-4b",
+   "variant": "motion-31",
+   "n": 48,
+   "baseline": "raw",
+   "nes": 0.21418542465062554,
+   "nes_baseline": 0.8963126898444632,
+   "d_nes": {
+    "n": 48,
+    "delta": -0.6821272651938376,
+    "p": 9.999000099990002e-05,
+    "lo": -0.7783230819280861,
+    "hi": -0.5792335937515902
+   },
+   "d_bowf1": {
+    "n": 48,
+    "delta": -0.6996343320675079,
+    "p": 9.999000099990002e-05,
+    "lo": -0.7949165939045325,
+    "hi": -0.5976187587274905
+   },
+   "gemini_minus_reader": {
+    "n": 48,
+    "delta": 0.15066513121905198,
+    "p": 0.021597840215978402,
+    "lo": 0.030926346373326714,
+    "hi": 0.2695599648101114
+   }
+  },
+  {
+   "reader": "vision",
+   "variant": "motion-31",
+   "n": 48,
+   "baseline": "resave-q92",
+   "nes": 0.08095105235716406,
+   "nes_baseline": 0.8046493763163941,
+   "d_nes": {
+    "n": 48,
+    "delta": -0.7236983239592302,
+    "p": 9.999000099990002e-05,
+    "lo": -0.7969541396314478,
+    "hi": -0.643948950762384
+   },
+   "d_bowf1": {
+    "n": 48,
+    "delta": -0.8146645347255528,
+    "p": 9.999000099990002e-05,
+    "lo": -0.8777380204421861,
+    "hi": -0.7439620308773781
+   },
+   "gemini_minus_reader": {
+    "n": 48,
+    "delta": 0.19223618998444444,
+    "p": 0.0057994200579942,
+    "lo": 0.0678931290528093,
+    "hi": 0.3173946313956056
+   }
+  },
+  {
+   "reader": "qwen3.6-27b",
+   "variant": "defocus-5",
+   "n": 48,
+   "baseline": "raw",
+   "nes": 0.7897562224482625,
+   "nes_baseline": 0.9564817656248964,
+   "d_nes": {
+    "n": 48,
+    "delta": -0.166725543176634,
+    "p": 9.999000099990002e-05,
+    "lo": -0.2484838772745472,
+    "hi": -0.09702030233151682
+   },
+   "d_bowf1": {
+    "n": 48,
+    "delta": -0.17023291566896648,
+    "p": 9.999000099990002e-05,
+    "lo": -0.24916718942630414,
+    "hi": -0.10396653221625667
+   },
+   "gemini_minus_reader": {
+    "n": 48,
+    "delta": 0.10471528175347673,
+    "p": 0.0020997900209979003,
+    "lo": 0.04015257397097324,
+    "hi": 0.17938401755583863
+   }
+  },
+  {
+   "reader": "lightonocr3-4b",
+   "variant": "defocus-5",
+   "n": 48,
+   "baseline": "raw",
+   "nes": 0.7543869389651637,
+   "nes_baseline": 0.8963126898444632,
+   "d_nes": {
+    "n": 48,
+    "delta": -0.14192575087929946,
+    "p": 9.999000099990002e-05,
+    "lo": -0.22121007794259162,
+    "hi": -0.07389466074686164
+   },
+   "d_bowf1": {
+    "n": 48,
+    "delta": -0.14066431455025014,
+    "p": 9.999000099990002e-05,
+    "lo": -0.2181257003448095,
+    "hi": -0.07760786166015392
+   },
+   "gemini_minus_reader": {
+    "n": 48,
+    "delta": 0.0799154894561422,
+    "p": 0.018698130186981302,
+    "lo": 0.01873577024259685,
+    "hi": 0.150278917578996
+   }
+  },
+  {
+   "reader": "vision",
+   "variant": "defocus-5",
+   "n": 48,
+   "baseline": "resave-q92",
+   "nes": 0.22185668619092205,
+   "nes_baseline": 0.8046493763163941,
+   "d_nes": {
+    "n": 48,
+    "delta": -0.5827926901254722,
+    "p": 9.999000099990002e-05,
+    "lo": -0.6784087551813286,
+    "hi": -0.4840939815520687
+   },
+   "d_bowf1": {
+    "n": 48,
+    "delta": -0.6517811895534641,
+    "p": 9.999000099990002e-05,
+    "lo": -0.7383931877954367,
+    "hi": -0.5608282352592571
+   },
+   "gemini_minus_reader": {
+    "n": 48,
+    "delta": 0.520782428702315,
+    "p": 9.999000099990002e-05,
+    "lo": 0.4164872252254135,
+    "hi": 0.620896946970416
+   }
+  },
+  {
+   "reader": "qwen3.6-27b",
+   "variant": "tilt-20",
+   "n": 48,
+   "baseline": "raw",
+   "nes": 0.9560178076159006,
+   "nes_baseline": 0.9564817656248964,
+   "d_nes": {
+    "n": 48,
+    "delta": -0.0004639580089956889,
+    "p": 0.8367163283671633,
+    "lo": -0.004897459307577154,
+    "hi": 0.004564729931312871
+   },
+   "d_bowf1": {
+    "n": 48,
+    "delta": 0.0018680784471826726,
+    "p": 0.6006399360063993,
+    "lo": -0.0025692502347581018,
+    "hi": 0.00786516647199728
+   },
+   "gemini_minus_reader": {
+    "n": 48,
+    "delta": -0.0007182784305861065,
+    "p": 0.7747225277472253,
+    "lo": -0.0046862136931441435,
+    "hi": 0.004013297842388959
+   }
+  },
+  {
+   "reader": "lightonocr3-4b",
+   "variant": "tilt-20",
+   "n": 48,
+   "baseline": "raw",
+   "nes": 0.9007842307489332,
+   "nes_baseline": 0.8963126898444632,
+   "d_nes": {
+    "n": 48,
+    "delta": 0.004471540904470039,
+    "p": 0.12148785121487851,
+    "lo": -0.0002626220748235518,
+    "hi": 0.0103931848300101
+   },
+   "d_bowf1": {
+    "n": 48,
+    "delta": 0.001147439678171917,
+    "p": 0.4697530246975302,
+    "lo": -0.0017172494516959208,
+    "hi": 0.004302576131525101
+   },
+   "gemini_minus_reader": {
+    "n": 48,
+    "delta": -0.005653777344051834,
+    "p": 0.1396860313968603,
+    "lo": -0.013246420462438816,
+    "hi": 0.0009457801422668698
+   }
+  },
+  {
+   "reader": "vision",
+   "variant": "tilt-20",
+   "n": 48,
+   "baseline": "resave-q92",
+   "nes": 0.7957517441922649,
+   "nes_baseline": 0.8046493763163941,
+   "d_nes": {
+    "n": 48,
+    "delta": -0.008897632124129203,
+    "p": 0.5781421857814218,
+    "lo": -0.033291279905246156,
+    "hi": 0.008127077949635143
+   },
+   "d_bowf1": {
+    "n": 48,
+    "delta": -0.003731926296208741,
+    "p": 0.42545745425457454,
+    "lo": -0.011640312879760724,
+    "hi": 0.005370164607074189
+   },
+   "gemini_minus_reader": {
+    "n": 48,
+    "delta": 0.007715395684547407,
+    "p": 0.6327367263273672,
+    "lo": -0.00956035807808441,
+    "hi": 0.031796773514022825
+   }
+  },
+  {
+   "reader": "qwen3.6-27b",
+   "variant": "jpeg-60",
+   "n": 48,
+   "baseline": "raw",
+   "nes": 0.9565069546440567,
+   "nes_baseline": 0.9564817656248964,
+   "d_nes": {
+    "n": 48,
+    "delta": 2.5189019160281694e-05,
+    "p": 0.964003599640036,
+    "lo": -0.00104122790942094,
+    "hi": 0.0012460182696705836
+   },
+   "d_bowf1": {
+    "n": 48,
+    "delta": -0.0005332142512369659,
+    "p": 0.41305869413058693,
+    "lo": -0.0017334541885913324,
+    "hi": 0.0006236165217767403
+   },
+   "gemini_minus_reader": {
+    "n": 48,
+    "delta": -0.006813791964919551,
+    "p": 0.11998800119988001,
+    "lo": -0.016041278879230306,
+    "hi": 0.00046908333130108587
+   }
+  },
+  {
+   "reader": "lightonocr3-4b",
+   "variant": "jpeg-60",
+   "n": 48,
+   "baseline": "raw",
+   "nes": 0.8971555414276869,
+   "nes_baseline": 0.8963126898444632,
+   "d_nes": {
+    "n": 48,
+    "delta": 0.0008428515832236971,
+    "p": 0.5549445055494451,
+    "lo": -0.0014233553437333717,
+    "hi": 0.0035469598034913105
+   },
+   "d_bowf1": {
+    "n": 48,
+    "delta": 0.0007672680515076087,
+    "p": 0.6523347665233477,
+    "lo": -0.002271948428746281,
+    "hi": 0.003819082244645259
+   },
+   "gemini_minus_reader": {
+    "n": 48,
+    "delta": -0.007631454528982967,
+    "p": 0.07779222077792221,
+    "lo": -0.016726336976815564,
+    "hi": -0.00016849243578136858
+   }
+  },
+  {
+   "reader": "vision",
+   "variant": "jpeg-60",
+   "n": 48,
+   "baseline": "resave-q92",
+   "nes": 0.7905297588117347,
+   "nes_baseline": 0.8046493763163941,
+   "d_nes": {
+    "n": 48,
+    "delta": -0.014119617504659392,
+    "p": 0.044195580441955803,
+    "lo": -0.028185583697849237,
+    "hi": -0.001611147511064959
+   },
+   "d_bowf1": {
+    "n": 48,
+    "delta": -0.01032699114690523,
+    "p": 0.017298270172982702,
+    "lo": -0.019380436143211555,
+    "hi": -0.0024942634443781246
+   },
+   "gemini_minus_reader": {
+    "n": 48,
+    "delta": 0.007331014558900122,
+    "p": 0.36606339366063395,
+    "lo": -0.007588961635103288,
+    "hi": 0.023496661042176487
+   }
+  },
+  {
+   "reader": "qwen3.6-27b",
+   "variant": "motion-17",
+   "n": 48,
+   "baseline": "raw",
+   "nes": 0.8527476489725956,
+   "nes_baseline": 0.9564817656248964,
+   "d_nes": {
+    "n": 48,
+    "delta": -0.1037341166523008,
+    "p": 9.999000099990002e-05,
+    "lo": -0.16291010230217653,
+    "hi": -0.05595972933792528
+   },
+   "d_bowf1": {
+    "n": 48,
+    "delta": -0.10186155612492082,
+    "p": 9.999000099990002e-05,
+    "lo": -0.16263245536708978,
+    "hi": -0.055866649422993596
+   },
+   "gemini_minus_reader": {
+    "n": 48,
+    "delta": -0.058603589573392366,
+    "p": 0.27177282271772824,
+    "lo": -0.16400681968810904,
+    "hi": 0.0407302031504994
+   }
+  },
+  {
+   "reader": "lightonocr3-4b",
+   "variant": "motion-17",
+   "n": 48,
+   "baseline": "raw",
+   "nes": 0.7796735299518005,
+   "nes_baseline": 0.8963126898444632,
+   "d_nes": {
+    "n": 48,
+    "delta": -0.11663915989266264,
+    "p": 9.999000099990002e-05,
+    "lo": -0.18856313231161573,
+    "hi": -0.061204408231153744
+   },
+   "d_bowf1": {
+    "n": 48,
+    "delta": -0.1194246571762058,
+    "p": 9.999000099990002e-05,
+    "lo": -0.18797582471704974,
+    "hi": -0.06586208667354325
+   },
+   "gemini_minus_reader": {
+    "n": 48,
+    "delta": -0.0456985463330305,
+    "p": 0.44295570442955706,
+    "lo": -0.16219067520177258,
+    "hi": 0.06711642357009723
+   }
+  },
+  {
+   "reader": "vision",
+   "variant": "motion-17",
+   "n": 48,
+   "baseline": "resave-q92",
+   "nes": 0.42926070398072835,
+   "nes_baseline": 0.8046493763163941,
+   "d_nes": {
+    "n": 48,
+    "delta": -0.37538867233566586,
+    "p": 9.999000099990002e-05,
+    "lo": -0.4611992990772435,
+    "hi": -0.2934862309826262
+   },
+   "d_bowf1": {
+    "n": 48,
+    "delta": -0.5501702346667994,
+    "p": 9.999000099990002e-05,
+    "lo": -0.6328647789544216,
+    "hi": -0.4660929136418965
+   },
+   "gemini_minus_reader": {
+    "n": 48,
+    "delta": 0.21305096610997273,
+    "p": 0.00019998000199980003,
+    "lo": 0.11731424308576717,
+    "hi": 0.3080086634126142
+   }
+  },
+  {
+   "reader": "qwen3.6-27b",
+   "variant": "defocus-3",
+   "n": 48,
+   "baseline": "raw",
+   "nes": 0.9338624877050247,
+   "nes_baseline": 0.9564817656248964,
+   "d_nes": {
+    "n": 48,
+    "delta": -0.022619277919871773,
+    "p": 0.00029997000299970003,
+    "lo": -0.05192202601835416,
+    "hi": -0.005832195699734273
+   },
+   "d_bowf1": {
+    "n": 48,
+    "delta": -0.026023848952427934,
+    "p": 9.999000099990002e-05,
+    "lo": -0.06129524610836514,
+    "hi": -0.006298887134340024
+   },
+   "gemini_minus_reader": {
+    "n": 48,
+    "delta": 0.013102961588073045,
+    "p": 0.5458454154584541,
+    "lo": -0.0060469380176484564,
+    "hi": 0.04420708920218664
+   }
+  },
+  {
+   "reader": "lightonocr3-4b",
+   "variant": "defocus-3",
+   "n": 48,
+   "baseline": "raw",
+   "nes": 0.8829916642282726,
+   "nes_baseline": 0.8963126898444632,
+   "d_nes": {
+    "n": 48,
+    "delta": -0.013321025616190635,
+    "p": 0.0053994600539946005,
+    "lo": -0.02822172849981865,
+    "hi": -0.002685155538723246
+   },
+   "d_bowf1": {
+    "n": 48,
+    "delta": -0.009469975361186241,
+    "p": 0.16528347165283472,
+    "lo": -0.022591628685675203,
+    "hi": 0.002708874418959639
+   },
+   "gemini_minus_reader": {
+    "n": 48,
+    "delta": 0.0038047092843919044,
+    "p": 0.5887411258874112,
+    "lo": -0.008676937359783242,
+    "hi": 0.017097574823805257
+   }
+  },
+  {
+   "reader": "vision",
+   "variant": "defocus-3",
+   "n": 48,
+   "baseline": "resave-q92",
+   "nes": 0.6403681529887765,
+   "nes_baseline": 0.8046493763163941,
+   "d_nes": {
+    "n": 48,
+    "delta": -0.16428122332761766,
+    "p": 9.999000099990002e-05,
+    "lo": -0.2496319408294456,
+    "hi": -0.09165347640681361
+   },
+   "d_bowf1": {
+    "n": 48,
+    "delta": -0.20005567793281817,
+    "p": 9.999000099990002e-05,
+    "lo": -0.27856719638895805,
+    "hi": -0.13195580828487327
+   },
+   "gemini_minus_reader": {
+    "n": 48,
+    "delta": 0.15476490699581893,
+    "p": 9.999000099990002e-05,
+    "lo": 0.0815802551624888,
+    "hi": 0.24079434527560153
+   }
   }
  ],
  "signals": [

@@ -36,27 +36,37 @@ Separately it judged the capture of those 528 images (the verdict section, at th
   only 0.2 to 0.5, so most of that is line order. Apple's quad correction of the tilted image recovers nothing
   measurable (tilt 12: -0.7 against -1.2; tilt 20: -1.7 against -1.4; both intervals overlap). The open readers lose
   at most 0.6 on any tilt, so there is nothing for a dewarp arm to recover for them, and none was run.
-- **Re-saving alone moves Vision.** Vision's reading of the raw file scores 1.5 bowF1 points below its reading of the
-  same image re-saved at JPEG 92 (-2.4 to -0.6); its NES is 1.6 lower (-3.9 to +0.4, so NES alone does not clear 0), 4.6 on
-  the 33 PDF images (-10.6 to -0.1). Vision is deterministic, so this is its sensitivity to small pixel changes, and
-  its defect rows are paired against the re-saved image for that reason. The Sherlock readers' JPEG 85
-  rows are 0.3 and 0.1 from raw.
+- **Vision's two baselines differ by the macOS update, not the re-save.** Vision's raw-file row was read on macOS
+  26.6 (2026-10-22), its re-save and defect rows on 27.2 (2026-11-03). The raw row scores 1.5 bowF1 points below the
+  re-save (-2.4 to -0.6; NES 1.6, -3.9 to +0.4; 4.6 on the 33 PDF images), and W46.vision-27-reread measured why: the
+  update alone, on the raw file, moves bowF1 +1.2 (+0.3 to +2.1); the re-encode alone, both read on 27.2, +0.3 (-0.3
+  to +0.9; NES -0.0, -0.6 to +0.5). Vision's defect rows are paired against the re-save, read on the same OS in the
+  same run, so its Δs stand. The Sherlock readers' JPEG 85 rows are 0.3 and 0.1 from raw.
 - **Capture-time signals are weak on their own.** Sharpness inside Vision's word boxes (Laplacian variance, Tenengrad)
   and the share of the image inside word boxes reach AUC 0.70 to 0.78 against a 5-point loss; the clipped-highlight
   share does not detect the glare defect (0.50 to 0.53) and luminance is inverted (glare brightens). The best cuts
   differ threefold between readers and are in-sample: a live blur warning could start from sharpness in word boxes,
   but its threshold needs real captures.
-- **Gemini 3.7 Flash through the gateway (48 of the 96) forgives defocus best and motion less well than the open
-  readers.** On the same 48 pages, each reader paired against its own plain image: defocus sigma 5 costs Gemini 6.2
-  NES points (-11.2 to -2.7), the 27B 16.7, LightOn 14.2 and Vision 58.3; sigma 3 costs it 1.0. Motion 17 px costs it
-  16.2 (-26.1 to -7.7), against the 27B's 10.4, LightOn's 11.7 and Vision's 37.5; motion 31 px 53.1, between the 27B
-  (44.2) and the other two (68 to 72). Glare costs it 8.9, the others 7.5 to 10.1. Low light, tilt, JPEG 60 and the
-  two faint Augraphy defects cost it under 1 point. It never looped or returned a blank.
-- **Gemini's own capture verdict ranks the damaging images better than any capture-time signal, but its retake
-  advice over-calls blur.** Its 1-5 quality score, asked apart from any reading, separates a 5-point loss at AUC 0.81
-  to 0.90 across the four readers, where sharpness in the word boxes reaches 0.61 to 0.77 and the word-box share 0.72
-  to 0.78 on the same 480 images. Its "retake" catches 90 to 96% of the losses with false alarms on 30 to 46% of the
-  rest: it asks for a retake on 96% of the defocus-3 images, which cost Gemini and the open readers 1 to 2 points. It
+- **Gemini 3.7 Flash through the gateway (48 of the 96) forgives defocus best and loses to motion about as the open
+  readers do.** On the same 48 pages, each reader against its own plain image, and Gemini's Δ minus each reader's
+  paired by page (the table beside the other readers): defocus sigma 5 costs Gemini 6.2 NES points (-11.2 to -2.7),
+  the 27B 16.7, LightOn 14.2 and Vision 58.3, so Gemini loses 10.5 less than the 27B (+4.0 to +17.9) and 8.0 less than
+  LightOn (+1.9 to +15.0); sigma 3 costs it 1.0. Motion 17 px costs it 16.2 (-26.1 to -7.7) against the 27B's 10.4 and
+  LightOn's 11.7, but paired by page those gaps hold zero (-5.9, -16.4 to +4.1; -4.6, -16.2 to +6.7): a tie. Vision
+  loses 37.5. Motion 31 px costs it 53.1, a tie with the 27B's 44.2 (-8.9, -19.7 to +1.5) and less than LightOn's 68.2
+  (+15.1, +3.1 to +27.0) and Vision's 72.4. Glare costs it 8.9, the others 7.5 to 10.1, ties. Low light, tilt, JPEG 60
+  and the two faint Augraphy defects cost it under 1 point. It never looped or returned a blank.
+- **Gemini's own capture verdict tells the damaging defect kinds from the harmless ones on this synthetic pool, and
+  ranks pages within one defect only modestly; its retake advice over-calls blur for every reader but Vision.** Its 1-5
+  quality score, asked apart from any reading, separates a 5-point loss at AUC 0.81 to 0.90 across the four readers on
+  the 480 defect images, where sharpness in the word boxes reaches 0.61 to 0.77 and the word-box share 0.72 to 0.78.
+  That is a separation of defect kinds: a page-blind score giving each image its setting's mean verdict reaches 0.86 /
+  0.90 / 0.91 / 0.83 (the 27B, LightOn, Vision, Gemini) against the verdict's 0.85 / 0.88 / 0.90 / 0.81, and the mix of
+  kinds is the design's (ten settings chosen in advance, 480 defect images against 48 plain). Within one defect the
+  verdict ranks pages at AUC 0.50 to 0.80 (0.50 at motion 31, where every image scored quality 1). Its "retake" catches
+  90 to 96% of the losses with false alarms on 30 to 46% of the rest: it asks for a retake on 96% of the defocus-3
+  images, which cost Gemini 1.0, LightOn 1.3 and the 27B 2.3 but Vision 16.4, so for Vision those retakes are
+  justified. It
   names blur on every motion and heavy-defocus image but confuses the two kinds (motion 31 px: out_of_focus 45 times,
   motion_blur 43), names glare on 73% of the reflected-light images and tilt on 52%, and asks to retake 8% of the
   plain photographs. The verdicts cost $0.80 for 528 images, about $0.0015 each.
@@ -231,6 +241,23 @@ sigma 5 costs Vision 58.3 NES points, Gemini 3.7 Flash 6.2 and the open readers 
 | motion-17 | -11.3 (-21.9 to -2.8) [31] | -25.2 (-45.1 to -8.5) [17] | -13.3 (-26.0 to -3.0) [25] | -25.2 (-46.1 to -7.1) [14] | -13.6 (-33.8 to +0.0) [8] |
 | defocus-3 | -1.1 (-2.3 to -0.3) [31] | -0.7 (-1.7 to -0.1) [17] | -0.6 (-1.3 to -0.2) [25] | -1.0 (-2.3 to -0.1) [14] | -2.3 (-5.9 to -0.0) [8] |
 
+## Gemini 3.7 Flash (gateway, 48 pages) beside the other readers, on its 48 pages
+
+Each reader's Δ NES strict against its own plain image on exactly these pages, and Gemini's Δ minus that reader's, paired by page (negative: Gemini lost more). The within-reader Δs are what is set side by side; the readers' levels are not (the card, Truth).
+
+| defect | Gemini Δ | Qwen3.6-27B Δ | Gemini minus Qwen3.6-27B | LightOnOCR-3 4B Δ | Gemini minus LightOnOCR-3 4B | Apple Vision Δ | Gemini minus Apple Vision |
+|---|---|---|---|---|---|---|---|
+| aug-ShadowCast | -0.2 (-0.6 to +0.1) | -0.1 (-0.4 to +0.0) | -0.1 (-0.5 to +0.3) | +0.3 (-0.1 to +0.9) | -0.5 (-1.2 to +0.1) | +0.0 (-0.8 to +0.8) | -0.2 (-1.3 to +0.8) |
+| aug-LightingGradient | -0.6 (-1.6 to +0.0) | -0.4 (-1.4 to +0.5) | -0.2 (-0.9 to +0.4) | +0.3 (-0.1 to +0.8) | -0.9 (-2.0 to -0.1) | +0.6 (-0.4 to +1.8) | -1.2 (-2.7 to -0.0) |
+| aug-ReflectedLight | -8.9 (-11.6 to -6.4) | -10.0 (-14.8 to -6.4) | +1.1 (-1.7 to +5.2) | -10.1 (-15.3 to -6.2) | +1.2 (-2.1 to +5.6) | -7.5 (-10.4 to -4.8) | -1.4 (-3.6 to +0.8) |
+| aug-LowLightNoise | -0.2 (-0.7 to +0.4) | +0.3 (-0.6 to +1.4) | -0.4 (-1.6 to +0.5) | +1.2 (-0.2 to +3.8) | -1.4 (-4.1 to +0.3) | -2.7 (-5.6 to -0.0) | +2.5 (-0.3 to +5.6) |
+| motion-31 | -53.1 (-64.8 to -41.9) | -44.2 (-54.4 to -34.4) | -8.9 (-19.7 to +1.5) | -68.2 (-77.8 to -57.9) | +15.1 (+3.1 to +27.0) | -72.4 (-79.7 to -64.4) | +19.2 (+6.8 to +31.7) |
+| defocus-5 | -6.2 (-11.2 to -2.7) | -16.7 (-24.8 to -9.7) | +10.5 (+4.0 to +17.9) | -14.2 (-22.1 to -7.4) | +8.0 (+1.9 to +15.0) | -58.3 (-67.8 to -48.4) | +52.1 (+41.6 to +62.1) |
+| tilt-20 | -0.1 (-0.5 to +0.3) | -0.0 (-0.5 to +0.5) | -0.1 (-0.5 to +0.4) | +0.4 (-0.0 to +1.0) | -0.6 (-1.3 to +0.1) | -0.9 (-3.3 to +0.8) | +0.8 (-1.0 to +3.2) |
+| jpeg-60 | -0.7 (-1.6 to +0.0) | +0.0 (-0.1 to +0.1) | -0.7 (-1.6 to +0.0) | +0.1 (-0.1 to +0.4) | -0.8 (-1.7 to -0.0) | -1.4 (-2.8 to -0.2) | +0.7 (-0.8 to +2.3) |
+| motion-17 | -16.2 (-26.1 to -7.7) | -10.4 (-16.3 to -5.6) | -5.9 (-16.4 to +4.1) | -11.7 (-18.9 to -6.1) | -4.6 (-16.2 to +6.7) | -37.5 (-46.1 to -29.3) | +21.3 (+11.7 to +30.8) |
+| defocus-3 | -1.0 (-1.8 to -0.3) | -2.3 (-5.2 to -0.6) | +1.3 (-0.6 to +4.4) | -1.3 (-2.8 to -0.3) | +0.4 (-0.9 to +1.7) | -16.4 (-25.0 to -9.2) | +15.5 (+8.2 to +24.1) |
+
 ## Capture-time signals against a loss of 5 NES points or more
 
 | signal | Qwen3.6-27B AUC | LightOnOCR-3 4B AUC | Apple Vision AUC | Qwen3.6-27B: cut (hit / false alarm) | LightOnOCR-3 4B: cut (hit / false alarm) | Apple Vision: cut (hit / false alarm) |
@@ -264,22 +291,25 @@ Gemini 3.7 Flash was asked, apart from any reading, to judge each image's captur
 
 Against each reader's loss of 5 NES points or more on the same 10 x 48 defect images (AUC 0.5 is no information; the signals' AUC is over these images only, so it differs from the table above):
 
-| reader | losses / images | verdict: 5 - quality AUC | retake: hit / false alarm | Laplacian variance AUC | word-box share AUC |
-|---|---:|---:|---|---:|---:|
-| Qwen3.6-27B | 124 / 480 | 0.85 | 94% / 42% | 0.68 | 0.76 |
-| LightOnOCR-3 4B | 111 / 480 | 0.88 | 96% / 43% | 0.68 | 0.78 |
-| Apple Vision | 204 / 480 | 0.90 | 90% / 30% | 0.77 | 0.76 |
-| Gemini 3.7 Flash (gateway, 48 pages) | 99 / 480 | 0.81 | 93% / 46% | 0.61 | 0.72 |
+| reader | losses / images | verdict: 5 - quality AUC | page-blind score AUC | within one defect AUC | retake: hit / false alarm | Laplacian variance AUC | word-box share AUC |
+|---|---:|---:|---:|---|---|---:|---:|
+| Qwen3.6-27B | 124 / 480 | 0.85 | 0.86 | 0.50 to 0.72 | 94% / 42% | 0.68 | 0.76 |
+| LightOnOCR-3 4B | 111 / 480 | 0.88 | 0.90 | 0.51 to 0.73 | 96% / 43% | 0.68 | 0.78 |
+| Apple Vision | 204 / 480 | 0.90 | 0.91 | 0.54 to 0.80 | 90% / 30% | 0.77 | 0.76 |
+| Gemini 3.7 Flash (gateway, 48 pages) | 99 / 480 | 0.81 | 0.83 | 0.50 to 0.77 | 93% / 46% | 0.61 | 0.72 |
+
+The page-blind score gives every image its setting's mean verdict, so it knows which defect the image was given and nothing about the page; within one defect is the verdict's AUC among one setting's 48 images, over the settings with at least 5 losses and 5 images without one (every setting's AUC and counts are in the JSON). The pool is the design's: ten defect settings chosen in advance, 480 defect images against 48 plain ones, so its mix of defect kinds, and with it the pooled AUC, is not what a phone would see.
 
 
 ## Measurement card
 
 - **Truth:** the 96's adjudicated truth (`ocr_truth`), the same for every image of a page. The figure is a change
   within one reader against one fixed truth, so a drafter bias in the truth moves the plain and the defect image alike
-  and largely cancels; it does not cancel in a comparison between readers, which this report does not rank on. The
-  owner's blind check found the typed-page truth fit for ranking (measurement audit, 2026-10-30). Gemini 3.8 Flash,
-  a relative of the scored Gemini 3.7 Flash, drafted that truth with Claude Opus 5.5, so Gemini's own level (97.1 on
-  its 48) is not compared with the other readers'; its Δ, like theirs, is within the reader.
+  and largely cancels. So the readers' levels are not compared with each other (least of all Gemini's, 97.1 on its
+  48: Gemini 3.8 Flash, a relative of the scored 3.7, drafted that truth with Claude Opus 5.5), while their
+  within-reader Δs are set side by side on the same pages, paired by page; for Gemini a relative's draft can only make
+  its own losses look larger. The owner's blind check found the typed-page truth fit for ranking (measurement audit,
+  2026-10-30).
 - **Selection:** all 96 scored pages, every defect; no page chosen by a reader's result or by ABBYY text. The optical
   capture tags are not used to slice (CAP-1, kappa 0.14-0.47 against a blind retag).
 - **Comparison:** the same pages, prompts, decoding and server arguments as each reader's baseline. One difference:

@@ -127,12 +127,13 @@ DEWARP_CLUSTER = CACHE / 'sherlock-results/dewarp-20261022'
 BIN = CACHE / 'segbench/bin/segbench-dewarp'
 TILT_ARMS = ('quad-tilt-12', 'quad-tilt-20')
 RESAVE = 'resave-q92'   # the raw image through make's save with no defect: Vision's baseline (see BASE)
-# Apple Vision moves on a re-encode alone (the quality-92 re-save against the raw file: bowF1 +1.5, +0.6 to +2.4;
-# NES +1.6, -0.4 to +3.9; +4.6 NES on the PDF images), so its defect rows are paired against the raw image re-saved
-# exactly as every defect image was; the
+# Apple Vision's raw row was read on macOS 26.6, its re-save and defect rows on 27.2, so its defect rows are paired
+# against the raw image re-saved exactly as every defect image was and read in the same run (the 1.5-point bowF1 gap
+# between the two baselines is the OS update: W46.vision-27-reread, the re-encode alone +0.3, -0.3 to +0.9); the
 # Sherlock readers' JPEG 85 rows are within 0.3 points of raw, so raw stays theirs (re-saving needs no new reading).
 BASE = {'qwen3.6-27b': 'raw', 'lightonocr3-4b': 'raw', 'vision': RESAVE, 'gemini3.7-flash-gw': 'raw'}
 LOSS = 0.05                                               # a "loss": the page's NES falls 5 points or more
+WITHIN_MIN = 5   # a setting's own verdict AUC is quoted only with this many losses and this many images without one
 
 
 def scored_pages():
@@ -324,30 +325,46 @@ def verdict_tables(by, sig, ver, pages):
     L += ['', f'Against each reader\'s loss of {round(100 * LOSS)} NES points or more on the same '
           f'{len(GW.VARIANTS)} x {len(gp)} defect images (AUC 0.5 is no information; the signals\' AUC is over these '
           'images only, so it differs from the table above):', '',
-          '| reader | losses / images | verdict: 5 - quality AUC | retake: hit / false alarm | '
-          'Laplacian variance AUC | word-box share AUC |', '|---|---:|---:|---|---:|---:|']
+          '| reader | losses / images | verdict: 5 - quality AUC | page-blind score AUC | within one defect AUC | '
+          'retake: hit / false alarm | Laplacian variance AUC | word-box share AUC |',
+          '|---|---:|---:|---:|---|---|---:|---:|']
     auc_rows = []
     f2 = lambda x: '—' if x is None else f'{x:.2f}'
+    # The page-blind score: every image gets its setting's mean verdict, so it knows the defect and nothing of the page.
+    blind = {c: mean([5 - ver[c, p]['quality'] for p in gp if ver[c, p]]) for c in GW.VARIANTS}
     for r in readers:
-        pos, neg, rp, rn, lp, ln, tp, tn = [], [], [], [], [], [], [], []
+        pos, neg, rp, rn, lp, ln, tp, tn, bp, bn = [], [], [], [], [], [], [], [], [], []
+        within = {}
         for c in GW.VARIANTS:
+            wp, wn = [], []
             for p in gp:
                 v = ver[c, p]
                 if not v:
                     continue
                 loss = by[r, BASE[r], p]['nes'] - by[r, c, p]['nes'] >= LOSS
                 (pos if loss else neg).append(5 - v['quality'])
+                (wp if loss else wn).append(5 - v['quality'])
+                (bp if loss else bn).append(blind[c])
                 (rp if loss else rn).append(v['retake'])
                 (lp if loss else ln).append(-sig[c, p]['laplacian_var'])
                 (tp if loss else tn).append(-sig[c, p]['text_px'])
+            within[c] = {'auc': auc(wp, wn), 'losses': len(wp), 'images': len(wp) + len(wn)}
+        ws = [w['auc'] for w in within.values() if min(w['losses'], w['images'] - w['losses']) >= WITHIN_MIN]
         row = {'reader': r, 'losses': len(pos), 'images': len(pos) + len(neg), 'auc_quality': auc(pos, neg),
+               'auc_page_blind': auc(bp, bn), 'auc_within_defect': within,
                'retake_hit': mean(rp), 'retake_false_alarm': mean(rn),
                'auc_laplacian': auc(lp, ln), 'auc_text_px': auc(tp, tn)}
         auc_rows.append(row)
         L.append(f"| {labels[r]} | {row['losses']} / {row['images']} | {f2(row['auc_quality'])} | "
+                 f"{f2(row['auc_page_blind'])} | {f2(min(ws)) if ws else '—'} to {f2(max(ws)) if ws else '—'} | "
                  f"{pc(row['retake_hit'])}% / {pc(row['retake_false_alarm'])}% | {f2(row['auc_laplacian'])} | "
                  f"{f2(row['auc_text_px'])} |")
-    L.append('')
+    L += ['', 'The page-blind score gives every image its setting\'s mean verdict, so it knows which defect the image '
+          f'was given and nothing about the page; within one defect is the verdict\'s AUC among one setting\'s '
+          f'{len(gp)} images, over the settings with at least {WITHIN_MIN} losses and {WITHIN_MIN} images without one '
+          '(every setting\'s AUC and counts are in the JSON). The pool is the design\'s: ten defect settings chosen in '
+          f'advance, {len(GW.VARIANTS) * len(gp)} defect images against {len(gp)} plain ones, so its mix of defect '
+          'kinds, and with it the pooled AUC, is not what a phone would see.', '']
     return L, {'pages': len(gp), 'conditions': cond_rows, 'auc': auc_rows, 'note': VERDICT_NOTE,
                'labels': labels, 'billed': GW.billed(), 'prompt': GW.VERDICT_PROMPT}
 
@@ -440,14 +457,14 @@ VARIANT_NAMES = {
 # The measured findings, written once the results were read (2026-11-03); a rerun that moves them must rewrite them.
 PAGE_NOTE = ('Each of the 96 pages degraded by one synthetic defect at one setting and read again by the same reader, '
              'paired by page against that reader\'s plain image (Apple Vision against the plain image re-saved as '
-             'every defect image was, because a re-save alone moves Vision\'s bag-of-words F1 by 1.5 points). Glare, motion blur and heavy '
+             'every defect image was and read in the same run on macOS 27.2; its raw row is a 26.6 reading). Glare, motion blur and heavy '
              'defocus cost every reader; tilt up to 20 degrees, JPEG down to quality 60 and Augraphy\'s shadow and '
              'lighting gradient at their defaults cost none of them more than about 2 points. Apple Vision breaks '
              'first: 9 px of motion costs it 6.6 points and 17 px 38, where Qwen3.6-27B loses 1.0 and 7.9. '
              'LightOnOCR-3 4B answers heavy blur with an empty reply (43 of 96 at 31 px). Correcting the tilt with '
              'Apple\'s quad recovers nothing for Vision, because tilt cost it little. Gemini 3.7 Flash through the '
-             'gateway, on 48 of the pages at ten settings, loses 6.2 points to sigma-5 defocus and 16.2 to 17 px of '
-             'motion. A loop is a reading cut at the '
+             'gateway, on 48 of the pages at ten settings, loses 6.2 points to sigma-5 defocus, less than the open '
+             'readers (14 to 17), and 16.2 to 17 px of motion, a tie with them (10 to 12) when paired by page. A loop is a reading cut at the '
              'token cap or the 600 s limit; loops and blanks score 0. Synthetic defects, one at a time: real phone '
              'captures are not in this table. Detail: segbench-results/capture-ladder.md.')
 SIGNALS_NOTE = ('Signals a phone can measure at capture, from the image alone, against a loss of 5 NES points or more '
@@ -475,27 +492,37 @@ FINDINGS = """## Findings
   only 0.2 to 0.5, so most of that is line order. Apple's quad correction of the tilted image recovers nothing
   measurable (tilt 12: -0.7 against -1.2; tilt 20: -1.7 against -1.4; both intervals overlap). The open readers lose
   at most 0.6 on any tilt, so there is nothing for a dewarp arm to recover for them, and none was run.
-- **Re-saving alone moves Vision.** Vision's reading of the raw file scores 1.5 bowF1 points below its reading of the
-  same image re-saved at JPEG 92 (-2.4 to -0.6); its NES is 1.6 lower (-3.9 to +0.4, so NES alone does not clear 0), 4.6 on
-  the 33 PDF images (-10.6 to -0.1). Vision is deterministic, so this is its sensitivity to small pixel changes, and
-  its defect rows are paired against the re-saved image for that reason. The Sherlock readers' JPEG 85
-  rows are 0.3 and 0.1 from raw.
+- **Vision's two baselines differ by the macOS update, not the re-save.** Vision's raw-file row was read on macOS
+  26.6 (2026-10-22), its re-save and defect rows on 27.2 (2026-11-03). The raw row scores 1.5 bowF1 points below the
+  re-save (-2.4 to -0.6; NES 1.6, -3.9 to +0.4; 4.6 on the 33 PDF images), and W46.vision-27-reread measured why: the
+  update alone, on the raw file, moves bowF1 +1.2 (+0.3 to +2.1); the re-encode alone, both read on 27.2, +0.3 (-0.3
+  to +0.9; NES -0.0, -0.6 to +0.5). Vision's defect rows are paired against the re-save, read on the same OS in the
+  same run, so its Δs stand. The Sherlock readers' JPEG 85 rows are 0.3 and 0.1 from raw.
 - **Capture-time signals are weak on their own.** Sharpness inside Vision's word boxes (Laplacian variance, Tenengrad)
   and the share of the image inside word boxes reach AUC 0.70 to 0.78 against a 5-point loss; the clipped-highlight
   share does not detect the glare defect (0.50 to 0.53) and luminance is inverted (glare brightens). The best cuts
   differ threefold between readers and are in-sample: a live blur warning could start from sharpness in word boxes,
   but its threshold needs real captures.
-- **Gemini 3.7 Flash through the gateway (48 of the 96) forgives defocus best and motion less well than the open
-  readers.** On the same 48 pages, each reader paired against its own plain image: defocus sigma 5 costs Gemini 6.2
-  NES points (-11.2 to -2.7), the 27B 16.7, LightOn 14.2 and Vision 58.3; sigma 3 costs it 1.0. Motion 17 px costs it
-  16.2 (-26.1 to -7.7), against the 27B's 10.4, LightOn's 11.7 and Vision's 37.5; motion 31 px 53.1, between the 27B
-  (44.2) and the other two (68 to 72). Glare costs it 8.9, the others 7.5 to 10.1. Low light, tilt, JPEG 60 and the
-  two faint Augraphy defects cost it under 1 point. It never looped or returned a blank.
-- **Gemini's own capture verdict ranks the damaging images better than any capture-time signal, but its retake
-  advice over-calls blur.** Its 1-5 quality score, asked apart from any reading, separates a 5-point loss at AUC 0.81
-  to 0.90 across the four readers, where sharpness in the word boxes reaches 0.61 to 0.77 and the word-box share 0.72
-  to 0.78 on the same 480 images. Its "retake" catches 90 to 96% of the losses with false alarms on 30 to 46% of the
-  rest: it asks for a retake on 96% of the defocus-3 images, which cost Gemini and the open readers 1 to 2 points. It
+- **Gemini 3.7 Flash through the gateway (48 of the 96) forgives defocus best and loses to motion about as the open
+  readers do.** On the same 48 pages, each reader against its own plain image, and Gemini's Δ minus each reader's
+  paired by page (the table beside the other readers): defocus sigma 5 costs Gemini 6.2 NES points (-11.2 to -2.7),
+  the 27B 16.7, LightOn 14.2 and Vision 58.3, so Gemini loses 10.5 less than the 27B (+4.0 to +17.9) and 8.0 less than
+  LightOn (+1.9 to +15.0); sigma 3 costs it 1.0. Motion 17 px costs it 16.2 (-26.1 to -7.7) against the 27B's 10.4 and
+  LightOn's 11.7, but paired by page those gaps hold zero (-5.9, -16.4 to +4.1; -4.6, -16.2 to +6.7): a tie. Vision
+  loses 37.5. Motion 31 px costs it 53.1, a tie with the 27B's 44.2 (-8.9, -19.7 to +1.5) and less than LightOn's 68.2
+  (+15.1, +3.1 to +27.0) and Vision's 72.4. Glare costs it 8.9, the others 7.5 to 10.1, ties. Low light, tilt, JPEG 60
+  and the two faint Augraphy defects cost it under 1 point. It never looped or returned a blank.
+- **Gemini's own capture verdict tells the damaging defect kinds from the harmless ones on this synthetic pool, and
+  ranks pages within one defect only modestly; its retake advice over-calls blur for every reader but Vision.** Its 1-5
+  quality score, asked apart from any reading, separates a 5-point loss at AUC 0.81 to 0.90 across the four readers on
+  the 480 defect images, where sharpness in the word boxes reaches 0.61 to 0.77 and the word-box share 0.72 to 0.78.
+  That is a separation of defect kinds: a page-blind score giving each image its setting's mean verdict reaches 0.86 /
+  0.90 / 0.91 / 0.83 (the 27B, LightOn, Vision, Gemini) against the verdict's 0.85 / 0.88 / 0.90 / 0.81, and the mix of
+  kinds is the design's (ten settings chosen in advance, 480 defect images against 48 plain). Within one defect the
+  verdict ranks pages at AUC 0.50 to 0.80 (0.50 at motion 31, where every image scored quality 1). Its "retake" catches
+  90 to 96% of the losses with false alarms on 30 to 46% of the rest: it asks for a retake on 96% of the defocus-3
+  images, which cost Gemini 1.0, LightOn 1.3 and the 27B 2.3 but Vision 16.4, so for Vision those retakes are
+  justified. It
   names blur on every motion and heavy-defocus image but confuses the two kinds (motion 31 px: out_of_focus 45 times,
   motion_blur 43), names glare on 73% of the reflected-light images and tilt on 52%, and asks to retake 8% of the
   plain photographs. The verdicts cost $0.80 for 528 images, about $0.0015 each.
@@ -530,10 +557,11 @@ CARD = """
 
 - **Truth:** the 96's adjudicated truth (`ocr_truth`), the same for every image of a page. The figure is a change
   within one reader against one fixed truth, so a drafter bias in the truth moves the plain and the defect image alike
-  and largely cancels; it does not cancel in a comparison between readers, which this report does not rank on. The
-  owner's blind check found the typed-page truth fit for ranking (measurement audit, 2026-10-30). Gemini 3.8 Flash,
-  a relative of the scored Gemini 3.7 Flash, drafted that truth with Claude Opus 5.5, so Gemini's own level (97.1 on
-  its 48) is not compared with the other readers'; its Δ, like theirs, is within the reader.
+  and largely cancels. So the readers' levels are not compared with each other (least of all Gemini's, 97.1 on its
+  48: Gemini 3.8 Flash, a relative of the scored 3.7, drafted that truth with Claude Opus 5.5), while their
+  within-reader Δs are set side by side on the same pages, paired by page; for Gemini a relative's draft can only make
+  its own losses look larger. The owner's blind check found the typed-page truth fit for ranking (measurement audit,
+  2026-10-30).
 - **Selection:** all 96 scored pages, every defect; no page chosen by a reader's result or by ABBYY text. The optical
   capture tags are not used to slice (CAP-1, kappa 0.14-0.47 against a blind retag).
 - **Comparison:** the same pages, prompts, decoding and server arguments as each reader's baseline. One difference:
@@ -613,8 +641,35 @@ def cmd_report(a):
                 cells.append(f"{ci(d)} [{d['n']}]")
             L.append(f'| {v} | ' + ' | '.join(cells) + ' |')
         L.append('')
+    between = []
+    if GEMINI in readers:
+        gp = [p for p in GW.pages() if (GEMINI, 'raw', p) in by]
+        L += [f'## {GEMINI_LABEL} beside the other readers, on its {len(gp)} pages', '',
+              'Each reader\'s Δ NES strict against its own plain image on exactly these pages, and Gemini\'s Δ minus '
+              'that reader\'s, paired by page (negative: Gemini lost more). The within-reader Δs are what is set side '
+              'by side; the readers\' levels are not (the card, Truth).', '',
+              '| defect | Gemini Δ | ' + ' | '.join(f'{lab} Δ | Gemini minus {lab}' for lab in READERS.values()) + ' |',
+              '|---|---|' + '---|---|' * len(READERS)]
+        dg = lambda r, v: [by[r, v, p]['nes'] - by[r, BASE[r], p]['nes'] for p in gp]
+        for v in GW.VARIANTS:
+            g = dg(GEMINI, v)
+            dgm = S.paired(g, [0.] * len(g))
+            cells = []
+            for r in READERS:
+                o = dg(r, v)
+                d_own, d_gap = S.paired(o, [0.] * len(o)), S.paired(g, o)
+                rr = [by[r, v, p] for p in gp]
+                between.append({'reader': r, 'variant': v, 'n': len(gp), 'baseline': BASE[r],
+                                'nes': sum(x['nes'] for x in rr) / len(rr),
+                                'nes_baseline': sum(by[r, BASE[r], p]['nes'] for p in gp) / len(gp),
+                                'd_nes': d_own,
+                                'd_bowf1': S.paired([x['bowf1'] for x in rr], [by[r, BASE[r], p]['bowf1'] for p in gp]),
+                                'gemini_minus_reader': d_gap})
+                cells += [ci(d_own), ci(d_gap)]
+            L.append(f'| {v} | {ci(dgm)} | ' + ' | '.join(cells) + ' |')
+        L.append('')
     pages = all_pages
-    sig = {(s['variant'], s['page']): s for s in json.loads((WORK / 'signals.json').read_text())}
+    sig ={(s['variant'], s['page']): s for s in json.loads((WORK / 'signals.json').read_text())}
     L += ['## Capture-time signals against a loss of 5 NES points or more', '',
           '| signal | ' + ' | '.join(f'{lab} AUC' for lab in SIGNAL_READERS.values()) + ' | ' +
           ' | '.join(f'{lab}: cut (hit / false alarm)' for lab in SIGNAL_READERS.values()) + ' |',
@@ -653,7 +708,7 @@ def cmd_report(a):
     L += vt
     page = {'report': 'capture-ladder.md', 'loss': LOSS, 'readers': readers, 'verdict': vj, 'variants': VARIANT_NAMES,
             'signal_names': {k: v[0] for k, v in SIGNALS.items()}, 'note': PAGE_NOTE, 'signals_note': SIGNALS_NOTE,
-            'summary': summary, 'signals': sig_rows}
+            'summary': summary, 'summary_gemini_pages': between, 'signals': sig_rows}
     (res / 'capture-ladder.json').write_text(json.dumps(page, indent=1) + '\n')
     (WORK / 'tables.md').write_text('\n'.join(L) + '\n')
     (res / 'capture-ladder.md').write_text(REPORT_HEAD + FINDINGS + '\n' + '\n'.join(L) + '\n' + CARD)
