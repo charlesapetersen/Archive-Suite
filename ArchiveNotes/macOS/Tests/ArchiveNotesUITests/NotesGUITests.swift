@@ -2754,6 +2754,9 @@ final class NotesGUITests: NotesFixtureUITestCase {
         XCTAssertTrue(pollUntil(timeout: 10) { !noteWin.descendants(matching: .any)["an.detail.header"].exists },
                       "templates mode should have unmounted the note detail")
 
+        // The Note window now covers the Extracts window's jump button; front the Extracts window.
+        frontWindow(named: "Extracts")
+        XCTAssertTrue(pollUntil(timeout: 10) { isKey(extractWin) }, "the Extracts window should be fronted")
         XCTAssertTrue(clickStripButton("an.editor.test.jump", timeout: 10, in: extractWin),
                       "the jump seam must be drivable in the Extracts window")
         XCTAssertTrue(noteWin.descendants(matching: .any)["an.detail.header"].waitForExistence(timeout: 15),

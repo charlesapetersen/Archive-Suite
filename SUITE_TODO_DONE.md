@@ -14041,3 +14041,13 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   post-close writes, unverified write closing normally) were all fixed. R-46 stays fixed-pending-recheck. No migration
   written: there is no production ledger to migrate. Bench cache: not used.
   <!-- /W40.fix-reader-ledger-durability -->
+- [x] **W40.fix-notes-jump-pending-template — a jump-to-source waits while the Note window shows a template, and a folder-scope-hidden target gets no highlight [S · S3]** · §W40 — verification phase: prove the Suite works (lane: notes) (uses: build) — Owner, 2026-10-31: queued from a KNOWN_ISSUES entry that no queue item covered (survey of the three KNOWN_ISSUES files). `ArchiveNotes/KNOWN_ISSUES.md` §"Extracts jump-to-source + provenance chips — follow-ups (W7-S3)": with a template in the Note window's detail, a jump or link request for a note stays pending until a note pane mounts; after a jump, the list row is not highlighted when a shared folder scope excludes the note. Fix both (switch the detail to the note; clear or widen the scope, or say why it is hidden), with `NotePassageResolveTests` cases and a VM UITest for the template case. SHIPPED 2026-11-03.
+  Fix: templates mode mounts no `NoteEditorPane`, so `NotesBrowserView` now handles a pending open request itself while
+  `showingTemplates`: a target the window selects leaves templates mode one main-loop turn later (the mounted pane's
+  `onAppear` consumes it; `NotePassageResolve.leavesTemplatesMode`), a deleted target is reported and a target of the
+  other kind opens that window without taking the template off screen. `NotesNavigationModel.revealForOpen` widens a
+  shared folder or smart-folder scope that excludes the target (`NotePassageResolve.scopeHides`) to All Notes and says so
+  in the status line; the other window's list widens too, as the scope is shared. Tests: 4 `NotePassageResolveTests`, 2
+  `NotesNavigationModelTests` (Notes unit bundle: 1066 Swift Testing + 240 XCTest, all pass, no new warnings); VM UITest
+  `testG16_JumpToSourceLeavesTemplatesMode` passes in the Tart VM. KNOWN_ISSUES W7-S3 entries marked fixed. Bench cache: not used.
+  <!-- /W40.fix-notes-jump-pending-template -->
