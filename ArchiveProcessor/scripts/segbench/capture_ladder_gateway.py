@@ -2,6 +2,7 @@
 """W46.capture-ladder-paid. Gemini 3.7 Flash through the Stanford AI API gateway on W46.capture-ladder's images.
 
   V=/usr/local/bin/python3                    # needs requests
+  $PACK_V capture_ladder_gateway.py pack      # the 480 ladder images this script needs, where missing (private venv)
   $V capture_ladder_gateway.py probe          # one reading and one verdict, to check the requests and the ledger
   $V capture_ladder_gateway.py run            # the readings, then the verdicts
   $V capture_ladder_gateway.py spent
@@ -128,6 +129,24 @@ def raw_reply(page):
     return json.loads(f.read_text()) if f.exists() else None
 
 
+def pack():
+    """The ladder images this script's jobs need (10 variants x 48 pages), regenerated where missing with
+    capture_ladder.make_image under the private venv (augraphy 8.2.6, numpy 2.5.4, opencv 5.0.0.93, pillow 13.0.0)
+    and every one checked against the Sherlock manifest. A whole `capture_ladder.py make` builds 16 x 99 and the
+    Augraphy variants take 10-20 s an image; this builds a third of that. Prints the count still wrong, if any."""
+    import capture_ladder as C
+    shas = manifest(); args = dict(C.variants()); bad = []
+    for n, (v, p) in enumerate(reading_jobs(), 1):
+        dst = C.image(v, p)
+        C.make_image(v, args[v], p, dst)
+        if hashlib.sha256(dst.read_bytes()).hexdigest() != shas[f'{v}/{p}']:
+            bad.append(f'{v}/{p}')
+        if n % 48 == 0:
+            print(v, 'done', flush=True)
+    print(f'pack: {n} images, {len(bad)} differ from the Sherlock manifest', bad[:10], flush=True)
+    return bad
+
+
 def reading_jobs():
     return [(v, p) for v in VARIANTS for p in pages()]
 
@@ -219,8 +238,10 @@ def billed():
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument('cmd', choices=['probe', 'run', 'readings', 'verdicts', 'spent'])
+    ap.add_argument('cmd', choices=['pack', 'probe', 'run', 'readings', 'verdicts', 'spent'])
     cmd = ap.parse_args().cmd
+    if cmd == 'pack':
+        sys.exit(1 if pack() else 0)
     if cmd == 'probe':
         run_readings(reading_jobs()[:1]); run_verdicts(verdict_jobs()[:1])
     if cmd in ('run', 'readings'):

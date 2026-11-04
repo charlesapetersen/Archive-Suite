@@ -83,9 +83,25 @@ def degrade(name, arg, rgb, rng):
     raise ValueError(name)
 
 
-def cmd_make(a):
+def make_image(name, arg, page, dst):
+    """One defect image, deterministic in (SEED, name, page) and the venv's library versions; a present file is kept.
+    Shared by `make` and capture_ladder_gateway.py pack, so a regenerated image is the Sherlock manifest's byte for
+    byte (the gateway script checks the hash before any upload)."""
     import numpy as np
     from PIL import Image
+    if dst.exists():
+        return
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    rng = random.Random(f'{SEED}/{name}/{page}')
+    with Image.open(SRC / f'{page}-original.jpg') as im:
+        rgb = np.asarray(im.convert('RGB'))
+    arr, q = degrade(name, arg, rgb, rng)
+    im = Image.fromarray(arr)
+    im.thumbnail((2400, 2400), Image.Resampling.LANCZOS)   # the panel's ceiling, after the warp
+    im.save(dst, 'JPEG', quality=q)
+
+
+def cmd_make(a):
     import ocr_panel as P
     pages = [r['page'] for r in P.rows()]
     out = a.out; rows = []
@@ -93,14 +109,7 @@ def cmd_make(a):
         d = out / 'images' / name; d.mkdir(parents=True, exist_ok=True)
         for p in pages:
             dst = d / f'{p}.jpg'
-            if not dst.exists():
-                rng = random.Random(f'{SEED}/{name}/{p}')
-                with Image.open(SRC / f'{p}-original.jpg') as im:
-                    rgb = np.asarray(im.convert('RGB'))
-                arr, q = degrade(name, arg, rgb, rng)
-                im = Image.fromarray(arr)
-                im.thumbnail((2400, 2400), Image.Resampling.LANCZOS)   # the panel's ceiling, after the warp
-                im.save(dst, 'JPEG', quality=q)
+            make_image(name, arg, p, dst)
             rows.append({'id': f'{name}/{p}', 'image': f'{a.remote}/images/{name}/{p}.jpg',
                          'sha256': hashlib.sha256(dst.read_bytes()).hexdigest()})
         print(name, len(pages), flush=True)
