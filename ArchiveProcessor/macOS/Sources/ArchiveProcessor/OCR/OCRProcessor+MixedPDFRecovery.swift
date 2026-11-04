@@ -213,8 +213,11 @@ extension OCRProcessor {
         return true
     }
 
+    /// `reloadedImport`: the run's cluster import as `resumeMixedPDF` read it when it checked the folder, so the run
+    /// uses exactly what was checked and the folder is walked once.
     func applyMixedPDFRuntimeConfig(
-        _ runtime: PendingRunRuntimeConfig, to config: inout SessionProcessingConfig, apiKey: String
+        _ runtime: PendingRunRuntimeConfig, to config: inout SessionProcessingConfig, apiKey: String,
+        reloadedImport: InstitutionalComputeImport?
     ) {
         config.taggingMode = runtime.taggingMode
         config.rotationMode = runtime.rotationMode
@@ -230,7 +233,7 @@ extension OCRProcessor {
         config.visionSettings = runtime.visionSettings
         config.cascade = runtime.cascade ?? .off
         config.pageReaders = runtime.pageReaders ?? .empty
-        config.institutionalComputeImport = runtime.institutionalComputeFolder.flatMap { Self.reloadInstitutionalComputeImport($0) }
+        config.institutionalComputeImport = runtime.institutionalComputeFolder == nil ? nil : reloadedImport
         if let provider = runtime.visionTextProvider, let model = runtime.visionTextModel {
             config.visionTextLLM = LLMTextConfiguration(
                 provider: provider, model: model,
@@ -239,7 +242,8 @@ extension OCRProcessor {
         }
     }
 
-    func resumeMixedPDF(apiKey: String, keyProvider: LLMProvider) async {
+    /// `readWithoutClusterText`: as `resumeRun`'s, for the run's images (a PDF's pages never match the cluster).
+    func resumeMixedPDF(apiKey: String, keyProvider: LLMProvider, readWithoutClusterText: Bool = false) async {
         guard let pending = Self.loadPendingMixedPDF(),
               Self.pendingMixedPDFIsSelfConsistent(pending) else {
             checkForPendingBatch()
@@ -277,12 +281,23 @@ extension OCRProcessor {
             statusMessage = "Restore the \(textProvider.rawValue) judgement key before resuming this run."
             return
         }
+        let reloaded = pending.runtimeConfig.institutionalComputeFolder.flatMap { Self.reloadInstitutionalComputeImport($0) }
+        if !readWithoutClusterText, let folder = pending.runtimeConfig.institutionalComputeFolder,
+           let prompt = Self.institutionalComputeResumePrompt(
+            recordedFolder: folder, reloaded: reloaded,
+            remainingPages: pending.originalFiles.count - pending.pdfIndices.count,
+            model: pending.model.displayName, mixedPDF: true) {
+            institutionalComputeResumePrompt = prompt
+            return
+        }
+        institutionalComputeResumePrompt = nil
         applyPendingRunRuntimeConfig(pending.runtimeConfig)
         let context = SegmentationContext(
             previousTextCharCount: pending.previousTextCharCount,
             sendPreviousImage: pending.sendPreviousImage,
             customPrompt: pending.customPrompt,
             imageScale: pending.imageScale)
+        institutionalComputeImport = reloaded   // taken by startProcessing, handed back to applyMixedPDFRuntimeConfig
         await startProcessing(
             files: pending.originalFiles, provider: pending.provider, model: pending.model,
             thinkingLevel: pending.thinkingLevel, apiKey: resolvedKey,

@@ -307,9 +307,11 @@ model elsewhere; the weights come from 144 pages of one corpus, so refit as labe
 - **Only image inputs match.** A PDF input's pages are drawn to temporary JPEGs whose bytes the cluster never saw.
   Paid batches, the gateway, the Local Agent and Apple Vision runs ignore the import.
 - **A resumed run reloads the folder on the main actor** (every `_meta` file); a very large run may pause the resume
-  for some seconds. A folder moved or deleted since gives no import, so its pages go to the run's model.
-- **A resumed run whose folder is gone says nothing**: its remaining pages are read (and paid for) by the run's
-  model, within the estimate but beyond what Start led the user to expect.
+  for some seconds. A folder moved, deleted or emptied since gives no import, so resume first asks whether to read
+  the remaining pages with the run's model or stop and put the folder back (W40.fix-processor-instcompute-resume-silent).
+  An interrupted mixed PDF run asks the same, counting its image pages as "up to": which of them are still unread
+  is not known until the resume runs. It asks only when the folder gives no page at all: a folder swapped for another
+  bulk run's still loads, so pages it does not match are read by the run's model without a question.
 - **Every imported page gets a classification call**, even when tagging, merging and segmentation are off:
   `performOCRCall` cannot see the run's tagging mode. One short text call a page, inside the estimate.
 - **Every page is hashed** once more than it is read (one extra read of each input), the price of matching by

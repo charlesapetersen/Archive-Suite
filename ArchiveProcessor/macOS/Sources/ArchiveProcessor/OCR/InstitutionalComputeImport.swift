@@ -21,7 +21,8 @@ import Foundation
 /// through never spends more than the estimate said.
 ///
 /// Read only: nothing here writes into the cluster folder or the input images. Applies where the page readers
-/// do (a direct-provider, non-batch Process Files run); frozen with the run, and a resumed run reloads the folder.
+/// do (a direct-provider, non-batch Process Files run); frozen with the run, and a resumed run reloads the folder
+/// (and asks before resuming when the folder no longer gives any text).
 struct InstitutionalComputeImport: Sendable {
     struct Page: Sendable, Equatable {
         /// The page's `<image>.txt`.
@@ -184,10 +185,47 @@ struct ImportedReading: Codable, Equatable, Sendable {
     }
 }
 
+/// The question a resume asks when the run's cluster folder no longer gives any text
+/// (W40.fix-processor-instcompute-resume-silent): its remaining pages would be read, and paid for, by the run's model.
+struct InstitutionalComputeResumePrompt: Equatable, Sendable {
+    let folder: String
+    /// The pages still to read; for an interrupted mixed PDF run, the most images it can still read.
+    let pages: Int
+    let model: String
+    /// Which resume asked, so the answer resumes the same one.
+    let mixedPDF: Bool
+
+    var title: String { "The cluster folder is gone" }
+    var message: String {
+        let name = URL(fileURLWithPath: folder).lastPathComponent
+        let count = mixedPDF ? "up to \(pages) image page\(pages == 1 ? "" : "s")" : "its \(pages) remaining page\(pages == 1 ? "" : "s")"
+        return "This run took text from the institutional-computing folder \u{201C}\(name)\u{201D}, which is gone or no longer holds the cluster's text (\(folder)). Without it, \(count) would be read, and paid for, by \(model). That stays within the run's estimate, but Start counted on the cluster's text.\n\nRead them with \(model), or stop and put the folder back first?"
+    }
+}
+
 extension OCRProcessor {
-    /// A resumed run's import, read again from its folder. A folder that is gone or no longer a bulk run gives nil:
-    /// its pages are then read by the run's model, which the run's estimate already counted.
+    /// A resumed run's import, read again from its folder. A folder that is gone or no longer a bulk run gives nil.
+    /// Resume does not then read its pages with the run's model unasked: see `institutionalComputeResumePrompt`.
     nonisolated static func reloadInstitutionalComputeImport(_ path: String) -> InstitutionalComputeImport? {
         try? InstitutionalComputeImport.load(folder: URL(fileURLWithPath: path, isDirectory: true))
+    }
+
+    /// W40.fix-processor-instcompute-resume-silent: what a resume must ask before going on, or nil when it may go on.
+    /// It asks when the run recorded a cluster folder whose reload now gives no page (moved, deleted, or emptied)
+    /// and pages remain, since those pages would otherwise be bought from the run's model without a word.
+    nonisolated static func institutionalComputeResumePrompt(
+        recordedFolder: String?, reloaded: InstitutionalComputeImport?, remainingPages: Int, model: String,
+        mixedPDF: Bool = false
+    ) -> InstitutionalComputeResumePrompt? {
+        guard let recordedFolder, (reloaded?.count ?? 0) == 0, remainingPages > 0 else { return nil }
+        return InstitutionalComputeResumePrompt(folder: recordedFolder, pages: remainingPages, model: model,
+                                                mixedPDF: mixedPDF)
+    }
+
+    /// Stop: the interrupted run stays as it was, to resume once the folder is back.
+    func declineInstitutionalComputeResume() {
+        guard let prompt = institutionalComputeResumePrompt else { return }
+        institutionalComputeResumePrompt = nil
+        statusMessage = "Not resumed. Put the cluster folder back at \(prompt.folder), then resume again."
     }
 }

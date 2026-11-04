@@ -1726,11 +1726,26 @@ extension OCRProcessor {
         postCompletionNotification()
     }
     /// Resume an interrupted non-batch run.
-    func resumeRun(apiKey: String) async {
+    /// `readWithoutClusterText` is the operator's answer to `institutionalComputeResumePrompt`: read the pages of a
+    /// run whose cluster folder is gone with the run's model.
+    func resumeRun(apiKey: String, readWithoutClusterText: Bool = false) async {
         // Ignore a torn/tampered manifest rather than misapply it (Tier-2 rule e). `resumeRun` replays
         // the manifest's OWN persisted input set + output dir (never the current UI selection), so a
         // stale manifest can never cross-contaminate a different job.
         guard let pending = Self.loadPendingRun(), Self.pendingRunIsSelfConsistent(pending) else { return }
+        let runConfig = makePendingRunResumeConfig(pending, apiKey: apiKey)
+        // W40.fix-processor-instcompute-resume-silent: ask before any state changes, so stopping leaves the
+        // interrupted run exactly as it was.
+        if !readWithoutClusterText, let prompt = Self.institutionalComputeResumePrompt(
+            recordedFolder: pending.runtimeConfig?.institutionalComputeFolder,
+            reloaded: runConfig.institutionalComputeImport,
+            remainingPages: Self.remainingIndices(totalFiles: pending.fileURLs.count,
+                                                  completedResults: pending.completedResults).count,
+            model: pending.model.displayName) {
+            institutionalComputeResumePrompt = prompt
+            return
+        }
+        institutionalComputeResumePrompt = nil
 
         isProcessing = true
         pendingRunInfo = nil
@@ -1746,7 +1761,6 @@ extension OCRProcessor {
         currentModel = pending.model
         currentGateway = pending.gatewayConfig
         currentLocalAgent = pending.localAgent
-        let runConfig = makePendingRunResumeConfig(pending, apiKey: apiKey)
         activeRunConfig = runConfig
         let resumeGatewayUpstream: LLMProvider
         if let config = pending.runtimeConfig {
@@ -2820,7 +2834,8 @@ extension OCRProcessor {
             || preOCRedInput
             ? nil : plannedImport
         if let resumingMixedPDF {
-            applyMixedPDFRuntimeConfig(resumingMixedPDF.runtimeConfig, to: &runConfig, apiKey: apiKey)
+            applyMixedPDFRuntimeConfig(resumingMixedPDF.runtimeConfig, to: &runConfig, apiKey: apiKey,
+                                       reloadedImport: plannedImport)
             activePendingMixedPDF = resumingMixedPDF
         }
         activeRunConfig = runConfig

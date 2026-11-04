@@ -458,6 +458,10 @@ struct OCRView: View {
             ManualSegmentTagView(processor: processor)
         }
         .modifier(SegmentationStagePresentations(processor: processor))
+        .modifier(InstitutionalComputeResumePresentation(processor: processor) { mixedPDF in
+            if mixedPDF { resumePendingMixedPDF(readWithoutClusterText: true) }
+            else { resumePendingRun(readWithoutClusterText: true) }
+        })
         .onChange(of: apiKey) { _, newKey in
             guard !useAppleVision else { return }
             // A local model's stand-in key (W41.app-local-models) is never saved over the gateway's real one.
@@ -1360,7 +1364,7 @@ struct OCRView: View {
         }
     }
 
-    private func resumePendingRun() {
+    private func resumePendingRun(readWithoutClusterText: Bool = false) {
         guard let key = processor.pendingRunResumeKey(fieldKey: apiKey) else { return }
         if let urls = processor.pendingRunFileURLs {
             droppedFiles = urls
@@ -1376,14 +1380,15 @@ struct OCRView: View {
             .map { $0.trimmingCharacters(in: .whitespaces) }
             .filter { !$0.isEmpty }
         processor.processingTask = Task {
-            await processor.resumeRun(apiKey: key)
+            await processor.resumeRun(apiKey: key, readWithoutClusterText: readWithoutClusterText)
         }
     }
 
-    private func resumePendingMixedPDF() {
+    private func resumePendingMixedPDF(readWithoutClusterText: Bool = false) {
         if let urls = processor.pendingMixedPDFFileURLs { droppedFiles = urls }
         processor.processingTask = Task {
-            await processor.resumeMixedPDF(apiKey: apiKey, keyProvider: effectiveProvider)
+            await processor.resumeMixedPDF(apiKey: apiKey, keyProvider: effectiveProvider,
+                                           readWithoutClusterText: readWithoutClusterText)
         }
     }
 
@@ -1449,6 +1454,29 @@ struct OCRView: View {
                 localAgent: currentLocalAgentConfig
             )
         }
+    }
+}
+
+/// W40.fix-processor-instcompute-resume-silent: a resume whose cluster folder is gone asks before its pages are
+/// bought from the run's model. Kept out of `OCRView.body` for the same type-check reason as the stage's below.
+private struct InstitutionalComputeResumePresentation: ViewModifier {
+    @ObservedObject var processor: OCRProcessor
+    /// Resume again, reading without the cluster's text; true for the interrupted mixed PDF run.
+    let readWithModel: (Bool) -> Void
+
+    func body(content: Content) -> some View {
+        content
+            .alert(processor.institutionalComputeResumePrompt?.title ?? "",
+                   isPresented: Binding(get: { processor.institutionalComputeResumePrompt != nil }, set: { _ in })) {
+                Button("Read with the run's model") {
+                    let mixedPDF = processor.institutionalComputeResumePrompt?.mixedPDF ?? false
+                    processor.institutionalComputeResumePrompt = nil
+                    readWithModel(mixedPDF)
+                }
+                Button("Stop", role: .cancel) { processor.declineInstitutionalComputeResume() }
+            } message: {
+                Text(processor.institutionalComputeResumePrompt?.message ?? "")
+            }
     }
 }
 

@@ -255,11 +255,92 @@ enum InstitutionalComputeImportTestDriver {
               && OCRProcessor.ocrCallValues(for: nil).imported == nil
               && OCRProcessor.ocrCallValues(for: config).imported?.count == 2)
 
+        // 6. W40.fix-processor-instcompute-resume-silent: the folder is removed between the run and its resume.
+        if let runtime = back { await resumeWithFolderGone(runtime, files: [box1, unread], bulk: bulk, root: root,
+                                                           script: script, check: check) }
+        else { check("the resume snapshot decodes", false) }
+        let prompt = { (folder: String?, reloaded: InstitutionalComputeImport?, pages: Int) in
+            OCRProcessor.institutionalComputeResumePrompt(recordedFolder: folder, reloaded: reloaded,
+                                                          remainingPages: pages, model: "M") }
+        check("a resume asks nothing when its folder still gives text, it had no folder, or no page is left",
+              prompt(bulk.path, imported, 3) == nil && prompt(nil, nil, 3) == nil && prompt(bulk.path, nil, 0) == nil)
+        check("an emptied folder (it loads, but matches nothing) asks like a missing one",
+              prompt(bulk.path, InstitutionalComputeImport(folder: bulk, pages: [:], unmatchable: 4), 1) != nil)
+        check("an interrupted mixed PDF run's question counts its image pages as at most",
+              OCRProcessor.institutionalComputeResumePrompt(recordedFolder: bulk.path, reloaded: nil, remainingPages: 1,
+                                                            model: "M", mixedPDF: true)?.message
+                .contains("Without it, up to 1 image page would be read") == true)
+
         check("nothing was written into the input folder",
               (fm.enumerator(atPath: input.path)?.allObjects as? [String] ?? []).filter { $0.hasSuffix(".jpg") }.count == 5
               && (fm.enumerator(atPath: input.path)?.allObjects as? [String] ?? []).allSatisfy {
                   $0.hasSuffix(".jpg") || !$0.contains(".") })
         finish(results)
+    }
+
+    /// An interrupted run that recorded `bulk`, resumed through the real `resumeRun` after the folder was moved away:
+    /// it must ask, spend nothing and leave the manifest as it was. The journal is redirected into `root` the way
+    /// `MultiPageReOCRTestDriver` does it, and nothing is written unless the redirection is proven.
+    private static func resumeWithFolderGone(_ runtime: OCRProcessor.PendingRunRuntimeConfig, files: [URL], bulk: URL,
+                                             root: URL, script: Script,
+                                             check: (String, Bool, String) -> Void) async {
+        let fm = FileManager.default
+        let stateRoot = root.appendingPathComponent("resume-state", isDirectory: true)
+        let saved = ["BATCHRESUME_TEST", "ARCHIVEPROC_TEST_STATE_ROOT"].map { ($0, ProcessInfo.processInfo.environment[$0]) }
+        setenv("BATCHRESUME_TEST", "1", 1)
+        setenv("ARCHIVEPROC_TEST_STATE_ROOT", stateRoot.path, 1)
+        defer {   // restored, not just unset: a harness that launched with them set keeps them
+            for (key, value) in saved { if let value { setenv(key, value, 1) } else { unsetenv(key) } }
+        }
+        let manifest = OCRProcessor.pendingRunURL
+        guard manifest.deletingLastPathComponent().standardizedFileURL == stateRoot.standardizedFileURL else {
+            check("the resume journal is redirected into scratch", false, manifest.path)
+            return
+        }
+        let model = LLMModel.geminiModels[0]
+        var run = OCRProcessor.PendingRun(
+            provider: .gemini, model: model, thinkingLevel: nil, fileURLs: files,
+            outputDirectory: root.appendingPathComponent("resume-out", isDirectory: true),
+            enableTagging: runtime.taggingMode.enablesTagging, enableSegmentJSON: false,
+            enableCollectionSegmentation: false,
+            confirmCollectionIDs: false, reviewDocumentSegmentation: false, preOCRedInput: false,
+            previousTextCharCount: 0, sendPreviousImage: false, customPrompt: nil, startedAt: Date(),
+            gatewayConfig: nil, completedResults: [:], runFingerprint: nil, exportOriginals: false,
+            localAgent: nil, runtimeConfig: runtime)
+        run.runFingerprint = OCRProcessor.pendingRunFingerprintV2(run)
+        guard OCRProcessor.pendingRunIsSelfConsistent(run), OCRProcessor._testWritePendingRun(run, to: manifest),
+              let before = try? Data(contentsOf: manifest) else {
+            check("the interrupted run's manifest is written and valid", false, "")
+            return
+        }
+        let moved = root.appendingPathComponent("bulk-moved", isDirectory: true)
+        guard (try? fm.moveItem(at: bulk, to: moved)) != nil else {
+            check("the cluster folder is moved away", false, "")
+            return
+        }
+        defer { try? fm.moveItem(at: moved, to: bulk) }
+
+        await script.set((200, #"{"candidates":[{"finishReason":"STOP","content":{"parts":[{"text":"[document_start]\nMODEL-TEXT"}]}}]}"#))
+        let processor = OCRProcessor()
+        await processor.resumeRun(apiKey: "test-key")
+        let prompt = processor.institutionalComputeResumePrompt
+        let calls = await script.calls()
+        check("a resume whose folder is gone asks instead of reading its pages",
+              prompt?.folder == bulk.path && prompt?.pages == 2 && prompt?.mixedPDF == false,
+              String(describing: prompt))
+        check("its question names the folder, the remaining pages and the model that would be paid",
+              prompt?.message.contains("\u{201C}bulk-out\u{201D}") == true
+              && prompt?.message.contains("its 2 remaining pages would be read") == true
+              && prompt?.message.contains(model.displayName) == true, prompt?.message ?? "")
+        check("asking starts nothing and spends nothing", !processor.isProcessing && calls.isEmpty, "\(calls.count) calls")
+        check("asking leaves the interrupted run's manifest exactly as it was",
+              (try? Data(contentsOf: manifest)) == before, "")
+        processor.declineInstitutionalComputeResume()
+        check("Stop clears the question, says where the folder belongs and keeps the run to resume",
+              processor.institutionalComputeResumePrompt == nil
+              && processor.statusMessage.contains(bulk.path) && (try? Data(contentsOf: manifest)) == before,
+              processor.statusMessage)
+        try? fm.removeItem(at: manifest)
     }
 
     private static func write(_ bulk: URL, _ rel: String, text: String, meta: [String: Any]?) {

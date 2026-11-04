@@ -13972,3 +13972,19 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   working-cap record with the superseded $2.50 grant, verification-20261102 screenshots). Published bench copy is behind
   (unattended session; an interactive one republishes).
   <!-- /W46.ocr-ppocrv6-hands-paid -->
+- [x] **W40.fix-processor-instcompute-resume-silent — a resumed institutional-compute run whose folder is gone pays the run's model without saying so [S · S3]** · §W40 — verification phase (lane: processor) (uses: build) — Owner, 2026-10-31: queued from a KNOWN_ISSUES entry that no queue item covered (survey of the three KNOWN_ISSUES files). `ArchiveProcessor/KNOWN_ISSUES.md` §"LIMITATION (W41.app-institutional-compute)": a resumed run reloads the folder; if it was moved or deleted, its remaining pages are read and paid for by the run's model, within the estimate but beyond what Start led the user to expect. Fix: on resume, if the folder is missing, say so and ask whether to read the remaining pages with the run's model or stop. Test in `scripts/test-institutional-compute-import.sh` with the folder removed between run and resume.
+  SHIPPED 2026-11-03. Resume now asks. `resumeRun` and `resumeMixedPDF` check, before changing any state, whether the run
+  recorded a cluster folder that now reloads to no page while pages remain (`OCRProcessor.institutionalComputeResumePrompt`).
+  If so they set `institutionalComputeResumePrompt` and return. OCRView's alert names the folder, the page count ("up to N
+  image pages" for an interrupted mixed PDF run) and the model that would be paid. "Read with the run's model" resumes with
+  `readWithoutClusterText: true`. "Stop" leaves the interrupted run as it was and says where the folder belongs. The mixed
+  PDF resume passes the import it checked through `startProcessing` to `applyMixedPDFRuntimeConfig`. The folder is therefore
+  read once, and it cannot vanish between the check and the run. Contract: `scripts/test-institutional-compute-import.sh`
+  §6 drives the real `resumeRun` with the bulk folder moved away, using a journal redirected into scratch. It checks that the
+  resume asks, starts nothing, makes 0 HTTP calls, leaves the manifest byte-identical and that Stop keeps it. The script
+  also covers the emptied-folder, no-folder, no-pages-left and mixed PDF wording cases. ALL PASS, as does
+  `test-multipage-reocr.sh`. The build is clean (`-jobs 4`: the default parallelism passed the heavy lock's 10.8 GB limit).
+  Paid smoke OCR was not run because the change touches no request. Adversarial review (opus) found no blocking defect. It
+  noted that a folder swapped for another bulk run still loads and pays without asking, which is recorded in KNOWN_ISSUES.
+  The previous session's uncommitted draft (retired 2026-11-01) was the starting point. No bench cache was used.
+  <!-- /W40.fix-processor-instcompute-resume-silent -->

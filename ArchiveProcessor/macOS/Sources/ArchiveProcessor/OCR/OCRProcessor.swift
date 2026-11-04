@@ -171,6 +171,8 @@ class OCRProcessor: ObservableObject {
     var windowStopContinuation: CheckedContinuation<WindowStopChoice, Never>?
     /// The Claude plan's first measurement on this account: the folder's share, and whether to go on.
     @Published var planCheckPrompt: PlanCheckPrompt? = nil
+    /// A resume whose cluster folder is gone, waiting for the operator (W40.fix-processor-instcompute-resume-silent).
+    @Published var institutionalComputeResumePrompt: InstitutionalComputeResumePrompt? = nil
     var planCheckContinuation: CheckedContinuation<Bool, Never>?
     /// "37 boundaries checked, 6 changed", added to the run's closing status. Never sent anywhere.
     var segmentationCheckSummary: String?
