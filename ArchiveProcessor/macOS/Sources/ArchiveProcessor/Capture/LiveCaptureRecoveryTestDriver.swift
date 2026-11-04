@@ -4599,6 +4599,14 @@ enum LiveCaptureRecoveryTestDriver {
             LiveCaptureProcessor._recoveryTestOCRTasks = [:]
         }
 
+        // --- Test 33 (W40.fix-processor-pending-invisible-after-relaunch): in its own file, because one more
+        // test in this function took the compiler past the heavy job's memory limit. ---
+        if isolatedBackup {
+            await runPendingRelaunchTest(tmp: tmp, stubModel: stubModel,
+                                         jpeg: bitmap?.representation(using: .jpeg, properties: [:]) ?? Data(),
+                                         check: check)
+        }
+
         // Last by design: this synthetic session may be the newest recoverable one in the shared scratch
         // backup root, so do not let it influence any preceding restart fixture.
         if isolatedBackup {

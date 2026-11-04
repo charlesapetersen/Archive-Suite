@@ -127,6 +127,11 @@ struct LiveCaptureView: View {
         }
         .onAppear {
             SystemTagsProvider.shared.warmUp()   // prime subject autocomplete
+            // W40.fix-processor-pending-invisible-after-relaunch: a session restored at launch shows its
+            // staged rows (a failed document with its Retry) as soon as this pane appears, not only after
+            // Start or the first page from the phone. A no-op unless every restored page is already staged
+            // or filed, so it never starts an OCR call by itself (`CaptureSession.resumeRecoveredSessionIfNeeded`).
+            session.resumeRecoveredSessionIfNeeded()
             if ProcessInfo.processInfo.environment["LIVECAPTURE_AUTOSTART"] == "1", !session.serverRunning {
                 session.start()
             }

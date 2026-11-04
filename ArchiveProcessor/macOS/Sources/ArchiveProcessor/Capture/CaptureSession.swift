@@ -234,7 +234,13 @@ final class CaptureSession: ObservableObject {
     func activateProcessingIfNeeded() {
         guard processingMode == .undecided else { return }
         if let dir = recoveryTestStagingDir, let cfg = recoveryTestSettings {
-            _recoveryTestBeginLive(config: cfg, stagingDir: dir)   // test-armed session only; see below
+            if recoveryTestResumesStaging {   // test-armed relaunch only; see `_recoveryTestArmRelaunch`
+                config = cfg
+                processingMode = .live
+                liveProcessor._recoveryTestResume(stagingDir: dir, config: cfg)
+            } else {
+                _recoveryTestBeginLive(config: cfg, stagingDir: dir)   // test-armed session only; see below
+            }
             return
         }
         if liveModeEnabled {
@@ -261,6 +267,46 @@ final class CaptureSession: ObservableObject {
         processingMode = .undecided
         config = nil
         settingsLocked = false
+        snapshotProvisional = false
+    }
+
+    /// W40.fix-processor-pending-invisible-after-relaunch — a session restored at launch still holds its
+    /// photos, but nothing loaded its staging manifest until the phone sent something: `activate` ran only
+    /// from the first ingest (or the pane's "Process N →"). So a document that had failed OCR had no row and
+    /// no Retry after a relaunch and Start (owner session iphone-1). The Live Capture pane's appearance and
+    /// Start now resume a Live session when doing so buys nothing: every restored page belongs to a staged or
+    /// filed document, so the rows come back (a failed one as failed, with Retry) and no OCR starts. A page
+    /// that was never staged would start a paid call on resume, so such a session stays undecided and
+    /// "Process N →" remains the operator's explicit choice, as before. An unreadable staging record also
+    /// resumes: the loader preserves it and shows its notice, and no OCR runs behind it. A fresh session has
+    /// no photos and is left undecided, so its Settings snapshot is still taken at its first page; so is a
+    /// Stage-for-later one. The snapshot a resume takes is provisional (`refreshProvisionalSnapshotIfUnused`).
+    func resumeRecoveredSessionIfNeeded() {
+        guard processingMode == .undecided, !photos.isEmpty,
+              liveModeEnabled || recoveryTestStagingDir != nil else { return }
+        if let staged = liveProcessor.recoveredStagedGroupIds(in: recoveryTestStagingDir) {
+            guard !staged.isEmpty,
+                  photos.allSatisfy({ staged.contains($0.groupId) || filedGroupIds.contains($0.groupId) })
+            else { return }
+        }
+        activateProcessingIfNeeded()
+        snapshotProvisional = processingMode == .live
+    }
+
+    /// A resume above takes the Settings snapshot on the operator's behalf, when the pane opens rather than
+    /// at their first action. Until this run uses it, it stays provisional: the first Retry or page re-reads
+    /// Settings, so a route changed after the relaunch (the owner's 402 key, then the gateway) is the one
+    /// that runs, as it was when the first ingest took the snapshot. Once an OCR has been bought on it the
+    /// snapshot is the session's, like any other (W40.fix-processor-live-settings-per-run), so each caller
+    /// consumes it: a refresh happens at most once per resume, and never after a call started on it.
+    private var snapshotProvisional = false
+    func refreshProvisionalSnapshotIfUnused() {
+        guard snapshotProvisional else { return }
+        snapshotProvisional = false
+        guard processingMode == .live, config != nil else { return }
+        let cfg = recoveryTestSettings ?? SessionProcessingConfig.fromDefaults()   // test stand-in, nil in production
+        config = cfg
+        liveProcessor.adoptSettingsSnapshot(cfg)
     }
 
     func markPaired() { notePhoneContact() }
@@ -314,6 +360,15 @@ final class CaptureSession: ObservableObject {
     /// defaults, for the reason above. Both nil in production.
     private var recoveryTestStagingDir: URL?
     var recoveryTestSettings: SessionProcessingConfig?
+    /// Test-only (W40.fix-processor-pending-invisible-after-relaunch): models a relaunch. The session is
+    /// NOT activated here; its first activation resumes `stagingDir` through the real manifest loader and
+    /// resume loop (`_recoveryTestResume`), still without `activate`'s legacy-root prune.
+    private var recoveryTestResumesStaging = false
+    func _recoveryTestArmRelaunch(config: SessionProcessingConfig, stagingDir: URL) {
+        recoveryTestStagingDir = stagingDir
+        recoveryTestSettings = config
+        recoveryTestResumesStaging = true
+    }
 
     /// Test-only: when set, the next `ingest` returns nil (simulating a durable-write failure) so the relay
     /// receiver's "no receipt / no delete / no processed-entry on a nil ingest" invariant can be exercised.
@@ -535,6 +590,7 @@ final class CaptureSession: ObservableObject {
     /// chooses Wired, Wi-Fi, OR Cloud with no mode to misconfigure. Under `LIVECAPTURE_TRANSPORT` (CI) it
     /// starts exactly the one forced receiver instead.
     func start() {
+        resumeRecoveredSessionIfNeeded()            // a relaunched session's rows and Retry, before any ingest
         if let forced = forcedTestTransport {
             switch forced {
             case .lan: if !serverRunning { server.start() }
@@ -707,6 +763,7 @@ final class CaptureSession: ObservableObject {
         // on disk and idempotent replace makes the retry safe; live processing waits until durable.
         guard writeManifest() else { return nil }
         activateProcessingIfNeeded()   // fix mode from Settings on first photo
+        refreshProvisionalSnapshotIfUnused()   // a resumed session's first page still reads Settings now
         if rejectPageForFiledGroup(groupId) { return finalURL }
         if processingMode == .live { liveProcessor.photoIngested(photo) }   // start OCR on arrival
         return finalURL

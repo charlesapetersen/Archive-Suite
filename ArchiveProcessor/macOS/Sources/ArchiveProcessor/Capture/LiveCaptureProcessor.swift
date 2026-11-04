@@ -462,8 +462,9 @@ final class LiveCaptureProcessor: ObservableObject {
     /// successfully but fail to save `filedGroupIds`; the durable staging record then remains the recovery
     /// evidence that those groups already have output. `nil` means the record exists but cannot be trusted,
     /// so callers must fail closed instead of handing the original pages out again.
-    func recoveredStagedGroupIds() -> Set<String>? {
-        let dir = Self.stagingDir(for: session)
+    /// `directory` is the session's own staging dir unless a recovery test armed another.
+    func recoveredStagedGroupIds(in directory: URL? = nil) -> Set<String>? {
+        let dir = directory ?? Self.stagingDir(for: session)
         let url = dir.appendingPathComponent("staging-manifest.json")
         let fm = FileManager.default
         guard fm.fileExists(atPath: dir.path) else { return [] }
@@ -502,11 +503,9 @@ final class LiveCaptureProcessor: ObservableObject {
         }
     }
 
-    /// Arm the coordinator for a `.live` session. Called from `CaptureSession.chooseLive`.
+    /// Arm the coordinator for a `.live` session. Called from `CaptureSession.activateProcessingIfNeeded`
+    /// and `beginLiveSession`.
     func activate(config: SessionProcessingConfig) {
-        self.config = config
-        stagingManifestBlocked = false
-        stagingRecoveryNotice = nil
         let fm = FileManager.default
         // Primary (Recovery Core Directive): stage inside the session's VISIBLE backup folder, so processed
         // PDFs/JPGs (with tags) are recoverable next to the raw sources if the app fails before finalize.
@@ -524,11 +523,32 @@ final class LiveCaptureProcessor: ObservableObject {
             : (hasManifest(legacyAppSupport) ? legacyAppSupport
                : (hasManifest(legacyOutput) ? legacyOutput : primary))
         try? fm.createDirectory(at: dir, withIntermediateDirectories: true)
-        stagingDir = dir
         Self.pruneLegacyStaging()   // best-effort: drop orphaned staging left by older builds
+        resume(stagingDir: dir, config: config)
+    }
+
+    /// Replace the run's Settings snapshot before anything has been bought on it: only
+    /// `CaptureSession.refreshProvisionalSnapshotIfUnused` calls this, once per resume at most
+    /// (W40.fix-processor-pending-invisible-after-relaunch). The staging dir is the session's and stays.
+    func adoptSettingsSnapshot(_ cfg: SessionProcessingConfig) { config = cfg }
+
+    /// Load `dir`'s staging manifest into the rows, then pick up the session's photos and any resolved
+    /// document that was never staged. Shared by `activate` and the relaunch test seam, so the test runs the
+    /// exact load and resume a relaunched session runs.
+    private func resume(stagingDir dir: URL, config: SessionProcessingConfig) {
+        self.config = config
+        stagingManifestBlocked = false
+        stagingRecoveryNotice = nil
+        stagingDir = dir
         guard loadStagingManifest() else { return }   // preserve failed recovery state; never resume as empty
-        // Process photos already received (resume after a crash, or "chose live after some capture").
-        for photo in session.photos { photoIngested(photo) }
+        // Process photos already received (resume after a crash, or "chose live after some capture"). A page
+        // of a staged or filed document is the session's own, not a late arrival: `photoIngested` would only
+        // post the late-page warning for it, which Start's resume (W40.fix-processor-pending-invisible-after-
+        // relaunch) would then show on every relaunch.
+        for photo in session.photos
+        where !finalizedGroups.contains(photo.groupId) && !session.filedGroupIds.contains(photo.groupId) {
+            photoIngested(photo)
+        }
         for group in session.groups where group.type == .document
             && session.resolvedGroupIds.contains(group.id) && !session.filedGroupIds.contains(group.id)
             && !finalizedGroups.contains(group.id) {
@@ -785,6 +805,7 @@ final class LiveCaptureProcessor: ObservableObject {
         // (`beginFinalize`'s own `guard !staged.isEmpty` can leave no sheet up, but then there is nothing
         // staged for a retry to race.)
         guard !isFinalizing else { return }
+        session.refreshProvisionalSnapshotIfUnused()   // a resumed session's first Retry reads Settings now
         let targets = groupIds ?? failedGroupIds
         let fm = FileManager.default
         var toReprocess: [String] = []
@@ -2636,6 +2657,12 @@ final class LiveCaptureProcessor: ObservableObject {
     func _recoveryTestDisarmForStageLaterClear() {
         stagingDir = nil
         config = nil
+    }
+
+    /// Test-only (W40.fix-processor-pending-invisible-after-relaunch): `activate` after a relaunch, minus the
+    /// staging-dir choice and the legacy-root prune (the same reason as below).
+    func _recoveryTestResume(stagingDir: URL, config: SessionProcessingConfig) {
+        resume(stagingDir: stagingDir, config: config)
     }
 
     /// Test-only ($0, W3.cap-r3-fu8): enter the REAL manifest loader without `activate`'s legacy-root prune.
