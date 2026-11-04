@@ -26,7 +26,12 @@ enum OCRCascadeTestDriver {
     private actor Script {
         var answers: [String: (Int, String)] = [:]
         var hosts: [String] = []
-        func set(_ answers: [String: (Int, String)]) { self.answers = answers; hosts = [] }
+        /// A host whose answer waits until the request is cancelled (a Stop mid-read).
+        var hanging: String?
+        func set(_ answers: [String: (Int, String)], hanging: String? = nil) {
+            self.answers = answers; hosts = []; self.hanging = hanging
+        }
+        func hangs(_ request: URLRequest) -> Bool { hanging.map { (request.url?.host ?? "").contains($0) } ?? false }
         func answer(_ request: URLRequest) -> (Int, String) {
             let host = request.url?.host ?? ""
             hosts.append(host)
@@ -55,6 +60,7 @@ enum OCRCascadeTestDriver {
         check("the HTTP seam is dormant before the contract installs it", !NetworkSession.testTransportIsActive)
         NetworkSession.testTransport = { request in
             let (status, body) = await script.answer(request)
+            if await script.hangs(request) { try await Task.sleep(for: .seconds(30)) }
             let response = HTTPURLResponse(url: request.url ?? URL(string: "https://x.invalid")!, statusCode: status,
                                            httpVersion: "HTTP/1.1", headerFields: nil)!
             return (Data(body.utf8), response)
@@ -279,8 +285,72 @@ enum OCRCascadeTestDriver {
         stopped.cancel()
         r = await stopped.value
         calls = await script.calls()
-        check("a Stop before the escalation spends nothing and leaves the exhausted verdict the batch refuses to persist",
-              r.text == nil && r.errorCode == OCRCascade.exhaustedCode && calls.isEmpty)
+        check("a Stop before the escalation spends nothing and hands back the first reading's failure",
+              r.text == nil && r.errorCode == OCRFailureCode.cutOff && calls.isEmpty)
+        // W40.fix-processor-cascade-edges — a Stop DURING the escalation read: the page goes back to its first
+        // failure (here a 500, which Live Capture fails for Retry), never `CascadeExhausted`.
+        let firstFailure = OCRResult(text: nil, classification: nil, errorMessage: "internal", errorCode: "500")
+        await script.set(["anthropic": (200, claudeText)], hanging: "anthropic")
+        let midRead = Task {
+            await OCRCascade.resolve(firstFailure, cascade: OCRCascade(routeID: OCRCascade.routeID(for: claude)),
+                                     provider: .openrouter, model: qwen, refusalFallback: true, imageURL: image,
+                                     previousText: nil, previousImageURL: nil, customPrompt: nil, imageScale: 1,
+                                     visionSettings: .default)
+        }
+        for _ in 0..<200 where await script.calls().isEmpty { try? await Task.sleep(for: .milliseconds(10)) }
+        let reached = await !script.calls().isEmpty
+        midRead.cancel()
+        r = await midRead.value
+        check("a Stop during the escalation read returns the page to its first failure, not CascadeExhausted",
+              reached && r.text == nil && r.errorCode == "500" && r.errorMessage == "internal"
+              && r.secondReader == nil && LiveCaptureProcessor.ocrFailed(r))
+        // A Gemini refusal stopped mid-escalation keeps its refusal and does not go on to the refusal readers.
+        OCRRefusalFallback.routesOverride = { [claudeRoute] }
+        await script.set(["openai": (200, gptText), "anthropic": (200, claudeText)], hanging: "openai")
+        let refusedMidRead = Task {
+            await OCRCascade.resolve(
+                OCRResult(text: nil, classification: nil, errorMessage: "recited", errorCode: "Recitation"),
+                cascade: OCRCascade(routeID: OCRCascade.routeID(for: gpt)), provider: .gemini, model: flash,
+                refusalFallback: true, imageURL: image, previousText: nil, previousImageURL: nil, customPrompt: nil,
+                imageScale: 1, visionSettings: .default)
+        }
+        for _ in 0..<200 where await script.calls().isEmpty { try? await Task.sleep(for: .milliseconds(10)) }
+        refusedMidRead.cancel()
+        r = await refusedMidRead.value
+        calls = await script.calls()
+        check("a refused page stopped mid-escalation keeps its refusal and buys no refusal reader",
+              r.errorCode == "Recitation" && calls.count == 1 && !calls.contains { $0.contains("anthropic") })
+        OCRRefusalFallback.routesOverride = { [] }
+
+        // W40.fix-processor-cascade-edges — one cost scale: the recorded cost is priced at the size-target slider
+        // fraction (the pre-run line's), not the per-file dimension scale the image is sent at.
+        await script.set(["anthropic": (200, claudeText)])
+        let priced = await OCRCascade.resolve(
+            OCRResult.cutOff, cascade: OCRCascade(routeID: OCRCascade.routeID(for: claude)), provider: .openrouter,
+            model: qwen, refusalFallback: true, imageURL: image, previousText: nil, previousImageURL: nil,
+            customPrompt: nil, imageScale: 0.7, costScale: 0.5, visionSettings: .default)
+        let halfPage = CostEstimator.secondReaderPageCost(model: claude, imageScale: 0.5)
+        check("the escalated page's recorded cost uses the slider fraction, as the pre-run line does",
+              priced.secondReader?.estimatedCost.map { abs($0 - halfPage) < 1e-12 } == true
+              && toClaude.pageCost(imageScale: 0.5).map { abs($0 - halfPage) < 1e-12 } == true
+              && abs(halfPage - CostEstimator.secondReaderPageCost(model: claude, imageScale: 0.7)) > 1e-12)
+        OCRRefusalFallback.routesOverride = { [claudeRoute] }
+        let pricedRefusal = await OCRRefusalFallback.readRefusedPage(
+            OCRResult(text: nil, classification: nil, errorMessage: "recited", errorCode: "Recitation"),
+            imageURL: image, previousText: nil, previousImageURL: nil, customPrompt: nil, imageScale: 0.7,
+            costScale: 0.5)
+        check("a refusal reader's recorded cost uses the same scale",
+              pricedRefusal.secondReader?.estimatedCost.map { abs($0 - halfPage) < 1e-12 } == true)
+        OCRRefusalFallback.routesOverride = { [] }
+        // Through the real synchronous call: the slider fraction it was given is what the page is priced at.
+        await script.set(["openrouter": (200, qwenCut), "anthropic": (200, claudeText)])
+        let syncPriced = await OCRProcessor.performOCRCall(
+            imageURL: image, provider: .openrouter, model: qwen, thinkingLevel: nil, apiKey: "test-first",
+            previousText: nil, previousImageURL: nil, imageScale: 0.5, rotationMode: .off, standardImageMB: 4,
+            cascade: OCRCascade(routeID: OCRCascade.routeID(for: claude)))
+        check("the synchronous path records the escalation at the slider fraction it was given",
+              syncPriced.secondReader?.estimatedCost.map { abs($0 - halfPage) < 1e-12 } == true
+              && abs(halfPage - CostEstimator.secondReaderPageCost(model: claude, imageScale: 1)) > 1e-12)
 
         // 9. Every client names a cut-off and an unparsable reply the same way.
         await script.set(["generativelanguage": (200, #"{"candidates":[{"finishReason":"MAX_TOKENS","content":{"parts":[{"text":"[document_start]\nloop loop"}]}}]}"#)])
@@ -315,6 +385,40 @@ enum OCRCascadeTestDriver {
         """#)
         check("Anthropic batch: a max_tokens page is a cut-off, its neighbour is kept",
               anthropicBatch["file-0"]?.errorCode == "length" && anthropicBatch["file-1"]?.text == "OK")
+        // W40.fix-processor-cascade-edges — an errored Anthropic batch item carries its error type as its code, so
+        // the cascade escalates a batch `api_error` (as a Gemini batch 500) and never a key or request error.
+        let anthropicErrors = AnthropicBatchClient.parseResultsJSONL(#"""
+        {"custom_id":"file-0","result":{"type":"errored","error":{"type":"error","error":{"type":"api_error","message":"Internal server error"}}}}
+        {"custom_id":"file-1","result":{"type":"errored","error":{"type":"api_error","message":"flat"}}}
+        {"custom_id":"file-2","result":{"type":"errored","error":{"type":"error","error":{"type":"invalid_request_error","message":"image exceeds 5 MB"}}}}
+        {"custom_id":"file-3","result":{"type":"errored","error":{"type":"error","error":{"type":"authentication_error","message":"invalid x-api-key"}}}}
+        {"custom_id":"file-4","result":{"type":"errored","error":{"type":"error","error":{"type":"invalid_request_error","message":"Your credit balance is too low"}}}}
+        {"custom_id":"file-5","result":{"type":"expired"}}
+        {"custom_id":"file-6","result":{"type":"errored","error":{"type":"error","error":{"type":"overloaded_error","message":"Overloaded"}}}}
+        {"custom_id":"file-7","result":{"type":"errored","error":{"type":"error","error":{"type":"billing_error","message":"billing"}}}}
+        """#)
+        let code = { (key: String) in anthropicErrors[key]?.errorCode }
+        check("Anthropic batch: an errored item's code is its error type, nested or flat, with its message",
+              code("file-0") == "api_error" && anthropicErrors["file-0"]?.errorMessage == "Internal server error"
+              && code("file-1") == "api_error" && code("file-2") == "invalid_request_error"
+              && anthropicErrors["file-2"]?.errorMessage == "image exceeds 5 MB" && code("file-3") == "authentication_error")
+        check("Anthropic batch: a low credit balance is a 402, an expired item has no code",
+              code("file-4") == "402" && code("file-7") == "402" && code("file-5") == nil && anthropicErrors["file-5"]?.text == nil)
+        check("Anthropic batch: api_error escalates; request, key, billing, overload and expiry do not",
+              anthropicErrors["file-0"].map { OCRCascade.isEscalatable($0, provider: .anthropic) } == true
+              && ["file-2", "file-3", "file-4", "file-5", "file-6"].allSatisfy { key in
+                  anthropicErrors[key].map { !OCRCascade.isEscalatable($0, provider: .anthropic) } == true })
+        await script.set(["openrouter": (200, qwenText)])
+        if let errored = anthropicErrors["file-0"] {
+            r = await OCRCascade.resolve(
+                errored, cascade: OCRCascade(routeID: OCRCascade.routeID(for: qwen)), provider: .anthropic,
+                model: claude, refusalFallback: false, imageURL: image, previousText: nil, previousImageURL: nil,
+                customPrompt: nil, imageScale: 1, visionSettings: .default)
+            check("an Anthropic batch api_error is read again by the escalation route",
+                  r.text?.contains("QWEN-TEXT") == true && r.secondReader?.firstCode == "api_error")
+        } else {
+            check("an Anthropic batch api_error is read again by the escalation route", false)
+        }
 
         // 9b. W41.app-ocr-cascade review M2: with the cascade off, Gemini's reply that held no answer (now coded
         // `unparsable`) still buys no second read, as before it had a code.

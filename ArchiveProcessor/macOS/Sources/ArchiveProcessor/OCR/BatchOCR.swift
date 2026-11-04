@@ -236,13 +236,33 @@ struct AnthropicBatchClient: Sendable {
                 let (classification, rotationDegrees, ocrText) = OCRPrompt.parseResponse(rawText)
                 results[customId] = OCRResult(text: ocrText, classification: classification, rotationDegrees: rotationDegrees, errorMessage: nil, errorCode: nil, enclosure: OCRPrompt.parseEnclosureFlag(rawText))
             } else {
-                let errorJson = resultObj["error"] as? [String: Any]
-                let errorMsg = errorJson?["message"] as? String ?? "Batch request failed"
-                results[customId] = OCRResult(text: nil, classification: nil, errorMessage: errorMsg, errorCode: nil)
+                let (errorMsg, errorCode) = Self.classifyErroredResult(resultObj)
+                results[customId] = OCRResult(text: nil, classification: nil, errorMessage: errorMsg, errorCode: errorCode)
             }
         }
 
         return results
+    }
+
+    /// W40.fix-processor-cascade-edges — an errored, expired or canceled line's message and code. The code is the
+    /// Anthropic error type, as `AnthropicClient` gives on the synchronous path, so the cascade escalates a batch
+    /// `api_error` as it does a synchronous one and a key or quota error is never escalated. The API nests the
+    /// error body (`{"type":"error","error":{"type":"api_error",…}}`); a flat `{"type":"api_error",…}` reads the
+    /// same. A low credit balance (or a `billing_error`) is a billing failure, coded 402 as on the synchronous
+    /// path. Since the message is now the provider's own, an `overloaded_error` or `rate_limit_error` page is
+    /// re-read by the run's high-use retry pass, as a Gemini batch 429 already was. An expired or
+    /// canceled request carries no error, and keeps no code (the request got no reading).
+    static func classifyErroredResult(_ resultObj: [String: Any]) -> (message: String, code: String?) {
+        let outer = resultObj["error"] as? [String: Any]
+        let inner = outer?["error"] as? [String: Any]
+        let body = inner ?? outer
+        let message = (body?["message"] as? String) ?? (outer?["message"] as? String) ?? "Batch request failed"
+        guard let type = body?["type"] as? String, !type.isEmpty, type != "error" else { return (message, nil) }
+        if type == "billing_error"
+            || (type == "invalid_request_error" && message.localizedCaseInsensitiveContains("credit balance")) {
+            return (billingStatusMessage(402, provider: .anthropic, detail: message) ?? message, "402")
+        }
+        return (message, type)
     }
 
     /// Cancel a running batch.

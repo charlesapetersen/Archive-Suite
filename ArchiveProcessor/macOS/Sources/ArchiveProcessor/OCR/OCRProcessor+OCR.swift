@@ -1263,9 +1263,10 @@ extension OCRProcessor {
                         mode: rotationMode, gatewayConfig: gateway, localAgent: localAgent
                     )
                     // A Stop cancels the routes mid-read, so "every second reader failed" is not true: never
-                    // persist that verdict; the kept journal brings the page back on resume.
-                    let abandoned = Task.isCancelled && (read.errorCode == OCRRefusalFallback.exhaustedCode
-                        || read.errorCode == OCRCascade.exhaustedCode)
+                    // persist that verdict; the kept journal brings the page back on resume. Since
+                    // W40.fix-processor-cascade-edges a stopped escalation hands back the batch's own failure, so
+                    // any page left without text under a Stop is held back, not only an exhausted one.
+                    let abandoned = Task.isCancelled && read.text == nil
                     return (entry.index, entry.url, entry.jobID,
                             Self.mergeRotation(into: read, correction: correction), abandoned)
                 }
@@ -1804,13 +1805,15 @@ extension OCRProcessor {
             resolved = await OCRCascade.resolve(
                 networkResult, cascade: cascade, provider: provider, model: model, refusalFallback: refusalFallback,
                 imageURL: imageURL, previousText: previousText, previousImageURL: previousImageURL,
-                customPrompt: customPrompt, imageScale: scale, visionSettings: visionSettings)
+                customPrompt: customPrompt, imageScale: scale, costScale: imageScale,
+                visionSettings: visionSettings)
         } else if localAgent == nil, let localGateway {
             let local = localGateway.asLLMModel()
             resolved = await OCRCascade.resolve(
                 networkResult, cascade: cascade, provider: local.provider, model: local, refusalFallback: false,
                 imageURL: imageURL, previousText: previousText, previousImageURL: previousImageURL,
-                customPrompt: customPrompt, imageScale: scale, visionSettings: visionSettings,
+                customPrompt: customPrompt, imageScale: scale, costScale: imageScale,
+                visionSettings: visionSettings,
                 firstReaderLabel: localGateway.displayName)
         } else {
             resolved = networkResult

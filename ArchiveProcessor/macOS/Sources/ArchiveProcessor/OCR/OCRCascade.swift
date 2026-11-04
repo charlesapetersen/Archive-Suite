@@ -149,17 +149,26 @@ struct OCRCascade: Codable, Equatable, Sendable {
     /// not apply or nothing triggers it. A failed first reading the escalation route also fails stays a failure
     /// (`exhaustedCode`, naming both reasons) unless it was a Gemini refusal, which then goes on to the refusal
     /// readers as before (`refusalFallback`). A disagreement whose escalation fails keeps the first reading.
+    /// A Stop that cuts the escalation short (W40.fix-processor-cascade-edges) returns the first reading as it came
+    /// back, so the page keeps its own failure and code rather than a `CascadeExhausted` verdict the escalation
+    /// route never gave; the batch path does not persist it either.
+    ///
+    /// `imageScale` is the scale the image is sent at; `costScale` is the size-target slider fraction the recorded
+    /// cost is priced at, the one the pre-run line and the batch path use (nil = `imageScale`, which on the batch
+    /// path already is that fraction). The synchronous path sends a per-file dimension scale, which the estimator
+    /// does not take.
     static func resolve(
         _ first: OCRResult, cascade: OCRCascade, provider: LLMProvider, model: LLMModel, refusalFallback: Bool,
         imageURL: URL, previousText: String?, previousImageURL: URL?, customPrompt: String?, imageScale: Double,
-        visionSettings: VisionOCRSettings, firstReaderLabel: String? = nil
+        costScale: Double? = nil, visionSettings: VisionOCRSettings, firstReaderLabel: String? = nil
     ) async -> OCRResult {
+        let costScale = costScale ?? imageScale
         let refused = refusalFallback && provider == .gemini && OCRRefusalFallback.isRefusal(first)
         guard cascade.applies(to: provider, model: model), let target = cascade.escalationModel else {
             return refused
                 ? await OCRRefusalFallback.readRefusedPage(
                     first, imageURL: imageURL, previousText: previousText, previousImageURL: previousImageURL,
-                    customPrompt: customPrompt, imageScale: imageScale)
+                    customPrompt: customPrompt, imageScale: imageScale, costScale: costScale)
                 : first
         }
         cascade.breaker.notePage(imageURL)
@@ -187,7 +196,7 @@ struct OCRCascade: Codable, Equatable, Sendable {
             if refused, !Task.isCancelled {
                 return await OCRRefusalFallback.readRefusedPage(
                     first, imageURL: imageURL, previousText: previousText, previousImageURL: previousImageURL,
-                    customPrompt: customPrompt, imageScale: imageScale)
+                    customPrompt: customPrompt, imageScale: imageScale, costScale: costScale)
             }
             let note = " Not escalated: \(admitted.escalated) of the run's \(admitted.pages) pages already were, which "
                 + "points to a fault on the first route rather than hard pages."
@@ -198,10 +207,11 @@ struct OCRCascade: Codable, Equatable, Sendable {
         let firstLabel = firstReaderLabel ?? "\(model.provider.rawValue) · \(model.displayName)"
         let targetLabel = "\(target.provider.rawValue) · \(target.displayName)"
         var why: String
-        // The escalation's code for `OCRResult.readingCodes`: "" when it threw, had no key or was stopped.
+        // The escalation's code for `OCRResult.readingCodes`: "" when it threw or had no key.
         var whyCode = ""
         if Task.isCancelled {
-            why = "stopped before \(targetLabel)"
+            NSLog("[OCR] \(imageURL.lastPathComponent): stopped before the escalation to \(targetLabel)")
+            return first
         } else if let key = key(for: target.provider), !key.isEmpty {
             let route = OCRRefusalFallback.Route(provider: target.provider, model: target, apiKey: key, localAgent: nil)
             do {
@@ -211,7 +221,7 @@ struct OCRCascade: Codable, Equatable, Sendable {
                 if read.text != nil {
                     let reader = SecondReader(
                         provider: route.provenanceProvider, model: route.provenanceModel, firstCode: firstCode,
-                        estimatedCost: CostEstimator.secondReaderPageCost(model: target, imageScale: imageScale),
+                        estimatedCost: CostEstimator.secondReaderPageCost(model: target, imageScale: costScale),
                         trigger: trigger, firstReader: firstLabel)
                     NSLog("[OCR] \(imageURL.lastPathComponent): read by \(reader.summary)")
                     return OCRResult(text: read.text, classification: read.classification,
@@ -226,15 +236,21 @@ struct OCRCascade: Codable, Equatable, Sendable {
         } else {
             why = "\(targetLabel) has no API key in Settings"
         }
+        // Stopped mid-read: the escalation route gave no verdict on the page (its request was cancelled, or its
+        // reply came back cut short), so the page goes back to the first reading's failure, code and all.
+        if Task.isCancelled {
+            NSLog("[OCR] \(imageURL.lastPathComponent): escalation (\(trigger.rawValue)) stopped — \(why)")
+            return first
+        }
         NSLog("[OCR] \(imageURL.lastPathComponent): escalation (\(trigger.rawValue)) failed — \(why)")
 
         // A disagreement still has the first reader's text: keep it rather than fail a page that was read.
         if trigger == .disagreement { return first }
-        if refused, !Task.isCancelled {
+        if refused {
             return await OCRRefusalFallback.readRefusedPage(
                 first, imageURL: imageURL, previousText: previousText, previousImageURL: previousImageURL,
-                customPrompt: customPrompt, imageScale: imageScale, excluding: target, failedBefore: why,
-                failedBeforeCode: whyCode)
+                customPrompt: customPrompt, imageScale: imageScale, costScale: costScale, excluding: target,
+                failedBefore: why, failedBeforeCode: whyCode)
         }
         let firstWhy = first.errorMessage ?? "\(firstLabel) returned no text (\(firstCode))."
         return OCRResult(text: nil, classification: nil,

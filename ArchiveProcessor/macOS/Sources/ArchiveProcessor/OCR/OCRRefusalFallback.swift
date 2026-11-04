@@ -106,9 +106,11 @@ enum OCRRefusalFallback {
     /// marked with `secondReader`. Otherwise a failure (`exhaustedCode`) naming Gemini's reason and every route's.
     static func readRefusedPage(
         _ refused: OCRResult, imageURL: URL, previousText: String?, previousImageURL: URL?,
-        customPrompt: String?, imageScale: Double, excluding: LLMModel? = nil, failedBefore: String? = nil,
-        failedBeforeCode: String = ""
+        customPrompt: String?, imageScale: Double, costScale: Double? = nil, excluding: LLMModel? = nil,
+        failedBefore: String? = nil, failedBeforeCode: String = ""
     ) async -> OCRResult {
+        // Priced at the size-target slider fraction, as the pre-run line is (`OCRCascade.resolve`'s `costScale`).
+        let costScale = costScale ?? imageScale
         let why = refused.errorMessage ?? "Gemini returned no text (\(refused.errorCode ?? "?"))."
         // W40.fix-processor-failed-ocr-wrapped: every reading's code, so Live Capture can tell a page never read
         // (Gemini's 500, then a 402 on each second reader) from a refusal (`OCRResult.readingCodes`).
@@ -147,7 +149,7 @@ enum OCRRefusalFallback {
             }
             if result.text != nil {
                 let cost = route.localAgent == nil
-                    ? CostEstimator.secondReaderPageCost(model: route.model, imageScale: imageScale) : 0
+                    ? CostEstimator.secondReaderPageCost(model: route.model, imageScale: costScale) : 0
                 let reader = SecondReader(provider: route.provenanceProvider, model: route.provenanceModel,
                                           firstCode: refused.errorCode ?? "?", estimatedCost: cost)
                 NSLog("[OCR] Gemini refused \(imageURL.lastPathComponent); read by \(reader.summary)")

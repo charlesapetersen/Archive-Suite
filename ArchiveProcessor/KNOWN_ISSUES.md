@@ -324,12 +324,15 @@ model elsewhere; the weights come from 144 pages of one corpus, so refit as labe
 
 ## ⚠️ LIMITATION (W41.app-ocr-cascade, 2026-10-16): what the cheap-first cascade does not yet cover
 
-`OCRCascade` (off by default) re-reads a failed page with the user's escalation model. What it leaves open, from its
-Tier-2 review: an **Anthropic batch** item that errors carries no code, so it is not escalated (a Gemini batch 500
-is); the recorded escalation cost uses the per-file dimension scale on the synchronous path but the slider fraction
-on the batch path and in the pre-run line (the refusal readers already did the same); a **Stop during an
-escalation read** on the synchronous path leaves the page `CascadeExhausted` (only batch collection refuses to keep
-that verdict), so it needs the operator's Retry; a **disagreement** escalation that fails keeps the first reading
+`OCRCascade` (off by default) re-reads a failed page with the user's escalation model. Fixed since its Tier-2 review
+(W40.fix-processor-cascade-edges, 2026-11-03): an errored **Anthropic batch** item now carries its error type as
+its code and its own message (nested or flat body; a low credit balance or `billing_error` is `402`), so a batch
+`api_error` escalates as a Gemini batch 500 does, and an overloaded or rate-limited batch page is now re-read by the
+high-use retry pass at the synchronous price, as a Gemini batch 429 already was; a **Stop** before or during an escalation read returns the page to its first reading's failure rather than
+`CascadeExhausted`, and batch collection holds back any page a Stop left without text; the recorded cost of an
+escalated or refusal-read page is priced at the slider fraction on every path, as the pre-run line is (the
+synchronous path used to price it at the per-file dimension scale). A Stop during the refusal readers alone (cascade
+off) still leaves `GeminiRefused` on the synchronous path. What it leaves open: a **disagreement** escalation that fails keeps the first reading
 and its spend is not added to the run's history; the breaker (`OCRCascade.Breaker`: the first 20 escalations, then
 at most a quarter of the run's pages) counts afresh after a resume. Since this item every client fails a reply cut
 off at the token limit (`length`) instead of saving the cut text; on OpenAI reasoning models a high Thinking level

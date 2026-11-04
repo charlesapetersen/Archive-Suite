@@ -14006,3 +14006,18 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   `report` needs `make --out ~/Library/Caches/ArchiveSuiteRehearsal/capture-ladder/pack` first (deterministic,
   about 25 minutes, needs augraphy) and `vision` for the re-save and tilt arms.
   <!-- /W46.capture-ladder -->
+- [x] **W40.fix-processor-cascade-edges — the OCR cascade's open edges: an Anthropic batch error is not escalated, and Stop mid-escalation leaves CascadeExhausted [S · S3]** · §W40 — verification phase (lane: processor) (uses: build) — Owner, 2026-10-31: queued from a KNOWN_ISSUES entry that no queue item covered (survey of the three KNOWN_ISSUES files). `ArchiveProcessor/KNOWN_ISSUES.md` §"LIMITATION (W41.app-ocr-cascade)": an Anthropic batch item that errors carries no code, so it is not escalated (a Gemini batch 500 is); a Stop during an escalation read on the synchronous path leaves the page `CascadeExhausted`; the recorded escalation cost uses the per-file dimension scale on the synchronous path but the slider fraction on the batch path and the pre-run line. Fix each (classify the Anthropic batch error from its body; a cancelled escalation returns the page to its pre-escalation failure; one cost scale) with cases in `scripts/test-ocr-cascade.sh`, and update the entry. SHIPPED 2026-11-03.
+  All three fixed, with cases in `scripts/test-ocr-cascade.sh` (59 → 68 checks, ALL PASS). (1) `AnthropicBatchClient.classifyErroredResult`:
+  an errored batch line carries its Anthropic error type as its code, nested (the real API's `error.error`) or flat,
+  with the provider's own message; a low credit balance or `billing_error` is `402`; expired/canceled keep no code. A
+  batch `api_error` now escalates; request, key, billing and overload errors do not. Side effect the review found:
+  with the real message, an overloaded/rate-limited batch page is re-read by the high-use retry pass at the
+  synchronous price, as a Gemini batch 429 already was (KNOWN_ISSUES). (2) A Stop before or during the escalation read
+  returns the first reading unchanged (code, message, readingCodes), never `CascadeExhausted`, and a refused Gemini
+  page stopped there buys no refusal reader; batch collection now holds back any page a Stop left without text (the
+  journal is kept, the page is collected on resume). (3) One cost scale: `resolve` and `readRefusedPage` take
+  `costScale`, the slider fraction; the synchronous path passes its slider fraction instead of the per-file dimension
+  scale. Remaining open edges (disagreement spend, breaker after resume, Stop in the refusal readers alone) stay in
+  KNOWN_ISSUES. Adversarial review (opus): no blocking defect; its comment, `billing_error` and test-strength notes
+  were folded in. The Processor build needs `-jobs 3` under the heavy lock's memory limit. No bench cache used; no paid call.
+  <!-- /W40.fix-processor-cascade-edges -->
