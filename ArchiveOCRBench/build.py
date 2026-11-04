@@ -37,9 +37,10 @@ GATEWAY_CSV = RESULTS / "gemini37-vs-38-groups.csv"
 GATEWAY_ROUTES = {"gemini3.7-flash-gw"}
 # W46.ocr-new-open's Mac readers and W46.ocr-new-open-boxes's granite-docling, added after the difficulty fit was built:
 # on the headline and speed tables, not in the fit.
-LATE_MAC_ROUTES = {"xiaomi-ocr-0-bf16", "paddleocr-vl1.6-bf16", "granite-docling-258m-mlx"}
+LATE_MAC_ROUTES = {"xiaomi-ocr-0-bf16", "paddleocr-vl1.6-bf16", "granite-docling-258m-mlx", "apple-fm-27"}
 MAC_MD = RESULTS / "ocr-mac-local.md"
 MAC_CSV = RESULTS / "ocr-mac-local-groups.csv"
+FOUNDATION = RESULTS / "r1-foundation.json"  # W46.r1-foundation: fm_foundation.py report, Apple's on-device model
 FARMSHARE = RESULTS / "farmshare" / "truth"
 PANEL_PY = HERE.parent / "ArchiveProcessor" / "scripts" / "segbench" / "ocr_panel.py"
 OPTIONS_MD = RESULTS / "options.md"
@@ -1132,6 +1133,19 @@ def main():
         scores, hw = farmshare_run(spec["run"], inputs["kinds"], op)
         extra.append({"name": spec["name"], "panel": "farmshare", "under": spec["under"], "std": cents(hw["usd_per_1000"]), "machine": spec["machine"],
                       "hw": hw, "scores": scores})
+    # W46.r1-foundation: Apple's macOS 27 on-device model, free on this Mac, on the 96 charts only. Its public figures
+    # are 100 Latin pages of the 895, not the full set, so they stay off the public tables (README, Completeness rule).
+    fm96 = json.loads(FOUNDATION.read_text())["ocr"].get("96") if FOUNDATION.exists() else None
+    if fm96:
+        if fm96["n"] != 96 or fm96["attempted"] != 96 or any(k not in fm96["groups"] for k in inputs["kinds"]):
+            sys.exit(f"{FOUNDATION.name}: the 96 must be read in full, with every kind")
+        sc = lambda g: [round(100 * g["fm_nes"], 2), int(g["ok"]), int(g["n"])]
+        routes.append({"id": "apple-fm-27", "name": "Apple on-device model (macOS 27)", "panel": "mac", "pair": None,
+                       "std": 0.0, "batch": None, "free_cluster": False,
+                       "machine": "Apple M3 Pro, 18 GB; the OS's own model",
+                       "hw": {"seconds": fm96["seconds"]["median"], "peak_gb": None, "peak_max_gb": None}})
+        for c in charts:
+            c["scores"]["apple-fm-27"] = sc(fm96) if c["key"] == "overall" else sc(fm96["groups"][c["key"]])
     layout_photo_data = json.loads(LAYOUT_PHOTO.read_text()) if LAYOUT_PHOTO.exists() else None
     for route in [*region_chart_routes(regions, inputs["kinds"], op),
                   *layout_photo_chart_routes(layout_photo_data, inputs["kinds"], op)]:

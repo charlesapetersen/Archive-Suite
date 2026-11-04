@@ -101,6 +101,11 @@ the 96 (16 handwritten, 2 mixed; the three agreement-only letters are left out, 
 they join part 7's stratum table as L1-L3 columns, but not the 895 table (no other stratum read), not the 96's four
 charts, the ranking table or part 5 (no typed or printed page read), so their owner figures stay in their own panel.
 
+W46.r1-foundation's Apple on-device model (macOS 27, `segbench-results/r1-foundation.json`) is on the 96's four charts
+and the speed table as a free Mac route, with no app memory figure (the model runs in the OS). Its public figures are
+100 Latin pages of the 895 (25 from each of L5-L8), not the full set, so they stay off the 895 and stratum tables and
+are reported only in `r1-foundation.md`; it is not in part 5 (no per-page fit).
+
 W46.ocr-ppocrv6-hands-paid's 0/8/16-line prompting panel is scaffolded but hidden while its run is
 incomplete. The reservation guard stopped at $2.427833 against the $2.50 cap after 207 conditions
 (195 successes, two content-filter refusals, ten retained old gateway failures); six Blackwell conditions

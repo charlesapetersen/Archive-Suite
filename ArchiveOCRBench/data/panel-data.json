@@ -609,6 +609,21 @@
    }
   },
   {
+   "id": "apple-fm-27",
+   "name": "Apple on-device model (macOS 27)",
+   "panel": "mac",
+   "pair": null,
+   "std": 0.0,
+   "batch": null,
+   "free_cluster": false,
+   "machine": "Apple M3 Pro, 18 GB; the OS's own model",
+   "hw": {
+    "seconds": 9.507528007030487,
+    "peak_gb": null,
+    "peak_max_gb": null
+   }
+  },
+  {
    "id": "regions-glm-ocr-doclayout_yolo",
    "name": "GLM-OCR \u00b7 DocLayout-YOLO",
    "panel": "farmshare",
@@ -1716,6 +1731,11 @@
      92,
      96
     ],
+    "apple-fm-27": [
+     42.35,
+     63,
+     96
+    ],
     "regions-glm-ocr-doclayout_yolo": [
      70.9,
      88,
@@ -2317,6 +2337,11 @@
     "nemotron-parse-2-sherlock": [
      90.69,
      50,
+     50
+    ],
+    "apple-fm-27": [
+     46.14,
+     33,
      50
     ],
     "regions-glm-ocr-doclayout_yolo": [
@@ -2922,6 +2947,11 @@
      28,
      28
     ],
+    "apple-fm-27": [
+     27.97,
+     15,
+     28
+    ],
     "regions-glm-ocr-doclayout_yolo": [
      74.91,
      26,
@@ -3522,6 +3552,11 @@
     ],
     "nemotron-parse-2-sherlock": [
      52.43,
+     13,
+     16
+    ],
+    "apple-fm-27": [
+     54.81,
      13,
      16
     ],

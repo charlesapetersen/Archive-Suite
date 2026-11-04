@@ -486,7 +486,7 @@ const priceCell = r => r.free_cluster ? 'no hosted price (free on the cluster)' 
 const FREE_CLUSTER = 0.19;  // just right of the Mac routes in the free column, so the two kinds of free stay apart
 const clusterName = r => r.cluster || 'Stanford FarmShare';
 const gpuText = r => r.hw.gpu_hours_per_100k == null ? 'per-arm throughput not measured' : Math.round(r.hw.gpu_hours_per_100k) + ' GPU-hours per 100,000 photos';
-const hwText = r => r.panel === 'mac' ? r.hw.seconds.toFixed(0) + ' s a page · ' + r.hw.peak_gb.toFixed(1) + ' GB peak (' + r.hw.peak_max_gb.toFixed(1) + ' max) · ' + r.machine
+const hwText = r => r.panel === 'mac' ? r.hw.seconds.toFixed(0) + ' s a page · ' + (r.hw.peak_gb == null ? 'OS model, no app memory' : r.hw.peak_gb.toFixed(1) + ' GB peak (' + r.hw.peak_max_gb.toFixed(1) + ' max)') + ' · ' + r.machine
   : r.panel === 'farmshare' ? (r.hw.photos_per_hour == null ? gpuText(r) : Math.round(r.hw.photos_per_hour).toLocaleString() + ' photos an hour · ' + gpuText(r)) + ' · ' + r.machine + ' · ' + clusterName(r) : '—';
 const overallRank = DATA.charts[0].scores;
 const routes = DATA.routes.slice().sort((a, b) => overallRank[b.id][0] - overallRank[a.id][0]);

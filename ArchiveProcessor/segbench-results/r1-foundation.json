@@ -1,0 +1,434 @@
+{
+ "tag": "W46.r1-foundation",
+ "model": "SystemLanguageModel (on-device), macOS 27.2 (26B123), Apple M3 Pro 18 GB",
+ "ocr": {
+  "96": {
+   "n": 96,
+   "attempted": 96,
+   "ok": 63,
+   "failures": {
+    "length": 33
+   },
+   "fm_nes": 0.423541070854806,
+   "fm_nes_answered": 0.6453959174930378,
+   "vision_nes": 0.8136946626993543,
+   "fm_nes_loops_cut": 0.46409320483088484,
+   "vision_ok": 96,
+   "diff": {
+    "mean": -0.39015359184454823,
+    "lo": -0.46989926385045594,
+    "hi": -0.30974702872200316
+   },
+   "diff_answered": -0.16121387838720014,
+   "fm_better": 15,
+   "fm_worse": 81,
+   "seconds": {
+    "median": 9.507528007030487,
+    "p90": 80.53843200206757,
+    "max": 90.7671240568161,
+    "total": 3078.938758611679
+   },
+   "input_tokens": {
+    "median": 244.0,
+    "min": 244,
+    "max": 276
+   },
+   "image_tokens": [
+    [
+     131,
+     53
+    ],
+    [
+     147,
+     41
+    ],
+    [
+     163,
+     2
+    ]
+   ],
+   "output_tokens": {
+    "median": 369.0,
+    "max": 4102
+   },
+   "sent_px": [
+    [
+     "1793x2400",
+     41
+    ],
+    [
+     "1800x2400",
+     10
+    ],
+    [
+     "1807x2400",
+     11
+    ]
+   ],
+   "groups": {
+    "handwritten": {
+     "n": 16,
+     "ok": 13,
+     "fm_nes": 0.548103542000511,
+     "fm_nes_answered": 0.6745889747698597,
+     "vision_nes": 0.5806094333758726,
+     "vision_nes_answered": 0.5940265713175485,
+     "diff_answered": [
+      0.08056240345231117,
+      -0.011400146161570214,
+      0.17728489625761734
+     ]
+    },
+    "mixed": {
+     "n": 2,
+     "ok": 2,
+     "fm_nes": 0.49529879097204765,
+     "fm_nes_answered": 0.49529879097204765,
+     "vision_nes": 0.7320015552948238,
+     "vision_nes_answered": 0.7320015552948238,
+     "diff_answered": [
+      -0.2367027643227762,
+      -0.2879341864716636,
+      -0.18547134217388883
+     ]
+    },
+    "printed": {
+     "n": 28,
+     "ok": 15,
+     "fm_nes": 0.2796760646139094,
+     "fm_nes_answered": 0.5220619872792976,
+     "vision_nes": 0.7643178444012291,
+     "vision_nes_answered": 0.8025631235941978,
+     "diff_answered": [
+      -0.28050113631490026,
+      -0.4204422826943985,
+      -0.14724176884591228
+     ]
+    },
+    "typewritten": {
+     "n": 50,
+     "ok": 33,
+     "fm_nes": 0.4613751747783929,
+     "fm_nes_answered": 0.6990532951187771,
+     "vision_nes": 0.9192006786259996,
+     "vision_nes_answered": 0.8967158105704316,
+     "diff_answered": [
+      -0.1976625154516545,
+      -0.27196026230857573,
+      -0.12920335629129667
+     ]
+    }
+   },
+   "auc": {
+    "this model NES < 70": {
+     "positives": 65,
+     "auc": 0.9627791563275434
+    },
+    "this model NES < 90": {
+     "positives": 85,
+     "auc": 0.9978609625668449
+    },
+    "this model failed": {
+     "positives": 33,
+     "auc": 1.0
+    },
+    "Apple Vision NES < 70": {
+     "positives": 25,
+     "auc": 0.6326760563380281
+    },
+    "Apple Vision NES < 90": {
+     "positives": 41,
+     "auc": 0.5507760532150776
+    }
+   },
+   "auc_answered": {
+    "this model NES < 70": {
+     "positives": 32,
+     "auc": 0.9243951612903226
+    },
+    "this model NES < 90": {
+     "positives": 52,
+     "auc": 0.9965034965034965
+    },
+    "this model failed": {
+     "positives": 0,
+     "auc": null
+    },
+    "Apple Vision NES < 70": {
+     "positives": 17,
+     "auc": 0.8375959079283888
+    },
+    "Apple Vision NES < 90": {
+     "positives": 30,
+     "auc": 0.7656565656565657
+    }
+   }
+  },
+  "100": {
+   "n": 100,
+   "attempted": 6,
+   "ok": 2,
+   "failures": {
+    "length": 4
+   },
+   "fm_nes": 0.023798080200706284,
+   "fm_nes_answered": 0.07139424060211885,
+   "vision_nes": 0.6345254140241251,
+   "fm_nes_loops_cut": 0.0274376284829906,
+   "vision_ok": 6,
+   "diff": {
+    "mean": -0.6107273338234188,
+    "lo": -0.6812140882252055,
+    "hi": -0.5307932905620606
+   },
+   "diff_answered": -0.4958353785740582,
+   "fm_better": 0,
+   "fm_worse": 6,
+   "seconds": {
+    "median": 89.69745945930481,
+    "p90": 91.9822289943695,
+    "max": 92.32737398147583,
+    "total": 369.0760979652405
+   },
+   "input_tokens": {
+    "median": 244.0,
+    "min": 244,
+    "max": 260
+   },
+   "image_tokens": [
+    [
+     131,
+     4
+    ],
+    [
+     147,
+     2
+    ]
+   ],
+   "output_tokens": {
+    "median": 4102.0,
+    "max": 4102
+   },
+   "sent_px": [
+    [
+     "1786x2400",
+     2
+    ],
+    [
+     "1788x2400",
+     1
+    ],
+    [
+     "1811x2400",
+     1
+    ]
+   ],
+   "groups": {
+    "L5": {
+     "n": 6,
+     "ok": 2,
+     "fm_nes": 0.023798080200706284,
+     "fm_nes_answered": 0.07139424060211885,
+     "vision_nes": 0.6345254140241251,
+     "vision_nes_answered": 0.567229619176177,
+     "diff_answered": [
+      -0.4958353785740582,
+      -0.5517241379310345,
+      -0.4399466192170819
+     ]
+    }
+   },
+   "auc": {
+    "this model NES < 70": {
+     "positives": 6,
+     "auc": null
+    },
+    "this model NES < 90": {
+     "positives": 6,
+     "auc": null
+    },
+    "this model failed": {
+     "positives": 4,
+     "auc": 1.0
+    },
+    "Apple Vision NES < 70": {
+     "positives": 5,
+     "auc": 0.3
+    },
+    "Apple Vision NES < 90": {
+     "positives": 6,
+     "auc": null
+    }
+   },
+   "auc_answered": {
+    "this model NES < 70": {
+     "positives": 2,
+     "auc": null
+    },
+    "this model NES < 90": {
+     "positives": 2,
+     "auc": null
+    },
+    "this model failed": {
+     "positives": 0,
+     "auc": null
+    },
+    "Apple Vision NES < 70": {
+     "positives": 2,
+     "auc": null
+    },
+    "Apple Vision NES < 90": {
+     "positives": 2,
+     "auc": null
+    }
+   }
+  }
+ },
+ "segmentation": {
+  "box": "Deaver",
+  "windows": 149,
+  "runs": {
+   "on-device k3-t": {
+    "failed_windows": 139,
+    "failures": {
+     "unparsed": 139
+    },
+    "seconds": {
+     "median": 5.878491997718811,
+     "total": 903.1680437326431
+    },
+    "input_tokens": {
+     "median": 3332,
+     "max": 3670
+    }
+   },
+   "on-device k3-t guided": {
+    "failed_windows": 17,
+    "failures": {
+     "refusal": 3,
+     "unparsed": 14
+    },
+    "seconds": {
+     "median": 6.56467604637146,
+     "total": 953.5528292655945
+    },
+    "input_tokens": {
+     "median": 3375,
+     "max": 3717
+    }
+   }
+  },
+  "rows": {
+   "on-device k3-t": {
+    "pages": 141,
+    "pages_exact": 0.3404255319148936,
+    "boundary_f1": 0.7570093457943924,
+    "false_splits": 49,
+    "false_merges": 3
+   },
+   "on-device k3-t guided": {
+    "pages": 141,
+    "pages_exact": 0.3333333333333333,
+    "boundary_f1": 0.7211538461538463,
+    "false_splits": 49,
+    "false_merges": 9
+   },
+   "Gemini 3.7 k3-t": {
+    "pages": 141,
+    "pages_exact": 0.9361702127659575,
+    "boundary_f1": 0.9761904761904762,
+    "false_splits": 2,
+    "false_merges": 2
+   },
+   "Gemini 3.7 k3-it": {
+    "pages": 141,
+    "pages_exact": 0.9219858156028369,
+    "boundary_f1": 0.9822485207100591,
+    "false_splits": 2,
+    "false_merges": 1
+   }
+  },
+  "paired": {
+   "on-device k3-t \u2212 Gemini 3.7 k3-t": {
+    "delta": -0.5957446808510638,
+    "lo": -0.6987179487179487,
+    "hi": -0.47368421052631576,
+    "pages": 141,
+    "runs": 89
+   },
+   "on-device k3-t \u2212 Gemini 3.7 k3-it": {
+    "delta": -0.5815602836879432,
+    "lo": -0.6891891891891891,
+    "hi": -0.4626865671641791,
+    "pages": 141,
+    "runs": 89
+   },
+   "on-device k3-t guided \u2212 Gemini 3.7 k3-t": {
+    "delta": -0.6028368794326241,
+    "lo": -0.7103448275862069,
+    "hi": -0.47244094488188976,
+    "pages": 141,
+    "runs": 89
+   },
+   "on-device k3-t guided \u2212 Gemini 3.7 k3-it": {
+    "delta": -0.5886524822695035,
+    "lo": -0.6962025316455697,
+    "hi": -0.46808510638297873,
+    "pages": 141,
+    "runs": 89
+   }
+  },
+  "incomplete": []
+ },
+ "image_tokens_by_size": [
+  {
+   "h": 256,
+   "input": 125,
+   "side": 256,
+   "tokenCount": 67,
+   "w": 191
+  },
+  {
+   "h": 512,
+   "input": 253,
+   "side": 512,
+   "tokenCount": 195,
+   "w": 382
+  },
+  {
+   "h": 768,
+   "input": 189,
+   "side": 768,
+   "tokenCount": 131,
+   "w": 573
+  },
+  {
+   "h": 1024,
+   "input": 189,
+   "side": 1024,
+   "tokenCount": 131,
+   "w": 765
+  },
+  {
+   "h": 1536,
+   "input": 189,
+   "side": 1536,
+   "tokenCount": 131,
+   "w": 1148
+  },
+  {
+   "h": 2400,
+   "input": 189,
+   "side": 2400,
+   "tokenCount": 131,
+   "w": 1793
+  },
+  {
+   "h": 2400,
+   "input": 189,
+   "side": 4000,
+   "tokenCount": 131,
+   "w": 1793
+  }
+ ]
+}

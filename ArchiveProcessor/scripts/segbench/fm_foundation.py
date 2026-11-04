@@ -419,7 +419,30 @@ def write_md(o):
     (RESULTS / 'r1-foundation.md').write_text('\n'.join(L) + '\n')
 
 
-FINDINGS = []   # filled from the measured results when the report is written up
+FINDINGS = [   # written from the measured results; the figures are in the tables below
+    '## Findings', '',
+    '- **Not a first reader.** On the owner\'s 96 it scores 42.4 NES against Apple Vision\'s 81.4 on the same images '
+    '(-39.0 points, interval -47.0 to -31.0). A third of the pages (33 of 96) run into a repetition loop and reach the '
+    '4,096-token cap; cutting each loop where it starts recovers only 4 points (46.4). Where it finishes a page it '
+    'still trails Vision on typed (-19.8) and printed (-28.1) pages.',
+    '- **Handwriting is the one lead, and it is a tie.** On the 13 handwritten pages it finished it reads 67.5 against '
+    'Vision\'s 59.4 (+8.1, interval -1.1 to +17.7). Those 13 are chosen by the model itself finishing, so this is a lead '
+    'for a test with a loop stop, not a result.',
+    '- **The image is seen at a fixed small size.** 131 image tokens for any page from 768 px to 2,400 px on the long '
+    'side (147-163 for other aspect ratios); sending more pixels buys nothing, and the resolution arm is moot. A page '
+    'takes 9.5 s at the median, 80 s when it loops.',
+    '- **Disagreement flags its own bad pages, not Vision\'s.** Its disagreement with Vision picks out its own pages '
+    'under 70 NES at AUC 0.92 (answered pages); Vision\'s own pages under 70 only at 0.84 and under 90 at 0.77 on the '
+    'pages it answered, and at 0.63 and 0.55 over all 96, because its loops (zero agreement) fall mostly on pages Vision '
+    'reads well. As a free routing voter beside Vision it is weak, and its loops make it noisy.',
+    '- **No text-only segmentation voter.** On Deaver, Gemini 3.7\'s k3-t prompt word for word gives replies that copy '
+    'the pasted schema\'s wrapper (139 of 149 unparsable); with guided generation into the same fields, 132 parse but '
+    'score 33.3% of pages in an exact document against Gemini 3.7\'s 93.6% (-60.3 points), 49 false splits: no better '
+    'than the failed windows\' 0.5 votes.',
+    '- **Guardrails.** The stock guardrail refused an owner page on the pilot; permissiveContentTransformations was used '
+    'throughout, and still refused 3 of 149 segmentation windows.',
+    '- **The 100 of the 895 are PENDING** (the run was still reading when this was written; the table shows what is in).',
+]
 
 
 def main():
