@@ -158,7 +158,7 @@ footer p { font-size: 13px; }
     <div id="swm-gw" hidden>
       <h3>Gemini 3.7 Flash through the gateway: images against text alone, and window size</h3>
       <div class="tbl"><table><thead><tr><th>Arm</th><th>Boxes</th><th>Pages in exact document</th><th>Boundary F1</th><th>Less its control, points (95% interval)</th></tr></thead><tbody id="swm-gw-rows"></tbody></table></div>
-      <p class="note" id="swm-gw-note">Gemini 3.7 Flash, low reasoning, the bench's g1 request, truth photos. Each arm is read against the Gemini 3.7 control on the same pages (K = 7 with images; a text-only row against the same size with images); the 3.8 row is a different model and route, for reference only. Intervals are a paired bootstrap over folder runs and do not include rerun noise (1.4 to 3.2 points a box). Source: <code>seg-window-gateway.md</code>.</p>
+      <p class="note" id="swm-gw-note">Gemini 3.7 Flash, low reasoning, the bench's g1 request, truth photos. Each arm is read against the Gemini 3.7 control on the same pages (K = 7 with images; a text-only row against the same size with images); the 3.8 row is a different model and route, for reference only. Intervals are a paired bootstrap over truth documents (the folder runs first fixed as the unit are too few to resample: Deaver has five) and do not include rerun noise (1.4 to 3.2 points a box). The 2B's text-only rows are above, from a different request (the l1 prompt, 1,024 px images).<span id="swm-gw-loss"></span> Source: <code>seg-window-gateway.md</code>.</p>
     </div>
     <h3>Six runs voting, against one run</h3>
     <div class="tbl"><table><thead><tr><th>Model</th><th>Boxes</th><th>Default run</th><th>Mean of six single runs</th><th>Vote of six</th><th>Offsets only</th><th>Prompts only</th></tr></thead><tbody id="swm-vote-rows"></tbody></table></div>
@@ -701,6 +701,10 @@ if (swm) {
     document.getElementById('swm-gw-rows').innerHTML = rows.filter(([, a, b]) => g(a, b)).map(([label, a, b, base]) =>
       '<tr><td>' + label + '</td><td>' + (b === dev ? 'Dean, Deaver, Herrnstein' : 'Deaver') + '</td><td>' + pe(g(a, b)) +
       '</td><td>' + f1(g(a, b)) + '</td><td>' + (base ? d(a, base, b) : '—') + '</td></tr>').join('');
+    const ld = gw.loss_difference;
+    if (ld) document.getElementById('swm-gw-loss').textContent = ' Gemini\'s text-only loss less the 2B\'s at K = 7, paired over the same ' +
+      ld.runs + ' truth documents: ' + (100 * ld.delta >= 0 ? '+' : '') + (100 * ld.delta).toFixed(1) + ' points (' + (100 * ld.lo).toFixed(1) +
+      ' to ' + (100 * ld.hi).toFixed(1) + '), ' + (ld.lo > 0 || ld.hi < 0 ? 'resolved.' : 'not resolved: Gemini loses less on these pages, not shown to need the images less.');
     document.getElementById('swm-gw').hidden = false;
   }
   document.getElementById('swm-sweep-rows').innerHTML = sweep.join('');

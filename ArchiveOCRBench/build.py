@@ -392,7 +392,8 @@ def seg_window_modality():
             sys.exit(f"seg-window-gateway.json has incomplete cells: {g['incomplete'][:1]}")
         out["gateway"] = {"pooled": [{k: r[k] for k in ("arm", "boxes", "pages", "pages_exact", "boundary_f1",
                                                         "false_splits", "false_merges")} for r in g["pooled"]],
-                          "paired": g["paired"], "spent": g["spent"]}
+                          "paired": g["paired"], "spent": g["spent"],
+                          "loss_difference": g.get("loss_difference")}
     return out
 
 

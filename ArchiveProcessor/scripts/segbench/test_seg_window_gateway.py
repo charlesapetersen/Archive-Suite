@@ -147,6 +147,19 @@ class Scoring(unittest.TestCase):
         col = SimpleNamespace(labels=["Box", "Folder", "New", "Cont", "Folder", "New", "Folder"])
         self.assertEqual(S.clusters(col), [[2, 3], [5]])
 
+    def test_loss_difference_is_the_difference_of_the_two_losses(self):
+        # Per-page loss vectors (text less images) for two models: the bootstrap's delta is loss A less loss B.
+        ga = [0, -1, 0, 0, -1, 0]          # Gemini loses 2 of 6
+        gb = [-1, -1, -1, 0, -1, 0]        # the 2B loses 4 of 6
+        r = S.bootstrap(ga, gb, [[0, 1], [2, 3], [4, 5]], rounds=200)
+        self.assertAlmostEqual(r["delta"], 2 / 6)
+        self.assertLessEqual(r["lo"], r["delta"])
+        self.assertGreaterEqual(r["hi"], r["delta"])
+
+    def test_two_b_pages_is_none_without_the_pack(self):
+        with tempfile.TemporaryDirectory() as d:
+            self.assertIsNone(S.two_b_pages({}, Path(d)))
+
 
 if __name__ == "__main__":
     unittest.main()

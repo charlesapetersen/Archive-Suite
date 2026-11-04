@@ -334,6 +334,21 @@ def bootstrap(pages_a, pages_b, groups, rounds=10000, seed=0):
             "runs": len(rows)}
 
 
+TWO_B_PACK = Path(os.environ.get("AGENT_STATE", Path.home() / ".local/state/archive-autonomous")) / \
+    "artifacts/seg-window-modality-20261029"
+
+
+def two_b_pages(cols, pack=TWO_B_PACK):
+    """The 2B's per-page exact flags at K = 7 with images and text only on the development boxes, rebuilt from
+    W46.seg-window-modality's Sherlock answers kept with its pack (no calls); None when the pack is not on disk."""
+    if not (Path(pack) / "runs/2b-sweep/answers.jsonl").exists():
+        return None
+    judge_for, _, _ = SM.judges(pack, Path(pack) / "runs", "2b-sweep")
+    return {(arm, box): exact_pages(col.labels, W.assemble(
+                col, SM.combine_units(col, SM.units(col, arm), judge_for(arm)), True).labels)
+            for arm in ("k7-it", "k7-t") for box, col in cols.items()}
+
+
 def cmd_score(a):
     import rescore
     from dataclasses import asdict
@@ -404,7 +419,27 @@ def cmd_score(a):
         paired("k7-t", "k7-it", DEV), paired("3.8-k7-it", "k7-it", DEV), paired("3.8-k7-it", "k7-it", (SUBSET,)),
         *(paired(f"k{k}-it", "k7-it", (SUBSET,)) for k in (3, 5, 10)), paired("folder-it", "k7-it", (SUBSET,)),
         *(paired(f"k{k}-t", f"k{k}-it", (SUBSET,)) for k in (3, 5, 10)), paired("k7-t", "k7-it", (SUBSET,)),
-        paired("3.8-folder-it", "3.8-k7-it", DEV)) if c]
+        paired("3.8-folder-it", "3.8-k7-it", DEV), paired("k7-t", "k7-it", ("Dean",)),
+        paired("3.8-k7-it", "k7-it", ("Dean",)), paired("3.8-folder-it", "3.8-k7-it", (SUBSET,)),
+        paired("3.8-folder-it", "3.8-k7-it", ("Dean",))) if c]
+    # The difference of the two models' text-only losses (Gemini's less the 2B's) over the same truth documents:
+    # per page, (Gemini text - Gemini images) against (2B text - 2B images), resampled together (P7-1).
+    tb_pages = two_b_pages(cols)
+    loss_difference = None
+    if tb_pages:
+        ga, gb, docs, off = [], [], [], 0
+        for b in DEV:
+            gt, gi = per_page[("k7-t", b)], per_page[("k7-it", b)]
+            bt, bi = tb_pages[("k7-t", b)], tb_pages[("k7-it", b)]
+            ga += [int(bool(x)) - int(bool(y)) for x, y in zip(gt, gi)]
+            gb += [int(bool(x)) - int(bool(y)) for x, y in zip(bt, bi)]
+            docs += [[off + k for k in g] for g in documents(cols[b])]
+            off += len(gt)
+        loss_difference = {"a": "gemini 3.7 k7-t less k7-it", "b": "2b k7-t less k7-it", "boxes": list(DEV),
+                           "two_b_pages_exact": {arm: sum(bool(v) for b in DEV for v in tb_pages[(arm, b)]) /
+                                                 sum(v is not None for b in DEV for v in tb_pages[(arm, b)])
+                                                 for arm in ("k7-it", "k7-t")},
+                           **bootstrap(ga, gb, docs)}
     calls = list(latest().values())
     settled = [r for r in calls if r["event"] == "settle"]
     usage = defaultdict(Counter)
@@ -422,7 +457,7 @@ def cmd_score(a):
            "item_cap_usd": ITEM_CAP_USD, "spent": spent(), "billed": GW.billed(settled, "estimate"),
            "rows": rows, "pooled": pooled, "paired": comparisons, "incomplete": missing,
            "usage": {k: dict(v) for k, v in usage.items()}, "cost_by_arm": dict(cost),
-           "two_b_development": two_b}
+           "two_b_development": two_b, "loss_difference": loss_difference}
     (RESULTS / "seg-window-gateway.json").write_text(json.dumps(out, indent=1, default=str) + "\n")
     report(out)
 
@@ -431,36 +466,48 @@ def pct(x):
     return f"{100 * x:.1f}%"
 
 
-# Written after the 2026-11-04 score; the figures are the report's tables above.
+# Written after the 2026-11-04 score, corrected by W46.seg-gateway-wording (measurement review pass 7, P7-1); the
+# figures are the report's tables above and seg-window-gateway.json (paired, loss_difference).
 FINDINGS = [
-    "- **Text alone costs Gemini little at K = 7, unlike the 2B.** Over the 551 pages the text-only arm is 2.7 points "
-    "below the image control (89.6% against 92.3%; interval -9.5 to +1.6), a tie at this size, with the same boundary "
-    "F1 (97.6 against 97.3: three fewer false splits, one more merge). The loss sits on one box: Dean drops from 93.4% "
-    "to 85.2%, Herrnstein is level at 91.2% and Deaver gains 1.4 points. The 2B lost 8.3 points on the same pages. "
-    "A04's claim, that the neighbouring text makes the images redundant, comes close to holding for a strong model on "
-    "these photographs and does not hold for the small one. Text only costs 46% of the image arm ($0.89 against "
-    "$1.92 for the 187 windows) and answers in 4.6 s against 6.7 s.",
+    "- **Text alone costs Gemini little at K = 7.** Over the 551 pages the text-only arm is 2.7 points below the image "
+    "control (89.6% against 92.3%; interval -9.5 to +1.6), a tie at this size, with the same boundary F1 (97.6 against "
+    "97.3: three fewer false splits, one more merge). The loss is one boundary: on Dean the text-only arm makes one "
+    "extra false split, at pages 37|38, which cuts a 16-page document and moves Dean from 93.4% to 85.2% (-8.2, "
+    "-22.9 to 0.0); Gemini 3.8 with images makes the same split. Herrnstein is level at 91.2% and Deaver gains 1.4 "
+    "points. Text only costs 46% of the image arm ($0.89 against $1.92 for the 187 windows) and answers in 4.6 s "
+    "against 6.7 s.",
+    "- **Gemini loses less than the 2B on these pages; the difference is not resolved.** The 2B lost 8.3 points on "
+    "the same pages (90.9% to 82.6%). Gemini's loss less the 2B's, paired over the same 318 truth documents, is +5.6 "
+    "points (-2.9 to +13.2), so the two losses are not shown to differ. The two routes also send different requests "
+    "(the 2B's l1 prompt with 1,024 px images, Gemini's g1 with 1,600 px), so the comparison is of routes, not of "
+    "models alone. A04's claim, that the neighbouring text makes the images redundant, is not contradicted for Gemini "
+    "here and does not hold for the 2B.",
     "- **Window size is flat for Gemini too.** On Deaver, K = 3, 5, 7 and 10 lie within 1.4 points of each other, "
     "with images (92.2-93.6%) and without (93.6-95.0%): one document or less, every interval spanning zero. K = 7 and "
     "K = 10 are the cheapest image windows on Deaver ($0.56 and $0.57, against $0.64 at K = 5, which carries one "
     "unsettled 502's reservation, and $0.81 at K = 3), since smaller windows send each page more often.",
-    "- **The whole folder is no better.** Gemini 3.7's whole folders on Deaver put 88.7% of pages in the exact "
-    "document, 3.5 points under K = 7 (interval -11.3 to +3.6), with twice the false splits (8 against 4), for "
-    "$0.20 against $0.56. Gemini 3.8's whole folders were also below its windows on Deaver (93.6% against 97.9%), "
-    "though level over the three boxes.",
-    "- **3.7 and 3.8 differ box by box, not overall (SEG-9).** Pooled, the cached 3.8 windows are 1.5 points under "
-    "3.7's (a tie); on Deaver 3.8 is 5.7 points higher (interval +1.3 to +11.8), on Dean 3.7 is 8.2 points higher. A "
-    "3.8 figure is not a stand-in for 3.7's on any one box, which is why every arm here is read against the 3.7 "
-    "control.",
+    "- **On Deaver, the whole folder is no better.** Gemini 3.7's whole folders on Deaver put 88.7% of pages in the "
+    "exact document, 3.5 points under K = 7 (interval -11.3 to +3.6), with twice the false splits (8 against 4), for "
+    "$0.20 against $0.56. The 3.7 folder arm was run on Deaver alone, the one box where 3.8's folders did worst "
+    "(93.6% against 97.9% at K = 7, -4.3, -12.7 to 0.0); over the three boxes 3.8's folders were 2.3 points above its "
+    "windows (-2.8 to +9.4) and on Dean 9.2 above (0.0 to +23.9), so this says nothing about 3.7's folders elsewhere.",
+    "- **3.7 and 3.8 can sit 5-8 points apart on a box, and are level overall (SEG-9).** Pooled, the cached 3.8 "
+    "windows are 1.5 points under 3.7's (-8.3 to +2.8, a tie). On Deaver 3.8 is 5.7 points higher: +1.3 to +11.8 "
+    "over truth documents, 0.0 to +9.2 over the five folder runs (the unit fixed before the first score, too few to "
+    "resample, so that interval is degenerate rather than a test). On Dean 3.7 is 8.2 points higher (-22.9 to 0.0 "
+    "over truth documents; that is the same one 37|38 split). Neither box gap is clear of zero under both units, so "
+    "this is not a ranking; it is why a 3.8 figure is not a stand-in for 3.7's on any one box, and why every arm here "
+    "is read against the 3.7 control.",
     "",
     "## What this means",
     "",
-    "1. **The cloud route keeps K = 7 with images.** No size beats it, none is cheaper, and the whole folder is not "
-    "better.",
+    "1. **The cloud route keeps K = 7 with images.** No size beats it, none is cheaper, and on Deaver the whole folder "
+    "is not better.",
     "2. **A text-only cloud window is a lead for a cheaper tier, not a default.** It roughly halves the token cost "
-    "and lands within noise over three boxes, but its point estimate is a loss, all on one box. Phase 4 "
+    "and lands within noise over three boxes; its point estimate is a loss of one boundary on one box. Phase 4 "
     "(W46.review-phase4) weighs it against the cost profiles; a test-box run would be needed before it ships.",
-    "3. **The local 2B keeps its images** (seg-window-modality.md): the gap between the two models is the finding.",
+    "3. **The local 2B keeps its images** (seg-window-modality.md). Gemini loses less without them on these pages, "
+    "but the difference between the two losses is not resolved.",
 ]
 
 
@@ -500,7 +547,16 @@ def report(o):
     tb = o["two_b_development"]
     if tb.get("k7-it") and tb.get("k7-t"):
         L += [f"For the 2B on the same pages (`seg-window-modality.json`): {pct(tb['k7-it']['pages_exact'])} with images, "
-              f"{pct(tb['k7-t']['pages_exact'])} text only.", ""]
+              f"{pct(tb['k7-t']['pages_exact'])} text only (the l1 prompt with 1,024 px images, a different request).",
+              ""]
+    ld = o.get("loss_difference")
+    if ld:
+        L += [f"Gemini's text-only loss less the 2B's, paired over the same {ld['runs']} truth documents (both arms' "
+              f"cached decisions; the 2B's rebuilt from W46.seg-window-modality's answers to "
+              f"{pct(ld['two_b_pages_exact']['k7-it'])} and {pct(ld['two_b_pages_exact']['k7-t'])}): "
+              f"{100 * ld['delta']:+.1f} points ({100 * ld['lo']:+.1f} to {100 * ld['hi']:+.1f}).", ""]
+    else:
+        L += ["The 2B's per-page decisions were not on disk, so the difference of the two losses is not computed.", ""]
     L += ["## Window size on Deaver (149 pages)", "",
           "| K | Images and text | Less K = 7 | Text only | Text less images |", "|---|---|---|---|---|"]
     for k in (3, 5, 7, 10):
@@ -540,7 +596,8 @@ def report(o):
               "documents on Deaver). Paired bootstrap intervals over truth documents cover document sampling, not "
               "rerun variation; the rerun floor is 1.4-3.2 points a box (SEG-10), so a gap inside it is a tie. The "
               "resampling unit was changed from folder runs after the first score: Deaver has five, too few to "
-              "resample (the JSON keeps those intervals as by_folder_run). Deaver's documents are 1-6 pages, so one "
+              "resample (the JSON keeps those intervals as by_folder_run, and the findings give both where they "
+              "disagree on whether a gap clears zero). Deaver's documents are 1-6 pages, so one "
               "boundary moves Deaver by up to about 4 points.",
         scope="Whether a strong cloud model needs the images at K = 7 on the owner's photographs, and whether its "
               "window size matters on one box. It does not set the app's cloud window (that is options.md's and "
