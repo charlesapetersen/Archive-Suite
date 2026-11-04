@@ -5,6 +5,7 @@
   python3 fm_foundation.py jobs                       # job lists: the 99 panel originals, 100 of the 895, Deaver
   python3 ops/autonomous/heavy-run.py run -- BIN/segbench-fm-ocr STORE/ocr96.tsv     # then ocr100.tsv
   python3 ops/autonomous/heavy-run.py run -- BIN/segbench-fm-text STORE/seg-deaver.tsv
+  python3 ops/autonomous/heavy-run.py run -- BIN/segbench-fm-text STORE/seg-deaver-guided.tsv --guided
   uv run --offline --with rapidfuzz --with 'sacrebleu==2.5.1' --with regex --with numpy \
       python fm_foundation.py report                  # -> segbench-results/r1-foundation.{json,md}
 
@@ -28,6 +29,10 @@ FIXED BEFORE ANY ANSWER:
   seg_window_gateway's k3-t arm sent Gemini 3.7 Flash (JSON schema in the prompt, no JSON mode on-device), its
   parser and combiner; a failed window votes 0.5. Compared paired with Gemini 3.7's k3-t and k3-it on Deaver,
   bootstrap over truth documents (seg_window_gateway.bootstrap).
+- ADDED AFTER THE FIRST REPLIES (so not fixed before any answer): the guided arm. The first plain windows came back
+  echoing the schema's own wrapper ({"type": "OBJECT", "properties": ...}), which the parser cannot read, so a
+  second arm drops the pasted schema and uses guided generation (a @Generable type with the schema's fields and
+  enums), which is how an app would call this model. Both arms are reported.
 No money, no network. Page images, text and replies stay in STORE and the panel cache, outside git.
 """
 from __future__ import annotations
@@ -90,6 +95,27 @@ def seg_units():
     return col, SG.units(col, ARM)
 
 
+SCHEMA_LINE = 'Return only one JSON object matching this schema:\n'
+SEG_ARMS = {   # arm: (prompts, replies, job list)
+    'on-device k3-t': (STORE / 'seg-prompts', STORE / 'seg-replies', STORE / 'seg-deaver.tsv'),
+    'on-device k3-t guided': (STORE / 'seg-prompts-guided', STORE / 'seg-replies-guided', STORE / 'seg-deaver-guided.tsv'),
+}
+
+
+def seg_prompt(col, a, b, arm):
+    """(request key, prompt text). The plain arm is Gemini 3.7's k3-t prompt word for word, its JSON schema pasted at
+    the end; the guided arm drops that pasted schema, since guided generation (fm_text.swift --guided) imposes the
+    same fields and enums, and keeps every other word."""
+    import seg_window_gateway as SG
+    body, key, nums = SG.request(col, a, b, ARM)
+    text = body['messages'][0]['content'][0]['text']
+    if arm.endswith('guided'):
+        if text.count(SCHEMA_LINE) != 1:
+            raise ValueError(f'{col.name} {nums[0]}-{nums[-1]}: the schema line is not unique')
+        text = text[:text.index(SCHEMA_LINE)].rstrip() + '\n'
+    return key, text
+
+
 def cmd_jobs(_):
     import ocr_panel as P
     import routes as R
@@ -100,14 +126,14 @@ def cmd_jobs(_):
     (STORE / 'ocr100.tsv').write_text(''.join(
         f"{R.RUN / 'images' / (j['id'] + '.jpg')}\t{ocr_dir('ocr100') / (j['id'] + '.txt')}\n" for j in draw_100()))
     col, us = seg_units()
-    pdir = STORE / 'seg-prompts'
-    pdir.mkdir(exist_ok=True)
-    lines = []
-    for a, b in us:
-        body, key, nums = SG.request(col, a, b, ARM)
-        (pdir / f'{key}.txt').write_text(body['messages'][0]['content'][0]['text'])
-        lines.append(f"{pdir / (key + '.txt')}\t{STORE / 'seg-replies' / (key + '.txt')}\n")
-    (STORE / 'seg-deaver.tsv').write_text(''.join(lines))
+    for arm, (pdir, rdir, tsv) in SEG_ARMS.items():
+        pdir.mkdir(exist_ok=True)
+        lines = []
+        for a, b in us:
+            key, text = seg_prompt(col, a, b, arm)
+            (pdir / f'{key}.txt').write_text(text)
+            lines.append(f"{pdir / (key + '.txt')}\t{rdir / (key + '.txt')}\n")
+        tsv.write_text(''.join(lines))
     print(f'jobs: {len(panel_jobs())} panel originals, {len(draw_100())} of the 895, {len(lines)} {BOX} windows')
 
 
@@ -121,6 +147,24 @@ def reading(d, jid):
     meta = json.loads(side.read_text())
     txt = d / (jid + '.txt')
     return meta, (txt.read_text() if meta.get('ok') and txt.exists() else None)
+
+
+def cut_loop(text):
+    """A looped reading cut where it starts repeating: at the third appearance of any line (after stripping). The
+    secondary 'loops cut' figure, what a repetition stop in an app could keep; the primary figure scores loops empty."""
+    seen, out = Counter(), []
+    for line in text.splitlines():
+        k = line.strip()
+        seen[k] += 1
+        if k and seen[k] >= 3:
+            break
+        out.append(line)
+    return '\n'.join(out)
+
+
+def raw_text(d, jid, meta):
+    f = d / (jid + '.txt')
+    return f.read_text() if meta and f.exists() else ''
 
 
 def pct(xs, q):
@@ -148,7 +192,8 @@ def ocr_rows():
         vf = P.CACHE / 'vision' / (j['id'] + '.txt')
         vis = vf.read_text() if vf.exists() else None
         rows.append({'set': '96', 'page': j['id'], 'group': kinds[j['page']], 'meta': meta, 'text': text, 'vision': vis,
-                     'fm': S.score(truth, text or ''), 'vs': S.score(truth, vis or '')})
+                     'fm': S.score(truth, text or ''), 'vs': S.score(truth, vis or ''),
+                     'cut': S.score(truth, cut_loop(raw_text(ocr_dir('ocr96'), j['id'], meta)))})
     truth = {R.job_id(r): r for r in R.frozen()}
     for j in draw_100():
         t = Path(truth[j['id']]['truth']).read_text()
@@ -156,7 +201,8 @@ def ocr_rows():
         vf = R.RUN / 'vision' / (j['id'] + '.txt')
         vis = vf.read_text() if vf.exists() else None
         rows.append({'set': '100', 'page': j['id'], 'group': j['stratum'], 'meta': meta, 'text': text, 'vision': vis,
-                     'fm': S.score(t, text or '', j['stratum']), 'vs': S.score(t, vis or '', j['stratum'])})
+                     'fm': S.score(t, text or '', j['stratum']), 'vs': S.score(t, vis or '', j['stratum']),
+                     'cut': S.score(t, cut_loop(raw_text(ocr_dir('ocr100'), j['id'], meta)), j['stratum'])})
     for r in rows:
         r['ok'] = r['text'] is not None
         r['vok'] = r['vision'] is not None
@@ -189,13 +235,18 @@ def ocr_summary(rows):
         groups = {}
         for g in sorted({r['group'] for r in done}):
             gg = [r for r in done if r['group'] == g]
-            groups[g] = {'n': len(gg), 'ok': sum(r['ok'] for r in gg), 'fm_nes': statistics.fmean(r['fm']['nes'] for r in gg),
-                         'vision_nes': statistics.fmean(r['vs']['nes'] for r in gg)}
+            ga = [r for r in gg if r['ok']]
+            groups[g] = {'n': len(gg), 'ok': len(ga), 'fm_nes': statistics.fmean(r['fm']['nes'] for r in gg),
+                         'fm_nes_answered': statistics.fmean(r['fm']['nes'] for r in ga) if ga else None,
+                         'vision_nes': statistics.fmean(r['vs']['nes'] for r in gg),
+                         'vision_nes_answered': statistics.fmean(r['vs']['nes'] for r in ga) if ga else None,
+                         'diff_answered': boot_mean([r['fm']['nes'] - r['vs']['nes'] for r in ga]) if len(ga) > 1 else None}
         out[s] = {'n': len(rr), 'attempted': len(done), 'ok': sum(r['ok'] for r in done),
                   'failures': dict(Counter(r['meta'].get('failure') for r in done if not r['ok'])),
                   'fm_nes': statistics.fmean(r['fm']['nes'] for r in done),
                   'fm_nes_answered': statistics.fmean(r['fm']['nes'] for r in done if r['ok']) if any(r['ok'] for r in done) else 0,
                   'vision_nes': statistics.fmean(r['vs']['nes'] for r in done),
+                  'fm_nes_loops_cut': statistics.fmean(r['cut']['nes'] for r in done),
                   'vision_ok': sum(r['vok'] for r in done),
                   'diff': {'mean': m, 'lo': lo, 'hi': hi},
                   'diff_answered': statistics.fmean(both) if both else None,
@@ -208,7 +259,7 @@ def ocr_summary(rows):
                   'output_tokens': {'median': statistics.median(x.get('output_tokens', 0) for x in metas),
                                     'max': max(x.get('output_tokens', 0) for x in metas)},
                   'sent_px': sorted(Counter(f"{x.get('sent_w')}x{x.get('sent_h')}" for x in metas).most_common(3)),
-                  'groups': groups, 'auc': auc_table(done)}
+                  'groups': groups, 'auc': auc_table(done), 'auc_answered': auc_table([r for r in done if r['ok']])}
     return out
 
 
@@ -219,28 +270,35 @@ def seg_summary():
     from score import score_labels, derived
     col, us = seg_units()
     failed = Counter()
-    metas = []
+    metas = {arm: [] for arm in SEG_ARMS}
 
-    def judge_fm(c, a, b):
-        body, key, nums = SG.request(c, a, b, ARM)
-        side = STORE / 'seg-replies' / (key + '.txt.json')
-        if not side.exists():
-            raise RuntimeError(f'{BOX} window {nums[0]}-{nums[-1]} not read yet')
-        meta = json.loads(side.read_text())
-        metas.append(meta)
-        if meta.get('ok'):
-            try:
-                return SG.parse((STORE / 'seg-replies' / (key + '.txt')).read_text(), nums, False)
-            except Exception:
-                meta['failure'] = 'unparsed'
-        failed['fm'] += 1
-        return SM._seg()[1].neutral(nums)
+    def judge_for(arm):
+        rdir = SEG_ARMS[arm][1]
 
-    preds = {}
-    try:
-        preds['on-device k3-t'] = W.assemble(col, SM.combine_units(col, us, judge_fm), True).labels
-    except RuntimeError as e:
-        return {'incomplete': str(e)}
+        def judge_fm(c, a, b):
+            body, key, nums = SG.request(c, a, b, ARM)
+            side = rdir / (key + '.txt.json')
+            if not side.exists():
+                raise RuntimeError(f'{arm}: {BOX} window {nums[0]}-{nums[-1]} not read yet')
+            meta = json.loads(side.read_text())
+            metas[arm].append(meta)
+            if meta.get('ok'):
+                try:
+                    return SG.parse((rdir / (key + '.txt')).read_text(), nums, False)
+                except Exception:
+                    meta['failure'] = 'unparsed'
+            failed[arm] += 1
+            return SM._seg()[1].neutral(nums)
+        return judge_fm
+
+    preds, incomplete = {}, []
+    for arm in SEG_ARMS:
+        try:
+            preds[arm] = W.assemble(col, SM.combine_units(col, us, judge_for(arm)), True).labels
+        except RuntimeError as e:
+            incomplete.append(str(e))
+    if not preds:
+        return {'incomplete': '; '.join(incomplete)}
     for arm in ('k3-t', 'k3-it'):
         preds[f'Gemini 3.7 {arm}'] = W.assemble(col, SM.combine_units(col, SG.units(col, arm), SG.judge_for(arm, failed)),
                                                 True).labels
@@ -252,14 +310,15 @@ def seg_summary():
         rows[name] = {'pages': c.doc_pages, 'pages_exact': m['pages_in_exact_doc'], 'boundary_f1': m['boundary_f1'],
                       'false_splits': c.false_splits, 'false_merges': c.false_merges}
     docs = SG.documents(col)
-    paired = {f'on-device k3-t − {g}': SG.bootstrap(per_page['on-device k3-t'], per_page[g], docs)
-              for g in ('Gemini 3.7 k3-t', 'Gemini 3.7 k3-it')}
-    return {'box': BOX, 'windows': len(us), 'failed_windows': failed['fm'],
-            'failures': dict(Counter(m.get('failure') for m in metas if not m.get('ok') or m.get('failure'))),
-            'seconds': {'median': statistics.median(m['seconds'] for m in metas), 'total': sum(m['seconds'] for m in metas)},
-            'input_tokens': {'median': statistics.median(m.get('input_tokens', 0) for m in metas),
-                             'max': max(m.get('input_tokens', 0) for m in metas)},
-            'rows': rows, 'paired': paired}
+    paired = {f'{arm} − {g}': SG.bootstrap(per_page[arm], per_page[g], docs)
+              for arm in SEG_ARMS if arm in per_page for g in ('Gemini 3.7 k3-t', 'Gemini 3.7 k3-it')}
+    runs = {arm: {'failed_windows': failed[arm],
+                  'failures': dict(Counter(m.get('failure') for m in ms if not m.get('ok') or m.get('failure'))),
+                  'seconds': {'median': statistics.median(m['seconds'] for m in ms), 'total': sum(m['seconds'] for m in ms)},
+                  'input_tokens': {'median': statistics.median(m.get('input_tokens', 0) for m in ms),
+                                   'max': max(m.get('input_tokens', 0) for m in ms)}}
+            for arm, ms in metas.items() if arm in preds}
+    return {'box': BOX, 'windows': len(us), 'runs': runs, 'rows': rows, 'paired': paired, 'incomplete': incomplete}
 
 
 def cmd_report(_):
@@ -287,16 +346,21 @@ def write_md(o):
          'M3 Pro with 18 GB; Private Cloud Compute never called. No money, no network. Page text stays in the cache.', '']
     L += FINDINGS + ['']
     names = {'96': 'The owner\'s 96', '100': '100 of the 895 (25 from each Latin stratum, L5-L8)'}
-    L += ['## OCR', '', '| set | read / n | NES % (failures empty) | NES % answered | Apple Vision NES % | '
-          'difference, points (95% interval) | failures |', '|---|---:|---:|---:|---:|---:|---|']
+    L += ['## OCR', '', '| set | read / n | NES % (failures empty) | NES % answered | NES %, loops cut | Apple Vision NES % | '
+          'difference from Vision, points (95% interval) | failures |', '|---|---:|---:|---:|---:|---:|---:|---|']
     for s, x in o['ocr'].items():
         d = x['diff']
         L.append(f"| {names[s]} | {x['ok']}/{x['attempted']} of {x['n']} | {p(x['fm_nes'])} | {p(x['fm_nes_answered'])} | "
-                 f"{p(x['vision_nes'])} | {100*d['mean']:+.1f} ({100*d['lo']:+.1f} to {100*d['hi']:+.1f}) | "
+                 f"{p(x['fm_nes_loops_cut'])} | {p(x['vision_nes'])} | {100*d['mean']:+.1f} ({100*d['lo']:+.1f} to {100*d['hi']:+.1f}) | "
                  f"{', '.join(f'{k} {v}' for k, v in x['failures'].items()) or 'none'} |")
     for s, x in o['ocr'].items():
-        L += ['', f'### {names[s]}: by group', '', '| group | n | read | on-device NES % | Vision NES % |', '|---|---:|---:|---:|---:|']
-        L += [f"| {g} | {v['n']} | {v['ok']} | {p(v['fm_nes'])} | {p(v['vision_nes'])} |" for g, v in x['groups'].items()]
+        L += ['', f'### {names[s]}: by group', '', '| group | n | read | on-device NES % | Vision NES % | on-device NES %, '
+              'pages it read | Vision NES %, the same pages | difference on those pages (95% interval) |',
+              '|---|---:|---:|---:|---:|---:|---:|---:|']
+        q = lambda v: '–' if v is None else p(v)
+        ci = lambda d: '–' if d is None else f"{100*d[0]:+.1f} ({100*d[1]:+.1f} to {100*d[2]:+.1f})"
+        L += [f"| {g} | {v['n']} | {v['ok']} | {p(v['fm_nes'])} | {p(v['vision_nes'])} | {q(v['fm_nes_answered'])} | "
+              f"{q(v['vision_nes_answered'])} | {ci(v['diff_answered'])} |" for g, v in x['groups'].items()]
     L += ['', '## Speed and tokens', '', '| set | seconds a page, median / 90th / max | total minutes | input tokens '
           '(image + prompt), median (min-max) | image tokens (tokenCount) | output tokens, median / max |',
           '|---|---:|---:|---:|---:|---:|']
@@ -311,20 +375,27 @@ def write_md(o):
               '|---:|---|---:|---:|']
         L += [f"| {r['side']} | {r['w']}x{r['h']} | {r['tokenCount']} | {r['input']} |" for r in o['image_tokens_by_size']]
     L += ['', '## Disagreement with Apple Vision as a routing signal', '',
-          'Risk = 1 − NES(on-device text, Vision text), 0 agreement when either failed. AUC 0.5 is chance.', '',
-          '| set | label | positives | AUC |', '|---|---|---:|---:|']
+          'Risk = 1 − NES(on-device text, Vision text), 0 agreement when either failed. AUC 0.5 is chance. On all pages '
+          'a failure is the worst risk by construction, so "this model failed" is 1.00 by definition; the answered-only '
+          'columns drop the failures and are the honest test of the signal.', '',
+          '| set | label | positives, all | AUC, all pages | positives, answered | AUC, answered pages |', '|---|---|---:|---:|---:|---:|']
+    f2 = lambda v: '–' if v['auc'] is None else format(v['auc'], '.2f')
     for s, x in o['ocr'].items():
-        L += [f"| {s} | {k} | {v['positives']} | {'–' if v['auc'] is None else format(v['auc'], '.2f')} |"
+        L += [f"| {s} | {k} | {v['positives']} | {f2(v)} | {x['auc_answered'][k]['positives']} | {f2(x['auc_answered'][k])} |"
               for k, v in x['auc'].items()]
     sg = o['segmentation']
     L += ['', f'## Text-only segmentation on {BOX}', '']
-    if 'incomplete' in sg:
+    if 'rows' not in sg:
         L += [f"Incomplete: {sg['incomplete']}"]
     else:
-        L += [f"{sg['windows']} K = 3 text-only windows, Gemini 3.7's k3-t prompt word for word; {sg['failed_windows']} "
-              f"failed ({', '.join(f'{k} {v}' for k, v in sg['failures'].items()) or 'none'}), each voting 0.5. "
-              f"{sg['seconds']['median']:.1f} s a window (median), {sg['seconds']['total']/60:.0f} min in all; "
-              f"input {sg['input_tokens']['median']:.0f} tokens a window (max {sg['input_tokens']['max']}).", '',
+        L += [f"{sg['windows']} K = 3 text-only windows. The plain arm sends Gemini 3.7's k3-t prompt word for word, "
+              "its JSON schema pasted at the end; the guided arm drops the pasted schema and uses the framework's guided "
+              "generation into the same fields and enums. A failed or unparsed window votes 0.5.", '']
+        L += [f"- {arm}: {r['failed_windows']} failed ({', '.join(f'{k} {v}' for k, v in r['failures'].items()) or 'none'}); "
+              f"{r['seconds']['median']:.1f} s a window (median), {r['seconds']['total']/60:.0f} min in all; input "
+              f"{r['input_tokens']['median']:.0f} tokens a window (max {r['input_tokens']['max']})." for arm, r in sg['runs'].items()]
+        L += [f"- Incomplete: {x}" for x in sg['incomplete']]
+        L += ['',
               '| route | pages in an exact document % | boundary F1 % | false splits | false merges |', '|---|---:|---:|---:|---:|']
         L += [f"| {k} | {p(v['pages_exact'])} | {p(v['boundary_f1'])} | {v['false_splits']} | {v['false_merges']} |"
               for k, v in sg['rows'].items()]
