@@ -102,9 +102,12 @@ they join part 7's stratum table as L1-L3 columns, but not the 895 table (no oth
 charts, the ranking table or part 5 (no typed or printed page read), so their owner figures stay in their own panel.
 
 W46.r1-foundation's Apple on-device model (macOS 27, `segbench-results/r1-foundation.json`) is on the 96's four charts
-and the speed table as a free Mac route, with no app memory figure (the model runs in the OS). Its public figures are
-100 Latin pages of the 895 (25 from each of L5-L8), not the full set, so they stay off the 895 and stratum tables and
-are reported only in `r1-foundation.md`; it is not in part 5 (no per-page fit).
+and the speed table as a free Mac route, with no app memory figure (the model runs in the OS). The speed table shows
+its median, 9.5 s a page; the mean is 32 s, because the third of pages that loop to the 4,096-token cap take about 80 s
+each. It is not in the ranking table, which reads `ocr-pages.csv` and has no per-page row for it. Its public figures
+are 100 Latin pages drawn from the 440 reference set's four Latin-script strata (25 from each of L5-L8, where Vision's
+readings are cached), not from the 895's nine strata, so they stay off the 895 and stratum tables and are reported
+only in `r1-foundation.md`; it is not in part 5 (no per-page fit).
 
 W46.ocr-ppocrv6-hands-paid's 0/8/16-line prompting panel is scaffolded but hidden while its run is
 incomplete. The reservation guard stopped at $2.427833 against the $2.50 cap after 207 conditions

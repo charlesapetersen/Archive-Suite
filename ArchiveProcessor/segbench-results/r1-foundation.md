@@ -14,61 +14,65 @@ Reproduce: `ArchiveProcessor/scripts/segbench/fm_foundation.py` (its header has 
 
 ## OCR
 
-| set | read / n | NES % (failures empty) | NES % answered | NES %, loops cut | Apple Vision NES % | difference from Vision, points (95% interval) | failures |
+| set | read / n | NES % (failures empty) | NES % answered | NES %, loops cut (post hoc) | Apple Vision NES % (27.2) | difference from Vision, points (95% interval) | failures |
 |---|---:|---:|---:|---:|---:|---:|---|
-| The owner's 96 | 63/96 of 96 | 42.4 | 64.5 | 46.4 | 81.4 | -39.0 (-47.0 to -31.0) | length 33 |
-| 100 of the 895 (25 from each Latin stratum, L5-L8) | 2/6 of 100 | 2.4 | 7.1 | 2.7 | 63.5 | -61.1 (-68.1 to -53.1) | length 4 |
+| The owner's 96 | 63/96 of 96 | 42.4 | 64.5 | 46.8 | 83.1 | -40.7 (-49.0 to -32.5) | length 33 |
+| 100 Latin pages of the 440 reference set (25 from each of L5-L8) | 3/16 of 100 | 0.9 | 4.8 | 3.6 | 52.4 | -51.5 (-61.8 to -40.2) | length 13 |
 
 ### The owner's 96: by group
 
-| group | n | read | on-device NES % | Vision NES % | on-device NES %, pages it read | Vision NES %, the same pages | difference on those pages (95% interval) |
-|---|---:|---:|---:|---:|---:|---:|---:|
-| handwritten | 16 | 13 | 54.8 | 58.1 | 67.5 | 59.4 | +8.1 (-1.1 to +17.7) |
-| mixed | 2 | 2 | 49.5 | 73.2 | 49.5 | 73.2 | -23.7 (-28.8 to -18.5) |
-| printed | 28 | 15 | 28.0 | 76.4 | 52.2 | 80.3 | -28.1 (-42.0 to -14.7) |
-| typewritten | 50 | 33 | 46.1 | 91.9 | 69.9 | 89.7 | -19.8 (-27.2 to -12.9) |
-
-### 100 of the 895 (25 from each Latin stratum, L5-L8): by group
+The columns on the pages it read, and their intervals, were added after the 96 were read (post hoc); no interval under ten pages.
 
 | group | n | read | on-device NES % | Vision NES % | on-device NES %, pages it read | Vision NES %, the same pages | difference on those pages (95% interval) |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| L5 | 6 | 2 | 2.4 | 63.5 | 7.1 | 56.7 | -49.6 (-55.2 to -44.0) |
+| handwritten | 16 | 13 | 54.8 | 60.6 | 67.5 | 61.5 | +5.9 (-3.8 to +15.8) |
+| mixed | 2 | 2 | 49.5 | 70.8 | 49.5 | 70.8 | – |
+| printed | 28 | 15 | 28.0 | 80.5 | 52.2 | 77.6 | -25.4 (-40.6 to -11.4) |
+| typewritten | 50 | 33 | 46.1 | 92.2 | 69.9 | 90.3 | -20.4 (-27.9 to -13.5) |
+
+### 100 Latin pages of the 440 reference set (25 from each of L5-L8): by group
+
+The columns on the pages it read, and their intervals, were added after the 96 were read (post hoc); no interval under ten pages.
+
+| group | n | read | on-device NES % | Vision NES % | on-device NES %, pages it read | Vision NES %, the same pages | difference on those pages (95% interval) |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| L5 | 16 | 3 | 0.9 | 52.4 | 4.8 | 65.7 | – |
 
 ## Speed and tokens
 
-| set | seconds a page, median / 90th / max | total minutes | input tokens (image + prompt), median (min-max) | image tokens (tokenCount) | output tokens, median / max |
+| set | seconds a page, median / mean / 90th / max | total minutes | input tokens (image + prompt), median (min-max) | image tokens (tokenCount) | output tokens, median / max |
 |---|---:|---:|---:|---:|---:|
-| The owner's 96 | 9.5 / 80.5 / 90.8 | 51 | 244 (244-276) | 131 on 53, 147 on 41, 163 on 2 | 369 / 4102 |
-| 100 of the 895 (25 from each Latin stratum, L5-L8) | 89.7 / 92.0 / 92.3 | 6 | 244 (244-260) | 131 on 4, 147 on 2 | 4102 / 4102 |
+| The owner's 96 | 9.5 / 32.1 / 80.5 / 90.8 | 51 | 244 (244-276) | 131 on 53, 147 on 41, 163 on 2 | 369 / 4102 |
+| 100 Latin pages of the 440 reference set (25 from each of L5-L8) | 90.3 / 333.8 / 110.9 / 4240.2 | 89 | 244 (244-260) | 131 on 11, 147 on 5 | 4102 / 4102 |
 
-Image tokens against the size sent (one owner page, `tokenCount(for: Attachment)` and the session's own input count for a five-token reply):
+Image tokens against the size sent (owner pages of three shapes, `tokenCount(for: Attachment)` and the session's own input count for a five-token reply; the long side is downsampled to at most the size named, never enlarged):
 
-| long side px | sent | tokenCount | session input tokens |
-|---:|---|---:|---:|
-| 256 | 191x256 | 67 | 125 |
-| 512 | 382x512 | 195 | 253 |
-| 768 | 573x768 | 131 | 189 |
-| 1024 | 765x1024 | 131 | 189 |
-| 1536 | 1148x1536 | 131 | 189 |
-| 2400 | 1793x2400 | 131 | 189 |
-| 4000 | 1793x2400 | 131 | 189 |
+| page | long side px | sent | tokenCount | session input tokens |
+|---|---:|---|---:|---:|
+| p002 | 256 | 191x256 | 67 | 125 |
+| p002 | 512 | 382x512 | 195 | 253 |
+| p002 | 768 | 573x768 | 131 | 189 |
+| p002 | 1024 | 765x1024 | 131 | 189 |
+| p002 | 1536 | 1148x1536 | 131 | 189 |
+| p002 | 2400 | 1793x2400 | 131 | 189 |
+| p002 | 4000 | 1793x2400 | 131 | 189 |
 
 ## Disagreement with Apple Vision as a routing signal
 
-Risk = 1 − NES(on-device text, Vision text), 0 agreement when either failed. AUC 0.5 is chance. On all pages a failure is the worst risk by construction, so "this model failed" is 1.00 by definition; the answered-only columns drop the failures and are the honest test of the signal.
+Risk = 1 − NES(on-device text, Vision text), 0 agreement when either failed. AUC 0.5 is chance. On all pages a failure is the worst risk by construction, so "this model failed" is 1.00 by definition; the answered-only columns drop the failures and are the honest test of the signal; they were added after the 96 were read (post hoc).
 
 | set | label | positives, all | AUC, all pages | positives, answered | AUC, answered pages |
 |---|---|---:|---:|---:|---:|
-| 96 | this model NES < 70 | 65 | 0.96 | 32 | 0.92 |
+| 96 | this model NES < 70 | 65 | 0.97 | 32 | 0.93 |
 | 96 | this model NES < 90 | 85 | 1.00 | 52 | 1.00 |
 | 96 | this model failed | 33 | 1.00 | 0 | – |
-| 96 | Apple Vision NES < 70 | 25 | 0.63 | 17 | 0.84 |
-| 96 | Apple Vision NES < 90 | 41 | 0.55 | 30 | 0.77 |
-| 100 | this model NES < 70 | 6 | – | 2 | – |
-| 100 | this model NES < 90 | 6 | – | 2 | – |
-| 100 | this model failed | 4 | 1.00 | 0 | – |
-| 100 | Apple Vision NES < 70 | 5 | 0.30 | 2 | – |
-| 100 | Apple Vision NES < 90 | 6 | – | 2 | – |
+| 96 | Apple Vision NES < 70 | 21 | 0.59 | 16 | 0.82 |
+| 96 | Apple Vision NES < 90 | 37 | 0.51 | 29 | 0.75 |
+| 100 | this model NES < 70 | 16 | – | 3 | – |
+| 100 | this model NES < 90 | 16 | – | 3 | – |
+| 100 | this model failed | 13 | 1.00 | 0 | – |
+| 100 | Apple Vision NES < 70 | 13 | 0.38 | 3 | – |
+| 100 | Apple Vision NES < 90 | 16 | – | 3 | – |
 
 ## Text-only segmentation on Deaver
 
@@ -93,9 +97,9 @@ Paired, pages in an exact document, bootstrap over truth documents:
 
 ## Measurement card
 
-- **Truth.** The owner's 96 pages (99 less the three agreement-only letters), truth drafted by Claude Opus 5.5 and Gemini 3.8 Flash and adjudicated by the owner where they differed (`ocr-truth.md`), corrected on 2026-10-29 (W46.truth-edits). Words the two drafters wrote alike were not adjudicated; since then the owner has checked samples of them blind: 59 places on 20 pages where Qwen3.6-27B differs (answered 2026-10-21, `ocr-truth-bias-score.md`: 4 truth errors, the bias not material) and every place where Qwen3.6-27B or LightOnOCR-3 4B differs on the 16 hand pages, with 19 typed controls (answered 2026-10-31, `ocr-hands-rescore.md`: 12 corrections, 10 places unresolved). Agreed words that no third-family reader disputes stay unchecked, so a drafter-family route can still gain where the truth shares its mistake. The 100 of the 895 carry their public sets' own transcriptions (corpus/README), scored at each page's stratum. Deaver's segmentation truth is the bench's development-box truth (data.py). No drafter is scored here.
-- **Selection.** The 96 are every accuracy page; the 100 are a seeded draw, 25 from each Latin stratum, made before any reading (SEED in the script); Deaver is the development box seg_window_gateway already read at K = 3. None chosen by a route's reading or by ABBYY text.
-- **Comparison.** Apple Vision on the same images (the shipped free reader); for segmentation, Gemini 3.7 Flash's k3-t and k3-it on the same windows and prompt. The on-device model gets a plain transcription prompt where the panel's routes get the KIND/TEXT prompt; that difference is the route as an app would call it, and is named here.
+- **Truth.** The owner's 96 pages (99 less the three agreement-only letters), truth drafted by Claude Opus 5.5 and Gemini 3.8 Flash and adjudicated by the owner where they differed (`ocr-truth.md`), corrected on 2026-10-29 (W46.truth-edits). Words the two drafters wrote alike were not adjudicated; since then the owner has checked samples of them blind: 59 places on 20 pages where Qwen3.6-27B differs (answered 2026-10-21, `ocr-truth-bias-score.md`: 4 truth errors, the bias not material) and every place where Qwen3.6-27B or LightOnOCR-3 4B differs on the 16 hand pages, with 19 typed controls (answered 2026-10-31, `ocr-hands-rescore.md`: 12 corrections, 10 places unresolved). Agreed words that no third-family reader disputes stay unchecked, so a drafter-family route can still gain where the truth shares its mistake. The 100 Latin pages carry their public sets' own transcriptions (corpus/README), scored at each page's stratum. Deaver's segmentation truth is the bench's development-box truth (data.py). No drafter is scored here.
+- **Selection.** The 96 are every accuracy page; the 100 are a seeded draw, 25 from each of the 440 reference set's four Latin-script strata (L5-L8, where Vision's readings are cached; not the 895's nine strata), made before any reading (SEED in the script); Deaver is the development box seg_window_gateway already read at K = 3. None chosen by a route's reading or by ABBYY text.
+- **Comparison.** Apple Vision on the same images (the shipped free reader), its macOS 27.2 re-read (W46.vision-27-reread), so both readers ran on the same OS build; for segmentation, Gemini 3.7 Flash's k3-t and k3-it on the same windows and prompt. The on-device model gets a plain transcription prompt where the panel's routes get the KIND/TEXT prompt; that difference is the route as an app would call it, and is named here.
 - **Noise.** n = 96 and 100 pages, paired bootstrap intervals on the page differences. The rerun floor on the 96 is `ocr-rerun-noise.md`'s: a gap under 0.49 NES points, or a paired interval across 0, is a tie. Greedy decoding on one Mac; one reading of each page. Segmentation n = one box (149 pages), intervals over its truth documents.
-- **Scope.** One Mac, one OS build, one prompt; the 100 are Latin script only; text-only segmentation on one box, not the three. Apple may change the model with an OS update, so these figures are for 26B123.
+- **Scope.** One Mac, one OS build, one prompt; the 100 are Latin script only, from L5-L8 of the 440; text-only segmentation on one box, not the three. The loops-cut score, the answered-page groups and intervals and the answered-page AUCs were added after the 96 were read. Apple may change the model with an OS update, so these figures are for macOS 27.2 (26B123), both readers.
 

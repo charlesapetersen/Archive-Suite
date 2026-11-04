@@ -616,7 +616,7 @@
    "std": 0.0,
    "batch": null,
    "free_cluster": false,
-   "machine": "Apple M3 Pro, 18 GB; the OS's own model",
+   "machine": "Apple M3 Pro, 18 GB; the OS's own model; median shown, mean 32 s (the pages that loop to the cap take about 80 s); not in the ranking table (no per-page row)",
    "hw": {
     "seconds": 9.507528007030487,
     "peak_gb": null,
