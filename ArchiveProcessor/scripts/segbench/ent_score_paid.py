@@ -367,6 +367,18 @@ def evidence(pr, truth, texts, cap):
     return out
 
 
+def by_city(pr, truth):
+    """The sending place cut to its city on both sides (ent_score.city), as W46.ent-score's place_city figures: the
+    full string counts "Springfield, IL" against "Springfield, Illinois" as a miss, a format and not a reading."""
+    import ent_score as ES
+    pc = {i: {"sending_place": [ES.city(n["name"]) for n in ET.ent_names((p or {}).get("sending_place"))
+                                if n.get("name")]} for i, p in pr.items()}
+    tc = {i: {**r, "sending_place": [{**e, "name": ES.city(e["name"]),
+                                      "alternates": [ES.city(x) for x in e.get("alternates", ())]}
+                                     for e in r["sending_place"]]} for i, r in truth.items()}
+    return pc, tc
+
+
 def cmd_report(a):
     import ent_score as ES
     import gateway_gemini as G
@@ -407,6 +419,21 @@ def cmd_report(a):
     ids = sorted(set(P["tagging"]) & set(prior))
     s["paired"]["tagging on Vision (3.7) vs the 3.8 reply on ABBYY"] = {
         "what": "text source and model version", **{f: paired(prior, P["tagging"], ids, truth, f) for f in ET.FIELDS}}
+    # the sending place by its city: F1 per arm on the 138 (and the 82 beside the 3.8 reply), and the paired diffs
+    s["place_city"], s["paired_city"] = {}, {}
+    for arm in list(ARMS) + ["prior"]:
+        pr = prior if arm == "prior" else P[arm]
+        pc, tc = by_city(pr, truth)
+        c = [doc_counts(tc[i], pc[i], "sending_place") for i in pc]
+        c82 = [doc_counts(tc[i], pc[i], "sending_place") for i in pc if i in sample]
+        tot = lambda cs: tuple(map(sum, zip(*cs))) if cs else (0, 0, 0)  # noqa: E731
+        s["place_city"][arm] = {"138": None if arm == "prior" else f1(tot(c)) or 0, "82": f1(tot(c82)) or 0}
+    for a_, b_ in [("tagging", "entity3k"), ("entity3k", "entity8k"), ("tagging", "entity8k"),
+                   ("entity8k", "entity8k-rerun"), ("prior", "tagging")]:
+        pa, ta = by_city(prior if a_ == "prior" else P[a_], truth)
+        pb, _tb = by_city(P[b_], truth)
+        ids = sorted(set(pa) & set(pb))
+        s["paired_city"][f"{b_} vs {a_}"] = paired(pa, pb, ids, ta, "sending_place")
     # how much of the truth is written in each text at all
     s["truth_in_text"] = {}
     for name, src, cap in (("Vision, first 3,000", texts, 3000), ("Vision, first 8,000", texts, ET.TEXT_CAP),
@@ -448,6 +475,17 @@ def report(s):
     for k, v in s["paired"].items():
         c = [f"{v[f]['diff']:+.3f} [{v[f]['lo']:+.3f}, {v[f]['hi']:+.3f}]" for f in ET.FIELDS]
         L.append(f"| {k} | {v['what']} | {v['sender']['n']} | " + " | ".join(c) + " |")
+    L += ["", "## The sending place by its city", "",
+          "Both sides cut to the city (`ent_score.city`), as W46.ent-score's place figures: the full string above counts "
+          "\"Springfield, IL\" against \"Springfield, Illinois\" as a miss.", "",
+          "| extractor | ed2 F1, 138 | ed2 F1, 82 |", "|---|---|---|"]
+    for k, v in s["place_city"].items():
+        name = "gemini-3.8-flash on ABBYY (W46.ent-score)" if k == "prior" else k
+        L.append(f"| {name} | " + (f"{v['138']:.3f}" if v["138"] is not None else "-") + f" | {v['82']:.3f} |")
+    L += ["", "| comparison | n | city ed2 F1 difference [95%] |", "|---|---|---|"]
+    for k, v in s["paired_city"].items():
+        k = k.replace("prior", "the 3.8 reply on ABBYY")
+        L.append(f"| {k} | {v['n']} | {v['diff']:+.3f} [{v['lo']:+.3f}, {v['hi']:+.3f}] |")
     L += ["", "## The evidence rule: precision (ed2) of the dedicated prompt's names by their quote", "",
           "A name matching a role- or correspondence-inferred truth entity is set aside, as in the scorer.", "",
           "| arm | field | quote in text | no quote | quote not in text |", "|---|---|---|---|---|"]
@@ -472,7 +510,56 @@ def report(s):
     return "\n".join(L) + "\n"
 
 
-READING = []   # filled in by hand once the figures are in (the report's reading and measurement card)
+READING = """## Reading
+
+- **Recipients: the dedicated prompt is better, and it is the prompt, not the length.** ed2 F1 0.72 with the app's
+  tagging prompt, 0.87 with the dedicated one on the same 3,000 characters (+0.15, interval +0.01 to +0.31); 8,000
+  characters add nothing (+0.01). The gain is in listing every addressee: the dedicated arms name 168 recipients
+  to the tagging arm's 124, and the multi-addressee letters are where the tagging prompt's single `recipient_name`
+  loses them. On the rerun the recipients did not move at all.
+- **Sending place: a format effect only.** On the full string the dedicated prompt gains 0.23, but cut to the city
+  on both sides, as W46.ent-score scored it, every arm is 0.90-0.91 and the differences are ties (+0.01, interval
+  -0.02 to +0.05). The full-string gap is "City, State" against the tagging reply's own forms; the rerun alone moved
+  it 0.16 ("Springfield, IL" against "Springfield, Illinois").
+- **Senders: no prompt gain, and a cost the dedicated prompt's own rule causes.** 0.71 tagging, 0.67 dedicated at
+  3,000 (-0.03, a tie), 0.76 at 8,000. The dedicated prompt nulls far less (9 or 19 of 129 against 31) but is wrong
+  on more documents (27-28 against 16): 15 of entity8k's 27 wrong senders are the organisation fallback its rule asks for
+  (an office or institution where the truth has the signer), the rest a surname or first name alone where the truth has the full name, or a garbled
+  signature. Length helps the dedicated prompt's sender (+0.09, interval +0.02 to +0.17; 12 more named senders sit
+  past 3,000 in the Vision text), but the rerun floor for senders is +0.04 on 40 documents, so read it as a likely
+  small gain, not a measured size.
+- **Vision text against ABBYY: no loss.** The tagging prompt on Vision text with Gemini 3.7 is level with
+  W46.ent-score's Gemini 3.8 reply on ABBYY on the 82 (sender +0.03, recipient +0.01, city +0.00, all ties), and Vision
+  text holds more of the truth's names (sender 78 against 64 of 138 in the first 3,000, recipient 146 against 112).
+- **The evidence rule is satisfiable.** Every one of the dedicated prompt's 364 quoted names was found verbatim in
+  the text it read (whitespace folded); 2 came without a quote. A quote check in the app would therefore pass the
+  model's own reads and catch only inferred names, which this prompt almost never offers.
+
+What it means for the app: the tagging prompt's recipient field should ask for every addressee, as a list, and its
+place for "City, State"; the sender should stay a person, null rather than the letterhead's organisation. Filed as
+W46.ent-prompt-app, which has to check the dates the same prompt returns do not move. No route or default changes on
+the sending place, and the 8,000-character window is not worth its tokens for the tagging call on this evidence.
+
+## Measurement card
+
+- **Truth:** W46.fix-ent-truth's 138 correspondence documents, drafted blind by GPT 5.6 Luna and Claude Sonnet 5
+  with the OCR text and the first and last page images, and ruled by Claude Sonnet 5 where they differed. It is
+  model truth: the owner has not checked it (the building session spot-checked 4 rows against the images). No
+  Gemini drafted or ruled, so no scored route is a drafter or a relative of one.
+- **Selection:** 82 of the date-tagging sample's 88 correspondence documents plus 56 additions stratified by text
+  cues (handwritten, role-addressed, unsigned, no dateline) read from the ABBYY text, so the additions were chosen
+  by the ABBYY text, though not by any route tested here. The 82 are the documents W46.ent-score had replies for.
+- **Comparison:** the same Vision text of the same JPEG originals (3 wrong pairs read from the PDF page image
+  instead), the same model, temperature 0 and gateway settings in every arm; tagging and entity3k see the same
+  3,000 characters. The 3.8 reply on ABBYY differs in text source and model version together, and is reported only
+  as that pair.
+- **Noise:** n 138 (82, 40 for the floor); paired document bootstrap, 2,000 draws, 95% intervals. Rerun floor
+  (entity8k repeated, one changed newline to pass the gateway's cache): sender +0.04, recipient 0.00, city -0.03,
+  full-string place -0.16. A gap inside its interval or the floor is a tie.
+- **Scope:** text-only, one model (Gemini 3.7 Flash), one prompt wording per arm; it does not settle a multimodal
+  read, a local model on the dedicated prompt, or how the dates move if the tagging prompt changes (W46.ent-prompt-app).
+  The plan-route Claude arm planned for this item is dropped, not moved (owner, 2026-10-30).
+""".splitlines()
 
 
 def main():
