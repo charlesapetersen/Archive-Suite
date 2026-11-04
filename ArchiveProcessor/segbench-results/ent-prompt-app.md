@@ -104,7 +104,8 @@ sender F1 is a tie.
 - **Comparison:** the same Vision text, first 3,000 characters, context block, model, temperature 0 and gateway in
   every arm; old and new tagging prompts differ in three rules only.
 - **Noise:** n 138 (82 for the owner's dates, 40 for the rerun floor); paired document bootstrap, 2,000 draws, 95%
-  intervals. Rerun floor: sender 0.00, recipient 0.00, full-string place -0.08, city -0.03; dates 1 of 40 documents.
+  intervals. Rerun floor: sender 0.00, recipient 0.00, full-string place -0.08, city -0.03 (-0.100 to 0.000,
+  one-signed: a drift between identical calls, not a floor around zero); dates 1 of 40 documents.
 - **Scope:** one model (Gemini 3.7 Flash), text only, correspondence documents only. It does not settle another
   model's reading of the new rules (the app's other routes), the date-tagging sample's other documents (their text
   is ABBYY's, which no new arm reads), or non-correspondence documents, where author_name is now null rather than an

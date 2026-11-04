@@ -108,42 +108,74 @@ class ReplyCache(unittest.TestCase):
     def put(self, label, doc, meta):
         P.write_reply(P.reply_path(label, doc, self.dir), {"meta": meta, "raw": "{}"})
 
+    R = {"model": "m1", "temperature": 0, "max_tokens": 8192}
+
     def test_same_prompt_hit_other_refused(self):
         dest = P.reply_path("x", "a", self.dir)
-        self.assertIsNone(P.cached(dest, "p"))
-        self.put("x", "a", {"prompt_sha256": P.prompt_sha("p")})
-        self.assertEqual(P.cached(dest, "p")["raw"], "{}")
+        self.assertIsNone(P.cached(dest, "p", self.R))
+        self.put("x", "a", {"prompt_sha256": P.prompt_sha("p"), "request": self.R})
+        self.assertEqual(P.cached(dest, "p", self.R)["raw"], "{}")
         with self.assertRaises(SystemExit):
-            P.cached(dest, "p\n")
+            P.cached(dest, "p\n", self.R)
+
+    def test_other_settings_refused(self):
+        """Measurement review 2026-11-04, P7-7: a model, temperature or token-cap change is a new call."""
+        dest = P.reply_path("x", "a", self.dir)
+        self.put("x", "a", {"prompt_sha256": P.prompt_sha("p"), "request": self.R})
+        for k, v in (("model", "m2"), ("temperature", 0.5), ("max_tokens", 4096)):
+            with self.assertRaises(SystemExit):
+                P.cached(dest, "p", {**self.R, k: v})
+        self.put("x", "b", {"prompt_sha256": P.prompt_sha("p")})          # a hash but no settings
+        with self.assertRaises(SystemExit):
+            P.cached(P.reply_path("x", "b", self.dir), "p", self.R)
 
     def test_unstamped_and_unknown_refused(self):
         self.put("x", "a", {})
         with self.assertRaises(SystemExit):
-            P.cached(P.reply_path("x", "a", self.dir), "p")
+            P.cached(P.reply_path("x", "a", self.dir), "p", self.R)
         self.put("x", "b", {"prompt_sha256": None, "prompt_hash": "unknown"})
         with self.assertRaises(SystemExit):
-            P.cached(P.reply_path("x", "b", self.dir), "p")
+            P.cached(P.reply_path("x", "b", self.dir), "p", self.R)
 
     def test_call_refuses_before_the_gateway(self):
         import types
-        sys.modules.setdefault("gateway_gemini", types.ModuleType("gateway_gemini"))
-        self.put("x", "a", {"prompt_sha256": P.prompt_sha("old")})
+        G = sys.modules.setdefault("gateway_gemini", types.ModuleType("gateway_gemini"))
+        G.MODEL, G.MAX_TOKENS = getattr(G, "MODEL", "m1"), getattr(G, "MAX_TOKENS", 8192)
+        self.put("x", "a", {"prompt_sha256": P.prompt_sha("old"), "request": P.request_settings()})
+        with self.assertRaises(SystemExit):
+            P.call("x", "a", "new", cache=self.dir)
+        self.put("x", "a", {"prompt_sha256": P.prompt_sha("new"), "request": {**P.request_settings(), "model": "?"}})
         with self.assertRaises(SystemExit):
             P.call("x", "a", "new", cache=self.dir)
 
+    def ledger(self, *recs):
+        with open(os.path.join(self.dir, "calls.jsonl"), "w") as fh:
+            for r in recs:
+                fh.write(json.dumps(r) + "\n")
+
     def test_stamp(self):
-        self.put("x", "a", {})
-        self.put("x", "b", {"prompt_sha256": P.prompt_sha("other")})
-        self.put("y", "a", {})
+        B = P.REQUEST_BEFORE
+        self.ledger({"doc": "a", "t": 1, "http": 200, "model": B["model"]},
+                    {"doc": "b", "t": 2, "http": 200, "model": B["model"]})
+        self.put("x", "a", {"t": 1})
+        self.put("x", "b", {"t": 2, "prompt_sha256": P.prompt_sha("other")})
+        self.put("y", "a", {"t": 9})                                          # no ledger line for this call
         got = P.stamp({"x": lambda d: "prompt " + d["id"], "y": None}, self.dir)
-        self.assertEqual(got["x"], {"reconstructed": 1, "had a hash, DIFFERENT": 1})
-        self.assertEqual(got["y"], {"unknown": 1})
-        self.assertEqual(P.cached(P.reply_path("x", "a", self.dir), "prompt a")["meta"]["prompt_hash"], "reconstructed")
+        self.assertEqual(got["x"], {"reconstructed": 1, "had a hash, DIFFERENT": 1, "settings reconstructed": 2})
+        self.assertEqual(got["y"], {"unknown": 1, "settings unknown": 1})
+        a = P.cached(P.reply_path("x", "a", self.dir), "prompt a", B)["meta"]
+        self.assertEqual((a["prompt_hash"], a["request_settings"], a["request"]), ("reconstructed", "reconstructed", B))
         b = json.load(open(P.reply_path("x", "b", self.dir)))["meta"]
         self.assertEqual(b["prompt_sha256"], P.prompt_sha("other"))   # a recorded hash is never changed
         with self.assertRaises(SystemExit):
-            P.check_replies("y", self.dir, lambda d: "p")         # unknown and missing-hash replies stop a report
+            P.check_replies("y", self.dir, lambda d: "p", B)        # unknown and missing-hash replies stop a report
+        again = P.stamp({"x": lambda d: "prompt " + d["id"]}, self.dir)["x"]
+        self.assertEqual(again["had settings, same"], 2)              # recorded settings are compared, never changed
 
+    def test_stamp_needs_the_ledger_model(self):
+        self.ledger({"doc": "a", "t": 1, "http": 200, "model": "another-model"})
+        self.put("x", "a", {"t": 1})
+        self.assertEqual(P.stamp({"x": lambda d: "p"}, self.dir)["x"]["settings unknown"], 1)
 
 
 if __name__ == "__main__":

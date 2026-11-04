@@ -5,7 +5,7 @@
     heavy-run.py run -- python3 ent_score_paid.py vision   # Apple Vision text per page (ocr.swift, the app's settings)
     python3 ent_score_paid.py run --arm tagging|entity3k|entity8k [--limit N] [--rerun]
     python3 ent_score_paid.py report                  # segbench-results/ent-score-paid.md and .json
-    python3 ent_score_paid.py stamp                   # rebuild the prompt hash of replies cached without one
+    python3 ent_score_paid.py stamp                   # record prompt hash and settings on old replies
 
 TORCH_PY is the shared environment's python (torch-env.sh; it holds numpy and Pillow, which extract needs).
 
@@ -268,12 +268,30 @@ def reply_path(arm, doc_id, cache=CACHE):
 # (measurement review 2026-11-03, P6-5). Replies made before the hash was recorded carry one rebuilt from the known
 # prompts by `stamp` ("prompt_hash": "reconstructed"); one whose prompt cannot be rebuilt is labelled "unknown" with
 # no hash, and is refused, never re-called.
+# The same holds for the request's settings, the model id, temperature and token cap ("request"): a cached reply is
+# returned only for the settings it was made with, so a model change calls again rather than scoring the old model's
+# replies (measurement review 2026-11-04, P7-7). Replies made before the settings were recorded get them from `stamp`
+# ("request_settings": "reconstructed"), only where the ledger has the reply's own call under REQUEST_BEFORE's model.
 def prompt_sha(prompt):
     return hashlib.sha256(prompt.encode("utf-8")).hexdigest()
 
 
-def cached(dest, prompt):
-    """The cached reply at dest if it answered this prompt; None if there is none; refuses any other."""
+def request_settings():
+    """The settings every call sends (and every cached reply must have been made with)."""
+    import gateway_gemini as G
+    return {"model": G.MODEL, "temperature": 0, "max_tokens": G.MAX_TOKENS}
+
+
+# What the 810 replies cached before the settings were recorded were sent with: W46.ent-score-paid (b958a87b,
+# 705f32f7) and W46.ent-prompt-app (4cdbba41) all called with gateway_gemini's MODEL 'gemini-3.7-flash', temperature
+# 0 and MAX_TOKENS 8192 (unchanged since 1baafbe7, 2026-10-23). The ledger records the model of each call; the
+# temperature and token cap are the code's at those commits.
+REQUEST_BEFORE = {"model": "gemini-3.7-flash", "temperature": 0, "max_tokens": 8192}
+
+
+def cached(dest, prompt, request):
+    """The cached reply at dest if it answered this prompt with these request settings; None if there is none;
+    refuses any other."""
     if not os.path.exists(dest):
         return None
     with open(dest, encoding="utf-8") as fh:
@@ -284,13 +302,21 @@ def cached(dest, prompt):
                          "run `stamp`, or move it aside to call again")
     if m["prompt_sha256"] != prompt_sha(prompt):
         raise SystemExit(f"{dest}: cached reply answered a different prompt; move it aside to call again")
+    if not m.get("request"):
+        raise SystemExit(f"{dest}: cached reply with no recorded settings "
+                         f"({m.get('request_settings', 'not stamped')}); run `stamp`, or move it aside to call again")
+    if m["request"] != request:
+        raise SystemExit(f"{dest}: cached reply was made with {m['request']}, not {request}; "
+                         "move it aside to call again")
     return out
 
 
-def check_replies(label, cache, prompt_of):
-    """Refuses unless every reply under label answered prompt_of(doc) as it now stands (a report scores no other)."""
+def check_replies(label, cache, prompt_of, request=None):
+    """Refuses unless every reply under label answered prompt_of(doc) as it now stands, with the settings calls now
+    send (a report scores no other)."""
+    request = request or request_settings()
     for _r, d in rows():
-        cached(reply_path(label, d["id"], cache), prompt_of(d))
+        cached(reply_path(label, d["id"], cache), prompt_of(d), request)
 
 
 def write_reply(dest, out):
@@ -302,9 +328,11 @@ def write_reply(dest, out):
 
 def stamp(labels, cache=CACHE):
     """Writes the rebuilt prompt hash into each reply under labels ({label: prompt_of(doc), or None where the prompt
-    is not known}) that has none, or labels it "unknown". A reply that has a hash is compared, never changed.
-    Returns {label: Counter of outcomes}."""
+    is not known}) that has none, or labels it "unknown"; and REQUEST_BEFORE as its settings into each reply that has
+    none, where the ledger holds its own call (same document and send time) under that model, or labels it
+    "unknown". A recorded hash or settings are compared, never changed. Returns {label: Counter of outcomes}."""
     got = {}
+    calls = {(r["doc"], r["t"]): r for r in ledger(cache)}
     for label, prompt_of in labels.items():
         c = got[label] = collections.Counter()
         d_ = os.path.join(cache, "replies", label)
@@ -316,16 +344,28 @@ def stamp(labels, cache=CACHE):
             with open(dest, encoding="utf-8") as fh:
                 out = json.load(fh)
             m = out.setdefault("meta", {})
+            changed = False
             try:
                 h = prompt_sha(prompt_of(docs[f[:-5]])) if prompt_of else None
             except (OSError, KeyError, ValueError, StopIteration):
                 h = None
             if m.get("prompt_sha256"):
                 c["had a hash, " + ("same" if m["prompt_sha256"] == h else "DIFFERENT")] += 1
-                continue
-            m["prompt_sha256"], m["prompt_hash"] = h, "reconstructed" if h else "unknown"
-            write_reply(dest, out)
-            c[m["prompt_hash"]] += 1
+            else:
+                m["prompt_sha256"], m["prompt_hash"] = h, "reconstructed" if h else "unknown"
+                c[m["prompt_hash"]] += 1
+                changed = True
+            if m.get("request"):
+                c["had settings, " + ("same" if m["request"] == REQUEST_BEFORE else "DIFFERENT")] += 1
+            else:
+                r = calls.get((f[:-5], m.get("t")))
+                ok = r is not None and r.get("http") == 200 and r.get("model") == REQUEST_BEFORE["model"]
+                m["request"], m["request_settings"] = ((dict(REQUEST_BEFORE), "reconstructed") if ok
+                                                       else (None, "unknown"))
+                c["settings " + m["request_settings"]] += 1
+                changed = True
+            if changed:
+                write_reply(dest, out)
     return got
 
 
@@ -340,17 +380,18 @@ def replies_labels(cache):
 
 
 def call(arm, doc_id, prompt, cache=CACHE, cap=CAP):
-    """One call, cached by destination and prompt hash; the ledger line is written before the reply is used."""
+    """One call, cached by destination, prompt hash and settings; the ledger line is written before the reply is
+    used."""
     import gateway_gemini as G
     dest = reply_path(arm, doc_id, cache)
-    hit = cached(dest, prompt)
+    request = request_settings()
+    hit = cached(dest, prompt, request)
     if hit is not None:
         return hit
     worst = G.cost({"prompt_tokens": 6000, "completion_tokens": G.MAX_TOKENS})
     if spent(cache) + worst > cap:
         raise SystemExit(f"cap: ${spent(cache):.4f} spent of ${cap}")
-    b = {"model": G.MODEL, "temperature": 0, "max_tokens": G.MAX_TOKENS,
-         "messages": [{"role": "user", "content": prompt}]}
+    b = {**request, "messages": [{"role": "user", "content": prompt}]}
     t = time.time()
     for attempt in range(3):
         r = G.request("/chat/completions", b)
@@ -361,7 +402,7 @@ def call(arm, doc_id, prompt, cache=CACHE, cap=CAP):
     usage = got.get("usage") or {}
     rec = {"arm": arm, "doc": doc_id, "http": r.status_code, "t": t, "wall_s": round(time.time() - t, 3),
            "model": got.get("model") or G.MODEL, "usage": usage, "cost": round(G.cost(usage), 6),
-           "prompt_sha256": prompt_sha(prompt), "prompt_hash": "sent"}
+           "prompt_sha256": prompt_sha(prompt), "prompt_hash": "sent", "request": request, "request_settings": "sent"}
     rec = G.with_gateway_cost(rec, r)
     with open(os.path.join(cache, "calls.jsonl"), "a") as fh:
         fh.write(json.dumps(rec) + "\n")
@@ -630,7 +671,8 @@ READING = """## Reading
 - **Sending place: a format effect only.** On the full string the dedicated prompt gains 0.23, but cut to the city
   on both sides, as W46.ent-score scored it, every arm is 0.90-0.91 and the differences are ties (+0.01, interval
   -0.02 to +0.05). The full-string gap is "City, State" against the tagging reply's own forms; the rerun alone moved
-  it 0.16 ("Springfield, IL" against "Springfield, Illinois").
+  it -0.16 ("Springfield, IL" against "Springfield, Illinois"), all one way (interval -0.338 to 0.000: a drift between
+  identical calls, as the sender's and the city's are).
 - **Senders: no prompt gain, and a cost the dedicated prompt's own rule causes.** 0.71 tagging, 0.67 dedicated at
   3,000 (-0.03, a tie), 0.76 at 8,000. The dedicated prompt nulls far less (9 or 19 of 129 against 31) but is wrong
   on more documents (27-28 against 16): 15 of entity8k's 27 wrong senders are the organisation fallback its rule asks for
@@ -666,9 +708,9 @@ the sending place, and the 8,000-character window is not worth its tokens for th
   3,000 characters. The 3.8 reply on ABBYY differs in text source and model version together, and is reported only
   as that pair.
 - **Noise:** n 138 (82, 40 for the floor); paired document bootstrap, 2,000 draws, 95% intervals. Rerun floor
-  (entity8k repeated, one changed newline to pass the gateway's cache): sender +0.04 (0.000 to +0.115, one-signed: a
-  drift between identical calls, not a floor around zero), recipient 0.00, city -0.03, full-string place -0.16. A gap
-  inside its interval or the floor is a tie.
+  (entity8k repeated, one changed newline to pass the gateway's cache): recipient 0.00; sender +0.04 (0.000 to
+  +0.115), city -0.03 (-0.111 to 0.000) and full-string place -0.16 (-0.338 to 0.000) are each one-signed: a drift
+  between identical calls, not a floor around zero. A gap inside its interval or the floor is a tie.
 - **Scope:** text-only, one model (Gemini 3.7 Flash), one prompt wording per arm; it does not settle a multimodal
   read, a local model on the dedicated prompt, or how the dates move if the tagging prompt changes (W46.ent-prompt-app).
   The plan-route Claude arm planned for this item is dropped, not moved (owner, 2026-10-30).

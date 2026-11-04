@@ -102,7 +102,8 @@ Spend: $1.19 estimated over 454 gateway calls (454 answered). the gateway's own 
 - **Sending place: a format effect only.** On the full string the dedicated prompt gains 0.23, but cut to the city
   on both sides, as W46.ent-score scored it, every arm is 0.90-0.91 and the differences are ties (+0.01, interval
   -0.02 to +0.05). The full-string gap is "City, State" against the tagging reply's own forms; the rerun alone moved
-  it 0.16 ("Springfield, IL" against "Springfield, Illinois").
+  it -0.16 ("Springfield, IL" against "Springfield, Illinois"), all one way (interval -0.338 to 0.000: a drift between
+  identical calls, as the sender's and the city's are).
 - **Senders: no prompt gain, and a cost the dedicated prompt's own rule causes.** 0.71 tagging, 0.67 dedicated at
   3,000 (-0.03, a tie), 0.76 at 8,000. The dedicated prompt nulls far less (9 or 19 of 129 against 31) but is wrong
   on more documents (27-28 against 16): 15 of entity8k's 27 wrong senders are the organisation fallback its rule asks for
@@ -138,9 +139,9 @@ the sending place, and the 8,000-character window is not worth its tokens for th
   3,000 characters. The 3.8 reply on ABBYY differs in text source and model version together, and is reported only
   as that pair.
 - **Noise:** n 138 (82, 40 for the floor); paired document bootstrap, 2,000 draws, 95% intervals. Rerun floor
-  (entity8k repeated, one changed newline to pass the gateway's cache): sender +0.04 (0.000 to +0.115, one-signed: a
-  drift between identical calls, not a floor around zero), recipient 0.00, city -0.03, full-string place -0.16. A gap
-  inside its interval or the floor is a tie.
+  (entity8k repeated, one changed newline to pass the gateway's cache): recipient 0.00; sender +0.04 (0.000 to
+  +0.115), city -0.03 (-0.111 to 0.000) and full-string place -0.16 (-0.338 to 0.000) are each one-signed: a drift
+  between identical calls, not a floor around zero. A gap inside its interval or the floor is a tie.
 - **Scope:** text-only, one model (Gemini 3.7 Flash), one prompt wording per arm; it does not settle a multimodal
   read, a local model on the dedicated prompt, or how the dates move if the tagging prompt changes (W46.ent-prompt-app).
   The plan-route Claude arm planned for this item is dropped, not moved (owner, 2026-10-30).
