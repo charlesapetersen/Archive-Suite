@@ -11,6 +11,12 @@ plain image from the dewarp run (W46.enh-dewarp), same settings. A loop is a rea
 limit; a blank is a reply with no text. Both score 0 (strict NES); NES answered leaves them out. bowF1 is the
 bag-of-words F1 from the panel's word counts, so it ignores reading order. Δ is paired by page: mean, 95% bootstrap.
 
+Gemini 3.7 Flash (W46.capture-ladder-paid, `capture_ladder_gateway.py`) read 48 of the 96 (every other page of the 96
+ordered by source, kind and a seeded key; no reader's result used) at the worst setting of each defect plus motion
+17 px and defocus sigma 3, through the Stanford gateway with the cloud panel's prompt and settings (temperature 0,
+low reasoning, 8,192 tokens); its baseline is the cloud panel's reading of the same plain image, checked by hash.
+Separately it judged the capture of those 528 images (the verdict section, at the end).
+
 ## Findings
 
 - **Glare, motion blur and heavy defocus cost every reader; nothing else measured does.** Augraphy's reflected light
@@ -39,6 +45,20 @@ bag-of-words F1 from the panel's word counts, so it ignores reading order. Δ is
   share does not detect the glare defect (0.50 to 0.53) and luminance is inverted (glare brightens). The best cuts
   differ threefold between readers and are in-sample: a live blur warning could start from sharpness in word boxes,
   but its threshold needs real captures.
+- **Gemini 3.7 Flash through the gateway (48 of the 96) forgives defocus best and motion less well than the open
+  readers.** On the same 48 pages, each reader paired against its own plain image: defocus sigma 5 costs Gemini 6.2
+  NES points (-11.2 to -2.7), the 27B 16.7, LightOn 14.2 and Vision 58.3; sigma 3 costs it 1.0. Motion 17 px costs it
+  16.2 (-26.1 to -7.7), against the 27B's 10.4, LightOn's 11.7 and Vision's 37.5; motion 31 px 53.1, between the 27B
+  (44.2) and the other two (68 to 72). Glare costs it 8.9, the others 7.5 to 10.1. Low light, tilt, JPEG 60 and the
+  two faint Augraphy defects cost it under 1 point. It never looped or returned a blank.
+- **Gemini's own capture verdict ranks the damaging images better than any capture-time signal, but its retake
+  advice over-calls blur.** Its 1-5 quality score, asked apart from any reading, separates a 5-point loss at AUC 0.81
+  to 0.90 across the four readers, where sharpness in the word boxes reaches 0.61 to 0.77 and the word-box share 0.72
+  to 0.78 on the same 480 images. Its "retake" catches 90 to 96% of the losses with false alarms on 30 to 46% of the
+  rest: it asks for a retake on 96% of the defocus-3 images, which cost Gemini and the open readers 1 to 2 points. It
+  names blur on every motion and heavy-defocus image but confuses the two kinds (motion 31 px: out_of_focus 45 times,
+  motion_blur 43), names glare on 73% of the reflected-light images and tilt on 52%, and asks to retake 8% of the
+  plain photographs. The verdicts cost $0.80 for 528 images, about $0.0015 each.
 
 What this means for the companion's guidance: hold the phone still and avoid reflections; tilt and compression need
 no warning for any reader, and the gateway or open readers forgive blur that Vision does not, so a blur warning
@@ -178,6 +198,37 @@ matters most where Vision reads on the device.
 | quad-tilt-12 | +0.2 (-1.3 to +1.4) [63] | -2.3 (-5.9 to +0.2) [33] | +0.3 (-0.7 to +1.2) [50] | -2.6 (-7.3 to +0.9) [28] | -0.6 (-3.6 to +2.3) [16] |
 | quad-tilt-20 | -0.5 (-2.3 to +1.2) [63] | -4.0 (-8.9 to -0.2) [33] | +0.6 (-0.1 to +1.5) [50] | -5.6 (-11.8 to -0.4) [28] | -0.8 (-3.7 to +2.4) [16] |
 
+## Gemini 3.7 Flash (gateway, 48 pages)
+
+| defect | n | loops (cap / timeout) | blank | NES strict % | Δ NES strict (95% CI) | NES answered % | bowF1 % | Δ bowF1 (95% CI) | words missed % | words added % | pages losing ≥5 NES |
+|---|---:|---:|---:|---:|---|---:|---:|---|---:|---:|---:|
+| raw | 48 | 0 | 0 | 97.1 | — | 97.1 | 98.7 | — | 0.5 | 1.1 | — |
+| aug-ShadowCast | 48 | 0 | 0 | 96.9 | -0.2 (-0.6 to +0.1) | 96.9 | 98.8 | +0.1 (-0.5 to +0.8) | 0.4 | 1.1 | 0 |
+| aug-LightingGradient | 48 | 0 | 0 | 96.5 | -0.6 (-1.6 to +0.0) | 96.5 | 97.8 | -0.8 (-2.1 to +0.1) | 1.1 | 1.9 | 1 |
+| aug-ReflectedLight | 48 | 0 | 0 | 88.1 | -8.9 (-11.6 to -6.4) | 88.1 | 92.6 | -6.0 (-7.9 to -4.3) | 10.0 | 2.0 | 27 |
+| aug-LowLightNoise | 48 | 0 | 0 | 96.9 | -0.2 (-0.7 to +0.4) | 96.9 | 98.4 | -0.3 (-1.0 to +0.5) | 1.0 | 1.4 | 1 |
+| motion-31 | 48 | 0 | 0 | 43.9 | -53.1 (-64.8 to -41.9) | 43.9 | 43.2 | -55.4 (-67.2 to -43.9) | 71.5 | 4.0 | 38 |
+| defocus-5 | 48 | 0 | 0 | 90.9 | -6.2 (-11.2 to -2.7) | 90.9 | 91.9 | -6.7 (-11.7 to -3.3) | 8.3 | 6.1 | 13 |
+| tilt-20 | 48 | 0 | 0 | 97.0 | -0.1 (-0.5 to +0.3) | 97.0 | 98.4 | -0.2 (-0.7 to +0.4) | 1.0 | 1.4 | 0 |
+| jpeg-60 | 48 | 0 | 0 | 96.4 | -0.7 (-1.6 to +0.0) | 96.4 | 98.1 | -0.5 (-1.3 to +0.1) | 1.2 | 1.9 | 2 |
+| motion-17 | 48 | 0 | 0 | 80.8 | -16.2 (-26.1 to -7.7) | 80.8 | 81.5 | -17.1 (-27.6 to -8.1) | 24.6 | 3.4 | 14 |
+| defocus-3 | 48 | 0 | 0 | 96.1 | -1.0 (-1.8 to -0.3) | 96.1 | 97.8 | -0.9 (-1.5 to -0.3) | 1.2 | 1.8 | 3 |
+
+Δ NES strict by page group, paired against Gemini 3.7 Flash (gateway, 48 pages) on the plain photograph (the panel's image) (n in brackets):
+
+| defect | originals | PDF images | typewritten | printed | handwritten |
+|---|---|---|---|---|---|
+| aug-ShadowCast | -0.4 (-0.9 to +0.2) [31] | +0.0 (-0.3 to +0.3) [17] | -0.1 (-0.6 to +0.4) [25] | -0.3 (-1.0 to +0.3) [14] | -0.5 (-1.3 to +0.2) [8] |
+| aug-LightingGradient | -0.8 (-2.3 to +0.2) [31] | -0.3 (-0.7 to -0.0) [17] | +0.1 (-0.2 to +0.5) [25] | -0.4 (-0.9 to -0.1) [14] | -0.8 (-1.5 to -0.2) [8] |
+| aug-ReflectedLight | -11.2 (-14.7 to -7.8) [31] | -4.8 (-7.7 to -2.5) [17] | -8.5 (-12.1 to -5.2) [25] | -5.2 (-7.6 to -3.0) [14] | -16.1 (-25.0 to -8.4) [8] |
+| aug-LowLightNoise | -0.1 (-0.9 to +0.7) [31] | -0.3 (-0.8 to -0.0) [17] | -0.4 (-1.4 to +0.4) [25] | -0.4 (-0.9 to -0.0) [14] | +0.2 (-0.7 to +1.2) [8] |
+| motion-31 | -44.1 (-58.3 to -30.3) [31] | -69.7 (-86.9 to -50.6) [17] | -50.4 (-67.6 to -33.1) [25] | -69.5 (-86.4 to -49.3) [14] | -34.5 (-57.2 to -15.9) [8] |
+| defocus-5 | -2.7 (-3.9 to -1.5) [31] | -12.6 (-26.0 to -3.4) [17] | -5.9 (-14.2 to -1.3) [25] | -8.0 (-15.0 to -2.3) [14] | -3.2 (-5.7 to -0.7) [8] |
+| tilt-20 | +0.0 (-0.6 to +0.7) [31] | -0.4 (-0.6 to -0.1) [17] | +0.1 (-0.2 to +0.4) [25] | -0.4 (-0.7 to -0.2) [14] | -1.1 (-2.3 to +0.1) [8] |
+| jpeg-60 | -1.0 (-2.3 to +0.1) [31] | -0.1 (-0.3 to +0.0) [17] | -0.3 (-1.5 to +0.6) [25] | -0.3 (-0.6 to -0.0) [14] | -1.1 (-2.3 to +0.0) [8] |
+| motion-17 | -11.3 (-21.9 to -2.8) [31] | -25.2 (-45.1 to -8.5) [17] | -13.3 (-26.0 to -3.0) [25] | -25.2 (-46.1 to -7.1) [14] | -13.6 (-33.8 to +0.0) [8] |
+| defocus-3 | -1.1 (-2.3 to -0.3) [31] | -0.7 (-1.7 to -0.1) [17] | -0.6 (-1.3 to -0.2) [25] | -1.0 (-2.3 to -0.1) [14] | -2.3 (-5.9 to -0.0) [8] |
+
 ## Capture-time signals against a loss of 5 NES points or more
 
 | signal | Qwen3.6-27B AUC | LightOnOCR-3 4B AUC | Apple Vision AUC | Qwen3.6-27B: cut (hit / false alarm) | LightOnOCR-3 4B: cut (hit / false alarm) | Apple Vision: cut (hit / false alarm) |
@@ -191,25 +242,58 @@ matters most where Vision reads on the device.
 
 Losses (of 1536 defect images): Qwen3.6-27B 251, LightOnOCR-3 4B 260, Apple Vision 472.
 
+## Gemini 3.7 Flash's own verdict on the capture
+
+Gemini 3.7 Flash was asked, apart from any reading, to judge each image's capture: a quality score 1-5, whether to retake it, and a defect list from a fixed vocabulary (capture_ladder_gateway.py VERDICT_PROMPT), temperature 0, low reasoning. The images are the 48 pages' plain photographs and their ten defect images that Gemini also read. "Flags the applied defect" is the share whose list names the defect the image was given (Augraphy shadow as shadow, lighting gradient as uneven_lighting, reflected light as glare, low light as dark_or_noisy, motion as motion_blur, defocus as out_of_focus, tilt as tilted, JPEG as compression_artifacts).
+
+| image | n | parsed | mean quality (1-5) | retake % | flags the applied defect % | flags a blur % | flags any defect % | most flagged |
+|---|---:|---:|---:|---:|---:|---:|---:|---|
+| raw | 48 | 48 | 4.52 | 8 | — | 6 | 29 | uneven_lighting 6, out_of_focus 3, compression_artifacts 3 |
+| aug-ShadowCast | 48 | 48 | 4.04 | 25 | 46 | 6 | 65 | uneven_lighting 27, shadow 22, cut_off 4 |
+| aug-LightingGradient | 48 | 48 | 4.35 | 15 | 19 | 10 | 44 | uneven_lighting 9, dark_or_noisy 6, out_of_focus 5 |
+| aug-ReflectedLight | 48 | 48 | 2.75 | 71 | 73 | 2 | 81 | glare 35, uneven_lighting 34, cut_off 2 |
+| aug-LowLightNoise | 48 | 48 | 3.60 | 33 | 33 | 21 | 69 | dark_or_noisy 16, uneven_lighting 15, out_of_focus 10 |
+| motion-31 | 48 | 48 | 1.00 | 100 | 90 | 100 | 100 | out_of_focus 45, motion_blur 43, compression_artifacts 2 |
+| defocus-5 | 48 | 48 | 1.29 | 100 | 100 | 100 | 100 | out_of_focus 48, motion_blur 12, compression_artifacts 5 |
+| tilt-20 | 48 | 48 | 4.17 | 8 | 52 | 4 | 65 | tilted 25, uneven_lighting 10, cut_off 7 |
+| jpeg-60 | 48 | 48 | 4.48 | 6 | 8 | 4 | 25 | uneven_lighting 5, compression_artifacts 4, tilted 3 |
+| motion-17 | 48 | 48 | 1.27 | 100 | 79 | 100 | 100 | out_of_focus 46, motion_blur 38, compression_artifacts 4 |
+| defocus-3 | 48 | 48 | 2.27 | 96 | 94 | 94 | 96 | out_of_focus 45, motion_blur 10, compression_artifacts 8 |
+
+Against each reader's loss of 5 NES points or more on the same 10 x 48 defect images (AUC 0.5 is no information; the signals' AUC is over these images only, so it differs from the table above):
+
+| reader | losses / images | verdict: 5 - quality AUC | retake: hit / false alarm | Laplacian variance AUC | word-box share AUC |
+|---|---:|---:|---|---:|---:|
+| Qwen3.6-27B | 124 / 480 | 0.85 | 94% / 42% | 0.68 | 0.76 |
+| LightOnOCR-3 4B | 111 / 480 | 0.88 | 96% / 43% | 0.68 | 0.78 |
+| Apple Vision | 204 / 480 | 0.90 | 90% / 30% | 0.77 | 0.76 |
+| Gemini 3.7 Flash (gateway, 48 pages) | 99 / 480 | 0.81 | 93% / 46% | 0.61 | 0.72 |
+
 
 ## Measurement card
 
 - **Truth:** the 96's adjudicated truth (`ocr_truth`), the same for every image of a page. The figure is a change
   within one reader against one fixed truth, so a drafter bias in the truth moves the plain and the defect image alike
   and largely cancels; it does not cancel in a comparison between readers, which this report does not rank on. The
-  owner's blind check found the typed-page truth fit for ranking (measurement audit, 2026-10-30).
+  owner's blind check found the typed-page truth fit for ranking (measurement audit, 2026-10-30). Gemini 3.8 Flash,
+  a relative of the scored Gemini 3.7 Flash, drafted that truth with Claude Opus 5.5, so Gemini's own level (97.1 on
+  its 48) is not compared with the other readers'; its Δ, like theirs, is within the reader.
 - **Selection:** all 96 scored pages, every defect; no page chosen by a reader's result or by ABBYY text. The optical
   capture tags are not used to slice (CAP-1, kappa 0.14-0.47 against a blind retag).
 - **Comparison:** the same pages, prompts, decoding and server arguments as each reader's baseline. One difference:
   every defect image went through the ladder's own JPEG save (quality 92, or the JPEG row's quality) after the panel's
   JPEG 90, so a second encoding is inside every Δ; the JPEG 85 row bounds it. The baseline was read on 2026-10-22 in a
-  separate job of the same container.
+  separate job of the same container. Gemini's baseline is the cloud panel's reading of the same plain image
+  (W46.fix-ocr-scorers-paid, an earlier run with the same request); its defect images were read on 2026-11-04.
+  Gemini is set beside the other readers only on its 48 pages, each reader against its own plain image.
 - **Noise:** n 96 per cell, paired intervals as above. No rerun floor has been measured for these two Sherlock readers
   (W46.ocr-rerun-noise measured Gemini 3.7 Flash, range 0.24 points, and Qwen3-VL 8B on MLX, 0). vLLM at temperature 0
   is not bit-deterministic with batching, so the JPEG 75 and 85 rows, near-invisible changes, are the practical floor
   here: a Δ inside them, or one whose interval crosses 0, is read as no effect. Apple Vision is deterministic.
+  Gemini's cells have n 48; its measured rerun range, 0.24 points, is the floor for the gap between its two dates.
 - **Scope:** synthetic defects on the owner's pages, one defect at a time, at the library defaults for Augraphy's four
   (ShadowCast's default shadow is faint, so its row may understate a real shadow). Not settled here: combined defects,
   real phone captures (SmartDoc-QA), the public 895, GLM-OCR on regions, the 2B segmentation student, and the
-  readers' own quality verdicts. Signal AUCs and cuts are in-sample on synthetic images: a cut for the companion app
+  open readers' own quality verdicts. Gemini's verdict was asked once per image with one prompt and is scored on
+  synthetic defects; whether it ranks real captures as well is not settled. Signal AUCs and cuts are in-sample on synthetic images: a cut for the companion app
   needs a held-out check on real captures before it ships.

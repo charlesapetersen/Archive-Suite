@@ -161,6 +161,17 @@ vision,jpeg-75,p003,original,printed,ok,True,0.980897,0.974079,0.982067,589,582,
 vision,jpeg-85,p003,original,printed,ok,True,0.980366,0.972519,0.978614,589,580,17,8
 vision,quad-tilt-12,p003,original,printed,ok,True,0.971876,0.974247,0.984589,589,579,14,4
 vision,quad-tilt-20,p003,original,printed,ok,True,0.980631,0.97741,0.980426,589,586,13,10
+gemini3.7-flash-gw,raw,p003,original,printed,ok,True,0.998411,0.997451,1.0,589,589,0,0
+gemini3.7-flash-gw,aug-ShadowCast,p003,original,printed,ok,True,0.998411,0.997451,1.0,589,589,0,0
+gemini3.7-flash-gw,aug-LightingGradient,p003,original,printed,ok,True,0.998411,0.997451,1.0,589,589,0,0
+gemini3.7-flash-gw,aug-ReflectedLight,p003,original,printed,ok,True,0.896524,0.887828,0.935252,589,523,69,3
+gemini3.7-flash-gw,aug-LowLightNoise,p003,original,printed,ok,True,0.997882,0.996277,1.0,589,589,0,0
+gemini3.7-flash-gw,motion-31,p003,original,printed,ok,True,0.150172,0.042721,0.0,589,0,589,0
+gemini3.7-flash-gw,defocus-5,p003,original,printed,ok,True,0.961365,0.946868,0.954894,589,586,28,25
+gemini3.7-flash-gw,tilt-20,p003,original,printed,ok,True,0.998411,0.997451,1.0,589,589,0,0
+gemini3.7-flash-gw,jpeg-60,p003,original,printed,ok,True,0.994459,0.995064,0.998305,589,591,0,2
+gemini3.7-flash-gw,motion-17,p003,original,printed,ok,True,0.987546,0.97888,0.985532,589,586,10,7
+gemini3.7-flash-gw,defocus-3,p003,original,printed,ok,True,0.990183,0.987978,0.996593,589,585,4,0
 qwen3.6-27b,raw,p004,original,typewritten,ok,True,1.0,1.0,1.0,282,282,0,0
 qwen3.6-27b,aug-ShadowCast,p004,original,typewritten,ok,True,1.0,1.0,1.0,282,282,0,0
 qwen3.6-27b,aug-LightingGradient,p004,original,typewritten,ok,True,1.0,1.0,1.0,282,282,0,0
@@ -269,6 +280,17 @@ vision,jpeg-75,p005,original,typewritten,ok,True,0.983172,0.981901,0.987762,576,
 vision,jpeg-85,p005,original,typewritten,ok,True,0.912436,0.922919,0.948229,576,525,54,3
 vision,quad-tilt-12,p005,original,typewritten,ok,True,0.990873,0.987674,0.992181,576,575,5,4
 vision,quad-tilt-20,p005,original,typewritten,ok,True,0.998859,0.995218,0.993056,576,576,4,4
+gemini3.7-flash-gw,raw,p005,original,typewritten,ok,True,1.0,1.0,1.0,576,576,0,0
+gemini3.7-flash-gw,aug-ShadowCast,p005,original,typewritten,ok,True,1.0,1.0,1.0,576,576,0,0
+gemini3.7-flash-gw,aug-LightingGradient,p005,original,typewritten,ok,True,1.0,1.0,1.0,576,576,0,0
+gemini3.7-flash-gw,aug-ReflectedLight,p005,original,typewritten,ok,True,0.863948,0.839287,0.886598,576,491,103,18
+gemini3.7-flash-gw,aug-LowLightNoise,p005,original,typewritten,ok,True,1.0,1.0,1.0,576,576,0,0
+gemini3.7-flash-gw,motion-31,p005,original,typewritten,ok,True,0.003708,0.002202,0.003466,576,1,575,0
+gemini3.7-flash-gw,defocus-5,p005,original,typewritten,ok,True,0.99943,0.998463,0.998264,576,576,1,1
+gemini3.7-flash-gw,tilt-20,p005,original,typewritten,ok,True,1.0,1.0,1.0,576,576,0,0
+gemini3.7-flash-gw,jpeg-60,p005,original,typewritten,ok,True,1.0,1.0,1.0,576,576,0,0
+gemini3.7-flash-gw,motion-17,p005,original,typewritten,ok,True,0.995737,0.996565,0.996528,576,576,2,2
+gemini3.7-flash-gw,defocus-3,p005,original,typewritten,ok,True,1.0,1.0,1.0,576,576,0,0
 qwen3.6-27b,raw,p006,original,typewritten,ok,True,1.0,1.0,1.0,45,45,0,0
 qwen3.6-27b,aug-ShadowCast,p006,original,typewritten,ok,True,1.0,1.0,1.0,45,45,0,0
 qwen3.6-27b,aug-LightingGradient,p006,original,typewritten,ok,True,1.0,1.0,1.0,45,45,0,0
@@ -323,6 +345,17 @@ vision,jpeg-75,p006,original,typewritten,ok,True,0.993569,0.974187,0.977778,45,4
 vision,jpeg-85,p006,original,typewritten,ok,True,0.906752,0.958244,1.0,45,45,0,0
 vision,quad-tilt-12,p006,original,typewritten,ok,True,0.823151,0.786093,0.819277,45,38,11,4
 vision,quad-tilt-20,p006,original,typewritten,ok,True,0.903537,0.955185,0.967033,45,46,1,2
+gemini3.7-flash-gw,raw,p006,original,typewritten,ok,True,1.0,1.0,1.0,45,45,0,0
+gemini3.7-flash-gw,aug-ShadowCast,p006,original,typewritten,ok,True,0.99361,0.989758,1.0,45,45,0,0
+gemini3.7-flash-gw,aug-LightingGradient,p006,original,typewritten,ok,True,1.0,1.0,1.0,45,45,0,0
+gemini3.7-flash-gw,aug-ReflectedLight,p006,original,typewritten,ok,True,0.835962,0.792141,0.894118,45,40,7,2
+gemini3.7-flash-gw,aug-LowLightNoise,p006,original,typewritten,ok,True,1.0,1.0,1.0,45,45,0,0
+gemini3.7-flash-gw,motion-31,p006,original,typewritten,ok,True,0.993569,0.974079,0.977778,45,45,1,1
+gemini3.7-flash-gw,defocus-5,p006,original,typewritten,ok,True,1.0,1.0,1.0,45,45,0,0
+gemini3.7-flash-gw,tilt-20,p006,original,typewritten,ok,True,1.0,1.0,1.0,45,45,0,0
+gemini3.7-flash-gw,jpeg-60,p006,original,typewritten,ok,True,1.0,1.0,1.0,45,45,0,0
+gemini3.7-flash-gw,motion-17,p006,original,typewritten,ok,True,1.0,1.0,1.0,45,45,0,0
+gemini3.7-flash-gw,defocus-3,p006,original,typewritten,ok,True,1.0,1.0,1.0,45,45,0,0
 qwen3.6-27b,raw,p007,original,handwritten,ok,True,0.934383,0.913993,0.932432,73,75,4,6
 qwen3.6-27b,aug-ShadowCast,p007,original,handwritten,ok,True,0.931579,0.908488,0.932432,73,75,4,6
 qwen3.6-27b,aug-LightingGradient,p007,original,handwritten,ok,True,0.926121,0.899044,0.932432,73,75,4,6
@@ -377,6 +410,17 @@ vision,jpeg-75,p007,original,handwritten,ok,True,0.539894,0.347717,0.452555,73,6
 vision,jpeg-85,p007,original,handwritten,ok,True,0.542553,0.357638,0.439716,73,68,42,37
 vision,quad-tilt-12,p007,original,handwritten,ok,True,0.558511,0.382295,0.434109,73,56,45,28
 vision,quad-tilt-20,p007,original,handwritten,ok,True,0.489362,0.269738,0.333333,73,53,52,32
+gemini3.7-flash-gw,raw,p007,original,handwritten,ok,True,0.994709,0.987514,1.0,73,73,0,0
+gemini3.7-flash-gw,aug-ShadowCast,p007,original,handwritten,ok,True,0.965426,0.962048,0.986301,73,73,1,1
+gemini3.7-flash-gw,aug-LightingGradient,p007,original,handwritten,ok,True,0.984211,0.952218,0.986301,73,73,1,1
+gemini3.7-flash-gw,aug-ReflectedLight,p007,original,handwritten,ok,True,0.885638,0.898024,0.957143,73,67,6,0
+gemini3.7-flash-gw,aug-LowLightNoise,p007,original,handwritten,ok,True,0.989418,0.970225,0.986301,73,73,1,1
+gemini3.7-flash-gw,motion-31,p007,original,handwritten,ok,True,0.851064,0.76854,0.861111,73,71,11,9
+gemini3.7-flash-gw,defocus-5,p007,original,handwritten,ok,True,0.909574,0.861996,0.938776,73,74,4,5
+gemini3.7-flash-gw,tilt-20,p007,original,handwritten,ok,True,0.960106,0.949512,0.986301,73,73,1,1
+gemini3.7-flash-gw,jpeg-60,p007,original,handwritten,ok,True,0.960106,0.942078,0.979592,73,74,1,2
+gemini3.7-flash-gw,motion-17,p007,original,handwritten,ok,True,0.976064,0.949472,0.986301,73,73,1,1
+gemini3.7-flash-gw,defocus-3,p007,original,handwritten,ok,True,0.994709,0.987514,1.0,73,73,0,0
 qwen3.6-27b,raw,p008,pdf image,typewritten,ok,True,0.999119,0.997855,1.0,605,605,0,0
 qwen3.6-27b,aug-ShadowCast,p008,pdf image,typewritten,ok,True,0.998825,0.996675,1.0,605,605,0,0
 qwen3.6-27b,aug-LightingGradient,p008,pdf image,typewritten,ok,True,0.999119,0.997855,1.0,605,605,0,0
@@ -431,6 +475,17 @@ vision,jpeg-75,p008,pdf image,typewritten,ok,True,0.882232,0.869466,0.885302,605
 vision,jpeg-85,p008,pdf image,typewritten,ok,True,0.902203,0.899615,0.919423,605,574,63,32
 vision,quad-tilt-12,p008,pdf image,typewritten,ok,True,0.93304,0.907431,0.91014,605,608,53,56
 vision,quad-tilt-20,p008,pdf image,typewritten,ok,True,0.873128,0.882162,0.906758,605,564,75,34
+gemini3.7-flash-gw,raw,p008,pdf image,typewritten,ok,True,0.999413,0.999035,1.0,605,605,0,0
+gemini3.7-flash-gw,aug-ShadowCast,p008,pdf image,typewritten,ok,True,0.998826,0.996533,1.0,605,605,0,0
+gemini3.7-flash-gw,aug-LightingGradient,p008,pdf image,typewritten,ok,True,0.999413,0.999035,1.0,605,605,0,0
+gemini3.7-flash-gw,aug-ReflectedLight,p008,pdf image,typewritten,ok,True,0.921292,0.911973,0.946367,605,551,58,4
+gemini3.7-flash-gw,aug-LowLightNoise,p008,pdf image,typewritten,ok,True,0.998238,0.99589,0.998347,605,605,1,1
+gemini3.7-flash-gw,motion-31,p008,pdf image,typewritten,ok,True,0.002643,0.001561,0.0,605,0,605,0
+gemini3.7-flash-gw,defocus-5,p008,pdf image,typewritten,ok,True,0.924949,0.880124,0.895868,605,605,63,63
+gemini3.7-flash-gw,tilt-20,p008,pdf image,typewritten,ok,True,0.997651,0.995495,0.992543,605,602,6,3
+gemini3.7-flash-gw,jpeg-60,p008,pdf image,typewritten,ok,True,0.999413,0.999035,1.0,605,605,0,0
+gemini3.7-flash-gw,motion-17,p008,pdf image,typewritten,ok,True,0.094567,0.031934,0.0033,605,1,604,0
+gemini3.7-flash-gw,defocus-3,p008,pdf image,typewritten,ok,True,0.997357,0.993459,0.995041,605,605,3,3
 qwen3.6-27b,raw,p009,original,mixed,ok,True,0.625308,0.726368,0.779006,160,202,19,61
 qwen3.6-27b,aug-ShadowCast,p009,original,mixed,ok,True,0.62326,0.725729,0.77686,160,203,19,62
 qwen3.6-27b,aug-LightingGradient,p009,original,mixed,ok,True,0.466179,0.744887,0.887538,160,169,14,23
@@ -485,6 +540,17 @@ vision,jpeg-75,p009,original,mixed,ok,True,0.438757,0.653942,0.770186,160,162,36
 vision,jpeg-85,p009,original,mixed,ok,True,0.445155,0.646857,0.76489,160,159,38,37
 vision,quad-tilt-12,p009,original,mixed,ok,True,0.584095,0.659039,0.803797,160,156,33,29
 vision,quad-tilt-20,p009,original,mixed,ok,True,0.433272,0.658105,0.783699,160,159,35,34
+gemini3.7-flash-gw,raw,p009,original,mixed,ok,True,0.688088,0.769924,0.807487,160,214,9,63
+gemini3.7-flash-gw,aug-ShadowCast,p009,original,mixed,ok,True,0.675503,0.757275,0.920732,160,168,9,17
+gemini3.7-flash-gw,aug-LightingGradient,p009,original,mixed,ok,True,0.488358,0.704758,0.671329,160,269,16,125
+gemini3.7-flash-gw,aug-ReflectedLight,p009,original,mixed,ok,True,0.531993,0.566284,0.676471,160,112,68,20
+gemini3.7-flash-gw,aug-LowLightNoise,p009,original,mixed,ok,True,0.742411,0.908172,0.923547,160,167,9,16
+gemini3.7-flash-gw,motion-31,p009,original,mixed,ok,True,0.275137,0.267618,0.231481,160,56,135,31
+gemini3.7-flash-gw,defocus-5,p009,original,mixed,ok,True,0.557012,0.708777,0.653061,160,232,32,104
+gemini3.7-flash-gw,tilt-20,p009,original,mixed,ok,True,0.756223,0.899775,0.907463,160,175,8,23
+gemini3.7-flash-gw,jpeg-60,p009,original,mixed,ok,True,0.561006,0.715383,0.683841,160,267,14,121
+gemini3.7-flash-gw,motion-17,p009,original,mixed,ok,True,0.825696,0.812298,0.839744,160,152,29,21
+gemini3.7-flash-gw,defocus-3,p009,original,mixed,ok,True,0.712848,0.736851,0.746667,160,215,20,75
 qwen3.6-27b,raw,p010,pdf image,printed,ok,True,0.998621,0.99548,0.993344,601,601,4,4
 qwen3.6-27b,aug-ShadowCast,p010,pdf image,printed,ok,True,0.998621,0.995535,0.995008,601,601,3,3
 qwen3.6-27b,aug-LightingGradient,p010,pdf image,printed,ok,True,0.998897,0.996638,0.995008,601,601,3,3
@@ -647,6 +713,17 @@ vision,jpeg-75,p012,original,typewritten,ok,True,0.949809,0.963942,0.962312,400,
 vision,jpeg-85,p012,original,typewritten,ok,True,0.970775,0.979249,0.981273,400,401,7,8
 vision,quad-tilt-12,p012,original,typewritten,ok,True,0.948533,0.939343,0.953105,400,389,24,13
 vision,quad-tilt-20,p012,original,typewritten,ok,True,0.940026,0.941879,0.956962,400,390,22,12
+gemini3.7-flash-gw,raw,p012,original,typewritten,ok,True,1.0,1.0,1.0,400,400,0,0
+gemini3.7-flash-gw,aug-ShadowCast,p012,original,typewritten,ok,True,1.0,1.0,1.0,400,400,0,0
+gemini3.7-flash-gw,aug-LightingGradient,p012,original,typewritten,ok,True,1.0,1.0,1.0,400,400,0,0
+gemini3.7-flash-gw,aug-ReflectedLight,p012,original,typewritten,ok,True,0.979044,0.979017,0.98995,400,396,6,2
+gemini3.7-flash-gw,aug-LowLightNoise,p012,original,typewritten,ok,True,1.0,1.0,1.0,400,400,0,0
+gemini3.7-flash-gw,motion-31,p012,original,typewritten,ok,True,0.981316,0.967285,0.969925,400,398,13,11
+gemini3.7-flash-gw,defocus-5,p012,original,typewritten,ok,True,1.0,1.0,1.0,400,400,0,0
+gemini3.7-flash-gw,tilt-20,p012,original,typewritten,ok,True,1.0,1.0,1.0,400,400,0,0
+gemini3.7-flash-gw,jpeg-60,p012,original,typewritten,ok,True,1.0,1.0,1.0,400,400,0,0
+gemini3.7-flash-gw,motion-17,p012,original,typewritten,ok,True,0.999149,0.997689,0.9975,400,400,1,1
+gemini3.7-flash-gw,defocus-3,p012,original,typewritten,ok,True,1.0,1.0,1.0,400,400,0,0
 qwen3.6-27b,raw,p013,original,typewritten,ok,True,0.786804,0.930622,0.990291,412,412,4,4
 qwen3.6-27b,aug-ShadowCast,p013,original,typewritten,ok,True,0.787629,0.931018,0.991515,412,413,3,4
 qwen3.6-27b,aug-LightingGradient,p013,original,typewritten,ok,True,0.790103,0.934291,0.995146,412,412,2,2
@@ -701,6 +778,17 @@ vision,jpeg-75,p013,original,typewritten,ok,True,0.790515,0.816365,0.835443,412,
 vision,jpeg-85,p013,original,typewritten,ok,True,0.723711,0.792631,0.839378,412,360,88,36
 vision,quad-tilt-12,p013,original,typewritten,ok,True,0.729072,0.756203,0.821664,412,345,101,34
 vision,quad-tilt-20,p013,original,typewritten,ok,True,0.732371,0.832232,0.876263,412,380,65,33
+gemini3.7-flash-gw,raw,p013,original,typewritten,ok,True,0.765773,0.990222,0.998785,412,411,1,0
+gemini3.7-flash-gw,aug-ShadowCast,p013,original,typewritten,ok,True,0.786804,0.986948,0.997579,412,414,0,2
+gemini3.7-flash-gw,aug-LightingGradient,p013,original,typewritten,ok,True,0.766186,0.987047,0.998788,412,413,0,1
+gemini3.7-flash-gw,aug-ReflectedLight,p013,original,typewritten,ok,True,0.646598,0.866075,0.905072,412,357,64,9
+gemini3.7-flash-gw,aug-LowLightNoise,p013,original,typewritten,ok,True,0.764536,0.986714,0.998785,412,411,1,0
+gemini3.7-flash-gw,motion-31,p013,original,typewritten,ok,True,0.163711,0.158053,0.218947,412,63,360,11
+gemini3.7-flash-gw,defocus-5,p013,original,typewritten,ok,True,0.758351,0.955557,0.974296,412,405,14,7
+gemini3.7-flash-gw,tilt-20,p013,original,typewritten,ok,True,0.765361,0.98899,1.0,412,412,0,0
+gemini3.7-flash-gw,jpeg-60,p013,original,typewritten,ok,True,0.804536,0.982716,0.995146,412,412,2,2
+gemini3.7-flash-gw,motion-17,p013,original,typewritten,ok,True,0.753358,0.974774,0.981818,412,413,7,8
+gemini3.7-flash-gw,defocus-3,p013,original,typewritten,ok,True,0.762474,0.987031,0.996355,412,411,2,1
 qwen3.6-27b,raw,p014,pdf image,typewritten,ok,True,0.990662,0.99084,0.994792,192,192,1,1
 qwen3.6-27b,aug-ShadowCast,p014,pdf image,typewritten,ok,True,0.990662,0.991041,1.0,192,192,0,0
 qwen3.6-27b,aug-LightingGradient,p014,pdf image,typewritten,ok,True,0.990662,0.99084,0.994792,192,192,1,1
@@ -809,6 +897,17 @@ vision,jpeg-75,p015,original,handwritten,ok,True,0.869774,0.83551,0.828571,217,2
 vision,jpeg-85,p015,original,handwritten,ok,True,0.87183,0.844874,0.830549,217,202,43,28
 vision,quad-tilt-12,p015,original,handwritten,ok,True,0.85538,0.840223,0.826087,217,197,46,26
 vision,quad-tilt-20,p015,original,handwritten,ok,True,0.858122,0.835661,0.821256,217,197,47,27
+gemini3.7-flash-gw,raw,p015,original,handwritten,ok,True,0.945243,0.992176,1.0,217,217,0,0
+gemini3.7-flash-gw,aug-ShadowCast,p015,original,handwritten,ok,True,0.950205,0.981497,0.995392,217,217,1,1
+gemini3.7-flash-gw,aug-LightingGradient,p015,original,handwritten,ok,True,0.92623,0.983566,0.995392,217,217,1,1
+gemini3.7-flash-gw,aug-ReflectedLight,p015,original,handwritten,ok,True,0.688143,0.782295,0.850746,217,185,46,14
+gemini3.7-flash-gw,aug-LowLightNoise,p015,original,handwritten,ok,True,0.97676,0.981767,1.0,217,217,0,0
+gemini3.7-flash-gw,motion-31,p015,original,handwritten,ok,True,0.793694,0.803512,0.839329,217,200,42,25
+gemini3.7-flash-gw,defocus-5,p015,original,handwritten,ok,True,0.868403,0.882797,0.919048,217,203,24,10
+gemini3.7-flash-gw,tilt-20,p015,original,handwritten,ok,True,0.95034,0.985237,1.0,217,217,0,0
+gemini3.7-flash-gw,jpeg-60,p015,original,handwritten,ok,True,0.927546,0.983566,0.995392,217,217,1,1
+gemini3.7-flash-gw,motion-17,p015,original,handwritten,ok,True,0.909527,0.907532,0.920863,217,200,25,8
+gemini3.7-flash-gw,defocus-3,p015,original,handwritten,ok,True,0.939685,0.964078,0.979215,217,216,5,4
 qwen3.6-27b,raw,p016,pdf image,typewritten,ok,True,0.992239,0.984285,0.985337,171,170,3,2
 qwen3.6-27b,aug-ShadowCast,p016,pdf image,typewritten,ok,True,0.992239,0.984285,0.985337,171,170,3,2
 qwen3.6-27b,aug-LightingGradient,p016,pdf image,typewritten,ok,True,0.992239,0.984285,0.985337,171,170,3,2
@@ -917,6 +1016,17 @@ vision,jpeg-75,p017,original,typewritten,ok,True,0.987084,0.981486,0.985138,237,
 vision,jpeg-85,p017,original,typewritten,ok,True,0.983005,0.974549,0.980892,237,234,6,3
 vision,quad-tilt-12,p017,original,typewritten,ok,True,0.988443,0.985281,0.985138,237,234,5,2
 vision,quad-tilt-20,p017,original,typewritten,ok,True,0.983005,0.984842,0.982979,237,233,6,2
+gemini3.7-flash-gw,raw,p017,original,typewritten,ok,True,0.991162,0.990499,0.989429,237,236,3,2
+gemini3.7-flash-gw,aug-ShadowCast,p017,original,typewritten,ok,True,0.990483,0.987436,0.989429,237,236,3,2
+gemini3.7-flash-gw,aug-LightingGradient,p017,original,typewritten,ok,True,0.993882,0.993747,0.993658,237,236,2,1
+gemini3.7-flash-gw,aug-ReflectedLight,p017,original,typewritten,ok,True,0.925221,0.922434,0.943478,237,223,20,6
+gemini3.7-flash-gw,aug-LowLightNoise,p017,original,typewritten,ok,True,0.991162,0.988604,0.985201,237,236,4,3
+gemini3.7-flash-gw,motion-31,p017,original,typewritten,ok,True,0.944935,0.921642,0.937901,237,230,18,11
+gemini3.7-flash-gw,defocus-5,p017,original,typewritten,ok,True,0.978926,0.972317,0.98081,237,232,7,2
+gemini3.7-flash-gw,tilt-20,p017,original,typewritten,ok,True,0.990483,0.987436,0.989429,237,236,3,2
+gemini3.7-flash-gw,jpeg-60,p017,original,typewritten,ok,True,0.991162,0.990499,0.989429,237,236,3,2
+gemini3.7-flash-gw,motion-17,p017,original,typewritten,ok,True,0.98374,0.984816,0.991489,237,233,4,0
+gemini3.7-flash-gw,defocus-3,p017,original,typewritten,ok,True,0.991168,0.988859,0.991525,237,235,3,1
 qwen3.6-27b,raw,p018,original,printed,ok,True,0.804681,0.87036,0.928144,330,338,20,28
 qwen3.6-27b,aug-ShadowCast,p018,original,printed,ok,True,0.83617,0.869718,0.928144,330,338,20,28
 qwen3.6-27b,aug-LightingGradient,p018,original,printed,ok,True,0.837872,0.87238,0.928144,330,338,20,28
@@ -1025,6 +1135,17 @@ vision,jpeg-75,p019,pdf image,typewritten,ok,True,0.974684,0.970647,0.987854,125
 vision,jpeg-85,p019,pdf image,typewritten,ok,True,0.964838,0.952981,0.963855,125,124,5,4
 vision,quad-tilt-12,p019,pdf image,typewritten,ok,True,0.974684,0.970647,0.987854,125,122,3,0
 vision,quad-tilt-20,p019,pdf image,typewritten,ok,True,0.962025,0.953271,0.971888,125,124,4,3
+gemini3.7-flash-gw,raw,p019,pdf image,typewritten,ok,True,0.991561,0.988813,0.995984,125,124,1,0
+gemini3.7-flash-gw,aug-ShadowCast,p019,pdf image,typewritten,ok,True,0.991561,0.988813,0.995984,125,124,1,0
+gemini3.7-flash-gw,aug-LightingGradient,p019,pdf image,typewritten,ok,True,0.991561,0.988813,0.995984,125,124,1,0
+gemini3.7-flash-gw,aug-ReflectedLight,p019,pdf image,typewritten,ok,True,0.991561,0.988813,0.995984,125,124,1,0
+gemini3.7-flash-gw,aug-LowLightNoise,p019,pdf image,typewritten,ok,True,0.991561,0.988813,0.995984,125,124,1,0
+gemini3.7-flash-gw,motion-31,p019,pdf image,typewritten,ok,True,0.895921,0.845334,0.854839,125,123,19,17
+gemini3.7-flash-gw,defocus-5,p019,pdf image,typewritten,ok,True,0.978903,0.955766,0.976,125,125,3,3
+gemini3.7-flash-gw,tilt-20,p019,pdf image,typewritten,ok,True,0.990155,0.982786,0.987952,125,124,2,1
+gemini3.7-flash-gw,jpeg-60,p019,pdf image,typewritten,ok,True,0.991561,0.988813,0.995984,125,124,1,0
+gemini3.7-flash-gw,motion-17,p019,pdf image,typewritten,ok,True,0.987342,0.972116,0.97992,125,124,3,2
+gemini3.7-flash-gw,defocus-3,p019,pdf image,typewritten,ok,True,0.990155,0.982786,0.987952,125,124,2,1
 qwen3.6-27b,raw,p020,original,typewritten,ok,True,0.974497,0.97842,0.988764,266,268,2,4
 qwen3.6-27b,aug-ShadowCast,p020,original,typewritten,ok,True,0.974497,0.97842,0.988764,266,268,2,4
 qwen3.6-27b,aug-LightingGradient,p020,original,typewritten,ok,True,0.969778,0.970852,0.985019,266,268,3,5
@@ -1079,6 +1200,17 @@ vision,jpeg-75,p020,original,typewritten,ok,True,0.935527,0.830956,0.828625,266,
 vision,jpeg-85,p020,original,typewritten,ok,True,0.938885,0.825059,0.821764,266,267,47,48
 vision,quad-tilt-12,p020,original,typewritten,ok,True,0.937542,0.846625,0.849057,266,264,41,39
 vision,quad-tilt-20,p020,original,typewritten,ok,True,0.931498,0.827269,0.813433,266,270,48,52
+gemini3.7-flash-gw,raw,p020,original,typewritten,ok,True,0.974565,0.982128,0.990619,266,267,2,3
+gemini3.7-flash-gw,aug-ShadowCast,p020,original,typewritten,ok,True,0.974565,0.982811,0.998124,266,267,0,1
+gemini3.7-flash-gw,aug-LightingGradient,p020,original,typewritten,ok,True,0.984615,0.988118,0.998124,266,267,0,1
+gemini3.7-flash-gw,aug-ReflectedLight,p020,original,typewritten,ok,True,0.949535,0.955401,0.971429,266,259,11,4
+gemini3.7-flash-gw,aug-LowLightNoise,p020,original,typewritten,ok,True,0.973226,0.977071,0.990619,266,267,2,3
+gemini3.7-flash-gw,motion-31,p020,original,typewritten,ok,True,0.007388,0.008695,0.0,266,0,266,0
+gemini3.7-flash-gw,defocus-5,p020,original,typewritten,ok,True,0.961873,0.960403,0.979439,266,269,4,7
+gemini3.7-flash-gw,tilt-20,p020,original,typewritten,ok,True,0.973226,0.977071,0.990619,266,267,2,3
+gemini3.7-flash-gw,jpeg-60,p020,original,typewritten,ok,True,0.974565,0.982811,0.998124,266,267,0,1
+gemini3.7-flash-gw,motion-17,p020,original,typewritten,ok,True,0.975823,0.971858,0.986867,266,267,3,4
+gemini3.7-flash-gw,defocus-3,p020,original,typewritten,ok,True,0.967914,0.971311,0.988764,266,268,2,4
 qwen3.6-27b,raw,p021,original,printed,ok,True,1.0,1.0,1.0,374,374,0,0
 qwen3.6-27b,aug-ShadowCast,p021,original,printed,ok,True,1.0,1.0,1.0,374,374,0,0
 qwen3.6-27b,aug-LightingGradient,p021,original,printed,ok,True,1.0,1.0,1.0,374,374,0,0
@@ -1187,6 +1319,17 @@ vision,jpeg-75,p022,original,handwritten,ok,True,0.344363,0.363178,0.461929,290,
 vision,jpeg-85,p022,original,handwritten,ok,True,0.386642,0.389947,0.479218,290,119,192,21
 vision,quad-tilt-12,p022,original,handwritten,ok,True,0.433824,0.427278,0.533958,290,137,176,23
 vision,quad-tilt-20,p022,original,handwritten,ok,True,0.321078,0.331475,0.421875,290,94,209,13
+gemini3.7-flash-gw,raw,p022,original,handwritten,ok,True,0.996936,0.99276,0.986159,290,288,5,3
+gemini3.7-flash-gw,aug-ShadowCast,p022,original,handwritten,ok,True,0.997549,0.992908,0.986207,290,290,4,4
+gemini3.7-flash-gw,aug-LightingGradient,p022,original,handwritten,ok,True,0.996936,0.995372,0.984456,290,289,5,4
+gemini3.7-flash-gw,aug-ReflectedLight,p022,original,handwritten,ok,True,0.996936,0.99276,0.989619,290,288,4,2
+gemini3.7-flash-gw,aug-LowLightNoise,p022,original,handwritten,ok,True,0.996936,0.99276,0.989619,290,288,4,2
+gemini3.7-flash-gw,motion-31,p022,original,handwritten,ok,True,0.035539,0.029293,0.040541,290,6,284,0
+gemini3.7-flash-gw,defocus-5,p022,original,handwritten,ok,True,0.944853,0.902905,0.928696,290,285,23,18
+gemini3.7-flash-gw,tilt-20,p022,original,handwritten,ok,True,0.996324,0.99042,0.981002,290,289,6,5
+gemini3.7-flash-gw,jpeg-60,p022,original,handwritten,ok,True,0.996324,0.99276,0.984456,290,289,5,4
+gemini3.7-flash-gw,motion-17,p022,original,handwritten,ok,True,0.210172,0.118614,0.104235,290,17,274,1
+gemini3.7-flash-gw,defocus-3,p022,original,handwritten,ok,True,0.995711,0.985793,0.986159,290,288,5,3
 qwen3.6-27b,raw,p023,pdf image,typewritten,ok,True,1.0,1.0,1.0,204,204,0,0
 qwen3.6-27b,aug-ShadowCast,p023,pdf image,typewritten,ok,True,0.998569,0.996224,1.0,204,204,0,0
 qwen3.6-27b,aug-LightingGradient,p023,pdf image,typewritten,ok,True,1.0,1.0,1.0,204,204,0,0
@@ -1295,6 +1438,17 @@ vision,jpeg-75,p024,original,typewritten,ok,True,0.468439,0.648369,0.762238,143,
 vision,jpeg-85,p024,original,typewritten,ok,True,0.52381,0.650449,0.745645,143,144,36,37
 vision,quad-tilt-12,p024,original,typewritten,ok,True,0.632337,0.61388,0.643137,143,112,61,30
 vision,quad-tilt-20,p024,original,typewritten,ok,True,0.613511,0.636528,0.684825,143,114,55,26
+gemini3.7-flash-gw,raw,p024,original,typewritten,ok,True,0.934479,0.95769,0.976109,143,150,0,7
+gemini3.7-flash-gw,aug-ShadowCast,p024,original,typewritten,ok,True,0.9701,0.958673,0.986014,143,143,2,2
+gemini3.7-flash-gw,aug-LightingGradient,p024,original,typewritten,ok,True,0.972315,0.963085,0.996516,143,144,0,1
+gemini3.7-flash-gw,aug-ReflectedLight,p024,original,typewritten,ok,True,0.9701,0.958673,0.986014,143,143,2,2
+gemini3.7-flash-gw,aug-LowLightNoise,p024,original,typewritten,ok,True,0.985604,0.974881,0.996516,143,144,0,1
+gemini3.7-flash-gw,motion-31,p024,original,typewritten,ok,True,0.393299,0.489728,0.639269,143,76,73,6
+gemini3.7-flash-gw,defocus-5,p024,original,typewritten,ok,True,0.873754,0.814606,0.862319,143,133,24,14
+gemini3.7-flash-gw,tilt-20,p024,original,typewritten,ok,True,0.972315,0.971903,0.975779,143,146,2,5
+gemini3.7-flash-gw,jpeg-60,p024,original,typewritten,ok,True,0.972315,0.963085,0.996516,143,144,0,1
+gemini3.7-flash-gw,motion-17,p024,original,typewritten,ok,True,0.809628,0.833113,0.824373,143,136,28,21
+gemini3.7-flash-gw,defocus-3,p024,original,typewritten,ok,True,0.90144,0.900757,0.960289,143,134,10,1
 qwen3.6-27b,raw,p025,pdf image,typewritten,ok,True,0.867971,0.839886,0.826087,69,69,12,12
 qwen3.6-27b,aug-ShadowCast,p025,pdf image,typewritten,ok,True,0.456,0.771314,0.62037,69,147,2,80
 qwen3.6-27b,aug-LightingGradient,p025,pdf image,typewritten,ok,True,0.45382,0.766503,0.611111,69,147,3,81
@@ -1619,6 +1773,17 @@ vision,jpeg-75,p030,original,typewritten,ok,True,0.980781,0.979187,0.983547,275,
 vision,jpeg-85,p030,original,typewritten,ok,True,0.980161,0.980939,0.985401,275,273,5,3
 vision,quad-tilt-12,p030,original,typewritten,ok,True,0.982021,0.982657,0.989011,275,271,5,1
 vision,quad-tilt-20,p030,original,typewritten,ok,True,0.985121,0.982522,0.987203,275,272,5,2
+gemini3.7-flash-gw,raw,p030,original,typewritten,ok,True,0.998762,0.997954,0.996364,275,275,1,1
+gemini3.7-flash-gw,aug-ShadowCast,p030,original,typewritten,ok,True,0.991321,0.989483,0.994536,275,274,2,1
+gemini3.7-flash-gw,aug-LightingGradient,p030,original,typewritten,ok,True,0.991321,0.989054,0.994536,275,274,2,1
+gemini3.7-flash-gw,aug-ReflectedLight,p030,original,typewritten,ok,True,0.964662,0.967063,0.983364,275,266,9,0
+gemini3.7-flash-gw,aug-LowLightNoise,p030,original,typewritten,ok,True,0.982021,0.979733,0.985348,275,271,6,2
+gemini3.7-flash-gw,motion-31,p030,original,typewritten,ok,True,0.985121,0.987597,0.989011,275,271,5,1
+gemini3.7-flash-gw,defocus-5,p030,original,typewritten,ok,True,0.990701,0.989132,0.990859,275,272,4,1
+gemini3.7-flash-gw,tilt-20,p030,original,typewritten,ok,True,0.99938,0.997754,1.0,275,275,0,0
+gemini3.7-flash-gw,jpeg-60,p030,original,typewritten,ok,True,0.99876,0.99753,1.0,275,275,0,0
+gemini3.7-flash-gw,motion-17,p030,original,typewritten,ok,True,0.978921,0.977531,0.979964,275,274,6,5
+gemini3.7-flash-gw,defocus-3,p030,original,typewritten,ok,True,0.991321,0.991756,0.994516,275,272,3,0
 qwen3.6-27b,raw,p031,original,mixed,ok,True,0.962687,0.9228,0.938776,50,48,4,2
 qwen3.6-27b,aug-ShadowCast,p031,original,mixed,ok,True,0.981343,0.9228,1.0,50,50,0,0
 qwen3.6-27b,aug-LightingGradient,p031,original,mixed,ok,True,0.981343,0.9228,1.0,50,50,0,0
@@ -1727,6 +1892,17 @@ vision,jpeg-75,p032,original,typewritten,ok,True,0.988423,0.991484,0.987805,327,
 vision,jpeg-85,p032,original,typewritten,ok,True,0.995134,0.99251,0.98773,327,325,5,3
 vision,quad-tilt-12,p032,original,typewritten,ok,True,0.996594,0.989376,0.986217,327,326,5,4
 vision,quad-tilt-20,p032,original,typewritten,ok,True,0.99562,0.98781,0.984709,327,327,5,5
+gemini3.7-flash-gw,raw,p032,original,typewritten,ok,True,1.0,1.0,1.0,327,327,0,0
+gemini3.7-flash-gw,aug-ShadowCast,p032,original,typewritten,ok,True,0.964789,0.990959,0.98941,327,334,0,7
+gemini3.7-flash-gw,aug-LightingGradient,p032,original,typewritten,ok,True,0.999028,0.996866,1.0,327,327,0,0
+gemini3.7-flash-gw,aug-ReflectedLight,p032,original,typewritten,ok,True,0.988932,0.994558,1.0,327,327,0,0
+gemini3.7-flash-gw,aug-LowLightNoise,p032,original,typewritten,ok,True,1.0,1.0,1.0,327,327,0,0
+gemini3.7-flash-gw,motion-31,p032,original,typewritten,ok,True,0.990268,0.978153,0.969419,327,327,10,10
+gemini3.7-flash-gw,defocus-5,p032,original,typewritten,ok,True,1.0,1.0,1.0,327,327,0,0
+gemini3.7-flash-gw,tilt-20,p032,original,typewritten,ok,True,0.999028,0.996866,1.0,327,327,0,0
+gemini3.7-flash-gw,jpeg-60,p032,original,typewritten,ok,True,1.0,1.0,1.0,327,327,0,0
+gemini3.7-flash-gw,motion-17,p032,original,typewritten,ok,True,0.990352,0.994555,0.996942,327,327,1,1
+gemini3.7-flash-gw,defocus-3,p032,original,typewritten,ok,True,0.989884,0.996236,1.0,327,327,0,0
 qwen3.6-27b,raw,p033,original,typewritten,ok,True,0.998245,0.998127,0.990172,406,408,3,5
 qwen3.6-27b,aug-ShadowCast,p033,original,typewritten,ok,True,0.998245,0.998127,0.990172,406,408,3,5
 qwen3.6-27b,aug-LightingGradient,p033,original,typewritten,ok,True,0.998245,0.998127,0.990172,406,408,3,5
@@ -1781,6 +1957,17 @@ vision,jpeg-75,p033,original,typewritten,ok,True,0.995173,0.983499,0.98155,406,4
 vision,jpeg-85,p033,original,typewritten,ok,True,0.995171,0.985194,0.98155,406,407,7,8
 vision,quad-tilt-12,p033,original,typewritten,ok,True,0.994296,0.983305,0.98401,406,407,6,7
 vision,quad-tilt-20,p033,original,typewritten,ok,True,0.99649,0.990707,0.98647,406,407,5,6
+gemini3.7-flash-gw,raw,p033,original,typewritten,ok,True,0.999122,0.996682,0.997537,406,406,1,1
+gemini3.7-flash-gw,aug-ShadowCast,p033,original,typewritten,ok,True,1.0,1.0,1.0,406,406,0,0
+gemini3.7-flash-gw,aug-LightingGradient,p033,original,typewritten,ok,True,1.0,1.0,1.0,406,406,0,0
+gemini3.7-flash-gw,aug-ReflectedLight,p033,original,typewritten,ok,True,0.728709,0.722182,0.802899,406,284,129,7
+gemini3.7-flash-gw,aug-LowLightNoise,p033,original,typewritten,ok,True,0.998245,0.998127,0.990172,406,408,3,5
+gemini3.7-flash-gw,motion-31,p033,original,typewritten,ok,True,0.095259,0.029119,0.0,406,1,406,1
+gemini3.7-flash-gw,defocus-5,p033,original,typewritten,ok,True,0.981206,0.968833,0.972906,406,406,11,11
+gemini3.7-flash-gw,tilt-20,p033,original,typewritten,ok,True,0.999561,1.0,0.99631,406,407,1,2
+gemini3.7-flash-gw,jpeg-60,p033,original,typewritten,ok,True,1.0,1.0,1.0,406,406,0,0
+gemini3.7-flash-gw,motion-17,p033,original,typewritten,ok,True,0.087357,0.027681,0.004914,406,1,405,0
+gemini3.7-flash-gw,defocus-3,p033,original,typewritten,ok,True,0.999561,0.998127,0.997537,406,406,1,1
 qwen3.6-27b,raw,p034,original,printed,ok,True,0.988439,0.975465,0.909091,28,27,3,2
 qwen3.6-27b,aug-ShadowCast,p034,original,printed,ok,True,0.982659,0.975465,0.888889,28,26,4,2
 qwen3.6-27b,aug-LightingGradient,p034,original,printed,ok,True,0.982659,0.975465,0.888889,28,26,4,2
@@ -2159,6 +2346,17 @@ vision,jpeg-75,p041,original,typewritten,ok,True,0.97652,0.94737,0.929032,385,39
 vision,jpeg-85,p041,original,typewritten,ok,True,0.959966,0.918479,0.902724,385,386,37,38
 vision,quad-tilt-12,p041,original,typewritten,ok,True,0.972701,0.940179,0.927649,385,389,26,30
 vision,quad-tilt-20,p041,original,typewritten,ok,True,0.972281,0.93707,0.922481,385,389,28,32
+gemini3.7-flash-gw,raw,p041,original,typewritten,ok,True,0.995365,0.993694,0.998703,385,386,0,1
+gemini3.7-flash-gw,aug-ShadowCast,p041,original,typewritten,ok,True,0.9941,0.991828,0.998703,385,386,0,1
+gemini3.7-flash-gw,aug-LightingGradient,p041,original,typewritten,ok,True,0.995365,0.993694,0.998703,385,386,0,1
+gemini3.7-flash-gw,aug-ReflectedLight,p041,original,typewritten,ok,True,0.804467,0.786331,0.86123,385,314,84,13
+gemini3.7-flash-gw,aug-LowLightNoise,p041,original,typewritten,ok,True,0.995365,0.993694,0.998703,385,386,0,1
+gemini3.7-flash-gw,motion-31,p041,original,typewritten,ok,True,0.004635,0.00535,0.0,385,0,385,0
+gemini3.7-flash-gw,defocus-5,p041,original,typewritten,ok,True,0.948588,0.906346,0.936611,385,388,23,26
+gemini3.7-flash-gw,tilt-20,p041,original,typewritten,ok,True,0.995365,0.993694,0.998703,385,386,0,1
+gemini3.7-flash-gw,jpeg-60,p041,original,typewritten,ok,True,0.995365,0.993694,0.998703,385,386,0,1
+gemini3.7-flash-gw,motion-17,p041,original,typewritten,ok,True,0.969102,0.956032,0.970013,385,382,13,10
+gemini3.7-flash-gw,defocus-3,p041,original,typewritten,ok,True,0.994943,0.991928,0.998703,385,386,0,1
 qwen3.6-27b,raw,p042,pdf image,printed,ok,True,0.98972,0.980807,0.952741,804,783,48,27
 qwen3.6-27b,aug-ShadowCast,p042,pdf image,printed,ok,True,0.98972,0.980807,0.952741,804,783,48,27
 qwen3.6-27b,aug-LightingGradient,p042,pdf image,printed,ok,True,0.98972,0.980807,0.952741,804,783,48,27
@@ -2213,6 +2411,17 @@ vision,jpeg-75,p042,pdf image,printed,ok,True,0.985564,0.975827,0.981227,804,794
 vision,jpeg-85,p042,pdf image,printed,ok,True,0.991251,0.980459,0.985019,804,798,15,9
 vision,quad-tilt-12,p042,pdf image,printed,ok,True,0.996283,0.987237,0.9944,804,803,5,4
 vision,quad-tilt-20,p042,pdf image,printed,ok,True,0.994969,0.986352,0.985037,804,800,14,10
+gemini3.7-flash-gw,raw,p042,pdf image,printed,ok,True,0.999781,1.0,0.998135,804,805,1,2
+gemini3.7-flash-gw,aug-ShadowCast,p042,pdf image,printed,ok,True,0.999781,1.0,0.998135,804,805,1,2
+gemini3.7-flash-gw,aug-LightingGradient,p042,pdf image,printed,ok,True,0.999563,1.0,0.996273,804,806,2,4
+gemini3.7-flash-gw,aug-ReflectedLight,p042,pdf image,printed,ok,True,0.96822,0.968641,0.97867,804,790,24,10
+gemini3.7-flash-gw,aug-LowLightNoise,p042,pdf image,printed,ok,True,1.0,1.0,1.0,804,804,0,0
+gemini3.7-flash-gw,motion-31,p042,pdf image,printed,ok,True,0.12839,0.042578,0.009901,804,4,800,0
+gemini3.7-flash-gw,defocus-5,p042,pdf image,printed,ok,True,0.991259,0.981327,0.980709,804,803,16,15
+gemini3.7-flash-gw,tilt-20,p042,pdf image,printed,ok,True,0.999563,1.0,0.996273,804,806,2,4
+gemini3.7-flash-gw,jpeg-60,p042,pdf image,printed,ok,True,0.999563,1.0,0.996273,804,806,2,4
+gemini3.7-flash-gw,motion-17,p042,pdf image,printed,ok,True,0.995414,0.984239,0.983219,804,805,13,14
+gemini3.7-flash-gw,defocus-3,p042,pdf image,printed,ok,True,0.998251,0.996628,0.995031,804,806,3,5
 qwen3.6-27b,raw,p043,pdf image,printed,ok,True,0.994479,0.989073,0.974081,836,823,28,15
 qwen3.6-27b,aug-ShadowCast,p043,pdf image,printed,ok,True,0.994266,0.988634,0.974081,836,823,28,15
 qwen3.6-27b,aug-LightingGradient,p043,pdf image,printed,ok,True,0.994266,0.988634,0.974081,836,823,28,15
@@ -2483,6 +2692,17 @@ vision,jpeg-75,p047,original,handwritten,ok,True,0.245669,0.188143,0.133333,106,
 vision,jpeg-85,p047,original,handwritten,ok,True,0.206299,0.140531,0.134328,106,28,97,19
 vision,quad-tilt-12,p047,original,handwritten,ok,True,0.146457,0.104442,0.141732,106,21,97,12
 vision,quad-tilt-20,p047,original,handwritten,ok,True,0.133858,0.080597,0.032,106,19,104,17
+gemini3.7-flash-gw,raw,p047,original,handwritten,ok,True,0.92126,0.91333,0.951456,106,100,8,2
+gemini3.7-flash-gw,aug-ShadowCast,p047,original,handwritten,ok,True,0.91811,0.915263,0.961165,106,100,7,1
+gemini3.7-flash-gw,aug-LightingGradient,p047,original,handwritten,ok,True,0.913386,0.897523,0.961165,106,100,7,1
+gemini3.7-flash-gw,aug-ReflectedLight,p047,original,handwritten,ok,True,0.738583,0.703795,0.817204,106,80,30,4
+gemini3.7-flash-gw,aug-LowLightNoise,p047,original,handwritten,ok,True,0.927559,0.924593,0.961165,106,100,7,1
+gemini3.7-flash-gw,motion-31,p047,original,handwritten,ok,True,0.724409,0.657128,0.84264,106,91,23,8
+gemini3.7-flash-gw,defocus-5,p047,original,handwritten,ok,True,0.908661,0.875981,0.941748,106,100,9,3
+gemini3.7-flash-gw,tilt-20,p047,original,handwritten,ok,True,0.914961,0.901122,0.961165,106,100,7,1
+gemini3.7-flash-gw,jpeg-60,p047,original,handwritten,ok,True,0.919685,0.906254,0.961165,106,100,7,1
+gemini3.7-flash-gw,motion-17,p047,original,handwritten,ok,True,0.88189,0.857141,0.926829,106,99,11,4
+gemini3.7-flash-gw,defocus-3,p047,original,handwritten,ok,True,0.92126,0.918776,0.961165,106,100,7,1
 qwen3.6-27b,raw,p048,original,handwritten,ok,True,0.572358,0.768373,0.752809,68,110,1,43
 qwen3.6-27b,aug-ShadowCast,p048,original,handwritten,ok,True,0.489569,0.739617,0.67,68,132,1,65
 qwen3.6-27b,aug-LightingGradient,p048,original,handwritten,ok,True,0.487535,0.73847,0.67,68,132,1,65
@@ -2645,6 +2865,17 @@ vision,jpeg-75,p050,original,handwritten,ok,True,0.25,0.188959,0.184615,190,70,1
 vision,jpeg-85,p050,original,handwritten,ok,True,0.371383,0.289082,0.222222,190,98,158,66
 vision,quad-tilt-12,p050,original,handwritten,ok,True,0.385852,0.30999,0.216949,190,105,158,73
 vision,quad-tilt-20,p050,original,handwritten,ok,True,0.234727,0.184024,0.134921,190,62,173,45
+gemini3.7-flash-gw,raw,p050,original,handwritten,ok,True,0.778125,0.903393,0.934726,190,193,11,14
+gemini3.7-flash-gw,aug-ShadowCast,p050,original,handwritten,ok,True,0.766998,0.932786,0.93401,190,204,6,20
+gemini3.7-flash-gw,aug-LightingGradient,p050,original,handwritten,ok,True,0.754496,0.915248,0.942408,190,192,10,12
+gemini3.7-flash-gw,aug-ReflectedLight,p050,original,handwritten,ok,True,0.608521,0.792405,0.837079,190,166,41,17
+gemini3.7-flash-gw,aug-LowLightNoise,p050,original,handwritten,ok,True,0.771679,0.905542,0.953125,190,194,7,11
+gemini3.7-flash-gw,motion-31,p050,original,handwritten,ok,True,0.48955,0.436769,0.576389,190,98,107,15
+gemini3.7-flash-gw,defocus-5,p050,original,handwritten,ok,True,0.803908,0.860988,0.883838,190,206,15,31
+gemini3.7-flash-gw,tilt-20,p050,original,handwritten,ok,True,0.791798,0.905593,0.935401,190,197,9,16
+gemini3.7-flash-gw,jpeg-60,p050,original,handwritten,ok,True,0.740354,0.881032,0.910569,190,179,22,11
+gemini3.7-flash-gw,motion-17,p050,original,handwritten,ok,True,0.839719,0.852903,0.873385,190,197,21,28
+gemini3.7-flash-gw,defocus-3,p050,original,handwritten,ok,True,0.633663,0.863547,0.843091,190,237,10,57
 qwen3.6-27b,raw,p051,original,handwritten,ok,True,0.953096,0.958064,0.935484,91,95,4,8
 qwen3.6-27b,aug-ShadowCast,p051,original,handwritten,ok,True,0.953096,0.958064,0.935484,91,95,4,8
 qwen3.6-27b,aug-LightingGradient,p051,original,handwritten,ok,True,0.953096,0.958064,0.935484,91,95,4,8
@@ -2699,6 +2930,17 @@ vision,jpeg-75,p051,original,handwritten,ok,True,0.793436,0.646369,0.612903,91,9
 vision,jpeg-85,p051,original,handwritten,ok,True,0.788868,0.639217,0.606383,91,97,34,40
 vision,quad-tilt-12,p051,original,handwritten,ok,True,0.744639,0.655121,0.644068,91,86,34,29
 vision,quad-tilt-20,p051,original,handwritten,ok,True,0.793037,0.64657,0.580645,91,95,37,41
+gemini3.7-flash-gw,raw,p051,original,handwritten,ok,True,0.986538,1.0,0.941799,91,98,2,9
+gemini3.7-flash-gw,aug-ShadowCast,p051,original,handwritten,ok,True,0.994163,1.0,0.967391,91,93,2,4
+gemini3.7-flash-gw,aug-LightingGradient,p051,original,handwritten,ok,True,0.996109,0.99355,0.967033,91,91,3,3
+gemini3.7-flash-gw,aug-ReflectedLight,p051,original,handwritten,ok,True,0.94152,0.943311,0.908108,91,94,7,10
+gemini3.7-flash-gw,aug-LowLightNoise,p051,original,handwritten,ok,True,0.996101,1.0,0.983607,91,92,1,2
+gemini3.7-flash-gw,motion-31,p051,original,handwritten,ok,True,0.896686,0.893759,0.910112,91,87,10,6
+gemini3.7-flash-gw,defocus-5,p051,original,handwritten,ok,True,0.994152,0.99355,0.967033,91,91,3,3
+gemini3.7-flash-gw,tilt-20,p051,original,handwritten,ok,True,0.95,0.992429,0.911917,91,102,3,14
+gemini3.7-flash-gw,jpeg-60,p051,original,handwritten,ok,True,1.0,1.0,1.0,91,91,0,0
+gemini3.7-flash-gw,motion-17,p051,original,handwritten,ok,True,0.992203,0.985194,0.956044,91,91,4,4
+gemini3.7-flash-gw,defocus-3,p051,original,handwritten,ok,True,0.994152,0.99355,0.967033,91,91,3,3
 qwen3.6-27b,raw,p052,original,handwritten,ok,True,0.986731,0.96399,0.974026,154,154,4,4
 qwen3.6-27b,aug-ShadowCast,p052,original,handwritten,ok,True,0.986731,0.96399,0.974026,154,154,4,4
 qwen3.6-27b,aug-LightingGradient,p052,original,handwritten,ok,True,0.986731,0.959982,0.964401,154,155,5,6
@@ -2753,6 +2995,17 @@ vision,jpeg-75,p052,original,handwritten,ok,True,0.872135,0.698655,0.700965,154,
 vision,jpeg-85,p052,original,handwritten,ok,True,0.86731,0.70952,0.707395,154,157,44,47
 vision,quad-tilt-12,p052,original,handwritten,ok,True,0.872135,0.733443,0.726688,154,157,41,44
 vision,quad-tilt-20,p052,original,handwritten,ok,True,0.86731,0.727108,0.707792,154,154,45,45
+gemini3.7-flash-gw,raw,p052,original,handwritten,ok,True,0.987937,0.970064,0.983713,154,153,3,2
+gemini3.7-flash-gw,aug-ShadowCast,p052,original,handwritten,ok,True,0.991556,0.975269,0.993506,154,154,1,1
+gemini3.7-flash-gw,aug-LightingGradient,p052,original,handwritten,ok,True,0.9807,0.957784,0.980392,154,152,4,2
+gemini3.7-flash-gw,aug-ReflectedLight,p052,original,handwritten,ok,True,0.575392,0.563403,0.691358,154,89,70,5
+gemini3.7-flash-gw,aug-LowLightNoise,p052,original,handwritten,ok,True,0.986731,0.959902,0.974026,154,154,4,4
+gemini3.7-flash-gw,motion-31,p052,original,handwritten,ok,True,0.80579,0.723761,0.857143,154,133,31,10
+gemini3.7-flash-gw,defocus-5,p052,original,handwritten,ok,True,0.960193,0.908046,0.918033,154,151,14,11
+gemini3.7-flash-gw,tilt-20,p052,original,handwritten,ok,True,0.989144,0.970064,0.983713,154,153,3,2
+gemini3.7-flash-gw,jpeg-60,p052,original,handwritten,ok,True,0.989144,0.975269,0.983713,154,153,3,2
+gemini3.7-flash-gw,motion-17,p052,original,handwritten,ok,True,0.969843,0.932521,0.954248,154,152,8,6
+gemini3.7-flash-gw,defocus-3,p052,original,handwritten,ok,True,0.979493,0.943021,0.944625,154,153,9,8
 qwen3.6-27b,raw,p053,original,handwritten,ok,True,0.954377,0.921476,0.92459,151,154,10,13
 qwen3.6-27b,aug-ShadowCast,p053,original,handwritten,ok,True,0.963009,0.922912,0.928105,151,155,9,13
 qwen3.6-27b,aug-LightingGradient,p053,original,handwritten,ok,True,0.963009,0.92416,0.931148,151,154,9,12
@@ -2861,6 +3114,17 @@ vision,jpeg-75,p054,original,handwritten,ok,True,0.332301,0.22044,0.217195,146,7
 vision,jpeg-85,p054,original,handwritten,ok,True,0.400413,0.22121,0.090226,146,120,134,108
 vision,quad-tilt-12,p054,original,handwritten,ok,True,0.45098,0.294416,0.251012,146,101,115,70
 vision,quad-tilt-20,p054,original,handwritten,ok,True,0.453044,0.256829,0.141791,146,122,127,103
+gemini3.7-flash-gw,raw,p054,original,handwritten,ok,True,0.938462,0.896856,0.938776,146,148,8,10
+gemini3.7-flash-gw,aug-ShadowCast,p054,original,handwritten,ok,True,0.924665,0.879537,0.965517,146,144,6,4
+gemini3.7-flash-gw,aug-LightingGradient,p054,original,handwritten,ok,True,0.930857,0.904226,0.955017,146,143,8,5
+gemini3.7-flash-gw,aug-ReflectedLight,p054,original,handwritten,ok,True,0.825593,0.802082,0.880866,146,131,24,9
+gemini3.7-flash-gw,aug-LowLightNoise,p054,original,handwritten,ok,True,0.919505,0.889893,0.941581,146,145,9,8
+gemini3.7-flash-gw,motion-31,p054,original,handwritten,ok,True,0.188854,0.068895,0.116129,146,9,137,0
+gemini3.7-flash-gw,defocus-5,p054,original,handwritten,ok,True,0.901961,0.855979,0.907216,146,145,14,13
+gemini3.7-flash-gw,tilt-20,p054,original,handwritten,ok,True,0.912334,0.876584,0.935154,146,147,9,10
+gemini3.7-flash-gw,jpeg-60,p054,original,handwritten,ok,True,0.929825,0.893233,0.948454,146,145,8,7
+gemini3.7-flash-gw,motion-17,p054,original,handwritten,ok,True,0.679245,0.723458,0.854093,146,135,26,15
+gemini3.7-flash-gw,defocus-3,p054,original,handwritten,ok,True,0.906089,0.881577,0.948454,146,145,8,7
 qwen3.6-27b,raw,p055,original,handwritten,ok,True,0.984848,0.974725,0.972376,90,91,2,3
 qwen3.6-27b,aug-ShadowCast,p055,original,handwritten,ok,True,0.984848,0.974725,0.972376,90,91,2,3
 qwen3.6-27b,aug-LightingGradient,p055,original,handwritten,ok,True,0.984848,0.974725,0.972376,90,91,2,3
@@ -3293,6 +3557,17 @@ vision,jpeg-75,p062,pdf image,printed,ok,True,0.951311,0.944334,0.971537,535,519
 vision,jpeg-85,p062,pdf image,printed,ok,True,0.953496,0.945166,0.971591,535,521,22,8
 vision,quad-tilt-12,p062,pdf image,printed,ok,True,0.481586,0.955705,0.980245,535,528,14,7
 vision,quad-tilt-20,p062,pdf image,printed,ok,True,0.484395,0.951748,0.973585,535,525,19,9
+gemini3.7-flash-gw,raw,p062,pdf image,printed,ok,True,0.984707,0.988782,0.999065,535,534,1,0
+gemini3.7-flash-gw,aug-ShadowCast,p062,pdf image,printed,ok,True,0.986908,0.995874,1.0,535,535,0,0
+gemini3.7-flash-gw,aug-LightingGradient,p062,pdf image,printed,ok,True,0.969101,0.979946,0.974552,535,526,18,9
+gemini3.7-flash-gw,aug-ReflectedLight,p062,pdf image,printed,ok,True,0.968477,0.975181,0.989613,535,524,11,0
+gemini3.7-flash-gw,aug-LowLightNoise,p062,pdf image,printed,ok,True,0.97288,0.98879,0.996262,535,535,2,2
+gemini3.7-flash-gw,motion-31,p062,pdf image,printed,ok,True,0.040886,0.027919,0.02214,535,7,529,1
+gemini3.7-flash-gw,defocus-5,p062,pdf image,printed,ok,True,0.968303,0.966456,0.974743,535,534,14,13
+gemini3.7-flash-gw,tilt-20,p062,pdf image,printed,ok,True,0.973159,0.982216,0.977401,535,527,16,8
+gemini3.7-flash-gw,jpeg-60,p062,pdf image,printed,ok,True,0.978152,0.990906,1.0,535,535,0,0
+gemini3.7-flash-gw,motion-17,p062,pdf image,printed,ok,True,0.96319,0.974125,0.98324,535,539,7,11
+gemini3.7-flash-gw,defocus-3,p062,pdf image,printed,ok,True,0.984745,0.991375,0.996262,535,535,2,2
 qwen3.6-27b,raw,p063,pdf image,printed,ok,True,0.99973,0.999131,1.0,589,589,0,0
 qwen3.6-27b,aug-ShadowCast,p063,pdf image,printed,ok,True,0.99973,0.999131,1.0,589,589,0,0
 qwen3.6-27b,aug-LightingGradient,p063,pdf image,printed,ok,True,0.99973,0.999131,1.0,589,589,0,0
@@ -3347,6 +3622,17 @@ vision,jpeg-75,p063,pdf image,printed,ok,True,0.997567,0.992919,0.994907,589,589
 vision,jpeg-85,p063,pdf image,printed,ok,True,0.998648,0.996234,0.996604,589,589,2,2
 vision,quad-tilt-12,p063,pdf image,printed,ok,True,0.997837,0.994914,0.998302,589,589,1,1
 vision,quad-tilt-20,p063,pdf image,printed,ok,True,0.997567,0.993143,0.996604,589,589,2,2
+gemini3.7-flash-gw,raw,p063,pdf image,printed,ok,True,1.0,1.0,1.0,589,589,0,0
+gemini3.7-flash-gw,aug-ShadowCast,p063,pdf image,printed,ok,True,1.0,1.0,1.0,589,589,0,0
+gemini3.7-flash-gw,aug-LightingGradient,p063,pdf image,printed,ok,True,1.0,1.0,1.0,589,589,0,0
+gemini3.7-flash-gw,aug-ReflectedLight,p063,pdf image,printed,ok,True,0.985183,0.984221,0.988898,589,582,10,3
+gemini3.7-flash-gw,aug-LowLightNoise,p063,pdf image,printed,ok,True,0.99973,0.998938,1.0,589,589,0,0
+gemini3.7-flash-gw,motion-31,p063,pdf image,printed,ok,True,0.003514,0.001673,0.0,589,1,589,1
+gemini3.7-flash-gw,defocus-5,p063,pdf image,printed,ok,True,0.989727,0.978829,0.982158,589,588,11,10
+gemini3.7-flash-gw,tilt-20,p063,pdf image,printed,ok,True,0.99946,0.998584,1.0,589,589,0,0
+gemini3.7-flash-gw,jpeg-60,p063,pdf image,printed,ok,True,1.0,1.0,1.0,589,589,0,0
+gemini3.7-flash-gw,motion-17,p063,pdf image,printed,ok,True,0.105975,0.044742,0.023451,589,8,582,1
+gemini3.7-flash-gw,defocus-3,p063,pdf image,printed,ok,True,0.998919,0.996685,0.998302,589,589,1,1
 qwen3.6-27b,raw,p064,original,typewritten,ok,True,1.0,1.0,1.0,129,129,0,0
 qwen3.6-27b,aug-ShadowCast,p064,original,typewritten,ok,True,1.0,1.0,1.0,129,129,0,0
 qwen3.6-27b,aug-LightingGradient,p064,original,typewritten,ok,True,1.0,1.0,1.0,129,129,0,0
@@ -3401,6 +3687,17 @@ vision,jpeg-75,p064,original,typewritten,ok,True,0.997722,0.991571,0.984496,129,
 vision,jpeg-85,p064,original,typewritten,ok,True,0.997722,0.991571,0.984496,129,129,2,2
 vision,quad-tilt-12,p064,original,typewritten,ok,True,0.997725,0.995082,0.980695,129,130,2,3
 vision,quad-tilt-20,p064,original,typewritten,ok,True,0.997725,0.995082,0.980695,129,130,2,3
+gemini3.7-flash-gw,raw,p064,original,typewritten,ok,True,1.0,1.0,1.0,129,129,0,0
+gemini3.7-flash-gw,aug-ShadowCast,p064,original,typewritten,ok,True,1.0,1.0,1.0,129,129,0,0
+gemini3.7-flash-gw,aug-LightingGradient,p064,original,typewritten,ok,True,1.0,1.0,1.0,129,129,0,0
+gemini3.7-flash-gw,aug-ReflectedLight,p064,original,typewritten,ok,True,1.0,1.0,1.0,129,129,0,0
+gemini3.7-flash-gw,aug-LowLightNoise,p064,original,typewritten,ok,True,1.0,1.0,1.0,129,129,0,0
+gemini3.7-flash-gw,motion-31,p064,original,typewritten,ok,True,0.986348,0.953059,0.953125,129,127,7,5
+gemini3.7-flash-gw,defocus-5,p064,original,typewritten,ok,True,0.964692,0.851055,0.984496,129,129,2,2
+gemini3.7-flash-gw,tilt-20,p064,original,typewritten,ok,True,1.0,1.0,1.0,129,129,0,0
+gemini3.7-flash-gw,jpeg-60,p064,original,typewritten,ok,True,1.0,1.0,1.0,129,129,0,0
+gemini3.7-flash-gw,motion-17,p064,original,typewritten,ok,True,0.998861,0.995317,0.992248,129,129,1,1
+gemini3.7-flash-gw,defocus-3,p064,original,typewritten,ok,True,1.0,1.0,1.0,129,129,0,0
 qwen3.6-27b,raw,p065,original,printed,ok,True,0.993958,0.987424,1.0,58,58,0,0
 qwen3.6-27b,aug-ShadowCast,p065,original,printed,ok,True,0.990937,0.977913,0.982759,58,58,1,1
 qwen3.6-27b,aug-LightingGradient,p065,original,printed,ok,True,0.993958,0.987424,1.0,58,58,0,0
@@ -3455,6 +3752,17 @@ vision,jpeg-75,p065,original,printed,ok,True,0.299094,0.791092,0.931034,58,58,4,
 vision,jpeg-85,p065,original,printed,ok,True,0.308157,0.787873,0.948276,58,58,3,3
 vision,quad-tilt-12,p065,original,printed,ok,True,0.371601,0.784097,0.964286,58,54,4,0
 vision,quad-tilt-20,p065,original,printed,ok,True,0.241692,0.744729,0.964286,58,54,4,0
+gemini3.7-flash-gw,raw,p065,original,printed,ok,True,1.0,1.0,1.0,58,58,0,0
+gemini3.7-flash-gw,aug-ShadowCast,p065,original,printed,ok,True,0.956012,0.96981,0.982759,58,58,1,1
+gemini3.7-flash-gw,aug-LightingGradient,p065,original,printed,ok,True,0.993958,0.987424,1.0,58,58,0,0
+gemini3.7-flash-gw,aug-ReflectedLight,p065,original,printed,ok,True,0.956268,0.952076,0.948276,58,58,3,3
+gemini3.7-flash-gw,aug-LowLightNoise,p065,original,printed,ok,True,1.0,1.0,1.0,58,58,0,0
+gemini3.7-flash-gw,motion-31,p065,original,printed,ok,True,0.483384,0.38728,0.292135,58,31,45,18
+gemini3.7-flash-gw,defocus-5,p065,original,printed,ok,True,0.918429,0.910784,0.946429,58,54,5,1
+gemini3.7-flash-gw,tilt-20,p065,original,printed,ok,True,0.993958,0.987424,1.0,58,58,0,0
+gemini3.7-flash-gw,jpeg-60,p065,original,printed,ok,True,1.0,1.0,1.0,58,58,0,0
+gemini3.7-flash-gw,motion-17,p065,original,printed,ok,True,0.933333,0.939878,0.964912,58,56,3,1
+gemini3.7-flash-gw,defocus-3,p065,original,printed,ok,True,0.964706,0.972441,0.973913,58,57,2,1
 qwen3.6-27b,raw,p066,original,typewritten,ok,True,0.793561,0.949054,0.896104,69,85,0,16
 qwen3.6-27b,aug-ShadowCast,p066,original,typewritten,ok,True,1.0,1.0,1.0,69,69,0,0
 qwen3.6-27b,aug-LightingGradient,p066,original,typewritten,ok,True,1.0,1.0,1.0,69,69,0,0
@@ -3563,6 +3871,17 @@ vision,jpeg-75,p067,pdf image,printed,ok,True,0.988722,0.969923,1.0,79,79,0,0
 vision,jpeg-85,p067,pdf image,printed,ok,True,0.988722,0.969923,1.0,79,79,0,0
 vision,quad-tilt-12,p067,pdf image,printed,ok,True,0.988722,0.969923,1.0,79,79,0,0
 vision,quad-tilt-20,p067,pdf image,printed,ok,True,0.992481,0.985525,1.0,79,79,0,0
+gemini3.7-flash-gw,raw,p067,pdf image,printed,ok,True,1.0,1.0,1.0,79,79,0,0
+gemini3.7-flash-gw,aug-ShadowCast,p067,pdf image,printed,ok,True,1.0,1.0,1.0,79,79,0,0
+gemini3.7-flash-gw,aug-LightingGradient,p067,pdf image,printed,ok,True,1.0,1.0,1.0,79,79,0,0
+gemini3.7-flash-gw,aug-ReflectedLight,p067,pdf image,printed,ok,True,1.0,1.0,1.0,79,79,0,0
+gemini3.7-flash-gw,aug-LowLightNoise,p067,pdf image,printed,ok,True,1.0,1.0,1.0,79,79,0,0
+gemini3.7-flash-gw,motion-31,p067,pdf image,printed,ok,True,0.996241,0.988558,0.987342,79,79,1,1
+gemini3.7-flash-gw,defocus-5,p067,pdf image,printed,ok,True,1.0,1.0,1.0,79,79,0,0
+gemini3.7-flash-gw,tilt-20,p067,pdf image,printed,ok,True,1.0,1.0,1.0,79,79,0,0
+gemini3.7-flash-gw,jpeg-60,p067,pdf image,printed,ok,True,1.0,1.0,1.0,79,79,0,0
+gemini3.7-flash-gw,motion-17,p067,pdf image,printed,ok,True,1.0,1.0,1.0,79,79,0,0
+gemini3.7-flash-gw,defocus-3,p067,pdf image,printed,ok,True,1.0,1.0,1.0,79,79,0,0
 qwen3.6-27b,raw,p068,original,typewritten,ok,True,0.999539,1.0,0.995489,333,332,2,1
 qwen3.6-27b,aug-ShadowCast,p068,original,typewritten,ok,True,0.999539,1.0,0.995489,333,332,2,1
 qwen3.6-27b,aug-LightingGradient,p068,original,typewritten,ok,True,0.999539,1.0,0.995489,333,332,2,1
@@ -3671,6 +3990,17 @@ vision,jpeg-75,p069,original,typewritten,ok,True,0.83903,0.947363,0.919118,128,1
 vision,jpeg-85,p069,original,typewritten,ok,True,0.840132,0.952417,0.919118,128,144,3,19
 vision,quad-tilt-12,p069,original,typewritten,ok,True,0.940071,0.978284,0.958491,128,137,1,10
 vision,quad-tilt-20,p069,original,typewritten,ok,True,0.995037,0.993635,0.996078,128,127,1,0
+gemini3.7-flash-gw,raw,p069,original,typewritten,ok,True,0.993797,0.9741,0.98008,128,123,5,0
+gemini3.7-flash-gw,aug-ShadowCast,p069,original,typewritten,ok,True,1.0,1.0,1.0,128,128,0,0
+gemini3.7-flash-gw,aug-LightingGradient,p069,original,typewritten,ok,True,0.993797,0.9741,0.98008,128,123,5,0
+gemini3.7-flash-gw,aug-ReflectedLight,p069,original,typewritten,ok,True,0.985112,0.965175,0.971888,128,121,7,0
+gemini3.7-flash-gw,aug-LowLightNoise,p069,original,typewritten,ok,True,0.893973,0.953895,0.931818,128,136,5,13
+gemini3.7-flash-gw,motion-31,p069,original,typewritten,ok,True,0.991337,0.969824,0.972112,128,123,6,1
+gemini3.7-flash-gw,defocus-5,p069,original,typewritten,ok,True,0.993797,0.9741,0.98008,128,123,5,0
+gemini3.7-flash-gw,tilt-20,p069,original,typewritten,ok,True,0.993797,0.9741,0.98008,128,123,5,0
+gemini3.7-flash-gw,jpeg-60,p069,original,typewritten,ok,True,0.867822,0.948138,0.911111,128,142,5,19
+gemini3.7-flash-gw,motion-17,p069,original,typewritten,ok,True,0.993797,0.9741,0.98008,128,123,5,0
+gemini3.7-flash-gw,defocus-3,p069,original,typewritten,ok,True,0.993797,0.9741,0.98008,128,123,5,0
 qwen3.6-27b,raw,p070,original,typewritten,ok,True,0.993552,0.994766,0.995448,330,329,2,1
 qwen3.6-27b,aug-ShadowCast,p070,original,typewritten,ok,True,0.993552,0.994766,0.995448,330,329,2,1
 qwen3.6-27b,aug-LightingGradient,p070,original,typewritten,ok,True,0.993552,0.994766,0.995448,330,329,2,1
@@ -3779,6 +4109,17 @@ vision,jpeg-75,p071,original,typewritten,ok,True,0.984341,0.993142,0.997172,529,
 vision,jpeg-85,p071,original,typewritten,ok,True,0.985851,0.992513,0.997167,529,530,1,2
 vision,quad-tilt-12,p071,original,typewritten,ok,True,0.986732,0.990498,0.997162,529,528,2,1
 vision,quad-tilt-20,p071,original,typewritten,ok,True,0.988275,0.991608,0.99811,529,529,1,1
+gemini3.7-flash-gw,raw,p071,original,typewritten,ok,True,1.0,1.0,1.0,529,529,0,0
+gemini3.7-flash-gw,aug-ShadowCast,p071,original,typewritten,ok,True,1.0,1.0,1.0,529,529,0,0
+gemini3.7-flash-gw,aug-LightingGradient,p071,original,typewritten,ok,True,1.0,1.0,1.0,529,529,0,0
+gemini3.7-flash-gw,aug-ReflectedLight,p071,original,typewritten,ok,True,1.0,1.0,1.0,529,529,0,0
+gemini3.7-flash-gw,aug-LowLightNoise,p071,original,typewritten,ok,True,1.0,1.0,1.0,529,529,0,0
+gemini3.7-flash-gw,motion-31,p071,original,typewritten,ok,True,0.002777,0.001535,0.0,529,0,529,0
+gemini3.7-flash-gw,defocus-5,p071,original,typewritten,ok,True,0.996607,0.990148,0.988658,529,529,6,6
+gemini3.7-flash-gw,tilt-20,p071,original,typewritten,ok,True,1.0,1.0,1.0,529,529,0,0
+gemini3.7-flash-gw,jpeg-60,p071,original,typewritten,ok,True,1.0,1.0,1.0,529,529,0,0
+gemini3.7-flash-gw,motion-17,p071,original,typewritten,ok,True,0.99599,0.983566,0.977316,529,529,12,12
+gemini3.7-flash-gw,defocus-3,p071,original,typewritten,ok,True,0.999383,0.998524,0.99811,529,529,1,1
 qwen3.6-27b,raw,p072,original,printed,ok,True,0.974655,0.962518,0.921681,1071,1023,106,58
 qwen3.6-27b,aug-ShadowCast,p072,original,printed,ok,True,0.974655,0.962518,0.921681,1071,1023,106,58
 qwen3.6-27b,aug-LightingGradient,p072,original,printed,ok,True,0.974505,0.962284,0.921681,1071,1023,106,58
@@ -3833,6 +4174,17 @@ vision,jpeg-75,p072,original,printed,ok,True,0.987403,0.97592,0.993922,1071,1068
 vision,jpeg-85,p072,original,printed,ok,True,0.987403,0.976169,0.993922,1071,1068,8,5
 vision,quad-tilt-12,p072,original,printed,ok,True,0.981254,0.970086,0.991565,1071,1063,13,5
 vision,quad-tilt-20,p072,original,printed,ok,True,0.983353,0.977945,0.99203,1071,1062,13,4
+gemini3.7-flash-gw,raw,p072,original,printed,ok,True,0.995357,0.993001,0.999066,1071,1071,1,1
+gemini3.7-flash-gw,aug-ShadowCast,p072,original,printed,ok,True,0.990901,0.992275,0.996737,1071,1074,2,5
+gemini3.7-flash-gw,aug-LightingGradient,p072,original,printed,ok,True,0.99491,0.99296,0.999066,1071,1071,1,1
+gemini3.7-flash-gw,aug-ReflectedLight,p072,original,printed,ok,True,0.852879,0.833764,0.900555,1071,910,179,18
+gemini3.7-flash-gw,aug-LowLightNoise,p072,original,printed,ok,True,0.995357,0.992858,0.999066,1071,1071,1,1
+gemini3.7-flash-gw,motion-31,p072,original,printed,ok,True,0.014847,0.013827,0.016651,1071,10,1062,1
+gemini3.7-flash-gw,defocus-5,p072,original,printed,ok,True,0.982903,0.971268,0.977549,1071,1067,26,22
+gemini3.7-flash-gw,tilt-20,p072,original,printed,ok,True,0.99296,0.99259,0.999066,1071,1071,1,1
+gemini3.7-flash-gw,jpeg-60,p072,original,printed,ok,True,0.975705,0.962745,0.922636,1071,1023,105,57
+gemini3.7-flash-gw,motion-17,p072,original,printed,ok,True,0.983291,0.978331,0.981767,1071,1068,21,18
+gemini3.7-flash-gw,defocus-3,p072,original,printed,ok,True,0.992809,0.991529,0.998133,1071,1071,2,2
 qwen3.6-27b,raw,p073,pdf image,printed,ok,True,0.948052,0.983492,1.0,81,81,0,0
 qwen3.6-27b,aug-ShadowCast,p073,pdf image,printed,ok,True,1.0,1.0,1.0,81,81,0,0
 qwen3.6-27b,aug-LightingGradient,p073,pdf image,printed,ok,True,1.0,1.0,1.0,81,81,0,0
@@ -3941,6 +4293,17 @@ vision,jpeg-75,p074,original,printed,ok,True,0.978805,0.969571,0.994413,448,447,
 vision,jpeg-85,p074,original,printed,ok,True,0.978805,0.969416,0.994413,448,447,3,2
 vision,quad-tilt-12,p074,original,printed,ok,True,0.977649,0.96904,0.994413,448,447,3,2
 vision,quad-tilt-20,p074,original,printed,ok,True,0.975337,0.967665,0.995526,448,446,3,1
+gemini3.7-flash-gw,raw,p074,original,printed,ok,True,0.980347,0.972732,1.0,448,448,0,0
+gemini3.7-flash-gw,aug-ShadowCast,p074,original,printed,ok,True,0.980347,0.972732,1.0,448,448,0,0
+gemini3.7-flash-gw,aug-LightingGradient,p074,original,printed,ok,True,0.980347,0.972732,1.0,448,448,0,0
+gemini3.7-flash-gw,aug-ReflectedLight,p074,original,printed,ok,True,0.864355,0.850085,0.916667,448,392,63,7
+gemini3.7-flash-gw,aug-LowLightNoise,p074,original,printed,ok,True,0.979961,0.971178,0.997768,448,448,1,1
+gemini3.7-flash-gw,motion-31,p074,original,printed,ok,True,0.945967,0.931612,0.934517,448,453,27,32
+gemini3.7-flash-gw,defocus-5,p074,original,printed,ok,True,0.978035,0.967461,0.993304,448,448,3,3
+gemini3.7-flash-gw,tilt-20,p074,original,printed,ok,True,0.980347,0.972732,1.0,448,448,0,0
+gemini3.7-flash-gw,jpeg-60,p074,original,printed,ok,True,0.980347,0.972732,1.0,448,448,0,0
+gemini3.7-flash-gw,motion-17,p074,original,printed,ok,True,0.980347,0.971644,0.997768,448,448,1,1
+gemini3.7-flash-gw,defocus-3,p074,original,printed,ok,True,0.979961,0.971878,0.997768,448,448,1,1
 qwen3.6-27b,raw,p075,pdf image,printed,ok,True,0.999382,0.99758,1.0,252,252,0,0
 qwen3.6-27b,aug-ShadowCast,p075,pdf image,printed,ok,True,0.999382,0.99758,1.0,252,252,0,0
 qwen3.6-27b,aug-LightingGradient,p075,pdf image,printed,ok,True,0.997531,0.993474,1.0,252,252,0,0
@@ -3995,6 +4358,17 @@ vision,jpeg-75,p075,pdf image,printed,ok,True,0.963535,0.884297,0.882704,252,251
 vision,jpeg-85,p075,pdf image,printed,ok,True,0.962299,0.886981,0.89243,252,250,28,26
 vision,quad-tilt-12,p075,pdf image,printed,ok,True,0.97157,0.908348,0.898608,252,251,26,25
 vision,quad-tilt-20,p075,pdf image,printed,ok,True,0.96848,0.895399,0.88668,252,251,29,28
+gemini3.7-flash-gw,raw,p075,pdf image,printed,ok,True,0.998149,0.995894,1.0,252,252,0,0
+gemini3.7-flash-gw,aug-ShadowCast,p075,pdf image,printed,ok,True,0.997531,0.993474,1.0,252,252,0,0
+gemini3.7-flash-gw,aug-LightingGradient,p075,pdf image,printed,ok,True,0.997531,0.993474,1.0,252,252,0,0
+gemini3.7-flash-gw,aug-ReflectedLight,p075,pdf image,printed,ok,True,0.996296,0.990419,0.996032,252,252,1,1
+gemini3.7-flash-gw,aug-LowLightNoise,p075,pdf image,printed,ok,True,1.0,1.0,1.0,252,252,0,0
+gemini3.7-flash-gw,motion-31,p075,pdf image,printed,ok,True,0.2911,0.218203,0.276316,252,52,210,10
+gemini3.7-flash-gw,defocus-5,p075,pdf image,printed,ok,True,0.983313,0.969348,0.968254,252,252,8,8
+gemini3.7-flash-gw,tilt-20,p075,pdf image,printed,ok,True,0.996915,0.992839,0.996032,252,252,1,1
+gemini3.7-flash-gw,jpeg-60,p075,pdf image,printed,ok,True,1.0,1.0,1.0,252,252,0,0
+gemini3.7-flash-gw,motion-17,p075,pdf image,printed,ok,True,0.911001,0.912308,0.946281,252,232,23,3
+gemini3.7-flash-gw,defocus-3,p075,pdf image,printed,ok,True,0.999382,0.997433,0.996032,252,252,1,1
 qwen3.6-27b,raw,p076,pdf image,typewritten,ok,True,0.941379,0.984891,0.967942,470,497,2,29
 qwen3.6-27b,aug-ShadowCast,p076,pdf image,typewritten,ok,True,0.942394,0.987535,0.972079,470,497,0,27
 qwen3.6-27b,aug-LightingGradient,p076,pdf image,typewritten,ok,True,0.940731,0.984718,0.967942,470,497,2,29
@@ -4049,6 +4423,17 @@ vision,jpeg-75,p076,pdf image,typewritten,ok,True,0.810427,0.906342,0.914712,470
 vision,jpeg-85,p076,pdf image,typewritten,ok,True,0.8125,0.901387,0.900634,470,476,44,50
 vision,quad-tilt-12,p076,pdf image,typewritten,ok,True,0.696193,0.809023,0.835991,470,408,103,41
 vision,quad-tilt-20,p076,pdf image,typewritten,ok,True,0.850053,0.933518,0.940439,470,487,20,37
+gemini3.7-flash-gw,raw,p076,pdf image,typewritten,ok,True,0.941744,0.986631,0.97001,470,497,1,28
+gemini3.7-flash-gw,aug-ShadowCast,p076,pdf image,typewritten,ok,True,0.9414,0.985096,0.97001,470,497,1,28
+gemini3.7-flash-gw,aug-LightingGradient,p076,pdf image,typewritten,ok,True,0.941744,0.986631,0.97001,470,497,1,28
+gemini3.7-flash-gw,aug-ReflectedLight,p076,pdf image,typewritten,ok,True,0.831991,0.881518,0.894737,470,442,62,34
+gemini3.7-flash-gw,aug-LowLightNoise,p076,pdf image,typewritten,ok,True,0.941724,0.986279,0.972079,470,497,0,27
+gemini3.7-flash-gw,motion-31,p076,pdf image,typewritten,ok,True,0.583638,0.559645,0.574538,470,449,206,185
+gemini3.7-flash-gw,defocus-5,p076,pdf image,typewritten,ok,True,0.930785,0.961542,0.950413,470,498,10,38
+gemini3.7-flash-gw,tilt-20,p076,pdf image,typewritten,ok,True,0.941075,0.985096,0.966942,470,498,2,30
+gemini3.7-flash-gw,jpeg-60,p076,pdf image,typewritten,ok,True,0.941744,0.986631,0.97001,470,497,1,28
+gemini3.7-flash-gw,motion-17,p076,pdf image,typewritten,ok,True,0.937285,0.976838,0.964876,470,498,3,31
+gemini3.7-flash-gw,defocus-3,p076,pdf image,typewritten,ok,True,0.941055,0.984585,0.97001,470,497,1,28
 qwen3.6-27b,raw,p077,pdf image,typewritten,ok,True,0.966819,0.968216,0.988976,321,314,7,0
 qwen3.6-27b,aug-ShadowCast,p077,pdf image,typewritten,ok,True,0.966819,0.968216,0.988976,321,314,7,0
 qwen3.6-27b,aug-LightingGradient,p077,pdf image,typewritten,ok,True,0.966819,0.968216,0.988976,321,314,7,0
@@ -4157,6 +4542,17 @@ vision,jpeg-75,p078,original,printed,ok,True,0.988081,0.987361,0.999457,922,921,
 vision,jpeg-85,p078,original,printed,ok,True,0.988081,0.987196,0.999457,922,921,1,0
 vision,quad-tilt-12,p078,original,printed,ok,True,0.987563,0.98424,0.996746,922,922,3,3
 vision,quad-tilt-20,p078,original,printed,ok,True,0.993783,0.988158,0.997831,922,922,2,2
+gemini3.7-flash-gw,raw,p078,original,printed,ok,True,0.994818,0.991189,1.0,922,922,0,0
+gemini3.7-flash-gw,aug-ShadowCast,p078,original,printed,ok,True,0.996896,0.992768,1.0,922,922,0,0
+gemini3.7-flash-gw,aug-LightingGradient,p078,original,printed,ok,True,0.994818,0.991189,1.0,922,922,0,0
+gemini3.7-flash-gw,aug-ReflectedLight,p078,original,printed,ok,True,0.940404,0.923432,0.956473,922,870,65,13
+gemini3.7-flash-gw,aug-LowLightNoise,p078,original,printed,ok,True,0.99276,0.986593,1.0,922,922,0,0
+gemini3.7-flash-gw,motion-31,p078,original,printed,ok,True,0.849115,0.838008,0.831522,922,918,157,153
+gemini3.7-flash-gw,defocus-5,p078,original,printed,ok,True,0.993436,0.990811,0.993478,922,918,8,4
+gemini3.7-flash-gw,tilt-20,p078,original,printed,ok,True,0.993445,0.986886,1.0,922,922,0,0
+gemini3.7-flash-gw,jpeg-60,p078,original,printed,ok,True,0.994818,0.991189,1.0,922,922,0,0
+gemini3.7-flash-gw,motion-17,p078,original,printed,ok,True,0.003455,0.001883,0.0,922,0,922,0
+gemini3.7-flash-gw,defocus-3,p078,original,printed,ok,True,0.994818,0.991189,1.0,922,922,0,0
 qwen3.6-27b,raw,p079,original,typewritten,ok,True,1.0,1.0,1.0,274,274,0,0
 qwen3.6-27b,aug-ShadowCast,p079,original,typewritten,ok,True,1.0,1.0,1.0,274,274,0,0
 qwen3.6-27b,aug-LightingGradient,p079,original,typewritten,ok,True,1.0,1.0,1.0,274,274,0,0
@@ -4265,6 +4661,17 @@ vision,jpeg-75,p080,original,printed,ok,True,0.264169,0.86502,0.936897,662,685,3
 vision,jpeg-85,p080,original,printed,ok,True,0.265723,0.849274,0.905011,662,675,57,70
 vision,quad-tilt-12,p080,original,printed,ok,True,0.262454,0.859725,0.917044,662,664,54,56
 vision,quad-tilt-20,p080,original,printed,ok,True,0.258199,0.839114,0.89759,662,666,66,70
+gemini3.7-flash-gw,raw,p080,original,printed,ok,True,0.941231,0.984477,0.97349,662,696,1,35
+gemini3.7-flash-gw,aug-ShadowCast,p080,original,printed,ok,True,0.943633,0.984188,0.974246,662,697,0,35
+gemini3.7-flash-gw,aug-LightingGradient,p080,original,printed,ok,True,0.943854,0.985581,0.974208,662,695,1,34
+gemini3.7-flash-gw,aug-ReflectedLight,p080,original,printed,ok,True,0.846395,0.892317,0.914729,662,628,72,38
+gemini3.7-flash-gw,aug-LowLightNoise,p080,original,printed,ok,True,0.943646,0.984083,0.974246,662,697,0,35
+gemini3.7-flash-gw,motion-31,p080,original,printed,ok,True,0.094469,0.093459,0.112022,662,70,621,29
+gemini3.7-flash-gw,defocus-5,p080,original,printed,ok,True,0.900623,0.934862,0.927192,662,684,38,60
+gemini3.7-flash-gw,tilt-20,p080,original,printed,ok,True,0.937806,0.982526,0.970458,662,692,5,35
+gemini3.7-flash-gw,jpeg-60,p080,original,printed,ok,True,0.943865,0.984863,0.974246,662,697,0,35
+gemini3.7-flash-gw,motion-17,p080,original,printed,ok,True,0.919438,0.958291,0.947601,662,693,20,51
+gemini3.7-flash-gw,defocus-3,p080,original,printed,ok,True,0.930377,0.975323,0.966127,662,696,6,40
 qwen3.6-27b,raw,p081,pdf image,printed,ok,True,0.901177,0.875883,0.901566,437,457,34,54
 qwen3.6-27b,aug-ShadowCast,p081,pdf image,printed,ok,True,0.906885,0.876614,0.911732,437,458,29,50
 qwen3.6-27b,aug-LightingGradient,p081,pdf image,printed,ok,True,0.899037,0.86916,0.89842,437,449,39,51
@@ -4319,6 +4726,17 @@ vision,jpeg-75,p081,pdf image,printed,ok,True,0.399215,0.332004,0.376296,437,238
 vision,jpeg-85,p081,pdf image,printed,ok,True,0.354263,0.307801,0.355346,437,199,324,86
 vision,quad-tilt-12,p081,pdf image,printed,ok,True,0.385301,0.33024,0.365297,437,220,317,100
 vision,quad-tilt-20,p081,pdf image,printed,ok,True,0.421334,0.349662,0.388148,437,238,306,107
+gemini3.7-flash-gw,raw,p081,pdf image,printed,ok,True,0.934713,0.922584,0.962372,437,440,15,18
+gemini3.7-flash-gw,aug-ShadowCast,p081,pdf image,printed,ok,True,0.95041,0.931627,0.963883,437,449,10,22
+gemini3.7-flash-gw,aug-LightingGradient,p081,pdf image,printed,ok,True,0.909026,0.897482,0.936073,437,439,27,29
+gemini3.7-flash-gw,aug-ReflectedLight,p081,pdf image,printed,ok,True,0.933999,0.922796,0.954545,437,443,17,23
+gemini3.7-flash-gw,aug-LowLightNoise,p081,pdf image,printed,ok,True,0.902248,0.876983,0.894977,437,439,45,47
+gemini3.7-flash-gw,motion-31,p081,pdf image,printed,ok,True,0.084196,0.106837,0.12043,437,28,409,0
+gemini3.7-flash-gw,defocus-5,p081,pdf image,printed,ok,True,0.53931,0.614976,0.588372,437,423,184,170
+gemini3.7-flash-gw,tilt-20,p081,pdf image,printed,ok,True,0.932929,0.936713,0.954233,437,437,20,20
+gemini3.7-flash-gw,jpeg-60,p081,pdf image,printed,ok,True,0.920799,0.904253,0.933941,437,441,27,31
+gemini3.7-flash-gw,motion-17,p081,pdf image,printed,ok,True,0.653585,0.704711,0.726404,437,400,133,96
+gemini3.7-flash-gw,defocus-3,p081,pdf image,printed,ok,True,0.853015,0.841065,0.875429,437,438,54,55
 qwen3.6-27b,raw,p082,original,printed,ok,True,0.596491,0.878898,0.760563,54,88,0,34
 qwen3.6-27b,aug-ShadowCast,p082,original,printed,ok,True,0.596491,0.878898,0.760563,54,88,0,34
 qwen3.6-27b,aug-LightingGradient,p082,original,printed,ok,True,0.596491,0.878898,0.760563,54,88,0,34
@@ -4427,6 +4845,17 @@ vision,jpeg-75,p083,pdf image,printed,ok,True,0.353231,0.927284,0.989707,631,632
 vision,jpeg-85,p083,pdf image,printed,ok,True,0.351232,0.927071,0.988124,631,632,7,8
 vision,quad-tilt-12,p083,pdf image,printed,ok,True,0.358701,0.912925,0.969841,631,629,20,18
 vision,quad-tilt-20,p083,pdf image,printed,ok,True,0.354496,0.929035,0.991304,631,634,4,7
+gemini3.7-flash-gw,raw,p083,pdf image,printed,ok,True,1.0,1.0,1.0,631,631,0,0
+gemini3.7-flash-gw,aug-ShadowCast,p083,pdf image,printed,ok,True,1.0,1.0,1.0,631,631,0,0
+gemini3.7-flash-gw,aug-LightingGradient,p083,pdf image,printed,ok,True,0.987792,0.976348,0.941842,631,607,48,24
+gemini3.7-flash-gw,aug-ReflectedLight,p083,pdf image,printed,ok,True,0.944675,0.93969,0.961444,631,588,45,2
+gemini3.7-flash-gw,aug-LowLightNoise,p083,pdf image,printed,ok,True,0.987792,0.976348,0.941842,631,607,48,24
+gemini3.7-flash-gw,motion-31,p083,pdf image,printed,ok,True,0.015844,0.017491,0.025039,631,8,623,0
+gemini3.7-flash-gw,defocus-5,p083,pdf image,printed,ok,True,0.813506,0.803153,0.81364,631,630,118,117
+gemini3.7-flash-gw,tilt-20,p083,pdf image,printed,ok,True,0.987273,0.974668,0.941842,631,607,48,24
+gemini3.7-flash-gw,jpeg-60,p083,pdf image,printed,ok,True,1.0,1.0,1.0,631,631,0,0
+gemini3.7-flash-gw,motion-17,p083,pdf image,printed,ok,True,0.865253,0.951228,0.906686,631,730,14,113
+gemini3.7-flash-gw,defocus-3,p083,pdf image,printed,ok,True,1.0,1.0,1.0,631,631,0,0
 qwen3.6-27b,raw,p084,pdf image,printed,ok,True,0.988722,0.98037,0.948879,567,548,38,19
 qwen3.6-27b,aug-ShadowCast,p084,pdf image,printed,ok,True,0.988722,0.98037,0.948879,567,548,38,19
 qwen3.6-27b,aug-LightingGradient,p084,pdf image,printed,ok,True,0.988722,0.98037,0.948879,567,548,38,19
@@ -4481,6 +4910,17 @@ vision,jpeg-75,p084,pdf image,printed,ok,True,0.990602,0.969612,0.970874,567,566
 vision,jpeg-85,p084,pdf image,printed,ok,True,0.992168,0.97723,0.982363,567,567,10,10
 vision,quad-tilt-12,p084,pdf image,printed,ok,True,0.990915,0.972982,0.976169,567,566,14,13
 vision,quad-tilt-20,p084,pdf image,printed,ok,True,0.988722,0.971732,0.974359,567,564,16,13
+gemini3.7-flash-gw,raw,p084,pdf image,printed,ok,True,1.0,1.0,1.0,567,567,0,0
+gemini3.7-flash-gw,aug-ShadowCast,p084,pdf image,printed,ok,True,0.985794,0.99677,0.994737,567,573,0,6
+gemini3.7-flash-gw,aug-LightingGradient,p084,pdf image,printed,ok,True,1.0,1.0,1.0,567,567,0,0
+gemini3.7-flash-gw,aug-ReflectedLight,p084,pdf image,printed,ok,True,0.946429,0.951674,0.970027,567,534,33,0
+gemini3.7-flash-gw,aug-LowLightNoise,p084,pdf image,printed,ok,True,0.999373,0.998437,0.998236,567,567,1,1
+gemini3.7-flash-gw,motion-31,p084,pdf image,printed,ok,True,0.00282,0.001744,0.0,567,0,567,0
+gemini3.7-flash-gw,defocus-5,p084,pdf image,printed,ok,True,0.68891,0.655246,0.685869,567,544,186,163
+gemini3.7-flash-gw,tilt-20,p084,pdf image,printed,ok,True,0.986077,0.993041,0.992098,567,572,2,7
+gemini3.7-flash-gw,jpeg-60,p084,pdf image,printed,ok,True,1.0,1.0,1.0,567,567,0,0
+gemini3.7-flash-gw,motion-17,p084,pdf image,printed,ok,True,0.00282,0.001744,0.0,567,0,567,0
+gemini3.7-flash-gw,defocus-3,p084,pdf image,printed,ok,True,0.99718,0.992513,0.991182,567,567,5,5
 qwen3.6-27b,raw,p085,pdf image,printed,ok,True,0.999515,0.998919,1.0,330,330,0,0
 qwen3.6-27b,aug-ShadowCast,p085,pdf image,printed,ok,True,0.999515,0.998919,1.0,330,330,0,0
 qwen3.6-27b,aug-LightingGradient,p085,pdf image,printed,ok,True,0.999515,0.998919,1.0,330,330,0,0
@@ -4589,6 +5029,17 @@ vision,jpeg-75,p087,pdf image,typewritten,ok,True,0.904861,0.910548,0.945282,656
 vision,jpeg-85,p087,pdf image,typewritten,ok,True,0.925136,0.917879,0.941824,656,616,57,17
 vision,quad-tilt-12,p087,pdf image,typewritten,ok,True,0.812061,0.834108,0.894606,656,549,117,10
 vision,quad-tilt-20,p087,pdf image,typewritten,ok,True,0.849493,0.881215,0.913876,656,598,83,25
+gemini3.7-flash-gw,raw,p087,pdf image,typewritten,ok,True,1.0,1.0,1.0,656,656,0,0
+gemini3.7-flash-gw,aug-ShadowCast,p087,pdf image,typewritten,ok,True,1.0,1.0,1.0,656,656,0,0
+gemini3.7-flash-gw,aug-LightingGradient,p087,pdf image,typewritten,ok,True,1.0,1.0,1.0,656,656,0,0
+gemini3.7-flash-gw,aug-ReflectedLight,p087,pdf image,typewritten,ok,True,0.923837,0.920683,0.952082,656,617,50,11
+gemini3.7-flash-gw,aug-LowLightNoise,p087,pdf image,typewritten,ok,True,1.0,1.0,1.0,656,656,0,0
+gemini3.7-flash-gw,motion-31,p087,pdf image,typewritten,ok,True,0.874968,0.840128,0.861515,656,651,93,88
+gemini3.7-flash-gw,defocus-5,p087,pdf image,typewritten,ok,True,0.991162,0.98182,0.984756,656,656,10,10
+gemini3.7-flash-gw,tilt-20,p087,pdf image,typewritten,ok,True,1.0,1.0,1.0,656,656,0,0
+gemini3.7-flash-gw,jpeg-60,p087,pdf image,typewritten,ok,True,1.0,1.0,1.0,656,656,0,0
+gemini3.7-flash-gw,motion-17,p087,pdf image,typewritten,ok,True,0.988883,0.987871,0.989313,656,654,8,6
+gemini3.7-flash-gw,defocus-3,p087,pdf image,typewritten,ok,True,0.99896,0.997351,0.996951,656,656,2,2
 qwen3.6-27b,raw,p088,pdf image,typewritten,ok,True,0.985736,0.978715,0.94772,450,449,24,23
 qwen3.6-27b,aug-ShadowCast,p088,pdf image,typewritten,ok,True,0.988739,0.978782,0.948661,450,446,25,21
 qwen3.6-27b,aug-LightingGradient,p088,pdf image,typewritten,ok,True,0.985736,0.978715,0.94772,450,449,24,23
@@ -4697,6 +5148,17 @@ vision,jpeg-75,p089,original,typewritten,ok,True,0.996279,0.987847,0.99661,295,2
 vision,jpeg-85,p089,original,typewritten,ok,True,0.996809,0.990188,0.99661,295,295,1,1
 vision,quad-tilt-12,p089,original,typewritten,ok,True,0.997871,0.991771,0.99661,295,295,1,1
 vision,quad-tilt-20,p089,original,typewritten,ok,True,0.997342,0.991645,1.0,295,295,0,0
+gemini3.7-flash-gw,raw,p089,original,typewritten,ok,True,0.993081,0.994618,1.0,295,295,0,0
+gemini3.7-flash-gw,aug-ShadowCast,p089,original,typewritten,ok,True,0.999468,0.997784,1.0,295,295,0,0
+gemini3.7-flash-gw,aug-LightingGradient,p089,original,typewritten,ok,True,0.999468,0.997784,1.0,295,295,0,0
+gemini3.7-flash-gw,aug-ReflectedLight,p089,original,typewritten,ok,True,0.840873,0.858625,0.91833,295,256,42,3
+gemini3.7-flash-gw,aug-LowLightNoise,p089,original,typewritten,ok,True,0.993081,0.994618,1.0,295,295,0,0
+gemini3.7-flash-gw,motion-31,p089,original,typewritten,ok,True,0.055349,0.043557,0.046205,295,8,288,1
+gemini3.7-flash-gw,defocus-5,p089,original,typewritten,ok,True,0.998403,0.993353,0.99322,295,295,2,2
+gemini3.7-flash-gw,tilt-20,p089,original,typewritten,ok,True,0.993081,0.994618,1.0,295,295,0,0
+gemini3.7-flash-gw,jpeg-60,p089,original,typewritten,ok,True,0.993081,0.994618,1.0,295,295,0,0
+gemini3.7-flash-gw,motion-17,p089,original,typewritten,ok,True,0.990953,0.988394,0.986441,295,295,4,4
+gemini3.7-flash-gw,defocus-3,p089,original,typewritten,ok,True,0.993081,0.994618,1.0,295,295,0,0
 qwen3.6-27b,raw,p090,pdf image,typewritten,ok,True,0.99782,0.995177,0.984877,528,530,7,9
 qwen3.6-27b,aug-ShadowCast,p090,pdf image,typewritten,ok,True,0.99782,0.995177,0.984877,528,530,7,9
 qwen3.6-27b,aug-LightingGradient,p090,pdf image,typewritten,ok,True,0.997547,0.994057,0.984877,528,530,7,9
@@ -4751,6 +5213,17 @@ vision,jpeg-75,p090,pdf image,typewritten,ok,True,0.877351,0.88106,0.910732,528,
 vision,jpeg-85,p090,pdf image,typewritten,ok,True,0.905151,0.901273,0.930049,528,487,56,15
 vision,quad-tilt-12,p090,pdf image,typewritten,ok,True,0.933497,0.93869,0.952839,528,511,33,16
 vision,quad-tilt-20,p090,pdf image,typewritten,ok,True,0.937585,0.921403,0.931135,528,503,48,23
+gemini3.7-flash-gw,raw,p090,pdf image,typewritten,ok,True,0.999183,0.996896,0.998106,528,528,1,1
+gemini3.7-flash-gw,aug-ShadowCast,p090,pdf image,typewritten,ok,True,0.997009,0.995106,0.998106,528,528,1,1
+gemini3.7-flash-gw,aug-LightingGradient,p090,pdf image,typewritten,ok,True,0.998095,0.995361,0.998106,528,528,1,1
+gemini3.7-flash-gw,aug-ReflectedLight,p090,pdf image,typewritten,ok,True,0.995102,0.993281,0.991485,528,529,4,5
+gemini3.7-flash-gw,aug-LowLightNoise,p090,pdf image,typewritten,ok,True,0.998094,0.994656,0.988658,528,530,5,7
+gemini3.7-flash-gw,motion-31,p090,pdf image,typewritten,ok,True,0.002453,0.001664,0.0,528,0,528,0
+gemini3.7-flash-gw,defocus-5,p090,pdf image,typewritten,ok,True,0.94236,0.899263,0.920455,528,528,42,42
+gemini3.7-flash-gw,tilt-20,p090,pdf image,typewritten,ok,True,0.994028,0.993423,0.987724,528,531,5,8
+gemini3.7-flash-gw,jpeg-60,p090,pdf image,typewritten,ok,True,0.995926,0.994851,0.998106,528,528,1,1
+gemini3.7-flash-gw,motion-17,p090,pdf image,typewritten,ok,True,0.115835,0.031508,0.0,528,0,528,0
+gemini3.7-flash-gw,defocus-3,p090,pdf image,typewritten,ok,True,0.995367,0.984294,0.986742,528,528,7,7
 qwen3.6-27b,raw,p091,pdf image,typewritten,ok,True,0.998915,0.998444,0.996232,664,663,3,2
 qwen3.6-27b,aug-ShadowCast,p091,pdf image,typewritten,ok,True,0.999729,1.0,0.997739,664,663,2,1
 qwen3.6-27b,aug-LightingGradient,p091,pdf image,typewritten,ok,True,0.999729,1.0,0.997739,664,663,2,1
@@ -4805,6 +5278,17 @@ vision,jpeg-75,p091,pdf image,typewritten,ok,True,0.904504,0.906054,0.927559,664
 vision,jpeg-85,p091,pdf image,typewritten,ok,True,0.931091,0.919933,0.929183,664,621,67,24
 vision,quad-tilt-12,p091,pdf image,typewritten,ok,True,0.953337,0.946136,0.954927,664,645,39,20
 vision,quad-tilt-20,p091,pdf image,typewritten,ok,True,0.979381,0.958773,0.960546,664,654,31,21
+gemini3.7-flash-gw,raw,p091,pdf image,typewritten,ok,True,1.0,1.0,1.0,664,664,0,0
+gemini3.7-flash-gw,aug-ShadowCast,p091,pdf image,typewritten,ok,True,1.0,1.0,1.0,664,664,0,0
+gemini3.7-flash-gw,aug-LightingGradient,p091,pdf image,typewritten,ok,True,1.0,1.0,1.0,664,664,0,0
+gemini3.7-flash-gw,aug-ReflectedLight,p091,pdf image,typewritten,ok,True,0.891481,0.88373,0.926518,664,588,84,8
+gemini3.7-flash-gw,aug-LowLightNoise,p091,pdf image,typewritten,ok,True,1.0,1.0,1.0,664,664,0,0
+gemini3.7-flash-gw,motion-31,p091,pdf image,typewritten,ok,True,0.002442,0.001515,0.0,664,0,664,0
+gemini3.7-flash-gw,defocus-5,p091,pdf image,typewritten,ok,True,0.951892,0.920055,0.924699,664,664,50,50
+gemini3.7-flash-gw,tilt-20,p091,pdf image,typewritten,ok,True,1.0,1.0,1.0,664,664,0,0
+gemini3.7-flash-gw,jpeg-60,p091,pdf image,typewritten,ok,True,1.0,1.0,1.0,664,664,0,0
+gemini3.7-flash-gw,motion-17,p091,pdf image,typewritten,ok,True,0.979713,0.965779,0.973545,664,659,20,15
+gemini3.7-flash-gw,defocus-3,p091,pdf image,typewritten,ok,True,0.999186,0.996523,0.995482,664,664,3,3
 qwen3.6-27b,raw,p092,pdf image,typewritten,ok,True,1.0,1.0,1.0,352,352,0,0
 qwen3.6-27b,aug-ShadowCast,p092,pdf image,typewritten,ok,True,1.0,1.0,1.0,352,352,0,0
 qwen3.6-27b,aug-LightingGradient,p092,pdf image,typewritten,ok,True,1.0,1.0,1.0,352,352,0,0
@@ -4859,6 +5343,17 @@ vision,jpeg-75,p092,pdf image,typewritten,ok,True,0.986855,0.979687,0.968839,352
 vision,jpeg-85,p092,pdf image,typewritten,ok,True,0.982004,0.962531,0.947666,352,355,17,20
 vision,quad-tilt-12,p092,pdf image,typewritten,ok,True,0.980019,0.960214,0.944837,352,355,18,21
 vision,quad-tilt-20,p092,pdf image,typewritten,ok,True,0.975693,0.952783,0.937853,352,356,20,24
+gemini3.7-flash-gw,raw,p092,pdf image,typewritten,ok,True,1.0,1.0,1.0,352,352,0,0
+gemini3.7-flash-gw,aug-ShadowCast,p092,pdf image,typewritten,ok,True,1.0,1.0,1.0,352,352,0,0
+gemini3.7-flash-gw,aug-LightingGradient,p092,pdf image,typewritten,ok,True,1.0,1.0,1.0,352,352,0,0
+gemini3.7-flash-gw,aug-ReflectedLight,p092,pdf image,typewritten,ok,True,0.968704,0.966406,0.981349,352,345,10,3
+gemini3.7-flash-gw,aug-LowLightNoise,p092,pdf image,typewritten,ok,True,1.0,1.0,1.0,352,352,0,0
+gemini3.7-flash-gw,motion-31,p092,pdf image,typewritten,ok,True,0.004401,0.002826,0.0,352,0,352,0
+gemini3.7-flash-gw,defocus-5,p092,pdf image,typewritten,ok,True,0.993655,0.992337,0.995733,352,351,2,1
+gemini3.7-flash-gw,tilt-20,p092,pdf image,typewritten,ok,True,1.0,1.0,1.0,352,352,0,0
+gemini3.7-flash-gw,jpeg-60,p092,pdf image,typewritten,ok,True,1.0,1.0,1.0,352,352,0,0
+gemini3.7-flash-gw,motion-17,p092,pdf image,typewritten,ok,True,0.994632,0.995391,0.998578,352,351,1,0
+gemini3.7-flash-gw,defocus-3,p092,pdf image,typewritten,ok,True,0.999511,0.99793,0.997159,352,352,1,1
 qwen3.6-27b,raw,p093,pdf image,typewritten,ok,True,0.992235,0.983068,0.956938,419,417,19,17
 qwen3.6-27b,aug-ShadowCast,p093,pdf image,typewritten,ok,True,0.991827,0.98134,0.954545,419,417,20,18
 qwen3.6-27b,aug-LightingGradient,p093,pdf image,typewritten,ok,True,0.992644,0.984796,0.956938,419,417,19,17
@@ -4913,6 +5408,17 @@ vision,jpeg-75,p093,pdf image,typewritten,ok,True,0.970168,0.934181,0.912409,419
 vision,jpeg-85,p093,pdf image,typewritten,ok,True,0.953821,0.939518,0.931034,419,393,41,15
 vision,quad-tilt-12,p093,pdf image,typewritten,ok,True,0.97548,0.947971,0.931873,419,403,36,20
 vision,quad-tilt-20,p093,pdf image,typewritten,ok,True,0.974254,0.945168,0.930572,419,402,37,20
+gemini3.7-flash-gw,raw,p093,pdf image,typewritten,ok,True,0.999183,0.998569,1.0,419,419,0,0
+gemini3.7-flash-gw,aug-ShadowCast,p093,pdf image,typewritten,ok,True,1.0,1.0,1.0,419,419,0,0
+gemini3.7-flash-gw,aug-LightingGradient,p093,pdf image,typewritten,ok,True,1.0,1.0,1.0,419,419,0,0
+gemini3.7-flash-gw,aug-ReflectedLight,p093,pdf image,typewritten,ok,True,0.777278,0.77944,0.8583,419,322,101,4
+gemini3.7-flash-gw,aug-LowLightNoise,p093,pdf image,typewritten,ok,True,1.0,1.0,1.0,419,419,0,0
+gemini3.7-flash-gw,motion-31,p093,pdf image,typewritten,ok,True,0.081324,0.028308,0.0,419,1,419,1
+gemini3.7-flash-gw,defocus-5,p093,pdf image,typewritten,ok,True,0.011443,0.005631,0.014218,419,3,416,0
+gemini3.7-flash-gw,tilt-20,p093,pdf image,typewritten,ok,True,0.988618,0.984288,0.961905,419,421,15,17
+gemini3.7-flash-gw,jpeg-60,p093,pdf image,typewritten,ok,True,1.0,1.0,1.0,419,419,0,0
+gemini3.7-flash-gw,motion-17,p093,pdf image,typewritten,ok,True,0.970173,0.957613,0.934289,419,418,28,27
+gemini3.7-flash-gw,defocus-3,p093,pdf image,typewritten,ok,True,0.983786,0.978468,0.972053,419,404,19,4
 qwen3.6-27b,raw,p095,pdf image,typewritten,ok,True,0.999033,0.99679,0.997442,391,391,1,1
 qwen3.6-27b,aug-ShadowCast,p095,pdf image,typewritten,ok,True,0.999033,0.99679,0.997442,391,391,1,1
 qwen3.6-27b,aug-LightingGradient,p095,pdf image,typewritten,ok,True,0.999033,0.99679,0.997442,391,391,1,1
@@ -4967,6 +5473,17 @@ vision,jpeg-75,p095,pdf image,typewritten,ok,True,0.999516,0.997906,1.0,391,391,
 vision,jpeg-85,p095,pdf image,typewritten,ok,True,0.999516,0.997906,1.0,391,391,0,0
 vision,quad-tilt-12,p095,pdf image,typewritten,ok,True,0.999516,0.997906,1.0,391,391,0,0
 vision,quad-tilt-20,p095,pdf image,typewritten,ok,True,0.999033,0.995932,1.0,391,391,0,0
+gemini3.7-flash-gw,raw,p095,pdf image,typewritten,ok,True,0.999516,0.997906,1.0,391,391,0,0
+gemini3.7-flash-gw,aug-ShadowCast,p095,pdf image,typewritten,ok,True,0.999516,0.997906,1.0,391,391,0,0
+gemini3.7-flash-gw,aug-LightingGradient,p095,pdf image,typewritten,ok,True,0.999516,0.997906,1.0,391,391,0,0
+gemini3.7-flash-gw,aug-ReflectedLight,p095,pdf image,typewritten,ok,True,0.979297,0.973053,0.984536,391,385,9,3
+gemini3.7-flash-gw,aug-LowLightNoise,p095,pdf image,typewritten,ok,True,0.999516,0.997906,1.0,391,391,0,0
+gemini3.7-flash-gw,motion-31,p095,pdf image,typewritten,ok,True,0.990333,0.984686,0.99106,391,392,3,4
+gemini3.7-flash-gw,defocus-5,p095,pdf image,typewritten,ok,True,0.999516,0.997906,1.0,391,391,0,0
+gemini3.7-flash-gw,tilt-20,p095,pdf image,typewritten,ok,True,0.999516,0.997906,1.0,391,391,0,0
+gemini3.7-flash-gw,jpeg-60,p095,pdf image,typewritten,ok,True,0.999516,0.997906,1.0,391,391,0,0
+gemini3.7-flash-gw,motion-17,p095,pdf image,typewritten,ok,True,0.996133,0.989513,0.994885,391,391,2,2
+gemini3.7-flash-gw,defocus-3,p095,pdf image,typewritten,ok,True,0.999516,0.997906,1.0,391,391,0,0
 qwen3.6-27b,raw,p097,original,typewritten,ok,True,0.993923,0.992935,0.998435,320,319,1,0
 qwen3.6-27b,aug-ShadowCast,p097,original,typewritten,ok,True,0.993923,0.992935,0.998435,320,319,1,0
 qwen3.6-27b,aug-LightingGradient,p097,original,typewritten,ok,True,0.993923,0.992935,0.998435,320,319,1,0
@@ -5183,3 +5700,14 @@ vision,jpeg-75,p100,original,typewritten,ok,True,0.433321,0.433887,0.738028,165,
 vision,jpeg-85,p100,original,typewritten,ok,True,0.43521,0.433685,0.738028,165,190,34,59
 vision,quad-tilt-12,p100,original,typewritten,ok,True,0.427276,0.426369,0.717949,165,186,39,60
 vision,quad-tilt-20,p100,original,typewritten,ok,True,0.434454,0.433862,0.721591,165,187,38,60
+gemini3.7-flash-gw,raw,p100,original,typewritten,ok,True,0.957952,0.992872,0.990881,165,164,2,1
+gemini3.7-flash-gw,aug-ShadowCast,p100,original,typewritten,ok,True,0.926332,0.939074,0.88563,165,176,14,25
+gemini3.7-flash-gw,aug-LightingGradient,p100,original,typewritten,ok,True,0.936532,0.950349,0.773109,165,192,27,54
+gemini3.7-flash-gw,aug-ReflectedLight,p100,original,typewritten,ok,True,0.653948,0.690865,0.794521,165,127,49,11
+gemini3.7-flash-gw,aug-LowLightNoise,p100,original,typewritten,ok,True,0.936154,0.948364,0.88563,165,176,14,25
+gemini3.7-flash-gw,motion-31,p100,original,typewritten,ok,True,0.890476,0.96028,0.885449,165,158,22,15
+gemini3.7-flash-gw,defocus-5,p100,original,typewritten,ok,True,0.894149,0.973877,0.97561,165,163,5,3
+gemini3.7-flash-gw,tilt-20,p100,original,typewritten,ok,True,0.956555,0.97075,0.990881,165,164,2,1
+gemini3.7-flash-gw,jpeg-60,p100,original,typewritten,ok,True,0.936154,0.949357,0.981707,165,163,4,2
+gemini3.7-flash-gw,motion-17,p100,original,typewritten,ok,True,0.630923,0.986152,0.765363,165,193,28,56
+gemini3.7-flash-gw,defocus-3,p100,original,typewritten,ok,True,0.890872,0.974335,0.981707,165,163,4,2

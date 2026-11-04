@@ -444,7 +444,9 @@ PAGE_NOTE = ('Each of the 96 pages degraded by one synthetic defect at one setti
              'lighting gradient at their defaults cost none of them more than about 2 points. Apple Vision breaks '
              'first: 9 px of motion costs it 6.6 points and 17 px 38, where Qwen3.6-27B loses 1.0 and 7.9. '
              'LightOnOCR-3 4B answers heavy blur with an empty reply (43 of 96 at 31 px). Correcting the tilt with '
-             'Apple\'s quad recovers nothing for Vision, because tilt cost it little. A loop is a reading cut at the '
+             'Apple\'s quad recovers nothing for Vision, because tilt cost it little. Gemini 3.7 Flash through the '
+             'gateway, on 48 of the pages at ten settings, loses 6.2 points to sigma-5 defocus and 16.2 to 17 px of '
+             'motion. A loop is a reading cut at the '
              'token cap or the 600 s limit; loops and blanks score 0. Synthetic defects, one at a time: real phone '
              'captures are not in this table. Detail: segbench-results/capture-ladder.md.')
 SIGNALS_NOTE = ('Signals a phone can measure at capture, from the image alone, against a loss of 5 NES points or more '
@@ -481,6 +483,20 @@ FINDINGS = """## Findings
   share does not detect the glare defect (0.50 to 0.53) and luminance is inverted (glare brightens). The best cuts
   differ threefold between readers and are in-sample: a live blur warning could start from sharpness in word boxes,
   but its threshold needs real captures.
+- **Gemini 3.7 Flash through the gateway (48 of the 96) forgives defocus best and motion less well than the open
+  readers.** On the same 48 pages, each reader paired against its own plain image: defocus sigma 5 costs Gemini 6.2
+  NES points (-11.2 to -2.7), the 27B 16.7, LightOn 14.2 and Vision 58.3; sigma 3 costs it 1.0. Motion 17 px costs it
+  16.2 (-26.1 to -7.7), against the 27B's 10.4, LightOn's 11.7 and Vision's 37.5; motion 31 px 53.1, between the 27B
+  (44.2) and the other two (68 to 72). Glare costs it 8.9, the others 7.5 to 10.1. Low light, tilt, JPEG 60 and the
+  two faint Augraphy defects cost it under 1 point. It never looped or returned a blank.
+- **Gemini's own capture verdict ranks the damaging images better than any capture-time signal, but its retake
+  advice over-calls blur.** Its 1-5 quality score, asked apart from any reading, separates a 5-point loss at AUC 0.81
+  to 0.90 across the four readers, where sharpness in the word boxes reaches 0.61 to 0.77 and the word-box share 0.72
+  to 0.78 on the same 480 images. Its "retake" catches 90 to 96% of the losses with false alarms on 30 to 46% of the
+  rest: it asks for a retake on 96% of the defocus-3 images, which cost Gemini and the open readers 1 to 2 points. It
+  names blur on every motion and heavy-defocus image but confuses the two kinds (motion 31 px: out_of_focus 45 times,
+  motion_blur 43), names glare on 73% of the reflected-light images and tilt on 52%, and asks to retake 8% of the
+  plain photographs. The verdicts cost $0.80 for 528 images, about $0.0015 each.
 
 What this means for the companion's guidance: hold the phone still and avoid reflections; tilt and compression need
 no warning for any reader, and the gateway or open readers forgive blur that Vision does not, so a blur warning
@@ -512,21 +528,27 @@ CARD = """
 - **Truth:** the 96's adjudicated truth (`ocr_truth`), the same for every image of a page. The figure is a change
   within one reader against one fixed truth, so a drafter bias in the truth moves the plain and the defect image alike
   and largely cancels; it does not cancel in a comparison between readers, which this report does not rank on. The
-  owner's blind check found the typed-page truth fit for ranking (measurement audit, 2026-10-30).
+  owner's blind check found the typed-page truth fit for ranking (measurement audit, 2026-10-30). Gemini 3.8 Flash,
+  a relative of the scored Gemini 3.7 Flash, drafted that truth with Claude Opus 5.5, so Gemini's own level (97.1 on
+  its 48) is not compared with the other readers'; its Δ, like theirs, is within the reader.
 - **Selection:** all 96 scored pages, every defect; no page chosen by a reader's result or by ABBYY text. The optical
   capture tags are not used to slice (CAP-1, kappa 0.14-0.47 against a blind retag).
 - **Comparison:** the same pages, prompts, decoding and server arguments as each reader's baseline. One difference:
   every defect image went through the ladder's own JPEG save (quality 92, or the JPEG row's quality) after the panel's
   JPEG 90, so a second encoding is inside every Δ; the JPEG 85 row bounds it. The baseline was read on 2026-10-22 in a
-  separate job of the same container.
+  separate job of the same container. Gemini's baseline is the cloud panel's reading of the same plain image
+  (W46.fix-ocr-scorers-paid, an earlier run with the same request); its defect images were read on 2026-11-04.
+  Gemini is set beside the other readers only on its 48 pages, each reader against its own plain image.
 - **Noise:** n 96 per cell, paired intervals as above. No rerun floor has been measured for these two Sherlock readers
   (W46.ocr-rerun-noise measured Gemini 3.7 Flash, range 0.24 points, and Qwen3-VL 8B on MLX, 0). vLLM at temperature 0
   is not bit-deterministic with batching, so the JPEG 75 and 85 rows, near-invisible changes, are the practical floor
   here: a Δ inside them, or one whose interval crosses 0, is read as no effect. Apple Vision is deterministic.
+  Gemini's cells have n 48; its measured rerun range, 0.24 points, is the floor for the gap between its two dates.
 - **Scope:** synthetic defects on the owner's pages, one defect at a time, at the library defaults for Augraphy's four
   (ShadowCast's default shadow is faint, so its row may understate a real shadow). Not settled here: combined defects,
   real phone captures (SmartDoc-QA), the public 895, GLM-OCR on regions, the 2B segmentation student, and the
-  readers' own quality verdicts. Signal AUCs and cuts are in-sample on synthetic images: a cut for the companion app
+  open readers' own quality verdicts. Gemini's verdict was asked once per image with one prompt and is scored on
+  synthetic defects; whether it ranks real captures as well is not settled. Signal AUCs and cuts are in-sample on synthetic images: a cut for the companion app
   needs a held-out check on real captures before it ships.
 """
 
