@@ -475,3 +475,15 @@ trusted owner consent; automatic approval review remains in place.
   it does not bypass automatic approval review.
 - **W46.fix-marks-sheet-feedback-owner-ok:** stays open. The owner will review the corrected
   nine-place/seven-page sheet and supply `marks-feedback-answers.json`; no labels are inferred.
+
+## 2026-11-03 evening — walkthrough answers recorded at owner request
+
+- **W46.ocr-ppocrv6-hands-paid:** the working cap rises from $2.50 to $2.60, only so the existing
+  $0.08 reservation guard can finish the six untouched Blackwell conditions
+  (`blackwell-mss1288000967-{42,44}-n{0,8,16}`). Counted total before them is $2.427833. No failed
+  or retained attempt, pilot or repeat runs; every accounting stop stays in force.
+- **W46.seg-boxes-score:** retain the full $0.045132 allowance for the interrupted Stanton 110–116
+  request `ad638e37ed0541138c1ba94ff4ccc226` as counted, retry that exact request once, then collect
+  the 329 untouched offset windows, within the unchanged $6.80 total cap including every attempt and
+  reservation. Any new uncertain outcome still stops the run. The 2026-11-01 upload scope is unchanged.
+- **W46.fix-marks-sheet-feedback-owner-ok:** stays open; the owner will do the nine-place recheck later.
