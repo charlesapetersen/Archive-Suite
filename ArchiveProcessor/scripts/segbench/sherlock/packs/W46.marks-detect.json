@@ -1,0 +1,23 @@
+{
+  "tag": "W46.marks-detect",
+  "pack": "marks-detect-20261104",
+  "mac": "artifacts/marks-detect-20261104",
+  "submit": "submit.sh",
+  "jobs": 3,
+  "gpu_hours": 6.5,
+  "review": "execution-plans/items/W46.marks-detect.md",
+  "imports": [
+    {"dir": ".", "modules": ["marks_detect_cluster"]}
+  ],
+  "creates": [
+    "$FS_ROOT/marks-detect-20261104",
+    "$FS_ROOT/marks-detect-data",
+    "$GROUP_HOME/$USER/envs/marks-yolo",
+    "$GROUP_HOME/$USER/archive-suite/sherlock-results/marks-detect-20261104"
+  ],
+  "provenance": [],
+  "requires": [],
+  "results": "$GROUP_HOME/$USER/archive-suite/sherlock-results/marks-detect-20261104",
+  "collect": ["$FS_ROOT/marks-detect-20261104/jobs.tsv", "$FS_ROOT/marks-detect-20261104/logs"],
+  "release": "YOLO11m boxes on the 32 owner-core pages (public.json, pilot.json) and best.pt collected into the Mac artifact's results; score with marks_detect.py (add the arm) and export Core ML on the Mac (item notes)"
+}

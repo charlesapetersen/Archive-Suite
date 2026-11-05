@@ -3,6 +3,7 @@
 
   <lab venv>/bin/python marks_detect.py detect pp          # PP-DocLayoutV3 regions on the 32 truth pages
   python3 marks_detect.py report                          # segbench-results/marks-detect.{json,md}
+  python3 marks_detect.py pack --out DIR                  # the Sherlock pack (YOLO11m training, sherlock/marks-detect)
 
 Truth is the reconciled owner core (W46.fix-marks-sheet-feedback): the 32 detector-eligible pages and their
 rough boxes. Excluded pages are never read as no-mark negatives. Boxes are matched one to one, class-agnostic
@@ -204,10 +205,49 @@ def markdown(t, res):
     return "\n".join(L) + "\n"
 
 
+def pack(t, out):
+    """The Sherlock pack: the 32 evaluation images (the freeze's copies, hash-recorded), the cluster scripts and a
+    copy of the Sherlock support files. No truth box, label or text leaves the Mac."""
+    import hashlib
+    import shutil
+    out = Path(out)
+    if out.exists():
+        raise SystemExit(f"{out} exists")
+    (out / "eval" / "images").mkdir(parents=True)
+    images = {}
+    for pid in t:
+        dest = out / "eval" / "images" / f"{pid}.jpg"
+        shutil.copyfile(IMAGES / f"{pid}.jpg", dest)
+        images[pid] = hashlib.sha256(dest.read_bytes()).hexdigest()
+    (out / "eval" / "pages.json").write_text(json.dumps(sorted(t)) + "\n")
+    src = HERE / "sherlock" / "marks-detect"
+    for f in ("marks_detect_cluster.py", "setup-job.sh", "job.sh", "submit.sh"):
+        shutil.copy2(src / f, out / f)
+    sup = out / "support" / "sherlock"
+    sup.mkdir(parents=True)
+    shutil.copy2(HERE / "sherlock" / "sh.env", sup / "sh.env")
+    shutil.copytree(HERE / "sherlock" / "bin", sup / "bin")
+    code = {f: hashlib.sha256((out / f).read_bytes()).hexdigest()
+            for f in ("marks_detect_cluster.py", "setup-job.sh", "job.sh", "submit.sh")}
+    (out / "freeze.json").write_text(json.dumps(dict(tag="W46.marks-detect", pack=out.name, record=str(RECORD),
+                                                     images=images, code_sha256=code), indent=1) + "\n")
+    (out / "README.md").write_text(
+        f"# W46.marks-detect — a YOLO11m marks detector trained on AnnoPage and SignverOD\n\n"
+        f"Submit only from an owner-started Sherlock session:\n\n    bash <pack>/submit.sh <pack>\n\n"
+        f"Three jobs: CPU setup (overlay, AnnoPage 5 GB, SignverOD, dataset), a one-epoch pilot, the training "
+        f"(stopped at 6 hours). {len(t)} evaluation pages.\n"
+        f"Results: `$GROUP_HOME/$USER/archive-suite/sherlock-results/{out.name}/`.\n"
+        "Size and necessity review: `execution-plans/items/W46.marks-detect.md` in the repo.\n")
+    print(f"pack {out}: {len(t)} pages")
+
+
 def main(argv):
     t = truth()
     if argv == ["detect", "pp"]:
         detect_pp(t)
+        return 0
+    if len(argv) == 3 and argv[:2] == ["pack", "--out"]:
+        pack(t, argv[2])
         return 0
     if argv == ["split", "pp"]:
         split(json.loads((WORK / "pp-raw.json").read_text()))

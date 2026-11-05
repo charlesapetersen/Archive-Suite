@@ -40,8 +40,9 @@ layer needs its own detector or a whole-page reader. The free recall check is cl
   with access.
 - **Qwen3.6-27B boxes.** The B-core was drawn from its pre-flag, so MRK-1 allows scoring it on the A-core only,
   which has 6 boxes. That interval would run from about 0 to 100, so the arm is not sent to Sherlock.
-- **A YOLO11m trained on AnnoPage, SignverOD and synthetic crops.** A cluster job with a size review in
-  `execution-plans/items/W46.marks-detect.md`.
+- **A YOLO11m trained on AnnoPage and SignverOD.** Prepared as a Sherlock pack (`sherlock/marks-detect/`, a
+  ceiling of 6.5 GPU-hours), with its size review in `execution-plans/items/W46.marks-detect.md`. It is scored here
+  when the results come home.
 - **Claude inline tags.** Dropped (measurement audit MRK-1). Gemini's boxes and inline tags are
   W46.marks-detect-paid; Gemini 3.7 drafted every core page, so the item has to rule on whether 3.8 may be
   ranked on them.
