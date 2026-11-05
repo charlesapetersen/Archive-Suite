@@ -267,10 +267,35 @@ struct NavigationWindowView: View {
                     chooseFolderButton
                 }
                 .emptyStateBackdrop()
+            // W40.fix-reader-filter-bar (reader-1 row 8): says which filter hid the rows and offers to clear it.
             case .filteredOut:
-                ContentUnavailableView("No matches", systemImage: "line.3.horizontal.decrease.circle",
-                                       description: Text("No files match the current filters or search. Use Clear to reset."))
-                    .emptyStateBackdrop()
+                VStack(spacing: 0) {
+                    ContentUnavailableView("No matches", systemImage: "line.3.horizontal.decrease.circle",
+                                           description: Text(model.emptyListExplanation))
+                        .accessibilityElement(children: .combine)
+                        .accessibilityIdentifier("ar.empty.filteredOut")
+                    filteredOutActions.padding(.bottom, 16)
+                }
+                .emptyStateBackdrop()
+            }
+        }
+    }
+
+    /// One button per filter that alone hides the rows, then Clear All (the filter bar's Clear: a smart folder
+    /// stays, which is why leaving one is its own button when it is the cause).
+    private var filteredOutActions: some View {
+        let chips = model.activeFilterChips
+        let causes = chips.filter { model.emptyListCauses.contains($0.facet) }
+        return VStack(spacing: 6) {
+            ForEach(causes) { chip in
+                Button(chip.facet == .smartFolder ? "Leave \(chip.label)" : "Clear \(chip.label)") {
+                    model.removeFilter(chip.facet)
+                }
+                .accessibilityIdentifier("ar.empty.clear.\(chip.accessibilityIdentifier)")
+            }
+            if chips.contains(where: { $0.facet != .smartFolder }) {
+                Button("Clear All Filters") { model.clearUserFilters() }
+                    .accessibilityIdentifier("ar.empty.clearAll")
             }
         }
     }
@@ -374,14 +399,36 @@ struct NavigationWindowView: View {
     /// W40.fix-reader-filter-focus): `ViewThatFits` shows one copy at a time, so when Save/Clear appear (the first
     /// character typed into the file-name filter, say) and the bar no longer fits its copy, it swaps in another, the
     /// text fields are rebuilt and the one being typed in loses the keyboard. Here they keep their identity.
+    ///
+    /// W40.fix-reader-filter-bar (reader-1 rows 7, 8): the file-name and OCR fields have their own row, a size
+    /// larger, and under them every filter and search in effect is a removable chip. Each row is a sibling in the
+    /// stack, so the chip row appearing (the first character typed) does not rebuild the field being typed in.
     private var filterBar: some View {
-        FilterBarLayout(spacing: 12) {
-            // each group wraps whole, as the rows did before: what the documents are, then what they contain
-            HStack(spacing: 12) { filterBarQueryControls }
-            HStack(spacing: 12) { filterBarSearchControls }
-            filterBarTrailingButtons
+        VStack(alignment: .leading, spacing: 8) {
+            FilterBarLayout(spacing: 12) {
+                HStack(spacing: 12) { filterBarQueryControls }
+                filterBarTrailingButtons
+            }
+            filterBarSearchControls
+            let chips = model.activeFilterChips
+            if !chips.isEmpty { activeFilterChipRow(chips) }
         }
         .padding(8)
+    }
+
+    private func activeFilterChipRow(_ chips: [ActiveFilterChip]) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            Text("In effect:").foregroundStyle(.secondary).font(.callout)
+                .accessibilityHidden(true)
+            FlowLayout(spacing: 6) {
+                ForEach(chips) { chip in
+                    ActiveFilterChipView(chip: chip) { model.removeFilter(chip.facet) }
+                }
+            }
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Filters in effect")
+        .accessibilityIdentifier("ar.filter.chips")
     }
 
     /// Read state, quality, tags and dates: what the documents are.
@@ -431,61 +478,41 @@ struct NavigationWindowView: View {
         .popover(isPresented: $showingDateFilter) { dateFilterPopover }
     }
 
-    /// File name, OCR text and the needs-attention toggle: finding documents by what they contain.
-    @ViewBuilder
+    /// File name and OCR text: finding documents by what they contain, on their own row (W40.fix-reader-filter-bar).
+    /// The two health filters, turned on from the Library health popover (W40.fix-reader-health-counts), show as
+    /// chips in the row below while on.
     private var filterBarSearchControls: some View {
-        TextField("Filter file name…", text: $model.filterSearchText)
-            .textFieldStyle(.roundedBorder)
-            .frame(minWidth: 90, maxWidth: 160)   // a full bar must not squeeze it to nothing
-            .help("Filter the list by file name")
-            .accessibilityLabel("Filter file name")
-            .accessibilityIdentifier("ar.filter.name")
-
-        HStack(spacing: 3) {
-            Image(systemName: "text.magnifyingglass")
-                .foregroundStyle(model.ftsPaths != nil ? Color.accentColor : .secondary)
-                .accessibilityHidden(true)
-            TextField("Search OCR text…", text: $model.fullTextQuery)
+        HStack(spacing: 12) {
+            TextField("Filter file name…", text: $model.filterSearchText)
                 .textFieldStyle(.roundedBorder)
-                .frame(minWidth: 100, maxWidth: 180)
-                .focused($searchFocused)
-                .help("Search the full OCR text of documents")
-                .accessibilityLabel("Search OCR text")
-                .accessibilityIdentifier("ar.filter.ocr")
-            if model.ftsPaths != nil {
-                Button { model.fullTextQuery = ""; model.runFullTextSearch() } label: {
-                    Image(systemName: "xmark.circle.fill")
+                .controlSize(.large)
+                .frame(minWidth: 140, idealWidth: 260, maxWidth: 300)   // a narrow window must not squeeze it to nothing
+                .help("Filter the list by file name")
+                .accessibilityLabel("Filter file name")
+                .accessibilityIdentifier("ar.filter.name")
+
+            HStack(spacing: 4) {
+                Image(systemName: "text.magnifyingglass")
+                    .foregroundStyle(model.ftsPaths != nil ? Color.accentColor : .secondary)
+                    .accessibilityHidden(true)
+                TextField("Search OCR text…", text: $model.fullTextQuery)
+                    .textFieldStyle(.roundedBorder)
+                    .controlSize(.large)
+                    .frame(minWidth: 160, idealWidth: 320, maxWidth: 380)
+                    .focused($searchFocused)
+                    .help("Search the full OCR text of documents")
+                    .accessibilityLabel("Search OCR text")
+                    .accessibilityIdentifier("ar.filter.ocr")
+                if model.ftsPaths != nil {
+                    Button { model.removeFilter(.text) } label: {
+                        Image(systemName: "xmark.circle.fill")
+                    }
+                    .buttonStyle(.borderless)
+                    .help("Clear full-text search")
+                    .accessibilityIdentifier("ar.filter.ocrClear")
                 }
-                .buttonStyle(.borderless)
-                .help("Clear full-text search")
-                .accessibilityIdentifier("ar.filter.ocrClear")
             }
-        }
-
-        // W40.fix-reader-health-counts (reader-1 row 2): the two health filters are turned on from the Library
-        // health popover, and show here only while on, so the bar is not a standing reminder of the counts and an
-        // active filter can still be seen and turned off.
-        if model.filter.needsAttentionOnly {
-            Toggle(isOn: $model.filter.needsAttentionOnly) {
-                Label("\(model.needsAttentionCount) need attention", systemImage: "exclamationmark.triangle")
-            }
-            .toggleStyle(.button)
-            .controlSize(.small)
-            .fixedSize()
-            .help("Show only non-standard PDFs — files that couldn't be opened, or have no selectable text")
-            .accessibilityIdentifier("ar.filter.needsAttention")
-        }
-
-        if model.filter.ambiguousDatesOnly {
-            Toggle(isOn: $model.filter.ambiguousDatesOnly) {
-                Label("\(model.ambiguousDateCount) ambiguous date\(model.ambiguousDateCount == 1 ? "" : "s")",
-                      systemImage: "calendar.badge.exclamationmark")
-            }
-            .toggleStyle(.button)
-            .controlSize(.small)
-            .fixedSize()
-            .help("Show only files with two tags for one date (two Years, Months, Days, Decades or Sent With dates)")
-            .accessibilityIdentifier("ar.filter.ambiguousDates")
+            Spacer(minLength: 0)
         }
     }
 
@@ -716,10 +743,6 @@ struct NavigationWindowView: View {
                     .help(f.detail)
                     .accessibilityIdentifier("ar.status.discoveryFailure")
             }
-            if let summary = model.activeFilterSummary {
-                Text("· \(summary)").foregroundStyle(.primary).lineLimit(1).truncationMode(.tail)
-                    .help("Active filter")
-            }
             if let p = model.indexingProgress {
                 ProgressView(value: Double(p.done), total: Double(max(1, p.total))).frame(width: 70)
                 Text("Indexing \(p.done)/\(p.total)").foregroundStyle(.primary)
@@ -791,6 +814,31 @@ private extension View {
             .frame(maxWidth: 440)
             .padding(.vertical, 8)
             .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
+    }
+}
+
+/// One filter or search in effect (W40.fix-reader-filter-bar). The whole chip is its ✕, one control for the
+/// keyboard and VoiceOver as for the mouse.
+private struct ActiveFilterChipView: View {
+    let chip: ActiveFilterChip
+    let remove: () -> Void
+    var body: some View {
+        Button(action: remove) {
+            HStack(spacing: 4) {
+                Text(chip.label).lineLimit(1).truncationMode(.middle)
+                Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
+            }
+            .font(.callout)
+            .padding(.horizontal, 8).padding(.vertical, 3)
+            .background(Capsule().fill(Color.accentColor.opacity(0.15)))
+            .overlay(Capsule().strokeBorder(Color.accentColor.opacity(0.45)))
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .frame(maxWidth: 320)
+        .help("In effect: \(chip.phrase). Click to remove it.")
+        .accessibilityLabel("Remove \(chip.label)")
+        .accessibilityIdentifier(chip.accessibilityIdentifier)
     }
 }
 

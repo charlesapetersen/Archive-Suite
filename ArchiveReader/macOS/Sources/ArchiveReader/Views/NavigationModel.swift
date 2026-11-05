@@ -367,31 +367,6 @@ final class NavigationModel: ObservableObject {
         return parts.isEmpty ? "Smart Folder" : parts.joined(separator: " \u{b7} ")
     }
 
-    /// A human-readable summary of the active filter for the status bar (nil when nothing is filtered).
-    var activeFilterSummary: String? {
-        let f = effectiveFilter
-        var parts: [String] = []
-        if let scope { parts.append("[\(scope.name)]") }
-        switch f.read {
-        case .all: break
-        case .read: parts.append("Read")
-        case .unread: parts.append("Unread")
-        case .noReadState: parts.append("No read-state")
-        }
-        if !f.qualities.isEmpty {
-            parts.append(f.qualities.sorted().map { "Q\($0)" }.joined(separator: "/"))
-        }
-        if let years = f.dateYearsSummary { parts.append(years) }
-        if !f.subjects.isEmpty {
-            parts.append("tags: " + f.subjects.sorted().joined(separator: f.subjectCombine == .all ? " + " : " / "))
-        }
-        if let p = f.pathPrefix, !p.isEmpty { parts.append("folder: " + URL(fileURLWithPath: p).lastPathComponent) }
-        let fn = f.searchText.trimmingCharacters(in: .whitespaces)
-        if !fn.isEmpty { parts.append("name: \(fn)") }
-        let q = effectiveFullTextQuery.trimmingCharacters(in: .whitespaces)
-        if !q.isEmpty { parts.append("text: \u{201c}\(q)\u{201d}") }
-        return parts.isEmpty ? nil : parts.joined(separator: " \u{b7} ")
-    }
 
     /// Enter a smart-folder scope: the saved search becomes the visible universe; user filters reset.
     func applyScope(_ search: SavedSearch) {
@@ -593,19 +568,10 @@ final class NavigationModel: ObservableObject {
         // Counted after the exclusion, so the toggle never offers files no filter can list.
         let ambiguous = base.reduce(0) { $0 + ($1.dateIsAmbiguous ? 1 : 0) }
         if ambiguous != ambiguousDateCount { ambiguousDateCount = ambiguous }
-        // Base scope = the visible universe (smart folder). User filter layers on top.
-        if let scope {
-            base = base.filter(scope.filter.matches)
-            if let baseFtsPaths { base = base.filter { baseFtsPaths.contains($0.path) } }
-            if scope.filter.needsAttentionOnly {
-                base = base.filter { formatStatuses[$0.path]?.needsAttention == true }
-            }
-        }
-        base = base.filter(filter.matches)
-        if let ftsPaths { base = base.filter { ftsPaths.contains($0.path) } }
-        if filter.needsAttentionOnly {
-            base = base.filter { formatStatuses[$0.path]?.needsAttention == true }
-        }
+        let universe = base
+        base = base.filter(rowPredicate(scope: scope, filter: filter, ftsPaths: ftsPaths))
+        let causes = base.isEmpty ? emptyCauses(in: universe) : []
+        if causes != emptyListCauses { emptyListCauses = causes }
         if let ftsRank, sort.first?.field == .relevance {
             // bm25 relevance ordering: sort by the rank map (0 = best match).
             displayed = base.sorted { (ftsRank[$0.path] ?? Int.max) < (ftsRank[$1.path] ?? Int.max) }
@@ -619,6 +585,73 @@ final class NavigationModel: ObservableObject {
         if !showingEditor { pruneSelectionToDisplayed() }
         refreshSelectionCache()   // sort order affects the selection cache too
         persistViewState()        // C2: remember filter + sort across launches
+    }
+
+    /// Whether a row is listed. The base scope (smart folder) is the visible universe; the user filter layers on
+    /// top, the OCR search and the needs-attention status (both from the content index) beside it.
+    private func rowPredicate(scope: SavedSearch?, filter: LibraryFilter,
+                              ftsPaths: Set<String>?) -> (ArchiveFile) -> Bool {
+        let baseFts = scope == nil ? nil : baseFtsPaths
+        let statuses = formatStatuses
+        return { file in
+            if let scope {
+                guard scope.filter.matches(file) else { return false }
+                if let baseFts, !baseFts.contains(file.path) { return false }
+                if scope.filter.needsAttentionOnly, statuses[file.path]?.needsAttention != true { return false }
+            }
+            guard filter.matches(file) else { return false }
+            if let ftsPaths, !ftsPaths.contains(file.path) { return false }
+            if filter.needsAttentionOnly, statuses[file.path]?.needsAttention != true { return false }
+            return true
+        }
+    }
+
+    // MARK: What is in effect (W40.fix-reader-filter-bar)
+
+    /// Every filter and search in effect, as the filter bar's chip row shows them.
+    var activeFilterChips: [ActiveFilterChip] {
+        ActiveFilterChip.chips(filter: filter, smartFolderName: scope?.name,
+                               fullTextQuery: ftsPaths == nil ? nil : fullTextQuery)
+    }
+
+    /// While the filters hide every row: the chips that, removed alone, would bring rows back. A location (the
+    /// folder, the smart folder) is blamed only when nothing else alone is, since it says where the list looks,
+    /// not what for; searching a name and then choosing another folder blames the name.
+    @Published private(set) var emptyListCauses: [FilterFacet] = []
+
+    private func emptyCauses(in universe: [ArchiveFile]) -> [FilterFacet] {
+        guard !universe.isEmpty else { return [] }
+        func bringsRowsBack(_ facet: FilterFacet) -> Bool {
+            let pred = rowPredicate(scope: facet == .smartFolder ? nil : scope, filter: filter.removing(facet),
+                                    ftsPaths: facet == .text ? nil : ftsPaths)
+            return universe.contains(where: pred)
+        }
+        let facets = activeFilterChips.map(\.facet)
+        let causes = facets.filter { !$0.isLocation && bringsRowsBack($0) }
+        return causes.isEmpty ? facets.filter { $0.isLocation && bringsRowsBack($0) } : causes
+    }
+
+    /// The empty list's sentence, naming what hides the rows.
+    var emptyListExplanation: String {
+        ActiveFilterChip.emptyExplanation(chips: activeFilterChips, causes: emptyListCauses)
+    }
+
+    /// A chip's ✕: turn that one filter or search off, leaving the rest.
+    func removeFilter(_ facet: FilterFacet) {
+        switch facet {
+        case .smartFolder:
+            scope = nil; baseFtsGeneration += 1; baseFtsPaths = nil
+        case .text:
+            fullTextQuery = ""
+            runFullTextSearch()   // the reset: bumps the generation, restores the sort
+            ftsPaths = nil; ftsRank = nil; ftsSnippets = [:]
+        case .name:
+            filterSearchText = ""
+            filter = filter.removing(facet)
+        default:
+            filter = filter.removing(facet)
+        }
+        recompute()
     }
 
     /// The marks `displayed` was sorted with, so the selection cache sorts the same way without rebuilding them on
