@@ -319,6 +319,12 @@ final class ContentIndexer: ObservableObject {
         return await index.searchRanked(query, snippetLimit: snippetLimit)
     }
 
+    /// The snippets `searchRanked` left out, for the hits the list is showing (see `ContentIndex.snippets`).
+    func snippets(_ query: String, for paths: [String]) async -> (snippets: [String: String], attempted: Int) {
+        guard await openForQuery() else { return ([:], 0) }
+        return await index.snippets(query, for: paths)
+    }
+
     /// Classification (`Document Start`/`Continuation`/`Box`/`Folder`) per path, where indexed.
     func classifications(for paths: [String]) async -> [String: String] {
         guard await openForQuery() else { return [:] }

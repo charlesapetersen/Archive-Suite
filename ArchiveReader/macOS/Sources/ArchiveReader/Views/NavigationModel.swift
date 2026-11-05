@@ -91,6 +91,24 @@ final class NavigationModel: ObservableObject {
     /// top-ranked hits of the active full-text query. Empty when no query is active. The list reads it
     /// via `searchSnippet(for:)` to render a preview line under matching rows.
     @Published private(set) var ftsSnippets: [String: String] = [:]
+    /// The hits `searchRanked` gave no snippet (past its cap or its time budget) are filled in as their
+    /// rows are drawn (W40.fix-reader-fts-snippets): `searchSnippet(for:)` queues the path, and one task at a
+    /// time asks the index for a batch, newest request first so the rows on screen come before rows already
+    /// scrolled past. `snippetFill` is reset whenever a new result is published.
+    private struct SnippetFill {
+        var resultGeneration = 0     // the `ftsGeneration` whose result the fill belongs to
+        var query = ""
+        var pending: [String] = []
+        var queued: Set<String> = []  // in `pending`, or already asked for: never asked twice
+        var running = false
+    }
+    private var snippetFill = SnippetFill()
+    /// Bumped after each filled batch, so the table reloads its visible rows (it skips reloads otherwise).
+    private(set) var snippetFillGeneration = 0
+    /// Rows asked for in one call to the index; the index's own time budget bounds the call as well.
+    nonisolated static let snippetFillBatch = 40
+    /// How many top hits the search itself gives snippets to; the rest are filled in. A test sets it low.
+    var ftsSnippetLimit = 300
     /// Page-2 `Classification:` values published by the disposable content index for nav-row display.
     /// Missing/unindexed rows stay absent and render as an em dash; classification never drives a write.
     @Published private(set) var classifications: [String: String] = [:]
@@ -695,12 +713,14 @@ final class NavigationModel: ObservableObject {
         }
         Task { [weak self] in
             guard let self else { return }
-            let result: ContentIndex.RankedSearch? = q.isEmpty ? nil : await self.indexer.searchRanked(q)
+            let result: ContentIndex.RankedSearch? = q.isEmpty
+                ? nil : await self.indexer.searchRanked(q, snippetLimit: self.ftsSnippetLimit)
             guard generation == self.ftsGeneration else { return }   // superseded by a newer search
             if let result {
                 self.ftsPaths = Set(result.paths)
                 self.ftsRank = Dictionary(uniqueKeysWithValues: result.paths.enumerated().map { ($1, $0) })
                 self.ftsSnippets = result.snippets
+                self.snippetFill = SnippetFill(resultGeneration: generation, query: q)
             } else {
                 self.ftsPaths = nil
                 self.ftsRank = nil
@@ -711,13 +731,47 @@ final class NavigationModel: ObservableObject {
     }
 
     /// Highlight segments for the active query's keyword-in-context snippet of `path`, or `nil` when
-    /// there is no active full-text query, no snippet for the path (a deep hit past the snippet cap, or
-    /// an empty-body doc), or the snippet carries no highlighted match. The list cell renders the
-    /// returned runs as a dimmed second line under the file name.
+    /// there is no active full-text query, no snippet for the path yet (one the search left out is then
+    /// queued, and arrives with a later table reload), an empty-body doc, or the snippet carries no
+    /// highlighted match. The list cell renders the returned runs as a dimmed second line under the name.
     func searchSnippet(for path: String) -> [SearchSnippet.Segment]? {
-        guard ftsPaths != nil, let raw = ftsSnippets[path], !raw.isEmpty else { return nil }
+        guard let hits = ftsPaths else { return nil }
+        guard let raw = ftsSnippets[path], !raw.isEmpty else {
+            if hits.contains(path) { requestSnippet(for: path) }
+            return nil
+        }
         let segments = SearchSnippet.segments(from: raw)
         return SearchSnippet.hasMatch(segments) ? segments : nil
+    }
+
+    private func requestSnippet(for path: String) {
+        // Only for the result on screen: between a new query and its result the old hits are still shown.
+        guard snippetFill.resultGeneration == ftsGeneration, !snippetFill.query.isEmpty,
+              snippetFill.queued.insert(path).inserted else { return }
+        snippetFill.pending.append(path)
+        guard !snippetFill.running else { return }
+        snippetFill.running = true
+        Task { [weak self] in await self?.fillSnippets() }
+    }
+
+    /// Drains `snippetFill.pending` a batch at a time, off the main thread in the index actor. Stops when
+    /// the queue is empty or a newer result replaced the one it was filling.
+    private func fillSnippets() async {
+        let generation = snippetFill.resultGeneration, query = snippetFill.query
+        while snippetFill.resultGeneration == generation, !snippetFill.pending.isEmpty {
+            let batch = Array(snippetFill.pending.suffix(Self.snippetFillBatch).reversed())
+            snippetFill.pending.removeLast(batch.count)
+            let filled = await indexer.snippets(query, for: batch)
+            guard snippetFill.resultGeneration == generation, ftsGeneration == generation else { return }
+            // What the time budget did not reach goes back on the queue, still first in line.
+            snippetFill.pending.append(contentsOf: batch[filled.attempted...].reversed())
+            if !filled.snippets.isEmpty {
+                ftsSnippets.merge(filled.snippets) { old, _ in old }
+                snippetFillGeneration += 1
+            }
+            if filled.attempted == 0 { break }   // the index is unavailable; rows simply stay without one
+        }
+        if snippetFill.resultGeneration == generation { snippetFill.running = false }
     }
 
     /// Re-run any active full-text search after an index pass completes (Part B: search-during-index

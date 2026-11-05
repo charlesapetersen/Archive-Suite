@@ -208,7 +208,8 @@ actor ContentIndex {
         /// the order for `.relevance` sorting, so it must NOT be truncated (a bound here would drop hits).
         let paths: [String]
         /// Marked KWIC snippet (see `SearchSnippet`) per path, for the top `snippetLimit` matches only.
-        /// Absent for deeper matches (rows past the limit simply show no preview — a graceful degrade).
+        /// Absent for deeper matches and for those the time budget did not reach; the list fills those in
+        /// with `snippets(_:for:)` as their rows come into view.
         let snippets: [String: String]
     }
 
@@ -223,7 +224,30 @@ actor ContentIndex {
         guard !hits.isEmpty else { return RankedSearch(paths: [], snippets: [:]) }
         let top = Array(hits.prefix(max(0, snippetLimit)))
         return RankedSearch(paths: hits.map { $0.path },
-                            snippets: snippetMap(query: query, hits: top, budget: snippetBudget))
+                            snippets: snippetMap(query: query, hits: top, budget: snippetBudget).snippets)
+    }
+
+    /// The snippets `searchRanked` left out, filled in afterwards for the rows the list shows
+    /// (W40.fix-reader-fts-snippets). `paths` are hits of `query`, in the order to serve them; work stops
+    /// after `budget` seconds, as in `searchRanked`. `attempted` is how many of `paths`, from the front, were
+    /// looked at — those without an entry in `snippets` have none to give (no body text, an unindexed path),
+    /// and the rest are for the caller to ask for again.
+    func snippets(_ query: String, for paths: [String],
+                  budget: TimeInterval = SearchSnippet.timeBudget) -> (snippets: [String: String], attempted: Int) {
+        guard !paths.isEmpty,
+              let stmt = prepare("SELECT rowid FROM files WHERE path = ?;") else { return ([:], 0) }
+        var hits: [(rowid: Int64, path: String)] = []
+        for path in paths {
+            sqlite3_reset(stmt); sqlite3_clear_bindings(stmt)
+            bindText(stmt, 1, path)
+            if sqlite3_step(stmt) == SQLITE_ROW { hits.append((sqlite3_column_int64(stmt, 0), path)) }
+        }
+        sqlite3_finalize(stmt)
+        let filled = snippetMap(query: query, hits: hits, budget: budget)
+        guard filled.attempted < hits.count else { return (filled.snippets, paths.count) }
+        // Stopped early: everything in `paths` before the first unattempted hit counts as looked at.
+        let nextPath = hits[filled.attempted].path
+        return (filled.snippets, paths.firstIndex(of: nextPath) ?? paths.count)
     }
 
     /// KWIC `snippet()` of the **body** column (index 0) for each of `hits`, keyed by path. One prepared
@@ -232,17 +256,20 @@ actor ContentIndex {
     /// clock before each row: rows left when `budget` runs out get no snippet. The expression is
     /// `snippetMatchExpression`, which every hit satisfies. Empty snippets (e.g. an image-only doc with no
     /// body text) are dropped. Terms are wrapped in `SearchSnippet` marks for the UI to emphasise.
+    /// `attempted` counts the hits looked at before the budget ran out (all of them when it did not).
     private func snippetMap(query: String, hits: [(rowid: Int64, path: String)],
-                            budget: TimeInterval) -> [String: String] {
+                            budget: TimeInterval) -> (snippets: [String: String], attempted: Int) {
         let match = snippetMatchExpression(query)
-        guard !match.isEmpty, !hits.isEmpty else { return [:] }
+        guard !match.isEmpty, !hits.isEmpty else { return ([:], hits.count) }
         let sql = "SELECT snippet(fts, 0, ?, ?, ?, ?) FROM fts WHERE fts MATCH ? AND rowid = ?;"
-        guard let stmt = prepare(sql) else { return [:] }
+        guard let stmt = prepare(sql) else { return ([:], hits.count) }
         defer { sqlite3_finalize(stmt) }
         let deadline = DispatchTime.now().uptimeNanoseconds + UInt64(max(0, budget) * 1e9)
         var out: [String: String] = [:]
+        var attempted = 0
         for hit in hits {
             guard DispatchTime.now().uptimeNanoseconds < deadline else { break }
+            attempted += 1
             sqlite3_reset(stmt); sqlite3_clear_bindings(stmt)
             // Placeholder order: 1–4 = snippet marks/ellipsis/tokens, 5 = MATCH expr, 6 = the rowid.
             bindText(stmt, 1, SearchSnippet.openMark)
@@ -255,7 +282,7 @@ actor ContentIndex {
             let snip = sqlite3_column_text(stmt, 0).map { String(cString: $0) } ?? ""
             if !snip.isEmpty { out[hit.path] = snip }
         }
-        return out
+        return (out, attempted)
     }
 
     func classifications(for paths: [String]) -> [String: String] {

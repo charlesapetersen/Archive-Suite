@@ -198,6 +198,24 @@ struct AppKitTableView: NSViewRepresentable {
             }
         }
 
+        // Search snippets filled in after the hits were listed (W40.fix-reader-fts-snippets): redraw the
+        // visible rows, which are the ones that asked, and let the rows that gained a line grow.
+        if coordinator.lastSnippetFillGeneration != model.snippetFillGeneration {
+            coordinator.lastSnippetFillGeneration = model.snippetFillGeneration
+            let visRange = tableView.rows(in: tableView.visibleRect)
+            if visRange.length > 0 {
+                var rowSet = IndexSet(integersIn: visRange.location..<NSMaxRange(visRange))
+                if let editID = coordinator.editingItemID, let editIdx = coordinator.rowByID[editID] {
+                    rowSet.remove(editIdx)
+                }
+                if !rowSet.isEmpty {
+                    tableView.reloadData(forRowIndexes: rowSet,
+                                         columnIndexes: IndexSet(integersIn: 0..<tableView.numberOfColumns))
+                    tableView.noteHeightOfRows(withIndexesChanged: rowSet)
+                }
+            }
+        }
+
         // Selection sync (SwiftUI → AppKit). Also after the rows change: the highlight is row indices,
         // and a new snapshot shifts or drops them while the model's selection stays the same, so the
         // `lastPushedSelection` check alone left a selection unhighlighted — the "2 selected", nothing highlighted, of
@@ -240,6 +258,7 @@ struct AppKitTableView: NSViewRepresentable {
         var isSortingFromModel = false
         var lastScrollRequest = 0
         var lastDisplayedGeneration: Int = -1
+        var lastSnippetFillGeneration: Int = 0
         private(set) var currentSnapshotIDs: [ArchiveFile.ID] = []
         /// Each id's row in `currentSnapshotIDs`, rebuilt only when the snapshot changes.
         private(set) var rowByID: [ArchiveFile.ID: Int] = [:]

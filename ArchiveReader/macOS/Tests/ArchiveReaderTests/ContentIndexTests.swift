@@ -403,6 +403,35 @@ final class ContentIndexTests: XCTestCase {
         await idx.close()
     }
 
+    /// W40.fix-reader-fts-snippets: the hits the search left without a preview get one afterwards, by path.
+    /// A path with no body text or no row is answered (counted as attempted) with no snippet, so the list
+    /// does not ask for it again; out of time, nothing is attempted and the caller asks again later.
+    func testSnippetsForPathsFillWhatTheSearchLeftOut() async throws {
+        let (idx, url) = makeIndex(); defer { try? FileManager.default.removeItem(at: url) }
+        try await idx.open()
+        for i in 0..<5 {
+            try await idx.upsert(path: "/f\(i).pdf", mtime: 1, name: "f\(i)", classification: nil,
+                                 body: "commonterm in document \(i)")
+        }
+        try await idx.upsert(path: "/commonterm-empty.pdf", mtime: 1, name: "commonterm empty",
+                             classification: nil, body: "")   // a name hit with no body to quote
+        let ranked = await idx.searchRanked("commonterm", snippetBudget: 0)
+        XCTAssertEqual(ranked.paths.count, 6)
+        XCTAssertTrue(ranked.snippets.isEmpty, "precondition: the search gave no previews")
+
+        let asked = ranked.paths + ["/not-indexed.pdf"]
+        let filled = await idx.snippets("commonterm", for: asked)
+        XCTAssertEqual(filled.attempted, asked.count)
+        XCTAssertEqual(Set(filled.snippets.keys), Set((0..<5).map { "/f\($0).pdf" }))
+        for snip in filled.snippets.values {
+            XCTAssertTrue(SearchSnippet.hasMatch(SearchSnippet.segments(from: snip)), snip)
+        }
+        let outOfTime = await idx.snippets("commonterm", for: asked, budget: 0)
+        XCTAssertEqual(outOfTime.attempted, 0)
+        XCTAssertTrue(outOfTime.snippets.isEmpty)
+        await idx.close()
+    }
+
     func testClassificationParsing() {
         let page2 = "Extracted text.\n00023 IMG — Brown.jpg\nGemini · Gemini 2.5 · 19 June 2026\nClassification: Document Start\nINTRODUCTION"
         XCTAssertEqual(PDFHeaderParser.parseClassification(from: page2), "Document Start")
