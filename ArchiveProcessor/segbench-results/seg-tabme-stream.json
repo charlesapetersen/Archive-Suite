@@ -1,0 +1,15 @@
+{
+ "repo": "bevaya/TABMEpp",
+ "revision": "46747c21eae9d2b0d138554aedf4af4980520711",
+ "shards": {
+  "data/test-00000-of-00002.parquet": "541ad1237eedee38142029732d66d8a99d32e1161f0b36ca8851371660209641",
+  "data/test-00001-of-00002.parquet": "3a6528ee6942c4295694e8dc216b93996c86de7881c356ffaf992af718bd2bf9"
+ },
+ "pages": 6237,
+ "documents": 2238,
+ "gaps": 6236,
+ "boundaries": 2237,
+ "single_page_documents": 1216,
+ "blank_ocr_pages": 24,
+ "stream_sha256": "241d4b2384341eb41971efd2df615b5b22abf84985aea0a0e0014cc4c39a527d"
+}
