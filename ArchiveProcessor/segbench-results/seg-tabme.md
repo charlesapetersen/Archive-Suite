@@ -103,4 +103,4 @@ The batch used about 6.1 GPU-hours of the 8-hour ceiling (sacct, including start
   student-to-teacher gap on the owner's boxes (2.0 points) is one run per model and inside that box's floor.
 - **Scope.** One genre of clean 20th-century business scans with one catalogue's document rule. It does not say how
   the students do on other users' photographed or handwritten boxes, nor what a per-collection adaptation buys
-  (`W46.seg-adapt-lora`). The paid Gemini arm at A04's own settings is `W46.seg-tabme-paid`.
+  (`W46.seg-adapt-lora`). Gemini on the stream's first 504 pages, with and without images, is `seg-tabme-gateway.md` (W46.seg-tabme-paid).

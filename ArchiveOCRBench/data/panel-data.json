@@ -28120,7 +28120,100 @@
   ],
   "pages": 6237,
   "documents": 2238,
-  "gaps": 6236
+  "gaps": 6236,
+  "gateway": {
+   "subset": {
+    "pages": 504,
+    "documents": 203,
+    "single_page_share": 0.6206896551724138,
+    "mean_pages": 2.4827586206896552,
+    "longest": 18
+   },
+   "cost": 2.5922,
+   "rows": [
+    {
+     "arm": "gemini-k7-it",
+     "boundary_f1": 0.8820960698689956,
+     "pages_exact": 0.6448412698412699,
+     "doc_f1": 0.7565217391304349,
+     "false_splits": 54,
+     "false_merges": 0,
+     "interval": [
+      0.8336755646817249,
+      0.926605504587156
+     ]
+    },
+    {
+     "arm": "gemini-k7-t",
+     "boundary_f1": 0.8977777777777778,
+     "pages_exact": 0.6527777777777778,
+     "doc_f1": 0.7787610619469026,
+     "false_splits": 46,
+     "false_merges": 0,
+     "interval": [
+      0.8523206751054853,
+      0.9395348837209302
+     ]
+    },
+    {
+     "arm": "2b-it",
+     "boundary_f1": 0.8463157894736842,
+     "pages_exact": 0.5853174603174603,
+     "doc_f1": 0.7169811320754716,
+     "false_splits": 72,
+     "false_merges": 1,
+     "interval": [
+      0.7858546168958742,
+      0.905829596412556
+     ]
+    },
+    {
+     "arm": "4b-it",
+     "boundary_f1": 0.8535031847133758,
+     "pages_exact": 0.6329365079365079,
+     "doc_f1": 0.7399577167019028,
+     "false_splits": 68,
+     "false_merges": 1,
+     "interval": [
+      0.7852998065764023,
+      0.9160997732426304
+     ]
+    },
+    {
+     "arm": "teacher-it",
+     "boundary_f1": 0.8154158215010142,
+     "pages_exact": 0.5734126984126984,
+     "doc_f1": 0.6909090909090909,
+     "false_splits": 90,
+     "false_merges": 1,
+     "interval": [
+      0.7362637362637363,
+      0.8898678414096917
+     ]
+    },
+    {
+     "arm": "teacher-t",
+     "boundary_f1": 0.8481012658227848,
+     "pages_exact": 0.6408730158730159,
+     "doc_f1": 0.7394957983193278,
+     "false_splits": 71,
+     "false_merges": 1,
+     "interval": [
+      0.7777777777777778,
+      0.9136363636363637
+     ]
+    },
+    {
+     "arm": "all-new",
+     "boundary_f1": 0.573049645390071,
+     "pages_exact": 0.25,
+     "doc_f1": 0.3564356435643564,
+     "false_splits": 301,
+     "false_merges": 0,
+     "interval": null
+    }
+   ]
+  }
  },
  "seg_kit_gate_sherlock": {
   "sc0122_owner": {
