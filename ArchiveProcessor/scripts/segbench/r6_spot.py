@@ -4,6 +4,7 @@
   r6_spot.py run azure|textract # one call per page; a reservation survives interruption and is never retried
   r6_spot.py report            # scores beside the panel's routes on the same 25 -> stdout (markdown)
   r6_spot.py transkribus-pack  # copy the 25 images and an instruction sheet for the owner's hand upload
+                               # (report also scores its PAGE XML export, in the export's own reading order)
 
 Azure: prebuilt-layout (text in reading order, paragraphs, per-span handwriting style), F0 free tier, $0.
 Textract: AnalyzeDocument LAYOUT + one QUERY ("the document's date"), $4 + $15 per 1,000 pages at list, so
@@ -202,6 +203,43 @@ def textract_date(got):
     return '', None
 
 
+PAGE_NS = {'p': 'http://schema.primaresearch.org/PAGE/gts/pagecontent/2013-07-15'}
+
+
+def transkribus_pages():
+    """{page id: PAGE XML path} from the owner's export, keyed by the image the pack uploaded (0001_p005.jpg)."""
+    import xml.etree.ElementTree as ET
+    out = {}
+    for f in sorted((CACHE / 'transkribus-pack' / 'export').glob('*/*/page/*.xml')):
+        img = ET.parse(f).getroot().find('p:Page', PAGE_NS).get('imageFilename')
+        m = re.fullmatch(r'(?:\d+_)?(p\d+)\.jpg', img)
+        assert m and m.group(1) not in out, (f, img)
+        out[m.group(1)] = f
+    return out
+
+
+def transkribus_text(path, hyphen=True):
+    """Lines in the export's reading order: regions by ReadingOrder, lines by their readingOrder index.
+    Transkribus writes a line-end hyphen as '¬'; the truth keeps the printed hyphen ('pre- sent'), so it is
+    mapped back to '-' unless hyphen=False."""
+    import xml.etree.ElementTree as ET
+    page = ET.parse(path).getroot().find('p:Page', PAGE_NS)
+    regions = {r.get('id'): r for r in page.iter('{%s}TextRegion' % PAGE_NS['p'])}
+    order = [x.get('regionRef') for x in sorted(page.iterfind('p:ReadingOrder//p:RegionRefIndexed', PAGE_NS),
+                                                key=lambda x: int(x.get('index')))]
+    order += [i for i in regions if i not in order]
+    idx = lambda e, n: int(m.group(1)) if (m := re.search(r'readingOrder \{index:(\d+);', e.get('custom', ''))) else n
+    lines = []
+    for rid in order:
+        tl = list(regions[rid].iterfind('p:TextLine', PAGE_NS))
+        for _, _, line in sorted((idx(t, n), n, t) for n, t in enumerate(tl)):
+            u = line.find('p:TextEquiv/p:Unicode', PAGE_NS)
+            if u is not None and u.text:
+                lines.append(u.text)
+    text = '\n'.join(lines)
+    return text.replace('¬', '-') if hyphen else text
+
+
 def decades(tags):
     return {int(d) for d in re.findall(r'\b(1[5-9]\d0|20[0-2]0)s\b', tags)}
 
@@ -211,6 +249,9 @@ def cmd_report():
     sel = selection()['jobs']; ids = {j['id'] for j in sel}
     by_page = {r['page']: r for r in P.rows()}
     rows = {}
+    tk = transkribus_pages()
+    if tk:
+        assert set(tk) == {j['page'] for j in sel}, sorted(set(tk) ^ {j['page'] for j in sel})
     for j in sel:
         truth = (P.TRUTH / 'truth' / (j['page'] + '.txt')).read_text()
         a = json.loads((CACHE / 'azure' / (j['id'] + '.json')).read_text())
@@ -219,6 +260,10 @@ def cmd_report():
         rows.setdefault('azure-di-layout', []).append(score(truth, azure_text(a))['nes'])
         rows.setdefault('textract-layout', []).append(score(truth, lay)['nes'])
         rows.setdefault('textract-lines', []).append(score(truth, plain)['nes'])
+        if tk:
+            rows.setdefault('transkribus-text-titan', []).append(score(truth, transkribus_text(tk[j['page']]))['nes'])
+            rows.setdefault('transkribus-raw-hyphen', []).append(
+                score(truth, transkribus_text(tk[j['page']], hyphen=False))['nes'])
     for r in R.all_scores():
         if r['id'] in ids and r['ok']:
             rows.setdefault(r['key'], []).append(r['nes'])
@@ -227,9 +272,26 @@ def cmd_report():
     for k, v in sorted(full.items(), key=lambda kv: -sum(kv[1])):
         print(f'| {k} | {100 * sum(v) / N:.1f} | {len(v)} |')
     for base in ('mistral-ocr-4-1',):
-        for k in ('azure-di-layout', 'textract-layout'):
+        for k in ('azure-di-layout', 'textract-layout', 'transkribus-text-titan'):
             if base in full:
                 print(f'\npaired {k} - {base}:', paired(full[k], full[base]))
+    if 'transkribus-text-titan' in full:
+        for k in ('azure-di-layout', 'textract-layout'):
+            print(f'\npaired transkribus-text-titan - {k}:', paired(full['transkribus-text-titan'], full[k]))
+        kinds = {}
+        for j, v in zip(sel, full['transkribus-text-titan']):
+            kinds.setdefault(by_page[j['page']]['kind'], []).append(v)
+        print('\ntranskribus by kind:', {k: (round(100 * sum(v) / len(v), 1), len(v)) for k, v in kinds.items()})
+        # Order-free: the share of truth words each vendor misses (a bag of words), so reading is told from order.
+        miss = {'azure-di-layout': [0, 0], 'textract-layout': [0, 0], 'transkribus-text-titan': [0, 0]}
+        for j in sel:
+            truth = (P.TRUTH / 'truth' / (j['page'] + '.txt')).read_text()
+            hyps = {'azure-di-layout': azure_text(json.loads((CACHE / 'azure' / (j['id'] + '.json')).read_text())),
+                    'textract-layout': textract_text(json.loads((CACHE / 'textract' / (j['id'] + '.json')).read_text()))[0],
+                    'transkribus-text-titan': transkribus_text(tk[j['page']])}
+            for k, h in hyps.items():
+                s = score(truth, h); miss[k][0] += s['missed']; miss[k][1] += s['words']
+        print('\ntruth words missed (order-free):', {k: f'{100 * m / w:.1f}% of {w}' for k, (m, w) in miss.items()})
     print('\n| page | kind | handwritten share (Azure) | Textract date has a year | conf | year matches a tagged year | year in date bin |')
     print('|---|---|---|---|---|---|---|')
     tally = {'answered': 0, 'year': 0, 'tag_pages': 0, 'tag_hit': 0, 'bin_pages': 0, 'bin_hit': 0}

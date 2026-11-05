@@ -824,7 +824,8 @@ document.getElementById('r6-rows').innerHTML = R6.rows.map(r => '<tr><td>' + r.r
   '</td><td>' + (r.usd_1000 ? money(r.usd_1000) + ' (' + r.price_note + ')' : '') + '</td></tr>').join('');
 document.getElementById('r6-note').textContent = 'Same pages, same scorer; panel routes are their stored panel replies on these ' + R6.pages + '. Against Mistral OCR 4.1, paired: Azure ' +
   R6.vs_mistral.azure[0] + ' NES points (' + R6.vs_mistral.azure[1] + ' to ' + R6.vs_mistral.azure[2] + '), Textract ' + R6.vs_mistral.textract[0] + ' (' +
-  R6.vs_mistral.textract[1] + ' to ' + R6.vs_mistral.textract[2] + ', a tie at this n). A spot check, not on the 96 charts. ' + R6.splitters + ' Source: ' + R6.source + '.';
+  R6.vs_mistral.textract[1] + ' to ' + R6.vs_mistral.textract[2] + ', a tie at this n)' +
+  (R6.vs_mistral.transkribus ? ', Transkribus ' + R6.vs_mistral.transkribus[0] + ' (' + R6.vs_mistral.transkribus[1] + ' to ' + R6.vs_mistral.transkribus[2] + ')' : '') + '. A spot check, not on the 96 charts. ' + R6.splitters + ' Source: ' + R6.source + '.';
 
 // Part 4: FarmShare.
 const FS = DATA.farmshare;

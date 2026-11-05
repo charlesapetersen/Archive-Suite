@@ -4153,6 +4153,12 @@
     "nes": 86.6,
     "usd_1000": 19.0,
     "price_note": "list, LAYOUT $4 + QUERIES $15; $0.475 spent"
+   },
+   {
+    "route": "Transkribus, Text Titan I with layout analysis (TrHtr 2.52.0, model 356425)",
+    "kind": "vendor",
+    "nes": 82.5,
+    "note": "the owner's hand upload on free credits, $0; Text Titan II was not offered on his account"
    }
   ],
   "splitters": "Custom splitters were priced, not run: $5 (Google Document AI) and $3 (Azure custom classification) per 1,000 pages at list, so $500 and $300 per 100,000 pages and hundreds of dollars for a corpus pass, which needs the owner under the $7 rule (W46.r6-spot-price).",
@@ -4166,6 +4172,11 @@
     -5.8,
     -13.4,
     1.5
+   ],
+   "transkribus": [
+    -10.0,
+    -16.9,
+    -4.5
    ]
   }
  },
