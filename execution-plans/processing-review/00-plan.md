@@ -207,23 +207,36 @@ Sherlock first, FarmShare as fallback, the Mac for profile 1, paid APIs where a 
 
 ## Phase 4 — decisions and the work queue (interactive)
 
-**The review's output is a settings wizard, not the owner's defaults (owner, 2026-11-04).** "Instead of setting my
-defaults, we should create a wizard or walkthrough or similar for users that produces the best settings based on
-their compute constraints, financial constraints, time constraints, document types, availability for
-fine-tuning, etc. If necessary I can set defaults behind this but we should try to provide as much flexibility for
-users as we can." So each stage's recommendation is written as a rule the wizard can apply: given the user's
-answers, which route and settings, with the measured reason, the expected cost and time, and the fallback when an
-answer rules the first choice out. The questions follow the profiles and routes above: the Mac and its memory, a
-cluster, which API keys or plans, a money ceiling (none, per batch, per month), how long a batch may take, the
-document kinds in the collection (typed, printed, handwritten, forms, clippings, newspapers, scripts and hands),
-and whether the user can fine-tune (a coding agent, a cluster, or neither). Defaults exist only behind the wizard,
-for a user who skips it, and the owner may set those. Every setting the wizard chooses stays editable. Phase 4
-files the wizard's build (the question flow, the rule table it reads, where it lives in the Processor, how a
-re-run changes settings already chosen) with the implementation queue, and the owner's calls in Phase 4 are about
-the rules and the skip-defaults, not about his own configuration.
+**The review's output is a way for users to choose their settings, not the owner's defaults (owner, 2026-11-04).**
+First: "Instead of setting my defaults, we should create a wizard or walkthrough or similar for users that produces
+the best settings based on their compute constraints, financial constraints, time constraints, document types,
+availability for fine-tuning, etc. If necessary I can set defaults behind this but we should try to provide as much
+flexibility for users as we can." Then, refining it the same evening: a wizard "may not be the best approach". The
+direction as it now stands:
+
+- **An introductory Q&A** asks the user basic questions about the resources they have: the Mac and its memory, a
+  cluster, which API keys or Claude/ChatGPT plans, a money ceiling (none, per batch, per month), how long a batch may
+  take, the document kinds in the collection (typed, printed, handwritten, forms, clippings, newspapers, scripts and
+  hands), and whether they can fine-tune (a coding agent, a cluster, or neither). The answers translate into settings,
+  every one of which can be changed later.
+- **A wizard may follow it** for further initial settings, but is not the core.
+- **Priorities and capacities change** over time and from one collection to the next, so the answers and the settings
+  they produce belong to a collection, not to the app once, and can be revisited at any time.
+- **The trade-offs are shown, not only decided.** The user should see the range of possibilities (accuracy against
+  cost against time, per stage and per document kind, from the bench's measured figures) and change them dynamically,
+  seeing what each change costs or gains.
+- **Defaults exist only behind this**, for a user who skips it, and the owner may set those.
+
+So each stage's recommendation is written as a rule the settings layer can apply: given the user's answers, which
+route and settings, with the measured reason, the expected cost and time, the alternatives with their own figures,
+and the fallback when an answer rules the first choice out. How the Q&A, the trade-off view and any wizard should
+work is researched first, in a Fable session (`W46.settings-design-research`), which presents its options to the
+owner interactively; Phase 4 waits on it and files the build it settles (the Q&A flow, the rule table it reads, the
+trade-off view, where they live in the Processor, how settings are kept per collection and revisited). The owner's
+calls in Phase 4 are about the rules, the presentation and the skip-defaults, not about his own configuration.
 
 - One decision note per stage, with the recommendation per profile and document kind, and what would change it as
-  models move. Each note ends in the wizard's rule for that stage (above).
+  models move. Each note ends in the settings layer's rule for that stage (above).
 - The owner's calls, walked one at a time.
 - The implementation queue filed with `ops/autonomous/plan-edit.sh`: the integration stages (W42.int-s1 to s7),
   changes to app defaults and routes, the training kit and its plug-in point, the marks layer, and the long-term
