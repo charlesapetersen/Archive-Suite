@@ -1456,14 +1456,15 @@ reader-session-1, the 24 retired worktrees, Vision OCR's model-home, ocrlab and 
 `date-tagging/traceable`, `date-tagging/iitcdip` and `bench-corpus/raw`, 4.2 GB; 31 Oct: `reader-sample` again, 9.0 GB,
 after W40.fts-snippet-sample-rerun shipped, and from Vision OCR `testdocs` and the engine's `model-files`, 1.8 GB,
 in a `vision-ocr` folder with its own `MOVED-2026-10-31-vision-ocr.md`; 5 Nov: `enh-ocr-input/stage`, `weights` and
-`src` and `ent-robust/g17`, 8.3 GB, with `MOVED-2026-11-05.md`). The walkthrough moves what is
+`src` and `ent-robust/g17`, 8.3 GB, with `MOVED-2026-11-05.md`, then `enh-dewarp/src` and `hf`, 2.2 GB, with
+`MOVED-2026-11-05-b.md`). The walkthrough moves what is
 movable now (`~/Claude/CLAUDE.md`, "The walkthrough", step 7). Sessions cannot
 read OneDrive (macOS blocks `~/Library/CloudStorage`), so an item that needs a moved folder reports it and asks the
 owner to copy it back to its original path, rather than failing or downloading it again. Sizes 29 Oct; each when nothing open reads it:
 
 | Folder | Size | What it is | Movable when |
 |---|---|---|---|
-| `enh-dewarp/` (`uvdoc-bench`, `src`, `hf`) | 4.3 GB | dewarp bench and model sources, W46.enh-dewarp (shipped) | after W46.place-geom, which may straighten with them |
+| `enh-dewarp/` (`src`, `hf` moved 5 Nov; the rest) | 1.9 GB left | dewarp bench and model sources, W46.enh-dewarp (shipped) | `images`, `stage`, `lines` once Phase 4 settles whether a dewarped copy is offered |
 | `sherlock-results/` | 0.8 GB | downloaded cluster outputs | each batch once its item is scored and shipped |
 | `mixed-def/pages` | 1.8 GB | mixed-page set renders | after W46.mixed-route-bands |
 | `enh-ocr-input/` (`stage`, `weights`, `src`) | 4.3 GB | enhancement arms | after W46.enh-ocr-input-marks and -ppocr |
