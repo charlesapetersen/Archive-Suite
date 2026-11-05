@@ -485,11 +485,17 @@ Views/
                               (NSTokenField): autocomplete from the corpus; edit-start-base diff → ONE
                               TagWriter delta; commits the field's tokens on blur — WYSIWYG, so a
                               typed-but-not-Return'd word sticks (owner 2026-07-08). Adds only route
-                              through TagWriter, so existing tags never lost.
+                              through TagWriter, so existing tags never lost. Return with text typed
+                              writes and keeps the field (W40.fix-reader-tag-entry); while a cell is
+                              edited the list holds its rows and snapshot until the edit ends.
+  TagEntry.swift              The tag fields' shared completion lookup (list cell, filter, ⌘I sheet): only
+                              leading space is trimmed, so a typed space ends a completion.
   RenameTagSheet.swift        Corpus-wide tag rename (D1): shows the affected-file count; via TagWriter batch.
   SimilarTagsSheet.swift      Near-duplicate tag finder (TagSimilarity clusters): pick a canonical +
                               Merge drives the corpus-wide rename (→ RenameTagSheet → TagWriter). Advisory only.
   TagEditorView.swift         Group-aware tag editor sheet (⌘I); `targetPaths` = the document window's file.
+  SubjectEntryField.swift     The sheet's add-a-subject token field: autocompletes; Return/comma/Tab add and
+                              the field keeps no tokens; Done adds what is still typed.
   DocumentTagActions.swift    The Tags menu in the document window: the open file, via NavigationModel's
                               TagWriter actions (`paths:`), checks and undo ledger; no write path of its own.
   OptionsView.swift           Settings form (⌘,), @AppStorage (incl. list font size).

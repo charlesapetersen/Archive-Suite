@@ -24,6 +24,17 @@ final class TagEntryTests: XCTestCase {
                        "a space inside a two-word subject still completes it")
     }
 
+    /// The field writes a filled-in completion over the typed text, so only one that starts with exactly what was
+    /// typed is filled in, and a case variant can be typed (R-27's warning).
+    func testOnlyAnExactPrefixIsFilledInSoTheTypedCaseStays() {
+        let found = TagEntry.completions(for: "w40d8 m", in: ["W40d8 Merge"])
+        XCTAssertEqual(found, ["W40d8 Merge"], "still listed")
+        XCTAssertEqual(TagEntry.filledInIndex(for: "w40d8 m", in: found), -1, "not filled in over the typed case")
+        let both = TagEntry.completions(for: "Civ", in: ["civil defence", "Civil War"])
+        XCTAssertEqual(TagEntry.filledInIndex(for: "Civ", in: both), 1, "the first exact-prefix one is filled in")
+        XCTAssertEqual(TagEntry.filledInIndex(for: " Civ", in: both), 1, "leading space after a comma is dropped")
+    }
+
     func testPendingTextLeavesOutTokens() {
         let tv = NSTextView()
         tv.string = "\u{FFFC}\u{FFFC} Civil W"

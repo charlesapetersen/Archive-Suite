@@ -74,6 +74,7 @@ struct SubjectFilterTokenField: NSViewRepresentable {
         func tokenField(_ tokenField: NSTokenField, completionsForSubstring substring: String,
                         indexOfToken tokenIndex: Int,
                         indexOfSelectedItem selectedIndex: UnsafeMutablePointer<Int>?) -> [Any]? {
+            // The first one is filled in whatever its case: a filter is meant to name a real subject.
             TagEntry.completions(for: substring, in: parent.suggestions)
         }
 

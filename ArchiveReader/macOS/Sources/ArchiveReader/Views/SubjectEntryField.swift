@@ -50,7 +50,9 @@ struct SubjectEntryField: NSViewRepresentable {
         func tokenField(_ tokenField: NSTokenField, completionsForSubstring substring: String,
                         indexOfToken tokenIndex: Int,
                         indexOfSelectedItem selectedIndex: UnsafeMutablePointer<Int>?) -> [Any]? {
-            TagEntry.completions(for: substring, in: parent.suggestions())
+            let found = TagEntry.completions(for: substring, in: parent.suggestions())
+            selectedIndex?.pointee = TagEntry.filledInIndex(for: substring, in: found)
+            return found
         }
 
         /// A comma, or Tab on a suggestion, makes a token; each one is added to the files on the next turn (so the

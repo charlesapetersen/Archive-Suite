@@ -3,6 +3,8 @@ import AppKit
 /// How the Reader's tag-entry token fields treat an autocompletion (W40.fix-reader-tag-entry; owner session
 /// reader-1, rows 28, 29 and 36). The list's inline tag field, the Edit Tags sheet's subject field and the tag
 /// filter share it, so the three behave alike: a space keeps what was typed, and Tab or → takes the suggestion.
+/// The list's field and the sheet fill a suggestion in only where it keeps the typed case (`filledInIndex`); the
+/// filter fills in the first, as a filter names a subject that exists.
 /// Tab and → need nothing here: with a suggestion showing, the token field itself turns it into a token on Tab
 /// (and moves on to the next control) and → moves the caret past it.
 @MainActor
@@ -14,12 +16,26 @@ enum TagEntry {
     /// be typed until the rest of the suggestion was taken. Subjects are often two words, so the space stays a
     /// space and the completion ends there unless a subject really starts "Civ ".
     static func completions(for substring: String, in subjects: [String], limit: Int = 20) -> [String] {
-        let s = String(substring.drop(while: { $0 == " " || $0 == "\t" }))
+        let s = typedPrefix(substring)
         guard !s.trimmingCharacters(in: .whitespaces).isEmpty else { return [] }
         return Array(subjects.lazy.filter {
             $0.caseInsensitiveCompare(s) != .orderedSame &&
             $0.range(of: s, options: [.caseInsensitive, .anchored]) != nil
         }.prefix(limit))
+    }
+
+    /// The completion the field fills in after the caret, or -1 for none (the list still shows). Only one that
+    /// starts with exactly what was typed is filled in: the field writes the filled-in completion over the typed
+    /// text, so a case-insensitive one turned "w40d8 m" into "W40d8 M" and a case variant could not be typed (the
+    /// sheet's case warning, R-27, never showed). Case is kept as typed; Tab or → takes a filled-in completion, and
+    /// ↓ picks one from the list.
+    static func filledInIndex(for substring: String, in completions: [String]) -> Int {
+        let s = typedPrefix(substring)
+        return completions.firstIndex { $0.hasPrefix(s) } ?? -1
+    }
+
+    private static func typedPrefix(_ substring: String) -> String {
+        String(substring.drop(while: { $0 == " " || $0 == "\t" }))
     }
 
     /// The text after the tokens, which Return or a comma would make a tag. A token is one attachment character

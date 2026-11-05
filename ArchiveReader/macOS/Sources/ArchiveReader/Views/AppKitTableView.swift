@@ -676,7 +676,9 @@ struct AppKitTableView: NSViewRepresentable {
         func tokenField(_ tokenField: NSTokenField, completionsForSubstring substring: String,
                         indexOfToken tokenIndex: Int,
                         indexOfSelectedItem selectedIndex: UnsafeMutablePointer<Int>?) -> [Any]? {
-            TagEntry.completions(for: substring, in: parent.model.allSubjects)
+            let found = TagEntry.completions(for: substring, in: parent.model.allSubjects)
+            selectedIndex?.pointee = TagEntry.filledInIndex(for: substring, in: found)
+            return found
         }
 
         func controlTextDidBeginEditing(_ obj: Notification) {
