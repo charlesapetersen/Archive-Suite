@@ -47,6 +47,26 @@ struct ArchiveReaderCommands: Commands {
             }
         }
 
+        // Edit — the two copies of what is on screen sit beside the standard Copy, where a reader looks for
+        // them (owner session reader-1, row 15; they were under Document until W40.fix-reader-edit-menu-copy).
+        // No "Copy" here: ⌘C is the standard Edit ▸ Copy, which reaches the viewer through the responder
+        // chain (`ReaderPDFView.copy(_:)`). A second ⌘C matched first and copied the PDF selection with the
+        // caret in the find field (W48.reader-copy-shortcut).
+        CommandGroup(after: .pasteboard) {
+            Divider()
+            // ⌥⌘C, not ⇧⌘C: ⇧⌘C is Selection ▸ Copy Link(s), and with the preview sheet up both items are
+            // enabled in the nav window at once (W40.fix-reader-visual-polish).
+            Button("Copy Cleaned for Prose") { doc?.copySelection() }
+                .keyboardShortcut("c", modifiers: [.command, .option]).disabled(doc == nil)
+            // ⌥⌘L: ⌘L is Focus Tag Filter and ⇧⌘L Copy Archive Link(s), which the preview sheet leaves enabled
+            // beside this one, so the page link takes the remaining L.
+            Button("Copy Archive Link to This Page") {
+                if let doc, let linkContext { doc.copyArchivePageLink(context: linkContext) }
+            }
+            .keyboardShortcut("l", modifiers: [.command, .option])
+            .disabled(doc == nil || linkContext?.target == nil)
+        }
+
         // File
         CommandGroup(replacing: .newItem) {
             Button("Choose Archive Folder…") { nav?.chooseRoot() }
@@ -151,20 +171,9 @@ struct ArchiveReaderCommands: Commands {
             Button("Fit Page") { doc?.fitFocused() }
                 .keyboardShortcut("0", modifiers: .command).disabled(doc == nil)
             Divider()
-            Button("Copy Archive Link to This Page") {
-                if let doc, let linkContext { doc.copyArchivePageLink(context: linkContext) }
-            }
-            .disabled(doc == nil || linkContext?.target == nil)
-            // No "Copy" here: ⌘C is the standard Edit ▸ Copy, which reaches the viewer through the
-            // responder chain (`ReaderPDFView.copy(_:)`). A second ⌘C on this menu matched first and copied
-            // the PDF selection with the caret in the find field (W48.reader-copy-shortcut).
-            // ⌥⌘C, not ⇧⌘C: ⇧⌘C is Selection ▸ Copy Link(s), and with the preview sheet up both items are
-            // enabled in the nav window at once (W40.fix-reader-visual-polish).
-            Button("Copy Cleaned for Prose") { doc?.copySelection() }
-                .keyboardShortcut("c", modifiers: [.command, .option]).disabled(doc == nil)
             // These three need MORE than a published viewer: they need one whose view renders a find bar.
             // The preview sheet publishes a model so zoom/paging/copy/page-link reach it (W26.previewzoom),
-            // which enables every `doc == nil` item here — but it has no find bar and no way to type a
+            // which enables every `doc == nil` item (here and under Edit) — but it has no find bar and no way to type a
             // query, so ⌘F looked live and did nothing there (W26.previewzoom-fu1).
             Button("Find…") { doc?.beginFind() }
                 .keyboardShortcut("f", modifiers: .command).disabled(noFind)

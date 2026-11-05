@@ -28,7 +28,10 @@ final class CopyShortcutUITests: FixtureUITestCase {
         XCTAssertFalse(menuItem("Document", "Copy").exists,
                        "⌘C belongs to Edit ▸ Copy alone; a second Copy here stole it from text fields")
         closeMenu()
-        XCTAssertTrue(menuItem("Document", "Copy Cleaned for Prose").exists); closeMenu()
+        XCTAssertTrue(menuItem("Edit", "Copy Cleaned for Prose").exists); closeMenu()
+        XCTAssertFalse(menuItem("Document", "Copy Cleaned for Prose").exists,
+                       "both copies of what is on screen live under Edit (W40.fix-reader-edit-menu-copy)")
+        closeMenu()
 
         // Nothing selected: Copy is disabled and ⌘C leaves the clipboard alone.
         doc.coordinate(withNormalizedOffset: CGVector(dx: 0.85, dy: 0.55)).click()

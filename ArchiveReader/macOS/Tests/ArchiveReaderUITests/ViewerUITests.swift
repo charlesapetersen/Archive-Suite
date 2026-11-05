@@ -1,4 +1,5 @@
 import XCTest
+import AppKit
 
 /// Tests for the document viewer and preview sheet.
 /// All tests run against the pre-built GUI fixture.
@@ -172,14 +173,40 @@ final class ViewerUITests: FixtureUITestCase {
         RunLoop.current.run(until: Date().addingTimeInterval(2))
         XCTAssertGreaterThanOrEqual(app.windows.count, 2, "precondition: the document window opened")
 
-        let item = documentMenuItem("Copy Archive Link to This Page")
-        XCTAssertTrue(item.exists, "the command should be in the Document menu")
+        let item = editMenuItem("Copy Archive Link to This Page")
+        XCTAssertTrue(item.exists, "the command should be in the Edit menu")
         XCTAssertTrue(item.isEnabled,
                       "…and ENABLED with only the viewer focused (it required a NavigationModel before)")
         app.typeKey(.escape, modifierFlags: [])            // close the menu without invoking it
         RunLoop.current.run(until: Date().addingTimeInterval(0.3))
 
         pressKey("w", modifiers: .command)                 // close the viewer
+        RunLoop.current.run(until: Date().addingTimeInterval(0.5))
+    }
+
+    /// W40.fix-reader-edit-menu-copy: ⌥⌘L copies the page link from the document window, through the key
+    /// alone (the owner wanted a shortcut for it, and none of ⌘L / ⇧⌘L / ⌥⌘C may answer instead).
+    func testCopyPageLinkShortcutInTheDocumentWindow() throws {
+        try requireGeneratedScratchFixtureForTagWrites()   // a first copy may write the root marker
+        waitForRows(minimum: 3, timeout: 10)
+        clickRow(0)
+        pressKey("o", modifiers: .command)
+        RunLoop.current.run(until: Date().addingTimeInterval(2))
+        XCTAssertGreaterThanOrEqual(app.windows.count, 2, "precondition: the document window opened")
+
+        let sentinel = "page-link-sentinel-\(UUID().uuidString)"
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(sentinel, forType: .string)
+        pressKey("l", modifiers: [.command, .option])
+        let deadline = Date().addingTimeInterval(5)
+        var copied = NSPasteboard.general.string(forType: .string) ?? ""
+        while copied == sentinel, Date() < deadline {
+            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+            copied = NSPasteboard.general.string(forType: .string) ?? ""
+        }
+        XCTAssertTrue(copied.hasPrefix("archivereader://"), "⌥⌘L should copy the page link, got \(copied)")
+
+        pressKey("w", modifiers: .command)
         RunLoop.current.run(until: Date().addingTimeInterval(0.5))
     }
 
@@ -219,7 +246,7 @@ final class ViewerUITests: FixtureUITestCase {
         }
         // The asynchronous sibling scan publishes a context even though it has no durable marker.
         RunLoop.current.run(until: Date().addingTimeInterval(2))
-        let item = documentMenuItem("Copy Archive Link to This Page")
+        let item = editMenuItem("Copy Archive Link to This Page")
         XCTAssertTrue(item.isEnabled, "first copy is reachable without an existing marker")
         item.click()
         let deadline = Date().addingTimeInterval(5)
@@ -407,10 +434,10 @@ final class ViewerUITests: FixtureUITestCase {
         XCTAssertTrue(documentMenuItem("Fit Page").isEnabled,
                       "precondition: the sheet's viewer model IS published (W26.previewzoom)")
         closeMenu()
-        // "Copy Cleaned for Prose", not plain "Copy": `documentMenuItem` queries the whole menu bar, and
+        // "Copy Cleaned for Prose", not plain "Copy": the menu helpers query the whole menu bar, and
         // the standard Edit menu has a "Copy" of its own — the ambiguous query fails the test outright
         // ("Multiple matching elements found"), which is how this line read on its first VM run.
-        XCTAssertTrue(documentMenuItem("Copy Cleaned for Prose").isEnabled,
+        XCTAssertTrue(editMenuItem("Copy Cleaned for Prose").isEnabled,
                       "precondition: the other commands the publication enables are wanted and stay enabled")
         closeMenu()
         for title in findItems {
@@ -548,6 +575,18 @@ final class ViewerUITests: FixtureUITestCase {
         let document = bar.menuBarItems["Document"]
         XCTAssertTrue(document.waitForExistence(timeout: 5), "the Document menu should exist")
         document.click()
+        let item = bar.menuItems[title]
+        _ = item.waitForExistence(timeout: 5)
+        return item
+    }
+
+    /// The Edit menu holds Copy Cleaned for Prose and Copy Archive Link to This Page
+    /// (W40.fix-reader-edit-menu-copy).
+    private func editMenuItem(_ title: String) -> XCUIElement {
+        let bar = app.menuBars.element(boundBy: 0)
+        let edit = bar.menuBarItems["Edit"]
+        XCTAssertTrue(edit.waitForExistence(timeout: 5), "the Edit menu should exist")
+        edit.click()
         let item = bar.menuItems[title]
         _ = item.waitForExistence(timeout: 5)
         return item

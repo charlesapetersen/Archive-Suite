@@ -267,7 +267,7 @@ writes against the real corpus — always a copy.
   then jump to the next `Unread`). Focus-scoped bare-key equivalents fire only when the list has key focus
   (text-field-safe, like `Space`): `]`/`[` = next/previous unread, `\` = mark read & advance. All read-state
   mutation routes through `mark(.read)` → `TagWriter` (undoable); the next/previous math is pure (`TriageNavigation`).
-- `⌘⇧C` Copy Link(s) · `⌘⇧R` Reveal in Finder · `⌘⇧O` Choose Archive Folder…
+- `⌘⇧C` Copy Link(s) · `⌘⇧L` Copy Archive Link(s) · `⌘⇧R` Reveal in Finder · `⌘⇧O` Choose Archive Folder…
 - `⌘L` focus tag filter · `⌘⌥F` Search OCR text · `⌘⇧K` Clear filters & search
 - *Menu-only (no shortcut):* Sort by Date/Name/Quality/Read-state · Rename Tag… · Find Similar Tags… ·
   Save Current Search… · Select Document Run
@@ -284,16 +284,18 @@ writes against the real corpus — always a copy.
   default (not necessarily ⅔) and fit both panes
 - `⌘C` copy verbatim — the standard **Edit ▸ Copy**, from whichever pane holds the selection (plain text;
   disabled with nothing selected; a focused text field such as the find bar copies its own text) · `⌥⌘C`
-  Document ▸ Copy Cleaned for Prose (intelligent; not `⌘⇧C`, which is Copy Link(s)); it also starts a
+  Edit ▸ Copy Cleaned for Prose (intelligent; not `⌘⇧C`, which is Copy Link(s)); it also starts a
   paragraph where the OCR left no blank line but the page's line boxes show one (Options toggle). Since
   `W48.reader-copy-shortcut` there is no second `⌘C` on the Document menu: it matched before Edit ▸ Copy
   and copied the PDF selection with the caret in the find field
+- `⌥⌘L` Edit ▸ Copy Archive Link to This Page (`⌘L` and `⌘⇧L` are the nav window's). Both copies of what is
+  on screen sit under Edit, beside Copy, since `W40.fix-reader-edit-menu-copy` (they were under Document)
 - `⌘F` find in the open document(s) · `⌘G`/`⇧⌘G` next/previous match (highlight-all, wraps, "N of M" across open docs)
 - `⌘,` Options (both windows)
 
 *Preview sheet* (opened by `Space`/`⌘Y`)
 - `↑/↓` previous/next file in the list (nav selection follows) · `←/→` cycle within a multi-file selection ·
-  `⌘C` (Edit ▸ Copy)/`⌥⌘C` copy verbatim/cleaned · `⌘O` open the full viewer · `Space`/`Esc` close
+  `⌘C` (Edit ▸ Copy)/`⌥⌘C` copy verbatim/cleaned · `⌥⌘L` copy the page link · `⌘O` open the full viewer · `Space`/`Esc` close
 - `⌘↑`/`⌘↓`/`⌘0` zoom in/out/fit the focused pane — the image pane on open (since `W26.previewzoom`: the
   sheet's viewer model is published by `NavigationWindowView`, so the Document menu acts on it)
 - **No find bar here:** `⌘F`/`⌘G`/`⌘⇧G` are *disabled* in the preview (`DocumentViewerModel.supportsFind`,
@@ -303,7 +305,7 @@ writes against the real corpus — always a copy.
 > (shipped UI batch #14): `↑/↓` now **scroll the focused page** instead
 > of cycling documents; cycling moved to `⌘⇧↑/↓`; zoom is `⌘↑/↓` (not `⌘=`/`⌘-`); reset is `⌥⌘0` (not
 > `⌥⌘=`); `⌘C`/`⌥⌘C` are verbatim/cleaned copy (cleaned was `⌘⇧C` until 2026-10-22). The document window has **no** Mark-Read (`⌘R`) or
-> copy-link shortcut — those are nav-window only.
+> Copy Link(s) shortcut — those are nav-window only; its page link is `⌥⌘L` (since 2026-11-04).
 
 ## §Options (⌘, — `OptionsView`, read via `AppSettings`)
 
