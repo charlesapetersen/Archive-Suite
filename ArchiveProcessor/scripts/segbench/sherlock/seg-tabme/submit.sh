@@ -1,5 +1,5 @@
 #!/bin/bash
-# W46.seg-tabme on Sherlock, from an owner-started session only (execution-plans/items/W46.seg-tabme.md).
+# W46.seg-tabme on Sherlock, from an owner-started session only (hand-over and result: SUITE_TODO_DONE.md, W46.seg-tabme).
 #   bash <pack>/support/job/submit.sh <pack> [--dry-run]   <pack>: $GROUP_HOME/$USER/archive-suite/seg-tabme-20261105
 # Seven jobs, every one after the stage; each GPU job is one model on one arm of 2,079 K = 7 windows:
 #   stage       CPU: copy the frozen pack into scratch, check its hashes, fetch the three base models if absent

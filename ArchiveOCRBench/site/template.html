@@ -151,6 +151,13 @@ footer p { font-size: 13px; }
     <p class="note">Every window sent twice to the same model, once as before and once with a COLLECTION FACTS block above its OCR: the catalogue line and item count (CREST, Lincoln) or the box and folder label photos' OCR (the owner's Stanton and RG 165), the span of years in the box's text, the share of low-text pages and a document-length prior. Nothing in it comes from the box's boundaries. The rerun column is the noise floor: the request without the block is byte-identical to the one FarmShare answered earlier, so its changed gap decisions are what a rerun alone changes. Only Lincoln moves beyond that, for both models, and there the catalogue's item count is close to the answer; on the owner's boxes the block changes nothing beyond rerun noise, so the app's window prompt is unchanged. One run per arm; one vote can move a box several points (the 2B's CREST gain is one vote). Source: <code>seg-context.md</code> and <code>seg-context.json</code>.</p>
   </section>
 
+  <section class="panel" id="seg-tabme" hidden>
+    <h2>Segmentation on clean public scans (TABME++)</h2>
+    <p class="note" id="seg-tabme-lede"></p>
+    <div class="tbl"><table><thead><tr><th>Route</th><th>Boundary F1 (95% interval)</th><th>Pages in exact document</th><th>Doc F1</th><th>False splits</th><th>False merges</th></tr></thead><tbody id="seg-tabme-rows"></tbody></table></div>
+    <div class="tbl"><table><thead><tr><th>Published on the same split</th><th>Boundary / page F1</th></tr></thead><tbody id="seg-tabme-refs"></tbody></table></div>
+    <p class="note">The trained 2B and 4B students and the 27B teacher at the local route's settings (K = 7 windows), one Sherlock batch. The students do not transfer as they stand: the 2B falls from 0.928 boundary F1 on the owner's test boxes to 0.814 here. The untrained teacher falls with them (the 2B leads it by 2.0 points on the owner's boxes and by 3.4 to 5.8 here with the same input, and ties it reading text), so the fall is this collection's document rule rather than the 2B's size. Almost every error is a false split (recall 99.4-99.7%), most inside long documents and shared by all four arms: TABME++'s document is its catalogue's unit, which zero-shot readers likely cut into items. The teacher's text-only row is the one like-for-like cell with A04's K = 7 text windows; A05's figures (page F1, synthetic folders, trained on TABME++) are context only. Intervals: bootstrap over documents, without rerun noise. Source: <code>seg-tabme.md</code> and <code>seg-tabme.json</code>.</p>
+  </section>
   <section class="panel" id="seg-window-modality" hidden>
     <div class="head"><h2>Window size, text-only windows and self-voting</h2><span class="meta">open models · Sherlock L40S</span></div>
     <h3>The trained 2B by window size, the owner's development boxes</h3>
@@ -682,6 +689,20 @@ if (segContext) {
   }
   document.getElementById('seg-context-rows').innerHTML = ctxRows.join('');
   document.getElementById('seg-context').hidden = !ctxRows.length;
+}
+
+const stb = DATA.seg_tabme;
+if (stb) {
+  const nm = {'2b-it': 'Trained Qwen3.5 2B, images and text', '4b-it': 'Trained Qwen3.5 4B, images and text',
+              'teacher-it': 'Qwen3.5 27B teacher, images and text', 'teacher-t': 'Qwen3.5 27B teacher, text only', 'all-new': 'Every page a new document'};
+  const f3 = v => v.toFixed(3);
+  document.getElementById('seg-tabme-lede').textContent = 'TABME++ test split: ' + stb.pages.toLocaleString() + ' pages, ' +
+    stb.documents.toLocaleString() + ' documents, ' + stb.gaps.toLocaleString() + ' decisions (A04\'s set).';
+  document.getElementById('seg-tabme-rows').innerHTML = stb.rows.map(r => '<tr><td>' + (nm[r.arm] || r.arm) + '</td><td>' + f3(r.boundary_f1) +
+    ' (' + f3(r.interval[0]) + '-' + f3(r.interval[1]) + ')</td><td>' + (100 * r.pages_exact).toFixed(1) + '%</td><td>' + f3(r.doc_f1) +
+    '</td><td>' + r.false_splits.toLocaleString() + '</td><td>' + r.false_merges + '</td></tr>').join('');
+  document.getElementById('seg-tabme-refs').innerHTML = stb.refs.map(([n, v]) => '<tr><td>' + n + '</td><td>' + f3(v) + '</td></tr>').join('');
+  document.getElementById('seg-tabme').hidden = false;
 }
 
 const swm = DATA.seg_window_modality;

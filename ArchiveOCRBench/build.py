@@ -405,6 +405,26 @@ def seg_window_modality():
     return out
 
 
+def seg_tabme():
+    """W46.seg-tabme: the students and the teacher over TABME++'s test split (clean scans, public), with the published
+    references the report compares them to."""
+    path = RESULTS / "seg-tabme.json"
+    if not path.exists():
+        return None
+    d = json.loads(path.read_text())
+    if d["incomplete"]:
+        sys.exit(f"seg-tabme.json has incomplete arms: {d['incomplete'][:1]}")
+    rows = [{**{k: r[k] for k in ("arm", "boundary_f1", "pages_exact", "doc_f1", "false_splits", "false_merges")},
+             "interval": d["intervals"][r["arm"]]["boundary_f1"]} for r in d["rows"] if r["arm"] != "no-boundaries"]
+    # Hand-entered from the papers (execution-plans/processing-review/A-segmentation.md), different protocols.
+    refs = [["Mistral-7B LoRA, fine-tuned on TABME++ (A05)", 0.987], ["Phi-3-mini LoRA, fine-tuned (A05)", 0.973],
+            ["Best encoder or XGBoost, trained on TABME++ (A05)", 0.831], ["Gemini 3.1 Flash-Lite, zero-shot text, K = 7 (A04)", 0.863],
+            ["Claude Haiku 4.5, zero-shot text, K = 7 (A04)", 0.782], ["GPT-5.4-mini, zero-shot text, K = 7 (A04)", 0.739],
+            ["doc-split-v1, zero-shot (A20)", 0.704]]
+    return {"rows": rows, "refs": refs, "pages": d["stream"]["pages"], "documents": d["stream"]["documents"],
+            "gaps": d["stream"]["gaps"]}
+
+
 def seg_kit_gate_sherlock():
     """W46.kit-gate-sherlock: the teacher and the two students on owner-ruled gaps, the checkpack and the three locked
     boxes, from one Sherlock job."""
@@ -1337,7 +1357,7 @@ def main():
              "dating_undated": json.loads(DATING_UNDATED.read_text()) if DATING_UNDATED.exists() else None,
              "seg_date": json.loads((RESULTS / "seg-date-model-final.json").read_text())
                          if (RESULTS / "seg-date-model-final.json").exists() else None,
-             "seg_context": seg_context(), "seg_window_modality": seg_window_modality(),
+             "seg_context": seg_context(), "seg_window_modality": seg_window_modality(), "seg_tabme": seg_tabme(),
              "seg_kit_gate_sherlock": seg_kit_gate_sherlock(), "seg_boxes_score": seg_boxes_score(),
              "public": pub, "ocr_scorers": ocr_scorers(),
              "ppocrv6_hands": ppocrv6_hands(pub and pub["open_sweep"]),

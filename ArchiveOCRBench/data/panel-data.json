@@ -28025,6 +28025,103 @@
    }
   }
  },
+ "seg_tabme": {
+  "rows": [
+   {
+    "arm": "2b-it",
+    "boundary_f1": 0.8141107658563334,
+    "pages_exact": 0.5747955747955747,
+    "doc_f1": 0.6636214142152385,
+    "false_splits": 1007,
+    "false_merges": 10,
+    "interval": [
+     0.7946524064171123,
+     0.8338323353293413
+    ]
+   },
+   {
+    "arm": "4b-it",
+    "boundary_f1": 0.8195391705069125,
+    "pages_exact": 0.6161616161616161,
+    "doc_f1": 0.68361894232541,
+    "false_splits": 965,
+    "false_merges": 14,
+    "interval": [
+     0.7989913544668588,
+     0.8401740117268772
+    ]
+   },
+   {
+    "arm": "teacher-it",
+    "boundary_f1": 0.7679063360881543,
+    "pages_exact": 0.5494628827962161,
+    "doc_f1": 0.614802065404475,
+    "false_splits": 1341,
+    "false_merges": 7,
+    "interval": [
+     0.7446524064171123,
+     0.7913567127169677
+    ]
+   },
+   {
+    "arm": "teacher-t",
+    "boundary_f1": 0.8092380432805965,
+    "pages_exact": 0.5977232643899311,
+    "doc_f1": 0.6660607162334121,
+    "false_splits": 1037,
+    "false_merges": 12,
+    "interval": [
+     0.7884376662528817,
+     0.8297594629871341
+    ]
+   },
+   {
+    "arm": "all-new",
+    "boundary_f1": 0.5280302136197332,
+    "pages_exact": 0.19496552829886163,
+    "doc_f1": 0.28696165191740414,
+    "false_splits": 3999,
+    "false_merges": 0,
+    "interval": [
+     0.5093931458499373,
+     0.5476569191239447
+    ]
+   }
+  ],
+  "refs": [
+   [
+    "Mistral-7B LoRA, fine-tuned on TABME++ (A05)",
+    0.987
+   ],
+   [
+    "Phi-3-mini LoRA, fine-tuned (A05)",
+    0.973
+   ],
+   [
+    "Best encoder or XGBoost, trained on TABME++ (A05)",
+    0.831
+   ],
+   [
+    "Gemini 3.1 Flash-Lite, zero-shot text, K = 7 (A04)",
+    0.863
+   ],
+   [
+    "Claude Haiku 4.5, zero-shot text, K = 7 (A04)",
+    0.782
+   ],
+   [
+    "GPT-5.4-mini, zero-shot text, K = 7 (A04)",
+    0.739
+   ],
+   [
+    "doc-split-v1, zero-shot (A20)",
+    0.704
+   ]
+  ],
+  "pages": 6237,
+  "documents": 2238,
+  "gaps": 6236
+ },
  "seg_kit_gate_sherlock": {
   "sc0122_owner": {
    "asked_known": 30,
