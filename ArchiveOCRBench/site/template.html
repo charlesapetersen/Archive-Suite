@@ -156,6 +156,10 @@ footer p { font-size: 13px; }
     <p class="note" id="seg-tabme-lede"></p>
     <div class="tbl"><table><thead><tr><th>Route</th><th>Boundary F1 (95% interval)</th><th>Pages in exact document</th><th>Doc F1</th><th>False splits</th><th>False merges</th></tr></thead><tbody id="seg-tabme-rows"></tbody></table></div>
     <div class="tbl"><table><thead><tr><th>Published on the same split</th><th>Boundary / page F1</th></tr></thead><tbody id="seg-tabme-refs"></tbody></table></div>
+    <div id="seg-tabme-gw" hidden>
+      <p class="note" id="seg-tabme-gw-lede"></p>
+      <div class="tbl"><table><thead><tr><th>Route, same documents</th><th>Boundary F1 (95% interval)</th><th>Pages in exact document</th><th>Doc F1</th><th>False splits</th><th>False merges</th></tr></thead><tbody id="seg-tabme-gw-rows"></tbody></table></div>
+    </div>
     <p class="note">The trained 2B and 4B students and the 27B teacher at the local route's settings (K = 7 windows), one Sherlock batch. The students do not transfer as they stand: the 2B falls from 0.928 boundary F1 on the owner's test boxes to 0.814 here. The untrained teacher falls with them (the 2B leads it by 2.0 points on the owner's boxes and by 3.4 to 5.8 here with the same input, and ties it reading text), so the fall is this collection's document rule rather than the 2B's size. Almost every error is a false split (recall 99.4-99.7%), most inside long documents and shared by all four arms: TABME++'s document is its catalogue's unit, which zero-shot readers likely cut into items. The teacher's text-only row is the one like-for-like cell with A04's K = 7 text windows; A05's figures (page F1, synthetic folders, trained on TABME++) are context only. Intervals: bootstrap over documents, without rerun noise. Source: <code>seg-tabme.md</code> and <code>seg-tabme.json</code>.</p>
   </section>
   <section class="panel" id="seg-window-modality" hidden>
@@ -702,6 +706,17 @@ if (stb) {
     ' (' + f3(r.interval[0]) + '-' + f3(r.interval[1]) + ')</td><td>' + (100 * r.pages_exact).toFixed(1) + '%</td><td>' + f3(r.doc_f1) +
     '</td><td>' + r.false_splits.toLocaleString() + '</td><td>' + r.false_merges + '</td></tr>').join('');
   document.getElementById('seg-tabme-refs').innerHTML = stb.refs.map(([n, v]) => '<tr><td>' + n + '</td><td>' + f3(v) + '</td></tr>').join('');
+  const tg = stb.gateway;
+  if (tg) {
+    const gn = {...nm, 'gemini-k7-it': 'Gemini 3.7 Flash (gateway), images and text', 'gemini-k7-t': 'Gemini 3.7 Flash (gateway), text only'};
+    document.getElementById('seg-tabme-gw-lede').textContent = 'Gemini through the Stanford gateway on the stream\'s first ' +
+      tg.subset.pages + ' pages (' + tg.subset.documents + ' whole documents), K = 7 windows, the cloud route\'s request with and without the images ($' +
+      tg.cost.toFixed(2) + '); the open models\' rows are the same documents cut from their whole-stream runs.';
+    document.getElementById('seg-tabme-gw-rows').innerHTML = tg.rows.map(r => '<tr><td>' + (gn[r.arm] || r.arm) + '</td><td>' + f3(r.boundary_f1) +
+      (r.interval ? ' (' + f3(r.interval[0]) + '-' + f3(r.interval[1]) + ')' : '') + '</td><td>' + (100 * r.pages_exact).toFixed(1) + '%</td><td>' + f3(r.doc_f1) +
+      '</td><td>' + r.false_splits.toLocaleString() + '</td><td>' + r.false_merges + '</td></tr>').join('');
+    document.getElementById('seg-tabme-gw').hidden = false;
+  }
   document.getElementById('seg-tabme').hidden = false;
 }
 

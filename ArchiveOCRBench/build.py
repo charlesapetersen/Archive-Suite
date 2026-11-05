@@ -421,8 +421,17 @@ def seg_tabme():
             ["Best encoder or XGBoost, trained on TABME++ (A05)", 0.831], ["Gemini 3.1 Flash-Lite, zero-shot text, K = 7 (A04)", 0.863],
             ["Claude Haiku 4.5, zero-shot text, K = 7 (A04)", 0.782], ["GPT-5.4-mini, zero-shot text, K = 7 (A04)", 0.739],
             ["doc-split-v1, zero-shot (A20)", 0.704]]
-    return {"rows": rows, "refs": refs, "pages": d["stream"]["pages"], "documents": d["stream"]["documents"],
-            "gaps": d["stream"]["gaps"]}
+    out = {"rows": rows, "refs": refs, "pages": d["stream"]["pages"], "documents": d["stream"]["documents"],
+           "gaps": d["stream"]["gaps"]}
+    gw = RESULTS / "seg-tabme-gateway.json"   # W46.seg-tabme-paid: Gemini 3.7 Flash on the stream's first documents
+    if gw.exists():
+        g = json.loads(gw.read_text())
+        out["gateway"] = {"subset": g["subset"], "cost": g["ledger"]["charged_usd"],
+                          "rows": [{**{k: r[k] for k in ("arm", "boundary_f1", "pages_exact", "doc_f1", "false_splits",
+                                                         "false_merges")},
+                                    "interval": g["intervals"].get(r["arm"], {}).get("boundary_f1")}
+                                   for r in g["rows"] if r["arm"] != "no-boundaries"]}
+    return out
 
 
 def seg_kit_gate_sherlock():
