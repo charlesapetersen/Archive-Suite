@@ -280,8 +280,11 @@ writes against the real corpus — always a copy.
 - `↑/↓` **scroll** the focused page (PDFView) — *not* document cycling
 - `⌘⇧↑/⌘⇧↓` previous/next page in the segment (the opened run/selection)
 - `⌘⌥←`/`⌘⌥→` focus image pane / focus text pane
-- `⌘↑`/`⌘↓` zoom in/out the focused pane · `⌘0` fit the focused page · `⌥⌘0` reset the split to the saved
-  default (not necessarily ⅔) and fit both panes
+- `⌘+`/`⌘−` zoom in/out the focused pane (also `⌘=`, and `⌘↑`/`⌘↓`, answered by the panes since a menu item
+  holds one shortcut) · `⌘0` fit the focused page · `⌥⌘0` reset the split to the saved default (not
+  necessarily ⅔) and fit both panes. On a single-page PDF the text pane is the page's text layer as plain
+  text, and its zoom is the text size (`DocumentViewerModel.textScale`, persisted; `W40.fix-reader-text-zoom`:
+  a PDF zoom never reached it)
 - `⌘C` copy verbatim — the standard **Edit ▸ Copy**, from whichever pane holds the selection (plain text;
   disabled with nothing selected; a focused text field such as the find bar copies its own text) · `⌥⌘C`
   Edit ▸ Copy Cleaned for Prose (intelligent; not `⌘⇧C`, which is Copy Link(s)); it also starts a
@@ -296,14 +299,14 @@ writes against the real corpus — always a copy.
 *Preview sheet* (opened by `Space`/`⌘Y`)
 - `↑/↓` previous/next file in the list (nav selection follows) · `←/→` cycle within a multi-file selection ·
   `⌘C` (Edit ▸ Copy)/`⌥⌘C` copy verbatim/cleaned · `⌥⌘L` copy the page link · `⌘O` open the full viewer · `Space`/`Esc` close
-- `⌘↑`/`⌘↓`/`⌘0` zoom in/out/fit the focused pane — the image pane on open (since `W26.previewzoom`: the
+- `⌘+`/`⌘−` (or `⌘↑`/`⌘↓`)/`⌘0` zoom in/out/fit the focused pane — the image pane on open (since `W26.previewzoom`: the
   sheet's viewer model is published by `NavigationWindowView`, so the Document menu acts on it)
 - **No find bar here:** `⌘F`/`⌘G`/`⌘⇧G` are *disabled* in the preview (`DocumentViewerModel.supportsFind`,
   `W26.previewzoom-fu1`) — `⌘O` into the full viewer to search
 
 > **Reconciled with the code, 2026-07-07.** The viewer scheme changed after PLAN was written
 > (shipped UI batch #14): `↑/↓` now **scroll the focused page** instead
-> of cycling documents; cycling moved to `⌘⇧↑/↓`; zoom is `⌘↑/↓` (not `⌘=`/`⌘-`); reset is `⌥⌘0` (not
+> of cycling documents; cycling moved to `⌘⇧↑/↓`; zoom was `⌘↑/↓` (`⌘+`/`⌘−` added 2026-11-04); reset is `⌥⌘0` (not
 > `⌥⌘=`); `⌘C`/`⌥⌘C` are verbatim/cleaned copy (cleaned was `⌘⇧C` until 2026-10-22). The document window has **no** Mark-Read (`⌘R`) or
 > Copy Link(s) shortcut — those are nav-window only; its page link is `⌥⌘L` (since 2026-11-04).
 

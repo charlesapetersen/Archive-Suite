@@ -58,6 +58,7 @@ final class DocumentViewerModel: ObservableObject {
     private let imageSourcePreferences: DocumentImageSourcePreferences
     private let persistsImageSource: Bool
     private var pinsJPEGPartnerFromLink = false
+    private let persistsTextScale: Bool
     private var linkedJPEGRelativePath: String?
 
     /// `persists: false` → preview mode: fit-to-pane default, zoom changes don't write to UserDefaults.
@@ -70,11 +71,19 @@ final class DocumentViewerModel: ObservableObject {
         self.supportsFind = supportsFind
         self.imageSourcePreferences = imageSourcePreferences
         self.persistsImageSource = persists
+        self.persistsTextScale = persists
         self.thumbnailer = thumbnailer
+        if persists, AppSettings.viewerTextScale > 0 {
+            textScale = Self.clampedTextScale(CGFloat(AppSettings.viewerTextScale))
+        }
         // Edit ▸ Copy (⌘C) reaching either pane copies the viewer's selection (`ReaderPDFView.copy(_:)`).
         for controller in [leftController, rightController] {
             controller.copySelection = { [weak self] in self?.copyPlainSelection() }
             controller.canCopySelection = { [weak self] in self?.hasTextSelection ?? false }
+            // ⌘= / ⌘↑ / ⌘↓ reaching either pane zoom the FOCUSED pane (`ReaderPDFView.performKeyEquivalent`).
+            controller.zoomFocused = { [weak self] zoomIn in
+                if zoomIn { self?.zoomFocusedIn() } else { self?.zoomFocusedOut() }
+            }
         }
     }
 
@@ -118,7 +127,7 @@ final class DocumentViewerModel: ObservableObject {
     /// OCR text page has no right pane, so leaving focus there would point zoom/scroll at nothing.
     private func setPair(_ p: Int) {
         pair = min(max(0, p), max(0, pairCount - 1))
-        if focusedPane == .right, textPage == nil { focusedPane = .left }
+        if focusedPane == .right, textPage == nil, embeddedText == nil { focusedPane = .left }
     }
 
     /// When the user manually cycles documents while find is active, keep the query's highlights on the
@@ -136,9 +145,32 @@ final class DocumentViewerModel: ObservableObject {
 
     /// Move keyboard focus to a pane (so ↑/↓ scroll it and ⌘↑/⌘↓ zoom it).
     func focusPane(_ p: Pane) { focusedPane = p; controller(p).focus() }
-    func zoomFocusedIn()  { controller(focusedPane).zoomIn() }
-    func zoomFocusedOut() { controller(focusedPane).zoomOut() }
-    func fitFocused()     { controller(focusedPane).fit() }
+    func zoomFocusedIn()  { focusedPane == .left ? leftController.zoomIn() : zoomTextIn() }
+    func zoomFocusedOut() { focusedPane == .left ? leftController.zoomOut() : zoomTextOut() }
+    func fitFocused()     { focusedPane == .left ? leftController.fit() : fitText() }
+
+    // MARK: Text pane zoom (W40.fix-reader-text-zoom)
+
+    /// The extracted-text pane's text size, as a multiple of the body size. A pair with an OCR text page
+    /// shows it in a PDFView, which `rightController` zooms; a single-page PDF (almost all of the corpus)
+    /// has none, so the right pane is plain SwiftUI text that a PDF zoom never reached — Zoom In on it
+    /// changed nothing visible. The text pane's zoom commands go through here and size that text instead.
+    /// Persists like the panes' zoom (not in preview mode).
+    @Published private(set) var textScale: CGFloat = 1
+    static let textScaleRange: ClosedRange<CGFloat> = 0.5...4
+
+    func zoomTextIn()  { hasTextPage ? rightController.zoomIn()  : setTextScale(textScale * 1.25) }
+    func zoomTextOut() { hasTextPage ? rightController.zoomOut() : setTextScale(textScale / 1.25) }
+    func fitText()     { hasTextPage ? rightController.fit()     : setTextScale(1) }
+
+    private func setTextScale(_ s: CGFloat) {
+        textScale = Self.clampedTextScale(s)
+        if persistsTextScale { AppSettings.setViewerTextScale(textScale == 1 ? 0 : Double(textScale)) }
+    }
+
+    private static func clampedTextScale(_ s: CGFloat) -> CGFloat {
+        min(textScaleRange.upperBound, max(textScaleRange.lowerBound, s))
+    }
 
     var title: String { urls.indices.contains(index) ? urls[index].lastPathComponent : "Document View" }
 

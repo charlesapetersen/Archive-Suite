@@ -87,15 +87,8 @@ struct DocumentWindowView: View {
                             .frame(maxWidth: .infinity)
                             .overlay(focusBorder(.right))
                     } else if let text = model.embeddedText {
-                        ScrollView {
-                            Text(text)
-                                .textSelection(.enabled)
-                                .font(.body)
-                                .padding()
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .overlay(focusBorder(.right))
+                        ExtractedTextPane(text: text, scale: model.textScale)
+                            .overlay(focusBorder(.right))
                         .accessibilityIdentifier("ar.doc.textPane")
                     } else {
                         ContentUnavailableView("No OCR text page", systemImage: "text.slash",
@@ -111,8 +104,8 @@ struct DocumentWindowView: View {
         }
     }
 
-    /// A thin accent outline on the pane that has keyboard focus, so it's clear which page ⌘↑/⌘↓
-    /// (zoom) and ↑/↓ (scroll) act on. Switch focus with ⌘⌥← / ⌘⌥→.
+    /// A thin accent outline on the pane that has keyboard focus, so it's clear which page ⌘+/⌘−
+    /// (zoom; also ⌘↑/⌘↓) and ↑/↓ (scroll) act on. Switch focus with ⌘⌥← / ⌘⌥→.
     private func focusBorder(_ pane: DocumentViewerModel.Pane) -> some View {
         Rectangle()
             .strokeBorder(model.focusedPane == pane ? Color.accentColor.opacity(0.7) : .clear, lineWidth: 2)
@@ -210,12 +203,12 @@ struct DocumentWindowView: View {
 
             Divider()
 
-            Button { model.rightController.zoomOut() } label: { Label("Zoom Out Right", systemImage: "minus.magnifyingglass") }
+            Button { model.zoomTextOut() } label: { Label("Zoom Out Right", systemImage: "minus.magnifyingglass") }
                 .help("Zoom out the OCR text page")
-            Button { model.rightController.zoomIn() } label: { Label("Zoom In Right", systemImage: "plus.magnifyingglass") }
+            Button { model.zoomTextIn() } label: { Label("Zoom In Right", systemImage: "plus.magnifyingglass") }
                 .help("Zoom in the OCR text page")
-            Button { model.rightController.fit() } label: { Label("Fit Right", systemImage: "arrow.up.left.and.arrow.down.right") }
-                .help("Fit the OCR text page to its pane")
+            Button { model.fitText() } label: { Label("Fit Right", systemImage: "arrow.up.left.and.arrow.down.right") }
+                .help("Fit the OCR text page to its pane, or reset the text size")
 
             Divider()
 
@@ -225,7 +218,7 @@ struct DocumentWindowView: View {
                 .help("Copy the selected text cleaned for prose — joins lines, de-hyphenates (⌥⌘C)")
             Button { model.beginFind() } label: { Label("Find", systemImage: "magnifyingglass") }
                 .help("Search for text in this document (⌘F)")
-            Button { fraction = defaultFraction; model.leftController.fit(); model.rightController.fit() } label: {
+            Button { fraction = defaultFraction; model.leftController.fit(); model.fitText() } label: {
                 Label("Reset Layout", systemImage: "rectangle.split.2x1")
             }
             .keyboardShortcut("0", modifiers: [.command, .option])

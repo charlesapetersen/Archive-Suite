@@ -152,7 +152,8 @@ struct ArchiveReaderCommands: Commands {
         }
 
         // Document (document window). ↑/↓ ALONE scroll the focused page (handled by the PDF view, not
-        // bound here). The focused pane (⌘⌥←/→) is what ⌘↑/⌘↓ zoom.
+        // bound here). The focused pane (⌘⌥←/→) is what ⌘+/⌘− zoom. A menu item holds one shortcut, so
+        // ⌘= and the older ⌘↑/⌘↓ are answered by the panes themselves (`ReaderPDFView.performKeyEquivalent`).
         CommandMenu("Document") {
             Button("Previous Page in Segment") { doc?.previous() }
                 .keyboardShortcut(.upArrow, modifiers: [.command, .shift]).disabled(doc == nil)
@@ -165,9 +166,9 @@ struct ArchiveReaderCommands: Commands {
                 .keyboardShortcut(.rightArrow, modifiers: [.command, .option]).disabled(doc == nil)
             Divider()
             Button("Zoom In") { doc?.zoomFocusedIn() }
-                .keyboardShortcut(.upArrow, modifiers: .command).disabled(doc == nil)
+                .keyboardShortcut("+", modifiers: .command).disabled(doc == nil)
             Button("Zoom Out") { doc?.zoomFocusedOut() }
-                .keyboardShortcut(.downArrow, modifiers: .command).disabled(doc == nil)
+                .keyboardShortcut("-", modifiers: .command).disabled(doc == nil)
             Button("Fit Page") { doc?.fitFocused() }
                 .keyboardShortcut("0", modifiers: .command).disabled(doc == nil)
             Divider()
@@ -184,8 +185,8 @@ struct ArchiveReaderCommands: Commands {
             Divider()
             Button("Zoom In (Image)") { doc?.leftController.zoomIn() }.disabled(doc == nil)
             Button("Zoom Out (Image)") { doc?.leftController.zoomOut() }.disabled(doc == nil)
-            Button("Zoom In (Text)") { doc?.rightController.zoomIn() }.disabled(doc == nil)
-            Button("Zoom Out (Text)") { doc?.rightController.zoomOut() }.disabled(doc == nil)
+            Button("Zoom In (Text)") { doc?.zoomTextIn() }.disabled(doc == nil)
+            Button("Zoom Out (Text)") { doc?.zoomTextOut() }.disabled(doc == nil)
         }
     }
 

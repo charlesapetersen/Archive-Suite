@@ -23,6 +23,9 @@ final class PDFPaneController {
     /// PDFKit's own `copy:` in place. See `ReaderPDFView.copy(_:)`.
     var copySelection: (() -> Void)?
     var canCopySelection: (() -> Bool)?
+    /// A zoom key reaching this pane (`true` = in), forwarded to the viewer so it zooms the FOCUSED pane —
+    /// which may be the extracted-text pane, not a PDFView at all. Set by `DocumentViewerModel`.
+    var zoomFocused: ((Bool) -> Void)?
 
     init(key: String, persists: Bool = true) {
         self.key = key
@@ -248,6 +251,34 @@ final class ReaderPDFView: PDFView {
     /// pane, plain text only, so focus on the image pane still copies text selected on the text page.
     override func copy(_ sender: Any?) {
         if let copy = paneController?.copySelection { copy() } else { super.copy(sender) }
+    }
+
+    /// W40.fix-reader-text-zoom: the Document menu shows ⌘+ / ⌘− for Zoom In / Out, and a menu item holds
+    /// one shortcut. The others — ⌘= (⌘+ without Shift), and the ⌘↑ / ⌘↓ that came first — are answered
+    /// here. A window offers key equivalents to every view in it, so this catches them wherever the
+    /// focus is (the find field included), and both panes forward to the same focused-pane zoom.
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        if let zoomIn = Self.zoomKey(event), let zoom = paneController?.zoomFocused {
+            zoom(zoomIn)
+            return true
+        }
+        return super.performKeyEquivalent(with: event)
+    }
+
+    /// `true` for a zoom-in key, `false` for zoom-out, `nil` for anything else. Command alone, except
+    /// that Shift is allowed for "+" (⌘+ is ⌘⇧= on most layouts) — and only there: ⌘⇧↑ / ⌘⇧↓ page
+    /// through the segment.
+    static func zoomKey(_ event: NSEvent) -> Bool? {
+        guard event.type == .keyDown, let key = event.charactersIgnoringModifiers else { return nil }
+        var mods = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+            .subtracting([.numericPad, .function, .capsLock])
+        if key == "+" { mods.remove(.shift) }
+        guard mods == .command else { return nil }
+        switch key {
+        case "=", "+", String(UnicodeScalar(NSUpArrowFunctionKey)!): return true
+        case "-", String(UnicodeScalar(NSDownArrowFunctionKey)!): return false
+        default: return nil
+        }
     }
 }
 

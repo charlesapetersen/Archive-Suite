@@ -18,6 +18,7 @@ enum SettingsKey {
     // Document-viewer "last used becomes the default" layout (DV-1/DV-2): zoom per pane, window size.
     static let viewerLeftZoom = "viewerLeftZoom"     // scaleFactor; 0 = fit-to-pane
     static let viewerRightZoom = "viewerRightZoom"   // scaleFactor; 0 = fit-to-pane
+    static let viewerTextScale = "viewerTextScale"   // extracted-text pane's text size; 0 = default
     static let viewerWinW = "viewerWindowWidth"      // 0 = unset → open maximized
     static let viewerWinH = "viewerWindowHeight"
 }
@@ -58,6 +59,11 @@ enum AppSettings {
     static func setViewerZoom(_ key: String, _ scale: Double) {
         d.set(scale, forKey: key == "left" ? SettingsKey.viewerLeftZoom : SettingsKey.viewerRightZoom)
     }
+
+    /// The text size of the extracted-text pane (a single-page PDF has no OCR text page, so the right
+    /// pane shows its text layer as plain text), as a multiple of the body size. `0` = default.
+    static var viewerTextScale: Double { d.double(forKey: SettingsKey.viewerTextScale) }
+    static func setViewerTextScale(_ scale: Double) { d.set(scale, forKey: SettingsKey.viewerTextScale) }
 
     /// Remembered document-window size (DV-1). `nil` when never resized → the window opens maximized.
     static var viewerWindowSize: CGSize? {
