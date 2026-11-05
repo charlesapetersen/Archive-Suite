@@ -413,14 +413,24 @@ def escalations():
     return sorted(k for k in v if k in pp and (v[k]['found'] is None or v[k]['found'] != pp[k]['found']))
 
 
+def turned_check():
+    """Every turn of the held-out pages two local routes agree are stored turned: Gemini as a third family, as the
+    public set's rule uses it. Scored nowhere as a route; it only says whether the model agrees the page is turned."""
+    import rotation_report as REP
+    ps = {p['id']: p for p in page_list()}
+    a = {r: done(r) for r in REP.LOCAL}
+    return sorted((pid, t) for pid in REP.stored_turned(ps, a) for t in TURNS)
+
+
 def gateway_escalations(concurrency=4, dry=False):
-    """llmSingle (one ordering) on the held-out set's escalated turns only: the cascade's cloud arm, priced first."""
+    """llmSingle (one ordering) on the held-out set's escalated turns, and on the turns of the pages two local routes
+    agree are stored turned: the cascade's cloud arm and a third-family check, priced first."""
     if SET != 'heldout':
         raise SystemExit('gateway-escalations is the held-out arm: --set heldout')
     HELDOUT.mkdir(parents=True, exist_ok=True)
     have = done('gw-order0')
     ps = {p['id']: p for p in page_list()}
-    jobs = [k for k in escalations() if k not in have]
+    jobs = sorted({k for k in escalations() + turned_check() if k not in have})
     G = gw()
     print(f'{len(jobs)} escalated turns to ask; about ${0.0037 * len(jobs):.2f} at llmSingle\'s measured $0.0037 a call; '
           f'${G.spent():.4f} spent of ${G.CAP}')

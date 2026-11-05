@@ -54933,7 +54933,10 @@
    "L7": "L7 charters",
    "N1": "N1 Arabic",
    "N4": "N4 Hebrew",
-   "N5": "N5 Chinese print"
+   "N5": "N5 Chinese print",
+   "heldout": "held out: 119 owner pages",
+   "heldout_replaced": "held out: the 19 the 96's draw replaced",
+   "heldout_boxes": "held out: 100 locked-box pages"
   },
   "rows": [
    {
@@ -55045,6 +55048,42 @@
      "lo": 57.9,
      "hi": 77.8,
      "seconds": 0.138,
+     "usd_per_page": 0.0
+    },
+    "heldout": {
+     "n": 476,
+     "exact": 436,
+     "axis": 9,
+     "flip": 9,
+     "abstain": 22,
+     "pct": 91.6,
+     "lo": 88.8,
+     "hi": 93.8,
+     "seconds": 0.203,
+     "usd_per_page": 0.0
+    },
+    "heldout_replaced": {
+     "n": 76,
+     "exact": 58,
+     "axis": 1,
+     "flip": 0,
+     "abstain": 17,
+     "pct": 76.3,
+     "lo": 65.6,
+     "hi": 84.5,
+     "seconds": 0.472,
+     "usd_per_page": 0.0
+    },
+    "heldout_boxes": {
+     "n": 400,
+     "exact": 378,
+     "axis": 8,
+     "flip": 9,
+     "abstain": 5,
+     "pct": 94.5,
+     "lo": 91.8,
+     "hi": 96.3,
+     "seconds": 0.152,
      "usd_per_page": 0.0
     }
    },
@@ -55158,6 +55197,42 @@
      "hi": 96.5,
      "seconds": 0.494,
      "usd_per_page": 0.0
+    },
+    "heldout": {
+     "n": 476,
+     "exact": 245,
+     "axis": 63,
+     "flip": 131,
+     "abstain": 37,
+     "pct": 51.5,
+     "lo": 47.0,
+     "hi": 55.9,
+     "seconds": 0.43,
+     "usd_per_page": 0.0
+    },
+    "heldout_replaced": {
+     "n": 76,
+     "exact": 14,
+     "axis": 19,
+     "flip": 12,
+     "abstain": 31,
+     "pct": 18.4,
+     "lo": 11.3,
+     "hi": 28.6,
+     "seconds": 0.308,
+     "usd_per_page": 0.0
+    },
+    "heldout_boxes": {
+     "n": 400,
+     "exact": 231,
+     "axis": 44,
+     "flip": 119,
+     "abstain": 6,
+     "pct": 57.8,
+     "lo": 52.9,
+     "hi": 62.5,
+     "seconds": 0.453,
+     "usd_per_page": 0.0
     }
    },
    {
@@ -55269,6 +55344,42 @@
      "lo": 91.3,
      "hi": 99.3,
      "seconds": 0.018,
+     "usd_per_page": 0.0
+    },
+    "heldout": {
+     "n": 476,
+     "exact": 422,
+     "axis": 28,
+     "flip": 26,
+     "abstain": 0,
+     "pct": 88.7,
+     "lo": 85.5,
+     "hi": 91.2,
+     "seconds": 0.026,
+     "usd_per_page": 0.0
+    },
+    "heldout_replaced": {
+     "n": 76,
+     "exact": 49,
+     "axis": 12,
+     "flip": 15,
+     "abstain": 0,
+     "pct": 64.5,
+     "lo": 53.3,
+     "hi": 74.3,
+     "seconds": 0.022,
+     "usd_per_page": 0.0
+    },
+    "heldout_boxes": {
+     "n": 400,
+     "exact": 373,
+     "axis": 16,
+     "flip": 11,
+     "abstain": 0,
+     "pct": 93.2,
+     "lo": 90.4,
+     "hi": 95.3,
+     "seconds": 0.027,
      "usd_per_page": 0.0
     }
    },
@@ -55382,7 +55493,10 @@
      "hi": 93.4,
      "seconds": 7.236,
      "usd_per_page": 0.0
-    }
+    },
+    "heldout": null,
+    "heldout_replaced": null,
+    "heldout_boxes": null
    },
    {
     "id": "mlx-qwen3vl-8b-single",
@@ -55494,7 +55608,10 @@
      "hi": 49.5,
      "seconds": 2.047,
      "usd_per_page": 0.0
-    }
+    },
+    "heldout": null,
+    "heldout_replaced": null,
+    "heldout_boxes": null
    },
    {
     "id": "mlx-qwen35-2b-compare",
@@ -55606,7 +55723,10 @@
      "hi": 28.3,
      "seconds": 2.499,
      "usd_per_page": 0.0
-    }
+    },
+    "heldout": null,
+    "heldout_replaced": null,
+    "heldout_boxes": null
    },
    {
     "id": "mlx-qwen35-2b-single",
@@ -55718,7 +55838,10 @@
      "hi": 55.6,
      "seconds": 0.715,
      "usd_per_page": 0.0
-    }
+    },
+    "heldout": null,
+    "heldout_replaced": null,
+    "heldout_boxes": null
    },
    {
     "id": "llm1",
@@ -55830,7 +55953,10 @@
      "hi": 99.3,
      "seconds": 5.579,
      "usd_per_page": 0.00379
-    }
+    },
+    "heldout": null,
+    "heldout_replaced": null,
+    "heldout_boxes": null
    },
    {
     "id": "llm1+v",
@@ -55942,7 +56068,10 @@
      "hi": 99.3,
      "seconds": 5.579,
      "usd_per_page": 0.00379
-    }
+    },
+    "heldout": null,
+    "heldout_replaced": null,
+    "heldout_boxes": null
    },
    {
     "id": "llm3",
@@ -56054,7 +56183,10 @@
      "hi": 100.0,
      "seconds": 13.696,
      "usd_per_page": 0.01124
-    }
+    },
+    "heldout": null,
+    "heldout_replaced": null,
+    "heldout_boxes": null
    },
    {
     "id": "vision>llm1",
@@ -56166,7 +56298,10 @@
      "hi": 98.7,
      "seconds": 1.921,
      "usd_per_page": 0.00118
-    }
+    },
+    "heldout": null,
+    "heldout_replaced": null,
+    "heldout_boxes": null
    },
    {
     "id": "vision>qwen3vl-compare",
@@ -56278,7 +56413,10 @@
      "hi": 96.5,
      "seconds": 4.613,
      "usd_per_page": 0.0
-    }
+    },
+    "heldout": null,
+    "heldout_replaced": null,
+    "heldout_boxes": null
    },
    {
     "id": "vision>paddle",
@@ -56389,6 +56527,42 @@
      "lo": 89.5,
      "hi": 98.7,
      "seconds": 0.143,
+     "usd_per_page": 0.0
+    },
+    "heldout": {
+     "n": 476,
+     "exact": 443,
+     "axis": 21,
+     "flip": 12,
+     "abstain": 0,
+     "pct": 93.1,
+     "lo": 90.4,
+     "hi": 95.0,
+     "seconds": 0.204,
+     "usd_per_page": 0.0
+    },
+    "heldout_replaced": {
+     "n": 76,
+     "exact": 64,
+     "axis": 9,
+     "flip": 3,
+     "abstain": 0,
+     "pct": 84.2,
+     "lo": 74.4,
+     "hi": 90.7,
+     "seconds": 0.478,
+     "usd_per_page": 0.0
+    },
+    "heldout_boxes": {
+     "n": 400,
+     "exact": 379,
+     "axis": 12,
+     "flip": 9,
+     "abstain": 0,
+     "pct": 94.8,
+     "lo": 92.1,
+     "hi": 96.5,
+     "seconds": 0.152,
      "usd_per_page": 0.0
     }
    },
@@ -56502,6 +56676,42 @@
      "hi": 99.3,
      "seconds": 2.025,
      "usd_per_page": 0.00124
+    },
+    "heldout": {
+     "n": 476,
+     "exact": 448,
+     "axis": 16,
+     "flip": 12,
+     "abstain": 0,
+     "pct": 94.1,
+     "lo": 91.6,
+     "hi": 95.9,
+     "seconds": 0.789,
+     "usd_per_page": 0.00035
+    },
+    "heldout_replaced": {
+     "n": 76,
+     "exact": 68,
+     "axis": 4,
+     "flip": 4,
+     "abstain": 0,
+     "pct": 89.5,
+     "lo": 80.6,
+     "hi": 94.6,
+     "seconds": 3.18,
+     "usd_per_page": 0.00157
+    },
+    "heldout_boxes": {
+     "n": 400,
+     "exact": 380,
+     "axis": 12,
+     "flip": 8,
+     "abstain": 0,
+     "pct": 95.0,
+     "lo": 92.4,
+     "hi": 96.7,
+     "seconds": 0.335,
+     "usd_per_page": 0.00012
     }
    },
    {
@@ -56614,7 +56824,10 @@
      "hi": 100.0,
      "seconds": 4.192,
      "usd_per_page": 0.00337
-    }
+    },
+    "heldout": null,
+    "heldout_replaced": null,
+    "heldout_boxes": null
    },
    {
     "id": "vision=qwen3vl>llm1",
@@ -56726,7 +56939,10 @@
      "hi": 100.0,
      "seconds": 10.803,
      "usd_per_page": 0.0026
-    }
+    },
+    "heldout": null,
+    "heldout_replaced": null,
+    "heldout_boxes": null
    },
    {
     "id": "vision=paddle>qwen3vl",
@@ -56838,7 +57054,10 @@
      "hi": 96.5,
      "seconds": 4.63,
      "usd_per_page": 0.0
-    }
+    },
+    "heldout": null,
+    "heldout_replaced": null,
+    "heldout_boxes": null
    },
    {
     "id": "vision=paddle>flag",
@@ -56950,11 +57169,47 @@
      "hi": 77.8,
      "seconds": 0.157,
      "usd_per_page": 0.0
+    },
+    "heldout": {
+     "n": 476,
+     "exact": 414,
+     "axis": 9,
+     "flip": 8,
+     "abstain": 45,
+     "pct": 87.0,
+     "lo": 83.7,
+     "hi": 89.7,
+     "seconds": 0.229,
+     "usd_per_page": 0.0
+    },
+    "heldout_replaced": {
+     "n": 76,
+     "exact": 43,
+     "axis": 1,
+     "flip": 0,
+     "abstain": 32,
+     "pct": 56.6,
+     "lo": 45.4,
+     "hi": 67.1,
+     "seconds": 0.494,
+     "usd_per_page": 0.0
+    },
+    "heldout_boxes": {
+     "n": 400,
+     "exact": 371,
+     "axis": 8,
+     "flip": 8,
+     "abstain": 13,
+     "pct": 92.8,
+     "lo": 89.8,
+     "hi": 94.9,
+     "seconds": 0.178,
+     "usd_per_page": 0.0
     }
    }
   ],
-  "meta": "216 pages \u00d7 4 turns \u00b7 Gemini through the gateway, the rest free on the Mac (W46.rotation-routes)",
-  "note": "Each upright page turned 0, 90, 180 and 270 degrees; a route is right when it gives the turn that makes it upright. Wrong axis = sideways, flip = upside down, abstain = no answer. The gateway's Gemini 3.7 Flash runs the app's comparative which-of-four prompt (llmSingle one call, llmMajority three, on a 108-page half); the local models ran on a 48-page subset. Vision is right on 99.0% of the owner's turns and never wrong there, but wrong-axis on charters; llmSingle is 100% on the 96 and 97.3% on the public strata; Vision and PP-LCNet agreeing, else llmSingle, is 100% on the 96 with 7 of 384 turns sent to the model. Small local vision models are near chance. Seconds were taken inside an unattended session (background QoS), so compare them, don't quote them. Detail: ArchiveProcessor/segbench-results/rotation-routes.md."
+  "meta": "216 pages \u00d7 4 turns, and 119 held-out owner pages for the local routes \u00b7 Gemini through the gateway, the rest free on the Mac (W46.rotation-routes)",
+  "note": "Each upright page turned 0, 90, 180 and 270 degrees; a route is right when it gives the turn that makes it upright. Wrong axis = sideways, flip = upside down, abstain = no answer. The gateway's Gemini 3.7 Flash runs the app's comparative which-of-four prompt (llmSingle one call, llmMajority three, on a 108-page half); the local models ran on a 48-page subset. Vision is right on 99.0% of the owner's turns and never wrong there, but wrong-axis on charters; llmSingle is 100% on the 96 and 97.3% on the public strata; Vision and PP-LCNet agreeing, else llmSingle, is 100% on the 96 with 7 of 384 turns sent to the model, but the 96 are the shipped detector's development set: on 119 held-out owner pages Vision is right at all four turns on 107 and wrong on 6, and Vision with PP-LCNet flagging is wrong on 5 and flags 14. The small local models are at chance with a one-image prompt; Qwen3-VL 8B with the app's comparative prompt is 78.1%, below Vision on the owner's pages. Seconds were taken inside an unattended session (background QoS), so compare them, don't quote them. Detail: ArchiveProcessor/segbench-results/rotation-routes.md."
  },
  "loops": {
   "report": "bench-corpus/loop-rerun-20261021.md",

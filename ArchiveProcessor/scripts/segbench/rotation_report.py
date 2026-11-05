@@ -41,7 +41,15 @@ set.** RotationDetector's policy was chosen on these 384 turns (W40.fix-processo
 96 were drawn through a 20-word Vision filter, so they hold no page where Vision's text, and its rotation vote, is
 weakest. By page it is 95 of 96 right at all four turns (p034 abstains at all four); zero wrong pages bounds its page
 error at 3.8%, not 1.0%. The held-out owner figure (below, W46.rotation-heldout) is the one a rule cites.
-__HELDOUT_VERDICT__
+__HELDOUT_VERDICT__ Five of its six wrong pages are box pages every route, Gemini included, agrees the box stores
+turned (two magazine pages upside down, three clippings sideways); they are reported apart, not dropped. Set apart (an
+upper bound, since the routes' own answers chose them), Vision is wrong at one turn on 2 of 114 pages (a clipping's
+flip, a near-blank cover's axis) and abstains on 6, five of them pages the 20-word filter took out of the 96. So "never
+wrong" is the development set's figure, not a population one, and Vision's abstentions gather on exactly the pages the
+filter removed. The profile rules hold up held out: the free rule (Vision checked by PP-LCNet, else flag) is wrong on 1
+of 114 pages at one turn (that cover) and flags 13, nine of them filter-replaced; the cloud rule is wrong on 2 of 114,
+the two near-blank covers on which Gemini gives one constant wrong answer, with 45 calls for 476 turns. PP-LCNet alone is
+weaker held out (9 wrong pages of 114, seven of them filter-replaced), and Tesseract is not a route (56 wrong).
 
 Its four misses on the 96 are abstentions (p034's two axes). It is also safe on L1 English handwriting and L4 ledgers (93.8% and 97.5%, abstentions only). It
 gives a confident **wrong axis** on charters (36 of L7's 80 turns), abstains on much of Hebrew (34 of 80) and Chinese
@@ -110,7 +118,8 @@ CARD = """- **Truth.** Constructed, not drafted: each page is taken as upright a
 - **Noise.** n is turns: 384 on the 96, 80 a public stratum (40 and 16 on the subsets). Exact rates carry 95% Wilson
   intervals. Route pairs are compared turn by turn on the same turns (the paired table). The four turns of a page
   are not independent (a route that fails a page often fails all four turns), so a stratum's interval is narrower
-  than its 20 pages justify. Gemini at temperature 0 was run once and no rerun floor was measured, so a gap of a few
+  than its 20 pages justify. The held-out section therefore gives page counts with Wilson intervals (zero wrong pages
+  of n bounds the page error, 3.8% at 96) and page-clustered turn intervals, and the same for the 96. Gemini at temperature 0 was run once and no rerun floor was measured, so a gap of a few
   turns between two routes is read as a tie, not a ranking.
 - **Scope.** Seconds are wall time inside an unattended engine session, which runs at background QoS. CPU-bound
   steps there can run several times slower than in the app (memory note: the daemon clamp), so read the local
@@ -118,7 +127,11 @@ CARD = """- **Truth.** Constructed, not drafted: each page is taken as upright a
   trip. Clean scans and photographs only: no skewed, cropped or mixed-orientation pages beyond what the sets hold
   (p034, the 96's mixed-axes page, is the one the axis test knows). The app's own Gemini, OpenAI and Anthropic
   rotation models were not measured: real money on personal keys, and 3.7 Flash stands in. What a wrong rotation
-  costs downstream (an OCR reading of a sideways page) is not measured here."""
+  costs downstream (an OCR reading of a sideways page) is not measured here. The held-out set ran Vision, PP-LCNet
+  and Tesseract on every turn (on macOS 27.2, PaddlePaddle 3.3.1, which reproduced the main run's PP-LCNet labels and
+  scores on 48 turns of the 96) and Gemini only on the cloud rule's 45 escalated turns and the stored-turned pages'
+  turns (61 calls, $0.23 on the gateway); llmSingle alone, llmMajority and the local VLMs have no held-out figure.
+  The locked boxes are three collections (letters, a magazine, clippings), not a draw from the whole corpus."""
 BENCH_META = '216 pages × 4 turns, and 119 held-out owner pages for the local routes · Gemini through the gateway, the rest free on the Mac (W46.rotation-routes)'
 BENCH_NOTE = ("Each upright page turned 0, 90, 180 and 270 degrees; a route is right when it gives the turn that "
               "makes it upright. Wrong axis = sideways, flip = upside down, abstain = no answer. The gateway's Gemini "
@@ -434,6 +447,7 @@ def load_heldout():
         spend = RR.gw().billed(RR.gw().ledger()) if llm else None
     finally:
         RR.use_set('main')
+    a['_llm'] = llm
     if 'vision' in a and 'paddle' in a:
         c = cascades(a)
         a['vision>paddle'] = c['vision>paddle']
@@ -455,13 +469,15 @@ def load_heldout():
     return pages, a, spend
 
 
-def stored_turned(pages, a):
-    """Held-out pages two local routes of different families agree are stored turned: the same non-zero offset at all
-    four turns. Reported apart, never dropped: they stay in every figure, and the table without them is labelled as
+def stored_turned(pages, a, llm=None):
+    """Held-out pages two routes of different families agree are stored turned: the same non-zero offset at all four
+    turns (Gemini counts where it was asked every turn of the page). Reported apart, never dropped: they stay in every figure, and the table without them is labelled as
     chosen by the routes it scores."""
     out = {}
     for pid in pages:
         offs = {r: offset(a[r], pid) for r in LOCAL if r in a}
+        if llm and all((pid, t) in llm for t in RR.TURNS):   # Gemini, where it was asked every turn
+            offs['llm1'] = offset(llm, pid)
         got = collections.Counter(v for v in offs.values() if v is not None)
         for off, c in got.items():
             if c >= 2:
@@ -471,12 +487,16 @@ def stored_turned(pages, a):
 
 def heldout_data(main_pages, main_a, main_casc):
     pages, a, spend = load_heldout()
+    llm = a.pop('_llm')
     if not a:
         return None
     groups = {g: [p for p in pages if pages[p]['stratum'] == g] for g in HELDOUT_GROUPS}
     groups['boxes'] = [p for p in pages if pages[p]['set'] == 'boxes']
     groups['heldout'] = list(pages)
-    turned = stored_turned(pages, a)
+    turned = stored_turned(pages, a, llm)
+    for pid, v in turned.items():   # Gemini, another family, on every turn of these pages (gateway-escalations)
+        if all((pid, t) in llm for t in RR.TURNS):
+            v['gemini'] = offset(llm, pid) or 0
     upright = [p for p in pages if p not in turned]
     routes = {}
     for r in HELDOUT_ROUTES:
@@ -533,7 +553,8 @@ def heldout_md(h, names):
            f"({h['pages']['Sasha']} Sasha letters, {h['pages']['IllustratedReview']} Illustrated Review, "
            f"{h['pages']['SC0122']} SC0122 clippings). Same turns, same routes, same scoring as above. A page is right "
            "when all four turns are; wrong when any turn gets a confident wrong answer; flagged when any turn is an "
-           "abstention or (for a rule) escalated. Page intervals are Wilson's (the bracket after \"wrong\" is the upper "
+           "abstention or (for a rule) escalated: for the free rule a flagged page is left for review, for the cloud "
+           "rule it is sent to Gemini. Page intervals are Wilson's (the bracket after \"wrong\" is the upper "
            "end); turn intervals are page-clustered (pages resampled with their four turns).", '',
            '| Route | Set | Pages | Turns |', '|---|---|---|---|']
     for r in R:
@@ -541,8 +562,12 @@ def heldout_md(h, names):
             out.append(f"| {names[r]} | {HELDOUT_NAMES[g]} | {page_cell(R[r][g]['pages'])} | {turn_cell(R[r][g]['turns'])} |")
     st = h['stored_turned']
     out += ['', f"**Pages two routes agree are stored turned** ({len(st)}): "
-            + (', '.join(f"{k} (+{v['offset']}°: {', '.join(v['routes'])})" for k, v in st.items()) or 'none')
-            + ". They stay in every figure above, scored as stored. Without them (an upper bound for the routes that "
+            + (', '.join(f"{k} (+{v['offset']}°: {', '.join(x for x in v['routes'] if x != 'llm1')}; Gemini "
+                         + ('not asked' if 'gemini' not in v else 'agrees' if v['gemini'] == v['offset'] else
+                            'gives no constant correction' if v['gemini'] == 0 else f"+{v['gemini']}°") + ')'
+                         for k, v in st.items()) or 'none')
+            + ". Gemini 3.7 Flash (llmSingle, through the gateway) was asked every turn of them as a third family. "
+            "Nobody looked at them. They stay in every figure above, scored as stored. Without them (an upper bound for the routes that "
             "named them, since their own answers chose the pages):", '', '| Route | Pages, without them | Turns, without them |',
             '|---|---|---|']
     for r in R:
@@ -596,9 +621,10 @@ def fill(text, data):
                 f"({cp['right']} of {n} pages at all four, {cp['wrong']} wrong) with {h['escalations']} calls.")
         else:
             sub['__HELDOUT_CLOUD__'] = 'its held-out escalations were not asked (no figure).'
-        sub['__HELDOUT_TURNED__'] = (f"{len(st)} of them two local routes agree are stored turned, reported apart in the "
-                                     "held-out section, never dropped." if st else
-                                     "no two local routes agree that any is stored turned.")
+        both = sum(v.get('gemini') == v['offset'] for v in st.values())
+        sub['__HELDOUT_TURNED__'] = (f"{len(st)} of them two routes agree are stored turned (Gemini gives the same "
+                                     f"correction on {both} of the {len(st)}), reported apart in the held-out section, "
+                                     "never dropped." if st else "no two routes agree that any is stored turned.")
         sub['__HELDOUT_NOTE__'] = (f"on {n} held-out owner pages Vision is right at all four turns on {v['right']} and "
                                    f"wrong on {v['wrong']}, and Vision with PP-LCNet flagging is wrong on {fr['wrong']} "
                                    f"and flags {fr['flagged']}.")
