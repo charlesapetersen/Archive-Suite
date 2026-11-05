@@ -105,9 +105,10 @@ JUDGE = "gemini"
 # ent_truth.PRICE (OpenRouter's catalogue). Labelled estimates; the gateway's own figure is kept beside each.
 PRICE = {"gemini-3.7-flash": (0.75, 3.75), "gpt-5.6-luna": (0.20, 1.20)}
 BAR = 0.90
-SHEET_DISPUTES, MIN_PER_FIELD, CONTROLS, ENTITY_CONTROLS = 85, 8, 30, 20
-# seconds an owner takes: a document's pages looked over once, then each item (ocr_truth's review rates, rounded)
-SECONDS_PER_DOC, SECONDS_PER_ITEM = 25, 20
+SHEET_DISPUTES, MIN_PER_FIELD, MAX_PER_FIELD, CONTROLS, ENTITY_CONTROLS = 85, 8, 20, 30, 20
+# Seconds an owner takes, an estimate from ocr_truth's review rates (10 s a page, 6 s a span, 30 s for the 15% typed):
+# a document's pages looked over once, then each question, slower than a span because the field has to be found.
+SECONDS_PER_DOC, SECONDS_PER_ITEM = 20, 12
 
 PROMPT = """You are labelling catalogue fields for a test set built from a historical archive. You get images of the \
 pages of one document (all of them, or for a long document the first 8 and the last 2) and the text machine OCR read \
@@ -659,6 +660,7 @@ def truth_rows():
                      "collection": d["collection"], "how": how, **{f: t[f] for f in IF.FIELDS},
                      "zotero": IF.ZOTERO.get(t["kind"]) if t["kind"] else None, "quotes": t.get("quotes") or {},
                      "basis": t.get("basis"), **det, "readers": {"gemini": plain(pa), "luna": plain(pb)},
+                     "reader_quotes": {"gemini": pa.get("quotes") or {}, "luna": pb.get("quotes") or {}},
                      "opinions": {**{k: plain(v) for k, v in (old_opinions(d) or {}).items()},
                                   "old_truth": {f: o.get(f) for f in IF.FIELDS} if o else None}
                      if d["part"] == "base" else None})
@@ -728,11 +730,14 @@ def prelim_precision(rows, docs):
 
 def quotas(avail, prec):
     """Disputed items per field: at least MIN_PER_FIELD (or all there are), the rest of SHEET_DISPUTES by weight
-    1 / (0.05 + |precision - BAR|), never more than a field has."""
+    1 / (0.05 + |precision - BAR|), never more than MAX_PER_FIELD or than a field has. A field Gemini 3.8 never
+    fills (title) has no precision and takes the other fields' mean weight."""
     q = {f: min(MIN_PER_FIELD, n) for f, n in avail.items()}
-    w = {f: 1 / (0.05 + abs((prec.get(f) or 0) - BAR)) for f in avail}
+    w = {f: 1 / (0.05 + abs(prec[f] - BAR)) for f in avail if prec.get(f) is not None}
+    mean = sum(w.values()) / len(w) if w else 1.0
+    w = {f: w.get(f, mean) for f in avail}
     while sum(q.values()) < SHEET_DISPUTES:
-        open_ = [f for f in avail if q[f] < avail[f]]
+        open_ = [f for f in avail if q[f] < min(avail[f], MAX_PER_FIELD)]
         if not open_:
             break
         f = max(open_, key=lambda f: w[f] / (q[f] + 1))
@@ -779,9 +784,9 @@ def cmd_sheet_items(rows, docs, rng):
     for f in IF.FIELDS:
         for r in sorted(rng.sample(cand.get(f, []), q.get(f, 0)), key=lambda r: r["id"]):
             ga, lb = r["readers"]["gemini"], r["readers"]["luna"]
-            qa = (r["quotes"] or {}).get(f)
-            opts = [{"text": shown(f, ga[f]), "quote": qa, "src": "gemini"},
-                    {"text": shown(f, lb[f]), "quote": qa, "src": "luna"}]
+            rq = r["reader_quotes"]
+            opts = [{"text": shown(f, ga[f]), "quote": rq["gemini"].get(f), "src": "gemini"},
+                    {"text": shown(f, lb[f]), "quote": rq["luna"].get(f), "src": "luna"}]
             rng.shuffle(opts)
             add(r["id"], "dispute", f, opts, {"truth": shown(f, r[f]), "side": r["field_sides"].get(f),
                                               "gemini": shown(f, ga[f]), "luna": shown(f, lb[f])})
@@ -795,11 +800,14 @@ def cmd_sheet_items(rows, docs, rng):
             ks = IF.SCOPE[f]
             if f in r.get("disputed", []) or (ks is not None and r["kind"] not in ks) or not IF.filled(f, r[f]):
                 continue
+            if any(x["field"] == f for x in items.get(r["id"], [])):
+                continue    # already asked on this document (a kind question)
             if IF.filled(f, p.get(f)) and IF.field_match(f, p.get(f), r[f], "ed2"):
                 ctl[f].append(r)
     fields = [f for f in IF.FIELDS if ctl[f]]
-    for f in fields:
+    for f in fields:   # documents already on the sheet first (no extra pages to look over), at random within each
         rng.shuffle(ctl[f])
+        ctl[f].sort(key=lambda r: r["id"] in items)
     got = 0
     while got < CONTROLS and any(ctl[f] for f in fields):
         for f in fields:
@@ -818,15 +826,19 @@ def cmd_sheet_items(rows, docs, rng):
         final = {k: e[k] for k in e if k not in ("readers",)}
         if ET.side(final, x, y) == "B":
             sided.append((e, x, y))
-    for e, x, y in sorted(rng.sample(sided, min(ENTITY_CONTROLS, len(sided))), key=lambda t: t[0]["id"]):
-        for f in ET.FIELDS:
-            if ET.same_field(x.get(f), y.get(f)):
-                continue
-            nm = lambda v: "; ".join(n["name"] for n in ET.ent_names(v))  # noqa: E731
-            opts = [{"text": nm(x.get(f)), "quote": " ".join(n.get("quote") or "" for n in ET.ent_names(x.get(f))),
-                     "src": "luna"},
-                    {"text": nm(y.get(f)), "quote": " ".join(n.get("quote") or "" for n in ET.ent_names(y.get(f))),
-                     "src": "claude"}]
+    rng.shuffle(sided)
+    sided.sort(key=lambda t: t[0]["id"] not in items)   # documents already on the sheet first, as the controls
+    nm = lambda v: "; ".join(n["name"] for n in ET.ent_names(v))  # noqa: E731
+    qt = lambda v: " ".join(n.get("quote") or "" for n in ET.ent_names(v))  # noqa: E731
+    took = []
+    for e, x, y in sided:   # a field whose names read the same differs only in class, which the sheet does not ask
+        fs = [f for f in ET.FIELDS if not ET.same_field(x.get(f), y.get(f)) and nm(x.get(f)) != nm(y.get(f))]
+        if fs and len(took) < ENTITY_CONTROLS:
+            took.append((e, x, y, fs))
+    for e, x, y, fs in sorted(took, key=lambda t: t[0]["id"]):
+        for f in fs:
+            opts = [{"text": nm(x.get(f)), "quote": qt(x.get(f)), "src": "luna"},
+                    {"text": nm(y.get(f)), "quote": qt(y.get(f)), "src": "claude"}]
             rng.shuffle(opts)
             add(e["id"], "entity", f, opts, {"truth": nm(e.get(f)), "luna": nm(x.get(f)), "claude": nm(y.get(f))})
     return items, keyed, prec, {f: len(v) for f, v in cand.items()}, q, len(sided)
@@ -845,12 +857,18 @@ def write_sheet(items, keyed, docs):
         data.append({"doc": doc_id, "label": f"{d['collection']} · {len(d['pages'])} page(s)",
                      "imgs": [os.path.relpath(send_path(p), out) for p in capped(d["pages"])],
                      "items": items[doc_id]})
-    open(os.path.join(out, "index.html"), "w").write(
-        SHEET_HTML.replace("__DATA__", json.dumps(data, ensure_ascii=False))
-        .replace("__N__", str(sum(len(v) for v in items.values()))).replace("__DOCS__", str(len(items)))
-        .replace("__MINUTES__", f"{minutes(items):.0f}"))
+    page = (SHEET_HTML.replace("__N__", str(sum(len(v) for v in items.values()))).replace("__DOCS__", str(len(items)))
+            .replace("__MINUTES__", f"{minutes(items):.0f}").replace("__NAMES__", script_json(FIELD_NAMES))
+            .replace("__DATA__", script_json(data)))   # the data last, so nothing in it is taken for a placeholder
+    with open(os.path.join(out, "index.html"), "w", encoding="utf-8") as fh:
+        fh.write(page)
     json.dump({"seed": SEED, "items": keyed}, open(os.path.join(out, "key.json"), "w"), indent=1, ensure_ascii=False)
     return True
+
+
+def script_json(v):
+    """JSON safe inside a <script> element: a "</" in a reading would otherwise end the script."""
+    return json.dumps(v, ensure_ascii=False).replace("</", "<\\/")
 
 
 def minutes(items):
@@ -940,9 +958,6 @@ def cmd_build(a):
     rng = random.Random(SEED)
     items, keyed, prec, avail, q, n_sided = cmd_sheet_items(rows, docs, rng)
     wrote = write_sheet(items, keyed, docs)
-    if wrote:   # the names table goes in after the data, so a field name cannot collide with the placeholder
-        p = os.path.join(CACHE, "sheet", "index.html")
-        open(p, "w").write(open(p).read().replace("__NAMES__", json.dumps(FIELD_NAMES)))
     parts = ("base", "clippings", "handwritten")
     by_part = lambda rs: {p: sum(r["part"] == p for r in rs) for p in parts}  # noqa: E731
     calls = ledger()

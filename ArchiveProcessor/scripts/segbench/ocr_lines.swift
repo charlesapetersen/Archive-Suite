@@ -27,7 +27,7 @@ func transcribe(_ url: URL) throws -> Page {
         let s = c.string.trimmingCharacters(in: .whitespacesAndNewlines)
         if s.isEmpty { return nil }
         let r = obs.boundingBox   // normalised, lower-left origin
-        let box = [r.minX, 1 - r.maxY, r.width, r.height].map { ($0 * 10000).rounded() / 10000 }
+        let box = [r.minX, 1 - r.maxY, r.width, r.height].map { (Double($0) * 10000).rounded() / 10000 }
         return Line(text: s, box: box)
     }
     return Page(lines: lines)

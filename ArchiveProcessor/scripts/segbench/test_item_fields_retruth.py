@@ -45,11 +45,23 @@ def collections_of(docs):
 
 class Quotas(unittest.TestCase):
     def test_floor_then_weight_near_the_bar(self):
-        q = R.quotas({"kind": 50, "title": 50, "publication": 3}, {"kind": 0.88, "title": 0.40, "publication": 0.5})
-        self.assertEqual(q["publication"], 3)            # all there are
-        self.assertGreater(q["kind"], q["title"])        # nearer the bar
+        avail = {"kind": 50, "title": 50, "byline": 50, "publication": 50, "recipient_place": 3}
+        prec = {"kind": 0.88, "title": 0.40, "byline": 0.6, "publication": 0.5, "recipient_place": 0.5}
+        q = R.quotas(avail, prec)
+        self.assertEqual(q["recipient_place"], 3)        # all there are
+        self.assertEqual(q["kind"], R.MAX_PER_FIELD)     # nearest the bar, up to the ceiling
+        self.assertGreaterEqual(q["byline"], q["title"])
         self.assertGreaterEqual(q["title"], R.MIN_PER_FIELD)
-        self.assertEqual(sum(q.values()), R.SHEET_DISPUTES)
+        self.assertEqual(sum(q.values()), min(R.SHEET_DISPUTES, 4 * R.MAX_PER_FIELD + 3))   # the ceilings bind
+
+    def test_no_precision_takes_the_mean_weight(self):
+        old, R.SHEET_DISPUTES = R.SHEET_DISPUTES, 40     # under the ceilings, so the weights show
+        try:
+            q = R.quotas({"kind": 50, "title": 50, "byline": 50}, {"kind": 0.30, "title": None, "byline": 0.89})
+        finally:
+            R.SHEET_DISPUTES = old
+        self.assertGreater(q["title"], q["kind"])
+        self.assertGreater(q["byline"], q["title"])
 
     def test_never_more_than_available(self):
         q = R.quotas({"kind": 5, "title": 4}, {"kind": 0.9, "title": 0.9})

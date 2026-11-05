@@ -1,0 +1,295 @@
+{
+ "counts": {
+  "agree_with_old_truth": {
+   "byline": [
+    192,
+    215
+   ],
+   "kind": [
+    173,
+    215
+   ],
+   "publication": [
+    183,
+    215
+   ],
+   "publication_date": [
+    166,
+    215
+   ],
+   "recipient_place": [
+    158,
+    215
+   ],
+   "title": [
+    166,
+    215
+   ]
+  },
+  "by_part": {
+   "base": 219,
+   "clippings": 60,
+   "handwritten": 20
+  },
+  "disputed_docs_by_part": {
+   "base": 75,
+   "clippings": 31,
+   "handwritten": 7
+  },
+  "disputed_fields": {
+   "byline": 24,
+   "kind": 47,
+   "publication": 18,
+   "publication_date": 15,
+   "recipient_place": 17,
+   "title": 48
+  },
+  "field_sides": {
+   "gemini": 116,
+   "luna": 53
+  },
+  "filled": {
+   "byline": {
+    "base": 46,
+    "clippings": 42,
+    "handwritten": 0
+   },
+   "kind": {
+    "base": 219,
+    "clippings": 60,
+    "handwritten": 20
+   },
+   "publication": {
+    "base": 39,
+    "clippings": 50,
+    "handwritten": 0
+   },
+   "publication_date": {
+    "base": 40,
+    "clippings": 49,
+    "handwritten": 0
+   },
+   "recipient_place": {
+    "base": 57,
+    "clippings": 2,
+    "handwritten": 2
+   },
+   "title": {
+    "base": 97,
+    "clippings": 54,
+    "handwritten": 2
+   }
+  },
+  "first_is_gemini_when_ruled": 62,
+  "how": {
+   "agreed": 186,
+   "ruled": 113
+  },
+  "http_errors": 0,
+  "kinds": {
+   "clipping": 13,
+   "journal article": 6,
+   "letter": 113,
+   "magazine article": 39,
+   "memo": 43,
+   "newsletter": 14,
+   "newspaper article": 31,
+   "other": 17,
+   "press release": 1,
+   "report": 20,
+   "speech": 1,
+   "telegram": 1
+  },
+  "kinds_by_part": {
+   "base": {
+    "clipping": 7,
+    "journal article": 1,
+    "letter": 96,
+    "magazine article": 20,
+    "memo": 42,
+    "newsletter": 6,
+    "newspaper article": 14,
+    "other": 12,
+    "report": 19,
+    "speech": 1,
+    "telegram": 1
+   },
+   "clippings": {
+    "clipping": 6,
+    "journal article": 5,
+    "letter": 1,
+    "magazine article": 19,
+    "memo": 1,
+    "newsletter": 8,
+    "newspaper article": 17,
+    "other": 1,
+    "press release": 1,
+    "report": 1
+   },
+   "handwritten": {
+    "letter": 16,
+    "other": 4
+   }
+  },
+  "labelled": 299,
+  "pages": {
+   "empty_vision": 0,
+   "from_pdf": 6,
+   "read": 627,
+   "rejected_pairs": 6,
+   "turned": 102
+  },
+  "select": {
+   "base": 219,
+   "clippings candidates": 1162,
+   "clippings collections": 47,
+   "clippings drawn": 60,
+   "documents": 299,
+   "handwritten candidates": 37,
+   "handwritten collections": 2,
+   "handwritten drawn": 20,
+   "neighbour pages": 782,
+   "pages": 650,
+   "pages read": 627
+  },
+  "sheet": {
+   "boxed_options": 116,
+   "by_part": {
+    "control": 30,
+    "dispute": 85,
+    "entity": 23,
+    "kind": 16
+   },
+   "disputes_available": {
+    "byline": 24,
+    "kind": 43,
+    "publication": 18,
+    "publication_date": 15,
+    "recipient_place": 17,
+    "title": 48
+   },
+   "disputes_quota": {
+    "byline": 13,
+    "kind": 20,
+    "publication": 12,
+    "publication_date": 8,
+    "recipient_place": 12,
+    "title": 20
+   },
+   "documents": 103,
+   "entity_sonnet_sided": 51,
+   "items": 154,
+   "minutes": 65,
+   "options_with_text": 153,
+   "prelim_gemini38": {
+    "byline": {
+     "filled": 38,
+     "n": 57,
+     "precision": 0.6842105263157895
+    },
+    "kind": {
+     "filled": 147,
+     "n": 147,
+     "precision": 0.8843537414965986
+    },
+    "publication": {
+     "filled": 34,
+     "n": 147,
+     "precision": 0.6470588235294118
+    },
+    "publication_date": {
+     "filled": 57,
+     "n": 57,
+     "precision": 0.3157894736842105
+    },
+    "recipient_place": {
+     "filled": 36,
+     "n": 83,
+     "precision": 0.6666666666666666
+    },
+    "title": {
+     "filled": 0,
+     "n": 147,
+     "precision": null
+    }
+   },
+   "written": true
+  },
+  "sides": {
+   "gemini": 73,
+   "luna": 36,
+   "mixed": 4
+  },
+  "spend": {
+   "adjudicated": {
+    "calls": 113,
+    "charged": 0.582787,
+    "estimate": 0.582772,
+    "gateway": 0.582775,
+    "gateway_calls": 113,
+    "gateway_over_estimate": 1.0
+   },
+   "drafts/gemini": {
+    "calls": 299,
+    "charged": 1.004197,
+    "estimate": 1.004155,
+    "gateway": 1.004161,
+    "gateway_calls": 299,
+    "gateway_over_estimate": 1.0
+   },
+   "drafts/luna": {
+    "calls": 299,
+    "charged": 0.457921,
+    "estimate": 0.457921,
+    "gateway": 0.228958,
+    "gateway_calls": 299,
+    "gateway_over_estimate": 0.5
+   },
+   "tagging": {
+    "calls": 299,
+    "charged": 0.946399,
+    "estimate": 0.946355,
+    "gateway": 0.946361,
+    "gateway_calls": 299,
+    "gateway_over_estimate": 1.0
+   }
+  },
+  "spend_total": {
+   "calls": 1010,
+   "charged": 2.991304,
+   "estimate": 2.991203,
+   "gateway": 2.762256,
+   "gateway_calls": 1010,
+   "gateway_over_estimate": 0.9235
+  },
+  "tagging": {
+   "answered": 299,
+   "documents": 299
+  },
+  "w46_kind_changed": 9,
+  "w46_old_cross": 14
+ },
+ "settings": {
+  "cap": 5.3,
+  "models": {
+   "gemini": "gemini-3.7-flash",
+   "luna": "gpt-5.6-luna"
+  },
+  "pages": [
+   8,
+   2
+  ],
+  "price": {
+   "gemini-3.7-flash": [
+    0.75,
+    3.75
+   ],
+   "gpt-5.6-luna": [
+    0.2,
+    1.2
+   ]
+  },
+  "send_side": 1600,
+  "text_cap": 16000
+ }
+}

@@ -191,5 +191,12 @@ the app gives now (kind closest, Gemini 0.87, inside the truth's own doubt on ki
 title). So `W47.item-fields-build` starts by testing an image-reading item-field prompt against this truth set
 (`scripts/segbench/item_fields.py`), and fills a field only if that prompt clears the bar.
 
+Re-truthed 2026-11-05 (`W47.item-fields-retruth`, `segbench-results/item-fields-retruth.md`), because the 10-30
+truth was weaker than the routes it judged (measurement audit FLD-1..FLD-9): 299 documents (the 219, 60 by the owner's
+Clippings tag, 20 by Handwritten), every page up to 8 + 2 as the JPEG original with Vision text, Gemini 3.7 and GPT 5.6
+Luna drafting, Gemini ruling, W46's ruling for correspondence kind; the app's call rerun on Vision text. The owner
+sheet (`W47.item-fields-owner-ok`) comes first; `W47.item-fields-retruth-score` then scores every route and its
+verdict replaces the 10-30 one.
+
 Cost: `W47.ct-read-paid` under $0.50; a full read of the corpus's 4,500 markers about $2–4 on the gateway, priced
 from `W47.ct-read`'s figures before it runs. The $3 rule applies to each item.
