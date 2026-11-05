@@ -61,7 +61,10 @@ mirrored by the `W40` section of `SUITE_TODO.md`, tags byte-identical. `next-que
    may not leave its app less verified than before. Its item adds a ledger row, `unproven`, for each new promise. It
    extends the checks that already cover the area it changes to run in the new mode or state as well as the old: the
    app's `AccessibilityAuditUITests` and `VisualReviewUITests`, and the journey that passes through that screen. A test
-   for the new path alone is not enough. It runs the app's whole UITest suite in the VM before it ships. The session
+   for the new path alone is not enough. It runs the UITest suites it touched in the VM before it ships; the app's
+   whole UITest suite runs once per batch instead, in the item that prepares the app's next guided-session pack, at HEAD
+   before it judges the time, filing `W40.fix-*` for any failure (owner, 2026-11-05: the whole-suite run per item
+   held the engine to two sessions on memory pressure, and the guided session is where the real check happens). The session
    that files the feature also files a separate `<TAG>-verify` item (rule 6, builder is not verifier), blocked on the
    feature, which re-runs those checks at HEAD and moves the rows to `works` or files `W40.fix-*`. The app's
    guided-session pack (`W40.g*`) is blocked on the verify item.
@@ -69,6 +72,12 @@ mirrored by the `W40` section of `SUITE_TODO.md`, tags byte-identical. `next-que
    `S1` data loss or a write to the wrong file · `S2` a promised feature broken or unreachable · `S3` wrong but
    recoverable · `S4` cosmetic. `S1` goes to the TOP of TIER 7; `S2`–`S4` go to the `W40 fixes` sub-block, above
    the discovery items not yet started. Every fix ships with the test that failed before it.
+   **A fix found by an owner session replays the owner's steps (owner, 2026-11-05).** Its failing test follows the
+   form row: the same way in (the menu bar, the shortcut, a drag, a click in the list, not a call to the action) and
+   the same sequence around it (type, deselect, reselect, type again; quit and relaunch). A test that drives the
+   action directly is not enough on its own. Why: the Notes editor fix (N-12) passed its own tests and failed in the
+   owner's first five minutes of notes-1, because no test reselected the note before typing; ⌘N and folder nesting
+   were never pressed or dragged by a test either.
 9. **Unchanged:** the real corpus (`~/Desktop/Google Drive/Archival Photos/`) is never written; nothing draws on
    the owner's screen (VM lane only); Tier-2 for irreversible paths; worktree-first; cost stated before any paid
    run, cheapest capable model, smallest input that proves the behaviour.
