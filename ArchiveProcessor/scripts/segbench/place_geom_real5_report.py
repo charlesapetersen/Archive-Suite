@@ -27,6 +27,7 @@ def strata(pages):
         'Warping folder': lambda m: m['cond'] == 'warp',
         'Skew folder': lambda m: m['cond'] == 'skew',
         f'skewed (|angle| ≥ {SKEW:g}°)': lambda m: abs(m['angle']) >= SKEW,
+        f'mildly skewed ({SKEW:g}° ≤ |angle| < {STEEP:g}°)': lambda m: SKEW <= abs(m['angle']) < STEEP,
         f'steeply skewed (|angle| ≥ {STEEP:g}°)': lambda m: abs(m['angle']) >= STEEP,
         f'level (|angle| < {SKEW:g}°)': lambda m: abs(m['angle']) < SKEW,
         f'perspective (angle range ≥ {SPREAD:g}°)': lambda m: (m['spread'] or 0) >= SPREAD,
@@ -68,15 +69,46 @@ def summarise(pages):
     return res
 
 
+def against_deskew(pages):
+    """UVDoc and quad (lab writer) against deskew (lab writer) on the same pages, paired as the main tables are;
+    also on the pages where the arm's image removes no truth line and no own-sheet word."""
+    by = R.table(pages)
+    S, _ = strata(pages)
+    base = ('deskew', 'lab')
+    rng = random.Random(R.SEED)
+    out = []
+    for arm in ('uvdoc', 'quad'):
+        v = (arm, 'lab')
+        sets = [(name, f) for name, f in S.items() if name.split(' (')[0] in
+                ('every page', 'Warping folder', 'Skew folder', 'level', 'curled')]
+        sets.append(('pages it removes nothing from', lambda m, arm=arm: not by[(arm, 'lab')][m['page']]['lost_lines']
+                     and not by[(arm, 'lab')][m['page']]['lost_own']))
+        for name, f in sets:
+            ids = [p['meta']['page'] for p in pages if f(p['meta'])]
+            k, n = R.rate(by, v, ids)
+            k0, n0 = R.rate(by, base, ids)
+            d = []
+            for _ in range(R.DRAWS):
+                draw = [rng.choice(ids) for _ in ids]
+                a, b = R.rate(by, v, draw), R.rate(by, base, draw)
+                if a[1] and b[1]:
+                    d.append(a[0] / a[1] - b[0] / b[1])
+            d.sort()
+            out.append({'arm': arm, 'stratum': name, 'pages': len(ids), 'lines': n, 'rate': k / n if n else None,
+                        'deskew': k0 / n0 if n0 else None, 'delta': (k / n - k0 / n0) if n and n0 else None,
+                        'ci': (d[int(0.025 * len(d))], d[int(0.975 * len(d)) - 1]) if d else None})
+    return out
+
+
 def tables(s, title):
     L = []
     for name, rows in s['strata'].items():
         L.append(f'\n### {name} ({rows[0]["pages"]} pages, {rows[0]["lines"]} lines)\n')
-        L.append('| arm | line pass % | Δ vs today (95% CI) | lines cut by the image | Find % |')
-        L.append('|---|---:|---|---:|---:|')
+        L.append('| arm | line pass % | Δ vs today (95% CI) | lines cut by the image |')
+        L.append('|---|---:|---|---:|')
         for r in rows:
             L.append(f'| {R.LABEL[(r["arm"], r["writer"])]} | {R.pct(r["rate"])} ({r["passed"]}/{r["lines"]}) | '
-                     f'{R.dpct(r)} | {r["cut_lines"]} | {R.pct(r["find"])} |')
+                     f'{R.dpct(r)} | {r["cut_lines"]} |')
     return f'\n## {title}\n' + '\n'.join(L)
 
 
@@ -87,7 +119,15 @@ def write(rows_path: Path, results: Path):
     over = rows_path.parent / 'rows-m035.jsonl'
     if over.exists():
         out['overshoot_035'] = summarise(load(over))['strata']
+    out['against_deskew'] = vd = against_deskew(pages)
     (results / 'place-geom-real5.json').write_text(json.dumps(out, indent=1) + '\n')
+    D = ['\n## Quad and UVDoc against deskew\n',
+         'Each with the lab writer, Δ against deskew with the lab writer on the same pages (paired, as above). The last '
+         'row of each is the pages where that arm\'s image removes no truth line and no own-sheet word.\n',
+         '| arm | pages | n | lines | arm % | deskew % | Δ vs deskew (95% CI) |', '|---|---|---:|---:|---:|---:|---|']
+    for r in vd:
+        D.append(f'| {r["arm"]} | {r["stratum"]} | {r["pages"]} | {r["lines"]} | {R.pct(r["rate"])} | '
+                 f'{R.pct(r["deskew"])} | {R.dpct(r)} |')
     every = s['strata']['every page']
     E = ['\n| arm | pages cut | Vision words lost, own sheet | lost, neighbour text | words partly cut |',
          '|---|---:|---:|---:|---:|']
@@ -99,12 +139,14 @@ def write(rows_path: Path, results: Path):
            + tables(s, 'Line pass rate, drags on the words\' edges') +
            (tables({'strata': out['overshoot_035']}, 'The same drags overshooting by 0.35 of the word\'s height')
             if 'overshoot_035' in out else '') +
+           '\n' + '\n'.join(D) +
            '\n\n## Words the reading copy removes (every page)\n' + '\n'.join(E) +
            f'\n\n## What was scored\n\n{len(pages)} images ({n_warp} Warping, {len(pages) - n_warp} Skew) of the '
            f'155 pages. {s["truth_lines"]} truth lines (Vision lines that are one OmniDocBench line); '
            f'{s["scored_lines"]} scored. Not scored: {s["skipped"]["short"]} under two words, '
            f'{s["skipped"]["sideways"]} sideways (over 45°), {s["skipped"]["shared"]} sharing a word. UVDoc bend '
-           f'median {s["bend_median"]:.1f} px.\n<!-- /tables -->')
+           f'median {s["bend_median"]:.1f} px. Find is not tabled: the truth is Vision\'s own words, so every arm finds '
+           f'all of them (the JSON keeps the figures).\n<!-- /tables -->')
     path = results / 'place-geom-real5.md'
     body = path.read_text() if path.exists() else '# W46.place-geom-real5\n\n'
     head = body.split('<!-- tables -->')[0] if '<!-- tables -->' in body else body
