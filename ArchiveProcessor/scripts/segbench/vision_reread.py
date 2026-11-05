@@ -170,7 +170,7 @@ def score_set(items):
     rows = []
     for groups, truth, old, new, stratum in items:
         so, sn = S.score(truth, old, stratum), S.score(truth, new, stratum)
-        rows.append({'groups': groups, 'same': old == new,
+        rows.append({'groups': groups, 'same': old == new, 'ans_old': bool(old.strip()), 'ans_new': bool(new.strip()),
                      'old': {'nes': so['nes'], 'bowf1': bowf1(so), 'chrf': so['chrf']},
                      'new': {'nes': sn['nes'], 'bowf1': bowf1(sn), 'chrf': sn['chrf']}})
     return rows
@@ -185,6 +185,9 @@ def summarise(rows):
     for g, rr in by.items():
         old = [r['old'] for r in rr]; new = [r['new'] for r in rr]
         cell = {'n': len(rr), 'identical': sum(r['same'] for r in rr),
+                'answered_old': sum(r['ans_old'] for r in rr), 'answered_new': sum(r['ans_new'] for r in rr),
+                'lost': sum(r['ans_old'] and not r['ans_new'] for r in rr),
+                'gained': sum(r['ans_new'] and not r['ans_old'] for r in rr),
                 'moved5': sum(abs(r['new']['nes'] - r['old']['nes']) >= .05 for r in rr)}
         for k in ('nes', 'bowf1', 'chrf'):
             cell[f'old_{k}'] = 100 * sum(x[k] for x in old) / len(rr)
@@ -254,11 +257,12 @@ def ci(d):
 
 
 def table(summary, order, title_col):
-    L_ = [f'| {title_col} | n | text identical | NES before → after | ΔNES (95% CI) | Δ bowF1 (95% CI) | '
-          f'pages moved ≥5 NES |', '|---|---|---|---|---|---|---|']
+    L_ = [f'| {title_col} | n | text identical | answered before → after | NES before → after | ΔNES (95% CI) | '
+          f'Δ bowF1 (95% CI) | pages moved ≥5 NES |', '|---|---|---|---|---|---|---|---|']
     for g in order:
         c = summary[g]
-        L_.append(f"| {g} | {c['n']} | {c['identical']} | {c['old_nes']:.1f} → {c['new_nes']:.1f} | {ci(c['d_nes'])} | "
+        L_.append(f"| {g} | {c['n']} | {c['identical']} | {c['answered_old']} → {c['answered_new']} | "
+                  f"{c['old_nes']:.1f} → {c['new_nes']:.1f} | {ci(c['d_nes'])} | "
                   f"{ci(c['d_bowf1'])} | {c['moved5']} |")
     return L_
 
@@ -266,7 +270,7 @@ def table(summary, order, title_col):
 def cmd_report(_):
     meta = json.loads((OUT.parent / 'vision-27-reread.read.json').read_text())
     panel = summarise(score_set(panel_items()))
-    bench = summarise(score_set(bench_items()))
+    bench_rows = score_set(bench_items()); bench = summarise(bench_rows)
     rs_rows = resave_rows(); resave = resave_summary(rs_rows)
     res = {'os_now': meta['os'], 'tools': {k: meta[k] for k in ('segbench-ocr', 'segbench-dewarp')},
            'panel': panel, 'bench': bench, 'resave': resave}
@@ -277,6 +281,19 @@ def cmd_report(_):
     o = panel['original · scored']; b = bench['all']
     moved = any(c['identical'] < c['n'] for c in [*panel.values(), *bench.values()])
     a, ra = resave['all'], resave['all']
+    l7 = [r for r in bench_rows if 'L7' in r['groups']]
+    l7_kept = [r for r in l7 if r['ans_old'] == r['ans_new']]
+    l7_rest = 100 * sum(r['new']['nes'] - r['old']['nes'] for r in l7_kept) / len(l7_kept)
+    l7_lost = 100 * sum(r['new']['nes'] - r['old']['nes'] for r in l7 if r['ans_old'] and not r['ans_new']) / len(l7)
+    flips = '; '.join(f"{g}: {c['lost']} lost" + (f", {c['gained']} gained" if c['gained'] else '')
+                      for g, c in sorted({**{f'panel {k}': v for k, v in panel.items() if k.startswith('all')},
+                                          **{f'public {k}': v for k, v in bench.items() if k != 'all'}}.items())
+                      if c['lost'] or c['gained'])
+    rh = meta['repeat_hands']; ct = rh['cross_tool']
+    tool_line = '; '.join(f"`{t}` {v['identical']} of {rh['n']} identical" +
+                          (' (' + ', '.join(f'{p} {d:+.1f}' for p, d in sorted(v['changed_nes'].items())) + ' NES)'
+                           if v['changed_nes'] else '') for t, v in rh['tools'].items())
+    floor = max([abs(d) for v in rh['tools'].values() for d in v['changed_nes'].values()] or [0.])
     M = ['# Apple Vision re-read on macOS 27.2 (W46.vision-27-reread)', '',
          f"Re-read on macOS {meta['os'].get('ProductVersion')} ({meta['os'].get('BuildVersion')}), {meta['machine']}, "
          "with the same tools and settings as the dated readings (`ocr.swift`: `.accurate`, language correction on, "
@@ -286,6 +303,12 @@ def cmd_report(_):
          "New readings sit beside the old, which are kept: `ocr-panel-local/vision-27.2/`, "
          "`bench-corpus/routes/vision-27.2/`, `enh-dewarp/lines/raw-27.2/` under "
          "`~/Library/Caches/ArchiveSuiteRehearsal`. Δ is after minus before, in points, paired by page.", '',
+         "**Swapped in (W46.vision-27-swap, regenerated 2026-11-04).** The 27.2 readings are now the bench's Vision "
+         "route: each dated folder moved aside as `*-26.6` (kept, nothing deleted) and a copy of its `*-27.2` "
+         "sibling put in its place. `raw-27.2` held 96 files to the dated `raw`'s 99, since `read` skipped the three "
+         "agreement pages the ladder does not score; `fill` read those on 27.2, so both hold 99. This regeneration adds "
+         "the answered column, the empty-page finding, the two-tool repeat on the handwritten originals and the "
+         "list below; no figure of the first report moved.", '',
          '## Verdict', '',
          (f"**The update moved Vision.** On the owner's {o['n']} scored originals NES goes {o['old_nes']:.1f} → "
           f"{o['new_nes']:.1f}, {ci(o['d_nes'])}, with {o['n'] - o['identical']} of {o['n']} texts changed; on the "
@@ -294,7 +317,13 @@ def cmd_report(_):
           f"({ci(o['d_bowf1'])}); the panel's downscaled copies went the other way (half "
           f"{ci(panel['all half']['d_nes'])}, quarter {ci(panel['all quarter']['d_nes'])} NES), and on the 440 "
           f"one stratum fell (L7 {ci(bench['L7']['d_nes'])}). The texts changed on nearly every page, so every "
-          "Vision figure read before 2026-10-30 is a macOS 26.6 figure and is labelled so." if moved else
+          "Vision figure read before 2026-10-30 is a macOS 26.6 figure and is labelled so. "
+          f"**On 27.2 Vision returns nothing on {bench['L7']['lost']} of the 80 L7 pages** it answered on 26.6 "
+          f"(answered {bench['L7']['answered_old']} → {bench['L7']['answered_new']}), and those pages are all of L7's "
+          f"fall: they contribute {l7_lost:+.1f} of its {bench['L7']['d_nes']['delta']:+.1f}, and the other pages "
+          f"average {l7_rest:+.1f}. With the swap the public Vision row answers {b['answered_new']} of {b['n']} pages, "
+          f"not {b['answered_old']}; Vision is the second reader of the bench's suspect columns, so on those pages "
+          f"every word another route reads is suspect. Pages that changed from answered to empty or back: {flips}." if moved else
           "**The update did not move Vision.** Every re-read text is byte-identical to its dated reading, on both "
           "sets."),
          (f"The capture ladder's re-save sentence compared a 26.6 raw reading with a 27.2 re-save. Measured on one "
@@ -305,7 +334,7 @@ def cmd_report(_):
          "## The owner's 96 (139 images)", '',
          *table(panel, po, 'set'), '',
          "\"original · scored\" is the panel's headline set (the three agreement pages out). The half and "
-         "quarter rows are the panel's downscaled copies of the same pages.", '',
+         "quarter rows are the panel's downscaled copies of the same pages. Answered: a non-empty text.", '',
          '## The 440 reference set, Latin-script pages (Vision reads only these)', '',
          *table(bench, bo, 'stratum'), '',
          "## The capture ladder's re-save baseline", '',
@@ -314,18 +343,30 @@ def cmd_report(_):
         for k in ('reported (resave 27.2 - raw 26.6)', 'update alone (raw 27.2 - raw 26.6)',
                   're-encode alone (resave 27.2 - raw 27.2)'):
             M.append(f"| {k} | {s} | {c['n']} | {ci(c[k]['bowf1'])} | {ci(c[k]['nes'])} |")
-    M += ['', '## Which reports carry a macOS 26.6 Vision figure', '',
-          "Every script that reads one of the three dated caches (`ocr-panel-local/vision`, `bench-corpus/routes/vision`, "
-          "`enh-dewarp/lines/raw`) reports 26.6 Vision text, as committed on 2026-11-04. Vision's own score: "
-          "`ocr-panel-local.md` (ocr_panel_score.py), `ocr-scorers.md` and `ocr-pages.csv` (ocr_rescore.py, "
+    M += ['', '## Which reports carry which Vision', '',
+          "As of the swap (2026-11-04). **Now macOS 27.2, regenerated together:** `ocr-panel-local.md` "
+          "(ocr_panel_score.py), `ocr-scorers.md`, `ocr-pages.csv` and `ocr-pages-agree.csv` (ocr_rescore.py, "
           "ocr_pages_export.py; the bench page's Vision rows and its cascade and agreement tables), "
-          "`bench-corpus/routes.csv` (corpus/routes.py), `enh-dewarp.md`'s raw row, `capture-ladder.md`'s raw row "
-          "and its re-save sentence (above: the update, not the re-save), `truth-jpeg-upgrade.md`, "
-          "`ocr-ppocrv6-hands.md`'s Vision rows, and the Vision column of `r1-foundation.md` (in flight). Vision text "
-          "as an input to another route: `layout-order.md` and `place-geom.md`. The capture ladder's defect and "
-          "re-save rows, and `capture-ladder-paid`, were read on 27.2. The bench page says so in its footer; "
-          "the charts keep the 26.6 readings until the dated caches are swapped for these and the reports above "
-          "regenerated together (W46.vision-27-swap), so that no table pairs a 27.2 Vision with a 26.6 one.", '']
+          "`bench-corpus/routes.csv` (corpus/routes.py), every row of `capture-ladder.md`, the apple-vision row of "
+          "`ocr-hands-rescore.md`, every Vision text in `ocr-ppocrv6-hands.md`, and the bench page. Already 27.2 "
+          "before the swap: `r1-foundation.md` (complete; `r1-foundation.json` byte-identical after the swap), the "
+          "capture ladder's defect and re-save rows and `capture-ladder-paid`, the hands panel's line boxes and "
+          "`apple-vision (lines)`, and the layout-photo document route (read 2026-10-30 20:00 UTC).", '',
+          "**Still macOS 26.6, labelled so and pinned to the `*-26.6` folders until every arm is re-read on one OS:** "
+          "`enh-dewarp.md` (all 16 arms, its raw row included: on 27.2 the two tools no longer agree byte for byte, "
+          "so its guard reads the 26.6 pair), `enh-ocr-input.md` (every arm, and its suspect counts) and "
+          "`truth-jpeg-upgrade.md` (both sides; with one side swapped Vision's JPEG-minus-PDF change would read "
+          "-7.0 for -4.2). The bench page labels their Vision routes 26.6.", '',
+          "**Kept on their own dated inputs, never re-read** (a re-read would change a request a cached model reply is "
+          "keyed on, so every cached reply would become a paid re-call, or the input belongs to another item): "
+          "`ent-robust.md` (reads the `vision-26.6` folders), `ocr-postcorrect.md`, `date-traceable.md` (read "
+          "2026-10-30 16:33-16:45 UTC, before the 19:06 install), `date-image.md`, `chaos-probe.md`, the "
+          "`vision-words.json` of 2026-10-14 behind the placement truth, and the segmentation Vision text cache "
+          "(data.py's: Dean, Deaver, Herrnstein, RG165 and Stanton 2026-10-05 on 26.6; Sasha, SC0122, the Illustrated "
+          "Review and the checkpack boxes 2026-11-01 on 27.2), which `seg_window_gateway.py` hashes into every "
+          "request; `r1-foundation.md`'s Deaver text-only windows carry that 26.6 text. `layout-order.md` and "
+          "`place-geom.md` read Vision caches of their own, which the swap does not touch, so neither was "
+          "regenerated.", '']
     M += ['', '## Measurement card', '',
           "- **Truth.** Unchanged and the same files the dated scores used: the owner panel's adjudicated truth "
           "(`ocr_truth` cache, owner-checked pages as recorded there) and the 440's frozen public truths. No model "
@@ -336,11 +377,19 @@ def cmd_report(_):
           "- **Comparison.** Same images byte for byte, same tool source and settings, same scorer "
           "(`ocr_panel_score.score`, the 440's per-stratum options) and truth; only the OS differs. The "
           "`segbench-ocr` (2026-11-03) and `segbench-dewarp` (2026-10-31) binaries were rebuilt on 27.2 from "
-          "unchanged sources, so \"the update\" here is the OS together with the SDK the tools link against, "
-          "which is what any build on this Mac now gets; the request revision is the SDK default in both runs.",
+          "unchanged sources. The request revision is the default in both runs: on 27.2 with the 27.2 SDK it "
+          "defaults to 3 and supports 1-3, as before, and the dated readings' tool was itself a 27.0-SDK build, so "
+          "the change is inside revision 3, in the OS, and reaches the app whatever SDK it is built with.",
           f"- **Noise.** Read twice on 27.2, {meta['repeat']['identical']} of {meta['repeat']['n']} texts (15 panel "
-          "images, 15 public pages) came back byte-identical, so Vision is deterministic on one OS and any change "
-          "here is the update. Intervals are paired bootstrap 95% over pages (10,000 resamples, "
+          "images, 15 public pages, one of them handwritten) came back byte-identical. Handwriting is not: the "
+          f"{rh['n']} handwritten originals read again with both tools (W46.vision-27-swap) gave {tool_line}; an "
+          f"earlier repeat of the 16 scored ones gave {rh['first_run']['ocr_identical']} and "
+          f"{rh['first_run']['lines_identical']} of 16. So on 27.2 Vision varies run to run on a few handwritten "
+          f"pages, by up to {floor:.1f} NES on a page, under 0.1 point on the 96's mean, far inside every interval "
+          "here, and the pages that vary are the ones where the two tools disagree on 27.2 "
+          f"({', '.join(ct['differ_27.2'])}; {ct['n'] - len(ct['differ_27.2'])} of {ct['n']} scored originals "
+          f"agree, {ct['n'] - len(ct['differ_26.6'])} of {ct['n']} on 26.6): the tools are not different, the "
+          "readings are. Intervals are paired bootstrap 95% over pages (10,000 resamples, "
           "`ocr_panel_score.paired`); none is given under ten pages.",
           "- **Scope.** Apple Vision text only, on these images. It does not re-read the capture ladder's defect "
           "rows (all read on 27.2 on 2026-11-03, and paired against the same-run re-save, so their deltas stand), "

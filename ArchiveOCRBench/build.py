@@ -1007,7 +1007,8 @@ def dewarp_chart_routes(data, kinds, op):
         overall = by[(route, arm, "the 96")]
         scores = {key: [round(100 * by[(route, arm, g)]["nes"], 2), by[(route, arm, g)]["ok"], by[(route, arm, g)]["n"]]
                   for key, g in [("overall", "the 96"), *((k, "kind:" + k) for k in kinds)]}
-        common = {"id": f"dewarp-{route}-{arm}", "name": names[route] + " · " + arms[arm], "batch": None, "scores": scores}
+        label = names[route] + (" (macOS 26.6)" if route == "apple-vision" else "")   # W46.vision-27-swap: not re-read on 27.2
+        common = {"id": f"dewarp-{route}-{arm}", "name": label + " · " + arms[arm], "batch": None, "scores": scores}
         if route == "apple-vision":
             out.append({**common, "panel": "local", "std": 0.0})
             continue
@@ -1040,7 +1041,8 @@ def enh_ocr_chart_routes(data, kinds, op):
         overall = by[(route, arm, "the 96")]
         scores = {key: [round(100 * by[(route, arm, g)]["nes"], 2), by[(route, arm, g)]["ok"], by[(route, arm, g)]["n"]]
                   for key, g in [("overall", "the 96"), *((k, "kind:" + k) for k in kinds)]}
-        common = {"id": f"enh-{route}-{arm}", "name": names[route] + " · " + arms[arm], "batch": None, "scores": scores}
+        label = names[route] + (" (macOS 26.6)" if route == "apple-vision" else "")   # W46.vision-27-swap: not re-read on 27.2
+        common = {"id": f"enh-{route}-{arm}", "name": label + " · " + arms[arm], "batch": None, "scores": scores}
         if route == "apple-vision":
             out.append({**common, "panel": "local", "std": 0.0})
             continue
@@ -1056,12 +1058,14 @@ def enh_ocr_chart_routes(data, kinds, op):
 
 
 def vision_reread():
-    """W46.vision-27-reread: every Apple Vision figure on the page is its macOS 26.6 reading; the re-read on 27.2 of
-    the same images, paired by page, says how far the update moved it (the 96's scored originals, the 440's Latin pages)."""
+    """W46.vision-27-reread and W46.vision-27-swap: the page's Apple Vision route is its macOS 27.2 reading; the paired
+    re-read says how far the update moved it from the 26.6 one (the 96's scored originals, the 440's Latin pages), and
+    the note names the panels that still show 26.6 arms."""
     if not VISION_REREAD.exists():
         return None
     d = json.loads(VISION_REREAD.read_text())
     cell = lambda c: {"n": c["n"], "changed": c["n"] - c["identical"], "old": round(c["old_nes"], 1),
+                      "answered_old": c["answered_old"], "answered_new": c["answered_new"], "lost": c["lost"],
                       "new": round(c["new_nes"], 1), **{k: round(c["d_nes"][k], 1) for k in ("delta", "lo", "hi")}}
     return {"os": d["os_now"].get("ProductVersion"), "build": d["os_now"].get("BuildVersion"),
             "panel": cell(d["panel"]["original · scored"]), "public": cell(d["bench"]["all"])}

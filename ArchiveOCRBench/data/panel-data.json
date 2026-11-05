@@ -835,42 +835,42 @@
   },
   {
    "id": "dewarp-apple-vision-quad",
-   "name": "Apple Vision \u00b7 Apple quad crop",
+   "name": "Apple Vision (macOS 26.6) \u00b7 Apple quad crop",
    "batch": null,
    "panel": "local",
    "std": 0.0
   },
   {
    "id": "dewarp-apple-vision-uvdoc",
-   "name": "Apple Vision \u00b7 UVDoc dewarp",
+   "name": "Apple Vision (macOS 26.6) \u00b7 UVDoc dewarp",
    "batch": null,
    "panel": "local",
    "std": 0.0
   },
   {
    "id": "dewarp-apple-vision-docres",
-   "name": "Apple Vision \u00b7 DocRes dewarp",
+   "name": "Apple Vision (macOS 26.6) \u00b7 DocRes dewarp",
    "batch": null,
    "panel": "local",
    "std": 0.0
   },
   {
    "id": "dewarp-apple-vision-enc-2048-q85",
-   "name": "Apple Vision \u00b7 app encoder 2048 px q0.85",
+   "name": "Apple Vision (macOS 26.6) \u00b7 app encoder 2048 px q0.85",
    "batch": null,
    "panel": "local",
    "std": 0.0
   },
   {
    "id": "dewarp-apple-vision-enc-2400-q90",
-   "name": "Apple Vision \u00b7 app encoder 2400 px q0.90",
+   "name": "Apple Vision (macOS 26.6) \u00b7 app encoder 2400 px q0.90",
    "batch": null,
    "panel": "local",
    "std": 0.0
   },
   {
    "id": "dewarp-apple-vision-enc-1600-q90",
-   "name": "Apple Vision \u00b7 app encoder 1600 px q0.90",
+   "name": "Apple Vision (macOS 26.6) \u00b7 app encoder 1600 px q0.90",
    "batch": null,
    "panel": "local",
    "std": 0.0
@@ -1122,35 +1122,35 @@
   },
   {
    "id": "enh-apple-vision-shading",
-   "name": "Apple Vision \u00b7 shading division",
+   "name": "Apple Vision (macOS 26.6) \u00b7 shading division",
    "batch": null,
    "panel": "local",
    "std": 0.0
   },
   {
    "id": "enh-apple-vision-gcdrnet",
-   "name": "Apple Vision \u00b7 GCDRNet",
+   "name": "Apple Vision (macOS 26.6) \u00b7 GCDRNet",
    "batch": null,
    "panel": "local",
    "std": 0.0
   },
   {
    "id": "enh-apple-vision-sbb",
-   "name": "Apple Vision \u00b7 SBB binarisation",
+   "name": "Apple Vision (macOS 26.6) \u00b7 SBB binarisation",
    "batch": null,
    "panel": "local",
    "std": 0.0
   },
   {
    "id": "enh-apple-vision-docres-appearance",
-   "name": "Apple Vision \u00b7 DocRes appearance",
+   "name": "Apple Vision (macOS 26.6) \u00b7 DocRes appearance",
    "batch": null,
    "panel": "local",
    "std": 0.0
   },
   {
    "id": "enh-apple-vision-docres-deshadow",
-   "name": "Apple Vision \u00b7 DocRes deshadow",
+   "name": "Apple Vision (macOS 26.6) \u00b7 DocRes deshadow",
    "batch": null,
    "panel": "local",
    "std": 0.0
@@ -1592,7 +1592,7 @@
      96
     ],
     "apple-vision": [
-     81.37,
+     83.07,
      96,
      96
     ],
@@ -2200,7 +2200,7 @@
      50
     ],
     "apple-vision": [
-     91.92,
+     92.18,
      50,
      50
     ],
@@ -2808,7 +2808,7 @@
      28
     ],
     "apple-vision": [
-     76.43,
+     80.54,
      28,
      28
     ],
@@ -3416,7 +3416,7 @@
      16
     ],
     "apple-vision": [
-     58.06,
+     60.58,
      16,
      16
     ],
@@ -4610,7 +4610,7 @@
   "pages": 96,
   "routes_n": 29,
   "wrong_bar": 90.0,
-  "mu": 93.33,
+  "mu": 93.39,
   "routes": [
    {
     "id": "gemini3.1-pro",
@@ -4624,7 +4624,7 @@
     "adjusted": 96.82,
     "page_mix": 0.14,
     "wrong": 10,
-    "fail_pctile": 70,
+    "fail_pctile": 71,
     "fail_hard": 1,
     "fail_kinds": {
      "printed": 2
@@ -4637,13 +4637,13 @@
       "wrong": 0
      },
      "middle": {
-      "answered_nes": 99.28,
+      "answered_nes": 99.29,
       "failed": 1,
       "n": 32,
       "wrong": 0
      },
      "hard": {
-      "answered_nes": 91.37,
+      "answered_nes": 91.35,
       "failed": 1,
       "n": 32,
       "wrong": 10
@@ -4682,14 +4682,14 @@
     "failed": 0,
     "answered_nes": 96.47,
     "adjusted": 96.59,
-    "page_mix": -0.0,
+    "page_mix": 0.0,
     "wrong": 8,
     "fail_pctile": null,
     "fail_hard": 0,
     "fail_kinds": {},
     "by_tier": {
      "easy": {
-      "answered_nes": 99.84,
+      "answered_nes": 99.85,
       "failed": 0,
       "n": 32,
       "wrong": 0
@@ -4742,7 +4742,7 @@
     "adjusted": 96.42,
     "page_mix": 0.14,
     "wrong": 6,
-    "fail_pctile": 70,
+    "fail_pctile": 72,
     "fail_hard": 1,
     "fail_kinds": {
      "printed": 2
@@ -4755,13 +4755,13 @@
       "wrong": 0
      },
      "middle": {
-      "answered_nes": 99.38,
+      "answered_nes": 99.36,
       "failed": 1,
       "n": 32,
       "wrong": 0
      },
      "hard": {
-      "answered_nes": 89.95,
+      "answered_nes": 89.96,
       "failed": 1,
       "n": 32,
       "wrong": 6
@@ -4864,14 +4864,14 @@
     "adjusted": 95.42,
     "page_mix": 0.14,
     "wrong": 8,
-    "fail_pctile": 70,
+    "fail_pctile": 72,
     "fail_hard": 1,
     "fail_kinds": {
      "printed": 2
     },
     "by_tier": {
      "easy": {
-      "answered_nes": 99.85,
+      "answered_nes": 99.84,
       "failed": 0,
       "n": 32,
       "wrong": 0
@@ -4883,7 +4883,7 @@
       "wrong": 1
      },
      "hard": {
-      "answered_nes": 87.73,
+      "answered_nes": 87.75,
       "failed": 1,
       "n": 32,
       "wrong": 7
@@ -4924,7 +4924,7 @@
     "adjusted": 95.4,
     "page_mix": 0.06,
     "wrong": 12,
-    "fail_pctile": 82,
+    "fail_pctile": 83,
     "fail_hard": 1,
     "fail_kinds": {
      "typewritten": 1
@@ -4981,8 +4981,8 @@
     "answered": 96,
     "failed": 0,
     "answered_nes": 95.25,
-    "adjusted": 95.37,
-    "page_mix": -0.0,
+    "adjusted": 95.38,
+    "page_mix": 0.0,
     "wrong": 14,
     "fail_pctile": null,
     "fail_hard": 0,
@@ -5039,23 +5039,23 @@
     "answered": 94,
     "failed": 2,
     "answered_nes": 95.1,
-    "adjusted": 95.09,
+    "adjusted": 95.08,
     "page_mix": 0.14,
     "wrong": 11,
-    "fail_pctile": 70,
+    "fail_pctile": 72,
     "fail_hard": 1,
     "fail_kinds": {
      "printed": 2
     },
     "by_tier": {
      "easy": {
-      "answered_nes": 99.54,
+      "answered_nes": 99.58,
       "failed": 0,
       "n": 32,
       "wrong": 0
      },
      "middle": {
-      "answered_nes": 98.01,
+      "answered_nes": 97.96,
       "failed": 1,
       "n": 32,
       "wrong": 0
@@ -5102,7 +5102,7 @@
     "adjusted": 95.16,
     "page_mix": -0.16,
     "wrong": 12,
-    "fail_pctile": 38,
+    "fail_pctile": 39,
     "fail_hard": 0,
     "fail_kinds": {
      "printed": 1,
@@ -5110,13 +5110,13 @@
     },
     "by_tier": {
      "easy": {
-      "answered_nes": 99.66,
+      "answered_nes": 99.67,
       "failed": 1,
       "n": 32,
       "wrong": 0
      },
      "middle": {
-      "answered_nes": 98.23,
+      "answered_nes": 98.22,
       "failed": 2,
       "n": 32,
       "wrong": 0
@@ -5160,10 +5160,10 @@
     "answered": 93,
     "failed": 3,
     "answered_nes": 94.54,
-    "adjusted": 94.52,
+    "adjusted": 94.51,
     "page_mix": 0.15,
     "wrong": 12,
-    "fail_pctile": 71,
+    "fail_pctile": 72,
     "fail_hard": 2,
     "fail_kinds": {
      "handwritten": 1,
@@ -5183,7 +5183,7 @@
       "wrong": 0
      },
      "hard": {
-      "answered_nes": 84.81,
+      "answered_nes": 84.8,
       "failed": 2,
       "n": 32,
       "wrong": 12
@@ -5224,14 +5224,14 @@
     "adjusted": 94.65,
     "page_mix": -0.07,
     "wrong": 17,
-    "fail_pctile": 20,
+    "fail_pctile": 21,
     "fail_hard": 0,
     "fail_kinds": {
      "typewritten": 1
     },
     "by_tier": {
      "easy": {
-      "answered_nes": 99.72,
+      "answered_nes": 99.75,
       "failed": 1,
       "n": 32,
       "wrong": 0
@@ -5243,7 +5243,7 @@
       "wrong": 0
      },
      "hard": {
-      "answered_nes": 85.16,
+      "answered_nes": 85.13,
       "failed": 0,
       "n": 32,
       "wrong": 17
@@ -5281,21 +5281,21 @@
     "answered": 96,
     "failed": 0,
     "answered_nes": 94.02,
-    "adjusted": 94.14,
-    "page_mix": -0.0,
+    "adjusted": 94.15,
+    "page_mix": 0.0,
     "wrong": 16,
     "fail_pctile": null,
     "fail_hard": 0,
     "fail_kinds": {},
     "by_tier": {
      "easy": {
-      "answered_nes": 99.81,
+      "answered_nes": 99.8,
       "failed": 0,
       "n": 32,
       "wrong": 0
      },
      "middle": {
-      "answered_nes": 97.85,
+      "answered_nes": 97.86,
       "failed": 0,
       "n": 32,
       "wrong": 1
@@ -5339,27 +5339,27 @@
     "answered": 96,
     "failed": 0,
     "answered_nes": 93.98,
-    "adjusted": 94.1,
-    "page_mix": -0.0,
+    "adjusted": 94.11,
+    "page_mix": 0.0,
     "wrong": 16,
     "fail_pctile": null,
     "fail_hard": 0,
     "fail_kinds": {},
     "by_tier": {
      "easy": {
-      "answered_nes": 99.8,
+      "answered_nes": 99.82,
       "failed": 0,
       "n": 32,
       "wrong": 0
      },
      "middle": {
-      "answered_nes": 98.32,
+      "answered_nes": 98.33,
       "failed": 0,
       "n": 32,
       "wrong": 0
      },
      "hard": {
-      "answered_nes": 83.83,
+      "answered_nes": 83.8,
       "failed": 0,
       "n": 32,
       "wrong": 16
@@ -5408,7 +5408,7 @@
     },
     "by_tier": {
      "easy": {
-      "answered_nes": 99.76,
+      "answered_nes": 99.77,
       "failed": 0,
       "n": 32,
       "wrong": 0
@@ -5461,7 +5461,7 @@
     "adjusted": 93.41,
     "page_mix": 0.28,
     "wrong": 21,
-    "fail_pctile": 74,
+    "fail_pctile": 75,
     "fail_hard": 3,
     "fail_kinds": {
      "mixed": 1,
@@ -5521,7 +5521,7 @@
     "failed": 3,
     "answered_nes": 93.49,
     "adjusted": 92.89,
-    "page_mix": 0.72,
+    "page_mix": 0.73,
     "wrong": 21,
     "fail_pctile": 91,
     "fail_hard": 3,
@@ -5531,13 +5531,13 @@
     },
     "by_tier": {
      "easy": {
-      "answered_nes": 98.76,
+      "answered_nes": 98.9,
       "failed": 0,
       "n": 32,
       "wrong": 1
      },
      "middle": {
-      "answered_nes": 95.78,
+      "answered_nes": 95.63,
       "failed": 0,
       "n": 32,
       "wrong": 5
@@ -5582,10 +5582,10 @@
     "failed": 4,
     "answered_nes": 93.33,
     "adjusted": 93.63,
-    "page_mix": -0.18,
+    "page_mix": -0.17,
     "wrong": 20,
-    "fail_pctile": 48,
-    "fail_hard": 1,
+    "fail_pctile": 50,
+    "fail_hard": 0,
     "fail_kinds": {
      "printed": 1,
      "typewritten": 3
@@ -5593,19 +5593,19 @@
     "by_tier": {
      "easy": {
       "answered_nes": 99.34,
-      "failed": 1,
+      "failed": 0,
       "n": 32,
       "wrong": 0
      },
      "middle": {
-      "answered_nes": 96.16,
-      "failed": 2,
+      "answered_nes": 96.06,
+      "failed": 4,
       "n": 32,
       "wrong": 2
      },
      "hard": {
-      "answered_nes": 84.59,
-      "failed": 1,
+      "answered_nes": 84.94,
+      "failed": 0,
       "n": 32,
       "wrong": 18
      }
@@ -5642,21 +5642,21 @@
     "answered": 96,
     "failed": 0,
     "answered_nes": 93.17,
-    "adjusted": 93.29,
-    "page_mix": -0.0,
+    "adjusted": 93.3,
+    "page_mix": 0.0,
     "wrong": 19,
     "fail_pctile": null,
     "fail_hard": 0,
     "fail_kinds": {},
     "by_tier": {
      "easy": {
-      "answered_nes": 99.7,
+      "answered_nes": 99.68,
       "failed": 0,
       "n": 32,
       "wrong": 0
      },
      "middle": {
-      "answered_nes": 97.02,
+      "answered_nes": 97.03,
       "failed": 0,
       "n": 32,
       "wrong": 1
@@ -5700,23 +5700,23 @@
     "answered": 95,
     "failed": 1,
     "answered_nes": 93.06,
-    "adjusted": 93.24,
+    "adjusted": 93.25,
     "page_mix": -0.07,
     "wrong": 19,
-    "fail_pctile": 20,
+    "fail_pctile": 21,
     "fail_hard": 0,
     "fail_kinds": {
      "typewritten": 1
     },
     "by_tier": {
      "easy": {
-      "answered_nes": 99.63,
+      "answered_nes": 99.62,
       "failed": 1,
       "n": 32,
       "wrong": 0
      },
      "middle": {
-      "answered_nes": 97.84,
+      "answered_nes": 97.85,
       "failed": 0,
       "n": 32,
       "wrong": 0
@@ -5760,21 +5760,21 @@
     "answered": 96,
     "failed": 0,
     "answered_nes": 93.02,
-    "adjusted": 93.14,
-    "page_mix": -0.0,
+    "adjusted": 93.15,
+    "page_mix": 0.0,
     "wrong": 17,
     "fail_pctile": null,
     "fail_hard": 0,
     "fail_kinds": {},
     "by_tier": {
      "easy": {
-      "answered_nes": 99.81,
+      "answered_nes": 99.82,
       "failed": 0,
       "n": 32,
       "wrong": 0
      },
      "middle": {
-      "answered_nes": 97.6,
+      "answered_nes": 97.59,
       "failed": 0,
       "n": 32,
       "wrong": 1
@@ -5819,7 +5819,7 @@
     "failed": 0,
     "answered_nes": 92.92,
     "adjusted": 93.04,
-    "page_mix": -0.0,
+    "page_mix": 0.0,
     "wrong": 17,
     "fail_pctile": null,
     "fail_hard": 0,
@@ -5879,7 +5879,7 @@
     "adjusted": 93.06,
     "page_mix": -0.05,
     "wrong": 19,
-    "fail_pctile": 48,
+    "fail_pctile": 52,
     "fail_hard": 0,
     "fail_kinds": {
      "typewritten": 1
@@ -5939,20 +5939,20 @@
     "adjusted": 92.83,
     "page_mix": 0.07,
     "wrong": 19,
-    "fail_pctile": 65,
+    "fail_pctile": 66,
     "fail_hard": 1,
     "fail_kinds": {
      "typewritten": 2
     },
     "by_tier": {
      "easy": {
-      "answered_nes": 99.79,
+      "answered_nes": 99.81,
       "failed": 0,
       "n": 32,
       "wrong": 0
      },
      "middle": {
-      "answered_nes": 98.12,
+      "answered_nes": 98.09,
       "failed": 1,
       "n": 32,
       "wrong": 1
@@ -5999,7 +5999,7 @@
     "adjusted": 91.31,
     "page_mix": 1.18,
     "wrong": 23,
-    "fail_pctile": 70,
+    "fail_pctile": 71,
     "fail_hard": 5,
     "fail_kinds": {
      "mixed": 1,
@@ -6008,13 +6008,13 @@
     },
     "by_tier": {
      "easy": {
-      "answered_nes": 98.51,
+      "answered_nes": 98.49,
       "failed": 1,
       "n": 32,
       "wrong": 1
      },
      "middle": {
-      "answered_nes": 96.79,
+      "answered_nes": 96.82,
       "failed": 4,
       "n": 32,
       "wrong": 1
@@ -6069,13 +6069,13 @@
     },
     "by_tier": {
      "easy": {
-      "answered_nes": 99.58,
+      "answered_nes": 99.61,
       "failed": 0,
       "n": 32,
       "wrong": 0
      },
      "middle": {
-      "answered_nes": 97.2,
+      "answered_nes": 97.17,
       "failed": 0,
       "n": 32,
       "wrong": 2
@@ -6136,13 +6136,13 @@
       "wrong": 0
      },
      "middle": {
-      "answered_nes": 96.93,
+      "answered_nes": 96.92,
       "failed": 0,
       "n": 32,
       "wrong": 3
      },
      "hard": {
-      "answered_nes": 76.65,
+      "answered_nes": 76.66,
       "failed": 2,
       "n": 32,
       "wrong": 21
@@ -6180,21 +6180,21 @@
     "answered": 96,
     "failed": 0,
     "answered_nes": 90.66,
-    "adjusted": 90.77,
-    "page_mix": -0.0,
+    "adjusted": 90.78,
+    "page_mix": 0.0,
     "wrong": 29,
     "fail_pctile": null,
     "fail_hard": 0,
     "fail_kinds": {},
     "by_tier": {
      "easy": {
-      "answered_nes": 98.8,
+      "answered_nes": 98.7,
       "failed": 0,
       "n": 32,
       "wrong": 0
      },
      "middle": {
-      "answered_nes": 96.08,
+      "answered_nes": 96.18,
       "failed": 0,
       "n": 32,
       "wrong": 4
@@ -6239,7 +6239,7 @@
     "failed": 0,
     "answered_nes": 89.17,
     "adjusted": 89.29,
-    "page_mix": -0.0,
+    "page_mix": 0.0,
     "wrong": 27,
     "fail_pctile": null,
     "fail_hard": 0,
@@ -6292,54 +6292,54 @@
     "name": "Apple Vision",
     "price": 0.0,
     "app": true,
-    "strict": 81.37,
+    "strict": 83.07,
     "answered": 96,
     "failed": 0,
-    "answered_nes": 81.37,
-    "adjusted": 81.49,
-    "page_mix": -0.0,
-    "wrong": 41,
+    "answered_nes": 83.07,
+    "adjusted": 83.19,
+    "page_mix": 0.0,
+    "wrong": 37,
     "fail_pctile": null,
     "fail_hard": 0,
     "fail_kinds": {},
     "by_tier": {
      "easy": {
-      "answered_nes": 95.27,
+      "answered_nes": 98.14,
       "failed": 0,
       "n": 32,
-      "wrong": 2
+      "wrong": 0
      },
      "middle": {
-      "answered_nes": 86.62,
+      "answered_nes": 88.02,
       "failed": 0,
       "n": 32,
       "wrong": 11
      },
      "hard": {
-      "answered_nes": 62.22,
+      "answered_nes": 63.05,
       "failed": 0,
       "n": 32,
-      "wrong": 28
+      "wrong": 26
      }
     },
     "by_kind": {
      "handwritten": {
-      "answered_nes": 58.06,
+      "answered_nes": 60.58,
       "failed": 0,
       "n": 16
      },
      "mixed": {
-      "answered_nes": 73.2,
+      "answered_nes": 70.84,
       "failed": 0,
       "n": 2
      },
      "printed": {
-      "answered_nes": 76.43,
+      "answered_nes": 80.54,
       "failed": 0,
       "n": 28
      },
      "typewritten": {
-      "answered_nes": 91.92,
+      "answered_nes": 92.18,
       "failed": 0,
       "n": 50
      }
@@ -6351,76 +6351,76 @@
     "easy": {
      "handwritten": 0,
      "mixed": 0,
-     "printed": 8,
-     "typewritten": 24
+     "printed": 9,
+     "typewritten": 23
     },
     "middle": {
-     "handwritten": 5,
+     "handwritten": 4,
      "mixed": 0,
-     "printed": 11,
-     "typewritten": 16
+     "printed": 10,
+     "typewritten": 18
     },
     "hard": {
-     "handwritten": 11,
+     "handwritten": 12,
      "mixed": 2,
      "printed": 9,
-     "typewritten": 10
+     "typewritten": 9
     }
    },
    "tier_mean": {
-    "easy": 99.5,
-    "middle": 97.33,
-    "hard": 82.77
+    "easy": 99.53,
+    "middle": 97.46,
+    "hard": 82.79
    },
    "hardest": [
     {
      "kind": "typewritten",
-     "mean_nes": 47.47,
+     "mean_nes": 47.55,
      "failed_by": 3
     },
     {
      "kind": "mixed",
-     "mean_nes": 47.65,
+     "mean_nes": 47.66,
      "failed_by": 1
     },
     {
      "kind": "printed",
-     "mean_nes": 55.93,
+     "mean_nes": 56.03,
      "failed_by": 1
     },
     {
      "kind": "printed",
-     "mean_nes": 72.28,
+     "mean_nes": 70.95,
      "failed_by": 0
     },
     {
      "kind": "handwritten",
-     "mean_nes": 74.46,
+     "mean_nes": 74.52,
      "failed_by": 1
     },
     {
      "kind": "printed",
-     "mean_nes": 74.86,
+     "mean_nes": 74.67,
      "failed_by": 9
     },
     {
-     "kind": "printed",
-     "mean_nes": 77.01,
+     "kind": "handwritten",
+     "mean_nes": 77.15,
      "failed_by": 0
     },
     {
-     "kind": "handwritten",
-     "mean_nes": 77.02,
+     "kind": "printed",
+     "mean_nes": 77.18,
      "failed_by": 0
     },
     {
      "kind": "typewritten",
-     "mean_nes": 80.36,
+     "mean_nes": 80.5,
      "failed_by": 1
     },
     {
      "kind": "typewritten",
-     "mean_nes": 81.54,
+     "mean_nes": 81.22,
      "failed_by": 2
     }
    ],
@@ -6430,7 +6430,7 @@
    "bins": [
     {
      "n": 16,
-     "difficulty": 0.24,
+     "difficulty": 0.21,
      "kinds": {
       "handwritten": 0,
       "mixed": 0,
@@ -6441,51 +6441,51 @@
     },
     {
      "n": 16,
-     "difficulty": 0.76,
+     "difficulty": 0.73,
+     "kinds": {
+      "handwritten": 0,
+      "mixed": 0,
+      "printed": 5,
+      "typewritten": 11
+     },
+     "route_failures": 4
+    },
+    {
+     "n": 16,
+     "difficulty": 1.63,
      "kinds": {
       "handwritten": 0,
       "mixed": 0,
       "printed": 4,
       "typewritten": 12
      },
-     "route_failures": 6
-    },
-    {
-     "n": 16,
-     "difficulty": 1.75,
-     "kinds": {
-      "handwritten": 1,
-      "mixed": 0,
-      "printed": 3,
-      "typewritten": 12
-     },
      "route_failures": 11
     },
     {
      "n": 16,
-     "difficulty": 3.59,
+     "difficulty": 3.44,
      "kinds": {
       "handwritten": 4,
       "mixed": 0,
-      "printed": 8,
-      "typewritten": 4
+      "printed": 6,
+      "typewritten": 6
      },
-     "route_failures": 9
+     "route_failures": 12
     },
     {
      "n": 16,
      "difficulty": 9.04,
      "kinds": {
-      "handwritten": 6,
+      "handwritten": 7,
       "mixed": 1,
       "printed": 2,
-      "typewritten": 7
+      "typewritten": 6
      },
-     "route_failures": 11
+     "route_failures": 10
     },
     {
      "n": 16,
-     "difficulty": 25.41,
+     "difficulty": 25.39,
      "kinds": {
       "handwritten": 5,
       "mixed": 1,
@@ -6502,19 +6502,19 @@
       "failed": 0
      },
      {
-      "nes": 99.73,
+      "nes": 99.81,
       "failed": 0
      },
      {
-      "nes": 99.52,
+      "nes": 99.37,
       "failed": 0
      },
      {
-      "nes": 98.76,
+      "nes": 98.69,
       "failed": 0
      },
      {
-      "nes": 94.78,
+      "nes": 94.93,
       "failed": 0
      },
      {
@@ -6528,19 +6528,19 @@
       "failed": 0
      },
      {
-      "nes": 99.61,
+      "nes": 99.64,
       "failed": 0
      },
      {
-      "nes": 99.58,
+      "nes": 99.47,
       "failed": 1
      },
      {
-      "nes": 98.99,
+      "nes": 99.07,
       "failed": 0
      },
      {
-      "nes": 95.44,
+      "nes": 95.42,
       "failed": 0
      },
      {
@@ -6554,19 +6554,19 @@
       "failed": 0
      },
      {
-      "nes": 99.83,
+      "nes": 99.87,
       "failed": 0
      },
      {
-      "nes": 99.45,
+      "nes": 99.32,
       "failed": 1
      },
      {
-      "nes": 99.31,
+      "nes": 99.36,
       "failed": 0
      },
      {
-      "nes": 97.13,
+      "nes": 97.16,
       "failed": 0
      },
      {
@@ -6576,23 +6576,23 @@
     ],
     "qwen3.5-397b": [
      {
-      "nes": 99.94,
+      "nes": 99.9,
       "failed": 0
      },
      {
-      "nes": 99.68,
+      "nes": 99.71,
       "failed": 0
      },
      {
-      "nes": 98.65,
+      "nes": 98.67,
       "failed": 0
      },
      {
-      "nes": 97.05,
+      "nes": 97.18,
       "failed": 0
      },
      {
-      "nes": 94.15,
+      "nes": 94.02,
       "failed": 0
      },
      {
@@ -6606,19 +6606,19 @@
       "failed": 0
      },
      {
-      "nes": 99.75,
+      "nes": 99.79,
       "failed": 0
      },
      {
-      "nes": 98.33,
+      "nes": 98.37,
       "failed": 0
      },
      {
-      "nes": 98.31,
+      "nes": 98.28,
       "failed": 0
      },
      {
-      "nes": 93.68,
+      "nes": 93.63,
       "failed": 0
      },
      {
@@ -6628,7 +6628,7 @@
     ],
     "qwen3.8-flash": [
      {
-      "nes": 99.86,
+      "nes": 99.87,
       "failed": 1
      },
      {
@@ -6636,15 +6636,15 @@
       "failed": 0
      },
      {
-      "nes": 98.81,
-      "failed": 1
+      "nes": 98.79,
+      "failed": 0
      },
      {
-      "nes": 97.65,
-      "failed": 1
+      "nes": 97.95,
+      "failed": 2
      },
      {
-      "nes": 94.38,
+      "nes": 94.05,
       "failed": 0
      },
      {
@@ -6654,23 +6654,23 @@
     ],
     "gpt5.4-mini": [
      {
-      "nes": 99.83,
+      "nes": 99.84,
       "failed": 0
      },
      {
-      "nes": 99.61,
+      "nes": 99.71,
       "failed": 1
      },
      {
-      "nes": 98.91,
+      "nes": 98.74,
       "failed": 0
      },
      {
-      "nes": 98.45,
+      "nes": 98.57,
       "failed": 0
      },
      {
-      "nes": 94.01,
+      "nes": 93.95,
       "failed": 0
      },
      {
@@ -6684,19 +6684,19 @@
       "failed": 0
      },
      {
-      "nes": 99.75,
+      "nes": 99.79,
       "failed": 0
      },
      {
-      "nes": 99.52,
+      "nes": 99.35,
       "failed": 1
      },
      {
-      "nes": 97.71,
+      "nes": 97.79,
       "failed": 0
      },
      {
-      "nes": 96.36,
+      "nes": 96.39,
       "failed": 0
      },
      {
@@ -6710,19 +6710,19 @@
       "failed": 0
      },
      {
-      "nes": 99.64,
+      "nes": 99.65,
       "failed": 0
      },
      {
-      "nes": 98.87,
+      "nes": 98.68,
       "failed": 0
      },
      {
-      "nes": 95.17,
+      "nes": 95.59,
       "failed": 0
      },
      {
-      "nes": 88.68,
+      "nes": 88.45,
       "failed": 0
      },
      {
@@ -6732,23 +6732,23 @@
     ],
     "gemini3.5-flash-lite": [
      {
-      "nes": 99.93,
+      "nes": 99.89,
       "failed": 0
      },
      {
-      "nes": 99.15,
+      "nes": 99.28,
       "failed": 0
      },
      {
-      "nes": 98.75,
+      "nes": 98.62,
       "failed": 1
      },
      {
-      "nes": 97.63,
+      "nes": 97.34,
       "failed": 0
      },
      {
-      "nes": 94.3,
+      "nes": 94.61,
       "failed": 0
      },
      {
@@ -6758,23 +6758,23 @@
     ],
     "mistral-ocr-4-1": [
      {
-      "nes": 99.73,
+      "nes": 99.69,
       "failed": 0
      },
      {
-      "nes": 99.1,
+      "nes": 99.32,
       "failed": 0
      },
      {
-      "nes": 98.1,
+      "nes": 97.87,
       "failed": 0
      },
      {
-      "nes": 97.46,
+      "nes": 98.01,
       "failed": 0
      },
      {
-      "nes": 92.81,
+      "nes": 92.31,
       "failed": 0
      },
      {
@@ -6784,23 +6784,23 @@
     ],
     "gpt5.6-luna": [
      {
-      "nes": 99.83,
+      "nes": 99.82,
       "failed": 0
      },
      {
-      "nes": 99.43,
+      "nes": 99.42,
       "failed": 1
      },
      {
-      "nes": 98.4,
+      "nes": 98.43,
       "failed": 0
      },
      {
-      "nes": 97.29,
+      "nes": 97.61,
       "failed": 0
      },
      {
-      "nes": 91.14,
+      "nes": 90.8,
       "failed": 0
      },
      {
@@ -6810,23 +6810,23 @@
     ],
     "mistral-medium3.5": [
      {
-      "nes": 99.5,
+      "nes": 99.51,
       "failed": 0
      },
      {
-      "nes": 98.67,
+      "nes": 98.47,
       "failed": 0
      },
      {
-      "nes": 97.11,
+      "nes": 97.8,
       "failed": 0
      },
      {
-      "nes": 95.85,
+      "nes": 93.97,
       "failed": 0
      },
      {
-      "nes": 86.75,
+      "nes": 88.13,
       "failed": 0
      },
      {
@@ -6836,23 +6836,23 @@
     ],
     "qwen3.6-27b": [
      {
-      "nes": 99.93,
+      "nes": 99.94,
       "failed": 0
      },
      {
-      "nes": 99.73,
+      "nes": 99.72,
       "failed": 0
      },
      {
-      "nes": 98.9,
+      "nes": 98.69,
       "failed": 0
      },
      {
-      "nes": 97.3,
+      "nes": 97.73,
       "failed": 0
      },
      {
-      "nes": 95.91,
+      "nes": 95.67,
       "failed": 1
      },
      {
@@ -6862,23 +6862,23 @@
     ],
     "qwen3.6-35b-a3b": [
      {
-      "nes": 99.94,
+      "nes": 99.92,
       "failed": 0
      },
      {
-      "nes": 99.68,
+      "nes": 99.71,
       "failed": 0
      },
      {
-      "nes": 98.66,
+      "nes": 98.65,
       "failed": 0
      },
      {
-      "nes": 98.02,
+      "nes": 96.53,
       "failed": 0
      },
      {
-      "nes": 91.88,
+      "nes": 93.36,
       "failed": 0
      },
      {
@@ -6888,7 +6888,7 @@
     ],
     "qwen3-vl-8b": [
      {
-      "nes": 99.84,
+      "nes": 99.85,
       "failed": 0
      },
      {
@@ -6896,15 +6896,15 @@
       "failed": 0
      },
      {
-      "nes": 96.43,
+      "nes": 98.59,
       "failed": 0
      },
      {
-      "nes": 97.22,
+      "nes": 94.87,
       "failed": 0
      },
      {
-      "nes": 91.79,
+      "nes": 91.98,
       "failed": 0
      },
      {
@@ -6914,19 +6914,19 @@
     ],
     "gemini3.1-flash-lite": [
      {
-      "nes": 99.63,
+      "nes": 99.59,
       "failed": 0
      },
      {
-      "nes": 99.69,
+      "nes": 99.73,
       "failed": 0
      },
      {
-      "nes": 99.3,
+      "nes": 99.29,
       "failed": 1
      },
      {
-      "nes": 98.1,
+      "nes": 98.11,
       "failed": 0
      },
      {
@@ -6940,11 +6940,11 @@
     ],
     "qwen3.5-35b-a3b": [
      {
-      "nes": 99.92,
+      "nes": 99.91,
       "failed": 0
      },
      {
-      "nes": 99.65,
+      "nes": 99.71,
       "failed": 0
      },
      {
@@ -6952,11 +6952,11 @@
       "failed": 1
      },
      {
-      "nes": 97.97,
+      "nes": 97.28,
       "failed": 0
      },
      {
-      "nes": 92.49,
+      "nes": 93.13,
       "failed": 0
      },
      {
@@ -6966,23 +6966,23 @@
     ],
     "gemma4-31b": [
      {
-      "nes": 99.74,
+      "nes": 99.83,
       "failed": 0
      },
      {
-      "nes": 98.19,
+      "nes": 98.05,
       "failed": 0
      },
      {
-      "nes": 98.21,
+      "nes": 96.98,
       "failed": 0
      },
      {
-      "nes": 93.73,
+      "nes": 94.2,
       "failed": 0
      },
      {
-      "nes": 91.07,
+      "nes": 91.93,
       "failed": 1
      },
      {
@@ -6996,19 +6996,19 @@
       "failed": 0
      },
      {
-      "nes": 99.26,
+      "nes": 99.32,
       "failed": 0
      },
      {
-      "nes": 98.42,
+      "nes": 97.46,
       "failed": 0
      },
      {
-      "nes": 95.99,
+      "nes": 97.46,
       "failed": 0
      },
      {
-      "nes": 88.04,
+      "nes": 87.38,
       "failed": 2
      },
      {
@@ -7018,24 +7018,24 @@
     ],
     "qwen3.5-9b": [
      {
-      "nes": 99.71,
+      "nes": 99.7,
       "failed": 0
      },
      {
-      "nes": 98.94,
-      "failed": 1
+      "nes": 98.98,
+      "failed": 0
      },
      {
-      "nes": 98.54,
-      "failed": 1
+      "nes": 98.45,
+      "failed": 2
      },
      {
-      "nes": 93.78,
-      "failed": 1
+      "nes": 93.67,
+      "failed": 2
      },
      {
-      "nes": 92.53,
-      "failed": 1
+      "nes": 92.73,
+      "failed": 0
      },
      {
       "nes": 77.15,
@@ -7044,23 +7044,23 @@
     ],
     "mistral-small-24b": [
      {
-      "nes": 99.33,
+      "nes": 99.34,
       "failed": 0
      },
      {
-      "nes": 99.23,
+      "nes": 99.22,
       "failed": 0
      },
      {
-      "nes": 97.82,
+      "nes": 98.34,
       "failed": 0
      },
      {
-      "nes": 96.04,
+      "nes": 95.5,
       "failed": 0
      },
      {
-      "nes": 85.13,
+      "nes": 85.15,
       "failed": 0
      },
      {
@@ -7070,23 +7070,23 @@
     ],
     "gemma4-26b-a4b": [
      {
-      "nes": 99.36,
+      "nes": 99.47,
       "failed": 0
      },
      {
-      "nes": 98.27,
+      "nes": 98.12,
       "failed": 1
      },
      {
-      "nes": 97.28,
+      "nes": 96.85,
       "failed": 1
      },
      {
-      "nes": 96.02,
+      "nes": 96.0,
       "failed": 3
      },
      {
-      "nes": 85.39,
+      "nes": 85.88,
       "failed": 1
      },
      {
@@ -7100,19 +7100,19 @@
       "failed": 2
      },
      {
-      "nes": 99.8,
-      "failed": 2
+      "nes": 99.77,
+      "failed": 1
      },
      {
-      "nes": 99.13,
-      "failed": 0
+      "nes": 98.95,
+      "failed": 1
      },
      {
-      "nes": 97.95,
+      "nes": 98.51,
       "failed": 4
      },
      {
-      "nes": 94.4,
+      "nes": 94.06,
       "failed": 3
      },
      {
@@ -7122,11 +7122,11 @@
     ],
     "apple-vision": [
      {
-      "nes": 98.58,
+      "nes": 99.38,
       "failed": 0
      },
      {
-      "nes": 96.42,
+      "nes": 96.91,
       "failed": 0
      },
      {
@@ -7134,15 +7134,15 @@
       "failed": 0
      },
      {
-      "nes": 75.64,
+      "nes": 86.19,
       "failed": 0
      },
      {
-      "nes": 66.83,
+      "nes": 64.38,
       "failed": 0
      },
      {
-      "nes": 54.2,
+      "nes": 55.03,
       "failed": 0
      }
     ],
@@ -7156,15 +7156,15 @@
       "failed": 0
      },
      {
-      "nes": 98.07,
+      "nes": 98.61,
       "failed": 1
      },
      {
-      "nes": 96.33,
+      "nes": 95.52,
       "failed": 0
      },
      {
-      "nes": 90.97,
+      "nes": 91.28,
       "failed": 1
      },
      {
@@ -7178,19 +7178,19 @@
       "failed": 0
      },
      {
-      "nes": 97.71,
+      "nes": 97.69,
       "failed": 0
      },
      {
-      "nes": 91.9,
+      "nes": 95.82,
       "failed": 0
      },
      {
-      "nes": 96.76,
+      "nes": 92.9,
       "failed": 0
      },
      {
-      "nes": 79.01,
+      "nes": 78.97,
       "failed": 0
      },
      {
@@ -7200,23 +7200,23 @@
     ],
     "qwen3.5-9b-mlx4": [
      {
-      "nes": 99.87,
+      "nes": 99.84,
       "failed": 0
      },
      {
-      "nes": 99.26,
+      "nes": 99.29,
       "failed": 0
      },
      {
-      "nes": 98.48,
+      "nes": 98.49,
+      "failed": 0
+     },
+     {
+      "nes": 98.1,
       "failed": 1
      },
      {
-      "nes": 97.81,
-      "failed": 0
-     },
-     {
-      "nes": 90.21,
+      "nes": 89.88,
       "failed": 0
      },
      {
@@ -7226,7 +7226,7 @@
     ],
     "qwen3.6-27b-farmshare": [
      {
-      "nes": 99.93,
+      "nes": 99.94,
       "failed": 0
      },
      {
@@ -7234,15 +7234,15 @@
       "failed": 0
      },
      {
-      "nes": 99.14,
+      "nes": 98.95,
       "failed": 0
      },
      {
-      "nes": 97.78,
+      "nes": 98.16,
       "failed": 0
      },
      {
-      "nes": 95.31,
+      "nes": 95.11,
       "failed": 0
      },
      {
@@ -7301,10 +7301,10 @@
       "qwen3.5-9b"
      ],
      "trigger": "disagree@0.80",
-     "nes": 94.34,
+     "nes": 94.36,
      "family": "disagree",
-     "usd": 0.07,
-     "escalated": 33,
+     "usd": 0.06,
+     "escalated": 30,
      "failed": 0
     },
     {
@@ -7370,6 +7370,19 @@
      "family": "fail+vision",
      "usd": 0.59,
      "escalated": 18,
+     "failed": 0
+    },
+    {
+     "label": "Qwen3.8 Flash, checked against Apple Vision at 0.80 \u2192 Qwen3.5 9B",
+     "stages": [
+      "qwen3.8-flash",
+      "qwen3.5-9b"
+     ],
+     "trigger": "disagree@0.80",
+     "nes": 95.16,
+     "family": "disagree",
+     "usd": 0.66,
+     "escalated": 30,
      "failed": 0
     },
     {
@@ -7689,20 +7702,20 @@
       },
       "disagree": {
        "best": {
-        "label": "Qwen3-VL 8B 4-bit (Mac), checked against Apple Vision at 0.90 \u2192 Qwen3.5-9B 4-bit (Mac)",
+        "label": "LightOnOCR-3-4B 8-bit (Mac), checked against Qwen3-VL 8B 4-bit (Mac) at 0.90 \u2192 Qwen3.5-9B 4-bit (Mac)",
         "stages": [
-         "qwen3-vl-8b-mlx4",
+         "lightonocr-3-4b-mlx8",
          "qwen3.5-9b-mlx4"
         ],
         "trigger": "disagree@0.90",
-        "nes": 93.28,
+        "nes": 93.24,
         "family": "disagree",
         "usd": 0.0,
-        "escalated": 44,
+        "escalated": 29,
         "failed": 0
        },
-       "split_in": 93.62,
-       "split_out": 91.65
+       "split_in": 93.6,
+       "split_out": 91.56
       }
      }
     },
@@ -7790,8 +7803,8 @@
         "escalated": 32,
         "failed": 0
        },
-       "split_in": 95.6,
-       "split_out": 92.63
+       "split_in": 95.61,
+       "split_out": 92.59
       }
      }
     },
@@ -7829,7 +7842,7 @@
         "failed": 0
        },
        "split_in": 95.09,
-       "split_out": 94.02
+       "split_out": 94.04
       },
       "fail+kind": {
        "best": {
@@ -7879,8 +7892,8 @@
         "escalated": 16,
         "failed": 0
        },
-       "split_in": 96.2,
-       "split_out": 93.46
+       "split_in": 96.19,
+       "split_out": 93.41
       }
      }
     },
@@ -7968,8 +7981,8 @@
         "escalated": 16,
         "failed": 0
        },
-       "split_in": 96.62,
-       "split_out": 94.11
+       "split_in": 96.63,
+       "split_out": 94.1
       }
      }
     },
@@ -8057,8 +8070,8 @@
         "escalated": 29,
         "failed": 0
        },
-       "split_in": 96.83,
-       "split_out": 94.48
+       "split_in": 96.84,
+       "split_out": 94.55
       }
      }
     },
@@ -8147,7 +8160,7 @@
         "failed": 0
        },
        "split_in": 96.89,
-       "split_out": 94.67
+       "split_out": 94.75
       }
      }
     }
@@ -8824,16 +8837,16 @@
     ],
     "disagree": [
      {
-      "label": "Qwen3-VL 8B 4-bit (Mac), checked against Apple Vision at 0.90 \u2192 Qwen3.5-9B 4-bit (Mac)",
+      "label": "LightOnOCR-3-4B 8-bit (Mac), checked against Qwen3-VL 8B 4-bit (Mac) at 0.90 \u2192 Qwen3.5-9B 4-bit (Mac)",
       "stages": [
-       "qwen3-vl-8b-mlx4",
+       "lightonocr-3-4b-mlx8",
        "qwen3.5-9b-mlx4"
       ],
       "trigger": "disagree@0.90",
-      "nes": 93.28,
+      "nes": 93.24,
       "family": "disagree",
       "usd": 0.0,
-      "escalated": 44,
+      "escalated": 29,
       "failed": 0
      },
      {
@@ -8869,10 +8882,10 @@
        "qwen3.5-9b"
       ],
       "trigger": "disagree@0.80",
-      "nes": 94.34,
+      "nes": 94.36,
       "family": "disagree",
-      "usd": 0.07,
-      "escalated": 33,
+      "usd": 0.06,
+      "escalated": 30,
       "failed": 0
      },
      {
@@ -8912,6 +8925,19 @@
       "family": "disagree",
       "usd": 0.44,
       "escalated": 32,
+      "failed": 0
+     },
+     {
+      "label": "Qwen3.8 Flash, checked against Apple Vision at 0.80 \u2192 Qwen3.5 9B",
+      "stages": [
+       "qwen3.8-flash",
+       "qwen3.5-9b"
+      ],
+      "trigger": "disagree@0.80",
+      "nes": 95.16,
+      "family": "disagree",
+      "usd": 0.66,
+      "escalated": 30,
       "failed": 0
      },
      {
@@ -9082,11 +9108,11 @@
       "caught_at_20": 4
      },
      "length against Apple Vision's": {
-      "auc": 0.87,
+      "auc": 0.837,
       "caught_at_20": 9
      },
-     "disagrees with Qwen3.6 35B-A3B": {
-      "auc": 0.913,
+     "disagrees with Apple Vision": {
+      "auc": 0.914,
       "caught_at_20": 10
      }
     }
@@ -9112,7 +9138,7 @@
       "caught_at_20": 3
      },
      "length against Apple Vision's": {
-      "auc": 0.854,
+      "auc": 0.838,
       "caught_at_20": 11
      },
      "disagrees with LightOnOCR-3-4B 8-bit (Mac)": {
@@ -9142,8 +9168,8 @@
       "caught_at_20": 6
      },
      "length against Apple Vision's": {
-      "auc": 0.885,
-      "caught_at_20": 14
+      "auc": 0.855,
+      "caught_at_20": 13
      },
      "disagrees with LightOnOCR-3-4B 8-bit (Mac)": {
       "auc": 0.907,
@@ -9172,8 +9198,8 @@
       "caught_at_20": 6
      },
      "length against Apple Vision's": {
-      "auc": 0.886,
-      "caught_at_20": 14
+      "auc": 0.846,
+      "caught_at_20": 12
      },
      "disagrees with Qwen3.6 35B-A3B": {
       "auc": 0.946,
@@ -9202,12 +9228,12 @@
       "caught_at_20": 9
      },
      "length against Apple Vision's": {
-      "auc": 0.873,
-      "caught_at_20": 16
+      "auc": 0.848,
+      "caught_at_20": 15
      },
      "disagrees with Apple Vision": {
-      "auc": 0.948,
-      "caught_at_20": 15
+      "auc": 0.954,
+      "caught_at_20": 16
      }
     }
    },
@@ -9232,7 +9258,7 @@
       "caught_at_20": 6
      },
      "length against Apple Vision's": {
-      "auc": 0.794,
+      "auc": 0.811,
       "caught_at_20": 13
      },
      "disagrees with Qwen3.6 35B-A3B": {
@@ -9262,8 +9288,8 @@
       "caught_at_20": 9
      },
      "length against Apple Vision's": {
-      "auc": 0.893,
-      "caught_at_20": 15
+      "auc": 0.878,
+      "caught_at_20": 16
      },
      "disagrees with Qwen3.6 35B-A3B": {
       "auc": 0.939,
@@ -9292,8 +9318,8 @@
       "caught_at_20": 8
      },
      "length against Apple Vision's": {
-      "auc": 0.854,
-      "caught_at_20": 14
+      "auc": 0.847,
+      "caught_at_20": 13
      },
      "disagrees with Qwen3.6 35B-A3B": {
       "auc": 0.975,
@@ -9305,21 +9331,21 @@
     "id": "apple-vision",
     "name": "Apple Vision",
     "answered": 96,
-    "wrong": 41,
+    "wrong": 37,
     "wrong_kinds": {
      "handwritten": 16,
      "mixed": 2,
-     "printed": 13,
-     "typewritten": 10
+     "printed": 10,
+     "typewritten": 9
     },
     "signals": {
      "Vision: handwriting": {
-      "auc": 0.683,
+      "auc": 0.703,
       "caught_at_20": 15
      },
      "disagrees with Qwen3.6 35B-A3B": {
-      "auc": 0.973,
-      "caught_at_20": 19
+      "auc": 0.97,
+      "caught_at_20": 18
      }
     }
    },
@@ -9344,7 +9370,7 @@
       "caught_at_20": 8
      },
      "length against Apple Vision's": {
-      "auc": 0.825,
+      "auc": 0.823,
       "caught_at_20": 14
      },
      "disagrees with Qwen3.6 35B-A3B": {
@@ -9370,7 +9396,7 @@
       "caught_at_20": 7
      },
      "length against Apple Vision's": {
-      "auc": 0.777,
+      "auc": 0.759,
       "caught_at_20": 14
      },
      "disagrees with Qwen3.6 35B-A3B": {
@@ -9400,8 +9426,8 @@
       "caught_at_20": 6
      },
      "length against Apple Vision's": {
-      "auc": 0.848,
-      "caught_at_20": 14
+      "auc": 0.792,
+      "caught_at_20": 12
      },
      "disagrees with Qwen3.6 35B-A3B": {
       "auc": 0.92,
@@ -9454,11 +9480,11 @@
       "typewritten": 39
      },
      "tiers": {
-      "easy": 24,
-      "middle": 17,
-      "hard": 16
+      "easy": 23,
+      "middle": 19,
+      "hard": 15
      },
-     "mean_nes": 93.78,
+     "mean_nes": 93.79,
      "route_failures": 46
     },
     "handwriting": {
@@ -9471,10 +9497,10 @@
      },
      "tiers": {
       "easy": 0,
-      "middle": 5,
-      "hard": 10
+      "middle": 4,
+      "hard": 11
      },
-     "mean_nes": 90.12,
+     "mean_nes": 90.19,
      "route_failures": 8
     },
     "other": {
@@ -9486,11 +9512,11 @@
       "typewritten": 11
      },
      "tiers": {
-      "easy": 8,
-      "middle": 10,
+      "easy": 9,
+      "middle": 9,
       "hard": 6
      },
-     "mean_nes": 93.75,
+     "mean_nes": 93.92,
      "route_failures": 7
     }
    },
@@ -10791,8 +10817,8 @@
     "name": "Apple Vision",
     "pages": 95,
     "answered": 95,
-    "nes_answered": 81.82,
-    "strict": 81.82,
+    "nes_answered": 83.61,
+    "strict": 83.61,
     "transport": 0,
     "model": 0,
     "cap": 0,
@@ -10800,13 +10826,13 @@
     "empty": 0,
     "vs_baseline": {
      "n": 94,
-     "delta": -13.23,
-     "lo": -17.76,
-     "hi": -9.07
+     "delta": -11.42,
+     "lo": -15.97,
+     "hi": -7.26
     },
     "p081": [
      true,
-     38.96
+     31.89
     ],
     "public_pages": 320
    },
@@ -28705,13 +28731,13 @@
     "n": 80.0,
     "ok": 80.0,
     "failed": 0.0,
-    "nes": 0.38362484366619054,
-    "nes_answered": 0.38362484366619054,
-    "nes_mapped": 0.3917240696745492,
+    "nes": 0.410577093769093,
+    "nes_answered": 0.410577093769093,
+    "nes_mapped": 0.41953161021845914,
     "nes_no_marks": null,
-    "chrf": 0.3000763732594705,
-    "miss": 0.8148848866065506,
-    "add": 0.562642816776825,
+    "chrf": 0.3220304001046745,
+    "miss": 0.7722794171846974,
+    "add": 0.5565247303373547,
     "words": 40699.0,
     "cost": 0.0
    },
@@ -28719,15 +28745,15 @@
     "route": "apple-vision",
     "stratum": "L6",
     "n": 80.0,
-    "ok": 78.0,
-    "failed": 0.025000000000000022,
-    "nes": 0.22432552431473293,
-    "nes_answered": 0.23007746083562353,
-    "nes_mapped": 0.22567547325095932,
+    "ok": 80.0,
+    "failed": 0.0,
+    "nes": 0.26502064437523554,
+    "nes_answered": 0.26502064437523554,
+    "nes_mapped": 0.2672934307090154,
     "nes_no_marks": null,
-    "chrf": 0.12312569210582924,
-    "miss": 0.9574519086714208,
-    "add": 0.5021873314556241,
+    "chrf": 0.14566096778060564,
+    "miss": 0.9542757835440763,
+    "add": 0.5740396716006472,
     "words": 16687.0,
     "cost": 0.0
    },
@@ -28735,15 +28761,15 @@
     "route": "apple-vision",
     "stratum": "L7",
     "n": 80.0,
-    "ok": 80.0,
-    "failed": 0.0,
-    "nes": 0.16314259603188047,
-    "nes_answered": 0.16314259603188047,
-    "nes_mapped": 0.1649257977553441,
+    "ok": 65.0,
+    "failed": 0.1875,
+    "nes": 0.14305918467472023,
+    "nes_answered": 0.17607284267657874,
+    "nes_mapped": 0.1453888052924016,
     "nes_no_marks": null,
-    "chrf": 0.13545541773443487,
-    "miss": 0.9818780889621087,
-    "add": 0.22213069741900054,
+    "chrf": 0.11664818724544886,
+    "miss": 0.9778967600219659,
+    "add": 0.23627127951674903,
     "words": 14568.0,
     "cost": 0.0
    },
@@ -28753,13 +28779,13 @@
     "n": 80.0,
     "ok": 80.0,
     "failed": 0.0,
-    "nes": 0.7277338669288033,
-    "nes_answered": 0.7277338669288033,
-    "nes_mapped": 0.732585017070461,
+    "nes": 0.7534167421844927,
+    "nes_answered": 0.7534167421844927,
+    "nes_mapped": 0.7585024214097681,
     "nes_no_marks": null,
-    "chrf": 0.5337922591080828,
-    "miss": 0.5877684119854796,
-    "add": 0.5384852027318033,
+    "chrf": 0.5664644866945784,
+    "miss": 0.5422383559958162,
+    "add": 0.5095059373654095,
     "words": 16253.0,
     "cost": 0.0
    },
@@ -28767,15 +28793,15 @@
     "route": "apple-vision",
     "stratum": "all",
     "n": 320.0,
-    "ok": 318.0,
-    "failed": 0.006249999999999978,
-    "nes": 0.37470670773540177,
-    "nes_answered": 0.3770633536960018,
-    "nes_mapped": 0.3787275894378284,
+    "ok": 305.0,
+    "failed": 0.046875,
+    "nes": 0.39301841625088535,
+    "nes_answered": 0.41234719082060106,
+    "nes_mapped": 0.39767906690741106,
     "nes_no_marks": null,
-    "chrf": 0.27311243555195436,
-    "miss": 0.8275873796864195,
-    "add": 0.4905166256646298,
+    "chrf": 0.2877010104563268,
+    "miss": 0.7982813155418504,
+    "add": 0.49828244923872256,
     "words": 88207.0,
     "cost": 0.0
    },
@@ -40510,9 +40536,9 @@
     "nb_overall": 0.9692365676458594,
     "nb_bowF1": 0.981964067561714,
     "nb_gap": 0.012727499915854534,
-    "suspect_rate": 0.07637160211092303,
-    "suspect_precision": 0.06040851803563668,
-    "suspect_recall": 0.5767634854771784,
+    "suspect_rate": 0.06767566132297786,
+    "suspect_precision": 0.07013241785188817,
+    "suspect_recall": 0.5933609958506224,
     "order_edit": null,
     "order_pages": 0,
     "markup_pages": 4,
@@ -40531,9 +40557,9 @@
     "nb_overall": 0.9678293765786828,
     "nb_bowF1": 0.9843562599836626,
     "nb_gap": 0.016526883404979764,
-    "suspect_rate": 0.07603097065762802,
-    "suspect_precision": 0.06118881118881119,
-    "suspect_recall": 0.5785123966942148,
+    "suspect_rate": 0.0671917057122919,
+    "suspect_precision": 0.0702274975272008,
+    "suspect_recall": 0.5867768595041323,
     "order_edit": null,
     "order_pages": 0,
     "markup_pages": 4,
@@ -40552,9 +40578,9 @@
     "nb_overall": 0.9525493209023893,
     "nb_bowF1": 0.9714522695015885,
     "nb_gap": 0.018902948599199165,
-    "suspect_rate": 0.08026073875981948,
-    "suspect_precision": 0.15160349854227406,
-    "suspect_recall": 0.7615062761506276,
+    "suspect_rate": 0.07156944676583654,
+    "suspect_precision": 0.17468472676319477,
+    "suspect_recall": 0.7824267782426778,
     "order_edit": null,
     "order_pages": 0,
     "markup_pages": 3,
@@ -40573,9 +40599,9 @@
     "nb_overall": 0.9525791813571105,
     "nb_bowF1": 0.966315187515112,
     "nb_gap": 0.013736006158001524,
-    "suspect_rate": 0.07511145900690876,
-    "suspect_precision": 0.05663797009515179,
-    "suspect_recall": 0.5186721991701245,
+    "suspect_rate": 0.06527583977129633,
+    "suspect_precision": 0.0662148070907195,
+    "suspect_recall": 0.5269709543568465,
     "order_edit": null,
     "order_pages": 0,
     "markup_pages": 3,
@@ -40594,9 +40620,9 @@
     "nb_overall": 0.9460093001223823,
     "nb_bowF1": 0.9660951969850388,
     "nb_gap": 0.020085896862656494,
-    "suspect_rate": 0.07720263569051015,
-    "suspect_precision": 0.07171139463264409,
-    "suspect_recall": 0.6392156862745098,
+    "suspect_rate": 0.06738672644521432,
+    "suspect_precision": 0.08266129032258064,
+    "suspect_recall": 0.6431372549019608,
     "order_edit": null,
     "order_pages": 0,
     "markup_pages": 3,
@@ -40615,9 +40641,9 @@
     "nb_overall": 0.9423251622336262,
     "nb_bowF1": 0.9603889001636706,
     "nb_gap": 0.018063737930044454,
-    "suspect_rate": 0.08053263567451532,
-    "suspect_precision": 0.16951270304039984,
-    "suspect_recall": 0.7140350877192982,
+    "suspect_rate": 0.07194606560676192,
+    "suspect_precision": 0.19627039627039627,
+    "suspect_recall": 0.7385964912280701,
     "order_edit": null,
     "order_pages": 0,
     "markup_pages": 2,
@@ -40636,9 +40662,9 @@
     "nb_overall": 0.9210109299942715,
     "nb_bowF1": 0.9647936974182012,
     "nb_gap": 0.043782767423929725,
-    "suspect_rate": 0.08151903767770156,
-    "suspect_precision": 0.17764227642276423,
-    "suspect_recall": 0.7508591065292096,
+    "suspect_rate": 0.07207475892235808,
+    "suspect_precision": 0.19586206896551725,
+    "suspect_recall": 0.7319587628865979,
     "order_edit": null,
     "order_pages": 0,
     "markup_pages": 3,
@@ -40657,9 +40683,9 @@
     "nb_overall": 0.9293087838937312,
     "nb_bowF1": 0.9693141424127565,
     "nb_gap": 0.040005358519025314,
-    "suspect_rate": 0.07993469278955084,
-    "suspect_precision": 0.1567319716548562,
-    "suspect_recall": 0.7445544554455445,
+    "suspect_rate": 0.070338531254165,
+    "suspect_precision": 0.1752723827569872,
+    "suspect_recall": 0.7326732673267327,
     "order_edit": null,
     "order_pages": 0,
     "markup_pages": 4,
@@ -40678,9 +40704,9 @@
     "nb_overall": 0.9213612209665198,
     "nb_bowF1": 0.9658739480936466,
     "nb_gap": 0.04451272712712673,
-    "suspect_rate": 0.07964222060862103,
-    "suspect_precision": 0.17861583091587235,
-    "suspect_recall": 0.7135761589403974,
+    "suspect_rate": 0.07122582348669879,
+    "suspect_precision": 0.20250231696014828,
+    "suspect_recall": 0.7235099337748344,
     "order_edit": null,
     "order_pages": 0,
     "markup_pages": 3,
@@ -40699,9 +40725,9 @@
     "nb_overall": 0.939939732607112,
     "nb_bowF1": 0.9548600847068571,
     "nb_gap": 0.014920352099745071,
-    "suspect_rate": 0.07386575407447565,
-    "suspect_precision": 0.1688073394495413,
-    "suspect_recall": 0.8401826484018264,
+    "suspect_rate": 0.06580151119845491,
+    "suspect_precision": 0.19309989701338826,
+    "suspect_recall": 0.8561643835616438,
     "order_edit": null,
     "order_pages": 0,
     "markup_pages": 3,
@@ -40720,9 +40746,9 @@
     "nb_overall": 0.9420582009235022,
     "nb_bowF1": 0.9649245236126452,
     "nb_gap": 0.022866322689143015,
-    "suspect_rate": 0.08040133779264214,
-    "suspect_precision": 0.17346089850249585,
-    "suspect_recall": 0.7897727272727273,
+    "suspect_rate": 0.07127090301003344,
+    "suspect_precision": 0.19333646175504457,
+    "suspect_recall": 0.7803030303030303,
     "order_edit": null,
     "order_pages": 0,
     "markup_pages": 2,
@@ -40741,9 +40767,9 @@
     "nb_overall": 0.8948545125194277,
     "nb_bowF1": 0.9492128187705378,
     "nb_gap": 0.054358306251110045,
-    "suspect_rate": 0.08475147430497051,
-    "suspect_precision": 0.18369781312127237,
-    "suspect_recall": 0.7573770491803279,
+    "suspect_rate": 0.07454085930918282,
+    "suspect_precision": 0.20750452079566004,
+    "suspect_recall": 0.7524590163934426,
     "order_edit": null,
     "order_pages": 0,
     "markup_pages": 5,
@@ -40762,9 +40788,9 @@
     "nb_overall": 0.9213933796808365,
     "nb_bowF1": 0.9621727017625937,
     "nb_gap": 0.040779322081757274,
-    "suspect_rate": 0.0859115655291462,
-    "suspect_precision": 0.2098145285935085,
-    "suspect_recall": 0.7927007299270074,
+    "suspect_rate": 0.07638427831629266,
+    "suspect_precision": 0.2320730117340287,
+    "suspect_recall": 0.7795620437956204,
     "order_edit": null,
     "order_pages": 0,
     "markup_pages": 3,
@@ -40783,9 +40809,9 @@
     "nb_overall": 0.9375894156934261,
     "nb_bowF1": 0.9537865152654795,
     "nb_gap": 0.016197099572053397,
-    "suspect_rate": 0.0785429515793778,
-    "suspect_precision": 0.17613882863340563,
-    "suspect_recall": 0.7718631178707225,
+    "suspect_rate": 0.0691723174430095,
+    "suspect_precision": 0.19852216748768473,
+    "suspect_recall": 0.7661596958174905,
     "order_edit": null,
     "order_pages": 0,
     "markup_pages": 3,
@@ -40804,9 +40830,9 @@
     "nb_overall": 0.9274117004669686,
     "nb_bowF1": 0.9514122073619422,
     "nb_gap": 0.024000506894973572,
-    "suspect_rate": 0.07668429131843767,
-    "suspect_precision": 0.12677935943060498,
-    "suspect_recall": 0.6551724137931034,
+    "suspect_rate": 0.0672010915913355,
+    "suspect_precision": 0.14720812182741116,
+    "suspect_recall": 0.6666666666666666,
     "order_edit": null,
     "order_pages": 0,
     "markup_pages": 3,
@@ -40825,9 +40851,9 @@
     "nb_overall": 0.9034787308289696,
     "nb_bowF1": 0.9583762588732453,
     "nb_gap": 0.05489752804427572,
-    "suspect_rate": 0.08356263102725367,
-    "suspect_precision": 0.21560172481379852,
-    "suspect_recall": 0.6935687263556116,
+    "suspect_rate": 0.07501310272536688,
+    "suspect_precision": 0.24323144104803493,
+    "suspect_recall": 0.7023959646910467,
     "order_edit": null,
     "order_pages": 0,
     "markup_pages": 3,
@@ -40846,9 +40872,9 @@
     "nb_overall": 0.9255882126544224,
     "nb_bowF1": 0.9508320181561122,
     "nb_gap": 0.02524380550168981,
-    "suspect_rate": 0.08307507747675698,
-    "suspect_precision": 0.2350581628559968,
-    "suspect_recall": 0.6643990929705216,
+    "suspect_rate": 0.07657702689193242,
+    "suspect_precision": 0.2819843342036554,
+    "suspect_recall": 0.7346938775510204,
     "order_edit": null,
     "order_pages": 0,
     "markup_pages": 52,
@@ -40867,9 +40893,9 @@
     "nb_overall": 0.9160831581518758,
     "nb_bowF1": 0.9543012013759772,
     "nb_gap": 0.03821804322410138,
-    "suspect_rate": 0.07761714688223258,
-    "suspect_precision": 0.18625756266205704,
-    "suspect_recall": 0.7342419080068143,
+    "suspect_rate": 0.06762150739610237,
+    "suspect_precision": 0.21081349206349206,
+    "suspect_recall": 0.7240204429301533,
     "order_edit": null,
     "order_pages": 0,
     "markup_pages": 4,
@@ -40888,9 +40914,9 @@
     "nb_overall": 0.9253502333043699,
     "nb_bowF1": 0.9445308012372039,
     "nb_gap": 0.01918056793283396,
-    "suspect_rate": 0.07684977196923286,
-    "suspect_precision": 0.2382639503985828,
-    "suspect_recall": 0.8705501618122977,
+    "suspect_rate": 0.06772854128377918,
+    "suspect_precision": 0.2708542713567839,
+    "suspect_recall": 0.872168284789644,
     "order_edit": null,
     "order_pages": 0,
     "markup_pages": 3,
@@ -40909,9 +40935,9 @@
     "nb_overall": 0.9069077690590891,
     "nb_bowF1": 0.951358468308909,
     "nb_gap": 0.044450699249819925,
-    "suspect_rate": 0.08283177601170486,
-    "suspect_precision": 0.18546768366118024,
-    "suspect_recall": 0.7561374795417348,
+    "suspect_rate": 0.07372061317460846,
+    "suspect_precision": 0.2079386558412269,
+    "suspect_recall": 0.7545008183306056,
     "order_edit": null,
     "order_pages": 0,
     "markup_pages": 3,
@@ -40930,9 +40956,9 @@
     "nb_overall": 0.9069077690590891,
     "nb_bowF1": 0.951358468308909,
     "nb_gap": 0.044450699249819925,
-    "suspect_rate": 0.08283177601170486,
-    "suspect_precision": 0.18546768366118024,
-    "suspect_recall": 0.7561374795417348,
+    "suspect_rate": 0.07372061317460846,
+    "suspect_precision": 0.2079386558412269,
+    "suspect_recall": 0.7545008183306056,
     "order_edit": null,
     "order_pages": 0,
     "markup_pages": 3,
@@ -40951,9 +40977,9 @@
     "nb_overall": 0.9294597542156318,
     "nb_bowF1": 0.9395064272158978,
     "nb_gap": 0.010046673000266071,
-    "suspect_rate": 0.07816636477636896,
-    "suspect_precision": 0.17335115864527628,
-    "suspect_recall": 0.7034358047016275,
+    "suspect_rate": 0.07116483210254981,
+    "suspect_precision": 0.19823788546255505,
+    "suspect_recall": 0.7323688969258589,
     "order_edit": null,
     "order_pages": 0,
     "markup_pages": 4,
@@ -40972,9 +40998,9 @@
     "nb_overall": 0.9091086126993215,
     "nb_bowF1": 0.9452036748680959,
     "nb_gap": 0.03609506216877434,
-    "suspect_rate": 0.07506566983228935,
-    "suspect_precision": 0.18663077613279497,
-    "suspect_recall": 0.7298245614035088,
+    "suspect_rate": 0.06526571024449383,
+    "suspect_precision": 0.21155830753353974,
+    "suspect_recall": 0.7192982456140351,
     "order_edit": null,
     "order_pages": 0,
     "markup_pages": 4,
@@ -40993,9 +41019,9 @@
     "nb_overall": 0.8923019489172489,
     "nb_bowF1": 0.9409709650282331,
     "nb_gap": 0.048669016110984176,
-    "suspect_rate": 0.0800258917316799,
-    "suspect_precision": 0.15538527032779906,
-    "suspect_recall": 0.687382297551789,
+    "suspect_rate": 0.07065717303171737,
+    "suspect_precision": 0.18129218900675023,
+    "suspect_recall": 0.7080979284369114,
     "order_edit": null,
     "order_pages": 0,
     "markup_pages": 4,
@@ -41014,9 +41040,9 @@
     "nb_overall": 0.9137417282699946,
     "nb_bowF1": 0.9495982614034227,
     "nb_gap": 0.03585653313342818,
-    "suspect_rate": 0.08098486108800533,
-    "suspect_precision": 0.19022185702547248,
-    "suspect_recall": 0.7302839116719243,
+    "suspect_rate": 0.07256696057228415,
+    "suspect_precision": 0.2164144887666208,
+    "suspect_recall": 0.7444794952681388,
     "order_edit": null,
     "order_pages": 0,
     "markup_pages": 2,
@@ -41035,9 +41061,9 @@
     "nb_overall": 0.9109156352519612,
     "nb_bowF1": 0.9265644251339387,
     "nb_gap": 0.015648789881977487,
-    "suspect_rate": 0.0786560292412048,
-    "suspect_precision": 0.22475424486148346,
-    "suspect_recall": 0.8672413793103448,
+    "suspect_rate": 0.06849892805679542,
+    "suspect_precision": 0.2539763981528989,
+    "suspect_recall": 0.853448275862069,
     "order_edit": null,
     "order_pages": 0,
     "markup_pages": 4,
@@ -41056,9 +41082,9 @@
     "nb_overall": 0.8849591271732192,
     "nb_bowF1": 0.9386710191331994,
     "nb_gap": 0.05371189195998016,
-    "suspect_rate": 0.08430866226231597,
-    "suspect_precision": 0.21121718377088305,
-    "suspect_recall": 0.7531914893617021,
+    "suspect_rate": 0.07485160468157886,
+    "suspect_precision": 0.23476702508960573,
+    "suspect_recall": 0.7432624113475177,
     "order_edit": null,
     "order_pages": 0,
     "markup_pages": 2,
@@ -41077,9 +41103,9 @@
     "nb_overall": 0.8890561989783303,
     "nb_bowF1": 0.9368923337717314,
     "nb_gap": 0.0478361347934011,
-    "suspect_rate": 0.08706717567477061,
-    "suspect_precision": 0.3130769230769231,
-    "suspect_recall": 0.8443983402489627,
+    "suspect_rate": 0.07822650860625543,
+    "suspect_precision": 0.3471746575342466,
+    "suspect_recall": 0.8412863070539419,
     "order_edit": null,
     "order_pages": 0,
     "markup_pages": 9,
@@ -41098,9 +41124,9 @@
     "nb_overall": 0.908715227285006,
     "nb_bowF1": 0.9269487114409118,
     "nb_gap": 0.018233484155905866,
-    "suspect_rate": 0.08802889576883385,
-    "suspect_precision": 0.30324345447440404,
-    "suspect_recall": 0.8434782608695652,
+    "suspect_rate": 0.0784313725490196,
+    "suspect_precision": 0.3478070175438597,
+    "suspect_recall": 0.8619565217391304,
     "order_edit": null,
     "order_pages": 0,
     "markup_pages": 2,
@@ -41119,9 +41145,9 @@
     "nb_overall": 0.8755901093633167,
     "nb_bowF1": 0.9319146056410847,
     "nb_gap": 0.05632449627776803,
-    "suspect_rate": 0.08418968283773173,
-    "suspect_precision": 0.2197891321978913,
-    "suspect_recall": 0.7666195190947667,
+    "suspect_rate": 0.07415247004199242,
+    "suspect_precision": 0.24493554327808473,
+    "suspect_recall": 0.7524752475247525,
     "order_edit": null,
     "order_pages": 0,
     "markup_pages": 4,
@@ -41140,9 +41166,9 @@
     "nb_overall": 0.8839118352101442,
     "nb_bowF1": 0.9189599070265378,
     "nb_gap": 0.03504807181639369,
-    "suspect_rate": 0.0781834557295275,
-    "suspect_precision": 0.19805050952591935,
-    "suspect_recall": 0.7256493506493507,
+    "suspect_rate": 0.06851877511431342,
+    "suspect_precision": 0.22901921132457026,
+    "suspect_recall": 0.7353896103896104,
     "order_edit": null,
     "order_pages": 0,
     "markup_pages": 4,
@@ -41161,9 +41187,9 @@
     "nb_overall": 0.8815427676984228,
     "nb_bowF1": 0.9218837153985208,
     "nb_gap": 0.040340947700097995,
-    "suspect_rate": 0.0899339347872416,
-    "suspect_precision": 0.21011058451816747,
-    "suspect_recall": 0.8222565687789799,
+    "suspect_rate": 0.08027278539461533,
+    "suspect_precision": 0.2345132743362832,
+    "suspect_recall": 0.8191653786707882,
     "order_edit": null,
     "order_pages": 0,
     "markup_pages": 3,
@@ -41182,8 +41208,8 @@
     "nb_overall": 0.8856797724862732,
     "nb_bowF1": 0.9313602938360984,
     "nb_gap": 0.045680521349825254,
-    "suspect_rate": 0.09807801965585483,
-    "suspect_precision": 0.36183310533515733,
+    "suspect_rate": 0.08928990708751217,
+    "suspect_precision": 0.39744552967693464,
     "suspect_recall": 0.9065981148243359,
     "order_edit": null,
     "order_pages": 0,
@@ -41203,9 +41229,9 @@
     "nb_overall": 0.8795959015362431,
     "nb_bowF1": 0.9272961362352587,
     "nb_gap": 0.04770023469901563,
-    "suspect_rate": 0.07974791347300289,
-    "suspect_precision": 0.2742417770183682,
-    "suspect_recall": 0.834850455136541,
+    "suspect_rate": 0.07146993697836825,
+    "suspect_precision": 0.31410867492850336,
+    "suspect_recall": 0.8569570871261378,
     "order_edit": null,
     "order_pages": 0,
     "markup_pages": 8,
@@ -41224,8 +41250,8 @@
     "nb_overall": 0.8760858769357052,
     "nb_bowF1": 0.9293378469476083,
     "nb_gap": 0.05325197001190318,
-    "suspect_rate": 0.09686303486263183,
-    "suspect_precision": 0.3602635228848821,
+    "suspect_rate": 0.0879962383287432,
+    "suspect_precision": 0.3965648854961832,
     "suspect_recall": 0.9090113735783028,
     "order_edit": null,
     "order_pages": 0,
@@ -41245,8 +41271,8 @@
     "nb_overall": 0.8760858769357052,
     "nb_bowF1": 0.9293378469476083,
     "nb_gap": 0.05325197001190318,
-    "suspect_rate": 0.09686303486263183,
-    "suspect_precision": 0.3602635228848821,
+    "suspect_rate": 0.0879962383287432,
+    "suspect_precision": 0.3965648854961832,
     "suspect_recall": 0.9090113735783028,
     "order_edit": null,
     "order_pages": 0,
@@ -41266,9 +41292,9 @@
     "nb_overall": 0.8761827859775534,
     "nb_bowF1": 0.9353589316678356,
     "nb_gap": 0.05917614569028218,
-    "suspect_rate": 0.07716481639624252,
-    "suspect_precision": 0.1899070385126162,
-    "suspect_recall": 0.778584392014519,
+    "suspect_rate": 0.06818104184457728,
+    "suspect_precision": 0.21342685370741482,
+    "suspect_recall": 0.7731397459165155,
     "order_edit": null,
     "order_pages": 0,
     "markup_pages": 3,
@@ -41287,9 +41313,9 @@
     "nb_overall": 0.877333739222617,
     "nb_bowF1": 0.9030386753011119,
     "nb_gap": 0.02570493607849489,
-    "suspect_rate": 0.08369084099421178,
-    "suspect_precision": 0.3681855166802278,
-    "suspect_recall": 0.8212341197822142,
+    "suspect_rate": 0.07422540006809669,
+    "suspect_precision": 0.4123853211009174,
+    "suspect_recall": 0.8157894736842105,
     "order_edit": null,
     "order_pages": 0,
     "markup_pages": 4,
@@ -41308,9 +41334,9 @@
     "nb_overall": 0.8772548692951316,
     "nb_bowF1": 0.9017279048394596,
     "nb_gap": 0.024473035544328003,
-    "suspect_rate": 0.08379031983378181,
-    "suspect_precision": 0.3695121951219512,
-    "suspect_recall": 0.8203971119133574,
+    "suspect_rate": 0.07415102694233455,
+    "suspect_precision": 0.41479099678456594,
+    "suspect_recall": 0.8149819494584838,
     "order_edit": null,
     "order_pages": 0,
     "markup_pages": 4,
@@ -41329,9 +41355,9 @@
     "nb_overall": 0.8694182732741447,
     "nb_bowF1": 0.9224065077356186,
     "nb_gap": 0.05298823446147394,
-    "suspect_rate": 0.08366478746584581,
-    "suspect_precision": 0.24803637866887143,
-    "suspect_recall": 0.8733624454148472,
+    "suspect_rate": 0.07384221630408466,
+    "suspect_precision": 0.2749414519906323,
+    "suspect_recall": 0.8544395924308588,
     "order_edit": null,
     "order_pages": 0,
     "markup_pages": 45,
@@ -41350,9 +41376,9 @@
     "nb_overall": 0.8696548695061533,
     "nb_bowF1": 0.9227375615142278,
     "nb_gap": 0.05308269200807447,
-    "suspect_rate": 0.08330738626535202,
-    "suspect_precision": 0.24584717607973422,
-    "suspect_recall": 0.869309838472834,
+    "suspect_rate": 0.0733091160698841,
+    "suspect_precision": 0.27229825389334594,
+    "suspect_recall": 0.8472834067547724,
     "order_edit": null,
     "order_pages": 0,
     "markup_pages": 45,
@@ -41371,9 +41397,9 @@
     "nb_overall": 0.8595407565805792,
     "nb_bowF1": 0.9237820945553161,
     "nb_gap": 0.06424133797473697,
-    "suspect_rate": 0.1030982201713909,
-    "suspect_precision": 0.4031329923273657,
-    "suspect_recall": 0.852027027027027,
+    "suspect_rate": 0.09466051417270929,
+    "suspect_precision": 0.4401114206128134,
+    "suspect_recall": 0.8540540540540541,
     "order_edit": null,
     "order_pages": 0,
     "markup_pages": 42,
@@ -41392,9 +41418,9 @@
     "nb_overall": 0.847019227743533,
     "nb_bowF1": 0.8525060684558977,
     "nb_gap": 0.005486840712364716,
-    "suspect_rate": 0.061167747914735865,
-    "suspect_precision": 0.3,
-    "suspect_recall": 0.7894736842105263,
+    "suspect_rate": 0.05327154772937905,
+    "suspect_precision": 0.34168406402226864,
+    "suspect_recall": 0.7830940988835726,
     "order_edit": null,
     "order_pages": 0,
     "markup_pages": 2,
@@ -41413,9 +41439,9 @@
     "nb_overall": 0.8172137189707893,
     "nb_bowF1": 0.8473885838561745,
     "nb_gap": 0.030174864885385233,
-    "suspect_rate": 0.08840660102620995,
-    "suspect_precision": 0.49686274509803924,
-    "suspect_recall": 0.867214236824093,
+    "suspect_rate": 0.07710442379697684,
+    "suspect_precision": 0.5377697841726619,
+    "suspect_recall": 0.8186173853524983,
     "order_edit": null,
     "order_pages": 0,
     "markup_pages": 9,
@@ -41434,13 +41460,34 @@
     "nb_overall": 0.8130181666985564,
     "nb_bowF1": 0.8595108808270013,
     "nb_gap": 0.04649271412844491,
-    "suspect_rate": 0.0873101586230172,
-    "suspect_precision": 0.47081561654425974,
-    "suspect_recall": 0.8644428672817601,
+    "suspect_rate": 0.07988525143435707,
+    "suspect_precision": 0.5111956062526405,
+    "suspect_recall": 0.8587650816181689,
     "order_edit": null,
     "order_pages": 0,
     "markup_pages": 50,
     "markup_mean_lift": 0.004089684340980732
+   },
+   {
+    "route": "apple-vision",
+    "family": "Mac",
+    "n": 96,
+    "ok": 96,
+    "nes": 0.8307230502328481,
+    "nes_answered": 0.8307230502328481,
+    "added_rate": 0.03323776503533805,
+    "rewritten_rate": 0.047573009734631286,
+    "cmer": 0.14820715037796875,
+    "nb_overall": 0.828278031559475,
+    "nb_bowF1": 0.8593680078829348,
+    "nb_gap": 0.031089976323459778,
+    "suspect_rate": 0.05856986320738044,
+    "suspect_precision": 0.9849124924562462,
+    "suspect_recall": 0.9460869565217391,
+    "order_edit": null,
+    "order_pages": 0,
+    "markup_pages": 2,
+    "markup_mean_lift": -4.0809663728370166e-05
    },
    {
     "route": "gemma4-26b-a4b",
@@ -41455,9 +41502,9 @@
     "nb_overall": 0.8229210334558933,
     "nb_bowF1": 0.8547580382453644,
     "nb_gap": 0.03183700478947116,
-    "suspect_rate": 0.07855727308759414,
-    "suspect_precision": 0.30524722502522705,
-    "suspect_recall": 0.7638888888888888,
+    "suspect_rate": 0.07051129607609988,
+    "suspect_precision": 0.34176503653738055,
+    "suspect_recall": 0.7676767676767676,
     "order_edit": null,
     "order_pages": 0,
     "markup_pages": 2,
@@ -41476,34 +41523,13 @@
     "nb_overall": 0.8257828352603759,
     "nb_bowF1": 0.8350851638492632,
     "nb_gap": 0.009302328588887354,
-    "suspect_rate": 0.07053509381514941,
-    "suspect_precision": 0.15489874110563764,
-    "suspect_recall": 0.7796143250688705,
+    "suspect_rate": 0.06458960698015598,
+    "suspect_precision": 0.17692767483562463,
+    "suspect_recall": 0.8154269972451791,
     "order_edit": null,
     "order_pages": 0,
     "markup_pages": 3,
     "markup_mean_lift": -8.503907585900167e-05
-   },
-   {
-    "route": "apple-vision",
-    "family": "Mac",
-    "n": 96,
-    "ok": 96,
-    "nes": 0.8136946626993543,
-    "nes_answered": 0.8136946626993543,
-    "added_rate": 0.05227363648486465,
-    "rewritten_rate": 0.058307774369915986,
-    "cmer": 0.16582867169523177,
-    "nb_overall": 0.8081853046895956,
-    "nb_bowF1": 0.8465051518307184,
-    "nb_gap": 0.0383198471411228,
-    "suspect_rate": 0.07316814534657665,
-    "suspect_precision": 0.9903381642512077,
-    "suspect_recall": 0.9557109557109557,
-    "order_edit": null,
-    "order_pages": 0,
-    "markup_pages": 2,
-    "markup_mean_lift": -4.0809663728371324e-05
    },
    {
     "route": "ppocrv6-medium",
@@ -41518,9 +41544,9 @@
     "nb_overall": 0.7577224276989851,
     "nb_bowF1": 0.849159260709908,
     "nb_gap": 0.09143683301092287,
-    "suspect_rate": 0.08580134899168007,
-    "suspect_precision": 0.6304868316041501,
-    "suspect_recall": 0.7760314341846758,
+    "suspect_rate": 0.07912486732632588,
+    "suspect_precision": 0.6988316745997404,
+    "suspect_recall": 0.7932220039292731,
     "order_edit": null,
     "order_pages": 0,
     "markup_pages": 1,
@@ -41539,8 +41565,8 @@
     "nb_overall": 0.40518271620116575,
     "nb_bowF1": 0.6529920588389997,
     "nb_gap": 0.24780934263783394,
-    "suspect_rate": 0.10388656233928441,
-    "suspect_precision": 0.5668316831683168,
+    "suspect_rate": 0.09848651825729189,
+    "suspect_precision": 0.597911227154047,
     "suspect_recall": 0.9490822972172883,
     "order_edit": null,
     "order_pages": 0,
@@ -41562,9 +41588,9 @@
     "nb_overall": 0.7985015977302199,
     "nb_bowF1": 0.7768012377841673,
     "nb_gap": -0.021700359946052572,
-    "suspect_rate": 0.7294635970797367,
-    "suspect_precision": 0.4264154222730762,
-    "suspect_recall": 0.8969898238986046,
+    "suspect_rate": 0.701009513969607,
+    "suspect_precision": 0.4301067014661856,
+    "suspect_recall": 0.8812242458557453,
     "order_edit": 0.06963089009165957,
     "order_pages": 619,
     "markup_pages": 12,
@@ -41583,9 +41609,9 @@
     "nb_overall": 0.707309485197778,
     "nb_bowF1": 0.46466805926562527,
     "nb_gap": -0.24264142593215277,
-    "suspect_rate": 0.9378199525533775,
-    "suspect_precision": 0.521168952203435,
-    "suspect_recall": 0.9761845386533666,
+    "suspect_rate": 0.9450569420886843,
+    "suspect_precision": 0.5193897827062368,
+    "suspect_recall": 0.9779145546705286,
     "order_edit": 0.08162041156759395,
     "order_pages": 63,
     "markup_pages": 0,
@@ -41604,9 +41630,9 @@
     "nb_overall": 0.6549951668947906,
     "nb_bowF1": 0.6059034703943043,
     "nb_gap": -0.04909169650048639,
-    "suspect_rate": 0.7345645580589255,
-    "suspect_precision": 0.446641598466416,
-    "suspect_recall": 0.9125116741481638,
+    "suspect_rate": 0.7048050108450268,
+    "suspect_precision": 0.45307666944056274,
+    "suspect_recall": 0.8969568866370333,
     "order_edit": 0.07939756291725442,
     "order_pages": 278,
     "markup_pages": 3,
@@ -41625,9 +41651,9 @@
     "nb_overall": 0.6628186259414756,
     "nb_bowF1": 0.6315104531768556,
     "nb_gap": -0.031308172764619946,
-    "suspect_rate": 0.7417807982888881,
-    "suspect_precision": 0.3918395188044523,
-    "suspect_recall": 0.9521585172907406,
+    "suspect_rate": 0.7134231414066805,
+    "suspect_precision": 0.4030895645028759,
+    "suspect_recall": 0.9431306955819587,
     "order_edit": 0.09672267346533128,
     "order_pages": 269,
     "markup_pages": 5,
@@ -41646,9 +41672,9 @@
     "nb_overall": 0.6689088680127099,
     "nb_bowF1": 0.5033847340934228,
     "nb_gap": -0.1655241339192871,
-    "suspect_rate": 0.9393164075313258,
-    "suspect_precision": 0.39565581785165527,
-    "suspect_recall": 0.9780732044198895,
+    "suspect_rate": 0.9488026424442609,
+    "suspect_precision": 0.3907076387494142,
+    "suspect_recall": 0.9836507668970167,
     "order_edit": 0.08388734861165939,
     "order_pages": 63,
     "markup_pages": 0,
@@ -41667,9 +41693,9 @@
     "nb_overall": 0.6159677576937076,
     "nb_bowF1": 0.3019807557647315,
     "nb_gap": -0.3139870019289761,
-    "suspect_rate": 0.932558743346748,
-    "suspect_precision": 0.685877357833925,
-    "suspect_recall": 0.9657943742036655,
+    "suspect_rate": 0.9440150801131009,
+    "suspect_precision": 0.6824414270500533,
+    "suspect_recall": 0.9727703984819734,
     "order_edit": 0.07536137405122874,
     "order_pages": 61,
     "markup_pages": 0,
@@ -41688,9 +41714,9 @@
     "nb_overall": 0.6890539091088668,
     "nb_bowF1": 0.6610838074776573,
     "nb_gap": -0.0279701016312095,
-    "suspect_rate": 0.6529114672355519,
-    "suspect_precision": 0.5270150575730735,
-    "suspect_recall": 0.8412139872443369,
+    "suspect_rate": 0.620916559591948,
+    "suspect_precision": 0.5348759432286114,
+    "suspect_recall": 0.8187432008702886,
     "order_edit": 0.08884785738463415,
     "order_pages": 547,
     "markup_pages": 22,
@@ -41709,9 +41735,9 @@
     "nb_overall": 0.6740131845973523,
     "nb_bowF1": 0.6485888044237592,
     "nb_gap": -0.025424380173593053,
-    "suspect_rate": 0.6591660543717854,
-    "suspect_precision": 0.5202531897529807,
-    "suspect_recall": 0.844518401240751,
+    "suspect_rate": 0.6263422098142382,
+    "suspect_precision": 0.5356477017036323,
+    "suspect_recall": 0.8340340340340341,
     "order_edit": 0.09504159711359143,
     "order_pages": 560,
     "markup_pages": 7,
@@ -41730,9 +41756,9 @@
     "nb_overall": 0.6390531044336027,
     "nb_bowF1": 0.6261625282781825,
     "nb_gap": -0.01289057615542022,
-    "suspect_rate": 0.6623547905787062,
-    "suspect_precision": 0.52360264687544,
-    "suspect_recall": 0.8519488169650162,
+    "suspect_rate": 0.6138647706296575,
+    "suspect_precision": 0.5359616883840072,
+    "suspect_recall": 0.8220703792278784,
     "order_edit": 0.06615253597683622,
     "order_pages": 538,
     "markup_pages": 4,
@@ -41772,9 +41798,9 @@
     "nb_overall": 0.5834080105583699,
     "nb_bowF1": 0.6405787057546953,
     "nb_gap": 0.05717069519632545,
-    "suspect_rate": 0.6970316942922533,
-    "suspect_precision": 0.5143856856209476,
-    "suspect_recall": 0.8857004168808178,
+    "suspect_rate": 0.6631781164185789,
+    "suspect_precision": 0.5242047272081037,
+    "suspect_recall": 0.866539365452409,
     "order_edit": 0.0849267249752787,
     "order_pages": 567,
     "markup_pages": 96,
@@ -41793,9 +41819,9 @@
     "nb_overall": 0.6443517463032258,
     "nb_bowF1": 0.5825334516440509,
     "nb_gap": -0.06181829465917488,
-    "suspect_rate": 0.6902283105022831,
-    "suspect_precision": 0.7045845461762371,
-    "suspect_recall": 0.8758274741992517,
+    "suspect_rate": 0.650774815021639,
+    "suspect_precision": 0.7233007973113089,
+    "suspect_recall": 0.8501607446786157,
     "order_edit": 0.08842586519320897,
     "order_pages": 550,
     "markup_pages": 192,
@@ -41814,9 +41840,9 @@
     "nb_overall": 0.6496785731048405,
     "nb_bowF1": 0.6270183815796602,
     "nb_gap": -0.022660191525180284,
-    "suspect_rate": 0.6449286375506031,
-    "suspect_precision": 0.48136166930888213,
-    "suspect_recall": 0.8485912833295566,
+    "suspect_rate": 0.6045566987125429,
+    "suspect_precision": 0.49450166228814546,
+    "suspect_recall": 0.825955265610438,
     "order_edit": 0.0747683745377181,
     "order_pages": 534,
     "markup_pages": 6,
@@ -41835,9 +41861,9 @@
     "nb_overall": 0.6452042734224693,
     "nb_bowF1": 0.6174255642968322,
     "nb_gap": -0.02777870912563718,
-    "suspect_rate": 0.6818181818181818,
-    "suspect_precision": 0.6017924096936442,
-    "suspect_recall": 0.8872559594434257,
+    "suspect_rate": 0.6396330976495318,
+    "suspect_precision": 0.617989165073295,
+    "suspect_recall": 0.8605502551586421,
     "order_edit": 0.09419635074214164,
     "order_pages": 555,
     "markup_pages": 3,
@@ -41856,9 +41882,9 @@
     "nb_overall": -0.1425005127862642,
     "nb_bowF1": 0.574680231186142,
     "nb_gap": 0.7171807439724062,
-    "suspect_rate": 0.6792777848666581,
-    "suspect_precision": 0.5685169531323377,
-    "suspect_recall": 0.8798732447597174,
+    "suspect_rate": 0.6382310680644989,
+    "suspect_precision": 0.5698532477278413,
+    "suspect_recall": 0.858277605098741,
     "order_edit": 0.08873361967922394,
     "order_pages": 535,
     "markup_pages": 122,
@@ -41877,9 +41903,9 @@
     "nb_overall": 0.5626929718791684,
     "nb_bowF1": 0.5778850681819016,
     "nb_gap": 0.015192096302733105,
-    "suspect_rate": 0.6835253998118532,
-    "suspect_precision": 0.5866636846904193,
-    "suspect_recall": 0.8906678507065061,
+    "suspect_rate": 0.6212521416333524,
+    "suspect_precision": 0.6013597625203485,
+    "suspect_recall": 0.8318321500476846,
     "order_edit": 0.09199402291766007,
     "order_pages": 494,
     "markup_pages": 5,
@@ -41898,9 +41924,9 @@
     "nb_overall": 0.6160572441062889,
     "nb_bowF1": 0.5623114524060341,
     "nb_gap": -0.05374579170025484,
-    "suspect_rate": 0.6242025551376162,
-    "suspect_precision": 0.575550836209185,
-    "suspect_recall": 0.8487042981288656,
+    "suspect_rate": 0.5704525318612418,
+    "suspect_precision": 0.5920970102446164,
+    "suspect_recall": 0.807593595958773,
     "order_edit": 0.09587459036621761,
     "order_pages": 479,
     "markup_pages": 5,
@@ -41919,9 +41945,9 @@
     "nb_overall": 0.2848617532788802,
     "nb_bowF1": 0.3694386839930962,
     "nb_gap": 0.08457693071421601,
-    "suspect_rate": 0.7732912594589627,
-    "suspect_precision": 0.6104948298403391,
-    "suspect_recall": 0.9410381679389312,
+    "suspect_rate": 0.7457982193020045,
+    "suspect_precision": 0.6314479060265578,
+    "suspect_recall": 0.9294014470510853,
     "order_edit": 0.14480304718376943,
     "order_pages": 121,
     "markup_pages": 0,
@@ -41940,9 +41966,9 @@
     "nb_overall": 0.30123657044667307,
     "nb_bowF1": 0.4086350704842607,
     "nb_gap": 0.10739850003758761,
-    "suspect_rate": 0.7971438049951818,
-    "suspect_precision": 0.559512485136742,
-    "suspect_recall": 0.9691737324499674,
+    "suspect_rate": 0.7701032617603671,
+    "suspect_precision": 0.5639366592882683,
+    "suspect_recall": 0.9651404218118238,
     "order_edit": 0.1560283299610487,
     "order_pages": 106,
     "markup_pages": 0,
@@ -41961,9 +41987,9 @@
     "nb_overall": 0.5485531281093994,
     "nb_bowF1": 0.43709234484517967,
     "nb_gap": -0.11146078326421971,
-    "suspect_rate": 0.6693073253366217,
-    "suspect_precision": 0.5615997320132504,
-    "suspect_recall": 0.8560365369340747,
+    "suspect_rate": 0.6296098138877212,
+    "suspect_precision": 0.5709256449165402,
+    "suspect_recall": 0.8277257927312194,
     "order_edit": 0.07593658143199072,
     "order_pages": 246,
     "markup_pages": 5,
@@ -41982,9 +42008,9 @@
     "nb_overall": 0.5991096728640606,
     "nb_bowF1": 0.5626204658495529,
     "nb_gap": -0.03648920701450764,
-    "suspect_rate": 0.6099188197219259,
-    "suspect_precision": 0.563407837789767,
-    "suspect_recall": 0.8409362417592142,
+    "suspect_rate": 0.557448897941369,
+    "suspect_precision": 0.5815743972857469,
+    "suspect_recall": 0.7969867668097281,
     "order_edit": 0.10638762612160019,
     "order_pages": 486,
     "markup_pages": 5,
@@ -42024,9 +42050,9 @@
     "nb_overall": 0.5912125969928728,
     "nb_bowF1": 0.5312638502608806,
     "nb_gap": -0.05994874673199213,
-    "suspect_rate": 0.615866858320489,
-    "suspect_precision": 0.6577807772341263,
-    "suspect_recall": 0.8358763623369663,
+    "suspect_rate": 0.5694429670602418,
+    "suspect_precision": 0.6804794520547945,
+    "suspect_recall": 0.8058771477029718,
     "order_edit": 0.07532670015511121,
     "order_pages": 459,
     "markup_pages": 9,
@@ -42045,9 +42071,9 @@
     "nb_overall": 0.4862827401625285,
     "nb_bowF1": 0.41833657933937446,
     "nb_gap": -0.06794616082315402,
-    "suspect_rate": 0.6116869460718041,
-    "suspect_precision": 0.7881700813920853,
-    "suspect_recall": 0.8185229715451597,
+    "suspect_rate": 0.5842626747876812,
+    "suspect_precision": 0.8132731343831443,
+    "suspect_recall": 0.8061124249590685,
     "order_edit": 0.0730623936264291,
     "order_pages": 387,
     "markup_pages": 12,
@@ -42066,9 +42092,9 @@
     "nb_overall": 0.32253717880072874,
     "nb_bowF1": 0.157179434932351,
     "nb_gap": -0.16535774386837773,
-    "suspect_rate": 0.8037945900714897,
-    "suspect_precision": 0.9082082965578111,
-    "suspect_recall": 0.9162537957487614,
+    "suspect_rate": 0.7940625450353077,
+    "suspect_precision": 0.9185798548094374,
+    "suspect_recall": 0.913502538071066,
     "order_edit": 0.14433887808090404,
     "order_pages": 93,
     "markup_pages": 0,
@@ -42087,13 +42113,34 @@
     "nb_overall": -0.9453816932910748,
     "nb_bowF1": 0.360291232864047,
     "nb_gap": 1.3056729261551219,
-    "suspect_rate": 0.7348406653701148,
-    "suspect_precision": 0.9115533607357247,
-    "suspect_recall": 0.8873727996315327,
+    "suspect_rate": 0.7080350223805503,
+    "suspect_precision": 0.9145158128593832,
+    "suspect_recall": 0.8761169971361055,
     "order_edit": 0.058306218093232706,
     "order_pages": 367,
     "markup_pages": 101,
     "markup_mean_lift": 0.009384251380096032
+   },
+   {
+    "route": "apple-vision",
+    "family": "Mac",
+    "n": 320,
+    "ok": 305,
+    "nes": 0.39301841625088535,
+    "nes_answered": 0.41234719082060106,
+    "added_rate": 0.10402719726164557,
+    "rewritten_rate": 0.3383474403604569,
+    "cmer": 0.5603010696535602,
+    "nb_overall": 0.32213069124287974,
+    "nb_bowF1": 0.21528794872834225,
+    "nb_gap": -0.10684274251453749,
+    "suspect_rate": 0.6544283032588659,
+    "suspect_precision": 0.9828927307026385,
+    "suspect_recall": 0.9417168040803189,
+    "order_edit": 0.13833182889786663,
+    "order_pages": 159,
+    "markup_pages": 2,
+    "markup_mean_lift": -1.6774020397208878e-06
    },
    {
     "route": "paddleocr-vl1.5",
@@ -42108,9 +42155,9 @@
     "nb_overall": 0.4212209693401532,
     "nb_bowF1": 0.3726456136243342,
     "nb_gap": -0.048575355715819,
-    "suspect_rate": 0.6151942020109222,
-    "suspect_precision": 0.8267308250715559,
-    "suspect_recall": 0.8424567781206408,
+    "suspect_rate": 0.589142331100087,
+    "suspect_precision": 0.8509917965189462,
+    "suspect_recall": 0.831537874289592,
     "order_edit": 0.06724119319576252,
     "order_pages": 320,
     "markup_pages": 8,
@@ -42129,34 +42176,13 @@
     "nb_overall": 0.386468898614834,
     "nb_bowF1": 0.37242151552798,
     "nb_gap": -0.014047383086854048,
-    "suspect_rate": 0.6916757858759688,
-    "suspect_precision": 0.8741032920829631,
-    "suspect_recall": 0.8470617885495862,
+    "suspect_rate": 0.6698458721196399,
+    "suspect_precision": 0.8880282492311197,
+    "suspect_recall": 0.8384238148498666,
     "order_edit": 0.13519464599321437,
     "order_pages": 403,
     "markup_pages": 8,
     "markup_mean_lift": -9.042148801922441e-06
-   },
-   {
-    "route": "apple-vision",
-    "family": "Mac",
-    "n": 320,
-    "ok": 318,
-    "nes": 0.37470670773540177,
-    "nes_answered": 0.3770633536960018,
-    "added_rate": 0.10084397810218979,
-    "rewritten_rate": 0.32979014598540146,
-    "cmer": 0.5966656731188787,
-    "nb_overall": 0.292193249109454,
-    "nb_bowF1": 0.19261223616889173,
-    "nb_gap": -0.09958101294056226,
-    "suspect_rate": 0.6956889413505752,
-    "suspect_precision": 0.985362641815235,
-    "suspect_recall": 0.9526491039075506,
-    "order_edit": 0.11217111552922528,
-    "order_pages": 157,
-    "markup_pages": 3,
-    "markup_mean_lift": -2.6316005130033737e-06
    },
    {
     "route": "fs-fanar",
@@ -42192,9 +42218,9 @@
     "nb_overall": 0.3328634932746326,
     "nb_bowF1": 0.3091372822967613,
     "nb_gap": -0.02372621097787131,
-    "suspect_rate": 0.6480502247836334,
-    "suspect_precision": 0.879775074873174,
-    "suspect_recall": 0.8478529775578724,
+    "suspect_rate": 0.629134607757595,
+    "suspect_precision": 0.8925802181176322,
+    "suspect_recall": 0.8356350330500472,
     "order_edit": 0.10185851761147627,
     "order_pages": 296,
     "markup_pages": 361,
@@ -43359,13 +43385,13 @@
     },
     {
      "route": "apple-vision",
-     "after": 58.060943337587254,
-     "before": 57.87491743311246,
-     "move": 0.18602590447479628,
+     "after": 60.5841902193579,
+     "before": 60.48835834263989,
+     "move": 0.09583187671800886,
      "failed": 0,
-     "lo": 57.967929951674876,
-     "hi": 58.11771951775357,
-     "clear": 55.146610150572116
+     "lo": 60.48641885548376,
+     "hi": 60.619804789623764,
+     "clear": 55.93952504141859
     },
     {
      "route": "nemotron-parse-2",
@@ -43391,10 +43417,10 @@
    "paired": {
     "apple-vision": {
      "n": 16,
-     "delta": 37.75008629340701,
+     "delta": 35.226839411636355,
      "p": 9.999000099990002e-05,
-     "lo": 28.48161251484376,
-     "hi": 46.80977267799243
+     "lo": 26.330123067827287,
+     "hi": 44.22007142189543
     },
     "claude-sonnet5.5": {
      "n": 16,
@@ -44362,10 +44388,10 @@
     "a": "ppocrv6-kraken-blla",
     "b": "apple-vision",
     "n": 18,
-    "delta": 9.89,
-    "lo": 0.86,
-    "hi": 19.2,
-    "p": 0.06
+    "delta": 7.91,
+    "lo": -0.5,
+    "hi": 17.21,
+    "p": 0.11
    },
    {
     "set": "owner",
@@ -44452,10 +44478,10 @@
     "a": "ppocrv6-kraken-vision",
     "b": "apple-vision",
     "n": 18,
-    "delta": 0.81,
-    "lo": -3.67,
-    "hi": 5.04,
-    "p": 0.73
+    "delta": -1.17,
+    "lo": -4.31,
+    "hi": 1.61,
+    "p": 0.51
    },
    {
     "set": "owner",
@@ -51777,7 +51803,7 @@
    "quad_margin": "quad-to-frame margin (low = cut or tight)",
    "text_px": "image share in Vision word boxes (low = text missed)"
   },
-  "note": "Each of the 96 pages degraded by one synthetic defect at one setting and read again by the same reader, paired by page against that reader's plain image (Apple Vision against the plain image re-saved as every defect image was and read in the same run on macOS 27.2; its raw row is a 26.6 reading). Glare, motion blur and heavy defocus cost every reader; tilt up to 20 degrees, JPEG down to quality 60 and Augraphy's shadow and lighting gradient at their defaults cost none of them more than about 2 points. Apple Vision breaks first: 9 px of motion costs it 6.6 points and 17 px 38, where Qwen3.6-27B loses 1.0 and 7.9. LightOnOCR-3 4B answers heavy blur with an empty reply (43 of 96 at 31 px). Correcting the tilt with Apple's quad recovers nothing for Vision, because tilt cost it little. Gemini 3.7 Flash through the gateway, on 48 of the pages at ten settings, loses 6.2 points to sigma-5 defocus, less than the open readers (14 to 17), and 16.2 to 17 px of motion, a tie with them (10 to 12) when paired by page. A loop is a reading cut at the token cap or the 600 s limit; loops and blanks score 0. Synthetic defects, one at a time: real phone captures are not in this table. Detail: segbench-results/capture-ladder.md.",
+  "note": "Each of the 96 pages degraded by one synthetic defect at one setting and read again by the same reader, paired by page against that reader's plain image (Apple Vision against the plain image re-saved as every defect image was and read in the same run on macOS 27.2, as its raw row now is). Glare, motion blur and heavy defocus cost every reader; tilt up to 20 degrees, JPEG down to quality 60 and Augraphy's shadow and lighting gradient at their defaults cost none of them more than about 2 points. Apple Vision breaks first: 9 px of motion costs it 6.6 points and 17 px 38, where Qwen3.6-27B loses 1.0 and 7.9. LightOnOCR-3 4B answers heavy blur with an empty reply (43 of 96 at 31 px). Correcting the tilt with Apple's quad recovers nothing for Vision, because tilt cost it little. Gemini 3.7 Flash through the gateway, on 48 of the pages at ten settings, loses 6.2 points to sigma-5 defocus, less than the open readers (14 to 17), and 16.2 to 17 px of motion, a tie with them (10 to 12) when paired by page. A loop is a reading cut at the token cap or the 600 s limit; loops and blanks score 0. Synthetic defects, one at a time: real phone captures are not in this table. Detail: segbench-results/capture-ladder.md.",
   "signals_note": "Signals a phone can measure at capture, from the image alone, against a loss of 5 NES points or more on each of the 1,536 defect images (0.5 is no information). Sharpness inside the word boxes and the share of the image the word boxes cover separate losses only moderately (AUC 0.70 to 0.78), and their best cuts differ threefold between readers; the clipped-highlight share does not see the glare that costs 9 points (0.50 to 0.53), and lower luminance goes with fewer losses, not more. The cuts are in-sample on synthetic images; none is ready to be a live warning without a check on real captures.",
   "summary": [
    {
@@ -52773,26 +52799,26 @@
     "failed": 0,
     "loops": 0,
     "blank": 0,
-    "nes": 0.8136946626993543,
-    "nes_answered": 0.8136946626993543,
-    "bowf1": 0.8393964326584021,
+    "nes": 0.8300044624782346,
+    "nes_answered": 0.8300044624782346,
+    "bowf1": 0.8512660794070087,
     "d_nes": {
      "n": 96,
-     "delta": -0.01591655655699951,
-     "p": 0.1648835116488351,
-     "lo": -0.038976271113412786,
-     "hi": 0.0035217362205298246
+     "delta": 0.00039324322188085656,
+     "p": 0.8899110088991101,
+     "lo": -0.004654004007331492,
+     "hi": 0.006090904094099615
     },
     "d_bowf1": {
      "n": 96,
-     "delta": -0.014979440004972104,
-     "p": 0.000999900009999,
-     "lo": -0.023920633745484213,
-     "hi": -0.006100065066487764
+     "delta": -0.0031097932563654133,
+     "p": 0.3304669533046695,
+     "lo": -0.009350525324919857,
+     "hi": 0.002807767539125735
     },
-    "missed": 0.11174823309774637,
-    "added": 0.07787705027336979,
-    "lost5": 13,
+    "missed": 0.0989465262034938,
+    "added": 0.06327510334711295,
+    "lost5": 3,
     "baseline": false
    },
    {
@@ -54728,6 +54754,9 @@
    "n": 96,
    "changed": 95,
    "old": 81.4,
+   "answered_old": 96,
+   "answered_new": 96,
+   "lost": 0,
    "new": 83.1,
    "delta": 1.7,
    "lo": -0.3,
@@ -54737,6 +54766,9 @@
    "n": 320,
    "changed": 320,
    "old": 37.5,
+   "answered_old": 318,
+   "answered_new": 305,
+   "lost": 15,
    "new": 39.3,
    "delta": 1.8,
    "lo": 0.6,
