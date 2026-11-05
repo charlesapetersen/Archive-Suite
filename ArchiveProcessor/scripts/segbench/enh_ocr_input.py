@@ -458,7 +458,8 @@ def report():
          '`enh_ocr_arms.py`. Page-level numbers: `enh-ocr-input-pages.csv`. Δ is paired by page: the mean, a 95% '
          'bootstrap interval and a permutation p. inserted and rewritten are per truth word, from a word alignment; '
          'restoration-only words are in neither the truth nor the same reader\'s raw reading; suspect words are in '
-         'neither the same reader\'s raw reading nor Vision\'s (no truth needed), both per 1,000 words read.', '']
+         'neither the same reader\'s raw reading nor Vision\'s (no truth needed), both per 1,000 words read.', '',
+         "**A dated macOS 26.6 report (W46.vision-27-swap, 2026-11-04).** Every Apple Vision arm here, raw included, was read on macOS 26.6 (2026-10-22 to 28), before the 27.2 update of 2026-10-30, and the suspect-word counts use that 26.6 Vision text. The bench's plain Vision route is now its 27.2 reading (`vision-27-reread.md`), so the bench page labels these arms 26.6 until they are re-read on one OS.", '']
     allrows, bench, pending, charts = [], [], [], []
     for reader in ('apple-vision', *READERS, GW.ROUTE):
         if reader not in readers:

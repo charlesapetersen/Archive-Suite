@@ -19,6 +19,12 @@ truth is the owner's adjudication):
 
 Both the old and the new readings below are scored against the unchanged truth, so the comparison is fair.
 
+**Apple Vision here is a macOS 26.6 reading on both images (W46.vision-27-swap, 2026-11-04).** The JPEG originals were
+read on 2026-10-29, the PDF images on 2026-10-14, both before the 27.2 update of 2026-10-30. The bench's Vision route
+is now its 27.2 reading, so `truth_jpeg_upgrade.py score` reads the PDF side from the dated `vision-26.6` folder, and
+the Vision row below stays a same-OS comparison; read with the 27.2 PDF side, the change would be -0.070, 2.8 points
+of it the update (measurement review 2026-11-04, pass 8). Its 96-page means are the 26.6 bench's, not the current one.
+
 ## What the PDF images cost per route
 
 Each route read both images of the 15 pages at the panel's 2,400 px ceiling with its panel settings; NES is the
@@ -52,3 +58,23 @@ nothing were rerun; the OpenRouter panels and the cluster readers still read the
 
 Cost: the Mac routes are free. Gemini 3.7 Flash through the Stanford gateway, 29 calls (15 pages; a second run
 started by mistake repeated 14 of them), about $0.13 estimated from its tokens at Gemini 3.8 Flash's list price.
+
+## Measurement card
+
+Added 2026-11-04 (W46.vision-27-swap); no figure above changed.
+
+- **Truth.** The owner panel's adjudicated truth, unchanged and frozen by hash: drafted by Claude Opus 5.5 and Gemini
+  3.8 Flash and adjudicated from the PDF images, with the owner's checks as recorded in the truth cache. Gemini 3.8
+  Flash drafted the truth and Gemini 3.7 Flash is scored here, a close relative; and the PDF images the truth was read
+  from are one of the two images compared, which favours them where they differ in what is legible.
+- **Selection.** The 15 of the 33 PDF-image truth pages that have a JPEG original (eight paired by `corpus_pairs.py`
+  and confirmed by grey correlation, seven named by the owner); the 18 without one are not in it. Chosen by whether an
+  original exists, not by any route or by ABBYY text.
+- **Comparison.** Each route read both images with its panel settings at the 2,400 px ceiling and the same scorer;
+  Apple Vision on one OS build (26.6) for both. Only the five free or near-free routes were rerun; the rest still read
+  the PDF images (W46.truth-jpeg-rest).
+- **Noise.** n is 15 pages (10 sharper, 5 upscaled), too few for an interval; the changes are given as means and no
+  claim rests on a difference under about a point. Rerun floors: Apple Vision in `vision-27-reread.md` (measured on
+  27.2), Gemini in `ocr-rerun-noise.md`; the MLX routes' was not measured here.
+- **Scope.** Whether the PDF images cost the bench anything on these 15 pages. It does not settle the 18 pages without
+  an original, the routes not rerun, or Vision on macOS 27.2.

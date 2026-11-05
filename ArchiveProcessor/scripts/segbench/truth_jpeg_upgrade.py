@@ -187,8 +187,8 @@ OUT = HERE.parents[1] / "segbench-results" / "truth-jpeg-upgrade"
 def reading(route, base, job):
     """(read, text) of one cached reading; base is the panel cache (old images) or the scratch pack (new). A page
     read but not parsed has text "" and so scores 0, the panel's rule for a failed page."""
-    if route == "apple-vision":
-        f = base / "vision" / f"{job}.txt"
+    if route == "apple-vision":   # the new images were read on macOS 26.6 (2026-10-29), so the old side is too
+        f = base / ("vision" if base == PACK else "vision-26.6") / f"{job}.txt"
         return (f.exists(), f.read_text() if f.exists() else "")
     if route == "gemini3.7-flash-gw":
         f = (PANEL / "gateway-gemini" if base != PACK else GW) / "panel" / f"{job}.json"

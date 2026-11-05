@@ -8,7 +8,13 @@ the same images again with the same tools and settings on the current OS, into s
 readings are kept, dated, beside them), and scores old and new with the same scorer against the same truth.
 Vision is deterministic, so a change between the two is the OS.
 
+W46.vision-27-swap (2026-11-04) then made the 27.2 readings the bench's: each dated folder moved aside as `*-26.6`
+and a copy of its `*-27.2` sibling put in its place (the `*-27.2` folders stay, so this script and fm_foundation.py
+read the same files as before). This script reads the dated readings from the `*-26.6` folders since then.
+
     python3 ops/autonomous/heavy-run.py run -- python3 vision_reread.py read
+    python3 ops/autonomous/heavy-run.py run -- python3 vision_reread.py fill          # the 3 agreement pages' raw
+    python3 ops/autonomous/heavy-run.py run -- python3 vision_reread.py repeat-hands  # both tools, 19 handwritten
     python3 vision_reread.py report      # segbench-results/vision-27-reread.{md,json}
 """
 from __future__ import annotations
@@ -35,6 +41,9 @@ OUT = HERE.parents[1] / 'segbench-results' / 'vision-27-reread'
 PANEL_NEW = P.CACHE / f'vision-{TAG}'
 BENCH_NEW = R.RUN / f'vision-{TAG}'
 RAW_NEW = L.DEWARP / 'lines' / f'raw-{TAG}'
+PANEL_OLD = P.CACHE / 'vision-26.6'             # the dated readings, moved aside by W46.vision-27-swap
+BENCH_OLD = R.RUN / 'vision-26.6'
+RAW_OLD = L.DEWARP / 'lines' / 'raw-26.6'
 
 
 def os_version():
@@ -68,6 +77,13 @@ def raw_jobs():
     return [(L.image('raw', r['page']), RAW_NEW / f"{r['page']}.json") for r in L.scored_pages()]
 
 
+def cmd_fill(_):
+    """The raw lines of the three agreement pages, which `read` skipped (the ladder scores without them), so the
+    27.2 folder that replaces the dated `raw` holds the same 99 files it did."""
+    run(L.BIN, 'lines', [(L.image('raw', p), RAW_NEW / f'{p}.json') for p in sorted(P.AGREEMENT)
+                         if not (RAW_NEW / f'{p}.json').exists()], 'fill')
+
+
 def cmd_read(_):
     for d in (PANEL_NEW, BENCH_NEW, RAW_NEW):
         d.mkdir(parents=True, exist_ok=True)
@@ -94,6 +110,44 @@ def cmd_repeat(_):
     m = json.loads(meta.read_text()); m['repeat'] = {'n': len(rows), 'identical': same}
     meta.write_text(json.dumps(m, indent=1) + '\n')
     print(f'repeat: {same} of {len(rows)} identical')
+
+
+def handwritten_originals():
+    """Every handwritten original of the panel, the agreement pages too (19; 16 are scored)."""
+    return sorted(r['page'] for r in P.rows() if r['kind'] == 'handwritten')
+
+
+def cmd_repeat_hands(_):
+    """Both tools again on the handwritten originals, each compared byte for byte with its own 27.2 reading
+    (`ocr.swift` against the panel folder, `segbench-dewarp lines` against the raw folder), with each changed page's
+    NES on the two reads; and the two tools compared with each other on every scored original, on both OS builds."""
+    import tempfile
+    pages = handwritten_originals()
+    truth = {p: (P.TRUTH / 'truth' / f'{p}.txt').read_text() for p in pages}
+    with tempfile.TemporaryDirectory() as t:
+        t = Path(t)
+        (t / 'p').mkdir(); (t / 'r').mkdir()
+        run(P.T.OCR_BIN, None, [(P.CACHE / 'images' / f'{p}-original.jpg', t / 'p' / f'{p}.txt') for p in pages],
+            'repeat-ocr')
+        run(L.BIN, 'lines', [(L.image('raw', p), t / 'r' / f'{p}.json') for p in pages], 'repeat-lines')
+        pairs = {'ocr.swift': {p: ((PANEL_NEW / f'{p}-original.txt').read_text(), (t / 'p' / f'{p}.txt').read_text())
+                               for p in pages},
+                 'segbench-dewarp lines': {p: (lines_text(RAW_NEW / f'{p}.json'), lines_text(t / 'r' / f'{p}.json'))
+                                           for p in pages}}
+    tools = {}
+    for tool, by in pairs.items():
+        moved = {p: round(100 * (S.score(truth[p], b)['nes'] - S.score(truth[p], a)['nes']), 2)
+                 for p, (a, b) in by.items() if a != b}
+        tools[tool] = {'identical': len(pages) - len(moved), 'changed_nes': moved}
+    scored = [r['page'] for r in L.scored_pages()]
+    cross = [p for p in scored if lines_text(RAW_NEW / f'{p}.json') != (PANEL_NEW / f'{p}-original.txt').read_text()]
+    cross_old = [p for p in scored if lines_text(RAW_OLD / f'{p}.json') != (PANEL_OLD / f'{p}-original.txt').read_text()]
+    meta = OUT.parent / 'vision-27-reread.read.json'
+    m = json.loads(meta.read_text())
+    m['repeat_hands'] = {'n': len(pages), 'pages': pages, 'tools': tools,
+                         'cross_tool': {'n': len(scored), 'differ_27.2': cross, 'differ_26.6': cross_old}}
+    meta.write_text(json.dumps(m, indent=1) + '\n')
+    print(json.dumps(m['repeat_hands'], indent=1))
 
 
 def lines_text(path):
@@ -146,7 +200,7 @@ def panel_items():
     for j in P.manifest()['jobs']:
         row = by_page[j['page']]; variant = j['id'].removeprefix(j['page'] + '-')
         truth = (P.TRUTH / 'truth' / f"{j['page']}.txt").read_text()
-        old = (P.CACHE / 'vision' / f"{j['id']}.txt").read_text()
+        old = (PANEL_OLD / f"{j['id']}.txt").read_text()
         new = (PANEL_NEW / f"{j['id']}.txt").read_text()
         groups = [f'all {variant}', f'{variant} · {row["kind"]}']
         if variant == 'original' and j['page'] not in P.AGREEMENT:
@@ -159,7 +213,7 @@ def bench_items():
     for j in R.manifest()['jobs']:
         if j['script'] not in R.VISION_SCRIPTS:
             continue
-        old = R.RUN / 'vision' / f"{j['id']}.txt"
+        old = BENCH_OLD / f"{j['id']}.txt"
         yield (['all', j['stratum']], Path(truth[j['id']]['truth']).read_text(), old.read_text(),
                (BENCH_NEW / f"{j['id']}.txt").read_text(), j['stratum'])
 
@@ -171,7 +225,7 @@ def resave_rows():
     for r in L.scored_pages():
         p = r['page']; truth = (P.TRUTH / 'truth' / f'{p}.txt').read_text()
         src = 'original' if r['source'] == 'original' else 'pdf image'
-        texts = {'raw-26.6': lines_text(L.lines_path('raw', p)), 'raw-27.2': lines_text(RAW_NEW / f'{p}.json'),
+        texts = {'raw-26.6': lines_text(RAW_OLD / f'{p}.json'), 'raw-27.2': lines_text(RAW_NEW / f'{p}.json'),
                  'resave-27.2': lines_text(L.lines_path(L.RESAVE, p))}
         sc = {k: S.score(truth, t) for k, t in texts.items()}
         out.append({'page': p, 'source': src, 'same_raw': texts['raw-26.6'] == texts['raw-27.2'],
@@ -297,9 +351,10 @@ def cmd_report(_):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument('command', choices=['read', 'repeat', 'report'])
+    ap.add_argument('command', choices=['read', 'fill', 'repeat', 'repeat-hands', 'report'])
     a = ap.parse_args()
-    {'read': cmd_read, 'repeat': cmd_repeat, 'report': cmd_report}[a.command](a)
+    {'read': cmd_read, 'fill': cmd_fill, 'repeat': cmd_repeat, 'repeat-hands': cmd_repeat_hands,
+     'report': cmd_report}[a.command](a)
 
 
 if __name__ == '__main__':

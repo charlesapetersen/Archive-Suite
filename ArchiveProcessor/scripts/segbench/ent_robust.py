@@ -81,8 +81,11 @@ SWITCH_F1 = 0.8
 BINS = [(0, .02), (.02, .05), (.05, .10), (.10, .20), (.20, .40), (.40, 9)]
 TEXTS = os.path.join(CACHE, "texts.jsonl")
 
+# The Vision text this item's cached replies were made from: macOS 26.6, moved aside by W46.vision-27-swap. Reading
+# the 27.2 text instead would change every request and turn each cached reply into a new call.
+VISION_DATED = "vision-26.6"
 OWNER_ROUTES = {   # route -> (csv route name, reader of the page's text)
-    "apple-vision": ("apple-vision", lambda p: _txt(os.path.join(RC, "ocr-panel-local", "vision", f"{p}-original.txt"))),
+    "apple-vision": ("apple-vision", lambda p: _txt(os.path.join(RC, "ocr-panel-local", VISION_DATED, f"{p}-original.txt"))),
     "qwen3-vl-8b-mlx4": ("qwen3-vl-8b-mlx4", lambda p: _parsed(os.path.join(RC, "ocr-panel-local", "local",
                                                                             "qwen3-vl-8b-mlx4", f"{p}-original.json"))),
     "qwen3.6-27b": ("qwen3.6-27b", lambda p: _parsed(os.path.join(RC, "ocr-panel-local", "responses", "qwen3.6-27b",
@@ -95,7 +98,7 @@ OWNER_ROUTES = {   # route -> (csv route name, reader of the page's text)
 FS19 = os.path.join(FARMSHARE, "FarmShare-20261019", "results", "ocr")
 FS_OPEN = os.path.join(FARMSHARE, "FarmShare-open-sweep-20261019", "outputs", "qwen3-vl-8b", "results", "ocr", "qwen3-vl-8b")
 PUBLIC_ROUTES = {
-    "apple-vision": ("apple-vision", lambda j: _txt(os.path.join(RC, "bench-corpus", "routes", "vision", f"{j}.txt"))),
+    "apple-vision": ("apple-vision", lambda j: _txt(os.path.join(RC, "bench-corpus", "routes", VISION_DATED, f"{j}.txt"))),
     "gemini3.8-flash": ("gemini3.8-flash", lambda j: _parsed(os.path.join(RC, "bench-corpus", "routes", "responses",
                                                                           "gemini3.8-flash", f"{j}.json"))),
     "qwen3.6-27b": ("qwen3.6-27b", lambda j: _farmshare(os.path.join(FS19, "qwen3.6-27b", f"{j}.json"))),

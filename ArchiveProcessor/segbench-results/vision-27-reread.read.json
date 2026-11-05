@@ -15,5 +15,60 @@
  "repeat": {
   "n": 30,
   "identical": 30
+ },
+ "repeat_hands": {
+  "n": 19,
+  "pages": [
+   "p007",
+   "p015",
+   "p022",
+   "p040",
+   "p045",
+   "p046",
+   "p047",
+   "p048",
+   "p049",
+   "p050",
+   "p051",
+   "p052",
+   "p053",
+   "p054",
+   "p055",
+   "p056",
+   "p086",
+   "p094",
+   "p096"
+  ],
+  "tools": {
+   "ocr.swift": {
+    "identical": 17,
+    "changed_nes": {
+     "p050": -3.7,
+     "p053": -2.71
+    }
+   },
+   "segbench-dewarp lines": {
+    "identical": 18,
+    "changed_nes": {
+     "p048": 0.49
+    }
+   }
+  },
+  "cross_tool": {
+   "n": 96,
+   "differ_27.2": [
+    "p048",
+    "p050",
+    "p053"
+   ],
+   "differ_26.6": []
+  },
+  "first_run": {
+   "n": 16,
+   "scored_only": true,
+   "ocr_identical": 13,
+   "lines_identical": 15,
+   "note": "W46.vision-27-swap, 2026-11-04: the first repeat, on the 16 scored handwritten originals; per-page NES not kept"
+  }
  }
 }
