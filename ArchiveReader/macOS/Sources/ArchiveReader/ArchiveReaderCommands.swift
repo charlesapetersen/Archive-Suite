@@ -23,6 +23,9 @@ struct ArchiveReaderCommands: Commands {
     @FocusedValue(\.archiveLinkContext) private var linkContext: ArchiveLinkContext?
     @FocusedValue(\.documentTagActions) private var documentTags: DocumentTagActions?
     @Environment(\.openWindow) private var openWindow
+    /// Holds the navigation window's model whichever window is in front, so File ▸ Choose Archive Folder…
+    /// can reach it from a document window or with no window open (W40.fix-reader-choose-folder-shortcut).
+    let router: DeepLinkRouter
     @AppStorage("ar.showSidebar") private var showingSidebar = true
     @AppStorage("ar.showTagCloud") private var showingTagCloud = false
 
@@ -86,9 +89,14 @@ struct ArchiveReaderCommands: Commands {
 
         // File
         CommandGroup(replacing: .newItem) {
-            Button("Choose Archive Folder…") { nav?.chooseRoot() }
-                .keyboardShortcut("o", modifiers: [.command, .shift])
-                .disabled(nav == nil)
+            // Enabled from every Reader window and with none open: the owner pressed ⇧⌘O over a document
+            // window and nothing happened (notes-1, row 1). The library window comes forward for the panel.
+            Button("Choose Archive Folder…") {
+                if let nav { nav.chooseRoot() } else {
+                    router.requestChooseRoot { openWindow(id: WindowID.navigation) }
+                }
+            }
+            .keyboardShortcut("o", modifiers: [.command, .shift])
             // Explicit recovery even though FSEvents normally keeps the library live. ⌘⌥R because
             // ⌘R is Mark Read.
             Button("Rescan Archive Folder") { nav?.rescan() }
