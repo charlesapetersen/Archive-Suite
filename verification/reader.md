@@ -9,7 +9,7 @@ Format and statuses: [`README.md`](README.md). Written by `W40.b1`, 2026-10-12.
   `W23.m9`, `W24.jpeg1`, `W24.cal1-reader`, `W26.walk2`, `W14.2-fu`). `SPEC/tag-format.md` is the contract
   behind R-05 and R-45.
 - **Sources and code read at:** `caefe33a`.
-- **Count:** `unproven 35 · works 6 · broken 0 · fixed-pending-recheck 6 · dropped 1` (works: R-11, R-25, R-28, R-29, R-47, R-48; fixed-pending-recheck: R-13, R-20, R-21, R-23, R-45, R-46; dropped: R-26). Updated by `W40.fix-reader-undo-focus`, 2026-11-05 (R-21 to `fixed-pending-recheck`).
+- **Count:** `unproven 35 · works 5 · broken 0 · fixed-pending-recheck 7 · dropped 1` (works: R-25, R-28, R-29, R-47, R-48; fixed-pending-recheck: R-11, R-13, R-20, R-21, R-23, R-45, R-46; dropped: R-26). Updated by `W40.fix-reader-fts-snippets`, 2026-11-05 (R-11 to `fixed-pending-recheck`).
 
 **Runtime evidence, for every row below: none yet.** The W40.a3 full VM suite
 ([`evidence/reader/W40.a3-full-ui.md`](evidence/reader/W40.a3-full-ui.md), `a5ab9e3c`) passed every UITest
@@ -230,13 +230,14 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
   `.testOCRSearchFieldExists`; `ArchiveReaderTests/ContentIndexTests.testBm25RankedSearch`.
 - **Runtime evidence:** [`evidence/reader/W40.d7-at-size.md`](evidence/reader/W40.d7-at-size.md). On the `W40.c2` sample's real OCR text, and on that text replicated to 102,478
   rows: single distinctive terms answer in 11–146 ms at 102k, `the` in 0.7 s, but `Bureau of the Budget` takes
-  2.2 s on the sample and **41.7 s** at 102k (`-O`). Index build: 5,268 PDFs in 9.2 s, one pass. After `W40.fix-reader-fts-snippet-stall`: 12.8 ms on the sample and **271 ms** at 102k, all 215 previews ([`evidence/reader/W40.fix-reader-fts-snippet-stall.md`](evidence/reader/W40.fix-reader-fts-snippet-stall.md)).
-- **Status:** `works`
+  2.2 s on the sample and **41.7 s** at 102k (`-O`). Index build: 5,268 PDFs in 9.2 s, one pass. After `W40.fix-reader-fts-snippet-stall`: 12.8 ms on the sample and **271 ms** at 102k, all 215 previews ([`evidence/reader/W40.fix-reader-fts-snippet-stall.md`](evidence/reader/W40.fix-reader-fts-snippet-stall.md)). After `W40.fix-reader-fts-snippets`, hits the search left without a preview get one as their rows are drawn: at 102k the first 1,000 hits of each query have one wherever the row has body text, no fill call holding the index over 37 ms ([`evidence/reader/W40.fix-reader-fts-snippets.md`](evidence/reader/W40.fix-reader-fts-snippets.md)).
+- **Status:** `fixed-pending-recheck`
 - **History:**
   - 2026-10-12 W40.b1 — row written, `unproven`.
   - 2026-10-15 W40.d7 — `unproven` → `broken`: a multi-word query with common words takes 42 s at corpus size; filed `W40.fix-reader-fts-snippet-stall` (S2).
   - 2026-10-31 W40.fix-reader-fts-snippet-stall — `fixed-pending-recheck`: snippets leave out stop words, seek each hit by rowid and stop after 250 ms. On 60 long bodies `Bureau of the Budget` went from 2 of 60 previews in the budget (~135 ms a document) to 60 of 60 in 26 ms. Not yet re-run on the W40.c2 sample, which is in the owner's backup (`W40.fts-snippet-sample-rerun`). [`evidence/reader/W40.fix-reader-fts-snippet-stall.md`](evidence/reader/W40.fix-reader-fts-snippet-stall.md).
   - 2026-10-31 W40.fts-snippet-sample-rerun — `fixed-pending-recheck` → `works`: the corpus-size lane on the W40.c2 sample (`run-reader-at-size.sh --optimized --only sample`, twice, sample unchanged) has `Bureau of the Budget` at 12.8 ms on the sample (2.2 s before) and 271 ms at 102,478 rows (41.7 s before), 215 of 215 hits with previews; the test's under-1-s assertion passes. Same evidence file.
+  - 2026-11-05 W40.fix-reader-fts-snippets — `works` → `fixed-pending-recheck`: the owner's Reader session 1 (2026-11-04) found hits without a snippet after a slow query. Missing snippets are now filled in, off the main thread, as rows are drawn, and a query of stop words alone is quoted by scanning the body (one `snippet()` call for `the` took 0.9 s). At 102k, `Bureau of the Budget` 190 of 190 hits, `the` 981 of the first 1,000; the hits left without one are photographs with no text. [`evidence/reader/W40.fix-reader-fts-snippets.md`](evidence/reader/W40.fix-reader-fts-snippets.md).
 - **Notes:** **Drift.** The search runs as you type, after 150 ms. There is no `.onSubmit` on the field, so
   `SMOKE_TEST.md` step G's "Submit-on-Return" is out of date. The behaviour is arguably better, but the record
   is wrong.

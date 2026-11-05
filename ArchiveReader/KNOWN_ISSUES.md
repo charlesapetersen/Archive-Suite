@@ -163,6 +163,11 @@ Debug otherwise, and Swift-side sorting is 1.5–3× slower there.
   `searchRanked("Bureau of the Budget")` took **41.7 s** over
   102k rows (the sample's real text, replicated); distinctive single terms take 11–146 ms. It runs on the
   `ContentIndex` actor, so later queries queue behind it.
+- **Fixed 2026-11-05, S3 — `W40.fix-reader-fts-snippets`:** the 250 ms budget above left hits without a snippet
+  (owner, Reader session 1), and every hit past the 300th never had one. They are now filled in, off the main thread,
+  as their rows are drawn; a query of stop words alone is quoted by scanning the body (`snippet()` on `the` took
+  0.9 s for one long body). At 102k every hit with body text among the first 1,000 has one; a photo (no body) still
+  shows only its name. Evidence: `verification/evidence/reader/W40.fix-reader-fts-snippets.md`.
 - **Fine at size:** filters 7–33 ms, the health popover's `dataQuality` 30 ms, scrolling's cell work 2.7 ms a
   row, index build 1.7 ms per real PDF (5,268 in 9.2 s; ~3 min projected for the corpus [I]).
 
