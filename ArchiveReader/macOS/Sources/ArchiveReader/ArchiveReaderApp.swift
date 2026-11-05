@@ -37,6 +37,7 @@ struct ArchiveReaderApp: App {
 #endif
             // The Appearance setting (W48.appearance-reader), before the first window; a UI test's forced mode wins.
             if !appearanceForced { AppAppearance.follow() }
+            TextUndoGuard.install()   // ⌘Z in a text field undoes the typing, not a tag change (S-001)
         }
     }
 

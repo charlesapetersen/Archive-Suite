@@ -167,8 +167,19 @@ final class AuditLedger: @unchecked Sendable {
     /// to the owner's ledger: both run as `com.archivereader.app` and share its container.
     /// The process ID alone is not unique: the container's tmp outlives the process, and a VM booted the
     /// same way each time hands the app the same PID again, so a fresh launch inherited an older run's
-    /// undoable history (W40.fix-reader-vm-nav-red). Fixed for the life of the process.
-    static let testLaunchID = "\(ProcessInfo.processInfo.processIdentifier)-\(UUID().uuidString)"
+    /// undoable history (W40.fix-reader-vm-nav-red). Fixed for the life of the process. A UITest that
+    /// relaunches the app and needs its history back passes its own `-ARUITestLedgerID` (DEBUG only), as
+    /// `UndoFocusUITests` does to press ⌘Z straight after a relaunch (W40.fix-reader-undo-focus).
+    static let testLaunchID: String = {
+#if DEBUG
+        let args = ProcessInfo.processInfo.arguments
+        if args.contains("-ARUITestRootPath"), let i = args.firstIndex(of: "-ARUITestLedgerID"), i + 1 < args.count {
+            let id = args[i + 1].filter { $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "-") }
+            if !id.isEmpty { return "shared-\(id)" }
+        }
+#endif
+        return "\(ProcessInfo.processInfo.processIdentifier)-\(UUID().uuidString)"
+    }()
 
     static func defaultFileURL() -> URL {
         if ArchiveTestHost.isUnitTestHost || ProcessInfo.processInfo.arguments.contains("-ARUITestRootPath") {

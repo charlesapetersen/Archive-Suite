@@ -1231,6 +1231,21 @@ final class ContextMenuTableView: NSTableView {
     /// The Read cell a press began on, which gets the rest of that press (W40.fix-reader-read-toggle).
     private var readCellPress: ReadStateCellView?
 
+    /// The list takes the keyboard when the window opens, unless text is already being typed. With no
+    /// focused view the window published no `NavigationModel` to the menus, so after a launch ⌘Z (and the
+    /// other Tags shortcuts) did nothing until the list was clicked (W40.fix-reader-undo-focus; reader-1 row 37).
+    private var tookInitialFocus = false
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        guard window != nil, !tookInitialFocus else { return }
+        tookInitialFocus = true
+        DispatchQueue.main.async { [weak self] in
+            guard let self, let window = self.window, !(window.firstResponder is NSText) else { return }
+            window.makeFirstResponder(self)
+        }
+    }
+
     /// The Read cell under `event`, if the press is inside one that shows a file.
     private func readCell(at event: NSEvent) -> ReadStateCellView? {
         let point = convert(event.locationInWindow, from: nil)
