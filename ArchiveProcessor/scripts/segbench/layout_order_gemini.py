@@ -3,6 +3,7 @@
 native order beside the free arms of W46.layout-order and W46.layout-order-marks.
 
     python3 layout_order_gemini.py run [bench|l9|owner|all]   # the gateway calls (cached; ledger and cap below)
+    python3 layout_order_gemini.py rerun all                  # the same calls again, for the rerun floor
     uv run --offline --with rapidfuzz --with numpy --with scikit-learn --with pillow python layout_order_gemini.py score
     uv run --offline --with rapidfuzz --with numpy --with scikit-learn --with pillow python -m unittest test_layout_order_gemini
 
@@ -75,8 +76,11 @@ def l9_keys() -> list[str]:
     return sorted(p.stem for p in (LO.WORK / "vision").glob("newsbench__*.json"))
 
 
+REPLIES = "replies"   # "replies-rerun" for the second, identical pass that gives the rerun floor
+
+
 def reply_path(job: str) -> Path:
-    return CACHE / "replies" / f"{job}.json"
+    return CACHE / REPLIES / f"{job}.json"
 
 
 def run(which="all", limit=None) -> int:
@@ -86,7 +90,14 @@ def run(which="all", limit=None) -> int:
     for _, img in todo:
         assert img.suffix == ".jpg" and img.exists(), img
     with ThreadPoolExecutor(4) as ex:
-        list(ex.map(lambda j: G.call("layout-order", j[0], j[1].read_bytes(), PROMPT, reply_path(j[0])), todo))
+        set_name = "layout-order" + ("-rerun" if REPLIES != "replies" else "")
+        if REPLIES != "replies":
+            # The gateway (LiteLLM) answers a byte-identical request from its response cache: a first rerun came
+            # back in 0.9 s a page with the first pass's exact replies (kept aside as replies-rerun-gateway-cached).
+            # This body field skips that cache; the request Google sees is unchanged (ocr_rerun_noise.py's fix).
+            body = G.body
+            G.body = lambda image, prompt: {**body(image, prompt), "cache": {"no-cache": True}}
+        list(ex.map(lambda j: G.call(set_name, j[0], j[1].read_bytes(), PROMPT, reply_path(j[0])), todo))
     bad = [j for j, _ in todo if blocks(load(j)) is None]
     print(f"{len(todo) - len(bad)}/{len(todo)} parsed; unparsed: {bad}; ${G.spent():.4f} of ${CAP} spent "
           f"({G.billed_note(G.ledger())})")
@@ -100,7 +111,7 @@ def load(job: str):
 
 _OBJ = re.compile(r"\{[^{}]*")
 _NUM = r"\s*(-?\d+(?:\.\d+)?)\s*"
-_BOX = re.compile(r'"box_2d"\s*:\s*\[' + ",".join([_NUM] * 4))
+_BOX = re.compile(r'"box(?:_2d?)?"\s*:\s*\[' + ",".join([_NUM] * 4))
 _LABEL = re.compile(r'"label"\s*:\s*"([^"]*)"')
 
 
@@ -108,8 +119,8 @@ def blocks(reply) -> list[dict] | None:
     """Gemini's blocks in its order as 0-1 [x0, y0, x1, y1] boxes, or None when the reply holds no box.
 
     Read object by object rather than as one JSON document: 3.7 returns the list bare as often as under
-    "blocks", and now and then breaks the JSON itself (a stray key, a brace for a bracket) while every block
-    in it is still whole. A block whose box is not four numbers is dropped."""
+    "blocks", and now and then breaks the JSON itself (a stray key, a brace for a bracket, "box_2" or
+    "box" for "box_2d") while every block in it is still whole. A block whose box is not four numbers is dropped."""
     raw = (reply or {}).get("raw")
     if not raw:
         return None
@@ -279,6 +290,42 @@ def summarise(rows, base_rows, groups: dict, pair_with: list[str], group_of) -> 
     return out
 
 
+def usage_of(calls) -> dict:
+    return {"calls": len(calls),
+            "prompt_tokens": sum((c.get("usage") or {}).get("prompt_tokens") or 0 for c in calls),
+            "completion_tokens": sum((c.get("usage") or {}).get("completion_tokens") or 0 for c in calls),
+            "wall_s_mean": round(statistics.mean(c["wall_s"] for c in calls), 2) if calls else None,
+            **G.billed(calls)}
+
+
+def rerun_floor(first: dict[str, list[dict]], bases: dict[str, list[dict]]) -> dict:
+    """Gemini's own order from the second, identical pass against the first: the rerun floor. A gap between two
+    arms smaller than this is inside Gemini's run-to-run noise."""
+    global REPLIES
+    REPLIES = "replies-rerun"
+    try:
+        second = {"bench": bench_panel(), "l9": l9_panel(), "owner": owner_panel()}
+    finally:
+        REPLIES = "replies"
+    sets = {"bench_multi": ("bench", LO.MULTICOL), "bench_single": ("bench", LO.SINGLECOL),
+            "l9": ("l9", None), "owner": ("owner", None)}
+    out = {}
+    for name, (s, langs) in sets.items():
+        pick = lambda rows: [r for r in rows if r["arm"] == "gemini/native" and (langs is None or r.get("lang") in langs)]
+        a, b = pick(first[s]), pick(second[s])
+        cell = summary_cell(b)
+        p = paired(a, b, "gemini/native", "gemini/native")
+        bv = {r["page"]: r for r in b if r.get("valid")}
+        d = [abs(r["tau"] - bv[r["page"]]["tau"]) for r in a if r.get("valid") and r["page"] in bv]
+        cell["paired"] = {x: paired(b, bases[s], "gemini/native", x) for x in PAIR_WITH[s]}
+        cell["first_minus_rerun"] = p
+        cell["mean_abs_page_diff"] = round(statistics.mean(d), 4) if d else None
+        cell["pages_differing_by_0_01"] = sum(x > 0.01 for x in d)
+        cell["unparsed"] = [r["page"] for r in b if r["regions"] == 0]
+        out[name] = cell
+    return out
+
+
 def score() -> int:
     _own_ledger()
     lo = json.loads(LO.OUT.read_text())
@@ -290,11 +337,16 @@ def score() -> int:
     owner_groups.update({g: (lambda gs, g=g: g in gs) for g in sorted({g for r in owner for g in r["groups"]})})
     unparsed = [j for j, _ in jobs("all") if blocks(load(j)) is None]
     broken = [j for j, _ in jobs("all") if j not in unparsed and not strict_json(load(j))]
-    calls = G.ledger()
-    usage = {"calls": len(calls), "prompt_tokens": sum((c.get("usage") or {}).get("prompt_tokens") or 0 for c in calls),
-             "completion_tokens": sum((c.get("usage") or {}).get("completion_tokens") or 0 for c in calls),
-             "wall_s_mean": round(statistics.mean(c["wall_s"] for c in calls), 2) if calls else None,
-             **G.billed(calls)}
+    # The first rerun pass was answered from the gateway's cache; its lines stay in the ledger (and the cap), and
+    # are the set's first len(jobs) lines, written before the live rerun began.
+    first_rerun = [c for c in G.ledger() if c["set"] == "layout-order-rerun"][:len(jobs("all"))]
+    usage = {"layout-order": usage_of([c for c in G.ledger() if c["set"] == "layout-order"]),
+             "rerun_gateway_cached": usage_of(first_rerun),
+             "rerun_live": usage_of([c for c in G.ledger() if c["set"] == "layout-order-rerun"
+                                     and c not in first_rerun])}
+    usage["all"] = G.billed(G.ledger())
+    rerun = rerun_floor({"bench": bench, "l9": l9, "owner": owner},
+                        {"bench": lo["bench_regions"]["pages"], "l9": lo["l9"]["pages"], "owner": lom["owner96"]["pages"]})
     res = {"item": "W46.layout-order-paid",
            "settings": {"model": G.MODEL, "route": G.API, "temperature": 0, "reasoning_effort": "low",
                         "max_tokens": MAX_TOKENS, "prompt": PROMPT, "price_assumed": G.PRICE, "cap": CAP,
@@ -303,7 +355,7 @@ def score() -> int:
                                   "l9": "Vision lines inside DocLayout-YOLO body regions (W46.layout-order's L9 set)",
                                   "owner": "Vision lines at the app's settings (W46.layout-order-marks's set)"},
                         "valid": {"bench": LO.MIN_FRAC, "min_n": LO.MIN_N}},
-           "unparsed": unparsed, "json_broken_but_read": broken, "usage": usage,
+           "unparsed": unparsed, "json_broken_but_read": broken, "usage": usage, "rerun": rerun,
            "bench": {"summary": summarise(bench, lo["bench_regions"]["pages"], bench_groups, PAIR_WITH["bench"], lang),
                      "pages": bench},
            "l9": {"summary": summarise(l9, lo["l9"]["pages"], {"all": lambda _: True}, PAIR_WITH["l9"], lang),
@@ -325,7 +377,8 @@ def score() -> int:
 
 if __name__ == "__main__":
     cmd = sys.argv[1] if len(sys.argv) > 1 else ""
-    if cmd == "run":
+    if cmd in ("run", "rerun"):
+        REPLIES = "replies" if cmd == "run" else "replies-rerun"
         sys.exit(run(sys.argv[2] if len(sys.argv) > 2 else "all", int(sys.argv[3]) if len(sys.argv) > 3 else None))
     if cmd == "score":
         sys.exit(score())

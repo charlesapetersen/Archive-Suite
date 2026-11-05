@@ -3,7 +3,7 @@
 Gap audit §5 item 28, E-layout test 2. Produced by `scripts/segbench/layout_order.py run` (figures in
 `layout-order.json`, per page and summarised). Free, on the Mac, 2026-10-28. Orli and the trained orderers (kraken
 `rotrain`, an Orli fine-tune) are not in this note: they are `W46.layout-order-orli` and `W46.layout-order-train`.
-Gemini asked for boxes in order is `W46.layout-order-paid`, and the 30 annotated owner pages are
+Gemini asked for boxes in order is `W46.layout-order-paid` (`layout-order-paid.md`: it changes no default), and the 30 annotated owner pages are
 `W46.layout-order-marks`.
 
 ## What was run

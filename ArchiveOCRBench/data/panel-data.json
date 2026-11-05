@@ -63193,6 +63193,47 @@
      "oiwer_median": 0.0,
      "coverage": 0.8882
     }
+   },
+   "gemini_native": {
+    "multi": {
+     "pages": 15,
+     "valid": 14,
+     "regions": 13.3,
+     "tau": 0.9606,
+     "tau_ci": [
+      0.8867,
+      0.9991
+     ],
+     "pages_tau_ge_095": 13,
+     "oiwer": 0.0521,
+     "coverage": 0.942
+    },
+    "single": {
+     "pages": 25,
+     "valid": 20,
+     "regions": 5.6,
+     "tau": 0.9972,
+     "tau_ci": [
+      0.9917,
+      1.0
+     ],
+     "pages_tau_ge_095": 19,
+     "oiwer": 0.0213,
+     "coverage": 0.881
+    },
+    "all": {
+     "pages": 40,
+     "valid": 34,
+     "regions": 8.4,
+     "tau": 0.9821,
+     "tau_ci": [
+      0.9508,
+      0.9995
+     ],
+     "pages_tau_ge_095": 32,
+     "oiwer": 0.034,
+     "coverage": 0.9039
+    }
    }
   },
   "l9": {
@@ -63362,6 +63403,25 @@
      "covered_median": 0.636,
      "tau_own": 0.7542,
      "tau_own_median": 0.8179
+    }
+   },
+   "gemini_native": {
+    "all": {
+     "pages": 15,
+     "valid": 15,
+     "regions": 52.9,
+     "tau": 0.4548,
+     "tau_ci": [
+      0.3012,
+      0.6132
+     ],
+     "pages_tau_ge_095": 2,
+     "word_acc": 0.1938,
+     "bow_f1": 0.6059,
+     "gap": 0.4121,
+     "roe": 0.3923,
+     "covered": 0.6625,
+     "tau_own": 0.6627
     }
    }
   },
@@ -66017,6 +66077,118 @@
        ]
       }
      }
+    },
+    "gemini/native": {
+     "all": {
+      "pages": 96,
+      "valid": 66,
+      "regions": 7.7,
+      "tau": 0.9819,
+      "tau_ci": [
+       0.9699,
+       0.9917
+      ],
+      "pages_tau_ge_095": 58,
+      "word_acc": 0.6623,
+      "bow_f1": 0.7683,
+      "gap": 0.106,
+      "kept_share": 0.8611,
+      "paired_vs_default": {
+       "tau_diff": 0.0324,
+       "ci": [
+        0.0089,
+        0.0644
+       ]
+      }
+     },
+     "clippings": {
+      "pages": 13,
+      "valid": 10,
+      "regions": 9.2,
+      "tau": 0.9571,
+      "tau_ci": [
+       0.8991,
+       0.9909
+      ],
+      "pages_tau_ge_095": 8,
+      "word_acc": 0.4509,
+      "bow_f1": 0.6898,
+      "gap": 0.2389,
+      "kept_share": 0.7515,
+      "paired_vs_default": {
+       "tau_diff": 0.033,
+       "ci": [
+        -0.0741,
+        0.1354
+       ]
+      }
+     },
+     "handwritten": {
+      "pages": 16,
+      "valid": 3,
+      "regions": 5.4,
+      "tau": 0.9973,
+      "tau_ci": [
+       0.9919,
+       1.0
+      ],
+      "pages_tau_ge_095": 3,
+      "word_acc": 0.3363,
+      "bow_f1": 0.4531,
+      "gap": 0.1168,
+      "kept_share": 0.9182,
+      "paired_vs_default": {
+       "tau_diff": 0.0,
+       "ci": [
+        0.0,
+        0.0
+       ]
+      }
+     },
+     "tables": {
+      "pages": 12,
+      "valid": 6,
+      "regions": 6.8,
+      "tau": 0.944,
+      "tau_ci": [
+       0.8778,
+       0.9906
+      ],
+      "pages_tau_ge_095": 3,
+      "word_acc": 0.739,
+      "bow_f1": 0.8756,
+      "gap": 0.1366,
+      "kept_share": 0.8738,
+      "paired_vs_default": {
+       "tau_diff": 0.0708,
+       "ci": [
+        0.0251,
+        0.1161
+       ]
+      }
+     },
+     "typed, no table or clipping": {
+      "pages": 41,
+      "valid": 37,
+      "regions": 6.9,
+      "tau": 0.9928,
+      "tau_ci": [
+       0.9875,
+       0.997
+      ],
+      "pages_tau_ge_095": 35,
+      "word_acc": 0.8325,
+      "bow_f1": 0.8877,
+      "gap": 0.0551,
+      "kept_share": 0.8953,
+      "paired_vs_default": {
+       "tau_diff": 0.0317,
+       "ci": [
+        0.0012,
+        0.076
+       ]
+      }
+     }
     }
    }
   },
@@ -66026,6 +66198,38 @@
    "yolo_filter": "7 (16%)",
    "yolo_pics": "26 (58%)",
    "pp": "3 (7%)"
+  },
+  "gemini": {
+   "cost": 1.68,
+   "rerun": {
+    "owner": {
+     "tau": 0.9713,
+     "abs": 0.0274,
+     "diff": 0.0111,
+     "ci": [
+      -0.009,
+      0.0367
+     ]
+    },
+    "l9": {
+     "tau": 0.5517,
+     "abs": 0.3243,
+     "diff": -0.0969,
+     "ci": [
+      -0.2972,
+      0.0998
+     ]
+    },
+    "bench_multi": {
+     "tau": 0.9577,
+     "abs": 0.0037,
+     "diff": -0.0037,
+     "ci": [
+      -0.0089,
+      0.0
+     ]
+    }
+   }
   }
  },
  "layout_photo": {

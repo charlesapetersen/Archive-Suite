@@ -76,6 +76,7 @@ POSTCORRECT = RESULTS / "ocr-postcorrect.json"  # W46.ocr-postcorrect: postcorre
 LOGPROB = RESULTS / "ocr-logprob.json"  # W46.ocr-logprob: ocr_logprob.py report, log-probabilities as an error flag
 LAYOUT_ORDER = RESULTS / "layout-order.json"  # W46.layout-order: layout_order.py run, ordering with detection fixed
 LAYOUT_ORDER_MARKS = RESULTS / "layout-order-marks.json"  # W46.layout-order-marks: the 96 and the marks core
+LAYOUT_ORDER_PAID = RESULTS / "layout-order-paid.json"  # W46.layout-order-paid: Gemini 3.7 Flash's blocks in its order
 LAYOUT_PHOTO = RESULTS / "layout-photo.json"  # W46.layout-photo: layout_photo.py score, four detectors feeding GLM-OCR
 RERUN_NOISE = RESULTS / "ocr-rerun-noise.json"  # W46.ocr-rerun-noise: ocr_rerun_noise.py report, the 96 read three times
 LOOPS = PUBLIC / "loop-rerun-20261021.json"  # W46.ocr-loops: corpus/loop_rerun.py report, the capped pages read again
@@ -902,8 +903,32 @@ def layout_order():
     if not LAYOUT_ORDER.exists():
         return None
     d = json.loads(LAYOUT_ORDER.read_text())
-    return {"guard": d["guard"], "sources": d["sources"],
-            **{k: d[k]["summary"] for k in ("bench_lines", "bench_regions", "l9")}, **layout_order_marks()}
+    return layout_order_paid({"guard": d["guard"], "sources": d["sources"],
+                              **{k: d[k]["summary"] for k in ("bench_lines", "bench_regions", "l9")},
+                              **layout_order_marks()})
+
+
+def layout_order_paid(lo):
+    """W46.layout-order-paid: Gemini's own blocks in its own order, one more row in each ordering table, with its
+    cost and rerun floor for the notes. ``lo`` unchanged until it has run."""
+    if not LAYOUT_ORDER_PAID.exists():
+        return lo
+    d = json.loads(LAYOUT_ORDER_PAID.read_text())
+    native = lambda s: {g: {k: v for k, v in c.items() if k != "paired"} for g, c in d[s]["summary"]["gemini/native"].items()}
+    lo["bench_regions"]["gemini_native"] = native("bench")
+    lo["l9"]["gemini_native"] = native("l9")
+    if "owner96" in lo:
+        base = "yolo/app_regions"
+        lo["owner96"]["summary"]["gemini/native"] = {
+            g: {**{k: v for k, v in c.items() if k != "paired"},
+                "paired_vs_default": c["paired"][base] and {"tau_diff": c["paired"][base]["diff"], "ci": c["paired"][base]["ci"]}}
+            for g, c in d["owner"]["summary"]["gemini/native"].items()}
+    r = d["rerun"]
+    lo["gemini"] = {"cost": round(d["usage"]["all"]["charged"], 2),
+                    "rerun": {k: {"tau": r[k].get("tau"), "abs": r[k]["mean_abs_page_diff"],
+                                  "diff": r[k]["first_minus_rerun"]["diff"], "ci": r[k]["first_minus_rerun"]["ci"]}
+                              for k in ("owner", "l9", "bench_multi")}}
+    return lo
 
 
 def layout_order_marks():

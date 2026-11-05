@@ -22,6 +22,10 @@ class Blocks(unittest.TestCase):
         got = M.blocks({"raw": raw})
         self.assertEqual(len(got), 2)
         self.assertFalse(M.strict_json({"raw": raw}))
+        # and, on a rerun of eng_01, the key itself misspelt
+        self.assertEqual(len(M.blocks({"raw": '{"blocks": [{"label": "header", "box_2": [41, 386, 53, 613]}]}'})), 1)
+        self.assertEqual(M.blocks({"raw": '[{"label": "list", "box": [131, 100, 269, 494]}]'})[0]["box"],
+                         [0.1, 0.131, 0.494, 0.269])
 
     def test_drops_empty_and_clamps(self):
         got = M.blocks({"raw": '[{"box_2d": [10, 10, 10, 50]}, {"box_2d": [-5, 0, 1200, 500]}]'})
