@@ -14305,3 +14305,26 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   `Capture/LiveCaptureRecoveryLateTests.swift` (`TestGate` lost its `private`); a clean `-jobs 2` build now peaks at
   8.4 GB footprint, with no new warnings, and `scripts/test-recovery.sh` passes 299/299 as before. No bench cache used; no money.
   <!-- /W46.rotation-majority-fix -->
+- [x] **W46.marks-detect — whether marks can be found and read [M]** · §Document processing review — W46 (owner, 2026-10-20) (lane: segbench) (uses: light) (cluster: sherlock) (blocked-on: W46.cluster-waves, W46.fix-marks-set-score) — A YOLO11m on AnnoPage, SignverOD and synthetic crops (trained on the cluster, Core ML export) against Qwen3.6 27B boxes and the signature detector; inline region tags from Claude through the plan at $0. detail: execution-plans/processing-review/10-gap-audit.md §5 item 24 — Plan-route arm held for the gateway (owner, 2026-10-21; CLAUDE.md "Plan routes wait for the gateway"). **Measurement audit (2026-10-30, `execution-plans/processing-review/11-measurement-audit.md`):** MRK-1: rank detectors on the owner core only; never rank a model on pages it pre-flagged or drafted; the Claude inline-tag arm is dropped (W46.marks-detect-paid carries Gemini's). (blocked-on: W46.fix-marks-sheet-feedback) — 2026-11-01: owner question feedback must be reconciled before marks-set experiments or Phase 4.
+  SHIPPED 2026-11-05. Detection (`scripts/segbench/marks_detect.py`, `segbench-results/marks-detect.{md,json}`), on the
+  reconciled owner core (32 pages, 45 rough boxes): PP-DocLayoutV3 Seal + Aside Text 0/45; a YOLO11m trained on Sherlock
+  (pack marks-detect-20261104, 3 jobs, one L40S: setup 42 min CPU, pilot 4 min, training 2 h 14 min = about 2.3 GPU-hours
+  of the 6.5 ceiling; 195 epochs, early stop, best epoch 95, val mAP50 0.81) on AnnoPage's 416 handwritten/stamp pages +
+  416 without and SignverOD's 2,299 forms found 8/45 (18%, 5-37) at IoU >= 0.1 and floor 0.25, 6/45 at IoU 0.5, 53%
+  precision; 17/45 (38%, 21-60) at 42% precision at floor 0.05; stamps 1 of 10 even at 0.05. The one-epoch pilot 0/45.
+  Core ML export on the Mac (`marks_detect.py coreml`, Ultralytics 8.4.202 + coremltools 9.0 in `torch-env.sh`; NMS left
+  to Ultralytics because coremltools 9's NMS pipeline fails on torch 2.15): 80.6 MB fp32, median 0.43 s a page on the
+  M3 Pro (engine-session upper bound), same 8/45 (square input, 14 boxes). Reading (`marks_read.py`,
+  `segbench-results/marks-read.{md,json}`): the 35 owner-reviewed mark texts cropped from the owner's boxes are read at
+  NES >= 0.8 by LightOnOCR-3 4B 8-bit 17/35 (mean 0.62) and Apple Vision 13/35 (0.59), a tie inside the interval;
+  LightOnOCR answers nothing on 8 short marks; a post-hoc Vision fallback reaches 18 (hypothesis only). Through the
+  YOLO11m's boxes, 4/35 (floor 0.25) to 6/35 (0.05). Verdict: no measured detector is a marks layer; the route goes to
+  W46.mixed-route (whole-page readers), and the own-page fine-tune is filed as W46.marks-detect-own (blocked-on:
+  W46.mixed-route). Not run: tech4humans signature detector (gated, 4 signature boxes), Qwen3.6-27B boxes (A-core only,
+  6 boxes), Claude inline tags (MRK-1). ArchiveOCRBench's marks note carries the detector's recall; the published copy
+  is behind. $0 money. Bench cache: kept `marks-detect/` (444 KB: PP boxes, Core ML boxes and timing, the crop
+  readings the report scores, private); moved the Core ML package, the best.pt copy and the 48 crops to the Trash
+  (rebuildable in seconds); the SignverOD shards were already gone. The cluster artifact
+  (`$AGENT_STATE/artifacts/marks-detect-20261104`, with best.pt and public.json) is kept for W46.marks-detect-own and
+  W46.mixed-route.
+  <!-- /W46.marks-detect -->

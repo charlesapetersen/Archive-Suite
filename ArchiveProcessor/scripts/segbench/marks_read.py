@@ -213,7 +213,8 @@ def report():
                                   read=sum(1 for _, m, v, _ in got if cls[m] == c and v >= READ))
                           for c in sorted(set(cls.values()))})
     lt = [json.loads(f.read_text())["wall_s"] for f in (WORK / "lighton").glob("*.json")]
-    meta = dict(crops=len(list(CROPS.glob("*.png"))), lighton_median_s=round(sorted(lt)[len(lt) // 2], 2) if lt else None)
+    crops = {crop_name(mid.split("#")[0], b) for rows in plan().values() for mid, b in rows.items() if b is not None}
+    meta = dict(crops=len(crops), lighton_median_s=round(sorted(lt)[len(lt) // 2], 2) if lt else None)
     (RESULTS / "marks-read.json").write_text(json.dumps(dict(meta=meta, arms=res), indent=1) + "\n")
     (RESULTS / "marks-read.md").write_text(markdown(res, meta))
     print(json.dumps({k: (v["read"], v["marks"], v["mean_nes"]) for k, v in res.items()}))
