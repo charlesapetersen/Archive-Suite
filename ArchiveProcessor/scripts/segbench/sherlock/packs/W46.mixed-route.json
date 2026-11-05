@@ -1,0 +1,27 @@
+{
+  "tag": "W46.mixed-route",
+  "pack": "mixed-route-20261105",
+  "mac": "artifacts/mixed-route-20261105",
+  "submit": "support/mixed-route/submit.sh",
+  "jobs": 3,
+  "gpu_hours": 3.0,
+  "review": "execution-plans/items/W46.mixed-route.md",
+  "imports": [
+    {"dir": ".", "modules": ["regions_cluster", "layout_photo_cluster", "mixed_route_cluster"]},
+    {"modules": ["vllm"]}
+  ],
+  "creates": [
+    "$FS_ROOT/mixed-route-20261105",
+    "$GROUP_HOME/$USER/archive-suite/sherlock-results/mixed-route-20261105"
+  ],
+  "provenance": [],
+  "requires": [
+    "$HF_HOME/hub/models--zai-org--GLM-OCR",
+    "$HF_HOME/hub/models--Qwen--Qwen3.6-27B-FP8",
+    "$FS_ROOT/open-sweep-20261019/glm-ocr/ocr/panel-prompt.txt",
+    "$FS_ROOT/interactive-20261018/ocr/panel-prompt.txt"
+  ],
+  "results": "$GROUP_HOME/$USER/archive-suite/sherlock-results/mixed-route-20261105",
+  "collect": ["$FS_ROOT/mixed-route-20261105/jobs.tsv", "$FS_ROOT/mixed-route-20261105/logs"],
+  "release": "GLM-OCR and Qwen3.6-27B receipts collected into the Mac artifact's out/; score with mixed_route.py report (it reads out/ in place)"
+}
