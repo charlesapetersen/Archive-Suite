@@ -37,6 +37,15 @@ per-page date truth, so this says only that the vendor's date answer is not a us
 The handwritten share of the text is 0.85 and 0.86 on the two pages tagged handwritten, 0.38 and 0.93 on the two
 mixed pages, and 0.00 to 0.05 on all 21 printed or typewritten pages: on this sample the flag separates the kinds.
 
+## Custom splitters, a price read (no run)
+
+List prices read 2026-11-04 from the vendors' pricing pages as quoted by search results, not checked against a
+bill: Google Document AI Custom Splitter (and custom classifier) $5 per 1,000 pages up to 1 million a month;
+Azure Document Intelligence custom classification $3 per 1,000 pages. Both need labelled training documents
+and a cloud project; Document AI has no account here. At the corpus's ~102k PDFs (~2 to 3 pages a document
+image on average) either is under $1.50 for a full pass, so price is not what rules them out; the open
+questions are accuracy on our boxes and sending the corpus off the Mac.
+
 ## Measurement card
 
 - **Truth:** the owner's 96 (`ocr_card.TRUTH_96`): drafted by Claude Opus 5.5 and Gemini 3.8 Flash, adjudicated by
