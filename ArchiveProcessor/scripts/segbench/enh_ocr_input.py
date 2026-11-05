@@ -212,7 +212,19 @@ def mac_arms():
     print('shading, gcdrnet, sbb ->', CACHE / 'images')
 
 
+# The probe's 30 as staged and read on 2026-10-22 (the pack's pages.json), lowest median NES first. W46.cards-dated:
+# probe_rule() on today's ocr-pages.csv gives a different 30 (its routes were rescored and re-read since), so a
+# regeneration that redrew them scored two pages nobody had read in place of two that were; the report reads this.
+PROBE_SET = ('p025', 'p009', 'p082', 'p018', 'p050', 'p013', 'p011', 'p078', 'p048', 'p054', 'p100', 'p049', 'p034',
+             'p046', 'p047', 'p081', 'p066', 'p024', 'p015', 'p069', 'p007', 'p080', 'p056', 'p027', 'p076', 'p053',
+             'p051', 'p040', 'p001', 'p062')
+
+
 def probe_pages():
+    return list(PROBE_SET)
+
+
+def probe_rule():
     """The PROBE_N pages with the lowest median NES over the saved routes (ocr-pages.csv), ties by page id."""
     by = collections.defaultdict(list)
     with (RESULTS / 'ocr-pages.csv').open() as f:
@@ -577,6 +589,26 @@ def report():
                                              'calls': len(GW.jobs()), 'cost_estimate': round(GW.spent(), 4),
                                              'price_assumed': GW.G.PRICE,
                                              'coverage': dict(gw_status) if gateway else None}}, indent=1) + '\n')
+    from ocr_card import card, TRUTH_96, DRAW_96, NOISE_96
+    L += ['', *card(
+        TRUTH_96 + ' Every table is scored on that truth as it stands when the report is generated.',
+        "The 96 as they are, no page chosen by an arm's result. " + DRAW_96 + ' The tag groups are '
+        "`capture-tags.json`'s defect tags, set without reading any arm. The probe's 30 are the pages with the lowest "
+        'median NES over the saved routes on 2026-10-22 (`PROBE_SET`), so they are chosen by the readers\' scores, '
+        'Vision\'s among them: the hardest pages, where restoration has the most to gain and the most room to invent.',
+        'Each arm against raw, one reader at a time, the same reader settings and the same truth, paired by page; '
+        'every arm keeps raw\'s size, so the regions and boxes found on raw apply to all. The Apple Vision arms are '
+        'macOS 26.6 readings (2026-10-22 to 28) paired with the 26.6 reading of raw, not with the bench\'s 27.2 '
+        'Vision route, and the suspect words use that 26.6 Vision text. Each Sherlock reader read raw again in the '
+        "same run. The 15 pages W46.truth-jpeg-upgrade later moved to their JPEG originals are their PDF images here, "
+        'raw included.',
+        'Paired 95% bootstrap intervals and permutation p on every row. ' + NOISE_96 + ' That floor is measured on '
+        "Gemini and Qwen, not Vision. The suspect gate's thresholds are set on these same pages (in-sample), so its "
+        'best threshold is optimistic; the probe has 30 pages and two seeds per method.',
+        "OCR input only: it does not judge a method's look as a reading copy. The Vision figures are 26.6's and do "
+        'not carry to the 27.2 route until the arms are re-read on one OS; the 96 hold no page Vision reads as empty, '
+        'so a method that rescues an unreadable page cannot show here. A reading that no method helps as OCR input '
+        '(the rule `enh-ocr-marks.md` builds on) holds for these readers and methods on these pages.')]
     REPORT.write_text('\n'.join(L) + '\n')
     print(REPORT)
 

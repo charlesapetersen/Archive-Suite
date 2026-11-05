@@ -778,6 +778,26 @@ def report(cluster_root=CLUSTER_ROOT):
                     'models': CLUSTER_MODELS, 'images_per_reader': len(cluster_jobs()), 'coverage': coverage},
         'chart_rows': chart_rows(by, everyone, ids),
         'uvdoc_benchmark': found.name if found.exists() else None, 'rows': bench}, indent=1) + '\n')
+    from ocr_card import card, TRUTH_96, DRAW_96, NOISE_96
+    L += ['', *card(
+        TRUTH_96 + ' Every table is scored on that truth as it stands when the report is generated.',
+        "The 96 as they are, no page chosen by an arm's result. " + DRAW_96 + ' The tag groups are '
+        "`capture-tags.json`'s defect tags, set without reading any arm. The hand crops are the six worst typed "
+        "originals on the saved routes' scores (`L-capture.md` claim 43), so they are chosen by low raw readings, "
+        "Vision's among them, and a crop's gain there is not a typical page's. The ladder "
+        "pages are the truth set's resolution ladder (`ocr-truth.md`).",
+        'Each arm against raw, one reader at a time, the same reader settings and the same truth, paired by page. '
+        'The Apple Vision arms are macOS 26.6 readings (2026-10-22) paired with the 26.6 reading of raw '
+        '(`lines/raw-26.6`), not with the bench\'s 27.2 Vision route. Each Sherlock reader read raw again in the same '
+        "run; Gemini's raw arm is W46.fix-ocr-scorers-paid's reading of the identical image. The arms were made from "
+        'the images of 2026-10-22, so the 15 pages W46.truth-jpeg-upgrade later moved to their JPEG originals are '
+        'their PDF images here, raw included.',
+        "Paired 95% bootstrap intervals and permutation p on every row. " + NOISE_96 + ' That floor is measured on '
+        "Gemini and Qwen; Vision's own swing on a near-identical image (reading order, p008) can be tens of points on "
+        'a page, and the tag groups are 10 to 52 pages.',
+        "OCR input only: it does not judge the reading copy's look. The figures are 26.6 Vision's and do not carry to "
+        "the 27.2 route until the arms are re-read on one OS; the 96 hold no page Vision reads as empty, so a dewarp "
+        'that rescues an unreadable page cannot show here.')]
     REPORT.write_text('\n'.join(L) + '\n')
     print(REPORT)
 

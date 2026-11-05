@@ -481,7 +481,7 @@ def cmd_draw(_):
         shutil.copyfile(CACHE / "prep" / f"{c['key']}.jpg", CACHE / "pages" / f"{c['page']}.jpg")
     draw = {"seed": SEED, "rule": __doc__.split("THE DRAW RULE")[1], "calibrate": cal, "pool_docs": len(docs),
             "pool_strata": pool, "files_per_collection": files_per_coll, "chosen": chosen,
-            "replaced": replaced, "failed": failed}
+            "replaced": replaced, "failed": failed, "drawn": time.strftime("%Y-%m-%d")}
     (CACHE / "draw.json").write_text(json.dumps(draw, indent=1))
     print(f"{len(chosen)} pages; {len(replaced)} replaced (under {MIN_WORDS} words); {len(failed)} failed")
 
@@ -860,7 +860,7 @@ def write_summary(draw, pages):
     ch = draw["chosen"]
     cal = draw["calibrate"]
     L = ["# W41.ocr-truth — the transcription truth set", "",
-         f"Drawn {time.strftime('%Y-%m-%d')} by `ArchiveProcessor/scripts/segbench/ocr_truth.py` (seed {draw['seed']}), "
+         f"Drawn {draw.get('drawn', '2026-10-14')} by `ArchiveProcessor/scripts/segbench/ocr_truth.py` (seed {draw['seed']}), "
          "read only on `Archival Photos` and `Archival Photos JPEGS`. The pages, their table, both drafts and the "
          "review sheet are outside git, under `~/Library/Caches/ArchiveSuiteRehearsal/ocr-truth/`; this file holds "
          "numbers only. The draw's rule is in the script's header, fixed before the draw ran.", "",
@@ -929,6 +929,22 @@ def write_summary(draw, pages):
               "(a kind of writing the two models agree on and the owner leaves alone counts as confirmed). The truth "
               "is a word sequence: line breaks and table bars are not kept, so a panel is scored on the words in "
               "order, with whitespace normalised (as socOCRbench's NES and chrF do)."]
+    # A truth report's card (W46.cards-dated): what the truth is, how its pages were chosen, what it cannot settle.
+    from ocr_card import card, TRUTH_96, DRAW_96, NOISE_96
+    L += ["", *card(
+        TRUTH_96 + " This report is that truth's construction; the 100 drawn pages hold the three agreement-only "
+                   "letters the 96 leave out.",
+        f"The draw rule in the script's header, fixed before it ran (seed {draw['seed']}, one page per document, "
+        "stratified by date and kind); no route's accuracy or ABBYY text chose a page, but Vision's word count did. "
+        + DRAW_96 + " The 15 PDF "
+        "images with a confirmed original were later replaced by their camera JPEGs (W46.truth-jpeg-upgrade, "
+        "2026-10-29); their truth was drafted from the PDF images, which favours a reading of those.",
+        "No route is scored here. The two drafters are the only readings: a span they wrote alike stands unchecked "
+        "unless a later blind sample reached it, so a route of either drafter's family can gain where the truth "
+        "shares its mistake.",
+        "The counts are of this one draft pair; the review time is an estimate. " + NOISE_96,
+        "A word sequence only, with no line breaks, layout or reading-order truth; 100 pages over 33 collections, "
+        "so no per-collection figure; only pages Vision could read.")]
     RESULTS.write_text("\n".join(L) + "\n")
 
 
