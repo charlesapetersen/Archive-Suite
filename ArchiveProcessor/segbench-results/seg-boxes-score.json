@@ -644,6 +644,237 @@
    "RG165": []
   }
  },
+ "newsletter_gaps": {
+  "box": "Stanton",
+  "source": "options.json's approaches, cached test-box answers, frozen rule and level",
+  "approaches": [
+   {
+    "id": "claude",
+    "label": "Claude only",
+    "rule": "min",
+    "level": 0.85,
+    "prompts": [
+     "w1"
+    ],
+    "magazine_rule": false,
+    "gaps": {
+     "101|102": {
+      "truth": "new",
+      "said": "continue",
+      "confidence": 0.675,
+      "flagged": true,
+      "votes": {
+       "C": [
+        "continue",
+        0.675
+       ]
+      }
+     },
+     "102|103": {
+      "truth": "new",
+      "said": "continue",
+      "confidence": 0.525,
+      "flagged": true,
+      "votes": {
+       "C": [
+        "continue",
+        0.525
+       ]
+      }
+     }
+    }
+   },
+   {
+    "id": "gemini",
+    "label": "Gemini only",
+    "rule": "min",
+    "level": 0.965,
+    "prompts": [
+     "g1"
+    ],
+    "magazine_rule": true,
+    "gaps": {
+     "101|102": {
+      "truth": "new",
+      "said": "continue",
+      "confidence": 0.985,
+      "flagged": false,
+      "votes": {
+       "G": [
+        "continue",
+        0.985
+       ]
+      }
+     },
+     "102|103": {
+      "truth": "new",
+      "said": "continue",
+      "confidence": 0.985,
+      "flagged": false,
+      "votes": {
+       "G": [
+        "continue",
+        0.985
+       ]
+      }
+     }
+    }
+   },
+   {
+    "id": "openai",
+    "label": "ChatGPT only",
+    "rule": "min",
+    "level": 0.99,
+    "prompts": [
+     "c1"
+    ],
+    "magazine_rule": false,
+    "gaps": {
+     "101|102": {
+      "truth": "new",
+      "said": "continue",
+      "confidence": 0.99,
+      "flagged": true,
+      "votes": {
+       "O": [
+        "continue",
+        0.99
+       ]
+      }
+     },
+     "102|103": {
+      "truth": "new",
+      "said": "continue",
+      "confidence": 0.99,
+      "flagged": true,
+      "votes": {
+       "O": [
+        "continue",
+        0.99
+       ]
+      }
+     }
+    }
+   },
+   {
+    "id": "mix",
+    "label": "Claude and ChatGPT together",
+    "rule": "min",
+    "level": 0.85,
+    "prompts": [
+     "c1",
+     "w1"
+    ],
+    "magazine_rule": false,
+    "gaps": {
+     "101|102": {
+      "truth": "new",
+      "said": "continue",
+      "confidence": 0.675,
+      "flagged": true,
+      "votes": {
+       "C": [
+        "continue",
+        0.675
+       ],
+       "O": [
+        "continue",
+        0.99
+       ]
+      }
+     },
+     "102|103": {
+      "truth": "new",
+      "said": "continue",
+      "confidence": 0.525,
+      "flagged": true,
+      "votes": {
+       "C": [
+        "continue",
+        0.525
+       ],
+       "O": [
+        "continue",
+        0.99
+       ]
+      }
+     }
+    }
+   },
+   {
+    "id": "glm",
+    "label": "GLM-5.3 Flash only (budget)",
+    "rule": "min",
+    "level": 0.925,
+    "prompts": [
+     "c1"
+    ],
+    "magazine_rule": false,
+    "gaps": {
+     "101|102": {
+      "truth": "new",
+      "said": "continue",
+      "confidence": 0.95,
+      "flagged": false,
+      "votes": {
+       "X:glm5.3-flash": [
+        "continue",
+        0.95
+       ]
+      }
+     },
+     "102|103": {
+      "truth": "new",
+      "said": "continue",
+      "confidence": 0.95,
+      "flagged": false,
+      "votes": {
+       "X:glm5.3-flash": [
+        "continue",
+        0.95
+       ]
+      }
+     }
+    }
+   },
+   {
+    "id": "local",
+    "label": "Corpus-trained Qwen3.5 2B on this Mac (no key)",
+    "rule": "min",
+    "level": 0.995,
+    "prompts": [
+     "c1"
+    ],
+    "magazine_rule": false,
+    "gaps": {
+     "101|102": {
+      "truth": "new",
+      "said": "new",
+      "confidence": 1.0,
+      "flagged": false,
+      "votes": {
+       "X:fs-seg-2b": [
+        "new",
+        1.0
+       ]
+      }
+     },
+     "102|103": {
+      "truth": "new",
+      "said": "new",
+      "confidence": 1.0,
+      "flagged": false,
+      "votes": {
+       "X:fs-seg-2b": [
+        "new",
+        1.0
+       ]
+      }
+     }
+    }
+   }
+  ]
+ },
  "gateway": {
   "calls": 546,
   "spent": 5.91978825,
@@ -661,5 +892,5 @@
   "mean_seconds": 16.028489010989013
  },
  "status": "complete",
- "note": "On held-out Sasha the shipped Mac 2B scores 89.7% on 175 known gaps (pages exact 37.4%), against the teacher's 67.4% and its bf16 source's 89.1%. The source's pages exact is 46.6%: similar gap accuracy can leave different long documents wrong, and these single runs do not rank quantizations. The Illustrated Review and SC0122 are trained-on diagnostics for the students, not evidence of generalization. SC0122's supported comparison is its owner-ruled disagreement gaps plus controls weighted to the agreed strata; document-exact scores there remain conditional on tag/teacher-drafted truth. Gemini 3.7 Flash scores 96.0% on held-out Sasha (pages exact 82.2%); paired against the Mac 2B it is 6.3 points ahead on gap accuracy (sign test p 0.019), and far ahead on whole documents. On the Illustrated Review it merges 40 article gaps, against the teacher's 21 and the students' 29-31; that g1 still asks for the full magazine issue (W46.seg-magazine-rule-redo) explains at most the excess over those, and its pages exact there is no test of reading ability. Across three offsets of Gemini 3.7 at the shipped route's 3.8-fitted rule and level, no-check exact pages range 83.0%\u201385.2% and checks per 100 pages 25.9\u201327.3; the shipped 3.8 route's own offset range is unmeasured. Its two unflagged errors are the re-ruled Stanton newsletter gaps 101|102 and 102|103, at every offset and for 3.8: a rule mismatch pending W46.seg-magazine-rule-redo, not reading error."
+ "note": "On held-out Sasha the shipped Mac 2B scores 89.7% on 175 known gaps (pages exact 37.4%), against the teacher's 67.4% and its bf16 source's 89.1%. The source's pages exact is 46.6%: similar gap accuracy can leave different long documents wrong, and these single runs do not rank quantizations. The Illustrated Review and SC0122 are trained-on diagnostics for the students, not evidence of generalization. SC0122's supported comparison is its owner-ruled disagreement gaps plus controls weighted to the agreed strata; document-exact scores there remain conditional on tag/teacher-drafted truth. Gemini 3.7 Flash scores 96.0% on held-out Sasha (pages exact 82.2%); paired against the Mac 2B it is 6.3 points ahead on gap accuracy (sign test p 0.019), and far ahead on whole documents. On the Illustrated Review it merges 40 article gaps, against the teacher's 21 and the students' 29-31; that g1 still asks for the full magazine issue (W46.seg-magazine-rule-redo) explains at most the excess over those, and its pages exact there is no test of reading ability. Across three offsets of Gemini 3.7 at the shipped route's 3.8-fitted rule and level, no-check exact pages range 83.0%\u201385.2% and checks per 100 pages 25.9\u201327.3; the shipped 3.8 route's own offset range is unmeasured. Its two unflagged errors are Stanton 101|102 and 102|103 at every offset and for 3.8: the newsletter gaps the owner re-ruled on 2026-10-31 under the article-within-issue rule, which every cloud route merges with or without the magazine rule (only Gemini's g1 carries it) and only the 2B trained on the owner's corpus splits; the prompt change (W46.seg-magazine-rule-redo) is the first thing to try and is unmeasured on these gaps."
 }

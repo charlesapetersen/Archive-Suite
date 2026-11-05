@@ -425,7 +425,7 @@ def cmd_score(a):
              "invalid": sum(not r.get("valid") for r in calls),
              "mean_seconds": sum(r.get("wall_s", 0) for r in calls) / max(1, len(calls))}
     out = {"tag": TAG, "observed": observed, "paired": paired, "sc0122_owner": sc, "offsets": off,
-           "gateway": usage, "status": "offline arms only; gateway and offsets pending" if a.local_only else "complete"}
+           "newsletter_gaps": None if a.local_only else newsletter_calls(), "gateway": usage, "status": "offline arms only; gateway and offsets pending" if a.local_only else "complete"}
     out["note"] = reading(out)
     stem = "seg-boxes-score-local" if a.local_only else "seg-boxes-score"
     (RESULTS / f"{stem}.json").write_text(json.dumps(out, indent=1) + "\n")
@@ -471,16 +471,17 @@ def reading(out):
     figures = [r["figures"] for r in out["offsets"]["rows"].values()]
     exact = [r["pages_exact_no_review"] for r in figures]
     flags = [r["flagged_per_100_pages"] for r in figures]
+    cause = newsletter_cause(out["newsletter_gaps"])
     return text + (f"Across three offsets of Gemini 3.7 at the shipped route's 3.8-fitted rule and level, no-check "
                    f"exact pages range {_p(min(exact))}–{_p(max(exact))} and checks per 100 pages "
                    f"{min(flags):.1f}–{max(flags):.1f}; the shipped 3.8 route's own offset range is unmeasured." +
-                   (" Its two unflagged errors are the re-ruled Stanton newsletter gaps 101|102 and 102|103, at every "
-                    "offset and for 3.8: a rule mismatch pending W46.seg-magazine-rule-redo, not reading error."
-                    if newsletter_only(out["offsets"]) else ""))
+                   (" Its two unflagged errors are Stanton 101|102 and 102|103 at every offset and for 3.8: " + cause + "."
+                    if newsletter_only(out["offsets"]) and cause else ""))
 
 
 # The Stanton gaps the owner re-ruled on 2026-10-31 under the article-within-issue rule (W46.seg-truth-sheet): the
-# newsletter issue 101-105 split at 101|102 and 102|103, which g1's rule 10 still tells the model to merge.
+# newsletter issue 101-105 split at 101|102 and 102|103. g1's rule 10 still tells the model to merge them, but every
+# cloud route merges them, rule or not (newsletter_calls; W46.seg-offsets-cause).
 NEWSLETTER_GAPS = {("Stanton", "101|102"), ("Stanton", "102|103")}
 
 
@@ -491,16 +492,16 @@ def wrong_sets(off):
     return {k: {(b, g["gap"]) for b, gs in v.items() for g in gs} for k, v in runs.items()}
 
 
-def unflagged_note(off):
+def unflagged_note(off, nl):
     sets = wrong_sets(off)
     same = len({frozenset(v) for v in sets.values()}) == 1
     listed = "; ".join(f"{k}: {', '.join(f'{b} {g}' for b, g in sorted(v)) or 'none'}" for k, v in sets.items())
     text = f"Unflagged errors, by gap: {listed}. "
-    if same and next(iter(sets.values())) == NEWSLETTER_GAPS:
-        text += ("Every run's are the same pair, both a confident continue (0.98-0.99): the newsletter gaps the owner "
-                 "re-ruled on 2026-10-31 under the article-within-issue rule, which g1's rule 10 still tells the model "
-                 "to merge. So the route's 2.8 unflagged errors per 500 pages, here and in options.md, is that rule "
-                 "mismatch pending W46.seg-magazine-rule-redo, not reading error, and \"after checking 98.5%\" is the "
+    cause = newsletter_cause(nl)
+    if same and next(iter(sets.values())) == NEWSLETTER_GAPS and cause:
+        text += ("Every run's are the same pair, both a confident continue (0.98-0.99): " + cause + ". So the "
+                 "route's 2.8 unflagged errors per 500 pages, here and in options.md, is the cloud models' own reading "
+                 "of those pages, which rule 10 agrees with rather than causes, and \"after checking 98.5%\" is the "
                  "same at every offset because the same confident pair is wrong every time. ")
     return text + ("The other approaches' unflagged errors in options.md, from its cached test-box answers at their "
                    "frozen levels (W46.seg-offsets-label): GLM-5.3 Flash's 3 are the same pair and Stanton 144|145; "
@@ -511,6 +512,75 @@ def unflagged_note(off):
 def newsletter_only(off):
     """True when every cloud run's unflagged errors are exactly the two re-ruled newsletter gaps."""
     return all(v == NEWSLETTER_GAPS for v in wrong_sets(off).values())
+
+
+# Each options.md approach's voter codes, as options.py and method_openrouter.py score them (W46.seg-offsets-cause).
+APPROACH_CODES = {"claude": ("C",), "gemini": ("G",), "openai": ("O",), "mix": ("C", "O"),
+                  "glm": ("X:glm5.3-flash",), "local": ("X:fs-seg-2b",)}
+MAGAZINE_RULE_PROMPTS = {"g1"}  # rule 10, the full-magazine rule (W46.seg-magazine-rule-redo)
+
+
+def newsletter_calls():
+    """Every options.md approach's decision, confidence and flag at the two newsletter gaps, from its cached
+    test-box answers at its frozen rule and level (no call)."""
+    import re
+    import ensemble as E
+    import options as O
+    import method_openrouter as R
+    base = E.voter_gaps
+
+    def voter_gaps(code, col):
+        if code.startswith("X:"):
+            return E._from_bounds(col, R.W.assemble(col, R.W.combine(col, R.judge(code[2:])), True))
+        return base(code, col)
+    aps = [a for a in json.loads(O.OUT_JSON.read_text())["approaches"] if a["id"] in APPROACH_CODES]
+    E.voter_gaps = voter_gaps
+    try:
+        box = E.Box(data.load("Stanton"), sorted({c for a in aps for c in APPROACH_CODES[a["id"]]}))
+    finally:
+        E.voter_gaps = base
+    wanted = sorted(int(g.split("|")[0]) - 1 for b, g in NEWSLETTER_GAPS)
+    rows = []
+    for a in aps:
+        S = APPROACH_CODES[a["id"]]
+        with O.rule(a["rule"]):
+            j = E.judge(box, S, a["level"])
+        prompts = sorted({m for v in a["voters"] for m in re.findall(r"prompt (\w+)", v)})
+        rows.append({"id": a["id"], "label": a["label"], "rule": a["rule"], "level": a["level"], "prompts": prompts,
+                     "magazine_rule": bool(MAGAZINE_RULE_PROMPTS & set(prompts)),
+                     "gaps": {f"{i + 1}|{i + 2}": {"truth": box.truth[i], "said": j[i][0],
+                                                     "confidence": round(j[i][2], 6), "flagged": j[i][1],
+                                                     "votes": {c: list(box.v[c][i]) for c in S}}
+                              for i in wanted}})
+    return {"box": "Stanton", "source": "options.json's approaches, cached test-box answers, frozen rule and level",
+            "approaches": rows}
+
+
+def newsletter_table(nl):
+    L = ["", "At the two newsletter gaps (truth: new at both), every options.md approach from its cached test-box "
+         "answers at its frozen rule and level (no call):", "",
+         "| approach | prompt | magazine rule | Stanton 101\\|102 | Stanton 102\\|103 |", "|---|---|---|---|---|"]
+    for a in nl["approaches"]:
+        cells = [f"{g['said']} {g['confidence']:.3f}, {'flagged' if g['flagged'] else 'accepted'}"
+                 for g in a["gaps"].values()]
+        L.append(f"| {a['label']} | {', '.join(a['prompts'])} | {'yes' if a['magazine_rule'] else 'no'} | "
+                 f"{' | '.join(cells)} |")
+    return L
+
+
+def newsletter_cause(nl):
+    """The two gaps' cause as the cached answers show it, or None when they no longer show it."""
+    rows = {a["id"]: a for a in nl["approaches"]}
+    cloud = [a for k, a in rows.items() if k != "local"]
+    merged = all(g["said"] == "continue" for a in cloud for g in a["gaps"].values())
+    local_splits = "local" in rows and all(g["said"] == "new" for g in rows["local"]["gaps"].values())
+    ruled = [a for a in cloud if a["magazine_rule"]]
+    if not (merged and local_splits and len(ruled) < len(cloud)):
+        return None
+    return ("the newsletter gaps the owner re-ruled on 2026-10-31 under the article-within-issue rule, which every "
+            "cloud route merges with or without the magazine rule (only Gemini's g1 carries it) and only the 2B "
+            "trained on the owner's corpus splits; the prompt change (W46.seg-magazine-rule-redo) is the first thing "
+            "to try and is unmeasured on these gaps")
 
 
 def offset_spread(out):
@@ -631,7 +701,7 @@ def render(out) -> str:
         for b, f in off["gemini38_o0_by_box"].items():
             L.append(f"| 3.8 o0 | {b} | {_p(f['pages_exact_no_review'])} | {f['flagged_per_100_pages']:.1f} | "
                      f"{_p(f['pages_exact_after_review'])} | {f['unflagged_errors']} |")
-        L += ["", unflagged_note(off)]
+        L += ["", unflagged_note(off, out["newsletter_gaps"])] + newsletter_table(out["newsletter_gaps"])
     L += ["", "## Reading", "", out["note"], ""]
     L += seg_card.card(
         truth="The three locked boxes' truths (Sasha owner-ruled from label tags, locked 2026-10-30; the Illustrated "
@@ -659,7 +729,8 @@ def render(out) -> str:
         scope=("Only the three owner boxes scored; the two test boxes' cloud offsets remain pending. "
                if out["offsets"] is None else "Three owner boxes and two test boxes. ") +
               "It does not settle a prompt change for the article-within-issue "
-              "rule (g1 still says full magazine: W46.seg-magazine-rule-redo), 3.8 against 3.7 on these boxes, the "
+              "rule (g1 still says full magazine: W46.seg-magazine-rule-redo; no route has been run on these gaps "
+              "with a prompt that states the new rule), 3.8 against 3.7 on these boxes, the "
               "shipped 3.8 route's own offset range (the gateway serves only 3.7), or a level fitted for 3.7.")
     return "\n".join(L) + "\n"
 

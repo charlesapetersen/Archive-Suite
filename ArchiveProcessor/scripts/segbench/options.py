@@ -837,8 +837,11 @@ def render(out: dict) -> str:
               "every figure here is on a fixed truth. Levels and the mix rule were frozen on the owner's development "
               "boxes (Dean, Deaver, Herrnstein). Gemini only's 2 unflagged errors (2.8 per 500 pages) are Stanton "
               "101|102 and 102|103, the newsletter gaps the owner re-ruled on 2026-10-31 under the "
-              "article-within-issue rule, which g1's rule 10 still tells the model to merge: a rule mismatch pending "
-              "W46.seg-magazine-rule-redo, not reading error. GLM-5.3 Flash's 3 are that pair and 144|145; Claude's "
+              "article-within-issue rule. Every cloud route merges them with or without the magazine rule (only g1's "
+              "rule 10 states it; Claude and ChatGPT merge them flagged, GLM-5.3 Flash accepted), and only the 2B "
+              "trained on the owner's corpus splits them (seg-boxes-score.json, newsletter_gaps), so they are the "
+              "cloud models' own reading of those pages; the prompt change (W46.seg-magazine-rule-redo) is the first "
+              "thing to try and is unmeasured on these gaps. GLM-5.3 Flash's 3 are that pair and 144|145; Claude's "
               "3 (Stanton 124|125 and 144|145, RG 165 99|100) and the Mac 2B's 1 (a false split at Stanton 108|109) "
               "do not include it (W46.seg-offsets-label, from the cached answers).",
         selection="Whole boxes chosen before these routes existed; the approaches are the ones the app offers, not "
@@ -851,8 +854,8 @@ def render(out: dict) -> str:
               "no-review column. Gemini 3.8's five figures have no measured window-offset range: the gateway serves "
               "only 3.7, whose range at this 3.8-fitted level is in seg-boxes-score.md (83.0%-85.2% no checking).",
         scope="The figures the Processor shows for one archive's two locked boxes (363 pages). Not other material "
-              "(Lincoln, CREST and the locked new boxes wait for W46.seg-boxes-score), and not a forecast for a "
-              "user's own corpus.")
+              "(the three locked owner boxes are scored in seg-boxes-score.md; Lincoln and CREST are not scored "
+              "here), and not a forecast for a user's own corpus.")
     text = "\n".join(L) + "\n"
     OUT_MD.write_text(text)
     return text
