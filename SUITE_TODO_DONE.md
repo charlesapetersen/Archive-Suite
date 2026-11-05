@@ -14194,3 +14194,17 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
 - [x] ** · §Nice-to-have, end of project — W46 (owner, 2026-10-22) · RETIRED by the owner 2026-11-04, not run`W46.ent-robust-paid` — Gemini on the scans and on G17 [S]** (lane: segbench) (uses: light,paid) (blocked-on: W46.nice-to-have, W46.ent-robust, W46.gateway-models-ok) — The gateway arm of W46.ent-robust, about $0.50. detail: execution-plans/processing-review/10-gap-audit.md §5 item 32 **Measurement audit (2026-10-30, `execution-plans/processing-review/11-measurement-audit.md`):** moved behind W46.nice-to-have: Gemini's names on the route already match the truth-text names at 0.96; it would not change a decision.
   - **Retired (owner, 2026-11-04):** "Let's get rid of the items behind the gate." It sat behind `W46.nice-to-have` as information or bench-page work that, measured, changes no pick or default; the four items that could change a pipeline step or a wizard rule were promoted the same day (efae556a). Not run; nothing waited on it.
   <!-- /W46.ent-robust-paid -->
+- [x] **W46.r6-spot — vendor layout, HTR and splitter spot checks with personal keys [S]** · §Document processing review — W46 (owner, 2026-10-20) (lane: segbench) (uses: light,paid) — Azure Document Intelligence and Textract on 25 of the 96, Transkribus if credits exist, a price read of the custom splitters, one vendor date entity; about $1.50, personal keys (root CLAUDE.md: what the gateway cannot serve). detail: execution-plans/processing-review/10-gap-audit.md §5 item 39 SHIPPED 2026-11-04.
+  Result (`ArchiveProcessor/segbench-results/r6-spot.md`, script `segbench/r6_spot.py`): on 25 seeded pages of the
+  96, Azure DI prebuilt-layout 89.6 NES and Textract LAYOUT 86.6 (raw line order 83.4), against Mistral OCR 4.1's
+  92.5 and the best panel route's 96.4 on the same pages; paired vs Mistral, Azure -2.9 (-6.3 to -0.2), Textract
+  -5.8 (a tie at n = 25). Textract's date query: a year in 13 of 25, inside the tagged range on 7 of 12. Azure's
+  isHandwritten share separated handwritten and mixed pages (0.38-0.93) from print (0.00-0.05) on this sample.
+  Custom splitters, price read only: Document AI $5, Azure custom classification $3 per 1,000 pages at list.
+  Document AI not run (no account). Transkribus has no API access on the owner's plan: its hand-upload pack is
+  built and scoring moved to W46.r6-spot-transkribus behind its owner gate. Money: $0.475 Textract at list;
+  Azure on F0, $0. Bench page: a spot-check panel (`ArchiveOCRBench/data/r6-spot.json`); the published copy is
+  now behind. Cache kept in `~/Library/Caches/ArchiveSuiteRehearsal/r6-spot/` (~25 replies each, selection,
+  ledger, the Transkribus pack): small, not rebuildable without paying again, and the follow-up reads it.
+  Run with `uv run --no-project --with-requirements ocr-panel-requirements.txt python r6_spot.py …`.
+  <!-- /W46.r6-spot -->

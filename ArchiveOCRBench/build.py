@@ -49,6 +49,7 @@ STUDENTS_MD = RESULTS / "seg-students.md"  # W41.seg-finetune: the fine-tuned 4B
 TEACHER_MD = RESULTS / "seg-teacher.md"  # W41.seg-27b-test: the FarmShare teacher, scored as cheap-models.md scores
 INPUTS = HERE / "data" / "inputs.json"
 HANDWRITING = HERE / "data" / "vision-ocr-handwriting.json"
+R6_SPOT = HERE / "data" / "r6-spot.json"
 KIND_CLASSIFIER = RESULTS / "kind-classifier.json"  # W41.bench-kind-classifier: kind_classifier.py report
 KIND_ATRIUM = RESULTS / "kind-atrium.json"  # W46.kind-mixed-support: covered estimates and full-call bounds
 DATING = RESULTS / "date-tagging.json"  # W41.date-tag-measure: date_tagging.py score
@@ -1248,7 +1249,7 @@ def main():
             elif k.removesuffix("-nothink") in op["models"]:
                 sys.exit(f"dating model {k} has an OpenRouter price but no token means in inputs.json")
     pub = public()
-    built = {"routes": routes, "table_only": extra, "charts": charts, "segmentation": segmentation(op), "handwriting": handwriting(),
+    built = {"routes": routes, "table_only": extra, "charts": charts, "segmentation": segmentation(op), "handwriting": handwriting(), "r6_spot": json.loads(R6_SPOT.read_text()),
              "farmshare": farmshare(op, own["routes"]), "difficulty": diff, "headline": headline(routes), "rerun_noise": rerun_noise(),
              "regions_orderfree": regions_orderfree(), "public_segmentation": public_segmentation(),
              "kind_classifier": json.loads(KIND_CLASSIFIER.read_text()) if KIND_CLASSIFIER.exists() else None,

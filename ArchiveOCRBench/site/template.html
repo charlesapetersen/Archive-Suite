@@ -203,6 +203,11 @@ footer p { font-size: 13px; }
     <div class="tbl"><table><thead><tr><th>Reader</th><th></th><th>Missed per 1,000</th><th>Added words</th><th>Passes the bar</th><th>Seconds a page</th><th>Peak memory</th><th>Download</th></tr></thead><tbody id="hw-rows"></tbody></table></div>
     <p class="note">A different truth set and a different score from part 1, so these numbers do not compare with NES. Missed words are truth words the reader did not produce; added words are words it produced that match no truth word. The pick rule was set before the run: of the readers that pass, take the fewest missed, but where two are within 20 per 1,000, take the smaller and faster. Qwen3.5-9B and LightOnOCR-3-4B are 5 apart, so LightOnOCR-3-4B, which is nearly twice as fast, is the pick (owner confirmed 2026-10-15, Vision OCR commit 168af14). Churro's added words come from one page that looped. Both are also on part 1's charts as Mac routes (◇), read on the panel's truth set and scored by NES like every route: on its <a href="#handwritten">handwritten chart</a> LightOnOCR-3-4B scores 89.67 and Qwen3.5-9B 87.92 at 4-bit (90.92 hosted). As read, neither model returns word positions, and the app's alignment places only 65% of their words, so handwritten pages will get a separate text page. <span id="hw-source"></span></p>
   </section>
+  <section class="panel" id="r6-spot">
+    <div class="head"><h2>Commercial document services, a spot check</h2><span class="meta" id="r6-meta"></span></div>
+    <div class="tbl"><table><thead><tr><th>Route</th><th></th><th>NES</th><th>Per 1,000 pages</th></tr></thead><tbody id="r6-rows"></tbody></table></div>
+    <p class="note" id="r6-note"></p>
+  </section>
 
   <header class="part" id="farmshare">
     <div class="eyebrow">Part 4 · Open-weight models on FarmShare · L40S GPUs</div>
@@ -804,6 +809,15 @@ document.getElementById('hw-rows').innerHTML = HW.readers.map(r => '<tr class="'
   '</td><td>' + gb(r.download_gb) + '</td></tr>').join('') +
   HW.reference.map(r => '<tr><td>' + r.name + '</td><td>today</td><td>' + r.missed + '</td><td>' + r.added.toLocaleString() + '</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>').join('');
 document.getElementById('hw-source').innerHTML = 'Source: <a href="' + HW.source.url + '">' + HW.source.file + '</a> (Vision OCR, commit ' + HW.source.commit + ').';
+
+// Commercial document services, a 25-page spot check (W46.r6-spot).
+const R6 = DATA.r6_spot;
+document.getElementById('r6-meta').textContent = R6.pages + ' of the 96, seeded draw';
+document.getElementById('r6-rows').innerHTML = R6.rows.map(r => '<tr><td>' + r.route + '</td><td>' + r.kind + '</td><td>' + r.nes.toFixed(1) +
+  '</td><td>' + (r.usd_1000 ? money(r.usd_1000) + ' (' + r.price_note + ')' : '') + '</td></tr>').join('');
+document.getElementById('r6-note').textContent = 'Same pages, same scorer; panel routes are their stored panel replies on these ' + R6.pages + '. Against Mistral OCR 4.1, paired: Azure ' +
+  R6.vs_mistral.azure[0] + ' NES points (' + R6.vs_mistral.azure[1] + ' to ' + R6.vs_mistral.azure[2] + '), Textract ' + R6.vs_mistral.textract[0] + ' (' +
+  R6.vs_mistral.textract[1] + ' to ' + R6.vs_mistral.textract[2] + ', a tie at this n). A spot check, not on the 96 charts. Source: ' + R6.source + '.';
 
 // Part 4: FarmShare.
 const FS = DATA.farmshare;
