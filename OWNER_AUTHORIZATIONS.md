@@ -522,3 +522,15 @@ trusted owner consent; automatic approval review remains in place.
   as their reader, so it is not a viewer the app targets. W46.place-print closes on the four measured
   viewers (PDFKit, poppler, mupdf, pdf.js) and its report says Acrobat Reader was not checked, by owner
   decision. The blind Acrobat sheet is scratch.
+
+## 2026-11-04 evening — W46.r6-spot credentials ready; Transkribus by hand
+
+- **Azure and AWS Textract:** set up by the owner and verified with free, no-page calls. Keychain service
+  `com.archiveprocessor.app`: `Azure DI` and `Azure DI endpoint` (F0 free tier); `AWS Textract key id` and
+  `AWS Textract` (IAM user `archive-suite-textract`, Textract-only policy, region us-east-2). The owner
+  directed in chat that both arms run on the item's 25 pages, which sends those page images to
+  Azure Document Intelligence and AWS Textract. Gate `W46.r6-spot-owner-ok` is ticked.
+- **Transkribus:** the owner's Stanford-plan account signs in but the processing API returns 401, so no API
+  arm. A session prepares a hand-upload pack of the same 25 images and an instruction sheet, and files
+  `W46.r6-spot-transkribus-owner-ok`; the owner uploads them in the web app (Text Titan II with layout),
+  exports PAGE XML beside the pack, and the next session scores it. Free credits only, no purchase.
