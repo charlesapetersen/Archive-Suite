@@ -77,6 +77,7 @@ LOGPROB = RESULTS / "ocr-logprob.json"  # W46.ocr-logprob: ocr_logprob.py report
 LAYOUT_ORDER = RESULTS / "layout-order.json"  # W46.layout-order: layout_order.py run, ordering with detection fixed
 LAYOUT_ORDER_MARKS = RESULTS / "layout-order-marks.json"  # W46.layout-order-marks: the 96 and the marks core
 MARKS_DETECT = RESULTS / "marks-detect.json"  # W46.marks-detect: marks_detect.py report, trained marks detectors
+MIXED_ROUTE = RESULTS / "mixed-route.json"    # W46.mixed-route: mixed_route.py report, marks read whole page or by box
 LAYOUT_ORDER_PAID = RESULTS / "layout-order-paid.json"  # W46.layout-order-paid: Gemini 3.7 Flash's blocks in its order
 LAYOUT_PHOTO = RESULTS / "layout-photo.json"  # W46.layout-photo: layout_photo.py score, four detectors feeding GLM-OCR
 RERUN_NOISE = RESULTS / "ocr-rerun-noise.json"  # W46.ocr-rerun-noise: ocr_rerun_noise.py report, the 96 read three times
@@ -955,7 +956,25 @@ def marks_detect():
     cell = lambda r, p: f'{r["found"]} ({100 * r["rate"]:.0f}%, interval {100 * r["ci"][0]:.0f}-{100 * r["ci"][1]:.0f}) at {100 * p:.0f}% precision'
     a = d["score"]["hit"]["all"]
     low = d["sweep"][0]["hit"]
-    return {"detector": cell(a["recall"], a["precision"]), "detector_low": cell(low["recall"], low["precision"])}
+    return {"detector": cell(a["recall"], a["precision"]), "detector_low": cell(low["recall"], low["precision"]),
+            **mixed_route()}
+
+
+MIXED_READERS = {"lighton": "LightOnOCR-3 4B", "vision": "Apple Vision", "glm": "GLM-OCR", "qwen27": "Qwen3.6-27B"}
+
+
+def mixed_route():
+    """W46.mixed-route: each reader's marks read (NES >= 0.8) given the whole page and given the owner's box."""
+    if not MIXED_ROUTE.exists():
+        return {}
+    d = json.loads(MIXED_ROUTE.read_text())
+    rows = []
+    for key, name in MIXED_READERS.items():
+        w, b = d["whole"].get(key, {}), d["region"].get(f"{key}/oracle")
+        if "read" not in w or b is None:
+            continue
+        rows.append(f'{name} {w["read"]} of {w["n"]} given the whole page, {b["read"]} from the owner\'s box')
+    return {"mixed_read": "; ".join(rows)} if rows else {}
 
 
 LAYOUT_PHOTO_ARMS = {"yolo_appsort": "DocLayout-YOLO regions, the app's sort", "heron": "docling-layout-heron regions",

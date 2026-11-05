@@ -291,7 +291,7 @@ def lines():
 # ---------------------------------------------------------------- marks in the text layer
 
 LAYER_BIN = WORK / "bin" / "mixed-route-layer"
-FORMS = {"run": "a labelled invisible run at the mark's box", "annot": "a FreeText annotation over the box",
+FORMS = {"none": "no marks (the control)", "run": "a labelled invisible run at the mark's box", "annot": "a FreeText annotation over the box",
          "textpage": "a text page after the image"}
 
 
@@ -438,6 +438,7 @@ def report():
         s["words_mean"] = round(sum(r["words"] for r in w["rows"]) / len(w["rows"]), 3)
         s["null_read_mean"] = round(sum(r["read_share"] for r in w["null"]) / len(w["null"]), 4)
         s["null_marks_any"] = sum(r["nes_max"] >= R.READ for r in w["null"])
+        s["read_also_elsewhere"] = sum(r["nes"] >= R.READ and n["nes_max"] >= R.READ for r, n in zip(w["rows"], w["null"]))
         s["null_words_mean"] = round(sum(r["words_mean"] for r in w["null"]) / len(w["null"]), 3)
         s["by_class"] = {c: dict(n=sum(cls[r["mark"]] == c for r in w["rows"]),
                                  read=sum(cls[r["mark"]] == c and r["nes"] >= R.READ for r in w["rows"]))
@@ -466,6 +467,13 @@ def report():
     lf = WORK / "lines.json"
     if lf.exists():
         res["lines"] = score_lines(json.loads(lf.read_text()))
+    yf = WORK / "layer.json"
+    if yf.exists():
+        got = json.loads(yf.read_text())
+        res["layer"] = {form: {k: sum(r[k] for g in got.values() for r in g[form])
+                               for k in ("found", "placed", "selected", "extracted", "spotlight")}
+                        for form in FORMS}
+        res["layer_marks"] = sum(len(g["run"]) for g in got.values())
     (RESULTS / "mixed-route.json").write_text(json.dumps(res, indent=1) + "\n")
     (RESULTS / "mixed-route.md").write_text(markdown(res, len(todo)))
     print(json.dumps({k: (v.get("read"), v.get("n")) for k, v in res["whole"].items()}))
@@ -519,7 +527,8 @@ def markdown(res, n):
             continue
         L.append(f"| {WHOLE[reader]} | {pct(s['read'], s['n'])}{ci(s['read_ci'])} | {s['mean_nes']:.2f}"
                  f"{ci(s['mean_ci'], 1, '{:.2f}')} | {s['words_mean'] * 100:.0f}% | "
-                 f"{s['null_read_mean'] * 100:.1f}% a page; {s['null_marks_any']} marks on at least one |")
+                 f"{s['null_read_mean'] * 100:.1f}% a page; {s['null_marks_any']} marks on at least one, "
+                 f"{s['read_also_elsewhere']} of them among its reads |")
     for key, s in res["region"].items():
         reader, arm = key.split("/")
         L.append(f"| {REGION[reader]}, {R.ARM_NAMES[arm]} | {pct(s['read'], s['n'])}{ci(s['read_ci'])} | "
@@ -558,6 +567,20 @@ def markdown(res, n):
             f = lambda d: "n/a" if d["auc"] is None else f"{d['auc']:.2f}{ci(d['ci'], 1, '{:.2f}')}"
             L.append(f"| {name} | {o['hand']} ({o['measured_hand']} measured) | {o['typed']} ({o['measured_typed']} "
                      f"measured) | {o['pages_with_hand']} | {f(o['periodic'])} | {f(o['harmonic'])} | {f(o['height'])} |")
+    if res.get("layer"):
+        k = res["layer_marks"]
+        L += ["", "## Marks in the text layer", "",
+              f"The same {k} marks written into a scratch PDF of each page (the page image, Vision's lines as the body's "
+              "invisible text; `mixed_route_layer.swift`). *Found*: PDFKit `findString`, case-insensitive, the call the "
+              "Reader's Find makes; *placed*: a hit on the image page that meets the mark's box; *selected*: a drag over "
+              "the box selects the text; *extracted*: in `PDFDocument.string`; *Spotlight*: in the text Spotlight's PDF "
+              "importer takes (`mdimport -t`, nothing indexed). The control row has no marks: what it finds is the print "
+              "agreeing with a mark.", "",
+              "| Form | Found | Placed | Selected | Extracted | Spotlight |", "|---|---:|---:|---:|---:|---:|"]
+        for form, name in FORMS.items():
+            v = res["layer"][form]
+            L.append(f"| {name} | " + " | ".join(f"{v[c]} of {k}" for c in
+                                                ("found", "placed", "selected", "extracted", "spotlight")) + " |")
     notes = Path(__file__).resolve().parent / "mixed_route_notes.md"
     if notes.exists():
         L += [""] + notes.read_text().splitlines()

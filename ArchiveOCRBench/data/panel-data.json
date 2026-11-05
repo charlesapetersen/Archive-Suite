@@ -66199,7 +66199,8 @@
    "yolo_pics": "26 (58%)",
    "pp": "3 (7%)",
    "detector": "8 (18%, interval 5-37) at 53% precision",
-   "detector_low": "17 (38%, interval 21-60) at 42% precision"
+   "detector_low": "17 (38%, interval 21-60) at 42% precision",
+   "mixed_read": "LightOnOCR-3 4B 16 of 35 given the whole page, 17 from the owner's box; Apple Vision 14 of 35 given the whole page, 13 from the owner's box"
   },
   "gemini": {
    "cost": 1.68,

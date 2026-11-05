@@ -1,0 +1,377 @@
+{
+ "whole": {
+  "vision": {
+   "n": 35,
+   "read": 14,
+   "read_ci": [
+    0.241,
+    0.56
+   ],
+   "mean_nes": 0.658,
+   "mean_ci": [
+    0.58,
+    0.746
+   ],
+   "words_mean": 0.394,
+   "null_read_mean": 0.0166,
+   "null_marks_any": 8,
+   "read_also_elsewhere": 1,
+   "null_words_mean": 0.082,
+   "by_class": {
+    "annotation": {
+     "n": 14,
+     "read": 5
+    },
+    "marginal_note": {
+     "n": 10,
+     "read": 1
+    },
+    "other": {
+     "n": 2,
+     "read": 2
+    },
+    "stamp": {
+     "n": 9,
+     "read": 6
+    }
+   }
+  },
+  "lighton": {
+   "n": 35,
+   "read": 16,
+   "read_ci": [
+    0.226,
+    0.636
+   ],
+   "mean_nes": 0.579,
+   "mean_ci": [
+    0.327,
+    0.756
+   ],
+   "words_mean": 0.408,
+   "null_read_mean": 0.0166,
+   "null_marks_any": 8,
+   "read_also_elsewhere": 1,
+   "null_words_mean": 0.076,
+   "by_class": {
+    "annotation": {
+     "n": 14,
+     "read": 7
+    },
+    "marginal_note": {
+     "n": 10,
+     "read": 2
+    },
+    "other": {
+     "n": 2,
+     "read": 1
+    },
+    "stamp": {
+     "n": 9,
+     "read": 6
+    }
+   },
+   "median_s": 24.42,
+   "length_capped": 0
+  },
+  "glm": {
+   "missing": 32
+  },
+  "qwen27": {
+   "missing": 32
+  }
+ },
+ "region": {
+  "vision/oracle": {
+   "n": 35,
+   "read": 13,
+   "read_ci": [
+    0.219,
+    0.581
+   ],
+   "mean_nes": 0.593,
+   "mean_ci": [
+    0.496,
+    0.734
+   ],
+   "by_class": {
+    "annotation": {
+     "n": 14,
+     "read": 4
+    },
+    "marginal_note": {
+     "n": 10,
+     "read": 1
+    },
+    "other": {
+     "n": 2,
+     "read": 2
+    },
+    "stamp": {
+     "n": 9,
+     "read": 6
+    }
+   }
+  },
+  "vision/det25": {
+   "n": 35,
+   "read": 2,
+   "read_ci": [
+    0.0,
+    0.16
+   ],
+   "mean_nes": 0.119,
+   "mean_ci": [
+    0.017,
+    0.272
+   ],
+   "by_class": {
+    "annotation": {
+     "n": 14,
+     "read": 2
+    },
+    "marginal_note": {
+     "n": 10,
+     "read": 0
+    },
+    "other": {
+     "n": 2,
+     "read": 0
+    },
+    "stamp": {
+     "n": 9,
+     "read": 0
+    }
+   }
+  },
+  "vision/det05": {
+   "n": 35,
+   "read": 5,
+   "read_ci": [
+    0.038,
+    0.318
+   ],
+   "mean_nes": 0.234,
+   "mean_ci": [
+    0.112,
+    0.418
+   ],
+   "by_class": {
+    "annotation": {
+     "n": 14,
+     "read": 4
+    },
+    "marginal_note": {
+     "n": 10,
+     "read": 0
+    },
+    "other": {
+     "n": 2,
+     "read": 0
+    },
+    "stamp": {
+     "n": 9,
+     "read": 1
+    }
+   }
+  },
+  "lighton/oracle": {
+   "n": 35,
+   "read": 17,
+   "read_ci": [
+    0.3,
+    0.742
+   ],
+   "mean_nes": 0.619,
+   "mean_ci": [
+    0.474,
+    0.819
+   ],
+   "by_class": {
+    "annotation": {
+     "n": 14,
+     "read": 4
+    },
+    "marginal_note": {
+     "n": 10,
+     "read": 5
+    },
+    "other": {
+     "n": 2,
+     "read": 2
+    },
+    "stamp": {
+     "n": 9,
+     "read": 6
+    }
+   }
+  },
+  "lighton/det25": {
+   "n": 35,
+   "read": 4,
+   "read_ci": [
+    0.0,
+    0.286
+   ],
+   "mean_nes": 0.147,
+   "mean_ci": [
+    0.021,
+    0.342
+   ],
+   "by_class": {
+    "annotation": {
+     "n": 14,
+     "read": 1
+    },
+    "marginal_note": {
+     "n": 10,
+     "read": 3
+    },
+    "other": {
+     "n": 2,
+     "read": 0
+    },
+    "stamp": {
+     "n": 9,
+     "read": 0
+    }
+   }
+  },
+  "lighton/det05": {
+   "n": 35,
+   "read": 6,
+   "read_ci": [
+    0.043,
+    0.394
+   ],
+   "mean_nes": 0.249,
+   "mean_ci": [
+    0.108,
+    0.48
+   ],
+   "by_class": {
+    "annotation": {
+     "n": 14,
+     "read": 3
+    },
+    "marginal_note": {
+     "n": 10,
+     "read": 3
+    },
+    "other": {
+     "n": 2,
+     "read": 0
+    },
+    "stamp": {
+     "n": 9,
+     "read": 0
+    }
+   }
+  }
+ },
+ "paired": {
+  "vision": {
+   "whole_only": 4,
+   "crop_only": 3,
+   "both": 10,
+   "neither": 18
+  },
+  "lighton": {
+   "whole_only": 7,
+   "crop_only": 8,
+   "both": 9,
+   "neither": 11
+  }
+ },
+ "lines": {
+  "all": {
+   "hand": 51,
+   "typed": 1846,
+   "measured_hand": 50,
+   "measured_typed": 1823,
+   "pages_with_hand": 15,
+   "periodic": {
+    "auc": 0.486,
+    "ci": [
+     0.381,
+     0.602
+    ]
+   },
+   "harmonic": {
+    "auc": 0.555,
+    "ci": [
+     0.459,
+     0.669
+    ]
+   },
+   "height": {
+    "auc": 0.87,
+    "ci": [
+     0.722,
+     0.947
+    ]
+   }
+  },
+  "15+": {
+   "hand": 20,
+   "typed": 1448,
+   "measured_hand": 20,
+   "measured_typed": 1448,
+   "pages_with_hand": 7,
+   "periodic": {
+    "auc": 0.32,
+    "ci": [
+     0.092,
+     0.402
+    ]
+   },
+   "harmonic": {
+    "auc": 0.329,
+    "ci": [
+     0.087,
+     0.456
+    ]
+   },
+   "height": {
+    "auc": 0.919,
+    "ci": [
+     0.714,
+     0.99
+    ]
+   }
+  },
+  "unlabelled": 37,
+  "lines": 1934
+ },
+ "layer": {
+  "none": {
+   "found": 3,
+   "placed": 2,
+   "selected": 3,
+   "extracted": 4,
+   "spotlight": 4
+  },
+  "run": {
+   "found": 35,
+   "placed": 35,
+   "selected": 35,
+   "extracted": 35,
+   "spotlight": 35
+  },
+  "annot": {
+   "found": 3,
+   "placed": 2,
+   "selected": 3,
+   "extracted": 4,
+   "spotlight": 4
+  },
+  "textpage": {
+   "found": 33,
+   "placed": 2,
+   "selected": 3,
+   "extracted": 33,
+   "spotlight": 33
+  }
+ },
+ "layer_marks": 35
+}

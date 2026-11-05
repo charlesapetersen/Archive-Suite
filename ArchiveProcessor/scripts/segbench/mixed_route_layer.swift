@@ -1,12 +1,13 @@
 // W46.mixed-route — how mark transcripts enter the text layer, checked the way the Reader and Spotlight read it.
 //
 //     swiftc -O mixed_route_layer.swift -o <bin>/mixed-route-layer
-//     mixed-route-layer write <spec.json> <out dir>    -> run.pdf, annot.pdf, textpage.pdf
+//     mixed-route-layer write <spec.json> <out dir>    -> none.pdf, run.pdf, annot.pdf, textpage.pdf
 //     mixed-route-layer check <spec.json> <out dir>    -> JSON on stdout: per form, per mark, found / placed / selected
 //
 // spec.json: {"image", "lines": [{"box", "text"}], "marks": [{"id", "box", "text", "cls"}]}, boxes [x0, y0, x1, y1]
 // as page fractions with a top-left origin. Every PDF is the page image with the body text (Vision's lines) as an
-// invisible run per line, as the Processor's layer is; the three forms differ only in where the marks go:
+// invisible run per line, as the Processor's layer is; `none` has no marks (the control: a mark's text found there
+// is the print agreeing with it), and the three forms differ only in where the marks go:
 //   run       each mark one more invisible run at its own box, its text prefixed with a label ("[handwritten] ",
 //             "[stamp] "), so the mark is placed and the label says what it is;
 //   annot     each mark a FreeText annotation over its box, contents the text, no visible ink (clear colour);
@@ -53,15 +54,22 @@ func flat(_ s: String) -> String { s.split(whereSeparator: { $0.isWhitespace }).
 
 func label(_ cls: String) -> String { cls == "stamp" ? "[stamp] " : cls == "other" ? "[mark] " : "[handwritten] " }
 
-/// One invisible run filling a box's width at 0.8 of its height (place_functional.swift's `oracle`).
+/// One invisible run at a box, place_functional.swift's `oracle --fit`: 0.8 of the box's height (at most 48 pt),
+/// shrunk to the box's width when wider and never stretched, since a stretched run reads back from PDFKit as
+/// spaced letters that Find misses (W46.place-hands).
 func invisibleRun(_ ctx: CGContext, _ text: String, _ r: CGRect) {
-    let font = CTFontCreateWithName("Helvetica" as CFString, max(1, min(r.height * 0.8, 48)), nil)
-    let line = CTLineCreateWithAttributedString(NSAttributedString(
-        string: text, attributes: [NSAttributedString.Key(kCTFontAttributeName as String): font]))
-    let width = CTLineGetTypographicBounds(line, nil, nil, nil)
+    func make(_ size: CGFloat) -> (CTLine, Double) {
+        let font = CTFontCreateWithName("Helvetica" as CFString, max(1, size), nil)
+        let line = CTLineCreateWithAttributedString(NSAttributedString(
+            string: text, attributes: [NSAttributedString.Key(kCTFontAttributeName as String): font]))
+        return (line, CTLineGetTypographicBounds(line, nil, nil, nil))
+    }
+    let size = min(r.height * 0.8, 48)
+    var (line, width) = make(size)
+    if width > r.width && width > 0 { (line, width) = make(size * r.width / width) }
     ctx.saveGState()
     ctx.setTextDrawingMode(.invisible)
-    ctx.textMatrix = CGAffineTransform(scaleX: width > 0 ? r.width / width : 1, y: 1)
+    ctx.textMatrix = .identity
     ctx.textPosition = CGPoint(x: r.minX, y: r.minY + r.height * 0.2)
     CTLineDraw(line, ctx)
     ctx.restoreGState()
@@ -87,6 +95,7 @@ func write(_ specPath: String, _ outDir: String) {
         body(ctx)
         ctx.closePDF()
     }
+    pdf("none.pdf") { imagePage($0, img, media, lines, nil) }
     pdf("run.pdf") { imagePage($0, img, media, lines, marks) }
     pdf("textpage.pdf") { ctx in
         imagePage(ctx, img, media, lines, nil)
@@ -121,7 +130,7 @@ func write(_ specPath: String, _ outDir: String) {
 func check(_ specPath: String, _ outDir: String) {
     let (_, _, marks) = loadSpec(specPath)
     var out: [String: Any] = [:]
-    for form in ["run", "annot", "textpage"] {
+    for form in ["none", "run", "annot", "textpage"] {
         let url = URL(fileURLWithPath: outDir).appendingPathComponent("\(form).pdf")
         guard let doc = PDFDocument(url: url), let page = doc.page(at: 0) else { fail("cannot read \(form).pdf") }
         let bounds = page.bounds(for: .mediaBox)
