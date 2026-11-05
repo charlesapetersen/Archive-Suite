@@ -895,17 +895,19 @@ enum MarkdownBridge {
                     }
                     inner = "[\(inner)](\(urlStr))"
                 } else {
+                    var delimiter = ""
                     if isBold && isItalic {
-                        inner = "***\(inner)***"
+                        delimiter = "***"
                     } else if isBold {
                         if case .heading = blockKind {
                             // heading text: no extra bold wrap
                         } else {
-                            inner = "**\(inner)**"
+                            delimiter = "**"
                         }
                     } else if isItalic {
-                        inner = "*\(inner)*"
+                        delimiter = "*"
                     }
+                    if !delimiter.isEmpty { inner = wrapEmphasis(inner, in: delimiter) }
                 }
 
                 result += inner
@@ -935,6 +937,15 @@ enum MarkdownBridge {
             }
         }
         return result
+    }
+
+    /// Wrap text in emphasis delimiters with any spaces at its edges moved outside them. CommonMark neither opens
+    /// emphasis before a space nor closes it after one, so a bold "Day " written as `**Day **` came back as
+    /// literal asterisks (W40.fix-notes-bold-space). A run that is only spaces is written plain.
+    private static func wrapEmphasis(_ text: String, in delimiter: String) -> String {
+        guard let first = text.firstIndex(where: { !$0.isWhitespace }),
+              let last = text.lastIndex(where: { !$0.isWhitespace }) else { return text }
+        return "\(text[..<first])\(delimiter)\(text[first...last])\(delimiter)\(text[text.index(after: last)...])"
     }
 
     /// Wrap text in inline code delimiters, choosing `` over ` if the text contains backticks.

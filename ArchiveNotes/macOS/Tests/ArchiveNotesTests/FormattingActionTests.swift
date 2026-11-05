@@ -218,6 +218,52 @@ struct FormattingActionTests {
         #expect(state.isUnorderedList)
     }
 
+    // MARK: - Emphasis with spaces at its edges (W40.fix-notes-bold-space)
+
+    /// A style applied to a selection with a space at either edge writes the space outside the delimiters, and the
+    /// text comes back styled with no asterisks in it. `**Day **` is not bold in CommonMark: it was saved that way,
+    /// reopened as literal `**Day **`, and escaped to `\*\*Day \*\*` on the next save.
+    @Test(arguments: [
+        ("bold", "**Day** one", "Day ", true, false),
+        ("italic", "*Day* one", "Day ", false, true),
+        ("bold italic", "***Day*** one", "Day ", true, true),
+    ])
+    @MainActor
+    func emphasisEndingInSpaceRoundTrips(_ name: String, _ expected: String, _ styled: String,
+                                         _ bold: Bool, _ italic: Bool) {
+        let tv = makeTextView("Day one")
+        tv.setSelectedRange(NSRange(location: 0, length: styled.utf16.count))
+        if bold { EditorFormatting.toggleBold(tv, fontSize: fontSize) }
+        if italic { EditorFormatting.toggleItalic(tv, fontSize: fontSize) }
+        let saved = MarkdownBridge.serialize(tv.textStorage!)
+        #expect(saved.trimmed == expected, "\(name)")
+
+        let reopened = MarkdownBridge.parse(markdown: saved, fontSize: fontSize)
+        #expect(reopened.string.trimmed == "Day one", "\(name)")
+        let traits = NSFontManager.shared.traits(of: reopened.attribute(.font, at: 0, effectiveRange: nil) as! NSFont)
+        #expect(traits.contains(.boldFontMask) == bold, "\(name)")
+        #expect(traits.contains(.italicFontMask) == italic, "\(name)")
+        #expect(MarkdownBridge.serialize(reopened) == saved, "\(name): a second save changes nothing")
+    }
+
+    @Test @MainActor
+    func boldStartingWithSpaceKeepsTheSpaceOutside() {
+        let tv = makeTextView("one day")
+        tv.setSelectedRange(NSRange(location: 3, length: 4))
+        EditorFormatting.toggleBold(tv, fontSize: fontSize)
+        let saved = MarkdownBridge.serialize(tv.textStorage!)
+        #expect(saved.trimmed == "one **day**")
+        #expect(MarkdownBridge.serialize(MarkdownBridge.parse(markdown: saved, fontSize: fontSize)) == saved)
+    }
+
+    @Test @MainActor
+    func boldSpaceAloneWritesNoDelimiters() {
+        let tv = makeTextView("one two")
+        tv.setSelectedRange(NSRange(location: 3, length: 1))
+        EditorFormatting.toggleBold(tv, fontSize: fontSize)
+        #expect(MarkdownBridge.serialize(tv.textStorage!).trimmed == "one two")
+    }
+
     // MARK: - Helpers
 
     private let fontSize: CGFloat = 14
