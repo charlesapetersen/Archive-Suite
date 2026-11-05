@@ -8,6 +8,8 @@ Truth: 32 detector-eligible owner-core pages, 45 rough boxes (`marks_detect.py r
 |---|---|---|---|---|---|---:|---|
 | PP-DocLayoutV3 Seal + Aside Text | 0/45 = 0% (0-0) | 0/6 = 0% (0-0) | 0/39 = 0% (0-0) | 0/18 = 0% (0-0) | 0/27 = 0% (0-0) | 1 | 0% |
 | PP-DocLayoutV3, any region (coverage only) | 4/45 = 9% (2-17) | 1/6 = 17% (0-50) | 3/39 = 8% (0-14) | 2/18 = 11% (0-26) | 2/27 = 7% (0-22) | 403 | – |
+| YOLO11m, AnnoPage + SignverOD (conf 0.25) | 8/45 = 18% (5-37) | 1/6 = 17% (0-50) | 7/39 = 18% (4-41) | 3/18 = 17% (0-42) | 5/27 = 18% (0-46) | 15 | 53% |
+| YOLO11m one-epoch pilot (conf 0.25) | 0/45 = 0% (0-0) | 0/6 = 0% (0-0) | 0/39 = 0% (0-0) | 0/18 = 0% (0-0) | 0/27 = 0% (0-0) | 2 | 0% |
 
 ## Recall, IoU >= 0.5, the filed rule
 
@@ -15,6 +17,20 @@ Truth: 32 detector-eligible owner-core pages, 45 rough boxes (`marks_detect.py r
 |---|---|---|---|---|---|---:|---|
 | PP-DocLayoutV3 Seal + Aside Text | 0/45 = 0% (0-0) | 0/6 = 0% (0-0) | 0/39 = 0% (0-0) | 0/18 = 0% (0-0) | 0/27 = 0% (0-0) | 1 | 0% |
 | PP-DocLayoutV3, any region (coverage only) | 1/45 = 2% (0-5) | 0/6 = 0% (0-0) | 1/39 = 3% (0-6) | 1/18 = 6% (0-15) | 0/27 = 0% (0-0) | 403 | – |
+| YOLO11m, AnnoPage + SignverOD (conf 0.25) | 6/45 = 13% (2-33) | 1/6 = 17% (0-50) | 5/39 = 13% (0-33) | 2/18 = 11% (0-33) | 4/27 = 15% (0-42) | 15 | 40% |
+| YOLO11m one-epoch pilot (conf 0.25) | 0/45 = 0% (0-0) | 0/6 = 0% (0-0) | 0/39 = 0% (0-0) | 0/18 = 0% (0-0) | 0/27 = 0% (0-0) | 2 | 0% |
+
+## YOLO11m, AnnoPage + SignverOD: confidence sweep
+
+| Floor | Recall, hit | Precision, hit | Recall, IoU 0.5 | Precision, IoU 0.5 | Boxes |
+|---:|---|---:|---|---:|---:|
+| 0.05 | 17/45 = 38% (21-60) | 42% | 11/45 = 24% (10-45) | 27% | 41 |
+| 0.1 | 12/45 = 27% (11-48) | 43% | 9/45 = 20% (6-40) | 32% | 28 |
+| 0.15 | 11/45 = 24% (9-46) | 50% | 9/45 = 20% (6-40) | 41% | 22 |
+| 0.25 | 8/45 = 18% (5-37) | 53% | 6/45 = 13% (2-33) | 40% | 15 |
+| 0.4 | 5/45 = 11% (3-22) | 56% | 3/45 = 7% (0-16) | 33% | 9 |
+| 0.5 | 5/45 = 11% (3-22) | 62% | 3/45 = 7% (0-16) | 38% | 8 |
+| 0.6 | 5/45 = 11% (3-22) | 100% | 3/45 = 7% (0-16) | 60% | 5 |
 
 ## Truth support by class
 
@@ -30,8 +46,21 @@ Truth: 32 detector-eligible owner-core pages, 45 rough boxes (`marks_detect.py r
 
 PP-DocLayoutV3 does not find marks. Its Seal and Aside Text classes emitted one box in 32 pages and matched none
 of the 45 marks. Even counting every region it draws, at the loose rule only 4 of 45 marks fall under one, and those
-are text regions that happen to overlap a mark. A layout-region route therefore drops nearly every mark: the marks
-layer needs its own detector or a whole-page reader. The free recall check is closed, at no cost.
+are text regions that happen to overlap a mark. A layout-region route therefore drops nearly every mark.
+
+A YOLO11m trained on public data finds few of them either. Trained on Sherlock (one L40S) on AnnoPage's 416 pages
+with a handwritten inscription or stamp box, as many pages without, and SignverOD's 2,299 forms, it scored mAP50
+0.81 on its own validation split (handwritten 0.51, stamp 0.82, signature 0.96; 195 epochs in 2.2 hours, stopped
+early, best at epoch 95). On our 32 pages, at Ultralytics' default floor of 0.25, it found 8 of 45 marks at the
+loose rule (18%, interval 5-37) and 6 at IoU 0.5, with half its 15 boxes on a mark. Dropping the floor to 0.05
+reaches 17 of 45 (38%, 21-60) at 42% precision. It found 1 of the 10 stamps even at 0.05, although stamps were its
+second-best class on AnnoPage: the public stamps are library and ownership stamps, ours are receipt and file
+stamps. Annotations went best (9 of 17 at 0.05). The one-epoch pilot found nothing, which says only that the
+chain ran.
+
+So no detector measured here is a marks layer. Public training data does not transfer to these pages at a usable
+recall; the next step is a fine-tune on our own pages (filed as W46.marks-detect-own), and the comparison that
+decides the route is a whole-page reader (W46.mixed-route), which needs no detector.
 
 ## Arms not run here
 
@@ -40,9 +69,6 @@ layer needs its own detector or a whole-page reader. The free recall check is cl
   with access.
 - **Qwen3.6-27B boxes.** The B-core was drawn from its pre-flag, so MRK-1 allows scoring it on the A-core only,
   which has 6 boxes. That interval would run from about 0 to 100, so the arm is not sent to Sherlock.
-- **A YOLO11m trained on AnnoPage and SignverOD.** Prepared as a Sherlock pack (`sherlock/marks-detect/`, a
-  ceiling of 6.5 GPU-hours), with its size review in `execution-plans/items/W46.marks-detect.md`. It is scored here
-  when the results come home.
 - **Claude inline tags.** Dropped (measurement audit MRK-1). Gemini's boxes and inline tags are
   W46.marks-detect-paid; Gemini 3.7 drafted every core page, so the item has to rule on whether 3.8 may be
   ranked on them.

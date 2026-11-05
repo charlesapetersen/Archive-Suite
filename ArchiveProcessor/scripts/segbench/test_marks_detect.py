@@ -57,6 +57,16 @@ class Scoring(unittest.TestCase):
         lo, hi = D.boot(rows, lambda s: D.ratio(s, lambda c, o: True))
         self.assertTrue(0 <= lo <= 0.5 <= hi <= 1)
 
+    def test_conf_floor(self):
+        # YOLO rows carry a confidence and are cut at the floor; PP's bare boxes pass whatever the floor.
+        pages = {"a": [dict(box=[0, 0, 1, 1], cls="stamp", conf=0.3), dict(box=[0, 0, 0.5, 0.5], cls="x", conf=0.1)],
+                 "b": [[0, 0, 1, 1]]}
+        self.assertEqual(D.boxes(pages, 0.25), {"a": [[0, 0, 1, 1]], "b": [[0, 0, 1, 1]]})
+        self.assertEqual(len(D.boxes(pages)["a"]), 2)
+        rows = D.sweep(self.T, {"a": [dict(box=[0, 0, 0.1, 0.1], cls="x", conf=0.2)]})
+        self.assertEqual([r["hit"]["predictions"] for r in rows][:4], [1, 1, 1, 0])
+        self.assertEqual(rows[0]["hit"]["recall"]["found"], 1)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -2,8 +2,21 @@
 
 PP-DocLayoutV3 does not find marks. Its Seal and Aside Text classes emitted one box in 32 pages and matched none
 of the 45 marks. Even counting every region it draws, at the loose rule only 4 of 45 marks fall under one, and those
-are text regions that happen to overlap a mark. A layout-region route therefore drops nearly every mark: the marks
-layer needs its own detector or a whole-page reader. The free recall check is closed, at no cost.
+are text regions that happen to overlap a mark. A layout-region route therefore drops nearly every mark.
+
+A YOLO11m trained on public data finds few of them either. Trained on Sherlock (one L40S) on AnnoPage's 416 pages
+with a handwritten inscription or stamp box, as many pages without, and SignverOD's 2,299 forms, it scored mAP50
+0.81 on its own validation split (handwritten 0.51, stamp 0.82, signature 0.96; 195 epochs in 2.2 hours, stopped
+early, best at epoch 95). On our 32 pages, at Ultralytics' default floor of 0.25, it found 8 of 45 marks at the
+loose rule (18%, interval 5-37) and 6 at IoU 0.5, with half its 15 boxes on a mark. Dropping the floor to 0.05
+reaches 17 of 45 (38%, 21-60) at 42% precision. It found 1 of the 10 stamps even at 0.05, although stamps were its
+second-best class on AnnoPage: the public stamps are library and ownership stamps, ours are receipt and file
+stamps. Annotations went best (9 of 17 at 0.05). The one-epoch pilot found nothing, which says only that the
+chain ran.
+
+So no detector measured here is a marks layer. Public training data does not transfer to these pages at a usable
+recall; the next step is a fine-tune on our own pages (filed as W46.marks-detect-own), and the comparison that
+decides the route is a whole-page reader (W46.mixed-route), which needs no detector.
 
 ## Arms not run here
 
@@ -12,9 +25,6 @@ layer needs its own detector or a whole-page reader. The free recall check is cl
   with access.
 - **Qwen3.6-27B boxes.** The B-core was drawn from its pre-flag, so MRK-1 allows scoring it on the A-core only,
   which has 6 boxes. That interval would run from about 0 to 100, so the arm is not sent to Sherlock.
-- **A YOLO11m trained on AnnoPage and SignverOD.** Prepared as a Sherlock pack (`sherlock/marks-detect/`, a
-  ceiling of 6.5 GPU-hours), with its size review in `execution-plans/items/W46.marks-detect.md`. It is scored here
-  when the results come home.
 - **Claude inline tags.** Dropped (measurement audit MRK-1). Gemini's boxes and inline tags are
   W46.marks-detect-paid; Gemini 3.7 drafted every core page, so the item has to rule on whether 3.8 may be
   ranked on them.

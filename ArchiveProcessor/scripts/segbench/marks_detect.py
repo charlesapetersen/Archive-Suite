@@ -27,6 +27,8 @@ SUPPORT = Path.home() / "Library/Application Support/ArchiveSuiteRehearsal"
 RECORD = SUPPORT / "marks-set-reconciled-da388b05c388-dac79c80c2f6"
 IMAGES = SUPPORT / "marks-set-frozen-da388b05c388/images"
 WORK = Path.home() / "Library/Caches/ArchiveSuiteRehearsal/marks-detect"
+# The collected Sherlock results (sherlock/packs/W46.marks-detect.json "mac"): public.json, pilot.json, runs/.
+CLUSTER = Path.home() / ".local/state/archive-autonomous/artifacts/marks-detect-20261104"
 RESULTS = HERE.parent.parent / "segbench-results"
 
 # Which of each detector's classes count as a mark. Anything else it emits is ignored, not a false positive.
@@ -34,7 +36,13 @@ ARMS = {
     "pp": dict(name="PP-DocLayoutV3 Seal + Aside Text", file="pp.json",
                labels={"seal", "aside_text"}, pages="all"),
     "pp-any": dict(name="PP-DocLayoutV3, any region (coverage only)", file="pp-any.json", labels=None, pages="all"),
+    # Every YOLO class is a mark class. Its boxes were kept down to conf 0.05; 0.25 is Ultralytics' default.
+    "yolo": dict(name="YOLO11m, AnnoPage + SignverOD (conf 0.25)", file=CLUSTER / "public.json", labels=None,
+                 pages="all", conf=0.25),
+    "yolo-pilot": dict(name="YOLO11m one-epoch pilot (conf 0.25)", file=CLUSTER / "pilot.json", labels=None,
+                       pages="all", conf=0.25, sweep=False),
 }
+SWEEP = (0.05, 0.1, 0.15, 0.25, 0.4, 0.5, 0.6)
 RULES = {"iou50": 0.5, "hit": 0.1}
 
 
@@ -143,6 +151,25 @@ def score(t, preds, arm):
     return out
 
 
+def boxes(pages, conf=None):
+    """{page: [box]}: PP files hold bare boxes; YOLO files hold {box, cls, conf}, cut at the arm's floor."""
+    return {pid: [r if isinstance(r, list) else r["box"] for r in regs
+                  if conf is None or isinstance(r, list) or r["conf"] >= conf]
+            for pid, regs in pages.items()}
+
+
+def sweep(t, pages):
+    """Recall and precision over the pooled core at each confidence floor, both match rules."""
+    out = []
+    for c in SWEEP:
+        row = dict(conf=c)
+        for rule, thr in RULES.items():
+            s = summarise(page_counts(t, boxes(pages, c), thr).values())
+            row[rule] = dict(recall=s["recall"], precision=s["precision"], predictions=s["predictions"])
+        out.append(row)
+    return out
+
+
 def detect_pp(t):
     sys.path.insert(0, str(HERE))
     import layout
@@ -192,6 +219,18 @@ def markdown(t, res):
             L.append(f"| {r['name']} | {pct(a['recall'])} | {pct((s['A-core'] or {}).get('recall'))} | "
                      f"{pct((s['B-core'] or {}).get('recall'))} | {pct(a['touching_print'])} | "
                      f"{pct(a['clear_of_print'])} | {a['predictions']} | {prec} |")
+        L.append("")
+    for key, r in res.items():
+        if "sweep" not in r:
+            continue
+        L += [f"## {r['name'].split(' (')[0]}: confidence sweep", "",
+              "| Floor | Recall, hit | Precision, hit | Recall, IoU 0.5 | Precision, IoU 0.5 | Boxes |",
+              "|---:|---|---:|---|---:|---:|"]
+        for w in r["sweep"]:
+            h, f = w["hit"], w["iou50"]
+            pr = lambda v: "–" if v is None else f"{v * 100:.0f}%"
+            L.append(f"| {w['conf']} | {pct(h['recall'])} | {pr(h['precision'])} | {pct(f['recall'])} | "
+                     f"{pr(f['precision'])} | {h['predictions']} |")
         L.append("")
     L += ["## Truth support by class", "", "| Class | Boxes | Touching print |", "|---|---:|---:|"]
     by = {}
@@ -257,8 +296,11 @@ def main(argv):
         for key, arm in ARMS.items():
             f = WORK / arm["file"]
             if f.exists():
+                pages = json.loads(f.read_text())["pages"]
                 res[key] = dict(name=arm["name"], pages=arm["pages"],
-                                score=score(t, json.loads(f.read_text())["pages"], arm))
+                                score=score(t, boxes(pages, arm.get("conf")), arm))
+                if arm.get("sweep", "conf" in arm):
+                    res[key]["sweep"] = sweep(t, pages)
         (RESULTS / "marks-detect.json").write_text(json.dumps(res, indent=1) + "\n")
         (RESULTS / "marks-detect.md").write_text(markdown(t, res))
         print(json.dumps({k: v["score"]["hit"]["all"]["recall"] for k, v in res.items()}))

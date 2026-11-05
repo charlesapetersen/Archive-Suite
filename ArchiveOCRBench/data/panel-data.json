@@ -66197,7 +66197,9 @@
    "vision": "30 (67%)",
    "yolo_filter": "7 (16%)",
    "yolo_pics": "26 (58%)",
-   "pp": "3 (7%)"
+   "pp": "3 (7%)",
+   "detector": "8 (18%, interval 5-37) at 53% precision",
+   "detector_low": "17 (38%, interval 21-60) at 42% precision"
   },
   "gemini": {
    "cost": 1.68,

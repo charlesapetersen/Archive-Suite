@@ -924,5 +924,1136 @@
     }
    }
   }
+ },
+ "yolo": {
+  "name": "YOLO11m, AnnoPage + SignverOD (conf 0.25)",
+  "pages": "all",
+  "score": {
+   "iou50": {
+    "all": {
+     "pages": 32,
+     "marks": 45,
+     "recall": {
+      "found": 6,
+      "of": 45,
+      "rate": 0.133,
+      "ci": [
+       0.021,
+       0.327
+      ]
+     },
+     "touching_print": {
+      "found": 2,
+      "of": 18,
+      "rate": 0.111,
+      "ci": [
+       0.0,
+       0.333
+      ]
+     },
+     "clear_of_print": {
+      "found": 4,
+      "of": 27,
+      "rate": 0.148,
+      "ci": [
+       0.0,
+       0.417
+      ]
+     },
+     "by_class": {
+      "annotation": {
+       "found": 2,
+       "of": 17,
+       "rate": 0.118,
+       "ci": [
+        0.0,
+        0.3
+       ]
+      },
+      "marginal_note": {
+       "found": 3,
+       "of": 11,
+       "rate": 0.273,
+       "ci": [
+        0.0,
+        0.667
+       ]
+      },
+      "other": {
+       "found": 1,
+       "of": 3,
+       "rate": 0.333,
+       "ci": [
+        0.0,
+        1.0
+       ]
+      },
+      "signature_initials": {
+       "found": 0,
+       "of": 4,
+       "rate": 0.0,
+       "ci": [
+        0.0,
+        0.0
+       ]
+      },
+      "stamp": {
+       "found": 0,
+       "of": 10,
+       "rate": 0.0,
+       "ci": [
+        0.0,
+        0.0
+       ]
+      }
+     },
+     "predictions": 15,
+     "precision": 0.4,
+     "precision_ci": [
+      0.091,
+      0.588
+     ],
+     "unmatched_per_page": 0.28
+    },
+    "A-core": {
+     "pages": 15,
+     "marks": 6,
+     "recall": {
+      "found": 1,
+      "of": 6,
+      "rate": 0.167,
+      "ci": [
+       0.0,
+       0.5
+      ]
+     },
+     "touching_print": {
+      "found": 1,
+      "of": 2,
+      "rate": 0.5,
+      "ci": [
+       0.0,
+       1.0
+      ]
+     },
+     "clear_of_print": {
+      "found": 0,
+      "of": 4,
+      "rate": 0.0,
+      "ci": [
+       0.0,
+       0.0
+      ]
+     },
+     "by_class": {
+      "annotation": {
+       "found": 1,
+       "of": 4,
+       "rate": 0.25,
+       "ci": [
+        0.0,
+        1.0
+       ]
+      },
+      "stamp": {
+       "found": 0,
+       "of": 2,
+       "rate": 0.0,
+       "ci": [
+        0.0,
+        0.0
+       ]
+      }
+     },
+     "predictions": 3,
+     "precision": 0.333,
+     "precision_ci": [
+      0.0,
+      1.0
+     ],
+     "unmatched_per_page": 0.13
+    },
+    "B-core": {
+     "pages": 17,
+     "marks": 39,
+     "recall": {
+      "found": 5,
+      "of": 39,
+      "rate": 0.128,
+      "ci": [
+       0.0,
+       0.333
+      ]
+     },
+     "touching_print": {
+      "found": 1,
+      "of": 16,
+      "rate": 0.062,
+      "ci": [
+       0.0,
+       0.231
+      ]
+     },
+     "clear_of_print": {
+      "found": 4,
+      "of": 23,
+      "rate": 0.174,
+      "ci": [
+       0.0,
+       0.5
+      ]
+     },
+     "by_class": {
+      "annotation": {
+       "found": 1,
+       "of": 13,
+       "rate": 0.077,
+       "ci": [
+        0.0,
+        0.25
+       ]
+      },
+      "marginal_note": {
+       "found": 3,
+       "of": 11,
+       "rate": 0.273,
+       "ci": [
+        0.0,
+        0.625
+       ]
+      },
+      "other": {
+       "found": 1,
+       "of": 3,
+       "rate": 0.333,
+       "ci": [
+        0.0,
+        1.0
+       ]
+      },
+      "signature_initials": {
+       "found": 0,
+       "of": 4,
+       "rate": 0.0,
+       "ci": [
+        0.0,
+        0.0
+       ]
+      },
+      "stamp": {
+       "found": 0,
+       "of": 8,
+       "rate": 0.0,
+       "ci": [
+        0.0,
+        0.0
+       ]
+      }
+     },
+     "predictions": 12,
+     "precision": 0.417,
+     "precision_ci": [
+      0.0,
+      0.6
+     ],
+     "unmatched_per_page": 0.41
+    }
+   },
+   "hit": {
+    "all": {
+     "pages": 32,
+     "marks": 45,
+     "recall": {
+      "found": 8,
+      "of": 45,
+      "rate": 0.178,
+      "ci": [
+       0.051,
+       0.37
+      ]
+     },
+     "touching_print": {
+      "found": 3,
+      "of": 18,
+      "rate": 0.167,
+      "ci": [
+       0.0,
+       0.417
+      ]
+     },
+     "clear_of_print": {
+      "found": 5,
+      "of": 27,
+      "rate": 0.185,
+      "ci": [
+       0.0,
+       0.462
+      ]
+     },
+     "by_class": {
+      "annotation": {
+       "found": 2,
+       "of": 17,
+       "rate": 0.118,
+       "ci": [
+        0.0,
+        0.3
+       ]
+      },
+      "marginal_note": {
+       "found": 3,
+       "of": 11,
+       "rate": 0.273,
+       "ci": [
+        0.0,
+        0.667
+       ]
+      },
+      "other": {
+       "found": 1,
+       "of": 3,
+       "rate": 0.333,
+       "ci": [
+        0.0,
+        1.0
+       ]
+      },
+      "signature_initials": {
+       "found": 2,
+       "of": 4,
+       "rate": 0.5,
+       "ci": [
+        0.0,
+        1.0
+       ]
+      },
+      "stamp": {
+       "found": 0,
+       "of": 10,
+       "rate": 0.0,
+       "ci": [
+        0.0,
+        0.0
+       ]
+      }
+     },
+     "predictions": 15,
+     "precision": 0.533,
+     "precision_ci": [
+      0.286,
+      0.737
+     ],
+     "unmatched_per_page": 0.22
+    },
+    "A-core": {
+     "pages": 15,
+     "marks": 6,
+     "recall": {
+      "found": 1,
+      "of": 6,
+      "rate": 0.167,
+      "ci": [
+       0.0,
+       0.5
+      ]
+     },
+     "touching_print": {
+      "found": 1,
+      "of": 2,
+      "rate": 0.5,
+      "ci": [
+       0.0,
+       1.0
+      ]
+     },
+     "clear_of_print": {
+      "found": 0,
+      "of": 4,
+      "rate": 0.0,
+      "ci": [
+       0.0,
+       0.0
+      ]
+     },
+     "by_class": {
+      "annotation": {
+       "found": 1,
+       "of": 4,
+       "rate": 0.25,
+       "ci": [
+        0.0,
+        1.0
+       ]
+      },
+      "stamp": {
+       "found": 0,
+       "of": 2,
+       "rate": 0.0,
+       "ci": [
+        0.0,
+        0.0
+       ]
+      }
+     },
+     "predictions": 3,
+     "precision": 0.333,
+     "precision_ci": [
+      0.0,
+      1.0
+     ],
+     "unmatched_per_page": 0.13
+    },
+    "B-core": {
+     "pages": 17,
+     "marks": 39,
+     "recall": {
+      "found": 7,
+      "of": 39,
+      "rate": 0.179,
+      "ci": [
+       0.045,
+       0.407
+      ]
+     },
+     "touching_print": {
+      "found": 2,
+      "of": 16,
+      "rate": 0.125,
+      "ci": [
+       0.0,
+       0.364
+      ]
+     },
+     "clear_of_print": {
+      "found": 5,
+      "of": 23,
+      "rate": 0.217,
+      "ci": [
+       0.0,
+       0.538
+      ]
+     },
+     "by_class": {
+      "annotation": {
+       "found": 1,
+       "of": 13,
+       "rate": 0.077,
+       "ci": [
+        0.0,
+        0.25
+       ]
+      },
+      "marginal_note": {
+       "found": 3,
+       "of": 11,
+       "rate": 0.273,
+       "ci": [
+        0.0,
+        0.625
+       ]
+      },
+      "other": {
+       "found": 1,
+       "of": 3,
+       "rate": 0.333,
+       "ci": [
+        0.0,
+        1.0
+       ]
+      },
+      "signature_initials": {
+       "found": 2,
+       "of": 4,
+       "rate": 0.5,
+       "ci": [
+        0.0,
+        1.0
+       ]
+      },
+      "stamp": {
+       "found": 0,
+       "of": 8,
+       "rate": 0.0,
+       "ci": [
+        0.0,
+        0.0
+       ]
+      }
+     },
+     "predictions": 12,
+     "precision": 0.583,
+     "precision_ci": [
+      0.333,
+      0.833
+     ],
+     "unmatched_per_page": 0.29
+    }
+   }
+  },
+  "sweep": [
+   {
+    "conf": 0.05,
+    "iou50": {
+     "recall": {
+      "found": 11,
+      "of": 45,
+      "rate": 0.244,
+      "ci": [
+       0.103,
+       0.452
+      ]
+     },
+     "precision": 0.268,
+     "predictions": 41
+    },
+    "hit": {
+     "recall": {
+      "found": 17,
+      "of": 45,
+      "rate": 0.378,
+      "ci": [
+       0.212,
+       0.6
+      ]
+     },
+     "precision": 0.415,
+     "predictions": 41
+    }
+   },
+   {
+    "conf": 0.1,
+    "iou50": {
+     "recall": {
+      "found": 9,
+      "of": 45,
+      "rate": 0.2,
+      "ci": [
+       0.063,
+       0.404
+      ]
+     },
+     "precision": 0.321,
+     "predictions": 28
+    },
+    "hit": {
+     "recall": {
+      "found": 12,
+      "of": 45,
+      "rate": 0.267,
+      "ci": [
+       0.111,
+       0.481
+      ]
+     },
+     "precision": 0.429,
+     "predictions": 28
+    }
+   },
+   {
+    "conf": 0.15,
+    "iou50": {
+     "recall": {
+      "found": 9,
+      "of": 45,
+      "rate": 0.2,
+      "ci": [
+       0.063,
+       0.404
+      ]
+     },
+     "precision": 0.409,
+     "predictions": 22
+    },
+    "hit": {
+     "recall": {
+      "found": 11,
+      "of": 45,
+      "rate": 0.244,
+      "ci": [
+       0.094,
+       0.455
+      ]
+     },
+     "precision": 0.5,
+     "predictions": 22
+    }
+   },
+   {
+    "conf": 0.25,
+    "iou50": {
+     "recall": {
+      "found": 6,
+      "of": 45,
+      "rate": 0.133,
+      "ci": [
+       0.021,
+       0.327
+      ]
+     },
+     "precision": 0.4,
+     "predictions": 15
+    },
+    "hit": {
+     "recall": {
+      "found": 8,
+      "of": 45,
+      "rate": 0.178,
+      "ci": [
+       0.051,
+       0.37
+      ]
+     },
+     "precision": 0.533,
+     "predictions": 15
+    }
+   },
+   {
+    "conf": 0.4,
+    "iou50": {
+     "recall": {
+      "found": 3,
+      "of": 45,
+      "rate": 0.067,
+      "ci": [
+       0.0,
+       0.156
+      ]
+     },
+     "precision": 0.333,
+     "predictions": 9
+    },
+    "hit": {
+     "recall": {
+      "found": 5,
+      "of": 45,
+      "rate": 0.111,
+      "ci": [
+       0.031,
+       0.222
+      ]
+     },
+     "precision": 0.556,
+     "predictions": 9
+    }
+   },
+   {
+    "conf": 0.5,
+    "iou50": {
+     "recall": {
+      "found": 3,
+      "of": 45,
+      "rate": 0.067,
+      "ci": [
+       0.0,
+       0.156
+      ]
+     },
+     "precision": 0.375,
+     "predictions": 8
+    },
+    "hit": {
+     "recall": {
+      "found": 5,
+      "of": 45,
+      "rate": 0.111,
+      "ci": [
+       0.031,
+       0.222
+      ]
+     },
+     "precision": 0.625,
+     "predictions": 8
+    }
+   },
+   {
+    "conf": 0.6,
+    "iou50": {
+     "recall": {
+      "found": 3,
+      "of": 45,
+      "rate": 0.067,
+      "ci": [
+       0.0,
+       0.156
+      ]
+     },
+     "precision": 0.6,
+     "predictions": 5
+    },
+    "hit": {
+     "recall": {
+      "found": 5,
+      "of": 45,
+      "rate": 0.111,
+      "ci": [
+       0.031,
+       0.222
+      ]
+     },
+     "precision": 1.0,
+     "predictions": 5
+    }
+   }
+  ]
+ },
+ "yolo-pilot": {
+  "name": "YOLO11m one-epoch pilot (conf 0.25)",
+  "pages": "all",
+  "score": {
+   "iou50": {
+    "all": {
+     "pages": 32,
+     "marks": 45,
+     "recall": {
+      "found": 0,
+      "of": 45,
+      "rate": 0.0,
+      "ci": [
+       0.0,
+       0.0
+      ]
+     },
+     "touching_print": {
+      "found": 0,
+      "of": 18,
+      "rate": 0.0,
+      "ci": [
+       0.0,
+       0.0
+      ]
+     },
+     "clear_of_print": {
+      "found": 0,
+      "of": 27,
+      "rate": 0.0,
+      "ci": [
+       0.0,
+       0.0
+      ]
+     },
+     "by_class": {
+      "annotation": {
+       "found": 0,
+       "of": 17,
+       "rate": 0.0,
+       "ci": [
+        0.0,
+        0.0
+       ]
+      },
+      "marginal_note": {
+       "found": 0,
+       "of": 11,
+       "rate": 0.0,
+       "ci": [
+        0.0,
+        0.0
+       ]
+      },
+      "other": {
+       "found": 0,
+       "of": 3,
+       "rate": 0.0,
+       "ci": [
+        0.0,
+        0.0
+       ]
+      },
+      "signature_initials": {
+       "found": 0,
+       "of": 4,
+       "rate": 0.0,
+       "ci": [
+        0.0,
+        0.0
+       ]
+      },
+      "stamp": {
+       "found": 0,
+       "of": 10,
+       "rate": 0.0,
+       "ci": [
+        0.0,
+        0.0
+       ]
+      }
+     },
+     "predictions": 2,
+     "precision": 0.0,
+     "precision_ci": [
+      0.0,
+      0.0
+     ],
+     "unmatched_per_page": 0.06
+    },
+    "A-core": {
+     "pages": 15,
+     "marks": 6,
+     "recall": {
+      "found": 0,
+      "of": 6,
+      "rate": 0.0,
+      "ci": [
+       0.0,
+       0.0
+      ]
+     },
+     "touching_print": {
+      "found": 0,
+      "of": 2,
+      "rate": 0.0,
+      "ci": [
+       0.0,
+       0.0
+      ]
+     },
+     "clear_of_print": {
+      "found": 0,
+      "of": 4,
+      "rate": 0.0,
+      "ci": [
+       0.0,
+       0.0
+      ]
+     },
+     "by_class": {
+      "annotation": {
+       "found": 0,
+       "of": 4,
+       "rate": 0.0,
+       "ci": [
+        0.0,
+        0.0
+       ]
+      },
+      "stamp": {
+       "found": 0,
+       "of": 2,
+       "rate": 0.0,
+       "ci": [
+        0.0,
+        0.0
+       ]
+      }
+     },
+     "predictions": 0,
+     "precision": null,
+     "precision_ci": null,
+     "unmatched_per_page": 0.0
+    },
+    "B-core": {
+     "pages": 17,
+     "marks": 39,
+     "recall": {
+      "found": 0,
+      "of": 39,
+      "rate": 0.0,
+      "ci": [
+       0.0,
+       0.0
+      ]
+     },
+     "touching_print": {
+      "found": 0,
+      "of": 16,
+      "rate": 0.0,
+      "ci": [
+       0.0,
+       0.0
+      ]
+     },
+     "clear_of_print": {
+      "found": 0,
+      "of": 23,
+      "rate": 0.0,
+      "ci": [
+       0.0,
+       0.0
+      ]
+     },
+     "by_class": {
+      "annotation": {
+       "found": 0,
+       "of": 13,
+       "rate": 0.0,
+       "ci": [
+        0.0,
+        0.0
+       ]
+      },
+      "marginal_note": {
+       "found": 0,
+       "of": 11,
+       "rate": 0.0,
+       "ci": [
+        0.0,
+        0.0
+       ]
+      },
+      "other": {
+       "found": 0,
+       "of": 3,
+       "rate": 0.0,
+       "ci": [
+        0.0,
+        0.0
+       ]
+      },
+      "signature_initials": {
+       "found": 0,
+       "of": 4,
+       "rate": 0.0,
+       "ci": [
+        0.0,
+        0.0
+       ]
+      },
+      "stamp": {
+       "found": 0,
+       "of": 8,
+       "rate": 0.0,
+       "ci": [
+        0.0,
+        0.0
+       ]
+      }
+     },
+     "predictions": 2,
+     "precision": 0.0,
+     "precision_ci": [
+      0.0,
+      0.0
+     ],
+     "unmatched_per_page": 0.12
+    }
+   },
+   "hit": {
+    "all": {
+     "pages": 32,
+     "marks": 45,
+     "recall": {
+      "found": 0,
+      "of": 45,
+      "rate": 0.0,
+      "ci": [
+       0.0,
+       0.0
+      ]
+     },
+     "touching_print": {
+      "found": 0,
+      "of": 18,
+      "rate": 0.0,
+      "ci": [
+       0.0,
+       0.0
+      ]
+     },
+     "clear_of_print": {
+      "found": 0,
+      "of": 27,
+      "rate": 0.0,
+      "ci": [
+       0.0,
+       0.0
+      ]
+     },
+     "by_class": {
+      "annotation": {
+       "found": 0,
+       "of": 17,
+       "rate": 0.0,
+       "ci": [
+        0.0,
+        0.0
+       ]
+      },
+      "marginal_note": {
+       "found": 0,
+       "of": 11,
+       "rate": 0.0,
+       "ci": [
+        0.0,
+        0.0
+       ]
+      },
+      "other": {
+       "found": 0,
+       "of": 3,
+       "rate": 0.0,
+       "ci": [
+        0.0,
+        0.0
+       ]
+      },
+      "signature_initials": {
+       "found": 0,
+       "of": 4,
+       "rate": 0.0,
+       "ci": [
+        0.0,
+        0.0
+       ]
+      },
+      "stamp": {
+       "found": 0,
+       "of": 10,
+       "rate": 0.0,
+       "ci": [
+        0.0,
+        0.0
+       ]
+      }
+     },
+     "predictions": 2,
+     "precision": 0.0,
+     "precision_ci": [
+      0.0,
+      0.0
+     ],
+     "unmatched_per_page": 0.06
+    },
+    "A-core": {
+     "pages": 15,
+     "marks": 6,
+     "recall": {
+      "found": 0,
+      "of": 6,
+      "rate": 0.0,
+      "ci": [
+       0.0,
+       0.0
+      ]
+     },
+     "touching_print": {
+      "found": 0,
+      "of": 2,
+      "rate": 0.0,
+      "ci": [
+       0.0,
+       0.0
+      ]
+     },
+     "clear_of_print": {
+      "found": 0,
+      "of": 4,
+      "rate": 0.0,
+      "ci": [
+       0.0,
+       0.0
+      ]
+     },
+     "by_class": {
+      "annotation": {
+       "found": 0,
+       "of": 4,
+       "rate": 0.0,
+       "ci": [
+        0.0,
+        0.0
+       ]
+      },
+      "stamp": {
+       "found": 0,
+       "of": 2,
+       "rate": 0.0,
+       "ci": [
+        0.0,
+        0.0
+       ]
+      }
+     },
+     "predictions": 0,
+     "precision": null,
+     "precision_ci": null,
+     "unmatched_per_page": 0.0
+    },
+    "B-core": {
+     "pages": 17,
+     "marks": 39,
+     "recall": {
+      "found": 0,
+      "of": 39,
+      "rate": 0.0,
+      "ci": [
+       0.0,
+       0.0
+      ]
+     },
+     "touching_print": {
+      "found": 0,
+      "of": 16,
+      "rate": 0.0,
+      "ci": [
+       0.0,
+       0.0
+      ]
+     },
+     "clear_of_print": {
+      "found": 0,
+      "of": 23,
+      "rate": 0.0,
+      "ci": [
+       0.0,
+       0.0
+      ]
+     },
+     "by_class": {
+      "annotation": {
+       "found": 0,
+       "of": 13,
+       "rate": 0.0,
+       "ci": [
+        0.0,
+        0.0
+       ]
+      },
+      "marginal_note": {
+       "found": 0,
+       "of": 11,
+       "rate": 0.0,
+       "ci": [
+        0.0,
+        0.0
+       ]
+      },
+      "other": {
+       "found": 0,
+       "of": 3,
+       "rate": 0.0,
+       "ci": [
+        0.0,
+        0.0
+       ]
+      },
+      "signature_initials": {
+       "found": 0,
+       "of": 4,
+       "rate": 0.0,
+       "ci": [
+        0.0,
+        0.0
+       ]
+      },
+      "stamp": {
+       "found": 0,
+       "of": 8,
+       "rate": 0.0,
+       "ci": [
+        0.0,
+        0.0
+       ]
+      }
+     },
+     "predictions": 2,
+     "precision": 0.0,
+     "precision_ci": [
+      0.0,
+      0.0
+     ],
+     "unmatched_per_page": 0.12
+    }
+   }
+  }
  }
 }
