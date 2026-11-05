@@ -5,11 +5,12 @@
   "seed": 4625,
   "rows": [
     {"route": "gpt5.4-mini", "kind": "panel", "nes": 96.4},
-    {"route": "claude-sonnet5.5", "kind": "panel", "nes": 95.9},
+    {"route": "claude-sonnet5.5", "kind": "panel", "nes": 95.9, "note": "a relative of the Claude Opus 5.5 drafter of the 96's truth"},
     {"route": "qwen3.5-397b", "kind": "panel", "nes": 95.4},
     {"route": "mistral-ocr-4-1", "kind": "panel", "nes": 92.5},
     {"route": "Azure Document Intelligence, prebuilt-layout", "kind": "vendor", "nes": 89.6, "usd_1000": 10.0, "price_note": "list; run on the F0 free tier, $0"},
     {"route": "AWS Textract, AnalyzeDocument LAYOUT (+ date query)", "kind": "vendor", "nes": 86.6, "usd_1000": 19.0, "price_note": "list, LAYOUT $4 + QUERIES $15; $0.475 spent"}
   ],
+  "splitters": "Custom splitters were priced, not run: $5 (Google Document AI) and $3 (Azure custom classification) per 1,000 pages at list, so $500 and $300 per 100,000 pages and hundreds of dollars for a corpus pass, which needs the owner under the $7 rule (W46.r6-spot-price).",
   "vs_mistral": {"azure": [-2.9, -6.3, -0.2], "textract": [-5.8, -13.4, 1.5]}
 }

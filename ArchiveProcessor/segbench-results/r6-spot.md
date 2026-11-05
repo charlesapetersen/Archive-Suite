@@ -42,18 +42,27 @@ mixed pages, and 0.00 to 0.05 on all 21 printed or typewritten pages: on this sa
 List prices read 2026-11-04 from the vendors' pricing pages as quoted by search results, not checked against a
 bill: Google Document AI Custom Splitter (and custom classifier) $5 per 1,000 pages up to 1 million a month;
 Azure Document Intelligence custom classification $3 per 1,000 pages. Both need labelled training documents
-and a cloud project; Document AI has no account here. At the corpus's ~102k PDFs (~2 to 3 pages a document
-image on average) either is under $1.50 for a full pass, so price is not what rules them out; the open
-questions are accuracy on our boxes and sending the corpus off the Mac.
+and a cloud project; Document AI has no account here. At these prices 100,000 pages cost $500 (Document AI) or
+$300 (Azure). The corpus is ~102k PDFs, so a full pass is $510 or $306 at one page a PDF and $1,020-1,530 or
+$612-918 at 2 to 3 pages a PDF: hundreds of dollars, so price is a real constraint on a custom splitter, and a
+corpus pass would need the owner's word under the $7 rule. (An earlier version of this paragraph said "under
+$1.50 for a full pass"; $1.50 at $5 per 1,000 is 300 pages. Corrected by W46.r6-spot-price, measurement review
+2026-11-05 P9-4.) Accuracy on our boxes and sending the corpus off the Mac stay open questions beside it.
 
 ## Measurement card
 
 - **Truth:** the owner's 96 (`ocr_card.TRUTH_96`): drafted by Claude Opus 5.5 and Gemini 3.8 Flash, adjudicated by
-  the owner where they differed, corrected 2026-10-29. Neither vendor drafted it. Date check uses folder tags only.
+  the owner where they differed, corrected 2026-10-29. Neither vendor drafted it, so the vendors-against-Mistral
+  comparison is untouched by the drafters; but claude-sonnet5.5 (95.9, second in the table) is a relative of the
+  Claude Opus 5.5 drafter, and its score can favour that family. Date check uses folder tags only.
 - **Selection:** 25 of the 96 by a seeded draw over page ids (seed 4625), never by a tested route or ABBYY text.
+  The 96 themselves (`ocr_card.DRAW_96`): every page where Apple Vision (26.6) read fewer than 20 words was
+  replaced at the draw (19 of them, 4 tagged Handwritten; `ocr-truth.md`), so the 96 hold no page Vision reads as
+  empty, and every comparison with Vision on them is on pages Vision could read.
 - **Comparison:** the same original JPEGs (`ocr-panel-cloud/images`, SHA-256 checked) and the same scorer as the
   panel; panel routes are their stored panel replies on these 25.
 - **Noise:** n = 25; paired bootstrap intervals above; the 96's rerun floor is 0.49 NES points. Textract's gap to
   Mistral is inside its interval (a tie); Azure's is just outside.
-- **Scope:** one sample of 25, one model per vendor, default settings. Says nothing about Document AI (no account),
+- **Scope:** one sample of 25 of the 96 (the owner's scoping), one model per vendor, default settings; the public
+  895 half is not run (a line in `execution-plans/paid-runs-deferred.md`). Says nothing about Document AI (no account),
   custom splitters (price read only) or Transkribus (hand-upload pack, scored when the owner exports it).

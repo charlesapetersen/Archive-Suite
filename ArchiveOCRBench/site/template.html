@@ -820,11 +820,11 @@ document.getElementById('hw-source').innerHTML = 'Source: <a href="' + HW.source
 // Commercial document services, a 25-page spot check (W46.r6-spot).
 const R6 = DATA.r6_spot;
 document.getElementById('r6-meta').textContent = R6.pages + ' of the 96, seeded draw';
-document.getElementById('r6-rows').innerHTML = R6.rows.map(r => '<tr><td>' + r.route + '</td><td>' + r.kind + '</td><td>' + r.nes.toFixed(1) +
+document.getElementById('r6-rows').innerHTML = R6.rows.map(r => '<tr><td>' + r.route + (r.note ? ' (' + r.note + ')' : '') + '</td><td>' + r.kind + '</td><td>' + r.nes.toFixed(1) +
   '</td><td>' + (r.usd_1000 ? money(r.usd_1000) + ' (' + r.price_note + ')' : '') + '</td></tr>').join('');
 document.getElementById('r6-note').textContent = 'Same pages, same scorer; panel routes are their stored panel replies on these ' + R6.pages + '. Against Mistral OCR 4.1, paired: Azure ' +
   R6.vs_mistral.azure[0] + ' NES points (' + R6.vs_mistral.azure[1] + ' to ' + R6.vs_mistral.azure[2] + '), Textract ' + R6.vs_mistral.textract[0] + ' (' +
-  R6.vs_mistral.textract[1] + ' to ' + R6.vs_mistral.textract[2] + ', a tie at this n). A spot check, not on the 96 charts. Source: ' + R6.source + '.';
+  R6.vs_mistral.textract[1] + ' to ' + R6.vs_mistral.textract[2] + ', a tie at this n). A spot check, not on the 96 charts. ' + R6.splitters + ' Source: ' + R6.source + '.';
 
 // Part 4: FarmShare.
 const FS = DATA.farmshare;
