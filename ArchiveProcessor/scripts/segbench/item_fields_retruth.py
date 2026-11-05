@@ -35,22 +35,26 @@ deleted (the bench cache budget). No ABBYY text goes to any model.
 
 Drafts. Gemini 3.7 Flash (A) and GPT 5.6 Luna (B) through the Stanford gateway, blind, temperature 0, low reasoning
 effort, each shown every capped page's image and the Vision text with page marks (first TEXT_CAP characters), with
-PROMPT. The label definitions (item_fields.by_definition) are applied to every reading before agreement. A document
-whose readings agree on every field takes A's. Otherwise Gemini 3.7, at its default reasoning, rules every field,
+PROMPT. The label definitions (item_fields.by_definition) are applied to every reading before agreement, and again
+to the assembled label (truth_of), so a ruled kind decides which fields the label may have. A document whose readings
+agree on every field takes A's. Otherwise Gemini 3.7, at its default reasoning, rules every field,
 shown both readings in a seeded random order (it is not told which is its own) with the same images and text; the
 report counts how often it sided with its own reading, with Luna's, mixed, or neither.
 
 Kind for correspondence (FLD-2). On W46.fix-ent-truth's 159, its is_correspondence ruling (two other frontier
 families, first and last pages) decides whether the kind is correspondence: a truth kind on the wrong side of it is
 replaced by a reader's kind on the right side (A first), else "letter" or "other", and the document goes on the
-sheet's kind part, with the 14 documents where the old truth's kind crossed that ruling.
+sheet's kind part, with the 14 documents where the old truth's kind crossed that ruling. A kind taken from a reader
+brings that reader's title, byline, publication and date; a default "other" marks them unknown (unknown_fields), so
+the score item leaves them out.
 
 The old Qwen3-VL 8B and Gemma 3 12B readings and the old truth are kept on each row as opinions, never as truth.
 
 The app's call (FLD-4). The app's tagging prompt (date_tagging.build_prompt, which test_date_tagging holds equal to
 TagGenerator's) on the document's Vision text, its first 3,000 characters as the app sends, with the nearby
 documents' block built as the app builds it (up to three neighbouring segments in the folder, 300 characters each)
-from the Vision text of each neighbour's first page. Gemini 3.7 Flash, temperature 0, the gateway's default reasoning
+from the Vision text of each neighbour's first page (the app joins all of a neighbour's pages before cutting at 300,
+so a neighbour whose first page holds under 300 characters gives a shorter block here). Gemini 3.7 Flash, temperature 0, the gateway's default reasoning
 (the app sends no thinking setting); labelled "gemini-3.7-flash vision" in the score item. It replaces the deferred
 74-document run in paid-runs-deferred.md.
 
@@ -62,7 +66,9 @@ choice is shown as two readings in random order, or one value to confirm; boxes 
 were quoted from, drawn for both readings so a box shows nothing about which is the truth.
 
 The gateway is real money on a Stanford PTA: CAP bounds this item (owner, 2026-10-30: up to $5.30, under $7),
-counted from the token usage at ceiling prices or the gateway's own figure, whichever is larger. Texts, images,
+counted from the token usage at ceiling prices or the gateway's own figure, whichever is larger; a call that
+never answers is counted at its worst case. The four workers check the cap without a lock, so the total could pass it
+by up to three calls' worst case (about $0.15), still under $7. Texts, images,
 readings, the truth and the sheet stay in the bench cache (the owner's material; the repo is public).
 """
 from __future__ import annotations
@@ -336,8 +342,12 @@ def cmd_pages(a):
     mp = os.path.join(CACHE, "pages.json")
     metas = json.load(open(mp)) if os.path.exists(mp) else {}
     docs = load_docs()[: a.limit or None]
+    read = {p for d in docs for p in capped(d["pages"])}   # a neighbour-only page needs its Vision text alone
     want = list(dict.fromkeys([p for d in docs for p in capped(d["pages"])] + [p for d in docs for p in d["near"]]))
-    todo = [p for p in want if not (os.path.exists(lines_path(p)) and os.path.exists(send_path(p)))]
+
+    def finished(p):
+        return os.path.exists(lines_path(p)) and (p not in read or os.path.exists(send_path(p)))
+    todo = [p for p in want if not finished(p)]
     print(f"{len(want)} pages wanted, {len(todo)} to do", flush=True)
 
     def one(p):
@@ -374,15 +384,16 @@ def cmd_pages(a):
                             "word_share": round(share, 3)}
                 vision([p])
         for p in batch:
-            if os.path.exists(full_path(p)):
+            if os.path.exists(full_path(p)) and p in read:
                 with Image.open(full_path(p)) as im:
                     im.thumbnail((SEND_SIDE, SEND_SIDE))
                     im.save(send_path(p), "JPEG", quality=85)
+            if os.path.exists(full_path(p)):
                 os.remove(full_path(p))
         json.dump(metas, open(mp + ".tmp", "w"), indent=1)
         os.replace(mp + ".tmp", mp)
         print(f"[{min(i + a.batch, len(todo))}/{len(todo)}] pages", flush=True)
-    bad = [p for p in want if not (os.path.exists(lines_path(p)) and os.path.exists(send_path(p)))]
+    bad = [p for p in want if not finished(p)]
     print(f"done; {len(bad)} pages missing; {sum(m.get('source') == 'pdf' for m in metas.values())} read from the PDF")
 
 
@@ -454,7 +465,13 @@ def call(stage, doc_id, model, images, text, effort):
         except Exception as e:  # noqa: BLE001 — a dropped connection is retried, then reported
             if attempt < 2:
                 time.sleep(10 * (attempt + 1)); continue
-            print(doc_id, "request failed:", str(e)[:200]); return {"meta": {}, "raw": None}
+            print(doc_id, "request failed:", str(e)[:200])
+            rec = {"stage": stage, "doc": doc_id, "http": None, "t": t, "model": model, "usage": {},
+                   "cost": round(worst, 6), "images": len(images), "content_sha256": digest, "request": settings,
+                   "note": "no reply; counted at the worst case, since the gateway may have billed it"}
+            with open(os.path.join(CACHE, "calls.jsonl"), "a") as fh:
+                fh.write(json.dumps(rec) + "\n")
+            return {"meta": rec, "raw": None}
         if r.status_code in (429, 500, 502, 503, 504) and attempt < 2:
             time.sleep(10 * (attempt + 1)); continue
         break
@@ -526,7 +543,7 @@ def show(r):
 
 
 def both(d):
-    return tuple(IF.by_definition(reading("drafts/" + k, d["id"])) for k in READERS)
+    return tuple(defined(reading("drafts/" + k, d["id"])) for k in READERS)
 
 
 def order_of(doc_id):
@@ -592,36 +609,64 @@ def w46_kind(final, pa, pb, w46_corr):
     return ("letter" if w46_corr else "other"), "default"
 
 
+DEFINED = ("title", "byline", "publication", "publication_date")   # the fields by_definition empties by kind
+
+
+def defined(r):
+    """A reading with the label definitions applied, its quotes kept."""
+    return None if r is None else {**IF.by_definition(r), "quotes": r.get("quotes") or {}}
+
+
 def truth_of(d):
-    """(label, how, details) for one document; label None when a draft or the ruling is missing."""
-    pa, pb = both(d)
+    """(label, how, details) for one document; label None when a draft or the ruling is missing.
+
+    Agreement is judged on the readings with the definitions applied; the label is assembled from the readings as
+    given (Gemini's on agreed fields, the ruling's on disputed ones) and the definitions are applied to it last, so
+    a ruling's kind decides which fields the kind allows, not the kind each reading had. Each field keeps the quote
+    of the reading it was taken from (on a disputed field, the ruling's own, else the reader's it matched)."""
+    ra, rb = (reading("drafts/" + k, d["id"]) for k in READERS)
+    pa, pb = defined(ra), defined(rb)
     if not pa or not pb:
         return None, "missing draft", {}
     dis = IF.disputes(pa, pb)
     det = {"disputed": dis, "first_is_gemini": order_of(d["id"])}
+    quotes = {f: (ra.get("quotes") or {}).get(f) for f in IF.FIELDS if f not in dis}
     if not dis:
-        final, how = dict(pa), "agreed"
+        final, how = dict(ra), "agreed"
     else:
-        pr = IF.by_definition(reading("adjudicated", d["id"]))
-        if not pr:
+        rr = reading("adjudicated", d["id"])
+        if not rr:
             return None, "missing ruling", det
+        pr = defined(rr)
         how = "ruled"
         det["side"] = side(dis, pr, pa, pb)
         det["field_sides"] = {f: ("both" if IF.agree(f, pr.get(f), pa.get(f)) and IF.agree(f, pr.get(f), pb.get(f))
                                   else "gemini" if IF.agree(f, pr.get(f), pa.get(f))
                                   else "luna" if IF.agree(f, pr.get(f), pb.get(f)) else "neither") for f in dis}
-        final = {f: (pr if f in dis else pa).get(f) for f in IF.FIELDS}
-        final["quotes"] = {**(pb.get("quotes") or {}), **(pa.get("quotes") or {}), **(pr.get("quotes") or {})}
-        final["basis"] = pr.get("basis")
+        final = {f: (rr if f in dis else ra).get(f) for f in IF.FIELDS}
+        src = {"gemini": ra, "luna": rb, "both": ra}
+        for f in dis:
+            quotes[f] = (rr.get("quotes") or {}).get(f) or (
+                (src[det["field_sides"][f]].get("quotes") or {}).get(f) if det["field_sides"][f] in src else None)
+        final["basis"] = rr.get("basis")
     if d["set"].startswith("ent-"):
         w46 = d["group"] == "correspondence"
         det["w46_correspondence"] = w46
-        k, src = w46_kind(final, pa, pb, w46)
-        if src:
-            det["kind_before_w46"], det["kind_from"] = final["kind"], "w46 " + src
+        k, how_k = w46_kind(IF.by_definition(final), pa, pb, w46)
+        if how_k:
+            det["kind_before_w46"], det["kind_from"] = IF.by_definition(final)["kind"], "w46 " + how_k
             final["kind"] = k
-            final = {**IF.by_definition(final), "quotes": final.get("quotes"), "basis": final.get("basis")}
-    return final, how, det
+            if how_k == "reader":   # the fields the new kind allows, from the reader the kind came from
+                r = ra if pa.get("kind") == k else rb
+                for f in DEFINED:
+                    final[f] = r.get(f)
+                    quotes[f] = (r.get("quotes") or {}).get(f)
+            elif k not in IF.CORRESP:   # no reader read it as this kind: those fields are not known
+                det["unknown_fields"] = list(DEFINED)
+    out = IF.by_definition(final)
+    out["quotes"] = {f: q for f, q in quotes.items() if q and IF.filled(f, out.get(f))}
+    out["basis"] = final.get("basis")
+    return out, how, det
 
 
 def old_opinions(d):
@@ -984,6 +1029,8 @@ def cmd_build(a):
                           for p in parts},
         "filled": {f: by_part([r for r in rows if IF.filled(f, r[f])]) for f in IF.FIELDS},
         "w46_kind_changed": sum(bool(r.get("kind_from")) for r in rows),
+        "w46_kind_from": dict(collections.Counter(r["kind_from"] for r in rows if r.get("kind_from"))),
+        "unknown_fields_docs": sum(bool(r.get("unknown_fields")) for r in rows),
         "w46_old_cross": sum(x["part"] == "kind" and keyed[x["id"]]["old_cross"] for v in items.values() for x in v),
         "agree_with_old_truth": {f: [agree_old[f], sum(r["id"] in old for r in rows)] for f in IF.FIELDS},
         "pages": {"read": len(read), "from_pdf": sum(meta.get(p, {}).get("source") == "pdf" for p in read),
@@ -1061,7 +1108,10 @@ def report(o):
           "Disputed fields (documents): " + ", ".join(f"{k} {v}" for k, v in sorted(c["disputed_fields"].items(),
                                                                                   key=lambda x: -x[1])) + ".", "",
           f"Kind for correspondence: W46.fix-ent-truth's ruling decided whether each of its documents is "
-          f"correspondence; it changed this truth's kind on {c['w46_kind_changed']}. Against the old truth "
+          f"correspondence; it changed this truth's kind on {c['w46_kind_changed']} ("
+          + ", ".join(f"{k} {v}" for k, v in sorted(c["w46_kind_from"].items())) + "; a reader's kind brings that "
+          f"reader's printed-piece fields, a default kind leaves them unknown, {c['unknown_fields_docs']} documents). "
+          "Against the old truth "
           "(W47.item-fields-truth's, kept on each row as an opinion with its two readers), the new truth agrees by "
           "field: " + ", ".join(f"{f} {v[0]} of {v[1]}" for f, v in c["agree_with_old_truth"].items()) + ".", "",
           "## The app's call on Vision text", "",

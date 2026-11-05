@@ -94,6 +94,64 @@ class W46Kind(unittest.TestCase):
                          ("letter", "default"))
 
 
+class TruthOf(unittest.TestCase):
+    """The label: definitions applied to the assembled label, the W46 kind rule, quotes from the reading taken."""
+
+    def setUp(self):
+        self._r = R.reading
+        self.docs = {}
+        R.reading = lambda stage, doc_id: self.docs.get((stage, doc_id))
+
+    def tearDown(self):
+        R.reading = self._r
+
+    def put(self, doc_id, a, b, ruling=None):
+        self.docs[("drafts/gemini", doc_id)] = a
+        self.docs[("drafts/luna", doc_id)] = b
+        if ruling:
+            self.docs[("adjudicated", doc_id)] = ruling
+
+    def test_a_ruled_memo_drops_the_agreed_byline(self):
+        a = reading(kind="report", byline=["Ford Foundation"], quotes={"byline": "FORD FOUNDATION"})
+        b = reading(kind="press release", byline=["Ford Foundation"])
+        self.put("x", a, b, reading(kind="memo", byline=["Ford Foundation"]))
+        t, how, det = R.truth_of({"id": "x", "set": "clippings", "group": "clippings"})
+        self.assertEqual((how, det["disputed"], t["kind"], t["byline"]), ("ruled", ["kind"], "memo", []))
+        self.assertNotIn("byline", t["quotes"])
+
+    def test_the_rulings_publication_kept_on_an_agreed_article(self):
+        a = reading(kind="newspaper article", publication="The Times")
+        b = reading(kind="newspaper article", publication="Sunday Magazine")
+        self.put("y", a, b, reading(kind="letter", publication="The Times", quotes={"publication": "THE TIMES"}))
+        t, _how, _det = R.truth_of({"id": "y", "set": "clippings", "group": "clippings"})
+        self.assertEqual((t["kind"], t["publication"]), ("newspaper article", "The Times"))
+        self.assertEqual(t["quotes"]["publication"], "THE TIMES")
+
+    def test_a_disputed_field_keeps_the_matched_readers_quote(self):
+        a = reading(kind="clipping", title="Tax Cut", quotes={"title": "TAX CUT"})
+        b = reading(kind="clipping", title="Kennedy Plan", quotes={"title": "KENNEDY PLAN"})
+        self.put("z", a, b, reading(kind="clipping", title="Kennedy Plan"))
+        t, _how, det = R.truth_of({"id": "z", "set": "clippings", "group": "clippings"})
+        self.assertEqual((t["title"], det["field_sides"]["title"]), ("Kennedy Plan", "luna"))
+        self.assertEqual(t["quotes"]["title"], "KENNEDY PLAN")
+
+    def test_w46_kind_from_a_reader_brings_its_fields(self):
+        a = reading(kind="letter", title="Dear Sir")
+        b = reading(kind="report", title="Annual Report", byline=["Ford Foundation"])
+        self.put("w", a, b, reading(kind="letter"))
+        t, _how, det = R.truth_of({"id": "w", "set": "ent-added", "group": "ent-other"})
+        self.assertEqual((t["kind"], t["title"], t["byline"]), ("report", "Annual Report", ["Ford Foundation"]))
+        self.assertEqual(det["kind_from"], "w46 reader")
+        self.assertNotIn("unknown_fields", det)
+
+    def test_w46_default_kind_marks_its_fields_unknown(self):
+        a, b = reading(kind="letter"), reading(kind="memo", title="Budget")
+        self.put("v", a, b, reading(kind="letter", title=None))
+        t, _how, det = R.truth_of({"id": "v", "set": "ent-added", "group": "ent-other"})
+        self.assertEqual((t["kind"], det["kind_from"]), ("other", "w46 default"))
+        self.assertEqual(det["unknown_fields"], list(R.DEFINED))
+
+
 class Locate(unittest.TestCase):
     def setUp(self):
         self.lines = {"p1": [{"text": "THE NEW YORK TIMES, SUNDAY, MARCH 3, 1962", "box": [0.1, 0.05, 0.8, 0.02]},

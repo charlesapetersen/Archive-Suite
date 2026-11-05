@@ -2,7 +2,7 @@
  "counts": {
   "agree_with_old_truth": {
    "byline": [
-    192,
+    191,
     215
    ],
    "kind": [
@@ -50,7 +50,7 @@
   },
   "filled": {
    "byline": {
-    "base": 46,
+    "base": 48,
     "clippings": 42,
     "handwritten": 0
    },
@@ -153,7 +153,7 @@
    "pages read": 627
   },
   "sheet": {
-   "boxed_options": 116,
+   "boxed_options": 117,
    "by_part": {
     "control": 30,
     "dispute": 85,
@@ -266,7 +266,12 @@
    "answered": 299,
    "documents": 299
   },
+  "unknown_fields_docs": 2,
   "w46_kind_changed": 9,
+  "w46_kind_from": {
+   "w46 default": 5,
+   "w46 reader": 4
+  },
   "w46_old_cross": 14
  },
  "settings": {

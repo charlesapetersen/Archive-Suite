@@ -33,7 +33,7 @@ Pages: the JPEG originals, turned upright (102 turned); 6 read from the PDF page
 |---|---|---|---|
 | kind | 219 | 60 | 20 |
 | title | 97 | 54 | 2 |
-| byline | 46 | 42 | 0 |
+| byline | 48 | 42 | 0 |
 | publication | 39 | 50 | 0 |
 | publication_date | 40 | 49 | 0 |
 | recipient_place | 57 | 2 | 2 |
@@ -44,7 +44,7 @@ Gemini 3.7 Flash and GPT 5.6 Luna drafted every document blind through the Stanf
 
 Disputed fields (documents): title 48, kind 47, byline 24, publication 18, recipient_place 17, publication_date 15.
 
-Kind for correspondence: W46.fix-ent-truth's ruling decided whether each of its documents is correspondence; it changed this truth's kind on 9. Against the old truth (W47.item-fields-truth's, kept on each row as an opinion with its two readers), the new truth agrees by field: kind 173 of 215, title 166 of 215, byline 192 of 215, publication 183 of 215, publication_date 166 of 215, recipient_place 158 of 215.
+Kind for correspondence: W46.fix-ent-truth's ruling decided whether each of its documents is correspondence; it changed this truth's kind on 9 (w46 default 5, w46 reader 4; a reader's kind brings that reader's printed-piece fields, a default kind leaves them unknown, 2 documents). Against the old truth (W47.item-fields-truth's, kept on each row as an opinion with its two readers), the new truth agrees by field: kind 173 of 215, title 166 of 215, byline 191 of 215, publication 183 of 215, publication_date 166 of 215, recipient_place 158 of 215.
 
 ## The app's call on Vision text
 
@@ -52,7 +52,7 @@ The app's tagging prompt on the Vision text, nearby block from the neighbours' V
 
 ## The owner sheet (W47.item-fields-owner-ok)
 
-154 questions on 103 documents, about 65 minutes: control 30, dispute 85, entity 23, kind 16. Kind: every document whose kind crossed W46's correspondence ruling, now or in the old truth (14 of them in the old one). Disputed fields: at least 8 a field, the rest of 85 weighted to the fields where Gemini 3.8's cached reply sits nearest the 0.90 bar against this draft truth (kind 0.88, title -, byline 0.68, publication 0.65, publication_date 0.32, recipient_place 0.67; a weighting only, not a score); quotas recipient_place 12 of 17, title 20 of 48, byline 13 of 24, publication 12 of 18, publication_date 8 of 15, kind 20 of 43. Controls: 30 agreed fields where Gemini 3.8 also agrees with the truth, the case a shared error would hide. Entity controls: 20 of the 51 W46.fix-ent-truth documents whose ruling Claude Sonnet made for its own draft. Every choice is offered blind (readings in a random order, or one value to confirm). 116 of 153 readings carry a box from the Vision line they were quoted from.
+154 questions on 103 documents, about 65 minutes: control 30, dispute 85, entity 23, kind 16. Kind: every document whose kind crossed W46's correspondence ruling, now or in the old truth (14 of them in the old one). Disputed fields: at least 8 a field, the rest of 85 weighted to the fields where Gemini 3.8's cached reply sits nearest the 0.90 bar against this draft truth (kind 0.88, title -, byline 0.68, publication 0.65, publication_date 0.32, recipient_place 0.67; a weighting only, not a score); quotas recipient_place 12 of 17, title 20 of 48, byline 13 of 24, publication 12 of 18, publication_date 8 of 15, kind 20 of 43. Controls: 30 agreed fields where Gemini 3.8 also agrees with the truth, the case a shared error would hide. Entity controls: 20 of the 51 W46.fix-ent-truth documents whose ruling Claude Sonnet made for its own draft. Every choice is offered blind (readings in a random order, or one value to confirm). 117 of 153 readings carry a box from the Vision line they were quoted from.
 
 ## Spend
 
