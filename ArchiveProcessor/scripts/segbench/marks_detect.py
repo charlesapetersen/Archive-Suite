@@ -4,6 +4,7 @@
   <lab venv>/bin/python marks_detect.py detect pp          # PP-DocLayoutV3 regions on the 32 truth pages
   python3 marks_detect.py report                          # segbench-results/marks-detect.{json,md}
   python3 marks_detect.py pack --out DIR                  # the Sherlock pack (YOLO11m training, sherlock/marks-detect)
+  $(torch-env.sh) marks_detect.py coreml                  # Core ML export of the trained best.pt, timed on the 32
 
 Truth is the reconciled owner core (W46.fix-marks-sheet-feedback): the 32 detector-eligible pages and their
 rough boxes. Excluded pages are never read as no-mark negatives. Boxes are matched one to one, class-agnostic
@@ -41,6 +42,9 @@ ARMS = {
                  pages="all", conf=0.25),
     "yolo-pilot": dict(name="YOLO11m one-epoch pilot (conf 0.25)", file=CLUSTER / "pilot.json", labels=None,
                        pages="all", conf=0.25, sweep=False),
+    # The Core ML export run on this Mac: parity with the cluster's PyTorch boxes, and seconds a page.
+    "yolo-coreml": dict(name="YOLO11m, Core ML on the Mac (conf 0.25)", file="coreml.json", labels=None,
+                        pages="all", conf=0.25, sweep=False),
 }
 SWEEP = (0.05, 0.1, 0.15, 0.25, 0.4, 0.5, 0.6)
 RULES = {"iou50": 0.5, "hit": 0.1}
@@ -170,6 +174,41 @@ def sweep(t, pages):
     return out
 
 
+def coreml(t):
+    """Export best.pt to an .mlpackage (NMS in Ultralytics after it: the coremltools 9 NMS pipeline fails on this torch) at 1,024 px and run it on the 32 pages as the cluster did
+    (conf 0.05 kept, the arm cuts at 0.25). Seconds a page exclude the first two pages (model compile, warm-up)."""
+    import platform
+    import shutil
+    import time
+    import coremltools
+    import ultralytics
+    from ultralytics import YOLO
+    WORK.mkdir(parents=True, exist_ok=True)
+    pt = WORK / "best.pt"
+    shutil.copyfile(CLUSTER / "runs/public/best.pt", pt)
+    t0 = time.time()
+    pkg = Path(YOLO(str(pt)).export(format="coreml", imgsz=1024, nms=False))
+    export_s = time.time() - t0
+    model = YOLO(str(pkg), task="detect")
+    names = model.names
+    out, secs = {}, []
+    for pid in t:
+        t0 = time.perf_counter()
+        r = model.predict(str(IMAGES / f"{pid}.jpg"), imgsz=1024, conf=0.05, verbose=False)[0]
+        secs.append(time.perf_counter() - t0)
+        out[pid] = [dict(box=[round(float(v), 5) for v in b], cls=names[int(c)], conf=round(float(c2), 4))
+                    for b, c, c2 in zip(r.boxes.xyxyn.tolist(), r.boxes.cls.tolist(), r.boxes.conf.tolist())]
+    warm = sorted(secs[2:])
+    size = sum(f.stat().st_size for f in pkg.rglob("*") if f.is_file())
+    meta = dict(ultralytics=ultralytics.__version__, coremltools=coremltools.__version__,
+                machine=platform.machine(), mac=platform.mac_ver()[0], export_seconds=round(export_s, 1),
+                package_mb=round(size / 1e6, 1), pages=len(secs), first_page_seconds=round(secs[0], 2),
+                median_seconds=round(warm[len(warm) // 2], 3), mean_seconds=round(sum(warm) / len(warm), 3))
+    (WORK / "coreml.json").write_text(json.dumps(dict(model="YOLO11m public, Core ML", imgsz=1024, conf_floor=0.05,
+                                                      meta=meta, pages=out)))
+    print(json.dumps(meta))
+
+
 def detect_pp(t):
     sys.path.insert(0, str(HERE))
     import layout
@@ -288,6 +327,9 @@ def main(argv):
     if len(argv) == 3 and argv[:2] == ["pack", "--out"]:
         pack(t, argv[2])
         return 0
+    if argv == ["coreml"]:
+        coreml(t)
+        return 0
     if argv == ["split", "pp"]:
         split(json.loads((WORK / "pp-raw.json").read_text()))
         return 0
@@ -296,9 +338,11 @@ def main(argv):
         for key, arm in ARMS.items():
             f = WORK / arm["file"]
             if f.exists():
-                pages = json.loads(f.read_text())["pages"]
+                d = json.loads(f.read_text())
+                pages = d["pages"]
                 res[key] = dict(name=arm["name"], pages=arm["pages"],
-                                score=score(t, boxes(pages, arm.get("conf")), arm))
+                                score=score(t, boxes(pages, arm.get("conf")), arm),
+                                **({"meta": d["meta"]} if "meta" in d else {}))
                 if arm.get("sweep", "conf" in arm):
                     res[key]["sweep"] = sweep(t, pages)
         (RESULTS / "marks-detect.json").write_text(json.dumps(res, indent=1) + "\n")

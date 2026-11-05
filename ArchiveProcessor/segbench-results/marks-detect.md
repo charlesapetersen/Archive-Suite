@@ -10,6 +10,7 @@ Truth: 32 detector-eligible owner-core pages, 45 rough boxes (`marks_detect.py r
 | PP-DocLayoutV3, any region (coverage only) | 4/45 = 9% (2-17) | 1/6 = 17% (0-50) | 3/39 = 8% (0-14) | 2/18 = 11% (0-26) | 2/27 = 7% (0-22) | 403 | – |
 | YOLO11m, AnnoPage + SignverOD (conf 0.25) | 8/45 = 18% (5-37) | 1/6 = 17% (0-50) | 7/39 = 18% (4-41) | 3/18 = 17% (0-42) | 5/27 = 18% (0-46) | 15 | 53% |
 | YOLO11m one-epoch pilot (conf 0.25) | 0/45 = 0% (0-0) | 0/6 = 0% (0-0) | 0/39 = 0% (0-0) | 0/18 = 0% (0-0) | 0/27 = 0% (0-0) | 2 | 0% |
+| YOLO11m, Core ML on the Mac (conf 0.25) | 8/45 = 18% (6-34) | 2/6 = 33% (0-75) | 6/39 = 15% (4-33) | 3/18 = 17% (0-42) | 5/27 = 18% (4-38) | 14 | 57% |
 
 ## Recall, IoU >= 0.5, the filed rule
 
@@ -19,6 +20,7 @@ Truth: 32 detector-eligible owner-core pages, 45 rough boxes (`marks_detect.py r
 | PP-DocLayoutV3, any region (coverage only) | 1/45 = 2% (0-5) | 0/6 = 0% (0-0) | 1/39 = 3% (0-6) | 1/18 = 6% (0-15) | 0/27 = 0% (0-0) | 403 | – |
 | YOLO11m, AnnoPage + SignverOD (conf 0.25) | 6/45 = 13% (2-33) | 1/6 = 17% (0-50) | 5/39 = 13% (0-33) | 2/18 = 11% (0-33) | 4/27 = 15% (0-42) | 15 | 40% |
 | YOLO11m one-epoch pilot (conf 0.25) | 0/45 = 0% (0-0) | 0/6 = 0% (0-0) | 0/39 = 0% (0-0) | 0/18 = 0% (0-0) | 0/27 = 0% (0-0) | 2 | 0% |
+| YOLO11m, Core ML on the Mac (conf 0.25) | 6/45 = 13% (3-28) | 2/6 = 33% (0-75) | 4/39 = 10% (0-25) | 2/18 = 11% (0-33) | 4/27 = 15% (0-33) | 14 | 43% |
 
 ## YOLO11m, AnnoPage + SignverOD: confidence sweep
 
@@ -58,9 +60,19 @@ second-best class on AnnoPage: the public stamps are library and ownership stamp
 stamps. Annotations went best (9 of 17 at 0.05). The one-epoch pilot found nothing, which says only that the
 chain ran.
 
+The trained model exports to Core ML on this Mac (Ultralytics 8.4.202, coremltools 9.0; an 80.6 MB fp32
+`.mlpackage`, NMS left to Ultralytics because coremltools 9's NMS pipeline fails to convert on torch 2.15). On the
+M3 Pro it takes a median 0.43 s a page, JPEG decode included, after a 1.1 s first page (an engine session's timing,
+so an upper bound). Its boxes are not identical to the cluster's, since the export takes a square 1,024 px input
+where PyTorch took the page's own shape: the same 8 of 45 at the default floor, but 2 rather than 1 on the A-core,
+and 14 boxes rather than 15.
+
+Reading the marks it finds is the other half (`marks-read.md`): on the owner's own boxes LightOnOCR-3 4B reads 17
+of 35 marks at NES 0.8 and Apple Vision 13; through this detector's boxes, 6 at best.
+
 So no detector measured here is a marks layer. Public training data does not transfer to these pages at a usable
-recall; the next step is a fine-tune on our own pages (filed as W46.marks-detect-own), and the comparison that
-decides the route is a whole-page reader (W46.mixed-route), which needs no detector.
+recall. The comparison that decides the route is a whole-page reader (W46.mixed-route), which needs no detector;
+a fine-tune on our own pages (W46.marks-detect-own) waits on it and runs only if whole-page readers miss marks.
 
 ## Arms not run here
 
@@ -79,12 +91,13 @@ decides the route is a whole-page reader (W46.mixed-route), which needs no detec
   `marks-set-reconciled-da388b05c388-dac79c80c2f6`): owner keep/reject, class and touches-print on 32 pages. The
   boxes are rough draft boxes from Gemini 3.7 Flash and Qwen3-VL 8B that the owner kept, plus one owner box. They
   are not tight geometry, which is why the loose rule is reported beside IoU 0.5. Neither PP-DocLayoutV3 nor
-  anything trained from it drafted or chose a page.
+  the YOLO11m drafted or chose a page, and the YOLO11m was trained on public sets only (no page of ours).
 - **Selection.** The frozen two-phase selection: A-core (15 pages) independent of every route, B-core (17) drawn
   from Qwen3.6-27B's pre-flag bands. Reported apart and pooled descriptively, without population weights. Excluded
   pages (8) are not negatives.
-- **Comparison.** One image per page (the freeze's 2,400 px copies), the detector's default settings (score floor
-  0.5, 1,024 px), class-agnostic one-to-one matching.
+- **Comparison.** One image per page (the freeze's 2,400 px copies), class-agnostic one-to-one matching, each
+  detector at its default settings: PP-DocLayoutV3 at score floor 0.5 and 1,024 px; the YOLO11m at 1,024 px and
+  Ultralytics' floor 0.25, with the sweep beside it.
 - **Noise.** n = 45 boxes on 32 pages. Page bootstrap, 2,000 resamples, seed 46. With 45 boxes, a detector's pooled
   recall carries an interval of about ±14 points, so only large differences separate two detectors. No per-class
   ranking: no class has more than 17 boxes.

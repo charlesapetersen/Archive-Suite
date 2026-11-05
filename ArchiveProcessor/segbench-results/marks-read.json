@@ -1,0 +1,305 @@
+{
+ "meta": {
+  "crops": 48,
+  "lighton_median_s": 1.1
+ },
+ "arms": {
+  "vision/oracle": {
+   "marks": 35,
+   "boxed": 35,
+   "mean_nes": 0.593,
+   "mean_ci": [
+    0.496,
+    0.734
+   ],
+   "read": 13,
+   "read_ci": [
+    0.219,
+    0.581
+   ],
+   "mean_nes_boxed": 0.593,
+   "by_class": {
+    "annotation": {
+     "n": 14,
+     "read": 4
+    },
+    "marginal_note": {
+     "n": 10,
+     "read": 1
+    },
+    "other": {
+     "n": 2,
+     "read": 2
+    },
+    "stamp": {
+     "n": 9,
+     "read": 6
+    }
+   }
+  },
+  "vision/det25": {
+   "marks": 35,
+   "boxed": 6,
+   "mean_nes": 0.119,
+   "mean_ci": [
+    0.017,
+    0.272
+   ],
+   "read": 2,
+   "read_ci": [
+    0.0,
+    0.16
+   ],
+   "mean_nes_boxed": 0.697,
+   "by_class": {
+    "annotation": {
+     "n": 14,
+     "read": 2
+    },
+    "marginal_note": {
+     "n": 10,
+     "read": 0
+    },
+    "other": {
+     "n": 2,
+     "read": 0
+    },
+    "stamp": {
+     "n": 9,
+     "read": 0
+    }
+   }
+  },
+  "vision/det05": {
+   "marks": 35,
+   "boxed": 13,
+   "mean_nes": 0.234,
+   "mean_ci": [
+    0.112,
+    0.418
+   ],
+   "read": 5,
+   "read_ci": [
+    0.038,
+    0.318
+   ],
+   "mean_nes_boxed": 0.631,
+   "by_class": {
+    "annotation": {
+     "n": 14,
+     "read": 4
+    },
+    "marginal_note": {
+     "n": 10,
+     "read": 0
+    },
+    "other": {
+     "n": 2,
+     "read": 0
+    },
+    "stamp": {
+     "n": 9,
+     "read": 1
+    }
+   }
+  },
+  "lighton/oracle": {
+   "marks": 35,
+   "boxed": 35,
+   "mean_nes": 0.619,
+   "mean_ci": [
+    0.474,
+    0.819
+   ],
+   "read": 17,
+   "read_ci": [
+    0.3,
+    0.742
+   ],
+   "mean_nes_boxed": 0.619,
+   "by_class": {
+    "annotation": {
+     "n": 14,
+     "read": 4
+    },
+    "marginal_note": {
+     "n": 10,
+     "read": 5
+    },
+    "other": {
+     "n": 2,
+     "read": 2
+    },
+    "stamp": {
+     "n": 9,
+     "read": 6
+    }
+   }
+  },
+  "lighton/det25": {
+   "marks": 35,
+   "boxed": 6,
+   "mean_nes": 0.147,
+   "mean_ci": [
+    0.021,
+    0.342
+   ],
+   "read": 4,
+   "read_ci": [
+    0.0,
+    0.286
+   ],
+   "mean_nes_boxed": 0.856,
+   "by_class": {
+    "annotation": {
+     "n": 14,
+     "read": 1
+    },
+    "marginal_note": {
+     "n": 10,
+     "read": 3
+    },
+    "other": {
+     "n": 2,
+     "read": 0
+    },
+    "stamp": {
+     "n": 9,
+     "read": 0
+    }
+   }
+  },
+  "lighton/det05": {
+   "marks": 35,
+   "boxed": 13,
+   "mean_nes": 0.249,
+   "mean_ci": [
+    0.108,
+    0.48
+   ],
+   "read": 6,
+   "read_ci": [
+    0.043,
+    0.394
+   ],
+   "mean_nes_boxed": 0.669,
+   "by_class": {
+    "annotation": {
+     "n": 14,
+     "read": 3
+    },
+    "marginal_note": {
+     "n": 10,
+     "read": 3
+    },
+    "other": {
+     "n": 2,
+     "read": 0
+    },
+    "stamp": {
+     "n": 9,
+     "read": 0
+    }
+   }
+  },
+  "fallback/oracle": {
+   "marks": 35,
+   "boxed": 35,
+   "mean_nes": 0.703,
+   "mean_ci": [
+    0.545,
+    0.89
+   ],
+   "read": 18,
+   "read_ci": [
+    0.318,
+    0.773
+   ],
+   "mean_nes_boxed": 0.703,
+   "by_class": {
+    "annotation": {
+     "n": 14,
+     "read": 4
+    },
+    "marginal_note": {
+     "n": 10,
+     "read": 5
+    },
+    "other": {
+     "n": 2,
+     "read": 2
+    },
+    "stamp": {
+     "n": 9,
+     "read": 7
+    }
+   }
+  },
+  "fallback/det25": {
+   "marks": 35,
+   "boxed": 6,
+   "mean_nes": 0.147,
+   "mean_ci": [
+    0.021,
+    0.342
+   ],
+   "read": 4,
+   "read_ci": [
+    0.0,
+    0.286
+   ],
+   "mean_nes_boxed": 0.856,
+   "by_class": {
+    "annotation": {
+     "n": 14,
+     "read": 1
+    },
+    "marginal_note": {
+     "n": 10,
+     "read": 3
+    },
+    "other": {
+     "n": 2,
+     "read": 0
+    },
+    "stamp": {
+     "n": 9,
+     "read": 0
+    }
+   }
+  },
+  "fallback/det05": {
+   "marks": 35,
+   "boxed": 13,
+   "mean_nes": 0.271,
+   "mean_ci": [
+    0.126,
+    0.497
+   ],
+   "read": 7,
+   "read_ci": [
+    0.065,
+    0.429
+   ],
+   "mean_nes_boxed": 0.731,
+   "by_class": {
+    "annotation": {
+     "n": 14,
+     "read": 3
+    },
+    "marginal_note": {
+     "n": 10,
+     "read": 3
+    },
+    "other": {
+     "n": 2,
+     "read": 0
+    },
+    "stamp": {
+     "n": 9,
+     "read": 1
+    }
+   }
+  }
+ }
+}
