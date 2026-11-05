@@ -175,7 +175,7 @@ def score(col, manifest, key, output_dir=None):
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--root", type=Path, required=True)
-    ap.add_argument("--box", choices=("crest", "lincoln"), required=True)
+    ap.add_argument("--box", choices=("crest", "lincoln", "lincoln2"), required=True)  # lincoln2: W46.seg-adapt-lora
     sub = ap.add_subparsers(dest="command", required=True)
     for cmd in ("verify", "ocr", "score", "pack"):
         p = sub.add_parser(cmd)
