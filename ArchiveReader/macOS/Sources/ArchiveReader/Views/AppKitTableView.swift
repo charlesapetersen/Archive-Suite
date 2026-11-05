@@ -220,6 +220,10 @@ struct AppKitTableView: NSViewRepresentable {
             }
         }
 
+        // Flags live in `FlagStore`, not in the rows, so a toggle leaves `displayedGeneration` alone and the
+        // reload above never ran: the ⚑ cell kept its old value (W40.fix-reader-flag).
+        coordinator.reloadFlagChanges(model.flags.flagged)
+
         // Selection sync (SwiftUI → AppKit). Also after the rows change: the highlight is row indices,
         // and a new snapshot shifts or drops them while the model's selection stays the same, so the
         // `lastPushedSelection` check alone left a selection unhighlighted — the "2 selected", nothing highlighted, of
@@ -298,6 +302,25 @@ struct AppKitTableView: NSViewRepresentable {
             rows = files
             if idsChanged { applySnapshot(files.map(\.id), animated: false) }
             return idsChanged
+        }
+
+        /// The flagged set the table last drew.
+        private var lastFlagged: Set<String>?
+
+        /// Redraw the ⚑ cell of every row whose flag changed since the last call, and return those rows. Only
+        /// the flag column is reloaded, so a tag cell being edited keeps its field editor.
+        @discardableResult
+        func reloadFlagChanges(_ flagged: Set<String>) -> IndexSet {
+            defer { lastFlagged = flagged }
+            guard let last = lastFlagged, last != flagged, let tableView else { return [] }
+            let column = tableView.column(withIdentifier: NSUserInterfaceItemIdentifier("flag"))
+            guard column >= 0 else { return [] }
+            let changed = last.symmetricDifference(flagged)
+            let rowSet = IndexSet(currentSnapshotIDs.indices.filter { changed.contains(currentSnapshotIDs[$0].path) })
+            if !rowSet.isEmpty {
+                tableView.reloadData(forRowIndexes: rowSet, columnIndexes: IndexSet(integer: column))
+            }
+            return rowSet
         }
 
         /// The file shown under `id`, or nil when `rows` and the snapshot disagree about it.

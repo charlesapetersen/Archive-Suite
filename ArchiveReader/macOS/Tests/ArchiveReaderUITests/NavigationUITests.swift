@@ -241,6 +241,36 @@ final class NavigationUITests: FixtureUITestCase {
         XCTAssertTrue(cell.isHittable, "the Read cell should be on screen to be clicked")
     }
 
+    // MARK: - Toggle Flag shows the flag at once (W40.fix-reader-flag)
+
+    /// Owner session reader-1, row 23: ⇧⌘F set the flag but the ⚑ cell kept its old value, because the table
+    /// redrew rows only when the list itself changed. Flags are app-side, so nothing is written to the document.
+    func testToggleFlagShowsAndClearsTheFlagAtOnce() throws {
+        try requireGeneratedScratchFixtureForTagWrites()
+        let name = "00004 IMG — Brown.pdf"
+        typeInField("ar.filter.name", text: "00004")
+        XCTAssertTrue(waitForRowCount(1), "name filter should isolate the scratch document")
+        let cell = app.staticTexts.matching(NSPredicate(
+            format: "identifier BEGINSWITH 'ar.cell.flag.' AND identifier ENDSWITH %@", name)).firstMatch
+        XCTAssertTrue(cell.waitForExistence(timeout: 5), "the ⚑ column should have a cell for the document")
+        clickRow(0)
+        func waitForLabel(_ label: String) -> Bool {
+            let deadline = Date().addingTimeInterval(5)
+            while cell.label != label, Date() < deadline { RunLoop.current.run(until: Date().addingTimeInterval(0.1)) }
+            return cell.label == label
+        }
+        // A flag left by an earlier run would make the first press clear it.
+        if cell.label == "Flagged" { pressKey("f", modifiers: [.command, .shift]); XCTAssertTrue(waitForLabel("Not flagged")) }
+        XCTAssertEqual(cell.label, "Not flagged", "the document should begin unflagged")
+
+        pressKey("f", modifiers: [.command, .shift])
+        let shown = waitForLabel("Flagged")
+        captureScreenshot("w40-reader-flag-after-toggle")
+        XCTAssertTrue(shown, "⇧⌘F should show the flag in the ⚑ column at once")
+        pressKey("f", modifiers: [.command, .shift])
+        XCTAssertTrue(waitForLabel("Not flagged"), "a second ⇧⌘F should clear it at once")
+    }
+
     // MARK: - Save Search takes the keyboard; Quality chips run Q1 → Q3 (W40.fix-reader-visual-polish)
 
     func testSaveSearchNameFieldHasTheKeyboardAndQualityChipsAscend() throws {

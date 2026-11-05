@@ -27,7 +27,7 @@ final class NavigationModel: ObservableObject {
     /// Monotonic lease for an async archive-copy enrichment. A later copy command must always win over
     /// an older thumbnail task, even when both began against the same pasteboard change count.
     private var archiveCopyGeneration = 0
-    let flags = FlagStore()
+    let flags: FlagStore
     let savedSearches = SavedSearchStore()
     let excludedFolders: ExcludedFoldersStore
     /// W24.cal1-reader: each document's display calendar, app-side (never written to the corpus).
@@ -165,6 +165,7 @@ final class NavigationModel: ObservableObject {
          indexer: ContentIndexer = ContentIndexer(),
          thumbnailer: PDFThumbnailer? = ArchiveTestHost.isUnitTestHost ? nil : ArchiveLinkThumbnailer.shared) {
         self.defaults = defaults
+        self.flags = FlagStore(defaults: defaults)
         self.indexer = indexer
         self.thumbnailer = thumbnailer
         self.library = ArchiveLibrary(defaults: defaults)
