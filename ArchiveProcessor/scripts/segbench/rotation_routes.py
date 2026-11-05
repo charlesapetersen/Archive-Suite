@@ -62,7 +62,7 @@ TURNS = (0, 90, 180, 270)
 RESULTS = HERE.parents[1] / 'segbench-results'
 BENCH = HERE.parents[2] / 'ArchiveOCRBench'
 PROCESSOR = HERE.parents[1]
-CAP = 6.50            # the item's gateway total in dollars, under the $7 rule
+CAP = 6.90            # the item's gateway total in dollars, under the $7 rule (llmSingle $3.24 + the majority half ~$3.24)
 MODEL = 'gemini-3.7-flash'
 
 # LLMRotationDetector.swift, verbatim: the prompt, the label orderings and the candidate size.
@@ -85,14 +85,25 @@ MLX_MODELS = {   # model_store's shared cache, pinned revisions
 }
 
 
+def sample(ps, own_n, per_stratum):
+    """own_n of the 96 and per_stratum of each public stratum's 20, by the salted hash (the public strata are already
+    in hash order). Each smaller draw is a subset of every larger one."""
+    own = sorted((p for p in ps if p['set'] == 'owner96'),
+                 key=lambda p: hashlib.sha256((SALT + p['id']).encode()).hexdigest())[:own_n]
+    return own + [p for s in PUBLIC_STRATA for p in [q for q in ps if q['stratum'] == s][:per_stratum]]
+
+
+def majority_sample(ps):
+    """llmMajority's second and third orderings: 48 of the 96 and 10 a stratum (108 pages, 864 calls, about $3.15),
+    since all 216 would take the item past the $7 rule (the pilot's $0.0036 a call)."""
+    return sample(ps, 48, 10)
+
+
 def local_sample(ps):
     """The local models' pages: 24 of the 96 and 4 of each public stratum's 20, by the salted hash (the public
     strata are already in hash order). Sized to what an 8B model at about 8 s a comparative call can read in one
     session; 192 turns give a 95% interval of about +-7 points."""
-    own = sorted((p for p in ps if p['set'] == 'owner96'),
-                 key=lambda p: hashlib.sha256((SALT + p['id']).encode()).hexdigest())[:24]
-    pub = [p for s in PUBLIC_STRATA for p in [q for q in ps if q['stratum'] == s][:4]]
-    return own + pub
+    return sample(ps, 24, 4)
 
 
 def want(turn):
@@ -309,7 +320,7 @@ def ask_gateway(p, turn, order_i, cands):
             'seconds': rec['wall_s'], 'cost': G.charge(rec), 'usage': usage}
 
 
-def gateway(orders, limit, concurrency=4):
+def gateway(orders, limit, concurrency=6):
     CACHE.mkdir(parents=True, exist_ok=True)
     have = {}
     for i in range(3):
@@ -319,7 +330,9 @@ def gateway(orders, limit, concurrency=4):
     if limit:
         # a pilot: the first `limit` pages of each set, so both sets are priced
         ps = [p for p in ps if p['set'] == 'owner96'][:limit] + [p for p in ps if p['set'] == 'public'][::20][:limit]
-    jobs = [(p, t, i) for p in ps for t in TURNS for i in range(orders) if (p['id'], t, i) not in have]
+    maj = {p['id'] for p in majority_sample(ps)}
+    jobs = [(p, t, i) for p in ps for t in TURNS for i in range(orders)
+            if (p['id'], t, i) not in have and (i == 0 or p['id'] in maj)]
 
     def one(j):
         p, t, i = j
