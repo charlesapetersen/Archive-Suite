@@ -81,3 +81,9 @@ Which form? (1) The sheet above, fixed sections, smart folders edited through it
 rule rows (+/− rows, "all/any of the following rules"), more flexible and about twice the work. (3) No form: only
 teach Find the syntax (`"phrase"`, `OR`, `-word`) and add "none of" to the filter bar. Also: is a subject
 exclusion ("has none of") wanted, given the filter bar's settled no-NOT rule?
+
+## The owner's answer (2026-11-04 walkthrough)
+
+**Finder-style rule rows.** ("all"/"any of the following rules", + and − rows), opening with a few starter rows (OCR text contains, Tags, Date) so it reads like sections at first; and "has none of these tags" as a rule in Advanced Search only, while the filter bar keeps its no-NOT rule. He asked whether there was any reason against rule rows beyond the work; the answer given: a general condition tree in place of the fixed `LibraryFilter`, slower OR-across-fields combinations at 100k files, harder to read at a glance (softened by the starter rows), more combinations to test. About twice the sheet's build.
+
+The build (`W40.reader-advanced-search`) follows this, not the recommended sheet above: a stored condition tree (field, operator, value; all/any at the top), the FTS builder for the text rules, the in-memory filter for the rest, a smart folder storing the tree, and the sheet opening with the starter rows.
