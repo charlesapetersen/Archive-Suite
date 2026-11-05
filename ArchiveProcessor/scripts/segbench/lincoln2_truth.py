@@ -2,7 +2,7 @@
 """W46.seg-adapt-lora: the truth for the second Lincoln box (lincoln_box2.py), without a Claude or owner reading.
 
   python3 lincoln2_truth.py --root DIR estimate   # gaps to ask and the worst-case charge; no call
-  python3 lincoln2_truth.py --root DIR collect    # Gemini 3.7 Flash, one call per within-item gap
+  python3 lincoln2_truth.py --root DIR collect [--limit N]   # Gemini 3.7 Flash, one call per within-item gap
   python3 lincoln2_truth.py --root DIR freeze     # -> segbench-results/public-segmentation/lincoln2.json
 
 THE RULE. Every Library of Congress catalogue item start is a document start (box 1 kept all 72 of its own). Inside
@@ -150,9 +150,9 @@ def estimate(root):
           f"(${RESERVE:.4f} each); spent so far ${spent():.4f} of the ${CAP:.2f} cap")
 
 
-def collect(root):
+def collect(root, limit=None):
     m = box(root)
-    for a, b, title in gaps(m):
+    for a, b, title in gaps(m)[:limit]:
         if reply_path(a, b).exists():
             continue
         gap = f"{a}|{b}"
@@ -223,8 +223,12 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--root", required=True, type=Path)
     ap.add_argument("cmd", choices=("estimate", "collect", "freeze"))
+    ap.add_argument("--limit", type=int, help="collect: only the first N gaps (a pilot)")
     a = ap.parse_args()
-    {"estimate": estimate, "collect": collect, "freeze": freeze}[a.cmd](a.root.resolve())
+    if a.cmd == "collect":
+        collect(a.root.resolve(), a.limit)
+    else:
+        {"estimate": estimate, "freeze": freeze}[a.cmd](a.root.resolve())
 
 
 if __name__ == "__main__":
