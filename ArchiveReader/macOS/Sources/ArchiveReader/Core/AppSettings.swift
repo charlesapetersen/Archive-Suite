@@ -8,6 +8,7 @@ enum SettingsKey {
     static let copyCollapse = "copyCollapseSingleNewlines"
     static let copyParagraph = "copyParagraphOnBlankLine"
     static let copyDehyphenate = "copyDeHyphenate"
+    static let copyLayoutParagraph = "copyParagraphFromLayout"
     static let viewerSplit = "viewerSplitFraction"
     static let subjectCombineAny = "subjectCombineAny"
     static let readFilterDefault = "readFilterDefault"
@@ -36,7 +37,8 @@ enum AppSettings {
     static var copyOptions: CopyTextOptions {
         CopyTextOptions(collapseSingleNewlines: bool(SettingsKey.copyCollapse, true),
                         paragraphOnBlankLine: bool(SettingsKey.copyParagraph, true),
-                        deHyphenate: bool(SettingsKey.copyDehyphenate, true))
+                        deHyphenate: bool(SettingsKey.copyDehyphenate, true),
+                        paragraphFromLayout: bool(SettingsKey.copyLayoutParagraph, true))
     }
 
     static var viewerSplitFraction: Double {

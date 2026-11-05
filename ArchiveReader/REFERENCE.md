@@ -284,7 +284,8 @@ writes against the real corpus — always a copy.
   default (not necessarily ⅔) and fit both panes
 - `⌘C` copy verbatim — the standard **Edit ▸ Copy**, from whichever pane holds the selection (plain text;
   disabled with nothing selected; a focused text field such as the find bar copies its own text) · `⌥⌘C`
-  Document ▸ Copy Cleaned for Prose (intelligent; not `⌘⇧C`, which is Copy Link(s)). Since
+  Document ▸ Copy Cleaned for Prose (intelligent; not `⌘⇧C`, which is Copy Link(s)); it also starts a
+  paragraph where the OCR left no blank line but the page's line boxes show one (Options toggle). Since
   `W48.reader-copy-shortcut` there is no second `⌘C` on the Document menu: it matched before Edit ▸ Copy
   and copied the PDF selection with the caret in the find field
 - `⌘F` find in the open document(s) · `⌘G`/`⇧⌘G` next/previous match (highlight-all, wraps, "N of M" across open docs)
@@ -409,7 +410,8 @@ Core/                         UI-free Reader-local domain (shared tag/PDF facets
                               match-facets) that gate NavigationModel's cache rebuilds. Subjects sig is
                               over the union (NOT the multiset) so even-count edits can't XOR-cancel.
   FileLink.swift              LinkFormat + FileLinkFormatter (percent-encoding; HTML-escaped).
-  CopyTextCleaner.swift       Intelligent copy (collapse single NLs, paragraph on blank, de-hyphenate).
+  CopyTextCleaner.swift       Intelligent copy (collapse single NLs, paragraph on blank, de-hyphenate,
+                              unmarked paragraph breaks from line boxes: wider gap, indent, short line).
   DocumentRuns.swift          Pure run detection (Start + Continuations) for opt-in run selection.
   TriageNavigation.swift      Pure next/previous-unread selection math (skip read, wrap/stop) for G4
                               keyboard triage; touches no file — the caller writes via TagWriter.

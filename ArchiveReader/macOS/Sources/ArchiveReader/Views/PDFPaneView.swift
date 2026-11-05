@@ -97,8 +97,19 @@ final class PDFPaneController {
 
     /// The current text selection, cleaned for prose copy (nil if nothing is selected here).
     func cleanedSelection(_ options: CopyTextOptions) -> String? {
-        guard let s = pdfView?.currentSelection?.string, !s.isEmpty else { return nil }
-        return CopyTextCleaner.clean(s, options: options)
+        guard let sel = pdfView?.currentSelection, let s = sel.string, !s.isEmpty else { return nil }
+        guard options.paragraphFromLayout else { return CopyTextCleaner.clean(s, options: options) }
+        return CopyTextCleaner.clean(s, lines: Self.layoutLines(sel), options: options)
+    }
+
+    /// The selection's lines with their boxes on the page, for finding the paragraph breaks the OCR left
+    /// unmarked. Reads geometry only; the document is not touched.
+    static func layoutLines(_ selection: PDFSelection) -> [CopyTextLine] {
+        selection.selectionsByLine().compactMap { line in
+            guard let page = line.pages.first, let text = line.string else { return nil }
+            return CopyTextLine(text: text, box: line.bounds(for: page),
+                                page: page.document?.index(for: page) ?? 0)
+        }
     }
 
     /// The current text selection, raw/verbatim (nil if nothing is selected here) — for plain copy.
