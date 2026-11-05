@@ -176,6 +176,29 @@ printf -- '- [x] **⌘0 = historical done notation**\n' > "$T/done.md"
 OUT="$(AUTONOMOUS_PLAN="$T/plan.md" AUTONOMOUS_TODO="$T/todo.md" AUTONOMOUS_TODO_DONE="$T/done.md" bash "$CHECK" 2>&1)"; RC=$?
 [ "$RC" = 0 ] && ok "historical DONE punctuation remains out of the open-item guard" || bad "done archive item incorrectly failed: $OUT"
 
+# W46.done-header-check — the 2026-11-04 shape: the DONE header carries its tag, but after the section and status,
+# so the shared tag rule reads nothing and an item blocked on W10.hid resolves only through the plan [x].
+printf -- '- [x] ** · §Some section · RETIRED by the owner 2026-11-04, not run`W10.hid` — a title**\n' > "$T/done.md"
+OUT="$(AUTONOMOUS_PLAN="$T/plan.md" AUTONOMOUS_TODO="$T/todo.md" AUTONOMOUS_TODO_DONE="$T/done.md" bash "$CHECK" 2>&1)"; RC=$?
+[ "$RC" = 1 ] && ok "a DONE header whose tag is not first -> exit 1" || bad "hidden DONE tag expected rc=1, got $RC ($OUT)"
+case "$OUT" in *"DONE HEADER HIDES ITS TAG"*"W10.hid"*) ok "names the condition and prints the line";; *) bad "hidden tag not reported: $OUT";; esac
+# ...and the fixed form, backticked or bare, passes.
+printf -- '- [x] **`W10.hid` — a title** · §Some section · RETIRED 2026-11-04\n- [x] **W10.bare — t** · §S · SHIPPED\n' > "$T/done.md"
+OUT="$(AUTONOMOUS_PLAN="$T/plan.md" AUTONOMOUS_TODO="$T/todo.md" AUTONOMOUS_TODO_DONE="$T/done.md" bash "$CHECK" 2>&1)"; RC=$?
+[ "$RC" = 0 ] && ok "a DONE header that starts with its tag passes" || bad "well-formed DONE header failed: $OUT"
+# Only the archive is checked for this shape; the live tracker's open-item guard is separate.
+printf -- '- [ ] **W10.valid — visible work**\n- [x] ** · §S · status `W10.x` — prose**\n' > "$T/todo.md"
+: > "$T/done.md"
+OUT="$(AUTONOMOUS_PLAN="$T/plan.md" AUTONOMOUS_TODO="$T/todo.md" AUTONOMOUS_TODO_DONE="$T/done.md" bash "$CHECK" 2>&1)"; RC=$?
+case "$OUT" in *"HIDES ITS TAG"*) bad "hidden-tag rule ran outside the archive: $OUT";; *) ok "hidden-tag rule is scoped to SUITE_TODO_DONE";; esac
+# The state is the ANCHORED checkbox, as in the resolver: an open plan item whose text quotes `- [x] **` is open.
+printf '## WORK QUEUE\n- [ ] **W10.quote — reports a line after `- [x] **`**\n\n## HOLD QUEUE\n' > "$T/plan.md"
+printf -- '- [ ] **W10.other**\n' > "$T/todo.md"
+printf -- '- [x] **W10.quote — shipped**\n' > "$T/done.md"
+OUT="$(AUTONOMOUS_PLAN="$T/plan.md" AUTONOMOUS_TODO="$T/todo.md" AUTONOMOUS_TODO_DONE="$T/done.md" bash "$CHECK" 2>&1)"; RC=$?
+case "$RC $OUT" in "1 "*"W10.quote — plan says OPEN"*) ok "a quoted [x] in an open item's text does not read as done";;
+  *) bad "quoted [x] hid the drift: rc=$RC $OUT";; esac
+
 # ---- 11. THE ARCHIVE IS PART OF THE SAME TRACKER ------------------------------------------------------
 # Regression: splitting done items into SUITE_TODO_DONE.md (consolidation phase 2) dropped coverage from 100
 # shared items to 34 and made the guard's founding case invisible — "[x] in the tracker" now often means

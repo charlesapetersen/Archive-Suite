@@ -41,9 +41,11 @@ grep -qE '^## WORK QUEUE' "$PLAN" || { echo "check-tracker-sync: no '## WORK QUE
 # $1 = file, $2 = 1 to restrict to the plan's WORK QUEUE region (an item parked in the HOLD QUEUE is not
 # offered as work, so it is not the same assertion and must not be compared), 0 to scan the whole file.
 items() {
-  awk -v region="$2" -v bad="$3" -v source="$4" '
+  awk -v region="$2" -v bad="$3" -v source="$4" -v hidden="${5:-}" '
     function emit(  st, t, id) {
-      st = (tolower($0) ~ /\[x\]/) ? "x" : " "
+      # Anchored checkbox, as next-queue-item.sh reads it: an open item whose TEXT quotes `- [x] **` (this very
+      # item, W46.done-header-check, did) read as done here and hid its own drift.
+      st = ($0 ~ /^[[:space:]]*[-*][[:space:]]+\[[xX]\]/) ? "x" : " "
       match($0, /^[[:space:]]*[-*][[:space:]]+\[[ xX]\][[:space:]]*/)
       t = substr($0, RLENGTH + 1)
       sub(/^\*+[[:space:]]*/, "", t)          # strip bold markers, as the resolver does
@@ -55,6 +57,12 @@ items() {
         # An OPEN checkbox without an alphanumeric tag cannot be mirrored, offered, blocked-on resolved, or
         # archived reliably. Do not discard it before the comparison can say what it saw.
         print source ": " $0 > bad
+      } else if (hidden != "" && match(t, /`[A-Za-z][A-Za-z0-9]*\.[A-Za-z0-9._-]+`/)) {
+        # W46.done-header-check — a DONE header whose tag sits later in the line, `- [x] ** · §<section> ·
+        # <status>` + backticked TAG (fourteen written on 2026-11-04). The shared tag rule cannot read it, so an
+        # item blocked on that tag resolves only through the plan [x]. Only a line that HAS an item-shaped tag
+        # somewhere is flagged: the archive tagless historical entries name nothing a dependency could wait on.
+        print source ": " $0 > hidden
       }
     }
     # ⚠️ W32.fence-order — THE FENCE RULE MUST COME FIRST, exactly as it does in next-queue-item.sh:95-98.
@@ -76,11 +84,11 @@ items() {
   ' "$1"
 }
 
-P="$(mktemp)"; T="$(mktemp)"; BP="$(mktemp)"; BT="$(mktemp)"; BD="$(mktemp)"
-trap 'rm -f "$P" "$T" "$BP" "$BT" "$BD"' EXIT
+P="$(mktemp)"; T="$(mktemp)"; BP="$(mktemp)"; BT="$(mktemp)"; BD="$(mktemp)"; HD="$(mktemp)"
+trap 'rm -f "$P" "$T" "$BP" "$BT" "$BD" "$HD"' EXIT
 items "$PLAN" 1 "$BP" "plan WORK QUEUE" | sort > "$P"
 # SUITE_TODO first so a live entry wins over a stale archived twin (first-occurrence-wins, as in the resolver).
-{ items "$TODO" 0 "$BT" "SUITE_TODO"; items "$TODO_DONE" 0 "$BD" "SUITE_TODO_DONE"; } \
+{ items "$TODO" 0 "$BT" "SUITE_TODO"; items "$TODO_DONE" 0 "$BD" "SUITE_TODO_DONE" "$HD"; } \
   | awk -F'\t' '!seen[$1]++' | sort > "$T"
 
 TAB="$(printf '\t')"
@@ -100,6 +108,7 @@ report="$(printf '%s\n' "$both" | awk -F"$TAB" 'NF==3 && $2 != $3')"
 untracked="$(awk -F"$TAB" '$2==" " && $1 ~ /\./ {print $1}' "$P" \
              | while IFS= read -r t; do grep -qxF -- "$t" <(cut -f1 "$T") || echo "$t"; done)"
 unparseable="$(cat "$BP" "$BT" "$BD")"
+hiddentag="$(cat "$HD")"
 # W35.uses-tags: worker-state.py refuses an item whose `(uses: …)` tag is malformed or unknown, and that refusal
 # lands only in a worker log, so the item would starve quietly. Make it loud here, on every gate, instead.
 baduses="$(python3 -I - "$ROOT/ops/autonomous/worker-state.py" "$PLAN" "$TODO" <<'PY'
@@ -121,7 +130,12 @@ if [ -n "$baduses" ]; then
   echo "      The claim helper refuses these items, so they never run. Fix the tag in BOTH trackers (README: uses)."
 fi
 
-if [ -z "$report" ] && [ -z "$untracked" ] && [ -z "$unparseable" ] && [ -z "$baduses" ]; then
+if [ -n "$hiddentag" ]; then
+  printf '%s\n' "$hiddentag" | cut -c1-160 | sed 's/^/  ⚠ DONE HEADER HIDES ITS TAG — /'
+  echo "      Start the first line with the tag: - [x] **TAG — <title>** · §<section> · SHIPPED <date> (SUITE_TODO_DONE.md header)."
+fi
+
+if [ -z "$report" ] && [ -z "$untracked" ] && [ -z "$unparseable" ] && [ -z "$baduses" ] && [ -z "$hiddentag" ]; then
   [ "$QUIET" = 1 ] || echo "  ✓ tracker-sync: plan WORK QUEUE and SUITE_TODO agree on all $overlap shared items"
   exit 0
 fi
