@@ -243,9 +243,14 @@ writes against the real corpus — always a copy.
   shipped `435b8c4`) — virtualized rows + `NSTableViewDiffableDataSource` incremental snapshots + a
   150ms-debounced filter off the keystroke path, so it stays smooth at scale. (This replaced the SwiftUI
   `Table`, which at 40k janked: scroll stutter, per-keystroke whole-collection main-thread re-diff, slow sort.)
-  Columns: Document date, File name, File type, File tags, Read/Unread, plus the display-only **Provenance**
-  (`Box`/`Folder`/`Document Start`/`Continuation`) column. Provenance is hidden by default and can be shown
-  from the native right-click column-header picker; the choice persists (`W18.reader-breadcrumb`).
+  Columns: ⚑ Flag, ⚠︎ Needs attention, Document date, File name, File type, File tags, Quality, Read, plus the
+  display-only **Capture marker** (`Box`/`Folder`/`Document Start`/`Continuation`, the page-2 `Classification:`
+  line; `W18.reader-breadcrumb`, named Provenance until `W40.fix-reader-columns`). Every header has a tooltip and
+  every column but Capture marker sorts (⚑ and ⚠︎ put the marked files first). Columns are chosen from the filter
+  bar's **Columns** chip or the header's right-click menu; both write `NavigationModel.hiddenColumns`, which
+  persists. Capture marker is hidden while no file in the library has a marker, since files made before the apps
+  have none. It names the kind of capture, not the container a file is in (that is `W47.ct-reader-view`'s
+  Container column).
 - **Document viewer:** two `PDFView`s (image left / OCR text right), **independent zoom** per pane,
   draggable gray splitter with center grab handle, **default 2/3 : 1/3** — the split, per-pane zoom,
   and window size then persist as the next viewer's default (DV-1/DV-2; **no** per-document reset).
@@ -427,7 +432,7 @@ Core/                         UI-free Reader-local domain (shared tag/PDF facets
   TriageNavigation.swift      Pure next/previous-unread selection math (skip read, wrap/stop) for G4
                               keyboard triage; touches no file — the caller writes via TagWriter.
   AppSettings.swift           UserDefaults-backed option accessors the models read at point of use;
-                              one-time default-hidden migration for the optional Provenance column.
+                              hidden list columns (`ar.hiddenColumns`, every column shown by default).
   DisplayCalendarPreferences.swift  W24.cal1-reader: Options ▸ Dates switch (off by default), each
                               document's display calendar (UserDefaults, root GUID + relative path), and
                               the Date column text in it. Display only: sort/filter/tags keep ISO; container identity works before a link copy.
@@ -464,7 +469,8 @@ Views/
                               on its own file, never the selection; NSTableView takes a press on a plain
                               cell view itself, so ContextMenuTableView hands it on — W40.fix-reader-read-toggle);
                               ContextMenuTableView + ContextMenuActions trampoline to NavigationModel;
-                              optional default-hidden Provenance column uses the existing header picker.
+                              column tooltips + chooser titles live in `columnDefinitions`; the header
+                              menu and the Columns chip both set `NavigationModel.hiddenColumns`.
                               Text cells are TintedTextCellView: a `tint` (normal, emphasized) follows the
                               row's selection. Type and Read labels use primary/selected text colours;
                               Unread is semibold (W40.fix-reader-a11y-contrast). ReaderColors supplies

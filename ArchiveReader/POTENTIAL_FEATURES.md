@@ -8,7 +8,7 @@ one suite.
 All High-priority items are implemented (see `CLAUDE.md` §Implementation map):
 - ✅ **Document-run / provenance convenience** — opt-in "Select Document Run" via the content index's
   classification (degrades to a single item when absent; never auto-groups), plus the optional,
-  default-hidden Provenance nav-table column (`W18.reader-breadcrumb`).
+  Capture marker nav-table column (`W18.reader-breadcrumb`; named Provenance until `W40.fix-reader-columns`).
 - ✅ **Reading-session resume** — the selection is persisted (≤500) and restored on next launch.
 - ✅ **App-side flags OUTSIDE the corpus** — `FlagStore` (UserDefaults); flag column. (The Reader's own notes were removed by W40.reader-remove-notes, 2026-11-05: notes belong to Archive Notes.)
 - ✅ **Corpus data-quality dashboard** — the library-health popover (stethoscope in the status bar).

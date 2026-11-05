@@ -610,7 +610,8 @@ final class NavigationModel: ObservableObject {
             // bm25 relevance ordering: sort by the rank map (0 = best match).
             displayed = base.sorted { (ftsRank[$0.path] ?? Int.max) < (ftsRank[$1.path] ?? Int.max) }
         } else {
-            displayed = LibrarySort.sorted(base, by: sort, marks: sortMarks())
+            lastSortMarks = sortMarks()
+            displayed = LibrarySort.sorted(base, by: sort, marks: lastSortMarks)
         }
         displayedGeneration += 1
         _tagCloudCache = nil
@@ -619,6 +620,10 @@ final class NavigationModel: ObservableObject {
         refreshSelectionCache()   // sort order affects the selection cache too
         persistViewState()        // C2: remember filter + sort across launches
     }
+
+    /// The marks `displayed` was sorted with, so the selection cache sorts the same way without rebuilding them on
+    /// every selection change.
+    private var lastSortMarks = SortMarks()
 
     /// The ⚑ and ⚠︎ sort keys, built only when the sort uses them (W40.fix-reader-columns).
     private func sortMarks() -> SortMarks {
@@ -880,7 +885,7 @@ final class NavigationModel: ObservableObject {
         // `showingEditor`; everything else only against the rows the list shows.
         let base = showingEditor ? library.files : displayed
         selectedFilesCache = sel.isEmpty ? [] : LibrarySort.sorted(base.filter { sel.contains($0.id) }, by: sort,
-                                                                         marks: sortMarks())
+                                                                         marks: lastSortMarks)
     }
 
     /// A row the filter hid leaves the selection, as it leaves the table's highlight; kept, it was

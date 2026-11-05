@@ -25,7 +25,8 @@ Zotero; it formats no citations.
   prompt is told to drop box numbers, accession numbers and call numbers. Folder-label text is never used.
 - No tag, PDF field, JSON sidecar key, Reader index column or Notes front-matter key holds repository, collection
   number, accession, series, box or folder.
-- The Reader's Provenance column (`W18.reader-breadcrumb`) shows each file's own classification. It does not work
+- The Reader's Capture marker column (`W18.reader-breadcrumb`; Provenance until `W40.fix-reader-columns`, hidden
+  while no file has a marker) shows each file's own classification. It does not work
   out which box a document is in, and nothing is editable.
 - Process Files reads a dropped folder flat (`Views/OCRView.swift`); a Box/Folder directory tree is lost.
 - Notes source blocks show the filename and page. Notes reads Zotero but sends it nothing.
