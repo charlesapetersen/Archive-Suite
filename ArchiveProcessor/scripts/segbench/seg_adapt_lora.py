@@ -197,34 +197,54 @@ def check(root):
     return freeze
 
 
+def replay_candidates(search, windows):
+    """Every folder under `search` holding train.jsonl and a data.json that counts `windows` windows and records an
+    images folder: train_seg.py's data sets (not every one records its `rule`), never a replay set this script wrote."""
+    found = set()
+    # No symlinked folders (train/seg-2b links to full/qwen3.5-2b) and none of the big trees, so one data set is
+    # found once and the walk stays short while the job holds a GPU.
+    for top, dirs, files in os.walk(search, followlinks=False):
+        dirs[:] = [d for d in dirs if d not in ("hf", "images", "cache", "runs", "logs", "adapter")
+                   and not d.startswith("step-")]
+        if "data.json" not in files or "train.jsonl" not in files:
+            continue
+        try:
+            meta = json.loads((Path(top) / "data.json").read_text())
+        except ValueError:
+            continue
+        if (isinstance(meta, dict) and meta.get("item") != TAG and isinstance(meta.get("images"), str)
+                and isinstance(windows, int) and meta.get("windows") == windows):
+            found.add(Path(top).resolve())
+    return sorted(found)
+
+
+def replay_source(search, windows, named=None):
+    """The one corpus set to replay: `named` (SAL_REPLAY) when given, else the single search candidate. None or
+    several stop with the search root, so a job never trains on a guess."""
+    if named:
+        src = Path(named).resolve()
+        if not ((src / "train.jsonl").is_file() and (src / "data.json").is_file()):
+            raise SystemExit(f"SAL_REPLAY={named}: no train.jsonl and data.json there")
+        return src
+    found = replay_candidates(search, windows)
+    if len(found) != 1:
+        listed = "".join(f"\n  {f}" for f in found)
+        raise SystemExit(f"replay set: {len(found)} candidates under {search} with {windows} windows; "
+                         f"name one with SAL_REPLAY{listed}")
+    return found[0]
+
+
 def cmd_replay(a):
     """On Sherlock: the correction rows plus REPLAY_RATIO times as many of the 2B's own no-text corpus training rows, with
     one images folder linking every box the rows name. The corpus set is the one whose data.json counts the windows
-    the 2B's train.json says it trained on; anything else (none, several, a missing images folder) stops here, and
+    the 2B's train.json says it trained on and records
+    its images folder (replay_candidates); anything else (none, several, a missing images folder) stops here, and
     SAL_REPLAY=<dir holding train.jsonl and data.json> names it instead."""
     import random
     root, out = Path(a.root), Path(a.out)
     freeze = check(root)
     trained = json.loads((Path(a.adapter).parent / "train.json").read_text())
-    if os.environ.get("SAL_REPLAY"):
-        found = [Path(os.environ["SAL_REPLAY"]).resolve()]
-    else:
-        found = set()
-        # No symlinked folders (train/seg-2b links to full/qwen3.5-2b) and none of the big trees, so one data set is
-        # found once and the walk stays short while the job holds a GPU.
-        for top, dirs, files in os.walk(a.search, followlinks=False):
-            dirs[:] = [d for d in dirs if d not in ("hf", "images", "cache", "runs", "logs", "adapter")
-                       and not d.startswith("step-")]
-            if "data.json" not in files or "train.jsonl" not in files:
-                continue
-            try:
-                meta = json.loads((Path(top) / "data.json").read_text())
-            except ValueError:
-                continue
-            if isinstance(meta, dict) and meta.get("windows") == trained.get("windows") and "rule" in meta:
-                found.add(Path(top).resolve())
-        found = sorted(found)
-    src = found[0]
+    src = replay_source(a.search, trained.get("windows"), os.environ.get("SAL_REPLAY"))
     meta = json.loads((src / "data.json").read_text())
     # FarmShare's scratch path, now inside the group copy; the copy first, because a scratch folder of the same path
     # may be a purged leftover. Every page a row names is checked below either way.

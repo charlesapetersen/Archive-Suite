@@ -1,5 +1,9 @@
-"""W46.seg-adapt-lora: a corrected target changes only the wrong decisions and refuses a reply it cannot correct."""
+"""W46.seg-adapt-lora: a corrected target changes only the wrong decisions and refuses a reply it cannot correct;
+the replay search finds the 2B's own corpus set and stops plainly on none or several (W46.fix-sal-replay-search)."""
 import json
+import os
+from pathlib import Path
+import tempfile
 import unittest
 
 import seg_adapt_lora as L
@@ -37,6 +41,69 @@ class Corrected(unittest.TestCase):
         odd = {**REPLY, "boundaries": [{**REPLY["boundaries"][0], "decision": "maybe"}, REPLY["boundaries"][1]]}
         for bad in ("not json", json.dumps([1]), json.dumps(missing), json.dumps(foreign), json.dumps(odd)):
             self.assertIsNone(L.corrected(bad, [4, 5, 6], LABELS))
+
+
+def data_set(path, meta):
+    path.mkdir(parents=True)
+    (path / "train.jsonl").write_text("")
+    (path / "data.json").write_text(json.dumps(meta))
+    return path.resolve()
+
+
+class ReplaySearch(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name) / "fs-ocr"
+        self.root.mkdir()
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_finds_the_set_without_a_rule(self):
+        # FarmShare's train/full/data: windows and images, no `rule` (the 2026-11-05 IndexError).
+        want = data_set(self.root / "train" / "full" / "data",
+                        {"windows": 5885, "no_text": 3000, "images": "/scratch/users/cp1/fs-ocr/images"})
+        data_set(self.root / "train" / "other" / "data", {"windows": 412, "images": "/x"})
+        data_set(self.root / "train" / "noimages", {"windows": 5885})
+        data_set(self.root / "runs" / "skipped", {"windows": 5885, "images": "/x"})
+        os.symlink(self.root / "train" / "full", self.root / "train" / "seg-2b")
+        self.assertEqual(L.replay_candidates(self.root, 5885), [want])
+        self.assertEqual(L.replay_source(self.root, 5885), want)
+
+    def test_skips_a_replay_set_it_wrote(self):
+        want = data_set(self.root / "a", {"windows": 300, "images": "/x"})
+        data_set(self.root / "out", {"item": L.TAG, "windows": 300, "images": "/y", "rule": "corrections+replay"})
+        self.assertEqual(L.replay_source(self.root, 300), want)
+
+    def test_none_stops_naming_the_root(self):
+        data_set(self.root / "a", {"windows": 10, "images": "/x"})
+        with self.assertRaises(SystemExit) as e:
+            L.replay_source(self.root, 5885)
+        self.assertIn("replay set: 0 candidates", str(e.exception.code))
+        self.assertIn(str(self.root), str(e.exception.code))
+
+    def test_several_stop_listing_them(self):
+        a = data_set(self.root / "a", {"windows": 5885, "images": "/x"})
+        b = data_set(self.root / "b", {"windows": 5885, "images": "/y"})
+        with self.assertRaises(SystemExit) as e:
+            L.replay_source(self.root, 5885)
+        msg = str(e.exception.code)
+        self.assertIn("replay set: 2 candidates", msg)
+        self.assertIn(str(self.root), msg)
+        self.assertIn(str(a), msg)
+        self.assertIn(str(b), msg)
+
+    def test_unknown_window_count_matches_nothing(self):
+        data_set(self.root / "a", {"images": "/x"})
+        with self.assertRaises(SystemExit):
+            L.replay_source(self.root, None)
+
+    def test_named_set_wins_and_must_exist(self):
+        named = data_set(self.root / "named", {"windows": 1, "images": "/x"})
+        data_set(self.root / "a", {"windows": 5885, "images": "/x"})
+        self.assertEqual(L.replay_source(self.root, 5885, str(named)), named)
+        with self.assertRaises(SystemExit):
+            L.replay_source(self.root, 5885, str(self.root / "missing"))
 
 
 if __name__ == "__main__":
