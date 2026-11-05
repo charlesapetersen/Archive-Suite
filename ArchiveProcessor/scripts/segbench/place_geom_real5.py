@@ -140,18 +140,25 @@ def norm(s: str) -> str:
 
 
 def omni_lines(page: dict) -> list[str]:
-    """Every text span of the page's blocks, merged blocks' spans included, normalised; at least two words."""
+    """The page's candidate lines, normalised, at least two words, each once: every text span of its blocks
+    (merged blocks' included), and each block's text and its newline-separated pieces. 59 of the 155 pages, most of
+    them slides, carry no spans; a Vision line that is a whole block or bullet is a printed line all the same, and a
+    piece that wraps over two printed lines is longer than either line, so it matches neither."""
     out = []
 
     def walk(b):
         for s in b.get('line_with_spans') or []:
             if s.get('category_type') == 'text_span' and s.get('text'):
                 out.append(norm(s['text']))
+        text = (b.get('text') or '').strip()
+        if text:
+            out.append(norm(text))
+            out.extend(norm(x) for x in text.split('\n'))
         for m in b.get('merge_list') or []:
             walk(m)
     for b in page['layout_dets']:
         walk(b)
-    return [s for s in out if len(s.split()) >= 2]
+    return list(dict.fromkeys(s for s in out if len(s.split()) >= 2))
 
 
 def match_lines(vtexts: list[str], olines: list[str]) -> dict[int, int]:
@@ -160,8 +167,13 @@ def match_lines(vtexts: list[str], olines: list[str]) -> dict[int, int]:
     for k, v in enumerate(vtexts):
         if len(v.split()) < 2:
             continue
-        scored = [(difflib.SequenceMatcher(None, v, o, autojunk=False).ratio(), j) for j, o in enumerate(olines)
-                  if abs(len(o) - len(v)) <= 0.25 * max(len(o), len(v))]
+        scored = []
+        for j, o in enumerate(olines):
+            if abs(len(o) - len(v)) > 0.25 * max(len(o), len(v)):
+                continue
+            sm = difflib.SequenceMatcher(None, v, o, autojunk=False)
+            if sm.quick_ratio() >= MATCH:            # an upper bound on ratio(), cheap
+                scored.append((sm.ratio(), j))
         if scored:
             r, j = max(scored)
             if r >= MATCH:
