@@ -117,6 +117,23 @@ final class NavigationModel: ObservableObject {
     /// Page-2 `Classification:` values published by the disposable content index for nav-row display.
     /// Missing/unindexed rows stay absent and render as an em dash; classification never drives a write.
     @Published private(set) var classifications: [String: String] = [:]
+    /// The list columns the user has hidden, from the Columns chip or the header's menu (W40.fix-reader-columns).
+    @Published var hiddenColumns: Set<String> = [] {
+        didSet { if hiddenColumns != oldValue { AppSettings.setHiddenColumns(hiddenColumns, in: defaults) } }
+    }
+    /// The columns the list hides: the user's choice, plus Capture marker while no file in the library has one.
+    /// Files made before the apps carry no page-2 marker, so for most material the column could only be blank.
+    var effectiveHiddenColumns: Set<String> {
+        classifications.isEmpty ? hiddenColumns.union([AppKitTableView.captureMarkerColumnID]) : hiddenColumns
+    }
+    /// Whether the user can show `id` now; Capture marker waits for a file that has one.
+    func isColumnAvailable(_ id: String) -> Bool {
+        id != AppKitTableView.captureMarkerColumnID || !classifications.isEmpty
+    }
+    func setColumn(_ id: String, visible: Bool) {
+        guard id != "name" else { return }   // the file name is always shown
+        if visible { hiddenColumns.remove(id) } else { hiddenColumns.insert(id) }
+    }
     @Published private(set) var formatStatuses: [String: PDFFormatStatus] = [:]   // non-standard-PDF detection, per path
     @Published private(set) var needsAttentionCount = 0     // indexed files that need attention
     @Published private(set) var ambiguousDateCount = 0      // files with two tags for one date facet (R-47)
@@ -166,6 +183,7 @@ final class NavigationModel: ObservableObject {
          thumbnailer: PDFThumbnailer? = ArchiveTestHost.isUnitTestHost ? nil : ArchiveLinkThumbnailer.shared) {
         self.defaults = defaults
         self.flags = FlagStore(defaults: defaults)
+        self.hiddenColumns = AppSettings.hiddenColumns(in: defaults)
         self.indexer = indexer
         self.thumbnailer = thumbnailer
         self.library = ArchiveLibrary(defaults: defaults)
@@ -470,7 +488,7 @@ final class NavigationModel: ObservableObject {
 
     // MARK: Flags (app-side, never written to the corpus)
 
-    func toggleFlagSelection() { flags.toggleFlag(selectedFiles.map(\.path)) }
+    func toggleFlagSelection() { flags.toggleFlag(selectedFiles.map(\.path)); resortAfterFlagChange() }
 
     /// The document window's Toggle Flag (W40.fix-reader-menus-follow-window): the open file, not the list's selection.
     /// Returns false, with the reason in `statusMessage`, when none of the paths is in the library.
@@ -478,6 +496,7 @@ final class NavigationModel: ObservableObject {
         let files = libraryFiles(atPaths: paths)
         guard !files.isEmpty else { reportNotInLibrary(); return false }
         flags.toggleFlag(files.map(\.path))
+        resortAfterFlagChange()
         return true
     }
 
@@ -591,7 +610,7 @@ final class NavigationModel: ObservableObject {
             // bm25 relevance ordering: sort by the rank map (0 = best match).
             displayed = base.sorted { (ftsRank[$0.path] ?? Int.max) < (ftsRank[$1.path] ?? Int.max) }
         } else {
-            displayed = LibrarySort.sorted(base, by: sort)
+            displayed = LibrarySort.sorted(base, by: sort, marks: sortMarks())
         }
         displayedGeneration += 1
         _tagCloudCache = nil
@@ -599,6 +618,21 @@ final class NavigationModel: ObservableObject {
         if !showingEditor { pruneSelectionToDisplayed() }
         refreshSelectionCache()   // sort order affects the selection cache too
         persistViewState()        // C2: remember filter + sort across launches
+    }
+
+    /// The ⚑ and ⚠︎ sort keys, built only when the sort uses them (W40.fix-reader-columns).
+    private func sortMarks() -> SortMarks {
+        var marks = SortMarks()
+        if sort.contains(where: { $0.field == .flag }) { marks.flagged = flags.flagged }
+        if sort.contains(where: { $0.field == .attention }) {
+            marks.needsAttention = Set(formatStatuses.lazy.filter { $0.value.needsAttention }.map(\.key))
+        }
+        return marks
+    }
+
+    /// A flag toggled while the list is sorted by ⚑ moves its row, as a tag edit does under a tag sort.
+    private func resortAfterFlagChange() {
+        if sort.contains(where: { $0.field == .flag }) { recompute() }
     }
 
     /// The detected non-standard-PDF status for a file, if the content index has seen it yet.
@@ -845,7 +879,8 @@ final class NavigationModel: ObservableObject {
         // The open tag editor resolves its (already-pruned) targets against the library — see
         // `showingEditor`; everything else only against the rows the list shows.
         let base = showingEditor ? library.files : displayed
-        selectedFilesCache = sel.isEmpty ? [] : LibrarySort.sorted(base.filter { sel.contains($0.id) }, by: sort)
+        selectedFilesCache = sel.isEmpty ? [] : LibrarySort.sorted(base.filter { sel.contains($0.id) }, by: sort,
+                                                                         marks: sortMarks())
     }
 
     /// A row the filter hid leaves the selection, as it leaves the table's highlight; kept, it was

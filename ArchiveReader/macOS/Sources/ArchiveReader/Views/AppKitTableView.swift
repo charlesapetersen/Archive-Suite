@@ -18,22 +18,45 @@ struct AppKitTableView: NSViewRepresentable {
         let sortField: SortField?
         /// Gives and takes width when the table's space changes (the tag cloud opening, the window resizing).
         var flexible = false
+        /// The name in the Columns chip and the header's menu, where a bare ⚑ or ⚠︎ says nothing.
+        var menuTitle: String? = nil
+        /// The header's tooltip: what the column shows and how it sorts (W40.fix-reader-columns).
+        var toolTip = ""
+
+        var chooserTitle: String { menuTitle ?? title }
     }
 
-    /// One source for construction and tests. Provenance is display-only and receives a one-time
-    /// default-hidden migration; the existing header picker then persists the explicit user choice.
+    /// The page-2 `Classification:` column. Its id predates the column's name, Capture marker.
+    static let captureMarkerColumnID = "classification"
+
+    /// One source for construction, the Columns chip, the header's menu and tests.
     static let columnDefinitions: [ColumnDefinition] = [
-        .init(id: "flag", title: "⚑", width: 26, minWidth: 26, maxWidth: 30, sortField: nil),
-        .init(id: "warning", title: "⚠︎", width: 24, minWidth: 24, maxWidth: 28, sortField: nil),
-        .init(id: "date", title: "Document date", width: 140, minWidth: 110, maxWidth: 220, sortField: .date),
-        .init(id: "name", title: "File name", width: 320, minWidth: 200, maxWidth: 800, sortField: .name, flexible: true),
-        .init(id: "type", title: "Type", width: 56, minWidth: 44, maxWidth: 80, sortField: .fileType),
-        .init(id: "classification", title: "Provenance", width: 132, minWidth: 100, maxWidth: 220, sortField: nil),
-        .init(id: "tags", title: "File tags", width: 300, minWidth: 160, maxWidth: 600, sortField: .subjects, flexible: true),
+        .init(id: "flag", title: "⚑", width: 26, minWidth: 26, maxWidth: 30, sortField: .flag,
+              menuTitle: "⚑ Flag",
+              toolTip: "Flag: your own mark for files to come back to. The Reader keeps it; the file is not changed. "
+                  + "Click to sort flagged files first; Toggle Flag is in the Tags menu."),
+        .init(id: "warning", title: "⚠︎", width: 24, minWidth: 24, maxWidth: 28, sortField: .attention,
+              menuTitle: "⚠︎ Needs attention",
+              toolTip: "Needs attention: a PDF that could not be opened or has no selectable text. "
+                  + "Click to sort these files first."),
+        .init(id: "date", title: "Document date", width: 140, minWidth: 110, maxWidth: 220, sortField: .date,
+              toolTip: "The document's own date, from its tags. Click to sort; undated files go last."),
+        .init(id: "name", title: "File name", width: 320, minWidth: 200, maxWidth: 800, sortField: .name, flexible: true,
+              toolTip: "The file's name. Always shown. Click to sort."),
+        .init(id: "type", title: "Type", width: 56, minWidth: 44, maxWidth: 80, sortField: .fileType,
+              toolTip: "The file's type, such as PDF or JPEG. Click to sort."),
+        .init(id: captureMarkerColumnID, title: "Capture marker", width: 132, minWidth: 100, maxWidth: 220, sortField: nil,
+              toolTip: "What the Processor recorded on page 2 when it made the file: Box, Folder, Document Start "
+                  + "or Continuation. Files made before the apps have none, so the column is offered only once "
+                  + "a file in the library has one. It names the kind of capture, not the box or folder a file is in."),
+        .init(id: "tags", title: "File tags", width: 300, minWidth: 160, maxWidth: 600, sortField: .subjects, flexible: true,
+              toolTip: "The file's topic tags. Click a cell to edit them; click the header to sort."),
         // Quality holds a 75-pt pop-up inset 1 pt each side, so 78 is the narrowest it fits in. At 72 it overhung
         // its cell, unseen while the column sat scrolled off past the window (W40.fix-reader-tagcloud-width).
-        .init(id: "quality", title: "Quality", width: 80, minWidth: 78, maxWidth: 100, sortField: .quality),
-        .init(id: "read", title: "Read", width: 84, minWidth: 70, maxWidth: 110, sortField: .readState),
+        .init(id: "quality", title: "Quality", width: 80, minWidth: 78, maxWidth: 100, sortField: .quality,
+              toolTip: "The scan's quality, Q1 (best) to Q3. Choose it in the cell. Click to sort."),
+        .init(id: "read", title: "Read", width: 84, minWidth: 70, maxWidth: 110, sortField: .readState,
+              toolTip: "Whether you have read the file. Click the cell to change it; click the header to sort."),
     ]
 
     /// The columns. How they share the width is `TableColumnFitter`'s job, started once the table is in its scroll
@@ -47,6 +70,7 @@ struct AppKitTableView: NSViewRepresentable {
             tc.minWidth = col.minWidth
             tc.maxWidth = col.maxWidth
             tc.resizingMask = .userResizingMask
+            tc.headerToolTip = col.toolTip
             if let sf = col.sortField {
                 tc.sortDescriptorPrototype = NSSortDescriptor(key: sf.rawValue, ascending: true)
             }
@@ -112,6 +136,10 @@ struct AppKitTableView: NSViewRepresentable {
         headerView.onResetSort = { [weak coordinator] in
             coordinator?.parent.model.sort = LibrarySort.default
         }
+        headerView.isColumnAvailable = { [weak coordinator] id in coordinator?.parent.model.isColumnAvailable(id) ?? true }
+        headerView.onSetColumnVisible = { [weak coordinator] id, visible in
+            coordinator?.parent.model.setColumn(id, visible: visible)
+        }
         tableView.headerView = headerView
         tableView.target = coordinator
         tableView.doubleAction = #selector(Coordinator.tableViewDoubleClicked(_:))
@@ -121,16 +149,11 @@ struct AppKitTableView: NSViewRepresentable {
 
         Self.addColumns(to: tableView)
 
-        let hidden = AppSettings.hiddenColumns
-        for col in tableView.tableColumns where hidden.contains(col.identifier.rawValue) {
-            col.isHidden = true
-        }
+        coordinator.applyHiddenColumns(model.effectiveHiddenColumns, to: tableView)
 
         scrollView.documentView = tableView
         coordinator.tableView = tableView
-        let fitter = Self.fitColumns(of: tableView)
-        coordinator.columnFitter = fitter
-        headerView.onColumnVisibilityChange = { [weak fitter] in fitter?.fit() }
+        coordinator.columnFitter = Self.fitColumns(of: tableView)
 
         let dataSource = SortableDiffableDataSource(tableView: tableView) { tv, column, row, itemID in
             coordinator.makeCell(tableView: tv, column: column, itemID: itemID)
@@ -220,6 +243,11 @@ struct AppKitTableView: NSViewRepresentable {
             }
         }
 
+        // Shown or hidden from the Columns chip or the header's menu, or Capture marker's first value arriving.
+        if coordinator.applyHiddenColumns(model.effectiveHiddenColumns, to: tableView) {
+            coordinator.columnFitter?.fit()
+        }
+
         // Flags live in `FlagStore`, not in the rows, so a toggle leaves `displayedGeneration` alone and the
         // reload above never ran: the ⚑ cell kept its old value (W40.fix-reader-flag).
         coordinator.reloadFlagChanges(model.flags.flagged)
@@ -302,6 +330,22 @@ struct AppKitTableView: NSViewRepresentable {
             rows = files
             if idsChanged { applySnapshot(files.map(\.id), animated: false) }
             return idsChanged
+        }
+
+        /// The hidden columns the table last took.
+        private var appliedHiddenColumns: Set<String>?
+
+        /// Hide exactly `hidden`'s columns; returns whether any column changed.
+        @discardableResult
+        func applyHiddenColumns(_ hidden: Set<String>, to tableView: NSTableView) -> Bool {
+            guard hidden != appliedHiddenColumns else { return false }
+            appliedHiddenColumns = hidden
+            var changed = false
+            for col in tableView.tableColumns {
+                let hide = hidden.contains(col.identifier.rawValue) && col.identifier.rawValue != "name"
+                if col.isHidden != hide { col.isHidden = hide; changed = true }
+            }
+            return changed
         }
 
         /// The flagged set the table last drew.
@@ -1198,8 +1242,9 @@ final class WrappingTokenField: NSTokenField {
 // MARK: - Column-picker header view
 
 /// Right-click the table header → a menu with checkmark toggles for each column plus sort options.
-/// "File name" is always visible (disabled toggle); all others can be hidden. If the clicked
-/// column is sortable, a secondary-sort section lets the user set it without Option-clicking.
+/// "File name" is always visible (disabled toggle); all others can be hidden, from here or the filter bar's
+/// Columns chip; both write `NavigationModel.hiddenColumns`. If the clicked column is sortable, a
+/// secondary-sort section lets the user set it without Option-clicking.
 @MainActor
 final class ColumnPickerHeaderView: NSTableHeaderView {
     /// Callback to set a secondary sort field. Parameters: (field, ascending).
@@ -1208,8 +1253,10 @@ final class ColumnPickerHeaderView: NSTableHeaderView {
     var onRemoveSecondarySort: (() -> Void)?
     /// Callback to reset sort to the default (date, then name).
     var onResetSort: (() -> Void)?
-    /// After the header menu shows or hides a column, so the others can be refitted.
-    var onColumnVisibilityChange: (() -> Void)?
+    /// Show or hide a column: (id, visible).
+    var onSetColumnVisible: ((String, Bool) -> Void)?
+    /// Whether a column can be shown now (Capture marker waits for a file that has one).
+    var isColumnAvailable: ((String) -> Bool)?
     /// Returns the current sort descriptors so the menu can reflect active state.
     var currentSort: (() -> [ARSortDescriptor])?
 
@@ -1220,11 +1267,15 @@ final class ColumnPickerHeaderView: NSTableHeaderView {
         // Column visibility toggles
         for col in tv.tableColumns {
             let id = col.identifier.rawValue
-            let item = NSMenuItem(title: col.title, action: #selector(toggleColumn(_:)), keyEquivalent: "")
+            let available = isColumnAvailable?(id) ?? true
+            let title = Self.chooserTitle(id: id, fallback: col.title)
+            let item = NSMenuItem(title: available ? title : "\(title) (no file has one yet)",
+                                  action: #selector(toggleColumn(_:)), keyEquivalent: "")
             item.target = self
             item.representedObject = id
             item.state = col.isHidden ? .off : .on
-            if id == "name" { item.isEnabled = false }
+            item.toolTip = col.headerToolTip
+            if id == "name" || !available { item.isEnabled = false }
             menu.addItem(item)
         }
 
@@ -1239,7 +1290,8 @@ final class ColumnPickerHeaderView: NSTableHeaderView {
                 let isSecondary = sort.count > 1 && sort[1].field == field
 
                 menu.addItem(.separator())
-                let header = NSMenuItem(title: "Sort — \(col.title)", action: nil, keyEquivalent: "")
+                let header = NSMenuItem(title: "Sort — \(Self.chooserTitle(id: col.identifier.rawValue, fallback: col.title))",
+                                        action: nil, keyEquivalent: "")
                 header.isEnabled = false
                 menu.addItem(header)
 
@@ -1272,15 +1324,14 @@ final class ColumnPickerHeaderView: NSTableHeaderView {
         return menu
     }
 
+    private static func chooserTitle(id: String, fallback: String) -> String {
+        AppKitTableView.columnDefinitions.first { $0.id == id }?.chooserTitle ?? fallback
+    }
+
     @objc private func toggleColumn(_ sender: NSMenuItem) {
         guard let id = sender.representedObject as? String,
-              let tv = tableView,
-              let col = tv.tableColumns.first(where: { $0.identifier.rawValue == id }) else { return }
-        col.isHidden.toggle()
-        var hidden = AppSettings.hiddenColumns
-        if col.isHidden { hidden.insert(id) } else { hidden.remove(id) }
-        AppSettings.setHiddenColumns(hidden)
-        onColumnVisibilityChange?()
+              let col = tableView?.tableColumns.first(where: { $0.identifier.rawValue == id }) else { return }
+        onSetColumnVisible?(id, col.isHidden)
     }
 
     @objc private func setSecondaryAsc(_ sender: NSMenuItem) {

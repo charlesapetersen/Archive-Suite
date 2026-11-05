@@ -132,6 +132,15 @@ extension LibraryFilter {
 
 enum SortField: String, Sendable, CaseIterable, Codable {
     case date, name, quality, readState, fileType, subjects, relevance
+    /// The ⚑ and ⚠︎ columns (W40.fix-reader-columns). Neither is on the file: they come from `SortMarks`.
+    case flag, attention
+}
+
+/// The two sort keys the rows do not carry: which paths are flagged (`FlagStore`) and which need attention
+/// (the content index's format status). Ascending puts the marked rows first.
+struct SortMarks: Sendable {
+    var flagged: Set<String> = []
+    var needsAttention: Set<String> = []
 }
 
 struct ARSortDescriptor: Sendable, Equatable, Codable {
@@ -155,7 +164,8 @@ enum LibrarySort {
     /// `localizedStandardCompare`, and in rebuilding `url.path` on every comparison that tied on the
     /// keys. The ranks persist across calls, so a tag edit or a sort change, which bring no new names,
     /// compares no strings at all; and paths are ranked only for rows that tie on every key.
-    static func sorted(_ files: [ArchiveFile], by descriptors: [ARSortDescriptor]) -> [ArchiveFile] {
+    static func sorted(_ files: [ArchiveFile], by descriptors: [ARSortDescriptor],
+                       marks: SortMarks = SortMarks()) -> [ArchiveFile] {
         guard !descriptors.isEmpty, files.count > 1 else { return files }
         let keyed = descriptors.filter { $0.field != .relevance }   // rank order is injected at recompute()
 
@@ -171,6 +181,9 @@ enum LibrarySort {
             case .fileType:  stringColumns.append((c, files.map { $0.fileType }))
             case .readState: stringColumns.append((c, files.map { $0.readState?.rawValue }))
             case .subjects:  stringColumns.append((c, files.map { subjectsKey($0) }))
+            // 0 or 1, never `Int.max`: an unmarked row is a value, so descending puts it first.
+            case .flag:      columns[c] = files.map { marks.flagged.contains($0.path) ? 0 : 1 }
+            case .attention: columns[c] = files.map { marks.needsAttention.contains($0.path) ? 0 : 1 }
             case .relevance: break
             }
         }

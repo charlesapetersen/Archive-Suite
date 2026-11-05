@@ -31,18 +31,39 @@ final class LibrarySortDecoratedTests: XCTestCase {
     }
 
     func testMatchesTheComparatorItReplaced() {
-        let fields: [SortField] = [.date, .name, .quality, .readState, .fileType, .subjects, .relevance]
+        XCTAssertEqual(Set(SortField.allCases), [.date, .name, .quality, .readState, .fileType, .subjects,
+                                                 .relevance, .flag, .attention], "a new field needs a reference case")
+        let fields = SortField.allCases
         var rng = SeededGenerator(seed: 7)
         for round in 0..<60 {
             let files = randomFiles(Int.random(in: 0...300, using: &rng), seed: UInt64(round))
+            // The ⚑ and ⚠︎ keys (W40.fix-reader-columns): about a third of the rows each.
+            let marks = SortMarks(
+                flagged: Set(files.map(\.path).filter { _ in Int.random(in: 0..<3, using: &rng) == 0 }),
+                needsAttention: Set(files.map(\.path).filter { _ in Int.random(in: 0..<3, using: &rng) == 0 }))
             let depth = Int.random(in: 1...3, using: &rng)
             let descriptors = (0..<depth).map { _ in
                 ARSortDescriptor(field: fields.randomElement(using: &rng)!, ascending: Bool.random(using: &rng))
             }
-            XCTAssertEqual(LibrarySort.sorted(files, by: descriptors).map(\.url.path),
-                           Self.reference(files, by: descriptors).map(\.url.path),
+            XCTAssertEqual(LibrarySort.sorted(files, by: descriptors, marks: marks).map(\.url.path),
+                           Self.reference(files, by: descriptors, marks: marks).map(\.url.path),
                            "round \(round): \(descriptors)")
         }
+    }
+
+    func testFlagAndAttentionSortTheMarkedRowsFirstAndReverse() {
+        let files = randomFiles(40, seed: 3)
+        let flagged = Set(files.enumerated().filter { $0.offset % 4 == 0 }.map(\.element.path))
+        let marks = SortMarks(flagged: flagged, needsAttention: flagged)
+        for field in [SortField.flag, .attention] {
+            let up = LibrarySort.sorted(files, by: [ARSortDescriptor(field: field, ascending: true)], marks: marks)
+            XCTAssertEqual(Set(up.prefix(flagged.count).map(\.path)), flagged, "\(field) ascending: marked rows first")
+            let down = LibrarySort.sorted(files, by: [ARSortDescriptor(field: field, ascending: false)], marks: marks)
+            XCTAssertEqual(Set(down.suffix(flagged.count).map(\.path)), flagged, "\(field) descending: marked rows last")
+        }
+        XCTAssertEqual(LibrarySort.sorted(files, by: [ARSortDescriptor(field: .flag)]).map(\.path),
+                       files.map(\.path).sorted { $0.localizedStandardCompare($1) == .orderedAscending },
+                       "no marks: every row ties and the path decides")
     }
 
     func testDefaultSortAfterASingleTagEditAndARename() {
@@ -94,7 +115,8 @@ final class LibrarySortDecoratedTests: XCTestCase {
 
     // MARK: - The comparator `sorted` used before the decoration, kept as the reference
 
-    private static func reference(_ files: [ArchiveFile], by descriptors: [ARSortDescriptor]) -> [ArchiveFile] {
+    private static func reference(_ files: [ArchiveFile], by descriptors: [ARSortDescriptor],
+                                  marks: SortMarks = SortMarks()) -> [ArchiveFile] {
         guard !descriptors.isEmpty else { return files }
         func nilLast<T>(_ x: T?, _ y: T?, _ c: (T, T) -> ComparisonResult) -> ComparisonResult {
             switch (x, y) {
@@ -124,6 +146,9 @@ final class LibrarySortDecoratedTests: XCTestCase {
                 case .fileType: r = dir(a.fileType.localizedStandardCompare(b.fileType), d.ascending)
                 case .readState: r = nilLast(a.readState?.rawValue, b.readState?.rawValue) { dir($0.localizedStandardCompare($1), d.ascending) }
                 case .subjects: r = nilLast(subjects(a), subjects(b)) { dir($0.localizedStandardCompare($1), d.ascending) }
+                case .flag: r = dir(cmp(marks.flagged.contains(a.path) ? 0 : 1, marks.flagged.contains(b.path) ? 0 : 1), d.ascending)
+                case .attention:
+                    r = dir(cmp(marks.needsAttention.contains(a.path) ? 0 : 1, marks.needsAttention.contains(b.path) ? 0 : 1), d.ascending)
                 case .relevance: r = .orderedSame
                 }
                 if r != .orderedSame { return r == .orderedAscending }

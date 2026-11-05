@@ -487,8 +487,32 @@ struct NavigationWindowView: View {
         }
     }
 
+    /// The visible column chooser (W40.fix-reader-columns; reader-1 row 5): the header's right-click menu was the
+    /// only way in, so optional columns stayed hidden from anyone who did not know it was there.
+    private var columnsChip: some View {
+        Menu {
+            ForEach(AppKitTableView.columnDefinitions, id: \.id) { col in
+                let available = model.isColumnAvailable(col.id)
+                Toggle(available ? col.chooserTitle : "\(col.chooserTitle) (no file has one yet)", isOn: Binding(
+                    get: { !model.effectiveHiddenColumns.contains(col.id) },
+                    set: { model.setColumn(col.id, visible: $0) }))
+                .disabled(col.id == "name" || !available)
+                .help(col.toolTip)
+            }
+        } label: {
+            Label("Columns", systemImage: "tablecells")
+        }
+        .menuStyle(.button)
+        .controlSize(.small)
+        .fixedSize()
+        .help("Choose the list's columns. The header's right-click menu has the same choices.")
+        .accessibilityIdentifier("ar.filter.columns")
+        .filterBarTrailing()
+    }
+
     @ViewBuilder
     private var filterBarTrailingButtons: some View {
+        columnsChip
         if model.filter.isActive || model.filterSearchText.trimmingCharacters(in: .whitespaces) != "" || model.ftsPaths != nil {
             Button("Save as Smart Folder") { model.showingSaveDialog = true }
                 .fixedSize()

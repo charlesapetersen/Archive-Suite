@@ -12,7 +12,7 @@ final class TableColumnFitTests: XCTestCase {
 
     private var fitter: TableColumnFitter?
 
-    /// Provenance hidden, as it is by default (`ProvenanceColumnTests`).
+    /// Capture marker hidden, as it is while no file has a marker (`CaptureMarkerColumnTests`).
     private func makeTable(width: CGFloat) -> (NSScrollView, NSTableView) {
         let scrollView = NSScrollView(frame: NSRect(x: 0, y: 0, width: width, height: 600))
         scrollView.hasVerticalScroller = true
@@ -115,7 +115,7 @@ final class TableColumnFitTests: XCTestCase {
         XCTAssertEqual(width(tableView, "tags"), 300)
     }
 
-    /// Showing Provenance takes its width from the flexible columns too.
+    /// Showing Capture marker takes its width from the flexible columns too.
     func testShowingAColumnRefits() {
         let (scrollView, tableView) = makeTable(width: 1_000)
         tableView.tableColumns.first { $0.identifier.rawValue == "classification" }!.isHidden = false
