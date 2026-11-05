@@ -34,18 +34,22 @@ final class AppearanceSettingUITests: FixtureUITestCase {
     func testPickingLightAndDarkChangesEveryWindowAtOnceWithASheetOpen() throws {
         let sheet = openSaveSearchSheet()
 
-        let settings = openSettings()
+        var settings = openSettings()
         // Measured with the sheet and Settings already open: a window's screenshot includes whatever is drawn over
         // it, so a baseline taken before Settings opened is not comparable with the later ones.
         let system = luminance(mainWindow, "system-main")
         for choice in ["Dark", "Light", "Dark"] {
             pick(choice, in: settings)
             let dark = choice == "Dark"
-            for (name, element) in [("main", mainWindow), ("sheet", sheet), ("settings", settings)] {
-                _ = pollUntil(timeout: 5) { self.reads(dark: dark, self.luminance(element)) }
-                let measured = luminance(element, "\(choice.lowercased())-\(name)")
-                XCTAssertTrue(reads(dark: dark, measured), "\(name) should turn \(choice) at once, measured \(measured)")
-            }
+            expect(settings, "settings", choice: choice, dark: dark)
+            // The sheet is centred on the window, under Settings, so an element screenshot of it with Settings open
+            // reads Settings' pixels (W48.appearance-verify). Close Settings, then read the main window and the
+            // sheet with nothing over them, and reopen it for the next pick.
+            settings.typeKey("w", modifierFlags: .command)
+            XCTAssertTrue(settings.waitForNonExistence(timeout: 5), "Settings should close")
+            expect(mainWindow, "main", choice: choice, dark: dark)
+            expect(sheet, "sheet", choice: choice, dark: dark)
+            settings = openSettings()
         }
 
         pick("System", in: settings)
@@ -121,6 +125,12 @@ final class AppearanceSettingUITests: FixtureUITestCase {
     }
 
     // MARK: - Helpers
+
+    private func expect(_ element: XCUIElement, _ name: String, choice: String, dark: Bool) {
+        _ = pollUntil(timeout: 5) { self.reads(dark: dark, self.luminance(element)) }
+        let measured = luminance(element, "\(choice.lowercased())-\(name)")
+        XCTAssertTrue(reads(dark: dark, measured), "\(name) should turn \(choice) at once, measured \(measured)")
+    }
 
     private func openSaveSearchSheet() -> XCUIElement {
         let menuBar = app.menuBars.element(boundBy: 0)

@@ -223,7 +223,7 @@ final class VisualReviewUITests: FixtureUITestCase {
         // Near the left edge, as `clickRow` falls back to: at the 900-pt minimum the row's centre falls in the
         // gap between File name and Type, where the accessibility hit test finds no row ("Not hittable").
         let row = table.tableRows.element(boundBy: 0)
-        row.coordinate(withNormalizedOffset: CGVector(dx: 0.1, dy: 0.5)).rightClick()
+        visiblePoint(of: row).rightClick()
         if app.menuItems.firstMatch.waitForExistence(timeout: 3) { shoot("row-contextmenu", menu: true) }
         else { missing.append("row context menu") }
         escape()
@@ -312,7 +312,7 @@ final class VisualReviewUITests: FixtureUITestCase {
         // Two files in one document window.
         clickRow(0)
         XCUIElement.perform(withKeyModifiers: .shift) {   // near the left edge, as the row context menu above
-            table.tableRows.element(boundBy: 1).coordinate(withNormalizedOffset: CGVector(dx: 0.1, dy: 0.5)).click()
+            visiblePoint(of: table.tableRows.element(boundBy: 1)).click()
         }
         app.typeKey("o", modifierFlags: .command)
         if waitForWindows(2) { shoot("document-multi"); closeDocument() } else { missing.append("document-multi") }

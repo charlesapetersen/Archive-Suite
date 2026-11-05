@@ -115,9 +115,21 @@ class FixtureUITestCase: XCTestCase {
             row.click()
         } else {
             // Fallback: tap near the row's left edge by coordinate (still exercises selection).
-            row.coordinate(withNormalizedOffset: CGVector(dx: 0.1, dy: 0.5)).tap()
+            visiblePoint(of: row).tap()
         }
         return row
+    }
+
+    /// A point near the left edge of the part of `row` the table actually shows. A row's frame spans every column,
+    /// so once the table has scrolled sideways (at the 900-pt minimum, a click on the part-hidden Quality column
+    /// scrolls it) the row's left end lies under the sidebar, and a click at a fraction of the row's own width
+    /// selects a folder instead (W48.appearance-verify: the visual tour clicked Box 2 and filtered the list).
+    func visiblePoint(of row: XCUIElement, dx: CGFloat = 0.1) -> XCUICoordinate {
+        let rowFrame = row.frame, tableFrame = table.frame
+        let visible = rowFrame.intersection(tableFrame)
+        let area = visible.isNull || visible.isEmpty ? rowFrame : visible
+        return table.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(
+            dx: area.minX - tableFrame.minX + area.width * dx, dy: area.midY - tableFrame.minY))
     }
 
     /// Type a string into a text field identified by its accessibility ID.

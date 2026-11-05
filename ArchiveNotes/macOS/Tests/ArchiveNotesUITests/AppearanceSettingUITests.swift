@@ -27,18 +27,22 @@ final class AppearanceSettingUITests: NotesFixtureUITestCase {
             let sheet = mainWindow.sheets.firstMatch
             XCTAssertTrue(sheet.waitForExistence(timeout: 5), "the Save Search sheet should open")
 
-            let settings = openSettings()
+            var settings = openSettings()
             // Measured with the sheet and Settings already open: a window's screenshot includes whatever is drawn
             // over it, so a baseline taken before Settings opened is not comparable with the later ones.
             let system = luminance(mainWindow, "system-main")
             for choice in ["Dark", "Light", "Dark"] {
                 pick(choice, in: settings)
                 let dark = choice == "Dark"
-                for (name, element) in [("main", mainWindow), ("sheet", sheet), ("settings", settings)] {
-                    _ = pollUntil(timeout: 5) { self.reads(dark: dark, self.luminance(element)) }
-                    let measured = luminance(element, "\(choice.lowercased())-\(name)")
-                    XCTAssertTrue(reads(dark: dark, measured), "\(name) should turn \(choice) at once, measured \(measured)")
-                }
+                expect(settings, "settings", choice: choice, dark: dark)
+                // Settings can cover the sheet, and an element screenshot of a covered sheet reads Settings' pixels
+                // (W48.appearance-verify, as in the Reader). Close Settings, then read the main window and the sheet
+                // with nothing over them, and reopen it for the next pick.
+                settings.typeKey("w", modifierFlags: .command)
+                XCTAssertTrue(settings.waitForNonExistence(timeout: 5), "Settings should close")
+                expect(mainWindow, "main", choice: choice, dark: dark)
+                expect(sheet, "sheet", choice: choice, dark: dark)
+                settings = openSettings()
             }
 
             pick("System", in: settings)
@@ -119,6 +123,12 @@ final class AppearanceSettingUITests: NotesFixtureUITestCase {
             _ = extracts.waitForNonExistence(timeout: 8)
         }
         LayoutGuard.waitUntilSettled(mainWindow)
+    }
+
+    private func expect(_ element: XCUIElement, _ name: String, choice: String, dark: Bool) {
+        _ = pollUntil(timeout: 5) { self.reads(dark: dark, self.luminance(element)) }
+        let measured = luminance(element, "\(choice.lowercased())-\(name)")
+        XCTAssertTrue(reads(dark: dark, measured), "\(name) should turn \(choice) at once, measured \(measured)")
     }
 
     private func reads(dark: Bool, _ value: Double) -> Bool {
