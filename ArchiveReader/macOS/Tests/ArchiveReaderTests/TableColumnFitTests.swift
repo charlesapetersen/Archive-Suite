@@ -94,13 +94,46 @@ final class TableColumnFitTests: XCTestCase {
         }
     }
 
-    /// Past what the flexible columns can give (both at their minimums), the table scrolls sideways rather than
-    /// squeezing Quality or Read below theirs.
+    /// Past what the flexible columns can give (both at their minimums), the other columns give up what they have
+    /// above theirs; past that too, the table scrolls sideways with every column at its minimum.
     func testNarrowerThanTheMinimumsStopsAtTheMinimums() {
         let (scrollView, tableView) = makeTable(width: 1_185)
         resize(scrollView, to: 500)
-        XCTAssertEqual(width(tableView, "name"), 200)
-        XCTAssertEqual(width(tableView, "tags"), 160)
+        let minimums = Dictionary(uniqueKeysWithValues: AppKitTableView.columnDefinitions.map { ($0.id, $0.minWidth) })
+        for column in tableView.tableColumns where !column.isHidden {
+            XCTAssertEqual(column.width, minimums[column.identifier.rawValue], "\(column.identifier.rawValue)")
+        }
+    }
+
+    /// W40.fix-reader-narrow-read-column — the owner's case: the 900-pt minimum window with the 210-pt sidebar
+    /// and its 7-pt divider leaves the table 683 pt, less a legacy vertical scroller when one shows. File name and
+    /// File tags give first, then the others, and every column fits, Read included. Widening again gives each
+    /// column back exactly its width.
+    func testTheNarrowestWindowKeepsReadOnScreen() {
+        let (scrollView, tableView) = makeTable(width: 1_185)
+        let built = Dictionary(uniqueKeysWithValues: tableView.tableColumns.map { ($0.identifier.rawValue, $0.width) })
+        for clip in [683, 683 - 15] as [CGFloat] {
+            resize(scrollView, to: clip)
+            XCTAssertLessThanOrEqual(needed(tableView), scrollView.contentSize.width, "at \(clip): every column fits")
+            XCTAssertEqual(width(tableView, "name"), 140, "File name gives all it can first")
+            XCTAssertEqual(width(tableView, "tags"), 100)
+            XCTAssertGreaterThanOrEqual(width(tableView, "read"), 70)
+            XCTAssertGreaterThanOrEqual(width(tableView, "quality"), 78)
+            resize(scrollView, to: 1_185)
+            for column in tableView.tableColumns {
+                XCTAssertEqual(column.width, built[column.identifier.rawValue], "\(column.identifier.rawValue) is given back")
+            }
+        }
+    }
+
+    /// While File name and File tags can still give, the other columns keep their widths.
+    func testTheOtherColumnsGiveOnlyOnceTheFlexibleOnesCannot() {
+        let (scrollView, tableView) = makeTable(width: 1_185)
+        resize(scrollView, to: 410 + 240 + 64 + 20)   // room for a scroller too
+        XCTAssertLessThan(width(tableView, "name"), 320)
+        XCTAssertGreaterThan(width(tableView, "name") + width(tableView, "tags"), 240, "both still above their minimums")
+        XCTAssertEqual(width(tableView, "date"), 140)
+        XCTAssertEqual(width(tableView, "type"), 56)
         XCTAssertEqual(width(tableView, "quality"), 80)
         XCTAssertEqual(width(tableView, "read"), 84)
     }

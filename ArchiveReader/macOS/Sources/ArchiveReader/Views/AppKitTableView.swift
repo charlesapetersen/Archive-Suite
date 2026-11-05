@@ -41,7 +41,9 @@ struct AppKitTableView: NSViewRepresentable {
                   + "Click to sort these files first."),
         .init(id: "date", title: "Document date", width: 140, minWidth: 110, maxWidth: 220, sortField: .date,
               toolTip: "The document's own date, from its tags. Click to sort; undated files go last."),
-        .init(id: "name", title: "File name", width: 320, minWidth: 200, maxWidth: 800, sortField: .name, flexible: true,
+        // File name's and File tags' minimums are what lets every column fit at the 900-pt window beside the
+        // default sidebar, Read included (W40.fix-reader-narrow-read-column); `TableColumnFitter` has the sums.
+        .init(id: "name", title: "File name", width: 320, minWidth: 140, maxWidth: 800, sortField: .name, flexible: true,
               toolTip: "The file's name. Always shown. Click to sort."),
         .init(id: "type", title: "Type", width: 56, minWidth: 44, maxWidth: 80, sortField: .fileType,
               toolTip: "The file's type, such as PDF or JPEG. Click to sort."),
@@ -49,7 +51,7 @@ struct AppKitTableView: NSViewRepresentable {
               toolTip: "What the Processor recorded on page 2 when it made the file: Box, Folder, Document Start "
                   + "or Continuation. Files made before the apps have none, so the column is offered only once "
                   + "a file in the library has one. It names the kind of capture, not the box or folder a file is in."),
-        .init(id: "tags", title: "File tags", width: 300, minWidth: 160, maxWidth: 600, sortField: .subjects, flexible: true,
+        .init(id: "tags", title: "File tags", width: 300, minWidth: 100, maxWidth: 600, sortField: .subjects, flexible: true,
               toolTip: "The file's topic tags. Click a cell to edit them; click the header to sort."),
         // Quality holds a 75-pt pop-up inset 1 pt each side, so 78 is the narrowest it fits in. At 72 it overhung
         // its cell, unseen while the column sat scrolled off past the window (W40.fix-reader-tagcloud-width).

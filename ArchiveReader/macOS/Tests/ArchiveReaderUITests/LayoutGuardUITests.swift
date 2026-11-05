@@ -40,6 +40,7 @@ final class LayoutGuardUITests: FixtureUITestCase {
         clickRow(0)
         LayoutGuard.sweep(main, screen: "navigation window, \(appearance)", in: self, ignore: isPDFPage)
         sweepTagCloud(main, appearance: appearance)
+        checkNarrowestWindow(main, appearance: appearance)
 
         // The tag sheets at the window's size (W40.fix-reader-tag-editor-chips): Edit Info over every row, so
         // its subjects are a mix of full and partial chips, then Find Similar Tags. Done only dismisses.
@@ -99,6 +100,27 @@ final class LayoutGuardUITests: FixtureUITestCase {
         LayoutGuard.dragCorner(of: main, to: CGPoint(x: original.maxX, y: original.maxY))
         button.click()
         XCTAssertTrue(tags.firstMatch.waitForNonExistence(timeout: 5), "the tag cloud should close from the toolbar")
+    }
+}
+
+extension LayoutGuardUITests {
+    /// W40.fix-reader-narrow-read-column — at the window's minimum width, with the sidebar showing, the last
+    /// column (Read) must end inside the window. The sweep cannot see it, for the reason `sweepTagCloud` gives:
+    /// cells sit inside a scroll view. The owner found Read pushed off the edge there in his guided session.
+    fileprivate func checkNarrowestWindow(_ main: XCUIElement, appearance: String) {
+        XCTAssertTrue(main.descendants(matching: .any)["ar.divider.sidebar"].exists,
+                      "the sidebar should be showing, as it is by default")
+        let original = main.frame
+        let narrow = LayoutGuard.dragCorner(of: main, to: CGPoint(x: original.minX + 600, y: original.minY + 600))
+        XCTAssertEqual(narrow.width, 900, accuracy: 2, "the window should stop at its 900-pt minimum width")
+        _ = LayoutGuard.waitUntilSettled(main)
+        let cells = table.tableRows.element(boundBy: 0).cells.allElementsBoundByIndex
+        XCTAssertEqual(cells.count, 8, "the first row should show the eight default columns")
+        let lastEdge = cells.map(\.frame.maxX).max() ?? .infinity
+        XCTAssertLessThanOrEqual(lastEdge, main.frame.maxX + LayoutGuard.tolerance,
+                                 "narrowest window, \(appearance): the last column ends at x=\(lastEdge), past the "
+                                    + "window's edge at x=\(main.frame.maxX); Read should stay on screen")
+        LayoutGuard.dragCorner(of: main, to: CGPoint(x: original.maxX, y: original.maxY))
     }
 }
 

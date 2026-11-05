@@ -12,8 +12,12 @@ import AppKit
 /// dragged it to), so opening and closing the cloud any number of times puts them back exactly.
 ///
 /// Only a narrower space changes anything. A wider one leaves the columns at their preferred widths, with blank
-/// space after Read, as the old style did once Read reached its maximum. Past what the flexible columns can give
-/// (both at their minimums), the table scrolls sideways; Quality and Read are never squeezed.
+/// space after Read, as the old style did once Read reached its maximum. Once the flexible columns are at their
+/// minimums, the other columns give up what they have above theirs, the same way, so at the window's 900-pt minimum
+/// with the sidebar at its default width Read is still on screen (W40.fix-reader-narrow-read-column: the owner saw
+/// it pushed off the edge there). The sums: at their minimums the eight columns shown by default take 656 pt with
+/// their spacing, and that window leaves the table about 668 pt (900, less the 210-pt sidebar, its 7-pt divider and
+/// a vertical scroller). Past that, the table scrolls sideways.
 @MainActor
 final class TableColumnFitter: NSObject {
     private weak var tableView: NSTableView?
@@ -26,7 +30,7 @@ final class TableColumnFitter: NSObject {
         self.flexibleIDs = flexibleIDs
         super.init()
         tableView.columnAutoresizingStyle = .noColumnAutoresizing
-        for column in tableView.tableColumns where flexibleIDs.contains(column.identifier.rawValue) {
+        for column in tableView.tableColumns {
             preferred[column.identifier.rawValue] = column.width
         }
         NotificationCenter.default.addObserver(self, selector: #selector(columnDidResize(_:)),
@@ -39,8 +43,8 @@ final class TableColumnFitter: NSObject {
         fit()
     }
 
-    /// The flexible columns' widths when `available` points are left for them: their preferred widths if those
-    /// fit, otherwise each gives up a share of the shortfall in proportion to how far it is above its minimum.
+    /// A group of columns' widths when `available` points are left for them (the flexible ones, then the rest):
+    /// their preferred widths if those fit, otherwise each gives up a share of the shortfall in proportion to how far it is above its minimum.
     /// Whole points that add up to `available` rounded down, the last column taking the remainder. Rounding each
     /// share down on its own let the sum, and so where Read starts, jitter by a point as the sidebar slid in
     /// (TransientStateUITests saw Read go 1007 → 1223 → 1222); while the cut lasts, Read now stays put.
@@ -64,14 +68,20 @@ final class TableColumnFitter: NSObject {
         let visible = tableView.tableColumns.filter { !$0.isHidden }
         let flexible = visible.filter { flexibleIDs.contains($0.identifier.rawValue) }
         guard !flexible.isEmpty else { return }
-        let fixed = visible.filter { !flexibleIDs.contains($0.identifier.rawValue) }.reduce(0) { $0 + $1.width }
-        let available = clip.bounds.width - fixed - CGFloat(visible.count) * tableView.intercellSpacing.width
-        let target = Self.widths(preferred: flexible.map { preferred[$0.identifier.rawValue] ?? $0.width },
-                                 minimums: flexible.map(\.minWidth), available: available)
+        let fixed = visible.filter { !flexibleIDs.contains($0.identifier.rawValue) }
+        let space = clip.bounds.width - CGFloat(visible.count) * tableView.intercellSpacing.width
+        let fixedPreferred = fixed.map { preferred[$0.identifier.rawValue] ?? $0.width }
+        // The flexible columns give first; the others only what is still short once both are at their minimums.
+        let flexibleTarget = Self.widths(preferred: flexible.map { preferred[$0.identifier.rawValue] ?? $0.width },
+                                         minimums: flexible.map(\.minWidth),
+                                         available: space - fixedPreferred.reduce(0, +))
+        let fixedTarget = Self.widths(preferred: fixedPreferred, minimums: fixed.map(\.minWidth),
+                                      available: space - flexibleTarget.reduce(0, +))
+        let target = zip(flexible + fixed, flexibleTarget + fixedTarget)
         isFitting = true
         defer { isFitting = false }
         var changed = false
-        for (column, width) in zip(flexible, target) where column.width != width {
+        for (column, width) in target where column.width != width {
             column.width = width
             changed = true
         }
@@ -92,8 +102,7 @@ final class TableColumnFitter: NSObject {
     /// A drag by the user sets that column's preferred width. It is not refitted at once: that would fight the drag,
     /// and a user who widens File name past the window is asking to scroll.
     @objc private func columnDidResize(_ note: Notification) {
-        guard !isFitting, let column = note.userInfo?["NSTableColumn"] as? NSTableColumn,
-              flexibleIDs.contains(column.identifier.rawValue) else { return }
+        guard !isFitting, let column = note.userInfo?["NSTableColumn"] as? NSTableColumn else { return }
         preferred[column.identifier.rawValue] = column.width
         remeasureVisibleRows()
     }
