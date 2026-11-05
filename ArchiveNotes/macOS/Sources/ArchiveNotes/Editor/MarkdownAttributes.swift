@@ -26,6 +26,10 @@ extension NSAttributedString.Key {
     /// Raw HTML read from the file, a headerless chip's unclosed `<!-- block:` opener included (Bool). Its
     /// newlines are its own, so the serializer writes them as they are rather than as paragraph breaks.
     static let noteRawHTML = NSAttributedString.Key("an.rawHTML")
+    /// The newline `MarkdownBridge.endLine` puts before a chip (Bool), which ends a block's text. Where text has
+    /// come to follow it (typed above the chip, or the chip left out of a passage) it is a paragraph break, not
+    /// a line break (W40.fix-notes-editor-lines).
+    static let noteChipLineEnd = NSAttributedString.Key("an.chipLineEnd")
 }
 
 // MARK: - BlockKind (paragraph-level semantic)
@@ -92,18 +96,18 @@ enum MarkdownStyler {
         result.deleteCharacters(in: NSRange(location: last, length: 1))
     }
 
-    /// The text that separates two adjacent blocks: a blank line, except between list items, which
-    /// stay tight. (Any two list items count as "the same list" — a nested sublist or an
-    /// immediately-following list of the other marker type both round-trip correctly without the
-    /// blank line, and both would render wrong with one.)
+    /// The text that separates two adjacent blocks (W40.fix-notes-editor-lines): only two paragraphs of text (or of one quote) are a blank line apart. A
+    /// heading, list, quote or code block is one newline from what borders it, which is what a Return typed
+    /// there makes: Markdown writes those boundaries the same with or without a blank line, so a blank line
+    /// shown there came back after every Backspace that deleted it.
     private static func blockSeparator(from previous: PresentationIntent?,
                                        to next: PresentationIntent?) -> String {
-        isListItem(previous) && isListItem(next) ? "\n" : "\n\n"
-    }
-
-    private static func isListItem(_ intent: PresentationIntent?) -> Bool {
-        guard let intent else { return false }
-        return intent.components.contains { if case .listItem = $0.kind { return true } else { return false } }
+        let a = previous.map(blockKind(from:)) ?? .plain
+        let b = next.map(blockKind(from:)) ?? .plain
+        switch (a, b) {
+        case (.plain, .plain), (.blockquote, .blockquote): return "\n\n"
+        default: return "\n"
+        }
     }
 
     /// Block-level attributes only. The separator belongs to the block it FOLLOWS (so it serializes
@@ -120,6 +124,17 @@ enum MarkdownStyler {
         separatorAttrs[.noteBlockKind] = attrs[.noteBlockKind]
         if let paragraphStyle = attrs[.paragraphStyle] { separatorAttrs[.paragraphStyle] = paragraphStyle }
         return separatorAttrs
+    }
+
+    /// A list item's paragraph style. Its text starts one marker width in per level, and the marker
+    /// (`ListMarkers`, drawn by `EditorTextView`) sits in the space before it (W40.fix-notes-editor-lines: no
+    /// marker was drawn at all, so a list showed only a 4-point indent).
+    static func listParagraphStyle(depth: Int) -> NSParagraphStyle {
+        let ps = NSMutableParagraphStyle()
+        let indent = CGFloat(depth + 1) * ListMarkers.levelWidth
+        ps.headIndent = indent
+        ps.firstLineHeadIndent = indent
+        return ps
     }
 
     private static func buildAttributes(
@@ -160,11 +175,7 @@ enum MarkdownStyler {
             attrs[.backgroundColor] = NSColor.quaternaryLabelColor
 
         case .listItem(_, let depth, _):
-            let ps = NSMutableParagraphStyle()
-            let indent = CGFloat(depth + 1) * 20
-            ps.headIndent = indent
-            ps.firstLineHeadIndent = max(indent - 16, 0)
-            attrs[.paragraphStyle] = ps
+            attrs[.paragraphStyle] = listParagraphStyle(depth: depth)
 
         case .plain:
             break

@@ -34,7 +34,7 @@ class WritingJourneyUITests: NotesFixtureUITestCase {
 
             // 1. Real keystrokes, then hands off: the idle autosave must write them.
             let first = "Typed by hand in the W40.d9 journey."
-            try typeIntoEditor("\n" + first)
+            try typeIntoEditor("\n\n" + first)
             let t0 = Date()
             XCTAssertTrue(pollUntil(timeout: 10) { self.bodyLines(id).contains(first) },
                           "N-14: typing should autosave without any other action")
@@ -45,7 +45,7 @@ class WritingJourneyUITests: NotesFixtureUITestCase {
 
             // 2. Type again and quit at once with ⌘Q — inside both debounces (editor ~400 ms + save 600 ms).
             let second = "Quit straight after typing this."
-            try typeIntoEditor("\n" + second)
+            try typeIntoEditor("\n\n" + second)
             app.typeKey("q", modifierFlags: .command)
             XCTAssertTrue(app.wait(for: .notRunning, timeout: 15), "⌘Q should quit the app")
             let afterQuit = try noteFile(id)
@@ -60,12 +60,14 @@ class WritingJourneyUITests: NotesFixtureUITestCase {
             XCTAssertTrue(pollUntil(timeout: 10) { self.editorText.contains(second) && self.editorText.contains(first) },
                           "the relaunched editor should show both typed lines")
             log("[d9] step 3 relaunched editor text: \(editorText.debugDescription)")
-            // W40.fix-notes-return-paragraph: each typed Return is written as a paragraph break, so the editor
-            // shows the Styler's blank-line separator between the paragraphs it reads back.
+            // W40.fix-notes-return-paragraph: each paragraph typed (two Returns, a blank line) is written as a
+            // paragraph break, so the editor shows the Styler's blank-line separator between the paragraphs it reads
+            // back. Since W40.fix-notes-editor-lines one Return is a line break (`EditorLinesUITests`), so the
+            // journey types two.
             XCTAssertTrue((noteBody(uuid: id) ?? "").contains("no source blocks.\n\n\(first)\n\n\(second)"),
-                          "N-12: each Return typed should be saved as a paragraph break")
+                          "N-12: each paragraph typed should be saved as a paragraph break")
             XCTAssertTrue(editorText.contains("no source blocks.\n\n\(first)\n\n\(second)"),
-                          "N-12: each Return typed should come back as its own paragraph after relaunch")
+                          "N-12: each paragraph typed should come back as its own paragraph after relaunch")
             RunLoop.current.run(until: Date().addingTimeInterval(3))   // past both debounces
             let afterRelaunch = try noteFile(id)
             XCTAssertEqual(afterRelaunch.data, afterQuit.data, "N-02: opening a note after relaunch must not rewrite it")
@@ -85,7 +87,7 @@ class WritingJourneyUITests: NotesFixtureUITestCase {
             try loadNote(id)
             let before = try noteFile(id)
             let line = "Window closed straight after this."
-            try typeIntoEditor("\n" + line)
+            try typeIntoEditor("\n\n" + line)
             let close = mainWindow.buttons[XCUIIdentifierCloseWindow]
             XCTAssertTrue(close.waitForExistence(timeout: 5), "the main window should have a close button")
             close.click()
@@ -118,7 +120,7 @@ class WritingJourneyUITests: NotesFixtureUITestCase {
 
             // Now type in the app and let it save.
             let typed = "Typed after the outside edit."
-            try typeIntoEditor("\n" + typed)
+            try typeIntoEditor("\n\n" + typed)
             XCTAssertTrue(pollUntil(timeout: 10) { self.bodyLines(id).contains(typed) }, "the typed line should autosave")
             let survived = bodyLines(id).contains(outside)
             let status = statusLine()
@@ -145,7 +147,7 @@ class WritingJourneyUITests: NotesFixtureUITestCase {
             let id = Self.idPlain
             try loadNote(id)
             let draft = "Localdrafttoken"
-            try typeIntoEditor("\n" + draft)
+            try typeIntoEditor("\n\n" + draft)
             let externalBase = try noteFile(id)
             let outside = "Externalconflicttoken"
             let edited = externalBase.text + "\n\n" + outside + "\n"
@@ -184,7 +186,7 @@ class WritingJourneyUITests: NotesFixtureUITestCase {
             XCTAssertEqual(chmod(dir, 0o555), 0, "should make the scratch note folder read-only")
             defer { _ = chmod(dir, 0o755) }
             let line = "Failedsavecloseline"
-            try typeIntoEditor("\n" + line)
+            try typeIntoEditor("\n\n" + line)
             RunLoop.current.run(until: Date().addingTimeInterval(2))   // the autosave is refused
             XCTAssertEqual(try Data(contentsOf: before.url), before.data, "precondition: the write was refused")
             mainWindow.buttons[XCUIIdentifierCloseWindow].click()
@@ -215,7 +217,7 @@ class WritingJourneyUITests: NotesFixtureUITestCase {
             XCTAssertEqual(chmod(dir, 0o555), 0, "should make the scratch note folder read-only")
             defer { _ = chmod(dir, 0o755) }
             let line = "Failedsavequitline"
-            try typeIntoEditor("\n" + line)
+            try typeIntoEditor("\n\n" + line)
             RunLoop.current.run(until: Date().addingTimeInterval(2))
             app.typeKey("q", modifierFlags: .command)
 
@@ -248,7 +250,7 @@ class WritingJourneyUITests: NotesFixtureUITestCase {
             XCTAssertEqual(chmod(dir, 0o555), 0, "should make the scratch note folder read-only")
             defer { _ = chmod(dir, 0o755) }
             let line = "Helddraftreopenline"
-            try typeIntoEditor("\n" + line)
+            try typeIntoEditor("\n\n" + line)
             RunLoop.current.run(until: Date().addingTimeInterval(2))   // the autosave is refused
 
             let templates = mainWindow.descendants(matching: .any)["an.sidebar.templates"].firstMatch

@@ -473,9 +473,9 @@ enum EditorFormatting {
     }
 
     static func toggleBlockquote(_ textView: NSTextView, fontSize: CGFloat) {
-        guard let storage = textView.textStorage, storage.length > 0 else { return }
+        guard let storage = textView.textStorage else { return }
         let paraRange = paragraphRange(for: textView.selectedRange(), in: storage)
-        let current = storage.attribute(.noteBlockKind, at: paraRange.location, effectiveRange: nil) as? BlockKind
+        let current = blockKind(at: paraRange, in: textView)
         if case .blockquote = current {
             applyBlockKind(.plain, textView: textView, fontSize: fontSize)
         } else {
@@ -484,9 +484,9 @@ enum EditorFormatting {
     }
 
     static func toggleCodeBlock(_ textView: NSTextView, fontSize: CGFloat) {
-        guard let storage = textView.textStorage, storage.length > 0 else { return }
+        guard let storage = textView.textStorage else { return }
         let paraRange = paragraphRange(for: textView.selectedRange(), in: storage)
-        let current = storage.attribute(.noteBlockKind, at: paraRange.location, effectiveRange: nil) as? BlockKind
+        let current = blockKind(at: paraRange, in: textView)
         if case .codeBlock = current {
             applyBlockKind(.plain, textView: textView, fontSize: fontSize)
         } else {
@@ -559,32 +559,32 @@ enum EditorFormatting {
     // MARK: List indent / outdent
 
     static func indentList(_ textView: NSTextView, fontSize: CGFloat) {
-        guard let storage = textView.textStorage, storage.length > 0 else { return }
+        guard let storage = textView.textStorage else { return }
         let paraRange = paragraphRange(for: textView.selectedRange(), in: storage)
-        guard let kind = storage.attribute(.noteBlockKind, at: paraRange.location,
-                                           effectiveRange: nil) as? BlockKind,
+        guard let kind = blockKind(at: paraRange, in: textView),
               case .listItem(let ordered, let depth, let ordinal) = kind else { return }
         let newKind = BlockKind.listItem(ordered: ordered, depth: depth + 1, ordinal: ordinal)
-        textView.undoManager?.beginUndoGrouping()
-        storage.beginEditing()
-        applyBlockKindAndVisuals(storage: storage, range: paraRange, kind: newKind, fontSize: fontSize)
-        storage.endEditing()
-        textView.undoManager?.endUndoGrouping()
+        changeAttributes(textView, in: paraRange) { storage in
+            applyBlockKindAndVisuals(storage: storage, range: paraRange, kind: newKind, fontSize: fontSize)
+        }
+        if textView.selectedRange().length == 0 {
+            textView.typingAttributes = typingAttributes(textView.typingAttributes, kind: newKind, fontSize: fontSize)
+        }
     }
 
     static func outdentList(_ textView: NSTextView, fontSize: CGFloat) {
-        guard let storage = textView.textStorage, storage.length > 0 else { return }
+        guard let storage = textView.textStorage else { return }
         let paraRange = paragraphRange(for: textView.selectedRange(), in: storage)
-        guard let kind = storage.attribute(.noteBlockKind, at: paraRange.location,
-                                           effectiveRange: nil) as? BlockKind,
+        guard let kind = blockKind(at: paraRange, in: textView),
               case .listItem(let ordered, let depth, let ordinal) = kind else { return }
         if depth > 0 {
             let newKind = BlockKind.listItem(ordered: ordered, depth: depth - 1, ordinal: ordinal)
-            textView.undoManager?.beginUndoGrouping()
-            storage.beginEditing()
-            applyBlockKindAndVisuals(storage: storage, range: paraRange, kind: newKind, fontSize: fontSize)
-            storage.endEditing()
-            textView.undoManager?.endUndoGrouping()
+            changeAttributes(textView, in: paraRange) { storage in
+                applyBlockKindAndVisuals(storage: storage, range: paraRange, kind: newKind, fontSize: fontSize)
+            }
+            if textView.selectedRange().length == 0 {
+                textView.typingAttributes = typingAttributes(textView.typingAttributes, kind: newKind, fontSize: fontSize)
+            }
         } else {
             applyBlockKind(.plain, textView: textView, fontSize: fontSize)
         }
@@ -593,7 +593,7 @@ enum EditorFormatting {
     // MARK: State query
 
     static func currentState(for textView: NSTextView) -> FormattingState {
-        guard let storage = textView.textStorage, storage.length > 0 else {
+        guard let storage = textView.textStorage else {
             return FormattingState()
         }
         let range = textView.selectedRange()
@@ -668,10 +668,9 @@ enum EditorFormatting {
     }
 
     private static func toggleList(ordered: Bool, textView: NSTextView, fontSize: CGFloat) {
-        guard let storage = textView.textStorage, storage.length > 0 else { return }
+        guard let storage = textView.textStorage else { return }
         let paraRange = paragraphRange(for: textView.selectedRange(), in: storage)
-        let current = storage.attribute(.noteBlockKind, at: paraRange.location,
-                                        effectiveRange: nil) as? BlockKind
+        let current = blockKind(at: paraRange, in: textView)
         if case .listItem(let ord, _, _) = current, ord == ordered {
             applyBlockKind(.plain, textView: textView, fontSize: fontSize)
         } else {
@@ -683,33 +682,94 @@ enum EditorFormatting {
     private static func applyBlockKind(_ kind: BlockKind,
                                        textView: NSTextView,
                                        fontSize: CGFloat) {
-        guard let storage = textView.textStorage, storage.length > 0 else { return }
+        guard let storage = textView.textStorage else { return }
         let paraRange = paragraphRange(for: textView.selectedRange(), in: storage)
 
         // Detect heading→non-heading: strip structural bold that headings add.
         // User-applied bold within headings has no Markdown representation (the
         // serializer skips ** for heading text), so nothing is lost.
-        let oldKind = storage.attribute(.noteBlockKind, at: paraRange.location,
-                                        effectiveRange: nil) as? BlockKind
+        let oldKind = blockKind(at: paraRange, in: textView)
         let wasHeading: Bool
         if case .heading = oldKind { wasHeading = true } else { wasHeading = false }
         let isHeading: Bool
         if case .heading = kind { isHeading = true } else { isHeading = false }
 
-        textView.undoManager?.beginUndoGrouping()
-        storage.beginEditing()
-        if wasHeading && !isHeading {
-            storage.enumerateAttribute(.font, in: paraRange) { val, r, _ in
-                if let font = val as? NSFont {
-                    storage.addAttribute(.font,
-                                         value: NSFontManager.shared.convert(font, toNotHaveTrait: .boldFontMask),
-                                         range: r)
+        changeAttributes(textView, in: paraRange) { storage in
+            if wasHeading && !isHeading {
+                storage.enumerateAttribute(.font, in: paraRange) { val, r, _ in
+                    if let font = val as? NSFont {
+                        storage.addAttribute(.font,
+                                             value: NSFontManager.shared.convert(font, toNotHaveTrait: .boldFontMask),
+                                             range: r)
+                    }
                 }
             }
+            applyBlockKindAndVisuals(storage: storage, range: paraRange, kind: kind, fontSize: fontSize)
         }
-        applyBlockKindAndVisuals(storage: storage, range: paraRange, kind: kind, fontSize: fontSize)
+        // What is typed next takes the kind too. An empty last line has no character to carry it, so without
+        // this a list or heading toggled on there showed nothing and the next keystroke was plain text
+        // (W40.fix-notes-editor-lines).
+        if textView.selectedRange().length == 0 {
+            textView.typingAttributes = typingAttributes(textView.typingAttributes, kind: kind, fontSize: fontSize)
+        }
+    }
+
+    /// `attrs` as typing attributes for a paragraph of `kind`: the same visuals `applyBlockKind` gives text.
+    static func typingAttributes(_ attrs: [NSAttributedString.Key: Any], kind: BlockKind,
+                                 fontSize: CGFloat) -> [NSAttributedString.Key: Any] {
+        var start = attrs
+        if case .heading? = attrs[.noteBlockKind] as? BlockKind, let font = attrs[.font] as? NSFont {
+            start[.font] = NSFontManager.shared.convert(font, toNotHaveTrait: .boldFontMask)
+        }
+        if start[.font] == nil { start[.font] = NSFont.systemFont(ofSize: fontSize) }
+        let sample = NSTextStorage(string: " ", attributes: start)
+        applyBlockKindAndVisuals(storage: sample, range: NSRange(location: 0, length: 1), kind: kind, fontSize: fontSize)
+        return sample.attributes(at: 0, effectiveRange: nil)
+    }
+
+    /// Give the paragraph at `location` the kind and visuals of `kind` (W40.fix-notes-editor-lines: text joined
+    /// to the paragraph above by Backspace takes that paragraph's kind, as it shows).
+    static func restyleParagraph(_ textView: NSTextView, at location: Int, kind: BlockKind, fontSize: CGFloat) {
+        guard let storage = textView.textStorage, location < storage.length else { return }
+        let range = paragraphRange(for: NSRange(location: location, length: 0), in: storage)
+        changeAttributes(textView, in: range) { storage in
+            if case .heading = kind {} else {
+                storage.enumerateAttribute(.noteBlockKind, in: range) { value, r, _ in
+                    guard case .heading? = value as? BlockKind else { return }
+                    storage.enumerateAttribute(.font, in: r) { font, fr, _ in
+                        guard let font = font as? NSFont else { return }
+                        storage.addAttribute(.font, value: NSFontManager.shared.convert(font, toNotHaveTrait: .boldFontMask),
+                                             range: fr)
+                    }
+                }
+            }
+            applyBlockKindAndVisuals(storage: storage, range: range, kind: kind, fontSize: fontSize)
+        }
+    }
+
+    /// An attribute-only edit of `range`, made through the text view so Undo restores the old attributes and
+    /// the delegate saves the note. Done on the storage alone, a block kind change was neither undone (Undo after
+    /// a Backspace join left the line below in the kind of the line above, and saved it so) nor saved until the
+    /// next keystroke (W40.fix-notes-editor-lines). A disabled editor refuses it, as it refuses typing.
+    static func changeAttributes(_ textView: NSTextView, in range: NSRange, _ body: (NSTextStorage) -> Void) {
+        guard let storage = textView.textStorage,
+              textView.shouldChangeText(in: range, replacementString: nil) else { return }
+        storage.beginEditing()
+        body(storage)
         storage.endEditing()
-        textView.undoManager?.endUndoGrouping()
+        textView.didChangeText()
+    }
+
+    /// The kind of the paragraph `paraRange`, or for the empty last line (which holds no character) the kind
+    /// typing there would get. Reading the attribute at the end of the text raised an exception, which AppKit
+    /// swallowed: Return, Backspace and the block toggles did nothing on an empty last line
+    /// (W40.fix-notes-editor-lines).
+    static func blockKind(at paraRange: NSRange, in textView: NSTextView) -> BlockKind? {
+        guard let storage = textView.textStorage else { return nil }
+        if paraRange.location < storage.length {
+            return storage.attribute(.noteBlockKind, at: paraRange.location, effectiveRange: nil) as? BlockKind
+        }
+        return textView.typingAttributes[.noteBlockKind] as? BlockKind
     }
 
     private static func applyBlockKindAndVisuals(storage: NSTextStorage,
@@ -751,11 +811,7 @@ enum EditorFormatting {
             storage.removeAttribute(.paragraphStyle, range: range)
 
         case .listItem(_, let depth, _):
-            let ps = NSMutableParagraphStyle()
-            let indent = CGFloat(depth + 1) * 20
-            ps.headIndent = indent
-            ps.firstLineHeadIndent = max(indent - 16, 0)
-            storage.addAttribute(.paragraphStyle, value: ps, range: range)
+            storage.addAttribute(.paragraphStyle, value: MarkdownStyler.listParagraphStyle(depth: depth), range: range)
             storage.addAttribute(.foregroundColor, value: NSColor.textColor, range: range)
             storage.removeAttribute(.backgroundColor, range: range)
             restoreBodyFont(storage: storage, range: range, fontSize: fontSize)

@@ -517,7 +517,7 @@ struct MarkdownBridgeTests {
         let storage = NSMutableAttributedString(attributedString: MarkdownBridge.parse(markdown: md))
         let at = location ?? storage.length
         var attrs = storage.attributes(at: max(at - 1, 0), effectiveRange: nil)
-        for key in [NSAttributedString.Key.noteBlockSeparator, .noteHardLineBreak, .noteRawHTML] {
+        for key in [NSAttributedString.Key.noteBlockSeparator, .noteHardLineBreak, .noteRawHTML, .noteChipLineEnd] {
             attrs.removeValue(forKey: key)   // as `EditorTextView.typingAttributes` strips them
         }
         storage.insert(NSAttributedString(string: text, attributes: attrs), at: at)
@@ -525,29 +525,31 @@ struct MarkdownBridgeTests {
     }
 
     /// The defect, measured by `W40.d9`: two Returns typed after a note's last paragraph were written one
-    /// newline apart, which Markdown reads as one paragraph, so the reopened note showed one.
+    /// newline apart, which Markdown reads as one paragraph, so the reopened note showed one. Each Return is a
+    /// line break now (W40.fix-notes-editor-lines: written as a paragraph break, it reopened as a blank line).
     @Test @MainActor
-    func typedReturnsAreSavedAsParagraphBreaks() {
+    func typedReturnsReopenAsTyped() {
         let saved = MarkdownBridge.serialize(typing("\nTyped by hand.\nQuit straight after.",
                                                     after: "Has no source blocks."))
-        #expect(saved == "Has no source blocks.\n\nTyped by hand.\n\nQuit straight after.")
+        #expect(saved == "Has no source blocks.\\\nTyped by hand.\\\nQuit straight after.")
         let reopened = MarkdownBridge.parse(markdown: saved)
-        #expect(reopened.string == "Has no source blocks.\n\nTyped by hand.\n\nQuit straight after.")
+        #expect(reopened.string == "Has no source blocks.\nTyped by hand.\nQuit straight after.")
         #expect(MarkdownBridge.serialize(reopened) == saved, "reopening must not rewrite the note")
     }
 
-    /// Returns in a row are one paragraph break (Markdown has no empty paragraph), and a Return ending the
-    /// text writes nothing after it.
+    /// Returns in a row are kept: a paragraph break, then a hard break for each one past two
+    /// (W40.fix-notes-editor-lines; they collapsed to one paragraph break). A Return ending the text writes
+    /// nothing after it.
     @Test @MainActor
-    func repeatedAndTrailingReturnsCollapse() {
-        #expect(MarkdownBridge.serialize(typing("\n\n\nB\n", after: "A")) == "A\n\nB")
+    func repeatedReturnsAreKeptAndTrailingOnesDropped() {
+        #expect(MarkdownBridge.serialize(typing("\n\n\nB\n", after: "A")) == "A\n\n\\\nB")
         #expect(MarkdownBridge.serialize(typing("\n", after: "A")) == "A")
     }
 
     /// A Return typed inside bold closes the emphasis before the break, rather than enclosing a blank line.
     @Test @MainActor
     func returnInsideBoldClosesTheEmphasis() {
-        #expect(MarkdownBridge.serialize(typing("\n", after: "**onetwo**", at: 3)) == "**one**\n\n**two**")
+        #expect(MarkdownBridge.serialize(typing("\n", after: "**onetwo**", at: 3)) == "**one**\\\n**two**")
     }
 
     /// A paragraph typed between existing blocks leaves the heading and list intact, and the blocks keep
@@ -582,8 +584,10 @@ struct MarkdownBridgeTests {
         #expect(MarkdownBridge.serialize(MarkdownBridge.parse(markdown: md)) == md)
     }
 
-    /// A hard break left at the edge of a paragraph, by a Return typed beside it or the text after it deleted,
-    /// writes no backslash: there it would read back as a literal `\`.
+    /// A hard break left at the end of a paragraph, by a Return typed beside it or the text after it deleted,
+    /// writes no backslash: there it would read back as a literal `\`. Beside a separator it is one more
+    /// empty line, written as a break opening the next paragraph, which reads back as one
+    /// (W40.fix-notes-editor-lines).
     @Test @MainActor
     func hardBreakAtAParagraphEdgeWritesNoBackslash() {
         let md = "Line one\\\nLine two"
@@ -596,10 +600,12 @@ struct MarkdownBridgeTests {
         // The same beside a separator the deleted text leaves behind, after the break or before it.
         let after = NSMutableAttributedString(attributedString: MarkdownBridge.parse(markdown: "Line one\\\nLine two\n\nNext"))
         after.deleteCharacters(in: NSRange(location: 9, length: ("Line two" as NSString).length))
-        #expect(!MarkdownBridge.serialize(after).contains("\\"), "got \(MarkdownBridge.serialize(after).debugDescription)")
+        #expect(MarkdownBridge.serialize(after) == "Line one\n\n\\\nNext", "got \(MarkdownBridge.serialize(after).debugDescription)")
+        #expect(MarkdownBridge.parse(markdown: MarkdownBridge.serialize(after)).string == after.string)
         let before = NSMutableAttributedString(attributedString: MarkdownBridge.parse(markdown: "Prev\n\nLine one\\\nLine two"))
         before.deleteCharacters(in: NSRange(location: 6, length: ("Line one" as NSString).length))
-        #expect(!MarkdownBridge.serialize(before).contains("\\"), "got \(MarkdownBridge.serialize(before).debugDescription)")
+        #expect(MarkdownBridge.serialize(before) == "Prev\n\n\\\nLine two", "got \(MarkdownBridge.serialize(before).debugDescription)")
+        #expect(MarkdownBridge.parse(markdown: MarkdownBridge.serialize(before)).string == before.string)
     }
 
     /// Newlines inside raw HTML are the file's own. A headerless chip's unclosed opener is raw HTML, and a
@@ -620,7 +626,7 @@ struct MarkdownBridgeTests {
     /// A lone CR, as pasted text can carry, is a line break like LF; CRLF is one break, not two.
     @Test @MainActor
     func carriageReturnsAreLineBreaks() {
-        #expect(MarkdownBridge.serialize(typing("\rB\r\nC", after: "A")) == "A\n\nB\n\nC")
+        #expect(MarkdownBridge.serialize(typing("\rB\r\nC", after: "A")) == "A\\\nB\\\nC")
     }
 
     // MARK: - W40.fix-notes-return-list-quote — Returns in quotes and lists, and typed block syntax
@@ -629,9 +635,10 @@ struct MarkdownBridgeTests {
     @Test @MainActor
     func returnTypedInAQuoteStaysInTheQuote() {
         let saved = MarkdownBridge.serialize(typing("\nr", after: "> q"))
-        #expect(saved == "> q\n>\n> r", "got \(saved.debugDescription)")
+        #expect(saved == "> q\\\n> r", "got \(saved.debugDescription)")
         let reopened = MarkdownBridge.parse(markdown: saved)
-        #expect(reopened.string == "q\n\nr")
+        #expect(reopened.string == "q\nr")
+        #expect(MarkdownBridge.serialize(typing("\n\nr", after: "> q")) == "> q\n>\n> r")
         #expect(MarkdownBridge.serialize(reopened) == saved, "reopening must not rewrite the note")
     }
 
@@ -681,16 +688,24 @@ struct MarkdownBridgeTests {
             ("1234567890. x", "1234567890. x")
         ]
         for (line, written) in cases {
+            // At the start of a paragraph (two Returns) and of a line after a hard break (one), where a list, a
+            // rule or a setext underline would interrupt the paragraph (W40.fix-notes-editor-lines).
+            for (typed, gap) in [("\n\n", "\n\n"), ("\n", "\\\n")] {
+                let saved = MarkdownBridge.serialize(typing(typed + line, after: "A"))
+                #expect(saved == "A" + gap + written, "\(line.debugDescription): got \(saved.debugDescription)")
+                let reopened = MarkdownBridge.parse(markdown: saved)
+                let shown = line.hasPrefix("  #") ? "# h" : line
+                #expect(reopened.string == "A" + typed + shown, "\(line.debugDescription): reopened \(reopened.string.debugDescription)")
+            }
             let saved = MarkdownBridge.serialize(typing("\n" + line, after: "A"))
-            #expect(saved == "A\n\n" + written, "\(line.debugDescription): got \(saved.debugDescription)")
             let reopened = MarkdownBridge.parse(markdown: saved)
-            let shown = line.hasPrefix("  #") ? "# h" : line
-            #expect(reopened.string == "A\n\n" + shown, "\(line.debugDescription): reopened \(reopened.string.debugDescription)")
             #expect(MarkdownBridge.serialize(reopened) == MarkdownBridge.serialize(MarkdownBridge.parse(markdown:
                 MarkdownBridge.serialize(reopened))), "\(line.debugDescription) must settle")
         }
         // The same at the start of a quote's or a list item's text.
-        #expect(MarkdownBridge.serialize(typing("\n2. b", after: "> q")) == "> q\n>\n> 2\\. b")
+        #expect(MarkdownBridge.serialize(typing("\n2. b", after: "> q")) == "> q\\\n> 2\\. b")
+        #expect(MarkdownBridge.serialize(typing("\n===", after: "A")) == "A\\\n\\===")
+        #expect(MarkdownBridge.parse(markdown: "A\\\n\\===").string == "A\n===")
         #expect(MarkdownBridge.serialize(typing("\n---", after: "- a")) == "- a\n- \\---")
         // Raw HTML at a piece start is the file's own and stays as it was.
         #expect(MarkdownBridge.serialize(MarkdownBridge.parse(markdown: "<div>\nx\n</div>")) == "<div>\nx\n</div>")
@@ -706,7 +721,7 @@ struct MarkdownBridgeTests {
         tv.setSelectedRange(NSRange(location: 3, length: 0))
         tv.insertText("X\nY", replacementRange: tv.selectedRange())
         #expect(tv.string == "A\n\nX\nYB")
-        #expect(MarkdownBridge.serialize(storage) == "A\n\nX\n\nYB")
+        #expect(MarkdownBridge.serialize(storage) == "A\n\nX\\\nYB")
     }
 
     /// Assert that parse→serialize produces the expected normalized form,

@@ -184,8 +184,11 @@ struct FrontMatterMutationFuzzTests {
         let typed = NSAttributedString(string: "Note.\n<!-- block: freeform -->\nMore.")
         let saved = MarkdownBridge.serialize(typed)
         #expect(BlockParser.parse(saved).blocks.isEmpty, "\(saved.debugDescription)")
-        #expect(BlockParser.parse(saved).leadingText?.contains("\n<!-- block: freeform -->") == true,
+        // Since W40.fix-notes-editor-lines one Return is a hard break, so the line is inside the paragraph, where
+        // `<!--` would start an HTML block: it is also escaped for Markdown (`\<`), under the block parser's escape.
+        #expect(BlockParser.parse(saved).leadingText?.contains("\n\\<!-- block: freeform -->") == true,
                 "\(saved.debugDescription)")
+        #expect(MarkdownBridge.parse(markdown: saved).string == typed.string, "the note reopens as typed")
     }
 }
 
