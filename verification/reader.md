@@ -468,12 +468,15 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
   (adds a subject in the sheet, reads it back from disk); `ArchiveReaderTests/TagEditingIntegrationTests.testApplySetYearOnDisk`,
   `.testApplySetQualityWritesCanonicalTokenAndPreservesBytes` (writer level);
   `NavigationUITests.testSheetSetsAndClearsASentWithDate` (Sent-With set, flagged, cleared, read back from disk;
-  added by `W40.fix-reader-sent-with-date`, 2026-10-29). Nothing tests Month, Day, color or group tri-state.
+  added by `W40.fix-reader-sent-with-date`, 2026-10-29); `TagEntryUITests.testTagEntryKeepsFocusAndASpaceEndsACompletion`
+  (step 3: autocomplete, Tab, Return, Done, read back from disk; `W40.fix-reader-tag-entry`). Nothing tests Month, Day,
+  color or group tri-state.
 - **Runtime evidence:** 2026-10-15 · `f5c31a95` · [`evidence/reader/W40.d8-triage.md`](evidence/reader/W40.d8-triage.md): ⌘I on three selected files added a subject to all three and nothing else; ⌘I on one file did the same.
 - **Status:** `unproven`
 - **History:**
   - 2026-10-12 W40.b1 — row written, `unproven`.
   - 2026-10-15 W40.d8 — runtime evidence for subjects (single and group); stays `unproven`: Year/Month/Day, Quality, colour and tri-state were not shown.
+  - 2026-11-05 W40.fix-reader-tag-entry — the subject field autocompletes (owner session reader-1 row 28): Tab adds the suggestion, Return adds what is typed and keeps the sheet open, Done adds what is still typed. VM run: [`evidence/reader/W40.fix-reader-tag-entry.md`](evidence/reader/W40.fix-reader-tag-entry.md). Stays `unproven` for the same reasons.
 - **Notes:** each control writes as soon as it changes (`Views/TagEditorView.swift:4-5`), so one sheet session
   makes several writes and several undo steps. Tri-state is real for subjects. For Quality, Color and Read it
   is only a "(mixed)" label. The sheet also holds Read state, Note and Flag.
@@ -482,13 +485,14 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
 
 - **Promise:** each row's Tags cell is an editable token field. It autocompletes from the subjects in the
   archive and commits on Return and on leaving the field, so a word typed but not Returned still sticks. One
-  commit is one delta, and existing tags are never lost.
+  commit is one delta, and existing tags are never lost. Return with text typed keeps the keyboard in the field
+  for the next tag; a space keeps what was typed rather than the suggestion (W40.fix-reader-tag-entry).
 - **Promised in:** `CLAUDE.md` Implementation map (`SubjectTokenField.swift`); `SUITE_TODO_DONE.md` "GUI-verified
   2026-07-08" (inline tag-editor commit).
 - **Reached by:** a click in the Tags column opens the AppKit `TagTokenCellView` (`Views/AppKitTableView.swift:262`,
   `:521-541`). Autocomplete is `tokenField(_:completionsForSubstring…)` (`:544`). `controlTextDidEndEditing`
   (`:566-581`) calls `NavigationModel.commitSubjectEdit` (`Views/NavigationModel.swift:1290`).
-- **Real-path test:** `ArchiveReaderUITests/TriageJourneyUITests.testTriageWritesKeepEveryOtherTagColourAndByte` (steps 2a, 2), through the cell. At the writer level, `ArchiveReaderTests/SubjectTokenEditIntegrationTests.testInlineEditPreservesFacetTokensAndBytes`
+- **Real-path test:** `ArchiveReaderUITests/TriageJourneyUITests.testTriageWritesKeepEveryOtherTagColourAndByte` (steps 2a, 2), through the cell; `TagEntryUITests.testTagEntryKeepsFocusAndASpaceEndsACompletion` (steps 1, 2: two tags in a row, a space in a completion). At the writer level, `ArchiveReaderTests/SubjectTokenEditIntegrationTests.testInlineEditPreservesFacetTokensAndBytes`
   and `.testInlineEditInverseRoundTrips` test `TagEditing.subjectDelta` and `TagWriter` directly.
 - **Runtime evidence:** 2026-10-15 · `f5c31a95` · [`evidence/reader/W40.d8-triage.md`](evidence/reader/W40.d8-triage.md): a Space typed in the focused token field opened the Preview sheet instead (an earlier run's two-word tag was written as its first word), and Return did not commit; the tag was written only on leaving the field. Leaving the field kept every other tag and colour.
 - **Status:** `fixed-pending-recheck` (builder is not verifier)
@@ -496,6 +500,7 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
   - 2026-10-12 W40.b1 — row written, `unproven`.
   - 2026-10-15 W40.d8 — `broken`: `W40.fix-reader-inline-keys` (S2).
   - 2026-10-31 W40.fix-reader-inline-keys — `fixed-pending-recheck`: a Space types a space (the two-word tag `W40d8 Inline` was written whole), and Return commits the edit as one delta, with every other file byte-identical. [`evidence/reader/W40.fix-reader-inline-keys.md`](evidence/reader/W40.fix-reader-inline-keys.md).
+  - 2026-11-04 owner session reader-1 rows 29, 36 — the field let go after every tag, and a space typed into a completion was refused. 2026-11-05 W40.fix-reader-tag-entry — stays `fixed-pending-recheck`: Return writes and keeps the keyboard (two tags in a row, no click), and "W40te Al" + " Two" wrote `W40te Al Two` with "W40te Alpha Beta" suggested. [`evidence/reader/W40.fix-reader-tag-entry.md`](evidence/reader/W40.fix-reader-tag-entry.md).
 - **Notes:** **Drift.** The live editor is the AppKit cell. `Views/SubjectTokenField.swift`, which the guide
   names, is referenced only by the dead `TagsCell` (R-25), so it is dead too. Autocomplete returns at most 20
   and leaves out an exact match. There is no case-duplicate warning here (R-27). 2026-10-16 `W40.e5` deleted

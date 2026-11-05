@@ -1423,9 +1423,11 @@ final class NavigationModel: ObservableObject {
     /// edit-start base means the delta names ONLY what the user actually changed, so `TagWriter`'s fresh
     /// read preserves any concurrent third-party tag (never dropping an untouched token). Applied as ONE
     /// delta = one write + one undo step; a no-op edit writes nothing. Subjects only — other facets stay.
-    func commitSubjectEdit(from base: [String], to edited: [String], for file: ArchiveFile) {
-        guard let file = reverifyCacheRow(file) else { return }
-        applyDelta(TagEditing.subjectDelta(from: base, to: edited), to: file)
+    /// Returns whether the file now has the edit: false when it could not be verified or written.
+    @discardableResult
+    func commitSubjectEdit(from base: [String], to edited: [String], for file: ArchiveFile) -> Bool {
+        guard let file = reverifyCacheRow(file) else { return false }
+        return applyDelta(TagEditing.subjectDelta(from: base, to: edited), to: file)
     }
 
     func setReadStateInline(_ target: ReadState, for file: ArchiveFile) {
@@ -1454,16 +1456,18 @@ final class NavigationModel: ObservableObject {
         applyDelta(TagDelta(remove: ReadState.allCases.map(\.rawValue)), to: file)
     }
 
-    private func applyDelta(_ delta: TagDelta, to file: ArchiveFile) {
-        guard !delta.isEmpty else { return }
-        guard let file = reverifyCacheRow(file) else { return }
+    @discardableResult
+    private func applyDelta(_ delta: TagDelta, to file: ArchiveFile) -> Bool {
+        guard !delta.isEmpty else { return true }
+        guard let file = reverifyCacheRow(file) else { return false }
         let identity = file.liveIdentity()   // §6: capture lazily at edit time
         let group = UUID()
         do {
             let r = try AuditLedger.withContext(group: group) { try TagWriter.apply(delta, to: file.url, expecting: identity) }
             reflect(r)
+            return true
         }
-        catch { statusMessage = "Could not edit \(file.name)."; announce(statusMessage) }
+        catch { statusMessage = "Could not edit \(file.name)."; announce(statusMessage); return false }
     }
 
     /// Reflect one verified inline write in the display (overlay) and push it as its own undo step.

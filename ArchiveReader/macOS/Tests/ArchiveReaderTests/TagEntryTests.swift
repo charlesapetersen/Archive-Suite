@@ -28,20 +28,10 @@ final class TagEntryTests: XCTestCase {
         let tv = NSTextView()
         tv.string = "\u{FFFC}\u{FFFC} Civil W"
         XCTAssertEqual(TagEntry.pendingText(in: tv), "Civil W")
+        tv.setSelectedRange(NSRange(location: 9, length: 1))   // "W": a suggested rest after "Civil "
+        XCTAssertEqual(TagEntry.pendingText(in: tv, includingSuggestion: false), "Civil")
+        XCTAssertEqual(TagEntry.pendingText(in: tv), "Civil W")
         tv.string = "\u{FFFC}"
         XCTAssertEqual(TagEntry.pendingText(in: tv), "")
-    }
-
-    func testTabTakesASelectedCompletionAndOtherwiseKeepsItsMeaning() {
-        let tv = NSTextView()
-        tv.string = "\u{FFFC}Civil War"
-        tv.setSelectedRange(NSRange(location: 4, length: 6))   // "il War", the suggested rest after "Civ"
-        XCTAssertTrue(TagEntry.acceptInlineCompletion(in: tv))
-        XCTAssertEqual(tv.selectedRange(), NSRange(location: 10, length: 0))
-        XCTAssertEqual(tv.string, "\u{FFFC}Civil War", "taking the completion changes no text")
-
-        XCTAssertFalse(TagEntry.acceptInlineCompletion(in: tv), "no selection: Tab moves on as usual")
-        tv.setSelectedRange(NSRange(location: 0, length: 2))
-        XCTAssertFalse(TagEntry.acceptInlineCompletion(in: tv), "a selected token is not a completion")
     }
 }

@@ -248,6 +248,8 @@ struct AppKitTableView: NSViewRepresentable {
         /// rebuild cost ~110 ms per edit at 116k rows (W40.fix-reader-list-recompute-at-size).
         private(set) var rows: [ArchiveFile] = []
         var editingItemID: ArchiveFile.ID?
+        /// A new set or order of rows arrived while a tag cell was being edited, and waits for the edit to end.
+        private var rowsWaitingForEdit = false
         var columnFitter: TableColumnFitter?
 
         init(_ parent: AppKitTableView) {
@@ -261,6 +263,15 @@ struct AppKitTableView: NSViewRepresentable {
         func showRows(_ files: [ArchiveFile]) -> Bool {
             let idsChanged = files.count != currentSnapshotIDs.count
                 || !zip(files, currentSnapshotIDs).allSatisfy { $0.id == $1 }
+            // Return writes a tag cell's tags while it is still being edited (W40.fix-reader-tag-entry), and that
+            // write can move or drop rows: a sort by tags, a tag filter. A new snapshot then would reload the cell
+            // under its field editor, and the cell, reused for another row, would keep this file's id and tokens,
+            // so the next tag typed would go to a file other than the one on screen. Rows and snapshot stay as
+            // they are until the edit ends (`catchUpRows`).
+            if idsChanged, editingItemID != nil {
+                rowsWaitingForEdit = true
+                return false
+            }
             rows = files
             if idsChanged { applySnapshot(files.map(\.id), animated: false) }
             return idsChanged
@@ -680,13 +691,9 @@ struct AppKitTableView: NSViewRepresentable {
         /// field keeps the keyboard, so the next tag can be typed at once (W40.fix-reader-tag-entry: the field
         /// was left after every tag, and each further tag needed a click). Return in a field with nothing typed
         /// ends the edit: the list takes focus back, and `controlTextDidEndEditing` commits.
-        /// Tab takes an inline completion (`TagEntry`); with none showing it keeps its usual meaning.
         func control(_ control: NSControl, textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
-            guard let tagCell = control.superview as? TagTokenCellView else { return false }
-            if commandSelector == #selector(NSResponder.insertTab(_:)) {
-                return TagEntry.acceptInlineCompletion(in: textView)
-            }
-            guard commandSelector == #selector(NSResponder.insertNewline(_:)) else { return false }
+            guard let tagCell = control.superview as? TagTokenCellView,
+                  commandSelector == #selector(NSResponder.insertNewline(_:)) else { return false }
             let typed = !TagEntry.pendingText(in: textView).isEmpty
             DispatchQueue.main.async { [weak self, weak control, weak tagCell] in
                 guard let self, let control, let tagCell, control.currentEditor() != nil else { return }
@@ -704,8 +711,8 @@ struct AppKitTableView: NSViewRepresentable {
         private func commitInProgress(_ tagCell: TagTokenCellView) {
             guard let base = tagCell.editBase, let fileID = tagCell.itemID, let file = self.file(for: fileID) else { return }
             let edited = (tagCell.tokenField.objectValue as? [String]) ?? []
-            tagCell.editBase = edited
-            parent.model.commitSubjectEdit(from: base, to: edited, for: file)
+            // A write that failed leaves the base where it was, so leaving the field tries those tags again.
+            if parent.model.commitSubjectEdit(from: base, to: edited, for: file) { tagCell.editBase = edited }
         }
 
         func controlTextDidEndEditing(_ obj: Notification) {
@@ -715,12 +722,28 @@ struct AppKitTableView: NSViewRepresentable {
                   let fileID = tagCell.itemID,
                   let file = self.file(for: fileID) else {
                 editingItemID = nil
+                catchUpRows()
                 return
             }
             tagCell.editBase = nil
             editingItemID = nil
             let edited = (tf.objectValue as? [String]) ?? []
             parent.model.commitSubjectEdit(from: base, to: edited, for: file)
+            catchUpRows()
+        }
+
+        /// Takes the rows that arrived during an edit, on the next turn, once the field editor has gone.
+        private func catchUpRows() {
+            guard rowsWaitingForEdit else { return }
+            rowsWaitingForEdit = false
+            DispatchQueue.main.async { [weak self] in
+                guard let self, self.editingItemID == nil, let tableView = self.tableView else { return }
+                if self.showRows(self.parent.model.displayed) {
+                    self.syncSelection(self.parent.selection)
+                } else {
+                    tableView.reloadData()
+                }
+            }
         }
     }
 }

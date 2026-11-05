@@ -3,8 +3,9 @@ import AppKit
 
 /// The Edit Tags sheet's add-a-subject field (W40.fix-reader-tag-entry, owner session reader-1 row 28): it
 /// autocompletes from the library's subjects as the list's tag field does, with the same keys (`TagEntry`).
-/// Return or a comma adds what is typed and the field keeps the keyboard for the next one. The field holds no
-/// tokens: the sheet's chips above it show the tags, so each added subject leaves the field empty.
+/// Return or a comma adds what is typed and the field keeps the keyboard for the next one; Tab adds the suggestion
+/// and moves on. The field keeps no tokens: the sheet's chips above it show the tags, so each added subject leaves
+/// the field empty.
 ///
 /// `draft` is the text typed so far, for the sheet's case warning and its Add button. Setting it to "" from
 /// outside (the Add button, once it has added the draft) empties the field.
@@ -52,28 +53,51 @@ struct SubjectEntryField: NSViewRepresentable {
             TagEntry.completions(for: substring, in: parent.suggestions())
         }
 
-        /// Return, a comma, a picked completion, or leaving the field with text typed: each subject is added to
-        /// the files, and none stays in the field as a token. Added on the next turn, so the model is not changed
-        /// inside the delegate call.
+        /// A comma, or Tab on a suggestion, makes a token; each one is added to the files on the next turn (so the
+        /// model is not changed inside the delegate call), and the field is emptied.
         func tokenField(_ tokenField: NSTokenField, shouldAdd tokens: [Any], at index: Int) -> [Any] {
-            let added = tokens.compactMap { ($0 as? String)?.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
             DispatchQueue.main.async { [weak self, weak tokenField] in
-                guard let self else { return }
-                added.forEach(self.parent.onAdd)
-                self.parent.draft = ""
-                if let tokenField { self.clear(tokenField) }
+                if let self, let tokenField { self.harvest(tokenField) }
             }
-            return []
+            return tokens
+        }
+
+        /// Leaving the field adds what is in it, tokens and text alike: typed text sticks, as in the list's field.
+        /// Tab on a suggestion turns it into a token without calling `shouldAdd` and moves on, so it arrives here.
+        func controlTextDidEndEditing(_ obj: Notification) {
+            guard let tf = obj.object as? NSTokenField else { return }
+            harvest(tf)
         }
 
         func controlTextDidChange(_ obj: Notification) {
             guard let tf = obj.object as? NSTokenField, let editor = tf.currentEditor() as? NSTextView else { return }
-            let typed = TagEntry.pendingText(in: editor)
+            let typed = TagEntry.pendingText(in: editor, includingSuggestion: false)
             if parent.draft != typed { parent.draft = typed }
         }
 
+        /// Return adds the subject in the field, a suggestion showing in it included, as Return does in the list's
+        /// field; the field is emptied and keeps the keyboard.
         func control(_ control: NSControl, textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
-            commandSelector == #selector(NSResponder.insertTab(_:)) && TagEntry.acceptInlineCompletion(in: textView)
+            guard commandSelector == #selector(NSResponder.insertNewline(_:)),
+                  let tf = control as? NSTokenField else { return false }
+            let subject = TagEntry.pendingText(in: textView)
+            guard !subject.isEmpty else { return false }
+            parent.draft = ""
+            clear(tf)
+            DispatchQueue.main.async { [weak self] in self?.parent.onAdd(subject) }
+            return true
+        }
+
+        /// Adds every subject the field holds and empties it. A subject the files already have is not written
+        /// again (`TagWriter` journals and writes nothing for a no-op), so the field tokenizing text the Add or
+        /// Done button has just added changes nothing.
+        private func harvest(_ tf: NSTokenField) {
+            let subjects = ((tf.objectValue as? [Any]) ?? []).compactMap { ($0 as? String)?.trimmingCharacters(in: .whitespaces) }
+                .filter { !$0.isEmpty }
+            guard !subjects.isEmpty else { return }
+            subjects.forEach(parent.onAdd)
+            if !parent.draft.isEmpty { parent.draft = "" }
+            clear(tf)
         }
 
         /// Empties the field, keeping the keyboard in it. While it is being edited the text is removed as an edit

@@ -70,15 +70,11 @@ struct SubjectFilterTokenField: NSViewRepresentable {
 
         /// Autocomplete the token being typed from the corpus's existing subjects (case-insensitive
         /// prefix match; drops an already-complete match), so filters stay in the real vocabulary. A space keeps
-        /// what was typed and Tab takes the suggestion, as in the other tag fields (`TagEntry`).
+        /// what was typed, as in the other tag fields (`TagEntry`).
         func tokenField(_ tokenField: NSTokenField, completionsForSubstring substring: String,
                         indexOfToken tokenIndex: Int,
                         indexOfSelectedItem selectedIndex: UnsafeMutablePointer<Int>?) -> [Any]? {
             TagEntry.completions(for: substring, in: parent.suggestions)
-        }
-
-        func control(_ control: NSControl, textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
-            commandSelector == #selector(NSResponder.insertTab(_:)) && TagEntry.acceptInlineCompletion(in: textView)
         }
 
         /// ADDs come through here (Return, comma, a completion pick, or blur auto-tokenizing typed text).
