@@ -21,7 +21,7 @@ final class PreviewSheetSizeTests: XCTestCase {
     }
 }
 
-/// W40.fix-reader-tag-editor-chips — the Edit Tags and Similar Tags sheets fit inside the minimum window too.
+/// W40.fix-reader-tag-editor-chips — the Edit Info and Similar Tags sheets fit inside the minimum window too.
 @MainActor
 final class TagSheetSizeTests: XCTestCase {
     func testTagSheetsShrinkInsideTheMinimumWindow() {

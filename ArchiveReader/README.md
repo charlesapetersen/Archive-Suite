@@ -5,7 +5,7 @@ were OCR'd and tagged by [**Archive Processor**](../ArchiveProcessor) (its sibli
 historians and archivists working through thousands of scanned documents.
 
 Archive Reader is the *reading & triage* companion to Archive Processor's *capture & tagging*: find
-tagged PDFs, list them in chronological order, filter by subject / quality / read-state, search the
+tagged PDFs, list them in chronological order, filter by tag / quality / read-state, search the
 OCR text, read them two-up (image + OCR text), copy text and file links, edit tags, and mark
 documents Read as you go. The two apps ship together as **Archive Suite** (this monorepo).
 
@@ -32,9 +32,9 @@ Protocol.
 - **Navigation window** (Finder-Smart-Folder-like): columns for Document date · File name · File
   type · File tags · Quality · Read/Unread; multi-level sort (chronological by default; medieval-safe; a second level from the column header's
   right-click menu);
-  separate filters for subject tags, Quality (Q1–Q3), and read-state.
+  separate filters for tags, Quality (Q1–Q3), and read-state.
 - **Full-text search** across the OCR'd text.
-- **Edit tags** for one file or a group (subjects, date facets, Quality, color) — safely.
+- **Edit Info…** (⌘I) for one file or a group: tags, date and Sent-with date, Quality, marker color, read state and flag — safely.
 - **Copy file links** (`file://` URL / path / Markdown / HTML) for single files or groups.
 - **Copy archive links** (`archivereader://`, ⇧⌘L in the Selection menu or the toolbar; ⌥⌘L in a document copies its page) that
   keep working after the folder moves. To open one, paste it into Archive Notes, Apple Notes, Mail or Messages

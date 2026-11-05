@@ -1,7 +1,7 @@
 import AppKit
 
 /// How the Reader's tag-entry token fields treat an autocompletion (W40.fix-reader-tag-entry; owner session
-/// reader-1, rows 28, 29 and 36). The list's inline tag field, the Edit Tags sheet's subject field and the tag
+/// reader-1, rows 28, 29 and 36). The list's inline tag field, the Edit Info sheet's subject field and the tag
 /// filter share it, so the three behave alike: a space keeps what was typed, and Tab or → takes the suggestion.
 /// The list's field and the sheet fill a suggestion in only where it keeps the typed case (`filledInIndex`); the
 /// filter fills in the first, as a filter names a subject that exists.

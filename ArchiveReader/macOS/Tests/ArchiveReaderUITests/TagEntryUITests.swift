@@ -6,7 +6,7 @@ import Darwin
 /// 1. The list's tag field keeps the keyboard after Return, so a second tag is typed without a click.
 /// 2. A space typed into an autocompletion keeps what was typed: "W40te Al" + " Two" is the tag "W40te Al Two",
 ///    even though "W40te Alpha Beta" was being suggested.
-/// 3. Edit Tags… autocompletes: "W40te Gam" + Tab adds "W40te Gamma". Return adds a typed subject and leaves the
+/// 3. Edit Info… autocompletes: "W40te Gam" + Tab adds "W40te Gamma". Return adds a typed subject and leaves the
 ///    sheet open with the keyboard in the field, so the next one is typed without a click; a subject still typed
 ///    when Done is clicked is added too.
 ///
@@ -78,7 +78,7 @@ final class TagEntryUITests: FixtureUITestCase {
         XCTAssertEqual(tags(path).filter { $0.hasPrefix("W40te") }.sorted(),
                        ["W40te Al Two", "W40te Alpha Beta", "W40te Gamma"], "the list field should write exactly the typed tags")
 
-        // (3) Edit Tags… on another file: Tab takes the suggestion, Return adds it and keeps the sheet open.
+        // (3) Edit Info… on another file: Tab takes the suggestion, Return adds it and keeps the sheet open.
         guard let (_, otherPath) = rowFile(1) else { return XCTFail("row 1 should expose its tag field") }
         clickRow(1)
         pressKey("i", modifiers: .command)
@@ -92,7 +92,7 @@ final class TagEntryUITests: FixtureUITestCase {
         settle(0.5)
         captureScreenshot("w40-tag-entry-editor-tab")
         XCTAssertTrue(waitFor { self.tags(otherPath).contains("W40te Gamma") },
-                      "row 28: Edit Tags should autocomplete, and Tab take the suggestion; tags \(tags(otherPath))")
+                      "row 28: Edit Info should autocomplete, and Tab take the suggestion; tags \(tags(otherPath))")
         XCTAssertFalse(tags(otherPath).contains("W40te Gam"), "Tab should take the whole suggestion")
         log("[tag-entry] editor field after Tab: \(String(describing: add.value))")
 
@@ -113,7 +113,7 @@ final class TagEntryUITests: FixtureUITestCase {
         XCTAssertTrue(waitFor { !self.app.buttons["ar.tagEditor.done"].exists }, "Done should close the sheet")
         log("[tag-entry] editor tags now \(tags(otherPath).filter { $0.hasPrefix("W40te") })")
         XCTAssertEqual(tags(otherPath).filter { $0.hasPrefix("W40te") }.sorted(),
-                       ["W40te Delta", "W40te Epsilon", "W40te Gamma"], "Edit Tags should add exactly the subjects entered")
+                       ["W40te Delta", "W40te Epsilon", "W40te Gamma"], "Edit Info should add exactly the subjects entered")
     }
 
     // MARK: helpers

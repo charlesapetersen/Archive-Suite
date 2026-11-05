@@ -23,7 +23,7 @@ struct TagEditorView: View {
         let s = targetPaths == nil ? model.groupSummary : GroupTagSummary(files.map(\.tags))
         VStack(spacing: 0) {
             HStack {
-                Text(s.count == 1 ? "Edit Tags" : "Edit Tags — \(s.count) files").font(.headline)
+                Text(s.count == 1 ? "Edit Info" : "Edit Info — \(s.count) files").font(.headline)
                 Spacer()
                 // Typed text sticks, as in the list's tag field: Done adds a subject still in the field. While
                 // one is being typed, Return belongs to the field, which adds it and keeps the keyboard.
@@ -57,7 +57,7 @@ struct TagEditorView: View {
 
     @ViewBuilder private func subjectsSection(_ s: GroupTagSummary) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            title("Subjects")
+            title("Tags")
             if s.subjectsOnAll.isEmpty && s.subjectsOnSome.isEmpty {
                 Text("None").foregroundStyle(.secondary).font(.callout)
             }
@@ -68,7 +68,7 @@ struct TagEditorView: View {
                 ForEach(s.subjectsOnSome, id: \.self) { chip($0, partial: true) }
             }
             HStack {
-                SubjectEntryField(draft: $subjectDraft, placeholder: "Add subject…",
+                SubjectEntryField(draft: $subjectDraft, placeholder: "Add tag…",
                                   suggestions: { let onAll = Set(s.subjectsOnAll); return model.allSubjects.filter { !onAll.contains($0) } },
                                   onAdd: { apply(.addSubject($0)) })
                 Button("Add", action: addSubject)
@@ -206,7 +206,7 @@ struct TagEditorView: View {
     private func dateAmbiguityMessage(_ files: [ArchiveFile]) -> String? {
         let ambiguous = files.filter(\.dateIsAmbiguous)
         if ambiguous.count == 1, files.count == 1, let text = ambiguous[0].dateAmbiguityText {
-            return "\(text) Remove the wrong tag: a set-aside one under Subjects, or the kept one by setting the date below."
+            return "\(text) Remove the wrong tag: a set-aside one under Tags, or the kept one by setting the date below."
         }
         return ambiguous.isEmpty ? nil
             : "\(ambiguous.count) of the selected files have two tags for one date. Open one to see which."

@@ -57,7 +57,7 @@ struct OptionsView: View {
                     Text("Read").tag(ReadFilter.read)
                     Text("No read-state").tag(ReadFilter.noReadState)
                 }
-                Toggle("Combine multiple subject filters with ANY (off = ALL)", isOn: $subjectCombineAny)
+                Toggle("Combine multiple tag filters with ANY (off = ALL)", isOn: $subjectCombineAny)
             }
             Section("File list") {
                 VStack(alignment: .leading) {
@@ -79,7 +79,7 @@ struct OptionsView: View {
                     .foregroundStyle(.secondary)
             }
             Section("Tag editing") {
-                Toggle("Warn when a new subject differs only by case from an existing one", isOn: $warnNearDuplicate)
+                Toggle("Warn when a new tag differs only by case from an existing one", isOn: $warnNearDuplicate)
             }
             Section("Excluded folders") {
                 Text("Files in these folders are hidden from the library and not indexed for search.")

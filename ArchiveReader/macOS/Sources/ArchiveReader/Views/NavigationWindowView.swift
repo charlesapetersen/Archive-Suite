@@ -172,7 +172,7 @@ struct NavigationWindowView: View {
         menu.addItem(withTitle: "Mark Read", action: #selector(ContextMenuActions.markRead), keyEquivalent: "")
         menu.addItem(withTitle: "Mark Unread", action: #selector(ContextMenuActions.markUnread), keyEquivalent: "")
         menu.addItem(withTitle: "Toggle Flag", action: #selector(ContextMenuActions.toggleFlag), keyEquivalent: "")
-        menu.addItem(withTitle: "Edit Tags…", action: #selector(ContextMenuActions.editTags), keyEquivalent: "")
+        menu.addItem(withTitle: "Edit Info…", action: #selector(ContextMenuActions.editTags), keyEquivalent: "")
         // W24.cal1-reader: only with Options ▸ Dates ▸ "Show dates in other calendars" on, and a root
         // marker to key the choice by (without one a pick could not be stored).
         let calendarMenu = calendarsEnabled && model.canChooseDisplayCalendar ? displayCalendarMenu() : nil
@@ -634,9 +634,9 @@ struct NavigationWindowView: View {
                 .help("Mark the selected documents as unread (⌘U)")
                 .accessibilityIdentifier("ar.toolbar.markUnread")
 
-            Button { model.showingEditor = true } label: { Label("Edit Tags", systemImage: "tag") }
+            Button { model.showingEditor = true } label: { Label("Edit Info", systemImage: "info.circle") }
                 .disabled(model.selectedFiles.isEmpty)
-                .help("Edit tags for the selected documents (⌘I)")
+                .help("Edit the tags, date, quality and flag of the selected documents (⌘I)")
                 .accessibilityIdentifier("ar.toolbar.editTags")
 
             Button { model.toggleFlagSelection() } label: { Label("Flag", systemImage: "flag") }

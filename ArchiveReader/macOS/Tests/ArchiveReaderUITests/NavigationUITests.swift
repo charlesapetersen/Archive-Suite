@@ -403,7 +403,7 @@ final class NavigationUITests: FixtureUITestCase {
         // (2) Group editor: NavigationModel.applyEdit → TagWriter.apply(expecting:).
         toolbarButton("ar.toolbar.editTags").click()
         let addField = app.textFields["ar.tagEditor.addSubject"]
-        XCTAssertTrue(addField.waitForExistence(timeout: 5), "Edit Tags should present its subject field")
+        XCTAssertTrue(addField.waitForExistence(timeout: 5), "Edit Info should present its subject field")
         addField.click()
         addField.typeText(addedTag)
         let addButton = app.buttons["ar.tagEditor.addSubjectButton"]

@@ -819,7 +819,7 @@ final class NavigationModel: ObservableObject {
     }
 
     /// Selected files resolved against the DISPLAYED rows only, in sort order — every selection-wide
-    /// action (Edit Tags, Mark Read, Open, Copy Links, Flag) acts on this, so none can reach a file the
+    /// action (Edit Info, Mark Read, Open, Copy Links, Flag) acts on this, so none can reach a file the
     /// list does not show. It once resolved against the whole library, which let a filtered-away
     /// selection be tagged unseen (`W40.fix-reader-phantom-selection`). Cached (recomputed on
     /// selection / sort / library change) to avoid an O(N) scan + sort on every SwiftUI render.

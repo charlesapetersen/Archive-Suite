@@ -25,7 +25,7 @@ struct SimilarTagsSheet: View {
                 Button("Done") { dismiss() }.keyboardShortcut(.cancelAction)
                     .accessibilityIdentifier("ar.similarTags.done")
             }
-            Text("Groups of subject tags that look like near-duplicates — typos, or case/spacing variants. Pick the correct spelling to keep, then **Merge** the others into it (renames every file that carries them). Nothing changes until you confirm the rename.")
+            Text("Groups of tags that look like near-duplicates — typos, or case/spacing variants. Pick the correct spelling to keep, then **Merge** the others into it (renames every file that carries them). Nothing changes until you confirm the rename.")
                 .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
 
             if clusters.isEmpty {
@@ -92,7 +92,7 @@ struct SimilarTagsSheet: View {
         VStack(spacing: 8) {
             Image(systemName: "checkmark.seal").font(.system(size: 34)).foregroundStyle(.secondary)
             Text("No near-duplicate tags found").font(.headline)
-            Text("Every subject tag looks distinct.").font(.callout).foregroundStyle(.secondary)
+            Text("Every tag looks distinct.").font(.callout).foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }

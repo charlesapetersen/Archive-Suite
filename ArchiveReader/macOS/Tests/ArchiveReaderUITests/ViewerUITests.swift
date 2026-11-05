@@ -208,7 +208,7 @@ final class ViewerUITests: FixtureUITestCase {
                        ["Hide Tag Cloud", "Show Tag Cloud"])).firstMatch.exists, "so does the tag cloud toggle")
         closeMenu()
 
-        for title in ["Mark Read", "Mark Unread", "Edit Tags…", "Toggle Flag"] {
+        for title in ["Mark Read", "Mark Unread", "Edit Info…", "Toggle Flag"] {
             let item = tagsMenuItem(title)
             XCTAssertTrue(item.exists, "\(title) should be in the Tags menu")
             XCTAssertTrue(item.isEnabled, "\(title) should act on the open document")

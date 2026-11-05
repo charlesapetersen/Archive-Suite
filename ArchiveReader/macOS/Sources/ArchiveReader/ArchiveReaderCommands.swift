@@ -139,7 +139,7 @@ struct ArchiveReaderCommands: Commands {
                 if let nav { nav.markReadAndAdvance() } else { docTags?.markReadAndNextUnread() }
             }
             .keyboardShortcut("m", modifiers: [.command, .shift]).disabled(noTagTarget)
-            Button("Edit Tags…") { if let nav { nav.showingEditor = true } else { docTags?.editTags() } }
+            Button("Edit Info…") { if let nav { nav.showingEditor = true } else { docTags?.editTags() } }
                 .keyboardShortcut("i", modifiers: .command).disabled(noTagTarget)
             Button("Rename Tag…") {
                 if nav == nil { openWindow(id: WindowID.navigation) }

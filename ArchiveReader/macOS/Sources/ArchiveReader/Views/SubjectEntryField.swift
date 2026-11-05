@@ -1,7 +1,7 @@
 import SwiftUI
 import AppKit
 
-/// The Edit Tags sheet's add-a-subject field (W40.fix-reader-tag-entry, owner session reader-1 row 28): it
+/// The Edit Info sheet's add-a-subject field (W40.fix-reader-tag-entry, owner session reader-1 row 28): it
 /// autocompletes from the library's subjects as the list's tag field does, with the same keys (`TagEntry`).
 /// Return or a comma adds what is typed and the field keeps the keyboard for the next one; Tab adds the suggestion
 /// and moves on. The field keeps no tokens: the sheet's chips above it show the tags, so each added subject leaves
