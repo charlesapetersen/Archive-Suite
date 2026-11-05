@@ -21,24 +21,38 @@ struct ArchiveReaderCommands: Commands {
     // Reading it as a focused value (instead of reaching through `nav`) is what makes
     // "Copy Archive Link to This Page" work in the document window, where there is no NavigationModel.
     @FocusedValue(\.archiveLinkContext) private var linkContext: ArchiveLinkContext?
+    @FocusedValue(\.documentTagActions) private var documentTags: DocumentTagActions?
+    @Environment(\.openWindow) private var openWindow
     @AppStorage("ar.showSidebar") private var showingSidebar = true
     @AppStorage("ar.showTagCloud") private var showingTagCloud = false
 
     private var noSelection: Bool { nav?.selectedFiles.isEmpty ?? true }
+    /// W40.fix-reader-menus-follow-window: the Tags menu follows the window in front. With the navigation
+    /// window in front (its preview sheet included) it acts on the list's selection; with a document window
+    /// in front, which publishes no `NavigationModel`, on the file that window shows.
+    private var docTags: DocumentTagActions? { nav == nil ? documentTags : nil }
+    private var noTagTarget: Bool { nav != nil ? noSelection : !(docTags?.canTag ?? false) }
+    /// The model the corpus-wide tag sheets (Rename, Find Similar) open in; from a document window they open
+    /// over the navigation window, which is brought forward.
+    private var tagSheetNav: NavigationModel? { nav ?? docTags?.navigation }
     /// No viewer, or a viewer with no find bar (the preview sheet) — see the Find items below.
     private var noFind: Bool { !(doc?.supportsFind ?? false) }
 
     var body: some Commands {
         // View — panel toggles (placed in the system View menu)
         CommandGroup(before: .sidebar) {
-            Button(showingSidebar ? "Hide Sidebar" : "Show Sidebar") {
-                showingSidebar.toggle()
+            // Both panels belong to the navigation window, so they are listed only while it is in front
+            // (W40.fix-reader-menus-follow-window; owner session reader-1, row 14).
+            if nav != nil {
+                Button(showingSidebar ? "Hide Sidebar" : "Show Sidebar") {
+                    showingSidebar.toggle()
+                }
+                .keyboardShortcut("s", modifiers: [.command, .option])
+                Button(showingTagCloud ? "Hide Tag Cloud" : "Show Tag Cloud") {
+                    showingTagCloud.toggle()
+                }
+                .keyboardShortcut("t", modifiers: [.command, .option])
             }
-            .keyboardShortcut("s", modifiers: [.command, .option])
-            Button(showingTagCloud ? "Hide Tag Cloud" : "Show Tag Cloud") {
-                showingTagCloud.toggle()
-            }
-            .keyboardShortcut("t", modifiers: [.command, .option])
             // W40.fix-reader-jpeg-toolbar: listed whenever a document is open, disabled without a JPEG
             // original, so it can be found; the document toolbar's PDF / JPEG switch says why.
             if let doc {
@@ -113,28 +127,36 @@ struct ArchiveReaderCommands: Commands {
                 .keyboardShortcut("[", modifiers: .command).disabled(nav == nil)
         }
 
-        // Tags (nav window)
+        // Tags — the list's selection, or the document window's open file (`docTags`)
         CommandMenu("Tags") {
-            Button("Mark Read") { nav?.mark(.read) }
-                .keyboardShortcut("r", modifiers: .command).disabled(noSelection)
-            Button("Mark Unread") { nav?.mark(.unread) }
-                .keyboardShortcut("u", modifiers: .command).disabled(noSelection)
+            Button("Mark Read") { if let nav { nav.mark(.read) } else { docTags?.mark(.read) } }
+                .keyboardShortcut("r", modifiers: .command).disabled(noTagTarget)
+            Button("Mark Unread") { if let nav { nav.mark(.unread) } else { docTags?.mark(.unread) } }
+                .keyboardShortcut("u", modifiers: .command).disabled(noTagTarget)
             // G4 one-key triage: mark Read (via TagWriter, undoable) then jump to the next unread.
             // Bare \ also works when the list has key focus (text-field-safe).
-            Button("Mark Read & Next Unread") { nav?.markReadAndAdvance() }
-                .keyboardShortcut("m", modifiers: [.command, .shift]).disabled(noSelection)
-            Button("Edit Tags…") { nav?.showingEditor = true }
-                .keyboardShortcut("i", modifiers: .command).disabled(noSelection)
-            Button("Rename Tag…") { nav?.beginRenameTag() }
-                .disabled(nav == nil)
-            Button("Find Similar Tags…") { nav?.showingSimilarTags = true }
-                .disabled(nav == nil)
-            Button("Toggle Flag") { nav?.toggleFlagSelection() }
-                .keyboardShortcut("f", modifiers: [.command, .shift]).disabled(noSelection)
+            Button("Mark Read & Next Unread") {
+                if let nav { nav.markReadAndAdvance() } else { docTags?.markReadAndNextUnread() }
+            }
+            .keyboardShortcut("m", modifiers: [.command, .shift]).disabled(noTagTarget)
+            Button("Edit Tags…") { if let nav { nav.showingEditor = true } else { docTags?.editTags() } }
+                .keyboardShortcut("i", modifiers: .command).disabled(noTagTarget)
+            Button("Rename Tag…") {
+                if nav == nil { openWindow(id: WindowID.navigation) }
+                tagSheetNav?.beginRenameTag()
+            }
+            .disabled(tagSheetNav == nil)
+            Button("Find Similar Tags…") {
+                if nav == nil { openWindow(id: WindowID.navigation) }
+                tagSheetNav?.showingSimilarTags = true
+            }
+            .disabled(tagSheetNav == nil)
+            Button("Toggle Flag") { if let nav { nav.toggleFlagSelection() } else { docTags?.toggleFlag() } }
+                .keyboardShortcut("f", modifiers: [.command, .shift]).disabled(noTagTarget)
             Divider()
-            Button("Undo Tag Change") { nav?.undoLast() }
+            Button("Undo Tag Change") { if let nav { nav.undoLast() } else { docTags?.undo() } }
                 .keyboardShortcut("z", modifiers: .command)
-                .disabled(nav == nil || (nav?.undoDepth ?? 0) == 0)
+                .disabled(nav != nil ? (nav?.undoDepth ?? 0) == 0 : !(docTags?.canUndo ?? false))
         }
 
         // View (nav window): sorting + clearing

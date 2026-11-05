@@ -10,6 +10,7 @@ struct DocumentWindowView: View {
     let selection: DocumentSelection?
     @StateObject private var model = DocumentViewerModel()
     @EnvironmentObject private var linkContext: ArchiveLinkContext
+    @EnvironmentObject private var router: DeepLinkRouter
 
     @State private var fraction: CGFloat = 0.667   // left pane share; default ⅔
     @FocusState private var findFocused: Bool
@@ -37,6 +38,10 @@ struct DocumentWindowView: View {
         // W23.m4: publish the link target here too, so "Copy Archive Link to This Page" is ENABLED in
         // the document window — it used to require a focused NavigationModel this scene never has.
         .focusedSceneValue(\.archiveLinkContext, linkContext)
+        // W40.fix-reader-menus-follow-window: the Tags menu acts on this window's open file.
+        .focusedSceneValue(\.documentTagActions, DocumentTagActions(router: router, viewer: model))
+        .sheet(isPresented: $model.showingTagEditor) { tagEditorSheet }
+        .onChange(of: findFocused) { model.findFieldFocused = findFocused }
         .onReceive(linkContext.$target.combineLatest(linkContext.$jpegPartnerIndex)) { target, index in
             model.updateArchiveContext(target: target, index: index)
         }
@@ -259,9 +264,28 @@ struct DocumentWindowView: View {
               : (model.jpegUnavailableReason ?? "No JPEG original for this file."))
     }
 
+    /// The tag editor over this window, editing the open file through the navigation window's model.
+    @ViewBuilder private var tagEditorSheet: some View {
+        if let nav = router.nav, let path = model.tagEditorPath {
+            TagEditorView(model: nav,
+                          size: SheetSizing.fitted(TagEditorView.preferredSize, in: docWindow?.frame.size ?? .zero),
+                          targetPaths: [path])
+        } else {
+            VStack(spacing: 12) {
+                Text("Tags can be edited while the Archive Reader window is open.")
+                Button("Done") { model.showingTagEditor = false }.keyboardShortcut(.defaultAction)
+            }
+            .padding()
+        }
+    }
+
     private var statusBar: some View {
         HStack {
             Text(model.title).lineLimit(1).truncationMode(.middle)
+            if let status = model.tagStatus {
+                Text(status).foregroundStyle(.secondary).lineLimit(1).truncationMode(.tail)
+                    .accessibilityIdentifier("ar.doc.tagStatus")
+            }
             Spacer()
             Text(model.positionLabel).foregroundStyle(.primary)
         }

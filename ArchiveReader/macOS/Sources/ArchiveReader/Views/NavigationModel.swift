@@ -445,6 +445,15 @@ final class NavigationModel: ObservableObject {
 
     func toggleFlagSelection() { notes.toggleFlag(selectedFiles.map(\.path)) }
 
+    /// The document window's Toggle Flag (W40.fix-reader-menus-follow-window): the open file, not the list's selection.
+    /// Returns false, with the reason in `statusMessage`, when none of the paths is in the library.
+    @discardableResult func toggleFlag(paths: [String]) -> Bool {
+        let files = libraryFiles(atPaths: paths)
+        guard !files.isEmpty else { reportNotInLibrary(); return false }
+        notes.toggleFlag(files.map(\.path))
+        return true
+    }
+
     /// Select every currently-displayed file that carries `tag` (from the tag cloud context menu).
     /// Matches on `subjects` — the same facet the tag filter uses — so it agrees with the cloud below.
     func selectFiles(withTag tag: String) {
@@ -1095,8 +1104,34 @@ final class NavigationModel: ObservableObject {
         return ReaderArchiveLayout.isContained(url, inRootPath: mainRoot.path)
     }
 
-    func mark(_ target: ReadState) {
-        let reverified = reverifyCacheRows(selectedFiles)
+    /// The library rows for these paths, in the order given; a path the library does not hold is left out.
+    /// The document window names its open file by path, and acts through the same `TagWriter` actions as the
+    /// list (W40.fix-reader-menus-follow-window), so the row still passes `reverifyCacheRows` before any write.
+    func libraryFiles(atPaths paths: [String]) -> [ArchiveFile] {
+        guard !paths.isEmpty else { return [] }
+        if paths.count == 1 { return library.files.first { $0.path == paths[0] }.map { [$0] } ?? [] }
+        let wanted = Set(paths)
+        var found: [String: ArchiveFile] = [:]
+        for f in library.files where wanted.contains(f.path) { found[f.path] = f }
+        return paths.compactMap { found[$0] }
+    }
+
+    /// The tag actions' targets: the named paths when the document window asks, else the list's selection.
+    private func tagTargets(_ paths: [String]?) -> [ArchiveFile] {
+        guard let paths else { return selectedFiles }
+        return libraryFiles(atPaths: paths)
+    }
+
+    private func reportNotInLibrary() {
+        statusMessage = "This file is not in the archive's library, so its tags cannot be changed here."
+        announce(statusMessage)
+    }
+
+    /// `paths` nil acts on the list's selection; the document window passes its open file.
+    func mark(_ target: ReadState, paths: [String]? = nil) {
+        let targets = tagTargets(paths)
+        if paths != nil, targets.isEmpty { reportNotInLibrary(); return }
+        let reverified = reverifyCacheRows(targets)
         let files = reverified.files
         guard !files.isEmpty else {
             if reverified.rejected > 0 {
@@ -1135,6 +1170,15 @@ final class NavigationModel: ObservableObject {
             undoGroups = AuditLedger.shared.undoGroups(in: ReaderArchiveLayout(grantedRoot: root).mainRoot)
         } else { undoGroups = [] }
         undoDepth = undoGroups.count
+    }
+
+    /// The names of the files the next `undoLast()` reverts, read fresh from the ledger. The document window
+    /// says them, since its undo may revert a file other than the one it shows (W40.fix-reader-menus-follow-window).
+    func nextUndoFileNames() -> [String] {
+        refreshUndoHistory()
+        var seen = Set<String>()
+        return (undoGroups.last ?? []).map { URL(fileURLWithPath: $0.path).lastPathComponent }
+            .filter { seen.insert($0).inserted }
     }
 
     func undoLast() {
@@ -1266,8 +1310,11 @@ final class NavigationModel: ObservableObject {
     var groupSummary: GroupTagSummary { GroupTagSummary(selectedFiles.map(\.tags)) }
 
     /// Apply one edit operation to every selected file (per-file delta), with grouped undo.
-    func applyEdit(_ op: TagEditOp) {
-        let reverified = reverifyCacheRows(selectedFiles)
+    /// `paths` nil acts on the list's selection; the tag editor opened from the document window passes its file.
+    func applyEdit(_ op: TagEditOp, paths: [String]? = nil) {
+        let targets = tagTargets(paths)
+        if paths != nil, targets.isEmpty { reportNotInLibrary(); return }
+        let reverified = reverifyCacheRows(targets)
         let files = reverified.files
         guard !files.isEmpty else {
             if reverified.rejected > 0 {

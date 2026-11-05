@@ -64,6 +64,7 @@ struct ArchiveReaderApp: App {
         WindowGroup(id: WindowID.document, for: DocumentSelection.self) { $selection in
             DocumentWindowView(selection: selection)
                 .environmentObject(linkContext)   // W23.m4: page links are writable from here too
+                .environmentObject(deepLinkRouter)   // its `nav` is what the Tags menu writes through here
         }
         .defaultSize(documentDefaultSize)   // DV-1: open at the remembered size (or the full screen) — no post-show resize flash
 

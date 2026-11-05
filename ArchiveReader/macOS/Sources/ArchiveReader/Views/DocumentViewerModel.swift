@@ -177,6 +177,21 @@ final class DocumentViewerModel: ObservableObject {
 
     var title: String { urls.indices.contains(index) ? urls[index].lastPathComponent : "Document View" }
 
+    // MARK: Tags from the document window (W40.fix-reader-menus-follow-window)
+
+    /// The open file's path, which the Tags menu acts on in the document window (`DocumentTagActions`).
+    var currentFilePath: String? { currentURL?.path }
+    /// The tag editor sheet over the document window, editing `tagEditorPath`.
+    @Published var showingTagEditor = false
+    /// The file the open tag editor edits, fixed when it opens, so moving on to another file underneath it
+    /// never turns an edit typed for one file into a write on the next.
+    @Published var tagEditorPath: String?
+    /// Whether the find field has the caret. Undo Tag Change (⌘Z) stays off then, so ⌘Z in the field
+    /// never undoes a tag change instead of the typing (S-001; W40.fix-reader-undo-focus owns the list's side).
+    @Published var findFieldFocused = false
+    /// The last tag action's result, shown in the status bar until the next document loads.
+    @Published var tagStatus: String?
+
     /// "3 of 12" across the open selection, plus " · page 2 of 4" when the current document holds more
     /// than one page pair — so a merged multi-page document says where you are inside it. Single-pair
     /// documents (the overwhelming majority) keep the original label exactly.
@@ -472,6 +487,7 @@ final class DocumentViewerModel: ObservableObject {
 
     private func loadCurrent() {
         pair = 0   // a newly loaded document always opens on its first page pair
+        tagStatus = nil
         jpegPartnerPage = nil
         jpegPartnerRelativePath = nil
         imageSource = .pdf

@@ -184,6 +184,56 @@ final class ViewerUITests: FixtureUITestCase {
         RunLoop.current.run(until: Date().addingTimeInterval(0.5))
     }
 
+    /// W40.fix-reader-menus-follow-window (owner session reader-1, rows 14 and 20): with the document window in
+    /// front, the list-only panel toggles leave the View menu, and the Tags menu works on the open file. ⌘R
+    /// marks it Read and ⌘Z undoes that, through the shared undo ledger; the window's status line says so.
+    func testMenusFollowTheDocumentWindow() throws {
+        try requireGeneratedScratchFixtureForTagWrites()   // ⌘R and ⌘Z write Finder tags
+        waitForRows(minimum: 3, timeout: 10)
+        let sidebarToggle = NSPredicate(format: "title IN %@", ["Hide Sidebar", "Show Sidebar"])
+        _ = viewMenuItem("Hide Sidebar")
+        XCTAssertTrue(app.menuBars.menuItems.matching(sidebarToggle).firstMatch.exists,
+                      "precondition: the sidebar toggle is listed with the navigation window in front")
+        closeMenu()
+
+        clickRow(0)
+        pressKey("o", modifiers: .command)
+        RunLoop.current.run(until: Date().addingTimeInterval(2))
+        XCTAssertGreaterThanOrEqual(app.windows.count, 2, "precondition: the document window opened")
+
+        _ = viewMenuItem("Hide Sidebar")
+        XCTAssertFalse(app.menuBars.menuItems.matching(sidebarToggle).firstMatch.exists,
+                       "the sidebar toggle belongs to the navigation window")
+        XCTAssertFalse(app.menuBars.menuItems.matching(NSPredicate(format: "title IN %@",
+                       ["Hide Tag Cloud", "Show Tag Cloud"])).firstMatch.exists, "so does the tag cloud toggle")
+        closeMenu()
+
+        for title in ["Mark Read", "Mark Unread", "Edit Tags…", "Toggle Flag"] {
+            let item = tagsMenuItem(title)
+            XCTAssertTrue(item.exists, "\(title) should be in the Tags menu")
+            XCTAssertTrue(item.isEnabled, "\(title) should act on the open document")
+            closeMenu()
+        }
+
+        // ⌘U first, so ⌘R is a real change whichever read state the fixture's first file starts in.
+        let status = app.staticTexts["ar.doc.tagStatus"]
+        func waitForStatus(_ prefix: String) -> Bool {
+            let deadline = Date().addingTimeInterval(5)
+            while !status.accessibilityText.hasPrefix(prefix), Date() < deadline { settle(0.2) }
+            return status.accessibilityText.hasPrefix(prefix)
+        }
+        pressKey("u", modifiers: .command)
+        XCTAssertTrue(status.waitForExistence(timeout: 5), "Mark Unread reports in the document window")
+        XCTAssertTrue(waitForStatus("Marked"), "got \(status.accessibilityText)")
+        pressKey("r", modifiers: .command)
+        XCTAssertTrue(waitForStatus("Marked 1 Read."), "⌘R marks the open file: \(status.accessibilityText)")
+        pressKey("z", modifiers: .command)
+        XCTAssertTrue(waitForStatus("Undid 1"), "⌘Z undoes it: \(status.accessibilityText)")
+
+        pressKey("w", modifiers: .command)
+        RunLoop.current.run(until: Date().addingTimeInterval(0.5))
+    }
+
     /// W40.fix-reader-edit-menu-copy: ⌥⌘L copies the page link from the document window, through the key
     /// alone (the owner wanted a shortcut for it, and none of ⌘L / ⇧⌘L / ⌥⌘C may answer instead).
     func testCopyPageLinkShortcutInTheDocumentWindow() throws {
@@ -642,6 +692,16 @@ final class ViewerUITests: FixtureUITestCase {
         let edit = bar.menuBarItems["Edit"]
         XCTAssertTrue(edit.waitForExistence(timeout: 5), "the Edit menu should exist")
         edit.click()
+        let item = bar.menuItems[title]
+        _ = item.waitForExistence(timeout: 5)
+        return item
+    }
+
+    private func tagsMenuItem(_ title: String) -> XCUIElement {
+        let bar = app.menuBars.element(boundBy: 0)
+        let tags = bar.menuBarItems["Tags"]
+        XCTAssertTrue(tags.waitForExistence(timeout: 5), "the Tags menu should exist")
+        tags.click()
         let item = bar.menuItems[title]
         _ = item.waitForExistence(timeout: 5)
         return item
