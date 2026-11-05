@@ -72,10 +72,12 @@ mirrored by the `W40` section of `SUITE_TODO.md`, tags byte-identical. `next-que
    `S1` data loss or a write to the wrong file · `S2` a promised feature broken or unreachable · `S3` wrong but
    recoverable · `S4` cosmetic. `S1` goes to the TOP of TIER 7; `S2`–`S4` go to the `W40 fixes` sub-block, above
    the discovery items not yet started. Every fix ships with the test that failed before it.
-   **A fix found by an owner session replays the owner's steps (owner, 2026-11-05).** Its failing test follows the
-   form row: the same way in (the menu bar, the shortcut, a drag, a click in the list, not a call to the action) and
-   the same sequence around it (type, deselect, reselect, type again; quit and relaunch). A test that drives the
-   action directly is not enough on its own. Why: the Notes editor fix (N-12) passed its own tests and failed in the
+   **A fix is tested on the paths a user takes, not only the one reported (owner, 2026-11-05).** Its failing tests
+   replay the owner's steps from the form row, and then the other typical paths to the same result: every way in the
+   app offers (menu bar, shortcut, toolbar, context menu, drag, a click in the list), and the usual sequences around
+   it (type, deselect, reselect, type again; switch to another item and back; undo; quit and relaunch; the other
+   window or layout where the same control appears). The item's evidence lists the paths it chose and why the rest
+   do not apply. A test that calls the action directly is not enough on its own. Why: the Notes editor fix (N-12) passed its own tests and failed in the
    owner's first five minutes of notes-1, because no test reselected the note before typing; ⌘N and folder nesting
    were never pressed or dragged by a test either.
 9. **Unchanged:** the real corpus (`~/Desktop/Google Drive/Archival Photos/`) is never written; nothing draws on
