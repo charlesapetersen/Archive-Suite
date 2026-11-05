@@ -520,9 +520,9 @@ private struct DetailPane: View {
                     Image(systemName: item.kind == .extract ? "quote.opening" : "doc.text")
                         .foregroundStyle(.secondary)
                         .accessibilityHidden(true)   // decorative
-                    Text(item.title.isEmpty ? "Untitled" : item.title)
-                        .font(.headline)
-                        .lineLimit(1)
+                    DetailHeaderTitle(item: item) { [model = nav.model] id, title in
+                        await model.renameNote(id, to: title)
+                    }
                 }
                 HStack(spacing: 10) {
                     ItemHeaderDates(item: item, calendarsEnabled: calendarsEnabled)
@@ -538,6 +538,8 @@ private struct DetailPane: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
+            // A container, so the title keeps its own identifier (an outer one replaced it).
+            .accessibilityElement(children: .contain)
             .accessibilityIdentifier("an.detail.header")
         } else {
             Text(nav.selection.count > 1 ? "\(nav.selection.count) items selected" : "No note selected")
@@ -547,6 +549,54 @@ private struct DetailPane: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)
+        }
+    }
+}
+
+/// The detail header's title. A click starts an edit; Return or a click elsewhere saves, Escape does not
+/// (W40.fix-notes-list-rename, notes-1 row 6). It is the list's inline title field, so both behave alike, and an
+/// edit saves to the item it began on even if the selection moves meanwhile.
+struct DetailHeaderTitle: NSViewRepresentable {
+    let item: ItemSummary
+    let rename: @MainActor (UUID, String) async -> Bool
+
+    final class Coordinator {
+        var latest: DetailHeaderTitle?
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
+    func makeNSView(context: Context) -> NoteTitleTextField {
+        let field = NoteTitleTextField(labelWithString: "")
+        field.beginsOnClick = true
+        field.font = .preferredFont(forTextStyle: .headline)
+        field.lineBreakMode = .byTruncatingTail
+        field.cell?.truncatesLastVisibleLine = true
+        field.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        field.toolTip = "Click to rename"
+        field.setAccessibilityIdentifier("an.detail.title")
+        // A draft is never replaced while it is being edited; the item shown meanwhile is applied after.
+        field.onEnd = { [weak field, coordinator = context.coordinator] in
+            guard let field, let latest = coordinator.latest else { return }
+            Task { @MainActor in if !field.isRenaming { latest.apply(to: field) } }
+        }
+        return field
+    }
+
+    func updateNSView(_ field: NoteTitleTextField, context: Context) {
+        context.coordinator.latest = self
+        if !field.isRenaming { apply(to: field) }
+    }
+
+    @MainActor
+    fileprivate func apply(to field: NoteTitleTextField) {
+        field.noteTitle = item.title
+        field.itemID = item.id
+        field.stringValue = item.title.isEmpty ? "Untitled" : item.title
+        let id = item.id
+        let rename = rename
+        field.onCommit = { title, completion in
+            Task { @MainActor in completion(await rename(id, title)) }
         }
     }
 }

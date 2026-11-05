@@ -166,15 +166,15 @@ struct NotesTableView: NSViewRepresentable {
 
             let newIDs = model.displayed.map(\.id)
             if newIDs != coordinator.currentSnapshotIDs {
-                coordinator.applySnapshot(newIDs, animated: false)
-            } else {
-                // IDs unchanged but values may have changed — reload visible rows.
-                let visRange = tableView.rows(in: tableView.visibleRect)
-                if visRange.length > 0 {
-                    tableView.reloadData(
-                        forRowIndexes: IndexSet(integersIn: visRange.location..<(visRange.location + visRange.length)),
-                        columnIndexes: IndexSet(integersIn: 0..<tableView.numberOfColumns))
-                }
+                coordinator.applySnapshotKeepingSelection(newIDs, wanted: selection)
+            }
+            // Values may have changed, and a row the snapshot moved keeps its old cell (a rename that
+            // re-sorts the list would still show the old title) — reload the visible rows.
+            let visRange = tableView.rows(in: tableView.visibleRect)
+            if visRange.length > 0 {
+                tableView.reloadData(
+                    forRowIndexes: IndexSet(integersIn: visRange.location..<(visRange.location + visRange.length)),
+                    columnIndexes: IndexSet(integersIn: 0..<tableView.numberOfColumns))
             }
         }
 
@@ -232,6 +232,21 @@ struct NotesTableView: NSViewRepresentable {
             snapshot.appendSections([0])
             snapshot.appendItems(ids, toSection: 0)
             dataSource?.apply(snapshot, animatingDifferences: animated)
+        }
+
+        /// A new row order keeps the selection on the same items. A rename re-sorts the list, and the moved
+        /// row left the table's selection while the model still held it, so the note showed in the detail
+        /// but not as selected, and a Return after a rename read as a deselect (W40.fix-notes-list-rename).
+        /// The model's selection is left as it was; only a change the reorder itself made is undone.
+        func applySnapshotKeepingSelection(_ ids: [UUID], wanted: Set<UUID>) {
+            applySnapshot(ids, animated: false)
+            syncSelection(wanted)
+            guard parent.selection != wanted else { return }
+            // Not during the view update that called this.
+            Task { @MainActor [weak self] in
+                guard let self, self.lastPushedSelection == wanted else { return }
+                self.parent.selection = wanted
+            }
         }
 
         func syncSelection(_ sel: Set<UUID>) {

@@ -38,4 +38,17 @@ struct NoteTitleTextFieldTests {
         #expect(field.stringValue == "Original")
         #expect(commits == ["New Title", "Cannot Save"])
     }
+
+    @Test("The header's title starts an edit on press; a list cell's does not")
+    func headerTitleBeginsOnPress() {
+        let header = NoteTitleTextField(labelWithString: "Original")
+        header.noteTitle = "Original"
+        header.beginsOnClick = true
+        #expect(header.accessibilityPerformPress())
+        #expect(header.isRenaming && header.isEditable)
+
+        let cell = NoteTitleTextField(labelWithString: "Original")
+        _ = cell.accessibilityPerformPress()
+        #expect(!cell.isRenaming && !cell.isEditable)
+    }
 }

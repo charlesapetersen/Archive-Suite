@@ -16,6 +16,9 @@ final class NoteTitleTextField: NSTextField, NSTextFieldDelegate {
     private var cancelled = false
     private var renameID = UUID()
     private var renamingItemID: UUID?
+    /// The detail header's title starts an edit on a click; a list cell waits for Return, a double-click
+    /// or Rename… (a click there selects the row).
+    var beginsOnClick = false
 
     func beginRename() {
         guard !isRenaming else { return }
@@ -32,19 +35,38 @@ final class NoteTitleTextField: NSTextField, NSTextFieldDelegate {
         selectText(nil)
     }
 
+    override func mouseDown(with event: NSEvent) {
+        if beginsOnClick && !isRenaming { beginRename(); return }
+        super.mouseDown(with: event)
+    }
+
+    override func accessibilityPerformPress() -> Bool {
+        guard beginsOnClick, !isRenaming else { return super.accessibilityPerformPress() }
+        beginRename()
+        return true
+    }
+
     func control(_ control: NSControl, textView: NSTextView, doCommandBy selector: Selector) -> Bool {
         if selector == #selector(NSResponder.cancelOperation(_:)) {
             cancelled = true
-            window?.makeFirstResponder(superview)
+            returnKeyboardToList()
             finishRename()
             return true
         }
         if selector == #selector(NSResponder.insertNewline(_:)) {
-            window?.makeFirstResponder(superview)
+            returnKeyboardToList()
             finishRename()
             return true
         }
         return false
+    }
+
+    /// The cell view refuses first responder, so handing it the keyboard left it with the window and the
+    /// list looked deselected; the table takes it, and arrow keys and Return go on working there.
+    private func returnKeyboardToList() {
+        var view = superview
+        while let candidate = view, !(candidate is NSTableView) { view = candidate.superview }
+        window?.makeFirstResponder(view ?? superview)
     }
 
     func controlTextDidEndEditing(_ notification: Notification) { finishRename() }
