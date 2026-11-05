@@ -1,0 +1,283 @@
+#!/usr/local/bin/python3
+"""W46.enh-ocr-input-marks. The enhancement methods of W46.enh-ocr-input on the marks set, with the mark-region
+ink check: whether any method may touch the reading copy without losing the hand on the page.
+
+  V=~/Library/Caches/ArchiveSuiteRehearsal/enh-ocr-input/venv/bin/python
+  python3 ops/autonomous/heavy-run.py run -- $V enh_ocr_marks.py arms   # jpeg, shading, GCDRNet, SBB on the 40
+  $V enh_ocr_marks.py report                                            # segbench-results/enh-ocr-marks.{md,json}
+
+Pages: the marks set's 40-page owner core (W46.fix-marks-set-score's freeze, after W46.fix-marks-sheet-feedback's
+recheck), read from the derived record `marks-set-reconciled.json` names; the images are the marks scan's 2400 px
+JPEGs, the copies every model read. Boxes: every mark the owner kept on those pages (rough draft boxes plus one
+owner box; [x0, y0, x1, y1] fractions of the image). The ink check needs regions, not complete detector truth, so
+the 8 pages excluded from detector truth for box completeness or relationships are measured too and the 32
+detector pages are also reported alone; the unit of every interval is the page, so a box that contains others is
+not counted twice in a page figure.
+
+Arms, each from the raw image at its size (enh_ocr_arms.py; the same code and weights as W46.enh-ocr-input):
+  jpeg      the raw image decoded and saved again at JPEG 90, as every arm is saved: the re-encoding floor.
+  shading   the contrast-only control (a gain field).
+  gcdrnet   GCDRNet, content-removing.
+  sbb       SBB binarisation, black on white.
+DocRes (appearance, deshadow) needs a cluster GPU; whether to run it here is the report's Scope.
+
+The ink check, per box, against raw. A pixel is ink where some channel is darker than its own background
+(enh_ocr_arms.background, DocRes's shading estimate) by more than T: darkness = 1 - min over channels of
+pixel / background. T = 0.30 (clear ink) and 0.15 (faint ink: pencil, a light stamp). For each box:
+  kept      the share of raw's ink pixels still ink in the arm (survival);
+  contrast  the arm's mean darkness over raw's ink pixels, as a share of raw's;
+  colour    the share of raw's coloured ink (channel spread over background above 0.15) still coloured;
+  added     ink in the arm where raw had none, as a share of raw's ink.
+A box is lost when under half its ink survives. The control for each page is the same figures outside every box
+(the print, mostly), so `kept - print kept` says whether a method removes marks more than it removes print.
+
+Images and pixel data stay in CACHE (the owner's material); committed results hold page ids and numbers only. No
+network, no money, no model reads a page.
+"""
+from __future__ import annotations
+import argparse
+import json
+import os
+import random
+import statistics
+import subprocess
+import sys
+from pathlib import Path
+
+HERE = Path(__file__).resolve().parent
+RESULTS = HERE.parents[1] / 'segbench-results'
+SCAN = Path.home() / '.local/state/archive-autonomous/artifacts/marks-scan-20261029'
+ENH = Path.home() / 'Library/Caches/ArchiveSuiteRehearsal/enh-ocr-input'   # W46.enh-ocr-input's src, weights, venvs
+CACHE = Path(os.environ.get('ENH_MARKS_CACHE', Path.home() / 'Library/Caches/ArchiveSuiteRehearsal/enh-ocr-marks'))
+RECONCILED = RESULTS / 'marks-set-reconciled.json'
+REPORT, DATA = RESULTS / 'enh-ocr-marks.md', RESULTS / 'enh-ocr-marks.json'
+ARMS = ('jpeg', 'shading', 'gcdrnet', 'sbb')
+THRESHOLDS = (0.30, 0.15)
+COLOUR = 0.15
+LOST = 0.5
+MIN_INK = 50   # a box with fewer raw ink pixels at T has no ink to lose at that T and is left out at it
+
+
+def record():
+    """(derived record dict, its root): the pages, marks and detector flags after the recheck."""
+    root = Path(json.loads(RECONCILED.read_text())['reconciled_root'])
+    return json.loads((root / 'reconciled.json').read_text()), root
+
+
+def pages():
+    return sorted(record()[0]['pages'])
+
+
+def raw_image(p):
+    return SCAN / 'images' / f'{p}.jpg'
+
+
+def arm_image(arm, p):
+    return CACHE / 'images' / arm / f'{p}.jpg'
+
+
+def arms():
+    """jpeg and shading here; GCDRNet and SBB in W46.enh-ocr-input's venvs, through its own runners."""
+    import numpy as np
+    from PIL import Image
+    import enh_ocr_arms as A
+    import enh_ocr_input as E
+    ids = pages()
+    link = CACHE / 'raw-links'
+    link.mkdir(parents=True, exist_ok=True)
+    for p in ids:
+        if not (link / f'{p}.jpg').exists():
+            (link / f'{p}.jpg').symlink_to(raw_image(p))
+        with Image.open(raw_image(p)) as im:
+            img = np.asarray(im.convert('RGB'))
+        for arm, make in (('jpeg', lambda x: x), ('shading', A.shading)):
+            if not arm_image(arm, p).exists():
+                E.save_jpeg(make(img), arm_image(arm, p))
+    subprocess.run([str(ENH / 'venv/bin/python'), str(HERE / 'enh_ocr_arms.py'), 'gcdrnet', str(ENH), str(link),
+                    str(CACHE / 'images'), *ids], check=True)
+    subprocess.run([str(ENH / 'venv-tf/bin/python'), '-c', E.SBB, str(ENH), str(link), str(CACHE / 'images'), *ids],
+                   check=True)
+    print('jpeg, shading, gcdrnet, sbb ->', CACHE / 'images')
+
+
+def darkness(img):
+    """(darkness, spread) per pixel, floats in [0, 1]: how far the darkest channel falls below its background, and
+    how far the channels' background-relative values spread (coloured ink)."""
+    import numpy as np
+    import enh_ocr_arms as A
+    bg = np.maximum(A.background(img).astype(np.float32), 1.0)
+    rel = np.clip(img.astype(np.float32) / bg, 0.0, 1.0)
+    return 1.0 - rel.min(axis=2), rel.max(axis=2) - rel.min(axis=2)
+
+
+def box_pixels(box, shape):
+    h, w = shape
+    x0, y0, x1, y1 = box
+    return (slice(max(0, int(y0 * h)), min(h, int(round(y1 * h)))),
+            slice(max(0, int(x0 * w)), min(w, int(round(x1 * w)))))
+
+
+def measure(raw, enh, t, mask=None):
+    """The ink check for one region: raw and enh are (darkness, spread) arrays cut to it, mask an optional boolean
+    array of the pixels that count. None when raw has under MIN_INK ink pixels there."""
+    import numpy as np
+    rd, rs = raw
+    ed, es = enh
+    ink = rd > t
+    if mask is not None:
+        ink &= mask
+    n = int(ink.sum())
+    if n < MIN_INK:
+        return None
+    ein = ed > t
+    col = ink & (rs > COLOUR)
+    nc = int(col.sum())
+    added = ein & ~(rd > t)
+    if mask is not None:
+        added &= mask
+    return dict(ink=n, kept=float((ein & ink).sum() / n), contrast=float(ed[ink].mean() / rd[ink].mean()),
+                colour=float(((es > COLOUR) & col).sum() / nc) if nc >= MIN_INK else None,
+                added=float(added.sum() / n))
+
+
+def page_rows(p, marks):
+    """Per arm, threshold: the boxes' checks and the outside-the-boxes control for one page."""
+    import numpy as np
+    from PIL import Image
+    with Image.open(raw_image(p)) as im:
+        raw = darkness(np.asarray(im.convert('RGB')))
+    shape = raw[0].shape
+    outside = np.ones(shape, bool)
+    for m in marks:
+        ys, xs = box_pixels(m['box'], shape)
+        outside[ys, xs] = False
+    out = {}
+    for arm in ARMS:
+        with Image.open(arm_image(arm, p)) as im:
+            a = np.asarray(im.convert('RGB'))
+        if a.shape[:2] != shape:
+            raise SystemExit(f'{arm}/{p}: {a.shape[:2]} is not the raw image\'s {shape}')
+        enh = darkness(a)
+        for t in THRESHOLDS:
+            boxes = []
+            for i, m in enumerate(marks):
+                ys, xs = box_pixels(m['box'], shape)
+                r = measure((raw[0][ys, xs], raw[1][ys, xs]), (enh[0][ys, xs], enh[1][ys, xs]), t)
+                if r:
+                    boxes.append(dict(r, mark=i + 1, cls=m['cls'], overlaps=m['overlaps']))
+            out[f'{arm}@{t:.2f}'] = dict(boxes=boxes, print=measure(raw, enh, t, outside))
+    return out
+
+
+def run_checks():
+    rec, _ = record()
+    rows = {}
+    for p in pages():
+        rows[p] = page_rows(p, rec['pages'][p]['marks'])
+        print('ink', p, flush=True)
+    return rec, rows
+
+
+def boot(xs, n=4000, seed=7):
+    """Mean and 95% percentile bootstrap interval over pages."""
+    if not xs:
+        return None
+    rnd = random.Random(seed)
+    ms = sorted(statistics.fmean(rnd.choices(xs, k=len(xs))) for _ in range(n))
+    return dict(n=len(xs), mean=statistics.fmean(xs), lo=ms[int(0.025 * n)], hi=ms[int(0.975 * n) - 1])
+
+
+def summarise(rec, rows, ids, key, pick=lambda b: True):
+    """Over pages ids at arm@T: page means of box kept, kept minus the page's print kept (paired), contrast, colour,
+    added; the lost-box count; all boxes pooled."""
+    kept, diff, contrast, colour, added = [], [], [], [], []
+    lost = total = 0
+    for p in ids:
+        r = rows[p][key]
+        bs = [b for b in r['boxes'] if pick(b)]
+        if not bs:
+            continue
+        k = statistics.fmean(b['kept'] for b in bs)
+        kept.append(k)
+        if r['print']:
+            diff.append(k - r['print']['kept'])
+        contrast.append(statistics.fmean(b['contrast'] for b in bs))
+        cs = [b['colour'] for b in bs if b['colour'] is not None]
+        if cs:
+            colour.append(statistics.fmean(cs))
+        added.append(statistics.fmean(b['added'] for b in bs))
+        lost += sum(b['kept'] < LOST for b in bs)
+        total += len(bs)
+    prints = [rows[p][key]['print']['kept'] for p in ids if rows[p][key]['print']]
+    return dict(kept=boot(kept), kept_minus_print=boot(diff), contrast=boot(contrast), colour=boot(colour),
+                added=boot(added), print_kept=boot(prints), lost=lost, boxes=total)
+
+
+def fmt(b, pct=True):
+    if not b:
+        return '–'
+    f = (lambda v: f'{100 * v:.1f}') if pct else (lambda v: f'{v:+.3f}')
+    return f"{f(b['mean'])} ({f(b['lo'])} to {f(b['hi'])})"
+
+
+def report():
+    rec, rows = run_checks()
+    ids = sorted(rows)
+    det = [p for p in ids if rec['pages'][p]['detector_evaluable']]
+    hand = ('annotation', 'marginal_note', 'signature_initials')
+    subsets = {'all 40 pages': (ids, lambda b: True), 'detector pages (32)': (det, lambda b: True),
+               'handwriting classes': (ids, lambda b: b['cls'] in hand),
+               'stamps': (ids, lambda b: b['cls'] == 'stamp'),
+               'boxes clear of print': (ids, lambda b: not b['overlaps'])}
+    out = dict(protocol='enh-ocr-marks-v1', pages=len(ids), detector_pages=len(det),
+               boxes=sum(len(rec['pages'][p]['marks']) for p in ids), arms=list(ARMS),
+               thresholds=list(THRESHOLDS), lost_below=LOST, min_ink=MIN_INK, summary={}, rows=rows)
+    for t in THRESHOLDS:
+        for arm in ARMS:
+            key = f'{arm}@{t:.2f}'
+            out['summary'][key] = {name: summarise(rec, rows, s, key, pick) for name, (s, pick) in subsets.items()}
+    DATA.write_text(json.dumps(out, indent=1, sort_keys=True) + '\n')
+
+    S = out['summary']
+    L = ['# Enhancement on the marks set: does the hand survive?', '',
+         'W46.enh-ocr-input-marks. The marks arm of W46.enh-ocr-input (`execution-plans/processing-review/'
+         '10-gap-audit.md` §5 item 11): the enhancement methods run on the marks set\'s 40-page owner core, and the '
+         'ink inside every mark box the owner kept checked against the raw image. It decides whether any method may '
+         'touch the reading copy. Script `scripts/segbench/enh_ocr_marks.py`; per-box figures `enh-ocr-marks.json`.',
+         '', f"{out['pages']} pages ({out['detector_pages']} of them detector truth), {out['boxes']} kept mark boxes. "
+         'Each figure is a mean over pages with a 95% bootstrap interval over pages. *Kept*: the share of the raw '
+         'image\'s ink pixels in a box that are still ink. *Kept − print*: the same page\'s box figure less its '
+         'figure outside every box (mostly print), paired by page: below zero means the method takes marks more '
+         'than print. *Lost*: boxes with under half their ink left. *Contrast*: mean darkness kept on raw\'s ink. '
+         '*Colour*: coloured ink still coloured. *Added*: new ink in the box, as a share of raw\'s ink. `jpeg` is the '
+         'raw image saved again as every arm is: the floor.', '']
+    for t in THRESHOLDS:
+        L += [f'## Ink darker than its background by {t:.2f}' + (' (clear ink)' if t >= 0.3 else ' (faint ink included)'),
+              '', '| Arm | Kept % | Kept − print | Lost boxes | Contrast % | Colour % | Added % | Print kept % |',
+              '|---|---|---|---:|---|---|---|---|']
+        for arm in ARMS:
+            s = S[f'{arm}@{t:.2f}']['all 40 pages']
+            L.append(f"| {arm} | {fmt(s['kept'])} | {fmt(s['kept_minus_print'], False)} | {s['lost']} of "
+                     f"{s['boxes']} | {fmt(s['contrast'])} | {fmt(s['colour'])} | {fmt(s['added'])} | "
+                     f"{fmt(s['print_kept'])} |")
+        L += ['', 'Kept % by subset:', '', '| Arm | ' + ' | '.join(n for n in subsets if n != 'all 40 pages') + ' |',
+              '|---|' + '---|' * (len(subsets) - 1)]
+        for arm in ARMS:
+            ss = S[f'{arm}@{t:.2f}']
+            L.append(f'| {arm} | ' + ' | '.join(f"{fmt(ss[n]['kept'])}, lost {ss[n]['lost']}/{ss[n]['boxes']}"
+                                               for n in subsets if n != 'all 40 pages') + ' |')
+        L.append('')
+    REPORT.write_text('\n'.join(L) + '\n')
+    print('->', REPORT, DATA)
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__.split('\n')[0])
+    ap.add_argument('cmd', choices=('arms', 'report'))
+    a = ap.parse_args()
+    {'arms': arms, 'report': report}[a.cmd]()
+
+
+if __name__ == '__main__':
+    sys.path.insert(0, str(HERE))
+    main()
