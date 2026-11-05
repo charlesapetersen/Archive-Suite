@@ -1,0 +1,3 @@
+{"tokens": 2849, "weights GB": 2.48}
+{"stage": "forward", "peak GB": 3.28}
+GUARD	2026-11-04T12:55:52	kit-mac-lora-probe-text	137	14	3060	8432	-24	2	memory_8432MB	bash /Users/cp1/Library/Caches/ArchiveSuiteRehearsal/kit-mac-lora/py.sh probe /Users/cp1/Library/Caches/ArchiveSuiteRehearsal/kit-mac-lora/probe-text --stages forward,step

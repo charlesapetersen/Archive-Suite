@@ -1,0 +1,16 @@
+{"tokens": 4385, "weights GB": 2.52}
+{"stage": "vision", "peak GB": 3.54}
+{"stage": "forward", "peak GB": 3.58}
+Traceback (most recent call last):
+  File "/Users/cp1/Claude/.worktrees/archive-suite/suite-wt-20261104-124908-79933/ArchiveProcessor/scripts/segbench/kit_mac_lora.py", line 359, in <module>
+    main()
+  File "/Users/cp1/Claude/.worktrees/archive-suite/suite-wt-20261104-124908-79933/ArchiveProcessor/scripts/segbench/kit_mac_lora.py", line 355, in main
+    a.f(a)
+  File "/Users/cp1/Claude/.worktrees/archive-suite/suite-wt-20261104-124908-79933/ArchiveProcessor/scripts/segbench/kit_mac_lora.py", line 316, in cmd_probe
+    lv, g = nn.value_and_grad(model, loss)(model, batch)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/cp1/.local/share/visionocr-ocrlab/venv/lib/python3.12/site-packages/mlx/nn/utils.py", line 35, in wrapped_value_grad_fn
+    value, grad = value_grad_fn(model.trainable_parameters(), *args, **kwargs)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ValueError: [Primitive::vjp] Not implemented for CustomKernel.
+GUARD	2026-11-04T12:53:43	kit-mac-lora-probe	1	11	3126	5626	0	1	-	env PYTHONPATH=/Users/cp1/Library/Caches/ArchiveSuiteRehearsal/kit-mac-lora/pylib /Users/cp1/.local/share/visionocr-ocrlab/venv/bin/python /Users/cp1/Claude/.worktrees/archive-suite/suite-wt-20261104-124908-79933/ArchiveProcessor/scripts/segbench/kit_mac_lora.py probe /Users/cp1/Library/Caches/ArchiveSuiteRehearsal/kit-mac-lora/seg-20-p2

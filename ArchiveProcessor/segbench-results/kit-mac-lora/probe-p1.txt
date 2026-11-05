@@ -1,0 +1,2 @@
+{"tokens": 2881, "weights GB": 2.5}
+GUARD	2026-11-04T12:55:32	kit-mac-lora-probe-p1	137	14	3040	9052	512	4	memory_9052MB	bash /Users/cp1/Library/Caches/ArchiveSuiteRehearsal/kit-mac-lora/py.sh probe /Users/cp1/Library/Caches/ArchiveSuiteRehearsal/kit-mac-lora/seg-20-p1 --stages step

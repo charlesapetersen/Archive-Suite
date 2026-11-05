@@ -1,0 +1,9 @@
+INFO:__main__:[95mLoading model from /Users/cp1/.local/share/visionocr-ocrlab/mlx/seg-qwen3.5-2b-8bit[0m
+INFO:__main__:[95mLoading dataset from /Users/cp1/Library/Caches/ArchiveSuiteRehearsal/kit-mac-lora/seg-20[0m
+INFO:__main__:[4mSetting up LoRA[0m
+INFO:__main__:[95mSetting up optimizer[0m
+INFO:__main__:[95mTraining model (sft)[0m
+/Users/cp1/.local/share/uv/python/cpython-3.12.13-macos-aarch64-none/lib/python3.12/multiprocessing/resource_tracker.py:279: UserWarning: resource_tracker: There appear to be 1 leaked semaphore objects to clean up at shutdown
+  warnings.warn('resource_tracker: There appear to be %d '
+GUARD	2026-11-04T05:05:10	kit-mac-lora-seg-20-r8-i20	137	19	2682	10249	1496	4	pressure_critical	env PYTHONPATH=/Users/cp1/Library/Caches/ArchiveSuiteRehearsal/kit-mac-lora/pylib /Users/cp1/.local/share/visionocr-ocrlab/venv/bin/python -m mlx_vlm.lora --model-path /Users/cp1/.local/share/visionocr-ocrlab/mlx/seg-qwen3.5-2b-8bit --dataset /Users/cp1/Library/Caches/ArchiveSuiteRehearsal/kit-mac-lora/seg-20 --batch-size 1 --iters 20 --steps-per-report 1 --steps-per-eval 1000000 --steps-per-save 1000000 --lora-rank 8 --lora-alpha 16 --grad-checkpoint --train-on-completions --max-seq-length 16384 --learning-rate 1e-4 --output-path /Users/cp1/Library/Caches/ArchiveSuiteRehearsal/kit-mac-lora/adapters/seg-20-r8-i20
+exit=137

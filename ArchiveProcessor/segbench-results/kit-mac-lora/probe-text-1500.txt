@@ -1,0 +1,3 @@
+{"tokens": 481, "weights GB": 2.48}
+{"stage": "step", "peak GB": 3.5}
+GUARD	2026-11-04T12:56:05	kit-mac-lora-probe-text-1500	0	7	2960	4607	0	1	-	bash /Users/cp1/Library/Caches/ArchiveSuiteRehearsal/kit-mac-lora/py.sh probe /Users/cp1/Library/Caches/ArchiveSuiteRehearsal/kit-mac-lora/probe-text-1500 --stages step

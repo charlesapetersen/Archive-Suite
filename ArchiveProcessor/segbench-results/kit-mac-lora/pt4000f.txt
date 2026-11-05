@@ -1,0 +1,2 @@
+{"tokens": 1121, "weights GB": 2.48}
+GUARD	2026-11-04T12:57:05	kit-mac-lora-pt4000f	137	12	2966	9353	-168	1	memory_9353MB	bash /Users/cp1/Library/Caches/ArchiveSuiteRehearsal/kit-mac-lora/py.sh probe /Users/cp1/Library/Caches/ArchiveSuiteRehearsal/kit-mac-lora/probe-text-4000 --stages step --full

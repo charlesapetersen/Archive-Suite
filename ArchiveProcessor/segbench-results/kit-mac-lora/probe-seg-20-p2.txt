@@ -1,0 +1,4 @@
+{"tokens": 4385, "weights GB": 2.52}
+{"stage": "vision", "peak GB": 3.56}
+{"stage": "forward", "peak GB": 3.58}
+GUARD	2026-11-04T12:54:11	kit-mac-lora-probe	137	19	3037	8298	560	2	memory_8298MB	env PYTHONPATH=/Users/cp1/Library/Caches/ArchiveSuiteRehearsal/kit-mac-lora/pylib /Users/cp1/.local/share/visionocr-ocrlab/venv/bin/python /Users/cp1/Claude/.worktrees/archive-suite/suite-wt-20261104-124908-79933/ArchiveProcessor/scripts/segbench/kit_mac_lora.py probe /Users/cp1/Library/Caches/ArchiveSuiteRehearsal/kit-mac-lora/seg-20-p2

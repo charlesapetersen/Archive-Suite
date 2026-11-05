@@ -1,0 +1,6 @@
+INFO:__main__:[95mLoading model from /Users/cp1/.local/share/visionocr-ocrlab/mlx/seg-qwen3.5-2b-8bit[0m
+INFO:__main__:[95mLoading dataset from /Users/cp1/Library/Caches/ArchiveSuiteRehearsal/kit-mac-lora/seg-20[0m
+INFO:__main__:[4mSetting up LoRA[0m
+INFO:__main__:[95mSetting up optimizer[0m
+INFO:__main__:[95mTraining model (sft)[0m
+Terminated: 15

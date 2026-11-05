@@ -1,0 +1,3 @@
+{"tokens": 1121, "weights GB": 2.48}
+{"stage": "trainforward", "peak GB": 2.94}
+GUARD	2026-11-04T12:56:33	kit-mac-lora-pt4000	0	4	3055	3594	0	1	-	bash /Users/cp1/Library/Caches/ArchiveSuiteRehearsal/kit-mac-lora/py.sh probe /Users/cp1/Library/Caches/ArchiveSuiteRehearsal/kit-mac-lora/probe-text-4000 --stages trainforward
