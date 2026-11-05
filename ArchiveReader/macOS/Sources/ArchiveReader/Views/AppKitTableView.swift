@@ -665,13 +665,7 @@ struct AppKitTableView: NSViewRepresentable {
         func tokenField(_ tokenField: NSTokenField, completionsForSubstring substring: String,
                         indexOfToken tokenIndex: Int,
                         indexOfSelectedItem selectedIndex: UnsafeMutablePointer<Int>?) -> [Any]? {
-            let s = substring.trimmingCharacters(in: .whitespaces)
-            guard !s.isEmpty else { return [] }
-            let suggestions = parent.model.allSubjects
-            return Array(suggestions.filter {
-                $0.caseInsensitiveCompare(s) != .orderedSame &&
-                $0.range(of: s, options: [.caseInsensitive, .anchored]) != nil
-            }.prefix(20))
+            TagEntry.completions(for: substring, in: parent.model.allSubjects)
         }
 
         func controlTextDidBeginEditing(_ obj: Notification) {
@@ -681,19 +675,37 @@ struct AppKitTableView: NSViewRepresentable {
             editingItemID = tagCell.itemID
         }
 
-        /// Return commits the inline edit (R-23), as leaving the field does. The token field handles the key
-        /// first, so pending text becomes a token and an open completion is taken; the list then takes focus
-        /// back on the next turn, which ends the edit and commits it through `controlTextDidEndEditing`
-        /// (W40.fix-reader-inline-keys: before, Return only tokenized and the edit stayed open).
+        /// Return commits the inline edit (R-23). The token field handles the key first, so pending text becomes a
+        /// token and an open completion is taken. With text typed, the tags are written on the next turn and the
+        /// field keeps the keyboard, so the next tag can be typed at once (W40.fix-reader-tag-entry: the field
+        /// was left after every tag, and each further tag needed a click). Return in a field with nothing typed
+        /// ends the edit: the list takes focus back, and `controlTextDidEndEditing` commits.
+        /// Tab takes an inline completion (`TagEntry`); with none showing it keeps its usual meaning.
         func control(_ control: NSControl, textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
-            guard control.superview is TagTokenCellView,
-                  commandSelector == #selector(NSResponder.insertNewline(_:)) else { return false }
-            DispatchQueue.main.async { [weak self, weak control] in
-                guard let control, control.currentEditor() != nil,
-                      let tableView = self?.tableView else { return }
-                tableView.window?.makeFirstResponder(tableView)
+            guard let tagCell = control.superview as? TagTokenCellView else { return false }
+            if commandSelector == #selector(NSResponder.insertTab(_:)) {
+                return TagEntry.acceptInlineCompletion(in: textView)
+            }
+            guard commandSelector == #selector(NSResponder.insertNewline(_:)) else { return false }
+            let typed = !TagEntry.pendingText(in: textView).isEmpty
+            DispatchQueue.main.async { [weak self, weak control, weak tagCell] in
+                guard let self, let control, let tagCell, control.currentEditor() != nil else { return }
+                if typed {
+                    self.commitInProgress(tagCell)
+                } else if let tableView = self.tableView {
+                    tableView.window?.makeFirstResponder(tableView)
+                }
             }
             return false
+        }
+
+        /// Writes the field's tags while it is still being edited, and makes them the base the rest of the edit
+        /// is measured from, so leaving the field later writes only what changed after this.
+        private func commitInProgress(_ tagCell: TagTokenCellView) {
+            guard let base = tagCell.editBase, let fileID = tagCell.itemID, let file = self.file(for: fileID) else { return }
+            let edited = (tagCell.tokenField.objectValue as? [String]) ?? []
+            tagCell.editBase = edited
+            parent.model.commitSubjectEdit(from: base, to: edited, for: file)
         }
 
         func controlTextDidEndEditing(_ obj: Notification) {

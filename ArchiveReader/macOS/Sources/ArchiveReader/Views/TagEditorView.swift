@@ -26,7 +26,10 @@ struct TagEditorView: View {
             HStack {
                 Text(s.count == 1 ? "Edit Tags" : "Edit Tags — \(s.count) files").font(.headline)
                 Spacer()
-                Button("Done") { dismiss() }.keyboardShortcut(.defaultAction)
+                // Typed text sticks, as in the list's tag field: Done adds a subject still in the field. While
+                // one is being typed, Return belongs to the field, which adds it and keeps the keyboard.
+                Button("Done") { addSubject(); dismiss() }
+                    .keyboardShortcut(subjectDraft.isEmpty ? .defaultAction : nil)
                     .accessibilityIdentifier("ar.tagEditor.done")
             }
             .padding()
@@ -66,10 +69,9 @@ struct TagEditorView: View {
                 ForEach(s.subjectsOnSome, id: \.self) { chip($0, partial: true) }
             }
             HStack {
-                TextField("Add subject…", text: $subjectDraft)
-                    .textFieldStyle(.roundedBorder)
-                    .onSubmit(addSubject)
-                    .accessibilityIdentifier("ar.tagEditor.addSubject")
+                SubjectEntryField(draft: $subjectDraft, placeholder: "Add subject…",
+                                  suggestions: { let onAll = Set(s.subjectsOnAll); return model.allSubjects.filter { !onAll.contains($0) } },
+                                  onAdd: { apply(.addSubject($0)) })
                 Button("Add", action: addSubject)
                     .disabled(subjectDraft.trimmingCharacters(in: .whitespaces).isEmpty)
                     .accessibilityIdentifier("ar.tagEditor.addSubjectButton")
