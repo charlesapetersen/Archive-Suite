@@ -1,7 +1,8 @@
 #!/bin/bash
 # W46.seg-adapt-lora, one LoRA continuation on one GPU: the k corrections of box 1 plus three corpus windows for
 # each (seg_adapt_lora.py replay), trained onto the merged corpus 2B with train_seg.py's recipe (rank 16, lr 1e-4,
-# accum 8) for two epochs, then merged so vLLM serves it as the base is served. The peft overlay venv is the one
+# accum 8) for two epochs, every window up to the 20,480 tokens vLLM serves (a longer one would be skipped without a
+# word), then merged so vLLM serves it as the base is served. The peft overlay venv is the one
 # merge-job.sh built (afterok), so no job installs anything here.
 #   sbatch ... train-job.sh ROOT 50|200
 set -euo pipefail
@@ -40,7 +41,7 @@ nvidia-smi --query-gpu=name,memory.total --format=csv,noheader
 run() { apptainer -s exec --nv --bind "$SCRATCH,$GROUP_HOME" --env PYTHONPATH="$SH_SHIM" --env HF_HOME="$HF_HOME" \
   --env HF_HUB_OFFLINE=1 "$SH_IMG" "$ENV/bin/python" "$@"; }
 TS="$ROOT/support/segbench/train_seg.py"
-[ -d "$OUT/adapter" ] || run "$TS" train --data "$DATA" --model "$BASE" --out "$OUT" --epochs 2
+[ -d "$OUT/adapter" ] || run "$TS" train --data "$DATA" --model "$BASE" --out "$OUT" --epochs 2 --max-len 20480
 rm -rf "$MERGED.tmp"
 run "$TS" merge --adapter "$OUT/adapter" --out "$MERGED.tmp"
 mv "$MERGED.tmp" "$MERGED"

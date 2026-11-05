@@ -4,7 +4,7 @@
   "mac": "artifacts/seg-adapt-lora-20261105",
   "submit": "support/job/submit.sh",
   "jobs": 7,
-  "gpu_hours": 3.0,
+  "gpu_hours": 5.25,
   "review": "execution-plans/items/W46.seg-adapt-lora.md",
   "imports": [
     {"dir": "support/segbench", "modules": ["seg_adapt_lora", "cluster_seg", "train_seg"]},
@@ -22,5 +22,5 @@
   ],
   "results": "$GROUP_HOME/$USER/archive-suite/sherlock-results/seg-adapt-lora-20261105",
   "collect": ["$FS_ROOT/seg-adapt-lora-20261105/jobs.tsv", "$FS_ROOT/seg-adapt-lora-20261105/logs"],
-  "release": "answers (runs/base, runs/k50, runs/k200) and lora/ records collected into the Mac artifact; the engine scores them with seg_adapt_lora.py score"
+  "release": "answers (runs/base, runs/k50, runs/k200) and lora/ records collected into the Mac artifact; the engine writes seg_adapt_lora.py score and scores box 2 whole and box 1 only above each arm's k"
 }

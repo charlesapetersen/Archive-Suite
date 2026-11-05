@@ -207,25 +207,34 @@ def cmd_replay(a):
     freeze = check(root)
     trained = json.loads((Path(a.adapter).parent / "train.json").read_text())
     if os.environ.get("SAL_REPLAY"):
-        found = [Path(os.environ["SAL_REPLAY"])]
+        found = [Path(os.environ["SAL_REPLAY"]).resolve()]
     else:
-        found = []
-        for d in sorted(Path(a.search).rglob("data.json")):
+        found = set()
+        # No symlinked folders (train/seg-2b links to full/qwen3.5-2b) and none of the big trees, so one data set is
+        # found once and the walk stays short while the job holds a GPU.
+        for top, dirs, files in os.walk(a.search, followlinks=False):
+            dirs[:] = [d for d in dirs if d not in ("hf", "images", "cache", "runs", "logs", "adapter")
+                       and not d.startswith("step-")]
+            if "data.json" not in files or "train.jsonl" not in files:
+                continue
             try:
-                meta = json.loads(d.read_text())
+                meta = json.loads((Path(top) / "data.json").read_text())
             except ValueError:
                 continue
-            if isinstance(meta, dict) and meta.get("windows") == trained.get("windows") and "rule" in meta \
-                    and (d.parent / "train.jsonl").is_file():
-                found.append(d.parent)
-    if len(found) != 1:
-        raise SystemExit(f"replay set: {len(found)} candidates {[str(f) for f in found]}; set SAL_REPLAY")
+            if isinstance(meta, dict) and meta.get("windows") == trained.get("windows") and "rule" in meta:
+                found.add(Path(top).resolve())
+        found = sorted(found)
     src = found[0]
     meta = json.loads((src / "data.json").read_text())
-    images = Path(meta["images"])
-    if not images.is_dir():                    # FarmShare's scratch path, now inside the group copy
-        images = Path(a.search) / Path(meta["images"]).relative_to("/scratch/users/cp1/fs-ocr")
-    if not images.is_dir():
+    # FarmShare's scratch path, now inside the group copy; the copy first, because a scratch folder of the same path
+    # may be a purged leftover. Every page a row names is checked below either way.
+    recorded = Path(meta["images"])
+    try:
+        candidates = [Path(a.search) / recorded.relative_to("/scratch/users/cp1/fs-ocr"), recorded]
+    except ValueError:
+        candidates = [recorded]
+    images = next((c for c in candidates if c.is_dir()), None)
+    if images is None:
         raise SystemExit(f"replay images not found: {meta['images']}")
     mine = [json.loads(x) for x in (root / "corrections" / f"k{a.k}.jsonl").read_text().splitlines()]
     corpus = [json.loads(x) for x in (src / "train.jsonl").read_text().splitlines()]
@@ -234,22 +243,30 @@ def cmd_replay(a):
     corpus = [r for r in corpus if "box" in r and r.get("text") == "none" and "ABBYY" not in r["prompt"]]
     if not corpus:   # fewer than REPLAY_RATIO times the corrections is used whole, and data.json says how many
         raise SystemExit("no no-text corpus windows to replay")
-    replay = random.Random(41 + a.k).sample(corpus, min(len(corpus), REPLAY_RATIO * len(mine)))
+    # One seeded order for every k: k=200's replay holds k=50's, so the arms differ only by what k adds.
+    random.Random(41).shuffle(corpus)
+    replay = corpus[:REPLAY_RATIO * len(mine)]
     rows = mine + replay
     random.Random(41).shuffle(rows)
     if out.exists():
         raise SystemExit(f"{out} exists")
-    (out / "images").mkdir(parents=True)
+    tmp = out.with_name(out.name + ".tmp")
+    if tmp.exists():                           # a failed earlier attempt of this job; scratch, rebuilt whole
+        import shutil
+        shutil.rmtree(tmp)
+    (tmp / "images").mkdir(parents=True)
     for box in sorted({r["box"] for r in rows}):
         target = root / "windows" / "images" / box if box.startswith("Lincoln") else images / box
-        if not target.is_dir():
-            raise SystemExit(f"no images for {box}")
-        os.symlink(target, out / "images" / box)
-    (out / "train.jsonl").write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows))
+        missing = [n for r in rows if r["box"] == box for n in r["window"] if not (target / f"{n}.jpg").is_file()]
+        if missing:
+            raise SystemExit(f"{box}: {len(missing)} page images missing under {target} (first {missing[0]})")
+        os.symlink(target, tmp / "images" / box)
+    (tmp / "train.jsonl").write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows))
     summary = {"item": TAG, "k": a.k, "corrections": len(mine), "replay": len(replay), "replay_from": str(src),
                "replay_images": str(images), "images": str(out / "images"), "rule": "corrections+replay",
                "windows": len(rows)}
-    (out / "data.json").write_text(json.dumps(summary, indent=1) + "\n")
+    (tmp / "data.json").write_text(json.dumps(summary, indent=1) + "\n")
+    tmp.rename(out)
     print(json.dumps(summary, indent=1))
 
 
