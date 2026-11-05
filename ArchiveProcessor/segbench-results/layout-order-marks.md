@@ -60,12 +60,14 @@ Every other arm and every page group are in the JSON. Tau by page kind for four 
 
 ## Results: marks on the owner core
 
-There are 45 owner marks on 32 pages. A mark reaches a stream when one kept region, or Vision's lines inside the
-mark, cover at least half its box. Each cell is found/of, with a 95% page-bootstrap interval.
+There are 45 owner marks, on 20 of the 32 pages (the other 12 have none). A mark reaches a stream when one kept
+region, or Vision's lines inside the mark, cover at least half its box. That is coverage, not reading: a line counts
+when at least half of it lies inside the mark's box, whatever text it holds, so a mark touching print can be covered
+by a print line. Each cell is found/of, with a 95% page-bootstrap interval.
 
 | Stream | all | touching print | clear of print | A-core | B-core |
 |---|---|---|---|---|---|
-| Vision lines | 30/45 (54–79%) | 9/18 | 21/27 | 5/6 | 25/39 |
+| Vision lines (covered) | 30/45 (54–79%) | 9/18 | 21/27 | 5/6 | 25/39 |
 | DocLayout-YOLO, the app's filter (text, title) | 7/45 (4–34%) | 4/18 | 3/27 | 2/6 | 5/39 |
 | DocLayout-YOLO, pictures and tables kept | 26/45 (29–78%) | 10/18 | 16/27 | 2/6 | 24/39 |
 | DocLayout-YOLO, any region | 32/45 (48–87%) | 13/18 | 19/27 | 4/6 | 28/39 |
@@ -79,14 +81,17 @@ mark, cover at least half its box. Each cell is found/of, with a 95% page-bootst
    rows-first XY-cut on YOLO regions (0.961). By the rule W46.layout-order-train carries, that item moves behind
    W46.nice-to-have.
 2. **Order and coverage pull apart.**
-   - PP-DocLayoutV3 orders best, and has the highest tau on clippings and tables. It keeps only
-     82% of the lines, so its word accuracy (69.0%) is below the no-detector arms (75.1-75.6%).
+   - PP-DocLayoutV3 orders best on the lines it keeps, and has the highest tau on clippings and tables. On the 66
+     pages both score, its tau is +0.020 [+0.002, +0.048] above Vision's line order, over about 6% fewer placed
+     lines (2,788 against 2,974). It keeps only 82% of the lines, so its word accuracy (69.0%) is below the
+     no-detector arms (75.1-75.6%).
    - The app's line column sort with no detector loses nothing and orders about as well as Vision's own order.
      For a whole-page reading of the owner's typed pages, which are most of them, it is enough.
    - Where a detector is used, the region orderer matters less than the detector does.
 3. **The app's region filter drops the marks.** With the app's filter (text and title only), DocLayout-YOLO's stream
    keeps 7 of 45 marks. Keeping pictures and tables raises that to 26, which confirms LAY-2. PP-DocLayoutV3 keeps
-   3 at most, as W46.marks-detect found. Vision's lines read 30 of 45, and 21 of the 27 that are clear of print.
+   3 at most, as W46.marks-detect found. Vision's lines cover 30 of 45, but 9 of those 30 touch print and may be covered by a print line; 21 of the 27
+   clear of print is the purer figure.
    Any route that reads regions has to keep pictures, or read marks in a separate layer (W46.marks-detect).
 4. **Handwriting is not settled here.** Only 2-3 of the 16 handwritten pages place 15 lines in the truth, so the
    handwritten column rests on 3 pages.
@@ -103,12 +108,18 @@ mark, cover at least half its box. Each cell is found/of, with a 95% page-bootst
   - The 96 are the frozen benchmark set.
   - The marks pages are the core's two-phase selection: A-core is independent of every route, and B-core came
     from Qwen3.6-27B's pre-flag. They are reported apart, with no population weights.
-  - Neither set was chosen by a tested route or by ABBYY text.
+  - Every page where Apple Vision (26.6) read fewer than 20 words was replaced at the 96's draw (19 of them,
+    4 tagged Handwritten; `ocr-truth.md`), so the 96 hold no page Vision reads as empty, and every comparison with
+    Vision on them is on pages Vision could read. Vision's lines and order are arms here.
+  - Neither set was chosen by a tested route or by ABBYY text; the 96's Vision filter is the exception above.
 - **Comparison.** Every arm uses the same Vision lines, so recognition is equal across arms. Detection is fixed per
   detector, at the settings W46.layout-photo used. Only the owner's set is scored here. The public pages are
   W46.layout-order's, whose geometric arms are the same code, so both sets are covered between the two items.
-- **Noise.** n is 66-72 valid pages for the 96 and 45 marks. The intervals are paired page bootstraps. The
-  orderers and Vision are deterministic, so there is no rerun floor to add. Differences whose interval holds zero
+- **Noise.** n is 66-72 valid pages for the 96 and 45 marks. The intervals are paired page bootstraps. No
+  rerun floor was measured. The orderers are deterministic. Vision's lines were read on macOS 27.2, where Vision is
+  not byte-stable on handwritten originals (a second read gave 17 and 18 of 19 identical, `vision-27-reread.md`);
+  the pages that varied (p048, p050, p053) are not among the three valid handwritten pages here (p015, p040, p052),
+  so no figure moves. Differences whose interval holds zero
   are ties: most region-orderer pairs on one detector are ties.
 - **Scope.**
   - This does not rank OCR routes.

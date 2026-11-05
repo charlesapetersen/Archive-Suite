@@ -221,7 +221,8 @@ def cover(mark, boxes) -> float:
 
 
 def lines_cover(mark, lines) -> float:
-    """The share of the mark's box under the union of the lines that lie mostly inside it (a raster estimate)."""
+    """The share of the mark's box under the union of the lines that lie mostly inside it (a raster estimate).
+    Coverage, not reading: a line counts whatever its text, so a print line can cover a mark that touches print."""
     inside = []
     for b in lines:
         a = max(LO._w(b) * LO._h(b), 1e-12)

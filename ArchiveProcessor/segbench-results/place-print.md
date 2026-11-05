@@ -210,8 +210,8 @@ The owner's line rulings (W46.place-lines-owner-ok) were asked only where blla a
     blla and PP-OCRv6 det both grouped differently from the truth (`place-truth-lines.md`: their agreement is the
     filter), and his rulings were folded as 50 joins (88 typed lines into 38; 30 single-word members unscored) and 24
     truth lines left out, no splits, on 11 pages; each can only move the truth toward the two detectors. Measured,
-    the fold also raised Vision's whole-and-alone share, from 64.1% to 66.0%, so its net effect was toward Vision
-    too, not away from it. Test 7 is therefore also reported on the unfolded truth and on the lines the fold left
+    the fold also raised Vision's whole-and-alone share, from 64.1% to 66.0%, but it made 7 lines whole and alone
+    for Vision against 21 for each detector, and PP-OCRv6 det's lead grew from +20.9 unfolded to +22.2 folded. Test 7 is therefore also reported on the unfolded truth and on the lines the fold left
     alone (its second table), the latter judged both with the touched lines removed and inside the unfolded truth
     (PP-OCRv6 det +21.4 and +21.8, blla +10.5 and +10.8); every verdict holds on each, and the fold accounts for
     about 1 point of PP-OCRv6 det's lead. PP-OCRv6 det's lines are

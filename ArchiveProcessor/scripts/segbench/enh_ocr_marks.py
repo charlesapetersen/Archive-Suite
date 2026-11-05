@@ -5,6 +5,7 @@ ink check: whether any method may touch the reading copy without losing the hand
   V=~/Library/Caches/ArchiveSuiteRehearsal/enh-ocr-input/venv/bin/python
   python3 ops/autonomous/heavy-run.py run -- $V enh_ocr_marks.py arms   # jpeg, shading, GCDRNet, SBB on the 40
   $V enh_ocr_marks.py report                                            # segbench-results/enh-ocr-marks.{md,json}
+  python3 enh_ocr_marks.py report --saved   # the report again from the rows in enh-ocr-marks.json (no images)
 
 Pages: the marks set's 40-page owner core (W46.fix-marks-set-score's freeze, after W46.fix-marks-sheet-feedback's
 recheck), read from the derived record `marks-set-reconciled.json` names; the images are the marks scan's 2400 px
@@ -29,7 +30,9 @@ pixel / background. T = 0.30 (clear ink) and 0.15 (faint ink: pencil, a light st
   colour    the share of raw's coloured ink (channel spread over background above 0.15) still coloured;
   added     ink in the arm where raw had none, as a share of raw's ink.
 A box is lost when under half its ink survives. The control for each page is the same figures outside every box
-(the print, mostly), so `kept - print kept` says whether a method removes marks more than it removes print.
+(the print, mostly), so `kept - print kept` says whether a method removes marks more than it removes print. Colour
+is also paired by page against the `jpeg` floor (`colour_vs_floor`, the pages with coloured ink in both), since the
+floor went through the same JPEG 90 save and chroma subsampling cancels in the pairing.
 
 Images and pixel data stay in CACHE (the owner's material); committed results hold page ids and numbers only. No
 network, no money, no model reads a page.
@@ -169,13 +172,30 @@ def page_rows(p, marks):
     return out
 
 
-def run_checks():
+def run_checks(saved=False):
+    """(record, rows): measured from the images, or with saved=True the rows the last report wrote (the images
+    are rebuildable scratch and may be gone)."""
     rec, _ = record()
+    if saved:
+        return rec, json.loads(DATA.read_text())['rows']
     rows = {}
     for p in pages():
         rows[p] = page_rows(p, rec['pages'][p]['marks'])
         print('ink', p, flush=True)
     return rec, rows
+
+
+def colour_vs_floor(rows, ids, key, floor):
+    """Page mean colour at arm@T less the jpeg floor's at the same T, over pages with coloured ink in both; 10,000
+    bootstrap draws over pages."""
+    diff = []
+    for p in ids:
+        a = [b['colour'] for b in rows[p][key]['boxes'] if b['colour'] is not None]
+        j = [b['colour'] for b in rows[p][floor]['boxes'] if b['colour'] is not None]
+        if a and j:
+            diff.append(statistics.fmean(a) - statistics.fmean(j))
+    b = boot(diff, n=10000)
+    return b and dict(b, below=sum(x < 0 for x in diff))
 
 
 def boot(xs, n=4000, seed=7):
@@ -223,8 +243,8 @@ def fmt(b, pct=True):
     return f"{f(b['mean'])} ({f(b['lo'])} to {f(b['hi'])})"
 
 
-def report():
-    rec, rows = run_checks()
+def report(saved=False):
+    rec, rows = run_checks(saved)
     ids = sorted(rows)
     det = [p for p in ids if rec['pages'][p]['detector_evaluable']]
     hand = ('annotation', 'marginal_note', 'signature_initials')
@@ -239,6 +259,7 @@ def report():
         for arm in ARMS:
             key = f'{arm}@{t:.2f}'
             out['summary'][key] = {name: summarise(rec, rows, s, key, pick) for name, (s, pick) in subsets.items()}
+            out['summary'][key]['colour_vs_floor'] = colour_vs_floor(rows, ids, key, f'jpeg@{t:.2f}')
     DATA.write_text(json.dumps(out, indent=1, sort_keys=True) + '\n')
 
     S = out['summary']
@@ -273,14 +294,24 @@ def report():
     g = lambda arm, t, f='kept': S[f'{arm}@{t:.2f}']['all 40 pages'][f]
     pc = lambda b: f"{100 * b['mean']:.1f}%"
     sbb_blank = [p for p in ids if (rows[p]['sbb@0.30']['print'] or {}).get('kept', 1) < 0.2]
+    a40 = S['jpeg@0.15']['all 40 pages']
+    with_boxes = a40['kept']['n']
+    with_colour, colour_boxes = a40['colour']['n'], sum(b['colour'] is not None for p in ids
+                                                        for b in rows[p]['jpeg@0.15']['boxes'])
+    cv = lambda arm, t: S[f'{arm}@{t:.2f}']['colour_vs_floor']
+    pts = lambda b: f"{100 * b['mean']:+.1f} colour points ({100 * b['lo']:+.1f} to {100 * b['hi']:+.1f})"
     L += ['## Verdict', '',
           '**Only the contrast-only control may touch the reading copy; the content-removing methods may not.** '
           f"Shading division keeps {pc(g('shading', 0.15))} of the faint-inclusive ink in the mark boxes against "
           f"the re-encoding floor's {pc(g('jpeg', 0.15))}, loses no box at either threshold, and takes marks no "
-          'more than print. GCDRNet keeps clear ink '
+          'more than print, but it greys the marks\' colour: paired by page against the floor, '
+          f"{pts(cv('shading', 0.15))} with faint ink and {pts(cv('shading', 0.30))} clear, on the "
+          f"{with_colour} pages and {colour_boxes} boxes with coloured ink ({cv('shading', 0.15)['below']} of the "
+          f"{with_colour} pages below the floor). GCDRNet keeps clear ink "
           f"({pc(g('gcdrnet', 0.30))}) but erases faint ink: {pc(g('gcdrnet', 0.15))} kept, "
           f"{g('gcdrnet', 0.15, 'lost')} of {g('gcdrnet', 0.15, 'boxes')} boxes lost on "
-          f"{len(g('gcdrnet', 0.15, 'lost_pages'))} pages (three stamps, a signature and two marginal notes). Its loss is no worse on marks than on the page's "
+          f"{len(g('gcdrnet', 0.15, 'lost_pages'))} pages (three stamps, a signature and two marginal notes), and "
+          f"greys colour like shading ({pts(cv('gcdrnet', 0.15))} with faint ink). Its loss is no worse on marks than on the page's "
           "faint print: it erases faint ink wherever it is. SBB keeps "
           f"{pc(g('sbb', 0.15))} of faint ink, loses {g('sbb', 0.15, 'lost')} boxes on "
           f"{len(g('sbb', 0.15, 'lost_pages'))} pages and every mark's colour by construction (coloured ink and "
@@ -289,7 +320,8 @@ def report():
           "kept under a fifth of the print's ink as well. Its positive kept-minus-print is that print loss, not a "
           'gain for the marks. With W46.enh-ocr-input (no method helps any reader as OCR input), the rule '
           'for the app: the reading copy and the OCR input both stay the raw image; a gain-only shading division is '
-          'the one method that may be offered for viewing, and a content-removing method never replaces the '
+          'the one method that may be offered for viewing, and it greys about a fifth of a mark\'s colour there; a '
+          'content-removing method never replaces the '
           'stored page.', '',
           '## Measurement card', '',
           '- **Truth.** The marks set\'s owner core after the 2026-11-04 recheck (`marks-set-reconciled.md`): the '
@@ -303,10 +335,14 @@ def report():
           '- **Comparison.** Every arm from the same 2400 px JPEG the models read, at its size, saved at JPEG 90 '
           'like the `jpeg` floor; the same ink function, thresholds and boxes for every arm; the code and weights '
           'of W46.enh-ocr-input.',
-          '- **Noise.** n = 40 pages (boxes nested in pages; the bootstrap resamples pages). The `jpeg` arm is the '
-          'floor: re-encoding alone moves 2-3% of ink pixels across a threshold and no box. A box figure within '
-          'the floor is no change. Coloured-ink figures are rough: the floor keeps only about 80% of them '
-          '(JPEG chroma subsampling) and shading and GCDRNet land together below it, so only SBB\'s 0% is read.',
+          f"- **Noise.** n = {with_boxes} pages: the {out['boxes']} boxes lie on {with_boxes} of the {out['pages']} "
+          f"pages (the rest have no kept mark), and {with_colour} of those have coloured ink "
+          f"({colour_boxes} boxes); boxes are nested in pages and the bootstrap resamples pages. The `jpeg` arm is "
+          'the floor: re-encoding alone moves 2-3% of ink pixels across a threshold and no box. A box figure '
+          'within the floor is no change. The floor keeps only about 80% of the coloured ink (JPEG chroma '
+          'subsampling), but every arm went through the same JPEG 90 save, so the colour loss is read paired by '
+          'page against the floor: shading\'s and GCDRNet\'s intervals stay below zero, a resolved loss, not '
+          'noise. Whether the colour measure itself reads divided images differently was not tested.',
           '- **Scope.** Ink survival, not legibility: a mark can keep its pixels and still read worse, and no reader '
           'transcribed the marks here. Rough boxes include print where a mark touches it (the clear-of-print '
           'subset is the purer figure). DocRes appearance and deshadow were not run: they need a cluster GPU, '
@@ -320,8 +356,9 @@ def report():
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split('\n')[0])
     ap.add_argument('cmd', choices=('arms', 'report'))
+    ap.add_argument('--saved', action='store_true', help='report: from the rows in enh-ocr-marks.json, no images')
     a = ap.parse_args()
-    {'arms': arms, 'report': report}[a.cmd]()
+    arms() if a.cmd == 'arms' else report(a.saved)
 
 
 if __name__ == '__main__':
