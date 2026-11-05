@@ -657,6 +657,14 @@ final class NotesModel: ObservableObject {
         return templates.first { $0.id == tid }
     }
 
+    /// The template a plain New uses for a `kind` item in `folderId`: the folder's effective template when it makes
+    /// that kind, else none (Blank). New Note never starts from an extract template, nor New Extract from a note
+    /// template, since a template makes its own kind (W40.fix-notes-new-note).
+    func defaultTemplateID(for kind: Item.Kind, in folderId: UUID?) -> UUID? {
+        guard let template = effectiveTemplate(for: folderId), template.kind == kind else { return nil }
+        return template.id
+    }
+
     private func clearDanglingAssignments(_ folderIds: [UUID]) async {
         for f in folderIds { try? await organization.removeTemplateAssignment(folder: f) }
         rebuild()

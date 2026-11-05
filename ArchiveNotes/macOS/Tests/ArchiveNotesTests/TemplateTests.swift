@@ -286,6 +286,25 @@ struct NotesModelTemplateTests {
         #expect(env.model.effectiveTemplate(for: parent)?.id == tid)
     }
 
+    @Test("a plain New uses the folder's template only for the kind it makes (W40.fix-notes-new-note)")
+    func defaultTemplateMatchesKind() async throws {
+        let env = try await makeEnv(); defer { Task { await cleanup(env) } }
+        let tid = try #require(await env.model.createTemplate(name: "Extract T", kind: .extract))
+        let folder = try await env.org.createFolder(name: "F").id
+        await env.model.assignTemplate(tid, to: folder)
+        #expect(env.model.defaultTemplateID(for: .extract, in: folder) == tid)
+        #expect(env.model.defaultTemplateID(for: .note, in: folder) == nil)
+        #expect(env.model.defaultTemplateID(for: .note, in: nil) == nil)
+        // New Note there is blank and a note; New Extract takes the template.
+        let note = try #require(await env.model.newItem(
+            kind: .note, in: folder, from: env.model.defaultTemplateID(for: .note, in: folder)))
+        #expect(env.model.allItems.first { $0.id == note }?.kind == .note)
+        #expect(env.model.allItems.first { $0.id == note }?.title == "")
+        let extract = try #require(await env.model.newItem(
+            kind: .extract, in: folder, from: env.model.defaultTemplateID(for: .extract, in: folder)))
+        #expect(env.model.allItems.first { $0.id == extract }?.title == "Extract T")
+    }
+
     @Test("effectiveTemplate returns nil for an assignment to a since-deleted template")
     func effectiveDangling() async throws {
         let env = try await makeEnv(); defer { Task { await cleanup(env) } }

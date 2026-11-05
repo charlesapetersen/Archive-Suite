@@ -71,6 +71,71 @@ struct ReaderRootCommands: Commands {
     }
 }
 
+/// File ▸ New Note (⌘N) and New Extract (⌥⌘N) (W40.fix-notes-new-note, notes-1 rows 5 and 38). ⌘N was bound only
+/// inside the toolbar's New menu, so the menu bar had no New and the key did nothing. The key window creates
+/// through its own `NewItemAction`; with no window open, the item is made in the shared folder scope and the
+/// window featuring its kind opens to show it.
+struct NewItemCommands: Commands {
+    let notesModel: NotesModel
+    let flushRegistry: EditorFlushRegistry
+    @FocusedValue(\.newItemAction) private var newItem
+    @Environment(\.openWindow) private var openWindow
+
+    var body: some Commands {
+        CommandGroup(replacing: .newItem) {
+            Button("New Note") { create(.note) }
+                .keyboardShortcut("n", modifiers: .command)
+            Button("New Extract") { create(.extract) }
+                .keyboardShortcut("n", modifiers: [.command, .option])
+        }
+    }
+
+    private func create(_ kind: Item.Kind) {
+        if let newItem { newItem.perform(kind); return }
+        let model = notesModel, registry = flushRegistry, open = openWindow
+        Task {
+            let template = model.defaultTemplateID(for: kind, in: model.selectedFolderId)
+            guard let id = await NewItemFlow.create(kind: kind, from: template, model: model, flushing: registry)
+            else { return }
+            model.openItem(id: id, block: nil)
+            // One turn later, as `NoteEditorPane`'s own open does: a window built now would read the
+            // request before it is stored.
+            DispatchQueue.main.async { open(id: kind == .extract ? NotesWindowID.extracts : NotesWindowID.notes) }
+        }
+    }
+}
+
+/// A window's way to make a new item, published to the menu bar as a focused scene value: `perform(kind)` makes a
+/// `kind` item from the selected folder's template of that kind.
+struct NewItemAction {
+    let perform: @MainActor (Item.Kind) -> Void
+}
+
+struct NewItemActionKey: FocusedValueKey {
+    typealias Value = NewItemAction
+}
+
+extension FocusedValues {
+    var newItemAction: NewItemAction? {
+        get { self[NewItemActionKey.self] }
+        set { self[NewItemActionKey.self] = newValue }
+    }
+}
+
+/// The one creation path behind every New: a template's open body edits are saved first, and a template whose
+/// last save failed makes nothing, so a note never starts from text that is not on disk.
+@MainActor
+enum NewItemFlow {
+    static func create(kind: Item.Kind, from templateId: UUID?, model: NotesModel,
+                       flushing registry: EditorFlushRegistry) async -> UUID? {
+        if let templateId {
+            await registry.flushAll()
+            guard !model.hasFailedTemplateBodySave(templateId) else { return nil }
+        }
+        return await model.newItem(kind: kind, in: model.selectedFolderId, from: templateId)
+    }
+}
+
 /// View menu: side by side, or the list above the note (W48.notes-stacked-layout). Both windows follow the
 /// one remembered choice; `NotesBrowserView` reads the same key.
 struct LayoutCommands: Commands {

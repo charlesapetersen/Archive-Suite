@@ -12,6 +12,8 @@ struct NameEntrySheet: View {
     @Binding var name: String
     let onConfirm: (String) -> Void
     var onCancel: () -> Void = {}
+    /// A further choice shown above the name field, such as New Template's kind (W40.fix-notes-new-note).
+    var accessory: AnyView? = nil
 
     @Environment(\.dismiss) private var dismiss
     @FocusState private var fieldFocused: Bool
@@ -22,6 +24,7 @@ struct NameEntrySheet: View {
         VStack(alignment: .leading, spacing: 10) {
             Text(title).font(.headline)
             if let message { Text(message).font(.callout).foregroundStyle(.primary) }
+            if let accessory { accessory }
             TextField("Name", text: $name)
                 .textFieldStyle(.roundedBorder)
                 .labelsHidden()

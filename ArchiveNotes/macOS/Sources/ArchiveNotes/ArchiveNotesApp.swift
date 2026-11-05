@@ -70,6 +70,7 @@ struct ArchiveNotesApp: App {
             }
         }
         .commands {
+            NewItemCommands(notesModel: notesModel, flushRegistry: appDelegate.flushRegistry)
             ReaderRootCommands(previewState: previewState, notesModel: notesModel)
             FormatCommands()
             SourceBlockCommands()

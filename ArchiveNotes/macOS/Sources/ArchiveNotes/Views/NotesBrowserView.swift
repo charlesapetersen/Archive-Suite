@@ -95,6 +95,7 @@ struct NotesBrowserView: View {
             await flushRegistry.sweepSavedCopies(noteIDs: model.allItems.map(\.id)) { await model.loadBody(for: $0) }
         }
         .toolbar { toolbar }
+        .focusedSceneValue(\.newItemAction, NewItemAction { newItem(kind: $0, from: .folderDefault) })
         // Templates mode mounts no `NoteEditorPane`, so nothing in this window would act on an open
         // request; handle it here instead (W40.fix-notes-jump-pending-template). The delivered value,
         // since `@Published` emits in `willSet`; an initial pending value covers a window just opened.
@@ -138,27 +139,46 @@ struct NotesBrowserView: View {
             .help(showingTree ? "Hide Folders" : "Show Folders")
             .accessibilityIdentifier("an.toggleTree")
         }
+        // Which window this is, in words: the kind picker can show notes in the Extracts window, which then
+        // looks like the Notes window (W40.fix-notes-new-note, notes-1 row 39).
+        ToolbarItem(placement: .navigation) {
+            Label(nav.windowKind == .extract ? "Extracts" : "Notes",
+                  systemImage: nav.windowKind == .extract ? "quote.opening" : "doc.text")
+                .labelStyle(.titleAndIcon)
+                .font(.headline)
+                .help(nav.windowKind == .extract ? "The Extracts window" : "The Notes window")
+                .accessibilityIdentifier("an.toolbar.windowKind")
+        }
         ToolbarItem(placement: .primaryAction) {
+            // Both kinds from either window, the window's own first. The menu bar's File ▸ New Note (⌘N) and
+            // New Extract (⌥⌘N) carry the keys, so none is bound here (it never fired from a toolbar menu).
             Menu {
-                // ⌘N: new item using the nearest-ancestor template of the current scope (§6), else blank.
-                Button("New \(kindLabel)") {
-                    newItem(from: model.effectiveTemplate(for: model.selectedFolderId)?.id)
+                ForEach(kindsOwnFirst, id: \.self) { kind in
+                    Button("New \(Self.label(kind))") { newItem(kind: kind, from: .folderDefault) }
                 }
-                .keyboardShortcut("n", modifiers: .command)
                 Divider()
                 Menu("New from Template") {
-                    Button("Blank") { newItem(from: nil) }
-                    let offered = model.templates(matching: nav.windowKind)
-                    if !offered.isEmpty { Divider() }
-                    ForEach(offered) { t in Button(t.name) { newItem(from: t.id) } }
+                    ForEach(kindsOwnFirst, id: \.self) { kind in
+                        Section {
+                            Button("Blank \(Self.label(kind))") { newItem(kind: kind, from: .blank) }
+                            ForEach(model.templates(matching: kind)) { t in
+                                Button(t.name) { newItem(kind: kind, from: .template(t.id)) }
+                            }
+                        }
+                    }
                 }
             } label: {
                 Image(systemName: "square.and.pencil")
             }
-            .help("New \(kindLabel.lowercased())")
+            .help("New note or extract")
             .accessibilityIdentifier("an.toolbar.new")
         }
     }
+
+    /// This window's kind first, then the other.
+    private var kindsOwnFirst: [Item.Kind] { nav.windowKind == .extract ? [.extract, .note] : [.note, .extract] }
+
+    private static func label(_ kind: Item.Kind) -> String { kind == .extract ? "Extract" : "Note" }
 
 #if DEBUG
     /// Live key-window state behind `keyWindowProbe` (W14.4 b). DEBUG-only, like the probe it backs.
@@ -247,16 +267,27 @@ struct NotesBrowserView: View {
         }
     }
 
-    /// `templateId` when given, then select it (leaving templates mode if active).
-    private func newItem(from templateId: UUID?) {
+    /// What a new item starts from: the folder's template of its kind (§6), Blank, or a chosen template.
+    enum NewItemSource { case folderDefault, blank, template(UUID) }
+
+    /// Create a `kind` item in the current folder scope (system default when unscoped, §16.6). This window's kind
+    /// is selected here, leaving templates mode if active; the other kind goes through the open channel to the
+    /// window featuring it, opened if closed (`NoteEditorPane.handleOpen`).
+    private func newItem(kind: Item.Kind, from source: NewItemSource) {
+        let templateId: UUID?
+        switch source {
+        case .folderDefault: templateId = model.defaultTemplateID(for: kind, in: model.selectedFolderId)
+        case .blank: templateId = nil
+        case let .template(id): templateId = id
+        }
         Task {
-            if let templateId {
-                await flushRegistry.flushAll()
-                guard !model.hasFailedTemplateBodySave(templateId) else { return }
-            }
-            if let id = await model.newItem(kind: nav.windowKind, in: model.selectedFolderId, from: templateId) {
+            guard let id = await NewItemFlow.create(kind: kind, from: templateId, model: model,
+                                                    flushing: flushRegistry) else { return }
+            if kind == nav.windowKind {
                 nav.showingTemplates = false
                 nav.selection = [id]
+            } else {
+                model.openItem(id: id, block: nil)
             }
         }
     }

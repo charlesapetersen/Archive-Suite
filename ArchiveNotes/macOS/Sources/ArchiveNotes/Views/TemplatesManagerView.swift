@@ -14,6 +14,7 @@ struct TemplatesManagerView: View {
     @EnvironmentObject private var flushRegistry: EditorFlushRegistry
     @State private var showNew = false
     @State private var newName = ""
+    @State private var newKind: Item.Kind = .note
     @State private var renameID: UUID?
     @State private var renameText = ""
     @State private var deleteID: UUID?
@@ -45,13 +46,16 @@ struct TemplatesManagerView: View {
         .onChange(of: model.templates.map(\.id)) { _, ids in
             if let selected, !ids.contains(selected) { self.selected = nil }
         }
+        // The sheet asks which kind the template makes; it starts at this window's kind, in view, rather
+        // than taking that kind silently (W40.fix-notes-new-note, notes-1 row 43).
         .sheet(isPresented: $showNew) {
-            let kind = nav.windowKind
-            NameEntrySheet(title: "New Template",
-                           message: "Create a \(kind == .extract ? "extract" : "note") template.",
-                           confirmLabel: "Create", name: $newName) { name in
-                Task { if let id = await model.createTemplate(name: name, kind: kind) { selected = id } }
-            }
+            NameEntrySheet(title: "New Template", message: "A template starts each new note or extract made from it.",
+                           confirmLabel: "Create", name: $newName,
+                           onConfirm: { name in
+                               let kind = newKind
+                               Task { if let id = await model.createTemplate(name: name, kind: kind) { selected = id } }
+                           },
+                           accessory: AnyView(kindPicker))
         }
         .sheet(isPresented: boolBinding($renameID)) {
             let id = renameID
@@ -139,7 +143,16 @@ struct TemplatesManagerView: View {
         .padding()
     }
 
-    private func beginNew() { newName = "New Template"; showNew = true }
+    private func beginNew() { newName = "New Template"; newKind = nav.windowKind; showNew = true }
+
+    private var kindPicker: some View {
+        Picker("Makes", selection: $newKind) {
+            Text("Notes").tag(Item.Kind.note)
+            Text("Extracts").tag(Item.Kind.extract)
+        }
+        .pickerStyle(.segmented)
+        .accessibilityIdentifier("an.template.new.kind")
+    }
 
     private func boolBinding(_ id: Binding<UUID?>) -> Binding<Bool> {
         Binding(get: { id.wrappedValue != nil }, set: { if !$0 { id.wrappedValue = nil } })
