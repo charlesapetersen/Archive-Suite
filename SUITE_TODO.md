@@ -990,7 +990,6 @@ Design-level ideas the owner wants recorded but explicitly de-prioritised. An au
 
 ## Archive Notes — owner requests (2026-10-28)
 
-- [ ] **`W48.appearance-verify` — re-check the Appearance setting in all three apps at HEAD, by a session that did not build it [S]** (lane: suite) (uses: build,vm) (blocked-on: W48.appearance-processor, W48.appearance-notes, W48.appearance-reader) — Rule 6 and rule 7 of `execution-plans/verification-phase/01-daemon-plan.md`. Read the ledger rows the three items added and write each expected outcome from the promise before reading the code. At HEAD, in the VM, for each app: every value picked from Settings changes every open window at once, with a sheet or panel open; a relaunch restores it; System follows the guest; the UI-test argument still overrides it; the accessibility audit and visual review pass in Light and in Dark. Move each row to `works` with its evidence under `verification/evidence/<app>/`, or file `W40.fix-<app>-*` with a severity. The Notes and Processor guided-session packs (W40.g2, W40.g3) wait on this item.
 
 
 ## FarmShare extensions — owner, 2026-10-19

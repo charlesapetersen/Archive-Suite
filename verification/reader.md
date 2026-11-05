@@ -9,7 +9,7 @@ Format and statuses: [`README.md`](README.md). Written by `W40.b1`, 2026-10-12.
   `W23.m9`, `W24.jpeg1`, `W24.cal1-reader`, `W26.walk2`, `W14.2-fu`). `SPEC/tag-format.md` is the contract
   behind R-05 and R-45.
 - **Sources and code read at:** `caefe33a`.
-- **Count:** `unproven 36 · works 5 · broken 1 · fixed-pending-recheck 5 · dropped 1` (works: R-11, R-25, R-28, R-29, R-47; broken: R-21; fixed-pending-recheck: R-13, R-20, R-23, R-45, R-46; dropped: R-26). Updated by owner session reader-1, 2026-11-04 (R-21 to `broken`).
+- **Count:** `unproven 35 · works 6 · broken 1 · fixed-pending-recheck 5 · dropped 1` (works: R-11, R-25, R-28, R-29, R-47, R-48; broken: R-21; fixed-pending-recheck: R-13, R-20, R-23, R-45, R-46; dropped: R-26). Updated by `W48.appearance-verify`, 2026-11-04 (R-48 to `works`).
 
 **Runtime evidence, for every row below: none yet.** The W40.a3 full VM suite
 ([`evidence/reader/W40.a3-full-ui.md`](evidence/reader/W40.a3-full-ui.md), `a5ab9e3c`) passed every UITest
@@ -1061,8 +1061,9 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
   live in the navigation window, the Save Search sheet, Options and an open document viewer; System back; restored
   after a relaunch; the argument wins). `AccessibilityAuditUITests` and `VisualReviewUITests` gain `…BySetting` variants that force the
   mode through the setting (`LayoutGuard.dark/lightSettingArguments`).
-- **Runtime evidence:** none.
-- **Status:** `unproven`
+- **Runtime evidence:** [`evidence/reader/W48.appearance-verify.md`](evidence/reader/W48.appearance-verify.md) (VM, `57596365`).
+- **Status:** `works`
 - **History:**
   - 2026-10-31 W48.appearance-reader — row written, `unproven`. The builder's VM runs:
     [`evidence/reader/W48.appearance-reader.md`](evidence/reader/W48.appearance-reader.md).
+  - 2026-11-04 W48.appearance-verify — re-checked at HEAD in the VM by a session that did not build it: every promise holds, Light and Dark, by setting, with System seen under a Light and a Dark guest; the uncovered sheet, the viewer, the relaunch and the argument; audits and both tours pass. The check made two test fixes on the way (the tour's row click, the covered sheet). `works`: [`evidence/reader/W48.appearance-verify.md`](evidence/reader/W48.appearance-verify.md).

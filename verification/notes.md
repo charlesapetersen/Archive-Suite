@@ -13,7 +13,7 @@ Format and statuses: [`README.md`](README.md). Written by `W40.b2`, 2026-10-12.
   `W23.m9`/`-fu3`, `W23.m14`/`-fu`, `W37.dual-date`, `W24.cal1`, `W24.cal1-toggle`, `W24.cal1-validator`,
   and the W0–W8 records under §*Archive Notes — NEW APP*.
 - **Sources and code read at:** `9e8959ef`.
-- **Count:** `unproven 42 · works 7 · broken 0 · unreachable 0 · fixed-pending-recheck 3` (works: N-07, N-14, N-34, N-45, N-49, N-50, N-51; fixed-pending-recheck: N-12, N-41, N-44). Updated by `W40.fix-notes-jump-scroll-short`, 2026-11-04 (N-41 to `fixed-pending-recheck`).
+- **Count:** `unproven 41 · works 8 · broken 0 · unreachable 0 · fixed-pending-recheck 3` (works: N-07, N-14, N-34, N-45, N-49, N-50, N-51, N-52; fixed-pending-recheck: N-12, N-41, N-44). Updated by `W48.appearance-verify`, 2026-11-04 (N-52 to `works`).
 
 **Runtime evidence, for every row below: none yet.** The W40.a3 full VM suite
 ([`evidence/notes/W40.a3-full-ui.md`](evidence/notes/W40.a3-full-ui.md)) and the `W9.e2` runtime sweep passed
@@ -1500,18 +1500,19 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
   `BlockHeaderChipView.updateLayer`, a CGColor) and the Missing / Blocked image tiles
   (`Editor/InlineImageAttachment.swift`, a drawing-handler image); every other colour is a dynamic system colour.
 - **Real-path test:** `ArchiveNotesTests/NotesAppearanceSettingTests` (stored value and default, the UI-test reset,
-  the chip's fill in each appearance) and `ArchiveCoreTests/AppAppearanceTests` (unit).
+  the chip's fill in each appearance, the Missing and Blocked tiles drawn in each appearance) and `ArchiveCoreTests/AppAppearanceTests` (unit).
   `ArchiveNotesUITests/AppearanceSettingUITests` (VM: Light and Dark live in the note window, a sheet and Settings;
   System back; restored after a relaunch; the argument wins). `AccessibilityAuditUITests` and `VisualReviewUITests`
   gain `…BySetting` variants that force the mode through the setting (`LayoutGuard.dark/lightSettingArguments`).
-- **Runtime evidence:** none.
-- **Status:** `unproven`
+- **Runtime evidence:** [`evidence/notes/W48.appearance-verify.md`](evidence/notes/W48.appearance-verify.md) (VM, `57596365`).
+- **Status:** `works`
 - **History:**
   - 2026-10-30 W48.appearance-notes — row written, `unproven`. The builder's runs, in the VM:
     AppearanceSettingUITests 2/2, the by-setting audits and the four tours (two by setting) pass; the whole suite's
     other failures are W40.fix-notes-extract-authors-clear (filed) and the stacked narrow-and-tall sweep, which
     depended on test order and is fixed:
     [`evidence/notes/W48.appearance-notes.md`](evidence/notes/W48.appearance-notes.md).
+  - 2026-11-04 W48.appearance-verify — re-checked at HEAD in the VM by a session that did not build it: every promise holds, Light and Dark, by setting, with System seen under a Light and a Dark guest; the uncovered sheet, the relaunch and the argument; audits and both tours pass; the Missing and Blocked tiles gained a unit test that draws them in each appearance. `works`: [`evidence/notes/W48.appearance-verify.md`](evidence/notes/W48.appearance-verify.md).
 
 ---
 

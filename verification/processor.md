@@ -8,7 +8,7 @@ Format and statuses: [`README.md`](README.md). Written by `W40.b3`, 2026-10-21.
   checklist §2.0-2.14, Tier 2D driver list), `ArchiveProcessor/LIVE_CAPTURE_ANDROID_TEST.md` (Runs A-C, Mac side
   only), and `SPEC/tag-format.md` (§Invariants 3, 5, 6, 7 and §2-page PDF structure).
 - **Sources read at:** `8a03097c`; code traced at the same commit.
-- **Count:** `unproven 52 · works 1` (works: P-45, taken in from `W40.d6`).
+- **Count:** `unproven 51 · works 2` (works: P-45, taken in from `W40.d6`; P-53, `W48.appearance-verify`).
 
 **Order of work (rule 3).** The *Promise* and *Promised in* of every row were committed first, before any
 implementation file was opened (`d3db14f3`). The rest was traced afterwards by four read-only passes, and every
@@ -1127,11 +1127,12 @@ cover the Mac: the receiver, the tag card, the drain gate, staging, finalize and
   picks System) and `.testTheUITestArgumentStillWinsOverTheStoredChoice`; the `…BySetting` variants of
   `AccessibilityAuditUITests` and `VisualReviewUITests.testTour*`; `ArchiveCoreTests/AppAppearanceTests` (value,
   default, titles).
-- **Runtime evidence:** none (the builder's VM runs are not the independent check; `W48.appearance-verify` is).
-- **Status:** `unproven`
+- **Runtime evidence:** [`evidence/processor/W48.appearance-verify.md`](evidence/processor/W48.appearance-verify.md) (VM, `57596365`).
+- **Status:** `works`
 - **History:**
   - 2026-10-29 W48.appearance-processor — row written, `unproven`.
   - 2026-10-30 W48.appearance-processor — builder's VM runs green (AppearanceSettingUITests 2/2, whole suite 0 failures, the BySetting audit and tours); still `unproven` until W48.appearance-verify.
+  - 2026-11-04 W48.appearance-verify — re-checked at HEAD in the VM by a session that did not build it: every promise holds, Light and Dark, by setting, with System seen under a Light and a Dark guest; the History sheet, the relaunch and the argument; audits and both tours pass. `works`: [`evidence/processor/W48.appearance-verify.md`](evidence/processor/W48.appearance-verify.md).
 
 ## Source drift — doc against doc, for `W40.b5`
 

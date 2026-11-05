@@ -81,4 +81,44 @@ struct NotesAppearanceSettingTests {
             }
         }
     }
+
+    // W48.appearance-verify: the Missing and Blocked tiles are the other thing Notes draws itself, and no tour reaches
+    // one. The same shared image is drawn in Dark, Light and Dark again; its label and fill are label colours, so
+    // the drawn pixels are far lighter in Dark, and a tile drawn once into a bitmap would read the same in both.
+    @Test("the Missing and Blocked tiles are drawn in the appearance they are shown in")
+    func placeholderTilesFollowAppearance() throws {
+        for kind in [InlineImageAttachment.Placeholder.missing, .outOfBounds] {
+            let image = try #require(InlineImageAttachment(relativePath: "assets/gone.png", placeholder: kind).image)
+            var drawn: [Double] = []
+            for name in [NSAppearance.Name.darkAqua, .aqua, .darkAqua] {
+                drawn.append(try luminanceOfOpaquePixels(image, in: #require(NSAppearance(named: name))))
+            }
+            #expect(drawn[0] > drawn[1] + 0.3, "\(kind): Dark \(drawn[0]) should be far lighter than Light \(drawn[1])")
+            #expect(abs(drawn[2] - drawn[0]) < 0.01, "\(kind): Dark again \(drawn[2]) should match Dark \(drawn[0])")
+        }
+    }
+
+    /// The alpha-weighted mean luminance, 0 to 1, of `image` drawn into a clear 64×64 bitmap in `appearance`.
+    private func luminanceOfOpaquePixels(_ image: NSImage, in appearance: NSAppearance) throws -> Double {
+        let side = 64
+        let rep = try #require(NSBitmapImageRep(
+            bitmapDataPlanes: nil, pixelsWide: side, pixelsHigh: side, bitsPerSample: 8, samplesPerPixel: 4,
+            hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: side * 4, bitsPerPixel: 32))
+        let context = try #require(NSGraphicsContext(bitmapImageRep: rep))
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = context
+        appearance.performAsCurrentDrawingAppearance {
+            image.draw(in: NSRect(x: 0, y: 0, width: side, height: side))
+        }
+        context.flushGraphics()
+        NSGraphicsContext.restoreGraphicsState()
+        let data = try #require(rep.bitmapData)
+        var light = 0.0, alpha = 0.0
+        for i in stride(from: 0, to: side * side * 4, by: 4) {
+            // Premultiplied, so the colour channels already carry the alpha weighting.
+            light += 0.2126 * Double(data[i]) + 0.7152 * Double(data[i + 1]) + 0.0722 * Double(data[i + 2])
+            alpha += Double(data[i + 3])
+        }
+        return alpha > 0 ? light / alpha : 0
+    }
 }
