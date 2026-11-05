@@ -794,9 +794,10 @@ def holds(region, c):
     return S.inside(c, region['box'])
 
 
-def grouping(t, tl_words, regions):
+def grouping(t, tl_words, regions, only=None):
     """Per scored truth line: `whole` when one region holds the centres of all its scored words, `alone` when that
-    region also holds no scored word of another truth line; and the truth words in no region at all."""
+    region also holds no scored word of another truth line; and the truth words in no region at all. With `only`,
+    just those lines are counted, while `alone` still sees every line of tl_words as a neighbour (P7-7)."""
     centre = {}
     for L, ws in tl_words.items():
         for i in ws:
@@ -808,13 +809,15 @@ def grouping(t, tl_words, regions):
         for i in ws:
             for k in home[i]:
                 owners[k].add(L)
+    counted = {L: ws for L, ws in tl_words.items() if only is None or L in only}
     whole = alone = 0
-    for L, ws in tl_words.items():
+    for L, ws in counted.items():
         common = set(home[ws[0]]).intersection(*(set(home[i]) for i in ws[1:]))
         whole += bool(common)
         alone += any(owners[k] == {L} for k in common)
-    return {'lines': len(tl_words), 'whole': whole, 'alone': alone,
-            'words': len(centre), 'outside': sum(1 for i in home if not home[i])}
+    mine = {i for ws in counted.values() for i in ws}
+    return {'lines': len(counted), 'whole': whole, 'alone': alone,
+            'words': len(mine), 'outside': sum(1 for i in mine if not home[i])}
 
 
 def block_text(t, blocks):
@@ -855,13 +858,16 @@ def cmd_boxes(a):
     truth toward them); the unfolded one (no rulings); and the unfolded lines the fold left alone (not merged,
     split or left out), on which the two truths agree."""
     R = rulings()
-    rows, offs = [], []
+    rows, offs, join_detail = [], [], {}
     for t in typed_pages():
         folded, _ = G.fold_lines(t, R)
         tlw = scored_line_words(t, folded)
         unfolded, _ = G.fold_lines(t, {})
         tlw_un = scored_line_words(t, unfolded)
         tlw_alone = {L: ws for L, ws in tlw_un.items() if folded.get(L) == unfolded[L]}
+        joins = [k.split('+') for k in folded if '+' in k]
+        join_detail[t['page']] = {'groups': len(joins), 'members': sum(len(m) for m in joins),
+                                  'members_unscored': sum(1 for m in joins for L in m if L not in tlw_un)}
         offs += nemotron_check(t['page'])
         sources = {f'vision-{api}': [{'box': l['box'], 'baseline': l['baseline']} for l in hyp(api, t)['lines']]
                    for api in ('accurate', 'documents')}
@@ -874,14 +880,15 @@ def cmd_boxes(a):
                 continue
             row = {'page': t['page'], 'kind': t['kind'], 'source': name, 'regions': len(regs),
                    **grouping(t, tlw, regs), 'unfolded': grouping(t, tlw_un, regs),
-                   'untouched': grouping(t, tlw_alone, regs)}
+                   'untouched': grouping(t, tlw_alone, regs),
+                   'untouched_in_unfolded': grouping(t, tlw_un, regs, only=set(tlw_alone))}
             if name.startswith(('vision', 'blla', 'ppocr')):
                 row['baseline'] = S.baseline_scores(t, {'lines': [r for r in regs if r.get('baseline')]})
             else:
                 row.update(block_text(t, regs))
             rows.append(row)
     med = ([statistics.median(o[0] for o in offs), statistics.median(o[1] for o in offs)] if offs else None)
-    (CACHE / 'boxes-rows.json').write_text(json.dumps({'rows': rows, 'nemotron_check': {
+    (CACHE / 'boxes-rows.json').write_text(json.dumps({'rows': rows, 'join_detail': join_detail, 'nemotron_check': {
         'pairs': len(offs), 'median_dx_dy': med,
         'within_0.02': sum(1 for o in offs if abs(o[0]) <= 0.02 and abs(o[1]) <= 0.02)}}) + '\n')
     print(len(rows), 'rows; nemotron vs unlimited', len(offs), med)

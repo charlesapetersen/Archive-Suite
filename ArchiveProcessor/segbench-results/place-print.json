@@ -1,5 +1,7 @@
 {
- "acrobat": {},
+ "acrobat": {
+  "checked": false
+ },
  "arms": {
   "all/aligned:gemini3.8-flash": {
    "broken": 110,
@@ -712,6 +714,11 @@
    "merged": 50,
    "split": 0
   },
+  "join_detail": {
+   "groups": 38,
+   "members": 88,
+   "members_unscored": 30
+  },
   "nemotron-parse-2": {
    "alone": 167,
    "baseline_F": null,
@@ -763,6 +770,15 @@
      22.582253240279172
     ],
     "lines": 1732
+   },
+   "untouched_in_unfolded": {
+    "alone": 1334,
+    "delta_vs_vision": [
+     10.796766743648956,
+     -2.73615635179153,
+     22.96089385474861
+    ],
+    "lines": 1732
    }
   },
   "truths/nemotron-parse-2": {
@@ -790,6 +806,15 @@
      -56.812933025404156,
      -66.97009102730819,
      -46.36642784032754
+    ],
+    "lines": 1732
+   },
+   "untouched_in_unfolded": {
+    "alone": 166,
+    "delta_vs_vision": [
+     -56.63972286374134,
+     -66.90140845070422,
+     -46.23205741626794
     ],
     "lines": 1732
    }
@@ -821,6 +846,15 @@
      30.85163363685056
     ],
     "lines": 1732
+   },
+   "untouched_in_unfolded": {
+    "alone": 1524,
+    "delta_vs_vision": [
+     21.76674364896074,
+     13.185378590078333,
+     31.161290322580648
+    ],
+    "lines": 1732
    }
   },
   "truths/unlimited-ocr": {
@@ -850,6 +884,15 @@
      -41.52585765488991
     ],
     "lines": 1652
+   },
+   "untouched_in_unfolded": {
+    "alone": 225,
+    "delta_vs_vision": [
+     -54.47941888619854,
+     -66.79744973025993,
+     -41.26582278481013
+    ],
+    "lines": 1652
    }
   },
   "truths/vision-accurate": {
@@ -863,6 +906,10 @@
    },
    "untouched": {
     "alone": 1153,
+    "lines": 1732
+   },
+   "untouched_in_unfolded": {
+    "alone": 1147,
     "lines": 1732
    }
   },
@@ -891,6 +938,15 @@
      -8.314087759815248,
      -13.056379821958453,
      -3.8105606967882455
+    ],
+    "lines": 1732
+   },
+   "untouched_in_unfolded": {
+    "alone": 1003,
+    "delta_vs_vision": [
+     -8.314087759815248,
+     -13.172966781214202,
+     -3.6923076923076947
     ],
     "lines": 1732
    }

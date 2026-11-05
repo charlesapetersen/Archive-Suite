@@ -271,12 +271,12 @@ def writer_tables(rows, vrows):
 
 def acrobat_tables(cache: Path):
     """The owner's Acrobat Reader check (place_print.py acrobat): his answers.json against the blind key."""
-    md, js = ['## Acrobat Reader, the owner\'s check (test 5, fifth viewer)\n'], {}
+    md, js = ['## Acrobat Reader (test 5, fifth viewer)\n'], {}
     ans, key = cache / 'acrobat' / 'answers.json', cache / 'acrobat-key.json'
     if not ans.exists():
-        md.append('Not answered yet: the sheet is `acrobat/index.html` in the bench cache, gate '
-                  '`W46.place-print-acrobat-owner-ok`.\n')
-        return md, js
+        md.append('Not checked, by owner decision (2026-11-04, `W46.place-print-acrobat-owner-ok`): few users read in '
+                  'Acrobat Reader, so it is not a viewer the app targets. The sheet was built and never answered.\n')
+        return md, {'checked': False}
     a, k = json.loads(ans.read_text()), json.loads(key.read_text())
     md.append('Five writer pages (p002, p024, p087 typewritten; p078, p081 clippings), each design under a blind name; '
               'ten Find words and two whole-line drags a PDF, ticked by the owner in Adobe Acrobat Reader.\n')
@@ -344,41 +344,50 @@ def box_tables(d):
     fs = collections.Counter()
     for v in fold.values():
         fs.update(v)
+    jd = collections.Counter()
+    for v in (d.get('join_detail') or {}).values():
+        jd.update(v)
     md.append('### The same grouping on the unfolded truth, and on the lines the fold left alone\n')
     md.append('The owner\'s line rulings (W46.place-lines-owner-ok) were asked only where blla and PP-OCRv6 det both '
               'grouped a place differently from the truth, so folding them can only move the truth toward those two '
-              f'detectors: {fs["merged"]} merges and {fs["left_out"]} truth lines left out, {fs["split"]} splits, on '
+              f'detectors: {fs["merged"]} joins ({jd["members"]} typed lines into {jd["groups"]}; '
+              f'{jd["members_unscored"]} single-word members unscored) and {fs["left_out"]} truth lines left out, '
+              f'{fs["split"]} splits, on '
               f'{sum(1 for v in fold.values() if any(v.values()))} pages. `folded` is the table above; `unfolded` the '
               'truth lines as typed, before any ruling; `untouched` the unfolded lines no ruling merged, split or left '
-              'out, on which the two truths agree. Δ is against Vision\'s `accurate` lines on the same truth, paired '
-              'over the 40 pages.\n')
+              'out, on which the two truths agree, judged with the touched lines removed; `untouched, among all` the same '
+              'lines judged inside the unfolded truth, every typed line still a neighbour that can spoil `alone` '
+              '(P7-7). Δ is against Vision\'s `accurate` lines on the same truth, paired over the 40 pages.\n')
     md.append('| source | folded: lines | whole and alone % | Δ vs Vision (95% CI) | unfolded: lines | '
-              'whole and alone % | Δ vs Vision (95% CI) | untouched: lines | whole and alone % | Δ vs Vision (95% CI) |')
-    md.append('|---|---:|---:|---|---:|---:|---|---:|---:|---|')
+              'whole and alone % | Δ vs Vision (95% CI) | untouched: lines | whole and alone % | Δ vs Vision (95% CI) | '
+              'untouched, among all: whole and alone % | Δ vs Vision (95% CI) |')
+    md.append('|---|---:|---:|---|---:|---:|---|---:|---:|---|---:|---|')
     base = {r['page']: r for r in rows if r['source'] == 'vision-accurate'}
     for src in ('vision-accurate', 'vision-documents', 'blla', 'ppocrv6', 'unlimited-ocr', 'nemotron-parse-2'):
         rs = [r for r in rows if r['source'] == src and r['page'] in base and 'unfolded' in r]
         if not rs:
             continue
         cells, jv = [], {}
-        for truth in ('folded', 'unfolded', 'untouched'):
+        for truth in ('folded', 'unfolded', 'untouched', 'untouched_in_unfolded'):
             g = (lambda r: r) if truth == 'folded' else (lambda r, k=truth: r[k])
             n = sum(g(r)['lines'] for r in rs)
             a = sum(g(r)['alone'] for r in rs)
             bn = sum(g(base[r['page']])['lines'] for r in rs)
             ba = sum(g(base[r['page']])['alone'] for r in rs)
             jv[truth] = {'lines': n, 'alone': a}
+            lead = '' if truth == 'untouched_in_unfolded' else f'{n} | '   # same lines as `untouched`
             if src == 'vision-accurate':
-                cells.append(f'{n} | {pct(a, n)} | —')
+                cells.append(f'{lead}{pct(a, n)} | —')
                 continue
             dd = 100 * (a / n - ba / bn)
             ci = boot([(g(r)['alone'], g(r)['lines'], g(base[r['page']])['alone'], g(base[r['page']])['lines'])
                        for r in rs], 'alone', 'lines')
             jv[truth]['delta_vs_vision'] = [dd, *ci]
-            cells.append(f'{n} | {pct(a, n)} | {fmt_ci(dd, *ci)}')
+            cells.append(f'{lead}{pct(a, n)} | {fmt_ci(dd, *ci)}')
         js[f'truths/{src}'] = jv
         md.append(f'| {src} | ' + ' | '.join(cells) + ' |')
     js['fold_counts'] = dict(fs)
+    js['join_detail'] = dict(jd)
     md.append('')
     return md, js
 

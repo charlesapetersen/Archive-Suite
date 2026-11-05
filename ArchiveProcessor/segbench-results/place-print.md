@@ -47,7 +47,8 @@ Gap audit §5 item 21 (`execution-plans/processing-review/10-gap-audit.md`), F-p
   31.8% in pdf.js (14.8% on the clippings), because pdf.js ends a line between words whose baselines step up a sloped
   line. poppler `pdftotext` is the weak viewer for all three (38-65%), welding a few words a thousand. The PDFKit drag
   is 64-68% strict on typewritten and 39-44% on clippings for all three; the per-word design costs 0.4 MB a page more.
-  Nothing here argues for leaving the lab's writer. Acrobat Reader is the owner's check (below).
+  Nothing here argues for leaving the lab's writer. Acrobat Reader was not checked, by owner decision (2026-11-04):
+  few users read in it, so it is not a viewer the app targets.
 - **PDF/A.** Once declared PDF/A-2 (the XMP `pdfaid` entries and an sRGB output intent, which the lab writer's PDFs lack
   today), every PDF of every design passes veraPDF 1.30 for PDF/A-2b (50 of 50). For PDF/A-2u, 19 of the 20 `lab`
   PDFs pass, all 15 OCRmyPDF ones, and 11 of the 15 per-word ones. All five failures are one rule, 6.2.11.7.2-1 (a
@@ -55,13 +56,6 @@ Gap audit §5 item 21 (`execution-plans/processing-review/10-gap-audit.md`), F-p
   is a font fallback: for symbols Vision misread (★, ₴) Core Text embedded a Hiragino CID font with no map and a
   Helvetica subset whose own map lacks ₴. So PDF/A-2u is within reach of the lab writer: declare it, and write a
   complete ToUnicode map, or keep the invisible layer's text inside the layer font's repertoire.
-
-## Still open
-
-- **The owner's Acrobat Reader check** (F test 5's fifth viewer): five writer pages, each in all three designs under
-  blind names, ten Find words and two line drags each, about 20 minutes. Sheet:
-  `~/Library/Caches/ArchiveSuiteRehearsal/place-print/acrobat/index.html` (the key is `acrobat-key.json` beside the
-  folder, not in it). Gate `W46.place-print-acrobat-owner-ok`; this item is completed once his answers are scored.
 
 <!-- tables -->
 ## Vision's own word and line boxes against the truth (test 2)
@@ -167,9 +161,9 @@ veraPDF 1.30 over each PDF made a PDF/A-2 candidate (XMP `pdfaid` part 2, confor
 | ocrmypdf | 15 | 15 | 15 | not needed | none |
 | words | 15 | 15 | 11 | 4 of 4 | 6.2.11.7.2-1 |
 
-## Acrobat Reader, the owner's check (test 5, fifth viewer)
+## Acrobat Reader (test 5, fifth viewer)
 
-Not answered yet: the sheet is `acrobat/index.html` in the bench cache, gate `W46.place-print-acrobat-owner-ok`.
+Not checked, by owner decision (2026-11-04, `W46.place-print-acrobat-owner-ok`): few users read in Acrobat Reader, so it is not a viewer the app targets. The sheet was built and never answered.
 
 ## The box-emitting readers and the open detectors beside Vision (test 7)
 
@@ -186,16 +180,16 @@ The 40 owner-typed pages, the same folded truth lines. A truth line is `whole` w
 
 ### The same grouping on the unfolded truth, and on the lines the fold left alone
 
-The owner's line rulings (W46.place-lines-owner-ok) were asked only where blla and PP-OCRv6 det both grouped a place differently from the truth, so folding them can only move the truth toward those two detectors: 50 merges and 24 truth lines left out, 0 splits, on 11 pages. `folded` is the table above; `unfolded` the truth lines as typed, before any ruling; `untouched` the unfolded lines no ruling merged, split or left out, on which the two truths agree. Δ is against Vision's `accurate` lines on the same truth, paired over the 40 pages.
+The owner's line rulings (W46.place-lines-owner-ok) were asked only where blla and PP-OCRv6 det both grouped a place differently from the truth, so folding them can only move the truth toward those two detectors: 50 joins (88 typed lines into 38; 30 single-word members unscored) and 24 truth lines left out, 0 splits, on 11 pages. `folded` is the table above; `unfolded` the truth lines as typed, before any ruling; `untouched` the unfolded lines no ruling merged, split or left out, on which the two truths agree, judged with the touched lines removed; `untouched, among all` the same lines judged inside the unfolded truth, every typed line still a neighbour that can spoil `alone` (P7-7). Δ is against Vision's `accurate` lines on the same truth, paired over the 40 pages.
 
-| source | folded: lines | whole and alone % | Δ vs Vision (95% CI) | unfolded: lines | whole and alone % | Δ vs Vision (95% CI) | untouched: lines | whole and alone % | Δ vs Vision (95% CI) |
-|---|---:|---:|---|---:|---:|---|---:|---:|---|
-| vision-accurate | 1770 | 66.0 | — | 1814 | 64.1 | — | 1732 | 66.6 | — |
-| vision-documents | 1770 | 57.7 | -8.4 (-13.0 to -3.8) | 1814 | 56.0 | -8.0 (-12.5 to -3.7) | 1732 | 58.3 | -8.3 (-13.1 to -3.8) |
-| blla | 1770 | 77.5 | +11.5 (-2.2 to +23.7) | 1814 | 74.5 | +10.4 (-2.6 to +22.1) | 1732 | 77.1 | +10.5 (-2.9 to +22.6) |
-| ppocrv6 | 1770 | 88.2 | +22.2 (+13.4 to +31.6) | 1814 | 85.0 | +20.9 (+12.6 to +30.0) | 1732 | 88.0 | +21.4 (+12.9 to +30.9) |
-| unlimited-ocr | 1690 | 13.5 | -54.4 (-66.7 to -41.4) | 1734 | 13.0 | -52.8 (-64.6 to -40.3) | 1652 | 13.8 | -54.7 (-66.9 to -41.5) |
-| nemotron-parse-2 | 1770 | 9.4 | -56.6 (-66.8 to -46.3) | 1814 | 9.2 | -54.9 (-64.6 to -45.0) | 1732 | 9.8 | -56.8 (-67.0 to -46.4) |
+| source | folded: lines | whole and alone % | Δ vs Vision (95% CI) | unfolded: lines | whole and alone % | Δ vs Vision (95% CI) | untouched: lines | whole and alone % | Δ vs Vision (95% CI) | untouched, among all: whole and alone % | Δ vs Vision (95% CI) |
+|---|---:|---:|---|---:|---:|---|---:|---:|---|---:|---|
+| vision-accurate | 1770 | 66.0 | — | 1814 | 64.1 | — | 1732 | 66.6 | — | 66.2 | — |
+| vision-documents | 1770 | 57.7 | -8.4 (-13.0 to -3.8) | 1814 | 56.0 | -8.0 (-12.5 to -3.7) | 1732 | 58.3 | -8.3 (-13.1 to -3.8) | 57.9 | -8.3 (-13.2 to -3.7) |
+| blla | 1770 | 77.5 | +11.5 (-2.2 to +23.7) | 1814 | 74.5 | +10.4 (-2.6 to +22.1) | 1732 | 77.1 | +10.5 (-2.9 to +22.6) | 77.0 | +10.8 (-2.7 to +23.0) |
+| ppocrv6 | 1770 | 88.2 | +22.2 (+13.4 to +31.6) | 1814 | 85.0 | +20.9 (+12.6 to +30.0) | 1732 | 88.0 | +21.4 (+12.9 to +30.9) | 88.0 | +21.8 (+13.2 to +31.2) |
+| unlimited-ocr | 1690 | 13.5 | -54.4 (-66.7 to -41.4) | 1734 | 13.0 | -52.8 (-64.6 to -40.3) | 1652 | 13.8 | -54.7 (-66.9 to -41.5) | 13.6 | -54.5 (-66.8 to -41.3) |
+| nemotron-parse-2 | 1770 | 9.4 | -56.6 (-66.8 to -46.3) | 1814 | 9.2 | -54.9 (-64.6 to -45.0) | 1732 | 9.8 | -56.8 (-67.0 to -46.4) | 9.6 | -56.6 (-66.9 to -46.2) |
 
 <!-- /tables -->
 
@@ -214,10 +208,13 @@ The owner's line rulings (W46.place-lines-owner-ok) were asked only where blla a
     shared, and the comparison between them is not affected.
   - The fold favours the open detectors (test 7). W46.place-lines-owner-ok asked the owner only about places where
     blla and PP-OCRv6 det both grouped differently from the truth (`place-truth-lines.md`: their agreement is the
-    filter), and his rulings were folded as 50 merges and 24 truth lines left out, no splits, on 11 pages; each can
-    only move the truth toward the two detectors, and at the Vision-derived join places away from Vision. Test 7 is
-    therefore also reported on the unfolded truth and on the lines the fold left alone (its second table); every
-    verdict holds on both, and the fold accounts for about 1 point of PP-OCRv6 det's lead. PP-OCRv6 det's lines are
+    filter), and his rulings were folded as 50 joins (88 typed lines into 38; 30 single-word members unscored) and 24
+    truth lines left out, no splits, on 11 pages; each can only move the truth toward the two detectors. Measured,
+    the fold also raised Vision's whole-and-alone share, from 64.1% to 66.0%, so its net effect was toward Vision
+    too, not away from it. Test 7 is therefore also reported on the unfolded truth and on the lines the fold left
+    alone (its second table), the latter judged both with the touched lines removed and inside the unfolded truth
+    (PP-OCRv6 det +21.4 and +21.8, blla +10.5 and +10.8); every verdict holds on each, and the fold accounts for
+    about 1 point of PP-OCRv6 det's lead. PP-OCRv6 det's lines are
     its pieces joined across gaps up to half a row's height (`place_truth_lines.py` JOIN_GAP 0.5), a rule set for the
     rulings sheet on these same 40 pages and not fitted to test 7; Vision's and blla's lines are used as they come.
     The fold is applied in every test, but test 3's arms all sit on Vision's lines, so it does not move them apart.
@@ -225,7 +222,7 @@ The owner's line rulings (W46.place-lines-owner-ok) were asked only where blla a
     or selection score.
 - **Selection.** Every audited-ok placement-truth page; no route chose a page. The writer pages: every second
   non-clipping typewritten page in page order, plus the five clippings; the veraPDF extras the next five by the same
-  rule; the Acrobat pages three of the writer pages and two clippings, fixed in the script. No ABBYY text was used.
+  rule; the Acrobat sheet's pages (built, never answered) three of the writer pages and two clippings, fixed in the script. No ABBYY text was used.
 - **Comparison.** One saved Vision reading per page and API; every aligned arm uses the same Vision lines, the lab's
   own aligner and writer, the same PDFKit drag from each truth line's first ink to its last, and the same scored line
   set (truth lines of two or more scored words, under 45° off level). The writers lay the same Vision words.
@@ -241,7 +238,7 @@ The owner's line rulings (W46.place-lines-owner-ok) were asked only where blla a
 - **Scope.** Print only (hands are W46.place-hands and W46.place-hands-lines). PDFKit is the only drag; poppler,
   mupdf and pdf.js are scored by their text extraction, which is what their selection and copy return, not by a
   pointer drag. A real user's drag varies more than one from first ink to last. The anchor share is an exact-equality
-  approximation of the lab's anchors, which it does not report. It does not settle Acrobat Reader (the owner's check),
+  approximation of the lab's anchors, which it does not report. It does not settle Acrobat Reader (not checked, by owner decision),
   the straightened reading copy (W46.place-geom), or why 46% of the typed lines fail on Vision's own layer, which is the
   line geometry: Vision's line boxes join or split a truth line (34% of lines are not held whole and alone by one Vision
   line), and PP-OCRv6 det's lines are the measured candidate for that.
