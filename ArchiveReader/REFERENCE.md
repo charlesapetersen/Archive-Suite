@@ -294,6 +294,11 @@ writes against the real corpus — always a copy.
 - `⌥⌘L` Edit ▸ Copy Archive Link to This Page (`⌘L` and `⌘⇧L` are the nav window's). Both copies of what is
   on screen sit under Edit, beside Copy, since `W40.fix-reader-edit-menu-copy` (they were under Document)
 - `⌘F` find in the open document(s) · `⌘G`/`⇧⌘G` next/previous match (highlight-all, wraps, "N of M" across open docs)
+- The **Tags** menu acts on the file the window shows (`W40.fix-reader-menus-follow-window`): `⌘R`/`⌘U`, `⌘I` (the
+  editor sheet opens over this window, pinned to that file), `⌘⇧F`, and `⌘⇧M`, which marks it Read and moves on to
+  the window's next Unread file. `⌘Z` undoes the newest change on the shared ledger, which may be on another file,
+  so the status line names it; it is off while the find field or the tag editor has the keyboard. Rename Tag… and
+  Find Similar Tags… open over the navigation window. Hide Sidebar / Hide Tag Cloud are not listed here.
 - `⌘,` Options (both windows)
 
 *Preview sheet* (opened by `Space`/`⌘Y`)
@@ -484,7 +489,9 @@ Views/
   RenameTagSheet.swift        Corpus-wide tag rename (D1): shows the affected-file count; via TagWriter batch.
   SimilarTagsSheet.swift      Near-duplicate tag finder (TagSimilarity clusters): pick a canonical +
                               Merge drives the corpus-wide rename (→ RenameTagSheet → TagWriter). Advisory only.
-  TagEditorView.swift         Group-aware tag editor sheet (⌘I).
+  TagEditorView.swift         Group-aware tag editor sheet (⌘I); `targetPaths` = the document window's file.
+  DocumentTagActions.swift    The Tags menu in the document window: the open file, via NavigationModel's
+                              TagWriter actions (`paths:`), checks and undo ledger; no write path of its own.
   OptionsView.swift           Settings form (⌘,), @AppStorage (incl. list font size).
   DocumentViewerModel.swift   Loads the selection; page cycling; focused-pane zoom; plain + intelligent copy;
                               in-viewer find state (⌘F) — scans open docs, drives FindNavigator, applies matches.
