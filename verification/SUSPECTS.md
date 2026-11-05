@@ -19,9 +19,10 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
   type "abc", press ⌘Z, then read that file's tags back from disk. Confirmed if it is `Unread` again or the
   status line says "Undid".
 - **Would clear it:** the same run leaves the file `Read` and only removes the typed text.
-- **Status:** `open`
+- **Status:** `reproduced`
 - **History:**
   - 2026-10-12 W40.b1 — raised.
+  - 2026-11-04 owner session reader-1 — reproduced by hand on a session copy of the sample ([`sessions/reader-1-returned.md`](sessions/reader-1-returned.md) row 32): typing in the file-name filter, then ⌘Z, undid the last tag change and left the typing. Filed as `W40.fix-reader-undo-focus` (S2, Tier-2).
 
 ### S-002 · Reader's viewer, preview or thumbnails may download a cloud placeholder
 
@@ -439,7 +440,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Would confirm it:** on a simulator with a camera stand-in, or the borrowed phone (`W40.i4`), capture one portrait
   and one landscape page and check the first bytes (`FF D8 FF`) and the EXIF orientation of what reaches the Mac.
 - **Would clear it:** both files are JPEG and both read upright on the Mac.
-- **Status:** `confirmed` (orientation) · format cleared
+- **Status:** `reproduced` (orientation) · format cleared
 - **History:**
   - 2026-10-21 W40.i2 — raised.
   - 2026-10-31 owner session iphone-1, task 6 (`sessions/iphone-1-returned.md`) — format cleared: both files `ffd8ff`.
@@ -459,7 +460,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Would confirm it:** in the `W40.i3` simulator E2E, background the app during a multi-page upload and record
   whether in-flight requests fail.
 - **Would clear it:** the uploads finish while the app is in the background.
-- **Status:** `confirmed` (expected behaviour; no fix filed)
+- **Status:** `reproduced` (expected behaviour; no fix filed)
 - **History:**
   - 2026-10-21 W40.i2 — raised.
   - 2026-10-23 W40.i-sim-ui — narrowed in the simulator: with three unsent pages and the Mac down, the app was sent to

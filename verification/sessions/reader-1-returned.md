@@ -21,7 +21,7 @@ the pack.
 
 Severity as the owner gave it; "not given" where he gave none. **Owner, at the end of the session: "Everything
 I've mentioned here should be fixed."** So the rows marked *design* below are decided, not questions for the Daemon
-Report, with one exception (row 24, Notes in the Reader). Bracketed text is what the session found in the code or
+Report. Row 24, Notes in the Reader, was put to him at filing: remove them, keep the flag. Bracketed text is what the session found in the code or
 told him.
 
 | # | Task | What I expected | What happened | B / A / C / ? |
@@ -49,8 +49,8 @@ told him.
 | 21 | 4 | Redo after undoing a Read change | Undo works; there is no Redo | design |
 | 22 | 4 | To see the Provenance column filled | Empty for every file [expected: the corpus predates the apps, so its PDFs carry no page-2 classification header. A column that is blank for most users' existing material needs a rethink] | design |
 | 23 | 4 | Toggle Flag (⇧⌘F) to show a flag | Doesn't appear to do anything | not given (reproduce: likely bug) |
-| 24 | 4 | To know what Notes are and where they appear | Unclear [app-side notes and flags in `NotesStore`, never written to the file; a note shows only in Edit Tags…]. **Owner: "I don't know that I asked for Notes to be created here and I'm not sure I actually want them. We have an entire Notes program for a reason."** | **open question (Daemon Report)** |
-| 25 | 4 | A note to save itself as it's typed | It needs a click on "Save note" | design (moot if 24 removes notes) |
+| 24 | 4 | To know what Notes are and where they appear | Unclear [app-side notes and flags in `NotesStore`, never written to the file; a note shows only in Edit Tags…]. **Owner: "I don't know that I asked for Notes to be created here and I'm not sure I actually want them. We have an entire Notes program for a reason."** | decided: remove (owner, 2026-11-04, asked at filing) |
+| 25 | 4 | A note to save itself as it's typed | It needs a click on "Save note" | dropped with row 24 |
 | 26 | 5 | A slider on the tag cloud to set the minimum count a tag needs to be shown | No such control | design |
 | 27 | 5 | Edit Tags to say "Tags", and the app to call them tags everywhere | The sheet labels them "Subjects" | design |
 | 28 | 5 | Tags to autocomplete in Edit Tags | They don't (they do in the list's tag field) | design |
@@ -83,7 +83,9 @@ Then the rest.
 
 The pack's filing rules apply, with the owner's call above changing one of them: a *design* row is filed as a
 `W40.fix-reader-<slug>` item (or a feature item where it is new work, e.g. rows 12, 26, 33), not as a Daemon Report
-question. Only row 24 goes to the Daemon Report. Rows 10, 11, 18 and 23 need a reproduction first; if one cannot be
+question. Row 24 was answered at filing (remove the Reader's notes), so nothing goes to the Daemon Report. Rows 10, 11, 18 and 23 need a reproduction first; if one cannot be
 reproduced it becomes a `SUSPECTS.md` entry ("Raised: owner session reader-1"). Row 32 closes `S-001` as confirmed and
 is filed as a fix on an irreversible path. Row 30 is a shared-contract change. Order the items by the owner's
-priority list. `reader-session-1/` is kept until the notes are filed.
+priority list.
+
+**Filed 2026-11-04** as 26 items in `SUITE_TODO.md` §W40, in the owner's order (`W40.fix-reader-prose-paragraphs` first, `W40.g1-reader-2` last). The owner had the session copy deleted at filing; it is in the Trash.

@@ -9,7 +9,7 @@ Format and statuses: [`README.md`](README.md). Written by `W40.b1`, 2026-10-12.
   `W23.m9`, `W24.jpeg1`, `W24.cal1-reader`, `W26.walk2`, `W14.2-fu`). `SPEC/tag-format.md` is the contract
   behind R-05 and R-45.
 - **Sources and code read at:** `caefe33a`.
-- **Count:** `unproven 36 · works 6 · broken 0 · fixed-pending-recheck 5 · dropped 1` (works: R-11, R-21, R-25, R-28, R-29, R-47; fixed-pending-recheck: R-13, R-20, R-23, R-45, R-46; dropped: R-26). Updated by `W40.fts-snippet-sample-rerun`, 2026-10-31 (R-11 to `works`).
+- **Count:** `unproven 36 · works 5 · broken 1 · fixed-pending-recheck 5 · dropped 1` (works: R-11, R-25, R-28, R-29, R-47; broken: R-21; fixed-pending-recheck: R-13, R-20, R-23, R-45, R-46; dropped: R-26). Updated by owner session reader-1, 2026-11-04 (R-21 to `broken`).
 
 **Runtime evidence, for every row below: none yet.** The W40.a3 full VM suite
 ([`evidence/reader/W40.a3-full-ui.md`](evidence/reader/W40.a3-full-ui.md), `a5ab9e3c`) passed every UITest
@@ -436,7 +436,7 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
 - **Real-path test:** `ArchiveReaderUITests/TriageJourneyUITests.testTriageWritesKeepEveryOtherTagColourAndByte` (steps 5a, 5b), through `undoLast`. At the writer level, `ArchiveReaderTests/TagWriterTests.testOccurrenceUndoPreservesConcurrentUnrelatedTag`
   and `.testOccurrenceInverseRestoresDuplicateTag` test the writer's inverse.
 - **Runtime evidence:** 2026-10-15 · `f5c31a95` · [`evidence/reader/W40.d8-triage.md`](evidence/reader/W40.d8-triage.md): one ⌘Z undid a three-file rename as one step, a second ⌘Z undid the three-file group edit, and the tags after the first undo equalled those before the rename. Every other file stayed byte-identical.
-- **Status:** `works`
+- **Status:** `broken`
 - **History:**
   - 2026-10-12 W40.b1 — row written, `unproven`.
   - 2026-10-15 W40.d8 — `works` (both runs).
@@ -451,6 +451,7 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
     failure. The row stays `works` for what it promises (the inverse delta, one step per batch); the §6
     refusal is R-45's safety promise, and the fix is recorded there too.
   - `S-001`: ⌘Z may fire Undo Tag Change while a text field has focus.
+  - 2026-11-04 owner session reader-1 — `broken`: ⌘Z with the caret in the file-name filter undid the last tag change instead of the typing (suspect S-001 confirmed); after a relaunch ⌘Z did nothing until the list was clicked. Fix item `W40.fix-reader-undo-focus`.
 
 ### R-22 · Tag editor sheet
 
