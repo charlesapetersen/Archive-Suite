@@ -210,6 +210,12 @@ record:
   Sherlock and Apple Vision on the Mac, each paired against its own plain image, and the capture-time signals' AUC
   against a 5-point loss. A section of its own with a reader picker; the defect images are degraded inputs, not
   routes, so none enters the OCR charts. Group tables are in `capture-ladder.md`.
+- `rotation-routes.json` (`scripts/segbench/rotation_routes.py report`, W46.rotation-routes): every rotation route
+  on the 96 and 20 pages each of six public strata, each turned four ways. The routes are local Vision as shipped,
+  llmSingle and llmMajority (Gemini 3.7 Flash through the gateway), PP-LCNet doc_ori, Tesseract OSD and Qwen3-VL 8B
+  and Qwen3.5 2B through mlx, plus the cascades scored from the same answers. A section of its own with a page-set
+  picker; rotation is not OCR, so nothing enters the OCR charts. Stratum and error tables are in
+  `rotation-routes.md`.
 - `ocr-logprob.json` (`scripts/segbench/ocr_logprob.py report`, W46.ocr-logprob): LightOnOCR-3 4B and Qwen3.5-9B
   read again with token log-probabilities (mlx-vlm on the Mac for the 96, vLLM on Sherlock for the 96 and the 895).
   Part 5 shows each signal's AUC against an answered page under 90 NES and the 455's 20%-budget cascade into

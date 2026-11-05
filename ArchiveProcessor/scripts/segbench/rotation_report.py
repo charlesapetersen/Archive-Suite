@@ -36,10 +36,88 @@ LICENCES = {
 }
 
 
-VERDICT = 'Pending.'
-CARD = 'Pending.'
-BENCH_META = '216 pages × 4 turns · W46.rotation-routes'
-BENCH_NOTE = 'Pending.'
+VERDICT = """**Local Vision is right on 99.0% of the 96's turns and is never wrong there.** Its four misses are abstentions
+(p034's two axes). It is also safe on L1 English handwriting and L4 ledgers (93.8% and 97.5%, abstentions only). It
+gives a confident **wrong axis** on charters (36 of L7's 80 turns), abstains on much of Hebrew (34 of 80) and Chinese
+(24 of 80), and is 67.7% over the six public strata.
+
+**llmSingle is the most accurate single route.** That is the app's comparative prompt, here on Gemini 3.7 Flash
+through the gateway. It is 100% on the 96 and 97.3% on the public strata (98.9% without the two pages the set
+probably stores turned, below). It costs $0.0037 and about 6 s of round trip a page. Its misses are those two
+Arabic pages at every turn, two Chinese turns, one charter flip and one Hebrew axis.
+
+**llmMajority buys nothing measurable.** On its 432 turns it is right on one turn llmSingle missed, and on none of
+the 96's, at three times the price and the time. The Settings label "most accurate" has no support. No three-way
+tie occurred, but the app breaks a tie by Swift's Dictionary hash order, which changes every launch.
+
+**PP-LCNet_x1_0_doc_ori complements Vision.** It is open (Apache-2.0), about 7 MB and 0.02 s a page, and scores
+99.2% on the 96 (three flips). Its errors fall where Vision's do not: it flips Hebrew (73 of 80), so it must never
+be used alone on right-to-left pages. When Vision and PP-LCNet agree they are right on 640 of 650 turns, and on every
+agreed turn of the 96, L1 and L4. **Tesseract's OSD is the weakest route** (62.7%, 171 flips) and is not recommended.
+
+**The small local vision models are not a rotation route.** With the one-image prompt both Qwen models are at chance
+(29% and 37%), answering "upright" for most turns. Qwen3.5 2B is at chance with the comparative prompt too (24.5%).
+Qwen3-VL 8B with the comparative prompt reaches 78.1% (82.3% on the 24 of the 96 it read), at 7.4 s a page and a
+6.9 GB peak, which is worse than Vision on the owner's pages. Without the app's "Image A:" labels between the
+images, the 8B was at chance in the pilot as well.
+
+**Cascades, from the same answers.** "Vision and PP-LCNet agree, else llmSingle" is 100% on the 96 and sends 7 of
+its 384 turns to the model. Overall it is 97.9% at $0.0010 a page, about a quarter of llmSingle's price. On the
+public strata it trails llmSingle by five turns of 480 (paired: 1 against 6), mostly charters the two local routes
+agree on wrongly. "Vision; llmSingle where Vision abstains" is also 100% on the 96, but only 55% on charters,
+because Vision is wrong there rather than silent.
+
+**The rule this supports, for Phase 4.** No default is changed here.
+- *On-this-Mac or free profile:* Vision checked by PP-LCNet. Where they disagree or Vision abstains, leave the page
+  as it is and flag it. On the 96 that is 0 wrong and 7 of 384 flagged; on L1 and L4, 0 wrong and 10 of 160 flagged.
+  The small local VLMs are no substitute. For charter, Hebrew or Chinese collections it flags most pages (L7 66 of
+  80, N4 78 of 80); such a collection needs the cloud rule.
+- *Cloud profile, Latin-script modern material (the owner's kind):* Vision and PP-LCNet agree, else llmSingle. It
+  matches llmSingle's 100% on the 96 with 7 calls instead of 384.
+- *Cloud profile, charters and non-Latin scripts:* llmSingle on every page (L7 98.8%, N1 88.8% or 98.6% without the
+  two turned pages, N4 98.8%, N5 97.5%).
+- *llmMajority:* retire it or relabel it, and make its tie-break deterministic (W46.rotation-majority-fix).
+- *The default:* today it is llmSingle. But `LLMRotationDetector.hasRoute` is false for the gateway, so a gateway
+  user's LLM modes silently run Vision, and PP-LCNet is not in the app (it needs a Core ML conversion). Whether the
+  default becomes the agreement rule, and the gateway's rotation route, are filed as W46.rotation-default, behind
+  Phase 4."""
+CARD = """- **Truth.** Constructed, not drafted: each page is taken as upright as stored and turned by a known angle, so
+  the right correction is known exactly. The owner's 96 are his frozen originals, upright since W41.ocr-panel-cloud
+  (the axis test's set). The public pages are upright as their datasets publish them; no one checked that. One
+  public page (above) gets the same sideways correction at every turn from Gemini and from Vision, so it is probably
+  stored turned; it stays in every figure, and the table above shows the strata without it. Nobody read a page to
+  rule on it.
+- **Selection.** The 96 entire. The public pages are 20 of each of six strata of the frozen 895, drawn by a salted
+  hash of the page id, never by a route's answer or by ABBYY text. The subsets are nested draws by the same hash:
+  llmMajority's two further orderings 48 of the 96 and 10 a stratum, the local models 24 and 4.
+- **Comparison.** Every route gets the same upright page with the same exact turns (lossless transposes of the same
+  decoded image). The comparative routes see the app's own candidates: the turned page downscaled to 800 px and
+  encoded at JPEG 0.8, under the app's prompt and labels. Vision gets the full-size turned page, as the app passes
+  it. Gemini 3.7 Flash runs at temperature 0 with minimal reasoning. The app's direct-Gemini rotation model is
+  gemini-2.5-flash-lite, which is not on the gateway, so 3.7 Flash stands in for it. The local models run greedy
+  (temperature 0) with thinking off. Both OCR sets: the owner's 96 and the public strata, in the same run.
+- **Noise.** n is turns: 384 on the 96, 80 a public stratum (40 and 16 on the subsets). Exact rates carry 95% Wilson
+  intervals. Route pairs are compared turn by turn on the same turns (the paired table). The four turns of a page
+  are not independent (a route that fails a page often fails all four turns), so a stratum's interval is narrower
+  than its 20 pages justify. Gemini at temperature 0 was run once and no rerun floor was measured, so a gap of a few
+  turns between two routes is read as a tie, not a ranking.
+- **Scope.** Seconds are wall time inside an unattended engine session, which runs at background QoS. CPU-bound
+  steps there can run several times slower than in the app (memory note: the daemon clamp), so read the local
+  seconds as ratios between local routes, not as what a user waits. A gateway call's seconds are its network round
+  trip. Clean scans and photographs only: no skewed, cropped or mixed-orientation pages beyond what the sets hold
+  (p034, the 96's mixed-axes page, is the one the axis test knows). The app's own Gemini, OpenAI and Anthropic
+  rotation models were not measured: real money on personal keys, and 3.7 Flash stands in. What a wrong rotation
+  costs downstream (an OCR reading of a sideways page) is not measured here."""
+BENCH_META = '216 pages × 4 turns · Gemini through the gateway, the rest free on the Mac (W46.rotation-routes)'
+BENCH_NOTE = ("Each upright page turned 0, 90, 180 and 270 degrees; a route is right when it gives the turn that "
+              "makes it upright. Wrong axis = sideways, flip = upside down, abstain = no answer. The gateway's Gemini "
+              "3.7 Flash runs the app's comparative which-of-four prompt (llmSingle one call, llmMajority three, on a "
+              "108-page half); the local models ran on a 48-page subset. Vision is right on 99.0% of the owner's turns "
+              "and never wrong there, but wrong-axis on charters; llmSingle is 100% on the 96 and 97.3% on the public "
+              "strata; Vision and PP-LCNet agreeing, else llmSingle, is 100% on the 96 with 7 of 384 turns sent to "
+              "the model. Small local vision models are near chance. Seconds were taken inside an unattended session "
+              "(background QoS), so compare them, don't quote them. Detail: ArchiveProcessor/segbench-results/"
+              "rotation-routes.md.")
 
 
 def wilson(k, n, z=1.96):
@@ -157,6 +235,12 @@ def cascades(a):
     chain('vision=paddle>llm1', ['llm1', 'vision'], agree=['vision', 'paddle'])
     chain('vision=paddle>llm3', ['llm3', 'vision'], agree=['vision', 'paddle'])
     chain('vision=qwen3vl>llm1', ['llm1', 'vision'], agree=['vision', 'mlx-qwen3vl-8b-compare'])
+    chain('vision=paddle>qwen3vl', ['mlx-qwen3vl-8b-compare', 'vision'], agree=['vision', 'paddle'])
+    if 'vision' in a and 'paddle' in a:   # free: where the two disagree or Vision abstains, no turn (flag for review)
+        out['vision=paddle>flag'] = {k: {'found': v['found'] if v['found'] == a['paddle'][k]['found'] else None,
+                                         'cost': 0.0, 'seconds': v['seconds'] + a['paddle'][k]['seconds'],
+                                         'escalated': v['found'] is None or v['found'] != a['paddle'][k]['found']}
+                                     for k, v in a['vision'].items() if k in a['paddle']}
     return out
 
 
@@ -167,6 +251,8 @@ CASCADE_NAMES = {
     'vision=paddle>llm1': 'Vision and PP-LCNet agree, else llmSingle (Vision if it abstains)',
     'vision=paddle>llm3': 'Vision and PP-LCNet agree, else llmMajority (Vision if it abstains)',
     'vision=qwen3vl>llm1': 'Vision and Qwen3-VL comparative agree, else llmSingle (Vision if it abstains)',
+    'vision=paddle>qwen3vl': 'Vision and PP-LCNet agree, else Qwen3-VL 8B comparative ($0)',
+    'vision=paddle>flag': 'Vision and PP-LCNet agree, else leave the page and flag it ($0)',
 }
 
 
@@ -222,8 +308,10 @@ def report():
         table[r] = {'all': score(pages, ans, keys), 'public': score(pages, ans, public),
                     **{g: score(pages, ans, by_group[g]) for g in GROUPS}}
         if r in casc:
-            esc = [v for v in ans.values() if v.get('escalated')]
-            table[r]['escalated'] = len(esc)
+            table[r]['escalated'] = sum(bool(v.get('escalated')) for v in ans.values())
+            for g, ks in (('owner96', by_group['owner96']), ('public', public)):
+                got = [ans[k] for k in ks if k in ans]
+                table[r][f'escalated_{g}'] = [sum(bool(v.get('escalated')) for v in got), len(got)]
     peaks = {}
     for r in a:
         if r.startswith('mlx-'):
@@ -306,10 +394,14 @@ def md(data, verdict, card):
     for r in order + casc:
         out.append(f"| {R[r]['name']} | {cell(R[r]['public'])} | {cell(R[r]['public_upright'])} |")
     out += ['', '## Cascades, scored from the same answers', '',
-            '| Cascade | Turns | Exact | Escalated | $ a page |', '|---|---|---|---|---|']
+            'Escalated = turns the first route did not settle (an abstention, or the two first routes disagreeing). '
+            'For the flag rule an escalated turn is left as it is and flagged, scored as an abstention.', '',
+            '| Cascade | Turns | Exact | Escalated: the 96 | Escalated: public | $ a page |', '|---|---|---|---|---|---|']
     for r in casc:
         s = R[r]['all']
-        out.append(f"| {R[r]['name']} | {s['n']} | {s['pct']:.1f}% ({s['lo']}–{s['hi']}) | {R[r].get('escalated', 0)} | {s['usd_per_page']:.4f} |")
+        e = lambda g: f"{R[r][g][0]}/{R[r][g][1]}"
+        out.append(f"| {R[r]['name']} | {s['n']} | {s['pct']:.1f}% ({s['lo']}–{s['hi']}) | {e('escalated_owner96')} | "
+                   f"{e('escalated_public')} | {s['usd_per_page']:.4f} |")
     out += ['', '## Paired: turns where one route is right and the other wrong', '', '| Pair · set | first right only | second right only |',
             '|---|---|---|']
     for k, (b, c) in data['paired'].items():

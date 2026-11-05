@@ -68,6 +68,7 @@ TRUTH_BIAS_SCORE = RESULTS / "ocr-truth-bias-score.json"  # W46.fix-ocr-truth-bi
 CHAOS = RESULTS / "chaos-probe.json"  # W46.fix-ocr-scorers: chaos_probe.py score, the altered-word probe
 DEWARP = RESULTS / "enh-dewarp.json"  # W46.enh-dewarp: enh_dewarp.py report, crop or dewarp against raw, by reader
 VISION_REREAD = RESULTS / "vision-27-reread.json"  # W46.vision-27-reread: Apple Vision on macOS 27.2 against 26.6
+ROTATION = RESULTS / "rotation-routes.json"  # W46.rotation-routes: every rotation route on the same turned pages
 CAPTURE = RESULTS / "capture-ladder.json"  # W46.capture-ladder: capture_ladder.py report, capture defects by reader
 ENH_OCR = RESULTS / "enh-ocr-input.json"  # W46.enh-ocr-input: enh_ocr_input.py report, content-removing enhancement
 ENH_MARKS = RESULTS / "enh-ocr-marks.json"  # W46.enh-ocr-input-marks: the mark-region ink check
@@ -1088,6 +1089,17 @@ def enh_marks():
     return {"pages": d["pages"], "rows": rows, "report": "enh-ocr-marks.md"}
 
 
+def rotation():
+    """W46.rotation-routes: every rotation route on the same turned pages (rotation_routes.py report), per page set."""
+    if not ROTATION.exists():
+        return None
+    d = json.loads(ROTATION.read_text())
+    groups = {"all": "all pages", "owner96": "the owner's 96", "public": "the six public strata", "L1": "L1 English handwriting",
+              "L4": "L4 ledgers and tables", "L7": "L7 charters", "N1": "N1 Arabic", "N4": "N4 Hebrew", "N5": "N5 Chinese print"}
+    rows = [{"id": k, "name": v["name"], **{g: v[g] for g in groups}} for k, v in d["routes"].items()]
+    return {"groups": groups, "rows": rows, "meta": d["bench_meta"], "note": d["bench_note"]}
+
+
 def vision_reread():
     """W46.vision-27-reread and W46.vision-27-swap: the page's Apple Vision route is its macOS 27.2 reading; the paired
     re-read says how far the update moved it from the 26.6 one (the 96's scored originals, the 440's Latin pages), and
@@ -1275,7 +1287,7 @@ def main():
                                if (RESULTS / "ocr-ppocrv6-hands-qwen.json").exists() else None,
              "dewarp": dewarp, "enh_ocr": enh_ocr, "enh_marks": enh_marks(),
              "capture_ladder": json.loads(CAPTURE.read_text()) if CAPTURE.exists() else None,
-             "vision_reread": vision_reread(),
+             "vision_reread": vision_reread(), "rotation": rotation(),
              "loops": json.loads(LOOPS.read_text()) if LOOPS.exists() else None, "regions": regions,
              "layout_order": layout_order(), "layout_photo": layout_photo(layout_photo_data), "logprob": logprob(), "postcorrect": postcorrect()}
     page = TEMPLATE.read_text().replace("__DATA__", json.dumps(built, separators=(",", ":")))
