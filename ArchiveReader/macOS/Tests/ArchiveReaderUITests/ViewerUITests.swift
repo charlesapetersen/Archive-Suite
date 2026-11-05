@@ -305,6 +305,61 @@ final class ViewerUITests: FixtureUITestCase {
         app.typeKey(.delete, modifierFlags: [])
     }
 
+    // MARK: - The toolbar's PDF / JPEG switch (W40.fix-reader-jpeg-toolbar)
+
+    /// The owner did not find the menu-only switch (reader-1, row 13). The document toolbar now has a
+    /// PDF / JPEG switch: live on a file with a JPEG original, where clicking a side shows that image, and
+    /// present but disabled on a file without one.
+    func testToolbarImageSourceSwitch() throws {
+        waitForRows(minimum: 3, timeout: 10)
+        let filterField = app.textFields["ar.filter.name"]
+        XCTAssertTrue(filterField.waitForExistence(timeout: 5))
+        filterField.click()
+        filterField.typeText("00001 IMG")
+        RunLoop.current.run(until: Date().addingTimeInterval(1))
+        XCTAssertEqual(rowCount, 1, "the scratch GUI fixture has one PDF with a JPEG partner")
+
+        clickRow(0)
+        pressKey("o", modifiers: .command)
+        settle(2)
+        let control = app.descendants(matching: .any)["ar.doc.imageSource"].firstMatch
+        XCTAssertTrue(control.waitForExistence(timeout: 5), "the document toolbar should carry the PDF / JPEG switch")
+        XCTAssertTrue(control.isEnabled, "a PDF with a JPEG original gets a live switch")
+        let jpegSide = control.descendants(matching: .any).matching(NSPredicate(format: "label == 'JPEG' OR title == 'JPEG'")).firstMatch
+        let pdfSide = control.descendants(matching: .any).matching(NSPredicate(format: "label == 'PDF' OR title == 'PDF'")).firstMatch
+        XCTAssertTrue(jpegSide.exists && pdfSide.exists, "both sides are labelled")
+        jpegSide.click()
+        settle(0.5)
+        XCTAssertTrue(viewMenuItem("Show PDF Image").exists, "clicking JPEG in the toolbar shows the JPEG original")
+        closeMenu()
+        captureScreenshot("jpeg-toolbar-1-jpeg-on")
+        pdfSide.click()
+        settle(0.5)
+        XCTAssertTrue(viewMenuItem("Show JPEG Image").exists, "clicking PDF in the toolbar goes back to the PDF image")
+        closeMenu()
+        pressKey("w", modifiers: .command)
+        settle(0.5)
+
+        filterField.click()
+        pressKey("a", modifiers: .command)
+        filterField.typeText("NOTEXT")
+        RunLoop.current.run(until: Date().addingTimeInterval(1))
+        XCTAssertGreaterThanOrEqual(rowCount, 1)
+        clickRow(0)
+        pressKey("o", modifiers: .command)
+        settle(2)
+        let unpaired = app.descendants(matching: .any)["ar.doc.imageSource"].firstMatch
+        XCTAssertTrue(unpaired.waitForExistence(timeout: 5), "the switch stays in the toolbar without a partner")
+        XCTAssertFalse(unpaired.isEnabled, "without a JPEG original the switch is disabled")
+        captureScreenshot("jpeg-toolbar-2-unpaired")
+        pressKey("w", modifiers: .command)
+        settle(0.5)
+
+        filterField.click()
+        pressKey("a", modifiers: .command)
+        app.typeKey(.delete, modifierFlags: [])
+    }
+
     // MARK: - ⌘0 (Fit Page) reaches the PREVIEW sheet (W26.docs-fu1)
 
     /// The preview-sheet half of "⌘0 = fit full page everywhere zoom applies", which shipped with only

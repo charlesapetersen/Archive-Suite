@@ -21,6 +21,9 @@ final class DocumentViewerModel: ObservableObject {
     @Published private(set) var jpegPartnerPage: PDFPage?
     @Published private(set) var jpegPartnerRelativePath: String?
     @Published private(set) var imageSource: DocumentImageSource = .pdf
+    /// Why the current document has no JPEG original to switch to, in words for the toolbar switch's
+    /// tooltip (W40.fix-reader-jpeg-toolbar). `nil` while a partner is available or nothing is loaded.
+    @Published private(set) var jpegUnavailableReason: String?
     @Published var showingFind = false   // driven by the toolbar and the Document menu
     /// Bumped by every `beginFind()`, so the view puts the caret in the find field even when the bar is
     /// already showing (⌘F again after clicking a pane), where `showingFind` itself does not change.
@@ -497,17 +500,54 @@ final class DocumentViewerModel: ObservableObject {
         jpegPartnerPage = nil
         jpegPartnerRelativePath = nil
         imageSource = .pdf
-        guard let pdfURL = currentURL,
-              let target = archiveLinkTarget,
-              let index = jpegPartnerIndex, index.isClean,
-              let partnerURL = resolvedJPEGPartner(pdfURL: pdfURL, target: target, index: index),
-              ReaderArchiveLayout.isContained(partnerURL, inRootPath: target.rootPath),
-              ReaderArchiveLayout.isSupportedImage(partnerURL.pathExtension),
-              index.candidates.first(where: { filesystemPath(partnerURL) == $0.path })?.fingerprint.isDataless != true,
-              let image = NSImage(contentsOf: partnerURL),
-              let page = PDFPage(image: image) else { return }
+        jpegUnavailableReason = nil
+        guard let pdfURL = currentURL, current != nil else { return }
+        guard let target = archiveLinkTarget else {
+            jpegUnavailableReason = "No JPEG original: this file is not inside an open archive."
+            return
+        }
+        guard let index = jpegPartnerIndex else {
+            jpegUnavailableReason = "No JPEG originals yet: the “\(ReaderArchiveLayout.jpegDirectoryName)” folder "
+                + "beside “\(ReaderArchiveLayout.mainDirectoryName)” was not found, or is still being checked."
+            return
+        }
+        guard index.isClean else {
+            jpegUnavailableReason = "JPEG originals are unknown until the JPEG folder is checked again; rescan to retry."
+            return
+        }
+        let partnerURL: URL
+        switch resolvedJPEGPartner(pdfURL: pdfURL, target: target, index: index) {
+        case .match(let url): partnerURL = url
+        case .ambiguous:
+            jpegUnavailableReason = "More than one JPEG has this file's name, so the Reader cannot tell which is its original."
+            return
+        case .unknown:
+            jpegUnavailableReason = "No JPEG original: this file is not inside “\(ReaderArchiveLayout.mainDirectoryName)”."
+            return
+        case .none:
+            jpegUnavailableReason = pinsJPEGPartnerFromLink
+                ? "No JPEG original: the JPEG this link names is no longer in the JPEG folder."
+                : "No JPEG original: the JPEG folder has no file with this file's name."
+            return
+        }
+        guard ReaderArchiveLayout.isContained(partnerURL, inRootPath: target.rootPath),
+              ReaderArchiveLayout.isSupportedImage(partnerURL.pathExtension) else {
+            jpegUnavailableReason = "No JPEG original: the JPEG folder has no file with this file's name."
+            return
+        }
+        guard index.candidates.first(where: { filesystemPath(partnerURL) == $0.path })?.fingerprint.isDataless != true else {
+            jpegUnavailableReason = "The JPEG original is not downloaded to this Mac."
+            return
+        }
+        guard let image = NSImage(contentsOf: partnerURL), let page = PDFPage(image: image) else {
+            jpegUnavailableReason = "The JPEG original “\(partnerURL.lastPathComponent)” could not be opened."
+            return
+        }
         let partnerRelativePath = relativePDFPath(for: partnerURL, rootPath: target.rootPath)
-        if pinsJPEGPartnerFromLink, linkedJPEGRelativePath != partnerRelativePath { return }
+        if pinsJPEGPartnerFromLink, linkedJPEGRelativePath != partnerRelativePath {
+            jpegUnavailableReason = "No JPEG original: the JPEG this link names is no longer in the JPEG folder."
+            return
+        }
         jpegPartnerPage = page
         jpegPartnerRelativePath = partnerRelativePath
         guard let relativePath = relativePDFPath(for: pdfURL, rootPath: target.rootPath) else { return }
@@ -527,27 +567,24 @@ final class DocumentViewerModel: ObservableObject {
     }
 
     private func resolvedJPEGPartner(pdfURL: URL, target: ArchiveLinkTarget,
-                                     index: JPEGPartnerIndex) -> URL? {
+                                     index: JPEGPartnerIndex) -> JPEGPartnerResolution {
         if pinsJPEGPartnerFromLink {
             guard let relative = linkedJPEGRelativePath, !relative.isEmpty,
                   !relative.hasPrefix("/"),
                   !relative.split(separator: "/").contains(where: { $0 == "." || $0 == ".." }) else {
-                return nil
+                return .none
             }
             let prefix = target.rootPath.hasSuffix("/") ? target.rootPath : target.rootPath + "/"
             let expected = Array((prefix + relative).utf8)
             guard let candidate = index.candidates.first(where: { Array($0.path.utf8) == expected }) else {
-                return nil
+                return .none
             }
-            return candidate.path.withCString {
+            return .match(candidate.path.withCString {
                 URL(fileURLWithFileSystemRepresentation: $0, isDirectory: false, relativeTo: nil)
-            }
+            })
         }
-        guard case let .match(partnerURL) = index.resolve(
-            pdfURL: pdfURL,
-            mainRoot: URL(fileURLWithPath: target.mainRootPath, isDirectory: true)
-        ) else { return nil }
-        return partnerURL
+        return index.resolve(pdfURL: pdfURL,
+                             mainRoot: URL(fileURLWithPath: target.mainRootPath, isDirectory: true))
     }
 
     private func filesystemPath(_ url: URL) -> String {

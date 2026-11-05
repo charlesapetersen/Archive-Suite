@@ -39,11 +39,14 @@ struct ArchiveReaderCommands: Commands {
                 showingTagCloud.toggle()
             }
             .keyboardShortcut("t", modifiers: [.command, .option])
-            if doc?.hasJPEGPartner == true {
-                Button(doc?.isShowingJPEG == true ? "Show PDF Image" : "Show JPEG Image") {
-                    doc?.toggleImageSource()
+            // W40.fix-reader-jpeg-toolbar: listed whenever a document is open, disabled without a JPEG
+            // original, so it can be found; the document toolbar's PDF / JPEG switch says why.
+            if let doc {
+                Button(doc.isShowingJPEG ? "Show PDF Image" : "Show JPEG Image") {
+                    doc.toggleImageSource()
                 }
                 .keyboardShortcut("j", modifiers: [.command, .option])
+                .disabled(!doc.hasJPEGPartner)
             }
         }
 

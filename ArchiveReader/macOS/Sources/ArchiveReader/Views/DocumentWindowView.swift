@@ -194,6 +194,10 @@ struct DocumentWindowView: View {
 
             Divider()
 
+            imageSourceSwitch
+
+            Divider()
+
             Button { model.leftController.zoomOut() } label: { Label("Zoom Out Left", systemImage: "minus.magnifyingglass") }
                 .help("Zoom out the image page")
             Button { model.leftController.zoomIn() } label: { Label("Zoom In Left", systemImage: "plus.magnifyingglass") }
@@ -224,6 +228,35 @@ struct DocumentWindowView: View {
             .keyboardShortcut("0", modifiers: [.command, .option])
             .help("Reset the split and zoom to defaults (⌥⌘0)")
         }
+    }
+
+    /// W40.fix-reader-jpeg-toolbar: the PDF / JPEG switch for the image pane, which the owner could not
+    /// find in the Document menu alone. It always shows which image is on screen; with no JPEG original it
+    /// stays on PDF, disabled, and its tooltip says why.
+    private var imageSourceSwitch: some View {
+        // The tooltip sits on a wrapper: a disabled control's own tooltip is not shown, and the reason
+        // matters most exactly when the switch is disabled.
+        HStack(spacing: 0) {
+            Picker("Image", selection: Binding(
+                get: { model.imageSource },
+                set: { if $0 != model.imageSource { model.toggleImageSource() } }
+            )) {
+                Text("PDF").tag(DocumentImageSource.pdf)
+                Text("JPEG").tag(DocumentImageSource.jpeg)
+            }
+            .pickerStyle(.segmented)
+            .fixedSize()
+            .disabled(!model.hasJPEGPartner)
+            .accessibilityLabel("Image source")
+            .accessibilityHint(model.hasJPEGPartner ? "" : (model.jpegUnavailableReason ?? ""))
+            .accessibilityIdentifier("ar.doc.imageSource")
+        }
+        .contentShape(Rectangle())
+        .help(model.hasJPEGPartner
+              ? (model.isShowingJPEG
+                 ? "Showing the JPEG original. Switch to the PDF's image (⌥⌘J)"
+                 : "Showing the PDF's image. Switch to the JPEG original (⌥⌘J)")
+              : (model.jpegUnavailableReason ?? "No JPEG original for this file."))
     }
 
     private var statusBar: some View {
