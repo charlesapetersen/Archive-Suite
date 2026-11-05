@@ -152,6 +152,37 @@ class ThreeReaders(unittest.TestCase):
         self.assertIsNone(t["fields"]["folder"])   # an unanswered control keeps its agreed value
         self.assertTrue(t["complete"])
         self.assertEqual(t["drafters"], list(T.READERS))
+        self.assertIsNone(t["notes"])
+
+    def test_fold_carries_notes_and_ignores_them_as_a_field(self):
+        agreed = {f: None for f in T.FIELDS}
+        agreed["kind"], agreed["series"] = "box label", "Series III"
+        rows = [{"id": "p1", "path": "x.pdf", "colour": "Red", "repository": "R", "parsed": [True] * 3,
+                 "agreed": agreed, "disputed": [], "controls": []}]
+        truth, missing = T.fold(rows, {"p1": {T.NOTES: {"text": "  series also says Subseries A  "}}})
+        self.assertEqual(truth[0]["notes"], "series also says Subseries A")
+        self.assertEqual((truth[0]["ruled"], missing, truth[0]["fields"]["series"]), ([], 0, "Series III"))
+        self.assertNotIn(T.NOTES, truth[0]["fields"])
+
+    def test_sheet_html_fills_placeholders_and_has_a_notes_box(self):
+        import os
+        import tempfile
+        agreed = {f: None for f in T.FIELDS}
+        agreed["kind"], agreed["collection_title"] = "box label", "Edward Shils. Papers"
+        rows = [{"id": "p1", "path": "x.pdf", "colour": "Red", "agreed": agreed, "disputed": [],
+                 "controls": [{"field": "container", "readings": ["Box 5"], "box": None, "placed": "none"}]}]
+        old, oldimg = T.SHEET, T.image_of
+        with tempfile.TemporaryDirectory() as d:
+            T.SHEET, T.image_of = d, (lambda mid: os.path.join(d, mid + ".jpg"))
+            try:
+                T.write_sheet(rows)
+                html = open(os.path.join(d, "index.html"), encoding="utf-8").read()
+            finally:
+                T.SHEET, T.image_of = old, oldimg
+        for ph in ("__DATA__", "__KINDS__", "__LABELS__", "__NOTES__"):
+            self.assertNotIn(ph, html)
+        self.assertIn("data-n=", html)
+        self.assertIn('"Edward Shils. Papers"', html)
 
 
 class Trees(unittest.TestCase):

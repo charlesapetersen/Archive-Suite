@@ -88,6 +88,7 @@ NAMES = {**{k: v[1] for k, v in MODELS.items()}, GATEWAY: "Gemini 3.7 Flash (Sta
 GATEWAY_CAP = 2.00
 GATEWAY_MAX_TOKENS = 4096
 MIN_CORR = 0.65   # ocr_truth.orient_like_pdf: true pairs measured 0.69-0.98, mismatches 0.16-0.48 (2026-10-22)
+NOTES = "_notes"   # the sheet's per-photo notes, kept beside the field answers
 CONTROLS = 20     # unanimous fields put on the sheet unmarked: half with a value, half agreed empty
 
 FIELDS = ["repository", "place", "collection_title", "collection_number", "accession", "series", "container",
@@ -654,13 +655,23 @@ def write_sheet(rows):
     os.makedirs(SHEET, exist_ok=True)
     with open(os.path.join(SHEET, "index.html"), "w", encoding="utf-8") as fh:
         fh.write(SHEET_HTML.replace("__DATA__", json.dumps(sheet_items(rows), ensure_ascii=False))
-                 .replace("__KINDS__", json.dumps(KINDS)))
+                 .replace("__KINDS__", json.dumps(KINDS)).replace("__LABELS__", json.dumps(LABELS))
+                 .replace("__NOTES__", json.dumps(NOTES)))
+
+
+def cmd_sheet(a):
+    """Rewrite the sheet from draft-truth.jsonl as it stands: no reader runs, and answers already saved in the
+    browser stay (same storage key)."""
+    write_sheet([json.loads(l) for l in open(os.path.join(POOL, "draft-truth.jsonl"), encoding="utf-8")])
+    print(os.path.join(SHEET, "index.html"))
 
 
 def fold(rows, answers):
     """W47.ct-read's truth: per photo, the agreed fields, then each disputed field as the owner answered it.
     An answer is {"pick": "<a reading>" | "other" | "not on the label", "text": "<typed value>"}; an unanswered
-    disputed field stays out of the truth and is counted; an unanswered control keeps its agreed value. `ruled` lists
+    disputed field stays out of the truth and is counted; the owner's free notes on a photo (answers[id][NOTES]) are
+    carried as `notes`, None when blank: they can say an agreed field is wrong or something on the label has no
+    field, and the scoring session reads them before it scores that photo; an unanswered control keeps its agreed value. `ruled` lists
     the fields the owner answered: the drafters (`drafters`) may be scored only on those (FLD-9), and a control the
     owner overturned is counted in `controls_overturned`. Returns (truth rows, unanswered count)."""
     truth, missing = [], 0
@@ -668,6 +679,7 @@ def fold(rows, answers):
         if not all(r["parsed"]):
             continue
         fields, ruled, overturned = dict(r["agreed"]), [], []
+        notes = clean(((answers.get(r["id"]) or {}).get(NOTES) or {}).get("text"))
         for d in r["disputed"] + r.get("controls", []):
             ans = (answers.get(r["id"]) or {}).get(d["field"])
             if not ans or not ans.get("pick"):
@@ -687,7 +699,8 @@ def fold(rows, answers):
             ruled.append(d["field"])
         truth.append({"id": r["id"], "path": r["path"], "colour": r["colour"], "stratum": r["repository"],
                       "fields": fields, "ruled": ruled, "controls_overturned": overturned,
-                      "drafters": r.get("readers", []), "complete": len(fields) == len(FIELDS) + 1})
+                      "drafters": r.get("readers", []), "complete": len(fields) == len(FIELDS) + 1,
+                      "notes": notes})
     return truth, missing
 
 
@@ -867,15 +880,19 @@ border-bottom:1px solid #ccc;z-index:9}.doc{border-bottom:2px solid #888;padding
 .box{position:absolute;border:3px solid #f0a;border-radius:4px;pointer-events:none}
 .tag{position:absolute;background:#f0a;color:#fff;font:bold 12px sans-serif;padding:0 4px;transform:translateY(-100%)}
 .q{margin:8px 0 14px}.q label{display:block;margin-left:12px}.agreed{color:#555;font-size:13px}.nobox{color:#a05;font-size:13px}
+.notes textarea{width:100%;max-width:560px;height:4.5em;font:14px -apple-system,sans-serif}
 </style>
 <header><b>Container labels.</b> Three readers do not all agree on most of the fields below; a few are fields
 where they did agree, mixed in as a check. Each pink box is where the field is written (it can be off; it does not
 say which reading is right). Pick what the label says, type it under "other", or say it is not on the label.
+The grey line on each photo lists the fields all three readers agreed on; they are not asked and go into the truth
+as written. Use the photo's notes box when one of them is wrong, or when the label carries something no field
+caught (a second series line, a date range, a subseries). Fields nobody read are not listed.
 Answers save in this browser; <button id="dl">download answers</button>
 <span id="prog"></span></header>
 <div id="root"></div>
 <script>
-const DATA=__DATA__;const KINDS=__KINDS__;const KEY='w47-ct-truth-jpeg';const ans=JSON.parse(localStorage.getItem(KEY)||'{}');
+const DATA=__DATA__;const KINDS=__KINDS__;const LABELS=__LABELS__;const NOTES=__NOTES__;const KEY='w47-ct-truth-jpeg';const ans=JSON.parse(localStorage.getItem(KEY)||'{}'); // gitleaks:allow (a storage key name, not a secret)
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const total=DATA.reduce((n,d)=>n+d.fields.length,0);
 function prog(){let n=0;for(const d of DATA)for(const f of d.fields)if(ans[d.id]?.[f.field]?.pick)n++;
@@ -883,18 +900,21 @@ function prog(){let n=0;for(const d of DATA)for(const f of d.fields)if(ans[d.id]
 let h='';DATA.forEach(d=>{h+=`<div class="doc"><div class="frame"><img src="${esc(d.img)}">`;
  d.fields.forEach((f,i)=>{if(f.box&&f.field!=='kind')h+=`<div class="box" style="left:${100*f.box[0]}%;top:${100*f.box[1]}%;width:${100*f.box[2]}%;height:${100*f.box[3]}%"></div><div class="tag" style="left:${100*f.box[0]}%;top:${100*f.box[1]}%">${i+1}</div>`});
  h+=`</div><div><b>${d.n}. Photo ${d.id}</b>, tagged ${esc(d.colour)}`;
- const ag=Object.entries(d.agreed);if(ag.length)h+=`<div class="agreed">The readers agree: ${ag.map(([k,v])=>esc(k)+' = '+esc(v)).join('; ')}</div>`;
+ const ag=Object.entries(d.agreed);h+=`<div class="agreed">Not asked, all three agree: ${ag.length?ag.map(([k,v])=>esc(LABELS[k]||k)+' = '+esc(v)).join('; '):'nothing beyond the fields below'}</div>`;
  d.fields.forEach((f,i)=>{const nm=d.id+'/'+f.field;const cur=ans[d.id]?.[f.field]||{};
   h+=`<div class="q"><b>${i+1}. ${esc(f.label)}</b>`;
   if(f.field!=='kind'&&f.placed==='label')h+=` <span class="nobox">(box ${i+1} is the whole label: no reading was found on a line)</span>`;
   if(f.field!=='kind'&&f.placed==='none')h+=` <span class="nobox">(no box: no reading was found on the photo; look over the whole label)</span>`;
   const opts=f.field==='kind'?KINDS:[...f.readings.filter(r=>r!==null),'other','not on the label'];
   for(const o of opts)h+=`<label><input type="radio" name="${esc(nm)}" value="${esc(o)}" ${cur.pick===o?'checked':''}> ${o==='other'?'other:':esc(o)}${o==='other'?` <input data-t="${esc(nm)}" value="${esc(cur.text)}" size="40">`:''}</label>`;
-  h+='</div>'});h+='</div></div>'});
+  h+='</div>'});
+  h+=`<div class="q notes"><b>Notes on this photo</b> (optional)<br><textarea data-n="${esc(d.id)}">${esc(ans[d.id]?.[NOTES]?.text)}</textarea></div>`;
+  h+='</div></div>'});
 document.getElementById('root').innerHTML=h;
 const set=(nm,k,v)=>{const [id,f]=nm.split('/');ans[id]=ans[id]||{};ans[id][f]={...(ans[id][f]||{}),[k]:v};localStorage.setItem(KEY,JSON.stringify(ans));prog()};
 document.querySelectorAll('input[type=radio]').forEach(e=>e.onchange=()=>set(e.name,'pick',e.value));
-document.querySelectorAll('[data-t]').forEach(e=>e.oninput=()=>set(e.dataset.t,'text',e.value));prog();
+document.querySelectorAll('[data-t]').forEach(e=>e.oninput=()=>set(e.dataset.t,'text',e.value));
+document.querySelectorAll('[data-n]').forEach(e=>e.oninput=()=>set(e.dataset.n+'/'+NOTES,'text',e.value));prog();
 document.getElementById('dl').onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(ans,null,1)],{type:'application/json'}));a.download='W47-ct-truth-jpeg-answers.json';a.click()};
 </script>"""
 
@@ -1029,7 +1049,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
     sub.add_parser("sample").set_defaults(fn=cmd_sample)
-    for name, fn in (("render", cmd_render), ("lines", cmd_lines), ("compare", cmd_compare), ("trees", cmd_trees),
+    for name, fn in (("render", cmd_render), ("lines", cmd_lines), ("compare", cmd_compare), ("sheet", cmd_sheet), ("trees", cmd_trees),
                      ("owner-tree", cmd_owner_tree)):
         sub.add_parser(name).set_defaults(fn=fn)
     g = sub.add_parser("gateway")
