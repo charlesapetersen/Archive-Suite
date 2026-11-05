@@ -230,10 +230,14 @@ direction as it now stands:
 So each stage's recommendation is written as a rule the settings layer can apply: given the user's answers, which
 route and settings, with the measured reason, the expected cost and time, the alternatives with their own figures,
 and the fallback when an answer rules the first choice out. How the Q&A, the trade-off view and any wizard should
-work is researched first, in a Fable session (`W46.settings-design-research`), which presents its options to the
-owner interactively; Phase 4 waits on it and files the build it settles (the Q&A flow, the rule table it reads, the
-trade-off view, where they live in the Processor, how settings are kept per collection and revisited). The owner's
-calls in Phase 4 are about the rules, the presentation and the skip-defaults, not about his own configuration.
+work was researched first, in a Fable session (`W46.settings-design-research`, done 2026-11-04), which presented
+its options to the owner on a working prototype: the design and the owner's calls are `12-settings-design.md` (two
+interviews, the limits-first sheet with the range one tab away, live inheritance with the source of each value
+shown, the document mix measured and the period, languages and scripts asked, starting points as fills, priorities
+asked and shown as editable weights). Phase 4 fills that design with rules and files its build (the interviews, the
+rule table the sheet reads, the range view, the settings document per collection and the general layer; nothing
+assumes the Processor's present settings model, owner 2026-11-04). The owner's calls in Phase 4 are about the rules,
+the presentation and the skip-defaults, not about his own configuration.
 
 - One decision note per stage, with the recommendation per profile and document kind, and what would change it as
   models move. Each note ends in the settings layer's rule for that stage (above).

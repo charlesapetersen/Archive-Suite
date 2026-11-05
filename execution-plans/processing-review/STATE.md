@@ -123,3 +123,11 @@ The owner's Gemini report is assessed in `screens/gemini-report-2026-10-20.md` (
   read as a result, unfair comparisons and weak verdicts; refute-checked by an independent agent. The owner applied the
   queue rework (13 new items, 4 owner sheets as gates, 23 re-scopes, two moved behind W46.nice-to-have, one retired)
   and approved the W47 gateway spend. W46.review-phase4 reads the note first and waits on its useful-now items.
+
+## Settings design research, 2026-11-04
+
+- [x] `12-settings-design.md` (W46.settings-design-research, a Fable session the owner started): how users choose
+  their settings, researched (setup interviews against editable settings; trade-off readouts and frontier views;
+  per-project layering) and shown to the owner on a working prototype built from the bench's own figures
+  (`settings-design/`, rebuilt by `build_figures.py` from `ArchiveOCRBench/data/panel-data.json`). The owner's six
+  calls are in its section 1. Phase 4 fills the design with rules (section 3.8) and files the gaps it names (3.9).

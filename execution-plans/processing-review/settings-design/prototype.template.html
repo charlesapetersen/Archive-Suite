@@ -1,0 +1,515 @@
+<title>Processing Settings Prototype</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,500;8..60,600&family=Source+Sans+3:wght@400;600&family=Source+Code+Pro:wght@400;600&display=swap">
+<style>
+/* Layout: a sticky resources column on the left; the derived settings and the range on the right. Paper neutrals with an ink accent; feasibility in semantic colour. */
+:root{
+  --bg:#f6f5f1; --panel:#fffdf9; --ink:#1d2430; --muted:#5d6472; --line:#d9d6cd; --accent:#1f4e79; --accent-soft:#e3ecf5;
+  --ok:#2d7a4f; --warn:#a86a12; --bad:#a83a2e; --chip:#ecebe5; --mac:#4b7bb0; --cloud:#c2633f; --plan:#7a4fb0; --cluster:#2d8a7a; --manual:#777;
+  --display:"Source Serif 4",Georgia,serif; --body:"Source Sans 3","Helvetica Neue",Arial,sans-serif; --mono:"Source Code Pro",Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#15181d;--panel:#1d2127;--ink:#e8e6e0;--muted:#a3a8b3;--line:#343a44;--accent:#8fb6e0;--accent-soft:#23313f;--ok:#6cc595;--warn:#e0a94f;--bad:#e5786a;--chip:#2a2f37;--mac:#7ea6d6;--cloud:#e08b67;--plan:#b595e0;--cluster:#63c0ad;--manual:#999;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#15181d;--panel:#1d2127;--ink:#e8e6e0;--muted:#a3a8b3;--line:#343a44;--accent:#8fb6e0;--accent-soft:#23313f;--ok:#6cc595;--warn:#e0a94f;--bad:#e5786a;--chip:#2a2f37;--mac:#7ea6d6;--cloud:#e08b67;--plan:#b595e0;--cluster:#63c0ad;--manual:#999;color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.45;margin:0;padding-block:0 40px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+h1,h2,h3{font-family:var(--display);font-weight:600;text-wrap:balance;margin:0}
+h1{font-size:1.6rem}h2{font-size:1.15rem}h3{font-size:1rem}
+p{margin:.3rem 0}
+small,.small{font-size:.82rem;color:var(--muted)}
+.num{font-variant-numeric:tabular-nums}
+header{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:baseline;padding:18px 0 12px;border-bottom:1px solid var(--line)}
+header .sub{color:var(--muted);max-width:60ch}
+.wrap{display:grid;grid-template-columns:minmax(280px,340px) minmax(0,1fr);gap:24px;align-items:start;margin-top:16px}
+@media (max-width:860px){.wrap{grid-template-columns:1fr}}
+main,aside{min-width:0}
+.stage,.range{min-width:0}
+aside{position:sticky;top:env(safe-area-inset-top,0px);max-height:calc(100vh - 10px);overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:14px}
+@media (max-width:860px){aside{position:static;max-height:none}}
+aside h2{margin-bottom:6px}
+fieldset{border:0;padding:0;margin:0 0 14px}
+legend{font-weight:600;font-size:.85rem;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);margin-bottom:4px}
+label.row{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:3px 0}
+label.row span:first-child{min-width:0}
+select,input[type=number],input[type=text]{font:inherit;color:inherit;background:var(--bg);border:1px solid var(--line);border-radius:4px;padding:3px 6px;max-width:150px}
+input[type=range]{width:100%}
+.kinds label{display:grid;grid-template-columns:1fr 3ch;gap:6px;align-items:center;font-size:.9rem}
+.kinds .bar{display:flex;height:10px;border-radius:5px;overflow:hidden;border:1px solid var(--line);margin:6px 0 4px}
+.kinds .bar i{display:block;height:100%}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font-size:.78rem;padding:2px 8px;border-radius:999px;background:var(--chip);color:var(--ink);white-space:nowrap}
+.chip.fam-mac{background:color-mix(in srgb,var(--mac) 18%,transparent)}.chip.fam-cloud{background:color-mix(in srgb,var(--cloud) 18%,transparent)}.chip.fam-plan{background:color-mix(in srgb,var(--plan) 18%,transparent)}.chip.fam-cluster{background:color-mix(in srgb,var(--cluster) 18%,transparent)}.chip.fam-manual{background:var(--chip)}
+.chip.custom{background:var(--warn);color:#fff}
+button{font:inherit;cursor:pointer;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:4px;padding:4px 10px}
+button.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.presets{display:flex;flex-wrap:wrap;gap:6px}
+.presets button{font-size:.85rem}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:14px}
+.tabs button{border:0;border-bottom:3px solid transparent;border-radius:0;background:none;padding:8px 12px;font-weight:600;color:var(--muted)}
+.tabs button[aria-selected=true]{color:var(--ink);border-bottom-color:var(--accent)}
+.totals{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:16px}
+.tile{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:10px 12px}
+.tile .v{font-family:var(--display);font-size:1.4rem;font-weight:600}
+.tile .v.bad{color:var(--bad)}.tile .v.ok{color:var(--ok)}
+.stage{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:14px 16px;margin-bottom:14px}
+.stage header{border:0;padding:0 0 6px;gap:8px 14px;align-items:center}
+.stage .pick{font-family:var(--display);font-size:1.15rem;font-weight:600}
+.facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:6px 14px;margin:8px 0}
+.facts div b{display:block;font-size:.75rem;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.why{margin:8px 0 4px;padding:8px 10px;background:var(--accent-soft);border-radius:4px;font-size:.9rem}
+.why ul{margin:4px 0 0 18px;padding:0}
+.alts{font-size:.9rem}
+.alts table,.range table{border-collapse:collapse;width:100%;font-size:.86rem}
+.range .tablewrap{overflow-x:auto}
+th,td{text-align:left;padding:4px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-weight:600;color:var(--muted);font-size:.78rem;letter-spacing:.03em;text-transform:uppercase}
+td.num,th.num{text-align:right}
+tr.chosen td{background:var(--accent-soft)}
+tr.infeasible td{color:var(--muted)}
+tr.clickable{cursor:pointer}
+.kindrow{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:.88rem}
+.kindrow span b{font-weight:600}
+.override{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:8px;font-size:.9rem}
+svg.frontier{width:100%;height:auto;display:block;background:var(--panel);border:1px solid var(--line);border-radius:6px}
+svg text{fill:var(--ink);font-family:var(--body);font-size:11px}
+svg .grid{stroke:var(--line);stroke-width:1}
+svg .pareto{fill:none;stroke:var(--accent);stroke-width:1.5;stroke-dasharray:4 3}
+svg .pt{cursor:pointer}
+svg .pt.infeasible{fill:none;stroke-width:1.5;opacity:.7}
+svg .pt.chosen-ring{fill:none;stroke:var(--ink);stroke-width:2}
+.tip{position:fixed;pointer-events:none;background:var(--ink);color:var(--bg);padding:6px 9px;border-radius:4px;font-size:.8rem;max-width:280px;z-index:20;display:none}
+.shape{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center;font-size:.9rem;margin:10px 0 8px;padding:8px 10px;border:1px dashed var(--line);border-radius:6px}
+.stage.both{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px}
+@media (max-width:1100px){.stage.both{grid-template-columns:1fr}}
+.both-card header{padding:0 0 6px}
+.rules{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px}
+.rules .tile p{font-size:.9rem}
+.collections{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:10px 0 0}
+.collections .saved{display:flex;flex-wrap:wrap;gap:6px}
+.collections .saved button{font-size:.82rem}
+footer{margin-top:28px;border-top:1px solid var(--line);padding-top:12px;max-width:80ch}
+footer ul{padding-left:18px;margin:4px 0}
+.note{font-size:.88rem;color:var(--muted)}
+.legend{display:flex;flex-wrap:wrap;gap:12px;font-size:.82rem;color:var(--muted);margin:6px 0}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:4px;vertical-align:middle}
+@media (prefers-reduced-motion:no-preference){.stage,.tile{transition:background .2s}}
+</style>
+
+<header>
+  <div>
+    <h1>Processing Settings Prototype</h1>
+    <p class="sub">How a user of Archive Processor would choose the processing settings for one collection: answer a few questions about resources, see what each stage would use and what it costs, move along the measured range, and keep the result with the collection. Every figure is the bench's own measurement; nothing here is modelled.</p>
+  </div>
+  <div class="collections" id="collections">
+    <label class="row"><span>Collection</span><input type="text" id="collName" value="Deaver clippings" size="18"></label>
+    <button id="saveColl" class="primary">Keep these settings with the collection</button>
+    <div class="saved" id="savedList"></div>
+  </div>
+</header>
+
+<div class="wrap">
+<aside id="resources">
+  <h2>Your resources</h2>
+  <p class="small">The introductory questions. Each answer is an ordinary setting; change any of them at any time and the picks on the right follow.</p>
+
+  <fieldset><legend>Starting points</legend>
+    <div class="presets">
+      <button data-preset="free">Free, on this Mac</button>
+      <button data-preset="cheap">A few dollars, overnight</button>
+      <button data-preset="plan">My Claude plan, no money</button>
+      <button data-preset="best">Best measured, no limit</button>
+    </div>
+    <p class="small">A starting point fills the answers below; it is not a mode.</p>
+  </fieldset>
+
+  <fieldset><legend>This Mac</legend>
+    <label class="row"><span>Unified memory</span>
+      <select id="macGb"><option>8</option><option>16</option><option selected>18</option><option>24</option><option>32</option><option>48</option><option>64</option><option>128</option></select></label>
+    <p class="small">Read from the machine in the app; a question only here.</p>
+  </fieldset>
+
+  <fieldset><legend>Keys and plans</legend>
+    <label class="row"><span>Gemini API key</span><input type="checkbox" id="keyGemini" checked></label>
+    <label class="row"><span>OpenRouter key</span><input type="checkbox" id="keyOpenrouter"></label>
+    <label class="row"><span>OpenAI key</span><input type="checkbox" id="keyOpenai"></label>
+    <label class="row"><span>Mistral key</span><input type="checkbox" id="keyMistral"></label>
+    <label class="row"><span>Claude plan (claude signed in)</span><input type="checkbox" id="planClaude"></label>
+    <label class="row"><span>ChatGPT plan</span><input type="checkbox" id="planChatgpt"></label>
+    <p class="small">Detected from the Keychain and the installed CLIs in the app.</p>
+  </fieldset>
+
+  <fieldset><legend>A cluster</legend>
+    <label class="row"><span>Slurm cluster with GPUs</span><input type="checkbox" id="cluster"></label>
+    <label class="row"><span>GPUs a job may use</span><input type="number" id="gpus" value="1" min="1" max="16" style="width:5em"></label>
+  </fieldset>
+
+  <fieldset><legend>Money</legend>
+    <label class="row"><span>Ceiling for this batch</span>
+      <span><input type="number" id="ceiling" value="5" min="0" step="0.5" style="width:5em"> $</span></label>
+    <label class="row"><span>No ceiling</span><input type="checkbox" id="noCeiling"></label>
+    <p class="small">Plans and clusters cost no money here; a plan draws on its windows and the app shows that share instead.</p>
+  </fieldset>
+
+  <fieldset><legend>Time</legend>
+    <label class="row"><span>Pages in this batch</span><input type="number" id="pages" value="1000" min="10" step="10" style="width:6em"></label>
+    <label class="row"><span>Pages a document, about</span><input type="number" id="ppd" value="4" min="1" max="50" style="width:4em"></label>
+    <label class="row"><span>Hours it may take</span><input type="number" id="hours" value="8" min="0.5" step="0.5" style="width:5em"></label>
+    <label class="row"><span>Minutes you will spend checking boundaries</span><input type="number" id="checkMin" value="20" min="0" step="5" style="width:5em"></label>
+    <p class="small">Over 24 hours the cloud routes use batch prices, half the list price.</p>
+  </fieldset>
+
+  <fieldset class="kinds"><legend>The documents</legend>
+    <div class="bar" id="kindBar"></div>
+    <label><span>Typewritten</span><input type="range" id="kTyped" min="0" max="100" value="52"><span class="num" id="kTypedV">52</span></label>
+    <label><span>Printed</span><input type="range" id="kPrinted" min="0" max="100" value="29"><span class="num" id="kPrintedV">29</span></label>
+    <label><span>Handwritten</span><input type="range" id="kHand" min="0" max="100" value="19"><span class="num" id="kHandV">19</span></label>
+    <button id="measureKinds" style="margin-top:6px">Measure from the first 200 photos</button>
+    <p class="small">Shares are normalised. In the app the on-device kind classifier measures them (139 of 144 right, 0.2 s a page), so this is a check, not a chore.</p>
+    <label class="row"><span>Newspapers or magazines</span><input type="checkbox" id="kNews"></label>
+    <label class="row"><span>Forms, ledgers, registers</span><input type="checkbox" id="kForms"></label>
+    <label class="row"><span>Clippings</span><input type="checkbox" id="kClips" checked></label>
+  </fieldset>
+
+  <fieldset><legend>Within the limits, prefer</legend>
+    <label class="row"><span>Best accuracy</span><input type="radio" name="opt" value="acc" checked></label>
+    <label class="row"><span>Cheapest within a point of the best</span><input type="radio" name="opt" value="cost"></label>
+    <label class="row"><span>Fastest within a point of the best</span><input type="radio" name="opt" value="time"></label>
+  </fieldset>
+
+  <fieldset><legend>Fine-tuning</legend>
+    <label class="row"><span>Can run the training kit</span>
+      <select id="finetune"><option value="none">No</option><option value="agent">With a coding agent</option><option value="cluster">On a cluster</option></select></label>
+  </fieldset>
+</aside>
+
+<main id="main">
+  <div class="shape"><span class="small">Screen shape, for the owner's call:</span> <label><input type="radio" name="shape" value="A" checked> A, limits first, the range one tab away</label> <label><input type="radio" name="shape" value="B"> B, range first, limits drawn on it</label> <label><input type="radio" name="shape" value="C"> C, both side by side per stage</label></div>
+  <div class="tabs" role="tablist">
+    <button role="tab" aria-selected="true" data-tab="settings">Settings for this collection</button>
+    <button role="tab" aria-selected="false" data-tab="range">The range, stage by stage</button>
+    <button role="tab" aria-selected="false" data-tab="rules">What is not a choice</button>
+  </div>
+
+  <section id="tab-settings">
+    <div id="totals"></div>
+    <div id="stages"></div>
+  </section>
+
+  <section id="tab-range" hidden>
+    <p class="note">Each chart is one stage. Across: what the route costs per 1,000 pages (free routes sit in the left band). Up: the measured accuracy for your document mix. Filled marks you can use with the resources you gave; hollow marks you cannot, and the tooltip says why. The dashed line joins the routes nothing beats on both counts. Click a mark to choose it; the settings then show Custom.</p>
+    <div class="legend"><span><i style="background:var(--mac)"></i>this Mac</span><span><i style="background:var(--cloud)"></i>paid API</span><span><i style="background:var(--plan)"></i>a plan</span><span><i style="background:var(--cluster)"></i>a cluster</span><span><i style="background:var(--manual)"></i>by hand</span></div>
+    <div id="ranges"></div>
+  </section>
+
+  <section id="tab-rules" hidden>
+    <p class="note">Stages the review measured and found no trade-off in. They are rules, shown with the measured reason, and a user switch where the owner ruled one.</p>
+    <div class="rules" id="rules"></div>
+  </section>
+
+  <footer>
+    <h3>What the figures rest on</h3>
+    <ul class="note" id="basis"></ul>
+  </footer>
+</main>
+</div>
+<div class="tip" id="tip"></div>
+
+<script>
+const F = __FIGURES__;
+const $ = id => document.getElementById(id);
+const fmt = {
+  usd: v => v === 0 ? "free" : v < 0.01 ? "<$0.01" : "$" + (v >= 100 ? v.toFixed(0) : v >= 10 ? v.toFixed(1) : v.toFixed(2)),
+  pct: v => v == null ? "–" : (Math.round(v * 10) / 10).toFixed(1) + "%",
+  hrs: h => h == null ? "not measured" : h < 1/60 ? "under a minute" : h < 1 ? Math.round(h * 60) + " min" : h < 48 ? (Math.round(h * 10) / 10) + " h" : Math.round(h / 24) + " days",
+};
+const FAM = {mac: "this Mac", cloud: "paid API", plan: "a plan", cluster: "a cluster", manual: "by hand"};
+const STAGES = ["seg", "ocr", "date", "ent"];
+const STAGE_NAME = {seg: "Segmentation into documents", ocr: "Reading (OCR and handwriting)", date: "Dating", ent: "Entities (sender, recipient, place)"};
+const STAGE_UNIT = {seg: "pages", ocr: "pages", date: "documents", ent: "documents"};
+const WEIGHT = {seg: 0.30, ocr: 0.45, date: 0.15, ent: 0.10};
+const overrides = {};
+let state = {};
+
+function readState() {
+  const q = sel => document.querySelector(sel);
+  let t = +$("kTyped").value, p = +$("kPrinted").value, h = +$("kHand").value, s = t + p + h || 1;
+  state = {
+    macGb: +$("macGb").value, keys: {gemini: $("keyGemini").checked, openrouter: $("keyOpenrouter").checked, openai: $("keyOpenai").checked, mistral: $("keyMistral").checked},
+    plans: {claude: $("planClaude").checked, chatgpt: $("planChatgpt").checked}, cluster: $("cluster").checked, gpus: Math.max(1, +$("gpus").value || 1),
+    ceiling: $("noCeiling").checked ? Infinity : Math.max(0, +$("ceiling").value || 0), pages: Math.max(10, +$("pages").value || 1000), ppd: Math.max(1, +$("ppd").value || 4),
+    hours: Math.max(0.5, +$("hours").value || 8), checkMin: Math.max(0, +$("checkMin").value || 0),
+    mix: {typewritten: t / s, printed: p / s, handwritten: h / s}, news: $("kNews").checked, forms: $("kForms").checked, clips: $("kClips").checked,
+    opt: q("input[name=opt]:checked").value, finetune: $("finetune").value,
+  };
+  state.batchPrices = state.hours >= 24;
+  state.docs = Math.ceil(state.pages / state.ppd);
+  $("ceiling").disabled = $("noCeiling").checked;
+  $("kTypedV").textContent = Math.round(state.mix.typewritten * 100); $("kPrintedV").textContent = Math.round(state.mix.printed * 100); $("kHandV").textContent = Math.round(state.mix.handwritten * 100);
+  $("kindBar").innerHTML = `<i style="width:${state.mix.typewritten*100}%;background:var(--accent)"></i><i style="width:${state.mix.printed*100}%;background:var(--cluster)"></i><i style="width:${state.mix.handwritten*100}%;background:var(--cloud)"></i>`;
+}
+
+// Why a route cannot be used with the resources given; empty when it can.
+function blockers(r) {
+  const out = [], n = r.needs || {};
+  if (n.key && !n.key.some(k => state.keys[k])) { const names = n.key.map(k => ({gemini: "Gemini", openrouter: "OpenRouter", openai: "OpenAI", mistral: "Mistral"})[k]); out.push("needs " + (/^[AEIOU]/.test(names[0]) ? "an " : "a ") + names.join(" or ") + " key"); }
+  if (n.plan && !n.plan.every(p => state.plans[p])) out.push("needs the " + n.plan.map(p => ({claude: "Claude", chatgpt: "ChatGPT"})[p]).join(" and ") + " plan");
+  if (n.cluster && !state.cluster && !(n.key && n.key.some(k => state.keys[k]))) out.push("needs a cluster");
+  if (n.mac_gb != null && (r.peak_gb || 0) + 5 > state.macGb) out.push(`needs about ${Math.ceil((r.peak_gb || 0) + 5)} GB of memory (peak ${r.peak_gb} GB measured)`);
+  if (n.mac_gb && state.macGb < n.mac_gb) out.push(`needs a ${n.mac_gb} GB Mac`);
+  return out;
+}
+function money(stage, r) {
+  if (r.family !== "cloud") return 0;
+  const per = (state.batchPrices && r.usd_1000_batch != null) ? r.usd_1000_batch : r.usd_1000;
+  const units = STAGE_UNIT[stage] === "pages" ? state.pages : state.docs;
+  return per * units / 1000;
+}
+function hoursFor(stage, r) {
+  const s = STAGE_UNIT[stage] === "pages" ? r.s_page : r.s_doc;
+  if (s == null) return null;
+  const units = STAGE_UNIT[stage] === "pages" ? state.pages : state.docs;
+  const par = r.family === "cluster" ? state.gpus : r.family === "mac" ? 1 : r.family === "manual" ? 1 : 3;
+  return s * units / par / 3600;
+}
+// The accuracy the user would see, for their mix.
+function accuracy(stage, r) {
+  if (stage === "ocr") {
+    const m = state.mix; let a = 0, w = 0;
+    for (const k of ["typewritten", "printed", "handwritten"]) if (r.nes[k] != null) { a += m[k] * r.nes[k]; w += m[k]; }
+    return w ? a / w : r.nes.overall;
+  }
+  if (stage === "seg") {
+    const base = r.nocheck == null ? 0 : r.nocheck; // by hand: nothing is segmented until a gap is checked
+    const needChecks = r.checks_per_100 * state.pages / 100, canChecks = state.checkMin * 60 / 20; // 20 s a check
+    const f = needChecks ? Math.min(1, canChecks / needChecks) : 1;
+    return base + (r.after - base) * f;
+  }
+  if (stage === "date") return r.year.all != null ? r.year.all : r.year["not in text"] || 0;
+  if (stage === "ent") return 100 * (r.f1.sender + r.f1.recipient + r.f1.place) / 3;
+}
+function rows(stage) {
+  const list = F[stage].filter(r => !(stage === "date" && ["cluster-27b-image", "mac-8b-image"].includes(r.id)));
+  return list.map(r => ({r, acc: accuracy(stage, r), usd: money(stage, r), hrs: hoursFor(stage, r), blocked: blockers(r)}));
+}
+function wall(parts) { // Mac stages run one after another; cloud and plan calls overlap them; the cluster runs apart.
+  const t = {mac: 0, net: 0, cluster: 0, manual: 0};
+  for (const p of parts) { if (p.hrs == null) continue; const f = p.r.family; (f === "mac" ? (t.mac += p.hrs) : f === "cluster" ? (t.cluster += p.hrs) : f === "manual" ? (t.manual += p.hrs) : (t.net += p.hrs)); }
+  return Math.max(t.mac, t.net, t.cluster, t.manual);
+}
+function solve() {
+  const cand = {};
+  for (const s of STAGES) {
+    const all = rows(s), feas = all.filter(x => !x.blocked.length);
+    const best = Math.max(...feas.map(x => x.acc));
+    // keep the useful ones: a none/manual fallback always, then those not dominated on (acc, usd, hrs)
+    cand[s] = {all, feas, best};
+  }
+  let bestCombo = null, bestScore = -Infinity;
+  const pick = (i, chosen, usd) => {
+    if (i === STAGES.length) {
+      if (usd > state.ceiling + 1e-9) return;
+      const h = wall(chosen); if (h > state.hours) return;
+      let score = 0, acc = 0;
+      chosen.forEach((x, k) => { acc += WEIGHT[STAGES[k]] * x.acc; });
+      score = acc;
+      if (state.opt === "cost") score = acc - usd * 40; if (state.opt === "time") score = acc - h * 25;
+      if (score > bestScore) { bestScore = score; bestCombo = chosen.slice(); }
+      return;
+    }
+    const s = STAGES[i];
+    let opts = overrides[s] ? cand[s].all.filter(x => x.r.id === overrides[s]) : cand[s].feas;
+    if (!opts.length) opts = cand[s].feas;
+    // prune: for the two cheaper objectives keep only routes within 1 point of the stage's best plus everything cheaper/faster
+    for (const x of opts) pick(i + 1, chosen.concat([x]), usd + x.usd);
+  };
+  pick(0, [], 0);
+  if (!bestCombo) { // nothing fits the ceiling and the hours together: fall back to the cheapest feasible per stage
+    bestCombo = STAGES.map(s => cand[s].feas.slice().sort((a, b) => a.usd - b.usd || (a.hrs || 0) - (b.hrs || 0))[0]);
+  }
+  return {cand, combo: Object.fromEntries(STAGES.map((s, i) => [s, bestCombo[i]]))};
+}
+
+function kindLine(stage, x) {
+  const r = x.r;
+  if (stage === "ocr") return `<div class="kindrow"><span>typewritten <b>${fmt.pct(r.nes.typewritten)}</b></span><span>printed <b>${fmt.pct(r.nes.printed)}</b></span><span>handwritten <b>${fmt.pct(r.nes.handwritten)}</b></span>${r.public895 != null ? `<span>public hard pages (895) <b>${fmt.pct(r.public895)}</b></span>` : ""}<span class="small">NES on the owner's 96, ${r.n.overall ? r.n.overall[0] + " of " + r.n.overall[1] + " answered" : ""}</span></div>`;
+  if (stage === "seg") {
+    const need = Math.round(r.checks_per_100 * state.pages / 100);
+    return `<div class="kindrow"><span>right with no checking <b>${r.nocheck == null ? "0% (nothing is segmented)" : fmt.pct(r.nocheck)}</b></span><span>boundaries to check <b>${need}</b> (${r.checks_per_100} per 100 pages, about ${Math.round(need * 20 / 60)} min)</span><span>right after checking <b>${fmt.pct(r.after)}</b></span><span>errors no flag catches <b>${r.unflagged_per_500}</b> per 500 pages</span></div>`;
+  }
+  if (stage === "date") return `<div class="kindrow">${r.year["in text"] != null ? `<span>year printed in the text <b>${fmt.pct(r.year["in text"])}</b></span>` : ""}${r.year["not in text"] != null ? `<span>year not in the text <b>${fmt.pct(r.year["not in text"])}</b></span>` : ""}${r.pool_weighted ? `<span>weighted to the corpus <b>${fmt.pct(r.pool_weighted)}</b></span>` : ""}${r.uncertain_marked != null ? `<span>marks Date Uncertain where the owner did <b>${r.uncertain_marked}%</b></span>` : ""}${r.image_pass_finds ? `<span>finds a date on the page for <b>${r.image_pass_finds}%</b> of unprinted years</span>` : ""}</div>`;
+  if (stage === "ent") return `<div class="kindrow"><span>sender <b>${(r.f1.sender).toFixed(2)}</b></span><span>recipient <b>${(r.f1.recipient).toFixed(2)}</b></span><span>sending place <b>${(r.f1.place).toFixed(2)}</b></span><span class="small">F1 at edit distance 2, ${r.n} correspondence documents</span></div>`;
+}
+function accLabel(stage) { return {seg: "pages in the right document", ocr: "accuracy for your mix", date: "exact year", ent: "mean F1"}[stage]; }
+function unitsOf(s) { return STAGE_UNIT[s] === "pages" ? state.pages : state.docs; }
+function kindNotes(s) {
+  const out = [];
+  if (s === "seg" && state.news) out.push("Magazines and newsletters are the weak case for every route: on the Illustrated Review box Gemini gets 71% of gaps and the Mac 2B 73%, against 96% and 90% on letters (seg-boxes-score.md).");
+  if (s === "seg" && state.clips) out.push("On the clippings box (Deaver) the cloud windows reach 96 to 98% of pages; the on-device feature model fails there (17 to 23%).");
+  if (s === "ocr" && state.news) out.push("Newspapers add a layout stage before reading (see What is not a choice); small readers need it, Gemini does not.");
+  if (s === "ocr" && state.forms) out.push("Forms and registers: a layout detector must not run on them; whole-page reading only. On the public ledgers stratum every route is far below its letter figures.");
+  if (s === "ocr" && state.mix.handwritten > 0.3 && state.finetune !== "none") out.push("Fine-tuning: about 160 corrected lines of one hand lifts the Mac line reader by 2.5 points on that hand (ocr-ppocrv6-hands.md); one hand and one seed, so a kit option, not a default.");
+  return out.map(t => `<p class="small">${t}</p>`).join("");
+}
+function totalsHTML(sol) {
+  const combo = sol.combo;
+  const usd = STAGES.reduce((a, s) => a + combo[s].usd, 0), h = wall(STAGES.map(s => combo[s]));
+  const overall = STAGES.reduce((a, s) => a + WEIGHT[s] * combo[s].acc, 0);
+  const planUse = STAGES.filter(s => combo[s].r.family === "plan").length;
+  return `<div class="totals">
+    <div class="tile"><b class="small">This batch costs</b><div class="v num ${usd > state.ceiling ? "bad" : ""}">${fmt.usd(usd)}</div><small>${state.ceiling === Infinity ? "no ceiling" : "ceiling " + fmt.usd(state.ceiling)}${state.batchPrices ? " · batch prices" : ""}</small></div>
+    <div class="tile"><b class="small">It takes about</b><div class="v num ${h > state.hours ? "bad" : ""}">${fmt.hrs(h)}</div><small>allowed ${state.hours} h; machine time, not your checking</small></div>
+    <div class="tile"><b class="small">Weighted accuracy</b><div class="v num">${overall.toFixed(1)}</div><small>reading 45%, segmentation 30%, dating 15%, entities 10%</small></div>
+    <div class="tile"><b class="small">Your plan</b><div class="v num">${planUse ? "in use" : "idle"}</div><small>${planUse ? "the app shows the share of the five-hour and weekly windows a folder takes, measured on your account" : "no plan route chosen"}</small></div></div>`;
+}
+function overrideHTML(s, sol, x) {
+  const cand = sol.cand[s], r = x.r;
+  return `<div class="override"><label>Use instead: <select data-override="${s}"><option value="">recommended</option>${cand.all.map(y => `<option value="${y.r.id}" ${overrides[s] === y.r.id ? "selected" : ""} ${y.blocked.length ? "disabled" : ""}>${y.r.name}${y.blocked.length ? " (" + y.blocked[0] + ")" : ""}</option>`).join("")}</select></label>${overrides[s] ? `<button data-reset="${s}">Back to recommended</button>` : ""}<small>source: ${r.source || ""}</small></div>`;
+}
+// The stage card: the pick, its figures, why not a better one, the nearest alternatives.
+function cardHTML(s, sol, opts = {}) {
+  const x = sol.combo[s], r = x.r, cand = sol.cand[s];
+  const better = cand.all.filter(y => y.acc > x.acc + 0.5 && y.r.id !== r.id).sort((a, b) => b.acc - a.acc).slice(0, opts.compact ? 3 : 4);
+  const why = better.map(y => {
+    const reasons = y.blocked.length ? y.blocked : [y.usd > state.ceiling ? `${fmt.usd(y.usd)} is over the ceiling` : (y.hrs != null && y.hrs > state.hours) ? `${fmt.hrs(y.hrs)} is over the time allowed` : overrides[s] ? "you chose another route" : (state.opt !== "acc" ? "within a point and dearer or slower" : "the batch as a whole would pass a limit")];
+    return `<li><b>${y.r.name}</b> would reach ${fmt.pct(y.acc)} (+${(y.acc - x.acc).toFixed(1)}): ${reasons.join("; ")}.</li>`;
+  }).join("");
+  const alts = cand.feas.filter(y => y.r.id !== r.id).sort((a, b) => Math.abs(a.acc - x.acc) - Math.abs(b.acc - x.acc)).slice(0, 3);
+  const unit = STAGE_UNIT[s] === "pages" ? state.pages + " pages" : state.docs + " documents";
+  return `<header><h2>${STAGE_NAME[s]}</h2><span class="chip fam-${r.family}">${FAM[r.family]}</span>${overrides[s] ? '<span class="chip custom">Custom</span>' : '<span class="chip">recommended</span>'}</header>
+      <div class="pick">${r.name}</div>
+      ${kindLine(s, x)}
+      <div class="facts">
+        <div><b>${accLabel(s)}</b><span class="num">${fmt.pct(x.acc)}</span></div>
+        <div><b>cost, ${unit}</b><span class="num">${fmt.usd(x.usd)}${r.family === "plan" ? ` <small>(about $${(r.usd_1000 * unitsOf(s) / 1000).toFixed(2)} of list-price use on the plan)</small>` : r.family === "cluster" && r.usd_1000 ? ` <small>(${fmt.usd(r.usd_1000 * state.pages / 1000)} at cloud GPU rates)</small>` : ""}</span></div>
+        <div><b>time</b><span class="num">${fmt.hrs(x.hrs)}${r.s_est ? " <small>est.</small>" : ""}</span></div>
+        ${r.peak_gb ? `<div><b>memory</b><span class="num">${r.peak_gb} GB peak</span></div>` : ""}
+      </div>
+      ${r.note ? `<p class="small">${r.note}</p>` : ""}
+      ${why ? `<div class="why">What a better figure would need<ul>${why}</ul></div>` : `<div class="why">Nothing measured beats this with any resources.</div>`}
+      ${kindNotes(s)}
+      ${opts.compact ? "" : `<div class="alts">Nearest alternatives you could use: <table><tr><th>route</th><th class="num">${accLabel(s)}</th><th class="num">cost</th><th class="num">time</th></tr>${alts.map(y => `<tr><td>${y.r.name} <span class="chip fam-${y.r.family}">${FAM[y.r.family]}</span></td><td class="num">${fmt.pct(y.acc)}</td><td class="num">${fmt.usd(y.usd)}</td><td class="num">${fmt.hrs(y.hrs)}</td></tr>`).join("")}</table></div>`}
+      ${overrideHTML(s, sol, x)}`;
+}
+// The stage chart: accuracy against cost, the undominated line, the chosen point; with limits drawn when asked.
+function chartHTML(s, sol, opts = {}) {
+  const cand = sol.cand[s], chosen = sol.combo[s];
+  const pts = cand.all.map(x => ({...x, per1000: x.usd / unitsOf(s) * 1000}));
+  const W = 720, H = opts.height || 300, L = 50, R = 20, T = 16, B = 40, freeW = 70;
+  const ys = pts.map(p => p.acc).filter(v => v != null && v > 0);
+  const ymin = Math.max(0, Math.floor((Math.min(...ys) - 4) / 5) * 5), ymax = 100;
+  const xs = pts.map(p => p.per1000).filter(v => v > 0);
+  const xmin = Math.max(0.1, Math.min(...xs, 0.3)), xmax = Math.max(...xs, 40);
+  const X = v => v <= 0 ? L + freeW / 2 : L + freeW + (Math.log10(Math.min(Math.max(v, xmin), xmax)) - Math.log10(xmin)) / (Math.log10(xmax) - Math.log10(xmin)) * (W - L - R - freeW);
+  const Y = v => T + (ymax - v) / (ymax - ymin) * (H - T - B);
+  const feas = pts.filter(p => !p.blocked.length && p.acc > 0).sort((a, b) => a.per1000 - b.per1000 || b.acc - a.acc);
+  let pareto = [], top = -1; for (const p of feas) if (p.acc > top) { pareto.push(p); top = p.acc; }
+  const yt = []; for (let v = ymin; v <= ymax; v += (ymax - ymin) > 40 ? 10 : 5) yt.push(v);
+  const xt = [0.3, 1, 3, 10, 30].filter(v => v >= xmin && v <= xmax);
+  const shape = p => { const x = X(p.per1000), y = Y(p.acc), c = `var(--${p.r.family})`, over = !p.blocked.length && (p.usd > state.ceiling || (p.hrs != null && p.hrs > state.hours)), cls = `pt ${p.blocked.length ? "infeasible" : ""}`, st = p.blocked.length ? `stroke="${c}"` : `fill="${c}" ${over ? 'opacity=".45"' : ""}`;
+    const d = {mac: `<circle class="${cls}" cx="${x}" cy="${y}" r="6" ${st}/>`, cloud: `<rect class="${cls}" x="${x-5}" y="${y-5}" width="10" height="10" ${st}/>`, plan: `<polygon class="${cls}" points="${x},${y-7} ${x+7},${y} ${x},${y+7} ${x-7},${y}" ${st}/>`, cluster: `<polygon class="${cls}" points="${x},${y-7} ${x+7},${y+6} ${x-7},${y+6}" ${st}/>`, manual: `<circle class="${cls}" cx="${x}" cy="${y}" r="5" ${st}/>`}[p.r.family];
+    return `<g data-id="${p.r.id}" data-stage="${s}">${d}${p.r.id === chosen.r.id ? `<circle class="pt chosen-ring" cx="${x}" cy="${y}" r="11"/>` : ""}</g>`; };
+  let limits = "";
+  if (opts.limits && state.ceiling !== Infinity) {
+    const others = STAGES.filter(t => t !== s).reduce((a, t) => a + sol.combo[t].usd, 0);
+    const left = Math.max(0, state.ceiling - others) / unitsOf(s) * 1000;
+    const lx = left <= 0 ? L + freeW : X(left);
+    limits = `<line x1="${lx}" x2="${lx}" y1="${T}" y2="${H-B}" stroke="var(--bad)" stroke-width="1.5" stroke-dasharray="2 3"/><text x="${lx+4}" y="${T+11}" fill="var(--bad)">ceiling: ${fmt.usd(Math.max(0, state.ceiling - others))} left for this stage</text>`;
+  }
+  const table = opts.table ? `<div class="tablewrap"><table><tr><th>route</th><th>runs on</th><th class="num">${accLabel(s)}</th>${s === "ocr" ? '<th class="num">typed</th><th class="num">printed</th><th class="num">hands</th><th class="num">public 895</th>' : s === "seg" ? '<th class="num">no checking</th><th class="num">checks / 100</th><th class="num">after checking</th>' : ""}<th class="num">$ / 1,000</th><th class="num">this batch</th><th class="num">time</th><th>can you use it</th></tr>
+      ${pts.slice().sort((a, b) => b.acc - a.acc).map(p => `<tr class="clickable ${p.r.id === chosen.r.id ? "chosen" : ""} ${p.blocked.length ? "infeasible" : ""}" data-id="${p.r.id}" data-stage="${s}"><td>${p.r.name}</td><td><span class="chip fam-${p.r.family}">${FAM[p.r.family]}</span></td><td class="num">${fmt.pct(p.acc)}</td>${s === "ocr" ? `<td class="num">${fmt.pct(p.r.nes.typewritten)}</td><td class="num">${fmt.pct(p.r.nes.printed)}</td><td class="num">${fmt.pct(p.r.nes.handwritten)}</td><td class="num">${fmt.pct(p.r.public895)}</td>` : s === "seg" ? `<td class="num">${fmt.pct(p.r.nocheck)}</td><td class="num">${p.r.checks_per_100}</td><td class="num">${fmt.pct(p.r.after)}</td>` : ""}<td class="num">${p.r.family === "cloud" ? fmt.usd(p.r.usd_1000) : p.r.family === "plan" ? "plan" : p.r.family === "cluster" ? "cluster" : "free"}</td><td class="num">${fmt.usd(p.usd)}</td><td class="num">${fmt.hrs(p.hrs)}</td><td>${p.blocked.length ? p.blocked.join("; ") : p.usd > state.ceiling ? "over the ceiling" : (p.hrs != null && p.hrs > state.hours) ? "over the time allowed" : "yes"}</td></tr>`).join("")}</table></div>` : "";
+  const casc = (s === "ocr" && opts.table) ? `<p class="small">Cascades (a first reader checked against a second, escalating on disagreement) sit between the points: for example ${F.cascades[5].label} reaches ${F.cascades[5].nes} at ${fmt.usd(F.cascades[5].usd_1000)} per 1,000 pages, and ${F.cascades[16].label} ${F.cascades[16].nes} at ${fmt.usd(F.cascades[16].usd_1000)} (96 pages). The app would offer the cascade as one more point on this line.</p>` : "";
+  return `<svg class="frontier" viewBox="0 0 ${W} ${H}" role="img" aria-label="${STAGE_NAME[s]}: accuracy against cost">
+        ${yt.map(v => `<line class="grid" x1="${L}" x2="${W-R}" y1="${Y(v)}" y2="${Y(v)}"/><text x="${L-6}" y="${Y(v)+4}" text-anchor="end">${v}</text>`).join("")}
+        <rect x="${L}" y="${T}" width="${freeW}" height="${H-T-B}" fill="var(--accent-soft)" opacity=".5"/><text x="${L+freeW/2}" y="${H-B+16}" text-anchor="middle">free</text>
+        ${xt.map(v => `<line class="grid" x1="${X(v)}" x2="${X(v)}" y1="${T}" y2="${H-B}"/><text x="${X(v)}" y="${H-B+16}" text-anchor="middle">$${v}</text>`).join("")}
+        <text x="${W/2}" y="${H-6}" text-anchor="middle" fill="var(--muted)">cost per 1,000 ${STAGE_UNIT[s]}, list price (batch halves the cloud figures)</text>
+        <text transform="translate(12 ${H/2}) rotate(-90)" text-anchor="middle">${accLabel(s)}</text>
+        <polyline class="pareto" points="${pareto.map(p => X(p.per1000) + "," + Y(p.acc)).join(" ")}"/>
+        ${limits}
+        ${pts.filter(p => p.acc != null && p.acc >= ymin).map(shape).join("")}
+      </svg>${table}${casc}`;
+}
+// A one-line readout under a chart (the range-first shape).
+function readoutHTML(s, sol) {
+  const x = sol.combo[s], r = x.r;
+  return `<div class="facts" style="margin-top:6px"><div><b>chosen</b><span>${r.name} <span class="chip fam-${r.family}">${FAM[r.family]}</span> ${overrides[s] ? '<span class="chip custom">Custom</span>' : '<span class="chip">recommended</span>'}</span></div><div><b>${accLabel(s)}</b><span class="num">${fmt.pct(x.acc)}</span></div><div><b>this batch</b><span class="num">${fmt.usd(x.usd)}</span></div><div><b>time</b><span class="num">${fmt.hrs(x.hrs)}${r.s_est ? " <small>est.</small>" : ""}</span></div></div>${kindLine(s, x)}${kindNotes(s)}${overrides[s] ? `<button data-reset="${s}" style="margin-top:6px">Back to recommended</button>` : ""}`;
+}
+let shape = "A";
+function renderMain(sol) {
+  const tabRange = document.querySelector('.tabs button[data-tab="range"]');
+  tabRange.hidden = shape !== "A";
+  if (shape !== "A" && tabRange.getAttribute("aria-selected") === "true") document.querySelector('.tabs button[data-tab="settings"]').click();
+  $("totals").innerHTML = totalsHTML(sol);
+  if (shape === "A") {
+    $("stages").innerHTML = STAGES.map(s => `<article class="stage" data-stage="${s}">${cardHTML(s, sol)}</article>`).join("");
+    $("ranges").innerHTML = STAGES.map(s => `<div class="range"><h2 style="margin:14px 0 6px">${STAGE_NAME[s]}</h2>${chartHTML(s, sol, {table: true})}</div>`).join("");
+  } else if (shape === "B") {
+    $("stages").innerHTML = `<p class="note">Each stage is its range. The dashed red line is what is left of the ceiling for that stage once the others are paid for; faded marks fit your resources but not your limits. Click a mark or a row to choose.</p>` + STAGES.map(s => `<article class="stage range" data-stage="${s}"><h2>${STAGE_NAME[s]}</h2>${chartHTML(s, sol, {table: true, limits: true})}${readoutHTML(s, sol)}</article>`).join("");
+    $("ranges").innerHTML = "";
+  } else {
+    $("stages").innerHTML = STAGES.map(s => `<article class="stage both" data-stage="${s}"><div class="both-card">${cardHTML(s, sol, {compact: true})}</div><div class="both-chart range">${chartHTML(s, sol, {limits: true, height: 320})}<p class="small">Click a mark to choose it; the dashed red line is the ceiling left for this stage.</p></div></article>`).join("");
+    $("ranges").innerHTML = "";
+  }
+  bind(sol);
+}
+function bind(sol) {
+  document.querySelectorAll("select[data-override]").forEach(el => el.onchange = () => { if (el.value) overrides[el.dataset.override] = el.value; else delete overrides[el.dataset.override]; update(); });
+  document.querySelectorAll("button[data-reset]").forEach(el => el.onclick = () => { delete overrides[el.dataset.reset]; update(); });
+  const tip = $("tip");
+  document.querySelectorAll("svg g[data-id]").forEach(g => {
+    g.onclick = () => { const s = g.dataset.stage, p = sol.cand[s].all.find(x => x.r.id === g.dataset.id); if (p.blocked.length) return; overrides[s] = g.dataset.id; update(); };
+    g.onmousemove = e => { const s = g.dataset.stage, p = sol.cand[s].all.find(x => x.r.id === g.dataset.id); tip.style.display = "block"; tip.style.left = Math.min(e.clientX + 12, innerWidth - 290) + "px"; tip.style.top = (e.clientY + 12) + "px"; tip.innerHTML = `<b>${p.r.name}</b><br>${accLabel(s)} ${fmt.pct(p.acc)} · ${fmt.usd(p.usd)} this batch · ${fmt.hrs(p.hrs)}${p.blocked.length ? "<br>" + p.blocked.join("; ") : (p.usd > state.ceiling ? "<br>over the ceiling" : (p.hrs != null && p.hrs > state.hours) ? "<br>over the time allowed" : "") + "<br>click to choose"}`; };
+    g.onmouseleave = () => tip.style.display = "none";
+  });
+  document.querySelectorAll("tr.clickable").forEach(tr => tr.onclick = () => { const s = tr.dataset.stage, p = sol.cand[s].all.find(x => x.r.id === tr.dataset.id); if (p.blocked.length) return; overrides[s] = tr.dataset.id; update(); });
+}
+
+function renderRules() {
+  const fx = F.fixed;
+  $("rules").innerHTML = [
+    ["Document kinds", fx.kinds.rule, fx.kinds.source],
+    ["Text placement on the page", fx.placement.rule, fx.placement.source],
+    ["Enhancement and the reading copy", fx.enhancement.rule + " <b>User switch:</b> deskew or dewarp the reading copy, on or off.", fx.enhancement.source],
+    ["Layout and reading order", fx.layout.rule, fx.layout.source],
+    ["Marks, stamps and annotations", fx.marks.rule, fx.marks.source],
+    ["Image size sent", "2,048 px on the long side at JPEG quality 0.85 is fine for every reader; dewarping before reading harms every one (DocRes), and the quad crop is the one preparation that restores a layout detector on skewed photographs.", "enh-dewarp.md, layout-photo.md"],
+  ].map(([t, r, s]) => `<div class="tile"><h3>${t}</h3><p>${r}</p><small>source: ${s}</small></div>`).join("");
+  $("basis").innerHTML = [
+    "Reading accuracy is NES on the owner's 96 truth pages (50 typewritten, 28 printed, 16 handwritten, 2 mixed), the same images and prompt for every route; " + F.noise.truth_note,
+    "Your document mix weights the three per-kind figures. The public hard pages (895 pages in 15 strata: hands before 1850, Kurrent, charters, early print, ledgers, non-Latin scripts) are shown where a route was run on them; every route is far lower there and Gemini leads the open routes by 16 to 22 points.",
+    "Segmentation is pages in exactly the right document on the two locked test boxes (Stanton and RG 165, 363 pages), scored once; the rerun floor is " + F.noise.seg_rerun_pages_exact_points + ". The checking column assumes 20 seconds a boundary.",
+    "Dating is the exact year on 250 owner-tagged documents; 'not in the text' is the 131 whose year the text layer did not carry. The Date Uncertain and false-year figures are owner-ruled on blind sheets.",
+    "Entities are F1 at edit distance 2 on 138 correspondence documents against an owner-checked truth.",
+    "Cloud times are typical call times, not a bench table (marked est.); Mac times are medians on an M3 Pro with 18 GB; cluster times are pages an hour on one L40S. Cluster money is shown at cloud GPU rates for comparison only.",
+    "Prices are list prices read on 2026-10-20; Gemini 3.8 Flash doubles on 1 January 2027. Built " + F.built + " from the bench's panel-data.json and result notes by build_figures.py.",
+  ].map(t => `<li>${t}</li>`).join("");
+}
+
+function update() {
+  readState();
+  const sol = solve();
+  renderMain(sol);
+}
+document.querySelectorAll("#resources input, #resources select").forEach(el => el.addEventListener("input", update));
+document.querySelectorAll("input[name=shape]").forEach(el => el.addEventListener("change", () => { shape = el.value; update(); }));
+document.querySelectorAll(".tabs button").forEach(b => b.onclick = () => { document.querySelectorAll(".tabs button").forEach(x => x.setAttribute("aria-selected", x === b)); for (const t of ["settings", "range", "rules"]) $("tab-" + t).hidden = t !== b.dataset.tab; });
+const PRESETS = {
+  free: {macGb: 18, keys: [], plans: [], cluster: false, ceiling: 0, hours: 48, opt: "acc"},
+  cheap: {macGb: 18, keys: ["keyGemini", "keyOpenrouter"], plans: [], cluster: false, ceiling: 5, hours: 30, opt: "cost"},
+  plan: {macGb: 18, keys: [], plans: ["planClaude"], cluster: false, ceiling: 0, hours: 8, opt: "acc"},
+  best: {macGb: 32, keys: ["keyGemini", "keyOpenrouter", "keyOpenai", "keyMistral"], plans: ["planClaude", "planChatgpt"], cluster: true, ceiling: null, hours: 8, opt: "acc"},
+};
+document.querySelectorAll("[data-preset]").forEach(b => b.onclick = () => {
+  const p = PRESETS[b.dataset.preset]; for (const k of Object.keys(overrides)) delete overrides[k];
+  $("macGb").value = p.macGb; ["keyGemini", "keyOpenrouter", "keyOpenai", "keyMistral", "planClaude", "planChatgpt"].forEach(id => $(id).checked = p.keys.includes(id) || p.plans.includes(id));
+  $("cluster").checked = p.cluster; $("noCeiling").checked = p.ceiling == null; if (p.ceiling != null) $("ceiling").value = p.ceiling; $("hours").value = p.hours;
+  document.querySelector(`input[name=opt][value=${p.opt}]`).checked = true; update();
+});
+$("measureKinds").onclick = () => { $("kTyped").value = 52; $("kPrinted").value = 29; $("kHand").value = 19; update(); };
+// Per-collection keeping (a convenience in this prototype: this browser only).
+const KEY = "settings-prototype-collections";
+function loadSaved() { try { return JSON.parse(localStorage.getItem(KEY) || "{}"); } catch (e) { return {}; } }
+function renderSaved() { const s = loadSaved(); $("savedList").innerHTML = Object.keys(s).map(n => `<button data-load="${n}">${n}</button>`).join(""); document.querySelectorAll("[data-load]").forEach(b => b.onclick = () => { const v = loadSaved()[b.dataset.load]; if (!v) return; $("collName").value = b.dataset.load; for (const [id, val] of Object.entries(v.fields)) { const el = $(id); if (!el) continue; if (el.type === "checkbox") el.checked = val; else el.value = val; } document.querySelector(`input[name=opt][value=${v.opt}]`).checked = true; for (const k of Object.keys(overrides)) delete overrides[k]; Object.assign(overrides, v.overrides || {}); update(); }); }
+$("saveColl").onclick = () => { const s = loadSaved(); const fields = {}; document.querySelectorAll("#resources input:not([type=radio]), #resources select").forEach(el => fields[el.id] = el.type === "checkbox" ? el.checked : el.value); s[$("collName").value || "untitled"] = {fields, opt: state.opt, overrides: {...overrides}, saved: new Date().toISOString()}; try { localStorage.setItem(KEY, JSON.stringify(s)); } catch (e) {} renderSaved(); };
+renderRules(); renderSaved(); update();
+</script>

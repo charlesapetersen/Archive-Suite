@@ -1,0 +1,2135 @@
+{
+ "built": "2026-11-04",
+ "noise": {
+  "ocr_tie_points": 0.5,
+  "seg_rerun_pages_exact_points": "1.4 to 3.2 a box",
+  "truth_note": "The 96's truth was drafted by Claude Opus 5.5 and Gemini 3.8 Flash and adjudicated by the owner; close rows among those families are provisional. Differences under half a point of NES are ties (ocr-rerun-noise.md)."
+ },
+ "ocr": [
+  {
+   "id": "apple-vision",
+   "name": "Apple Vision (built in)",
+   "family": "mac",
+   "needs": {
+    "mac_gb": 0
+   },
+   "nes": {
+    "overall": 83.07,
+    "typewritten": 92.18,
+    "printed": 80.54,
+    "handwritten": 60.58
+   },
+   "n": {
+    "overall": [
+     96,
+     96
+    ],
+    "typewritten": [
+     50,
+     50
+    ],
+    "printed": [
+     28,
+     28
+    ],
+    "handwritten": [
+     16,
+     16
+    ]
+   },
+   "hands16": 60.58,
+   "public895": 39.3,
+   "public_n": [
+    305,
+    320
+   ],
+   "usd_1000": 0.0,
+   "usd_1000_batch": null,
+   "s_page": 1.0,
+   "s_est": true,
+   "peak_gb": 0.3,
+   "note": "macOS 27.2 reading; free; reads nothing on 15 of 80 charter pages (L7)",
+   "source": "ocr-panel-cloud.md / ocr-panel-local.md / ocr-mac-local-hw.md / farmshare/truth96-20261020.md; per-kind rows from the bench's panel-data.json charts"
+  },
+  {
+   "id": "paddleocr-vl1.6-bf16",
+   "name": "PaddleOCR-VL 1.6 (Mac)",
+   "family": "mac",
+   "needs": {
+    "mac_gb": 8
+   },
+   "nes": {
+    "overall": 88.81,
+    "typewritten": 93.69,
+    "printed": 85.89,
+    "handwritten": 80.37
+   },
+   "n": {
+    "overall": [
+     94,
+     96
+    ],
+    "typewritten": [
+     49,
+     50
+    ],
+    "printed": [
+     27,
+     28
+    ],
+    "handwritten": [
+     16,
+     16
+    ]
+   },
+   "hands16": 80.37,
+   "public895": 44.5,
+   "public_n": [
+    669,
+    895
+   ],
+   "usd_1000": 0.0,
+   "usd_1000_batch": null,
+   "s_page": 4.8,
+   "s_est": false,
+   "peak_gb": 2.6,
+   "note": "3 of 99 pages looped to the cap",
+   "source": "ocr-panel-cloud.md / ocr-panel-local.md / ocr-mac-local-hw.md / farmshare/truth96-20261020.md; per-kind rows from the bench's panel-data.json charts"
+  },
+  {
+   "id": "xiaomi-ocr-0-bf16",
+   "name": "Xiaomi-OCR-0 (Mac)",
+   "family": "mac",
+   "needs": {
+    "mac_gb": 8
+   },
+   "nes": {
+    "overall": 88.7,
+    "typewritten": 92.03,
+    "printed": 85.97,
+    "handwritten": 86.04
+   },
+   "n": {
+    "overall": [
+     96,
+     96
+    ],
+    "typewritten": [
+     50,
+     50
+    ],
+    "printed": [
+     28,
+     28
+    ],
+    "handwritten": [
+     16,
+     16
+    ]
+   },
+   "hands16": 86.04,
+   "public895": 62.2,
+   "public_n": [
+    894,
+    895
+   ],
+   "usd_1000": 0.0,
+   "usd_1000_batch": null,
+   "s_page": 8.8,
+   "s_est": false,
+   "peak_gb": 2.9,
+   "note": "",
+   "source": "ocr-panel-cloud.md / ocr-panel-local.md / ocr-mac-local-hw.md / farmshare/truth96-20261020.md; per-kind rows from the bench's panel-data.json charts"
+  },
+  {
+   "id": "lightonocr-3-4b-mlx8",
+   "name": "LightOnOCR-3 4B 8-bit (Mac)",
+   "family": "mac",
+   "needs": {
+    "mac_gb": 16
+   },
+   "nes": {
+    "overall": 89.17,
+    "typewritten": 90.81,
+    "printed": 87.98,
+    "handwritten": 89.91
+   },
+   "n": {
+    "overall": [
+     96,
+     96
+    ],
+    "typewritten": [
+     50,
+     50
+    ],
+    "printed": [
+     28,
+     28
+    ],
+    "handwritten": [
+     16,
+     16
+    ]
+   },
+   "hands16": 89.91,
+   "public895": null,
+   "public_n": null,
+   "usd_1000": 0.0,
+   "usd_1000_batch": null,
+   "s_page": 23.8,
+   "s_est": false,
+   "peak_gb": 6.4,
+   "note": "the lab's handwriting pick; no page failed",
+   "source": "ocr-panel-cloud.md / ocr-panel-local.md / ocr-mac-local-hw.md / farmshare/truth96-20261020.md; per-kind rows from the bench's panel-data.json charts"
+  },
+  {
+   "id": "qwen3.5-9b-mlx4",
+   "name": "Qwen3.5 9B 4-bit (Mac)",
+   "family": "mac",
+   "needs": {
+    "mac_gb": 16
+   },
+   "nes": {
+    "overall": 91.93,
+    "typewritten": 93.32,
+    "printed": 92.78,
+    "handwritten": 88.06
+   },
+   "n": {
+    "overall": [
+     95,
+     96
+    ],
+    "typewritten": [
+     49,
+     50
+    ],
+    "printed": [
+     28,
+     28
+    ],
+    "handwritten": [
+     16,
+     16
+    ]
+   },
+   "hands16": 88.06,
+   "public895": null,
+   "public_n": null,
+   "usd_1000": 0.0,
+   "usd_1000_batch": null,
+   "s_page": 37.6,
+   "s_est": false,
+   "peak_gb": 7.5,
+   "note": "9.1 GB whole-process footprint",
+   "source": "ocr-panel-cloud.md / ocr-panel-local.md / ocr-mac-local-hw.md / farmshare/truth96-20261020.md; per-kind rows from the bench's panel-data.json charts"
+  },
+  {
+   "id": "qwen3-vl-8b-mlx4",
+   "name": "Qwen3-VL 8B 4-bit (Mac)",
+   "family": "mac",
+   "needs": {
+    "mac_gb": 16
+   },
+   "nes": {
+    "overall": 89.67,
+    "typewritten": 91.59,
+    "printed": 91.69,
+    "handwritten": 89.24
+   },
+   "n": {
+    "overall": [
+     92,
+     96
+    ],
+    "typewritten": [
+     48,
+     50
+    ],
+    "printed": [
+     27,
+     28
+    ],
+    "handwritten": [
+     16,
+     16
+    ]
+   },
+   "hands16": 89.24,
+   "public895": null,
+   "public_n": null,
+   "usd_1000": 0.0,
+   "usd_1000_batch": null,
+   "s_page": 40.8,
+   "s_est": false,
+   "peak_gb": 7.6,
+   "note": "3 of 99 pages looped, 7 minutes each; needs a loop stop",
+   "source": "ocr-panel-cloud.md / ocr-panel-local.md / ocr-mac-local-hw.md / farmshare/truth96-20261020.md; per-kind rows from the bench's panel-data.json charts"
+  },
+  {
+   "id": "apple-fm-27",
+   "name": "macOS 27 on-device model",
+   "family": "mac",
+   "needs": {
+    "mac_gb": 0
+   },
+   "nes": {
+    "overall": 42.35,
+    "typewritten": 46.14,
+    "printed": 27.97,
+    "handwritten": 54.81
+   },
+   "n": {
+    "overall": [
+     63,
+     96
+    ],
+    "typewritten": [
+     33,
+     50
+    ],
+    "printed": [
+     15,
+     28
+    ],
+    "handwritten": [
+     13,
+     16
+    ]
+   },
+   "hands16": null,
+   "public895": null,
+   "public_n": null,
+   "usd_1000": 0.0,
+   "usd_1000_batch": null,
+   "s_page": 9.5,
+   "s_est": false,
+   "peak_gb": 1.0,
+   "note": "not a reader: a third of pages loop; shown for completeness",
+   "source": "ocr-panel-cloud.md / ocr-panel-local.md / ocr-mac-local-hw.md / farmshare/truth96-20261020.md; per-kind rows from the bench's panel-data.json charts"
+  },
+  {
+   "id": "gemini3.8-flash",
+   "name": "Gemini 3.8 Flash",
+   "family": "cloud",
+   "needs": {
+    "key": [
+     "gemini",
+     "openrouter"
+    ]
+   },
+   "nes": {
+    "overall": 94.43,
+    "typewritten": 98.73,
+    "printed": 87.21,
+    "handwritten": 95.81
+   },
+   "n": {
+    "overall": [
+     94,
+     96
+    ],
+    "typewritten": [
+     50,
+     50
+    ],
+    "printed": [
+     26,
+     28
+    ],
+    "handwritten": [
+     16,
+     16
+    ]
+   },
+   "hands16": 95.81,
+   "public895": 70.3,
+   "public_n": [
+    419,
+    440
+   ],
+   "usd_1000": 3.22,
+   "usd_1000_batch": 1.61,
+   "s_page": 6.0,
+   "s_est": true,
+   "peak_gb": 0,
+   "note": "the app's default; 2 of 96 refused; price doubles 1 Jan 2027",
+   "source": "ocr-panel-cloud.md / ocr-panel-local.md / ocr-mac-local-hw.md / farmshare/truth96-20261020.md; per-kind rows from the bench's panel-data.json charts"
+  },
+  {
+   "id": "gemini3.1-pro",
+   "name": "Gemini 3.1 Pro",
+   "family": "cloud",
+   "needs": {
+    "key": [
+     "gemini",
+     "openrouter"
+    ]
+   },
+   "nes": {
+    "overall": 94.82,
+    "typewritten": 98.74,
+    "printed": 89.21,
+    "handwritten": 93.98
+   },
+   "n": {
+    "overall": [
+     94,
+     96
+    ],
+    "typewritten": [
+     50,
+     50
+    ],
+    "printed": [
+     26,
+     28
+    ],
+    "handwritten": [
+     16,
+     16
+    ]
+   },
+   "hands16": 93.98,
+   "public895": null,
+   "public_n": null,
+   "usd_1000": 21.92,
+   "usd_1000_batch": 10.96,
+   "s_page": 6.0,
+   "s_est": true,
+   "peak_gb": 0,
+   "note": "2 refusals",
+   "source": "ocr-panel-cloud.md / ocr-panel-local.md / ocr-mac-local-hw.md / farmshare/truth96-20261020.md; per-kind rows from the bench's panel-data.json charts"
+  },
+  {
+   "id": "gemini3.5-flash",
+   "name": "Gemini 3.5 Flash",
+   "family": "cloud",
+   "needs": {
+    "key": [
+     "gemini",
+     "openrouter"
+    ]
+   },
+   "nes": {
+    "overall": 93.45,
+    "typewritten": 97.34,
+    "printed": 88.18,
+    "handwritten": 92.69
+   },
+   "n": {
+    "overall": [
+     94,
+     96
+    ],
+    "typewritten": [
+     50,
+     50
+    ],
+    "printed": [
+     26,
+     28
+    ],
+    "handwritten": [
+     16,
+     16
+    ]
+   },
+   "hands16": 92.69,
+   "public895": null,
+   "public_n": null,
+   "usd_1000": 6.23,
+   "usd_1000_batch": 3.12,
+   "s_page": 6.0,
+   "s_est": true,
+   "peak_gb": 0,
+   "note": "",
+   "source": "ocr-panel-cloud.md / ocr-panel-local.md / ocr-mac-local-hw.md / farmshare/truth96-20261020.md; per-kind rows from the bench's panel-data.json charts"
+  },
+  {
+   "id": "gemini3.5-flash-lite",
+   "name": "Gemini 3.5 Flash-Lite",
+   "family": "cloud",
+   "needs": {
+    "key": [
+     "gemini",
+     "openrouter"
+    ]
+   },
+   "nes": {
+    "overall": 93.12,
+    "typewritten": 97.56,
+    "printed": 87.92,
+    "handwritten": 91.96
+   },
+   "n": {
+    "overall": [
+     94,
+     96
+    ],
+    "typewritten": [
+     50,
+     50
+    ],
+    "printed": [
+     26,
+     28
+    ],
+    "handwritten": [
+     16,
+     16
+    ]
+   },
+   "hands16": 91.96,
+   "public895": null,
+   "public_n": null,
+   "usd_1000": 1.57,
+   "usd_1000_batch": 0.79,
+   "s_page": 6.0,
+   "s_est": true,
+   "peak_gb": 0,
+   "note": "",
+   "source": "ocr-panel-cloud.md / ocr-panel-local.md / ocr-mac-local-hw.md / farmshare/truth96-20261020.md; per-kind rows from the bench's panel-data.json charts"
+  },
+  {
+   "id": "gemini3.1-flash-lite",
+   "name": "Gemini 3.1 Flash-Lite",
+   "family": "cloud",
+   "needs": {
+    "key": [
+     "gemini",
+     "openrouter"
+    ]
+   },
+   "nes": {
+    "overall": 91.59,
+    "typewritten": 96.36,
+    "printed": 86.85,
+    "handwritten": 86.55
+   },
+   "n": {
+    "overall": [
+     93,
+     96
+    ],
+    "typewritten": [
+     50,
+     50
+    ],
+    "printed": [
+     26,
+     28
+    ],
+    "handwritten": [
+     15,
+     16
+    ]
+   },
+   "hands16": 86.55,
+   "public895": null,
+   "public_n": null,
+   "usd_1000": 1.17,
+   "usd_1000_batch": 0.58,
+   "s_page": 6.0,
+   "s_est": true,
+   "peak_gb": 0,
+   "note": "",
+   "source": "ocr-panel-cloud.md / ocr-panel-local.md / ocr-mac-local-hw.md / farmshare/truth96-20261020.md; per-kind rows from the bench's panel-data.json charts"
+  },
+  {
+   "id": "qwen3.5-397b",
+   "name": "Qwen3.5 397B (OpenRouter)",
+   "family": "cloud",
+   "needs": {
+    "key": [
+     "openrouter"
+    ]
+   },
+   "nes": {
+    "overall": 94.02,
+    "typewritten": 96.18,
+    "printed": 93.72,
+    "handwritten": 90.84
+   },
+   "n": {
+    "overall": [
+     96,
+     96
+    ],
+    "typewritten": [
+     50,
+     50
+    ],
+    "printed": [
+     28,
+     28
+    ],
+    "handwritten": [
+     16,
+     16
+    ]
+   },
+   "hands16": 90.84,
+   "public895": null,
+   "public_n": null,
+   "usd_1000": 2.02,
+   "usd_1000_batch": null,
+   "s_page": 6.0,
+   "s_est": true,
+   "peak_gb": 0,
+   "note": "open weights, hosted",
+   "source": "ocr-panel-cloud.md / ocr-panel-local.md / ocr-mac-local-hw.md / farmshare/truth96-20261020.md; per-kind rows from the bench's panel-data.json charts"
+  },
+  {
+   "id": "qwen3-vl-235b",
+   "name": "Qwen3-VL 235B (OpenRouter)",
+   "family": "cloud",
+   "needs": {
+    "key": [
+     "openrouter"
+    ]
+   },
+   "nes": {
+    "overall": 93.98,
+    "typewritten": 96.09,
+    "printed": 93.25,
+    "handwritten": 91.59
+   },
+   "n": {
+    "overall": [
+     96,
+     96
+    ],
+    "typewritten": [
+     50,
+     50
+    ],
+    "printed": [
+     28,
+     28
+    ],
+    "handwritten": [
+     16,
+     16
+    ]
+   },
+   "hands16": 91.59,
+   "public895": 51.6,
+   "public_n": [
+    365,
+    440
+   ],
+   "usd_1000": 1.22,
+   "usd_1000_batch": null,
+   "s_page": 6.0,
+   "s_est": true,
+   "peak_gb": 0,
+   "note": "open weights, hosted",
+   "source": "ocr-panel-cloud.md / ocr-panel-local.md / ocr-mac-local-hw.md / farmshare/truth96-20261020.md; per-kind rows from the bench's panel-data.json charts"
+  },
+  {
+   "id": "qwen3.6-27b",
+   "name": "Qwen3.6 27B (OpenRouter)",
+   "family": "cloud",
+   "needs": {
+    "key": [
+     "openrouter"
+    ]
+   },
+   "nes": {
+    "overall": 94.35,
+    "typewritten": 95.54,
+    "printed": 94.82,
+    "handwritten": 92.61
+   },
+   "n": {
+    "overall": [
+     95,
+     96
+    ],
+    "typewritten": [
+     49,
+     50
+    ],
+    "printed": [
+     28,
+     28
+    ],
+    "handwritten": [
+     16,
+     16
+    ]
+   },
+   "hands16": 92.61,
+   "public895": 63.3,
+   "public_n": [
+    798,
+    895
+   ],
+   "usd_1000": 1.94,
+   "usd_1000_batch": null,
+   "s_page": 6.0,
+   "s_est": true,
+   "peak_gb": 0,
+   "note": "open weights, hosted fp8; the same model runs on a cluster",
+   "source": "ocr-panel-cloud.md / ocr-panel-local.md / ocr-mac-local-hw.md / farmshare/truth96-20261020.md; per-kind rows from the bench's panel-data.json charts"
+  },
+  {
+   "id": "qwen3.6-35b-a3b",
+   "name": "Qwen3.6 35B-A3B (OpenRouter)",
+   "family": "cloud",
+   "needs": {
+    "key": [
+     "openrouter"
+    ]
+   },
+   "nes": {
+    "overall": 93.02,
+    "typewritten": 95.69,
+    "printed": 92.34,
+    "handwritten": 88.83
+   },
+   "n": {
+    "overall": [
+     96,
+     96
+    ],
+    "typewritten": [
+     50,
+     50
+    ],
+    "printed": [
+     28,
+     28
+    ],
+    "handwritten": [
+     16,
+     16
+    ]
+   },
+   "hands16": 88.83,
+   "public895": 63.9,
+   "public_n": [
+    818,
+    895
+   ],
+   "usd_1000": 0.6,
+   "usd_1000_batch": null,
+   "s_page": 6.0,
+   "s_est": true,
+   "peak_gb": 0,
+   "note": "open weights, hosted",
+   "source": "ocr-panel-cloud.md / ocr-panel-local.md / ocr-mac-local-hw.md / farmshare/truth96-20261020.md; per-kind rows from the bench's panel-data.json charts"
+  },
+  {
+   "id": "qwen3.8-flash",
+   "name": "Qwen3.8 Flash (OpenRouter)",
+   "family": "cloud",
+   "needs": {
+    "key": [
+     "openrouter"
+    ]
+   },
+   "nes": {
+    "overall": 91.91,
+    "typewritten": 93.42,
+    "printed": 91.27,
+    "handwritten": 91.25
+   },
+   "n": {
+    "overall": [
+     93,
+     96
+    ],
+    "typewritten": [
+     48,
+     50
+    ],
+    "printed": [
+     27,
+     28
+    ],
+    "handwritten": [
+     16,
+     16
+    ]
+   },
+   "hands16": 91.25,
+   "public895": null,
+   "public_n": null,
+   "usd_1000": 0.6,
+   "usd_1000_batch": null,
+   "s_page": 6.0,
+   "s_est": true,
+   "peak_gb": 0,
+   "note": "3 of 96 failed",
+   "source": "ocr-panel-cloud.md / ocr-panel-local.md / ocr-mac-local-hw.md / farmshare/truth96-20261020.md; per-kind rows from the bench's panel-data.json charts"
+  },
+  {
+   "id": "gpt5.4-mini",
+   "name": "GPT-5.4 Mini",
+   "family": "cloud",
+   "needs": {
+    "key": [
+     "openai",
+     "openrouter"
+    ]
+   },
+   "nes": {
+    "overall": 93.48,
+    "typewritten": 95.49,
+    "printed": 93.32,
+    "handwritten": 89.13
+   },
+   "n": {
+    "overall": [
+     95,
+     96
+    ],
+    "typewritten": [
+     49,
+     50
+    ],
+    "printed": [
+     28,
+     28
+    ],
+    "handwritten": [
+     16,
+     16
+    ]
+   },
+   "hands16": 89.13,
+   "public895": null,
+   "public_n": null,
+   "usd_1000": 5.55,
+   "usd_1000_batch": 2.78,
+   "s_page": 6.0,
+   "s_est": true,
+   "peak_gb": 0,
+   "note": "",
+   "source": "ocr-panel-cloud.md / ocr-panel-local.md / ocr-mac-local-hw.md / farmshare/truth96-20261020.md; per-kind rows from the bench's panel-data.json charts"
+  },
+  {
+   "id": "gpt5.6-luna",
+   "name": "GPT-5.6 Luna",
+   "family": "cloud",
+   "needs": {
+    "key": [
+     "openai",
+     "openrouter"
+    ]
+   },
+   "nes": {
+    "overall": 92.09,
+    "typewritten": 94.98,
+    "printed": 92.61,
+    "handwritten": 85.2
+   },
+   "n": {
+    "overall": [
+     95,
+     96
+    ],
+    "typewritten": [
+     49,
+     50
+    ],
+    "printed": [
+     28,
+     28
+    ],
+    "handwritten": [
+     16,
+     16
+    ]
+   },
+   "hands16": 85.2,
+   "public895": null,
+   "public_n": null,
+   "usd_1000": 1.41,
+   "usd_1000_batch": 0.71,
+   "s_page": 6.0,
+   "s_est": true,
+   "peak_gb": 0,
+   "note": "",
+   "source": "ocr-panel-cloud.md / ocr-panel-local.md / ocr-mac-local-hw.md / farmshare/truth96-20261020.md; per-kind rows from the bench's panel-data.json charts"
+  },
+  {
+   "id": "mistral-large4",
+   "name": "Mistral Large 4",
+   "family": "cloud",
+   "needs": {
+    "key": [
+     "mistral",
+     "openrouter"
+    ]
+   },
+   "nes": {
+    "overall": 93.17,
+    "typewritten": 95.46,
+    "printed": 92.46,
+    "handwritten": 92.2
+   },
+   "n": {
+    "overall": [
+     96,
+     96
+    ],
+    "typewritten": [
+     50,
+     50
+    ],
+    "printed": [
+     28,
+     28
+    ],
+    "handwritten": [
+     16,
+     16
+    ]
+   },
+   "hands16": 92.2,
+   "public895": null,
+   "public_n": null,
+   "usd_1000": 2.69,
+   "usd_1000_batch": null,
+   "s_page": 6.0,
+   "s_est": true,
+   "peak_gb": 0,
+   "note": "",
+   "source": "ocr-panel-cloud.md / ocr-panel-local.md / ocr-mac-local-hw.md / farmshare/truth96-20261020.md; per-kind rows from the bench's panel-data.json charts"
+  },
+  {
+   "id": "mistral-ocr-4-1",
+   "name": "Mistral OCR 4.1",
+   "family": "cloud",
+   "needs": {
+    "key": [
+     "mistral"
+    ]
+   },
+   "nes": {
+    "overall": 92.92,
+    "typewritten": 95.68,
+    "printed": 91.49,
+    "handwritten": 89.1
+   },
+   "n": {
+    "overall": [
+     96,
+     96
+    ],
+    "typewritten": [
+     50,
+     50
+    ],
+    "printed": [
+     28,
+     28
+    ],
+    "handwritten": [
+     16,
+     16
+    ]
+   },
+   "hands16": 89.1,
+   "public895": null,
+   "public_n": null,
+   "usd_1000": 4.0,
+   "usd_1000_batch": 2.0,
+   "s_page": 6.0,
+   "s_est": true,
+   "peak_gb": 0,
+   "note": "text only, no kind label; $4 per 1,000 pages flat",
+   "source": "ocr-panel-cloud.md / ocr-panel-local.md / ocr-mac-local-hw.md / farmshare/truth96-20261020.md; per-kind rows from the bench's panel-data.json charts"
+  },
+  {
+   "id": "claude-sonnet5.5",
+   "name": "Claude Sonnet 5.5 (your Claude plan)",
+   "family": "plan",
+   "needs": {
+    "plan": [
+     "claude"
+    ]
+   },
+   "nes": {
+    "overall": 96.47,
+    "typewritten": 98.57,
+    "printed": 96.31,
+    "handwritten": 92.5
+   },
+   "n": {
+    "overall": [
+     96,
+     96
+    ],
+    "typewritten": [
+     50,
+     50
+    ],
+    "printed": [
+     28,
+     28
+    ],
+    "handwritten": [
+     16,
+     16
+    ]
+   },
+   "hands16": 92.5,
+   "public895": null,
+   "public_n": null,
+   "usd_1000": 11.5,
+   "usd_1000_batch": 5.75,
+   "s_page": 10.0,
+   "s_est": false,
+   "peak_gb": 0,
+   "note": "no money; draws on the plan's five-hour and weekly windows; the truth leans toward this family",
+   "source": "ocr-panel-cloud.md / ocr-panel-local.md / ocr-mac-local-hw.md / farmshare/truth96-20261020.md; per-kind rows from the bench's panel-data.json charts"
+  },
+  {
+   "id": "qwen3.6-27b-farmshare",
+   "name": "Qwen3.6 27B (your cluster)",
+   "family": "cluster",
+   "needs": {
+    "cluster": true
+   },
+   "nes": {
+    "overall": 95.25,
+    "typewritten": 97.22,
+    "printed": 94.93,
+    "handwritten": 92.8
+   },
+   "n": {
+    "overall": [
+     96,
+     96
+    ],
+    "typewritten": [
+     50,
+     50
+    ],
+    "printed": [
+     28,
+     28
+    ],
+    "handwritten": [
+     16,
+     16
+    ]
+   },
+   "hands16": 92.61,
+   "public895": 63.3,
+   "public_n": [
+    798,
+    895
+   ],
+   "usd_1000": 1.95,
+   "usd_1000_batch": null,
+   "s_page": 3.4,
+   "s_est": false,
+   "peak_gb": 0,
+   "note": "one L40S; fp8 KV cache",
+   "source": "ocr-panel-cloud.md / ocr-panel-local.md / ocr-mac-local-hw.md / farmshare/truth96-20261020.md; per-kind rows from the bench's panel-data.json charts"
+  },
+  {
+   "id": "qwen3.5-27b-farmshare",
+   "name": "Qwen3.5 27B (your cluster)",
+   "family": "cluster",
+   "needs": {
+    "cluster": true
+   },
+   "nes": {
+    "overall": 95.33,
+    "typewritten": 97.61,
+    "printed": 94.98,
+    "handwritten": 92.1
+   },
+   "n": {
+    "overall": [
+     96,
+     96
+    ],
+    "typewritten": [
+     50,
+     50
+    ],
+    "printed": [
+     28,
+     28
+    ],
+    "handwritten": [
+     16,
+     16
+    ]
+   },
+   "hands16": null,
+   "public895": 62.2,
+   "public_n": [
+    764,
+    895
+   ],
+   "usd_1000": 2.1,
+   "usd_1000_batch": null,
+   "s_page": 3.5,
+   "s_est": false,
+   "peak_gb": 0,
+   "note": "one L40S",
+   "source": "ocr-panel-cloud.md / ocr-panel-local.md / ocr-mac-local-hw.md / farmshare/truth96-20261020.md; per-kind rows from the bench's panel-data.json charts"
+  },
+  {
+   "id": "qwen3.6-35b-a3b-farmshare",
+   "name": "Qwen3.6 35B-A3B (your cluster)",
+   "family": "cluster",
+   "needs": {
+    "cluster": true
+   },
+   "nes": {
+    "overall": 94.51,
+    "typewritten": 96.45,
+    "printed": 95.26,
+    "handwritten": 89.84
+   },
+   "n": {
+    "overall": [
+     96,
+     96
+    ],
+    "typewritten": [
+     50,
+     50
+    ],
+    "printed": [
+     28,
+     28
+    ],
+    "handwritten": [
+     16,
+     16
+    ]
+   },
+   "hands16": 88.83,
+   "public895": 63.9,
+   "public_n": [
+    818,
+    895
+   ],
+   "usd_1000": 0.87,
+   "usd_1000_batch": null,
+   "s_page": 1.1,
+   "s_est": false,
+   "peak_gb": 0,
+   "note": "one L40S; the fast cluster route",
+   "source": "ocr-panel-cloud.md / ocr-panel-local.md / ocr-mac-local-hw.md / farmshare/truth96-20261020.md; per-kind rows from the bench's panel-data.json charts"
+  },
+  {
+   "id": "qwen3.5-9b-sherlock",
+   "name": "Qwen3.5 9B (your cluster)",
+   "family": "cluster",
+   "needs": {
+    "cluster": true
+   },
+   "nes": {
+    "overall": 93.1,
+    "typewritten": 95.64,
+    "printed": 91.15,
+    "handwritten": 90.7
+   },
+   "n": {
+    "overall": [
+     94,
+     96
+    ],
+    "typewritten": [
+     49,
+     50
+    ],
+    "printed": [
+     27,
+     28
+    ],
+    "handwritten": [
+     16,
+     16
+    ]
+   },
+   "hands16": 91.0,
+   "public895": null,
+   "public_n": null,
+   "usd_1000": 0.48,
+   "usd_1000_batch": null,
+   "s_page": 0.9,
+   "s_est": false,
+   "peak_gb": 0,
+   "note": "",
+   "source": "ocr-panel-cloud.md / ocr-panel-local.md / ocr-mac-local-hw.md / farmshare/truth96-20261020.md; per-kind rows from the bench's panel-data.json charts"
+  },
+  {
+   "id": "lightonocr3-4b-farmshare",
+   "name": "LightOnOCR-3 4B (your cluster)",
+   "family": "cluster",
+   "needs": {
+    "cluster": true
+   },
+   "nes": {
+    "overall": 89.38,
+    "typewritten": 91.18,
+    "printed": 88.54,
+    "handwritten": 88.85
+   },
+   "n": {
+    "overall": [
+     96,
+     96
+    ],
+    "typewritten": [
+     50,
+     50
+    ],
+    "printed": [
+     28,
+     28
+    ],
+    "handwritten": [
+     16,
+     16
+    ]
+   },
+   "hands16": 89.21,
+   "public895": 62.9,
+   "public_n": [
+    810,
+    895
+   ],
+   "usd_1000": 0.0,
+   "usd_1000_batch": null,
+   "s_page": 1.4,
+   "s_est": false,
+   "peak_gb": 0,
+   "note": "",
+   "source": "ocr-panel-cloud.md / ocr-panel-local.md / ocr-mac-local-hw.md / farmshare/truth96-20261020.md; per-kind rows from the bench's panel-data.json charts"
+  },
+  {
+   "id": "paddleocr-vl1.6-sherlock",
+   "name": "PaddleOCR-VL 1.6 (your cluster)",
+   "family": "cluster",
+   "needs": {
+    "cluster": true
+   },
+   "nes": {
+    "overall": 88.87,
+    "typewritten": 93.67,
+    "printed": 86.31,
+    "handwritten": 80.06
+   },
+   "n": {
+    "overall": [
+     94,
+     96
+    ],
+    "typewritten": [
+     49,
+     50
+    ],
+    "printed": [
+     27,
+     28
+    ],
+    "handwritten": [
+     16,
+     16
+    ]
+   },
+   "hands16": 80.22,
+   "public895": 44.5,
+   "public_n": [
+    669,
+    895
+   ],
+   "usd_1000": 0.0,
+   "usd_1000_batch": null,
+   "s_page": 0.3,
+   "s_est": false,
+   "peak_gb": 0,
+   "note": "12,000 pages an hour a GPU",
+   "source": "ocr-panel-cloud.md / ocr-panel-local.md / ocr-mac-local-hw.md / farmshare/truth96-20261020.md; per-kind rows from the bench's panel-data.json charts"
+  }
+ ],
+ "seg": [
+  {
+   "id": "Full manual",
+   "name": "No model: check every gap by hand",
+   "family": "manual",
+   "needs": {},
+   "nocheck": null,
+   "checks_per_100": 86.8,
+   "after": 100.0,
+   "unflagged_per_500": 0,
+   "usd_1000": 0.0,
+   "usd_1000_batch": null,
+   "s_page": 0,
+   "s_est": false,
+   "peak_gb": 0,
+   "note": "every gap is a check",
+   "source": "options.md"
+  },
+  {
+   "id": "Claude only",
+   "name": "Claude Sonnet 5.5 (your Claude plan)",
+   "family": "plan",
+   "needs": {
+    "plan": [
+     "claude"
+    ]
+   },
+   "nocheck": 85.5,
+   "checks_per_100": 10.2,
+   "after": 97.3,
+   "unflagged_per_500": 3,
+   "usd_1000": 16.93,
+   "usd_1000_batch": null,
+   "s_page": 1.5,
+   "s_est": false,
+   "peak_gb": 0,
+   "note": "25 min per 1,000 pages at three calls at once (usage.md); about 5% of a five-hour window per 100 pages on the owner's plan",
+   "source": "options.md"
+  },
+  {
+   "id": "Gemini only",
+   "name": "Gemini 3.8 Flash",
+   "family": "cloud",
+   "needs": {
+    "key": [
+     "gemini",
+     "openrouter"
+    ]
+   },
+   "nocheck": 87.3,
+   "checks_per_100": 24.2,
+   "after": 98.5,
+   "unflagged_per_500": 2,
+   "usd_1000": 3.61,
+   "usd_1000_batch": 1.81,
+   "s_page": 5.3,
+   "s_est": true,
+   "peak_gb": 0,
+   "note": "16 s a seven-page window at stride 3 (seg-boxes-score.md)",
+   "source": "options.md"
+  },
+  {
+   "id": "ChatGPT only",
+   "name": "ChatGPT (your plan)",
+   "family": "plan",
+   "needs": {
+    "plan": [
+     "chatgpt"
+    ]
+   },
+   "nocheck": 90.9,
+   "checks_per_100": 79.1,
+   "after": 100.0,
+   "unflagged_per_500": 0,
+   "usd_1000": 14.51,
+   "usd_1000_batch": null,
+   "s_page": 5.0,
+   "s_est": true,
+   "peak_gb": 0,
+   "note": "Sign in with ChatGPT; no meter the app can read",
+   "source": "options.md"
+  },
+  {
+   "id": "Claude and ChatGPT together",
+   "name": "Claude and ChatGPT together (both plans)",
+   "family": "plan",
+   "needs": {
+    "plan": [
+     "claude",
+     "chatgpt"
+    ]
+   },
+   "nocheck": 90.9,
+   "checks_per_100": 10.2,
+   "after": 97.3,
+   "unflagged_per_500": 3,
+   "usd_1000": 31.44,
+   "usd_1000_batch": null,
+   "s_page": 5.0,
+   "s_est": true,
+   "peak_gb": 0,
+   "note": "",
+   "source": "options.md"
+  },
+  {
+   "id": "GLM-5.3 Flash only (budget)",
+   "name": "GLM-5.3 Flash (OpenRouter)",
+   "family": "cloud",
+   "needs": {
+    "key": [
+     "openrouter"
+    ]
+   },
+   "nocheck": 80.6,
+   "checks_per_100": 33.1,
+   "after": 97.0,
+   "unflagged_per_500": 3,
+   "usd_1000": 1.16,
+   "usd_1000_batch": 0.46,
+   "s_page": 5.0,
+   "s_est": true,
+   "peak_gb": 0,
+   "note": "",
+   "source": "options.md"
+  },
+  {
+   "id": "Corpus-trained Qwen3.5 2B on this Mac (no key) (scored at full precision on FarmShare)",
+   "name": "Trained Qwen3.5 2B (Mac, no key)",
+   "family": "mac",
+   "needs": {
+    "mac_gb": 16
+   },
+   "nocheck": 80.3,
+   "checks_per_100": 78.8,
+   "after": 98.8,
+   "unflagged_per_500": 1,
+   "usd_1000": 0.0,
+   "usd_1000_batch": null,
+   "s_page": 6.0,
+   "s_est": false,
+   "peak_gb": 6.8,
+   "note": "about 6 s a page, 6.8 GB footprint (seg-students.md, local-seg-proof-runtime.json); the shipped build",
+   "source": "options.md"
+  },
+  {
+   "id": "GPT-5.6 Luna",
+   "name": "GPT-5.6 Luna",
+   "family": "cloud",
+   "needs": {
+    "key": [
+     "openai",
+     "openrouter"
+    ]
+   },
+   "nocheck": 83.0,
+   "checks_per_100": 86.2,
+   "after": 100.0,
+   "unflagged_per_500": 0,
+   "usd_1000": 1.9,
+   "usd_1000_batch": 0.78,
+   "s_page": 5.0,
+   "s_est": true,
+   "peak_gb": 0,
+   "note": "",
+   "source": "cheap-models.md"
+  },
+  {
+   "id": "Qwen3.5 Flash",
+   "name": "Qwen3.5 Flash (OpenRouter)",
+   "family": "cloud",
+   "needs": {
+    "key": [
+     "openrouter"
+    ]
+   },
+   "nocheck": 76.1,
+   "checks_per_100": 55.9,
+   "after": 100.0,
+   "unflagged_per_500": 0,
+   "usd_1000": 0.48,
+   "usd_1000_batch": null,
+   "s_page": 5.0,
+   "s_est": true,
+   "peak_gb": 0,
+   "note": "5 of 259 windows failed to parse",
+   "source": "cheap-models.md"
+  },
+  {
+   "id": "Qwen3.5 27B on FarmShare (the corpus teacher)",
+   "name": "Qwen3.5 27B (your cluster)",
+   "family": "cluster",
+   "needs": {
+    "cluster": true
+   },
+   "nocheck": 81.5,
+   "checks_per_100": 86.8,
+   "after": 100.0,
+   "unflagged_per_500": 0,
+   "usd_1000": 0.0,
+   "usd_1000_batch": null,
+   "s_page": null,
+   "s_est": false,
+   "peak_gb": 0,
+   "note": "not fine-tuned; the 2B beats it on letters",
+   "source": "seg-teacher.md"
+  },
+  {
+   "id": "Qwen3.5 4B, fine-tuned (trained on the corpus; FarmShare figures)",
+   "name": "Trained Qwen3.5 4B (your cluster)",
+   "family": "cluster",
+   "needs": {
+    "cluster": true
+   },
+   "nocheck": 80.0,
+   "checks_per_100": 79.9,
+   "after": 98.8,
+   "unflagged_per_500": 1,
+   "usd_1000": 0.0,
+   "usd_1000_batch": null,
+   "s_page": null,
+   "s_est": false,
+   "peak_gb": 0,
+   "note": "",
+   "source": "seg-students.md"
+  }
+ ],
+ "seg_boxes": {
+  "Gemini 3.7 Flash (gateway)": {
+   "Sasha": {
+    "kind": "letters, typed and handwritten (held out from every student)",
+    "gap_acc": 96.0,
+    "pages_exact": 82.2,
+    "split": "not fine-tuned"
+   },
+   "IllustratedReview": {
+    "kind": "a magazine: articles within issues",
+    "gap_acc": 71.2,
+    "pages_exact": 25.2,
+    "split": "not fine-tuned"
+   },
+   "SC0122": {
+    "kind": "typed office files",
+    "gap_acc": 98.9,
+    "pages_exact": 95.5,
+    "split": "not fine-tuned"
+   }
+  },
+  "Shipped 2B, 8-bit, on the Mac": {
+   "Sasha": {
+    "kind": "letters, typed and handwritten (held out from every student)",
+    "gap_acc": 89.7,
+    "pages_exact": 37.4,
+    "split": "held-out"
+   },
+   "IllustratedReview": {
+    "kind": "a magazine: articles within issues",
+    "gap_acc": 72.6,
+    "pages_exact": 42.9,
+    "split": "trained-on"
+   },
+   "SC0122": {
+    "kind": "typed office files",
+    "gap_acc": 98.4,
+    "pages_exact": 96.6,
+    "split": "trained-on"
+   }
+  },
+  "Qwen3.5 27B teacher": {
+   "Sasha": {
+    "kind": "letters, typed and handwritten (held out from every student)",
+    "gap_acc": 67.4,
+    "pages_exact": 15.5,
+    "split": "not fine-tuned"
+   },
+   "IllustratedReview": {
+    "kind": "a magazine: articles within issues",
+    "gap_acc": 78.1,
+    "pages_exact": 53.1,
+    "split": "not fine-tuned"
+   },
+   "SC0122": {
+    "kind": "typed office files",
+    "gap_acc": 99.5,
+    "pages_exact": 92.2,
+    "split": "not fine-tuned"
+   }
+  }
+ },
+ "date": [
+  {
+   "id": "gemini-oneshot",
+   "name": "Gemini 3.8 Flash, the app's one-shot tagging call",
+   "family": "cloud",
+   "needs": {
+    "key": [
+     "gemini",
+     "openrouter"
+    ]
+   },
+   "year": {
+    "year+month": 93.3,
+    "year": 78.8,
+    "year+DU": 48.0,
+    "in text": 97.5,
+    "not in text": 63.4,
+    "all": 79.6
+   },
+   "pool_weighted": 89.2,
+   "uncertain_marked": 88,
+   "false_year_undated": 6.7,
+   "usd_1000": 4.07,
+   "s_doc": 3.0,
+   "s_est": true,
+   "note": "text and three neighbouring segments; false year on undated documents 6.7% owner-ruled (13% model-scored)",
+   "source": "date-tagging.md, date-undated.md"
+  },
+  {
+   "id": "gemini-oneshot-image",
+   "name": "Gemini one-shot plus an image pass on the unprinted ones",
+   "family": "cloud",
+   "needs": {
+    "key": [
+     "gemini",
+     "openrouter"
+    ]
+   },
+   "year": {
+    "year+month": 93.3,
+    "year": 78.8,
+    "year+DU": 48.0,
+    "in text": 97.5,
+    "not in text": 63.4,
+    "all": 79.6
+   },
+   "pool_weighted": 89.2,
+   "uncertain_marked": 88,
+   "false_year_undated": 6.7,
+   "usd_1000": 6.87,
+   "s_doc": 8.0,
+   "s_est": true,
+   "image_pass_finds": 46,
+   "note": "the image pass finds the date on the page for 46% of documents whose year is not in the text (Gemini 3.7, 122 documents); traceable: the quote and its place",
+   "source": "date-image.md"
+  },
+  {
+   "id": "mac-2b",
+   "name": "Trained Qwen3.5 2B 8-bit (Mac, no key)",
+   "family": "mac",
+   "needs": {
+    "mac_gb": 8
+   },
+   "peak_gb": 2.7,
+   "year": {
+    "year+month": 81.7,
+    "year": 66.2,
+    "year+DU": 34.0,
+    "in text": 95.8,
+    "not in text": 41.2,
+    "all": 67.2
+   },
+   "pool_weighted": null,
+   "uncertain_marked": 0,
+   "false_year_undated": null,
+   "usd_1000": 0.0,
+   "s_doc": 1.4,
+   "s_est": false,
+   "note": "never marks Date Uncertain; 41% where the year is not in the text; not recommended as the default tagger",
+   "source": "date-model.md"
+  },
+  {
+   "id": "cluster-27b-image",
+   "name": "Qwen3.6 27B image pass (your cluster)",
+   "family": "cluster",
+   "needs": {
+    "cluster": true
+   },
+   "year": {
+    "not in text": 39.0
+   },
+   "pool_weighted": null,
+   "uncertain_marked": null,
+   "false_year_undated": null,
+   "usd_1000": 0.0,
+   "s_doc": 17.5,
+   "s_est": false,
+   "image_pass_finds": 43,
+   "note": "finds the page date for 43% of unprinted-year documents; the app's text one-shot prompt looped on this model (300 of 300 unparsed)",
+   "source": "date-image.md, dating open_models"
+  },
+  {
+   "id": "mac-8b-image",
+   "name": "Qwen3-VL 8B image pass (Mac)",
+   "family": "mac",
+   "needs": {
+    "mac_gb": 16
+   },
+   "peak_gb": 7.6,
+   "year": {
+    "not in text": 16.0
+   },
+   "pool_weighted": null,
+   "uncertain_marked": null,
+   "false_year_undated": null,
+   "usd_1000": 0.0,
+   "s_doc": 12.0,
+   "s_est": false,
+   "image_pass_finds": 32,
+   "note": "finds the page date for 32% of unprinted-year documents",
+   "source": "date-image.md"
+  },
+  {
+   "id": "none",
+   "name": "No dating",
+   "family": "manual",
+   "needs": {},
+   "year": {
+    "all": 0
+   },
+   "pool_weighted": 0,
+   "usd_1000": 0.0,
+   "s_doc": 0,
+   "s_est": false,
+   "note": "",
+   "source": ""
+  }
+ ],
+ "ent": [
+  {
+   "id": "gemini-tagging",
+   "name": "Gemini, inside the tagging call",
+   "family": "cloud",
+   "needs": {
+    "key": [
+     "gemini",
+     "openrouter"
+    ]
+   },
+   "f1": {
+    "sender": 0.706,
+    "recipient": 0.717,
+    "place": 0.617
+   },
+   "n": 138,
+   "usd_1000": 0.0,
+   "s_doc": 0,
+   "s_est": true,
+   "note": "no extra call; the first 3,000 characters only",
+   "source": "ent-score-paid.md (tagging arm)"
+  },
+  {
+   "id": "gemini-entity8k",
+   "name": "Gemini, a dedicated entity prompt (8k)",
+   "family": "cloud",
+   "needs": {
+    "key": [
+     "gemini",
+     "openrouter"
+    ]
+   },
+   "f1": {
+    "sender": 0.759,
+    "recipient": 0.876,
+    "place": 0.843
+   },
+   "n": 138,
+   "usd_1000": 3.0,
+   "s_doc": 3.0,
+   "s_est": true,
+   "note": "one more text call per document; cost estimated from the tagging call's size",
+   "source": "ent-score-paid.md"
+  },
+  {
+   "id": "qwen27b",
+   "name": "Qwen3.6 27B (your cluster or OpenRouter)",
+   "family": "cluster",
+   "needs": {
+    "cluster": true,
+    "key": [
+     "openrouter"
+    ]
+   },
+   "f1": {
+    "sender": 0.603,
+    "recipient": 0.59,
+    "place": 0.489
+   },
+   "n": 82,
+   "usd_1000": 1.4,
+   "s_doc": 5.0,
+   "s_est": true,
+   "note": "",
+   "source": "ent-score.md"
+  },
+  {
+   "id": "qwen8b-mac",
+   "name": "Qwen3-VL 8B (Mac)",
+   "family": "mac",
+   "needs": {
+    "mac_gb": 16
+   },
+   "peak_gb": 7.6,
+   "f1": {
+    "sender": 0.562,
+    "recipient": 0.552,
+    "place": 0.444
+   },
+   "n": 82,
+   "usd_1000": 0.0,
+   "s_doc": 8.0,
+   "s_est": true,
+   "note": "",
+   "source": "ent-score.md"
+  },
+  {
+   "id": "qwen4b-mac",
+   "name": "Qwen3.5 4B (Mac)",
+   "family": "mac",
+   "needs": {
+    "mac_gb": 8
+   },
+   "peak_gb": 4.9,
+   "f1": {
+    "sender": 0.496,
+    "recipient": 0.42,
+    "place": 0.311
+   },
+   "n": 82,
+   "usd_1000": 0.0,
+   "s_doc": 4.0,
+   "s_est": true,
+   "note": "",
+   "source": "ent-score.md"
+  },
+  {
+   "id": "nltagger",
+   "name": "Apple NLTagger (built in)",
+   "family": "mac",
+   "needs": {
+    "mac_gb": 0
+   },
+   "peak_gb": 0,
+   "f1": {
+    "sender": 0.045,
+    "recipient": 0.124,
+    "place": 0.022
+   },
+   "n": 82,
+   "usd_1000": 0.0,
+   "s_doc": 0.1,
+   "s_est": false,
+   "note": "cannot replace the LLM",
+   "source": "ent-score.md"
+  },
+  {
+   "id": "none",
+   "name": "No entities",
+   "family": "manual",
+   "needs": {},
+   "f1": {
+    "sender": 0,
+    "recipient": 0,
+    "place": 0
+   },
+   "n": 0,
+   "usd_1000": 0.0,
+   "s_doc": 0,
+   "s_est": false,
+   "note": "",
+   "source": ""
+  }
+ ],
+ "cascades": [
+  {
+   "label": "Qwen3-VL 8B 4-bit (Mac) → Qwen3.5-9B 4-bit (Mac)",
+   "stages": [
+    "qwen3-vl-8b-mlx4",
+    "qwen3.5-9b-mlx4"
+   ],
+   "trigger": "fail",
+   "nes": 93.43,
+   "usd_1000": 0.0,
+   "escalated_of_96": 4
+  },
+  {
+   "label": "Qwen3.5-9B 4-bit (Mac), checked against Qwen3-VL 8B 4-bit (Mac) at 0.80 → Qwen3.5 9B",
+   "stages": [
+    "qwen3.5-9b-mlx4",
+    "qwen3.5-9b"
+   ],
+   "trigger": "disagree@0.80",
+   "nes": 93.72,
+   "usd_1000": 0.21,
+   "escalated_of_96": 10
+  },
+  {
+   "label": "Qwen3.5-9B 4-bit (Mac), checked against Qwen3-VL 8B 4-bit (Mac) at 0.85 → Qwen3.5 9B",
+   "stages": [
+    "qwen3.5-9b-mlx4",
+    "qwen3.5-9b"
+   ],
+   "trigger": "disagree@0.85",
+   "nes": 94.21,
+   "usd_1000": 0.21,
+   "escalated_of_96": 13
+  },
+  {
+   "label": "Qwen3.5-9B 4-bit (Mac), checked against Apple Vision at 0.80 → Qwen3.5 9B",
+   "stages": [
+    "qwen3.5-9b-mlx4",
+    "qwen3.5-9b"
+   ],
+   "trigger": "disagree@0.80",
+   "nes": 94.36,
+   "usd_1000": 0.62,
+   "escalated_of_96": 30
+  },
+  {
+   "label": "Qwen3-VL 8B 4-bit (Mac), checked against LightOnOCR-3-4B 8-bit (Mac) at 0.85 → Qwen3.8 Flash",
+   "stages": [
+    "qwen3-vl-8b-mlx4",
+    "qwen3.8-flash"
+   ],
+   "trigger": "disagree@0.85",
+   "nes": 94.71,
+   "usd_1000": 1.15,
+   "escalated_of_96": 19
+  },
+  {
+   "label": "LightOnOCR-3-4B 8-bit (Mac), checked against Qwen3-VL 8B 4-bit (Mac) at 0.90 → Qwen3.8 Flash",
+   "stages": [
+    "lightonocr-3-4b-mlx8",
+    "qwen3.8-flash"
+   ],
+   "trigger": "disagree@0.90",
+   "nes": 94.94,
+   "usd_1000": 1.67,
+   "escalated_of_96": 29
+  },
+  {
+   "label": "LightOnOCR-3-4B 8-bit (Mac), checked against Qwen3.5 9B at 0.90 → Qwen3.8 Flash",
+   "stages": [
+    "lightonocr-3-4b-mlx8",
+    "qwen3.8-flash"
+   ],
+   "trigger": "disagree@0.90",
+   "nes": 95.01,
+   "usd_1000": 4.58,
+   "escalated_of_96": 32
+  },
+  {
+   "label": "Qwen3.8 Flash → Qwen3.5 9B (Vision's handwriting pages straight to Qwen3.5 9B)",
+   "stages": [
+    "qwen3.8-flash",
+    "qwen3.5-9b"
+   ],
+   "trigger": "fail+vision",
+   "nes": 95.02,
+   "usd_1000": 5.73,
+   "escalated_of_96": 18
+  },
+  {
+   "label": "Qwen3.8 Flash → Qwen3.6 35B-A3B (Vision's handwriting pages straight to Qwen3.6 35B-A3B)",
+   "stages": [
+    "qwen3.8-flash",
+    "qwen3.6-35b-a3b"
+   ],
+   "trigger": "fail+vision",
+   "nes": 95.12,
+   "usd_1000": 6.15,
+   "escalated_of_96": 18
+  },
+  {
+   "label": "Qwen3.8 Flash, checked against Apple Vision at 0.80 → Qwen3.5 9B",
+   "stages": [
+    "qwen3.8-flash",
+    "qwen3.5-9b"
+   ],
+   "trigger": "disagree@0.80",
+   "nes": 95.16,
+   "usd_1000": 6.88,
+   "escalated_of_96": 30
+  },
+  {
+   "label": "Qwen3.6 35B-A3B, checked against Qwen3-VL 8B 4-bit (Mac) at 0.80 → Qwen3.8 Flash",
+   "stages": [
+    "qwen3.6-35b-a3b",
+    "qwen3.8-flash"
+   ],
+   "trigger": "disagree@0.80",
+   "nes": 95.45,
+   "usd_1000": 6.98,
+   "escalated_of_96": 11
+  },
+  {
+   "label": "Qwen3.6 35B-A3B, checked against Qwen3.5 9B at 0.90 → Qwen3.8 Flash",
+   "stages": [
+    "qwen3.6-35b-a3b",
+    "qwen3.8-flash"
+   ],
+   "trigger": "disagree@0.90",
+   "nes": 95.46,
+   "usd_1000": 9.9,
+   "escalated_of_96": 16
+  },
+  {
+   "label": "Qwen3.5-9B 4-bit (Mac), checked against Qwen3.8 Flash at 0.90 → Gemini 3.8 Flash",
+   "stages": [
+    "qwen3.5-9b-mlx4",
+    "gemini3.8-flash"
+   ],
+   "trigger": "disagree@0.90",
+   "nes": 95.49,
+   "usd_1000": 12.4,
+   "escalated_of_96": 21
+  },
+  {
+   "label": "Qwen3.6 35B-A3B, checked against Qwen3.5 9B at 0.80 → Gemini 3.8 Flash",
+   "stages": [
+    "qwen3.6-35b-a3b",
+    "gemini3.8-flash"
+   ],
+   "trigger": "disagree@0.80",
+   "nes": 95.63,
+   "usd_1000": 12.71,
+   "escalated_of_96": 12
+  },
+  {
+   "label": "Qwen3.8 Flash → Gemini 3.8 Flash (Vision's handwriting pages straight to Gemini 3.8 Flash)",
+   "stages": [
+    "qwen3.8-flash",
+    "gemini3.8-flash"
+   ],
+   "trigger": "fail+vision",
+   "nes": 95.81,
+   "usd_1000": 13.02,
+   "escalated_of_96": 18
+  },
+  {
+   "label": "Qwen3.6 35B-A3B, checked against Qwen3.5 9B at 0.90 → Gemini 3.8 Flash",
+   "stages": [
+    "qwen3.6-35b-a3b",
+    "gemini3.8-flash"
+   ],
+   "trigger": "disagree@0.90",
+   "nes": 95.98,
+   "usd_1000": 13.85,
+   "escalated_of_96": 16
+  },
+  {
+   "label": "Qwen3.8 Flash, checked against Qwen3.5 9B at 0.85 → Gemini 3.8 Flash",
+   "stages": [
+    "qwen3.8-flash",
+    "gemini3.8-flash"
+   ],
+   "trigger": "disagree@0.85",
+   "nes": 96.13,
+   "usd_1000": 14.48,
+   "escalated_of_96": 16
+  },
+  {
+   "label": "Gemini 3.8 Flash → Qwen3.5-9B 4-bit (Mac)",
+   "stages": [
+    "gemini3.8-flash",
+    "qwen3.5-9b-mlx4"
+   ],
+   "trigger": "fail",
+   "nes": 96.35,
+   "usd_1000": 33.54,
+   "escalated_of_96": 2
+  },
+  {
+   "label": "Gemini 3.8 Flash → Qwen3.5 35B-A3B",
+   "stages": [
+    "gemini3.8-flash",
+    "qwen3.5-35b-a3b"
+   ],
+   "trigger": "fail",
+   "nes": 96.36,
+   "usd_1000": 33.75,
+   "escalated_of_96": 2
+  },
+  {
+   "label": "Qwen3.6 35B-A3B, checked against Gemma 4 26B-A4B at 0.90 → Claude Sonnet 5.5",
+   "stages": [
+    "qwen3.6-35b-a3b",
+    "claude-sonnet5.5"
+   ],
+   "trigger": "disagree@0.90",
+   "nes": 96.44,
+   "usd_1000": 46.67,
+   "escalated_of_96": 29
+  },
+  {
+   "label": "Qwen3.5 35B-A3B, checked against Gemma 4 31B at 0.95 → Claude Sonnet 5.5",
+   "stages": [
+    "qwen3.5-35b-a3b",
+    "claude-sonnet5.5"
+   ],
+   "trigger": "disagree@0.95",
+   "nes": 96.54,
+   "usd_1000": 58.75,
+   "escalated_of_96": 37
+  },
+  {
+   "label": "Gemini 3.1 Pro → Qwen3.5-9B 4-bit (Mac)",
+   "stages": [
+    "gemini3.1-pro",
+    "qwen3.5-9b-mlx4"
+   ],
+   "trigger": "fail",
+   "nes": 96.74,
+   "usd_1000": 228.33,
+   "escalated_of_96": 2
+  },
+  {
+   "label": "Gemini 3.1 Pro → Qwen3.5 35B-A3B",
+   "stages": [
+    "gemini3.1-pro",
+    "qwen3.5-35b-a3b"
+   ],
+   "trigger": "fail",
+   "nes": 96.75,
+   "usd_1000": 228.54,
+   "escalated_of_96": 2
+  }
+ ],
+ "fixed": {
+  "kinds": {
+   "rule": "The app measures the collection's mix itself: Vision signals and a feature print, 139 of 144 pages right, 0.2 s a page, free.",
+   "source": "kind-classifier.md",
+   "speed": [
+    {
+     "step": "Vision text lines (accurate) + ink periodicity",
+     "s_page": 0.21,
+     "peak_gb": null
+    },
+    {
+     "step": "Vision document request (tables)",
+     "s_page": 0.38,
+     "peak_gb": null
+    },
+    {
+     "step": "Vision feature print",
+     "s_page": 0.01,
+     "peak_gb": null
+    },
+    {
+     "step": "qwen3.5-2b-mlx4",
+     "s_page": 1.31,
+     "peak_gb": 3.6
+    },
+    {
+     "step": "qwen3.5-4b-mlx4",
+     "s_page": 2.23,
+     "peak_gb": 4.9
+    }
+   ]
+  },
+  "placement": {
+   "rule": "Print: Apple Vision's own layer (free). Handwriting: kraken line detection with the reading aligned to the lines, about 6 s a page on the CPU; a page whose alignment confidence is under 0.67 falls back to a text page.",
+   "source": "place-print.md, place-hands.md"
+  },
+  "enhancement": {
+   "rule": "No content-removing enhancement helps any reader as OCR input, and DocRes dewarp harms every one; so there is no OCR-input enhancement to choose. The reading copy's deskew or dewarp is a user switch, content-preserving methods only (owner, 2026-10-20).",
+   "source": "enh-ocr-input.md, enh-dewarp.md"
+  },
+  "layout": {
+   "rule": "Newspapers get a layout stage (PP-DocLayoutV3 regions); every other kind reads the whole page; a layout detector never runs on handwriting or registers (it drops them).",
+   "source": "layout-photo.md"
+  },
+  "marks": {
+   "rule": "No detector found a mark (0 of 45 boxes). Nothing to offer yet; marks are preserved on the reading copy by the enhancement rule.",
+   "source": "marks-detect.md"
+  }
+ }
+}
