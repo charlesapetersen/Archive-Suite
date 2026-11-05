@@ -481,7 +481,7 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
   - 2026-11-05 W40.fix-reader-tag-entry — the subject field autocompletes (owner session reader-1 row 28): Tab adds the suggestion, Return adds what is typed and keeps the sheet open, Done adds what is still typed. VM run: [`evidence/reader/W40.fix-reader-tag-entry.md`](evidence/reader/W40.fix-reader-tag-entry.md). Stays `unproven` for the same reasons.
 - **Notes:** each control writes as soon as it changes (`Views/TagEditorView.swift:4-5`), so one sheet session
   makes several writes and several undo steps. Tri-state is real for subjects. For Quality, Color and Read it
-  is only a "(mixed)" label. The sheet also holds Read state, Note and Flag.
+  is only a "(mixed)" label. The sheet also holds Read state and Flag.
 
 ### R-23 · Inline subject editor in each row
 
@@ -621,23 +621,26 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
 - **Notes:** a Merge renames one variant, the most-used one that is not kept. A group of N tags needs N−1
   merges. It is also in the tag cloud's context menu.
 
-### R-30 · Flag and note, kept in the app
+### R-30 · Flag, kept in the app
 
-- **Promise:** Toggle Flag (⌘⇧F) flags a file and a note can be attached. Both are stored by the app, never
-  in the file. The list shows a flag column.
-- **Promised in:** `CLAUDE.md` §Keyboard map, Implementation map (`NotesStore`); `SMOKE_TEST.md` step R.
+- **Promise:** Toggle Flag (⌘⇧F) flags a file. The flag is stored by the app, never in the file. The list shows
+  a flag column. (The Reader has no notes of its own: owner, 2026-11-04, "We have an entire Notes program for a
+  reason.")
+- **Promised in:** `CLAUDE.md` §Keyboard map, Implementation map (`FlagStore`); `SMOKE_TEST.md` step R.
 - **Reached by:** ⌘⇧F (`ArchiveReaderCommands.swift:109-110`), the toolbar `ar.toolbar.flag` button, the
-  context menu and the ⌘I sheet call `NavigationModel.toggleFlagSelection()` (`Views/NavigationModel.swift:433`),
-  which calls `NotesStore.toggleFlag` (`Search/NotesStore.swift:36`). The flag column is drawn at
-  `Views/AppKitTableView.swift:299-302`. A note can be edited only in the ⌘I sheet, for one file
-  (`setNote`, `NavigationModel.swift:440`).
-- **Real-path test:** `ArchiveReaderTests/NotesStoreTests.testSetNoteAndFlagPersist`, `.testGroupToggleFlag`
+  context menu and the ⌘I sheet call `NavigationModel.toggleFlagSelection()` (`Views/NavigationModel.swift`),
+  which calls `FlagStore.toggleFlag` (`Search/FlagStore.swift`). The flag column is drawn in
+  `Views/AppKitTableView.swift`.
+- **Real-path test:** `ArchiveReaderTests/FlagStoreTests.testSetFlagPersists`, `.testGroupToggleFlag`
   (store only).
 - **Runtime evidence:** none.
 - **Status:** `unproven`
 - **History:**
   - 2026-10-12 W40.b1 — row written, `unproven`.
-- **Notes:** the list does not show that a file has a note.
+  - 2026-11-05 W40.reader-remove-notes — the note field and the store's note half removed (owner session reader-1
+    rows 24, 25); the flag is unchanged. The next pack (W40.g1-reader-2) no longer lists the note as a known
+    problem. Stays `unproven`.
+- **Notes:** none.
 
 ### R-31 · Copy file links
 

@@ -57,7 +57,7 @@ never the real `Test files/` corpus. Mark-Read / tag edits therefore never touch
       (verifies the `applyEdit`→render path for a non-read-state tag); Undo restored P8. This historical
       Priority UI was superseded by Quality; the current picker proof is recorded separately below.
 - [x] **R. Flag (⌘⇧F / Toggle Flag)** — **PASS**. ⚑ column fills orange on 00015; toggles off. App-side
-      (NotesStore), never written to the corpus.
+      (NotesStore, now `FlagStore`), never written to the corpus.
 - [~] **S. Saved search** — not driven this pass; built from proven components (LibraryFilter + FTS +
       `SavedSearchStore`, which is unit-tested — SavedSearchCodable/StoreTests).
 - [x] **T. Options (⌘,)** — **PASS**. Settings window: link format, blank-lines stepper, three copy-text

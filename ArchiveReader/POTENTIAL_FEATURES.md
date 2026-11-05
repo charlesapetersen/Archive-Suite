@@ -10,7 +10,7 @@ All High-priority items are implemented (see `CLAUDE.md` §Implementation map):
   classification (degrades to a single item when absent; never auto-groups), plus the optional,
   default-hidden Provenance nav-table column (`W18.reader-breadcrumb`).
 - ✅ **Reading-session resume** — the selection is persisted (≤500) and restored on next launch.
-- ✅ **App-side notes / flags OUTSIDE the corpus** — `NotesStore` (UserDefaults); flag column + editor.
+- ✅ **App-side flags OUTSIDE the corpus** — `FlagStore` (UserDefaults); flag column. (The Reader's own notes were removed by W40.reader-remove-notes, 2026-11-05: notes belong to Archive Notes.)
 - ✅ **Corpus data-quality dashboard** — the library-health popover (stethoscope in the status bar).
 - ✅ **Quick Look preview** from the nav list (⌘Y — moved off bare Space so it can't block typing).
 - ✅ **Saved searches / smart folders** — `SavedSearch` + the toolbar "Saved" menu.

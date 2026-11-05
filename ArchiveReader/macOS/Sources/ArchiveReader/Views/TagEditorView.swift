@@ -17,7 +17,6 @@ struct TagEditorView: View {
     @State private var yearDraft = ""
     @State private var dayDraft = ""
     @State private var sentWithDraft = ""
-    @State private var noteDraft = ""
 
     var body: some View {
         let files = targetFiles
@@ -46,7 +45,7 @@ struct TagEditorView: View {
                     Divider()
                     readStateSection(s)
                     Divider()
-                    notesSection(files)
+                    flagSection
                 }
                 .padding()
             }
@@ -268,22 +267,13 @@ struct TagEditorView: View {
         }
     }
 
-    // MARK: Notes & flag (app-side, never written to the file)
+    // MARK: Flag (app-side, never written to the file)
 
-    @ViewBuilder private func notesSection(_ files: [ArchiveFile]) -> some View {
+    @ViewBuilder private var flagSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            title("Notes & flag")
+            title("Flag")
             Text("Stored in the app — never written to the file.").font(.caption).foregroundStyle(.secondary)
             Button { toggleFlag() } label: { Label("Toggle flag", systemImage: "flag") }
-            if files.count == 1, let f = files.first {
-                TextField("Note…", text: $noteDraft, axis: .vertical)
-                    .textFieldStyle(.roundedBorder)
-                    .lineLimit(2...5)
-                    .onAppear { noteDraft = model.notes.annotation(for: f.url.path).note }
-                Button("Save note") { model.setNote(noteDraft, forPath: f.url.path) }
-            } else {
-                Text("Select a single file to edit its note.").font(.caption).foregroundStyle(.secondary)
-            }
         }
     }
 

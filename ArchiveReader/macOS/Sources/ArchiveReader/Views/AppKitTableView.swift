@@ -347,7 +347,7 @@ struct AppKitTableView: NSViewRepresentable {
 
             switch colID {
             case "flag":
-                let flagged = parent.model.notes.isFlagged(file.path)
+                let flagged = parent.model.flags.isFlagged(file.path)
                 tf.stringValue = flagged ? "⚑" : ""
                 tf.setAccessibilityLabel(flagged ? "Flagged" : "Not flagged")
                 cell.tint = flagged ? ReaderColors.warningCellTint : nil

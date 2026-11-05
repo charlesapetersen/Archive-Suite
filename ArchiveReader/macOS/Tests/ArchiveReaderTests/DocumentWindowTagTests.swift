@@ -4,7 +4,7 @@ import XCTest
 /// `W40.fix-reader-menus-follow-window`: with a document window in front, the Tags menu acts on the file that
 /// window shows, through the navigation model's own `TagWriter` actions and undo ledger, never on the list's
 /// selection. Scratch `mktemp` fixtures only; the audit ledger is redirected away from the real one.
-/// (Toggle Flag is not exercised here: `NotesStore` writes the host app's standard defaults.)
+/// (Toggle Flag is not exercised here: `FlagStore` writes the host app's standard defaults.)
 @MainActor
 final class DocumentWindowTagTests: XCTestCase {
 

@@ -64,7 +64,7 @@ struct DocumentTagActions {
     func toggleFlag() {
         guard let navigation, let paths else { return }
         guard navigation.toggleFlag(paths: paths) else { viewer.tagStatus = navigation.statusMessage; return }
-        viewer.tagStatus = paths.allSatisfy(navigation.notes.isFlagged) ? "Flagged." : "Flag removed."
+        viewer.tagStatus = paths.allSatisfy(navigation.flags.isFlagged) ? "Flagged." : "Flag removed."
     }
 
     func undo() {

@@ -27,7 +27,7 @@ final class NavigationModel: ObservableObject {
     /// Monotonic lease for an async archive-copy enrichment. A later copy command must always win over
     /// an older thumbnail task, even when both began against the same pasteboard change count.
     private var archiveCopyGeneration = 0
-    let notes = NotesStore()
+    let flags = FlagStore()
     let savedSearches = SavedSearchStore()
     let excludedFolders: ExcludedFoldersStore
     /// W24.cal1-reader: each document's display calendar, app-side (never written to the corpus).
@@ -196,8 +196,8 @@ final class NavigationModel: ObservableObject {
                 }
             } }
             .store(in: &cancellables)
-        // Republish when notes/flags change so the table's flag column refreshes.
-        notes.objectWillChange
+        // Republish when flags change so the table's flag column refreshes.
+        flags.objectWillChange
             .sink { [weak self] _ in MainActor.assumeIsolated { self?.objectWillChange.send() } }
             .store(in: &cancellables)
         // Republish on library changes (phase / scope) so the results-area spinner is reactive.
@@ -444,16 +444,16 @@ final class NavigationModel: ObservableObject {
         }
     }
 
-    // MARK: Notes & flags (app-side, never written to the corpus)
+    // MARK: Flags (app-side, never written to the corpus)
 
-    func toggleFlagSelection() { notes.toggleFlag(selectedFiles.map(\.path)) }
+    func toggleFlagSelection() { flags.toggleFlag(selectedFiles.map(\.path)) }
 
     /// The document window's Toggle Flag (W40.fix-reader-menus-follow-window): the open file, not the list's selection.
     /// Returns false, with the reason in `statusMessage`, when none of the paths is in the library.
     @discardableResult func toggleFlag(paths: [String]) -> Bool {
         let files = libraryFiles(atPaths: paths)
         guard !files.isEmpty else { reportNotInLibrary(); return false }
-        notes.toggleFlag(files.map(\.path))
+        flags.toggleFlag(files.map(\.path))
         return true
     }
 
@@ -462,7 +462,6 @@ final class NavigationModel: ObservableObject {
     func selectFiles(withTag tag: String) {
         selection = Set(displayed.filter { $0.subjects.contains(tag) }.map(\.id))
     }
-    func setNote(_ note: String, forPath path: String) { notes.setNote(note, for: path) }
 
     // MARK: Display calendars (W24.cal1-reader; app-side, never written to the corpus)
 

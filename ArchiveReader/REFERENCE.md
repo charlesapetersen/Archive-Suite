@@ -445,7 +445,7 @@ Search/                       Discovery + disposable caches (never the corpus):
   ContentIndexer.swift        Background (detached) incremental indexing; async search/classification;
                               publishes `Failure` (unavailable/incomplete) → amber status-bar line (W23.m9).
   PDFTextExtractor.swift      PDFKit text + Classification-line extraction (guards corrupt/non-PDF).
-  NotesStore.swift            Per-file note+flag in UserDefaults (outside the corpus).
+  FlagStore.swift             Per-file flag in UserDefaults (outside the corpus); notes are Archive Notes' job.
   SavedSearch.swift           Named filter+FTS query (smart folders), UserDefaults-persisted.
 Views/
   NavigationModel.swift       Nav view model: filter/sort/selection, folder tree, smart-folder counts,
