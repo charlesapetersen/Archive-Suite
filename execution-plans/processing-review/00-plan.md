@@ -207,8 +207,23 @@ Sherlock first, FarmShare as fallback, the Mac for profile 1, paid APIs where a 
 
 ## Phase 4 — decisions and the work queue (interactive)
 
+**The review's output is a settings wizard, not the owner's defaults (owner, 2026-11-04).** "Instead of setting my
+defaults, we should create a wizard or walkthrough or similar for users that produces the best settings based on
+their compute constraints, financial constraints, time constraints, document types, availability for
+fine-tuning, etc. If necessary I can set defaults behind this but we should try to provide as much flexibility for
+users as we can." So each stage's recommendation is written as a rule the wizard can apply: given the user's
+answers, which route and settings, with the measured reason, the expected cost and time, and the fallback when an
+answer rules the first choice out. The questions follow the profiles and routes above: the Mac and its memory, a
+cluster, which API keys or plans, a money ceiling (none, per batch, per month), how long a batch may take, the
+document kinds in the collection (typed, printed, handwritten, forms, clippings, newspapers, scripts and hands),
+and whether the user can fine-tune (a coding agent, a cluster, or neither). Defaults exist only behind the wizard,
+for a user who skips it, and the owner may set those. Every setting the wizard chooses stays editable. Phase 4
+files the wizard's build (the question flow, the rule table it reads, where it lives in the Processor, how a
+re-run changes settings already chosen) with the implementation queue, and the owner's calls in Phase 4 are about
+the rules and the skip-defaults, not about his own configuration.
+
 - One decision note per stage, with the recommendation per profile and document kind, and what would change it as
-  models move.
+  models move. Each note ends in the wizard's rule for that stage (above).
 - The owner's calls, walked one at a time.
 - The implementation queue filed with `ops/autonomous/plan-edit.sh`: the integration stages (W42.int-s1 to s7),
   changes to app defaults and routes, the training kit and its plug-in point, the marks layer, and the long-term
