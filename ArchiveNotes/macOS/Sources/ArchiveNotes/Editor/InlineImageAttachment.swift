@@ -97,12 +97,15 @@ final class InlineImageAttachment: NSTextAttachment {
     private static let outOfBoundsImage = makePlaceholderImage(labelled: "Blocked")
 
     /// Drawn by a handler rather than once into a bitmap, so the tile is redrawn in each appearance it is shown in and
-    /// follows a live switch in Settings ▸ Appearance (W48.appearance-notes).
+    /// follows a live switch in Settings ▸ Appearance (W48.appearance-notes). The image is shared app-wide and never
+    /// cached: with caching, one `tiffRepresentation` call froze it in that call's appearance for every later draw.
     private static func makePlaceholderImage(labelled label: String) -> NSImage {
-        NSImage(size: NSSize(width: 64, height: 64), flipped: false) { rect in
+        let image = NSImage(size: NSSize(width: 64, height: 64), flipped: false) { rect in
             drawPlaceholder(labelled: label, size: rect.size)
             return true
         }
+        image.cacheMode = .never
+        return image
     }
 
     private static func drawPlaceholder(labelled label: String, size: NSSize) {

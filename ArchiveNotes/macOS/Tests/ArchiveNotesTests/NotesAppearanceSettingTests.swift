@@ -85,10 +85,15 @@ struct NotesAppearanceSettingTests {
     // W48.appearance-verify: the Missing and Blocked tiles are the other thing Notes draws itself, and no tour reaches
     // one. The same shared image is drawn in Dark, Light and Dark again; its label and fill are label colours, so
     // the drawn pixels are far lighter in Dark, and a tile drawn once into a bitmap would read the same in both.
+    // The tile is shared app-wide, so asking it for its bitmap first (as `tiffRepresentation` does, and as
+    // `InlineImageReadSeamTests` did just before this suite in the gate) must not freeze it in that appearance.
     @Test("the Missing and Blocked tiles are drawn in the appearance they are shown in")
     func placeholderTilesFollowAppearance() throws {
         for kind in [InlineImageAttachment.Placeholder.missing, .outOfBounds] {
             let image = try #require(InlineImageAttachment(relativePath: "assets/gone.png", placeholder: kind).image)
+            try #require(NSAppearance(named: .darkAqua)).performAsCurrentDrawingAppearance {
+                _ = image.tiffRepresentation
+            }
             var drawn: [Double] = []
             for name in [NSAppearance.Name.darkAqua, .aqua, .darkAqua] {
                 drawn.append(try luminanceOfOpaquePixels(image, in: #require(NSAppearance(named: name))))
