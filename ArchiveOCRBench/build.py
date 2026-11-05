@@ -73,6 +73,7 @@ ENH_MARKS = RESULTS / "enh-ocr-marks.json"  # W46.enh-ocr-input-marks: the mark-
 POSTCORRECT = RESULTS / "ocr-postcorrect.json"  # W46.ocr-postcorrect: postcorrect.py score --results, the band corrector
 LOGPROB = RESULTS / "ocr-logprob.json"  # W46.ocr-logprob: ocr_logprob.py report, log-probabilities as an error flag
 LAYOUT_ORDER = RESULTS / "layout-order.json"  # W46.layout-order: layout_order.py run, ordering with detection fixed
+LAYOUT_ORDER_MARKS = RESULTS / "layout-order-marks.json"  # W46.layout-order-marks: the 96 and the marks core
 LAYOUT_PHOTO = RESULTS / "layout-photo.json"  # W46.layout-photo: layout_photo.py score, four detectors feeding GLM-OCR
 RERUN_NOISE = RESULTS / "ocr-rerun-noise.json"  # W46.ocr-rerun-noise: ocr_rerun_noise.py report, the 96 read three times
 LOOPS = PUBLIC / "loop-rerun-20261021.json"  # W46.ocr-loops: corpus/loop_rerun.py report, the capped pages read again
@@ -900,7 +901,19 @@ def layout_order():
         return None
     d = json.loads(LAYOUT_ORDER.read_text())
     return {"guard": d["guard"], "sources": d["sources"],
-            **{k: d[k]["summary"] for k in ("bench_lines", "bench_regions", "l9")}}
+            **{k: d[k]["summary"] for k in ("bench_lines", "bench_regions", "l9")}, **layout_order_marks()}
+
+
+def layout_order_marks():
+    """W46.layout-order-marks: ordering on the 96 owner pages, and the share of owner-core marks each stream keeps."""
+    if not LAYOUT_ORDER_MARKS.exists():
+        return {}
+    d = json.loads(LAYOUT_ORDER_MARKS.read_text())
+    m = d["marks"]["summary"]
+    share = lambda arm: f'{m[arm]["all"]["reached"]} ({100 * m[arm]["all"]["share"]:.0f}%)'
+    return {"owner96": {"summary": d["owner96"]["summary"]},
+            "marks": {"of": m["vision-lines"]["all"]["of"], "vision": share("vision-lines"),
+                      "yolo_filter": share("yolo-app-filter"), "yolo_pics": share("yolo-pictures-kept"), "pp": share("pp-any")}}
 
 
 LAYOUT_PHOTO_ARMS = {"yolo_appsort": "DocLayout-YOLO regions, the app's sort", "heron": "docling-layout-heron regions",
