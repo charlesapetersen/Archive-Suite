@@ -101,6 +101,29 @@ protects cooperating writers; an arbitrary uncoordinated process can still write
 replacement operation.
 
 
+## ✅ FIXED (W40.fix-notes-editor-lines, 2026-11-05) — Return, Backspace and Bulleted List in the styled editor
+
+Found by owner session notes-1 (rows 8 and 10). On the empty last line, Return, Backspace, Tab and the block
+toggles read the paragraph's kind one past the end of the text. That raised `NSRangeException`, which AppKit
+swallowed, so the key did nothing. The save also wrote every Return as a paragraph break, so after a reselect a
+typed blank line was gone and a deleted one came back. List items drew no marker.
+
+Now:
+- One Return is saved as a line break (`\` at the end of the line). Two are a paragraph break, and each past two
+  is a line break that starts the next paragraph, so the note reopens with the lines it showed.
+- Headings, lists, quotes and code blocks show one newline from what borders them. The file keeps a blank line
+  there.
+- Lists draw •/◦/▪ and numbers.
+
+Evidence: `verification/evidence/notes/W40.fix-notes-editor-lines.md`. These limits remain, because Markdown
+has no form for them:
+- **Blank lines typed at the end of text, right before a heading, list, quote or code block, are not kept.**
+  The boundary is written as one blank line.
+- **An empty line between two list items is not kept.**
+- **A list toggled on an empty last line is lost if the caret moves away before anything is typed.** The line
+  holds no character to carry the kind.
+- **A file with several blank lines between a heading and its text shows one newline there.**
+
 ## ✅ FIXED (W40.d9, 2026-10-15) — writing-session defects, reproduced in the VM
 
 `ArchiveNotesUITests/WritingJourneyUITests` types into the styled editor with real keystrokes. Autosave, ⌘Q

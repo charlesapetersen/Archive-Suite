@@ -842,8 +842,13 @@ final class EditorTextView: NSTextView {
             var contentEnd = NSMaxRange(paraRange)
             while contentEnd > paraRange.location, [0x0A, 0x0D].contains(text.character(at: contentEnd - 1)) { contentEnd -= 1 }
             let atEnd = sel.length == 0 && sel.location >= contentEnd
+            let atStart = sel.length == 0 && sel.location == paraRange.location && contentEnd > paraRange.location
             super.insertNewline(sender)
             if atEnd { EditorFormatting.setPlain(self, fontSize: configuredFontSize) }
+            // At its start, the empty line left above the heading is text, not an empty heading (`# `).
+            if atStart {
+                EditorFormatting.restyleParagraph(self, at: paraRange.location, kind: .plain, fontSize: configuredFontSize)
+            }
             return
         }
         guard case .listItem(let ordered, let depth, let ordinal)? = kind else {

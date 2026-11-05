@@ -73,9 +73,14 @@ enum MarkdownStyler {
             if let previous, previous.intent != run.presentationIntent {
                 dropRawHTMLLineEnd(result)
                 let separator = blockSeparator(from: previous.intent, to: run.presentationIntent)
-                result.append(NSAttributedString(string: separator,
-                                                 attributes: separatorAttributes(after: previous.attrs,
-                                                                                 bodyFont: bodyFont)))
+                // A code block's text ends with its own newline, which already is the one newline to what follows
+                // (W40.fix-notes-editor-lines: a second showed a blank line that came back after Backspace).
+                let endsLine = result.length > 0 && (result.string as NSString).character(at: result.length - 1) == 0x0A
+                if !(separator == "\n" && endsLine) {
+                    result.append(NSAttributedString(string: separator,
+                                                     attributes: separatorAttributes(after: previous.attrs,
+                                                                                     bodyFont: bodyFont)))
+                }
             }
 
             result.append(NSAttributedString(string: runText, attributes: attrs))

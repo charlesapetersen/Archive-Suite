@@ -310,13 +310,36 @@ struct EditorLinesTests {
         #expect(MarkdownBridge.serialize(storage) == "A")
     }
 
-    /// Backspace on the line after a code block deletes the blank line without making the text code.
+    /// Backspace that deletes a blank line typed after a code block joins nothing, so the text keeps its kind.
     @Test func backspaceAfterACodeBlock() throws {
         let (tv, storage) = try editor("```\nx\n```\n\nBody")
-        caret(tv, at: storage.length - 4)
+        caret(tv, at: 2)
+        tv.insertNewline(nil)
+        #expect(storage.string == "x\n\nBody")
         tv.deleteBackward(nil)
+        #expect(storage.string == "x\nBody")
+        #expect(MarkdownBridge.serialize(storage) == "```\nx\n```\n\nBody", "got \(MarkdownBridge.serialize(storage).debugDescription)")
+    }
+
+    /// A code block is one newline from the text after it, as other blocks are, and Backspace there joins the text
+    /// into the block, for good.
+    @Test func codeBlockBoundaryIsOneNewline() throws {
+        let (tv, storage) = try editor("```\nx\n```\n\nBody")
+        #expect(storage.string == "x\nBody")
+        #expect(MarkdownBridge.serialize(storage) == "```\nx\n```\n\nBody")
+        caret(tv, at: 2)
+        tv.deleteBackward(nil)
+        #expect(reselect(tv, storage) == "```\nxBody\n```")
+    }
+
+    /// Return at the start of a heading moves it down a line; the line left above is text, not an empty heading.
+    @Test func returnAtTheStartOfAHeading() throws {
+        let (tv, storage) = try editor("Intro\n\n# Title")
+        caret(tv, at: 6)
+        tv.insertNewline(nil)
         let saved = MarkdownBridge.serialize(storage)
-        #expect(saved.hasSuffix("```\n\nBody") || saved.hasSuffix("```\nBody"), "got \(saved.debugDescription)")
+        #expect(!saved.contains("# \n") && !saved.hasSuffix("# "), "got \(saved.debugDescription)")
+        #expect(saved.hasSuffix("\n# Title"), "got \(saved.debugDescription)")
     }
 
     /// Tab and Shift-Tab on an empty last list line indent and outdent what is typed there.

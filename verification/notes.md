@@ -13,7 +13,7 @@ Format and statuses: [`README.md`](README.md). Written by `W40.b2`, 2026-10-12.
   `W23.m9`/`-fu3`, `W23.m14`/`-fu`, `W37.dual-date`, `W24.cal1`, `W24.cal1-toggle`, `W24.cal1-validator`,
   and the W0–W8 records under §*Archive Notes — NEW APP*.
 - **Sources and code read at:** `9e8959ef`.
-- **Count:** `unproven 39 · works 9 · broken 4 · unreachable 0 · fixed-pending-recheck 0` (works: N-07, N-14, N-34, N-41, N-45, N-49, N-50, N-51, N-52; broken: N-11, N-12, N-26, N-44). Updated by owner session notes-1, 2026-11-05 (N-41 to `works`; N-11, N-12, N-26, N-44 to `broken`).
+- **Count:** `unproven 39 · works 9 · broken 3 · unreachable 0 · fixed-pending-recheck 1` (works: N-07, N-14, N-34, N-41, N-45, N-49, N-50, N-51, N-52; broken: N-11, N-26, N-44; fixed-pending-recheck: N-12). Updated by owner session notes-1, 2026-11-05 (N-41 to `works`; N-11, N-12, N-26, N-44 to `broken`).
 
 **Runtime evidence, for every row below: none yet.** The W40.a3 full VM suite
 ([`evidence/notes/W40.a3-full-ui.md`](evidence/notes/W40.a3-full-ui.md)) and the `W9.e2` runtime sweep passed
@@ -502,14 +502,15 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
   toolbar reach, but they skip `FormattingContext`. Also `ArchiveNotesTests/MarkdownBridgeTests.orderedListRenumbersFromFirst`
   and `ArchiveNotesTests/EditorBindingTests.textViewFindBarEnabled`. No test presses Tab, Shift-Tab, Return or
   Backspace in a list.
-- **Runtime evidence:** [`evidence/notes/W40.d9-writing.md`](evidence/notes/W40.d9-writing.md): text typed with `typeText` into the styled editor saves; but each Return typed there is saved as one newline, so typed paragraphs merge into one when the note is reopened.
-- **Status:** `broken`
+- **Runtime evidence:** [`evidence/notes/W40.d9-writing.md`](evidence/notes/W40.d9-writing.md): text typed with `typeText` into the styled editor saves; but each Return typed there is saved as one newline, so typed paragraphs merge into one when the note is reopened. [`evidence/notes/W40.fix-notes-editor-lines.md`](evidence/notes/W40.fix-notes-editor-lines.md): Return, Backspace and Bulleted List typed in the VM, across a reselect and a relaunch (`EditorLinesUITests`).
+- **Status:** `fixed-pending-recheck`
 - **History:**
   - 2026-10-12 W40.b2 — row written, `unproven`.
   - 2026-10-15 W40.d9 — `unproven` → `broken`: typed paragraph breaks are lost on reopen; filed `W40.fix-notes-return-paragraph` (S2).
   - 2026-10-31 W40.fix-notes-return-paragraph — `broken` → `fixed-pending-recheck`: a Return typed in plain text is saved as a paragraph break (`MarkdownBridge.serializePlainLines`), a hard break read from the file is kept as one, and `WritingJourneyUITests` step 3 now asserts the breaks on disk and after relaunch instead of expecting them to fail.
   - 2026-10-31 W40.fix-notes-return-list-quote — stays `fixed-pending-recheck`: a Return typed in a blockquote stays in the quote (`> q\n>\n> r`), typed unordered items keep their `- ` markers, and a typed line beginning with four spaces, `2. `, `---`, `- `, `> ` and the like is escaped (`MarkdownBridge.plainPieces`, `escapingBlockStart`); unit tests only, the recheck is the builder-is-not-verifier pass
   - 2026-11-05 owner session notes-1 — `fixed-pending-recheck` → `broken`: Return would not add blank lines and Backspace would not join lines, coming back after reselecting the note; Bulleted List showed nothing; a bold run ending in a space saved as literal `\*\*Day \*\*` ([`sessions/notes-1-returned.md`](sessions/notes-1-returned.md) rows 8, 10, 11). Fix items `W40.fix-notes-editor-lines`, `W40.fix-notes-bold-space`.
+  - 2026-11-05 W40.fix-notes-editor-lines — `broken` → `fixed-pending-recheck` (rows 8 and 10; row 11 is `W40.fix-notes-bold-space`): Return and Backspace on the empty last line raised and did nothing; one typed Return is now a line break and every count of Returns reopens as typed; list items draw their bullets and numbers. Promise-test change (rule 4): `WritingJourneyUITests` types two Returns for its paragraph-break checks, since one Return is a line break now, not a paragraph. Recheck: the next Notes guided session (`W40.g2-notes-2`).
 - **Notes:** **Drift.**
   - There is no indent or outdent button on the toolbar and no Indent/Outdent item in the Format menu.
     `indentList` and `outdentList` are reached only from Tab and Shift-Tab, and `outdentList` also from Return or
