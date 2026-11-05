@@ -43,6 +43,9 @@ The copy has gaps a pack's paths can fall into (2026-10-23, 23 jobs failed on th
   96-set run) was never copied. It is now in Sherlock's `$HOME/fs-truthpack`, the same absolute path, rebuilt on the
   Mac with `institutional-compute/cluster_ocr.py pack`; its 99 images match every hash the packs record.
 - Some images a pack names under `interactive-20261019/ocr/images` sit only in the `interactive-20261018` folder.
+- FarmShare's `$HOME/fs-cleanpack/images` (the corpus training windows' page images, 48,894 files, 9.5 GB) was
+  never copied either. Since 2026-11-05 it is in `$GROUP_HOME/cp1/archive-suite/fs-cleanpack/images`, and Sherlock's
+  `~/fs-cleanpack` links there, so data.json files that record `/home/users/cp1/fs-cleanpack/images` resolve unchanged.
 - FarmShare's venvs carried packages the vLLM image does not (scipy); `$SH_ENH_EXTRA` holds them for the
   enhancement arms.
 Before a submission, check every path the pack's json, jsonl, tsv and sh files name, home paths included, not only
