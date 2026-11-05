@@ -237,16 +237,13 @@ struct NotesTableView: NSViewRepresentable {
         /// A new row order keeps the selection on the same items. A rename re-sorts the list, and the moved
         /// row left the table's selection while the model still held it, so the note showed in the detail
         /// but not as selected, and a Return after a rename read as a deselect (W40.fix-notes-list-rename).
-        /// The model's selection is left as it was; only a change the reorder itself made is undone.
+        /// The apply never writes the model's selection: the model has already pruned it to the listed items
+        /// (`NotesNavigationModel.applyRecompute`), so it is put back on the table as it stands.
         func applySnapshotKeepingSelection(_ ids: [UUID], wanted: Set<UUID>) {
+            isUpdatingSelection = true
             applySnapshot(ids, animated: false)
+            isUpdatingSelection = false
             syncSelection(wanted)
-            guard parent.selection != wanted else { return }
-            // Not during the view update that called this.
-            Task { @MainActor [weak self] in
-                guard let self, self.lastPushedSelection == wanted else { return }
-                self.parent.selection = wanted
-            }
         }
 
         func syncSelection(_ sel: Set<UUID>) {

@@ -1482,6 +1482,9 @@ its pre-run mtime, all writes confined to the scratch `AN-GUI-Fixture`).
   button id now resolves. **Same shape still latent on `an.detail.header` / `an.detail.metadata`** (their
   child elements also report the container id) — harmless today because no check queries those children, but a
   future check that needs one must relocate the marker the same way.
+  **`an.detail.header` resolved 2026-11-05 (W40.fix-notes-list-rename):** its editable title needs its own id
+  (`an.detail.title`), so the header is now `.accessibilityElement(children: .contain)` and keeps its id as a
+  container. `an.detail.metadata` is still the latent shape.
 - **G8 confirms the recoverable-delete contract under the sandbox:** Cancel leaves the note on disk + its
   membership intact; Delete Note moves `items/<uuid>` out via `FileManager.trashItem` (system Trash,
   recoverable) — verified working even with only the Route-B temporary-exception grant.

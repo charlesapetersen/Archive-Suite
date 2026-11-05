@@ -13,7 +13,7 @@ Format and statuses: [`README.md`](README.md). Written by `W40.b2`, 2026-10-12.
   `W23.m9`/`-fu3`, `W23.m14`/`-fu`, `W37.dual-date`, `W24.cal1`, `W24.cal1-toggle`, `W24.cal1-validator`,
   and the W0–W8 records under §*Archive Notes — NEW APP*.
 - **Sources and code read at:** `9e8959ef`.
-- **Count:** `unproven 39 · works 9 · broken 3 · unreachable 0 · fixed-pending-recheck 1` (works: N-07, N-14, N-34, N-41, N-45, N-49, N-50, N-51, N-52; broken: N-11, N-26, N-44; fixed-pending-recheck: N-12). Updated by owner session notes-1, 2026-11-05 (N-41 to `works`; N-11, N-12, N-26, N-44 to `broken`).
+- **Count:** `unproven 38 · works 9 · broken 3 · unreachable 0 · fixed-pending-recheck 2` (works: N-07, N-14, N-34, N-41, N-45, N-49, N-50, N-51, N-52; broken: N-11, N-26, N-44; fixed-pending-recheck: N-12, N-16). Updated by owner session notes-1, 2026-11-05 (N-41 to `works`; N-11, N-12, N-26, N-44 to `broken`); N-16 to `fixed-pending-recheck` by W40.fix-notes-list-rename.
 
 **Runtime evidence, for every row below: none yet.** The W40.a3 full VM suite
 ([`evidence/notes/W40.a3-full-ui.md`](evidence/notes/W40.a3-full-ui.md)) and the `W9.e2` runtime sweep passed
@@ -638,10 +638,17 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
   Escape no-write, Return rename, context-menu Rename…; asserts the UUID-folder filename and `title:`);
   `ArchiveNotesTests/NotesTagProjectorSafetyTests.renameRetainsSubjects` (model path: UUID, body, subjects,
   third-party tags and label survive); `ArchiveNotesTests/NoteStoreTests.saveRetitle`.
-- **Runtime evidence:** none
-- **Status:** `unproven`
+- **Runtime evidence:** VM, 2026-11-05: `ArchiveNotesUITests/ListRenameUITests` (Return rename of a seeded note and
+  a double-click rename of a new one: still selected, title still listed after another note is selected; the
+  header title renamed by a click, Escape a no-write), with G17 and W7 S3 green beside it.
+- **Status:** `fixed-pending-recheck`
 - **History:**
   - 2026-10-12 W40.b2 — row written, `unproven`.
+  - 2026-11-05 owner session notes-1 rows 6, 9, 14; W40.fix-notes-list-rename — `fixed-pending-recheck`. Row 14
+    reproduced in the VM on the old code (a rename that re-sorts the list dropped the row from the table's
+    selection) and is fixed; row 6 (header title) added. Row 9 (the title gone from the list after a deselect,
+    the `.md` correct) did NOT reproduce in the VM on the old code, by Return, by a click away, or with body
+    typing around the rename; moved rows now reload their cells, but its cause is unproven. notes-2 rechecks it.
 - **Notes:** the W9.e2 result named no rename test; `W9.b3` says G17 drives all three rename routes VM-green.
   The rejected-rename restore (`NoteTitleTextField.swift:69-73`, guarded on the same rename id and item id) has
   no test that forces `renameNote` to return false. Double-click on a single row always renames; the browser's

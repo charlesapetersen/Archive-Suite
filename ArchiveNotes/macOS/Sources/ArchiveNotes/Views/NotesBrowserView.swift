@@ -575,10 +575,13 @@ struct DetailHeaderTitle: NSViewRepresentable {
         field.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         field.toolTip = "Click to rename"
         field.setAccessibilityIdentifier("an.detail.title")
-        // A draft is never replaced while it is being edited; the item shown meanwhile is applied after.
+        // A draft is never replaced while it is being edited. If the selection moved meanwhile, the item now
+        // shown is applied once it closes; otherwise the typed title stays until the saved one arrives.
         field.onEnd = { [weak field, coordinator = context.coordinator] in
             guard let field, let latest = coordinator.latest else { return }
-            Task { @MainActor in if !field.isRenaming { latest.apply(to: field) } }
+            Task { @MainActor in
+                if !field.isRenaming, field.itemID != latest.item.id { latest.apply(to: field) }
+            }
         }
         return field
     }

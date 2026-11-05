@@ -35,6 +35,16 @@ final class NoteTitleTextField: NSTextField, NSTextFieldDelegate {
         selectText(nil)
     }
 
+    /// A field taken away mid-edit (the header when the detail empties, a cell scrolled out) ends the edit
+    /// first, so the draft is saved like a click elsewhere rather than dropped.
+    override func viewWillMove(toWindow newWindow: NSWindow?) {
+        if newWindow == nil, isRenaming, let window, let editor = currentEditor(),
+           window.firstResponder === editor {
+            window.makeFirstResponder(nil)
+        }
+        super.viewWillMove(toWindow: newWindow)
+    }
+
     override func mouseDown(with event: NSEvent) {
         if beginsOnClick && !isRenaming { beginRename(); return }
         super.mouseDown(with: event)
