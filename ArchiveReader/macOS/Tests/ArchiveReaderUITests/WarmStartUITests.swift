@@ -232,8 +232,8 @@ final class WarmStartUITests: XCTestCase {
     /// `/private/var/folders` temporary directory would be invisible to it. The runner's own
     /// `temporaryDirectory` normally resolves inside its sandbox container — under `/Users/` — but that
     /// is a property of the container, not a guarantee, so it is CHECKED here. `AR_WARMSTART_ROOT` lets
-    /// a harness supply a directory it prepared instead.
-    private static func makeScratchDirectory() throws -> URL {
+    /// a harness supply a directory it prepared instead. `TextZoomUITests` borrows it.
+    static func makeScratchDirectory(prefix: String = "AR-WarmStart") throws -> URL {
         var candidates: [URL] = []
         if let override = ProcessInfo.processInfo.environment["AR_WARMSTART_ROOT"], !override.isEmpty {
             candidates.append(URL(fileURLWithPath: override, isDirectory: true))
@@ -254,7 +254,7 @@ final class WarmStartUITests: XCTestCase {
                 tried.append("\(parent.path) (not under /Users/, the app could not read it)")
                 continue
             }
-            let url = parent.appendingPathComponent("AR-WarmStart-\(UUID().uuidString)", isDirectory: true)
+            let url = parent.appendingPathComponent("\(prefix)-\(UUID().uuidString)", isDirectory: true)
             do {
                 try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
                 return url
