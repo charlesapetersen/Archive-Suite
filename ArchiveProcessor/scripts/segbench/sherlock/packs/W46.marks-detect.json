@@ -15,7 +15,7 @@
     "$GROUP_HOME/$USER/envs/marks-yolo",
     "$GROUP_HOME/$USER/archive-suite/sherlock-results/marks-detect-20261104"
   ],
-  "provenance": [],
+  "provenance": ["freeze.json"],
   "requires": [],
   "results": "$GROUP_HOME/$USER/archive-suite/sherlock-results/marks-detect-20261104",
   "collect": ["$FS_ROOT/marks-detect-20261104/jobs.tsv", "$FS_ROOT/marks-detect-20261104/logs"],
