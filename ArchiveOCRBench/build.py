@@ -1090,13 +1090,17 @@ def enh_marks():
 
 
 def rotation():
-    """W46.rotation-routes: every rotation route on the same turned pages (rotation_routes.py report), per page set."""
+    """W46.rotation-routes: every rotation route on the same turned pages (rotation_routes.py report), per page set;
+    W46.rotation-heldout's held-out owner pages for the routes that ran on them (the rest have no figure there)."""
     if not ROTATION.exists():
         return None
     d = json.loads(ROTATION.read_text())
     groups = {"all": "all pages", "owner96": "the owner's 96", "public": "the six public strata", "L1": "L1 English handwriting",
-              "L4": "L4 ledgers and tables", "L7": "L7 charters", "N1": "N1 Arabic", "N4": "N4 Hebrew", "N5": "N5 Chinese print"}
-    rows = [{"id": k, "name": v["name"], **{g: v[g] for g in groups}} for k, v in d["routes"].items()]
+              "L4": "L4 ledgers and tables", "L7": "L7 charters", "N1": "N1 Arabic", "N4": "N4 Hebrew", "N5": "N5 Chinese print",
+              # W46.rotation-heldout: owner pages the shipped detector was not tuned on (local routes and their rules)
+              "heldout": "held out: 119 owner pages", "heldout_replaced": "held out: the 19 the 96's draw replaced",
+              "heldout_boxes": "held out: 100 locked-box pages"}
+    rows = [{"id": k, "name": v["name"], **{g: v.get(g) for g in groups}} for k, v in d["routes"].items()]
     return {"groups": groups, "rows": rows, "meta": d["bench_meta"], "note": d["bench_note"]}
 
 

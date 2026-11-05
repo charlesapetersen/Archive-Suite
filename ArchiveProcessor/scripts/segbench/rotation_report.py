@@ -36,14 +36,20 @@ LICENCES = {
 }
 
 
-VERDICT = """**Local Vision is right on 99.0% of the 96's turns and is never wrong there.** Its four misses are abstentions
-(p034's two axes). It is also safe on L1 English handwriting and L4 ledgers (93.8% and 97.5%, abstentions only). It
+VERDICT = """**Local Vision is right on 99.0% of the 96's turns and is never wrong there, but the 96 are its development
+set.** RotationDetector's policy was chosen on these 384 turns (W40.fix-processor-rotation-axis, 342 → 380), and the
+96 were drawn through a 20-word Vision filter, so they hold no page where Vision's text, and its rotation vote, is
+weakest. By page it is 95 of 96 right at all four turns (p034 abstains at all four); zero wrong pages bounds its page
+error at 3.8%, not 1.0%. The held-out owner figure (below, W46.rotation-heldout) is the one a rule cites.
+__HELDOUT_VERDICT__
+
+Its four misses on the 96 are abstentions (p034's two axes). It is also safe on L1 English handwriting and L4 ledgers (93.8% and 97.5%, abstentions only). It
 gives a confident **wrong axis** on charters (36 of L7's 80 turns), abstains on much of Hebrew (34 of 80) and Chinese
 (24 of 80), and is 67.7% over the six public strata.
 
 **llmSingle is the most accurate single route.** That is the app's comparative prompt, here on Gemini 3.7 Flash
-through the gateway. It is 100% on the 96 and 97.3% on the public strata (98.9% without the two pages the set
-probably stores turned, below). It costs $0.0037 and about 6 s of round trip a page. Its misses are those two
+through the gateway. It is 100% on the 96 and 97.3% on the public strata as stored (two pages the set may store
+turned are among its misses; the "without" figure is an upper bound chosen by its own answers, below). It costs $0.0037 and about 6 s of round trip a page. Its misses are those two
 Arabic pages at every turn, two Chinese turns, one charter flip and one Hebrew axis.
 
 **llmMajority buys nothing measurable.** On its 432 turns it is right on one turn llmSingle missed, and on none of
@@ -69,13 +75,14 @@ because Vision is wrong there rather than silent.
 
 **The rule this supports, for Phase 4.** No default is changed here.
 - *On-this-Mac or free profile:* Vision checked by PP-LCNet. Where they disagree or Vision abstains, leave the page
-  as it is and flag it. On the 96 that is 0 wrong and 7 of 384 flagged; on L1 and L4, 0 wrong and 10 of 160 flagged.
+  as it is and flag it. On the 96 (the development set) that is 0 wrong and 7 of 384 turns flagged, 2 of 96 pages;
+  __HELDOUT_FREE__ on L1 and L4, 0 wrong and 10 of 160 flagged.
   The small local VLMs are no substitute. For charter, Hebrew or Chinese collections it flags most pages (L7 66 of
   80, N4 78 of 80); such a collection needs the cloud rule.
 - *Cloud profile, Latin-script modern material (the owner's kind):* Vision and PP-LCNet agree, else llmSingle. It
-  matches llmSingle's 100% on the 96 with 7 calls instead of 384.
-- *Cloud profile, charters and non-Latin scripts:* llmSingle on every page (L7 98.8%, N1 88.8% or 98.6% without the
-  two turned pages, N4 98.8%, N5 97.5%).
+  matches llmSingle's 100% on the 96 with 7 calls instead of 384; __HELDOUT_CLOUD__
+- *Cloud profile, charters and non-Latin scripts:* llmSingle on every page (L7 98.8%, N1 88.8% as stored, N4 98.8%,
+  N5 97.5%).
 - *llmMajority:* retire it or relabel it, and make its tie-break deterministic (W46.rotation-majority-fix).
 - *The default:* today it is llmSingle. But `LLMRotationDetector.hasRoute` is false for the gateway, so a gateway
   user's LLM modes silently run Vision, and PP-LCNet is not in the app (it needs a Core ML conversion). Whether the
@@ -83,11 +90,15 @@ because Vision is wrong there rather than silent.
   Phase 4."""
 CARD = """- **Truth.** Constructed, not drafted: each page is taken as upright as stored and turned by a known angle, so
   the right correction is known exactly. The owner's 96 are his frozen originals, upright since W41.ocr-panel-cloud
-  (the axis test's set). The public pages are upright as their datasets publish them; no one checked that. One
-  public page (above) gets the same sideways correction at every turn from Gemini and from Vision, so it is probably
-  stored turned; it stays in every figure, and the table above shows the strata without it. Nobody read a page to
+  (the axis test's set). The public pages are upright as their datasets publish them; no one checked that.
+  __SIDEWAYS__ They stay in every figure; the table without them is an upper bound for llmSingle, whose own answers
+  chose them. The held-out owner pages are upright as stored, unchecked; __HELDOUT_TURNED__ Nobody read a page to
   rule on it.
-- **Selection.** The 96 entire. The public pages are 20 of each of six strata of the frozen 895, drawn by a salted
+- **Selection.** The 96 entire, which are RotationDetector's development set: its policy was chosen on these 384
+  turns (W40.fix-processor-rotation-axis), so its figure on them is not held out. __DRAW_96__ The held-out set is
+  the 19 pages that filter replaced and 100 pages of the three locked segmentation boxes (527 pages, none
+  byte-identical to a panel page), drawn by a salted hash of the box and file number; no route's answer chose them.
+  The public pages are 20 of each of six strata of the frozen 895, drawn by a salted
   hash of the page id, never by a route's answer or by ABBYY text. The subsets are nested draws by the same hash:
   llmMajority's two further orderings 48 of the 96 and 10 a stratum, the local models 24 and 4.
 - **Comparison.** Every route gets the same upright page with the same exact turns (lossless transposes of the same
@@ -108,14 +119,16 @@ CARD = """- **Truth.** Constructed, not drafted: each page is taken as upright a
   (p034, the 96's mixed-axes page, is the one the axis test knows). The app's own Gemini, OpenAI and Anthropic
   rotation models were not measured: real money on personal keys, and 3.7 Flash stands in. What a wrong rotation
   costs downstream (an OCR reading of a sideways page) is not measured here."""
-BENCH_META = '216 pages × 4 turns · Gemini through the gateway, the rest free on the Mac (W46.rotation-routes)'
+BENCH_META = '216 pages × 4 turns, and 119 held-out owner pages for the local routes · Gemini through the gateway, the rest free on the Mac (W46.rotation-routes)'
 BENCH_NOTE = ("Each upright page turned 0, 90, 180 and 270 degrees; a route is right when it gives the turn that "
               "makes it upright. Wrong axis = sideways, flip = upside down, abstain = no answer. The gateway's Gemini "
               "3.7 Flash runs the app's comparative which-of-four prompt (llmSingle one call, llmMajority three, on a "
               "108-page half); the local models ran on a 48-page subset. Vision is right on 99.0% of the owner's turns "
               "and never wrong there, but wrong-axis on charters; llmSingle is 100% on the 96 and 97.3% on the public "
               "strata; Vision and PP-LCNet agreeing, else llmSingle, is 100% on the 96 with 7 of 384 turns sent to "
-              "the model. Small local vision models are near chance. Seconds were taken inside an unattended session "
+              "the model, but the 96 are the shipped detector's development set: __HELDOUT_NOTE__ The small local "
+              "models are at chance with a one-image prompt; Qwen3-VL 8B with the app's comparative prompt is 78.1%, "
+              "below Vision on the owner's pages. Seconds were taken inside an unattended session "
               "(background QoS), so compare them, don't quote them. Detail: ArchiveProcessor/segbench-results/"
               "rotation-routes.md.")
 
@@ -341,11 +354,260 @@ def report():
             'mlx_peak_gb': peaks, 'gateway_spend': spend, 'licences': LICENCES,
             'tesseract': RR.tesseract_version(), 'machine': f"{platform.machine()} {platform.mac_ver()[0]}",
             'misses': {r: v for r, v in misses.items()}, 'paired': {k: list(v) for k, v in pairs.items()}}
+    data['heldout'] = heldout_data(pages, a, casc)
+    if data['heldout']:
+        for r, v in data['heldout']['routes'].items():
+            data['routes'][r].update(v['bench'])
     data['bench_meta'] = BENCH_META
-    data['bench_note'] = BENCH_NOTE
+    data['bench_note'] = fill(BENCH_NOTE, data)
+    data['item'] = 'W46.rotation-routes, W46.rotation-heldout'
     (RR.RESULTS / 'rotation-routes.json').write_text(json.dumps(data, indent=1) + '\n')
-    (RR.RESULTS / 'rotation-routes.md').write_text(md(data, VERDICT, CARD))
+    (RR.RESULTS / 'rotation-routes.md').write_text(md(data, fill(VERDICT, data), fill(CARD, data)))
     print(json.dumps({r: (table[r]['all'], table[r]['owner96']['pct'], table[r]['public']['pct']) for r in table}, indent=0))
+
+
+# ---------------------------------------------------------------------------------------------- held out
+
+HELDOUT_GROUPS = ('replaced', 'Sasha', 'IllustratedReview', 'SC0122')
+HELDOUT_NAMES = {'replaced': "the 19 pages the 96's draw replaced (Vision read under 20 words)",
+                 'Sasha': 'Young, Sasha (handwritten letters)', 'IllustratedReview': 'Stanford Illustrated Review (magazine)',
+                 'SC0122': 'SC0122 News Service (clippings)', 'boxes': 'the 100 locked-box pages',
+                 'heldout': 'all 119 held-out pages'}
+HELDOUT_ROUTES = ('vision', 'paddle', 'tesseract', 'vision>paddle', 'vision=paddle>flag', 'vision=paddle>llm1')
+LOCAL = ('vision', 'paddle', 'tesseract')
+
+
+def page_figures(ans, pids):
+    """By page: right at all four turns; wrong (an axis or a flip) at any turn; flagged (an abstention, or an escalated
+    turn of a rule) at any turn. Zero wrong pages of n bounds the page error rate by Wilson's upper end."""
+    n = right = wrong = flagged = 0
+    for pid in pids:
+        got = [ans.get((pid, t)) for t in RR.TURNS]
+        if any(g is None for g in got):
+            continue
+        o = [outcome(g['found'], t) for g, t in zip(got, RR.TURNS)]
+        n += 1
+        right += all(x == 'exact' for x in o)
+        wrong += any(x in ('axis', 'flip') for x in o)
+        flagged += any(x == 'abstain' or g.get('escalated') for x, g in zip(o, got))
+    return {'n': n, 'right': right, 'wrong': wrong, 'flagged': flagged, 'right_ci': wilson(right, n),
+            'wrong_ci': wilson(wrong, n), 'flagged_ci': wilson(flagged, n)}
+
+
+def clustered(ans, pids, what, reps=2000, seed=46):
+    """A turn rate with a page-clustered 95% interval: the pages resampled with replacement, each bringing its four
+    turns (a route that fails a page tends to fail all four). Degenerate at a zero count; the page Wilson bound is the
+    one to read there."""
+    import random
+    per = []
+    for pid in pids:
+        got = [ans.get((pid, t)) for t in RR.TURNS]
+        if any(g is None for g in got):
+            continue
+        per.append(sum(what(g, t) for g, t in zip(got, RR.TURNS)))
+    if not per:
+        return None
+    n = 4 * len(per)
+    rng = random.Random(seed)
+    boot = sorted(sum(rng.choice(per) for _ in per) / n for _ in range(reps))
+    return {'k': sum(per), 'n': n, 'pct': round(100 * sum(per) / n, 1),
+            'lo': round(100 * boot[int(0.025 * reps)], 1), 'hi': round(100 * boot[int(0.975 * reps) - 1], 1)}
+
+
+def turn_figures(ans, pids):
+    exact = lambda g, t: g['found'] == RR.want(t)
+    wrong = lambda g, t: outcome(g['found'], t) in ('axis', 'flip')
+    flag = lambda g, t: g['found'] is None or bool(g.get('escalated'))
+    return {'exact': clustered(ans, pids, exact), 'wrong': clustered(ans, pids, wrong),
+            'flagged': clustered(ans, pids, flag)}
+
+
+def load_heldout():
+    """The held-out answers (rotation_routes.py --set heldout) and the rules built from them. The cloud rule asks
+    llmSingle only where Vision and PP-LCNet disagree or Vision abstains (gateway-escalations); its answer, else
+    Vision's, is the rule's."""
+    RR.use_set('heldout')
+    try:
+        pages = {p['id']: p for p in RR.page_list()}
+        a = {r: RR.done(r) for r in LOCAL if RR.done(r)}
+        llm = RR.done('gw-order0')
+        spend = RR.gw().billed(RR.gw().ledger()) if llm else None
+    finally:
+        RR.use_set('main')
+    if 'vision' in a and 'paddle' in a:
+        c = cascades(a)
+        a['vision>paddle'] = c['vision>paddle']
+        a['vision=paddle>flag'] = c['vision=paddle>flag']
+        esc = {k for k, v in a['vision=paddle>flag'].items() if v['escalated']}
+        if llm and all(k in llm for k in esc):
+            m = {}
+            for k, v in a['vision'].items():
+                if k not in a['paddle']:
+                    continue
+                if k in esc:
+                    r = llm[k]
+                    m[k] = {'found': r['found'] if r['found'] is not None else v['found'], 'cost': r['cost'],
+                            'seconds': v['seconds'] + a['paddle'][k]['seconds'] + r['seconds'], 'escalated': True}
+                else:
+                    m[k] = {'found': v['found'], 'cost': 0.0, 'seconds': v['seconds'] + a['paddle'][k]['seconds'],
+                            'escalated': False}
+            a['vision=paddle>llm1'] = m
+    return pages, a, spend
+
+
+def stored_turned(pages, a):
+    """Held-out pages two local routes of different families agree are stored turned: the same non-zero offset at all
+    four turns. Reported apart, never dropped: they stay in every figure, and the table without them is labelled as
+    chosen by the routes it scores."""
+    out = {}
+    for pid in pages:
+        offs = {r: offset(a[r], pid) for r in LOCAL if r in a}
+        got = collections.Counter(v for v in offs.values() if v is not None)
+        for off, c in got.items():
+            if c >= 2:
+                out[pid] = {'offset': off, 'routes': sorted(r for r, v in offs.items() if v == off)}
+    return out
+
+
+def heldout_data(main_pages, main_a, main_casc):
+    pages, a, spend = load_heldout()
+    if not a:
+        return None
+    groups = {g: [p for p in pages if pages[p]['stratum'] == g] for g in HELDOUT_GROUPS}
+    groups['boxes'] = [p for p in pages if pages[p]['set'] == 'boxes']
+    groups['heldout'] = list(pages)
+    turned = stored_turned(pages, a)
+    upright = [p for p in pages if p not in turned]
+    routes = {}
+    for r in HELDOUT_ROUTES:
+        if r not in a:
+            continue
+        routes[r] = {g: {'pages': page_figures(a[r], ps), 'turns': turn_figures(a[r], ps)} for g, ps in groups.items()}
+        routes[r]['upright'] = {'pages': page_figures(a[r], upright), 'turns': turn_figures(a[r], upright)}
+        keys = [(p, t) for p in pages for t in RR.TURNS]
+        routes[r]['bench'] = {g: score(pages, a[r], [(p, t) for p in ps for t in RR.TURNS])
+                              for g, ps in (('heldout', list(pages)), ('heldout_boxes', groups['boxes']),
+                                            ('heldout_replaced', groups['replaced']))}
+        routes[r]['misses'] = [f"{k[0]}@{k[1]}:{outcome(v['found'], k[1])}" for k, v in sorted(a[r].items())
+                               if outcome(v['found'], k[1]) in ('axis', 'flip')]
+    own = [p for p in main_pages if main_pages[p]['set'] == 'owner96']
+    main_routes = {**main_a, **main_casc}
+    owner96 = {r: {'pages': page_figures(main_routes[r], own), 'turns': turn_figures(main_routes[r], own)}
+               for r in ('vision', 'paddle', 'tesseract', 'llm1', 'vision>paddle', 'vision=paddle>flag', 'vision=paddle>llm1')
+               if r in main_routes}
+    return {'pages': {g: len(ps) for g, ps in groups.items()}, 'stored_turned': turned, 'routes': routes,
+            'owner96': owner96, 'escalations': len(RR_escalated(a)), 'gateway_spend': spend}
+
+
+def RR_escalated(a):
+    return [k for k, v in a.get('vision=paddle>flag', {}).items() if v['escalated']]
+
+
+def pct(k, n):
+    return f"{100 * k / n:.1f}%" if n else '—'
+
+
+def page_cell(f):
+    if not f or not f['n']:
+        return '—'
+    return (f"{f['right']}/{f['n']} right, {f['wrong']} wrong (≤{f['wrong_ci'][1]}%), "
+            f"{f['flagged']} flagged")
+
+
+def turn_cell(t):
+    e = t['exact']
+    if not e:
+        return '—'
+    return f"{e['k']}/{e['n']} ({e['pct']:.1f}%, {e['lo']}–{e['hi']}); {t['wrong']['k']} wrong, {t['flagged']['k']} flagged"
+
+
+def heldout_md(h, names):
+    if not h:
+        return []
+    R = h['routes']
+    out = ['', '## Held out: owner pages the detector was not tuned on (W46.rotation-heldout)', '',
+           "RotationDetector's policy was chosen on the 96's 384 turns (W40.fix-processor-rotation-axis: \"not held-out "
+           "population accuracy\"), and the 96 were drawn through a 20-word Vision filter. These pages are neither: the "
+           f"{h['pages']['replaced']} pages that filter replaced (covers, photographs, blanks and pages Vision barely read), "
+           f"and {h['pages']['boxes']} pages of the three locked segmentation boxes drawn by a salted hash "
+           f"({h['pages']['Sasha']} Sasha letters, {h['pages']['IllustratedReview']} Illustrated Review, "
+           f"{h['pages']['SC0122']} SC0122 clippings). Same turns, same routes, same scoring as above. A page is right "
+           "when all four turns are; wrong when any turn gets a confident wrong answer; flagged when any turn is an "
+           "abstention or (for a rule) escalated. Page intervals are Wilson's (the bracket after \"wrong\" is the upper "
+           "end); turn intervals are page-clustered (pages resampled with their four turns).", '',
+           '| Route | Set | Pages | Turns |', '|---|---|---|---|']
+    for r in R:
+        for g in ('heldout', 'replaced', 'boxes', 'Sasha', 'IllustratedReview', 'SC0122'):
+            out.append(f"| {names[r]} | {HELDOUT_NAMES[g]} | {page_cell(R[r][g]['pages'])} | {turn_cell(R[r][g]['turns'])} |")
+    st = h['stored_turned']
+    out += ['', f"**Pages two routes agree are stored turned** ({len(st)}): "
+            + (', '.join(f"{k} (+{v['offset']}°: {', '.join(v['routes'])})" for k, v in st.items()) or 'none')
+            + ". They stay in every figure above, scored as stored. Without them (an upper bound for the routes that "
+            "named them, since their own answers chose the pages):", '', '| Route | Pages, without them | Turns, without them |',
+            '|---|---|---|']
+    for r in R:
+        out.append(f"| {names[r]} | {page_cell(R[r]['upright']['pages'])} | {turn_cell(R[r]['upright']['turns'])} |")
+    out += ['', "**The 96 by page, beside the turn figures** (the development set; the same page and clustered-turn "
+            "figures as the held-out table):", '', '| Route | Pages | Turns |', '|---|---|---|']
+    for r, v in h['owner96'].items():
+        out.append(f"| {names[r]} | {page_cell(v['pages'])} | {turn_cell(v['turns'])} |")
+    out += ['', '**Held-out wrong turns:** ' + '; '.join(f"{names[r]} ({len(R[r]['misses'])}): "
+                                                         + (', '.join(R[r]['misses'][:30]) + (' …' if len(R[r]['misses']) > 30 else '') or 'none')
+                                                         for r in R) + '.']
+    sp = h['gateway_spend']
+    if sp:
+        out.append(f"- Held-out gateway arm: {sp['calls']} llmSingle calls on the {h['escalations']} escalated turns, "
+                   f"${sp['charged']:.2f} charged (the gateway's own figure ${sp['gateway'] or 0:.2f}); ledger "
+                   "`rotation-routes/heldout/calls.jsonl`.")
+    return out
+
+
+def fill(text, data):
+    """The generated sentences the static Verdict, card and bench note carry: held-out figures, the stored-turned
+    pages with the routes behind each, and the 96's draw rule (ocr_card.DRAW_96)."""
+    import ocr_card
+    h = data.get('heldout')
+    sw = data['stored_sideways']
+    sub = {'__DRAW_96__': ocr_card.DRAW_96,
+           '__SIDEWAYS__': (f"{len(sw)} public pages get the same non-zero correction at all four turns from Gemini and "
+                            "from a local route of another family, so the set probably stores them turned: "
+                            + '; '.join(f"{k} (+{v['offset']}°, from {', '.join(ROUTE_NAMES[r].split(':')[0].split(' (')[0] for r in v['routes'])})"
+                                        for k, v in sw.items()) + '.') if sw else 'No public page looks stored turned.'}
+    if h:
+        R = h['routes']
+        n = h['pages']['heldout']
+        v, vt = R['vision']['heldout']['pages'], R['vision']['heldout']['turns']
+        fr, ft = R['vision=paddle>flag']['heldout']['pages'], R['vision=paddle>flag']['heldout']['turns']
+        st = h['stored_turned']
+        sub['__HELDOUT_VERDICT__'] = (
+            f"**Held out** ({n} owner pages: the {h['pages']['replaced']} the filter replaced and {h['pages']['boxes']} "
+            f"locked-box pages), Vision is right at all four turns on {v['right']} of {n} pages and wrong at some turn on "
+            f"{v['wrong']} (Wilson upper end {v['wrong_ci'][1]}%); by turn {vt['exact']['pct']:.1f}% exact "
+            f"({vt['exact']['lo']}–{vt['exact']['hi']}, page-clustered), {vt['wrong']['k']} of {vt['wrong']['n']} wrong, "
+            f"{vt['flagged']['k']} abstentions.")
+        sub['__HELDOUT_FREE__'] = (
+            f"on the {n} held-out owner pages, {fr['wrong']} wrong pages (Wilson upper end {fr['wrong_ci'][1]}%; "
+            f"{ft['wrong']['k']} of {ft['wrong']['n']} turns) and {fr['flagged']} of {n} pages flagged "
+            f"({ft['flagged']['k']} turns);")
+        if 'vision=paddle>llm1' in R:
+            cp, ct = R['vision=paddle>llm1']['heldout']['pages'], R['vision=paddle>llm1']['heldout']['turns']
+            sub['__HELDOUT_CLOUD__'] = (
+                f"on the {n} held-out owner pages it is right on {ct['exact']['k']} of {ct['exact']['n']} turns "
+                f"({cp['right']} of {n} pages at all four, {cp['wrong']} wrong) with {h['escalations']} calls.")
+        else:
+            sub['__HELDOUT_CLOUD__'] = 'its held-out escalations were not asked (no figure).'
+        sub['__HELDOUT_TURNED__'] = (f"{len(st)} of them two local routes agree are stored turned, reported apart in the "
+                                     "held-out section, never dropped." if st else
+                                     "no two local routes agree that any is stored turned.")
+        sub['__HELDOUT_NOTE__'] = (f"on {n} held-out owner pages Vision is right at all four turns on {v['right']} and "
+                                   f"wrong on {v['wrong']}, and Vision with PP-LCNet flagging is wrong on {fr['wrong']} "
+                                   f"and flags {fr['flagged']}.")
+    else:
+        for k in ('__HELDOUT_VERDICT__', '__HELDOUT_FREE__', '__HELDOUT_CLOUD__', '__HELDOUT_TURNED__', '__HELDOUT_NOTE__'):
+            sub[k] = ''
+    for k, x in sub.items():
+        text = text.replace(k, x)
+    return text
 
 
 def cell(s):
@@ -389,7 +651,8 @@ def md(data, verdict, card):
             f"{len(sw)} public pages get the same non-zero correction at all four turns from Gemini and from at least one "
             "local route of another family, so the dataset's own orientation of them is probably not upright: "
             + (', '.join(f"{k} (+{v['offset']}°: {', '.join(v['routes'])})" for k, v in sw.items()) or 'none') + '. '
-            'They stay in every figure above. Without them, on the public strata:', '',
+            'They stay in every figure above. Without them, on the public strata (an upper bound for llmSingle, whose '
+            'own constant answers chose these pages, so its "without" figure is not a measurement of it):', '',
             '| Route | Public, as stored | Public, without these pages |', '|---|---|---|']
     for r in order + casc:
         out.append(f"| {R[r]['name']} | {cell(R[r]['public'])} | {cell(R[r]['public_upright'])} |")
@@ -422,5 +685,7 @@ def md(data, verdict, card):
             "`rotation-routes/calls.jsonl` in the bench cache.",
             '- Local models\' peak memory (mlx, GB): ' + ', '.join(f"{R[r]['name']} {v}" for r, v in data['mlx_peak_gb'].items()) + '.',
             '- Licences: ' + '; '.join(f'{k}: {v}' for k, v in data['licences'].items()) + '.', '',
-            '## Measurement card', '', card, '']
+            ]
+    out += heldout_md(data.get('heldout'), {r: R[r]['name'] for r in R})
+    out += ['', '## Measurement card', '', card, '']
     return '\n'.join(out)

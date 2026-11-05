@@ -9,6 +9,10 @@
   heavy-run.py run -- <lab venv python> rotation_routes.py mlx MODEL compare|single [--limit N]
   python3 rotation_routes.py report                   # segbench-results/rotation-routes.md + ArchiveOCRBench data
 
+W46.rotation-heldout: the same local routes on owner pages the shipped detector was not tuned on (`--set heldout`):
+  python3 rotation_routes.py heldout-pages            # the 19 pages the 96's draw replaced + 100 locked-box pages
+  heavy-run.py run -- python3 rotation_routes.py vision --set heldout      # (and tesseract, paddle, gateway-escalations)
+
 The pages: the 96 frozen owner originals (ocr-panel-cloud/images, read-only; scripts/test-rotation-axis.sh's set)
 and 20 pages from each of six public strata local Vision is likely to miss (L1 English handwriting, L4 ledgers and
 tables, L7 charters, N1 Arabic, N4 Hebrew, N5 Chinese print), drawn from the frozen 895 by a salted hash of the page
@@ -62,6 +66,7 @@ TURNS = (0, 90, 180, 270)
 RESULTS = HERE.parents[1] / 'segbench-results'
 BENCH = HERE.parents[2] / 'ArchiveOCRBench'
 PROCESSOR = HERE.parents[1]
+HELDOUT_CAP = 1.00    # W46.rotation-heldout's own gateway total: the cloud cascade's escalations only
 CAP = 6.90            # the item's gateway total in dollars, under the $7 rule (llmSingle $3.24 + the majority half ~$3.24)
 MODEL = 'gemini-3.7-flash'
 
@@ -83,6 +88,23 @@ MLX_MODELS = {   # model_store's shared cache, pinned revisions
     'qwen3vl-8b': ('mlx-community/Qwen3-VL-8B-Instruct-4bit', 'defcdea7cc7a4b0858fea563cbbce171d328e457'),
     'qwen35-2b': ('mlx-community/Qwen3.5-2B-4bit', '674aaa7240b91e8012fcad5d791b7dfe5ba90207'),
 }
+
+
+# W46.rotation-heldout (measurement review pass 9, P9-1): RotationDetector's policy was chosen on the 96's 384 turns
+# (W40.fix-processor-rotation-axis), and the 96 were drawn through a 20-word Vision filter, so the held-out set is the
+# 19 pages that filter replaced (ocr-truth/draw.json, images in ocr-truth/prep by their key) and HELDOUT_N pages of the
+# three locked segmentation boxes, by a salted hash of the box and file number. Neither was seen by the detector's
+# tuning; neither was chosen by a route's answer. A box page byte-identical to one of the 99 panel originals is left out.
+HELDOUT = CACHE / 'heldout'
+HELDOUT_SALT = 'W46.rotation-heldout'
+HELDOUT_N = 100
+OCR_TRUTH = REHEARSAL / 'ocr-truth'
+SET = 'main'          # 'heldout' switches the page list and the answer files (use_set)
+
+
+def use_set(name):
+    global SET
+    SET = name
 
 
 def sample(ps, own_n, per_stratum):
@@ -113,7 +135,36 @@ def want(turn):
 # ---------------------------------------------------------------------------------------------------- pages
 
 def page_list():
-    return [json.loads(x) for x in (CACHE / 'pages.jsonl').read_text().splitlines()]
+    f = HELDOUT / 'pages.jsonl' if SET == 'heldout' else CACHE / 'pages.jsonl'
+    return [json.loads(x) for x in f.read_text().splitlines()]
+
+
+def heldout_pages():
+    import data as D
+    rows = []
+    draw = json.loads((OCR_TRUTH / 'draw.json').read_text())
+    for r in draw['replaced']:
+        key = hashlib.sha256(f"{r['folder']}/{r['name']}".encode()).hexdigest()[:16]
+        path = OCR_TRUTH / 'prep' / f'{key}.jpg'
+        if not path.exists():
+            raise SystemExit('a replaced page has no prepared image: ' + key)
+        rows.append({'id': 'replaced:' + key, 'set': 'replaced', 'stratum': 'replaced', 'path': str(path),
+                     'words': r['words'], 'why': r['why'], 'sha256': hashlib.sha256(path.read_bytes()).hexdigest()})
+    panel = {hashlib.sha256(p.read_bytes()).hexdigest() for p in OWNER96.glob('*-original.jpg')}
+    pool, overlap = [], []
+    for box, folder in D.LOCKED.items():
+        for n, path in sorted(D.list_images(D.DATA_DIR / folder).items()):
+            h = hashlib.sha256(path.read_bytes()).hexdigest()
+            (overlap if h in panel else pool).append({'id': f'box:{box}:{n:03d}', 'set': 'boxes', 'stratum': box,
+                                                      'path': str(path), 'sha256': h})
+    pool.sort(key=lambda p: hashlib.sha256((HELDOUT_SALT + p['id']).encode()).hexdigest())
+    rows += pool[:HELDOUT_N]
+    HELDOUT.mkdir(parents=True, exist_ok=True)
+    (HELDOUT / 'pages.jsonl').write_text(''.join(json.dumps(r) + '\n' for r in rows))
+    (HELDOUT / 'draw.json').write_text(json.dumps({'salt': HELDOUT_SALT, 'pool': len(pool),
+                                                   'panel_overlap': [p['id'] for p in overlap]}, indent=1))
+    print(len(rows), dict(collections.Counter(r['stratum'] for r in rows)), 'pool', len(pool),
+          'left out as panel pages', len(overlap))
 
 
 def pages():
@@ -179,8 +230,12 @@ def candidates(path, turn):
     return {c: jpeg(im.transpose(rot[c]) if rot[c] else im, 80) for c in TURNS}
 
 
+def answer_name(name):
+    return 'heldout-' + name if SET == 'heldout' else name
+
+
 def done(name):
-    f = ANSWERS / (name + '.jsonl')
+    f = ANSWERS / (answer_name(name) + '.jsonl')
     if not f.exists():
         return {}
     out = {}
@@ -192,7 +247,7 @@ def done(name):
 
 def append(name, rec):
     ANSWERS.mkdir(parents=True, exist_ok=True)
-    with (ANSWERS / (name + '.jsonl')).open('a') as f:
+    with (ANSWERS / (answer_name(name) + '.jsonl')).open('a') as f:
         f.write(json.dumps(rec) + '\n')
 
 
@@ -277,10 +332,15 @@ def paddle():
 
 # ---------------------------------------------------------------------------------------------------- gateway
 
+def ledger_dir():
+    """The held-out arm keeps its own ledger and cap: it is a new item under the $7 rule."""
+    return HELDOUT if SET == 'heldout' else CACHE
+
+
 def gw():
     import gateway_gemini as G
-    G.CACHE = CACHE
-    G.CAP = CAP
+    G.CACHE = ledger_dir()
+    G.CAP = HELDOUT_CAP if SET == 'heldout' else CAP
     return G
 
 
@@ -293,8 +353,8 @@ def ask_gateway(p, turn, order_i, cands):
         content.append({'type': 'image_url', 'image_url': {'url': 'data:image/jpeg;base64,' + base64.b64encode(cands[c]).decode()}})
     body = {'model': MODEL, 'temperature': 0, 'reasoning_effort': 'minimal', 'max_tokens': 2048,
             'messages': [{'role': 'user', 'content': content}]}
-    if G.spent() + 0.02 > CAP:
-        raise SystemExit(f'cap: ${G.spent():.4f} spent of ${CAP}')
+    if G.spent() + 0.02 > G.CAP:
+        raise SystemExit(f'cap: ${G.spent():.4f} spent of ${G.CAP}')
     t = time.time()
     for attempt in range(4):
         r = G.request('/chat/completions', body, timeout=120)
@@ -307,7 +367,7 @@ def ask_gateway(p, turn, order_i, cands):
            'wall_s': round(time.time() - t, 3), 'model': got.get('model'), 'usage': usage,
            'cost': round(G.cost(usage), 6)}
     rec = G.with_gateway_cost(rec, r)
-    with (CACHE / 'calls.jsonl').open('a') as f:
+    with (ledger_dir() / 'calls.jsonl').open('a') as f:
         f.write(json.dumps(rec) + '\n')
     if r.status_code != 200:
         print(p['id'], turn, order_i, r.status_code, json.dumps(got)[:300])
@@ -321,6 +381,8 @@ def ask_gateway(p, turn, order_i, cands):
 
 
 def gateway(orders, limit, concurrency=6):
+    if SET == 'heldout':
+        raise SystemExit('the held-out set asks the gateway only for the cascade\'s escalations: gateway-escalations')
     CACHE.mkdir(parents=True, exist_ok=True)
     have = {}
     for i in range(3):
@@ -343,6 +405,36 @@ def gateway(orders, limit, concurrency=6):
                 append(f'gw-order{i}', rec)
     G = gw()
     print(f'gateway: {len(jobs)} calls asked; ${G.spent():.4f} spent in all; {G.billed_note(G.ledger())}')
+
+
+def escalations():
+    """The held-out turns the cloud cascade sends to the model: Vision abstains, or Vision and PP-LCNet disagree."""
+    v, pp = done('vision'), done('paddle')
+    return sorted(k for k in v if k in pp and (v[k]['found'] is None or v[k]['found'] != pp[k]['found']))
+
+
+def gateway_escalations(concurrency=4, dry=False):
+    """llmSingle (one ordering) on the held-out set's escalated turns only: the cascade's cloud arm, priced first."""
+    if SET != 'heldout':
+        raise SystemExit('gateway-escalations is the held-out arm: --set heldout')
+    HELDOUT.mkdir(parents=True, exist_ok=True)
+    have = done('gw-order0')
+    ps = {p['id']: p for p in page_list()}
+    jobs = [k for k in escalations() if k not in have]
+    G = gw()
+    print(f'{len(jobs)} escalated turns to ask; about ${0.0037 * len(jobs):.2f} at llmSingle\'s measured $0.0037 a call; '
+          f'${G.spent():.4f} spent of ${G.CAP}')
+    if dry:
+        return
+
+    def one(k):
+        p, t = ps[k[0]], k[1]
+        return ask_gateway(p, t, 0, candidates(p['path'], t))
+    with ThreadPoolExecutor(concurrency) as ex:
+        for rec in ex.map(one, jobs):
+            if rec:
+                append('gw-order0', rec)
+    print(f'gateway: ${G.spent():.4f} spent in all; {G.billed_note(G.ledger())}')
 
 
 # ---------------------------------------------------------------------------------------------------- mlx
@@ -413,9 +505,13 @@ def main():
     a.add_argument('--orders', type=int, default=3)
     a.add_argument('--limit', type=int, default=0)
     a.add_argument('--all', action='store_true', help='mlx: every page, not the local sample')
+    a.add_argument('--set', default='main', choices=('main', 'heldout'))
     o = a.parse_args()
+    use_set(o.set)
     if o.cmd == 'pages':
         pages()
+    elif o.cmd == 'heldout-pages':
+        heldout_pages()
     elif o.cmd == 'vision':
         vision()
     elif o.cmd == 'tesseract':
@@ -424,6 +520,8 @@ def main():
         paddle()
     elif o.cmd == 'gateway':
         gateway(o.orders, o.limit)
+    elif o.cmd == 'gateway-escalations':
+        gateway_escalations(dry=bool(o.args and o.args[0] == 'dry'))
     elif o.cmd == 'mlx':
         mlx(o.args[0], o.args[1], o.limit, sample=not o.all)
     elif o.cmd == 'report':
