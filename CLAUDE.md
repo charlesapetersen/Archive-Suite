@@ -352,7 +352,7 @@ drafter or relative scored), **Selection** (never by a tested route or ABBYY tex
 settings, both OCR sets), **Noise** (n, paired intervals, the rerun floor; a gap inside it is a tie) and **Scope**
 (what the verdict does not settle). When a truth needs the owner, and how to ask him:
 [`ops/autonomous/README.md`](ops/autonomous/README.md) §"The measurement review". `W46.measure-review` (standing,
-Fable at max effort) reworks the queue on new results; why: `execution-plans/processing-review/11-measurement-audit.md`.
+Opus at xhigh, after every 8 finished result items) reworks the queue on new results; why: `execution-plans/processing-review/11-measurement-audit.md`.
 
 **Both OCR sets, every time (owner, 2026-10-20).** A model tested on the 895-page public set is also run on the
 owner's 96 truth pages, with the same settings, in the same item. The 96 are the owner's own material and are what

@@ -13,10 +13,18 @@ review: weak or circular truth, sets chosen by a tested route or by ABBYY text, 
 comparisons, verdicts too strong for their sample, and stale dependencies. Each result is written by one engine
 session, which judges its own measurement; nothing looked across them. So a standing queue item, W46.measure-review,
 runs on Fable at max effort (its `(effort: max)` marker; Agent Manager policy.py maps max to the escalated model)
-whenever enough new results have landed, and reworks the queue on what it finds.
+whenever enough new results have landed, and reworks the queue on what it finds. Owner, 2026-11-04: it runs on
+Opus at xhigh (its `(effort: xhigh)` marker), not Fable at max.
 
-Cadence. A review is due when MIN_RESULTS commits on origin/main have touched a result path since the last review, or
-when CADENCE_DAYS have passed and at least one has. The last review is $STATE/measure-review/last.json
+Cadence. Owner, 2026-11-04: a review is due when MIN_ITEMS items have finished with a result since the last review.
+An item counts when a commit on origin/main since the last review names it (`type(scope): TAG ...`) and touched a
+result path, and the item is now ticked in SUITE_TODO_DONE.md, so an item's checkpoint commits count once and only
+when it is done. Items the review itself filed do not count: the next pass checks them through the queue anyway.
+They are the tags a review note names first on a `**Queue:**` line (execution-plans/processing-review/measure-reviews/),
+and, as a backstop, any whose DONE entry's first line opens its description with "Measurement review <date> pass N,
+P<N>-<k>". A later pass's note appended to an owner's item further down its entry does not make it review-filed. Neither time nor the
+number of commits opens a review (it was 8 result commits, or a week with one, until 2026-11-04: the engine lands 8
+result commits most days, so it ran almost daily). The last review is $STATE/measure-review/last.json
 ({"commit", "at"}), written by `done`; the first upkeep seeds it with SEED, the audit's own commit. Opening is
 `plan-edit.py due W46.measure-review-due NOTE`, which ticks the gate in the plan's `## RECURRING` section; the
 standing item then runs, and re-arms the gate when it is done. Nothing here edits a tracked file, so upkeep (which
@@ -40,9 +48,13 @@ SCRIPTS = os.path.normpath(os.path.join(HERE, "..", "autonomous"))
 GATE = "W46.measure-review-due"
 ITEM = "W46.measure-review"
 SEED = "66daa3c1"            # the measurement audit's commit: the first review covers what landed after it
-MIN_RESULTS = 8
-CADENCE_DAYS = 7
+MIN_ITEMS = 8
 RESULT_PATHS = ["ArchiveProcessor/segbench-results", "ArchiveOCRBench/data"]
+SUBJECT_TAG = re.compile(r"^[A-Za-z]+(?:\([^)]*\))?!?:\s*`?(W\d+\.[A-Za-z0-9._-]*[A-Za-z0-9])")
+REVIEW_FILED = re.compile(r"\*\*[^\n]*?— Measurement review[^.\n]{0,40}pass \d+, P\d+-\d+")
+QUEUE_LINE = re.compile(r"(?m)^\**Queue:?\**:?\s*`?(W\d+\.[A-Za-z0-9._-]*[A-Za-z0-9])")
+NOTES = "execution-plans/processing-review/measure-reviews"
+END_MARK = re.compile(r"<!--\s*/(W\d+\.[A-Za-z0-9._-]*[A-Za-z0-9])\s*-->")
 CARD = re.compile(r"(?mi)^#{1,4}\s+measurement card\b")
 TAG = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
 
@@ -100,6 +112,69 @@ def results_since(env, commit):
     return [c for c in out.split() if c]
 
 
+def done_lines(env):
+    """{tag: its first ticked entry, with its indented lines} in SUITE_TODO_DONE.md as origin/main has it (the working file when git has none)."""
+    try:
+        text = git(env, "show", "%s:SUITE_TODO_DONE.md" % head(env))
+    except RuntimeError:
+        try:
+            text = open(os.path.join(env.repo, "SUITE_TODO_DONE.md")).read()
+        except OSError:
+            text = ""
+    out, cur, nameless = {}, None, None
+    for line in text.splitlines():
+        m = re.match(r"^\s*[-*]\s+\[([ xX])\]\s*\**`?", line)
+        if m:
+            nameless = None
+            t = TAG.match(line[m.end():]) if m.group(1) != " " else None
+            tag = t[0].rstrip(".") if t and re.match(r"W\d+\.", t[0]) else None
+            cur = tag if tag and tag not in out else None
+            if cur:
+                out[cur] = line
+            elif m.group(1) != " " and not tag:
+                nameless = line   # a garbled header: its end marker below names it
+        elif line.startswith((" ", "\t")):
+            if cur:
+                out[cur] += "\n" + line   # the entry's indented continuation (SHIPPED notes, the end marker)
+            elif nameless is not None:
+                e = END_MARK.search(line)
+                if e and e.group(1) not in out:
+                    out[e.group(1)] = nameless
+                    nameless = None
+        else:
+            cur = nameless = None
+    return out
+
+
+def review_filed(env):
+    """The tags review notes name first on a **Queue:** line, as origin/main has the notes."""
+    try:
+        names = git(env, "ls-tree", "--name-only", head(env), NOTES + "/").split()
+    except RuntimeError:
+        names = []
+    out = set()
+    for rel in names:
+        if rel.endswith(".md"):
+            try:
+                out |= set(QUEUE_LINE.findall(git(env, "show", "%s:%s" % (head(env), rel))))
+            except RuntimeError:
+                pass
+    return out
+
+
+def finished_since(env, commit):
+    """The items finished with a result since commit, oldest first: named by a result commit, ticked in the DONE
+    archive, and not filed by the review itself."""
+    done, filed, seen = done_lines(env), review_filed(env), []
+    for c in reversed(results_since(env, commit)):
+        m = SUBJECT_TAG.match(git(env, "log", "-1", "--format=%s", c).strip())
+        tag = m.group(1) if m else None
+        if tag and tag not in seen and tag in done and tag not in filed \
+                and not REVIEW_FILED.search(done[tag].split("\n", 1)[0]):
+            seen.append(tag)
+    return seen
+
+
 def gate_ticked(env):
     """Ticked in `## RECURRING` only: a quoted line elsewhere (a Daemon Report entry) must not stop the cadence."""
     try:
@@ -115,15 +190,12 @@ def gate_ticked(env):
 
 
 def due(env):
-    """(due?, reason, number of result commits, the last review)."""
+    """(due?, reason, number of finished result items, the last review)."""
     lr = last(env)
-    n = len(results_since(env, lr["commit"]))
-    days = (env.now - lr["at"]) / 86400
-    if n >= MIN_RESULTS:
-        return True, "%d result commits since the last review (%s)" % (n, lr["commit"][:8]), n, lr
-    if n and days >= CADENCE_DAYS:
-        return True, "%.0f days and %d result commit(s) since the last review (%s)" % (days, n, lr["commit"][:8]), n, lr
-    return False, "%d result commit(s), %.1f days since the last review (%s)" % (n, days, lr["commit"][:8]), n, lr
+    n = len(finished_since(env, lr["commit"]))
+    if n >= MIN_ITEMS:
+        return True, "%d items finished with a result since the last review (%s)" % (n, lr["commit"][:8]), n, lr
+    return False, "%d of %d finished result items since the last review (%s)" % (n, MIN_ITEMS, lr["commit"][:8]), n, lr
 
 
 def plan_edit(env, action, values):
@@ -251,8 +323,8 @@ def main(argv=None):
     if a.cmd == "status":
         ok, why, _, lr = due(env)
         print(("due: " if ok else "not due: ") + why + ("; the gate is ticked" if gate_ticked(env) else ""))
-        for c in results_since(env, lr["commit"]):
-            print("  " + git(env, "log", "-1", "--format=%h %ad %s", "--date=short", c).strip())
+        for tag in finished_since(env, lr["commit"]):
+            print("  " + tag)
         return 0
     if a.cmd == "cards":
         miss = cards(env, a.sha)

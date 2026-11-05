@@ -1495,9 +1495,15 @@ flaw across the review. Two fixes: every result report carries a measurement car
 review on the strongest model reads what has landed and reworks the queue.
 
 **Cadence.** `measure-review.py upkeep` (the upkeep hook) ticks `W46.measure-review-due` in `## RECURRING` once 8
-commits on origin/main have touched `ArchiveProcessor/segbench-results/` or `ArchiveOCRBench/data/` since the last
-review, or a week has passed with at least one. The standing item `W46.measure-review` carries `(effort: max)`, which
-the Agent Manager's policy runs on Fable at max effort. `status` shows what landed and whether a review is due;
+items have finished with a result since the last review (owner, 2026-11-04). An item counts when a commit on
+origin/main names it in its subject and touched `ArchiveProcessor/segbench-results/` or `ArchiveOCRBench/data/`, and
+the item is ticked in `SUITE_TODO_DONE.md`; its checkpoint commits count once, when it is done. Items the review filed
+do not count. They are read from the pass's note: **each item a pass files is named first on a `**Queue:**` line of its
+note**, as every pass since the third has done; a DONE entry whose first line opens its description with "Measurement
+review <date> pass N, P<N>-<k>" counts as review-filed too. A pass's remark appended to an owner's item does not. Neither time nor the number
+of commits opens a review (until 2026-11-04 it was 8 result commits or a week with one, which ran it almost daily).
+The standing item `W46.measure-review` carries `(effort: xhigh)`, which the Agent Manager's policy runs on Opus at
+xhigh (owner, 2026-11-04; it ran on Fable at max before). `status` shows what landed and whether a review is due;
 `cards` lists result reports since the last review with no measurement card; `deps` lists open items waiting on a
 tag that exists nowhere, and dependency cycles (W42.int-s1..s7 and AM-restructure-R3 are expected there: Phase 4
 and the Agent Manager file them).

@@ -31,7 +31,7 @@ RUN STATUS: IN_PROGRESS — fixture
 
 ## WORK QUEUE (priority order — do top to bottom)
 
-- [ ] **W46.measure-review — the standing review** (lane: segbench) (uses: light) (effort: max) (blocked-on: W46.measure-review-due)
+- [ ] **W46.measure-review — the standing review** (lane: segbench) (uses: light) (effort: xhigh) (blocked-on: W46.measure-review-due)
 - [ ] **W1.a — waits on a typo** (lane: ops) (blocked-on: W1.nosuch)
 - [ ] **W1.b — one half of a cycle** (lane: ops) (blocked-on: W1.c)
 - [ ] **W1.c — the other half** (lane: ops) (blocked-on: W1.b)
@@ -49,7 +49,7 @@ RUN STATUS: IN_PROGRESS — fixture
 """
 TODO = """# todo
 
-- [ ] **`W46.measure-review` — the standing review** (lane: segbench) (uses: light) (effort: max) (blocked-on: W46.measure-review-due)
+- [ ] **`W46.measure-review` — the standing review** (lane: segbench) (uses: light) (effort: xhigh) (blocked-on: W46.measure-review-due)
 - [ ] **`W1.a` — waits on a typo** (lane: ops) (blocked-on: W1.nosuch)
 - [ ] **`W1.b` — one half of a cycle** (lane: ops) (blocked-on: W1.c)
 - [ ] **`W1.c` — the other half** (lane: ops) (blocked-on: W1.b)
@@ -84,14 +84,28 @@ class Base(unittest.TestCase):
     def git(self, *a):
         return subprocess.run(["git", "-C", self.repo, *a], check=True, capture_output=True, text=True).stdout
 
-    def result(self, name="r.md", card=True, path="ArchiveProcessor/segbench-results"):
+    def result(self, name="r.md", card=True, path="ArchiveProcessor/segbench-results", tag=None, done=True,
+               note="SHIPPED. Figures.", header="— Owner: a result."):
+        """One result commit for item tag (a new one each call by default), and with done its DONE entry."""
         self.n += 1
+        tag = tag or "W9.r%d" % self.n
         d = os.path.join(self.repo, path)
         os.makedirs(d, exist_ok=True)
         with open(os.path.join(d, name), "w") as f:
             f.write("# result %d\n\n%s" % (self.n, "## Measurement card\n\n- Truth: owner\n" if card else "figures\n"))
         self.git("add", "-A", path)
-        self.git("commit", "-q", "-m", "result %d" % self.n)
+        if done:
+            self.finish(tag, note, commit=False, header=header)
+        self.git("commit", "-q", "-m", "bench(segbench): %s — result %d" % (tag, self.n))
+        return tag
+
+    def finish(self, tag, note="SHIPPED. Figures.", commit=True, header="— Owner: a result."):
+        with open(os.path.join(self.repo, "SUITE_TODO_DONE.md"), "a") as f:
+            f.write("- [x] **%s — an item [S]** · §x (lane: segbench) %s\n  %s\n  <!-- /%s -->\n"
+                    % (tag, header, note, tag))
+        self.git("add", "SUITE_TODO_DONE.md")
+        if commit:
+            self.git("commit", "-q", "-m", "docs(todo): %s done" % tag)
 
     def other(self):
         self.n += 1
@@ -118,9 +132,10 @@ class Base(unittest.TestCase):
 
 
 class Cadence(Base):
-    def test_not_due_below_the_count_and_inside_the_week(self):
+    # Owner, 2026-11-04: a review is due after MIN_ITEMS finished result items; neither time nor commits open one.
+    def test_not_due_below_the_count(self):
         self.seed()
-        for _ in range(mr.MIN_RESULTS - 1):
+        for _ in range(mr.MIN_ITEMS - 1):
             self.result()
         self.other()
         self.assertEqual(self.run_mr("upkeep", now=NOW + DAY), 0)
@@ -129,36 +144,88 @@ class Cadence(Base):
 
     def test_due_at_the_count_opens_the_standing_item(self):
         self.seed()
-        for _ in range(mr.MIN_RESULTS):
+        for _ in range(mr.MIN_ITEMS):
             self.result()
         self.run_mr("upkeep", now=NOW + DAY)
         self.assertTrue(self.ticked())
         self.assertIn("ok\tW46.measure-review", self.resolver())
 
-    def test_due_after_a_week_with_one_result(self):
+    def test_an_items_checkpoints_count_once(self):
         self.seed()
-        self.result()
-        self.run_mr("upkeep", now=NOW + 6 * DAY)
+        for _ in range(mr.MIN_ITEMS * 2):
+            self.result(tag="W9.big", done=False)        # checkpoint commits of one item
+        self.result(tag="W9.big")                         # and the one that finishes it
+        for _ in range(mr.MIN_ITEMS - 2):
+            self.result()
+        self.run_mr("upkeep", now=NOW + DAY)
         self.assertFalse(self.ticked())
-        self.run_mr("upkeep", now=NOW + 7 * DAY)
+        self.result()
+        self.run_mr("upkeep", now=NOW + DAY)
         self.assertTrue(self.ticked())
 
-    def test_a_quiet_week_opens_nothing(self):
+    def test_an_unfinished_item_does_not_count_until_it_is_done(self):
         self.seed()
+        for _ in range(mr.MIN_ITEMS - 1):
+            self.result()
+        self.result(tag="W9.open", done=False)
+        self.run_mr("upkeep", now=NOW + DAY)
+        self.assertFalse(self.ticked())
+        self.finish("W9.open")                            # ticked later, in a commit of its own
+        self.run_mr("upkeep", now=NOW + DAY)
+        self.assertTrue(self.ticked())
+
+    def test_the_reviews_own_corrections_do_not_count(self):
+        self.seed()
+        for k in range(mr.MIN_ITEMS):
+            self.result(tag="W9.c%d" % k, header="— Measurement review 2026-11-04 pass 7, P7-%d (`notes`), offline." % k)
+        self.result(header="— Owner: a result. Measurement review pass 7 (2026-11-04, P7-6) conditions apply.")
+        self.run_mr("upkeep", now=NOW + DAY)
+        self.assertFalse(self.ticked())
+        env = mr.Env(type("A", (), {"repo": self.repo, "state": self.state, "plan": self.plan, "now": NOW})())
+        self.assertEqual(len(mr.finished_since(env, self.base)), 1)   # the last one only cites a review
+
+    def test_a_review_notes_queue_line_marks_its_item_and_a_later_note_does_not(self):
+        self.seed()
+        d = os.path.join(self.repo, mr.NOTES)
+        os.makedirs(d, exist_ok=True)
+        with open(os.path.join(d, "2026-11-04.md"), "w") as f:
+            f.write("# pass\n\n**Queue:** W9.fix, offline/$0: relabel.\n\nQueue: W9.fix2, offline.\n")
+        self.git("add", "-A", mr.NOTES)
+        self.git("commit", "-q", "-m", "docs(segbench): W46.measure-review pass 7 — note")
+        self.result(tag="W9.fix", note="SHIPPED. Relabelled.")
+        self.result(tag="W9.fix2", note="SHIPPED. Relabelled.")
+        owner = self.result(note="SHIPPED. **Figures** — Measurement review 2026-11-05 pass 8, P8-6, for the "
+                                 "completing session: relabel the table.")
+        env = mr.Env(type("A", (), {"repo": self.repo, "state": self.state, "plan": self.plan, "now": NOW})())
+        self.assertEqual(mr.finished_since(env, self.base), [owner])
+
+    def test_a_garbled_done_header_is_named_by_its_end_marker(self):
+        self.seed()
+        self.result(tag="W9.garbled", done=False)
+        with open(os.path.join(self.repo, "SUITE_TODO_DONE.md"), "a") as f:
+            f.write("- [x] ** · §x (owner)W9.garbled — an item [S]**\n  SHIPPED.\n  <!-- /W9.garbled -->\n")
+        self.git("add", "SUITE_TODO_DONE.md")
+        self.git("commit", "-q", "-m", "docs(todo): done")
+        env = mr.Env(type("A", (), {"repo": self.repo, "state": self.state, "plan": self.plan, "now": NOW})())
+        self.assertEqual(mr.finished_since(env, self.base), ["W9.garbled"])
+
+    def test_time_alone_opens_nothing(self):
+        self.seed()
+        self.result()
         self.other()
         self.run_mr("upkeep", now=NOW + 30 * DAY)
         self.assertFalse(self.ticked())
 
     def test_only_result_paths_count(self):
         self.seed()
-        for _ in range(mr.MIN_RESULTS):
-            self.other()
+        for k in range(mr.MIN_ITEMS):
+            self.finish("W9.code%d" % k)                  # finished, but no result commit names it
         self.run_mr("upkeep", now=NOW + DAY)
         self.assertFalse(self.ticked())
 
     def test_done_moves_the_window_and_a_ticked_gate_is_left_alone(self):
         self.seed()
-        for _ in range(mr.MIN_RESULTS):
+        for _ in range(mr.MIN_ITEMS):
             self.result()
         self.run_mr("upkeep", now=NOW + DAY)
         before = open(self.plan).read()
