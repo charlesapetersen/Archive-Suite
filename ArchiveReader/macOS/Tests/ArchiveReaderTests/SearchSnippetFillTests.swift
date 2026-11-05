@@ -53,6 +53,24 @@ final class SearchSnippetFillTests: XCTestCase {
             XCTAssertEqual(segments.filter { $0.isMatch }.map { $0.text }, ["snippetterm"])
         }
         XCTAssertGreaterThan(model.snippetFillGeneration, 0, "the table is told to redraw")
+        XCTAssertEqual(model.takeFilledSnippetPaths(), Set(paths), "the table reloads exactly the filled rows")
+        XCTAssertTrue(model.takeFilledSnippetPaths().isEmpty)
         await indexer.closeForTesting()
+    }
+
+    /// The scanned fragment for a stop-word-only query: a window of `tokenCount` words starting a few
+    /// words before the first match, with an ellipsis on each side where text was left out.
+    func testScannedFragmentWindowsTheFirstMatch() {
+        let the = [SearchSnippet.Term(word: "the", isPrefix: false)]
+        let body = "one two three four five six seven the eight nine ten eleven twelve thirteen fourteen"
+        XCTAssertEqual(SearchSnippet.fragment(in: body, terms: the, tokenCount: 6),
+                       "…six seven \u{2}the\u{3} eight nine ten…")
+        XCTAssertEqual(SearchSnippet.fragment(in: "The end.", terms: the),
+                       "\u{2}The\u{3} end.")   // case-folded; nothing left out, so no ellipsis
+        XCTAssertNil(SearchSnippet.fragment(in: "nothing to see here", terms: the))
+        XCTAssertNil(SearchSnippet.fragment(in: "", terms: the))
+        let prefix = [SearchSnippet.Term(word: "the", isPrefix: true)]
+        XCTAssertEqual(SearchSnippet.fragment(in: "Over there, Thé.", terms: prefix),
+                       "Over \u{2}there\u{3}, \u{2}Thé\u{3}.")
     }
 }

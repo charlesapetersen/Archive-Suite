@@ -199,12 +199,16 @@ struct AppKitTableView: NSViewRepresentable {
         }
 
         // Search snippets filled in after the hits were listed (W40.fix-reader-fts-snippets): redraw the
-        // visible rows, which are the ones that asked, and let the rows that gained a line grow.
+        // visible rows that got one, and let them grow by the line.
         if coordinator.lastSnippetFillGeneration != model.snippetFillGeneration {
             coordinator.lastSnippetFillGeneration = model.snippetFillGeneration
+            let filled = model.takeFilledSnippetPaths()
             let visRange = tableView.rows(in: tableView.visibleRect)
             if visRange.length > 0 {
-                var rowSet = IndexSet(integersIn: visRange.location..<NSMaxRange(visRange))
+                let ids = coordinator.currentSnapshotIDs
+                var rowSet = IndexSet((visRange.location..<NSMaxRange(visRange)).filter {
+                    $0 < ids.count && filled.contains(ids[$0].path)
+                })
                 if let editID = coordinator.editingItemID, let editIdx = coordinator.rowByID[editID] {
                     rowSet.remove(editIdx)
                 }

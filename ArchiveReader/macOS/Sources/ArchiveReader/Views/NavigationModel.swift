@@ -103,10 +103,15 @@ final class NavigationModel: ObservableObject {
         var running = false
     }
     private var snippetFill = SnippetFill()
-    /// Bumped after each filled batch, so the table reloads its visible rows (it skips reloads otherwise).
+    /// Bumped after each filled batch, so the table reloads those of `filledSnippetPaths` it shows.
     private(set) var snippetFillGeneration = 0
+    /// Paths given a snippet since the table last took them (`takeFilledSnippetPaths`).
+    private var filledSnippetPaths: Set<String> = []
     /// Rows asked for in one call to the index; the index's own time budget bounds the call as well.
     nonisolated static let snippetFillBatch = 40
+    /// The most rows waiting at once, about ten screens. A fast scroll past more drops the oldest; they are
+    /// asked for again if they are drawn again, so the index is not kept busy on rows long gone.
+    nonisolated static let snippetFillQueueLimit = 400
     /// How many top hits the search itself gives snippets to; the rest are filled in. A test sets it low.
     var ftsSnippetLimit = 300
     /// Page-2 `Classification:` values published by the disposable content index for nav-row display.
@@ -744,20 +749,46 @@ final class NavigationModel: ObservableObject {
         return SearchSnippet.hasMatch(segments) ? segments : nil
     }
 
+    /// The paths filled since the last call, for the table to reload the rows among them it shows.
+    func takeFilledSnippetPaths() -> Set<String> {
+        defer { filledSnippetPaths = [] }
+        return filledSnippetPaths
+    }
+
+#if DEBUG
+    /// Publishes a full-text result without an index, as `runFullTextSearch` would: the 150k list lane
+    /// (`ReaderAtSizeTests`) measures the rows' cost with a query active and every snippet still to fill.
+    func setFullTextResultForTesting(query: String, paths: [String], snippets: [String: String]) {
+        ftsGeneration += 1
+        ftsPaths = Set(paths)
+        ftsRank = Dictionary(uniqueKeysWithValues: paths.enumerated().map { ($1, $0) })
+        ftsSnippets = snippets
+        snippetFill = SnippetFill(resultGeneration: ftsGeneration, query: query)
+    }
+
+    var pendingSnippetCountForTesting: Int { snippetFill.pending.count }
+#endif
+
     private func requestSnippet(for path: String) {
         // Only for the result on screen: between a new query and its result the old hits are still shown.
         guard snippetFill.resultGeneration == ftsGeneration, !snippetFill.query.isEmpty,
               snippetFill.queued.insert(path).inserted else { return }
         snippetFill.pending.append(path)
+        if snippetFill.pending.count > Self.snippetFillQueueLimit {
+            let dropped = snippetFill.pending.prefix(snippetFill.pending.count - Self.snippetFillQueueLimit)
+            snippetFill.queued.subtract(dropped)
+            snippetFill.pending.removeFirst(dropped.count)
+        }
         guard !snippetFill.running else { return }
         snippetFill.running = true
-        Task { [weak self] in await self?.fillSnippets() }
+        let generation = snippetFill.resultGeneration
+        Task { [weak self] in await self?.fillSnippets(for: generation) }
     }
 
     /// Drains `snippetFill.pending` a batch at a time, off the main thread in the index actor. Stops when
     /// the queue is empty or a newer result replaced the one it was filling.
-    private func fillSnippets() async {
-        let generation = snippetFill.resultGeneration, query = snippetFill.query
+    private func fillSnippets(for generation: Int) async {
+        let query = snippetFill.query
         while snippetFill.resultGeneration == generation, !snippetFill.pending.isEmpty {
             let batch = Array(snippetFill.pending.suffix(Self.snippetFillBatch).reversed())
             snippetFill.pending.removeLast(batch.count)
@@ -767,6 +798,7 @@ final class NavigationModel: ObservableObject {
             snippetFill.pending.append(contentsOf: batch[filled.attempted...].reversed())
             if !filled.snippets.isEmpty {
                 ftsSnippets.merge(filled.snippets) { old, _ in old }
+                filledSnippetPaths.formUnion(filled.snippets.keys)
                 snippetFillGeneration += 1
             }
             if filled.attempted == 0 { break }   // the index is unavailable; rows simply stay without one

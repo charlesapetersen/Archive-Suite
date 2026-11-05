@@ -426,6 +426,15 @@ final class ContentIndexTests: XCTestCase {
         for snip in filled.snippets.values {
             XCTAssertTrue(SearchSnippet.hasMatch(SearchSnippet.segments(from: snip)), snip)
         }
+        // A query of stop words alone is quoted by scanning the body, not by `snippet()`.
+        try await idx.upsert(path: "/memo.pdf", mtime: 1, name: "memo", classification: nil,
+                             body: "Notes on the meeting of the Board, held at the Treasury.")
+        let stop = await idx.snippets("of the", for: ["/memo.pdf"])
+        XCTAssertEqual(stop.attempted, 1)
+        let marked = try XCTUnwrap(stop.snippets["/memo.pdf"])
+        XCTAssertEqual(SearchSnippet.segments(from: marked).filter { $0.isMatch }.map { $0.text },
+                       ["the", "of", "the", "the"], marked.debugDescription)
+
         let outOfTime = await idx.snippets("commonterm", for: asked, budget: 0)
         XCTAssertEqual(outOfTime.attempted, 0)
         XCTAssertTrue(outOfTime.snippets.isEmpty)

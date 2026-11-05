@@ -146,6 +146,28 @@ final class ReaderAtSizeTests: XCTestCase {
         return (value, Double(DispatchTime.now().uptimeNanoseconds - start) / 1e9)
     }
 
+    /// W40.fix-reader-fts-snippets: the fill the list runs as rows scroll into view, done here for the first
+    /// `rows` hits in rank order, in the model's batches (`NavigationModel.snippetFillBatch`), a batch's
+    /// unreached paths asked for again. Returns the previews among those rows after the fill, the batch
+    /// count and the slowest batch, which is how long one fill call holds the index actor.
+    private func fillSnippets(_ ranked: ContentIndex.RankedSearch, rows: Int,
+                              fill: ([String]) async -> (snippets: [String: String], attempted: Int)) async
+        -> (previews: Int, batches: Int, slowest: Double, total: Double) {
+        let shown = Array(ranked.paths.prefix(rows))
+        var snippets = ranked.snippets
+        var pending = shown.filter { snippets[$0] == nil }
+        var batches = 0, slowest = 0.0, total = 0.0
+        while !pending.isEmpty {
+            let batch = Array(pending.prefix(NavigationModel.snippetFillBatch))
+            let (filled, seconds) = await timeAsync { await fill(batch) }
+            batches += 1; slowest = max(slowest, seconds); total += seconds
+            snippets.merge(filled.snippets) { old, _ in old }
+            guard filled.attempted > 0 else { break }
+            pending.removeFirst(filled.attempted)
+        }
+        return (shown.filter { snippets[$0] != nil }.count, batches, slowest, total)
+    }
+
     /// Every row's index row, extracted the way `ContentIndexer.extractRow` does, in parallel.
     private nonisolated func extractAll(_ rows: [ArchiveFile]) -> [IndexRow] {
         final class Slots: @unchecked Sendable { var rows: [IndexRow?]; init(_ n: Int) { rows = Array(repeating: nil, count: n) } }
@@ -241,6 +263,11 @@ final class ReaderAtSizeTests: XCTestCase {
             samples.sort()
             print("D7 search \"\(query)\" hits=\(hits) previews=\(previews) median \(ms(samples[samples.count / 2])) max \(ms(samples.last!))"
                   + (i == 0 ? " (first query: opens the index)" : ""))
+            let ranked = await indexer.searchRanked(query)
+            let fill = await fillSnippets(ranked, rows: 1_000) { await indexer.snippets(query, for: $0) }
+            print("D7 fill \"\(query)\" first \(min(1_000, hits)) rows: previews \(previews)→\(fill.previews) "
+                  + "in \(fill.batches) batches, slowest \(ms(fill.slowest)), total \(ms(fill.total))")
+            XCTAssertLessThan(fill.slowest, 0.5, "one snippet-fill batch for \"\(query)\" on the sample")
         }
         await indexer.closeForTesting()
 
@@ -290,6 +317,11 @@ final class ReaderAtSizeTests: XCTestCase {
             if query == "Bureau of the Budget" {
                 XCTAssertLessThan(samples[1], 1.0, "searchRanked(\"\(query)\") at \(corpusRows) rows")
             }
+            let ranked = await corpusIndex.searchRanked(query)
+            let fill = await fillSnippets(ranked, rows: 1_000) { await corpusIndex.snippets(query, for: $0) }
+            print("D7 fill@102k \"\(query)\" first \(min(1_000, hits)) rows: previews \(previews)→\(fill.previews) "
+                  + "in \(fill.batches) batches, slowest \(ms(fill.slowest)), total \(ms(fill.total))")
+            XCTAssertLessThan(fill.slowest, 0.5, "one snippet-fill batch for \"\(query)\" at \(corpusRows) rows")
         }
         await corpusIndex.close()
 
@@ -331,6 +363,15 @@ final class ReaderAtSizeTests: XCTestCase {
         XCTAssertEqual(ranked.paths.count, rows.count)
         XCTAssertEqual(ranked.snippets.count, rows.count, "every hit should keep its preview")
         XCTAssertLessThan(seconds, 0.5, "searchRanked(\"Bureau of the Budget\") over \(rows.count) long bodies")
+
+        // W40.fix-reader-fts-snippets: a query of stop words alone keeps them in the snippet expression, so
+        // `snippet()` paid the full quadratic cost (0.9 s for one long body of the sample); the fragment is
+        // now built by scanning the body. Every hit must still get its preview within the budget.
+        let (onlyStopWords, stopSeconds) = await timeAsync { await index.searchRanked("of the") }
+        print("D7 long-body \"of the\" hits=\(onlyStopWords.paths.count) snippets=\(onlyStopWords.snippets.count) "
+              + ms(stopSeconds))
+        XCTAssertEqual(onlyStopWords.snippets.count, rows.count, "every stop-word hit should keep its preview")
+        XCTAssertLessThan(stopSeconds, 0.5, "searchRanked(\"of the\") over \(rows.count) long bodies")
         await index.close()
     }
 
@@ -498,6 +539,30 @@ final class ReaderAtSizeTests: XCTestCase {
         let p95 = screenTimes[Int(Double(screenTimes.count) * 0.95)]
         print("D7 table screen of \(screenRows) rows x \(tableView.tableColumns.count) columns: median \(ms(screenTimes[100])) "
               + "p95 \(ms(p95)) max \(ms(screenTimes.last!)) — per row \(ms(screenTimes[100] / Double(screenRows)))")
+
+        // W40.fix-reader-fts-snippets: the same screens with a query matching every row and no snippet yet,
+        // so every name cell queues its path for the fill. The fill itself runs in the index actor; this is
+        // what the queueing adds to drawing a screen at list length.
+        navigation.setFullTextResultForTesting(query: "zzqxvnotaword", paths: navigation.displayed.map(\.path),
+                                               snippets: [:])
+        var queuedTimes: [Double] = []
+        for step in 0..<200 {
+            let top = (ids.count - screenRows) * step / 199
+            let (_, t) = time { autoreleasepool {
+                for row in top..<(top + screenRows) {
+                    for column in tableView.tableColumns {
+                        _ = coordinator.makeCell(tableView: tableView, column: column, itemID: ids[row]).fittingSize
+                    }
+                }
+            } }
+            queuedTimes.append(t)
+        }
+        queuedTimes.sort()
+        print("D7 table screen with every row queuing its snippet: median \(ms(queuedTimes[100])) "
+              + "p95 \(ms(queuedTimes[190])) max \(ms(queuedTimes.last!)) "
+              + "(queued \(navigation.pendingSnippetCountForTesting) paths)")
+        // A newer, empty result: the fill task, not yet run, finds nothing to ask the closing index for.
+        navigation.setFullTextResultForTesting(query: "", paths: [], snippets: [:])
 
         await indexer.closeForTesting()
         print(String(format: "D7 synthetic footprint %.0f -> %.0f MiB", footprintStart, footprintMiB()))

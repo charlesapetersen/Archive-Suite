@@ -261,6 +261,9 @@ actor ContentIndex {
                             budget: TimeInterval) -> (snippets: [String: String], attempted: Int) {
         let match = snippetMatchExpression(query)
         guard !match.isEmpty, !hits.isEmpty else { return ([:], hits.count) }
+        if let terms = stopWordSnippetTerms(query) {
+            return scannedSnippetMap(terms: terms, hits: hits, budget: budget)
+        }
         let sql = "SELECT snippet(fts, 0, ?, ?, ?, ?) FROM fts WHERE fts MATCH ? AND rowid = ?;"
         guard let stmt = prepare(sql) else { return ([:], hits.count) }
         defer { sqlite3_finalize(stmt) }
@@ -281,6 +284,27 @@ actor ContentIndex {
             guard sqlite3_step(stmt) == SQLITE_ROW else { continue }
             let snip = sqlite3_column_text(stmt, 0).map { String(cString: $0) } ?? ""
             if !snip.isEmpty { out[hit.path] = snip }
+        }
+        return (out, attempted)
+    }
+
+    /// `snippetMap` for a query made only of stop words: the body is read and scanned in Swift
+    /// (`SearchSnippet.fragment`), because `snippet()` on such a query costs up to a second on one long
+    /// OCR body (W40.fix-reader-fts-snippets). Same budget, same `attempted` count.
+    private func scannedSnippetMap(terms: [SearchSnippet.Term], hits: [(rowid: Int64, path: String)],
+                                   budget: TimeInterval) -> (snippets: [String: String], attempted: Int) {
+        guard let stmt = prepare("SELECT body FROM fts WHERE rowid = ?;") else { return ([:], hits.count) }
+        defer { sqlite3_finalize(stmt) }
+        let deadline = DispatchTime.now().uptimeNanoseconds + UInt64(max(0, budget) * 1e9)
+        var out: [String: String] = [:]
+        var attempted = 0
+        for hit in hits {
+            guard DispatchTime.now().uptimeNanoseconds < deadline else { break }
+            attempted += 1
+            sqlite3_reset(stmt); sqlite3_clear_bindings(stmt)
+            sqlite3_bind_int64(stmt, 1, hit.rowid)
+            guard sqlite3_step(stmt) == SQLITE_ROW, let c = sqlite3_column_text(stmt, 0) else { continue }
+            if let snip = SearchSnippet.fragment(in: String(cString: c), terms: terms) { out[hit.path] = snip }
         }
         return (out, attempted)
     }
@@ -436,6 +460,21 @@ actor ContentIndex {
     }
 
     /// Each whitespace-separated query token with its quoted (and, for the last, wildcarded) FTS5 term.
+    /// The query's terms for `SearchSnippet.fragment` when every one is a stop word, else `nil` (then
+    /// `snippetMatchExpression` leaves the stop words out and `snippet()` is cheap). The last term is a
+    /// prefix where `matchTerms` makes it one.
+    nonisolated func stopWordSnippetTerms(_ query: String) -> [SearchSnippet.Term]? {
+        let tokens = query.split(whereSeparator: { $0.isWhitespace })
+        let words = tokens.map {
+            $0.lowercased().trimmingCharacters(in: .punctuationCharacters)
+                .folding(options: [.caseInsensitive, .diacriticInsensitive], locale: nil)
+        }
+        guard !words.isEmpty, words.allSatisfy({ SearchSnippet.stopWords.contains($0) }) else { return nil }
+        return words.enumerated().map { i, word in
+            SearchSnippet.Term(word: word, isPrefix: i == tokens.count - 1 && tokens[i].count > 2)
+        }
+    }
+
     private nonisolated func matchTerms(_ query: String) -> [(token: Substring, term: String)] {
         let tokens = query.split(whereSeparator: { $0.isWhitespace })
         return tokens.enumerated().map { (i, tok) in

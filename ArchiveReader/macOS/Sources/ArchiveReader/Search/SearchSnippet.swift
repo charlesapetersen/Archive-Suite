@@ -69,4 +69,53 @@ enum SearchSnippet {
 
     /// True if any run is a highlighted match — lets a caller skip rendering a match-free preview.
     static func hasMatch(_ segments: [Segment]) -> Bool { segments.contains { $0.isMatch } }
+
+    /// A query term for `fragment(in:terms:)`: a folded word, matched whole or, for the query's last
+    /// term as `ContentIndex.matchTerms` writes it, as a prefix.
+    struct Term: Equatable, Sendable {
+        let word: String
+        let isPrefix: Bool
+    }
+
+    /// The `snippet()`-shaped fragment around the first matching word of `body`, built by scanning the
+    /// text rather than by FTS5 (W40.fix-reader-fts-snippets). It is for a query made only of `stopWords`,
+    /// which the snippet expression then keeps: `snippet()` on `the` took 0.9 s for one long sample body,
+    /// while this stops one window past the first match. Words are runs of letters and digits, compared
+    /// case- and diacritic-folded, as FTS5's default tokenizer does. `nil` when no word matches.
+    static func fragment(in body: String, terms: [Term], tokenCount: Int = tokenCount) -> String? {
+        guard !terms.isEmpty, tokenCount > 0 else { return nil }
+        func matches(_ word: Substring) -> Bool {
+            let folded = word.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: nil)
+            return terms.contains { $0.isPrefix ? folded.hasPrefix($0.word) : folded == $0.word }
+        }
+        func isWordCharacter(_ c: Character) -> Bool { c.isLetter || c.isNumber }
+        let lead = tokenCount / 3   // words kept before the first match
+        var before: [Range<String.Index>] = []   // up to `lead` words before the first match
+        var window: [Range<String.Index>] = []   // the first match and the words after it
+        var droppedBefore = false
+        var i = body.startIndex
+        while i < body.endIndex, before.count + window.count < tokenCount || window.isEmpty {
+            guard isWordCharacter(body[i]) else { i = body.index(after: i); continue }
+            var end = body.index(after: i)
+            while end < body.endIndex, isWordCharacter(body[end]) { end = body.index(after: end) }
+            if !window.isEmpty || matches(body[i..<end]) {
+                window.append(i..<end)
+            } else {
+                before.append(i..<end)
+                if before.count > lead { before.removeFirst(); droppedBefore = true }
+            }
+            i = end
+        }
+        guard let first = (before + window).first, !window.isEmpty else { return nil }
+        var out = droppedBefore ? ellipsis : ""
+        var cursor = first.lowerBound
+        for range in before + window {
+            out += body[cursor..<range.lowerBound]
+            out += matches(body[range]) ? openMark + body[range] + closeMark : String(body[range])
+            cursor = range.upperBound
+        }
+        // Text left out after the window gets an ellipsis; trailing punctuation alone is kept.
+        out += body[cursor...].contains(where: isWordCharacter) ? ellipsis : String(body[cursor...])
+        return out
+    }
 }
