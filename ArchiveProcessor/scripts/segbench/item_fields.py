@@ -294,6 +294,12 @@ def app_reading(prompt, label):
             raw = "".join(x.get("text", "") for x in json.load(fh)["candidates"][0]["content"]["parts"])
     except (KeyError, IndexError, TypeError):
         raw = ""
+    return app_reading_raw(raw)
+
+
+def app_reading_raw(raw):
+    """What the app keeps of one tagging reply's text, in this item's fields."""
+    import date_tagging as DT
     js = ET.parse_json(DT.strip_reasoning(raw)) or {}
     year, month, _, _ = DT.app_parse({"candidates": [{"content": {"parts": [{"text": raw}]}}]})
     day = clean(js.get("day"))
