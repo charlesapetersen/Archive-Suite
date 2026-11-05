@@ -116,6 +116,8 @@ lint scope history): REFERENCE.md §Safety Protocol.
     older undo until a synchronized history barrier persists; each forward action is write-ahead journalled, and
     an action a crash left unclosed is a barrier after relaunch. The 100-group undo window counts consumed groups,
     so older changes never resurface, and undo skips unsupported, undecodable and unverified ledger lines.
+    **Redo** (⇧⌘Z) is the undo of an undo: the undo's own lines' inverse, applied by the same step under the same
+    checks, consumed by a synchronized marker first, journalled like a forward action; a new change ends it.
 13. **PDF panes are provably non-writing:** PDFViews non-editable, annotations disabled, no `PDFDocument.write`
     path. The write-surface lint covers *all* write spellings (`setResourceValue(s)`, `setxattr`, `FileManager`
     mutators, `PDFDocument.write`) across `macOS/Sources/ArchiveReader`, `packages/ArchiveCore/Sources/ArchiveCore`

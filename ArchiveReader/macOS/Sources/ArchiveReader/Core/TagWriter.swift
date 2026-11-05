@@ -83,10 +83,14 @@ enum TagWriter {
     /// the later one reads the earlier one's result) writes nothing. The label is restored only while it
     /// still reads as the change left it; when someone has changed it since, the colour tokens in the
     /// inverse are left alone too, so a file never ends with a second colour token beside the new one.
+    ///
+    /// A redo is this same step on an undo's line (`op: .redo`): its inverse, against the tags before the
+    /// undo (W40.fix-reader-redo).
     static func applyOccurrence(_ delta: TagOccurrenceDelta, to url: URL,
                                 expecting identity: FileIdentity? = nil,
-                                undoing change: UndoneChange) throws -> TagWriteResult {
-        try recorded(.undo, url) { try journalledWrite(url, expectedIdentity: identity) { current, label in
+                                undoing change: UndoneChange,
+                                op: AuditLedger.Operation = .undo) throws -> TagWriteResult {
+        try recorded(op, url) { try journalledWrite(url, expectedIdentity: identity) { current, label in
             var targetLabel = label
             switch delta.color {
             case .restoreLabel(let lbl): targetLabel = lbl

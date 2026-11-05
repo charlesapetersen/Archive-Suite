@@ -427,7 +427,8 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
 ### R-21 · Undo a tag change
 
 - **Promise:** ⌘Z (Tags ▸ Undo Tag Change) undoes the last tag change by applying its inverse delta to a
-  fresh read of the file. A bulk action undoes as one step. There is no redo.
+  fresh read of the file. A bulk action undoes as one step. ⇧⌘Z (Tags ▸ Redo Tag Change) redoes the newest
+  undo the same way, until a new change is made; both survive a quit.
 - **Promised in:** `CLAUDE.md` Safety Protocol §9, §Keyboard map; `SMOKE_TEST.md` step O; `SUITE_TODO_DONE.md`
   `W15.tu2`.
 - **Reached by:** ⌘Z with the list or a document pane focused, or the menu item by mouse (`ArchiveReaderCommands.swift:112-114`, enabled only while `undoDepth > 0`) or the toolbar
@@ -453,6 +454,7 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
   - `S-001`: ⌘Z may fire Undo Tag Change while a text field has focus.
   - 2026-11-04 owner session reader-1 — `broken`: ⌘Z with the caret in the file-name filter undid the last tag change instead of the typing (suspect S-001 confirmed); after a relaunch ⌘Z did nothing until the list was clicked. Fix item `W40.fix-reader-undo-focus`.
   - 2026-11-05 W40.fix-reader-undo-focus — `fixed-pending-recheck`: a bare ⌘Z in any editable text field undoes the typing and leaves the tags alone (`TextUndoGuard`), and the list has the keyboard at launch, so ⌘Z works with no click. VM: `UndoFocusUITests` passes and fails on both counts with the fix switched off. [`evidence/reader/W40.fix-reader-undo-focus.md`](evidence/reader/W40.fix-reader-undo-focus.md).
+  - 2026-11-05 W40.fix-reader-redo — still `fixed-pending-recheck`: Redo Tag Change (⇧⌘Z) added (session row 21). `RedoTagChangeTests` (unit, scratch files) and `UndoFocusUITests.testShiftCommandZRedoesTheTagChangeAndBelongsToTheFocusedField` (VM). [`evidence/reader/W40.fix-reader-redo.md`](evidence/reader/W40.fix-reader-redo.md).
 
 ### R-22 · Tag editor sheet
 

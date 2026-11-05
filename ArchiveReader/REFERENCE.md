@@ -262,7 +262,7 @@ writes against the real corpus — always a copy.
 - `↑/↓` move selection · `⇧↑/⇧↓` extend · `⌘A` select all · type letters/digits = type-select *(native `Table`)*
 - `Space` Quick-Look-style **Preview** (2-up peek; fires only when the list has key focus) · `⌘Y` Preview (menu) ·
   double-click or `⌘O` open in the document window (`⏎` has no handler; ledger R-35)
-- `⌘R` Mark Read · `⌘U` Mark Unread · `⌘I` Edit Tags… · `⌘⇧F` Toggle Flag · `⌘Z` Undo tag change (grouped; **no redo binding**; with the caret in a text field ⌘Z undoes the typing instead, `TextUndoGuard`)
+- `⌘R` Mark Read · `⌘U` Mark Unread · `⌘I` Edit Tags… · `⌘⇧F` Toggle Flag · `⌘Z` Undo tag change (grouped) · `⇧⌘Z` Redo tag change (the newest undo, until a new change; `W40.fix-reader-redo`); with the caret in a text field ⌘Z / ⇧⌘Z undo and redo the typing instead (`TextUndoGuard`)
 - **Keyboard triage (G4):** `⌘]`/`⌘[` Next/Previous Unread · `⌘⇧M` Mark Read & Next Unread (mark Read via `TagWriter`,
   then jump to the next `Unread`). Focus-scoped bare-key equivalents fire only when the list has key focus
   (text-field-safe, like `Space`): `]`/`[` = next/previous unread, `\` = mark read & advance. All read-state
@@ -297,7 +297,8 @@ writes against the real corpus — always a copy.
 - The **Tags** menu acts on the file the window shows (`W40.fix-reader-menus-follow-window`): `⌘R`/`⌘U`, `⌘I` (the
   editor sheet opens over this window, pinned to that file), `⌘⇧F`, and `⌘⇧M`, which marks it Read and moves on to
   the window's next Unread file. `⌘Z` undoes the newest change on the shared ledger, which may be on another file,
-  so the status line names it; it is off while the find field or the tag editor has the keyboard. Rename Tag… and
+  so the status line names it; it is off while the find field or the tag editor has the keyboard. `⇧⌘Z` redoes the
+  same way. Rename Tag… and
   Find Similar Tags… open over the navigation window. Hide Sidebar / Hide Tag Cloud are not listed here.
 - `⌘,` Options (both windows)
 

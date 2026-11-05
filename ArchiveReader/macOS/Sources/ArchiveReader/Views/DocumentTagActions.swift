@@ -22,6 +22,10 @@ struct DocumentTagActions {
     var canUndo: Bool {
         (navigation?.undoDepth ?? 0) > 0 && !viewer.findFieldFocused && !viewer.showingTagEditor
     }
+    /// Off in the same places as `canUndo`, so ⇧⌘Z there never redoes a tag change.
+    var canRedo: Bool {
+        (navigation?.redoDepth ?? 0) > 0 && !viewer.findFieldFocused && !viewer.showingTagEditor
+    }
 
     func mark(_ state: ReadState) {
         guard let navigation, let paths else { return }
@@ -68,6 +72,14 @@ struct DocumentTagActions {
         // The ledger is shared with the list, so the newest change may be on another file: name it.
         let names = navigation.nextUndoFileNames()
         navigation.undoLast()
+        let shown = names.prefix(3).joined(separator: ", ") + (names.count > 3 ? ", …" : "")
+        viewer.tagStatus = navigation.statusMessage + (names.isEmpty ? "" : " (\(shown))")
+    }
+
+    func redo() {
+        guard let navigation, canRedo else { return }
+        let names = navigation.nextRedoFileNames()
+        navigation.redoLast()
         let shown = names.prefix(3).joined(separator: ", ") + (names.count > 3 ? ", …" : "")
         viewer.tagStatus = navigation.statusMessage + (names.isEmpty ? "" : " (\(shown))")
     }

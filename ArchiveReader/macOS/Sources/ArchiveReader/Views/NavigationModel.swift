@@ -102,6 +102,8 @@ final class NavigationModel: ObservableObject {
     /// instead of going idle over a partial or unopenable one (W23.m9). `nil` = healthy.
     @Published private(set) var indexFailure: ContentIndexer.Failure?
     @Published private(set) var undoDepth = 0
+    /// How many undos Redo Tag Change can reverse (W40.fix-reader-redo).
+    @Published private(set) var redoDepth = 0
     @Published var statusMessage = ""
     // G4 keyboard triage: bumped whenever a triage action wants the newly-selected row scrolled into
     // view. The window observes the counter (so scrolling to the *same* id twice still fires) and asks
@@ -127,6 +129,7 @@ final class NavigationModel: ObservableObject {
 
     /// Ledger-derived history only; refreshed at launch, action boundaries and archive switches.
     private var undoGroups: [[AuditLedger.Entry]] = []
+    private var redoGroups: [[AuditLedger.Entry]] = []
     private var seenRecordingFailures = AuditLedger.shared.recordingFailureCount
     private var cancellables = Set<AnyCancellable>()
 
@@ -1167,27 +1170,56 @@ final class NavigationModel: ObservableObject {
 
     private func refreshUndoHistory() {
         if let root = rootStore.root {
-            undoGroups = AuditLedger.shared.undoGroups(in: ReaderArchiveLayout(grantedRoot: root).mainRoot)
-        } else { undoGroups = [] }
+            let main = ReaderArchiveLayout(grantedRoot: root).mainRoot
+            undoGroups = AuditLedger.shared.undoGroups(in: main)
+            redoGroups = AuditLedger.shared.redoGroups(in: main)
+        } else { undoGroups = []; redoGroups = [] }
         undoDepth = undoGroups.count
+        redoDepth = redoGroups.count
     }
 
     /// The names of the files the next `undoLast()` reverts, read fresh from the ledger. The document window
     /// says them, since its undo may revert a file other than the one it shows (W40.fix-reader-menus-follow-window).
     func nextUndoFileNames() -> [String] {
         refreshUndoHistory()
+        return Self.fileNames(undoGroups.last ?? [])
+    }
+
+    /// `nextUndoFileNames()` for `redoLast()`.
+    func nextRedoFileNames() -> [String] {
+        refreshUndoHistory()
+        return Self.fileNames(redoGroups.last ?? [])
+    }
+
+    private static func fileNames(_ batch: [AuditLedger.Entry]) -> [String] {
         var seen = Set<String>()
-        return (undoGroups.last ?? []).map { URL(fileURLWithPath: $0.path).lastPathComponent }
-            .filter { seen.insert($0).inserted }
+        return batch.map { URL(fileURLWithPath: $0.path).lastPathComponent }.filter { seen.insert($0).inserted }
     }
 
     func undoLast() {
         refreshUndoHistory()
-        guard let batch = undoGroups.last, let group = batch.first?.group else { return }
+        guard let batch = undoGroups.last else { return }
+        reverse(batch, redo: false)
+    }
+
+    /// Redo Tag Change (⇧⌘Z; W40.fix-reader-redo): reverse the newest undo that no new change has followed.
+    /// The undo's own lines are applied the way undo applies a forward line, so redo carries every guard
+    /// undo does: identity, the main archive, the fresh read, no token past its count before the undo.
+    func redoLast() {
+        refreshUndoHistory()
+        guard let batch = redoGroups.last else { return }
+        reverse(batch, redo: true)
+    }
+
+    /// Apply the inverse of every line of `batch` (one ledger group): an undo of a forward action or a redo,
+    /// or (`redo`) a redo of an undo.
+    private func reverse(_ batch: [AuditLedger.Entry], redo: Bool) {
+        guard let group = batch.first?.group else { return }
+        let verb = redo ? "redo" : "undo", verbed = redo ? "Redid" : "Undid", undone = redo ? "redone" : "undone"
         // Reserve durably before the first inverse. An append failure must never allow a later
         // relaunch to replay a non-idempotent occurrence addition.
-        guard AuditLedger.shared.beginUndo(group) else {
-            statusMessage = "Could not record undo safely; no files were changed."
+        guard redo ? AuditLedger.shared.beginRedo(group) : AuditLedger.shared.beginUndo(group) else {
+            statusMessage = "Could not record \(verb) safely; no files were changed."
             announce(statusMessage)
             return
         }
@@ -1198,7 +1230,7 @@ final class NavigationModel: ObservableObject {
         // alone too: undoing an older write under a newer one that is still on disk, and then retrying the
         // newer one, could put back a tag the step removed. They share the first failure's fate.
         var failedFiles: [AuditLedger.FileNumber: Bool] = [:]
-        AuditLedger.withContext(group: UUID(), undoes: group) {
+        AuditLedger.withContext(group: UUID(), undoes: redo ? nil : group, redoes: redo ? group : nil) {
             for entry in batch {
                 if let file = entry.file, let mayRetry = failedFiles[file] {
                     if mayRetry, (entry.attempt ?? 1) < AuditLedger.undoAttemptLimit { retryable.append(entry) }
@@ -1213,7 +1245,7 @@ final class NavigationModel: ObservableObject {
                     let inverse = TagOccurrenceDelta(add: entry.inverse.add, remove: entry.inverse.remove,
                         color: entry.inverse.label.map { .restoreLabel($0) })
                     verified.append(try TagWriter.applyOccurrence(inverse, to: target.url, expecting: target.identity,
-                        undoing: .init(before: entry.before, afterLabel: entry.afterLabel)))
+                        undoing: .init(before: entry.before, afterLabel: entry.afterLabel), op: redo ? .redo : .undo))
                 } catch {
                     failures.append(URL(fileURLWithPath: entry.path).lastPathComponent)
                     let mayRetry = AuditLedger.undoMayBeRetried(after: error, attempt: entry.attempt ?? 1)
@@ -1225,15 +1257,16 @@ final class NavigationModel: ObservableObject {
         // The batch is already consumed; only the members that failed for a cause that may pass come
         // back, as their own undo step (W40.fix-reader-undo-partial). Re-recorded oldest first, as they
         // were written, so the history reads them back newest first again.
-        let kept = AuditLedger.shared.keepForRetry(retryable.reversed(), of: group) ? retryable.count : 0
+        let kept = AuditLedger.shared.keepForRetry(retryable.reversed(), of: group, redo: redo) ? retryable.count : 0
         library.applyVerifiedWrites(verified)
         refreshUndoHistory()
         let changed = verified.filter { !$0.isNoOp }.count
-        var message = "Undid \(changed) change\(changed == 1 ? "" : "s")"
+        var message = "\(verbed) \(changed) change\(changed == 1 ? "" : "s")"
         if !failures.isEmpty {
-            message += "; \(failures.count) could not be undone (\(failures.prefix(3).joined(separator: ", ")))."
+            message += "; \(failures.count) could not be \(undone) (\(failures.prefix(3).joined(separator: ", ")))."
             if kept > 0 {
-                message += kept == failures.count ? " Undo again to retry." : " Undo again to retry \(kept)."
+                let again = redo ? "Redo" : "Undo"
+                message += kept == failures.count ? " \(again) again to retry." : " \(again) again to retry \(kept)."
             }
         } else { message += "." }
         statusMessage = message

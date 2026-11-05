@@ -157,6 +157,9 @@ struct ArchiveReaderCommands: Commands {
             Button("Undo Tag Change") { if let nav { nav.undoLast() } else { docTags?.undo() } }
                 .keyboardShortcut("z", modifiers: .command)
                 .disabled(nav != nil ? (nav?.undoDepth ?? 0) == 0 : !(docTags?.canUndo ?? false))
+            Button("Redo Tag Change") { if let nav { nav.redoLast() } else { docTags?.redo() } }
+                .keyboardShortcut("z", modifiers: [.command, .shift])
+                .disabled(nav != nil ? (nav?.redoDepth ?? 0) == 0 : !(docTags?.canRedo ?? false))
         }
 
         // View (nav window): sorting + clearing

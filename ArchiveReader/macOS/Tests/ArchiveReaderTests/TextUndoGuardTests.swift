@@ -37,11 +37,13 @@ final class TextUndoGuardTests: XCTestCase {
                         "with the field editor up, ⌘Z must undo the typing, not a tag change")
         XCTAssertNotNil(TextUndoGuard.editingTextView(for: key("z", [.command, .capsLock]), in: window),
                         "Caps Lock does not change which ⌘Z it is")
+        XCTAssertNotNil(TextUndoGuard.editingTextView(for: key("Z", [.command, .shift]), in: window),
+                        "⇧⌘Z redoes the typing, not a tag change (W40.fix-reader-redo)")
     }
 
     func testOtherKeysAndOtherFocusFallThroughToTheMenus() {
         XCTAssertTrue(window.makeFirstResponder(field))
-        XCTAssertNil(TextUndoGuard.editingTextView(for: key("Z", [.command, .shift]), in: window), "⇧⌘Z is Redo")
+        XCTAssertNil(TextUndoGuard.editingTextView(for: key("Z", [.command, .shift, .option]), in: window))
         XCTAssertNil(TextUndoGuard.editingTextView(for: key("z", [.command, .option]), in: window))
         XCTAssertNil(TextUndoGuard.editingTextView(for: key("r", .command), in: window))
         XCTAssertNil(TextUndoGuard.editingTextView(for: key("z", .command, type: .keyUp), in: window))
@@ -49,6 +51,8 @@ final class TextUndoGuardTests: XCTestCase {
         XCTAssertTrue(window.makeFirstResponder(table))
         XCTAssertNil(TextUndoGuard.editingTextView(for: key("z", .command), in: window),
                      "with the list focused, ⌘Z is Undo Tag Change")
+        XCTAssertNil(TextUndoGuard.editingTextView(for: key("Z", [.command, .shift]), in: window),
+                     "and ⇧⌘Z is Redo Tag Change")
         XCTAssertNil(TextUndoGuard.editingTextView(for: key("z", .command), in: nil))
     }
 

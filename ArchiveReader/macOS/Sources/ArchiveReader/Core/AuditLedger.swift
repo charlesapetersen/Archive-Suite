@@ -18,6 +18,12 @@ import os
 //  bulk action stays one undo step. An undo is itself a change and gets its own line, naming the
 //  group it undoes in `undoes`.
 //
+//  Redo (W40.fix-reader-redo) is the undo of an undo: the undo's own lines carry the inverse of what
+//  the undo wrote, and redo applies it to a fresh read the same way undo applies its inverse. A redo
+//  is journalled like a forward action and names the undo it reverses in `redoes`; it is an undo
+//  source again. Redo is offered only for the undos newer than the newest forward change, so a new
+//  change ends it.
+//
 //  Durability (W40.fix-reader-ledger-durability). A forward action is write-ahead journalled: before
 //  its first tag write, a synchronized `actionIntent` line names the group; once every record of the
 //  action has been appended, a synchronized `actionDone` closes it. The records between them are not
@@ -38,19 +44,25 @@ final class AuditLedger: @unchecked Sendable {
     struct Context: Sendable {
         var group: UUID
         var undoes: UUID?
+        var redoes: UUID? = nil
         var journal: ActionJournal? = nil
     }
     @TaskLocal static var context: Context?
 
-    /// Run `body` with every ledger entry it produces tagged with `group` (and `undoes`). A forward
-    /// action is journalled (`writeAhead`); an undo is not, because `beginUndo` consumed its group
-    /// durably first and an undo write is never itself an undo source.
-    static func withContext<T>(group: UUID, undoes: UUID? = nil, _ body: () throws -> T) rethrows -> T {
+    /// Run `body` with every ledger entry it produces tagged with `group` (and `undoes` / `redoes`). A
+    /// forward action or a redo is journalled (`writeAhead`), since either is an undo source; an undo is
+    /// not, because `beginUndo` consumed its group durably first and an undo write is never itself an undo
+    /// source.
+    static func withContext<T>(group: UUID, undoes: UUID? = nil, redoes: UUID? = nil,
+                               _ body: () throws -> T) rethrows -> T {
         // Nested inside the same action: keep its journal, so one `actionDone` cannot close the other's intent.
-        if let outer = context, outer.group == group, outer.undoes == undoes { return try body() }
+        if let outer = context, outer.group == group, outer.undoes == undoes, outer.redoes == redoes {
+            return try body()
+        }
         let journal = undoes == nil ? ActionJournal(group: group) : nil
         defer { journal?.close() }
-        return try $context.withValue(Context(group: group, undoes: undoes, journal: journal), operation: body)
+        return try $context.withValue(Context(group: group, undoes: undoes, redoes: redoes, journal: journal),
+                                      operation: body)
     }
 
     /// The write-ahead state of one forward action: whether its intent is durable, and whether any of
@@ -93,7 +105,8 @@ final class AuditLedger: @unchecked Sendable {
     }
 
     enum Operation: String, Codable, Sendable {
-        case apply, readState, rename, undo, undoAttempt, historyBarrier, actionIntent, actionDone
+        case apply, readState, rename, undo, undoAttempt, historyBarrier, actionIntent, actionDone,
+             redo, redoAttempt
     }
 
     struct Delta: Codable, Equatable, Sendable {
@@ -130,6 +143,8 @@ final class AuditLedger: @unchecked Sendable {
         /// file, and which attempt the next undo of it will be (the original undo was attempt 1).
         var retryOf: UUID?
         var attempt: Int?
+        /// Set on a redo's lines and its `redoAttempt` marker: the undo group the redo reverses.
+        var redoes: UUID?
     }
 
     private let lock = NSLock()
@@ -222,7 +237,7 @@ final class AuditLedger: @unchecked Sendable {
             delta: Self.forwardDelta(r),
             inverse: Delta(add: r.occurrenceInverse.add, remove: r.occurrenceInverse.remove,
                            label: Self.label(of: r.occurrenceInverse.color)),
-            unverified: nil)
+            unverified: nil, redoes: ctx.redoes)
         append(entry, recordsChange: true)
     }
 
@@ -237,7 +252,7 @@ final class AuditLedger: @unchecked Sendable {
             v: 1, timestamp: Date(), op: op, group: ctx.group, undoes: ctx.undoes, path: url.path,
             bookmark: try? url.bookmarkData(options: [], includingResourceValuesForKeys: nil, relativeTo: nil),
             file: Self.fileNumber(url), before: [], after: [], beforeLabel: nil, afterLabel: nil,
-            delta: none, inverse: none, unverified: why), recordsChange: true)
+            delta: none, inverse: none, unverified: why, redoes: ctx.redoes), recordsChange: true)
     }
 
     @discardableResult
@@ -343,7 +358,7 @@ final class AuditLedger: @unchecked Sendable {
                 break history
             }
             if let undone = entry.undoes { consumed.insert(undone); continue }
-            guard entry.op != .undo && entry.op != .undoAttempt,
+            guard entry.op != .undo && entry.op != .undoAttempt && entry.op != .redoAttempt,
                   (ReaderArchiveLayout.isContained(URL(fileURLWithPath: entry.path), inRootPath: root.path)
                     || Self.bookmarkURL(entry).map { ReaderArchiveLayout.isContained($0, inRootPath: root.path) } == true)
             else { continue }
@@ -362,12 +377,70 @@ final class AuditLedger: @unchecked Sendable {
         return order.reversed().filter { !consumed.contains($0) }.compactMap { groups[$0] }
     }
 
+    /// The undos a redo may reverse, oldest first like `undoGroups`: every completed undo newer than the
+    /// newest change that was not itself an undo or a redo. A new change ends the redo history, as it does
+    /// in any editor; a redo does not (it is the history being walked). An undo's retry group (failed
+    /// members re-recorded by `keepForRetry`) is part of that undo, not a new change. The same barriers
+    /// stop it as stop undo: a recording gap, a history barrier, an unclosed action. Each group holds the
+    /// undo's verified lines in reverse write order; a redo applies each line's `inverse`.
+    func redoGroups(in root: URL) -> [[Entry]] {
+        guard !hasRecordingGap else { return [] }
+        var consumed = Set<UUID>()
+        var closed = Set<UUID>()
+        var order: [UUID] = []
+        var groups: [UUID: [Entry]] = [:]
+        let files = historyFilesNewestFirst()
+        history: for file in files {
+          guard let lines = Self.decodeEntries(file) else { return [] }
+          for entry in lines.reversed() where entry.v == 1 {
+            switch entry.op {
+            case .historyBarrier: break history
+            case .actionDone: closed.insert(entry.group); continue
+            case .actionIntent:
+                if closed.contains(entry.group) { continue }
+                break history   // unclosed: a change of this action may be on disk unrecorded
+            case .undoAttempt: continue
+            default: break
+            }
+            // A redo (its lines, its marker, or a retry of an undo of one) consumes the undo it reverses.
+            if let redone = entry.redoes { consumed.insert(redone); continue }
+            if entry.op == .undo, entry.undoes != nil {
+                guard entry.unverified == nil, Self.isContained(entry, in: root) else { continue }
+                if groups[entry.group] == nil {
+                    guard order.count < Self.undoGroupLimit else { break history }
+                    order.append(entry.group)
+                    groups[entry.group] = []
+                }
+                groups[entry.group, default: []].append(entry)
+                continue
+            }
+            if entry.op == .undo || entry.retryOf != nil { continue }
+            // A forward change, verified or not, in any archive: nothing older may be redone.
+            break history
+          }
+        }
+        guard historyFilesNewestFirst() == files else { return [] }
+        return order.reversed().filter { !consumed.contains($0) }.compactMap { groups[$0] }
+    }
+
+    private static func isContained(_ entry: Entry, in root: URL) -> Bool {
+        ReaderArchiveLayout.isContained(URL(fileURLWithPath: entry.path), inRootPath: root.path)
+            || bookmarkURL(entry).map { ReaderArchiveLayout.isContained($0, inRootPath: root.path) } == true
+    }
+
     /// Consume BEFORE applying an occurrence inverse: replay can append duplicate occurrences. If the
     /// append/sync fails, the caller must refuse to write. A crash consumes the entire action; a member
     /// that failed is offered again only through `keepForRetry`, after its failure is known.
     func beginUndo(_ group: UUID) -> Bool {
         var attempt = Self.marker(.undoAttempt, group: UUID())
         attempt.undoes = group
+        return append(attempt, synchronize: true)
+    }
+
+    /// `beginUndo` for a redo: consumes the undo group `group` durably before the first write.
+    func beginRedo(_ group: UUID) -> Bool {
+        var attempt = Self.marker(.redoAttempt, group: UUID())
+        attempt.redoes = group
         return append(attempt, synchronize: true)
     }
 
@@ -392,7 +465,9 @@ final class AuditLedger: @unchecked Sendable {
     /// already reversed. Called only AFTER `beginUndo` consumed `group` and the members were tried, so a
     /// crash in between loses the retry (the safe direction) and can never replay a reversed member.
     /// Returns false when the ledger could not record it; the caller reports the files as lost.
-    func keepForRetry(_ failed: [Entry], of group: UUID) -> Bool {
+    /// For a partly failed redo (`redo`), `failed` are the undo's lines and stay undo lines, keeping their
+    /// `undoes`, so the next redo offers exactly those files.
+    func keepForRetry(_ failed: [Entry], of group: UUID, redo: Bool = false) -> Bool {
         guard !failed.isEmpty else { return true }
         let retryGroup = UUID()
         var lines = Data()
@@ -400,7 +475,7 @@ final class AuditLedger: @unchecked Sendable {
             for var entry in failed {
                 entry.timestamp = Date()
                 entry.group = retryGroup
-                entry.undoes = nil
+                if !redo { entry.undoes = nil }
                 entry.retryOf = group
                 entry.attempt = (entry.attempt ?? 1) + 1
                 lines.append(try Self.encoder.encode(entry))

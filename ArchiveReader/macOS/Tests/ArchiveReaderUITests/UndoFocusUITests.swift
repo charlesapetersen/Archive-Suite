@@ -87,6 +87,72 @@ final class UndoFocusUITests: FixtureUITestCase {
                       + "tags now \(Self.tags(Self.xattr(path))), before \(before)")
     }
 
+    /// W40.fix-reader-redo: ⇧⌘Z from the list redoes the undone tag change, after a relaunch too; in the
+    /// filter it redoes the typing and leaves the tags alone.
+    func testShiftCommandZRedoesTheTagChangeAndBelongsToTheFocusedField() throws {
+        app.terminate()
+        app.launchArguments += ["-ARUITestLedgerID", UUID().uuidString]
+        app.launch()
+        app.activate()
+        XCTAssertTrue(table.waitForExistence(timeout: 10))
+        waitForRows(minimum: 1, timeout: 15)
+        clickRow(0)
+        pressKey("r", modifiers: .command)
+        var changed = waitForChange(from: baseline)
+        if changed.isEmpty {
+            pressKey("u", modifiers: .command)
+            changed = waitForChange(from: baseline)
+        }
+        XCTAssertEqual(changed.count, 1, "precondition: one file's tags changed, got \(changed.keys.sorted())")
+        let path = changed.keys.first ?? ""
+        let before = Self.tags(baseline[path] ?? nil), after = Self.tags(Self.xattr(path))
+
+        pressKey("z", modifiers: .command)
+        XCTAssertTrue(waitFor { Self.tags(Self.xattr(path)) == before }, "precondition: ⌘Z undid the change")
+        pressKey("z", modifiers: [.command, .shift])
+        XCTAssertTrue(waitFor { Self.tags(Self.xattr(path)) == after },
+                      "⇧⌘Z should redo the tag change; tags now \(Self.tags(Self.xattr(path))), redone \(after)")
+        pressKey("z", modifiers: .command)
+        XCTAssertTrue(waitFor { Self.tags(Self.xattr(path)) == before }, "the redone change undoes again")
+
+        // ⇧⌘Z in the file-name filter: the typing comes back, the tag change is not redone.
+        let filter = app.textFields["ar.filter.name"]
+        XCTAssertTrue(filter.waitForExistence(timeout: 5))
+        filter.click()
+        filter.typeText("zq")
+        settle(0.5)
+        pressKey("z", modifiers: .command)
+        settle(1)
+        XCTAssertNotEqual(filter.value as? String, "zq", "precondition: ⌘Z undid the typing")
+        pressKey("z", modifiers: [.command, .shift])
+        settle(1.5)
+        XCTAssertEqual(filter.value as? String, "zq", "⇧⌘Z in the filter should redo the typing")
+        XCTAssertEqual(Self.tags(Self.xattr(path)), before, "⇧⌘Z in the filter must not redo the tag change")
+        // Leave the filter empty with its typing redoable, then ⇧⌘Z from the list: the tag change, not the
+        // text (Edit ▸ Redo must not take the key while the list has the keyboard).
+        pressKey("z", modifiers: .command)
+        settle(1)
+        XCTAssertNotEqual(filter.value as? String, "zq", "precondition: the filter's typing is undone again")
+        clickRow(0)
+        pressKey("z", modifiers: [.command, .shift])
+        XCTAssertTrue(waitFor { Self.tags(Self.xattr(path)) == after },
+                      "⇧⌘Z from the list should redo the tag change even with text redo pending")
+        XCTAssertNotEqual(filter.value as? String, "zq", "and leave the filter's typing undone")
+        pressKey("z", modifiers: .command)
+        XCTAssertTrue(waitFor { Self.tags(Self.xattr(path)) == before }, "precondition for the relaunch: undone")
+
+        // The redo survives a relaunch, and ⇧⌘Z works before anything is clicked.
+        app.terminate()
+        app.launch()
+        app.activate()
+        XCTAssertTrue(table.waitForExistence(timeout: 10))
+        waitForRows(minimum: 1, timeout: 15)
+        settle(1)
+        pressKey("z", modifiers: [.command, .shift])
+        XCTAssertTrue(waitFor { Self.tags(Self.xattr(path)) == after },
+                      "⇧⌘Z after a relaunch should redo the change; tags now \(Self.tags(Self.xattr(path)))")
+    }
+
     // MARK: helpers
 
     /// Every fixture file's raw tag xattr, keyed by path; nil where a file has none.
