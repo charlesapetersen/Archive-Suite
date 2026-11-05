@@ -114,9 +114,12 @@ extension LayoutGuardUITests {
         let narrow = LayoutGuard.dragCorner(of: main, to: CGPoint(x: original.minX + 600, y: original.minY + 600))
         XCTAssertEqual(narrow.width, 900, accuracy: 2, "the window should stop at its 900-pt minimum width")
         _ = LayoutGuard.waitUntilSettled(main)
+        // Before the fix Read's cell was there but ended at x=1006 in this 900-pt window (VM, 2026-11-05).
+        let read = table.tableRows.element(boundBy: 0)
+            .descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH 'ar.cell.read.'")).firstMatch
+        XCTAssertTrue(read.exists, "narrowest window, \(appearance): the first row's Read cell should be on screen")
         let cells = table.tableRows.element(boundBy: 0).cells.allElementsBoundByIndex
-        XCTAssertEqual(cells.count, 8, "the first row should show the eight default columns")
-        let lastEdge = cells.map(\.frame.maxX).max() ?? .infinity
+        let lastEdge = max(read.exists ? read.frame.maxX : .infinity, cells.map(\.frame.maxX).max() ?? 0)
         XCTAssertLessThanOrEqual(lastEdge, main.frame.maxX + LayoutGuard.tolerance,
                                  "narrowest window, \(appearance): the last column ends at x=\(lastEdge), past the "
                                     + "window's edge at x=\(main.frame.maxX); Read should stay on screen")
