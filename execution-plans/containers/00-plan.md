@@ -157,7 +157,8 @@ Not in this plan: typed box and folder numbers on the phone (the label read shou
 The measurement comes first and the build waits on the owner's look at it (`W47.ct-design-ok`).
 
 1. `W47.ct-truth` — the label truth set and the owner's disagreement sheet, plus a Route B test set of folder
-   trees in common naming conventions.
+   trees in common naming conventions. Rebuilt on the JPEG originals with a third blind reader and 20 controls
+   (`W47.ct-truth-jpeg`, `segbench-results/ct-truth.md`); the first, PDF-built draft is `ct-truth-pdf.md`.
 2. `W47.ct-truth-owner-ok` — OWNER GATE: that sheet answered.
 3. `W47.ct-read` — the free reading routes scored per field, the Route B name patterns scored on the tree set,
    plus carry-forward and Purple's meaning.

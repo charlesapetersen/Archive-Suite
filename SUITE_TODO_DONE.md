@@ -14367,3 +14367,21 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   own output skipped, none, several, unknown count, SAL_REPLAY). The Sherlock retry already ran with SAL_REPLAY; no
   bench cache scratch was made.
   <!-- /W46.fix-sal-replay-search -->
+- [x] **W47.ct-truth-jpeg — rebuild the label truth draft and sheet on the JPEG originals [S]** · §Archival containers — W47 — SHIPPED 2026-11-05.
+  The owner's 2026-10-29 call: the label truth is rebuilt on the JPEG originals, not the corpus PDFs. `ct_truth.py` now starts from
+  the PDF build's 240 markers (the corpus has changed since: 4,399 single-colour markers now, so a fresh draw kept only 46 of them).
+  Each is paired through `corpus_pairs.py`'s pairs.tsv and confirmed by `ocr_truth.orient_like_pdf` (cut 0.65); the best turn
+  makes the JPEG upright (34 turned). Left out: 54 "not the same photo", 11 with no JPEG paired, 11 no longer a marker in the corpus;
+  54 refilled from their strata; 22 short. That leaves 218 (108 Red, 110 Purple). **Finding:** the 0.65 cut is conservative on label
+  photos. The rejects ran −0.03 to 0.645 in an unbroken spread, and an eye check of 8 spread across it found all 8 the same photo,
+  their PDFs cropped or deskewed (one upside down). So most left-outs are true pairs, and the refills lean toward markers with
+  little-changed PDFs (`ct-truth.md`). Three blind readers (FLD-9): Qwen3-VL 8B and Qwen3.5 4B on this Mac ($0, 33 + 23 min) and
+  Gemini 3.7 Flash through the gateway ($0.44 real money, the gateway's own figure, against about $0.70 approved). All 218 parsed by
+  all three. 184 photos carry 488 split fields; the sheet adds 20 unmarked unanimous controls (10 valued, 10 empty), so it asks 508
+  fields on 188 photos (366 boxes from Vision lines, 106 from a label region, 3 none). The fold records `ruled` and
+  `controls_overturned`; the drafters W47.ct-read may score only on owner-ruled fields are the three readers. Beside the PDF build:
+  on the 164 markers in both, Qwen3-VL 8B read 95% of fields the same from the JPEG as from the PDF. The PDF-built draft is kept
+  (`ct-truth-pdf.md`, cache `ct-truth/pool/`). Timing judged: it is time for the sheet, with no known defect in its way and no queued
+  item that changes it, so gate W47.ct-truth-owner-ok is now live. Bench cache: everything kept. `ct-truth/pool-jpeg/` (pages,
+  lines, drafts, sheet, 47 MB) is the sheet's input and W47.ct-read's; `pool/` is the PDF build kept beside it as asked.
+  <!-- /W47.ct-truth-jpeg -->
