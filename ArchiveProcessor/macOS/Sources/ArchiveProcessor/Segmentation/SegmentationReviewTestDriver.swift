@@ -20,6 +20,8 @@ import Foundation
 ///      the checked page, then the classifications in the jobs and the count line.
 ///   6. A resume with the manifest's answers asks the model nothing and offers the gap already answered.
 ///   7. A usage limit asks; "check the rest myself" flags every gap the model did not answer.
+///   8. Each window's answer is in the manifest as soon as it lands, so a run killed mid-windows resumes asking
+///      only the windows that had not answered.
 @MainActor
 enum SegmentationReviewTestDriver {
     private static var didRun = false
@@ -314,6 +316,67 @@ enum SegmentationReviewTestDriver {
         check("7b the status says so", s2.statusMessage.hasPrefix("Stopped before segmentation"), s2.statusMessage)
         check("7b the manifest was saved before stopping", keptBox.value != nil)
         check("7b the prompt is gone", s2.windowStopPrompt == nil && s2.windowStopContinuation == nil)
+
+        // 8. Killed mid-windows (W40.fix-processor-window-answers-per-window): one window answers, the other two
+        // never return. The manifest already holds that window while the run is still waiting, which is what a
+        // crash at that moment leaves on disk; a resume from it asks only the two missing windows.
+        let hanging = HangingTransport(answers: [1, 2, 3, 4], verdicts: verdicts)
+        let k = makeProcessor(urls: urls)
+        k.windowTransportOverride = hanging
+        let crashBox = Box<OCRProcessor.PendingRun>()
+        k.pendingRunSaveOverride = { crashBox.value = $0 }
+        k.activePendingRun = pending.withoutProgress()
+        let killed = Box<WindowStageOutcome>()
+        let stage = Task {
+            killed.value = await k.runWindowSegmentationStage(files: urls, approach: .claude, runConfig: nil)
+        }
+        if await waitFor({ k.awaitingBoxFolderConfirmation }) { k.confirmBoxFolderReview() }
+        check("8 all three windows sent", await waitFor { hanging.calls.count == 3 })
+        check("8 the answered window is saved before the run ends",
+              await waitFor { crashBox.value?.segmentationWindows?.count == 1 })
+        eq("8 it is the window that answered", crashBox.value?.segmentationWindows?.keys.map { [$0.start, $0.end] },
+           [[0, 4]])
+        check("8 the run is still in the windows", killed.value == nil && !k.awaitingFlaggedReview)
+        stage.cancel()
+        check("8 the killed stage ends", await waitFor { killed.value == .stopped })
+
+        let rest = FakeTransport(verdicts: verdicts)
+        let kr = makeProcessor(urls: urls)
+        kr.windowTransportOverride = rest
+        kr.pendingRunSaveOverride = { _ in }
+        kr.activePendingRun = crashBox.value
+        let afterCrash = Box<WindowStageOutcome>()
+        Task { afterCrash.value = await kr.runWindowSegmentationStage(files: urls, approach: .claude, runConfig: nil) }
+        if await waitFor({ kr.awaitingBoxFolderConfirmation }) { kr.confirmBoxFolderReview() }
+        check("8 the flagged pass opens after the crash", await waitFor { kr.awaitingFlaggedReview })
+        eq("8 only the two missing windows asked", Set(rest.calls), [[1, 2, 3, 4, 5, 6], [4, 5, 6]])
+        eq("8 the same flagged gap", kr.flaggedGapItems.map(\.id), [2])
+        kr.cancel()
+        check("8 the resumed stage ends", await waitFor { afterCrash.value == .stopped })
+    }
+
+    /// Answers the window whose pages are `answers` as `FakeTransport` does; every other window waits until its
+    /// task is cancelled.
+    final class HangingTransport: WindowTransport, @unchecked Sendable {
+        private let lock = NSLock()
+        private var _calls: [[Int]] = []
+        var calls: [[Int]] { lock.withLock { _calls } }
+        let answers: [Int]
+        private let fake: FakeTransport
+
+        init(answers: [Int], verdicts: [Int: (String, Double)]) {
+            self.answers = answers
+            fake = FakeTransport(verdicts: verdicts)
+        }
+
+        func send(_ r: WindowRequest) async throws -> String {
+            lock.withLock { _calls.append(r.pageNumbers) }
+            guard r.pageNumbers == answers else {
+                try await Task.sleep(for: .seconds(600))
+                throw CancellationError()
+            }
+            return try await fake.send(r)
+        }
     }
 
     private static func makeProcessor(urls: [URL]) -> OCRProcessor {

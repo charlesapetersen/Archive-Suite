@@ -387,8 +387,13 @@ struct WindowSegmenter: Sendable {
     /// The API route's `NetworkSession` call is non-idempotent and does not retry 5xx itself.
     var retryDelay: Duration = .seconds(20)
 
+    /// `onAnswer` is given every window answered so far each time one more lands, so the caller can keep them
+    /// one window at a time and a crash mid-run costs only the windows in flight
+    /// (W40.fix-processor-window-answers-per-window).
     func segment(pages: [PageInput], photoKinds: [PhotoKind?], approach: ApproachSpec,
-                 answered prior: [WindowKey: WindowAnswer] = [:]) async throws -> WindowSegmentation {
+                 answered prior: [WindowKey: WindowAnswer] = [:],
+                 onAnswer: (@Sendable ([WindowKey: WindowAnswer]) async -> Void)? = nil)
+        async throws -> WindowSegmentation {
         guard pages.count == photoKinds.count else {
             throw WindowSegmenterError.pageCountMismatch(pages: pages.count, photoKinds: photoKinds.count)
         }
@@ -421,9 +426,11 @@ struct WindowSegmenter: Sendable {
             }
             for _ in 0..<max(1, maxConcurrent) { launch() }
             while let (k, result) = try await group.next() {
+                var landed = false
                 switch result {
                 case .success(let a):
                     answered[k] = a
+                    landed = true
                 case .failure(WindowTransportError.usageLimit(let reset, let message)):
                     if limit == nil { limit = (reset, message) }
                 case .failure(WindowTransportError.paused(let reset, let message)):
@@ -436,6 +443,8 @@ struct WindowSegmenter: Sendable {
                     failed.append(k)
                 }
                 if limit == nil && pause == nil && fatal == nil { launch() }
+                // After the next window is on its way, so the save does not hold it up.
+                if landed, let onAnswer { await onAnswer(answered) }
             }
         }
         if let fatal {

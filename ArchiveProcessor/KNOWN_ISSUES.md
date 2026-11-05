@@ -414,8 +414,6 @@ Runtime evidence and the final unattended rerun are under `verification/evidence
   `PendingRun.segmentationWindows`/`segmentationAnswers`) and can stop and resume.
 - **A window approach sends page images to its model even in an Apple Vision run** that has a judgment LLM. The
   approach is an explicit opt-in with its cost shown, so this is by design, but it is not text-only.
-- **The window answers are saved when the segmenter returns or stops**, not one window at a time. A crash in the
-  middle of the windows asks the model for all of them again on resume.
 - **Every page's window image is held in memory for the run** (about 1,600 px JPEGs, so roughly 150 MB for 500
   pages), as the engine takes the whole page list at once.
 - **A box or folder photo the OCR model missed** is added in the skim, after the windows ran, so the gaps on

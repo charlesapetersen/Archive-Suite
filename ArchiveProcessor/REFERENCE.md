@@ -325,7 +325,8 @@ Segmentation/                  W36 window segmenter (not Tier-2: proposes bounda
                                confirm → windows → `Views/FlaggedBoundaryReviewSheet` → the skim
                                (`DocumentSegmentReviewSheet` with note + Checked marks). Called from startProcessing,
                                the pre-OCRed path, resumeRun and resumeBatch. Limit/error → "check the rest myself"
-                               or stop (resumable: `PendingRun.segmentationWindows`/`segmentationAnswers`).
+                               or stop (resumable: `PendingRun.segmentationWindows`, saved as each window lands,
+                               and `segmentationAnswers`).
                                Self-test: `SegmentationReviewTestDriver`, `scripts/test-segmentation-review.sh`;
                                VM UITest `testFlaggedBoundaryPassNeedsEveryAnswerBeforeDone`.
   SegmentationApproach.swift   `SegmentationApproach` (manual/claude/gemini/openai/mix, `DefaultsKeys.segmentationApproach`,

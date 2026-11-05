@@ -170,7 +170,12 @@ extension OCRProcessor {
             let onThisMac = spec.voters.allSatisfy { $0.provider == .local }
             let result = try await WindowSegmenter(transport: transport, maxConcurrent: onThisMac ? 1 : 3)
                 .segment(pages: loaded.compactMap { $0 }, photoKinds: pages.photoKinds, approach: spec,
-                         answered: prior)
+                         answered: prior) { [weak self] answered in
+                    // Each window as it lands, so a crash mid-run re-asks only the windows in flight. Not after a
+                    // Stop: cancel() has already cleared the run, and a late answer must not reach the next one.
+                    guard !Task.isCancelled else { return }
+                    await self?.persistWindowSegmentationProgress(windows: answered)
+                }
             persistWindowSegmentationProgress(windows: result.answered)
             return result.proposals
         } catch WindowSegmenterError.usageLimit(let reset, let message, let answered) {
