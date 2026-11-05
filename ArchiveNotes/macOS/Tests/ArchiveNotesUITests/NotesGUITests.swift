@@ -1157,7 +1157,7 @@ final class NotesGUITests: NotesFixtureUITestCase {
             let newMenu = mainWindow.descendants(matching: .any)["an.toolbar.new"]
             if newMenu.waitForExistence(timeout: 5) {
                 newMenu.click()
-                let item = app.menuItems["New Note"]
+                let item = newMenu.menuItems["New Note"]   // not File ▸ New Note
                 if item.waitForExistence(timeout: 3) { item.click() }
             }
             created = pollUntil(timeout: 10) { !newDirsWithMD().isEmpty }

@@ -37,7 +37,7 @@ final class ListRenameUITests: NotesFixtureUITestCase {
             let newMenu = mainWindow.descendants(matching: .any)["an.toolbar.new"]
             XCTAssertTrue(newMenu.waitForExistence(timeout: 10), "the toolbar New menu should exist")
             newMenu.click()
-            let newNote = app.menuItems["New Note"]
+            let newNote = newMenu.menuItems["New Note"]   // the menu bar has a File ▸ New Note too
             XCTAssertTrue(newNote.waitForExistence(timeout: 5), "New ▸ New Note should exist")
             newNote.click()
             var created: [String] = []

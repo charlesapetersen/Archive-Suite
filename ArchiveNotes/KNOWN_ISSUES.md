@@ -396,6 +396,11 @@ network, or credentials were used.
 
 ## ✅ VERIFIED (W9.cand1) — the GUI can create a note from All Notes
 
+**Corrected 2026-11-05 (W40.fix-notes-new-note).** The conclusion below was wrong: `⌘N` was bound only inside
+the toolbar's New menu, so it did nothing from the keyboard and the menu bar had no New Note (the owner's
+notes-1 session, row 5). G1 passed through its toolbar-menu fallback. `⌘N` is now File ▸ New Note
+(`NewItemCommands`), and `NewItemMenuUITests` presses it with no fallback.
+
 **2026-09-05.** The interrupted 2026-07-18 GUI sweep reported that `⌘N` and the toolbar pencil did nothing
 while All Notes was selected. The current production command is reachable there: `NotesBrowserView` binds
 `⌘N` to **New Note**, which invokes `NotesModel.newItem` using the Inbox default when no concrete folder is

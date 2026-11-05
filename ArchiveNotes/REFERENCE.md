@@ -306,8 +306,10 @@ macOS/Sources/ArchiveNotes/
                                    kind Picker + NotesTableView, detail = selected-item header + bounded
                                    metadata inspector + NoteEditorPane; settled empty-library, empty-folder,
                                    and no-match guidance over the list (W9.d8)
-                                   (W6-S3); .task bootstraps the store. Toolbar "New" menu (New \(kind) ⌘N
-                                   from nearest-ancestor template + New from Template ▸ matching kind); item
+                                   (W6-S3); .task bootstraps the store. Toolbar kind label + "New" menu (both
+                                   kinds, own first; New from Template ▸ both kinds' templates; another kind
+                                   goes to its window via openItem). File ▸ New Note ⌘N / New Extract ⌥⌘N =
+                                   NewItemCommands via focused NewItemAction (W40.fix-notes-new-note); item
                                    pane swaps to TemplatesManagerView in templates mode (W6-S6). Hosts the
                                    hidden `an.status.indexReady` a11y probe the GUI harness polls (W8-S7 §3.4)
     TemplatesManagerView.swift     Per-window templates manager (shown in the item pane in templates mode):
