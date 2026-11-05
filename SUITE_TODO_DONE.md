@@ -14330,3 +14330,25 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   <!-- /W46.marks-detect -->
 - [x] **W40.fix-reader-health-counts — the library health counts are not always on screen [S · S4]** · §W40 (lane: reader) — SHIPPED 2026-11-05. Found by the owner's Reader guided session 1 (`verification/sessions/reader-1-returned.md`, row 2): "931 needs attention" and "104 ambiguous dates" sat in the filter bar all the time. Now the filter bar shows each of those two toggles only while its filter is on (so an active filter can still be seen and turned off); the Library health popover lists both counts with a Show button that turns the filter on and closes the popover; and the status-bar stethoscope is the quiet indicator — filled and tinted the warning colour, with "some files need a look" in its tooltip and accessibility value, while either count is above zero. Verified: `NavigationUITests.testTwoYearTagsAreFlaggedAndTheFilterFindsThem` rewritten to go through the popover (asserts the toggle is absent while off, present while on, gone again once off) passed in the Tart VM; screenshot `w40-health-popover` read. Reader unit bundle 600 tests green, no new warnings. No bench cache used.
   <!-- /W40.fix-reader-health-counts -->
+- [x] **W46.place-geom-real5 — the line-drag arms on Real5's warp and skew folders [S]** · §Document processing review — W46 (owner, 2026-10-20) (lane: segbench) (uses: build) — W46.place-geom scored raw, deskew, quad and UVDoc reading copies on the 58 placement-truth pages of the 96 only: Real5 has no saved Vision reading or UVDoc lattice in W46.enh-dewarp, and no line truth for selection (OmniDocBench's lines would have to be carried through each folder's capture). Deskew won +6.8 points on skewed pages there; this would check it on public photographs. detail: segbench-results/place-geom.md §Measurement card. **Promoted from nice-to-have (owner, 2026-11-04):** its answer can change a pipeline step or a settings-wizard rule, so it no longer waits on `W46.nice-to-have`; `W46.review-phase4` waits on it (it checks whether deskew's +6.8 on the 96's skewed pages holds on public photographs, before deskew becomes a reading-copy rule for other users). — SHIPPED 2026-11-05.
+  Result (`ArchiveProcessor/segbench-results/place-geom-real5.md`, `.json`): W46.place-geom's arms, writers and PDFKit
+  line-drag scorer, through its own `page_rows`, on Real5's Warping and Skew photographs of W46.layout-photo's 155
+  English plain-text OmniDocBench v1.5 pages (310 images, 15,067 scored lines). Deskew with the lab writer +33.1 over
+  raw (paired 95% +25.6 to +40.7): +5.7 on pages skewed 1°–3° (+2.7 to +9.4, the 96's range, where it was +6.8),
+  +57.8 at 3° or more, +0.1 on level pages, nothing removed; better on 162 of 229 skewed images, worse on 20. The 1°
+  trigger for W46.review-phase4 is confirmed. New: UVDoc after the quad selects best here (88.1%, +7.9 over deskew,
+  +19.3 on level-but-warped pages), unlike on the 96 where it lost everywhere, but it cuts 900 truth lines and 443
+  own-sheet words on 128 images; whether a dewarped copy is ever offered (only when its lattice keeps every word) is
+  left to Phase 4. Quad alone no better than deskew; sloped runs lose again (−6.3). Overshooting drags give the same
+  order. Truth: Vision lines on the raw photograph whose text is one OmniDocBench line (spans, or a block or newline
+  piece of one; similarity ≥ 0.9, unique), Vision's own words, so Find is 100% everywhere and is not tabled; drags
+  run quad-edge midpoint to quad-edge midpoint, since box corners are not word edges at Real5's angles
+  (`test_place_geom_real5.py`). Runs: `$L place_geom_real5.py fetch`, then `$V … prep`, `truth`, `run --fresh`,
+  `PLACE_GEOM_MARGIN=0.35 PLACE_GEOM_ROWS=rows-m035.jsonl $V … run --fresh`, `report` ($L the lab venv, $V the
+  enh-dewarp venv; prep and run under heavy-run.py, about 10 min each); a fresh rerun reproduced every count. Not on
+  the ArchiveOCRBench page (placement, not OCR or segmentation). Apple Vision only, no network beyond the public
+  Hugging Face download, no money. Bench cache: the session's permission rules refused deleting
+  `place-geom-real5/` (`pages/` 510 MB of layers and drags, `images/` 212 MB, `omnidocbench-v1_5/` 63 MB, `truth/`
+  39 MB, `grids/` 15 MB, `rows-rerun.jsonl`), all rebuildable by the commands above, and may go to the Trash;
+  keep `rows.jsonl` and `rows-m035.jsonl` (what `report` reads) and `lines/` and `quad/` (Vision's readings, 30 MB).
+  <!-- /W46.place-geom-real5 -->

@@ -221,8 +221,9 @@ Own sheet: inside Apple's quad, or on a Vision line the arm keeps part of. Partl
   map that carries words and truth to it (rotation, the quad homography, the UVDoc lattice after the quad). Same
   drags, same scorer, same PDFKit. Lines an arm's image cuts fail on that arm. Both OCR sets: not applicable — the
   895-page public set has no line truth for selection, and Real5's warp and skew folders (named in the item) have
-  no saved Vision reading or lattice in W46.enh-dewarp, so they are not scored here (W46.place-geom-real5, behind
-  W46.nice-to-have).
+  no saved Vision reading or lattice in W46.enh-dewarp, so they are not scored here. W46.place-geom-real5 scored
+  them (`place-geom-real5.md`, 2026-11-05): deskew +5.7 on pages skewed 1°–3°, +57.8 at 3° or more, +0.1 on level
+  pages; UVDoc selects best there but cuts 900 of 15,067 lines.
 - **Noise.** n = 58 pages, 1,682 scored lines (226 hand). Intervals are paired bootstrap over pages (2,000 draws).
   The run is deterministic: a fresh rerun on 2026-11-01 reproduced every count of the first, so the rerun floor is
   0 and the page sample is the noise. The skewed stratum is 17 pages, so its interval is wide (+3.4 to +14.2).
