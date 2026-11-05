@@ -266,6 +266,10 @@ def report():
          'Reproduce: `ocr_panel.py prepare`, `collect --probe`, `collect`, `vision` (under the heavy lock), then '
          '`ocr_panel_score.py`. Inputs, catalogs, raw responses, reservations and page scores: '
          '`~/Library/Caches/ArchiveSuiteRehearsal/ocr-panel-local/` (outside git).', '',
+         '**Apple Vision is its macOS 27.2 reading (regenerated 2026-11-04, W46.vision-27-swap; `vision-27-reread.md`).** '
+         'The 26.6 reading of 2026-10-14 is kept as `vision-26.6/`. On the 96 Vision moved 81.37 to 83.07 NES, but its '
+         'half-size copies fell (79.48 to 73.23) and its quarter-size ones too (52.69 to 50.39), so its downscale '
+         'figures change most; no other route moved.', '',
          f'Conservative OpenRouter budget accounting, every attempt: **${P.spent():.6f} / $2.00 cap**. '
          'Each row pins one endpoint and precision; temperature 0, reasoning off (Flash-Lite minimal; '
          'the VL Instruct/Mistral endpoints have no reasoning control). No paid retries.', '',

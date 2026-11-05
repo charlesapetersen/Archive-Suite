@@ -33,7 +33,7 @@ lightonocr3-4b,tilt-20,p001,original,typewritten,ok,True,0.898477,0.983932,0.991
 lightonocr3-4b,jpeg-60,p001,original,typewritten,ok,True,0.898477,0.983932,0.991482,295,292,4,1
 lightonocr3-4b,jpeg-75,p001,original,typewritten,ok,True,0.898477,0.983932,0.991482,295,292,4,1
 lightonocr3-4b,jpeg-85,p001,original,typewritten,ok,True,0.898477,0.983932,0.991482,295,292,4,1
-vision,raw,p001,original,typewritten,ok,True,0.981951,0.980489,0.986441,295,295,4,4
+vision,raw,p001,original,typewritten,ok,True,0.943034,0.983591,0.994907,295,294,2,1
 vision,resave-q92,p001,original,typewritten,ok,True,0.976875,0.986982,0.994907,295,294,2,1
 vision,aug-ShadowCast,p001,original,typewritten,ok,True,0.974619,0.986982,0.994907,295,294,2,1
 vision,aug-LightingGradient,p001,original,typewritten,ok,True,0.973491,0.985286,0.994907,295,294,2,1
@@ -87,7 +87,7 @@ lightonocr3-4b,tilt-20,p002,original,typewritten,ok,True,0.987327,0.979629,0.950
 lightonocr3-4b,jpeg-60,p002,original,typewritten,ok,True,0.987327,0.979629,0.950943,135,130,9,4
 lightonocr3-4b,jpeg-75,p002,original,typewritten,ok,True,0.987327,0.979629,0.950943,135,130,9,4
 lightonocr3-4b,jpeg-85,p002,original,typewritten,ok,True,0.987327,0.979629,0.950943,135,130,9,4
-vision,raw,p002,original,typewritten,ok,True,0.988545,0.984074,0.992647,135,137,0,2
+vision,raw,p002,original,typewritten,ok,True,0.998848,1.0,1.0,135,135,0,0
 vision,resave-q92,p002,original,typewritten,ok,True,1.0,1.0,1.0,135,135,0,0
 vision,aug-ShadowCast,p002,original,typewritten,ok,True,1.0,1.0,1.0,135,135,0,0
 vision,aug-LightingGradient,p002,original,typewritten,ok,True,0.998848,1.0,1.0,135,135,0,0
@@ -141,7 +141,7 @@ lightonocr3-4b,tilt-20,p003,original,printed,ok,True,0.980631,0.970073,0.938422,
 lightonocr3-4b,jpeg-60,p003,original,printed,ok,True,0.982223,0.965644,0.944732,589,569,42,22
 lightonocr3-4b,jpeg-75,p003,original,printed,ok,True,0.981958,0.965644,0.942092,589,568,44,23
 lightonocr3-4b,jpeg-85,p003,original,printed,ok,True,0.982754,0.966859,0.94382,589,568,43,22
-vision,raw,p003,original,printed,ok,True,0.903688,0.905599,0.944938,589,537,57,5
+vision,raw,p003,original,printed,ok,True,0.980897,0.974779,0.979487,589,581,16,8
 vision,resave-q92,p003,original,printed,ok,True,0.981427,0.975793,0.979557,589,585,14,10
 vision,aug-ShadowCast,p003,original,printed,ok,True,0.982223,0.977378,0.981261,589,585,13,9
 vision,aug-LightingGradient,p003,original,printed,ok,True,0.97957,0.970819,0.979522,589,583,15,9
@@ -206,7 +206,7 @@ lightonocr3-4b,tilt-20,p004,original,typewritten,ok,True,0.992516,0.990681,0.992
 lightonocr3-4b,jpeg-60,p004,original,typewritten,ok,True,0.995394,0.995929,0.992883,282,280,3,1
 lightonocr3-4b,jpeg-75,p004,original,typewritten,ok,True,0.993092,0.990681,0.992883,282,280,3,1
 lightonocr3-4b,jpeg-85,p004,original,typewritten,ok,True,0.992516,0.990681,0.992883,282,280,3,1
-vision,raw,p004,original,typewritten,ok,True,0.990213,0.973616,0.973357,282,281,8,7
+vision,raw,p004,original,typewritten,ok,True,0.989637,0.980537,0.975089,282,280,8,6
 vision,resave-q92,p004,original,typewritten,ok,True,0.99194,0.987072,0.982206,282,280,6,4
 vision,aug-ShadowCast,p004,original,typewritten,ok,True,0.99194,0.985944,0.982206,282,280,6,4
 vision,aug-LightingGradient,p004,original,typewritten,ok,True,0.993092,0.990546,0.985765,282,280,5,3
@@ -260,7 +260,7 @@ lightonocr3-4b,tilt-20,p005,original,typewritten,ok,True,0.991728,0.984443,0.965
 lightonocr3-4b,jpeg-60,p005,original,typewritten,ok,True,0.992869,0.985266,0.966667,576,564,25,13
 lightonocr3-4b,jpeg-75,p005,original,typewritten,ok,True,0.992869,0.985266,0.966667,576,564,25,13
 lightonocr3-4b,jpeg-85,p005,original,typewritten,ok,True,0.992869,0.985266,0.966667,576,564,25,13
-vision,raw,p005,original,typewritten,ok,True,0.918711,0.924977,0.950406,576,533,49,6
+vision,raw,p005,original,typewritten,ok,True,0.932687,0.941119,0.956835,576,536,44,4
 vision,resave-q92,p005,original,typewritten,ok,True,0.982601,0.979893,0.986014,576,568,12,4
 vision,aug-ShadowCast,p005,original,typewritten,ok,True,0.982886,0.981092,0.987762,576,568,11,3
 vision,aug-LightingGradient,p005,original,typewritten,ok,True,0.982316,0.978589,0.984266,576,568,13,5
@@ -325,7 +325,7 @@ lightonocr3-4b,tilt-20,p006,original,typewritten,ok,True,1.0,1.0,1.0,45,45,0,0
 lightonocr3-4b,jpeg-60,p006,original,typewritten,ok,True,1.0,1.0,1.0,45,45,0,0
 lightonocr3-4b,jpeg-75,p006,original,typewritten,ok,True,1.0,1.0,1.0,45,45,0,0
 lightonocr3-4b,jpeg-85,p006,original,typewritten,ok,True,1.0,1.0,1.0,45,45,0,0
-vision,raw,p006,original,typewritten,ok,True,0.890675,0.917195,0.955556,45,45,2,2
+vision,raw,p006,original,typewritten,ok,True,0.990354,0.96163,0.977778,45,45,1,1
 vision,resave-q92,p006,original,typewritten,ok,True,0.832797,0.806212,0.833333,45,39,10,4
 vision,aug-ShadowCast,p006,original,typewritten,ok,True,0.720257,0.749441,0.846154,45,33,12,0
 vision,aug-LightingGradient,p006,original,typewritten,ok,True,0.987138,0.957843,0.977778,45,45,1,1
@@ -390,7 +390,7 @@ lightonocr3-4b,tilt-20,p007,original,handwritten,ok,True,0.912234,0.880094,0.937
 lightonocr3-4b,jpeg-60,p007,original,handwritten,ok,True,0.909574,0.864846,0.923077,73,70,7,4
 lightonocr3-4b,jpeg-75,p007,original,handwritten,ok,True,0.909574,0.86482,0.923077,73,70,7,4
 lightonocr3-4b,jpeg-85,p007,original,handwritten,ok,True,0.909574,0.86482,0.923077,73,70,7,4
-vision,raw,p007,original,handwritten,ok,True,0.430851,0.28057,0.444444,73,53,45,25
+vision,raw,p007,original,handwritten,ok,True,0.534574,0.345887,0.394161,73,64,46,37
 vision,resave-q92,p007,original,handwritten,ok,True,0.537234,0.35899,0.437956,73,64,43,34
 vision,aug-ShadowCast,p007,original,handwritten,ok,True,0.566489,0.365905,0.450704,73,69,41,37
 vision,aug-LightingGradient,p007,original,handwritten,ok,True,0.571809,0.393595,0.458015,73,58,43,28
@@ -455,7 +455,7 @@ lightonocr3-4b,tilt-20,p008,pdf image,typewritten,ok,True,0.993833,0.984288,0.98
 lightonocr3-4b,jpeg-60,p008,pdf image,typewritten,ok,True,0.930066,0.973418,0.9568,605,645,7,47
 lightonocr3-4b,jpeg-75,p008,pdf image,typewritten,ok,True,0.925977,0.97727,0.954509,605,648,7,50
 lightonocr3-4b,jpeg-85,p008,pdf image,typewritten,ok,True,0.930617,0.973947,0.9568,605,645,7,47
-vision,raw,p008,pdf image,typewritten,ok,True,0.925698,0.855714,0.848333,605,595,96,86
+vision,raw,p008,pdf image,typewritten,ok,True,0.887518,0.876568,0.896027,605,578,75,48
 vision,resave-q92,p008,pdf image,typewritten,ok,True,0.898678,0.896501,0.903117,605,582,69,46
 vision,aug-ShadowCast,p008,pdf image,typewritten,ok,True,0.920999,0.909662,0.909242,605,596,59,50
 vision,aug-LightingGradient,p008,pdf image,typewritten,ok,True,0.863142,0.867339,0.878505,605,572,88,55
@@ -520,7 +520,7 @@ lightonocr3-4b,tilt-20,p009,original,mixed,ok,True,0.370201,0.725622,0.864353,16
 lightonocr3-4b,jpeg-60,p009,original,mixed,ok,True,0.368373,0.742673,0.909657,160,161,14,15
 lightonocr3-4b,jpeg-75,p009,original,mixed,ok,True,0.370201,0.742797,0.890282,160,159,18,17
 lightonocr3-4b,jpeg-85,p009,original,mixed,ok,True,0.364717,0.744233,0.875,160,160,20,20
-vision,raw,p009,original,mixed,ok,True,0.572212,0.634538,0.755556,160,155,41,36
+vision,raw,p009,original,mixed,ok,True,0.574954,0.657772,0.785047,160,161,34,35
 vision,resave-q92,p009,original,mixed,ok,True,0.581353,0.64915,0.749226,160,163,39,42
 vision,aug-ShadowCast,p009,original,mixed,ok,True,0.573126,0.645732,0.765823,160,156,39,35
 vision,aug-LightingGradient,p009,original,mixed,ok,True,0.577697,0.650067,0.789969,160,159,34,33
@@ -585,7 +585,7 @@ lightonocr3-4b,tilt-20,p010,pdf image,printed,ok,True,0.979379,0.973686,0.957841
 lightonocr3-4b,jpeg-60,p010,pdf image,printed,ok,True,0.981538,0.974679,0.957841,601,585,33,17
 lightonocr3-4b,jpeg-75,p010,pdf image,printed,ok,True,0.981262,0.973522,0.957841,601,585,33,17
 lightonocr3-4b,jpeg-85,p010,pdf image,printed,ok,True,0.981262,0.973522,0.957841,601,585,33,17
-vision,raw,p010,pdf image,printed,ok,True,0.819961,0.711186,0.692108,601,552,202,153
+vision,raw,p010,pdf image,printed,ok,True,0.890543,0.801242,0.805508,601,561,133,93
 vision,resave-q92,p010,pdf image,printed,ok,True,0.882823,0.809768,0.820069,601,555,127,81
 vision,aug-ShadowCast,p010,pdf image,printed,ok,True,0.877585,0.754415,0.713559,601,579,180,158
 vision,aug-LightingGradient,p010,pdf image,printed,ok,True,0.933554,0.835029,0.835294,601,589,104,92
@@ -639,7 +639,7 @@ lightonocr3-4b,tilt-20,p011,original,printed,ok,True,0.367634,0.618096,0.453125,
 lightonocr3-4b,jpeg-60,p011,original,printed,ok,True,0.399267,0.639293,0.470588,83,121,35,73
 lightonocr3-4b,jpeg-75,p011,original,printed,ok,True,0.393939,0.702686,0.635071,83,128,16,61
 lightonocr3-4b,jpeg-85,p011,original,printed,ok,True,0.549351,0.719842,0.580952,83,127,22,66
-vision,raw,p011,original,printed,ok,True,0.850622,0.86394,0.866242,83,74,15,6
+vision,raw,p011,original,printed,ok,True,0.900415,0.908191,0.95122,83,81,5,3
 vision,resave-q92,p011,original,printed,ok,True,0.900415,0.899246,0.95122,83,81,5,3
 vision,aug-ShadowCast,p011,original,printed,ok,True,0.904564,0.906091,0.95122,83,81,5,3
 vision,aug-LightingGradient,p011,original,printed,ok,True,0.904564,0.90228,0.963415,83,81,4,2
@@ -693,7 +693,7 @@ lightonocr3-4b,tilt-20,p012,original,typewritten,ok,True,0.997448,0.998767,0.998
 lightonocr3-4b,jpeg-60,p012,original,typewritten,ok,True,0.997448,0.998767,0.998748,400,399,1,0
 lightonocr3-4b,jpeg-75,p012,original,typewritten,ok,True,0.997448,0.998767,0.998748,400,399,1,0
 lightonocr3-4b,jpeg-85,p012,original,typewritten,ok,True,0.997448,0.998767,0.998748,400,399,1,0
-vision,raw,p012,original,typewritten,ok,True,0.949131,0.9755,0.98373,400,399,7,6
+vision,raw,p012,original,typewritten,ok,True,0.964361,0.972791,0.97,400,400,12,12
 vision,resave-q92,p012,original,typewritten,ok,True,0.966073,0.976029,0.9775,400,400,9,9
 vision,aug-ShadowCast,p012,original,typewritten,ok,True,0.971501,0.973492,0.974874,400,396,12,8
 vision,aug-LightingGradient,p012,original,typewritten,ok,True,0.969543,0.97939,0.98005,400,402,7,9
@@ -758,7 +758,7 @@ lightonocr3-4b,tilt-20,p013,original,typewritten,ok,True,0.809485,0.838382,0.897
 lightonocr3-4b,jpeg-60,p013,original,typewritten,ok,True,0.809485,0.838382,0.897196,412,337,76,1
 lightonocr3-4b,jpeg-75,p013,original,typewritten,ok,True,0.809485,0.838382,0.897196,412,337,76,1
 lightonocr3-4b,jpeg-85,p013,original,typewritten,ok,True,0.809485,0.838382,0.897196,412,337,76,1
-vision,raw,p013,original,typewritten,ok,True,0.734433,0.777562,0.819372,412,352,99,39
+vision,raw,p013,original,typewritten,ok,True,0.774845,0.805777,0.845361,412,364,84,36
 vision,resave-q92,p013,original,typewritten,ok,True,0.764948,0.79326,0.820972,412,370,91,49
 vision,aug-ShadowCast,p013,original,typewritten,ok,True,0.745567,0.776947,0.805774,412,350,105,43
 vision,aug-LightingGradient,p013,original,typewritten,ok,True,0.797526,0.831979,0.867257,412,379,69,36
@@ -823,7 +823,7 @@ lightonocr3-4b,tilt-20,p014,pdf image,typewritten,ok,True,0.953311,0.963923,0.97
 lightonocr3-4b,jpeg-60,p014,pdf image,typewritten,ok,True,0.990662,0.99084,0.994792,192,192,1,1
 lightonocr3-4b,jpeg-75,p014,pdf image,typewritten,ok,True,0.990662,0.99084,0.994792,192,192,1,1
 lightonocr3-4b,jpeg-85,p014,pdf image,typewritten,ok,True,0.953311,0.963923,0.970509,192,181,11,0
-vision,raw,p014,pdf image,typewritten,ok,True,0.988964,0.99084,0.994792,192,192,1,1
+vision,raw,p014,pdf image,typewritten,ok,True,0.990662,0.99084,0.994792,192,192,1,1
 vision,resave-q92,p014,pdf image,typewritten,ok,True,0.988964,0.98411,0.994792,192,192,1,1
 vision,aug-ShadowCast,p014,pdf image,typewritten,ok,True,0.989813,0.987475,0.994792,192,192,1,1
 vision,aug-LightingGradient,p014,pdf image,typewritten,ok,True,0.990662,0.99084,0.994792,192,192,1,1
@@ -877,7 +877,7 @@ lightonocr3-4b,tilt-20,p015,original,handwritten,ok,True,0.863605,0.873508,0.900
 lightonocr3-4b,jpeg-60,p015,original,handwritten,ok,True,0.864976,0.876581,0.915842,217,187,32,2
 lightonocr3-4b,jpeg-75,p015,original,handwritten,ok,True,0.863605,0.873363,0.910891,217,187,33,3
 lightonocr3-4b,jpeg-85,p015,original,handwritten,ok,True,0.864976,0.874761,0.905941,217,187,34,4
-vision,raw,p015,original,handwritten,ok,True,0.870459,0.840713,0.836105,217,204,41,28
+vision,raw,p015,original,handwritten,ok,True,0.870459,0.837986,0.825776,217,202,44,29
 vision,resave-q92,p015,original,handwritten,ok,True,0.873201,0.838539,0.838095,217,203,41,27
 vision,aug-ShadowCast,p015,original,handwritten,ok,True,0.873886,0.844036,0.844869,217,202,40,25
 vision,aug-LightingGradient,p015,original,handwritten,ok,True,0.85401,0.834677,0.828571,217,203,43,29
@@ -942,7 +942,7 @@ lightonocr3-4b,tilt-20,p016,pdf image,typewritten,ok,True,0.978936,0.976005,0.98
 lightonocr3-4b,jpeg-60,p016,pdf image,typewritten,ok,True,0.986755,0.982624,0.985337,171,170,3,2
 lightonocr3-4b,jpeg-75,p016,pdf image,typewritten,ok,True,0.986755,0.982624,0.985337,171,170,3,2
 lightonocr3-4b,jpeg-85,p016,pdf image,typewritten,ok,True,0.986755,0.982624,0.985337,171,170,3,2
-vision,raw,p016,pdf image,typewritten,ok,True,0.993348,0.989141,0.997067,171,170,1,0
+vision,raw,p016,pdf image,typewritten,ok,True,0.990022,0.980052,0.985337,171,170,3,2
 vision,resave-q92,p016,pdf image,typewritten,ok,True,0.952747,0.963338,0.96793,171,172,5,6
 vision,aug-ShadowCast,p016,pdf image,typewritten,ok,True,0.991131,0.984869,0.991202,171,170,2,1
 vision,aug-LightingGradient,p016,pdf image,typewritten,ok,True,0.991131,0.984869,0.991202,171,170,2,1
@@ -996,7 +996,7 @@ lightonocr3-4b,tilt-20,p017,original,typewritten,ok,True,0.980965,0.985669,0.987
 lightonocr3-4b,jpeg-60,p017,original,typewritten,ok,True,0.980965,0.985669,0.987179,237,231,6,0
 lightonocr3-4b,jpeg-75,p017,original,typewritten,ok,True,0.980965,0.985669,0.987179,237,231,6,0
 lightonocr3-4b,jpeg-85,p017,original,typewritten,ok,True,0.980965,0.985669,0.987179,237,231,6,0
-vision,raw,p017,original,typewritten,ok,True,0.987084,0.984039,0.978814,237,235,6,4
+vision,raw,p017,original,typewritten,ok,True,0.987763,0.981756,0.985138,237,234,5,2
 vision,resave-q92,p017,original,typewritten,ok,True,0.984364,0.980498,0.987234,237,233,5,1
 vision,aug-ShadowCast,p017,original,typewritten,ok,True,0.984364,0.980498,0.987234,237,233,5,1
 vision,aug-LightingGradient,p017,original,typewritten,ok,True,0.982325,0.977491,0.982979,237,233,6,2
@@ -1061,7 +1061,7 @@ lightonocr3-4b,tilt-20,p018,original,printed,ok,True,0.676669,0.794037,0.769912,
 lightonocr3-4b,jpeg-60,p018,original,printed,ok,True,0.658966,0.783239,0.775988,330,353,65,88
 lightonocr3-4b,jpeg-75,p018,original,printed,ok,True,0.657982,0.781225,0.77306,330,353,66,89
 lightonocr3-4b,jpeg-85,p018,original,printed,ok,True,0.677791,0.799002,0.774669,330,349,67,86
-vision,raw,p018,original,printed,ok,True,0.488085,0.563651,0.657293,330,239,143,52
+vision,raw,p018,original,printed,ok,True,0.450638,0.483131,0.611632,330,203,167,40
 vision,resave-q92,p018,original,printed,ok,True,0.438298,0.471889,0.608696,330,199,169,38
 vision,aug-ShadowCast,p018,original,printed,ok,True,0.443404,0.523372,0.641441,330,225,152,47
 vision,aug-LightingGradient,p018,original,printed,ok,True,0.400851,0.485275,0.634328,330,206,160,36
@@ -1115,7 +1115,7 @@ lightonocr3-4b,tilt-20,p019,pdf image,typewritten,ok,True,0.960619,0.953729,0.97
 lightonocr3-4b,jpeg-60,p019,pdf image,typewritten,ok,True,0.960619,0.953729,0.97561,125,121,5,1
 lightonocr3-4b,jpeg-75,p019,pdf image,typewritten,ok,True,0.960619,0.953729,0.97561,125,121,5,1
 lightonocr3-4b,jpeg-85,p019,pdf image,typewritten,ok,True,0.960619,0.953729,0.97561,125,121,5,1
-vision,raw,p019,pdf image,typewritten,ok,True,0.963432,0.955284,0.971888,125,124,4,3
+vision,raw,p019,pdf image,typewritten,ok,True,0.966245,0.959011,0.971888,125,124,4,3
 vision,resave-q92,p019,pdf image,typewritten,ok,True,0.962025,0.957866,0.971888,125,124,4,3
 vision,aug-ShadowCast,p019,pdf image,typewritten,ok,True,0.963432,0.958152,0.971888,125,124,4,3
 vision,aug-LightingGradient,p019,pdf image,typewritten,ok,True,0.971871,0.960567,0.97561,125,121,5,1
@@ -1180,7 +1180,7 @@ lightonocr3-4b,tilt-20,p020,original,typewritten,ok,True,0.975151,0.977205,0.994
 lightonocr3-4b,jpeg-60,p020,original,typewritten,ok,True,0.975151,0.977205,0.994371,266,267,1,2
 lightonocr3-4b,jpeg-75,p020,original,typewritten,ok,True,0.975151,0.977205,0.994371,266,267,1,2
 lightonocr3-4b,jpeg-85,p020,original,typewritten,ok,True,0.975151,0.977205,0.994371,266,267,1,2
-vision,raw,p020,original,typewritten,ok,True,0.838818,0.6754,0.662835,266,256,93,83
+vision,raw,p020,original,typewritten,ok,True,0.944258,0.844809,0.843284,266,270,40,44
 vision,resave-q92,p020,original,typewritten,ok,True,0.942243,0.831506,0.825516,266,267,46,47
 vision,aug-ShadowCast,p020,original,typewritten,ok,True,0.939557,0.825196,0.816479,266,268,48,50
 vision,aug-LightingGradient,p020,original,typewritten,ok,True,0.92411,0.807332,0.808271,266,266,51,51
@@ -1245,7 +1245,7 @@ lightonocr3-4b,tilt-20,p021,original,printed,ok,True,0.998532,0.99904,0.998661,3
 lightonocr3-4b,jpeg-60,p021,original,printed,ok,True,0.998532,0.99904,0.998661,374,373,1,0
 lightonocr3-4b,jpeg-75,p021,original,printed,ok,True,0.998532,0.99904,0.998661,374,373,1,0
 lightonocr3-4b,jpeg-85,p021,original,printed,ok,True,0.998532,0.99904,0.998661,374,373,1,0
-vision,raw,p021,original,printed,ok,True,0.999511,0.99802,0.997326,374,374,1,1
+vision,raw,p021,original,printed,ok,True,1.0,1.0,1.0,374,374,0,0
 vision,resave-q92,p021,original,printed,ok,True,0.999511,0.9979,0.997326,374,374,1,1
 vision,aug-ShadowCast,p021,original,printed,ok,True,0.999511,0.9979,0.997326,374,374,1,1
 vision,aug-LightingGradient,p021,original,printed,ok,True,1.0,1.0,1.0,374,374,0,0
@@ -1299,7 +1299,7 @@ lightonocr3-4b,tilt-20,p022,original,handwritten,ok,True,0.989024,0.978077,0.996
 lightonocr3-4b,jpeg-60,p022,original,handwritten,ok,True,0.986618,0.973891,0.996552,290,290,1,1
 lightonocr3-4b,jpeg-75,p022,original,handwritten,ok,True,0.987849,0.978816,0.996552,290,290,1,1
 lightonocr3-4b,jpeg-85,p022,original,handwritten,ok,True,0.986618,0.973891,0.996552,290,290,1,1
-vision,raw,p022,original,handwritten,ok,True,0.370098,0.391979,0.488889,290,115,191,16
+vision,raw,p022,original,handwritten,ok,True,0.402574,0.40129,0.5,290,126,186,22
 vision,resave-q92,p022,original,handwritten,ok,True,0.382966,0.386142,0.484108,290,119,191,20
 vision,aug-ShadowCast,p022,original,handwritten,ok,True,0.378064,0.373346,0.455882,290,118,197,25
 vision,aug-LightingGradient,p022,original,handwritten,ok,True,0.376225,0.379416,0.478261,290,124,191,25
@@ -1364,7 +1364,7 @@ lightonocr3-4b,tilt-20,p023,pdf image,typewritten,ok,True,0.987124,0.9836,0.9753
 lightonocr3-4b,jpeg-60,p023,pdf image,typewritten,ok,True,0.986409,0.983435,0.975369,204,202,6,4
 lightonocr3-4b,jpeg-75,p023,pdf image,typewritten,ok,True,0.98784,0.986379,0.982716,204,201,5,2
 lightonocr3-4b,jpeg-85,p023,pdf image,typewritten,ok,True,0.98784,0.986379,0.982716,204,201,5,2
-vision,raw,p023,pdf image,typewritten,ok,True,0.980687,0.941473,0.929095,204,205,14,15
+vision,raw,p023,pdf image,typewritten,ok,True,0.986409,0.960366,0.960784,204,204,8,8
 vision,resave-q92,p023,pdf image,typewritten,ok,True,0.987124,0.960785,0.955882,204,204,9,9
 vision,aug-ShadowCast,p023,pdf image,typewritten,ok,True,0.986409,0.959947,0.955882,204,204,9,9
 vision,aug-LightingGradient,p023,pdf image,typewritten,ok,True,0.984263,0.95719,0.953545,204,205,9,10
@@ -1418,7 +1418,7 @@ lightonocr3-4b,tilt-20,p024,original,typewritten,ok,True,0.444028,0.558034,0.385
 lightonocr3-4b,jpeg-60,p024,original,typewritten,ok,True,0.434853,0.572611,0.374233,143,183,82,122
 lightonocr3-4b,jpeg-75,p024,original,typewritten,ok,True,0.432052,0.566776,0.368098,143,183,83,123
 lightonocr3-4b,jpeg-85,p024,original,typewritten,ok,True,0.418351,0.553952,0.371517,143,180,83,120
-vision,raw,p024,original,typewritten,ok,True,0.502769,0.601712,0.741007,143,135,40,32
+vision,raw,p024,original,typewritten,ok,True,0.501661,0.636117,0.768683,143,138,35,30
 vision,resave-q92,p024,original,typewritten,ok,True,0.568106,0.643324,0.770318,143,140,34,31
 vision,aug-ShadowCast,p024,original,typewritten,ok,True,0.500554,0.647349,0.764912,143,142,34,33
 vision,aug-LightingGradient,p024,original,typewritten,ok,True,0.55371,0.65107,0.749117,143,140,37,34
@@ -1483,7 +1483,7 @@ lightonocr3-4b,tilt-20,p025,pdf image,typewritten,ok,True,0.273256,0.64819,0.433
 lightonocr3-4b,jpeg-60,p025,pdf image,typewritten,ok,True,0.272464,0.650256,0.429967,69,238,3,172
 lightonocr3-4b,jpeg-75,p025,pdf image,typewritten,ok,True,0.33112,0.692573,0.471429,69,211,3,145
 lightonocr3-4b,jpeg-85,p025,pdf image,typewritten,ok,True,0.303285,0.662394,0.445946,69,227,3,161
-vision,raw,p025,pdf image,typewritten,ok,True,0.858537,0.723825,0.705036,69,70,20,21
+vision,raw,p025,pdf image,typewritten,ok,True,0.881643,0.809154,0.794326,69,72,13,16
 vision,resave-q92,p025,pdf image,typewritten,ok,True,0.90709,0.850314,0.828571,69,71,11,13
 vision,aug-ShadowCast,p025,pdf image,typewritten,ok,True,0.904645,0.847303,0.828571,69,71,11,13
 vision,aug-LightingGradient,p025,pdf image,typewritten,ok,True,0.9,0.829214,0.808511,69,72,12,15
@@ -1537,7 +1537,7 @@ lightonocr3-4b,tilt-20,p026,original,typewritten,ok,True,0.994043,0.9925,1.0,426
 lightonocr3-4b,jpeg-60,p026,original,typewritten,ok,True,0.994043,0.9925,1.0,426,426,0,0
 lightonocr3-4b,jpeg-75,p026,original,typewritten,ok,True,0.994043,0.9925,1.0,426,426,0,0
 lightonocr3-4b,jpeg-85,p026,original,typewritten,ok,True,0.994043,0.9925,1.0,426,426,0,0
-vision,raw,p026,original,typewritten,ok,True,0.992182,0.986664,0.990588,426,424,5,3
+vision,raw,p026,original,typewritten,ok,True,0.994788,0.993149,0.997653,426,426,1,1
 vision,resave-q92,p026,original,typewritten,ok,True,0.994788,0.993149,0.997653,426,426,1,1
 vision,aug-ShadowCast,p026,original,typewritten,ok,True,0.994415,0.991595,0.997653,426,426,1,1
 vision,aug-LightingGradient,p026,original,typewritten,ok,True,0.994415,0.992335,0.997653,426,426,1,1
@@ -1591,7 +1591,7 @@ lightonocr3-4b,tilt-20,p027,pdf image,typewritten,ok,True,0.97138,0.984758,0.966
 lightonocr3-4b,jpeg-60,p027,pdf image,typewritten,ok,True,0.933333,0.978647,0.967033,222,233,2,13
 lightonocr3-4b,jpeg-75,p027,pdf image,typewritten,ok,True,0.933333,0.978647,0.967033,222,233,2,13
 lightonocr3-4b,jpeg-85,p027,pdf image,typewritten,ok,True,0.933333,0.978647,0.967033,222,233,2,13
-vision,raw,p027,pdf image,typewritten,ok,True,0.956343,0.989135,0.975717,222,231,1,10
+vision,raw,p027,pdf image,typewritten,ok,True,0.969167,0.990545,0.986667,222,228,0,6
 vision,resave-q92,p027,pdf image,typewritten,ok,True,0.969773,0.984114,0.982143,222,226,2,6
 vision,aug-ShadowCast,p027,pdf image,typewritten,ok,True,0.969773,0.984114,0.982143,222,226,2,6
 vision,aug-LightingGradient,p027,pdf image,typewritten,ok,True,0.986418,0.982879,0.982063,222,224,3,5
@@ -1645,7 +1645,7 @@ lightonocr3-4b,tilt-20,p028,pdf image,typewritten,ok,True,0.997643,0.993618,0.99
 lightonocr3-4b,jpeg-60,p028,pdf image,typewritten,ok,True,0.987431,0.987687,0.987531,202,199,4,1
 lightonocr3-4b,jpeg-75,p028,pdf image,typewritten,ok,True,0.987431,0.987687,0.987531,202,199,4,1
 lightonocr3-4b,jpeg-85,p028,pdf image,typewritten,ok,True,0.997643,0.993618,0.992556,202,201,2,1
-vision,raw,p028,pdf image,typewritten,ok,True,0.996072,0.990774,1.0,202,202,0,0
+vision,raw,p028,pdf image,typewritten,ok,True,0.999214,1.0,1.0,202,202,0,0
 vision,resave-q92,p028,pdf image,typewritten,ok,True,0.999214,1.0,1.0,202,202,0,0
 vision,aug-ShadowCast,p028,pdf image,typewritten,ok,True,0.999214,1.0,1.0,202,202,0,0
 vision,aug-LightingGradient,p028,pdf image,typewritten,ok,True,0.99686,0.995747,1.0,202,202,0,0
@@ -1753,7 +1753,7 @@ lightonocr3-4b,tilt-20,p030,original,typewritten,ok,True,0.986981,0.984098,0.972
 lightonocr3-4b,jpeg-60,p030,original,typewritten,ok,True,0.986981,0.984098,0.972376,275,268,11,4
 lightonocr3-4b,jpeg-75,p030,original,typewritten,ok,True,0.986981,0.984098,0.972376,275,268,11,4
 lightonocr3-4b,jpeg-85,p030,original,typewritten,ok,True,0.986981,0.984098,0.972376,275,268,11,4
-vision,raw,p030,original,typewritten,ok,True,0.935524,0.931257,0.942486,275,264,21,10
+vision,raw,p030,original,typewritten,ok,True,0.981401,0.98169,0.987203,275,272,5,2
 vision,resave-q92,p030,original,typewritten,ok,True,0.980781,0.979062,0.987203,275,272,5,2
 vision,aug-ShadowCast,p030,original,typewritten,ok,True,0.972102,0.961359,0.968807,275,270,11,6
 vision,aug-LightingGradient,p030,original,typewritten,ok,True,0.980161,0.977965,0.987156,275,270,6,1
@@ -1818,7 +1818,7 @@ lightonocr3-4b,tilt-20,p031,original,mixed,ok,True,0.802239,0.616833,0.989899,50
 lightonocr3-4b,jpeg-60,p031,original,mixed,ok,True,0.805054,0.62895,0.989899,50,49,1,0
 lightonocr3-4b,jpeg-75,p031,original,mixed,ok,True,0.802239,0.616833,0.989899,50,49,1,0
 lightonocr3-4b,jpeg-85,p031,original,mixed,ok,True,0.835165,0.643534,1.0,50,50,0,0
-vision,raw,p031,original,mixed,ok,True,0.891791,0.734974,0.742268,50,47,14,11
+vision,raw,p031,original,mixed,ok,True,0.841912,0.675938,0.647059,50,52,17,19
 vision,resave-q92,p031,original,mixed,ok,True,0.820144,0.650729,0.647059,50,52,17,19
 vision,aug-ShadowCast,p031,original,mixed,ok,True,0.817164,0.646277,0.693878,50,48,16,14
 vision,aug-LightingGradient,p031,original,mixed,ok,True,0.843284,0.7188,0.76,50,50,12,12
@@ -1872,7 +1872,7 @@ lightonocr3-4b,tilt-20,p032,original,typewritten,ok,True,0.99562,0.994773,0.9938
 lightonocr3-4b,jpeg-60,p032,original,typewritten,ok,True,0.99562,0.994773,0.993865,327,325,3,1
 lightonocr3-4b,jpeg-75,p032,original,typewritten,ok,True,0.99562,0.994773,0.993865,327,325,3,1
 lightonocr3-4b,jpeg-85,p032,original,typewritten,ok,True,0.99562,0.994773,0.993865,327,325,3,1
-vision,raw,p032,original,typewritten,ok,True,0.992214,0.988566,0.984709,327,327,5,5
+vision,raw,p032,original,typewritten,ok,True,0.987934,0.991695,0.983257,327,330,4,7
 vision,resave-q92,p032,original,typewritten,ok,True,0.9889,0.992293,0.983257,327,330,4,7
 vision,aug-ShadowCast,p032,original,typewritten,ok,True,0.988428,0.992063,0.983257,327,330,4,7
 vision,aug-LightingGradient,p032,original,typewritten,ok,True,0.988428,0.992159,0.983257,327,330,4,7
@@ -1937,7 +1937,7 @@ lightonocr3-4b,tilt-20,p033,original,typewritten,ok,True,0.992537,0.988432,0.970
 lightonocr3-4b,jpeg-60,p033,original,typewritten,ok,True,0.992537,0.988432,0.970297,406,402,14,10
 lightonocr3-4b,jpeg-75,p033,original,typewritten,ok,True,0.992537,0.988432,0.970297,406,402,14,10
 lightonocr3-4b,jpeg-85,p033,original,typewritten,ok,True,0.992537,0.988432,0.970297,406,402,14,10
-vision,raw,p033,original,typewritten,ok,True,0.991659,0.977511,0.967901,406,404,14,12
+vision,raw,p033,original,typewritten,ok,True,0.994293,0.982551,0.982801,406,408,6,8
 vision,resave-q92,p033,original,typewritten,ok,True,0.994732,0.984854,0.985258,406,408,5,7
 vision,aug-ShadowCast,p033,original,typewritten,ok,True,0.994293,0.98298,0.98155,406,407,7,8
 vision,aug-LightingGradient,p033,original,typewritten,ok,True,0.995171,0.985372,0.98155,406,407,7,8
@@ -2002,7 +2002,7 @@ lightonocr3-4b,tilt-20,p034,original,printed,ok,True,0.306358,0.34458,0.486486,2
 lightonocr3-4b,jpeg-60,p034,original,printed,ok,True,0.306358,0.34458,0.486486,28,9,19,0
 lightonocr3-4b,jpeg-75,p034,original,printed,ok,True,0.306358,0.34458,0.486486,28,9,19,0
 lightonocr3-4b,jpeg-85,p034,original,printed,ok,True,0.306358,0.34458,0.486486,28,9,19,0
-vision,raw,p034,original,printed,ok,True,0.601156,0.694536,0.653846,28,24,11,7
+vision,raw,p034,original,printed,ok,True,0.213873,0.721189,0.615385,28,24,12,8
 vision,resave-q92,p034,original,printed,ok,True,0.236994,0.739048,0.666667,28,23,11,6
 vision,aug-ShadowCast,p034,original,printed,ok,True,0.236994,0.739048,0.666667,28,23,11,6
 vision,aug-LightingGradient,p034,original,printed,ok,True,0.225434,0.716512,0.615385,28,24,12,8
@@ -2056,7 +2056,7 @@ lightonocr3-4b,tilt-20,p035,original,typewritten,ok,True,0.993076,0.990725,0.982
 lightonocr3-4b,jpeg-60,p035,original,typewritten,ok,True,0.993076,0.990725,0.982456,316,311,8,3
 lightonocr3-4b,jpeg-75,p035,original,typewritten,ok,True,0.993076,0.990725,0.982456,316,311,8,3
 lightonocr3-4b,jpeg-85,p035,original,typewritten,ok,True,0.993076,0.990725,0.982456,316,311,8,3
-vision,raw,p035,original,typewritten,ok,True,0.941726,0.975858,0.956386,316,326,9,19
+vision,raw,p035,original,typewritten,ok,True,0.948619,0.97913,0.967136,316,323,7,14
 vision,resave-q92,p035,original,typewritten,ok,True,0.949143,0.979267,0.967136,316,323,7,14
 vision,aug-ShadowCast,p035,original,typewritten,ok,True,0.947543,0.976911,0.9625,316,324,8,16
 vision,aug-LightingGradient,p035,original,typewritten,ok,True,0.948448,0.98225,0.973312,316,321,6,11
@@ -2110,7 +2110,7 @@ lightonocr3-4b,tilt-20,p036,original,typewritten,ok,True,0.991278,0.984027,0.978
 lightonocr3-4b,jpeg-60,p036,original,typewritten,ok,True,0.995639,0.991341,0.980237,382,377,10,5
 lightonocr3-4b,jpeg-75,p036,original,typewritten,ok,True,0.993022,0.990079,0.978892,382,376,11,5
 lightonocr3-4b,jpeg-85,p036,original,typewritten,ok,True,0.991278,0.984027,0.978892,382,376,11,5
-vision,raw,p036,original,typewritten,ok,True,0.953336,0.854209,0.827225,382,382,66,66
+vision,raw,p036,original,typewritten,ok,True,0.983864,0.940756,0.921466,382,382,30,30
 vision,resave-q92,p036,original,typewritten,ok,True,0.982992,0.939807,0.926702,382,382,28,28
 vision,aug-ShadowCast,p036,original,typewritten,ok,True,0.981683,0.938058,0.924084,382,382,29,29
 vision,aug-LightingGradient,p036,original,typewritten,ok,True,0.979939,0.930002,0.913613,382,382,33,33
@@ -2164,7 +2164,7 @@ lightonocr3-4b,tilt-20,p037,original,printed,ok,True,0.996238,0.99432,0.989141,5
 lightonocr3-4b,jpeg-60,p037,original,printed,ok,True,0.988155,0.985779,0.989141,508,505,7,4
 lightonocr3-4b,jpeg-75,p037,original,printed,ok,True,0.988155,0.985779,0.989141,508,505,7,4
 lightonocr3-4b,jpeg-85,p037,original,printed,ok,True,0.996238,0.99432,0.989141,508,505,7,4
-vision,raw,p037,original,printed,ok,True,0.99185,0.972468,0.970472,508,508,15,15
+vision,raw,p037,original,printed,ok,True,0.994357,0.982485,0.984252,508,508,8,8
 vision,resave-q92,p037,original,printed,ok,True,0.996238,0.988453,0.988189,508,508,6,6
 vision,aug-ShadowCast,p037,original,printed,ok,True,0.996552,0.988441,0.988189,508,508,6,6
 vision,aug-LightingGradient,p037,original,printed,ok,True,0.99279,0.983833,0.989163,508,507,6,5
@@ -2218,7 +2218,7 @@ lightonocr3-4b,tilt-20,p039,original,typewritten,ok,True,0.998303,0.998896,0.998
 lightonocr3-4b,jpeg-60,p039,original,typewritten,ok,True,0.998303,0.998896,0.99842,317,316,1,0
 lightonocr3-4b,jpeg-75,p039,original,typewritten,ok,True,0.998303,0.998896,0.99842,317,316,1,0
 lightonocr3-4b,jpeg-85,p039,original,typewritten,ok,True,0.998303,0.998896,0.99842,317,316,1,0
-vision,raw,p039,original,typewritten,ok,True,0.997172,0.992889,0.987342,317,315,5,3
+vision,raw,p039,original,typewritten,ok,True,0.996606,0.986466,0.990536,317,317,3,3
 vision,resave-q92,p039,original,typewritten,ok,True,0.997172,0.988329,0.993691,317,317,2,2
 vision,aug-ShadowCast,p039,original,typewritten,ok,True,0.996606,0.986048,0.990536,317,317,3,3
 vision,aug-LightingGradient,p039,original,typewritten,ok,True,0.997172,0.988329,0.993691,317,317,2,2
@@ -2272,7 +2272,7 @@ lightonocr3-4b,tilt-20,p040,original,handwritten,ok,True,0.973913,0.921393,0.947
 lightonocr3-4b,jpeg-60,p040,original,handwritten,ok,True,0.975,0.926188,0.953425,185,180,11,6
 lightonocr3-4b,jpeg-75,p040,original,handwritten,ok,True,0.975,0.926188,0.953425,185,180,11,6
 lightonocr3-4b,jpeg-85,p040,original,handwritten,ok,True,0.975,0.926188,0.953425,185,180,11,6
-vision,raw,p040,original,handwritten,ok,True,0.593478,0.480377,0.546624,185,126,100,41
+vision,raw,p040,original,handwritten,ok,True,0.553261,0.48646,0.533333,185,115,105,35
 vision,resave-q92,p040,original,handwritten,ok,True,0.527174,0.489864,0.535117,185,114,105,34
 vision,aug-ShadowCast,p040,original,handwritten,ok,True,0.494565,0.472406,0.518771,185,108,109,32
 vision,aug-LightingGradient,p040,original,handwritten,ok,True,0.527174,0.480788,0.532423,185,108,107,30
@@ -2326,7 +2326,7 @@ lightonocr3-4b,tilt-20,p041,original,typewritten,ok,True,0.990729,0.984435,0.980
 lightonocr3-4b,jpeg-60,p041,original,typewritten,ok,True,0.99115,0.986202,0.983051,385,382,8,5
 lightonocr3-4b,jpeg-75,p041,original,typewritten,ok,True,0.990308,0.983256,0.983051,385,382,8,5
 lightonocr3-4b,jpeg-85,p041,original,typewritten,ok,True,0.99115,0.986202,0.983051,385,382,8,5
-vision,raw,p041,original,typewritten,ok,True,0.960234,0.914597,0.891753,385,391,39,45
+vision,raw,p041,original,typewritten,ok,True,0.971766,0.942642,0.923476,385,386,29,30
 vision,resave-q92,p041,original,typewritten,ok,True,0.970923,0.945203,0.927461,385,387,27,29
 vision,aug-ShadowCast,p041,original,typewritten,ok,True,0.951117,0.917802,0.912647,385,382,35,32
 vision,aug-LightingGradient,p041,original,typewritten,ok,True,0.957016,0.923068,0.910995,385,379,37,31
@@ -2391,7 +2391,7 @@ lightonocr3-4b,tilt-20,p042,pdf image,printed,ok,True,0.989064,0.979817,0.951481
 lightonocr3-4b,jpeg-60,p042,pdf image,printed,ok,True,0.989064,0.98032,0.952741,804,783,48,27
 lightonocr3-4b,jpeg-75,p042,pdf image,printed,ok,True,0.988189,0.979457,0.952081,804,782,49,27
 lightonocr3-4b,jpeg-85,p042,pdf image,printed,ok,True,0.988189,0.979457,0.952081,804,782,49,27
-vision,raw,p042,pdf image,printed,ok,True,0.991251,0.971328,0.989421,804,803,9,8
+vision,raw,p042,pdf image,printed,ok,True,0.990157,0.979737,0.98375,804,796,17,9
 vision,resave-q92,p042,pdf image,printed,ok,True,0.98972,0.978084,0.98375,804,796,17,9
 vision,aug-ShadowCast,p042,pdf image,printed,ok,True,0.989283,0.976954,0.9825,804,796,18,10
 vision,aug-LightingGradient,p042,pdf image,printed,ok,True,0.987533,0.978428,0.985634,804,797,15,8
@@ -2456,7 +2456,7 @@ lightonocr3-4b,tilt-20,p043,pdf image,printed,ok,True,0.991718,0.986777,0.971014
 lightonocr3-4b,jpeg-60,p043,pdf image,printed,ok,True,0.991506,0.985501,0.969807,836,820,33,17
 lightonocr3-4b,jpeg-75,p043,pdf image,printed,ok,True,0.991506,0.985501,0.969807,836,820,33,17
 lightonocr3-4b,jpeg-85,p043,pdf image,printed,ok,True,0.991081,0.986433,0.971014,836,820,32,16
-vision,raw,p043,pdf image,printed,ok,True,0.270546,0.917801,0.991617,836,834,8,6
+vision,raw,p043,pdf image,printed,ok,True,0.993842,0.984668,0.986203,836,831,14,9
 vision,resave-q92,p043,pdf image,printed,ok,True,0.993842,0.983117,0.985612,836,832,14,10
 vision,aug-ShadowCast,p043,pdf image,printed,ok,True,0.993417,0.983712,0.989209,836,832,11,7
 vision,aug-LightingGradient,p043,pdf image,printed,ok,True,0.994266,0.984926,0.989209,836,832,11,7
@@ -2510,7 +2510,7 @@ lightonocr3-4b,tilt-20,p044,pdf image,printed,ok,True,0.98744,0.980303,0.964809,
 lightonocr3-4b,jpeg-60,p044,pdf image,printed,ok,True,0.987692,0.981123,0.964809,690,674,32,16
 lightonocr3-4b,jpeg-75,p044,pdf image,printed,ok,True,0.987692,0.981123,0.964809,690,674,32,16
 lightonocr3-4b,jpeg-85,p044,pdf image,printed,ok,True,0.987692,0.981123,0.964809,690,674,32,16
-vision,raw,p044,pdf image,printed,ok,True,0.695051,0.976612,0.997821,690,687,3,0
+vision,raw,p044,pdf image,printed,ok,True,0.990706,0.982938,0.988372,690,686,10,6
 vision,resave-q92,p044,pdf image,printed,ok,True,0.990706,0.98249,0.989826,690,686,9,5
 vision,aug-ShadowCast,p044,pdf image,printed,ok,True,0.989199,0.982273,0.988355,690,684,11,5
 vision,aug-LightingGradient,p044,pdf image,printed,ok,True,0.990706,0.982998,0.988372,690,686,10,6
@@ -2564,7 +2564,7 @@ lightonocr3-4b,tilt-20,p045,original,handwritten,ok,True,0.979695,0.960474,0.995
 lightonocr3-4b,jpeg-60,p045,original,handwritten,ok,True,0.996587,0.985545,1.0,113,113,0,0
 lightonocr3-4b,jpeg-75,p045,original,handwritten,ok,True,0.996587,0.985545,1.0,113,113,0,0
 lightonocr3-4b,jpeg-85,p045,original,handwritten,ok,True,0.996587,0.985545,1.0,113,113,0,0
-vision,raw,p045,original,handwritten,ok,True,0.848123,0.763281,0.769231,113,108,28,23
+vision,raw,p045,original,handwritten,ok,True,0.8157,0.674923,0.660633,113,108,40,35
 vision,resave-q92,p045,original,handwritten,ok,True,0.9046,0.791777,0.801762,113,114,22,23
 vision,aug-ShadowCast,p045,original,handwritten,ok,True,0.882253,0.722336,0.696035,113,114,34,35
 vision,aug-LightingGradient,p045,original,handwritten,ok,True,0.849829,0.741978,0.727273,113,107,33,27
@@ -2618,7 +2618,7 @@ lightonocr3-4b,tilt-20,p046,original,handwritten,ok,True,0.788955,0.856051,0.914
 lightonocr3-4b,jpeg-60,p046,original,handwritten,ok,True,0.854043,0.926105,0.934132,86,81,8,3
 lightonocr3-4b,jpeg-75,p046,original,handwritten,ok,True,0.854043,0.926105,0.934132,86,81,8,3
 lightonocr3-4b,jpeg-85,p046,original,handwritten,ok,True,0.779093,0.804019,0.842105,86,66,22,2
-vision,raw,p046,original,handwritten,ok,True,0.516765,0.403666,0.507042,86,56,50,20
+vision,raw,p046,original,handwritten,ok,True,0.727811,0.53365,0.52439,86,78,43,35
 vision,resave-q92,p046,original,handwritten,ok,True,0.733728,0.484083,0.428571,86,82,50,46
 vision,aug-ShadowCast,p046,original,handwritten,ok,True,0.717949,0.516862,0.487805,86,78,46,38
 vision,aug-LightingGradient,p046,original,handwritten,ok,True,0.729783,0.552036,0.552147,86,77,41,32
@@ -2672,7 +2672,7 @@ lightonocr3-4b,tilt-20,p047,original,handwritten,ok,True,0.883465,0.822964,0.926
 lightonocr3-4b,jpeg-60,p047,original,handwritten,ok,True,0.886614,0.82749,0.932039,106,100,10,4
 lightonocr3-4b,jpeg-75,p047,original,handwritten,ok,True,0.894488,0.85689,0.932039,106,100,10,4
 lightonocr3-4b,jpeg-85,p047,original,handwritten,ok,True,0.892913,0.8391,0.941748,106,100,9,3
-vision,raw,p047,original,handwritten,ok,True,0.27874,0.199923,0.115108,106,33,98,25
+vision,raw,p047,original,handwritten,ok,True,0.2,0.151969,0.153846,106,24,96,14
 vision,resave-q92,p047,original,handwritten,ok,True,0.198425,0.155368,0.137405,106,25,97,16
 vision,aug-ShadowCast,p047,original,handwritten,ok,True,0.2,0.156419,0.152672,106,25,96,15
 vision,aug-LightingGradient,p047,original,handwritten,ok,True,0.15748,0.082788,0.059259,106,29,102,25
@@ -2737,7 +2737,7 @@ lightonocr3-4b,tilt-20,p048,original,handwritten,ok,True,0.745721,0.792382,0.985
 lightonocr3-4b,jpeg-60,p048,original,handwritten,ok,True,0.746929,0.799794,0.985294,68,68,1,1
 lightonocr3-4b,jpeg-75,p048,original,handwritten,ok,True,0.745721,0.791891,0.985294,68,68,1,1
 lightonocr3-4b,jpeg-85,p048,original,handwritten,ok,True,0.745721,0.791891,0.985294,68,68,1,1
-vision,raw,p048,original,handwritten,ok,True,0.445008,0.466141,0.468571,68,107,27,66
+vision,raw,p048,original,handwritten,ok,True,0.478618,0.491875,0.49162,68,111,24,67
 vision,resave-q92,p048,original,handwritten,ok,True,0.474465,0.500971,0.502793,68,111,23,66
 vision,aug-ShadowCast,p048,original,handwritten,ok,True,0.476423,0.517612,0.511111,68,112,22,66
 vision,aug-LightingGradient,p048,original,handwritten,ok,True,0.470779,0.493654,0.488889,68,112,24,68
@@ -2791,7 +2791,7 @@ lightonocr3-4b,tilt-20,p049,original,handwritten,ok,True,0.826848,0.734498,0.831
 lightonocr3-4b,jpeg-60,p049,original,handwritten,ok,True,0.828794,0.747104,0.860606,85,80,14,9
 lightonocr3-4b,jpeg-75,p049,original,handwritten,ok,True,0.846304,0.765519,0.853659,85,79,15,9
 lightonocr3-4b,jpeg-85,p049,original,handwritten,ok,True,0.83237,0.749896,0.850299,85,82,14,11
-vision,raw,p049,original,handwritten,ok,True,0.326848,0.21465,0.145161,85,39,76,30
+vision,raw,p049,original,handwritten,ok,True,0.420233,0.259096,0.15942,85,53,74,42
 vision,resave-q92,p049,original,handwritten,ok,True,0.375486,0.235801,0.149254,85,49,75,39
 vision,aug-ShadowCast,p049,original,handwritten,ok,True,0.293774,0.193766,0.134454,85,34,77,26
 vision,aug-LightingGradient,p049,original,handwritten,ok,True,0.447471,0.25092,0.138889,85,59,75,49
@@ -2845,7 +2845,7 @@ lightonocr3-4b,tilt-20,p050,original,handwritten,ok,True,0.753215,0.734275,0.804
 lightonocr3-4b,jpeg-60,p050,original,handwritten,ok,True,0.728296,0.734004,0.810651,190,148,53,11
 lightonocr3-4b,jpeg-75,p050,original,handwritten,ok,True,0.720257,0.726039,0.804734,190,148,54,12
 lightonocr3-4b,jpeg-85,p050,original,handwritten,ok,True,0.736334,0.73837,0.811765,190,150,52,12
-vision,raw,p050,original,handwritten,ok,True,0.356913,0.23854,0.107383,190,108,174,92
+vision,raw,p050,original,handwritten,ok,True,0.336817,0.263436,0.186207,190,100,163,73
 vision,resave-q92,p050,original,handwritten,ok,True,0.348071,0.284088,0.245614,190,95,155,60
 vision,aug-ShadowCast,p050,original,handwritten,ok,True,0.385852,0.268269,0.171429,190,125,163,98
 vision,aug-LightingGradient,p050,original,handwritten,ok,True,0.282154,0.210332,0.156716,190,78,169,57
@@ -2910,7 +2910,7 @@ lightonocr3-4b,tilt-20,p051,original,handwritten,ok,True,0.956848,0.981695,0.946
 lightonocr3-4b,jpeg-60,p051,original,handwritten,ok,True,0.956685,0.975375,0.945652,91,93,4,6
 lightonocr3-4b,jpeg-75,p051,original,handwritten,ok,True,0.946097,0.975305,0.905263,91,99,5,13
 lightonocr3-4b,jpeg-85,p051,original,handwritten,ok,True,0.956685,0.975375,0.945652,91,93,4,6
-vision,raw,p051,original,handwritten,ok,True,0.773879,0.611872,0.527473,91,91,43,43
+vision,raw,p051,original,handwritten,ok,True,0.803846,0.649313,0.637838,91,94,32,35
 vision,resave-q92,p051,original,handwritten,ok,True,0.818356,0.68794,0.652406,91,96,30,35
 vision,aug-ShadowCast,p051,original,handwritten,ok,True,0.799235,0.650107,0.585106,91,97,36,42
 vision,aug-LightingGradient,p051,original,handwritten,ok,True,0.773879,0.663792,0.604396,91,91,36,36
@@ -2975,7 +2975,7 @@ lightonocr3-4b,tilt-20,p052,original,handwritten,ok,True,0.983133,0.955861,0.961
 lightonocr3-4b,jpeg-60,p052,original,handwritten,ok,True,0.984337,0.962512,0.970684,154,153,5,4
 lightonocr3-4b,jpeg-75,p052,original,handwritten,ok,True,0.981928,0.954837,0.964169,154,153,6,5
 lightonocr3-4b,jpeg-85,p052,original,handwritten,ok,True,0.944778,0.930752,0.954545,154,154,7,7
-vision,raw,p052,original,handwritten,ok,True,0.866104,0.692772,0.683871,154,156,48,50
+vision,raw,p052,original,handwritten,ok,True,0.86731,0.704304,0.700965,154,157,45,48
 vision,resave-q92,p052,original,handwritten,ok,True,0.870929,0.705692,0.700965,154,157,45,48
 vision,aug-ShadowCast,p052,original,handwritten,ok,True,0.875754,0.715387,0.711538,154,158,43,47
 vision,aug-LightingGradient,p052,original,handwritten,ok,True,0.880579,0.724665,0.717949,154,158,42,46
@@ -3040,7 +3040,7 @@ lightonocr3-4b,tilt-20,p053,original,handwritten,ok,True,0.950678,0.912639,0.937
 lightonocr3-4b,jpeg-60,p053,original,handwritten,ok,True,0.951911,0.917981,0.937705,151,154,8,11
 lightonocr3-4b,jpeg-75,p053,original,handwritten,ok,True,0.951911,0.918261,0.937705,151,154,8,11
 lightonocr3-4b,jpeg-85,p053,original,handwritten,ok,True,0.953144,0.918514,0.937705,151,154,8,11
-vision,raw,p053,original,handwritten,ok,True,0.750925,0.52393,0.52349,151,147,73,69
+vision,raw,p053,original,handwritten,ok,True,0.713933,0.457155,0.401338,151,148,91,88
 vision,resave-q92,p053,original,handwritten,ok,True,0.74476,0.509,0.535593,151,144,72,65
 vision,aug-ShadowCast,p053,original,handwritten,ok,True,0.755857,0.528799,0.549153,151,144,70,63
 vision,aug-LightingGradient,p053,original,handwritten,ok,True,0.763255,0.520047,0.508475,151,144,76,69
@@ -3094,7 +3094,7 @@ lightonocr3-4b,tilt-20,p054,original,handwritten,ok,True,0.853457,0.761911,0.864
 lightonocr3-4b,jpeg-60,p054,original,handwritten,ok,True,0.78225,0.620653,0.829268,146,141,27,22
 lightonocr3-4b,jpeg-75,p054,original,handwritten,ok,True,0.726522,0.518269,0.83045,146,143,26,23
 lightonocr3-4b,jpeg-85,p054,original,handwritten,ok,True,0.822497,0.744956,0.8223,146,141,28,23
-vision,raw,p054,original,handwritten,ok,True,0.425181,0.253857,0.143939,146,118,127,99
+vision,raw,p054,original,handwritten,ok,True,0.454076,0.256405,0.139706,146,126,127,107
 vision,resave-q92,p054,original,handwritten,ok,True,0.325077,0.226761,0.20354,146,80,123,57
 vision,aug-ShadowCast,p054,original,handwritten,ok,True,0.364293,0.215711,0.154472,146,100,127,81
 vision,aug-LightingGradient,p054,original,handwritten,ok,True,0.373581,0.217702,0.134387,146,107,129,90
@@ -3159,7 +3159,7 @@ lightonocr3-4b,tilt-20,p055,original,handwritten,ok,True,0.971429,0.963801,0.960
 lightonocr3-4b,jpeg-60,p055,original,handwritten,ok,True,0.969524,0.957978,0.949153,90,87,6,3
 lightonocr3-4b,jpeg-75,p055,original,handwritten,ok,True,0.969524,0.957978,0.949153,90,87,6,3
 lightonocr3-4b,jpeg-85,p055,original,handwritten,ok,True,0.971429,0.963801,0.960452,90,87,5,2
-vision,raw,p055,original,handwritten,ok,True,0.755639,0.598515,0.536842,90,100,39,49
+vision,raw,p055,original,handwritten,ok,True,0.769811,0.607378,0.569892,90,96,37,43
 vision,resave-q92,p055,original,handwritten,ok,True,0.779661,0.601942,0.534759,90,97,40,47
 vision,aug-ShadowCast,p055,original,handwritten,ok,True,0.789869,0.631203,0.588235,90,97,35,42
 vision,aug-LightingGradient,p055,original,handwritten,ok,True,0.769663,0.617936,0.539683,90,99,39,48
@@ -3213,7 +3213,7 @@ lightonocr3-4b,tilt-20,p056,original,handwritten,ok,True,0.92876,0.87186,0.88888
 lightonocr3-4b,jpeg-60,p056,original,handwritten,ok,True,0.923483,0.876977,0.916667,132,132,11,11
 lightonocr3-4b,jpeg-75,p056,original,handwritten,ok,True,0.94591,0.900996,0.931818,132,132,9,9
 lightonocr3-4b,jpeg-85,p056,original,handwritten,ok,True,0.924802,0.881582,0.916667,132,132,11,11
-vision,raw,p056,original,handwritten,ok,True,0.680739,0.492113,0.449799,132,117,76,61
+vision,raw,p056,original,handwritten,ok,True,0.675462,0.451115,0.366534,132,119,86,73
 vision,resave-q92,p056,original,handwritten,ok,True,0.654354,0.443316,0.367347,132,113,87,68
 vision,aug-ShadowCast,p056,original,handwritten,ok,True,0.66095,0.449874,0.395161,132,116,83,67
 vision,aug-LightingGradient,p056,original,handwritten,ok,True,0.689974,0.462997,0.382812,132,124,83,75
@@ -3267,7 +3267,7 @@ lightonocr3-4b,tilt-20,p057,original,typewritten,ok,True,0.337591,0.358802,0.113
 lightonocr3-4b,jpeg-60,p057,original,typewritten,ok,True,0.337591,0.358802,0.113636,77,99,67,89
 lightonocr3-4b,jpeg-75,p057,original,typewritten,ok,True,0.337591,0.358802,0.113636,77,99,67,89
 lightonocr3-4b,jpeg-85,p057,original,typewritten,ok,True,0.337591,0.358802,0.113636,77,99,67,89
-vision,raw,p057,original,typewritten,ok,True,0.241117,0.549058,0.961039,77,77,3,3
+vision,raw,p057,original,typewritten,ok,True,0.233503,0.545344,0.96732,77,76,3,2
 vision,resave-q92,p057,original,typewritten,ok,True,0.236041,0.549577,0.96732,77,76,3,2
 vision,aug-ShadowCast,p057,original,typewritten,ok,True,0.230964,0.544492,0.961039,77,77,3,3
 vision,aug-LightingGradient,p057,original,typewritten,ok,True,0.256345,0.533631,0.934211,77,75,6,4
@@ -3321,7 +3321,7 @@ lightonocr3-4b,tilt-20,p058,pdf image,printed,ok,True,0.889908,0.942199,0.865625
 lightonocr3-4b,jpeg-60,p058,pdf image,printed,ok,True,0.883817,0.935264,0.858491,315,321,42,48
 lightonocr3-4b,jpeg-75,p058,pdf image,printed,ok,True,0.889908,0.942199,0.865625,315,325,38,48
 lightonocr3-4b,jpeg-85,p058,pdf image,printed,ok,True,0.883817,0.935264,0.858491,315,321,42,48
-vision,raw,p058,pdf image,printed,ok,True,0.927273,0.970949,0.982622,315,318,4,7
+vision,raw,p058,pdf image,printed,ok,True,0.875116,0.975042,0.982622,315,318,4,7
 vision,resave-q92,p058,pdf image,printed,ok,True,0.926306,0.971146,0.982622,315,318,4,7
 vision,aug-ShadowCast,p058,pdf image,printed,ok,True,0.931469,0.97378,0.985782,315,318,3,6
 vision,aug-LightingGradient,p058,pdf image,printed,ok,True,0.874126,0.972683,0.979463,315,318,5,8
@@ -3375,7 +3375,7 @@ lightonocr3-4b,tilt-20,p059,original,typewritten,ok,True,0.994915,0.996715,0.995
 lightonocr3-4b,jpeg-60,p059,original,typewritten,ok,True,0.994915,0.996715,0.995025,101,100,1,0
 lightonocr3-4b,jpeg-75,p059,original,typewritten,ok,True,0.994915,0.996715,0.995025,101,100,1,0
 lightonocr3-4b,jpeg-85,p059,original,typewritten,ok,True,0.994915,0.996715,0.995025,101,100,1,0
-vision,raw,p059,original,typewritten,ok,True,1.0,1.0,1.0,101,101,0,0
+vision,raw,p059,original,typewritten,ok,True,0.994915,0.996715,0.995025,101,100,1,0
 vision,resave-q92,p059,original,typewritten,ok,True,0.994915,0.996715,0.995025,101,100,1,0
 vision,aug-ShadowCast,p059,original,typewritten,ok,True,1.0,1.0,1.0,101,101,0,0
 vision,aug-LightingGradient,p059,original,typewritten,ok,True,0.994915,0.996715,0.995025,101,100,1,0
@@ -3429,7 +3429,7 @@ lightonocr3-4b,tilt-20,p060,original,typewritten,ok,True,1.0,1.0,1.0,211,211,0,0
 lightonocr3-4b,jpeg-60,p060,original,typewritten,ok,True,1.0,1.0,1.0,211,211,0,0
 lightonocr3-4b,jpeg-75,p060,original,typewritten,ok,True,1.0,1.0,1.0,211,211,0,0
 lightonocr3-4b,jpeg-85,p060,original,typewritten,ok,True,1.0,1.0,1.0,211,211,0,0
-vision,raw,p060,original,typewritten,ok,True,0.985737,0.976018,0.985646,211,207,5,1
+vision,raw,p060,original,typewritten,ok,True,0.993661,0.981149,1.0,211,211,0,0
 vision,resave-q92,p060,original,typewritten,ok,True,0.995246,0.986899,1.0,211,211,0,0
 vision,aug-ShadowCast,p060,original,typewritten,ok,True,0.993661,0.98214,1.0,211,211,0,0
 vision,aug-LightingGradient,p060,original,typewritten,ok,True,0.990491,0.975799,0.997625,211,210,1,0
@@ -3483,7 +3483,7 @@ lightonocr3-4b,tilt-20,p061,pdf image,printed,ok,True,0.993674,0.993626,0.993532
 lightonocr3-4b,jpeg-60,p061,pdf image,printed,ok,True,0.994125,0.992671,0.996129,388,387,2,1
 lightonocr3-4b,jpeg-75,p061,pdf image,printed,ok,True,0.994125,0.992671,0.996129,388,387,2,1
 lightonocr3-4b,jpeg-85,p061,pdf image,printed,ok,True,0.994125,0.992671,0.996129,388,387,2,1
-vision,raw,p061,pdf image,printed,ok,True,0.997469,0.990841,0.989691,388,388,4,4
+vision,raw,p061,pdf image,printed,ok,True,0.997469,0.992191,0.992268,388,388,3,3
 vision,resave-q92,p061,pdf image,printed,ok,True,0.994939,0.993217,0.994832,388,386,3,1
 vision,aug-ShadowCast,p061,pdf image,printed,ok,True,0.993674,0.991344,0.992248,388,386,4,2
 vision,aug-LightingGradient,p061,pdf image,printed,ok,True,0.994939,0.993217,0.994832,388,386,3,1
@@ -3537,7 +3537,7 @@ lightonocr3-4b,tilt-20,p062,pdf image,printed,ok,True,0.964431,0.963512,0.962121
 lightonocr3-4b,jpeg-60,p062,pdf image,printed,ok,True,0.96173,0.962191,0.962121,535,521,27,13
 lightonocr3-4b,jpeg-75,p062,pdf image,printed,ok,True,0.96173,0.962191,0.962121,535,521,27,13
 lightonocr3-4b,jpeg-85,p062,pdf image,printed,ok,True,0.96173,0.962191,0.962121,535,521,27,13
-vision,raw,p062,pdf image,printed,ok,True,0.482522,0.944711,0.973485,535,521,21,7
+vision,raw,p062,pdf image,printed,ok,True,0.954432,0.948007,0.971591,535,521,22,8
 vision,resave-q92,p062,pdf image,printed,ok,True,0.954744,0.947304,0.971591,535,521,22,8
 vision,aug-ShadowCast,p062,pdf image,printed,ok,True,0.956305,0.948468,0.970672,535,522,22,9
 vision,aug-LightingGradient,p062,pdf image,printed,ok,True,0.953184,0.946943,0.970616,535,520,23,8
@@ -3602,7 +3602,7 @@ lightonocr3-4b,tilt-20,p063,pdf image,printed,ok,True,0.996488,0.994294,0.99915,
 lightonocr3-4b,jpeg-60,p063,pdf image,printed,ok,True,0.996219,0.992494,0.997451,589,588,2,1
 lightonocr3-4b,jpeg-75,p063,pdf image,printed,ok,True,0.997302,0.994071,1.0,589,589,0,0
 lightonocr3-4b,jpeg-85,p063,pdf image,printed,ok,True,0.997302,0.994071,1.0,589,589,0,0
-vision,raw,p063,pdf image,printed,ok,True,0.999459,0.997812,1.0,589,589,0,0
+vision,raw,p063,pdf image,printed,ok,True,0.997567,0.992661,0.993209,589,589,4,4
 vision,resave-q92,p063,pdf image,printed,ok,True,0.997837,0.99324,0.994907,589,589,3,3
 vision,aug-ShadowCast,p063,pdf image,printed,ok,True,0.997567,0.993787,0.992353,589,588,5,4
 vision,aug-LightingGradient,p063,pdf image,printed,ok,True,0.99216,0.990366,0.994898,589,587,4,2
@@ -3667,7 +3667,7 @@ lightonocr3-4b,tilt-20,p064,original,typewritten,ok,True,0.424266,0.80836,0.5704
 lightonocr3-4b,jpeg-60,p064,original,typewritten,ok,True,0.424266,0.80836,0.570423,129,155,48,74
 lightonocr3-4b,jpeg-75,p064,original,typewritten,ok,True,0.424266,0.80836,0.570423,129,155,48,74
 lightonocr3-4b,jpeg-85,p064,original,typewritten,ok,True,0.424266,0.80836,0.570423,129,155,48,74
-vision,raw,p064,original,typewritten,ok,True,0.998861,0.995082,0.992248,129,129,1,1
+vision,raw,p064,original,typewritten,ok,True,0.996583,0.986653,0.976744,129,129,3,3
 vision,resave-q92,p064,original,typewritten,ok,True,0.994305,0.985953,0.976744,129,129,3,3
 vision,aug-ShadowCast,p064,original,typewritten,ok,True,0.996583,0.986653,0.976744,129,129,3,3
 vision,aug-LightingGradient,p064,original,typewritten,ok,True,0.994305,0.985953,0.976744,129,129,3,3
@@ -3732,7 +3732,7 @@ lightonocr3-4b,tilt-20,p065,original,printed,ok,True,0.414523,0.585059,0.283582,
 lightonocr3-4b,jpeg-60,p065,original,printed,ok,True,0.414523,0.585059,0.283582,58,76,39,57
 lightonocr3-4b,jpeg-75,p065,original,printed,ok,True,0.414523,0.585059,0.283582,58,76,39,57
 lightonocr3-4b,jpeg-85,p065,original,printed,ok,True,0.414523,0.585059,0.283582,58,76,39,57
-vision,raw,p065,original,printed,ok,True,0.435045,0.801344,0.921739,58,57,5,4
+vision,raw,p065,original,printed,ok,True,0.305136,0.79165,0.93913,58,57,4,3
 vision,resave-q92,p065,original,printed,ok,True,0.305136,0.797333,0.93913,58,57,4,3
 vision,aug-ShadowCast,p065,original,printed,ok,True,0.407855,0.793619,0.940171,58,59,3,4
 vision,aug-LightingGradient,p065,original,printed,ok,True,0.413897,0.803764,0.948276,58,58,3,3
@@ -3797,7 +3797,7 @@ lightonocr3-4b,tilt-20,p066,original,typewritten,ok,True,0.402027,0.565259,0.444
 lightonocr3-4b,jpeg-60,p066,original,typewritten,ok,True,0.377778,0.572174,0.466165,69,64,38,33
 lightonocr3-4b,jpeg-75,p066,original,typewritten,ok,True,0.320755,0.539292,0.395062,69,93,37,61
 lightonocr3-4b,jpeg-85,p066,original,typewritten,ok,True,0.246556,0.482615,0.30137,69,150,36,117
-vision,raw,p066,original,typewritten,ok,True,0.638202,0.796364,0.937063,69,74,2,7
+vision,raw,p066,original,typewritten,ok,True,0.644796,0.80538,0.971831,69,73,0,4
 vision,resave-q92,p066,original,typewritten,ok,True,0.641892,0.804462,0.971831,69,73,0,4
 vision,aug-ShadowCast,p066,original,typewritten,ok,True,0.643341,0.804921,0.971831,69,73,0,4
 vision,aug-LightingGradient,p066,original,typewritten,ok,True,0.644796,0.804906,0.971831,69,73,0,4
@@ -3851,7 +3851,7 @@ lightonocr3-4b,tilt-20,p067,pdf image,printed,ok,True,0.891122,0.901873,1.0,79,7
 lightonocr3-4b,jpeg-60,p067,pdf image,printed,ok,True,0.891122,0.901873,1.0,79,79,0,0
 lightonocr3-4b,jpeg-75,p067,pdf image,printed,ok,True,0.891122,0.901873,1.0,79,79,0,0
 lightonocr3-4b,jpeg-85,p067,pdf image,printed,ok,True,0.891122,0.901873,1.0,79,79,0,0
-vision,raw,p067,pdf image,printed,ok,True,0.990602,0.977724,1.0,79,79,0,0
+vision,raw,p067,pdf image,printed,ok,True,0.988722,0.969923,1.0,79,79,0,0
 vision,resave-q92,p067,pdf image,printed,ok,True,0.988722,0.969923,1.0,79,79,0,0
 vision,aug-ShadowCast,p067,pdf image,printed,ok,True,0.990602,0.977724,1.0,79,79,0,0
 vision,aug-LightingGradient,p067,pdf image,printed,ok,True,0.990602,0.970292,1.0,79,79,0,0
@@ -3916,7 +3916,7 @@ lightonocr3-4b,tilt-20,p068,original,typewritten,ok,True,0.993084,0.983901,0.984
 lightonocr3-4b,jpeg-60,p068,original,typewritten,ok,True,0.993084,0.983901,0.984802,333,325,9,1
 lightonocr3-4b,jpeg-75,p068,original,typewritten,ok,True,0.993084,0.983901,0.984802,333,325,9,1
 lightonocr3-4b,jpeg-85,p068,original,typewritten,ok,True,0.993084,0.983901,0.984802,333,325,9,1
-vision,raw,p068,original,typewritten,ok,True,0.988474,0.979412,0.987842,333,325,8,0
+vision,raw,p068,original,typewritten,ok,True,0.988935,0.98259,0.986343,333,326,8,1
 vision,resave-q92,p068,original,typewritten,ok,True,0.988935,0.98259,0.986343,333,326,8,1
 vision,aug-ShadowCast,p068,original,typewritten,ok,True,0.988935,0.98259,0.986343,333,326,8,1
 vision,aug-LightingGradient,p068,original,typewritten,ok,True,0.988474,0.980872,0.986343,333,326,8,1
@@ -3970,7 +3970,7 @@ lightonocr3-4b,tilt-20,p069,original,typewritten,ok,True,0.992556,0.991558,0.984
 lightonocr3-4b,jpeg-60,p069,original,typewritten,ok,True,0.986352,0.965627,0.963855,128,121,8,1
 lightonocr3-4b,jpeg-75,p069,original,typewritten,ok,True,0.986352,0.965627,0.963855,128,121,8,1
 lightonocr3-4b,jpeg-85,p069,original,typewritten,ok,True,0.986352,0.965627,0.963855,128,121,8,1
-vision,raw,p069,original,typewritten,ok,True,0.893905,0.956384,0.921348,128,139,5,16
+vision,raw,p069,original,typewritten,ok,True,0.838284,0.951868,0.919118,128,144,3,19
 vision,resave-q92,p069,original,typewritten,ok,True,0.836264,0.946544,0.919118,128,144,3,19
 vision,aug-ShadowCast,p069,original,typewritten,ok,True,0.838106,0.94709,0.919118,128,144,3,19
 vision,aug-LightingGradient,p069,original,typewritten,ok,True,0.875551,0.9647,0.923077,128,145,2,19
@@ -4035,7 +4035,7 @@ lightonocr3-4b,tilt-20,p070,original,typewritten,ok,True,0.993552,0.994766,0.995
 lightonocr3-4b,jpeg-60,p070,original,typewritten,ok,True,0.975502,0.981263,0.99239,330,327,4,1
 lightonocr3-4b,jpeg-75,p070,original,typewritten,ok,True,0.975502,0.981263,0.99239,330,327,4,1
 lightonocr3-4b,jpeg-85,p070,original,typewritten,ok,True,0.993552,0.994766,0.995448,330,329,2,1
-vision,raw,p070,original,typewritten,ok,True,0.985119,0.986688,0.993939,330,330,2,2
+vision,raw,p070,original,typewritten,ok,True,0.987103,0.987343,0.990909,330,330,3,3
 vision,resave-q92,p070,original,typewritten,ok,True,0.987599,0.989423,0.992436,330,331,2,3
 vision,aug-ShadowCast,p070,original,typewritten,ok,True,0.987599,0.989423,0.992436,330,331,2,3
 vision,aug-LightingGradient,p070,original,typewritten,ok,True,0.987103,0.987343,0.990909,330,330,3,3
@@ -4089,7 +4089,7 @@ lightonocr3-4b,tilt-20,p071,original,typewritten,ok,True,0.992903,0.99346,0.9962
 lightonocr3-4b,jpeg-60,p071,original,typewritten,ok,True,0.992903,0.99346,0.996205,529,525,4,0
 lightonocr3-4b,jpeg-75,p071,original,typewritten,ok,True,0.992903,0.99346,0.996205,529,525,4,0
 lightonocr3-4b,jpeg-85,p071,original,typewritten,ok,True,0.992903,0.99346,0.996205,529,525,4,0
-vision,raw,p071,original,typewritten,ok,True,0.986732,0.990267,0.989593,529,528,6,5
+vision,raw,p071,original,typewritten,ok,True,0.985855,0.99244,0.997167,529,530,1,2
 vision,resave-q92,p071,original,typewritten,ok,True,0.985855,0.99244,0.997167,529,530,1,2
 vision,aug-ShadowCast,p071,original,typewritten,ok,True,0.985855,0.99244,0.997167,529,530,1,2
 vision,aug-LightingGradient,p071,original,typewritten,ok,True,0.984644,0.99222,0.996226,529,531,1,3
@@ -4154,7 +4154,7 @@ lightonocr3-4b,tilt-20,p072,original,printed,ok,True,0.974055,0.959162,0.922265,
 lightonocr3-4b,jpeg-60,p072,original,printed,ok,True,0.974055,0.959162,0.922265,1071,1013,110,52
 lightonocr3-4b,jpeg-75,p072,original,printed,ok,True,0.979454,0.964465,0.92433,1071,1017,106,52
 lightonocr3-4b,jpeg-85,p072,original,printed,ok,True,0.979454,0.964465,0.92433,1071,1017,106,52
-vision,raw,p072,original,printed,ok,True,0.963707,0.957075,0.982555,1071,1050,29,8
+vision,raw,p072,original,printed,ok,True,0.985903,0.976136,0.993917,1071,1066,9,4
 vision,resave-q92,p072,original,printed,ok,True,0.985753,0.975827,0.992981,1071,1066,10,5
 vision,aug-ShadowCast,p072,original,printed,ok,True,0.989952,0.976748,0.994398,1071,1071,6,6
 vision,aug-LightingGradient,p072,original,printed,ok,True,0.973155,0.957248,0.984962,1071,1057,23,9
@@ -4219,7 +4219,7 @@ lightonocr3-4b,tilt-20,p073,pdf image,printed,ok,True,0.866559,0.880182,1.0,81,8
 lightonocr3-4b,jpeg-60,p073,pdf image,printed,ok,True,0.866559,0.880182,1.0,81,81,0,0
 lightonocr3-4b,jpeg-75,p073,pdf image,printed,ok,True,0.866559,0.880182,1.0,81,81,0,0
 lightonocr3-4b,jpeg-85,p073,pdf image,printed,ok,True,0.866559,0.880182,1.0,81,81,0,0
-vision,raw,p073,pdf image,printed,ok,True,0.805195,0.942778,1.0,81,81,0,0
+vision,raw,p073,pdf image,printed,ok,True,0.87013,0.960389,1.0,81,81,0,0
 vision,resave-q92,p073,pdf image,printed,ok,True,0.87013,0.966984,1.0,81,81,0,0
 vision,aug-ShadowCast,p073,pdf image,printed,ok,True,0.87013,0.966984,1.0,81,81,0,0
 vision,aug-LightingGradient,p073,pdf image,printed,ok,True,0.883117,0.959286,1.0,81,81,0,0
@@ -4273,7 +4273,7 @@ lightonocr3-4b,tilt-20,p074,original,printed,ok,True,0.955684,0.952162,0.975057,
 lightonocr3-4b,jpeg-60,p074,original,printed,ok,True,0.955684,0.952162,0.975057,448,434,18,4
 lightonocr3-4b,jpeg-75,p074,original,printed,ok,True,0.97264,0.96289,0.98427,448,442,10,4
 lightonocr3-4b,jpeg-85,p074,original,printed,ok,True,0.97264,0.96289,0.98427,448,442,10,4
-vision,raw,p074,original,printed,ok,True,0.97499,0.966724,0.995546,448,450,1,3
+vision,raw,p074,original,printed,ok,True,0.979191,0.971048,0.996648,448,447,2,1
 vision,resave-q92,p074,original,printed,ok,True,0.979191,0.971048,0.996648,448,447,2,1
 vision,aug-ShadowCast,p074,original,printed,ok,True,0.978805,0.969416,0.994413,448,447,3,2
 vision,aug-LightingGradient,p074,original,printed,ok,True,0.979191,0.971048,0.996648,448,447,2,1
@@ -4338,7 +4338,7 @@ lightonocr3-4b,tilt-20,p075,pdf image,printed,ok,True,0.869592,0.878879,0.904863
 lightonocr3-4b,jpeg-60,p075,pdf image,printed,ok,True,0.870828,0.879141,0.904863,252,221,38,7
 lightonocr3-4b,jpeg-75,p075,pdf image,printed,ok,True,0.870828,0.879141,0.904863,252,221,38,7
 lightonocr3-4b,jpeg-85,p075,pdf image,printed,ok,True,0.870828,0.879141,0.904863,252,221,38,7
-vision,raw,p075,pdf image,printed,ok,True,0.946396,0.836835,0.824701,252,250,45,43
+vision,raw,p075,pdf image,printed,ok,True,0.960445,0.879406,0.880478,252,250,31,29
 vision,resave-q92,p075,pdf image,printed,ok,True,0.961063,0.880751,0.880478,252,250,31,29
 vision,aug-ShadowCast,p075,pdf image,printed,ok,True,0.960445,0.878053,0.876494,252,250,32,30
 vision,aug-LightingGradient,p075,pdf image,printed,ok,True,0.962917,0.88676,0.874751,252,251,32,31
@@ -4403,7 +4403,7 @@ lightonocr3-4b,tilt-20,p076,pdf image,typewritten,ok,True,0.934247,0.981832,0.96
 lightonocr3-4b,jpeg-60,p076,pdf image,typewritten,ok,True,0.935528,0.983272,0.961816,470,499,4,33
 lightonocr3-4b,jpeg-75,p076,pdf image,typewritten,ok,True,0.935528,0.983272,0.961816,470,499,4,33
 lightonocr3-4b,jpeg-85,p076,pdf image,typewritten,ok,True,0.935528,0.983272,0.961816,470,499,4,33
-vision,raw,p076,pdf image,typewritten,ok,True,0.875224,0.929455,0.938819,470,478,25,33
+vision,raw,p076,pdf image,typewritten,ok,True,0.830853,0.905605,0.909478,470,469,43,42
 vision,resave-q92,p076,pdf image,typewritten,ok,True,0.832305,0.911595,0.914894,470,470,40,40
 vision,aug-ShadowCast,p076,pdf image,typewritten,ok,True,0.810154,0.905882,0.90562,470,473,43,46
 vision,aug-LightingGradient,p076,pdf image,typewritten,ok,True,0.803807,0.903638,0.908306,470,457,49,36
@@ -4468,7 +4468,7 @@ lightonocr3-4b,tilt-20,p077,pdf image,typewritten,ok,True,0.950801,0.947652,0.96
 lightonocr3-4b,jpeg-60,p077,pdf image,typewritten,ok,True,0.970252,0.968904,0.987382,321,313,8,0
 lightonocr3-4b,jpeg-75,p077,pdf image,typewritten,ok,True,0.953089,0.954632,0.960128,321,306,20,5
 lightonocr3-4b,jpeg-85,p077,pdf image,typewritten,ok,True,0.951373,0.952655,0.960128,321,306,20,5
-vision,raw,p077,pdf image,typewritten,ok,True,0.971968,0.953269,0.959248,321,317,15,11
+vision,raw,p077,pdf image,typewritten,ok,True,0.971396,0.957504,0.965517,321,317,13,9
 vision,resave-q92,p077,pdf image,typewritten,ok,True,0.965675,0.955572,0.973312,321,316,11,6
 vision,aug-ShadowCast,p077,pdf image,typewritten,ok,True,0.973684,0.957778,0.973312,321,316,11,6
 vision,aug-LightingGradient,p077,pdf image,typewritten,ok,True,0.976545,0.958607,0.9625,321,319,13,11
@@ -4522,7 +4522,7 @@ lightonocr3-4b,tilt-20,p078,original,printed,ok,True,0.79392,0.978186,0.951435,9
 lightonocr3-4b,jpeg-60,p078,original,printed,ok,True,0.79461,0.978025,0.953744,922,894,56,28
 lightonocr3-4b,jpeg-75,p078,original,printed,ok,True,0.795992,0.979843,0.953744,922,894,56,28
 lightonocr3-4b,jpeg-85,p078,original,printed,ok,True,0.79461,0.971437,0.953744,922,894,56,28
-vision,raw,p078,original,printed,ok,True,0.988945,0.988235,0.998372,922,921,2,1
+vision,raw,p078,original,printed,ok,True,0.988254,0.987916,0.999457,922,921,1,0
 vision,resave-q92,p078,original,printed,ok,True,0.988254,0.987875,0.999457,922,921,1,0
 vision,aug-ShadowCast,p078,original,printed,ok,True,0.984971,0.984552,0.99837,922,919,3,0
 vision,aug-LightingGradient,p078,original,printed,ok,True,0.987908,0.986099,0.998372,922,921,2,1
@@ -4587,7 +4587,7 @@ lightonocr3-4b,tilt-20,p079,original,typewritten,ok,True,0.997356,0.996965,0.992
 lightonocr3-4b,jpeg-60,p079,original,typewritten,ok,True,0.997356,0.996965,0.992674,274,272,3,1
 lightonocr3-4b,jpeg-75,p079,original,typewritten,ok,True,0.997356,0.996965,0.992674,274,272,3,1
 lightonocr3-4b,jpeg-85,p079,original,typewritten,ok,True,0.997356,0.996965,0.992674,274,272,3,1
-vision,raw,p079,original,typewritten,ok,True,0.997885,0.991452,0.989051,274,274,3,3
+vision,raw,p079,original,typewritten,ok,True,0.994712,0.987297,0.983547,274,273,5,4
 vision,resave-q92,p079,original,typewritten,ok,True,0.993654,0.983269,0.976234,274,273,7,6
 vision,aug-ShadowCast,p079,original,typewritten,ok,True,0.993654,0.983081,0.976234,274,273,7,6
 vision,aug-LightingGradient,p079,original,typewritten,ok,True,0.993125,0.986303,0.981685,274,272,6,4
@@ -4641,7 +4641,7 @@ lightonocr3-4b,tilt-20,p080,original,printed,ok,True,0.922824,0.957446,0.924231,
 lightonocr3-4b,jpeg-60,p080,original,printed,ok,True,0.911137,0.947882,0.919245,662,663,53,54
 lightonocr3-4b,jpeg-75,p080,original,printed,ok,True,0.917952,0.955265,0.922731,662,671,47,56
 lightonocr3-4b,jpeg-85,p080,original,printed,ok,True,0.922824,0.958225,0.924231,662,671,46,55
-vision,raw,p080,original,printed,ok,True,0.26534,0.86247,0.940133,662,691,26,55
+vision,raw,p080,original,printed,ok,True,0.263057,0.850659,0.915052,662,680,48,66
 vision,resave-q92,p080,original,printed,ok,True,0.26502,0.861247,0.930752,662,681,37,56
 vision,aug-ShadowCast,p080,original,printed,ok,True,0.268114,0.860533,0.932442,662,685,34,57
 vision,aug-LightingGradient,p080,original,printed,ok,True,0.262494,0.85443,0.919523,662,680,45,63
@@ -4706,7 +4706,7 @@ lightonocr3-4b,tilt-20,p081,pdf image,printed,ok,True,0.892258,0.854719,0.859791
 lightonocr3-4b,jpeg-60,p081,pdf image,printed,ok,True,0.88655,0.849687,0.845977,437,433,69,65
 lightonocr3-4b,jpeg-75,p081,pdf image,printed,ok,True,0.895469,0.861907,0.891954,437,433,49,45
 lightonocr3-4b,jpeg-85,p081,pdf image,printed,ok,True,0.894042,0.860741,0.884307,437,436,51,50
-vision,raw,p081,pdf image,printed,ok,True,0.389583,0.316752,0.336283,437,241,323,127
+vision,raw,p081,pdf image,printed,ok,True,0.318944,0.28433,0.33279,437,176,335,74
 vision,resave-q92,p081,pdf image,printed,ok,True,0.34035,0.294512,0.337079,437,186,332,81
 vision,aug-ShadowCast,p081,pdf image,printed,ok,True,0.326079,0.28207,0.313916,437,181,340,84
 vision,aug-LightingGradient,p081,pdf image,printed,ok,True,0.436318,0.342372,0.37464,437,257,307,127
@@ -4771,7 +4771,7 @@ lightonocr3-4b,tilt-20,p082,original,printed,ok,True,0.537688,0.701738,0.760563,
 lightonocr3-4b,jpeg-60,p082,original,printed,ok,True,0.537688,0.701738,0.760563,54,88,0,34
 lightonocr3-4b,jpeg-75,p082,original,printed,ok,True,0.537688,0.701738,0.760563,54,88,0,34
 lightonocr3-4b,jpeg-85,p082,original,printed,ok,True,0.944118,0.850267,1.0,54,54,0,0
-vision,raw,p082,original,printed,ok,True,0.351765,0.692452,0.553846,54,141,0,87
+vision,raw,p082,original,printed,ok,True,0.381881,0.735998,0.545455,54,144,0,90
 vision,resave-q92,p082,original,printed,ok,True,0.381171,0.736393,0.545455,54,144,0,90
 vision,aug-ShadowCast,p082,original,printed,ok,True,0.382319,0.736393,0.545455,54,144,0,90
 vision,aug-LightingGradient,p082,original,printed,ok,True,0.369464,0.725935,0.530612,54,142,2,90
@@ -4825,7 +4825,7 @@ lightonocr3-4b,tilt-20,p083,pdf image,printed,ok,True,0.983896,0.97247,0.940226,
 lightonocr3-4b,jpeg-60,p083,pdf image,printed,ok,True,0.983896,0.97247,0.940226,631,607,49,25
 lightonocr3-4b,jpeg-75,p083,pdf image,printed,ok,True,0.983896,0.97247,0.940226,631,607,49,25
 lightonocr3-4b,jpeg-85,p083,pdf image,printed,ok,True,0.983896,0.97247,0.940226,631,607,49,25
-vision,raw,p083,pdf image,printed,ok,True,0.342338,0.913882,0.979266,631,623,17,9
+vision,raw,p083,pdf image,printed,ok,True,0.352956,0.931841,0.986561,631,634,7,10
 vision,resave-q92,p083,pdf image,printed,ok,True,0.35381,0.933022,0.986561,631,634,7,10
 vision,aug-ShadowCast,p083,pdf image,printed,ok,True,0.353307,0.933241,0.988924,631,633,6,8
 vision,aug-LightingGradient,p083,pdf image,printed,ok,True,0.350376,0.931491,0.985759,631,633,8,10
@@ -4890,7 +4890,7 @@ lightonocr3-4b,tilt-20,p084,pdf image,printed,ok,True,0.97839,0.978747,0.945584,
 lightonocr3-4b,jpeg-60,p084,pdf image,printed,ok,True,0.978697,0.978821,0.945584,567,554,37,24
 lightonocr3-4b,jpeg-75,p084,pdf image,printed,ok,True,0.97839,0.978747,0.945584,567,554,37,24
 lightonocr3-4b,jpeg-85,p084,pdf image,printed,ok,True,0.97871,0.978747,0.948307,567,555,35,23
-vision,raw,p084,pdf image,printed,ok,True,0.990915,0.969834,0.974404,567,566,15,14
+vision,raw,p084,pdf image,printed,ok,True,0.992168,0.976097,0.977935,567,566,13,12
 vision,resave-q92,p084,pdf image,printed,ok,True,0.991855,0.979915,0.98323,567,566,10,9
 vision,aug-ShadowCast,p084,pdf image,printed,ok,True,0.993421,0.979698,0.981465,567,566,11,10
 vision,aug-LightingGradient,p084,pdf image,printed,ok,True,0.989662,0.97223,0.976169,567,566,14,13
@@ -4955,7 +4955,7 @@ lightonocr3-4b,tilt-20,p085,pdf image,printed,ok,True,0.874333,0.880566,0.89644,
 lightonocr3-4b,jpeg-60,p085,pdf image,printed,ok,True,0.980107,0.970767,0.944444,330,318,24,12
 lightonocr3-4b,jpeg-75,p085,pdf image,printed,ok,True,0.980107,0.970767,0.944444,330,318,24,12
 lightonocr3-4b,jpeg-85,p085,pdf image,printed,ok,True,0.985929,0.973809,0.944444,330,318,24,12
-vision,raw,p085,pdf image,printed,ok,True,0.939835,0.910046,0.92236,330,314,33,17
+vision,raw,p085,pdf image,printed,ok,True,0.935953,0.93158,0.946708,330,308,28,6
 vision,resave-q92,p085,pdf image,printed,ok,True,0.956332,0.950052,0.964341,330,315,19,4
 vision,aug-ShadowCast,p085,pdf image,printed,ok,True,0.989326,0.969,0.966565,330,328,12,10
 vision,aug-LightingGradient,p085,pdf image,printed,ok,True,0.934983,0.928629,0.933754,330,304,34,8
@@ -5009,7 +5009,7 @@ lightonocr3-4b,tilt-20,p087,pdf image,typewritten,ok,True,0.996361,0.993778,0.98
 lightonocr3-4b,jpeg-60,p087,pdf image,typewritten,ok,True,0.994281,0.990357,0.983908,656,649,14,7
 lightonocr3-4b,jpeg-75,p087,pdf image,typewritten,ok,True,0.994281,0.990357,0.983908,656,649,14,7
 lightonocr3-4b,jpeg-85,p087,pdf image,typewritten,ok,True,0.996361,0.993778,0.983908,656,649,14,7
-vision,raw,p087,pdf image,typewritten,ok,True,0.946452,0.943153,0.966485,656,627,36,7
+vision,raw,p087,pdf image,typewritten,ok,True,0.912659,0.914456,0.944795,656,612,57,13
 vision,resave-q92,p087,pdf image,typewritten,ok,True,0.894983,0.909053,0.94127,656,604,63,11
 vision,aug-ShadowCast,p087,pdf image,typewritten,ok,True,0.856512,0.868181,0.893951,656,617,87,48
 vision,aug-LightingGradient,p087,pdf image,typewritten,ok,True,0.943073,0.947355,0.96365,656,637,33,14
@@ -5074,7 +5074,7 @@ lightonocr3-4b,tilt-20,p088,pdf image,typewritten,ok,True,0.988363,0.977286,0.94
 lightonocr3-4b,jpeg-60,p088,pdf image,typewritten,ok,True,0.950308,0.970539,0.934354,450,464,23,37
 lightonocr3-4b,jpeg-75,p088,pdf image,typewritten,ok,True,0.988363,0.977286,0.948661,450,446,25,21
 lightonocr3-4b,jpeg-85,p088,pdf image,typewritten,ok,True,0.988363,0.977286,0.948661,450,446,25,21
-vision,raw,p088,pdf image,typewritten,ok,True,0.961712,0.942373,0.923251,450,436,41,27
+vision,raw,p088,pdf image,typewritten,ok,True,0.972598,0.968437,0.959276,450,434,26,10
 vision,resave-q92,p088,pdf image,typewritten,ok,True,0.973348,0.971617,0.960452,450,435,25,10
 vision,aug-ShadowCast,p088,pdf image,typewritten,ok,True,0.97973,0.97144,0.963636,450,430,26,6
 vision,aug-LightingGradient,p088,pdf image,typewritten,ok,True,0.981231,0.975518,0.970455,450,430,23,3
@@ -5128,7 +5128,7 @@ lightonocr3-4b,tilt-20,p089,original,typewritten,ok,True,0.975519,0.977946,0.975
 lightonocr3-4b,jpeg-60,p089,original,typewritten,ok,True,0.990953,0.990438,0.989796,295,293,4,2
 lightonocr3-4b,jpeg-75,p089,original,typewritten,ok,True,0.990953,0.990438,0.989796,295,293,4,2
 lightonocr3-4b,jpeg-85,p089,original,typewritten,ok,True,0.990953,0.990438,0.989796,295,293,4,2
-vision,raw,p089,original,typewritten,ok,True,0.992549,0.98968,0.99661,295,295,1,1
+vision,raw,p089,original,typewritten,ok,True,0.995213,0.984596,0.99322,295,295,2,2
 vision,resave-q92,p089,original,typewritten,ok,True,0.995213,0.983541,0.99661,295,295,1,1
 vision,aug-ShadowCast,p089,original,typewritten,ok,True,0.995213,0.983541,0.99661,295,295,1,1
 vision,aug-LightingGradient,p089,original,typewritten,ok,True,0.993107,0.987347,0.994924,295,296,1,2
@@ -5193,7 +5193,7 @@ lightonocr3-4b,tilt-20,p090,pdf image,typewritten,ok,True,0.991551,0.98705,0.969
 lightonocr3-4b,jpeg-60,p090,pdf image,typewritten,ok,True,0.992368,0.988811,0.971483,528,524,17,13
 lightonocr3-4b,jpeg-75,p090,pdf image,typewritten,ok,True,0.992368,0.988811,0.971483,528,524,17,13
 lightonocr3-4b,jpeg-85,p090,pdf image,typewritten,ok,True,0.992368,0.988811,0.971483,528,524,17,13
-vision,raw,p090,pdf image,typewritten,ok,True,0.952303,0.922171,0.920422,528,515,48,35
+vision,raw,p090,pdf image,typewritten,ok,True,0.921777,0.914826,0.9375,528,496,48,16
 vision,resave-q92,p090,pdf image,typewritten,ok,True,0.923685,0.921802,0.945312,528,496,44,12
 vision,aug-ShadowCast,p090,pdf image,typewritten,ok,True,0.934315,0.928989,0.950437,528,501,39,12
 vision,aug-LightingGradient,p090,pdf image,typewritten,ok,True,0.914146,0.908506,0.933333,528,492,52,16
@@ -5258,7 +5258,7 @@ lightonocr3-4b,tilt-20,p091,pdf image,typewritten,ok,True,0.999729,1.0,0.997739,
 lightonocr3-4b,jpeg-60,p091,pdf image,typewritten,ok,True,0.999729,1.0,0.997739,664,663,2,1
 lightonocr3-4b,jpeg-75,p091,pdf image,typewritten,ok,True,0.999729,1.0,0.997739,664,663,2,1
 lightonocr3-4b,jpeg-85,p091,pdf image,typewritten,ok,True,0.999729,1.0,0.997739,664,663,2,1
-vision,raw,p091,pdf image,typewritten,ok,True,0.976126,0.915234,0.902108,664,664,65,65
+vision,raw,p091,pdf image,typewritten,ok,True,0.929463,0.927837,0.951938,664,626,50,12
 vision,resave-q92,p091,pdf image,typewritten,ok,True,0.92675,0.926427,0.949651,664,627,51,14
 vision,aug-ShadowCast,p091,pdf image,typewritten,ok,True,0.992412,0.976128,0.979684,664,665,13,14
 vision,aug-LightingGradient,p091,pdf image,typewritten,ok,True,0.98752,0.96895,0.97281,664,660,20,16
@@ -5323,7 +5323,7 @@ lightonocr3-4b,tilt-20,p092,pdf image,typewritten,ok,True,0.993643,0.994791,0.99
 lightonocr3-4b,jpeg-60,p092,pdf image,typewritten,ok,True,1.0,1.0,1.0,352,352,0,0
 lightonocr3-4b,jpeg-75,p092,pdf image,typewritten,ok,True,1.0,1.0,1.0,352,352,0,0
 lightonocr3-4b,jpeg-85,p092,pdf image,typewritten,ok,True,0.993643,0.994791,0.997151,352,350,2,0
-vision,raw,p092,pdf image,typewritten,ok,True,0.931707,0.847894,0.822034,352,356,61,65
+vision,raw,p092,pdf image,typewritten,ok,True,0.983934,0.970329,0.957507,352,354,14,16
 vision,resave-q92,p092,pdf image,typewritten,ok,True,0.985387,0.973793,0.96034,352,354,13,15
 vision,aug-ShadowCast,p092,pdf image,typewritten,ok,True,0.985874,0.977143,0.966006,352,354,11,13
 vision,aug-LightingGradient,p092,pdf image,typewritten,ok,True,0.982396,0.955457,0.941844,352,353,20,21
@@ -5388,7 +5388,7 @@ lightonocr3-4b,tilt-20,p093,pdf image,typewritten,ok,True,0.985697,0.97906,0.971
 lightonocr3-4b,jpeg-60,p093,pdf image,typewritten,ok,True,0.980793,0.982215,0.974421,419,402,19,2
 lightonocr3-4b,jpeg-75,p093,pdf image,typewritten,ok,True,0.980793,0.982215,0.974421,419,402,19,2
 lightonocr3-4b,jpeg-85,p093,pdf image,typewritten,ok,True,0.980793,0.982215,0.974421,419,402,19,2
-vision,raw,p093,pdf image,typewritten,ok,True,0.94483,0.846666,0.822816,419,405,80,66
+vision,raw,p093,pdf image,typewritten,ok,True,0.96036,0.936772,0.925153,419,396,42,19
 vision,resave-q92,p093,pdf image,typewritten,ok,True,0.959542,0.934457,0.922699,419,396,43,20
 vision,aug-ShadowCast,p093,pdf image,typewritten,ok,True,0.968942,0.933854,0.914842,419,403,43,27
 vision,aug-LightingGradient,p093,pdf image,typewritten,ok,True,0.961586,0.942726,0.928922,419,397,40,18
@@ -5453,7 +5453,7 @@ lightonocr3-4b,tilt-20,p095,pdf image,typewritten,ok,True,0.999517,0.998385,0.99
 lightonocr3-4b,jpeg-60,p095,pdf image,typewritten,ok,True,0.999517,0.998385,0.997442,391,391,1,1
 lightonocr3-4b,jpeg-75,p095,pdf image,typewritten,ok,True,0.999517,0.998385,0.997442,391,391,1,1
 lightonocr3-4b,jpeg-85,p095,pdf image,typewritten,ok,True,0.999517,0.998385,0.997442,391,391,1,1
-vision,raw,p095,pdf image,typewritten,ok,True,0.999033,0.995813,0.997442,391,391,1,1
+vision,raw,p095,pdf image,typewritten,ok,True,0.999516,0.997906,1.0,391,391,0,0
 vision,resave-q92,p095,pdf image,typewritten,ok,True,0.999516,0.997906,1.0,391,391,0,0
 vision,aug-ShadowCast,p095,pdf image,typewritten,ok,True,0.999516,0.997906,1.0,391,391,0,0
 vision,aug-LightingGradient,p095,pdf image,typewritten,ok,True,0.999516,0.997906,1.0,391,391,0,0
@@ -5518,7 +5518,7 @@ lightonocr3-4b,tilt-20,p097,original,typewritten,ok,True,0.963536,0.970708,0.976
 lightonocr3-4b,jpeg-60,p097,original,typewritten,ok,True,0.963536,0.970708,0.976,320,305,15,0
 lightonocr3-4b,jpeg-75,p097,original,typewritten,ok,True,0.963536,0.970708,0.976,320,305,15,0
 lightonocr3-4b,jpeg-85,p097,original,typewritten,ok,True,0.928177,0.941676,0.952537,320,291,29,0
-vision,raw,p097,original,typewritten,ok,True,1.0,1.0,1.0,320,320,0,0
+vision,raw,p097,original,typewritten,ok,True,0.98453,0.992221,0.998435,320,319,1,0
 vision,resave-q92,p097,original,typewritten,ok,True,0.982873,0.987907,0.996865,320,318,2,0
 vision,aug-ShadowCast,p097,original,typewritten,ok,True,0.98674,0.995517,1.0,320,320,0,0
 vision,aug-LightingGradient,p097,original,typewritten,ok,True,0.98674,0.995517,1.0,320,320,0,0
@@ -5572,7 +5572,7 @@ lightonocr3-4b,tilt-20,p098,pdf image,typewritten,ok,True,0.959843,0.954105,0.96
 lightonocr3-4b,jpeg-60,p098,pdf image,typewritten,ok,True,0.986301,0.96565,0.987097,155,155,2,2
 lightonocr3-4b,jpeg-75,p098,pdf image,typewritten,ok,True,0.986301,0.96565,0.987097,155,155,2,2
 lightonocr3-4b,jpeg-85,p098,pdf image,typewritten,ok,True,0.998043,0.995697,0.987097,155,155,2,2
-vision,raw,p098,pdf image,typewritten,ok,True,0.979432,0.947792,0.944984,155,154,9,8
+vision,raw,p098,pdf image,typewritten,ok,True,0.987267,0.967919,0.974194,155,155,4,4
 vision,resave-q92,p098,pdf image,typewritten,ok,True,0.991185,0.974479,0.980645,155,155,3,3
 vision,aug-ShadowCast,p098,pdf image,typewritten,ok,True,0.985309,0.964711,0.974194,155,155,4,4
 vision,aug-LightingGradient,p098,pdf image,typewritten,ok,True,0.985309,0.965817,0.967742,155,155,5,5
@@ -5626,7 +5626,7 @@ lightonocr3-4b,tilt-20,p099,original,typewritten,ok,True,0.974044,0.974455,0.984
 lightonocr3-4b,jpeg-60,p099,original,typewritten,ok,True,0.974044,0.974455,0.984314,258,252,7,1
 lightonocr3-4b,jpeg-75,p099,original,typewritten,ok,True,0.974044,0.974455,0.984314,258,252,7,1
 lightonocr3-4b,jpeg-85,p099,original,typewritten,ok,True,0.974044,0.974455,0.984314,258,252,7,1
-vision,raw,p099,original,typewritten,ok,True,0.98224,0.954169,0.957364,258,258,11,11
+vision,raw,p099,original,typewritten,ok,True,0.990444,0.982137,0.988372,258,258,3,3
 vision,resave-q92,p099,original,typewritten,ok,True,0.990444,0.984214,0.992248,258,258,2,2
 vision,aug-ShadowCast,p099,original,typewritten,ok,True,0.990444,0.984214,0.992248,258,258,2,2
 vision,aug-LightingGradient,p099,original,typewritten,ok,True,0.990444,0.980059,0.984496,258,258,4,4
@@ -5680,7 +5680,7 @@ lightonocr3-4b,tilt-20,p100,original,typewritten,ok,True,0.660469,0.910359,0.773
 lightonocr3-4b,jpeg-60,p100,original,typewritten,ok,True,0.660965,0.910962,0.773109,165,192,27,54
 lightonocr3-4b,jpeg-75,p100,original,typewritten,ok,True,0.657861,0.909624,0.773109,165,192,27,54
 lightonocr3-4b,jpeg-85,p100,original,typewritten,ok,True,0.679558,0.918726,0.773109,165,192,27,54
-vision,raw,p100,original,typewritten,ok,True,0.520967,0.514637,0.730337,165,191,35,61
+vision,raw,p100,original,typewritten,ok,True,0.432565,0.433583,0.730337,165,191,35,61
 vision,resave-q92,p100,original,typewritten,ok,True,0.433699,0.434714,0.730337,165,191,35,61
 vision,aug-ShadowCast,p100,original,typewritten,ok,True,0.434454,0.435088,0.738028,165,190,34,59
 vision,aug-LightingGradient,p100,original,typewritten,ok,True,0.425765,0.426912,0.717514,165,189,38,62

@@ -127,10 +127,11 @@ DEWARP_CLUSTER = CACHE / 'sherlock-results/dewarp-20261022'
 BIN = CACHE / 'segbench/bin/segbench-dewarp'
 TILT_ARMS = ('quad-tilt-12', 'quad-tilt-20')
 RESAVE = 'resave-q92'   # the raw image through make's save with no defect: Vision's baseline (see BASE)
-# Apple Vision's raw row was read on macOS 26.6, its re-save and defect rows on 27.2, so its defect rows are paired
-# against the raw image re-saved exactly as every defect image was and read in the same run (the 1.5-point bowF1 gap
-# between the two baselines is the OS update: W46.vision-27-reread, the re-encode alone +0.3, -0.3 to +0.9); the
-# Sherlock readers' JPEG 85 rows are within 0.3 points of raw, so raw stays theirs (re-saving needs no new reading).
+# Apple Vision's defect rows are paired against the raw image re-saved exactly as every defect image was and read in
+# the same run on macOS 27.2. Since W46.vision-27-swap (2026-11-04) its raw row is the 27.2 re-read too, so the gap
+# between its two baselines is the re-encode alone (bowF1 +0.3, -0.3 to +0.9; until then the raw row was a 26.6
+# reading and the gap was 1.5 points, the update's); the Sherlock readers' JPEG 85 rows are within 0.3 points of raw,
+# so raw stays theirs (re-saving needs no new reading).
 BASE = {'qwen3.6-27b': 'raw', 'lightonocr3-4b': 'raw', 'vision': RESAVE, 'gemini3.7-flash-gw': 'raw'}
 LOSS = 0.05                                               # a "loss": the page's NES falls 5 points or more
 WITHIN_MIN = 5   # a setting's own verdict AUC is quoted only with this many losses and this many images without one
@@ -457,7 +458,7 @@ VARIANT_NAMES = {
 # The measured findings, written once the results were read (2026-11-03); a rerun that moves them must rewrite them.
 PAGE_NOTE = ('Each of the 96 pages degraded by one synthetic defect at one setting and read again by the same reader, '
              'paired by page against that reader\'s plain image (Apple Vision against the plain image re-saved as '
-             'every defect image was and read in the same run on macOS 27.2; its raw row is a 26.6 reading). Glare, motion blur and heavy '
+             'every defect image was and read in the same run on macOS 27.2, as its raw row now is). Glare, motion blur and heavy '
              'defocus cost every reader; tilt up to 20 degrees, JPEG down to quality 60 and Augraphy\'s shadow and '
              'lighting gradient at their defaults cost none of them more than about 2 points. Apple Vision breaks '
              'first: 9 px of motion costs it 6.6 points and 17 px 38, where Qwen3.6-27B loses 1.0 and 7.9. '
@@ -492,12 +493,13 @@ FINDINGS = """## Findings
   only 0.2 to 0.5, so most of that is line order. Apple's quad correction of the tilted image recovers nothing
   measurable (tilt 12: -0.7 against -1.2; tilt 20: -1.7 against -1.4; both intervals overlap). The open readers lose
   at most 0.6 on any tilt, so there is nothing for a dewarp arm to recover for them, and none was run.
-- **Vision's two baselines differ by the macOS update, not the re-save.** Vision's raw-file row was read on macOS
-  26.6 (2026-10-22), its re-save and defect rows on 27.2 (2026-11-03). The raw row scores 1.5 bowF1 points below the
-  re-save (-2.4 to -0.6; NES 1.6, -3.9 to +0.4; 4.6 on the 33 PDF images), and W46.vision-27-reread measured why: the
-  update alone, on the raw file, moves bowF1 +1.2 (+0.3 to +2.1); the re-encode alone, both read on 27.2, +0.3 (-0.3
-  to +0.9; NES -0.0, -0.6 to +0.5). Vision's defect rows are paired against the re-save, read on the same OS in the
-  same run, so its Δs stand. The Sherlock readers' JPEG 85 rows are 0.3 and 0.1 from raw.
+- **Vision's two baselines differ by the re-encode alone, a tie.** Every Vision row here is a macOS 27.2 reading: the
+  re-save and defect rows from 2026-11-03, the raw-file row the W46.vision-27-reread re-read, swapped in on 2026-11-04
+  (W46.vision-27-swap). The raw row scores bowF1 0.3 below the re-save (-0.9 to +0.3; NES +0.0, -0.5 to +0.6).
+  Until the swap the raw row was a 26.6 reading and sat 1.5 bowF1 points below (-2.4 to -0.6), which was the OS
+  update (on the raw file alone +1.2, +0.3 to +2.1), not the re-save. Vision's defect rows are paired against the
+  re-save, read on the same OS in the same run, so its Δs did not move. The Sherlock readers' JPEG 85 rows are 0.3
+  and 0.1 from raw.
 - **Capture-time signals are weak on their own.** Sharpness inside Vision's word boxes (Laplacian variance, Tenengrad)
   and the share of the image inside word boxes reach AUC 0.70 to 0.78 against a 5-point loss; the clipped-highlight
   share does not detect the glare defect (0.50 to 0.53) and luminance is inverted (glare brightens). The best cuts

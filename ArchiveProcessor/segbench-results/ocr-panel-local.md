@@ -2,6 +2,8 @@
 
 Reproduce: `ocr_panel.py prepare`, `collect --probe`, `collect`, `vision` (under the heavy lock), then `ocr_panel_score.py`. Inputs, catalogs, raw responses, reservations and page scores: `~/Library/Caches/ArchiveSuiteRehearsal/ocr-panel-local/` (outside git).
 
+**Apple Vision is its macOS 27.2 reading (regenerated 2026-11-04, W46.vision-27-swap; `vision-27-reread.md`).** The 26.6 reading of 2026-10-14 is kept as `vision-26.6/`. On the 96 Vision moved 81.37 to 83.07 NES, but its half-size copies fell (79.48 to 73.23) and its quarter-size ones too (52.69 to 50.39), so its downscale figures change most; no other route moved.
+
 Conservative OpenRouter budget accounting, every attempt: **$1.533384 / $2.00 cap**. Each row pins one endpoint and precision; temperature 0, reasoning off (Flash-Lite minimal; the VL Instruct/Mistral endpoints have no reasoning control). No paid retries.
 
 ## Scoring and limits
@@ -31,7 +33,7 @@ Every source is converted to JPEG quality 90 and capped at 2400 pixels on its lo
 | qwen3-vl-30b-a3b | 94/96/96 | 89.84 | 92.70 | 5.76 | 3.41 | $0.000984 |
 | mistral-small-24b | 94/96/96 | 89.36 | 90.86 | 6.14 | 4.00 | $0.000316 |
 | gemini3.1-flash-lite | 93/96/96 | 91.59 | 93.65 | 4.70 | 2.56 | $0.001168 |
-| apple-vision | 96/96/96 | 81.37 | 82.51 | 11.17 | 7.79 | $0.000000 |
+| apple-vision | 96/96/96 | 83.07 | 83.87 | 9.82 | 6.30 | $0.000000 |
 
 ## Completed original responses only (coverage differs)
 
@@ -50,7 +52,7 @@ These conditional scores diagnose transcription quality apart from response fail
 | qwen3-vl-30b-a3b | 94/96 | 91.75 | 94.67 | 3.14 | 3.51 |
 | mistral-small-24b | 94/96 | 91.26 | 92.79 | 5.01 | 4.05 |
 | gemini3.1-flash-lite | 93/96 | 94.54 | 96.67 | 1.66 | 2.64 |
-| apple-vision | 96/96 | 81.37 | 82.51 | 11.17 | 7.79 |
+| apple-vision | 96/96 | 83.07 | 83.87 | 9.82 | 6.30 |
 
 ## All 99 pages, agreement-only letters, and the matched ladder
 
@@ -111,11 +113,11 @@ These conditional scores diagnose transcription quality apart from response fail
 | gemini3.1-flash-lite | ladder-original | 20/20 | 95.69 | 97.06 | 1.09 | 2.26 |
 | gemini3.1-flash-lite | ladder-half | 19/20 | 90.70 | 91.99 | 7.79 | 2.84 |
 | gemini3.1-flash-lite | ladder-quarter | 19/20 | 89.74 | 91.51 | 8.08 | 3.80 |
-| apple-vision | all-99 | 99/99 | 79.97 | 80.59 | 12.57 | 8.65 |
-| apple-vision | agreement-only | 3/3 | 35.07 | 18.98 | 77.60 | 48.99 |
-| apple-vision | ladder-original | 20/20 | 80.14 | 84.99 | 12.61 | 8.91 |
-| apple-vision | ladder-half | 20/20 | 79.48 | 83.55 | 14.62 | 9.78 |
-| apple-vision | ladder-quarter | 20/20 | 52.69 | 51.90 | 57.12 | 9.40 |
+| apple-vision | all-99 | 99/99 | 81.54 | 81.85 | 11.29 | 7.12 |
+| apple-vision | agreement-only | 3/3 | 32.39 | 17.33 | 79.78 | 45.10 |
+| apple-vision | ladder-original | 20/20 | 79.61 | 86.20 | 11.61 | 5.94 |
+| apple-vision | ladder-half | 20/20 | 73.23 | 80.01 | 20.37 | 7.58 |
+| apple-vision | ladder-quarter | 20/20 | 50.39 | 51.85 | 58.63 | 7.06 |
 
 The [attribute table](ocr-panel-local-groups.csv) includes collection, source, historical period, owner-confirmed kind, tag strata, table/form flag, camera, capture year, pixel/sharpness/year tertiles, ladder membership and every tag (overlapping groups). Small groups are descriptive, not reliable rankings. Page/folder/file identity fields are private; the per-page table allows any further grouping.
 

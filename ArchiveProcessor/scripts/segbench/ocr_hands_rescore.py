@@ -310,6 +310,11 @@ def write_md(path: Path, r: dict):
          'drafted the 96\'s truth with Claude Opus 5.5 and leads on its 16 hand pages, so until the owner checked '
          'them the hand chart was agreement with the drafters. The owner answered the blind sheet '
          '(`ocr-hands-sheet.md`) on 2026-10-31.', '',
+         '**Regenerations.** 2026-11-04 (W46.hands-kit-epochs): Granite-Docling 258M now reads its completed Mac run '
+         '(W46.ocr-new-open-boxes, 17.26 with 5 of 16 failed; 11.32 with 10 failed before), and Unlimited-OCR and '
+         'Nemotron-Parse 2.0, already shipped, were added; no other row moved. 2026-11-04 (W46.vision-27-swap): the '
+         'apple-vision row is now the macOS 27.2 re-read (`vision-27-reread.md`; 58.06 on the 26.6 reading); no other '
+         'row moved.', '',
          '## The sheet\'s rulings', '',
          f'On the 114 hand places, the truth stands at {h["truth stands"]}, the answer is "either will do / can\'t tell" at {h["either"]} '
          '(unresolved: the sheet\'s one key covers both meanings, so these are not ten readings known to be right), '

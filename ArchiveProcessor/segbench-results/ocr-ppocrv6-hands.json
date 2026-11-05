@@ -766,20 +766,20 @@
    "empty": 0
   },
   {
+   "route": "apple-vision",
+   "n": 18,
+   "nes": 61.72409164424458,
+   "strata": {
+    "S0": 61.72409164424458
+   },
+   "empty": 0
+  },
+  {
    "route": "ppocrv6-kraken-vision",
    "n": 18,
    "nes": 60.55070042908366,
    "strata": {
     "S0": 60.55070042908366
-   },
-   "empty": 0
-  },
-  {
-   "route": "apple-vision",
-   "n": 18,
-   "nes": 59.743078025575606,
-   "strata": {
-    "S0": 59.743078025575606
    },
    "empty": 0
   },
@@ -845,7 +845,7 @@
   "qwen3.5-9b-mlx4": 88.06149008859128,
   "qwen3.5-9b-mlx4-logprob": 88.06149008859128,
   "xiaomi-ocr-0-bf16": 86.0386744265129,
-  "apple-vision": 58.060943337587254,
+  "apple-vision": 60.5841902193579,
   "glm-ocr": 85.78487064624143,
   "lightonocr3-4b": 89.21090650255938,
   "lightonocr3-0.8b": 84.95112475452605,
@@ -900,7 +900,7 @@
   "qwen3.5-9b-mlx4": 76.21524461786134,
   "qwen3.5-9b-mlx4-logprob": 76.21524461786134,
   "xiaomi-ocr-0-bf16": 64.83191901552567,
-  "apple-vision": 73.20015552948239,
+  "apple-vision": 70.843303043338,
   "glm-ocr": 77.81180932631177,
   "lightonocr3-4b": 60.17688892460373,
   "lightonocr3-0.8b": 66.59449685744406,
@@ -959,10 +959,10 @@
   },
   "ppocrv6-kraken-blla vs apple-vision": {
    "n": 18,
-   "delta": 9.89,
-   "p": 0.06,
-   "lo": 0.86,
-   "hi": 19.2
+   "delta": 7.91,
+   "p": 0.11,
+   "lo": -0.5,
+   "hi": 17.21
   },
   "ppocrv6-kraken-blla vs ppocrv6-medium": {
    "n": 18,
@@ -1022,10 +1022,10 @@
   },
   "ppocrv6-kraken-vision vs apple-vision": {
    "n": 18,
-   "delta": 0.81,
-   "p": 0.73,
-   "lo": -3.67,
-   "hi": 5.04
+   "delta": -1.17,
+   "p": 0.51,
+   "lo": -4.31,
+   "hi": 1.61
   },
   "ppocrv6-kraken-vision vs ppocrv6-medium": {
    "n": 18,

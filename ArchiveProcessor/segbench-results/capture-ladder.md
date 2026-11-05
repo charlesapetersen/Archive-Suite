@@ -36,12 +36,13 @@ Separately it judged the capture of those 528 images (the verdict section, at th
   only 0.2 to 0.5, so most of that is line order. Apple's quad correction of the tilted image recovers nothing
   measurable (tilt 12: -0.7 against -1.2; tilt 20: -1.7 against -1.4; both intervals overlap). The open readers lose
   at most 0.6 on any tilt, so there is nothing for a dewarp arm to recover for them, and none was run.
-- **Vision's two baselines differ by the macOS update, not the re-save.** Vision's raw-file row was read on macOS
-  26.6 (2026-10-22), its re-save and defect rows on 27.2 (2026-11-03). The raw row scores 1.5 bowF1 points below the
-  re-save (-2.4 to -0.6; NES 1.6, -3.9 to +0.4; 4.6 on the 33 PDF images), and W46.vision-27-reread measured why: the
-  update alone, on the raw file, moves bowF1 +1.2 (+0.3 to +2.1); the re-encode alone, both read on 27.2, +0.3 (-0.3
-  to +0.9; NES -0.0, -0.6 to +0.5). Vision's defect rows are paired against the re-save, read on the same OS in the
-  same run, so its Δs stand. The Sherlock readers' JPEG 85 rows are 0.3 and 0.1 from raw.
+- **Vision's two baselines differ by the re-encode alone, a tie.** Every Vision row here is a macOS 27.2 reading: the
+  re-save and defect rows from 2026-11-03, the raw-file row the W46.vision-27-reread re-read, swapped in on 2026-11-04
+  (W46.vision-27-swap). The raw row scores bowF1 0.3 below the re-save (-0.9 to +0.3; NES +0.0, -0.5 to +0.6).
+  Until the swap the raw row was a 26.6 reading and sat 1.5 bowF1 points below (-2.4 to -0.6), which was the OS
+  update (on the raw file alone +1.2, +0.3 to +2.1), not the re-save. Vision's defect rows are paired against the
+  re-save, read on the same OS in the same run, so its Δs did not move. The Sherlock readers' JPEG 85 rows are 0.3
+  and 0.1 from raw.
 - **Capture-time signals are weak on their own.** Sharpness inside Vision's word boxes (Laplacian variance, Tenengrad)
   and the share of the image inside word boxes reach AUC 0.70 to 0.78 against a 5-point loss; the clipped-highlight
   share does not detect the glare defect (0.50 to 0.53) and luminance is inverted (glare brightens). The best cuts
@@ -166,7 +167,7 @@ sigma 5 costs Vision 58.3 NES points, Gemini 3.7 Flash 6.2 and the open readers 
 
 | defect | n | loops (cap / timeout) | blank | NES strict % | Δ NES strict (95% CI) | NES answered % | bowF1 % | Δ bowF1 (95% CI) | words missed % | words added % | pages losing ≥5 NES |
 |---|---:|---:|---:|---:|---|---:|---:|---|---:|---:|---:|
-| raw | 96 | 0 | 0 | 81.4 | -1.6 (-3.9 to +0.4) | 81.4 | 83.9 | -1.5 (-2.4 to -0.6) | 11.2 | 7.8 | 13 |
+| raw | 96 | 0 | 0 | 83.0 | +0.0 (-0.5 to +0.6) | 83.0 | 85.1 | -0.3 (-0.9 to +0.3) | 9.9 | 6.3 | 3 |
 | resave-q92 | 96 | 0 | 0 | 83.0 | — | 83.0 | 85.4 | — | 9.6 | 5.9 | — |
 | aug-ShadowCast | 96 | 0 | 0 | 82.9 | -0.0 (-0.5 to +0.4) | 82.9 | 85.2 | -0.2 (-0.7 to +0.2) | 9.8 | 6.6 | 3 |
 | aug-LightingGradient | 96 | 0 | 0 | 83.4 | +0.4 (-0.2 to +1.0) | 83.4 | 85.4 | -0.1 (-0.7 to +0.6) | 9.5 | 6.3 | 3 |
