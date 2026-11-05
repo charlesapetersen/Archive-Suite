@@ -1,10 +1,10 @@
 # Marks set: the owner core after the question-feedback recheck
 
-40 pages; 33 are detector truth, 7 stay excluded. The recheck returned 5 pages to detector truth: Dean-24a6d76b84c2729b, Dean-7d1bce1dde28dfee, Dean-e6ecf7a0b3ed6e6b, Herrnstein-39bea9fb30cda479, Herrnstein-3f753f88969588ac.
+40 pages; 32 are detector truth, 8 stay excluded. The recheck returned 4 pages to detector truth: Dean-7d1bce1dde28dfee, Dean-e6ecf7a0b3ed6e6b, Herrnstein-39bea9fb30cda479, Herrnstein-3f753f88969588ac.
 
 | Core group | Pages | Detector-eligible pages | Accepted rough boxes | Scored texts |
 |---|---:|---:|---:|---:|
-| A-core | 16 | 16 | 7 | 6 |
+| A-core | 16 | 15 | 7 | 6 |
 | B-core | 24 | 17 | 78 | 56 |
 
 ## Still excluded from detector truth
@@ -13,6 +13,7 @@ These pages have no label file in the derived `core/`; that is never a no-mark n
 
 - Dean-0a07517aa636ba99: relationship boxes unmerged
 - Dean-23edf5f15485b7ff: relationship boxes unmerged
+- Dean-24a6d76b84c2729b: rejected mark may be unboxed
 - Dean-b31c4f7387db3844: relationship boxes unmerged
 - Dean-d3a52a7e272b066a: grouped subannotations not drawn
 - Herrnstein-04d25d2e123a33d0: relationship boxes unmerged
@@ -29,7 +30,11 @@ Only an owner reading with no hedge is scored. The owner's entries and notes are
 - uncertain (1): Herrnstein-3f753f88969588ac/1
 - unread (5): Dean-7d1bce1dde28dfee/2, Dean-d3a52a7e272b066a/3, Dean-e6ecf7a0b3ed6e6b/1, Herrnstein-39bea9fb30cda479/2, Herrnstein-5d66cd10e6af25f0/1
 
-7 explicit duplicate/connected/part relationships are metadata on their pages; no box is merged or dropped and no reading is concatenated.
+7 explicit duplicate/connected/part relationships are metadata on their pages; no box is merged or dropped and no reading is concatenated. Transcription stays per mark, so a clean reading on an excluded page can still be scored as text. RG165-15a0647456422fb9/1 is such a reading on a box that contains three others, so word totals summed across boxes count their words twice; score it per box.
+
+## The review view
+
+The recheck sheet (`marks_feedback.py prepare`) showed hash-verified original JPEG bytes, not the scan's 2400 px model copies, with native-pixel crops, full-page views, rotation, hideable boxes and numbers, and a separate note field per mark. Prior labels and bands were locked; only the nine places could change, and the fold refuses an export that changed anything else.
 
 ## Measurement card
 

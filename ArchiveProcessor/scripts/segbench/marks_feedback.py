@@ -177,6 +177,10 @@ GEOMETRY = {
     'Dean-d3a52a7e272b066a': 'grouped_subannotations_not_drawn',
     'Herrnstein-5d66cd10e6af25f0': 'incomplete_box_on_sideways_page',
     'RG165-15a0647456422fb9': 'one_box_contains_others_duplicate_text',
+    # The owner rejected a page-sized 'other' box as a cross-out mark. Whether
+    # the rejection covers the stroke or only the box is unknown, so a detector
+    # finding the stroke could be scored against a missing box.
+    'Dean-24a6d76b84c2729b': 'rejected_mark_may_be_unboxed',
 }
 GEOMETRY.update({pid: 'relationship_boxes_unmerged' for pid in RELATIONS})
 PLACE_FIELDS = {'keep', 'cls', 'overlaps', 'text', 'feedback', 'note', 'reviewed'}
@@ -238,6 +242,8 @@ def fold_recheck(truth, export):
         if page['detector_evaluable']:
             page['resolution'] = None
             continue
+        if page['exclusion'] != 'unresolved_owner_question_feedback':
+            raise ValueError(f'{pid}: masked for a reason this fold does not settle')
         for m in page['marks']:
             place = PLACES.get((pid, m['candidate']))
             if place is None:
@@ -297,7 +303,15 @@ def report_fold(out, reports):
               'in the derived record outside Git.', '']
     lines += [f"- {status.replace('_', ' ')} ({len(ids)}): " + ', '.join(ids) for status, ids in sorted(out['places'].items())]
     lines += ['', f"{out['relationships']} explicit duplicate/connected/part relationships are metadata on their "
-              'pages; no box is merged or dropped and no reading is concatenated.', '',
+              'pages; no box is merged or dropped and no reading is concatenated. Transcription stays per mark, '
+              'so a clean reading on an excluded page can still be scored as text. RG165-15a0647456422fb9/1 is '
+              'such a reading on a box that contains three others, so word totals summed across boxes count '
+              'their words twice; score it per box.', '',
+              '## The review view', '',
+              'The recheck sheet (`marks_feedback.py prepare`) showed hash-verified original JPEG bytes, not the '
+              "scan's 2400 px model copies, with native-pixel crops, full-page views, rotation, hideable boxes and "
+              'numbers, and a separate note field per mark. Prior labels and bands were locked; only the nine '
+              'places could change, and the fold refuses an export that changed anything else.', '',
               '## Measurement card', '',
               "- **Truth.** The da388b05c388 freeze (owner keep/reject, class, touches-print and bands on 40 pages; "
               'rough draft boxes plus one owner box), with the owner\'s 2026-11-04 recheck of nine places on '
@@ -332,17 +346,28 @@ def fold(frozen_root, review, out, reports):
         raise ValueError('reconciliation no longer matches the freeze')
     export = P.load(raw)
     check_recheck(export, baseline)
+    derived = fold_recheck(P.load(frozen_root / 'owner-reviewed.json'), export)
     if out.exists():
-        # Repeated generation: verify what is there, never rewrite it.
+        # Repeated generation: rebuild in memory and compare, never rewrite. A
+        # changed disposition table needs a new record, not a stale pass.
         existing = P.load(out / 'manifest.json')
         if existing['summary']['receipts'] != receipts:
             raise ValueError('refusing to change a derived record built from different inputs')
+        present = {str(p.relative_to(out)) for p in out.rglob('*') if p.is_file()} - {'manifest.json'}
+        if present != set(existing['files']):
+            raise ValueError('derived folder holds files its manifest does not list')
         for name, digest in existing['files'].items():
             if C.sha(P.relative(out, name)) != digest:
                 raise ValueError('derived file changed: ' + name)
+        labels = {p: ''.join(S.yolo_line(m['cls'], m['box']) + '\n' for m in v['marks'])
+                  for p, v in derived['pages'].items() if v['detector_evaluable']}
+        if (P.load(out / 'reconciled.json') != P.loads(P.encoded(derived).decode())
+                or {n[5:-4] for n in existing['files'] if n.startswith('core/') and n.endswith('.txt')} - {'classes'}
+                != set(labels)
+                or any((out / 'core' / (p + '.txt')).read_text() != t for p, t in labels.items())):
+            raise ValueError('derived record differs from a fresh fold; build a new record')
         result = existing['summary']
     else:
-        derived = fold_recheck(P.load(frozen_root / 'owner-reviewed.json'), export)
         stage = Path(tempfile.mkdtemp(prefix=out.name + '.partial-', dir=out.parent))
         shutil.copyfile(raw, stage / 'recheck-answers.json')
         (stage / 'reconciled.json').write_bytes(P.encoded(derived))

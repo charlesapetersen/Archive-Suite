@@ -4,7 +4,7 @@
 
 Question feedback: 18 entries on 12 pages. These pages remain in the reviewed record but are excluded from detector labels until resolved. 16 kept entries containing feedback have no scored text. Raw owner entries are retained verbatim in the frozen record.
 
-Current status: reconciled in `marks-set-reconciled.md` (recheck dac79c80c2f6): 33 detector-eligible pages, 7 still excluded. Use that record, not this freeze, for detector or transcription truth.
+Current status: reconciled in `marks-set-reconciled.md` (recheck dac79c80c2f6): 32 detector-eligible pages, 8 still excluded. Use that record, not this freeze, for detector or transcription truth.
 
 | Core group | Answered pages | Detector-eligible pages | Accepted rough boxes |
 |---|---:|---:|---:|

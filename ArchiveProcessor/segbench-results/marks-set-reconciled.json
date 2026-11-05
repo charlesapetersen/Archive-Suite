@@ -1,7 +1,6 @@
 {
   "detector_pages": [
     "Dean-045ee66bf2a8cfde",
-    "Dean-24a6d76b84c2729b",
     "Dean-334e2d7a9b3ec242",
     "Dean-7d1bce1dde28dfee",
     "Dean-e087cc8ae12fbbaf",
@@ -37,6 +36,7 @@
   "excluded": {
     "Dean-0a07517aa636ba99": "relationship_boxes_unmerged",
     "Dean-23edf5f15485b7ff": "relationship_boxes_unmerged",
+    "Dean-24a6d76b84c2729b": "rejected_mark_may_be_unboxed",
     "Dean-b31c4f7387db3844": "relationship_boxes_unmerged",
     "Dean-d3a52a7e272b066a": "grouped_subannotations_not_drawn",
     "Herrnstein-04d25d2e123a33d0": "relationship_boxes_unmerged",
@@ -46,7 +46,7 @@
   "groups": {
     "A-core": {
       "accepted_boxes": 7,
-      "detector_evaluable": 16,
+      "detector_evaluable": 15,
       "pages": 16,
       "scored_texts": 6
     },
@@ -89,7 +89,6 @@
   "reconciled_root": "/Users/cp1/Library/Application Support/ArchiveSuiteRehearsal/marks-set-reconciled-da388b05c388-dac79c80c2f6",
   "relationships": 7,
   "unmasked": [
-    "Dean-24a6d76b84c2729b",
     "Dean-7d1bce1dde28dfee",
     "Dean-e6ecf7a0b3ed6e6b",
     "Herrnstein-39bea9fb30cda479",

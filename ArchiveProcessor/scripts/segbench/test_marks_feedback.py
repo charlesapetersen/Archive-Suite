@@ -258,10 +258,23 @@ class Fold(unittest.TestCase):
             self.assertIn('rejected-only', first['unmasked'])
             for p in (frozen / 'core').glob('*.txt'):
                 self.assertEqual((out / 'core' / p.name).read_bytes(), p.read_bytes())
+            with mock.patch.dict(F.PLACES, {('RG165-15a0647456422fb9', '1'): 'uncertain'}):
+                with self.assertRaisesRegex(ValueError, 'fresh fold'): F.fold(frozen, review, out, reports)
+            (out / 'core' / 'stray.txt').write_text('')
+            with self.assertRaisesRegex(ValueError, 'does not list'): F.fold(frozen, review, out, reports)
+            (out / 'core' / 'stray.txt').unlink()
             (out / 'core' / 'clean-page.txt').write_text('tampered')
             with self.assertRaisesRegex(ValueError, 'derived file changed'): F.fold(frozen, review, out, reports)
             (review / 'reconciliation.json').write_text('{}')
             with self.assertRaisesRegex(ValueError, 'review artifact changed'): F.fold(frozen, review, out, reports)
+
+
+class Guard(unittest.TestCase):
+    def test_page_masked_for_another_reason_is_never_unmasked(self):
+        answers, _, export = recheck_fixture()
+        truth = truth_fixture(answers)
+        truth['pages']['rejected-only']['exclusion'] = 'some_other_reason'
+        with self.assertRaisesRegex(ValueError, 'does not settle'): F.fold_recheck(truth, export)
 
 
 class StatusPointer(unittest.TestCase):
