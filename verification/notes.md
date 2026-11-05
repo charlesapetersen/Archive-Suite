@@ -13,7 +13,7 @@ Format and statuses: [`README.md`](README.md). Written by `W40.b2`, 2026-10-12.
   `W23.m9`/`-fu3`, `W23.m14`/`-fu`, `W37.dual-date`, `W24.cal1`, `W24.cal1-toggle`, `W24.cal1-validator`,
   and the W0–W8 records under §*Archive Notes — NEW APP*.
 - **Sources and code read at:** `9e8959ef`.
-- **Count:** `unproven 41 · works 8 · broken 0 · unreachable 0 · fixed-pending-recheck 3` (works: N-07, N-14, N-34, N-45, N-49, N-50, N-51, N-52; fixed-pending-recheck: N-12, N-41, N-44). Updated by `W48.appearance-verify`, 2026-11-04 (N-52 to `works`).
+- **Count:** `unproven 39 · works 9 · broken 4 · unreachable 0 · fixed-pending-recheck 0` (works: N-07, N-14, N-34, N-41, N-45, N-49, N-50, N-51, N-52; broken: N-11, N-12, N-26, N-44). Updated by owner session notes-1, 2026-11-05 (N-41 to `works`; N-11, N-12, N-26, N-44 to `broken`).
 
 **Runtime evidence, for every row below: none yet.** The W40.a3 full VM suite
 ([`evidence/notes/W40.a3-full-ui.md`](evidence/notes/W40.a3-full-ui.md)) and the `W9.e2` runtime sweep passed
@@ -461,9 +461,10 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
 - **Real-path test:** `ArchiveNotesUITests/NotesGUITests.testTemplateNewFromTemplateCreatesNoteWithTemplateBody`
   (the toolbar menu, the file on disk and the row in the list); `ArchiveNotesUITests/NotesGUITests.testG1_CreateNoteWritesNewItemFile`.
 - **Runtime evidence:** none.
-- **Status:** `unproven`
+- **Status:** `broken`
 - **History:**
   - 2026-10-12 W40.b2 — row written, `unproven`.
+  - 2026-11-05 owner session notes-1 — `unproven` → `broken`: ⌘N is not in the menu bar and does nothing ([`sessions/notes-1-returned.md`](sessions/notes-1-returned.md) row 5; it is bound only inside the toolbar's New menu); the toolbar's New offered only New Extract in what the owner read as the Notes window (rows 38-39). Fix items `W40.fix-notes-new-note`.
 - **Notes:**
   - ⌘N is a `.keyboardShortcut` on a button inside the toolbar `Menu`. G1 presses ⌘N but falls back to clicking
     the menu if nothing appears, so a G1 pass does not show that ⌘N works.
@@ -502,12 +503,13 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
   and `ArchiveNotesTests/EditorBindingTests.textViewFindBarEnabled`. No test presses Tab, Shift-Tab, Return or
   Backspace in a list.
 - **Runtime evidence:** [`evidence/notes/W40.d9-writing.md`](evidence/notes/W40.d9-writing.md): text typed with `typeText` into the styled editor saves; but each Return typed there is saved as one newline, so typed paragraphs merge into one when the note is reopened.
-- **Status:** `fixed-pending-recheck` (builder is not verifier)
+- **Status:** `broken`
 - **History:**
   - 2026-10-12 W40.b2 — row written, `unproven`.
   - 2026-10-15 W40.d9 — `unproven` → `broken`: typed paragraph breaks are lost on reopen; filed `W40.fix-notes-return-paragraph` (S2).
   - 2026-10-31 W40.fix-notes-return-paragraph — `broken` → `fixed-pending-recheck`: a Return typed in plain text is saved as a paragraph break (`MarkdownBridge.serializePlainLines`), a hard break read from the file is kept as one, and `WritingJourneyUITests` step 3 now asserts the breaks on disk and after relaunch instead of expecting them to fail.
   - 2026-10-31 W40.fix-notes-return-list-quote — stays `fixed-pending-recheck`: a Return typed in a blockquote stays in the quote (`> q\n>\n> r`), typed unordered items keep their `- ` markers, and a typed line beginning with four spaces, `2. `, `---`, `- `, `> ` and the like is escaped (`MarkdownBridge.plainPieces`, `escapingBlockStart`); unit tests only, the recheck is the builder-is-not-verifier pass
+  - 2026-11-05 owner session notes-1 — `fixed-pending-recheck` → `broken`: Return would not add blank lines and Backspace would not join lines, coming back after reselecting the note; Bulleted List showed nothing; a bold run ending in a space saved as literal `\*\*Day \*\*` ([`sessions/notes-1-returned.md`](sessions/notes-1-returned.md) rows 8, 10, 11). Fix items `W40.fix-notes-editor-lines`, `W40.fix-notes-bold-space`.
 - **Notes:** **Drift.**
   - There is no indent or outdent button on the toolbar and no Indent/Outdent item in the Format menu.
     `indentList` and `outdentList` are reached only from Tab and Shift-Tab, and `outdentList` also from Return or
@@ -888,9 +890,10 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
 - **Real-path test:** `ArchiveNotesUITests/NotesE2FolderTests.testE2_FolderDragToBottomEdgeReorders`;
   `.testE2_FolderMoveUpAndDownReorderTheLevel`; `ArchiveNotesUITests/NotesGUITests.testG18_DragFolderOntoFolderReparentsIt`.
 - **Runtime evidence:** none
-- **Status:** `unproven`
+- **Status:** `broken`
 - **History:**
   - 2026-10-12 W40.b2 — row written, `unproven`.
+  - 2026-11-05 owner session notes-1 — `unproven` → `broken`: reordering by drag works, but a folder cannot be dragged onto another to nest it, and the drop highlight follows the pointer erratically ([`sessions/notes-1-returned.md`](sessions/notes-1-returned.md) rows 30-31). Fix item `W40.fix-notes-folder-drag`.
 - **Notes:** the W9.e2 result: `W9.e2-folders` found both D1 doubts real. A gap drop re-parented instead of
   reordering (filed `W9.e2-fu1`, fixed `af7d049`, `NotesE2FolderTests.testE2_FolderDragToBottomEdgeReorders`,
   4/4), and there was no way back to the top level (fixed by Move to Top Level). Drop onto a folder:
@@ -1307,11 +1310,12 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
   drawn in the view after the jump, live since the fix), `.testS3_RenamedThenDeletedSourceUpdatesTheChipAndTheJump`,
   `.testS3_StaleOrdinalJumpOpensTheSourceAndSaysItHasChanged`.
 - **Runtime evidence:** 2026-11-04 · [`evidence/notes/W40.notes-w7-gui-checks.md`](evidence/notes/W40.notes-w7-gui-checks.md): **the scroll fails.** A jump from the Extracts window to a block half-way down a 200-paragraph source selects the note in the Note window and moves the view down, but the block's header is not on screen afterwards (the screenshots show paragraphs 93 to 98, the block after paragraph 100), 3 runs of 3. Held in the same runs: a renamed source's chip shows the new title, a deleted source greys the chip and the jump says "no longer exists — the extract text is preserved", a stale ordinal opens the source at its top with "The source note has changed since this extract was made."
-- **Status:** `fixed-pending-recheck` (builder is not verifier)
+- **Status:** `works`
 - **History:**
   - 2026-10-12 W40.b2 — row written, `unproven`.
   - 2026-11-04 W40.notes-w7-gui-checks — the scroll to the block reproduced failing; `broken`, `W40.fix-notes-jump-scroll-short` (S3).
   - 2026-11-04 W40.fix-notes-jump-scroll-short — `broken` → `fixed-pending-recheck`: the jump measures the header's position from the fragments the viewport has drawn (`EditorTextView.scrollBlockToTop`) and is placed again once the new editor's relayout passes finish (`whenLayoutSettles`); the S3 test now asserts the header is drawn in the view, by the paragraphs drawn at its top and bottom, 6 runs of 6 in the VM, and the W7 class with G10 3 runs of 3. [`evidence/notes/W40.fix-notes-jump-scroll-short.md`](evidence/notes/W40.fix-notes-jump-scroll-short.md).
+  - 2026-11-05 owner session notes-1 — `fixed-pending-recheck` → `works`: with the owner watching, Create Extract, Append, a pasted chip and Jump to Source all did what the row promises ([`sessions/notes-1-returned.md`](sessions/notes-1-returned.md) row 28).
 - **Notes:** W9.e1 rated this PARTIAL (a jump with the Notes window closed did nothing). `W9.b5-fu1` fixed it, and
   VM `testG15_OpenRequestOpensTheClosedFeaturingWindow` covers both directions. That test drives Jump through a
   DEBUG seam, not the chip button. If the source's block ordinal no longer matches, the jump selects the note
@@ -1397,11 +1401,12 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
   `ArchiveNotesTests/ZoteroAutoFillTests.modelCancelWritesNothing`, `.planFillEmpty` and
   `.attachedReferenceResolverRejectsAmbiguousNote`.
 - **Runtime evidence:** [`evidence/notes/W40.d10-integrations.md`](evidence/notes/W40.d10-integrations.md): against the real Zotero, Note ▸ Auto-fill from Zotero… crashes Notes (SIGABRT in `ZoteroClient.fetchCSLviaLocalAPI`; Zotero returns `csljson` as a string holding an array). 2 of 2 VM runs, plus the crash report.
-- **Status:** `fixed-pending-recheck` (builder is not verifier)
+- **Status:** `broken`
 - **History:**
   - 2026-10-12 W40.b2 — row written, `unproven`.
   - 2026-10-15 W40.d10 — reproduced against the real Zotero; `broken`, filed `W40.fix-notes-zotero-csljson-crash` (S2).
   - 2026-10-31 W40.fix-notes-zotero-csljson-crash — `broken` → `fixed-pending-recheck`: `ZoteroClient.fetchCSLviaLocalAPI` reads the string holding a CSL array (and an object or array), never hands an unvalidated value to `data(withJSONObject:)`, and `CSLDate` decodes numeric-string date parts; `ZoteroLocalAPIShapeTests` carries Zotero's measured body, the DEBUG UI-test transport answers in that shape, and `testD10_2_AutoFillFromRealZotero` no longer expects the failure. VM: the real-Zotero journey step passed (sheet opened; Apply wrote `date: 1843` and the APA citation).
+  - 2026-11-05 owner session notes-1 — `fixed-pending-recheck` → `broken`: Auto-fill from Zotero failed with "ClientError error 0" (`.unavailable`) while Zotero's local API answered 200 from a shell at the same moment ([`sessions/notes-1-returned.md`](sessions/notes-1-returned.md) row 51). Fix item `W40.fix-notes-zotero-fetch`.
 - **Notes:** `W9.e2-zotero` ran `testG15_AutoFill…` (attach → Cancel writes nothing → Apply writes only the
   accepted date plus the configured-style citation) through the DEBUG in-process transport. There are two
   `testG15_…` tests; this row means the AutoFill one. A citation fetch that fails does not block Auto-fill
