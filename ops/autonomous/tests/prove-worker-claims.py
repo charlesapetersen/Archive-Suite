@@ -469,6 +469,13 @@ with tempfile.TemporaryDirectory(prefix="worker claims [scratch] ") as scratch:
         plan_run("report", "### new decision\nquestion")
         check(plan.read_text().index("### new decision") < plan.read_text().index("### ✅ settled"),
               "new report lands before the settled walkthrough anchor")
+        plan_run("report", "✅ 2026-11-04 21:16 PST — walkthrough done (owner): bare")
+        plan_run("report", "## ✅ 2026-11-04 21:17 PST — walkthrough done (owner): wrong level")
+        lines = plan.read_text().splitlines()
+        check("### ✅ 2026-11-04 21:16 PST — walkthrough done (owner): bare" in lines
+              and "### ✅ 2026-11-04 21:17 PST — walkthrough done (owner): wrong level" in lines
+              and not any(l.startswith(("✅", "## ✅")) for l in lines),
+              "a walkthrough-done report line is always written as a ### heading, the stop line readers need")
         p = subprocess.run(["bash", str(HERE / "plan-edit.sh"), str(plan), "complete", "Owner", "abcdef0", "bad"],
                            env=env, capture_output=True)
         check(p.returncode == 2, "a HOLD entry cannot be ticked as queued work")

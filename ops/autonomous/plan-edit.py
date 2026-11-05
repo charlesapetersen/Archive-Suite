@@ -316,6 +316,12 @@ def edit(plan, action, values):
                 heading, content = "## Session Log", values[0]
             elif action == "report":
                 heading, content = "## Daemon Report", values[0]
+                # A walkthrough-done line is the stop line every reader of the report looks for, and only as a
+                # `### ` heading (hooks.py WALKED, status-digest.sh). Seven were written bare from 2026-11-03,
+                # so the holds hook read each one as a new decision and the owner was notified "Needs you:
+                # walkthrough done" (2026-11-04). Give it the heading mark however it was passed.
+                if re.match(r"^\s*(#+\s*)?✅.*[Ww]alkthrough", content):
+                    content = "### " + re.sub(r"^\s*#*\s*", "", content)
             elif action == "append":
                 heading, content = values
             else:
