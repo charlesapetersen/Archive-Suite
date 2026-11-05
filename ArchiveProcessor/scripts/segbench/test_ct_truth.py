@@ -105,6 +105,55 @@ class Fold(unittest.TestCase):
         self.assertEqual((truth[0]["fields"]["accession"], missing, truth[0]["complete"]), ("91006-10.V", 0, True))
 
 
+class ThreeReaders(unittest.TestCase):
+    def test_unanimity_and_odd_one(self):
+        a = T.parse('{"kind": "box label", "container": "Box 17", "series": "Series II"}')
+        b = T.parse('{"kind": "box label", "container": "BOX NO. 17", "series": null}')
+        c = T.parse('{"kind": "box label", "container": "Box 71", "series": "Series III"}')
+        self.assertEqual(T.disputes(a, b, c), ["series", "container"])
+        self.assertEqual(T.disputes(a, b, a), ["series"])
+        keys = ("x", "y", "z")
+        self.assertEqual(T.odd_one("container", ["Box 17", "BOX NO. 17", "Box 71"], keys), "z")
+        self.assertIsNone(T.odd_one("series", ["Series II", None, "Series III"], keys))
+        self.assertEqual(len(T.order_readings("p", "series", ["Series II", None, "Series III"])), 3)
+
+    def test_controls_are_drawn_from_unanimous_fields(self):
+        rows = []
+        for k in range(30):
+            agreed = {f: None for f in T.FIELDS}
+            agreed["kind"], agreed["container"] = "box label", f"Box {k}"
+            rows.append({"id": f"p{k}", "agreed": agreed, "disputed": [], "controls": [], "_place": ([], [None])})
+        T.pick_controls(rows, n=6)
+        ctl = [(r["id"], d) for r in rows for d in r["controls"]]
+        self.assertEqual(len(ctl), 6)
+        self.assertEqual(sum(1 for _, d in ctl if d["readings"]), 3)
+        for mid, d in ctl:
+            r = next(x for x in rows if x["id"] == mid)
+            self.assertEqual(d["readings"], [r["agreed"][d["field"]]] if r["agreed"][d["field"]] else [])
+        items = T.sheet_items([dict(r, colour="Red") for r in rows])
+        for it in items:   # a control's agreed value is not shown beside it
+            self.assertFalse({f["field"] for f in it["fields"]} & set(it["agreed"]))
+
+    def test_fold_records_rulings_and_overturned_controls(self):
+        agreed = {f: None for f in T.FIELDS}
+        agreed["kind"], agreed["container"] = "box label", "Box 3"
+        del agreed["series"]
+        rows = [{"id": "p1", "path": "x.pdf", "colour": "Red", "repository": "R", "parsed": [True] * 3,
+                 "readers": list(T.READERS), "agreed": agreed,
+                 "disputed": [{"field": "series", "readings": ["Series II", None]}],
+                 "controls": [{"field": "container", "readings": ["Box 3"]},
+                              {"field": "folder", "readings": []}]}]
+        truth, missing = T.fold(rows, {"p1": {"series": {"pick": "Series II"}, "container": {"pick": "other",
+                                                                                         "text": "Box 8"}}})
+        t = truth[0]
+        self.assertEqual((missing, t["fields"]["container"], t["fields"]["series"]), (0, "Box 8", "Series II"))
+        self.assertEqual(sorted(t["ruled"]), ["container", "series"])
+        self.assertEqual(t["controls_overturned"], ["container"])
+        self.assertIsNone(t["fields"]["folder"])   # an unanswered control keeps its agreed value
+        self.assertTrue(t["complete"])
+        self.assertEqual(t["drafters"], list(T.READERS))
+
+
 class Trees(unittest.TestCase):
     def test_committed_set_matches_generator(self):
         with open(T.TREES, encoding="utf-8") as fh:

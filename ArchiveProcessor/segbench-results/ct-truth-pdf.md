@@ -1,4 +1,6 @@
-# Container labels: the truth set's two-reader draft (W47.ct-truth)
+# Container labels: the truth set's two-reader draft on the corpus PDFs (W47.ct-truth, superseded)
+
+> Superseded by `ct-truth.md` (W47.ct-truth-jpeg, 2026-11-05): the root rule (2026-10-22) is that a model or a sheet sees the JPEG originals, not the corpus PDFs. Kept beside it for comparison; the cache keeps this build as `ct-truth/pool/`. `ct_truth.py` no longer writes this file.
 
 Written by `scripts/segbench/ct_truth.py compare`. 240 marker photos from the corpus (read-only; pages copied as JPEG at 1280 px), stratified by repository (floor 2, then by the square root of each repository's marker count, round-robin across collection directories, seed 4701). Each was read blind into the nine fields of `execution-plans/containers/00-plan.md` plus what the photo is, by Qwen3-VL 8B, 4-bit MLX and Qwen3.5 4B, 4-bit MLX (this Mac, temperature 0, $0, no plan route). A field is agreed when both readings match after case, punctuation and "Box No." spellings are normalised; both empty counts as agreed. Agreement is not truth: two readers can make the same miss, and the owner sees only the disputes.
 

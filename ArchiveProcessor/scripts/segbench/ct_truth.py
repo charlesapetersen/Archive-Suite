@@ -1,16 +1,29 @@
 #!/usr/bin/env python3
 """W47.ct-truth: the container-label truth set, the owner's disagreement sheet and a folder-tree test set.
 
-    python3 ct_truth.py sample                      # ~120 box + ~120 folder marker photos, stratified by repository
-    python3 ct_truth.py render                      # each photo's page as JPEG into the cache (sips, read-only)
+    python3 ct_truth.py sample                      # ~120 box + ~120 folder markers whose JPEG original is confirmed
+    python3 ct_truth.py render                      # each marker's JPEG original, upright, into the cache (read-only)
     python3 ct_truth.py lines                       # Apple Vision text lines with boxes (layout_order.py's helper)
-    run-guarded.sh --label ct-truth --need-gb 8 -- <lab venv>/bin/python ct_truth.py collect --model K
+    heavy-run.py run -- <lab venv>/bin/python ct_truth.py collect --model K
+    python3 ct_truth.py gateway                     # the third reader, Gemini 3.7 Flash through the gateway (real money)
     python3 ct_truth.py compare                     # segbench-results/ct-truth.md; the owner's sheet; draft truth
-    python3 ct_truth.py fold ANSWERS.json           # the owner's answers -> pool/truth.jsonl (W47.ct-read's truth)
+    python3 ct_truth.py fold ANSWERS.json           # the owner's answers -> pool-jpeg/truth.jsonl (W47.ct-read's truth)
     python3 ct_truth.py trees                       # writes ct_trees.json, the synthetic Route B set (committed)
     python3 ct_truth.py owner-tree                  # the corpus's level-1 and level-2 names, private, in the cache
 
 <lab venv> is ~/.local/share/visionocr-ocrlab/venv (mlx_vlm 0.7.4). --model is a key of MODELS; both are run.
+
+JPEG originals (W47.ct-truth-jpeg; owner, 2026-10-22 and the 2026-10-29 walkthrough): every image a model or the
+sheet sees is the marker's JPEG original, never the corpus PDF. Each sampled PDF is paired through corpus_pairs.py's
+pairs.tsv and confirmed by ocr_truth.orient_like_pdf (correlation at least MIN_CORR), whose best turn makes the
+JPEG upright. A marker with no confirmed JPEG is left out and the next marker of its stratum and colour in the same
+draw order takes its place; the draw is the PDF build's, so the markers that were confirmed are the same photos.
+The PDF-built draft stays in the cache's `pool/` and in segbench-results/ct-truth-pdf.md.
+
+Three blind readers (measurement audit FLD-9, owner 2026-10-30): the two open models and Gemini 3.7 Flash through
+the Stanford gateway. The owner's sheet holds every field where the three are not unanimous, plus CONTROLS fields
+where they are, mixed in unmarked. The fold records which fields the owner ruled: the three are the truth's
+drafters, so W47.ct-read scores any of them only on those fields, or reports the rest as agreement.
 
 The corpus is read, never written: tags with getxattr(2) (corpus_survey.read_tags), pages with sips into the
 cache. A marker is a Red (box) or Purple (folder) photo; the seven carrying both are left out. The stratum is the
@@ -47,16 +60,17 @@ import corpus_survey as CS
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 CACHE = os.path.expanduser("~/Library/Caches/ArchiveSuiteRehearsal/ct-truth")
-POOL = os.path.join(CACHE, "pool")
+PDF_POOL = os.path.join(CACHE, "pool")          # the first build, on the corpus PDFs: kept for comparison
+POOL = os.path.join(CACHE, "pool-jpeg")
 PAGES = os.path.join(POOL, "pages")
 LINES = os.path.join(POOL, "lines")
 SHEET = os.path.join(POOL, "sheet")
 SAMPLE = os.path.join(POOL, "sample.jsonl")
+SAMPLING = os.path.join(POOL, "sampling.json")
 RESULTS = os.path.join(HERE, "..", "..", "segbench-results", "ct-truth.md")
 TREES = os.path.join(HERE, "ct_trees.json")
 OWNER_TREE = os.path.join(POOL, "owner-tree.json")
 
-PER_CLASS = 120
 FLOOR = 2
 SEED = 4701
 MAX_SIDE = 1280
@@ -66,6 +80,15 @@ WORKFLOW = re.compile(r"^\d\d ")  # "05 Final Tagging", "03 Unconverted (…)": 
 MODELS = {"qwen3-vl-8b-mlx4": ("mlx-community/Qwen3-VL-8B-Instruct-4bit", "Qwen3-VL 8B, 4-bit MLX", 8),
           "qwen3.5-4b-mlx4": ("lmstudio-community/Qwen3.5-4B-MLX-4bit", "Qwen3.5 4B, 4-bit MLX", 5)}
 FIRST = "qwen3-vl-8b-mlx4"   # the agreed value is taken from this reader's spelling
+GATEWAY = "gemini3.7-flash-gw"
+READERS = (FIRST, "qwen3.5-4b-mlx4", GATEWAY)
+NAMES = {**{k: v[1] for k, v in MODELS.items()}, GATEWAY: "Gemini 3.7 Flash (Stanford gateway, low reasoning)"}
+# The gateway reader's spend: counted at gateway_gemini.PRICE (Gemini 3.8 Flash list, a ceiling for 3.7) or the
+# gateway's own figure, whichever is larger. The owner approved about $0.70 (FLD-9); this cap is under the $7 rule.
+GATEWAY_CAP = 2.00
+GATEWAY_MAX_TOKENS = 4096
+MIN_CORR = 0.65   # ocr_truth.orient_like_pdf: true pairs measured 0.69-0.98, mismatches 0.16-0.48 (2026-10-22)
+CONTROLS = 20     # unanimous fields put on the sheet unmarked: half with a value, half agreed empty
 
 FIELDS = ["repository", "place", "collection_title", "collection_number", "accession", "series", "container",
           "folder", "folder_title"]
@@ -156,21 +179,91 @@ def cmd_sample(a):
             rows.append({"id": marker_id(rel), "path": rel, "colour": got.pop(), "position": i, "of": len(names),
                          "repository": repository_of(folder), "collection": collection_dir(folder),
                          "workflow": bool(WORKFLOW.match(folder.split(os.sep)[0]))})
-    rng = random.Random(SEED)
-    picked = []
-    for colour in ("Red", "Purple"):
-        mine = [r for r in rows if r["colour"] == colour]
-        counts = collections.Counter(r["repository"] for r in mine)
-        alloc = allocate(counts, a.per_class)
-        for rep in sorted(alloc):
-            picked += draw([r for r in mine if r["repository"] == rep], alloc[rep], rng)
+    import tempfile
+    pairs = load_pairs()
     os.makedirs(POOL, exist_ok=True)
+    tmp = tempfile.mkdtemp(dir=POOL)
+    # The PDF build's 240 are the sample (the corpus has changed since, so a fresh draw would not give them back).
+    # Each keeps its place when its JPEG is confirmed; a stratum's left-out markers are refilled in a fresh draw
+    # order over the stratum's current markers of that colour, skipping any already sampled or not confirmed.
+    base = [json.loads(l) for l in open(os.path.join(PDF_POOL, "sample.jsonl"), encoding="utf-8")]
+    taken = {r["path"] for r in base}
+    present = {r["path"] for r in rows}
+    rng = random.Random(SEED)
+    picked, stats = [], {"min_corr": MIN_CORR, "classes": {}, "markers_now": len(rows)}
+    for colour in ("Red", "Purple"):
+        mine = [r for r in base if r["colour"] == colour]
+        st = {"pdf_sample": len(mine), "left_out": collections.Counter(), "refilled": 0, "short": {},
+              "checked": 0, "rejected_corr": []}
+        for rep in sorted({r["repository"] for r in mine}):
+            want, got = [r for r in mine if r["repository"] == rep], 0
+            for r in want:
+                if r["path"] not in present:
+                    st["left_out"]["no longer a marker in the corpus"] += 1
+                    continue
+                st["checked"] += 1
+                jpeg, turn, corr = confirm(r["path"], pairs, tmp)
+                if jpeg is None:
+                    st["left_out"][turn] += 1
+                    if corr is not None:
+                        st["rejected_corr"].append(round(corr, 3))
+                    continue
+                picked.append(dict(r, jpeg=jpeg, turn=turn, corr=round(corr, 3), refill=False))
+                got += 1
+            pool = [r for r in rows if r["colour"] == colour and r["repository"] == rep and r["path"] not in taken]
+            for r in draw(pool, len(pool), rng):
+                if got == len(want):
+                    break
+                st["checked"] += 1
+                jpeg, turn, corr = confirm(r["path"], pairs, tmp)
+                if jpeg is None:
+                    continue
+                picked.append(dict(r, jpeg=jpeg, turn=turn, corr=round(corr, 3), refill=True))
+                st["refilled"] += 1
+                got += 1
+            if got < len(want):
+                st["short"][rep] = len(want) - got
+        st["sampled"] = sum(1 for r in picked if r["colour"] == colour)
+        st["left_out"] = dict(st["left_out"])
+        st["rejected_corr"].sort()
+        stats["classes"][colour] = st
+    import shutil
+    shutil.rmtree(tmp, ignore_errors=True)
     with open(SAMPLE, "w", encoding="utf-8") as fh:
         for r in picked:
             fh.write(json.dumps(r, ensure_ascii=False) + "\n")
+    with open(SAMPLING, "w", encoding="utf-8") as fh:
+        json.dump(stats, fh, ensure_ascii=False, indent=1)
     c = collections.Counter(r["colour"] for r in picked)
     print(f"{len(rows)} single-colour markers; sampled {c['Red']} Red, {c['Purple']} Purple across "
-          f"{len({r['repository'] for r in picked})} strata; {SAMPLE}")
+          f"{len({r['repository'] for r in picked})} strata; {json.dumps(stats['classes'])}; {SAMPLE}")
+
+
+def load_pairs():
+    """{corpus-relative PDF: absolute JPEG path} for every PDF corpus_pairs.py paired (method other than none)."""
+    import corpus_pairs as CP
+    return {pdf: os.path.join(CP.JPEGS, jpeg) for pdf, jpeg, method, _ in CP.read_pairs() if jpeg and method != "none"}
+
+
+def confirm(rel, pairs, tmp):
+    """(JPEG path, turn, correlation) when the marker's paired JPEG is the same photo as its PDF, else
+    (None, why, correlation). The turn (degrees counter-clockwise, after EXIF) makes the JPEG upright like the PDF."""
+    import ocr_truth as OT
+    from pathlib import Path
+    from PIL import Image, ImageOps
+    jpeg = pairs.get(rel)
+    if not jpeg:
+        return None, "no JPEG paired", None
+    if not os.path.exists(os.path.join(CS.CORPUS, rel)) or not os.path.exists(jpeg):
+        return None, "comparison failed", None   # orient_like_pdf would score a missing page as correlation 0
+    try:
+        with Image.open(jpeg) as im:
+            turn, corr = OT.orient_like_pdf(ImageOps.exif_transpose(im), Path(CS.CORPUS) / rel, Path(tmp))
+    except Exception:
+        return None, "comparison failed", None
+    if corr < MIN_CORR:
+        return None, "JPEG not the same photo", corr
+    return jpeg, turn, corr
 
 
 def sample():
@@ -182,13 +275,21 @@ def image_of(mid):
 
 
 def cmd_render(a):
+    """Each marker's JPEG original, EXIF applied, turned upright, MAX_SIDE on the long side. Read-only on the tree."""
+    from PIL import Image, ImageOps
     os.makedirs(PAGES, exist_ok=True)
     bad = 0
     for r in sample():
         out = image_of(r["id"])
         if not os.path.exists(out):
-            subprocess.run(["sips", "-s", "format", "jpeg", "-Z", str(MAX_SIDE), os.path.join(CS.CORPUS, r["path"]),
-                            "--out", out], capture_output=True, check=False)
+            try:
+                with Image.open(r["jpeg"]) as im:
+                    up = ImageOps.exif_transpose(im).convert("RGB").rotate(r["turn"], expand=True)
+                up.thumbnail((MAX_SIDE, MAX_SIDE), Image.Resampling.LANCZOS)
+                up.save(out + ".tmp", "JPEG", quality=90)
+                os.replace(out + ".tmp", out)
+            except Exception as e:
+                print(r["id"], e)
         bad += not os.path.exists(out)
     print(f"{len(sample())} photos, {bad} not rendered; {PAGES}")
 
@@ -248,6 +349,70 @@ def cmd_collect(a):
         with open(os.path.join(out, mid + ".json"), "w", encoding="utf-8") as fh:
             json.dump(rec, fh, ensure_ascii=False)
         print(f"[{k}/{len(todo)}] {mid} {rec['wall_s']}s {'ok' if rec['parsed'] else 'unparsed'}", flush=True)
+
+
+def gateway_ledger():
+    p = os.path.join(POOL, "gateway-calls.jsonl")
+    return [json.loads(x) for x in open(p, encoding="utf-8")] if os.path.exists(p) else []
+
+
+def cmd_gateway(a):
+    """The third blind reader: Gemini 3.7 Flash through the Stanford gateway, the same image and prompt, temperature
+    0, low reasoning. Real money: every call is in pool-jpeg/gateway-calls.jsonl before its reply is used, and
+    GATEWAY_CAP stops the run. Replies stay in the cache (the owner's material)."""
+    import base64
+    import threading
+    from concurrent.futures import ThreadPoolExecutor
+    import gateway_gemini as G
+    out = draft_dir(GATEWAY)
+    os.makedirs(out, exist_ok=True)
+    todo = [r["id"] for r in sample() if os.path.exists(image_of(r["id"]))
+            and not os.path.exists(os.path.join(out, r["id"] + ".json"))][: a.limit or None]
+    worst = (4000 * G.PRICE[0] + GATEWAY_MAX_TOKENS * G.PRICE[1]) / 1e6
+    lock = threading.Lock()
+    print(f"{GATEWAY}: {len(todo)} photos to read", flush=True)
+
+    def one(mid):
+        with lock:
+            spent = sum(G.charge(r) for r in gateway_ledger())
+            if spent + worst > GATEWAY_CAP:
+                return mid, f"cap: ${spent:.4f} spent of ${GATEWAY_CAP}"
+        with open(image_of(mid), "rb") as fh:
+            img = fh.read()
+        body = {"model": G.MODEL, "temperature": 0, "max_tokens": GATEWAY_MAX_TOKENS, "reasoning_effort": "low",
+                "messages": [{"role": "user", "content": [
+                    {"type": "image_url", "image_url": {"url": "data:image/jpeg;base64," + base64.b64encode(img).decode()}},
+                    {"type": "text", "text": PROMPT}]}]}
+        t = time.time()
+        for attempt in range(3):
+            r = G.request("/chat/completions", body)
+            if r.status_code in (429, 500, 502, 503, 504) and attempt < 2:
+                time.sleep(10 * (attempt + 1))
+                continue
+            break
+        got = r.json() if r.headers.get("content-type", "").startswith("application/json") else {"raw": r.text[:2000]}
+        usage = got.get("usage") or {}
+        rec = G.with_gateway_cost({"id": mid, "http": r.status_code, "t": t, "wall_s": round(time.time() - t, 2),
+                                   "model": got.get("model"), "usage": usage, "cost": round(G.cost(usage), 6)}, r)
+        with lock:
+            with open(os.path.join(POOL, "gateway-calls.jsonl"), "a", encoding="utf-8") as fh:
+                fh.write(json.dumps(rec) + "\n")
+        choice = (got.get("choices") or [{}])[0]
+        raw = (choice.get("message") or {}).get("content") if r.status_code == 200 else None
+        if not raw:
+            return mid, f"http {r.status_code} {choice.get('finish_reason')} {json.dumps(got)[:200]}"
+        d = {"id": mid, "raw": raw, "parsed": parse(raw), "wall_s": rec["wall_s"],
+             "tokens": [usage.get("prompt_tokens"), usage.get("completion_tokens")], "finish": choice.get("finish_reason")}
+        with open(os.path.join(out, mid + ".json"), "w", encoding="utf-8") as fh:
+            json.dump(d, fh, ensure_ascii=False)
+        return mid, "ok" if d["parsed"] else "unparsed"
+
+    with ThreadPoolExecutor(4) as ex:
+        res = list(ex.map(one, todo))
+    bad = [(m, s) for m, s in res if s != "ok"]
+    led = gateway_ledger()
+    print(f"{len(res) - len(bad)}/{len(res)} parsed; ${sum(G.charge(r) for r in led):.4f} charged in all "
+          f"({G.billed_note(led)}); not ok: {bad[:10]}")
 
 
 def clean(v):
@@ -324,13 +489,14 @@ def agree(field, a, b):
     return norm(field, a) == norm(field, b)
 
 
-def disputes(da, db):
-    """The fields (and `kind`) on which two parsed drafts differ, in FIELDS order, `kind` first."""
+def disputes(*drafts):
+    """The fields (and `kind`) on which the parsed drafts are not unanimous, in FIELDS order, `kind` first."""
+    ds = [d or {} for d in drafts]
     out = []
-    if (da or {}).get("kind") != (db or {}).get("kind"):
+    if len({d.get("kind") for d in ds}) > 1:
         out.append("kind")
     for f in FIELDS:
-        if not agree(f, (da or {}).get(f), (db or {}).get(f)):
+        if not all(agree(f, ds[0].get(f), d.get(f)) for d in ds[1:]):
             out.append(f)
     return out
 
@@ -384,36 +550,74 @@ def field_place(field, readings, lines, label_boxes):
 # --- compare, sheet, fold -----------------------------------------------------------------------------------------
 
 def order_readings(mid, field, vals):
-    """The two readings in an order fixed by the photo and field, not by which model gave them; one when equal."""
+    """The distinct readings in an order fixed by the photo and field, not by which model gave them."""
     uniq = []
     for v in vals:
         if not any(agree(field if field != "kind" else "x", v, u) for u in uniq):
             uniq.append(v)
-    flip = int(hashlib.sha1(f"{mid}/{field}".encode()).hexdigest(), 16) & 1
-    return uniq[::-1] if flip else uniq
+    random.Random(hashlib.sha1(f"{mid}/{field}".encode()).hexdigest()).shuffle(uniq)
+    return uniq
 
 
-def build(rows, keys=(FIRST, "qwen3.5-4b-mlx4")):
-    """Per photo: both drafts, the agreed fields, and the disputed ones with their readings and place."""
+def build(rows, keys=READERS):
+    """Per photo: every reader's draft, the unanimous fields, and the rest with their readings and place."""
     out = []
     for r in rows:
-        ra, rb = draft_of(r["id"], keys[0]), draft_of(r["id"], keys[1])
-        da, db = (ra or {}).get("parsed"), (rb or {}).get("parsed")
-        rec = dict(r, drafted=[ra is not None, rb is not None], parsed=[da is not None, db is not None],
-                   agreed={}, disputed=[], wall_s=[(ra or {}).get("wall_s"), (rb or {}).get("wall_s")])
-        if da is None or db is None:
+        recs = [draft_of(r["id"], k) for k in keys]
+        ds = [(x or {}).get("parsed") for x in recs]
+        rec = dict(r, readers=list(keys), drafted=[x is not None for x in recs], parsed=[d is not None for d in ds],
+                   agreed={}, disputed=[], controls=[], wall_s=[(x or {}).get("wall_s") for x in recs],
+                   odd=None)
+        if any(d is None for d in ds):
             out.append(rec)
             continue
         lines = lines_of(r["id"])
+        rec["_place"] = (lines, [d.get("label_box") for d in ds])
+        split = disputes(*ds)
+        odd = {}
         for f in ["kind"] + FIELDS:
-            if f in disputes(da, db):
-                vals = order_readings(r["id"], f, [da.get(f), db.get(f)])
-                box, how = field_place(f, vals, lines, [da.get("label_box"), db.get("label_box")])
-                rec["disputed"].append({"field": f, "readings": vals, "box": box, "placed": how})
+            vals = [d.get(f) for d in ds]
+            if f in split:
+                box, how = field_place(f, order_readings(r["id"], f, vals), lines, rec["_place"][1])
+                rec["disputed"].append({"field": f, "readings": order_readings(r["id"], f, vals), "box": box,
+                                        "placed": how})
+                odd[f] = odd_one(f, vals, keys)
             else:
-                rec["agreed"][f] = da.get(f)
+                rec["agreed"][f] = ds[0].get(f)
+        rec["odd"] = odd
         out.append(rec)
+    pick_controls(out)
+    for r in out:
+        r.pop("_place", None)
     return out
+
+
+def odd_one(field, vals, keys):
+    """The reader that alone disagrees with the other two, or None when no two agree."""
+    g = "x" if field == "kind" else field
+    for i, k in enumerate(keys):
+        rest = [v for j, v in enumerate(vals) if j != i]
+        if agree(g, rest[0], rest[1]) and not agree(g, vals[i], rest[0]):
+            return k
+    return None
+
+
+def pick_controls(rows, n=CONTROLS):
+    """Put n unanimous fields on the sheet unmarked, half with a value and half agreed empty, drawn with the seed.
+    A control keeps its agreed value in the truth unless the owner answers it."""
+    cands = sorted((r["id"], f) for r in rows if "_place" in r for f, v in r["agreed"].items() if v is not None)
+    empty = sorted((r["id"], f) for r in rows if "_place" in r for f, v in r["agreed"].items()
+                   if v is None and f != "kind")
+    rng = random.Random(SEED)
+    chosen = rng.sample(cands, min(n - n // 2, len(cands))) + rng.sample(empty, min(n // 2, len(empty)))
+    by = {r["id"]: r for r in rows}
+    for mid, f in chosen:
+        r = by[mid]
+        v = r["agreed"][f]
+        box, how = field_place(f, [v] if v else [], *r["_place"])
+        r["controls"].append({"field": f, "readings": [v] if v else [], "box": box, "placed": how})
+    for r in rows:   # in field order, so a control sits among the disputes like one of them
+        r["controls"].sort(key=lambda d: (["kind"] + FIELDS).index(d["field"]))
 
 
 def cmd_compare(a):
@@ -427,14 +631,22 @@ def cmd_compare(a):
     print(f"{RESULTS}; sheet {os.path.join(SHEET, 'index.html')}")
 
 
+def asked(r):
+    """The fields the sheet asks about on one photo, disputes and controls together, in field order, unmarked."""
+    order = ["kind"] + FIELDS
+    return sorted(r["disputed"] + r.get("controls", []), key=lambda d: order.index(d["field"]))
+
+
 def sheet_items(rows):
     out = []
-    for n, r in enumerate((r for r in rows if r["disputed"]), 1):
+    for n, r in enumerate((r for r in rows if asked(r)), 1):
+        ask = asked(r)
+        on = {d["field"] for d in ask}
         out.append({"id": r["id"], "n": n, "img": os.path.relpath(image_of(r["id"]), SHEET),
                     "colour": "box (Red)" if r["colour"] == "Red" else "folder (Purple)",
-                    "agreed": {f: v for f, v in r["agreed"].items() if v},
+                    "agreed": {f: v for f, v in r["agreed"].items() if v and f not in on},
                     "fields": [{"field": d["field"], "label": LABELS[d["field"]], "readings": d["readings"],
-                                "box": d["box"], "placed": d["placed"]} for d in r["disputed"]]})
+                                "box": d["box"], "placed": d["placed"]} for d in ask]})
     return out
 
 
@@ -448,26 +660,34 @@ def write_sheet(rows):
 def fold(rows, answers):
     """W47.ct-read's truth: per photo, the agreed fields, then each disputed field as the owner answered it.
     An answer is {"pick": "<a reading>" | "other" | "not on the label", "text": "<typed value>"}; an unanswered
-    disputed field stays out of the truth and is counted. Returns (truth rows, unanswered count)."""
+    disputed field stays out of the truth and is counted; an unanswered control keeps its agreed value. `ruled` lists
+    the fields the owner answered: the drafters (`drafters`) may be scored only on those (FLD-9), and a control the
+    owner overturned is counted in `controls_overturned`. Returns (truth rows, unanswered count)."""
     truth, missing = [], 0
     for r in rows:
         if not all(r["parsed"]):
             continue
-        fields = dict(r["agreed"])
-        for d in r["disputed"]:
+        fields, ruled, overturned = dict(r["agreed"]), [], []
+        for d in r["disputed"] + r.get("controls", []):
             ans = (answers.get(r["id"]) or {}).get(d["field"])
             if not ans or not ans.get("pick"):
-                missing += 1
+                missing += d in r["disputed"]
                 continue
             pick = ans["pick"]
             if pick == "not on the label":
-                fields[d["field"]] = None
+                v = None
             elif pick == "other":
-                fields[d["field"]] = clean(ans.get("text"))
+                v = clean(ans.get("text"))
             else:
-                fields[d["field"]] = pick
+                v = pick
+            if d in r.get("controls", []) and not agree("x" if d["field"] == "kind" else d["field"], v,
+                                                          fields.get(d["field"])):
+                overturned.append(d["field"])
+            fields[d["field"]] = v
+            ruled.append(d["field"])
         truth.append({"id": r["id"], "path": r["path"], "colour": r["colour"], "stratum": r["repository"],
-                      "fields": fields, "complete": len(fields) == len(FIELDS) + 1})
+                      "fields": fields, "ruled": ruled, "controls_overturned": overturned,
+                      "drafters": r.get("readers", []), "complete": len(fields) == len(FIELDS) + 1})
     return truth, missing
 
 
@@ -478,7 +698,34 @@ def cmd_fold(a):
         for t in truth:
             fh.write(json.dumps(t, ensure_ascii=False) + "\n")
     print(f"{len(truth)} photos in the truth, {sum(t['complete'] for t in truth)} complete; "
-          f"{missing} disputed fields unanswered")
+          f"{missing} disputed fields unanswered; {sum(len(t['ruled']) for t in truth)} fields owner-ruled; "
+          f"controls overturned: {sum(len(t['controls_overturned']) for t in truth)} of {CONTROLS}")
+
+
+def pdf_comparison(rows):
+    """The PDF build beside this one, on the markers both read: how often the PDF-built two-reader agreement held
+    on the JPEGs, and how often Qwen3-VL 8B's own reading changed between the PDF and the JPEG."""
+    p = os.path.join(PDF_POOL, "draft-truth.jsonl")
+    if not os.path.exists(p):
+        return None
+    old = {r["id"]: r for r in (json.loads(l) for l in open(p, encoding="utf-8")) if all(r["parsed"])}
+    both = [r for r in rows if all(r["parsed"]) and r["id"] in old]
+    c = collections.Counter()
+    for r in both:
+        o = old[r["id"]]
+        da = (draft_of(r["id"], FIRST) or {}).get("parsed") or {}
+        oa = ((json.load(open(os.path.join(PDF_POOL, "draft", FIRST, r["id"] + ".json"), encoding="utf-8"))
+               if os.path.exists(os.path.join(PDF_POOL, "draft", FIRST, r["id"] + ".json")) else {})
+              .get("parsed") or {})
+        for f in ["kind"] + FIELDS:
+            c["fields"] += 1
+            c["8b same"] += agree("x" if f == "kind" else f, da.get(f), oa.get(f))
+            if f in o["agreed"]:
+                c["pdf agreed"] += 1
+                if f in r["agreed"]:
+                    c["pdf agreed, jpeg unanimous"] += 1
+                    c["pdf agreed, jpeg same value"] += agree("x" if f == "kind" else f, r["agreed"][f], o["agreed"][f])
+    return len(both), c
 
 
 def write_results(rows):
@@ -486,57 +733,129 @@ def write_results(rows):
     unparsed = [r for r in rows if not all(r["parsed"])]
     by_class = {c: [r for r in drafted if r["colour"] == c] for c in ("Red", "Purple")}
     lines_n = sum(1 for r in rows if lines_of(r["id"]))
-    L = ["# Container labels: the truth set's two-reader draft (W47.ct-truth)", "",
-         f"Written by `scripts/segbench/ct_truth.py compare`. {len(rows)} marker photos from the corpus (read-only; "
-         f"pages copied as JPEG at {MAX_SIDE} px), stratified by repository (floor {FLOOR}, then by the square root "
-         f"of each repository's marker count, round-robin across collection directories, seed {SEED}). Each was read "
-         f"blind into the nine fields of `execution-plans/containers/00-plan.md` plus what the photo is, by "
-         f"{MODELS[FIRST][1]} and {MODELS['qwen3.5-4b-mlx4'][1]} (this Mac, temperature 0, $0, no plan route). "
-         f"A field is agreed when both readings match after case, punctuation and \"Box No.\" spellings are "
-         f"normalised; both empty counts as agreed. Agreement is not truth: two readers can make the same miss, "
-         f"and the owner sees only the disputes.", "",
-         f"Drafted by both: {len(drafted)}; a reply that did not parse: {len(unparsed)}. Apple Vision lines for "
-         f"the sheet's boxes: {lines_n} photos.", "",
-         "## Strata in the sample", "",
-         "A stratum is the repository's directory, except under a workflow folder, where the level below it is a "
-         "priority folder or Re-OCR and the corpus has no repository level (marked *workflow*).", "",
-         "| stratum | box (Red) | folder (Purple) |", "|---|---|---|"]
+    st = json.load(open(SAMPLING, encoding="utf-8")) if os.path.exists(SAMPLING) else {"classes": {}}
+    names = ", ".join(NAMES[k] for k in READERS)
+    L = ["# Container labels: the truth set's three-reader draft, on the JPEG originals (W47.ct-truth-jpeg)", "",
+         f"Written by `scripts/segbench/ct_truth.py compare`. {len(rows)} marker photos (Red for a box, Purple for a "
+         f"folder), each the JPEG original of a corpus PDF, upright, at {MAX_SIDE} px. Read blind into the nine "
+         f"fields of `execution-plans/containers/00-plan.md` plus what the photo is, by {names}; temperature 0, "
+         f"the same image and prompt for each. A field is agreed when all three readings match after case, "
+         f"punctuation and \"Box No.\" spellings are normalised; all empty counts as agreed. Agreement is not truth: "
+         f"three readers can make the same miss, which is what the sheet's controls measure.", "",
+         "The first build read the corpus PDFs; it stays beside this one (`ct-truth-pdf.md`, and `pool/` in the "
+         "cache) and is compared below.", "",
+         "## The sample: the PDF build's 240, on their JPEG originals", "",
+         f"Each of the PDF build's 240 markers was paired through `corpus_pairs.py`'s pairs.tsv and confirmed by "
+         f"`ocr_truth.orient_like_pdf` (grey thumbnails at four turns, correlation at least {MIN_CORR}), whose best "
+         f"turn makes the JPEG upright like the PDF. A marker left out was refilled from its stratum and colour "
+         f"(a fresh draw, seed {SEED}, over the corpus's current markers, each confirmed the same way). The corpus "
+         f"now holds {st.get('markers_now', '?')} single-colour markers; some of the 240 have moved since.", "",
+         "| | box (Red) | folder (Purple) |", "|---|---|---|"]
+    cl = st["classes"]
+    reasons = sorted({k for c in cl.values() for k in c["left_out"]})
+    get = lambda c, k: cl.get(c, {}).get(k, 0)
+    L.append(f"| in the PDF build | {get('Red', 'pdf_sample')} | {get('Purple', 'pdf_sample')} |")
+    for k in reasons:
+        L.append(f"| left out: {k} | {cl.get('Red', {}).get('left_out', {}).get(k, 0)} | "
+                 f"{cl.get('Purple', {}).get('left_out', {}).get(k, 0)} |")
+    L.append(f"| refilled from the stratum | {get('Red', 'refilled')} | {get('Purple', 'refilled')} |")
+    L.append(f"| short (a stratum with no confirmed marker left) | "
+             f"{sum(cl.get('Red', {}).get('short', {}).values())} | {sum(cl.get('Purple', {}).get('short', {}).values())} |")
+    L.append(f"| in this build | {get('Red', 'sampled')} | {get('Purple', 'sampled')} |")
+    turns = collections.Counter(r.get("turn", 0) for r in rows)
+    corr = sorted(r["corr"] for r in rows if r.get("corr") is not None)
+    rej = sorted(v for c in cl.values() for v in c.get("rejected_corr", []))
+    L += ["", f"Turned to match the PDF: {sum(v for k, v in turns.items() if k)} of {len(rows)} "
+          f"({', '.join(f'{v} by {k}°' for k, v in sorted(turns.items()) if k)}). Correlation of the kept pairs "
+          f"{corr[0]:.2f}–{corr[-1]:.2f}, median {corr[len(corr) // 2]:.2f}." if corr else "",
+          "",
+          f"**The cut is conservative on label photos.** The {len(rej)} pairs under the cut ran "
+          f"{rej[0] if rej else '–'} to {rej[-1] if rej else '–'} in an unbroken spread, not the two clusters "
+          f"the cut was set on (true document pages 0.69–0.98, mismatches 0.16–0.48). An eye check of eight Red "
+          f"rejects spread across that range (−0.03 to 0.645) found all eight the same photo as their PDF: the PDF "
+          f"had been cropped, deskewed or straightened (one PDF is upside down), which lowers a whole-image "
+          f"correlation. So most of the \"not the same photo\" left-outs are true pairs, and the refills lean "
+          f"toward markers whose PDF was little changed. The cut was kept, as the item asks; a label-photo "
+          f"confirmation that tolerates cropping (text overlap, feature matching) would recover them.", "",
+          "## Strata in the sample", "",
+          "A stratum is the repository's directory, except under a workflow folder, where the level below it is a "
+          "priority folder or Re-OCR and the corpus has no repository level (marked *workflow*).", "",
+          "| stratum | box (Red) | folder (Purple) | of them refilled |", "|---|---|---|---|"]
     reps = collections.Counter((r["repository"], r["colour"]) for r in rows)
+    refills = collections.Counter(r["repository"] for r in rows if r.get("refill"))
     wf = {r["repository"] for r in rows if r.get("workflow")}
     for rep in sorted({r["repository"] for r in rows}):
-        L.append(f"| {rep}{' (*workflow*)' if rep in wf else ''} | {reps[(rep, 'Red')]} | {reps[(rep, 'Purple')]} |")
-    L += ["", "## Agreement per field", "",
-          "Disputed / with a value from both readers agreed / both empty, out of the photos both drafted.", "",
-          "| field | box: disputed | box: agreed, a value | box: agreed, empty | folder: disputed | "
-          "folder: agreed, a value | folder: agreed, empty |", "|---|---|---|---|---|---|---|"]
+        L.append(f"| {rep}{' (*workflow*)' if rep in wf else ''} | {reps[(rep, 'Red')]} | {reps[(rep, 'Purple')]} "
+                 f"| {refills[rep]} |")
+    L += ["", f"Drafted by all three: {len(drafted)}; a reply that did not parse: {len(unparsed)}. Apple Vision "
+          f"lines for the sheet's boxes: {lines_n} photos.", "",
+          "## Agreement per field", "",
+          "Not unanimous / unanimous with a value / unanimous empty, out of the photos all three drafted; then which "
+          "reader was the odd one out where the other two agreed.", "",
+          "| field | box: split | box: agreed, a value | box: agreed, empty | folder: split | folder: agreed, a value "
+          "| folder: agreed, empty | odd one out: " + " / ".join(NAMES[k].split(",")[0].split(" (")[0] for k in READERS)
+          + " / no two agree |", "|---|---|---|---|---|---|---|---|"]
     for f in ["kind"] + FIELDS:
         cells = []
         for c in ("Red", "Purple"):
             rs = by_class[c]
-            dis = sum(any(d["field"] == f for d in r["disputed"]) for r in rs)
-            val = sum(f in r["agreed"] and r["agreed"][f] is not None for r in rs)
-            emp = sum(f in r["agreed"] and r["agreed"][f] is None for r in rs)
-            cells += [str(dis), str(val), str(emp)]
+            cells += [str(sum(any(d["field"] == f for d in r["disputed"]) for r in rs)),
+                      str(sum(f in r["agreed"] and r["agreed"][f] is not None for r in rs)),
+                      str(sum(f in r["agreed"] and r["agreed"][f] is None for r in rs))]
+        odd = collections.Counter((r.get("odd") or {}).get(f, "none") for r in drafted if f in (r.get("odd") or {}))
+        cells.append(" / ".join(str(odd[k]) for k in READERS) + f" / {odd['none'] + odd[None]}")
         L.append(f"| {LABELS[f]} | " + " | ".join(cells) + " |")
-    kinds = collections.Counter((r["colour"], r["agreed"].get("kind", "disputed")) for r in drafted if
-                                "kind" in r["agreed"] or any(d["field"] == "kind" for d in r["disputed"]))
-    L += ["", "## What the photos are, where both readers agree", "", "| reading | box (Red) | folder (Purple) |",
+    kinds = collections.Counter((r["colour"], r["agreed"].get("kind", "disputed")) for r in drafted)
+    L += ["", "## What the photos are, where all three agree", "", "| reading | box (Red) | folder (Purple) |",
           "|---|---|---|"]
     for k in KINDS + [None, "disputed"]:
         L.append(f"| {k or 'no answer'} | {kinds[('Red', k)]} | {kinds[('Purple', k)]} |")
-    sheet = [r for r in drafted if r["disputed"]]
-    placed = collections.Counter(d["placed"] for r in sheet for d in r["disputed"] if d["field"] != "kind")
-    walls = {k: [r["wall_s"][i] for r in rows if r["wall_s"][i]] for i, k in enumerate((FIRST, "qwen3.5-4b-mlx4"))}
+    sheet = [r for r in drafted if asked(r)]
+    ctl = [d for r in drafted for d in r.get("controls", [])]
+    placed = collections.Counter(d["placed"] for r in sheet for d in asked(r) if d["field"] != "kind")
     L += ["", "## The owner's sheet", "",
-          f"{len(sheet)} photos carry at least one dispute, {sum(len(r['disputed']) for r in sheet)} disputed "
-          f"fields in all, {sum(1 for r in drafted if not r['disputed'])} photos fully agreed. Boxes on the sheet "
-          f"(fields other than what the photo is): {placed['lines']} drawn from the Vision lines matching a "
-          f"reading, {placed['label']} from a reader's label region, {placed['none']} with no box (the sheet "
-          f"says so). The sheet is `pool/sheet/index.html` in the cache (private: corpus images); its answers fold "
-          f"into `pool/truth.jsonl` with `ct_truth.py fold`.", "",
+          f"{sum(1 for r in drafted if r['disputed'])} photos carry at least one split field, "
+          f"{sum(len(r['disputed']) for r in drafted)} split fields in all; "
+          f"{sum(1 for r in drafted if not r['disputed'])} photos are unanimous on every field. The sheet adds "
+          f"{len(ctl)} unanimous fields as unmarked controls ({sum(1 for d in ctl if d['readings'])} with a value, "
+          f"{sum(1 for d in ctl if not d['readings'])} agreed empty), so it asks {sum(len(asked(r)) for r in sheet)} "
+          f"fields on {len(sheet)} photos. Boxes (fields other than what the photo is): {placed['lines']} from the "
+          f"Vision lines matching a reading, {placed['label']} from a reader's label region, {placed['none']} with "
+          f"no box (the sheet says so). The sheet is `pool-jpeg/sheet/index.html` in the cache (private: corpus "
+          f"images); its answers fold into `pool-jpeg/truth.jsonl` with `ct_truth.py fold`, which records the "
+          f"fields the owner ruled and how many controls the owner overturned.", ""]
+    cmp_ = pdf_comparison(rows)
+    if cmp_:
+        n, c = cmp_
+        L += ["## Beside the PDF build", "",
+              f"On the {n} markers both builds read: Qwen3-VL 8B gave the same reading from the JPEG as from the PDF "
+              f"on {c['8b same']} of {c['fields']} fields ({100 * c['8b same'] / max(1, c['fields']):.0f}%). Of the "
+              f"{c['pdf agreed']} fields the two Qwen readers agreed on from the PDFs, {c['pdf agreed, jpeg unanimous']} "
+              f"are unanimous among the three readers on the JPEGs, {c['pdf agreed, jpeg same value']} with the same "
+              f"value; the rest now go to the owner.", ""]
+    led = gateway_ledger()
+    walls = {k: [r["wall_s"][i] for r in rows if r.get("wall_s") and r["wall_s"][i]] for i, k in enumerate(READERS)}
+    import gateway_gemini as G
+    L += ["## The drafters W47.ct-read may not score", "",
+          f"{names} drafted this truth. W47.ct-read scores any of them only on the fields the owner ruled (the fold's "
+          f"`ruled`: the split fields and the controls answered); on the rest a figure is agreement with the "
+          f"drafters, and is reported as that (measurement audit FLD-9).", "",
           "## Cost", "",
-          " ".join(f"{MODELS[k][1]}: {len(w)} photos, {sum(w) / len(w):.1f} s a photo on average, "
-                   f"{sum(w) / 60:.0f} min in all." for k, w in walls.items() if w) + " $0.", ""]
+          " ".join(f"{NAMES[k]}: {len(w)} photos, {sum(w) / len(w):.1f} s a photo on average, "
+                   f"{sum(w) / 60:.0f} min in all." for k, w in walls.items() if w and k != GATEWAY) + " $0.", "",
+          f"{NAMES[GATEWAY]}: {len(led)} calls, ${sum(G.charge(r) for r in led):.2f} real money on the Stanford "
+          f"gateway ({G.billed_note(led)}), against the owner's approval of about $0.70.", "",
+          "## Measurement card", "",
+          "- **Truth:** none yet. This is a draft for the owner's sheet: unanimous fields go in unchecked except the "
+          f"{CONTROLS} controls, split fields wait for the owner's ruling. The three drafters are named above.",
+          "- **Selection:** the PDF build's stratified draw by repository from the Finder tags (no tested route, no "
+          "ABBYY text), less the markers with no confirmed JPEG; refills come from the same strata. The cut's "
+          "losses are not random (see the sample), and they fall mostly on Red.",
+          "- **Comparison:** the same JPEG, prompt and settings for all three readers.",
+          "- **Noise:** a single pass at temperature 0; no rerun floor. The counts above describe this sample, not "
+          "the corpus.",
+          "- **Scope:** reports agreement only; says nothing about which reader is right until the sheet is "
+          "answered and W47.ct-read scores it.", ""]
     with open(RESULTS, "w", encoding="utf-8") as fh:
         fh.write("\n".join(L))
 
@@ -549,13 +868,14 @@ border-bottom:1px solid #ccc;z-index:9}.doc{border-bottom:2px solid #888;padding
 .tag{position:absolute;background:#f0a;color:#fff;font:bold 12px sans-serif;padding:0 4px;transform:translateY(-100%)}
 .q{margin:8px 0 14px}.q label{display:block;margin-left:12px}.agreed{color:#555;font-size:13px}.nobox{color:#a05;font-size:13px}
 </style>
-<header><b>Container labels.</b> Two readers disagree on the fields below. Each pink box is where the field is
-written (it can be off; it does not say which reading is right). Pick what the label says, type it under "other",
-or say it is not on the label. Answers save in this browser; <button id="dl">download answers</button>
+<header><b>Container labels.</b> Three readers do not all agree on most of the fields below; a few are fields
+where they did agree, mixed in as a check. Each pink box is where the field is written (it can be off; it does not
+say which reading is right). Pick what the label says, type it under "other", or say it is not on the label.
+Answers save in this browser; <button id="dl">download answers</button>
 <span id="prog"></span></header>
 <div id="root"></div>
 <script>
-const DATA=__DATA__;const KINDS=__KINDS__;const KEY='w47-ct-truth';const ans=JSON.parse(localStorage.getItem(KEY)||'{}');
+const DATA=__DATA__;const KINDS=__KINDS__;const KEY='w47-ct-truth-jpeg';const ans=JSON.parse(localStorage.getItem(KEY)||'{}');
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const total=DATA.reduce((n,d)=>n+d.fields.length,0);
 function prog(){let n=0;for(const d of DATA)for(const f of d.fields)if(ans[d.id]?.[f.field]?.pick)n++;
@@ -563,11 +883,11 @@ function prog(){let n=0;for(const d of DATA)for(const f of d.fields)if(ans[d.id]
 let h='';DATA.forEach(d=>{h+=`<div class="doc"><div class="frame"><img src="${esc(d.img)}">`;
  d.fields.forEach((f,i)=>{if(f.box&&f.field!=='kind')h+=`<div class="box" style="left:${100*f.box[0]}%;top:${100*f.box[1]}%;width:${100*f.box[2]}%;height:${100*f.box[3]}%"></div><div class="tag" style="left:${100*f.box[0]}%;top:${100*f.box[1]}%">${i+1}</div>`});
  h+=`</div><div><b>${d.n}. Photo ${d.id}</b>, tagged ${esc(d.colour)}`;
- const ag=Object.entries(d.agreed);if(ag.length)h+=`<div class="agreed">Both readers agree: ${ag.map(([k,v])=>esc(k)+' = '+esc(v)).join('; ')}</div>`;
+ const ag=Object.entries(d.agreed);if(ag.length)h+=`<div class="agreed">The readers agree: ${ag.map(([k,v])=>esc(k)+' = '+esc(v)).join('; ')}</div>`;
  d.fields.forEach((f,i)=>{const nm=d.id+'/'+f.field;const cur=ans[d.id]?.[f.field]||{};
   h+=`<div class="q"><b>${i+1}. ${esc(f.label)}</b>`;
-  if(f.field!=='kind'&&f.placed==='label')h+=` <span class="nobox">(box ${i+1} is the whole label: neither reading was found on a line)</span>`;
-  if(f.field!=='kind'&&f.placed==='none')h+=` <span class="nobox">(no box: neither reading was found on the photo; look over the whole label)</span>`;
+  if(f.field!=='kind'&&f.placed==='label')h+=` <span class="nobox">(box ${i+1} is the whole label: no reading was found on a line)</span>`;
+  if(f.field!=='kind'&&f.placed==='none')h+=` <span class="nobox">(no box: no reading was found on the photo; look over the whole label)</span>`;
   const opts=f.field==='kind'?KINDS:[...f.readings.filter(r=>r!==null),'other','not on the label'];
   for(const o of opts)h+=`<label><input type="radio" name="${esc(nm)}" value="${esc(o)}" ${cur.pick===o?'checked':''}> ${o==='other'?'other:':esc(o)}${o==='other'?` <input data-t="${esc(nm)}" value="${esc(cur.text)}" size="40">`:''}</label>`;
   h+='</div>'});h+='</div></div>'});
@@ -575,7 +895,7 @@ document.getElementById('root').innerHTML=h;
 const set=(nm,k,v)=>{const [id,f]=nm.split('/');ans[id]=ans[id]||{};ans[id][f]={...(ans[id][f]||{}),[k]:v};localStorage.setItem(KEY,JSON.stringify(ans));prog()};
 document.querySelectorAll('input[type=radio]').forEach(e=>e.onchange=()=>set(e.name,'pick',e.value));
 document.querySelectorAll('[data-t]').forEach(e=>e.oninput=()=>set(e.dataset.t,'text',e.value));prog();
-document.getElementById('dl').onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(ans,null,1)],{type:'application/json'}));a.download='W47-ct-truth-answers.json';a.click()};
+document.getElementById('dl').onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(ans,null,1)],{type:'application/json'}));a.download='W47-ct-truth-jpeg-answers.json';a.click()};
 </script>"""
 
 
@@ -708,12 +1028,13 @@ def cmd_owner_tree(a):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
-    s = sub.add_parser("sample")
-    s.add_argument("--per-class", type=int, default=PER_CLASS)
-    s.set_defaults(fn=cmd_sample)
+    sub.add_parser("sample").set_defaults(fn=cmd_sample)
     for name, fn in (("render", cmd_render), ("lines", cmd_lines), ("compare", cmd_compare), ("trees", cmd_trees),
                      ("owner-tree", cmd_owner_tree)):
         sub.add_parser(name).set_defaults(fn=fn)
+    g = sub.add_parser("gateway")
+    g.add_argument("--limit", type=int)
+    g.set_defaults(fn=cmd_gateway)
     c = sub.add_parser("collect")
     c.add_argument("--limit", type=int)
     c.add_argument("--model", choices=sorted(MODELS), default=FIRST)
