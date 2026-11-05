@@ -554,12 +554,26 @@ final class NavigationUITests: FixtureUITestCase {
     }
 
     /// W40.fix-reader-date-ambiguity (ledger R-47): the fixture's `00006` carries two Years (`1983`, `1984`).
-    /// The filter-bar toggle finds it alone, its Date cell is flagged naming the Year set aside, and the ⌘I
-    /// sheet says the same. Read-only: nothing is written.
+    /// The Library health popover's Show button finds it alone (W40.fix-reader-health-counts: the filter bar shows the
+    /// toggle only while it is on), its Date cell is flagged naming the Year set aside, and the ⌘I sheet says the
+    /// same. Read-only: nothing is written.
     func testTwoYearTagsAreFlaggedAndTheFilterFindsThem() throws {
         let toggle = app.descendants(matching: .any)["ar.filter.ambiguousDates"]
-        XCTAssertTrue(toggle.waitForExistence(timeout: 10), "a fixture with two Year tags should offer the filter")
-        toggle.click()
+        XCTAssertFalse(toggle.exists, "the filter bar should not show the ambiguous-dates count while the filter is off")
+        let health = app.descendants(matching: .any)["ar.status.health"]
+        XCTAssertTrue(health.waitForExistence(timeout: 10))
+        let show = app.descendants(matching: .any)["ar.health.ambiguousDates"]
+        // The count arrives after the library loads; reopen the popover until its Show button is enabled.
+        let deadline = Date().addingTimeInterval(15)
+        repeat {
+            health.click()
+            if show.waitForExistence(timeout: 3), show.isEnabled { break }
+            app.typeKey(.escape, modifierFlags: [])
+        } while Date() < deadline
+        XCTAssertTrue(show.isEnabled, "a fixture with two Year tags should offer the filter in Library health")
+        captureScreenshot("w40-health-popover")
+        show.click()
+        XCTAssertTrue(toggle.waitForExistence(timeout: 5), "the active filter should show in the filter bar")
         XCTAssertTrue(waitForRowCount(1), "the ambiguous-dates filter should list only the two-Year document")
         let row = table.tableRows.element(boundBy: 0)
         let dateCell = row.descendants(matching: .any)
@@ -582,6 +596,7 @@ final class NavigationUITests: FixtureUITestCase {
         toggle.click()
         waitForRows(minimum: 2, timeout: 10)
         XCTAssertGreaterThan(rowCount, 1, "turning the filter off should bring the other rows back")
+        XCTAssertTrue(toggle.waitForNonExistence(timeout: 5), "turned off, the filter should leave the filter bar")
     }
 
     // MARK: - Phantom selection (W40.fix-reader-phantom-selection)

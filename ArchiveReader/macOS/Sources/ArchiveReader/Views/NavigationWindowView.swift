@@ -462,7 +462,10 @@ struct NavigationWindowView: View {
             }
         }
 
-        if model.needsAttentionCount > 0 {
+        // W40.fix-reader-health-counts (reader-1 row 2): the two health filters are turned on from the Library
+        // health popover, and show here only while on, so the bar is not a standing reminder of the counts and an
+        // active filter can still be seen and turned off.
+        if model.filter.needsAttentionOnly {
             Toggle(isOn: $model.filter.needsAttentionOnly) {
                 Label("\(model.needsAttentionCount) need attention", systemImage: "exclamationmark.triangle")
             }
@@ -473,8 +476,7 @@ struct NavigationWindowView: View {
             .accessibilityIdentifier("ar.filter.needsAttention")
         }
 
-        // W40.fix-reader-date-ambiguity: stays visible while on, so fixing the last file never strands the filter.
-        if model.ambiguousDateCount > 0 || model.filter.ambiguousDatesOnly {
+        if model.filter.ambiguousDatesOnly {
             Toggle(isOn: $model.filter.ambiguousDatesOnly) {
                 Label("\(model.ambiguousDateCount) ambiguous date\(model.ambiguousDateCount == 1 ? "" : "s")",
                       systemImage: "calendar.badge.exclamationmark")
@@ -731,11 +733,24 @@ struct NavigationWindowView: View {
                     .help(f.detail)
                     .accessibilityIdentifier("ar.status.indexFailure")
             }
-            Button { showingHealth = true } label: { Image(systemName: "stethoscope") }
+            // The quiet indicator for the counts the filter bar no longer shows (W40.fix-reader-health-counts):
+            // tinted, with a dot, while a file needs attention or has an ambiguous date.
+            let healthIssues = model.needsAttentionCount > 0 || model.ambiguousDateCount > 0
+            Button { showingHealth = true } label: {
+                Image(systemName: healthIssues ? "stethoscope.circle.fill" : "stethoscope")
+                    .foregroundStyle(healthIssues ? ReaderColors.warning : .secondary)
+            }
                 .buttonStyle(.borderless)
-                .help("Library health")
+                .help(healthIssues ? "Library health: some files need a look" : "Library health")
+                .accessibilityLabel("Library health")
+                .accessibilityValue(healthIssues ? "some files need a look" : "")
                 .accessibilityIdentifier("ar.status.health")
-                .popover(isPresented: $showingHealth) { DataQualityView(q: model.dataQuality, needsAttention: model.needsAttentionCount) }
+                .popover(isPresented: $showingHealth) {
+                    DataQualityView(q: model.dataQuality, needsAttention: model.needsAttentionCount,
+                                    ambiguousDates: model.ambiguousDateCount,
+                                    showNeedsAttention: { model.filter.needsAttentionOnly = true; showingHealth = false },
+                                    showAmbiguousDates: { model.filter.ambiguousDatesOnly = true; showingHealth = false })
+                }
             Spacer()
             // Identified because this is where a REFUSED write reports itself ("Could not verify …"),
             // which is the only on-screen evidence that a cache row was re-verified rather than
@@ -779,10 +794,14 @@ private extension View {
     }
 }
 
-/// A small library-health readout (data-quality counts).
+/// A small library-health readout (data-quality counts). The two counts that have a list filter carry a Show
+/// button for it; the filter bar shows those filters only while they are on (W40.fix-reader-health-counts).
 private struct DataQualityView: View {
     let q: NavigationModel.DataQuality
     let needsAttention: Int
+    let ambiguousDates: Int
+    let showNeedsAttention: () -> Void
+    let showAmbiguousDates: () -> Void
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("Library health").font(.headline)
@@ -792,10 +811,27 @@ private struct DataQualityView: View {
             row("Date uncertain", q.dateUncertain)
             row("Box/folder markers", q.markers)
             row("Both Read + Unread (corrupt)", q.bothReadUnread, warn: q.bothReadUnread > 0)
-            row("Non-standard PDFs (need attention)", needsAttention, warn: needsAttention > 0)
+            filterRow("Non-standard PDFs (need attention)", needsAttention,
+                      help: "Show only non-standard PDFs — files that couldn't be opened, or have no selectable text",
+                      id: "ar.health.needsAttention", action: showNeedsAttention)
+            filterRow("Ambiguous dates", ambiguousDates,
+                      help: "Show only files with two tags for one date (two Years, Months, Days, Decades or Sent With dates)",
+                      id: "ar.health.ambiguousDates", action: showAmbiguousDates)
         }
         .padding(14)
-        .frame(width: 260)
+        .frame(width: 300)
+    }
+    private func filterRow(_ label: String, _ value: Int, help: String, id: String,
+                           action: @escaping () -> Void) -> some View {
+        HStack {
+            row(label, value, warn: value > 0)
+            Button("Show", action: action)
+                .controlSize(.small)
+                .disabled(value == 0)
+                .help(help)
+                .accessibilityLabel("Show \(label.lowercased())")
+                .accessibilityIdentifier(id)
+        }
     }
     private func row(_ label: String, _ value: Int, warn: Bool = false) -> some View {
         HStack {
