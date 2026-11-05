@@ -94,6 +94,12 @@ final class RootMarkerDisclosureTests: XCTestCase {
         let link = try copiedLink()
         XCTAssertEqual(link.0, marker.guid)
         XCTAssertEqual(link.1, pdf.lastPathComponent)
+        // W40.fix-reader-link-paste-help: the status line says where the link opens.
+        XCTAssertEqual(model.statusMessage, NavigationModel.archiveLinksCopiedMessage(count: 1))
+        for place in ["Archive Notes", "Apple Notes", "Mail", "Messages", "Safari’s address bar"] {
+            XCTAssertTrue(model.statusMessage.contains(place), "the copy status should name \(place)")
+        }
+        XCTAssertTrue(NavigationModel.archiveLinksCopiedMessage(count: 2).hasPrefix("Copied 2 archive links."))
         XCTAssertEqual(try listing(root).subtracting(before), [RootMarker.filename])
         let markerURL = root.appendingPathComponent(RootMarker.filename)
         let bytes = try Data(contentsOf: markerURL), modified = try mtime(markerURL)

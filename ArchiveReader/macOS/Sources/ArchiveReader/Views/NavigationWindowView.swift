@@ -718,6 +718,7 @@ struct NavigationWindowView: View {
             // written blind (`W26.verify-fu2`).
             if !model.statusMessage.isEmpty {
                 Text(model.statusMessage).foregroundStyle(.primary)
+                    .help(model.statusMessage)   // the whole line when a narrow window truncates it
                     .accessibilityIdentifier("ar.status.message")
             }
             // Counts what the actions will act on (`selectedFiles`, visible rows only), so the number can

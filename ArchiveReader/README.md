@@ -36,6 +36,9 @@ Protocol.
 - **Full-text search** across the OCR'd text.
 - **Edit tags** for one file or a group (subjects, date facets, Quality, color) — safely.
 - **Copy file links** (`file://` URL / path / Markdown / HTML) for single files or groups.
+- **Copy archive links** (`archivereader://`, ⇧⌘L in the Selection menu or the toolbar; ⌥⌘L in a document copies its page) that
+  keep working after the folder moves. To open one, paste it into Archive Notes, Apple Notes, Mail or Messages
+  and click it, or paste it into Safari's address bar; Archive Reader opens the document.
 - **Mark Read/Unread** in one keystroke; read files drop out of an Unread view.
 - **Document window**: two-up viewer (image left / OCR text right), independent per-pane zoom, a
   draggable splitter (default ⅔ : ⅓), keyboard-driven page-scroll + document cycling, intelligent copy

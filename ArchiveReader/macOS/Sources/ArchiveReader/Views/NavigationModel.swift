@@ -1532,6 +1532,14 @@ final class NavigationModel: ObservableObject {
         statusMessage = "Copied \(urls.count) link\(urls.count == 1 ? "" : "s")."
     }
 
+    /// Says where an `archivereader://` link opens: the owner's guided session (reader-1, row 38) did not
+    /// know where to paste one (`W40.fix-reader-link-paste-help`). The README says the same.
+    static func archiveLinksCopiedMessage(count: Int) -> String {
+        let one = count == 1
+        return "Copied \(count) archive link\(one ? "" : "s"). To open \(one ? "it" : "one"), paste into "
+            + "Archive Notes, Apple Notes, Mail or Messages and click it, or into Safari’s address bar."
+    }
+
     func copyArchiveLinks() {
         let files = selectedFiles
         guard !files.isEmpty, let rootPath = rootStore.discoveredPathPrefix else {
@@ -1552,7 +1560,7 @@ final class NavigationModel: ObservableObject {
         let expectedChangeCount = NSPasteboard.general.changeCount
         archiveCopyGeneration &+= 1
         let generation = archiveCopyGeneration
-        statusMessage = "Copied \(files.count) archive link\(files.count == 1 ? "" : "s")."
+        statusMessage = Self.archiveLinksCopiedMessage(count: files.count)
         Task {
             let item = await ArchiveLinkWriter.pasteboardItem(
                 for: files, rootPath: rootPath, marker: marker, thumbnailer: thumbnailer,
