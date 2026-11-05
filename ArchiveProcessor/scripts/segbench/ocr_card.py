@@ -18,5 +18,11 @@ TRUTH_96 = (
     "`ocr-hands-rescore.md`: 12 corrections, 10 places unresolved). Agreed words that no third-family reader "
     "disputes stay unchecked, so a drafter-family route can still gain where the truth shares its mistake.")
 
+# W46.ocr-96-vision-filter (measurement review pass 8, P8-3): the draw's MIN_WORDS filter read every candidate
+# with Apple Vision, so the 96 are conditional on Vision. Every Selection line about the 96 carries this.
+DRAW_96 = ("Every page where Apple Vision (26.6) read fewer than 20 words was replaced at the draw (19 of them, "
+           "4 tagged Handwritten; `ocr-truth.md`), so the 96 hold no page Vision reads as empty, and every "
+           "comparison with Vision on them is on pages Vision could read.")
+
 NOISE_96 = ("The rerun floor on the 96 is `ocr-rerun-noise.md`'s: a gap under 0.49 NES points, or a paired "
             "interval across 0, is a tie.")

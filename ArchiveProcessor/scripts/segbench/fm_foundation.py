@@ -355,7 +355,7 @@ def p(x):
 
 
 def write_md(o):
-    from ocr_card import card, TRUTH_96, NOISE_96
+    from ocr_card import card, TRUTH_96, NOISE_96, DRAW_96
     L = [f'# {TAG} — the macOS 27 on-device model as a free first reader', '',
          'Reproduce: `ArchiveProcessor/scripts/segbench/fm_foundation.py` (its header has every step and every setting '
          'fixed before the first answer). Model: Apple\'s on-device `SystemLanguageModel` on macOS 27.2, on the '
@@ -430,7 +430,7 @@ def write_md(o):
         'The 96 are every accuracy page; the 100 are a seeded draw, 25 from each of the 440 reference set\'s four '
         'Latin-script strata (L5-L8, where Vision\'s readings are cached; not the 895\'s nine strata), made before any '
         'reading (SEED in the script); Deaver is the development box seg_window_gateway already read at K = 3. None chosen by a '
-        'route\'s reading or by ABBYY text.',
+        'route\'s reading or by ABBYY text. ' + DRAW_96,
         'Apple Vision on the same images (the shipped free reader), its macOS 27.2 re-read (W46.vision-27-reread), so '
         'both readers ran on the same OS build; for segmentation, Gemini 3.7 Flash\'s k3-t and '
         'k3-it on the same windows and prompt. The on-device model gets a plain transcription prompt where the panel\'s '

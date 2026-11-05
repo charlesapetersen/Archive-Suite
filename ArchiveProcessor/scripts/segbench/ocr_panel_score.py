@@ -15,7 +15,7 @@ import regex
 from rapidfuzz.distance import Levenshtein
 from sacrebleu.metrics import CHRF
 import ocr_panel as P
-from ocr_card import card, TRUTH_96, NOISE_96
+from ocr_card import card, TRUTH_96, NOISE_96, DRAW_96
 
 CHRF2 = CHRF(char_order=6, word_order=0, beta=2, lowercase=False, whitespace=False, eps_smoothing=False)
 PARAMETERS = {
@@ -389,7 +389,7 @@ def report():
                     'All 99 settled originals for every route (96 in the accuracy table, the three agreement-only '
                     'letters apart, p038 excluded by the owner), and 20 matched pages for the ladder; none chosen by '
                     'a tested route or by ABBYY text. The routes are the local-sized models planned in W41, read '
-                    'hosted through OpenRouter, not on a Mac.',
+                    'hosted through OpenRouter, not on a Mac. ' + DRAW_96,
                     'The same JPEG images (quality 90, 2,400 px cap), prompt, temperature 0 and reasoning setting '
                     'for every route, one pinned endpoint and precision each, Apple Vision included. One scorer; a '
                     'failed reading scores empty.',

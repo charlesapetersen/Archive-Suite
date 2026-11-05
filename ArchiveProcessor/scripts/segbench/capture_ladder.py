@@ -42,6 +42,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
+from ocr_card import DRAW_96  # noqa: E402
 SEED = 46
 CACHE = Path.home() / 'Library/Caches/ArchiveSuiteRehearsal'
 SRC = CACHE / 'ocr-panel-local/images'
@@ -564,7 +565,7 @@ CARD = """
   within-reader Δs are set side by side on the same pages, paired by page; for Gemini a relative's draft can only make
   its own losses look larger. The owner's blind check found the typed-page truth fit for ranking (measurement audit,
   2026-10-30).
-- **Selection:** all 96 scored pages, every defect; no page chosen by a reader's result or by ABBYY text. The optical
+- **Selection:** all 96 scored pages, every defect; no page chosen by a reader's result or by ABBYY text. @DRAW_96@ The optical
   capture tags are not used to slice (CAP-1, kappa 0.14-0.47 against a blind retag).
 - **Comparison:** the same pages, prompts, decoding and server arguments as each reader's baseline. One difference:
   every defect image went through the ladder's own JPEG save (quality 92, or the JPEG row's quality) after the panel's
@@ -713,7 +714,7 @@ def cmd_report(a):
             'summary': summary, 'summary_gemini_pages': between, 'signals': sig_rows}
     (res / 'capture-ladder.json').write_text(json.dumps(page, indent=1) + '\n')
     (WORK / 'tables.md').write_text('\n'.join(L) + '\n')
-    (res / 'capture-ladder.md').write_text(REPORT_HEAD + FINDINGS + '\n' + '\n'.join(L) + '\n' + CARD)
+    (res / 'capture-ladder.md').write_text(REPORT_HEAD + FINDINGS + '\n' + '\n'.join(L) + '\n' + CARD.replace('@DRAW_96@', DRAW_96))
     print('\n'.join(L))
 
 

@@ -8,6 +8,30 @@ Drawn 2026-10-14 by `ArchiveProcessor/scripts/segbench/ocr_truth.py` (seed 41), 
 
 100 pages, one per document, from 33 collections and 58 folders. The pool: 21,105 implied documents. 19 drawn pages were replaced for having under 20 words in Apple Vision's reading; 0 could not be read from disk.
 
+The filter read every candidate with Apple Vision (macOS 26.6), so no page where Vision read fewer than 20 words is in the set: every comparison with Vision on these pages, and every suspect rate or cascade figure that uses Vision as the second reader, is on pages Vision could read. The 19 replaced pages, by their folder tags (no page was read for this): 4 tagged Handwritten, written pages Vision could not read rather than covers or blanks, so the handwritten pages kept are all hands Vision read at least 20 words of; 2 tagged Images worth reproducing, 2 a tree diagram, 1 a clipping; 10 carry no kind tag, so what they hold is not known without reading them. Vision's word counts: 0, 0, 4, 5, 6, 8, 10, 10, 10, 11, 12, 14, 15, 15, 17, 17, 18, 18, 19.
+
+| Vision words | drawn for | kind tag |
+|---:|---|---|
+| 0 | cover Harvard University Archives | no kind tag |
+| 0 | stratum 1900-1949 | no kind tag |
+| 4 | stratum undated | Images worth reproducing |
+| 5 | stratum undated | no kind tag |
+| 6 | stratum handwritten | Handwritten |
+| 8 | stratum handwritten | Handwritten |
+| 10 | fill | Images worth reproducing |
+| 10 | fill | a tree diagram |
+| 10 | stratum 1985 on | no kind tag |
+| 11 | stratum undated | no kind tag |
+| 12 | stratum before 1900 | no kind tag |
+| 14 | stratum undated | no kind tag |
+| 15 | stratum 1900-1949 | no kind tag |
+| 15 | stratum handwritten | Handwritten |
+| 17 | cover Huntington Library | a tree diagram |
+| 17 | fill | no kind tag |
+| 18 | stratum handwritten | Handwritten |
+| 18 | stratum undated | no kind tag |
+| 19 | cover Stanford University Archives | Clippings |
+
 | stratum | pool (documents) | pages | from the original photo |
 |---|---:|---:|---:|
 | before 1900 | 63 | 12 | 9 (75%) |

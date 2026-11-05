@@ -43,6 +43,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path[:0] = [str(HERE), str(HERE / 'corpus')]
 import ocr_panel as P                      # noqa: E402
+from ocr_card import DRAW_96                # noqa: E402
 import ocr_panel_score as S                # noqa: E402
 import ocr_scorers as Z                    # noqa: E402
 import routes as R                         # noqa: E402
@@ -401,7 +402,9 @@ def write_md(path, summary, rest, counts):
          'share of the reading\'s words that the second reader (Apple Vision; Gemini 3.8 Flash for Vision\'s own row) '
          'does not contain; **prec** is the share of those the truth lacks, **rec** the share of the reading\'s '
          'non-truth words that are suspect, **ρ** the page-level Spearman correlation of suspect rate with added '
-         'rate.', '']
+         'rate. The 96 hold no page Vision reads as empty: the draw replaced every page where Vision (26.6) read '
+         'fewer than 20 words (19 of them, `ocr-truth.md`), so the suspect columns on the 96 are on pages Vision '
+         'could read.', '']
     hdr = ('| route | family | pages | NES (answered) | added | rewritten | cMER | NB overall | bowF1 | gap | '
            'suspect | prec | rec | ρ |')
     sep = '|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|'
@@ -486,7 +489,7 @@ def card(own, pub):
             '- **Truth.** The 96: the adjudicated truth with the 2026-10-29 corrections (`ocr_panel.TRUTH`). The 895: '
             'the published transcriptions of the frozen public pages (`corpus/routes.frozen()`).',
             f'- **Selection.** Every cached reading: {len(own)} routes on the 96, {len(pub)} on the 895, each over the '
-            'pages its own run covered; no route or page chosen by its score.',
+            'pages its own run covered; no route or page chosen by its score. On the 96: ' + DRAW_96,
             '- **Comparison.** Each route at its own run\'s settings: quantisation, KV-cache dtype, hardware and harness '
             'differ across the cloud, FarmShare and Sherlock rows, and a FarmShare route\'s 96 and 895 rows are '
             'different runs (fp8 against BF16 KV cache, 32 against 16 sequences). '

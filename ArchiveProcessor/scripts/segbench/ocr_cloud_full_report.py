@@ -5,7 +5,7 @@ from pathlib import Path
 import ocr_cloud_full as F
 import ocr_panel as P
 from ocr_panel_score import score, aggregate, group_values, write_csv
-from ocr_card import card, TRUTH_96, NOISE_96
+from ocr_card import card, TRUTH_96, NOISE_96, DRAW_96
 
 MISTRAL = 'mistral-ocr-4-1'
 LOCAL_SCORES = F.C.LOCAL / 'scores.json'
@@ -191,7 +191,7 @@ def report():
     L += card(TRUTH_96 + ' The figures here are rescored on that truth as it now stands.',
               'All 96 accuracy pages for every route, none chosen by a tested route or by ABBYY text; the routes are '
               'the panel planned in W41 (the subscription and paid hosted routes of October 2026), not a sample of '
-              'current models.',
+              'current models. ' + DRAW_96,
               'Every route reads the same JPEG images (2,400 px cap) with the panel prompt, except Mistral OCR, which '
               'takes the app\'s own 2,048 px encoding and no prompt, and Claude Sonnet 5.5 through `claude -p`, whose '
               'harness may resize the image and retried an empty answer once (the OpenRouter routes had no retry). '

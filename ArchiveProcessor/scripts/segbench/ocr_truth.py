@@ -828,6 +828,34 @@ def pct(k, n):
     return f"{100 * k / n:.0f}%" if n else "-"
 
 
+def replaced_lines(draw):
+    """W46.ocr-96-vision-filter (measurement review pass 8, P8-3): what the MIN_WORDS filter took out, from the
+    draw record and the folder tags only (no page is read). The filter ran on Apple Vision's reading (macOS 26.6),
+    so every page kept is one Vision could read; the tags say which replaced pages were text Vision failed on."""
+    tags = {(f["folder"], n): t for f in load_index()["folders"] for n, t in f["photos"]}
+    kinds = (("Handwritten", {"Handwritten"}), ("Clippings", {"Clippings"}),
+             ("Images worth reproducing", {"Images worth reproducing"}),
+             ("a tree diagram", {"Management Trees", "Family Trees"}))
+    rows = []
+    for r in draw["replaced"]:
+        t = set(tags.get((r["folder"], r["name"]), ()))
+        rows.append((r["words"], r["why"], ", ".join(k for k, v in kinds if t & v) or "no kind tag"))
+    n = collections.Counter(k for _, _, k in rows)
+    L = [f"The filter read every candidate with Apple Vision (macOS 26.6), so no page where Vision read fewer than "
+         f"{MIN_WORDS} words is in the set: every comparison with Vision on these pages, and every suspect rate or "
+         f"cascade figure that uses Vision as the second reader, is on pages Vision could read. The "
+         f"{len(rows)} replaced pages, by their folder tags (no page was read for this): {n['Handwritten']} tagged "
+         f"Handwritten, written pages Vision could not read rather than covers or blanks, so the handwritten "
+         f"pages kept are all hands Vision read at least {MIN_WORDS} words of; "
+         f"{n['Images worth reproducing']} tagged Images worth reproducing, {n['a tree diagram']} a tree diagram, "
+         f"{n['Clippings']} a clipping; {n['no kind tag']} carry no kind tag, so what they hold is not known "
+         f"without reading them. Vision's word counts: "
+         f"{', '.join(str(w) for w in sorted(w for w, _, _ in rows))}.", "",
+         "| Vision words | drawn for | kind tag |", "|---:|---|---|"]
+    L += [f"| {w} | {why} | {k} |" for w, why, k in sorted(rows)]
+    return L + [""]
+
+
 def write_summary(draw, pages):
     ch = draw["chosen"]
     cal = draw["calibrate"]
@@ -844,6 +872,7 @@ def write_summary(draw, pages):
          f"{len({c['folder'] for c in ch})} folders. The pool: {draw['pool_docs']:,} implied documents. "
          f"{len(draw['replaced'])} drawn pages were replaced for having under {MIN_WORDS} words in Apple Vision's "
          f"reading; {len(draw['failed'])} could not be read from disk.", "",
+         *replaced_lines(draw),
          "| stratum | pool (documents) | pages | from the original photo |", "|---|---:|---:|---:|"]
     for s in list(DATE_BINS) + list(KIND_TAGS):
         rows = [c for c in ch if s in c["strata"]]

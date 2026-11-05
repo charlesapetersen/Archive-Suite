@@ -35,6 +35,7 @@ import ocr_panel as P            # noqa: E402
 import ocr_panel_score as S      # noqa: E402
 import routes as R               # noqa: E402
 import capture_ladder as L       # noqa: E402
+from ocr_card import DRAW_96   # noqa: E402
 
 TAG = '27.2'
 OUT = HERE.parents[1] / 'segbench-results' / 'vision-27-reread'
@@ -373,7 +374,7 @@ def cmd_report(_):
           "drafted anything here; this item compares Vision with itself.",
           "- **Selection.** Every image the dated readings covered: all 139 panel jobs, all 320 Latin-script "
           "pages of the 440 (Vision's script filter, unchanged), the capture ladder's scored pages (the panel's originals less the three agreement pages). Nothing "
-          "chosen by a route or by ABBYY text.",
+          "chosen by a route or by ABBYY text. The panel's pages were drawn through Vision (26.6) itself: " + DRAW_96,
           "- **Comparison.** Same images byte for byte, same tool source and settings, same scorer "
           "(`ocr_panel_score.score`, the 440's per-stratum options) and truth; only the OS differs. The "
           "`segbench-ocr` (2026-11-03) and `segbench-dewarp` (2026-10-31) binaries were rebuilt on 27.2 from "

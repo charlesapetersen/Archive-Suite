@@ -311,7 +311,7 @@ The page-blind score gives every image its setting's mean verdict, so it knows w
   within-reader Δs are set side by side on the same pages, paired by page; for Gemini a relative's draft can only make
   its own losses look larger. The owner's blind check found the typed-page truth fit for ranking (measurement audit,
   2026-10-30).
-- **Selection:** all 96 scored pages, every defect; no page chosen by a reader's result or by ABBYY text. The optical
+- **Selection:** all 96 scored pages, every defect; no page chosen by a reader's result or by ABBYY text. Every page where Apple Vision (26.6) read fewer than 20 words was replaced at the draw (19 of them, 4 tagged Handwritten; `ocr-truth.md`), so the 96 hold no page Vision reads as empty, and every comparison with Vision on them is on pages Vision could read. The optical
   capture tags are not used to slice (CAP-1, kappa 0.14-0.47 against a blind retag).
 - **Comparison:** the same pages, prompts, decoding and server arguments as each reader's baseline. One difference:
   every defect image went through the ladder's own JPEG save (quality 92, or the JPEG row's quality) after the panel's
