@@ -51204,6 +51204,100 @@
    }
   }
  },
+ "enh_marks": {
+  "pages": 40,
+  "rows": [
+   {
+    "arm": "gcdrnet",
+    "t": 0.15,
+    "mean": 84.9,
+    "lo": 79.5,
+    "hi": 89.8,
+    "lost": 6,
+    "boxes": 85,
+    "lost_pages": 3,
+    "print": 82.6
+   },
+   {
+    "arm": "gcdrnet",
+    "t": 0.3,
+    "mean": 97.8,
+    "lo": 95.6,
+    "hi": 99.4,
+    "lost": 1,
+    "boxes": 82,
+    "lost_pages": 1,
+    "print": 96.7
+   },
+   {
+    "arm": "jpeg",
+    "t": 0.15,
+    "mean": 97.9,
+    "lo": 97.5,
+    "hi": 98.3,
+    "lost": 0,
+    "boxes": 85,
+    "lost_pages": 0,
+    "print": 97.4
+   },
+   {
+    "arm": "jpeg",
+    "t": 0.3,
+    "mean": 97.1,
+    "lo": 96.3,
+    "hi": 97.9,
+    "lost": 0,
+    "boxes": 82,
+    "lost_pages": 0,
+    "print": 97.5
+   },
+   {
+    "arm": "sbb",
+    "t": 0.15,
+    "mean": 75.9,
+    "lo": 67.8,
+    "hi": 82.7,
+    "lost": 13,
+    "boxes": 85,
+    "lost_pages": 5,
+    "print": 56.8
+   },
+   {
+    "arm": "sbb",
+    "t": 0.3,
+    "mean": 89.0,
+    "lo": 81.0,
+    "hi": 95.2,
+    "lost": 6,
+    "boxes": 82,
+    "lost_pages": 4,
+    "print": 73.7
+   },
+   {
+    "arm": "shading",
+    "t": 0.15,
+    "mean": 97.3,
+    "lo": 96.4,
+    "hi": 97.9,
+    "lost": 0,
+    "boxes": 85,
+    "lost_pages": 0,
+    "print": 93.9
+   },
+   {
+    "arm": "shading",
+    "t": 0.3,
+    "mean": 96.3,
+    "lo": 94.9,
+    "hi": 97.5,
+    "lost": 0,
+    "boxes": 82,
+    "lost_pages": 0,
+    "print": 94.6
+   }
+  ],
+  "report": "enh-ocr-marks.md"
+ },
  "capture_ladder": {
   "report": "capture-ladder.md",
   "loss": 0.05,

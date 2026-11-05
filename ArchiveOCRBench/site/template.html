@@ -328,6 +328,8 @@ footer p { font-size: 13px; }
     <p class="note" id="eo-note"></p>
     <label for="eo-group">Pages </label><select id="eo-group"></select>
     <div class="tbl"><table><thead><tr><th>Reader</th><th>Pages</th><th>Image</th><th>NES</th><th>Change against the plain image (95% CI)</th><th>chrF2</th><th>Inserted</th><th>Rewritten</th><th>New words /1k</th><th>Suspect /1k</th></tr></thead><tbody id="eo-rows"></tbody></table></div>
+    <p class="note" id="em-note" hidden></p>
+    <div class="tbl" id="em-tbl" hidden><table><thead><tr><th>Image</th><th>Ink counted</th><th>Mark ink kept (95% CI)</th><th>Boxes lost</th><th>Print ink kept</th></tr></thead><tbody id="em-rows"></tbody></table></div>
   </section>
 
   <section class="panel" id="ocr-scorers" hidden>
@@ -1055,6 +1057,14 @@ if (EO) {
   const draw = () => { document.getElementById('eo-rows').innerHTML = EO.rows.filter(r => r.pages === sel.value).map(r => '<tr><td>' + (r.reader === 'apple-vision' ? 'apple-vision (macOS 26.6)' : r.reader) + '</td><td>' + r.n + '</td><td>' + (names[r.arm] || r.arm) + '</td><td>' + q1(r.nes) + '</td><td>' + (r.d_nes == null ? '—' : sg(r.d_nes) + ' (' + sg(r.lo) + ' to ' + sg(r.hi) + ')') + '</td><td>' + q1(r.chrf) + '</td><td>' + q1(r.inserted) + '</td><td>' + q1(r.rewritten) + '</td><td>' + k1(r.restoration_only_k) + '</td><td>' + k1(r.suspect_k) + '</td></tr>').join(''); };
   sel.addEventListener('change', draw);
   draw();
+  const EM = DATA.enh_marks;
+  if (EM) {
+    const note = document.getElementById('em-note');
+    note.hidden = false;
+    document.getElementById('em-tbl').hidden = false;
+    note.textContent = 'Do the marks survive? The same methods on the marks set\'s ' + EM.pages + ' owner-checked pages (W46.enh-ocr-input-marks), the ink inside every mark box the owner kept checked against the plain image: the share of its ink pixels still ink, the boxes left with under half, and the same share for the print outside the boxes. The plain image saved again is the floor. Shading division keeps the marks as the floor does; GCDRNet erases faint ink, marks with it; SBB binarisation loses more and every mark\'s colour. So only the contrast-only control may touch the reading copy. Detail: segbench-results/' + EM.report + '.';
+    document.getElementById('em-rows').innerHTML = EM.rows.map(r => '<tr><td>' + (r.arm === 'jpeg' ? 'plain image saved again (floor)' : (names[r.arm] || r.arm)) + '</td><td>' + (r.t >= 0.3 ? 'clear (0.30)' : 'faint too (0.15)') + '</td><td>' + r.mean.toFixed(1) + '% (' + r.lo.toFixed(1) + ' to ' + r.hi.toFixed(1) + ')</td><td>' + r.lost + ' of ' + r.boxes + ' (' + r.lost_pages + (r.lost_pages === 1 ? ' page' : ' pages') + ')</td><td>' + r.print.toFixed(1) + '%</td></tr>').join('');
+  }
 }
 const PH = DATA.ppocrv6_hands;
 if (PH) {

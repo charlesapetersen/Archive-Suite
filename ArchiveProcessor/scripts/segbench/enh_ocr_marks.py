@@ -192,11 +192,14 @@ def summarise(rec, rows, ids, key, pick=lambda b: True):
     added; the lost-box count; all boxes pooled."""
     kept, diff, contrast, colour, added = [], [], [], [], []
     lost = total = 0
+    lost_pages = []
     for p in ids:
         r = rows[p][key]
         bs = [b for b in r['boxes'] if pick(b)]
         if not bs:
             continue
+        if any(b['kept'] < LOST for b in bs):
+            lost_pages.append(p)
         k = statistics.fmean(b['kept'] for b in bs)
         kept.append(k)
         if r['print']:
@@ -210,7 +213,7 @@ def summarise(rec, rows, ids, key, pick=lambda b: True):
         total += len(bs)
     prints = [rows[p][key]['print']['kept'] for p in ids if rows[p][key]['print']]
     return dict(kept=boot(kept), kept_minus_print=boot(diff), contrast=boot(contrast), colour=boot(colour),
-                added=boot(added), print_kept=boot(prints), lost=lost, boxes=total)
+                added=boot(added), print_kept=boot(prints), lost=lost, boxes=total, lost_pages=lost_pages)
 
 
 def fmt(b, pct=True):
@@ -258,7 +261,7 @@ def report():
         for arm in ARMS:
             s = S[f'{arm}@{t:.2f}']['all 40 pages']
             L.append(f"| {arm} | {fmt(s['kept'])} | {fmt(s['kept_minus_print'], False)} | {s['lost']} of "
-                     f"{s['boxes']} | {fmt(s['contrast'])} | {fmt(s['colour'])} | {fmt(s['added'])} | "
+                     f"{s['boxes']} ({len(s['lost_pages'])} page{'' if len(s['lost_pages']) == 1 else 's'}) | {fmt(s['contrast'])} | {fmt(s['colour'])} | {fmt(s['added'])} | "
                      f"{fmt(s['print_kept'])} |")
         L += ['', 'Kept % by subset:', '', '| Arm | ' + ' | '.join(n for n in subsets if n != 'all 40 pages') + ' |',
               '|---|' + '---|' * (len(subsets) - 1)]
@@ -267,6 +270,49 @@ def report():
             L.append(f'| {arm} | ' + ' | '.join(f"{fmt(ss[n]['kept'])}, lost {ss[n]['lost']}/{ss[n]['boxes']}"
                                                for n in subsets if n != 'all 40 pages') + ' |')
         L.append('')
+    g = lambda arm, t, f='kept': S[f'{arm}@{t:.2f}']['all 40 pages'][f]
+    pc = lambda b: f"{100 * b['mean']:.1f}%"
+    sbb_blank = [p for p in ids if (rows[p]['sbb@0.30']['print'] or {}).get('kept', 1) < 0.2]
+    L += ['## Verdict', '',
+          '**Only the contrast-only control may touch the reading copy; the content-removing methods may not.** '
+          f"Shading division keeps {pc(g('shading', 0.15))} of the faint-inclusive ink in the mark boxes against "
+          f"the re-encoding floor's {pc(g('jpeg', 0.15))}, loses no box at either threshold, and takes marks no "
+          'more than print. GCDRNet keeps clear ink '
+          f"({pc(g('gcdrnet', 0.30))}) but erases faint ink: {pc(g('gcdrnet', 0.15))} kept, "
+          f"{g('gcdrnet', 0.15, 'lost')} of {g('gcdrnet', 0.15, 'boxes')} boxes lost on "
+          f"{len(g('gcdrnet', 0.15, 'lost_pages'))} pages (three stamps, a signature and two marginal notes). Its loss is no worse on marks than on the page's "
+          "faint print: it erases faint ink wherever it is. SBB keeps "
+          f"{pc(g('sbb', 0.15))} of faint ink, loses {g('sbb', 0.15, 'lost')} boxes on "
+          f"{len(g('sbb', 0.15, 'lost_pages'))} pages and every mark's colour by construction (coloured ink and "
+          'typed print become the same black), and on '
+          f"{len(sbb_blank)} page{'s' if len(sbb_blank) != 1 else ''} ({', '.join(sbb_blank) or 'none'}) it "
+          "kept under a fifth of the print's ink as well. Its positive kept-minus-print is that print loss, not a "
+          'gain for the marks. With W46.enh-ocr-input (no method helps any reader as OCR input), the rule '
+          'for the app: the reading copy and the OCR input both stay the raw image; a gain-only shading division is '
+          'the one method that may be offered for viewing, and a content-removing method never replaces the '
+          'stored page.', '',
+          '## Measurement card', '',
+          '- **Truth.** The marks set\'s owner core after the 2026-11-04 recheck (`marks-set-reconciled.md`): the '
+          'owner kept or rejected every candidate mark, its class and whether it touches print; the boxes are rough '
+          'draft boxes from Gemini 3.7 Flash and Qwen3-VL 8B plus one owner box, not tight geometry. The ink '
+          'itself is measured, not judged: no person or model read a page for this item.',
+          '- **Selection.** The frozen two-phase draw\'s 40-page core (16 A-core, 24 B-core), drawn before any '
+          'enhancement method existed for these pages; no method or ABBYY text chose a page. Descriptive, no '
+          'population weights (W46.marks-sampling-support). The 8 pages excluded from detector truth are in the '
+          'measure (their boxes are regions, whatever their completeness) and the 32 detector pages are shown alone.',
+          '- **Comparison.** Every arm from the same 2400 px JPEG the models read, at its size, saved at JPEG 90 '
+          'like the `jpeg` floor; the same ink function, thresholds and boxes for every arm; the code and weights '
+          'of W46.enh-ocr-input.',
+          '- **Noise.** n = 40 pages (boxes nested in pages; the bootstrap resamples pages). The `jpeg` arm is the '
+          'floor: re-encoding alone moves 2-3% of ink pixels across a threshold and no box. A box figure within '
+          'the floor is no change. Coloured-ink figures are rough: the floor keeps only about 80% of them '
+          '(JPEG chroma subsampling) and shading and GCDRNet land together below it, so only SBB\'s 0% is read.',
+          '- **Scope.** Ink survival, not legibility: a mark can keep its pixels and still read worse, and no reader '
+          'transcribed the marks here. Rough boxes include print where a mark touches it (the clear-of-print '
+          'subset is the purer figure). DocRes appearance and deshadow were not run: they need a cluster GPU, '
+          'neither helped any reader in W46.enh-ocr-input and the app ships no enhancement, so their marks arm '
+          'decides nothing now and is filed behind W46.nice-to-have (W46.enh-ocr-input-marks-docres). Gemini on '
+          'the enhanced images (W46.enh-ocr-input-paid) is untouched.', '']
     REPORT.write_text('\n'.join(L) + '\n')
     print('->', REPORT, DATA)
 

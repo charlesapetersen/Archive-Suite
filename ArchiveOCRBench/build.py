@@ -69,6 +69,7 @@ DEWARP = RESULTS / "enh-dewarp.json"  # W46.enh-dewarp: enh_dewarp.py report, cr
 VISION_REREAD = RESULTS / "vision-27-reread.json"  # W46.vision-27-reread: Apple Vision on macOS 27.2 against 26.6
 CAPTURE = RESULTS / "capture-ladder.json"  # W46.capture-ladder: capture_ladder.py report, capture defects by reader
 ENH_OCR = RESULTS / "enh-ocr-input.json"  # W46.enh-ocr-input: enh_ocr_input.py report, content-removing enhancement
+ENH_MARKS = RESULTS / "enh-ocr-marks.json"  # W46.enh-ocr-input-marks: the mark-region ink check
 POSTCORRECT = RESULTS / "ocr-postcorrect.json"  # W46.ocr-postcorrect: postcorrect.py score --results, the band corrector
 LOGPROB = RESULTS / "ocr-logprob.json"  # W46.ocr-logprob: ocr_logprob.py report, log-probabilities as an error flag
 LAYOUT_ORDER = RESULTS / "layout-order.json"  # W46.layout-order: layout_order.py run, ordering with detection fixed
@@ -1057,6 +1058,22 @@ def enh_ocr_chart_routes(data, kinds, op):
     return out
 
 
+def enh_marks():
+    """W46.enh-ocr-input-marks: per arm and ink threshold, the share of the mark boxes' ink each method keeps on the
+    marks set's 40-page owner core, the boxes it loses and the print kept outside them (enh_ocr_marks.py report)."""
+    if not ENH_MARKS.exists():
+        return None
+    d = json.loads(ENH_MARKS.read_text())
+    rows = []
+    for key, groups in d["summary"].items():
+        arm, t = key.split("@")
+        s = groups["all 40 pages"]
+        rows.append({"arm": arm, "t": float(t), **{k: round(100 * s["kept"][k], 1) for k in ("mean", "lo", "hi")},
+                     "lost": s["lost"], "boxes": s["boxes"], "lost_pages": len(s["lost_pages"]),
+                     "print": round(100 * s["print_kept"]["mean"], 1)})
+    return {"pages": d["pages"], "rows": rows, "report": "enh-ocr-marks.md"}
+
+
 def vision_reread():
     """W46.vision-27-reread and W46.vision-27-swap: the page's Apple Vision route is its macOS 27.2 reading; the paired
     re-read says how far the update moved it from the 26.6 one (the 96's scored originals, the 440's Latin pages), and
@@ -1242,7 +1259,7 @@ def main():
              "hands_icl_qwen": {k: v for k, v in json.loads((RESULTS / "ocr-ppocrv6-hands-qwen.json").read_text()).items()
                                 if k in ("model", "groups", "comparisons", "cohorts", "verdict", "completion_tokens_max")}
                                if (RESULTS / "ocr-ppocrv6-hands-qwen.json").exists() else None,
-             "dewarp": dewarp, "enh_ocr": enh_ocr,
+             "dewarp": dewarp, "enh_ocr": enh_ocr, "enh_marks": enh_marks(),
              "capture_ladder": json.loads(CAPTURE.read_text()) if CAPTURE.exists() else None,
              "vision_reread": vision_reread(),
              "loops": json.loads(LOOPS.read_text()) if LOOPS.exists() else None, "regions": regions,
