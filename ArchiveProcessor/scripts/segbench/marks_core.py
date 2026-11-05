@@ -121,6 +121,17 @@ def summary(truth, receipts, root):
                       'independently measured geometry. Non-core agreement remains model drafts, never truth.')
 
 
+def status_line(reports):
+    """This freeze never changes; the current feedback status lives in the derived record's report."""
+    derived = reports / 'marks-set-reconciled.json'
+    if not derived.exists():
+        return 'Current status: the feedback is unresolved; no reconciled record exists yet.'
+    d = json.loads(derived.read_text())
+    return (f"Current status: reconciled in `marks-set-reconciled.md` (recheck {d['receipts']['recheck'][:12]}): "
+            f"{len(d['detector_pages'])} detector-eligible pages, {len(d['excluded'])} still excluded. "
+            'Use that record, not this freeze, for detector or transcription truth.')
+
+
 def report(out, reports):
     reports.mkdir(parents=True, exist_ok=True)
     (reports / 'marks-set-freeze.json').write_text(json.dumps(out, indent=1) + '\n')
@@ -131,6 +142,7 @@ def report(out, reports):
              'These pages remain in the reviewed record but are excluded from detector labels until resolved. '
              f"{out['transcription_excluded_feedback']} kept entries containing feedback have no scored text. "
              'Raw owner entries are retained verbatim in the frozen record.', '',
+             status_line(reports), '',
              '| Core group | Answered pages | Detector-eligible pages | Accepted rough boxes |',
              '|---|---:|---:|---:|']
     for group, g in out['groups'].items():

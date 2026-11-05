@@ -1,0 +1,98 @@
+{
+  "detector_pages": [
+    "Dean-045ee66bf2a8cfde",
+    "Dean-24a6d76b84c2729b",
+    "Dean-334e2d7a9b3ec242",
+    "Dean-7d1bce1dde28dfee",
+    "Dean-e087cc8ae12fbbaf",
+    "Dean-e2e08ce8aad21ad6",
+    "Dean-e6ecf7a0b3ed6e6b",
+    "Deaver-121ef0a90a8b6e50",
+    "Deaver-25d964981d232154",
+    "Deaver-650b1e19e4de3209",
+    "Deaver-8ae6fd1b533022f9",
+    "Herrnstein-2fbe4f2e179052d2",
+    "Herrnstein-39bea9fb30cda479",
+    "Herrnstein-3f753f88969588ac",
+    "Herrnstein-493cc4688af77647",
+    "Herrnstein-4ef3cbdae790c6ee",
+    "Herrnstein-6cd0a8613c23703f",
+    "Herrnstein-8c937397cea57ec2",
+    "Herrnstein-cd90d77ed844dfe8",
+    "Herrnstein-ffa375644a778474",
+    "RG165-00ddd16c4738ada2",
+    "RG165-396a60e40b8cda58",
+    "RG165-ebcabf5758c3be91",
+    "Stanton-00948e05eccffc0d",
+    "Stanton-05ba2c5c14daa5ba",
+    "Stanton-1eabfb22cb387f61",
+    "Stanton-355ed7385ef1e51d",
+    "Stanton-861964e4c404fa9d",
+    "Stanton-9340dbe7c2fe5002",
+    "Stanton-b25eca07791ab8bd",
+    "Stanton-be6d3d7d736d56dd",
+    "Stanton-cdc4fb8c3daa12f0",
+    "Stanton-fa8be330c31b38a3"
+  ],
+  "excluded": {
+    "Dean-0a07517aa636ba99": "relationship_boxes_unmerged",
+    "Dean-23edf5f15485b7ff": "relationship_boxes_unmerged",
+    "Dean-b31c4f7387db3844": "relationship_boxes_unmerged",
+    "Dean-d3a52a7e272b066a": "grouped_subannotations_not_drawn",
+    "Herrnstein-04d25d2e123a33d0": "relationship_boxes_unmerged",
+    "Herrnstein-5d66cd10e6af25f0": "incomplete_box_on_sideways_page",
+    "RG165-15a0647456422fb9": "one_box_contains_others_duplicate_text"
+  },
+  "groups": {
+    "A-core": {
+      "accepted_boxes": 7,
+      "detector_evaluable": 16,
+      "pages": 16,
+      "scored_texts": 6
+    },
+    "B-core": {
+      "accepted_boxes": 78,
+      "detector_evaluable": 17,
+      "pages": 24,
+      "scored_texts": 56
+    }
+  },
+  "owner_pages": 40,
+  "places": {
+    "incomplete": [
+      "Dean-e6ecf7a0b3ed6e6b/2"
+    ],
+    "owner_reviewed": [
+      "RG165-15a0647456422fb9/1"
+    ],
+    "reading_in_note": [
+      "RG165-15a0647456422fb9/3"
+    ],
+    "uncertain": [
+      "Herrnstein-3f753f88969588ac/1"
+    ],
+    "unread": [
+      "Dean-7d1bce1dde28dfee/2",
+      "Dean-d3a52a7e272b066a/3",
+      "Dean-e6ecf7a0b3ed6e6b/1",
+      "Herrnstein-39bea9fb30cda479/2",
+      "Herrnstein-5d66cd10e6af25f0/1"
+    ]
+  },
+  "protocol": "marks-set-reconciled-v1",
+  "receipts": {
+    "answers": "da388b05c3885d6fc1f20986ddea02ba7cbed7274de5c33a4d3b1b5b98554b38",
+    "freeze": "e86dd708e8713fca8c438f1076fc51665671fb34d77b062b54241cbe245c49bf",
+    "recheck": "dac79c80c2f6fceee7ebb319b8e0beac7d3a283b63f76c889c9f89cb8c8a210e",
+    "review_manifest": "97ecfeb87e889f125fe8da8cb5dded561317e7a856e10c980a56a92220a7a371"
+  },
+  "reconciled_root": "/Users/cp1/Library/Application Support/ArchiveSuiteRehearsal/marks-set-reconciled-da388b05c388-dac79c80c2f6",
+  "relationships": 7,
+  "unmasked": [
+    "Dean-24a6d76b84c2729b",
+    "Dean-7d1bce1dde28dfee",
+    "Dean-e6ecf7a0b3ed6e6b",
+    "Herrnstein-39bea9fb30cda479",
+    "Herrnstein-3f753f88969588ac"
+  ]
+}
