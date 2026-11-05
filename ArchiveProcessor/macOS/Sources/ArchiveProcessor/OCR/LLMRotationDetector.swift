@@ -58,9 +58,18 @@ enum LLMRotationDetector {
                 votes.append(correction)
             }
         }
-        guard !votes.isEmpty else { return nil }
-        let counts = Dictionary(grouping: votes, by: { $0 }).mapValues { $0.count }
-        return counts.max { $0.value < $1.value }!.key
+        return majority(of: votes)
+    }
+
+    /// The most-voted correction; a tie goes to the earliest vote (the first ordering that answered), so the
+    /// pick never follows the Dictionary's per-launch hash seed (W46.rotation-majority-fix). `nil` for no votes.
+    static func majority(of votes: [Int]) -> Int? {
+        var best: (value: Int, count: Int)?
+        for value in votes {
+            let count = votes.lazy.filter { $0 == value }.count
+            if best == nil || count > best!.count { best = (value, count) }
+        }
+        return best?.value
     }
 
     // MARK: - One comparative call

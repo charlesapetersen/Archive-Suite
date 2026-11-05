@@ -14,6 +14,7 @@ import Foundation
 ///   3. A model the catalog lacks gets no client: an unpinned call is never made.
 ///   4. OpenRouter's 200-with-an-error reply becomes a failed page with its message, never an empty success.
 ///   5. The cost estimate is priced at the pinned provider's rates, and is not below what the panel paid.
+///   7. The rotation vote (llmMajority) breaks a tie by the first ordering's answer, not by hash order.
 @MainActor
 enum OpenRouterTestDriver {
     nonisolated static let envKey = "OPENROUTER_TEST"
@@ -137,6 +138,7 @@ enum OpenRouterTestDriver {
         eq("4 an HTTP error keeps its status and message", [limited?.errorCode, limited?.errorMessage], ["401", "No auth credentials found"])
 
         costChecks()
+        rotationVoteChecks()
         segmentationChecks()
     }
 
@@ -294,6 +296,17 @@ enum OpenRouterTestDriver {
         eq("5 rotation by LLM is not priced (local Vision instead)",
            CostEstimator.estimate(fileCount: 10, model: m, enableTagging: false, sendPreviousImage: false,
                                   contextCharCount: 0, rotationMode: .llmMajority).rotationCost, 0)
+    }
+
+    /// W46.rotation-majority-fix: llmMajority's vote is deterministic. A tie goes to the earliest vote (the first
+    /// ordering that answered), never to the Dictionary's per-launch hash order.
+    private static func rotationVoteChecks() {
+        eq("7 no votes, no answer (Vision decides)", LLMRotationDetector.majority(of: []), nil)
+        eq("7 a majority wins wherever it falls", LLMRotationDetector.majority(of: [90, 0, 0]), 0)
+        eq("7 three different answers take the first ordering's", LLMRotationDetector.majority(of: [270, 90, 180]), 270)
+        eq("7 three different answers, other order", LLMRotationDetector.majority(of: [180, 270, 0]), 180)
+        eq("7 a two-vote split takes the earlier", LLMRotationDetector.majority(of: [90, 0]), 90)
+        eq("7 the label claims no accuracy", RotationMode.llmMajority.displayName, "LLM comparative ×3")
     }
 
     private static func makeImage() -> URL? {

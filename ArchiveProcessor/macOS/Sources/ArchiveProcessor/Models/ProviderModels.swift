@@ -136,7 +136,7 @@ enum RotationMode: String, CaseIterable, Identifiable, Codable {
     case off               // No rotation correction
     case localVision       // Free, local macOS Vision (99% exact on the 96-page rotation benchmark)
     case llmSingle         // One LLM "which-of-4-is-upright" comparative call
-    case llmMajority       // Three comparative calls, majority vote (most accurate)
+    case llmMajority       // Three comparative calls, majority vote; a tie takes the first ordering's answer
 
     var id: String { rawValue }
 
@@ -145,7 +145,7 @@ enum RotationMode: String, CaseIterable, Identifiable, Codable {
         case .off: return "Off"
         case .localVision: return "Local (fast, free)"
         case .llmSingle: return "LLM comparative"
-        case .llmMajority: return "LLM comparative ×3 (most accurate)"
+        case .llmMajority: return "LLM comparative ×3"
         }
     }
 
@@ -154,7 +154,7 @@ enum RotationMode: String, CaseIterable, Identifiable, Codable {
         case .off: return "Do not correct rotation."
         case .localVision: return "On-device macOS Vision. Free and fast; 99% exact on the 96-page benchmark. Ambiguous text keeps the OCR model’s rotation guess."
         case .llmSingle: return "Shows the model all four rotations and asks which is upright — one extra cheap API call per image."
-        case .llmMajority: return "Repeats the comparison three times and takes the majority vote. Most accurate; three extra cheap API calls per image."
+        case .llmMajority: return "Repeats the comparison three times and takes the majority vote; three extra cheap API calls per image."
         }
     }
 
