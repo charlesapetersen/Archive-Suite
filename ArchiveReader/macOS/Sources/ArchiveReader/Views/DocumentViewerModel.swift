@@ -187,7 +187,7 @@ final class DocumentViewerModel: ObservableObject {
     /// never turns an edit typed for one file into a write on the next.
     @Published var tagEditorPath: String?
     /// Whether the find field has the caret. Undo Tag Change (⌘Z) stays off then, so ⌘Z in the field
-    /// never undoes a tag change instead of the typing (S-001; W40.fix-reader-undo-focus owns the list's side).
+    /// never undoes a tag change instead of the typing (S-001; `TextUndoGuard` does the same app-wide).
     @Published var findFieldFocused = false
     /// The last tag action's result, shown in the status bar until the next document loads.
     @Published var tagStatus: String?

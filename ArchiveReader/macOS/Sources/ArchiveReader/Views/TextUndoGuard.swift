@@ -24,7 +24,13 @@ enum TextUndoGuard {
     private static func undoText(for event: NSEvent) -> Bool {
         guard let text = editingTextView(for: event, in: NSApp.keyWindow) else { return false }
         // The text's own undo, or nothing: ⌘Z with no typing to undo must still not fall through to the tag undo.
-        if let undo = text.undoManager, undo.canUndo { undo.undo() } else { NSSound.beep() }
+        // Not mid-composition (the input method owns the marked text), and not in text that keeps no undo of
+        // its own, whose `undoManager` is the window's and could hold someone else's actions.
+        if text.allowsUndo, !text.hasMarkedText(), let undo = text.undoManager, undo.canUndo {
+            undo.undo()
+        } else {
+            NSSound.beep()
+        }
         return true
     }
 
@@ -33,7 +39,8 @@ enum TextUndoGuard {
     static func editingTextView(for event: NSEvent, in window: NSWindow?) -> NSTextView? {
         guard event.type == .keyDown,
               event.modifierFlags.intersection(.deviceIndependentFlagsMask).subtracting([.capsLock, .numericPad, .function]) == .command,
-              event.charactersIgnoringModifiers?.lowercased() == "z",
+              // Either reading: a "… – QWERTY ⌘" layout gives the menu's "z" only with ⌘ applied.
+              event.charactersIgnoringModifiers?.lowercased() == "z" || event.characters?.lowercased() == "z",
               let text = window?.firstResponder as? NSTextView, text.isEditable else { return nil }
         return text
     }

@@ -19,10 +19,11 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
   type "abc", press ⌘Z, then read that file's tags back from disk. Confirmed if it is `Unread` again or the
   status line says "Undid".
 - **Would clear it:** the same run leaves the file `Read` and only removes the typed text.
-- **Status:** `reproduced`
+- **Status:** `cleared` — fixed by `W40.fix-reader-undo-focus`, [`evidence/reader/W40.fix-reader-undo-focus.md`](evidence/reader/W40.fix-reader-undo-focus.md)
 - **History:**
   - 2026-10-12 W40.b1 — raised.
   - 2026-11-04 owner session reader-1 — reproduced by hand on a session copy of the sample ([`sessions/reader-1-returned.md`](sessions/reader-1-returned.md) row 32): typing in the file-name filter, then ⌘Z, undid the last tag change and left the typing. Filed as `W40.fix-reader-undo-focus` (S2, Tier-2).
+  - 2026-11-05 W40.fix-reader-undo-focus — fixed: a bare ⌘Z with an editable text view focused now undoes the typing and never reaches Undo Tag Change. The VM run above leaves the file's tags unchanged and removes the typed text; with the fix switched off the same run re-wrote the tags.
 
 ### S-002 · Reader's viewer, preview or thumbnails may download a cloud placeholder
 

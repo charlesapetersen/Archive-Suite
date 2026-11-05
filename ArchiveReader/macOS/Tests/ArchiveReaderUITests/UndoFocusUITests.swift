@@ -21,6 +21,7 @@ final class UndoFocusUITests: FixtureUITestCase {
 
     override func tearDown() async throws {
         app?.terminate()
+        guard !baseline.isEmpty else { return try await super.tearDown() }   // setup failed before any write
         for (path, bytes) in baseline where tagSnapshot()[path] != bytes {
             if let bytes {
                 _ = bytes.withUnsafeBytes { setxattr(path, Self.tagXattr, $0.baseAddress, bytes.count, 0, XATTR_NOFOLLOW) }
