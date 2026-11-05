@@ -59,9 +59,9 @@ bounds) and lists the file once. The Date column shows both dates (`Nov 3, 1957 
 nothing highlights which of the two put the row in the result. The sent-with date is edited in the ⌘I sheet's
 Date section, the one date editor (owner, 2026-10-12; `W40.fix-reader-sent-with-date`, 2026-10-29).
 
-The filter bar is crowded in a narrow window (the VM's ~900-pt window): the quality toggles collapse to
-`…`, which already happened before W37. W37 adds only a calendar button (the range is in its popover), and
-the name/OCR fields now have minimum widths so the tag field gives way first; all 32 VM UITests pass.
+The filter bar was crowded in a narrow window. Since W40.fix-reader-filter-bar (2026-11-05) the name and OCR
+fields have a row of their own under the query controls, with the chips for what is in effect below them, so the
+first row holds only read state, quality, tags, dates and the trailing buttons, which `FilterBarLayout` still wraps.
 
 ## ⚠️ LIMITATION (W24.jpeg1, 2026-09-26) — duplicate JPEG stems need a known collection mapping
 

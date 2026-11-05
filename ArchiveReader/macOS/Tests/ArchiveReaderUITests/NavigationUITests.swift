@@ -352,6 +352,30 @@ final class NavigationUITests: FixtureUITestCase {
         waitForRows(minimum: countBefore, timeout: 5)
     }
 
+    /// W40.fix-reader-filter-bar (reader-1 row 8): the name filter shows as a chip while it applies; a filter that
+    /// hides every row is named in the empty list, whose button clears it and brings the rows back. Read-only.
+    func testAnEmptyListNamesTheFilterThatHidItAndClearsIt() throws {
+        waitForRows(minimum: 5, timeout: 10)
+        let countBefore = rowCount
+        typeInField("ar.filter.name", text: "zz-no-such-file")
+
+        let chip = app.descendants(matching: .any)["ar.filter.chip.name"]
+        XCTAssertTrue(chip.waitForExistence(timeout: 5), "the name filter should show as a chip in effect")
+        let empty = app.descendants(matching: .any)["ar.empty.filteredOut"]
+        XCTAssertTrue(empty.waitForExistence(timeout: 5), "every row is filtered out")
+        XCTAssertTrue(empty.accessibilityText.contains("file-name filter"), "the empty list should name the filter: \(empty.accessibilityText)")
+        captureScreenshot("w40-filter-bar-empty-names-filter")
+
+        let clear = app.buttons["ar.empty.clear.ar.filter.chip.name"]
+        XCTAssertTrue(clear.waitForExistence(timeout: 5), "the empty list should offer to clear that filter")
+        clear.click()
+        waitForRows(minimum: countBefore, timeout: 10)
+        XCTAssertTrue(chip.waitForNonExistence(timeout: 5), "cleared, the chip should leave")
+        let fieldValue = app.textFields["ar.filter.name"].value as? String ?? ""
+        XCTAssertFalse(fieldValue.contains("zz-no-such-file"), "and the field should empty with it: \(fieldValue)")
+        captureScreenshot("w40-filter-bar-cleared")
+    }
+
     // MARK: - OCR search field exists (W5.d1 infrastructure)
 
     func testOCRSearchFieldExists() throws {
