@@ -319,6 +319,23 @@ final class ContentIndexer: ObservableObject {
         return await index.searchRanked(query, snippetLimit: snippetLimit)
     }
 
+    /// Paths matching a ready-made FTS5 expression (an Advanced Search text rule), bm25 order.
+    func search(expression: String) async -> [String] {
+        guard await openForQuery() else { return [] }
+        return await index.search(expression: expression)
+    }
+
+    /// `searchRanked` for a ready-made expression (an Advanced Search's text rules together).
+    func searchRanked(expression: String, snippetLimit: Int = 300) async -> ContentIndex.RankedSearch {
+        guard await openForQuery() else { return ContentIndex.RankedSearch(paths: [], snippets: [:]) }
+        return await index.searchRanked(expression: expression, snippetLimit: snippetLimit)
+    }
+
+    func snippets(expression: String, for paths: [String]) async -> (snippets: [String: String], attempted: Int) {
+        guard await openForQuery() else { return ([:], 0) }
+        return await index.snippets(expression: expression, for: paths)
+    }
+
     /// The snippets `searchRanked` left out, for the hits the list is showing (see `ContentIndex.snippets`).
     func snippets(_ query: String, for paths: [String]) async -> (snippets: [String: String], attempted: Int) {
         guard await openForQuery() else { return ([:], 0) }

@@ -180,7 +180,27 @@ actor ContentIndex {
 
     /// `search`'s hits with their FTS rowids, which `snippetMap` seeks by.
     private func rankedHits(_ query: String, limit: Int? = nil) -> [(rowid: Int64, path: String)] {
-        let match = ftsMatchExpression(query)
+        rankedHits(match: ftsMatchExpression(query), limit: limit)
+    }
+
+    /// Paths matching a ready-made FTS5 expression (an Advanced Search text rule, `AdvancedSearch`), bm25
+    /// order. The expression's words arrive quoted; one SQLite still rejects gives no hits.
+    func search(expression: String) -> [String] {
+        rankedHits(match: expression).map { $0.path }
+    }
+
+    /// `searchRanked` for a ready-made expression; its snippets highlight the expression's own terms.
+    func searchRanked(expression: String, snippetLimit: Int = 300,
+                      snippetBudget: TimeInterval = SearchSnippet.timeBudget) -> RankedSearch {
+        let hits = rankedHits(match: expression)
+        guard !hits.isEmpty else { return RankedSearch(paths: [], snippets: [:]) }
+        let top = Array(hits.prefix(max(0, snippetLimit)))
+        return RankedSearch(paths: hits.map { $0.path },
+                            snippets: snippetMap(match: expression, stopTerms: nil, hits: top,
+                                                 budget: snippetBudget).snippets)
+    }
+
+    private func rankedHits(match: String, limit: Int? = nil) -> [(rowid: Int64, path: String)] {
         guard !match.isEmpty else { return [] }
         // bm25 weights in FTS5 column order (body, classification, name): name hits rank
         // highest (10), then classification (5), then body (1). bm25 returns negative scores
@@ -224,7 +244,9 @@ actor ContentIndex {
         guard !hits.isEmpty else { return RankedSearch(paths: [], snippets: [:]) }
         let top = Array(hits.prefix(max(0, snippetLimit)))
         return RankedSearch(paths: hits.map { $0.path },
-                            snippets: snippetMap(query: query, hits: top, budget: snippetBudget).snippets)
+                            snippets: snippetMap(match: snippetMatchExpression(query),
+                                                 stopTerms: stopWordSnippetTerms(query), hits: top,
+                                                 budget: snippetBudget).snippets)
     }
 
     /// The snippets `searchRanked` left out, filled in afterwards for the rows the list shows
@@ -234,6 +256,18 @@ actor ContentIndex {
     /// and the rest are for the caller to ask for again.
     func snippets(_ query: String, for paths: [String],
                   budget: TimeInterval = SearchSnippet.timeBudget) -> (snippets: [String: String], attempted: Int) {
+        snippets(match: snippetMatchExpression(query), stopTerms: stopWordSnippetTerms(query), for: paths,
+                 budget: budget)
+    }
+
+    /// `snippets(_:for:)` for a ready-made expression (`searchRanked(expression:)`).
+    func snippets(expression: String, for paths: [String],
+                  budget: TimeInterval = SearchSnippet.timeBudget) -> (snippets: [String: String], attempted: Int) {
+        snippets(match: expression, stopTerms: nil, for: paths, budget: budget)
+    }
+
+    private func snippets(match: String, stopTerms: [SearchSnippet.Term]?, for paths: [String],
+                          budget: TimeInterval) -> (snippets: [String: String], attempted: Int) {
         guard !paths.isEmpty,
               let stmt = prepare("SELECT rowid FROM files WHERE path = ?;") else { return ([:], 0) }
         var hits: [(rowid: Int64, path: String)] = []
@@ -243,7 +277,7 @@ actor ContentIndex {
             if sqlite3_step(stmt) == SQLITE_ROW { hits.append((sqlite3_column_int64(stmt, 0), path)) }
         }
         sqlite3_finalize(stmt)
-        let filled = snippetMap(query: query, hits: hits, budget: budget)
+        let filled = snippetMap(match: match, stopTerms: stopTerms, hits: hits, budget: budget)
         guard filled.attempted < hits.count else { return (filled.snippets, paths.count) }
         // Stopped early: everything in `paths` before the first unattempted hit counts as looked at.
         let nextPath = hits[filled.attempted].path
@@ -254,14 +288,13 @@ actor ContentIndex {
     /// statement, MATCH plus `rowid = ?`, which FTS5 answers by seeking the doclists to that row, so
     /// `snippet()` (which reads the stored body) runs only for these rows. Best match first, checking the
     /// clock before each row: rows left when `budget` runs out get no snippet. The expression is
-    /// `snippetMatchExpression`, which every hit satisfies. Empty snippets (e.g. an image-only doc with no
+    /// `snippetMatchExpression` (or an Advanced Search expression), which every hit satisfies. Empty snippets (e.g. an image-only doc with no
     /// body text) are dropped. Terms are wrapped in `SearchSnippet` marks for the UI to emphasise.
     /// `attempted` counts the hits looked at before the budget ran out (all of them when it did not).
-    private func snippetMap(query: String, hits: [(rowid: Int64, path: String)],
+    private func snippetMap(match: String, stopTerms: [SearchSnippet.Term]?, hits: [(rowid: Int64, path: String)],
                             budget: TimeInterval) -> (snippets: [String: String], attempted: Int) {
-        let match = snippetMatchExpression(query)
         guard !match.isEmpty, !hits.isEmpty else { return ([:], hits.count) }
-        if let terms = stopWordSnippetTerms(query) {
+        if let terms = stopTerms {
             return scannedSnippetMap(terms: terms, hits: hits, budget: budget)
         }
         let sql = "SELECT snippet(fts, 0, ?, ?, ?, ?) FROM fts WHERE fts MATCH ? AND rowid = ?;"
