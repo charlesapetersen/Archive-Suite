@@ -150,6 +150,7 @@ final class NavigationModel: ObservableObject {
     // its ScrollViewReader to reveal `scrollTargetID`. Pure UI hint — never a file operation.
     @Published private(set) var scrollRequest = 0
     private(set) var scrollTargetID: ArchiveFile.ID?
+    private(set) var scrollTargetAtTop = false
     // W23.m4: bumped when a deep link that cited a PAGE wants the document window opened on it. Same
     // shape as `scrollRequest` — the window observes the counter (so two links to the same page both
     // fire) and calls `openWindow`, which only a View can do. Read-only w.r.t. the corpus.
@@ -533,19 +534,57 @@ final class NavigationModel: ObservableObject {
     /// Spelled once so the read, the write and the removal cannot drift apart — the three-call-sites,
     /// two-spellings defect `W26.fixturehang` found in `ArchiveLibrary`.
     private static let selectionKey = "lastSelectionFileURLs"
+    /// The row at the top of the list when it last stopped moving (W40.fix-reader-restore-scroll).
+    private static let topRowKey = "lastTopRowFileURL"
 
     private var didRestoreSelection = false
+    /// The row a relaunch is putting back at the top. Kept while the list is still arriving — a smart
+    /// folder's text search and a cold scan both change the rows after the first ones show, and the
+    /// table keeps its offset, not its row — so each recompute scrolls back to it. Dropped once the user
+    /// scrolls or clicks, or when the row leaves the list.
+    private var pendingTopRow: ArchiveFile.ID?
+    private var lastNotedTopRow: ArchiveFile.ID?
+
     private func restoreSelectionIfNeeded() {
         // On the list, not the library: a restored filter may still be hiding every row (a "needs
         // attention" filter before format statuses arrive), and the resume should wait for it.
         guard !didRestoreSelection, !displayed.isEmpty else { return }
         didRestoreSelection = true
+        let shown = Set(displayed.map(\.id))
         let saved = Set((defaults.stringArray(forKey: Self.selectionKey) ?? [])
             .compactMap(URL.init(string:)))
-        guard !saved.isEmpty else { return }
-        let present = Set(displayed.map(\.id)).intersection(saved)   // a restored filter may hide some
+        let present = shown.intersection(saved)   // a restored filter may hide some
         if !present.isEmpty { selection = present }
+        // Return to the rows that were on screen; failing that, at least show the selection.
+        if let top = defaults.string(forKey: Self.topRowKey).flatMap(URL.init(string:)), shown.contains(top) {
+            pendingTopRow = top
+            lastNotedTopRow = top
+            requestScroll(to: top, atTop: true)
+        } else if let first = displayed.first(where: { present.contains($0.id) }) {
+            requestScroll(to: first.id)
+        }
     }
+
+    /// Keep the relaunch's place while rows are still arriving (see `pendingTopRow`).
+    private func reapplyPendingTopRow() {
+        guard let top = pendingTopRow else { return }
+        if displayed.contains(where: { $0.id == top }) {
+            requestScroll(to: top, atTop: true)
+        } else {
+            pendingTopRow = nil
+        }
+    }
+
+    /// The table reports its top row after each scroll. Ignored until the relaunch's place is restored,
+    /// so the first, unscrolled draw cannot overwrite the place it is about to return to.
+    func noteTopVisibleRow(_ id: ArchiveFile.ID) {
+        guard didRestoreSelection, pendingTopRow == nil, id != lastNotedTopRow else { return }
+        lastNotedTopRow = id
+        defaults.set(id.absoluteString, forKey: Self.topRowKey)
+    }
+
+    /// The user scrolled or clicked in the list: their place wins over the one being restored.
+    func userMovedInList() { pendingTopRow = nil }
     private func persistSelection() {
         // Cap persistence so a huge multi-select (e.g. Select All over 150k) never serializes a giant
         // array on the main actor or bloats the defaults plist; such selections aren't worth restoring.
@@ -585,6 +624,7 @@ final class NavigationModel: ObservableObject {
         if !showingEditor { pruneSelectionToDisplayed() }
         refreshSelectionCache()   // sort order affects the selection cache too
         persistViewState()        // C2: remember filter + sort across launches
+        reapplyPendingTopRow()    // a relaunch's place, while the rows are still arriving
     }
 
     /// Whether a row is listed. The base scope (smart folder) is the visible universe; the user filter layers on
@@ -1450,7 +1490,11 @@ final class NavigationModel: ObservableObject {
     // through `mark(.read)` → `TagWriter` (with undo). They add NO new write path — the next/previous
     // helpers are pure selection math (`TriageNavigation`) and never touch a file.
 
-    private func requestScroll(to id: ArchiveFile.ID) { scrollTargetID = id; scrollRequest &+= 1 }
+    /// `atTop` puts the row at the top of the list (a relaunch's place) rather than just into view.
+    private func requestScroll(to id: ArchiveFile.ID, atTop: Bool = false) {
+        if !atTop { pendingTopRow = nil }   // any other scroll is the user's, or a link's, and wins
+        scrollTargetID = id; scrollTargetAtTop = atTop; scrollRequest &+= 1
+    }
 
     /// W23.m4: ask the navigation window to open a document window on this selection (page included).
     /// A counter, like `requestScroll`, so two links to the same page both fire.

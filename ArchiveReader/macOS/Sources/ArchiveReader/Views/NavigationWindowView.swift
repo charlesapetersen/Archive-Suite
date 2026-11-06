@@ -131,6 +131,7 @@ struct NavigationWindowView: View {
             fontSize: listFontSize,
             scrollRequest: model.scrollRequest,
             scrollTargetID: model.scrollTargetID,
+            scrollTargetAtTop: model.scrollTargetAtTop,
             onDoubleClick: { openSelection() },
             buildContextMenu: { _ in buildNSContextMenu() }
         )

@@ -93,6 +93,8 @@ struct AppKitTableView: NSViewRepresentable {
     var fontSize: CGFloat
     var scrollRequest: Int
     var scrollTargetID: ArchiveFile.ID?
+    /// Put `scrollTargetID` at the top of the list rather than just into view (a relaunch's place).
+    var scrollTargetAtTop = false
     var onDoubleClick: () -> Void
     var buildContextMenu: (Set<ArchiveFile.ID>) -> NSMenu?
 
@@ -156,6 +158,9 @@ struct AppKitTableView: NSViewRepresentable {
 
         scrollView.documentView = tableView
         coordinator.tableView = tableView
+        coordinator.observeScrolling(of: scrollView)
+        tableView.onUserInput = { [weak coordinator] in coordinator?.parent.model.userMovedInList() }
+        scrollView.onScrollWheel = tableView.onUserInput
         coordinator.columnFitter = Self.fitColumns(of: tableView)
 
         let dataSource = SortableDiffableDataSource(tableView: tableView) { tv, column, row, itemID in
@@ -276,6 +281,7 @@ struct AppKitTableView: NSViewRepresentable {
             coordinator.lastScrollRequest = scrollRequest
             if let idx = coordinator.rowByID[target] {
                 tableView.scrollRowToVisible(idx)
+                if scrollTargetAtTop { coordinator.scrollRowToTop(idx, in: scrollView) }
             }
         }
     }
@@ -317,6 +323,49 @@ struct AppKitTableView: NSViewRepresentable {
 
         /// Take a displayed generation; a new snapshot is applied only when its ids differ from the
         /// current one. Returns whether they did.
+        // MARK: Place in the list (W40.fix-reader-restore-scroll)
+
+        /// Report the top row after each scroll, so a relaunch can return to it, and tell the model when
+        /// the user scrolls, so a place still being restored stops pulling the list back. Selector
+        /// observers, which the notification center drops by itself when the coordinator goes.
+        func observeScrolling(of scrollView: NSScrollView) {
+            scrollView.contentView.postsBoundsChangedNotifications = true
+            let center = NotificationCenter.default
+            center.addObserver(self, selector: #selector(clipBoundsChanged(_:)),
+                               name: NSView.boundsDidChangeNotification, object: scrollView.contentView)
+            center.addObserver(self, selector: #selector(liveScrollStarted(_:)),
+                               name: NSScrollView.willStartLiveScrollNotification, object: scrollView)
+        }
+
+        @objc private func clipBoundsChanged(_ note: Notification) {
+            guard let clip = note.object as? NSClipView else { return }
+            noteTopRow(in: clip)
+        }
+
+        @objc private func liveScrollStarted(_ note: Notification) { parent.model.userMovedInList() }
+
+        /// The first row under the top edge of the visible area (below the header, if it overlaps).
+        private func topRow(in clip: NSClipView) -> Int? {
+            guard let tableView else { return nil }
+            let row = tableView.row(at: NSPoint(x: clip.bounds.minX, y: clip.bounds.minY + clip.contentInsets.top))
+            return row >= 0 && row < currentSnapshotIDs.count ? row : nil
+        }
+
+        private func noteTopRow(in clip: NSClipView) {
+            guard let row = topRow(in: clip) else { return }
+            parent.model.noteTopVisibleRow(currentSnapshotIDs[row])
+        }
+
+        /// Scroll so `row` is the first one shown, as far as the list's length allows.
+        func scrollRowToTop(_ row: Int, in scrollView: NSScrollView) {
+            guard let tableView else { return }
+            let clip = scrollView.contentView
+            var bounds = clip.bounds
+            bounds.origin.y = tableView.rect(ofRow: row).minY - clip.contentInsets.top
+            clip.scroll(to: clip.constrainBoundsRect(bounds).origin)
+            scrollView.reflectScrolledClipView(clip)
+        }
+
         @discardableResult
         func showRows(_ files: [ArchiveFile]) -> Bool {
             let idsChanged = files.count != currentSnapshotIDs.count
@@ -712,6 +761,7 @@ struct AppKitTableView: NSViewRepresentable {
 
         func tableViewSelectionDidChange(_ notification: Notification) {
             guard !isUpdatingSelection, let tableView else { return }
+            parent.model.userMovedInList()
             let indices = tableView.selectedRowIndexes
             var newSel = Set<ArchiveFile.ID>()
             for i in indices {
@@ -1365,6 +1415,8 @@ private final class QualityPopUpButton: NSPopUpButton {
 @MainActor
 final class ContextMenuTableView: NSTableView {
     var contextMenuProvider: ((Set<ArchiveFile.ID>) -> NSMenu?)?
+    /// A key or click the user pressed in the list (W40.fix-reader-restore-scroll).
+    var onUserInput: (() -> Void)?
     /// The Read cell a press began on, which gets the rest of that press (W40.fix-reader-read-toggle).
     private var readCellPress: ReadStateCellView?
 
@@ -1393,7 +1445,13 @@ final class ContextMenuTableView: NSTableView {
         return cell
     }
 
+    override func keyDown(with event: NSEvent) {
+        onUserInput?()   // Page Down, Home and End move the list without changing the selection
+        super.keyDown(with: event)
+    }
+
     override func mouseDown(with event: NSEvent) {
+        onUserInput?()
         readCellPress = nil
         if let cell = readCell(at: event), cell.handleMouseDown(event) {
             readCellPress = cell

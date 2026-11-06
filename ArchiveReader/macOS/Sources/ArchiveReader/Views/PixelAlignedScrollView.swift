@@ -12,6 +12,13 @@ final class PixelAlignedScrollView: NSScrollView {
     /// The frame SwiftUI last asked for, before rounding. Kept so that an origin and a size set separately are each
     /// rounded from the requested edges rather than from an already rounded frame.
     private var requested: NSRect?
+    /// Told of every scroll-wheel or trackpad scroll, which a mouse wheel's live-scroll notification can miss.
+    var onScrollWheel: (() -> Void)?
+
+    override func scrollWheel(with event: NSEvent) {
+        onScrollWheel?()
+        super.scrollWheel(with: event)
+    }
 
     override var frame: NSRect {
         get { super.frame }

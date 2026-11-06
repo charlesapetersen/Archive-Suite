@@ -63,7 +63,7 @@ final class NavigationModelDefaultsIsolationTests: XCTestCase {
 
     /// Every key a `NavigationModel` and the stores it owns can write.
     private static let ownedKeys = ["ARUITestRootPath", "ar.viewState", "lastSelectionFileURLs",
-                                   "archiveRootBookmark", "ar.excludedFolders"]
+                                   "archiveRootBookmark", "ar.excludedFolders", "lastTopRowFileURL"]
 
     /// `Any?` out of the real domain, compared as its property-list encoding so `Data`, `[String]` and
     /// absence all compare properly without knowing each key's type.
