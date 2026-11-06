@@ -5,6 +5,7 @@
 import XCTest
 import PDFKit
 import AppKit
+import SwiftUI
 @testable import ArchiveReader
 
 @MainActor
@@ -109,6 +110,70 @@ final class PDFPaneViewportTests: XCTestCase {
         XCTAssertEqual(pdfView.scaleFactor, 1.5, accuracy: 0.001, "400 pt × 1.5 = the same 600 pt")
     }
 
+    /// The real SwiftUI wiring: `PDFPaneView`s swapped by identity, as the document window swaps the image
+    /// pane, hosted offscreen (never put in a window). A 20 px JPEG against a 400 pt page needs a scale 20
+    /// times the PDF's, beyond PDFKit's default zoom limit of 20.
+    func testHostedSwapKeepsOnScreenSize() throws {
+        let pdfPage = PDFPage()
+        pdfPage.setBounds(CGRect(x: 0, y: 0, width: 400, height: 520), for: .mediaBox)
+        let jpegPage = try makeImagePage(width: 20, height: 26)
+        let controller = PDFPaneController(key: "left", persists: false)
+        let state = SwapState()
+        let host = NSHostingView(rootView: SwapHost(state: state, pdf: pdfPage, jpeg: jpegPage, controller: controller))
+        host.frame = CGRect(x: 0, y: 0, width: 600, height: 500)
+        host.layoutSubtreeIfNeeded(); settle()
+        controller.zoomIn(); controller.zoomIn(); settle()
+        let pdfScale = try XCTUnwrap(controller.pdfView?.scaleFactor)
+        controller.captureViewport()
+        let before = try XCTUnwrap(controller.pendingViewport)
+        state.jpeg = true
+        host.layoutSubtreeIfNeeded(); settle()
+        let jpegView = try XCTUnwrap(controller.pdfView)
+        XCTAssertEqual(jpegView.document?.page(at: 0)?.bounds(for: .mediaBox).width ?? 0, 20, accuracy: 0.01)
+        XCTAssertEqual(jpegView.scaleFactor * 20, pdfScale * 400, accuracy: 1, "the JPEG keeps the PDF page's size")
+        let shownJPEG = try XCTUnwrap(jpegView.document?.page(at: 0))
+        let pageRect = jpegView.convert(shownJPEG.bounds(for: .mediaBox), from: shownJPEG)
+        XCTAssertTrue(pageRect.contains(CGPoint(x: jpegView.bounds.midX, y: jpegView.bounds.midY)),
+                      "the image is under the middle of the pane, not off in the margin")
+        controller.captureViewport()
+        let onJPEG = try XCTUnwrap(controller.pendingViewport)
+        XCTAssertEqual(onJPEG.centre.x, before.centre.x, accuracy: 0.02)
+        XCTAssertEqual(onJPEG.centre.y, before.centre.y, accuracy: 0.02)
+        state.jpeg = false
+        host.layoutSubtreeIfNeeded(); settle()
+        XCTAssertEqual(controller.pdfView?.scaleFactor ?? 0, pdfScale, accuracy: 0.001)
+    }
+
+    /// Zoomed out, so the page sits inside the pane, in a real window (never ordered onto the screen) with
+    /// always-shown scrollers: the VM showed PDFKit rescaling the fresh view by about 2% as they settle.
+    func testHostedSwapKeepsZoomedOutSize() throws {
+        let pdfPage = PDFPage()
+        pdfPage.setBounds(CGRect(x: 0, y: 0, width: 612, height: 792), for: .mediaBox)
+        let jpegPage = try makeImagePage(width: 1224, height: 1584)
+        let controller = PDFPaneController(key: "left", persists: false)
+        let state = SwapState()
+        let host = NSHostingView(rootView: SwapHost(state: state, pdf: pdfPage, jpeg: jpegPage, controller: controller))
+        // Legacy (always-shown) scrollers, as on a Mac with a mouse rather than a trackpad.
+        UserDefaults.standard.set("Always", forKey: "AppleShowScrollBars")
+        defer { UserDefaults.standard.removeObject(forKey: "AppleShowScrollBars") }
+        let window = NSWindow(contentRect: CGRect(x: 0, y: 0, width: 930, height: 780), styleMask: [.titled],
+                              backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        defer { window.close() }
+        window.contentView = host
+        host.layoutSubtreeIfNeeded(); settle()
+        controller.zoomOut(); settle(); controller.zoomOut(); settle()
+        let pdfScale = try XCTUnwrap(controller.pdfView?.scaleFactor)
+        controller.captureViewport()
+        state.jpeg = true
+        host.layoutSubtreeIfNeeded(); settle()
+        let jpegScale = try XCTUnwrap(controller.pdfView?.scaleFactor)
+        XCTAssertEqual(jpegScale * 1224, pdfScale * 612, accuracy: 0.5)
+        state.jpeg = false
+        host.layoutSubtreeIfNeeded(); settle()
+        XCTAssertEqual(controller.pdfView?.scaleFactor ?? 0, pdfScale, accuracy: 0.001)
+    }
+
     private func makeView() -> PDFView {
         let view = ReaderPDFView(frame: CGRect(x: 0, y: 0, width: 300, height: 320))
         view.displayMode = .singlePage
@@ -132,5 +197,18 @@ final class PDFPaneViewportTests: XCTestCase {
     /// Let the deferred second scroll (and PDFKit's relayout) land.
     private func settle() {
         RunLoop.main.run(until: Date().addingTimeInterval(0.15))
+    }
+}
+
+private final class SwapState: ObservableObject { @Published var jpeg = false }
+
+private struct SwapHost: View {
+    @ObservedObject var state: SwapState
+    let pdf: PDFPage
+    let jpeg: PDFPage
+    let controller: PDFPaneController
+    var body: some View {
+        PDFPaneView(page: state.jpeg ? jpeg : pdf, controller: controller, reference: pdf)
+            .id(state.jpeg ? "jpeg" : "pdf")
     }
 }

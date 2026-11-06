@@ -187,7 +187,9 @@ sys.stdout.buffer.write(chunk(b'IEND', b''))
 " > "$TMPPNG"
 sips -s format jpeg "$TMPPNG" --out "$DST/IMG_PHOTO — Fixture.jpg" >/dev/null 2>&1
 mkdir -p "$DST/Archival Photos JPEGS"
-sips -s format jpeg "$TMPPNG" --out "$DST/Archival Photos JPEGS/00001 IMG — Brown.jpg" >/dev/null 2>&1
+# The partner is sized like a real scan, 1224 x 1584 px (the PDF's 612 x 792 pt page at 2 px a point), so
+# the viewer's PDF / JPEG switch has a realistic size ratio to keep the zoom through (W40.fix-reader-jpeg-keep-view).
+sips -s format jpeg -z 1584 1224 "$TMPPNG" --out "$DST/Archival Photos JPEGS/00001 IMG — Brown.jpg" >/dev/null 2>&1
 rm -f "$TMPPNG"
 
 # --- strip ALL inherited Finder tags from every file ---

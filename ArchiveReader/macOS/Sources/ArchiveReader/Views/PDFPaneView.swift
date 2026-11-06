@@ -80,6 +80,9 @@ final class PDFPaneController {
     func applyToView() {
         guard let v = pdfView else { return }
         isApplying = true
+        // The zoom limits move with the unit too, so a JPEG measured in pixels can reach the same sizes.
+        v.minScaleFactor = Self.defaultScaleRange.lowerBound * scaleUnit
+        v.maxScaleFactor = Self.defaultScaleRange.upperBound * scaleUnit
         if let s = savedScale { v.autoScales = false; v.scaleFactor = s * scaleUnit } else { v.autoScales = true }
         isApplying = false
         #if DEBUG
@@ -103,9 +106,6 @@ final class PDFPaneController {
             view.document = nil
         }
         scaleUnit = Self.scaleUnit(showing: page, reference: reference, box: view.displayBox)
-        // The zoom limits move with the unit too, so a JPEG measured in pixels can reach the same sizes.
-        view.minScaleFactor = Self.defaultScaleRange.lowerBound * scaleUnit
-        view.maxScaleFactor = Self.defaultScaleRange.upperBound * scaleUnit
         view.layoutDocumentView()
         applyToView()   // restore the persisted/current zoom + pin the page top (or the switched-from region)
     }
@@ -134,10 +134,24 @@ final class PDFPaneController {
         let point = Self.pagePoint(fromDisplayed: topLeft, on: page, box: v.displayBox)
         v.layoutDocumentView()
         v.go(to: PDFDestination(page: page, at: point))
-        DispatchQueue.main.async { [weak v] in
+        DispatchQueue.main.async { [weak self, weak v] in
             guard let v, v.document?.page(at: 0) === page else { return }
+            self?.reassertScale(on: v)
             v.go(to: PDFDestination(page: page, at: point))
         }
+    }
+
+    /// A view given its zoom before it had its real size is rescaled by PDFKit, silently (no
+    /// `PDFViewScaleChanged`), when its scrollers settle: about 2% with always-shown scrollers, as on a Mac
+    /// with a mouse. Put the saved zoom back once the layout has landed, so the page keeps its exact size.
+    private func reassertScale(on v: PDFView) {
+        guard let s = savedScale, !v.autoScales else { return }
+        let want = max(v.minScaleFactor, min(v.maxScaleFactor, s * scaleUnit))
+        guard abs(v.scaleFactor - want) > want * 1e-6 else { return }
+        isApplying = true
+        v.scaleFactor = want
+        isApplying = false
+        v.layoutDocumentView()
     }
 
     /// A pane's visible region: its centre as fractions of the page as displayed (x from the left, y from the
@@ -204,8 +218,9 @@ final class PDFPaneController {
         let top = CGPoint(x: 0, y: page.bounds(for: v.displayBox).height)   // PDF origin bottom-left → y=height is the top
         v.layoutDocumentView()
         v.go(to: PDFDestination(page: page, at: top))
-        DispatchQueue.main.async { [weak v] in
+        DispatchQueue.main.async { [weak self, weak v] in
             guard let v, v.document?.page(at: 0) === page else { return }
+            self?.reassertScale(on: v)
             v.go(to: PDFDestination(page: page, at: top))
         }
     }

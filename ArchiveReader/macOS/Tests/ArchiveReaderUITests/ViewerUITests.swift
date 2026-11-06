@@ -357,6 +357,31 @@ final class ViewerUITests: FixtureUITestCase {
 
     // MARK: - The toolbar's PDF / JPEG switch (W40.fix-reader-jpeg-toolbar)
 
+    /// The width and height, in screen points, of the run of pixels passing `match` through the middle of the
+    /// document window's image pane (the left ⅔ of the split, below the toolbar), read from a screenshot.
+    private func pageExtent(in window: XCUIElement, _ match: (Int, Int, Int) -> Bool) -> CGSize {
+        let shot = XCUIScreen.main.screenshot().image
+        var rect = CGRect(origin: .zero, size: shot.size)
+        guard let cg = shot.cgImage(forProposedRect: &rect, context: nil, hints: nil),
+              let data = cg.dataProvider?.data, let bytes = CFDataGetBytePtr(data),
+              cg.bitsPerPixel == 32, shot.size.width > 0 else { return .zero }
+        let scale = CGFloat(cg.width) / shot.size.width
+        let f = window.frame
+        let bgra = cg.bitmapInfo.contains(.byteOrder32Little)
+        func hit(_ x: Int, _ y: Int) -> Bool {
+            guard x >= 0, y >= 0, x < cg.width, y < cg.height else { return false }
+            let o = y * cg.bytesPerRow + x * 4
+            let (r, g, b) = bgra ? (bytes[o + 2], bytes[o + 1], bytes[o]) : (bytes[o], bytes[o + 1], bytes[o + 2])
+            return match(Int(r), Int(g), Int(b))
+        }
+        let left = Int((f.minX + 4) * scale), right = Int((f.minX + f.width * 0.65) * scale)
+        let top = Int((f.minY + 60) * scale), bottom = Int((f.maxY - 30) * scale)
+        let midX = (left + right) / 2, midY = (top + bottom) / 2
+        let row = (left...right).filter { hit($0, midY) }, column = (top...bottom).filter { hit(midX, $0) }
+        guard let x0 = row.first, let x1 = row.last, let y0 = column.first, let y1 = column.last else { return .zero }
+        return CGSize(width: CGFloat(x1 - x0 + 1) / scale, height: CGFloat(y1 - y0 + 1) / scale)
+    }
+
     /// The owner did not find the menu-only switch (reader-1, row 13). The document toolbar now has a
     /// PDF / JPEG switch: live on a file with a JPEG original, where clicking a side shows that image, and
     /// present but disabled on a file without one.
@@ -378,15 +403,42 @@ final class ViewerUITests: FixtureUITestCase {
         let jpegSide = control.descendants(matching: .any).matching(NSPredicate(format: "label == 'JPEG' OR title == 'JPEG'")).firstMatch
         let pdfSide = control.descendants(matching: .any).matching(NSPredicate(format: "label == 'PDF' OR title == 'PDF'")).firstMatch
         XCTAssertTrue(jpegSide.exists && pdfSide.exists, "both sides are labelled")
-        jpegSide.click()
+        // W40.fix-reader-jpeg-keep-view: zoom out on the PDF so its page sits inside the pane, then switch. The
+        // fixture's JPEG is solid tan, 1224 px wide against the PDF page's 612 pt, so keeping the on-screen size
+        // means the tan JPEG covers as much of the pane as the white PDF page did. (Carrying the raw scale
+        // factor, the old behaviour, drew it at twice the width and height.)
+        let docWindow = app.windows.containing(.any, identifier: "ar.doc.imageSource").firstMatch
+        let isWhite: (Int, Int, Int) -> Bool = { r, g, b in r > 248 && g > 248 && b > 248 }
+        let isTan: (Int, Int, Int) -> Bool = { r, g, b in abs(r - 180) < 30 && abs(g - 160) < 30 && abs(b - 140) < 30 }
+        let zoomOut = app.buttons["Zoom Out Left"].firstMatch
+        XCTAssertTrue(zoomOut.waitForExistence(timeout: 5))
+        pdfSide.click()                                  // start on the PDF, fitted: the source and the pane's
+        pressKey("0", modifiers: [.command, .option])   // zoom both persist, so a failed run can leave either
         settle(0.5)
+        zoomOut.click(); zoomOut.click()
+        settle(1)
+        captureScreenshot("jpeg-toolbar-0-pdf-zoomed")
+        let pdfSize = pageExtent(in: docWindow, isWhite)
+        jpegSide.click()
+        settle(1)
         XCTAssertTrue(viewMenuItem("Show PDF Image").exists, "clicking JPEG in the toolbar shows the JPEG original")
         closeMenu()
         captureScreenshot("jpeg-toolbar-1-jpeg-on")
+        let jpegSize = pageExtent(in: docWindow, isTan)
+        print("[jpeg-keep-view] page on screen: PDF \(pdfSize), JPEG \(jpegSize)")
+        XCTAssertGreaterThan(pdfSize.width, 100, "the zoomed-out PDF page is on screen")
+        XCTAssertEqual(jpegSize.width, pdfSize.width, accuracy: pdfSize.width * 0.02, "the JPEG keeps the PDF page's width")
+        XCTAssertEqual(jpegSize.height, pdfSize.height, accuracy: pdfSize.height * 0.02, "and its height")
         pdfSide.click()
         settle(0.5)
         XCTAssertTrue(viewMenuItem("Show JPEG Image").exists, "clicking PDF in the toolbar goes back to the PDF image")
         closeMenu()
+        settle(0.5)
+        let backSize = pageExtent(in: docWindow, isWhite)
+        print("[jpeg-keep-view] page on screen back on the PDF: \(backSize)")
+        XCTAssertEqual(backSize.width, pdfSize.width, accuracy: 2, "back on the PDF, its own zoom returns")
+        pressKey("0", modifiers: [.command, .option])   // reset the zoom so later tests start fitted
+        settle(0.5)
         pressKey("w", modifiers: .command)
         settle(0.5)
 
