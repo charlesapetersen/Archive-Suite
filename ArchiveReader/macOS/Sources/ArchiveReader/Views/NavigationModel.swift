@@ -956,6 +956,15 @@ final class NavigationModel: ObservableObject {
         return result
     }
 
+    /// The tag cloud's minimum-count control (W40.fix-reader-tagcloud-threshold): the tags used on at least
+    /// `minimumCount` of the visible files. A tag that is in the tag filter stays, whatever its count, so it can
+    /// still be clicked off.
+    nonisolated static func tagCloud(_ cloud: [(tag: String, count: Int)], minimumCount: Int,
+                         keeping active: Set<String>) -> [(tag: String, count: Int)] {
+        guard minimumCount > 1 else { return cloud }
+        return cloud.filter { $0.count >= minimumCount || active.contains($0.tag) }
+    }
+
     // MARK: Folder tree (sidebar)
 
     // Cheap change-signatures (see `LibraryChangeSignature`) so a tag edit — which never moves files and,

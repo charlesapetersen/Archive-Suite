@@ -14,6 +14,7 @@ struct NavigationWindowView: View {
     @AppStorage("ar.showSidebar") private var showingSidebar = true
     @AppStorage("ar.sidebarWidth") private var sidebarWidth = 210.0
     @AppStorage("ar.tagCloudWidth") private var tagCloudWidth = 240.0
+    @AppStorage("ar.tagCloudMinCount") private var tagCloudMinCount = 1   // W40.fix-reader-tagcloud-threshold
     @AppStorage("ar.listFontSize") private var listFontSize = 13.0   // C3 row density / readability
     @AppStorage(DisplayCalendarSettings.enabledKey) private var calendarsEnabled = false   // W24.cal1-reader
     @State private var renameText = ""
@@ -319,19 +320,35 @@ struct NavigationWindowView: View {
     // MARK: Tag cloud (right margin)
 
     private var tagCloudPanel: some View {
-        let cloud = model.tagCloud
+        let allTags = model.tagCloud
+        let cloud = NavigationModel.tagCloud(allTags, minimumCount: tagCloudMinCount, keeping: model.filter.subjects)
         let maxCount = max(1, cloud.map(\.count).max() ?? 1)
         return VStack(alignment: .leading, spacing: 0) {
             HStack {
                 Text("Tags in view").font(.headline)
                 Spacer()
-                Text("\(cloud.count)").foregroundStyle(.primary).font(.caption)
+                Text(cloud.count == allTags.count ? "\(cloud.count)" : "\(cloud.count) of \(allTags.count)")
+                    .foregroundStyle(.primary).font(.caption)
+                    .accessibilityIdentifier("ar.tagCloud.count")
             }
-            .padding(10)
+            .padding([.horizontal, .top], 10)
+            // Hides the tags used on fewer than N of the visible files; remembered between launches.
+            Stepper(value: $tagCloudMinCount, in: 1...999) {
+                Text(tagCloudMinCount == 1 ? "Showing every tag" : "On at least \(tagCloudMinCount) files")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            .controlSize(.small)
+            .help("Hide the tags used on fewer files than this")
+            .accessibilityLabel("Minimum files per tag")
+            .accessibilityValue("\(tagCloudMinCount)")
+            .accessibilityIdentifier("ar.tagCloud.minCount")
+            .padding(.horizontal, 10).padding(.vertical, 6)
             Divider()
             if cloud.isEmpty {
-                Text("No tags in the current view.")
+                Text(allTags.isEmpty ? "No tags in the current view."
+                                     : "No tag is on \(tagCloudMinCount) or more of the files in view.")
                     .foregroundStyle(.secondary).font(.callout)
+                    .multilineTextAlignment(.center).padding(10)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 ScrollView {

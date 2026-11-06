@@ -115,6 +115,41 @@ final class NavigationUITests: FixtureUITestCase {
         XCTAssertEqual(countWhenClosed, 0, "Tag cloud tags should disappear when panel is closed")
     }
 
+    // MARK: - Tag cloud minimum count (W40.fix-reader-tagcloud-threshold)
+
+    func testTagCloudMinimumCountHidesRareTags() throws {
+        let button = toolbarButton("ar.toolbar.tagCloud")
+        XCTAssertTrue(button.waitForExistence(timeout: 5))
+        func tagCount() -> Int { app.buttons.matching(identifier: "ar.tagCloud.tag").count }
+        for _ in 0..<2 where tagCount() == 0 {
+            button.click()
+            RunLoop.current.run(until: Date().addingTimeInterval(1))
+        }
+        let all = tagCount()
+        XCTAssertGreaterThan(all, 0, "Tag cloud should show tags when open")
+
+        let control = app.descendants(matching: .any)["ar.tagCloud.minCount"]
+        XCTAssertTrue(control.waitForExistence(timeout: 3), "the minimum-count control should be in the panel")
+        let stepper = control.elementType == .stepper ? control : control.steppers.firstMatch
+        let increment = stepper.incrementArrows.firstMatch
+        XCTAssertTrue(increment.waitForExistence(timeout: 3), "the control should have an increment arrow")
+
+        // The fixture has 12 files, so a minimum of 13 hides every tag; stop as soon as the count drops.
+        for _ in 0..<13 where tagCount() == all {
+            increment.click()
+            RunLoop.current.run(until: Date().addingTimeInterval(0.4))
+        }
+        XCTAssertLessThan(tagCount(), all, "raising the minimum should hide the tags on fewer files")
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "value BEGINSWITH 'On at least'")).firstMatch.exists
+                      || app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'On at least'")).firstMatch.exists,
+                      "the control should say the minimum it applies")
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "value CONTAINS ' of '")).firstMatch.exists
+                      || app.staticTexts.matching(NSPredicate(format: "label CONTAINS ' of '")).firstMatch.exists,
+                      "the header should say how many of the tags are shown")
+        captureScreenshot("tagcloud-min-count")
+        button.click()
+    }
+
     // MARK: - Column headers exist
 
     func testColumnHeadersExist() throws {

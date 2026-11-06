@@ -4,7 +4,8 @@
 // toggles (`ar.showSidebar`, `ar.showTagCloud`) persist in the app's own defaults, which nothing between UI tests
 // resets. So a fixture launch (`-ARUITestRootPath`) starts as a fresh install does: System, the sidebar shown, the
 // tag cloud closed. A test that stopped with the sidebar hidden hid it from every later test, so the folder and
-// smart-folder rows they looked for were never there (W40.fix-reader-vm-suite-red). `-ARUITestKeepAppearance` keeps
+// smart-folder rows they looked for were never there (W40.fix-reader-vm-suite-red). The tag cloud's minimum count
+// (`ar.tagCloudMinCount`) is reset with them, so every test sees every tag. `-ARUITestKeepAppearance` keeps
 // the Appearance choice (the relaunch check); the panes are reset on every fixture launch. Only the persisted value
 // is removed: an argument-domain value (`-archiveAppearance dark`, the runner's "via the setting" passes;
 // `-ar.showTagCloud YES` in the audits) still reads through. The Notes twin is `NotesAppearanceUITestDefaults`.
@@ -15,7 +16,7 @@ import Foundation
 
 enum ReaderUITestDefaults {
     static let keepArgument = "-ARUITestKeepAppearance"
-    static let paneKeys = ["ar.showSidebar", "ar.showTagCloud"]
+    static let paneKeys = ["ar.showSidebar", "ar.showTagCloud", "ar.tagCloudMinCount"]
 
     static func clearStoredStateIfUITest(arguments: [String] = ProcessInfo.processInfo.arguments,
                                          defaults: UserDefaults = .standard) {
