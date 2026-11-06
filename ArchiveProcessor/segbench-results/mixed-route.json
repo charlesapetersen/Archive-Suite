@@ -831,6 +831,396 @@
   "unlabelled": 37,
   "lines": 1934
  },
+ "two_pass": {
+  "vision/oracle": {
+   "n": 35,
+   "whole": 14,
+   "region": 13,
+   "union": 17,
+   "gains": 3,
+   "floor_gains": 0,
+   "no_partner": 4,
+   "missed": 21,
+   "same_pairs": 53,
+   "same_hits": 0,
+   "far_pairs": 601,
+   "far_hits": 1,
+   "sign_p": 0.25,
+   "by_core": {
+    "A-core": {
+     "n": 5,
+     "whole": 4,
+     "union": 4,
+     "floor": 0
+    },
+    "B-core": {
+     "n": 30,
+     "whole": 10,
+     "union": 13,
+     "floor": 0
+    }
+   }
+  },
+  "vision/det25": {
+   "n": 35,
+   "whole": 14,
+   "region": 2,
+   "union": 14,
+   "gains": 0,
+   "floor_gains": 1,
+   "no_partner": 4,
+   "missed": 21,
+   "same_pairs": 6,
+   "same_hits": 1,
+   "far_pairs": 117,
+   "far_hits": 0,
+   "sign_p": 1.0,
+   "by_core": {
+    "A-core": {
+     "n": 5,
+     "whole": 4,
+     "union": 4,
+     "floor": 0
+    },
+    "B-core": {
+     "n": 30,
+     "whole": 10,
+     "union": 10,
+     "floor": 1
+    }
+   }
+  },
+  "vision/det05": {
+   "n": 35,
+   "whole": 14,
+   "region": 5,
+   "union": 16,
+   "gains": 2,
+   "floor_gains": 1,
+   "no_partner": 4,
+   "missed": 21,
+   "same_pairs": 14,
+   "same_hits": 1,
+   "far_pairs": 250,
+   "far_hits": 0,
+   "sign_p": 1.0,
+   "by_core": {
+    "A-core": {
+     "n": 5,
+     "whole": 4,
+     "union": 4,
+     "floor": 0
+    },
+    "B-core": {
+     "n": 30,
+     "whole": 10,
+     "union": 12,
+     "floor": 1
+    }
+   }
+  },
+  "lighton/oracle": {
+   "n": 35,
+   "whole": 16,
+   "region": 17,
+   "union": 24,
+   "gains": 8,
+   "floor_gains": 1,
+   "no_partner": 4,
+   "missed": 19,
+   "same_pairs": 33,
+   "same_hits": 1,
+   "far_pairs": 467,
+   "far_hits": 1,
+   "sign_p": 0.0156,
+   "by_core": {
+    "A-core": {
+     "n": 5,
+     "whole": 3,
+     "union": 4,
+     "floor": 0
+    },
+    "B-core": {
+     "n": 30,
+     "whole": 13,
+     "union": 20,
+     "floor": 1
+    }
+   }
+  },
+  "lighton/det25": {
+   "n": 35,
+   "whole": 16,
+   "region": 4,
+   "union": 19,
+   "gains": 3,
+   "floor_gains": 1,
+   "no_partner": 4,
+   "missed": 19,
+   "same_pairs": 8,
+   "same_hits": 1,
+   "far_pairs": 101,
+   "far_hits": 0,
+   "sign_p": 0.625,
+   "by_core": {
+    "A-core": {
+     "n": 5,
+     "whole": 3,
+     "union": 3,
+     "floor": 0
+    },
+    "B-core": {
+     "n": 30,
+     "whole": 13,
+     "union": 16,
+     "floor": 1
+    }
+   }
+  },
+  "lighton/det05": {
+   "n": 35,
+   "whole": 16,
+   "region": 6,
+   "union": 19,
+   "gains": 3,
+   "floor_gains": 1,
+   "no_partner": 4,
+   "missed": 19,
+   "same_pairs": 14,
+   "same_hits": 1,
+   "far_pairs": 206,
+   "far_hits": 0,
+   "sign_p": 0.625,
+   "by_core": {
+    "A-core": {
+     "n": 5,
+     "whole": 3,
+     "union": 3,
+     "floor": 0
+    },
+    "B-core": {
+     "n": 30,
+     "whole": 13,
+     "union": 16,
+     "floor": 1
+    }
+   }
+  },
+  "glm/oracle": {
+   "n": 35,
+   "whole": 13,
+   "region": 18,
+   "union": 21,
+   "gains": 8,
+   "floor_gains": 0,
+   "no_partner": 8,
+   "missed": 22,
+   "same_pairs": 40,
+   "same_hits": 0,
+   "far_pairs": 644,
+   "far_hits": 2,
+   "sign_p": 0.0078,
+   "by_core": {
+    "A-core": {
+     "n": 5,
+     "whole": 0,
+     "union": 3,
+     "floor": 0
+    },
+    "B-core": {
+     "n": 30,
+     "whole": 13,
+     "union": 18,
+     "floor": 0
+    }
+   }
+  },
+  "glm/det25": {
+   "n": 35,
+   "whole": 13,
+   "region": 3,
+   "union": 14,
+   "gains": 1,
+   "floor_gains": 0,
+   "no_partner": 8,
+   "missed": 22,
+   "same_pairs": 1,
+   "same_hits": 0,
+   "far_pairs": 129,
+   "far_hits": 0,
+   "sign_p": 1.0,
+   "by_core": {
+    "A-core": {
+     "n": 5,
+     "whole": 0,
+     "union": 1,
+     "floor": 0
+    },
+    "B-core": {
+     "n": 30,
+     "whole": 13,
+     "union": 13,
+     "floor": 0
+    }
+   }
+  },
+  "glm/det05": {
+   "n": 35,
+   "whole": 13,
+   "region": 5,
+   "union": 15,
+   "gains": 2,
+   "floor_gains": 0,
+   "no_partner": 8,
+   "missed": 22,
+   "same_pairs": 9,
+   "same_hits": 0,
+   "far_pairs": 271,
+   "far_hits": 0,
+   "sign_p": 0.5,
+   "by_core": {
+    "A-core": {
+     "n": 5,
+     "whole": 0,
+     "union": 1,
+     "floor": 0
+    },
+    "B-core": {
+     "n": 30,
+     "whole": 13,
+     "union": 14,
+     "floor": 0
+    }
+   }
+  },
+  "qwen27/oracle": {
+   "n": 35,
+   "whole": 26,
+   "region": 19,
+   "union": 27,
+   "gains": 1,
+   "floor_gains": 0,
+   "no_partner": 2,
+   "missed": 9,
+   "same_pairs": 28,
+   "same_hits": 0,
+   "far_pairs": 278,
+   "far_hits": 0,
+   "sign_p": 1.0,
+   "by_core": {
+    "A-core": {
+     "n": 5,
+     "whole": 3,
+     "union": 4,
+     "floor": 0
+    },
+    "B-core": {
+     "n": 30,
+     "whole": 23,
+     "union": 23,
+     "floor": 0
+    }
+   }
+  },
+  "qwen27/det25": {
+   "n": 35,
+   "whole": 26,
+   "region": 3,
+   "union": 26,
+   "gains": 0,
+   "floor_gains": 0,
+   "no_partner": 2,
+   "missed": 9,
+   "same_pairs": 0,
+   "same_hits": 0,
+   "far_pairs": 54,
+   "far_hits": 0,
+   "sign_p": 1.0,
+   "by_core": {
+    "A-core": {
+     "n": 5,
+     "whole": 3,
+     "union": 3,
+     "floor": 0
+    },
+    "B-core": {
+     "n": 30,
+     "whole": 23,
+     "union": 23,
+     "floor": 0
+    }
+   }
+  },
+  "qwen27/det05": {
+   "n": 35,
+   "whole": 26,
+   "region": 6,
+   "union": 26,
+   "gains": 0,
+   "floor_gains": 0,
+   "no_partner": 2,
+   "missed": 9,
+   "same_pairs": 4,
+   "same_hits": 0,
+   "far_pairs": 111,
+   "far_hits": 0,
+   "sign_p": 1.0,
+   "by_core": {
+    "A-core": {
+     "n": 5,
+     "whole": 3,
+     "union": 3,
+     "floor": 0
+    },
+    "B-core": {
+     "n": 30,
+     "whole": 23,
+     "union": 23,
+     "floor": 0
+    }
+   }
+  }
+ },
+ "rerun": {
+  "pages": 32,
+  "identical_pages": 32,
+  "read_first": 16,
+  "read_second": 16,
+  "first_only": 0,
+  "second_only": 0,
+  "union": 16,
+  "median_s": 24.78,
+  "by_core": {
+   "A-core": 3,
+   "B-core": 13
+  }
+ },
+ "placement": {
+  "vision": {
+   "read": 14,
+   "placed": 13,
+   "pages_same_text": 32,
+   "pages": 32
+  },
+  "lighton": {
+   "read": 16,
+   "placed": 0,
+   "replies": 32,
+   "with_coordinates": 0
+  },
+  "glm": {
+   "read": 13,
+   "placed": 0,
+   "replies": 32,
+   "with_coordinates": 0
+  },
+  "qwen27": {
+   "read": 26,
+   "placed": 0,
+   "replies": 32,
+   "with_coordinates": 0
+  }
+ },
  "layer": {
   "none": {
    "found": 3,

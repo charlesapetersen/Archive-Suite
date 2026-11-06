@@ -16,7 +16,8 @@ whole page. Those gains are not doubled text buying matches by chance: the same 
 the same page reads a missed mark 0-1 times in 33-53 tries (the Two passes table), so LightOnOCR's 8 (sign test
 p = 0.016) and GLM-OCR's 8 (p = 0.008) stand, and Vision's 3 (p = 0.25) does not. By core the gain is mostly B-core:
 on the A-core's 5 marks the union adds nothing for Vision (4 and 4), one for LightOnOCR (3 to 4) and three for GLM-OCR
-(0 to 3). Today's detector reaches little of it: whole page plus a YOLO11m box adds 0-3 marks per
+(0 to 3). Nor are they read-to-read variation: LightOnOCR-3 4B read the 32 pages whole a second time and gave
+identical text on 32 of 32, so the whole page read twice stays at 16. Today's detector reaches little of it: whole page plus a YOLO11m box adds 0-3 marks per
 reader at either floor, none significant (p >= 0.5), and its own floor is about one mark. These are the owner's
 boxes, so a trained detector would get less than the union. A second sense in which the layer needs a box: the form
 that works is an invisible run at the mark's box (below), and only Vision's whole-page reply carries coordinates (13
@@ -82,8 +83,10 @@ stretch, a mark's run.
 - **Noise.** n = 35 marks on 17 pages; page bootstrap, 2,000 resamples, seed 46; read-rate intervals about ±16
   points, so every whole-against-box gap of the ranked readers is a tie (GLM-OCR's five, the largest, sign test
   p = 0.23 on its 11 discordant marks). Vision's determinism is measured (its 2026-11-04 and 2026-11-05 runs give
-  identical tokens on 32 of 32 pages); LightOnOCR's, GLM-OCR's and Qwen3.6-27B's at temperature 0 are asserted; no
-  rerun floor was measured.
+  identical tokens on 32 of 32 pages), and so is LightOnOCR-3 4B's whole page at temperature 0 (a second run,
+  W46.marks-two-pass, gives identical text on 32 of 32 pages, so a second whole-page reading adds no mark); GLM-OCR's
+  and Qwen3.6-27B's are asserted. The two-pass gains are set against an irrelevant second reading (the same reader's
+  crop of another mark on its page), which reads a missed mark 0-1 times per reader.
 - **Scope.** Marks only: these pages have no body-text truth, so the body cost of region routing on mixed pages is
   W46.ocr-regions' and W46.layout-photo's result on the 96, not this one. Not settled here: Qwen3.6-27B's rank on marks
   (it chose 30 of the 35), Gemini (W46.mixed-route-paid, retired by the owner 2026-11-05), results by handwriting band

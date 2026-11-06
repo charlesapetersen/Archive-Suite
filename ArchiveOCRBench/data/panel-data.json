@@ -66401,7 +66401,7 @@
    "pp": "3 (7%)",
    "detector": "8 (18%, interval 5-37) at 53% precision",
    "detector_low": "17 (38%, interval 21-60) at 42% precision",
-   "mixed_read": "LightOnOCR-3 4B 16 of 35 given the whole page, 17 from the owner's box; Apple Vision 14 of 35 given the whole page, 13 from the owner's box; GLM-OCR 13 of 35 given the whole page, 18 from the owner's box; Qwen3.6-27B 26 of 35 given the whole page, 19 from the owner's box (not ranked: it pre-flagged the pages of 30 of them; on the other 5, 3 and 4, too few to rank)",
+   "mixed_read": "LightOnOCR-3 4B 16 of 35 given the whole page, 17 from the owner's box, 24 from either reading; Apple Vision 14 of 35 given the whole page, 13 from the owner's box, 17 from either reading; GLM-OCR 13 of 35 given the whole page, 18 from the owner's box, 21 from either reading; Qwen3.6-27B 26 of 35 given the whole page, 19 from the owner's box, 27 from either reading (not ranked: it pre-flagged the pages of 30 of them; on the other 5, 3 and 4, too few to rank)",
    "mixed_bands": "Mixed pages are an estimated 33% (24-44%) of the bulk-pilot draw, 24% (17-34%) with more than a signature, initials or a date; on the 96's 78 typed and printed pages, body NES against Apple Vision is LightOnOCR-3 4B +1.8 (-2.2 to +5.9), GLM-OCR +4.3 (+0.4 to +8.8), Qwen3.6-27B +7.3 (+2.6 to +12.3) points"
   },
   "gemini": {

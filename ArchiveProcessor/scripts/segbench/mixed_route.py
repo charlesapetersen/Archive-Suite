@@ -697,8 +697,9 @@ def markdown(res, n):
                   f"settings (temperature 0). {rr['identical_pages']} of {rr['pages']} replies are identical; it reads "
                   f"{rr['read_first']} and {rr['read_second']} marks, {rr['first_only']} only the first time and "
                   f"{rr['second_only']} only the second, so the whole page read twice gives {rr['union']} of 35 "
-                  f"(A-core {rr['by_core']['A-core']}, B-core {rr['by_core']['B-core']}), against the owner's box's "
-                  f"{res['two_pass']['lighton/oracle']['union']} as the second reading. Median {rr['median_s']} s a page."]
+                  f"(A-core {rr['by_core']['A-core']}, B-core {rr['by_core']['B-core']}), against "
+                  f"{res['two_pass']['lighton/oracle']['union']} with the owner's box as the second reading. Median "
+                  f"{rr['median_s']} s a page."]
         pl = res.get("placement")
         if pl:
             v = pl.get("vision")

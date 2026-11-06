@@ -34,6 +34,31 @@ The same reader, whole page against the owner's box (marks read):
 | GLM-OCR (Sherlock) | 10 | 3 | 8 | 14 |
 | Qwen3.6-27B (Sherlock) ‡ | 18 | 8 | 1 | 8 |
 
+## Two passes: the whole page plus a region pass (W46.marks-two-pass)
+
+A detector would add a region pass beside the whole page, and the text layer can carry both readings, so its ceiling is the union: a mark is read when either reading reads it. A union cannot lose a mark, so each gain is set against an irrelevant second reading: the same reader's crop of a different mark on the same page, from the same boxes (a crop that read nothing is left out). *Floor* counts the marks the whole page missed that such a crop reads at 0.8; the sign test (exact, two-sided) pairs each missed mark's real gain against its floor gain. A mark alone on its page has no same-page crop; the other pages' crops are given as a rate.
+
+| Reader | Second pass | Whole page | Region alone | Union | Gains | Floor | Sign test p | Same-page crops that read the mark | Other pages' crops | A-core: whole, union | B-core: whole, union |
+|---|---|---:|---:|---:|---:|---:|---:|---|---|---|---|
+| Apple Vision | the owner's box (oracle) | 14 | 13 | 17 | +3 | 0 | 0.25 | 0 of 53 | 1 of 601 | 4, 4 of 5 | 10, 13 of 30 |
+| Apple Vision | YOLO11m box, floor 0.25 | 14 | 2 | 14 | +0 | 1 | 1 | 1 of 6 | 0 of 117 | 4, 4 of 5 | 10, 10 of 30 |
+| Apple Vision | YOLO11m box, floor 0.05 | 14 | 5 | 16 | +2 | 1 | 1 | 1 of 14 | 0 of 250 | 4, 4 of 5 | 10, 12 of 30 |
+| LightOnOCR-3 4B 8-bit | the owner's box (oracle) | 16 | 17 | 24 | +8 | 1 | 0.0156 | 1 of 33 | 1 of 467 | 3, 4 of 5 | 13, 20 of 30 |
+| LightOnOCR-3 4B 8-bit | YOLO11m box, floor 0.25 | 16 | 4 | 19 | +3 | 1 | 0.625 | 1 of 8 | 0 of 101 | 3, 3 of 5 | 13, 16 of 30 |
+| LightOnOCR-3 4B 8-bit | YOLO11m box, floor 0.05 | 16 | 6 | 19 | +3 | 1 | 0.625 | 1 of 14 | 0 of 206 | 3, 3 of 5 | 13, 16 of 30 |
+| GLM-OCR (Sherlock) | the owner's box (oracle) | 13 | 18 | 21 | +8 | 0 | 0.0078 | 0 of 40 | 2 of 644 | 0, 3 of 5 | 13, 18 of 30 |
+| GLM-OCR (Sherlock) | YOLO11m box, floor 0.25 | 13 | 3 | 14 | +1 | 0 | 1 | 0 of 1 | 0 of 129 | 0, 1 of 5 | 13, 13 of 30 |
+| GLM-OCR (Sherlock) | YOLO11m box, floor 0.05 | 13 | 5 | 15 | +2 | 0 | 0.5 | 0 of 9 | 0 of 271 | 0, 1 of 5 | 13, 14 of 30 |
+| Qwen3.6-27B (Sherlock) ‡ | the owner's box (oracle) | 26 | 19 | 27 | +1 | 0 | 1 | 0 of 28 | 0 of 278 | 3, 4 of 5 | 23, 23 of 30 |
+| Qwen3.6-27B (Sherlock) ‡ | YOLO11m box, floor 0.25 | 26 | 3 | 26 | +0 | 0 | 1 | 0 of 0 | 0 of 54 | 3, 3 of 5 | 23, 23 of 30 |
+| Qwen3.6-27B (Sherlock) ‡ | YOLO11m box, floor 0.05 | 26 | 6 | 26 | +0 | 0 | 1 | 0 of 4 | 0 of 111 | 3, 3 of 5 | 23, 23 of 30 |
+
+Read-to-read floor: LightOnOCR-3 4B read the 32 pages whole a second time at the same settings (temperature 0). 32 of 32 replies are identical; it reads 16 and 16 marks, 0 only the first time and 0 only the second, so the whole page read twice gives 16 of 35 (A-core 3, B-core 13), against 24 with the owner's box as the second reading. Median 24.78 s a page.
+
+Placing a whole-page reading in the layer: the working form is an invisible run at the mark's box, so a mark read whole page needs coordinates.
+Apple Vision returns a box with each line: of its 14 whole-page reads, 13 are read again from the lines meeting the mark's own box, so they can be placed without a detector (its line file and whole-page text agree on 32 of 32 pages).
+The VLM replies are plain text with no coordinates: LightOnOCR-3 4B 8-bit (16 reads; 0 of 32 replies with any coordinate); GLM-OCR (13 reads; 0 of 32 replies with any coordinate); Qwen3.6-27B (26 reads; 0 of 32 replies with any coordinate). A mark they read whole page cannot be placed on the page without a box from somewhere else.
+
 By core (MRK-1): the A-core, drawn independently of any reader (5 marks on 5 pages), and the B-core, drawn from Qwen3.6-27B's pre-flag bands (30 marks on 12 pages). Marks read, mean NES:
 
 | Route | A-core | B-core |
@@ -84,17 +109,30 @@ The same 35 marks written into a scratch PDF of each page (the page image, Visio
 
 ## What this says
 
-**Whole page is as good as reading the mark's region for every reader ranked on all 35, and a detector makes the
-region route far worse.** Apple Vision given the whole page gets 14 of the 35 marks, against 13 from the owner's own
-box; LightOnOCR-3 4B gets 16 against 17; GLM-OCR 13 against 18. The Vision and LightOnOCR gaps are one mark. GLM-OCR's
-is five (3 marks only whole, 8 only from the box; exact sign test on the 11 discordant marks p = 0.23), inside
-intervals about 30 points wide, so it leans to the box but is not shown; on the A-core GLM-OCR's whole page reads none
-of the 5 marks. The readers do not get the *same* marks the two ways (LightOnOCR: 9 both ways, 7 only whole, 8 only
-from the box), so a route that read both would carry more, but that is a two-reader cascade and is not ranked here.
-And the owner's box is the region route's ceiling: through YOLO11m's boxes every reader falls to 2-6 of 35
-(W46.marks-detect), GLM-OCR to 3-5. So on today's detectors **region routing does not beat the whole page for
-marks, and the whole page needs no detector**. A fine-tuned detector (W46.marks-detect-own) could at best bring a
-reader up to its owner's-box figure, which no ranked reader's whole page trails beyond noise.
+**Whole page instead of the mark's region is not shown worse for any reader ranked on all 35, and a detector makes
+the region route far worse.** Apple Vision given the whole page gets 14 of the 35 marks, against 13 from the owner's
+own box; LightOnOCR-3 4B gets 16 against 17; GLM-OCR 13 against 18. The Vision and LightOnOCR gaps are one mark.
+GLM-OCR's is five (3 marks only whole, 8 only from the box; exact sign test on the 11 discordant marks p = 0.23),
+inside intervals about 30 points wide, so it leans to the box but is not shown; on the A-core GLM-OCR's whole page
+reads none of the 5 marks against 3 of 5 from the box. Through YOLO11m's boxes alone every reader falls to 2-6 of 35
+(W46.marks-detect), so on today's detector **region routing in place of the whole page loses marks**.
+
+**But a whole-page reader does miss marks a region pass reads (W46.marks-two-pass).** The readers do not get the
+*same* marks the two ways (LightOnOCR: 9 both ways, 7 only whole, 8 only from the box), and a detector would serve as
+a region pass added to the whole page, the text layer carrying both readings, so its ceiling is the union, not the box
+alone: given the owner's box as well, Vision reads 17, LightOnOCR-3 4B 24 and GLM-OCR 21 of 35, against 14, 16 and 13
+whole page. Those gains are not doubled text buying matches by chance: the same reader's crop of a different mark on
+the same page reads a missed mark 0-1 times in 33-53 tries (the Two passes table), so LightOnOCR's 8 (sign test
+p = 0.016) and GLM-OCR's 8 (p = 0.008) stand, and Vision's 3 (p = 0.25) does not. By core the gain is mostly B-core:
+on the A-core's 5 marks the union adds nothing for Vision (4 and 4), one for LightOnOCR (3 to 4) and three for GLM-OCR
+(0 to 3). Nor are they read-to-read variation: LightOnOCR-3 4B read the 32 pages whole a second time and gave
+identical text on 32 of 32, so the whole page read twice stays at 16. Today's detector reaches little of it: whole page plus a YOLO11m box adds 0-3 marks per
+reader at either floor, none significant (p >= 0.5), and its own floor is about one mark. These are the owner's
+boxes, so a trained detector would get less than the union. A second sense in which the layer needs a box: the form
+that works is an invisible run at the mark's box (below), and only Vision's whole-page reply carries coordinates (13
+of its 14 whole-page reads are read again from the lines meeting the mark's box); LightOnOCR's, GLM-OCR's and
+Qwen3.6-27B's replies are plain text, so a mark they read whole page cannot be placed without a box. A fine-tuned
+detector (W46.marks-detect-own) would be judged against the union, not against the owner's-box figure alone.
 
 **Qwen3.6-27B reads the most marks whole page, but it cannot be ranked on these pages (MRK-1).** Whole page it gets
 26 of 35 (mean NES 0.86) against 19 from the owner's box (18 both ways, 8 only whole, 1 only from the box). But 30 of
@@ -154,10 +192,16 @@ stretch, a mark's run.
 - **Noise.** n = 35 marks on 17 pages; page bootstrap, 2,000 resamples, seed 46; read-rate intervals about ±16
   points, so every whole-against-box gap of the ranked readers is a tie (GLM-OCR's five, the largest, sign test
   p = 0.23 on its 11 discordant marks). Vision's determinism is measured (its 2026-11-04 and 2026-11-05 runs give
-  identical tokens on 32 of 32 pages); LightOnOCR's, GLM-OCR's and Qwen3.6-27B's at temperature 0 are asserted; no
-  rerun floor was measured.
+  identical tokens on 32 of 32 pages), and so is LightOnOCR-3 4B's whole page at temperature 0 (a second run,
+  W46.marks-two-pass, gives identical text on 32 of 32 pages, so a second whole-page reading adds no mark); GLM-OCR's
+  and Qwen3.6-27B's are asserted. The two-pass gains are set against an irrelevant second reading (the same reader's
+  crop of another mark on its page), which reads a missed mark 0-1 times per reader.
 - **Scope.** Marks only: these pages have no body-text truth, so the body cost of region routing on mixed pages is
   W46.ocr-regions' and W46.layout-photo's result on the 96, not this one. Not settled here: Qwen3.6-27B's rank on marks
   (it chose 30 of the 35), Gemini (W46.mixed-route-paid, retired by the owner 2026-11-05), results by handwriting band
-  (W46.mixed-route-bands), and whether a two-reader cascade is worth its cost. The layer check is PDFKit and the
-  Spotlight importer on scratch PDFs, not the Processor's own writer.
+  (W46.mixed-route-bands), and whether a two-reader cascade is worth its cost. The two-pass union is taken on the
+  owner's boxes, so it is a ceiling for a detector used beside the whole page, not a detector's figure: whether a
+  trained one reaches it (W46.marks-detect-own, put to the owner 2026-11-05) and what the second pass costs in time
+  are not measured, and its gains sit mostly on the B-core (Qwen3.6-27B's pre-flag chose those pages, which does not
+  bias the other three readers but makes them pages rich in marks). The layer check is PDFKit and the Spotlight
+  importer on scratch PDFs, not the Processor's own writer.
