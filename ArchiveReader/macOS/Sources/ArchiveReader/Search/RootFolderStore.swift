@@ -33,7 +33,7 @@ final class RootFolderStore: ObservableObject {
     var rootMarker: RootMarker? { markerState.durableMarker }
 
     /// Container-only identity for display preferences, never used to mint links or validate caches.
-    /// Aliases by path and, once available, durable GUID keep choices stable across first copy/moves.
+    /// Aliases by path and, once available, durable GUID keep choices stable across marker creation/moves.
     @Published private(set) var preferenceGUID: UUID?
 
     private var accessing: URL?
@@ -108,6 +108,11 @@ final class RootFolderStore: ObservableObject {
             accessing = target
             if let previous, previous != target { previous.stopAccessingSecurityScopedResource() }
             adopt(target)
+            // Choosing a folder gives it its archive identity, so Notes accepts the folder the Reader
+            // is showing with no further step (owner, W40.root-marker-auto, 2026-11-06). This is the
+            // Core Directive's one named write into the archive root. A folder that cannot be written
+            // still opens: the state is then `.degraded`, and a link copy says why it is refused.
+            ensureMarker()
             return nil
         } catch {
             NSLog("RootFolderStore: could not bookmark \(target.path): \(error)")
@@ -194,8 +199,8 @@ final class RootFolderStore: ObservableObject {
         var identities = defaults.dictionary(forKey: "ar.rootPreferenceIDs") as? [String: String] ?? [:]
         let pathKey = "path:" + Data(url.path.utf8).base64EncodedString()
         let markerKey = rootMarker.map { "marker:" + $0.guid.uuidString }
-        // A known durable marker outranks a reused filesystem path. Its alias is recorded at the
-        // first copy, so markerless choices still survive that transition and subsequent moves.
+        // A known durable marker outranks a reused filesystem path. Its alias is recorded when the
+        // marker is created, so markerless choices still survive that transition and later moves.
         let identity: UUID
         if let marker = rootMarker, let markerKey {
             identity = identities[markerKey].flatMap(UUID.init(uuidString:)) ?? markerlessIdentity ?? marker.guid
@@ -214,20 +219,26 @@ final class RootFolderStore: ObservableObject {
         if let a = accessing { a.stopAccessingSecurityScopedResource(); accessing = nil }
     }
 
-    /// The only creation path, called after a deliberate archive-link copy has a usable target.
+    /// Create the marker if it is absent, else re-read it. The two callers are choosing a folder
+    /// (`setRoot`) and an archive-link copy, which still creates one for a root chosen before
+    /// W40.root-marker-auto or whose marker was removed while it was open. A relaunch only reads.
     /// Re-read even an already-durable identity: deletion/replacement while open must not mint a
     /// link with a GUID that exists only in memory. Existing damaged/unreadable markers stay intact.
     @discardableResult
-    func prepareMarkerForLinkCopy() -> RootMarker? {
+    func ensureMarker() -> RootMarker? {
         guard let root else { return nil }
         // Preserve markerless preferences only when the identity was actually absent. A different
         // durable archive substituted while open must retain its own preference namespace.
-        let beforeCopy = RootMarkerState.reading(root)
-        let markerlessIdentity = beforeCopy == .absent ? preferenceGUID : nil
+        let before = RootMarkerState.reading(root)
+        let markerlessIdentity = before == .absent ? preferenceGUID : nil
         markerState = .ensuring(root)
         if rootMarker != nil { updatePreferenceIdentity(preserving: markerlessIdentity) }
         return rootMarker
     }
+
+    /// Called after a deliberate archive-link copy has a usable target.
+    @discardableResult
+    func prepareMarkerForLinkCopy() -> RootMarker? { ensureMarker() }
 
 #if DEBUG
     /// Set root for UI testing without persisting a bookmark. This method does NOT read or write

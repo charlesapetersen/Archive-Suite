@@ -14,6 +14,20 @@ never granted to Notes is therefore accepted as a new store. Nothing already in 
 the store's marker, `items/` and `organization.json` are added inside that empty folder. Granting the archive
 to Notes first closes the gap.
 
+## ⚠️ LIMIT (W40.root-marker-auto, 2026-11-06) — Choose Archive Folder… gives a plain folder an archive identity
+
+File ▸ Choose Archive Folder… now writes `.archive-suite-root.json` (kind `reader`) into a folder that has none,
+as the Reader does when a folder is chosen, so the two apps agree on a folder with no step to know. It is
+created once and never rewritten. It is refused, with nothing written, for a folder that holds the notes store
+or is inside it, one inside or holding an archive already granted to Notes, one named like the Reader layout's
+`Archival Photos` or `Archival Photos JPEGS` folder (the Reader's root is the folder holding them), one whose
+parent carries a marker, and one that cannot be written. The bookmark is made before the file, so a refused
+grant writes nothing. With a link in hand (the preview popover) Notes never creates one: a fresh identity
+could not be the one the link names, so a folder without one is "not the archive this link was copied from".
+The sandbox limit above applies: a subfolder of an archive never granted to Notes cannot be recognised, so
+picking one gives that subfolder an identity of its own. No existing file is changed; the small file can be
+deleted. Tests: `ReaderRootChooserTests` (scratch folders).
+
 ## ✅ FIXED (W40.fix-notes-stale-body-on-switch, 2026-10-25) — the outgoing editor remained writable during loading
 
 The earlier inspector-jitter fix kept the previous note whole while the next body loaded, but SwiftUI's

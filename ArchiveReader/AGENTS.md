@@ -28,8 +28,9 @@ worktree."
   delete / trash / content-write API** (`FileManager.removeItem/moveItem/trashItem/…`,
   `PDFDocument.write`, `Data.write`, `FileHandle` writes). A CI-style lint enforces this; the lint is
   one layer — the real guarantee is the isolation.
-- **Root-identity exception:** only a deliberate archive-link copy may create `.archive-suite-root.json`
-  via `RootFolderStore.prepareMarkerForLinkCopy` → ArchiveCore `RootMarker.ensure`; adoption only reads.
+- **Root-identity exception:** only choosing a folder (`RootFolderStore.setRoot`) or an archive-link copy
+  (`prepareMarkerForLinkCopy`) may create `.archive-suite-root.json`, both via `RootFolderStore.ensureMarker`
+  → ArchiveCore `RootMarker.ensure`; reopening at launch only reads (W40.root-marker-auto).
   Existing identity files are never rewritten. See `CLAUDE.md` Core Directive.
 - **Never test tag writes against the real corpus.** Always copy files to the scratchpad first.
 - `TagWriter` and anything touching it is **Tier-2** (adversarial review + scratch-copy tests) on

@@ -1,4 +1,5 @@
-// W40.root-marker — owner chose (b), 2026-10-17: defer creation to explicit archive-link copy.
+// W40.root-marker-auto (owner, 2026-11-06): choosing a folder writes its identity file, once; a relaunch
+// only reads it, and an archive-link copy still creates one for a root that has none.
 // Every file is scratch and every defaults domain is throwaway; never the owner's root/bookmark.
 import XCTest
 import CryptoKit
@@ -62,24 +63,67 @@ final class RootMarkerDisclosureTests: XCTestCase {
     }
     private struct XCTUnwrapError: Error {}
 
-    func testChoosingAFolderDoesNotWriteAnIdentityFileIntoIt() throws {
+    func testChoosingAFolderWritesOneIdentityFileAndNothingElse() throws {
         let (root, pdf) = try makeArchive()
         let before = try listing(root), hash = try sha256(pdf), originalTags = try tags(pdf)
-        let modified = try mtime(root)
+        let pdfModified = try mtime(pdf)
         let defaults = fixtureDefaults()
         let store = RootFolderStore(defaults: defaults)
         XCTAssertNil(store.setRoot(root))
-        XCTAssertEqual(store.markerState, .absent)
-        XCTAssertNil(store.rootMarker)
-        XCTAssertEqual(try listing(root), before)
-        XCTAssertEqual(try mtime(root), modified)
+        let marker = try XCTUnwrap(store.rootMarker)
+        XCTAssertEqual(store.markerState, .durable(marker))
+        XCTAssertEqual(marker.kind, .reader)
+        XCTAssertEqual(marker.name, root.lastPathComponent)
+        XCTAssertEqual(try RootMarker.read(at: root), marker)
+        XCTAssertEqual(try listing(root).subtracting(before), [RootMarker.filename])
+        XCTAssertEqual(try listing(root).count, before.count + 1)
+        let markerURL = root.appendingPathComponent(RootMarker.filename)
+        let bytes = try Data(contentsOf: markerURL), markerModified = try mtime(markerURL)
+        XCTAssertLessThan(bytes.count, 512)
+        // A relaunch reads it; choosing the same folder again keeps it; neither rewrites it.
         let relaunched = RootFolderStore(defaults: defaults)
-        XCTAssertNotNil(relaunched.root)
-        XCTAssertEqual(relaunched.markerState, .absent)
-        XCTAssertEqual(try listing(root), before)
-        XCTAssertEqual(try mtime(root), modified)
+        XCTAssertEqual(relaunched.rootMarker, marker)
+        XCTAssertNil(RootFolderStore(defaults: fixtureDefaults()).setRoot(root))
+        XCTAssertEqual(try Data(contentsOf: markerURL), bytes)
+        XCTAssertEqual(try mtime(markerURL), markerModified)
+        XCTAssertEqual(try listing(root).subtracting(before), [RootMarker.filename])
         XCTAssertEqual(try sha256(pdf), hash)
         XCTAssertEqual(try tags(pdf), originalTags)
+        XCTAssertEqual(try mtime(pdf), pdfModified)
+    }
+
+    func testChoosingAReadOnlyFolderOpensItWithoutAnIdentity() throws {
+        let (root, pdf) = try makeArchive()
+        try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: root.path)
+        let before = try listing(root)
+        let store = RootFolderStore(defaults: fixtureDefaults())
+        XCTAssertNil(store.setRoot(root), "a read-only folder must still open")
+        XCTAssertEqual(store.root?.lastPathComponent, root.lastPathComponent)
+        XCTAssertEqual(store.markerState, .degraded(.notWritable))
+        XCTAssertNil(store.rootMarker)
+        XCTAssertEqual(try listing(root), before)
+        XCTAssertEqual(try tags(pdf), ["1981", "Unread"])
+    }
+
+    func testChoosingAFolderKeepsAnExistingIdentityAndNeverOverwritesADamagedOne() throws {
+        let (root, _) = try makeArchive()
+        let existing = RootMarker(guid: UUID(), name: "Earlier", kind: .reader,
+                                  createdAt: Date(timeIntervalSince1970: 1_700_000_000))
+        let markerURL = root.appendingPathComponent(RootMarker.filename)
+        try JSONEncoder().encode(existing).write(to: markerURL)
+        let bytes = try Data(contentsOf: markerURL)
+        let store = RootFolderStore(defaults: fixtureDefaults())
+        XCTAssertNil(store.setRoot(root))
+        XCTAssertEqual(store.rootMarker, existing)
+        XCTAssertEqual(try Data(contentsOf: markerURL), bytes)
+
+        let (damagedRoot, _) = try makeArchive()
+        let damagedURL = damagedRoot.appendingPathComponent(RootMarker.filename)
+        let damaged = Data("{damaged".utf8)
+        try damaged.write(to: damagedURL)
+        XCTAssertNil(store.setRoot(damagedRoot), "a damaged identity must not stop the folder opening")
+        XCTAssertEqual(store.markerState, .degraded(.malformed))
+        XCTAssertEqual(try Data(contentsOf: damagedURL), damaged)
     }
 
     func testFirstNavigationCopyWritesOneMarkerAndKeepsItAcrossRelaunch() async throws {
@@ -198,7 +242,8 @@ final class RootMarkerDisclosureTests: XCTestCase {
         // No run-loop turn: even if the published target is stale, preparation uses the live root.
         viewer.copyArchivePageLink(context: context)
         XCTAssertTrue(viewer.archiveLinkError?.contains("different archive") == true)
-        XCTAssertFalse(try listing(otherRoot).contains(RootMarker.filename))
+        // Choosing the other folder gave it its own identity; the stale target still minted nothing.
+        XCTAssertEqual(try listing(otherRoot).filter { $0 == RootMarker.filename }.count, 1)
         XCTAssertEqual(NSPasteboard.general.string(forType: .string), "keep this")
     }
 

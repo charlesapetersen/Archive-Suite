@@ -22,8 +22,25 @@ enum ReaderRootGrantRefusal: Equatable, Sendable {
     /// The folder cannot be opened at all: missing, permission-denied, a dangling symlink, an
     /// `ELOOP` cycle, or not a directory.
     case unreadable(URL)
-    /// It opens, but carries no `.archive-suite-root.json` — it is not an Archive root at all.
+    /// It opens, but carries no `.archive-suite-root.json`. Since W40.root-marker-auto only the
+    /// in-context pick (a link in hand) refuses this way: File ▸ Choose Archive Folder… creates the
+    /// identity instead, but a folder with none cannot be the archive an existing link was copied from.
     case notAnArchiveRoot(URL)
+    /// File ▸ Choose Archive Folder… would have given it an identity, but a folder above it already
+    /// carries one: it is inside an archive (or inside the notes store), and a second identity there
+    /// would name a root no Reader link uses.
+    case insideAnotherRoot(URL)
+    /// It holds an archive already granted to Notes. An identity there would put that archive inside
+    /// another one, and Notes' store check would then refuse any store beneath it.
+    case holdsAnotherRoot(URL)
+    /// It is named like the main or JPEG folder of the Reader's layout, whose root is the folder that
+    /// holds both. Giving it an identity would make a second archive inside the real one.
+    case readerLayoutSubfolder(URL)
+    /// It holds the notes store, or is inside it. An archive identity there would make the notes
+    /// store a folder inside an archive, which Notes then refuses to open at the next launch.
+    case overlapsNotesStore(URL)
+    /// The identity could not be written (read-only folder or volume, no permission, disk full).
+    case couldNotCreateIdentity(URL, String)
     /// It is an Archive root, but of the wrong kind — the likely pick being Archive Notes' own
     /// notes folder, which carries a `.notes` marker (`RootFolderStore` writes one).
     ///
@@ -45,12 +62,26 @@ enum ReaderRootGrantRefusal: Equatable, Sendable {
             return "Could not open “\(url.lastPathComponent)”. "
                 + "Check that the folder still exists and that you have permission to read it."
         case let .notAnArchiveRoot(url):
-            // W40.fix-suite-root-marker: the Reader gives a folder its identity at the first archive-link
-            // copy, not when it opens the folder (owner, W40.root-marker (b)), so "the folder Reader opens"
-            // sent the user to a step that does not help. Name the step that does.
-            return "“\(url.lastPathComponent)” has no Archive Reader identity yet. "
-                + "In Archive Reader, open this folder and copy one archive link "
-                + "(Selection ▸ Copy Archive Link(s), ⇧⌘L), then choose it here again."
+            // Reached only with a link in hand: the folder the link was copied from has an identity,
+            // because the Reader writes it when the folder is chosen (W40.root-marker-auto).
+            return "“\(url.lastPathComponent)” is not the archive folder this link was copied from. "
+                + "Choose the folder Archive Reader had open when the link was copied."
+        case let .insideAnotherRoot(url):
+            return "“\(url.lastPathComponent)” is inside another archive folder. "
+                + "Choose the folder Archive Reader opens."
+        case let .holdsAnotherRoot(url):
+            return "“\(url.lastPathComponent)” holds an archive folder already chosen here. "
+                + "Choose the folder Archive Reader opens."
+        case let .readerLayoutSubfolder(url):
+            return "“\(url.lastPathComponent)” looks like a folder inside an archive. Choose the folder "
+                + "that holds it, the one Archive Reader opens. If the Reader opens “\(url.lastPathComponent)” "
+                + "itself, choose it in Archive Reader first."
+        case let .overlapsNotesStore(url):
+            return "“\(url.lastPathComponent)” holds your Archive Notes store, or is inside it. "
+                + "Choose the folder Archive Reader opens."
+        case let .couldNotCreateIdentity(url, _):
+            return "“\(url.lastPathComponent)” can’t be written to, so it can’t be given an archive identity. "
+                + "Give it write access, or choose it in Archive Reader first, then choose it here again."
         case let .wrongRootKind(url, kind):
             switch kind {
             case .notes:
@@ -144,6 +175,10 @@ final class ReaderRootStore: ObservableObject {
     var startScope: (URL) -> Bool = { $0.startAccessingSecurityScopedResource() }
     var stopScope: (URL) -> Void = { $0.stopAccessingSecurityScopedResource() }
 
+    /// Where the notes store is, so `grantRoot` never gives an archive identity to a folder holding it
+    /// or inside it. A test seam: the default reads the app's own saved store choice.
+    var notesStoreFolder: () -> URL? = { RootFolderStore.savedStoreFolder() }
+
     /// - Parameter defaults: where the bookmarks are persisted. Injected so a test can hand over a
     ///   throwaway suite: `grantRoot` WRITES, and `readerRootBookmarks` in `.standard` is the app's
     ///   real set of granted Reader roots.
@@ -226,9 +261,12 @@ final class ReaderRootStore: ObservableObject {
     /// Every refusal names the folder **as picked**, not the canonicalised target: that is the name the
     /// user chose, and for a symlinked pick the target's last component is a folder they never saw.
     ///
+    /// - Parameter createIdentity: give a folder with no marker its Reader identity, as the Reader does
+    ///   when it is chosen (owner, W40.root-marker-auto, 2026-11-06). True for File ▸ Choose Archive
+    ///   Folder…; false with a link in hand, since a fresh GUID could never be the one the link names.
     /// - Returns: `.granted(marker)`, or `.refused(_)` carrying a reason the caller can show.
     @discardableResult
-    func grantRoot(_ url: URL) -> ReaderRootGrant {
+    func grantRoot(_ url: URL, createIdentity: Bool = false) -> ReaderRootGrant {
         guard let target = CorpusWalker.canonicalRoot(url) else { return .refused(.unreadable(url)) }
 
         let found: RootMarker?
@@ -237,7 +275,30 @@ final class ReaderRootStore: ObservableObject {
         } catch {
             return .refused(.markerUnreadable(url, "\(error)"))
         }
-        guard let marker = found else { return .refused(.notAnArchiveRoot(url)) }
+        let marker: RootMarker
+        var minted: Data?
+        if let found {
+            marker = found
+        } else if createIdentity {
+            if let refusal = identityRefusal(for: target, picked: url) { return .refused(refusal) }
+            // Bookmark first: a grant refused after the identity was written would leave the file
+            // behind while telling the user the folder was not opened.
+            do {
+                minted = try mintBookmark(target)
+            } catch {
+                NSLog("ReaderRootStore: could not bookmark \(target.path): \(error)")
+                return .refused(.couldNotBookmark(url, "\(error)"))
+            }
+            do {
+                // Created once, under coordination, and read back; an existing one is never rewritten.
+                marker = try RootMarker.ensure(at: target, kind: .reader, name: target.lastPathComponent)
+            } catch {
+                NSLog("ReaderRootStore: could not create an identity at \(target.path): \(error)")
+                return .refused(.couldNotCreateIdentity(url, "\(error)"))
+            }
+        } else {
+            return .refused(.notAnArchiveRoot(url))
+        }
         // A `.notes` marker is a real Archive root — Notes writes one at its own store — so it gets
         // past `notAnArchiveRoot` and would be adopted, keyed by a GUID no Reader link can ever
         // name. Refusing it is only worth saying now that a user can pick a folder at all
@@ -248,7 +309,7 @@ final class ReaderRootStore: ObservableObject {
         }
 
         do {
-            let data = try mintBookmark(target)
+            let data = try minted ?? mintBookmark(target)
             // Store the raw bookmark data keyed by lowercased GUID string.
             var stored = savedBookmarks()
             stored[marker.guid.uuidString.lowercased()] = data
@@ -301,6 +362,46 @@ final class ReaderRootStore: ObservableObject {
     }
 
     // MARK: - Private
+
+    /// The two folders of the Reader's archive layout (`ReaderArchiveLayout` in the Reader). The
+    /// Reader's root is the folder that holds them, so a pick of either one in Notes is a subfolder
+    /// of the archive, which the sandbox gives Notes no way to see.
+    nonisolated static let readerLayoutFolderNames: Set<String> = ["archival photos", "archival photos jpegs"]
+
+    /// Why a folder with no marker must not be given one. Compared case-folded: APFS is usually
+    /// case-insensitive, and refusing one folder too many is safe.
+    private func identityRefusal(for target: URL, picked: URL) -> ReaderRootGrantRefusal? {
+        func canonical(_ url: URL) -> String {
+            url.resolvingSymlinksInPath().standardizedFileURL.path.lowercased()
+        }
+        func contains(_ outer: String, _ inner: String) -> Bool {
+            inner == outer || inner.hasPrefix(outer.hasSuffix("/") ? outer : outer + "/")
+        }
+        let path = canonical(target)
+        if let store = notesStoreFolder().map(canonical), contains(path, store) || contains(store, path) {
+            return .overlapsNotesStore(picked)
+        }
+        // Inside an archive already granted here. The sandbox shows Notes the picked folder and not
+        // its parents, so this, not the walk below, is what catches a subfolder in the shipping app.
+        if Self.readerLayoutFolderNames.contains(target.lastPathComponent.lowercased()) {
+            return .readerLayoutSubfolder(picked)
+        }
+        let granted = knownRoots.values.map(canonical)
+        if granted.contains(where: { $0 != path && contains($0, path) }) {
+            return .insideAnotherRoot(picked)
+        }
+        if granted.contains(where: { $0 != path && contains(path, $0) }) {
+            return .holdsAnotherRoot(picked)
+        }
+        var parent = target.resolvingSymlinksInPath().standardizedFileURL.deletingLastPathComponent()
+        while parent.path != "/" && !parent.path.isEmpty {
+            if FileManager.default.fileExists(atPath: parent.appendingPathComponent(RootMarker.filename).path) {
+                return .insideAnotherRoot(picked)
+            }
+            parent = parent.deletingLastPathComponent()
+        }
+        return nil
+    }
 
     private func savedBookmarks() -> [String: Data] {
         defaults.dictionary(forKey: defaultsKey) as? [String: Data] ?? [:]

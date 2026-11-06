@@ -135,6 +135,7 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
 - **Reached by:** a negative promise. These are the user paths that touch the corpus at all:
   - File ▸ Choose Archive Folder… (`ArchiveNotesCommands.swift:62`), or a preview popover's re-grant, runs
     `ReaderRootChooser.runOpenPanel` (`Links/ReaderRootChooser.swift:111`) and then `ReaderRootStore.grantRoot`.
+    From the menu, a folder with no identity file is given one (W40.root-marker-auto); the popover never does.
     That bookmarks the root (`Links/ReaderRootStore.swift:127`) and only *reads* its marker (`:220`).
   - Clicking a source block's preview runs `ReaderPreviewPopover.show` (`Views/ReaderPreviewPopover.swift:46`),
     then `showPDF` (`:224`), which calls `PDFDocument(url:)`.

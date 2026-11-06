@@ -54,7 +54,8 @@ enum RootMarkerDegradation: Equatable {
 /// The granted root's link identity: durable, degraded (with the reason), or no root at all.
 enum RootMarkerState: Equatable {
     case noRoot
-    /// No marker yet: normal browsing, with creation deferred to a deliberate link copy.
+    /// No marker: a root reopened at launch whose marker was never made or was removed. Normal
+    /// browsing; choosing the folder again or copying an archive link creates one.
     case absent
     case durable(RootMarker)
     case degraded(RootMarkerDegradation)
@@ -85,7 +86,7 @@ enum RootMarkerState: Equatable {
         }
     }
 
-    /// Read — never create — the identity when choosing or reopening any root.
+    /// Read — never create — the identity when reopening a root at launch or checking it before a copy.
     static func reading(_ directory: URL) -> RootMarkerState {
         do {
             guard let marker = try RootMarker.read(at: directory) else { return .absent }

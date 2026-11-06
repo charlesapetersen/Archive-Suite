@@ -89,15 +89,30 @@ struct ReaderRootChooserTests {
         }
     }
 
-    @Test("Picking a folder with no marker is refused and reported, never silently granted")
-    func pickingABadFolderIsRefusedAndReported() async throws {
-        let tmp = FileManager.default.temporaryDirectory
-            .appendingPathComponent("ArchiveNotes-chooser-bad-\(UUID().uuidString)", isDirectory: true)
-        try FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
+    private func makePlainFolder(_ label: String) throws -> URL {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("ArchiveNotes-chooser-\(label)-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir
+    }
+
+    private func listing(_ dir: URL) throws -> Set<String> {
+        Set(try FileManager.default.contentsOfDirectory(atPath: dir.path))
+    }
+
+    // W40.root-marker-auto (owner, 2026-11-06): choosing a folder gives it its identity, as the Reader does.
+    @Test("Picking a folder with no marker gives it one Reader identity and grants it")
+    func pickingAPlainFolderCreatesTheIdentity() async throws {
+        let tmp = try makePlainFolder("plain")
         defer { try? FileManager.default.removeItem(at: tmp) }
+        let pdf = tmp.appendingPathComponent("doc.pdf")
+        try Data("%PDF-1.4 scratch\n".utf8).write(to: pdf, options: .atomic)
+        let pdfBytes = try Data(contentsOf: pdf)
+        let before = try listing(tmp)
 
         try await ScratchDefaults.with { defaults in
             let store = ReaderRootStore(defaults: defaults)
+            store.notesStoreFolder = { nil }
             let resolver = ReaderLinkResolver(rootStore: store)
             let chooser = ReaderRootChooser(rootStore: store, resolver: resolver)
             let log = ReportLog()
@@ -106,8 +121,145 @@ struct ReaderRootChooserTests {
 
             let outcome = chooser.chooseRoot()
 
-            #expect(outcome == .refused(.notAnArchiveRoot(tmp)))
-            #expect(log.outcomes == [.refused(.notAnArchiveRoot(tmp))])
+            guard case let .granted(marker, picked) = outcome else {
+                Issue.record("expected .granted, got \(outcome)")
+                return
+            }
+            #expect(picked == tmp)
+            #expect(marker.kind == .reader)
+            #expect(marker.name == tmp.lastPathComponent)
+            #expect(try RootMarker.read(at: tmp) == marker)
+            #expect(try listing(tmp).subtracting(before) == [RootMarker.filename])
+            #expect(try listing(tmp).count == before.count + 1)
+            #expect(try Data(contentsOf: pdf) == pdfBytes)
+            #expect(store.knownRoots[marker.guid] != nil)
+            #expect(log.outcomes.count == 1)
+
+            // Choosing it again adopts the same identity and never rewrites the file.
+            let markerURL = tmp.appendingPathComponent(RootMarker.filename)
+            let bytes = try Data(contentsOf: markerURL)
+            let again = chooser.chooseRoot()
+            guard case let .granted(second, _) = again else {
+                Issue.record("expected .granted, got \(again)")
+                return
+            }
+            #expect(second.guid == marker.guid)
+            #expect(try Data(contentsOf: markerURL) == bytes)
+        }
+    }
+
+    @Test("A folder holding the notes store, or inside it, is refused and nothing is written")
+    func pickingAroundTheNotesStoreIsRefused() async throws {
+        let outer = try makePlainFolder("holds-store")
+        defer { try? FileManager.default.removeItem(at: outer) }
+        let storeDir = outer.appendingPathComponent("Store", isDirectory: true)
+        let inner = storeDir.appendingPathComponent("items", isDirectory: true)
+        try FileManager.default.createDirectory(at: inner, withIntermediateDirectories: true)
+
+        try await ScratchDefaults.with { defaults in
+            let store = ReaderRootStore(defaults: defaults)
+            store.notesStoreFolder = { storeDir }
+            for pick in [outer, inner] {
+                let before = try listing(pick)
+                let result = store.grantRoot(pick, createIdentity: true)
+                #expect(result.refusal == .overlapsNotesStore(pick))
+                #expect(try listing(pick) == before)
+            }
+            #expect(store.knownRoots.isEmpty)
+        }
+    }
+
+    @Test("A folder inside another archive is refused and nothing is written")
+    func pickingInsideAnArchiveIsRefused() async throws {
+        let (root, _) = try makeMarkedRoot("outer")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let sub = root.appendingPathComponent("Box 1", isDirectory: true)
+        try FileManager.default.createDirectory(at: sub, withIntermediateDirectories: true)
+
+        try await ScratchDefaults.with { defaults in
+            let store = ReaderRootStore(defaults: defaults)
+            store.notesStoreFolder = { nil }
+            let result = store.grantRoot(sub, createIdentity: true)
+            #expect(result.refusal == .insideAnotherRoot(sub))
+            // The sandbox hides parents, so a granted archive is what catches it in the app: the
+            // outer marker removed, the grant alone still refuses the subfolder.
+            #expect(store.grantRoot(root).marker != nil)
+            try FileManager.default.removeItem(at: root.appendingPathComponent(RootMarker.filename))
+            #expect(store.grantRoot(sub, createIdentity: true).refusal == .insideAnotherRoot(sub))
+            let left = try listing(sub)
+            #expect(left.isEmpty)
+        }
+    }
+
+    @Test("A folder holding a granted archive, or a Reader layout subfolder, is refused, nothing written")
+    func pickingAroundAnArchiveIsRefused() async throws {
+        let outer = try makePlainFolder("holds-archive")
+        defer { try? FileManager.default.removeItem(at: outer) }
+        let archive = outer.appendingPathComponent("Archive", isDirectory: true)
+        let main = archive.appendingPathComponent("Archival Photos", isDirectory: true)
+        let jpegs = archive.appendingPathComponent("Archival Photos JPEGS", isDirectory: true)
+        for dir in [main, jpegs] {
+            try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        }
+        let marker = RootMarker(guid: UUID(), name: "Archive", kind: .reader, createdAt: Date())
+        try JSONEncoder().encode(marker).write(to: archive.appendingPathComponent(RootMarker.filename))
+
+        try await ScratchDefaults.with { defaults in
+            let store = ReaderRootStore(defaults: defaults)
+            store.notesStoreFolder = { nil }
+            // Not yet granted: the name alone refuses the main and JPEG folders.
+            for sub in [main, jpegs] {
+                #expect(store.grantRoot(sub, createIdentity: true).refusal == .readerLayoutSubfolder(sub))
+            }
+            #expect(store.grantRoot(archive, createIdentity: true).marker?.guid == marker.guid)
+            #expect(store.grantRoot(outer, createIdentity: true).refusal == .holdsAnotherRoot(outer))
+            for dir in [outer, main, jpegs] {
+                #expect(!FileManager.default.fileExists(atPath: dir.appendingPathComponent(RootMarker.filename).path))
+            }
+        }
+    }
+
+    @Test("A bookmark that cannot be made refuses the grant before any identity is written")
+    func bookmarkFailureWritesNothing() async throws {
+        let tmp = try makePlainFolder("nobookmark")
+        defer { try? FileManager.default.removeItem(at: tmp) }
+        struct Refused: Error {}
+
+        try await ScratchDefaults.with { defaults in
+            let store = ReaderRootStore(defaults: defaults)
+            store.notesStoreFolder = { nil }
+            store.mintBookmark = { _ in throw Refused() }
+            guard case .couldNotBookmark(let named, _)? = store.grantRoot(tmp, createIdentity: true).refusal else {
+                Issue.record("expected .couldNotBookmark")
+                return
+            }
+            #expect(named == tmp)
+            let left = try listing(tmp)
+            #expect(left.isEmpty)
+        }
+    }
+
+    @Test("A read-only folder with no marker is refused with the reason, nothing written")
+    func pickingAReadOnlyFolderIsRefused() async throws {
+        let tmp = try makePlainFolder("readonly")
+        try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: tmp.path)
+        defer {
+            try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: tmp.path)
+            try? FileManager.default.removeItem(at: tmp)
+        }
+
+        try await ScratchDefaults.with { defaults in
+            let store = ReaderRootStore(defaults: defaults)
+            store.notesStoreFolder = { nil }
+            let result = store.grantRoot(tmp, createIdentity: true)
+            guard case .couldNotCreateIdentity(let named, _)? = result.refusal else {
+                Issue.record("expected .couldNotCreateIdentity, got \(String(describing: result.refusal))")
+                return
+            }
+            #expect(named == tmp)
+            #expect(result.refusal?.message.contains("can’t be written to") == true)
+            let left = try listing(tmp)
+            #expect(left.isEmpty)
             #expect(store.knownRoots.isEmpty)
         }
     }

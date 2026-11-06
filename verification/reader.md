@@ -884,7 +884,7 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
 - **Status:** `unproven`
 - **History:**
   - 2026-10-12 W40.b1 — row written, `unproven`.
-- **Notes:** W40.root-marker: container-only display identity enables this menu before the first archive-link copy.
+- **Notes:** W40.root-marker: container-only display identity enables this menu for a root with no identity file.
 
 ### R-43 · Showing the JPEG original
 
@@ -937,8 +937,8 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
 ### R-45 · The Core Directive holds on every tag write
 
 - **Promise:** only Finder tags change on existing archive files; their bytes and location never do.
-  W40.root-marker names one creation exception: the first archive-link copy may create the root identity
-  file. Every tag write goes through the one audited writer:
+  W40.root-marker-auto names one creation exception: choosing a folder creates the root identity file if it
+  is absent. Every tag write goes through the one audited writer:
   - It is coordinated and metadata-only.
   - It re-reads the tags first and aborts if they cannot be read, so an unreadable file is never wiped.
   - It matches tokens exactly, as whole strings.
@@ -997,6 +997,12 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
     Directive's named exception. `RootMarkerDisclosureTests` checks chooser/relaunch mtime and listing,
     navigation/page copies, unchanged PDF bytes/tags, read-only and damaged-marker refusal, root switches,
     and marker removal. Original evidence: [`W40.f2-root-marker.md`](evidence/reader/W40.f2-root-marker.md).
+  - W40.root-marker-auto (2026-11-06, owner): choosing a folder (`RootFolderStore.setRoot`) now creates the
+    marker if absent; reopening at launch still only reads, and an archive-link copy still creates one for a
+    root without. `RootMarkerDisclosureTests` checks that a pick adds exactly that one file and leaves PDF
+    bytes, tags and mtime unchanged, a re-pick and relaunch never rewrite it, a read-only pick opens degraded
+    with nothing written, and an existing or damaged marker is kept byte-for-byte. Notes' Choose Archive
+    Folder… does the same (`ReaderRootChooserTests`). Scratch folders only.
 
 ### R-46 · Append-only audit ledger of every change
 

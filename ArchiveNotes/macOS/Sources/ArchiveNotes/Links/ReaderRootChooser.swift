@@ -79,7 +79,7 @@ final class ReaderRootChooser {
     func chooseRoot() -> Outcome {
         guard let url = pickFolder() else { return .cancelled }
         let outcome: Outcome
-        switch rootStore.grantRoot(url) {
+        switch rootStore.grantRoot(url, createIdentity: true) {
         case let .granted(marker):
             outcome = .granted(marker, picked: url)
         case let .refused(refusal):

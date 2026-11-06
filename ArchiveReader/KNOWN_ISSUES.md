@@ -908,3 +908,8 @@ image-source choices use a container-only identity before/after that first copy.
 marker, browsing does not recreate it; another explicit archive-link copy makes a new GUID, invalidating
 old links. The Core Directive and SPEC now disclose this single creation exception. Scratch regressions:
 `RootMarkerDisclosureTests`; no real corpus used.
+
+**Superseded 2026-11-06 by W40.root-marker-auto** (owner: "I'd rather this be possible automatically"):
+choosing a folder creates the marker if absent, so Notes accepts the folder the Reader shows with no
+link copy first. Reopening at launch still only reads; an archive-link copy still creates one for a root
+that has none. A read-only folder opens with no marker (`.degraded(.notWritable)`) and copies refuse.

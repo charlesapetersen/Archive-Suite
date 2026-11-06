@@ -71,9 +71,8 @@ corrected and passed in the VM.
    `notes-session-1/`, has been filed and can be deleted: `rm -rf ~/Library/Caches/ArchiveSuiteRehearsal/notes-session-1`.
 2. **Start the Reader and point it at the copy.** `cd ~/Claude/"Archive Suite" && ./launch.sh reader`, then
    File ▸ Choose Archive Folder… (⇧⌘O), ⇧⌘G, paste `~/Library/Caches/ArchiveSuiteRehearsal/notes-session-2/archive`
-   and choose it. Then select any file and copy its archive link (Selection ▸ Copy Archive Link(s), ⇧⌘L). The
-   Reader gives a folder its identity file at the first archive-link copy, and Notes needs that file to accept
-   the folder.
+   and choose it. Choosing the folder gives it its identity file, so Notes accepts the same folder with no
+   further step (W40.root-marker-auto).
 3. **Start Notes:** `./launch.sh notes`.
 4. **Point Notes at the new store:** File ▸ Choose Store Folder…, ⇧⌘G,
    `~/Library/Caches/ArchiveSuiteRehearsal/notes-session-2/store`. Notes asks to confirm, then quits; start it

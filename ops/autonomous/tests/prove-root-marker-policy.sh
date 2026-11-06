@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# W40.root-marker: the real prose checker must reject a missing first-copy disclosure.
+# W40.root-marker(-auto): the real prose checker must reject a missing choosing-a-folder disclosure.
 # All mutations are in a temporary git repo (including a space in its path); no app/engine/network.
 set -euo pipefail
 python3 - "$(cd "$(dirname "$0")/../../.." && pwd)" <<'PY'
@@ -38,8 +38,8 @@ with tempfile.TemporaryDirectory(prefix='root-marker-policy-') as tmp:
         print('PASS ' + label)
 
     run(0, 'current policy passes from a spaced scratch path')
-    guide.write_text(original.replace('One named exception: the first archive-link copy', 'omitted disclosure'))
-    run(1, 'removing first-copy disclosure fails despite mentions in other files')
+    guide.write_text(original.replace('One named exception: choosing a folder', 'omitted disclosure'))
+    run(1, 'removing the choosing-a-folder disclosure fails despite mentions in other files')
     guide.write_text(original.replace('`.archive-suite-root.json`', '`omitted filename`'))
     run(1, 'removing the exact identity filename fails')
     guide.write_text(original)

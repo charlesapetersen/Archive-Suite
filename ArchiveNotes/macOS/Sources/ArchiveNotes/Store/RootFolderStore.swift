@@ -40,6 +40,23 @@ final class RootFolderStore: ObservableObject {
             .appendingPathComponent("Store", isDirectory: true)
     }
 
+    /// The store folder a launch opens, resolved and nothing more: no scope started, nothing written.
+    /// For `ReaderRootStore.grantRoot`, which must not give an archive identity to a folder that holds
+    /// the notes store, or one inside it (W40.root-marker-auto).
+    nonisolated static func savedStoreFolder(defaults: UserDefaults = .standard) -> URL? {
+#if DEBUG
+        if let path = UserDefaults.standard.string(forKey: "ANUITestStorePath"), !path.isEmpty {
+            return URL(fileURLWithPath: path, isDirectory: true)
+        }
+#endif
+        if let data = defaults.data(forKey: "notesStoreRootBookmark") {
+            var stale = false
+            return try? URL(resolvingBookmarkData: data, options: [.withSecurityScope, .withoutMounting],
+                            relativeTo: nil, bookmarkDataIsStale: &stale)
+        }
+        return standardDefaultRoot
+    }
+
     /// - Parameters:
     ///   - defaults: where the chosen store's bookmark persists. Injected so a test never reads or
     ///     writes the app's real `notesStoreRootBookmark`.

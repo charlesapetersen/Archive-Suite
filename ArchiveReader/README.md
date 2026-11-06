@@ -14,8 +14,9 @@ documents Read as you go. The two apps ship together as **Archive Suite** (this 
 Archival images cannot be re-shot and their tagging was extremely time-consuming. Archive Reader
 **never deletes, moves, renames, or alters any existing archive file's bytes or location.** It changes
 **macOS Finder tags** only as a deliberate, verified, reversible user action through a single audited
-writer. The first archive-link copy may also create one small identity file, `.archive-suite-root.json`,
-at the archive root; it is never rewritten. Choosing, reopening, browsing and tagging create no marker.
+writer. Choosing a folder (in the Reader, or in Archive Notes) also creates one small identity file,
+`.archive-suite-root.json`, at the archive root if it has none; it is never rewritten. Reopening, browsing
+and tagging create no marker.
 Keep that identity file with the folder so copied archive links continue to resolve. See [CLAUDE.md](CLAUDE.md) → Core Directive & Safety
 Protocol.
 

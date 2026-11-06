@@ -24,12 +24,15 @@ Archival image files are **irreplaceable** and their tagging was **extremely tim
   (add-set / remove-set) to a **freshly-read** tag array, and **verified** afterward. Finder-tag
   (extended-attribute) metadata is the only change to existing archive files; their **bytes and
   location never change**. (Read/Unread triage is just the fast-path preset of this same editor.)
-- **One named exception: the first archive-link copy** may create `.archive-suite-root.json`, a small
-  identity file at the granted root, so links travel with the folder. It is created once, never
-  rewritten; no existing archive file is touched. Choosing/reopening a folder, browsing, tagging,
-  and ordinary text/file-link copying create no marker. If it is removed, browsing leaves it absent;
-  another deliberate archive-link copy creates a new identity, and earlier links no longer resolve.
-  A damaged/unreadable marker is left untouched; a failed creation refuses the copy with an explanation.
+- **One named exception: choosing a folder** (in the Reader, or in Archive Notes' Choose Archive
+  Folder…) creates `.archive-suite-root.json` if it is absent, a small identity file at the granted
+  root, so links travel with the folder and Notes accepts the folder the Reader shows (owner,
+  W40.root-marker-auto, 2026-11-06). It is created once, never rewritten; no existing archive file is
+  touched. Reopening at launch, browsing, tagging and ordinary text/file-link copying create no marker.
+  An archive-link copy still creates one for a root that has none (chosen before this rule, or removed
+  while open), which is a new identity: earlier links no longer resolve. A read-only folder still opens,
+  with no marker, and link copies are refused with the reason. A damaged/unreadable marker is left
+  untouched.
 - Everything else — discovery, filtering, viewing, ordinary copying — is strictly **read-only**.
 
 This is an architectural property, not a coding-discipline hope: **all tag writes route through the

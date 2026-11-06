@@ -328,10 +328,13 @@ struct ReaderLinkResolverTests {
             // The popover shows this string, so it has to name the folder it is about.
             let message = ReaderRootGrantRefusal.notAnArchiveRoot(plain).message
             #expect(message.contains(plain.lastPathComponent))
-            // W40.fix-suite-root-marker: the Reader writes the identity at the first archive-link copy,
-            // so the refusal must name that step, not opening the folder in the Reader.
-            #expect(message.contains("Copy Archive Link"))
-            #expect(!message.contains("Reader itself opens"))
+            // W40.root-marker-auto: the Reader writes the identity when the folder is chosen, so a
+            // folder with none is simply not the archive the link came from; no copy step is named.
+            #expect(message.contains("this link was copied from"))
+            #expect(!message.contains("Copy Archive Link"))
+            // A pick with a link in hand never writes an identity: a fresh GUID could not match.
+            #expect(!FileManager.default.fileExists(
+                atPath: plain.appendingPathComponent(RootMarker.filename).path))
         }
     }
 
