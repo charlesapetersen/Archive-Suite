@@ -116,6 +116,10 @@ final class NotesNavigationModel: ObservableObject {
     enum PaneMode: Equatable { case notes, templates, trash }
     @Published var paneMode: PaneMode = .notes
 
+    /// Set by File ▸ New Template…; the templates manager clears it and opens its New Template sheet
+    /// (W40.fix-notes-templates).
+    @Published var newTemplateRequested = false
+
     /// A pending single-item **delete-last-instance** confirmation (§3.6, W6-S5). Non-nil ⟹ the view
     /// MUST present the mandatory modal before anything is deleted; `nil` = nothing pending. (The
     /// batched folder-delete variant lives on the shared tree, since folder structure is shared.)

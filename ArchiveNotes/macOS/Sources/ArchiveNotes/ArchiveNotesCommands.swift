@@ -75,6 +75,10 @@ struct ReaderRootCommands: Commands {
 /// inside the toolbar's New menu, so the menu bar had no New and the key did nothing. The key window creates
 /// through its own `NewItemAction`; with no window open, the item is made in the shared folder scope and the
 /// window featuring its kind opens to show it.
+///
+/// New Template… (W40.fix-notes-templates, notes-1 rows 35 and 41): a template could be made only from the
+/// sidebar's Templates row and its +, which the owner could not find. It shows the templates manager and its
+/// New Template sheet, which asks the kind.
 struct NewItemCommands: Commands {
     let notesModel: NotesModel
     let flushRegistry: EditorFlushRegistry
@@ -87,7 +91,14 @@ struct NewItemCommands: Commands {
                 .keyboardShortcut("n", modifiers: .command)
             Button("New Extract") { create(.extract) }
                 .keyboardShortcut("n", modifiers: [.command, .option])
+            Button("New Template\u{2026}") { newTemplate() }
         }
+    }
+
+    private func newTemplate() {
+        if let newItem { newItem.newTemplate(); return }
+        notesModel.pendingNewTemplate = true
+        openWindow(id: NotesWindowID.notes)
     }
 
     private func create(_ kind: Item.Kind) {
@@ -106,9 +117,11 @@ struct NewItemCommands: Commands {
 }
 
 /// A window's way to make a new item, published to the menu bar as a focused scene value: `perform(kind)` makes a
-/// `kind` item from the selected folder's template of that kind.
+/// `kind` item from the selected folder's template of that kind; `newTemplate()` shows the window's templates
+/// manager with its New Template sheet.
 struct NewItemAction {
     let perform: @MainActor (Item.Kind) -> Void
+    let newTemplate: @MainActor () -> Void
 }
 
 struct NewItemActionKey: FocusedValueKey {

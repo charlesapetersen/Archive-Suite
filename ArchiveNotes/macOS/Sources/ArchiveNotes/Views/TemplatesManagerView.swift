@@ -3,6 +3,9 @@ import SwiftUI
 /// The per-window **templates manager** (06-viewers §6): shown in the item pane when the sidebar
 /// "Templates" row (or a folder's "Template ▸ Manage…") is active. Lists every template (both kinds,
 /// with a kind glyph) and offers New / Duplicate / Rename / Delete via `NotesModel`'s template actions.
+/// A name is edited in its row, as a note's title is in the list: Return or a double-click on the row,
+/// Rename… or the pencil starts it; Return or a click elsewhere saves, Escape leaves the name as it was
+/// (W40.fix-notes-templates, notes-1 row 42).
 ///
 /// Selecting a template opens its body in the detail editor. Selection is owned by the window so
 /// the list and detail pane stay bound to the same template.
@@ -17,6 +20,8 @@ struct TemplatesManagerView: View {
     @State private var newKind: Item.Kind = .note
     @State private var renameID: UUID?
     @State private var renameText = ""
+    @FocusState private var renameFocused: Bool
+    @FocusState private var listFocused: Bool
     @State private var deleteID: UUID?
 
     var body: some View {
@@ -28,15 +33,37 @@ struct TemplatesManagerView: View {
                     HStack(spacing: 6) {
                         Image(systemName: t.kind == .extract ? "quote.opening" : "doc.text")
                             .foregroundStyle(.secondary)
-                        Text(t.name.isEmpty ? "Untitled" : t.name).lineLimit(1)
+                        if renameID == t.id {
+                            TextField("Template name", text: $renameText)
+                                .textFieldStyle(.plain)
+                                .focused($renameFocused)
+                                .onSubmit { commitRename() }
+                                .onExitCommand { cancelRename() }
+                                .accessibilityIdentifier("an.template.rename")
+                        } else {
+                            Text(t.name.isEmpty ? "Untitled" : t.name).lineLimit(1)
+                        }
                         Spacer(minLength: 4)
                         Text(t.kind == .extract ? "Extract" : "Note")
                             .font(.caption).foregroundStyle(.primary)
                     }
                     .tag(t.id)
                     .accessibilityIdentifier("an.template.row.\(t.id.uuidString)")
-                    .contextMenu { rowMenu(t) }
                 }
+            }
+            // The selection-based menu gives a row its double-click, as the notes list has.
+            .contextMenu(forSelectionType: UUID.self) { ids in
+                if ids.count == 1, let id = ids.first, let t = model.templates.first(where: { $0.id == id }) {
+                    rowMenu(t)
+                }
+            } primaryAction: { ids in
+                if ids.count == 1, let id = ids.first { beginRename(id) }
+            }
+            .focused($listFocused)
+            .onKeyPress(.return) {
+                guard renameID == nil, let id = selected else { return .ignored }
+                beginRename(id)
+                return .handled
             }
             .overlay { if model.templates.isEmpty { emptyState } }
             Divider()
@@ -45,7 +72,15 @@ struct TemplatesManagerView: View {
         .background(Color(nsColor: .textBackgroundColor))
         .onChange(of: model.templates.map(\.id)) { _, ids in
             if let selected, !ids.contains(selected) { self.selected = nil }
+            if let renameID, !ids.contains(renameID) { self.renameID = nil }
         }
+        // A click elsewhere ends the edit and saves it, as a note's title does.
+        .onChange(of: renameFocused) { _, focused in
+            if !focused, renameID != nil { commitRename() }
+        }
+        // File ▸ New Template… asks for a template from this window (W40.fix-notes-templates, notes-1 rows 35, 41).
+        .onAppear { takeNewTemplateRequest() }
+        .onChange(of: nav.newTemplateRequested) { _, _ in takeNewTemplateRequest() }
         // The sheet asks which kind the template makes; it starts at this window's kind, in view, rather
         // than taking that kind silently (W40.fix-notes-new-note, notes-1 row 43).
         .sheet(isPresented: $showNew) {
@@ -56,13 +91,6 @@ struct TemplatesManagerView: View {
                                Task { if let id = await model.createTemplate(name: name, kind: kind) { selected = id } }
                            },
                            accessory: AnyView(kindPicker))
-        }
-        .sheet(isPresented: boolBinding($renameID)) {
-            let id = renameID
-            NameEntrySheet(title: "Rename Template", confirmLabel: "Rename", name: $renameText) { name in
-                guard let id else { return }
-                Task { await model.renameTemplate(id, to: name) }
-            }
         }
         .confirmationDialog("Delete this template?", isPresented: boolBinding($deleteID),
                             presenting: deleteID) { id in
@@ -99,7 +127,7 @@ struct TemplatesManagerView: View {
                 if let id = await model.duplicateTemplate(t.id) { selected = id }
             }
         }
-        Button("Rename…") { renameText = t.name; renameID = t.id }
+        Button("Rename…") { beginRename(t.id) }
         Divider()
         Button("Delete", role: .destructive) { deleteID = t.id }
     }
@@ -118,9 +146,7 @@ struct TemplatesManagerView: View {
             } label: { Image(systemName: "plus.square.on.square") }
                 .help("Duplicate").disabled(selected == nil)
             Button {
-                if let id = selected, let t = model.templates.first(where: { $0.id == id }) {
-                    renameText = t.name; renameID = id
-                }
+                if let id = selected { beginRename(id) }
             } label: { Image(systemName: "pencil") }.help("Rename").disabled(selected == nil)
             Button { if let id = selected { deleteID = id } } label: { Image(systemName: "trash") }
                 .help("Delete").disabled(selected == nil)
@@ -141,6 +167,39 @@ struct TemplatesManagerView: View {
                 .font(.callout).foregroundStyle(.primary).multilineTextAlignment(.center)
         }
         .padding()
+    }
+
+    /// Starts editing a template's name in its row, selecting the row as the notes list does.
+    private func beginRename(_ id: UUID) {
+        guard let t = model.templates.first(where: { $0.id == id }) else { return }
+        selected = id
+        renameText = t.name
+        renameID = id
+        // One turn later: the field exists only once the row has redrawn with it.
+        DispatchQueue.main.async { if renameID == id { renameFocused = true } }
+    }
+
+    /// Saves the edited name; an unchanged or empty name writes nothing. The list gets the keyboard back so
+    /// arrow keys and Return go on working there.
+    private func commitRename() {
+        guard let id = renameID else { return }
+        let name = renameText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let unchanged = model.templates.first(where: { $0.id == id })?.name == name
+        renameID = nil
+        listFocused = true
+        guard !name.isEmpty, !unchanged else { return }
+        Task { await model.renameTemplate(id, to: name) }
+    }
+
+    private func cancelRename() {
+        renameID = nil
+        listFocused = true
+    }
+
+    private func takeNewTemplateRequest() {
+        guard nav.newTemplateRequested else { return }
+        nav.newTemplateRequested = false
+        beginNew()
     }
 
     private func beginNew() { newName = "New Template"; newKind = nav.windowKind; showNew = true }

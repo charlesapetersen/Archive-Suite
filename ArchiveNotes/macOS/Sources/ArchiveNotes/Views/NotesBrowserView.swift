@@ -96,7 +96,17 @@ struct NotesBrowserView: View {
             await flushRegistry.sweepSavedCopies(noteIDs: model.allItems.map(\.id)) { await model.loadBody(for: $0) }
         }
         .toolbar { toolbar }
-        .focusedSceneValue(\.newItemAction, NewItemAction { newItem(kind: $0, from: .folderDefault) })
+        .focusedSceneValue(\.newItemAction, NewItemAction(perform: { newItem(kind: $0, from: .folderDefault) },
+                                                           newTemplate: { showNewTemplate() }))
+        // File ▸ New Template… with no window open opened this one for it; the Extracts window leaves it alone.
+        .onReceive(model.$pendingNewTemplate) { pending in
+            guard pending, nav.windowKind == .note else { return }
+            DispatchQueue.main.async {
+                guard model.pendingNewTemplate else { return }
+                model.pendingNewTemplate = false
+                showNewTemplate()
+            }
+        }
         // Templates mode mounts no `NoteEditorPane`, so nothing in this window would act on an open
         // request; handle it here instead (W40.fix-notes-jump-pending-template). The delivered value,
         // since `@Published` emits in `willSet`; an initial pending value covers a window just opened.
@@ -278,6 +288,12 @@ struct NotesBrowserView: View {
         case .selectAndScroll, .ignore:
             break
         }
+    }
+
+    /// The templates manager, with its New Template sheet open (W40.fix-notes-templates).
+    private func showNewTemplate() {
+        nav.showingTemplates = true
+        nav.newTemplateRequested = true
     }
 
     /// What a new item starts from: the folder's template of its kind (§6), Blank, or a chosen template.

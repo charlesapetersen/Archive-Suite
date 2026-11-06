@@ -136,6 +136,10 @@ final class NotesModel: ObservableObject {
         return true
     }
 
+    /// File ▸ New Template… with no window open (W40.fix-notes-templates): the Notes window, opened for it,
+    /// clears this and shows its templates manager with the New Template sheet.
+    @Published var pendingNewTemplate = false
+
     /// Clear the pending open request once a window has handled it.
     func consumeOpen() {
         pendingOpen = nil
