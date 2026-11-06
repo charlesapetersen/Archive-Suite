@@ -17,6 +17,11 @@ import AppKit
 /// divider. The tree stays on the left in both. The list, divider and detail sit in one `AnyLayout`, so a switch
 /// changes only how they are arranged: the editor is not rebuilt, and its selection, unsaved text and scroll
 /// position stay.
+///
+/// The inspector (W40.notes-detail-layout; owner session notes-1 rows 20, 21, 32) is a panel at the window's right,
+/// outside that layout, so in the stacked layout it runs the full height beside the list and the note. View ▸ Show
+/// Inspector (⌥⌘I) and the toolbar's right-hand button open and close it; open or closed and its width are
+/// remembered, like the folder list's.
 struct NotesBrowserView: View {
     /// The shared UI façade (folder tree + scope + item source), passed from the app.
     @ObservedObject private var model: NotesModel
@@ -28,6 +33,8 @@ struct NotesBrowserView: View {
     @AppStorage(NotesLayoutSettingsKey.detailWidth) private var detailWidth = NotesLayoutSettings.defaultDetailWidth
     @AppStorage(NotesLayoutSettingsKey.layoutMode)  private var layoutMode: NotesLayoutMode = .sideBySide
     @AppStorage(NotesLayoutSettingsKey.listHeight)  private var listHeight  = NotesLayoutSettings.defaultListHeight
+    @AppStorage(NotesLayoutSettingsKey.showInspector)  private var showingInspector = true
+    @AppStorage(NotesLayoutSettingsKey.inspectorWidth) private var inspectorWidth = NotesLayoutSettings.defaultInspectorWidth
 
     /// The right-hand panes' height, so the stacked list gives way before the note is squeezed.
     @State private var panesHeight = 0.0
@@ -77,15 +84,25 @@ struct NotesBrowserView: View {
             // it places the panes, so no state written here feeds back into layout (a feedback loop through the
             // list's frame crashed AppKit's layout pass on an animated tree toggle).
             .onGeometryChange(for: Double.self) { Double($0.size.height) } action: { panesHeight = $0 }
+            if showingInspector {
+                PanelDivider(size: $inspectorWidth, panelBefore: false,
+                             range: NotesLayoutSettings.inspectorWidthRange, label: "Inspector width",
+                             id: "an.divider.inspector")
+                NoteInspectorPanel(nav: nav)
+                    .frame(width: inspectorWidth)
+                    .transition(.move(edge: .trailing))
+            }
         }
         // The list needs 527 pt for its fixed filter controls in the VM; reserve 540 so its
         // minimum proposal agrees with what it actually draws. Without that floor SwiftUI reports
         // a 1053 pt window minimum but centres 1121 pt of panes inside it, clipping both edges.
         // Keep the floor on the LIST: the shell's minimum then follows the current sidebar/detail
         // widths and whether the sidebar is visible, rather than understating their total again.
-        // Stacked, the list's floor and the note's must both fit (W48.notes-stacked-layout).
-        .frame(minHeight: layoutMode == .stacked ? NotesLayoutSettings.stackedMinHeight : 560)
+        // Stacked, the list's floor and the note's must both fit (W48.notes-stacked-layout); since the note's fields
+        // moved to the inspector that is less than the side-by-side floor, which then holds (W40.notes-detail-layout).
+        .frame(minHeight: max(560, layoutMode == .stacked ? NotesLayoutSettings.stackedMinHeight : 0))
         .animation(.easeInOut(duration: 0.18), value: showingTree)
+        .animation(.easeInOut(duration: 0.18), value: showingInspector)
         .background(indexReadyProbe)                               // hidden XCUITest index-ready signal (§3.4)
         .background(NotesWindowAccessor { configureWindow($0) })   // restore/remember window size (DV-1)
         .task { await model.bootstrap() }   // open the store + load organization + items (idempotent)
@@ -194,6 +211,16 @@ struct NotesBrowserView: View {
             }
             .help("New note or extract")
             .accessibilityIdentifier("an.toolbar.new")
+        }
+        ToolbarItem(placement: .primaryAction) {
+            Button {
+                withAnimation { showingInspector.toggle() }
+            } label: {
+                Image(systemName: "sidebar.right")
+            }
+            .help(showingInspector ? "Hide Inspector (⌥⌘I)" : "Show Inspector (⌥⌘I)")
+            .accessibilityLabel(showingInspector ? "Hide Inspector" : "Show Inspector")
+            .accessibilityIdentifier("an.inspector.toggle")
         }
     }
 
@@ -487,15 +514,14 @@ private struct ItemListPane: View {
 
 // MARK: - Detail pane
 
-/// Right pane: a compact header, the locations inspector, and the metadata inspector (date front-matter
-/// plus the front-matter-backed Q1...Q3 mirror) for the currently-selected item, above the W3 editor.
-/// They follow `nav.detailItemID`, not the selection, so they change in the same pass as the editor's body.
+/// Right pane: a compact header for the currently-selected item, the W3 editor, and the tag bar under it
+/// (W40.notes-detail-layout). They follow `nav.detailItemID`, not the selection, so they change in the same pass
+/// as the editor's body.
 /// The header is the visible "selection → detail" signal (W6-S3). The editor is bound to the selected
 /// item's body and autosaves through `NoteStore` (W7-S1a — `NoteEditorPane` + `NoteBodyEditorModel`).
 private struct DetailPane: View {
     @ObservedObject var nav: NotesNavigationModel
     @AppStorage(DisplayCalendarSettings.enabledKey) private var calendarsEnabled = false
-    @AppStorage(NotesLayoutSettingsKey.metadataCollapsed) private var metadataCollapsed = false
     @Binding var selectedTemplateID: UUID?
 
     var body: some View {
@@ -528,55 +554,20 @@ private struct DetailPane: View {
         }
     }
 
+    /// The header, the editor and the tag bar under it. The fields and locations are in the inspector
+    /// (`NoteInspectorPanel`), so the editor takes the whole height between the header and the tags.
     private var noteDetail: some View {
-        GeometryReader { geo in
-            VStack(spacing: 0) {
-                selectedHeader
-                if let id = nav.detailItemID {
-                    Divider()
-                    LocationsInspector(nav: nav, itemId: id)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-                }
-                if let summary = nav.detailSummary {
-                    Divider()
-                    metadataToggle
-                    if !metadataCollapsed {
-                        // Keep the editor the larger share at every window height (W40.fix-notes-editor-squeezed).
-                        ScrollView {
-                            NoteMetadataInspector(nav: nav, item: summary)
-                        }
-                        .frame(maxHeight: DetailPaneLayout.metadataMaxHeight(paneHeight: geo.size.height))
-                        .accessibilityIdentifier("an.detail.metadataScroll")
-                    }
-                }
+        VStack(spacing: 0) {
+            selectedHeader
+            Divider()
+            NoteEditorPane(nav: nav)
+            if let summary = nav.detailSummary {
                 Divider()
-                NoteEditorPane(nav: nav)
+                // Keyed by the note, so a tag still saving finishes on the note it was typed for.
+                NoteTagBar(model: nav.model, item: summary)
+                    .id(summary.id)
             }
         }
-    }
-
-    /// Folds the metadata inspector away so the editor gets the whole pane below the locations.
-    private var metadataToggle: some View {
-        Button {
-            metadataCollapsed.toggle()
-        } label: {
-            HStack(spacing: 4) {
-                Image(systemName: metadataCollapsed ? "chevron.right" : "chevron.down")
-                    .font(.caption2.weight(.semibold))
-                    .frame(width: 10)
-                Text("Details").font(.caption.weight(.semibold))
-                Spacer()
-            }
-            .foregroundStyle(.primary)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .padding(.horizontal, 10)
-        .padding(.vertical, 4)
-        .help(metadataCollapsed ? "Show the note's details" : "Hide the note's details to give the editor more room")
-        .accessibilityLabel(metadataCollapsed ? "Show details" : "Hide details")
-        .accessibilityIdentifier("an.detail.metadataToggle")
     }
 
     @ViewBuilder private var selectedHeader: some View {
@@ -616,6 +607,39 @@ private struct DetailPane: View {
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)
         }
+    }
+}
+
+/// The inspector panel at the window's right (W40.notes-detail-layout): the selected item's fields and locations,
+/// `NoteMetadataInspector`, in a scroll view. It reads `nav.detailItemID` as the note pane does, so it follows the
+/// selection in the same pass as the editor; with nothing or several items selected it says so, as the header does.
+private struct NoteInspectorPanel: View {
+    @ObservedObject var nav: NotesNavigationModel
+
+    var body: some View {
+        VStack(spacing: 0) {
+            if nav.paneMode == .notes, let summary = nav.detailSummary {
+                ScrollView {
+                    NoteMetadataInspector(nav: nav, item: summary)
+                }
+                .accessibilityIdentifier("an.detail.metadataScroll")
+            } else {
+                Text(placeholder)
+                    .font(.callout).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                    .opacity(nav.detailSwitchPending ? 0 : 1)
+                    .padding()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        }
+        .background(Color(nsColor: .windowBackgroundColor))
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Inspector")
+        .accessibilityIdentifier("an.inspector")
+    }
+
+    private var placeholder: String {
+        if nav.paneMode != .notes { return "No details to show" }
+        return nav.selection.count > 1 ? "\(nav.selection.count) items selected" : "No note selected"
     }
 }
 

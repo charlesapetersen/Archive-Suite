@@ -149,13 +149,20 @@ enum NewItemFlow {
     }
 }
 
-/// View menu: side by side, or the list above the note (W48.notes-stacked-layout). Both windows follow the
-/// one remembered choice; `NotesBrowserView` reads the same key.
+/// View menu: side by side, or the list above the note (W48.notes-stacked-layout), and Show/Hide Inspector
+/// (⌥⌘I, W40.notes-detail-layout; ⌘I is Italic here). Both windows follow the one remembered choice;
+/// `NotesBrowserView` reads the same keys.
 struct LayoutCommands: Commands {
     @AppStorage(NotesLayoutSettingsKey.layoutMode) private var layoutMode: NotesLayoutMode = .sideBySide
+    @AppStorage(NotesLayoutSettingsKey.showInspector) private var showingInspector = true
 
     var body: some Commands {
         CommandGroup(before: .toolbar) {
+            Button(showingInspector ? "Hide Inspector" : "Show Inspector") {
+                withAnimation { showingInspector.toggle() }
+            }
+            .keyboardShortcut("i", modifiers: [.command, .option])
+            Divider()
             Picker("Layout", selection: $layoutMode) {
                 ForEach(NotesLayoutMode.allCases, id: \.self) { mode in
                     Text(mode.title).tag(mode)

@@ -14,13 +14,13 @@ final class NoteTagSuggestionsTests: XCTestCase {
         let note = summary(["Intel"])
         let others = [summary(["intel", "silicon valley"]), summary(["Silicon Valley", "corporate culture"]),
                       summary(["computing history", "silicon valley"])]
-        XCTAssertEqual(NoteTagsInspector.suggestions(for: note, in: [note] + others),
+        XCTAssertEqual(NoteTagBar.suggestions(for: note, in: [note] + others),
                        ["Silicon Valley", "Computing History", "Corporate Culture"],
                        "own tags left out (any case), variants merged in the form a save writes, most used first")
     }
 
     func testANoteAloneHasNoSuggestions() {
         let note = summary(["Intel"])
-        XCTAssertEqual(NoteTagsInspector.suggestions(for: note, in: [note]), [])
+        XCTAssertEqual(NoteTagBar.suggestions(for: note, in: [note]), [])
     }
 }

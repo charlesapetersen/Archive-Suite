@@ -1,11 +1,11 @@
 import SwiftUI
 import ArchiveCore
 
-/// The detail-pane **metadata strip** for the selected note/extract: edit authors, document DATE
-/// (one typed field + a "date uncertain" toggle), and QUALITY. These fields
-/// use front matter through `NotesNavigationModel` → `NotesModel`; authors remain front-matter only,
-/// while the model mirrors valid Quality values as Q1...Q3 on this note's own `.md`. Its Tags subsection
-/// uses the audited model path, so front matter remains authoritative and Finder subjects stay in sync.
+/// The **inspector panel**'s fields for the selected note/extract (W40.notes-detail-layout): Round-up or
+/// Sources, authors, document DATE (one typed field + a "date uncertain" toggle), QUALITY, the item's
+/// folder locations and Zotero. These fields use front matter through `NotesNavigationModel` →
+/// `NotesModel`; authors remain front-matter only, while the model mirrors valid Quality values as Q1...Q3
+/// on this note's own `.md`. Tags are edited in the tag bar under the note (`NoteTagBar`).
 ///
 /// Adapted from Reader's `InlineEditCells.DateCell` + `TagEditorView.dateSection`/`prioritySection`,
 /// retargeted from tag writes to the Notes front-matter store. Local field state is seeded from the
@@ -74,8 +74,8 @@ struct NoteMetadataInspector: View {
             Divider()
             qualitySection
             Divider()
-            NoteTagsInspector(model: nav.model, item: item)
-                .id(item.id)
+            // In the inspector rather than above the note (W40.notes-detail-layout, notes-1 row 32).
+            LocationsInspector(nav: nav, itemId: item.id)
             Divider()
             NoteZoteroInspector(model: nav.model, itemID: item.id)
                 .id(item.id)

@@ -70,7 +70,7 @@ final class StackedLayoutVerifyUITests: NotesFixtureUITestCase {
             let bottom = height(divider)
             drag(divider, by: 300)
             XCTAssertEqual(height(divider), bottom, accuracy: 0.5, "past its bottom limit the divider should not move")
-            XCTAssertEqual(mainWindow.frame.maxY - divider.frame.maxY, 480, accuracy: 30,
+            XCTAssertEqual(mainWindow.frame.maxY - divider.frame.maxY, 320, accuracy: 30,
                            "the list should stop where the note keeps its floor")
             drag(divider, by: -900)
             XCTAssertEqual(height(divider), 160, accuracy: 0.5, "the list should clamp at 160 pt")

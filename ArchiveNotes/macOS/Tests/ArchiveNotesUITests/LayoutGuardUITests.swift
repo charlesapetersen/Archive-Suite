@@ -137,6 +137,7 @@ final class LayoutGuardUITests: NotesFixtureUITestCase {
         let removes = window.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "an.locations.remove."))
         XCTAssertGreaterThan(removes.count, 0, "the selected fixture item has a location")
         for control in removes.allElementsBoundByIndex {
+            revealInInspector(control, in: window)
             XCTAssertTrue(control.isHittable, "a location's remove button must be reachable at minimum width")
         }
         checkEditorShare(window, name: name)
@@ -149,32 +150,45 @@ final class LayoutGuardUITests: NotesFixtureUITestCase {
         }
     }
 
-    /// W40.fix-notes-editor-squeezed: at minimum size the metadata inspector used to take about two-thirds of
-    /// the right pane. The editor must now be the larger of the two, and folding the metadata must give it the room.
+    /// W40.fix-notes-editor-squeezed, then W40.notes-detail-layout: the note's fields are in the inspector at the
+    /// window's right, so the editor takes the note pane between its header and the tag bar. It must be most of the
+    /// pane's height, the tag bar under it; closing the inspector (⌥⌘I) must not take the editor away, and ⌥⌘I
+    /// brings it back.
     private func checkEditorShare(_ window: XCUIElement, name: String) {
         let editor = window.scrollViews.containing(.textView, identifier: "an.editor.text").firstMatch
-        let metadata = window.scrollViews["an.detail.metadataScroll"]
-        let toggle = window.buttons["an.detail.metadataToggle"]
-        guard editor.exists, metadata.exists, toggle.exists else {
-            XCTFail("\(name): the editor, the metadata scroll and its toggle should all be shown")
+        let inspector = window.descendants(matching: .any)["an.inspector"]
+        let tagBar = window.descendants(matching: .any)["an.tagbar"]
+        guard editor.exists, inspector.exists, tagBar.exists else {
+            XCTFail("\(name): the editor, the inspector and the tag bar should all be shown")
             return
         }
-        let shown = editor.frame.height
-        print("[layout] \(name): editor \(Int(shown)) pt, metadata \(Int(metadata.frame.height)) pt, " +
-              "window \(Int(window.frame.height)) pt")
-        XCTAssertGreaterThan(shown, metadata.frame.height,
-                             "\(name): the editor should get the larger share of the right pane")
-        toggle.click()
+        print("[layout] \(name): editor \(Int(editor.frame.height)) pt, tag bar \(Int(tagBar.frame.height)) pt, " +
+              "inspector \(Int(inspector.frame.width)) pt wide, window " +
+              "\(Int(window.frame.width))×\(Int(window.frame.height)) pt")
+        XCTAssertGreaterThan(editor.frame.height, window.frame.height * 0.45,
+                             "\(name): the editor should take most of the note pane's height")
+        XCTAssertGreaterThanOrEqual(tagBar.frame.minY, editor.frame.maxY - 1, "\(name): the tag bar should be under the editor")
+        XCTAssertGreaterThanOrEqual(inspector.frame.minX, editor.frame.maxX - 1,
+                                    "\(name): the inspector should be right of the note")
+        app.typeKey("i", modifierFlags: [.command, .option])
         LayoutGuard.waitUntilSettled(window)
-        XCTAssertFalse(metadata.exists, "\(name): Hide details should fold the metadata away")
-        let folded = editor.frame.height
-        print("[layout] \(name): editor with details hidden \(Int(folded)) pt")
-        XCTAssertGreaterThan(folded, shown + 60, "\(name): folding the metadata should give the editor its room")
-        let foldedURL = FileManager.default.temporaryDirectory.appendingPathComponent("uitest-minimum-\(name)-folded.png")
-        try? window.screenshot().pngRepresentation.write(to: foldedURL, options: .atomic)
-        toggle.click()   // the choice is remembered; leave it as later tests expect
+        XCTAssertFalse(inspector.exists, "\(name): ⌥⌘I should close the inspector")
+        XCTAssertTrue(editor.exists, "\(name): the editor stays with the inspector closed")
+        let closedURL = FileManager.default.temporaryDirectory.appendingPathComponent("uitest-minimum-\(name)-noinspector.png")
+        try? window.screenshot().pngRepresentation.write(to: closedURL, options: .atomic)
+        app.typeKey("i", modifierFlags: [.command, .option])   // the choice is remembered; leave it as later tests expect
         LayoutGuard.waitUntilSettled(window)
-        XCTAssertTrue(metadata.waitForExistence(timeout: 5), "\(name): Show details should bring the metadata back")
+        XCTAssertTrue(inspector.waitForExistence(timeout: 5), "\(name): ⌥⌘I should bring the inspector back")
+    }
+
+    /// Scroll the inspector until `control` is inside it: Locations sits below the fields, under the fold in a short
+    /// window.
+    private func revealInInspector(_ control: XCUIElement, in window: XCUIElement) {
+        let scroll = window.scrollViews["an.detail.metadataScroll"]
+        guard scroll.exists else { return }
+        for _ in 0..<10 where !(control.frame.minY >= scroll.frame.minY && control.frame.maxY <= scroll.frame.maxY) {
+            scroll.scroll(byDeltaX: 0, deltaY: control.frame.maxY > scroll.frame.maxY ? -60 : 60)
+        }
     }
 
     /// UI-test-only harness elements (`ArchiveNotesApp` adds them only under the UITest launch arguments): the

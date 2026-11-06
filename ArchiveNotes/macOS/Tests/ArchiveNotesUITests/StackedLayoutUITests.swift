@@ -117,7 +117,7 @@ final class StackedLayoutUITests: NotesFixtureUITestCase {
             drag(divider, by: 60)
             XCTAssertEqual(height(divider), 220, accuracy: 6, "dragging down should grow the list")
             XCTAssertEqual(list.frame.maxY, divider.frame.minY, accuracy: 4, "the list should end at the divider")
-            // Down as far as it goes: only the note's 480 pt floor below it stops the list (there is no fixed
+            // Down as far as it goes: only the note's 320 pt floor below it stops the list (there is no fixed
             // maximum since W40.fix-notes-small-fixes); the note keeps a usable editor.
             drag(divider, by: mainWindow.frame.maxY - divider.frame.midY - 12)   // to the window's bottom edge
             let top = height(divider)
@@ -125,7 +125,7 @@ final class StackedLayoutUITests: NotesFixtureUITestCase {
             print("[w48] list height at the bottom of the drag: \(top) in a \(mainWindow.frame.height) pt window, "
                   + "\(noteBelow) pt below the divider")
             XCTAssertGreaterThan(top, 280, "dragging down should grow the list up to what fits")
-            XCTAssertEqual(noteBelow, 480, accuracy: 30, "the list should stop only where the note keeps its floor")
+            XCTAssertEqual(noteBelow, 320, accuracy: 30, "the list should stop only where the note keeps its floor")
             drag(divider, by: 200)
             XCTAssertEqual(height(divider), top, accuracy: 0.5, "past its limit the list should stay where it stopped")
             let shownEditor = mainWindow.scrollViews.containing(.textView, identifier: "an.editor.text").firstMatch

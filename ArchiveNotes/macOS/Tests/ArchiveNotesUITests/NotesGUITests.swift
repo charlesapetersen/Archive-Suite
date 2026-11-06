@@ -1987,7 +1987,10 @@ final class NotesGUITests: NotesFixtureUITestCase {
 
             let input = mainWindow.textFields["an.detail.tags.input"]
             XCTAssertTrue(input.waitForExistence(timeout: 5))
-            revealInMetadataScroll(input)
+            // In the tag bar under the editor (W40.notes-detail-layout), not in the inspector.
+            XCTAssertTrue(mainWindow.descendants(matching: .any)["an.tagbar"].exists, "the tag bar should be shown")
+            XCTAssertFalse(mainWindow.descendants(matching: .any)["an.inspector"].descendants(matching: .any)[
+                "an.detail.tags.input"].exists, "tags should not be edited in the inspector")
             input.click()
             // W40.fix-notes-tag-entry (owner session notes-1 row 26): Return adds the tag and keeps the keyboard,
             // so a second one is typed straight after; there is no Add button.

@@ -187,17 +187,18 @@ struct NotesAppSettingsTests {
         #expect(NotesAppSettings.windowHiddenColumns(for: .extract, from: d) == ["tags"])
     }
 
-    /// W40.fix-notes-editor-squeezed: the metadata inspector takes a quarter of the detail pane, between
-    /// a floor and the old 280 pt ceiling, so a short window no longer leaves the editor about 100 pt.
-    @Test func metadataHeightScalesWithThePane() {
-        #expect(DetailPaneLayout.metadataMaxHeight(paneHeight: 500) == 125)   // minimum window
-        #expect(DetailPaneLayout.metadataMaxHeight(paneHeight: 840) == 210)   // 1440×900
-        #expect(DetailPaneLayout.metadataMaxHeight(paneHeight: 2000) == 280)  // capped
-        #expect(DetailPaneLayout.metadataMaxHeight(paneHeight: 200) == 90)    // floored
-        // The editor keeps the larger share of what the metadata could take.
-        for h in stride(from: CGFloat(500), through: 1400, by: 100) {
-            #expect(DetailPaneLayout.metadataMaxHeight(paneHeight: h) <= h / 2)
-        }
+    /// W40.notes-detail-layout: the inspector panel is shown by default, and its width clamps like the others.
+    @Test func inspectorDefaultsShownAndClampsItsWidth() {
+        let d = scratchDefaults()
+        #expect(NotesLayoutSettings(reading: d).showInspector == true)
+        #expect(NotesLayoutSettings(reading: d).inspectorWidth == NotesLayoutSettings.defaultInspectorWidth)
+        #expect(NotesLayoutSettings.inspectorWidthRange.contains(CGFloat(NotesLayoutSettings.defaultInspectorWidth)))
+        d.set(false, forKey: NotesLayoutSettingsKey.showInspector)
+        d.set(10.0, forKey: NotesLayoutSettingsKey.inspectorWidth)
+        #expect(NotesLayoutSettings(reading: d).showInspector == false)
+        #expect(NotesLayoutSettings(reading: d).inspectorWidth == NotesLayoutSettings.inspectorWidthMin)
+        d.set(5000.0, forKey: NotesLayoutSettingsKey.inspectorWidth)
+        #expect(NotesLayoutSettings(reading: d).inspectorWidth == NotesLayoutSettings.inspectorWidthMax)
     }
 
     // MARK: stacked layout (W48.notes-stacked-layout)
@@ -218,7 +219,7 @@ struct NotesAppSettingsTests {
         #expect(keys == ["an.layoutMode", "an.listHeight"])
         let others = [NotesLayoutSettingsKey.windowW, NotesLayoutSettingsKey.windowH, NotesLayoutSettingsKey.treeWidth,
                       NotesLayoutSettingsKey.detailWidth, NotesLayoutSettingsKey.showTree,
-                      NotesLayoutSettingsKey.metadataCollapsed]
+                      NotesLayoutSettingsKey.showInspector, NotesLayoutSettingsKey.inspectorWidth]
         #expect(Set(keys).isDisjoint(with: others))
         #expect(NotesLayoutMode.allCases.map(\.title) == ["Side by Side", "List Above Note"])
     }
@@ -237,7 +238,7 @@ struct NotesAppSettingsTests {
         #expect(NotesLayoutSettings.clampedListHeight(.infinity) == NotesLayoutSettings.defaultListHeight)
         #expect(NotesLayoutSettings.listHeightRange == 160...1600)
         #expect(NotesLayoutSettings.listHeightRange.contains(CGFloat(NotesLayoutSettings.defaultListHeight)))
-        #expect(NotesLayoutSettings.stackedMinHeight == 647)
+        #expect(NotesLayoutSettings.stackedMinHeight == 487)
     }
 
     /// The VM's 612 pt window squeezed the stacked editor to 9 pt: the list must give way to the note first.
@@ -245,17 +246,18 @@ struct NotesAppSettingsTests {
         // Not measured yet: only the remembered value's own clamp applies.
         #expect(NotesLayoutSettings.stackedListHeight(stored: 300, paneHeight: 0) == 300)
         #expect(NotesLayoutSettings.stackedListRange(paneHeight: 0) == NotesLayoutSettings.listHeightRange)
-        // Going down, only the note's floor stops the list: a 1200 pt pane gives it 713, a 2400 pt one the ceiling.
+        // Going down, only the note's floor stops the list: a 1200 pt pane gives it 873, a 2400 pt one the ceiling.
         #expect(NotesLayoutSettings.stackedListHeight(stored: 440, paneHeight: 1200) == 440)
-        #expect(NotesLayoutSettings.stackedListHeight(stored: 900, paneHeight: 1200) == 713)
-        #expect(NotesLayoutSettings.stackedListRange(paneHeight: 1200) == 160...713)
+        #expect(NotesLayoutSettings.stackedListHeight(stored: 900, paneHeight: 1200) == 873)
+        #expect(NotesLayoutSettings.stackedListRange(paneHeight: 1200) == 160...873)
         #expect(NotesLayoutSettings.stackedListRange(paneHeight: 2400) == 160...1600)
-        // A 900 pt pane: the note keeps 480, the list gets what is left (413), never below its floor.
-        #expect(NotesLayoutSettings.stackedListHeight(stored: 300, paneHeight: 900) == 300)
-        #expect(NotesLayoutSettings.stackedListHeight(stored: 440, paneHeight: 900) == 413)
-        #expect(NotesLayoutSettings.stackedListRange(paneHeight: 900) == 160...413)
-        #expect(NotesLayoutSettings.stackedListHeight(stored: 300, paneHeight: 600) == 160)
-        #expect(NotesLayoutSettings.stackedListRange(paneHeight: 600) == 160...160)
+        // A 900 pt pane: the note keeps 320 (480 before its fields moved to the inspector, W40.notes-detail-layout),
+        // the list gets what is left (573), never below its floor.
+        #expect(NotesLayoutSettings.stackedListHeight(stored: 440, paneHeight: 900) == 440)
+        #expect(NotesLayoutSettings.stackedListHeight(stored: 700, paneHeight: 900) == 573)
+        #expect(NotesLayoutSettings.stackedListRange(paneHeight: 900) == 160...573)
+        #expect(NotesLayoutSettings.stackedListHeight(stored: 300, paneHeight: 450) == 160)
+        #expect(NotesLayoutSettings.stackedListRange(paneHeight: 450) == 160...160)
         // Whatever the pane, list + divider + note fit whenever the pane is at least the stacked minimum.
         for pane in stride(from: NotesLayoutSettings.stackedMinHeight, through: 1400, by: 37) {
             for stored in [0.0, 140, 160, 220, 240, 440, 900, 9000, .nan] {

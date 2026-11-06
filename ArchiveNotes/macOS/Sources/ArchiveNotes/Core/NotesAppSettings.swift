@@ -23,8 +23,10 @@ enum NotesLayoutSettingsKey {
     // legacy key (now read-only — it seeds a first-open per-window default).
     static let noteWindowHiddenColumns = "an.noteWindow.hiddenColumns"
     static let extractWindowHiddenColumns = "an.extractWindow.hiddenColumns"
-    /// The detail pane's metadata inspector folded away (W40.fix-notes-editor-squeezed), shared by both windows.
-    static let metadataCollapsed = "an.detail.metadataCollapsed"
+    /// The inspector panel at the window's right shown (W40.notes-detail-layout), shared by both windows.
+    static let showInspector = "an.showInspector"
+    /// The inspector panel's width (W40.notes-detail-layout).
+    static let inspectorWidth = "an.inspectorWidth"
     /// Side by side or list above note (W48.notes-stacked-layout), shared by both windows; a `NotesLayoutMode` raw value.
     static let layoutMode = "an.layoutMode"
     /// The item list's height in the stacked layout (W48.notes-stacked-layout).
@@ -40,21 +42,6 @@ enum NotesLayoutMode: String, CaseIterable, Sendable {
     var title: String { self == .stacked ? "List Above Note" : "Side by Side" }
 }
 
-/// How much of the detail pane's height the metadata inspector may take (W40.fix-notes-editor-squeezed).
-/// It used to be a flat 280 pt, which left the editor about 100 pt at the minimum window height.
-enum DetailPaneLayout {
-    /// The inspector's ceiling in a tall pane; it scrolls beyond this.
-    static let metadataCeiling: CGFloat = 280
-    /// Enough for its first section and the start of the next, so it never shrinks to a sliver.
-    static let metadataFloor: CGFloat = 90
-    /// Its share of the pane; the editor keeps well over half after the header and locations.
-    static let metadataShare: CGFloat = 0.25
-
-    static func metadataMaxHeight(paneHeight: CGFloat) -> CGFloat {
-        min(metadataCeiling, max(metadataFloor, paneHeight * metadataShare))
-    }
-}
-
 /// Resolved, validated Notes layout/window settings. A pure value type so the resolution logic is
 /// testable against a scratch `UserDefaults` without touching `.standard` (mirrors `ZoteroSettings`).
 ///
@@ -66,12 +53,16 @@ struct NotesLayoutSettings: Equatable, Sendable {
     var treeWidth: Double
     var detailWidth: Double
     var showTree: Bool
+    var showInspector: Bool
+    var inspectorWidth: Double
     var hiddenColumns: Set<String>
     var layoutMode: NotesLayoutMode
     var listHeight: Double
 
     static let defaultTreeWidth = 220.0,  treeWidthMin = 160.0,  treeWidthMax = 400.0
     static let defaultDetailWidth = 360.0, detailWidthMin = 260.0, detailWidthMax = 700.0
+    /// The inspector panel holding a note's fields and locations (W40.notes-detail-layout).
+    static let defaultInspectorWidth = 260.0, inspectorWidthMin = 220.0, inspectorWidthMax = 360.0
     /// The stacked list keeps its filter bar (three rows), header and a row: at 140 pt, before the list was clipped
     /// to its share, the bar spilled up under the toolbar in the VM's visual tour. The default shows about seven rows
     /// in a 900 pt window (at 240 pt it showed four or five, the filter bar taking most of it). The divider was
@@ -82,10 +73,10 @@ struct NotesLayoutSettings: Equatable, Sendable {
     /// The list pane's floor: its fixed filter controls need 527 pt in the VM; 540 keeps its minimum proposal
     /// in step with what it draws. The panes' layouts quote it instead of measuring the pane (see `StackedPanesLayout`).
     static let listMinWidth = 540.0
-    /// The note pane's floor in the stacked layout: its header, locations and details inspector, and an editor
-    /// still larger than the details (measured in the VM: at 313 pt the editor got 9, and at 440 an extract's got
-    /// 103 against 110 for its details). The list gives way first.
-    static let stackedDetailMinHeight = 480.0
+    /// The note pane's floor in the stacked layout: its header, the editor and the tag bar under it. It was 480 pt
+    /// while the locations and the details sat above the editor; they are in the inspector now
+    /// (W40.notes-detail-layout), so the list drags further down (notes-1, row 45). The list gives way first.
+    static let stackedDetailMinHeight = 320.0
     /// The divider's own thickness, between the list and the note.
     static let stackedDividerHeight = 7.0
     /// The stacked panes' minimum height: the list at its floor and the note at its.
@@ -96,6 +87,7 @@ struct NotesLayoutSettings: Equatable, Sendable {
     /// The divider clamp ranges, as `CGFloat` for `PanelDivider` (the layout's single source of truth).
     static var treeWidthRange: ClosedRange<CGFloat> { CGFloat(treeWidthMin)...CGFloat(treeWidthMax) }
     static var detailWidthRange: ClosedRange<CGFloat> { CGFloat(detailWidthMin)...CGFloat(detailWidthMax) }
+    static var inspectorWidthRange: ClosedRange<CGFloat> { CGFloat(inspectorWidthMin)...CGFloat(inspectorWidthMax) }
     static var listHeightRange: ClosedRange<CGFloat> { CGFloat(listHeightMin)...CGFloat(listHeightMax) }
 
     /// The stacked list height to lay out with: a stored value outside the divider's range, or not a number,
@@ -132,6 +124,9 @@ struct NotesLayoutSettings: Equatable, Sendable {
         detailWidth = min(Self.detailWidthMax, max(Self.detailWidthMin, dw))
 
         showTree = d.object(forKey: NotesLayoutSettingsKey.showTree) as? Bool ?? true
+        showInspector = d.object(forKey: NotesLayoutSettingsKey.showInspector) as? Bool ?? true
+        let iw = d.object(forKey: NotesLayoutSettingsKey.inspectorWidth) as? Double ?? Self.defaultInspectorWidth
+        inspectorWidth = min(Self.inspectorWidthMax, max(Self.inspectorWidthMin, iw))
         hiddenColumns = Set(d.stringArray(forKey: NotesLayoutSettingsKey.hiddenColumns) ?? [])
 
         layoutMode = d.string(forKey: NotesLayoutSettingsKey.layoutMode).flatMap(NotesLayoutMode.init(rawValue:))
