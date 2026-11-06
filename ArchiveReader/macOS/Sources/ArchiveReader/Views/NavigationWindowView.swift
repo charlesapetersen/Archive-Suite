@@ -299,7 +299,8 @@ struct NavigationWindowView: View {
                 .accessibilityIdentifier("ar.empty.clear.\(chip.accessibilityIdentifier)")
             }
             if chips.contains(where: { $0.facet != .smartFolder }) {
-                Button("Clear All Filters") { model.clearUserFilters() }
+                Button("Clear All") { model.clearUserFilters() }
+                    .help(model.clearAllHelp)
                     .accessibilityIdentifier("ar.empty.clearAll")
             }
         }
@@ -572,9 +573,9 @@ struct NavigationWindowView: View {
                 .help("Save these filters as a smart folder in the sidebar")
                 .accessibilityIdentifier("ar.filter.saveSmartFolder")
                 .filterBarTrailing()
-            Button("Clear") { model.clearUserFilters() }
+            Button("Clear All") { model.clearUserFilters() }
                 .fixedSize()
-                .help(model.scope != nil ? "Clear user filters (return to smart folder)" : "Clear all filters and searches")
+                .help(model.clearAllHelp)
                 .accessibilityIdentifier("ar.filter.clear")
                 .filterBarTrailing()
         }

@@ -507,7 +507,16 @@ final class NavigationModel: ObservableObject {
         if ftsRank == nil, sort.first?.field == .relevance { sort = LibrarySort.default }
     }
 
-    /// Reset user-applied filters to neutral (preserving the base scope). Both Clear sites call this.
+    /// Tooltip for every Clear All site: what `clearUserFilters` clears, and that a smart folder's own rules stay.
+    var clearAllHelp: String {
+        if let scope {
+            let base = scopeIsSaved ? "the smart folder \u{201C}\(scope.name)\u{201D}" : "the Advanced Search"
+            return "Clear every filter and search you added, returning to \(base)'s own rules"
+        }
+        return "Clear every filter and search. Each filter's \u{2715} clears just that one"
+    }
+
+    /// Reset user-applied filters to neutral (preserving the base scope). Every Clear All site calls this.
     func clearUserFilters(recompute doRecompute: Bool = true) {
         filter = LibraryFilter()
         filter.read = AppSettings.defaultReadFilter

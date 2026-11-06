@@ -144,7 +144,7 @@ plan's `## WORK QUEUE` (`ops/autonomous/next-queue-item.sh` walks only that).
   field with a hint and is never written. A two-state flag is a checkbox, not a Mark/Clear pair. The pattern:
   the Reader's Edit Info sheet (`TagEditorView`) and Notes' inspector (`NoteMetadataInspector`). Not covered:
   a sheet's or form's own confirm (OK, Add Model, Save ▸ a segment), and a command that resets a whole
-  filter or list (Clear All Filters, Clear History).
+  filter or list (Clear All, Clear History).
 
 ## Verification
 

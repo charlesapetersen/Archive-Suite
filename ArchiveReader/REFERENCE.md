@@ -273,7 +273,7 @@ writes against the real corpus — always a copy.
   (text-field-safe, like `Space`): `]`/`[` = next/previous unread, `\` = mark read & advance. All read-state
   mutation routes through `mark(.read)` → `TagWriter` (undoable); the next/previous math is pure (`TriageNavigation`).
 - `⌘⇧C` Copy Link(s) · `⌘⇧L` Copy Archive Link(s) · `⌘⇧R` Reveal in Finder · `⌘⇧O` Choose Archive Folder…
-- `⌘L` focus tag filter · `⌘F` or `⌘⌥F` Search OCR text (⌘F is Find… in the document window) · `⌘⇧K` Clear filters & search
+- `⌘L` focus tag filter · `⌘F` or `⌘⌥F` Search OCR text (⌘F is Find… in the document window) · `⌘⇧K` Clear All (every filter and search; inside a smart folder, back to its own rules). Each filter chip's ✕ and the OCR box's ✕ clear just that one
 - `⌃⌘S` Show/Hide Sidebar · `⌃⌘T` Show/Hide Tag Cloud (View menu, this window only). ⌃⌘S is the Mac's sidebar key;
   they were `⌥⌘S`/`⌥⌘T` until `W40.fix-suite-shortcuts`, and ⌥⌘T is the Mac's Show/Hide Toolbar
 - `⌘⌥R` Rescan Archive Folder · `⌘⌥J` Show JPEG/PDF Image (document window and preview)
@@ -405,7 +405,7 @@ The decisions are in CLAUDE.md §Decisions (authoritative). Original text:
   Results are **bm25 relevance-ranked** (name/classification/body column weights) and auto-refreshed when
   an index pass completes. The nav list auto-selects a `.relevance` sort during an active query.
 - **Smart folders are a scoped root** — selecting a saved search enters a base scope (the visible
-  universe); user filters layer on top (AND); Clear resets the user layer to neutral (back to the base
+  universe); user filters layer on top (AND); Clear All resets the user layer to neutral (back to the base
   set, not the whole root); selecting a folder / All Files exits the scope. Scope persists across
   relaunch. `LibraryFilter.effective(base:user:)` merges for Save/summary.
 

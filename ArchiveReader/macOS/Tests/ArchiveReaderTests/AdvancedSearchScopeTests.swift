@@ -44,6 +44,7 @@ final class AdvancedSearchScopeTests: XCTestCase {
         }
         model.clearUserFilters()
         try await waitFor(["a.pdf", "b.pdf", "c.pdf", "d.pdf"], "precondition: nothing filtered")
+        XCTAssertFalse(model.clearAllHelp.contains("own rules"), "outside a scope there are no folder rules to return to")
 
         // OCR text has "budget", and no text has "draft".
         var budget = SearchRule(field: .ocrText); budget.text = "budget"
@@ -65,6 +66,8 @@ final class AdvancedSearchScopeTests: XCTestCase {
         model.clearUserFilters()
         XCTAssertEqual(shown(), ["a.pdf"])
         XCTAssertEqual(model.sort.first?.field, .relevance, "Clear keeps the scope's relevance order")
+        XCTAssertTrue(model.clearAllHelp.contains("the Advanced Search's own rules"),
+                      "W40.fix-reader-clear-all: inside a scope, Clear All's tooltip says it returns to the scope's rules")
 
         // Saved with a filter-bar narrowing, then opened: the same rows.
         model.filter.subjects = ["press"]

@@ -183,7 +183,7 @@ struct ArchiveReaderCommands: Commands {
             Button("Sort by Flag") { nav?.sort = sortBy(.flag) }.disabled(nav == nil)
             Button("Sort by Needs Attention") { nav?.sort = sortBy(.attention) }.disabled(nav == nil)
             Divider()
-            Button("Clear Filters & Search") { nav?.clearUserFilters() }
+            Button("Clear All") { nav?.clearUserFilters() }
             .keyboardShortcut("k", modifiers: [.command, .shift])
             .disabled(nav == nil)
             Divider()

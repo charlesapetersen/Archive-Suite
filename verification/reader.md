@@ -202,7 +202,7 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
 - **Promised in:** `CLAUDE.md` §Architecture (navigation table), §Keyboard map; `SMOKE_TEST.md` step F.
 - **Reached by:** the `ar.filter.name` field (`Views/NavigationWindowView.swift:387`). A 150 ms debounce
   (`Views/NavigationModel.swift:165-171`) copies the text into `filter.searchText`. ⌘⇧K,
-  `ArchiveReaderCommands.swift:124`, and the filter-bar Clear button (`NavigationWindowView.swift:427`) both
+  `ArchiveReaderCommands.swift:124`, the filter-bar Clear All button (`ar.filter.clear`) and the empty state's Clear All both
   call `clearUserFilters` (`NavigationModel.swift:357`).
 - **Real-path test:** `ArchiveReaderUITests/NavigationUITests.testNameFilterReducesRows`;
   `ArchiveReaderTests/LibrarySortFilterTests.testFilenameSearch`. ⌘⇧K has no test.

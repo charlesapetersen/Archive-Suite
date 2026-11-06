@@ -150,7 +150,7 @@ final class VisualReviewUITests: FixtureUITestCase {
             name.typeText("zzzz-no-such-file")
             pause(1)
             shoot("filter-nomatch")
-            app.typeKey("k", modifierFlags: [.command, .shift])   // Clear Filters & Search
+            app.typeKey("k", modifierFlags: [.command, .shift])   // Clear All (filters and search)
             pause(1)
         } else { missing.append("name filter") }
 
