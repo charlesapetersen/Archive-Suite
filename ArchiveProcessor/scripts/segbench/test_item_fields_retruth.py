@@ -247,5 +247,66 @@ class SheetUpright(unittest.TestCase):
         self.assertNotIn("byline", got)
 
 
+def row(doc_id, part, truth, gemini=None, luna=None, disputed=(), unknown=None):
+    return {"id": doc_id, "part": part, **truth, "disputed": list(disputed), "unknown_fields": unknown,
+            "readers": {"gemini": gemini or dict(truth), "luna": luna or dict(truth)}}
+
+
+class RandomControls(unittest.TestCase):
+    def test_only_pairs_both_drafters_gave_and_in_scope(self):
+        art = reading(kind="newspaper article", title="Tax cut", byline=["A. Smith"])
+        rows = [row("a", "base", art),
+                row("b", "base", art, luna=reading(kind="newspaper article", title="Tax", byline=["A. Smith"]),
+                    disputed=["title"]),
+                row("c", "clippings", reading(kind="letter", recipient_place=["Boston"]),
+                    unknown=["title", "byline", "publication", "publication_date"])]
+        pop = R.agreed_pairs(rows)
+        self.assertEqual(sorted(f for (p, f), v in pop.items() if any(r["id"] == "a" for r in v)),
+                         ["byline", "kind", "publication", "publication_date", "title"])   # no recipient_place
+        self.assertNotIn("b", [r["id"] for r in pop["base", "title"]])                       # disputed
+        self.assertEqual(sorted(f for (p, f) in pop if p == "clippings"), ["kind", "recipient_place"])
+        self.assertNotIn(("clippings", "byline"), pop)                                         # out of scope
+
+    def test_a_kind_ruled_away_from_what_both_said_is_not_agreed(self):
+        # both read an article with a byline; the truth's kind became a memo, which empties the byline
+        r = row("a", "base", reading(kind="memo"), gemini=reading(kind="newspaper article", byline=["X"]),
+                luna=reading(kind="newspaper article", byline=["X"]), disputed=[])
+        self.assertNotIn(("base", "kind"), R.agreed_pairs([r]))
+
+    def test_quota_per_part_seeded_and_fields_take_turns(self):
+        rows = [row(f"{p}{i}", p, reading(kind="newspaper article", title=f"T{i}", publication="P",
+                                          byline=["B"], publication_date=[1990, 1]))
+                for p in ("base", "clippings", "handwritten") for i in range(30)]
+        quota = {"base": 8, "clippings": 6, "handwritten": 6}
+        _, a = R.random_controls(rows, random.Random(3), quota)
+        _, b = R.random_controls(rows, random.Random(3), quota)
+        self.assertEqual([(r["id"], f) for r, f in a], [(r["id"], f) for r, f in b])
+        self.assertEqual(len(a), 20)
+        self.assertEqual({p: sum(r["part"] == p for r, _ in a) for p in quota}, quota)
+        self.assertEqual({f for _, f in a}, {"kind", "title", "byline", "publication", "publication_date"})
+        self.assertEqual(len({(r["id"], f) for r, f in a}), 20)   # no pair twice
+
+    def test_a_small_part_takes_what_it_has(self):
+        rows = [row("h", "handwritten", reading(kind="letter"))]   # kind, title, publication, recipient_place
+        _, got = R.random_controls(rows, random.Random(1), {"handwritten": 6})
+        self.assertEqual(len(got), 4)
+
+
+class KeptIds(unittest.TestCase):
+    def test_appended_random_controls_pass_and_a_changed_question_does_not(self):
+        old = {"a:0": {"doc": "a", "part": "dispute", "field": "title", "options": ["gemini", "luna"]}}
+        with tempfile.TemporaryDirectory() as d:
+            p = os.path.join(d, "key.json")
+            json.dump({"items": old}, open(p, "w"))
+            new = {**old, "a:0": {**old["a:0"], "ignore": "out of scope"},
+                   "a:1": {"doc": "a", "part": "random", "field": "kind", "options": ["truth"]}}
+            self.assertEqual(R.changed_questions(p, new), [])
+            self.assertEqual(R.changed_questions(p, {**new, "a:0": {**old["a:0"], "field": "byline"}}), ["a:0"])
+            self.assertEqual(R.changed_questions(p, {"a:1": new["a:1"]}), ["a:0"])
+            self.assertEqual(R.changed_questions(p, {**new, "b:0": {"doc": "b", "part": "control", "field": "kind",
+                                                                    "options": ["truth"]}}), ["b:0"])
+            self.assertEqual(R.changed_questions(os.path.join(d, "none.json"), new), [])
+
+
 if __name__ == "__main__":
     unittest.main()

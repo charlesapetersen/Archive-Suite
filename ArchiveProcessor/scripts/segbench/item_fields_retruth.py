@@ -61,7 +61,13 @@ so a neighbour whose first page holds under 300 characters gives a shorter block
 The sheet (W47.item-fields-owner-ok): the kind conflicts; about SHEET_DISPUTES disputed fields, at least
 MIN_PER_FIELD a field and the rest weighted to the fields whose Gemini 3.8 precision against this draft truth is
 nearest the bar; CONTROLS agreed fields where Gemini 3.8's cached reply also agrees (the circularity a control
-must catch); ENTITY_CONTROLS W46.fix-ent-truth documents whose ruling Claude Sonnet made for its own draft. Every
+must catch, which measures 3.8's false credit); ENTITY_CONTROLS W46.fix-ent-truth documents whose ruling Claude
+Sonnet made for its own draft; and RANDOM_CONTROLS random agreed controls (measurement review pass 10, P10-1), a
+seeded draw over every in-scope pair whose truth is what both drafters said, with or without a value, a quota per
+part and the fields in turn, no route consulted and no document preferred, which measure the truth's own error.
+They were appended to the sheet as new ids while its answers were not exported, so answers saved in a browser keep
+theirs; write_sheet refuses any other change to a question already in key.json. Dispute questions on a field out
+of scope for the truth's kind carry "ignore" in the key and are not scored. Every
 choice is shown as two readings in random order, or one value to confirm; boxes from the Vision lines the values
 were quoted from, drawn for both readings so a box shows nothing about which is the truth.
 
@@ -112,6 +118,8 @@ JUDGE = "gemini"
 PRICE = {"gemini-3.7-flash": (0.75, 3.75), "gpt-5.6-luna": (0.20, 1.20)}
 BAR = 0.90
 SHEET_DISPUTES, MIN_PER_FIELD, MAX_PER_FIELD, CONTROLS, ENTITY_CONTROLS = 85, 8, 20, 30, 20
+# Random agreed controls per part (pass 10, P10-1): the small parts get more than their share so each has a few.
+RANDOM_CONTROLS, RANDOM_SEED = {"base": 8, "clippings": 6, "handwritten": 6}, 4749
 # Seconds an owner takes, an estimate from ocr_truth's review rates (10 s a page, 6 s a span, 30 s for the 15% typed):
 # a document's pages looked over once, then each question, slower than a span because the field has to be found.
 SECONDS_PER_DOC, SECONDS_PER_ITEM = 20, 12
@@ -886,7 +894,68 @@ def cmd_sheet_items(rows, docs, rng):
                     {"text": nm(y.get(f)), "quote": qt(y.get(f)), "src": "claude"}]
             rng.shuffle(opts)
             add(e["id"], "entity", f, opts, {"truth": nm(e.get(f)), "luna": nm(x.get(f)), "claude": nm(y.get(f))})
+    # 5. random agreed controls: the truth's own error, drawn with no route consulted (pass 10, P10-1)
+    pop, picks = random_controls(rows, random.Random(RANDOM_SEED))
+    asked = {(keyed[x["id"]]["doc"], x["field"]): x["id"] for v in items.values() for x in v}
+    for r, f in picks:
+        meta = {"truth": shown(f, r[f]), "filled": IF.filled(f, r[f]), "stratum": [r["part"], f],
+                "stratum_pairs": len(pop[r["part"], f])}
+        if (r["id"], f) in asked:   # already a question: its answer serves, the field is not asked twice
+            keyed[f"{r['id']}:random-{f}"] = {"doc": r["id"], "part": "random", "field": f,
+                                              "same_as": asked[r["id"], f], **meta}
+            continue
+        add(r["id"], "random", f, [{"text": shown(f, r[f]), "quote": (r["quotes"] or {}).get(f), "src": "truth"}],
+            meta)
+    # dispute items on a field the truth's kind does not have: kept on the sheet (their ids stay), not scored
+    for n, k in keyed.items():
+        ks = IF.SCOPE[k["field"]] if k["part"] == "dispute" else None
+        if ks is not None and truth[k["doc"]]["kind"] not in ks:
+            k["ignore"] = f"{k['field']} is out of scope for the truth's kind ({truth[k['doc']]['kind']})"
     return items, keyed, prec, {f: len(v) for f, v in cand.items()}, q, len(sided)
+
+
+def tup(f, v):
+    return tuple(v) if f == "publication_date" and v else v
+
+
+def agreed_pairs(rows):
+    """{(part, field): [row, ...]}: every in-scope (document, field) pair whose truth is what both drafters said,
+    with or without a value. Scope is the truth's kind's (item_fields.SCOPE); a field the W46 kind left unknown is
+    out. No route's reading is consulted."""
+    pop = collections.defaultdict(list)
+    for r in rows:
+        for f in IF.FIELDS:
+            ks = IF.SCOPE[f]
+            if (ks is not None and r["kind"] not in ks) or f in r.get("disputed", []) \
+                    or f in (r.get("unknown_fields") or []):
+                continue
+            if all(rd and IF.agree(f, tup(f, r[f]), tup(f, rd.get(f)))
+                   for rd in (r["readers"]["gemini"], r["readers"]["luna"])):
+                pop[r["part"], f].append(r)
+    return pop
+
+
+def random_controls(rows, rng, quota=None):
+    """(population, [(row, field), ...]): RANDOM_CONTROLS agreed pairs, a quota per part; within a part the fields
+    take turns in one seeded order that carries on from part to part (so every field is drawn somewhere), and each
+    pick is a uniform draw from its (part, field) stratum. A stratum's size is kept with each pick, so the score item
+    can weight the error back to the whole population."""
+    pop = agreed_pairs(rows)
+    order = list(IF.FIELDS)
+    rng.shuffle(order)
+    picks, k, used = [], 0, set()
+    for part, n in (quota or RANDOM_CONTROLS).items():
+        for _ in range(n):
+            for _step in range(len(order)):
+                f = order[k % len(order)]
+                k += 1
+                left = [r for r in pop[part, f] if (r["id"], f) not in used]
+                if left:
+                    r = rng.choice(sorted(left, key=lambda r: r["id"]))
+                    used.add((r["id"], f))
+                    picks.append((r, f))
+                    break
+    return pop, picks
 
 
 ORIENT = os.path.join(CACHE, "sheet-orient.tsv")   # ocr_orient.swift over send/: Vision's score at each turn
@@ -920,6 +989,38 @@ def display_turns(path=ORIENT, eye=ORIENT_EYE):
     return {k: v for k, v in turns.items() if v}
 
 
+TALL_SHARE, TALL_RATIO, TALL_MIN_LINES = 0.8, 1.5, 5   # a page read sideways: most Vision lines taller than wide
+
+
+def image_size(path):
+    out = subprocess.run(["sips", "-g", "pixelWidth", "-g", "pixelHeight", path], capture_output=True, text=True).stdout
+    v = dict(re.findall(r"pixel(Width|Height):\s*(\d+)", out))
+    return int(v.get("Width", 0)), int(v.get("Height", 0))
+
+
+def sideways_pages(docs, turns=None):
+    """[{doc, part, page, how}] for the pages the drafters read as sent while not upright: a turn the sheet shows
+    (ocr_orient.swift's scores or the eye file, a51cc0ef), or Vision's lines mostly tall on the sent copy, which a
+    sideways page gives and an upside-down one does not. The readings on them were not rerun."""
+    turns = display_turns() if turns is None else turns
+    out = []
+    for d in docs:
+        for p in capped(d["pages"]):
+            how = None
+            if turns.get(key(p)):
+                how = f"turned {turns[key(p)]} degrees for the sheet"
+            else:
+                ls = page_lines(p) or []
+                if len(ls) >= TALL_MIN_LINES and os.path.exists(send_path(p)):
+                    w, h = image_size(send_path(p))
+                    tall = sum(x["box"][3] * h > TALL_RATIO * x["box"][2] * w for x in ls)
+                    if tall >= TALL_SHARE * len(ls):
+                        how = f"lines taller than wide ({tall} of {len(ls)}), not turned"
+            if how:
+                out.append({"doc": d["id"], "part": d["part"], "page": key(p), "how": how})
+    return out
+
+
 def turn_box(b, deg):
     """A normalised top-left [x, y, w, h] box on an image turned `deg` degrees clockwise."""
     x, y, w, h = b
@@ -951,6 +1052,10 @@ def write_sheet(items, keyed, docs, rows=None, turns=None):
     if os.path.exists(os.path.join(out, "answers.json")):
         print(f"{out} is answered: sheet and key left as they are", file=sys.stderr)
         return False
+    bad = changed_questions(os.path.join(out, "key.json"), keyed)
+    if bad:
+        sys.exit(f"{len(bad)} questions would change or go ({', '.join(bad[:5])}): answers saved in a browser are kept "
+                 "by id, so the sheet is not rewritten")
     os.makedirs(out, exist_ok=True)
     by_id = {d["id"]: d for d in docs}
     truth = {r["id"]: r for r in rows or []}
@@ -985,6 +1090,21 @@ def write_sheet(items, keyed, docs, rows=None, turns=None):
     return True
 
 
+ASKED = ("doc", "part", "field", "options")   # what a question is; other key fields are notes for the scoring
+
+
+def changed_questions(path, keyed):
+    """Ids whose question the new key changes or drops, and new ids that are not random controls: [] when every
+    answer saved under the old key still answers the same question (the random controls are appended)."""
+    if not os.path.exists(path):
+        return []
+    with open(path, encoding="utf-8") as fh:
+        old = json.load(fh)["items"]
+    new = json.loads(json.dumps(keyed))
+    bad = [n for n, k in old.items() if n not in new or any(new[n].get(x) != k.get(x) for x in ASKED)]
+    return bad + [n for n, k in new.items() if n not in old and k["part"] != "random"]
+
+
 def script_json(v):
     """JSON safe inside a <script> element: a "</" in a reading would otherwise end the script."""
     return json.dumps(v, ensure_ascii=False).replace("</", "<\\/")
@@ -1017,7 +1137,8 @@ header{position:sticky;top:0;background:#fff;border-bottom:1px solid #ccc;paddin
 <header><b>Item-field check</b> — __N__ questions on __DOCS__ documents, about __MINUTES__ minutes. Each question shows
 one or more readings of a field; which source each came from is not shown. Pick the one the pages show.
 Keys: <b>1</b>-<b>5</b> pick that reading · <b>0</b> none of them (type it; empty = the field is empty) ·
-<b>9</b> can't tell · <b>n/p</b> next/previous · <b>z</b> zoom. A reading offered alone: <b>1</b> right, <b>0</b> wrong.
+<b>9</b> can't tell · <b>n/p</b> next/previous · <b>z</b> zoom. A reading offered alone: <b>1</b> right, <b>0</b> wrong
+(offered as <i>(empty)</i>, <b>1</b> means the pages show no such thing, <b>0</b> that they do: type it).
 The grey line lists the fields not asked on that document (both readers agreed, or Gemini ruled), with what goes
 into the truth; the notes box under each document is for one that is wrong, or anything the fields miss. Pages
 photographed sideways or upside down are shown turned upright where a check found them; "turn page" turns any
@@ -1077,14 +1198,12 @@ prog();go(0);
 # --- the report -------------------------------------------------------------------------------------------------
 
 def cmd_sheet(a):
-    """Rewrite the unanswered sheet from truth.jsonl as it stands: no reader runs. The questions must come out the
-    same as key.json's (same seed, same truth), so answers already saved in the browser keep their ids."""
+    """Rewrite the unanswered sheet from truth.jsonl as it stands: no reader runs. Every question in key.json must
+    come out the same (same seed, same truth), so answers already saved in the browser keep their ids; the only
+    new ones allowed are random controls (write_sheet checks it, for build too)."""
     docs = load_docs()
     rows = [json.loads(x) for x in open(os.path.join(CACHE, "truth.jsonl"), encoding="utf-8")]
     items, keyed, *_ = cmd_sheet_items(rows, docs, random.Random(SEED))
-    old = os.path.join(CACHE, "sheet", "key.json")
-    if os.path.exists(old) and json.loads(json.dumps(keyed)) != json.load(open(old, encoding="utf-8"))["items"]:
-        sys.exit("the questions differ from key.json: not rewritten (rerun build instead)")
     if write_sheet(items, keyed, docs, rows):
         print(os.path.join(CACHE, "sheet", "index.html"), f"({sum(1 for v in display_turns().values() if v)} pages "
               "turned upright in the cache's orientation scores)")
@@ -1143,7 +1262,17 @@ def cmd_build(a):
                   "boxed_options": sum(bool(o["boxes"]) for v in items.values() for x in v for o in x["options"]
                                        if o["text"] and x["field"] != "kind"),
                   "options_with_text": sum(1 for v in items.values() for x in v for o in x["options"]
-                                           if o["text"] and x["field"] != "kind"), "written": wrote},
+                                           if o["text"] and x["field"] != "kind"), "written": wrote,
+                  "ignored_disputes": sorted(f"{k['field']} ({k['ignore'].split('(')[-1].rstrip(')')})"
+                                             for k in keyed.values() if k.get("ignore"))},
+        "random": {"population": {f"{p}/{f}": [sum(IF.filled(f, r[f]) for r in v), sum(not IF.filled(f, r[f])
+                                                                                     for r in v)]
+                                  for (p, f), v in sorted(agreed_pairs(rows).items())},
+                   "picks": [{"part": k["stratum"][0], "field": k["field"], "filled": k["filled"],
+                              "on_the_sheet_already": bool(k.get("same_as"))}
+                             for k in keyed.values() if k["part"] == "random"],
+                   "new_documents": sum(all(x["part"] == "random" for x in v) for v in items.values())},
+        "sideways": sideways_pages(docs),
         "spend": {stage: G.billed([c for c in calls if c["stage"] == stage])
                   for stage in sorted({c["stage"] for c in calls})},
         "spend_total": G.billed(calls), "http_errors": sum(c["http"] != 200 for c in calls),
@@ -1161,7 +1290,9 @@ def f2(x):
 
 def report(o):
     c = o["counts"]
-    s, sh = c["select"], c["sheet"]
+    s, sh, rc = c["select"], c["sheet"], c["random"]
+    n_pop = sum(a + b for a, b in rc["population"].values())
+    pop_filled = sum(a for a, _ in rc["population"].values())
     parts = ("base", "clippings", "handwritten")
     L = ["# Item fields, re-truthed through the gateway, and the owner sheet (W47.item-fields-retruth)", "",
          "Generated by `scripts/segbench/item_fields_retruth.py build`; method in its header. The labels, the readings "
@@ -1227,10 +1358,32 @@ def report(o):
           "score); quotas " + ", ".join(f"{f} {sh['disputes_quota'].get(f, 0)} of {n}"
                                         for f, n in sh["disputes_available"].items()) + ". "
           f"Controls: {CONTROLS} agreed fields where Gemini 3.8 also agrees with the truth, the case a shared error "
-          f"would hide. Entity controls: {ENTITY_CONTROLS} of the {sh['entity_sonnet_sided']} W46.fix-ent-truth "
+          "would hide; they measure Gemini 3.8's false credit, not the truth's error (3.8 answered base documents "
+          "only and never fills a title, and no agreed-empty field can be one). "
+          f"Random controls: {len(rc['picks'])} agreed (document, field) pairs drawn at random with no route "
+          f"consulted and no preference for documents already on the sheet, from the {n_pop} in-scope pairs whose "
+          f"truth is what both drafters said ({pop_filled} with a value, {n_pop - pop_filled} agreed empty), "
+          f"a quota per part ({', '.join(f'{p} {n}' for p, n in RANDOM_CONTROLS.items())}) and the fields in turn "
+          f"within it: {sum(x['filled'] for x in rc['picks'])} with a value and "
+          f"{sum(not x['filled'] for x in rc['picks'])} empty, over the fields "
+          + ", ".join(f"{f} {n}" for f, n in collections.Counter(x["field"] for x in rc["picks"]).items())
+          + f"; {sum(x['on_the_sheet_already'] for x in rc['picks'])} fell on a question already asked, whose "
+          f"answer serves, and {rc['new_documents']} documents are new to the sheet. They measure the truth's own "
+          "error, each weighted by its (part, field) stratum's size (seeded draw, `RANDOM_SEED`; appended to the "
+          "sheet as new ids, so answers already saved keep theirs). "
+          f"Entity controls: {ENTITY_CONTROLS} of the {sh['entity_sonnet_sided']} W46.fix-ent-truth "
           "documents whose ruling Claude Sonnet made for its own draft. Every choice is offered blind (readings in a "
           f"random order, or one value to confirm). {sh['boxed_options']} of {sh['options_with_text']} readings "
-          "carry a box from the Vision line they were quoted from.", "",
+          "carry a box from the Vision line they were quoted from. "
+          f"{len(sh['ignored_disputes'])} dispute questions ask a field out of scope for the truth's kind ("
+          + ", ".join(sh["ignored_disputes"]) + "): they stay on the sheet and are not scored.", "",
+          "## Pages read sideways or upside down", "",
+          "The drafters read each page as it was sent, and a few were sent sideways or upside down (a51cc0ef turned "
+          "them for the sheet only; the readings were not rerun). W47.item-fields-retruth-score reports these "
+          "documents apart. Page and document ids are the cache's own.", "",
+          "| document | part | page | found by |", "|---|---|---|---|"]
+    L += [f"| {x['doc']} | {x['part']} | {x['page']} | {x['how']} |" for x in c["sideways"]]
+    L += ["",
           "## Spend", "",
           f"${c['spend_total']['charged']:.2f} charged against the ${o['settings']['cap']:.2f} cap over "
           f"{c['spend_total']['calls']} calls ({c['http_errors']} not answered); estimate at ceiling prices "
@@ -1239,9 +1392,10 @@ def report(o):
           "## Measurement card", "",
           "- **Truth:** drafted by Gemini 3.7 Flash and GPT 5.6 Luna, ruled by Gemini 3.7 where they differ; W46's "
           "ruling for correspondence kind. Stronger than the routes the old truth judged, but model-made and not yet "
-          "owner-checked: its error is measured from the sheet's controls in the score item. Gemini 3.7 is both a "
-          "drafter and the judge and is the family of the app's cloud route, so its rows lean its way until the "
-          "owner's answers are folded in; Luna's family is not a scored route.",
+          "owner-checked: its own error is measured in the score item from the random controls (by part where n "
+          "allows), while the 30 controls drawn where Gemini 3.8 agrees measure 3.8's false credit and are reported "
+          "apart. Gemini 3.7 is both a drafter and the judge and is the family of the app's cloud route, so its rows "
+          "lean its way until the owner's answers are folded in; Luna's family is not a scored route.",
           "- **Selection:** base by Gemini 3.8's format and ABBYY cues (inherited, FLD-3); clippings and handwritten "
           "by the owner's own tags, no route and no ABBYY text. The handwritten part is two collections.",
           "- **Comparison:** not made here. Every route is scored on the same documents in the score item, the app's "

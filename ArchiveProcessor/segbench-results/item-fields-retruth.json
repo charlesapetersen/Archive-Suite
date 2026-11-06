@@ -139,6 +139,197 @@
    "rejected_pairs": 6,
    "turned": 102
   },
+  "random": {
+   "new_documents": 14,
+   "picks": [
+    {
+     "field": "byline",
+     "filled": true,
+     "on_the_sheet_already": false,
+     "part": "base"
+    },
+    {
+     "field": "publication_date",
+     "filled": false,
+     "on_the_sheet_already": false,
+     "part": "base"
+    },
+    {
+     "field": "recipient_place",
+     "filled": false,
+     "on_the_sheet_already": false,
+     "part": "base"
+    },
+    {
+     "field": "title",
+     "filled": false,
+     "on_the_sheet_already": false,
+     "part": "base"
+    },
+    {
+     "field": "kind",
+     "filled": true,
+     "on_the_sheet_already": false,
+     "part": "base"
+    },
+    {
+     "field": "publication",
+     "filled": false,
+     "on_the_sheet_already": false,
+     "part": "base"
+    },
+    {
+     "field": "byline",
+     "filled": true,
+     "on_the_sheet_already": true,
+     "part": "base"
+    },
+    {
+     "field": "publication_date",
+     "filled": false,
+     "on_the_sheet_already": false,
+     "part": "base"
+    },
+    {
+     "field": "recipient_place",
+     "filled": true,
+     "on_the_sheet_already": false,
+     "part": "clippings"
+    },
+    {
+     "field": "title",
+     "filled": true,
+     "on_the_sheet_already": false,
+     "part": "clippings"
+    },
+    {
+     "field": "kind",
+     "filled": true,
+     "on_the_sheet_already": false,
+     "part": "clippings"
+    },
+    {
+     "field": "publication",
+     "filled": true,
+     "on_the_sheet_already": false,
+     "part": "clippings"
+    },
+    {
+     "field": "byline",
+     "filled": true,
+     "on_the_sheet_already": false,
+     "part": "clippings"
+    },
+    {
+     "field": "publication_date",
+     "filled": true,
+     "on_the_sheet_already": false,
+     "part": "clippings"
+    },
+    {
+     "field": "recipient_place",
+     "filled": false,
+     "on_the_sheet_already": false,
+     "part": "handwritten"
+    },
+    {
+     "field": "title",
+     "filled": false,
+     "on_the_sheet_already": false,
+     "part": "handwritten"
+    },
+    {
+     "field": "kind",
+     "filled": true,
+     "on_the_sheet_already": false,
+     "part": "handwritten"
+    },
+    {
+     "field": "publication",
+     "filled": false,
+     "on_the_sheet_already": false,
+     "part": "handwritten"
+    },
+    {
+     "field": "recipient_place",
+     "filled": false,
+     "on_the_sheet_already": false,
+     "part": "handwritten"
+    },
+    {
+     "field": "title",
+     "filled": false,
+     "on_the_sheet_already": false,
+     "part": "handwritten"
+    }
+   ],
+   "population": {
+    "base/byline": [
+     37,
+     19
+    ],
+    "base/kind": [
+     183,
+     0
+    ],
+    "base/publication": [
+     31,
+     176
+    ],
+    "base/publication_date": [
+     33,
+     26
+    ],
+    "base/recipient_place": [
+     49,
+     78
+    ],
+    "base/title": [
+     77,
+     109
+    ],
+    "clippings/byline": [
+     35,
+     14
+    ],
+    "clippings/kind": [
+     44,
+     0
+    ],
+    "clippings/publication": [
+     45,
+     7
+    ],
+    "clippings/publication_date": [
+     43,
+     8
+    ],
+    "clippings/recipient_place": [
+     1,
+     1
+    ],
+    "clippings/title": [
+     41,
+     3
+    ],
+    "handwritten/kind": [
+     20,
+     0
+    ],
+    "handwritten/publication": [
+     0,
+     20
+    ],
+    "handwritten/recipient_place": [
+     1,
+     10
+    ],
+    "handwritten/title": [
+     1,
+     17
+    ]
+   }
+  },
   "select": {
    "base": 219,
    "clippings candidates": 1162,
@@ -153,12 +344,13 @@
    "pages read": 627
   },
   "sheet": {
-   "boxed_options": 117,
+   "boxed_options": 123,
    "by_part": {
     "control": 30,
     "dispute": 85,
     "entity": 23,
-    "kind": 16
+    "kind": 16,
+    "random": 19
    },
    "disputes_available": {
     "byline": 24,
@@ -176,11 +368,17 @@
     "recipient_place": 12,
     "title": 20
    },
-   "documents": 103,
+   "documents": 117,
    "entity_sonnet_sided": 51,
-   "items": 154,
-   "minutes": 65,
-   "options_with_text": 153,
+   "ignored_disputes": [
+    "byline (letter)",
+    "byline (other)",
+    "byline (other)",
+    "byline (other)"
+   ],
+   "items": 173,
+   "minutes": 74,
+   "options_with_text": 159,
    "prelim_gemini38": {
     "byline": {
      "filled": 38,
@@ -220,6 +418,44 @@
    "luna": 36,
    "mixed": 4
   },
+  "sideways": [
+   {
+    "doc": "3346174052bedbd7",
+    "how": "turned 270 degrees for the sheet",
+    "page": "3346174052bedbd7",
+    "part": "base"
+   },
+   {
+    "doc": "7de26cdabe6ac6c0",
+    "how": "turned 90 degrees for the sheet",
+    "page": "06612ba17e727b51",
+    "part": "base"
+   },
+   {
+    "doc": "c6cf1c2727ff7163",
+    "how": "turned 90 degrees for the sheet",
+    "page": "10ae6d13cb3f2fe2",
+    "part": "base"
+   },
+   {
+    "doc": "8c5be79fd1c75ee7",
+    "how": "turned 90 degrees for the sheet",
+    "page": "8c5be79fd1c75ee7",
+    "part": "base"
+   },
+   {
+    "doc": "8c5be79fd1c75ee7",
+    "how": "turned 90 degrees for the sheet",
+    "page": "4372186e79774909",
+    "part": "base"
+   },
+   {
+    "doc": "c6738dd8fd5b47fa",
+    "how": "lines taller than wide (28 of 28), not turned",
+    "page": "c6738dd8fd5b47fa",
+    "part": "handwritten"
+   }
+  ],
   "spend": {
    "adjudicated": {
     "calls": 113,

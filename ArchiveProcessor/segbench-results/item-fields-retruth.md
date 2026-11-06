@@ -52,7 +52,20 @@ The app's tagging prompt on the Vision text, nearby block from the neighbours' V
 
 ## The owner sheet (W47.item-fields-owner-ok)
 
-154 questions on 103 documents, about 65 minutes: control 30, dispute 85, entity 23, kind 16. Kind: every document whose kind crossed W46's correspondence ruling, now or in the old truth (14 of them in the old one). Disputed fields: at least 8 a field, the rest of 85 weighted to the fields where Gemini 3.8's cached reply sits nearest the 0.90 bar against this draft truth (kind 0.88, title -, byline 0.68, publication 0.65, publication_date 0.32, recipient_place 0.67; a weighting only, not a score); quotas recipient_place 12 of 17, title 20 of 48, byline 13 of 24, publication 12 of 18, publication_date 8 of 15, kind 20 of 43. Controls: 30 agreed fields where Gemini 3.8 also agrees with the truth, the case a shared error would hide. Entity controls: 20 of the 51 W46.fix-ent-truth documents whose ruling Claude Sonnet made for its own draft. Every choice is offered blind (readings in a random order, or one value to confirm). 117 of 153 readings carry a box from the Vision line they were quoted from.
+173 questions on 117 documents, about 74 minutes: control 30, dispute 85, entity 23, kind 16, random 19. Kind: every document whose kind crossed W46's correspondence ruling, now or in the old truth (14 of them in the old one). Disputed fields: at least 8 a field, the rest of 85 weighted to the fields where Gemini 3.8's cached reply sits nearest the 0.90 bar against this draft truth (kind 0.88, title -, byline 0.68, publication 0.65, publication_date 0.32, recipient_place 0.67; a weighting only, not a score); quotas recipient_place 12 of 17, title 20 of 48, byline 13 of 24, publication 12 of 18, publication_date 8 of 15, kind 20 of 43. Controls: 30 agreed fields where Gemini 3.8 also agrees with the truth, the case a shared error would hide; they measure Gemini 3.8's false credit, not the truth's error (3.8 answered base documents only and never fills a title, and no agreed-empty field can be one). Random controls: 20 agreed (document, field) pairs drawn at random with no route consulted and no preference for documents already on the sheet, from the 1129 in-scope pairs whose truth is what both drafters said (641 with a value, 488 agreed empty), a quota per part (base 8, clippings 6, handwritten 6) and the fields in turn within it: 10 with a value and 10 empty, over the fields byline 3, publication_date 3, recipient_place 4, title 4, kind 3, publication 3; 1 fell on a question already asked, whose answer serves, and 14 documents are new to the sheet. They measure the truth's own error, each weighted by its (part, field) stratum's size (seeded draw, `RANDOM_SEED`; appended to the sheet as new ids, so answers already saved keep theirs). Entity controls: 20 of the 51 W46.fix-ent-truth documents whose ruling Claude Sonnet made for its own draft. Every choice is offered blind (readings in a random order, or one value to confirm). 123 of 159 readings carry a box from the Vision line they were quoted from. 4 dispute questions ask a field out of scope for the truth's kind (byline (letter), byline (other), byline (other), byline (other)): they stay on the sheet and are not scored.
+
+## Pages read sideways or upside down
+
+The drafters read each page as it was sent, and a few were sent sideways or upside down (a51cc0ef turned them for the sheet only; the readings were not rerun). W47.item-fields-retruth-score reports these documents apart. Page and document ids are the cache's own.
+
+| document | part | page | found by |
+|---|---|---|---|
+| 3346174052bedbd7 | base | 3346174052bedbd7 | turned 270 degrees for the sheet |
+| 7de26cdabe6ac6c0 | base | 06612ba17e727b51 | turned 90 degrees for the sheet |
+| c6cf1c2727ff7163 | base | 10ae6d13cb3f2fe2 | turned 90 degrees for the sheet |
+| 8c5be79fd1c75ee7 | base | 8c5be79fd1c75ee7 | turned 90 degrees for the sheet |
+| 8c5be79fd1c75ee7 | base | 4372186e79774909 | turned 90 degrees for the sheet |
+| c6738dd8fd5b47fa | handwritten | c6738dd8fd5b47fa | lines taller than wide (28 of 28), not turned |
 
 ## Spend
 
@@ -60,7 +73,7 @@ $2.99 charged against the $5.30 cap over 1010 calls (0 not answered); estimate a
 
 ## Measurement card
 
-- **Truth:** drafted by Gemini 3.7 Flash and GPT 5.6 Luna, ruled by Gemini 3.7 where they differ; W46's ruling for correspondence kind. Stronger than the routes the old truth judged, but model-made and not yet owner-checked: its error is measured from the sheet's controls in the score item. Gemini 3.7 is both a drafter and the judge and is the family of the app's cloud route, so its rows lean its way until the owner's answers are folded in; Luna's family is not a scored route.
+- **Truth:** drafted by Gemini 3.7 Flash and GPT 5.6 Luna, ruled by Gemini 3.7 where they differ; W46's ruling for correspondence kind. Stronger than the routes the old truth judged, but model-made and not yet owner-checked: its own error is measured in the score item from the random controls (by part where n allows), while the 30 controls drawn where Gemini 3.8 agrees measure 3.8's false credit and are reported apart. Gemini 3.7 is both a drafter and the judge and is the family of the app's cloud route, so its rows lean its way until the owner's answers are folded in; Luna's family is not a scored route.
 - **Selection:** base by Gemini 3.8's format and ABBYY cues (inherited, FLD-3); clippings and handwritten by the owner's own tags, no route and no ABBYY text. The handwritten part is two collections.
 - **Comparison:** not made here. Every route is scored on the same documents in the score item, the app's call on the same Vision text the drafters read.
 - **Noise:** no rerun here; the score item reports Wilson intervals and the controls' error.
