@@ -715,7 +715,7 @@ def norm(field, v):
         m = CONTAINER.search(s)
         if m:
             kind = {"vol": "volume"}.get(m.group(1).lower(), re.sub(r"\s+", "", m.group(1).lower()))
-            return f"{kind} {m.group(2).lower()}"
+            return f"{kind} {re.sub(r'^0+(?=[0-9])', '', m.group(2).lower())}"
         bare = re.fullmatch(r"\s*(?:no\.?|#)?\s*(\d+[a-z]?)\s*", s)
         if bare:  # a bare number is read as a box, the usual container
             return f"box {bare.group(1)}"
@@ -997,7 +997,8 @@ def canon(field, v):
     m = CONTAINER.search(v)
     if m:
         kind = {"vol": "volume"}.get(m.group(1).lower(), re.sub(r"\s+", " ", m.group(1).lower()))
-        return f"{kind.capitalize()} {m.group(2).upper() if m.group(2)[-1:].isalpha() else m.group(2)}"
+        num = re.sub(r"^0+(?=\d)", "", m.group(2))   # "Box 9", not "Box 09" (owner, 2026-11-05)
+        return f"{kind.capitalize()} {num.upper() if num[-1:].isalpha() else num}"
     bare = re.fullmatch(r"\s*(?:no\.?|#)?\s*(\d+[a-z]?)\s*", v, re.I)
     return f"Box {bare.group(1)}" if bare else v
 
@@ -1398,6 +1399,669 @@ def write_rev_results(rows, st):
         fh.write("\n".join(L))
 
 
+# --- the final truth (W47.ct-truth-final, from the owner's second-sheet answers and notes of 2026-11-05) ------------
+# `ct_truth.py --final <command>` works in pool-jpeg/final/: `upright` (the photos read at the wrong turn, at the
+# owner's turn, checked by Gemini), `render`, `lines`, `collect`, `gateway` (the three readers on those photos only),
+# `finish` (final/truth.jsonl, the third sheet, segbench-results/ct-truth-final.md) and `fold ANSWERS.json`.
+
+FINAL = os.path.join(POOL, "final")
+FINAL_RESULTS = os.path.join(HERE, "..", "..", "segbench-results", "ct-truth-final.md")
+FINAL_NOTES = os.path.join(FINAL, "note-rulings.json")   # values the second sheet's notes give (private)
+REV_ANSWERS = os.path.join(REV, "answers-owner-20261105.json")
+FINAL_CAP = 0.50   # the item's gateway spend, the upright check and the readers together; under the $7 rule
+FIELDS_FINAL = [f for f in FIELDS_REV if f != "place"]   # "I don't think Place is a relevant field for boxes and folders"
+DROPPED_FINAL = {"aad3358690bb": "\"exclude this from training\"", "6756d60908a3": "\"exclude this from training\"",
+                 "1dac6accbfb7": "\"very unusual\"", "ee7bd7e7d59f": "\"just a document\""}
+CARRY = ("a3d642a470d9", "a2c277485aa5", "6446f85e887f", "4dcb24712d18", "6ad51db0c192")  # "Fill in per last few boxes"
+CARRY_FROM = 4   # the last few: the four box photos before it on the sheet, in its directory
+CUT_NOTES = {"e05ca8dcd0d4": "folder_title", "4691dd8b79b9": "folder_title", "13fb82409b02": "folder_title",
+             "fb9626e4077a": "folder_title"}   # "the title should not simply be provided as the cut off text"
+ILLEGIBLE = {"fb9626e4077a": ["folder_title"]}   # "cut off and illegible"
+ILLEGIBLE_PHOTO = {"532774989cd1"}   # "blurred and can't be read ... crucial information for the user"
+UNLABELLED = {"4a9f2210cb6d"}   # "a folder with no label ... an untitled and unnumbered folder"
+TURN_NOTES = {"6034e86e328f": 90, "556fdc267d90": None}   # further PIL turn (anticlockwise); None: no direction given
+# Internal marks (the owner's notes on seven photos and more): text beside a serial number, "Archival Media", location
+# notes, the archive's logos, barcodes and notes about the box itself are not identifying marks.
+INTERNAL = re.compile(r"archival\s+media|acid[\s-]*free|\bbar\s*code\b|^\s*(shelf\s+)?location\b|\bCHF\b|\blogo\b", re.I)
+LOCATION_MARK = re.compile(r"^\s*\d{2,3}-[A-Z]-\d+\s*$")   # a shelf mark such as "40-E-5"
+BARCODE = re.compile(r"^\s*\d(?:\s?\d){9,}\s*$")           # ten or more digits, a library barcode's number
+OWNER_FINAL = ("sheet", "note", "sheet2", "note2", "sheet3")   # the owner's own answers; "rule" is reported apart
+PROMPT_FINAL = (PROMPT_REV
+                .replace(" \"place\": the city or state of the repository, if written,\n", "")
+                .replace("e.g. a shelf or location mark \"40-E-5\" or an unlabelled number \"84-044\"",
+                         "e.g. an unlabelled number \"84-044\"")
+                .replace("- A title cut off by the edge of the photo or hidden ends with \"...\".\n",
+                         "- A title cut off by the edge of the photo or hidden ends with \"...\".\n"
+                         "- Leave out the archive's internal marks: text or numbers beside a serial number, "
+                         "\"Archival Media\", location or shelf-location notes, the archive's logo, barcodes and their "
+                         "numbers, and notes about the box itself such as \"Acid Free\".\n"))
+assert PROMPT_FINAL.count("Leave out the archive's internal marks") == 1 and "\"place\"" not in PROMPT_FINAL
+FINAL_MODE = False
+
+
+def use_final():
+    """Point the shared steps at final/: the reread photos at the owner's turn, the final fields and prompt."""
+    global POOL, PAGES, LINES, SHEET, SAMPLE, FIELDS, PROMPT, MAX_TOKENS, GATEWAY_CAP, RESULTS, FINAL_MODE
+    POOL, PAGES, LINES, SHEET = FINAL, os.path.join(FINAL, "pages"), os.path.join(FINAL, "lines"), \
+        os.path.join(FINAL, "sheet")
+    SAMPLE, FIELDS, PROMPT, MAX_TOKENS, RESULTS = os.path.join(FINAL, "sample.jsonl"), FIELDS_FINAL, PROMPT_FINAL, \
+        640, FINAL_RESULTS
+    GATEWAY_CAP = FINAL_CAP - final_upright_spent()
+    FINAL_MODE = True
+
+
+def final_upright_spent():
+    import gateway_gemini as G
+    return sum(G.charge(r) for n in ("upright-calls.jsonl", "check-calls.jsonl") for r in jsonl(os.path.join(FINAL, n)))
+
+
+def further_of(pick):
+    """The sheet's which-way-up answer as the further PIL turn (anticlockwise degrees): a quarter turn clockwise is
+    270. TURN_OPTIONS' index times 90 is the turn clockwise."""
+    return (-90 * TURN_OPTIONS.index(pick)) % 360
+
+
+def ask_upright(mid, image_path, ledger, cap, exclude=()):
+    """Gemini's pick of the upright turn among the four (or those not in `exclude`), as in cmd_upright: the turn,
+    in PIL degrees, that makes `image_path` upright, or None. Every call is in `ledger` before its reply is used."""
+    import base64
+    import io
+    from PIL import Image
+    import gateway_gemini as G
+    worst = (4 * 1200 * G.PRICE[0] + 2048 * G.PRICE[1]) / 1e6
+    if final_upright_spent() + sum(G.charge(r) for r in jsonl(os.path.join(FINAL, "gateway-calls.jsonl"))) + worst > cap:
+        raise SystemExit(f"cap: ${cap:.2f} would be passed")
+    order = [d for d in (0, 90, 180, 270) if d not in exclude]
+    random.Random(f"{SEED}/final/{mid}").shuffle(order)
+    content = []
+    with Image.open(image_path) as im:
+        im = im.convert("RGB")
+        im.thumbnail((UPRIGHT_SIDE, UPRIGHT_SIDE))
+        for k, deg in enumerate(order, 1):
+            buf = io.BytesIO()
+            im.rotate(deg, expand=True).save(buf, "JPEG", quality=85)
+            content += [{"type": "text", "text": f"Image {k}:"},
+                        {"type": "image_url", "image_url": {"url": "data:image/jpeg;base64,"
+                                                                   + base64.b64encode(buf.getvalue()).decode()}}]
+    n = len(order)
+    content.append({"type": "text", "text": UPRIGHT_PROMPT.replace("These four images", f"These {n} images")
+                    .replace("1, 2, 3 or 4", ", ".join(str(k) for k in range(1, n)) + f" or {n}")})
+    body = {"model": G.MODEL, "temperature": 0, "max_tokens": 2048, "reasoning_effort": "low",
+            "messages": [{"role": "user", "content": content}]}
+    t = time.time()
+    for attempt in range(3):
+        r = G.request("/chat/completions", body)
+        if r.status_code in (429, 500, 502, 503, 504) and attempt < 2:
+            time.sleep(10 * (attempt + 1))
+            continue
+        break
+    got = r.json() if r.headers.get("content-type", "").startswith("application/json") else {}
+    usage = got.get("usage") or {}
+    rec = G.with_gateway_cost({"id": mid, "http": r.status_code, "t": t, "usage": usage,
+                               "cost": round(G.cost(usage), 6), "order": order}, r)
+    reply = ((got.get("choices") or [{}])[0].get("message") or {}).get("content") if r.status_code == 200 else None
+    m = re.search(rf"\b([1-{n}])\b", reply or "")
+    rec.update(reply=(reply or "")[:40], pick=order[int(m.group(1)) - 1] if m else None)
+    with open(ledger, "a", encoding="utf-8") as fh:
+        fh.write(json.dumps(rec) + "\n")
+    return rec["pick"]
+
+
+def cmd_upright_final(a):
+    """final/sample.jsonl: the photos read at the wrong turn, each at the owner's turn: the 13 he turned on the second
+    sheet, 6034e86e328f a quarter turn anticlockwise, and 556fdc267d90 ("needs to be rotated", no direction), whose
+    turn is Gemini's pick among the three it was not shown at. Then the rendered photos are checked: Gemini picks the
+    upright turn of each among all four, and a photo whose pick is not "as it is" gets a which-way-up question."""
+    os.makedirs(FINAL, exist_ok=True)
+    answers = json.load(open(REV_ANSWERS, encoding="utf-8"))
+    rev = {r["id"]: r for r in jsonl(os.path.join(REV, "sample.jsonl"))}
+    ledger = os.path.join(FINAL, "upright-calls.jsonl")
+    out = []
+    for mid, r in rev.items():
+        if mid in DROPPED_FINAL:
+            continue
+        pick = ((answers.get(mid) or {}).get("_turn") or {}).get("pick")
+        if pick in TURN_OPTIONS and TURN_OPTIONS.index(pick):
+            further, how = further_of(pick), "sheet"
+        elif mid in TURN_NOTES and TURN_NOTES[mid] is not None:
+            further, how = TURN_NOTES[mid], "note"
+        elif mid in TURN_NOTES:
+            done = [x for x in jsonl(ledger) if x["id"] == mid and x.get("pick") is not None]
+            further = done[-1]["pick"] if done else ask_upright(mid, os.path.join(REV, "pages", mid + ".jpg"),
+                                                                ledger, FINAL_CAP, exclude=(0,))
+            how = "gemini, among the three other turns"
+        else:
+            continue
+        out.append(dict(r, turn_rev2=r["turn"], further=further, further_how=how, turn=(r["turn"] + (further or 0)) % 360))
+    with open(os.path.join(FINAL, "sample.jsonl"), "w", encoding="utf-8") as fh:
+        for r in out:
+            fh.write(json.dumps(r, ensure_ascii=False) + "\n")
+    print(f"{len(out)} photos to reread: " + ", ".join(f"{k} {v}" for k, v in
+                                                      collections.Counter(r["further_how"] for r in out).items()))
+
+
+def cmd_check_final(a):
+    """The rendered photos at the final turn, checked: Gemini's pick among all four turns of each. Real money,
+    about half a cent a photo, in final/check.jsonl."""
+    import gateway_gemini as G
+    ledger = os.path.join(FINAL, "check-calls.jsonl")
+    done = {x["id"]: x for x in jsonl(os.path.join(FINAL, "check.jsonl"))}
+    for r in sample():
+        if r["id"] in done:
+            continue
+        if final_upright_spent() + sum(G.charge(x) for x in gateway_ledger()) > FINAL_CAP - 0.01:
+            raise SystemExit("cap")
+        p = ask_upright(r["id"], image_of(r["id"]), ledger, FINAL_CAP)
+        with open(os.path.join(FINAL, "check.jsonl"), "a", encoding="utf-8") as fh:
+            fh.write(json.dumps({"id": r["id"], "pick": p}) + "\n")
+    c = collections.Counter(x["pick"] for x in jsonl(os.path.join(FINAL, "check.jsonl")))
+    print(f"check: {dict(c)}; ${final_upright_spent():.4f} spent on the upright steps")
+
+
+def _readings_rev2(mid, f):
+    """The three readers' rev2 readings of field f, in the photo's fixed order (the readers read at rev2's turn)."""
+    vals = [((json.load(open(p, encoding="utf-8")) if os.path.exists(p) else {}).get("parsed") or {}).get(f)
+            for p in (os.path.join(REV, "draft", k, mid + ".json") for k in READERS)]
+    return order_readings(mid, f, vals)
+
+
+def strip_internal(v):
+    """A reading with its internal-mark parts left out ("; "-joined parts), None when nothing is left."""
+    if v is None:
+        return None
+    keep = [p for p in re.split(r"\s*;\s*", v) if p.strip() and not internal(p)]
+    return "; ".join(keep) or None
+
+
+def internal(part):
+    return bool(INTERNAL.search(part) or LOCATION_MARK.match(part) or BARCODE.match(part))
+
+
+def settle_open(x, f, readings, st, lines, boxes):
+    """The second sheet's rules on a field left open: a reading only repeating settled text is not on the label, a
+    date inside a settled title is the date, a box label has no folder title, internal marks are left out; what is
+    left is asked. Returns True when the field was settled."""
+    fields, src = x["fields"], x["src"]
+    if f == "other":
+        readings = list(dict.fromkeys(strip_internal(r) for r in readings))
+    if f == "folder_title" and fields.get("kind") == "box label":
+        fields[f], src[f] = None, "rule"
+        st["box label, no folder title (rule)"] += 1
+        return True
+    if f not in REPEAT_EXEMPT:
+        if f == "date":
+            dates = list(dict.fromkeys(r for r in readings if r))
+            if len(dates) == 1 and repeats_in(dates[0], fields, TITLE_FIELDS):
+                fields[f], src[f] = dates[0], "rule"
+                st["date inside a settled title (rule)"] += 1
+                return True
+        elif repeat_of(readings, fields):
+            fields[f], src[f] = None, "rule"
+            st["reading only repeats settled text (rule)"] += 1
+            return True
+        else:
+            readings = drop_repeats(readings, fields)
+    if f == "other" and readings == [None]:
+        fields[f], src[f] = None, "rule"
+        st["only internal marks read, not on the label (rule)"] += 1
+        return True
+    box, how = field_place(f, readings, lines, boxes)
+    x["open"].append({"field": f, "readings": readings, "box": box, "placed": how})
+    return False
+
+
+def final_rows():
+    """The final truth from rev2/draft-truth.jsonl as the second sheet's fold left it, with the owner's second-sheet
+    notes applied in this order: the four photos out; Place dropped; a typed answer whose button was not pressed taken
+    as typed; corrections the notes give; the reread photos refilled from the readers at the right turn; internal
+    marks left out; cut-off and illegible titles flagged; carried fields filled from the boxes before on the sheet."""
+    rows = [x for x in jsonl(os.path.join(REV, "draft-truth.jsonl")) if x["id"] not in DROPPED_FINAL]
+    answers = json.load(open(REV_ANSWERS, encoding="utf-8"))
+    notes = json.load(open(FINAL_NOTES, encoding="utf-8"))["fields"]
+    reread = {r["id"]: r for r in sample()}
+    st = collections.Counter()
+    for x in rows:
+        mid, fields, src = x["id"], x["fields"], x["src"]
+        ans = answers.get(mid) or {}
+        x.update(carried={}, illegible=[], cut_text={}, unlabelled=mid in UNLABELLED, controls=[],
+                 illegible_photo=mid in ILLEGIBLE_PHOTO, reread_final=mid in reread, turn_question=None)
+        in_rev = mid not in reread
+        lines = lines_of_in(REV if in_rev else FINAL, mid)
+        boxes = label_boxes_in(REV if in_rev else FINAL, mid)
+        # Place is not a field for boxes and folders
+        if "place" in fields:
+            st[f"Place cells dropped ({src['place']})"] += 1
+            fields.pop("place"), src.pop("place")
+        st["Place cells dropped (open)"] += sum(d["field"] == "place" for d in x["open"])
+        x["open"] = [d for d in x["open"] if d["field"] != "place"]
+        if fields.get("container") and canon("container", fields["container"]) != fields["container"]:
+            fields["container"] = canon("container", fields["container"])
+            st["container number's leading zero dropped (\"Box 9\", not \"Box 09\")"] += 1
+        # a value typed under "other" whose button was not pressed is the answer typed
+        for d in list(x["open"]):
+            g = ans.get(d["field"]) or {}
+            if not g.get("pick") and clean(g.get("text")):
+                fields[d["field"]], src[d["field"]] = canon(d["field"], clean(g["text"])), "sheet2"
+                x["open"].remove(d)
+                st["typed with the button not pressed, taken as typed"] += 1
+        # what the owner left unanswered stays out and is counted, not asked a third time (the reread photos' open
+        # cells are the fold's reopened reader cells, refilled below)
+        x["unanswered"] = [] if mid in reread else [d["field"] for d in x["open"]]
+        st["left unanswered on the second sheet, kept out"] += len(x["unanswered"])
+        if mid not in reread:
+            x["open"] = []
+        # "other" pressed with nothing typed: carried (the five "fill in" photos), flagged (a cut-off title), or
+        # asked again; folded as "not on the label" it would say the wrong thing
+        x["_carry"] = []
+        for f, g in ans.items():
+            if f in (NOTES, "_turn") or f not in FIELDS_FINAL or not isinstance(g, dict):
+                continue
+            if g.get("pick") == "other" and not clean(g.get("text")) and src.get(f) == "sheet2":
+                fields.pop(f), src.pop(f)
+                if mid in CARRY:
+                    x["_carry"].append(f)
+                elif CUT_NOTES.get(mid) == f:
+                    pass
+                else:
+                    st["\"other\" pressed with nothing typed, asked again"] += 1
+                    x["_reask"] = x.get("_reask", []) + [f]
+        # corrections the notes give; a rule cell on that photo is judged again against the corrected fields
+        for f, v in notes.get(mid, {}).items():
+            had = fields.get(f)
+            fields[f], src[f] = canon(f, v), "note2"
+            x["open"] = [d for d in x["open"] if d["field"] != f]
+            st["corrected from the second sheet's notes"] += 1
+            if had is not None and v is None:
+                for g in [g for g, s in src.items() if s == "rule"]:
+                    fields.pop(g), src.pop(g)
+                    x["_reask"] = x.get("_reask", []) + [g]
+                    st["rule cell judged again after a correction"] += 1
+        # one piece of label text in one field (the owner's rule): an owner value repeating another owner field
+        # word for word is asked again with the carried or reader reading beside it
+        own = [(f, v) for f, v in fields.items() if v and f != "kind" and src[f] in OWNER_FINAL and f not in TITLE_FIELDS]
+        for f, v in own:
+            if any(g != f and w and norm(g, w) == norm(f, v) for g, w in fields.items()):
+                x["_recheck"] = x.get("_recheck", []) + [f]
+                st["owner value repeating another field word for word, asked again"] += 1
+        # owner values the new internal-mark rule would drop: asked once more, never dropped silently
+        if fields.get("other") and src.get("other") in OWNER_FINAL and \
+                any(internal(p) for p in re.split(r"\s*;\s*", fields["other"])):
+            x["_recheck"] = x.get("_recheck", []) + ["other"]
+            st["owner value the internal-mark rule would drop, asked again"] += 1
+        elif fields.get("other") and src.get("other") in ("readers", "rule") and \
+                strip_internal(fields["other"]) != fields["other"]:
+            fields["other"], src["other"] = strip_internal(fields["other"]), "rule"
+            st["reader value with internal marks left out (rule)"] += 1
+        # the reread: reader-settled fields and the fields reopened at the fold come from the readers at the right turn
+        if mid in reread:
+            for f in [f for f, s in src.items() if s in ("readers", "rule")]:
+                fields.pop(f), src.pop(f)
+            x["open"] = []
+            ds = [((draft_of(mid, k) or {}).get("parsed")) for k in READERS]
+            ok = all(d is not None for d in ds)
+            st["reread photos"] += 1
+            st["reread photos, a reply did not parse"] += not ok
+            for f in ["kind"] + FIELDS_FINAL:
+                if f in fields or f in x["unsure"] or f in x["cut_off"] or f in x["_carry"]:
+                    continue
+                # a reply that did not parse (a repetition loop at temperature 0 repeats on a rerun) settles nothing:
+                # the field is asked, with the readings of the readers that did parse
+                vals = [d.get(f) for d in ds if d is not None]
+                g = "x" if f == "kind" else f
+                if ok and all(agree(g, vals[0], v) for v in vals[1:]) and (f != "other" or strip_internal(vals[0]) == vals[0]):
+                    fields[f], src[f] = canon(f, vals[0]), "readers"
+                    st["reread: the three readers unanimous"] += 1
+                elif settle_open(x, f, order_readings(mid, f, vals), st, lines, boxes):
+                    pass
+                else:
+                    st["reread: open"] += 1
+            # The owner's turn stands even where the check disagrees (it undid his turn on 9 of 15 and never picked a
+            # half turn, so the arithmetic is not reversed: it is Gemini disagreeing with him, as on the second sheet).
+            # The one photo turned by Gemini's own pick is asked.
+            if reread[mid].get("further_how", "").startswith("gemini"):
+                x["turn_question"] = "turned by the gateway's pick, the owner gave no direction"
+        for f in x.pop("_reask", []):
+            if f in fields:
+                continue
+            settle_open(x, f, _readings_rev2(mid, f), st, lines, boxes)
+        for f in x.pop("_recheck", []):
+            v = fields.pop(f)
+            src.pop(f)
+            readings = list(dict.fromkeys([v] + [r for r in _readings_rev2(mid, f) if r is not None]))
+            box, how = field_place(f, readings, lines, boxes)
+            x["open"].append({"field": f, "readings": readings, "box": box, "placed": how, "recheck": True})
+        # cut off and illegible: the visible text is not the value; the field is flagged
+        if mid in CUT_NOTES:
+            f = CUT_NOTES[mid]
+            v = fields.pop(f, None)
+            src.pop(f, None)
+            x["open"] = [d for d in x["open"] if d["field"] != f]
+            if v:
+                x["cut_text"][f] = v
+            if f not in x["cut_off"]:
+                x["cut_off"].append(f)
+            st["titles flagged cut off"] += 1
+        for f in ILLEGIBLE.get(mid, []):
+            x["illegible"].append(f)
+            st["fields flagged illegible"] += 1
+        if mid in ILLEGIBLE_PHOTO:
+            for f in FIELDS_FINAL:
+                if f not in x["illegible"]:
+                    fields.pop(f, None), src.pop(f, None)
+                    x["illegible"].append(f)
+            x["open"] = []
+            st["photos flagged illegible"] += 1
+    # carried: the field the label leaves out is the one the boxes before it on the sheet give (owner, "per last few
+    # boxes"): the most common owner value among the CARRY_FROM box photos before it in its directory
+    for i, x in enumerate(rows):
+        for f in x.pop("_carry", []):
+            d = os.path.dirname(x["path"])
+            prev = [y for y in rows[:i] if os.path.dirname(y["path"]) == d and y["colour"] == "Red"
+                    and y["id"] not in CARRY][-CARRY_FROM:]
+            vals = [y["fields"][f] for y in prev if y["fields"].get(f) and y["src"].get(f) in OWNER_FINAL]
+            groups = collections.Counter(norm(f, v) for v in vals)
+            if vals and groups.most_common(1)[0][1] * 2 > len(vals):
+                top = groups.most_common(1)[0][0]
+                pick = collections.Counter(v for v in vals if norm(f, v) == top).most_common(1)[0][0]
+                x["fields"][f], x["src"][f] = pick, "carried"
+                x["carried"][f] = [y["id"] for y in prev if y["fields"].get(f) and norm(f, y["fields"][f]) == top]
+                st["carried from the boxes before"] += 1
+            else:
+                lines, boxes = lines_of_in(REV, x["id"]), label_boxes_in(REV, x["id"])
+                readings = [r for r in _readings_rev2(x["id"], f)]
+                box, how = field_place(f, readings, lines, boxes)
+                x["open"].append({"field": f, "readings": readings, "box": box, "placed": how, "carry": "none before"})
+                st["to carry, but the boxes before give no value: asked"] += 1
+    return rows, st
+
+
+def _parsed_final(mid):
+    return [((draft_of(mid, k) or {}).get("parsed")) is not None for k in READERS]
+
+
+def _check_pick(mid):
+    got = [x["pick"] for x in jsonl(os.path.join(FINAL, "check.jsonl")) if x["id"] == mid]
+    return got[-1] if got else None
+
+
+def lines_of_in(pool, mid):
+    p = os.path.join(pool, "lines", mid + ".json")
+    return json.load(open(p, encoding="utf-8")).get("lines", []) if os.path.exists(p) else []
+
+
+def label_boxes_in(pool, mid):
+    out = []
+    for k in READERS:
+        p = os.path.join(pool, "draft", k, mid + ".json")
+        out.append(((json.load(open(p, encoding="utf-8")) if os.path.exists(p) else {}).get("parsed") or {})
+                   .get("label_box"))
+    return out
+
+
+FINAL_CONTROLS = 10   # rule-settled cells put on the third sheet unmarked (P11-7: the rules had no control)
+
+
+def pick_final_controls(rows):
+    cands = sorted((x["id"], f) for x in rows for f, s in x["src"].items() if s == "rule" and not x["illegible_photo"])
+    for mid, f in random.Random(SEED + 3).sample(cands, min(FINAL_CONTROLS, len(cands))):
+        x = next(y for y in rows if y["id"] == mid)
+        v = x["fields"][f]
+        pool = FINAL if x["reread_final"] else REV
+        box, how = field_place(f, [v] if v else [], lines_of_in(pool, mid), label_boxes_in(pool, mid))
+        x["controls"].append({"field": f, "readings": [v] if v else [], "box": box, "placed": how})
+
+
+def shown_settled(x, on):
+    """Every truth the photo has that the sheet does not ask, with the value going into the truth."""
+    out = {}
+    for f in ["kind"] + FIELDS_FINAL:
+        if f in on:
+            continue
+        if f in x["illegible"]:
+            out[f] = "illegible (flagged)"
+        elif f in x["cut_off"]:
+            out[f] = "cut off (flagged, not transcribed)"
+        elif f in x["unsure"]:
+            out[f] = "left out, you could not read it"
+        elif f in x.get("unanswered", []):
+            out[f] = "left out, unanswered on the second sheet"
+        elif f in x["fields"]:
+            v = x["fields"][f]
+            out[f] = (v if v is not None else "not on the label") + (" (carried from the boxes before)"
+                                                                     if x["src"][f] == "carried" else "")
+    return out
+
+
+def sheet3_items(rows):
+    out = []
+    order = ["kind"] + FIELDS_FINAL
+    for x in rows:
+        ask = sorted(x["open"] + x["controls"], key=lambda d: order.index(d["field"]))
+        if not ask and not x["turn_question"]:
+            continue
+        pool = FINAL if x["reread_final"] else REV
+        fields = [{"field": "_turn", "label": LABELS["_turn"], "readings": [], "box": None, "placed": "turn",
+                   "options": TURN_OPTIONS}] if x["turn_question"] else []
+        fields += [{"field": d["field"], "label": LABELS[d["field"]] + (" (check again)" if d.get("recheck") else ""),
+                    "readings": d["readings"], "box": d["box"], "placed": d["placed"]} for d in ask]
+        out.append({"id": x["id"], "n": len(out) + 1,
+                    "img": os.path.relpath(os.path.join(pool, "pages", x["id"] + ".jpg"), os.path.join(FINAL, "sheet")),
+                    "colour": "box (Red)" if x["colour"] == "Red" else "folder (Purple)",
+                    "agreed": shown_settled(x, {d["field"] for d in ask}), "fields": fields})
+    return out
+
+
+SHEET3_HEADER = """<b>Container labels, third round (short).</b> Your second-sheet answers and notes are in: Place is
+gone; internal marks (text beside serial numbers, Archival Media, location notes, logos, barcodes, Acid Free) are left
+out; cut-off and illegible titles are flagged rather than transcribed; the five "fill in" photos take their missing
+fields from the boxes before them; four photos are out; the photos you turned were read again the right way up. What is
+left: fields still open after that, values marked "check again" (one of your answers repeats another field word for
+word, or a mark the new internal-mark rule would leave out), and a few fields settled by your rules, mixed in as a
+check. The grey line lists everything else going into the truth, carried and flagged fields included; correct any of
+it in the notes. "Turn photo" turns a photo with its boxes, and the turn is saved with your answers."""
+
+
+def write_final_truth(rows, path):
+    with open(path, "w", encoding="utf-8") as fh:
+        for x in rows:
+            n = len(x["fields"]) + len(set(x["unsure"]) | set(x["cut_off"]) | set(x["illegible"]))
+            fh.write(json.dumps({
+                "id": x["id"], "path": x["path"], "colour": x["colour"], "stratum": x["stratum"],
+                "fields": x["fields"], "src": x["src"],
+                "ruled": [f for f, s in x["src"].items() if s in OWNER_FINAL],
+                "by_rule": [f for f, s in x["src"].items() if s == "rule"],
+                "carried": x["carried"], "open": [d["field"] for d in x["open"]], "unsure": x["unsure"],
+                "cut_off": x["cut_off"], "cut_text": x["cut_text"], "illegible": x["illegible"],
+                "unanswered": x.get("unanswered", []),
+                "illegible_photo": x["illegible_photo"], "unlabelled": x["unlabelled"], "drafters": x["drafters"],
+                "notes": x["notes"], "notes2": x.get("notes2"), "notes3": x.get("notes3"),
+                "prompt_example": prompt_examples_final(x), "reread_final": x["reread_final"],
+                "turn_question": x["turn_question"], "turn3": x.get("turn3"),
+                "complete": not x["open"] and n == len(FIELDS_FINAL) + 1}, ensure_ascii=False) + "\n")
+
+
+def prompt_examples_final(x):
+    ex = set(re.findall(r'"([^"]+)"', PROMPT_REV)) | set(re.findall(r'"([^"]+)"', PROMPT_FINAL)) | {"Box 5", "9", "Box 8", "5"}
+    return [f for f, v in x["fields"].items() if v and f != "kind" and any(norm(f, v) == norm(f, e) for e in ex)]
+
+
+def cmd_finish(a):
+    """final/draft-truth.jsonl and final/truth.jsonl, the third sheet (only what stays open, with controls) and
+    segbench-results/ct-truth-final.md."""
+    rows, st = final_rows()
+    pick_final_controls(rows)
+    with open(os.path.join(FINAL, "draft-truth.jsonl"), "w", encoding="utf-8") as fh:
+        for x in rows:
+            fh.write(json.dumps(x, ensure_ascii=False) + "\n")
+    write_final_truth(rows, os.path.join(FINAL, "truth.jsonl"))
+    items = sheet3_items(rows)
+    os.makedirs(os.path.join(FINAL, "sheet"), exist_ok=True)
+    with open(os.path.join(FINAL, "sheet", "index.html"), "w", encoding="utf-8") as fh:
+        fh.write(sheet_html(items, key="w47-ct-truth-final", header=SHEET3_HEADER, settled="Not asked, going in as",
+                            dl="W47-ct-truth-final-answers.json"))
+    write_final_results(rows, st, items)
+    print(dict(st))
+    print(f"{FINAL_RESULTS}; sheet {os.path.join(FINAL, 'sheet', 'index.html')}: {len(items)} photos, "
+          f"{sum(len(i['fields']) for i in items)} questions")
+
+
+def cmd_fold_final(a):
+    """The third sheet's answers into final/truth.jsonl: an open field or control answered becomes the owner's
+    (`sheet3`); "other" with nothing typed stays open; a typed answer whose button was not pressed is taken as typed;
+    a turn the owner gave (button or question) is recorded as `turn3`, and a photo turned further has its reader
+    fields reopened, to be reread."""
+    rows = jsonl(os.path.join(FINAL, "draft-truth.jsonl"))
+    answers = json.load(open(a.answers, encoding="utf-8"))
+    c = collections.Counter()
+    for x in rows:
+        ans = answers.get(x["id"]) or {}
+        t = (ans.get("_turn") or {}).get("pick")
+        deg = further_of(t) if t in TURN_OPTIONS else None
+        if deg is None and (ans.get("_rot") or {}).get("deg"):
+            deg = (-int(ans["_rot"]["deg"])) % 360   # the button turns clockwise in CSS degrees
+        if deg:
+            x["turn3"] = deg
+            c["photos turned further (reread)"] += 1
+            for f in [f for f, s in x["src"].items() if s in ("readers", "rule", "carried")]:
+                x["fields"].pop(f), x["src"].pop(f)
+                x["open"].append({"field": f, "readings": [], "box": None, "placed": "none"})
+        keep = []
+        for d in x["open"] + x["controls"]:
+            g = ans.get(d["field"]) or {}
+            pick, text = g.get("pick"), clean(g.get("text"))
+            if not pick and text:
+                pick = "other"
+            if not pick or (pick == "other" and not text):
+                keep += [d] if d in x["open"] else []
+                c["open, unanswered"] += d in x["open"]
+                continue
+            v = None if pick == "not on the label" else text if pick == "other" else pick
+            if d in x["controls"]:
+                c["controls answered"] += 1
+                c["controls overturned"] += not agree("x" if d["field"] == "kind" else d["field"], v,
+                                                      x["fields"].get(d["field"]))
+            x["fields"][d["field"]], x["src"][d["field"]] = canon(d["field"], v), "sheet3"
+            c["fields ruled"] += 1
+        x["open"] = keep
+        note = clean((ans.get(NOTES) or {}).get("text"))
+        if note:
+            x["notes3"] = note
+            c["notes"] += 1
+    with open(os.path.join(FINAL, "draft-truth.jsonl"), "w", encoding="utf-8") as fh:
+        for x in rows:
+            fh.write(json.dumps(x, ensure_ascii=False) + "\n")
+    write_final_truth(rows, os.path.join(FINAL, "truth.jsonl"))
+    print(dict(c))
+
+
+def write_final_results(rows, st, items):
+    import gateway_gemini as G
+    srcs = collections.Counter(s for x in rows for s in x["src"].values())
+    led = jsonl(os.path.join(FINAL, "gateway-calls.jsonl"))
+    up = jsonl(os.path.join(FINAL, "upright-calls.jsonl")) + jsonl(os.path.join(FINAL, "check-calls.jsonl"))
+    reread = [x for x in rows if x["reread_final"]]
+    chk = collections.Counter(x["pick"] for x in jsonl(os.path.join(FINAL, "check.jsonl")))
+    n_ctl = sum(len(x["controls"]) for x in rows)
+    n_open = sum(len(x["open"]) for x in rows)
+    n_turn = sum(bool(x["turn_question"]) for x in rows)
+    spent = sum(G.charge(r) for r in led) + sum(G.charge(r) for r in up)
+    L = ["# Container labels: the truth finished from the owner's second sheet (W47.ct-truth-final)", "",
+         "Written by `scripts/segbench/ct_truth.py --final finish`. The owner answered the second sheet "
+         "(`ct-truth-revised.md`) on 2026-11-05: 411 of its 417 questions, with notes on 32 photos. This build "
+         "applies the notes' rules and rereads the photos that were read at the wrong turn. Label values stay in the "
+         "cache: this page gives counts and photo ids only.", "",
+         "## What each rule changed", "",
+         "| rule | cells or photos |", "|---|---|",
+         f"| photos taken out ({', '.join(sorted(set(DROPPED_FINAL.values())))}) | {len(DROPPED_FINAL)} |"]
+    for k, v in sorted(st.items()):
+        L.append(f"| {k} | {v} |")
+    L += ["",
+          f"{len(rows)} photos remain: {sum(x['colour'] == 'Red' for x in rows)} box (Red), "
+          f"{sum(x['colour'] == 'Purple' for x in rows)} folder (Purple), {len(FIELDS_FINAL)} fields and the kind.", "",
+          "- **Place** is not a field for boxes and folders (the owner's note); it is gone from the fields, the prompt "
+          "and the truth, and W47.ct-read does not score it.",
+          "- **Internal marks** are not identifying marks: text beside a serial number, \"Archival Media\", location "
+          "and shelf-location notes, the archive's logos, barcodes and notes about the box itself. They are in the "
+          "prompt the reread used; reader values have them left out; an owner value the rule would change is asked "
+          "once more rather than dropped (on the third sheet, marked \"check again\").",
+          "- **Cut off and illegible.** A cut-off title is flagged (`cut_off`) and its visible text kept apart "
+          "(`cut_text`), not given as the value; a title that cannot be read is flagged `illegible`; the blurred "
+          "photo has every field flagged `illegible` (`illegible_photo`), which is itself what the user needs to "
+          "know, not an empty label. The folder with no label is `unlabelled`: its empty fields are true empties.",
+          "- **Carried.** On the five photos the owner marked \"fill in per last few boxes\", a field he answered "
+          f"\"other\" with nothing typed takes the most common owner value of the {CARRY_FROM} box photos before it on "
+          "the sheet in its directory (a strict majority), with `src` `carried` and the photos it came from in "
+          "`carried`. A carried cell is not a reading: W47.ct-read leaves carried cells out of every reading score "
+          "and never uses them to score carry-forward.",
+          "- **\"Other\" pressed with nothing typed** elsewhere is not \"not on the label\" (the second fold read it "
+          "so); it is asked again. A value typed with no button pressed is taken as typed. The third sheet's fold "
+          "does both, and its turn button records the turn in the answers.", "",
+          "## The reread", "",
+          f"{len(reread)} photos were read at the wrong turn: the {sum(1 for r in sample() if r.get('further_how') == 'sheet')} "
+          "the owner turned on the second sheet, one his note gave the turn for, and one he said needs turning with no "
+          "direction (Gemini 3.7 Flash picked among the three turns it had not been shown at). All three readers read "
+          "them again at that turn with the final prompt. Gemini's upright pick among all four turns of each "
+          f"rendered photo, as a check: {chk.get(0, 0)} of {sum(chk.values())} as they are, "
+          f"{chk.get(180, 0)} upside down, {sum(chk.values()) - chk.get(0, 0) - chk.get(180, 0)} a quarter turn off. "
+          "Every quarter-turn pick undoes the owner's own turn and none is a half turn, so the turn arithmetic is not "
+          "reversed: Gemini disagrees with the owner on these photos, as its first pick did (the reason they were on "
+          "the second sheet). The owner's turn stands. The photo turned by Gemini's pick alone is asked which way up "
+          "on the third sheet.", "",
+          "## Where each settled cell came from", "", "| source | cells |", "|---|---|"]
+    for s, label in (("sheet", "the owner, first sheet"), ("note", "the owner's first-sheet notes"),
+                     ("sheet2", "the owner, second sheet"), ("note2", "the owner's second-sheet notes"),
+                     ("rule", "the owner's rules, applied to the readers' readings (reported apart; no owner check "
+                              "but the third sheet's controls)"),
+                     ("carried", "carried from the boxes before"), ("readers", "the three readers, unanimous")):
+        L.append(f"| {label} | {srcs[s]} |")
+    complete = sum(1 for x in rows if not x["open"] and len(x["fields"]) + len(set(x["unsure"]) | set(x["cut_off"])
+                                                                                 | set(x["illegible"])) == len(FIELDS_FINAL) + 1)
+    L += ["", f"Flagged: {sum(len(x['cut_off']) for x in rows)} cut off, {sum(len(x['illegible']) for x in rows)} "
+          f"illegible, {sum(len(x['unsure']) for x in rows)} the owner could not read. Of the second sheet's 6 "
+          f"unanswered cells, 4 were on photos now out, one was typed with its button not pressed (taken as typed) "
+          f"and {sum(len(x.get('unanswered', [])) for x in rows)} stays out of the truth, unasked (`unanswered`). "
+          f"{complete} of {len(rows)} photos are complete.", "",
+          "## The third sheet", ""]
+    if items:
+        L += [f"{n_open} cells stay open, so a short third sheet asks {sum(len(i['fields']) for i in items)} questions on "
+              f"{len(items)} photos: the {n_open} open cells, {n_ctl} rule-settled cells as controls (drawn at random "
+              f"with a fixed seed, unmarked) and {n_turn} which-way-up question{'s' if n_turn != 1 else ''}. "
+              f"{sum(len(x['open']) for x in rows if x['reread_final'] and not all(_parsed_final(x['id'])))} of the "
+              "open cells are on the reread photo where one reader's reply did not parse (a repetition loop, which "
+              "a rerun at temperature 0 repeats): two readers settle nothing, so those cells are asked with the two "
+              "readings. It follows the sheet rule: a notes box "
+              "per photo, every unasked truth listed with its value, the photos upright with a turn button that is "
+              "saved. `pool-jpeg/final/sheet/index.html` in the cache (private); `ct_truth.py --final fold "
+              "ANSWERS.json` folds it into `final/truth.jsonl`.", "",
+              "| field | open |", "|---|---|"]
+        for f in ["kind"] + FIELDS_FINAL:
+            k = sum(d["field"] == f for x in rows for d in x["open"])
+            if k:
+                L.append(f"| {LABELS[f]} | {k} |")
+    else:
+        L += ["Nothing stays open; W47.ct-read scores against `final/truth.jsonl`."]
+    L += ["", "## Cost", "",
+          f"Gateway (Gemini 3.7 Flash, real money on the Stanford PTA): {len(up)} upright calls (the one pick and "
+          f"the check) and {len(led)} reader "
+          f"calls, ${spent:.3f} of this item's ${FINAL_CAP:.2f} cap. The two open models ran on this Mac, $0.", "",
+          "## Measurement card", "",
+          "- **Truth:** the owner's answers on two sheets and his notes, his rules applied to the readers' readings, "
+          "values carried from the boxes before, and for the rest the three readers unanimous. `ruled` lists the "
+          "owner's own cells; `by_rule` the rule-settled ones, reported apart, whose only check is the third sheet's "
+          f"{n_ctl} controls; carried cells are marked and are no reader's reading. The drafters are scored only on "
+          "`ruled` (FLD-9); `prompt_example` cells are left out of their scores.",
+          "- **Selection:** the first build's stratified draw by repository, less the photos the owner took out (now "
+          f"{len(DROPPED) + len(DROPPED_FINAL)}). The pairing cut's lean stands (54 photos left out, 43 Red, toward "
+          "little-changed PDFs); W47.ct-read reports it beside every figure.",
+          "- **Comparison:** the reread photos were read by the same three readers, at the right turn, with the final "
+          "prompt (the second-sheet prompt less Place, plus the internal-mark rule); the other photos' reader cells "
+          "are from the second-sheet prompt, whose difference the rules applied here cover.",
+          "- **Noise:** one pass at temperature 0; no rerun floor.",
+          "- **Scope:** a truth. Says nothing about which reader is right; that is W47.ct-read.", ""]
+    with open(FINAL_RESULTS, "w", encoding="utf-8") as fh:
+        fh.write("\n".join(L))
+
+
 def pdf_comparison(rows):
     """The PDF build beside this one, on the markers both read: how often the PDF-built two-reader agreement held
     on the JPEGs, and how often Qwen3-VL 8B's own reading changed between the PDF and the JPEG."""
@@ -1588,12 +2252,17 @@ let h='';DATA.forEach(d=>{h+=`<div class="doc"><div><button class="turn" data-t=
   h+=`<div class="q notes"><b>Notes on this photo</b> (optional)<br><textarea data-n="${esc(d.id)}">${esc(ans[d.id]?.[NOTES]?.text)}</textarea></div>`;
   h+='</div></div>'});
 document.getElementById('root').innerHTML=h;
-document.querySelectorAll('button.turn').forEach(b=>b.onclick=()=>{const f=document.querySelector(`.frame[data-f="${b.dataset.t}"]`);
- const d=((+f.dataset.deg||0)+90)%360;f.dataset.deg=d;f.style.transform=d?`rotate(${d}deg)`:'';
- const side=d%180?(f.offsetWidth-f.offsetHeight)/2:0;f.style.margin=side?`${Math.max(side,0)}px ${Math.max(-side,0)}px`:'';});
 const set=(nm,k,v)=>{const [id,f]=nm.split('/');ans[id]=ans[id]||{};ans[id][f]={...(ans[id][f]||{}),[k]:v};localStorage.setItem(KEY,JSON.stringify(ans));prog()};
+// the turn is saved with the answers as _rot.deg (clockwise, as shown), and restored on reload
+const turnTo=(f,d)=>{f.dataset.deg=d;f.style.transform=d?`rotate(${d}deg)`:'';
+ const side=d%180?(f.offsetWidth-f.offsetHeight)/2:0;f.style.margin=side?`${Math.max(side,0)}px ${Math.max(-side,0)}px`:''};
+document.querySelectorAll('button.turn').forEach(b=>{const f=document.querySelector(`.frame[data-f="${b.dataset.t}"]`);
+ const saved=+(ans[b.dataset.t]?._rot?.deg||0);if(saved)f.querySelector('img').addEventListener('load',()=>turnTo(f,saved),{once:true});
+ b.onclick=()=>{const d=((+f.dataset.deg||0)+90)%360;turnTo(f,d);set(b.dataset.t+'/_rot','deg',d)}});
 document.querySelectorAll('input[type=radio]').forEach(e=>e.onchange=()=>set(e.name,'pick',e.value));
-document.querySelectorAll('[data-t]').forEach(e=>e.oninput=()=>set(e.dataset.t,'text',e.value));
+// typing under "other" presses "other": a typed answer with no button pressed was lost on the second sheet
+document.querySelectorAll('input[data-t]').forEach(e=>e.oninput=()=>{set(e.dataset.t,'text',e.value);
+ const r=[...document.getElementsByName(e.dataset.t)].find(x=>x.value==='other');if(r&&e.value.trim()&&!r.checked){r.checked=true;set(e.dataset.t,'pick','other')}});
 document.querySelectorAll('[data-n]').forEach(e=>e.oninput=()=>set(e.dataset.n+'/'+NOTES,'text',e.value));prog();
 document.getElementById('dl').onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(ans,null,1)],{type:'application/json'}));a.download=__DLNAME__;a.click()};
 </script>"""
@@ -1728,12 +2397,14 @@ def cmd_owner_tree(a):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--rev", action="store_true", help="the revision: rev2/, the revised fields and prompt")
+    ap.add_argument("--final", action="store_true", help="the final truth: final/, the reread and the third sheet")
     sub = ap.add_subparsers(dest="cmd", required=True)
     sub.add_parser("sample").set_defaults(fn=cmd_sample)
     u = sub.add_parser("upright")
     u.add_argument("--limit", type=int)
     u.set_defaults(fn=cmd_upright)
-    for name, fn in (("render", cmd_render), ("lines", cmd_lines), ("compare", cmd_compare), ("revise", cmd_revise), ("sheet", cmd_sheet), ("trees", cmd_trees),
+    for name, fn in (("render", cmd_render), ("lines", cmd_lines), ("compare", cmd_compare), ("revise", cmd_revise),
+                     ("sheet", cmd_sheet), ("trees", cmd_trees), ("finish", cmd_finish), ("check", cmd_check_final),
                      ("owner-tree", cmd_owner_tree)):
         sub.add_parser(name).set_defaults(fn=fn)
     g = sub.add_parser("gateway")
@@ -1749,6 +2420,11 @@ def main():
     a = ap.parse_args()
     if a.rev:
         use_revision()
+    if a.final:
+        use_final()
+        a.fn = {cmd_upright: cmd_upright_final, cmd_fold: cmd_fold_final}.get(a.fn, a.fn)
+    elif a.fn in (cmd_finish, cmd_check_final):
+        ap.error(f"{a.cmd} needs --final")
     a.fn(a)
 
 
