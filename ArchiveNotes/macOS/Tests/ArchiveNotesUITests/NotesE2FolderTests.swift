@@ -134,7 +134,8 @@ final class NotesE2FolderTests: NotesFixtureUITestCase {
             XCTAssertEqual(ideasAboveReading(), false, "fixture: Ideas starts below Reading")
             folderRow(named: "Reading").coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
                 .press(forDuration: 1.0,
-                       thenDragTo: folderRow(named: "Ideas").coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.92)))
+                       thenDragTo: folderRow(named: "Ideas").coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 1.0))
+                        .withOffset(CGVector(dx: 0, dy: 3)))
             XCTAssertTrue(pollUntil(timeout: 10) {
                 guard let i = self.folderRecord(id: Self.folderIdeas.lowercased()),
                       let r = self.folderRecord(id: Self.folderReading.lowercased()) else { return false }
@@ -144,8 +145,7 @@ final class NotesE2FolderTests: NotesFixtureUITestCase {
     }
 
     /// A drag the way a hand does it (W40.fix-notes-folder-drag): no long press before it moves, then a
-    /// pause over the middle of the target. The long-press drags above start the row's own drag; a quick one
-    /// started the List's reorder drag instead, which can only reorder, so nesting failed for the owner.
+    /// pause over the middle of the target, and no highlight left once it has landed.
     func testE2_QuickFolderDragOntoMiddleNests() throws {
         try withFixture {
             try requireCanonicalScratchFixtureForStoreWrites()
@@ -157,25 +157,30 @@ final class NotesE2FolderTests: NotesFixtureUITestCase {
             XCTAssertTrue(pollUntil(timeout: 10) {
                 self.folderRecord(id: Self.folderReading.lowercased())?.parent == Self.folderIdeas.lowercased()
             }, "a quick drag of Reading onto the middle of Ideas should nest Reading in Ideas")
+            assertNoDropHighlight()
         }
     }
 
     /// A note held over each part of a folder row lands in the row the drop highlight is on
-    /// (W40.fix-notes-folder-drag): the top edge, the middle and the bottom edge of Ideas all file into Ideas.
+    /// (W40.fix-notes-folder-drag): above the label, its top, middle and bottom, and below it, all file into
+    /// Ideas. The label is about half the row; the points above and below it took no drop before the fix.
     func testE2_NoteDropOnAnyPartOfAFolderRowFilesIntoIt() throws {
         try withFixture {
             try requireCanonicalScratchFixtureForStoreWrites()
             folderRow(named: "Reading").click()
-            for dy in [0.08, 0.5, 0.92] {
+            // Points from the top of the Ideas label (16 pt tall in the VM).
+            for dy in [-4.0, 1, 8, 15, 20] {
                 let row = selectItem(uuid: Self.idPlain)
                 row.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
                     .press(forDuration: 0.05,
-                           thenDragTo: folderRow(named: "Ideas").coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: dy)),
-                           withVelocity: .slow, thenHoldForDuration: 1.5)
+                           thenDragTo: folderRow(named: "Ideas").coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0))
+                            .withOffset(CGVector(dx: 0, dy: dy)),
+                           withVelocity: .slow, thenHoldForDuration: 1.0)
                 XCTAssertTrue(pollUntil(timeout: 10) {
                     (self.organizationMemberships() ?? []).contains([Self.folderIdeas, Self.idPlain])
                 }, "a note dropped at \(dy) of the Ideas row should file into Ideas")
-                // Back to Reading for the next position, through the row menu so no drag is involved.
+                assertNoDropHighlight()
+                // Back to Reading for the next position.
                 folderRow(named: "Ideas").click()
                 let moved = selectItem(uuid: Self.idPlain)
                 moved.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
@@ -192,6 +197,15 @@ final class NotesE2FolderTests: NotesFixtureUITestCase {
     }
 
     // MARK: - Helpers
+
+    /// The tree's drop highlight is off (the DEBUG seam `an.sidebar.test.dropTarget` reads "none").
+    private func assertNoDropHighlight(file: StaticString = #filePath, line: UInt = #line) {
+        let probe = mainWindow.descendants(matching: .any).matching(identifier: "an.sidebar.test.dropTarget").firstMatch
+        XCTAssertTrue(probe.waitForExistence(timeout: 5), "the drop-target seam should exist", file: file, line: line)
+        XCTAssertTrue(pollUntil(timeout: 3) { (probe.value as? String) == "none" },
+                      "no drop highlight should be left after the drop; it reads \(String(describing: probe.value))",
+                      file: file, line: line)
+    }
 
     /// Whether Ideas sorts above Reading, both still at the top level; nil if either is missing.
     private func ideasAboveReading() -> Bool? {

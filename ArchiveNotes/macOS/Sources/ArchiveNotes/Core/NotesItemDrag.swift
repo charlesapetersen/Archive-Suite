@@ -56,12 +56,13 @@ enum NotesItemDrag {
     static func dragKind(on pasteboard: NSPasteboard) -> DragKind {
         let types = pasteboard.types ?? []
         if types.contains(pasteboardType) { return .items }
+        // A SwiftUI folder drag lists the `.ownProcess` folder type but answers nil for its data (measured
+        // in the VM), so the id is read from the text when the folder type gives nothing.
         let folderType = NSPasteboard.PasteboardType(folderTypeIdentifier)
-        let text = types.contains(folderType)
-            ? pasteboard.data(forType: folderType).flatMap { String(data: $0, encoding: .utf8) }
-            : pasteboard.string(forType: .string)
-        if let text, let id = UUID(uuidString: text.trimmingCharacters(in: .whitespacesAndNewlines)) {
-            return .folder(id)
+        let candidates = [pasteboard.data(forType: folderType).flatMap { String(data: $0, encoding: .utf8) },
+                          pasteboard.string(forType: .string)]
+        for case let text? in candidates {
+            if let id = UUID(uuidString: text.trimmingCharacters(in: .whitespacesAndNewlines)) { return .folder(id) }
         }
         return .other
     }

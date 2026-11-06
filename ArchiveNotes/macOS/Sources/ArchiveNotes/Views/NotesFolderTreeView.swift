@@ -34,6 +34,10 @@ struct NotesFolderTreeView: View {
     @State private var expandedFolders: Set<UUID> = []
     /// The row a drag is over and where on it the drop would land; the only drop highlight drawn.
     @State private var dropTarget: NotesFolderDropTarget?
+    /// The drag pasteboard's change count when the last drop was performed. SwiftUI can still send that
+    /// drag's row an update after the drop, which re-lit the highlight and left it on (seen in the VM's
+    /// video); a new drag changes the count.
+    @State private var finishedDrag: Int?
 
     private static let allNotesTag = "\u{0}ALL"
     private static let templatesTag = "\u{0}TEMPLATES"
@@ -229,6 +233,7 @@ struct NotesFolderTreeView: View {
                 folderID: node.id,
                 target: $dropTarget,
                 resolve: { y, height in dropTarget(onto: node.id, y: y, rowHeight: height) },
+                finish: { finishedDrag = NSPasteboard(name: .drag).changeCount },
                 sourceFolder: { model.selectedFolderId },
                 dropFolder: { dragged, target in dropFolder(dragged, on: target) },
                 acceptItems: { payload, replicate, source in
@@ -244,18 +249,27 @@ struct NotesFolderTreeView: View {
     /// a drag from outside the app. The row draws exactly this and the drop performs exactly this, so
     /// the highlighted row is always the one the drop lands in (W40.fix-notes-folder-drag).
     private func dropTarget(onto folderID: UUID, y: CGFloat, rowHeight: CGFloat) -> NotesFolderDropTarget? {
-        switch NotesItemDrag.dragKind(on: NSPasteboard(name: .drag)) {
+        let pasteboard = NSPasteboard(name: .drag)
+        guard pasteboard.changeCount != finishedDrag else { return nil }
+        switch NotesItemDrag.dragKind(on: pasteboard) {
         case .other:
             return nil
         case .items:
-            return NotesFolderDropTarget(folder: folderID, zone: .into, dragged: nil)
+            return NotesFolderDropTarget(row: folderID, folder: folderID, zone: .into, dragged: nil)
         case .folder(let dragged):
             guard model.organization.folders.contains(where: { $0.id == dragged }),
                   dragged != folderID else { return nil }
             let zone = NotesItemDrag.dropZone(y: y, rowHeight: rowHeight, isFolder: true)
+            // Below an open folder the next row is its first child, so the line there means "first
+            // child", whichever of the two rows the pointer is on.
+            if zone == .after, expandedFolders.contains(folderID),
+               let first = level(containing: folderID)?.siblings.first(where: { $0.id == folderID })?.children.first {
+                guard first.id != dragged, !model.wouldCreateCycle(moving: dragged, to: folderID) else { return nil }
+                return NotesFolderDropTarget(row: folderID, folder: first.id, zone: .before, dragged: dragged)
+            }
             let newParent = zone == .into ? folderID : level(containing: folderID)?.parentID
             if model.wouldCreateCycle(moving: dragged, to: newParent) { return nil }
-            return NotesFolderDropTarget(folder: folderID, zone: zone, dragged: dragged)
+            return NotesFolderDropTarget(row: folderID, folder: folderID, zone: zone, dragged: dragged)
         }
     }
 
@@ -311,16 +325,16 @@ struct NotesFolderTreeView: View {
                     Capsule().fill(Color.accentColor).frame(height: 2)
                     if target.zone == .before { Spacer(minLength: 0) }
                 }
-                .padding(.vertical, -2)
+                .padding(.vertical, -5)   // in the gap between the rows
                 .accessibilityHidden(true)
             }
         }
     }
 
-    /// Build each level, retaining nested disclosure rows. Deliberately no `ForEach.onMove`: on macOS it
-    /// makes the List start its own drag when a row is dragged without a long press first, and that drag
-    /// can only reorder, so a folder dropped onto another never nested (W40.fix-notes-folder-drag). The
-    /// row's own drag reorders on its edges and nests in its middle instead.
+    /// Build each level, retaining nested disclosure rows. Deliberately no `ForEach.onMove`: it made the gaps
+    /// between rows the List's own reorder targets, drawn by the List, so most of a row's height reordered and
+    /// only a band in its middle nested (W40.fix-notes-folder-drag). The row's own drop area now covers the
+    /// row, reordering on its edges and nesting in its middle, and the app draws the only highlight.
     private func folderTreeLevel(_ nodes: [NotesFolderNode], parentID: UUID?) -> AnyView {
         AnyView(
             ForEach(nodes) { node in
@@ -440,6 +454,14 @@ struct NotesFolderTreeView: View {
                 .buttonStyle(.borderless).help("New Folder")
                 .accessibilityIdentifier("an.sidebar.newFolder")
                 Spacer()
+                #if DEBUG
+                // UI-test seam: the drop highlight's state, so a test can see none is left after a drop.
+                if ProcessInfo.processInfo.arguments.contains("-ANUITestStorePath") {
+                    Text(dropTarget.map { "\($0.zone) \($0.folder.uuidString)" } ?? "none")
+                        .font(.system(size: 2)).opacity(0.05)
+                        .accessibilityIdentifier("an.sidebar.test.dropTarget")
+                }
+                #endif
             }
             .padding(.horizontal, 8).padding(.vertical, 4)
         }
@@ -483,8 +505,10 @@ struct NotesFolderTreeView: View {
     }
 }
 
-/// A drop resolved over a folder row: which row, where on it, and the folder being dragged (nil for notes).
+/// A drop resolved over a folder row: the row under the pointer, the folder the drop lands on or beside
+/// (usually the same row), where, and the folder being dragged (nil for notes).
 struct NotesFolderDropTarget: Equatable {
+    let row: UUID
     let folder: UUID
     let zone: NotesItemDrag.DropZone
     let dragged: UUID?
@@ -496,19 +520,26 @@ private struct NotesFolderRowDropTarget: ViewModifier {
     let folderID: UUID
     @Binding var target: NotesFolderDropTarget?
     let resolve: @MainActor (CGFloat, CGFloat) -> NotesFolderDropTarget?
+    let finish: @MainActor () -> Void
     let sourceFolder: @MainActor @Sendable () -> UUID?
     let dropFolder: @MainActor (UUID, NotesFolderDropTarget) -> Void
     let acceptItems: @MainActor @Sendable (String, Bool, UUID?) -> Void
     @State private var height: CGFloat = 0
+    /// How far the drop area reaches past the label, above and below. A sidebar row's label is about half
+    /// the row's height (16 of 32 pt in the VM), so without this, half of every row took no drop and the
+    /// highlight went out between rows (W40.fix-notes-folder-drag). It does not change the layout.
+    static let reach: CGFloat = 6
 
     func body(content: Content) -> some View {
         content
             .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.vertical, Self.reach)
             .contentShape(Rectangle())
             .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height = $0 }
             .onDrop(of: NotesFolderDropDelegate.types, delegate: NotesFolderDropDelegate(
-                folderID: folderID, rowHeight: height, target: $target, resolve: resolve,
+                folderID: folderID, rowHeight: height, target: $target, resolve: resolve, finish: finish,
                 sourceFolder: sourceFolder, dropFolder: dropFolder, acceptItems: acceptItems))
+            .padding(.vertical, -Self.reach)
     }
 }
 
@@ -524,6 +555,8 @@ private struct NotesFolderDropDelegate: DropDelegate {
     let rowHeight: CGFloat
     @Binding var target: NotesFolderDropTarget?
     let resolve: @MainActor (CGFloat, CGFloat) -> NotesFolderDropTarget?
+    /// Marks the drag as dropped, so no late update for it lights a row again.
+    let finish: @MainActor () -> Void
     // SwiftUI may retain the delegate across selection updates. Resolve the current scope at the
     // drop boundary, then capture the value before any provider callback can run.
     let sourceFolder: @MainActor @Sendable () -> UUID?
@@ -544,14 +577,14 @@ private struct NotesFolderDropDelegate: DropDelegate {
     /// Leaving this row clears the highlight only if it is still this row's; the next row may already
     /// have taken it.
     func dropExited(info: DropInfo) {
-        MainActor.assumeIsolated { if target?.folder == folderID { target = nil } }
+        MainActor.assumeIsolated { if target?.row == folderID { target = nil } }
     }
 
     @discardableResult
     private func track(_ info: DropInfo) -> NotesFolderDropTarget? {
         MainActor.assumeIsolated {
             let resolved = resolve(info.location.y, rowHeight)
-            if resolved != nil || target?.folder == folderID, target != resolved { target = resolved }
+            if resolved != nil || target?.row == folderID, target != resolved { target = resolved }
             return resolved
         }
     }
@@ -559,6 +592,7 @@ private struct NotesFolderDropDelegate: DropDelegate {
     func performDrop(info: DropInfo) -> Bool {
         let resolved = MainActor.assumeIsolated { () -> NotesFolderDropTarget? in
             let resolved = resolve(info.location.y, rowHeight)
+            finish()
             target = nil
             return resolved
         }
