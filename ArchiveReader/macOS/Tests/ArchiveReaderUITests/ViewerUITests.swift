@@ -184,6 +184,42 @@ final class ViewerUITests: FixtureUITestCase {
         RunLoop.current.run(until: Date().addingTimeInterval(0.5))
     }
 
+    /// W40.fix-suite-shortcuts: the panel toggles are on the Mac's sidebar key (⌃⌘S) and beside it (⌃⌘T), off
+    /// ⌥⌘T, the Mac's toolbar key; and ⌘F in the navigation window goes to the OCR search, as ⌥⌘F does.
+    func testPanelKeysAndFindInTheNavigationWindow() throws {
+        waitForRows(minimum: 3, timeout: 10)
+        func toggleTitle(_ names: [String]) -> String {
+            _ = viewMenuItem(names[0])
+            let item = app.menuBars.menuItems.matching(NSPredicate(format: "title IN %@", names)).firstMatch
+            let title = item.exists ? item.title : ""
+            closeMenu()
+            return title
+        }
+        for (key, names) in [("s", ["Hide Sidebar", "Show Sidebar"]), ("t", ["Hide Tag Cloud", "Show Tag Cloud"])] {
+            let before = toggleTitle(names)
+            XCTAssertTrue(names.contains(before), "precondition: View lists \(names[0]) or \(names[1])")
+            pressKey(key, modifiers: [.command, .control])
+            settle(0.5)
+            XCTAssertNotEqual(toggleTitle(names), before, "⌃⌘\(key.uppercased()) toggles \(names[0])")
+            pressKey(key, modifiers: [.command, .control])   // as it was, for the tests after this one
+            settle(0.5)
+            XCTAssertEqual(toggleTitle(names), before)
+        }
+
+        clickRow(0)
+        let search = app.textFields["ar.filter.ocr"]
+        XCTAssertTrue(search.waitForExistence(timeout: 5), "the OCR search field is in the toolbar")
+        pressKey("f", modifiers: .command)
+        let deadline = Date().addingTimeInterval(5)
+        func focused() -> Bool {
+            (search.value(forKey: "hasKeyboardFocus") as? Bool) == true
+                || search.descendants(matching: .any).matching(NSPredicate(format: "hasKeyboardFocus == true")).count > 0
+        }
+        while !focused(), Date() < deadline { settle(0.2) }
+        XCTAssertTrue(focused(), "⌘F in the navigation window puts the caret in Search OCR text")
+        app.typeKey(.escape, modifierFlags: [])
+    }
+
     /// W40.fix-reader-menus-follow-window (owner session reader-1, rows 14 and 20): with the document window in
     /// front, the list-only panel toggles leave the View menu, and the Tags menu works on the open file. ⌘R
     /// marks it Read and ⌘Z undoes that, through the shared undo ledger; the window's status line says so.

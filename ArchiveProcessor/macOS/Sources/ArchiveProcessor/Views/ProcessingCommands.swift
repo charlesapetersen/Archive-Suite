@@ -3,11 +3,15 @@ import AppKit
 
 // Discoverable main-window keyboard shortcuts, exposed as a menu-bar `CommandMenu` so they show their
 // key equivalents in the menu (⌘R, ⌘⌥P) and route through AppKit's menu system rather than hijacking
-// text input. Chosen combos are free: the app only removes ⌘N (`.newItem`); ⌘, is the system Settings
-// shortcut; every other existing `.keyboardShortcut` is scoped to a modal sheet (Return/Esc/⌘Return).
+// text input. Chosen combos are free: the app replaces File ▸ New (`.newItem`) with Add Files… (⌘O) and
+// Choose Output Folder… (⇧⌘O, the suite's "choose folder" key: Choose Archive Folder… in the Reader and
+// Notes; W40.fix-suite-shortcuts); ⌘, is the system Settings shortcut; Stop Processing is ⌘., the Mac's
+// Cancel; every other existing `.keyboardShortcut` is scoped to a modal sheet (Return/Esc/⌘Return).
 //
 // The menu items only POST a request; the real work runs in MainActor view observers (`OCRView` for
-// Start — reusing its exact enable guard; `ContentView` for Cycle provider). Both observers stand down
+// Start, Stop and the two panels — each reusing its button's exact guard; `ContentView` for Cycle
+// provider). With another mode in front (Live Capture, Tools) no `OCRView` is listening, so they do
+// nothing, as the buttons are not there either. Every observer stands down
 // while a text field is being edited (`TextEditingGuard`), so a shortcut never steals a keystroke from
 // typing and Start can never begin a run the button itself wouldn't allow.
 
@@ -17,6 +21,12 @@ extension Notification.Name {
     static let startProcessingRequested = Notification.Name("StartProcessingRequested")
     /// Posted from the menu to cycle the LLM provider (⌘⌥P). Handled in `ContentView`.
     static let cycleProviderRequested = Notification.Name("CycleProviderRequested")
+    /// Posted from the menu to stop the run or the review (⌘.), as the Cancel button does. Handled in `OCRView`.
+    static let stopProcessingRequested = Notification.Name("StopProcessingRequested")
+    /// Posted from File ▸ Add Files… (⌘O); `OCRView` opens its file panel when its Add Files… button would.
+    static let addFilesRequested = Notification.Name("AddFilesRequested")
+    /// Posted from File ▸ Choose Output Folder… (⇧⌘O); `OCRView` opens its output-folder panel.
+    static let chooseOutputFolderRequested = Notification.Name("ChooseOutputFolderRequested")
     /// Posted after a processing profile is applied so views holding derived `@State` (selected model,
     /// API-key fields) re-sync from the freshly-written UserDefaults values.
     static let processingProfileApplied = Notification.Name("ProcessingProfileApplied")
@@ -59,10 +69,31 @@ struct ProcessingCommands: Commands {
             }
             .keyboardShortcut("r", modifiers: .command)
 
+            Button("Stop Processing") {
+                NotificationCenter.default.post(name: .stopProcessingRequested, object: nil)
+            }
+            .keyboardShortcut(".", modifiers: .command)
+
             Button("Cycle Provider") {
                 NotificationCenter.default.post(name: .cycleProviderRequested, object: nil)
             }
             .keyboardShortcut("p", modifiers: [.command, .option])
+        }
+    }
+}
+
+/// File menu: in place of New, which the Processor has no use for.
+struct ProcessorFileCommands: Commands {
+    var body: some Commands {
+        CommandGroup(replacing: .newItem) {
+            Button("Add Files\u{2026}") {
+                NotificationCenter.default.post(name: .addFilesRequested, object: nil)
+            }
+            .keyboardShortcut("o", modifiers: .command)
+            Button("Choose Output Folder\u{2026}") {
+                NotificationCenter.default.post(name: .chooseOutputFolderRequested, object: nil)
+            }
+            .keyboardShortcut("o", modifiers: [.command, .shift])
         }
     }
 }

@@ -182,7 +182,7 @@ struct EditorLinesTests {
         #expect(MarkdownBridge.serialize(storage) == "- x")
     }
 
-    /// The toggle on a line with text, through `FormattingContext` (what ⇧⌘U, the menu and the toolbar call).
+    /// The toggle on a line with text, through `FormattingContext` (what ⌥⌘U, the menu and the toolbar call).
     @Test func bulletedListOnALineWithText() throws {
         let (tv, storage) = try editor("A\n\nB")
         let context = FormattingContext()

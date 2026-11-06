@@ -396,6 +396,20 @@ struct OCRView: View {
             guard !TextEditingGuard.isEditingText, canStartProcessing else { return }
             startProcessing()
         }
+        // ⌘., ⌘O and ⇧⌘O (W40.fix-suite-shortcuts) do what the Cancel, Add Files… and Choose… buttons do,
+        // and only when that button is on screen and enabled. The two panels take no keystroke from a field,
+        // so only Stop stands down while one is edited (there ⌘. ends the editing).
+        .onReceive(NotificationCenter.default.publisher(for: .stopProcessingRequested)) { _ in
+            guard !TextEditingGuard.isEditingText, processor.isProcessing || isInReviewMode else { return }
+            processor.cancel()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .addFilesRequested)) { _ in
+            guard !isInReviewMode, !processor.isProcessing else { return }
+            selectFiles()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .chooseOutputFolderRequested)) { _ in
+            chooseOutputDirectory()
+        }
         .onChange(of: scenePhase) { _, phase in
             // Returning from the Settings window: pick up any changed key / output folder. (The model is
             // no longer re-synced here — it is read live from `ModelSelectionStore`, which also covers the

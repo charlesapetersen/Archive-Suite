@@ -40,21 +40,25 @@ struct ArchiveReaderCommands: Commands {
     private var tagSheetNav: NavigationModel? { nav ?? docTags?.navigation }
     /// No viewer, or a viewer with no find bar (the preview sheet) — see the Find items below.
     private var noFind: Bool { !(doc?.supportsFind ?? false) }
+    /// The navigation window is in front with nothing over it, so Find… searches the library.
+    private var findSearchesLibrary: Bool { nav.map { !$0.showingPreview } ?? false }
 
     var body: some Commands {
         // View — panel toggles (placed in the system View menu)
         CommandGroup(before: .sidebar) {
             // Both panels belong to the navigation window, so they are listed only while it is in front
             // (W40.fix-reader-menus-follow-window; owner session reader-1, row 14).
+            // ⌃⌘S is the Mac's Show/Hide Sidebar, and the tag cloud takes the T beside it. They were ⌥⌘S and ⌥⌘T
+            // until W40.fix-suite-shortcuts; ⌥⌘T is the Mac's Show/Hide Toolbar.
             if nav != nil {
                 Button(showingSidebar ? "Hide Sidebar" : "Show Sidebar") {
                     showingSidebar.toggle()
                 }
-                .keyboardShortcut("s", modifiers: [.command, .option])
+                .keyboardShortcut("s", modifiers: [.command, .control])
                 Button(showingTagCloud ? "Hide Tag Cloud" : "Show Tag Cloud") {
                     showingTagCloud.toggle()
                 }
-                .keyboardShortcut("t", modifiers: [.command, .option])
+                .keyboardShortcut("t", modifiers: [.command, .control])
             }
             // W40.fix-reader-jpeg-toolbar: listed whenever a document is open, disabled without a JPEG
             // original, so it can be found; the document toolbar's PDF / JPEG switch says why.
@@ -214,8 +218,10 @@ struct ArchiveReaderCommands: Commands {
             // The preview sheet publishes a model so zoom/paging/copy/page-link reach it (W26.previewzoom),
             // which enables every `doc == nil` item (here and under Edit) — but it has no find bar and no way to type a
             // query, so ⌘F looked live and did nothing there (W26.previewzoom-fu1).
-            Button("Find…") { doc?.beginFind() }
-                .keyboardShortcut("f", modifiers: .command).disabled(noFind)
+            // ⌘F is Find in every window (W40.fix-suite-shortcuts): with the navigation window in front, and no
+            // preview sheet over it, it is Search OCR Text, as ⌥⌘F is. The preview sheet still has no find.
+            Button("Find…") { if !noFind { doc?.beginFind() } else { nav?.requestFocusSearch() } }
+                .keyboardShortcut("f", modifiers: .command).disabled(noFind && !findSearchesLibrary)
             Button("Find Next") { doc?.showingFind = true; doc?.findNext() }
                 .keyboardShortcut("g", modifiers: .command).disabled(noFind)
             Button("Find Previous") { doc?.showingFind = true; doc?.findPrevious() }

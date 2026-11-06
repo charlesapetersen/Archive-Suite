@@ -31,12 +31,14 @@ struct FormatCommands: Commands {
                         .disabled(formatting == nil)
                 }
             }
+            // Block formats share ⌥⌘ (headings, Body, Blockquote, Code Block). The lists were ⇧⌘U and ⇧⌘O
+            // until W40.fix-suite-shortcuts: ⇧⌘O is Choose Archive Folder… in every app of the suite.
             Section {
                 Button("Bulleted List") { formatting?.toggleUnorderedList() }
-                    .keyboardShortcut("u", modifiers: [.command, .shift])
+                    .keyboardShortcut("u", modifiers: [.command, .option])
                     .disabled(formatting == nil)
                 Button("Numbered List") { formatting?.toggleOrderedList() }
-                    .keyboardShortcut("o", modifiers: [.command, .shift])
+                    .keyboardShortcut("o", modifiers: [.command, .option])
                     .disabled(formatting == nil)
                 Button("Blockquote") { formatting?.toggleBlockquote() }
                     .keyboardShortcut("q", modifiers: [.command, .option])
@@ -63,7 +65,9 @@ struct ReaderRootCommands: Commands {
 
     var body: some Commands {
         CommandGroup(after: .newItem) {
+            // ⇧⌘O, as in the Reader (W40.fix-suite-shortcuts).
             Button("Choose Archive Folder\u{2026}") { previewState.chooseArchiveFolder() }
+                .keyboardShortcut("o", modifiers: [.command, .shift])
             Button("Choose Store Folder\u{2026}") {
                 notesModel.storeFolderChooser?.choose(readerRoots: previewState.grantedArchiveFolders)
             }
@@ -197,7 +201,9 @@ struct ZoteroCommands: Commands {
 
     var body: some Commands {
         CommandMenu("Note") {
+            // ⇧⌘C, the Reader's Copy Link(s) (W40.fix-suite-shortcuts).
             Button("Copy Link") { formatting?.copyCurrentItemLink() }
+                .keyboardShortcut("c", modifiers: [.command, .shift])
                 .disabled(copyLinkAvailable != true)
             Divider()
             Button("Attach Zotero Link\u{2026}") { formatting?.attachZoteroLink() }

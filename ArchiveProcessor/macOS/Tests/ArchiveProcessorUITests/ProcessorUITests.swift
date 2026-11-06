@@ -102,6 +102,29 @@ final class ProcessorUITests: XCTestCase {
         attachScreenshot("processor-start-blocked-reason")
     }
 
+    /// W40.fix-suite-shortcuts: File ▸ Add Files… (⌘O) and Choose Output Folder… (⇧⌘O, the suite's "choose
+    /// folder" key) open the panels their buttons open, and Processing ▸ Stop Processing is listed on ⌘.
+    func testFileMenuShortcutsOpenTheirPanels() throws {
+        XCTAssertTrue(element("ap.ocr.dropZone").waitForExistence(timeout: 10), "the Process Files window is up")
+        for title in ["Add Files…", "Choose Output Folder…", "Stop Processing"] {
+            XCTAssertTrue(app.menuBars.menuItems[title].exists, "the menu bar lists \(title)")
+        }
+
+        app.typeKey("o", modifierFlags: .command)
+        let open = app.buttons["Open"]
+        XCTAssertTrue(open.waitForExistence(timeout: 5), "⌘O opens the Add Files panel")
+        attachScreenshot("processor-cmd-o-add-files")
+        app.typeKey(.escape, modifierFlags: [])
+        XCTAssertTrue(open.waitForNonExistence(timeout: 5), "Escape dismisses it")
+
+        app.typeKey("o", modifierFlags: [.command, .shift])
+        let select = app.buttons["Select Output Folder"]
+        XCTAssertTrue(select.waitForExistence(timeout: 5), "⇧⌘O opens the output-folder panel")
+        attachScreenshot("processor-shift-cmd-o-output-folder")
+        app.typeKey(.escape, modifierFlags: [])
+        XCTAssertTrue(select.waitForNonExistence(timeout: 5), "Escape dismisses it")
+    }
+
     func testInstitutionalComputingImportOffersNeutralFolderChooser() throws {
         relaunch(extra: ["-APUITestSyntheticMultiPagePDF"])
         let choose = element("ap.ocr.institutionalComputeChoose")

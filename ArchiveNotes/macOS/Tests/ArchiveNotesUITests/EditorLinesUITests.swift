@@ -6,7 +6,7 @@ import XCTest
 /// selected again. Row 10: Bulleted List showed nothing.
 ///
 /// The paths (phase rule 8): Return and Backspace at the end of the note and in the middle of it; type, select
-/// another note, select this one again, type again; quit and relaunch. Bulleted List from ⇧⌘U, the Format menu and
+/// another note, select this one again, type again; quit and relaunch. Bulleted List from ⌥⌘U, the Format menu and
 /// the editor toolbar, on an empty last line, then across a reselect. `EditorLinesStackedUITests` runs it all again
 /// with the list above the note. Scratch fixture only (`AN-GUI-Fixture`, restored before every test).
 class EditorLinesUITests: NotesFixtureUITestCase {
@@ -84,11 +84,11 @@ class EditorLinesUITests: NotesFixtureUITestCase {
             try loadNote(id)
             XCTAssertEqual(markers(), "", "the note starts with no list")
 
-            // ⇧⌘U on an empty last line: the bullet shows before anything is typed.
+            // ⌥⌘U on an empty last line: the bullet shows before anything is typed.
             try typeIntoEditor("\n\n")
-            app.typeKey("u", modifierFlags: [.command, .shift])
+            app.typeKey("u", modifierFlags: [.command, .option])
             XCTAssertTrue(pollUntil(timeout: 5) { self.markerCount() == 1 },
-                          "⇧⌘U should draw a bullet on the empty line — markers: \(markers())")
+                          "⌥⌘U should draw a bullet on the empty line — markers: \(markers())")
             editor.typeText("Via shortcut\nSecond item")
             XCTAssertTrue(pollUntil(timeout: 5) { self.markerCount() == 2 }, "Return should make a second item — \(markers())")
 

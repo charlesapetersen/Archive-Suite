@@ -42,7 +42,7 @@ struct ArchiveProcessorApp: App {
         .windowStyle(.titleBar)
         .windowToolbarStyle(.unified)
         .commands {
-            CommandGroup(replacing: .newItem) {}
+            ProcessorFileCommands()
             ProcessingCommands()
         }
 
