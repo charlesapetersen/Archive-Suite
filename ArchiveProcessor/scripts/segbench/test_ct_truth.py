@@ -217,6 +217,15 @@ class Repeats(unittest.TestCase):
         self.assertFalse(T.repeat_of([None, "CBI 15"], fields))                          # not on a word boundary
         self.assertFalse(T.repeat_of(["box label"], {"kind": "box label"}))              # kind is not settled text
 
+    def test_still_asked_questions_drop_repeated_readings(self):
+        fields = {"kind": "box label", "collection_number": "91/115 c", "collection_title": "Paul Seabury Papers"}
+        self.assertEqual(T.drop_repeats(["c", "91/115 c", "UC-NRLF; W 94 937", None], fields),
+                         ["UC-NRLF; W 94 937", None])
+        self.assertEqual(T.repeats_in("2007-119", {"accession": "2007-119"}, T.TITLE_FIELDS), [])   # not a title
+        self.assertEqual(T.repeats_in("1959-1987", {"collection_title": "X Records, 1959-1987"}, T.TITLE_FIELDS),
+                         ["collection_title"])
+        self.assertIn("folder", T.REPEAT_EXEMPT)   # "5" as the folder of "Box 5" is not a repeat
+
 
 if __name__ == "__main__":
     unittest.main()

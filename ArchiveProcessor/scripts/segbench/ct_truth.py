@@ -1010,15 +1010,35 @@ def _txt(v):
     return re.sub(r"[^a-z0-9]+", " ", str(v).lower()).strip()
 
 
+# Fields the repeat rule leaves alone: a folder or series number legitimately repeats a number elsewhere on the
+# label ("5" as the folder of "Box 5"), and a container is the label's own subject.
+REPEAT_EXEMPT = {"kind", "folder", "container", "series"}
+TITLE_FIELDS = {"collection_title", "collection_subtitle", "box_title", "series_title", "folder_title"}
+
+
+def repeats_in(v, fields, only=None):
+    """The settled fields (of `only`, if given) whose text contains reading v, word-bounded after case and
+    punctuation are folded."""
+    t = _txt(v) if v else ""
+    if not t:
+        return []
+    return [k for k, w in fields.items() if w and k != "kind" and (only is None or k in only)
+            and re.search(r"(?<![a-z0-9])" + re.escape(t) + r"(?![a-z0-9])", _txt(w))]
+
+
 def repeat_of(readings, fields):
     """Owner, 2026-11-05, on the second sheet: one piece of label text goes in one field. True when every reading
     offered for a field only repeats text already settled in another field on the photo (the collection title
     offered again as the box title, "CBI 154" as an other mark when it is the collection number), so the field is
     settled as not on the label instead of asked. A reading that adds anything to the settled text stays asked."""
-    settled = [_txt(v) for k, v in fields.items() if v and k != "kind"]
-    vals = [_txt(r) for r in readings if r]
-    return bool(vals) and all(len(v) >= 2 and any(re.search(r"(?<![a-z0-9])" + re.escape(v) + r"(?![a-z0-9])", t)
-                                                  for t in settled) for v in vals)
+    vals = [r for r in readings if r]
+    return bool(vals) and all(repeats_in(v, fields) for v in vals)
+
+
+def drop_repeats(readings, fields):
+    """The owner, the same evening: a field still asked does not offer a reading that only repeats settled text
+    ("91/115 c", the collection number, offered as an other mark beside a new reading). The empty reading stays."""
+    return [r for r in readings if not r or not repeats_in(r, fields)]
 
 
 def revise_rows():
@@ -1066,18 +1086,24 @@ def revise_rows():
                 readings = [v] + [x for x in readings if not agree(f, x, v)]
                 if not disputed.get(f) and ok and r["agreed"].get(f) is not None and not agree(f, r["agreed"][f], v):
                     readings.append(r["agreed"][f])
-            if f != "kind" and f not in n.get("confirm", []) and repeat_of(readings, fields):
-                # The exception, the owner's: a date inside a settled title (the collection's "1959-1987") is the
-                # date as well, when the readings give one value for it.
-                dates = list(dict.fromkeys(x for x in readings if x))
-                if f == "date" and len(dates) == 1:
-                    put(f, dates[0], "rule")
-                    st["date inside settled text, taken as the date (rule)"] += 1
-                elif f != "date":
+            if f not in REPEAT_EXEMPT and f not in n.get("confirm", []):
+                if f == "date":
+                    # The exception, the owner's: a date inside a settled title (the collection's "1959-1987") is
+                    # the date as well, when the readings give one value. Only inside a title: "2007-119" repeats
+                    # an accession and is no date, so it stays asked.
+                    dates = list(dict.fromkeys(x for x in readings if x))
+                    if len(dates) == 1 and repeats_in(dates[0], fields, TITLE_FIELDS):
+                        put(f, dates[0], "rule")
+                        st["date inside a settled title, taken as the date (rule)"] += 1
+                        continue
+                elif repeat_of(readings, fields):
                     put(f, None, "rule")
                     st["reading only repeats settled text, not on the label (rule)"] += 1
-                if f in fields:
                     continue
+                else:
+                    kept = drop_repeats(readings, fields)
+                    st["repeated readings dropped from a question still asked"] += len(readings) - len(kept)
+                    readings = kept
             box, how = field_place(f, readings, lines, boxes)
             open_.append({"field": f, "readings": readings, "box": box, "placed": how})
         if not ok:
