@@ -5,31 +5,36 @@ final class PDFHeaderParserTests: XCTestCase {
 
     // MARK: - parseClassification
 
+    /// An app-format page-2 text whose header carries `line` after the provider line.
+    private func page(_ line: String, body: String = "The quick brown fox.") -> String {
+        "Extracted text.\nscan_001.jpg\nAnthropic \u{00B7} Claude \u{00B7} 2026-07-10\n\(line)\n\n\(body)"
+    }
+
     func testParseClassificationKnownValues() {
-        XCTAssertEqual(PDFHeaderParser.parseClassification(from: "Classification: Document Start"), "Document Start")
-        XCTAssertEqual(PDFHeaderParser.parseClassification(from: "Classification: Continuation"), "Continuation")
-        XCTAssertEqual(PDFHeaderParser.parseClassification(from: "Classification: Box"), "Box")
-        XCTAssertEqual(PDFHeaderParser.parseClassification(from: "Classification: Folder"), "Folder")
+        XCTAssertEqual(PDFHeaderParser.parseClassification(from: page("Classification: Document Start")), "Document Start")
+        XCTAssertEqual(PDFHeaderParser.parseClassification(from: page("Classification: Continuation")), "Continuation")
+        XCTAssertEqual(PDFHeaderParser.parseClassification(from: page("Classification: Box")), "Box")
+        XCTAssertEqual(PDFHeaderParser.parseClassification(from: page("Classification: Folder")), "Folder")
     }
 
     func testParseClassificationUnknownValue() {
         // The parser returns the raw string; enum mapping is the caller's job.
-        XCTAssertEqual(PDFHeaderParser.parseClassification(from: "Classification: NewType"), "NewType")
+        XCTAssertEqual(PDFHeaderParser.parseClassification(from: page("Classification: NewType")), "NewType")
     }
 
     func testParseClassificationEmpty() {
-        XCTAssertNil(PDFHeaderParser.parseClassification(from: "Classification: "))
-        XCTAssertNil(PDFHeaderParser.parseClassification(from: "Classification:"))
+        XCTAssertNil(PDFHeaderParser.parseClassification(from: page("Classification: ")))
+        XCTAssertNil(PDFHeaderParser.parseClassification(from: page("Classification:")))
     }
 
     func testParseClassificationAbsent() {
-        XCTAssertNil(PDFHeaderParser.parseClassification(from: "No classification here"))
+        XCTAssertNil(PDFHeaderParser.parseClassification(from: page("Document date: 1957")))
         XCTAssertNil(PDFHeaderParser.parseClassification(from: ""))
     }
 
     func testParseClassificationWithLeadingWhitespace() {
         // Tabs/spaces before "Classification:" should still be found.
-        XCTAssertEqual(PDFHeaderParser.parseClassification(from: "  Classification: Box"), "Box")
+        XCTAssertEqual(PDFHeaderParser.parseClassification(from: page("  Classification: Box")), "Box")
     }
 
     func testParseClassificationMultiline() {
@@ -195,12 +200,56 @@ final class PDFHeaderParserTests: XCTestCase {
         XCTAssertEqual(PDFHeaderParser.stripHeader(from: pageText), "document date: 1957\n\nBody.")
     }
 
-    // MARK: - Classification in body text (not header)
+    // MARK: - Classification outside the header (W40.fix-core-classification-from-body)
 
-    func testClassificationLineInBodyTextIsFound() {
-        // A Classification: line appearing in body text on page 1 should still be found
-        // by parseClassification (Reader's historical behavior — scan all pages).
-        let text = "Some preamble\nClassification: Folder\nSome other text"
-        XCTAssertEqual(PDFHeaderParser.parseClassification(from: text), "Folder")
+    func testClassificationLineInBodyTextIsNotTheClassification() {
+        // An OCR'd security marking in the body is document text, not the page's classification.
+        let body = "Memo\nClassification: Top Secret"
+        XCTAssertNil(PDFHeaderParser.parseClassification(from: page("Document date: 1957", body: body)))
+        XCTAssertEqual(PDFHeaderParser.parseClassification(from: page("Classification: Continuation", body: body)),
+                       "Continuation")
+    }
+
+    func testClassificationNeedsTheAppFormatHeader() {
+        // Text that is not an app-format page 2 (a page-1 text layer, a bare line) has no classification.
+        XCTAssertNil(PDFHeaderParser.parseClassification(from: "Classification: Box"))
+        XCTAssertNil(PDFHeaderParser.parseClassification(from: "Some preamble\nClassification: Folder\nSome other text"))
+    }
+
+    func testFileNameStartingWithClassificationIsNotTheClassification() {
+        let meta = "Anthropic \u{00B7} Claude \u{00B7} 2026-07-10"
+        XCTAssertNil(PDFHeaderParser.parseClassification(from: "Extracted text.\nClassification: notes.jpg\n\(meta)\n\nBody."))
+        XCTAssertEqual(PDFHeaderParser.parseClassification(
+            from: "Extracted text.\nClassification: notes.jpg\n\(meta)\nClassification: Box\n\nBody."), "Box")
+        // No file name line: the classification directly follows the meta line.
+        XCTAssertEqual(PDFHeaderParser.parseClassification(from: "Extracted text.\n\(meta)\nClassification: Box\n\nBody."), "Box")
+        // A file name with the separator in it does not hide the classification.
+        XCTAssertEqual(PDFHeaderParser.parseClassification(
+            from: "Extracted text.\nBox 4 \u{00B7} Folder 2.jpg\n\(meta)\nClassification: Folder\n\nBody."), "Folder")
+        XCTAssertEqual(PDFHeaderParser.parseClassification(
+            from: "Extracted text.\nA \u{00B7} B \u{00B7} C.jpg\n\(meta)\nClassification: Folder\n\nBody."), "Folder")
+    }
+
+    func testClassificationWithoutTheBlankSeparator() {
+        // PDFKit drops the blank line under the header from a real page's text; the header still ends at
+        // the first line that is not a header line.
+        let meta = "Gemini \u{00B7} Gemini 3.1 Flash Lite Preview \u{00B7} 3 April 2026"
+        XCTAssertEqual(PDFHeaderParser.parseClassification(
+            from: "Extracted text.\n00206 \u{2014} Young.jpg\n\(meta)\nClassification: Document Start\nBOOK NOTE No.20"),
+            "Document Start")
+        XCTAssertNil(PDFHeaderParser.parseClassification(
+            from: "Extracted text.\nscan.jpg\n\(meta)\nMemo\nClassification: Top Secret"))
+        XCTAssertNil(PDFHeaderParser.parseClassification(
+            from: "Extracted text.\nscan.jpg\n\(meta)\nDocument date: 1957\nClassification: Top Secret"))
+        // A body line with middle dots in it is not a second meta line.
+        XCTAssertNil(PDFHeaderParser.parseClassification(
+            from: "Extracted text.\n\(meta)\nA \u{00B7} B \u{00B7} C\nClassification: Top Secret"))
+        // A meta line wrapped before its date still leads to the classification.
+        XCTAssertEqual(PDFHeaderParser.parseClassification(
+            from: "Extracted text.\nscan.jpg\nOpenRouter \u{00B7} Qwen3-VL 235B (deepinfra fp8) \u{00B7}\n3 April 2026\nClassification: Box\nBody"),
+            "Box")
+        // So does a file name that has the separator and ends in a year.
+        XCTAssertEqual(PDFHeaderParser.parseClassification(
+            from: "Extracted text.\nBox 4 \u{00B7} 1957\n\(meta)\nClassification: Box\nBody"), "Box")
     }
 }

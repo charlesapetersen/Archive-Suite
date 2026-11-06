@@ -180,6 +180,11 @@ Sent with: <display>           ← OPTIONAL (W37); the covering letter's date, e
 - **Classification may be ABSENT.** It is written only when the Processor knows it; consumers **must
   degrade gracefully** (fall back to filename-sequence order + manual grouping). Never build a core
   behavior that assumes it exists.
+- **Classification is read from the header only** (W40.fix-core-classification-from-body): page 2 must start
+  `Extracted text.`, and the line must directly follow the provider line, before any source-date line. A
+  `Classification:` line in the OCR body (an archival security marking), on another page or in the file name
+  is not the classification. PDFKit drops the blank separator from a real page's text, so the header ends at
+  the first line that is not a header line; a wrapped provider line may take one continuation line.
 - **Source-date lines (W37.dual-date).** `Document date:` / `Sent with:` are the SOURCE document's dates
   (`ArchiveDate.display` form), distinct from the provider line's OCR processing date, and only an
   output-time snapshot: the live value is always the Finder tags. Exact case-sensitive prefixes

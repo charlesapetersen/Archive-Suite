@@ -444,7 +444,8 @@ final class ContentIndexTests: XCTestCase {
     func testClassificationParsing() {
         let page2 = "Extracted text.\n00023 IMG — Brown.jpg\nGemini · Gemini 2.5 · 19 June 2026\nClassification: Document Start\nINTRODUCTION"
         XCTAssertEqual(PDFHeaderParser.parseClassification(from: page2), "Document Start")
-        XCTAssertEqual(PDFHeaderParser.parseClassification(from: "Classification: Box"), "Box")
+        // Only the app-format header carries it (W40.fix-core-classification-from-body).
+        XCTAssertNil(PDFHeaderParser.parseClassification(from: "Classification: Box"))
         XCTAssertNil(PDFHeaderParser.parseClassification(from: "no classification line here"))
     }
 

@@ -43,22 +43,17 @@ public enum PDFHeaderParser {
 
         let fullBody = pageTexts.joined(separator: "\n")
 
-        // Scan all pages for a Classification: line (Reader's behavior — first match wins).
-        var classification: String?
-        for text in pageTexts {
-            if let c = parseClassification(from: text) {
-                classification = c
-                break
-            }
-        }
-
-        // Attempt to parse the Processor's app-format header from page 2 to produce strippedBody.
+        // Parse the Processor's app-format header from page 2: the classification and strippedBody.
+        // W40.fix-core-classification-from-body: the classification comes from that header block only,
+        // never from a `Classification:` line in OCR body text or on another page.
         let strippedBody: String
+        var classification: String?
         if doc.pageCount >= 2, let textPage = doc.page(at: 1),
            let pageText = textPage.string, pageText.hasPrefix("Extracted text.") {
             strippedBody = stripHeader(from: pageText)
+            classification = parseClassification(from: pageText)
         } else {
-            // Not app-format — stripped = full (nothing to strip).
+            // Not app-format — stripped = full (nothing to strip), and no header to read a classification from.
             strippedBody = fullBody
         }
 
@@ -70,16 +65,51 @@ public enum PDFHeaderParser {
         )
     }
 
-    /// Parse the `Classification:` value from a page's text. Returns `nil` if absent or empty.
+    /// Parse the `Classification:` value from an app-format page-2 text. Returns `nil` if absent or empty.
+    ///
+    /// Read only from the header block (`stripHeader`'s layout): the page must start `Extracted text.`, and
+    /// the line must directly follow the provider/model line, ahead of any source-date line (the SPEC's
+    /// order). A `Classification:` line in the OCR body (an archival security marking) or a file name that
+    /// starts with the word is not the classification (W40.fix-core-classification-from-body).
+    ///
+    /// The scan stops at the first line that is not a header line, not only at the blank separator: PDFKit
+    /// drops that blank line from a real page's text (seen on the corpus's app-format PDFs, 2026-11-06), so
+    /// the header runs straight into the body. A body whose FIRST line is a `Classification:` line under a
+    /// header without one therefore still reads as the header's; nothing on such a page tells them apart.
     public static func parseClassification(from text: String) -> String? {
-        for line in text.split(separator: "\n") {
+        let lines = text.components(separatedBy: .newlines)
+        guard let first = lines.first, first.trimmingCharacters(in: .whitespaces).hasPrefix("Extracted text.") else {
+            return nil
+        }
+        var seenMetaLine = false, metaLineEnded = false, extraLine = false
+        for line in lines.dropFirst() {
             let t = line.trimmingCharacters(in: .whitespaces)
+            if t.isEmpty { break }  // the blank separator, when the text kept it
+            if !seenMetaLine {
+                // The optional file name comes before the meta line and is skipped whatever it says.
+                if t.contains(" \u{00B7} ") { seenMetaLine = true; metaLineEnded = endsWithYear(t) }
+                continue
+            }
             if t.hasPrefix("Classification:") {
                 let value = t.dropFirst("Classification:".count).trimmingCharacters(in: .whitespaces)
                 return value.isEmpty ? nil : value
             }
+            if isSourceDateLine(t) { return nil }  // the classification comes before the date lines
+            // One more line may belong to the meta line: the rest of a wrapped one (it has not reached its
+            // closing `d MMMM yyyy` date yet), or the real one after a file name with " · " in it.
+            if !extraLine && (!metaLineEnded || (t.contains(" \u{00B7} ") && endsWithYear(t))) {
+                extraLine = true
+                metaLineEnded = true
+                continue
+            }
+            return nil  // the body: the header had no classification
         }
         return nil
+    }
+
+    /// The meta line ends with the Processor's `d MMMM yyyy` processing date.
+    private static func endsWithYear(_ trimmed: String) -> Bool {
+        trimmed.range(of: #"[0-9]{4}$"#, options: .regularExpression) != nil
     }
 
     /// W37.dual-date: exact prefix of the optional source-document date line in the OCR-text header

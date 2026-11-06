@@ -167,27 +167,48 @@ final class ParserFuzzTests: XCTestCase {
         }
     }
 
-    /// The stripped body survives lookalike lines in the file name and the body.
+    /// The stripped body and the classification survive lookalike lines in the file name and the body.
     func testPageTwoBodySurvivesLookalikeLines() {
         var rng = FuzzRNG(seed: 0x9A6E3)
         for i in 0..<10_000 {
             let page = PageTwo.random(&rng, classificationLookalikes: true)
             XCTAssertEqual(PDFHeaderParser.stripHeader(from: page.text), page.expectedBody, "iteration \(i): \(page.text.debugDescription)")
+            XCTAssertEqual(PDFHeaderParser.parseClassification(from: page.text), page.classification,
+                           "iteration \(i): \(page.text.debugDescription)")
         }
     }
 
-    /// KNOWN ISSUE `W40.fix-core-classification-from-body`: `parseClassification` takes the first
-    /// `Classification:` line anywhere on the page, so a header without one borrows the body's (an OCR'd
-    /// security marking), and a file name that starts with the word wins over the real header line.
-    /// Delete the expectation when the fix lands; `strict` makes this test fail the day it is fixed.
-    func testClassificationIsReadOnlyFromTheHeaderKnownIssue() {
+    /// The classification is read only from the header (W40.fix-core-classification-from-body): a header
+    /// without one does not borrow the body's (an OCR'd security marking), and a file name that starts with
+    /// the word does not win over the real header line.
+    func testClassificationIsReadOnlyFromTheHeader() {
         let noHeaderClass = PageTwo(fileName: "IMG_0001.jpg", metaLine: "Anthropic \u{00B7} Claude \u{00B7} Oct 20, 2026",
                                     classification: nil, dateLines: [], body: "Memo\nClassification: Top Secret")
         let lookalikeName = PageTwo(fileName: "Classification: notes.jpg", metaLine: "Anthropic \u{00B7} Claude \u{00B7} Oct 20, 2026",
                                     classification: "Continuation", dateLines: [], body: "Page two of the letter.")
-        XCTExpectFailure("W40.fix-core-classification-from-body", strict: true) {
-            XCTAssertNil(PDFHeaderParser.parseClassification(from: noHeaderClass.text))
-            XCTAssertEqual(PDFHeaderParser.parseClassification(from: lookalikeName.text), "Continuation")
+        XCTAssertNil(PDFHeaderParser.parseClassification(from: noHeaderClass.text))
+        XCTAssertEqual(PDFHeaderParser.parseClassification(from: lookalikeName.text), "Continuation")
+    }
+
+    /// The same through a real two-page PDF, whose extracted text has lost the blank line under the header:
+    /// `extract` reads the page-2 header, not the body's marking.
+    func testExtractReadsTheClassificationFromThePageTwoHeader() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("ParserFuzzClass-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let meta = "Anthropic \u{00B7} Claude \u{00B7} Oct 20, 2026"
+        let cases: [(PageTwo, String?)] = [
+            (PageTwo(fileName: "IMG_0001.jpg", metaLine: meta, classification: nil, dateLines: [],
+                     body: "Memo\nClassification: Top Secret"), nil),
+            (PageTwo(fileName: "Classification: notes.jpg", metaLine: meta, classification: "Continuation",
+                     dateLines: [], body: "Page two.\nClassification: Secret"), "Continuation"),
+        ]
+        for (i, (page, expected)) in cases.enumerated() {
+            let url = dir.appendingPathComponent("p\(i).pdf")
+            try PageTwo.writePDF(text: page.text, to: url)
+            let content = try XCTUnwrap(PDFHeaderParser.extract(url))
+            XCTAssertEqual(content.classification, expected, "case \(i)")
+            XCTAssertTrue(content.strippedBody.contains("Classification: "), "case \(i): the body keeps its marking")
         }
     }
 
@@ -425,8 +446,8 @@ struct PageTwo {
 
     var expectedBody: String { body.trimmingCharacters(in: .whitespacesAndNewlines) }
 
-    /// `classificationLookalikes` adds file names and body lines that start `Classification:` — the known
-    /// issue in `testClassificationIsReadOnlyFromTheHeaderKnownIssue`.
+    /// `classificationLookalikes` adds file names and body lines that start `Classification:`, which the
+    /// parser must ignore (`testClassificationIsReadOnlyFromTheHeader`).
     static func random(_ rng: inout FuzzRNG, classificationLookalikes: Bool = true) -> PageTwo {
         let names = ["IMG_0001.jpg", "scan 12.tiff", "Box 4 · Folder 2.jpg", "Document date: 1958.png",
                      "Extracted text..jpg", "  padded.jpg", "日本語.heic", "P9.jpg"]
