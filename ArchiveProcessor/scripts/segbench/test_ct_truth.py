@@ -225,6 +225,16 @@ class Repeats(unittest.TestCase):
         self.assertEqual(T.repeats_in("1959-1987", {"collection_title": "X Records, 1959-1987"}, T.TITLE_FIELDS),
                          ["collection_title"])
         self.assertIn("folder", T.REPEAT_EXEMPT)   # "5" as the folder of "Box 5" is not a repeat
+        f2 = {"kind": "box label", "collection_title": "American Jewish Congress Records, n.d., 1916-",
+              "collection_number": "I-77", "container": "Box 34"}
+        self.assertEqual(T.drop_repeats(["of 201", "Records; Box 34 of 201", None], f2), [None])   # parts, the count
+        self.assertTrue(T.repeat_of(["of 201", "Records; Box 34 of 201"], f2))
+        self.assertFalse(T.repeat_of(["Records; Shelf 12"], f2))   # one new part keeps it asked
+        f3 = {"kind": "box label", "series": "Series III", "series_title": "Correspondence", "container": "Box 5",
+              "folder": "9"}
+        self.assertTrue(T.repeat_of(["Series III, Correspondence"], f3))   # pieces of two settled fields
+        self.assertTrue(T.repeat_of(["5-9"], f3))                          # box and folder, the mark rule
+        self.assertFalse(T.repeat_of(["Series III, Minutes"], f3))         # a new word keeps it asked
 
 
 if __name__ == "__main__":

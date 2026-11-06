@@ -1016,14 +1016,47 @@ REPEAT_EXEMPT = {"kind", "folder", "container", "series"}
 TITLE_FIELDS = {"collection_title", "collection_subtitle", "box_title", "series_title", "folder_title"}
 
 
-def repeats_in(v, fields, only=None):
-    """The settled fields (of `only`, if given) whose text contains reading v, word-bounded after case and
-    punctuation are folded."""
-    t = _txt(v) if v else ""
+COUNT_REST = re.compile(r"(?:of|/)\s*\d+[a-z]?", re.I)   # "of 201" in "Box 34 of 201": the count the box number drops
+
+
+def _part_in(part, fields, only):
+    t = _txt(part)
     if not t:
         return []
-    return [k for k, w in fields.items() if w and k != "kind" and (only is None or k in only)
-            and re.search(r"(?<![a-z0-9])" + re.escape(t) + r"(?![a-z0-9])", _txt(w))]
+    hit = [k for k, w in fields.items() if w and k != "kind" and (only is None or k in only)
+           and re.search(r"(?<![a-z0-9])" + re.escape(t) + r"(?![a-z0-9])", _txt(w))]
+    if only is None and not hit:
+        # Pieces of several settled fields together ("Series III, Correspondence": the series and its title; "5-9":
+        # the box and folder the owner's mark rule reads) are extraneous as well (owner, 2026-11-05: "I don't need to
+        # be shown already settled extraneous things"): every word of the part is already in the settled text.
+        words = set(re.findall(r"[a-z0-9]+", t))
+        have = set()
+        for k, w in fields.items():
+            if w and k != "kind":
+                have |= set(re.findall(r"[a-z0-9]+", _txt(w)))
+        if words and words <= have:
+            hit = [k for k, w in fields.items() if w and k != "kind" and words & set(re.findall(r"[a-z0-9]+", _txt(w)))]
+    if only is None and not hit and fields.get("container"):
+        # The owner's box-number rule: "Box 34 of 201" is the settled "Box 34", and "of 201" is the count it drops,
+        # not a mark of its own (owner, 2026-11-05, photo d6c863c11630 on the second sheet).
+        if canon("container", part) == fields["container"] or COUNT_REST.fullmatch(part.strip()):
+            hit = ["container"]
+    return hit
+
+
+def repeats_in(v, fields, only=None):
+    """The settled fields (of `only`, if given) that hold reading v, word-bounded after case and punctuation are
+    folded. A reading joined with ";" ("Records; Box 34 of 201") repeats when each of its parts does."""
+    parts = [x for x in re.split(r"\s*;\s*", v or "") if x.strip()]
+    if not parts:
+        return []
+    found = []
+    for x in parts:
+        hit = _part_in(x, fields, only)
+        if not hit:
+            return []
+        found += [k for k in hit if k not in found]
+    return found
 
 
 def repeat_of(readings, fields):
