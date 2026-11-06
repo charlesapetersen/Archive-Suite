@@ -235,7 +235,9 @@ final class DocumentViewerPagePairTests: XCTestCase {
     func testExtractedTextPaneFollowsTheImagePanesHit() throws {
         let url = try scratchDir().appendingPathComponent("single.pdf")
         XCTAssertTrue(TestPDFBuilder.write(pages: ["zulu one zulu two"], to: url))
-        let model = load([url])
+        let other = try scratchDir().appendingPathComponent("single-other.pdf")
+        XCTAssertTrue(TestPDFBuilder.write(pages: ["nothing to see"], to: other))
+        let model = load([url, other])
         XCTAssertNotNil(model.embeddedText, "precondition: the right pane is the extracted text")
         XCTAssertNil(model.extractedTextFind, "nothing searched yet")
         model.findQuery = "zulu"
@@ -246,6 +248,11 @@ final class DocumentViewerPagePairTests: XCTestCase {
         model.findNext()
         XCTAssertEqual(model.extractedTextFind?.current, 1)
         XCTAssertEqual(model.leftController.findCurrentIndex, 1)
+        model.next(); model.previous()
+        XCTAssertEqual(model.index, 0, "precondition: back on the first file")
+        XCTAssertNil(model.extractedTextFind?.current,
+                     "paging away and back drops the current hit here as it does in the image pane")
+        XCTAssertNil(model.leftController.findCurrentIndex)
         model.endFind()
         XCTAssertNil(model.extractedTextFind, "Done clears the highlight")
     }

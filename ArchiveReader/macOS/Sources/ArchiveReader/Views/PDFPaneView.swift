@@ -327,7 +327,10 @@ final class PDFPaneController {
         let rects = Self.standInMatchRects(query: findQuery, source: source, shown: shown, box: v.displayBox)
         let current = findCurrentIndex.flatMap { rects.indices.contains($0) ? $0 : nil }
         standInOverlay.update(rects: rects, current: current)
-        if scroll, let current { v.go(to: rects[current], on: shown); scrollAgain(to: rects[current], on: shown, in: v) }
+        if scroll, let current, !rects[current].isEmpty {
+            v.go(to: rects[current], on: shown)
+            scrollAgain(to: rects[current], on: shown, in: v)
+        }
     }
 
     /// Scroll to the current hit once more on the next runloop. A freshly built pane (a hit on another
@@ -340,15 +343,16 @@ final class PDFPaneController {
         }
     }
 
-    /// The boxes, in `shown`'s page space, of `query`'s matches on `source`, in match order. Read-only:
-    /// `source` is searched through a copy, so neither page's document is touched.
+    /// The boxes, in `shown`'s page space, of `query`'s matches on `source`, in match order — one per match,
+    /// an empty box for a match with no bounds, so the k-th box stays the k-th match. Read-only: `source` is
+    /// searched through a copy, so neither page's document is touched.
     static func standInMatchRects(query: String, source: PDFPage, shown: PDFPage, box: PDFDisplayBox) -> [CGRect] {
         guard !query.isEmpty, let copy = source.copy() as? PDFPage else { return [] }
         let doc = PDFDocument()
         doc.insert(copy, at: 0)
-        return doc.findString(query, withOptions: [.caseInsensitive]).compactMap { match in
+        return doc.findString(query, withOptions: [.caseInsensitive]).map { match in
             let r = match.bounds(for: copy)
-            guard !r.isEmpty else { return nil }
+            guard !r.isEmpty else { return .zero }
             let a = pagePoint(fromDisplayed: displayedFraction(of: CGPoint(x: r.minX, y: r.minY), on: copy, box: box),
                               on: shown, box: box)
             let b = pagePoint(fromDisplayed: displayedFraction(of: CGPoint(x: r.maxX, y: r.maxY), on: copy, box: box),
@@ -365,19 +369,19 @@ final class PDFPaneController {
 final class StandInFindOverlay: NSObject, @preconcurrency PDFPageOverlayViewProvider {
     private(set) var rects: [CGRect] = []
     private(set) var current: Int?
-    private var views: [StandInFindOverlayView] = []
+    /// Every overlay handed to PDFKit, held weakly: PDFKit owns them while the page is shown.
+    private let views = NSHashTable<StandInFindOverlayView>.weakObjects()
 
     func update(rects: [CGRect], current: Int?) {
         guard rects != self.rects || current != self.current else { return }
         self.rects = rects
         self.current = current
-        for view in views { view.needsDisplay = true }
+        for view in views.allObjects { view.needsDisplay = true }
     }
 
     func pdfView(_ view: PDFView, overlayViewFor page: PDFPage) -> NSView? {
         let overlay = StandInFindOverlayView(provider: self, page: page, pdfView: view)
-        views.removeAll { $0.superview == nil }
-        views.append(overlay)
+        views.add(overlay)
         return overlay
     }
 }

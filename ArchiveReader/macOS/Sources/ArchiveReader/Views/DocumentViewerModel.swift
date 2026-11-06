@@ -417,12 +417,12 @@ final class DocumentViewerModel: ObservableObject {
     }
 
     /// What the extracted-text pane highlights: the searched query, and which of its matches is the
-    /// current hit (the image pane's own ordinal, since that pane shows the image page's text layer).
+    /// current hit — whatever the image pane beside it selects, since that pane shows the same text layer
+    /// (so paging away and back drops the current hit in both, as `prepareFindForManualCycle` does).
     /// `nil` while no query has been searched.
     var extractedTextFind: (query: String, current: Int?)? {
         guard let query = lastFoundQuery, !query.isEmpty else { return nil }
-        let loc = findNavigator.current
-        return (query, loc?.doc == index && loc?.pair == pair ? loc?.left : nil)
+        return (query, leftController.findCurrentIndex)
     }
 
     // MARK: Page-level durable links (W23.m4)

@@ -2,6 +2,19 @@
 
 Running log of quirks, risks, and things verified/unverified. Keep current.
 
+## Find in the document window: what "both panes" can and cannot do (W40.fix-reader-find-both-panes, 2026-11-05)
+
+A find hit is the k-th match of each pane of its page pair, selected in both and stepped together; the
+JPEG original gets boxes at the PDF image page's match positions (a page overlay — `PDFPage.copy()` shares
+annotations with the original and removing one from the copy leaves it there, measured). Limits that stay:
+- **Pairing is by ordinal.** If the image page's text layer misses or splits an occurrence the OCR text page
+  has, later hits on that pair select different words in the two panes. Nothing in the PDF links them better.
+- **An image page with no text layer gets no highlight** (the test corpus's image pages have none): there are
+  no positions to draw from. The hit still shows on the text page.
+- **The extracted-text pane highlights but does not scroll to the current hit** (a SwiftUI `Text` cannot
+  scroll to a range); the image pane beside it does. Its matches come from a string search on the same text
+  as PDFKit's, so a query PDFKit matches across a line break or ligature may be marked one match off there.
+
 ## ✅ CLOSED (W40.fix-reader-a11y-labels, 2026-10-25) — unnamed Reader controls and PDF pages
 
 The tag/name/OCR filters and file list have explicit names; the OCR magnifier is decorative. Flag and warning

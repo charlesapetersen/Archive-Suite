@@ -382,6 +382,88 @@ final class ViewerUITests: FixtureUITestCase {
         return CGSize(width: CGFloat(x1 - x0 + 1) / scale, height: CGFloat(y1 - y0 + 1) / scale)
     }
 
+    /// How many pixels of the window's left `fraction` (below its toolbar) `match`, sampling every other pixel.
+    private func pixelCount(in window: XCUIElement, leftFraction fraction: CGFloat,
+                            _ match: (Int, Int, Int) -> Bool) -> Int {
+        let shot = XCUIScreen.main.screenshot().image
+        var rect = CGRect(origin: .zero, size: shot.size)
+        guard let cg = shot.cgImage(forProposedRect: &rect, context: nil, hints: nil),
+              let data = cg.dataProvider?.data, let bytes = CFDataGetBytePtr(data),
+              cg.bitsPerPixel == 32, shot.size.width > 0 else { return 0 }
+        let scale = CGFloat(cg.width) / shot.size.width
+        let f = window.frame
+        let bgra = cg.bitmapInfo.contains(.byteOrder32Little)
+        var count = 0
+        for y in stride(from: Int((f.minY + 60) * scale), to: min(cg.height, Int((f.maxY - 30) * scale)), by: 2) {
+            for x in stride(from: Int((f.minX + 4) * scale), to: min(cg.width, Int((f.minX + f.width * fraction) * scale)), by: 2)
+            where x >= 0 && y >= 0 {
+                let o = y * cg.bytesPerRow + x * 4
+                let (r, g, b) = bgra ? (bytes[o + 2], bytes[o + 1], bytes[o]) : (bytes[o], bytes[o + 1], bytes[o + 2])
+                if match(Int(r), Int(g), Int(b)) { count += 1 }
+            }
+        }
+        return count
+    }
+
+    /// W40.fix-reader-find-both-panes (owner, reader-1 row 12): Find searches the image page and the text
+    /// page together. In the fixture "synthetic" is on both pages of 00001, so it is ONE hit ("1 of 1"),
+    /// selected in both panes; on the JPEG original, which has no text, the hit is a box drawn at the PDF
+    /// image page's match position — the tan photograph gains find-yellow pixels where it had none.
+    func testFindHighlightsTheHitInBothPanesAndOnTheJPEG() throws {
+        waitForRows(minimum: 3, timeout: 10)
+        let filterField = app.textFields["ar.filter.name"]
+        XCTAssertTrue(filterField.waitForExistence(timeout: 5))
+        filterField.click()
+        filterField.typeText("00001 IMG")
+        RunLoop.current.run(until: Date().addingTimeInterval(1))
+        XCTAssertEqual(rowCount, 1, "the scratch GUI fixture has one PDF with a JPEG partner")
+        clickRow(0)
+        pressKey("o", modifiers: .command)
+        settle(2)
+        let control = app.descendants(matching: .any)["ar.doc.imageSource"].firstMatch
+        XCTAssertTrue(control.waitForExistence(timeout: 5))
+        let jpegSide = control.descendants(matching: .any).matching(NSPredicate(format: "label == 'JPEG' OR title == 'JPEG'")).firstMatch
+        let pdfSide = control.descendants(matching: .any).matching(NSPredicate(format: "label == 'PDF' OR title == 'PDF'")).firstMatch
+        let docWindow = app.windows.containing(.any, identifier: "ar.doc.imageSource").firstMatch
+        // The find colour over the tan JPEG: strong red and green, little blue. Tan itself is (180, 160, 140).
+        let isFindBox: (Int, Int, Int) -> Bool = { r, g, b in r > 190 && g > 170 && b < 110 }
+        jpegSide.click()
+        settle(1)
+        let before = pixelCount(in: docWindow, leftFraction: 0.5, isFindBox)
+
+        pdfSide.click()
+        settle(0.5)
+        pressKey("f", modifiers: .command)
+        let find = app.textFields["ar.doc.findField"]
+        XCTAssertTrue(find.waitForExistence(timeout: 5))
+        settle(0.5)
+        app.typeText("synthetic\r")
+        settle(1)
+        let count = app.staticTexts["ar.doc.findCount"]
+        XCTAssertEqual(count.value as? String ?? count.label, "1 of 1",
+                       "a word on both pages is one hit, not one per pane")
+        captureScreenshot("find-both-0-pdf")
+
+        jpegSide.click()
+        settle(1)
+        captureScreenshot("find-both-1-jpeg")
+        let after = pixelCount(in: docWindow, leftFraction: 0.5, isFindBox)
+        print("[find-both-panes] find-box pixels on the JPEG: before \(before), after \(after)")
+        XCTAssertGreaterThan(after, before + 50, "the hit is boxed on the JPEG original")
+
+        app.buttons["Done"].firstMatch.click()
+        settle(0.5)
+        XCTAssertLessThanOrEqual(pixelCount(in: docWindow, leftFraction: 0.5, isFindBox), before + 5,
+                                 "Done removes the box")
+        pdfSide.click()
+        settle(0.5)
+        pressKey("w", modifiers: .command)
+        settle(0.5)
+        filterField.click()
+        pressKey("a", modifiers: .command)
+        app.typeKey(.delete, modifierFlags: [])
+    }
+
     /// The owner did not find the menu-only switch (reader-1, row 13). The document toolbar now has a
     /// PDF / JPEG switch: live on a file with a JPEG original, where clicking a side shows that image, and
     /// present but disabled on a file without one.
