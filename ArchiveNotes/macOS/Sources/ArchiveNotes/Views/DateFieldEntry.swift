@@ -120,14 +120,122 @@ enum DateFieldEntry {
         return "Not saved: enter a year, month and day — only a whole \(calendar.displayName) day is stored."
     }
 
-    /// Whether the day row's "Set" is live. It stays live for everything it always covered (a
-    /// plausible day, or no month chosen yet — the commit then simply writes the coarser date) and
-    /// goes dead only for a day the chosen month cannot have, which `impossibleDayNote` names.
-    static func dayCommittable(yearText: String, month: Int, dayText: String,
-                               calendar: DisplayCalendar = .standard) -> Bool {
-        guard let d = Int(dayText.trimmingCharacters(in: .whitespaces)),
-              (1...31).contains(d) else { return false }
-        return impossibleDayNote(yearText: yearText, month: month, dayText: dayText, calendar: calendar) == nil
+    // MARK: Typed entry (W40.fix-notes-date-entry)
+
+    /// What one typed date field says. The precision is the one typed — `1960s` is a decade, `1968` a
+    /// year, `March 1968` or `1968-03` a month, `12 March 1968` or `1968-03-12` a day — so there is no
+    /// precision picker; an emptied field clears the date.
+    enum Typed: Equatable {
+        case empty
+        case date(Fields, Item.DatePrecision)
+        /// Nothing is written; the text says why.
+        case unreadable(String)
+    }
+
+    /// Read a typed date in `calendar`. Accepted: a decade (`1960s`, `1960's`); numbers with the year
+    /// first (`1968`, `1968-3`, `1968/03/12`) or a month before a year (`3/1968`); and a month name or
+    /// its first three or more letters with a year and an optional day in either order (`March 1968`,
+    /// `12 Mar 1968`, `March 12th, 1968`). All-number dates that do not start with the year
+    /// (`12/3/1968`) are refused, since day-month and month-day orders cannot be told apart. A day the
+    /// month cannot have is kept here; `commit` drops it to the month and `impossibleDayNote` says so.
+    static func parse(_ text: String, calendar: DisplayCalendar = .standard) -> Typed {
+        let raw = text.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if raw.isEmpty { return .empty }
+        if let m = raw.wholeMatch(of: /(\d+)0\s*'?s/), let y = Int(m.1 + "0"), y > 0 {
+            return .date(Fields(yearText: String(y), month: 0, dayText: ""), .decade)
+        }
+        var numbers: [Substring] = []
+        var words: [Substring] = []
+        for token in raw.split(whereSeparator: { " ,/.-".contains($0) }) {
+            if let m = token.wholeMatch(of: /(\d+)(?:st|nd|rd|th)?/) {
+                numbers.append(m.1)
+            } else if token.contains(where: \.isNumber) {
+                return .unreadable(readHint)
+            } else {
+                words.append(token)
+            }
+        }
+        let values = numbers.compactMap { Int($0) }
+        guard values.count == numbers.count else { return .unreadable(readHint) }
+        /// A number that can only be a year: three or more digits, or past any day.
+        func isYear(_ i: Int) -> Bool { numbers[i].count >= 3 || values[i] > 31 }
+        func make(_ y: Int, _ m: Int = 0, _ d: Int? = nil) -> Typed {
+            guard y > 0 else { return .unreadable("The year must be 1 or later.") }
+            let choices = monthChoices(yearText: String(y), calendar: calendar)
+            if m != 0, !(1...choices.count).contains(m) {
+                return .unreadable("There is no month \(m) — write the month as a word or a number up to \(choices.count).")
+            }
+            if let d, d < 1 { return .unreadable("There is no day \(d).") }
+            let precision: Item.DatePrecision = d != nil ? .day : (m != 0 ? .month : .year)
+            return .date(Fields(yearText: String(y), month: m, dayText: d.map(String.init) ?? ""), precision)
+        }
+
+        if words.isEmpty {
+            switch values.count {
+            case 1: return make(values[0])
+            case 2 where isYear(0): return make(values[0], values[1])
+            case 2 where isYear(1) && values[0] >= 1: return make(values[1], values[0])
+            case 3 where isYear(0): return make(values[0], values[1], values[2])
+            default: return .unreadable(readHint)
+            }
+        }
+        // A month name, possibly several words long ("Adar II", "Rabi al-Awwal").
+        let phrase = words.joined(separator: " ")
+        let yearIndex = values.indices.first(where: isYear)
+        let choices = monthChoices(yearText: yearIndex.map { String(values[$0]) } ?? "", calendar: calendar)
+        guard let month = monthNumber(phrase, choices: choices) else {
+            return .unreadable("“\(phrase)” is not a month name. \(readHint)")
+        }
+        switch values.count {
+        case 1:
+            guard isYear(0) else { return .unreadable("Write the year in full. \(readHint)") }
+            return make(values[0], month)
+        case 2:
+            guard let y = yearIndex, !isYear(1 - y) else { return .unreadable("Write the year in full. \(readHint)") }
+            return make(values[y], month, values[1 - y])
+        default: return .unreadable(readHint)
+        }
+    }
+
+    private static let readHint = "Type a year (1968), a decade (1960s), a month (March 1968) or a day (12 March 1968 or 1968-03-12)."
+
+    /// The month a typed name means: a whole name, or an unambiguous start of one at least three
+    /// letters long (`mar`, `sept`). Punctuation and spacing inside a name are ignored.
+    private static func monthNumber(_ phrase: String, choices: [(month: Int, name: String)]) -> Int? {
+        func letters(_ s: String) -> String { s.lowercased().filter(\.isLetter) }
+        let typed = letters(phrase)
+        guard !typed.isEmpty else { return nil }
+        if let whole = choices.first(where: { letters($0.name) == typed }) { return whole.month }
+        guard typed.count >= 3 else { return nil }
+        let starts = choices.filter { letters($0.name).hasPrefix(typed) }
+        return starts.count == 1 ? starts[0].month : nil
+    }
+
+    /// The text a typed field starts from for a stored date, in the calendar it is typed in — the
+    /// inverse of `parse`. Gregorian shows the stored ISO form (a decade as `1960s`); another calendar
+    /// shows its whole day in words (`15 Tishri 5786`).
+    static func text(_ fields: Fields, precision: Item.DatePrecision?, calendar: DisplayCalendar) -> String {
+        guard let y = year(fields.yearText) else { return "" }
+        let day = Int(fields.dayText.trimmingCharacters(in: .whitespaces))
+        if calendar != .standard, fields.month > 0, let day {
+            return "\(day) \(calendar.monthName(fields.month, year: y) ?? String(fields.month)) \(y)"
+        }
+        func pad2(_ n: Int) -> String { n < 10 ? "0\(n)" : "\(n)" }
+        if precision == .decade { return "\((y / 10) * 10)s" }
+        guard fields.month > 0 else { return String(y) }
+        guard let day else { return "\(y)-\(pad2(fields.month))" }
+        return "\(y)-\(pad2(fields.month))-\(pad2(day))"
+    }
+
+    /// What committing a typed field does, given the stored date it would replace.
+    static func commit(typed: Typed, calendar: DisplayCalendar, storedDate: String?) -> (Commit, Item.DatePrecision?) {
+        switch typed {
+        case .empty: return (.write(nil), nil)
+        case .unreadable: return (.keep, nil)
+        case .date(let f, let p):
+            return (commit(yearText: f.yearText, month: f.month, dayText: f.dayText, precision: p,
+                           calendar: calendar, storedDate: storedDate), p)
+        }
     }
 
     /// The loose date string the fields describe at `precision`; the model normalizes it afterwards
@@ -208,5 +316,13 @@ enum DateFieldEntry {
         let calendar = entryCalendar(active, precision: precision)
         if let f = fields(storedDate: storedDate, calendar: calendar) { return (f, calendar) }
         return (fields(storedDate: storedDate) ?? Fields(yearText: "", month: 0, dayText: ""), .standard)
+    }
+
+    /// The typed field's starting text and calendar for a stored date. An empty date is typed in the
+    /// item's calendar (a whole day is what a calendar stores); a stored year or month in Gregorian.
+    static func seedText(storedDate: String?, precision: Item.DatePrecision?,
+                         active: DisplayCalendar?) -> (text: String, calendar: DisplayCalendar) {
+        let s = seed(storedDate: storedDate, active: active, precision: storedDate == nil ? .day : (precision ?? .year))
+        return (text(s.fields, precision: precision, calendar: s.calendar), s.calendar)
     }
 }

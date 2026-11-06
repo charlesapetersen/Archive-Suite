@@ -2,45 +2,52 @@ import SwiftUI
 import ArchiveCore
 
 /// The detail-pane **metadata strip** for the selected note/extract: edit authors, document DATE
-/// (precision + precision-appropriate fields + a "date uncertain" toggle), and QUALITY. These fields
+/// (one typed field + a "date uncertain" toggle), and QUALITY. These fields
 /// use front matter through `NotesNavigationModel` → `NotesModel`; authors remain front-matter only,
 /// while the model mirrors valid Quality values as Q1...Q3 on this note's own `.md`. Its Tags subsection
 /// uses the audited model path, so front matter remains authoritative and Finder subjects stay in sync.
 ///
 /// Adapted from Reader's `InlineEditCells.DateCell` + `TagEditorView.dateSection`/`prioritySection`,
 /// retargeted from tag writes to the Notes front-matter store. Local field state is seeded from the
-/// selected `ItemSummary` on selection change and committed on explicit user action (segmented-control
-/// / month-menu bindings + "Set" buttons) — never on the programmatic seed, so selecting an item never
-/// rewrites its date. Each edit composes a canonical string for the chosen precision and calls the
-/// async setter, which normalizes (`Item.normalizedDate`: decade floors the year; month/day downgrade
-/// when a lower field is missing), persists atomically, and re-indexes.
+/// selected `ItemSummary` on selection change. A date field applies on Return or on leaving it, at the
+/// precision typed, and an emptied one clears the date (W40.fix-notes-date-entry: no Set, Clear or
+/// precision picker) — never on the programmatic seed, so selecting an item never rewrites its date.
+/// Each edit calls the async setter, which normalizes (`Item.normalizedDate`: decade floors the year;
+/// month/day downgrade when a lower field is missing), persists atomically, and re-indexes.
 ///
-/// The field rules — what a commit composes, whether the day row's "Set" is live, and the note shown
-/// for a day the chosen month cannot have (`Feb 31`, W23.l4) — live in `DateFieldEntry` so they are
-/// unit-testable without a window; this view is the `@State` + bindings layer over them.
+/// The field rules — how typed text is read, what a commit composes, and the note shown for a day
+/// the month cannot have (`Feb 31`, W23.l4) — live in `DateFieldEntry` so they are unit-testable
+/// without a window; this view is the `@State` layer over them.
 struct NoteMetadataInspector: View {
     @ObservedObject var nav: NotesNavigationModel
     let item: ItemSummary
     @EnvironmentObject private var sourcePreview: SourceBlockPreviewState
     @AppStorage(DisplayCalendarSettings.enabledKey) private var calendarsEnabled = false
 
-    @State private var precision: Item.DatePrecision = .year
-    @State private var yearText = ""
-    @State private var month = 0          // 0 = none
-    @State private var dayText = ""
-    /// The calendar the date fields are typed in (W24.cal1-validator) — `DateFieldEntry.seed`.
+    @State private var dateText = ""
+    /// The calendar the date field is typed in (W24.cal1-validator) — `DateFieldEntry.seedText`.
     @State private var entryCalendar: DisplayCalendar = .standard
-    // W37.dual-date: the covering letter's ("sent with") date — same field idiom, separate state, so
-    // the two dates' components can never cross-pair.
-    @State private var swPrecision: Item.DatePrecision = .year
-    @State private var swYearText = ""
-    @State private var swMonth = 0        // 0 = none
-    @State private var swDayText = ""
+    // W37.dual-date: the covering letter's ("sent with") date — same field idiom, separate state.
+    @State private var swDateText = ""
     @State private var swEntryCalendar: DisplayCalendar = .standard
+    /// Which item each field's text belongs to and the text last applied there, so leaving a field
+    /// writes only a real edit, and only to the item it was typed for — even when the selection has
+    /// already moved on.
+    @State private var dateApplied = AppliedText()
+    @State private var swApplied = AppliedText()
+    @FocusState private var focusedDate: DateRole?
     @State private var authorsText = ""
     @State private var extractSources: [ExtractSourceUsage]?
     @State private var extractSourcesFailed = false
     @State private var roundupYear: Int?
+
+    private enum DateRole: Hashable { case own, sentWith }
+
+    private struct AppliedText {
+        var id: UUID?
+        var text = ""
+        var stored: String?
+    }
 
     private struct SourceLoadKey: Equatable {
         let id: UUID
@@ -76,9 +83,17 @@ struct NoteMetadataInspector: View {
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
         .onAppear { seed(from: item) }
-        .onChange(of: item.id) { seed(from: item) }   // re-seed only on selection change (WYSIWYG typing)
+        .onChange(of: item.id) {   // re-seed only on selection change (WYSIWYG typing)…
+            applyDates()           // …after a field still being typed in reaches its own item
+            seed(from: item)
+        }
         // …or when the calendar the fields are typed in changes (the stored date does not).
         .onChange(of: activeCalendar) { seedDates(from: item) }
+        .onChange(of: focusedDate) { old, _ in
+            if old == .own { applyDate() }
+            if old == .sentWith { applySentWith() }
+        }
+        .onDisappear { applyDates() }
         .task(id: SourceLoadKey(id: item.id, mtime: item.mtime)) {
             extractSources = nil
             extractSourcesFailed = false
@@ -111,12 +126,9 @@ struct NoteMetadataInspector: View {
                 Text("Linked PDFs share the year \(String(year)).")
                     .font(.caption).foregroundStyle(.primary)
                 Button("Use \(String(year)) as note date") {
-                    precision = .year
                     entryCalendar = .standard   // a year is always Gregorian
-                    yearText = String(year)
-                    month = 0
-                    dayText = ""
-                    commit()
+                    dateText = String(year)
+                    applyDate()
                 }
                 .accessibilityIdentifier("an.detail.roundup.useYear")
             }
@@ -206,75 +218,17 @@ struct NoteMetadataInspector: View {
         VStack(alignment: .leading, spacing: 6) {
             Text("Date").font(.subheadline.bold())
                 .accessibilityIdentifier("an.detail.metadata")
-            Picker("Precision", selection: precisionBinding) {
-                Text("Decade").tag(Item.DatePrecision.decade)
-                Text("Year").tag(Item.DatePrecision.year)
-                Text("Month").tag(Item.DatePrecision.month)
-                Text("Day").tag(Item.DatePrecision.day)
-            }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .accessibilityIdentifier("an.detail.date.precision")
-
-            HStack {
-                Text(precision == .decade ? "Decade" : "Year").frame(width: 54, alignment: .leading)
-                TextField(precision == .decade ? "e.g. 1970" : "e.g. 1968", text: $yearText)
-                    .textFieldStyle(.roundedBorder).frame(width: 90)
-                    .onSubmit { commit() }
-                    .accessibilityLabel(precision == .decade ? "Decade" : "Year")
-                    .accessibilityIdentifier("an.detail.date.year")
-                Button("Set") { commit() }
-                    .disabled((Int(yearText.trimmingCharacters(in: .whitespaces)) ?? 0) <= 0)
-                Button("Clear") {
-                    entryCalendar = DateFieldEntry.seed(storedDate: nil, active: activeCalendar,
-                                                        precision: precision).calendar
-                    yearText = ""; month = 0; dayText = ""; commit(.write(nil))
-                }
-            }
-
-            if precision == .month || precision == .day {
-                HStack {
-                    Text("Month").frame(width: 54, alignment: .leading)
-                    Picker("", selection: monthBinding) {
-                        Text("—").tag(0)
-                        ForEach(DateFieldEntry.monthChoices(yearText: yearText, calendar: entryCalendar),
-                                id: \.month) { c in Text(c.name).tag(c.month) }
-                    }
-                    .labelsHidden().frame(width: 150)
-                    .accessibilityLabel("Month")
-                    .accessibilityIdentifier("an.detail.date.month")
-                }
-            }
-
-            if precision == .day {
-                HStack {
-                    Text("Day").frame(width: 54, alignment: .leading)
-                    TextField("1–31", text: $dayText).textFieldStyle(.roundedBorder).frame(width: 60)
-                        .onSubmit { commit() }
-                        .accessibilityLabel("Day")
-                        .accessibilityIdentifier("an.detail.date.day")
-                    Button("Set") { commit() }
-                        .disabled(!dayFieldCommittable)
-                }
-                if let msg = impossibleDayMessage {
-                    HStack(spacing: 4) {
-                        Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
-                        Text(msg).font(.caption).fixedSize(horizontal: false, vertical: true)
-                            .accessibilityIdentifier("an.detail.date.dayWarning")
-                    }
-                    .padding(.leading, 54)
-                }
-                if let msg = DateFieldEntry.incompleteNote(yearText: yearText, month: month, dayText: dayText,
-                                                           calendar: entryCalendar) {
-                    Text(msg).font(.caption).fixedSize(horizontal: false, vertical: true)
-                        .accessibilityIdentifier("an.detail.date.incomplete")
-                }
-                if let note = Self.entryNote(entryCalendar, active: activeCalendar) {
-                    Text(note)
-                        .font(.caption).foregroundStyle(.primary)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .accessibilityIdentifier("an.detail.date.entryCalendar")
-                }
+            TextField("e.g. 1968, 1960s, March 1968, 12 March 1968", text: $dateText)
+                .textFieldStyle(.roundedBorder).frame(maxWidth: 260)
+                .focused($focusedDate, equals: .own)
+                .onSubmit { applyDate() }
+                .accessibilityLabel("Date")
+                .accessibilityIdentifier("an.detail.date.field")
+            dateMessages(text: dateText, calendar: entryCalendar, id: "an.detail.date")
+            if let shown = item.displayDate(calendarsEnabled: calendarsEnabled), let p = item.datePrecision {
+                Text("Saved as \(shown) (\(p.rawValue)).")
+                    .font(.caption).foregroundStyle(.primary)
+                    .accessibilityIdentifier("an.detail.date.saved")
             }
 
             Toggle("Date uncertain (shown in italics)", isOn: uncertainBinding)
@@ -283,6 +237,39 @@ struct NoteMetadataInspector: View {
             if calendarsEnabled { calendarSection }
 
             sentWithSection
+        }
+    }
+
+    /// What a typed date field needs to say: why the text cannot be read, why a day is dropped, why a
+    /// calendar entry is not saved yet, and which calendar the field is typed in.
+    @ViewBuilder private func dateMessages(text: String, calendar: DisplayCalendar, id: String) -> some View {
+        let typed = DateFieldEntry.parse(text, calendar: calendar)
+        switch typed {
+        case .unreadable(let why):
+            Text(why).font(.caption).fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("\(id).unreadable")
+        case .date(let f, _):
+            if let msg = DateFieldEntry.impossibleDayNote(yearText: f.yearText, month: f.month,
+                                                          dayText: f.dayText, calendar: calendar) {
+                HStack(spacing: 4) {
+                    Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+                    Text(msg).font(.caption).fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("\(id).dayWarning")
+                }
+            }
+            if let msg = DateFieldEntry.incompleteNote(yearText: f.yearText, month: f.month,
+                                                       dayText: f.dayText, calendar: calendar) {
+                Text(msg).font(.caption).fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("\(id).incomplete")
+            }
+        case .empty:
+            EmptyView()
+        }
+        if let note = Self.entryNote(calendar, active: activeCalendar) {
+            Text(note)
+                .font(.caption).foregroundStyle(.primary)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("\(id).entryCalendar")
         }
     }
 
@@ -326,74 +313,13 @@ struct NoteMetadataInspector: View {
         VStack(alignment: .leading, spacing: 6) {
             Text("Sent with").font(.subheadline.bold())
                 .accessibilityIdentifier("an.detail.sentWith.heading")
-            Picker("Sent-with precision", selection: swPrecisionBinding) {
-                Text("Decade").tag(Item.DatePrecision.decade)
-                Text("Year").tag(Item.DatePrecision.year)
-                Text("Month").tag(Item.DatePrecision.month)
-                Text("Day").tag(Item.DatePrecision.day)
-            }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .accessibilityIdentifier("an.detail.sentWith.precision")
-
-            HStack {
-                Text(swPrecision == .decade ? "Decade" : "Year").frame(width: 54, alignment: .leading)
-                TextField(swPrecision == .decade ? "e.g. 1950" : "e.g. 1958", text: $swYearText)
-                    .textFieldStyle(.roundedBorder).frame(width: 90)
-                    .onSubmit { commitSentWith() }
-                    .accessibilityIdentifier("an.detail.sentWith.year")
-                Button("Set") { commitSentWith() }
-                    .disabled((Int(swYearText.trimmingCharacters(in: .whitespaces)) ?? 0) <= 0)
-                Button("Clear") {
-                    swEntryCalendar = DateFieldEntry.seed(storedDate: nil, active: activeCalendar,
-                                                          precision: swPrecision).calendar
-                    swYearText = ""; swMonth = 0; swDayText = ""; commitSentWith(.write(nil))
-                }
-                    .disabled(item.sentWith == nil)
-            }
-
-            if swPrecision == .month || swPrecision == .day {
-                HStack {
-                    Text("Month").frame(width: 54, alignment: .leading)
-                    Picker("", selection: swMonthBinding) {
-                        Text("—").tag(0)
-                        ForEach(DateFieldEntry.monthChoices(yearText: swYearText, calendar: swEntryCalendar),
-                                id: \.month) { c in Text(c.name).tag(c.month) }
-                    }
-                    .labelsHidden().frame(width: 150)
-                    .accessibilityIdentifier("an.detail.sentWith.month")
-                }
-            }
-
-            if swPrecision == .day {
-                HStack {
-                    Text("Day").frame(width: 54, alignment: .leading)
-                    TextField("1–31", text: $swDayText).textFieldStyle(.roundedBorder).frame(width: 60)
-                        .onSubmit { commitSentWith() }
-                        .accessibilityIdentifier("an.detail.sentWith.day")
-                    Button("Set") { commitSentWith() }
-                        .disabled(!DateFieldEntry.dayCommittable(yearText: swYearText, month: swMonth,
-                                                                 dayText: swDayText, calendar: swEntryCalendar))
-                }
-                if let msg = DateFieldEntry.impossibleDayNote(yearText: swYearText, month: swMonth,
-                                                              dayText: swDayText, calendar: swEntryCalendar) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
-                        Text(msg).font(.caption).fixedSize(horizontal: false, vertical: true)
-                            .accessibilityIdentifier("an.detail.sentWith.dayWarning")
-                    }
-                    .padding(.leading, 54)
-                }
-                if let msg = DateFieldEntry.incompleteNote(yearText: swYearText, month: swMonth,
-                                                           dayText: swDayText, calendar: swEntryCalendar) {
-                    Text(msg).font(.caption).fixedSize(horizontal: false, vertical: true)
-                }
-                if let note = Self.entryNote(swEntryCalendar, active: activeCalendar) {
-                    Text(note)
-                        .font(.caption).foregroundStyle(.primary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
+            TextField("e.g. 1958, March 1958, 12 March 1958", text: $swDateText)
+                .textFieldStyle(.roundedBorder).frame(maxWidth: 260)
+                .focused($focusedDate, equals: .sentWith)
+                .onSubmit { applySentWith() }
+                .accessibilityLabel("Sent-with date")
+                .accessibilityIdentifier("an.detail.sentWith.field")
+            dateMessages(text: swDateText, calendar: swEntryCalendar, id: "an.detail.sentWith")
 
             Toggle("Sent-with date uncertain", isOn: sentWithUncertainBinding)
                 .disabled(item.sentWith == nil)
@@ -429,18 +355,16 @@ struct NoteMetadataInspector: View {
         seedDates(from: item)
     }
 
-    /// Seed both dates' fields, each in the calendar it is typed in (`DateFieldEntry.seed`).
+    /// Seed both date fields, each in the calendar it is typed in (`DateFieldEntry.seedText`).
     private func seedDates(from item: ItemSummary) {
-        precision = item.datePrecision ?? .year
         let active = item.activeCalendar(calendarsEnabled: calendarsEnabled)
-        let own = DateFieldEntry.seed(storedDate: item.date, active: active, precision: precision)
-        (yearText, month, dayText) = (own.fields.yearText, own.fields.month, own.fields.dayText)
-        entryCalendar = own.calendar
+        let own = DateFieldEntry.seedText(storedDate: item.date, precision: item.datePrecision, active: active)
+        (dateText, entryCalendar) = (own.text, own.calendar)
+        dateApplied = AppliedText(id: item.id, text: own.text, stored: item.date)
         let sent = item.sentWith.map(Item.frontMatterDate)
-        swPrecision = sent?.precision ?? .year
-        let sw = DateFieldEntry.seed(storedDate: sent?.date, active: active, precision: swPrecision)
-        (swYearText, swMonth, swDayText) = (sw.fields.yearText, sw.fields.month, sw.fields.dayText)
-        swEntryCalendar = sw.calendar
+        let sw = DateFieldEntry.seedText(storedDate: sent?.date, precision: sent?.precision, active: active)
+        (swDateText, swEntryCalendar) = (sw.text, sw.calendar)
+        swApplied = AppliedText(id: item.id, text: sw.text, stored: sent?.date)
     }
 
     private var activeCalendar: DisplayCalendar? { item.activeCalendar(calendarsEnabled: calendarsEnabled) }
@@ -452,44 +376,44 @@ struct NoteMetadataInspector: View {
             return "Entered in the \(entry.displayName) calendar; only a whole day is stored, as its Gregorian day."
         }
         guard let active, active != .standard else { return nil }
-        return "Entered in Gregorian: when selected, the item held no whole day \(active.displayName) can show. Clear the date to enter one in \(active.displayName)."
+        return "Entered in Gregorian: when selected, the item held no whole day \(active.displayName) can show. Empty the field to enter one in \(active.displayName)."
     }
 
-    /// Why a typed day is being dropped (nil when there is nothing to report) — see `DateFieldEntry`.
-    private var impossibleDayMessage: String? {
-        DateFieldEntry.impossibleDayNote(yearText: yearText, month: month, dayText: dayText,
-                                         calendar: entryCalendar)
+    private func applyDates() {
+        applyDate()
+        applySentWith()
     }
 
-    private var dayFieldCommittable: Bool {
-        DateFieldEntry.dayCommittable(yearText: yearText, month: month, dayText: dayText,
-                                      calendar: entryCalendar)
+    /// Apply the typed own date to the item it was typed for, if it changed since it was last applied.
+    private func applyDate() {
+        guard let id = dateApplied.id, dateText != dateApplied.text else { return }
+        let typed = DateFieldEntry.parse(dateText, calendar: entryCalendar)
+        let (value, precision) = DateFieldEntry.commit(typed: typed, calendar: entryCalendar,
+                                                       storedDate: dateApplied.stored)
+        guard case .write(let date) = value else { return }
+        dateApplied.text = dateText
+        dateApplied.stored = date
+        if date == nil {   // emptied: the next date is typed in the item's calendar again
+            entryCalendar = DateFieldEntry.seedText(storedDate: nil, precision: nil, active: activeCalendar).calendar
+        }
+        Task { await nav.setDate(date, precision: precision, for: id) }
     }
 
-    /// What the fields commit; the model normalizes a written date (zero-pads, floors a decade,
-    /// downgrades when a component is missing or impossible). `.write(nil)` ⟹ clear the date.
-    private func composedDate() -> DateFieldEntry.Commit {
-        DateFieldEntry.commit(yearText: yearText, month: month, dayText: dayText, precision: precision,
-                              calendar: entryCalendar, storedDate: item.date)
-    }
-
-    private func commit(_ value: DateFieldEntry.Commit? = nil) {
-        guard case .write(let date) = value ?? composedDate() else { return }
-        let p = precision
-        let id = item.id
-        Task { await nav.setDate(date, precision: p, for: id) }
-    }
-
-    private func commitSentWith(_ value: DateFieldEntry.Commit? = nil) {
-        let stored = item.sentWith.map(Item.frontMatterDate)?.date
-        guard case .write(let date) = value ?? DateFieldEntry.commit(
-            yearText: swYearText, month: swMonth, dayText: swDayText, precision: swPrecision,
-            calendar: swEntryCalendar, storedDate: stored) else { return }
-        // A precision/month change with no year typed and nothing stored is not an edit.
-        if date == nil && item.sentWith == nil { return }
-        let p = swPrecision
-        let id = item.id
-        Task { await nav.setSentWith(date, precision: p, for: id) }
+    /// The same for the covering letter's date.
+    private func applySentWith() {
+        guard let id = swApplied.id, swDateText != swApplied.text else { return }
+        let typed = DateFieldEntry.parse(swDateText, calendar: swEntryCalendar)
+        let (value, precision) = DateFieldEntry.commit(typed: typed, calendar: swEntryCalendar,
+                                                       storedDate: swApplied.stored)
+        guard case .write(let date) = value else { return }
+        let hadDate = swApplied.stored != nil
+        swApplied.text = swDateText
+        swApplied.stored = date
+        if date == nil {
+            swEntryCalendar = DateFieldEntry.seedText(storedDate: nil, precision: nil, active: activeCalendar).calendar
+            guard hadDate else { return }   // emptying an empty field is not an edit
+        }
+        Task { await nav.setSentWith(date, precision: precision, for: id) }
     }
 
     private var composedAuthors: [String] {
@@ -506,53 +430,6 @@ struct NoteMetadataInspector: View {
 
     // Bindings whose setters fire ONLY on user interaction (not on the programmatic `seed`), so
     // selecting an item never triggers a spurious write.
-    private var precisionBinding: Binding<Item.DatePrecision> {
-        Binding(get: { precision }, set: { new in
-            // Composed in the calendar the fields are typed in. Moving into or out of a calendar (it
-            // applies at day precision only) re-shows the date in the new one — the date being
-            // written, or the stored one when the calendar fields commit nothing, which is then
-            // committed at the new precision from its Gregorian fields.
-            var value = DateFieldEntry.commit(yearText: yearText, month: month, dayText: dayText,
-                                              precision: new, calendar: entryCalendar)
-            precision = new
-            if DateFieldEntry.entryCalendar(activeCalendar, precision: new) != entryCalendar {
-                let shown: String? = if case .write(let d) = value { d } else { item.date }
-                let s = DateFieldEntry.seed(storedDate: shown, active: activeCalendar, precision: new)
-                (yearText, month, dayText) = (s.fields.yearText, s.fields.month, s.fields.dayText)
-                entryCalendar = s.calendar
-                if value == .keep {
-                    value = DateFieldEntry.commit(yearText: yearText, month: month, dayText: dayText,
-                                                  precision: new, calendar: entryCalendar)
-                }
-            }
-            commit(value)
-        })
-    }
-    private var monthBinding: Binding<Int> {
-        Binding(get: { month }, set: { month = $0; commit() })
-    }
-    private var swPrecisionBinding: Binding<Item.DatePrecision> {
-        Binding(get: { swPrecision }, set: { new in
-            var value = DateFieldEntry.commit(yearText: swYearText, month: swMonth, dayText: swDayText,
-                                              precision: new, calendar: swEntryCalendar)
-            swPrecision = new
-            if DateFieldEntry.entryCalendar(activeCalendar, precision: new) != swEntryCalendar {
-                let stored = item.sentWith.map(Item.frontMatterDate)?.date
-                let shown: String? = if case .write(let d) = value { d } else { stored }
-                let s = DateFieldEntry.seed(storedDate: shown, active: activeCalendar, precision: new)
-                (swYearText, swMonth, swDayText) = (s.fields.yearText, s.fields.month, s.fields.dayText)
-                swEntryCalendar = s.calendar
-                if value == .keep {
-                    value = DateFieldEntry.commit(yearText: swYearText, month: swMonth, dayText: swDayText,
-                                                  precision: new, calendar: swEntryCalendar)
-                }
-            }
-            commitSentWith(value)
-        })
-    }
-    private var swMonthBinding: Binding<Int> {
-        Binding(get: { swMonth }, set: { swMonth = $0; commitSentWith() })
-    }
     private var sentWithUncertainBinding: Binding<Bool> {
         Binding(get: { item.sentWithUncertain },
                 set: { v in let id = item.id; Task { await nav.setSentWithUncertain(v, for: id) } })

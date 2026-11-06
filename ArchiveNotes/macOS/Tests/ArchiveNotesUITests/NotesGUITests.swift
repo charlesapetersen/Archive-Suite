@@ -921,70 +921,57 @@ final class NotesGUITests: NotesFixtureUITestCase {
         }
     }
 
-    /// W23.l4-fu — the metadata date row renders the impossible-day warning and persists the
-    /// coarser month, while an actual month end remains day precision.
+    /// W23.l4-fu, W40.fix-notes-date-entry — one typed date field: Return applies it at the precision
+    /// typed, an impossible day is warned about and saved at month precision, a real month end stays a
+    /// day, a bare year is a year, and an emptied field clears the date. No Set, Clear or precision picker.
     func testDateRowWarnsAndDropsImpossibleDayButKeepsValidMonthEnd() throws {
         try withFixture {
             try requireCanonicalScratchFixtureForStoreWrites()
             let uuid = Self.idPlain
             _ = selectItem(uuid: uuid)
 
-            let precision = mainWindow.radioGroups["an.detail.date.precision"]
-            XCTAssertTrue(precision.waitForExistence(timeout: 8), "date precision control should be visible")
-            let dayPrecision = precision.radioButtons["Day"]
-            XCTAssertTrue(dayPrecision.waitForExistence(timeout: 5), "Day precision should be selectable")
+            XCTAssertFalse(mainWindow.radioGroups["an.detail.date.precision"].exists,
+                           "there is no precision picker any more")
+            let field = mainWindow.textFields["an.detail.date.field"]
+            XCTAssertTrue(field.waitForExistence(timeout: 8), "the date field should be visible")
             // The pane is 140 pt tall in the VM and the date section starts below its fold, so an unrevealed
-            // click landed outside it and precision stayed Year (W40.fix-notes-date-day-uitest).
-            revealInMetadataScroll(precision)
-            dayPrecision.click()
-            XCTAssertTrue(pollUntil(timeout: 5) { (dayPrecision.value as? Int) == 1 },
-                          "the Day click should select day precision: \(precision.debugDescription)")
+            // click lands outside it (W40.fix-notes-date-day-uitest).
+            @MainActor func type(_ text: String) {
+                revealInMetadataScroll(field)
+                field.click()
+                field.typeKey("a", modifierFlags: .command)
+                field.typeKey(.delete, modifierFlags: [])
+                field.typeText(text + "\r")
+            }
+            @MainActor func saved(_ needle: String...) -> Bool {
+                pollUntil(timeout: 12) {
+                    let markdown = self.rawMarkdown(inItemDir: uuid) ?? ""
+                    return needle.allSatisfy { markdown.contains($0) }
+                }
+            }
 
-            let year = mainWindow.textFields["an.detail.date.year"]
-            XCTAssertTrue(year.waitForExistence(timeout: 5), "the date year field should be visible")
-            revealInMetadataScroll(year)
-            year.click()
-            year.typeKey("a", modifierFlags: .command)
-            year.typeText("2026")
-
-            let day = mainWindow.textFields["an.detail.date.day"]
-            XCTAssertTrue(day.waitForExistence(timeout: 5), "the day field should be visible at day precision")
-            revealInMetadataScroll(day)
-            day.click()
-            day.typeKey("a", modifierFlags: .command)
-            day.typeText("31")
-
-            let month = mainWindow.descendants(matching: .any)["an.detail.date.month"]
-            XCTAssertTrue(month.waitForExistence(timeout: 5), "the month picker should be visible")
-            revealInMetadataScroll(month)
-            month.click()
-            let february = app.menuItems["February"]
-            XCTAssertTrue(february.waitForExistence(timeout: 5), "February should be available in the month menu")
-            february.click()
-
+            type("31 February 2026")
             let warning = mainWindow.staticTexts["an.detail.date.dayWarning"]
-            XCTAssertTrue(warning.waitForExistence(timeout: 5), "choosing February with day 31 should render a warning")
+            XCTAssertTrue(warning.waitForExistence(timeout: 5), "February 31 should render a warning")
             let warningText = (warning.value as? String).flatMap { $0.isEmpty ? nil : $0 } ?? warning.label
             XCTAssertEqual(warningText, "February 2026 has 28 days — the day is ignored.")
-            XCTAssertTrue(pollUntil(timeout: 12) {
-                let markdown = self.rawMarkdown(inItemDir: uuid) ?? ""
-                return markdown.contains("date: 2026-02") && markdown.contains("date_precision: month")
-            }, "the impossible day should be dropped and saved at month precision")
-            let februarySaved = try XCTUnwrap(rawMarkdown(inItemDir: uuid))
-            XCTAssertFalse(februarySaved.contains("2026-02-31"), "the impossible day must not be persisted")
+            XCTAssertTrue(saved("date: 2026-02", "date_precision: month"),
+                          "the impossible day should be dropped and saved at month precision")
+            XCTAssertFalse(try XCTUnwrap(rawMarkdown(inItemDir: uuid)).contains("2026-02-31"),
+                           "the impossible day must not be persisted")
 
-            // The same typed day is valid for January. The picker commits on selection, so this
-            // also proves that the month binding does not silently discard a legitimate day.
-            month.click()
-            let january = app.menuItems["January"]
-            XCTAssertTrue(january.waitForExistence(timeout: 5), "January should be available in the month menu")
-            january.click()
+            type("31 January 2026")
+            XCTAssertTrue(pollUntil(timeout: 5) { !warning.exists }, "a valid month end should clear the warning")
+            XCTAssertTrue(saved("date: 2026-01-31", "date_precision: day"), "January 31 should persist at day precision")
 
-            XCTAssertFalse(warning.exists, "a valid month end should clear the warning")
+            type("1968")
+            XCTAssertTrue(saved("1968", "date_precision: year"),
+                          "a bare year should persist at year precision")
+
+            type("")
             XCTAssertTrue(pollUntil(timeout: 12) {
-                let markdown = self.rawMarkdown(inItemDir: uuid) ?? ""
-                return markdown.contains("date: 2026-01-31") && markdown.contains("date_precision: day")
-            }, "January 31 should persist at day precision")
+                !(self.rawMarkdown(inItemDir: uuid) ?? "date_precision:").contains("date_precision:")
+            }, "an emptied field should clear the date")
         }
     }
 

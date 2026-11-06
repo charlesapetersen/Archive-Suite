@@ -27,7 +27,6 @@ struct DateFieldCalendarEntryTests {
     @Test("1700-02-29 is accepted under Julian with the 1752 cutover, and stored as its ISO day")
     func englishLeapDayAccepted() {
         #expect(DateFieldEntry.acceptedDay(yearText: "1700", month: 2, dayText: "29", calendar: english) == 29)
-        #expect(DateFieldEntry.dayCommittable(yearText: "1700", month: 2, dayText: "29", calendar: english))
         #expect(DateFieldEntry.impossibleDayNote(yearText: "1700", month: 2, dayText: "29", calendar: english) == nil)
         // Eleven days behind by then: Julian 29 February 1700 is Gregorian 11 March 1700.
         #expect(commit("1700", 2, "29", .day, english) == .write("1700-3-11"))
@@ -39,7 +38,6 @@ struct DateFieldCalendarEntryTests {
     @Test("1700-02-29 is rejected under Gregorian, and the date drops to the month")
     func englishLeapDayRejectedUnderGregorian() {
         #expect(DateFieldEntry.acceptedDay(yearText: "1700", month: 2, dayText: "29") == nil)
-        #expect(!DateFieldEntry.dayCommittable(yearText: "1700", month: 2, dayText: "29"))
         #expect(DateFieldEntry.impossibleDayNote(yearText: "1700", month: 2, dayText: "29")
                 == "February 1700 has 28 days — the day is ignored.")
         #expect(commit("1700", 2, "29") == .write("1700-2"))

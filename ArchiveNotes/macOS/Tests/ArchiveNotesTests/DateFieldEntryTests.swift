@@ -114,34 +114,6 @@ struct DateFieldEntryTests {
         #expect(DateFieldEntry.impossibleDayNote(yearText: "circa", month: 2, dayText: "29") == nil)
     }
 
-    // MARK: - The day row's "Set" button
-
-    @Test("Set goes dead only for a day the chosen month cannot have")
-    func setEnablement() {
-        #expect(DateFieldEntry.dayCommittable(yearText: "1968", month: 4, dayText: "15"))
-        #expect(DateFieldEntry.dayCommittable(yearText: "1968", month: 0, dayText: "15"))  // as before
-        #expect(DateFieldEntry.dayCommittable(yearText: "", month: 4, dayText: "15"))      // as before
-        #expect(DateFieldEntry.dayCommittable(yearText: "2024", month: 2, dayText: "29"))
-        #expect(!DateFieldEntry.dayCommittable(yearText: "2026", month: 2, dayText: "29"))
-        #expect(!DateFieldEntry.dayCommittable(yearText: "1968", month: 4, dayText: "31"))
-        #expect(!DateFieldEntry.dayCommittable(yearText: "1968", month: 4, dayText: ""))   // as before
-        #expect(!DateFieldEntry.dayCommittable(yearText: "1968", month: 4, dayText: "0"))  // as before
-        #expect(!DateFieldEntry.dayCommittable(yearText: "1968", month: 4, dayText: "32")) // as before
-    }
-
-    @Test("a live Set and a shown warning are mutually exclusive")
-    func setAndWarningNeverAgree() {
-        for y in ["", "0", "1968", "2024", "2026", "1500"] {
-            for m in 0...12 {
-                for d in ["", "abc", "0", "1", "28", "29", "30", "31", "32"] {
-                    let committable = DateFieldEntry.dayCommittable(yearText: y, month: m, dayText: d)
-                    let warned = DateFieldEntry.impossibleDayNote(yearText: y, month: m, dayText: d) != nil
-                    #expect(!(committable && warned), "\(y)/\(m)/\(d)")
-                }
-            }
-        }
-    }
-
     // MARK: - Month names
 
     @Test("the picker labels and the messages read from one list")
