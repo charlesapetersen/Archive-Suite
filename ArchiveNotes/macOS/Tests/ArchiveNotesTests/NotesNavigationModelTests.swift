@@ -358,6 +358,46 @@ struct NotesNavigationModelTests {
         #expect(nav.sort.first?.field == .date)                   // relevance dropped
     }
 
+    /// W40.fix-notes-filter-bar: the date range clears on its own, leaving the other facets.
+    @Test func clearDateFilterKeepsOtherFacets() async throws {
+        let (model, index, root) = try await makeModel()
+        defer { Task { await cleanup(root, index) } }
+        model.replaceItems([sum("a", kind: .note)])
+        let nav = NotesNavigationModel(model: model, defaultKind: .note)
+        #expect(!nav.hasDateFilter)
+        #expect(!nav.hasUserFilters)
+        nav.filter.dateFrom = 19600000
+        nav.filter.dateTo = 19701231
+        nav.filter.tags = ["X"]
+        nav.searchText = "zzz"
+        #expect(nav.hasDateFilter)
+
+        nav.clearDateFilter()
+        #expect(!nav.hasDateFilter)
+        #expect(nav.filter.dateFrom == nil && nav.filter.dateTo == nil)
+        #expect(nav.filter.tags == ["X"])
+        #expect(nav.searchText == "zzz")
+        #expect(nav.hasUserFilters)                               // the tag and keyword remain
+    }
+
+    /// One bound alone counts as a date filter, and Clear All sees every facet (round-up included).
+    @Test func hasUserFiltersCoversEveryFacet() async throws {
+        let (model, index, root) = try await makeModel()
+        defer { Task { await cleanup(root, index) } }
+        let nav = NotesNavigationModel(model: model, defaultKind: .note)
+        nav.filter.dateTo = 19701231
+        #expect(nav.hasDateFilter && nav.hasUserFilters)
+        nav.clearUserFilters()
+        #expect(!nav.hasUserFilters)
+        nav.filter.roundup = true
+        #expect(nav.hasUserFilters)
+        nav.clearUserFilters()
+        nav.kindFilter = .both                                    // kind is never a clearable filter
+        #expect(!nav.hasUserFilters)
+        nav.searchText = "   "
+        #expect(!nav.hasUserFilters)
+    }
+
     @Test func saveAsSmartFolderPersistsEffectiveQuery() async throws {
         let (model, index, root) = try await makeModel()
         defer { Task { await cleanup(root, index) } }

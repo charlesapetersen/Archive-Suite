@@ -43,8 +43,9 @@ step.
 - [ ] **D. Sort** — list re-orders by title / date / kind / quality; nil-last is stable.
 - [ ] **E. Keyword full-text search** — as-you-type (bm25) narrows the list; a nonsense query → 0 rows;
       clearing restores. Auto-relevance sort while querying.
-- [ ] **F. Quality / tag / date-range filters** — ★ toggles, tag ALL/ANY chips, and a year range each
-      narrow the list; Save-as-Smart-Folder captures the active filter; Clear resets the user layer.
+- [ ] **F. Quality / tag / date-range filters** — ★ toggles, tag chips (all must match; no All/Any in
+      the bar), and a year range each narrow the list; the date's ⓧ clears only the years; Save-as-Smart-Folder
+      captures the active filter; Clear All resets the user layer.
 - [ ] **G. Open a note + edit body** — the detail pane binds to the selected note; typing autosaves
       (flush-on-switch); the raw-Markdown toggle (⌘/) round-trips styled ⇄ raw without data loss.
       *(typing gesture is `[owner]` per GUI-HARNESS G2.)*

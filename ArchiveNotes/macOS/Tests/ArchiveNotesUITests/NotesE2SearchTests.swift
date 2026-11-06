@@ -51,9 +51,22 @@ final class NotesE2SearchTests: NotesFixtureUITestCase {
             to.typeText("1970\r")
             XCTAssertTrue(pollUntil(timeout: 10) { self.visibleNotes() == [Self.idReader] },
                           "1960–1970 should leave only the 1968 note, saw \(visibleNotes())")
+            // W40.fix-notes-filter-bar: the date range has its own clear, which keeps other facets.
+            addTagFacet("intel")
+            XCTAssertTrue(pollUntil(timeout: 10) { self.visibleNotes() == [Self.idReader] })
+            let dateClear = mainWindow.descendants(matching: .any)["an.filter.dateClear"].firstMatch
+            XCTAssertTrue(dateClear.waitForExistence(timeout: 5), "a set date range should offer its clear")
+            dateClear.click()
+            XCTAssertTrue(pollUntil(timeout: 10) { self.visibleNotes() == [Self.idPlain, Self.idReader] },
+                          "clearing the date should keep the intel tag, saw \(visibleNotes())")
+            XCTAssertEqual(from.value as? String ?? "", "", "the From field should be empty")
+            XCTAssertFalse(mainWindow.descendants(matching: .any)["an.filter.dateClear"].exists,
+                           "with no date set there is nothing to clear")
             clearFilters()
             XCTAssertTrue(pollUntil(timeout: 10) { self.visibleNotes() == self.allNotes },
-                          "Clear should drop the date range")
+                          "Clear All should drop the tag")
+            XCTAssertFalse(mainWindow.descendants(matching: .any)["an.filter.tagCombine"].exists,
+                           "the bar has no All/Any; that is Advanced Search's")
         }
     }
 

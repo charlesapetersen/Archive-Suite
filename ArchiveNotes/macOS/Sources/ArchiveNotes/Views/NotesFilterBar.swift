@@ -3,8 +3,10 @@ import AppKit
 
 /// The item-list filter bar (06-viewers §4, W6-S4). Binds a per-window `NotesNavigationModel` and
 /// surfaces the kind segmented control, a keyword search field (drives FTS — bm25 relevance,
-/// as-you-type), quality (★1–★3) toggles, a tag filter with ALL/ANY combine + chips, a year date
-/// range, and Save-as-Smart-Folder / Clear. The shared folder/smart-folder SCOPE comes from the tree
+/// as-you-type), quality (★1–★3) toggles, a tag filter with chips (every tag must match), a year date
+/// range with its own clear button, and Save-as-Smart-Folder / Clear All. Matching any tag rather than
+/// all of them belongs to Advanced Search (`W40.notes-advanced-search`), not this bar (owner, notes-1
+/// row 37, as ruled for the Reader on 2026-11-04). The shared folder/smart-folder SCOPE comes from the tree
 /// (`NotesModel.scope`) and is merged with this window's filter at `recompute()`.
 ///
 /// Adapted from Reader's `NavigationWindowView.filterBar`; layout is three compact rows so all facets
@@ -77,11 +79,12 @@ struct NotesFilterBar: View {
             .help("Save as Smart Folder")
             .accessibilityIdentifier("an.filter.save")
 
-            Button("Clear") {
+            Button("Clear All") {
                 nav.clearUserFilters()
                 pendingTag = ""
             }
-            .disabled(!hasClearableFilters)
+            .disabled(!nav.hasUserFilters && pendingTag.isEmpty)
+            .help("Clear every filter and the search")
             .accessibilityIdentifier("an.filter.clear")
         }
     }
@@ -143,16 +146,6 @@ struct NotesFilterBar: View {
 
     private var tagFilter: some View {
         HStack(spacing: 6) {
-            Picker("", selection: $nav.filter.tagCombine) {
-                Text("All").tag(TagCombine.all)
-                Text("Any").tag(TagCombine.any)
-            }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .fixedSize()
-            .help("Match all tags, or any tag")
-            .accessibilityIdentifier("an.filter.tagCombine")
-
             TextField("Tag…", text: $pendingTag)
                 .textFieldStyle(.roundedBorder)
                 .frame(width: 90)
@@ -194,6 +187,16 @@ struct NotesFilterBar: View {
                 .help("To year")
                 .accessibilityLabel("To year")
                 .accessibilityIdentifier("an.filter.dateTo")
+            if nav.hasDateFilter {
+                Button { nav.clearDateFilter() } label: {
+                    Image(systemName: "xmark.circle.fill")
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+                .help("Clear the date filter")
+                .accessibilityLabel("Clear the date filter")
+                .accessibilityIdentifier("an.filter.dateClear")
+            }
         }
     }
 
@@ -204,16 +207,6 @@ struct NotesFilterBar: View {
         pendingTag = ""
         guard !t.isEmpty, !nav.filter.tags.contains(t) else { return }
         nav.filter.tags.append(t)
-    }
-
-    /// Something beyond the always-visible kind control is set (so Clear has an effect).
-    private var hasClearableFilters: Bool {
-        !nav.filter.qualities.isEmpty
-            || !nav.filter.tags.isEmpty
-            || nav.filter.dateFrom != nil
-            || nav.filter.dateTo != nil
-            || !nav.searchText.trimmingCharacters(in: .whitespaces).isEmpty
-            || nav.filter.roundup != nil
     }
 
     /// Year ⇆ sortDate int, derived straight from the filter (so Clear resets the field). The lower

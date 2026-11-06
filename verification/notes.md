@@ -1068,18 +1068,20 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
 
 ### N-32 · Quality, tag and date filters
 
-- **Promise:** ★1–★3 toggles, tag chips with ALL/ANY, and a year range each narrow the list; Clear resets them.
+- **Promise:** ★1–★3 toggles, tag chips (every tag must match), and a year range each narrow the list; the
+  date range's own clear drops only the years; Clear All resets them all. The bar has no All/Any (owner,
+  notes-1 row 37: it belongs in Advanced Search; W40.fix-notes-filter-bar).
 - **Promised in:** `SMOKE_TEST.md` step F; `00-overview.md` §16.3; `CLAUDE.md` Impl Map `NotesFilter`,
   `NotesFilterBar`.
 - **Reached by:** filter bar row 2 (`Views/NotesFilterBar.swift:114`). The ★3…★1 buttons (`:127-139`) toggle
-  `nav.filter.qualities`. The All/Any picker (`:146`) sets `tagCombine`. The "Tag…" field (`:156`) adds a chip on
-  Return (`addPendingTag`, `:198`). The From/To year fields (`:182`, `:188`) set `dateFrom`/`dateTo` through
-  bindings at `:216-236`. Each change recomputes the list through `NotesFilter.matches`
-  (`Models/NotesFilter.swift:73`). Clear (`Views/NotesFilterBar.swift:81`) calls
+  `nav.filter.qualities`. The "Tag…" field adds a chip on Return (`addPendingTag`). The From/To year fields set
+  `dateFrom`/`dateTo` through bindings; the ⓧ beside them (`an.filter.dateClear`, shown while a year is set)
+  calls `NotesNavigationModel.clearDateFilter`. Each change recomputes the list through `NotesFilter.matches`
+  (`Models/NotesFilter.swift:73`). Clear All (`an.filter.clear`) calls
   `NotesNavigationModel.clearUserFilters` (`Core/NotesNavigationModel.swift:257`), which keeps the kind.
 - **Real-path test:** `ArchiveNotesUITests/NotesE2SearchTests.testE2_KeywordSearchAndQualityTagDateFiltersNarrowTheList`;
   `ArchiveNotesTests/NotesNavigationModelTests.qualityAndDateFacetsNarrowDisplayed` and
-  `.clearUserFiltersResetsFacetsKeepsKind`; `ArchiveNotesTests/NotesFilterTests.testTagsAllVsAny` (predicate only).
+  `.clearUserFiltersResetsFacetsKeepsKind`, `.clearDateFilterKeepsOtherFacets`, `.hasUserFiltersCoversEveryFacet`; `ArchiveNotesTests/NotesFilterTests.testTagsAllVsAny` (predicate only).
 - **Runtime evidence:** none
 - **Status:** `unproven`
 - **History:**

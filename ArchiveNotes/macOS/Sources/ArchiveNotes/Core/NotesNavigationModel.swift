@@ -296,6 +296,22 @@ final class NotesNavigationModel: ObservableObject {
 
     // MARK: Filter control (from the filter bar)
 
+    /// Something beyond the always-visible kind control is set, so Clear All has an effect.
+    var hasUserFilters: Bool {
+        filter != NotesFilter(kind: filter.kind)
+            || !searchText.trimmingCharacters(in: .whitespaces).isEmpty
+    }
+
+    /// A From or To year is set, so the date range's clear button shows.
+    var hasDateFilter: Bool { filter.dateFrom != nil || filter.dateTo != nil }
+
+    /// Drop the year range alone, leaving every other filter and the keyword in place
+    /// (W40.fix-notes-filter-bar: "a simple way to clear the date filtering").
+    func clearDateFilter() {
+        filter.dateFrom = nil
+        filter.dateTo = nil
+    }
+
     /// Reset the per-window user filter + keyword to neutral, keeping only the window's kind (the
     /// segmented control is always visible). Mirrors Reader's `clearUserFilters`
     /// (`NavigationModel.swift:239-248`): also invalidates any in-flight search and drops relevance sort.

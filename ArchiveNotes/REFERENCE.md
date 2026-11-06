@@ -342,8 +342,9 @@ macOS/Sources/ArchiveNotes/
     QualityControl.swift           Inspector facet buttons plus compact borderless list menu; both call
                                    the existing quality setter (W9.d4)
     NotesFilterBar.swift           Item-list filter bar: kind segmented control · keyword search (FTS,
-                                   bm25 relevance as-you-type) · quality ★1–★3 toggles · tag ALL/ANY +
-                                   chips · year date range · Save-as-Smart-Folder / Clear (W6-S4)
+                                   bm25 relevance as-you-type) · quality ★1–★3 toggles · tag chips
+                                   (all must match; Any is Advanced Search's) · year date range + its own
+                                   clear · Save-as-Smart-Folder / Clear All (W6-S4, W40.fix-notes-filter-bar)
     NameEntrySheet.swift           The one "give it a name" sheet (folders, templates, smart folders):
                                    focused field, Return/Escape, no blank names (W40.fix-notes-visual-polish)
     LocationsInspector.swift       Detail-pane "Locations" — every folder the selected item is in, each
