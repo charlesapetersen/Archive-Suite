@@ -210,5 +210,42 @@ class Parse(unittest.TestCase):
         self.assertEqual(r["quotes"]["title"], "TAX CUT")
 
 
+class SheetUpright(unittest.TestCase):
+    def test_turn_box_maps_a_corner_and_four_turns_return(self):
+        b = [0.1, 0.2, 0.3, 0.1]   # near the top-left
+        self.assertEqual([round(v, 6) for v in R.turn_box(b, 90)], [0.7, 0.1, 0.1, 0.3])   # clockwise: top-right
+        self.assertEqual([round(v, 6) for v in R.turn_box(b, 180)], [0.6, 0.7, 0.3, 0.1])
+        self.assertEqual([round(v, 6) for v in R.turn_box(b, 270)], [0.2, 0.6, 0.1, 0.3])
+        x = b
+        for _ in range(4):
+            x = R.turn_box(x, 90)
+        self.assertEqual([round(v, 6) for v in x], b)
+        self.assertEqual(R.turn_box(b, 0), b)
+
+    def test_display_turns_needs_a_clear_win(self):
+        with tempfile.TemporaryDirectory() as d:
+            f = os.path.join(d, "o.tsv")
+            with open(f, "w") as fh:
+                fh.write("/x/send/a.jpg\t3.5\t102.0\t3.5\t233.2\n"     # left wins: 270
+                         "/x/send/b.jpg\t2019.4\t86.8\t1492.2\t43.4\n"  # upright
+                         "/x/send/c.jpg\t0.0\t65.5\t2.4\t14.4\n"        # right wins: 90
+                         "/x/send/g.jpg\t0.0\t61.5\t2.5\t71.9\n"        # the sideways turns close: stays
+                         "/x/send/d.jpg\t40\t70\t0\t0\n"                # under twice upright: stays
+                         "/x/send/e.jpg\t1\t15\t0\t0\n"                 # under 20 characters: stays
+                         "/x/send/f.jpg\t5\t0\t300\t0\n")               # upside down: 180
+            self.assertEqual(R.display_turns(f, eye=os.path.join(d, "none.tsv")), {"a": 270, "c": 90, "f": 180})
+            eye = os.path.join(d, "eye.tsv")
+            with open(eye, "w") as fh:
+                fh.write("d\t90\na\t0\n")   # an eye check adds a turn the scores missed, and can undo one
+            self.assertEqual(R.display_turns(f, eye=eye), {"c": 90, "f": 180, "d": 90})
+
+    def test_agreed_line_skips_asked_and_empty_fields(self):
+        r = {"kind": "article", "title": "Tax cut", "publication": "The Times", "byline": [], "publication_date": None}
+        got = dict(R.agreed_line(r, {"publication"}))
+        self.assertIn("title", got)
+        self.assertNotIn("publication", got)
+        self.assertNotIn("byline", got)
+
+
 if __name__ == "__main__":
     unittest.main()

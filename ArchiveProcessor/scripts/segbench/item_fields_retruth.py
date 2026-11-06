@@ -889,19 +889,93 @@ def cmd_sheet_items(rows, docs, rng):
     return items, keyed, prec, {f: len(v) for f, v in cand.items()}, q, len(sided)
 
 
-def write_sheet(items, keyed, docs):
+ORIENT = os.path.join(CACHE, "sheet-orient.tsv")   # ocr_orient.swift over send/: Vision's score at each turn
+ORIENT_EYE = os.path.join(CACHE, "sheet-orient-eye.tsv")   # "<page key>\t<degrees clockwise>", checked by eye
+TURN_RATIO, TURN_MIN = 2.0, 20.0   # a turn wins only by twice every other turn's score and 20 weighted characters
+
+
+def display_turns(path=ORIENT, eye=ORIENT_EYE):
+    """{page key: degrees clockwise that show it upright}, from ocr_orient.swift's scores (up, right, down, left).
+    W47.item-fields-owner-ok, 2026-11-05: the upload copies are turned to match the PDF page, and the owner's label
+    sheet showed that a PDF page is not always upright. Only the sheet's display turns; the readings stand."""
+    turns = {}
+    if not os.path.exists(path):
+        return turns
+    for line in open(path, encoding="utf-8"):
+        f = line.rstrip("\n").split("\t")
+        if len(f) != 5:
+            continue
+        sc = [float(x) for x in f[1:]]
+        best = max(range(4), key=lambda i: sc[i])
+        rest = [sc[i] for i in range(4) if i != best]
+        # Twice every other turn, not only upright: the two sideways turns can score close (61.5 against 71.9 on
+        # 4372186e, which the larger turned upside down), and an upside-down page is worse than a sideways one.
+        if best and all(sc[best] >= TURN_RATIO * x for x in rest) and sc[best] - max(rest) >= TURN_MIN:
+            turns[os.path.splitext(os.path.basename(f[0]))[0]] = 90 * best
+    if os.path.exists(eye):   # pages too short of text for the scores, turned as an eye check found them
+        for line in open(eye, encoding="utf-8"):
+            f = line.split()
+            if len(f) >= 2 and f[1] in ("0", "90", "180", "270"):
+                turns[f[0]] = int(f[1])
+    return {k: v for k, v in turns.items() if v}
+
+
+def turn_box(b, deg):
+    """A normalised top-left [x, y, w, h] box on an image turned `deg` degrees clockwise."""
+    x, y, w, h = b
+    if deg == 90:
+        return [1 - y - h, x, h, w]
+    if deg == 180:
+        return [1 - x - w, 1 - y - h, w, h]
+    if deg == 270:
+        return [y, 1 - x - w, h, w]
+    return list(b)
+
+
+def agreed_line(r, asked):
+    """The item fields the sheet does not ask on one document, with the truth's values: the owner reads them and
+    says in the notes when one is wrong or something is missing."""
+    out = []
+    for f in IF.FIELDS:
+        if f in asked or not IF.filled(f, r.get(f)):
+            continue
+        ks = IF.SCOPE.get(f)
+        if ks is not None and r.get("kind") not in ks:
+            continue
+        out.append([f, shown(f, r[f])])
+    return out
+
+
+def write_sheet(items, keyed, docs, rows=None, turns=None):
     out = os.path.join(CACHE, "sheet")
     if os.path.exists(os.path.join(out, "answers.json")):
         print(f"{out} is answered: sheet and key left as they are", file=sys.stderr)
         return False
     os.makedirs(out, exist_ok=True)
     by_id = {d["id"]: d for d in docs}
+    truth = {r["id"]: r for r in rows or []}
+    turns = display_turns() if turns is None else turns
     data = []
     for doc_id in sorted(items, key=lambda i: (by_id[i]["part"], by_id[i]["collection"], i)):
         d = by_id[doc_id]
-        data.append({"doc": doc_id, "label": f"{d['collection']} · {len(d['pages'])} page(s)",
-                     "imgs": [os.path.relpath(send_path(p), out) for p in capped(d["pages"])],
-                     "items": items[doc_id]})
+        pages = capped(d["pages"])
+        imgs, turned = [], {}
+        for i, p in enumerate(pages):
+            deg = turns.get(key(p), 0)
+            src = send_path(p)
+            if deg:
+                os.makedirs(os.path.join(out, "upright"), exist_ok=True)
+                dst = os.path.join(out, "upright", key(p) + ".jpg")
+                if not os.path.exists(dst):
+                    subprocess.run(["sips", "-r", str(deg), src, "--out", dst], check=True, capture_output=True)
+                src, turned[i] = dst, deg
+            imgs.append(os.path.relpath(src, out))
+        its = [dict(x, options=[dict(o, boxes=[[pi, turn_box(b, turned.get(pi, 0))] for pi, b in o["boxes"]])
+                                for o in x["options"]]) for x in items[doc_id]]
+        asked = {x["field"] for x in items[doc_id]}
+        data.append({"doc": doc_id, "label": f"{d['collection']} · {len(d['pages'])} page(s)", "imgs": imgs,
+                     "turned": len(turned), "agreed": agreed_line(truth[doc_id], asked) if doc_id in truth else [],
+                     "items": its})
     page = (SHEET_HTML.replace("__N__", str(sum(len(v) for v in items.values()))).replace("__DOCS__", str(len(items)))
             .replace("__MINUTES__", f"{minutes(items):.0f}").replace("__NAMES__", script_json(FIELD_NAMES))
             .replace("__DATA__", script_json(data)))   # the data last, so nothing in it is taken for a placeholder
@@ -937,17 +1011,21 @@ header{position:sticky;top:0;background:#fff;border-bottom:1px solid #ccc;paddin
 .list{flex:1 1 42%}.it{border:1px solid #ccc;border-radius:4px;padding:6px;margin:8px 0}
 .it.cur{outline:3px solid #06f}.it.done{background:#e6f6e6;border-color:#4a4}
 .q{font-weight:600}.opt{display:block;margin:4px 0;font-family:Georgia,serif}.opt.sel{font-weight:bold;color:#060}
+.turn{font-size:12px;margin:0 0 4px}.agreed{color:#555;font-size:13px;margin:4px 0}.notes textarea{width:100%;height:5em;font:14px -apple-system,sans-serif}
 .k{color:#888;font-size:12px;font-family:-apple-system,sans-serif}.typed{color:#a40}.where{color:#a40;font-size:12px}
 </style>
 <header><b>Item-field check</b> — __N__ questions on __DOCS__ documents, about __MINUTES__ minutes. Each question shows
 one or more readings of a field; which source each came from is not shown. Pick the one the pages show.
 Keys: <b>1</b>-<b>5</b> pick that reading · <b>0</b> none of them (type it; empty = the field is empty) ·
 <b>9</b> can't tell · <b>n/p</b> next/previous · <b>z</b> zoom. A reading offered alone: <b>1</b> right, <b>0</b> wrong.
-Pink boxes mark where the readings were found in the text (from Apple Vision's line positions; they can be off, and
+The grey line lists the fields not asked on that document (both readers agreed, or Gemini ruled), with what goes
+into the truth; the notes box under each document is for one that is wrong, or anything the fields miss. Pages
+photographed sideways or upside down are shown turned upright where a check found them; "turn page" turns any
+other, with its boxes. Pink boxes mark where the readings were found in the text (from Apple Vision's line positions; they can be off, and
 a reading with no box was not found). Answers stay in this browser;
 <button onclick="exportAnswers()">Export answers</button><span id="prog"></span></header><div id="root"></div>
 <script>
-const DATA=__DATA__;const NAMES=__NAMES__;const KEY='w47-item-fields-sheet';
+const DATA=__DATA__;const NAMES=__NAMES__;const KEY='w47-item-fields-sheet';const NOTE='_notes/';
 let A=JSON.parse(localStorage.getItem(KEY)||'{}');const items=[];
 function esc(s){return String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))}
 function save(){localStorage.setItem(KEY,JSON.stringify(A));prog()}
@@ -958,12 +1036,18 @@ function paint(it){const v=A[it.id];it.el.classList.toggle('done',v!==undefined)
  it.el.querySelector('.typed').textContent=v===undefined?'':v==='?'?"can't tell":String(v).startsWith('=')?'typed: '+(v.slice(1)||'(empty)'):''}
 const root=document.getElementById('root');
 for(const d of DATA){const div=document.createElement('div');div.className='doc';
- let h='<div class="img">'+d.imgs.map((s,i)=>`<div class="frame" data-p="${i}"><img src="${s}"></div>`).join('')+`</div><div class="list"><b>${esc(d.label)}</b>`;
+ let h='<div class="img">'+d.imgs.map((s,i)=>`<button class="turn" data-t="${i}">turn page ${i+1} ↻</button><div class="frame" data-p="${i}"><img src="${s}"></div>`).join('')+`</div><div class="list"><b>${esc(d.label)}</b>`+(d.turned?` <span class="k">(${d.turned} page(s) turned upright)</span>`:'')
+  +`<div class="agreed">Not asked: ${d.agreed.length?d.agreed.map(([f,v])=>esc(NAMES[f]||f)+' = '+esc(v)).join('; '):'no other field is filled'}</div>`;
  for(const x of d.items){h+=`<div class="it" data-key="${x.id}"><div class="q">${esc(NAMES[x.field]||x.field)}</div>`;
   x.options.forEach((o,i)=>{h+=`<span class="opt" data-v="${i+1}"><span class="k">${i+1}</span> ${o.text?esc(o.text):'<i>(empty)</i>'}`+(o.text&&!o.boxes.length&&x.field!=='kind'?' <span class="where">(no box)</span>':'')+'</span>'});
   h+='<span class="typed"></span></div>'}
+ h+=`<div class="notes"><b>Notes on this document</b> (optional)<textarea data-n="${esc(d.doc)}">${esc(A[NOTE+d.doc]||'')}</textarea></div>`;
  div.innerHTML=h+'</div>';root.appendChild(div);
+ div.querySelector('textarea').addEventListener('input',e=>{const t=e.target.value;if(t)A[NOTE+d.doc]=t;else delete A[NOTE+d.doc];save()});
  div.querySelectorAll('.frame').forEach(f=>f.onclick=()=>f.classList.toggle('zoom'));
+ div.querySelectorAll('.turn').forEach(b=>b.onclick=()=>{const f=div.querySelector(`.frame[data-p="${b.dataset.t}"]`);
+  const d=((+f.dataset.deg||0)+90)%360;f.dataset.deg=d;f.style.transform=d?`rotate(${d}deg)`:'';
+  const side=d%180?(f.offsetHeight-f.offsetWidth)/2:0;f.style.margin=side>0?`${side}px 0`:side<0?`${-side}px ${side}px`:'';});
  div.querySelectorAll('.it').forEach(el=>{const x=d.items.find(x=>x.id===el.dataset.key);
   const it={id:x.id,x,el,div};items.push(it);paint(it);el.addEventListener('click',()=>go(items.indexOf(it)))})}
 let cur=0,first=true;
@@ -979,7 +1063,7 @@ function go(i){if(i<0||i>=items.length)return;const prev=first?null:items[cur];f
 function head(){const h=document.querySelector('header').offsetHeight;document.documentElement.style.setProperty('--head',h+'px');
  document.querySelectorAll('.doc').forEach(d=>d.style.scrollMarginTop=h+'px')}
 addEventListener('resize',head);head();
-document.addEventListener('keydown',e=>{const it=items[cur];if(!it)return;const n=it.x.options.length;
+document.addEventListener('keydown',e=>{if(e.target.closest&&e.target.closest('textarea,input'))return;const it=items[cur];if(!it)return;const n=it.x.options.length;
  if(e.key==='n')go(cur+1);else if(e.key==='p')go(cur-1);else if(e.key==='z'){it.div.querySelectorAll('.frame').forEach(f=>f.classList.toggle('zoom'));show(it)}
  else if(/^[1-5]$/.test(e.key)&&+e.key<=n){set(it,e.key);go(cur+1)}
  else if(e.key==='9'){set(it,'?');go(cur+1)}
@@ -992,6 +1076,20 @@ prog();go(0);
 
 # --- the report -------------------------------------------------------------------------------------------------
 
+def cmd_sheet(a):
+    """Rewrite the unanswered sheet from truth.jsonl as it stands: no reader runs. The questions must come out the
+    same as key.json's (same seed, same truth), so answers already saved in the browser keep their ids."""
+    docs = load_docs()
+    rows = [json.loads(x) for x in open(os.path.join(CACHE, "truth.jsonl"), encoding="utf-8")]
+    items, keyed, *_ = cmd_sheet_items(rows, docs, random.Random(SEED))
+    old = os.path.join(CACHE, "sheet", "key.json")
+    if os.path.exists(old) and json.loads(json.dumps(keyed)) != json.load(open(old, encoding="utf-8"))["items"]:
+        sys.exit("the questions differ from key.json: not rewritten (rerun build instead)")
+    if write_sheet(items, keyed, docs, rows):
+        print(os.path.join(CACHE, "sheet", "index.html"), f"({sum(1 for v in display_turns().values() if v)} pages "
+              "turned upright in the cache's orientation scores)")
+
+
 def cmd_build(a):
     import gateway_gemini as G
     docs = load_docs()
@@ -1002,7 +1100,7 @@ def cmd_build(a):
     os.replace(os.path.join(CACHE, "truth.jsonl.tmp"), os.path.join(CACHE, "truth.jsonl"))
     rng = random.Random(SEED)
     items, keyed, prec, avail, q, n_sided = cmd_sheet_items(rows, docs, rng)
-    wrote = write_sheet(items, keyed, docs)
+    wrote = write_sheet(items, keyed, docs, rows)
     parts = ("base", "clippings", "handwritten")
     by_part = lambda rs: {p: sum(r["part"] == p for r in rs) for p in parts}  # noqa: E731
     calls = ledger()
@@ -1172,6 +1270,7 @@ def main():
     p.add_argument("--limit", type=int)
     p.set_defaults(fn=cmd_draft)
     sub.add_parser("build").set_defaults(fn=cmd_build)
+    sub.add_parser("sheet").set_defaults(fn=cmd_sheet)
     for name, fn in (("adjudicate", cmd_adjudicate), ("tagging", cmd_tagging)):
         p = sub.add_parser(name)
         p.add_argument("--limit", type=int)
