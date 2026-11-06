@@ -786,6 +786,17 @@ def f3(x):
     return "–" if x is None else f"{x:.3f}"
 
 
+# The truth's unasked self-rulings, counted on the 138 by measurement review pass 11 (P11-5); the measurement cards of
+# ent-truth.md, ent-score.md and ent-truth-owner.md all carry it.
+SELF_RULINGS = (
+    "Sonnet ruled for its own reader on sender 17, recipient 18 and sending place 33 fields of the 138; the owner's "
+    "sheet asked 5, 6 and 12, so 12, 12 and 21 self-rulings were never asked (the place rule has since emptied 14 of "
+    "those places; 8 senders and 4 recipients stay filled where the readers named different people). The owner "
+    "overturned 3 of the 7 asked sender and recipient rulings he settled (Wilson about 0.16 to 0.75), which suggests "
+    "about 2-3% of those fields are wrong in the truth: small beside the gaps the entity reports give, but a truth "
+    "error the scores do not carry (counts from measurement review pass 11, P11-5).")
+
+
 def report(s):
     L = ["# The entity truth set (W46.fix-ent-truth)", "",
          "The owner's answers on 23 of its fields and the sending-place rule (a place the document writes, "
@@ -848,7 +859,23 @@ def report(s):
           "- Only the first and last page images were shown; a name only legible on a middle page is missed.",
           "- The additions come from the agreed, year-tagged pool with ABBYY text, as the 300 did: undated documents "
           "and documents without text are not in it.",
-          "- The cached tagging replies W46.ent-score reads cover the 88 only; the additions need fresh replies.", ""]
+          "- The cached tagging replies W46.ent-score reads cover the 88 only; the additions need fresh replies.", "",
+          "## Measurement card", "",
+          "The full card for the truth as it now stands, with the owner's answers and the place rule, is "
+          "`ent-truth-owner.md`'s; this one is for the truth as built.", "",
+          "- **Truth.** Model truth: GPT 5.6 Luna and Claude Sonnet 5 drafts, Sonnet adjudicating, no owner pass when "
+          "built. The readers' agreement with it (above) is the scorer's self-check, not their accuracy. Since then "
+          "the owner answered 23 fields on 20 documents, all of them Sonnet's rulings for its own reader "
+          "(W46.ent-truth-owner-fold). " + SELF_RULINGS,
+          "- **Selection.** The date-tagging sample's letters and 56 additions drawn by cue strata from the agreed, "
+          "year-tagged pool with ABBYY text, so chosen by ABBYY text (undated documents and documents without text "
+          "are not in it); no route scored against it chose a document.",
+          "- **Comparison.** Both readers drafted blind from the same first and last page images and the same first "
+          "8,000 characters of text, with the same prompt.",
+          "- **Noise.** One draft per reader and one ruling per dispute; no rerun of either, so how often a redraw "
+          "would change a field is not measured.",
+          f"- **Scope.** Correspondence documents only, typed-heavy ({s['strata_truth']['handwritten']} handwritten "
+          "letters), dated ones only; a name legible only on a middle page is missed.", ""]
     return "\n".join(L)
 
 

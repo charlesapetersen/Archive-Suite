@@ -677,9 +677,14 @@ def report(o):
           "",
           "## Measurement card", "",
           "- **Truth:** W47.item-fields-retruth's (Gemini 3.7 and GPT 5.6 Luna drafting, Gemini 3.7 ruling) with "
-          "the owner's sheet answers and notes folded in. Its error is the random controls' above; the disputed "
-          "fields are owner-checked on a seeded sample. Gemini 3.7 drafted and ruled, and 3.8 is its relative, so "
-          "their rows are judged on owner-checked pairs only.",
+          "the owner's sheet answers and notes folded in. The random controls' error above covers the agreed cells "
+          "only; the disputed fields are owner-checked on a seeded sample. The disputes nobody asked keep the "
+          "judge's ruling: in scope, sideways documents out, 72 pairs (kind 24, title 25, byline 9, publication 4, "
+          "publication date 4, recipient place 6), 46 of them in base, where the non-drafter routes score. The "
+          "owner upheld the judge on 43 of the 74 disputes he answered, so about 19 of those 46 are likely wrong: "
+          "1-4 points of truth error per field beyond the controls' (measurement review pass 11, P11-6). The "
+          "non-drafter rows are ABBYY records rather than candidates, and no verdict moves. Gemini 3.7 drafted and "
+          "ruled, and 3.8 is its relative, so their rows are judged on owner-checked pairs only.",
           "- **Selection:** base by Gemini 3.8's format and ABBYY cues (inherited, FLD-3); clippings and handwritten "
           "by the owner's tags. The owner-checked pairs are the sheet's: kind crossings, a seeded sample of "
           "disputes per field, the 3.8-agreeing controls (left out of 3.8's own row) and the random controls, so "

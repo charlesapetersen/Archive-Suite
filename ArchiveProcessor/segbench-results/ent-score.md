@@ -205,3 +205,13 @@ both hit. The judges share families with the truth's drafters; their 9 disagreem
 the ones an owner's eye would settle, and none moves the reading, so no owner sheet was made. Timings come from an
 unattended session at background QoS. Not an OCR or segmentation result, so ArchiveOCRBench is unchanged.
 
+## Measurement card
+
+Added by W46.p11-wording (measurement review pass 11, P11-5). The full card for the truth as it now stands is `ent-truth-owner.md`'s, which restates this page's place, sender and recipient scores.
+
+- **Truth.** W46.fix-ent-truth as built (`ent-truth.md`): GPT 5.6 Luna and Claude Sonnet 5 drafts, Sonnet adjudicating, model truth. The owner's answers on 23 fields of 20 documents and the sending-place rule were folded in afterwards (W46.ent-truth-owner-fold); the figures here are against the truth before that. Sonnet ruled for its own reader on sender 17, recipient 18 and sending place 33 fields of the 138; the owner's sheet asked 5, 6 and 12, so 12, 12 and 21 self-rulings were never asked (the place rule has since emptied 14 of those places; 8 senders and 4 recipients stay filled where the readers named different people). The owner overturned 3 of the 7 asked sender and recipient rulings he settled (Wilson about 0.16 to 0.75), which suggests about 2-3% of those fields are wrong in the truth: small beside the gaps the entity reports give, but a truth error the scores do not carry (counts from measurement review pass 11, P11-5). No scored route drafted the truth; the judges of the doubtful names share families with its drafters.
+- **Selection.** The 138 correspondence documents, 82 of them with cached tagging replies; the set was drawn from the agreed, year-tagged pool with ABBYY text (its 56 additions by ABBYY text cues), not by any route scored here.
+- **Comparison.** On the 82 the routes see the first 3,000 characters, as the app's tagging prompt does (its replies read ABBYY text and were scored before the owner's 2026-10-30 rule against it; no new ABBYY arm runs); on all 138 the local extractors see the first 8,000 characters the truth readers saw. The two sections are not like for like.
+- **Noise.** No paired intervals or rerun floor on this page; a gap of a few points between two routes here is not shown to be beyond noise. W46.ent-score-paid and `ent-truth-owner.md` give paired intervals and rerun floors for the Gemini arms. Timings are from an engine session at background priority: read the ratios, not the seconds.
+- **Scope.** Correspondence documents only, text-only routes, few handwritten letters. It does not settle a dedicated entity prompt (W46.ent-score-paid) or the place rule in the app's prompt (`ent-place-rule.md`).
+

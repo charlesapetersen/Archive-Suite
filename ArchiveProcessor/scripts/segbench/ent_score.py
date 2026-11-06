@@ -674,6 +674,28 @@ def report(s):
           f"Spend: ${s['spend_usd']:.2f} estimated over {s['calls']} gateway calls at ceiling prices"
           f"{'; ' + s['billed_note'] if s.get('billed_note') else ''}.", ""]
     L += READING
+    L += ["## Measurement card", "",
+          "Added by W46.p11-wording (measurement review pass 11, P11-5). The full card for the truth as it now stands "
+          "is `ent-truth-owner.md`'s, which restates this page's place, sender and recipient scores.", "",
+          "- **Truth.** W46.fix-ent-truth as built (`ent-truth.md`): GPT 5.6 Luna and Claude Sonnet 5 drafts, Sonnet "
+          "adjudicating, model truth. The owner's answers on 23 fields of 20 documents and the sending-place rule "
+          "were folded in afterwards (W46.ent-truth-owner-fold); the figures here are against the truth before that. "
+          + ET.SELF_RULINGS + " No scored route drafted the truth; the judges of the doubtful names share families "
+          "with its drafters.",
+          f"- **Selection.** The {s['documents']} correspondence documents, {s['sample88']} of them with cached "
+          "tagging replies; the set was drawn from the agreed, year-tagged pool with ABBYY text (its 56 additions by "
+          "ABBYY text cues), not by any route scored here.",
+          f"- **Comparison.** On the {s['sample88']} the routes see the first 3,000 characters, as the app's tagging "
+          "prompt does (its replies read ABBYY text and were scored before the owner's 2026-10-30 rule against it; "
+          f"no new ABBYY arm runs); on all {s['documents']} the local extractors see the first {ET.TEXT_CAP:,} "
+          "characters the truth readers saw. The two sections are not like for like.",
+          "- **Noise.** No paired intervals or rerun floor on this page; a gap of a few points between two routes "
+          "here is not shown to be beyond noise. W46.ent-score-paid and `ent-truth-owner.md` give paired intervals "
+          "and rerun floors for the Gemini arms. Timings are from an engine session at background priority: read "
+          "the ratios, not the seconds.",
+          "- **Scope.** Correspondence documents only, text-only routes, few handwritten letters. It does not settle "
+          "a dedicated entity prompt (W46.ent-score-paid) or the place rule in the app's prompt "
+          "(`ent-place-rule.md`).", ""]
     return "\n".join(L) + "\n"
 
 

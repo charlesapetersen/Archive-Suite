@@ -361,14 +361,8 @@ def report(s):
           "- **Truth.** W46.fix-ent-truth (GPT 5.6 Luna and Claude Sonnet 5 drafts, Sonnet adjudicating), with the "
           "owner's answers on the 23 fields his sheet asked (all of them fields Sonnet ruled for its own reader) and "
           "six confirming notes. The rest of the set has no owner check; the 20 documents asked (23 fields) were "
-          "chosen as Sonnet's self-rulings, so they say how far to trust those, not the agreed rows. Sonnet ruled "
-          "for its own reader on sender 17, recipient 18 and sending place 33 fields of the 138; the sheet asked 5, "
-          "6 and 12, so 12, 12 and 21 self-rulings were never asked (the rule has since emptied 14 of those places; "
-          "8 senders and 4 recipients stay filled where the readers named different people). The owner overturned 3 "
-          "of the 7 asked sender and recipient rulings he settled (Wilson about 0.16 to 0.75), which suggests about "
-          "2-3% of those fields are wrong in the truth: small beside the gaps the entity reports give, but a truth "
-          "error the scores do not carry (counts from measurement review pass 11, P11-5). No scored route drafted "
-          "the truth.",
+          "chosen as Sonnet's self-rulings, so they say how far to trust those, not the agreed rows. "
+          + ET.SELF_RULINGS + " No scored route drafted the truth.",
           "- **Selection.** The 138 correspondence documents and the reports' own subsets (the 82 with cached "
           "tagging replies); nothing chosen by a scored route. The set itself was chosen by ABBYY text: its 56 "
           "additions came from the agreed, year-tagged pool with ABBYY text, as the date-tagging sample's letters "

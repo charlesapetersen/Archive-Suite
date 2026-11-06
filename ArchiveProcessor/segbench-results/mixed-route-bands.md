@@ -48,7 +48,7 @@ Marks read at NES >= 0.8 (all owner-reviewed marks on the band's pages, stamps i
 
 ## Time and tokens a page, by band
 
-Whole-page reads of the 32 pages. Apple Vision ran as one batch, 1.31 s a page on average. LightOnOCR-3 4B on the M3 Pro (an engine session's timing, so an upper bound); GLM-OCR and Qwen3.6-27B on one Sherlock GPU each at concurrency 16, so a request's latency under load, not its share of the GPU. Median seconds (median output tokens):
+Whole-page reads of the 32 pages. Apple Vision ran as one batch, 1.31 s a page on average: the batch's wall time with the program's launch and setup, divided by 32. LightOnOCR-3 4B on the M3 Pro, each page's generation wall with the model's load left out; both in one engine session at background priority, so neither is a clean figure and the two are not measured alike. GLM-OCR and Qwen3.6-27B on one Sherlock GPU each at concurrency 16, so a request's latency under load, not its share of the GPU. Median seconds (median output tokens):
 
 | Reader | No handwriting (print or stamps only) | Signature, initials or date only | Under about 10 words | About 10-29 words | 30 words or more | Handwriting the owner left unread |
 |---|---|---|---|---|---|---|
@@ -72,7 +72,7 @@ The marks core has no body-text truth, so this is read off the owner's 96 OCR tr
 
 † Gemini 3.7 Flash is a relative of Gemini 3.8 Flash, one of the 96's two truth drafters, so its gain is partly agreement with its relative's text; it is shown for its cost, not ranked.
 
-Only 2 of the 96 are mixed pages, so mixed pages have no body figure of their own (LightOnOCR-3 4B is -12.1 points against Vision on those two: two pages, not a result).
+Only 2 of the 96 are mixed pages, so mixed pages have no body figure of their own (LightOnOCR-3 4B is -12.1 points against Vision on those two, -20.7 to -3.6, 2 of 2 pages worse: two pages, not a result, but the only mixed pages measured).
 
 ## How many pages each band is
 
@@ -87,30 +87,38 @@ Post-stratified share of the 2,000-page bulk-pilot draw (mixed-def-score.md's es
 
 ## What this says
 
-**Sending a signature-only or few-word page through a handwriting reader does not lower its typed-text accuracy.**
-On the 96's 78 typed and printed pages every handwriting-capable reader is level with Apple Vision or better on body
-NES: LightOnOCR-3 4B +1.8 points (a tie, -2.2 to +5.9), GLM-OCR +4.3, Qwen3.6-27B +7.3. A typed page is what a
-signature-only page mostly is, so the band does not change the answer: a page loses no typed accuracy for being
-routed for its handwriting. The per-page spread is real, though: LightOnOCR is more than 2 points below Vision on 14 of
-the 78 pages and GLM-OCR on 20, so a given page can lose even where the average gains. Mixed pages themselves have
-no body truth (2 of the 96), so this is the typed-text cost measured where the typed text is, not on mixed pages.
+**On typed pages, a handwriting reader is not shown to lower the typed text's accuracy; on mixed pages it is
+unmeasured.** On the 96's 78 typed and printed pages every handwriting-capable reader is level with Apple Vision or
+better on body NES: LightOnOCR-3 4B +1.8 points (a tie, -2.2 to +5.9), GLM-OCR +4.3, Qwen3.6-27B +7.3. The per-page
+spread is real: LightOnOCR is more than 2 points below Vision on 14 of the 78 pages and GLM-OCR on 20, so a given page
+can lose even where the average gains, and for the Mac reader the average itself is a tie, not a gain. The setting is
+for mixed pages, and those are not measured: only 2 of the 96 are mixed, and on them LightOnOCR-3 4B is -12.1 points
+against Vision (-20.7 to -3.6), both pages worse. Two pages are not a result, but they are the only evidence on the
+pages the setting is for, and they point the other way. So "a page loses no typed accuracy for being routed for its
+handwriting" is measured on typed pages only.
 
-**What it costs is time, or money, not accuracy.** On the Mac, Vision reads a page in about 1.3 s and LightOnOCR-3 4B
-in about 24 s (an upper bound), so routing a page to the Mac handwriting reader costs about 19 times the time and
-no money. Hosted, Qwen3.6-27B costs about $0.002 a page and Gemini 3.7 Flash about $0.004. The band does not change the
-time: a page's time follows its print, and the pages with the most handwriting were read fastest. With mixed pages an
-estimated 33% (24-44%) of the draw, routing all of them on the Mac adds about 2.1 hours a thousand pages (1.6-2.8);
-leaving out the signature-only band (8.7%, 4.0-16.7%) saves about a quarter of that.
+**What it costs is time, or money.** On the Mac, Vision read the 32 pages at about 1.3 s a page and LightOnOCR-3 4B at
+about 24 s, which would make the Mac handwriting reader about 19 times the time, at no money. That ratio sets unlike
+walls side by side: Vision's 1.3 s is a batch's wall with the program's launch and setup, LightOnOCR's 24 s a page's
+generation with the model's load left out, both from an engine session at background priority; the bench's own Vision
+row (0.21 s a page, as measurement review pass 11 reads it) would make it nearer 100 times than 19. So the time cost is large but not yet measured like for
+like (W46.mixed-route-setting measures it before a figure is shown). Hosted, Qwen3.6-27B costs about $0.002 a page and
+Gemini 3.7 Flash about $0.004. The band does not change the time: a page's time follows its print, and the pages with
+the most handwriting were read fastest. With mixed pages an estimated 33% (24-44%) of the draw, routing all of them on
+the Mac adds about 2.1 hours a thousand pages (1.6-2.8) on these walls; leaving out the signature-only band (8.7%,
+4.0-16.7%) saves about a quarter of that.
 
 **On marks, the bands are too small to tell routes apart, and the signature-only band gains little.** The
 signature-only band's handwriting is three dates, which Vision reads as often as LightOnOCR-3 4B (2 of 3 whole
-page; GLM-OCR 1). The one 30-plus page is the only place the whole page clearly leads the owner's box (whole page 2-4 of
-its 7 handwritten marks, from the box 0-1), and every 10-29 and 30-plus page is a B-core page, chosen by Qwen3.6-27B's
+page; GLM-OCR 1). The one 30-plus page is the only place the whole page reads more than the owner's box (whole page
+2-4 of its 7 handwritten marks, from the box 0-1): one page of 7 marks, not a lead, and every 10-29 and 30-plus page is a B-core page, chosen by Qwen3.6-27B's
 pre-flag. Per band there are 3-9 marks: no band figure is a ranking.
 
 **Recommendation: give users the choice, with the trade-off stated, not a default that hides it.** A setting such as
-"Read handwriting on typed pages (signatures, dates, notes in the margin)" with a note that it costs about 19 times
-the reading time on this Mac (or about $0.002-0.004 a page hosted) and does not lower the typed text's accuracy. A
+"Read handwriting on typed pages (signatures, dates, notes in the margin)" with a note of what it costs in reading time
+on this Mac (many times Vision's; the figure waits on a like-for-like timing) or about $0.002-0.004 a page hosted, and
+that the typed text was measured level on typed pages and is unmeasured on mixed pages (W46.mixed-route-setting
+carries both conditions). A
 finer choice by band (leave out signature-only pages) saves about a quarter of the time on these estimates but
 needs a page's band before it is read, and the pre-flag guessed the band right on 7 of 14 pages; it is not worth a
 setting of its own on this evidence. The setting is filed as W46.mixed-route-setting, behind Phase 4 and the
@@ -128,7 +136,8 @@ settings research, which decide the settings layer.
   are the panel's fixed draw (seed 41). None chosen by a tested route or ABBYY text.
 - **Comparison.** W46.mixed-route's settings unchanged for the marks; the 96-page panel's settings for the body
   figures (every route on the same 78 pages). Times come from three machines and load conditions and are stated as
-  such; they compare routes, not hardware.
+  such; they compare routes, not hardware, and Vision's batch wall (launch included) against LightOnOCR-3 4B's
+  per-page wall (model load left out) is not a like-for-like ratio (measurement review pass 11, P11-4).
 - **Noise.** Marks: 3-9 marks a band, too few for any band-level difference to be more than a tie. Body: paired page
   bootstrap, 2,000 resamples, seed 46; LightOnOCR-3 4B's gain is inside it, GLM-OCR's and Qwen3.6-27B's are not. No
   rerun floor is measured for the open readers (W46.ocr-rerun-noise covers Vision and the gateway). Share: within-
