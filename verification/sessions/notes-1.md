@@ -46,8 +46,9 @@ Note layout and an Appearance setting (System, Light, Dark).
    did.
 2. **Start the Reader and point it at the copy.** `cd ~/Claude/"Archive Suite" && ./launch.sh reader`, then
    File ▸ Choose Archive Folder… (⇧⌘O), ⇧⌘G, paste `~/Library/Caches/ArchiveSuiteRehearsal/notes-session-1/archive`
-   and choose it. Do this first: the Reader gives the folder its identity file, which Notes needs to accept the
-   folder.
+   and choose it. Then select any file and copy one archive link (Selection ▸ Copy Archive Link(s), ⇧⌘L): the
+   Reader gives the folder its identity file at the first archive-link copy, not when it opens the folder, and
+   Notes needs that file to accept the folder. (Corrected after the session, W40.fix-suite-root-marker.)
 3. **Start Notes:** `./launch.sh notes`.
 4. **Point Notes at the new store:** File ▸ Choose Store Folder…, ⇧⌘G,
    `~/Library/Caches/ArchiveSuiteRehearsal/notes-session-1/store`. An empty folder becomes a new store. Notes asks

@@ -45,8 +45,12 @@ enum ReaderRootGrantRefusal: Equatable, Sendable {
             return "Could not open “\(url.lastPathComponent)”. "
                 + "Check that the folder still exists and that you have permission to read it."
         case let .notAnArchiveRoot(url):
-            return "“\(url.lastPathComponent)” is not an Archive Reader folder. "
-                + "Choose the archive folder Reader itself opens."
+            // W40.fix-suite-root-marker: the Reader gives a folder its identity at the first archive-link
+            // copy, not when it opens the folder (owner, W40.root-marker (b)), so "the folder Reader opens"
+            // sent the user to a step that does not help. Name the step that does.
+            return "“\(url.lastPathComponent)” has no Archive Reader identity yet. "
+                + "In Archive Reader, open this folder and copy one archive link "
+                + "(Selection ▸ Copy Archive Link(s), ⇧⌘L), then choose it here again."
         case let .wrongRootKind(url, kind):
             switch kind {
             case .notes:

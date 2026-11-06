@@ -326,8 +326,12 @@ struct ReaderLinkResolverTests {
             #expect(result == .grantRefused(.notAnArchiveRoot(plain)))
             #expect(result != .notFound)
             // The popover shows this string, so it has to name the folder it is about.
-            #expect(ReaderRootGrantRefusal.notAnArchiveRoot(plain).message
-                        .contains(plain.lastPathComponent))
+            let message = ReaderRootGrantRefusal.notAnArchiveRoot(plain).message
+            #expect(message.contains(plain.lastPathComponent))
+            // W40.fix-suite-root-marker: the Reader writes the identity at the first archive-link copy,
+            // so the refusal must name that step, not opening the folder in the Reader.
+            #expect(message.contains("Copy Archive Link"))
+            #expect(!message.contains("Reader itself opens"))
         }
     }
 
