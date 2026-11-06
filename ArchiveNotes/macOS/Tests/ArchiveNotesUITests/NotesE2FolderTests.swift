@@ -161,6 +161,37 @@ final class NotesE2FolderTests: NotesFixtureUITestCase {
         }
     }
 
+    /// Below an open folder the line means "first child", from either side of it (W40.fix-notes-folder-drag):
+    /// the bottom edge of Ideas, once Reading is inside it and showing, puts a third folder above Reading.
+    func testE2_FolderDropBelowAnOpenFolderBecomesItsFirstChild() throws {
+        try withFixture {
+            try requireCanonicalScratchFixtureForStoreWrites()
+            let ideasID = Self.folderIdeas.lowercased(), readingID = Self.folderReading.lowercased()
+            folderRow(named: "Reading").coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.5))
+                .press(forDuration: 0.05,
+                       thenDragTo: folderRow(named: "Ideas").coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)),
+                       withVelocity: .slow, thenHoldForDuration: 1.0)
+            XCTAssertTrue(pollUntil(timeout: 10) { self.folderRecord(id: readingID)?.parent == ideasID },
+                          "Reading should nest in Ideas first")
+            XCTAssertTrue(folderRow(named: "Reading").waitForExistence(timeout: 5), "a drop opens the folder it went into")
+
+            mainWindow.descendants(matching: .any)["an.sidebar.newFolder"].click()
+            answerNameAlert("E2 Third", button: "Create")
+            XCTAssertTrue(pollUntil(timeout: 10) { self.folderRecord(named: "E2 Third") != nil })
+            folderRow(named: "E2 Third").coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.5))
+                .press(forDuration: 0.05,
+                       // 95% down is in the bottom quarter whether the AX frame is the 16 pt label or the
+                       // 28 pt drop area (an open parent's row reports the latter).
+                       thenDragTo: openFolderRow(named: "Ideas").coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.95)),
+                       withVelocity: .slow, thenHoldForDuration: 1.0)
+            XCTAssertTrue(pollUntil(timeout: 10) {
+                guard let third = self.folderRecord(named: "E2 Third"), let r = self.folderRecord(id: readingID) else { return false }
+                return third.parent == ideasID && third.sortOrder < r.sortOrder
+            }, "E2 Third should become Ideas' first child, above Reading; it is \(String(describing: folderRecord(named: "E2 Third")))")
+            assertNoDropHighlight()
+        }
+    }
+
     /// A note held over each part of a folder row lands in the row the drop highlight is on
     /// (W40.fix-notes-folder-drag): above the label, its top, middle and bottom, and below it, all file into
     /// Ideas. The label is about half the row; the points above and below it took no drop before the fix.
@@ -231,6 +262,16 @@ final class NotesE2FolderTests: NotesFixtureUITestCase {
         let row = mainWindow.descendants(matching: .any).matching(identifier: "an.sidebar.folder")
             .matching(NSPredicate(format: "value ==[c] %@ OR label ==[c] %@", name, name)).firstMatch
         XCTAssertTrue(row.waitForExistence(timeout: 10), "the \(name) folder row should be visible")
+        return row
+    }
+
+    /// An open parent folder's row. SwiftUI merges a DisclosureGroup's label into the outline row, which then
+    /// reads identifier "an.sidebar.folder-an.sidebar.folder" and label "Ideas, 3" (seen in the VM).
+    private func openFolderRow(named name: String) -> XCUIElement {
+        let row = mainWindow.descendants(matching: .any)
+            .matching(NSPredicate(format: "identifier BEGINSWITH %@ AND (label ==[c] %@ OR label BEGINSWITH[c] %@)",
+                                  "an.sidebar.folder", name, name + ",")).firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 10), "the open \(name) folder row should be visible")
         return row
     }
 

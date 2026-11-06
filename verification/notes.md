@@ -13,7 +13,7 @@ Format and statuses: [`README.md`](README.md). Written by `W40.b2`, 2026-10-12.
   `W23.m9`/`-fu3`, `W23.m14`/`-fu`, `W37.dual-date`, `W24.cal1`, `W24.cal1-toggle`, `W24.cal1-validator`,
   and the W0–W8 records under §*Archive Notes — NEW APP*.
 - **Sources and code read at:** `9e8959ef`.
-- **Count:** `unproven 38 · works 9 · broken 3 · unreachable 0 · fixed-pending-recheck 2` (works: N-07, N-14, N-34, N-41, N-45, N-49, N-50, N-51, N-52; broken: N-11, N-26, N-44; fixed-pending-recheck: N-12, N-16). Updated by owner session notes-1, 2026-11-05 (N-41 to `works`; N-11, N-12, N-26, N-44 to `broken`); N-16 to `fixed-pending-recheck` by W40.fix-notes-list-rename.
+- **Count:** `unproven 38 · works 9 · broken 2 · unreachable 0 · fixed-pending-recheck 3` (works: N-07, N-14, N-34, N-41, N-45, N-49, N-50, N-51, N-52; broken: N-11, N-44; fixed-pending-recheck: N-12, N-16, N-26). Updated by owner session notes-1, 2026-11-05 (N-41 to `works`; N-11, N-12, N-26, N-44 to `broken`); N-16 to `fixed-pending-recheck` by W40.fix-notes-list-rename; N-26 by W40.fix-notes-folder-drag.
 
 **Runtime evidence, for every row below: none yet.** The W40.a3 full VM suite
 ([`evidence/notes/W40.a3-full-ui.md`](evidence/notes/W40.a3-full-ui.md)) and the `W9.e2` runtime sweep passed
@@ -886,29 +886,37 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
 ### N-26 · Reorder and re-parent folders
 
 - **Promise:** drag a folder between siblings to reorder, onto a folder to re-parent (a cycle is refused);
-  Move Up / Move Down and Move to Top Level in the folder menu.
+  Move Up / Move Down and Move to Top Level in the folder menu. The highlight drawn during a drag is the row
+  the drop lands in.
 - **Promised in:** `CLAUDE.md` Impl Map `NotesFolderTreeView` (W9.d1); `09-gap-closure.md` D1;
-  `SUITE_TODO_DONE.md` `W9.d1`, `W9.e2-folders`, `W9.e2-fu1`.
-- **Reached by:** folder drag (`.onDrag`, `Views/NotesFolderTreeView.swift:238`) onto a row.
-  `NotesFolderDropDelegate.performDrop` (`:487`) treats the top and bottom quarter of the row as an edge
-  (`edge`, `:471`) → `placeFolder` (`:251`), which reorders that level. The middle of the row goes to
-  `handleDrop` (`:163`) → `NotesModel.moveFolder` (`Core/NotesModel.swift:1472`), which refuses a cycle with
-  a message (`:1473-1476`, `wouldCreateCycle` `:1645`). The level's `ForEach.onMove` (`:287`) also reorders.
-  The menu's Move Up / Move Down (`:317-320`, `shiftFolder` `:187`) and Move to Top Level (`:321`,
-  `moveToTopLevel` `:196`) end in `OrganizationStore.moveFolder` (`Index/OrganizationStore.swift:325`).
+  `SUITE_TODO_DONE.md` `W9.d1`, `W9.e2-folders`, `W9.e2-fu1`, `W40.fix-notes-folder-drag`.
+- **Reached by:** folder drag (`.onDrag`, `Views/NotesFolderTreeView.swift`, `folderRow`) onto a row. The row's
+  drop area (`NotesFolderRowDropTarget`) reaches 8 pt above and below the label. On every pointer move
+  `dropTarget(onto:y:rowHeight:)` reads the drag pasteboard (`NotesItemDrag.dragKind`) and the pointer's band
+  (`NotesItemDrag.dropZone`: top or bottom quarter = beside, middle = into); the app draws that one target
+  (`dropHighlight`) and the drop performs it (`dropFolder` → `NotesModel.moveFolder` to nest, `placeFolder` to
+  reorder that level). A folder over itself or into its own descendant resolves to nothing: no highlight, a
+  refused drop. There is no `ForEach.onMove` any more (its List-drawn gap targets only reordered). The menu's
+  Move Up / Move Down (`shiftFolder`) and Move to Top Level (`moveToTopLevel`) end in
+  `OrganizationStore.moveFolder` (`Index/OrganizationStore.swift`).
 - **Real-path test:** `ArchiveNotesUITests/NotesE2FolderTests.testE2_FolderDragToBottomEdgeReorders`;
-  `.testE2_FolderMoveUpAndDownReorderTheLevel`; `ArchiveNotesUITests/NotesGUITests.testG18_DragFolderOntoFolderReparentsIt`.
-- **Runtime evidence:** none
-- **Status:** `broken`
+  `.testE2_FolderDragToSiblingGapReorders`; `.testE2_FolderMoveUpAndDownReorderTheLevel`;
+  `.testE2_QuickFolderDragOntoMiddleNests`; `.testE2_FolderDropBelowAnOpenFolderBecomesItsFirstChild`;
+  `.testE2_NoteDropOnAnyPartOfAFolderRowFilesIntoIt`; `ArchiveNotesUITests/NotesGUITests.testG18_DragFolderOntoFolderReparentsIt`.
+- **Runtime evidence:** VM 2026-11-05 (W40.fix-notes-folder-drag): the folder and drag UI tests pass, and the
+  screen video shows the app's outline on the row under a held note; the DEBUG seam
+  `an.sidebar.test.dropTarget` shows none left after each drop.
+- **Status:** `fixed-pending-recheck`
 - **History:**
   - 2026-10-12 W40.b2 — row written, `unproven`.
   - 2026-11-05 owner session notes-1 — `unproven` → `broken`: reordering by drag works, but a folder cannot be dragged onto another to nest it, and the drop highlight follows the pointer erratically ([`sessions/notes-1-returned.md`](sessions/notes-1-returned.md) rows 30-31). Fix item `W40.fix-notes-folder-drag`.
+  - 2026-11-05 W40.fix-notes-folder-drag — `broken` → `fixed-pending-recheck`: a sidebar label is 16 of the row's 32 pt, and the gaps around it belonged to the List's `onMove` (reorder only), so only an 8 pt band nested; the row now takes the whole height, and the highlight is drawn by the app from the same resolution the drop performs. Recheck by hand in notes-2.
 - **Notes:** the W9.e2 result: `W9.e2-folders` found both D1 doubts real. A gap drop re-parented instead of
-  reordering (filed `W9.e2-fu1`, fixed `af7d049`, `NotesE2FolderTests.testE2_FolderDragToBottomEdgeReorders`,
-  4/4), and there was no way back to the top level (fixed by Move to Top Level). Drop onto a folder:
-  `testG18_DragFolderOntoFolderReparentsIt`. `.testE2_FolderDragToSiblingGapReorders` also exists. A reorder is
-  one `moveFolder` call per sibling (`:208-212`, `:263-267`), not one transaction. No test drives the cycle
-  refusal by drag; `ArchiveNotesTests/OrganizationStoreTests.moveFolderCycleGuardRefuses` covers the store.
+  reordering (filed `W9.e2-fu1`, fixed `af7d049`), and there was no way back to the top level (fixed by Move to
+  Top Level). XCUITest's synthesized drag nested even before the fix, so the tests prove the paths, not the
+  owner's hand. A reorder is one `moveFolder` call per sibling, not one transaction.
+  `ArchiveNotesTests/OrganizationStoreTests.moveFolderCycleGuardRefuses` covers the store's cycle guard;
+  `NotesItemDragTests` covers `dragKind` and `dropZone`.
 
 ### N-27 · Replication: one note in many folders
 

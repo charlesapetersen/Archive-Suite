@@ -325,7 +325,7 @@ struct NotesFolderTreeView: View {
                     Capsule().fill(Color.accentColor).frame(height: 2)
                     if target.zone == .before { Spacer(minLength: 0) }
                 }
-                .padding(.vertical, -5)   // in the gap between the rows
+                .padding(.vertical, -6)   // in the gap between the rows
                 .accessibilityHidden(true)
             }
         }
@@ -527,8 +527,10 @@ private struct NotesFolderRowDropTarget: ViewModifier {
     @State private var height: CGFloat = 0
     /// How far the drop area reaches past the label, above and below. A sidebar row's label is about half
     /// the row's height (16 of 32 pt in the VM), so without this, half of every row took no drop and the
-    /// highlight went out between rows (W40.fix-notes-folder-drag). It does not change the layout.
-    static let reach: CGFloat = 6
+    /// highlight went out between rows (W40.fix-notes-folder-drag). 8 pt meets the next row's area at the
+    /// default row size; at a smaller one the areas overlap, and the row holding the drag decides. It does
+    /// not change the layout.
+    static let reach: CGFloat = 8
 
     func body(content: Content) -> some View {
         content
