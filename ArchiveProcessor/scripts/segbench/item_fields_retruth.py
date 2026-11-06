@@ -1146,7 +1146,9 @@ header{position:sticky;top:0;background:#fff;border-bottom:1px solid #ccc;paddin
 .box{position:absolute;border:3px solid #f0a;border-radius:4px;pointer-events:none}
 .list{flex:1 1 42%}.it{border:1px solid #ccc;border-radius:4px;padding:6px;margin:8px 0}
 .it.cur{outline:3px solid #06f}.it.done{background:#e6f6e6;border-color:#4a4}
-.q{font-weight:600}.opt{display:block;margin:4px 0;font-family:Georgia,serif}.opt.sel{font-weight:bold;color:#060}
+.q{font-weight:600}.opt{display:block;margin:4px 0;padding:3px 6px;border:1px solid #ddd;border-radius:4px;cursor:pointer;font-family:Georgia,serif}
+.opt:hover{background:#f3f3f3}.opt.sel{font-weight:bold;color:#060;border-color:#4a4;background:#d8f0d8}
+.opt.ctl{font-family:-apple-system,sans-serif}.wrongin{width:95%;margin-top:3px;font:14px Georgia,serif}
 .turn{font-size:12px;margin:0 0 4px}.agreed{color:#555;font-size:13px;margin:4px 0}.notes textarea{width:100%;height:5em;font:14px -apple-system,sans-serif}
 .k{color:#888;font-size:12px;font-family:-apple-system,sans-serif}.typed{color:#a40}.where{color:#a40;font-size:12px}
 </style>
@@ -1160,14 +1162,19 @@ function save(){localStorage.setItem(KEY,JSON.stringify(A));prog()}
 function prog(){document.getElementById('prog').textContent=` ${items.filter(it=>A[it.id]!==undefined).length} / ${items.length} answered`}
 function set(it,v){A[it.id]=v;save();paint(it)}
 function paint(it){const v=A[it.id];it.el.classList.toggle('done',v!==undefined);
- it.el.querySelectorAll('.opt').forEach(o=>o.classList.toggle('sel',o.dataset.v===String(v)));
+ const typed=v!==undefined&&String(v).startsWith('=');
+ it.el.querySelectorAll('.opt').forEach(o=>o.classList.toggle('sel',o.dataset.v===String(v)||(typed&&o.dataset.v==='0')));
+ const inp=it.el.querySelector('.wrongin');if(typed&&inp.value!==v.slice(1))inp.value=v.slice(1);
  it.el.querySelector('.typed').textContent=v===undefined?'':v==='?'?"can't tell":String(v).startsWith('=')?'typed: '+(v.slice(1)||'(empty)'):''}
 const root=document.getElementById('root');
 for(const d of DATA){const div=document.createElement('div');div.className='doc';
  let h='<div class="img">'+d.imgs.map((s,i)=>`<button class="turn" data-t="${i}">turn page ${i+1} ↻</button><div class="frame" data-p="${i}"><img src="${s}"></div>`).join('')+`</div><div class="list"><b>${esc(d.label)}</b>`+(d.turned?` <span class="k">(${d.turned} page(s) turned upright)</span>`:'')
   +`<div class="agreed">Not asked: ${d.agreed.length?d.agreed.map(([f,v])=>esc(NAMES[f]||f)+' = '+esc(v)).join('; '):'no other field is filled'}</div>`;
  for(const x of d.items){h+=`<div class="it" data-key="${x.id}"><div class="q">${esc(NAMES[x.field]||x.field)}</div>`;
-  x.options.forEach((o,i)=>{h+=`<span class="opt" data-v="${i+1}"><span class="k">${i+1}</span> ${o.text?esc(o.text):'<i>(empty)</i>'}`+(o.text&&!o.boxes.length&&x.field!=='kind'?' <span class="where">(no box)</span>':'')+'</span>'});
+  const one=x.options.length===1;
+  x.options.forEach((o,i)=>{h+=`<span class="opt" data-v="${i+1}"><span class="k">${i+1}</span> ${one?'right: ':''}${o.text?esc(o.text):'<i>(empty)</i>'}`+(o.text&&!o.boxes.length&&x.field!=='kind'?' <span class="where">(no box)</span>':'')+'</span>'});
+  h+=`<span class="opt ctl" data-v="0"><span class="k">0</span> ${one?'wrong':'none of these'}: type what the pages show (left empty, the field is empty)<input class="wrongin" type="text"></span>`
+   +`<span class="opt ctl" data-v="?"><span class="k">9</span> can't tell</span>`;
   h+='<span class="typed"></span></div>'}
  h+=`<div class="notes"><b>Notes on this document</b> (optional)<textarea data-n="${esc(d.doc)}">${esc(A[NOTE+d.doc]||'')}</textarea></div>`;
  div.innerHTML=h+'</div>';root.appendChild(div);
@@ -1177,7 +1184,12 @@ for(const d of DATA){const div=document.createElement('div');div.className='doc'
   const d=((+f.dataset.deg||0)+90)%360;f.dataset.deg=d;f.style.transform=d?`rotate(${d}deg)`:'';
   const side=d%180?(f.offsetHeight-f.offsetWidth)/2:0;f.style.margin=side>0?`${side}px 0`:side<0?`${-side}px ${side}px`:'';});
  div.querySelectorAll('.it').forEach(el=>{const x=d.items.find(x=>x.id===el.dataset.key);
-  const it={id:x.id,x,el,div};items.push(it);paint(it);el.addEventListener('click',()=>go(items.indexOf(it)))})}
+  const it={id:x.id,x,el,div};items.push(it);paint(it);el.addEventListener('click',()=>go(items.indexOf(it)));
+  const inp=el.querySelector('.wrongin');
+  el.querySelectorAll('.opt').forEach(o=>o.addEventListener('click',()=>{const v=o.dataset.v;
+   if(v==='0'){set(it,'='+inp.value);if(document.activeElement!==inp)inp.focus()}else set(it,v)}));
+  inp.addEventListener('input',()=>set(it,'='+inp.value));
+  inp.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();inp.blur();go(items.indexOf(it)+1)}})})}
 let cur=0,first=true;
 function show(it){it.div.querySelectorAll('.box').forEach(b=>b.remove());let top=null;
  it.x.options.forEach(o=>o.boxes.forEach(([p,b])=>{const f=it.div.querySelector(`.frame[data-p="${p}"]`);if(!f)return;
@@ -1195,7 +1207,7 @@ document.addEventListener('keydown',e=>{if(e.target.closest&&e.target.closest('t
  if(e.key==='n')go(cur+1);else if(e.key==='p')go(cur-1);else if(e.key==='z'){it.div.querySelectorAll('.frame').forEach(f=>f.classList.toggle('zoom'));show(it)}
  else if(/^[1-5]$/.test(e.key)&&+e.key<=n){set(it,e.key);go(cur+1)}
  else if(e.key==='9'){set(it,'?');go(cur+1)}
- else if(e.key==='0'){const t=prompt('What the pages show for this field (empty = the field is empty):','');if(t!==null){set(it,'='+t);go(cur+1)}}});
+ else if(e.key==='0'){e.preventDefault();const inp=it.el.querySelector('.wrongin');set(it,'='+inp.value);inp.focus()}});
 function exportAnswers(){const b=new Blob([JSON.stringify(A,null,1)],{type:'application/json'});
  const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='answers.json';a.click()}
 prog();go(0);

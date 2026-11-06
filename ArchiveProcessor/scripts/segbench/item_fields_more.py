@@ -57,7 +57,7 @@ STORE = "w47-item-fields-more"
 DATE_NAME = "date (your Finder tags on the first page)"
 
 INTRO = """A second check, drawn at random so the readings can be measured. Each question offers one reading of a
-field: <b>1</b> right · <b>0</b> wrong (type what the pages show; empty = the field is empty) · <b>9</b> can't tell
+field, then "wrong" and "can't tell"; click one or press its key: <b>1</b> right · <b>0</b> wrong (type what the pages show; empty = the field is empty) · <b>9</b> can't tell (after typing a correction, Enter moves on)
 · <b>n/p</b> next/previous · <b>z</b> zoom. A reading offered as <i>(empty)</i>: <b>1</b> means the pages show no
 such thing, <b>0</b> that they do: type it. Give what the pages show; when a value needs inference (a full name from
 initials, a paper from its initials), say so in the notes. The grey line lists every other truth the document has,
