@@ -356,8 +356,8 @@ final class TriageJourneyUITests: FixtureUITestCase {
             XCTAssertTrue(shown, "a case variant should be named as the existing tag")
             log("[d8]   existing-spelling note shown: \(shown ? "yes" : "NO")")
         }
-        app.buttons["ar.tagEditor.addSubjectButton"].click()
-        // The sheet writes on Add; give the write a moment before Done dismisses the sheet.
+        field.typeText("\r")   // Return adds the tag: there is no Add button
+        // The sheet writes on Return; give the write a moment before Done dismisses the sheet.
         RunLoop.current.run(until: Date().addingTimeInterval(1))
         app.buttons["Done"].firstMatch.click()
     }

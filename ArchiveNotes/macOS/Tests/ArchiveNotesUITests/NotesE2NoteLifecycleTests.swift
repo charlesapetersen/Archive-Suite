@@ -19,7 +19,7 @@ final class NotesE2NoteLifecycleTests: NotesFixtureUITestCase {
             setAuthors("Zenobia Quartermaine", in: mainWindow)
             XCTAssertTrue(pollUntil(timeout: 10) {
                 (self.rawMarkdown(inItemDir: Self.idPlain) ?? "").contains("authors: [Zenobia Quartermaine]")
-            }, "Set should write the note's authors to front matter")
+            }, "leaving the authors field should write the note's authors to front matter")
 
             let search = mainWindow.textFields["an.filter.search"]
             XCTAssertTrue(search.waitForExistence(timeout: 10))
@@ -39,24 +39,19 @@ final class NotesE2NoteLifecycleTests: NotesFixtureUITestCase {
             setAuthors("Ignatius Fenwick", in: win)
             XCTAssertTrue(pollUntil(timeout: 10) {
                 (self.rawMarkdown(inItemDir: Self.idExtract) ?? "").contains("authors: [Ignatius Fenwick]")
-            }, "Set should write the extract's authors to front matter")
+            }, "leaving the authors field should write the extract's authors to front matter")
 
             // Put both back so the later checks see the fixture as generated.
-            let extractClear = win.buttons["an.detail.authors.clear"]
-            revealInMetadataScroll(extractClear, in: win)
-            extractClear.click()
+            setAuthors("", in: win)
             XCTAssertTrue(pollUntil(timeout: 10) {
                 !(self.rawMarkdown(inItemDir: Self.idExtract) ?? "").contains("Ignatius Fenwick")
-            }, "Clear should remove the extract's authors")
+            }, "emptying the authors field should remove the extract's authors")
             closeExtractsWindow(win)
             selectItem(uuid: Self.idPlain)
-            let clear = mainWindow.buttons["an.detail.authors.clear"]
-            XCTAssertTrue(clear.waitForExistence(timeout: 10))
-            revealInMetadataScroll(clear)
-            clear.click()
+            setAuthors("", in: mainWindow)
             XCTAssertTrue(pollUntil(timeout: 10) {
                 !(self.rawMarkdown(inItemDir: Self.idPlain) ?? "").contains("authors:")
-            }, "Clear should remove the note's authors line")
+            }, "emptying the authors field should remove the note's authors line")
         }
     }
 
@@ -98,11 +93,10 @@ final class NotesE2NoteLifecycleTests: NotesFixtureUITestCase {
         revealInMetadataScroll(field, in: window)
         field.click()
         app.typeKey("a", modifierFlags: .command)
-        app.typeText(name)
-        // In the Extracts window the Sources section pushes this row to the pane's fold.
-        let set = window.buttons["an.detail.authors.set"]
-        revealInMetadataScroll(set, in: window)
-        set.click()
+        app.typeText(name.isEmpty ? XCUIKeyboardKey.delete.rawValue : name)
+        XCTAssertFalse(window.buttons["Set"].exists || window.buttons["Clear"].exists,
+                       "the authors field applies as edited: no Set or Clear button (W40.fix-suite-no-set-clear)")
+        app.typeKey(.tab, modifierFlags: [])   // leaving the field applies it
     }
 
     private func openExtractsWindow() -> XCUIElement {

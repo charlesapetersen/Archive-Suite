@@ -37,6 +37,9 @@ struct NoteMetadataInspector: View {
     @State private var swApplied = AppliedText()
     @FocusState private var focusedDate: DateRole?
     @State private var authorsText = ""
+    /// Which item the authors text belongs to and the list last applied there, as for the dates.
+    @State private var authorsApplied: (id: UUID?, authors: [String]) = (nil, [])
+    @FocusState private var authorsFocused: Bool
     @State private var extractSources: [ExtractSourceUsage]?
     @State private var extractSourcesFailed = false
     @State private var roundupYear: Int?
@@ -94,6 +97,7 @@ struct NoteMetadataInspector: View {
         .onAppear { seed(from: item) }
         .onChange(of: item.id) {   // re-seed only on selection change (WYSIWYG typing)…
             applyDates()           // …after a field still being typed in reaches its own item
+            applyAuthors()
             seed(from: item)
         }
         // …or when the calendar the fields are typed in changes (the stored date does not).
@@ -111,7 +115,13 @@ struct NoteMetadataInspector: View {
             if old == .own { applyDate() }
             if old == .sentWith { applySentWith() }
         }
-        .onDisappear { applyDates() }
+        .onChange(of: authorsFocused) { wasFocused, _ in if wasFocused { applyAuthors() } }
+        // Authors filled elsewhere (Zotero) show here, unless the field holds text not applied yet.
+        .onChange(of: item.authors) {
+            guard !authorsFocused, composedAuthors == authorsApplied.authors else { return }
+            seedAuthors(from: item)
+        }
+        .onDisappear { applyDates(); applyAuthors() }
         .task(id: SourceLoadKey(id: item.id, mtime: item.mtime)) {
             extractSources = nil
             extractSourcesFailed = false
@@ -222,22 +232,16 @@ struct NoteMetadataInspector: View {
         VStack(alignment: .leading, spacing: 6) {
             Text("Authors").font(.subheadline.bold())
                 .accessibilityIdentifier("an.detail.authors.heading")
+            // Applies on leaving the field and clears when emptied: no Set or Clear button (owner, notes-1
+            // row 25). A submit (Return, where the field does not take it as a new line) applies too.
             TextField("One author per line", text: $authorsText, axis: .vertical)
                 .lineLimit(2...4)
                 .textFieldStyle(.roundedBorder)
+                .focused($authorsFocused)
+                .onSubmit { applyAuthors() }
+                .help("One author per line. Applies when you leave the field; empty it to remove the authors.")
                 .accessibilityLabel("Authors")
                 .accessibilityIdentifier("an.detail.authors")
-            HStack {
-                Button("Set") { commitAuthors() }
-                    .disabled(composedAuthors == item.authors)
-                    .accessibilityIdentifier("an.detail.authors.set")
-                Button("Clear") {
-                    authorsText = ""
-                    commitAuthors([])
-                }
-                .disabled(item.authors.isEmpty && composedAuthors.isEmpty)
-                .accessibilityIdentifier("an.detail.authors.clear")
-            }
         }
     }
 
@@ -381,7 +385,7 @@ struct NoteMetadataInspector: View {
 
     /// Seed local fields from the selected item's stored authors and date (no write — see the type doc).
     private func seed(from item: ItemSummary) {
-        authorsText = item.authors.joined(separator: "\n")
+        seedAuthors(from: item)
         seedDates(from: item)
     }
 
@@ -452,9 +456,16 @@ struct NoteMetadataInspector: View {
             .filter { !$0.isEmpty }
     }
 
-    private func commitAuthors(_ authors: [String]? = nil) {
-        let value = authors ?? composedAuthors
-        let id = item.id
+    private func seedAuthors(from item: ItemSummary) {
+        authorsText = item.authors.joined(separator: "\n")
+        authorsApplied = (item.id, item.authors)
+    }
+
+    /// Apply the typed authors to the item they were typed for, if they changed since last applied.
+    private func applyAuthors() {
+        let value = composedAuthors
+        guard let id = authorsApplied.id, value != authorsApplied.authors else { return }
+        authorsApplied.authors = value
         Task { await nav.setAuthors(value, for: id) }
     }
 

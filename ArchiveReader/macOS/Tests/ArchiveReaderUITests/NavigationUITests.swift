@@ -497,10 +497,7 @@ final class NavigationUITests: FixtureUITestCase {
         let addField = app.textFields["ar.tagEditor.addSubject"]
         XCTAssertTrue(addField.waitForExistence(timeout: 5), "Edit Info should present its subject field")
         addField.click()
-        addField.typeText(addedTag)
-        let addButton = app.buttons["ar.tagEditor.addSubjectButton"]
-        XCTAssertTrue(addButton.waitForExistence(timeout: 5))
-        addButton.click()
+        addField.typeText(addedTag + "\r")   // Return adds the tag: there is no Add button
         XCTAssertTrue(waitForTags(on: targetName, containing: [addedTag]),
                       "the editor's subject addition should be verified on the scratch document")
         app.buttons["Done"].click()
@@ -596,22 +593,24 @@ final class NavigationUITests: FixtureUITestCase {
         let field = app.textFields["ar.tagEditor.sentWith"]
         XCTAssertTrue(field.waitForExistence(timeout: 5), "the ⌘I sheet should offer a Sent-With field")
         field.click()
-        field.typeText("1958-03-12")
-        let set = app.buttons["ar.tagEditor.sentWithSet"]
-        XCTAssertTrue(set.isEnabled, "a valid Sent-With date enables Set")
-        set.click()
+        XCTAssertFalse(app.buttons["Set"].exists || app.buttons["Clear"].exists,
+                       "the sheet applies its fields as typed: no Set or Clear button (W40.fix-suite-no-set-clear)")
+        field.typeText("1958-03-12\r")
         XCTAssertTrue(waitForTags(on: name, containing: ["842", "Sent With 1958-03-12"]),
-                      "Set should write the Sent-With date and keep the document's own date")
+                      "Return should write the Sent-With date and keep the document's own date")
 
-        app.buttons["ar.tagEditor.sentWithUncertain"].click()
+        app.checkBoxes["ar.tagEditor.sentWithUncertain"].click()
         XCTAssertTrue(waitForTags(on: name, containing: ["Sent With 1958-03-12", "Sent With Date Uncertain"]),
                       "Mark Uncertain should flag the Sent-With date")
         captureScreenshot("w40-sent-with-date-in-sheet")
 
-        app.buttons["ar.tagEditor.sentWithClear"].click()
+        // Emptying the field and leaving it (Tab) removes the date and its flag.
+        field.click()
+        pressKey("a", modifiers: .command)
+        field.typeText(XCUIKeyboardKey.delete.rawValue + "\t")
         XCTAssertTrue(waitForTags(on: name, containing: ["842"],
                                   excluding: ["Sent With 1958-03-12", "Sent With Date Uncertain"]),
-                      "Clear should remove the Sent-With date and its flag")
+                      "an emptied Sent-With field should remove the date and its flag")
         app.buttons["ar.tagEditor.done"].click()
     }
 

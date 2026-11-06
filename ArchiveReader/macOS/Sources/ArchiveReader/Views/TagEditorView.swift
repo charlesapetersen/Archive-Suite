@@ -15,9 +15,11 @@ struct TagEditorView: View {
     var targetPaths: [String]? = nil
     @Environment(\.dismiss) private var dismiss
     @State private var subjectDraft = ""
-    @State private var yearDraft = ""
-    @State private var dayDraft = ""
-    @State private var sentWithDraft = ""
+    @State private var dateDrafts: [DateField: String] = [:]
+    /// The fields typed in since they were last applied or seeded: only these are written.
+    @State private var editedFields: Set<DateField> = []
+    @State private var seededText: [DateField: String?] = [:]
+    @FocusState private var focusedField: DateField?
 
     var body: some View {
         let files = targetFiles
@@ -26,9 +28,10 @@ struct TagEditorView: View {
             HStack {
                 Text(s.count == 1 ? "Edit Info" : "Edit Info — \(s.count) files").font(.headline)
                 Spacer()
-                // Typed text sticks, as in the list's tag field: Done adds a subject still in the field. While
-                // one is being typed, Return belongs to the field, which adds it and keeps the keyboard.
-                Button("Done") { addSubject(); dismiss() }
+                // Typed text sticks, as in the list's tag field: Done adds a subject still in the field and applies
+                // a date still being typed. While a tag is being typed, Return belongs to the field, which adds it
+                // and keeps the keyboard.
+                Button("Done") { addSubject(); commitDateFields(); dismiss() }
                     .keyboardShortcut(subjectDraft.isEmpty ? .defaultAction : nil)
                     .accessibilityIdentifier("ar.tagEditor.done")
             }
@@ -68,14 +71,10 @@ struct TagEditorView: View {
                 ForEach(s.subjectsOnAll, id: \.self) { chip($0, partial: false) }
                 ForEach(s.subjectsOnSome, id: \.self) { chip($0, partial: true) }
             }
-            HStack {
-                SubjectEntryField(draft: $subjectDraft, placeholder: "Add tag…", identifier: "ar.tagEditor.addSubject",
-                                  suggestions: { let onAll = Set(s.subjectsOnAll.map(tagKey)); return model.allSubjects.filter { !onAll.contains(tagKey($0)) } },
-                                  onAdd: { apply(.addSubject($0)) })
-                Button("Add", action: addSubject)
-                    .disabled(subjectDraft.trimmingCharacters(in: .whitespaces).isEmpty)
-                    .accessibilityIdentifier("ar.tagEditor.addSubjectButton")
-            }
+            // Return adds the typed tag; there is no Add button (owner, notes-1 rows 25-26).
+            SubjectEntryField(draft: $subjectDraft, placeholder: "Add tag…", identifier: "ar.tagEditor.addSubject",
+                              suggestions: { let onAll = Set(s.subjectsOnAll.map(tagKey)); return model.allSubjects.filter { !onAll.contains(tagKey($0)) } },
+                              onAdd: { apply(.addSubject($0)) })
             // Tags that differ only in case are one tag: say which spelling the new one is written in.
             if let existing = model.existingSpelling(differingFrom: subjectDraft) {
                 Label("Added as “\(existing)”, the existing spelling of this tag.", systemImage: "info.circle")
@@ -121,70 +120,148 @@ struct TagEditorView: View {
 
     // MARK: Date
 
+    /// The typed date fields. Each applies on Return or on leaving it, and an emptied field clears its facet:
+    /// there is no Set or Clear button (owner, notes-1 row 25; AGENTS.md §UI conventions).
+    enum DateField: Hashable { case year, day, sentWith }
+
     @ViewBuilder private func dateSection(_ s: GroupTagSummary, _ files: [ArchiveFile]) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             title("Date")
             dateAmbiguityNotice(files)
             HStack {
                 Text("Year").frame(width: 52, alignment: .leading)
-                TextField(yearPlaceholder(s), text: $yearDraft).textFieldStyle(.roundedBorder).frame(width: 90)
-                Button("Set") { if let y = Int(yearDraft), (100...9999).contains(y) { apply(.setYear(y)) } }
-                    .disabled(Int(yearDraft).map { !(100...9999).contains($0) } ?? true)
-                Button("Clear") { apply(.setYear(nil)); yearDraft = "" }
+                dateField(.year, placeholder: yearPlaceholder(s), width: 90)
+                    .help("Type a year from 100 to 9999; empty the field to remove the year")
+                    .accessibilityIdentifier("ar.tagEditor.year")
             }
+            if let hint = invalidHint(.year) { hint }
             HStack {
                 Text("Month").frame(width: 52, alignment: .leading)
-                Menu(monthLabel()) {
+                Menu(monthLabel(files)) {
                     Button("None") { apply(.setMonth(nil)) }
                     ForEach(1...12, id: \.self) { m in
                         Button(TagEditing.monthToken(m)) { apply(.setMonth(m)) }
                     }
                 }
                 .frame(width: 150)
+                .accessibilityIdentifier("ar.tagEditor.month")
             }
             HStack {
                 Text("Day").frame(width: 52, alignment: .leading)
-                TextField("1–31", text: $dayDraft).textFieldStyle(.roundedBorder).frame(width: 90)
-                Button("Set") { if let d = Int(dayDraft), (1...31).contains(d) { apply(.setDay(d)) } }
-                    .disabled(Int(dayDraft).map { !(1...31).contains($0) } ?? true)
-                Button("Clear") { apply(.setDay(nil)); dayDraft = "" }
+                dateField(.day, placeholder: dayPlaceholder(files), width: 90)
+                    .help("Type a day from 1 to 31; empty the field to remove the day")
+                    .accessibilityIdentifier("ar.tagEditor.day")
             }
-            HStack {
-                Text("Uncertain").frame(width: 68, alignment: .leading)
-                let allUncertain = !files.isEmpty && files.allSatisfy(\.tags.dateUncertain)
-                facetButton("Mark Uncertain", current: allUncertain) { apply(.setDateUncertain(true)) }
-                Button("Clear Uncertain") { apply(.setDateUncertain(false)) }
-            }
+            if let hint = invalidHint(.day) { hint }
+            uncertainToggle(relevant: files, op: TagEditOp.setDateUncertain) { $0.tags.dateUncertain }
+                .accessibilityIdentifier("ar.tagEditor.dateUncertain")
             Divider()
             // W37: the covering letter's date, for an enclosure that has its own date above. The sheet is the one
             // date editor (owner, 2026-10-12), so Sent-With lives here too (W40.fix-reader-sent-with-date).
             HStack {
                 Text("Sent with").frame(width: 68, alignment: .leading)
-                TextField(sentWithPlaceholder(files), text: $sentWithDraft).textFieldStyle(.roundedBorder).frame(width: 110)
-                    .onSubmit(setSentWith)
-                    .help("The date of the letter this was enclosed with: 1958, 1958-03, 1958-03-12 or 1950s")
+                dateField(.sentWith, placeholder: sentWithPlaceholder(files), width: 110)
+                    .help("The date of the letter this was enclosed with: 1958, 1958-03, 1958-03-12 or 1950s. Empty the field to remove it.")
                     .accessibilityIdentifier("ar.tagEditor.sentWith")
-                Button("Set", action: setSentWith)
-                    .disabled(parsedSentWith == nil)
-                    .accessibilityIdentifier("ar.tagEditor.sentWithSet")
-                // Also clears a stray uncertain flag left on a file with no Sent-With date.
-                Button("Clear") { apply(.setSentWith(nil)); sentWithDraft = "" }
-                    .disabled(!files.contains { $0.tags.sentWith != nil || $0.tags.sentWithUncertain })
-                    .accessibilityIdentifier("ar.tagEditor.sentWithClear")
             }
-            if !sentWithDraft.trimmingCharacters(in: .whitespaces).isEmpty, parsedSentWith == nil {
-                Text("Use 1958, 1958-03, 1958-03-12 or 1950s").font(.caption).foregroundStyle(.red)
+            if let hint = invalidHint(.sentWith) { hint }
+            // Enabled for a file with a stray flag and no Sent-With date too, so that flag can be turned off.
+            uncertainToggle(relevant: files.filter { $0.tags.sentWith != nil || $0.tags.sentWithUncertain },
+                            op: TagEditOp.setSentWithUncertain) { $0.tags.sentWithUncertain }
+                .accessibilityIdentifier("ar.tagEditor.sentWithUncertain")
+        }
+        .onAppear { seedDateFields(files) }
+        // A date changed by this sheet or elsewhere shows here, unless the field is being typed in or holds
+        // text not applied yet, which a reseed would throw away.
+        .onChange(of: DateFacets(files)) { seedDateFields(files) }
+        .onChange(of: focusedField) { old, _ in if let old { commit(old) } }
+        .onDisappear { commitDateFields() }
+    }
+
+    private func dateField(_ field: DateField, placeholder: String, width: CGFloat) -> some View {
+        // Only typing goes through this setter, so a reseed never counts as an edit.
+        TextField(placeholder, text: Binding(get: { dateDrafts[field] ?? "" },
+                                             set: { dateDrafts[field] = $0; editedFields.insert(field) }))
+            .textFieldStyle(.roundedBorder).frame(width: width)
+            .focused($focusedField, equals: field)
+            .onSubmit { commit(field) }
+    }
+
+    @ViewBuilder private func uncertainToggle(relevant: [ArchiveFile], op: @escaping @Sendable (Bool) -> TagEditOp,
+                                              isFlagged: (ArchiveFile) -> Bool) -> some View {
+        let flagged = relevant.filter(isFlagged).count
+        HStack {
+            Toggle("Uncertain", isOn: Binding(get: { !relevant.isEmpty && flagged == relevant.count },
+                                                set: { apply(op($0)) }))
+                .toggleStyle(.checkbox)
+                .disabled(relevant.isEmpty)
+            if flagged > 0 && flagged < relevant.count {
+                Text("(mixed)").font(.caption).foregroundStyle(.secondary)
             }
-            HStack {
-                Text("Uncertain").frame(width: 68, alignment: .leading)
-                let dated = files.filter { $0.tags.sentWith != nil }
-                let allUncertain = !dated.isEmpty && dated.allSatisfy(\.tags.sentWithUncertain)
-                facetButton("Mark Uncertain", current: allUncertain) { apply(.setSentWithUncertain(true)) }
-                    .disabled(dated.isEmpty)
-                    .accessibilityIdentifier("ar.tagEditor.sentWithUncertain")
-                Button("Clear Uncertain") { apply(.setSentWithUncertain(false)) }
-                    .disabled(!files.contains(where: \.tags.sentWithUncertain))
-            }
+        }
+    }
+
+    /// The edit a field's text makes: `nil` for text that is not a valid value (kept, never written), else
+    /// the op, an emptied field clearing its facet.
+    private func dateOp(_ field: DateField, _ text: String) -> TagEditOp? {
+        let t = text.trimmingCharacters(in: .whitespaces)
+        switch field {
+        case .year:
+            if t.isEmpty { return .setYear(nil) }
+            guard let y = Int(t), (100...9999).contains(y) else { return nil }
+            return .setYear(y)
+        case .day:
+            if t.isEmpty { return .setDay(nil) }
+            guard let d = Int(t), (1...31).contains(d) else { return nil }
+            return .setDay(d)
+        case .sentWith:
+            if t.isEmpty { return .setSentWith(nil) }
+            guard let d = ArchiveDate.parse(wireValue: t) else { return nil }
+            return .setSentWith(d)
+        }
+    }
+
+    /// Apply a field that was typed in. Leaving one untouched writes nothing, so tabbing past a group's mixed
+    /// value never overwrites it.
+    private func commit(_ field: DateField) {
+        guard editedFields.contains(field), let op = dateOp(field, dateDrafts[field] ?? "") else { return }
+        editedFields.remove(field)
+        // Unchanged from a value all the files share: nothing to write. A mixed field always writes once typed in.
+        if let seeded = seededText[field] ?? nil,
+           (dateDrafts[field] ?? "").trimmingCharacters(in: .whitespaces) == seeded { return }
+        apply(op)
+    }
+
+    private func commitDateFields() { for f in [DateField.year, .day, .sentWith] { commit(f) } }
+
+    private func seedDateFields(_ files: [ArchiveFile]) {
+        let shown = DateFacets(files).texts
+        for f in [DateField.year, .day, .sentWith] where !editedFields.contains(f) && focusedField != f {
+            dateDrafts[f] = shown[f] ?? ""
+        }
+        seededText = shown
+    }
+
+    private func invalidHint(_ field: DateField) -> Text? {
+        guard editedFields.contains(field), dateOp(field, dateDrafts[field] ?? "") == nil else { return nil }
+        let message: String
+        switch field {
+        case .year: message = "Use a year from 100 to 9999"
+        case .day: message = "Use a day from 1 to 31"
+        case .sentWith: message = "Use 1958, 1958-03, 1958-03-12 or 1950s"
+        }
+        return Text(message).font(.caption).foregroundStyle(.red)
+    }
+
+    /// The selection's date facets, each as the text its field shows: the common value, "" when none has it,
+    /// `nil` when the files differ (the field is then empty with a "mixed" placeholder).
+    struct DateFacets: Equatable {
+        let texts: [DateField: String?]
+        init(_ files: [ArchiveFile]) {
+            func common(_ values: [String]) -> String? { Set(values).count == 1 ? values.first : (values.isEmpty ? "" : nil) }
+            texts = [.year: common(files.map { $0.tags.year.map(String.init) ?? "" }),
+                     .day: common(files.map { $0.tags.day.map(String.init) ?? "" }),
+                     .sentWith: common(files.map { $0.tags.sentWith?.wireValue ?? "" })]
         }
     }
 
@@ -212,20 +289,8 @@ struct TagEditorView: View {
             : "\(ambiguous.count) of the selected files have two tags for one date. Open one to see which."
     }
 
-    private var parsedSentWith: ArchiveDate? {
-        ArchiveDate.parse(wireValue: sentWithDraft.trimmingCharacters(in: .whitespaces))
-    }
-
-    private func setSentWith() {
-        guard let d = parsedSentWith else { return }
-        apply(.setSentWith(d))
-        sentWithDraft = ""
-    }
-
     private func sentWithPlaceholder(_ files: [ArchiveFile]) -> String {
-        let values = Set(files.map { $0.tags.sentWith?.wireValue })
-        guard values.count == 1, let only = values.first else { return values.isEmpty ? "1958-03-12" : "mixed" }
-        return only ?? "1958-03-12"
+        DateFacets(files).texts[.sentWith] == .some(nil) ? "mixed" : "1958-03-12"
     }
 
     // MARK: Quality
@@ -307,16 +372,16 @@ struct TagEditorView: View {
         }
     }
 
-    private func yearPlaceholder(_ s: GroupTagSummary) -> String {
-        switch s.commonYear {
-        case .some(.some(let y)): return String(y)
-        case .some(.none): return "none"
-        case .none: return "mixed"
-        }
+    private func yearPlaceholder(_ s: GroupTagSummary) -> String { s.commonYear == nil ? "mixed" : "1958" }
+
+    private func dayPlaceholder(_ files: [ArchiveFile]) -> String {
+        DateFacets(files).texts[.day] == .some(nil) ? "mixed" : "1–31"
     }
 
-    private func monthLabel() -> String {
-        // commonYear-style is not tracked for month; show a neutral prompt.
-        "Set month…"
+    /// The month the files share, "None", or "Mixed".
+    private func monthLabel(_ files: [ArchiveFile]) -> String {
+        let months = Set(files.map { $0.tags.month?.number })
+        guard months.count == 1, let only = months.first else { return files.isEmpty ? "None" : "Mixed" }
+        return only.map(TagEditing.monthToken) ?? "None"
     }
 }
