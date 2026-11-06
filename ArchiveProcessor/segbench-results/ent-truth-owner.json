@@ -1,0 +1,3163 @@
+{
+ "documents": 138,
+ "asked": {
+  "sending_place": 12,
+  "recipient": 6,
+  "sender": 5
+ },
+ "rulings": {
+  "sending_place": {
+   "none given": 10,
+   "upheld, another spelling": 2
+  },
+  "recipient": {
+   "upheld": 3,
+   "none given": 1,
+   "open": 1,
+   "unscored": 1
+  },
+  "sender": {
+   "another name": 2,
+   "upheld": 1,
+   "unscored": 2
+  }
+ },
+ "place_kinds": {
+  "dateline": 5,
+  "line above a date": 2,
+  "heading or address": 52,
+  "read in an image": 10,
+  "institution name": 3,
+  "inferred": 32
+ },
+ "asked_place_kinds": {
+  "inferred": {
+   "none given": 8
+  },
+  "heading or address": {
+   "upheld, another spelling": 2,
+   "none given": 1
+  },
+  "institution name": {
+   "none given": 1
+  }
+ },
+ "truth_places": {
+  "built": {
+   "documents with a place": 104,
+   "named places": 72,
+   "inferred places": 32,
+   "unscored fields": 0
+  },
+  "owner": {
+   "documents with a place": 94,
+   "named places": 70,
+   "inferred places": 24,
+   "unscored fields": 3
+  },
+  "owner+rule": {
+   "documents with a place": 68,
+   "named places": 68,
+   "inferred places": 0,
+   "unscored fields": 3
+  }
+ },
+ "scores": {
+  "gemini-3.8-flash tagging reply, ABBYY (82)": {
+   "built": {
+    "sender": {
+     "precision": 0.8333333333333334,
+     "recall": 0.5921052631578947,
+     "f1": 0.6923076923076922,
+     "tp": 45,
+     "fp": 9,
+     "fn": 31,
+     "wrong_when_filled_docs": 9,
+     "filled_when_empty": 2,
+     "truth_nonempty": 77,
+     "docs": 82
+    },
+    "recipient": {
+     "precision": 0.8169014084507042,
+     "recall": 0.5178571428571429,
+     "f1": 0.633879781420765,
+     "tp": 58,
+     "fp": 13,
+     "fn": 54,
+     "wrong_when_filled_docs": 13,
+     "filled_when_empty": 2,
+     "truth_nonempty": 77,
+     "docs": 82
+    },
+    "sending_place": {
+     "precision": 0.6097560975609756,
+     "recall": 0.6410256410256411,
+     "f1": 0.625,
+     "tp": 25,
+     "fp": 16,
+     "fn": 14,
+     "wrong_when_filled_docs": 16,
+     "filled_when_empty": 1,
+     "truth_nonempty": 58,
+     "docs": 82
+    },
+    "city": {
+     "tp": 34,
+     "fp": 3,
+     "fn": 5,
+     "f1": 0.8947368421052632,
+     "precision": 0.918918918918919
+    },
+    "n": 82
+   },
+   "owner": {
+    "sender": {
+     "precision": 0.8333333333333334,
+     "recall": 0.6164383561643836,
+     "f1": 0.7086614173228347,
+     "tp": 45,
+     "fp": 9,
+     "fn": 28,
+     "wrong_when_filled_docs": 9,
+     "filled_when_empty": 2,
+     "truth_nonempty": 75,
+     "docs": 80
+    },
+    "recipient": {
+     "precision": 0.8169014084507042,
+     "recall": 0.5178571428571429,
+     "f1": 0.633879781420765,
+     "tp": 58,
+     "fp": 13,
+     "fn": 54,
+     "wrong_when_filled_docs": 13,
+     "filled_when_empty": 2,
+     "truth_nonempty": 77,
+     "docs": 82
+    },
+    "sending_place": {
+     "precision": 0.6585365853658537,
+     "recall": 0.7105263157894737,
+     "f1": 0.6835443037974684,
+     "tp": 27,
+     "fp": 14,
+     "fn": 11,
+     "wrong_when_filled_docs": 14,
+     "filled_when_empty": 4,
+     "truth_nonempty": 51,
+     "docs": 82
+    },
+    "city": {
+     "tp": 33,
+     "fp": 5,
+     "fn": 5,
+     "f1": 0.868421052631579,
+     "precision": 0.868421052631579
+    },
+    "n": 82
+   },
+   "owner+rule": {
+    "sender": {
+     "precision": 0.8333333333333334,
+     "recall": 0.6164383561643836,
+     "f1": 0.7086614173228347,
+     "tp": 45,
+     "fp": 9,
+     "fn": 28,
+     "wrong_when_filled_docs": 9,
+     "filled_when_empty": 2,
+     "truth_nonempty": 75,
+     "docs": 80
+    },
+    "recipient": {
+     "precision": 0.8169014084507042,
+     "recall": 0.5178571428571429,
+     "f1": 0.633879781420765,
+     "tp": 58,
+     "fp": 13,
+     "fn": 54,
+     "wrong_when_filled_docs": 13,
+     "filled_when_empty": 2,
+     "truth_nonempty": 77,
+     "docs": 82
+    },
+    "sending_place": {
+     "precision": 0.6136363636363636,
+     "recall": 0.7297297297297297,
+     "f1": 0.6666666666666666,
+     "tp": 27,
+     "fp": 17,
+     "fn": 10,
+     "wrong_when_filled_docs": 17,
+     "filled_when_empty": 10,
+     "truth_nonempty": 37,
+     "docs": 82
+    },
+    "city": {
+     "tp": 33,
+     "fp": 11,
+     "fn": 4,
+     "f1": 0.8148148148148148,
+     "precision": 0.75
+    },
+    "n": 82
+   }
+  },
+  "qwen3.6-27b tagging reply, ABBYY (82)": {
+   "built": {
+    "sender": {
+     "precision": 0.76,
+     "recall": 0.5,
+     "f1": 0.6031746031746031,
+     "tp": 38,
+     "fp": 12,
+     "fn": 38,
+     "wrong_when_filled_docs": 12,
+     "filled_when_empty": 2,
+     "truth_nonempty": 77,
+     "docs": 82
+    },
+    "recipient": {
+     "precision": 0.7605633802816901,
+     "recall": 0.48214285714285715,
+     "f1": 0.5901639344262295,
+     "tp": 54,
+     "fp": 17,
+     "fn": 58,
+     "wrong_when_filled_docs": 17,
+     "filled_when_empty": 2,
+     "truth_nonempty": 77,
+     "docs": 82
+    },
+    "sending_place": {
+     "precision": 0.43137254901960786,
+     "recall": 0.5641025641025641,
+     "f1": 0.48888888888888893,
+     "tp": 22,
+     "fp": 29,
+     "fn": 17,
+     "wrong_when_filled_docs": 29,
+     "filled_when_empty": 3,
+     "truth_nonempty": 58,
+     "docs": 82
+    },
+    "city": {
+     "tp": 31,
+     "fp": 19,
+     "fn": 8,
+     "f1": 0.6966292134831461,
+     "precision": 0.62
+    },
+    "n": 82
+   },
+   "owner": {
+    "sender": {
+     "precision": 0.76,
+     "recall": 0.5205479452054794,
+     "f1": 0.6178861788617885,
+     "tp": 38,
+     "fp": 12,
+     "fn": 35,
+     "wrong_when_filled_docs": 12,
+     "filled_when_empty": 2,
+     "truth_nonempty": 75,
+     "docs": 80
+    },
+    "recipient": {
+     "precision": 0.7605633802816901,
+     "recall": 0.48214285714285715,
+     "f1": 0.5901639344262295,
+     "tp": 54,
+     "fp": 17,
+     "fn": 58,
+     "wrong_when_filled_docs": 17,
+     "filled_when_empty": 2,
+     "truth_nonempty": 77,
+     "docs": 82
+    },
+    "sending_place": {
+     "precision": 0.46153846153846156,
+     "recall": 0.631578947368421,
+     "f1": 0.5333333333333333,
+     "tp": 24,
+     "fp": 28,
+     "fn": 14,
+     "wrong_when_filled_docs": 28,
+     "filled_when_empty": 9,
+     "truth_nonempty": 51,
+     "docs": 82
+    },
+    "city": {
+     "tp": 30,
+     "fp": 21,
+     "fn": 8,
+     "f1": 0.6741573033707865,
+     "precision": 0.5882352941176471
+    },
+    "n": 82
+   },
+   "owner+rule": {
+    "sender": {
+     "precision": 0.76,
+     "recall": 0.5205479452054794,
+     "f1": 0.6178861788617885,
+     "tp": 38,
+     "fp": 12,
+     "fn": 35,
+     "wrong_when_filled_docs": 12,
+     "filled_when_empty": 2,
+     "truth_nonempty": 75,
+     "docs": 80
+    },
+    "recipient": {
+     "precision": 0.7605633802816901,
+     "recall": 0.48214285714285715,
+     "f1": 0.5901639344262295,
+     "tp": 54,
+     "fp": 17,
+     "fn": 58,
+     "wrong_when_filled_docs": 17,
+     "filled_when_empty": 2,
+     "truth_nonempty": 77,
+     "docs": 82
+    },
+    "sending_place": {
+     "precision": 0.46153846153846156,
+     "recall": 0.6486486486486487,
+     "f1": 0.5393258426966292,
+     "tp": 24,
+     "fp": 28,
+     "fn": 13,
+     "wrong_when_filled_docs": 28,
+     "filled_when_empty": 18,
+     "truth_nonempty": 37,
+     "docs": 82
+    },
+    "city": {
+     "tp": 30,
+     "fp": 22,
+     "fn": 7,
+     "f1": 0.6741573033707865,
+     "precision": 0.5769230769230769
+    },
+    "n": 82
+   }
+  },
+  "qwen3.5-4b tagging reply, ABBYY (82)": {
+   "built": {
+    "sender": {
+     "precision": 0.5384615384615384,
+     "recall": 0.4605263157894737,
+     "f1": 0.49645390070921985,
+     "tp": 35,
+     "fp": 30,
+     "fn": 41,
+     "wrong_when_filled_docs": 30,
+     "filled_when_empty": 3,
+     "truth_nonempty": 77,
+     "docs": 82
+    },
+    "recipient": {
+     "precision": 0.578125,
+     "recall": 0.33035714285714285,
+     "f1": 0.42045454545454547,
+     "tp": 37,
+     "fp": 27,
+     "fn": 75,
+     "wrong_when_filled_docs": 27,
+     "filled_when_empty": 2,
+     "truth_nonempty": 77,
+     "docs": 82
+    },
+    "sending_place": {
+     "precision": 0.27450980392156865,
+     "recall": 0.358974358974359,
+     "f1": 0.31111111111111117,
+     "tp": 14,
+     "fp": 37,
+     "fn": 25,
+     "wrong_when_filled_docs": 37,
+     "filled_when_empty": 7,
+     "truth_nonempty": 58,
+     "docs": 82
+    },
+    "city": {
+     "tp": 20,
+     "fp": 29,
+     "fn": 19,
+     "f1": 0.45454545454545453,
+     "precision": 0.40816326530612246
+    },
+    "n": 82
+   },
+   "owner": {
+    "sender": {
+     "precision": 0.5384615384615384,
+     "recall": 0.4794520547945205,
+     "f1": 0.5072463768115941,
+     "tp": 35,
+     "fp": 30,
+     "fn": 38,
+     "wrong_when_filled_docs": 30,
+     "filled_when_empty": 3,
+     "truth_nonempty": 75,
+     "docs": 80
+    },
+    "recipient": {
+     "precision": 0.578125,
+     "recall": 0.33035714285714285,
+     "f1": 0.42045454545454547,
+     "tp": 37,
+     "fp": 27,
+     "fn": 75,
+     "wrong_when_filled_docs": 27,
+     "filled_when_empty": 2,
+     "truth_nonempty": 77,
+     "docs": 82
+    },
+    "sending_place": {
+     "precision": 0.3137254901960784,
+     "recall": 0.42105263157894735,
+     "f1": 0.3595505617977528,
+     "tp": 16,
+     "fp": 35,
+     "fn": 22,
+     "wrong_when_filled_docs": 35,
+     "filled_when_empty": 11,
+     "truth_nonempty": 51,
+     "docs": 82
+    },
+    "city": {
+     "tp": 20,
+     "fp": 30,
+     "fn": 18,
+     "f1": 0.45454545454545453,
+     "precision": 0.4
+    },
+    "n": 82
+   },
+   "owner+rule": {
+    "sender": {
+     "precision": 0.5384615384615384,
+     "recall": 0.4794520547945205,
+     "f1": 0.5072463768115941,
+     "tp": 35,
+     "fp": 30,
+     "fn": 38,
+     "wrong_when_filled_docs": 30,
+     "filled_when_empty": 3,
+     "truth_nonempty": 75,
+     "docs": 80
+    },
+    "recipient": {
+     "precision": 0.578125,
+     "recall": 0.33035714285714285,
+     "f1": 0.42045454545454547,
+     "tp": 37,
+     "fp": 27,
+     "fn": 75,
+     "wrong_when_filled_docs": 27,
+     "filled_when_empty": 2,
+     "truth_nonempty": 77,
+     "docs": 82
+    },
+    "sending_place": {
+     "precision": 0.3076923076923077,
+     "recall": 0.43243243243243246,
+     "f1": 0.3595505617977528,
+     "tp": 16,
+     "fp": 36,
+     "fn": 21,
+     "wrong_when_filled_docs": 36,
+     "filled_when_empty": 22,
+     "truth_nonempty": 37,
+     "docs": 82
+    },
+    "city": {
+     "tp": 20,
+     "fp": 32,
+     "fn": 17,
+     "f1": 0.449438202247191,
+     "precision": 0.38461538461538464
+    },
+    "n": 82
+   }
+  },
+  "qwen3-vl-8b tagging reply, ABBYY (82)": {
+   "built": {
+    "sender": {
+     "precision": 0.6923076923076923,
+     "recall": 0.47368421052631576,
+     "f1": 0.5625,
+     "tp": 36,
+     "fp": 16,
+     "fn": 40,
+     "wrong_when_filled_docs": 16,
+     "filled_when_empty": 1,
+     "truth_nonempty": 77,
+     "docs": 82
+    },
+    "recipient": {
+     "precision": 0.7246376811594203,
+     "recall": 0.44642857142857145,
+     "f1": 0.5524861878453039,
+     "tp": 50,
+     "fp": 19,
+     "fn": 62,
+     "wrong_when_filled_docs": 19,
+     "filled_when_empty": 2,
+     "truth_nonempty": 77,
+     "docs": 82
+    },
+    "sending_place": {
+     "precision": 0.42857142857142855,
+     "recall": 0.46153846153846156,
+     "f1": 0.4444444444444445,
+     "tp": 18,
+     "fp": 24,
+     "fn": 21,
+     "wrong_when_filled_docs": 24,
+     "filled_when_empty": 3,
+     "truth_nonempty": 58,
+     "docs": 82
+    },
+    "city": {
+     "tp": 28,
+     "fp": 11,
+     "fn": 11,
+     "f1": 0.717948717948718,
+     "precision": 0.717948717948718
+    },
+    "n": 82
+   },
+   "owner": {
+    "sender": {
+     "precision": 0.6923076923076923,
+     "recall": 0.4931506849315068,
+     "f1": 0.576,
+     "tp": 36,
+     "fp": 16,
+     "fn": 37,
+     "wrong_when_filled_docs": 16,
+     "filled_when_empty": 1,
+     "truth_nonempty": 75,
+     "docs": 80
+    },
+    "recipient": {
+     "precision": 0.7246376811594203,
+     "recall": 0.44642857142857145,
+     "f1": 0.5524861878453039,
+     "tp": 50,
+     "fp": 19,
+     "fn": 62,
+     "wrong_when_filled_docs": 19,
+     "filled_when_empty": 2,
+     "truth_nonempty": 77,
+     "docs": 82
+    },
+    "sending_place": {
+     "precision": 0.46511627906976744,
+     "recall": 0.5263157894736842,
+     "f1": 0.49382716049382713,
+     "tp": 20,
+     "fp": 23,
+     "fn": 18,
+     "wrong_when_filled_docs": 23,
+     "filled_when_empty": 6,
+     "truth_nonempty": 51,
+     "docs": 82
+    },
+    "city": {
+     "tp": 28,
+     "fp": 13,
+     "fn": 10,
+     "f1": 0.7088607594936709,
+     "precision": 0.6829268292682927
+    },
+    "n": 82
+   },
+   "owner+rule": {
+    "sender": {
+     "precision": 0.6923076923076923,
+     "recall": 0.4931506849315068,
+     "f1": 0.576,
+     "tp": 36,
+     "fp": 16,
+     "fn": 37,
+     "wrong_when_filled_docs": 16,
+     "filled_when_empty": 1,
+     "truth_nonempty": 75,
+     "docs": 80
+    },
+    "recipient": {
+     "precision": 0.7246376811594203,
+     "recall": 0.44642857142857145,
+     "f1": 0.5524861878453039,
+     "tp": 50,
+     "fp": 19,
+     "fn": 62,
+     "wrong_when_filled_docs": 19,
+     "filled_when_empty": 2,
+     "truth_nonempty": 77,
+     "docs": 82
+    },
+    "sending_place": {
+     "precision": 0.4222222222222222,
+     "recall": 0.5135135135135135,
+     "f1": 0.4634146341463415,
+     "tp": 19,
+     "fp": 26,
+     "fn": 18,
+     "wrong_when_filled_docs": 26,
+     "filled_when_empty": 15,
+     "truth_nonempty": 37,
+     "docs": 82
+    },
+    "city": {
+     "tp": 27,
+     "fp": 18,
+     "fn": 10,
+     "f1": 0.6585365853658537,
+     "precision": 0.6
+    },
+    "n": 82
+   }
+  },
+  "nltagger (138)": {
+   "built": {
+    "sender": {
+     "precision": 0.14912280701754385,
+     "recall": 0.12318840579710146,
+     "f1": 0.1349206349206349,
+     "tp": 17,
+     "fp": 97,
+     "fn": 121,
+     "wrong_when_filled_docs": 97,
+     "filled_when_empty": 8,
+     "truth_nonempty": 129,
+     "docs": 138
+    },
+    "recipient": {
+     "precision": 0.25287356321839083,
+     "recall": 0.12716763005780346,
+     "f1": 0.16923076923076924,
+     "tp": 22,
+     "fp": 65,
+     "fn": 151,
+     "wrong_when_filled_docs": 65,
+     "filled_when_empty": 2,
+     "truth_nonempty": 132,
+     "docs": 138
+    },
+    "sending_place": {
+     "precision": 0.033707865168539325,
+     "recall": 0.041666666666666664,
+     "f1": 0.037267080745341616,
+     "tp": 3,
+     "fp": 86,
+     "fn": 69,
+     "wrong_when_filled_docs": 86,
+     "filled_when_empty": 18,
+     "truth_nonempty": 104,
+     "docs": 138
+    },
+    "city": {
+     "tp": 16,
+     "fp": 72,
+     "fn": 56,
+     "f1": 0.2,
+     "precision": 0.18181818181818182
+    },
+    "n": 138
+   },
+   "owner": {
+    "sender": {
+     "precision": 0.14912280701754385,
+     "recall": 0.1259259259259259,
+     "f1": 0.1365461847389558,
+     "tp": 17,
+     "fp": 97,
+     "fn": 118,
+     "wrong_when_filled_docs": 97,
+     "filled_when_empty": 8,
+     "truth_nonempty": 127,
+     "docs": 136
+    },
+    "recipient": {
+     "precision": 0.2441860465116279,
+     "recall": 0.12280701754385964,
+     "f1": 0.16342412451361868,
+     "tp": 21,
+     "fp": 65,
+     "fn": 150,
+     "wrong_when_filled_docs": 65,
+     "filled_when_empty": 3,
+     "truth_nonempty": 130,
+     "docs": 137
+    },
+    "sending_place": {
+     "precision": 0.033707865168539325,
+     "recall": 0.04285714285714286,
+     "f1": 0.03773584905660377,
+     "tp": 3,
+     "fp": 86,
+     "fn": 67,
+     "wrong_when_filled_docs": 86,
+     "filled_when_empty": 23,
+     "truth_nonempty": 94,
+     "docs": 138
+    },
+    "city": {
+     "tp": 16,
+     "fp": 72,
+     "fn": 54,
+     "f1": 0.20253164556962025,
+     "precision": 0.18181818181818182
+    },
+    "n": 138
+   },
+   "owner+rule": {
+    "sender": {
+     "precision": 0.14912280701754385,
+     "recall": 0.1259259259259259,
+     "f1": 0.1365461847389558,
+     "tp": 17,
+     "fp": 97,
+     "fn": 118,
+     "wrong_when_filled_docs": 97,
+     "filled_when_empty": 8,
+     "truth_nonempty": 127,
+     "docs": 136
+    },
+    "recipient": {
+     "precision": 0.2441860465116279,
+     "recall": 0.12280701754385964,
+     "f1": 0.16342412451361868,
+     "tp": 21,
+     "fp": 65,
+     "fn": 150,
+     "wrong_when_filled_docs": 65,
+     "filled_when_empty": 3,
+     "truth_nonempty": 130,
+     "docs": 137
+    },
+    "sending_place": {
+     "precision": 0.033707865168539325,
+     "recall": 0.04411764705882353,
+     "f1": 0.03821656050955414,
+     "tp": 3,
+     "fp": 86,
+     "fn": 65,
+     "wrong_when_filled_docs": 86,
+     "filled_when_empty": 35,
+     "truth_nonempty": 68,
+     "docs": 138
+    },
+    "city": {
+     "tp": 16,
+     "fp": 73,
+     "fn": 52,
+     "f1": 0.20382165605095542,
+     "precision": 0.1797752808988764
+    },
+    "n": 138
+   }
+  },
+  "gliner2.5-small-schema (138)": {
+   "built": {
+    "sender": {
+     "precision": 0.10714285714285714,
+     "recall": 0.15217391304347827,
+     "f1": 0.12574850299401197,
+     "tp": 21,
+     "fp": 175,
+     "fn": 117,
+     "wrong_when_filled_docs": 97,
+     "filled_when_empty": 9,
+     "truth_nonempty": 129,
+     "docs": 138
+    },
+    "recipient": {
+     "precision": 0.2542372881355932,
+     "recall": 0.08670520231213873,
+     "f1": 0.1293103448275862,
+     "tp": 15,
+     "fp": 44,
+     "fn": 158,
+     "wrong_when_filled_docs": 37,
+     "filled_when_empty": 1,
+     "truth_nonempty": 132,
+     "docs": 138
+    },
+    "sending_place": {
+     "precision": 0.0,
+     "recall": 0.0,
+     "f1": 0.0,
+     "tp": 0,
+     "fp": 49,
+     "fn": 72,
+     "wrong_when_filled_docs": 49,
+     "filled_when_empty": 11,
+     "truth_nonempty": 104,
+     "docs": 138
+    },
+    "city": {
+     "tp": 4,
+     "fp": 43,
+     "fn": 68,
+     "f1": 0.06722689075630252,
+     "precision": 0.0851063829787234
+    },
+    "n": 138
+   },
+   "owner": {
+    "sender": {
+     "precision": 0.10714285714285714,
+     "recall": 0.15555555555555556,
+     "f1": 0.1268882175226586,
+     "tp": 21,
+     "fp": 175,
+     "fn": 114,
+     "wrong_when_filled_docs": 97,
+     "filled_when_empty": 9,
+     "truth_nonempty": 127,
+     "docs": 136
+    },
+    "recipient": {
+     "precision": 0.2542372881355932,
+     "recall": 0.08771929824561403,
+     "f1": 0.13043478260869565,
+     "tp": 15,
+     "fp": 44,
+     "fn": 156,
+     "wrong_when_filled_docs": 37,
+     "filled_when_empty": 1,
+     "truth_nonempty": 130,
+     "docs": 137
+    },
+    "sending_place": {
+     "precision": 0.0,
+     "recall": 0.0,
+     "f1": 0.0,
+     "tp": 0,
+     "fp": 49,
+     "fn": 70,
+     "wrong_when_filled_docs": 49,
+     "filled_when_empty": 14,
+     "truth_nonempty": 94,
+     "docs": 138
+    },
+    "city": {
+     "tp": 3,
+     "fp": 44,
+     "fn": 67,
+     "f1": 0.05128205128205128,
+     "precision": 0.06382978723404255
+    },
+    "n": 138
+   },
+   "owner+rule": {
+    "sender": {
+     "precision": 0.10714285714285714,
+     "recall": 0.15555555555555556,
+     "f1": 0.1268882175226586,
+     "tp": 21,
+     "fp": 175,
+     "fn": 114,
+     "wrong_when_filled_docs": 97,
+     "filled_when_empty": 9,
+     "truth_nonempty": 127,
+     "docs": 136
+    },
+    "recipient": {
+     "precision": 0.2542372881355932,
+     "recall": 0.08771929824561403,
+     "f1": 0.13043478260869565,
+     "tp": 15,
+     "fp": 44,
+     "fn": 156,
+     "wrong_when_filled_docs": 37,
+     "filled_when_empty": 1,
+     "truth_nonempty": 130,
+     "docs": 137
+    },
+    "sending_place": {
+     "precision": 0.0,
+     "recall": 0.0,
+     "f1": 0.0,
+     "tp": 0,
+     "fp": 49,
+     "fn": 68,
+     "wrong_when_filled_docs": 49,
+     "filled_when_empty": 24,
+     "truth_nonempty": 68,
+     "docs": 138
+    },
+    "city": {
+     "tp": 2,
+     "fp": 47,
+     "fn": 66,
+     "f1": 0.03418803418803419,
+     "precision": 0.04081632653061224
+    },
+    "n": 138
+   }
+  },
+  "gliner2.5-small-labels (138)": {
+   "built": {
+    "sender": {
+     "precision": 0.10032362459546926,
+     "recall": 0.2246376811594203,
+     "f1": 0.13870246085011184,
+     "tp": 31,
+     "fp": 278,
+     "fn": 107,
+     "wrong_when_filled_docs": 106,
+     "filled_when_empty": 9,
+     "truth_nonempty": 129,
+     "docs": 138
+    },
+    "recipient": {
+     "precision": 0.2,
+     "recall": 0.08092485549132948,
+     "f1": 0.11522633744855967,
+     "tp": 14,
+     "fp": 56,
+     "fn": 159,
+     "wrong_when_filled_docs": 40,
+     "filled_when_empty": 1,
+     "truth_nonempty": 132,
+     "docs": 138
+    },
+    "sending_place": {
+     "precision": 0.006756756756756757,
+     "recall": 0.013888888888888888,
+     "f1": 0.00909090909090909,
+     "tp": 1,
+     "fp": 147,
+     "fn": 71,
+     "wrong_when_filled_docs": 78,
+     "filled_when_empty": 22,
+     "truth_nonempty": 104,
+     "docs": 138
+    },
+    "city": {
+     "tp": 8,
+     "fp": 132,
+     "fn": 64,
+     "f1": 0.07547169811320754,
+     "precision": 0.05714285714285714
+    },
+    "n": 138
+   },
+   "owner": {
+    "sender": {
+     "precision": 0.10064935064935066,
+     "recall": 0.22962962962962963,
+     "f1": 0.1399548532731377,
+     "tp": 31,
+     "fp": 277,
+     "fn": 104,
+     "wrong_when_filled_docs": 105,
+     "filled_when_empty": 9,
+     "truth_nonempty": 127,
+     "docs": 136
+    },
+    "recipient": {
+     "precision": 0.2,
+     "recall": 0.08187134502923976,
+     "f1": 0.11618257261410789,
+     "tp": 14,
+     "fp": 56,
+     "fn": 157,
+     "wrong_when_filled_docs": 40,
+     "filled_when_empty": 1,
+     "truth_nonempty": 130,
+     "docs": 137
+    },
+    "sending_place": {
+     "precision": 0.006756756756756757,
+     "recall": 0.014285714285714285,
+     "f1": 0.009174311926605505,
+     "tp": 1,
+     "fp": 147,
+     "fn": 69,
+     "wrong_when_filled_docs": 78,
+     "filled_when_empty": 28,
+     "truth_nonempty": 94,
+     "docs": 138
+    },
+    "city": {
+     "tp": 7,
+     "fp": 135,
+     "fn": 63,
+     "f1": 0.0660377358490566,
+     "precision": 0.04929577464788732
+    },
+    "n": 138
+   },
+   "owner+rule": {
+    "sender": {
+     "precision": 0.10064935064935066,
+     "recall": 0.22962962962962963,
+     "f1": 0.1399548532731377,
+     "tp": 31,
+     "fp": 277,
+     "fn": 104,
+     "wrong_when_filled_docs": 105,
+     "filled_when_empty": 9,
+     "truth_nonempty": 127,
+     "docs": 136
+    },
+    "recipient": {
+     "precision": 0.2,
+     "recall": 0.08187134502923976,
+     "f1": 0.11618257261410789,
+     "tp": 14,
+     "fp": 56,
+     "fn": 157,
+     "wrong_when_filled_docs": 40,
+     "filled_when_empty": 1,
+     "truth_nonempty": 130,
+     "docs": 137
+    },
+    "sending_place": {
+     "precision": 0.006756756756756757,
+     "recall": 0.014705882352941176,
+     "f1": 0.00925925925925926,
+     "tp": 1,
+     "fp": 147,
+     "fn": 67,
+     "wrong_when_filled_docs": 78,
+     "filled_when_empty": 44,
+     "truth_nonempty": 68,
+     "docs": 138
+    },
+    "city": {
+     "tp": 6,
+     "fp": 142,
+     "fn": 62,
+     "f1": 0.05555555555555555,
+     "precision": 0.04054054054054054
+    },
+    "n": 138
+   }
+  },
+  "gliner2.5-small-spans-rule (138)": {
+   "built": {
+    "sender": {
+     "precision": 0.27450980392156865,
+     "recall": 0.2028985507246377,
+     "f1": 0.23333333333333336,
+     "tp": 28,
+     "fp": 74,
+     "fn": 110,
+     "wrong_when_filled_docs": 74,
+     "filled_when_empty": 7,
+     "truth_nonempty": 129,
+     "docs": 138
+    },
+    "recipient": {
+     "precision": 0.39325842696629215,
+     "recall": 0.2023121387283237,
+     "f1": 0.26717557251908397,
+     "tp": 35,
+     "fp": 54,
+     "fn": 138,
+     "wrong_when_filled_docs": 54,
+     "filled_when_empty": 1,
+     "truth_nonempty": 132,
+     "docs": 138
+    },
+    "sending_place": {
+     "precision": 0.06521739130434782,
+     "recall": 0.041666666666666664,
+     "f1": 0.05084745762711864,
+     "tp": 3,
+     "fp": 43,
+     "fn": 69,
+     "wrong_when_filled_docs": 43,
+     "filled_when_empty": 10,
+     "truth_nonempty": 104,
+     "docs": 138
+    },
+    "city": {
+     "tp": 11,
+     "fp": 31,
+     "fn": 61,
+     "f1": 0.19298245614035087,
+     "precision": 0.2619047619047619
+    },
+    "n": 138
+   },
+   "owner": {
+    "sender": {
+     "precision": 0.27450980392156865,
+     "recall": 0.2074074074074074,
+     "f1": 0.23628691983122366,
+     "tp": 28,
+     "fp": 74,
+     "fn": 107,
+     "wrong_when_filled_docs": 74,
+     "filled_when_empty": 7,
+     "truth_nonempty": 127,
+     "docs": 136
+    },
+    "recipient": {
+     "precision": 0.38636363636363635,
+     "recall": 0.19883040935672514,
+     "f1": 0.2625482625482625,
+     "tp": 34,
+     "fp": 54,
+     "fn": 137,
+     "wrong_when_filled_docs": 54,
+     "filled_when_empty": 1,
+     "truth_nonempty": 130,
+     "docs": 137
+    },
+    "sending_place": {
+     "precision": 0.08695652173913043,
+     "recall": 0.05714285714285714,
+     "f1": 0.06896551724137931,
+     "tp": 4,
+     "fp": 42,
+     "fn": 66,
+     "wrong_when_filled_docs": 42,
+     "filled_when_empty": 13,
+     "truth_nonempty": 94,
+     "docs": 138
+    },
+    "city": {
+     "tp": 11,
+     "fp": 32,
+     "fn": 59,
+     "f1": 0.19469026548672566,
+     "precision": 0.2558139534883721
+    },
+    "n": 138
+   },
+   "owner+rule": {
+    "sender": {
+     "precision": 0.27450980392156865,
+     "recall": 0.2074074074074074,
+     "f1": 0.23628691983122366,
+     "tp": 28,
+     "fp": 74,
+     "fn": 107,
+     "wrong_when_filled_docs": 74,
+     "filled_when_empty": 7,
+     "truth_nonempty": 127,
+     "docs": 136
+    },
+    "recipient": {
+     "precision": 0.38636363636363635,
+     "recall": 0.19883040935672514,
+     "f1": 0.2625482625482625,
+     "tp": 34,
+     "fp": 54,
+     "fn": 137,
+     "wrong_when_filled_docs": 54,
+     "filled_when_empty": 1,
+     "truth_nonempty": 130,
+     "docs": 137
+    },
+    "sending_place": {
+     "precision": 0.0851063829787234,
+     "recall": 0.058823529411764705,
+     "f1": 0.06956521739130435,
+     "tp": 4,
+     "fp": 43,
+     "fn": 64,
+     "wrong_when_filled_docs": 43,
+     "filled_when_empty": 21,
+     "truth_nonempty": 68,
+     "docs": 138
+    },
+    "city": {
+     "tp": 11,
+     "fp": 36,
+     "fn": 57,
+     "f1": 0.19130434782608696,
+     "precision": 0.23404255319148937
+    },
+    "n": 138
+   }
+  },
+  "gliner2.5-base-schema (138)": {
+   "built": {
+    "sender": {
+     "precision": 0.21818181818181817,
+     "recall": 0.17391304347826086,
+     "f1": 0.1935483870967742,
+     "tp": 24,
+     "fp": 86,
+     "fn": 114,
+     "wrong_when_filled_docs": 66,
+     "filled_when_empty": 5,
+     "truth_nonempty": 129,
+     "docs": 138
+    },
+    "recipient": {
+     "precision": 0.23121387283236994,
+     "recall": 0.23121387283236994,
+     "f1": 0.23121387283236994,
+     "tp": 40,
+     "fp": 133,
+     "fn": 133,
+     "wrong_when_filled_docs": 69,
+     "filled_when_empty": 4,
+     "truth_nonempty": 132,
+     "docs": 138
+    },
+    "sending_place": {
+     "precision": 0.0,
+     "recall": 0.0,
+     "f1": 0.0,
+     "tp": 0,
+     "fp": 78,
+     "fn": 72,
+     "wrong_when_filled_docs": 78,
+     "filled_when_empty": 18,
+     "truth_nonempty": 104,
+     "docs": 138
+    },
+    "city": {
+     "tp": 13,
+     "fp": 63,
+     "fn": 59,
+     "f1": 0.17567567567567569,
+     "precision": 0.17105263157894737
+    },
+    "n": 138
+   },
+   "owner": {
+    "sender": {
+     "precision": 0.22018348623853212,
+     "recall": 0.17777777777777778,
+     "f1": 0.19672131147540983,
+     "tp": 24,
+     "fp": 85,
+     "fn": 111,
+     "wrong_when_filled_docs": 65,
+     "filled_when_empty": 5,
+     "truth_nonempty": 127,
+     "docs": 136
+    },
+    "recipient": {
+     "precision": 0.23255813953488372,
+     "recall": 0.23391812865497075,
+     "f1": 0.23323615160349856,
+     "tp": 40,
+     "fp": 132,
+     "fn": 131,
+     "wrong_when_filled_docs": 68,
+     "filled_when_empty": 4,
+     "truth_nonempty": 130,
+     "docs": 137
+    },
+    "sending_place": {
+     "precision": 0.01282051282051282,
+     "recall": 0.014285714285714285,
+     "f1": 0.013513513513513513,
+     "tp": 1,
+     "fp": 77,
+     "fn": 69,
+     "wrong_when_filled_docs": 77,
+     "filled_when_empty": 23,
+     "truth_nonempty": 94,
+     "docs": 138
+    },
+    "city": {
+     "tp": 12,
+     "fp": 65,
+     "fn": 58,
+     "f1": 0.16326530612244897,
+     "precision": 0.15584415584415584
+    },
+    "n": 138
+   },
+   "owner+rule": {
+    "sender": {
+     "precision": 0.22018348623853212,
+     "recall": 0.17777777777777778,
+     "f1": 0.19672131147540983,
+     "tp": 24,
+     "fp": 85,
+     "fn": 111,
+     "wrong_when_filled_docs": 65,
+     "filled_when_empty": 5,
+     "truth_nonempty": 127,
+     "docs": 136
+    },
+    "recipient": {
+     "precision": 0.23255813953488372,
+     "recall": 0.23391812865497075,
+     "f1": 0.23323615160349856,
+     "tp": 40,
+     "fp": 132,
+     "fn": 131,
+     "wrong_when_filled_docs": 68,
+     "filled_when_empty": 4,
+     "truth_nonempty": 130,
+     "docs": 137
+    },
+    "sending_place": {
+     "precision": 0.012658227848101266,
+     "recall": 0.014705882352941176,
+     "f1": 0.013605442176870748,
+     "tp": 1,
+     "fp": 78,
+     "fn": 67,
+     "wrong_when_filled_docs": 78,
+     "filled_when_empty": 35,
+     "truth_nonempty": 68,
+     "docs": 138
+    },
+    "city": {
+     "tp": 12,
+     "fp": 67,
+     "fn": 56,
+     "f1": 0.16326530612244897,
+     "precision": 0.1518987341772152
+    },
+    "n": 138
+   }
+  },
+  "gliner2.5-base-labels (138)": {
+   "built": {
+    "sender": {
+     "precision": 0.20958083832335328,
+     "recall": 0.2536231884057971,
+     "f1": 0.22950819672131148,
+     "tp": 35,
+     "fp": 132,
+     "fn": 103,
+     "wrong_when_filled_docs": 79,
+     "filled_when_empty": 6,
+     "truth_nonempty": 129,
+     "docs": 138
+    },
+    "recipient": {
+     "precision": 0.16,
+     "recall": 0.2543352601156069,
+     "f1": 0.19642857142857142,
+     "tp": 44,
+     "fp": 231,
+     "fn": 129,
+     "wrong_when_filled_docs": 91,
+     "filled_when_empty": 5,
+     "truth_nonempty": 132,
+     "docs": 138
+    },
+    "sending_place": {
+     "precision": 0.0,
+     "recall": 0.0,
+     "f1": 0.0,
+     "tp": 0,
+     "fp": 174,
+     "fn": 72,
+     "wrong_when_filled_docs": 91,
+     "filled_when_empty": 18,
+     "truth_nonempty": 104,
+     "docs": 138
+    },
+    "city": {
+     "tp": 20,
+     "fp": 147,
+     "fn": 52,
+     "f1": 0.16736401673640167,
+     "precision": 0.11976047904191617
+    },
+    "n": 138
+   },
+   "owner": {
+    "sender": {
+     "precision": 0.21084337349397592,
+     "recall": 0.25925925925925924,
+     "f1": 0.23255813953488372,
+     "tp": 35,
+     "fp": 131,
+     "fn": 100,
+     "wrong_when_filled_docs": 78,
+     "filled_when_empty": 6,
+     "truth_nonempty": 127,
+     "docs": 136
+    },
+    "recipient": {
+     "precision": 0.16058394160583941,
+     "recall": 0.2573099415204678,
+     "f1": 0.19775280898876405,
+     "tp": 44,
+     "fp": 230,
+     "fn": 127,
+     "wrong_when_filled_docs": 90,
+     "filled_when_empty": 5,
+     "truth_nonempty": 130,
+     "docs": 137
+    },
+    "sending_place": {
+     "precision": 0.005747126436781609,
+     "recall": 0.014285714285714285,
+     "f1": 0.00819672131147541,
+     "tp": 1,
+     "fp": 173,
+     "fn": 69,
+     "wrong_when_filled_docs": 91,
+     "filled_when_empty": 24,
+     "truth_nonempty": 94,
+     "docs": 138
+    },
+    "city": {
+     "tp": 19,
+     "fp": 149,
+     "fn": 51,
+     "f1": 0.15966386554621848,
+     "precision": 0.1130952380952381
+    },
+    "n": 138
+   },
+   "owner+rule": {
+    "sender": {
+     "precision": 0.21084337349397592,
+     "recall": 0.25925925925925924,
+     "f1": 0.23255813953488372,
+     "tp": 35,
+     "fp": 131,
+     "fn": 100,
+     "wrong_when_filled_docs": 78,
+     "filled_when_empty": 6,
+     "truth_nonempty": 127,
+     "docs": 136
+    },
+    "recipient": {
+     "precision": 0.16058394160583941,
+     "recall": 0.2573099415204678,
+     "f1": 0.19775280898876405,
+     "tp": 44,
+     "fp": 230,
+     "fn": 127,
+     "wrong_when_filled_docs": 90,
+     "filled_when_empty": 5,
+     "truth_nonempty": 130,
+     "docs": 137
+    },
+    "sending_place": {
+     "precision": 0.005714285714285714,
+     "recall": 0.014705882352941176,
+     "f1": 0.00823045267489712,
+     "tp": 1,
+     "fp": 174,
+     "fn": 67,
+     "wrong_when_filled_docs": 91,
+     "filled_when_empty": 39,
+     "truth_nonempty": 68,
+     "docs": 138
+    },
+    "city": {
+     "tp": 19,
+     "fp": 156,
+     "fn": 49,
+     "f1": 0.15637860082304528,
+     "precision": 0.10857142857142857
+    },
+    "n": 138
+   }
+  },
+  "gliner2.5-base-spans-rule (138)": {
+   "built": {
+    "sender": {
+     "precision": 0.26548672566371684,
+     "recall": 0.21739130434782608,
+     "f1": 0.2390438247011952,
+     "tp": 30,
+     "fp": 83,
+     "fn": 108,
+     "wrong_when_filled_docs": 83,
+     "filled_when_empty": 7,
+     "truth_nonempty": 129,
+     "docs": 138
+    },
+    "recipient": {
+     "precision": 0.47368421052631576,
+     "recall": 0.20809248554913296,
+     "f1": 0.2891566265060241,
+     "tp": 36,
+     "fp": 40,
+     "fn": 137,
+     "wrong_when_filled_docs": 40,
+     "filled_when_empty": 0,
+     "truth_nonempty": 132,
+     "docs": 138
+    },
+    "sending_place": {
+     "precision": 0.13793103448275862,
+     "recall": 0.1111111111111111,
+     "f1": 0.12307692307692307,
+     "tp": 8,
+     "fp": 50,
+     "fn": 64,
+     "wrong_when_filled_docs": 50,
+     "filled_when_empty": 11,
+     "truth_nonempty": 104,
+     "docs": 138
+    },
+    "city": {
+     "tp": 21,
+     "fp": 36,
+     "fn": 51,
+     "f1": 0.32558139534883723,
+     "precision": 0.3684210526315789
+    },
+    "n": 138
+   },
+   "owner": {
+    "sender": {
+     "precision": 0.26548672566371684,
+     "recall": 0.2222222222222222,
+     "f1": 0.24193548387096772,
+     "tp": 30,
+     "fp": 83,
+     "fn": 105,
+     "wrong_when_filled_docs": 83,
+     "filled_when_empty": 7,
+     "truth_nonempty": 127,
+     "docs": 136
+    },
+    "recipient": {
+     "precision": 0.4666666666666667,
+     "recall": 0.2046783625730994,
+     "f1": 0.2845528455284553,
+     "tp": 35,
+     "fp": 40,
+     "fn": 136,
+     "wrong_when_filled_docs": 40,
+     "filled_when_empty": 0,
+     "truth_nonempty": 130,
+     "docs": 137
+    },
+    "sending_place": {
+     "precision": 0.15517241379310345,
+     "recall": 0.12857142857142856,
+     "f1": 0.140625,
+     "tp": 9,
+     "fp": 49,
+     "fn": 61,
+     "wrong_when_filled_docs": 49,
+     "filled_when_empty": 13,
+     "truth_nonempty": 94,
+     "docs": 138
+    },
+    "city": {
+     "tp": 21,
+     "fp": 36,
+     "fn": 49,
+     "f1": 0.33070866141732286,
+     "precision": 0.3684210526315789
+    },
+    "n": 138
+   },
+   "owner+rule": {
+    "sender": {
+     "precision": 0.26548672566371684,
+     "recall": 0.2222222222222222,
+     "f1": 0.24193548387096772,
+     "tp": 30,
+     "fp": 83,
+     "fn": 105,
+     "wrong_when_filled_docs": 83,
+     "filled_when_empty": 7,
+     "truth_nonempty": 127,
+     "docs": 136
+    },
+    "recipient": {
+     "precision": 0.4666666666666667,
+     "recall": 0.2046783625730994,
+     "f1": 0.2845528455284553,
+     "tp": 35,
+     "fp": 40,
+     "fn": 136,
+     "wrong_when_filled_docs": 40,
+     "filled_when_empty": 0,
+     "truth_nonempty": 130,
+     "docs": 137
+    },
+    "sending_place": {
+     "precision": 0.15254237288135594,
+     "recall": 0.1323529411764706,
+     "f1": 0.14173228346456693,
+     "tp": 9,
+     "fp": 50,
+     "fn": 59,
+     "wrong_when_filled_docs": 50,
+     "filled_when_empty": 19,
+     "truth_nonempty": 68,
+     "docs": 138
+    },
+    "city": {
+     "tp": 21,
+     "fp": 38,
+     "fn": 47,
+     "f1": 0.33070866141732286,
+     "precision": 0.3559322033898305
+    },
+    "n": 138
+   }
+  },
+  "gliner2.5-multi-schema (138)": {
+   "built": {
+    "sender": {
+     "precision": 0.19402985074626866,
+     "recall": 0.09420289855072464,
+     "f1": 0.12682926829268293,
+     "tp": 13,
+     "fp": 54,
+     "fn": 125,
+     "wrong_when_filled_docs": 36,
+     "filled_when_empty": 4,
+     "truth_nonempty": 129,
+     "docs": 138
+    },
+    "recipient": {
+     "precision": 0.22950819672131148,
+     "recall": 0.16184971098265896,
+     "f1": 0.1898305084745763,
+     "tp": 28,
+     "fp": 94,
+     "fn": 145,
+     "wrong_when_filled_docs": 63,
+     "filled_when_empty": 2,
+     "truth_nonempty": 132,
+     "docs": 138
+    },
+    "sending_place": {
+     "precision": 0.0,
+     "recall": 0.0,
+     "f1": 0.0,
+     "tp": 0,
+     "fp": 56,
+     "fn": 72,
+     "wrong_when_filled_docs": 56,
+     "filled_when_empty": 16,
+     "truth_nonempty": 104,
+     "docs": 138
+    },
+    "city": {
+     "tp": 10,
+     "fp": 40,
+     "fn": 62,
+     "f1": 0.16393442622950818,
+     "precision": 0.2
+    },
+    "n": 138
+   },
+   "owner": {
+    "sender": {
+     "precision": 0.19402985074626866,
+     "recall": 0.0962962962962963,
+     "f1": 0.1287128712871287,
+     "tp": 13,
+     "fp": 54,
+     "fn": 122,
+     "wrong_when_filled_docs": 36,
+     "filled_when_empty": 4,
+     "truth_nonempty": 127,
+     "docs": 136
+    },
+    "recipient": {
+     "precision": 0.22950819672131148,
+     "recall": 0.16374269005847952,
+     "f1": 0.1911262798634812,
+     "tp": 28,
+     "fp": 94,
+     "fn": 143,
+     "wrong_when_filled_docs": 63,
+     "filled_when_empty": 3,
+     "truth_nonempty": 130,
+     "docs": 137
+    },
+    "sending_place": {
+     "precision": 0.017857142857142856,
+     "recall": 0.014285714285714285,
+     "f1": 0.015873015873015872,
+     "tp": 1,
+     "fp": 55,
+     "fn": 69,
+     "wrong_when_filled_docs": 55,
+     "filled_when_empty": 19,
+     "truth_nonempty": 94,
+     "docs": 138
+    },
+    "city": {
+     "tp": 9,
+     "fp": 41,
+     "fn": 61,
+     "f1": 0.15,
+     "precision": 0.18
+    },
+    "n": 138
+   },
+   "owner+rule": {
+    "sender": {
+     "precision": 0.19402985074626866,
+     "recall": 0.0962962962962963,
+     "f1": 0.1287128712871287,
+     "tp": 13,
+     "fp": 54,
+     "fn": 122,
+     "wrong_when_filled_docs": 36,
+     "filled_when_empty": 4,
+     "truth_nonempty": 127,
+     "docs": 136
+    },
+    "recipient": {
+     "precision": 0.22950819672131148,
+     "recall": 0.16374269005847952,
+     "f1": 0.1911262798634812,
+     "tp": 28,
+     "fp": 94,
+     "fn": 143,
+     "wrong_when_filled_docs": 63,
+     "filled_when_empty": 3,
+     "truth_nonempty": 130,
+     "docs": 137
+    },
+    "sending_place": {
+     "precision": 0.017857142857142856,
+     "recall": 0.014705882352941176,
+     "f1": 0.01612903225806452,
+     "tp": 1,
+     "fp": 55,
+     "fn": 67,
+     "wrong_when_filled_docs": 55,
+     "filled_when_empty": 32,
+     "truth_nonempty": 68,
+     "docs": 138
+    },
+    "city": {
+     "tp": 9,
+     "fp": 47,
+     "fn": 59,
+     "f1": 0.14516129032258066,
+     "precision": 0.16071428571428573
+    },
+    "n": 138
+   }
+  },
+  "gliner2.5-multi-labels (138)": {
+   "built": {
+    "sender": {
+     "precision": 0.18333333333333332,
+     "recall": 0.15942028985507245,
+     "f1": 0.17054263565891473,
+     "tp": 22,
+     "fp": 98,
+     "fn": 116,
+     "wrong_when_filled_docs": 54,
+     "filled_when_empty": 5,
+     "truth_nonempty": 129,
+     "docs": 138
+    },
+    "recipient": {
+     "precision": 0.16568047337278108,
+     "recall": 0.16184971098265896,
+     "f1": 0.16374269005847955,
+     "tp": 28,
+     "fp": 141,
+     "fn": 145,
+     "wrong_when_filled_docs": 77,
+     "filled_when_empty": 2,
+     "truth_nonempty": 132,
+     "docs": 138
+    },
+    "sending_place": {
+     "precision": 0.015384615384615385,
+     "recall": 0.027777777777777776,
+     "f1": 0.019801980198019802,
+     "tp": 2,
+     "fp": 128,
+     "fn": 70,
+     "wrong_when_filled_docs": 74,
+     "filled_when_empty": 17,
+     "truth_nonempty": 104,
+     "docs": 138
+    },
+    "city": {
+     "tp": 17,
+     "fp": 105,
+     "fn": 55,
+     "f1": 0.17525773195876287,
+     "precision": 0.13934426229508196
+    },
+    "n": 138
+   },
+   "owner": {
+    "sender": {
+     "precision": 0.18333333333333332,
+     "recall": 0.16296296296296298,
+     "f1": 0.17254901960784313,
+     "tp": 22,
+     "fp": 98,
+     "fn": 113,
+     "wrong_when_filled_docs": 54,
+     "filled_when_empty": 5,
+     "truth_nonempty": 127,
+     "docs": 136
+    },
+    "recipient": {
+     "precision": 0.16666666666666666,
+     "recall": 0.16374269005847952,
+     "f1": 0.16519174041297938,
+     "tp": 28,
+     "fp": 140,
+     "fn": 143,
+     "wrong_when_filled_docs": 76,
+     "filled_when_empty": 3,
+     "truth_nonempty": 130,
+     "docs": 137
+    },
+    "sending_place": {
+     "precision": 0.015384615384615385,
+     "recall": 0.02857142857142857,
+     "f1": 0.02,
+     "tp": 2,
+     "fp": 128,
+     "fn": 68,
+     "wrong_when_filled_docs": 74,
+     "filled_when_empty": 20,
+     "truth_nonempty": 94,
+     "docs": 138
+    },
+    "city": {
+     "tp": 17,
+     "fp": 106,
+     "fn": 53,
+     "f1": 0.17616580310880828,
+     "precision": 0.13821138211382114
+    },
+    "n": 138
+   },
+   "owner+rule": {
+    "sender": {
+     "precision": 0.18333333333333332,
+     "recall": 0.16296296296296298,
+     "f1": 0.17254901960784313,
+     "tp": 22,
+     "fp": 98,
+     "fn": 113,
+     "wrong_when_filled_docs": 54,
+     "filled_when_empty": 5,
+     "truth_nonempty": 127,
+     "docs": 136
+    },
+    "recipient": {
+     "precision": 0.16666666666666666,
+     "recall": 0.16374269005847952,
+     "f1": 0.16519174041297938,
+     "tp": 28,
+     "fp": 140,
+     "fn": 143,
+     "wrong_when_filled_docs": 76,
+     "filled_when_empty": 3,
+     "truth_nonempty": 130,
+     "docs": 137
+    },
+    "sending_place": {
+     "precision": 0.015384615384615385,
+     "recall": 0.029411764705882353,
+     "f1": 0.020202020202020204,
+     "tp": 2,
+     "fp": 128,
+     "fn": 66,
+     "wrong_when_filled_docs": 74,
+     "filled_when_empty": 36,
+     "truth_nonempty": 68,
+     "docs": 138
+    },
+    "city": {
+     "tp": 16,
+     "fp": 114,
+     "fn": 52,
+     "f1": 0.16161616161616163,
+     "precision": 0.12307692307692308
+    },
+    "n": 138
+   }
+  },
+  "gliner2.5-multi-spans-rule (138)": {
+   "built": {
+    "sender": {
+     "precision": 0.25925925925925924,
+     "recall": 0.2028985507246377,
+     "f1": 0.22764227642276422,
+     "tp": 28,
+     "fp": 80,
+     "fn": 110,
+     "wrong_when_filled_docs": 80,
+     "filled_when_empty": 7,
+     "truth_nonempty": 129,
+     "docs": 138
+    },
+    "recipient": {
+     "precision": 0.5294117647058824,
+     "recall": 0.20809248554913296,
+     "f1": 0.2987551867219917,
+     "tp": 36,
+     "fp": 32,
+     "fn": 137,
+     "wrong_when_filled_docs": 32,
+     "filled_when_empty": 1,
+     "truth_nonempty": 132,
+     "docs": 138
+    },
+    "sending_place": {
+     "precision": 0.07142857142857142,
+     "recall": 0.06944444444444445,
+     "f1": 0.07042253521126761,
+     "tp": 5,
+     "fp": 65,
+     "fn": 67,
+     "wrong_when_filled_docs": 65,
+     "filled_when_empty": 16,
+     "truth_nonempty": 104,
+     "docs": 138
+    },
+    "city": {
+     "tp": 21,
+     "fp": 44,
+     "fn": 51,
+     "f1": 0.30656934306569344,
+     "precision": 0.3230769230769231
+    },
+    "n": 138
+   },
+   "owner": {
+    "sender": {
+     "precision": 0.25925925925925924,
+     "recall": 0.2074074074074074,
+     "f1": 0.23045267489711932,
+     "tp": 28,
+     "fp": 80,
+     "fn": 107,
+     "wrong_when_filled_docs": 80,
+     "filled_when_empty": 7,
+     "truth_nonempty": 127,
+     "docs": 136
+    },
+    "recipient": {
+     "precision": 0.5223880597014925,
+     "recall": 0.2046783625730994,
+     "f1": 0.2941176470588235,
+     "tp": 35,
+     "fp": 32,
+     "fn": 136,
+     "wrong_when_filled_docs": 32,
+     "filled_when_empty": 1,
+     "truth_nonempty": 130,
+     "docs": 137
+    },
+    "sending_place": {
+     "precision": 0.07142857142857142,
+     "recall": 0.07142857142857142,
+     "f1": 0.07142857142857142,
+     "tp": 5,
+     "fp": 65,
+     "fn": 65,
+     "wrong_when_filled_docs": 65,
+     "filled_when_empty": 18,
+     "truth_nonempty": 94,
+     "docs": 138
+    },
+    "city": {
+     "tp": 21,
+     "fp": 45,
+     "fn": 49,
+     "f1": 0.3088235294117647,
+     "precision": 0.3181818181818182
+    },
+    "n": 138
+   },
+   "owner+rule": {
+    "sender": {
+     "precision": 0.25925925925925924,
+     "recall": 0.2074074074074074,
+     "f1": 0.23045267489711932,
+     "tp": 28,
+     "fp": 80,
+     "fn": 107,
+     "wrong_when_filled_docs": 80,
+     "filled_when_empty": 7,
+     "truth_nonempty": 127,
+     "docs": 136
+    },
+    "recipient": {
+     "precision": 0.5223880597014925,
+     "recall": 0.2046783625730994,
+     "f1": 0.2941176470588235,
+     "tp": 35,
+     "fp": 32,
+     "fn": 136,
+     "wrong_when_filled_docs": 32,
+     "filled_when_empty": 1,
+     "truth_nonempty": 130,
+     "docs": 137
+    },
+    "sending_place": {
+     "precision": 0.07042253521126761,
+     "recall": 0.07352941176470588,
+     "f1": 0.07194244604316546,
+     "tp": 5,
+     "fp": 66,
+     "fn": 63,
+     "wrong_when_filled_docs": 66,
+     "filled_when_empty": 28,
+     "truth_nonempty": 68,
+     "docs": 138
+    },
+    "city": {
+     "tp": 21,
+     "fp": 50,
+     "fn": 47,
+     "f1": 0.302158273381295,
+     "precision": 0.29577464788732394
+    },
+    "n": 138
+   }
+  },
+  "gemini-3.7 tagging, Vision": {
+   "built": {
+    "sender": {
+     "precision": 0.84,
+     "recall": 0.6086956521739131,
+     "f1": 0.7058823529411766,
+     "tp": 84,
+     "fp": 16,
+     "fn": 54,
+     "wrong_when_filled_docs": 16,
+     "filled_when_empty": 4,
+     "truth_nonempty": 129,
+     "docs": 138
+    },
+    "recipient": {
+     "precision": 0.875,
+     "recall": 0.6069364161849711,
+     "f1": 0.7167235494880546,
+     "tp": 105,
+     "fp": 15,
+     "fn": 68,
+     "wrong_when_filled_docs": 15,
+     "filled_when_empty": 1,
+     "truth_nonempty": 132,
+     "docs": 138
+    },
+    "sending_place": {
+     "precision": 0.5974025974025974,
+     "recall": 0.6388888888888888,
+     "f1": 0.6174496644295301,
+     "tp": 46,
+     "fp": 31,
+     "fn": 26,
+     "wrong_when_filled_docs": 31,
+     "filled_when_empty": 1,
+     "truth_nonempty": 104,
+     "docs": 138
+    },
+    "city": {
+     "tp": 64,
+     "fp": 7,
+     "fn": 8,
+     "f1": 0.8951048951048951,
+     "precision": 0.9014084507042254
+    },
+    "n": 138
+   },
+   "owner": {
+    "sender": {
+     "precision": 0.83,
+     "recall": 0.6148148148148148,
+     "f1": 0.7063829787234042,
+     "tp": 83,
+     "fp": 17,
+     "fn": 52,
+     "wrong_when_filled_docs": 17,
+     "filled_when_empty": 4,
+     "truth_nonempty": 127,
+     "docs": 136
+    },
+    "recipient": {
+     "precision": 0.8739495798319328,
+     "recall": 0.6081871345029239,
+     "f1": 0.7172413793103448,
+     "tp": 104,
+     "fp": 15,
+     "fn": 67,
+     "wrong_when_filled_docs": 15,
+     "filled_when_empty": 1,
+     "truth_nonempty": 130,
+     "docs": 137
+    },
+    "sending_place": {
+     "precision": 0.6025641025641025,
+     "recall": 0.6714285714285714,
+     "f1": 0.6351351351351351,
+     "tp": 47,
+     "fp": 31,
+     "fn": 23,
+     "wrong_when_filled_docs": 31,
+     "filled_when_empty": 6,
+     "truth_nonempty": 94,
+     "docs": 138
+    },
+    "city": {
+     "tp": 63,
+     "fp": 11,
+     "fn": 7,
+     "f1": 0.875,
+     "precision": 0.8513513513513513
+    },
+    "n": 138
+   },
+   "owner+rule": {
+    "sender": {
+     "precision": 0.83,
+     "recall": 0.6148148148148148,
+     "f1": 0.7063829787234042,
+     "tp": 83,
+     "fp": 17,
+     "fn": 52,
+     "wrong_when_filled_docs": 17,
+     "filled_when_empty": 4,
+     "truth_nonempty": 127,
+     "docs": 136
+    },
+    "recipient": {
+     "precision": 0.8739495798319328,
+     "recall": 0.6081871345029239,
+     "f1": 0.7172413793103448,
+     "tp": 104,
+     "fp": 15,
+     "fn": 67,
+     "wrong_when_filled_docs": 15,
+     "filled_when_empty": 1,
+     "truth_nonempty": 130,
+     "docs": 137
+    },
+    "sending_place": {
+     "precision": 0.5802469135802469,
+     "recall": 0.6911764705882353,
+     "f1": 0.6308724832214765,
+     "tp": 47,
+     "fp": 34,
+     "fn": 21,
+     "wrong_when_filled_docs": 34,
+     "filled_when_empty": 14,
+     "truth_nonempty": 68,
+     "docs": 138
+    },
+    "city": {
+     "tp": 62,
+     "fp": 19,
+     "fn": 6,
+     "f1": 0.8322147651006712,
+     "precision": 0.7654320987654321
+    },
+    "n": 138
+   }
+  },
+  "gemini-3.7 entity3k, Vision": {
+   "built": {
+    "sender": {
+     "precision": 0.75,
+     "recall": 0.6086956521739131,
+     "f1": 0.672,
+     "tp": 84,
+     "fp": 28,
+     "fn": 54,
+     "wrong_when_filled_docs": 28,
+     "filled_when_empty": 1,
+     "truth_nonempty": 129,
+     "docs": 138
+    },
+    "recipient": {
+     "precision": 0.8909090909090909,
+     "recall": 0.8497109826589595,
+     "f1": 0.8698224852071005,
+     "tp": 147,
+     "fp": 18,
+     "fn": 26,
+     "wrong_when_filled_docs": 17,
+     "filled_when_empty": 1,
+     "truth_nonempty": 132,
+     "docs": 138
+    },
+    "sending_place": {
+     "precision": 0.8676470588235294,
+     "recall": 0.8194444444444444,
+     "f1": 0.8428571428571429,
+     "tp": 59,
+     "fp": 9,
+     "fn": 13,
+     "wrong_when_filled_docs": 9,
+     "filled_when_empty": 0,
+     "truth_nonempty": 104,
+     "docs": 138
+    },
+    "city": {
+     "tp": 63,
+     "fp": 4,
+     "fn": 9,
+     "f1": 0.9064748201438849,
+     "precision": 0.9402985074626866
+    },
+    "n": 138
+   },
+   "owner": {
+    "sender": {
+     "precision": 0.7410714285714286,
+     "recall": 0.6148148148148148,
+     "f1": 0.6720647773279352,
+     "tp": 83,
+     "fp": 29,
+     "fn": 52,
+     "wrong_when_filled_docs": 29,
+     "filled_when_empty": 1,
+     "truth_nonempty": 127,
+     "docs": 136
+    },
+    "recipient": {
+     "precision": 0.8902439024390244,
+     "recall": 0.8538011695906432,
+     "f1": 0.8716417910447761,
+     "tp": 146,
+     "fp": 18,
+     "fn": 25,
+     "wrong_when_filled_docs": 17,
+     "filled_when_empty": 1,
+     "truth_nonempty": 130,
+     "docs": 137
+    },
+    "sending_place": {
+     "precision": 0.8676470588235294,
+     "recall": 0.8428571428571429,
+     "f1": 0.855072463768116,
+     "tp": 59,
+     "fp": 9,
+     "fn": 11,
+     "wrong_when_filled_docs": 9,
+     "filled_when_empty": 0,
+     "truth_nonempty": 94,
+     "docs": 138
+    },
+    "city": {
+     "tp": 63,
+     "fp": 4,
+     "fn": 7,
+     "f1": 0.9197080291970803,
+     "precision": 0.9402985074626866
+    },
+    "n": 138
+   },
+   "owner+rule": {
+    "sender": {
+     "precision": 0.7410714285714286,
+     "recall": 0.6148148148148148,
+     "f1": 0.6720647773279352,
+     "tp": 83,
+     "fp": 29,
+     "fn": 52,
+     "wrong_when_filled_docs": 29,
+     "filled_when_empty": 1,
+     "truth_nonempty": 127,
+     "docs": 136
+    },
+    "recipient": {
+     "precision": 0.8902439024390244,
+     "recall": 0.8538011695906432,
+     "f1": 0.8716417910447761,
+     "tp": 146,
+     "fp": 18,
+     "fn": 25,
+     "wrong_when_filled_docs": 17,
+     "filled_when_empty": 1,
+     "truth_nonempty": 130,
+     "docs": 137
+    },
+    "sending_place": {
+     "precision": 0.855072463768116,
+     "recall": 0.8676470588235294,
+     "f1": 0.8613138686131386,
+     "tp": 59,
+     "fp": 10,
+     "fn": 9,
+     "wrong_when_filled_docs": 10,
+     "filled_when_empty": 2,
+     "truth_nonempty": 68,
+     "docs": 138
+    },
+    "city": {
+     "tp": 63,
+     "fp": 6,
+     "fn": 5,
+     "f1": 0.9197080291970803,
+     "precision": 0.9130434782608695
+    },
+    "n": 138
+   }
+  },
+  "gemini-3.7 entity8k, Vision": {
+   "built": {
+    "sender": {
+     "precision": 0.7890625,
+     "recall": 0.7318840579710145,
+     "f1": 0.7593984962406015,
+     "tp": 101,
+     "fp": 27,
+     "fn": 37,
+     "wrong_when_filled_docs": 27,
+     "filled_when_empty": 1,
+     "truth_nonempty": 129,
+     "docs": 138
+    },
+    "recipient": {
+     "precision": 0.896969696969697,
+     "recall": 0.8554913294797688,
+     "f1": 0.8757396449704141,
+     "tp": 148,
+     "fp": 17,
+     "fn": 25,
+     "wrong_when_filled_docs": 16,
+     "filled_when_empty": 1,
+     "truth_nonempty": 132,
+     "docs": 138
+    },
+    "sending_place": {
+     "precision": 0.8676470588235294,
+     "recall": 0.8194444444444444,
+     "f1": 0.8428571428571429,
+     "tp": 59,
+     "fp": 9,
+     "fn": 13,
+     "wrong_when_filled_docs": 9,
+     "filled_when_empty": 0,
+     "truth_nonempty": 104,
+     "docs": 138
+    },
+    "city": {
+     "tp": 63,
+     "fp": 4,
+     "fn": 9,
+     "f1": 0.9064748201438849,
+     "precision": 0.9402985074626866
+    },
+    "n": 138
+   },
+   "owner": {
+    "sender": {
+     "precision": 0.7874015748031497,
+     "recall": 0.7407407407407407,
+     "f1": 0.7633587786259541,
+     "tp": 100,
+     "fp": 27,
+     "fn": 35,
+     "wrong_when_filled_docs": 27,
+     "filled_when_empty": 1,
+     "truth_nonempty": 127,
+     "docs": 136
+    },
+    "recipient": {
+     "precision": 0.8963414634146342,
+     "recall": 0.8596491228070176,
+     "f1": 0.8776119402985074,
+     "tp": 147,
+     "fp": 17,
+     "fn": 24,
+     "wrong_when_filled_docs": 16,
+     "filled_when_empty": 1,
+     "truth_nonempty": 130,
+     "docs": 137
+    },
+    "sending_place": {
+     "precision": 0.8676470588235294,
+     "recall": 0.8428571428571429,
+     "f1": 0.855072463768116,
+     "tp": 59,
+     "fp": 9,
+     "fn": 11,
+     "wrong_when_filled_docs": 9,
+     "filled_when_empty": 0,
+     "truth_nonempty": 94,
+     "docs": 138
+    },
+    "city": {
+     "tp": 63,
+     "fp": 4,
+     "fn": 7,
+     "f1": 0.9197080291970803,
+     "precision": 0.9402985074626866
+    },
+    "n": 138
+   },
+   "owner+rule": {
+    "sender": {
+     "precision": 0.7874015748031497,
+     "recall": 0.7407407407407407,
+     "f1": 0.7633587786259541,
+     "tp": 100,
+     "fp": 27,
+     "fn": 35,
+     "wrong_when_filled_docs": 27,
+     "filled_when_empty": 1,
+     "truth_nonempty": 127,
+     "docs": 136
+    },
+    "recipient": {
+     "precision": 0.8963414634146342,
+     "recall": 0.8596491228070176,
+     "f1": 0.8776119402985074,
+     "tp": 147,
+     "fp": 17,
+     "fn": 24,
+     "wrong_when_filled_docs": 16,
+     "filled_when_empty": 1,
+     "truth_nonempty": 130,
+     "docs": 137
+    },
+    "sending_place": {
+     "precision": 0.855072463768116,
+     "recall": 0.8676470588235294,
+     "f1": 0.8613138686131386,
+     "tp": 59,
+     "fp": 10,
+     "fn": 9,
+     "wrong_when_filled_docs": 10,
+     "filled_when_empty": 2,
+     "truth_nonempty": 68,
+     "docs": 138
+    },
+    "city": {
+     "tp": 63,
+     "fp": 6,
+     "fn": 5,
+     "f1": 0.9197080291970803,
+     "precision": 0.9130434782608695
+    },
+    "n": 138
+   }
+  },
+  "gemini-3.7 entity8k-rerun, Vision": {
+   "built": {
+    "sender": {
+     "precision": 0.8857142857142857,
+     "recall": 0.8378378378378378,
+     "f1": 0.8611111111111112,
+     "tp": 31,
+     "fp": 4,
+     "fn": 6,
+     "wrong_when_filled_docs": 4,
+     "filled_when_empty": 0,
+     "truth_nonempty": 38,
+     "docs": 40
+    },
+    "recipient": {
+     "precision": 0.9655172413793104,
+     "recall": 0.835820895522388,
+     "f1": 0.896,
+     "tp": 56,
+     "fp": 2,
+     "fn": 11,
+     "wrong_when_filled_docs": 2,
+     "filled_when_empty": 1,
+     "truth_nonempty": 37,
+     "docs": 40
+    },
+    "sending_place": {
+     "precision": 0.75,
+     "recall": 0.7058823529411765,
+     "f1": 0.7272727272727272,
+     "tp": 12,
+     "fp": 4,
+     "fn": 5,
+     "wrong_when_filled_docs": 4,
+     "filled_when_empty": 0,
+     "truth_nonempty": 27,
+     "docs": 40
+    },
+    "city": {
+     "tp": 15,
+     "fp": 0,
+     "fn": 2,
+     "f1": 0.9375,
+     "precision": 1.0
+    },
+    "n": 40
+   },
+   "owner": {
+    "sender": {
+     "precision": 0.8571428571428571,
+     "recall": 0.8108108108108109,
+     "f1": 0.8333333333333334,
+     "tp": 30,
+     "fp": 5,
+     "fn": 7,
+     "wrong_when_filled_docs": 5,
+     "filled_when_empty": 0,
+     "truth_nonempty": 38,
+     "docs": 40
+    },
+    "recipient": {
+     "precision": 0.9655172413793104,
+     "recall": 0.835820895522388,
+     "f1": 0.896,
+     "tp": 56,
+     "fp": 2,
+     "fn": 11,
+     "wrong_when_filled_docs": 2,
+     "filled_when_empty": 1,
+     "truth_nonempty": 37,
+     "docs": 40
+    },
+    "sending_place": {
+     "precision": 0.75,
+     "recall": 0.75,
+     "f1": 0.75,
+     "tp": 12,
+     "fp": 4,
+     "fn": 4,
+     "wrong_when_filled_docs": 4,
+     "filled_when_empty": 0,
+     "truth_nonempty": 23,
+     "docs": 40
+    },
+    "city": {
+     "tp": 15,
+     "fp": 0,
+     "fn": 1,
+     "f1": 0.967741935483871,
+     "precision": 1.0
+    },
+    "n": 40
+   },
+   "owner+rule": {
+    "sender": {
+     "precision": 0.8571428571428571,
+     "recall": 0.8108108108108109,
+     "f1": 0.8333333333333334,
+     "tp": 30,
+     "fp": 5,
+     "fn": 7,
+     "wrong_when_filled_docs": 5,
+     "filled_when_empty": 0,
+     "truth_nonempty": 38,
+     "docs": 40
+    },
+    "recipient": {
+     "precision": 0.9655172413793104,
+     "recall": 0.835820895522388,
+     "f1": 0.896,
+     "tp": 56,
+     "fp": 2,
+     "fn": 11,
+     "wrong_when_filled_docs": 2,
+     "filled_when_empty": 1,
+     "truth_nonempty": 37,
+     "docs": 40
+    },
+    "sending_place": {
+     "precision": 0.75,
+     "recall": 0.75,
+     "f1": 0.75,
+     "tp": 12,
+     "fp": 4,
+     "fn": 4,
+     "wrong_when_filled_docs": 4,
+     "filled_when_empty": 1,
+     "truth_nonempty": 16,
+     "docs": 40
+    },
+    "city": {
+     "tp": 15,
+     "fp": 1,
+     "fn": 1,
+     "f1": 0.9375,
+     "precision": 0.9375
+    },
+    "n": 40
+   }
+  },
+  "gemini-3.7 tagging-v1, Vision": {
+   "built": {
+    "sender": {
+     "precision": 0.9333333333333333,
+     "recall": 0.6086956521739131,
+     "f1": 0.7368421052631579,
+     "tp": 84,
+     "fp": 6,
+     "fn": 54,
+     "wrong_when_filled_docs": 6,
+     "filled_when_empty": 1,
+     "truth_nonempty": 129,
+     "docs": 138
+    },
+    "recipient": {
+     "precision": 0.9044117647058824,
+     "recall": 0.7109826589595376,
+     "f1": 0.796116504854369,
+     "tp": 123,
+     "fp": 13,
+     "fn": 50,
+     "wrong_when_filled_docs": 13,
+     "filled_when_empty": 0,
+     "truth_nonempty": 132,
+     "docs": 138
+    },
+    "sending_place": {
+     "precision": 0.5555555555555556,
+     "recall": 0.625,
+     "f1": 0.5882352941176471,
+     "tp": 45,
+     "fp": 36,
+     "fn": 27,
+     "wrong_when_filled_docs": 36,
+     "filled_when_empty": 1,
+     "truth_nonempty": 104,
+     "docs": 138
+    },
+    "city": {
+     "tp": 64,
+     "fp": 6,
+     "fn": 8,
+     "f1": 0.9014084507042254,
+     "precision": 0.9142857142857143
+    },
+    "n": 138
+   },
+   "owner": {
+    "sender": {
+     "precision": 0.9222222222222223,
+     "recall": 0.6148148148148148,
+     "f1": 0.7377777777777778,
+     "tp": 83,
+     "fp": 7,
+     "fn": 52,
+     "wrong_when_filled_docs": 7,
+     "filled_when_empty": 1,
+     "truth_nonempty": 127,
+     "docs": 136
+    },
+    "recipient": {
+     "precision": 0.9044117647058824,
+     "recall": 0.7192982456140351,
+     "f1": 0.8013029315960913,
+     "tp": 123,
+     "fp": 13,
+     "fn": 48,
+     "wrong_when_filled_docs": 13,
+     "filled_when_empty": 0,
+     "truth_nonempty": 130,
+     "docs": 137
+    },
+    "sending_place": {
+     "precision": 0.5679012345679012,
+     "recall": 0.6571428571428571,
+     "f1": 0.6092715231788078,
+     "tp": 46,
+     "fp": 35,
+     "fn": 24,
+     "wrong_when_filled_docs": 35,
+     "filled_when_empty": 5,
+     "truth_nonempty": 94,
+     "docs": 138
+    },
+    "city": {
+     "tp": 63,
+     "fp": 9,
+     "fn": 7,
+     "f1": 0.8873239436619719,
+     "precision": 0.875
+    },
+    "n": 138
+   },
+   "owner+rule": {
+    "sender": {
+     "precision": 0.9222222222222223,
+     "recall": 0.6148148148148148,
+     "f1": 0.7377777777777778,
+     "tp": 83,
+     "fp": 7,
+     "fn": 52,
+     "wrong_when_filled_docs": 7,
+     "filled_when_empty": 1,
+     "truth_nonempty": 127,
+     "docs": 136
+    },
+    "recipient": {
+     "precision": 0.9044117647058824,
+     "recall": 0.7192982456140351,
+     "f1": 0.8013029315960913,
+     "tp": 123,
+     "fp": 13,
+     "fn": 48,
+     "wrong_when_filled_docs": 13,
+     "filled_when_empty": 0,
+     "truth_nonempty": 130,
+     "docs": 137
+    },
+    "sending_place": {
+     "precision": 0.5679012345679012,
+     "recall": 0.6764705882352942,
+     "f1": 0.6174496644295301,
+     "tp": 46,
+     "fp": 35,
+     "fn": 22,
+     "wrong_when_filled_docs": 35,
+     "filled_when_empty": 15,
+     "truth_nonempty": 68,
+     "docs": 138
+    },
+    "city": {
+     "tp": 62,
+     "fp": 19,
+     "fn": 6,
+     "f1": 0.8322147651006712,
+     "precision": 0.7654320987654321
+    },
+    "n": 138
+   }
+  },
+  "gemini-3.7 tagging-new, Vision": {
+   "built": {
+    "sender": {
+     "precision": 0.9325842696629213,
+     "recall": 0.6014492753623188,
+     "f1": 0.7312775330396476,
+     "tp": 83,
+     "fp": 6,
+     "fn": 55,
+     "wrong_when_filled_docs": 6,
+     "filled_when_empty": 1,
+     "truth_nonempty": 129,
+     "docs": 138
+    },
+    "recipient": {
+     "precision": 0.8653846153846154,
+     "recall": 0.7803468208092486,
+     "f1": 0.8206686930091186,
+     "tp": 135,
+     "fp": 21,
+     "fn": 38,
+     "wrong_when_filled_docs": 21,
+     "filled_when_empty": 1,
+     "truth_nonempty": 132,
+     "docs": 138
+    },
+    "sending_place": {
+     "precision": 0.782608695652174,
+     "recall": 0.75,
+     "f1": 0.7659574468085107,
+     "tp": 54,
+     "fp": 15,
+     "fn": 18,
+     "wrong_when_filled_docs": 15,
+     "filled_when_empty": 1,
+     "truth_nonempty": 104,
+     "docs": 138
+    },
+    "city": {
+     "tp": 65,
+     "fp": 4,
+     "fn": 7,
+     "f1": 0.9219858156028369,
+     "precision": 0.9420289855072463
+    },
+    "n": 138
+   },
+   "owner": {
+    "sender": {
+     "precision": 0.9213483146067416,
+     "recall": 0.6074074074074074,
+     "f1": 0.7321428571428571,
+     "tp": 82,
+     "fp": 7,
+     "fn": 53,
+     "wrong_when_filled_docs": 7,
+     "filled_when_empty": 1,
+     "truth_nonempty": 127,
+     "docs": 136
+    },
+    "recipient": {
+     "precision": 0.864516129032258,
+     "recall": 0.783625730994152,
+     "f1": 0.8220858895705522,
+     "tp": 134,
+     "fp": 21,
+     "fn": 37,
+     "wrong_when_filled_docs": 21,
+     "filled_when_empty": 1,
+     "truth_nonempty": 130,
+     "docs": 137
+    },
+    "sending_place": {
+     "precision": 0.7361111111111112,
+     "recall": 0.7571428571428571,
+     "f1": 0.7464788732394366,
+     "tp": 53,
+     "fp": 19,
+     "fn": 17,
+     "wrong_when_filled_docs": 19,
+     "filled_when_empty": 5,
+     "truth_nonempty": 94,
+     "docs": 138
+    },
+    "city": {
+     "tp": 64,
+     "fp": 8,
+     "fn": 6,
+     "f1": 0.9014084507042254,
+     "precision": 0.8888888888888888
+    },
+    "n": 138
+   },
+   "owner+rule": {
+    "sender": {
+     "precision": 0.9213483146067416,
+     "recall": 0.6074074074074074,
+     "f1": 0.7321428571428571,
+     "tp": 82,
+     "fp": 7,
+     "fn": 53,
+     "wrong_when_filled_docs": 7,
+     "filled_when_empty": 1,
+     "truth_nonempty": 127,
+     "docs": 136
+    },
+    "recipient": {
+     "precision": 0.864516129032258,
+     "recall": 0.783625730994152,
+     "f1": 0.8220858895705522,
+     "tp": 134,
+     "fp": 21,
+     "fn": 37,
+     "wrong_when_filled_docs": 21,
+     "filled_when_empty": 1,
+     "truth_nonempty": 130,
+     "docs": 137
+    },
+    "sending_place": {
+     "precision": 0.6190476190476191,
+     "recall": 0.7647058823529411,
+     "f1": 0.6842105263157895,
+     "tp": 52,
+     "fp": 32,
+     "fn": 16,
+     "wrong_when_filled_docs": 32,
+     "filled_when_empty": 18,
+     "truth_nonempty": 68,
+     "docs": 138
+    },
+    "city": {
+     "tp": 63,
+     "fp": 21,
+     "fn": 5,
+     "f1": 0.8289473684210527,
+     "precision": 0.75
+    },
+    "n": 138
+   }
+  },
+  "gemini-3.7 tagging-new-rerun, Vision": {
+   "built": {
+    "sender": {
+     "precision": 1.0,
+     "recall": 0.6486486486486487,
+     "f1": 0.7868852459016393,
+     "tp": 24,
+     "fp": 0,
+     "fn": 13,
+     "wrong_when_filled_docs": 0,
+     "filled_when_empty": 0,
+     "truth_nonempty": 38,
+     "docs": 40
+    },
+    "recipient": {
+     "precision": 0.95,
+     "recall": 0.8507462686567164,
+     "f1": 0.8976377952755905,
+     "tp": 57,
+     "fp": 3,
+     "fn": 10,
+     "wrong_when_filled_docs": 3,
+     "filled_when_empty": 1,
+     "truth_nonempty": 37,
+     "docs": 40
+    },
+    "sending_place": {
+     "precision": 0.6111111111111112,
+     "recall": 0.6470588235294118,
+     "f1": 0.6285714285714287,
+     "tp": 11,
+     "fp": 7,
+     "fn": 6,
+     "wrong_when_filled_docs": 7,
+     "filled_when_empty": 0,
+     "truth_nonempty": 27,
+     "docs": 40
+    },
+    "city": {
+     "tp": 17,
+     "fp": 1,
+     "fn": 0,
+     "f1": 0.9714285714285714,
+     "precision": 0.9444444444444444
+    },
+    "n": 40
+   },
+   "owner": {
+    "sender": {
+     "precision": 0.9583333333333334,
+     "recall": 0.6216216216216216,
+     "f1": 0.7540983606557377,
+     "tp": 23,
+     "fp": 1,
+     "fn": 14,
+     "wrong_when_filled_docs": 1,
+     "filled_when_empty": 0,
+     "truth_nonempty": 38,
+     "docs": 40
+    },
+    "recipient": {
+     "precision": 0.95,
+     "recall": 0.8507462686567164,
+     "f1": 0.8976377952755905,
+     "tp": 57,
+     "fp": 3,
+     "fn": 10,
+     "wrong_when_filled_docs": 3,
+     "filled_when_empty": 1,
+     "truth_nonempty": 37,
+     "docs": 40
+    },
+    "sending_place": {
+     "precision": 0.5263157894736842,
+     "recall": 0.625,
+     "f1": 0.5714285714285714,
+     "tp": 10,
+     "fp": 9,
+     "fn": 6,
+     "wrong_when_filled_docs": 9,
+     "filled_when_empty": 3,
+     "truth_nonempty": 23,
+     "docs": 40
+    },
+    "city": {
+     "tp": 16,
+     "fp": 3,
+     "fn": 0,
+     "f1": 0.9142857142857143,
+     "precision": 0.8421052631578947
+    },
+    "n": 40
+   },
+   "owner+rule": {
+    "sender": {
+     "precision": 0.9583333333333334,
+     "recall": 0.6216216216216216,
+     "f1": 0.7540983606557377,
+     "tp": 23,
+     "fp": 1,
+     "fn": 14,
+     "wrong_when_filled_docs": 1,
+     "filled_when_empty": 0,
+     "truth_nonempty": 38,
+     "docs": 40
+    },
+    "recipient": {
+     "precision": 0.95,
+     "recall": 0.8507462686567164,
+     "f1": 0.8976377952755905,
+     "tp": 57,
+     "fp": 3,
+     "fn": 10,
+     "wrong_when_filled_docs": 3,
+     "filled_when_empty": 1,
+     "truth_nonempty": 37,
+     "docs": 40
+    },
+    "sending_place": {
+     "precision": 0.45454545454545453,
+     "recall": 0.625,
+     "f1": 0.5263157894736842,
+     "tp": 10,
+     "fp": 12,
+     "fn": 6,
+     "wrong_when_filled_docs": 12,
+     "filled_when_empty": 6,
+     "truth_nonempty": 16,
+     "docs": 40
+    },
+    "city": {
+     "tp": 16,
+     "fp": 6,
+     "fn": 0,
+     "f1": 0.8421052631578947,
+     "precision": 0.7272727272727273
+    },
+    "n": 40
+   }
+  }
+ },
+ "paired": {
+  "entity3k vs tagging": {
+   "built": {
+    "full": {
+     "n": 138,
+     "diff": 0.22540747842761266,
+     "lo": 0.1251791686574295,
+     "hi": 0.3294814814814815
+    },
+    "city": {
+     "n": 138,
+     "diff": 0.011369925038989814,
+     "lo": -0.02321966384921792,
+     "hi": 0.046478773751501
+    }
+   },
+   "owner+rule": {
+    "full": {
+     "n": 138,
+     "diff": 0.23044138539166215,
+     "lo": 0.13030508474576274,
+     "hi": 0.33628727037755013
+    },
+    "city": {
+     "n": 138,
+     "diff": 0.08749326409640912,
+     "lo": 0.044963388086285416,
+     "hi": 0.13741813741813735
+    }
+   }
+  },
+  "tagging-new vs tagging": {
+   "built": {
+    "full": {
+     "n": 138,
+     "diff": 0.14850778237898044,
+     "lo": 0.013378273269380347,
+     "hi": 0.28451759140632693
+    },
+    "city": {
+     "n": 138,
+     "diff": 0.026880920497941774,
+     "lo": -0.008354702622218602,
+     "hi": 0.06721132897603488
+    }
+   },
+   "owner+rule": {
+    "full": {
+     "n": 138,
+     "diff": 0.053338043094313004,
+     "lo": -0.07302428733704758,
+     "hi": 0.1806451612903226
+    },
+    "city": {
+     "n": 138,
+     "diff": -0.003267396679618506,
+     "lo": -0.05234945255474455,
+     "hi": 0.04870754112369147
+    }
+   }
+  },
+  "rerun floor: entity8k again": {
+   "built": {
+    "full": {
+     "n": 40,
+     "diff": -0.15508021390374327,
+     "lo": -0.3375082399472643,
+     "hi": 0.0
+    },
+    "city": {
+     "n": 40,
+     "diff": -0.032196969696969724,
+     "lo": -0.11111111111111116,
+     "hi": 0.0
+    }
+   },
+   "owner+rule": {
+    "full": {
+     "n": 40,
+     "diff": -0.15909090909090906,
+     "lo": -0.34782608695652173,
+     "hi": 0.0
+    },
+    "city": {
+     "n": 40,
+     "diff": -0.032196969696969724,
+     "lo": -0.11111111111111116,
+     "hi": 0.0
+    }
+   }
+  },
+  "rerun floor: tagging-new again": {
+   "built": {
+    "full": {
+     "n": 40,
+     "diff": -0.07731092436974796,
+     "lo": -0.2881720430107527,
+     "hi": 0.11764705882352944
+    },
+    "city": {
+     "n": 40,
+     "diff": -0.02857142857142858,
+     "lo": -0.09999999999999998,
+     "hi": 0.0
+    }
+   },
+   "owner+rule": {
+    "full": {
+     "n": 40,
+     "diff": -0.052631578947368474,
+     "lo": -0.24026696329254726,
+     "hi": 0.1333333333333333
+    },
+    "city": {
+     "n": 40,
+     "diff": 0.0,
+     "lo": -0.08791208791208782,
+     "hi": 0.09377289377289377
+    }
+   }
+  }
+ },
+ "corrections": {
+  "documents": 21,
+  "fields": {
+   "set (sheet answer)": 11,
+   "confirm (sheet answer)": 5,
+   "confirm (note)": 7,
+   "set (note)": 2,
+   "unscored (note)": 3
+  }
+ },
+ "rule_dropped_documents": 26,
+ "sources": {
+  "gemini-3.8-flash tagging reply, ABBYY (82)": "ent-score",
+  "qwen3.6-27b tagging reply, ABBYY (82)": "ent-score",
+  "qwen3.5-4b tagging reply, ABBYY (82)": "ent-score",
+  "qwen3-vl-8b tagging reply, ABBYY (82)": "ent-score",
+  "nltagger (138)": "ent-score",
+  "gliner2.5-small-schema (138)": "ent-score",
+  "gliner2.5-small-labels (138)": "ent-score",
+  "gliner2.5-small-spans-rule (138)": "ent-score",
+  "gliner2.5-base-schema (138)": "ent-score",
+  "gliner2.5-base-labels (138)": "ent-score",
+  "gliner2.5-base-spans-rule (138)": "ent-score",
+  "gliner2.5-multi-schema (138)": "ent-score",
+  "gliner2.5-multi-labels (138)": "ent-score",
+  "gliner2.5-multi-spans-rule (138)": "ent-score",
+  "gemini-3.7 tagging, Vision": "ent-score-paid",
+  "gemini-3.7 entity3k, Vision": "ent-score-paid",
+  "gemini-3.7 entity8k, Vision": "ent-score-paid",
+  "gemini-3.7 entity8k-rerun, Vision": "ent-score-paid",
+  "gemini-3.7 tagging-v1, Vision": "ent-prompt-app",
+  "gemini-3.7 tagging-new, Vision": "ent-prompt-app",
+  "gemini-3.7 tagging-new-rerun, Vision": "ent-prompt-app"
+ }
+}

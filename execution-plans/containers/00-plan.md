@@ -206,7 +206,9 @@ Gemini route that gives a title; the app's call is below the bar on publication 
 the owner's tags. `W47.item-fields-more-checks` draws the image prompt's filled values for the owner to reach the
 floor, and `W47.item-fields-build` waits on it. The owner's notes ask for inference (a name from a first name or
 initials, a paper from its initials) as a user-set level, title case for display, and the letterhead kept apart from
-the sending place.
+the sending place. W46.ent-truth-owner-fold (2026-11-05) folded the entity answers: a sending place is one the
+document writes (a letterhead included, the owner's caveat noted), never an inferred one
+(`segbench-results/ent-truth-owner.md`); W46.ent-place-rule-paid measures that rule in the app's prompt.
 
 Cost: `W47.ct-read-paid` under $0.50; a full read of the corpus's 4,500 markers about $2–4 on the gateway, priced
 from `W47.ct-read`'s figures before it runs. The $3 rule applies to each item.

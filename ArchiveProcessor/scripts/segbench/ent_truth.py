@@ -87,6 +87,9 @@ MAX_TOKENS = 4000
 
 FORMATS = ("letter", "memo", "memorandum", "telegram")
 
+# The drafts and rulings were made with this prompt, so it stays as sent. Its sending place ("the dateline's place,
+# or the letterhead address") is narrowed by the owner's answers (W46.ent-truth-owner-fold, place_rule): a place the
+# document writes; one inferred from the collection, the content or an institution's name is none given.
 PROMPT = """You are labelling correspondence metadata for a test set built from a historical archive. You get the OCR \
 text of one document (it may be noisy, and handwriting may be garbled or missing in it) and images of its first and \
 last page. Read the images as well as the text.
@@ -219,9 +222,12 @@ def in_text(name, text):
 
 def score_rows(rows, levels=("exact", "overlap", "ed2")):
     """rows: [{"truth": truth row, "pred": {field: value}}], value in any `ent_names` shape. Returns per field and
-    level: tp, fp, fn, precision, recall, f1; plus null, wrong-when-filled, inferred and evidence counts."""
+    level: tp, fp, fn, precision, recall, f1; plus null, wrong-when-filled, inferred and evidence counts. A field
+    listed in a truth row's "unscored" (one the owner's note left unsettled, apply_owner) is left out for that row."""
     out = {}
+    every = rows
     for f in FIELDS:
+        rows = [r for r in every if f not in r["truth"].get("unscored", ())]
         res = {"docs": len(rows)}
         for lv in levels:
             tp = fp = fn = inf_hit = wrong_docs = 0
@@ -461,6 +467,105 @@ def load_docs():
     return [json.loads(l) for l in open(os.path.join(CACHE, "docs.jsonl"), encoding="utf-8")]
 
 
+# --- the owner's corrections and the sending-place rule (W46.ent-truth-owner-fold) ---------------------------------
+
+OWNER_CORRECTIONS = os.path.join(CACHE, "owner-corrections.json")
+INSTITUTION = {"university", "univ", "college", "school", "institute", "institution", "laboratory", "laboratories",
+               "lab", "company", "corporation", "corp", "inc", "hospital", "foundation", "society", "association",
+               "department", "dept", "office", "bank", "church", "library", "museum", "center", "centre", "board",
+               "committee", "council", "academy", "seminary"}
+DATE_RE = re.compile(r"\b(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\.?\s*\d{1,2}\b|"
+                     r"\b\d{1,2}(st|nd|rd|th)?\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)|"
+                     r"\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b|\b(1[789]|20)\d\d\b", re.I)
+PLACE_KINDS = ("dateline", "line above a date", "heading or address", "read in an image", "institution name",
+               "inferred")
+
+
+def place_kind(e, text):
+    """Where a truth sending place stands, from its class, its quote and the quote's line in the OCR text: on a line
+    with a date (a dateline); on the line above one; in a heading or address with no date beside it (a letterhead or a
+    typed address, which the text alone cannot tell apart); named but only in an image; an institution's name taken
+    for its town ("STANFORD UNIVERSITY" for Stanford, California); or inferred (not written)."""
+    if e.get("class") != "named":
+        return "inferred"
+    q = e.get("quote")
+    if not q:
+        return "read in an image"
+    # An institution's name: an institution word and no state or country. A quote that does not spell the city is
+    # not one: OCR garbles places ("C a m b r id g e 3 8 . Ma s s a c h u s e t t s", "EUasblngton, 3 .C .").
+    qt = [x for x in (re.sub(r"[^a-z0-9]", "", t) for t in re.split(r"[\s,.;:/\-*]+", fold(q))) if x]
+    rest = [x for x in tokens(",".join(e["name"].split(",")[1:])) if len(x) >= 2]
+    if set(qt) & INSTITUTION and not any(t.startswith(x) or x.startswith(t) for x in rest for t in qt if len(t) >= 2):
+        return "institution name"
+    i = text.find(q)
+    if i < 0:
+        j = squash(text).find(squash(q))
+        if j < 0:
+            return "heading or address"
+        text, i = squash(text), j
+    ls = text.rfind("\n", 0, i) + 1
+    le = text.find("\n", i)
+    le = len(text) if le < 0 else le
+    nx = text.find("\n", le + 1)
+    if DATE_RE.search(text[ls:le]):
+        return "dateline"
+    if le < len(text) and DATE_RE.search(text[le + 1:len(text) if nx < 0 else nx]):
+        return "line above a date"
+    return "heading or address"
+
+
+def place_rule(r, text):
+    """The sending place as the owner's answers define it (owner, 2026-11-05, on W47.item-fields-retruth's sheet): a
+    place written in the document, in a dateline, a letterhead or an address. A place inferred from the collection,
+    the content or an institution's name is not a sending place, so the field is empty and a route that fills it is
+    wrong when filled. A letterhead place stays, as the owner upheld one; his note that a letterhead is not always where
+    a letter was sent from is kept as a caveat (ent-truth-owner.md). A field the owner checked is left as he set it."""
+    if "sending_place" in r.get("owner_checked", []) + r.get("unscored", []):
+        return r
+    keep = [e for e in r["sending_place"] if place_kind(e, text) not in ("inferred", "institution name")]
+    if len(keep) == len(r["sending_place"]):
+        return r
+    return {**r, "sending_place": keep, "place_rule_dropped": [e["name"] for e in r["sending_place"] if e not in keep]}
+
+
+def apply_owner(r, corr):
+    """One truth row with the owner's corrections for it: a field he settled takes his value and is listed in
+    owner_checked; a field his note leaves unsettled is listed in unscored, which score_rows skips."""
+    c = corr.get(r["id"])
+    if not c:
+        return r
+    r = {**r, "owner_checked": list(r.get("owner_checked", [])), "unscored": list(r.get("unscored", []))}
+    for f, x in sorted(c.items()):
+        if x["action"] == "unscored":
+            r["unscored"].append(f)
+            continue
+        if x["action"] == "set":
+            r[f] = x["value"]
+        elif x.get("alternates"):         # upheld, the owner choosing another spelling of the same name
+            r[f] = [{**e, "alternates": list(e.get("alternates", [])) + x["alternates"]} for e in r[f]]
+        r["owner_checked"].append(f)
+    return r
+
+
+def load_truth(owner=True, rule=True, correspondence=True):
+    """The truth rows. owner: with the owner's corrections (OWNER_CORRECTIONS, written by ent_truth_owner.py fold);
+    rule: with the sending-place rule (place_rule). Both on is the truth as it now stands, and what new scoring uses;
+    both off is truth.jsonl as W46.fix-ent-truth built it, which the W46 entity reports up to 2026-11-05 were scored
+    against (ent_truth_owner.py report restates their figures)."""
+    rows = [json.loads(x) for x in open(os.path.join(CACHE, "truth.jsonl"), encoding="utf-8")]
+    if correspondence:
+        rows = [r for r in rows if r["is_correspondence"]]
+    if owner:
+        if not os.path.exists(OWNER_CORRECTIONS):
+            raise SystemExit(f"no {OWNER_CORRECTIONS}: run ent_truth_owner.py fold, or load_truth(owner=False)")
+        corr = json.load(open(OWNER_CORRECTIONS, encoding="utf-8"))["docs"]
+        rows = [apply_owner(r, corr) for r in rows]
+    if rule:
+        docs = {d["id"]: d["text"] for d in load_docs()}
+        rows = [place_rule(r, docs[r["id"]]) for r in rows]
+    return rows
+
+
 def images_of(d):
     """The first page's image, and the last page's when the document has more than one."""
     ends = [d["pages"][0]] + ([d["pages"][-1]] if len(d["pages"]) > 1 else [])
@@ -683,6 +788,9 @@ def f3(x):
 
 def report(s):
     L = ["# The entity truth set (W46.fix-ent-truth)", "",
+         "The owner's answers on 23 of its fields and the sending-place rule (a place the document writes, "
+         "never an inferred one) are folded in by W46.ent-truth-owner-fold (`ent-truth-owner.md`); "
+         "`ent_truth.load_truth()` gives the truth as it now stands. The counts below are the truth as built.", "",
          "Generated by `scripts/segbench/ent_truth.py build`; method in its header. The labels themselves are the "
          "owner's material and stay in the bench cache (`~/Library/Caches/ArchiveSuiteRehearsal/ent-truth/"
          "truth.jsonl`); this page has counts only. W46.ent-score scores the app's extractors against it with "

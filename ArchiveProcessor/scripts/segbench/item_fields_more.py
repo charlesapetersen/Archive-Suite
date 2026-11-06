@@ -108,11 +108,11 @@ def draw(pools, have, rng, floor=IS.FLOOR, share=FILL_SHARE, empty=EMPTY_PER_FIE
 
 
 def entity_truth():
-    p = os.path.join(ET.CACHE, "truth.jsonl")
-    if not os.path.exists(p):
+    """W46's entity truth as it now stands: the owner's answers folded in and the sending-place rule applied
+    (ent_truth.load_truth, W46.ent-truth-owner-fold)."""
+    if not os.path.exists(os.path.join(ET.CACHE, "truth.jsonl")):
         return {}
-    with open(p, encoding="utf-8") as fh:
-        return {e["id"]: e for e in (json.loads(x) for x in fh)}
+    return {e["id"]: e for e in ET.load_truth(correspondence=False)}
 
 
 def not_asked(t, asked, ent, tag):
