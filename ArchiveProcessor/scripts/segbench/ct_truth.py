@@ -11,6 +11,14 @@
     python3 ct_truth.py trees                       # writes ct_trees.json, the synthetic Route B set (committed)
     python3 ct_truth.py owner-tree                  # the corpus's level-1 and level-2 names, private, in the cache
 
+The revision (W47.ct-truth-revise, from the owner's sheet notes of 2026-11-05), in pool-jpeg/rev2/:
+    python3 ct_truth.py upright                     # Gemini's upright turn for each kept photo (real money); rev2 sample
+    python3 ct_truth.py --rev render | lines        # the photos turned upright, and their Vision lines
+    heavy-run.py run -- <lab venv>/bin/python ct_truth.py --rev collect --model K
+    python3 ct_truth.py --rev gateway               # the readers on the revised fields and prompt
+    python3 ct_truth.py --rev revise                # revised truth, second sheet, segbench-results/ct-truth-revised.md
+    python3 ct_truth.py --rev fold ANSWERS.json     # the second sheet's answers -> rev2/truth.jsonl (W47.ct-read's truth)
+
 <lab venv> is ~/.local/share/visionocr-ocrlab/venv (mlx_vlm 0.7.4). --model is a key of MODELS; both are run.
 
 JPEG originals (W47.ct-truth-jpeg; owner, 2026-10-22 and the 2026-10-29 walkthrough): every image a model or the
@@ -715,6 +723,9 @@ def norm(field, v):
         s = re.sub(r"\b(folder|fol|fld|fd|f)\b\.?\s*(no\.?|#)?", "", s)
     if field == "series" and "series_title" in FIELDS:   # the revision: "Series III" and "III" are one series
         s = re.sub(r"^\s*series\b\.?\s*", "", s)
+    if field == "other":   # several marks joined with "; ": the same marks in another order are the same reading
+        parts = sorted(p for p in (re.sub(r"[^a-z0-9]", "", x.replace("&", "and")) for x in re.split(r"[;\n|]", s)) if p)
+        return "|".join(parts) or None
     s = s.replace("&", "and")
     return re.sub(r"[^a-z0-9]", "", s) or None
 
@@ -1016,7 +1027,8 @@ def revise_rows():
         if ok:
             for f, v in r["agreed"].items():
                 put(f, v, "readers")
-        if fields.get("kind") == "box label" and src.get("folder_title") != "note":
+        if fields.get("kind") == "box label" and src.get("folder_title") != "note" and \
+                not (src.get("folder_title") == "readers" and fields["folder_title"] is None):
             if src.get("folder_title") == "sheet" and fields["folder_title"] is not None:
                 st["sheet rulings of a folder title on a box label, overridden by the rule"] += 1
             fields.pop("folder_title", None)
@@ -1122,6 +1134,15 @@ def write_sheet2(rows):
                             settled="Already settled", dl="W47-ct-truth-revise-answers.json"))
 
 
+def prompt_examples(x):
+    """The fields whose truth value is one of PROMPT_REV's examples. Several examples were taken from the owner's
+    notes ("Box 34", "3/5/57", the 5-9 and 8.5 folder marks...), so the drafters, which read with that prompt, may
+    have copied them: W47.ct-read leaves these fields out when it scores the drafters. Generic examples are included
+    too, the same way."""
+    ex = set(re.findall(r'"([^"]+)"', PROMPT_REV)) | {"Box 5", "9", "Box 8", "5"}
+    return [f for f, v in x["fields"].items() if v and f != "kind" and any(norm(f, v) == norm(f, e) for e in ex)]
+
+
 def write_rev_truth(rows):
     with open(os.path.join(REV, "truth.jsonl"), "w", encoding="utf-8") as fh:
         for x in rows:
@@ -1130,6 +1151,7 @@ def write_rev_truth(rows):
                                  "fields": x["fields"], "src": x["src"], "ruled": ruled,
                                  "open": [d["field"] for d in x["open"]], "unsure": x["unsure"],
                                  "cut_off": x["cut_off"], "drafters": x["drafters"], "notes": x["notes"],
+                                 "prompt_example": prompt_examples(x),
                                  "turn_question": x["turn_question"], "reread": x.get("reread", False),
                                  "complete": not x["open"] and len(x["fields"]) + len(x["unsure"]) == len(FIELDS) + 1},
                                 ensure_ascii=False) + "\n")
@@ -1230,9 +1252,17 @@ def write_rev_results(rows, st):
                      ("rule", "the owner's rules (no folder title on a box label)"),
                      ("readers", "the three readers, unanimous on the revised prompt")):
         L.append(f"| {label} | {srcs[s]} |")
-    L += ["", f"Fields left out of scoring because the owner could not read them: "
+    pe = [f for x in rows for f in prompt_examples(x)]
+    L += ["", f"**Prompt examples.** {len(pe)} settled fields ({sum(x['src'][f] in OWNER for x in rows for f in prompt_examples(x))} "
+          f"of them the owner's) hold a value that is also one of the prompt's examples, and several examples were "
+          f"taken from the owner's notes, so the drafters may have copied them; each truth row lists them as "
+          f"`prompt_example`, and W47.ct-read leaves them out when it scores the drafters. A route W47.ct-read "
+          f"tests reads with invented examples.", "",
+          f"Fields left out of scoring because the owner could not read them: "
           f"{sum(len(x['unsure']) for x in rows)}. Titles the owner marked cut off: "
           f"{sum(len(x['cut_off']) for x in rows)}."]
+    L += ["", "The first build's agreed fields that the owner did not rule, read again on the revised prompt "
+          "(a measure of how much the new fields and rules moved the readers):", ""]
     for k, v in sorted(st.items()):
         L.append(f"- {k}: {v}")
     L += ["", "## Open, per field (the second sheet)", "",
@@ -1259,7 +1289,8 @@ def write_rev_results(rows, st):
           f"checked by {n_ctl} controls on the second sheet). The readers are the truth's drafters: W47.ct-read "
           "scores any of them only on the owner's fields (`ruled`), and reports the rest as agreement (FLD-9). "
           "The note values were transcribed from his notes by this session, field by field; long typed titles go "
-          "back to him on the second sheet to check.",
+          "back to him on the second sheet to check. Fields whose value is a prompt example are marked and not "
+          "scored against the drafters.",
           "- **Selection:** the first build's stratified draw by repository from the Finder tags, less the photos "
           "the owner took out. The pairing cut's lean stands: 54 photos (43 of the 120 Red) were left out at "
           f"correlation under {MIN_CORR}, and the ones checked were true pairs whose PDF was cropped or deskewed, "
