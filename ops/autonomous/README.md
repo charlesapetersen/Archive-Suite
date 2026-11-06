@@ -1469,8 +1469,10 @@ owner to copy it back to its original path, rather than failing or downloading i
 | `enh-dewarp/` (`src`, `hf` moved 5 Nov; the rest) | 1.9 GB left | dewarp bench and model sources, W46.enh-dewarp (shipped) | `images`, `stage`, `lines` once Phase 4 settles whether a dewarped copy is offered |
 | `sherlock-results/` | 0.8 GB | downloaded cluster outputs | each batch once its item is scored and shipped |
 
-Never moved here: `mlx-hf/` (the one model cache, above) and owner session folders. Owner session folders are never
-deleted either.
+Never moved here: `mlx-hf/` (the one model cache, above) and owner session folders. An owner session folder goes to
+the Trash instead, unasked, once its session is filed (the next pack or the fold says so) and nothing open reads it
+(owner, 2026-11-06: "it's fine to delete owner session folders"; `notes-session-1`, 8.5 GB, was the first). Only the
+walkthrough does this; an item session never deletes one.
 
 **A model with no current plans is deleted** (owner, 2026-10-31). The walkthrough moves a model in `mlx-hf/` to the
 Trash, unasked, when no open item and no app source names it and it can be downloaded again by its repo id (a public
