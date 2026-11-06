@@ -9,8 +9,33 @@ route in `../evidence/capture/W40.i-usb-build-cable-e2e.md`). Whenever something
 something wrong, write one line on the form at the end. The next daemon session turns each note into a reproduced
 bug, a design question for you, or a suspect (`../SUSPECTS.md`).
 
-Part A was run on 2026-10-31; the returned form is [`iphone-1-returned.md`](iphone-1-returned.md). Part B waits on
-`W40.fix-processor-after-finish-not-processed`.
+Part A was run on 2026-10-31; the returned form is [`iphone-1-returned.md`](iphone-1-returned.md). Part B waited on
+`W40.fix-processor-after-finish-not-processed`, which shipped on 2026-11-01 with the other fixes Part A found (below).
+
+**Is it time for Part B? Yes (judged 2026-11-06).** Every finding from Part A has a fix that has shipped, and no fix
+for the iPhone app or for Live Capture is open. The queued capture work (reading box and folder labels at capture,
+`W47.ct-processor-capture`, and the rotation default, `W46.rotation-default`) waits on the processing review, so it
+changes none of these tasks soon. The failing Processor UITests on the new macOS 27 VM are the test harness
+(`W40.vm-macos27-harness`), not Live Capture.
+
+**Before Part B, install the app again** (steps 3 and 4 below). The landscape fix is in the phone app, built after
+your install on 2026-10-31, and a free account's install stops opening after seven days. Start the Processor with
+`./launch.sh processor` so it builds the fixed Mac side.
+
+**What Part A's fixes changed, for Part B** (all shipped 2026-11-01):
+- A document shot after a Finish, in the same app run, is now processed and filed
+  (`W40.fix-processor-after-finish-not-processed`). Task 8 checks it.
+- A page shot with the phone held sideways is filed upright: the photo carries its orientation
+  (`W40.fix-ios-landscape-orientation`). Task 8 checks it.
+- A document whose every page failed OCR now fails, with its Retry, instead of being filed as image-only
+  (`W40.fix-processor-failed-ocr-filed-image-only`).
+- A Settings change reaches Live Capture after a Finish or Clear empties the session, without a relaunch
+  (`W40.fix-processor-live-settings-per-run`).
+- A gateway base URL ending in `/chat/completions` is no longer doubled (`W40.fix-processor-gateway-url-doubled`).
+- After a relaunch a waiting document shows its row and Retry at once
+  (`W40.fix-processor-pending-invisible-after-relaunch`).
+- The rotation check no longer hangs a document (`W40.fix-processor-rotation-deadlock`), and a 402 from the OCR
+  provider says the credit is used up rather than "Rate limit exceeded" (`W40.fix-processor-gemini-402-message`).
 
 Prepared by `W40.i5` on 2026-10-22. Rewritten by `W40.i5-usb` on 2026-10-31 for the iPhone cable route
 (`W40.i-usb-mac`, `W40.i-usb-app`, `W40.i-usb-build`), which is now the first way to connect, and for what your
@@ -126,7 +151,9 @@ how much it got in your way**.
   estimate), and whether pages reach the Mac at a normal speed. Tasks 2 to 5 are those checks.
 - **Sending stops while the app is in the background or the phone is locked** (S-023), on the cable and on Wi-Fi
   alike: the app has no background mode. It should carry on by itself once you come back. Tasks 5 and 9.
-- **A photo might be written in the wrong format or the wrong way up** (S-022). Task 6 checks it.
+- **A photo might be written in the wrong format or the wrong way up** (S-022). Task 6 checked it on 2026-10-31:
+  the format was right, and a sideways shot was filed upside down. That half is fixed
+  (`W40.fix-ios-landscape-orientation`) but not yet seen on a phone; task 8 checks it.
 - **A year you give on the phone may keep the day the OCR read** from a different date on the page (S-040). For
   example, a page dated "December 3, 1974" that you tag 1962 may be filed "1962, Day 3". In task 3, look at the
   filed PDF's tags and note whether the day or month is one you did not give.
@@ -184,8 +211,11 @@ the new address. Unplug the cable for this part, so you know the pages are comin
 (`W40.i-sim-ui`): Retry and auto-retry with the Mac stopped, the app sent to the background and closed with pages
 unsent, the Clear and delete dialogs, and Re-pair. What it cannot show is a real network dropping.
 
-8. **Pair over Wi-Fi (5 min).** **Re-pair**, choose **Wi-Fi**, scan the same QR. The phone should say "Connected ·
-   <the Mac's name>", without "cable". Shoot a two-page document and file it. [C-31, C-33, C-35]
+8. **Pair over Wi-Fi (8 min).** **Re-pair**, choose **Wi-Fi**, scan the same QR. The phone should say "Connected ·
+   <the Mac's name>", without "cable". Shoot a two-page document and file it. Then, without quitting the
+   Processor, shoot one more document of two pages, one of them held sideways, and file it too. Is it processed
+   and filed like the first (on 2026-10-31 a document after a Finish never was), and is the sideways page upright
+   in the PDF? [C-31, C-33, C-35; W40.fix-processor-after-finish-not-processed, W40.fix-ios-landscape-orientation]
 9. **Lose the network mid-send (5 min).** Shoot five pages quickly, then at once turn off the phone's Wi-Fi, or
    walk out of range. Turn Wi-Fi back on. Did the pages go across by themselves, and how long after the network came
    back? Nothing should be missing or doubled at the end. [C-39]

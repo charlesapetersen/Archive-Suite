@@ -1,17 +1,18 @@
 # Notes guided session 2
 
-About 40 minutes in Archive Notes, going back over the tasks that drew notes in session 1
+About 45 minutes in Archive Notes, going back over the tasks that drew notes in session 1
 ([`notes-1-returned.md`](notes-1-returned.md)), on a fresh copy of the same 5,000-PDF sample. Work as you would
 on a research day. Whenever something confuses you, feels slow, or gets something wrong, write one line on the
 form at the end. Short notes are enough, and so is "I expected X". The next daemon session turns each note into a
 reproduced bug, a design question for you, or a suspect (`verification/SUSPECTS.md`).
 
-Prepared by `W40.g2-notes-2` on 2026-11-06.
+Prepared by `W40.g2-notes-2` on 2026-11-06. Updated the same afternoon in an interactive session: Notes' Advanced
+Search shipped at 10:05 (`W40.notes-advanced-search`), so it is no longer a known problem and task 5 now tries it.
 
-**Is it time? Yes (judged 2026-11-06).** Every row you filed in session 1 has a fix that has shipped. No Notes fix
-item is open, and the Notes work still queued does not change what these tasks look at: Advanced Search
-(`W40.notes-advanced-search`) waits for the Reader's, and the box and folder in source blocks (`W47.ct-zotero`)
-waits for your sign-off on the containers design. The Reader fixes from your Reader session have shipped too; the
+**Is it time? Yes (judged 2026-11-06, checked again that afternoon).** Every row you filed in session 1 has a fix
+that has shipped. No Notes fix item is open, and the Notes work still queued does not change what these tasks look
+at: the box and folder in source blocks (`W47.ct-zotero`) waits for your sign-off on the containers design, and tag
+rename across the apps (`W40.tag-rename-suite`) starts with a design note. The Reader fixes from your Reader session have shipped too; the
 Reader items still open (the title-bar gradient, scroll position after a relaunch, Advanced Search) are not in
 these tasks. One thing was checked first. A test of the real Reader's page link failed on 2026-11-05. The cause
 was the test: it still looked under Document for a command that has moved to the Edit menu. The test was
@@ -51,10 +52,15 @@ corrected and passed in the VM.
 - Shortcuts were checked across the three apps. In Notes, Choose Archive Folder… is ⇧⌘O as in the Reader, the
   lists moved to ⌥⌘U and ⌥⌘O, Note ▸ Copy Link is ⇧⌘C, and Edit ▸ Find (⌘F) searches the note. The full
   table is in `ArchiveNotes/REFERENCE.md` §Keyboard map. [1, 3]
-- Each app has its own icon: candidate set B, built in until you choose a set (that question is in the Daemon
-  Report, `release/app-icon-candidates.png`). [4]
-- If Notes refuses an archive folder, it now says to open the folder in the Reader and copy one archive link
-  first. [2, 2a]
+- Each app has its own icon: set B, which you chose on 2026-11-06. [4]
+- Choosing a folder in the Reader, or with File ▸ Choose Archive Folder… in Notes, now gives it its archive
+  identity, so Notes no longer asks you to open the folder in the Reader and copy a link first. Notes refuses only
+  a folder it cannot use, such as one it cannot write to, and says why (`W40.root-marker-auto`). [2, 2a]
+- **Advanced Search** (Edit ▸ Advanced Search…, ⇧⌥⌘F, or the Advanced Search button in the filter bar):
+  Finder-style rule rows, as in the Reader. Rules for any text, note text, title, authors, tags (all, any or none
+  of them), kind, quality, date (between, after, before or missing), date uncertain, folder and round-up, with All
+  or Any and nested groups. The form shows a live count. Save as Smart Folder… keeps a search, and Edit Smart
+  Folder… on a smart folder opens it again. [37, 47]
 
 ## Before you start (5 minutes, not counted)
 
@@ -84,8 +90,6 @@ corrected and passed in the VM.
 
 Only those that will stay open for a while:
 
-- **No Advanced Search yet**, so a tag filter cannot ask for "any of these tags". It is `W40.notes-advanced-search`,
-  built on the Reader's design once the Reader's is done. Task 5.
 - **A source block does not show the box and folder its document came from, and there is no Copy for Zotero yet.**
   Both are `W47.ct-zotero`, waiting on the containers design. Tasks 2 and 7.
 - **Small limits of the fixes, left on purpose:**
@@ -97,7 +101,7 @@ Only those that will stay open for a while:
   Tasks 1, 3 and 4.
 - **The Reader** is used here only to read and copy links. Leave notes about the Reader to its own next session.
 
-## The tasks (40 minutes)
+## The tasks (45 minutes)
 
 The minutes are a guide. If one task is going badly, note it and move on. The brackets give session 1's rows and the
 ledger rows each task covers, for the session that files your notes. You don't need them.
@@ -128,10 +132,12 @@ ledger rows each task covers, for the session that files your notes. You don't n
    scratch note, then Edit ▸ Undo. Delete it again and find it in the sidebar's Trash; Put Back. Make a template
    with File ▸ New Template… (choose Notes), rename it in its list, assign it to a folder, and create a note from
    it in that folder: is the new item a note, not an extract? *[rows 30, 31, 34, 35, 38-43; N-26, N-28, N-29]*
-5. **Find it again (5 min).** With five or more notes, narrow the list by a year and a tag. Clear only the year
+5. **Find it again (10 min).** With five or more notes, narrow the list by a year and a tag. Clear only the year
    with its ⓧ, then everything with Clear All. Switch the scope control between All, Notes and Extracts. In
-   View ▸ List Above Note, drag the divider up and down as far as you like. *[rows 36, 37, 45, 47; N-07, N-32,
-   N-50]*
+   View ▸ List Above Note, drag the divider up and down as far as you like. Then open Advanced Search (⇧⌥⌘F) and
+   ask for notes with any of two tags, plus a date rule; watch the count change as you edit. Press Search, then
+   Save as Smart Folder…. Right-click the smart folder ▸ Edit Smart Folder…, change one rule and save. Does the
+   folder show what the rules say? *[rows 36, 37, 45, 47; N-07, N-32, N-50; W40.notes-advanced-search]*
 6. **Shortcuts across the apps (3 min).** Without the mouse: ⌘N, ⌥⌘N, ⇧⌘O, ⌘F in a note, ⇧⌘C (Copy Link),
    ⌥⌘I. Then in the Reader, ⇧⌘O from a document window. Is any key you expected missing or different between
    the two apps? Can you tell the three apps apart by their icons in the Dock? *[rows 1, 3, 4]*
