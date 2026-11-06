@@ -140,62 +140,6 @@ final class LibrarySortFilterTests: XCTestCase {
         XCTAssertEqual(sorted, ["q2", "q3", "none"])  // Q2<Q3 ascending; unrated last
     }
 
-    // MARK: - LibraryFilter.effective (base-scope merge)
-
-    func testEffectiveUserWinsRead() {
-        let base = LibraryFilter(read: .unread)
-        let user = LibraryFilter(read: .read)
-        XCTAssertEqual(LibraryFilter.effective(base: base, user: user).read, .read)
-    }
-
-    func testEffectiveInheritsBaseWhenUserNeutral() {
-        let base = LibraryFilter(qualities: [3], read: .unread, searchText: "memo")
-        let user = LibraryFilter()   // neutral
-        let eff = LibraryFilter.effective(base: base, user: user)
-        XCTAssertEqual(eff.read, .unread)
-        XCTAssertEqual(eff.qualities, [3])
-        XCTAssertEqual(eff.searchText, "memo")
-    }
-
-    func testEffectiveSubjectsUnion() {
-        let base = LibraryFilter(subjects: ["A", "B"])
-        let user = LibraryFilter(subjects: ["B", "C"])
-        XCTAssertEqual(LibraryFilter.effective(base: base, user: user).subjects, ["A", "B", "C"])
-    }
-
-    func testEffectiveSubjectCombineUserWins() {
-        let base = LibraryFilter(subjects: ["A"], subjectCombine: .all)
-        let user = LibraryFilter(subjects: ["B"], subjectCombine: .any)
-        XCTAssertEqual(LibraryFilter.effective(base: base, user: user).subjectCombine, .any)
-    }
-
-    func testEffectiveSubjectCombineInheritsBaseWhenUserEmpty() {
-        let base = LibraryFilter(subjects: ["A"], subjectCombine: .any)
-        let user = LibraryFilter()
-        XCTAssertEqual(LibraryFilter.effective(base: base, user: user).subjectCombine, .any)
-    }
-
-    func testEffectivePathPrefixUserWins() {
-        let base = LibraryFilter(pathPrefix: "/corpus/Brown")
-        let user = LibraryFilter(pathPrefix: "/corpus/Smith")
-        XCTAssertEqual(LibraryFilter.effective(base: base, user: user).pathPrefix, "/corpus/Smith")
-    }
-
-    func testEffectivePathPrefixInheritsBase() {
-        let base = LibraryFilter(pathPrefix: "/corpus/Brown")
-        let user = LibraryFilter()
-        XCTAssertEqual(LibraryFilter.effective(base: base, user: user).pathPrefix, "/corpus/Brown")
-    }
-
-    func testEffectiveNeedsAttentionOR() {
-        let base = LibraryFilter(needsAttentionOnly: true)
-        let user = LibraryFilter()
-        XCTAssertTrue(LibraryFilter.effective(base: base, user: user).needsAttentionOnly)
-        let user2 = LibraryFilter(needsAttentionOnly: true)
-        let base2 = LibraryFilter()
-        XCTAssertTrue(LibraryFilter.effective(base: base2, user: user2).needsAttentionOnly)
-    }
-
     // W40.fix-reader-date-ambiguity (R-47): failed before it — nothing flagged two Years, and no filter found them.
     func testTwoYearsAreFlaggedAndTheAmbiguousDatesFilterFindsThem() {
         let twoYears = file("a", ["Unread", "1980", "Cold War", "1984"])
@@ -209,12 +153,5 @@ final class LibrarySortFilterTests: XCTestCase {
         var f = LibraryFilter(); f.ambiguousDatesOnly = true
         XCTAssertTrue(f.isActive)
         XCTAssertEqual([twoYears, oneYear].filter(f.matches).map(\.name), ["a"])
-        XCTAssertTrue(LibraryFilter.effective(base: f, user: LibraryFilter()).ambiguousDatesOnly)
-        XCTAssertTrue(LibraryFilter.effective(base: LibraryFilter(), user: f).ambiguousDatesOnly)
-    }
-
-    func testEffectiveNeutralBothReturnsNeutral() {
-        let eff = LibraryFilter.effective(base: LibraryFilter(), user: LibraryFilter())
-        XCTAssertFalse(eff.isActive)
     }
 }

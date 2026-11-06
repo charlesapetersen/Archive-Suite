@@ -109,29 +109,6 @@ extension LibraryFilter {
         case (nil, nil): return nil
         }
     }
-
-    /// Fold a user filter onto a base scope for "Save Current Search" / the status summary.
-    /// Per-facet: user wins when set, else inherit the base; subjects = union;
-    /// pathPrefix/searchText = user's if non-empty, else base's; needsAttentionOnly, ambiguousDatesOnly = OR.
-    static func effective(base: LibraryFilter, user: LibraryFilter) -> LibraryFilter {
-        var r = LibraryFilter()
-        r.read = user.read != .all ? user.read : base.read
-        r.qualities = user.qualities.isEmpty ? base.qualities : user.qualities
-        r.subjects = base.subjects.union(user.subjects)
-        r.subjectCombine = user.subjects.isEmpty ? base.subjectCombine : user.subjectCombine
-        let us = user.searchText.trimmingCharacters(in: .whitespaces)
-        r.searchText = us.isEmpty ? base.searchText : user.searchText
-        let up = user.pathPrefix
-        r.pathPrefix = (up == nil || up?.isEmpty == true) ? base.pathPrefix : up
-        r.needsAttentionOnly = base.needsAttentionOnly || user.needsAttentionOnly
-        r.ambiguousDatesOnly = base.ambiguousDatesOnly || user.ambiguousDatesOnly
-        if user.dateRange != nil {
-            r.dateFromYear = user.dateFromYear; r.dateToYear = user.dateToYear
-        } else {
-            r.dateFromYear = base.dateFromYear; r.dateToYear = base.dateToYear
-        }
-        return r
-    }
 }
 
 // MARK: - Sorting

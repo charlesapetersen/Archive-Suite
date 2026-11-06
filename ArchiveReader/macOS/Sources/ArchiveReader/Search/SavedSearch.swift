@@ -1,12 +1,14 @@
 import Foundation
 import Combine
 
-/// A named filter + full-text query the user can recall (a "smart folder").
+/// A named Advanced Search the user can recall (a "smart folder"). Saving the filter bar stores its state as the
+/// equivalent rules (`AdvancedSearch(filter:fullTextQuery:)`), so every smart folder is one rule tree and opens in
+/// the Advanced Search form. Before W40.reader-advanced-search it held a `LibraryFilter` and a Find query; no
+/// migration is written because there is nothing to migrate (owner, 2026-08-01).
 struct SavedSearch: Codable, Identifiable, Equatable, Sendable {
     var id = UUID()
     var name: String
-    var filter: LibraryFilter
-    var fullTextQuery: String
+    var search: AdvancedSearch
 }
 
 /// Persists saved searches in UserDefaults (app data, not the corpus).
@@ -22,12 +24,23 @@ final class SavedSearchStore: ObservableObject {
         load()
     }
 
-    func add(name: String, filter: LibraryFilter, fullTextQuery: String) {
+    /// The new smart folder's id, or nil for a blank name.
+    @discardableResult
+    func add(name: String, search: AdvancedSearch) -> UUID? {
         let trimmed = name.trimmingCharacters(in: .whitespaces)
-        guard !trimmed.isEmpty else { return }
+        guard !trimmed.isEmpty else { return nil }
         // Disambiguate a duplicate name (rather than silently dropping the user's save).
         let unique = uniqueName(trimmed, excluding: nil)
-        searches.append(SavedSearch(name: unique, filter: filter, fullTextQuery: fullTextQuery))
+        let saved = SavedSearch(name: unique, search: search)
+        searches.append(saved)
+        save()
+        return saved.id
+    }
+
+    /// Replace a smart folder's rules (Edit Smart Folder), keeping its name and place.
+    func update(_ id: UUID, search: AdvancedSearch) {
+        guard let i = searches.firstIndex(where: { $0.id == id }), searches[i].search != search else { return }
+        searches[i].search = search
         save()
     }
 
@@ -69,10 +82,16 @@ final class SavedSearchStore: ObservableObject {
     }
 
     private func load() {
+        // One entry at a time: a smart folder in a shape this build cannot read (one saved before the rule
+        // tree) is dropped alone instead of emptying the list.
         if let data = defaults.data(forKey: key),
-           let arr = try? JSONDecoder().decode([SavedSearch].self, from: data) {
-            searches = arr
+           let arr = try? JSONDecoder().decode([Lossy].self, from: data) {
+            searches = arr.compactMap(\.value)
         }
+    }
+    private struct Lossy: Decodable {
+        let value: SavedSearch?
+        init(from decoder: Decoder) throws { value = try? SavedSearch(from: decoder) }
     }
     private func save() {
         if let data = try? JSONEncoder().encode(searches) { defaults.set(data, forKey: key) }

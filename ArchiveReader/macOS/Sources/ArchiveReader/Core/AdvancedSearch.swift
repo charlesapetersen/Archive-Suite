@@ -196,6 +196,14 @@ struct AdvancedSearch: Codable, Equatable, Sendable {
 
     var hasTextRules: Bool { !textRules.isEmpty }
 
+    /// Whether an active rule, groups included, tests `field`.
+    func uses(_ field: RuleField) -> Bool {
+        func walk(_ rules: [SearchRule]) -> Bool {
+            rules.contains { $0.isActive && ($0.field == field || ($0.field == .group && walk($0.children))) }
+        }
+        return walk(rules)
+    }
+
     /// One expression for ranking and snippets: the positive text rules OR-ed. nil when there are none.
     var rankingExpression: String? {
         let parts = textRules.filter { $0.op != .noWords }.compactMap(\.ftsExpression)

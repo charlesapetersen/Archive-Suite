@@ -53,12 +53,8 @@ final class DualDateLibraryTests: XCTestCase {
         XCTAssertTrue(LibraryFilter(dateFromYear: 1900).isActive)
     }
 
-    func testEffectiveFilterAndCodable() throws {
+    func testDateFilterCodable() throws {
         let base = LibraryFilter(dateFromYear: 1950, dateToYear: 1960)
-        XCTAssertEqual(LibraryFilter.effective(base: base, user: LibraryFilter()).dateToYear, 1960)
-        let user = LibraryFilter(dateFromYear: 1970)
-        let eff = LibraryFilter.effective(base: base, user: user)
-        XCTAssertEqual(eff.dateFromYear, 1970); XCTAssertNil(eff.dateToYear)
         let back = try JSONDecoder().decode(LibraryFilter.self, from: JSONEncoder().encode(base))
         XCTAssertEqual(back, base)
         XCTAssertEqual(base.dateYearsSummary, "1950\u{2013}1960")

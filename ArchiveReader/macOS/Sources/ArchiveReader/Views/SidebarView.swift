@@ -29,7 +29,7 @@ struct SidebarView: View {
                     // Badge is tag-facet-only, so hide it for smart folders that also carry an OCR query
                     // (the opened list is a subset — the count would over-state and contradict it).
                     row(name: s.name, systemImage: "folder.badge.gearshape",
-                        count: s.fullTextQuery.isEmpty ? model.smartFolderCounts[s.id] : nil)
+                        count: s.search.hasTextRules ? nil : model.smartFolderCounts[s.id])
                         .tag(SidebarView.smartPrefix + s.id.uuidString)
                         .accessibilityIdentifier("ar.sidebar.smart")
                         .contextMenu {
