@@ -346,12 +346,14 @@ macOS/Sources/ArchiveNotes/
                                    focused field, Return/Escape, no blank names (W40.fix-notes-visual-polish)
     LocationsInspector.swift       Detail-pane "Locations" — every folder the selected item is in, each
                                    a scope shortcut + guarded Remove (replicant→quiet, last→modal) (W6-S5)
-    DateFieldEntry.swift           Pure rules behind NoteMetadataInspector's DATE row (year text +
-                                   month index + day text ⟹ committed string, day-Set enablement, and
-                                   the note shown when a day the chosen month cannot have is dropped) —
-                                   extracted so they are unit-testable without a window (W23.l4). At
-                                   day precision the fields are typed in the item's display calendar
-                                   (when Settings allows) and converted to the ISO day (W24.cal1-validator)
+    DateFieldEntry.swift           Pure rules behind NoteMetadataInspector's date fields: `parse` reads
+                                   one typed date at the precision typed (1960s, 1968, March 1968,
+                                   12 March 1968, 1968-03-12; no picker, no Set/Clear — applied on
+                                   Return or leaving the field, emptied clears; W40.fix-notes-date-entry),
+                                   `commit` composes the written string, and the note shown when a day
+                                   the month cannot have is dropped (W23.l4). An empty date or a whole
+                                   day is typed in the item's display calendar (when Settings allows)
+                                   and converted to the ISO day (W24.cal1-validator)
     NoteTagsInspector.swift        Detail add/remove subjects, retrying the exact failed delta rather
                                    than silently dropping it (W9.b3). The Retry button is per-session view
                                    state (@State failedEdit), gone after a relaunch; what survives is

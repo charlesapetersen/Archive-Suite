@@ -327,7 +327,8 @@ metadata strip, asserts the rendered warning *“February 2026 has 28 days — t
 confirms front matter saves `2026-02` at month precision. It then selects January with the same day and
 confirms `2026-01-31` persists at day precision with no warning. The test ran 1/1 in the off-screen Tart
 VM; the Notes smoke passed 880 Swift Testing checks in 89 suites and 218 XCTest checks. No real Notes
-store or archive corpus was used.
+store or archive corpus was used. *2026-11-05, W40.fix-notes-date-entry:* the precision control and the
+Year/Month/Day fields are gone; the same test now types `31 February 2026` into the one date field.
 
 ## ✅ FIXED (W9.c6) — 100k-note navigation sorting blocked the main actor
 

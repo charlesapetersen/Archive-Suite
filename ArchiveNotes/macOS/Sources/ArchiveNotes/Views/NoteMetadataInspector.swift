@@ -88,7 +88,10 @@ struct NoteMetadataInspector: View {
             seed(from: item)
         }
         // …or when the calendar the fields are typed in changes (the stored date does not).
-        .onChange(of: activeCalendar) { seedDates(from: item) }
+        .onChange(of: activeCalendar) {
+            applyDates()
+            seedDates(from: item)
+        }
         .onChange(of: focusedDate) { old, _ in
             if old == .own { applyDate() }
             if old == .sentWith { applySentWith() }
@@ -243,7 +246,7 @@ struct NoteMetadataInspector: View {
     /// What a typed date field needs to say: why the text cannot be read, why a day is dropped, why a
     /// calendar entry is not saved yet, and which calendar the field is typed in.
     @ViewBuilder private func dateMessages(text: String, calendar: DisplayCalendar, id: String) -> some View {
-        let typed = DateFieldEntry.parse(text, calendar: calendar)
+        let (typed, calendar) = DateFieldEntry.resolve(text, calendar: calendar)
         switch typed {
         case .unreadable(let why):
             Text(why).font(.caption).fixedSize(horizontal: false, vertical: true)
@@ -265,7 +268,8 @@ struct NoteMetadataInspector: View {
         case .empty:
             EmptyView()
         }
-        if let note = Self.entryNote(calendar, active: activeCalendar) {
+        if let note = Self.entryNote(DateFieldEntry.resolve(text, calendar: calendar).calendar,
+                                     active: activeCalendar) {
             Text(note)
                 .font(.caption).foregroundStyle(.primary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -373,7 +377,7 @@ struct NoteMetadataInspector: View {
     /// play. A stored date that is not a whole day is entered in Gregorian even with a calendar chosen.
     private static func entryNote(_ entry: DisplayCalendar, active: DisplayCalendar?) -> String? {
         if entry != .standard {
-            return "Entered in the \(entry.displayName) calendar; only a whole day is stored, as its Gregorian day."
+            return "A whole day is entered in the \(entry.displayName) calendar and stored as its Gregorian day; a year, month or decade is read as Gregorian."
         }
         guard let active, active != .standard else { return nil }
         return "Entered in Gregorian: when selected, the item held no whole day \(active.displayName) can show. Empty the field to enter one in \(active.displayName)."
@@ -387,8 +391,8 @@ struct NoteMetadataInspector: View {
     /// Apply the typed own date to the item it was typed for, if it changed since it was last applied.
     private func applyDate() {
         guard let id = dateApplied.id, dateText != dateApplied.text else { return }
-        let typed = DateFieldEntry.parse(dateText, calendar: entryCalendar)
-        let (value, precision) = DateFieldEntry.commit(typed: typed, calendar: entryCalendar,
+        let (typed, calendar) = DateFieldEntry.resolve(dateText, calendar: entryCalendar)
+        let (value, precision) = DateFieldEntry.commit(typed: typed, calendar: calendar,
                                                        storedDate: dateApplied.stored)
         guard case .write(let date) = value else { return }
         dateApplied.text = dateText
@@ -402,8 +406,8 @@ struct NoteMetadataInspector: View {
     /// The same for the covering letter's date.
     private func applySentWith() {
         guard let id = swApplied.id, swDateText != swApplied.text else { return }
-        let typed = DateFieldEntry.parse(swDateText, calendar: swEntryCalendar)
-        let (value, precision) = DateFieldEntry.commit(typed: typed, calendar: swEntryCalendar,
+        let (typed, calendar) = DateFieldEntry.resolve(swDateText, calendar: swEntryCalendar)
+        let (value, precision) = DateFieldEntry.commit(typed: typed, calendar: calendar,
                                                        storedDate: swApplied.stored)
         guard case .write(let date) = value else { return }
         let hadDate = swApplied.stored != nil

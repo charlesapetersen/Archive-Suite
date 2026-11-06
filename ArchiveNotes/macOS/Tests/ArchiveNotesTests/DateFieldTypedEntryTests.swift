@@ -19,7 +19,8 @@ struct DateFieldTypedEntryTests {
     }
 
     private func written(_ s: String, _ cal: DisplayCalendar = .standard, stored: String? = nil) -> String? {
-        let (value, precision) = DateFieldEntry.commit(typed: parse(s, cal), calendar: cal, storedDate: stored)
+        let (typed, calendar) = DateFieldEntry.resolve(s, calendar: cal)
+        let (value, precision) = DateFieldEntry.commit(typed: typed, calendar: calendar, storedDate: stored)
         guard case .write(let date) = value else { return "keep" }
         return Item.normalizedDate(date, precision: precision).date.map {
             "\($0) \(Item.normalizedDate(date, precision: precision).precision!.rawValue)"
@@ -30,6 +31,7 @@ struct DateFieldTypedEntryTests {
     func precisionDetected() {
         #expect(written("1960s") == "1960 decade")
         #expect(written("1960's") == "1960 decade")
+        #expect(written("1960’s") == "1960 decade")   // the apostrophe smart quotes type
         #expect(written("1968") == "1968 year")
         #expect(written("1968-03") == "1968-03 month")
         #expect(written("March 1968") == "1968-03 month")
@@ -63,7 +65,9 @@ struct DateFieldTypedEntryTests {
     @Test("ambiguous or unreadable text writes nothing")
     func unreadable() {
         for text in ["12/3/1968", "3/12", "March", "March 12", "Smarch 1968", "circa 1968", "1968-13",
-                     "1968-03-00", "0", "ma 1968", "12 March 20", "1968a", "1 2 3 4"] {
+                     "1968-03-00", "0", "ma 1968", "12 March 20", "1968a", "1 2 3 4",
+                     // a year is written in full: 68 could be 1968 or AD 68
+                     "68", "60s", "Mar 68", "March 12, 68", "3/68", "68-3-12"] {
             guard case .unreadable = parse(text) else {
                 Issue.record("\(text) should be unreadable, got \(parse(text))")
                 continue
@@ -96,8 +100,13 @@ struct DateFieldTypedEntryTests {
         #expect(written("29 February 1700", english) == "1700-03-11 day")
         // Retyping the stored day unchanged writes nothing (a pre-1582 leap day is not rewritten).
         #expect(written("1500-02-29", english, stored: "1500-02-29") == "keep")
-        // Anything short of a whole day is not saved under a calendar.
-        #expect(written("1700", english) == "keep")
+        // A calendar applies to whole days only: a year, month or decade is read as Gregorian…
+        #expect(written("1700", english) == "1700 year")
+        #expect(written("March 1700", english) == "1700-03 month")
+        #expect(written("1960s", .hebrew) == "1960 decade")
+        // …while a month that only the calendar names is not saved short of a whole day.
+        let tishri = DisplayCalendar.hebrew.monthName(1, year: 5786) ?? ""
+        #expect(written("\(tishri) 5786", .hebrew) == "keep")
         // An empty date is typed in the item's calendar; its day is shown back in words.
         #expect(DateFieldEntry.seedText(storedDate: nil, precision: nil, active: english).calendar == english)
         let seeded = DateFieldEntry.seedText(storedDate: "1700-03-11", precision: .day, active: english)

@@ -141,7 +141,7 @@ enum DateFieldEntry {
     static func parse(_ text: String, calendar: DisplayCalendar = .standard) -> Typed {
         let raw = text.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         if raw.isEmpty { return .empty }
-        if let m = raw.wholeMatch(of: /(\d+)0\s*'?s/), let y = Int(m.1 + "0"), y > 0 {
+        if let m = raw.wholeMatch(of: /(\d{2,})0\s*['’]?s/), let y = Int(m.1 + "0"), y > 0 {
             return .date(Fields(yearText: String(y), month: 0, dayText: ""), .decade)
         }
         var numbers: [Substring] = []
@@ -157,8 +157,8 @@ enum DateFieldEntry {
         }
         let values = numbers.compactMap { Int($0) }
         guard values.count == numbers.count else { return .unreadable(readHint) }
-        /// A number that can only be a year: three or more digits, or past any day.
-        func isYear(_ i: Int) -> Bool { numbers[i].count >= 3 || values[i] > 31 }
+        /// A year is written in full, with three or more digits: `68` could be 1968 or AD 68.
+        func isYear(_ i: Int) -> Bool { numbers[i].count >= 3 }
         func make(_ y: Int, _ m: Int = 0, _ d: Int? = nil) -> Typed {
             guard y > 0 else { return .unreadable("The year must be 1 or later.") }
             let choices = monthChoices(yearText: String(y), calendar: calendar)
@@ -172,10 +172,11 @@ enum DateFieldEntry {
 
         if words.isEmpty {
             switch values.count {
-            case 1: return make(values[0])
+            case 1 where isYear(0): return make(values[0])
             case 2 where isYear(0): return make(values[0], values[1])
             case 2 where isYear(1) && values[0] >= 1: return make(values[1], values[0])
             case 3 where isYear(0): return make(values[0], values[1], values[2])
+            case 1, 2: return .unreadable("Write the year in full. \(readHint)")
             default: return .unreadable(readHint)
             }
         }
@@ -195,6 +196,19 @@ enum DateFieldEntry {
             return make(values[y], month, values[1 - y])
         default: return .unreadable(readHint)
         }
+    }
+
+    /// The typed text and the calendar it is read in. A calendar applies to whole days only, so text
+    /// that names less than a day (a year, a month, a decade) is read in Gregorian when it can be — the
+    /// way choosing a coarser precision used to switch the fields to Gregorian (W24.cal1-validator).
+    static func resolve(_ text: String, calendar: DisplayCalendar) -> (typed: Typed, calendar: DisplayCalendar) {
+        let typed = parse(text, calendar: calendar)
+        guard calendar != .standard else { return (typed, calendar) }
+        if case .date(_, .day) = typed { return (typed, calendar) }
+        if case .empty = typed { return (typed, calendar) }
+        let gregorian = parse(text)
+        if case .date(_, let p) = gregorian, p != .day { return (gregorian, .standard) }
+        return (typed, calendar)
     }
 
     private static let readHint = "Type a year (1968), a decade (1960s), a month (March 1968) or a day (12 March 1968 or 1968-03-12)."

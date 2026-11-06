@@ -712,14 +712,13 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
   month precision.
 - **Promised in:** `00-overview.md` §3.1, §7; `CLAUDE.md` Impl Map `Item.normalizedDate`, `GregorianDay`,
   `DateFieldEntry`; `SMOKE_TEST.md` step L; `SUITE_TODO_DONE.md` `W23.l4`, `W23.l4-fu`.
-- **Reached by:** inspector Date section (`Views/NoteMetadataInspector.swift:204-283`): the precision segmented
-  control (`:208`, which commits on change, `:505`), the Year/Month/Day fields with Set or Return
-  (`:220-253`), Clear (`:226`), and the "Date uncertain" toggle (`:276`). `commit` (`:472`) composes through
-  `DateFieldEntry.commit` (`Views/DateFieldEntry.swift:159`) and calls `NotesNavigationModel.setDate`
-  (`Core/NotesNavigationModel.swift:203`) → `NotesModel.setDate` (`Core/NotesModel.swift:887`) →
-  `Item.normalizedDate` (`Store/Item.swift:143`) → `mutateItem`. The impossible-day warning is
-  `DateFieldEntry.impossibleDayNote` (`Views/DateFieldEntry.swift:84`), shown at
-  `NoteMetadataInspector.swift:255-262`. The day check is `GregorianDay.isValidDay` (`Store/GregorianDay.swift:40`).
+- **Reached by:** inspector Date section (`Views/NoteMetadataInspector.swift`, `dateSection`): one typed field
+  (`an.detail.date.field`), read at the precision typed by `DateFieldEntry.parse` and applied on Return, on
+  leaving the field, or on a selection change by `applyDate` (W40.fix-notes-date-entry: no precision control,
+  no Set or Clear; an emptied field clears). It composes through `DateFieldEntry.commit(typed:)` and calls
+  `NotesNavigationModel.setDate` → `NotesModel.setDate` → `Item.normalizedDate` (`Store/Item.swift`) →
+  `mutateItem`. The impossible-day warning is `DateFieldEntry.impossibleDayNote`, shown by `dateMessages`.
+  The day check is `GregorianDay.isValidDay` (`Store/GregorianDay.swift:40`).
   The uncertain flag goes through `setDateUncertain` (`Core/NotesModel.swift:896`).
 - **Real-path test:** `ArchiveNotesUITests/NotesGUITests.testDateRowWarnsAndDropsImpossibleDayButKeepsValidMonthEnd`;
   `ArchiveNotesTests/FrontMatterDateWriteTests.impossibleDayDowngrades`; `.uncertainSortsByValue`.
@@ -727,11 +726,9 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
 - **Status:** `unproven`
 - **History:**
   - 2026-10-12 W40.b2 — row written, `unproven`.
-- **Notes:** `W23.l4-fu` names the off-screen UITest for the 2026-02-31 warning. The W9.e2 result named none;
-  the `W9.e2` closing record says a draft "daterow" finding did not reproduce, and the date-row test passed in
-  the `W9.g16-flake` full VM suite. Picking a month in the menu commits at once (`monthBinding`, `:527`), so an
-  impossible day is written straight away at month precision, before Set is pressed. Set stays disabled for
-  that day (`dayFieldCommittable`, `:460`).
+- **Notes:** `W23.l4-fu` names the off-screen UITest for the 2026-02-31 warning; W40.fix-notes-date-entry
+  rewrote it for the typed field (Return applies; February 31 warns and saves the month; a bare year is a
+  year; an emptied field clears).
 
 ### N-20 · A second "sent with" date
 
@@ -740,8 +737,8 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
 - **Promised in:** `CLAUDE.md` Impl Map `NotesFilter` (W37), `FrontMatterCodec` (`additional_dates`);
   `SUITE_TODO_DONE.md` `W37.dual-date`, `W37.dual-date-owner-ok`; `W24.cal1-toggle` (sent-with displays).
 - **Reached by:** inspector "Sent with" section under Date (`Views/NoteMetadataInspector.swift:321-405`):
-  precision control, Year/Month/Day with Set or Return, Clear, and "Sent-with date uncertain". `commitSentWith`
-  (`:479`) → `NotesNavigationModel.setSentWith` (`Core/NotesNavigationModel.swift:218`) →
+  one typed field (`an.detail.sentWith.field`) read like the own date, and "Sent-with date uncertain".
+  `applySentWith` → `NotesNavigationModel.setSentWith` (`Core/NotesNavigationModel.swift:218`) →
   `NotesModel.setSentWith` (`Core/NotesModel.swift:918`), which refuses a year that is not 3–4 digits
   (`:934-937`). The sort fallback is `ItemSummary.sortDate` / `sortsBySentWith` (`Index/NoteIndexRow.swift:106-110`).
   The filter is `NotesFilter.matches` → `dateRange.matchingRoles(item.dateKeysByRole)`
