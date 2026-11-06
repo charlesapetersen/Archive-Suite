@@ -219,7 +219,10 @@ final class FormattingContext: ObservableObject {
         let anchor = SourceAnchor(display: ref.citation ?? ref.itemKey,
                                   zoteroSelect: ref.selectLink)
         guard let coordinator else { return }
-        coordinator.insertBlock(kind: kind, anchor: anchor)
+        // The chip goes in at once with the item key; the citation follows when Zotero answers.
+        let pendingID = ref.citation == nil && zoteroStatus != nil ? UUID().uuidString : nil
+        guard coordinator.insertBlock(kind: kind, anchor: anchor, pendingCitationID: pendingID) else { return }
+        if let pendingID { fetchCitation(for: ref, kind: kind, anchor: anchor, pendingID: pendingID) }
         // The block's debounce is flushed before the command reads it. If the note already had a
         // resolved source, avoid selecting an arbitrary one while the new block is pending.
         if zoteroAutoFillReference == nil {
@@ -229,6 +232,27 @@ final class FormattingContext: ObservableObject {
                                                       noteFrontMatter: false, sourceBlocks: true))
         } else {
             zoteroAutoFillReference = nil
+        }
+    }
+
+    /// W40.fix-notes-zotero-fetch: a block attached here showed the bare item key ("GL2HWVUW") for good,
+    /// because only the inspector's chips fetched a citation. A failure leaves the key and says why.
+    private func fetchCitation(for ref: ZoteroRef, kind: Block.Kind, anchor: SourceAnchor, pendingID: String) {
+        let itemID = currentItemID
+        Task { [weak self, weak coordinator, weak zoteroStatus] in
+            guard let zoteroStatus else { return }
+            do {
+                let citation = try await zoteroStatus.fetchCitation(for: ref)
+                guard !citation.isEmpty, let coordinator else { return }
+                var filled = anchor
+                filled.display = citation
+                coordinator.fillPendingCitation(pendingID: pendingID, kind: kind, anchor: filled, itemID: itemID)
+            } catch is CancellationError {
+                return
+            } catch {
+                self?.notesModel?.statusMessage = "The Zotero link is attached, but its citation could not be "
+                    + "fetched. \(error.localizedDescription)"
+            }
         }
     }
 
@@ -274,6 +298,8 @@ final class FormattingContext: ObservableObject {
                         try await notesModel.applyZoteroAutoFill(resolved, basedOn: item,
                                                                  target: reference.target)
                     })
+            } catch is CancellationError {
+                return
             } catch {
                 // Every client failure is a `ClientError` whose description says what to check.
                 let detail = error.localizedDescription

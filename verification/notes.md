@@ -13,7 +13,7 @@ Format and statuses: [`README.md`](README.md). Written by `W40.b2`, 2026-10-12.
   `W23.m9`/`-fu3`, `W23.m14`/`-fu`, `W37.dual-date`, `W24.cal1`, `W24.cal1-toggle`, `W24.cal1-validator`,
   and the W0–W8 records under §*Archive Notes — NEW APP*.
 - **Sources and code read at:** `9e8959ef`.
-- **Count:** `unproven 38 · works 9 · broken 2 · unreachable 0 · fixed-pending-recheck 3` (works: N-07, N-14, N-34, N-41, N-45, N-49, N-50, N-51, N-52; broken: N-11, N-44; fixed-pending-recheck: N-12, N-16, N-26). Updated by owner session notes-1, 2026-11-05 (N-41 to `works`; N-11, N-12, N-26, N-44 to `broken`); N-16 to `fixed-pending-recheck` by W40.fix-notes-list-rename; N-26 by W40.fix-notes-folder-drag.
+- **Count:** `unproven 38 · works 9 · broken 1 · unreachable 0 · fixed-pending-recheck 4` (works: N-07, N-14, N-34, N-41, N-45, N-49, N-50, N-51, N-52; broken: N-11; fixed-pending-recheck: N-12, N-16, N-26, N-44). Updated by owner session notes-1, 2026-11-05 (N-41 to `works`; N-11, N-12, N-26, N-44 to `broken`); N-16 to `fixed-pending-recheck` by W40.fix-notes-list-rename; N-26 by W40.fix-notes-folder-drag; N-44 by W40.fix-notes-zotero-fetch.
 
 **Runtime evidence, for every row below: none yet.** The W40.a3 full VM suite
 ([`evidence/notes/W40.a3-full-ui.md`](evidence/notes/W40.a3-full-ui.md)) and the `W9.e2` runtime sweep passed
@@ -1392,7 +1392,8 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
 - **History:**
   - 2026-10-12 W40.b2 — row written, `unproven`.
   - 2026-10-15 W40.d10 — real Zotero citation and Open in Zotero shown; stays `unproven`: the clipboard offer and Zotero-not-running were not driven against the real Zotero.
-- **Notes:** **Drift:** the citation fetch, spinner and Retry exist only on the note-level inspector path. A
+  - 2026-11-05 W40.fix-notes-zotero-fetch — stays `unproven`. The owner's session (notes-1 row 50) saw the item key ("GL2HWVUW") on the chip: every fetch failed on his Mac (see N-44), and a block attached through Note ▸ Attach Zotero Link… never fetched at all (the drift below). A block now fetches its citation after it is inserted (`FormattingContext.insertZoteroBlock` → `Coordinator.fillPendingCitation`); a failed inspector chip shows the reason under it (`an.zotero.failure.<key>`). G15 and G16 check both through the DEBUG transport.
+- **Notes:** **Drift (fixed 2026-11-05, kept for the record):** the citation fetch, spinner and Retry exist only on the note-level inspector path. A
   block attached through Note ▸ Attach Zotero Link… (or the clipboard banner's Attach) shows `ref.citation ??
   itemKey` (`Editor/EditorFormatting.swift:217-218`). Nothing fetches a citation for it except Auto-fill (N-44):
   the only callers of `fetchCitation` are `NoteZoteroInspector.swift:74` and `ZoteroStatusModel.swift:71`.
@@ -1424,6 +1425,7 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
   - 2026-10-15 W40.d10 — reproduced against the real Zotero; `broken`, filed `W40.fix-notes-zotero-csljson-crash` (S2).
   - 2026-10-31 W40.fix-notes-zotero-csljson-crash — `broken` → `fixed-pending-recheck`: `ZoteroClient.fetchCSLviaLocalAPI` reads the string holding a CSL array (and an object or array), never hands an unvalidated value to `data(withJSONObject:)`, and `CSLDate` decodes numeric-string date parts; `ZoteroLocalAPIShapeTests` carries Zotero's measured body, the DEBUG UI-test transport answers in that shape, and `testD10_2_AutoFillFromRealZotero` no longer expects the failure. VM: the real-Zotero journey step passed (sheet opened; Apply wrote `date: 1843` and the APA citation).
   - 2026-11-05 owner session notes-1 — `fixed-pending-recheck` → `broken`: Auto-fill from Zotero failed with "ClientError error 0" (`.unavailable`) while Zotero's local API answered 200 from a shell at the same moment ([`sessions/notes-1-returned.md`](sessions/notes-1-returned.md) row 51). Fix item `W40.fix-notes-zotero-fetch`.
+  - 2026-11-05 W40.fix-notes-zotero-fetch — `broken` → `fixed-pending-recheck`. Cause: the probe asked Better BibTeX for `item.search ""` (every item) and then `items?limit=1`, each limited to 1.5 s, which a large library (the owner's: 190 MB, with Better BibTeX) does not meet, and every fetch threw `.unavailable` from that cached verdict without asking for the item. Fetches now ask the local API for the item by key (10 s), fall back to BBT only on a 403/404/unreadable answer, and never consult the probe; the probe is `GET /api/` then BBT `api.ready`. Errors are sentences that say what to check. The sandbox's `network.client` was already in the signed Debug app. VM: `testD10_1` and `testD10_2` passed against the real Zotero 10.0.6. Recheck: Auto-fill and the chip against the owner's own Zotero.
 - **Notes:** `W9.e2-zotero` ran `testG15_AutoFill…` (attach → Cancel writes nothing → Apply writes only the
   accepted date plus the configured-style citation) through the DEBUG in-process transport. There are two
   `testG15_…` tests; this row means the AutoFill one. A citation fetch that fails does not block Auto-fill

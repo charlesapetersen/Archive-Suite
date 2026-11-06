@@ -605,16 +605,40 @@ struct MarkdownEditorView: NSViewRepresentable {
 
         // MARK: Insert block (W4 seam)
 
-        /// Insert a source-block chip at the current caret position.
-        func insertBlock(kind: Block.Kind = .readerPage, anchor: SourceAnchor) {
-            guard let textView, textView.isEditable, !currentIsRaw else { return }
-            let chipStr = MarkdownBridge.buildInsertableBlock(
+        /// Insert a source-block chip at the current caret position. A `pendingCitationID` marks the chip so
+        /// `fillPendingCitation` can later give it the citation fetched for it. Returns whether it was inserted.
+        @discardableResult
+        func insertBlock(kind: Block.Kind = .readerPage, anchor: SourceAnchor,
+                         pendingCitationID: String? = nil) -> Bool {
+            guard let textView, textView.isEditable, !currentIsRaw else { return false }
+            let chipStr = NSMutableAttributedString(attributedString: MarkdownBridge.buildInsertableBlock(
                 kind: kind, anchor: anchor, fontSize: currentFontSize, assetStore: assetStore,
                 onReveal: onRevealBlock, onPreview: onPreviewBlock
-            )
+            ))
+            if let pendingCitationID {
+                chipStr.addAttribute(.notePendingCitationID, value: pendingCitationID,
+                                     range: NSRange(location: 0, length: chipStr.length))
+            }
             textView.undoManager?.beginUndoGrouping()
             textView.insertText(startingALine(chipStr, in: textView), replacementRange: textView.selectedRange())
             textView.undoManager?.endUndoGrouping()
+            scheduleWriteBack()
+            return true
+        }
+
+        /// Give a Zotero chip inserted with a `pendingCitationID` the citation fetched for it
+        /// (W40.fix-notes-zotero-fetch: it showed the bare item key for good). Nothing happens when the user
+        /// deleted the chip, switched notes or went raw while Zotero answered.
+        func fillPendingCitation(pendingID: String, kind: Block.Kind, anchor: SourceAnchor, itemID: UUID?) {
+            guard let textView, let storage = textView.textStorage, !currentIsRaw,
+                  formattingContext?.currentItemID == itemID,
+                  let range = pendingSourceBlockRange(pendingID: pendingID, key: .notePendingCitationID,
+                                                      in: textView) else { return }
+            let replacement = MarkdownBridge.buildInsertableBlock(
+                kind: kind, anchor: anchor, fontSize: currentFontSize, assetStore: assetStore,
+                onReveal: onRevealBlock, onPreview: onPreviewBlock
+            )
+            storage.replaceCharacters(in: range, with: replacement)
             scheduleWriteBack()
         }
 
@@ -787,11 +811,13 @@ struct MarkdownEditorView: NSViewRepresentable {
         /// Locates a pending source block without relying on the current selection. The render task uses
         /// this before importing its asset so deleting the block while it renders leaves neither a late
         /// text mutation nor an orphaned thumbnail asset behind.
-        private func pendingSourceBlockRange(pendingID: String, in textView: EditorTextView) -> NSRange? {
+        private func pendingSourceBlockRange(pendingID: String,
+                                             key: NSAttributedString.Key = .notePendingThumbnailID,
+                                             in textView: EditorTextView) -> NSRange? {
             guard let storage = textView.textStorage, storage.length > 0 else { return nil }
             let fullRange = NSRange(location: 0, length: storage.length)
             var placeholderRange: NSRange?
-            storage.enumerateAttribute(.notePendingThumbnailID, in: fullRange) { value, range, stop in
+            storage.enumerateAttribute(key, in: fullRange) { value, range, stop in
                 if value as? String == pendingID {
                     placeholderRange = range
                     stop.pointee = true

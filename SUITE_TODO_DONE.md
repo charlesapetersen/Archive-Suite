@@ -14540,3 +14540,25 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   <!-- /W40.fix-reader-jpeg-keep-view -->
 - [x] **W46.ent-place-rule-paid — the sending-place rule in the app's tagging prompt and the entity prompt, measured [S]** · §Document processing review — W46 (owner, 2026-10-20) — SHIPPED 2026-11-05. Filed by W46.ent-truth-owner-fold. TagGenerator.generateTags' author_location now adds: "Only a place the document writes (a dateline, a letterhead or an address): null when it writes none, never a place inferred from an institution's name, the collection or the nearby documents" (mirrored in date_tagging.PROMPT and prompts.md; test_ent_place_rule checks the measured line is the shipped one). Measured by `ArchiveProcessor/scripts/segbench/ent_place_rule.py` (report `segbench-results/ent-place-rule.md`): Gemini 3.7 Flash through the gateway, Vision text, the 138 with 40-document reruns, against `ent_truth.load_truth()`. Tagging: places filled where none is written 18 -> 1, wrong places 32 -> 16, place by city 0.83 -> 0.91 (+0.08 [+0.02, +0.14]), full string +0.06 [-0.01, +0.14]; sender and recipient unchanged. Dates hold: 3 of 138 estimated years move (reruns move 1-2 of 40); owner's year right on the 82 74 -> 76, months and Date Uncertain identical. The dedicated entity prompt with the rule ties leaning worse (place -0.04 [-0.11, +0.02]; it already filled only 2 unwritten places), so ENTITY_PROMPT is left unchanged and the wording kept as ent_place_rule.ENTITY_PLACE. ent_prompt_app.prompt_new pins its shipped place line (AUTHOR_LOCATION_BEFORE) so its cached replies still check; every earlier entity report regenerates byte for byte. Spend $1.01 over 356 calls (the gateway's own figure the same; cap $1.50). Processor build clean, no warnings. Bench cache: ent-place-rule/ (replies plus ledger) kept for the report. Not an OCR or segmentation result, so ArchiveOCRBench is unchanged.
   <!-- /W46.ent-place-rule-paid -->
+- [x] **W40.fix-notes-zotero-fetch — Zotero citations and Auto-fill reach a running Zotero [M · S2]** · §W40 — verification phase: prove the Suite works (owner-approved 2026-10-04) · SHIPPED 2026-11-05 (lane: notes) (uses: build)
+  Found by the owner's Notes guided session 1 (`verification/sessions/notes-1-returned.md` rows 50-51; ledger N-44):
+  Auto-fill said "ClientError error 0" (`.unavailable`) and the chip showed the item key while Zotero answered a shell.
+  Cause: the availability probe asked Better BibTeX for `item.search ""` (every item) and then `items?limit=1`, each
+  limited to 1.5 s, and `fetchCSL`/`fetchCitation` threw `.unavailable` from that cached verdict without asking for the
+  item. The owner's Zotero has Better BibTeX and a 190 MB database; the session could not query it, so the timeout is
+  inferred, not measured. The sandbox `network.client` entitlement was already present (checked in the signed Debug
+  app). A second cause of the bare key: a block attached through Note ▸ Attach Zotero Link… never fetched a citation.
+  Fix: a fetch asks the local API for the item by key (10 s) and falls back to BBT only on a 403, 404 or unreadable
+  answer, never on an unreachable or slow Zotero; the probe (`GET /api/`, then BBT `api.ready`, 3 s) is a status signal
+  only and a successful fetch refreshes it; BBT citations use `item.bibliography` with the style URI (`item.export`
+  takes a translator); `ClientError` is a `LocalizedError` (switched off in Notes, unreachable, timed out, local API
+  off, item not found, unreadable), each a sentence naming what to check; a failed inspector chip shows the reason
+  (`an.zotero.failure.<key>`); an attached block is inserted with a pending marker and filled with its citation when
+  Zotero answers (`Coordinator.fillPendingCitation`), and a failure says why on the status line.
+  Tests: unit bundle 1115 green; new `ZoteroClientErrorTextTests`, `fetchSucceedsAfterAFailedProbe`,
+  `probeNeverListsTheLibrary`, `testSilentServerIsTimedOut`, BBT `item.bibliography`. VM: G11, G15 (now also waits for
+  the block's citation), G16 (now checks the failure sentence) green; real Zotero 10.0.6 `testD10_1` and `testD10_2`
+  green. `testD10_3` (the real Reader's Document menu) failed on a menu click at infinite coordinates, outside this item.
+  Ledger: N-44 `fixed-pending-recheck` (recheck against the owner's own Zotero), N-43 history noted. No bench cache used.
+  Commits: 2dddd6fc (checkpoint 1) and this one.
+  <!-- /W40.fix-notes-zotero-fetch -->

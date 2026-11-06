@@ -140,6 +140,20 @@ or code syntax is escaped so it reopens as typed.)
   reserved, so a later paste cannot land under it and make the old reference show a different image. This closes
   residual (a) of the W7-S5 entry below.
 
+## ✅ FIXED (W40.fix-notes-zotero-fetch, 2026-11-05) — Zotero citations and Auto-fill failed against a large, running Zotero
+
+Found by the owner's guided session notes-1: Auto-fill said "ClientError error 0" and the chip showed the item key,
+while Zotero answered a shell. The availability probe (BBT `item.search ""`, which lists every item, then
+`items?limit=1`, 1.5 s each) timed out on a large library, and `fetchCSL`/`fetchCitation` threw `.unavailable` from
+that cached verdict without asking for the item. A block attached through Note ▸ Attach Zotero Link… also never
+fetched a citation at all. Now a fetch asks the local API for the item by key (10 s) and falls back to Better BibTeX
+only on a 403, 404 or unreadable answer; the probe (`GET /api/`, then BBT `api.ready`) is a status signal only; BBT
+citations use `item.bibliography`; every `ClientError` is a sentence that says what to check; an attached block fills
+in its citation when Zotero answers. Tests: `ZoteroClientProbeTests`, `ZoteroClientFetchTests`,
+`ZoteroClientErrorTextTests`, `ZoteroLocalServerTests.testSilentServerIsTimedOut`; G15/G16 in the VM; the real-Zotero
+journey (`testD10_1`, `testD10_2`). Not reproduced here: the owner's own library (the session could not query it), so
+the slow-probe cause is inferred from its size and Better BibTeX, not measured.
+
 ## ✅ FIXED (W40.fix-notes-zotero-csljson-crash, 2026-10-31) — Auto-fill from Zotero crashed against a real Zotero
 
 Found by W40.d10 (2026-10-15): with a real Zotero (10.0.6, local API on, no Better BibTeX), Note ▸ Auto-fill from

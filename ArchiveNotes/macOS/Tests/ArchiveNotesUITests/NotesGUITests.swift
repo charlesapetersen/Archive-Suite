@@ -1839,6 +1839,11 @@ final class NotesGUITests: NotesFixtureUITestCase {
             let raw = rawMarkdown(inItemDir: uuid) ?? ""
             return raw.contains("block: zotero-item") && raw.contains(selectLink)
         }, "Attach Zotero Link must persist a source block before Auto-fill consumes it")
+        // The attached block fetches its own citation; it used to show the bare item key for good
+        // (W40.fix-notes-zotero-fetch). Wait for it, so Cancel below is compared with the settled file.
+        XCTAssertTrue(pollUntil(timeout: 12) {
+            (rawMarkdown(inItemDir: uuid) ?? "").contains("display: \"Citation for archive-notes-ui-test.\"")
+        }, "the attached block should show the citation fetched in the configured style")
         let before = rawMarkdown(inItemDir: uuid) ?? ""
 
         func openAutoFillSheet() {
@@ -1945,6 +1950,11 @@ final class NotesGUITests: NotesFixtureUITestCase {
             XCTAssertTrue(failedChip.waitForExistence(timeout: 8))
             XCTAssertTrue(pollUntil(timeout: 10) { failedChip.value as? String == "Citation unavailable" })
             XCTAssertTrue(app.buttons["an.zotero.retry.FAIL1234"].exists)
+            // The reason is a sentence that says what to check, not an error code (W40.fix-notes-zotero-fetch).
+            let reason = app.staticTexts["an.zotero.failure.FAIL1234"]
+            XCTAssertTrue(reason.waitForExistence(timeout: 5))
+            let reasonText = (reason.value as? String).flatMap { $0.isEmpty ? nil : $0 } ?? reason.label
+            XCTAssertTrue(reasonText.contains("Zotero is running"), "got: \(reasonText)")
             failedChip.click()
             XCTAssertEqual(lastOpenedURL(startingWith: "zotero://select/library/items/FAIL"),
                            "zotero://select/library/items/FAIL1234", "offline links must still open")

@@ -15,6 +15,9 @@ extension NSAttributedString.Key {
     /// It is deliberately presentation-only: the Markdown serializer ignores it, so it can never
     /// become a durable note field.
     static let notePendingThumbnailID = NSAttributedString.Key("an.pendingThumbnailID")
+    /// The same, for a Zotero source block whose citation is still being fetched
+    /// (W40.fix-notes-zotero-fetch). Presentation-only as well.
+    static let notePendingCitationID = NSAttributedString.Key("an.pendingCitationID")
     /// The whitespace the Styler inserts BETWEEN two blocks (Bool). Not the operator's text: the
     /// serializer reads it to tell a paragraph break from a newline someone typed
     /// (`W3.notes-editor-blankline-collapse`).
