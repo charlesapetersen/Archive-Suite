@@ -68,6 +68,60 @@ final class TagWriterPrimitiveTests: XCTestCase {
         XCTAssertTrue(multisetEqual(try readTags(url), ["A", "B", "C"]))
     }
 
+    /// The tag verify must be seen to fire: macOS drops an empty tag name on write, so the re-read
+    /// differs from the intended array and the write throws `.verificationFailed` (W40.e7 mutant C06).
+    func testTagVerifyFailsWhenTheReReadDiffers() throws {
+        let url = try makeFile("verify-tags.pdf", tags: ["A"])
+        XCTAssertThrowsError(try CoordinatedTagWriter.write(url) { current, label in
+            (current + [""], label)
+        }) { error in
+            guard case let TagWriteError.verificationFailed(why) = error else {
+                return XCTFail("expected .verificationFailed, got \(error)")
+            }
+            XCTAssertTrue(why.hasPrefix("tag mismatch"), why)
+        }
+        XCTAssertEqual(try readTags(url), ["A"], "test premise: macOS dropped the empty name")
+    }
+
+    /// The label verify must be seen to fire: macOS stores an out-of-range label (9) as no label, so
+    /// the re-read differs and the write throws `.verificationFailed` (W40.e7 mutant C07).
+    func testLabelVerifyFailsWhenTheReReadDiffers() throws {
+        let url = try makeFile("verify-label.pdf", tags: ["A"])
+        XCTAssertThrowsError(try CoordinatedTagWriter.write(url) { current, _ in
+            (current, 9)
+        }) { error in
+            guard case let TagWriteError.verificationFailed(why) = error else {
+                return XCTFail("expected .verificationFailed, got \(error)")
+            }
+            XCTAssertTrue(why.hasPrefix("label mismatch"), why)
+        }
+        XCTAssertEqual(normalizedLabel(try readLabel(url)), 0, "test premise: macOS did not keep label 9")
+    }
+
+    /// Multiset equality counts duplicates: the verify must not accept a re-read that lost one
+    /// occurrence of a duplicated tag (W40.e7 mutant C12).
+    func testMultisetEqualCountsDuplicates() {
+        XCTAssertFalse(multisetEqual(["A", "A"], ["A"]))
+        XCTAssertFalse(multisetEqual(["A"], ["A", "A"]))
+        XCTAssertTrue(multisetEqual(["B", "A", "A"], ["A", "B", "A"]))
+    }
+
+    // MARK: Removal matching — whole token, never substring
+
+    /// Removing subject "Smith" leaves "Smithson" (the "never substring" promise in `shouldRemoveTag`'s
+    /// doc comment; W40.e7 mutant C11), and through the write primitive as the apps call it.
+    func testRemovingASubjectLeavesALongerOneSharingItsPrefix() throws {
+        XCTAssertTrue(shouldRemoveTag("Smith", matching: "Smith"))
+        XCTAssertFalse(shouldRemoveTag("Smithson", matching: "Smith"))
+        XCTAssertFalse(shouldRemoveTag("Unread later", matching: "Unread"))
+
+        let url = try makeFile("untag-prefix.pdf", tags: ["Smith", "Smithson"])
+        _ = try CoordinatedTagWriter.write(url) { current, label in
+            (current.filter { !shouldRemoveTag($0, matching: "Smith") }, label)
+        }
+        XCTAssertEqual(try readTags(url), ["Smithson"])
+    }
+
     // MARK: §7 Label written only when changed; drift restored
 
     func testLabelPreservedWhenTransformDoesNotChangeIt() throws {
@@ -193,13 +247,28 @@ final class TagWriterPrimitiveTests: XCTestCase {
         XCTAssertTrue(multisetEqual(try readTags(replacement), ["Untouched", "Reviewed"]))
     }
 
-    // NOTE: the "captured file was fully DELETED (nothing at the path)" edge is intentionally NOT
-    // asserted here. NSFileCoordinator's behavior on a vanished path is OS-implementation-defined
-    // (it may recreate the path), so the failure surfaces nondeterministically as .identityMismatch,
-    // .unreadable, .coordinationFailed, or a raw setResourceValue error — all of which prevent a
-    // wrong-file tag, but none reliably. It is not a §6 safety scenario (no *different* file is
-    // present to mis-tag); the existing `testUnreadableFileAborts` already covers ghost-file aborts,
-    // and `testReplacedFileAborts…` covers the dangerous "different file at the same path" case.
+    /// The captured file was DELETED since discovery (nothing at the path) → the §6 check finds no
+    /// identity and aborts with `.identityMismatch`, before the tag read. Asserting the exact case is
+    /// what kills W40.e7's mutant C02 (a nil capture falling back to the expected identity): with the
+    /// check bypassed the write still fails, but later and as `.unreadable`. An earlier note here
+    /// called this case nondeterministic; W40.fix-mut-tagwriter-tests measured it (20 deletions per
+    /// run, every run) and the §6 check runs first, so the coordinator never reaches the path.
+    func testDeletedTargetAbortsWithIdentityMismatch() throws {
+        for i in 0..<20 {
+            let url = try makeFile("id-gone-\(i).pdf", tags: ["Unread"])
+            let identity = try XCTUnwrap(FileIdentity.capture(url))
+            try FileManager.default.removeItem(at: url)
+
+            XCTAssertThrowsError(try CoordinatedTagWriter.write(url, expectedIdentity: identity) { current, label in
+                (current + ["Reviewed"], label)
+            }) { error in
+                guard case TagWriteError.identityMismatch = error else {
+                    return XCTFail("expected .identityMismatch, got \(error)")
+                }
+            }
+            XCTAssertFalse(FileManager.default.fileExists(atPath: url.path), "the aborted write created nothing")
+        }
+    }
 
     /// FileIdentity.capture + matches semantics: same file matches itself (and is symmetric),
     /// distinct files differ, and a nonexistent file yields nil.
