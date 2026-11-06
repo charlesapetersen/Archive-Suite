@@ -68,9 +68,10 @@ public struct SubjectEntryField: NSViewRepresentable {
         public func tokenField(_ tokenField: NSTokenField, completionsForSubstring substring: String,
                         indexOfToken tokenIndex: Int,
                         indexOfSelectedItem selectedIndex: UnsafeMutablePointer<Int>?) -> [Any]? {
-            let found = TagEntry.completions(for: substring, in: parent.suggestions())
-            selectedIndex?.pointee = parent.fillsInAnyCase ? (found.isEmpty ? -1 : 0)
-                                                           : TagEntry.filledInIndex(for: substring, in: found)
+            let subjects = parent.suggestions()
+            let found = TagEntry.completions(for: substring, in: subjects)
+            selectedIndex?.pointee = TagEntry.filledInIndex(for: substring, in: found, among: subjects,
+                                                            anyCase: parent.fillsInAnyCase)
             return found
         }
 

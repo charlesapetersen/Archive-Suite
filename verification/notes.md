@@ -661,24 +661,29 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
   write is retried with the same change, even after relaunch.
 - **Promised in:** `CLAUDE.md` Impl Map `NoteTagsInspector` (W9.b3); `00-overview.md` §3.1, §3.2 (tags are
   whole-note only); `09-gap-closure.md` B3; `SUITE_TODO_DONE.md` `W9.b3`.
-- **Reached by:** select an item, then in the detail inspector's Tags section type into "New tag" and press Add
-  or Return (`Views/NoteTagsInspector.swift:37-43`), or press a tag's minus button (`:23`). `save` (`:62`) calls
+- **Reached by:** select an item, then in the detail inspector's Tags section type into "Add tag…" (ArchiveCore's
+  `SubjectEntryField`, `an.detail.tags.input`; it autocompletes from other notes' tags) and press Return or a
+  comma, or Tab on a suggestion; there is no Add button (W40.fix-notes-tag-entry). Or press a tag's minus button.
+  `enqueue`/`drain` (`Views/NoteTagsInspector.swift`) save the edits in order and call
   `NotesModel.addTag` / `removeTag` (`Core/NotesModel.swift:855`, `:863`) → `mutateItem(projectSubjects: true)`
   (`:1266`) → `NoteStore.withEntry` (`Store/NoteStore.swift:174`), which writes the pending-subjects journal
   before the YAML (`:180-191`) and projects via `projectSubjectTags` → `NotesTagProjector.project`
   (`Core/NotesModel.swift:870-881`). A failed projection shows "Couldn't finish saving tags." with Retry
-  (`Views/NoteTagsInspector.swift:45-50`), which replays the same delta. The section sits in
+  (`Views/NoteTagsInspector.swift`), which replays the same delta. The section sits in
   `NoteMetadataInspector` (`Views/NoteMetadataInspector.swift:70`), placed by `Views/NotesBrowserView.swift:357`.
-- **Real-path test:** `ArchiveNotesUITests/NotesGUITests.testG17_InlineRenameAndInspectorTagsPersist` (add and
-  remove through the inspector; Finder tags read back via `tagNamesKey`);
+- **Real-path test:** `ArchiveNotesUITests/NotesGUITests.testG17_InlineRenameAndInspectorTagsPersist` (two tags
+  added by Return in a row, one by autocomplete and Tab, one removed, through the inspector; Finder tags read back
+  via `tagNamesKey`); `ArchiveNotesTests/NoteTagSuggestionsTests`;
   `ArchiveNotesTests/NotesTagProjectorSafetyTests.subjectProjectionRetry` (failure keeps removal ownership across a
   restart and an identical retry); `.subjectEditsRespectFacets`.
 - **Runtime evidence:** none
 - **Status:** `unproven`
 - **History:**
   - 2026-10-12 W40.b2 — row written, `unproven`.
-- **Notes:** **Drift:** the in-app Retry is per-session view state (`@State failedEdit`,
-  `NoteTagsInspector.swift:11`), so it is gone after a relaunch. What survives a relaunch is the
+  - 2026-11-05 W40.fix-notes-tag-entry — owner session notes-1 row 26 ("Tags don't autocomplete. Pressing return
+    should add them"): the field is now the Reader's shared one; testG17 green in the VM. Status left for notes-2.
+- **Notes:** **Drift:** the in-app Retry is per-session view state (`@State failedEdits` in
+  `NoteTagsInspector.swift`), so it is gone after a relaunch. What survives a relaunch is the
   pending-subjects journal beside the `.md` (`NoteStore.swift:180-206`): the user has to make the same edit
   again, and that edit then still removes the old subjects. Nothing retries automatically. The W9.e2 result
   names `NotesGUITests.testG17_…` (projection read back via `tagNamesKey`). No UITest drives the Retry button.

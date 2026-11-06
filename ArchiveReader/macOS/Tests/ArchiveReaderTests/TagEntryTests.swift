@@ -36,6 +36,21 @@ final class TagEntryTests: XCTestCase {
         XCTAssertEqual(TagEntry.filledInIndex(for: " Civ", in: both), 1, "leading space after a comma is dropped")
     }
 
+    /// W40.fix-notes-tag-entry: `SubjectEntryField` (the Reader's Edit Info field and Notes' tag field) fills
+    /// nothing in over a tag typed in full, so Return adds that tag, not a longer one it is a prefix of.
+    func testAnExistingTagTypedInFullIsNotFilledInWithALongerOne() {
+        let tags = ["Intel", "Intelligence", "civil defence", "Civil War"]
+        for anyCase in [false, true] {
+            let found = TagEntry.completions(for: "intel", in: tags)
+            XCTAssertEqual(found, ["Intelligence"])
+            XCTAssertEqual(TagEntry.filledInIndex(for: "intel", in: found, among: tags, anyCase: anyCase), -1)
+        }
+        let civ = TagEntry.completions(for: "Civ", in: tags)
+        XCTAssertEqual(TagEntry.filledInIndex(for: "Civ", in: civ, among: tags, anyCase: false), 1, "as filledInIndex(for:in:)")
+        XCTAssertEqual(TagEntry.filledInIndex(for: "Civ", in: civ, among: tags, anyCase: true), 0, "any case: the first")
+        XCTAssertEqual(TagEntry.filledInIndex(for: "Zz", in: [], among: tags, anyCase: true), -1)
+    }
+
     func testPendingTextLeavesOutTokens() {
         let tv = NSTextView()
         tv.string = "\u{FFFC}\u{FFFC} Civil W"

@@ -13,7 +13,12 @@ struct NoteTagsInspector: View {
     @ObservedObject var model: NotesModel
     let item: ItemSummary
     @State private var draft = ""
-    private enum Edit: Equatable { case add(String), remove(String) }
+    private enum Edit: Equatable {
+        case add(String), remove(String)
+        var tag: String {
+            switch self { case .add(let t), .remove(let t): NotesTagVocabulary.titleCased(t) }
+        }
+    }
     @State private var pending: [Edit] = []
     @State private var saving = false
     @State private var failedEdits: [Edit] = []
@@ -48,11 +53,7 @@ struct NoteTagsInspector: View {
             if !failedEdits.isEmpty {
                 HStack {
                     Text("Couldn't finish saving tags.").font(.caption).foregroundStyle(.red)
-                    Button("Retry") {
-                        let retry = failedEdits
-                        failedEdits = []
-                        retry.forEach(enqueue)
-                    }
+                    Button("Retry") { failedEdits.forEach(enqueue) }
                     .accessibilityIdentifier("an.detail.tags.retry")
                 }
             }
@@ -74,6 +75,8 @@ struct NoteTagsInspector: View {
 
     private func enqueue(_ edit: Edit) {
         if case .add(let tag) = edit, tag.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return }
+        // A later edit of the same tag supersedes a failed one, so Retry cannot put back a tag removed since.
+        failedEdits.removeAll { $0.tag == edit.tag }
         pending.append(edit)
         drain()
     }

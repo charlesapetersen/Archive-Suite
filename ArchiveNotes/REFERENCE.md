@@ -354,9 +354,12 @@ macOS/Sources/ArchiveNotes/
                                    the month cannot have is dropped (W23.l4). An empty date or a whole
                                    day is typed in the item's display calendar (when Settings allows)
                                    and converted to the ISO day (W24.cal1-validator)
-    NoteTagsInspector.swift        Detail add/remove subjects, retrying the exact failed delta rather
-                                   than silently dropping it (W9.b3). The Retry button is per-session view
-                                   state (@State failedEdit), gone after a relaunch; what survives is
+    NoteTagsInspector.swift        Detail add/remove subjects through ArchiveCore's SubjectEntryField
+                                   (W40.fix-notes-tag-entry): autocompletes from other notes' tags,
+                                   Return/comma add and keep the keyboard, Tab takes the suggestion, no
+                                   Add button; edits queue and save in order. Retries the exact failed
+                                   delta rather than silently dropping it (W9.b3). The Retry button is
+                                   per-session view state (@State failedEdits), gone after a relaunch; what survives is
                                    NoteStore's pending-subjects journal, so the user repeats the edit and
                                    it still removes the old subjects. Nothing retries automatically
     NoteTitleTextField.swift       AppKit inline-title field: Return/Escape/blank semantics and

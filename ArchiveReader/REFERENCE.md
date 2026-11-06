@@ -497,14 +497,16 @@ Views/
                               through TagWriter, so existing tags never lost. Return with text typed
                               writes and keeps the field (W40.fix-reader-tag-entry); while a cell is
                               edited the list holds its rows and snapshot until the edit ends.
-  TagEntry.swift              The tag fields' shared completion lookup (list cell, filter, ⌘I sheet): only
-                              leading space is trimmed, so a typed space ends a completion.
+  (ArchiveCore) TagEntry      The tag fields' shared completion lookup (list cell, filter, ⌘I sheet, Notes'
+                              tag field): only leading space is trimmed, so a typed space ends a completion.
+                              In `packages/ArchiveCore/.../TagEntry/` since W40.fix-notes-tag-entry.
   RenameTagSheet.swift        Corpus-wide tag rename (D1): shows the affected-file count; via TagWriter batch.
   SimilarTagsSheet.swift      Near-duplicate tag finder (TagSimilarity clusters): pick a canonical +
                               Merge drives the corpus-wide rename (→ RenameTagSheet → TagWriter). Advisory only.
   TagEditorView.swift         Group-aware tag editor sheet (⌘I); `targetPaths` = the document window's file.
-  SubjectEntryField.swift     The sheet's add-a-subject token field: autocompletes; Return/comma/Tab add and
-                              the field keeps no tokens; Done adds what is still typed.
+  (ArchiveCore) SubjectEntryField  The sheet's add-a-subject token field, shared with Notes: autocompletes;
+                              Return/comma/Tab add and the field keeps no tokens; Done adds what is still
+                              typed; a tag typed in full is never filled in with a longer one.
   DocumentTagActions.swift    The Tags menu in the document window: the open file, via NavigationModel's
                               TagWriter actions (`paths:`), checks and undo ledger; no write path of its own.
   OptionsView.swift           Settings form (⌘,), @AppStorage (incl. list font size).
@@ -525,6 +527,7 @@ types both apps must interpret *identically* now live in one package instead of 
 (extracted in the W0 refactor, `49c0162`–`b90800f`): `DocumentTags` (tag→facet parser —
 year/month/Day N/decade/quality/read/color/subjects; `sortDate` medieval-safe, `displayDate`,
 `dateIsSpeculative`), `TagReading`/`TagEditing`, `PDFFormatStatus`/`ExtractedContent`, `GeneratedTags`, the
+tag-entry field both apps' tag editors use (`TagEntry`/`SubjectEntryField`, W40.fix-notes-tag-entry), the
 durable-link types (`DurableLink`/`ArchiveLinkPayload`/`RootMarker`), `PDFThumbnailer`/`ThumbnailCacheKey`,
 **The Finder-tag write choke-point is `ArchiveCore.CoordinatedTagWriter`**
 (`Tags/TagWrite.swift`): Reader's `TagWriter` is a thin *delta adapter* over it and Processor's `MacOSTagger`

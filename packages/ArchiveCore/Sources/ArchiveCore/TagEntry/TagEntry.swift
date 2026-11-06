@@ -36,6 +36,18 @@ public enum TagEntry {
         return completions.firstIndex { $0.hasPrefix(s) } ?? -1
     }
 
+    /// The completion `SubjectEntryField` fills in, or -1 for none. Nothing is filled in when what was typed is
+    /// already one of `subjects` (any case): an exact match is never a completion, so "Intel" typed in full showed
+    /// "Intelligence" after the caret, and Return added the longer tag (W40.fix-notes-tag-entry review). With
+    /// `anyCase` the first completion is filled in whatever its case; otherwise as `filledInIndex(for:in:)`.
+    public static func filledInIndex(for substring: String, in completions: [String], among subjects: [String],
+                                     anyCase: Bool) -> Int {
+        guard !completions.isEmpty else { return -1 }
+        let s = typedPrefix(substring)
+        if subjects.contains(where: { $0.caseInsensitiveCompare(s) == .orderedSame }) { return -1 }
+        return anyCase ? 0 : filledInIndex(for: substring, in: completions)
+    }
+
     private static func typedPrefix(_ substring: String) -> String {
         String(substring.drop(while: { $0 == " " || $0 == "\t" }))
     }
