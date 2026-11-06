@@ -14682,3 +14682,13 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   **Docs.** Core Directive's named exception is now "choosing a folder" (Reader CLAUDE.md, README, AGENTS.md, SPEC/tag-format.md, `check-policy-coherence.sh` + `prove-root-marker-policy.sh` pin the new wording), Reader and Notes KNOWN_ISSUES, verification/reader.md + notes.md, notes-2.md setup drops the copy-a-link step. The write-surface lint's allowance is on the one write line in `RootMarker.swift`, which did not change, so it needed no move.
   **Tests.** `RootMarkerDisclosureTests` (choosing writes exactly one file and leaves PDF bytes/tags/mtime unchanged, re-pick and relaunch never rewrite, read-only opens degraded, existing/damaged kept); `ReaderRootChooserTests` (creation, re-pick keeps bytes, notes-store overlap, inside/holding an archive, layout subfolders, read-only, bookmark failure); `ReaderLinkResolverTests` (popover never writes). Reader unit bundle 672 passed (DeepLinkTests skipped as usual); Notes unit bundle 1,145 Swift Testing + 242 XCTest passed; policy coherence, its prove harness and the write-surface lint + self-test green. All scratch folders; no corpus. No VM UITest run: the only visible change is alert text. No bench-cache scratch made.
   <!-- /W40.root-marker-auto -->
+- [x] **W40.suite-app-icons — a distinct new icon for each of the three apps [S-M]** · §W40 (lane: suite) (uses: build) — From the owner's Notes guided session 1, 2026-11-05 (`verification/sessions/notes-1-returned.md`, row 4): "Notes and Reader have the same App icons, which is confusing. We should differentiate, and maybe make new icons for all three apps." Draw candidates that read as one family and apart at Dock size, show them to the owner in the Daemon Report, then build the chosen set into all three apps' asset catalogues.
+  SHIPPED 2026-11-06. Before it, Notes shipped a byte-identical copy of Reader's icon. `release/make-app-icons.swift`
+  draws three candidate sets offscreen (`sheet <out.png>` for the sheet, `install <A|B|C>` from the repo root writes a
+  set into all three macOS `AppIcon.appiconset`s); `release/app-icon-candidates.png` is the sheet the owner judged.
+  Owner's pick (walkthrough 2026-11-06, W40.suite-app-icons-owner-ok): **set B** (Processor a scanned page in a
+  viewfinder, Reader an open book with a ribbon, Notes a page with a quotation mark and a pencil), installed in
+  checkpoint b2ae63ce. Final check: the three 1024 px icons differ (md5), re-running `install B` reproduces the
+  committed files byte for byte, and actool compiles all three catalogues with no warnings or errors. The iOS capture
+  companion's icon is outside this item. No bench-cache scratch was made.
+  <!-- /W40.suite-app-icons -->
