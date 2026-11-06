@@ -333,7 +333,7 @@ struct NotesItemTransactionTests {
         let id = UUID()
         _ = try await env.store.create(Self.blankItem(id: id))
 
-        async let dateEdit: Void = env.model.setDate("1968-04-15", precision: .day, for: id)
+        async let dateEdit: Bool = env.model.setDate("1968-04-15", precision: .day, for: id)
         async let qualityEdit: Void = env.model.setQuality(2, for: id)
         _ = await (dateEdit, qualityEdit)
 

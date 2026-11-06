@@ -21,6 +21,9 @@ final class InspectorPanelUITests: NotesFixtureUITestCase {
             XCTAssertTrue(inside["an.detail.date.field"].exists, "the date is in the inspector")
             XCTAssertTrue(inside["an.detail.locations"].exists, "the locations are in the inspector")
             XCTAssertFalse(inside["an.detail.tags.input"].exists, "the tags are not in the inspector")
+            let scroll = mainWindow.descendants(matching: .any)["an.detail.metadataScroll"].firstMatch
+            XCTAssertTrue(scroll.exists, "the inspector's fields scroll")
+            print("[inspector] metadata scroll is a \(scroll.elementType.rawValue) at \(scroll.frame)")
             XCTAssertTrue(mainWindow.descendants(matching: .any)["an.tagbar"].exists, "the tag bar is under the note")
             XCTAssertFalse(mainWindow.buttons["an.detail.metadataToggle"].exists, "the Details strip is gone")
             let readingRemove = "an.locations.remove.\(Self.folderReading)"
@@ -33,7 +36,8 @@ final class InspectorPanelUITests: NotesFixtureUITestCase {
             XCTAssertTrue(pollUntil(timeout: 10) { inside[ideasRemove].exists && !inside[readingRemove].exists },
                           "the inspector should follow the selection to the Zotero note's location")
 
-            let toggle = mainWindow.buttons["an.inspector.toggle"]
+            // A toolbar item and its button carry the same identifier.
+            let toggle = mainWindow.buttons["an.inspector.toggle"].firstMatch
             XCTAssertTrue(toggle.waitForExistence(timeout: 5), "the toolbar has the inspector button")
             let header = mainWindow.descendants(matching: .any)["an.detail.header"]
             toggle.click()
@@ -86,6 +90,65 @@ final class InspectorPanelUITests: NotesFixtureUITestCase {
             XCTAssertGreaterThanOrEqual(tree.frame.minX, window.minX - 1, "the folder list is inside the window")
             XCTAssertTrue(editor.exists && editor.frame.width > 200, "the note keeps its editor")
             shot("inspector-minimum")
+        }
+    }
+
+    /// Row 7: the list's Date and Tags cells edit in place — a double-click or the row's context menu, Return saves,
+    /// Escape writes nothing, an emptied Date cell clears the date, and removing the tokens removes the tags.
+    func testDateAndTagsEditInTheList() throws {
+        try withFixture {
+            try requireCanonicalScratchFixtureForStoreWrites()
+            let id = Self.idPlain
+            _ = selectItem(uuid: id)
+            @MainActor func markdown() -> String { rawMarkdown(inItemDir: id) ?? "" }
+            @MainActor func saved(_ check: @escaping (String) -> Bool) -> Bool { pollUntil(timeout: 12) { check(markdown()) } }
+            let before = markdown()
+            let dateCell = mainWindow.descendants(matching: .any)["an.cell.date.\(id)"]
+            XCTAssertTrue(dateCell.waitForExistence(timeout: 10), "the list shows the Date column")
+
+            dateCell.doubleClick()
+            app.typeKey("a", modifierFlags: .command)
+            app.typeText("1999")
+            app.typeKey(.escape, modifierFlags: [])
+            RunLoop.current.run(until: Date().addingTimeInterval(1))
+            XCTAssertEqual(markdown(), before, "Escape in the Date cell writes nothing")
+
+            dateCell.doubleClick()
+            app.typeKey("a", modifierFlags: .command)
+            app.typeText("March 1971\r")
+            XCTAssertTrue(saved { $0.contains("date: 1971-03") && $0.contains("date_precision: month") },
+                          "a date typed in the list saves at the precision typed")
+            shot("list-date-edited")
+
+            let tagsCell = mainWindow.descendants(matching: .any)["an.cell.tags.\(id)"]
+            XCTAssertTrue(tagsCell.waitForExistence(timeout: 5), "the list shows the Tags column")
+            tagsCell.doubleClick()
+            let tagsField = mainWindow.descendants(matching: .any)["an.cell.tags.edit.\(id)"]
+            XCTAssertTrue(tagsField.waitForExistence(timeout: 5), "a double-click on Tags opens its field in the cell")
+            app.typeText("list tag\r")
+            XCTAssertTrue(saved { $0.contains("List Tag") }, "a tag typed in the list is added")
+            XCTAssertTrue(pollUntil(timeout: 5) { !tagsField.exists }, "Return closes the cell's tags field")
+
+            tagsCell.rightClick()
+            let editTags = app.menuItems["Edit Tags"]
+            XCTAssertTrue(editTags.waitForExistence(timeout: 5), "the row's menu offers Edit Tags")
+            editTags.click()
+            XCTAssertTrue(tagsField.waitForExistence(timeout: 5))
+            app.typeKey("a", modifierFlags: .command)
+            app.typeKey(.delete, modifierFlags: [])
+            app.typeKey(.return, modifierFlags: [])
+            XCTAssertTrue(saved { !$0.contains("List Tag") }, "removing the tokens in the list removes the tags")
+
+            dateCell.rightClick()
+            let editDate = app.menuItems["Edit Date"]
+            XCTAssertTrue(editDate.waitForExistence(timeout: 5), "the row's menu offers Edit Date")
+            editDate.click()
+            app.typeKey("a", modifierFlags: .command)
+            app.typeKey(.delete, modifierFlags: [])
+            app.typeKey(.return, modifierFlags: [])
+            XCTAssertTrue(saved { !$0.contains("date: 1971") }, "an emptied Date cell clears the date")
+            XCTAssertEqual(markdown().components(separatedBy: "\n---\n").last,
+                           before.components(separatedBy: "\n---\n").last, "the note's body is untouched")
         }
     }
 

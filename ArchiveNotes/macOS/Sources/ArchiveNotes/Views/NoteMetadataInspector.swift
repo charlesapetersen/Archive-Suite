@@ -49,6 +49,15 @@ struct NoteMetadataInspector: View {
         var stored: String?
     }
 
+    private struct StoredDates: Equatable {
+        let date: String?
+        let precision: Item.DatePrecision?
+        let sentWith: ArchiveDate?
+        init(_ item: ItemSummary) {
+            (date, precision, sentWith) = (item.date, item.datePrecision, item.sentWith)
+        }
+    }
+
     private struct SourceLoadKey: Equatable {
         let id: UUID
         let mtime: Double
@@ -90,6 +99,12 @@ struct NoteMetadataInspector: View {
         // …or when the calendar the fields are typed in changes (the stored date does not).
         .onChange(of: activeCalendar) {
             applyDates()
+            seedDates(from: item)
+        }
+        // The list's Date cell edits the same dates (W40.notes-detail-layout): show a date changed there, unless one
+        // of the fields is being typed in or holds text not applied yet, which a reseed would throw away.
+        .onChange(of: StoredDates(item)) {
+            guard focusedDate == nil, dateText == dateApplied.text, swDateText == swApplied.text else { return }
             seedDates(from: item)
         }
         .onChange(of: focusedDate) { old, _ in

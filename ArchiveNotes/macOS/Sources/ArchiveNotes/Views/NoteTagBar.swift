@@ -99,6 +99,21 @@ struct NoteTagBar: View {
         return counts.sorted { $0.value != $1.value ? $0.value > $1.value : $0.key < $1.key }.map(\.key)
     }
 
+    /// What the list's Tags cell does when its tags are edited in place (W40.notes-detail-layout): the tags to add
+    /// and to remove, each once, in the form a save writes them, comparing case-insensitively, so retyping a tag in
+    /// another case changes nothing.
+    static func edits(from edited: [String], current: [String]) -> (add: [String], remove: [String]) {
+        func key(_ t: String) -> String { NotesTagVocabulary.titleCased(t).lowercased() }
+        var seen = Set<String>(), wanted: [String] = []
+        for raw in edited {
+            let tag = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !tag.isEmpty, seen.insert(key(tag)).inserted else { continue }
+            wanted.append(tag)
+        }
+        let have = Set(current.map(key))
+        return (wanted.filter { !have.contains(key($0)) }, current.filter { !seen.contains(key($0)) })
+    }
+
     private func enqueue(_ edit: Edit) {
         if case .add(let tag) = edit, tag.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return }
         // A later edit of the same tag supersedes a failed one, so Retry cannot put back a tag removed since.

@@ -245,7 +245,8 @@ final class NotesNavigationModel: ObservableObject {
 
     /// Set the date + precision for `id`, forwarding to the shared model (§16.1). The metadata inspector
     /// composes the canonical string for the chosen precision; the model normalizes + persists + re-indexes.
-    func setDate(_ date: String?, precision: Item.DatePrecision?, for id: UUID) async {
+    @discardableResult
+    func setDate(_ date: String?, precision: Item.DatePrecision?, for id: UUID) async -> Bool {
         await model.setDate(date, precision: precision, for: id)
     }
 

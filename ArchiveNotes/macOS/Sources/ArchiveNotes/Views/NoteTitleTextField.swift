@@ -2,6 +2,8 @@ import AppKit
 
 /// A table title is a label until an explicit Rename gesture. Commit captures the item identity in
 /// the cell's closure, never a row number that could change under sorting. Escape is a true no-write.
+/// The list's Date cell is one too (W40.notes-detail-layout): `noteTitle` is then the date as typed, and an
+/// emptied field commits, since it clears the date.
 @MainActor
 final class NoteTitleTextField: NSTextField, NSTextFieldDelegate {
     var noteTitle = ""
@@ -19,6 +21,8 @@ final class NoteTitleTextField: NSTextField, NSTextFieldDelegate {
     /// The detail header's title starts an edit on a click; a list cell waits for Return, a double-click
     /// or Rename… (a click there selects the row).
     var beginsOnClick = false
+    /// Whether an emptied field commits (the Date cell, which it clears) rather than putting the text back (a title).
+    var commitsEmpty = false
 
     func beginRename() {
         guard !isRenaming else { return }
@@ -87,7 +91,7 @@ final class NoteTitleTextField: NSTextField, NSTextFieldDelegate {
         isRenaming = false
         isEditable = false
         isSelectable = false
-        if cancelled || title.isEmpty || title == noteTitle {
+        if cancelled || (title.isEmpty && !commitsEmpty) || title == noteTitle {
             attributedStringValue = originalDisplay
         } else {
             let savedDisplay = originalDisplay

@@ -35,10 +35,11 @@ final class StackedLayoutUITests: NotesFixtureUITestCase {
             XCTAssertTrue(editor.waitForExistence(timeout: 10), "the editor should exist")
             XCTAssertTrue(pollUntil(timeout: 10) { self.editorText.contains("A plain note") }, "the note should load")
             // Enough lines that the editor scrolls, then the caret (and the view) at the end.
-            // Short lines: typeText is slow in the VM (60 long lines once took 18 minutes).
-            let filler = (1...30).map { "Filler \($0)." }.joined(separator: "\n")
+            // Short lines: typeText is slow in the VM (60 long lines once took 18 minutes). 55, since the editor got
+            // the whole note pane's height when the fields moved to the inspector (W40.notes-detail-layout): 30 fit.
+            let filler = (1...55).map { "Filler \($0)." }.joined(separator: "\n")
             try typeIntoEditor("\n" + filler)
-            XCTAssertTrue(pollUntil(timeout: 10) { self.bodyContains(id, "Filler 30.") }, "the filler should save")
+            XCTAssertTrue(pollUntil(timeout: 10) { self.bodyContains(id, "Filler 55.") }, "the filler should save")
 
             var expected = [String]()
             for (n, layout) in [Layout.stacked, .sideBySide, .stacked, .sideBySide].enumerated() {

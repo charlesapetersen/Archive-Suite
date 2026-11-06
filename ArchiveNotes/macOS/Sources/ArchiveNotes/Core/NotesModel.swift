@@ -1038,9 +1038,11 @@ final class NotesModel: ObservableObject {
     /// normalized (`Item.normalizedDate`) so the stored string always matches its precision, keeping
     /// `sortDate` correct — decade → `decade * 10_000`; an uncertain date still sorts by its value
     /// (rendered italic), never dumped last.
-    func setDate(_ date: String?, precision: Item.DatePrecision?, for id: UUID) async {
+    /// Returns whether it was saved, so the list's Date cell can put the old date back when it was not.
+    @discardableResult
+    func setDate(_ date: String?, precision: Item.DatePrecision?, for id: UUID) async -> Bool {
         let n = Item.normalizedDate(date, precision: precision)
-        await mutateItem(id, "set the date") { item in
+        return await mutateItem(id, "set the date") { item in
             item.date = n.date
             item.datePrecision = n.precision
         }

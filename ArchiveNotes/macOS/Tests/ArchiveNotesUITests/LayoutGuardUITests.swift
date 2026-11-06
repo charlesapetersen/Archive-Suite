@@ -151,22 +151,24 @@ final class LayoutGuardUITests: NotesFixtureUITestCase {
     }
 
     /// W40.fix-notes-editor-squeezed, then W40.notes-detail-layout: the note's fields are in the inspector at the
-    /// window's right, so the editor takes the note pane between its header and the tag bar. It must be most of the
-    /// pane's height, the tag bar under it; closing the inspector (⌥⌘I) must not take the editor away, and ⌥⌘I
-    /// brings it back.
+    /// window's right, so the editor takes the note pane between its header and the tag bar. It must be usable and
+    /// taller than the header and the tag bar together (stacked, the list above takes its own share), the tag bar
+    /// under it; closing the inspector (⌥⌘I) must not take the editor away, and ⌥⌘I brings it back.
     private func checkEditorShare(_ window: XCUIElement, name: String) {
         let editor = window.scrollViews.containing(.textView, identifier: "an.editor.text").firstMatch
         let inspector = window.descendants(matching: .any)["an.inspector"]
         let tagBar = window.descendants(matching: .any)["an.tagbar"]
-        guard editor.exists, inspector.exists, tagBar.exists else {
+        let header = window.descendants(matching: .any)["an.detail.header"]
+        guard editor.exists, inspector.exists, tagBar.exists, header.exists else {
             XCTFail("\(name): the editor, the inspector and the tag bar should all be shown")
             return
         }
         print("[layout] \(name): editor \(Int(editor.frame.height)) pt, tag bar \(Int(tagBar.frame.height)) pt, " +
               "inspector \(Int(inspector.frame.width)) pt wide, window " +
               "\(Int(window.frame.width))×\(Int(window.frame.height)) pt")
-        XCTAssertGreaterThan(editor.frame.height, window.frame.height * 0.45,
-                             "\(name): the editor should take most of the note pane's height")
+        XCTAssertGreaterThan(editor.frame.height, 100, "\(name): the editor should stay usable")
+        XCTAssertGreaterThan(editor.frame.height, header.frame.height + tagBar.frame.height,
+                             "\(name): the editor should be the larger share of the note pane")
         XCTAssertGreaterThanOrEqual(tagBar.frame.minY, editor.frame.maxY - 1, "\(name): the tag bar should be under the editor")
         XCTAssertGreaterThanOrEqual(inspector.frame.minX, editor.frame.maxX - 1,
                                     "\(name): the inspector should be right of the note")
@@ -184,7 +186,7 @@ final class LayoutGuardUITests: NotesFixtureUITestCase {
     /// Scroll the inspector until `control` is inside it: Locations sits below the fields, under the fold in a short
     /// window.
     private func revealInInspector(_ control: XCUIElement, in window: XCUIElement) {
-        let scroll = window.scrollViews["an.detail.metadataScroll"]
+        let scroll = window.descendants(matching: .any)["an.detail.metadataScroll"].firstMatch
         guard scroll.exists else { return }
         for _ in 0..<10 where !(control.frame.minY >= scroll.frame.minY && control.frame.maxY <= scroll.frame.maxY) {
             scroll.scroll(byDeltaX: 0, deltaY: control.frame.maxY > scroll.frame.maxY ? -60 : 60)
@@ -195,6 +197,7 @@ final class LayoutGuardUITests: NotesFixtureUITestCase {
     /// 1-line status probes drawn behind the panes, and the editor's test-button strip. Not product layout.
     private func isHarness(_ node: LayoutNode) -> Bool {
         node.identifier.hasPrefix("an.status.") || node.identifier.hasPrefix("an.editor.test.")
+            || node.identifier.hasPrefix("an.sidebar.test.")   // the drop-highlight seam, a 2 pt hidden label
     }
 
     private func open(_ id: String, in window: XCUIElement) {

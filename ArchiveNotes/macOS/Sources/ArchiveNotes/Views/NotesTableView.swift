@@ -78,12 +78,20 @@ struct NotesTableView: NSViewRepresentable {
             guard let coordinator else { return nil }
             let menu = coordinator.parent.buildContextMenu(selIDs) ?? NSMenu()
             if selIDs.count == 1, let id = selIDs.first {
-                let rename = NSMenuItem(title: "Rename…", action: #selector(NotesMenuAction.fire), keyEquivalent: "")
-                let action = NotesMenuAction { [weak coordinator] in coordinator?.beginRename(id) }
-                rename.target = action
-                rename.representedObject = action
+                // The title, the date and the tags are edited in the list (W40.notes-detail-layout).
+                let edits: [(String, () -> Void)] = [
+                    ("Rename…", { [weak coordinator] in coordinator?.beginRename(id) }),
+                    ("Edit Date", { [weak coordinator] in coordinator?.beginDateEdit(id) }),
+                    ("Edit Tags", { [weak coordinator] in coordinator?.beginTagsEdit(id) }),
+                ]
                 menu.insertItem(.separator(), at: 0)
-                menu.insertItem(rename, at: 0)
+                for (title, perform) in edits.reversed() {
+                    let item = NSMenuItem(title: title, action: #selector(NotesMenuAction.fire), keyEquivalent: "")
+                    let action = NotesMenuAction(perform)
+                    item.target = action
+                    item.representedObject = action
+                    menu.insertItem(item, at: 0)
+                }
             }
             return menu
         }
@@ -156,7 +164,7 @@ struct NotesTableView: NSViewRepresentable {
         coordinator.parent = self
         // A body autosave or another window's update must not replace the field editor mid-draft.
         // Keep the old generation until editing ends, then apply the latest model snapshot once.
-        if coordinator.editingTitle?.isRenaming == true { return }
+        if coordinator.editingTitle?.isRenaming == true || coordinator.editingTags != nil { return }
 
         // Only rebuild the O(N) lookup + diff the snapshot when `displayed` actually changed.
         let gen = model.displayedGeneration
@@ -221,7 +229,11 @@ struct NotesTableView: NSViewRepresentable {
         var displayedByID: [UUID: ItemSummary] = [:]
         var lastDisplayedGeneration = -1
         var currentSnapshotIDs: [UUID] = []
+        /// The title or date field being edited in a row, if any.
         weak var editingTitle: NoteTitleTextField?
+        /// The tags field laid over a row's Tags cell while its tags are edited, and the item it edits.
+        var editingTags: NoteTagsCellField?
+        var editingTagsItemID: UUID?
 
         init(_ parent: NotesTableView) { self.parent = parent }
 
@@ -271,7 +283,7 @@ struct NotesTableView: NSViewRepresentable {
             } else {
                 cell = colID == "title" ? NotesTitleCellView() : NSTableCellView()
                 cell.identifier = cellID
-                let tf = colID == "title"
+                let tf = colID == "title" || colID == "date"
                     ? NoteTitleTextField(labelWithString: "") : NSTextField(labelWithString: "")
                 tf.translatesAutoresizingMaskIntoConstraints = false
                 tf.lineBreakMode = .byTruncatingMiddle
@@ -347,6 +359,7 @@ struct NotesTableView: NSViewRepresentable {
                     tf.font = NSFontManager.shared.convert(regularFont, toHaveTrait: .italicFontMask)
                 }
                 tf.setAccessibilityIdentifier("an.cell.date.\(item.id.uuidString)")
+                if let dateField = tf as? NoteTitleTextField { configureDateField(dateField, for: item) }
 
             case "sources":
                 // Distinct source notes for a segmented extract; blank for notes / source-less
@@ -362,6 +375,10 @@ struct NotesTableView: NSViewRepresentable {
                 tf.textColor = .labelColor
                 tf.setAccessibilityIdentifier("an.cell.tags.\(item.id.uuidString)")
                 tf.setAccessibilityLabel(item.displayTags.isEmpty ? "No tags" : nil)
+                // A recycled cell still holding another row's tags field: end that edit, which saves to its own item.
+                if let editing = editingTags, editing.superview === cell, editingTagsItemID != item.id {
+                    tableView.window?.makeFirstResponder(tableView)
+                }
 
             default:
                 tf.stringValue = ""
@@ -449,6 +466,15 @@ struct NotesTableView: NSViewRepresentable {
 
         @objc func tableViewDoubleClicked(_ sender: Any?) {
             guard let tableView, tableView.clickedRow >= 0 else { return }
+            // A double-click on the Date or Tags cell edits it there (W40.notes-detail-layout); elsewhere it renames.
+            if tableView.clickedColumn >= 0, currentSnapshotIDs.indices.contains(tableView.clickedRow) {
+                let id = currentSnapshotIDs[tableView.clickedRow]
+                switch tableView.tableColumns[tableView.clickedColumn].identifier.rawValue {
+                case "date": beginDateEdit(id); return
+                case "tags": beginTagsEdit(id); return
+                default: break
+                }
+            }
             if !renameSelection() { parent.onDoubleClick() }
         }
 
@@ -468,6 +494,101 @@ struct NotesTableView: NSViewRepresentable {
             tableView.scrollRowToVisible(row)
             let cell = tableView.view(atColumn: column, row: row, makeIfNecessary: true) as? NSTableCellView
             (cell?.textField as? NoteTitleTextField)?.beginRename()
+        }
+
+        // MARK: Date and tags edited in the list (W40.notes-detail-layout)
+
+        /// The Date cell's field: the date as the inspector's field shows it, typed over with the same rules
+        /// (`DateFieldEntry.listEdit`); an emptied cell clears the date, refused text is said in the status line.
+        private func configureDateField(_ field: NoteTitleTextField, for item: ItemSummary) {
+            let seed = DateFieldEntry.listSeed(storedDate: item.date, precision: item.datePrecision,
+                                               active: item.activeCalendar(calendarsEnabled: parent.calendarsEnabled))
+            field.noteTitle = seed.text
+            field.itemID = item.id
+            field.commitsEmpty = true
+            field.toolTip = "Double-click to edit the date"
+            field.onBegin = { [weak self, weak field] in self?.editingTitle = field }
+            field.onEnd = { [weak self] in
+                self?.editingTitle = nil
+                self?.parent.model.objectWillChange.send()
+            }
+            let id = item.id, stored = item.date
+            field.onCommit = { [weak self] text, completion in
+                guard let nav = self?.parent.model else { completion(false); return }
+                switch DateFieldEntry.listEdit(text, seed: seed.text, calendar: seed.calendar, storedDate: stored) {
+                case .unchanged:
+                    completion(false)
+                case .refused(let message):
+                    nav.model.statusMessage = "Date not changed. \(message)"
+                    NSSound.beep()
+                    completion(false)
+                case let .write(date, precision, note):
+                    Task { @MainActor in
+                        let saved = await nav.setDate(date, precision: precision, for: id)
+                        if saved, let note { nav.model.statusMessage = note }
+                        completion(saved)
+                    }
+                }
+            }
+        }
+
+        private func cell(column columnID: String, item id: UUID) -> NSTableCellView? {
+            guard let tableView, let row = currentSnapshotIDs.firstIndex(of: id),
+                  let column = tableView.tableColumns.firstIndex(where: { $0.identifier.rawValue == columnID }),
+                  !tableView.tableColumns[column].isHidden else { return nil }
+            tableView.scrollRowToVisible(row)
+            tableView.scrollColumnToVisible(column)
+            return tableView.view(atColumn: column, row: row, makeIfNecessary: true) as? NSTableCellView
+        }
+
+        func beginDateEdit(_ id: UUID) {
+            guard let field = cell(column: "date", item: id)?.textField as? NoteTitleTextField else { NSSound.beep(); return }
+            field.beginRename()
+        }
+
+        /// Lays a tags field over the item's Tags cell and gives it the keyboard; it saves the edited tags as adds and
+        /// removes (`NoteTagBar.edits`), one at a time, to the item it began on.
+        func beginTagsEdit(_ id: UUID) {
+            guard editingTags == nil, let item = displayedByID[id],
+                  let cell = cell(column: "tags", item: id) else { NSSound.beep(); return }
+            let model = parent.model.model
+            let field = NoteTagsCellField(
+                tags: item.managedTags,
+                suggestions: { NoteTagBar.suggestions(for: item, in: model.allItems) },
+                onCommit: { edited in
+                    let (add, remove) = NoteTagBar.edits(from: edited, current: item.managedTags)
+                    Task { @MainActor in
+                        var saved = true
+                        for tag in remove { saved = await model.removeTag(tag, from: id) && saved }
+                        for tag in add { saved = await model.addTag(tag, to: id) && saved }
+                        if !saved { model.statusMessage = "Some tags of “\(item.title)” could not be saved." }
+                    }
+                },
+                onEnd: { [weak self, weak cell] in
+                    DispatchQueue.main.async {
+                        guard let self else { return }
+                        self.editingTags?.removeFromSuperview()
+                        self.editingTags = nil
+                        self.editingTagsItemID = nil
+                        cell?.textField?.isHidden = false
+                        self.parent.model.objectWillChange.send()
+                    }
+                })
+            field.setAccessibilityIdentifier("an.cell.tags.edit.\(id.uuidString)")
+            field.frame = cell.bounds.insetBy(dx: 1, dy: 1)
+            field.autoresizingMask = [.width, .height]
+            cell.addSubview(field)
+            cell.textField?.isHidden = true
+            editingTags = field
+            editingTagsItemID = id
+            // A field that cannot take the keyboard would never end, and the list would stay frozen.
+            if cell.window?.makeFirstResponder(field) != true {
+                field.removeFromSuperview()
+                cell.textField?.isHidden = false
+                editingTags = nil
+                editingTagsItemID = nil
+                NSSound.beep()
+            }
         }
     }
 }

@@ -339,4 +339,39 @@ enum DateFieldEntry {
         let s = seed(storedDate: storedDate, active: active, precision: storedDate == nil ? .day : (precision ?? .year))
         return (text(s.fields, precision: precision, calendar: s.calendar), s.calendar)
     }
+
+    // MARK: The list's Date cell (W40.notes-detail-layout)
+
+    /// What a date typed into the list's Date cell does: the inspector's field rules, in one step.
+    enum ListEdit: Equatable {
+        /// Write `date` (nil clears it) at `precision`; `note` says what was dropped, as the inspector's line does.
+        case write(String?, Item.DatePrecision?, note: String?)
+        /// Nothing to write: the text is the stored date's own.
+        case unchanged
+        /// Nothing written; the message says what to type.
+        case refused(String)
+    }
+
+    /// The text the list's Date cell edits, in the calendar it is typed in.
+    static func listSeed(storedDate: String?, precision: Item.DatePrecision?,
+                         active: DisplayCalendar?) -> (text: String, calendar: DisplayCalendar) {
+        seedText(storedDate: storedDate, precision: precision, active: active)
+    }
+
+    /// Read `text` typed over `seed` (the cell's starting text, typed in `calendar`) for an item whose date is
+    /// `storedDate`. An emptied cell clears the date; text the inspector would refuse is refused with its message.
+    static func listEdit(_ text: String, seed: String, calendar: DisplayCalendar, storedDate: String?) -> ListEdit {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed != seed.trimmingCharacters(in: .whitespacesAndNewlines) else { return .unchanged }
+        let (typed, resolved) = resolve(trimmed, calendar: calendar)
+        if case .unreadable(let message) = typed { return .refused(message) }
+        let (value, precision) = commit(typed: typed, calendar: resolved, storedDate: storedDate)
+        guard case .write(let date) = value else { return .unchanged }
+        if date == nil, storedDate == nil { return .unchanged }   // emptying an empty date is not an edit
+        var note: String?
+        if case .date(let f, _) = typed {
+            note = impossibleDayNote(yearText: f.yearText, month: f.month, dayText: f.dayText, calendar: resolved)
+        }
+        return .write(date, precision, note: note)
+    }
 }

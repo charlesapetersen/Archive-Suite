@@ -368,7 +368,8 @@ class NotesFixtureUITestCase: XCTestCase {
         return condition()
     }
 
-    /// Scroll `an.detail.metadataScroll` until `element` lies wholly inside its visible area (W35.vm-mem-fu1).
+    /// Scroll `an.detail.metadataScroll` (the inspector's scroll area, W40.notes-detail-layout) until `element` lies
+    /// wholly inside its visible area (W35.vm-mem-fu1).
     /// In the VM's window the day row sits below the pane's fold, so a click there landed outside the
     /// field and the year field kept keyboard focus ("Neither element nor any descendant has keyboard focus").
     /// An element half under the fold still reports hittable, but its centre, where `click()` lands, is
@@ -376,7 +377,7 @@ class NotesFixtureUITestCase: XCTestCase {
     /// (W40.fix-notes-extract-authors-clear). Pass `window` for a window other than the note window.
     func revealInMetadataScroll(_ element: XCUIElement, in window: XCUIElement? = nil,
                                 file: StaticString = #filePath, line: UInt = #line) {
-        let scroll = (window ?? mainWindow).scrollViews["an.detail.metadataScroll"]
+        let scroll = (window ?? mainWindow).descendants(matching: .any)["an.detail.metadataScroll"].firstMatch
         guard scroll.exists else { return }
         for _ in 0..<10 {
             let clip = scroll.frame, frame = element.frame
@@ -1530,6 +1531,7 @@ final class NotesGUITests: NotesFixtureUITestCase {
         XCTAssertTrue(remove.waitForExistence(timeout: 10), "Locations ▸ Remove should be present")
 
         // --- Cancel leg: the confirmation must appear, and cancelling must NOT delete the note. ---
+        revealInMetadataScroll(remove)   // Locations sits low in the inspector (W40.notes-detail-layout)
         _ = pollUntil(timeout: 8) { app.activate(); return remove.isHittable }
         remove.click()
         let cancel = app.descendants(matching: .any)["an.dialog.deleteLastInstance.cancel"]
@@ -1544,6 +1546,7 @@ final class NotesGUITests: NotesFixtureUITestCase {
         // --- Confirm leg: Delete moves the note out of items/ (to the Trash) + drops the membership. ---
         let remove2 = app.descendants(matching: .any)["an.locations.remove.\(Self.folderIdeas)"]
         XCTAssertTrue(remove2.waitForExistence(timeout: 8), "Remove should still be present after Cancel")
+        revealInMetadataScroll(remove2)
         _ = pollUntil(timeout: 8) { app.activate(); return remove2.isHittable }
         remove2.click()
         let confirm = app.descendants(matching: .any)["an.dialog.deleteLastInstance.confirm"]
@@ -1603,6 +1606,7 @@ final class NotesGUITests: NotesFixtureUITestCase {
         selectItem(uuid: Self.idReader)
         let ideasRemove = noteWin.descendants(matching: .any)["an.locations.remove.\(Self.folderIdeas)"]
         XCTAssertTrue(ideasRemove.waitForExistence(timeout: 10), "the Ideas membership remove control should exist")
+        revealInMetadataScroll(ideasRemove, in: noteWin)   // Locations sits low in the inspector
         _ = pollUntil(timeout: 8) { app.activate(); return ideasRemove.isHittable }
         XCTAssertTrue(ideasRemove.isHittable, "the Ideas remove control should be hittable")
         ideasRemove.click()
@@ -1615,6 +1619,7 @@ final class NotesGUITests: NotesFixtureUITestCase {
 
         let readingRemove = noteWin.descendants(matching: .any)["an.locations.remove.\(Self.folderReading)"]
         XCTAssertTrue(readingRemove.waitForExistence(timeout: 10), "the remaining Reading remove control should exist")
+        revealInMetadataScroll(readingRemove, in: noteWin)
         _ = pollUntil(timeout: 8) { app.activate(); return readingRemove.isHittable }
         XCTAssertTrue(readingRemove.isHittable, "the Reading remove control should be hittable")
         readingRemove.click()
@@ -1894,7 +1899,7 @@ final class NotesGUITests: NotesFixtureUITestCase {
             let input = app.textFields["an.zotero.note.link"]
             let attach = app.buttons["an.zotero.note.attach"]
             XCTAssertTrue(input.waitForExistence(timeout: 5))
-            mainWindow.scrollViews["an.detail.metadataScroll"].scroll(byDeltaX: 0, deltaY: -600)
+            mainWindow.descendants(matching: .any)["an.detail.metadataScroll"].firstMatch.scroll(byDeltaX: 0, deltaY: -600)
             let editorBefore = editor.value as? String
             input.click()
             input.typeText(link)
@@ -1928,7 +1933,7 @@ final class NotesGUITests: NotesFixtureUITestCase {
             XCTAssertTrue(banner.waitForNonExistence(timeout: 8))
             XCTAssertTrue(chip.waitForExistence(timeout: 8), "the persisted chip must survive selection changes")
 
-            mainWindow.scrollViews["an.detail.metadataScroll"].scroll(byDeltaX: 0, deltaY: -600)
+            mainWindow.descendants(matching: .any)["an.detail.metadataScroll"].firstMatch.scroll(byDeltaX: 0, deltaY: -600)
             input.click()
             input.typeText("zotero://select/library/items/FAIL1234")
             XCTAssertEqual(input.value as? String, "zotero://select/library/items/FAIL1234")
