@@ -1458,7 +1458,8 @@ after W40.fts-snippet-sample-rerun shipped, and from Vision OCR `testdocs` and t
 in a `vision-ocr` folder with its own `MOVED-2026-10-31-vision-ocr.md`; 5 Nov: `enh-ocr-input/stage`, `weights` and
 `src` and `ent-robust/g17`, 8.3 GB, with `MOVED-2026-11-05.md`, then `enh-dewarp/src` and `hf`, 2.2 GB, with
 `MOVED-2026-11-05-b.md`; then `enh-ocr-input/images`, `lines` and `lines-jobs.tsv` and `sherlock-results/`
-`enh-ocr-input-20261022` and `ent-robust-20261029`, 0.8 GB, with `MOVED-2026-11-05-c.md`). The walkthrough moves what is
+`enh-ocr-input-20261022` and `ent-robust-20261029`, 0.8 GB, with `MOVED-2026-11-05-c.md`; then `mixed-def/pages`, 1.8 GB, with
+`MOVED-2026-11-05-d.md`, after W46.mixed-route-bands shipped). The walkthrough moves what is
 movable now (`~/Claude/CLAUDE.md`, "The walkthrough", step 7). Sessions cannot
 read OneDrive (macOS blocks `~/Library/CloudStorage`), so an item that needs a moved folder reports it and asks the
 owner to copy it back to its original path, rather than failing or downloading it again. Sizes 29 Oct; each when nothing open reads it:
@@ -1467,7 +1468,6 @@ owner to copy it back to its original path, rather than failing or downloading i
 |---|---|---|---|
 | `enh-dewarp/` (`src`, `hf` moved 5 Nov; the rest) | 1.9 GB left | dewarp bench and model sources, W46.enh-dewarp (shipped) | `images`, `stage`, `lines` once Phase 4 settles whether a dewarped copy is offered |
 | `sherlock-results/` | 0.8 GB | downloaded cluster outputs | each batch once its item is scored and shipped |
-| `mixed-def/pages` | 1.8 GB | mixed-page set renders | after W46.mixed-route-bands |
 
 Never moved here: `mlx-hf/` (the one model cache, above) and owner session folders. Owner session folders are never
 deleted either.
