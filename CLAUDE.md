@@ -341,7 +341,10 @@ the owner answers (truth checks, rulings, label or field disputes) has three thi
   note on its truth row, and the session that scores reads the notes first, since a note can correct what was not
   asked or say an item should be dropped.
 - **The fields it does not ask**, listed on each item with the value going into the truth (agreed by the readers, or
-  ruled by a reader), so the owner can correct one in the notes. The header says that unasked fields go in as listed.
+  ruled by a reader), so the owner can correct one in the notes. That means every truth the item has, not only the
+  one being asked: on a letter, the sender, recipient and date from the entity and date truths as well as the item
+  fields. The item-field sheet listed only its own fields, and the owner's notes asked of many letters "did we get the
+  date, the sender, the recipient?" (2026-11-05). The header says that unasked fields go in as listed.
 - **Pages and photos upright.** Matching a JPEG to its PDF page's orientation does not make it upright. Check each
   image with `segbench/ocr_orient.swift` (Apple Vision at all four turns), turn only clear wins, check close calls
   by eye, and give every image a "turn" button that turns its boxes with it. The sheet says which pages it turned.
