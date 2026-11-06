@@ -678,6 +678,30 @@ packages/ArchiveCore/              Shared read-side contract — see root CLAUDE
 The map grows with each wave (W2 storage, W3 editor, W4 linking, W5 Zotero, W6 viewers,
 W7 extracts, W8 tests).
 
+## §Keyboard map (the menu bar — `ArchiveNotesCommands.swift`; checked by `MenuShortcutTests`)
+
+Audited across the suite by `W40.fix-suite-shortcuts` (2026-11-06); the shared table, with the keys each command has
+in the Reader and the Processor, is in `ArchiveReader/REFERENCE.md` §Keyboard map, *Across the suite*.
+
+| Menu | Command | Key |
+|---|---|---|
+| File | New Note · New Extract · New Template… | `⌘N` · `⌥⌘N` · — |
+| File | Choose Archive Folder… · Choose Store Folder… | `⇧⌘O` (the Reader's key) · — |
+| Edit | Paste as Source Block(s) | `⇧⌘V` |
+| Edit | Find ▸ Find… · Find Next · Find Previous · Use Selection for Find (the Mac's own, `TextEditingCommands`; the editor's find bar) | `⌘F` · `⌘G` · `⇧⌘G` · `⌘E` |
+| View | Show/Hide Inspector · Layout (Side by Side / List Above Note) | `⌥⌘I` (`⌘I` is Italic) · — |
+| Format | Bold · Italic · Inline Code · Link… | `⌘B` · `⌘I` · `⌥⌘C` · `⌘K` |
+| Format | Body · Heading 1–6 | `⌥⌘0` · `⌥⌘1`–`⌥⌘6` |
+| Format | Bulleted List · Numbered List · Blockquote · Code Block | `⌥⌘U` · `⌥⌘O` · `⌥⌘Q` · `⌥⌘K` |
+| Note | Copy Link · Attach Zotero Link… · Auto-fill from Zotero… | `⇧⌘C` (the Reader's Copy Link(s)) · — · — |
+| Extract | Create Extract · Append to Extract… | `⌥⌘E` · — |
+
+- Not in the menu bar: `⌘/` switches the editor (and the template editor) between styled and raw Markdown, from the
+  button above it. The list's context menu (Open, Reveal in Finder, Copy Link, folders, Set Quality, Delete…) has no keys.
+- Changed by `W40.fix-suite-shortcuts`: the lists were `⇧⌘U`/`⇧⌘O`, and ⇧⌘O is Choose Archive Folder… in every app
+  of the suite (notes-1, row 1), so both lists joined the other block formats on ⌥⌘. Choose Archive Folder…, Copy
+  Link and Find had no key.
+
 ## Core Directive — file safety (detail)
 
 - **Store location.** The app is sandboxed, so `Application Support/ArchiveNotes/Store` is inside its container,

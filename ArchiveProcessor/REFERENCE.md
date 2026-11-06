@@ -204,6 +204,27 @@ Photograph documents with a phone companion — **Android** (`ArchiveCapture/`, 
 
 ---
 
+## Keyboard map (the menu bar — `Views/ProcessingCommands.swift`)
+
+Audited across the suite by `W40.fix-suite-shortcuts` (2026-11-06); the shared table is in
+`ArchiveReader/REFERENCE.md` §Keyboard map, *Across the suite*.
+
+| Menu | Command | Key |
+|---|---|---|
+| File | Add Files… · Choose Output Folder… | `⌘O` · `⇧⌘O` (the suite's choose-folder key) |
+| Processing | Start Processing · Stop Processing · Cycle Provider | `⌘R` · `⌘.` · `⌥⌘P` |
+| App | Settings… | `⌘,` |
+
+- Each menu item posts a request that `OCRView` (or `ContentView`, for Cycle Provider) carries out under its button's
+  own guard: Start only when Start is enabled, Stop only while a run or its review is up, Add Files… not mid-run.
+  With Live Capture or Tools in front nothing listens, as the buttons are not there. Start and Stop stand down while a
+  text field is being edited (`TextEditingGuard`), and Stop and both panels while a sheet or alert is up
+  (`SheetGuard`), so ⌘. never takes an answer from under a question such as the plan check's Go on / Stop here.
+- Sheets keep their own keys: `Return` / `Esc` / `⌘Return` on their buttons.
+- File ▸ New is removed (the Processor has no document to make); Add Files… and Choose Output Folder… stand in its
+  place since `W40.fix-suite-shortcuts`, which also added Stop Processing. Tested in `ProcessorUITests`
+  (`testFileMenuShortcutsOpenTheirPanels`); the Processor has no unit bundle for the menu-bar clash check.
+
 ## Test Files
 - Located in `Test Files/` directory within the project (gitignored; **not in git** — no recovery via git).
 - Deliberately slimmed to a representative + test-critical **minimum** (2026-07-18): all of

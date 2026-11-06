@@ -490,7 +490,7 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
 - **Promised in:** `CLAUDE.md` Impl Map `EditorTextView`, `EditorFormatting`, `FormattingToolbar`,
   `MarkdownBridge`; `00-overview.md` D6; `SMOKE_TEST.md` step G; `SUITE_TODO_DONE.md` `W9.d12b`.
 - **Reached by:**
-  - **Format menu** (`ArchiveNotesCommands.swift:8-48`: ⌘B, ⌘I, ⌥⌘C, ⌘K, ⌥⌘0–6, ⇧⌘U, ⇧⌘O, ⌥⌘Q, ⌥⌘K) and the
+  - **Format menu** (`ArchiveNotesCommands.swift:8-48`: ⌘B, ⌘I, ⌥⌘C, ⌘K, ⌥⌘0–6, ⌥⌘U, ⌥⌘O, ⌥⌘Q, ⌥⌘K) and the
     editor toolbar (`Editor/FormattingToolbar.swift:25-90`). Both call `FormattingContext`
     (`Editor/EditorFormatting.swift:39`, e.g. `toggleBold` `:103`), which calls the static `EditorFormatting`
     actions (`:398`).

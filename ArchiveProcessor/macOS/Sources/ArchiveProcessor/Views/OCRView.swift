@@ -397,17 +397,20 @@ struct OCRView: View {
             startProcessing()
         }
         // ⌘., ⌘O and ⇧⌘O (W40.fix-suite-shortcuts) do what the Cancel, Add Files… and Choose… buttons do,
-        // and only when that button is on screen and enabled. The two panels take no keystroke from a field,
-        // so only Stop stands down while one is edited (there ⌘. ends the editing).
+        // and only when that button is on screen and enabled, with no sheet or alert over it (`SheetGuard`).
+        // The two panels take no keystroke from a field, so only Stop stands down while one is edited (there
+        // ⌘. ends the editing).
         .onReceive(NotificationCenter.default.publisher(for: .stopProcessingRequested)) { _ in
-            guard !TextEditingGuard.isEditingText, processor.isProcessing || isInReviewMode else { return }
+            guard !TextEditingGuard.isEditingText, !SheetGuard.sheetIsUp, processor.isProcessing || isInReviewMode
+            else { return }
             processor.cancel()
         }
         .onReceive(NotificationCenter.default.publisher(for: .addFilesRequested)) { _ in
-            guard !isInReviewMode, !processor.isProcessing else { return }
+            guard !SheetGuard.sheetIsUp, !isInReviewMode, !processor.isProcessing else { return }
             selectFiles()
         }
         .onReceive(NotificationCenter.default.publisher(for: .chooseOutputFolderRequested)) { _ in
+            guard !SheetGuard.sheetIsUp else { return }
             chooseOutputDirectory()
         }
         .onChange(of: scenePhase) { _, phase in

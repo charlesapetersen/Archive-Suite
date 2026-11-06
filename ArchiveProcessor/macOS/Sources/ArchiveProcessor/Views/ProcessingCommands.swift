@@ -42,6 +42,14 @@ enum TextEditingGuard {
     }
 }
 
+/// Whether the window in front has a sheet or an alert up. The File menu's panels and Stop Processing stand down
+/// then: an answer the sheet asks for (the plan check's Go on / Stop here) is never taken from under it by ⌘. .
+enum SheetGuard {
+    @MainActor static var sheetIsUp: Bool {
+        NSApp.modalWindow != nil || NSApp.keyWindow?.attachedSheet != nil || NSApp.keyWindow?.isSheet == true
+    }
+}
+
 enum ProviderCycler {
     /// Advance `selectedProvider` to the next provider (Anthropic → Gemini → Mistral → wrap), writing the
     /// shared `@AppStorage` key so the main window and Settings both update. `OCRView`/`SettingsView`

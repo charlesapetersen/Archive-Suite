@@ -273,7 +273,10 @@ writes against the real corpus — always a copy.
   (text-field-safe, like `Space`): `]`/`[` = next/previous unread, `\` = mark read & advance. All read-state
   mutation routes through `mark(.read)` → `TagWriter` (undoable); the next/previous math is pure (`TriageNavigation`).
 - `⌘⇧C` Copy Link(s) · `⌘⇧L` Copy Archive Link(s) · `⌘⇧R` Reveal in Finder · `⌘⇧O` Choose Archive Folder…
-- `⌘L` focus tag filter · `⌘⌥F` Search OCR text · `⌘⇧K` Clear filters & search
+- `⌘L` focus tag filter · `⌘F` or `⌘⌥F` Search OCR text (⌘F is Find… in the document window) · `⌘⇧K` Clear filters & search
+- `⌃⌘S` Show/Hide Sidebar · `⌃⌘T` Show/Hide Tag Cloud (View menu, this window only). ⌃⌘S is the Mac's sidebar key;
+  they were `⌥⌘S`/`⌥⌘T` until `W40.fix-suite-shortcuts`, and ⌥⌘T is the Mac's Show/Hide Toolbar
+- `⌘⌥R` Rescan Archive Folder · `⌘⌥J` Show JPEG/PDF Image (document window and preview)
 - *Menu-only (no shortcut):* Sort by Date/Name/Quality/Read-state · Rename Tag… · Find Similar Tags… ·
   Save Current Search… · Select Document Run
 - *Sorting:* each Sort menu item sets that field, then name, both ascending. A column-header click also
@@ -322,6 +325,26 @@ writes against the real corpus — always a copy.
 > of cycling documents; cycling moved to `⌘⇧↑/↓`; zoom was `⌘↑/↓` (`⌘+`/`⌘−` added 2026-11-04); reset is `⌥⌘0` (not
 > `⌥⌘=`); `⌘C`/`⌥⌘C` are verbatim/cleaned copy (cleaned was `⌘⇧C` until 2026-10-22). The document window has **no** Mark-Read (`⌘R`) or
 > Copy Link(s) shortcut — those are nav-window only; its page link is `⌥⌘L` (since 2026-11-04).
+
+*Across the suite* (`W40.fix-suite-shortcuts`, 2026-11-06). One command, one key, in every app that has it; the
+Mac's standard keys (Edit, Window, ⌘, ⌘W ⌘Q ⌘M ⌘H, ⌃⌘F full screen, ⌃⌘S sidebar, ⌥⌘T toolbar) are left to the
+system. `MenuShortcutTests` (Reader and Notes unit bundles) fails on any key two menu-bar commands share; the one
+allowed pair here is ⌘Z/⇧⌘Z, Tags ▸ Undo/Redo Tag Change beside Edit ▸ Undo/Redo (`TextUndoGuard`).
+
+| Command | Reader | Notes | Processor |
+|---|---|---|---|
+| Choose the archive folder | `⇧⌘O` Choose Archive Folder… | `⇧⌘O` Choose Archive Folder… | `⇧⌘O` Choose Output Folder… |
+| Open | `⌘O` Open in Document Window | — (double-click a row) | `⌘O` Add Files… |
+| Copy a link to the item | `⇧⌘C` Copy Link(s) | `⇧⌘C` Note ▸ Copy Link | — |
+| Its details | `⌘I` Edit Info… | `⌥⌘I` Show/Hide Inspector (`⌘I` is Italic) | — |
+| New | — | `⌘N` New Note · `⌥⌘N` New Extract | — |
+| Find | `⌘F` | Edit ▸ Find (system) | — |
+| Start / stop the work | — | — | `⌘R` Start Processing · `⌘.` Stop Processing |
+| Settings | `⌘,` | `⌘,` | `⌘,` |
+
+Same key, different command, by design: `⌘R` (Reader Mark Read, Processor Start Processing), `⌥⌘C` (Reader Copy
+Cleaned for Prose, Notes Inline Code), `⌥⌘0` (Reader reset the split, Notes Body). Each app's own table: Notes
+`REFERENCE.md` §Keyboard map, Processor `REFERENCE.md` §Keyboard map.
 
 ## §Options (⌘, — `OptionsView`, read via `AppSettings`)
 

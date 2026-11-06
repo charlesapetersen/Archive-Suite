@@ -367,7 +367,7 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
   that tag only, switch All/Any, and select the files carrying the tag.
 - **Promised in:** `SMOKE_TEST.md` Batch 2 (C6); `CLAUDE.md` Implementation map (`NavigationWindowView`).
 - **Reached by:** the toolbar `ar.toolbar.tagCloud` button (`Views/NavigationWindowView.swift:527`) or Show Tag
-  Cloud (⌥⌘T, `ArchiveReaderCommands.swift:38`). The panel is `tagCloudPanel` (`NavigationWindowView.swift:273-330`).
+  Cloud (⌃⌘T, `ArchiveReaderCommands.swift`). The panel is `tagCloudPanel` (`NavigationWindowView.swift:273-330`).
   Its context menu (`:304-320`) edits `model.filter` or calls `NavigationModel.selectFiles(withTag:)`
   (`Views/NavigationModel.swift:437`).
 - **Real-path test:** `ArchiveReaderUITests/NavigationUITests.testTagCloudShowsSubjectsNotDateTokens`,
