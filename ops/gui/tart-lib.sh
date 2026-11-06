@@ -11,7 +11,7 @@
 # no bare `[ ... ]` as the last statement of a function, no unguarded command substitution on failure.
 
 GUEST_REPO="${GUEST_REPO:-/Volumes/My Shared Files/repo}" # --dir=repo:<suite root>
-GUEST_HOME="${GUEST_HOME:-/Users/admin}"                   # the Cirrus image's user
+GUEST_HOME="${GUEST_HOME:-/Users/admin}"                   # the guest's user (admin/admin)
 
 # ---------------------------------------------------------------------------------------------------
 # `tart` must be FINDABLE before any of the helpers below mean anything (SUITE_TODO W21.vmgui-path).
@@ -390,6 +390,27 @@ tart_crash_harvest() {
 }
 
 # ---------------------------------------------------------------------------------------------------
+# tart_stop_clean VM [SECONDS] — shut the guest down from inside, then `tart stop` only as the fallback.
+#
+# W40.vm-macos27 (measured 2026-11-06): on the macOS 27.2 guest with Tart 2.32.1, `tart stop` returns in 0 s —
+# the graceful request is not honoured, so it is a hard power-off — and writes the guest had not flushed are
+# LOST. A file written seconds before the stop was gone at the next boot; an installed CLI vanished the same
+# way. That would silently corrupt state the lanes keep on the guest disk (the reused DerivedData, the
+# fixtures). So: `sync`, ask the guest to halt, wait for the VM to report stopped, and only then fall back to
+# `tart stop`. Safe to call on a VM that is already stopped or whose agent is down (every step is guarded).
+tart_stop_clean() {
+  local vm="$1" limit="${2:-60}" waited=0
+  if tart exec "$vm" true >/dev/null 2>&1; then
+    tart exec "$vm" sync >/dev/null 2>&1 || true
+    tart exec "$vm" sudo -n /sbin/shutdown -h now >/dev/null 2>&1 || true
+    while [ "$waited" -lt "$limit" ]; do
+      tart list --format json 2>/dev/null | python3 -c 'import json,sys; v=[x for x in json.load(sys.stdin) if x["Name"]==sys.argv[1]]; sys.exit(0 if v and not v[0]["Running"] else 1)' "$vm" && return 0
+      sleep 2; waited=$(( waited + 2 ))
+    done
+  fi
+  tart stop "$vm" >/dev/null 2>&1 || true
+}
+
 # tart_lock_acquire [WAIT_SECONDS] / tart_lock_release — one writer at a time for the shared VM.
 #
 # There is ONE VM name and ONE artifact dir, and both entry points (the health gate and the interactive

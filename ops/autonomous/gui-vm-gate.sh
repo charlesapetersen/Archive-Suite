@@ -78,7 +78,7 @@ if command -v gtimeout >/dev/null; then TO=(gtimeout "$MAXRUN"); else TO=(); fi
 # on the pre-boot skips below, which on a shared machine means killing a VM another run legitimately owns.
 VM_BOOTED=0
 cleanup() {
-  [ "$VM_BOOTED" = 1 ] && tart stop "$VM" >/dev/null 2>&1
+  [ "$VM_BOOTED" = 1 ] && tart_stop_clean "$VM"
   tart_lock_release
   return 0
 }
@@ -129,7 +129,7 @@ select_app
 # "GUI fixture absent" warning), and the gate fell through to its fail-open skip. Confirmed by hand:
 # the identical `tart exec` succeeds seconds later. So poll the agent until it actually answers.
 boot_vm() {
-  tart stop "$VM" >/dev/null 2>&1 || true
+  tart_stop_clean "$VM" || true
   local mounts=(--dir=repo:"$ROOT" --dir=out:"$ART")
   VM_BOOTED=1
   # --no-clipboard: a host copy otherwise overwrites the guest pasteboard mid-test (W9.g4-flake; see

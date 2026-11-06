@@ -187,6 +187,14 @@ grep -q 'tart run "\$VM" "\${gfx\[@\]}" --no-clipboard' "$RUNNER" \
   || no "runner shares the host clipboard — a host copy can clobber a pasteboard test"
 grep -q 'tart run "\$VM" --no-graphics --no-clipboard' "$GATEF" \
   && ok "gate boots --no-clipboard" || no "gate shares the host clipboard with the guest"
+# W40.vm-macos27: on the macOS 27 guest `tart stop` is an instant power-off that loses unflushed writes, so
+# every stop of a VM a script booted goes through the in-guest shutdown first.
+if grep -q '&& tart_stop_clean "\$VM"' "$RUNNER" && grep -q '&& tart_stop_clean "\$VM"' "$GATEF" \
+   && ! grep -qE '^[^#]*&& tart stop "\$VM"' "$RUNNER" "$GATEF"; then
+  ok "runner and gate stop the guest with tart_stop_clean (in-guest shutdown before any power-off)"
+else
+  no "a bare tart stop is back — on macOS 27 it powers the guest off and loses unflushed writes"
+fi
 
 echo "== 9. FORWARD tripwire: any app-hosted test bundle must suppress its window =="
 # The window-suppression fix is per-app opt-in (each App calls ArchiveTestHost in init()), so it does NOT

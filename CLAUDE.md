@@ -70,7 +70,7 @@ The whole per-change checklist in one place, so no rule hides inside a longer se
 2. **Build-verify** — clean build, **no new warnings**; run the touched app's smoke test — but note the
    smoke script runs the app's WHOLE scheme, and the scheme contains the UITest bundle, so on the host it
    drives the real app on screen. `test-smoke.sh` therefore restricts itself to the unit bundle whenever
-   `ARCHIVE_UNATTENDED=1`, and the UITests run off-screen in the VM instead (`ops/gui/vm-gui-runner.sh
+   `ARCHIVE_UNATTENDED=1`, and the UITests run off-screen in the VM (macOS 27.2, Xcode 27.2) instead (`ops/gui/vm-gui-runner.sh
    <reader|notes|processor> xcuitest`). The periodic gate rotates one of all three apps per invocation, so
    its 20-minute per-app cap stays inside the 50-minute whole-gate budget. Note the unit bundles are app-**hosted** — `xcodebuild test -only-testing:<App>Tests`
    launches the real `.app` — but it renders nothing under each app's local `ArchiveTestHost`, so a

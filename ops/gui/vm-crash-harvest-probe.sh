@@ -26,7 +26,7 @@ die(){ printf 'ERROR: %s\n' "$*" >&2; exit 2; }
 
 tart_require || die "tart missing"
 tart list 2>/dev/null | awk '{print $2}' | grep -qx "$VM" || die "VM '$VM' does not exist"
-cleanup(){ [ "${BOOTED:-0}" = 1 ] && tart stop "$VM" >/dev/null 2>&1; tart_lock_release; }
+cleanup(){ [ "${BOOTED:-0}" = 1 ] && tart_stop_clean "$VM"; tart_lock_release; }
 trap cleanup EXIT
 tart_lock_acquire "${LOCK_WAIT:-120}" || die "the GUI VM is in use (pid ${TART_LOCK_OWNER:-?})"
 mkdir -p "$ART"

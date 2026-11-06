@@ -51,7 +51,7 @@ monitor. This is the daemon-safe GUI lane.
 **Run:** `ops/gui/vm-gui-runner.sh [reader|notes|processor] [xcuitest|sighted|both]` (default `reader both`; the app
 argument is optional, so the old `vm-gui-runner.sh xcuitest` form still means "reader"). Artifacts (`.xcresult`, PNGs) land in
 `~/.tart-mirror/vm-artifacts/<app>/` — `Read` the PNGs to eyeball renders. Drive the VM with
-`tart exec <vm> …` (no SSH — Cirrus images ship the guest agent).
+`tart exec <vm> …` (no SSH — the guest runs the Tart guest agent).
 
 **Index warning / recovery check (W23.m9-fu3):** the opt-in `CORRUPT_INDEX_FIXTURE=1` mode seeds only the
 generated Reader or Notes fixture with 1 KiB of invalid SQLite bytes. Run the focused check per app:
@@ -102,20 +102,36 @@ The test records a uniquely named PNG in its sandbox-local tmp directory and the
 `__Snapshots__/` only after the VM test reports success. Restore `.missing` and run the lane again to compare;
 never copy a reference from the host by hand.
 
-**One-time setup** (`brew install cirruslabs/cli/tart crane`; `vncdotool` in a venv at `~/.tart-mirror/vncenv`):
-build the VM from Cirrus's `macos-tahoe-xcode:26.3` (macOS 26 + Xcode 26.3 — matches host). The image is
-~63 GB; pull it **resumably** by mirroring into a local registry then cloning (a network drop costs ≤512 MB,
-not the whole pull — `tart pull` itself is NOT resumable):
-```
-crane registry serve --disk ~/.tart-mirror/registry-storage --address 127.0.0.1:5001 &   # local registry
-skopeo copy --dest-tls-verify=false docker://ghcr.io/cirruslabs/macos-tahoe-xcode:26.3 \
-  docker://127.0.0.1:5001/cirruslabs/macos-tahoe-xcode:26.3        # RESUMABLE: re-run to continue
-tart clone 127.0.0.1:5001/cirruslabs/macos-tahoe-xcode:26.3 archive-gui-runner --insecure
-rm -rf ~/.tart-mirror/registry-storage                            # reclaim the ~63 GB mirror after clone
-tart set archive-gui-runner --display 1920x1200
-```
+**The guest: macOS 27.2 (26B123) with Xcode 27.2 (27B52), matching the host** (W40.vm-macos27, built
+2026-11-06; before that it was Cirrus's `macos-tahoe-xcode:26.3` image, macOS 26.2 with Xcode 26.3). 4 CPUs,
+6144 MB, a 100 GB ASIF disk, user `admin`/`admin` with passwordless sudo, SIP off, Spotlight indexing off,
+auto-login, `Xcode_27.2.app` selected. Cirrus publishes no macOS 27 Xcode image, so it is built from the IPSW.
+Rebuilding it (`tart` on the host, `vncdotool` in a venv at `~/.tart-mirror/vncenv`):
+1. `tart create --from-ipsw <the 27.2 UniversalMac IPSW URL> --disk-size 100 --disk-format asif <name>`, then
+   `tart set <name> --cpu 4 --memory 6144 --display 1920x1200`. The IPSW is ~25 GB, cached in
+   `~/.tart/cache/IPSWs` (delete it afterwards).
+2. Boot `--no-graphics --vnc-experimental` and click through the setup assistant over VNC with `vncdotool`,
+   reading a capture after each step: no Apple Account, location off, analytics off, FileVault off, updates
+   download-only. VNC-typed text loses Shift, so type only unshifted characters. Tart 2.33+ can skip the
+   assistant with `--provisioning-opts` (Cirrus's `vanilla-golden-gate.pkr.hcl`); the host's Tart was 2.32.1.
+3. From the guest Terminal, run a provisioning script from a `--dir` share: passwordless sudo, no sleep or screen
+   lock, auto-login, the two loginwindow defaults below, `mdutil -a -i off`, and `tart-guest-agent` with its two
+   launchd plists (`org.cirruslabs.tart-guest-agent` in LaunchAgents, `…-guest-daemon` in LaunchDaemons, binary
+   at `/opt/homebrew/Cellar/tart-guest-agent/<ver>/bin`, linked from `/opt/homebrew/bin`). From then on use
+   `tart exec`. The Reader and Notes fixture builders also need the `tag` CLI at `/opt/homebrew/bin/tag`; the
+   host's Homebrew `Cellar/tag` copies across as is (it links only system frameworks). Without it every
+   fixtured UITest fails with `FixtureMissing`. There is no Homebrew in the guest.
+4. Xcode: `tar` the host's `/Applications/Xcode.app` into the share and unpack it in the guest as
+   `/Applications/Xcode_27.2.app`. Copying the app straight off the virtio share breaks its framework symlinks
+   ("Too many levels of symbolic links"), and Gatekeeper then calls it damaged. Then `xcode-select -s`,
+   `xcodebuild -license accept`, `-runFirstLaunch`, `DevToolsSecurity -enable`, and
+   `automationmodetool enable-automationmode-without-authentication`.
+5. Recovery (`tart run --recovery`, Options, Utilities > Terminal): `csrutil disable`. Then seed the TCC grants
+   for the agent (Accessibility, ScreenCapture, PostEvent, Microphone, SystemPolicyAllFiles) with Cirrus's
+   `scripts/update-tcc-database.sh` (it knows macOS 27's new per-user TCC database location), and check with
+   `ops/gui/vm-seed-accessibility.sh --check`.
 `xcodegen` must be on the **host** — the runner generates the `.xcodeproj` into the mounted worktree; the
-guest image has no xcodegen.
+guest has no xcodegen.
 
 ⚠️ **Keep the guest booting to an EMPTY desktop.** macOS's *reopen at login* resume list survives
 `tart stop`, so anything left running when the VM goes down is relaunched by `launchd` ~7 s into the next

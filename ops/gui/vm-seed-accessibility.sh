@@ -21,7 +21,7 @@
 # requirement to match the binary that is actually installed.
 #
 # WHY IT IS SAFE TO DO THIS HERE, AND ONLY HERE. It writes the *guest's* TCC database — a throwaway Tart VM
-# that exists to run GUI tests, boots from a Cirrus image, and ships with **SIP disabled** (checked below;
+# that exists to run GUI tests, built with **SIP disabled** (ops/gui/README.md §3; checked below;
 # the write is impossible otherwise). It never touches the host's TCC. The owner's own grants — the ones
 # AGENTS.md §"GUI verification" describes — are a different machine and are not in scope.
 #
@@ -52,7 +52,7 @@ die()  { printf '\033[31m[vm-a11y] ERROR:\033[0m %s\n' "$*" >&2; exit 1; }
 # exactly as found. Same one-writer lock as both lanes, for the same reason: this stops and starts the VM.
 BOOTED_BY_US=0
 cleanup() {
-  [ "$BOOTED_BY_US" = 1 ] && tart stop "$VM" >/dev/null 2>&1
+  [ "$BOOTED_BY_US" = 1 ] && tart_stop_clean "$VM"
   tart_lock_release
   return 0
 }

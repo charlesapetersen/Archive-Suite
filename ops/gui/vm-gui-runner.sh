@@ -63,7 +63,7 @@ mkdir -p "$APP_ART"
 # mid-flight kills it, and the gate reports "inconclusive" for work it was about to complete.
 VM_BOOTED=0
 cleanup() {
-  [ "$VM_BOOTED" = 1 ] && tart stop "$VM" >/dev/null 2>&1
+  [ "$VM_BOOTED" = 1 ] && tart_stop_clean "$VM"
   tart_lock_release
   return 0
 }
