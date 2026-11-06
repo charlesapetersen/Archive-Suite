@@ -202,5 +202,21 @@ class Trees(unittest.TestCase):
                 self.assertEqual(len(levels), len(t["levels"]), t["id"])
 
 
+
+class Repeats(unittest.TestCase):
+    def test_a_reading_that_only_repeats_settled_text_is_a_repeat(self):
+        fields = {"kind": "box label", "collection_title": "Applied Data Research Software Products Division Records, 1959-1987",
+                  "collection_number": "CBI 154", "container": "Box 6"}
+        self.assertTrue(T.repeat_of([None, "Applied Data Research Software Products Division"], fields))
+        self.assertTrue(T.repeat_of(["Applied Data Research Software Products Division Records, 1959-1987", None], fields))
+        self.assertTrue(T.repeat_of([None, "CBI 154"], fields))
+        self.assertTrue(T.repeat_of([None, "1959-1987"], fields))
+        self.assertFalse(T.repeat_of([None, "Correspondence, 1960"], fields))           # new text: asked
+        self.assertFalse(T.repeat_of(["Records, 1959-1987, Series 2", None], fields))   # adds to it: asked
+        self.assertFalse(T.repeat_of([None, None], fields))                              # nothing offered
+        self.assertFalse(T.repeat_of([None, "CBI 15"], fields))                          # not on a word boundary
+        self.assertFalse(T.repeat_of(["box label"], {"kind": "box label"}))              # kind is not settled text
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -1006,6 +1006,21 @@ def jsonl(path):
     return [json.loads(l) for l in open(path, encoding="utf-8")] if os.path.exists(path) else []
 
 
+def _txt(v):
+    return re.sub(r"[^a-z0-9]+", " ", str(v).lower()).strip()
+
+
+def repeat_of(readings, fields):
+    """Owner, 2026-11-05, on the second sheet: one piece of label text goes in one field. True when every reading
+    offered for a field only repeats text already settled in another field on the photo (the collection title
+    offered again as the box title, "CBI 154" as an other mark when it is the collection number), so the field is
+    settled as not on the label instead of asked. A reading that adds anything to the settled text stays asked."""
+    settled = [_txt(v) for k, v in fields.items() if v and k != "kind"]
+    vals = [_txt(r) for r in readings if r]
+    return bool(vals) and all(len(v) >= 2 and any(re.search(r"(?<![a-z0-9])" + re.escape(v) + r"(?![a-z0-9])", t)
+                                                  for t in settled) for v in vals)
+
+
 def revise_rows():
     rows = build(sample())
     old = {t["id"]: t for t in jsonl(os.path.join(CACHE, "pool-jpeg", "truth.jsonl"))}
@@ -1051,6 +1066,18 @@ def revise_rows():
                 readings = [v] + [x for x in readings if not agree(f, x, v)]
                 if not disputed.get(f) and ok and r["agreed"].get(f) is not None and not agree(f, r["agreed"][f], v):
                     readings.append(r["agreed"][f])
+            if f != "kind" and f not in n.get("confirm", []) and repeat_of(readings, fields):
+                # The exception, the owner's: a date inside a settled title (the collection's "1959-1987") is the
+                # date as well, when the readings give one value for it.
+                dates = list(dict.fromkeys(x for x in readings if x))
+                if f == "date" and len(dates) == 1:
+                    put(f, dates[0], "rule")
+                    st["date inside settled text, taken as the date (rule)"] += 1
+                elif f != "date":
+                    put(f, None, "rule")
+                    st["reading only repeats settled text, not on the label (rule)"] += 1
+                if f in fields:
+                    continue
             box, how = field_place(f, readings, lines, boxes)
             open_.append({"field": f, "readings": readings, "box": box, "placed": how})
         if not ok:
@@ -1116,7 +1143,9 @@ took out are gone. The photos were turned upright again and three readers read t
 fields the readers do not all agree on, values you typed in a note that are worth checking letter by letter, and a
 few fields where they did agree, mixed in as a check. Where a photo asks which way up it is, the turning step and your
 notes disagreed. Each pink box is roughly where the field is written; it does not say which reading is right. The grey
-line lists what is already settled (your answers, your notes, or all three readers). "Turn photo" turns a photo still
+line lists what is already settled (your answers, your notes, all three readers, or your rules). A reading that only
+repeats text settled in another field is not asked: that field is settled as not on the label, except a date inside
+a title, which is taken as the date. "Turn photo" turns a photo still
 shown the wrong way, with its boxes; say so in its notes too."""
 
 
@@ -1254,7 +1283,8 @@ def write_rev_results(rows, st):
          "## Where each settled field came from", "",
          "| source | fields |", "|---|---|"]
     for s, label in (("sheet", "the owner's ruling on the first sheet"), ("note", "a value the owner's notes give"),
-                     ("rule", "the owner's rules (no folder title on a box label)"),
+                     ("rule", "the owner's rules (no folder title on a box label; text already settled is not a "
+                              "second field; a date inside a title is the date too)"),
                      ("readers", "the three readers, unanimous on the revised prompt")):
         L.append(f"| {label} | {srcs[s]} |")
     pe = [f for x in rows for f in prompt_examples(x)]

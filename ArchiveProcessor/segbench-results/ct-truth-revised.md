@@ -26,7 +26,7 @@ The 19 photos where the pick and the notes disagree (10 turned, the owner did no
 |---|---|
 | the owner's ruling on the first sheet | 351 |
 | a value the owner's notes give | 122 |
-| the owner's rules (no folder title on a box label) | 8 |
+| the owner's rules (no folder title on a box label; text already settled is not a second field; a date inside a title is the date too) | 146 |
 | the three readers, unanimous on the revised prompt | 1982 |
 
 **Prompt examples.** 44 settled fields (20 of them the owner's) hold a value that is also one of the prompt's examples, and several examples were taken from the owner's notes, so the drafters may have copied them; each truth row lists them as `prompt_example`, and W47.ct-read leaves them out when it scores the drafters. A route W47.ct-read tests reads with invented examples.
@@ -35,9 +35,11 @@ Fields left out of scoring because the owner could not read them: 1. Titles the 
 
 The first build's agreed fields that the owner did not rule, read again on the revised prompt (a measure of how much the new fields and rules moved the readers):
 
+- date inside settled text, taken as the date (rule): 8
 - first build agreed, unruled, now open or the owner's: 198
 - first build agreed, unruled, same value again: 1346
 - first build agreed, unruled, unanimous again: 1354
+- reading only repeats settled text, not on the label (rule): 130
 
 ## Open, per field (the second sheet)
 
@@ -45,21 +47,21 @@ The first build's agreed fields that the owner did not rule, read again on the r
 |---|---|---|---|
 | What the photo is | 0 | 45 | 133 |
 | Repository | 19 | 0 | 133 |
-| Place | 8 | 3 | 173 |
-| Collection title | 16 | 24 | 107 |
-| Collection subtitle | 46 | 21 | 133 |
-| Collection number | 16 | 9 | 128 |
-| Accession | 4 | 3 | 167 |
-| Series | 3 | 3 | 167 |
-| Series title | 3 | 7 | 186 |
+| Place | 7 | 0 | 173 |
+| Collection title | 15 | 14 | 107 |
+| Collection subtitle | 26 | 9 | 133 |
+| Collection number | 14 | 8 | 128 |
+| Accession | 3 | 1 | 167 |
+| Series | 3 | 2 | 167 |
+| Series title | 2 | 2 | 186 |
 | Container (box, carton…) | 10 | 7 | 134 |
-| Box title | 43 | 25 | 121 |
-| Folder number | 3 | 11 | 144 |
+| Box title | 21 | 12 | 121 |
+| Folder number | 3 | 10 | 144 |
 | Folder title | 1 | 21 | 97 |
-| Date or time period | 22 | 13 | 121 |
-| Other identifying marks | 66 | 84 | 38 |
+| Date or time period | 15 | 12 | 121 |
+| Other identifying marks | 53 | 63 | 38 |
 
-The second sheet asks 575 questions on 191 photos: 536 open fields, 20 controls (unanimous reader fields, unmarked) and 19 which-way-up questions. It is `pool-jpeg/rev2/sheet/index.html` in the cache (private: corpus images); `ct_truth.py --rev fold ANSWERS.json` folds it into `rev2/truth.jsonl`.
+The second sheet asks 437 questions on 168 photos: 398 open fields, 20 controls (unanimous reader fields, unmarked) and 19 which-way-up questions. It is `pool-jpeg/rev2/sheet/index.html` in the cache (private: corpus images); `ct_truth.py --rev fold ANSWERS.json` folds it into `rev2/truth.jsonl`.
 
 ## Cost
 
