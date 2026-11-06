@@ -289,7 +289,9 @@ writes against the real corpus — always a copy.
   holds one shortcut) · `⌘0` fit the focused page · `⌥⌘0` reset the split to the saved default (not
   necessarily ⅔) and fit both panes. On a single-page PDF the text pane is the page's text layer as plain
   text, and its zoom is the text size (`DocumentViewerModel.textScale`, persisted; `W40.fix-reader-text-zoom`:
-  a PDF zoom never reached it)
+  a PDF zoom never reached it). The toolbar has Zoom Out / In Image (magnifiers), Smaller / Larger Text
+  (text-size glyphs) and Reset Zoom (`⌥⌘0`), disabled while both pages already fit at the normal text size
+  (`DocumentViewerModel.zoomIsDefault`); there are no per-pane Fit buttons (`W40.fix-reader-doc-toolbar`)
 - `⌘C` copy verbatim — the standard **Edit ▸ Copy**, from whichever pane holds the selection (plain text;
   disabled with nothing selected; a focused text field such as the find bar copies its own text) · `⌥⌘C`
   Edit ▸ Copy Cleaned for Prose (intelligent; not `⌘⇧C`, which is Copy Link(s)); it also starts a
