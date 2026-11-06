@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """W47.item-fields-retruth-score: fold the owner's item-field sheet into W47.item-fields-retruth's truth, measure the
 truth's own error, score every route, and give each field's fill verdict (measurement audit 2026-10-30, FLD-1, 2, 6,
-7, 8; measurement review pass 10, P10-1).
+7, 8; measurement review pass 10, P10-1). W47.item-fields-more-score folds the later sheets too and judges the
+drafter-family routes on a stratified precision (measurement review pass 11, P11-2 and P11-6).
 
     python3 item_fields_score.py      # CACHE/truth-owner.jsonl and CACHE/note-answers.md (private), the report
 
@@ -10,7 +11,11 @@ getxattr(2) (corpus_survey.read_tags), nothing else there, and writes nothing in
 
 The fold. The sheet's answers (sheet/answers.json against sheet/key.json): a kind answer is the owner's kind; a
 dispute answer is the reading he picked (Gemini 3.7's or Luna's value); a control confirms the truth's value; "?" and
-an unanswered question change nothing. The owner's notes (`_notes/<doc>`) were read one by one by the scoring session
+an unanswered question change nothing. The later sheets (sheet2, the random draw from the image prompt's readings,
+W47.item-fields-more-checks; sheet3, the draw that continues it) fold the same way, each with its own key, answers,
+and note-fixes.json, their question ids distinct and their notes kept apart (`note2`, `note3` on the truth row); a
+typed answer the date reader cannot parse is read by hand into note-fixes' `answer`, which keeps the question's part.
+The owner's notes (`_notes/<doc>`) were read one by one by the scoring session
 and turned into sheet/note-fixes.json: `set` a value a note states plainly, `drop` a field it leaves unsettled (two
 pieces in one document, a name only inference gives, a value he questions), which then leaves every score. A kind the
 owner changed across the correspondence line (item_fields.by_definition) leaves the printed-piece fields the old kind
@@ -33,11 +38,14 @@ out (the 55 self-rulings P10-1 counts among them), is reported as agreement with
 truth's measured error beside. The image-reading item-field prompt test (moved here from W47.item-fields-build) is the
 drafters' own rows on owner-checked pairs: the candidate prompt is the item's PROMPT on the page images.
 
-The fill rule (FLD-7): fill when the precision's Wilson lower bound is at least LOWER and the point at least POINT, on
-at least FLOOR documents with a true value. Otherwise "too close (n)" when the floor is not met, "below the bar" when
+The fill rule (FLD-7): fill when the precision's lower bound is at least LOWER and the point at least POINT, on at
+least FLOOR documents with a true value. A drafter-family route's precision is the stratified one (`stratified`): the
+pairs the owner settled other than by the draw counted exactly at their own number, the rest at theirs from the
+uniform draw, so the first sheet's hard cases weigh no more than their share; its pooled owner-checked figure is shown
+beside it. A route judged on the drafted truth has the truth error's upper bound taken off its lower bound for a fill
+(P11-6). Otherwise "too close (n)" when the floor is not met, "below the bar" when
 the interval's upper bound, plus the truth error's upper bound on the drafted truth, is under POINT, and "too close"
-between. A drafter-family route's owner-checked pairs lean to the hard cases (kind crossings, disputes) while its
-agreement with the drafted truth leans its way, so it is "below the bar" only when both upper bounds are under POINT.
+between.
 
 Publication date (FLD-6) is also scored against the owner's own year and month tags on each printed piece's first
 page, which the Zotero export's date would carry; the app's field is the document's date, the readers' the printed
@@ -61,6 +69,14 @@ import item_fields_retruth as IR  # noqa: E402
 
 CACHE = IR.CACHE
 SHEET = os.path.join(CACHE, "sheet")
+# The later sheets, each folded once its answers.json is saved: the random draw from the image prompt's readings
+# (W47.item-fields-more-checks) and the third sheet that continues it for kind, title and publication
+# (W47.item-fields-more-score).
+SHEET2 = os.path.join(CACHE, "sheet2")
+SHEET3 = os.path.join(CACHE, "sheet3")
+MORE_SHEETS = [(SHEET2, "_notes2"), (SHEET3, "_notes3")]
+THIRD_FIELDS = ("kind", "title", "publication")   # what the third sheet draws more of (item_fields_more.THIRD)
+DRAW = "draw"
 RESULTS = os.path.join(HERE, "..", "..", "segbench-results", "item-fields-score.md")
 RETRUTH_JSON = IR.RESULTS.replace(".md", ".json")
 FLOOR, LOWER, POINT = 40, 0.85, 0.90
@@ -136,13 +152,50 @@ def same(f, a, b):
 
 # --- the fold ------------------------------------------------------------------------------------------------------
 
-def load():
+def merge_fixes(a, b):
+    """Two sheets' note fixes for one truth: per document, the second's set and answer win, drops add up."""
+    out = {d: dict(v) for d, v in a.items()}
+    for d, fx in b.items():
+        m = out.setdefault(d, {})
+        for k in ("set", "answer"):
+            if fx.get(k):
+                m[k] = {**(m.get(k) or {}), **fx[k]}
+        for k in ("drop", "themes"):
+            if fx.get(k):
+                m[k] = list(m.get(k) or []) + [x for x in fx[k] if x not in (m.get(k) or [])]
+    return out
+
+
+def load_sheet(path, note_prefix):
+    """(key, answers, fixes) of one answered sheet, its notes renamed `<note_prefix>/<doc>` so two sheets' notes on one
+    document stay apart; every note must be in the sheet's own note-fixes.json."""
+    key = json.load(open(os.path.join(path, "key.json"), encoding="utf-8"))["items"]
+    answers = json.load(open(os.path.join(path, "answers.json"), encoding="utf-8"))
+    fp = os.path.join(path, "note-fixes.json")
+    fixes = {k: v for k, v in json.load(open(fp, encoding="utf-8")).items() if not k.startswith("_")} \
+        if os.path.exists(fp) else {}
+    notes = [k.split("/", 1)[1] for k in answers if k.startswith("_notes/")]
+    missing = [d for d in notes if d not in fixes]
+    if missing:
+        sys.exit(f"{path}: {len(missing)} notes not read into note-fixes.json: {', '.join(missing[:5])}")
+    answers = {(note_prefix + k[len("_notes"):] if k.startswith("_notes/") else k): v for k, v in answers.items()}
+    return key, answers, fixes
+
+
+def load(more=True):
+    """The truth rows, the documents, and every answered sheet folded into one key, answers and fixes. more=False:
+    the first sheet only (what W47.item-fields-more-checks drew the second sheet against)."""
     rows = [json.loads(x) for x in open(os.path.join(CACHE, "truth.jsonl"), encoding="utf-8")]
     docs = IR.load_docs()
-    key = json.load(open(os.path.join(SHEET, "key.json"), encoding="utf-8"))["items"]
-    answers = json.load(open(os.path.join(SHEET, "answers.json"), encoding="utf-8"))
-    fixes = {k: v for k, v in json.load(open(os.path.join(SHEET, "note-fixes.json"), encoding="utf-8")).items()
-             if not k.startswith("_")}
+    key, answers, fixes = load_sheet(SHEET, "_notes")
+    for path, prefix in (MORE_SHEETS if more else ()):
+        if not os.path.exists(os.path.join(path, "answers.json")):
+            continue
+        k2, a2, f2_ = load_sheet(path, prefix)
+        clash = set(k2) & set(key)
+        if clash:
+            sys.exit(f"{path}: question ids already on an earlier sheet: {', '.join(sorted(clash)[:5])}")
+        key, answers, fixes = {**key, **k2}, {**answers, **a2}, merge_fixes(fixes, f2_)
     return rows, docs, key, answers, fixes
 
 
@@ -158,6 +211,9 @@ def checked_values(rows, key, answers, fixes):
         if st == "value":   # an "ignore" dispute counts only if the owner's kind brings its field in scope (fold)
             out[k["doc"]].setdefault(k["field"], (v, "ignored" if k.get("ignore") else k["part"]))
     for d, fx in fixes.items():
+        for f, v in (fx.get("answer") or {}).items():   # a typed answer read by hand: the value, not how it came
+            if f in out[d]:
+                out[d][f] = (typed(f, v) if isinstance(v, str) else norm(f, v), out[d][f][1])
         for f, v in (fx.get("set") or {}).items():
             out[d][f] = (typed(f, v) if isinstance(v, str) else norm(f, v), "note")
         for f in fx.get("drop") or []:
@@ -169,6 +225,8 @@ def fold(rows, key, answers, fixes):
     """The folded truth rows: label, owner (field -> how), unknown fields, self-ruled-unchecked, note."""
     chk = checked_values(rows, key, answers, fixes)
     notes = {k.split("/", 1)[1]: v for k, v in answers.items() if k.startswith("_notes/")}
+    notes2 = {k.split("/", 1)[1]: v for k, v in answers.items() if k.startswith("_notes2/")}
+    notes3 = {k.split("/", 1)[1]: v for k, v in answers.items() if k.startswith("_notes3/")}
     out = []
     for r in rows:
         c = chk.get(r["id"], {})
@@ -189,7 +247,8 @@ def fold(rows, key, answers, fixes):
                     "owner": {f: how for f, (_v, how) in c.items() if f not in unknown},
                     "unknown": sorted(unknown), "disputed": r.get("disputed") or [],
                     "field_sides": r.get("field_sides") or {}, "kind_changed": kind != kind0,
-                    "note": notes.get(r["id"])})
+                    "note": notes.get(r["id"]), "note2": notes2.get(r["id"]),
+                    "note3": notes3.get(r["id"])})
     return out, chk
 
 
@@ -325,21 +384,133 @@ def pairs(route, family, pred, frows, field, which, skip):
     return out
 
 
-def verdict(s, err_hi=0.0, agreement=None):
-    """agreement: a drafter-family route's drafted-truth score. Its owner-checked pairs lean to the hard cases (kind
-    crossings, disputes) and its agreement with the drafted truth leans its way, so it is below the bar only when
-    both intervals are."""
+def stratified(pred, gem, frows, field, skip):
+    """A route's precision over every pair it filled, from the owner's values (measurement review pass 11, P11-2).
+    The pairs split in two: the ones the owner settled other than by the draw (the first sheet's kind crossings,
+    disputes and controls, and the notes), known exactly, a census; and the rest, the pool the second sheet drew from
+    uniformly, split again by whether the image prompt (the drawn route) filled the field, since the draw took its
+    filled and empty pairs at different rates. Each part of the pool counts at its own size, its precision the drawn
+    pairs' there, so neither the hard-leaning census nor the draw weighs more than its share. The interval sets each
+    part of the pool at its Wilson bounds (a part with no drawn pair the route filled, at 0 and 1): exact for the image
+    prompt, whose filled pairs are all in one part, and conservative for a route that fills in both. The point leaves
+    out a part with no drawn pair (its pairs are in the interval only). None when the route filled nothing."""
+    census, pool = [0, 0], {True: [0, 0, 0], False: [0, 0, 0]}   # pool: [route filled, of them drawn, drawn right]
+    for t in frows:
+        p = pred.get(t["id"])
+        ks = IF.SCOPE[field]
+        if p is None or t["id"] in skip or field in t["unknown"] or (ks is not None and t["label"]["kind"] not in ks):
+            continue
+        pv, tv = p.get(field), t["label"][field]
+        if not IF.filled(field, pv):
+            continue
+        right = IF.filled(field, tv) and IF.field_match(field, pv, tv, "ed2")
+        how = t["owner"].get(field)
+        if how and how != DRAW:
+            census[0] += right
+            census[1] += 1
+            continue
+        g = gem.get(t["id"])
+        c = pool[bool(g and IF.filled(field, g.get(field)))]
+        c[0] += 1
+        if how == DRAW:
+            c[1] += 1
+            c[2] += right
+    filled = census[1] + sum(c[0] for c in pool.values())
+    if not filled:
+        return None
+    parts = [(c[0], c[2], c[1]) for c in pool.values() if c[0]]
+    bounds = [wilson(k, n) if n else (0.0, 1.0) for _N, k, n in parts]
+    seen = [(N, k, n) for N, k, n in parts if n]
+    point = (census[0] + sum(N * k / n for N, k, n in seen)) / (census[1] + sum(N for N, _k, _n in seen))
+    return {"precision": point, "lo": (census[0] + sum(N * b[0] for (N, _k, _n), b in zip(parts, bounds))) / filled,
+            "hi": (census[0] + sum(N * b[1] for (N, _k, _n), b in zip(parts, bounds))) / filled,
+            "filled": filled, "census": census, "pool": {"image prompt filled": pool[True],
+                                                         "image prompt empty": pool[False]}}
+
+
+def verdict(s, err_hi=0.0, agreement=None, strat=None):
+    """strat: the stratified precision (above), which a drafter-family route is judged on; its owner-checked pairs
+    pooled lean to the hard cases, which the strata undo, so `agreement` is not consulted then. Without strat, a
+    drafter-family route is below the bar only when its agreement with the drafted truth is too. err_hi, the
+    drafted truth's error bound, widens both ends for a route judged on the drafted truth (P11-6): the fill branch's
+    lower bound as well as the below-the-bar upper bound."""
     if not s["docs"]:
         return "not scored"
     if not s["pred_filled"]:
         return "never filled"
-    lo, hi = wilson(s["ed2"], s["pred_filled"])
-    if s["truth_filled"] >= FLOOR and lo >= LOWER and s["precision_ed2"] >= POINT:
+    if strat is not None:
+        lo, hi, point = strat["lo"], strat["hi"], strat["precision"]
+    else:
+        (lo, hi), point = wilson(s["ed2"], s["pred_filled"]), s["precision_ed2"]
+    if s["truth_filled"] >= FLOOR and lo - err_hi >= LOWER and point >= POINT:
         return "fill"
-    if hi + err_hi < POINT and (agreement is None or not agreement["pred_filled"]
+    if hi + err_hi < POINT and (strat is not None or agreement is None or not agreement["pred_filled"]
                                 or wilson(agreement["ed2"], agreement["pred_filled"])[1] < POINT):
         return "below the bar"
     return f"too close (n {s['truth_filled']})" if s["truth_filled"] < FLOOR else "too close"
+
+
+def draws_to_fill(st, cap=200):
+    """For the image prompt: how many more drawn pairs, every one right, its stratified figure needs to fill (the
+    lower bound at LOWER and the point at POINT), or None when no number up to cap would do."""
+    if not st:
+        return None
+    N, n, k = st["pool"]["image prompt filled"]
+    a, m = st["census"]
+    for x in range(cap + 1):
+        lo = (a + N * wilson(k + x, n + x)[0]) / (m + N)
+        if lo >= LOWER and (a + N * (k + x) / (n + x)) / (m + N) >= POINT:
+            return x
+    return None
+
+
+def draw_summary(frows, gem, skip):
+    """The second sheet's draw for the image prompt alone, per field: its filled pairs right / answered, and its
+    empty pairs the owner found empty / answered (sideways documents never drawn)."""
+    out = {}
+    for f in FIELDS:
+        c = collections.Counter()
+        for t in frows:
+            if t["owner"].get(f) != DRAW or t["id"] in skip or f in t["unknown"]:
+                continue
+            gv, tv = (gem.get(t["id"]) or {}).get(f), t["label"][f]
+            if IF.filled(f, gv):
+                c["filled"] += 1
+                c["right"] += IF.filled(f, tv) and IF.field_match(f, gv, tv, "ed2")
+            else:
+                c["empty"] += 1
+                c["truly empty"] += not IF.filled(f, tv)
+        out[f] = dict(c)
+    return out
+
+
+def draw_routes(P, frows, skip):
+    """Every route on the drawn pairs alone: right / filled. The pairs were drawn on the image prompt's filling, so
+    for any other route they are a sample conditioned on it, not on its own values."""
+    out = {}
+    for rk, *_ in ROUTES:
+        for f in FIELDS:
+            c = [0, 0]
+            for t in frows:
+                p = P[rk].get(t["id"])
+                if p is None or t["owner"].get(f) != DRAW or t["id"] in skip or f in t["unknown"]:
+                    continue
+                pv, tv = p.get(f), t["label"][f]
+                if IF.filled(f, pv):
+                    c[1] += 1
+                    c[0] += IF.filled(f, tv) and IF.field_match(f, pv, tv, "ed2")
+            out[f"{rk}|{f}"] = c
+    return out
+
+
+def unasked_disputes(frows, skip):
+    """{field: [pairs, in base]}: in-scope disputed pairs no sheet settled, which keep the judge's ruling."""
+    out = {}
+    for f in FIELDS:
+        ts = [t for t in frows if f in t["disputed"] and not t["owner"].get(f) and t["id"] not in skip
+              and f not in t["unknown"] and (IF.SCOPE[f] is None or t["label"]["kind"] in IF.SCOPE[f])]
+        out[f] = [len(ts), sum(t["part"] == "base" for t in ts)]
+    return out
 
 
 def owner_tags(docs):
@@ -448,10 +619,7 @@ def note_answers(frows, docs, fixes, tags, P):
 
 def build():
     rows, docs, key, answers, fixes = load()
-    notes = [k.split("/", 1)[1] for k in answers if k.startswith("_notes/")]
-    missing = [d for d in notes if d not in fixes]
-    if missing:
-        sys.exit(f"{len(missing)} notes not read into note-fixes.json: {', '.join(missing[:5])}")
+    notes = [k for k in answers if k.startswith("_notes")]
     frows, chk = fold(rows, key, answers, fixes)
     with open(os.path.join(CACHE, "truth-owner.jsonl"), "w", encoding="utf-8") as fh:
         for t in frows:
@@ -464,14 +632,19 @@ def build():
     skip = {x["doc"] for x in side}
     P = predictions(rows, docs)
     tags = owner_tags(docs)
-    scores, verdicts, by_part = {}, {}, {}
+    scores, verdicts, by_part, strat = {}, {}, {}, {}
+    third_open = not os.path.exists(os.path.join(SHEET3, "answers.json"))
     for rk, _label, fam in ROUTES:
         for which in ("owner", "drafted"):
             for f in FIELDS:
                 scores[f"{rk}|{which}|{f}"] = IF.score(pairs(rk, fam, P[rk], frows, f, which, skip), f)
         for f in FIELDS:
             so, sd = scores[f"{rk}|owner|{f}"], scores[f"{rk}|drafted|{f}"]
-            verdicts[f"{rk}|{f}"] = verdict(so, 0.0, sd) if fam else verdict(sd, err_hi)
+            strat[f"{rk}|{f}"] = st = stratified(P[rk], P["draft-gemini"], frows, f, skip)
+            v = verdict(so, 0.0, sd, st) if fam and st else verdict(sd, err_hi)
+            if fam and f in THIRD_FIELDS and third_open and v not in ("fill", "below the bar", "never filled"):
+                v = "waits on the third sheet"   # kind: 3 drawn pairs cannot carry its pool (P11-2)
+            verdicts[f"{rk}|{f}"] = v
         for part in ("base", "clippings", "handwritten"):
             fr = [t for t in frows if t["part"] == part]
             for f in FIELDS:
@@ -487,16 +660,23 @@ def build():
             tot[0] += s["ed2"]
             tot[1] += s["pred_filled"]
         side_scores[rk] = tot
-    owner_n = {f: [sum(1 for t in frows if t["owner"].get(f) and t["id"] not in skip
-                       and (IF.SCOPE[f] is None or t["label"]["kind"] in IF.SCOPE[f])),
-                   sum(1 for t in frows if t["owner"].get(f) and t["id"] not in skip
-                       and (IF.SCOPE[f] is None or t["label"]["kind"] in IF.SCOPE[f])
-                       and IF.filled(f, t["label"][f]))] for f in FIELDS}
+    insc = lambda t, f: t["id"] not in skip and (IF.SCOPE[f] is None or t["label"]["kind"] in IF.SCOPE[f])  # noqa: E731
+    owner_n = {f: [sum(1 for t in frows if t["owner"].get(f) and insc(t, f)),
+                   sum(1 for t in frows if t["owner"].get(f) and insc(t, f) and IF.filled(f, t["label"][f])),
+                   sum(1 for t in frows if t["owner"].get(f) == DRAW and insc(t, f) and IF.filled(f, t["label"][f]))]
+               for f in FIELDS}
     themes = collections.Counter(th for fx in fixes.values() for th in fx.get("themes") or [])
     o = {"counts": {
         "documents": len(frows), "notes": len(notes), "answered": sum(1 for k, v in answers.items()
                                                                      if not k.startswith("_") and v is not None),
-        "questions": len(key), "note_sets": sum(len(fx.get("set") or {}) for fx in fixes.values()),
+        "questions": len(key), "sheets": {"first": sum(":more-" not in n and ":third-" not in n for n in key),
+                                          "second": sum(":more-" in n for n in key),
+                                          "third": sum(":third-" in n for n in key)},
+        "notes_by_sheet": {"first": sum(k.startswith("_notes/") for k in notes),
+                           "second": sum(k.startswith("_notes2/") for k in notes),
+                           "third": sum(k.startswith("_notes3/") for k in notes)},
+        "typed_by_hand": sum(len(fx.get("answer") or {}) for fx in fixes.values()),
+        "note_sets": sum(len(fx.get("set") or {}) for fx in fixes.values()),
         "note_drops": sum(len(fx.get("drop") or []) for fx in fixes.values()),
         "note_themes": dict(themes.most_common()),
         "owner_changed": {f: sum(1 for t in frows if t["owner"].get(f) and not same(
@@ -508,7 +688,9 @@ def build():
         "printed": sum(1 for t in frows if t["label"]["kind"] in PRINTED),
         "note_answers": note_answers(frows, docs, fixes, tags, P)},
         "truth_error": err, "sheet": sheet_measures(rows, key, answers, chk), "scores": scores,
-        "verdicts": verdicts, "by_part": by_part, "sideways": side_scores,
+        "verdicts": verdicts, "by_part": by_part, "sideways": side_scores, "stratified": strat,
+        "draw": draw_summary(frows, P["draft-gemini"], skip), "draw_routes": draw_routes(P, frows, skip),
+        "unasked_disputes": unasked_disputes(frows, skip), "third_sheet_open": third_open,
         "tags": {rk: tag_score(P[rk], frows, tags, skip) for rk, *_ in ROUTES},
         "paired": {w: paired(P, frows, skip, w) for w in ("drafted", "owner")},
         "rule": {"floor": FLOOR, "lower": LOWER, "point": POINT}}
@@ -530,16 +712,28 @@ def frac(k, n):
     return f"{k}/{n} {k / n:.2f} [{lo:.2f}, {hi:.2f}]"
 
 
+def strat_cell(st):
+    if not st:
+        return "-"
+    return f"{f2(st['precision'])} [{f2(st['lo'])}, {f2(st['hi'])}] of {st['filled']}"
+
+
 def report(o):
     c, e, sh = o["counts"], o["truth_error"], o["sheet"]
-    L = ["# Item fields: the owner's sheet folded in, every route scored, the fill verdict "
-         "(W47.item-fields-retruth-score)", "",
+    sc, ns = c["sheets"], c["notes_by_sheet"]
+    L = ["# Item fields: the owner's sheets folded in, every route scored, the fill verdict "
+         "(W47.item-fields-retruth-score; the second sheet, W47.item-fields-more-score)", "",
          "Generated by `scripts/segbench/item_fields_score.py`; method in its header. Truth from "
          "W47.item-fields-retruth (`item-fields-retruth.md`) with the owner's answers and notes folded in; the "
          "labels, notes and readings stay in the bench cache, and this page has counts only. Offline, $0.", ""]
     L += ["## The fold", "",
-          f"{c['answered']} of {c['questions']} sheet questions answered, notes on {c['notes']} documents. Every note "
-          f"was read before scoring: {c['note_sets']} values set from a note and {c['note_drops']} fields dropped as "
+          f"{c['answered']} of {c['questions']} sheet questions answered ({sc['first']} on the first sheet, "
+          f"{sc['second']} on the second, a random draw from the image prompt's readings"
+          + (f", {sc['third']} on the third" if sc["third"] else "") + f"), notes on {c['notes']} documents "
+          f"({ns['first']} first sheet, {ns['second']} second" + (f", {ns['third']} third" if ns["third"] else "")
+          + "; a document on two sheets keeps both notes apart). Every note "
+          f"was read before scoring, and {c['typed_by_hand']} typed dates the reader cannot parse (\"22 May 1967\", "
+          f"a season, a two-month issue) were read by hand, a season or a two-month issue as its year: {c['note_sets']} values set from a note and {c['note_drops']} fields dropped as "
           "unsettled (two pieces in one document, a name only inference gives, a value the owner questions); the "
           f"owner changed the kind of {c['kind_changed']} documents. Owner-checked (document, field) pairs: "
           + ", ".join(f"{f} {c['owner_checked'][f]}" for f in FIELDS) + "; of them the owner's value differs from "
@@ -601,31 +795,57 @@ def report(o):
           "(W46.ent-truth-owner-fold). It changes no item field here.", ""]
     L += ["## Owner-checked n per field", "",
           "Pairs the owner answered or a note settled, in scope for the folded kind, sideways documents out; the "
-          f"fill rule needs {FLOOR} with a true value.", "", "| field | owner-checked | with a true value |",
-          "|---|---|---|"]
+          f"fill rule needs {FLOOR} with a true value.", "", "| field | owner-checked | with a true value | of them "
+          "from the draw |", "|---|---|---|---|"]
     for f in FIELDS:
-        L.append(f"| {f} | {c['owner_n'][f][0]} | {c['owner_n'][f][1]} |")
+        L.append(f"| {f} | {c['owner_n'][f][0]} | {c['owner_n'][f][1]} | {c['owner_n'][f][2]} |")
+    L += ["", "## The random draw, the image prompt alone", "",
+          "The second sheet drew uniformly from the pairs no earlier answer settled, split by whether the image prompt "
+          "(Gemini 3.7 Flash, the item prompt on the page images) filled the field: its filled draw measures the "
+          "image prompt's precision on that pool directly, and its empty draw how often an empty reading hides a "
+          "value. Apart from the first sheet's pairs, which lean to the hard cases.", "",
+          "| field | filled drawn: right | empty drawn: truly empty |", "|---|---|---|"]
+    for f in FIELDS:
+        d = o["draw"][f]
+        L.append(f"| {f} | {frac(d.get('right', 0), d.get('filled', 0))} | "
+                 + (f"{d.get('truly empty', 0)}/{d['empty']}" if d.get("empty") else "-") + " |")
     L += ["", "## Every route, field by field", "",
-          "Precision at the loose level (ed2; kind at the Zotero item type) as right / filled, with its Wilson "
-          "interval, then recall (right / with a true value) and the verdict. Drafter-family rows (Gemini 3.7, 3.8 "
-          "and Luna) are judged on owner-checked pairs only, their drafted-truth figure is agreement with the "
-          "drafters, and they are below the bar only when that agreement is too (the owner-checked pairs lean to "
-          "the hard cases, the agreement the route's way); the other rows are judged on the drafted truth, whose "
-          "error is the controls' above "
-          f"(upper bound {f2(e['wilson'][1])} allowed for). Replies per route: "
+          "Precision at the loose level (ed2; kind at the Zotero item type). Owner-checked, pooled: right / filled "
+          "over every owner-checked pair, with its Wilson interval; it weighs the first sheet's hard cases (kind "
+          "crossings, disputes) 2.5 to 5 times their share (measurement review pass 11, P11-2), so it is shown for "
+          "comparison only. Stratified: the route's precision over every pair it filled, the first sheet's pairs "
+          "counted exactly at their own number and the rest at theirs from the draw (the method in "
+          "`stratified`'s docstring), with its interval. A drafter-family row (Gemini 3.7, 3.8 and Luna) is judged "
+          "on the stratified figure and the owner-checked n; its drafted-truth figure is agreement with the "
+          "drafters. For any route but the image prompt the drawn pairs were chosen on the image prompt's filling, "
+          "so its stratified figure weighs them by that split and its interval is conservative. The other rows "
+          "are judged on the drafted truth, whose error is the controls' above "
+          f"(upper bound {f2(e['wilson'][1])}, taken off the lower bound for a fill and added to the upper for "
+          "below the bar). Replies per route: "
           + ", ".join(f"{SHORT[rk]} {c['replies'][rk]}" for rk, *_ in ROUTES) + ".", ""]
     for f in FIELDS:
-        L += [f"### {f}", "", "| route | owner-checked precision | recall | drafted-truth precision | recall | "
-              "verdict |", "|---|---|---|---|---|---|"]
+        L += [f"### {f}", "", "| route | owner-checked precision, pooled | stratified precision | recall | "
+              "drafted-truth precision | recall | verdict |", "|---|---|---|---|---|---|---|"]
         for rk, label, fam in ROUTES:
             so, sd = o["scores"][f"{rk}|owner|{f}"], o["scores"][f"{rk}|drafted|{f}"]
             if not so["docs"] and not sd["docs"]:
                 continue
-            L.append(f"| {label} | {frac(so['ed2'], so['pred_filled'])} | {so['ed2']}/{so['truth_filled']} | "
+            st = o["stratified"].get(f"{rk}|{f}")
+            L.append(f"| {label} | {frac(so['ed2'], so['pred_filled'])} | {strat_cell(st)} | "
+                     f"{so['ed2']}/{so['truth_filled']} | "
                      f"{frac(sd['ed2'], sd['pred_filled'])}{' (agreement)' if fam else ''} | "
                      f"{sd['ed2']}/{sd['truth_filled']} | {o['verdicts'][f'{rk}|{f}']} |")
         L.append("")
-    L += ["## By part (drafted truth, right / filled)", "", "| route | field | base | clippings | handwritten |",
+    L += ["## The drawn pairs, every route", "",
+          "Right / filled on the second sheet's drawn pairs alone. They were drawn on the image prompt's filling, so "
+          "for every other route they are conditioned on it: a sample of the pairs the image prompt filled or left "
+          "empty, not of the route's own values.", "", "| route | " + " | ".join(FIELDS) + " |",
+          "|---|" + "---|" * len(FIELDS)]
+    for rk, *_ in ROUTES:
+        cells = [o["draw_routes"][f"{rk}|{f}"] for f in FIELDS]
+        if any(x[1] for x in cells):
+            L.append(f"| {SHORT[rk]} | " + " | ".join(f"{x[0]}/{x[1]}" if x[1] else "-" for x in cells) + " |")
+    L += ["", "## By part (drafted truth, right / filled)", "", "| route | field | base | clippings | handwritten |",
           "|---|---|---|---|---|"]
     for rk in ("draft-gemini", "tagging", "draft-luna"):
         for f in FIELDS:
@@ -654,46 +874,56 @@ def report(o):
           f"{c['sideways_docs']} documents (listed in `item-fields-retruth.md`) are out of every figure above. On "
           "them, right / filled over all fields against the drafted truth: "
           + ", ".join(f"{SHORT[rk]} {v[0]}/{v[1]}" for rk, v in o["sideways"].items() if v[1]) + ".", ""]
-    fills = sorted({k.split("|")[1] for k, v in o["verdicts"].items() if v == "fill"})
     L += ["## The verdict", ""]
     for f in FIELDS:
         vs = [(SHORT[rk], o["verdicts"][f"{rk}|{f}"]) for rk, *_ in ROUTES]
         L.append(f"- **{f}**: " + "; ".join(f"{n} {v}" for n, v in vs) + ".")
-    L += ["", ("Fields that clear the rule: " + ", ".join(fills) + ".") if fills else
-          "No field clears the fill rule for any route. For the drafter-family routes that is the owner-checked n "
-          f"(the floor is {FLOOR} documents with a true value) as much as the precision: it is \"too close\", not "
-          "\"leave empty\", and W47.item-fields-build should not take it as a measured failure.", "",
-          "What the figures do show. "
-          + "; ".join(f"{f}: the image prompt {frac(o['scores'][f'draft-gemini|owner|{f}']['ed2'], o['scores'][f'draft-gemini|owner|{f}']['pred_filled'])}"
-                      f", the app's call {frac(o['scores'][f'tagging|owner|{f}']['ed2'], o['scores'][f'tagging|owner|{f}']['pred_filled'])}"
-                      for f in FIELDS) + " (owner-checked). The image prompt (the item's prompt on the page images, "
-          "the test moved here from W47.item-fields-build) is the only Gemini route that gives a title; on the "
-          "other fields the two overlap within their intervals at these n. The app's call is below the bar on "
-          "publication date against the printed date and against the owner's tags "
-          f"({frac(o['tags']['tagging'].get('right', 0), o['tags']['tagging'].get('filled', 0))}), since it returns "
-          "the document's date. The local routes and the extractor ran on ABBYY text, which the app will not use "
-          "(owner, 2026-10-30), so their rows are a record rather than a candidate. Reaching the floor needs more owner-checked values, drawn at random "
-          "from the image prompt's filled fields so they measure its precision directly: W47.item-fields-more-checks.",
-          "",
+    ud = o["unasked_disputes"]
+    udn, udb = sum(v[0] for v in ud.values()), sum(v[1] for v in ud.values())
+    gem = [f for f in FIELDS if o["verdicts"][f"draft-gemini|{f}"] == "fill"]
+    close = [(f, draws_to_fill(o["stratified"][f"draft-gemini|{f}"])) for f in FIELDS if f != "kind"
+             and o["verdicts"][f"draft-gemini|{f}"] in ("too close", "waits on the third sheet")]
+    L += ["", (("Fields the image prompt fills by the rule: " + ", ".join(gem) + ".") if gem else
+               "The image prompt clears the rule on no field.")
+          + ("".join(f" On {f} its point is {f2(o['stratified'][f'draft-gemini|{f}']['precision'])} and the lower "
+                     f"bound {f2(o['stratified'][f'draft-gemini|{f}']['lo'])}: "
+                     + (f"about {x} more drawn pairs, every one right, would let it fill." if x is not None else
+                        "no further draw of right readings would let it fill.") for f, x in close)), "",
+          "The verdicts rest on the stratified precision: the first sheet's pairs, which lean to the hard cases, at "
+          "their own share, and the pool the second sheet drew from at its share. "
+          + ("Kind, title and publication wait on the third sheet (W47.item-fields-third-score), which continues "
+             "the same seeded draw: the second sheet drew 3 of kind's 254 unsettled pairs, too few to carry the "
+             "pool (P11-2), and title's and publication's lower bounds fall short as above, so it draws 35 kind, 31 "
+             "title and 22 publication pairs more, each the fewest with which one wrong new reading still lets the "
+             "image prompt fill. " if o["third_sheet_open"] else "") +
+          "The app's call on Vision text gives no title and returns the document's date rather than the printed "
+          "issue date, so the image prompt is the route for the item fields. The local routes and the extractor "
+          "ran on ABBYY text, which the app will not use (owner, 2026-10-30): their rows are a record rather than a "
+          "candidate.", "",
           "## Measurement card", "",
           "- **Truth:** W47.item-fields-retruth's (Gemini 3.7 and GPT 5.6 Luna drafting, Gemini 3.7 ruling) with "
-          "the owner's sheet answers and notes folded in. The random controls' error above covers the agreed cells "
-          "only; the disputed fields are owner-checked on a seeded sample. The disputes nobody asked keep the "
-          "judge's ruling: in scope, sideways documents out, 72 pairs (kind 24, title 25, byline 9, publication 4, "
-          "publication date 4, recipient place 6), 46 of them in base, where the non-drafter routes score. The "
-          "owner upheld the judge on 43 of the 74 disputes he answered, so about 19 of those 46 are likely wrong: "
-          "1-4 points of truth error per field beyond the controls' (measurement review pass 11, P11-6). The "
-          "non-drafter rows are ABBYY records rather than candidates, and no verdict moves. Gemini 3.7 drafted and "
-          "ruled, and 3.8 is its relative, so their rows are judged on owner-checked pairs only.",
+          "both owner sheets' answers and notes folded in. The random controls' error above covers the agreed cells "
+          f"only. The disputes no sheet asked keep the judge's ruling: in scope, sideways documents out, {udn} pairs "
+          "(" + ", ".join(f"{f} {v[0]}" for f, v in ud.items() if v[0]) + f"), {udb} of them in base, where the "
+          f"non-drafter routes score. The owner upheld the judge on {tot['judge right']} of the {tot['answered']} "
+          f"disputes he answered, an error of {frac(tot['answered'] - tot['judge right'], tot['answered'])} on that "
+          "stratum beside the controls', so a few points of truth error per field beyond the controls' on the "
+          "drafted truth (P11-6); it moves no verdict, since the rows judged on the drafted truth are ABBYY "
+          "records. The drafter-family rows are judged on the owner's values only.",
           "- **Selection:** base by Gemini 3.8's format and ABBYY cues (inherited, FLD-3); clippings and handwritten "
-          "by the owner's tags. The owner-checked pairs are the sheet's: kind crossings, a seeded sample of "
-          "disputes per field, the 3.8-agreeing controls (left out of 3.8's own row) and the random controls, so "
-          "they lean toward the hard cases.",
+          "by the owner's tags. The first sheet's owner-checked pairs are kind crossings, a seeded sample of "
+          "disputes per field, the 3.8-agreeing controls (left out of 3.8's pooled row) and the random controls, so "
+          "they lean toward the hard cases; the second sheet's are a seeded uniform draw (W47.item-fields-more-checks, "
+          "seed 4750) from the rest, split by the image prompt's filling, chosen by no other route and no ABBYY "
+          "text. The stratified figure counts each part at its own size.",
           "- **Comparison:** the image prompt and the app's call on Vision text ran on the same pages; the cached "
           "app replies and the extractor ran on ABBYY text (FLD-4), base only.",
-          "- **Noise:** Wilson intervals throughout; no rerun of any route here.",
+          "- **Noise:** Wilson intervals; the stratified interval sets each drawn part at its Wilson bounds, exact "
+          "for the image prompt (one part) and conservative for the other routes; no rerun of any route here, so a "
+          "route's run-to-run spread is not in the intervals.",
           "- **Scope:** these 299 documents and six fields; it does not settle sender, recipient or the document "
-          "date (W46), nor kinds and fields outside the list.", ""]
+          "date (W46), nor kinds and fields outside the list, nor (until the third sheet is folded) kind, title and publication. Inference "
+          "(a place from an address, a name from initials) is left out, not scored either way.", ""]
     return "\n".join(L)
 
 

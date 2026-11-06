@@ -3,6 +3,7 @@
 owner-checked n reaches the fill rule's floor (filed by W47.item-fields-retruth-score, 2026-11-05).
 
     python3 item_fields_more.py sheet     # CACHE/sheet2: index.html and key.json (private); the draw summary
+    python3 item_fields_more.py third     # CACHE/sheet3: the draw that continues it (W47.item-fields-more-score)
 
 Offline and $0: every reading is already in the bench cache. It reads the corpus's Finder tags with getxattr(2)
 (corpus_survey.read_tags), nothing else there, and writes nothing in it.
@@ -21,6 +22,14 @@ pages to look over down. Each field takes ceil(need / FILL_SHARE) of its pairs w
 (need = FLOOR less the owner-checked n with a true value), so that with some readings wrong and some answers "can't
 tell" the floor is still reached, and EMPTY_PER_FIELD where it gave none, for recall. Kind is always given, so it has
 no empty draw. The filled draw measures the image prompt's precision directly; the empty draw, how often it misses.
+
+The third sheet (W47.item-fields-more-score). Kind's pool of unsettled pairs is 254 and the second sheet drew 3 of
+them, so kind's stratified interval could not reach the fill rule (measurement review pass 11, P11-2, asked for about
+35 more). On the folded second sheet, title's and publication's points cleared 0.90 with lower bounds under 0.85.
+The third sheet takes the next THIRD[field] filled pairs of each in the same seeded order, so the second sheet's and
+these together are the first of one uniform draw; each number is the fewest with which the image prompt's stratified
+figure still fills with one of the new readings wrong (item_fields_score.draws_to_fill counts the all-right case).
+Ids are "<doc>:third-<field>".
 
 The sheet. One reading per question (the image prompt's value, or "(empty)"), confirmed or corrected, in
 item_fields_retruth's sheet with its notes box per document, the fields it does not ask, and pages upright (root
@@ -53,6 +62,9 @@ FILL_SHARE = 0.8        # the share of a filled draw expected to end with a true
 EMPTY_PER_FIELD = 10
 ROUTE = "draft-gemini"
 PART = "draw"
+OUT_THIRD = os.path.join(IR.CACHE, "sheet3")
+THIRD = {"kind": 35, "title": 31, "publication": 22}
+STORE_THIRD = "w47-item-fields-third"
 STORE = "w47-item-fields-more"
 DATE_NAME = "date (your Finder tags on the first page)"
 
@@ -91,14 +103,15 @@ def eligible(frows, pred, skip):
     return out
 
 
-def draw(pools, have, rng, floor=IS.FLOOR, share=FILL_SHARE, empty=EMPTY_PER_FIELD):
+def draw(pools, have, rng, floor=IS.FLOOR, share=FILL_SHARE, empty=EMPTY_PER_FIELD, fields=None, order_from=None):
     """[(doc, field, "filled"|"empty")]: one seeded shuffle of the documents; each field takes the first of its
-    eligible documents in that order, ceil(need / share) filled and `empty` empty (none for kind)."""
-    order = sorted({d for v in pools.values() for ds in v.values() for d in ds})
+    eligible documents in that order, ceil(need / share) filled and `empty` empty (none for kind). order_from: the
+    pools the shuffle is taken over (all fields'), so a draw for some fields keeps the order the full draw had."""
+    order = sorted({d for v in (order_from or pools).values() for ds in v.values() for d in ds})
     rng.shuffle(order)
     rank = {d: i for i, d in enumerate(order)}
     picks = []
-    for f in IS.FIELDS:
+    for f in fields or IS.FIELDS:
         need = max(0, floor - have.get(f, 0))
         want = {"filled": math.ceil(need / share) if need else 0, "empty": 0 if f == "kind" else empty}
         for which, k in want.items():
@@ -137,7 +150,7 @@ def not_asked(t, asked, ent, tag):
     return out
 
 
-def questions(picks, rows, frows, docs):
+def questions(picks, rows, frows, docs, tag="more"):
     """(items, keyed) in item_fields_retruth.write_sheet's shape, one question per pick."""
     by_doc = {d["id"]: d for d in docs}
     rd = {r["id"]: r for r in rows}
@@ -149,7 +162,7 @@ def questions(picks, rows, frows, docs):
         text = IR.shown(f, g.get(f))
         quote = (r.get("reader_quotes") or {}).get("gemini", {}).get(f)
         boxes = IR.locate(by_doc[doc], text, quote) if f != "kind" and text else []
-        n = f"{doc}:more-{f}"
+        n = f"{doc}:{tag}-{f}"
         items[doc].append({"id": n, "part": PART, "field": f, "options": [{"text": text, "boxes": boxes}]})
         keyed[n] = {"doc": doc, "part": PART, "field": f, "options": ["gemini"], "draw": which, "gemini": text,
                     "truth": IR.shown(f, fr[doc]["label"].get(f))}
@@ -185,7 +198,7 @@ def close_calls(items, docs, turns):
 
 
 def cmd_sheet(_a):
-    rows, docs, key, answers, fixes = IS.load()
+    rows, docs, key, answers, fixes = IS.load(more=False)   # the state the draw was taken against
     frows, _chk = IS.fold(rows, key, answers, fixes)
     skip = {x["doc"] for x in json.load(open(IS.RETRUTH_JSON, encoding="utf-8"))["counts"]["sideways"]}
     pred = IS.predictions(rows, docs)[ROUTE]
@@ -211,6 +224,55 @@ def cmd_sheet(_a):
     open(RESULTS, "w").write(report(o))
     print(report(o))
     print(os.path.join(OUT, "index.html"), "written" if ok else "left as it was (answered)")
+
+
+def third_picks(frows, pred, skip):
+    """{field: (the second sheet's filled picks, the next THIRD[field] in the same seeded order)}."""
+    pools = eligible(frows, pred, skip)
+    have = owner_n(frows, skip)
+    first = draw(pools, have, random.Random(SEED))
+    out = {}
+    for f, extra in THIRD.items():
+        got = [d for d, g, w in first if g == f and w == "filled"]
+        need = math.ceil(max(0, IS.FLOOR - have[f]) / FILL_SHARE)
+        assert len(got) == need, (f, len(got), need)
+        longer = draw({f: pools[f]}, {}, random.Random(SEED), floor=len(got) + extra, share=1, empty=0, fields=[f],
+                      order_from=pools)
+        ext = [d for d, g, w in longer if w == "filled"]
+        assert ext[:len(got)] == got, f"the {f} draw does not continue the second sheet's"
+        out[f] = (got, ext[len(got):])
+    return out
+
+
+def cmd_third(_a):
+    rows, docs, key, answers, fixes = IS.load(more=False)   # the state the second sheet was drawn against
+    frows, _chk = IS.fold(rows, key, answers, fixes)
+    skip = {x["doc"] for x in json.load(open(IS.RETRUTH_JSON, encoding="utf-8"))["counts"]["sideways"]}
+    pred = IS.predictions(rows, docs)[ROUTE]
+    picks = third_picks(frows, pred, skip)
+    rows2, _d, key2, answers2, fixes2 = IS.load()          # the truth as it now stands, for the not-asked line
+    frows2, _c = IS.fold(rows2, key2, answers2, fixes2)
+    fr = {t["id"]: t for t in frows2}
+    new = [(d, f, "filled") for f, (_got, ext) in picks.items() for d in ext]
+    settled = [f"{d} {f}" for d, f, _w in new if fr[d]["owner"].get(f) or f in fr[d]["unknown"]]
+    if settled:
+        sys.exit(f"settled since the second sheet was drawn: {', '.join(settled)}")
+    items, keyed = questions(new, rows, frows2, docs, tag="third")
+    ent, tags = entity_truth(), IS.owner_tags(docs)
+    turns = IR.display_turns()
+    intro = INTRO.replace("A second check", "A third, shorter check of three fields (kind, title, publication)")
+    ok = IR.write_sheet(items, keyed, docs, rows, turns=turns, out=OUT_THIRD, intro=intro, store=STORE_THIRD,
+                        appendable=(), seed=SEED, agreed=lambda d, asked: not_asked(fr[d], asked, ent.get(d),
+                                                                                    tags.get(d)))
+    o = {"questions": len(keyed), "documents": len(items),
+         "drawn": {f: {"second sheet": len(g), "third sheet": len(e)} for f, (g, e) in picks.items()},
+         "by_part": dict(collections.Counter(fr[d]["part"] for d in items)), "minutes": round(IR.minutes(items)),
+         "turned_pages": sum(1 for d in items for p in IR.capped({x["id"]: x for x in docs}[d]["pages"])
+                             if turns.get(IR.key(p))),
+         "close_calls": close_calls(items, docs, turns), "written": ok}
+    json.dump(o, open(os.path.join(OUT_THIRD, "draw.json"), "w"), indent=1, sort_keys=True)
+    print(json.dumps(o, indent=1))
+    print(os.path.join(OUT_THIRD, "index.html"), "written" if ok else "left as it was (answered)")
 
 
 def report(o):
@@ -244,7 +306,10 @@ def report(o):
           "other route and no ABBYY text chose them. Documents with a page read sideways are out, as in the score.",
           "- **Comparison**: none yet; the score item folds both sheets and scores every route on the same pairs.",
           "- **Noise**: the filled draw alone is about 25-32 a field, so its precision is reported with its Wilson "
-          "interval; the floor of 40 is met with the first sheet's checked pairs.",
+          "interval. The floor of 40 counts the first sheet's checked pairs too, but those lean to the hard cases, "
+          "so the fill verdict weighs each part at its share (a stratified precision, measurement review pass 11, "
+          "P11-2; W47.item-fields-more-score), not the pooled count; kind's 3 drawn pairs cannot carry its pool, "
+          "so a third sheet continues the draw.",
           "- **Scope**: the draw is over the image prompt's readings, so it measures that route's precision "
           "directly; the other routes gain owner-checked pairs but not a draw over their own values. The first "
           "sheet's pairs lean to the hard cases; the score item should report the random draw apart as well."]
@@ -256,6 +321,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
     sub.add_parser("sheet").set_defaults(fn=cmd_sheet)
+    sub.add_parser("third").set_defaults(fn=cmd_third)
     a = ap.parse_args()
     a.fn(a)
 

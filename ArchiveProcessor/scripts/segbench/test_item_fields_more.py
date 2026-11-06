@@ -83,6 +83,18 @@ class Draw(unittest.TestCase):
         self.assertEqual([d for d, g, _ in picks if g == "byline"], [x for x in order if x in "cd"][:1])
 
 
+    def test_a_one_field_draw_continues_the_full_draw(self):
+        """The third sheet: a longer draw of one field, ordered over every field's pools, starts with the full
+        draw's picks for that field, so the two together are the first of one uniform draw."""
+        pools = self.pools()
+        have = {f: 30 for f in FIELDS}
+        full = [d for d, g, w in M.draw(pools, have, random.Random(5)) if g == "title" and w == "filled"]
+        longer = M.draw({"title": pools["title"]}, {}, random.Random(5), floor=len(full) + 4, share=1, empty=0,
+                        fields=["title"], order_from=pools)
+        ext = [d for d, _g, _w in longer]
+        self.assertEqual(ext[:len(full)], full)
+        self.assertEqual(len(ext), len(full) + 4)
+
 class NotAsked(unittest.TestCase):
     def test_every_truth_listed_and_checked_marked(self):
         t = frow("a", kind="letter", owner={"kind": "kind"}, recipient_place=["Paris"], byline=["out of scope for a letter"])
