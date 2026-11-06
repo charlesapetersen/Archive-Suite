@@ -522,6 +522,9 @@ struct RootMarker: Codable {          // .archive-suite-root.json (dropped at a 
 Field label is **`block`** (not `blockIndex`) everywhere; `RootMarker.guid` is **`UUID`** (not `String`).
 
 ### 16.3 Filtering / smart folders — ONE type
+> **Superseded (W40.notes-advanced-search, 2026-11-06):** a smart folder now stores Advanced Search rules
+> (`NotesAdvancedSearch`, `Models/NotesAdvancedSearch.swift`) in `folders.query_json`; `NotesFilter` is only the
+> filter bar's state. The block below is the original design.
 ```swift
 struct NotesFilter: Codable, Equatable {   // BOTH live filtering AND smart-folder persistence (folders.query_json)
   var searchText: String = ""

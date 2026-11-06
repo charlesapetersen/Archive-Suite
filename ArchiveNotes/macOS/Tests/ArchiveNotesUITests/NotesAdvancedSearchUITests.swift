@@ -1,6 +1,6 @@
 import XCTest
 
-/// W40.notes-advanced-search — the Advanced Search form in the running app (Tart VM): Advanced… opens it on the
+/// W40.notes-advanced-search — the Advanced Search form in the running app (Tart VM): the filter bar's Advanced Search button opens it on the
 /// starter rows, the field, operator and combine popups work, the live count follows the rules, Search makes them
 /// the list, Save as Smart Folder stores them, and Edit Smart Folder… reopens them filled in and saves in place.
 ///
@@ -61,6 +61,7 @@ final class NotesAdvancedSearchUITests: NotesFixtureUITestCase {
                           "Search should make the rules the list, saw \(visibleNotes())")
             XCTAssertTrue(mainWindow.descendants(matching: .any)["an.filter.advancedScope"].firstMatch.exists,
                           "the bar should say the list is an Advanced Search")
+            shot("w40-notes-advanced-scope")
 
             // Edit… reopens it filled in; save it as a smart folder.
             mainWindow.buttons["an.filter.advancedEdit"].click()

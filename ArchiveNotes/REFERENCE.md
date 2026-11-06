@@ -18,10 +18,15 @@ macOS/Sources/ArchiveNotes/
                                    Extract ⌘⌥E / Append to Extract…, W7-S2), LayoutCommands (View ▸
                                    Side by Side / List Above Note, W48), DebugBlockCommands
   Models/
-    NotesFilter.swift              Filter type (§16.3) + matches(_:folderItemIDs:) (kind/quality/
+    NotesFilter.swift              The filter bar's state + matches(_:folderItemIDs:) (kind/quality/
                                    date-range — own OR sent-with date, same value both bounds (W37) —
                                    /tags ALL|ANY/title-substring/graph folder-membership/round-up),
-                                   effective(base:user:) merge, tolerant init(from:) (W6-S4)
+                                   tolerant init(from:) (W6-S4). Smart folders store rules instead:
+    NotesAdvancedSearch.swift      Advanced Search rule tree (W40.notes-advanced-search): fields, rows,
+                                   groups, NotesRuleContext (FTS hits + folder subtrees), filter-bar →
+                                   rules (NotesAdvancedSearch(filter:keyword:)), narrowed(by:). What a
+                                   smart folder's queryJSON holds and what NotesModel.scope is. Shared
+                                   parts: ArchiveCore Search/AdvancedSearchRules.swift
   Store/
     Item.swift                     Item/ZoteroRef/UnknownKey domain models; normalizedDate is THE
                                    write-path date normalizer (decade floors; month/day downgrade to the
@@ -347,7 +352,11 @@ macOS/Sources/ArchiveNotes/
     NotesFilterBar.swift           Item-list filter bar: kind segmented control · keyword search (FTS,
                                    bm25 relevance as-you-type) · quality ★1–★3 toggles · tag chips
                                    (all must match; Any is Advanced Search's) · year date range + its own
-                                   clear · Save-as-Smart-Folder / Clear All (W6-S4, W40.fix-notes-filter-bar)
+                                   clear · Advanced Search button · Save-as-Smart-Folder / Clear All (W6-S4,
+                                   W40.fix-notes-filter-bar); an "Advanced Search" row while the list is
+                                   an unsaved one (Edit… / Show All Notes)
+    NotesAdvancedSearchSheet.swift The Advanced Search form: rule rows, live count, Search, Save as Smart
+                                   Folder…, Edit Smart Folder… in place (W40.notes-advanced-search)
     NameEntrySheet.swift           The one "give it a name" sheet (folders, templates, smart folders):
                                    focused field, Return/Escape, no blank names (W40.fix-notes-visual-polish)
     LocationsInspector.swift       Inspector "Locations" — every folder the selected item is in, each
@@ -459,7 +468,10 @@ macOS/Tests/ArchiveNotesTests/
   NotesAppSettingsTests.swift      20 tests: isolated-defaults layout persistence/clamping, including
                                    harness-close suppression + ordinary-close write-through (W21)
   NotesFilterTests.swift           NotesFilter defaults/isEmpty/Codable/Equatable + matches (all facets,
-                                   ALL/ANY, date range, membership), effective merge, tolerant decode (W6-S4)
+                                   ALL/ANY, date range, membership), tolerant decode (W6-S4)
+  NotesAdvancedSearchTests.swift   Every rule field/operator, groups, the filter-bar conversion against
+                                   NotesFilter.matches, text rules on a real FTS5 index, the model end to
+                                   end (unsaved scope, save, edit in place, counts) (W40.notes-advanced-search)
   NotesReplicationTests.swift      16 Tier-2 scratch-store tests: guard (replicant-quiet / last→pending
                                    no-mutate / confirm→Trash / cancel-noop / fresh re-check TOCTOU ×2 /
                                    captured-value confirm), move/replicate (incl. smart-folder refusal),

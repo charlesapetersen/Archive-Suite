@@ -322,7 +322,7 @@ struct NotesBrowserView: View {
     }
 
     /// The templates manager, with its New Template sheet open (W40.fix-notes-templates).
-    /// Edit ▸ Advanced Search… and the filter bar's Advanced… button (W40.notes-advanced-search).
+    /// Edit ▸ Advanced Search… and the filter bar's Advanced Search button (W40.notes-advanced-search).
     private func openAdvancedSearch() { nav.openAdvancedSearch() }
 
     private func showNewTemplate() {
