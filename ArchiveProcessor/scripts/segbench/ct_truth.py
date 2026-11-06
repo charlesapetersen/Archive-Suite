@@ -919,7 +919,11 @@ def write_sheet(rows):
 
 def cmd_sheet(a):
     """Rewrite the sheet from draft-truth.jsonl as it stands: no reader runs, and answers already saved in the
-    browser stay (same storage key)."""
+    browser stay (same storage key). With --rev, the second sheet from rev2/draft-truth.jsonl."""
+    if getattr(a, "rev", False):
+        write_sheet2([json.loads(l) for l in open(os.path.join(REV, "draft-truth.jsonl"), encoding="utf-8")])
+        print(os.path.join(SHEET, "index.html"))
+        return
     write_sheet([json.loads(l) for l in open(os.path.join(POOL, "draft-truth.jsonl"), encoding="utf-8")])
     print(os.path.join(SHEET, "index.html"))
 
@@ -1112,7 +1116,8 @@ took out are gone. The photos were turned upright again and three readers read t
 fields the readers do not all agree on, values you typed in a note that are worth checking letter by letter, and a
 few fields where they did agree, mixed in as a check. Where a photo asks which way up it is, the turning step and your
 notes disagreed. Each pink box is roughly where the field is written; it does not say which reading is right. The grey
-line lists what is already settled (your answers, your notes, or all three readers)."""
+line lists what is already settled (your answers, your notes, or all three readers). "Turn photo" turns a photo still
+shown the wrong way, with its boxes; say so in its notes too."""
 
 
 def cmd_revise(a):
@@ -1465,7 +1470,7 @@ def write_results(rows):
 SHEET_HTML = r"""<!doctype html><meta charset="utf-8"><title>W47 container labels: disagreements</title>
 <style>body{font:15px -apple-system,sans-serif;margin:0}header{position:sticky;top:0;background:#fff;padding:8px 16px;
 border-bottom:1px solid #ccc;z-index:9}.doc{border-bottom:2px solid #888;padding:12px 16px;display:flex;gap:18px}
-.frame{position:relative;display:inline-block;flex:none}.frame img{max-height:82vh;max-width:52vw;display:block}
+.turn{font-size:12px;margin:0 0 4px}.frame{position:relative;display:inline-block;flex:none}.frame img{max-height:82vh;max-width:52vw;display:block}
 .box{position:absolute;border:3px solid #f0a;border-radius:4px;pointer-events:none}
 .tag{position:absolute;background:#f0a;color:#fff;font:bold 12px sans-serif;padding:0 4px;transform:translateY(-100%)}
 .q{margin:8px 0 14px}.q label{display:block;margin-left:12px}.agreed{color:#555;font-size:13px}.nobox{color:#a05;font-size:13px}
@@ -1481,9 +1486,9 @@ const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&g
 const total=DATA.reduce((n,d)=>n+d.fields.length,0);
 function prog(){let n=0;for(const d of DATA)for(const f of d.fields)if(ans[d.id]?.[f.field]?.pick)n++;
  document.getElementById('prog').textContent=n+' of '+total+' fields answered'}
-let h='';DATA.forEach(d=>{h+=`<div class="doc"><div class="frame"><img src="${esc(d.img)}">`;
+let h='';DATA.forEach(d=>{h+=`<div class="doc"><div><button class="turn" data-t="${esc(d.id)}">turn photo ↻</button><br><div class="frame" data-f="${esc(d.id)}"><img src="${esc(d.img)}">`;
  d.fields.forEach((f,i)=>{if(f.box&&f.field!=='kind'&&!f.options)h+=`<div class="box" style="left:${100*f.box[0]}%;top:${100*f.box[1]}%;width:${100*f.box[2]}%;height:${100*f.box[3]}%"></div><div class="tag" style="left:${100*f.box[0]}%;top:${100*f.box[1]}%">${i+1}</div>`});
- h+=`</div><div><b>${d.n}. Photo ${d.id}</b>, tagged ${esc(d.colour)}`;
+ h+=`</div></div><div><b>${d.n}. Photo ${d.id}</b>, tagged ${esc(d.colour)}`;
  const ag=Object.entries(d.agreed);h+=`<div class="agreed">${esc(SETTLED)}: ${ag.length?ag.map(([k,v])=>esc(LABELS[k]||k)+' = '+esc(v)).join('; '):'nothing beyond the fields below'}</div>`;
  d.fields.forEach((f,i)=>{const nm=d.id+'/'+f.field;const cur=ans[d.id]?.[f.field]||{};
   h+=`<div class="q"><b>${i+1}. ${esc(f.label)}</b>`;
@@ -1494,6 +1499,9 @@ let h='';DATA.forEach(d=>{h+=`<div class="doc"><div class="frame"><img src="${es
   h+=`<div class="q notes"><b>Notes on this photo</b> (optional)<br><textarea data-n="${esc(d.id)}">${esc(ans[d.id]?.[NOTES]?.text)}</textarea></div>`;
   h+='</div></div>'});
 document.getElementById('root').innerHTML=h;
+document.querySelectorAll('button.turn').forEach(b=>b.onclick=()=>{const f=document.querySelector(`.frame[data-f="${b.dataset.t}"]`);
+ const d=((+f.dataset.deg||0)+90)%360;f.dataset.deg=d;f.style.transform=d?`rotate(${d}deg)`:'';
+ const side=d%180?(f.offsetWidth-f.offsetHeight)/2:0;f.style.margin=side?`${Math.max(side,0)}px ${Math.max(-side,0)}px`:'';});
 const set=(nm,k,v)=>{const [id,f]=nm.split('/');ans[id]=ans[id]||{};ans[id][f]={...(ans[id][f]||{}),[k]:v};localStorage.setItem(KEY,JSON.stringify(ans));prog()};
 document.querySelectorAll('input[type=radio]').forEach(e=>e.onchange=()=>set(e.name,'pick',e.value));
 document.querySelectorAll('[data-t]').forEach(e=>e.oninput=()=>set(e.dataset.t,'text',e.value));
