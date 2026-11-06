@@ -13,7 +13,7 @@ Format and statuses: [`README.md`](README.md). Written by `W40.b2`, 2026-10-12.
   `W23.m9`/`-fu3`, `W23.m14`/`-fu`, `W37.dual-date`, `W24.cal1`, `W24.cal1-toggle`, `W24.cal1-validator`,
   and the W0–W8 records under §*Archive Notes — NEW APP*.
 - **Sources and code read at:** `9e8959ef`.
-- **Count:** `unproven 36 · works 7 · broken 1 · unreachable 0 · fixed-pending-recheck 8` (works: N-14, N-34, N-41, N-45, N-49, N-51, N-52; broken: N-11; fixed-pending-recheck: N-07, N-12, N-16, N-22, N-26, N-35, N-44, N-50). Updated by owner session notes-1, 2026-11-05 (N-41 to `works`; N-11, N-12, N-26, N-44 to `broken`); N-16 to `fixed-pending-recheck` by W40.fix-notes-list-rename; N-26 by W40.fix-notes-folder-drag; N-44 by W40.fix-notes-zotero-fetch; N-07, N-22, N-35, N-50 by W40.fix-notes-small-fixes.
+- **Count:** `unproven 36 · works 7 · broken 0 · unreachable 0 · fixed-pending-recheck 9` (works: N-14, N-34, N-41, N-45, N-49, N-51, N-52; fixed-pending-recheck: N-07, N-11, N-12, N-16, N-22, N-26, N-35, N-44, N-50). Updated by owner session notes-1, 2026-11-05 (N-41 to `works`; N-11, N-12, N-26, N-44 to `broken`); N-16 to `fixed-pending-recheck` by W40.fix-notes-list-rename; N-26 by W40.fix-notes-folder-drag; N-44 by W40.fix-notes-zotero-fetch; N-07, N-22, N-35, N-50 by W40.fix-notes-small-fixes. N-11 by W40.g2-notes-2 (2026-11-06), after `W40.fix-notes-new-note` left it `broken`; N-44's status line also corrected to its history. The owner's recheck of all nine is [`sessions/notes-2.md`](sessions/notes-2.md).
 
 **Runtime evidence, for every row below: none yet.** The W40.a3 full VM suite
 ([`evidence/notes/W40.a3-full-ui.md`](evidence/notes/W40.a3-full-ui.md)) and the `W9.e2` runtime sweep passed
@@ -464,10 +464,11 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
 - **Real-path test:** `ArchiveNotesUITests/NotesGUITests.testTemplateNewFromTemplateCreatesNoteWithTemplateBody`
   (the toolbar menu, the file on disk and the row in the list); `ArchiveNotesUITests/NotesGUITests.testG1_CreateNoteWritesNewItemFile`.
 - **Runtime evidence:** none.
-- **Status:** `broken`
+- **Status:** `fixed-pending-recheck`
 - **History:**
   - 2026-10-12 W40.b2 — row written, `unproven`.
   - 2026-11-05 owner session notes-1 — `unproven` → `broken`: ⌘N is not in the menu bar and does nothing ([`sessions/notes-1-returned.md`](sessions/notes-1-returned.md) row 5; it is bound only inside the toolbar's New menu); the toolbar's New offered only New Extract in what the owner read as the Notes window (rows 38-39). Fix items `W40.fix-notes-new-note`.
+  - 2026-11-06 W40.g2-notes-2 — `broken` → `fixed-pending-recheck`: `W40.fix-notes-new-note` (2026-11-05) put File ▸ New Note (⌘N) and New Extract (⌥⌘N) in the menu bar, named each window's kind in its toolbar and made the toolbar's New offer both kinds, but left this row `broken`. The owner's recheck is [`sessions/notes-2.md`](sessions/notes-2.md) task 1.
 - **Notes:**
   - ⌘N is a `.keyboardShortcut` on a button inside the toolbar `Menu`. G1 presses ⌘N but falls back to clicking
     the menu if nothing appears, so a G1 pass does not show that ⌘N works.
@@ -1436,7 +1437,7 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
   `ArchiveNotesTests/ZoteroAutoFillTests.modelCancelWritesNothing`, `.planFillEmpty` and
   `.attachedReferenceResolverRejectsAmbiguousNote`.
 - **Runtime evidence:** [`evidence/notes/W40.d10-integrations.md`](evidence/notes/W40.d10-integrations.md): against the real Zotero, Note ▸ Auto-fill from Zotero… crashes Notes (SIGABRT in `ZoteroClient.fetchCSLviaLocalAPI`; Zotero returns `csljson` as a string holding an array). 2 of 2 VM runs, plus the crash report.
-- **Status:** `broken`
+- **Status:** `fixed-pending-recheck`
 - **History:**
   - 2026-10-12 W40.b2 — row written, `unproven`.
   - 2026-10-15 W40.d10 — reproduced against the real Zotero; `broken`, filed `W40.fix-notes-zotero-csljson-crash` (S2).

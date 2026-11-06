@@ -159,7 +159,8 @@ final class IntegrationJourneyUITests: NotesFixtureUITestCase {
             XCTAssertTrue(statusLabel(in: doc, containing: "page 2 of 3").waitForExistence(timeout: 8),
                           "Next should move to the second pair")
             NSPasteboard.general.clearContents()
-            reader.menuBars.menuBarItems["Document"].click()
+            // The page link is under Edit, beside Copy, since W40.fix-reader-edit-menu-copy (it was Document).
+            reader.menuBars.menuBarItems["Edit"].click()
             reader.menuItems["Copy Archive Link to This Page"].click()
             var copied = ""
             XCTAssertTrue(pollUntil(timeout: 10) {
