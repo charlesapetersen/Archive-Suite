@@ -78,6 +78,7 @@ LAYOUT_ORDER = RESULTS / "layout-order.json"  # W46.layout-order: layout_order.p
 LAYOUT_ORDER_MARKS = RESULTS / "layout-order-marks.json"  # W46.layout-order-marks: the 96 and the marks core
 MARKS_DETECT = RESULTS / "marks-detect.json"  # W46.marks-detect: marks_detect.py report, trained marks detectors
 MIXED_ROUTE = RESULTS / "mixed-route.json"    # W46.mixed-route: mixed_route.py report, marks read whole page or by box
+MIXED_BANDS = RESULTS / "mixed-route-bands.json"   # W46.mixed-route-bands: mixed_route_bands.py report
 LAYOUT_ORDER_PAID = RESULTS / "layout-order-paid.json"  # W46.layout-order-paid: Gemini 3.7 Flash's blocks in its order
 LAYOUT_PHOTO = RESULTS / "layout-photo.json"  # W46.layout-photo: layout_photo.py score, four detectors feeding GLM-OCR
 RERUN_NOISE = RESULTS / "ocr-rerun-noise.json"  # W46.ocr-rerun-noise: ocr_rerun_noise.py report, the 96 read three times
@@ -1009,7 +1010,24 @@ def mixed_route():
             row += (f' (not ranked: it pre-flagged the pages of {w["by_core"]["B-core"]["n"]} of them; on the other '
                     f'{wa["n"]}, {wa["read"]} and {ba["read"]}, too few to rank)')
         rows.append(row)
-    return {"mixed_read": "; ".join(rows)} if rows else {}
+    out = {"mixed_read": "; ".join(rows)} if rows else {}
+    if MIXED_BANDS.exists():
+        out.update(mixed_bands(json.loads(MIXED_BANDS.read_text())))
+    return out
+
+
+def mixed_bands(d):
+    """W46.mixed-route-bands: the mixed share by handwriting band, and what a handwriting reader does to typed text."""
+    share = lambda h: f'{100 * d["share"][h]["share"]:.0f}% ({100 * d["share"][h]["ci"][0]:.0f}-{100 * d["share"][h]["ci"][1]:.0f}%)'
+    body = d["body"]["routes"]
+    typed = lambda r: body[r]["typed"]
+    diff = lambda r: (f'{100 * typed(r)["minus_vision"]:+.1f} ({100 * typed(r)["minus_vision_ci"][0]:+.1f} to '
+                      f'{100 * typed(r)["minus_vision_ci"][1]:+.1f})')
+    return {"mixed_bands": (f'Mixed pages are an estimated {share("signature")} of the bulk-pilot draw, '
+                            f'{share("few")} with more than a signature, initials or a date; on the 96\'s '
+                            f'{typed("apple-vision")["pages"]} typed and printed pages, body NES against Apple Vision is '
+                            f'LightOnOCR-3 4B {diff("lightonocr-3-4b-mlx8")}, GLM-OCR {diff("glm-ocr")}, '
+                            f'Qwen3.6-27B {diff("qwen3.6-27b")} points')}
 
 
 LAYOUT_PHOTO_ARMS = {"yolo_appsort": "DocLayout-YOLO regions, the app's sort", "heron": "docling-layout-heron regions",

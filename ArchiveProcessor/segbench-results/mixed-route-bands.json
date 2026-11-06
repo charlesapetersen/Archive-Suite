@@ -1,0 +1,699 @@
+{
+ "pages": {
+  "none": 15,
+  "signature": 5,
+  "few": 4,
+  "passage": 4,
+  "long": 1,
+  "unread": 3
+ },
+ "pages_by_core": {
+  "none": {
+   "A-core": 11,
+   "B-core": 4
+  },
+  "signature": {
+   "A-core": 1,
+   "B-core": 4
+  },
+  "few": {
+   "A-core": 2,
+   "B-core": 2
+  },
+  "passage": {
+   "A-core": 0,
+   "B-core": 4
+  },
+  "long": {
+   "A-core": 0,
+   "B-core": 1
+  },
+  "unread": {
+   "A-core": 1,
+   "B-core": 2
+  }
+ },
+ "agreement": {
+  "signature": {
+   "signature": 4,
+   "few": 1,
+   "passage": 1
+  },
+  "passage": {
+   "passage": 1,
+   "few": 2,
+   "signature": 1
+  },
+  "few": {
+   "unread": 3,
+   "few": 1,
+   "passage": 2
+  },
+  "none": {
+   "none": 15
+  },
+  "long": {
+   "long": 1
+  }
+ },
+ "agree_n": 22,
+ "n_pages": 32,
+ "marks": {
+  "whole/vision": {
+   "none": {
+    "n": 4,
+    "read": 3,
+    "hand_n": 0,
+    "hand_read": 0,
+    "mean_nes": 0.801
+   },
+   "signature": {
+    "n": 6,
+    "read": 4,
+    "hand_n": 3,
+    "hand_read": 2,
+    "mean_nes": 0.838
+   },
+   "few": {
+    "n": 6,
+    "read": 2,
+    "hand_n": 5,
+    "hand_read": 1,
+    "mean_nes": 0.749
+   },
+   "passage": {
+    "n": 9,
+    "read": 1,
+    "hand_n": 8,
+    "hand_read": 1,
+    "mean_nes": 0.452
+   },
+   "long": {
+    "n": 9,
+    "read": 4,
+    "hand_n": 7,
+    "hand_read": 2,
+    "mean_nes": 0.641
+   },
+   "unread": {
+    "n": 1,
+    "read": 0,
+    "hand_n": 1,
+    "hand_read": 0,
+    "mean_nes": 0.446
+   }
+  },
+  "whole/lighton": {
+   "none": {
+    "n": 4,
+    "read": 2,
+    "hand_n": 0,
+    "hand_read": 0,
+    "mean_nes": 0.632
+   },
+   "signature": {
+    "n": 6,
+    "read": 4,
+    "hand_n": 3,
+    "hand_read": 2,
+    "mean_nes": 0.722
+   },
+   "few": {
+    "n": 6,
+    "read": 2,
+    "hand_n": 5,
+    "hand_read": 2,
+    "mean_nes": 0.402
+   },
+   "passage": {
+    "n": 9,
+    "read": 2,
+    "hand_n": 8,
+    "hand_read": 1,
+    "mean_nes": 0.374
+   },
+   "long": {
+    "n": 9,
+    "read": 6,
+    "hand_n": 7,
+    "hand_read": 4,
+    "mean_nes": 0.82
+   },
+   "unread": {
+    "n": 1,
+    "read": 0,
+    "hand_n": 1,
+    "hand_read": 0,
+    "mean_nes": 0.262
+   }
+  },
+  "whole/glm": {
+   "none": {
+    "n": 4,
+    "read": 0,
+    "hand_n": 0,
+    "hand_read": 0,
+    "mean_nes": 0.207
+   },
+   "signature": {
+    "n": 6,
+    "read": 3,
+    "hand_n": 3,
+    "hand_read": 1,
+    "mean_nes": 0.635
+   },
+   "few": {
+    "n": 6,
+    "read": 3,
+    "hand_n": 5,
+    "hand_read": 2,
+    "mean_nes": 0.635
+   },
+   "passage": {
+    "n": 9,
+    "read": 2,
+    "hand_n": 8,
+    "hand_read": 2,
+    "mean_nes": 0.609
+   },
+   "long": {
+    "n": 9,
+    "read": 5,
+    "hand_n": 7,
+    "hand_read": 4,
+    "mean_nes": 0.698
+   },
+   "unread": {
+    "n": 1,
+    "read": 0,
+    "hand_n": 1,
+    "hand_read": 0,
+    "mean_nes": 0.262
+   }
+  },
+  "whole/qwen27": {
+   "none": {
+    "n": 4,
+    "read": 3,
+    "hand_n": 0,
+    "hand_read": 0,
+    "mean_nes": 0.812
+   },
+   "signature": {
+    "n": 6,
+    "read": 5,
+    "hand_n": 3,
+    "hand_read": 2,
+    "mean_nes": 0.958
+   },
+   "few": {
+    "n": 6,
+    "read": 4,
+    "hand_n": 5,
+    "hand_read": 3,
+    "mean_nes": 0.856
+   },
+   "passage": {
+    "n": 9,
+    "read": 7,
+    "hand_n": 8,
+    "hand_read": 6,
+    "mean_nes": 0.861
+   },
+   "long": {
+    "n": 9,
+    "read": 6,
+    "hand_n": 7,
+    "hand_read": 4,
+    "mean_nes": 0.793
+   },
+   "unread": {
+    "n": 1,
+    "read": 1,
+    "hand_n": 1,
+    "hand_read": 1,
+    "mean_nes": 0.969
+   }
+  },
+  "box/vision": {
+   "none": {
+    "n": 4,
+    "read": 3,
+    "hand_n": 0,
+    "hand_read": 0,
+    "mean_nes": 0.812
+   },
+   "signature": {
+    "n": 6,
+    "read": 4,
+    "hand_n": 3,
+    "hand_read": 2,
+    "mean_nes": 0.86
+   },
+   "few": {
+    "n": 6,
+    "read": 2,
+    "hand_n": 5,
+    "hand_read": 1,
+    "mean_nes": 0.649
+   },
+   "passage": {
+    "n": 9,
+    "read": 2,
+    "hand_n": 8,
+    "hand_read": 1,
+    "mean_nes": 0.471
+   },
+   "long": {
+    "n": 9,
+    "read": 2,
+    "hand_n": 7,
+    "hand_read": 1,
+    "mean_nes": 0.413
+   },
+   "unread": {
+    "n": 1,
+    "read": 0,
+    "hand_n": 1,
+    "hand_read": 0,
+    "mean_nes": 0.492
+   }
+  },
+  "box/lighton": {
+   "none": {
+    "n": 4,
+    "read": 3,
+    "hand_n": 0,
+    "hand_read": 0,
+    "mean_nes": 0.75
+   },
+   "signature": {
+    "n": 6,
+    "read": 5,
+    "hand_n": 3,
+    "hand_read": 2,
+    "mean_nes": 0.833
+   },
+   "few": {
+    "n": 6,
+    "read": 4,
+    "hand_n": 5,
+    "hand_read": 3,
+    "mean_nes": 0.749
+   },
+   "passage": {
+    "n": 9,
+    "read": 3,
+    "hand_n": 8,
+    "hand_read": 3,
+    "mean_nes": 0.607
+   },
+   "long": {
+    "n": 9,
+    "read": 1,
+    "hand_n": 7,
+    "hand_read": 0,
+    "mean_nes": 0.305
+   },
+   "unread": {
+    "n": 1,
+    "read": 1,
+    "hand_n": 1,
+    "hand_read": 1,
+    "mean_nes": 0.954
+   }
+  },
+  "box/glm": {
+   "none": {
+    "n": 4,
+    "read": 2,
+    "hand_n": 0,
+    "hand_read": 0,
+    "mean_nes": 0.589
+   },
+   "signature": {
+    "n": 6,
+    "read": 5,
+    "hand_n": 3,
+    "hand_read": 2,
+    "mean_nes": 0.938
+   },
+   "few": {
+    "n": 6,
+    "read": 3,
+    "hand_n": 5,
+    "hand_read": 2,
+    "mean_nes": 0.705
+   },
+   "passage": {
+    "n": 9,
+    "read": 5,
+    "hand_n": 8,
+    "hand_read": 4,
+    "mean_nes": 0.635
+   },
+   "long": {
+    "n": 9,
+    "read": 3,
+    "hand_n": 7,
+    "hand_read": 1,
+    "mean_nes": 0.57
+   },
+   "unread": {
+    "n": 1,
+    "read": 0,
+    "hand_n": 1,
+    "hand_read": 0,
+    "mean_nes": 0.538
+   }
+  },
+  "box/qwen27": {
+   "none": {
+    "n": 4,
+    "read": 3,
+    "hand_n": 0,
+    "hand_read": 0,
+    "mean_nes": 0.833
+   },
+   "signature": {
+    "n": 6,
+    "read": 5,
+    "hand_n": 3,
+    "hand_read": 2,
+    "mean_nes": 0.958
+   },
+   "few": {
+    "n": 6,
+    "read": 5,
+    "hand_n": 5,
+    "hand_read": 4,
+    "mean_nes": 0.883
+   },
+   "passage": {
+    "n": 9,
+    "read": 3,
+    "hand_n": 8,
+    "hand_read": 2,
+    "mean_nes": 0.718
+   },
+   "long": {
+    "n": 9,
+    "read": 2,
+    "hand_n": 7,
+    "hand_read": 1,
+    "mean_nes": 0.544
+   },
+   "unread": {
+    "n": 1,
+    "read": 1,
+    "hand_n": 1,
+    "hand_read": 1,
+    "mean_nes": 0.955
+   }
+  }
+ },
+ "time": {
+  "vision": {
+   "batch_s_per_page": 1.31
+  },
+  "lighton": {
+   "none": {
+    "pages": 15,
+    "median_s": 31.34,
+    "median_tokens": null
+   },
+   "signature": {
+    "pages": 5,
+    "median_s": 26.68,
+    "median_tokens": null
+   },
+   "few": {
+    "pages": 4,
+    "median_s": 21.47,
+    "median_tokens": null
+   },
+   "passage": {
+    "pages": 4,
+    "median_s": 23.44,
+    "median_tokens": null
+   },
+   "long": {
+    "pages": 1,
+    "median_s": 17.35,
+    "median_tokens": null
+   },
+   "unread": {
+    "pages": 3,
+    "median_s": 27.23,
+    "median_tokens": null
+   }
+  },
+  "glm": {
+   "none": {
+    "pages": 15,
+    "median_s": 4.191,
+    "median_tokens": 534
+   },
+   "signature": {
+    "pages": 5,
+    "median_s": 3.068,
+    "median_tokens": 438
+   },
+   "few": {
+    "pages": 4,
+    "median_s": 4.736,
+    "median_tokens": 313
+   },
+   "passage": {
+    "pages": 4,
+    "median_s": 3.999,
+    "median_tokens": 304
+   },
+   "long": {
+    "pages": 1,
+    "median_s": 2.004,
+    "median_tokens": 192
+   },
+   "unread": {
+    "pages": 3,
+    "median_s": 5.941,
+    "median_tokens": 415
+   }
+  },
+  "qwen27": {
+   "none": {
+    "pages": 15,
+    "median_s": 15.147,
+    "median_tokens": 572
+   },
+   "signature": {
+    "pages": 5,
+    "median_s": 8.276,
+    "median_tokens": 476
+   },
+   "few": {
+    "pages": 4,
+    "median_s": 10.535,
+    "median_tokens": 321
+   },
+   "passage": {
+    "pages": 4,
+    "median_s": 11.414,
+    "median_tokens": 346
+   },
+   "long": {
+    "pages": 1,
+    "median_s": 5.436,
+    "median_tokens": 203
+   },
+   "unread": {
+    "pages": 3,
+    "median_s": 15.113,
+    "median_tokens": 465
+   }
+  }
+ },
+ "share": {
+  "signature": {
+   "share": 0.3302,
+   "ci": [
+    0.2424,
+    0.4422
+   ],
+   "band_share": 0.0866,
+   "band_ci": [
+    0.04,
+    0.1669
+   ]
+  },
+  "few": {
+   "share": 0.2436,
+   "ci": [
+    0.1707,
+    0.3353
+   ],
+   "band_share": 0.2095,
+   "band_ci": [
+    0.1375,
+    0.3076
+   ]
+  },
+  "passage": {
+   "share": 0.0341,
+   "ci": [
+    0.0163,
+    0.0454
+   ],
+   "band_share": 0.0219,
+   "band_ci": [
+    0.0078,
+    0.0349
+   ]
+  },
+  "long": {
+   "share": 0.0122,
+   "ci": [
+    0.0035,
+    0.0148
+   ],
+   "band_share": 0.0122,
+   "band_ci": [
+    0.0035,
+    0.0148
+   ]
+  }
+ },
+ "body": {
+  "kinds": {
+   "handwritten": 16,
+   "mixed": 2,
+   "printed": 28,
+   "typewritten": 50
+  },
+  "routes": {
+   "apple-vision": {
+    "typed": {
+     "pages": 78,
+     "nes": 0.88,
+     "minus_vision": 0.0,
+     "minus_vision_ci": [
+      0.0,
+      0.0
+     ],
+     "worse_pages": 0
+    },
+    "cost_per_page": 0.0,
+    "median_tokens": null,
+    "mixed": {
+     "pages": 2,
+     "nes": 0.7084,
+     "minus_vision": 0.0,
+     "minus_vision_ci": [
+      0.0,
+      0.0
+     ],
+     "worse_pages": 0
+    }
+   },
+   "lightonocr-3-4b-mlx8": {
+    "typed": {
+     "pages": 78,
+     "nes": 0.898,
+     "minus_vision": 0.018,
+     "minus_vision_ci": [
+      -0.0224,
+      0.0589
+     ],
+     "worse_pages": 14
+    },
+    "cost_per_page": 0.0,
+    "median_tokens": 391,
+    "mixed": {
+     "pages": 2,
+     "nes": 0.5872,
+     "minus_vision": -0.1213,
+     "minus_vision_ci": [
+      -0.2066,
+      -0.0359
+     ],
+     "worse_pages": 2
+    }
+   },
+   "glm-ocr": {
+    "typed": {
+     "pages": 78,
+     "nes": 0.9233,
+     "minus_vision": 0.0433,
+     "minus_vision_ci": [
+      0.0036,
+      0.0881
+     ],
+     "worse_pages": 20
+    },
+    "mixed": {
+     "pages": 2,
+     "nes": 0.7781,
+     "minus_vision": 0.0697,
+     "minus_vision_ci": [
+      0.0484,
+      0.0909
+     ],
+     "worse_pages": 0
+    }
+   },
+   "qwen3.6-27b": {
+    "typed": {
+     "pages": 78,
+     "nes": 0.9528,
+     "minus_vision": 0.0728,
+     "minus_vision_ci": [
+      0.0259,
+      0.1233
+     ],
+     "worse_pages": 6
+    },
+    "cost_per_page": 0.00194,
+    "median_tokens": 416,
+    "mixed": {
+     "pages": 2,
+     "nes": 0.72,
+     "minus_vision": 0.0116,
+     "minus_vision_ci": [
+      -0.1088,
+      0.132
+     ],
+     "worse_pages": 1
+    }
+   },
+   "gemini3.7-flash-gw": {
+    "typed": {
+     "pages": 78,
+     "nes": 0.974,
+     "minus_vision": 0.094,
+     "minus_vision_ci": [
+      0.0577,
+      0.1359
+     ],
+     "worse_pages": 0
+    },
+    "cost_per_page": 0.00389,
+    "median_tokens": 659,
+    "mixed": {
+     "pages": 2,
+     "nes": 0.8384,
+     "minus_vision": 0.13,
+     "minus_vision_ci": [
+      0.1131,
+      0.1469
+     ],
+     "worse_pages": 0
+    }
+   }
+  }
+ },
+ "unread_known_words": [
+  0,
+  0,
+  12
+ ]
+}
